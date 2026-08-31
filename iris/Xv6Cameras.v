@@ -256,6 +256,9 @@ Class diskGhostG (Σ : gFunctors) := DiskGhostG {
   (* a receipt records the slot AND the pin map deposited at publish *)
   disk_slot_inG :: ghost_mapG Σ nat (vslot * gmap Arch.pa (bv 8));
   disk_np_inG   :: ghost_varG Σ nat;
+  (* A6.126 §6: the completions' log positions, persistent fragments
+     ([VirtioProto.disk_done_pos]) *)
+  disk_pos_inG  :: ghost_mapG Σ nat nat;
   (* the publisher's private claim map: dom = the positions whose state is
      still live in disk_res (in flight or parked); the fragment is how a
      sleeping rw re-finds its own request (DiskInv.v).  See [dclaim]. *)
@@ -273,7 +276,7 @@ Class diskGhostG (Σ : gFunctors) := DiskGhostG {
 
 Definition diskGhostΣ : gFunctors :=
   #[ghost_mapΣ nat (vslot * gmap Arch.pa (bv 8));
-    mono_natΣ; ghost_varΣ nat; ghost_mapΣ nat dclaim;
+    mono_natΣ; ghost_varΣ nat; ghost_mapΣ nat dclaim; ghost_mapΣ nat nat;
     GFunctor (dfrac_agreeR (leibnizO virtio_cfg));
     permΣ].
 

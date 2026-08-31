@@ -1,0 +1,23 @@
+DIGEST f06eed12d032cfd420036ef98f7633da
+Fxv6iris.LinkNamexTr
+R523:532 xv6iris.LinkMyproc <> <> lib
+R534:541 xv6iris.LinkIdup <> <> lib
+R543:550 xv6iris.LinkIget <> <> lib
+R552:562 xv6iris.LinkMemmove <> <> lib
+R580:588 xv6iris.LinkIlock <> <> lib
+R590:600 xv6iris.LinkIunlock <> <> lib
+R602:615 xv6iris.LinkIunlockput <> <> lib
+R617:629 xv6iris.LinkDirlookup <> <> lib
+R631:638 xv6iris.LinkIput <> <> lib
+R656:667 xv6iris.ProofNamexTr <> <> lib
+R689:700 xv6iris.ProofNamexTr NamexTrProof <> modtype
+R702:707 xv6iris.LinkMyproc Myproc <> modtype
+R709:712 xv6iris.LinkIdup Idup <> modtype
+R714:717 xv6iris.LinkIget Iget <> modtype
+R719:725 xv6iris.LinkMemmove Memmove <> modtype
+R758:762 xv6iris.LinkIlock Ilock <> modtype
+R764:770 xv6iris.LinkIunlock Iunlock <> modtype
+R772:781 xv6iris.LinkIunlockput Iunlockput <> modtype
+R783:791 xv6iris.LinkDirlookup Dirlookup <> modtype
+R793:796 xv6iris.LinkIput Iput <> modtype
+mod 678:684 <> NamexTr

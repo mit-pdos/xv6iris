@@ -60,6 +60,7 @@ Require Import RiscvExtras.
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import WpLock.     (* [lk_floor] (A6.126 §6.6) *)
 (* M1 stage 2 landed: [↦₄]/[↦₂] ARE the context-indexed towers here, so the
    zeroed-window words rebuild with [ctx_word4_pointsto_intro] /
    [ctx_word2_pointsto_intro] directly.  The old route (drop to the raw
@@ -330,7 +331,8 @@ Section DiskBoot.
   (* §5  THE COMPOSITION.                                                  *)
   (* ==================================================================== *)
 
-  Lemma disk_res_boot (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) :
+  Lemma disk_res_boot (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
+      (t0 t1 : nat) :
     virtio_pages_aligned (virtio_init_cfg pd pav pu) ->
     (* --- what [SpecVirtioDiskInit.vdi_post] hands its caller --- *)
     disk_pub γ 0%nat -∗
@@ -345,10 +347,14 @@ Section DiskBoot.
     ghost_map_auth (dn_claim γ) 1 (∅ : gmap nat dclaim) -∗
     (* A6.124: the payload's half of the avail-index word, out of the init *)
     avail_half pav 0%nat -∗
+    (* A6.126 §6: the reader's floors, from virtio_disk_init's carve-out of
+       the used index word (DiskAvail.used_split_init) and the intro *)
+    disk_fl γ t0 t1 -∗ disk_nr γ 0%nat -∗ disk_flr γ 0%nat -∗
+    lk_floor cur_ctx t0 -∗ lk_floor cur_ctx t1 -∗
     disk_res γ pd pav pu.
   Proof.
     intro Hal. destruct (init_cfg_pages_aligned pd pav pu Hal) as [Hpd Hpav].
-    iIntros "Hpub Hdesc Havail Hfree Huidx Hraw Hlb Hclaim Havh".
+    iIntros "Hpub Hdesc Havail Hfree Huidx Hraw Hlb Hclaim Havh Hfl Hnr Hflr #Hfl0 #Hfl1".
     iDestruct (desc_page_entries pd Hpd with "Hdesc") as "Hde".
     iDestruct (avail_page_ring pav Hpav with "Havail") as "Hring".
     iDestruct (free_bundles_boot pd with "Hfree Hde Hraw") as "Hfb".
@@ -373,6 +379,8 @@ Section DiskBoot.
     iSplitR.
     { iPureIntro. intros p T i Hp _. rewrite lookup_empty in Hp. discriminate. }
     iFrame "Hpub Hlb Hclaim Huidx".
+    iSplitL "Hfl Hnr Hflr".
+    { iExists t0, t1, 0%nat. iFrame "Hfl Hnr Hflr Hfl0 Hfl1". iApply TsoCtx.ctx_floor_0. }
     assert (Hm8 : mod8 (∅ : gset nat) = ∅) by (rewrite /mod8; set_solver).
     rewrite Hm8.
     iFrame "Hfb Hring Havh".

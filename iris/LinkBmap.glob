@@ -1,0 +1,13 @@
+DIGEST 602135ec8f965f07c3fa24d3eac0424f
+Fxv6iris.LinkBmap
+R228:237 xv6iris.LinkBalloc <> <> lib
+R239:247 xv6iris.LinkBread <> <> lib
+R249:258 xv6iris.LinkBrelse <> <> lib
+R260:271 xv6iris.LinkLogWrite <> <> lib
+R273:281 xv6iris.ProofBmap <> <> lib
+R300:308 xv6iris.ProofBmap BmapProof <> modtype
+R310:315 xv6iris.LinkBalloc Balloc <> modtype
+R317:321 xv6iris.LinkBread Bread <> modtype
+R323:328 xv6iris.LinkBrelse Brelse <> modtype
+R330:337 xv6iris.LinkLogWrite LogWrite <> modtype
+mod 292:295 <> Bmap

@@ -1,0 +1,17 @@
+DIGEST efc41a1699c55e6fced7b4f1cfa20cd4
+Fxv6iris.LinkSysMknod
+R1288:1298 xv6iris.LinkBeginOp <> <> lib
+R1300:1309 xv6iris.LinkArgint <> <> lib
+R1311:1320 xv6iris.LinkArgstr <> <> lib
+R1322:1331 xv6iris.LinkCreate <> <> lib
+R1333:1346 xv6iris.LinkIunlockput <> <> lib
+R1356:1364 xv6iris.LinkEndOp <> <> lib
+R1366:1378 xv6iris.ProofSysMknod <> <> lib
+R1401:1413 xv6iris.ProofSysMknod SysMknodProof <> modtype
+R1415:1421 xv6iris.LinkBeginOp BeginOp <> modtype
+R1423:1428 xv6iris.LinkArgint Argint <> modtype
+R1430:1435 xv6iris.LinkArgstr Argstr <> modtype
+R1437:1442 xv6iris.LinkCreate Create <> modtype
+R1444:1453 xv6iris.LinkIunlockput Iunlockput <> modtype
+R1455:1459 xv6iris.LinkEndOp EndOp <> modtype
+mod 1389:1396 <> SysMknod

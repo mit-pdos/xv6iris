@@ -697,7 +697,7 @@ Proof.
      Auth and fragment at the same value, so a [view_lb] receipt is
      INCLUSION rather than an update ([TsoGhost.view_auth_alloc]). *)
   iMod (view_auth_alloc (avf g)) as (γview) "Hviewauth".
-  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γkptb γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv γts γlogm γloglen γview).
+  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γkptb γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv γts γlogm γloglen γview g.(gimg)).
   iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
   (* THE DURABLE DISK, minted ONCE at the machine's own image: the AUTH is
      [state_interp]'s fixed conjunct, the FULL fragments go to the client's
@@ -858,7 +858,8 @@ Proof.
       iSplitR.
       { iPureIntro. intros i. rewrite lookup_empty Hlog0 //. }
       rewrite Hlog0 /=. iFrame "Hloglenauth Hviewauth".
-      iPureIntro. rewrite /mm_ok Hlog0 Himg0 /TsoMemPa.flat /=.
+      iPureIntro. split; [| reflexivity].
+      rewrite /mm_ok Hlog0 Himg0 /TsoMemPa.flat /=.
       split_and!; [reflexivity | intros c; rewrite Htv0; lia |].
       intros a Ha. apply Hramtot.
       move: Ha. rewrite /addr_is_ram /ram_base /ram_size /ram_lo /ram_hi. lia. }
@@ -1152,7 +1153,10 @@ Section power.
         ghost_map_elem (era_ts_name HE) a (DfracOwn 1)
           ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem)) ∗
      crash_inv ∗
-     gen_born gen ∗ gen_started gen ∗ era_registered gen HE)%I.
+     gen_born gen ∗ gen_started gen ∗ era_registered gen HE ∗
+     (* A6.131: the era's image, as the boot client's pure fact -- what a
+        racy reader of a once-written .bss word ([StartedInv]) needs *)
+     ⌜era_img HE = g'.(gimg)⌝)%I.
 
   Lemma wp_power_loop (D : CPU -> gset register) (nproc ndisk : nat)
       (* THE CLIENT'S PURE PROJECTION OF THE CRASH PREDICATE (stage H0,
@@ -1377,7 +1381,7 @@ Section power.
         as (γlogm) "Hlogmauth2".
       iMod (mono_nat_own_alloc 0%nat) as (γloglen) "[Hloglenauth2 _]".
       iMod (view_auth_alloc (avf g2)) as (γview) "Hviewauth2".
-      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γkptb γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv γts γlogm γloglen γview).
+      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γkptb γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv γts γlogm γloglen γview g2.(gimg)).
       (* the started counter ticks (PowerOff had already bumped [ggen], so
          the count moves from [ggen + 0] to [ggen + 1]) *)
       iMod (mono_nat_own_update (n := start_count g) (g.(ggen) + 1)%nat
@@ -1425,7 +1429,7 @@ Section power.
         iSplitL "Htsfrags2"; [iExact "Htsfrags2" |].
         iSplitR; [iExact "Hcinv"|].
         iSplitR; [iExact "Hbornlb"|].
-        iSplitR; [|iExact "HRelem"].
+        iSplitR; [|iSplitR; [iExact "HRelem" | iPureIntro; reflexivity]].
         iExact "Hgst". }
       iModIntro.
       rewrite /start_count Hpw /= Nat.add_0_r in Hdom.
@@ -1491,7 +1495,8 @@ Section power.
           iSplitR.
           { iPureIntro. intros i. rewrite lookup_empty Hlog0 //. }
           rewrite Hlog0 /=. iFrame "Hloglenauth2 Hviewauth2".
-          iPureIntro. rewrite /mm_ok Hlog0 Himg0 /TsoMemPa.flat /=.
+          iPureIntro. split; [| reflexivity].
+          rewrite /mm_ok Hlog0 Himg0 /TsoMemPa.flat /=.
           split_and!; [reflexivity | intros c; rewrite Htv0; lia |].
           (* [boot_facts]' RAM totality: the era image is created HERE and
              this is the one arm that has to establish the conjunct. *)

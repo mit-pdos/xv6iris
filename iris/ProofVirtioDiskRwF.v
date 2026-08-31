@@ -411,24 +411,11 @@ Section VdrwfBridges.
     rewrite /ctx_word_pointsto. iSplitR; [iPureIntro; exact Hal|]. iExact "H".
   Qed.
 
-  Lemma vdrwf_plist_mem `{XI : CurCtx} (a : Arch.pa) (bs : list (bv 8)) :
-    (forall j, (j < length bs)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
-    (forall j, (j < length bs)%nat ->
-       (uint (pa_add a j : SailStdpp.Values.mword 64) < 274877906944)%Z) ->
-    kmap_static_claims -∗ phys_list a bs -∗
-    ([∗ list] j ↦ x ∈ bs, pa_add a j ↦ₘ x).
-  Proof.
-    iIntros (Hs Hc) "#Hb H". rewrite /phys_list.
-    iApply (big_sepL_impl with "H").
-    iIntros "!>" (k x Hk) "Hx".
-    assert (Hlt : (k < length bs)%nat) by (apply lookup_lt_Some in Hk; lia).
-    iApply (phys_to_byte (pa_add a k) x (Hs k Hlt) (Hc k Hlt) with "Hb Hx").
-  Qed.
-
-  Lemma vdrwf_map_plist (a : Arch.pa) (bs : list (bv 8)) :
-    (Z.of_nat (length bs) < 18446744073709551616)%Z ->
-    phys_map (range_map a (length bs) (fun j => bs !!! j)) -∗ phys_list a bs.
-  Proof. intro Hn. rewrite (phys_list_map a bs Hn). iIntros "$". Qed.
+  (* [vdrwf_plist_mem]/[vdrwf_map_plist] DELETED (A6.126 §6.7): the raw
+     phys->ctx crossing they stated is exactly the device-write hole the
+     Ztso flip closes.  The withdraw now takes the buffer back STAMPED
+     ([phys_ledger_at ... q] beside [ctx_floor cur_ctx q], parked_res's own
+     rows) and re-registers it through [DiskAvail.ctx_bytes_of_at_seq]. *)
 
 End VdrwfBridges.
 
@@ -858,7 +845,7 @@ Section VdrwfP6.
     (* ================= STEP 1: withdraw the parked payoff ============== *)
     rewrite /vdrw_body.
     iDestruct "Hbody" as "(%Hdfl & %Hpkb & %Hdtr & %Hcoh & %Htrok & %Htrdj & %Htrfr &
-                           Hpub & #Hlb & Hcl & Huidx & Hflm & Hpkm & Hfb & Hring & Havh)".
+                           Hpub & #Hlb & Hdfl & Hcl & Huidx & Hflm & Hpkm & Hfb & Hring & Havh)".
     assert (Hqpk : q ∈ dom pk) by (apply elem_of_dom; eexists; exact Hpq).
     assert (Hqnr : (q < nr)%nat) by exact (Hpkb q Hqpk).
     assert (Hnflq : q ∉ dom fl)
@@ -881,7 +868,8 @@ Section VdrwfP6.
     rewrite /parked_res.
     iDestruct "Hpayoff" as (bs)
       "(%Hlink & %Hbslen & %Hbsdata & Hbdisk & Hinfob & Hpinm & Hhcm & Hstat & Hdbytes &
-        Hperm & Hbufp)".
+        Hperm & Hbufq)".
+    iDestruct "Hbufq" as (qb) "[#Hflqb Hbufp]".
     (* ======== COLLECT THE RECEIPT (PermInv.v) ========================= *)
     (* The parked payoff carries the SPENT permit's token at our own [kq]
        (the claim pinned [vs_perm] of the slot WE published), so this is the
@@ -1030,8 +1018,6 @@ Section VdrwfP6.
     assert (Hcanst : (uint (d_info_status h : SailStdpp.Values.mword 64)
                       < 274877906944)%Z)
       by (unfold d_info_status; apply vdrwf_disk_canon; lia).
-    iDestruct (phys_to_byte (d_info_status h) byte_zero Hstatst Hcanst
-                 with "Hkm Hstat") as "Hstat".
     (* ================= +0x1d2 .. +0x1f0 ============================== *)
     iDestruct "Hidx" as "(Hx0 & Hx1 & Hx2 & Hxp)".
     assert (Hidxa : add_vec (M !!! Regidx Rs0)
@@ -1356,7 +1342,7 @@ Section VdrwfP6.
     { intros i N1 N2 N3. rewrite /fr' (fr_upd_ne _ t i true N3)
         (fr_upd_ne _ m2 i true N2) (fr_upd_ne fr h i true N1). reflexivity. }
     iAssert (disk_res γd pd pav pu)
-      with "[Hpub Hcl Huidx Hflm Hpkm Hfb Hring Havh]" as "HR".
+      with "[Hpub Hdfl Hcl Huidx Hflm Hpkm Hfb Hring Havh]" as "HR".
     { iApply (vdrw_body_close γd pd pav pu np nr fl (delete q pk) (delete q tr) fr').
       rewrite /vdrw_body.
       iSplitR; [iPureIntro; exact Hdfl|].
@@ -1397,7 +1383,7 @@ Section VdrwfP6.
         assert (Hnt : i <> t)
           by (intro Hc; subst i; exact (proj1 (elem_of_disjoint _ _) Hdj t Hi Hint)).
         rewrite (Hfr'other i Hnh Hnm Hnt). exact (Htrfr p T i Hp Hi). }
-      iFrame "Hpub Hlb Hcl Huidx Hflm Hpkm Hfb Hring Havh". }
+      iFrame "Hdfl". iFrame "Hpub Hlb Hcl Huidx Hflm Hpkm Hfb Hring Havh". }
     (* ================= +0x210 .. +0x218: release ====================== *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x210) : mword 64) Ra0
               (mword_of_int 30 : mword 20) G3 (trap_res eb + (K - 12))%nat false
@@ -1822,9 +1808,20 @@ Section VdrwfP6.
       - assert (Hbsd : bs = bs_disk)
           by (rewrite Hbs; exact (Hsl_in eq_refl)).
         rewrite (Hsl_in eq_refl) -Hbsd.
-        iApply (vdrwf_plist_mem (b_data b) bs
-                  ltac:(rgall; rewrite Hbsd Hlendisk; exact Hsbuf)
-                  ltac:(rgall; rewrite Hbsd Hlendisk; exact Hcbuf) with "Hkm Hbufp"). }
+        (* A6.126 §6: the buffer's bytes come STAMPED at the completion's
+           position with the holder's floor past it; this context (which
+           has the buffer page's claims) re-registers them *)
+        assert (Hlbs : length bs = 1024%nat) by (rewrite Hbsd; exact Hlendisk).
+        assert (Hlenb : vs_len (dc_slot (DClaim b (vdrwd_slot kq b h wr sector bs)
+                                            (h, m2, t) pin)) = length bs)
+          by (rewrite Hlbs Hbs -Hbslen; exact Hlbs).
+        iEval (rewrite Hlenb) in "Hbufp".
+        iDestruct (ctx_bytes_of_at_seq (b_data b) (length bs) (fun j => bs !!! j) qb
+                     ltac:(rgall; rewrite Hlbs; exact Hsbuf)
+                     ltac:(rgall; rewrite Hlbs; exact Hcbuf) with "Hkm Hflqb Hbufp") as "Hbufp".
+        iEval (rewrite -(vdrwd_ctx_bytes_of_fun (b_data b) (length bs)
+                            (fun j => bs !!! j) bs (list_eq_total bs))) in "Hbufp".
+        iExact "Hbufp". }
     (* [Hown] stopped transporting for free the moment the epilogue's SIE
        index became the VARIABLE [eb] instead of the literal [true]: at
        [b = true], [cpu_own]'s payload sits entirely in [sie_arm true] and

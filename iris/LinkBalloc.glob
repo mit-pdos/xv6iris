@@ -1,0 +1,13 @@
+DIGEST 7149d23d9a280cd115d6b640fcd8ffd9
+Fxv6iris.LinkBalloc
+R1502:1510 xv6iris.LinkBread <> <> lib
+R1512:1523 xv6iris.LinkLogWrite <> <> lib
+R1525:1534 xv6iris.LinkBrelse <> <> lib
+R1536:1550 xv6iris.LinkMemsetArray <> <> lib
+R1552:1562 xv6iris.ProofBalloc <> <> lib
+R1707:1717 xv6iris.ProofBalloc BallocProof <> modtype
+R1719:1723 xv6iris.LinkBread Bread <> modtype
+R1725:1732 xv6iris.LinkLogWrite LogWrite <> modtype
+R1734:1739 xv6iris.LinkBrelse Brelse <> modtype
+R1741:1751 xv6iris.LinkMemsetArray MemsetArray <> modtype
+mod 1697:1702 <> Balloc

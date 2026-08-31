@@ -370,6 +370,12 @@ Record riscvEraGS := RiscvEraGS {
   era_logm_name : gname;    (* the write log's entries, persisted        *)
   era_loglen_name : gname;  (* mono-nat = length glog ([llb] receipts)   *)
   era_view_name : gname;    (* auth of the per-agent views ([view_lb])   *)
+  (* THE ERA'S IMAGE, AS A CONSTANT (A6.131).  The image never changes
+     within an era, and a racy reader of a once-written word ([started])
+     needs to know what the image held there in order to tell the write
+     from the image; a pure tie in the interpretation ([tso_interp_at],
+     [tso_interp_of]) makes every image byte a persistent pure fact. *)
+  era_img : gmap Arch.pa (bv 8);
 }.
 
 (* THE DURABLE FILE SYSTEM'S REMAINING GHOST NAMES (durable-disk 2c;
@@ -2203,7 +2209,14 @@ Definition tso_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate)
      ⌜∀ i, LM !! i = g.(glog) !! i⌝ ∗
      mono_nat_auth_own (era_loglen_name E) 1 (length g.(glog)) ∗
      view_auth (era_view_name E) (avf g) ∗
-     ⌜mm_ok g⌝)%I.
+     ⌜mm_ok g /\ g.(gimg) = era_img E⌝)%I.
+
+Lemma tso_interp_at_img `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) :
+  tso_interp_at E g -∗ ⌜g.(gimg) = era_img E⌝.
+Proof.
+  iIntros "H". iDestruct "H" as (TM LM) "(_ & _ & _ & _ & _ & _ & _ & %Hmm)".
+  iPureIntro. exact (proj2 Hmm).
+Qed.
 
 Definition era_interp `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) : iProp Σ :=
   (gregs_interp_at E g.(gregs) ∗

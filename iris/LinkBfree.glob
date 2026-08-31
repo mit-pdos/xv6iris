@@ -1,0 +1,11 @@
+DIGEST b61035fb0e69281f53a3222f3dbdaa69
+Fxv6iris.LinkBfree
+R362:370 xv6iris.LinkBread <> <> lib
+R372:383 xv6iris.LinkLogWrite <> <> lib
+R385:394 xv6iris.LinkBrelse <> <> lib
+R396:405 xv6iris.ProofBfree <> <> lib
+R425:434 xv6iris.ProofBfree BfreeProof <> modtype
+R436:440 xv6iris.LinkBread Bread <> modtype
+R442:449 xv6iris.LinkLogWrite LogWrite <> modtype
+R451:456 xv6iris.LinkBrelse Brelse <> modtype
+mod 416:420 <> Bfree

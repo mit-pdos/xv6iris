@@ -26,6 +26,7 @@ Require Import RegFile.
 Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import WpSconfMem.
+Require Import WpLock.     (* [lk_floor] (A6.126 §6.6) *)
 Require Import VirtioModel DiskPtsto DiskInv DiskAvail.
 Require Import SpecFreeDesc.
 Require Import SpecVirtioDiskRw.
@@ -532,6 +533,9 @@ Section VdrwbDefs.
      ⌜forall p T i, tr !! p = Some T -> i ∈ tri_set T -> fr i = false⌝ ∗
      disk_pub γ np ∗
      disk_done_lb γ nr ∗
+     (∃ t0 t1 F : nat,
+        disk_fl γ t0 t1 ∗ disk_nr γ nr ∗ disk_flr γ F ∗
+        lk_floor cur_ctx t0 ∗ lk_floor cur_ctx t1 ∗ TsoCtx.ctx_floor cur_ctx F) ∗
      ghost_map_auth (dn_claim γ) 1 (fl ∪ pk) ∗
      d_used_idx ↦₂ wrap16 nr ∗
      ([∗ map] p ↦ v ∈ fl, flight_res γ p v) ∗

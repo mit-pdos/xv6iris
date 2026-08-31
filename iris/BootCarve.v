@@ -1843,4 +1843,59 @@ Section BootCarve.
     iApply (boot_ledger_at0_word g base Hmem Hlo Hhi Hal with "Hr Hl").
   Qed.
 
+  (* A6.132: a 4-byte .bss cell carved STRAIGHT TO THE LEDGER TIER at
+     timestamp 0, with the address facts a [WpSconfMem.wordw_claim] needs
+     beside it.  [started] is the client: a barrier word is neither a ctx
+     cell (no stable view) nor a payload cell yet (the release store mints
+     that), so what boot hands over is the plain window plus the claim. *)
+  Lemma boot_cran_ledger_at0_bss4 (g : gstate) (A : Z) (w : mword 32) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> img_end <= A -> A + 4 <= ram_hi -> A mod 4 = 0 ->
+    (forall j, (j < 4)%nat -> nth_byte w j = DevModel.byte0) ->
+    kmap_static_claims -∗ boot_cran g A (A + 4) -∗
+    ⌜is_aligned_paddr (Physaddr (pa_of_z A)) 4 = true⌝ ∗
+    (∃ ppn : mword 44,
+       kmap_at (svpn_of (pa_of_z A)) ppn KP_rw ∗
+       ⌜(uint (pa_of_z A) < 274877906944)%Z⌝ ∗
+       ⌜addr_is_ram (pa_of ppn (pa_of_z A))⌝ ∗
+       ⌜ktier_pin KT0 ppn (pa_of_z A)⌝) ∗
+    ([∗ list] j ∈ seq 0 4,
+       TsoCtx.phys_ledger_at (pa_add (pa_of_z A) j) (DfracOwn 1)
+         (nth_byte w j) 0%nat).
+  Proof.
+    intros Hmem Hlo Hbss Hhi Hal Hz. iIntros "#Hcl H".
+    iDestruct (boot_cran_elim with "H") as "[Hr Hl]".
+    assert (Hram : ram_lo <= A < ram_hi) by (unfold ram_lo, text_end in *; lia).
+    assert (E : A + 4 = A + Z.of_nat 4%nat) by (cbn; lia).
+    assert (Hhi' : A + Z.of_nat 4%nat <= ram_hi) by (cbn; lia).
+    iDestruct (boot_ran_eq g A (A + 4) A (A + Z.of_nat 4%nat) eq_refl E with "Hr") as "Hr".
+    iDestruct (boot_led_eq g A (A + 4) A (A + Z.of_nat 4%nat) eq_refl E with "Hl") as "Hl".
+    iDestruct (boot_ran_run_bss (m := 32%N) g A 4%nat w Hmem Hlo Hbss Hhi' Hz
+                 with "Hcl Hr") as "Hbs".
+    iDestruct (boot_led_run g A 4%nat Hmem ltac:(lia) Hhi' with "Hl") as "Hl".
+    assert (Hal4 : is_aligned_paddr (Physaddr (pa_of_z A)) 4 = true).
+    { apply (aligned_of_mod _ 4); [lia |].
+      rewrite (boot_uint_pa A Hram). exact Hal. }
+    iSplitR; [iPureIntro; exact Hal4 |].
+    (* the claim's facts, off byte 0 (put straight back) *)
+    assert (H0 : pa_add (pa_of_z A) 0%nat = pa_of_z A).
+    { rewrite pa_add_of_z. f_equal. lia. }
+    iDestruct (big_sepL_lookup_acc _ (seq 0 4) 0%nat 0%nat eq_refl with "Hbs") as "[Hb0 Hback]".
+    iEval (rewrite H0) in "Hb0".
+    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hc & %Hram0 & %Hpin & Hp0 & Hb0)".
+    iDestruct ("Hb0" with "Hp0") as "Hb0".
+    iEval (rewrite -H0) in "Hb0".
+    iDestruct ("Hback" with "Hb0") as "Hbs".
+    iSplitR.
+    { iExists ppn. iFrame "Hk". iPureIntro. split; [exact Hc | split; [exact Hram0 | exact Hpin]]. }
+    (* the bytes: mem-tier byte -> phys byte, then the element beside it *)
+    iCombine "Hbs Hl" as "H". rewrite -big_sepL_sep.
+    iApply (big_sepL_impl with "H"). iIntros "!>" (kk j _) "[Hb He]".
+    iDestruct (mem_pointsto_acc with "Hb") as (ppnj) "(_ & _ & %Hramj & %Hpinj & Hp & _)".
+    rewrite (ktier_pin_id _ _ Hpinj) in Hramj. rewrite (ktier_pin_id _ _ Hpinj).
+    iApply (TsoCtx.phys_ledger_at0_of_elem with "[Hp] He").
+    rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact Hramj.
+  Qed.
+
 End BootCarve.

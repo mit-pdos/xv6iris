@@ -1,0 +1,39 @@
+DIGEST 16c68ad5915e748730ef64a8045a3698
+Fxv6iris.LinkKexec
+R1830:1839 xv6iris.LinkMyproc <> <> lib
+R1841:1851 xv6iris.LinkBeginOp <> <> lib
+R1853:1861 xv6iris.LinkNamei <> <> lib
+R1863:1871 xv6iris.LinkIlock <> <> lib
+R1873:1881 xv6iris.LinkReadi <> <> lib
+R1891:1904 xv6iris.LinkIunlockput <> <> lib
+R1906:1914 xv6iris.LinkEndOp <> <> lib
+R1916:1932 xv6iris.LinkProcPagetable <> <> lib
+R1934:1954 xv6iris.LinkProcFreepagetable <> <> lib
+R1964:1975 xv6iris.LinkWalkaddr <> <> lib
+R1977:1990 xv6iris.LinkFlags2perm <> <> lib
+R1992:2003 xv6iris.LinkUvmalloc <> <> lib
+R2005:2016 xv6iris.LinkUvmclear <> <> lib
+R2018:2027 xv6iris.LinkStrlen <> <> lib
+R2037:2047 xv6iris.LinkCopyout <> <> lib
+R2049:2062 xv6iris.LinkSafestrcpy <> <> lib
+R2072:2080 xv6iris.LinkPanic <> <> lib
+R2082:2091 xv6iris.ProofKexec <> <> lib
+R2111:2120 xv6iris.ProofKexec KexecProof <> modtype
+R2122:2127 xv6iris.LinkMyproc Myproc <> modtype
+R2129:2135 xv6iris.LinkBeginOp BeginOp <> modtype
+R2137:2141 xv6iris.LinkNamei Namei <> modtype
+R2143:2147 xv6iris.LinkIlock Ilock <> modtype
+R2149:2153 xv6iris.LinkReadi Readi <> modtype
+R2155:2164 xv6iris.LinkIunlockput Iunlockput <> modtype
+R2166:2170 xv6iris.LinkEndOp EndOp <> modtype
+R2199:2214 xv6iris.LinkProcPagetable ProcPagetableGen <> modtype
+R2216:2232 xv6iris.LinkProcFreepagetable ProcFreepagetable <> modtype
+R2234:2241 xv6iris.LinkWalkaddr Walkaddr <> modtype
+R2270:2279 xv6iris.LinkFlags2perm Flags2perm <> modtype
+R2281:2288 xv6iris.LinkUvmalloc Uvmalloc <> modtype
+R2290:2297 xv6iris.LinkUvmclear Uvmclear <> modtype
+R2299:2304 xv6iris.LinkStrlen Strlen <> modtype
+R2306:2312 xv6iris.LinkCopyout Copyout <> modtype
+R2341:2350 xv6iris.LinkSafestrcpy Safestrcpy <> modtype
+R2352:2356 xv6iris.LinkPanic Panic <> modtype
+mod 2102:2106 <> Kexec

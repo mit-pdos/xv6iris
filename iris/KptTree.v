@@ -55,6 +55,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import TsoMemPa.
 Require Import TsoGhost.   (* A6.55: [view_lb] for the pin receipt *)
 Require Import TsoCtx.
+Require Import CtxValues.
 (* NO SHIM: the slot bridge is an ISOMORPHISM between the two LEDGER
    families now (A6.16), not a crossing out of the ledger. *)
 Local Open Scope Z_scope.
@@ -648,7 +649,7 @@ Section KptTreeInv.
           free at the [__sync_synchronize] drain, which is where the
           publication moves; carrying it here is what lets
           [KptShare.tlb_inv_pt_share] hand it to every later reader. *)
-       view_lb view_name loglen_name (hart_agent cpu_id) B ∗
+       CtxValues.cv_boot_cred B ∗
        pmp_config root_ppn)%I.
 
   Lemma tlb_inv_pt_intro (root_ppn : mword 44) (satp0 : mword 64)
@@ -661,7 +662,7 @@ Section KptTreeInv.
     kpt_tree_spec_gen root_ppn M t ->
     satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ kmap_auth M -∗
     kptree_own B 2 (DfracOwn 1) t -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    CtxValues.cv_boot_cred B -∗
     pmp_config root_ppn -∗
     tlb_inv_pt root_ppn.
   Proof.
@@ -682,7 +683,7 @@ Section KptTreeInv.
       ⌜ kpt_tree_spec_gen root_ppn M t ⌝ ∗
       kmap_auth M ∗
       kptree_own B 2 (DfracOwn 1) t ∗
-      view_lb view_name loglen_name (hart_agent cpu_id) B ∗
+      CtxValues.cv_boot_cred B ∗
       pmp_config root_ppn.
   Proof. iIntros "H". iExact "H". Qed.
 

@@ -1,0 +1,13 @@
+DIGEST d4f07dd8a51c87c944c75ab463de6d95
+Fxv6iris.LinkPipealloc
+R305:317 xv6iris.LinkFilealloc <> <> lib
+R319:328 xv6iris.LinkKalloc <> <> lib
+R330:341 xv6iris.LinkInitlock <> <> lib
+R343:355 xv6iris.LinkFileclose <> <> lib
+R373:386 xv6iris.ProofPipealloc <> <> lib
+R410:423 xv6iris.ProofPipealloc PipeallocProof <> modtype
+R425:433 xv6iris.LinkFilealloc Filealloc <> modtype
+R435:440 xv6iris.LinkKalloc Kalloc <> modtype
+R442:449 xv6iris.LinkInitlock Initlock <> modtype
+R451:459 xv6iris.LinkFileclose Fileclose <> modtype
+mod 397:405 <> Pipealloc

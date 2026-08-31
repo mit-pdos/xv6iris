@@ -1,0 +1,17 @@
+DIGEST 72a33285b53ef3d47e34e5395fce6ea3
+Fxv6iris.LinkFileclose
+R437:447 xv6iris.LinkAcquire <> <> lib
+R449:459 xv6iris.LinkRelease <> <> lib
+R461:473 xv6iris.LinkPipeclose <> <> lib
+R475:485 xv6iris.LinkBeginOp <> <> lib
+R487:494 xv6iris.LinkIput <> <> lib
+R512:520 xv6iris.LinkEndOp <> <> lib
+R522:535 xv6iris.ProofFileclose <> <> lib
+R559:572 xv6iris.ProofFileclose FilecloseProof <> modtype
+R574:580 xv6iris.LinkAcquire Acquire <> modtype
+R582:588 xv6iris.LinkRelease Release <> modtype
+R590:598 xv6iris.LinkPipeclose Pipeclose <> modtype
+R600:606 xv6iris.LinkBeginOp BeginOp <> modtype
+R608:611 xv6iris.LinkIput Iput <> modtype
+R613:617 xv6iris.LinkEndOp EndOp <> modtype
+mod 546:554 <> Fileclose

@@ -1,0 +1,11 @@
+DIGEST 6f1cf303316bad61381f2c6f08856b53
+Fxv6iris.LinkNameiPinned
+R955:964 xv6iris.DirViewPin <> <> lib
+R982:996 xv6iris.NameiInitPinned <> <> lib
+R1014:1024 xv6iris.LinkNameiTr <> <> lib
+R1050:1076 xv6iris.DirViewPin NameiPinnedProof <> modtype
+R1078:1096 xv6iris.LinkNameiTr NameiTr <> modtype
+mod 1035:1045 <> NameiPinned
+R1123:1158 xv6iris.NameiInitPinned NameiInitPinnedProof <> modtype
+R1160:1178 xv6iris.LinkNameiTr NameiTr <> modtype
+mod 1107:1116 <> InitPinned

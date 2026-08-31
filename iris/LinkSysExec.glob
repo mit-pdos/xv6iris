@@ -1,0 +1,21 @@
+DIGEST 3960085f825a3b93e50db6c625a978b8
+Fxv6iris.LinkSysExec
+R916:926 xv6iris.LinkArgaddr <> <> lib
+R928:937 xv6iris.LinkArgstr <> <> lib
+R939:953 xv6iris.LinkMemsetArray <> <> lib
+R955:967 xv6iris.LinkFetchaddr <> <> lib
+R969:978 xv6iris.LinkKalloc <> <> lib
+R988:999 xv6iris.LinkFetchstr <> <> lib
+R1001:1009 xv6iris.LinkKexec <> <> lib
+R1011:1019 xv6iris.LinkKfree <> <> lib
+R1029:1040 xv6iris.ProofSysExec <> <> lib
+R1062:1073 xv6iris.ProofSysExec SysExecProof <> modtype
+R1075:1081 xv6iris.LinkArgaddr Argaddr <> modtype
+R1083:1088 xv6iris.LinkArgstr Argstr <> modtype
+R1090:1100 xv6iris.LinkMemsetArray MemsetArray <> modtype
+R1102:1110 xv6iris.LinkFetchaddr Fetchaddr <> modtype
+R1112:1117 xv6iris.LinkKalloc Kalloc <> modtype
+R1150:1157 xv6iris.LinkFetchstr Fetchstr <> modtype
+R1159:1163 xv6iris.LinkKexec Kexec <> modtype
+R1165:1169 xv6iris.LinkKfree Kfree <> modtype
+mod 1051:1057 <> SysExec

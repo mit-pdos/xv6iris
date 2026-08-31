@@ -1,0 +1,11 @@
+DIGEST 7d8914ca1d83b61d812e639640d76552
+Fxv6iris.LinkFsSyscalls
+R1084:1095 xv6iris.LinkSysMkdir <> <> lib
+R1097:1108 xv6iris.LinkSysChdir <> <> lib
+R1110:1119 xv6iris.FsSyscalls <> <> lib
+R1141:1150 xv6iris.FsSyscalls FsSysMkdir <> modtype
+R1152:1159 xv6iris.LinkSysMkdir SysMkdir <> modtype
+mod 1130:1136 <> FsMkdir
+R1180:1189 xv6iris.FsSyscalls FsSysChdir <> modtype
+R1191:1198 xv6iris.LinkSysChdir SysChdir <> modtype
+mod 1169:1175 <> FsChdir

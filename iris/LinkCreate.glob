@@ -1,0 +1,19 @@
+DIGEST d4332a2388866d791af4f32072aa8973
+Fxv6iris.LinkCreate
+R1667:1681 xv6iris.LinkNameiparent <> <> lib
+R1683:1691 xv6iris.LinkIlock <> <> lib
+R1693:1706 xv6iris.LinkIunlockput <> <> lib
+R1708:1720 xv6iris.LinkDirlookup <> <> lib
+R1730:1739 xv6iris.LinkIalloc <> <> lib
+R1741:1751 xv6iris.LinkIupdate <> <> lib
+R1753:1763 xv6iris.LinkDirlink <> <> lib
+R1773:1783 xv6iris.ProofCreate <> <> lib
+R1804:1814 xv6iris.ProofCreate CreateProof <> modtype
+R1816:1826 xv6iris.LinkNameiparent Nameiparent <> modtype
+R1828:1832 xv6iris.LinkIlock Ilock <> modtype
+R1834:1843 xv6iris.LinkIunlockput Iunlockput <> modtype
+R1845:1853 xv6iris.LinkDirlookup Dirlookup <> modtype
+R1884:1889 xv6iris.LinkIalloc Ialloc <> modtype
+R1891:1897 xv6iris.LinkIupdate Iupdate <> modtype
+R1899:1905 xv6iris.LinkDirlink Dirlink <> modtype
+mod 1794:1799 <> Create

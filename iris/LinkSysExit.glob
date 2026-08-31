@@ -1,0 +1,9 @@
+DIGEST 6c0aef3836fb7b9aa32f684aa473ebbc
+Fxv6iris.LinkSysExit
+R116:125 xv6iris.LinkArgint <> <> lib
+R127:135 xv6iris.LinkKexit <> <> lib
+R137:148 xv6iris.ProofSysExit <> <> lib
+R170:181 xv6iris.ProofSysExit SysExitProof <> modtype
+R183:188 xv6iris.LinkArgint Argint <> modtype
+R190:194 xv6iris.LinkKexit Kexit <> modtype
+mod 159:165 <> SysExit

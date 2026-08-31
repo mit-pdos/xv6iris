@@ -880,8 +880,7 @@ Section VdrwdLeaves.
       iInv "Hvinv" as ">Hdbody" "Hdclose".
       iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
       iDestruct (virtio_proto_used_idx_acc γd vst np nr with "Hproto Hpub Hlb0")
-        as (nc) "(%Hnrnc & %Hncnp & _ & _ & _ & Hwu & Hbacku)".
-      iDestruct ("Hbacku" with "Hwu") as "[Hproto Hpub]".
+        as (nc) "(%Hnrnc & %Hncnp & _ & _ & _ & [Hproto Hpub])".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
       { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
       iModIntro. iExists (wrap16 np : SailStdpp.Values.mword 16).
@@ -1839,7 +1838,7 @@ Section VdrwdP4.
     (* ---- open the lock resource ---- *)
     rewrite /vdrw_body.
     iDestruct "Hbody" as "(%Hdfl & %Hpkb & %Hdtr & %Hcoh & %Htrok & %Htrdj & %Htrfr &
-                           Hpub & #Hlb & Hclaim & Huidx & Hflm & Hpkm & Hfb & Hring & Havh)".
+                           Hpub & #Hlb & Hdfl & Hclaim & Huidx & Hflm & Hpkm & Hfb & Hring & Havh)".
     (* ---- +0x176  c.ld a3,8(a5) ---- *)
     assert (Hava : add_vec (M !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 8 : mword 12))
                    = (d_avail_ptr : SailStdpp.Values.mword 64))
@@ -2175,7 +2174,7 @@ Section VdrwdP4.
     { iPureIntro. exact (vdrwd_tr_disj_ins tr np (h, m2, t) Htrdj Hdisj0). }
     iSplitR.
     { iPureIntro. exact (vdrwd_tr_free_ins tr np h m2 t fr Hfrh Hfrm Hfrt Htrfr). }
-    iFrame "Hpub Hlb".
+    iFrame "Hpub Hlb Hdfl".
     rewrite (insert_union_l fl pk np V). iFrame "Hclaim".
     iFrame "Huidx Hflm Hpkm Hfb".
     rewrite dom_insert_L vdrwd_mod8_insert. iFrame "Hring". iExact "Havh".

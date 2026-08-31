@@ -1,1676 +1,1738 @@
-DIGEST c25c3265f865ae9fc4e6a8a68d968a5e
+DIGEST 8853f7de8c257b507965054e844fade2
 Fxv6iris.PipeInvDefs
-R6564:6569 Stdlib.ZArith.ZArith <> <> lib
-R6571:6573 Stdlib.micromega.Lia <> <> lib
-R6575:6578 Stdlib.Lists.List <> <> lib
-R6607:6610 stdpp.list <> <> lib
-R6612:6632 stdpp.bitvector.definitions <> <> lib
-R6668:6671 iris.algebra.frac <> <> lib
-R6673:6677 iris.algebra.dfrac <> <> lib
-R6712:6721 iris.bi.lib.fractional <> <> lib
-R6759:6767 iris.proofmode.proofmode <> <> lib
-R6810:6817 iris.base_logic.lib.gen_heap <> <> lib
-R6819:6828 iris.base_logic.lib.invariants <> <> lib
-R6830:6832 iris.base_logic.lib.own <> <> lib
-R6850:6879 SailStdpp.ConcurrencyInterface <> <> lib
-R6881:6918 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
-R6920:6954 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
-R6956:6981 SailStdpp.Operators_mwords <> <> lib
-R6999:7012 SailStdpp.Base <> <> lib
-R7014:7032 SailStdpp.TypeCasts <> <> lib
-R7034:7049 SailStdpp.Values <> <> lib
-R7051:7071 SailStdpp.MachineWord <> <> lib
-R7089:7103 xv6iris.RiscvModelBytes <> <> lib
-R7121:7130 xv6iris.RiscvPtsto <> <> lib
-R7148:7156 xv6iris.KallocInv <> <> lib
-R7174:7179 xv6iris.WpLock <> <> lib
-R7197:7202 xv6iris.TsoCtx <> <> lib
-R7269:7285 Riscv.rv64d_types <> <> lib
-R7287:7297 Riscv.rv64d <> <> lib
-R7299:7316 Riscv.riscv_extras <> <> lib
-R7334:7343 xv6iris.Xv6Cameras <> <> lib
-def 7658:7665 <> PIPESIZE
-R7669:7671 Corelib.Init.Datatypes <> nat ind
-def 7692:7704 <> pipe_data_off
-R7708:7710 Corelib.Init.Datatypes <> nat ind
-def 7766:7776 <> pipe_sizeof
-R7780:7782 Corelib.Init.Datatypes <> nat ind
-def 7831:7842 <> pipe_pgbytes
-R7846:7848 Corelib.Init.Datatypes <> nat ind
-def 8100:8106 <> poff_of
-R8113:8117 SailStdpp.Values <> mword def
-binder 8109:8109 <> a:1
-R8128:8128 Corelib.Numbers.BinNums <> Z ind
-binder 8124:8124 <> i:2
-R8133:8137 SailStdpp.Values <> mword def
-R8147:8153 SailStdpp.Operators_mwords <> add_vec def
-R8158:8169 Riscv.rv64d <> sign_extend' def
-R8192:8196 SailStdpp.Values <> mword def
-R8175:8186 SailStdpp.Values <> mword_of_int def
-R8188:8188 xv6iris.PipeInvDefs <> i:2 var
-R8155:8155 xv6iris.PipeInvDefs <> a:1 var
-def 8216:8223 <> a_pnread
-R8232:8236 SailStdpp.Values <> mword def
-binder 8227:8228 <> pi:3
-R8244:8248 SailStdpp.Values <> mword def
-R8256:8262 xv6iris.PipeInvDefs <> poff_of def
-R8264:8265 xv6iris.PipeInvDefs <> pi:3 var
-def 8283:8291 <> a_pnwrite
-R8299:8303 SailStdpp.Values <> mword def
-binder 8294:8295 <> pi:4
-R8311:8315 SailStdpp.Values <> mword def
-R8323:8329 xv6iris.PipeInvDefs <> poff_of def
-R8331:8332 xv6iris.PipeInvDefs <> pi:4 var
-def 8570:8576 <> a_popen
-R8584:8588 SailStdpp.Values <> mword def
-binder 8579:8580 <> pi:5
-R8599:8602 Corelib.Init.Datatypes <> bool ind
-binder 8595:8595 <> w:6
-R8607:8611 SailStdpp.Values <> mword def
-R8621:8627 xv6iris.PipeInvDefs <> poff_of def
-R8629:8630 xv6iris.PipeInvDefs <> pi:5 var
-R8633:8635 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R8637:8642 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R8646:8651 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R8636:8636 xv6iris.PipeInvDefs <> w:6 var
-def 8891:8900 <> pflag_open
-R8907:8911 SailStdpp.Values <> mword def
-binder 8903:8903 <> v:7
-R8965:8967 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R8929:8935 SailStdpp.Operators_mwords <> neq_vec def
-R8957:8964 Riscv.rv64d <> zero_reg def
-R8938:8949 Riscv.rv64d <> sign_extend' def
-R8954:8954 xv6iris.PipeInvDefs <> v:7 var
-R8968:8971 Corelib.Init.Datatypes <> true constr
-prf 8981:8994 <> pflag_one_open
-R8998:9007 xv6iris.PipeInvDefs <> pflag_open def
-R9027:9031 SailStdpp.Values <> mword def
-R9010:9021 SailStdpp.Values <> mword_of_int def
-prf 9070:9088 <> pflag_zero_not_open
-R9092:9093 Corelib.Init.Logic <> ::type_scope:'~'_x not
-R9094:9103 xv6iris.PipeInvDefs <> pflag_open def
-R9123:9127 SailStdpp.Values <> mword def
-R9106:9117 SailStdpp.Values <> mword_of_int def
-R9148:9157 xv6iris.PipeInvDefs <> pflag_open def
-def 9979:9988 <> pipe_count
-R9999:10003 SailStdpp.Values <> mword def
-binder 9991:9992 <> nr:8
-binder 9994:9995 <> nw:9
-R10011:10011 Corelib.Numbers.BinNums <> Z ind
-R10019:10019 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R10051:10056 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R10034:10036 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R10020:10030 stdpp.bitvector.definitions <> bv_unsigned proj
-R10032:10033 xv6iris.PipeInvDefs <> nw:9 var
-R10037:10047 stdpp.bitvector.definitions <> bv_unsigned proj
-R10049:10050 xv6iris.PipeInvDefs <> nr:8 var
-R10058:10060 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-def 10080:10092 <> pipe_count_ok
-R10103:10107 SailStdpp.Values <> mword def
-binder 10095:10096 <> nr:10
-binder 10098:10099 <> nw:11
-R10142:10145 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
-R10126:10135 xv6iris.PipeInvDefs <> pipe_count def
-R10137:10138 xv6iris.PipeInvDefs <> nr:10 var
-R10140:10141 xv6iris.PipeInvDefs <> nw:11 var
-R10146:10153 Stdlib.ZArith.BinInt Z of_nat def
-R10155:10162 xv6iris.PipeInvDefs <> PIPESIZE def
-prf 10175:10190 <> pipe_count_ok_00
-R10196:10208 xv6iris.PipeInvDefs <> pipe_count_ok def
-R10228:10232 SailStdpp.Values <> mword def
-R10211:10222 SailStdpp.Values <> mword_of_int def
-R10256:10260 SailStdpp.Values <> mword def
-R10239:10250 SailStdpp.Values <> mword_of_int def
-R10281:10293 xv6iris.PipeInvDefs <> pipe_count_ok def
-R10296:10305 xv6iris.PipeInvDefs <> pipe_count def
-prf 10481:10498 <> add_vec32_unsigned
-R10507:10511 SailStdpp.Values <> mword def
-binder 10501:10501 <> x:12
-binder 10503:10503 <> y:13
-R10546:10548 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R10521:10531 stdpp.bitvector.definitions <> bv_unsigned proj
-R10534:10540 SailStdpp.Operators_mwords <> add_vec def
-R10544:10544 xv6iris.PipeInvDefs <> y:13 var
-R10542:10542 xv6iris.PipeInvDefs <> x:12 var
-R10549:10555 stdpp.bitvector.definitions <> bv_wrap def
-R10574:10576 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R10561:10571 stdpp.bitvector.definitions <> bv_unsigned proj
-R10573:10573 xv6iris.PipeInvDefs <> x:12 var
-R10577:10587 stdpp.bitvector.definitions <> bv_unsigned proj
-R10589:10589 xv6iris.PipeInvDefs <> y:13 var
-R10609:10615 SailStdpp.Operators_mwords <> add_vec def
-R10618:10644 SailStdpp.Operators_mwords <> word_binop def
-R10647:10673 SailStdpp.Operators_mwords <> with_word' def
-R10680:10705 SailStdpp.Values <> with_word def
-R10708:10714 SailStdpp.Values <> to_word def
-R10717:10724 SailStdpp.Values <> get_word def
-R10727:10753 SailStdpp.MachineWord MachineWord add def
-R10766:10780 stdpp.bitvector.definitions <> bv_add_unsigned thm
-R10766:10780 stdpp.bitvector.definitions <> bv_add_unsigned thm
-R10766:10780 stdpp.bitvector.definitions <> bv_add_unsigned thm
-prf 10814:10823 <> wrap32_mod
-R10830:10830 Corelib.Numbers.BinNums <> Z ind
-binder 10826:10826 <> z:14
-R10847:10849 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R10835:10841 stdpp.bitvector.definitions <> bv_wrap def
-R10846:10846 xv6iris.PipeInvDefs <> z:14 var
-R10852:10856 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R10851:10851 xv6iris.PipeInvDefs <> z:14 var
-R10858:10860 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R10884:10890 stdpp.bitvector.definitions <> bv_wrap def
-R10893:10902 stdpp.bitvector.definitions <> bv_modulus def
-R10916:10918 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R10919:10924 Stdlib.ZArith.BinInt Z of_N def
-R10939:10941 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R10916:10918 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R10919:10924 Stdlib.ZArith.BinInt Z of_N def
-R10939:10941 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-prf 10980:10988 <> u32_range
-R10995:10999 SailStdpp.Values <> mword def
-binder 10991:10991 <> x:15
-R11009:11012 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11026:11028 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11013:11023 stdpp.bitvector.definitions <> bv_unsigned proj
-R11025:11025 xv6iris.PipeInvDefs <> x:15 var
-R11013:11023 stdpp.bitvector.definitions <> bv_unsigned proj
-R11025:11025 xv6iris.PipeInvDefs <> x:15 var
-R11030:11032 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11061:11080 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
-R11061:11080 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
-R11103:11112 stdpp.bitvector.definitions <> bv_modulus def
-R11132:11134 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11135:11140 Stdlib.ZArith.BinInt Z of_N def
-R11155:11157 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11132:11134 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11135:11140 Stdlib.ZArith.BinInt Z of_N def
-prf 11375:11395 <> pipe_count_arith_incr
-R11404:11404 Corelib.Numbers.BinNums <> Z ind
-binder 11398:11398 <> a:16
-binder 11400:11400 <> b:17
-R11430:11433 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R11413:11416 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11418:11420 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11417:11417 xv6iris.PipeInvDefs <> a:16 var
-R11417:11417 xv6iris.PipeInvDefs <> a:16 var
-R11422:11424 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11453:11458 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R11436:11439 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11441:11443 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11440:11440 xv6iris.PipeInvDefs <> b:17 var
-R11440:11440 xv6iris.PipeInvDefs <> b:17 var
-R11445:11447 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11488:11493 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R11478:11481 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
-R11460:11460 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11466:11471 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11462:11464 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11461:11461 xv6iris.PipeInvDefs <> b:17 var
-R11465:11465 xv6iris.PipeInvDefs <> a:16 var
-R11473:11475 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11523:11528 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R11513:11516 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
-R11495:11495 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11501:11506 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11497:11499 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11496:11496 xv6iris.PipeInvDefs <> b:17 var
-R11500:11500 xv6iris.PipeInvDefs <> a:16 var
-R11508:11510 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11565:11568 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
-R11530:11530 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11553:11558 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11549:11551 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11531:11531 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11537:11542 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11533:11535 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R11532:11532 xv6iris.PipeInvDefs <> b:17 var
-R11544:11546 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11552:11552 xv6iris.PipeInvDefs <> a:16 var
-R11560:11562 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11618:11635 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_l thm
-R11618:11635 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_l thm
-R11618:11635 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_l thm
-R11654:11656 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11650:11652 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R11668:11668 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R11674:11677 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R11670:11672 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11654:11656 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11650:11652 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R11668:11668 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R11674:11677 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R11670:11672 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11705:11721 Stdlib.ZArith.Zdiv <> Zplus_mod_idemp_l thm
-R11725:11727 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11705:11721 Stdlib.ZArith.Zdiv <> Zplus_mod_idemp_l thm
-R11725:11727 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11705:11721 Stdlib.ZArith.Zdiv <> Zplus_mod_idemp_l thm
-R11725:11727 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11752:11755 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11774:11776 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11756:11756 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11762:11767 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11758:11760 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11769:11771 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11756:11756 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11762:11767 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11758:11760 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11769:11771 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11778:11780 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11802:11816 Stdlib.ZArith.BinInt Z mod_pos_bound thm
-R11752:11755 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11774:11776 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11756:11756 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11762:11767 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11758:11760 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11769:11771 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11756:11756 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11762:11767 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11758:11760 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11769:11771 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11778:11780 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11802:11816 Stdlib.ZArith.BinInt Z mod_pos_bound thm
-R11855:11865 Stdlib.ZArith.BinInt Z mod_small thm
-R11855:11865 Stdlib.ZArith.BinInt Z mod_small thm
-R11855:11865 Stdlib.ZArith.BinInt Z mod_small thm
-prf 11891:11911 <> pipe_count_arith_decr
-R11920:11920 Corelib.Numbers.BinNums <> Z ind
-binder 11914:11914 <> a:18
-binder 11916:11916 <> b:19
-R11946:11949 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R11929:11932 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11934:11936 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11933:11933 xv6iris.PipeInvDefs <> a:18 var
-R11933:11933 xv6iris.PipeInvDefs <> a:18 var
-R11938:11940 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R11969:11974 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R11952:11955 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11957:11959 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R11956:11956 xv6iris.PipeInvDefs <> b:19 var
-R11956:11956 xv6iris.PipeInvDefs <> b:19 var
-R11961:11963 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R12004:12009 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R11994:11997 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
-R11976:11976 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11982:11987 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R11978:11980 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R11977:11977 xv6iris.PipeInvDefs <> b:19 var
-R11981:11981 xv6iris.PipeInvDefs <> a:18 var
-R11989:11991 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R12016:12021 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R12011:12014 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
-R12010:12010 xv6iris.PipeInvDefs <> a:18 var
-R12015:12015 xv6iris.PipeInvDefs <> b:19 var
-R12058:12061 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
-R12023:12023 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12046:12051 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12025:12027 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12024:12024 xv6iris.PipeInvDefs <> b:19 var
-R12028:12028 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12034:12039 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12030:12032 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R12029:12029 xv6iris.PipeInvDefs <> a:18 var
-R12041:12043 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R12053:12055 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R12111:12128 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_r thm
-R12111:12128 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_r thm
-R12111:12128 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_r thm
-R12143:12146 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12152:12152 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12148:12150 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R12163:12163 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12169:12172 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12165:12167 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12143:12146 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12152:12152 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12148:12150 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R12163:12163 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12169:12172 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12165:12167 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12200:12217 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_l thm
-R12221:12223 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12200:12217 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_l thm
-R12221:12223 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12200:12217 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_l thm
-R12221:12223 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12248:12251 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R12270:12272 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R12252:12252 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12258:12263 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12254:12256 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12265:12267 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R12252:12252 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12258:12263 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12254:12256 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12265:12267 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R12274:12276 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R12298:12312 Stdlib.ZArith.BinInt Z mod_pos_bound thm
-R12248:12251 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R12270:12272 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
-R12252:12252 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12258:12263 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12254:12256 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12265:12267 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R12252:12252 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12258:12263 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12254:12256 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12265:12267 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R12274:12276 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R12298:12312 Stdlib.ZArith.BinInt Z mod_pos_bound thm
-R12376:12379 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
-R12358:12358 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12364:12369 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12360:12362 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12371:12373 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R12376:12379 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
-R12358:12358 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12364:12369 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R12360:12362 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R12371:12373 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R12407:12418 Stdlib.ZArith.BinInt Z mod_divide thm
-R12407:12418 Stdlib.ZArith.BinInt Z mod_divide thm
-R12492:12494 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R12492:12494 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R12525:12535 Stdlib.ZArith.BinInt Z mod_small thm
-R12525:12535 Stdlib.ZArith.BinInt Z mod_small thm
-R12525:12535 Stdlib.ZArith.BinInt Z mod_small thm
-prf 12726:12742 <> pipe_count_incr_w
-R12753:12757 SailStdpp.Values <> mword def
-binder 12745:12746 <> nr:20
-binder 12748:12749 <> nw:21
-R12786:12791 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R12767:12779 xv6iris.PipeInvDefs <> pipe_count_ok def
-R12781:12782 xv6iris.PipeInvDefs <> nr:20 var
-R12784:12785 xv6iris.PipeInvDefs <> nw:21 var
-R12838:12843 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R12794:12797 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
-R12792:12793 xv6iris.PipeInvDefs <> nw:21 var
-R12798:12804 SailStdpp.Operators_mwords <> add_vec def
-R12829:12833 SailStdpp.Values <> mword def
-R12810:12821 SailStdpp.Values <> mword_of_int def
-R12806:12807 xv6iris.PipeInvDefs <> nr:20 var
-R12844:12856 xv6iris.PipeInvDefs <> pipe_count_ok def
-R12858:12859 xv6iris.PipeInvDefs <> nr:20 var
-R12862:12868 SailStdpp.Operators_mwords <> add_vec def
-R12891:12895 SailStdpp.Values <> mword def
-R12874:12885 SailStdpp.Values <> mword_of_int def
-R12870:12871 xv6iris.PipeInvDefs <> nw:21 var
-R12919:12931 xv6iris.PipeInvDefs <> pipe_count_ok def
-R12934:12943 xv6iris.PipeInvDefs <> pipe_count def
-R12976:12984 xv6iris.PipeInvDefs <> u32_range thm
-R12976:12984 xv6iris.PipeInvDefs <> u32_range thm
-R13010:13018 xv6iris.PipeInvDefs <> u32_range thm
-R13010:13018 xv6iris.PipeInvDefs <> u32_range thm
-R13042:13059 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
-R13061:13070 xv6iris.PipeInvDefs <> wrap32_mod thm
-R13042:13059 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
-R13042:13059 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
-R13061:13070 xv6iris.PipeInvDefs <> wrap32_mod thm
-R13061:13070 xv6iris.PipeInvDefs <> wrap32_mod thm
-R13127:13129 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13088:13098 stdpp.bitvector.definitions <> bv_unsigned proj
-R13118:13122 SailStdpp.Values <> mword def
-R13101:13112 SailStdpp.Values <> mword_of_int def
-R13127:13129 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13088:13098 stdpp.bitvector.definitions <> bv_unsigned proj
-R13118:13122 SailStdpp.Values <> mword def
-R13101:13112 SailStdpp.Values <> mword_of_int def
-R13187:13207 xv6iris.PipeInvDefs <> pipe_count_arith_incr thm
-R13187:13207 xv6iris.PipeInvDefs <> pipe_count_arith_incr thm
-R13262:13266 stdpp.bitvector.definitions <> bv_eq thm
-R13262:13266 stdpp.bitvector.definitions <> bv_eq thm
-R13279:13296 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
-R13298:13307 xv6iris.PipeInvDefs <> wrap32_mod thm
-R13279:13296 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
-R13279:13296 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
-R13298:13307 xv6iris.PipeInvDefs <> wrap32_mod thm
-R13298:13307 xv6iris.PipeInvDefs <> wrap32_mod thm
-R13368:13370 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13327:13337 stdpp.bitvector.definitions <> bv_unsigned proj
-R13359:13363 SailStdpp.Values <> mword def
-R13340:13351 SailStdpp.Values <> mword_of_int def
-R13368:13370 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13327:13337 stdpp.bitvector.definitions <> bv_unsigned proj
-R13359:13363 SailStdpp.Values <> mword def
-R13340:13351 SailStdpp.Values <> mword_of_int def
-R13543:13562 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
-R13504:13504 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13536:13539 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13519:13521 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13505:13515 stdpp.bitvector.definitions <> bv_unsigned proj
-R13522:13532 stdpp.bitvector.definitions <> bv_unsigned proj
-R13563:13563 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13595:13598 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13578:13580 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13564:13574 stdpp.bitvector.definitions <> bv_unsigned proj
-R13581:13591 stdpp.bitvector.definitions <> bv_unsigned proj
-R13602:13604 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13606:13608 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R13543:13562 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
-R13504:13504 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13536:13539 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13519:13521 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13505:13515 stdpp.bitvector.definitions <> bv_unsigned proj
-R13522:13532 stdpp.bitvector.definitions <> bv_unsigned proj
-R13563:13563 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13595:13598 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13578:13580 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13564:13574 stdpp.bitvector.definitions <> bv_unsigned proj
-R13581:13591 stdpp.bitvector.definitions <> bv_unsigned proj
-R13602:13604 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13606:13608 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R13643:13645 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x_'<'_x not
-R13677:13679 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x_'<'_x not
-R13635:13636 Stdlib.ZArith.BinInt <> ::Z_scope:'-'_x not
-R13638:13640 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R13660:13662 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13646:13656 stdpp.bitvector.definitions <> bv_unsigned proj
-R13663:13673 stdpp.bitvector.definitions <> bv_unsigned proj
-R13660:13662 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13646:13656 stdpp.bitvector.definitions <> bv_unsigned proj
-R13663:13673 stdpp.bitvector.definitions <> bv_unsigned proj
-R13681:13683 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R13643:13645 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x_'<'_x not
-R13677:13679 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x_'<'_x not
-R13635:13636 Stdlib.ZArith.BinInt <> ::Z_scope:'-'_x not
-R13638:13640 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R13660:13662 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13646:13656 stdpp.bitvector.definitions <> bv_unsigned proj
-R13663:13673 stdpp.bitvector.definitions <> bv_unsigned proj
-R13660:13662 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13646:13656 stdpp.bitvector.definitions <> bv_unsigned proj
-R13663:13673 stdpp.bitvector.definitions <> bv_unsigned proj
-R13681:13683 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R13713:13725 Stdlib.ZArith.BinInt Z le_gt_cases thm
-R13744:13746 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13730:13740 stdpp.bitvector.definitions <> bv_unsigned proj
-R13747:13757 stdpp.bitvector.definitions <> bv_unsigned proj
-R13713:13725 Stdlib.ZArith.BinInt Z le_gt_cases thm
-R13744:13746 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13730:13740 stdpp.bitvector.definitions <> bv_unsigned proj
-R13747:13757 stdpp.bitvector.definitions <> bv_unsigned proj
-R13800:13810 Stdlib.ZArith.BinInt Z mod_small thm
-R13800:13810 Stdlib.ZArith.BinInt Z mod_small thm
-R13800:13810 Stdlib.ZArith.BinInt Z mod_small thm
-R13906:13932 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13862:13862 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R13894:13899 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R13877:13879 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13863:13873 stdpp.bitvector.definitions <> bv_unsigned proj
-R13880:13890 stdpp.bitvector.definitions <> bv_unsigned proj
-R13901:13903 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R13933:13933 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R13965:13968 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R13948:13950 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13934:13944 stdpp.bitvector.definitions <> bv_unsigned proj
-R13951:13961 stdpp.bitvector.definitions <> bv_unsigned proj
-R13970:13972 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R13906:13932 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13862:13862 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R13894:13899 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
-R13877:13879 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13863:13873 stdpp.bitvector.definitions <> bv_unsigned proj
-R13880:13890 stdpp.bitvector.definitions <> bv_unsigned proj
-R13901:13903 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R13933:13933 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R13965:13968 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R13948:13950 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R13934:13944 stdpp.bitvector.definitions <> bv_unsigned proj
-R13951:13961 stdpp.bitvector.definitions <> bv_unsigned proj
-R13970:13972 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14001:14011 Stdlib.ZArith.BinInt Z mod_small thm
-R14014:14014 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14046:14049 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14029:14031 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R14015:14025 stdpp.bitvector.definitions <> bv_unsigned proj
-R14032:14042 stdpp.bitvector.definitions <> bv_unsigned proj
-R14051:14053 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14060:14062 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14001:14011 Stdlib.ZArith.BinInt Z mod_small thm
-R14014:14014 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14046:14049 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14029:14031 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R14015:14025 stdpp.bitvector.definitions <> bv_unsigned proj
-R14032:14042 stdpp.bitvector.definitions <> bv_unsigned proj
-R14051:14053 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14060:14062 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14001:14011 Stdlib.ZArith.BinInt Z mod_small thm
-R14014:14014 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14046:14049 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14029:14031 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R14015:14025 stdpp.bitvector.definitions <> bv_unsigned proj
-R14032:14042 stdpp.bitvector.definitions <> bv_unsigned proj
-R14051:14053 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14060:14062 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14001:14011 Stdlib.ZArith.BinInt Z mod_small thm
-R14014:14014 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14046:14049 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14029:14031 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
-R14015:14025 stdpp.bitvector.definitions <> bv_unsigned proj
-R14032:14042 stdpp.bitvector.definitions <> bv_unsigned proj
-R14051:14053 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14060:14062 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14096:14112 Stdlib.ZArith.Zdiv <> Zplus_mod_idemp_r thm
-R14096:14112 Stdlib.ZArith.Zdiv <> Zplus_mod_idemp_r thm
-R14096:14112 Stdlib.ZArith.Zdiv <> Zplus_mod_idemp_r thm
-R14123:14137 Stdlib.ZArith.Zdiv <> Z_mod_same_full thm
-R14123:14137 Stdlib.ZArith.Zdiv <> Z_mod_same_full thm
-R14123:14137 Stdlib.ZArith.Zdiv <> Z_mod_same_full thm
-R14214:14224 Stdlib.ZArith.BinInt Z mod_small thm
-R14214:14224 Stdlib.ZArith.BinInt Z mod_small thm
-R14214:14224 Stdlib.ZArith.BinInt Z mod_small thm
-R14248:14258 Stdlib.ZArith.BinInt Z mod_small thm
-R14261:14271 stdpp.bitvector.definitions <> bv_unsigned proj
-R14279:14281 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14248:14258 Stdlib.ZArith.BinInt Z mod_small thm
-R14261:14271 stdpp.bitvector.definitions <> bv_unsigned proj
-R14279:14281 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14248:14258 Stdlib.ZArith.BinInt Z mod_small thm
-R14261:14271 stdpp.bitvector.definitions <> bv_unsigned proj
-R14279:14281 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14248:14258 Stdlib.ZArith.BinInt Z mod_small thm
-R14261:14271 stdpp.bitvector.definitions <> bv_unsigned proj
-R14279:14281 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14307:14317 stdpp.bitvector.definitions <> bv_unsigned proj
-R14331:14331 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14352:14355 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14346:14348 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14332:14342 stdpp.bitvector.definitions <> bv_unsigned proj
-R14356:14356 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
-R14360:14363 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
-R14365:14367 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14307:14317 stdpp.bitvector.definitions <> bv_unsigned proj
-R14331:14331 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14352:14355 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14346:14348 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
-R14332:14342 stdpp.bitvector.definitions <> bv_unsigned proj
-R14356:14356 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
-R14360:14363 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
-R14365:14367 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R14392:14406 Stdlib.ZArith.Zdiv <> Z_mod_plus_full thm
-R14392:14406 Stdlib.ZArith.Zdiv <> Z_mod_plus_full thm
-R14392:14406 Stdlib.ZArith.Zdiv <> Z_mod_plus_full thm
-prf 14570:14586 <> pipe_count_decr_r
-R14597:14601 SailStdpp.Values <> mword def
-binder 14589:14590 <> nr:22
-binder 14592:14593 <> nw:23
-R14630:14635 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R14611:14623 xv6iris.PipeInvDefs <> pipe_count_ok def
-R14625:14626 xv6iris.PipeInvDefs <> nr:22 var
-R14628:14629 xv6iris.PipeInvDefs <> nw:23 var
-R14644:14649 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R14638:14641 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
-R14636:14637 xv6iris.PipeInvDefs <> nr:22 var
-R14642:14643 xv6iris.PipeInvDefs <> nw:23 var
-R14650:14662 xv6iris.PipeInvDefs <> pipe_count_ok def
-R14665:14671 SailStdpp.Operators_mwords <> add_vec def
-R14694:14698 SailStdpp.Values <> mword def
-R14677:14688 SailStdpp.Values <> mword_of_int def
-R14673:14674 xv6iris.PipeInvDefs <> nr:22 var
-R14705:14706 xv6iris.PipeInvDefs <> nw:23 var
-R14725:14737 xv6iris.PipeInvDefs <> pipe_count_ok def
-R14740:14749 xv6iris.PipeInvDefs <> pipe_count def
-R14782:14790 xv6iris.PipeInvDefs <> u32_range thm
-R14782:14790 xv6iris.PipeInvDefs <> u32_range thm
-R14816:14824 xv6iris.PipeInvDefs <> u32_range thm
-R14816:14824 xv6iris.PipeInvDefs <> u32_range thm
-R14848:14865 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
-R14867:14876 xv6iris.PipeInvDefs <> wrap32_mod thm
-R14848:14865 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
-R14848:14865 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
-R14867:14876 xv6iris.PipeInvDefs <> wrap32_mod thm
-R14867:14876 xv6iris.PipeInvDefs <> wrap32_mod thm
-R14933:14935 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R14894:14904 stdpp.bitvector.definitions <> bv_unsigned proj
-R14924:14928 SailStdpp.Values <> mword def
-R14907:14918 SailStdpp.Values <> mword_of_int def
-R14933:14935 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R14894:14904 stdpp.bitvector.definitions <> bv_unsigned proj
-R14924:14928 SailStdpp.Values <> mword def
-R14907:14918 SailStdpp.Values <> mword_of_int def
-R14993:15013 xv6iris.PipeInvDefs <> pipe_count_arith_decr thm
-R14993:15013 xv6iris.PipeInvDefs <> pipe_count_arith_decr thm
-R15071:15075 stdpp.bitvector.definitions <> bv_eq thm
-R15071:15075 stdpp.bitvector.definitions <> bv_eq thm
-def 15280:15290 <> pipe_rw_ret
-R15297:15297 Corelib.Numbers.BinNums <> Z ind
-binder 15293:15293 <> n:24
-R15305:15309 SailStdpp.Values <> mword def
-binder 15301:15301 <> r:25
-R15361:15366 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
-R15328:15331 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R15360:15360 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R15327:15327 xv6iris.PipeInvDefs <> r:25 var
-R15352:15356 SailStdpp.Values <> mword def
-R15332:15343 SailStdpp.Values <> mword_of_int def
-R15367:15373 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
-R15379:15380 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
-R15378:15378 Corelib.Numbers.BinNums <> Z ind
-binder 15374:15374 <> i:26
-R15412:15415 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
-R15382:15385 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R15411:15411 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R15381:15381 xv6iris.PipeInvDefs <> r:25 var
-R15403:15407 SailStdpp.Values <> mword def
-R15386:15397 SailStdpp.Values <> mword_of_int def
-R15399:15399 xv6iris.PipeInvDefs <> i:26 var
-R15418:15421 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<='_x not
-R15423:15426 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<='_x not
-R15422:15422 xv6iris.PipeInvDefs <> i:26 var
-R15422:15422 xv6iris.PipeInvDefs <> i:26 var
-R15427:15431 Stdlib.ZArith.BinInt Z max def
-R15435:15435 xv6iris.PipeInvDefs <> n:24 var
-rec 15859:15868 <> pipe_names
-proj 15889:15895 <> pn_read
-proj 15906:15913 <> pn_write
-proj 15928:15935 <> pn_mread
-proj 15946:15954 <> pn_mwrite
-R15899:15903 iris.base_logic.lib.iprop <> gname def
-R15917:15921 iris.base_logic.lib.iprop <> gname def
-R15939:15943 iris.base_logic.lib.iprop <> gname def
-R15958:15962 iris.base_logic.lib.iprop <> gname def
-def 15979:15984 <> pn_end
-R15993:16002 xv6iris.PipeInvDefs <> pipe_names rec
-binder 15987:15989 <> γp:32
-R16010:16013 Corelib.Init.Datatypes <> bool ind
-binder 16006:16006 <> w:33
-R16018:16022 iris.base_logic.lib.iprop <> gname def
-R16029:16031 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R16033:16038 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R16051:16056 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R16057:16063 xv6iris.PipeInvDefs <> pn_read proj
-R16065:16067 xv6iris.PipeInvDefs <> γp:32 var
-R16039:16046 xv6iris.PipeInvDefs <> pn_write proj
-R16048:16050 xv6iris.PipeInvDefs <> γp:32 var
-R16032:16032 xv6iris.PipeInvDefs <> w:33 var
-def 16081:16087 <> pn_mark
-R16096:16105 xv6iris.PipeInvDefs <> pipe_names rec
-binder 16090:16092 <> γp:34
-R16113:16116 Corelib.Init.Datatypes <> bool ind
-binder 16109:16109 <> w:35
-R16121:16125 iris.base_logic.lib.iprop <> gname def
-R16132:16134 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R16136:16141 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R16155:16160 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R16161:16168 xv6iris.PipeInvDefs <> pn_mread proj
-R16170:16172 xv6iris.PipeInvDefs <> γp:34 var
-R16142:16150 xv6iris.PipeInvDefs <> pn_mwrite proj
-R16152:16154 xv6iris.PipeInvDefs <> γp:34 var
-R16135:16135 xv6iris.PipeInvDefs <> w:35 var
-sec 16184:16190 <> PipeInv
-R16206:16212 xv6iris.RiscvPtsto <> riscvGS class
-R16219:16223 xv6iris.Xv6Cameras <> lockG class
-R16225:16226 xv6iris.PipeInvDefs <> Σ:36 var
-R16230:16234 xv6iris.Xv6Cameras <> pipeG class
-R16236:16237 xv6iris.PipeInvDefs <> Σ:36 var
-var  16253:16254 PipeInv XI
-R16258:16263 xv6iris.TsoCtx <> CurCtx class
-def 16968:16975 <> pipe_ref
-R16984:16993 xv6iris.PipeInvDefs <> pipe_names rec
-binder 16978:16980 <> γp:41
-R17001:17004 Corelib.Init.Datatypes <> bool ind
-binder 16997:16997 <> w:42
-R17012:17013 stdpp.numbers <> Qp rec
-binder 17008:17008 <> q:43
-R17018:17022 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R17024:17025 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R17034:17036 iris.base_logic.lib.own <> own def
-R17053:17053 xv6iris.PipeInvDefs <> q:43 var
-R17039:17044 xv6iris.PipeInvDefs <> pn_end def
-R17046:17048 xv6iris.PipeInvDefs <> γp:41 var
-R17050:17050 xv6iris.PipeInvDefs <> w:42 var
-def 17206:17218 <> pipe_end_full
-R17227:17236 xv6iris.PipeInvDefs <> pipe_names rec
-binder 17221:17223 <> γp:44
-R17244:17247 Corelib.Init.Datatypes <> bool ind
-binder 17240:17240 <> w:45
-R17252:17256 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R17258:17259 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R17268:17275 xv6iris.PipeInvDefs <> pipe_ref def
-R17277:17279 xv6iris.PipeInvDefs <> γp:44 var
-R17281:17281 xv6iris.PipeInvDefs <> w:45 var
-inst 17308:17324 <> pipe_ref_timeless
-binder 17326:17328 <> γp:46
-binder 17330:17330 <> w:47
-binder 17332:17332 <> q:48
-R17336:17343 iris.bi.derived_connectives <> Timeless class
-R17346:17353 xv6iris.PipeInvDefs <> pipe_ref def
-R17355:17357 xv6iris.PipeInvDefs <> γp:46 var
-R17359:17359 xv6iris.PipeInvDefs <> w:47 var
-R17361:17361 xv6iris.PipeInvDefs <> q:48 var
-inst 17406:17427 <> pipe_end_full_timeless
-binder 17429:17431 <> γp:49
-binder 17433:17433 <> w:50
-R17437:17444 iris.bi.derived_connectives <> Timeless class
-R17447:17459 xv6iris.PipeInvDefs <> pipe_end_full def
-R17461:17463 xv6iris.PipeInvDefs <> γp:49 var
-R17465:17465 xv6iris.PipeInvDefs <> w:50 var
-inst 17511:17529 <> pipe_ref_fractional
-binder 17531:17533 <> γp:51
-binder 17535:17535 <> w:52
-R17543:17552 iris.bi.lib.fractional <> Fractional class
-binder 17559:17559 <> q:53
-R17564:17571 xv6iris.PipeInvDefs <> pipe_ref def
-R17573:17575 xv6iris.PipeInvDefs <> γp:51 var
-R17577:17577 xv6iris.PipeInvDefs <> w:52 var
-R17579:17579 xv6iris.PipeInvDefs <> q:53 var
-R17618:17625 xv6iris.PipeInvDefs <> pipe_ref def
-R17628:17633 iris.base_logic.lib.own <> own_op thm
-R17635:17641 iris.algebra.frac <> frac_op thm
-R17618:17625 xv6iris.PipeInvDefs <> pipe_ref def
-R17618:17625 xv6iris.PipeInvDefs <> pipe_ref def
-R17628:17633 iris.base_logic.lib.own <> own_op thm
-R17628:17633 iris.base_logic.lib.own <> own_op thm
-R17635:17641 iris.algebra.frac <> frac_op thm
-R17635:17641 iris.algebra.frac <> frac_op thm
-prf 17658:17671 <> pipe_ref_split
-binder 17673:17675 <> γp:54
-binder 17677:17677 <> w:55
-binder 17679:17680 <> q1:56
-binder 17682:17683 <> q2:57
-R17715:17722 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
-R17691:17698 xv6iris.PipeInvDefs <> pipe_ref def
-R17700:17702 xv6iris.PipeInvDefs <> γp:54 var
-R17704:17704 xv6iris.PipeInvDefs <> w:55 var
-R17709:17711 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
-R17707:17708 xv6iris.PipeInvDefs <> q1:56 var
-R17712:17713 xv6iris.PipeInvDefs <> q2:57 var
-R17740:17744 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R17723:17730 xv6iris.PipeInvDefs <> pipe_ref def
-R17732:17734 xv6iris.PipeInvDefs <> γp:54 var
-R17736:17736 xv6iris.PipeInvDefs <> w:55 var
-R17738:17739 xv6iris.PipeInvDefs <> q1:56 var
-R17745:17752 xv6iris.PipeInvDefs <> pipe_ref def
-R17754:17756 xv6iris.PipeInvDefs <> γp:54 var
-R17758:17758 xv6iris.PipeInvDefs <> w:55 var
-R17760:17761 xv6iris.PipeInvDefs <> q2:57 var
-R17785:17792 xv6iris.PipeInvDefs <> pipe_ref def
-R17795:17800 iris.base_logic.lib.own <> own_op thm
-R17802:17808 iris.algebra.frac <> frac_op thm
-R17785:17792 xv6iris.PipeInvDefs <> pipe_ref def
-R17785:17792 xv6iris.PipeInvDefs <> pipe_ref def
-R17795:17800 iris.base_logic.lib.own <> own_op thm
-R17795:17800 iris.base_logic.lib.own <> own_op thm
-R17802:17808 iris.algebra.frac <> frac_op thm
-R17802:17808 iris.algebra.frac <> frac_op thm
-prf 17825:17838 <> pipe_ref_valid
-binder 17840:17842 <> γp:58
-binder 17844:17844 <> w:59
-binder 17846:17846 <> q:60
-R17866:17871 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R17850:17857 xv6iris.PipeInvDefs <> pipe_ref def
-R17859:17861 xv6iris.PipeInvDefs <> γp:58 var
-R17863:17863 xv6iris.PipeInvDefs <> w:59 var
-R17865:17865 xv6iris.PipeInvDefs <> q:60 var
-R17872:17874 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R17887:17889 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R17877:17881 stdpp.numbers Qp.notations ::Qp_scope:x_'≤'_x not
-R17876:17876 xv6iris.PipeInvDefs <> q:60 var
-R17927:17927 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R17937:17942 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R17946:17946 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R17928:17936 iris.base_logic.lib.own <> own_valid thm
-R17954:17963 iris.algebra.frac <> frac_valid thm
-R17927:17927 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R17937:17942 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R17946:17946 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R17928:17936 iris.base_logic.lib.own <> own_valid thm
-R17954:17963 iris.algebra.frac <> frac_valid thm
-prf 18061:18078 <> pipe_end_full_excl
-binder 18080:18082 <> γp:61
-binder 18084:18084 <> w:62
-binder 18086:18086 <> q:63
-R18113:18118 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R18094:18106 xv6iris.PipeInvDefs <> pipe_end_full def
-R18108:18110 xv6iris.PipeInvDefs <> γp:61 var
-R18112:18112 xv6iris.PipeInvDefs <> w:62 var
-R18135:18140 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R18119:18126 xv6iris.PipeInvDefs <> pipe_ref def
-R18128:18130 xv6iris.PipeInvDefs <> γp:61 var
-R18132:18132 xv6iris.PipeInvDefs <> w:62 var
-R18134:18134 xv6iris.PipeInvDefs <> q:63 var
-R18141:18145 iris.bi.interface <> ::bi_scope:'False' not
-R18192:18192 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R18204:18209 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R18217:18217 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R18193:18203 iris.base_logic.lib.own <> own_valid_2 thm
-R18192:18192 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R18204:18209 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R18217:18217 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R18193:18203 iris.base_logic.lib.own <> own_valid_2 thm
-R18239:18245 iris.algebra.frac <> frac_op thm
-R18239:18245 iris.algebra.frac <> frac_op thm
-R18239:18245 iris.algebra.frac <> frac_op thm
-R18260:18269 iris.algebra.frac <> frac_valid thm
-R18260:18269 iris.algebra.frac <> frac_valid thm
-R18301:18315 stdpp.numbers Qp not_add_le_l thm
-R18301:18315 stdpp.numbers Qp not_add_le_l thm
-prf 18342:18359 <> pipe_ref_full_excl
-binder 18361:18363 <> γp:64
-binder 18365:18365 <> w:65
-binder 18367:18367 <> q:66
-R18391:18396 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R18375:18382 xv6iris.PipeInvDefs <> pipe_ref def
-R18384:18386 xv6iris.PipeInvDefs <> γp:64 var
-R18388:18388 xv6iris.PipeInvDefs <> w:65 var
-R18413:18418 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R18397:18404 xv6iris.PipeInvDefs <> pipe_ref def
-R18406:18408 xv6iris.PipeInvDefs <> γp:64 var
-R18410:18410 xv6iris.PipeInvDefs <> w:65 var
-R18412:18412 xv6iris.PipeInvDefs <> q:66 var
-R18419:18423 iris.bi.interface <> ::bi_scope:'False' not
-R18441:18458 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
-R18441:18458 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
-def 19303:19315 <> pipe_openmark
-R19324:19333 xv6iris.PipeInvDefs <> pipe_names rec
-binder 19318:19320 <> γp:67
-R19341:19344 Corelib.Init.Datatypes <> bool ind
-binder 19337:19337 <> w:68
-R19349:19353 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R19355:19356 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R19365:19367 iris.base_logic.lib.own <> own def
-R19386:19393 iris.algebra.dfrac <> DfracOwn constr
-R19370:19376 xv6iris.PipeInvDefs <> pn_mark def
-R19378:19380 xv6iris.PipeInvDefs <> γp:67 var
-R19382:19382 xv6iris.PipeInvDefs <> w:68 var
-def 19412:19420 <> pipe_shut
-R19429:19438 xv6iris.PipeInvDefs <> pipe_names rec
-binder 19423:19425 <> γp:69
-R19446:19449 Corelib.Init.Datatypes <> bool ind
-binder 19442:19442 <> w:70
-R19454:19458 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R19460:19461 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R19470:19472 iris.base_logic.lib.own <> own def
-R19490:19503 iris.algebra.dfrac <> DfracDiscarded constr
-R19475:19481 xv6iris.PipeInvDefs <> pn_mark def
-R19483:19485 xv6iris.PipeInvDefs <> γp:69 var
-R19487:19487 xv6iris.PipeInvDefs <> w:70 var
-inst 19525:19546 <> pipe_openmark_timeless
-binder 19548:19550 <> γp:71
-binder 19552:19552 <> w:72
-R19556:19563 iris.bi.derived_connectives <> Timeless class
-R19566:19578 xv6iris.PipeInvDefs <> pipe_openmark def
-R19580:19582 xv6iris.PipeInvDefs <> γp:71 var
-R19584:19584 xv6iris.PipeInvDefs <> w:72 var
-inst 19629:19648 <> pipe_shut_persistent
-binder 19650:19652 <> γp:73
-binder 19654:19654 <> w:74
-R19658:19667 iris.bi.derived_connectives <> Persistent class
-R19670:19678 xv6iris.PipeInvDefs <> pipe_shut def
-R19680:19682 xv6iris.PipeInvDefs <> γp:73 var
-R19684:19684 xv6iris.PipeInvDefs <> w:74 var
-inst 19729:19746 <> pipe_shut_timeless
-binder 19748:19750 <> γp:75
-binder 19752:19752 <> w:76
-R19756:19763 iris.bi.derived_connectives <> Timeless class
-R19766:19774 xv6iris.PipeInvDefs <> pipe_shut def
-R19776:19778 xv6iris.PipeInvDefs <> γp:75 var
-R19780:19780 xv6iris.PipeInvDefs <> w:76 var
-prf 19816:19833 <> pipe_shut_openmark
-binder 19835:19837 <> γp:77
-binder 19839:19839 <> w:78
-R19862:19867 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R19847:19855 xv6iris.PipeInvDefs <> pipe_shut def
-R19857:19859 xv6iris.PipeInvDefs <> γp:77 var
-R19861:19861 xv6iris.PipeInvDefs <> w:78 var
-R19887:19892 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R19868:19880 xv6iris.PipeInvDefs <> pipe_openmark def
-R19882:19884 xv6iris.PipeInvDefs <> γp:77 var
-R19886:19886 xv6iris.PipeInvDefs <> w:78 var
-R19893:19897 iris.bi.interface <> ::bi_scope:'False' not
-R19947:19947 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R19959:19964 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R19972:19972 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R19948:19958 iris.base_logic.lib.own <> own_valid_2 thm
-R19947:19947 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R19959:19964 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R19972:19972 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R19948:19958 iris.base_logic.lib.own <> own_valid_2 thm
-prf 19997:20014 <> pipe_openmark_shut
-binder 20016:20018 <> γp:79
-binder 20020:20020 <> w:80
-R20043:20049 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
-R20024:20036 xv6iris.PipeInvDefs <> pipe_openmark def
-R20038:20040 xv6iris.PipeInvDefs <> γp:79 var
-R20042:20042 xv6iris.PipeInvDefs <> w:80 var
-R20050:20058 xv6iris.PipeInvDefs <> pipe_shut def
-R20060:20062 xv6iris.PipeInvDefs <> γp:79 var
-R20064:20064 xv6iris.PipeInvDefs <> w:80 var
-R20096:20096 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R20107:20112 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R20116:20116 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R20097:20106 iris.base_logic.lib.own <> own_update thm
-R20096:20096 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R20107:20112 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R20116:20116 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R20097:20106 iris.base_logic.lib.own <> own_update thm
-R20125:20144 iris.algebra.dfrac <> dfrac_discard_update thm
-R20125:20144 iris.algebra.dfrac <> dfrac_discard_update thm
-def 20166:20178 <> pipe_endstate
-R20187:20196 xv6iris.PipeInvDefs <> pipe_names rec
-binder 20181:20183 <> γp:81
-R20204:20207 Corelib.Init.Datatypes <> bool ind
-binder 20200:20200 <> w:82
-R20215:20219 SailStdpp.Values <> mword def
-binder 20211:20211 <> v:83
-R20227:20231 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R20233:20234 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R20286:20332 iris.bi.interface <> ::bi_scope:x_'∨'_x not
-R20262:20266 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R20244:20246 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R20259:20261 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R20247:20256 xv6iris.PipeInvDefs <> pflag_open def
-R20258:20258 xv6iris.PipeInvDefs <> v:83 var
-R20267:20279 xv6iris.PipeInvDefs <> pipe_openmark def
-R20281:20283 xv6iris.PipeInvDefs <> γp:81 var
-R20285:20285 xv6iris.PipeInvDefs <> w:82 var
-R20370:20374 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R20333:20335 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R20367:20369 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R20337:20340 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R20366:20366 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R20336:20336 xv6iris.PipeInvDefs <> v:83 var
-R20358:20362 SailStdpp.Values <> mword def
-R20341:20352 SailStdpp.Values <> mword_of_int def
-R20394:20398 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R20375:20387 xv6iris.PipeInvDefs <> pipe_end_full def
-R20389:20391 xv6iris.PipeInvDefs <> γp:81 var
-R20393:20393 xv6iris.PipeInvDefs <> w:82 var
-R20399:20407 xv6iris.PipeInvDefs <> pipe_shut def
-R20409:20411 xv6iris.PipeInvDefs <> γp:81 var
-R20413:20413 xv6iris.PipeInvDefs <> w:82 var
-inst 20520:20541 <> pipe_endstate_timeless
-binder 20543:20545 <> γp:84
-binder 20547:20547 <> w:85
-binder 20549:20549 <> v:86
-R20553:20560 iris.bi.derived_connectives <> Timeless class
-R20563:20575 xv6iris.PipeInvDefs <> pipe_endstate def
-R20577:20579 xv6iris.PipeInvDefs <> γp:84 var
-R20581:20581 xv6iris.PipeInvDefs <> w:85 var
-R20583:20583 xv6iris.PipeInvDefs <> v:86 var
-prf 20619:20642 <> pipe_endstate_open_intro
-binder 20644:20646 <> γp:87
-binder 20648:20648 <> w:88
-binder 20650:20650 <> v:89
-R20670:20673 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R20658:20667 xv6iris.PipeInvDefs <> pflag_open def
-R20669:20669 xv6iris.PipeInvDefs <> v:89 var
-R20693:20698 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R20674:20686 xv6iris.PipeInvDefs <> pipe_openmark def
-R20688:20690 xv6iris.PipeInvDefs <> γp:87 var
-R20692:20692 xv6iris.PipeInvDefs <> w:88 var
-R20699:20711 xv6iris.PipeInvDefs <> pipe_endstate def
-R20713:20715 xv6iris.PipeInvDefs <> γp:87 var
-R20717:20717 xv6iris.PipeInvDefs <> w:88 var
-R20719:20719 xv6iris.PipeInvDefs <> v:89 var
-prf 20924:20943 <> pipe_endstate_holder
-binder 20945:20947 <> γp:90
-binder 20949:20949 <> w:91
-binder 20951:20951 <> v:92
-binder 20953:20953 <> q:93
-R20982:20987 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R20961:20973 xv6iris.PipeInvDefs <> pipe_endstate def
-R20975:20977 xv6iris.PipeInvDefs <> γp:90 var
-R20979:20979 xv6iris.PipeInvDefs <> w:91 var
-R20981:20981 xv6iris.PipeInvDefs <> v:92 var
-R21004:21009 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R20988:20995 xv6iris.PipeInvDefs <> pipe_ref def
-R20997:20999 xv6iris.PipeInvDefs <> γp:90 var
-R21001:21001 xv6iris.PipeInvDefs <> w:91 var
-R21003:21003 xv6iris.PipeInvDefs <> q:93 var
-R21010:21012 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R21025:21027 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R21013:21022 xv6iris.PipeInvDefs <> pflag_open def
-R21024:21024 xv6iris.PipeInvDefs <> v:92 var
-R21145:21145 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21164:21169 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21180:21180 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21146:21163 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
-R21145:21145 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21164:21169 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21180:21180 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21146:21163 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
-prf 21357:21374 <> pipe_endstate_shut
-binder 21376:21378 <> γp:94
-binder 21380:21380 <> w:95
-binder 21382:21382 <> v:96
-R21411:21416 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R21390:21402 xv6iris.PipeInvDefs <> pipe_endstate def
-R21404:21406 xv6iris.PipeInvDefs <> γp:94 var
-R21408:21408 xv6iris.PipeInvDefs <> w:95 var
-R21410:21410 xv6iris.PipeInvDefs <> v:96 var
-R21433:21443 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
-R21417:21424 xv6iris.PipeInvDefs <> pipe_ref def
-R21426:21428 xv6iris.PipeInvDefs <> γp:94 var
-R21430:21430 xv6iris.PipeInvDefs <> w:95 var
-R21491:21495 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R21444:21456 xv6iris.PipeInvDefs <> pipe_endstate def
-R21458:21460 xv6iris.PipeInvDefs <> γp:94 var
-R21462:21462 xv6iris.PipeInvDefs <> w:95 var
-R21482:21486 SailStdpp.Values <> mword def
-R21465:21476 SailStdpp.Values <> mword_of_int def
-R21496:21504 xv6iris.PipeInvDefs <> pipe_shut def
-R21506:21508 xv6iris.PipeInvDefs <> γp:94 var
-R21510:21510 xv6iris.PipeInvDefs <> w:95 var
-R21626:21626 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21645:21650 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21664:21664 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21627:21644 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
-R21626:21626 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21645:21650 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21664:21664 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21627:21644 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
-R21678:21678 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21697:21702 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21710:21710 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21679:21696 xv6iris.PipeInvDefs <> pipe_openmark_shut thm
-R21678:21678 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21697:21702 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21710:21710 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R21679:21696 xv6iris.PipeInvDefs <> pipe_openmark_shut thm
-prf 22013:22035 <> pipe_endstate_shut_elim
-binder 22037:22039 <> γp:97
-binder 22041:22041 <> w:98
-binder 22043:22043 <> v:99
-R22066:22071 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R22051:22059 xv6iris.PipeInvDefs <> pipe_shut def
-R22061:22063 xv6iris.PipeInvDefs <> γp:97 var
-R22065:22065 xv6iris.PipeInvDefs <> w:98 var
-R22093:22102 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R22072:22084 xv6iris.PipeInvDefs <> pipe_endstate def
-R22086:22088 xv6iris.PipeInvDefs <> γp:97 var
-R22090:22090 xv6iris.PipeInvDefs <> w:98 var
-R22092:22092 xv6iris.PipeInvDefs <> v:99 var
-R22140:22144 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R22103:22105 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R22137:22139 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R22107:22110 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R22136:22136 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R22106:22106 xv6iris.PipeInvDefs <> v:99 var
-R22128:22132 SailStdpp.Values <> mword def
-R22111:22122 SailStdpp.Values <> mword_of_int def
-R22145:22157 xv6iris.PipeInvDefs <> pipe_end_full def
-R22159:22161 xv6iris.PipeInvDefs <> γp:97 var
-R22163:22163 xv6iris.PipeInvDefs <> w:98 var
-R22235:22235 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R22254:22259 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R22267:22267 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R22236:22253 xv6iris.PipeInvDefs <> pipe_shut_openmark thm
-R22235:22235 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R22254:22259 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R22267:22267 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R22236:22253 xv6iris.PipeInvDefs <> pipe_shut_openmark thm
-prf 22504:22523 <> pipe_endstate_closed
-binder 22525:22527 <> γp:100
-binder 22529:22529 <> w:101
-binder 22531:22531 <> v:102
-R22553:22560 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R22539:22540 Corelib.Init.Logic <> ::type_scope:'~'_x not
-R22541:22550 xv6iris.PipeInvDefs <> pflag_open def
-R22552:22552 xv6iris.PipeInvDefs <> v:102 var
-R22582:22587 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R22561:22573 xv6iris.PipeInvDefs <> pipe_endstate def
-R22575:22577 xv6iris.PipeInvDefs <> γp:100 var
-R22579:22579 xv6iris.PipeInvDefs <> w:101 var
-R22581:22581 xv6iris.PipeInvDefs <> v:102 var
-R22609:22613 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R22588:22600 xv6iris.PipeInvDefs <> pipe_endstate def
-R22602:22604 xv6iris.PipeInvDefs <> γp:100 var
-R22606:22606 xv6iris.PipeInvDefs <> w:101 var
-R22608:22608 xv6iris.PipeInvDefs <> v:102 var
-R22614:22622 xv6iris.PipeInvDefs <> pipe_shut def
-R22624:22626 xv6iris.PipeInvDefs <> γp:100 var
-R22628:22628 xv6iris.PipeInvDefs <> w:101 var
-prf 22896:22909 <> pipe_shut_both
-binder 22911:22913 <> γp:103
-binder 22915:22915 <> w:104
-R22938:22943 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R22923:22931 xv6iris.PipeInvDefs <> pipe_shut def
-R22933:22935 xv6iris.PipeInvDefs <> γp:103 var
-R22937:22937 xv6iris.PipeInvDefs <> w:104 var
-R22966:22975 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R22944:22952 xv6iris.PipeInvDefs <> pipe_shut def
-R22954:22956 xv6iris.PipeInvDefs <> γp:103 var
-R22959:22962 Corelib.Init.Datatypes <> negb def
-R22964:22964 xv6iris.PipeInvDefs <> w:104 var
-R22995:22999 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R22976:22984 xv6iris.PipeInvDefs <> pipe_shut def
-R22986:22988 xv6iris.PipeInvDefs <> γp:103 var
-R22990:22994 Corelib.Init.Datatypes <> false constr
-R23000:23008 xv6iris.PipeInvDefs <> pipe_shut def
-R23010:23012 xv6iris.PipeInvDefs <> γp:103 var
-R23014:23017 Corelib.Init.Datatypes <> true constr
-def 23514:23522 <> pipe_data
-R23530:23534 SailStdpp.Values <> mword def
-binder 23525:23526 <> pi:105
-R23546:23549 Corelib.Init.Datatypes <> list ind
-R23552:23553 stdpp.bitvector.definitions <> bv rec
-binder 23541:23542 <> bs:106
-R23561:23565 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R23567:23568 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R23578:23588 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
-R23590:23594 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
-R23596:23600 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
-R23603:23604 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
-binder 23589:23589 <> j:107
-binder 23589:23589 <> j:108
-binder 23595:23595 <> b:109
-binder 23595:23595 <> b:110
-R23634:23641 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
-R23605:23610 xv6iris.RiscvModelBytes <> pa_add def
-R23612:23613 xv6iris.PipeInvDefs <> pi:105 var
-R23629:23631 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
-R23616:23628 xv6iris.PipeInvDefs <> pipe_data_off def
-R23632:23632 xv6iris.PipeInvDefs <> j:107 var
-R23642:23642 xv6iris.PipeInvDefs <> b:109 var
-R23601:23602 xv6iris.PipeInvDefs <> bs:106 var
-def 23940:23949 <> pipe_slack
-R23957:23961 SailStdpp.Values <> mword def
-binder 23952:23953 <> pi:111
-R23969:23973 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R23975:23976 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R23986:23986 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R24035:24046 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R24140:24140 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R23987:23997 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-R23999:24003 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-R24011:24012 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-binder 23998:23998 <> j:112
-binder 23998:23998 <> j:113
-R24013:24020 xv6iris.KallocInv <> byte_any def
-R24023:24028 xv6iris.RiscvModelBytes <> pa_add def
-R24030:24031 xv6iris.PipeInvDefs <> pi:111 var
-R24033:24033 xv6iris.PipeInvDefs <> j:112 var
-R24004:24006 Corelib.Lists.ListDef <> seq def
-R24047:24057 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-R24059:24063 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-R24108:24117 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-binder 24058:24058 <> j:114
-binder 24058:24058 <> j:115
-R24118:24125 xv6iris.KallocInv <> byte_any def
-R24128:24133 xv6iris.RiscvModelBytes <> pa_add def
-R24135:24136 xv6iris.PipeInvDefs <> pi:111 var
-R24138:24138 xv6iris.PipeInvDefs <> j:114 var
-R24064:24066 Corelib.Lists.ListDef <> seq def
-R24093:24095 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
-R24081:24092 xv6iris.PipeInvDefs <> pipe_pgbytes def
-R24096:24106 xv6iris.PipeInvDefs <> pipe_sizeof def
-R24068:24078 xv6iris.PipeInvDefs <> pipe_sizeof def
-def 24482:24489 <> pipe_res
-R24498:24507 xv6iris.PipeInvDefs <> pipe_names rec
-binder 24492:24494 <> γp:116
-R24516:24520 SailStdpp.Values <> mword def
-binder 24511:24512 <> pi:117
-R24528:24532 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R24534:24535 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R24545:24549 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R24610:24619 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R24564:24568 SailStdpp.Values <> mword def
-binder 24550:24551 <> nr:118
-R24564:24568 SailStdpp.Values <> mword def
-binder 24553:24554 <> nw:119
-R24564:24568 SailStdpp.Values <> mword def
-binder 24556:24557 <> ro:120
-R24564:24568 SailStdpp.Values <> mword def
-binder 24559:24560 <> wo:121
-R24583:24587 SailStdpp.Values <> mword def
-binder 24575:24579 <> vname:122
-R24599:24602 Corelib.Init.Datatypes <> list ind
-R24605:24606 stdpp.bitvector.definitions <> bv rec
-binder 24594:24595 <> bs:123
-R24651:24662 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R24638:24645 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
-R24620:24634 xv6iris.WpLock <> lock_name_field def
-R24636:24637 xv6iris.PipeInvDefs <> pi:117 var
-R24646:24650 xv6iris.PipeInvDefs <> vname:122 var
-R24689:24700 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R24674:24686 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
-R24663:24670 xv6iris.PipeInvDefs <> a_pnread def
-R24672:24673 xv6iris.PipeInvDefs <> pi:117 var
-R24687:24688 xv6iris.PipeInvDefs <> nr:118 var
-R24727:24738 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R24713:24724 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
-R24701:24709 xv6iris.PipeInvDefs <> a_pnwrite def
-R24711:24712 xv6iris.PipeInvDefs <> pi:117 var
-R24725:24726 xv6iris.PipeInvDefs <> nw:119 var
-R24765:24776 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R24755:24762 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
-R24739:24745 xv6iris.PipeInvDefs <> a_popen def
-R24747:24748 xv6iris.PipeInvDefs <> pi:117 var
-R24750:24754 Corelib.Init.Datatypes <> false constr
-R24763:24764 xv6iris.PipeInvDefs <> ro:120 var
-R24803:24814 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R24792:24800 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
-R24777:24783 xv6iris.PipeInvDefs <> a_popen def
-R24785:24786 xv6iris.PipeInvDefs <> pi:117 var
-R24788:24791 Corelib.Init.Datatypes <> true constr
-R24801:24802 xv6iris.PipeInvDefs <> wo:121 var
-R24841:24852 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R24815:24827 xv6iris.PipeInvDefs <> pipe_endstate def
-R24829:24831 xv6iris.PipeInvDefs <> γp:116 var
-R24833:24837 Corelib.Init.Datatypes <> false constr
-R24839:24840 xv6iris.PipeInvDefs <> ro:120 var
-R24878:24889 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R24853:24865 xv6iris.PipeInvDefs <> pipe_endstate def
-R24867:24869 xv6iris.PipeInvDefs <> γp:116 var
-R24871:24874 Corelib.Init.Datatypes <> true constr
-R24876:24877 xv6iris.PipeInvDefs <> wo:121 var
-R24915:24926 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R24890:24892 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R24912:24914 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R24893:24905 xv6iris.PipeInvDefs <> pipe_count_ok def
-R24907:24908 xv6iris.PipeInvDefs <> nr:118 var
-R24910:24911 xv6iris.PipeInvDefs <> nw:119 var
-R24953:24957 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R24927:24929 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R24950:24952 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R24939:24941 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R24930:24935 Stdlib.Lists.List <> length abbrev
-R24937:24938 xv6iris.PipeInvDefs <> bs:123 var
-R24942:24949 xv6iris.PipeInvDefs <> PIPESIZE def
-R24973:24984 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R24958:24966 xv6iris.PipeInvDefs <> pipe_data def
-R24968:24969 xv6iris.PipeInvDefs <> pi:117 var
-R24971:24972 xv6iris.PipeInvDefs <> bs:123 var
-R24985:24994 xv6iris.PipeInvDefs <> pipe_slack def
-R24996:24997 xv6iris.PipeInvDefs <> pi:117 var
-def 25228:25237 <> pipe_bytes
-R25245:25249 SailStdpp.Values <> mword def
-binder 25240:25241 <> pi:124
-R25257:25261 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R25263:25264 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R25274:25278 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R25339:25348 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R25287:25291 SailStdpp.Values <> mword def
-binder 25279:25283 <> vname:125
-R25312:25316 SailStdpp.Values <> mword def
-binder 25298:25299 <> nr:126
-R25312:25316 SailStdpp.Values <> mword def
-binder 25301:25302 <> nw:127
-R25312:25316 SailStdpp.Values <> mword def
-binder 25304:25305 <> ro:128
-R25312:25316 SailStdpp.Values <> mword def
-binder 25307:25308 <> wo:129
-R25328:25331 Corelib.Init.Datatypes <> list ind
-R25334:25335 stdpp.bitvector.definitions <> bv rec
-binder 25323:25324 <> bs:130
-R25380:25391 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R25367:25374 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
-R25349:25363 xv6iris.WpLock <> lock_name_field def
-R25365:25366 xv6iris.PipeInvDefs <> pi:124 var
-R25375:25379 xv6iris.PipeInvDefs <> vname:125 var
-R25418:25429 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R25403:25415 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
-R25392:25399 xv6iris.PipeInvDefs <> a_pnread def
-R25401:25402 xv6iris.PipeInvDefs <> pi:124 var
-R25416:25417 xv6iris.PipeInvDefs <> nr:126 var
-R25456:25467 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R25442:25453 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
-R25430:25438 xv6iris.PipeInvDefs <> a_pnwrite def
-R25440:25441 xv6iris.PipeInvDefs <> pi:124 var
-R25454:25455 xv6iris.PipeInvDefs <> nw:127 var
-R25494:25505 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R25484:25491 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
-R25468:25474 xv6iris.PipeInvDefs <> a_popen def
-R25476:25477 xv6iris.PipeInvDefs <> pi:124 var
-R25479:25483 Corelib.Init.Datatypes <> false constr
-R25492:25493 xv6iris.PipeInvDefs <> ro:128 var
-R25532:25543 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R25521:25529 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
-R25506:25512 xv6iris.PipeInvDefs <> a_popen def
-R25514:25515 xv6iris.PipeInvDefs <> pi:124 var
-R25517:25520 Corelib.Init.Datatypes <> true constr
-R25530:25531 xv6iris.PipeInvDefs <> wo:129 var
-R25570:25574 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R25544:25546 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R25567:25569 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R25556:25558 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R25547:25552 Stdlib.Lists.List <> length abbrev
-R25554:25555 xv6iris.PipeInvDefs <> bs:130 var
-R25559:25566 xv6iris.PipeInvDefs <> PIPESIZE def
-R25590:25601 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R25575:25583 xv6iris.PipeInvDefs <> pipe_data def
-R25585:25586 xv6iris.PipeInvDefs <> pi:124 var
-R25588:25589 xv6iris.PipeInvDefs <> bs:130 var
-R25602:25611 xv6iris.PipeInvDefs <> pipe_slack def
-R25613:25614 xv6iris.PipeInvDefs <> pi:124 var
-def 26296:26304 <> pipe_dead
-R26313:26317 iris.base_logic.lib.iprop <> gname def
-binder 26307:26309 <> γl:131
-R26327:26336 xv6iris.PipeInvDefs <> pipe_names rec
-binder 26321:26323 <> γp:132
-R26341:26345 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R26347:26348 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R26376:26380 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R26358:26366 xv6iris.WpLock <> lock_frag def
-R26368:26370 xv6iris.PipeInvDefs <> γl:131 var
-R26372:26375 Corelib.Init.Datatypes <> None constr
-R26404:26408 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R26381:26393 xv6iris.PipeInvDefs <> pipe_end_full def
-R26395:26397 xv6iris.PipeInvDefs <> γp:132 var
-R26399:26403 Corelib.Init.Datatypes <> false constr
-R26409:26421 xv6iris.PipeInvDefs <> pipe_end_full def
-R26423:26425 xv6iris.PipeInvDefs <> γp:132 var
-R26427:26430 Corelib.Init.Datatypes <> true constr
-inst 26455:26472 <> pipe_dead_timeless
-binder 26474:26476 <> γl:133
-binder 26478:26480 <> γp:134
-R26484:26491 iris.bi.derived_connectives <> Timeless class
-R26494:26502 xv6iris.PipeInvDefs <> pipe_dead def
-R26504:26506 xv6iris.PipeInvDefs <> γl:133 var
-R26508:26510 xv6iris.PipeInvDefs <> γp:134 var
-R26532:26540 xv6iris.PipeInvDefs <> pipe_dead def
-R26543:26555 xv6iris.PipeInvDefs <> pipe_end_full def
-R26558:26565 xv6iris.PipeInvDefs <> pipe_ref def
-R26568:26576 xv6iris.WpLock <> lock_frag def
-R26532:26540 xv6iris.PipeInvDefs <> pipe_dead def
-R26532:26540 xv6iris.PipeInvDefs <> pipe_dead def
-R26543:26555 xv6iris.PipeInvDefs <> pipe_end_full def
-R26543:26555 xv6iris.PipeInvDefs <> pipe_end_full def
-R26558:26565 xv6iris.PipeInvDefs <> pipe_ref def
-R26558:26565 xv6iris.PipeInvDefs <> pipe_ref def
-R26568:26576 xv6iris.WpLock <> lock_frag def
-R26568:26576 xv6iris.WpLock <> lock_frag def
-prf 26602:26614 <> pipe_ref_dead
-binder 26616:26618 <> γl:135
-binder 26620:26622 <> γp:136
-binder 26624:26624 <> w:137
-binder 26626:26626 <> q:138
-R26650:26655 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R26634:26641 xv6iris.PipeInvDefs <> pipe_ref def
-R26643:26645 xv6iris.PipeInvDefs <> γp:136 var
-R26647:26647 xv6iris.PipeInvDefs <> w:137 var
-R26649:26649 xv6iris.PipeInvDefs <> q:138 var
-R26673:26678 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R26656:26664 xv6iris.PipeInvDefs <> pipe_dead def
-R26666:26668 xv6iris.PipeInvDefs <> γl:135 var
-R26670:26672 xv6iris.PipeInvDefs <> γp:136 var
-R26679:26683 iris.bi.interface <> ::bi_scope:'False' not
-R26752:26752 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26771:26776 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26784:26784 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26753:26770 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
-R26752:26752 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26771:26776 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26784:26784 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26753:26770 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
-R26800:26800 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26819:26824 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26832:26832 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26801:26818 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
-R26800:26800 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26819:26824 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26832:26832 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26801:26818 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
-prf 26851:26864 <> lock_frag_dead
-binder 26866:26868 <> γl:139
-binder 26870:26872 <> γp:140
-binder 26874:26875 <> st:141
-R26899:26904 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R26883:26891 xv6iris.WpLock <> lock_frag def
-R26893:26895 xv6iris.PipeInvDefs <> γl:139 var
-R26897:26898 xv6iris.PipeInvDefs <> st:141 var
-R26922:26927 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R26905:26913 xv6iris.PipeInvDefs <> pipe_dead def
-R26915:26917 xv6iris.PipeInvDefs <> γl:139 var
-R26919:26921 xv6iris.PipeInvDefs <> γp:140 var
-R26928:26932 iris.bi.interface <> ::bi_scope:'False' not
-R26979:26979 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26999:27004 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27013:27013 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26980:26998 xv6iris.WpLock <> lock_frag_exclusive thm
-R26979:26979 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26999:27004 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27013:27013 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R26980:26998 xv6iris.WpLock <> lock_frag_exclusive thm
-prf 27362:27372 <> locked_dead
-binder 27374:27376 <> γl:142
-binder 27378:27380 <> γp:143
-binder 27382:27382 <> i:144
-R27386:27389 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
-R27402:27407 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R27390:27395 xv6iris.WpLock <> locked def
-R27397:27399 xv6iris.PipeInvDefs <> γl:142 var
-R27401:27401 xv6iris.PipeInvDefs <> i:144 var
-R27425:27430 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R27408:27416 xv6iris.PipeInvDefs <> pipe_dead def
-R27418:27420 xv6iris.PipeInvDefs <> γl:142 var
-R27422:27424 xv6iris.PipeInvDefs <> γp:143 var
-R27431:27435 iris.bi.interface <> ::bi_scope:'False' not
-R27490:27490 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27505:27510 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27520:27520 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27491:27504 xv6iris.PipeInvDefs <> lock_frag_dead thm
-R27490:27490 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27505:27510 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27520:27520 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27491:27504 xv6iris.PipeInvDefs <> lock_frag_dead thm
-prf 27552:27566 <> locked_pre_dead
-binder 27568:27570 <> γl:145
-binder 27572:27574 <> γp:146
-binder 27576:27576 <> i:147
-R27580:27583 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
-R27600:27605 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R27584:27593 xv6iris.WpLock <> locked_pre def
-R27595:27597 xv6iris.PipeInvDefs <> γl:145 var
-R27599:27599 xv6iris.PipeInvDefs <> i:147 var
-R27623:27628 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R27606:27614 xv6iris.PipeInvDefs <> pipe_dead def
-R27616:27618 xv6iris.PipeInvDefs <> γl:145 var
-R27620:27622 xv6iris.PipeInvDefs <> γp:146 var
-R27629:27633 iris.bi.interface <> ::bi_scope:'False' not
-R27688:27688 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27703:27708 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27718:27718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27689:27702 xv6iris.PipeInvDefs <> lock_frag_dead thm
-R27688:27688 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27703:27708 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27718:27718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R27689:27702 xv6iris.PipeInvDefs <> lock_frag_dead thm
-prf 28255:28267 <> pipe_res_dead
-binder 28269:28271 <> γl:148
-binder 28273:28275 <> γp:149
-binder 28277:28278 <> pi:150
-R28305:28310 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R28286:28294 xv6iris.PipeInvDefs <> pipe_shut def
-R28296:28298 xv6iris.PipeInvDefs <> γp:149 var
-R28300:28304 Corelib.Init.Datatypes <> false constr
-R28329:28338 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R28311:28319 xv6iris.PipeInvDefs <> pipe_shut def
-R28321:28323 xv6iris.PipeInvDefs <> γp:149 var
-R28325:28328 Corelib.Init.Datatypes <> true constr
-R28357:28362 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R28339:28347 xv6iris.WpLock <> lock_frag def
-R28349:28351 xv6iris.PipeInvDefs <> γl:148 var
-R28353:28356 Corelib.Init.Datatypes <> None constr
-R28378:28387 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R28363:28370 xv6iris.PipeInvDefs <> pipe_res def
-R28372:28374 xv6iris.PipeInvDefs <> γp:149 var
-R28376:28377 xv6iris.PipeInvDefs <> pi:150 var
-R28405:28409 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R28388:28396 xv6iris.PipeInvDefs <> pipe_dead def
-R28398:28400 xv6iris.PipeInvDefs <> γl:148 var
-R28402:28404 xv6iris.PipeInvDefs <> γp:149 var
-R28410:28419 xv6iris.PipeInvDefs <> pipe_bytes def
-R28421:28422 xv6iris.PipeInvDefs <> pi:150 var
-R28616:28616 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28640:28645 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28656:28656 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28617:28639 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
-R28616:28616 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28640:28645 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28656:28656 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28617:28639 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
-R28686:28686 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28710:28715 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28726:28726 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28687:28709 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
-R28686:28686 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28710:28715 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28726:28726 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28687:28709 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
-R28845:28849 SailStdpp.Values <> mword def
-R28828:28839 SailStdpp.Values <> mword_of_int def
-R28874:28878 SailStdpp.Values <> mword def
-R28857:28868 SailStdpp.Values <> mword_of_int def
-R28845:28849 SailStdpp.Values <> mword def
-R28828:28839 SailStdpp.Values <> mword_of_int def
-R28874:28878 SailStdpp.Values <> mword def
-R28857:28868 SailStdpp.Values <> mword_of_int def
-def 29193:29199 <> is_pipe
-R29208:29212 iris.base_logic.lib.iprop <> gname def
-binder 29202:29204 <> γl:151
-R29222:29231 xv6iris.PipeInvDefs <> pipe_names rec
-binder 29216:29218 <> γp:152
-R29240:29244 SailStdpp.Values <> mword def
-binder 29235:29236 <> pi:153
-R29252:29256 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R29258:29259 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R29288:29297 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R29269:29271 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R29285:29287 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R29272:29281 xv6iris.PageGeom <> page_valid def
-R29283:29284 xv6iris.PipeInvDefs <> pi:153 var
-R29298:29301 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R29310:29318 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R29307:29309 Corelib.Init.Datatypes <> nat ind
-binder 29302:29303 <> lo:154
-R29400:29411 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R29319:29321 iris.base_logic.lib.invariants <> inv def
-R29377:29381 iris.bi.interface <> ::bi_scope:x_'∨'_x not
-R29330:29337 xv6iris.WpLock <> lock_inv def
-R29339:29341 xv6iris.PipeInvDefs <> γl:151 var
-R29343:29344 xv6iris.PipeInvDefs <> pi:153 var
-R29353:29355 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R29371:29373 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R29356:29363 xv6iris.PipeInvDefs <> pipe_res def
-R29365:29367 xv6iris.PipeInvDefs <> γp:152 var
-R29369:29370 xv6iris.PipeInvDefs <> pi:153 var
-R29375:29376 xv6iris.PipeInvDefs <> lo:154 var
-R29382:29390 xv6iris.PipeInvDefs <> pipe_dead def
-R29392:29394 xv6iris.PipeInvDefs <> γl:151 var
-R29396:29398 xv6iris.PipeInvDefs <> γp:152 var
-R29323:29327 xv6iris.WpLock <> lockN def
-R29412:29426 xv6iris.WpLock <> lk_floor def
-R29428:29434 xv6iris.TsoCtx <> cur_ctx def
-R29436:29437 xv6iris.PipeInvDefs <> lo:154 var
-inst 29462:29479 <> is_pipe_persistent
-binder 29481:29483 <> γl:155
-binder 29485:29487 <> γp:156
-binder 29489:29490 <> pi:157
-R29494:29503 iris.bi.derived_connectives <> Persistent class
-R29506:29512 xv6iris.PipeInvDefs <> is_pipe def
-R29514:29516 xv6iris.PipeInvDefs <> γl:155 var
-R29518:29520 xv6iris.PipeInvDefs <> γp:156 var
-R29522:29523 xv6iris.PipeInvDefs <> pi:157 var
-prf 30004:30016 <> is_pipe_valid
-binder 30018:30020 <> γl:158
-binder 30022:30024 <> γp:159
-binder 30026:30027 <> pi:160
-R30049:30054 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R30031:30037 xv6iris.PipeInvDefs <> is_pipe def
-R30039:30041 xv6iris.PipeInvDefs <> γl:158 var
-R30043:30045 xv6iris.PipeInvDefs <> γp:159 var
-R30047:30048 xv6iris.PipeInvDefs <> pi:160 var
-R30055:30057 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R30071:30073 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R30058:30067 xv6iris.PageGeom <> page_valid def
-R30069:30070 xv6iris.PipeInvDefs <> pi:160 var
-R30094:30100 xv6iris.PipeInvDefs <> is_pipe def
-R30094:30100 xv6iris.PipeInvDefs <> is_pipe def
-R30094:30100 xv6iris.PipeInvDefs <> is_pipe def
-prf 30317:30327 <> is_pipe_inv
-binder 30329:30331 <> γl:161
-binder 30333:30335 <> γp:162
-binder 30337:30338 <> pi:163
-R30364:30373 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R30346:30352 xv6iris.PipeInvDefs <> is_pipe def
-R30354:30356 xv6iris.PipeInvDefs <> γl:161 var
-R30358:30360 xv6iris.PipeInvDefs <> γp:162 var
-R30362:30363 xv6iris.PipeInvDefs <> pi:163 var
-R30374:30377 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R30386:30393 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R30383:30385 Corelib.Init.Datatypes <> nat ind
-binder 30378:30379 <> lo:164
-R30475:30485 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R30394:30396 iris.base_logic.lib.invariants <> inv def
-R30452:30456 iris.bi.interface <> ::bi_scope:x_'∨'_x not
-R30405:30412 xv6iris.WpLock <> lock_inv def
-R30414:30416 xv6iris.PipeInvDefs <> γl:161 var
-R30418:30419 xv6iris.PipeInvDefs <> pi:163 var
-R30428:30430 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R30446:30448 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R30431:30438 xv6iris.PipeInvDefs <> pipe_res def
-R30440:30442 xv6iris.PipeInvDefs <> γp:162 var
-R30444:30445 xv6iris.PipeInvDefs <> pi:163 var
-R30450:30451 xv6iris.PipeInvDefs <> lo:164 var
-R30457:30465 xv6iris.PipeInvDefs <> pipe_dead def
-R30467:30469 xv6iris.PipeInvDefs <> γl:161 var
-R30471:30473 xv6iris.PipeInvDefs <> γp:162 var
-R30398:30402 xv6iris.WpLock <> lockN def
-R30486:30500 xv6iris.WpLock <> lk_floor def
-R30502:30508 xv6iris.TsoCtx <> cur_ctx def
-R30510:30511 xv6iris.PipeInvDefs <> lo:164 var
-R30532:30538 xv6iris.PipeInvDefs <> is_pipe def
-R30532:30538 xv6iris.PipeInvDefs <> is_pipe def
-R30532:30538 xv6iris.PipeInvDefs <> is_pipe def
-prf 30721:30736 <> is_pipe_openable
-binder 30738:30740 <> γl:165
-binder 30742:30744 <> γp:166
-binder 30746:30747 <> pi:167
-R30773:30782 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R30755:30761 xv6iris.PipeInvDefs <> is_pipe def
-R30763:30765 xv6iris.PipeInvDefs <> γl:165 var
-R30767:30769 xv6iris.PipeInvDefs <> γp:166 var
-R30771:30772 xv6iris.PipeInvDefs <> pi:167 var
-R30783:30795 xv6iris.WpLock <> lock_openable def
-R30797:30799 xv6iris.PipeInvDefs <> γl:165 var
-R30801:30802 xv6iris.PipeInvDefs <> pi:167 var
-R30811:30813 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R30829:30831 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R30814:30821 xv6iris.PipeInvDefs <> pipe_res def
-R30823:30825 xv6iris.PipeInvDefs <> γp:166 var
-R30827:30828 xv6iris.PipeInvDefs <> pi:167 var
-R30834:30842 xv6iris.PipeInvDefs <> pipe_dead def
-R30844:30846 xv6iris.PipeInvDefs <> γl:165 var
-R30848:30850 xv6iris.PipeInvDefs <> γp:166 var
-R30890:30890 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R30902:30907 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R30911:30911 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R30891:30901 xv6iris.PipeInvDefs <> is_pipe_inv thm
-R30890:30890 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R30902:30907 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R30911:30911 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R30891:30901 xv6iris.PipeInvDefs <> is_pipe_inv thm
-R30943:30943 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R30965:30970 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R30978:30978 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R30944:30964 xv6iris.WpLock <> lock_openable_of_dead thm
-R30943:30943 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R30965:30970 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R30978:30978 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R30944:30964 xv6iris.WpLock <> lock_openable_of_dead thm
-def 31955:31963 <> pipe_held
-R31971:31975 SailStdpp.Values <> mword def
-binder 31966:31967 <> pi:168
-R31986:31989 Corelib.Init.Datatypes <> bool ind
-binder 31982:31982 <> w:169
-R31997:31998 stdpp.numbers <> Qp rec
-binder 31993:31993 <> q:170
-R32003:32007 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R32009:32010 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R32020:32024 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R32055:32057 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R32031:32035 iris.base_logic.lib.iprop <> gname def
-binder 32025:32027 <> γl:171
-R32045:32054 xv6iris.PipeInvDefs <> pipe_names rec
-binder 32039:32041 <> γp:172
-R32076:32080 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R32058:32064 xv6iris.PipeInvDefs <> is_pipe def
-R32066:32068 xv6iris.PipeInvDefs <> γl:171 var
-R32070:32072 xv6iris.PipeInvDefs <> γp:172 var
-R32074:32075 xv6iris.PipeInvDefs <> pi:168 var
-R32081:32088 xv6iris.PipeInvDefs <> pipe_ref def
-R32090:32092 xv6iris.PipeInvDefs <> γp:172 var
-R32094:32094 xv6iris.PipeInvDefs <> w:169 var
-R32096:32096 xv6iris.PipeInvDefs <> q:170 var
-R32106:32112 xv6iris.PipeInvDefs PipeInv <> sec
+R6563:6568 Stdlib.ZArith.ZArith <> <> lib
+R6570:6572 Stdlib.micromega.Lia <> <> lib
+R6574:6577 Stdlib.Lists.List <> <> lib
+R6606:6609 stdpp.list <> <> lib
+R6611:6631 stdpp.bitvector.definitions <> <> lib
+R6667:6670 iris.algebra.frac <> <> lib
+R6672:6676 iris.algebra.dfrac <> <> lib
+R6711:6720 iris.bi.lib.fractional <> <> lib
+R6758:6766 iris.proofmode.proofmode <> <> lib
+R6809:6816 iris.base_logic.lib.gen_heap <> <> lib
+R6818:6827 iris.base_logic.lib.invariants <> <> lib
+R6829:6831 iris.base_logic.lib.own <> <> lib
+R6849:6878 SailStdpp.ConcurrencyInterface <> <> lib
+R6880:6917 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R6919:6953 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R6955:6980 SailStdpp.Operators_mwords <> <> lib
+R6998:7011 SailStdpp.Base <> <> lib
+R7013:7031 SailStdpp.TypeCasts <> <> lib
+R7033:7048 SailStdpp.Values <> <> lib
+R7050:7070 SailStdpp.MachineWord <> <> lib
+R7088:7102 xv6iris.RiscvModelBytes <> <> lib
+R7120:7129 xv6iris.RiscvPtsto <> <> lib
+R7147:7155 xv6iris.KallocInv <> <> lib
+R7173:7178 xv6iris.WpLock <> <> lib
+R7196:7201 xv6iris.TsoCtx <> <> lib
+R7203:7213 xv6iris.CtxMorphTac <> <> lib
+R7271:7287 Riscv.rv64d_types <> <> lib
+R7289:7299 Riscv.rv64d <> <> lib
+R7301:7318 Riscv.riscv_extras <> <> lib
+R7336:7345 xv6iris.Xv6Cameras <> <> lib
+def 7660:7667 <> PIPESIZE
+R7671:7673 Corelib.Init.Datatypes <> nat ind
+def 7694:7706 <> pipe_data_off
+R7710:7712 Corelib.Init.Datatypes <> nat ind
+def 7768:7778 <> pipe_sizeof
+R7782:7784 Corelib.Init.Datatypes <> nat ind
+def 7833:7844 <> pipe_pgbytes
+R7848:7850 Corelib.Init.Datatypes <> nat ind
+def 8102:8108 <> poff_of
+R8115:8119 SailStdpp.Values <> mword def
+binder 8111:8111 <> a:1
+R8130:8130 Corelib.Numbers.BinNums <> Z ind
+binder 8126:8126 <> i:2
+R8135:8139 SailStdpp.Values <> mword def
+R8149:8155 SailStdpp.Operators_mwords <> add_vec def
+R8160:8171 Riscv.rv64d <> sign_extend' def
+R8194:8198 SailStdpp.Values <> mword def
+R8177:8188 SailStdpp.Values <> mword_of_int def
+R8190:8190 xv6iris.PipeInvDefs <> i:2 var
+R8157:8157 xv6iris.PipeInvDefs <> a:1 var
+def 8218:8225 <> a_pnread
+R8234:8238 SailStdpp.Values <> mword def
+binder 8229:8230 <> pi:3
+R8246:8250 SailStdpp.Values <> mword def
+R8258:8264 xv6iris.PipeInvDefs <> poff_of def
+R8266:8267 xv6iris.PipeInvDefs <> pi:3 var
+def 8285:8293 <> a_pnwrite
+R8301:8305 SailStdpp.Values <> mword def
+binder 8296:8297 <> pi:4
+R8313:8317 SailStdpp.Values <> mword def
+R8325:8331 xv6iris.PipeInvDefs <> poff_of def
+R8333:8334 xv6iris.PipeInvDefs <> pi:4 var
+def 8572:8578 <> a_popen
+R8586:8590 SailStdpp.Values <> mword def
+binder 8581:8582 <> pi:5
+R8601:8604 Corelib.Init.Datatypes <> bool ind
+binder 8597:8597 <> w:6
+R8609:8613 SailStdpp.Values <> mword def
+R8623:8629 xv6iris.PipeInvDefs <> poff_of def
+R8631:8632 xv6iris.PipeInvDefs <> pi:5 var
+R8635:8637 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R8639:8644 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R8648:8653 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R8638:8638 xv6iris.PipeInvDefs <> w:6 var
+def 8893:8902 <> pflag_open
+R8909:8913 SailStdpp.Values <> mword def
+binder 8905:8905 <> v:7
+R8967:8969 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R8931:8937 SailStdpp.Operators_mwords <> neq_vec def
+R8959:8966 Riscv.rv64d <> zero_reg def
+R8940:8951 Riscv.rv64d <> sign_extend' def
+R8956:8956 xv6iris.PipeInvDefs <> v:7 var
+R8970:8973 Corelib.Init.Datatypes <> true constr
+prf 8983:8996 <> pflag_one_open
+R9000:9009 xv6iris.PipeInvDefs <> pflag_open def
+R9029:9033 SailStdpp.Values <> mword def
+R9012:9023 SailStdpp.Values <> mword_of_int def
+prf 9072:9090 <> pflag_zero_not_open
+R9094:9095 Corelib.Init.Logic <> ::type_scope:'~'_x not
+R9096:9105 xv6iris.PipeInvDefs <> pflag_open def
+R9125:9129 SailStdpp.Values <> mword def
+R9108:9119 SailStdpp.Values <> mword_of_int def
+R9150:9159 xv6iris.PipeInvDefs <> pflag_open def
+def 9981:9990 <> pipe_count
+R10001:10005 SailStdpp.Values <> mword def
+binder 9993:9994 <> nr:8
+binder 9996:9997 <> nw:9
+R10013:10013 Corelib.Numbers.BinNums <> Z ind
+R10021:10021 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R10053:10058 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R10036:10038 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R10022:10032 stdpp.bitvector.definitions <> bv_unsigned proj
+R10034:10035 xv6iris.PipeInvDefs <> nw:9 var
+R10039:10049 stdpp.bitvector.definitions <> bv_unsigned proj
+R10051:10052 xv6iris.PipeInvDefs <> nr:8 var
+R10060:10062 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+def 10082:10094 <> pipe_count_ok
+R10105:10109 SailStdpp.Values <> mword def
+binder 10097:10098 <> nr:10
+binder 10100:10101 <> nw:11
+R10144:10147 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R10128:10137 xv6iris.PipeInvDefs <> pipe_count def
+R10139:10140 xv6iris.PipeInvDefs <> nr:10 var
+R10142:10143 xv6iris.PipeInvDefs <> nw:11 var
+R10148:10155 Stdlib.ZArith.BinInt Z of_nat def
+R10157:10164 xv6iris.PipeInvDefs <> PIPESIZE def
+prf 10177:10192 <> pipe_count_ok_00
+R10198:10210 xv6iris.PipeInvDefs <> pipe_count_ok def
+R10230:10234 SailStdpp.Values <> mword def
+R10213:10224 SailStdpp.Values <> mword_of_int def
+R10258:10262 SailStdpp.Values <> mword def
+R10241:10252 SailStdpp.Values <> mword_of_int def
+R10283:10295 xv6iris.PipeInvDefs <> pipe_count_ok def
+R10298:10307 xv6iris.PipeInvDefs <> pipe_count def
+prf 10483:10500 <> add_vec32_unsigned
+R10509:10513 SailStdpp.Values <> mword def
+binder 10503:10503 <> x:12
+binder 10505:10505 <> y:13
+R10548:10550 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10523:10533 stdpp.bitvector.definitions <> bv_unsigned proj
+R10536:10542 SailStdpp.Operators_mwords <> add_vec def
+R10546:10546 xv6iris.PipeInvDefs <> y:13 var
+R10544:10544 xv6iris.PipeInvDefs <> x:12 var
+R10551:10557 stdpp.bitvector.definitions <> bv_wrap def
+R10576:10578 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R10563:10573 stdpp.bitvector.definitions <> bv_unsigned proj
+R10575:10575 xv6iris.PipeInvDefs <> x:12 var
+R10579:10589 stdpp.bitvector.definitions <> bv_unsigned proj
+R10591:10591 xv6iris.PipeInvDefs <> y:13 var
+R10611:10617 SailStdpp.Operators_mwords <> add_vec def
+R10620:10646 SailStdpp.Operators_mwords <> word_binop def
+R10649:10675 SailStdpp.Operators_mwords <> with_word' def
+R10682:10707 SailStdpp.Values <> with_word def
+R10710:10716 SailStdpp.Values <> to_word def
+R10719:10726 SailStdpp.Values <> get_word def
+R10729:10755 SailStdpp.MachineWord MachineWord add def
+R10768:10782 stdpp.bitvector.definitions <> bv_add_unsigned thm
+R10768:10782 stdpp.bitvector.definitions <> bv_add_unsigned thm
+R10768:10782 stdpp.bitvector.definitions <> bv_add_unsigned thm
+prf 10816:10825 <> wrap32_mod
+R10832:10832 Corelib.Numbers.BinNums <> Z ind
+binder 10828:10828 <> z:14
+R10849:10851 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10837:10843 stdpp.bitvector.definitions <> bv_wrap def
+R10848:10848 xv6iris.PipeInvDefs <> z:14 var
+R10854:10858 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R10853:10853 xv6iris.PipeInvDefs <> z:14 var
+R10860:10862 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R10886:10892 stdpp.bitvector.definitions <> bv_wrap def
+R10895:10904 stdpp.bitvector.definitions <> bv_modulus def
+R10918:10920 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R10921:10926 Stdlib.ZArith.BinInt Z of_N def
+R10941:10943 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R10918:10920 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R10921:10926 Stdlib.ZArith.BinInt Z of_N def
+R10941:10943 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+prf 10982:10990 <> u32_range
+R10997:11001 SailStdpp.Values <> mword def
+binder 10993:10993 <> x:15
+R11011:11014 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11028:11030 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11015:11025 stdpp.bitvector.definitions <> bv_unsigned proj
+R11027:11027 xv6iris.PipeInvDefs <> x:15 var
+R11015:11025 stdpp.bitvector.definitions <> bv_unsigned proj
+R11027:11027 xv6iris.PipeInvDefs <> x:15 var
+R11032:11034 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11063:11082 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
+R11063:11082 stdpp.bitvector.definitions <> bv_unsigned_in_range thm
+R11105:11114 stdpp.bitvector.definitions <> bv_modulus def
+R11134:11136 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11137:11142 Stdlib.ZArith.BinInt Z of_N def
+R11157:11159 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11134:11136 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11137:11142 Stdlib.ZArith.BinInt Z of_N def
+prf 11377:11397 <> pipe_count_arith_incr
+R11406:11406 Corelib.Numbers.BinNums <> Z ind
+binder 11400:11400 <> a:16
+binder 11402:11402 <> b:17
+R11432:11435 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11415:11418 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11420:11422 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11419:11419 xv6iris.PipeInvDefs <> a:16 var
+R11419:11419 xv6iris.PipeInvDefs <> a:16 var
+R11424:11426 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11455:11460 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11438:11441 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11443:11445 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11442:11442 xv6iris.PipeInvDefs <> b:17 var
+R11442:11442 xv6iris.PipeInvDefs <> b:17 var
+R11447:11449 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11490:11495 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11480:11483 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R11462:11462 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11468:11473 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11464:11466 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11463:11463 xv6iris.PipeInvDefs <> b:17 var
+R11467:11467 xv6iris.PipeInvDefs <> a:16 var
+R11475:11477 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11525:11530 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11515:11518 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R11497:11497 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11503:11508 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11499:11501 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11498:11498 xv6iris.PipeInvDefs <> b:17 var
+R11502:11502 xv6iris.PipeInvDefs <> a:16 var
+R11510:11512 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11567:11570 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R11532:11532 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11555:11560 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11551:11553 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11533:11533 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11539:11544 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11535:11537 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11534:11534 xv6iris.PipeInvDefs <> b:17 var
+R11546:11548 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11554:11554 xv6iris.PipeInvDefs <> a:16 var
+R11562:11564 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11620:11637 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_l thm
+R11620:11637 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_l thm
+R11620:11637 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_l thm
+R11656:11658 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11652:11654 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11670:11670 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11676:11679 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11672:11674 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11656:11658 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11652:11654 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11670:11670 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11676:11679 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R11672:11674 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11707:11723 Stdlib.ZArith.Zdiv <> Zplus_mod_idemp_l thm
+R11727:11729 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11707:11723 Stdlib.ZArith.Zdiv <> Zplus_mod_idemp_l thm
+R11727:11729 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11707:11723 Stdlib.ZArith.Zdiv <> Zplus_mod_idemp_l thm
+R11727:11729 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11754:11757 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11776:11778 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11758:11758 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11764:11769 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11760:11762 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11771:11773 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11758:11758 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11764:11769 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11760:11762 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11771:11773 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11780:11782 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11804:11818 Stdlib.ZArith.BinInt Z mod_pos_bound thm
+R11754:11757 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11776:11778 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11758:11758 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11764:11769 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11760:11762 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11771:11773 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11758:11758 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11764:11769 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11760:11762 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11771:11773 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11780:11782 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11804:11818 Stdlib.ZArith.BinInt Z mod_pos_bound thm
+R11857:11867 Stdlib.ZArith.BinInt Z mod_small thm
+R11857:11867 Stdlib.ZArith.BinInt Z mod_small thm
+R11857:11867 Stdlib.ZArith.BinInt Z mod_small thm
+prf 11893:11913 <> pipe_count_arith_decr
+R11922:11922 Corelib.Numbers.BinNums <> Z ind
+binder 11916:11916 <> a:18
+binder 11918:11918 <> b:19
+R11948:11951 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11931:11934 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11936:11938 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11935:11935 xv6iris.PipeInvDefs <> a:18 var
+R11935:11935 xv6iris.PipeInvDefs <> a:18 var
+R11940:11942 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R11971:11976 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11954:11957 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11959:11961 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R11958:11958 xv6iris.PipeInvDefs <> b:19 var
+R11958:11958 xv6iris.PipeInvDefs <> b:19 var
+R11963:11965 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R12006:12011 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R11996:11999 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R11978:11978 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11984:11989 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R11980:11982 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R11979:11979 xv6iris.PipeInvDefs <> b:19 var
+R11983:11983 xv6iris.PipeInvDefs <> a:18 var
+R11991:11993 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R12018:12023 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12013:12016 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R12012:12012 xv6iris.PipeInvDefs <> a:18 var
+R12017:12017 xv6iris.PipeInvDefs <> b:19 var
+R12060:12063 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R12025:12025 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12048:12053 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12027:12029 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12026:12026 xv6iris.PipeInvDefs <> b:19 var
+R12030:12030 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12036:12041 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12032:12034 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R12031:12031 xv6iris.PipeInvDefs <> a:18 var
+R12043:12045 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R12055:12057 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R12113:12130 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_r thm
+R12113:12130 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_r thm
+R12113:12130 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_r thm
+R12145:12148 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12154:12154 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12150:12152 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R12165:12165 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12171:12174 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12167:12169 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12145:12148 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12154:12154 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12150:12152 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R12165:12165 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12171:12174 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12167:12169 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12202:12219 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_l thm
+R12223:12225 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12202:12219 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_l thm
+R12223:12225 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12202:12219 Stdlib.ZArith.Zdiv <> Zminus_mod_idemp_l thm
+R12223:12225 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12250:12253 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R12272:12274 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R12254:12254 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12260:12265 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12256:12258 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12267:12269 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R12254:12254 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12260:12265 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12256:12258 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12267:12269 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R12276:12278 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R12300:12314 Stdlib.ZArith.BinInt Z mod_pos_bound thm
+R12250:12253 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R12272:12274 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<'_x not
+R12254:12254 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12260:12265 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12256:12258 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12267:12269 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R12254:12254 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12260:12265 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12256:12258 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12267:12269 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R12276:12278 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R12300:12314 Stdlib.ZArith.BinInt Z mod_pos_bound thm
+R12378:12381 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R12360:12360 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12366:12371 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12362:12364 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12373:12375 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R12378:12381 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R12360:12360 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12366:12371 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R12362:12364 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R12373:12375 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R12409:12420 Stdlib.ZArith.BinInt Z mod_divide thm
+R12409:12420 Stdlib.ZArith.BinInt Z mod_divide thm
+R12494:12496 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12494:12496 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12527:12537 Stdlib.ZArith.BinInt Z mod_small thm
+R12527:12537 Stdlib.ZArith.BinInt Z mod_small thm
+R12527:12537 Stdlib.ZArith.BinInt Z mod_small thm
+prf 12728:12744 <> pipe_count_incr_w
+R12755:12759 SailStdpp.Values <> mword def
+binder 12747:12748 <> nr:20
+binder 12750:12751 <> nw:21
+R12788:12793 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12769:12781 xv6iris.PipeInvDefs <> pipe_count_ok def
+R12783:12784 xv6iris.PipeInvDefs <> nr:20 var
+R12786:12787 xv6iris.PipeInvDefs <> nw:21 var
+R12840:12845 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12796:12799 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R12794:12795 xv6iris.PipeInvDefs <> nw:21 var
+R12800:12806 SailStdpp.Operators_mwords <> add_vec def
+R12831:12835 SailStdpp.Values <> mword def
+R12812:12823 SailStdpp.Values <> mword_of_int def
+R12808:12809 xv6iris.PipeInvDefs <> nr:20 var
+R12846:12858 xv6iris.PipeInvDefs <> pipe_count_ok def
+R12860:12861 xv6iris.PipeInvDefs <> nr:20 var
+R12864:12870 SailStdpp.Operators_mwords <> add_vec def
+R12893:12897 SailStdpp.Values <> mword def
+R12876:12887 SailStdpp.Values <> mword_of_int def
+R12872:12873 xv6iris.PipeInvDefs <> nw:21 var
+R12921:12933 xv6iris.PipeInvDefs <> pipe_count_ok def
+R12936:12945 xv6iris.PipeInvDefs <> pipe_count def
+R12978:12986 xv6iris.PipeInvDefs <> u32_range thm
+R12978:12986 xv6iris.PipeInvDefs <> u32_range thm
+R13012:13020 xv6iris.PipeInvDefs <> u32_range thm
+R13012:13020 xv6iris.PipeInvDefs <> u32_range thm
+R13044:13061 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
+R13063:13072 xv6iris.PipeInvDefs <> wrap32_mod thm
+R13044:13061 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
+R13044:13061 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
+R13063:13072 xv6iris.PipeInvDefs <> wrap32_mod thm
+R13063:13072 xv6iris.PipeInvDefs <> wrap32_mod thm
+R13129:13131 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13090:13100 stdpp.bitvector.definitions <> bv_unsigned proj
+R13120:13124 SailStdpp.Values <> mword def
+R13103:13114 SailStdpp.Values <> mword_of_int def
+R13129:13131 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13090:13100 stdpp.bitvector.definitions <> bv_unsigned proj
+R13120:13124 SailStdpp.Values <> mword def
+R13103:13114 SailStdpp.Values <> mword_of_int def
+R13189:13209 xv6iris.PipeInvDefs <> pipe_count_arith_incr thm
+R13189:13209 xv6iris.PipeInvDefs <> pipe_count_arith_incr thm
+R13264:13268 stdpp.bitvector.definitions <> bv_eq thm
+R13264:13268 stdpp.bitvector.definitions <> bv_eq thm
+R13281:13298 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
+R13300:13309 xv6iris.PipeInvDefs <> wrap32_mod thm
+R13281:13298 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
+R13281:13298 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
+R13300:13309 xv6iris.PipeInvDefs <> wrap32_mod thm
+R13300:13309 xv6iris.PipeInvDefs <> wrap32_mod thm
+R13370:13372 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13329:13339 stdpp.bitvector.definitions <> bv_unsigned proj
+R13361:13365 SailStdpp.Values <> mword def
+R13342:13353 SailStdpp.Values <> mword_of_int def
+R13370:13372 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13329:13339 stdpp.bitvector.definitions <> bv_unsigned proj
+R13361:13365 SailStdpp.Values <> mword def
+R13342:13353 SailStdpp.Values <> mword_of_int def
+R13545:13564 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R13506:13506 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13538:13541 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13521:13523 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13507:13517 stdpp.bitvector.definitions <> bv_unsigned proj
+R13524:13534 stdpp.bitvector.definitions <> bv_unsigned proj
+R13565:13565 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13597:13600 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13580:13582 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13566:13576 stdpp.bitvector.definitions <> bv_unsigned proj
+R13583:13593 stdpp.bitvector.definitions <> bv_unsigned proj
+R13604:13606 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13608:13610 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R13545:13564 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R13506:13506 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13538:13541 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13521:13523 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13507:13517 stdpp.bitvector.definitions <> bv_unsigned proj
+R13524:13534 stdpp.bitvector.definitions <> bv_unsigned proj
+R13565:13565 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13597:13600 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13580:13582 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13566:13576 stdpp.bitvector.definitions <> bv_unsigned proj
+R13583:13593 stdpp.bitvector.definitions <> bv_unsigned proj
+R13604:13606 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13608:13610 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R13645:13647 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x_'<'_x not
+R13679:13681 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x_'<'_x not
+R13637:13638 Stdlib.ZArith.BinInt <> ::Z_scope:'-'_x not
+R13640:13642 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R13662:13664 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13648:13658 stdpp.bitvector.definitions <> bv_unsigned proj
+R13665:13675 stdpp.bitvector.definitions <> bv_unsigned proj
+R13662:13664 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13648:13658 stdpp.bitvector.definitions <> bv_unsigned proj
+R13665:13675 stdpp.bitvector.definitions <> bv_unsigned proj
+R13683:13685 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R13645:13647 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x_'<'_x not
+R13679:13681 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x_'<'_x not
+R13637:13638 Stdlib.ZArith.BinInt <> ::Z_scope:'-'_x not
+R13640:13642 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R13662:13664 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13648:13658 stdpp.bitvector.definitions <> bv_unsigned proj
+R13665:13675 stdpp.bitvector.definitions <> bv_unsigned proj
+R13662:13664 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13648:13658 stdpp.bitvector.definitions <> bv_unsigned proj
+R13665:13675 stdpp.bitvector.definitions <> bv_unsigned proj
+R13683:13685 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R13715:13727 Stdlib.ZArith.BinInt Z le_gt_cases thm
+R13746:13748 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13732:13742 stdpp.bitvector.definitions <> bv_unsigned proj
+R13749:13759 stdpp.bitvector.definitions <> bv_unsigned proj
+R13715:13727 Stdlib.ZArith.BinInt Z le_gt_cases thm
+R13746:13748 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13732:13742 stdpp.bitvector.definitions <> bv_unsigned proj
+R13749:13759 stdpp.bitvector.definitions <> bv_unsigned proj
+R13802:13812 Stdlib.ZArith.BinInt Z mod_small thm
+R13802:13812 Stdlib.ZArith.BinInt Z mod_small thm
+R13802:13812 Stdlib.ZArith.BinInt Z mod_small thm
+R13908:13934 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13864:13864 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R13896:13901 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R13879:13881 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13865:13875 stdpp.bitvector.definitions <> bv_unsigned proj
+R13882:13892 stdpp.bitvector.definitions <> bv_unsigned proj
+R13903:13905 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R13935:13935 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R13967:13970 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R13950:13952 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13936:13946 stdpp.bitvector.definitions <> bv_unsigned proj
+R13953:13963 stdpp.bitvector.definitions <> bv_unsigned proj
+R13972:13974 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R13908:13934 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13864:13864 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R13896:13901 Stdlib.ZArith.BinInt <> ::Z_scope:x_'mod'_x not
+R13879:13881 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13865:13875 stdpp.bitvector.definitions <> bv_unsigned proj
+R13882:13892 stdpp.bitvector.definitions <> bv_unsigned proj
+R13903:13905 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R13935:13935 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R13967:13970 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R13950:13952 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R13936:13946 stdpp.bitvector.definitions <> bv_unsigned proj
+R13953:13963 stdpp.bitvector.definitions <> bv_unsigned proj
+R13972:13974 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14003:14013 Stdlib.ZArith.BinInt Z mod_small thm
+R14016:14016 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14048:14051 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14031:14033 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R14017:14027 stdpp.bitvector.definitions <> bv_unsigned proj
+R14034:14044 stdpp.bitvector.definitions <> bv_unsigned proj
+R14053:14055 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14062:14064 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14003:14013 Stdlib.ZArith.BinInt Z mod_small thm
+R14016:14016 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14048:14051 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14031:14033 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R14017:14027 stdpp.bitvector.definitions <> bv_unsigned proj
+R14034:14044 stdpp.bitvector.definitions <> bv_unsigned proj
+R14053:14055 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14062:14064 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14003:14013 Stdlib.ZArith.BinInt Z mod_small thm
+R14016:14016 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14048:14051 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14031:14033 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R14017:14027 stdpp.bitvector.definitions <> bv_unsigned proj
+R14034:14044 stdpp.bitvector.definitions <> bv_unsigned proj
+R14053:14055 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14062:14064 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14003:14013 Stdlib.ZArith.BinInt Z mod_small thm
+R14016:14016 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14048:14051 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14031:14033 Stdlib.ZArith.BinInt <> ::Z_scope:x_'-'_x not
+R14017:14027 stdpp.bitvector.definitions <> bv_unsigned proj
+R14034:14044 stdpp.bitvector.definitions <> bv_unsigned proj
+R14053:14055 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14062:14064 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14098:14114 Stdlib.ZArith.Zdiv <> Zplus_mod_idemp_r thm
+R14098:14114 Stdlib.ZArith.Zdiv <> Zplus_mod_idemp_r thm
+R14098:14114 Stdlib.ZArith.Zdiv <> Zplus_mod_idemp_r thm
+R14125:14139 Stdlib.ZArith.Zdiv <> Z_mod_same_full thm
+R14125:14139 Stdlib.ZArith.Zdiv <> Z_mod_same_full thm
+R14125:14139 Stdlib.ZArith.Zdiv <> Z_mod_same_full thm
+R14216:14226 Stdlib.ZArith.BinInt Z mod_small thm
+R14216:14226 Stdlib.ZArith.BinInt Z mod_small thm
+R14216:14226 Stdlib.ZArith.BinInt Z mod_small thm
+R14250:14260 Stdlib.ZArith.BinInt Z mod_small thm
+R14263:14273 stdpp.bitvector.definitions <> bv_unsigned proj
+R14281:14283 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14250:14260 Stdlib.ZArith.BinInt Z mod_small thm
+R14263:14273 stdpp.bitvector.definitions <> bv_unsigned proj
+R14281:14283 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14250:14260 Stdlib.ZArith.BinInt Z mod_small thm
+R14263:14273 stdpp.bitvector.definitions <> bv_unsigned proj
+R14281:14283 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14250:14260 Stdlib.ZArith.BinInt Z mod_small thm
+R14263:14273 stdpp.bitvector.definitions <> bv_unsigned proj
+R14281:14283 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14309:14319 stdpp.bitvector.definitions <> bv_unsigned proj
+R14333:14333 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14354:14357 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14348:14350 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14334:14344 stdpp.bitvector.definitions <> bv_unsigned proj
+R14358:14358 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R14362:14365 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R14367:14369 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14309:14319 stdpp.bitvector.definitions <> bv_unsigned proj
+R14333:14333 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14354:14357 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14348:14350 Stdlib.ZArith.BinInt <> ::Z_scope:x_'+'_x not
+R14334:14344 stdpp.bitvector.definitions <> bv_unsigned proj
+R14358:14358 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R14362:14365 Stdlib.ZArith.BinInt <> ::Z_scope:x_'*'_x not
+R14367:14369 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R14394:14408 Stdlib.ZArith.Zdiv <> Z_mod_plus_full thm
+R14394:14408 Stdlib.ZArith.Zdiv <> Z_mod_plus_full thm
+R14394:14408 Stdlib.ZArith.Zdiv <> Z_mod_plus_full thm
+prf 14572:14588 <> pipe_count_decr_r
+R14599:14603 SailStdpp.Values <> mword def
+binder 14591:14592 <> nr:22
+binder 14594:14595 <> nw:23
+R14632:14637 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14613:14625 xv6iris.PipeInvDefs <> pipe_count_ok def
+R14627:14628 xv6iris.PipeInvDefs <> nr:22 var
+R14630:14631 xv6iris.PipeInvDefs <> nw:23 var
+R14646:14651 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R14640:14643 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R14638:14639 xv6iris.PipeInvDefs <> nr:22 var
+R14644:14645 xv6iris.PipeInvDefs <> nw:23 var
+R14652:14664 xv6iris.PipeInvDefs <> pipe_count_ok def
+R14667:14673 SailStdpp.Operators_mwords <> add_vec def
+R14696:14700 SailStdpp.Values <> mword def
+R14679:14690 SailStdpp.Values <> mword_of_int def
+R14675:14676 xv6iris.PipeInvDefs <> nr:22 var
+R14707:14708 xv6iris.PipeInvDefs <> nw:23 var
+R14727:14739 xv6iris.PipeInvDefs <> pipe_count_ok def
+R14742:14751 xv6iris.PipeInvDefs <> pipe_count def
+R14784:14792 xv6iris.PipeInvDefs <> u32_range thm
+R14784:14792 xv6iris.PipeInvDefs <> u32_range thm
+R14818:14826 xv6iris.PipeInvDefs <> u32_range thm
+R14818:14826 xv6iris.PipeInvDefs <> u32_range thm
+R14850:14867 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
+R14869:14878 xv6iris.PipeInvDefs <> wrap32_mod thm
+R14850:14867 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
+R14850:14867 xv6iris.PipeInvDefs <> add_vec32_unsigned thm
+R14869:14878 xv6iris.PipeInvDefs <> wrap32_mod thm
+R14869:14878 xv6iris.PipeInvDefs <> wrap32_mod thm
+R14935:14937 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14896:14906 stdpp.bitvector.definitions <> bv_unsigned proj
+R14926:14930 SailStdpp.Values <> mword def
+R14909:14920 SailStdpp.Values <> mword_of_int def
+R14935:14937 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14896:14906 stdpp.bitvector.definitions <> bv_unsigned proj
+R14926:14930 SailStdpp.Values <> mword def
+R14909:14920 SailStdpp.Values <> mword_of_int def
+R14995:15015 xv6iris.PipeInvDefs <> pipe_count_arith_decr thm
+R14995:15015 xv6iris.PipeInvDefs <> pipe_count_arith_decr thm
+R15073:15077 stdpp.bitvector.definitions <> bv_eq thm
+R15073:15077 stdpp.bitvector.definitions <> bv_eq thm
+def 15282:15292 <> pipe_rw_ret
+R15299:15299 Corelib.Numbers.BinNums <> Z ind
+binder 15295:15295 <> n:24
+R15307:15311 SailStdpp.Values <> mword def
+binder 15303:15303 <> r:25
+R15363:15368 Corelib.Init.Logic <> ::type_scope:x_'\/'_x not
+R15330:15333 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15362:15362 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15329:15329 xv6iris.PipeInvDefs <> r:25 var
+R15354:15358 SailStdpp.Values <> mword def
+R15334:15345 SailStdpp.Values <> mword_of_int def
+R15369:15375 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R15381:15382 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R15380:15380 Corelib.Numbers.BinNums <> Z ind
+binder 15376:15376 <> i:26
+R15414:15417 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R15384:15387 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15413:15413 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R15383:15383 xv6iris.PipeInvDefs <> r:25 var
+R15405:15409 SailStdpp.Values <> mword def
+R15388:15399 SailStdpp.Values <> mword_of_int def
+R15401:15401 xv6iris.PipeInvDefs <> i:26 var
+R15420:15423 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<='_x not
+R15425:15428 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x_'<='_x not
+R15424:15424 xv6iris.PipeInvDefs <> i:26 var
+R15424:15424 xv6iris.PipeInvDefs <> i:26 var
+R15429:15433 Stdlib.ZArith.BinInt Z max def
+R15437:15437 xv6iris.PipeInvDefs <> n:24 var
+rec 15861:15870 <> pipe_names
+proj 15891:15897 <> pn_read
+proj 15908:15915 <> pn_write
+proj 15930:15937 <> pn_mread
+proj 15948:15956 <> pn_mwrite
+R15901:15905 iris.base_logic.lib.iprop <> gname def
+R15919:15923 iris.base_logic.lib.iprop <> gname def
+R15941:15945 iris.base_logic.lib.iprop <> gname def
+R15960:15964 iris.base_logic.lib.iprop <> gname def
+def 15981:15986 <> pn_end
+R15995:16004 xv6iris.PipeInvDefs <> pipe_names rec
+binder 15989:15991 <> γp:32
+R16012:16015 Corelib.Init.Datatypes <> bool ind
+binder 16008:16008 <> w:33
+R16020:16024 iris.base_logic.lib.iprop <> gname def
+R16031:16033 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R16035:16040 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R16053:16058 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R16059:16065 xv6iris.PipeInvDefs <> pn_read proj
+R16067:16069 xv6iris.PipeInvDefs <> γp:32 var
+R16041:16048 xv6iris.PipeInvDefs <> pn_write proj
+R16050:16052 xv6iris.PipeInvDefs <> γp:32 var
+R16034:16034 xv6iris.PipeInvDefs <> w:33 var
+def 16083:16089 <> pn_mark
+R16098:16107 xv6iris.PipeInvDefs <> pipe_names rec
+binder 16092:16094 <> γp:34
+R16115:16118 Corelib.Init.Datatypes <> bool ind
+binder 16111:16111 <> w:35
+R16123:16127 iris.base_logic.lib.iprop <> gname def
+R16134:16136 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R16138:16143 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R16157:16162 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R16163:16170 xv6iris.PipeInvDefs <> pn_mread proj
+R16172:16174 xv6iris.PipeInvDefs <> γp:34 var
+R16144:16152 xv6iris.PipeInvDefs <> pn_mwrite proj
+R16154:16156 xv6iris.PipeInvDefs <> γp:34 var
+R16137:16137 xv6iris.PipeInvDefs <> w:35 var
+sec 16186:16192 <> PipeInv
+R16208:16214 xv6iris.RiscvPtsto <> riscvGS class
+R16221:16225 xv6iris.Xv6Cameras <> lockG class
+R16227:16228 xv6iris.PipeInvDefs <> Σ:36 var
+R16232:16236 xv6iris.Xv6Cameras <> pipeG class
+R16238:16239 xv6iris.PipeInvDefs <> Σ:36 var
+var  16255:16256 PipeInv XI
+R16260:16265 xv6iris.TsoCtx <> CurCtx class
+def 16970:16977 <> pipe_ref
+R16986:16995 xv6iris.PipeInvDefs <> pipe_names rec
+binder 16980:16982 <> γp:41
+R17003:17006 Corelib.Init.Datatypes <> bool ind
+binder 16999:16999 <> w:42
+R17014:17015 stdpp.numbers <> Qp rec
+binder 17010:17010 <> q:43
+R17020:17024 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R17026:17027 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R17036:17038 iris.base_logic.lib.own <> own def
+R17055:17055 xv6iris.PipeInvDefs <> q:43 var
+R17041:17046 xv6iris.PipeInvDefs <> pn_end def
+R17048:17050 xv6iris.PipeInvDefs <> γp:41 var
+R17052:17052 xv6iris.PipeInvDefs <> w:42 var
+def 17208:17220 <> pipe_end_full
+R17229:17238 xv6iris.PipeInvDefs <> pipe_names rec
+binder 17223:17225 <> γp:44
+R17246:17249 Corelib.Init.Datatypes <> bool ind
+binder 17242:17242 <> w:45
+R17254:17258 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R17260:17261 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R17270:17277 xv6iris.PipeInvDefs <> pipe_ref def
+R17279:17281 xv6iris.PipeInvDefs <> γp:44 var
+R17283:17283 xv6iris.PipeInvDefs <> w:45 var
+inst 17310:17326 <> pipe_ref_timeless
+binder 17328:17330 <> γp:46
+binder 17332:17332 <> w:47
+binder 17334:17334 <> q:48
+R17338:17345 iris.bi.derived_connectives <> Timeless class
+R17348:17355 xv6iris.PipeInvDefs <> pipe_ref def
+R17357:17359 xv6iris.PipeInvDefs <> γp:46 var
+R17361:17361 xv6iris.PipeInvDefs <> w:47 var
+R17363:17363 xv6iris.PipeInvDefs <> q:48 var
+inst 17408:17429 <> pipe_end_full_timeless
+binder 17431:17433 <> γp:49
+binder 17435:17435 <> w:50
+R17439:17446 iris.bi.derived_connectives <> Timeless class
+R17449:17461 xv6iris.PipeInvDefs <> pipe_end_full def
+R17463:17465 xv6iris.PipeInvDefs <> γp:49 var
+R17467:17467 xv6iris.PipeInvDefs <> w:50 var
+inst 17513:17531 <> pipe_ref_fractional
+binder 17533:17535 <> γp:51
+binder 17537:17537 <> w:52
+R17545:17554 iris.bi.lib.fractional <> Fractional class
+binder 17561:17561 <> q:53
+R17566:17573 xv6iris.PipeInvDefs <> pipe_ref def
+R17575:17577 xv6iris.PipeInvDefs <> γp:51 var
+R17579:17579 xv6iris.PipeInvDefs <> w:52 var
+R17581:17581 xv6iris.PipeInvDefs <> q:53 var
+R17620:17627 xv6iris.PipeInvDefs <> pipe_ref def
+R17630:17635 iris.base_logic.lib.own <> own_op thm
+R17637:17643 iris.algebra.frac <> frac_op thm
+R17620:17627 xv6iris.PipeInvDefs <> pipe_ref def
+R17620:17627 xv6iris.PipeInvDefs <> pipe_ref def
+R17630:17635 iris.base_logic.lib.own <> own_op thm
+R17630:17635 iris.base_logic.lib.own <> own_op thm
+R17637:17643 iris.algebra.frac <> frac_op thm
+R17637:17643 iris.algebra.frac <> frac_op thm
+prf 17660:17673 <> pipe_ref_split
+binder 17675:17677 <> γp:54
+binder 17679:17679 <> w:55
+binder 17681:17682 <> q1:56
+binder 17684:17685 <> q2:57
+R17717:17724 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R17693:17700 xv6iris.PipeInvDefs <> pipe_ref def
+R17702:17704 xv6iris.PipeInvDefs <> γp:54 var
+R17706:17706 xv6iris.PipeInvDefs <> w:55 var
+R17711:17713 stdpp.numbers Qp.notations ::Qp_scope:x_'+'_x not
+R17709:17710 xv6iris.PipeInvDefs <> q1:56 var
+R17714:17715 xv6iris.PipeInvDefs <> q2:57 var
+R17742:17746 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R17725:17732 xv6iris.PipeInvDefs <> pipe_ref def
+R17734:17736 xv6iris.PipeInvDefs <> γp:54 var
+R17738:17738 xv6iris.PipeInvDefs <> w:55 var
+R17740:17741 xv6iris.PipeInvDefs <> q1:56 var
+R17747:17754 xv6iris.PipeInvDefs <> pipe_ref def
+R17756:17758 xv6iris.PipeInvDefs <> γp:54 var
+R17760:17760 xv6iris.PipeInvDefs <> w:55 var
+R17762:17763 xv6iris.PipeInvDefs <> q2:57 var
+R17787:17794 xv6iris.PipeInvDefs <> pipe_ref def
+R17797:17802 iris.base_logic.lib.own <> own_op thm
+R17804:17810 iris.algebra.frac <> frac_op thm
+R17787:17794 xv6iris.PipeInvDefs <> pipe_ref def
+R17787:17794 xv6iris.PipeInvDefs <> pipe_ref def
+R17797:17802 iris.base_logic.lib.own <> own_op thm
+R17797:17802 iris.base_logic.lib.own <> own_op thm
+R17804:17810 iris.algebra.frac <> frac_op thm
+R17804:17810 iris.algebra.frac <> frac_op thm
+prf 17827:17840 <> pipe_ref_valid
+binder 17842:17844 <> γp:58
+binder 17846:17846 <> w:59
+binder 17848:17848 <> q:60
+R17868:17873 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R17852:17859 xv6iris.PipeInvDefs <> pipe_ref def
+R17861:17863 xv6iris.PipeInvDefs <> γp:58 var
+R17865:17865 xv6iris.PipeInvDefs <> w:59 var
+R17867:17867 xv6iris.PipeInvDefs <> q:60 var
+R17874:17876 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R17889:17891 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R17879:17883 stdpp.numbers Qp.notations ::Qp_scope:x_'≤'_x not
+R17878:17878 xv6iris.PipeInvDefs <> q:60 var
+R17929:17929 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17939:17944 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17948:17948 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17930:17938 iris.base_logic.lib.own <> own_valid thm
+R17956:17965 iris.algebra.frac <> frac_valid thm
+R17929:17929 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17939:17944 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17948:17948 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17930:17938 iris.base_logic.lib.own <> own_valid thm
+R17956:17965 iris.algebra.frac <> frac_valid thm
+prf 18063:18080 <> pipe_end_full_excl
+binder 18082:18084 <> γp:61
+binder 18086:18086 <> w:62
+binder 18088:18088 <> q:63
+R18115:18120 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R18096:18108 xv6iris.PipeInvDefs <> pipe_end_full def
+R18110:18112 xv6iris.PipeInvDefs <> γp:61 var
+R18114:18114 xv6iris.PipeInvDefs <> w:62 var
+R18137:18142 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R18121:18128 xv6iris.PipeInvDefs <> pipe_ref def
+R18130:18132 xv6iris.PipeInvDefs <> γp:61 var
+R18134:18134 xv6iris.PipeInvDefs <> w:62 var
+R18136:18136 xv6iris.PipeInvDefs <> q:63 var
+R18143:18147 iris.bi.interface <> ::bi_scope:'False' not
+R18194:18194 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18206:18211 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18219:18219 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18195:18205 iris.base_logic.lib.own <> own_valid_2 thm
+R18194:18194 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18206:18211 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18219:18219 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18195:18205 iris.base_logic.lib.own <> own_valid_2 thm
+R18241:18247 iris.algebra.frac <> frac_op thm
+R18241:18247 iris.algebra.frac <> frac_op thm
+R18241:18247 iris.algebra.frac <> frac_op thm
+R18262:18271 iris.algebra.frac <> frac_valid thm
+R18262:18271 iris.algebra.frac <> frac_valid thm
+R18303:18317 stdpp.numbers Qp not_add_le_l thm
+R18303:18317 stdpp.numbers Qp not_add_le_l thm
+prf 18344:18361 <> pipe_ref_full_excl
+binder 18363:18365 <> γp:64
+binder 18367:18367 <> w:65
+binder 18369:18369 <> q:66
+R18393:18398 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R18377:18384 xv6iris.PipeInvDefs <> pipe_ref def
+R18386:18388 xv6iris.PipeInvDefs <> γp:64 var
+R18390:18390 xv6iris.PipeInvDefs <> w:65 var
+R18415:18420 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R18399:18406 xv6iris.PipeInvDefs <> pipe_ref def
+R18408:18410 xv6iris.PipeInvDefs <> γp:64 var
+R18412:18412 xv6iris.PipeInvDefs <> w:65 var
+R18414:18414 xv6iris.PipeInvDefs <> q:66 var
+R18421:18425 iris.bi.interface <> ::bi_scope:'False' not
+R18443:18460 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
+R18443:18460 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
+def 19305:19317 <> pipe_openmark
+R19326:19335 xv6iris.PipeInvDefs <> pipe_names rec
+binder 19320:19322 <> γp:67
+R19343:19346 Corelib.Init.Datatypes <> bool ind
+binder 19339:19339 <> w:68
+R19351:19355 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R19357:19358 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R19367:19369 iris.base_logic.lib.own <> own def
+R19388:19395 iris.algebra.dfrac <> DfracOwn constr
+R19372:19378 xv6iris.PipeInvDefs <> pn_mark def
+R19380:19382 xv6iris.PipeInvDefs <> γp:67 var
+R19384:19384 xv6iris.PipeInvDefs <> w:68 var
+def 19414:19422 <> pipe_shut
+R19431:19440 xv6iris.PipeInvDefs <> pipe_names rec
+binder 19425:19427 <> γp:69
+R19448:19451 Corelib.Init.Datatypes <> bool ind
+binder 19444:19444 <> w:70
+R19456:19460 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R19462:19463 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R19472:19474 iris.base_logic.lib.own <> own def
+R19492:19505 iris.algebra.dfrac <> DfracDiscarded constr
+R19477:19483 xv6iris.PipeInvDefs <> pn_mark def
+R19485:19487 xv6iris.PipeInvDefs <> γp:69 var
+R19489:19489 xv6iris.PipeInvDefs <> w:70 var
+inst 19527:19548 <> pipe_openmark_timeless
+binder 19550:19552 <> γp:71
+binder 19554:19554 <> w:72
+R19558:19565 iris.bi.derived_connectives <> Timeless class
+R19568:19580 xv6iris.PipeInvDefs <> pipe_openmark def
+R19582:19584 xv6iris.PipeInvDefs <> γp:71 var
+R19586:19586 xv6iris.PipeInvDefs <> w:72 var
+inst 19631:19650 <> pipe_shut_persistent
+binder 19652:19654 <> γp:73
+binder 19656:19656 <> w:74
+R19660:19669 iris.bi.derived_connectives <> Persistent class
+R19672:19680 xv6iris.PipeInvDefs <> pipe_shut def
+R19682:19684 xv6iris.PipeInvDefs <> γp:73 var
+R19686:19686 xv6iris.PipeInvDefs <> w:74 var
+inst 19731:19748 <> pipe_shut_timeless
+binder 19750:19752 <> γp:75
+binder 19754:19754 <> w:76
+R19758:19765 iris.bi.derived_connectives <> Timeless class
+R19768:19776 xv6iris.PipeInvDefs <> pipe_shut def
+R19778:19780 xv6iris.PipeInvDefs <> γp:75 var
+R19782:19782 xv6iris.PipeInvDefs <> w:76 var
+prf 19818:19835 <> pipe_shut_openmark
+binder 19837:19839 <> γp:77
+binder 19841:19841 <> w:78
+R19864:19869 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R19849:19857 xv6iris.PipeInvDefs <> pipe_shut def
+R19859:19861 xv6iris.PipeInvDefs <> γp:77 var
+R19863:19863 xv6iris.PipeInvDefs <> w:78 var
+R19889:19894 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R19870:19882 xv6iris.PipeInvDefs <> pipe_openmark def
+R19884:19886 xv6iris.PipeInvDefs <> γp:77 var
+R19888:19888 xv6iris.PipeInvDefs <> w:78 var
+R19895:19899 iris.bi.interface <> ::bi_scope:'False' not
+R19949:19949 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19961:19966 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19974:19974 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19950:19960 iris.base_logic.lib.own <> own_valid_2 thm
+R19949:19949 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19961:19966 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19974:19974 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19950:19960 iris.base_logic.lib.own <> own_valid_2 thm
+prf 19999:20016 <> pipe_openmark_shut
+binder 20018:20020 <> γp:79
+binder 20022:20022 <> w:80
+R20045:20051 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R20026:20038 xv6iris.PipeInvDefs <> pipe_openmark def
+R20040:20042 xv6iris.PipeInvDefs <> γp:79 var
+R20044:20044 xv6iris.PipeInvDefs <> w:80 var
+R20052:20060 xv6iris.PipeInvDefs <> pipe_shut def
+R20062:20064 xv6iris.PipeInvDefs <> γp:79 var
+R20066:20066 xv6iris.PipeInvDefs <> w:80 var
+R20098:20098 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20109:20114 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20118:20118 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20099:20108 iris.base_logic.lib.own <> own_update thm
+R20098:20098 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20109:20114 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20118:20118 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20099:20108 iris.base_logic.lib.own <> own_update thm
+R20127:20146 iris.algebra.dfrac <> dfrac_discard_update thm
+R20127:20146 iris.algebra.dfrac <> dfrac_discard_update thm
+def 20168:20180 <> pipe_endstate
+R20189:20198 xv6iris.PipeInvDefs <> pipe_names rec
+binder 20183:20185 <> γp:81
+R20206:20209 Corelib.Init.Datatypes <> bool ind
+binder 20202:20202 <> w:82
+R20217:20221 SailStdpp.Values <> mword def
+binder 20213:20213 <> v:83
+R20229:20233 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R20235:20236 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R20288:20334 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R20264:20268 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R20246:20248 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R20261:20263 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R20249:20258 xv6iris.PipeInvDefs <> pflag_open def
+R20260:20260 xv6iris.PipeInvDefs <> v:83 var
+R20269:20281 xv6iris.PipeInvDefs <> pipe_openmark def
+R20283:20285 xv6iris.PipeInvDefs <> γp:81 var
+R20287:20287 xv6iris.PipeInvDefs <> w:82 var
+R20372:20376 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R20335:20337 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R20369:20371 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R20339:20342 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20368:20368 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R20338:20338 xv6iris.PipeInvDefs <> v:83 var
+R20360:20364 SailStdpp.Values <> mword def
+R20343:20354 SailStdpp.Values <> mword_of_int def
+R20396:20400 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R20377:20389 xv6iris.PipeInvDefs <> pipe_end_full def
+R20391:20393 xv6iris.PipeInvDefs <> γp:81 var
+R20395:20395 xv6iris.PipeInvDefs <> w:82 var
+R20401:20409 xv6iris.PipeInvDefs <> pipe_shut def
+R20411:20413 xv6iris.PipeInvDefs <> γp:81 var
+R20415:20415 xv6iris.PipeInvDefs <> w:82 var
+inst 20522:20543 <> pipe_endstate_timeless
+binder 20545:20547 <> γp:84
+binder 20549:20549 <> w:85
+binder 20551:20551 <> v:86
+R20555:20562 iris.bi.derived_connectives <> Timeless class
+R20565:20577 xv6iris.PipeInvDefs <> pipe_endstate def
+R20579:20581 xv6iris.PipeInvDefs <> γp:84 var
+R20583:20583 xv6iris.PipeInvDefs <> w:85 var
+R20585:20585 xv6iris.PipeInvDefs <> v:86 var
+prf 20621:20644 <> pipe_endstate_open_intro
+binder 20646:20648 <> γp:87
+binder 20650:20650 <> w:88
+binder 20652:20652 <> v:89
+R20672:20675 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R20660:20669 xv6iris.PipeInvDefs <> pflag_open def
+R20671:20671 xv6iris.PipeInvDefs <> v:89 var
+R20695:20700 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R20676:20688 xv6iris.PipeInvDefs <> pipe_openmark def
+R20690:20692 xv6iris.PipeInvDefs <> γp:87 var
+R20694:20694 xv6iris.PipeInvDefs <> w:88 var
+R20701:20713 xv6iris.PipeInvDefs <> pipe_endstate def
+R20715:20717 xv6iris.PipeInvDefs <> γp:87 var
+R20719:20719 xv6iris.PipeInvDefs <> w:88 var
+R20721:20721 xv6iris.PipeInvDefs <> v:89 var
+prf 20926:20945 <> pipe_endstate_holder
+binder 20947:20949 <> γp:90
+binder 20951:20951 <> w:91
+binder 20953:20953 <> v:92
+binder 20955:20955 <> q:93
+R20984:20989 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R20963:20975 xv6iris.PipeInvDefs <> pipe_endstate def
+R20977:20979 xv6iris.PipeInvDefs <> γp:90 var
+R20981:20981 xv6iris.PipeInvDefs <> w:91 var
+R20983:20983 xv6iris.PipeInvDefs <> v:92 var
+R21006:21011 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R20990:20997 xv6iris.PipeInvDefs <> pipe_ref def
+R20999:21001 xv6iris.PipeInvDefs <> γp:90 var
+R21003:21003 xv6iris.PipeInvDefs <> w:91 var
+R21005:21005 xv6iris.PipeInvDefs <> q:93 var
+R21012:21014 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R21027:21029 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R21015:21024 xv6iris.PipeInvDefs <> pflag_open def
+R21026:21026 xv6iris.PipeInvDefs <> v:92 var
+R21147:21147 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21166:21171 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21182:21182 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21148:21165 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
+R21147:21147 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21166:21171 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21182:21182 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21148:21165 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
+prf 21359:21376 <> pipe_endstate_shut
+binder 21378:21380 <> γp:94
+binder 21382:21382 <> w:95
+binder 21384:21384 <> v:96
+R21413:21418 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R21392:21404 xv6iris.PipeInvDefs <> pipe_endstate def
+R21406:21408 xv6iris.PipeInvDefs <> γp:94 var
+R21410:21410 xv6iris.PipeInvDefs <> w:95 var
+R21412:21412 xv6iris.PipeInvDefs <> v:96 var
+R21435:21445 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R21419:21426 xv6iris.PipeInvDefs <> pipe_ref def
+R21428:21430 xv6iris.PipeInvDefs <> γp:94 var
+R21432:21432 xv6iris.PipeInvDefs <> w:95 var
+R21493:21497 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R21446:21458 xv6iris.PipeInvDefs <> pipe_endstate def
+R21460:21462 xv6iris.PipeInvDefs <> γp:94 var
+R21464:21464 xv6iris.PipeInvDefs <> w:95 var
+R21484:21488 SailStdpp.Values <> mword def
+R21467:21478 SailStdpp.Values <> mword_of_int def
+R21498:21506 xv6iris.PipeInvDefs <> pipe_shut def
+R21508:21510 xv6iris.PipeInvDefs <> γp:94 var
+R21512:21512 xv6iris.PipeInvDefs <> w:95 var
+R21628:21628 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21647:21652 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21666:21666 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21629:21646 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
+R21628:21628 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21647:21652 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21666:21666 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21629:21646 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
+R21680:21680 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21699:21704 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21712:21712 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21681:21698 xv6iris.PipeInvDefs <> pipe_openmark_shut thm
+R21680:21680 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21699:21704 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21712:21712 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R21681:21698 xv6iris.PipeInvDefs <> pipe_openmark_shut thm
+prf 22015:22037 <> pipe_endstate_shut_elim
+binder 22039:22041 <> γp:97
+binder 22043:22043 <> w:98
+binder 22045:22045 <> v:99
+R22068:22073 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R22053:22061 xv6iris.PipeInvDefs <> pipe_shut def
+R22063:22065 xv6iris.PipeInvDefs <> γp:97 var
+R22067:22067 xv6iris.PipeInvDefs <> w:98 var
+R22095:22104 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R22074:22086 xv6iris.PipeInvDefs <> pipe_endstate def
+R22088:22090 xv6iris.PipeInvDefs <> γp:97 var
+R22092:22092 xv6iris.PipeInvDefs <> w:98 var
+R22094:22094 xv6iris.PipeInvDefs <> v:99 var
+R22142:22146 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R22105:22107 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R22139:22141 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R22109:22112 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22138:22138 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R22108:22108 xv6iris.PipeInvDefs <> v:99 var
+R22130:22134 SailStdpp.Values <> mword def
+R22113:22124 SailStdpp.Values <> mword_of_int def
+R22147:22159 xv6iris.PipeInvDefs <> pipe_end_full def
+R22161:22163 xv6iris.PipeInvDefs <> γp:97 var
+R22165:22165 xv6iris.PipeInvDefs <> w:98 var
+R22237:22237 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22256:22261 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22269:22269 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22238:22255 xv6iris.PipeInvDefs <> pipe_shut_openmark thm
+R22237:22237 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22256:22261 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22269:22269 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R22238:22255 xv6iris.PipeInvDefs <> pipe_shut_openmark thm
+prf 22506:22525 <> pipe_endstate_closed
+binder 22527:22529 <> γp:100
+binder 22531:22531 <> w:101
+binder 22533:22533 <> v:102
+R22555:22562 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R22541:22542 Corelib.Init.Logic <> ::type_scope:'~'_x not
+R22543:22552 xv6iris.PipeInvDefs <> pflag_open def
+R22554:22554 xv6iris.PipeInvDefs <> v:102 var
+R22584:22589 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R22563:22575 xv6iris.PipeInvDefs <> pipe_endstate def
+R22577:22579 xv6iris.PipeInvDefs <> γp:100 var
+R22581:22581 xv6iris.PipeInvDefs <> w:101 var
+R22583:22583 xv6iris.PipeInvDefs <> v:102 var
+R22611:22615 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R22590:22602 xv6iris.PipeInvDefs <> pipe_endstate def
+R22604:22606 xv6iris.PipeInvDefs <> γp:100 var
+R22608:22608 xv6iris.PipeInvDefs <> w:101 var
+R22610:22610 xv6iris.PipeInvDefs <> v:102 var
+R22616:22624 xv6iris.PipeInvDefs <> pipe_shut def
+R22626:22628 xv6iris.PipeInvDefs <> γp:100 var
+R22630:22630 xv6iris.PipeInvDefs <> w:101 var
+prf 22898:22911 <> pipe_shut_both
+binder 22913:22915 <> γp:103
+binder 22917:22917 <> w:104
+R22940:22945 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R22925:22933 xv6iris.PipeInvDefs <> pipe_shut def
+R22935:22937 xv6iris.PipeInvDefs <> γp:103 var
+R22939:22939 xv6iris.PipeInvDefs <> w:104 var
+R22968:22977 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R22946:22954 xv6iris.PipeInvDefs <> pipe_shut def
+R22956:22958 xv6iris.PipeInvDefs <> γp:103 var
+R22961:22964 Corelib.Init.Datatypes <> negb def
+R22966:22966 xv6iris.PipeInvDefs <> w:104 var
+R22997:23001 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R22978:22986 xv6iris.PipeInvDefs <> pipe_shut def
+R22988:22990 xv6iris.PipeInvDefs <> γp:103 var
+R22992:22996 Corelib.Init.Datatypes <> false constr
+R23002:23010 xv6iris.PipeInvDefs <> pipe_shut def
+R23012:23014 xv6iris.PipeInvDefs <> γp:103 var
+R23016:23019 Corelib.Init.Datatypes <> true constr
+def 23650:23661 <> pipe_data_at
+R23669:23673 xv6iris.TsoCtx <> CtxId rec
+binder 23664:23665 <> ξ:105
+R23682:23686 SailStdpp.Values <> mword def
+binder 23677:23678 <> pi:106
+R23698:23701 Corelib.Init.Datatypes <> list ind
+R23704:23705 stdpp.bitvector.definitions <> bv rec
+binder 23693:23694 <> bs:107
+R23713:23717 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R23719:23720 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R23730:23740 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R23742:23746 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R23748:23752 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R23755:23756 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+binder 23741:23741 <> j:108
+binder 23741:23741 <> j:109
+binder 23747:23747 <> b:110
+binder 23747:23747 <> b:111
+R23757:23768 xv6iris.TsoCtx <> ctx_pointsto def
+R23818:23818 xv6iris.PipeInvDefs <> b:110 var
+R23806:23813 iris.algebra.dfrac <> DfracOwn constr
+R23774:23779 xv6iris.RiscvModelBytes <> pa_add def
+R23781:23782 xv6iris.PipeInvDefs <> pi:106 var
+R23798:23800 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R23785:23797 xv6iris.PipeInvDefs <> pipe_data_off def
+R23801:23801 xv6iris.PipeInvDefs <> j:108 var
+R23770:23771 xv6iris.PipeInvDefs <> ξ:105 var
+R23753:23754 xv6iris.PipeInvDefs <> bs:107 var
+def 23837:23845 <> pipe_data
+R23853:23857 SailStdpp.Values <> mword def
+binder 23848:23849 <> pi:112
+R23869:23872 Corelib.Init.Datatypes <> list ind
+R23875:23876 stdpp.bitvector.definitions <> bv rec
+binder 23864:23865 <> bs:113
+R23884:23888 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R23890:23891 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R23900:23911 xv6iris.PipeInvDefs <> pipe_data_at def
+R23913:23919 xv6iris.TsoCtx <> cur_ctx def
+R23921:23922 xv6iris.PipeInvDefs <> pi:112 var
+R23924:23925 xv6iris.PipeInvDefs <> bs:113 var
+def 24220:24229 <> pipe_slack
+R24237:24241 SailStdpp.Values <> mword def
+binder 24232:24233 <> pi:114
+R24249:24253 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R24255:24256 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R24266:24266 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R24315:24326 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R24420:24420 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R24267:24277 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R24279:24283 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R24291:24292 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 24278:24278 <> j:115
+binder 24278:24278 <> j:116
+R24293:24300 xv6iris.KallocInv <> byte_any def
+R24303:24308 xv6iris.RiscvModelBytes <> pa_add def
+R24310:24311 xv6iris.PipeInvDefs <> pi:114 var
+R24313:24313 xv6iris.PipeInvDefs <> j:115 var
+R24284:24286 Corelib.Lists.ListDef <> seq def
+R24327:24337 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R24339:24343 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R24388:24397 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 24338:24338 <> j:117
+binder 24338:24338 <> j:118
+R24398:24405 xv6iris.KallocInv <> byte_any def
+R24408:24413 xv6iris.RiscvModelBytes <> pa_add def
+R24415:24416 xv6iris.PipeInvDefs <> pi:114 var
+R24418:24418 xv6iris.PipeInvDefs <> j:117 var
+R24344:24346 Corelib.Lists.ListDef <> seq def
+R24373:24375 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R24361:24372 xv6iris.PipeInvDefs <> pipe_pgbytes def
+R24376:24386 xv6iris.PipeInvDefs <> pipe_sizeof def
+R24348:24358 xv6iris.PipeInvDefs <> pipe_sizeof def
+def 25219:25229 <> pipe_res_at
+R25238:25247 xv6iris.PipeInvDefs <> pipe_names rec
+binder 25232:25234 <> γp:119
+R25256:25260 SailStdpp.Values <> mword def
+binder 25251:25252 <> pi:120
+R25272:25276 xv6iris.TsoCtx <> CtxId rec
+binder 25267:25268 <> ξ:121
+R25281:25285 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R25287:25288 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R25298:25302 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R25363:25372 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R25317:25321 SailStdpp.Values <> mword def
+binder 25303:25304 <> nr:122
+R25317:25321 SailStdpp.Values <> mword def
+binder 25306:25307 <> nw:123
+R25317:25321 SailStdpp.Values <> mword def
+binder 25309:25310 <> ro:124
+R25317:25321 SailStdpp.Values <> mword def
+binder 25312:25313 <> wo:125
+R25336:25340 SailStdpp.Values <> mword def
+binder 25328:25332 <> vname:126
+R25352:25355 Corelib.Init.Datatypes <> list ind
+R25358:25359 stdpp.bitvector.definitions <> bv rec
+binder 25347:25348 <> bs:127
+R25433:25444 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R25373:25389 xv6iris.TsoCtx <> ctx_word_pointsto def
+R25428:25432 xv6iris.PipeInvDefs <> vname:126 var
+R25416:25423 iris.algebra.dfrac <> DfracOwn constr
+R25395:25409 xv6iris.WpLock <> lock_name_field def
+R25411:25412 xv6iris.PipeInvDefs <> pi:120 var
+R25391:25392 xv6iris.PipeInvDefs <> ξ:121 var
+R25496:25507 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R25445:25462 xv6iris.TsoCtx <> ctx_word4_pointsto def
+R25494:25495 xv6iris.PipeInvDefs <> nr:122 var
+R25482:25489 iris.algebra.dfrac <> DfracOwn constr
+R25468:25475 xv6iris.PipeInvDefs <> a_pnread def
+R25477:25478 xv6iris.PipeInvDefs <> pi:120 var
+R25464:25465 xv6iris.PipeInvDefs <> ξ:121 var
+R25560:25571 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R25508:25525 xv6iris.TsoCtx <> ctx_word4_pointsto def
+R25558:25559 xv6iris.PipeInvDefs <> nw:123 var
+R25546:25553 iris.algebra.dfrac <> DfracOwn constr
+R25531:25539 xv6iris.PipeInvDefs <> a_pnwrite def
+R25541:25542 xv6iris.PipeInvDefs <> pi:120 var
+R25527:25528 xv6iris.PipeInvDefs <> ξ:121 var
+R25628:25639 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R25572:25589 xv6iris.TsoCtx <> ctx_word4_pointsto def
+R25626:25627 xv6iris.PipeInvDefs <> ro:124 var
+R25614:25621 iris.algebra.dfrac <> DfracOwn constr
+R25595:25601 xv6iris.PipeInvDefs <> a_popen def
+R25603:25604 xv6iris.PipeInvDefs <> pi:120 var
+R25606:25610 Corelib.Init.Datatypes <> false constr
+R25591:25592 xv6iris.PipeInvDefs <> ξ:121 var
+R25695:25706 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R25640:25657 xv6iris.TsoCtx <> ctx_word4_pointsto def
+R25693:25694 xv6iris.PipeInvDefs <> wo:125 var
+R25681:25688 iris.algebra.dfrac <> DfracOwn constr
+R25663:25669 xv6iris.PipeInvDefs <> a_popen def
+R25671:25672 xv6iris.PipeInvDefs <> pi:120 var
+R25674:25677 Corelib.Init.Datatypes <> true constr
+R25659:25660 xv6iris.PipeInvDefs <> ξ:121 var
+R25733:25744 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R25707:25719 xv6iris.PipeInvDefs <> pipe_endstate def
+R25721:25723 xv6iris.PipeInvDefs <> γp:119 var
+R25725:25729 Corelib.Init.Datatypes <> false constr
+R25731:25732 xv6iris.PipeInvDefs <> ro:124 var
+R25770:25781 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R25745:25757 xv6iris.PipeInvDefs <> pipe_endstate def
+R25759:25761 xv6iris.PipeInvDefs <> γp:119 var
+R25763:25766 Corelib.Init.Datatypes <> true constr
+R25768:25769 xv6iris.PipeInvDefs <> wo:125 var
+R25807:25818 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R25782:25784 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R25804:25806 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R25785:25797 xv6iris.PipeInvDefs <> pipe_count_ok def
+R25799:25800 xv6iris.PipeInvDefs <> nr:122 var
+R25802:25803 xv6iris.PipeInvDefs <> nw:123 var
+R25845:25849 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R25819:25821 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R25842:25844 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R25831:25833 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R25822:25827 Stdlib.Lists.List <> length abbrev
+R25829:25830 xv6iris.PipeInvDefs <> bs:127 var
+R25834:25841 xv6iris.PipeInvDefs <> PIPESIZE def
+R25871:25882 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R25850:25861 xv6iris.PipeInvDefs <> pipe_data_at def
+R25863:25864 xv6iris.PipeInvDefs <> ξ:121 var
+R25866:25867 xv6iris.PipeInvDefs <> pi:120 var
+R25869:25870 xv6iris.PipeInvDefs <> bs:127 var
+R25883:25892 xv6iris.PipeInvDefs <> pipe_slack def
+R25894:25895 xv6iris.PipeInvDefs <> pi:120 var
+def 25914:25921 <> pipe_res
+R25930:25939 xv6iris.PipeInvDefs <> pipe_names rec
+binder 25924:25926 <> γp:128
+R25948:25952 SailStdpp.Values <> mword def
+binder 25943:25944 <> pi:129
+R25960:25964 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R25966:25967 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R25976:25986 xv6iris.PipeInvDefs <> pipe_res_at def
+R25988:25990 xv6iris.PipeInvDefs <> γp:128 var
+R25992:25993 xv6iris.PipeInvDefs <> pi:129 var
+R25995:26001 xv6iris.TsoCtx <> cur_ctx def
+inst 26023:26040 <> pipe_data_at_morph
+binder 26042:26043 <> pi:130
+binder 26045:26046 <> bs:131
+R26050:26057 xv6iris.TsoCtx <> CtxMorph class
+R26060:26062 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R26065:26066 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 26063:26064 <> ξ:132
+R26067:26078 xv6iris.PipeInvDefs <> pipe_data_at def
+R26080:26081 xv6iris.PipeInvDefs <> ξ:132 var
+R26083:26084 xv6iris.PipeInvDefs <> pi:130 var
+R26086:26087 xv6iris.PipeInvDefs <> bs:131 var
+R26109:26120 xv6iris.PipeInvDefs <> pipe_data_at def
+R26109:26120 xv6iris.PipeInvDefs <> pipe_data_at def
+R26109:26120 xv6iris.PipeInvDefs <> pipe_data_at def
+inst 26163:26179 <> pipe_res_at_morph
+binder 26181:26183 <> γp:133
+binder 26185:26186 <> pi:134
+R26190:26197 xv6iris.TsoCtx <> CtxMorph class
+R26200:26210 xv6iris.PipeInvDefs <> pipe_res_at def
+R26212:26214 xv6iris.PipeInvDefs <> γp:133 var
+R26216:26217 xv6iris.PipeInvDefs <> pi:134 var
+R26239:26249 xv6iris.PipeInvDefs <> pipe_res_at def
+R26239:26249 xv6iris.PipeInvDefs <> pipe_res_at def
+R26239:26249 xv6iris.PipeInvDefs <> pipe_res_at def
+def 26499:26508 <> pipe_bytes
+R26516:26520 SailStdpp.Values <> mword def
+binder 26511:26512 <> pi:135
+R26528:26532 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R26534:26535 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R26545:26549 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R26610:26619 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R26558:26562 SailStdpp.Values <> mword def
+binder 26550:26554 <> vname:136
+R26583:26587 SailStdpp.Values <> mword def
+binder 26569:26570 <> nr:137
+R26583:26587 SailStdpp.Values <> mword def
+binder 26572:26573 <> nw:138
+R26583:26587 SailStdpp.Values <> mword def
+binder 26575:26576 <> ro:139
+R26583:26587 SailStdpp.Values <> mword def
+binder 26578:26579 <> wo:140
+R26599:26602 Corelib.Init.Datatypes <> list ind
+R26605:26606 stdpp.bitvector.definitions <> bv rec
+binder 26594:26595 <> bs:141
+R26651:26662 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R26638:26645 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈'_x not
+R26620:26634 xv6iris.WpLock <> lock_name_field def
+R26636:26637 xv6iris.PipeInvDefs <> pi:135 var
+R26646:26650 xv6iris.PipeInvDefs <> vname:136 var
+R26689:26700 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R26674:26686 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R26663:26670 xv6iris.PipeInvDefs <> a_pnread def
+R26672:26673 xv6iris.PipeInvDefs <> pi:135 var
+R26687:26688 xv6iris.PipeInvDefs <> nr:137 var
+R26727:26738 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R26713:26724 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R26701:26709 xv6iris.PipeInvDefs <> a_pnwrite def
+R26711:26712 xv6iris.PipeInvDefs <> pi:135 var
+R26725:26726 xv6iris.PipeInvDefs <> nw:138 var
+R26765:26776 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R26755:26762 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R26739:26745 xv6iris.PipeInvDefs <> a_popen def
+R26747:26748 xv6iris.PipeInvDefs <> pi:135 var
+R26750:26754 Corelib.Init.Datatypes <> false constr
+R26763:26764 xv6iris.PipeInvDefs <> ro:139 var
+R26803:26814 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R26792:26800 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R26777:26783 xv6iris.PipeInvDefs <> a_popen def
+R26785:26786 xv6iris.PipeInvDefs <> pi:135 var
+R26788:26791 Corelib.Init.Datatypes <> true constr
+R26801:26802 xv6iris.PipeInvDefs <> wo:140 var
+R26841:26845 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R26815:26817 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R26838:26840 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R26827:26829 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R26818:26823 Stdlib.Lists.List <> length abbrev
+R26825:26826 xv6iris.PipeInvDefs <> bs:141 var
+R26830:26837 xv6iris.PipeInvDefs <> PIPESIZE def
+R26861:26872 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R26846:26854 xv6iris.PipeInvDefs <> pipe_data def
+R26856:26857 xv6iris.PipeInvDefs <> pi:135 var
+R26859:26860 xv6iris.PipeInvDefs <> bs:141 var
+R26873:26882 xv6iris.PipeInvDefs <> pipe_slack def
+R26884:26885 xv6iris.PipeInvDefs <> pi:135 var
+def 27567:27575 <> pipe_dead
+R27584:27588 iris.base_logic.lib.iprop <> gname def
+binder 27578:27580 <> γl:142
+R27598:27607 xv6iris.PipeInvDefs <> pipe_names rec
+binder 27592:27594 <> γp:143
+R27612:27616 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R27618:27619 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R27647:27651 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R27629:27637 xv6iris.WpLock <> lock_frag def
+R27639:27641 xv6iris.PipeInvDefs <> γl:142 var
+R27643:27646 Corelib.Init.Datatypes <> None constr
+R27675:27679 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R27652:27664 xv6iris.PipeInvDefs <> pipe_end_full def
+R27666:27668 xv6iris.PipeInvDefs <> γp:143 var
+R27670:27674 Corelib.Init.Datatypes <> false constr
+R27680:27692 xv6iris.PipeInvDefs <> pipe_end_full def
+R27694:27696 xv6iris.PipeInvDefs <> γp:143 var
+R27698:27701 Corelib.Init.Datatypes <> true constr
+inst 27726:27743 <> pipe_dead_timeless
+binder 27745:27747 <> γl:144
+binder 27749:27751 <> γp:145
+R27755:27762 iris.bi.derived_connectives <> Timeless class
+R27765:27773 xv6iris.PipeInvDefs <> pipe_dead def
+R27775:27777 xv6iris.PipeInvDefs <> γl:144 var
+R27779:27781 xv6iris.PipeInvDefs <> γp:145 var
+R27803:27811 xv6iris.PipeInvDefs <> pipe_dead def
+R27814:27826 xv6iris.PipeInvDefs <> pipe_end_full def
+R27829:27836 xv6iris.PipeInvDefs <> pipe_ref def
+R27839:27847 xv6iris.WpLock <> lock_frag def
+R27803:27811 xv6iris.PipeInvDefs <> pipe_dead def
+R27803:27811 xv6iris.PipeInvDefs <> pipe_dead def
+R27814:27826 xv6iris.PipeInvDefs <> pipe_end_full def
+R27814:27826 xv6iris.PipeInvDefs <> pipe_end_full def
+R27829:27836 xv6iris.PipeInvDefs <> pipe_ref def
+R27829:27836 xv6iris.PipeInvDefs <> pipe_ref def
+R27839:27847 xv6iris.WpLock <> lock_frag def
+R27839:27847 xv6iris.WpLock <> lock_frag def
+prf 27873:27885 <> pipe_ref_dead
+binder 27887:27889 <> γl:146
+binder 27891:27893 <> γp:147
+binder 27895:27895 <> w:148
+binder 27897:27897 <> q:149
+R27921:27926 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R27905:27912 xv6iris.PipeInvDefs <> pipe_ref def
+R27914:27916 xv6iris.PipeInvDefs <> γp:147 var
+R27918:27918 xv6iris.PipeInvDefs <> w:148 var
+R27920:27920 xv6iris.PipeInvDefs <> q:149 var
+R27944:27949 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R27927:27935 xv6iris.PipeInvDefs <> pipe_dead def
+R27937:27939 xv6iris.PipeInvDefs <> γl:146 var
+R27941:27943 xv6iris.PipeInvDefs <> γp:147 var
+R27950:27954 iris.bi.interface <> ::bi_scope:'False' not
+R28023:28023 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28042:28047 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28055:28055 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28024:28041 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
+R28023:28023 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28042:28047 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28055:28055 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28024:28041 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
+R28071:28071 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28090:28095 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28103:28103 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28072:28089 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
+R28071:28071 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28090:28095 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28103:28103 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28072:28089 xv6iris.PipeInvDefs <> pipe_end_full_excl thm
+prf 28122:28135 <> lock_frag_dead
+binder 28137:28139 <> γl:150
+binder 28141:28143 <> γp:151
+binder 28145:28146 <> st:152
+R28170:28175 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R28154:28162 xv6iris.WpLock <> lock_frag def
+R28164:28166 xv6iris.PipeInvDefs <> γl:150 var
+R28168:28169 xv6iris.PipeInvDefs <> st:152 var
+R28193:28198 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R28176:28184 xv6iris.PipeInvDefs <> pipe_dead def
+R28186:28188 xv6iris.PipeInvDefs <> γl:150 var
+R28190:28192 xv6iris.PipeInvDefs <> γp:151 var
+R28199:28203 iris.bi.interface <> ::bi_scope:'False' not
+R28250:28250 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28270:28275 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28284:28284 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28251:28269 xv6iris.WpLock <> lock_frag_exclusive thm
+R28250:28250 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28270:28275 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28284:28284 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28251:28269 xv6iris.WpLock <> lock_frag_exclusive thm
+prf 28633:28643 <> locked_dead
+binder 28645:28647 <> γl:153
+binder 28649:28651 <> γp:154
+binder 28653:28653 <> i:155
+R28657:28660 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R28673:28678 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R28661:28666 xv6iris.WpLock <> locked def
+R28668:28670 xv6iris.PipeInvDefs <> γl:153 var
+R28672:28672 xv6iris.PipeInvDefs <> i:155 var
+R28696:28701 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R28679:28687 xv6iris.PipeInvDefs <> pipe_dead def
+R28689:28691 xv6iris.PipeInvDefs <> γl:153 var
+R28693:28695 xv6iris.PipeInvDefs <> γp:154 var
+R28702:28706 iris.bi.interface <> ::bi_scope:'False' not
+R28761:28761 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28776:28781 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28791:28791 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28762:28775 xv6iris.PipeInvDefs <> lock_frag_dead thm
+R28761:28761 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28776:28781 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28791:28791 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28762:28775 xv6iris.PipeInvDefs <> lock_frag_dead thm
+prf 28823:28837 <> locked_pre_dead
+binder 28839:28841 <> γl:156
+binder 28843:28845 <> γp:157
+binder 28847:28847 <> i:158
+R28851:28854 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R28871:28876 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R28855:28864 xv6iris.WpLock <> locked_pre def
+R28866:28868 xv6iris.PipeInvDefs <> γl:156 var
+R28870:28870 xv6iris.PipeInvDefs <> i:158 var
+R28894:28899 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R28877:28885 xv6iris.PipeInvDefs <> pipe_dead def
+R28887:28889 xv6iris.PipeInvDefs <> γl:156 var
+R28891:28893 xv6iris.PipeInvDefs <> γp:157 var
+R28900:28904 iris.bi.interface <> ::bi_scope:'False' not
+R28959:28959 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28974:28979 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28989:28989 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28960:28973 xv6iris.PipeInvDefs <> lock_frag_dead thm
+R28959:28959 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28974:28979 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28989:28989 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28960:28973 xv6iris.PipeInvDefs <> lock_frag_dead thm
+prf 29526:29538 <> pipe_res_dead
+binder 29540:29542 <> γl:159
+binder 29544:29546 <> γp:160
+binder 29548:29549 <> pi:161
+R29576:29581 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R29557:29565 xv6iris.PipeInvDefs <> pipe_shut def
+R29567:29569 xv6iris.PipeInvDefs <> γp:160 var
+R29571:29575 Corelib.Init.Datatypes <> false constr
+R29600:29609 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R29582:29590 xv6iris.PipeInvDefs <> pipe_shut def
+R29592:29594 xv6iris.PipeInvDefs <> γp:160 var
+R29596:29599 Corelib.Init.Datatypes <> true constr
+R29628:29633 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R29610:29618 xv6iris.WpLock <> lock_frag def
+R29620:29622 xv6iris.PipeInvDefs <> γl:159 var
+R29624:29627 Corelib.Init.Datatypes <> None constr
+R29649:29658 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R29634:29641 xv6iris.PipeInvDefs <> pipe_res def
+R29643:29645 xv6iris.PipeInvDefs <> γp:160 var
+R29647:29648 xv6iris.PipeInvDefs <> pi:161 var
+R29676:29680 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R29659:29667 xv6iris.PipeInvDefs <> pipe_dead def
+R29669:29671 xv6iris.PipeInvDefs <> γl:159 var
+R29673:29675 xv6iris.PipeInvDefs <> γp:160 var
+R29681:29690 xv6iris.PipeInvDefs <> pipe_bytes def
+R29692:29693 xv6iris.PipeInvDefs <> pi:161 var
+R29887:29887 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29911:29916 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29927:29927 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29888:29910 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
+R29887:29887 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29911:29916 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29927:29927 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29888:29910 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
+R29957:29957 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29981:29986 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29997:29997 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29958:29980 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
+R29957:29957 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29981:29986 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29997:29997 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R29958:29980 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
+R30116:30120 SailStdpp.Values <> mword def
+R30099:30110 SailStdpp.Values <> mword_of_int def
+R30145:30149 SailStdpp.Values <> mword def
+R30128:30139 SailStdpp.Values <> mword_of_int def
+R30116:30120 SailStdpp.Values <> mword def
+R30099:30110 SailStdpp.Values <> mword_of_int def
+R30145:30149 SailStdpp.Values <> mword def
+R30128:30139 SailStdpp.Values <> mword_of_int def
+R30173:30181 xv6iris.PipeInvDefs <> pipe_data def
+R30173:30181 xv6iris.PipeInvDefs <> pipe_data def
+R30173:30181 xv6iris.PipeInvDefs <> pipe_data def
+def 30484:30490 <> is_pipe
+R30499:30503 iris.base_logic.lib.iprop <> gname def
+binder 30493:30495 <> γl:162
+R30513:30522 xv6iris.PipeInvDefs <> pipe_names rec
+binder 30507:30509 <> γp:163
+R30531:30535 SailStdpp.Values <> mword def
+binder 30526:30527 <> pi:164
+R30543:30547 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R30549:30550 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R30579:30588 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R30560:30562 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R30576:30578 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R30563:30572 xv6iris.PageGeom <> page_valid def
+R30574:30575 xv6iris.PipeInvDefs <> pi:164 var
+R30589:30592 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R30601:30609 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R30598:30600 Corelib.Init.Datatypes <> nat ind
+binder 30593:30594 <> lo:165
+R30690:30701 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R30610:30612 iris.base_logic.lib.invariants <> inv def
+R30667:30671 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R30621:30628 xv6iris.WpLock <> lock_inv def
+R30630:30632 xv6iris.PipeInvDefs <> γl:162 var
+R30634:30635 xv6iris.PipeInvDefs <> pi:164 var
+R30645:30655 xv6iris.PipeInvDefs <> pipe_res_at def
+R30657:30659 xv6iris.PipeInvDefs <> γp:163 var
+R30661:30662 xv6iris.PipeInvDefs <> pi:164 var
+R30665:30666 xv6iris.PipeInvDefs <> lo:165 var
+R30672:30680 xv6iris.PipeInvDefs <> pipe_dead def
+R30682:30684 xv6iris.PipeInvDefs <> γl:162 var
+R30686:30688 xv6iris.PipeInvDefs <> γp:163 var
+R30614:30618 xv6iris.WpLock <> lockN def
+R30702:30716 xv6iris.WpLock <> lk_floor def
+R30718:30724 xv6iris.TsoCtx <> cur_ctx def
+R30726:30727 xv6iris.PipeInvDefs <> lo:165 var
+inst 30752:30769 <> is_pipe_persistent
+binder 30771:30773 <> γl:166
+binder 30775:30777 <> γp:167
+binder 30779:30780 <> pi:168
+R30784:30793 iris.bi.derived_connectives <> Persistent class
+R30796:30802 xv6iris.PipeInvDefs <> is_pipe def
+R30804:30806 xv6iris.PipeInvDefs <> γl:166 var
+R30808:30810 xv6iris.PipeInvDefs <> γp:167 var
+R30812:30813 xv6iris.PipeInvDefs <> pi:168 var
+prf 31293:31305 <> is_pipe_valid
+binder 31307:31309 <> γl:169
+binder 31311:31313 <> γp:170
+binder 31315:31316 <> pi:171
+R31338:31343 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R31320:31326 xv6iris.PipeInvDefs <> is_pipe def
+R31328:31330 xv6iris.PipeInvDefs <> γl:169 var
+R31332:31334 xv6iris.PipeInvDefs <> γp:170 var
+R31336:31337 xv6iris.PipeInvDefs <> pi:171 var
+R31344:31346 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R31360:31362 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R31347:31356 xv6iris.PageGeom <> page_valid def
+R31358:31359 xv6iris.PipeInvDefs <> pi:171 var
+R31383:31389 xv6iris.PipeInvDefs <> is_pipe def
+R31383:31389 xv6iris.PipeInvDefs <> is_pipe def
+R31383:31389 xv6iris.PipeInvDefs <> is_pipe def
+prf 31606:31616 <> is_pipe_inv
+binder 31618:31620 <> γl:172
+binder 31622:31624 <> γp:173
+binder 31626:31627 <> pi:174
+R31653:31662 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R31635:31641 xv6iris.PipeInvDefs <> is_pipe def
+R31643:31645 xv6iris.PipeInvDefs <> γl:172 var
+R31647:31649 xv6iris.PipeInvDefs <> γp:173 var
+R31651:31652 xv6iris.PipeInvDefs <> pi:174 var
+R31663:31666 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R31675:31682 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R31672:31674 Corelib.Init.Datatypes <> nat ind
+binder 31667:31668 <> lo:175
+R31763:31773 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R31683:31685 iris.base_logic.lib.invariants <> inv def
+R31740:31744 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R31694:31701 xv6iris.WpLock <> lock_inv def
+R31703:31705 xv6iris.PipeInvDefs <> γl:172 var
+R31707:31708 xv6iris.PipeInvDefs <> pi:174 var
+R31718:31728 xv6iris.PipeInvDefs <> pipe_res_at def
+R31730:31732 xv6iris.PipeInvDefs <> γp:173 var
+R31734:31735 xv6iris.PipeInvDefs <> pi:174 var
+R31738:31739 xv6iris.PipeInvDefs <> lo:175 var
+R31745:31753 xv6iris.PipeInvDefs <> pipe_dead def
+R31755:31757 xv6iris.PipeInvDefs <> γl:172 var
+R31759:31761 xv6iris.PipeInvDefs <> γp:173 var
+R31687:31691 xv6iris.WpLock <> lockN def
+R31774:31788 xv6iris.WpLock <> lk_floor def
+R31790:31796 xv6iris.TsoCtx <> cur_ctx def
+R31798:31799 xv6iris.PipeInvDefs <> lo:175 var
+R31820:31826 xv6iris.PipeInvDefs <> is_pipe def
+R31820:31826 xv6iris.PipeInvDefs <> is_pipe def
+R31820:31826 xv6iris.PipeInvDefs <> is_pipe def
+prf 32009:32024 <> is_pipe_openable
+binder 32026:32028 <> γl:176
+binder 32030:32032 <> γp:177
+binder 32034:32035 <> pi:178
+R32061:32070 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R32043:32049 xv6iris.PipeInvDefs <> is_pipe def
+R32051:32053 xv6iris.PipeInvDefs <> γl:176 var
+R32055:32057 xv6iris.PipeInvDefs <> γp:177 var
+R32059:32060 xv6iris.PipeInvDefs <> pi:178 var
+R32071:32083 xv6iris.WpLock <> lock_openable def
+R32085:32087 xv6iris.PipeInvDefs <> γl:176 var
+R32089:32090 xv6iris.PipeInvDefs <> pi:178 var
+R32100:32110 xv6iris.PipeInvDefs <> pipe_res_at def
+R32112:32114 xv6iris.PipeInvDefs <> γp:177 var
+R32116:32117 xv6iris.PipeInvDefs <> pi:178 var
+R32121:32129 xv6iris.PipeInvDefs <> pipe_dead def
+R32131:32133 xv6iris.PipeInvDefs <> γl:176 var
+R32135:32137 xv6iris.PipeInvDefs <> γp:177 var
+R32177:32177 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32189:32194 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32198:32198 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32178:32188 xv6iris.PipeInvDefs <> is_pipe_inv thm
+R32177:32177 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32189:32194 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32198:32198 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32178:32188 xv6iris.PipeInvDefs <> is_pipe_inv thm
+R32230:32230 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32252:32257 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32265:32265 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32231:32251 xv6iris.WpLock <> lock_openable_of_dead thm
+R32230:32230 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32252:32257 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32265:32265 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R32231:32251 xv6iris.WpLock <> lock_openable_of_dead thm
+def 33242:33250 <> pipe_held
+R33258:33262 SailStdpp.Values <> mword def
+binder 33253:33254 <> pi:179
+R33273:33276 Corelib.Init.Datatypes <> bool ind
+binder 33269:33269 <> w:180
+R33284:33285 stdpp.numbers <> Qp rec
+binder 33280:33280 <> q:181
+R33290:33294 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R33296:33297 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R33307:33311 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R33342:33344 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R33318:33322 iris.base_logic.lib.iprop <> gname def
+binder 33312:33314 <> γl:182
+R33332:33341 xv6iris.PipeInvDefs <> pipe_names rec
+binder 33326:33328 <> γp:183
+R33363:33367 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R33345:33351 xv6iris.PipeInvDefs <> is_pipe def
+R33353:33355 xv6iris.PipeInvDefs <> γl:182 var
+R33357:33359 xv6iris.PipeInvDefs <> γp:183 var
+R33361:33362 xv6iris.PipeInvDefs <> pi:179 var
+R33368:33375 xv6iris.PipeInvDefs <> pipe_ref def
+R33377:33379 xv6iris.PipeInvDefs <> γp:183 var
+R33381:33381 xv6iris.PipeInvDefs <> w:180 var
+R33383:33383 xv6iris.PipeInvDefs <> q:181 var
+R33393:33399 xv6iris.PipeInvDefs PipeInv <> sec

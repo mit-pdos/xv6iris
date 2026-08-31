@@ -64,6 +64,7 @@ Section CtxPinMint.
     iIntros "Hint He".
     iDestruct "Hint"
       as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
+    destruct Hmm as (Hmm & Hera).
     iDestruct (ghost_map_lookup with "Hauth He") as %HTM.
     destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTM)) as (v0 & _ & Hlat).
     iPureIntro. destruct Hlat as [Hlb _].
@@ -120,6 +121,7 @@ Section CtxPinMint.
       as (B K W D) "([Hb' Hd'] & #HK & %HBK & #HW & %HDW & #Hoks)".
     iDestruct "Hint"
       as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
+    destruct Hmm as (Hmm & Hera).
     iDestruct (view_auth_valid with "Hvw HK") as %HKtv.
     rewrite avf_hart in HKtv.
     iDestruct "Hbit" as "[Hclean | Hdirty]".
@@ -337,7 +339,7 @@ Section CtxPinMint.
     iIntros "Hint".
     iDestruct "Hint"
       as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as (Hflat & Htv & Hcov).
+    destruct Hmm as ((Hflat & Htv & Hcov) & Hera).
     iDestruct (view_lb_get _ _ (avf g) (length g.(glog)) (hart_agent cpu_id)
                 with "Hv Hlen") as "(Hv & Hlen & #Hrcpt)".
     { rewrite avf_hart. apply Htv. }

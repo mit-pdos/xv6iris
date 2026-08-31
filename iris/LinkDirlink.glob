@@ -1,0 +1,17 @@
+DIGEST 2388862b65d13f48d79cf3b32600acdf
+Fxv6iris.LinkDirlink
+R1283:1295 xv6iris.LinkDirlookup <> <> lib
+R1297:1305 xv6iris.LinkReadi <> <> lib
+R1307:1314 xv6iris.LinkIput <> <> lib
+R1316:1326 xv6iris.LinkStrncpy <> <> lib
+R1328:1337 xv6iris.LinkWritei <> <> lib
+R1347:1355 xv6iris.LinkPanic <> <> lib
+R1357:1368 xv6iris.ProofDirlink <> <> lib
+R1390:1401 xv6iris.ProofDirlink DirlinkProof <> modtype
+R1403:1411 xv6iris.LinkDirlookup Dirlookup <> modtype
+R1413:1417 xv6iris.LinkReadi Readi <> modtype
+R1419:1422 xv6iris.LinkIput Iput <> modtype
+R1424:1430 xv6iris.LinkStrncpy Strncpy <> modtype
+R1432:1437 xv6iris.LinkWritei Writei <> modtype
+R1439:1443 xv6iris.LinkPanic Panic <> modtype
+mod 1379:1385 <> Dirlink

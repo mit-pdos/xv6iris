@@ -1,0 +1,27 @@
+DIGEST d994128b89fc9067c64e262470b9ceec
+Fxv6iris.LinkKexit
+R514:523 xv6iris.LinkMyproc <> <> lib
+R525:537 xv6iris.LinkFileclose <> <> lib
+R539:549 xv6iris.LinkBeginOp <> <> lib
+R551:558 xv6iris.LinkIput <> <> lib
+R560:568 xv6iris.LinkEndOp <> <> lib
+R586:596 xv6iris.LinkAcquire <> <> lib
+R598:609 xv6iris.LinkReparent <> <> lib
+R611:620 xv6iris.LinkWakeup <> <> lib
+R622:632 xv6iris.LinkRelease <> <> lib
+R634:642 xv6iris.LinkSched <> <> lib
+R660:669 xv6iris.ProofKexit <> <> lib
+R671:679 xv6iris.LinkPanic <> <> lib
+R699:708 xv6iris.ProofKexit KexitProof <> modtype
+R710:715 xv6iris.LinkMyproc Myproc <> modtype
+R717:725 xv6iris.LinkFileclose Fileclose <> modtype
+R727:733 xv6iris.LinkBeginOp BeginOp <> modtype
+R735:738 xv6iris.LinkIput Iput <> modtype
+R740:744 xv6iris.LinkEndOp EndOp <> modtype
+R772:778 xv6iris.LinkAcquire Acquire <> modtype
+R780:787 xv6iris.LinkReparent Reparent <> modtype
+R789:794 xv6iris.LinkWakeup Wakeup <> modtype
+R796:802 xv6iris.LinkRelease Release <> modtype
+R804:808 xv6iris.LinkSched Sched <> modtype
+R810:814 xv6iris.LinkPanic Panic <> modtype
+mod 690:694 <> Kexit

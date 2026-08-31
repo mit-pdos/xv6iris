@@ -1,0 +1,31 @@
+DIGEST 3a02167c2fc588088acee83a3c0234e7
+Fxv6iris.LinkSysOpen
+R2439:2448 xv6iris.LinkArgint <> <> lib
+R2450:2459 xv6iris.LinkArgstr <> <> lib
+R2461:2471 xv6iris.LinkBeginOp <> <> lib
+R2473:2482 xv6iris.LinkCreate <> <> lib
+R2484:2492 xv6iris.LinkNamei <> <> lib
+R2502:2510 xv6iris.LinkIlock <> <> lib
+R2512:2522 xv6iris.LinkIunlock <> <> lib
+R2524:2537 xv6iris.LinkIunlockput <> <> lib
+R2539:2547 xv6iris.LinkEndOp <> <> lib
+R2549:2561 xv6iris.LinkFileclose <> <> lib
+R2571:2580 xv6iris.LinkItrunc <> <> lib
+R2582:2594 xv6iris.LinkFilealloc <> <> lib
+R2596:2606 xv6iris.LinkFdalloc <> <> lib
+R2616:2627 xv6iris.ProofSysOpen <> <> lib
+R2649:2660 xv6iris.ProofSysOpen SysOpenProof <> modtype
+R2662:2667 xv6iris.LinkArgint Argint <> modtype
+R2669:2674 xv6iris.LinkArgstr Argstr <> modtype
+R2676:2682 xv6iris.LinkBeginOp BeginOp <> modtype
+R2684:2689 xv6iris.LinkCreate Create <> modtype
+R2691:2695 xv6iris.LinkNamei Namei <> modtype
+R2697:2701 xv6iris.LinkIlock Ilock <> modtype
+R2733:2739 xv6iris.LinkIunlock Iunlock <> modtype
+R2741:2750 xv6iris.LinkIunlockput Iunlockput <> modtype
+R2752:2756 xv6iris.LinkEndOp EndOp <> modtype
+R2758:2766 xv6iris.LinkFileclose Fileclose <> modtype
+R2768:2773 xv6iris.LinkItrunc Itrunc <> modtype
+R2805:2813 xv6iris.LinkFilealloc Filealloc <> modtype
+R2815:2821 xv6iris.LinkFdalloc Fdalloc <> modtype
+mod 2638:2644 <> SysOpen

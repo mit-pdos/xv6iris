@@ -1,0 +1,7 @@
+DIGEST 28b672de8d5ec50df4101c7b650f5567
+Fxv6iris.LinkNameiparent
+R465:473 xv6iris.LinkNamex <> <> lib
+R491:506 xv6iris.ProofNameiparent <> <> lib
+R532:547 xv6iris.ProofNameiparent NameiparentProof <> modtype
+R549:553 xv6iris.LinkNamex Namex <> modtype
+mod 517:527 <> Nameiparent

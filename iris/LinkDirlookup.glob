@@ -1,0 +1,13 @@
+DIGEST b814ab9129432b02afe12019a24dd808
+Fxv6iris.LinkDirlookup
+R799:807 xv6iris.LinkReadi <> <> lib
+R809:819 xv6iris.LinkNamecmp <> <> lib
+R821:828 xv6iris.LinkIget <> <> lib
+R830:838 xv6iris.LinkPanic <> <> lib
+R840:853 xv6iris.ProofDirlookup <> <> lib
+R877:890 xv6iris.ProofDirlookup DirlookupProof <> modtype
+R892:896 xv6iris.LinkReadi Readi <> modtype
+R898:904 xv6iris.LinkNamecmp Namecmp <> modtype
+R906:909 xv6iris.LinkIget Iget <> modtype
+R911:915 xv6iris.LinkPanic Panic <> modtype
+mod 864:872 <> Dirlookup

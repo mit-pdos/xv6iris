@@ -81,7 +81,7 @@ Require Import TimerCap.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx.
+Require Import TsoCtx CtxMorphTac UartTxInv ConsoleInv.
 
 (* the secondary arm's stack budget: see the header.  Like [SpecMain.K_main]
    this is set by the SCHEDULER's trap reserve rather than by the arm's own
@@ -128,9 +128,42 @@ Section SpecMainSecondary.
   (* ------------------------------------------------------------------- *)
   (* main(), entered on a SECONDARY hart.                                 *)
   (* ------------------------------------------------------------------- *)
+End SpecMainSecondary.
+
+(* A6.132: THE DEPOSIT AS A FUNCTION OF THE CONTEXT, with its transport --
+   what the barrier record carries at [ξd] and each secondary absorbs into
+   its own context.  One [CtxMorph] instance per named row, as elsewhere. *)
+Section MainDepositMorph.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId}.
+
+  Global Instance is_txlock_morph γl γu : CtxMorph (λ ξ, is_txlock (XI := ξ) γl γu).
+  Proof. rewrite /is_txlock. ctx_morph_solve. Qed.
+  Global Instance is_conslock_morph γ : CtxMorph (λ ξ, is_conslock (XI := ξ) γ).
+  Proof. rewrite /is_conslock. ctx_morph_solve. Qed.
+  Global Instance console_caps_morph γu : CtxMorph (λ ξ, console_caps (XI := ξ) γu).
+  Proof. rewrite /console_caps. ctx_morph_solve. Qed.
+  Global Instance printk_env_morph γpr γd γv : CtxMorph (λ ξ, printk_env (XI := ξ) γpr γd γv).
+  Proof. rewrite /printk_env. ctx_morph_solve. Qed.
+  Global Instance disk_geom_morph γ pd pav pu : CtxMorph (λ ξ, disk_geom (XI := ξ) γ pd pav pu).
+  Proof. rewrite /disk_geom. ctx_morph_solve. Qed.
+
+  Definition main_dep (γd : uart_names) (γv : disk_names) : CtxId -> iProp Σ :=
+    λ ξ, main_deposit (XI := ξ) γd γv.
+  Global Instance main_dep_persistent γd γv ξ : Persistent (main_dep γd γv ξ).
+  Proof. rewrite /main_dep. apply _. Qed.
+  Global Instance main_dep_morph γd γv : CtxMorph (main_dep γd γv).
+  Proof. rewrite /main_dep /main_deposit. ctx_morph_solve. Qed.
+End MainDepositMorph.
+
+Section SpecMainSecondaryBody.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+
   Definition wp_main_secondary_sconf_body
       (m : regfile) (K : nat)
       (p0 : mword 64)
+      (γi : gname) (ξd : CtxId)
       (γd : uart_names) (γv : disk_names)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :=
     let pcE : mword 64 := mword_of_int KernelSyms.main in
@@ -158,7 +191,7 @@ Section SpecMainSecondary.
     (* HART-GENERIC, as on the boot arm: this arm reaches scheduler(), whose
        acquire wants them hart-generically. *)
     (* the handover channel, at the CONCRETE deposit *)
-    started_inv (main_deposit γd γv) -∗
+    started_inv γi ξd (main_dep γd γv) -∗
     (* this hart's own translation and trap resources *)
     (* THE TIMER CAPABILITY, this hart's.  [timer_cap] is the sstc pin plus the
        stimecmp invariant (TimerCap.v), allocated in the boot chain out of the
@@ -180,15 +213,15 @@ Section SpecMainSecondary.
     main_hart_raw tlbvec0 -∗
     WP (Loop : expr riscv_lang).
 
-End SpecMainSecondary.
+End SpecMainSecondaryBody.
 
 Module Type MAIN_SECONDARY.
   Parameter wp_main_secondary_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       
       (m : regfile) (K : nat)
-      (p0 : mword 64)
+      (p0 : mword 64) (γi : gname) (ξd : CtxId)
       (γd : uart_names) (γv : disk_names)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)),
-      wp_main_secondary_sconf_body m K p0 γd γv tlbvec0.
+      wp_main_secondary_sconf_body m K p0 γi ξd γd γv tlbvec0.
 End MAIN_SECONDARY.

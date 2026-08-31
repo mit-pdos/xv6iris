@@ -41,6 +41,7 @@ Require Import VirtioModel.
 Require Import VirtioQueue.
 Require Import DiskPtsto.
 Require Import VirtioProto.
+Require Import WpLock.     (* [lk_floor]: the payload floors (A6.126 §6.6) *)
 Require Import DiskAvail.
 Require Import Xv6Cameras.
 Require Import KptPt.
@@ -362,7 +363,11 @@ Section DiskInv.
        d_info_b (sl_head (dc_slot v)) ↦₈ (dc_buf v : SailStdpp.Values.mword 64) ∗
        half_map (dc_pinr pav p v) ∗
        hcell_map cur_ctx (dc_pinr pav p v) ∗
-       phys_ledger (vr_status (vs_req (dc_slot v))) (DfracOwn 1) byte_zero ∗
+       (* A6.126 §6: the device-written bytes are CTX CELLS again -- the
+          handler read them with the completion's position in its view and
+          re-registered them ([TsoCtx.ctx_phys_pointsto_of_at_floor]), so the
+          woken publisher gets its status byte and buffer back as its own *)
+       (vr_status (vs_req (dc_slot v))) ↦ₘ byte_zero ∗
        disk_bytes γ (vs_sector_off (dc_slot v)) bs ∗
        (* THE SPENT CRASH PERMIT's token (PermInv.v).  It is named at the
           CLAIM's own slot, so a woken publisher -- whose claim fragment pins
@@ -375,8 +380,14 @@ Section DiskInv.
           was re-indexed at each landing and spent at the completion
           (sector-atomic-disk.md §6e). *)
        slot_perms_done γ (dc_slot v) ∗
-       (if vs_is_out (dc_slot v) then emp
-        else phys_list (vr_buf (vs_req (dc_slot v))) bs))%I.
+       (* the buffer's bytes stay STAMPED at the completion's position, with
+          the holder's floor past it: the publisher (which has the buffer
+          page's claims) re-registers them at withdraw *)
+       (∃ q : nat, TsoCtx.ctx_floor cur_ctx q ∗
+          (if vs_is_out (dc_slot v) then emp
+           else [∗ list] j ∈ seq 0 (vs_len (dc_slot v)),
+                  phys_ledger_at (pa_add (vr_buf (vs_req (dc_slot v))) j) (DfracOwn 1)
+                    (bs !!! j) q)))%I.
 
   (* the residual pin never covers the ring slot: the publisher's own
      [ring_slots_res] cell is back in the pool, not in somebody's payoff *)
@@ -432,6 +443,16 @@ Section DiskInv.
        (* the protocol tokens *)
        disk_pub γ np ∗
        disk_done_lb γ nr ∗
+       (* A6.126 §6: THE READER'S FLOORS -- the two floor stamps of the used
+          index word (the init hart's own byte writes, transported to every
+          later holder by [lk_floor]), the reclaimed count, and the reader
+          floor [F]: a VIEW bound (left arm only; the reclaim raises it to
+          the read's view) under which every reclaimed completion's position
+          sits.  What [VirtioProto.used_rel_read_ok] cashes: a holder reads
+          the index as [wrap16 k] with [nr ≤ k ≤ nc]. *)
+       (∃ t0 t1 F : nat,
+          disk_fl γ t0 t1 ∗ disk_nr γ nr ∗ disk_flr γ F ∗
+          lk_floor cur_ctx t0 ∗ lk_floor cur_ctx t1 ∗ TsoCtx.ctx_floor cur_ctx F) ∗
        ghost_map_auth (dn_claim γ) 1 (fl ∪ pk) ∗
        (* driver counters and cells *)
        d_used_idx ↦₂ wrap16 nr ∗
@@ -503,55 +524,9 @@ Section DiskInv.
      to-phys side only.  The four consumers that need a DMA-written byte back
      IN the ledger are named at [phys_to_word8] / [phys_to_byte] below. ---- *)
 
-  Lemma mem_win_to_phys_raw (p : Arch.pa) (n : nat) (dq : dfrac)
-      (f : nat -> bv 8) :
-    (forall j, (j < n)%nat -> kmap_static (svpn_of (pa_add p j)) KP_rw) ->
-    kmap_static_claims -∗
-    ([∗ list] j ∈ seq 0 n, mem_pointsto (pa_add p j) dq (f j)) -∗
-    ([∗ list] j ∈ seq 0 n, phys_pointsto (pa_add p j) dq (f j)).
-  Proof.
-    iIntros (Hstat) "#Hb Hbytes".
-    iApply (big_sepL_impl with "Hbytes").
-    iIntros "!>" (k x Hk) "H".
-    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
-    iApply (mem_ident_phys (pa_add p (0 + k)%nat) dq (f (0 + k)%nat)
-              (Hstat (0 + k)%nat ltac:(lia)) with "Hb H").
-  Qed.
-
-  (* THE WINDOW KEEPS ITS LEDGER NOW (A6.48 ruling 4), and that reverses the
-     sentence this bridge used to carry.  [↦ₘ] IS [ctx_pointsto], which
-     CONTAINS the byte's latest-write timestamp element; the old bridge threw
-     it away with [ctx_pointsto_forget] because the DMA tier was raw
-     [phys_pointsto].  Now the tier is [TsoCtx.phys_ledger], so the element
-     travels with the byte -- and that is exactly what lets the device's
-     completion pay its own log append.  A6.9's "a raw byte has left the
-     ledger for good" is unchanged as a statement; what changed is that the
-     lease never leaves the ledger in the first place. *)
-  Lemma ctx_ident_ledger (a : Arch.pa) (dq : dfrac) (b : bv 8) :
-    kmap_static (svpn_of a) KP_rw ->
-    kmap_static_claims -∗ a ↦ₘ{dq} b -∗ phys_ledger a dq b.
-  Proof.
-    iIntros (Hs) "#Hcl H".
-    iDestruct (ctx_pointsto_canonical with "H") as %Hc.
-    iDestruct (kmap_static_claims_at (svpn_of a) KP_rw Hs with "Hcl") as "#Hk0".
-    iDestruct (ctx_pointsto_to_phys cur_ctx (kpt_leaf_ppn (svpn_of a)) a dq b
-                 (pa_of_id a Hc) with "Hk0 H") as "H".
-    by iApply ctx_phys_pointsto_ledger.
-  Qed.
-
-  Lemma mem_win_to_phys (p : Arch.pa) (n : nat) (dq : dfrac) (f : nat -> bv 8) :
-    (forall j, (j < n)%nat -> kmap_static (svpn_of (pa_add p j)) KP_rw) ->
-    kmap_static_claims -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add p j) ↦ₘ{dq} f j) -∗
-    ([∗ list] j ∈ seq 0 n, phys_ledger (pa_add p j) dq (f j)).
-  Proof.
-    iIntros (Hstat) "#Hb Hbytes".
-    iApply (big_sepL_impl with "Hbytes").
-    iIntros "!>" (k x Hk) "H".
-    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
-    iApply (ctx_ident_ledger (pa_add p (0 + k)%nat) dq (f (0 + k)%nat)
-              (Hstat (0 + k)%nat ltac:(lia)) with "Hb H").
-  Qed.
+  (* [mem_win_to_phys_raw] / [ctx_ident_ledger] / [mem_win_to_phys] moved to
+     DiskAvail.v (A6.126 §6: [used_split_init] needs them and this file
+     imports that one). *)
 
   Lemma phys_win_to_mem (p : Arch.pa) (n : nat) (dq : dfrac) (f : nat -> bv 8) :
     (forall j, (j < n)%nat -> kmap_static (svpn_of (pa_add p j)) KP_rw) ->
@@ -907,9 +882,19 @@ Section DiskResAt.
   Global Instance flight_res_morph γ p v :
     CtxMorph (λ ξ, flight_res (XI := ξ) γ p v).
   Proof. rewrite /flight_res. ctx_morph_solve. all: apply hcell_map_morph. Qed.
+  (* A6.126 §6: a bare view floor transports like [lk_floor]'s left arm *)
+  Global Instance ctx_floor_morph (lo : nat) : CtxMorph (λ ξ, TsoCtx.ctx_floor ξ lo).
+  Proof.
+    iIntros (ξ ξ') "Hd #Hfl".
+    iDestruct (TsoCtx.ctx_floor_dom with "Hd Hfl") as "[Hd #Hfl']".
+    iModIntro. iFrame "Hd Hfl'".
+  Qed.
   Global Instance parked_res_morph γ pav p v :
     CtxMorph (λ ξ, parked_res (XI := ξ) γ pav p v).
-  Proof. rewrite /parked_res. ctx_morph_solve. all: apply hcell_map_morph. Qed.
+  Proof.
+    rewrite /parked_res. ctx_morph_solve.
+    all: try apply hcell_map_morph; try apply ctx_floor_morph.
+  Qed.
   Global Instance ring_slots_res_morph pav occ :
     CtxMorph (λ ξ, ring_slots_res (XI := ξ) pav occ).
   Proof. rewrite /ring_slots_res. ctx_morph_solve. Qed.

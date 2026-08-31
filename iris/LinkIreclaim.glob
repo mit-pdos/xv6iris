@@ -1,0 +1,21 @@
+DIGEST 96be869e1aae8b5376f34a5c2a4cd032
+Fxv6iris.LinkIreclaim
+R2459:2467 xv6iris.LinkBread <> <> lib
+R2469:2478 xv6iris.LinkBrelse <> <> lib
+R2480:2487 xv6iris.LinkIget <> <> lib
+R2489:2499 xv6iris.LinkBeginOp <> <> lib
+R2517:2525 xv6iris.LinkIlock <> <> lib
+R2527:2537 xv6iris.LinkIunlock <> <> lib
+R2539:2546 xv6iris.LinkIput <> <> lib
+R2548:2556 xv6iris.LinkEndOp <> <> lib
+R2574:2586 xv6iris.ProofIreclaim <> <> lib
+R2609:2621 xv6iris.ProofIreclaim IreclaimProof <> modtype
+R2623:2627 xv6iris.LinkBread Bread <> modtype
+R2629:2634 xv6iris.LinkBrelse Brelse <> modtype
+R2636:2639 xv6iris.LinkIget Iget <> modtype
+R2641:2647 xv6iris.LinkBeginOp BeginOp <> modtype
+R2682:2686 xv6iris.LinkIlock Ilock <> modtype
+R2688:2694 xv6iris.LinkIunlock Iunlock <> modtype
+R2696:2699 xv6iris.LinkIput Iput <> modtype
+R2701:2705 xv6iris.LinkEndOp EndOp <> modtype
+mod 2597:2604 <> Ireclaim

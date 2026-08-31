@@ -1,0 +1,11 @@
+DIGEST 1b7646406397005e0586bcd2e2760760
+Fxv6iris.LinkSysFstat
+R436:446 xv6iris.LinkArgaddr <> <> lib
+R448:456 xv6iris.LinkArgfd <> <> lib
+R458:469 xv6iris.LinkFilestat <> <> lib
+R471:483 xv6iris.ProofSysFstat <> <> lib
+R506:518 xv6iris.ProofSysFstat SysFstatProof <> modtype
+R520:526 xv6iris.LinkArgaddr Argaddr <> modtype
+R528:532 xv6iris.LinkArgfd Argfd <> modtype
+R534:541 xv6iris.LinkFilestat Filestat <> modtype
+mod 494:501 <> SysFstat

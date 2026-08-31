@@ -1,0 +1,13 @@
+DIGEST 09f019e028f4177eaaacc8e78146874b
+Fxv6iris.LinkReadi
+R385:399 xv6iris.LinkBmapNoalloc <> <> lib
+R401:409 xv6iris.LinkBread <> <> lib
+R411:420 xv6iris.LinkBrelse <> <> lib
+R422:438 xv6iris.LinkEitherCopyout <> <> lib
+R440:449 xv6iris.ProofReadi <> <> lib
+R469:478 xv6iris.ProofReadi ReadiProof <> modtype
+R480:490 xv6iris.LinkBmapNoalloc BmapNoalloc <> modtype
+R492:496 xv6iris.LinkBread Bread <> modtype
+R498:503 xv6iris.LinkBrelse Brelse <> modtype
+R505:517 xv6iris.LinkEitherCopyout EitherCopyout <> modtype
+mod 460:464 <> Readi

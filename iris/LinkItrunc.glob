@@ -1,0 +1,13 @@
+DIGEST 067052e8ed2474afd5b7fe6018fcce79
+Fxv6iris.LinkItrunc
+R1134:1142 xv6iris.LinkBread <> <> lib
+R1144:1152 xv6iris.LinkBfree <> <> lib
+R1154:1163 xv6iris.LinkBrelse <> <> lib
+R1165:1175 xv6iris.LinkIupdate <> <> lib
+R1177:1187 xv6iris.ProofItrunc <> <> lib
+R1208:1218 xv6iris.ProofItrunc ItruncProof <> modtype
+R1220:1224 xv6iris.LinkBread Bread <> modtype
+R1226:1230 xv6iris.LinkBfree Bfree <> modtype
+R1232:1237 xv6iris.LinkBrelse Brelse <> modtype
+R1239:1245 xv6iris.LinkIupdate Iupdate <> modtype
+mod 1198:1203 <> Itrunc

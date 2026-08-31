@@ -1,0 +1,15 @@
+DIGEST 8010e9c1f9deb76abfe639815717ca10
+Fxv6iris.LinkIalloc
+R1962:1970 xv6iris.LinkBread <> <> lib
+R1972:1983 xv6iris.LinkLogWrite <> <> lib
+R1985:1994 xv6iris.LinkBrelse <> <> lib
+R1996:2010 xv6iris.LinkMemsetArray <> <> lib
+R2012:2019 xv6iris.LinkIget <> <> lib
+R2037:2047 xv6iris.ProofIalloc <> <> lib
+R2068:2078 xv6iris.ProofIalloc IallocProof <> modtype
+R2080:2084 xv6iris.LinkBread Bread <> modtype
+R2086:2093 xv6iris.LinkLogWrite LogWrite <> modtype
+R2095:2100 xv6iris.LinkBrelse Brelse <> modtype
+R2102:2112 xv6iris.LinkMemsetArray MemsetArray <> modtype
+R2114:2117 xv6iris.LinkIget Iget <> modtype
+mod 2058:2063 <> Ialloc

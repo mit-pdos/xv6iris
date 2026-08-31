@@ -410,7 +410,16 @@ Section TsoBundle.
           scope. *)
        ⌜∀ a : Arch.pa,
           (ram_lo <= SailStdpp.Operators_mwords.uint a < ram_hi)%Z ->
-          is_Some (img !! a)⌝)%I.
+          is_Some (img !! a)⌝ ∗
+       (* A6.131: the image is the era's constant *)
+       ⌜img = era_img E⌝)%I.
+
+  Lemma tso_interp_of_img (E : riscvEraGS) img mem log (V : agent -> nat) :
+    tso_interp_of E img mem log V -∗ ⌜img = era_img E⌝.
+  Proof.
+    iIntros "H". iDestruct "H" as (TM LM) "(_&_&_&_&_&_&_&_&_&_&_&%Hi)".
+    by iPureIntro.
+  Qed.
 
   (* A6.105: the log-length receipt, straight off the interpretation.  It is
      the one thing a WRITER can take away about the position its own store
@@ -442,14 +451,14 @@ Section TsoBundle.
   Proof.
     intros HV. rewrite /tso_interp_of. iSplit.
     - iIntros "H". iDestruct "H" as (TM LM)
-        "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6 & %H7)".
+        "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6 & %H7 & %H8)".
       iExists TM, LM.
       rewrite -(view_auth_ext (era_view_name E) V V' HV).
       iFrame "Hts Hlm Hll Hv". iPureIntro. split_and!; try done.
       + intros h. rewrite -HV. apply H5.
       + intros h Hh. rewrite -HV. by apply H6.
     - iIntros "H". iDestruct "H" as (TM LM)
-        "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6 & %H7)".
+        "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6 & %H7 & %H8)".
       iExists TM, LM.
       rewrite (view_auth_ext (era_view_name E) V V' HV).
       iFrame "Hts Hlm Hll Hv". iPureIntro. split_and!; try done.
@@ -466,17 +475,17 @@ Section TsoBundle.
     rewrite /tso_interp_at /tso_interp_of. iSplit.
     - iIntros "H". iDestruct "H" as (TM LM)
         "(Hts & %Hdom & %Hlat & Hlm & %Hlm2 & Hll & Hv & %Hmm)".
-      destruct Hmm as (Hflat & Htv & Hcov).
+      destruct Hmm as ((Hflat & Htv & Hcov) & Himg).
       iExists TM, LM. iFrame "Hts Hlm Hll Hv". iPureIntro.
-      split_and!; [exact Hdom|exact Hlat|exact Hlm2|exact Hflat| | |exact Hcov].
+      split_and!; [exact Hdom|exact Hlat|exact Hlm2|exact Hflat| | |exact Hcov|exact Himg].
       + intros h. rewrite /avf. destruct (lt_dec h NCPU) as [Hlt|]; [|lia].
         apply Htv.
       + intros h Hh. rewrite /avf.
         destruct (lt_dec h NCPU) as [Hlt|]; [lia|done].
     - iIntros "H". iDestruct "H" as (TM LM)
-        "(Hts & %Hdom & %Hlat & Hlm & %Hlm2 & Hll & Hv & %Hflat & %HV & _ & %Hcov)".
+        "(Hts & %Hdom & %Hlat & Hlm & %Hlm2 & Hll & Hv & %Hflat & %HV & _ & %Hcov & %Himg)".
       iExists TM, LM. iFrame "Hts Hlm Hll Hv". iPureIntro.
-      split_and!; [exact Hdom|exact Hlat|exact Hlm2|].
+      split_and!; [exact Hdom|exact Hlat|exact Hlm2| |exact Himg].
       split_and!; [exact Hflat| |exact Hcov].
       intros c. rewrite -(avf_hart g c). apply HV.
   Qed.
@@ -491,7 +500,7 @@ Section TsoBundle.
        (ram_lo <= SailStdpp.Operators_mwords.uint a < ram_hi)%Z ->
        is_Some (img !! a)⌝.
   Proof.
-    iIntros "H". iDestruct "H" as (TM LM) "(_&_&_&_&_&_&_&_&_&_&%Hc)".
+    iIntros "H". iDestruct "H" as (TM LM) "(_&_&_&_&_&_&_&_&_&_&%Hc & _)".
     iPureIntro. exact Hc.
   Qed.
 
@@ -510,7 +519,7 @@ Section TsoBundle.
     tso_interp_of E img mem log (vstep h (V h) log V).
   Proof.
     iIntros "H". iDestruct "H" as (TM LM)
-      "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6 & %H7)".
+      "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6 & %H7 & %H8)".
     iApply (tso_interp_of_mono E img mem log V (vstep h (V h) log V)
               (fun h' => eq_sym (vstep_idle V log h h' H6))).
     iExists TM, LM. iFrame "Hts Hlm Hll Hv". iPureIntro. by split_and!.
@@ -539,7 +548,7 @@ Section TsoBundle.
     view_lb (era_view_name E) (era_loglen_name E) h (V h).
   Proof.
     iIntros "H". iDestruct "H" as (TM LM)
-      "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6 & %H7)".
+      "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6 & %H7 & %H8)".
     iDestruct (view_lb_get (era_view_name E) (era_loglen_name E) V
                  (length log) h (H5 h) with "Hv Hll") as "(Hv & Hll & #Hrec)".
     iFrame "Hrec". iExists TM, LM. iFrame "Hts Hlm Hll Hv". iPureIntro.
@@ -609,14 +618,14 @@ Section TsoBundle.
     tso_interp_of E img mem log (vstep h t log V).
   Proof.
     iIntros (Hh Hle Htop) "H". iDestruct "H" as (TM LM)
-      "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6 & %H7)".
+      "(Hts & %H1 & %H2 & Hlm & %H3 & Hll & Hv & %H4 & %H5 & %H6 & %H7 & %H8)".
     assert (Hmono : ∀ h', (V h' ≤ vstep h t log V h')%nat).
     { intros h'. rewrite /vstep. case_decide as Hd; [by subst|].
       destruct (lt_dec h' NCPU) as [|Hge]; [done|].
       rewrite H6; [done|lia]. }
     iMod (view_auth_update _ V (vstep h t log V) Hmono with "Hv") as "Hv".
     iModIntro. iExists TM, LM. iFrame "Hts Hlm Hll Hv". iPureIntro.
-    split_and!; [done|done|done|done| | |done].
+    split_and!; [done|done|done|done| | |done|done].
     - intros h'. rewrite /vstep. case_decide as Hd; [exact Htop|].
       destruct (lt_dec h' NCPU); [apply H5|lia].
     - intros h' Hh'. rewrite /vstep. case_decide as Hd; [lia|].

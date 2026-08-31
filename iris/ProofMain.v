@@ -127,6 +127,7 @@ Require Import WaitInv.   (* [wait_res] -- what main finally brings wait_lock up
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoGhost.   (* [dset_auth]: the started barrier's index authority (A6.132) *)
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the creators' borrow *)
 Local Open Scope Z_scope.
 Import Defs.
@@ -1680,7 +1681,8 @@ Section ProofMain.
     all: try lkbelow.
     rewrite /vdi_post.
     iIntros (mvd pd pav pu) "Hcg Hcpu Hpc %Hcsvd %Hpvd %Hpva %Hpvu Hkenv".
-    iIntros "Hpub #Hdcfg Hdescpg Havpg Hdd Hda Hdu Hdfree Hdlkw Hdlnm Hdcpu".
+    iIntros "Hpub #Hdcfg Hdescpg Havpg Hdd Hda Hdu Hdfree Hdlkw Hdlnm Hdcpu Havh Hflrs".
+    iDestruct "Hflrs" as (t0 t1) "(Hfl & Hnr & Hflr & #Hfl0 & #Hfl1)".
     assert (Hretvd : ret_pc (tp_pin F4 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x9e) : mword 64)).
     { rewrite (mn_tp_pin_ne F4 (mword_of_int 1 : mword 5) ltac:(reg_neq)).
@@ -1718,8 +1720,9 @@ Section ProofMain.
                 apply page_in_range_addr_is_kdata; [exact Hpva | exact Hj]|].
       iPureIntro; intros j Hj;
         apply page_in_range_addr_is_kdata; [exact Hpvu | exact Hj]. }
-    iPoseProof (disk_res_boot γv pd pav pu Hal
-                  with "Hpub Hdescpg Havpg Hdfree Hdusedidx Hdslots Hdone Hclaim")
+    iPoseProof (disk_res_boot γv pd pav pu t0 t1 Hal
+                  with "Hpub Hdescpg Havpg Hdfree Hdusedidx Hdslots Hdone Hclaim Havh
+                        Hfl Hnr Hflr Hfl0 Hfl1")
       as "HRdisk".
     (* [newlock_at], NOT [newlock] (fs-cfg-boot.md stage (e), row (P3)): the
        lock's gname is the AMBIENT [fsc_dlock], minted by
@@ -1890,18 +1893,20 @@ Section ProofMain.
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) (pd pav pu : mword 64)
       (root : mword 44) (pas : nat -> mword 44)
-      (P : iProp Σ) `{!Persistent P} :
+      (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ)
+      `{!∀ ξ, Persistent (P ξ)} `{!CtxMorph P} :
     (* the scheduler this block tail-calls enables interrupts at its loop head
        and must fund [kv_frame_slots] there; see [SpecScheduler]. *)
     (kv_frame_slots + 22 <= n)%nat ->
     p0 = zero_reg ->
+    cid_word = zero_reg ->
     sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
     trap_csrs KT1 -∗
-    started_inv P -∗
+    started_inv γi ξd P -∗ started_prim γi -∗
     □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
          (root' : mword 44) (pas' : nat -> mword 44),
          printk_env γpr' γd γv -∗
@@ -1914,7 +1919,7 @@ Section ProofMain.
            (zero_extend' 64 (concat_vec root' (zeros' 12 : mword 12))) -∗
          kmap_at tramp_vpn tramp_ppn KP_rx -∗
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas' i) KP_rw) -∗
-         P) -∗
+         P cur_ctx) -∗
     printk_env γpr γd γv -∗
     procs_inv γs -∗
     console_caps γd -∗
@@ -1927,11 +1932,11 @@ Section ProofMain.
     ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hp0.
-    iIntros "Hcg #Htext Hpc Hfree Hcpu Htcsr #Hsinv #Hwand".
+    intros Hn Hp0 Hcid.
+    iIntros "Hcg #Htext Hpc Hfree Hcpu Htcsr #Hsinv Hprim #Hwand".
     iIntros "#Hpenv #Hpinv #Hccaps #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
     (* the deposit itself: everything main built, through the □-wand *)
-    iAssert P as "#HP".
+    iAssert (P cur_ctx) as "#HP".
     { iApply ("Hwand" $! γpr γs γk pd pav pu root pas
                 with "Hpenv Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx"). }
     (* The release sequence.  Note the shape: the address is materialized
@@ -2006,27 +2011,30 @@ Section ProofMain.
        persistent and says nothing about the VALUE, so one peek-open of the
        started invariant delivers it and puts the body straight back. *)
     iApply fupd_wp.
-    iMod (inv_acc ⊤ startedN with "Hsinv") as "[Hbody Hclose]"; [ solve_ndisj | ].
-    iDestruct "Hbody" as (vpk) "[>Hword Hrest]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 started_addr (DfracOwn 1) vpk
-                 ltac:(lia) with "Hword") as "#Hstcl".
-    iMod ("Hclose" with "[Hword Hrest]") as "_".
-    { iNext. iExists vpk. iFrame "Hword Hrest". }
+    iMod (started_inv_claim ⊤ γi ξd P ltac:(solve_ndisj) with "Hsinv") as "#Hstcl".
     iModIntro.
-    iApply (wp_store_s_sconf_au (kt := KT1) (ktd := KT0) 4 true (mword_of_int (KernelSyms.main + 0xb0))
+    (* THE RELEASE STORE (A6.132): the datum-form leaf, whose obligation
+       runs [started_store_obl] -- the plain window becomes the armed one
+       at the store's own index, the deposit context is stamped there and
+       the ownership rows go into the invariant's armed disjunct. *)
+    iApply (wp_store_s_sconf_au_dat (kt := KT1) (ktd := KT0) 4 true (mword_of_int (KernelSyms.main + 0xb0))
               (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
               (mword_of_int 0 : mword 12) S3 n
               (trunc32 (rget S3 (mword_of_int 14 : mword 5))) True%I
               ((⊤ ∖ ↑minstretN) ∖ ↑startedN) false
+              (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_parked ξd 0 ∗
+               started_prim γi ∗ P cur_ctx)%I
+              (started_right γi ξd P)
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_write_ram_plain_4
               (store_ext_4 (rget S3 (mword_of_int 14 : mword 5)))
-              ltac:(solve_ndisj) with "Hcg Hpc [] [] [HP]").
+              ltac:(solve_ndisj)
+              ltac:(cbv zeta; rewrite Hsa Hsvst; exact (started_store_obl γi ξd P p0 Hcid))
+              with "Hcg Hpc [] [] [Hprim HP]").
     { iApply (mni_b0 with "Htext"). }
     { rewrite Hsa. iExact "Hstcl". }
-    { rewrite Hsa Hsvst.
-      iApply (started_inv_store_au (⊤ ∖ ↑minstretN) P ltac:(solve_ndisj)
-                with "Hsinv HP"). }
+    { iApply (started_store_open (⊤ ∖ ↑minstretN) γi ξd P ltac:(solve_ndisj)
+                with "Hsinv Hprim HP"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc _".
     iEval (change (if true then 2%Z else 4%Z) with 2%Z) in "Hpc".
@@ -2076,9 +2084,10 @@ Section ProofMain.
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (P : iProp Σ) `{!Persistent P}
+      (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ)
+      `{!∀ ξ, Persistent (P ξ)} `{!CtxMorph P}
     : wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 γi ξd P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
     intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Himg Hp0.
@@ -2090,7 +2099,7 @@ Section ProofMain.
                       Hicovin & Hicovmeta & Hicovdata & Hiparse & Hiush & Hind & Hileq).
     assert (Hcov0 : (0 : Z) ∉ cov) by exact (FsBoot.fs_cov_in_0 _ _ Hicovin).
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
-    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".
+    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv Hprim #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
     iIntros "Hparks Hpst Hpavail Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
     iIntros "#Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hbunset Hkauth Hpages".
@@ -2240,8 +2249,8 @@ Section ProofMain.
     { iApply bi.later_intro. iExact "Hkvs". }
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started fsc_printk γk fsc_kalloc γs γd γv m5 (K - 2)%nat p0 pd pav pu
-              root pas P ltac:(lia) Hp0
-              with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hwand Hpenv
+              root pas γi ξd P ltac:(lia) Hp0 Hcid
+              with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hprim Hwand Hpenv
                     Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
     (* fold the boot cells and the freshly built handler resource into the
        [trap_csrs] the scheduler consumes. *)

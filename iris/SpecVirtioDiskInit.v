@@ -177,6 +177,14 @@ Definition vdi_post
     (* A6.124: the vdisk_lock payload's half of the avail-index word, with
        its floors -- the boot creator's arm (DiskAvail.v) *)
     avail_half pav 0%nat -∗
+    (* A6.126 §6: the reader's floors -- the two floor stamps of the used
+       index word with the init hart's floors at them (its own byte writes,
+       DiskAvail.used_split_init), the reclaimed count and the reader floor
+       at 0 (VirtioProto.virtio_proto_intro) -- what [DiskBoot.disk_res_boot]
+       seats in the vdisk_lock's payload. *)
+    (∃ t0 t1 : nat,
+       disk_fl γv t0 t1 ∗ disk_nr γv 0%nat ∗ disk_flr γv 0%nat ∗
+       lk_floor cur_ctx t0 ∗ lk_floor cur_ctx t1) -∗
     WP (Loop : expr riscv_lang))%I.
 Global Typeclasses Opaque vdi_post.
 

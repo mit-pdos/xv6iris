@@ -1,2 +1,15 @@
 DIGEST 33febc5a1729a4413ce9e24d7bf4fda0
 Fxv6iris.LinkVirtioDiskRw
+R247:257 xv6iris.LinkAcquire <> <> lib
+R259:269 xv6iris.LinkRelease <> <> lib
+R271:286 xv6iris.LinkSleepPrepare <> <> lib
+R288:296 xv6iris.LinkSleep <> <> lib
+R298:309 xv6iris.LinkFreeDesc <> <> lib
+R311:328 xv6iris.ProofVirtioDiskRwF <> <> lib
+R355:371 xv6iris.ProofVirtioDiskRwF VirtioDiskRwProof <> modtype
+R373:379 xv6iris.LinkAcquire Acquire <> modtype
+R381:387 xv6iris.LinkRelease Release <> modtype
+R389:400 xv6iris.LinkSleepPrepare SleepPrepare <> modtype
+R402:406 xv6iris.LinkSleep Sleep <> modtype
+R408:415 xv6iris.LinkFreeDesc FreeDesc <> modtype
+mod 339:350 <> VirtioDiskRw

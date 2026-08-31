@@ -450,7 +450,8 @@ Section SpecMain.
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (P : iProp Σ) `{!Persistent P} :=
+      (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ)
+      `{!∀ ξ, Persistent (P ξ)} `{!CtxMorph P} :=
     let pcE : mword 64 := mword_of_int KernelSyms.main in
     (* the arm is decided by the ambient hart: [beqz a0] at main+0x14 takes
        the boot path exactly when cpuid() returns 0. *)
@@ -506,7 +507,7 @@ Section SpecMain.
     (* the handover channel, and the RECIPE for the deposit it will carry:
        main applies this wand at the [started = 1] store, to the [pr] lock, the
        64 proc locks and the vdisk_lock it has just allocated. *)
-    started_inv P -∗
+    started_inv γi ξd P -∗ started_prim γi -∗
     □ (∀ (γpr : gname) (γs : list gname) (γk : gname) (pd pav pu : mword 64)
          (root : mword 44) (pas : nat -> mword 44),
          printk_env γpr γd γv -∗
@@ -519,7 +520,7 @@ Section SpecMain.
            (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
          kmap_at tramp_vpn tramp_ppn KP_rx -∗
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
-         P) -∗
+         P cur_ctx) -∗
     (* the boot supply *)
     main_locks_raw -∗
     main_globals_raw -∗
@@ -674,7 +675,8 @@ Module Type MAIN.
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (P : iProp Σ) `{!Persistent P},
+      (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ)
+      `{!∀ ξ, Persistent (P ξ)} `{!CtxMorph P},
       wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 γi ξd P.
 End MAIN.

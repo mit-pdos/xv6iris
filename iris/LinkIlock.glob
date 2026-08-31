@@ -1,0 +1,15 @@
+DIGEST 960dbc138c4f7b6f80cc94c1cc361469
+Fxv6iris.LinkIlock
+R219:234 xv6iris.LinkAcquiresleep <> <> lib
+R236:244 xv6iris.LinkBread <> <> lib
+R246:256 xv6iris.LinkMemmove <> <> lib
+R258:267 xv6iris.LinkBrelse <> <> lib
+R269:277 xv6iris.LinkPanic <> <> lib
+R295:304 xv6iris.ProofIlock <> <> lib
+R324:333 xv6iris.ProofIlock IlockProof <> modtype
+R335:346 xv6iris.LinkAcquiresleep Acquiresleep <> modtype
+R348:352 xv6iris.LinkBread Bread <> modtype
+R354:360 xv6iris.LinkMemmove Memmove <> modtype
+R362:367 xv6iris.LinkBrelse Brelse <> modtype
+R369:373 xv6iris.LinkPanic Panic <> modtype
+mod 315:319 <> Ilock

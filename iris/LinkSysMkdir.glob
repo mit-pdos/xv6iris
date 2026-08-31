@@ -1,0 +1,15 @@
+DIGEST 71fad9ca66f1c7a0d491526c12722b5c
+Fxv6iris.LinkSysMkdir
+R1449:1459 xv6iris.LinkBeginOp <> <> lib
+R1461:1470 xv6iris.LinkArgstr <> <> lib
+R1472:1481 xv6iris.LinkCreate <> <> lib
+R1483:1496 xv6iris.LinkIunlockput <> <> lib
+R1498:1506 xv6iris.LinkEndOp <> <> lib
+R1516:1528 xv6iris.ProofSysMkdir <> <> lib
+R1551:1563 xv6iris.ProofSysMkdir SysMkdirProof <> modtype
+R1565:1571 xv6iris.LinkBeginOp BeginOp <> modtype
+R1573:1578 xv6iris.LinkArgstr Argstr <> modtype
+R1580:1585 xv6iris.LinkCreate Create <> modtype
+R1587:1596 xv6iris.LinkIunlockput Iunlockput <> modtype
+R1598:1602 xv6iris.LinkEndOp EndOp <> modtype
+mod 1539:1546 <> SysMkdir

@@ -455,7 +455,7 @@ Section BootBssChain.
        [ProcDefs.proc_dormant]'s note for the ledger it opens. *)
     bslots (NPROC * 3) -∗
     boot_cran g img_end ram_hi -∗
-      started_addr ↦₄ started_clear ∗
+      started_claim ∗ started_win_plain ∗
       main_locks_raw ∗
       main_globals_raw ∗
       ([∗ list] h ∈ enum CPU, boot_hart_bss h) ∗
@@ -478,10 +478,12 @@ Section BootBssChain.
     iDestruct (bss_cut g img_end KernelSyms.started
                  (KernelSyms.started + 4) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hst H]".
-    iDestruct (boot_cran_cell4_bss g KernelSyms.started started_clear Hmem
+    iDestruct (boot_cran_ledger_at0_bss4 g KernelSyms.started started_clear Hmem
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) ltac:(zeq)
                  ltac:(intros j _; apply nth_byte_zero; zeq)
-                 with "Hcl Hst") as "Hst".
+                 with "Hcl Hst") as "(%Hstal & Hstpp & Hst)".
+    iDestruct "Hstpp" as (ppnst) "(#Hkst & %Hstc & %Hstr & %Hstpin)".
+    iDestruct (started_claim_intro ppnst Hstal Hstc Hstr Hstpin with "Hkst") as "#Hstcl".
     (* ---- 0x8000a238 kernel_pagetable, 0x8000a260 initproc ---- *)
     iDestruct (bss_cut g (KernelSyms.started + 4) KernelSyms.kernel_pagetable
                  (KernelSyms.kernel_pagetable + 8) ram_hi
@@ -856,7 +858,7 @@ Section BootBssChain.
     (* ================================================================ *)
     (* everything is carved; assemble.                                   *)
     (* ================================================================ *)
-    iSplitL "Hst"; [iExact "Hst" |].
+    iSplitL "Hst"; [iSplitR; [iExact "Hstcl" | iExact "Hst"] |].
     iSplitL "Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11".
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
@@ -1165,7 +1167,9 @@ Section BootAlloc.
          supplier.  It arrives as the WHOLE map, exactly as the raw row
          does, and is cut in step with it by [boot_led_all_split]. *)
       BootCarve.boot_led_all g ∗
-      crash_inv ∗ gen_cert.
+      crash_inv ∗ gen_cert ∗
+      (* A6.131: the era's image is the boot state's memory, as a pure fact *)
+      ⌜era_img riscv_eraGS = g.(gimg)⌝.
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ZIPPING THE FOUR PER-HART FAMILIES: DO IT HERE, NOT AT THE USE SITE.
@@ -1275,11 +1279,12 @@ Section BootAlloc.
       (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) g
     ={⊤}=∗ ∃ (HFd : fdslotG Σ) (HIr : irefslotG Σ) (HPav : pavG Σ)
              (HBs : bioslotG Σ)
-             (HF : fileG Σ) (γd : uart_names) (γv : disk_names),
+             (HF : fileG Σ) (γd : uart_names) (γv : disk_names)
+             (γi : gname) (ξd : CtxId),
       ⌜dn_img γv = disk_img_name⌝ ∗
       (* --- the shared persistents --- *)
       kernel_text ∗ kernel_data ∗
-      started_inv (main_deposit γd γv) ∗
+      started_inv γi ξd (main_dep γd γv) ∗ started_prim γi ∗
       dev_inv γd γv ∗ wire_inv ∗ crash_inv ∗ gen_cert ∗
       (* --- one bundle per hart --- *)
       ([∗ list] c ∈ enum CPU,
@@ -1359,7 +1364,7 @@ Section BootAlloc.
     iDestruct (power_boot_res_unpack g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hstrans & Hsie & Hspp & Hspie &
         Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hswlb &
-        Hled & #Hcinv & #Hcert)".
+        Hled & #Hcinv & #Hcert & %Hera)".
     (* ---- the claims bundle FIRST: both image halves need it ---- *)
     iMod (kmap_static_claims_intro with "Hkfrags") as "#Hcl".
     (* ---- the image: text persisted, data persisted up to [rodata_end] ---- *)
@@ -1581,17 +1586,29 @@ Section BootAlloc.
       as "#Hwinv".
     { iApply RiscvAdequacy.big_sepL_enum_to_set. iExact "Hpins". }
     (* ---- the handover channel, at the settled payload ---- *)
-    iMod (started_inv_alloc ⊤ (main_deposit γd γv) with "Hstartcell")
-      as "#Hstarted".
+    iDestruct "Hstartcell" as "[#Hstcl Hstw]".
+    iMod ctx_parked_alloc as (ξd) "Hpkd".
+    assert (Hsimg : started_img).
+    { pose proof Hbf as Hbf2.
+      destruct Hbf2 as (_ & _ & _ & _ & _ & _ & _ & _ & _ & Hgimg & _).
+      pose proof (boot_mem_of_facts g Hbf) as Hmem'.
+      intros j Hj. rewrite Hera Hgimg.
+      change started_addr with (pa_of_z KernelSyms.started).
+      rewrite pa_add_of_z Hmem'; [| unfold ram_lo, ram_hi, KernelSyms.started; lia].
+      rewrite boot_byte_bss; [| unfold img_end, KernelSyms.started; lia].
+      f_equal. symmetry. apply nth_byte_zero. zeq. }
+    iMod (started_alloc ⊤ ξd (main_dep γd γv) Hsimg with "Hstcl Hstw Hpkd")
+      as (γi) "[#Hstarted Hprim]".
     (* ================================================================ *)
     (* [Hprocsavail] -- [procs_avail (Some NPROC)] -- now leaves in the
        postcondition: userinit is proven and its contract
        ([SpecUserinit.v]) takes exactly this. *)
-    iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC), γd, γv.
+    iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC), γd, γv, γi, ξd.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iExact "Hktext" |].
     iSplitR; [iExact "Hkdata" |].
     iSplitR; [iExact "Hstarted" |].
+    iSplitL "Hprim"; [iExact "Hprim" |].
     iSplitR; [iExact "Hdev" |].
     iSplitR; [iExact "Hwinv" |].
     iSplitR; [iExact "Hcinv" |].

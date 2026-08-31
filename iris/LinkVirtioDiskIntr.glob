@@ -1,0 +1,11 @@
+DIGEST f37605971a4dabd8de88ebd293f6785c
+Fxv6iris.LinkVirtioDiskIntr
+R169:179 xv6iris.LinkAcquire <> <> lib
+R181:191 xv6iris.LinkRelease <> <> lib
+R193:202 xv6iris.LinkWakeup <> <> lib
+R204:222 xv6iris.ProofVirtioDiskIntr <> <> lib
+R251:269 xv6iris.ProofVirtioDiskIntr VirtioDiskIntrProof <> modtype
+R271:277 xv6iris.LinkAcquire Acquire <> modtype
+R279:285 xv6iris.LinkRelease Release <> modtype
+R287:292 xv6iris.LinkWakeup Wakeup <> modtype
+mod 233:246 <> VirtioDiskIntr

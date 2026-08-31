@@ -57,6 +57,16 @@ Record disk_names := DiskNames {
      [PermInv.perm_inv (dn_perm γ)], allocated per era beside [disk_inv], and
      its ELEMENTS ([PermInv.perm_tok]) ride the timeless request slots. *)
   dn_perm  : gname;
+  (* A6.126 §6 (the release arm's reader side): the used index's two floor
+     stamps [ghost_var nat], the READER floor and the reclaimed count
+     [ghost_var nat] -- halves in VirtioProto's live arm and in
+     DiskInv.disk_res -- and the positions of the completions, a ghost map
+     whose fragments are persistent ([disk_done_pos]). *)
+  dn_fl0   : gname;
+  dn_fl1   : gname;
+  dn_flr   : gname;
+  dn_nr    : gname;
+  dn_pos   : gname;
 }.
 
 (* ---------------------------------------------------------------------- *)

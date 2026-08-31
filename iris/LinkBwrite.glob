@@ -1,0 +1,9 @@
+DIGEST 581d009f3ddaeeca6f5aac06a352c43e
+Fxv6iris.LinkBwrite
+R334:349 xv6iris.LinkHoldingsleep <> <> lib
+R351:366 xv6iris.LinkVirtioDiskRw <> <> lib
+R368:378 xv6iris.ProofBwrite <> <> lib
+R399:409 xv6iris.ProofBwrite BwriteProof <> modtype
+R411:422 xv6iris.LinkHoldingsleep Holdingsleep <> modtype
+R424:435 xv6iris.LinkVirtioDiskRw VirtioDiskRw <> modtype
+mod 389:394 <> Bwrite

@@ -1,0 +1,7 @@
+DIGEST ac81038598fe7258db36027a83ece6c3
+Fxv6iris.LinkNamei
+R519:527 xv6iris.LinkNamex <> <> lib
+R545:554 xv6iris.ProofNamei <> <> lib
+R574:583 xv6iris.ProofNamei NameiProof <> modtype
+R585:589 xv6iris.LinkNamex Namex <> modtype
+mod 565:569 <> Namei

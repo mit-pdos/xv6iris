@@ -1,0 +1,7 @@
+DIGEST 2ad0cb7d70665728bc5c420cdaab227a
+Fxv6iris.LinkNameiTr
+R405:415 xv6iris.LinkNamexTr <> <> lib
+R433:444 xv6iris.ProofNameiTr <> <> lib
+R466:477 xv6iris.ProofNameiTr NameiTrProof <> modtype
+R479:485 xv6iris.LinkNamexTr NamexTr <> modtype
+mod 455:461 <> NameiTr

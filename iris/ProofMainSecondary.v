@@ -50,6 +50,7 @@ Require Import StackOwn.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the acquire's context borrow *)
 Require Import WpLock.
 Require Import KptShare.
 Require Import CpuOwn SchedCtx FdSlots.
@@ -310,21 +311,23 @@ Section ProofMainSecondary.
   (* 0x16 .. 0x1e -- [while (started == 0) ;] with the acquire fence.     *)
   (* =================================================================== *)
   Local Lemma ms_spin
-      (γd : uart_names) (γv : disk_names) (m : regfile) (n : nat)
-      (p0 : mword 64) :
+      (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ)
+      `{!∀ ξ, Persistent (P ξ)} `{!CtxMorph P}
+      (m : regfile) (n : nat) (p0 : mword 64) :
     add_vec (rget m (mword_of_int 14 : mword 5))
         (sign_extend' 64 (mword_of_int 0 : mword 12)) = started_addr ->
+    cid_word <> (zero_reg : mword 64) ->
     sie_cap_gpr KT0 m n false p0 -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.main + 0x16) : mword 64) -∗
-    started_inv (main_deposit γd γv) -∗
+    started_inv γi ξd P -∗
     ( ∀ m' : regfile,
         sie_cap_gpr KT0 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x20) : mword 64) -∗
-        main_deposit γd γv -∗
+        P cur_ctx -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Ha4.
+    intros Ha4 Hcid.
     iIntros "Hcg #Htext Hpc #Hsinv Hcont".
     iLöb as "IH" forall (m Ha4).
     (* ---- +0x16 c.lw a5,0(a4) : the spin load, under the invariant ---- *)
@@ -334,31 +337,32 @@ Section ProofMainSecondary.
        says nothing about the VALUE, so one peek-open of the started
        invariant delivers it and puts the body straight back. *)
     iApply fupd_wp.
-    iMod (inv_acc ⊤ startedN with "Hsinv") as "[Hbody Hclose]"; [ solve_ndisj | ].
-    iDestruct "Hbody" as (vpk) "[>Hword Hrest]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 started_addr (DfracOwn 1) vpk
-                 ltac:(lia) with "Hword") as "#Hstcl".
-    iMod ("Hclose" with "[Hword Hrest]") as "_".
-    { iNext. iExists vpk. iFrame "Hword Hrest". }
+    iMod (started_inv_claim ⊤ γi ξd P ltac:(solve_ndisj) with "Hsinv") as "#Hstcl".
     iModIntro.
-    iApply (wp_load_s_sconf_au (kt := KT0) (ktd := KT0) 4 true false (mword_of_int (KernelSyms.main + 0x16))
+    (* THE RACY READ (A6.132): the resource-post leaf.  What the
+       continuation learns is [started_W] at SOME view [V0] the machine's
+       drain chose, with [hart_view_lb V0] beside it: either the word read
+       as 0, or it read as 1 and [V0] is at or past the release store's
+       index -- which is what lets the acquire below absorb the deposit. *)
+    iApply (wp_load_s_sconf_au_relr (kt := KT0) (ktd := KT0) 4 true false (mword_of_int (KernelSyms.main + 0x16))
               (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
               (mword_of_int 0 : mword 12) m n
               (fun v => sign_extend' 64 v)
-              (fun v => (▷ (⌜v = started_clear⌝ ∨ main_deposit γd γv))%I)
               ((⊤ ∖ ↑minstretN) ∖ ↑startedN) false
+              (started_W γi ξd P) (started_res γi ξd P) True%I
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_read_ram_plain_4 data2_ext_4
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(solve_ndisj) with "Hcg Hpc [] [] []").
+              ltac:(solve_ndisj)
+              ltac:(cbv zeta; rewrite Ha4; exact (started_read_obl γi ξd P p0 Hcid))
+              with "Hcg Hpc [] [] []").
     { iApply (mni_16 with "Htext"). }
     { rewrite Ha4. iExact "Hstcl". }
-    { rewrite Ha4.
-      iApply (started_inv_load_au (⊤ ∖ ↑minstretN) (main_deposit γd γv)
-                ltac:(solve_ndisj) with "Hsinv"). }
+    { iApply (started_read_open (⊤ ∖ ↑minstretN) γi ξd P ltac:(solve_ndisj) with "Hsinv"). }
     iIntros (v).
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc HPsi".
+    iIntros "Hcg Hpc HW _".
+    iDestruct "HW" as (V0) "[#Hlb HW]".
     pose (M1 := <[Regidx (mword_of_int 15 : mword 5) :=
         regval_into_reg (sign_extend' 64 (v : mword 32))]> m).
     iEval (change (if true then 2%Z else 4%Z) with 2%Z) in "Hpc".
@@ -439,10 +443,22 @@ Section ProofMainSecondary.
       assert (Hp20 : add_vec_int (mword_of_int (KernelSyms.main + 0x1e) : mword 64) 2
                      = mword_of_int (KernelSyms.main + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp20) in "Hpc".
-      iDestruct "HPsi" as "[%Hv0 | #Hdep]".
+      iDestruct "HW" as "[%Hv0 | HW]".
       + (* the word read as 0 contradicts the branch having fallen through *)
         exfalso. rewrite HM2a5 Hv0 in Hbz. vm_compute in Hbz. discriminate.
-      + iApply ("Hcont" $! M2 with "Hcg Hpc Hdep").
+      + iDestruct "HW" as (i) "(%Hvi & #Hidx & #HPd)".
+        destruct Hvi as [Hv0 | [Hvs Hle]].
+        { exfalso. rewrite HM2a5 Hv0 in Hbz. vm_compute in Hbz. discriminate. }
+        (* THE ACQUIRE: the fence at +0x18 has run, the read's view is at
+           or past the release index, so the deposit context's facts
+           transport to this hart's own context. *)
+        iApply fupd_wp.
+        iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hctx Hcg]".
+        iMod (started_absorb ⊤ γi ξd P i V0 ltac:(solve_ndisj) Hle
+                with "Hsinv Hidx Hlb Hctx HPd") as "[Hctx #HP]".
+        iDestruct ("Hcg" with "Hctx") as "Hcg".
+        iModIntro.
+        iApply ("Hcont" $! M2 with "Hcg Hpc HP").
   Qed.
 
   (* =================================================================== *)
@@ -749,9 +765,10 @@ Section ProofMainSecondary.
   (* =================================================================== *)
   Lemma wp_main_secondary_sconf 
       (m : regfile) (K : nat) (p0 : mword 64)
+      (γi : gname) (ξd : CtxId)
       (γd : uart_names) (γv : disk_names)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-    : wp_main_secondary_sconf_body m K p0 γd γv tlbvec0.
+    : wp_main_secondary_sconf_body m K p0 γi ξd γd γv tlbvec0.
   (* [kallocG]/[fileG] are in [MAIN_SECONDARY]'s signature but this arm's proof
      never touches them, so the section would not generalize over them. *)
   Proof using All.
@@ -764,8 +781,9 @@ Section ProofMainSecondary.
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
     iApply (ms_entry m K p0 Hcid HK with "Hcg Htext Hpc").
     iIntros (m1) "Hcg Hpc %Ha4".
-    iApply (ms_spin γd γv m1 (K - 2)%nat p0 Ha4 with "Hcg Htext Hpc Hsinv").
+    iApply (ms_spin γi ξd (main_dep γd γv) m1 (K - 2)%nat p0 Ha4 Hcid with "Hcg Htext Hpc Hsinv").
     iIntros (m2) "Hcg Hpc #Hdep".
+    iEval (rewrite /main_dep) in "Hdep".
     iDestruct "Hdep" as (γpr γk γs pd pav pu root pas)
       "(#Hpenv & #Hpinv & #Hccaps & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".
     iPoseProof "Hpenv" as "Hpenv2".

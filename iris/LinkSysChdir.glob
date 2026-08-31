@@ -1,0 +1,23 @@
+DIGEST 72187f9d45b93370fbc1e7cb7f56496e
+Fxv6iris.LinkSysChdir
+R423:432 xv6iris.LinkMyproc <> <> lib
+R434:444 xv6iris.LinkBeginOp <> <> lib
+R446:455 xv6iris.LinkArgstr <> <> lib
+R457:465 xv6iris.LinkNamei <> <> lib
+R467:475 xv6iris.LinkIlock <> <> lib
+R485:495 xv6iris.LinkIunlock <> <> lib
+R497:504 xv6iris.LinkIput <> <> lib
+R506:519 xv6iris.LinkIunlockput <> <> lib
+R521:529 xv6iris.LinkEndOp <> <> lib
+R531:543 xv6iris.ProofSysChdir <> <> lib
+R566:578 xv6iris.ProofSysChdir SysChdirProof <> modtype
+R580:585 xv6iris.LinkMyproc Myproc <> modtype
+R587:593 xv6iris.LinkBeginOp BeginOp <> modtype
+R595:600 xv6iris.LinkArgstr Argstr <> modtype
+R602:606 xv6iris.LinkNamei Namei <> modtype
+R608:612 xv6iris.LinkIlock Ilock <> modtype
+R614:620 xv6iris.LinkIunlock Iunlock <> modtype
+R654:657 xv6iris.LinkIput Iput <> modtype
+R659:668 xv6iris.LinkIunlockput Iunlockput <> modtype
+R670:674 xv6iris.LinkEndOp EndOp <> modtype
+mod 554:561 <> SysChdir

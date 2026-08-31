@@ -1,0 +1,15 @@
+DIGEST cc84131c165c8a3fbf7d18b4b6bd073d
+Fxv6iris.LinkInstallTrans
+R578:586 xv6iris.LinkBread <> <> lib
+R588:597 xv6iris.LinkBwrite <> <> lib
+R599:608 xv6iris.LinkBunpin <> <> lib
+R610:619 xv6iris.LinkBrelse <> <> lib
+R621:631 xv6iris.LinkMemmove <> <> lib
+R633:649 xv6iris.ProofInstallTrans <> <> lib
+R676:692 xv6iris.ProofInstallTrans InstallTransProof <> modtype
+R694:698 xv6iris.LinkBread Bread <> modtype
+R700:705 xv6iris.LinkBwrite Bwrite <> modtype
+R707:712 xv6iris.LinkBunpin Bunpin <> modtype
+R714:719 xv6iris.LinkBrelse Brelse <> modtype
+R721:727 xv6iris.LinkMemmove Memmove <> modtype
+mod 660:671 <> InstallTrans

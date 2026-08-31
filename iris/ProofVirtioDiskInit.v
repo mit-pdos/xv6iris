@@ -514,7 +514,7 @@ Section VdiLeaves.
   Lemma wp_vdi_flip (γv : disk_names)
       (pc : mword 64) (rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (c : virtio_cfg) (pd pav pu : Arch.pa)
-      (a : mword 64) (off : Z) (sw : mword 32) (p : mword 64) :
+      (a : mword 64) (off : Z) (sw : mword 32) (p : mword 64) (t0 t1 : nat) :
     Regidx rs1 <> Regidx Rtp -> Regidx rs2 <> Regidx Rtp ->
     add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = a ->
     vdi_geom a ->
@@ -529,11 +529,17 @@ Section VdiLeaves.
     pc_is pc -∗ instr pc rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
     disk_inv γv -∗ disk_cfg_is γv (DfracOwn (1/2)) c -∗
     avail_lease_half (virtio_init_cfg pd pav pu) 0%nat -∗
-    phys_list pu (replicate 4096 byte_zero) -∗
+    (* A6.126 §6: the used page minus its index word, sealed, and the word's
+       two bytes stamped (their floor writes) *)
+    phys_map (used_page_rest (virtio_init_cfg pd pav pu)) -∗
+    ([∗ list] j ∈ seq 0 2,
+       phys_ledger_at (pa_add (used_idx_pa (virtio_init_cfg pd pav pu)) j)
+         (DfracOwn 1) byte_zero (tf2 t0 t1 j)) -∗
     ( sie_cap_gpr KT1 m n false p -∗
       pc_is (add_vec_int pc (if rvc then 2 else 4)) -∗
       disk_pub γv 0%nat -∗
       disk_cfg γv (virtio_init_cfg pd pav pu) -∗
+      disk_fl γv t0 t1 -∗ disk_nr γv 0%nat -∗ disk_flr γv 0%nat -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -546,34 +552,38 @@ Section VdiLeaves.
     assert (Ha8 : sign_extend' 64 (subrange_vec_dec
                     (add_vec (rget m rs1) (sign_extend' 64 imm)) (xlen - 0 - 1) 0) = a).
     { rewrite (rget_ne m rs1 Hrs1tp). rewrite subrange_id. rewrite sign_extend'_id. exact Hea. }
-    iIntros "Hcg Hpc Hinstr #Hdinv Hvc Hidx Hpage Hcont".
+    iIntros "Hcg Hpc Hinstr #Hdinv Hvc Hidx Hpage Hcells Hcont".
     iApply (wp_sw_virtio_dinv_s_sconf (CID:=CID) γv pc rvc rs2 rs1 imm m n
               (disk_cfg_is γv (DfracOwn (1/2)) c ∗
                avail_lease_half (virtio_init_cfg pd pav pu) 0%nat ∗
-               phys_list pu (replicate 4096 byte_zero))%I
-              (disk_pub γv 0%nat ∗ disk_cfg γv (virtio_init_cfg pd pav pu))%I
+               phys_map (used_page_rest (virtio_init_cfg pd pav pu)) ∗
+               ([∗ list] j ∈ seq 0 2,
+                  phys_ledger_at (pa_add (used_idx_pa (virtio_init_cfg pd pav pu)) j)
+                    (DfracOwn 1) byte_zero (tf2 t0 t1 j)))%I
+              (disk_pub γv 0%nat ∗ disk_cfg γv (virtio_init_cfg pd pav pu) ∗
+               disk_fl γv t0 t1 ∗ disk_nr γv 0%nat ∗ disk_flr γv 0%nat)%I
               ltac:(rewrite Ha8; exact Hr)
               ltac:(rewrite Ha8; exact Hal)
               ltac:(rewrite Ha8; exact Hcan)
               ltac:(rewrite Ha8; exact Hdv)
-              with "Hcg Hpc Hinstr Hdinv [Hvc Hidx Hpage] []").
-    { iFrame "Hvc Hidx Hpage". }
-    { iIntros (v Hvok) "Hproto (Hmine & Hidx & Hpage)".
+              with "Hcg Hpc Hinstr Hdinv [Hvc Hidx Hpage Hcells] []").
+    { iFrame "Hvc Hidx Hpage Hcells". }
+    { iIntros (v Hvok) "Hproto (Hmine & Hidx & Hpage & Hcells)".
       iDestruct (virtio_proto_not_live_cfg γv v c Hl0 with "Hproto Hmine")
         as %(Hcv & Hsn & Hui & Hca & Htk).
       iEval (rewrite -Hcv) in "Hmine".
       iMod (virtio_proto_intro γv v (set_vcfg v (virtio_init_cfg pd pav pu))
-              pd pav pu ltac:(rewrite Hcv; exact Hl0) eq_refl eq_refl eq_refl
-              eq_refl eq_refl Hpal Hdisj with "Hproto Hmine Hidx Hpage")
-        as "(Hproto & Hpub & #Hcfg)".
+              pd pav pu t0 t1 ltac:(rewrite Hcv; exact Hl0) eq_refl eq_refl eq_refl
+              eq_refl eq_refl Hpal Hdisj with "Hproto Hmine Hidx Hpage Hcells")
+        as "(Hproto & Hpub & #Hcfg & Hfl & Hnr & Hflr)".
       iModIntro. iExists (set_vcfg v (virtio_init_cfg pd pav pu)).
       iSplitR.
       { iPureIntro. rewrite Ha8 Hoff Hsw'. exact (Hcw v Hcv). }
       iSplitR; [iPureIntro; exact Hvok|].
-      iFrame "Hproto Hpub Hcfg". }
+      iFrame "Hproto Hpub Hcfg Hfl Hnr Hflr". }
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc [Hpub #Hcfg]".
-    iApply ("Hcont" with "Hcg Hpc Hpub Hcfg").
+    iIntros "Hcg Hpc (Hpub & #Hcfg & Hfl & Hnr & Hflr)".
+    iApply ("Hcont" with "Hcg Hpc Hpub Hcfg Hfl Hnr Hflr").
   Qed.
 
   Lemma vdi_ldval (w : mword (8*4)) :
@@ -651,17 +661,22 @@ Section VdiLease.
   Qed.
 
   (* the whole zeroed used page, as the lease's byte list *)
-  Lemma vdi_used_phys (pu : mword 64) :
+  (* A6.126 §6: the whole zeroed used page, MINUS its index word (sealed, the
+     lease's), plus the word's two bytes stamped with the init hart's floors
+     at them -- DiskAvail.used_split_init on this page's static claims *)
+  Lemma vdi_used_split (pd pav pu : mword 64) :
     page_valid pu ->
     kmap_static_claims -∗
-    ([∗ list] j ∈ seq 0 4096, (pa_add pu j) ↦ₘ byte_zero) -∗
-    phys_list pu (replicate 4096 byte_zero).
+    ([∗ list] j ∈ seq 0 4096, (pa_add pu j) ↦ₘ byte_zero) ==∗
+    ∃ t0 t1 : nat,
+      phys_map (used_page_rest (virtio_init_cfg pd pav pu)) ∗
+      ([∗ list] j ∈ seq 0 2,
+         phys_ledger_at (pa_add (used_idx_pa (virtio_init_cfg pd pav pu)) j)
+           (DfracOwn 1) byte_zero (tf2 t0 t1 j)) ∗
+      lk_floor cur_ctx t0 ∗ lk_floor cur_ctx t1.
   Proof.
     iIntros (Hpv) "#Hkm H".
-    rewrite (phys_list_of_fun pu 4096 (fun _ : nat => byte_zero)
-               (replicate 4096 byte_zero) (replicate_fmap_seq 4096 byte_zero)).
-    iApply (mem_win_to_phys pu 4096 (DfracOwn 1) (fun _ : nat => byte_zero)
-              (vdi_page_static pu Hpv) with "Hkm H").
+    iApply (used_split_init pd pav pu (vdi_page_static pu Hpv) with "Hkm H").
   Qed.
 
   (* the available page: flags (bytes 0..1) DROPPED, index (2..3) leased,
@@ -2491,16 +2506,17 @@ Section ProofVirtioDiskInit.
             ltac:(intros j Hj; rewrite pa_add_add;
                   exact (vdi_page_static pav Hpavv (2 + j)%nat ltac:(lia)))
             with "Hkm Hidx") as "[Hidxp Havh]".
+    iMod (vdi_used_split pd pav pu Hpuv with "Hkm Hbpu")
+      as (t0 t1) "(Hpup & Hcells & #Hfl0 & #Hfl1)".
     iModIntro.
-    iDestruct (vdi_used_phys pu Hpuv with "Hkm Hbpu") as "Hpup".
     iApply (wp_vdi_flip γv (mword_of_int (KernelSyms.virtio_disk_init + 0x170)) false (mword_of_int 18 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 112 : mword 12)
-              H13 (K - 4)%nat Q14 pd pav pu (mword_of_int 0x10001070) 112 (Z_to_bv 32 15 : mword 32) pp ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              H13 (K - 4)%nat Q14 pd pav pu (mword_of_int 0x10001070) 112 (Z_to_bv 32 15 : mword 32) pp t0 t1 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(rewrite HH13a4; bvc) vg_070 ltac:(vm_compute; reflexivity)
               ltac:(rewrite HH13s2; bvc) ltac:(reflexivity) ltac:(vcw)
               (init_cfg_pages_aligned_of_valid pd pav pu Hpdv Hpavv Hpuv) Hdmadisj
-              with "Hcg Hpc [] Hdinv Hvc Hidxp Hpup").
+              with "Hcg Hpc [] Hdinv Hvc Hidxp Hpup Hcells").
     { iApply (vdi_170 with "Htext"). }
-    iIntros "Hcg Hpc Hpub #Hcfgp".
+    iIntros "Hcg Hpc Hpub #Hcfgp Hfl Hnr Hflr".
     assert (Hp174 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x170) : mword 64) 4 = mword_of_int (KernelSyms.virtio_disk_init + 0x174)) by pcs.
     iEval (rewrite Hp174) in "Hpc".
     (* ===== EPILOGUE (0x174..0x17e) ===== *)
@@ -2707,7 +2723,7 @@ Section ProofVirtioDiskInit.
        chain the proofmode re-traverses at every context split. *)
     iEval (rewrite /vdi_post) in "Hcont".
     iApply ("Hcont" $! P5 pd pav pu with
-      "Hcg Hcpu Hpc [%] [%] [%] [%] Henv Hpub Hcfgp Hbpd Hbpavr Hdesc Havail Hused Hfree Hlk Hlnm Hcp Havh").
+      "Hcg Hcpu Hpc [%] [%] [%] [%] Henv Hpub Hcfgp Hbpd Hbpavr Hdesc Havail Hused Hfree Hlk Hlnm Hcp Havh [Hfl Hnr Hflr]").
     { try iPureIntro. unfold callee_saved.
       split. { rewrite /P5 upd_eq. exact Hwv. }
       split. { rewrite /P5 upd_ne; [| reg_neq]. rewrite /P4 upd_ne; [| reg_neq].
@@ -2719,6 +2735,7 @@ Section ProofVirtioDiskInit.
     { try iPureIntro. exact Hpdv. }
     { try iPureIntro. exact Hpavv. }
     { try iPureIntro. exact Hpuv. }
+    { iExists t0, t1. iFrame "Hfl Hnr Hflr Hfl0 Hfl1". }
   Qed.
 End ProofVirtioDiskInit.
 End VirtioDiskInitProof.

@@ -72,6 +72,7 @@ Require Import WpDecodeBridge.
 Require Import CommonWalk.
 (* A6.21: the PT-slot TIER INDEX lives here now; see [pt_slot_own]. *)
 Require Import TsoCtx.
+Require Import CtxValues.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -1143,9 +1144,28 @@ Section PtTreeIris.
      seven files; the ~50 consumer files behind the notations do not move. *)
   Context (PTT : ptier).
 
+  (* A6.135: the kernel slot at PER-BYTE floors under the global bound
+     [B], each byte carrying the BOOT HART's persistent own-write anchor
+     (or floor 0, the image).  [Ba] is the byte's own publication floor --
+     establishment mints it at the byte's own write stamp, which is what
+     makes the publication UNCONDITIONAL (no drain, no log-top) and gives
+     hart 0 a token-free read credential ([CtxValues.cv_own]); a secondary
+     reads through [view_lb B] and [Ba <= B].  The A/D write-back restamps
+     the cell but keeps [(Ba, pte_slot_set w)] -- the [Bg]-generalized
+     store gate ([TsoCtx.ledger_store_win_pin_okf]). *)
+  Definition kpt_slot_pin (a : Arch.pa) (dq : dfrac) (w : bv 64)
+      (B : nat) : iProp Σ :=
+    (⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
+     [∗ list] j ∈ seq 0 8, ∃ (Ba t : nat), ⌜(Ba <= B)%nat⌝ ∗
+       TsoCtx.phys_ledger_pin (pa_add a j) dq (nth_byte w j) t Ba
+         (pte_slot_set w j) ∗
+       (⌜Ba = 0%nat⌝ ∨
+        CtxValues.cv_own 0%nat (pa_add a j) Ba ∨
+        TsoGhost.view_lb RiscvPtsto.view_name RiscvPtsto.loglen_name 0%nat Ba))%I.
+
   Definition pt_slot_own (a : Arch.pa) (dq : dfrac) (w : bv 64) : iProp Σ :=
     match PTT with
-    | KTier B => phys_ledger_word_pin a dq w B (pte_slot_set w)
+    | KTier B => kpt_slot_pin a dq w B
     | UTier xi => ctx_phys_word_pointsto xi a dq w
     end.
 
@@ -1157,11 +1177,20 @@ Section PtTreeIris.
      the walk lane nothing: only the two places that ACT on a slot (the
      software walk's load, the A/D write-back's store) care which tier it
      is. *)
+  Lemma kpt_slot_pin_forget a dq w B :
+    kpt_slot_pin a dq w B ⊢ phys_word_pointsto a dq w.
+  Proof.
+    iIntros "[%Hal Hb]". rewrite /phys_word_pointsto. iSplitR; first done.
+    iApply (big_sepL_impl with "Hb").
+    iIntros "!>" (k j _) "(%Ba & %t & %HBa & H & _)".
+    by iApply TsoCtx.phys_ledger_pin_forget.
+  Qed.
+
   Lemma pt_slot_own_forget a dq w :
     pt_slot_own a dq w ⊢ phys_word_pointsto a dq w.
   Proof.
     rewrite /pt_slot_own. destruct PTT as [B|xi].
-    - apply phys_ledger_word_pin_forget.
+    - apply kpt_slot_pin_forget.
     - apply ctx_phys_word_pointsto_forget.
   Qed.
 
@@ -1187,7 +1216,7 @@ Section PtTreeIris.
 
   Lemma pt_slot_own_ker (B : nat) a dq w :
     PTT = KTier B ->
-    pt_slot_own a dq w = phys_ledger_word_pin a dq w B (pte_slot_set w).
+    pt_slot_own a dq w = kpt_slot_pin a dq w B.
   Proof. intros HP. by rewrite /pt_slot_own HP. Qed.
 
   (* PERSISTENT per-node identity claim (uniform-claims PHYSICAL TIER): the
@@ -1626,8 +1655,7 @@ Proof. reflexivity. Qed.
 
 Lemma pt_slot_own_None `{!riscvGS Σ} (B : nat)
     (a : Arch.pa) (dq : dfrac) (w : bv 64) :
-  pt_slot_own (KTier B) a dq w
-  = TsoCtx.phys_ledger_word_pin a dq w B (pte_slot_set w).
+  pt_slot_own (KTier B) a dq w = kpt_slot_pin a dq w B.
 Proof. reflexivity. Qed.
 
 Notation pt_page_own           := (pt_page_own_at (UTier TsoCtx.cur_ctx)).

@@ -1,0 +1,15 @@
+DIGEST bcfaa2ed726df535beb8b958aa351ca9
+Fxv6iris.LinkBread
+R350:360 xv6iris.LinkAcquire <> <> lib
+R362:372 xv6iris.LinkRelease <> <> lib
+R374:389 xv6iris.LinkAcquiresleep <> <> lib
+R391:406 xv6iris.LinkVirtioDiskRw <> <> lib
+R408:416 xv6iris.LinkPanic <> <> lib
+R434:443 xv6iris.ProofBread <> <> lib
+R463:472 xv6iris.ProofBread BreadProof <> modtype
+R474:480 xv6iris.LinkAcquire Acquire <> modtype
+R482:488 xv6iris.LinkRelease Release <> modtype
+R490:501 xv6iris.LinkAcquiresleep Acquiresleep <> modtype
+R503:514 xv6iris.LinkVirtioDiskRw VirtioDiskRw <> modtype
+R516:520 xv6iris.LinkPanic Panic <> modtype
+mod 454:458 <> Bread

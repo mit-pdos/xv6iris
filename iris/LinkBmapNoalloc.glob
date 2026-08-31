@@ -1,0 +1,9 @@
+DIGEST 7808498b7c2b0c6032f450db8304872b
+Fxv6iris.LinkBmapNoalloc
+R565:573 xv6iris.LinkBread <> <> lib
+R575:584 xv6iris.LinkBrelse <> <> lib
+R586:594 xv6iris.ProofBmap <> <> lib
+R620:635 xv6iris.ProofBmap BmapNoallocProof <> modtype
+R637:641 xv6iris.LinkBread Bread <> modtype
+R643:648 xv6iris.LinkBrelse Brelse <> modtype
+mod 605:615 <> BmapNoalloc

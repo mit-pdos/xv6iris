@@ -1,0 +1,15 @@
+DIGEST 62f60b399c111cec6dc1ac8403a18a38
+Fxv6iris.LinkFilestat
+R577:586 xv6iris.LinkMyproc <> <> lib
+R588:596 xv6iris.LinkIlock <> <> lib
+R598:606 xv6iris.LinkStati <> <> lib
+R608:618 xv6iris.LinkIunlock <> <> lib
+R620:630 xv6iris.LinkCopyout <> <> lib
+R648:660 xv6iris.ProofFilestat <> <> lib
+R683:695 xv6iris.ProofFilestat FilestatProof <> modtype
+R697:702 xv6iris.LinkMyproc Myproc <> modtype
+R704:708 xv6iris.LinkIlock Ilock <> modtype
+R710:714 xv6iris.LinkStati Stati <> modtype
+R716:722 xv6iris.LinkIunlock Iunlock <> modtype
+R724:730 xv6iris.LinkCopyout Copyout <> modtype
+mod 671:678 <> Filestat

@@ -54,6 +54,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import TsoMemPa.
 Require Import TsoGhost.   (* A6.55: [view_lb] for the pin receipt *)
 Require Import TsoCtx.
+Require Import CtxValues.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -157,16 +158,23 @@ Section KptShare.
      halves are per-HART facts, which is why they live in the translation
      residue beside [tlb_snap_ok] rather than in [kpt_inv]. *)
   Definition kpt_creds : iProp Σ :=
-    (∃ B : nat, kpt_bound B ∗
-       view_lb view_name loglen_name (hart_agent cpu_id) B)%I.
+    (∃ B : nat, kpt_bound B ∗ CtxValues.cv_boot_cred B)%I.
 
   Global Instance kpt_creds_persistent : Persistent kpt_creds.
   Proof. rewrite /kpt_creds. apply _. Qed.
 
   Lemma kpt_creds_intro (B : nat) :
-    kpt_bound B -∗ view_lb view_name loglen_name (hart_agent cpu_id) B -∗
-    kpt_creds.
+    kpt_bound B -∗ CtxValues.cv_boot_cred B -∗ kpt_creds.
   Proof. iIntros "H1 H2". iExists B. iFrame. Qed.
+
+  (* the boot hart's arm: no view receipt anywhere (A6.135) *)
+  Lemma kpt_creds_intro_boot (B : nat) :
+    hart_agent cpu_id = 0%nat ->
+    kpt_bound B -∗ TsoGhost.llb loglen_name B -∗ kpt_creds.
+  Proof.
+    intros H0. iIntros "H1 Hl". iExists B. iFrame "H1".
+    iApply (CtxValues.cv_boot_cred_boot B H0 with "Hl").
+  Qed.
 
   Definition tlb_res_pt (root_ppn : mword 44) : iProp Σ :=
     (∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
@@ -190,7 +198,7 @@ Section KptShare.
     autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     tlb_ok_pt (mword_of_int 0) t0 tlbvec ->
     satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ kpt_lb t0 -∗ kpt_bound B0 -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) B0 -∗
+    CtxValues.cv_boot_cred B0 -∗
     pmp_config root_ppn -∗ kpt_inv root_ppn -∗
     tlb_res_pt root_ppn.
   Proof.
@@ -289,7 +297,7 @@ Section KptShare.
     iIntros "Hinv Hnone Hbnone".
     iDestruct (tlb_inv_pt_open with "Hinv") as (satp0 tlbvec t M B)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hok & %Hspec & HM & Ht & #Hvlb & Hpmp)".
-    iDestruct (view_lb_llb with "Hvlb") as "#Hllb".
+    iDestruct (CtxValues.cv_boot_cred_llb with "Hvlb") as "#Hllb".
     iMod (kpt_inv_alloc root_ppn B t M E Hspec with "Ht HM Hllb Hnone Hbnone")
       as "(#Hkinv & #Hlb & #Hbd)".
     iModIntro.

@@ -431,7 +431,7 @@ Section ProofVirtioDiskRwB.
       (* open the lock's resource *)
       iDestruct (vdrw_body_open γd pd pav pu with "HR") as (np nr fl pk tr fr) "Hbody".
       iDestruct "Hbody" as "(%Hdfl & %Hdpk & %Hdtr & %Hcoh & %Htok1 & %Htok2 & %Htok3 &
-                             Hpub & Hlb & Hcl & Huidx & Hflight & Hparked &
+                             Hpub & Hlb & Hdfl & Hcl & Huidx & Hflight & Hparked &
                              Hbun & Hring & Havh)".
       (* ---- the three-descriptor allocator ---- *)
       iApply (P1.wp_vdrw_alloc3 (proc_addr j) pd sp0 fr (trap_res eb + (K - 12))%nat M
@@ -450,7 +450,7 @@ Section ProofVirtioDiskRwB.
         iSpecialize ("Hexit" $! CIDlp with "[%]"); [wp_next_chain|].
         iApply ("Hexit" $! M1 np nr fl pk tr fr h m2 t with
                   "[%] [%] [%] [%] Hcg Hown Htc Hclm Hpc Htok
-                   [Hpub Hlb Hcl Huidx Hflight Hparked Hbun Hring Havh] Hbh Hbm Hbt Hidx").
+                   [Hpub Hlb Hdfl Hcl Huidx Hflight Hparked Hbun Hring Havh] Hbh Hbm Hbt Hidx").
         - split;
             [| exact (vdrw_hi_frame1 M M1 m0 Rs2 ltac:(vm_compute; reflexivity) Hcs1 Hhi)].
           unfold vdrw_regs. split_and!.
@@ -462,7 +462,7 @@ Section ProofVirtioDiskRwB.
         - unfold tri_ok. cbn. split_and!; assumption.
         - exact (vdrwb_tri_disj fr tr h m2 t Htok3 Hfrh Hfrm Hfrt).
         - exact Hal.
-        - rewrite /vdrw_body. iFrame "Hpub Hlb Hcl Huidx Hflight Hparked Hbun Hring Havh".
+        - rewrite /vdrw_body. iFrame "Hpub Hlb Hdfl Hcl Huidx Hflight Hparked Hbun Hring Havh".
           iPureIntro. split_and!; try assumption.
           intros p T i HpT Hi.
           apply fr_upd_false_pres, fr_upd_false_pres, fr_upd_false_pres.
@@ -512,7 +512,7 @@ Section ProofVirtioDiskRwB.
                   vdrw_scratch (KTR := KT1) sp0 -∗
                   vdrw_p2_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector m0 lks -∗
                   WP (Loop : expr riscv_lang))%I
-        with "[Hpub Hlb Hcl Huidx Hflight Hparked Hring Havh IH]" as "Hsleep".
+        with "[Hpub Hlb Hdfl Hcl Huidx Hflight Hparked Hring Havh IH]" as "Hsleep".
       { iIntros (Mz) "%Hcsz Hcg Hown Htc Hclm Hpc Htok Hbun Hscr Hexit".
         assert (Hhiz : vdrw_hi Mz m0)
           by (exact (vdrw_hi_frame M1 Mz m0 Hcsz
@@ -621,10 +621,10 @@ Section ProofVirtioDiskRwB.
         (* re-close the lock's resource: the bundle is whole again.  It has
            to be whole BEFORE the release, which is the only consumer. *)
         iAssert (disk_res γd pd pav pu)
-          with "[Hpub Hlb Hcl Huidx Hflight Hparked Hbun Hring Havh]" as "HR".
+          with "[Hpub Hlb Hdfl Hcl Huidx Hflight Hparked Hbun Hring Havh]" as "HR".
         { iApply (vdrw_body_close γd pd pav pu np nr fl pk tr fr).
           rewrite /vdrw_body.
-          iFrame "Hpub Hlb Hcl Huidx Hflight Hparked Hbun Hring Havh".
+          iFrame "Hpub Hlb Hdfl Hcl Huidx Hflight Hparked Hbun Hring Havh".
           iPureIntro. split_and!; assumption. }
         (* ============== sleep_prepare(&disk.free[0]) ==============
            Noff-balanced and index-generic: it neither parks nor touches the

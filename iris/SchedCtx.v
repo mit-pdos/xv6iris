@@ -343,6 +343,8 @@ Section SchedCtxPay.
   Qed.
   Global Instance is_lock_move γ lk s R : CtxMove (λ ξ, is_lock (XI := ξ) γ lk s R).
   Proof. rewrite /is_lock. ctx_move_solve. Qed.
+  Global Instance is_lock_morph γ lk s R : CtxMorph (λ ξ, is_lock (XI := ξ) γ lk s R).
+  Proof. rewrite /is_lock. ctx_morph_solve. Qed.
   Global Instance p_sched_move h A' c cret tpv p back :
     CtxMove (λ ξ, p_sched h A' c cret tpv p back ξ).
   Proof. rewrite /p_sched. ctx_move_solve. Qed.
@@ -1115,4 +1117,6 @@ Section SchedCtxMove.
   Context (γs : list gname).
   Global Instance procs_inv_move : CtxMove (λ ξ, procs_inv (XI := ξ) γs).
   Proof. rewrite /procs_inv. ctx_move_solve. Qed.
+  Global Instance procs_inv_morph : CtxMorph (λ ξ, procs_inv (XI := ξ) γs).
+  Proof. rewrite /procs_inv. ctx_morph_solve. Qed.
 End SchedCtxMove.

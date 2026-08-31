@@ -71,7 +71,7 @@ Section PipeInv.
   Lemma pipe_data_rebase (pi : mword 64) (bs : list (bv 8)) :
     ([∗ list] j ↦ b ∈ bs, pa_add (pa_add pi pipe_data_off) j ↦ₘ b) ⊣⊢ pipe_data pi bs.
   Proof.
-    rewrite /pipe_data. apply big_sepL_proper. intros k b _. by rewrite pa_add_add.
+    rewrite /pipe_data /pipe_data_at. apply big_sepL_proper. intros k b _. by rewrite pa_add_add.
   Qed.
 
   (* the ten windows [struct pipe] divides its page into. *)
@@ -395,7 +395,7 @@ Section PipeInv.
     iMod pipe_ends_alloc as (γp) "(Hrd & Hwr & Hm0 & Hm1)".
     (* A6.67: the DELAYED form takes [CtxMorph] as a pure premise and the
        running token beside the payload (A6.66); both come straight back. *)
-    iMod ("Hmake" $! (<{ pipe_res γp pi }>) (pipe_dead γl γp) with "[%] Hrun
+    iMod ("Hmake" $! (pipe_res_at γp pi) (pipe_dead γl γp) with "[%] Hrun
             [Hnm Hnr Hnw Hro Hwo Hdata Hslack Hm0 Hm1]") as "[Hrun #Hlk]".
     { apply _. }
     { iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),

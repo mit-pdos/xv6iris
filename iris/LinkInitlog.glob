@@ -1,0 +1,15 @@
+DIGEST 60266c71748f1b12f191eac519706c64
+Fxv6iris.LinkInitlog
+R403:414 xv6iris.LinkInitlock <> <> lib
+R416:424 xv6iris.LinkBread <> <> lib
+R426:435 xv6iris.LinkBrelse <> <> lib
+R437:452 xv6iris.LinkInstallTrans <> <> lib
+R454:466 xv6iris.LinkWriteHead <> <> lib
+R476:487 xv6iris.ProofInitlog <> <> lib
+R509:520 xv6iris.ProofInitlog InitlogProof <> modtype
+R522:529 xv6iris.LinkInitlock Initlock <> modtype
+R531:535 xv6iris.LinkBread Bread <> modtype
+R537:542 xv6iris.LinkBrelse Brelse <> modtype
+R544:555 xv6iris.LinkInstallTrans InstallTrans <> modtype
+R557:565 xv6iris.LinkWriteHead WriteHead <> modtype
+mod 498:504 <> Initlog

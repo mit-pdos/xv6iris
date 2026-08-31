@@ -1,0 +1,11 @@
+DIGEST 87308c859d46747e5b23294ee8b7a9eb
+Fxv6iris.LinkSysClose
+R270:278 xv6iris.LinkArgfd <> <> lib
+R280:289 xv6iris.LinkMyproc <> <> lib
+R291:303 xv6iris.LinkFileclose <> <> lib
+R305:317 xv6iris.ProofSysClose <> <> lib
+R340:352 xv6iris.ProofSysClose SysCloseProof <> modtype
+R354:358 xv6iris.LinkArgfd Argfd <> modtype
+R360:365 xv6iris.LinkMyproc Myproc <> modtype
+R367:375 xv6iris.LinkFileclose Fileclose <> modtype
+mod 328:335 <> SysClose

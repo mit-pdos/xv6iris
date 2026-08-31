@@ -1,0 +1,11 @@
+DIGEST e2e20d2b464a8176b12c23d70fdf2434
+Fxv6iris.LinkWriteHead
+R189:197 xv6iris.LinkBread <> <> lib
+R199:208 xv6iris.LinkBwrite <> <> lib
+R210:219 xv6iris.LinkBrelse <> <> lib
+R221:234 xv6iris.ProofWriteHead <> <> lib
+R258:271 xv6iris.ProofWriteHead WriteHeadProof <> modtype
+R273:277 xv6iris.LinkBread Bread <> modtype
+R279:284 xv6iris.LinkBwrite Bwrite <> modtype
+R286:291 xv6iris.LinkBrelse Brelse <> modtype
+mod 245:253 <> WriteHead

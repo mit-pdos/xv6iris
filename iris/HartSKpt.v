@@ -48,6 +48,7 @@ Require Import CommonWalk HartSTrans.
 Require Import TsoMemPa TsoGhost HartMFetch.  (* A6.55: [pwmsg]/[agent],
    [view_lb], [fobl_ram]/[fobl_ram_ex] -- the pin's read path names all three *)
 Require Import TsoCtx.
+Require Import CtxValues.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -126,7 +127,7 @@ Section kptnode.
       (a : Arch.pa) (w : mword 64) :
     V (hart_agent cpu_id) = tv ->
     tso_interp_of riscv_eraGS img mem log V -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    CtxValues.cv_boot_cred B -∗
     pt_slot_own (KTier B) a (DfracOwn 1) w -∗
     ⌜forall tv' : nat, (tv <= tv')%nat -> forall j : nat, (j < 8)%nat ->
        exists b, tso_read img log (hart_agent cpu_id) tv' (pa_add a j) = Some b
@@ -136,21 +137,20 @@ Section kptnode.
   Proof.
     intros Htv. iIntros "Htso #Hlb Hs".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    iEval (rewrite (pt_slot_own_None B)) in "Hs".
-    iDestruct (TsoCtx.phys_ledger_word_pin_aligned_p with "Hs") as %Hal.
-    iDestruct (TsoCtx.phys_ledger_word_pin_bytes with "Hs") as "Hb".
+    iEval (rewrite (pt_slot_own_None B) /kpt_slot_pin) in "Hs".
+    iDestruct "Hs" as "[%Hal Hb]".
     rewrite (tso_interp_of_at_gs riscv_eraGS img mem log V rs d Hpin).
-    iDestruct (TsoCtx.ledger_read_pin_bytes_ok
-                 (gs_of img mem log V rs d) a 8 (DfracOwn 1)
-                 (fun j => nth_byte w j) B (pte_slot_set w)
+    iDestruct (CtxValues.cv_slot_read_ok
+                 (gs_of img mem log V rs d) a (DfracOwn 1)
+                 (fun j => nth_byte w j) 8 B (pte_slot_set w)
                  with "Htso Hlb Hb") as %Hok.
     rewrite -(tso_interp_of_at_gs riscv_eraGS img mem log V rs d Hpin).
     iFrame "Htso".
     iSplitR.
     { iPureIntro. intros tv' Hlo j Hj.
-      exact (Hok (hart_agent cpu_id) tv' ltac:(cbn; rewrite Htv; exact Hlo) j Hj). }
-    rewrite (pt_slot_own_None B).
-    iApply (TsoCtx.phys_ledger_word_pin_intro _ _ _ _ _ Hal with "Hb").
+      exact (Hok tv' ltac:(cbn; rewrite Htv; exact Hlo) j Hj). }
+    rewrite (pt_slot_own_None B) /kpt_slot_pin.
+    iSplitR; [by iPureIntro |]. iExact "Hb".
   Qed.
 
   (* the byte-set conclusion, reassembled into a WORD.  At an INTERIOR slot
@@ -262,7 +262,7 @@ Section kptnode.
     V (hart_agent cpu_id) = tv ->
     ptree_maps t0 vpn p2 p1 p0 ->
     kpt_bound B -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    CtxValues.cv_boot_cred B -∗
     kpt_lb t0 -∗ kpt_inv root_ppn -∗
     tso_interp_of riscv_eraGS img mem log V ={E}=∗
       ⌜fobl_ram img log tv (pt_addr2 t0 vpn) 8 p2⌝ ∗
@@ -328,7 +328,7 @@ Section kptnode.
       (p2 p1 p0 : mword 64) (B : nat) :
     ptree_maps t0 vpn p2 p1 p0 ->
     kpt_bound B -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    CtxValues.cv_boot_cred B -∗
     kpt_lb t0 -∗ kpt_inv root_ppn -∗ kpt_obl (pt_addr2 t0 vpn) p2.
   Proof.
     intros Hmaps. rewrite /kpt_obl.
@@ -345,7 +345,7 @@ Section kptnode.
       (p2 p1 p0 : mword 64) (B : nat) :
     ptree_maps t0 vpn p2 p1 p0 ->
     kpt_bound B -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    CtxValues.cv_boot_cred B -∗
     kpt_lb t0 -∗ kpt_inv root_ppn -∗ kpt_obl (pt_addr1 p2 vpn) p1.
   Proof.
     intros Hmaps. rewrite /kpt_obl.
@@ -362,7 +362,7 @@ Section kptnode.
       (p2 p1 leaf0 : mword 64) (a0 d0 : mword 1) (B : nat) :
     ptree_maps t0 vpn p2 p1 (pte_set_ad leaf0 a0 d0) ->
     kpt_bound B -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    CtxValues.cv_boot_cred B -∗
     kpt_lb t0 -∗ kpt_inv root_ppn -∗
     kpt_obl_ex (pt_addr0 p1 vpn) (fun w => pte_canon w = pte_canon leaf0).
   Proof.
@@ -802,9 +802,32 @@ Section kptnode.
               (uint (pt_addr0 p1 vpn) + Z.of_nat j < 18446744073709551616)%Z).
     { intros j Hj. destruct Haok as ((_ & Hh) & _ & _).
       unfold ram_base, ram_size in Hh. lia. }
-    iEval (rewrite (pt_slot_own_None B)) in "Hs0".
-    iDestruct (TsoCtx.phys_ledger_word_pin_aligned_p with "Hs0") as %Hal.
-    iDestruct (TsoCtx.phys_ledger_word_pin_bytes with "Hs0") as "Hb0".
+    iEval (rewrite (pt_slot_own_None B) /kpt_slot_pin) in "Hs0".
+    iDestruct "Hs0" as "[%Hal Hb00]".
+    (* name the per-byte floors (A6.135), split off the persistent anchors *)
+    iDestruct (CtxValues.big_sepL_seq_exist 8
+                 (fun j Ba => ∃ t : nat, ⌜(Ba <= B)%nat⌝ ∗
+                    TsoCtx.phys_ledger_pin (pa_add (pt_addr0 p1 vpn) j)
+                      (DfracOwn 1) (nth_byte q0 j) t Ba (pte_slot_set q0 j) ∗
+                    (⌜Ba = 0%nat⌝ ∨
+                     CtxValues.cv_own 0%nat (pa_add (pt_addr0 p1 vpn) j) Ba ∨
+                     TsoGhost.view_lb RiscvPtsto.view_name RiscvPtsto.loglen_name
+                       0%nat Ba))%I
+                 with "Hb00") as (Bf) "Hb00".
+    iAssert ([∗ list] j ∈ seq 0 8,
+               (⌜(Bf j <= B)%nat⌝ ∗
+                (⌜Bf j = 0%nat⌝ ∨
+                 CtxValues.cv_own 0%nat (pa_add (pt_addr0 p1 vpn) j) (Bf j) ∨
+                 TsoGhost.view_lb RiscvPtsto.view_name RiscvPtsto.loglen_name
+                   0%nat (Bf j))) ∗
+               (∃ t : nat, TsoCtx.phys_ledger_pin (pa_add (pt_addr0 p1 vpn) j)
+                  (DfracOwn 1) (nth_byte q0 j) t (Bf j) (pte_slot_set q0 j)))%I
+      with "[Hb00]" as "Hb00".
+    { iApply (big_sepL_impl with "Hb00").
+      iIntros "!>" (k j Hkj) "(%tts & %Hle & Hp & #Ha)".
+      iSplitR "Hp"; [iSplit; [by iPureIntro | iExact "Ha"] | by iExists tts]. }
+    iEval (rewrite big_sepL_sep) in "Hb00".
+    iDestruct "Hb00" as "[#Hmeta Hb0]".
     (* THE OFFSET -> ADDRESS BRIDGE (A6.55).  The word tower states its
        allowed sets by BYTE OFFSET, the store gate's footprint map states
        them by ADDRESS; an 8-byte slot inside RAM cannot wrap, so the
@@ -823,11 +846,21 @@ Section kptnode.
        [AV_exclusive]), so the hart's view goes PAST its own append -- the
        [_ex] form -- and the pin's bound and sets are UNCHANGED, which is
        what keeps the shared table canon-INVARIANT under its own store. *)
-    iMod (wobl_ram_ledger_pin_ex img σ log V 8
+    set (Bg := fun a' : Arch.pa =>
+                 Bf (Z.to_nat (uint a' - uint (pt_addr0 p1 vpn)))).
+    assert (HBg : forall j : nat, (j < 8)%nat ->
+              Bg (pa_add (pt_addr0 p1 vpn) j) = Bf j).
+    { intros j Hj. subst Bg. cbn beta.
+      rewrite (uint_pa_add (pt_addr0 p1 vpn) j (Hnw j Hj)).
+      replace (uint (pt_addr0 p1 vpn) + Z.of_nat j - uint (pt_addr0 p1 vpn))
+        with (Z.of_nat j) by lia.
+      by rewrite Nat2Z.id. }
+    iMod (wobl_ram_ledger_pin_exf img σ log V 8
             (mwrite_req8_con (pt_addr0 p1 vpn) (autocast (T := mword) m0'))
-            q0 B (pte_slot_set q0) Sg
+            q0 Bf (pte_slot_set q0) Sg Bg
             ltac:(reflexivity) ltac:(vm_compute; discriminate)
             ltac:(cbn [Interface.WriteReq.pa mwrite_req8_con]; exact HSg)
+            ltac:(cbn [Interface.WriteReq.pa mwrite_req8_con]; exact HBg)
             ltac:(cbn [Interface.WriteReq.value mwrite_req8_con];
                   rewrite TypeCasts.cast_N_refl autocast_id;
                   intros j Hj; rewrite Hset;
@@ -836,14 +869,17 @@ Section kptnode.
             with "Hgh Htso Hb0") as "(Hgh & Hobl & Hb0')".
     iEval (cbn [Interface.WriteReq.value Interface.WriteReq.pa mwrite_req8_con];
            rewrite TypeCasts.cast_N_refl autocast_id) in "Hb0'".
-    iDestruct (TsoCtx.phys_ledger_word_pin_intro _ _ m0' _ _ Hal with "Hb0'")
-      as "Hs0".
-    iDestruct (TsoCtx.phys_ledger_word_pin_sets _ _ m0' B (pte_slot_set q0)
-                 (pte_slot_set m0')
-                 ltac:(intros j Hj; rewrite Hset;
-                       symmetry; apply pte_slot_set_set_ad;
-                       [ exact Hlf0 | lia ])
-                 with "Hs0") as "Hs0".
+    iDestruct (big_sepL_sep_2 with "Hmeta Hb0'") as "Hb0n".
+    iAssert (kpt_slot_pin (pt_addr0 p1 vpn) (DfracOwn 1) m0' B)%I
+      with "[Hb0n]" as "Hs0".
+    { rewrite /kpt_slot_pin. iSplitR; [by iPureIntro |].
+      iApply (big_sepL_impl with "Hb0n").
+      iIntros "!>" (k j Hkj) "((%Hle & #Ha) & (%tts & Hp))".
+      apply lookup_seq in Hkj. destruct Hkj as [-> Hlt].
+      assert (Hsets : pte_slot_set m0' (0 + k)%nat = pte_slot_set q0 (0 + k)%nat).
+      { rewrite Hset. apply pte_slot_set_set_ad; [ exact Hlf0 | lia ]. }
+      iExists (Bf (0 + k)%nat), tts. rewrite Hsets.
+      iFrame "Hp". iSplitR; [by iPureIntro | iExact "Ha"]. }
     iEval (rewrite -(pt_slot_own_None B)) in "Hs0".
     iDestruct ("Hback" $! m0' with "Hs2 Hs1 Hs0") as "Ht".
     (* the canonical table does not move, so the snapshot is a rewrite *)
@@ -962,7 +998,7 @@ Section kptnode.
        makes that a premise of the walk rather than an assumption inside
        it. *)
     kpt_bound B -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) B -∗
+    CtxValues.cv_boot_cred B -∗
     tlb_snap_ok tlbvec -∗
     gen_cert -∗
     resv_frag cpu_id rr -∗

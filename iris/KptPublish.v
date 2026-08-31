@@ -49,6 +49,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto Ktier.
 Require Import TsoMemPa TsoGhost TsoCtx.
 Require Import PtreeType CommonWalk PtAdBits PtTree.
+Require Import CtxValues.
 Require Import CtxPinMint.
 Local Open Scope Z_scope.
 
@@ -86,9 +87,26 @@ Section KptPublish.
   (* indexed the same way ([seqZ 0 512]) and the tree recursion below      *)
   (* reuses the shape.                                                    *)
   (* ------------------------------------------------------------------ *)
+  (* A6.135: the slot's per-byte credential can be a recorded view
+     receipt of the boot hart -- what a DRAINED hart-0 publisher has.
+     This wraps a common-bound word pin into the anchored slot form. *)
+  Lemma kpt_slot_pin_of_word_pin (a : Arch.pa) (w : mword 64) (B : nat) :
+    view_lb view_name loglen_name 0%nat B -∗
+    phys_ledger_word_pin a (DfracOwn 1) w B (pte_slot_set w) -∗
+    kpt_slot_pin a (DfracOwn 1) w B.
+  Proof.
+    iIntros "#Hv [%Hal Hb]". rewrite /kpt_slot_pin.
+    iSplitR; [by iPureIntro |].
+    iApply (big_sepL_impl with "Hb").
+    iIntros "!>" (k j Hkj) "(%t & Hp)".
+    iExists B, t. iFrame "Hp".
+    iSplitR; [by iPureIntro |]. iRight. iRight. iExact "Hv".
+  Qed.
+
   Lemma pt_slots_publish (g : gstate) (xi : CtxId)
       (l : list Z) (F : Z -> Arch.pa) (W : Z -> mword 64) :
     drained g ->
+    view_lb view_name loglen_name 0%nat (g.(gtv) cpu_id) -∗
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗ own_context xi -∗
     ([∗ list] i ∈ l, pt_slot_own (UTier xi) (F i) (DfracOwn 1) (W i)) ==∗
@@ -97,19 +115,20 @@ Section KptPublish.
     ([∗ list] i ∈ l, pt_slot_own (KTier (g.(gtv) cpu_id)) (F i) (DfracOwn 1) (W i)).
   Proof.
     intros Hdr. induction l as [|i l IH].
-    - iIntros "Hgh Hint Hrun Hl". iModIntro. iFrame "Hgh Hint Hrun".
+    - iIntros "#Hv0 Hgh Hint Hrun Hl". iModIntro. iFrame "Hgh Hint Hrun".
       iExact "Hl".
     - rewrite !big_sepL_cons.
-      iIntros "Hgh Hint Hrun [Hs Hl]".
+      iIntros "#Hv0 Hgh Hint Hrun [Hs Hl]".
       rewrite (pt_slot_own_ctx (UTier xi) xi (F i) (DfracOwn 1) (W i) eq_refl).
       iMod (ctx_phys_word_pin_mint g xi (F i) (W i) (pte_slot_set (W i)) Hdr
               (fun j (_ : (j < 8)%nat) => pte_slot_set_self (W i) j)
               with "Hgh Hint Hrun Hs") as "(Hgh & Hint & Hrun & Hs)".
-      iMod (IH with "Hgh Hint Hrun Hl") as "(Hgh & Hint & Hrun & Hl)".
+      iMod (IH with "Hv0 Hgh Hint Hrun Hl") as "(Hgh & Hint & Hrun & Hl)".
       iModIntro. iFrame "Hgh Hint Hrun Hl".
       rewrite (pt_slot_own_ker (KTier (g.(gtv) cpu_id)) (g.(gtv) cpu_id)
                  (F i) (DfracOwn 1) (W i) eq_refl).
-      iExact "Hs".
+      iApply (kpt_slot_pin_of_word_pin (F i) (W i) (g.(gtv) cpu_id)
+                with "Hv0 Hs").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -120,6 +139,7 @@ Section KptPublish.
   (* ------------------------------------------------------------------ *)
   Lemma pt_page_publish (g : gstate) (xi : CtxId) (t : ptree) :
     drained g ->
+    view_lb view_name loglen_name 0%nat (g.(gtv) cpu_id) -∗
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗ own_context xi -∗
     pt_page_own_at (UTier xi) (DfracOwn 1) t ==∗
@@ -127,10 +147,11 @@ Section KptPublish.
     tso_interp_at riscv_eraGS g ∗ own_context xi ∗
     pt_page_own_at (KTier (g.(gtv) cpu_id)) (DfracOwn 1) t.
   Proof.
-    intros Hdr. iIntros "Hgh Hint Hrun [#Hcl Hs]".
+    intros Hdr. iIntros "#Hv0 Hgh Hint Hrun [#Hcl Hs]".
     iMod (pt_slots_publish g xi (seqZ 0 512)
             (fun i => u_pte_addr (pt_base t) (mword_of_int i))
-            (fun i => pt_ents t (mword_of_int i)) Hdr with "Hgh Hint Hrun Hs")
+            (fun i => pt_ents t (mword_of_int i)) Hdr
+            with "Hv0 Hgh Hint Hrun Hs")
       as "(Hgh & Hint & Hrun & Hs)".
     iModIntro. iFrame "Hgh Hint Hrun". rewrite /pt_page_own_at.
     iFrame "Hcl Hs".
@@ -168,11 +189,44 @@ Section KptPublish.
         iModIntro. iFrame "Hgh Hint Hrun Hl".
   Qed.
 
+  (* the same fold with the per-child step as a PERSISTENT WAND, for a
+     caller whose step closes over resources of its own (A6.135: the
+     drained telescope's recorded receipt, the boot telescope's hart
+     identity). *)
+  Lemma pt_kids_publish_w (g : gstate) (xi : CtxId) (P Q : ptree -> iProp Σ)
+      (l : list Z) (K : Z -> option ptree) :
+    □ (∀ c : ptree,
+         gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+         tso_interp_at riscv_eraGS g -∗ own_context xi -∗ P c ==∗
+         gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+         tso_interp_at riscv_eraGS g ∗ own_context xi ∗ Q c) -∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗ own_context xi -∗
+    ([∗ list] i ∈ l, match K i with Some c => P c | None => emp end) ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗ own_context xi ∗
+    ([∗ list] i ∈ l, match K i with Some c => Q c | None => emp end).
+  Proof.
+    iIntros "#Hstep". iInduction l as [|i l] "IHl".
+    - iIntros "Hgh Hint Hrun Hl". iModIntro. iFrame "Hgh Hint Hrun".
+      iExact "Hl".
+    - rewrite !big_sepL_cons.
+      iIntros "Hgh Hint Hrun [Hc Hl]".
+      destruct (K i) as [c|].
+      + iMod ("Hstep" $! c with "Hgh Hint Hrun Hc")
+          as "(Hgh & Hint & Hrun & Hc)".
+        iMod ("IHl" with "Hgh Hint Hrun Hl") as "(Hgh & Hint & Hrun & Hl)".
+        iModIntro. iFrame "Hgh Hint Hrun Hc Hl".
+      + iMod ("IHl" with "Hgh Hint Hrun Hl") as "(Hgh & Hint & Hrun & Hl)".
+        iModIntro. iFrame "Hgh Hint Hrun Hl".
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* §4 THE WHOLE TREE.                                                   *)
   (* ------------------------------------------------------------------ *)
   Lemma ptree_own_publish (g : gstate) (xi : CtxId) (lvl : nat) (t : ptree) :
     drained g ->
+    view_lb view_name loglen_name 0%nat (g.(gtv) cpu_id) -∗
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗ own_context xi -∗
     ptree_own_at (UTier xi) lvl (DfracOwn 1) t ==∗
@@ -181,18 +235,27 @@ Section KptPublish.
     ptree_own_at (KTier (g.(gtv) cpu_id)) lvl (DfracOwn 1) t.
   Proof.
     intros Hdr. revert t. induction lvl as [|lvl IH]; intros t.
-    - iIntros "Hgh Hint Hrun [Hp _]".
-      iMod (pt_page_publish g xi t Hdr with "Hgh Hint Hrun Hp")
+    - iIntros "#Hv0 Hgh Hint Hrun [Hp _]".
+      iMod (pt_page_publish g xi t Hdr with "Hv0 Hgh Hint Hrun Hp")
         as "(Hgh & Hint & Hrun & Hp)".
       iModIntro. iFrame "Hgh Hint Hrun Hp".
-    - iIntros "Hgh Hint Hrun [Hp Hk]".
-      iMod (pt_page_publish g xi t Hdr with "Hgh Hint Hrun Hp")
+    - iIntros "#Hv0 Hgh Hint Hrun [Hp Hk]".
+      iMod (pt_page_publish g xi t Hdr with "Hv0 Hgh Hint Hrun Hp")
         as "(Hgh & Hint & Hrun & Hp)".
-      iMod (pt_kids_publish g xi
+      iAssert (□ ∀ c : ptree,
+                 gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+                 tso_interp_at riscv_eraGS g -∗ own_context xi -∗
+                 ptree_own_at (UTier xi) lvl (DfracOwn 1) c ==∗
+                 gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+                 tso_interp_at riscv_eraGS g ∗ own_context xi ∗
+                 ptree_own_at (KTier (g.(gtv) cpu_id)) lvl (DfracOwn 1) c)%I
+        as "#Hstep".
+      { iIntros "!>" (c). iApply (IH c with "Hv0"). }
+      iMod (pt_kids_publish_w g xi
               (fun c => ptree_own_at (UTier xi) lvl (DfracOwn 1) c)
               (fun c => ptree_own_at (KTier (g.(gtv) cpu_id)) lvl (DfracOwn 1) c)
-              (seqZ 0 512) (fun i => pt_kids t (mword_of_int i)) IH
-              with "Hgh Hint Hrun Hk") as "(Hgh & Hint & Hrun & Hk)".
+              (seqZ 0 512) (fun i => pt_kids t (mword_of_int i))
+              with "Hstep Hgh Hint Hrun Hk") as "(Hgh & Hint & Hrun & Hk)".
       iModIntro. iFrame "Hgh Hint Hrun Hp Hk".
   Qed.
 
@@ -208,6 +271,7 @@ Section KptPublish.
   (* ------------------------------------------------------------------ *)
   Lemma kptree_publish (g : gstate) (xi : CtxId) (lvl : nat) (t : ptree) :
     drained g ->
+    hart_agent cpu_id = 0%nat ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗ own_context xi -∗
     ptree_own_at (UTier xi) lvl (DfracOwn 1) t ==∗
@@ -216,9 +280,14 @@ Section KptPublish.
     ptree_own_at (KTier (g.(gtv) cpu_id)) lvl (DfracOwn 1) t ∗
     llb loglen_name (g.(gtv) cpu_id) ∗ hart_view_lb (g.(gtv) cpu_id).
   Proof.
-    intros Hdr. iIntros "Hgh Hint Hrun Ht".
+    intros Hdr H0. iIntros "Hgh Hint Hrun Ht".
     iDestruct (hart_view_lb_now g with "Hint") as "[Hint #Hvlb]".
-    iMod (ptree_own_publish g xi lvl t Hdr with "Hgh Hint Hrun Ht")
+    iAssert (view_lb view_name loglen_name 0%nat (g.(gtv) cpu_id))%I
+      as "#Hv0".
+    { rewrite -H0.
+      iEval (rewrite hart_view_lb_unseal /hart_view_lb_def) in "Hvlb".
+      iExact "Hvlb". }
+    iMod (ptree_own_publish g xi lvl t Hdr with "Hv0 Hgh Hint Hrun Ht")
       as "(Hgh & Hint & Hrun & Ht)".
     iModIntro. iFrame "Hgh Hint Hrun Ht Hvlb".
     iEval (rewrite hart_view_lb_unseal /hart_view_lb_def) in "Hvlb".
@@ -244,8 +313,159 @@ Section KptPublish.
   (* [own_context] thread is inert, which is why this arm keeps the token *)
   (* in its telescope even though the byte mint no longer wants it.       *)
   (* ================================================================== *)
-  Lemma pt_slots_publish_top (g : gstate) (xi : CtxId)
+  (* ================================================================== *)
+  (* §6 THE BOOT GATE, AT THE SLOTS' OWN STAMPS (A6.135).                 *)
+  (*                                                                     *)
+  (* §5's drain premise has no site on hart 0's boot path (`fence rw,w`  *)
+  (* does not drain -- CtxPinMint §3b), and A6.106's log-top arm gave     *)
+  (* hart 0 no read credential at all (A6.134).  This arm mints every     *)
+  (* byte at ITS OWN WRITE STAMP, so the mint obligation is [t <= t] --   *)
+  (* UNCONDITIONAL: no drain, no log top -- and the slot records, per     *)
+  (* byte, the boot hart's own-message anchor ([CtxValues.cv_own], off    *)
+  (* the token's dirty registry) or its bound/view receipt.  Every floor  *)
+  (* is under [length glog], which becomes the tree's global bound and    *)
+  (* the [llb] that [KptShare.kpt_inv_alloc] wants.  Hart 0 then reads    *)
+  (* through [CtxValues.cv_boot_cred]'s boot arm with NO view receipt.    *)
+  (* ================================================================== *)
+  Lemma ctx_phys_byte_publish_boot (g : gstate) (xi : CtxId)
+      (a : Arch.pa) (v : bv 8) (Sv : TsoMemPa.byteset) :
+    hart_agent cpu_id = 0%nat ->
+    v ∈ Sv ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗ own_context xi -∗
+    ctx_phys_pointsto xi a (DfracOwn 1) v ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗ own_context xi ∗
+    (∃ Ba t : nat, ⌜(Ba <= length g.(glog))%nat⌝ ∗
+       phys_ledger_pin a (DfracOwn 1) v t Ba Sv ∗
+       (⌜Ba = 0%nat⌝ ∨ CtxValues.cv_own 0%nat a Ba ∨
+        view_lb view_name loglen_name 0%nat Ba)).
+  Proof.
+    intros H0 Hv. iIntros "Hgh Hint Hrun Hb".
+    rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
+    iDestruct "Hb" as (t) "(Hpt & Hts & Hbit)".
+    iDestruct (tso_interp_ts_le g a (DfracOwn 1)
+                 ((t, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem)
+                 with "Hint Hts") as %Htlen.
+    cbn in Htlen.
+    iDestruct (CtxValues.cv_latest g a (DfracOwn 1) v t
+                 with "Hint Hgh Hpt Hts") as %Hlat.
+    iMod (ledger_pin_mint g a v t t Sv (Nat.le_refl t) Hv
+            with "Hgh Hint [Hpt Hts]") as "(Hgh & Hint & Hpin)".
+    { rewrite /phys_ledger_at. iFrame "Hpt Hts". }
+    destruct t as [|i].
+    - iModIntro. iFrame "Hgh Hint Hrun".
+      iExists 0%nat, 0%nat. iFrame "Hpin".
+      iSplitR; [iPureIntro; lia |]. iLeft. by iPureIntro.
+    - destruct Hlat as [Hbyte _].
+      rewrite /TsoMemPa.log_byte in Hbyte.
+      destruct (g.(glog) !! i) as [m|] eqn:Hlog; last done.
+      rewrite own_context_unseal /own_context_def.
+      iDestruct "Hrun"
+        as (Btok K W D) "(Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
+      iDestruct "Hbit" as "[#Hcln | #Hdirty]".
+      + (* CLEAN under the token's bound: the hart's own view receipt *)
+        iDestruct "Hat" as "[Hbnd Hd]".
+        iDestruct (TsoGhost.llb_valid with "Hbnd Hcln") as %HtB.
+        iDestruct (TsoGhost.view_lb_le view_name loglen_name
+                     (hart_agent cpu_id) K (S i) ltac:(lia) with "HK")
+          as "#HvSi".
+        iModIntro. iFrame "Hgh Hint".
+        iSplitL "Hbnd Hd".
+        { iExists Btok, K, W, D. iFrame "Hbnd Hd HK HW Hoks".
+          iSplit; by iPureIntro. }
+        iExists (S i), (S i). iFrame "Hpin".
+        iSplitR; [by iPureIntro |].
+        iRight. iRight. iEval (rewrite -H0). iExact "HvSi".
+      + (* DIRTY: the token's registry decides *)
+        iDestruct (TsoGhost.dset_lookup with "[Hat] [Hdirty]") as %HinD.
+        { iDestruct "Hat" as "[_ $]". }
+        { iExact "Hdirty". }
+        iDestruct (big_sepS_elem_of _ _ _ HinD with "Hoks") as "#Hok".
+        iDestruct "Hok" as "[%Hle | Hown]".
+        * (* under the bound: view receipt again *)
+          cbn in Hle.
+          iDestruct (TsoGhost.view_lb_le view_name loglen_name
+                       (hart_agent cpu_id) K (S i) ltac:(lia) with "HK")
+            as "#HvSi".
+          iModIntro. iFrame "Hgh Hint".
+          iSplitL "Hat".
+          { iExists Btok, K, W, D. iFrame "Hat HK HW Hoks".
+            iSplit; by iPureIntro. }
+          iExists (S i), (S i). iFrame "Hpin".
+          iSplitR; [by iPureIntro |].
+          iRight. iRight. iEval (rewrite -H0). iExact "HvSi".
+        * (* the hart's OWN MESSAGE: the anchor *)
+          iDestruct "Hown" as (i' m') "(%Hii & #Hm & %Htid)".
+          cbn in Hii. injection Hii as <-.
+          iAssert (⌜g.(glog) !! i = Some m'⌝)%I as %Hlog'.
+          { iApply (CtxValues.cv_msg_lookup with "Hint Hm"). }
+          rewrite Hlog in Hlog'. injection Hlog' as <-.
+          iModIntro. iFrame "Hgh Hint".
+          iSplitL "Hat".
+          { iExists Btok, K, W, D. iFrame "Hat HK HW Hoks".
+            iSplit; by iPureIntro. }
+          iExists (S i), (S i). iFrame "Hpin".
+          iSplitR; [by iPureIntro |].
+          iRight. iLeft. iExists i, m, v.
+          iSplitR; [by iPureIntro |].
+          iSplitR; [iExact "Hm" |].
+          iSplit; iPureIntro; [exact Hbyte | rewrite Htid; exact H0].
+  Qed.
+
+  Lemma ctx_phys_bytes_publish_boot (g : gstate) (xi : CtxId)
+      (a : Arch.pa) (n : nat) (f : nat -> bv 8)
+      (Sf : nat -> TsoMemPa.byteset) :
+    hart_agent cpu_id = 0%nat ->
+    (forall j : nat, (j < n)%nat -> f j ∈ Sf j) ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗ own_context xi -∗
+    ([∗ list] j ∈ seq 0 n, ctx_phys_pointsto xi (pa_add a j) (DfracOwn 1) (f j))
+    ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗ own_context xi ∗
+    ([∗ list] j ∈ seq 0 n, ∃ Ba t : nat, ⌜(Ba <= length g.(glog))%nat⌝ ∗
+       phys_ledger_pin (pa_add a j) (DfracOwn 1) (f j) t Ba (Sf j) ∗
+       (⌜Ba = 0%nat⌝ ∨ CtxValues.cv_own 0%nat (pa_add a j) Ba ∨
+        view_lb view_name loglen_name 0%nat Ba)).
+  Proof.
+    intros H0. induction n as [|n IH]; intros Hf.
+    - iIntros "Hgh Hint Hrun Hl". iModIntro. iFrame "Hgh Hint Hrun".
+      iExact "Hl".
+    - rewrite seq_S !big_sepL_app /=.
+      iIntros "Hgh Hint Hrun [Hb [Hlast _]]".
+      iMod (IH ltac:(intros j Hj; apply Hf; lia) with "Hgh Hint Hrun Hb")
+        as "(Hgh & Hint & Hrun & Hb)".
+      iMod (ctx_phys_byte_publish_boot g xi (pa_add a n) (f n) (Sf n) H0
+              (Hf n ltac:(lia)) with "Hgh Hint Hrun Hlast")
+        as "(Hgh & Hint & Hrun & Hlast)".
+      iModIntro. iFrame "Hgh Hint Hrun Hb Hlast".
+  Qed.
+
+  Lemma kpt_slot_publish_boot (g : gstate) (xi : CtxId)
+      (a : Arch.pa) (w : bv 64) :
+    hart_agent cpu_id = 0%nat ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗ own_context xi -∗
+    ctx_phys_word_pointsto xi a (DfracOwn 1) w ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗ own_context xi ∗
+    kpt_slot_pin a (DfracOwn 1) w (length g.(glog)).
+  Proof.
+    intros H0. iIntros "Hgh Hint Hrun Hw".
+    iDestruct (ctx_phys_word_pointsto_aligned_p with "Hw") as %Hal.
+    iDestruct (ctx_phys_word_pointsto_bytes with "Hw") as "Hb".
+    iMod (ctx_phys_bytes_publish_boot g xi a 8 (nth_byte w)
+            (pte_slot_set w) H0
+            (fun j (_ : (j < 8)%nat) => pte_slot_set_self w j)
+            with "Hgh Hint Hrun Hb") as "(Hgh & Hint & Hrun & Hb)".
+    iModIntro. iFrame "Hgh Hint Hrun".
+    rewrite /kpt_slot_pin. iSplitR; [by iPureIntro |]. iExact "Hb".
+  Qed.
+
+  Lemma pt_slots_publish_boot (g : gstate) (xi : CtxId)
       (l : list Z) (F : Z -> Arch.pa) (W : Z -> mword 64) :
+    hart_agent cpu_id = 0%nat ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗ own_context xi -∗
     ([∗ list] i ∈ l, pt_slot_own (UTier xi) (F i) (DfracOwn 1) (W i)) ==∗
@@ -253,14 +473,13 @@ Section KptPublish.
     tso_interp_at riscv_eraGS g ∗ own_context xi ∗
     ([∗ list] i ∈ l, pt_slot_own (KTier (length g.(glog))) (F i) (DfracOwn 1) (W i)).
   Proof.
-    induction l as [|i l IH].
+    intros H0. induction l as [|i l IH].
     - iIntros "Hgh Hint Hrun Hl". iModIntro. iFrame "Hgh Hint Hrun".
       iExact "Hl".
     - rewrite !big_sepL_cons.
       iIntros "Hgh Hint Hrun [Hs Hl]".
       rewrite (pt_slot_own_ctx (UTier xi) xi (F i) (DfracOwn 1) (W i) eq_refl).
-      iMod (ctx_phys_word_pin_mint_top g xi (F i) (W i) (pte_slot_set (W i))
-              (fun j (_ : (j < 8)%nat) => pte_slot_set_self (W i) j)
+      iMod (kpt_slot_publish_boot g xi (F i) (W i) H0
               with "Hgh Hint Hrun Hs") as "(Hgh & Hint & Hrun & Hs)".
       iMod (IH with "Hgh Hint Hrun Hl") as "(Hgh & Hint & Hrun & Hl)".
       iModIntro. iFrame "Hgh Hint Hrun Hl".
@@ -269,7 +488,8 @@ Section KptPublish.
       iExact "Hs".
   Qed.
 
-  Lemma pt_page_publish_top (g : gstate) (xi : CtxId) (t : ptree) :
+  Lemma pt_page_publish_boot (g : gstate) (xi : CtxId) (t : ptree) :
+    hart_agent cpu_id = 0%nat ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗ own_context xi -∗
     pt_page_own_at (UTier xi) (DfracOwn 1) t ==∗
@@ -277,16 +497,17 @@ Section KptPublish.
     tso_interp_at riscv_eraGS g ∗ own_context xi ∗
     pt_page_own_at (KTier (length g.(glog))) (DfracOwn 1) t.
   Proof.
-    iIntros "Hgh Hint Hrun [#Hcl Hs]".
-    iMod (pt_slots_publish_top g xi (seqZ 0 512)
+    intros H0. iIntros "Hgh Hint Hrun [#Hcl Hs]".
+    iMod (pt_slots_publish_boot g xi (seqZ 0 512)
             (fun i => u_pte_addr (pt_base t) (mword_of_int i))
-            (fun i => pt_ents t (mword_of_int i)) with "Hgh Hint Hrun Hs")
+            (fun i => pt_ents t (mword_of_int i)) H0 with "Hgh Hint Hrun Hs")
       as "(Hgh & Hint & Hrun & Hs)".
     iModIntro. iFrame "Hgh Hint Hrun". rewrite /pt_page_own_at.
     iFrame "Hcl Hs".
   Qed.
 
-  Lemma ptree_own_publish_top (g : gstate) (xi : CtxId) (lvl : nat) (t : ptree) :
+  Lemma ptree_own_publish_boot (g : gstate) (xi : CtxId) (lvl : nat) (t : ptree) :
+    hart_agent cpu_id = 0%nat ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗ own_context xi -∗
     ptree_own_at (UTier xi) lvl (DfracOwn 1) t ==∗
@@ -294,13 +515,13 @@ Section KptPublish.
     tso_interp_at riscv_eraGS g ∗ own_context xi ∗
     ptree_own_at (KTier (length g.(glog))) lvl (DfracOwn 1) t.
   Proof.
-    revert t. induction lvl as [|lvl IH]; intros t.
+    intros H0. revert t. induction lvl as [|lvl IH]; intros t.
     - iIntros "Hgh Hint Hrun [Hp _]".
-      iMod (pt_page_publish_top g xi t with "Hgh Hint Hrun Hp")
+      iMod (pt_page_publish_boot g xi t H0 with "Hgh Hint Hrun Hp")
         as "(Hgh & Hint & Hrun & Hp)".
       iModIntro. iFrame "Hgh Hint Hrun Hp".
     - iIntros "Hgh Hint Hrun [Hp Hk]".
-      iMod (pt_page_publish_top g xi t with "Hgh Hint Hrun Hp")
+      iMod (pt_page_publish_boot g xi t H0 with "Hgh Hint Hrun Hp")
         as "(Hgh & Hint & Hrun & Hp)".
       iMod (pt_kids_publish g xi
               (fun c => ptree_own_at (UTier xi) lvl (DfracOwn 1) c)
@@ -310,7 +531,8 @@ Section KptPublish.
       iModIntro. iFrame "Hgh Hint Hrun Hp Hk".
   Qed.
 
-  Lemma kptree_publish_top (g : gstate) (xi : CtxId) (lvl : nat) (t : ptree) :
+  Lemma kptree_publish_boot (g : gstate) (xi : CtxId) (lvl : nat) (t : ptree) :
+    hart_agent cpu_id = 0%nat ->
     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
     tso_interp_at riscv_eraGS g -∗ own_context xi -∗
     ptree_own_at (UTier xi) lvl (DfracOwn 1) t ==∗
@@ -319,9 +541,9 @@ Section KptPublish.
     ptree_own_at (KTier (length g.(glog))) lvl (DfracOwn 1) t ∗
     llb loglen_name (length g.(glog)).
   Proof.
-    iIntros "Hgh Hint Hrun Ht".
+    intros H0. iIntros "Hgh Hint Hrun Ht".
     iDestruct (tso_interp_loglen_llb g with "Hint") as "[Hint #Hllb]".
-    iMod (ptree_own_publish_top g xi lvl t with "Hgh Hint Hrun Ht")
+    iMod (ptree_own_publish_boot g xi lvl t H0 with "Hgh Hint Hrun Ht")
       as "(Hgh & Hint & Hrun & Ht)".
     iModIntro. iFrame "Hgh Hint Hrun Ht Hllb".
   Qed.

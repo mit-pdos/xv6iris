@@ -1,0 +1,13 @@
+DIGEST c779118614e872b23b7153769740aa69
+Fxv6iris.LinkSysWrite
+R965:975 xv6iris.LinkArgaddr <> <> lib
+R977:986 xv6iris.LinkArgint <> <> lib
+R988:996 xv6iris.LinkArgfd <> <> lib
+R998:1010 xv6iris.LinkFilewrite <> <> lib
+R1012:1024 xv6iris.ProofSysWrite <> <> lib
+R1047:1059 xv6iris.ProofSysWrite SysWriteProof <> modtype
+R1061:1067 xv6iris.LinkArgaddr Argaddr <> modtype
+R1069:1074 xv6iris.LinkArgint Argint <> modtype
+R1076:1080 xv6iris.LinkArgfd Argfd <> modtype
+R1082:1090 xv6iris.LinkFilewrite Filewrite <> modtype
+mod 1035:1042 <> SysWrite

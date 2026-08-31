@@ -1,0 +1,21 @@
+DIGEST 22eecc06bd66339379bdac553f9ef1a3
+Fxv6iris.LinkFilewrite
+R1155:1167 xv6iris.LinkPipewrite <> <> lib
+R1169:1177 xv6iris.LinkIlock <> <> lib
+R1179:1188 xv6iris.LinkWritei <> <> lib
+R1190:1200 xv6iris.LinkIunlock <> <> lib
+R1202:1212 xv6iris.LinkBeginOp <> <> lib
+R1230:1238 xv6iris.LinkEndOp <> <> lib
+R1240:1255 xv6iris.LinkConsolewrite <> <> lib
+R1257:1265 xv6iris.LinkPanic <> <> lib
+R1283:1296 xv6iris.ProofFilewrite <> <> lib
+R1320:1333 xv6iris.ProofFilewrite FilewriteProof <> modtype
+R1335:1343 xv6iris.LinkPipewrite Pipewrite <> modtype
+R1345:1349 xv6iris.LinkIlock Ilock <> modtype
+R1351:1356 xv6iris.LinkWritei Writei <> modtype
+R1358:1364 xv6iris.LinkIunlock Iunlock <> modtype
+R1366:1372 xv6iris.LinkBeginOp BeginOp <> modtype
+R1409:1413 xv6iris.LinkEndOp EndOp <> modtype
+R1415:1426 xv6iris.LinkConsolewrite Consolewrite <> modtype
+R1428:1432 xv6iris.LinkPanic Panic <> modtype
+mod 1307:1315 <> Filewrite

@@ -1,0 +1,15 @@
+DIGEST b8c90725f3191f164debe53b3e67b1d9
+Fxv6iris.LinkFsinit
+R2827:2835 xv6iris.LinkBread <> <> lib
+R2837:2847 xv6iris.LinkMemmove <> <> lib
+R2849:2858 xv6iris.LinkBrelse <> <> lib
+R2860:2870 xv6iris.LinkInitlog <> <> lib
+R2872:2883 xv6iris.LinkIreclaim <> <> lib
+R2901:2911 xv6iris.ProofFsinit <> <> lib
+R2932:2942 xv6iris.ProofFsinit FsinitProof <> modtype
+R2944:2948 xv6iris.LinkBread Bread <> modtype
+R2950:2956 xv6iris.LinkMemmove Memmove <> modtype
+R2958:2963 xv6iris.LinkBrelse Brelse <> modtype
+R2965:2971 xv6iris.LinkInitlog Initlog <> modtype
+R2973:2980 xv6iris.LinkIreclaim Ireclaim <> modtype
+mod 2922:2927 <> Fsinit

@@ -1,0 +1,13 @@
+DIGEST b97ca6b2ed925752559f29055b33f779
+Fxv6iris.LinkSysRead
+R874:884 xv6iris.LinkArgaddr <> <> lib
+R886:895 xv6iris.LinkArgint <> <> lib
+R897:905 xv6iris.LinkArgfd <> <> lib
+R907:918 xv6iris.LinkFileread <> <> lib
+R920:931 xv6iris.ProofSysRead <> <> lib
+R953:964 xv6iris.ProofSysRead SysReadProof <> modtype
+R966:972 xv6iris.LinkArgaddr Argaddr <> modtype
+R974:979 xv6iris.LinkArgint Argint <> modtype
+R981:985 xv6iris.LinkArgfd Argfd <> modtype
+R987:994 xv6iris.LinkFileread Fileread <> modtype
+mod 942:948 <> SysRead

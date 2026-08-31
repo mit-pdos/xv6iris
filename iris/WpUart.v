@@ -44,7 +44,8 @@ Require Import WireInv WpVirtio.
    ([virtio_proto], VirtioProto.v) rather than as the bare [virtio_lease];
    these two are required AFTER SailStdpp.Base/Values above, exactly like
    WpVirtio, so their (RiscvPtsto-mirroring) elaboration is unaffected. *)
-Require Import DiskPtsto VirtioProto.
+Require Import RiscvModelBytes.   (* [nth_byte] *)
+Require Import DiskPtsto VirtioQueue VirtioProto.
 (* A6.48 ruling 4: the disk loop is the payer of the DMA completion's log
    append, so it names the message and the store gate. *)
 Require Import TsoMemPa.
@@ -933,7 +934,8 @@ Section DevLoops.
          out the completing request's PENDING token and owes the SPENT one *)
       iMod (virtio_proto_step γd vs m mv vnew w Hview Hdisk
               with "Hmem Hdur Hlease")
-        as (kq wr old) "(%Hwr & %Hdomold & Hmem & Hold & Hpend & Hback)".
+        as (kq wr old nc lo tf hist)
+           "(%Hwr & %Hdomold & %Hsnapw & %Hho & %Htf & %Hlo & Hmem & Hold & Hrel & Hpend & Hback)".
       (* the post-completion image, in the form the tie must move to: the
          IDENTITY, because every sector landed at its own earlier step *)
       assert (Hpost : wr_apply None (v_disk (dvirtio d)) = v_disk vnew)
@@ -983,23 +985,33 @@ Section DevLoops.
       (* A6.11's log disjunct decides which half runs: an EMPTY write set   *)
       (* hands both authorities straight back, a non-empty one stores.      *)
       (* ================================================================ *)
+      (* A6.126 §6: the append is ONE message carrying the slot's bytes AND
+         the index word; the slot's bytes come back STAMPED at the append's
+         position and the index word as the release window with its history
+         extended -- [TsoCtx.ledger_store_rel_map_ok].  The window is minted
+         here if this is the device's first completion (the boot's stamped
+         zero bytes, [rel_pre_cells]). *)
       iAssert (|==> gen_heap_interp (w ∪ m) ∗
                  tso_interp_of riscv_eraGS img (w ∪ m) log'
                    (vstep disk_agent (length log') log' V) ∗
-                 ([∗ map] a ↦ b ∈ w, TsoCtx.phys_ledger a (DfracOwn 1) b))%I
-        with "[Hmem Htso Hold]" as ">(Hmem & Htso & Hnew)".
+                 (∃ q : nat,
+                    ⌜forall k q' g, hist !! k = Some (q', g) -> (q' < q)%nat⌝ ∗
+                    ([∗ map] a ↦ b ∈ w ∖ snap_of (used_idx_pa (v_cfg vs)) 2 (wrap16 (S nc)),
+                       TsoCtx.phys_ledger_at a (DfracOwn 1) b q) ∗
+                    TsoCtx.rel_cells (used_idx_pa (v_cfg vs)) 2 (DfracOwn 1) disk_agent lo tf
+                      (nth_byte (wrap16 0)) (nth_byte (wrap16 (S nc)))
+                      (hist ++ [(q, nth_byte (wrap16 (S nc)))])))%I
+        with "[Hmem Htso Hold Hrel]" as ">(Hmem & Htso & Hnew)".
       { iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
         iDestruct (tso_interp_of_bound with "Htso") as %Hbnd.
         destruct Hlog as [[Hw Hl] | [Hne Hl]].
-        - (* nothing was written: [old] is empty too ([dom old = dom w]) *)
-          subst w log'.
-          rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
-          rewrite big_sepM_empty.
-          assert (Hoe : old = ∅) by (apply dom_empty_inv_L;
-            rewrite Hdomold dom_empty_L //).
-          rewrite Hoe big_sepM_empty.
-          iModIntro. iFrame "Hmem".
-          iSplitL; [|done]. iApply (tso_interp_of_disk_idle with "Htso").
+        - (* the completion always writes the index word: never empty *)
+          exfalso. subst w.
+          assert (Hs : snap_of (used_idx_pa (v_cfg vs)) 2 (wrap16 (S nc))
+                         !! pa_add (used_idx_pa (v_cfg vs)) 0 = Some (nth_byte (wrap16 (S nc)) 0))
+            by (apply write_bytes_lookup; lia).
+          rewrite map_subseteq_spec in Hsnapw.
+          pose proof (Hsnapw _ _ Hs) as Hc. rewrite lookup_empty in Hc. discriminate Hc.
         - (* the real append, at the [disk_agent] author *)
           subst log'.
           set (V' := vstep disk_agent
@@ -1026,22 +1038,57 @@ Section DevLoops.
             - lia. }
           rewrite (tso_interp_of_at_gs riscv_eraGS img m log V
                      (gr 0%fin) d Hpin).
-          iMod (TsoCtx.ledger_store_ok
+          (* the window in minted form: minted now if this is the first completion *)
+          iAssert (|==> tso_interp_at riscv_eraGS (gs_of img m log V (gr 0%fin) d) ∗
+                     gen_heap_interp m ∗
+                     TsoCtx.rel_cells (used_idx_pa (v_cfg vs)) 2 (DfracOwn 1) disk_agent lo tf
+                       (nth_byte (wrap16 0)) (nth_byte (wrap16 nc)) hist)%I
+            with "[Htso Hmem Hrel]" as ">(Htso & Hmem & Hrel)".
+          { iDestruct "Hrel" as "[[%Hnil Hpre] | Hrel]"; last by iFrame.
+            assert (Hnc0 : nc = 0%nat)
+              by (destruct Hho as [Hlen _]; rewrite Hnil in Hlen; cbn in Hlen; lia).
+            subst hist. rewrite Hnc0.
+            iEval (rewrite /TsoCtx.rel_pre_cells) in "Hpre".
+            iMod (TsoCtx.ledger_rpay_mint (gs_of img m log V (gr 0%fin) d)
+                    (used_idx_pa (v_cfg vs)) 2 disk_agent lo tf (nth_byte (wrap16 0))
+                    ltac:(lia) Htf Hlo with "Hmem Htso Hpre") as "(Hmem & Htso & Hcells)".
+            iModIntro. iFrame "Htso Hmem". rewrite /TsoCtx.rel_cells.
+            iApply (big_sepL_impl with "Hcells"). iIntros "!>" (k j _) "H".
+            iExists (tf j). iExact "H". }
+          (* every history position is a log position: under the append *)
+          iAssert (⌜forall k q' g, hist !! k = Some (q', g) -> (q' < S (length log))%nat⌝)%I
+            as %Hqgt.
+          { rewrite /TsoCtx.rel_cells.
+            iDestruct (big_sepL_lookup _ (seq 0 2) 0%nat 0%nat with "Hrel") as (tc) "Hc0";
+              [reflexivity|].
+            iDestruct (TsoCtx.ledger_rpay_ok with "Htso Hc0") as %Hok0.
+            iPureIntro. intros k q' g Hk.
+            destruct Hok0 as (_ & _ & _ & _ & H1b & _). cbn in H1b.
+            destruct (H1b q' g (elem_of_list_lookup_2 _ _ _ Hk)) as (_ & i & mg & -> & Hlk & _).
+            apply lookup_lt_Some in Hlk. lia. }
+          iMod (TsoCtx.ledger_store_rel_map_ok
                   (gs_of img m log V (gr 0%fin) d)
                   (gs_of img (w ∪ m)
                      (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'
                      (gr 0%fin) d)
-                  disk_agent old w Hdomold eq_refl eq_refl eq_refl
-                  Htvmono Htvtop with "Hmem Htso Hold")
-            as "(Hmem & Htso & _ & Hnew)".
+                  disk_agent old w (used_idx_pa (v_cfg vs)) 2 (wrap16 nc) (wrap16 (S nc))
+                  lo tf (nth_byte (wrap16 0)) hist
+                  ltac:(cbn; lia) Hsnapw Hdomold eq_refl eq_refl eq_refl
+                  Htvmono Htvtop with "Hmem Htso Hold Hrel")
+            as "(Hmem & Htso & _ & Hnew & Hrel)".
           iModIntro. iFrame "Hmem".
           rewrite -(tso_interp_of_at_gs riscv_eraGS img (w ∪ m)
                       (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'
                       (gr 0%fin) d Hpin').
-          iFrame "Htso".
-          iApply (big_sepM_mono with "Hnew"). iIntros (a b _) "H".
-          by iApply TsoCtx.phys_ledger_at_ledger. }
-      iDestruct ("Hback" with "Hdone Hnew") as "(Hdur' & Hlease')".
+          iFrame "Htso". iEval (cbn [gs_of glog]) in "Hnew Hrel".
+          iExists (S (length log)). iFrame "Hnew".
+          iSplitR; [iPureIntro; exact Hqgt|].
+          iEval (change (N.to_nat 2) with 2%nat) in "Hrel".
+          rewrite /TsoCtx.rel_cells.
+          iApply (big_sepL_mono with "Hrel"). iIntros (k j _) "H".
+          iExists (S (length log)). iExact "H". }
+      iDestruct "Hnew" as (q) "(%Hqgt & Hnew & Hrel)".
+      iMod ("Hback" $! q with "[%] Hdone Hnew Hrel") as "(Hdur' & Hlease')"; [exact Hqgt|].
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
         iPureIntro. exact (virtio_req_step_isr_ok vs mv vnew w Hvok Hdisk). }

@@ -1,0 +1,33 @@
+DIGEST 694db74239c0fe413fb7af53a8000ea2
+Fxv6iris.LinkSysUnlink
+R2132:2137 Stdlib.ZArith.ZArith <> <> lib
+R2139:2142 Stdlib.Lists.List <> <> lib
+R2396:2405 xv6iris.LinkArgstr <> <> lib
+R2407:2417 xv6iris.LinkBeginOp <> <> lib
+R2419:2433 xv6iris.LinkNameiparent <> <> lib
+R2435:2443 xv6iris.LinkIlock <> <> lib
+R2445:2455 xv6iris.LinkNamecmp <> <> lib
+R2465:2477 xv6iris.LinkDirlookup <> <> lib
+R2479:2493 xv6iris.LinkMemsetArray <> <> lib
+R2495:2503 xv6iris.LinkReadi <> <> lib
+R2505:2514 xv6iris.LinkWritei <> <> lib
+R2516:2526 xv6iris.LinkIupdate <> <> lib
+R2536:2549 xv6iris.LinkIunlockput <> <> lib
+R2551:2559 xv6iris.LinkEndOp <> <> lib
+R2561:2569 xv6iris.LinkPanic <> <> lib
+R2579:2592 xv6iris.ProofSysUnlink <> <> lib
+R2616:2629 xv6iris.ProofSysUnlink SysUnlinkProof <> modtype
+R2631:2636 xv6iris.LinkArgstr Argstr <> modtype
+R2638:2644 xv6iris.LinkBeginOp BeginOp <> modtype
+R2646:2656 xv6iris.LinkNameiparent Nameiparent <> modtype
+R2658:2662 xv6iris.LinkIlock Ilock <> modtype
+R2664:2670 xv6iris.LinkNamecmp Namecmp <> modtype
+R2707:2715 xv6iris.LinkDirlookup Dirlookup <> modtype
+R2717:2727 xv6iris.LinkMemsetArray MemsetArray <> modtype
+R2729:2733 xv6iris.LinkReadi Readi <> modtype
+R2735:2740 xv6iris.LinkWritei Writei <> modtype
+R2742:2748 xv6iris.LinkIupdate Iupdate <> modtype
+R2785:2794 xv6iris.LinkIunlockput Iunlockput <> modtype
+R2796:2800 xv6iris.LinkEndOp EndOp <> modtype
+R2802:2806 xv6iris.LinkPanic Panic <> modtype
+mod 2603:2611 <> SysUnlink

@@ -1,0 +1,24 @@
+DIGEST 272711904b6e882361cf1fdc6c4d4670
+Fxv6iris.LinkWritei
+R399:408 xv6iris.SpecWritei <> <> lib
+R410:417 xv6iris.SpecBmap <> <> lib
+R419:427 xv6iris.SpecBread <> <> lib
+R429:438 xv6iris.SpecBrelse <> <> lib
+R440:451 xv6iris.SpecLogWrite <> <> lib
+R461:476 xv6iris.SpecEitherCopyin <> <> lib
+R478:488 xv6iris.SpecIupdate <> <> lib
+R506:513 xv6iris.LinkBmap <> <> lib
+R515:523 xv6iris.LinkBread <> <> lib
+R525:534 xv6iris.LinkBrelse <> <> lib
+R536:547 xv6iris.LinkLogWrite <> <> lib
+R549:564 xv6iris.LinkEitherCopyin <> <> lib
+R574:584 xv6iris.LinkIupdate <> <> lib
+R586:596 xv6iris.ProofWritei <> <> lib
+R617:627 xv6iris.ProofWritei WriteiProof <> modtype
+R629:632 xv6iris.LinkBmap Bmap <> modtype
+R634:638 xv6iris.LinkBread Bread <> modtype
+R640:645 xv6iris.LinkBrelse Brelse <> modtype
+R647:654 xv6iris.LinkLogWrite LogWrite <> modtype
+R656:667 xv6iris.LinkEitherCopyin EitherCopyin <> modtype
+R669:675 xv6iris.LinkIupdate Iupdate <> modtype
+mod 607:612 <> Writei

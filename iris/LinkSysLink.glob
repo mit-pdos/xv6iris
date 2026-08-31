@@ -1,0 +1,27 @@
+DIGEST 2cf1b198760662d4f0fdee8bb9bda851
+Fxv6iris.LinkSysLink
+R1540:1549 xv6iris.LinkArgstr <> <> lib
+R1551:1561 xv6iris.LinkBeginOp <> <> lib
+R1563:1571 xv6iris.LinkNamei <> <> lib
+R1573:1587 xv6iris.LinkNameiparent <> <> lib
+R1589:1597 xv6iris.LinkIlock <> <> lib
+R1607:1617 xv6iris.LinkIunlock <> <> lib
+R1619:1629 xv6iris.LinkIupdate <> <> lib
+R1631:1641 xv6iris.LinkDirlink <> <> lib
+R1643:1650 xv6iris.LinkIput <> <> lib
+R1652:1665 xv6iris.LinkIunlockput <> <> lib
+R1667:1675 xv6iris.LinkEndOp <> <> lib
+R1685:1696 xv6iris.ProofSysLink <> <> lib
+R1718:1729 xv6iris.ProofSysLink SysLinkProof <> modtype
+R1731:1736 xv6iris.LinkArgstr Argstr <> modtype
+R1738:1744 xv6iris.LinkBeginOp BeginOp <> modtype
+R1746:1750 xv6iris.LinkNamei Namei <> modtype
+R1752:1762 xv6iris.LinkNameiparent Nameiparent <> modtype
+R1764:1768 xv6iris.LinkIlock Ilock <> modtype
+R1770:1776 xv6iris.LinkIunlock Iunlock <> modtype
+R1808:1814 xv6iris.LinkIupdate Iupdate <> modtype
+R1816:1822 xv6iris.LinkDirlink Dirlink <> modtype
+R1824:1827 xv6iris.LinkIput Iput <> modtype
+R1829:1838 xv6iris.LinkIunlockput Iunlockput <> modtype
+R1840:1844 xv6iris.LinkEndOp EndOp <> modtype
+mod 1707:1713 <> SysLink

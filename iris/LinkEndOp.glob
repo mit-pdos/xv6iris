@@ -1,0 +1,23 @@
+DIGEST ead99e8826978834524f51d655f52077
+Fxv6iris.LinkEndOp
+R724:734 xv6iris.LinkAcquire <> <> lib
+R736:746 xv6iris.LinkRelease <> <> lib
+R748:757 xv6iris.LinkWakeup <> <> lib
+R759:767 xv6iris.LinkBread <> <> lib
+R769:778 xv6iris.LinkBwrite <> <> lib
+R795:804 xv6iris.LinkBrelse <> <> lib
+R806:816 xv6iris.LinkMemmove <> <> lib
+R818:830 xv6iris.LinkWriteHead <> <> lib
+R832:847 xv6iris.LinkInstallTrans <> <> lib
+R849:858 xv6iris.ProofEndOp <> <> lib
+R878:887 xv6iris.ProofEndOp EndOpProof <> modtype
+R889:895 xv6iris.LinkAcquire Acquire <> modtype
+R897:903 xv6iris.LinkRelease Release <> modtype
+R905:910 xv6iris.LinkWakeup Wakeup <> modtype
+R912:916 xv6iris.LinkBread Bread <> modtype
+R918:923 xv6iris.LinkBwrite Bwrite <> modtype
+R925:930 xv6iris.LinkBrelse Brelse <> modtype
+R932:938 xv6iris.LinkMemmove Memmove <> modtype
+R967:975 xv6iris.LinkWriteHead WriteHead <> modtype
+R977:988 xv6iris.LinkInstallTrans InstallTrans <> modtype
+mod 869:873 <> EndOp

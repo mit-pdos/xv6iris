@@ -1,0 +1,9 @@
+DIGEST 6695a314a57e56bb20bef7ebdbe9feab
+Fxv6iris.LinkIunlockput
+R284:294 xv6iris.LinkIunlock <> <> lib
+R296:303 xv6iris.LinkIput <> <> lib
+R305:319 xv6iris.ProofIunlockput <> <> lib
+R344:358 xv6iris.ProofIunlockput IunlockputProof <> modtype
+R360:366 xv6iris.LinkIunlock Iunlock <> modtype
+R368:371 xv6iris.LinkIput Iput <> modtype
+mod 330:339 <> Iunlockput

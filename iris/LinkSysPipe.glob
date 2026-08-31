@@ -1,0 +1,17 @@
+DIGEST 62d6af695da08a114f96c06a0bff5770
+Fxv6iris.LinkSysPipe
+R340:349 xv6iris.LinkMyproc <> <> lib
+R351:361 xv6iris.LinkArgaddr <> <> lib
+R363:375 xv6iris.LinkPipealloc <> <> lib
+R377:387 xv6iris.LinkFdalloc <> <> lib
+R389:401 xv6iris.LinkFileclose <> <> lib
+R419:429 xv6iris.LinkCopyout <> <> lib
+R431:442 xv6iris.ProofSysPipe <> <> lib
+R464:475 xv6iris.ProofSysPipe SysPipeProof <> modtype
+R477:482 xv6iris.LinkMyproc Myproc <> modtype
+R484:490 xv6iris.LinkArgaddr Argaddr <> modtype
+R492:500 xv6iris.LinkPipealloc Pipealloc <> modtype
+R502:508 xv6iris.LinkFdalloc Fdalloc <> modtype
+R510:518 xv6iris.LinkFileclose Fileclose <> modtype
+R520:526 xv6iris.LinkCopyout Copyout <> modtype
+mod 453:459 <> SysPipe

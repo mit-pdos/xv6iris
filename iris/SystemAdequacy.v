@@ -303,8 +303,8 @@ Section SystemBoot.
     { rewrite /fs_crash_seam. iModIntro.
       rewrite Hcp. iSplitL; iIntros "H"; iExact "H". }
     iMod (boot_shared_alloc g XV6_DISK_BYTES sb nib cov Hbf Himg with "Hres")
-      as (Hfd Hir Hpav Hbs HF γd γv)
-      "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
+      as (Hfd Hir Hpav Hbs HF γd γv γi ξd)
+      "(%Hdimg & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
         Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hmir & Hpages & Hirauth &
         Hirslot & Hfs)".
@@ -343,12 +343,12 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+    iSplitL "Hh0 Hhrest Hprim Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+      iSplitL "Hh0 Hprim Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         (* AT [HF] EXPLICITLY, not by resolution.  [SpecMain.MAIN]'s
@@ -373,11 +373,11 @@ Section SystemBoot.
         iMod (own_context_boot (CID := 0%fin)) as (ξ0) "Hthr0".
         iModIntro.
         iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin) (XI := ξ0)
-                  (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
+                  (g.(gregs) 0%fin) iv DfracDiscarded γd γv γi ξd ps l0 b0 c0
                   (v_disk (g.(gdev).(dvirtio))) sb nib cov XV6_DISK_BYTES
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
                   Himg
-                  with "Htext Hdata Hh0 Hthr0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
+                  with "Htext Hdata Hh0 Hthr0 Hstarted Hprim Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
                         Hfs Hmir Hirslot Hirauth Hcert Hseam
                         Hdev Hwinv Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
                         Hpages"). }
@@ -391,7 +391,7 @@ Section SystemBoot.
       iMod (own_context_boot (CID := FS c)) as (ξc) "Hthrc".
       iModIntro.
       iApply (boot_hart_secondary (fileG0 := HF) (CID := FS c) (XI := ξc)
-                (g.(gregs) (FS c)) iv DfracDiscarded γd γv
+                (g.(gregs) (FS c)) iv DfracDiscarded γd γv γi ξd
                 (boot_regs_of_facts g Hbf (FS c)) (fin_FS_nz c)
                 with "Htext Hdata Hh Hthrc Hstarted"). }
     iSplitR; [iApply (wp_uart_loop γd with "Hcert Huinv Hpinv") |].

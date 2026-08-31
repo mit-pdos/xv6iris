@@ -1,0 +1,17 @@
+DIGEST aa379a6db15a1ce691e7c06606c953af
+Fxv6iris.LinkFileread
+R605:616 xv6iris.LinkPiperead <> <> lib
+R618:626 xv6iris.LinkIlock <> <> lib
+R628:636 xv6iris.LinkReadi <> <> lib
+R638:648 xv6iris.LinkIunlock <> <> lib
+R650:664 xv6iris.LinkConsoleread <> <> lib
+R682:690 xv6iris.LinkPanic <> <> lib
+R692:704 xv6iris.ProofFileread <> <> lib
+R727:739 xv6iris.ProofFileread FilereadProof <> modtype
+R741:748 xv6iris.LinkPiperead Piperead <> modtype
+R750:754 xv6iris.LinkIlock Ilock <> modtype
+R756:760 xv6iris.LinkReadi Readi <> modtype
+R762:768 xv6iris.LinkIunlock Iunlock <> modtype
+R770:780 xv6iris.LinkConsoleread Consoleread <> modtype
+R782:786 xv6iris.LinkPanic Panic <> modtype
+mod 715:722 <> Fileread
