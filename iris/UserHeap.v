@@ -1293,6 +1293,44 @@ Section UserHeap.
     iSplit; [ iPureIntro; exact Hal | ]. iFrame.
   Qed.
 
+  (* the twelve-word frame, directed -- printf's and vprintf's (96 bytes) *)
+  Lemma ustack_12_open (γd : gname) (sp : mword 64) :
+    ustack γd sp 12 -∗
+      ⌜ uint sp mod 8 = 0 ⌝ ∗
+      (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 16) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 24) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 32) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 40) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 48) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 56) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 64) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 72) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 80) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 88) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 96) w).
+  Proof. rewrite ustack_12. iIntros "H". iExact "H". Qed.
+
+  Lemma ustack_12_close (γd : gname) (sp : mword 64) :
+    uint sp mod 8 = 0 ->
+    (∃ w : mword 64, uword γd (uint sp - 8) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 16) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 24) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 32) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 40) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 48) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 56) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 64) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 72) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 80) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 88) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 96) w) -∗
+    ustack γd sp 12.
+  Proof.
+    intros Hal. iIntros "H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11".
+    rewrite ustack_12. iSplit; [ iPureIntro; exact Hal | ]. iFrame.
+  Qed.
+
   Lemma ustack_acc (γd : gname) (sp : mword 64) (n i : nat) :
     (i < n)%nat ->
     ustack γd sp n -∗
