@@ -17780,3 +17780,61 @@ mono_nat stamp is the concrete instrument for the re-base step.
 DEFERRED FOR OWNER REVIEW; until the ruling, [ProofForkretPark] is red
 at its ONE remaining bullet (the [proc_priv] row), with the blocker
 recorded in place.
+
+## A6.142: THE ANCHOR (`CtxAnchor.v`) -- the parked-context custody machinery for ξ-bodied invariants
+
+The owner's ruling on the A6.141 blocker, designed live at the bcache
+escrow: an `inv` that must own cells does NOT state them at an ambient ξ;
+it custodies them at a PARKED, hart-free context (`ctx_parked XI T` -- the
+"pin box"), making the body ONE fixed proposition (movable at fork/boot).
+E (the visibility horizon) IS the box's stamp; the token a guarding lock's
+payload carries IS a floor on the box.  `CtxAnchor.v` (new, after
+TsoCtxPark.v in `_CoqProject`, GREEN, zero admits, built off TsoCtx's
+public gates + one bespoke cmra `authR (gmap nat (agree nat))` --
+`anchorG`/`anchorΣ` for the eventual Σ extension at adequacy):
+
+- `anchor γ n XI T`: custody token in the inv body (generation n, stamp T,
+  the parked box).  `astamp γ n T`: persistent generation witness.
+  `aguard γ n ξ`: the guard = witness + `ctx_floor ξ (lo ≥ T)`;
+  PERSISTENT, `CtxMorph` (rides lock payloads), timeless.
+- `anchor_deposit` (wraps `ctx_deposit`: stamp raised past the depositor's
+  K⊔W, buffered stores included, nothing to prove at the site; exports
+  `astamp (S n) T'` + `llb loglen T'`), `anchor_withdraw` (the borrow:
+  guard cashed via `own_context_floor_view`, cells out via
+  `ctx_absorb_lb`; box stays parked), `anchor_open_close`,
+  `anchor_alloc`/`aguard_boot` (gen 0 free everywhere),
+  `aguard_intro`/`aguard_receipt` (mints from a floor / from a view
+  receipt via `ctx_bound_raise`), `astamp_agree`.
+
+What the mechanism deliberately does NOT contain, and stays per-protocol:
+(1) the FRESHNESS theorem -- that a withdrawer's reachable guard is
+current-generation -- proved from each client invariant's own ghost state
+machine (for bcache: the three receipt chains recorded in the session
+dialog); (2) the GUARD MINT AT A RELEASE whose deposit covered buffered
+stores: the depositor cannot floor the new stamp at its own context (the
+A6.113 asymmetry).  Routes available: gen-0 free; `aguard_receipt` at any
+later AMO (cash the exported `llb T'` via `hart_view_lb_get` at the
+acquire leaf -- the depositor's own next acquire, or any contender's);
+or the lock's own record floor (`lock_pay_won` gives every winner
+`ctx_floor cur_ctx T_rec` with T_rec = releaser's K⊔W ≥ T' under
+withdraw-first discipline -- needs a small WpLock export of the stamp
+ordering).  MEASURE at the real sites (ProofBrelse/SpecAcquire) before
+choosing.
+
+The agreed bcache design (owner dialog, this session): case-by-case,
+full-ownership motion, NO fractions.  (a) `f->off` -- expected to
+dissolve into ip->lock's payload after the main-side refactor (owner
+delegating); (b) bcache: refcnt==0 custody = bcache.lock payload
+(recycler becomes trivial, buf_mid dies), chain-held = thread/sleeplock
+domain, and the anchor custodies ONLY the transit windows ([0->1 bump ..
+first win], [releasesleep .. next win or 1->0 drop]) -- forced by two
+C-code facts: checkout holds only b->lock, and the brelse->waiter handoff
+happens at releasesleep before brelse reaches bcache.lock; `b->valid`
+stays anchor-resident (irreducibly cross-lock: recycler writes it under
+bcache.lock at refcnt==0, bread reads/writes under b->lock, exclusion is
+refcount-mediated).  A prophecy-variable alternative (angelically appoint
+the carrier; fully eliminates invariant-resident cells) was analyzed
+SOUND but costs operational-semantics surgery (observations in prim_step,
+proph_map in the interp, adequacy erasure) -- deferred pending the
+itable_inv comparison: if itable needs the anchor anyway, prophecy buys
+nothing.
