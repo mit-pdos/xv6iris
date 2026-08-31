@@ -244,6 +244,83 @@ Proof.
   - pose proof (IH (S i) H). lia.
 Qed.
 
+(* what a HIT means, and what a MISS means -- the two facts the lexer's
+   table lookups turn on, proved once over an arbitrary window rather than
+   at each of the three tables [peek] and [gettoken] search. *)
+Lemma ushp_find_some_val (n i j : nat) (f : nat -> bv 8) (c : bv 8) :
+  ushp_find n i f c = Some j -> f j = c.
+Proof.
+  revert i. induction n as [| n IH ]; intros i H; cbn in H; [ discriminate | ].
+  destruct (decide (f i = c)) as [ E | E ].
+  - rewrite (bool_decide_eq_true_2 _ E) in H. injection H as <-. exact E.
+  - rewrite (bool_decide_eq_false_2 _ E) in H. exact (IH (S i) H).
+Qed.
+
+Lemma ushp_find_some_of (n i j : nat) (f : nat -> bv 8) (c : bv 8) :
+  (i <= j < i + n)%nat -> f j = c ->
+  exists k : nat, ushp_find n i f c = Some k.
+Proof.
+  revert i. induction n as [| n IH ]; intros i Hj Hf; [ lia | ].
+  cbn. destruct (decide (f i = c)) as [ E | E ].
+  - rewrite (bool_decide_eq_true_2 _ E). exists i. reflexivity.
+  - rewrite (bool_decide_eq_false_2 _ E).
+    destruct (Nat.eq_dec i j) as [ Hij | Hne ];
+      [ exfalso; apply E; rewrite Hij; exact Hf | ].
+    exact (IH (S i) ltac:(lia) Hf).
+Qed.
+
+(* ---- THE WHITESPACE TABLE, as a [ustr]'s content function -------------- *)
+(* [ushp_ws_bytes] is the five bytes as a LIST, which is what [ushp_is_ws]
+   is stated over; this is the same five as the INDEX FUNCTION a [ustr] at
+   0x2008 carries.  Both spellings are needed and the four lemmas below are
+   the bridge: [strchr(whitespace, c)] is nonzero exactly when
+   [ushp_is_ws c], which is what makes [ushp_skipws] the measure of peek's
+   and gettoken's scans. *)
+Definition ushp_ws_f (i : nat) : bv 8 :=
+  match i with
+  | 0%nat => Z_to_bv 8 32 | 1%nat => Z_to_bv 8 9 | 2%nat => Z_to_bv 8 13
+  | 3%nat => Z_to_bv 8 10 | _ => Z_to_bv 8 11
+  end.
+
+(* the table IS a C string: five bytes, none of them NUL *)
+Lemma ushp_ws_f_nonul (j : nat) : (j < 5)%nat -> ushp_ws_f j <> ubyte0.
+Proof.
+  intro Hj. destruct j as [| [| [| [| [| j ]]]]];
+    vm_compute; discriminate.
+Qed.
+
+Lemma ushp_ws_mem (j : nat) : (j < 5)%nat -> ushp_ws_f j ∈ ushp_ws_bytes.
+Proof.
+  intro Hj. unfold ushp_ws_bytes.
+  destruct j as [| [| [| [| [| j ]]]]]; cbn [fmap list_fmap ushp_ws_f];
+    [ apply elem_of_list_here
+    | apply elem_of_list_further, elem_of_list_here
+    | apply elem_of_list_further, elem_of_list_further, elem_of_list_here
+    | apply elem_of_list_further, elem_of_list_further,
+            elem_of_list_further, elem_of_list_here
+    | apply elem_of_list_further, elem_of_list_further,
+            elem_of_list_further, elem_of_list_further, elem_of_list_here
+    | lia ].
+Qed.
+
+Lemma ushp_ws_mem_inv (c : bv 8) :
+  c ∈ ushp_ws_bytes -> exists j : nat, (j < 5)%nat /\ ushp_ws_f j = c.
+Proof.
+  unfold ushp_ws_bytes. cbn [fmap list_fmap]. intro H.
+  apply elem_of_cons in H; destruct H as [ -> | H ];
+    [ exists 0%nat; split; [ lia | reflexivity ] | ].
+  apply elem_of_cons in H; destruct H as [ -> | H ];
+    [ exists 1%nat; split; [ lia | reflexivity ] | ].
+  apply elem_of_cons in H; destruct H as [ -> | H ];
+    [ exists 2%nat; split; [ lia | reflexivity ] | ].
+  apply elem_of_cons in H; destruct H as [ -> | H ];
+    [ exists 3%nat; split; [ lia | reflexivity ] | ].
+  apply elem_of_cons in H; destruct H as [ -> | H ];
+    [ exists 4%nat; split; [ lia | reflexivity ] | ].
+  apply elem_of_nil in H. destruct H.
+Qed.
+
+
 (* ... and what the code returns for it: the address of that byte, or NULL.
    Note that xv6's strchr returns 0 -- NOT a pointer to the terminator --
    when [c] is the NUL byte, and [ushp_find] agrees, because a [ustr]'s
@@ -262,12 +339,42 @@ Lemma ushp_chr_miss (s : Z) (n i : nat) (f : nat -> bv 8) (c : bv 8) :
   ushp_find n i f c = None -> ushp_chr s n i f c = 0.
 Proof. intro H. unfold ushp_chr. rewrite H. reflexivity. Qed.
 
+(* ...and what [strchr] over it RETURNS: 0 exactly on a non-whitespace byte,
+   an address inside the table on a whitespace one *)
+Lemma ushp_ws_chr_z (c : bv 8) :
+  ushp_is_ws c = false ->
+  ushp_chr ushp_whitespace 5 0%nat ushp_ws_f c = 0.
+Proof.
+  intro H. apply ushp_chr_miss.
+  destruct (ushp_find 5 0%nat ushp_ws_f c) as [ j | ] eqn:E;
+    [ exfalso | reflexivity ].
+  pose proof (ushp_find_ge 5 0%nat ushp_ws_f c j E) as Hj.
+  pose proof (ushp_find_some_val 5 0%nat j ushp_ws_f c E) as Hv.
+  unfold ushp_is_ws in H. rewrite bool_decide_eq_false in H. apply H.
+  rewrite <- Hv. exact (ushp_ws_mem j ltac:(lia)).
+Qed.
+
+Lemma ushp_ws_chr_nz (c : bv 8) :
+  ushp_is_ws c = true ->
+  exists j : nat, (j < 5)%nat /\
+    ushp_chr ushp_whitespace 5 0%nat ushp_ws_f c = ushp_whitespace + Z.of_nat j.
+Proof.
+  intro H. unfold ushp_is_ws in H. rewrite bool_decide_eq_true in H.
+  destruct (ushp_ws_mem_inv c H) as [ j [ Hj Hv ] ].
+  destruct (ushp_find_some_of 5 0%nat j ushp_ws_f c ltac:(lia) Hv)
+    as [ k Hk ].
+  pose proof (ushp_find_ge 5 0%nat ushp_ws_f c k Hk) as Hkr.
+  exists k. split; [ lia | ].
+  exact (ushp_chr_hit ushp_whitespace 5 0%nat ushp_ws_f c k Hk).
+Qed.
+
 Section UkShParse.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context (γt γd γs : gname).
 
+  Local Notation x0_idx := (mword_of_int 0 : mword 5).
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
   Local Notation s1_idx := (mword_of_int 9 : mword 5).
@@ -377,6 +484,40 @@ Section UkShParse.
     - rewrite (bool_decide_eq_false_2 _ Hb0).
       apply Z.eqb_neq. intro He. apply Hb0. apply bv_eq. rewrite He.
       vm_compute. reflexivity.
+  Qed.
+
+  (* x0's VALUE is not readable off [m] -- the register file says nothing
+     about it -- but the bundle inside [urun] does.  [peek] ends on
+     [snez a0,a0], which the decoder gives as [sltu a0,x0,a0], so without
+     this the return value could not be named.  Stage 2 has the same lemma
+     as a [Local Lemma] inside [Section UkSh] for the STORE of x0; that is
+     the same relocation ask, one instruction class over. *)
+  Local Lemma urun_x0 (h : CpuId) (m : regfile) (pc : mword 64) (avail : nat) :
+    urun γt γd γs h m pc avail -∗
+    ⌜ m !!! Regidx x0_idx = zero_reg ⌝ ∗ urun γt γd γs h m pc avail.
+  Proof.
+    iIntros "Hrun".
+    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv)
+      "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    iSplitR; [ iPureIntro; exact Hx0 | ].
+    iExists C, pt, Rfd, Rut, sz, M, pm, fdv. iFrame "Hheap Hstk Hb".
+    iPureIntro. split; [ exact Hlo | exact Hpm ].
+  Qed.
+
+  (* ...and what that instruction WRITES: 1 exactly when its operand is
+     nonzero, which is how peek turns a strchr result into a C boolean. *)
+  Local Lemma ushp_snez_val (v : Z) :
+    0 <= v < Z64 ->
+    (zero_extend' 64 (bool_to_bit (zopz0zI_u (zero_reg : mword 64)
+                                     (mword_of_int v))) : mword 64)
+    = mword_of_int (if Z.ltb 0 v then 1 else 0).
+  Proof.
+    intro Hv.
+    assert (Ez : (zero_reg : mword 64) = mword_of_int 0)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite Ez (moi_lt_u 0 v ltac:(unfold Z64; lia) Hv).
+    destruct (Z.ltb 0 v); apply bv_eq; vm_compute; reflexivity.
   Qed.
 
   (* ===================================================================== *)
