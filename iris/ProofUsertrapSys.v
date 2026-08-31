@@ -113,7 +113,7 @@ Section UtSysBlock.
 
   Lemma ut_90 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
-      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) :
+      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) (sts : list fdstate) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -138,12 +138,12 @@ Section UtSysBlock.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x90)) -∗
     sie_cap_gpr KT1 m nx false (un_pj N) -∗
-    ut_hold (SY.syscall_env) N U false lks -∗
+    ut_hold (SY.syscall_env) N U false lks sts -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res SY.syscall_env) pt ksp m0
-                     mie_v menvcfg0 U0 epv scv) -∗
+                     mie_v menvcfg0 U0 sts epv scv) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hma0 Hcs Hmiev Hmenvv Hpro Hscec.
@@ -273,7 +273,7 @@ Section UtSysBlock.
       iApply (T.ut_kexit SY.syscall_env N U
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xca) : mword 64) 4)]> K1)
-                nx false lks Hwf' ltac:(lia)
+                nx false lks sts Hwf' ltac:(lia)
                 with "Htext Hpc Hcg Hkcl4 [-]").
       all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
@@ -480,7 +480,11 @@ Section UtSysBlock.
  (un_fn N) (un_ip N) (un_dqi N)
                 S4 n2 (un_pid N) (MkUstate V1 ((us_M U))) lks
                 Hj Hjl ltac:(rewrite Hn2; lia) eq_refl
-                with "Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv Hufr [-]").
+                with "Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv [Hufr] [-]").
+    (* the syscall channel takes the bundle ∃-weakened: it spends
+       descriptors and states no delta, so the residue's NAMED states are
+       weakened here -- the one line where the two conventions meet. *)
+    2: { rewrite /FdSlots.fd_frags_any. iExists sts. iExact "Hufr". }
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now
          takes no premise at all -- [cpu_own] carries no caller frame to
@@ -548,7 +552,16 @@ Section UtSysBlock.
       (* the bundle comes back keyed on the ENTRY record; [Hfgg] is the
          dispatcher's own statement that no syscall moves [pv_fdg]. *)
       iEval (rewrite -Hfgg) in "Hufr".
-      iPoseProof (ut_own_rebuild SY.syscall_env N (MkUstate V2 M2)
+      (* THE SYSCALL HANDED THE BUNDLE BACK ∃-WEAKENED, and the residue is
+         indexed by the states, so the dispatcher NAMES where they landed.
+         This is the one direction the syscall channel cannot supply: a
+         landed spec says which descriptors it spent, not which list the
+         table now reads -- so the name is introduced here, and it is what
+         [ut_own] is rebuilt at.  When the four fd-touching rows (pipe, dup,
+         open, close) state a delta, it is [sts2] they will relate to the
+         entry [sts]. *)
+      iDestruct "Hufr" as (sts2) "Hufr".
+      iPoseProof (ut_own_rebuild SY.syscall_env N (MkUstate V2 M2) sts2
                     with "Hbs Hip Hfd Hir Hpv Hufr Hsy") as "Hown".
       assert (Hmgsp : mg !!! Regidx csp_rs1 = pa_stk ksp 4)
         by (rewrite (callee_saved_lookup Hcsg csp_rs1
@@ -673,7 +686,7 @@ Section UtSysBlock.
                        Hnex Hnsb eq_refl (f_equal uint Hszq) Hmemg). }
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N U0 (MkUstate V2 M2) pt ksp m0 mg av
                 n2 true
-                mie_v menvcfg0 epv scv lks
+                mie_v menvcfg0 epv scv lks sts2
                 Hwf' Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg

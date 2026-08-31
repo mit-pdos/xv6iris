@@ -128,14 +128,14 @@ Qed.
 
 Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (* the kernel-side residue, abstract exactly as [SpecUservec] takes it *)
-    (URes : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (C : ucfg) (pt : uptd)
     (kroot : mword 44) (j : nat) (ksp : mword 64)
     (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)
     (* THE DESCRIPTOR VIEW the deposited slot is keyed at.  ∀-bound at the
        entry: whoever holds the slot holds it at some [uvis_of U sts], and
        the entry runs it at the same one. *)
-    (fdv : list fdstate) :=
+    (fdv : list fdstate) (sts : list fdstate) :=
   (* ---- the loop's own shape, re-established every round ---- *)
   loop_ok C pt ->
   (j < NPROC)%nat ->
@@ -197,7 +197,7 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
       (uint (pv_sz (us_V U))) fdv
       (tf_resume_gpr0 (pv_tf (us_V U))) (ret_pc sepc0) -∗
   (* ---- the kernel-side bundle, at THIS hart ---- *)
-  URes CID pt ksp U -∗
+  URes CID pt ksp U sts -∗
   WP (Loop : expr riscv_lang).
 
 Module Type USERRET_CLOSED.
@@ -214,7 +214,11 @@ Module Type USERRET_CLOSED.
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
       (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)
-      (fdv : list fdstate),
+      (* ONE LIST: [sts] indexes the residue and [fdv] keys the slot, and at
+         the entry they are the same descriptor states -- see
+         [ParkCap.park_pkg]'s shared existential, which is where the entry's
+         two halves come from. *)
+      (sts : list fdstate),
       wp_userret_closed_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U fdv.
+        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U sts sts.
 End USERRET_CLOSED.

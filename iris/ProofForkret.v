@@ -694,7 +694,7 @@ Proof.
      first round consumes. *)
   iDestruct ("Hyield" $! CIDf pt (MkUstate (upd_upt V' pt) (us_M U))
                with "[%] [%] [%] [%] Htfk' Hdone HW Htc Hyld")
-    as "[Hures Hslot]"; [reflexivity | exact Hnorm | exact Hptwf | | ].
+    as (sts) "[Hures Hslot]"; [reflexivity | exact Hnorm | exact Hptwf | | ].
   (* the resumed record names the parked process's fd-state ghost: forkret
      moved only [pv_upt], and [upd_upt] does not touch [pv_fdg]. *)
   { exact Hfg. }
@@ -713,8 +713,7 @@ Proof.
      air: the parker captured the process's [FdSlots.fd_frags] bundle and
      the closer keyed the slot at ITS states ([ParkCap.park_pkg]), so this
      [sts] is a reading of [p->ofile[]] and not a choice forkret makes.
-     Named BEFORE [Hpcslot], which is stated at the key it indexes. *)
-  iDestruct "Hslot" as (sts) "Hslot".
+     Named at the [iDestruct] of the closer's shared existential above. *)
   assert (Hpcslot : tf_resume_pc
                       (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts))
                     = ret_pc (mepc_val epc)).

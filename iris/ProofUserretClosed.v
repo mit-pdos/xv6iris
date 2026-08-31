@@ -136,17 +136,20 @@ Section UserretClosed.
      [ud_data = ud_pas] makes [ProcPtOwn.ud_norm] the identity on [pt], so
      the loop re-keys the index onto [pt] itself when it reads the residue
      back ([UV.usertrap_res_bare_norm]). *)
+  (* [sts] is ∃-packed here beside [ksp] and [U]: [Rut] is [uptd -> iProp],
+     so the loop carries the residue without naming its index.  Stage B --
+     the fd resource in [uvb] -- is what gives the key a name for it. *)
   Definition Rut_at (h : CpuId) (sz : Z) : uptd -> iProp Σ :=
-    fun p => (∃ (ksp : mword 64) (U : ustate),
+    fun p => (∃ (ksp : mword 64) (U : ustate) (sts : list fdstate),
                 ⌜uint (pv_sz (us_V U)) = sz⌝ ∗
-                UV.usertrap_res_bare (CID := h) p ksp U)%I.
+                UV.usertrap_res_bare (CID := h) p ksp U sts)%I.
 
   Lemma Rut_at_intro (h : CpuId) (sz : Z) (p : uptd) (ksp : mword 64)
-      (U : ustate) :
+      (U : ustate) (sts : list fdstate) :
     uint (pv_sz (us_V U)) = sz ->
-    UV.usertrap_res_bare (CID := h) p ksp U -∗ Rut_at h sz p.
+    UV.usertrap_res_bare (CID := h) p ksp U sts -∗ Rut_at h sz p.
   Proof.
-    intros Hsz. iIntros "H". rewrite /Rut_at. iExists ksp, U.
+    intros Hsz. iIntros "H". rewrite /Rut_at. iExists ksp, U, sts.
     iSplitR; [ iPureIntro; exact Hsz | iExact "H" ].
   Qed.
 
@@ -197,7 +200,9 @@ Section UserretClosed.
     iDestruct "Hframe" as (ms_v)
       "(%Hlen & %Hmsok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc &
         Hpc & Hgpr & Hupt & Hcfg & Hrut)".
-    iDestruct "Hrut" as (ksp U0) "[%Hsz Hures]".
+    (* [Rut_at] packs three: the stack, the record, and the descriptor
+       states the residue is indexed by. *)
+    iDestruct "Hrut" as (ksp U0 sts0) "[%Hsz Hures]".
     (* put [Hszw] in terms of the residue's size FIRST: otherwise [subst sz]
        has two equations to choose from and takes the wrong one. *)
     rewrite <- Hsz in Hszw.
@@ -219,13 +224,13 @@ Section UserretClosed.
     (* ---- one round.  [Hret] -- the linear [uexec_ret] user execution
            handed back -- is FRAMED across the crossing (R-a / K8). ---- *)
     iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) j ksp
-              (us_upt U0 pt) (uvis_M W) (tf_resume_gpr0 (uvis_tf W))
+              (us_upt U0 pt) sts0 (uvis_M W) (tf_resume_gpr0 (uvis_tf W))
               ms_v sc stv (tf_w (uvis_tf W) tf_epc_idx)
               Hstv Hdqc Hmie Hj Hnorm Hptwf
               with "Hkt Hhw Hmin Hclaim Hframe Hures [-]").
     iApply wp_next_intro. iIntros (CID').
     rewrite /uservec_post.
-    iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2)
+    iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2)
       "%Huptpt' %Hround' %Hpcret' %Hgprtie'
        %Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
@@ -262,7 +267,9 @@ Section UserretClosed.
       iSplitR; [iExists mcen', scen'; iFrame "Hmcen' Hscen'"
                | iExists hpm'; iFrame "Hhpm'"]. }
     (* the residue, parked at the size the next round will resume under *)
-    iDestruct (Rut_at_intro CID' (uint (pv_sz (us_V U2))) pt' ksp U2 eq_refl
+    (* the residue comes back at whatever states the round left ([sts2'],
+       named where [uservec_post] handed it over); [Rut_at] packs them. *)
+    iDestruct (Rut_at_intro CID' (uint (pv_sz (us_V U2))) pt' ksp U2 _ eq_refl
                  with "Hures'") as "Hrut'".
     (* ---- STEPS A/B: the returned [uexec_ret], re-keyed onto the record
            the round left ([UexecApply]).  The round is stated at the RUN
@@ -370,7 +377,7 @@ End Res.
       (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)
       (fdv : list fdstate) :
       wp_userret_closed_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U fdv.
+        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U fdv fdv.
   Proof.
     cbv beta delta [wp_userret_closed_body].
     intros Hok Hj Hretms Hwf Ha0 Hsatpr Hinj Hacc.
@@ -450,7 +457,8 @@ End Res.
       (* the kernel words are untouched: userret only READ the page *)
       iDestruct ("Hclose" with "[%] Htfp'") as "Hres'";
         [ refine (tf_kernel_words_ok_tail _ _ _ _ _ _ _ _ _ Hokws) | ].
-      rewrite /LP.Rut_at. iExists ksp, _.
+      (* [Rut_at] packs three now: the stack, the record, and the states *)
+      rewrite /LP.Rut_at. iExists ksp, _, _.
       iSplitR; [| iExact "Hres'"].
       iPureIntro. reflexivity.
     - (* the trap seam, at the kernel obligation's own shape: the loop is

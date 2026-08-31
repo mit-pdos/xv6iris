@@ -273,9 +273,10 @@ Proof.
              TimerCap.timer_cap (CID := h) -∗
              forkret_yield (CID := h) γf (proc_addr j)
                (add_vec ks (mword_of_int 4096)) pid av (us_V U') -∗
-             (FR.usertrap_res_bare (CID := h) pt'
-                (add_vec ks (mword_of_int 4096)) U'
-              ∗ ∃ sts : list fdstate, uslot (uvis_of U' sts)))%I
+             (∃ sts : list fdstate,
+                FR.usertrap_res_bare (CID := h) pt'
+                  (add_vec ks (mword_of_int 4096)) U' sts
+                ∗ uslot (uvis_of U' sts)))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
   { iIntros (h pt' U') "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc Hy".
     iApply ("Hclose" with "[%] [%] [%] [%] Htfk Hdone HW Htc Hy Hfd Hirsp");

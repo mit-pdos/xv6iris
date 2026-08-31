@@ -199,7 +199,7 @@ Qed.
    [wp_uservec_pt], via [Include USERTRAP_RES]) to supply, not for this
    definition to re-demand. *)
 Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (URes : uptd -> mword 64 -> ustate -> iProp Σ)
+    (URes : uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (C : ucfg) (pt : uptd) (vksp : mword 64)
     (* THE ROUND'S ENTRY STATE (milestone J1a) -- see [SpecUsertrap.usertrap_post].
        Here the entry trapframe is named at the MACHINE that trapped: [g] is
@@ -214,7 +214,10 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
        below is the FULL [UexecRound.uround_ok], image half included. *)
     (M : gmap Z (bv 8)) (g : regfile) (sepc_v sc_v : mword 64) : iProp Σ :=
   ( ∀ (pt' : uptd) (mf : regfile) (ms' usatp uepc sc' stval' mdv0 : mword 64)
-      (U' : ustate),
+      (U' : ustate)
+      (* the round may have moved the descriptor states; the post names
+         where they landed, beside where the record landed *)
+      (sts' : list fdstate),
     (* ---- THE ROUND, IMAGE HALF INCLUDED (milestone J, S3).  It used to be
        [uround_vis_ok] (deleted at S6) -- the relation with the image weakened
        away -- because the boundary's residue is the BARE one, whose body
@@ -297,7 +300,7 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
        same as at entry -- see the header and
        claude-notes/completed/usertrap.md.  Folding this bundle into the
        user-mode loop is USER-module work, not this spec's. *)
-    URes pt' vksp U' -∗
+    URes pt' vksp U' sts' -∗
     (* THE TWO AMBIENT-HART PERSISTENT BUNDLES, AT THE RESUMING HART.  Both
        are per-hart -- [hw_config]'s cells and the body of [minstret_inv]'s
        invariant are this hart's -- so a caller's pre-crossing copy is a
@@ -319,9 +322,9 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
        (SpecUsertrap.v's own [wp_next true pj] crossing), so everything
        after that call -- the residue included -- is a resource AT WHATEVER
        HART RESUMED.  Same shape, same reason, as [wp_usertrap_body]'s [R]. *)
-    (URes : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-    (j : nat) (vksp : mword 64) (U : ustate)
+    (j : nat) (vksp : mword 64) (U : ustate) (sts : list fdstate)
     (* THE DELIVERED FRAME, AT NAMED VALUES AND A NAMED IMAGE.
        [user_trap_frame] is definitionally the ∃ over [user_trap_frame_at],
        so the five data are the same premise with names -- which is what
@@ -402,7 +405,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
      unrelated to [Rut] (which stays fully abstract: uservec's own proof
      never opens it, exactly like [mie]/[mideleg]/[menvcfg] ride through
      [user_cfg] untouched). *)
-  URes CID pt vksp U -∗
+  URes CID pt vksp U sts -∗
   (* THE CONTINUATION, ACROSS THE CROSSING.  userret's own exit shape plus
      the leftover bare residue -- but at whatever hart usertrap resumed on,
      not the one uservec entered at.  Everything in [uservec_post] is
@@ -429,7 +432,8 @@ Module Type USERVEC.
   Parameter wp_uservec_pt :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (j : nat) (vksp : mword 64) (U : ustate) (M : gmap Z (bv 8))
+      (j : nat) (vksp : mword 64) (U : ustate) (sts : list fdstate)
+      (M : gmap Z (bv 8))
       (g : regfile) (ms_v sc_v stval_v sepc_v : mword 64),
       (* THE BARE RESIDUE, not [usertrap_res] and not even the parked form.
          [usertrap_res] and this spec's own [user_trap_frame] premise claim
@@ -445,5 +449,5 @@ Module Type USERVEC.
          the same two moves in reverse.  See
          claude-notes/projects/uservec.md. *)
       wp_uservec_pt_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt Rut j vksp U M g ms_v sc_v stval_v sepc_v.
+        C pt Rut j vksp U sts M g ms_v sc_v stval_v sepc_v.
 End USERVEC.

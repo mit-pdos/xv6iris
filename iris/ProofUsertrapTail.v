@@ -117,7 +117,7 @@ Section ProofUsertrapTail.
      kexit does not want, and dropping it is right -- the syscalls' footprint
      belongs to a process that is going to run one. *)
   Lemma ut_kexit (N : ut_names) (U : ustate) (m : regfile) (nx : nat)
-      (b : bool) (lks : gset string) :
+      (b : bool) (lks : gset string) (sts : list fdstate) :
     ut_wf N ->
     (K_kexit <= nx)%nat ->
     (* kexit's own cone bottoms out at "ftable" (1) -- the fileclose loop --
@@ -134,7 +134,7 @@ Section ProofUsertrapTail.
        [ut_caps]' [is_kstack] and usertrap's own frame; see
        [ProcDefs.kstack_closer_top]. *)
     kstack_closer (un_pj N) (m !!! Regidx csp_rs1) (trap_res b + nx)%nat -∗
-    ut_hold Rsys N U b lks -∗
+    ut_hold Rsys N U b lks sts -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hnx Hbelow. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -152,7 +152,11 @@ Section ProofUsertrapTail.
 
               None (un_fn N) m nx b b _ (un_pid N) (upd_usM U _) eq_refl Hj Hjl Hnx Hlg Hbelow
               with "Hcg Hcl Hcpu Hcsrs Hclm Htext Hkd Hpc Hpi Hpe Hw Hft Hkm Hav
-                    Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hfsr Hip Hfd Hir Hpv Hufr").
+                    Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hfsr Hip Hfd Hir Hpv [Hufr]").
+    (* kexit's contract takes the bundle ∃-weakened -- it spends descriptors
+       and does not state a delta -- so the residue's NAMED states are
+       weakened here, at the one call that needs it. *)
+    { rewrite /FdSlots.fd_frags_any. iExists sts. iExact "Hufr". }
     all: try lkbelow.
   Qed.
 
@@ -180,7 +184,7 @@ Section UtRet2.
   Lemma ut_ret2 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 mf : regfile) (av nx : nat) (b : bool)
       (uepc : mword 64) (vb : mword 1)
-      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) :
+      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) (sts : list fdstate) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -219,12 +223,12 @@ Section UtRet2.
     (* the four kernel words prepare_return just wrote, as the residue
        states them -- see [UsertrapRes.ut_tfk] *)
     ut_tfk ksp (us_V U) -∗
-    ut_env Rsys N U -∗
+    ut_env Rsys N U sts -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 epw scw) -∗
+                     mie_v menvcfg0 U0 sts epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcs Hmiev Hmenvv Hrd Hepcw.
@@ -656,7 +660,7 @@ Section UtRet.
   (* ==================================================================== *)
   Lemma ut_ret (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (b : bool)
-      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) :
+      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) (sts : list fdstate) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -673,12 +677,12 @@ Section UtRet.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xae)) -∗
     sie_cap_gpr KT1 m nx b (un_pj N) -∗
-    ut_hold Rsys N U b lks -∗
+    ut_hold Rsys N U b lks sts -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 epw scw) -∗
+                     mie_v menvcfg0 U0 sts epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
@@ -772,7 +776,7 @@ Section UtRet.
                     (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))).
       apply list_lookup_total_correct. exact Hepc. }
     iApply (ut_ret2 (CID := CIDp) Rsys N U0 (MkUstate Vr _) pt ksp m0 mf av nx b uepc vb
-              mie_v menvcfg0 epw scw lks
+              mie_v menvcfg0 epw scw lks sts
               Hwf' Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp
               ltac:(rewrite (callee_saved_lookup Hcspr csp_rs1
                               ltac:(vm_compute; reflexivity)); exact HM1sp)
@@ -802,7 +806,7 @@ Section UtA6.
      s2,0] is stepped and its value never read again. *)
   Lemma ut_a6 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (b : bool)
-      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) :
+      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) (sts : list fdstate) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -824,12 +828,12 @@ Section UtA6.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xa6)) -∗
     sie_cap_gpr KT1 m nx b (un_pj N) -∗
-    ut_hold Rsys N U b lks -∗
+    ut_hold Rsys N U b lks sts -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 epw scw) -∗
+                     mie_v menvcfg0 U0 sts epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hbelow.
@@ -1012,7 +1016,7 @@ Section UtA6.
       iApply (ut_kexit (CID := CID7) Rsys N U
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K2)
-                nx b lks Hwf' ltac:(lia) ltac:(lkbelow)
+                nx b lks sts Hwf' ltac:(lia) ltac:(lkbelow)
                 with "Htext Hpc Hcg Hkcl4 [-]").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
@@ -1038,7 +1042,7 @@ Section UtA6.
       iDestruct (wp_next_retarget CID3 CID4 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID4) Rsys N U0 U pt ksp m0 mf av nx b
-                mie_v menvcfg0 epw scw lks
+                mie_v menvcfg0 epw scw lks sts
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
@@ -1065,7 +1069,7 @@ Section UtFa.
      has to be re-anchored on the far side. *)
   Lemma ut_fa (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (b : bool)
-      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) :
+      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) (sts : list fdstate) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -1082,12 +1086,12 @@ Section UtFa.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xfc)) -∗
     sie_cap_gpr KT1 m nx b (un_pj N) -∗
-    ut_hold Rsys N U b lks -∗
+    ut_hold Rsys N U b lks sts -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 epw scw) -∗
+                     mie_v menvcfg0 U0 sts epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
@@ -1148,7 +1152,7 @@ Section UtFa.
       iDestruct (wp_next_retarget CID CID2 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID2) Rsys N U0 U pt ksp m0 M1 av nx b
-                mie_v menvcfg0 epw scw lks
+                mie_v menvcfg0 epw scw lks sts
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
@@ -1236,7 +1240,7 @@ Section UtFa.
       iDestruct (wp_next_retarget CID4 CID5 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID5) Rsys N U0 U pt ksp m0 mf av nx b
-                mie_v menvcfg0 epw scw lks
+                mie_v menvcfg0 epw scw lks sts
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
