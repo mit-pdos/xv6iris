@@ -1916,11 +1916,15 @@ things, and the answer differs:
 
   * **CATALOG DELTA.**  `tools/ucode_shk.txt` gains `panic`, `fprintf`,
     `vprintf` and `putc` (the three `skipfunc`s go); 326 → **615**
-    instructions, 22 functions, 410 decode lemmas, one `omit`.  Measured
-    on the mirror: `UCodeShK.v` **8 996 lines**, and the whole chain
-    rebuilt in 22.9 s (`UkShRun.v`) + 49.7 s (`UkShDiag.v`) — the
-    unshelve hoist is in the generator, so the 1.9 s/instruction law no
-    longer applies to a regeneration.  `shk_syms_pins` grew 18 → 22
+    instructions, 22 functions, 410 decode lemmas, one `omit`.  **THE
+    CATALOG COST LAW IS DEAD, MEASURED.**  `UCodeShK.v` is 8 996 lines and
+    compiles in **37.3 s** at 615 instructions — 0.06 s each, against
+    stage 1's pre-hoist 1.9 s.  The unshelve hoist is in the generator, so
+    stage 4's "18 min 58 s at 564 instructions confirms the law" is a
+    PRE-HOIST reading and the split of `UCodeShP.v` off `UCodeShK.v` is
+    now purely a readability choice, exactly as the stage-1 record said
+    once the hoist landed.  The rest of the chain: `UkShRun.v` 22.9 s,
+    `UkShDiag.v` 49.7 s.  `shk_syms_pins` grew 18 → 22
     conjuncts; because the four new rows are APPENDED, every existing
     positional destruct in `UkSh.v` and `UkShRun.v` still ends in `&H&_`
     and **no fix-forward was needed** (the stage-5 breakage was the LAST
