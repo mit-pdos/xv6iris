@@ -259,8 +259,93 @@ make run, never from memory.
 
 ## 7. Requests to the kernel lane
 
-*(append here)*
+None so far — every edit stayed inside the §5 fences.  Two INTERFACE
+records for the later (out-of-lane) conversions, no action needed now:
+
+- **The trampoline tranche (A6.61)**: the `tramp_tr_obl` instances at the
+  user table now live in **`UptWalkTramp.v`** (new file, appended to
+  `_CoqProject`, DELIBERATELY RED — it is the §0.37′ red root's successor).
+  When the A6.61 token-parameter tranche runs, it edits that file plus
+  TrampStepPt/Pt2WalkPt/TransPt/UservecExitPt/UserretEntryPt; the
+  trampoline-proof files additionally need `Require Import UptWalkTramp`
+  (UserretPt:195 now fails on `wp_instr_u_pt` not found, and Pt2WalkPt:427
+  on the un-threaded token — both were red before, the messages moved).
+  `UptWalkPt.utf_translate` (the trapframe leaf) is fixed IN PLACE: it now
+  takes `own_context XI` between `resv_frag` and `upt_res_pt` and hands it
+  back in the post, exactly like `swp_translate_upt`.
+- **ProofUser (per-binary side)**: the generic theorems in
+  `UserActiveClass.v` (`active_class_intro`,
+  `user_step_obligation_active_holds`, `wp_user_exec_full`) gained ONE
+  section premise, the residue token accessor
+  `Rut_ctx : forall pt', ⊢ Rut pt' -∗ own_context cur_ctx ∗
+                            (own_context cur_ctx -∗ Rut pt')`.
+  For the concrete `Rut := fun pt => ∃ ksp, usertrap_res pt ksp` the
+  accessor is the `own_context cur_ctx` conjunct of
+  `UsertrapRes.ut_trap_parked` ("the token rides the parked twin") — a
+  two-line borrow.  ProofUser:75 fails on the new premise; it is the
+  §0-OUT per-binary lane's to supply.
 
 ## 8. U-lane log
 
-*(append here: what you measured, what landed, current build state)*
+**2026-08-31 (session 1): the §0.37′ cone is GREEN — 1279/1305, snapshot
+`tso-flip-umode` @ `9bfb42d9ed4` (parent r60 `86e7eca4c7b`), zero admits,
+sentinel-backed (full `make -k` on the VM, `ZZ-iris3.log.aux`).**
+
+Baseline reproduced first: fresh tree from the r60 snapshot rebuilt to
+exactly 1265/1304 with the four certified red roots.  Two tooling facts
+worth keeping:
+- A tree materialized by `git archive | tar` gets ONE mtime for every
+  file, so a stale snapshot `iris/.CoqMakefile.d` (r60's predates
+  CtxValues.v) is treated as current and `make -j` compiles new files in
+  garbage order ("Cannot find a physical path bound to logical path …" at
+  files that compiled before their Requires).  Delete
+  `.CoqMakefile.d`/`CoqMakefile*` after materializing and let make regen.
+- Keep a locally-generated `CoqMakefile` in the tree: `run-on-gcp`'s
+  `--delete` sync removes the VM's regenerated copy on every push if the
+  local side lacks it (same class as the handoff's `*.aux` gotcha).
+
+**UserMemPt:427 dissolved by deletion, not conversion.**  Measured: the
+SC-era interp-level composers (`udata_own_upd`, `udata_read_word_g`,
+`udata_own_store_g`, `user_pt_load/store_data_g`, UserMemAccess §2/§6/§7/§8
+wrappers, UserMemMis's MisWindow/MisUser sections, ALL of UserFetchPt's
+Iris sections) have ZERO live consumers on the flip tree — every
+cross-file reference is a comment.  The port had already replaced that
+route: the safety tier consumes PURE exec+goodmb pairs (UserFetchCert /
+UserMemCert / UserFaultCert) through `HartMemRun.swp_hmrun_of_exec`, whose
+RAM arms pay the ledger (`bytes_own` = ctx-tier map; `bytes_own_wobl` =
+the one-message store gate that replaced the per-byte fold — its header
+says so explicitly).  So the fix was to DELETE the dead composers; the
+pure lemmas (heavily consumed: exec_/goodmb_ pairs, the GenRead/GenWrite
+sections, wchain) all stayed.  UserFetchPt shrank to
+`u_fetch_fault_flavor` + imports.  If an interp-level udata store is ever
+wanted again, `udata_own data = ∃ dm, ⌜dom dm = data⌝ ∗ bytes_own dm`
+makes `bytes_own_wobl` serve it directly.
+
+**UptWalkPt:679 split.**  §§0–4 (upt_tmem, upt_res_pt, upt_swp_open/close,
+`swp_translate_upt`) were already green text; §6's `utf_translate` needed
+only the token threading (done in place).  §5 (the □-shaped
+`tramp_tr_obl` instances — the A6.61 blocker recorded verbatim inside
+TrampStepPt.v at the failure point) moved to `UptWalkTramp.v` (red, §7).
+The engine cone (`WpUmodeStep`/`WpUmodeStore` etc. — delisted from
+`_CoqProject` on the flip tree, so not built) consumes only
+upt_swp_open/close, which stay green in UptWalkPt.
+
+**UserActiveClass:1126 — the ONE design point, resolved inside the lane.**
+The fetch/execute hmrun bridges (`swp_fetch_of_pure`,
+`swp_execute_of_pure`) needed `own_context cur_ctx` for
+`swp_hmrun_of_exec`.  `active_class` is a □-obligation (cannot capture
+the linear token), but the class holds `Rut pt` at every bridge site, and
+the token's ruled home across a user excursion IS the kernel residue
+(`ut_trap_parked`'s `own_context cur_ctx` conjunct, M2 ruling quoted in
+UsertrapRes.v).  So the section takes the `Rut_ctx` borrow accessor (§7)
+and `u_swp_fetch` borrows before the fetch bridge, threads the token
+through both execute bridges, and restores into `Rut` before each arm
+close.  No Σ-level change, no new ghost, `UserStepFull`/`UserExec`
+untouched.
+
+Current red roots (whole tree): ProofForkretPark:318 + ProofKernelvec:1704
+(other lanes, untouched), UptWalkTramp:101 (deliberate, §7), and the
+out-of-scope trampoline/per-binary files behind them (Pt2WalkPt:427,
+UserretPt:195, ProofUser:75 — see §7 for what each needs).
+
+`_CoqProject` delta: `UptWalkTramp.v` appended at end (only change).
