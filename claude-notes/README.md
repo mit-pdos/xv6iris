@@ -104,6 +104,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   lives and how it travels, the two run sites, the seal discipline, and
   the entry-deposit constructors (`sync`'s and `echo`'s).  Read before
   touching the trap loop's user-WP seam.
+- **[`fd-row-pilot.md`](design/fd-row-pilot.md)** — the ENRICHED u-tier
+  syscall row (the parked Φ-refinement's landing shape): the ghost-crossing
+  seam ruling, the per-process fs/fd MIRROR deposited through the trap, and
+  the era-0 pilot theorem (init's open-after-mknod yields the console).
+  Files: `FsFdMirror.v` / `UexecRetFs.v` / `FdRowPilot.v`; worklist in
+  `projects/fs-syscall-specs.md` (FD-ROW PILOT section).
 - **[`uk-engine.md`](design/uk-engine.md)** — the user-mode-on-kernel
   engine: the per-page PERMISSION MAP in the slot's key (a projection of
   the table and size, lazy pages filled RW, and why), the `Uk*.v` engine
