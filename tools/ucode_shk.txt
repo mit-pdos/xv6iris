@@ -18,6 +18,17 @@
 # wrong, only compile time -- but a whole uncalled function would be a claim
 # about code nothing reads, so it is left out and the reason recorded.
 
+note SH LANE STAGES 1-2 and 5.
+note
+note STAGE 5 adds [runcmd] and [fork1] -- the command TREE walk -- with the
+note six further usys.S stubs they and the [cd] builtin issue: fork, exec,
+note pipe, wait, chdir and dup.  [runcmd]'s whole range is catalogued, the
+note two fprintf-and-die tails included: they are not walked (the diagnostic
+note code is cut at UkShRun.v's [ush_diag_leaf]) but they sit inside the
+note function and pruning per branch would have to be re-audited whenever an
+note arm moves.  [panic], [fprintf], [printf] and [vprintf] are NOT here:
+note nothing fetches an instruction of them under that cut.
+note
 note SH LANE STAGES 1-2: the ELF entry, main's console preamble, and the
 note COMMAND LOOP down to the blank-line test.  [start] calls [main]; main's
 note first act is the loop that opens "console" until it owns fd 3, then it
@@ -48,8 +59,29 @@ func exit
 func write
 func read
 
+# ---- stage 5: the command tree walk.  [runcmd] dispatches on the node type
+# ---- through the 0x1398 jump table and never returns; [fork1] is fork with
+# ---- a panic on -1.
+func runcmd
+func fork1
+
+# ---- the syscall stubs stage 5 issues, same three-instruction shape
+func fork
+func exec
+func pipe
+func wait
+func dup
+func chdir
+
 omit 0xc8c exit's [c.jr ra] -- the ecall at 0xc88 never returns
 
-skipdefault not on stage 1's or stage 2's path: the [cd] builtin, the parser,
-skipdefault the fork/exec walk and the allocator are later stages of the SH
-skipdefault lane, and this catalog grows to meet them
+skipfunc panic every path into it prints through fprintf; UkShRun.v cuts the
+skipfunc panic diagnostic code at [ush_diag_leaf], whose first site IS panic's
+skipfunc panic entry, so no instruction of panic is ever fetched
+skipfunc fprintf the diagnostic printer, behind [ush_diag_leaf] -- see panic
+skipfunc printf the diagnostic printer, behind [ush_diag_leaf] -- see panic
+skipfunc vprintf the diagnostic printer, behind [ush_diag_leaf] -- see panic
+
+skipdefault not on stage 1's, 2's or 5's path: the [cd] builtin's body, the
+skipdefault parser and the allocator are later stages of the SH lane, and this
+skipdefault catalog grows to meet them
