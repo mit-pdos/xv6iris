@@ -1755,10 +1755,23 @@ UkShParse.v
 # FdRowMint = the era-0 mirror mint at the userinit park (both halves'
 # homes + the park arm in parallel form).  FdRowPilot and FdRowMint are
 # image-check consumers, so the leaf rule applies to the PILOT CONE:
-# FdRowMint is its leaf and nothing may require it; FdRowPilot is required
-# by FdRowMint alone.
+# FdRowMint and UkInitFs are its leaves and nothing may require either;
+# FdRowPilot is required by those two alone.
+#   UkRunFsLeaf = the enriched LEAF TOWER (stage P5): the plain leaves
+# init's console preamble uses, re-threaded on urun_fs/ukc_fs, plus the
+# text-string and no-path enriched ecall leaves, over ONE more seal --
+# FDROW_UKFS_RETIRE.wp_uk_retire_fs_later = UkStep.wp_uk_retire_later with
+# uvb/ukc swapped for their enriched twins.  That single funnel seal covers
+# EVERY non-ecall leaf kind in the slice (registers, auipc, the three
+# jumps, the x0 branch); both it and UkRunSysFs's collapse to nothing under
+# upstream ask (4), the X-generic engine.
+#   UkInitFs = init's console preamble WALKED on the enriched tier (0xc
+# through the two dups to the restart head 0x32), refining
+# FdRowPilot.pilot_console_dups.
 FsFdMirror.v
 UexecRetFs.v
 UkRunSysFs.v
+UkRunFsLeaf.v
 FdRowPilot.v
 FdRowMint.v
+UkInitFs.v

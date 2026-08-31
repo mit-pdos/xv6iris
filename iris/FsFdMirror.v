@@ -240,14 +240,29 @@ Definition um_resolve_parent (u : umirror) (pl : list (bv 8)) : option Z :=
 (*  5.  THE STEP TABLE (the enriched rows, pure)                          *)
 (* ===================================================================== *)
 
-(* the two pilot rows' syscall numbers (kernel/syscall.h) *)
+(* the pilot rows' syscall numbers (kernel/syscall.h) *)
 Definition USYS_open  : Z := 15.
 Definition USYS_mknod : Z := 17.
+Definition USYS_dup   : Z := 10.
 
-(* which numbers take the enriched arm -- the pilot's two, and a FIXED
-   decidable set so the trap contract's case analysis stays pure *)
-Definition uenr_dom (n : Z) : bool :=
+(* WHICH ENRICHED ROWS TAKE A PATH.  open and mknod read argument 0 as a
+   POINTER and fetch a string through it ([ufs_step] below); dup reads
+   argument 0 as a descriptor NUMBER.  The split matters and is not
+   cosmetic: forcing the string fetch on dup's row would make its only
+   satisfiable arm the [-1] blanket (a small integer is not the address of
+   a NUL-terminated string in the image), i.e. a contract the enriched loop
+   could NOT discharge on a dup that succeeds.  So the path fetch is keyed
+   by [uenr_path], and the enriched domain is that plus dup. *)
+Definition uenr_path (n : Z) : bool :=
   bool_decide (n = USYS_open) || bool_decide (n = USYS_mknod).
+
+(* which numbers take the enriched arm -- a FIXED decidable set so the trap
+   contract's case analysis stays pure *)
+Definition uenr_dom (n : Z) : bool :=
+  uenr_path n || bool_decide (n = USYS_dup).
+
+Lemma uenr_path_dom (n : Z) : uenr_path n = true -> uenr_dom n = true.
+Proof. intros H. unfold uenr_dom. rewrite H. reflexivity. Qed.
 
 Section Steps.
   Context `{XI : CurCtx}.
@@ -319,6 +334,35 @@ Section Steps.
                     (delta_create d nm i (ADev ma mi) (um_av u))
                     (um_cwd u)).
 
+  (* ------------------------------------------------------------------ *)
+  (* dup, at the descriptor word in argument 0.                           *)
+  (*                                                                      *)
+  (* sys_dup is argfd + fdalloc + filedup.  The [-1] blanket covers both   *)
+  (* of its failures (the argument is not an open descriptor; the table    *)
+  (* is full); the success arm says the argument names an OPEN row, the    *)
+  (* new descriptor is fdalloc's least closed one, and THE TWO ROWS ARE    *)
+  (* EQUAL -- filedup shares the [struct file] rather than copying it, so  *)
+  (* the mirror's reading of the new row is literally the old row.  The    *)
+  (* fd leg is the only leg that moves: dup touches neither the abstract   *)
+  (* view nor the cwd.                                                     *)
+  (* ------------------------------------------------------------------ *)
+  (* the descriptor is read the way argfd reads it: [argint] into a C [int],
+     i.e. the SIGNED word, with the negative half rejected.  Keying the row
+     on [bv_signed vfd] rather than on "some [ofd] whose encoding is [vfd]"
+     is what makes the row USABLE: the caller knows the word it passed, and
+     no injectivity argument about [mword_of_int] is needed to get from it
+     to the index. *)
+  Definition ufs_dup_at (vfd : mword 64) (r : mword 64) (u u' : umirror)
+      : Prop :=
+    (r = (mword_of_int (-1) : mword 64) /\ u' = u)
+    \/ (exists (nfd : nat) (st : fdstate),
+          0 <= bv_signed vfd
+          /\ um_fdt u !! Z.to_nat (bv_signed vfd) = Some st
+          /\ st <> FdClosed
+          /\ fd_lowest_closed (um_fdt u) = Some nfd
+          /\ r = (mword_of_int (Z.of_nat nfd) : mword 64)
+          /\ u' = MkUmirror (<[nfd := st]> (um_fdt u)) (um_av u) (um_cwd u)).
+
   (* the table, keyed by the number; the trapframe supplies the argument
      words the way the kernel reads them (a1 = the mode / major, a2 = the
      minor; [dev_arg] is the AU's short reading) *)
@@ -331,17 +375,22 @@ Section Steps.
     else if decide (n = USYS_mknod) then
       ufs_mknod_at pl (dev_arg (ufs_arg tf 1)) (dev_arg (ufs_arg tf 2))
         r u u'
+    else if decide (n = USYS_dup) then ufs_dup_at (ufs_arg tf 0) r u u'
     else u' = u.
 
-  (* ...and with the path read off the image at argument 0, plus the
-     honest escape when it cannot be read (argstr fails, the syscall
-     returns -1, the mirror does not move) *)
+  (* ...and with the path read off the image at argument 0 FOR THE PATH
+     ROWS, plus the honest escape when it cannot be read (argstr fails, the
+     syscall returns -1, the mirror does not move).  A non-path enriched row
+     (dup) does not read the image at all, and its [pl] is irrelevant --
+     [ufs_step_at] does not mention it there. *)
   Definition ufs_step (n : Z) (tf : list (mword 64)) (Mi : gmap Z (bv 8))
       (r : mword 64) (u u' : umirror) : Prop :=
-    (r = (mword_of_int (-1) : mword 64) /\ u' = u)
-    \/ (exists pl : list (bv 8),
-          ustr_read Mi (uint (ufs_arg tf 0)) = Some pl
-          /\ ufs_step_at n pl tf r u u').
+    if uenr_path n then
+      (r = (mword_of_int (-1) : mword 64) /\ u' = u)
+      \/ (exists pl : list (bv 8),
+            ustr_read Mi (uint (ufs_arg tf 0)) = Some pl
+            /\ ufs_step_at n pl tf r u u')
+    else ufs_step_at n [] tf r u u'.
 
   (* ------------------------------------------------------------------ *)
   (* The forced-arm readers: what a program actually applies.             *)
@@ -413,6 +462,21 @@ Section Steps.
       /\ u' = MkUmirror (um_fdt u)
                 (delta_create d nm i (ADev ma mi) (um_av u))
                 (um_cwd u).
+  Proof.
+    intros [[Hr _] | H] Hne; [exfalso; exact (Hne Hr) | exact H].
+  Qed.
+
+  (* a non-(-1) return forces dup's success facts *)
+  Lemma ufs_dup_at_hit (vfd r : mword 64) (u u' : umirror) :
+    ufs_dup_at vfd r u u' ->
+    r <> (mword_of_int (-1) : mword 64) ->
+    exists (nfd : nat) (st : fdstate),
+      0 <= bv_signed vfd
+      /\ um_fdt u !! Z.to_nat (bv_signed vfd) = Some st
+      /\ st <> FdClosed
+      /\ fd_lowest_closed (um_fdt u) = Some nfd
+      /\ r = (mword_of_int (Z.of_nat nfd) : mword 64)
+      /\ u' = MkUmirror (<[nfd := st]> (um_fdt u)) (um_av u) (um_cwd u).
   Proof.
     intros [[Hr _] | H] Hne; [exfalso; exact (Hne Hr) | exact H].
   Qed.

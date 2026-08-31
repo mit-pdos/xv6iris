@@ -320,9 +320,19 @@ ecall leaf's proof once the arm lands (stage P2), and the enriched
   facts stay with `fs-syscall-specs.md` §5's three principles.
 - **No offset carrier.**  `f->off` stays behind `file_pay` (RULING B's
   business); the pilot's rows never mention it.
-- **No dup/close/read rows yet** — dup is the obvious third row (init's
-  `dup(0); dup(0)` finishing the fds-0-1-2-are-console story) and is
-  listed as the first extension, not built.
+- **No close/read rows yet.**  ~~dup is the obvious third row~~
+  **SUPERSEDED (prover stage P5, 2026-08-31): the DUP ROW IS BUILT.**
+  `FsFdMirror.ufs_dup_at` (argfd + fdalloc + filedup: the `-1` blanket, or
+  the argument names an open row, the new fd is `fd_lowest_closed` and the
+  two rows are EQUAL because filedup shares the `struct file`), and
+  `FdRowPilot.pilot_console_dups` finishes the fds-0-1-2-are-console
+  story.  Its one structural cost: `uenr_dom` had to split into
+  `uenr_path` (open, mknod — the rows whose argument 0 is a POINTER and
+  which therefore fetch a string off the image) and the rest, because
+  forcing that fetch on dup's row would have pinned it to the `-1`
+  blanket — a contract the enriched loop could not discharge on a dup
+  that succeeds.  `ufs_step_at`'s `pl` is simply unused off the path
+  rows, so no landed statement moved.  close and read stay unbuilt.
 
 ## 8. Owner / upstream rulings this design flags (each a yes/no)
 
