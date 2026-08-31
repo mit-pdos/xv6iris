@@ -2255,7 +2255,7 @@ AS-LANDED FINDINGS:
 
 THE STAGES (prover lanes; budgets keyed to the landed analogues):
 
-- [x] **P2 — the engine leaf** — AS LANDED (`iris/UkRunSysFs.v`, 352
+- [x] **P2 — the engine leaf** — AS LANDED (`iris/UkRunSysFs.v`, 391
   lines of which 220 are statements+proofs; EC2-green, zero `Admitted`, zero new
   `Axiom`, audit = the standing three).  **The wrapper is DISCHARGED and
   the seal SHRANK; it did not vanish.**
