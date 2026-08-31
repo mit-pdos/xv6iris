@@ -1704,7 +1704,11 @@ Section KernelvecHandler.
     iApply (Kerneltrap.wp_kerneltrap_sconf (GEN := GEN) (CID := CID) (XI := XIc) γu γv γdk γtl γs pd pav pu
               (kv_m2 Me) (58 + av) p pc0 sc tv ∅
               Hgs ltac:(lia) Hdi Hpc0
-              with "Hcgk Hsret Hires Hrcpt [Hcpu] Htext Hpc Hsepc Hscause Hstval Hcaps Hclm").
+              with "Hcgk Hsret Hires Hrcpt [Hcpu] Htext Hpc Hsepc Hscause Hstval").
+    all: try lkbelow.
+    { iFrame "Hcpu". }
+    Set Printing Implicit.
+    iExact "Hcaps".
     all: try lkbelow.
     { iFrame "Hcpu". }
     (* ---- THE CROSSING: everything below is at the RESUMING hart ---- *)

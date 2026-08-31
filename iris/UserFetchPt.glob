@@ -1,0 +1,47 @@
+DIGEST c81b903d702a1f677b65d04cedf9913c
+Fxv6iris.UserFetchPt
+R543:548 Stdlib.ZArith.ZArith <> <> lib
+R550:553 Stdlib.Bool.Bool <> <> lib
+R555:557 Stdlib.micromega.Lia <> <> lib
+R586:589 stdpp.gmap <> <> lib
+R591:611 stdpp.bitvector.definitions <> <> lib
+R629:658 SailStdpp.ConcurrencyInterface <> <> lib
+R660:697 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R699:733 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R735:760 SailStdpp.Operators_mwords <> <> lib
+R778:791 SailStdpp.Base <> <> lib
+R793:811 SailStdpp.TypeCasts <> <> lib
+R813:828 SailStdpp.Values <> <> lib
+R830:850 SailStdpp.MachineWord <> <> lib
+R868:882 xv6iris.RiscvModelBytes <> <> lib
+R884:892 xv6iris.RiscvLang <> <> lib
+R894:903 xv6iris.RiscvPtsto <> <> lib
+R905:913 xv6iris.RiscvExec <> <> lib
+R915:926 xv6iris.RiscvTryStep <> <> lib
+R928:941 xv6iris.RiscvFetchExec <> <> lib
+R943:953 xv6iris.RiscvExtras <> <> lib
+R971:980 xv6iris.CommonWalk <> <> lib
+R998:1006 xv6iris.SmodeCore <> <> lib
+R1024:1030 xv6iris.UptTree <> <> lib
+R1048:1057 xv6iris.UserPtTree <> <> lib
+R1075:1082 xv6iris.UserBits <> <> lib
+R1100:1106 xv6iris.UserMem <> <> lib
+R1124:1132 xv6iris.UserFetch <> <> lib
+R1150:1166 Riscv.rv64d_types <> <> lib
+R1168:1178 Riscv.rv64d <> <> lib
+R1214:1217 Riscv.rv64d_types Defs <> mod
+def 1310:1329 <> u_fetch_fault_flavor
+R1338:1342 SailStdpp.Values <> mword def
+binder 1332:1334 <> tfp:1
+R1358:1361 stdpp.gmap <> gmap rec
+R1375:1379 SailStdpp.Values <> mword def
+R1364:1368 SailStdpp.Values <> mword def
+binder 1353:1354 <> um:2
+R1392:1396 SailStdpp.Values <> mword def
+binder 1387:1388 <> va:3
+R1414:1427 xv6iris.UserPtTree <> u_fault_flavor def
+R1430:1445 Riscv.rv64d_types <> InstructionFetch constr
+R1447:1448 Corelib.Init.Datatypes <> tt constr
+R1451:1453 xv6iris.UserFetchPt <> tfp:1 var
+R1455:1456 xv6iris.UserFetchPt <> um:2 var
+R1458:1459 xv6iris.UserFetchPt <> va:3 var
