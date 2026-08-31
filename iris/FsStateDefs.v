@@ -13,7 +13,9 @@
 
    Consequently this file imports NOTHING from [FsBlocks]/[LogInv]/any
    [Proof*]/[Spec*] file: it is pure Iris over the tree's ENCODING
-   vocabulary (FsImg/DinodeEnc/BitmapEnc/FsTree/BlockWords) only.
+   vocabulary (DinodeEnc/BitmapEnc/FsTree/BlockWords) only -- and not even
+   over [FsImg], since the ONE thing it wanted from there was the block
+   size, which is [BioDefs.BSIZE_z] and lives beside [BSIZE].
 
    THE POINTS-TO IS FRACTION-INDEXED (durable-fs-plan.md sections 4 and 6,
    lane B').  [fsΦ] takes a [dfrac], and so do the two block shapes, in the
@@ -52,8 +54,7 @@ From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import dfrac.
 From iris.base_logic.lib Require Import iprop.
-Require Import BioDefs.
-Require Import FsImg.
+Require Import BioDefs.  (* [BSIZE_z]: the byte points-to is block-indexed *)
 
 (* the proofmode import re-opens nat_scope on top of the scope stack, so the
    file's scope has to be (re-)issued after it -- durable-notes.md *)

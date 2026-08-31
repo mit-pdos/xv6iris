@@ -72,7 +72,7 @@ Require Import WpUart.        (* [uart_names] *)
 Require Import DiskPtsto.     (* [disk_names] *)
 Require Import BioDefs.       (* [bio_names]  *)
 Require Import FsBlocks.      (* [fs_names]   *)
-Require Import IcacheEscrow.  (* [ic_names]   *)
+Require Import IcacheRef.     (* [ic_names]   *)
 Local Open Scope Z_scope.
 
 Class fscfg := MkFscfg {

@@ -418,44 +418,6 @@ Section LogInv.
   Context `{GEN : GenId}.
 
   (* ---------------------------------------------------------------- *)
-  (*  An active operation                                              *)
-  (* ---------------------------------------------------------------- *)
-
-  (* THE CLIENT-SIDE EPOCH LOWER BOUND (fs-log.md §G.3/§G.13), defined HERE
-     rather than beside its two auth lemmas because [log_opSe] bundles it.
-     "the batch epoch has reached [e]": PERSISTENT and monotone, so a copy
-     taken under the log lock stays true forever outside it -- which is the
-     whole point, since a PARKER does not hold the log spinlock and can
-     never read the auth. *)
-  Definition log_epoch_lb (γ : log_names) (e : nat) : iProp Σ :=
-    mono_nat_lb_own (ln_ep γ) e.
-
-  Global Instance log_epoch_lb_persistent γ e : Persistent (log_epoch_lb γ e).
-  Proof. apply _. Qed.
-
-  Global Instance log_epoch_lb_timeless γ e : Timeless (log_epoch_lb γ e).
-  Proof. apply _. Qed.
-
-  (* MINTING, where the auth is open (every log ghost step, and begin_op's
-     in particular).  Free: the auth is handed straight back. *)
-  Lemma log_epoch_lb_get (γ : log_names) (E : nat) :
-    mono_nat_auth_own (ln_ep γ) 1 E -∗
-    mono_nat_auth_own (ln_ep γ) 1 E ∗ log_epoch_lb γ E.
-  Proof.
-    iIntros "Ha".
-    iDestruct (mono_nat_lb_own_get with "Ha") as "#Hlb".
-    iFrame "Ha". iApply "Hlb".
-  Qed.
-
-  (* ...and USING one, back under the auth: the bound is real. *)
-  Lemma log_epoch_lb_le (γ : log_names) (E e : nat) :
-    mono_nat_auth_own (ln_ep γ) 1 E -∗ log_epoch_lb γ e -∗ ⌜(e <= E)%nat⌝.
-  Proof.
-    iIntros "Ha Hl".
-    iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ Hle]. done.
-  Qed.
-
-  (* ---------------------------------------------------------------- *)
   (*  THE BANK (fs-syscall-specs lane Y, owner-ruled)                  *)
   (* ---------------------------------------------------------------- *)
 
@@ -531,6 +493,10 @@ Section LogInv.
     iExists b, D. iSplitR; [| iSplitR; [iExact "Hf" | by iPureIntro]].
     rewrite /log_epoch_lb. iApply (mono_nat_lb_own_le e with "Hlb"). exact Hle.
   Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  An active operation                                              *)
+  (* ---------------------------------------------------------------- *)
 
   (* one ledger entry with remaining budget u AND the blocks this op has
      already appended; the id is existential -- no client ever needs it,
@@ -648,55 +614,6 @@ Section LogInv.
   Proof. iIntros "H". iDestruct "H" as (e0) "H". iExists e0. iFrame. Qed.
 
   (* ---------------------------------------------------------------- *)
-  (*  THE EPOCH AND THE APPEND REGISTRY (fs-log.md §G.2)               *)
-  (* ---------------------------------------------------------------- *)
-
-  (* "block [b] was appended to lh in epoch [e]".  PERSISTENT and never
-     revoked: a witness from an old batch is not wrong, it is unusable --
-     [log_use_group] can only fire when [e] is the CURRENT epoch, and the
-     only way to know that is to hold a live entry, whose [e0] the auth
-     pins to it.  Persistence is sound precisely because the epoch index,
-     not the token's lifetime, carries the soundness. *)
-  Definition logged_at (γ : log_names) (e : nat) (b : Z) : iProp Σ :=
-    own (ln_lg γ) (◯ ({[(e, b)]} : gset (nat * Z))).
-
-  Global Instance logged_at_persistent γ e b : Persistent (logged_at γ e b).
-  Proof. apply _. Qed.
-
-  Global Instance logged_at_timeless γ e b : Timeless (logged_at γ e b).
-  Proof. apply _. Qed.
-
-  (* the registry's two operations, over the [gset] auth: minting is an
-     allocation into a union (idempotent, so the fragment is core-id and
-     the token duplicates for free) and using it is [gset_included]. *)
-  Lemma log_mint_logged (γ : log_names) (X : gset (nat * Z)) (e : nat) (b : Z) :
-    own (ln_lg γ) (● X) ==∗
-    own (ln_lg γ) (● (X ∪ {[(e, b)]})) ∗ logged_at γ e b.
-  Proof.
-    iIntros "H".
-    iMod (own_update _ _ (● (X ∪ {[(e, b)]} : gset (nat * Z))
-                          ⋅ ◯ (X ∪ {[(e, b)]} : gset (nat * Z))) with "H")
-      as "[$ Hf]".
-    { apply auth_update_alloc.
-      apply local_update_unital_discrete. intros z _ Hz.
-      split; [done|]. rewrite left_id in Hz. rewrite -Hz.
-      rewrite /op /cmra_op /=. set_solver. }
-    iModIntro. rewrite /logged_at.
-    iApply (own_mono with "Hf"). apply auth_frag_mono.
-    apply gset_included. set_solver.
-  Qed.
-
-  Lemma logged_at_in (γ : log_names) (X : gset (nat * Z)) (e : nat) (b : Z) :
-    own (ln_lg γ) (● X) -∗ logged_at γ e b -∗ ⌜(e, b) ∈ X⌝.
-  Proof.
-    iIntros "Ha Hf".
-    iDestruct (own_valid_2 with "Ha Hf") as %Hv.
-    iPureIntro.
-    apply auth_both_valid_discrete in Hv as [Hincl _].
-    apply gset_included in Hincl. set_solver.
-  Qed.
-
-  (* ---------------------------------------------------------------- *)
   (*  THE APPEND RECEIPT: log_write's own post-state currency           *)
   (*  (fs-log.md §G.3)                                                  *)
   (* ---------------------------------------------------------------- *)
@@ -802,10 +719,6 @@ Section LogInv.
     iSplitL "H"; [iExists e0; iFrame |].
     iExists e0. iFrame "Hw". iPureIntro. exact Hv.
   Qed.
-
-  (* ...and the trivial anchor, for every caller that wants none of it *)
-  Lemma log_epoch_lb_0 (γ : log_names) : ⊢ |==> log_epoch_lb γ 0.
-  Proof. rewrite /log_epoch_lb. iApply mono_nat_lb_own_0. Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  THE ABSORPTION CREDIT (fs-log.md §G.19)                           *)
@@ -1903,9 +1816,12 @@ Section LogInv.
   (*  THE CLIENT-SIDE EPOCH LOWER BOUND (fs-log.md §G.3)                *)
   (* ---------------------------------------------------------------- *)
 
-  (* [log_epoch_lb] and its two auth-facing lemmas are defined up beside
-     [log_opSe], which BUNDLES the bound (§G.13) -- [log_begin_step] mints
-     it, and that lemma is above this point. *)
+  (* [log_epoch_lb], [logged_at] and their auth-facing lemmas are in
+     [LogDefs]: they are FRAGMENTS of the names' fields, and a layer that
+     parks one ([InodeRegion]'s zero-receipt, §G.17) needs the vocabulary,
+     not the lock invariant.  This file re-exports [LogDefs], so every
+     reading of them through [LogInv] is unchanged.  Only the TRANSITION
+     stays here. *)
 
 
   (* THE BUMP, at the commit re-deposit (ProofEndOp's [Hommt] arm): nothing

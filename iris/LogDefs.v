@@ -444,6 +444,117 @@ Record log_names := MkLogNames {
 }.
 
 (* ==================================================================== *)
+(*  THE TWO CLIENT-SIDE FRAGMENTS OF THOSE NAMES                         *)
+(*                                                                      *)
+(*  [log_epoch_lb] (a lower bound on [ln_ep]) and [logged_at] (a witness *)
+(*  in [ln_lg]) are FRAGMENTS -- persistent, held off the log spinlock,  *)
+(*  and stated over nothing but the record above.  They belong here, in  *)
+(*  the names' own file, for the reason this file exists: a layer that   *)
+(*  PARKS one of them owes nothing to the log's lock invariant.          *)
+(*  [InodeRegion]'s zero-receipt (fs-log.md §G.17) is exactly that       *)
+(*  layer, and it used to pay for [LogInv] -- the whole WAL, its         *)
+(*  transaction bundle, the crash record and the snapshot law -- to say  *)
+(*  "epoch at least [v]".                                               *)
+(*                                                                      *)
+(*  The auth-facing lemmas come along: they say what a fragment IS       *)
+(*  against the authority ([mono_nat_auth_own (ln_ep γ)], [own (ln_lg    *)
+(*  γ) (● X)]) and mention no invariant either.  What stays in [LogInv]  *)
+(*  is the TRANSITION -- [log_epoch_bump], the commit's re-deposit --    *)
+(*  which is a step of the WAL's own ghost machine.  [LogInv]            *)
+(*  re-exports this file, so every existing reading is unchanged.        *)
+(* ==================================================================== *)
+Section LogFrags.
+  Context `{!riscvGS Σ, !logG Σ}.
+
+  (* THE CLIENT-SIDE EPOCH LOWER BOUND (fs-log.md §G.3/§G.13), defined HERE
+     rather than beside its two auth lemmas because [log_opSe] bundles it.
+     "the batch epoch has reached [e]": PERSISTENT and monotone, so a copy
+     taken under the log lock stays true forever outside it -- which is the
+     whole point, since a PARKER does not hold the log spinlock and can
+     never read the auth. *)
+  Definition log_epoch_lb (γ : log_names) (e : nat) : iProp Σ :=
+    mono_nat_lb_own (ln_ep γ) e.
+
+  Global Instance log_epoch_lb_persistent γ e : Persistent (log_epoch_lb γ e).
+  Proof. apply _. Qed.
+
+  Global Instance log_epoch_lb_timeless γ e : Timeless (log_epoch_lb γ e).
+  Proof. apply _. Qed.
+
+  (* MINTING, where the auth is open (every log ghost step, and begin_op's
+     in particular).  Free: the auth is handed straight back. *)
+  Lemma log_epoch_lb_get (γ : log_names) (E : nat) :
+    mono_nat_auth_own (ln_ep γ) 1 E -∗
+    mono_nat_auth_own (ln_ep γ) 1 E ∗ log_epoch_lb γ E.
+  Proof.
+    iIntros "Ha".
+    iDestruct (mono_nat_lb_own_get with "Ha") as "#Hlb".
+    iFrame "Ha". iApply "Hlb".
+  Qed.
+
+  (* ...and USING one, back under the auth: the bound is real. *)
+  Lemma log_epoch_lb_le (γ : log_names) (E e : nat) :
+    mono_nat_auth_own (ln_ep γ) 1 E -∗ log_epoch_lb γ e -∗ ⌜(e <= E)%nat⌝.
+  Proof.
+    iIntros "Ha Hl".
+    iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ Hle]. done.
+  Qed.
+
+  (* ...and the trivial anchor, for every caller that wants none of it *)
+  Lemma log_epoch_lb_0 (γ : log_names) : ⊢ |==> log_epoch_lb γ 0.
+  Proof. rewrite /log_epoch_lb. iApply mono_nat_lb_own_0. Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  THE EPOCH AND THE APPEND REGISTRY (fs-log.md §G.2)               *)
+  (* ---------------------------------------------------------------- *)
+
+  (* "block [b] was appended to lh in epoch [e]".  PERSISTENT and never
+     revoked: a witness from an old batch is not wrong, it is unusable --
+     [log_use_group] can only fire when [e] is the CURRENT epoch, and the
+     only way to know that is to hold a live entry, whose [e0] the auth
+     pins to it.  Persistence is sound precisely because the epoch index,
+     not the token's lifetime, carries the soundness. *)
+  Definition logged_at (γ : log_names) (e : nat) (b : Z) : iProp Σ :=
+    own (ln_lg γ) (◯ ({[(e, b)]} : gset (nat * Z))).
+
+  Global Instance logged_at_persistent γ e b : Persistent (logged_at γ e b).
+  Proof. apply _. Qed.
+
+  Global Instance logged_at_timeless γ e b : Timeless (logged_at γ e b).
+  Proof. apply _. Qed.
+
+  (* the registry's two operations, over the [gset] auth: minting is an
+     allocation into a union (idempotent, so the fragment is core-id and
+     the token duplicates for free) and using it is [gset_included]. *)
+  Lemma log_mint_logged (γ : log_names) (X : gset (nat * Z)) (e : nat) (b : Z) :
+    own (ln_lg γ) (● X) ==∗
+    own (ln_lg γ) (● (X ∪ {[(e, b)]})) ∗ logged_at γ e b.
+  Proof.
+    iIntros "H".
+    iMod (own_update _ _ (● (X ∪ {[(e, b)]} : gset (nat * Z))
+                          ⋅ ◯ (X ∪ {[(e, b)]} : gset (nat * Z))) with "H")
+      as "[$ Hf]".
+    { apply auth_update_alloc.
+      apply local_update_unital_discrete. intros z _ Hz.
+      split; [done|]. rewrite left_id in Hz. rewrite -Hz.
+      rewrite /op /cmra_op /=. set_solver. }
+    iModIntro. rewrite /logged_at.
+    iApply (own_mono with "Hf"). apply auth_frag_mono.
+    apply gset_included. set_solver.
+  Qed.
+
+  Lemma logged_at_in (γ : log_names) (X : gset (nat * Z)) (e : nat) (b : Z) :
+    own (ln_lg γ) (● X) -∗ logged_at γ e b -∗ ⌜(e, b) ∈ X⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (own_valid_2 with "Ha Hf") as %Hv.
+    iPureIntro.
+    apply auth_both_valid_discrete in Hv as [Hincl _].
+    apply gset_included in Hincl. set_solver.
+  Qed.
+End LogFrags.
+
+(* ==================================================================== *)
 (*  THE FOUR GNAMES' FREE STATE, AS ONE TOKEN                            *)
 (*                                                                      *)
 (*  claude-notes/projects/fs-cfg-boot.md, THE PRINCIPLE: every ghost     *)

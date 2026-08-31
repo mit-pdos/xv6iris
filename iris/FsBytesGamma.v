@@ -20,7 +20,7 @@
    equations that identify the abstract runs with the concrete ones.
 
    THE EQUATIONS HOLD BY CONVERSION, NOT BY NAME.  [FsStateDefs.byte_range]
-   multiplies by [FsImg.BSIZE_z], [FsBlocks.byte_range] by [FsBlocks.BSZ];
+   multiplies by [BioDefs.BSIZE_z], [FsBlocks.byte_range] by [FsBlocks.BSZ];
    both delta-reduce to 1024, so the two runs are convertible and the
    lemmas below are [reflexivity].  A [rewrite] between the two spellings
    will NOT fire (fs-state.md section 7, last bullet), which is exactly why
@@ -106,7 +106,7 @@ Section Bridge.
      [ipool_alloc] are stated -- go through them, so nothing at 3/4 or 1/4
      could cross into the [InodeInv] vocabulary before these existed.  They
      hold by CONVERSION exactly as their fraction-1 readings do
-     ([FsStateDefs.byte_range_q] multiplies by [FsImg.BSIZE_z],
+     ([FsStateDefs.byte_range_q] multiplies by [BioDefs.BSIZE_z],
      [FsBlocks.byte_range_q] by [FsBlocks.BSZ]; both delta-reduce to 1024). *)
   Lemma gamma_byte_range_q (γfs : fs_names) (dq : dfrac) (b off : Z)
       (bs : list (bv 8)) :

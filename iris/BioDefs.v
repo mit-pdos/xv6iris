@@ -22,6 +22,17 @@ Local Open Scope Z_scope.
 Definition BSIZE : nat := 1024%nat.
 Definition BSLOTS : nat := 1024%nat.
 
+(* ...and the SAME constant at [Z].  The geometry arithmetic above the bio
+   layer is at [Z] ([FsImg]'s block/byte conversions, [FsStateDefs]'s byte
+   points-to) while [InodeDefs.file_byte] indexes at [nat]; this pair is the
+   one bridge, and it lives beside [BSIZE] rather than in [FsImg] because it
+   IS [BSIZE] -- a file that needs only the block size should not have to
+   name the on-disk image's encoding vocabulary to get it. *)
+Definition BSIZE_z : Z := 1024.
+
+Lemma BSIZE_z_nat : Z.of_nat BSIZE = BSIZE_z.
+Proof. vm_compute. reflexivity. Qed.
+
 (* THE SUPPLY SPLITS ONCE, AT BOOT, AND THE TWO SHARES NEVER MIX.
    [BSLOTS_PROC] is the proc layer's: three units per process slot, parked in
    [ProcDefs.proc_dormant] so that a slot which has never run still owns what

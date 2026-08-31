@@ -198,7 +198,7 @@ Section sys_sync_flush.
   (* THE CASE SPLIT, DISCHARGED ONCE.  Both arms of sys_sync end at the same
      place -- holding the log lock, with the bank readable at the counter's
      current value -- and both are covered by this one entailment: the fast
-     path reads it at the [E >= e] it finds ([LogInv.log_epoch_lb_le] against
+     path reads it at the [E >= e] it finds ([LogDefs.log_epoch_lb_le] against
      the caller's witness), the slow path at the [E' >= E + 1] it waited for.
      So item (iii) of the design's derivation chain reduces to item (ii),
      the bank, and nothing else. *)

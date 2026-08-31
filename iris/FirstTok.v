@@ -711,7 +711,7 @@ Section FirstTok.
     pose proof (FsImg.sbo_nblocks _ Hsb) as Hnb.
     pose proof (FsImg.sbo_one_bitmap _ Hsb) as Hone.
     pose proof (FsImg.sbo_ushort _ Hsb) as Hush0.
-    unfold FsImg.ROOTINO in Hni. unfold FsImg.BSIZE_z in Hone.
+    unfold FsImg.ROOTINO in Hni. unfold BioDefs.BSIZE_z in Hone.
     assert (Hdiv : 0 <= FsImg.sb_ninodes (FsState.fss_sb S) / 16)
       by (apply Z.div_pos; lia).
     assert (Hds : FsImg.fs_data_start (FsState.fss_sb S)

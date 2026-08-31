@@ -92,8 +92,10 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 Require Import RiscvModelBytes.
-Require Import BioDefs.  (* [BSIZE]: [InodeDefs.file_byte] indexes with it,
-                            and [Require Import] does not propagate *)
+Require Import BioDefs.  (* [BSIZE]/[BSIZE_z]: [InodeDefs.file_byte] indexes
+                            with the first and this file's geometry arithmetic
+                            with the second, and [Require Import] does not
+                            propagate *)
 Require Import BlockWords.
 Require Import BitmapEnc.
 Require Import DinodeEnc.
@@ -118,13 +120,6 @@ Definition FSMAGIC : Z := 0x10203040.
 Definition ROOTINO : Z := 1.
 Definition T_FILE_z : Z := 2.
 Definition T_DEVICE_z : Z := 3.
-
-(* [BioDefs.BSIZE] at [Z].  [InodeDefs.file_byte] indexes at [nat], the
-   geometry arithmetic is at [Z]; this is the one bridge. *)
-Definition BSIZE_z : Z := 1024.
-
-Lemma BSIZE_z_nat : Z.of_nat BSIZE = BSIZE_z.
-Proof. vm_compute. reflexivity. Qed.
 
 (* [ElfEnc.le_at]'s body with the buffer's naming function replaced by the
    list's total lookup -- the same move [ElfFile.elf_le_at] makes, and

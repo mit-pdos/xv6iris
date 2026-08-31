@@ -209,16 +209,11 @@ Require Import TsoCtx.
 (*  0.  GHOST NAMES                                                       *)
 (* ===================================================================== *)
 
-(* the escrow layer's names, as one record (BioInv.bio_names' shape): the
-   reference authority IcacheInv's lemmas take, and per slot the checkout
-   token's gname and the recycle token's gname.  The itable spinlock's own
-   gname stays a separate argument, which is why [is_itable2] takes it
-   beside this record rather than inside it. *)
-Record ic_names := MkIcNames {
-  icn_esc : nat -> gname;   (* entry k's CHECKOUT token                  *)
-  icn_mid : nat -> gname;   (* entry k's RECYCLE token                   *)
-  icn_id  : nat -> gname;   (* entry k's LIVE / EMPTY agreement          *)
-}.
+(* [ic_names] -- the three per-slot gname families this layer's arms are
+   stated over -- is in [IcacheRef], beside [icfg] and [icfg_isl]: it is a
+   record of gnames and nothing more, and [FsCfg] has to name it to carry
+   [fsc_ic].  [IcacheInv] re-exports [IcacheRef], so every reading of it
+   through this file is unchanged. *)
 
 Section IcacheEscrow.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.

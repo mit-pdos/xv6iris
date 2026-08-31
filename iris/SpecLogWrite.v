@@ -467,7 +467,7 @@ Qed.
    its inode block, stated over the ABSTRACT view record's run
    ([FsStateDefs.byte_range] at [Γ_L], i.e. [rec_owned]'s own spelling)
    and carrying no receipt.  [FsBytesGamma.gamma_byte_range] is the whole
-   bridge -- the two spellings multiply by [FsImg.BSIZE_z] and
+   bridge -- the two spellings multiply by [BioDefs.BSIZE_z] and
    [FsBlocks.BSZ], both 1024 -- and the degenerate anchor is
    [lw_au_lb0]'s: the bound is parked at 0 and both extra wand inputs are
    dropped, so a region supplier writes exactly the fupd it can build
@@ -514,7 +514,7 @@ Proof. unfold BSIZE. lia. Qed.
    iupdate's two ordinary region steps, and the held-[fsblock] form below --
    states its fupd without an anchor and without the two extra wand inputs.
    This is the whole conversion: park the bound at ZERO, where
-   [LogInv.log_epoch_lb_0] mints it for free, and drop both inputs on the
+   [LogDefs.log_epoch_lb_0] mints it for free, and drop both inputs on the
    way back in.  One line at each site, so the atomic-update premise can
    carry the writer's anchor without any of them moving. *)
 Lemma lw_au_lb0 `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}

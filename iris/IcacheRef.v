@@ -785,6 +785,32 @@ Class icfg := MkIcfg {
   icfg_pcrp : gname;
 }.
 
+(* ---------------------------------------------------------------------- *)
+(*  THE ESCROW LAYER'S NAMES, THREADED RATHER THAN AMBIENT                 *)
+(* ---------------------------------------------------------------------- *)
+
+(* [IcacheEscrow]'s three per-slot gname families, as one record
+   ([BioDefs.bio_names]' shape): per slot the checkout token's gname, the
+   recycle token's gname and the live/empty agreement's.  The itable
+   spinlock's own gname stays a separate argument, which is why
+   [IcacheEscrow.is_itable2] takes this record beside it rather than
+   inside it.
+
+   IT IS HERE, NOT IN [IcacheEscrow], because it is a record of gnames and
+   nothing else -- no arm, no escrow, no ghost step, none of what the
+   header says is not in this file.  [FsCfg] carries it as [fsc_ic] beside
+   [uart_names] / [disk_names] / [bio_names] / [fs_names], each of which
+   lives in ITS layer's dependency-light base; leaving this one in the
+   escrow's 6000-line invariant file put that whole file -- and its
+   hundred-file cone -- underneath the tree's canonical-ghost-names class.
+   [IcacheInv] and [IcacheEscrow] re-export this file, so every existing
+   reading is unchanged. *)
+Record ic_names := MkIcNames {
+  icn_esc : nat -> gname;   (* entry k's CHECKOUT token                  *)
+  icn_mid : nat -> gname;   (* entry k's RECYCLE token                   *)
+  icn_id  : nat -> gname;   (* entry k's LIVE / EMPTY agreement          *)
+}.
+
 (* the pool at BOOT: one whole unit at each of the fifty slots, as ONE map,
    so a single [own_alloc] mints it and [big_opL_own] fans it out.  Stated
    outside the section because [icfg_alloc] below is what builds it.

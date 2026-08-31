@@ -167,8 +167,11 @@ Require Import EscrowDefs.   (* OPTION A: region_pending / reg_half / committedA
 (* [logged_at] / [log_epoch_lb]: the zero-receipt parked in [ireg_slot]
    (fs-log.md §G.17).  This is what puts [logG] in the section's context,
    and hence in the context of the four files that STATE something over
-   [ireg_inv] -- the enumerated sweep. *)
-Require Import LogInv.
+   [ireg_inv] -- the enumerated sweep.  The fragments and their auth-facing
+   lemmas are ALL this file wants of the log, so it names [LogDefs] and not
+   [LogInv]: parking a receipt owes nothing to the WAL's lock invariant,
+   its transaction bundle, the crash record or the snapshot law. *)
+Require Import LogDefs.
 (* THE TRANSACTION PIN (rank 5).  The region's three parks -- the f column's
    freeze window [ireg_fpin], the c column's claim box [ireg_cpin] and the
    armed registry's [ireg_parked] -- all keep a share of an open
