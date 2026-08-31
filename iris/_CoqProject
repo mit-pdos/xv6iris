@@ -68,6 +68,7 @@ TsoCtxPark.v
 CtxAnchor.v
 TsoCtxMove.v
 CtxValues.v
+CtxPinw.v
 CtxKMap.v
 CtxPinMint.v
 PermInv.v
