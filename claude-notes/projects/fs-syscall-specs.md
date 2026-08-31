@@ -2119,7 +2119,9 @@ things, and the answer differs:
       0x46a..0x482 has ONE postcondition), and `wp_kshp_peek_epi`
       (0x48e..0x49e, stated once because the epilogue is reached BOTH
       ways), with `ushp_peek_res` naming the answer.  `wp_kshp_peek` itself
-      — the ~750 lines that glue them, written and complete — is parked.
+      — the ~750 lines that glue them, written and complete — is parked in
+      `claude-notes/projects/sh-peek-body.v.parked`, out of the build, with
+      a header saying where to paste it back.
       **THE SCAN IS BOUNDED BY `es`, NOT BY THE NUL**: `s2` holds the end
       pointer and the back edge tests against it, so the scan reads only
       BODY bytes and the terminator never enters it.  That is the opposite
