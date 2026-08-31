@@ -56,12 +56,15 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import auth gmap frac numbers excl.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants own ghost_var.
+From iris.base_logic.lib Require Import gen_heap invariants own ghost_var mono_nat.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvExtras.
 Require Import WpLock SleepLock.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
+Require Import RiscvModelBytes.  (* [nth_byte]/[bv_eq_of_bytes]: A6.145's
+   word-set pin states the count word per byte *)
+Require Import CtxPinw.  (* A6.145: the word-set pin's store/read kit *)
 
 (* ====================================================================== *)
 Require Import LogInv.
@@ -330,6 +333,57 @@ Qed.
 Local Lemma seq_ninode_lookup (k : nat) :
   (k < NINODE)%nat -> seq 0 NINODE !! k = Some k.
 Proof. intros Hk. apply lookup_seq. split; [lia|exact Hk]. Qed.
+
+(* ===================================================================== *)
+(* A6.145: THE COUNT WORD'S MEMBER PREDICATE -- the word-set pin's [pw_S] *)
+(* for [ip->ref].  The set is the counts the CREDIT POOL can back:        *)
+(* [1 .. IREFSLOTS] -- never zero, which is what kills ilock's and        *)
+(* iunlock's [ref < 1] panic at a RACY read (TsoMemPa §12f: the per-byte  *)
+(* box of [1..422] would readmit the all-zero word; the WORD set does     *)
+(* not).                                                                  *)
+(* ===================================================================== *)
+Definition iref_set : (nat -> bv 8) -> Prop :=
+  fun f => exists z : Z,
+    (1 <= z <= Z.of_nat IrefSlots.IREFSLOTS)%Z /\
+    forall k : nat, (k < 4)%nat ->
+      f k = nth_byte (mword_of_int z : mword 32) k.
+
+(* the store side: a credit-backed count is a member *)
+Lemma iref_set_count (n : positive) :
+  (Z.pos n <= Z.of_nat IrefSlots.IREFSLOTS)%Z ->
+  iref_set (nth_byte (mword_of_int (Z.pos n) : mword 32)).
+Proof.
+  intros Hn. exists (Z.pos n). split; [lia | intros k Hk; reflexivity].
+Qed.
+
+(* the read side: any member word is positive and below 2^31 -- the two
+   bounds [InodeLock.inode_ref_spos] turns into "the panic is dead" *)
+Lemma iref_set_read (v : mword 32) (f : nat -> bv 8) :
+  iref_set f ->
+  (forall j : nat, (j < 4)%nat -> nth_byte v j = f j) ->
+  (0 < bv_unsigned v < 2 ^ 31)%Z.
+Proof.
+  intros (z & Hz & Hf) Hv.
+  assert (EI : Z.of_nat IrefSlots.IREFSLOTS = 422%Z)
+    by (vm_compute; reflexivity).
+  assert (E32 : (2 ^ 32 = 4294967296)%Z) by (vm_compute; reflexivity).
+  assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
+  assert (Hveq : v = (mword_of_int z : mword 32)).
+  { apply (bv_eq_of_bytes (n := 4%N)). intros j Hj.
+    assert (Hj4 : (j < 4)%nat) by lia.
+    rewrite (Hv j Hj4) (Hf j Hj4). reflexivity. }
+  rewrite Hveq moi32_small; [rewrite E31; lia | rewrite E32; lia].
+Qed.
+
+(* and at the exact count: the member the counter stores *)
+Lemma iref_set_word (M : gmap nat (Qp * positive)) (k : nat)
+    (q : Qp) (n : positive) :
+  M !! k = Some (q, n) ->
+  (Z.pos n <= Z.of_nat IrefSlots.IREFSLOTS)%Z ->
+  iref_set (nth_byte (iref_word M k)).
+Proof.
+  intros HM Hn. rewrite /iref_word HM. exact (iref_set_count n Hn).
+Qed.
 
 Section IcacheGhost.
   Context `{!xv6G Σ}.
@@ -1412,6 +1466,51 @@ Section IcacheRefInv.
 
   Global Instance itable_inv_persistent : Persistent itable_inv.
   Proof. apply _. Qed.
+
+  (* ================================================================== *)
+  (* A6.145: THE PINNED SLOT -- a LIVE slot's custody under the word-set  *)
+  (* pin.  [lo] is the epoch's arm position (the pin floor), [tst] the    *)
+  (* last count store's position; the invariant holds HALF of each        *)
+  (* mono_nat (the other half: [tst]'s rides the itable lock's payload    *)
+  (* under the A6.144 floor row -- the holder's EXACT read; [lo]'s is     *)
+  (* cut into 1/1024 quanta riding each reference's credential -- the     *)
+  (* racy reader's currency agreement).  The four cells are RAW pinw      *)
+  (* ledger bytes: NO context appears, which is the entire point.         *)
+  (* ================================================================== *)
+  Definition iref_pin_slot (k : nat) (w : mword 32) : iProp Σ :=
+    (∃ lo tst : nat,
+       mono_nat_auth_own (icfg_ieplo k) (1/2) lo ∗
+       mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
+       [∗ list] j ∈ seq 0 4, ∃ t : nat, ⌜(t <= tst)%nat⌝ ∗
+          TsoCtx.phys_ledger_pinw (pa_add (i_ref (ientry k)) j) (DfracOwn 1)
+            (nth_byte w j) t
+            (TsoMemPa.TsPinw (i_ref (ientry k)) 4 j lo iref_set))%I.
+
+  (* the pinw body: live slots pinned, free slots' cells OUT (they ride
+     the itable lock's payload as plain ctx cells -- the motion rule).
+     NOT yet [itable_body]: the cutover swaps them once the accessor
+     family is green (tso-machine-flip.md A6.145). *)
+  Definition itable_body_pinw : iProp Σ :=
+    (∃ M : gmap nat (Qp * positive),
+       itable_half M ∗ ⌜icM_wf M⌝ ∗
+       ([∗ list] k ∈ seq 0 NINODE,
+          match M !! k with
+          | Some _ => iref_pin_slot k (iref_word M k)
+          | None => emp
+          end) ∗
+       live_pool M)%I.
+
+  (* THE CREDENTIAL a reference carries for the racy read: a 1/1024
+     quantum of the slot's epoch auth (auth-fraction agreement with the
+     invariant's half is what proves "my floor IS the current epoch's")
+     plus the floor at it on the CARRIER's context.  ξ-relative only
+     through the floor, which transports ([TsoCtx.ctx_floor_dom]) -- the
+     credential crosses fork beside its reference. *)
+  Definition iref_cred_q : Qp := (1 / pos_to_Qp 1024)%Qp.
+
+  Definition iref_cred (k : nat) (lo : nat) : iProp Σ :=
+    (mono_nat_auth_own (icfg_ieplo k) iref_cred_q lo ∗
+     TsoCtx.ctx_floor TsoCtx.cur_ctx lo)%I.
 
   Lemma iref_cells_acc (M : gmap nat (Qp * positive)) (k : nat) :
     (k < NINODE)%nat ->
