@@ -26,6 +26,8 @@ Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto.
 Require Import TsoMemPa TsoGhost TsoCtx.
+Require Import RiscvExec.  (* [tso_interp_of]/[gs_of]/[vstep]: the leaf-
+   obligation face of the member store ([pinw_write_c] below) *)
 
 Local Open Scope Z_scope.
 
@@ -216,6 +218,124 @@ Section CtxPinw.
     iModIntro. iFrame "Hint".
     iApply (big_sepL_impl with "Hnew").
     iIntros "!>" (k j Hkj) "H". by iExists (S (length g.(glog))).
+  Qed.
+
+  (* ---- THE EXACT READ, for a receipt that covers the stamps: a LOCK
+     HOLDER's read.  All writes to a pinw window happen under its guarding
+     lock; the A6.144 floor row hands the holder [ctx_floor ξ tl] with
+     every stamp ≤ tl (the γ-stamp tie), and the cash-in
+     ([TsoCtx.own_context_floor_view]) gives the view receipt this lemma
+     takes.  Conclusion: the read is the LATEST value, exactly. ---- *)
+  Lemma ledger_read_pinw_latest `{CID : CpuId} (g : gstate) (base : Arch.pa)
+      (nn tl : nat) (dq : dfrac) (f : nat -> bv 8) (Wf : nat -> ts_pinw) :
+    tso_interp_at riscv_eraGS g -∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tl -∗
+    ([∗ list] j ∈ seq 0 nn, ∃ t : nat, ⌜(t <= tl)%nat⌝ ∗
+       phys_ledger_pinw (pa_add base j) dq (f j) t (Wf j)) -∗
+    ⌜forall tv : nat, (g.(gtv) cpu_id <= tv)%nat -> forall j, (j < nn)%nat ->
+       tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv (pa_add base j)
+       = Some (f j)⌝.
+  Proof.
+    iIntros "Hint Hgh #Htl Hb".
+    iAssert (⌜forall j, (j < nn)%nat -> exists t, (t <= tl)%nat /\
+               TsoMemPa.latest g.(gimg) g.(glog) (pa_add base j) t (f j)⌝)%I
+      as %Hlat.
+    { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
+      iDestruct (big_sepL_lookup _ (seq 0 nn) j j with "Hb")
+        as (t) "(%Htl' & Hpw)".
+      { rewrite lookup_seq_lt; [reflexivity|lia]. }
+      rewrite /phys_ledger_pinw. iDestruct "Hpw" as "[Hpt Hts]".
+      iDestruct "Hint"
+        as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
+      iDestruct (ghost_map_lookup with "Hauth Hts") as %HTM.
+      destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat0).
+      cbn in Hlat0.
+      rewrite /phys_pointsto. iDestruct "Hpt" as "[Hp %Hram]".
+      iDestruct (gen_heap_valid with "Hgh Hp") as %Hgm.
+      rewrite Hgm in Hgm0. injection Hgm0 as <-.
+      iPureIntro. exists t. split; [exact Htl' | exact Hlat0]. }
+    iDestruct "Hint"
+      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
+    iDestruct (view_auth_valid with "Hv Htl") as %Htlv.
+    rewrite avf_hart in Htlv.
+    iPureIntro. intros tv Htv j Hj.
+    destruct (Hlat j Hj) as (t & Htl' & Hl).
+    apply (TsoMemPa.tso_read_of_latest _ _ _ _ _ t); [exact Hl|].
+    apply TsoMemPa.visibleb_below. lia.
+  Qed.
+
+  (* ---- THE LEAF-OBLIGATION FACE (the [wp_store_s_sconf_au_dat] shape):
+     the member store at [tso_interp_of], with the vstep bookkeeping done
+     here once.  A plain store does not advance the writer's view
+     ([vstep] at [V h]); the message and the new top's log-length receipt
+     come out for the A6.144 floor row. ---- *)
+  Lemma pinw_write_c `{CID : CpuId} (img : bytemap) (σ : mstate)
+      (log : list pwmsg) (V : agent -> nat) (pa : Arch.pa)
+      {mw : N} (vold vnew : bv mw) (n : N)
+      (lo : nat) (Sw : (nat -> bv 8) -> Prop) :
+    (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->
+    Sw (nth_byte vnew) ->
+    gen_heap_interp (hG := riscv_memGS) σ.(mem) -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n), ∃ t : nat,
+       phys_ledger_pinw (pa_add pa j) (DfracOwn 1) (nth_byte vold j) t
+         (TsPinw pa (N.to_nat n) j lo Sw)) ==∗
+    gen_heap_interp (hG := riscv_memGS) (write_bytes σ.(mem) pa n vnew) ∗
+    tso_interp_of riscv_eraGS img (write_bytes σ.(mem) pa n vnew)
+      (log ++ [TsoMemPa.PWMsg (snap_of pa n vnew) (hart_agent cpu_id)])%list
+      (vstep (hart_agent cpu_id) (V (hart_agent cpu_id))
+         (log ++ [TsoMemPa.PWMsg (snap_of pa n vnew) (hart_agent cpu_id)])%list
+         V) ∗
+    ledger_msg_at (length log)
+      (TsoMemPa.PWMsg (snap_of pa n vnew) (hart_agent cpu_id)) ∗
+    TsoGhost.llb loglen_name (S (length log)) ∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n), ∃ t : nat,
+       phys_ledger_pinw (pa_add pa j) (DfracOwn 1) (nth_byte vnew j) t
+         (TsPinw pa (N.to_nat n) j lo Sw)).
+  Proof.
+    intros Hn HSw. iIntros "Hgh Htso Hpw".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    iDestruct (tso_interp_of_bound with "Htso") as %Hb.
+    set (msg := TsoMemPa.PWMsg (snap_of pa n vnew) (hart_agent cpu_id)).
+    set (log' := (log ++ [msg])%list).
+    set (V' := vstep (hart_agent cpu_id) (V (hart_agent cpu_id)) log' V).
+    assert (Hlen' : length log' = S (length log))
+      by (rewrite /log' length_app /=; lia).
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+    { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
+      - exfalso. subst h. pose proof (fin_to_nat_lt cpu_id).
+        rewrite /hart_agent in Hh. lia.
+      - destruct (lt_dec h NCPU); [lia | reflexivity]. }
+    assert (Htvmono : forall c : CPU,
+              (V (hart_agent c) <= V' (hart_agent c))%nat).
+    { intros c. rewrite /V' /vstep. case_decide as Hd; [by rewrite Hd | ].
+      destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; first reflexivity.
+      exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
+    assert (Htvtop : forall c : CPU,
+              (V' (hart_agent c) <= length log')%nat).
+    { intros c. rewrite /V' /vstep. case_decide as Hd.
+      - pose proof (Hb (hart_agent cpu_id)) as Hb1. lia.
+      - destruct (lt_dec (hart_agent c) NCPU).
+        + pose proof (Hb (hart_agent c)) as Hb1. lia.
+        + lia. }
+    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+               σ.(sregs) σ.(mdev) Hpin).
+    iMod (ledger_store_pinw_ok
+            (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
+            (gs_of img (write_bytes σ.(mem) pa n vnew) log' V'
+               σ.(sregs) σ.(mdev))
+            pa n vold vnew lo Sw Hn HSw eq_refl eq_refl eq_refl
+            (fun c => Htvmono c) (fun c => Htvtop c)
+            with "Hgh Htso Hpw") as "(Hgh & Htso & #Hmsg & Hpw)".
+    iDestruct (tso_interp_loglen_llb with "Htso") as "[Htso #Hllb]".
+    cbn [glog gs_of] in *.
+    iModIntro.
+    rewrite -(tso_interp_of_at_gs riscv_eraGS img
+                (write_bytes σ.(mem) pa n vnew) log' V'
+                σ.(sregs) σ.(mdev) Hpin').
+    iFrame "Hgh Htso Hpw Hmsg".
+    iApply (TsoGhost.llb_le with "Hllb"). rewrite Hlen'. lia.
   Qed.
 
 End CtxPinw.
