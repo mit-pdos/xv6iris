@@ -1,0 +1,52 @@
+# ucode_cat.txt -- the pc set of iris/UCodeCat.v, for tools/gen_ucode.py.
+#
+#   tools/gen_ucode.py --module Cat --out iris/UCodeCat.v \
+#       --spec tools/ucode_cat.txt
+#
+# cat is the first verified program whose SYSCALLS WRITE ITS MEMORY.  init,
+# echo and sync issue only quiet syscalls and exec/fork/wait; cat's inner
+# loop is `read(fd, buf, 512)` into a 512-byte global, and the theorem has
+# to hold whatever the kernel puts there and however much of it it fills.
+# It is also the first to reach vprintf's `%s` arm, through
+# `fprintf(2, "cat: cannot open %s\n", argv[i])`.
+#
+# Unreachable branches INSIDE a listed function are kept, following
+# ucode_init.txt: an unused [uinstr] fact costs only compile time, and
+# pruning per branch would have to be re-audited whenever the reachable set
+# moves.  A whole function never entered is another matter -- its facts
+# would be a claim about code no proof reads -- so those are left out and
+# the reason recorded below.
+
+note This catalog covers cat as it runs: main's walk over argv, the
+note read/write loop in cat(), and the fprintf cone underneath its three
+note diagnostics.  Its coverage claim is the list of omitted functions
+note below, not all of ulib.
+
+# ---- the program ------------------------------------------------------
+func start
+func main
+func cat
+
+# ---- the fprintf cone (reached by all three diagnostics) --------------
+func fprintf
+func vprintf
+func putc
+
+# ---- the syscall stubs it issues --------------------------------------
+func read
+func write
+func open
+func close
+func exit
+
+# ---- and what is deliberately absent ---------------------------------
+skipfunc printint unreachable: vprintf reaches it only from the %d/%u/%x arms, and cat's only conversion is %s
+skipfunc printf unreachable: cat calls fprintf, never printf
+skipfunc malloc unreachable: cat allocates nothing
+skipfunc free unreachable: cat allocates nothing
+skipfunc sbrk unreachable: only malloc calls it
+skipfunc sbrklazy unreachable: only malloc calls it
+skipfunc sys_sbrk unreachable: only malloc calls it
+skipfunc gets unreachable: cat never reads a line
+skipfunc stat unreachable: cat never stats
+skipfunc fstat unreachable: only stat calls it
