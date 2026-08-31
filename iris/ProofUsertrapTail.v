@@ -184,8 +184,18 @@ Section UtRet2.
   Lemma ut_ret2 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 mf : regfile) (av nx : nat) (b : bool)
       (uepc : mword 64) (vb : mword 1)
-      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) (sts : list fdstate) :
+      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string)
+      (* TWO DESCRIPTOR INDICES, and the difference is the point: [sts0] is
+         what usertrap was ENTERED at -- the index the caller's post is
+         stated against -- and [sts] is what this tail is parking.  They
+         differ on exactly one arm. *)
+      (sts0 sts : list fdstate) :
     ut_wf N ->
+    (* the round's descriptor half, as this tail's caller certifies it.  The
+       fault and timer arms pass one list twice and prove it by
+       [reflexivity]; the syscall arm may have moved them, and its cause IS
+       the ecall, so its proof is vacuous. *)
+    ut_fd_kept scw sts0 sts ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -228,10 +238,10 @@ Section UtRet2.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts epw scw) -∗
+                     mie_v menvcfg0 U0 sts0 epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcs Hmiev Hmenvv Hrd Hepcw.
+    intros Hwf Hfdk Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcs Hmiev Hmenvv Hrd Hepcw.
     (* the budget, in numbers [lia] can see -- every one of these is a
        [Definition] and the index arithmetic below is what needs them *)
     pose proof Hav as Hav'.
@@ -597,11 +607,16 @@ Section UtRet2.
     iDestruct ("Hownback" $! U with "Hpv Hufr Hsy") as "Hown".
     iApply ("Hcont" $! (pv_upt (us_V U)) (tp_pin S9) msg
               (kvi_satp_word (ud_root (pv_upt (us_V U)))) (mepc_val uepc) scv stv mdv0 U
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     Hhs Hpriv Hms Hscause Hstval Hsepc [Hstvec] Hpc [Hfile]
                     Hmie Hmdl Hmenv Hhw Hmin [-]").
     - reflexivity.
     - exact Hrd.
+    - (* [ut_fd_kept], straight off the premise: this tail re-closes the
+         residue with the SAME fragments it borrowed, so what it parks is
+         what its caller handed it, and whether THAT moved the states is
+         the caller's statement to make. *)
+      exact Hfdk.
     - (* [ret_pc (mepc_val uepc) = tf_resume_pc (pv_tf (us_V U))]: [mepc_val]
          IS [ret_pc], which is idempotent, and the epc word is [uepc]. *)
       unfold tf_resume_pc, tf_w. rewrite Hepcw. exact (ret_pc_idem uepc).
@@ -660,8 +675,18 @@ Section UtRet.
   (* ==================================================================== *)
   Lemma ut_ret (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (b : bool)
-      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) (sts : list fdstate) :
+      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string)
+      (* TWO DESCRIPTOR INDICES, and the difference is the point: [sts0] is
+         what usertrap was ENTERED at -- the index the caller's post is
+         stated against -- and [sts] is what this tail is parking.  They
+         differ on exactly one arm. *)
+      (sts0 sts : list fdstate) :
     ut_wf N ->
+    (* the round's descriptor half, as this tail's caller certifies it.  The
+       fault and timer arms pass one list twice and prove it by
+       [reflexivity]; the syscall arm may have moved them, and its cause IS
+       the ecall, so its proof is vacuous. *)
+    ut_fd_kept scw sts0 sts ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -682,10 +707,10 @@ Section UtRet.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts epw scw) -∗
+                     mie_v menvcfg0 U0 sts0 epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
+    intros Hwf Hfdk Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -776,8 +801,8 @@ Section UtRet.
                     (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))).
       apply list_lookup_total_correct. exact Hepc. }
     iApply (ut_ret2 (CID := CIDp) Rsys N U0 (MkUstate Vr _) pt ksp m0 mf av nx b uepc vb
-              mie_v menvcfg0 epw scw lks sts
-              Hwf' Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp
+              mie_v menvcfg0 epw scw lks sts0 sts
+              Hwf' Hfdk Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp
               ltac:(rewrite (callee_saved_lookup Hcspr csp_rs1
                               ltac:(vm_compute; reflexivity)); exact HM1sp)
               ltac:(rewrite (callee_saved_lookup Hcspr Rs1
@@ -806,8 +831,18 @@ Section UtA6.
      s2,0] is stepped and its value never read again. *)
   Lemma ut_a6 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (b : bool)
-      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) (sts : list fdstate) :
+      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string)
+      (* TWO DESCRIPTOR INDICES, and the difference is the point: [sts0] is
+         what usertrap was ENTERED at -- the index the caller's post is
+         stated against -- and [sts] is what this tail is parking.  They
+         differ on exactly one arm. *)
+      (sts0 sts : list fdstate) :
     ut_wf N ->
+    (* the round's descriptor half, as this tail's caller certifies it.  The
+       fault and timer arms pass one list twice and prove it by
+       [reflexivity]; the syscall arm may have moved them, and its cause IS
+       the ecall, so its proof is vacuous. *)
+    ut_fd_kept scw sts0 sts ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -833,10 +868,10 @@ Section UtA6.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts epw scw) -∗
+                     mie_v menvcfg0 U0 sts0 epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hbelow.
+    intros Hwf Hfdk Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hbelow.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -1042,8 +1077,8 @@ Section UtA6.
       iDestruct (wp_next_retarget CID3 CID4 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID4) Rsys N U0 U pt ksp m0 mf av nx b
-                mie_v menvcfg0 epw scw lks sts
-                Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
+                mie_v menvcfg0 epw scw lks sts0 sts
+                Hwf' Hfdk Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
@@ -1069,8 +1104,18 @@ Section UtFa.
      has to be re-anchored on the far side. *)
   Lemma ut_fa (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (b : bool)
-      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) (sts : list fdstate) :
+      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string)
+      (* TWO DESCRIPTOR INDICES, and the difference is the point: [sts0] is
+         what usertrap was ENTERED at -- the index the caller's post is
+         stated against -- and [sts] is what this tail is parking.  They
+         differ on exactly one arm. *)
+      (sts0 sts : list fdstate) :
     ut_wf N ->
+    (* the round's descriptor half, as this tail's caller certifies it.  The
+       fault and timer arms pass one list twice and prove it by
+       [reflexivity]; the syscall arm may have moved them, and its cause IS
+       the ecall, so its proof is vacuous. *)
+    ut_fd_kept scw sts0 sts ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -1091,10 +1136,10 @@ Section UtFa.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0 U0 sts epw scw) -∗
+                     mie_v menvcfg0 U0 sts0 epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
+    intros Hwf Hfdk Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -1152,8 +1197,8 @@ Section UtFa.
       iDestruct (wp_next_retarget CID CID2 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID2) Rsys N U0 U pt ksp m0 M1 av nx b
-                mie_v menvcfg0 epw scw lks sts
-                Hwf' Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
+                mie_v menvcfg0 epw scw lks sts0 sts
+                Hwf' Hfdk Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
@@ -1240,8 +1285,8 @@ Section UtFa.
       iDestruct (wp_next_retarget CID4 CID5 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID5) Rsys N U0 U pt ksp m0 mf av nx b
-                mie_v menvcfg0 epw scw lks sts
-                Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
+                mie_v menvcfg0 epw scw lks sts0 sts
+                Hwf' Hfdk Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       (* the yield arm came back at the literal [∅]; [lks = ∅] at depth 0
