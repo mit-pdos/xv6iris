@@ -425,7 +425,7 @@ Section UkRunSys.
       unfold add_vec_int.
       rewrite moi_add_l (uint_moi a Ha64).
       exact (uint_moi (a + Z.of_nat k) Hak64). }
-    rewrite (umem_wr_write M a d bs Hwrap) in HM'.
+    rewrite (UserPtTree.umem_wr_write M a d bs Hwrap) in HM'.
     rewrite (umem_write_prefix M a cnt d bs f Hdn
                ltac:(intros k Hk; exact (proj1 (Himg k Hk)))) in HM'.
     subst M'.
