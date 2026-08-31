@@ -23,7 +23,7 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
    locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
-   suffixed `.aux` -- see the gotcha).  **Last certified: r59 (`081a27ff178f`), 1264/1304, red cone unchanged from r58, zero admits.  A6.135 §1–§4 LANDED (per-slot-anchor KTier, Bg gates, cv_boot_cred walk credential, kptree_publish_boot — the UNCONDITIONAL boot publication).  Remaining: §5 (the satp-write ghost hook, plan measured in tso-machine-flip.md A6.135 §5) then ProofMain mn_grp_kvm.  Builds via `run-on-gcp` ONLY.**
+   suffixed `.aux` -- see the gotcha).  **Last certified: r60 (`86e7eca4c7b`), 1265/1304, red roots 4 (ProofForkretPark:318, ProofKernelvec:1704, UptWalkPt:679, UserMemPt:427 -- the last two the deliberate §0.37′ cone), zero admits.  A6.135 COMPLETE: the kernel page table is established AT the `csrw satp` node -- per-slot own-stamp pins with the boot hart's cv_own anchors, kpt_inv_alloc under the write-node fupd hook, kpt_creds with NO view receipt on hart 0.  ProofMain.mn_grp_kvm is GREEN.  Next: ProofKernelvec (§0.39′, unmeasured) and the stamped_rec ruling for ProofForkretPark.  Builds via `run-on-gcp` ONLY.**
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
    this session EXCEPT one mirrored hunk: `iris/SmodeCorePt.v`'s
    `word_pointsto_wpay_mint_c` gained the trailing own-message fragment

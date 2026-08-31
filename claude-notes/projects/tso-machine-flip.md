@@ -17215,3 +17215,11 @@ Gotchas: re-importing gen_heap at the END of a spec file breaks the
 it; `iApply ("Hcont" … ); last first` scrambles bullet order — spell the
 subgoals in order instead.
 
+### r60 CERTIFIED: 1265/1304, snapshot `86e7eca4c7b9f`, red roots 4
+
+`ProofMain` left the red list (mn_grp_kvm AND mn_grp_fs both green).
+Remaining roots: `ProofForkretPark:318` (stamped_rec ruling pending),
+`ProofKernelvec:1704` (§0.39′, unmeasured), `UptWalkPt:679` /
+`UserMemPt:427` (§0.37′, deliberately red).  Mirror refreshed; `.vo`
+pulled so the snapshot matches the build.
+
