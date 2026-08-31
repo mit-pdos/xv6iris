@@ -2064,7 +2064,11 @@ things, and the answer differs:
      gname, in the shape `UkInit.init_rodata` / `UkInitLit.init_lit_str`
      already have for init.  Everything the premise needs is in that
      shape; nothing about it is unsatisfiable.
-  5. **The eleven first-generation `UProofSh*.v` files.**  Precedent says
+  5. **RULED (owner, 2026-08-31): DELETE.**  Done same day — the eleven
+     `UProofSh*.v` + `UCodeSh.v` + `USpecSh.v` + `USpecShParse.v` are
+     deleted; `sh_img_sub` + halves relocated verbatim into
+     `SpecKexecPin.v` (their one outside consumer); tombstone in
+     `_CoqProject`.  The original ask, for the record: precedent says
      the old proofs are DELETED when a program is ported (4f088971f did
      exactly that for sync).  That is 33k green lines and a closed
      theorem; deleting them is a coordinator/owner call, not this lane's.

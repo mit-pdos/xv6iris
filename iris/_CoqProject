@@ -278,22 +278,16 @@ UEchoKernel.v
 UkAbi.v
 UexecCond.v
 UCodeEcho.v
-UCodeSh.v
-USpecSh.v
-USpecShParse.v
+# TOMBSTONE (owner ruling, 2026-08-31): the FIRST-GENERATION sh proof --
+# UCodeSh.v, USpecSh.v, USpecShParse.v and the eleven UProofSh*.v files
+# (33k lines, zero Admitted/Axiom, closing at wp_sh_execs_echo) -- is
+# DELETED on port, per the precedent (4f088971f).  The port's stack is
+# UCodeShK.v/UCodeShP.v + UkSh.v/UkShParse.v/UkShRun.v; the pure parser
+# vocabulary was transposed into UkShParse.v (ushp_*), and the one fact
+# the pinned-exec contract consumed (sh_img_sub + halves) moved verbatim
+# into SpecKexecPin.v.  Design of record: claude-notes/completed/user-sh.md.
 UmodeFrame.v
 UmodeStub.v
-UProofShLib.v
-UProofShMem.v
-UProofShHeap.v
-UProofShLex.v
-UProofShIo.v
-UProofShInput.v
-UProofShParse.v
-UProofShCmd.v
-UProofShTop.v
-UProofShMain.v
-UProofShEcho.v
 UCodeInit.v
 # CAT.  The first verified program whose SYSCALLS WRITE ITS MEMORY: its
 # inner loop is read(fd, buf, 512) into a 512-byte global, and the theorem
