@@ -99,6 +99,17 @@ Import Defs.
 Require Import TsoCtx.
 Require Import SpecSysOpenAU.   (* [om_*], [delta_trunc] -- the mode readings
                                    and the one no-CREATE delta, reused *)
+Require Import UsysMemOk.       (* [usys_fd_ok] -- UPSTREAM'S per-syscall
+                                   DESCRIPTOR table.  The mirror's fd leg is a
+                                   READING of it (section 5b), never a twin:
+                                   off the enriched rows [ufs_step_at] IS that
+                                   table, and on them the agreement is proven.
+                                   Cone: [UsysMemOk]'s own requires are
+                                   [ProcGeom] / [TfUser] / [UserPtTree] /
+                                   [ProcPtOwn] / [UserPerm] / [FdSlots], all
+                                   below this file already; nothing upstream
+                                   requires [FsFdMirror], so there is no
+                                   cycle. *)
 
 Local Open Scope Z_scope.
 
@@ -260,6 +271,93 @@ Definition uenr_dom (n : Z) : bool :=
 Lemma uenr_path_dom (n : Z) : uenr_path n = true -> uenr_dom n = true.
 Proof. intros H. unfold uenr_dom. rewrite H. reflexivity. Qed.
 
+(* --------------------------------------------------------------------- *)
+(*  The three word readings the agreement with [usys_fd_ok] needs.  All    *)
+(*  SECTION-FREE and closed, so the [vm_compute]s below are safe           *)
+(*  (durable-notes: [vm_compute] on a goal carrying a section variable     *)
+(*  HANGS rather than fails).                                              *)
+(* --------------------------------------------------------------------- *)
+
+(* a small non-negative literal reads back as itself, unsigned... *)
+Lemma um_uint_moi (z : Z) : (0 <= z < 2 ^ 63)%Z ->
+  uint (mword_of_int z : mword 64) = z.
+Proof.
+  intros Hz.
+  assert (E63 : (2 ^ 63 = 9223372036854775808)%Z) by (vm_compute; reflexivity).
+  assert (E64 : (2 ^ 64 = 18446744073709551616)%Z) by (vm_compute; reflexivity).
+  assert (H64 : (0 <= z < 2 ^ 64)%Z) by lia.
+  rewrite uint_unsigned. rewrite moi64_unsigned. exact (bvw64_small z H64).
+Qed.
+
+(* ...and signed *)
+Lemma um_signed_moi (z : Z) : (0 <= z < 2 ^ 63)%Z ->
+  bv_signed (mword_of_int z : mword 64) = z.
+Proof.
+  intros Hz.
+  assert (E63 : (2 ^ 63 = 9223372036854775808)%Z) by (vm_compute; reflexivity).
+  assert (E64 : (2 ^ 64 = 18446744073709551616)%Z) by (vm_compute; reflexivity).
+  assert (H64 : (0 <= z < 2 ^ 64)%Z) by lia.
+  unfold bv_signed. rewrite moi64_unsigned. rewrite (bvw64_small z H64).
+  apply bv_swrap_small.
+  assert (Hhm : bv_half_modulus 64 = (2 ^ 63)%Z) by reflexivity.
+  rewrite Hhm. lia.
+Qed.
+
+(* a word whose SIGNED reading is non-negative reads the same unsigned --
+   what turns [argfd]'s signed test (our dup row's key) into the index
+   [usys_fd_ok] inserts at *)
+Lemma um_uint_of_signed (b : mword 64) :
+  (0 <= bv_signed b)%Z -> uint b = bv_signed b.
+Proof.
+  intros Hs. rewrite uint_unsigned.
+  assert (Hsi : sint b = bv_signed b) by reflexivity.
+  rewrite <- Hsi in Hs |- *.
+  exact (sint64_unsigned b Hs).
+Qed.
+
+(* the two readings of the FAILURE value, which every row's failure arm is
+   keyed on *)
+Lemma um_signed_moi_neg1 :
+  bv_signed (mword_of_int (-1) : mword 64) = (-1)%Z.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma um_uint_moi_neg1 :
+  uint (mword_of_int (-1) : mword 64) = 18446744073709551615%Z.
+Proof. vm_compute. reflexivity. Qed.
+
+(* ===================================================================== *)
+(*  A -1 RETURN MOVES NO DESCRIPTOR, ON EVERY ROW OF UPSTREAM'S TABLE.     *)
+(*                                                                        *)
+(*  Stated about [usys_fd_ok] alone -- it is a fact about THEIR table, not *)
+(*  about the mirror -- because it is what every one of our rows' honest   *)
+(*  [-1] blanket has to hand back.  Each of the four rows keys its         *)
+(*  failure arm on the return value ([uint r = 0] for close and pipe,      *)
+(*  [0 <= bv_signed r] for dup and open), and [-1] is on the failing side  *)
+(*  of all four.                                                          *)
+(* ===================================================================== *)
+Lemma usys_fd_ok_neg1 (n : Z) (tf : list (mword 64)) (sts : list fdstate) :
+  usys_fd_ok n tf (mword_of_int (-1) : mword 64) sts sts.
+Proof.
+  assert (Hneg : ¬ (0 <= bv_signed (mword_of_int (-1) : mword 64))%Z).
+  { rewrite um_signed_moi_neg1. lia. }
+  assert (Hnz : uint (mword_of_int (-1) : mword 64) <> 0%Z).
+  { rewrite um_uint_moi_neg1. discriminate. }
+  unfold usys_fd_ok.
+  destruct (decide (n = UsysMemOk.USYS_close)) as [_ | _].
+  { destruct (decide (uint (mword_of_int (-1) : mword 64) = 0%Z))
+      as [Hc | _]; [ exfalso; exact (Hnz Hc) | reflexivity ]. }
+  destruct (decide (n = UsysMemOk.USYS_dup)) as [_ | _].
+  { destruct (decide (0 <= bv_signed (mword_of_int (-1) : mword 64))%Z)
+      as [Hc | _]; [ exfalso; exact (Hneg Hc) | reflexivity ]. }
+  destruct (decide (n = UsysMemOk.USYS_open)) as [_ | _].
+  { destruct (decide (0 <= bv_signed (mword_of_int (-1) : mword 64))%Z)
+      as [Hc | _]; [ exfalso; exact (Hneg Hc) | reflexivity ]. }
+  destruct (decide (n = UsysMemOk.USYS_pipe)) as [_ | _].
+  { destruct (decide (uint (mword_of_int (-1) : mword 64) = 0%Z))
+      as [Hc | _]; [ exfalso; exact (Hnz Hc) | reflexivity ]. }
+  reflexivity.
+Qed.
+
 Section Steps.
   Context `{XI : CurCtx}.
 
@@ -372,7 +470,22 @@ Section Steps.
       ufs_mknod_at pl (dev_arg (ufs_arg tf 1)) (dev_arg (ufs_arg tf 2))
         r u u'
     else if decide (n = USYS_dup) then ufs_dup_at (ufs_arg tf 0) r u u'
-    else u' = u.
+    else
+      (* OFF THE ENRICHED ROWS THE MIRROR'S FD LEG *IS* UPSTREAM'S TABLE.
+         This arm used to read [u' = u] -- "no other syscall moves the
+         mirror" -- which is FALSE of the descriptor table on three of
+         upstream's own rows ([UsysMemOk.usys_fd_ok]: close, pipe and a dup
+         that is not in [uenr_dom] all move it) and would have been an
+         undischargeable contract the day [uenr_dom] widened, exactly the
+         shape stage P5's dup finding hit.  Delegating instead is the v3
+         discipline: our carrier READS their ghost/table rather than
+         restating it, so the arm is true by construction and the enriched
+         loop discharges it from the dispatcher's own [sysc_fd_ok] post.
+         Nothing is claimed about the shared legs here -- a quiet row's
+         [um_av]/[um_cwd] is the SHARED state's business (chdir moves the
+         cwd, write/unlink/mkdir move the view), and claiming otherwise
+         would just move the same false conjunct one leg over. *)
+      usys_fd_ok n tf r (um_fdt u) (um_fdt u').
 
   (* ...and with the path read off the image at argument 0 FOR THE PATH
      ROWS, plus the honest escape when it cannot be read (argstr fails, the
@@ -475,6 +588,171 @@ Section Steps.
       /\ u' = MkUmirror (<[nfd := st]> (um_fdt u)) (um_av u) (um_cwd u).
   Proof.
     intros [[Hr _] | H] Hne; [exfalso; exact (Hne Hr) | exact H].
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* 5b.  THE AGREEMENT WITH UPSTREAM'S DESCRIPTOR TABLE.                *)
+  (*                                                                     *)
+  (* [UsysMemOk.usys_fd_ok] is upstream's pure per-syscall row for the    *)
+  (* PROCESS'S DESCRIPTORS -- the same shape, keyed on the same number,   *)
+  (* and the thing the kernel dispatcher discharges                      *)
+  (* ([SpecSyscall.sysc_fd_ok], [UsysMemOkSpec.sysc_fd_ok_usys]).  The    *)
+  (* mirror's fd leg must not be a SECOND opinion about the same code, so *)
+  (* below is the receipt that it is not:                                *)
+  (*                                                                     *)
+  (*   - off the enriched rows the mirror's leg IS their row              *)
+  (*     (definitional, since the delegation above);                      *)
+  (*   - on the three enriched rows the mirror's leg REFINES their row -- *)
+  (*     ours pins the descriptor NUMBER ([fd_lowest_closed], fdalloc's   *)
+  (*     own scan) and the row's TYPE, theirs says only that the returned *)
+  (*     slot is now open at SOME type and mode (open), or that it is a   *)
+  (*     copy of the argument's (dup); mknod touches no descriptor on     *)
+  (*     either side.                                                     *)
+  (*                                                                     *)
+  (* SO THE TWO TABLES CANNOT DISAGREE, and when the enriched loop steps  *)
+  (* the real fd view by [usys_fd_ok] it may step the mirror's leg by     *)
+  (* [ufs_step] at the same time: [ufs_step_fd_agrees] is exactly the     *)
+  (* obligation that would otherwise be owed at every enriched call.      *)
+  (*                                                                     *)
+  (* THE LENGTH PREMISE is the bundle's own invariant                     *)
+  (* ([FdSlots.fd_frags] carries [length sts = NOFILE], read off the      *)
+  (* residue by [FdRowMint.mirror_tied_fdlen]).  It is what makes the     *)
+  (* returned fd a SMALL number, so that the row's index -- theirs is     *)
+  (* [Z.to_nat (uint r)], ours is the [nat] itself -- is the same index.  *)
+  (* ------------------------------------------------------------------ *)
+  Lemma ufs_step_at_fd_agrees (n : Z) (pl : list (bv 8))
+      (tf : list (mword 64)) (r : mword 64) (u u' : umirror) :
+    length (um_fdt u) = NOFILE ->
+    ufs_step_at n pl tf r u u' ->
+    usys_fd_ok n tf r (um_fdt u) (um_fdt u').
+  Proof.
+    intros Hlen Hst.
+    assert (HN : NOFILE = 16%nat) by (vm_compute; reflexivity).
+    assert (E63 : (2 ^ 63 = 9223372036854775808)%Z)
+      by (vm_compute; reflexivity).
+    unfold ufs_step_at in Hst.
+    destruct (decide (n = USYS_open)) as [-> | Hno].
+    { (* ---- open = 15, against upstream's open row ---- *)
+      unfold usys_fd_ok.
+      destruct (decide (USYS_open = UsysMemOk.USYS_close)) as [Hc | _];
+        [ discriminate Hc | ].
+      destruct (decide (USYS_open = UsysMemOk.USYS_dup)) as [Hc | _];
+        [ discriminate Hc | ].
+      destruct (decide (USYS_open = UsysMemOk.USYS_open)) as [_ | Hc];
+        [ | exfalso; exact (Hc eq_refl) ].
+      destruct Hst as [[-> ->] | (i & a & fd & Hres & Hrow & Hfd & -> & Harm)].
+      - (* the blanket: -1 is on the failing side of their row *)
+        destruct (decide (0 <= bv_signed (mword_of_int (-1) : mword 64))%Z)
+          as [Hc | _]; [ | reflexivity ].
+        exfalso. rewrite um_signed_moi_neg1 in Hc. lia.
+      - (* the success arm: ours pins the number, theirs only asks that
+           SOME open row landed at [Z.to_nat (uint r)] *)
+        pose proof (fd_lowest_closed_bound (um_fdt u) fd Hfd) as Hb.
+        assert (Hz : (0 <= Z.of_nat fd < 2 ^ 63)%Z) by lia.
+        destruct (decide (0 <= bv_signed
+                            (mword_of_int (Z.of_nat fd) : mword 64))%Z)
+          as [_ | Hc];
+          [ | exfalso; apply Hc; rewrite (um_signed_moi (Z.of_nat fd) Hz);
+              lia ].
+        assert (Hidx : Z.to_nat (uint (mword_of_int (Z.of_nat fd)
+                                       : mword 64)) = fd).
+        { rewrite (um_uint_moi (Z.of_nat fd) Hz). exact (Nat2Z.id fd). }
+        rewrite Hidx.
+        destruct Harm as [(ma & mi & nl & _ & _ & ->)
+                         | [(bs & nl & _ & ->) | (e & nl & _ & _ & ->)]].
+        + exists (om_readable (ufs_arg tf 1)), (om_writable (ufs_arg tf 1)),
+                 (FdDevice ma).
+          reflexivity.
+        + exists (om_readable (ufs_arg tf 1)), (om_writable (ufs_arg tf 1)),
+                 (FdInode i).
+          reflexivity.
+        + exists true, false, (FdInode i). reflexivity. }
+    destruct (decide (n = USYS_mknod)) as [-> | Hnm].
+    { (* ---- mknod = 17: NEITHER table moves a descriptor.  Upstream has
+           no mknod row at all, and that is right against the C: sys_mknod
+           is create() + iunlockput, with no [fdalloc] anywhere in it. ---- *)
+      unfold usys_fd_ok.
+      destruct (decide (USYS_mknod = UsysMemOk.USYS_close)) as [Hc | _];
+        [ discriminate Hc | ].
+      destruct (decide (USYS_mknod = UsysMemOk.USYS_dup)) as [Hc | _];
+        [ discriminate Hc | ].
+      destruct (decide (USYS_mknod = UsysMemOk.USYS_open)) as [Hc | _];
+        [ discriminate Hc | ].
+      destruct (decide (USYS_mknod = UsysMemOk.USYS_pipe)) as [Hc | _];
+        [ discriminate Hc | ].
+      destruct Hst as [[_ ->] | (d & i & nm & e & nl & _ & _ & _ & _ & _ &
+                                _ & _ & ->)];
+        reflexivity. }
+    destruct (decide (n = USYS_dup)) as [-> | Hnd].
+    { (* ---- dup = 10, against upstream's dup row ---- *)
+      unfold usys_fd_ok.
+      destruct (decide (USYS_dup = UsysMemOk.USYS_close)) as [Hc | _];
+        [ discriminate Hc | ].
+      destruct (decide (USYS_dup = UsysMemOk.USYS_dup)) as [_ | Hc];
+        [ | exfalso; exact (Hc eq_refl) ].
+      unfold ufs_arg in Hst.
+      destruct Hst as [[-> ->]
+                      | (nfd & st & Hnn & Hlk & _ & Hfd & -> & ->)].
+      - destruct (decide (0 <= bv_signed (mword_of_int (-1) : mword 64))%Z)
+          as [Hc | _]; [ | reflexivity ].
+        exfalso. rewrite um_signed_moi_neg1 in Hc. lia.
+      - pose proof (fd_lowest_closed_bound (um_fdt u) nfd Hfd) as Hb.
+        assert (Hz : (0 <= Z.of_nat nfd < 2 ^ 63)%Z) by lia.
+        destruct (decide (0 <= bv_signed
+                            (mword_of_int (Z.of_nat nfd) : mword 64))%Z)
+          as [_ | Hc];
+          [ | exfalso; apply Hc; rewrite (um_signed_moi (Z.of_nat nfd) Hz);
+              lia ].
+        assert (Hidx : Z.to_nat (uint (mword_of_int (Z.of_nat nfd)
+                                       : mword 64)) = nfd).
+        { rewrite (um_uint_moi (Z.of_nat nfd) Hz). exact (Nat2Z.id nfd). }
+        rewrite Hidx.
+        (* THE ARGUMENT'S INDEX IS THE SAME INDEX ON BOTH SIDES: ours keys
+           the row on [bv_signed] (argfd reads an [int] and rejects the
+           negative half), theirs on [uint], and the two agree exactly
+           where argfd accepted. *)
+        rewrite (um_uint_of_signed (tf !!! tf_arg_idx 0) Hnn).
+        rewrite (list_lookup_total_correct (um_fdt u)
+                   (Z.to_nat (bv_signed (tf !!! tf_arg_idx 0))) st Hlk).
+        reflexivity. }
+    (* ---- every other number: the arm IS their row ---- *)
+    exact Hst.
+  Qed.
+
+  (* ...and the same at the contract's own relation.  The path rows' extra
+     escape (the string at argument 0 is unreadable, so argstr fails and the
+     call returns -1) lands on [usys_fd_ok_neg1], which is why the escape
+     costs the agreement nothing. *)
+  Lemma ufs_step_fd_agrees (n : Z) (tf : list (mword 64))
+      (Mi : gmap Z (bv 8)) (r : mword 64) (u u' : umirror) :
+    length (um_fdt u) = NOFILE ->
+    ufs_step n tf Mi r u u' ->
+    usys_fd_ok n tf r (um_fdt u) (um_fdt u').
+  Proof.
+    intros Hlen Hst. unfold ufs_step in Hst.
+    destruct (uenr_path n) eqn:Hp.
+    - destruct Hst as [[-> ->] | (pl & _ & Hst)].
+      + exact (usys_fd_ok_neg1 n tf (um_fdt u)).
+      + exact (ufs_step_at_fd_agrees n pl tf r u u' Hlen Hst).
+    - exact (ufs_step_at_fd_agrees n [] tf r u u' Hlen Hst).
+  Qed.
+
+  (* THE BUNDLE'S INVARIANT SURVIVES, which is what makes the stepped
+     mirror re-indexable at [fd_frags]: [FdSlots.fd_frags] carries
+     [length sts = NOFILE] inside it, so a step that could change the
+     length would be a step no residue could accept.  Upstream proves it
+     of their table ([usys_fd_ok_length]); by the agreement it holds of
+     ours. *)
+  Lemma ufs_step_fd_len (n : Z) (tf : list (mword 64))
+      (Mi : gmap Z (bv 8)) (r : mword 64) (u u' : umirror) :
+    length (um_fdt u) = NOFILE ->
+    ufs_step n tf Mi r u u' ->
+    length (um_fdt u') = NOFILE.
+  Proof.
+    intros Hlen Hst.
+    rewrite <- Hlen.
+    exact (usys_fd_ok_length n tf r (um_fdt u) (um_fdt u')
+             (ufs_step_fd_agrees n tf Mi r u u' Hlen Hst)).
   Qed.
 
 End Steps.
