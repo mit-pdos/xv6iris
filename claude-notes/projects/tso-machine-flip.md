@@ -17308,3 +17308,54 @@ receipt from the deposit context to XIc.
 Nothing else in ProofKernelvec looks red: the failure is this single
 premise at the single `wp_kerneltrap_sconf` application.
 
+### A6.138 — THE SECONDARY WIRING, mapped end to end
+
+What a secondary needs at `SpecMainSecondary` (all now measured against
+the r60 interfaces): `kpt_inv root`, the root cell `↦₈□`, `kmap_at`
+tramp/kstacks, `devintr_caps`' members, and `KptShare.kpt_creds =
+∃B, kpt_bound B ∗ cv_boot_cred B` — a secondary lands in the VIEW arm,
+so it must produce `view_lb (its own hart) B`.
+
+**What already works** (hart 0 side, landed at r60): the establishment
+hook's `Qk` hands `mn_grp_kvm`'s continuation persistent copies of
+`kpt_inv ∗ kpt_creds`; the mn continuation already routes `kpt_inv`,
+the root cell and the kmaps into `mn_grp_started`'s deposit □-wand
+(ProofMain:1935ff) — so adding `kpt_bound B` (persistent) to the payload
+is a one-conjunct change to the wand and the payload instance.
+
+**The one missing fact**: the receiver derives `view_lb (S i)` from the
+armed read (`started_W`'s `S i ≤ tv` + `view_lb_get` under the interp —
+§0.36 clause 2, machinery landed at r58), and needs `B ≤ S i` to weaken
+it to `view_lb B` (`view_lb_le`).  `B ≤ S i` is TRUE (the establishment
+ran before the flag store: B = loglen at satp < the store's position)
+and PROVABLE AT THE STORE (hart 0 holds `llb B`; the append position is
+the log length), but is currently RECORDED NOWHERE the receiver can
+reach: the payload `P : CtxId → iProp` is fixed at `started_alloc`
+(boot), before the store's position exists; the position `i` lives only
+in the invariant's armed arm (`started_right`'s `∃ i T`).
+
+**The plan: position-indexed payload.**  Generalize
+`P : CtxId → iProp` to `P : nat → CtxId → iProp` through the started
+family (`started_alloc/inv/right/W/read_obl/absorb/store_obl`), with the
+armed arm carrying `P (S i) ξd` — the payload learns the flag position.
+The store obligation's caller (`mn_grp_started`) then discharges
+`P (S i)` at store time, where `⌜B ≤ S i⌝` is free from `llb B` + the
+gate's position.  The kpt instance becomes
+`P := λ pos ξ, (…existing payload…) ∗ ∃ B, kpt_bound B ∗ ⌜B ≤ pos⌝`.
+Receiver chain (BootChain/LinkMainSecondary, red cone):
+armed read → `S i ≤ tv` → `view_lb (S i)` (view_lb_get) → `⌜B ≤ S i⌝`
+(payload) → `view_lb B` (view_lb_le) → `cv_boot_cred_view` →
+`kpt_creds_intro`.  No new ghost, no Σ change, no StartedInv
+re-proving beyond the mechanical arity thread (the landed started
+proofs keep their shapes with `λ _ ξ, …` where the position is unused).
+NOTE the owner's r58 sentence ("keep the proven started and virtio
+proofs as-is") — this is an arity GENERALIZATION with mechanical
+updates, not a redo; flagging in case the owner prefers a separate
+recording site instead (the alternative is a new agreement ghost minted
+at the store — Σ-level, worse).
+
+Order of work: the arity thread (StartedInv + mn_grp_started), the
+payload instance, then the receiver chain — but the receiver files sit
+behind the kernelvec red (A6.137) in the certification order, so the
+kernelvec ruling should come first.
+
