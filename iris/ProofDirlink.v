@@ -2393,7 +2393,7 @@ Section ProofDirlinkMain.
                  Sbw)
           "%Hcswi %Hwf' %Hholes' %Haddrs' %Hsz' %Hcov' %Hcap' %Hsized'
            %Hdistb %Hdist0
-           %Hdistk %Hrange %Htie %Harm %Hbud %Hsbw %Hwi16 %Hwiany %Hwiat %Hupt
+           %Hdistk %Hrange %Htie %Htieu %Harm %Hbud %Hsbw %Hwi16 %Hwiany %Hwiat %Hupt
            Hcg Hcnt _ _ Hpc Hidev Hiinum
            Hmeta Hmap Hblocks Hsbi Hsbs Hsbb Hdat Hsrc Hbsl Hop".
         (* and they come back together: re-bracket into the two names the

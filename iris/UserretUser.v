@@ -70,6 +70,7 @@ Require Import UexecRet.  (* [ukc] / [ukb] / [uvb] -- the U-mode contract.
                              file puts a [uvb]-carrying continuation in the
                              proofmode context and the [Typeclasses Opaque]
                              seal does not travel (durable-notes). *)
+Require Import FdSlots.   (* [fdstate] -- the key's descriptor view *)
 Require Import UexecApply.  (* [ukc_apply] -- the bundle build, named *)
 Require Import SpecUserret.
 From Kernel Require KernelSyms.
@@ -93,8 +94,11 @@ Section UserretUser.
          MAPPED view, so the proof forgets it again ([umem_lazy_any]) before
          the bridge.  Taking the named form here is what keeps the weakening
          in ONE place instead of at every entry into the loop. *)
-      (sz : Z) (M : gmap Z (bv 8))
-      (Rut : uptd -> iProp Σ)
+      (sz : Z) (fdv : list fdstate) (M : gmap Z (bv 8))
+      (* [Rfd] rides beside [Rut] and for its reason: [UexecRet.uvb] holds
+         the process's descriptor view as an ABSTRACT predicate, so this
+         layer never needs [fdslotG] to pass it through. *)
+      (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (kroot : mword 44)
       (m : regfile) (usatp : mword 64)
       (mstatus0 sepc0 : mword 64)
@@ -200,6 +204,10 @@ Section UserretUser.
     (R_bitvector_32 scounteren) ↦ᵣ□ scounteren_v -∗
     mhpmcounter ↦ᵣ□ mhpmcounter_v -∗
     umem_lazy pt sz M -∗
+    (* the descriptor view, AT THE VALUE THE KEY NAMES.  It sits next to
+       the image because that is what it is: the second thing [uvb] hands
+       the running process and takes back at the trap. *)
+    Rfd fdv -∗
     (* ---- THE RESIDUE, COMPLETED BY THE WORDS userret READS ----------------
        The 31 save slots are OWNED BY the kernel-side bundle that parks
        across user execution ([UsertrapRes.ut_res_bare]'s [tf_page], via
@@ -253,7 +261,7 @@ Section UserretUser.
            and size.  [UexecRet.ukc] IS the slot at a natural state
            ([uslot_ukc]), so the caller does the re-key and this lemma's
            whole job is "build [uvb] and apply". ---- *)
-    ukc (perm_of (ud_um pt) sz) M sz
+    ukc (perm_of (ud_um pt) sz) M sz fdv
         (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
            va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
            vs11 vt3 vt4 vt5 vt6 va0f)
@@ -266,7 +274,7 @@ Section UserretUser.
            actually produce.  The old shape hid all five under
            [user_trap_frame]'s existentials and typed the successor at
            [uexec_wp] (defect F1/F2, design/user-wp-slot.md). ---- *)
-    ▷ ukb C pt Rut sz (perm_of (ud_um pt) sz) -∗
+    ▷ ukb C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
@@ -278,7 +286,7 @@ Section UserretUser.
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264
              Htf272 Htf280 Htf112
              Hsc Hstval Hstvec Hmedl Hmse Hsse #Hmcen #Hscen #Hhpm
-             Hdata Hrutw Huwp Hhandler".
+             Hdata Hfdr Hrutw Huwp Hhandler".
     (* the running token: SC-minted here (TsoCtxShim seam); the T-leg
        borrows it from the residue it holds through [Hrutw]'s source *)
     iPoseProof (TsoCtxShim.own_context_sc TsoCtx.cur_ctx) as "Hctx".
@@ -332,13 +340,13 @@ Section UserretUser.
     (* AND THE CONTINUATION RUNS.  The bundle is built row by row inside
        [UexecApply.ukc_apply] -- where the context is that lemma's own
        premises -- rather than inline here (optimization.md, RULE ONE). *)
-    iApply (ukc_apply C pt Rut sz M
+    iApply (ukc_apply C pt Rfd Rut sz fdv M
               (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
                  va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
                  vs11 vt3 vt4 vt5 vt6 va0f)
               (sret_ms5 mstatus0) sc_v stval_v sepc0 (ret_pc sepc0)
               Hlok Hszok Hmsok
-              with "Huwp Hhw Hmi Hwi Hregs Hupt Hcfg Hrut Hhandler").
+              with "Huwp Hhw Hmi Hwi Hregs Hupt Hfdr Hcfg Hrut Hhandler").
   Qed.
 
 End UserretUser.

@@ -77,14 +77,23 @@ each quiet/window arm's `P' = P`, `sz' = sz` to show at J.
 
 `UexecRet.v`, as landed:
 
-- `ukb C pt Rut sz π` — the kernel obligation's LATER-FREE body:
-  `∀ W' sc stv, ⌜uvis_perm W' = π⌝ -∗ trapped_machine … sz … W' ∗ uexec_ret sc W' -∗ WP`;
-  `ukont C pt Rut sz π := ▷ ukb …` (`ukont_unfold`).  The pure premise pins
-  the trapped key's map to the one the kernel resumed the process under
-  (user execution never changes it), which is what lets J re-apply the
-  returned slot at the same table; `sz` rides beside `π` for the same
-  reason (the lazy image is sz-indexed).
-- `uvb C pt Rut sz π M m pc` carries `ukont C pt Rut sz π` last.
+- `ukb C pt Rut sz π fdv` — the kernel obligation's LATER-FREE body:
+  `∀ W' sc stv, ⌜uvis_perm W' = π⌝ -∗ ⌜uvis_sz W' = sz⌝ -∗ ⌜uvis_fd W' = fdv⌝ -∗
+  trapped_machine … sz … W' ∗ uexec_ret sc W' -∗ WP`;
+  `ukont C pt Rut sz π fdv := ▷ ukb …` (`ukont_unfold`).  The three pure
+  premises pin the trapped key to what the kernel resumed the process
+  under — the permission map, the break, and the DESCRIPTOR VIEW — because
+  user execution changes none of them.  All three are free at the
+  dispatcher: the trap-out key is BUILT at them
+  (`user_trap_frame_trapped C pt Rut sz π fdv` returns `W'` with all three
+  by `reflexivity`), which is why adding one costs the kernel nothing.
+  The fd pin is what gives the TRANSPARENT arm its shape: a page fault, a
+  timer interrupt or a device interrupt hands `X W'` back at the same key,
+  so the descriptor view the contract names survives it.  That is not yet
+  "an interrupt cannot retype a descriptor": the key's fd component is not
+  tied to the kernel's `FdSlots.fd_frags` values (see
+  [`user-wp-slot.md`](user-wp-slot.md) stage 4, "What is NOT yet tied").
+- `uvb C pt Rut sz π fdv M m pc` carries `ukont C pt Rut sz π fdv` last.
   **THE IMAGE CONJUNCT IS THE LAZY VIEW** (owner-ruled 2026-08-28: the
   process cannot observe lazy allocation, so the abstraction must not
   distinguish lazy vs allocated): `user_ptm_inv pt sz M`
@@ -107,14 +116,22 @@ each quiet/window arm's `P' = P`, `sz' = sz` to show at J.
   same second arm when they port (`perm_of_unmapped_lt` /
   `uk_fault_pair` at `Load Data` are already the pieces).
 - `uslot W := ∀ h C pt Rut sz, ⌜loop_ok C pt⌝ -∗ ⌜perm_of (ud_um pt) sz = uvis_perm W⌝ -∗ uvb … -∗ WP`.
-- `ukc π M m pc` — THE U-MODE CONTINUATION at a natural state, the same ∀
-  over the bundle at `(π, M, m, pc)`; `uslot_ukc` says the slot is the
-  continuation at the key's state, `uslot_run` that the slot at the
-  trap-out key `uvis_of_run m pc M π` is `ukc π M m pc` (under x0 = 0 and
-  a 2-aligned pc), `uslot_bump_run` the same after a returning syscall
-  (`a0 := r`, `pc + 4`).
-- `uexec_ret`'s ecall arms carry `M'` AND `π'` under `usys_mem_ok`;
-  `bump W r M' π'`.
+- `ukc π M sz fdv m pc` — THE U-MODE CONTINUATION at a natural state, the
+  same ∀ over the bundle at `(π, M, sz, fdv, m, pc)`; `uslot_ukc` says the
+  slot is the continuation at the key's state, `uslot_run` that the slot at
+  the trap-out key `uvis_of_run m pc M π sz fdv` is `ukc π M sz fdv m pc`
+  (under x0 = 0 and a 2-aligned pc), `uslot_bump_run` the same after a
+  returning syscall (`a0 := r`, `pc + 4`).
+- `uexec_ret`'s ecall arms carry `M'`, `π'` and `szv'` under
+  `usys_mem_ok`, and `fdv'` under NOTHING: `bump W r M' π' szv' fdv'`, with
+  `fdv'` ∀-bound and unconstrained.  That binder is where the rows for the
+  four entries that touch `p->ofile[]` — pipe (4), dup (10), open (15),
+  close (21) — will go; every other entry leaves the table alone, and the
+  loop's choice is the entry view (`UexecApply.uexec_ret_round_slot` takes
+  `uvis_fd W' = uvis_fd W` as a premise and discharges it at the resume).
+  Constraining `fdv'` for the four is NOT free: it needs the per-syscall
+  receipts to travel with an EXPLICIT `FdSlots.fd_frags` bundle, and
+  `UsertrapRes.ut_own` carries `fd_frags_any`.
 
 ## The engine (`UkStep.v`)
 

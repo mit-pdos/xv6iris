@@ -77,7 +77,7 @@ Section ParkCap.
      is this, verbatim).  [W] is what the residue closer is handed at the
      resume beside [first_done] and the timer capability. *)
   Definition park_pkg
-      (URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
       (γs : list gname) (γf : gname) (pa ks : mword 64)
       (* the parked process's fd-state ghost name -- see
          [SpecForkretParkPaid.forkret_park_pkg], which is this verbatim *)
@@ -112,8 +112,26 @@ Section ParkCap.
            park and the resume and applies this closer at the POST-EXEC
            record, so a key captured at userinit's park is stale by then
            (projects/user-wp-slot.md SS4c, refutation R-b). *)
-        (URB h pt' (add_vec ks (mword_of_int 4096)) U'
-         ∗ uslot (uvis_of U'))))%I.
+        (* ...AT THE RECORD'S OWN DESCRIPTOR VIEW, AND THE RESIDUE'S IS THE
+           SAME ONE.  The existential scopes over BOTH conjuncts, which is
+           the tie stated rather than merely arranged: the residue the
+           resume hands back carries [FdSlots.fd_frags] at [sts]
+           ([UsertrapRes.ut_own]'s conjunct) and the slot is keyed at
+           [uvis_of U' sts] -- one list, named once.
+
+           EXISTENTIAL, i.e. the PRODUCER picks, and the producer is the
+           party holding the fragments ([park_token_park] below reads [sts]
+           off the very bundle it hands to the residue).  ∀ would be the
+           wrong shape: it would let the CONSUMER name any view at all,
+           including one the process does not have, which is exactly the
+           sense in which the field would carry no information.  And the
+           reading stays true across the park because moving a descriptor's
+           state needs BOTH halves ([FdSlots.fd_st_both_update]) and this
+           closure holds one -- not even forkret's boot arm, whose
+           kexec("/init") does not touch the descriptor array. *)
+        (∃ sts : list fdstate,
+           URB h pt' (add_vec ks (mword_of_int 4096)) U' sts
+           ∗ uslot (uvis_of U' sts))))%I.
 
   (* the child's own rows, the ones the park spends *)
   Definition park_child (γs : list gname) (γf : gname) (pa ks : mword 64)
@@ -127,7 +145,7 @@ Section ParkCap.
   (* THE CAP, at a given [W]: the statement of
      [SpecForkretParkPaid.forkret_park_paid_body], as a [□] wand *)
   Definition park_cap
-      (URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
     (□ ∀ (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
          (pid : mword 32) (U : ustate) (av : nat),
@@ -150,12 +168,12 @@ Section ParkCap.
      the records of THIS table ([un_s N = γs]), which is all the token for
      [γs] ever parks *)
   Definition park_chan
-      (URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
     (□ ∀ (N : ut_names) (av : nat),
        ⌜un_s N = γs⌝ -∗ ⌜ut_wf N⌝ -∗ ⌜(K_usertrap <= av)%nat⌝ -∗
        ▷ (park_env N -∗ park_own N -∗
-          (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+          (∀ (h : CpuId) (pt' : uptd) (U' : ustate) (sts : list fdstate),
              ⌜pv_upt (us_V U') = pt'⌝ -∗
              ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) (us_V U') -∗
              first_done -∗
@@ -171,13 +189,13 @@ Section ParkCap.
                 no longer carries a ∀-state WP for the channel to spend.  The
                 keyed [uslot (uvis_of U')] in [park_pkg]'s closer above is
                 what crosses the park now. *)
-             fd_frags_any (pv_fdg (us_V U')) -∗
-             URB h pt' (add_vec (un_ks N) (mword_of_int 4096)) U')))%I.
+             fd_frags (pv_fdg (us_V U')) sts -∗
+             URB h pt' (add_vec (un_ks N) (mword_of_int 4096)) U' sts)))%I.
 
   (* THE TOKEN: some residue, its cap and its channel, both at [W := the
      token itself] *)
   Definition park_token_F (γs : list gname) (X : iProp Σ) : iProp Σ :=
-    (∃ URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ,
+    (∃ URB : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ,
        park_cap URB X γs ∗ park_chan URB X γs)%I.
 
   Local Instance park_token_F_contractive γs : Contractive (park_token_F γs).
@@ -257,16 +275,27 @@ Section ParkCap.
       iIntros (h pt' U') "%Hupt %Hnorm %Hptwf %Hfg #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
       (* the parked bundle, re-keyed onto the resumed record *)
       iEval (rewrite -Hfg) in "Hfrag".
+      (* ...AND ITS STATES, NAMED.  This is the only place in the park
+         channel where the descriptor states are in hand as a value, and it
+         is the place the key is minted -- so the key is minted AT them.
+         The bundle is handed on to the residue unchanged (re-weakened to
+         [fd_frags_any] below), so the view the slot is keyed at and the
+         view the residue carries are the same list by construction. *)
+      iDestruct "Hfrag" as (sts) "Hfrag".
+      (* ONE [sts] FOR BOTH: the same list names the residue's fragments and
+         the slot's key, which is what the shared existential says. *)
+      iExists sts.
       (* row by row, never a frame past a bundle carrying a slot
          (claude-notes/optimization.md): the residue on the left, the
          instantiated slot on the right. *)
       iSplitR "Hslot".
-      + iApply ("Hclose'" $! h pt' U'
+      + iApply ("Hclose'" $! h pt' U' sts
                   with "[%] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag").
         exact Hupt.
       + (* THE INSTANTIATION -- the whole of milestone J's park channel:
-           a generic family in, the resumed record's key out. *)
-        iApply ("Hslot" $! (uvis_of U')).
+           a generic family in, the resumed record's key out, keyed at the
+           descriptor states the residue is about to carry. *)
+        iApply ("Hslot" $! (uvis_of U' sts)).
     - iNext. iExact "Htok".
   Qed.
 
@@ -277,7 +306,7 @@ Section ParkCap.
   (* [usertrap_res_bare_park], both at [URB := usertrap_res_bare].          *)
   (* ------------------------------------------------------------------- *)
   Lemma park_token_intro_of
-      (URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (γs : list gname) :
+      (URB : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (γs : list gname) :
     (forall N av, ut_park_intro_body URB (park_token (un_s N)) N av) ->
     park_cap URB (park_token γs) γs -∗
     park_token γs.

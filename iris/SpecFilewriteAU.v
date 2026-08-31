@@ -112,6 +112,7 @@ Require Import Xv6G.
 Require Import FsCfg.
 Require Import SpecSysWriteAU.     (* [wchunks], [wri_receipts]             *)
 Require Import FsAbsWriteFire.     (* [awrite_commits_at]                   *)
+Require Import SpecCopyin.         (* [ubytes_at]: the content seam         *)
 Require Import SpecSysWriteAUEra.  (* [write_arms_at]                       *)
 Require Import FsAbs.              (* LAST (FsAbs's own rule)               *)
 Import Defs.
@@ -136,6 +137,10 @@ Definition wp_filewrite_au_body
   let pcE : mword 64 := mword_of_int KernelSyms.filewrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (* THE USER SOURCE (RULING A).  filewrite reads [addr + i] per chunk with
+     [i] its own running total, so a1 is the base the whole run is pinned
+     at; a [let], not a premise, so no caller moves. *)
+  let uaddr : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
   let Γfs := fs_gamma_L fsc_fs in
   (filewrite_stack <= K)%nat ->
   (k < NFILE)%nat ->
@@ -177,7 +182,7 @@ Definition wp_filewrite_au_body
       file_ref γf k q st -∗
       proc_priv_core pj pidv (us_upt U P') -∗
       filewrite_env_out fn st -∗
-      write_arms_at Γfs i n Φw r -∗
+      write_arms_at Γfs i n (us_M U) uaddr Φw r -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -227,44 +232,61 @@ Section FilewriteAUState.
   Implicit Types Γ : fs_view_names Σ.
 
   Definition fw_au_raw Γ (i : Z) (n : Z)
+      (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
       (t : Z) (p : nat) : iProp Σ :=
     (∃ bss : list (list (bv 8)),
        ⌜length bss = p⌝ ∗
        ⌜Z.of_nat (length (concat bss)) = t⌝ ∗
        ⌜(p <= wchunks n)%nat⌝ ∗
+       (* THE CONTENT HALF (RULING A).  What has been spliced so far IS the
+          caller's own run at [ua].  It rides INSIDE the iProp rather than as
+          a Coq-level tie beside it, because unlike [t = FW_MAX * p] it is
+          true of every state the loop hands out -- the exhausted exit
+          included -- and both exits read it off unchanged. *)
+       ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
        awrite_commits_at Γ ∅ i Φ p (wchunks n - p)%nat)%I.
 
-  Lemma fw_au_raw_init Γ (i n : Z) Φ :
-    awrite_commits_at Γ ∅ i Φ 0%nat (wchunks n) -∗ fw_au_raw Γ i n Φ 0 0%nat.
+  Lemma fw_au_raw_init Γ (i n : Z) M ua Φ :
+    awrite_commits_at Γ ∅ i Φ 0%nat (wchunks n) -∗
+    fw_au_raw Γ i n M ua Φ 0 0%nat.
   Proof.
     iIntros "Hcm". rewrite /fw_au_raw. iExists [].
     iSplitR; [done |]. iSplitR; [done |]. iSplitR; [iPureIntro; lia |].
+    iSplitR; [iPureIntro; apply ubytes_at_nil |].
     iSplitR; [iApply wri_receipts_nil |].
     rewrite Nat.sub_0_r. iExact "Hcm".
   Qed.
 
   (* ONE CHUNK'S FIRE, both halves: the head commit comes out at the index
      the bundle handed it out at, and the closer takes the receipt back. *)
-  Lemma fw_au_raw_take Γ (i n : Z) Φ (t : Z) (p : nat) :
+  Lemma fw_au_raw_take Γ (i n : Z) M ua Φ (t : Z) (p : nat) :
     (0 <= t)%Z -> (t < n)%Z -> t = FW_MAX * Z.of_nat p ->
-    fw_au_raw Γ i n Φ t p -∗
+    fw_au_raw Γ i n M ua Φ t p -∗
       awrite_commit_at Γ ∅ i p Φ ∗
       (∀ (bs : list (bv 8)) (av : aview) (off : nat) (bs0 : list (bv 8))
          (nl : nat),
-         ⌜wri_pre av i off bs bs0 nl⌝ -∗ Φ p av off bs -∗
-         fw_au_raw Γ i n Φ (t + Z.of_nat (length bs)) (S p)).
+         ⌜wri_pre av i off bs bs0 nl⌝ -∗
+         (* THE CONTENT PREMISE (RULING A): this chunk was copied from the
+            base BUMPED BY THE RUNNING TOTAL, which is [t] -- filewrite's
+            [add a2,s4,s6] with [s4 = i] the loop's own count.  That is the
+            whole of what the fire owes, and it is exactly what
+            [SpecWritei]'s user-arm clause delivers. *)
+         ⌜ubytes_at M (add_vec_int ua t) bs⌝ -∗
+         Φ p av off bs -∗
+         fw_au_raw Γ i n M ua Φ (t + Z.of_nat (length bs)) (S p)).
   Proof.
     intros Ht Htn Htie. iIntros "Hst".
     assert (Hsp : (S p <= wchunks n)%nat)
       by exact (wri_count_step n t p Ht Htn Htie).
-    rewrite /fw_au_raw. iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & Hrs & Hcm)".
+    rewrite /fw_au_raw.
+    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & %Hby & Hrs & Hcm)".
     (* the peel: the suffix has at least one commit left *)
     assert (Hcnt : (wchunks n - p = S (wchunks n - S p))%nat) by lia.
     rewrite /awrite_commits_at Hcnt /=.
     iDestruct "Hcm" as "[Hhead Htail]".
-    iFrame "Hhead". iIntros (bs av off bs0 nl) "%Hpre HΦ".
+    iFrame "Hhead". iIntros (bs av off bs0 nl) "%Hpre %Hbyc HΦ".
     iExists (bss ++ [bs])%list.
     assert (Hlen' : length ((bss ++ [bs])%list) = S p)
       by (rewrite length_app Hlen /=; lia).
@@ -272,6 +294,12 @@ Section FilewriteAUState.
     iSplitR.
     { iPureIntro. rewrite concat_app length_app /= app_nil_r. lia. }
     iSplitR; [by iPureIntro |].
+    (* THE APPEND: the accumulated run and this chunk are ADJACENT at [ua],
+       because [t] IS the accumulated length ([Htot]). *)
+    iSplitR.
+    { iPureIntro. rewrite concat_app /= app_nil_r.
+      apply (ubytes_at_app M ua (concat bss) bs Hby).
+      rewrite Htot. exact Hbyc. }
     iSplitL "Hrs HΦ".
     { iApply (wri_receipts_snoc i Φ bss bs av off bs0 nl Hpre
                 with "Hrs [HΦ]"). rewrite Hlen. iExact "HΦ". }
@@ -279,31 +307,33 @@ Section FilewriteAUState.
   Qed.
 
   (* THE THREE EXITS *)
-  Lemma fw_au_raw_ok Γ (i n : Z) Φ (p : nat) :
-    fw_au_raw Γ i n Φ n p -∗ write_post_ok_at Γ i n Φ.
+  Lemma fw_au_raw_ok Γ (i n : Z) M ua Φ (p : nat) :
+    fw_au_raw Γ i n M ua Φ n p -∗ write_post_ok_at Γ i n M ua Φ.
   Proof.
     iIntros "Hst". rewrite /fw_au_raw /write_post_ok_at.
-    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & Hrs & Hcm)".
+    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & %Hby & Hrs & Hcm)".
     iExists bss. iSplitR; [by iPureIntro |].
-    iSplitR; [iPureIntro; lia |]. iFrame "Hrs". rewrite Hlen. iExact "Hcm".
+    iSplitR; [iPureIntro; lia |]. iSplitR; [by iPureIntro |].
+    iFrame "Hrs". rewrite Hlen. iExact "Hcm".
   Qed.
 
   (* THE FAIL EXIT, AT BOTH OF ITS TWO SHAPES.  [t < n] is the loop's own
      (the short-write break, the only way out of the loop that is not the
      count); the second disjunct is the CAPSTONE's, on the [n < 0] guard at
      +0x20, where the loop is never entered and the bundle refunds whole. *)
-  Lemma fw_au_raw_fail Γ (i n : Z) Φ (t : Z) (p : nat) :
+  Lemma fw_au_raw_fail Γ (i n : Z) M ua Φ (t : Z) (p : nat) :
     (t < n)%Z \/ (n < 0)%Z /\ p = 0%nat ->
-    fw_au_raw Γ i n Φ t p -∗ write_post_fail_at Γ i n Φ.
+    fw_au_raw Γ i n M ua Φ t p -∗ write_post_fail_at Γ i n M ua Φ.
   Proof.
     intros Hex. iIntros "Hst". rewrite /fw_au_raw /write_post_fail_at.
-    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & Hrs & Hcm)".
+    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & %Hby & Hrs & Hcm)".
     iExists bss. iSplitR.
     { iPureIntro. destruct Hex as [Htn | [Hneg Hp0]].
       - left. lia.
       - right. split; [exact Hneg |].
         apply nil_length_inv. rewrite Hlen. exact Hp0. }
-    iSplitR; [iPureIntro; lia |]. iFrame "Hrs". rewrite Hlen. iExact "Hcm".
+    iSplitR; [iPureIntro; lia |]. iSplitR; [by iPureIntro |].
+    iFrame "Hrs". rewrite Hlen. iExact "Hcm".
   Qed.
 
 End FilewriteAUState.

@@ -1043,6 +1043,7 @@ Require Import FsBytesGamma.       (* [fs_gamma_L]: the live Γ             *)
 Require Import FsAbsOpenFire.      (* [opf_era_file_row]                   *)
 Require Import FsAbsWriteFire.     (* the fire, the splice bridge, item 4  *)
 Require Import SpecSysWriteAUEra.  (* [write_arms_at]                      *)
+Require Import SpecCopyin.         (* [ubytes_at], [add_vec_moi_comm]      *)
 Require Import SpecFilewriteAU.    (* the contract this file seals         *)
 Require Import FsAbs.              (* LAST (FsAbs's own rule)              *)
 
@@ -1966,7 +1967,7 @@ Section ProofFilewriteAU.
     (* ---- the EXCLUSIVE half ---- *)
     filewrite_fs_out fn -∗
     (* ---- AU EDIT (difference 2): the carried commit state ---- *)
-    fw_au_raw (fs_gamma_L fsc_fs) nx n Φw t p -∗
+    fw_au_raw (fs_gamma_L fsc_fs) nx n (us_M U) (m !!! Regidx Ra1) Φw t p -∗
     (* ---- and the contract's own continuation ---- *)
     (* [true], verbatim from [SpecFilewrite]: this IS the contract's crossing,
        forwarded, so the two must be spelled the same or [iExact] fails. *)
@@ -1985,7 +1986,7 @@ Section ProofFilewriteAU.
         file_ref gf kx qx stx -∗
         proc_priv_core pj pidv (us_upt U P') -∗
         filewrite_env_out fn stx -∗
-        write_arms_at (fs_gamma_L fsc_fs) nx n Φw r -∗
+        write_arms_at (fs_gamma_L fsc_fs) nx n (us_M U) (m !!! Regidx Ra1) Φw r -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2424,6 +2425,27 @@ Section ProofFilewriteAU.
     iIntros (CIDa6 Hsa6) "Hcg Hpc".
     set (Q3 := <[Regidx Ra2 := regval_into_reg
                   (add_vec (rget Q2 Rs4) (rget Q2 Rs6))]> Q2).
+    (* a2 IS [addr + i], NAMED (RULING A).  The landed walk left it
+       unconstrained -- either_copyin promised nothing about the bytes there
+       -- and the content seam is stated at exactly this address.  Proved
+       HERE rather than at the fire because [rget] carries the ambient
+       [CpuId] and the two blocks sit at different harts' instances. *)
+    assert (HQ2s4 : Q2 !!! Regidx Rs4 = (mword_of_int iz : mword 64)).
+    { rewrite /Q2 upd_ne; [| vm_compute; discriminate].
+      rewrite /Q1 upd_ne; [| vm_compute; discriminate].
+      rewrite (Hilcs Rs4 ltac:(vm_compute; reflexivity)). exact HB0s4. }
+    assert (HQ2s6 : Q2 !!! Regidx Rs6 = (m !!! Regidx Ra1 : mword 64)).
+    { rewrite /Q2 upd_ne; [| vm_compute; discriminate].
+      rewrite /Q1 upd_ne; [| vm_compute; discriminate].
+      rewrite (Hilcs Rs6 ltac:(vm_compute; reflexivity)). exact HB0s6. }
+    assert (Hq3v : add_vec (rget Q2 Rs4) (rget Q2 Rs6)
+                   = add_vec (mword_of_int iz : mword 64) (m !!! Regidx Ra1)).
+    { rewrite (rget_ne Q2 Rs4 ltac:(vm_compute; discriminate)).
+      rewrite (rget_ne Q2 Rs6 ltac:(vm_compute; discriminate)).
+      rewrite HQ2s4 HQ2s6. reflexivity. }
+    assert (HQ3a2 : Q3 !!! Regidx Ra2
+                    = add_vec (mword_of_int iz : mword 64) (m !!! Regidx Ra1)).
+    { rewrite /Q3 upd_eq. unfold regval_into_reg. exact Hq3v. }
     assert (Hppa2 : add_vec_int (mword_of_int (FW + 0x9e) : mword 64) 4
                     = mword_of_int (FW + 0xa2))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -2568,7 +2590,7 @@ Section ProofFilewriteAU.
     { iExact "Hpriv". }
     iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' n' wrote dist dstb P' Sb')
       "%Hcswi %Hbmwf2 %Hholes2 %Hdaddr2 %Hsz2 %Hbmcov2 %Hcap2 %Hsized2
-       %Hdist %Hdistn %Hdistk %Hrange %Hkbytes %Harms %Hbud
+       %Hdist %Hdistn %Hdistk %Hrange %Hkbytes %Hubytes %Harms %Hbud
        %HSbsub %Hwi16p %Hwi16sp %Hwi16at %Hupt
        Hcg Hcnt _ _ Hpc Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb
        Hdnat Hpriv Hbsl HlogS".
@@ -2756,7 +2778,7 @@ Section ProofFilewriteAU.
              ∗ ∃ (tf : Z) (pf : nat),
                  ⌜(tf = t /\ pf = p /\ rz <> c)
                   \/ (tf = (t + c)%Z /\ pf = S p /\ rz = c)⌝
-                 ∗ fw_au_raw (fs_gamma_L fsc_fs) nx n Φw tf pf)%I
+                 ∗ fw_au_raw (fs_gamma_L fsc_fs) nx n (us_M U) (m !!! Regidx Ra1) Φw tf pf)%I
       with "[Htop Hau]" as ">[Htop Hst]".
     { rewrite Hnum.
       destruct (decide (rz = c)) as [Hfc | Hnokey].
@@ -2817,8 +2839,25 @@ Section ProofFilewriteAU.
         assert (Hlenc : (t + Z.of_nat (length (wrf_run wrote tot)))%Z
                         = (t + c)%Z)
           by (rewrite wrf_run_length; lia).
+        (* THE CHUNK'S CONTENT (RULING A).  writei's user-arm clause pins
+           the run it wrote to the process's image at ITS a2, which the
+           [add a2,s4,s6] at +0x9e made [i + addr]; [add_vec_moi_comm] turns
+           that into the base-bumped form [fw_au_raw_take] asks for, and
+           [t = iz] is the loop's own tie.  [wrf_run] is the [f <$> seq 0 t]
+           spelling [ubytes_at_of_got] bridges. *)
+        assert (HQ6a2 : Q6 !!! Regidx Ra2
+                        = add_vec (mword_of_int iz : mword 64)
+                            (m !!! Regidx Ra1)).
+        { rewrite /Q6 upd_ne; [| vm_compute; discriminate].
+          rewrite /Q5 upd_ne; [| vm_compute; discriminate].
+          rewrite /Q4 upd_ne; [exact HQ3a2 | vm_compute; discriminate]. }
+        assert (Hchunkb : ubytes_at (us_M U) (add_vec_int (m !!! Regidx Ra1) t)
+                            (wrf_run wrote tot)).
+        { rewrite Htiz -add_vec_moi_comm -HQ6a2.
+          exact (ubytes_at_of_got _ _ tot wrote (Hubytes eq_refl)). }
         (* ONE COMMIT OUT OF THE BUNDLE, at this chunk's index *)
-        iDestruct (fw_au_raw_take (fs_gamma_L fsc_fs) (bv_unsigned inum) n Φw
+        iDestruct (fw_au_raw_take (fs_gamma_L fsc_fs) (bv_unsigned inum) n (us_M U)
+                     (m !!! Regidx Ra1) Φw
                      t p ltac:(lia) ltac:(lia) Hmul with "Hau")
           as "[Hcm Hback]".
         iMod (wrf_awrite_fire fsc_fs ⊤ (bv_unsigned inum) p Φw
@@ -2837,8 +2876,8 @@ Section ProofFilewriteAU.
         iSpecialize ("Hback" $! (wrf_run wrote tot) av
                        (Z.to_nat (bv_unsigned v))
                        (fn_file_bytes (era_node dnl bml datal))
-                       (fn_nlink (era_node dnl bml datal)) with "[]");
-          [iPureIntro; exact Hpre |].
+                       (fn_nlink (era_node dnl bml datal)) with "[] []");
+          [iPureIntro; exact Hpre | iPureIntro; exact Hchunkb |].
         rewrite -Hlenc. iApply ("Hback" with "HΦ").
       - (* ---- THE CHUNK DOES NOT FIRE: the landed retag, unchanged ---- *)
         iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned inum)
@@ -3157,7 +3196,7 @@ Section ProofFilewriteAU.
               [exfalso; exact (E3 Hcrz) | rewrite E1; lia]. }
           rewrite /write_arms_at. subst tf. iLeft.
           iSplitR; [iPureIntro; split; [exact Hrvn | lia] |].
-          iApply (fw_au_raw_ok (fs_gamma_L fsc_fs) nx n Φw pf with "Hau"). }
+          iApply (fw_au_raw_ok (fs_gamma_L fsc_fs) nx n (us_M U) (m !!! Regidx Ra1) Φw pf with "Hau"). }
       + (* ---- NOT EXHAUSTED: the FALL is the back edge to +0xcc ---- *)
         assert (Hlt : (iz + c < n)%Z).
         { destruct (Z.le_gt_cases n (iz + c)) as [Hle | Hgt]; [| lia].
@@ -3275,7 +3314,7 @@ Section ProofFilewriteAU.
       { iApply (fw_env_out_fs fn stx Cf inumx Hokx Htyi). iExact "Hout". }
       { rewrite /write_arms_at. iRight.
         iSplitR; [iPureIntro; exact Hrvm1 |].
-        iApply (fw_au_raw_fail (fs_gamma_L fsc_fs) nx n Φw tf pf
+        iApply (fw_au_raw_fail (fs_gamma_L fsc_fs) nx n (us_M U) (m !!! Regidx Ra1) Φw tf pf
                   ltac:(left; lia) with "Hau"). }
   Qed.
 
@@ -3290,7 +3329,7 @@ Section ProofFilewriteAU.
         rb i Φw.
   Proof.
     cbv beta delta [wp_filewrite_au_body].
-    intros pcE pj ret_tgt Γfs HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Hst
+    intros pcE pj ret_tgt uaddr Γfs HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Hst
            Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv
@@ -3581,7 +3620,7 @@ Section ProofFilewriteAU.
              exists for exactly this arm. *)
           rewrite /write_arms_at. iRight.
           iSplitR; [iPureIntro; reflexivity |].
-          iApply (fw_au_raw_fail Γfs i n Φw 0%Z 0%nat
+          iApply (fw_au_raw_fail Γfs i n (us_M U) (m !!! Regidx Ra1) Φw 0%Z 0%nat
                     ltac:(right; split; [lia | reflexivity])).
           iApply (fw_au_raw_init with "Hbundle"). } }
       (* ---- 0 <= n : [Hn0] is now a fact of the code, not a premise ---- *)
@@ -3918,7 +3957,7 @@ Section ProofFilewriteAU.
                    (* [rewrite] reaches the proofmode context too, so
                       "Hbundle" arrives at [wchunks 0] with the goal. *)
                    rewrite Hnz0.
-                   iApply (fw_au_raw_ok Γfs i 0%Z Φw 0%nat).
+                   iApply (fw_au_raw_ok Γfs i 0%Z (us_M U) (m !!! Regidx Ra1) Φw 0%nat).
                    iApply (fw_au_raw_init with "Hbundle"). }
                - (* ---- 0 < n: the five late spills, the two 3072s, and
                       the jump to the BOTTOM test at +0xcc ---- *)

@@ -486,6 +486,19 @@ things, and the answer differs:
     15 s, first try.
   - `iris/ProofSysWriteAUStable.v` — `SYSWRITE_AU_ERA -> …_STABLE`, 14
     lines, lands in the escape disjunct at `off0 := 0`.
+  **SINCE 2026-08-31 THE ARMS NAME THE BYTES (RULING A, as landed at the
+  ruling briefs below).**  `write_post_ok_at` / `write_post_fail_at` /
+  `write_stable_arms_at` — and their frozen non-`_at` twins — carry
+  `⌜SpecCopyin.ubytes_at M ua (concat bss)⌝` and take `(M) (ua)`;
+  `fw_au_raw` carries the same conjunct as its content half and
+  `fw_au_raw_take`'s closer gained `⌜ubytes_at M (add_vec_int ua t) bs⌝`,
+  discharged at the fire from `SpecWritei`'s new user-arm clause.  The
+  chunk DECOMPOSITION is still existential and the per-chunk FILE offsets
+  still are; only the CONTENT existential died.  Syscall argument 1 is a
+  named binder now (`v1`), because the arms speak about the bytes there.
+  Finding 2 below is unaffected — the disturbed tail still carries no
+  receipt and still has no nameable bytes.
+
   AS-LANDED FINDINGS:
   1. **The astate-shaped commit is not dischargeable — again.**
      `FsAbsMknodFire`'s first finding repeats verbatim at the write
@@ -1400,6 +1413,19 @@ things, and the answer differs:
     (3) `SpecFilewriteCons.v` is BYTE-IDENTICAL (R10): its shape had
     already been validated by the syscall seal above it, and it needed no
     edit to be provable.
+  - **SINCE 2026-08-31 THE RECEIPT NAMES THE BYTES (RULING A, as landed at
+    the ruling briefs below).**  Note (3) no longer holds: `cons_sent_cnt`,
+    `wcons_ok`, `wcons_short` and `write_cons_arms` all take
+    `(M : gmap Z (bv 8)) (ua : mword 64)` and carry
+    `⌜SpecCopyin.ubytes_at M ua bs⌝` beside the length, so the three bridge
+    lemmas grew one `iSplitR` each and the walk grew ONE new register fact,
+    `HE2a1` (a1 survives to the `c.jalr a5` untouched — the landed walk
+    never needed to say so, because consolewrite promised nothing about the
+    bytes there).  The syscall shell grew `HS4a1` and one `iEval`, and
+    syscall argument 1 stopped being existentially quantified.  What the
+    printf theorem now says: `write(1, buf, n)` returns a count that IS the
+    UART's accepted-byte receipt AND those bytes are `buf`'s own, at the
+    image the caller lent.
 
 - [ ] **INIT — the init.c program theorem (three stages; scoped
   2026-08-29 after upstream's echo landed the Uk pattern).**
@@ -1573,6 +1599,16 @@ things, and the answer differs:
     `ucode_sh.txt`'s 1032 would be ~32 min in one file, and **the split
     plan stands**: the parser's ~500 instructions go in a SECOND catalog
     file, which costs one more ~22 s prelude and divides the wall clock.
+    **OVERTAKEN — the per-instruction bill was one inline `ltac:`.**  The
+    byte side condition in `uis_run` was spliced into the `iApply` term
+    instead of discharged as a goal; hoisting it (`unshelve iApply … _`;
+    `[ … | ]`, in `tools/gen_ucode.py` and all five catalogs) took
+    `UCodeShK.v` from **319 s to 10.6 s**, `UCodeInit.v` 245 → 15.9 s and
+    `UCodeCat.v` 260 → 16.5 s, i.e. ~0.03 s per instruction against 0.75 s.
+    `ucode_sh.txt`'s 1032 is now well under a minute in ONE file, so the
+    split is a readability choice, not a build constraint.  This is
+    `optimization.md`'s "unshelve hoist"; the tell was that `coqc -time`
+    put 233 s of `UCodeInit.v`'s 243 s in the three `uis_*` sentences.
   * **Two engine leaves were missing, and both are UkRunLeaf's.**
     `wp_uk_btype0` — the base branch against x0 (`bltz`/`bgez`/…): the
     value of x0 is not readable off the register file, so `wp_uk_btype`'s
@@ -1697,6 +1733,113 @@ things, and the answer differs:
     opens a NESTED Rocq comment exactly the way a cast's `*)` closes one;
     write `if ( *cmd`.
 
+  **STAGE 5 AS LANDED (2026-08-31; `iris/UkShRun.v` 3863 lines,
+  `iris/UCodeShK.v` 5195 lines / 326 instructions in 18 functions;
+  audit = the standing three (`resv_matches`, `resv_is_valid`, funext) on
+  `wp_kshr_runcmd`, `wp_kshr_runcmd_null` and `wp_kshr_fork1`; zero
+  `Admitted`, zero new `Axiom`).**  `runcmd`'s prologue, its 0x1398 jump
+  table, ALL FIVE ARMS and `fork1`.
+
+  * **PER-ARM STATUS.**  All five walked to a leaf, plus the null-argument
+    arm as its own lemma.
+    | arm | walked | consumes |
+    |---|---|---|
+    | EXEC (0xce) | argv[0]-null → `exit(1)`; else `exec`, which the row lets return ONLY at −1, then the diagnostic tail | `wp_kshr_exec` (the −1 arm), `wp_ksh_exit` |
+    | REDIR (0xf6) | `close(fd)`, `open(file,mode)`, then either the failure tail or `runcmd(rcmd->cmd)` | `wp_ksh_close`, `wp_ksh_open`, ITSELF |
+    | LIST (0x124) | `fork1`; child runs left, parent `wait(0)` then runs right | `wp_kshr_fork1`, `wp_kshr_wait0`, ITSELF ×2 |
+    | PIPE (0x13c) | `pipe(p)` (window row, cap 8 at a0) or `panic`; two `fork1`s; fd plumbing; two `wait(0)`; `exit(0)` | `wp_kshr_pipe`, `wp_kshr_fork1` ×2, `wp_ksh_close` ×6, `wp_kshr_dup` ×2, `wp_kshr_wait0` ×2, ITSELF ×2 |
+    | BACK (0x1c4) | `fork1`; child runs the subtree, parent `exit(0)` | `wp_kshr_fork1`, ITSELF |
+    | null (0xba) | `runcmd(0)` = `exit(1)`, `wp_kshr_runcmd_null` | `wp_ksh_exit` |
+    The DEFAULT arm (`panic("runcmd")` at 0xc2) is **refuted, not walked**:
+    the node predicate pins the type word to 1..5, so `bltu a5,a4` at 0xa0
+    is not taken.  So is the null test at 0x96 inside `wp_kshr_runcmd`.
+
+  * **THE TREE PREDICATE, AND WHY IT IS PERSISTENT.**  `ush_cmd g t c`
+    over `Inductive ushcmd := UExec (args : list uarg) | URedir | UPipe |
+    UList | UBack`, with the measure `ush_ht` (the tree's HEIGHT, which is
+    the depth of the runcmd call chain).  Every byte it names is
+    `DfracDiscarded` — the type word, the pointer slots, REDIR's mode and
+    fd, and the argv vector (which is `UserHeap.uargv` verbatim, plus its
+    NUL cap).  That is not decoration: **three of the five arms fork, and
+    a child runs a subtree under a FRESH gname triple**, so the tree has
+    to cross as a `UkFork.Forkable` payload — `ush_cmd_forkable`, proved
+    by the same induction as the walk and `Closed under the global
+    context`.  An exclusive tree would need the same instance and could
+    not also be read twice.  Stage 4 builds a node with exclusive bytes
+    and must PERSIST them (`UserHeap.uarea_persist`) before handing it
+    over; that is the one thing stage 6 has to reconcile.
+
+  * **THE BUDGET IS A HEIGHT.**  `wp_kshr_runcmd c` asks for
+    `6 * ush_ht c + (2 + (Dg + n))` words: 6 per 48-byte frame, 2 for
+    fork1's own frame, `Dg` for the diagnostic subtree, `n` the caller's
+    tail.  A child's instance is the SAME theorem with the surplus rolled
+    into `n` (`n' := 6 * (max - ht sub) + n`), which is what makes the
+    induction hypothesis applicable at a smaller height without weakening
+    the statement.  Nothing is ever popped — runcmd does not return.
+
+  * **ONE HYPOTHESIS, `ush_diag_leaf`, AND ITS TAINT SET.**  Three pcs
+    hand control to sh's printer and none returns: `panic` (0x4a — from
+    fork1's −1 arm and from PIPE's failing `pipe`), the "exec … failed"
+    tail (0xda) and the "open … failed" tail (0x10e).  Each runs `fprintf`
+    (0x10aa, ~280 instructions with vprintf under it) and then `exit`.
+    The premise is stated at those three pcs with exactly what each site
+    holds: panic with a0 pinned to one of sh's THREE message addresses
+    (0x1298 "fork", 0x12a0 "runcmd", 0x12c8 "pipe") and no resource, the
+    two tails with the node's pointer word and its string, both
+    `DfracDiscarded` and both straight out of `ush_cmd`.  **It is
+    satisfiable by construction** — its discharger holds sh's read-only
+    image persistently and OUTSIDE the premise, so nothing is quantified
+    away (cf. the durable notes' unsatisfiable-gap rule).  TAINT SET:
+    `wp_kshr_fork1`, `wp_kshr_runcmd`.  Everything else in the file —
+    the four leaves, the stubs, the tree algebra, the entry walk,
+    `wp_kshr_runcmd_null` — is unconditional.
+
+  * **FOUR LANE LEAVES, ALL RELOCATION ASKS.**  `wp_uk_cldq`,
+    `wp_uk_clwq`, `wp_uk_lwuq` are UkRunMem's `wp_uk_cld` / `wp_uk_clw` /
+    `wp_uk_lwu` at a DFRAC.  Those three are stated at `DfracOwn 1` though
+    their bridge (`uheap_access`) already takes a `dq` and their base-form
+    siblings (`wp_uk_ld`, `wp_uk_lbu`) already expose it — so the
+    generalisation is the same proof with `dq` threaded, and **without it
+    a read-only data structure cannot be read at all**.  `wp_uk_clw_text`
+    is the fourth and is a real gap, not a spelling: the 0x1398 jump table
+    is .rodata, which the heap files under the TEXT gname as X-and-not-W,
+    and the tier's only text reader is `wp_uk_lbu_text` — one byte wide.
+
+  * **THE JUMP TABLE IS A RESOURCE.**  `ush_jtab g` is the five reachable
+    rows of 0x1398 as `utext` runs (row 0 is the default arm's and the
+    node predicate makes it unreachable); it is persistent, `Forkable`,
+    and a premise of `wp_kshr_runcmd` beside `shk_code`.  The six
+    dispatch identities (`ush_bltu_false`, `ush_slli_eq`, `ush_jarm_eq`,
+    `ush_jarm_even`, `ush_jtab_align`, `ush_jtab_bnd`) are all
+    `destruct c; vm_compute` — closed in each of the five cases.
+
+  * **CATALOG DELTA.**  `tools/ucode_shk.txt` gains `runcmd`, `fork1` and
+    the fork/exec/pipe/wait/dup/chdir stubs; 192 → **326** instructions,
+    18 functions.  `panic`, `fprintf`, `printf` and `vprintf` are
+    `skipfunc`ed with the reason: under the diagnostic cut no instruction
+    of them is ever fetched.  Regenerating grew `shk_syms_pins` from 10 to
+    18 conjuncts, which broke `UkSh.v`'s positional `shp_read`
+    (`&_&_&…&H` now binds a nested conjunction); fixed forward, one
+    character.
+
+  * **ASK 6, RESOLVED IN-TREE.**  Stage 4's blocker — `wp_ksh_memset`'s
+    postcondition was `∃ g, ubytes γd a N g`, forgetting that memset
+    ZEROES, which is the only source of the NULL cap at `cmd->argv` —
+    is folded into this commit: the loop now carries the byte it writes
+    and the prefix already written, and hands back
+    `ubytes γd a N (fun _ => nth_byte (m !!! a1_idx) 0)`.  `getcmd`'s call
+    site re-weakens with one `iAssert`, so no stage-2 shape moved.
+    `iris/UkShParse.v` recompiles unchanged against it (checked).
+
+  * **TWO LANE GOTCHAS WORTH THE LINE.**  (1) A `"` in a Rocq comment
+    opens a string and the comment's `*)` then does not close it — the
+    error surfaces as `Unterminated string` at END OF FILE, hundreds of
+    lines away.  Same family as the C-cast trap already recorded, and
+    both bit here.  (2) `Require Import UkLoad` AFTER `UkRunMem` shadows
+    every `wp_uk_<load>` with the low-level twin whose first argument is
+    a `ucfg`; the error names the wrong lemma.  Use `Require UkLoad` and
+    qualify.
+
   **THE PLAN (stages 2–6).**
   * **STAGE 2 — the command loop's head, and the READ window.  LANDED;
     see the record above.**  The one leaf it could not build,
@@ -1723,19 +1866,168 @@ things, and the answer differs:
     `nulterminate`'s jump table is the one novelty (a computed control
     transfer) and the old `UProofShCmd.nt_mem` model ports.
     Catalog: split it — see the compile-time finding.
-  * **STAGE 5 — `runcmd`'s tree walk.**  0x8e, 102 instructions, five arms
-    off the 0x1398 jump table.  EXEC needs the exec −1 arm plus, for
-    success, the pinned-exec prover (lane X's `SpecKexecPin.Q_pin`) —
-    that is the same seam init's stage 3 sits on.  LIST and BACK need
-    `fork`'s TWO continuations (`uexec_ret_F`'s separating conjunction —
-    a `wp_uk_ecall_fork` leaf, third unbuilt).  REDIR needs open/close
-    (have them).  PIPE needs `pipe`'s window row + `dup` (quiet) — and
-    note the pipe row has **no null guard**, unlike wait's; if `p` can be
-    argued non-null from the code the row still permits a write at 0, so
-    this may become a fourth upstream contract ask.  `fork1`'s
-    `panic("fork")` arm and every `fprintf` diagnostic are REFUTABLE the
-    way UkInitPrintf refuted init's %-tree, or scoped out the way
-    `ucode_sh.txt` scoped them out; decide once, at the top.
+
+    **STAGE 4 AS LANDED — PARTIAL, 2026-08-31** (`iris/UCodeShP.v` 8190
+    lines / 564 instructions, `iris/UkShParse.v` 1845 lines; EC2-green;
+    audit = the standing three (`resv_matches`, `resv_is_valid`, funext) on
+    `wp_kshp_strchr` and `wp_kshp_strlen`, and *closed under the global
+    context* on the pure layer; zero `Admitted`, zero new `Axiom`).
+
+    * **THE CATALOG IS THE STAGE'S BIG DELIVERABLE, and the cost law
+      HOLDS.**  `tools/ucode_shp.txt` → `iris/UCodeShP.v` at `--prog shp`:
+      **564 instructions in eleven functions** (parsecmd, parseline,
+      parsepipe, parseexec, parseredirs, nulterminate, peek, gettoken,
+      execcmd, strlen, strchr), 359 distinct decode lemmas.  Measured
+      serially on the mirror: **18 min 58 s**.  Stage 1's law (~22 s fixed
+      + ~1.9 s/instruction) predicts 18 min 13 s — **4 % under**, so the
+      law is confirmed at 3× the sample it was fitted on and the split
+      plan's economics stand exactly as stated.  A monolithic
+      `UCodeShK.v` + parser would be 756 instructions ≈ 24 min *on every
+      stage-1/2 edit*; as two files, stage 4's 19 min is paid once and the
+      two halves build in parallel.  Five whole functions are OUT with the
+      reason recorded in the spec file — `parseblock`, `redircmd`,
+      `pipecmd`, `listcmd`, `backcmd` are each reached only through a
+      `peek` for a symbol byte, which `ushp_no_symbols` excludes — as are
+      `malloc` (stage 3's; the Hypothesis crosses the call without fetching
+      an instruction) and `memset` (already `UCodeShK.v`'s).
+    * **THE HYPOTHESIS, VERBATIM, AND ITS TAINT SET (empty today).**
+      `ushp_malloc_ok`, in `UkShParse.v` §6, at the idiom of the landed
+      function contracts in `UkSh.v` (same binder order, `ucallee_saved`
+      read-back, `ret_pc` return) so stage 3's discharge is `intros` +
+      `exact` or a thin adapter:
+
+          Hypothesis ushp_malloc_ok :
+            forall (h : CpuId) (m : regfile) (nbytes : Z) (avail : nat),
+              m !!! Regidx a0_idx = mword_of_int nbytes ->
+              0 < nbytes -> nbytes < Z31 ->
+              shp_code γt -∗
+              urun γt γd γs h m (mword_of_int ShSyms.malloc) (10 + avail) -∗
+              (∀ (h' : CpuId) (m' : regfile) (p : Z) (g : nat -> bv 8),
+                 ⌜ ucallee_saved m m' ⌝ -∗
+                 ⌜ m' !!! Regidx a0_idx = mword_of_int p ⌝ -∗
+                 ⌜ 0 < p /\ p mod 16 = 0 /\ p + nbytes < 2 ^ 38 ⌝ -∗
+                 ubytes γd p (Z.to_nat nbytes) g -∗
+                 urun γt γd γs h' m' (ret_pc (m !!! Regidx ra_idx))
+                   (10 + avail) -∗
+                 WP (Loop : expr riscv_lang)) -∗
+              WP (Loop : expr riscv_lang).
+
+      `10 + avail` is the call chain spelled out, not a round number:
+      malloc's own frame is 64 bytes (8 words) and the deepest thing it
+      calls is `free` or `sbrk`, 2 words each.  **It has NO failure arm,
+      deliberately**: sh's constructors never test malloc's result
+      (`execcmd` goes straight into `memset(cmd, 0, 168)`), so a NULL
+      return is a fault in sh rather than a branch, and a contract with a
+      NULL arm would be unusable by the code it is for — the first
+      generation drew the same line and named it (its
+      `wp_sh_malloc_first_body` is first-call-only).  **IT TAINTS NOTHING
+      YET**: the two landed walks call no constructor, so every lemma in
+      the file is unconditional today.  The moment `wp_kshp_execcmd` lands
+      it becomes the first tainted lemma and parseexec/parsepipe/parseline/
+      parsecmd follow, each labelled in its own header as stage 2 labelled
+      its seven.
+    * **THE TREE PREDICATE — stage 6's interface.**  `ushp_tree s0 p t`
+      over `Inductive ushp_cmd := UshpExec (toks : list (nat * nat)) |
+      UshpRedir c q eq mode fd | UshpPipe l r | UshpList l r | UshpBack c`.
+      It is an **`iProp`, not a `Prop` over a `gmap`** (on urun a node's
+      bytes are OWNED, which is also what makes it usable as `parseexec`'s
+      loop invariant), and it is sh's own struct layout, not an abstraction
+      of it: `ushp_exec_at s0 p toks` = the type word at `p`, its four
+      bytes of padding, and ten `ushp_slot`s at `p+8` and ten at `p+88` —
+      slot `i` being the token boundary while `i` indexes a token, the NULL
+      cap at `i = |toks|`, and an unconstrained cell above that, which is
+      the honest reading of what `memset` left.  **A token is a PAIR OF
+      INDEXES into the line, not a string** — that is what the parser
+      records, and `nulterminate` (not `parseexec`) is what turns the pair
+      into a C string, so keeping the predicate at indexes lets one
+      predicate state both sides of that step.  Only the EXEC arm is
+      reachable under `ushp_no_symbols`; the other four are stated because
+      stage 5 walks `runcmd`'s five-way table.  The sibling stage-5 lane
+      states its own copy — **stage 6 reconciles, per the lane brief**.
+    * **THE PURE VOCABULARY, ported not required.**  `ushp_is_ws` /
+      `ushp_is_sym` / `ushp_skipws` / `ushp_toklen` / `ushp_tokens` /
+      `ushp_find` are `USpecSh.v`'s and `USpecShParse.v`'s definitions
+      transposed from `list (bv 8)` onto the **index function** `nat -> bv
+      8` that `UserHeap.ubytes`/`ustr` actually carry.  They are re-stated
+      rather than `Require`d for the reason `UkSh.v` re-stated
+      `USpecSh.SH_BUF` as `sh_buf`: requiring `USpecShParse.v` drags
+      `UCodeSh.v` (10 148 lines), `UmodeIo` and `Xv6G` — the whole
+      first-generation engine — into a urun-tier file.  R10 keeps the old
+      statements where they are; stage 6 reconciles the two spellings.
+      `ushp_tokens_in` (tokens are ordered, non-empty and inside the line)
+      is proved, not assumed.
+    * **THE TWO-WORD FRAME, PROVEN ONCE — and this is the economy the rest
+      of the stage needs.**  `wp_kshp_pro2` / `wp_kshp_epi2` take the four
+      PCs as parameters and the four `uinstr_is` facts as premises, so a
+      call site is four one-line `iApply`s of its own catalog rows.  They
+      already save six copies (two functions, and `strchr` reaches its
+      epilogue three ways).  With them, `ushp_pc_step` retires stage 2's
+      per-instruction `assert (E0xNNN : add_vec_int (mword_of_int 0xNNN) k
+      = mword_of_int 0xMMM) by (apply bv_eq; vm_compute; reflexivity)`
+      — one unconditional lemma instead of one `vm_compute` per step.
+      **Generalising the pair over the frame size `k` is the next thing to
+      build**: peek (8 words), gettoken (8), parseredirs (14), parseexec
+      (16), parsecmd (8) all have the same shape at a different size, and
+      it needs one `ustack_k` split per size.
+    * **WHAT WALKED: `strchr` (17 instructions) and `strlen` (18).**  Both
+      are stated over an arbitrary `ustr γd dq s len f` at an arbitrary
+      dfrac, so the two static tables (which a caller may hold
+      persistently) and the command buffer (which it owns) are the same
+      instance — there is no table-specific version.
+      `wp_kshp_strchr` returns `ushp_chr s len 0 f c`, i.e. `s + i` at the
+      first `i` with `f i = c` and **0 when there is none, including when
+      `c` is NUL** — xv6's strchr does not return a pointer to the
+      terminator, and `ushp_find` agrees because a `ustr`'s body bytes are
+      all non-NUL.  `wp_kshp_strlen` returns `len` EXACTLY, the length the
+      resource already pins.  **Both loops are BOUNDED ROCQ INDUCTIONS,
+      not iLöbs** — what bounds them is the `ustr` RESOURCE, whose
+      terminator conjunct is the byte the back edge tests; echo's strlen
+      mold, one tier down.  strlen's count comes back through a 32-bit
+      `subw`, which is why `ustr` carrying `len < 2^31` as part of what a
+      string IS (rather than as a caller's side condition) pays for itself.
+    * **WHAT DID NOT WALK, AND THE ONE MEASURED OBSTACLE.**  peek,
+      gettoken, parseredirs, parseexec, parsepipe, parseline, nulterminate
+      and execcmd are NOT walked; ~510 of the 564 catalogued instructions
+      are still owed, and with them the parser theorem.  Beyond raw volume
+      (stage 2 measured ~45 lines of walk per instruction, so the balance
+      is ~20 k lines at that rate) there is ONE hard blocker, and it is a
+      CONTRACT, not a proof: **`UkSh.wp_ksh_memset`'s postcondition is
+      `∃ g, ubytes γd a N g` — the buffer comes back owned with UNKNOWN
+      CONTENTS.**  That is enough for stage 2 (getcmd only needs the buffer
+      back) and not enough for stage 4: `execcmd` is `malloc(168);
+      memset(cmd,0,168); cmd->type = EXEC`, and the only reason
+      `cmd->argv[0] == 0` — the NULL cap `ushp_exec_at` and
+      `nulterminate`'s loop both turn on — is that the memset ZEROED it.
+      The fact is present in stage 2's proof (its loop stores
+      `nth_byte (mc !!! a1) 0` at every index) and absent from its
+      statement.  **ASK (new, #6 below): strengthen `wp_ksh_memset` to hand
+      back `ubytes γd a N (fun _ => nth_byte (m !!! a1_idx) 0)`**; the
+      existential form is one `iExists` away, so no stage-2 call site
+      moves.  Until it lands `execcmd` cannot be walked and the constructor
+      chain above it cannot start.  A second, smaller relocation ask: six
+      pieces of engine algebra (`ushp_ridx_eq`/`_ne`, `ushp_cs_ne`,
+      `ushp_byte_rng`, `ushp_zext_eq`, `ushp_zext_nul`) are re-stated here
+      because stage 2 made them `Local Lemma`s inside `Section UkSh`; with
+      `UkSh.ush_bytes_upd` and `urun_x0` they belong beside
+      `UserHeap.ustr_byte`.
+    * **MIRROR HAZARD, recorded.**  The sibling stage-5 lane edits
+      `iris/UCodeShK.v` and `iris/UkSh.v` in the shared mirror's working
+      tree, which invalidated `UkSh.vo` mid-run.  `UkShParse.v`'s only use
+      of that half is `ushp_code_shk`, which unfolds `shk_code` — stable
+      under any catalog regrowth — and the walks were additionally verified
+      green under a scratch variant that requires `UCodeShP.v` alone.
+  * **STAGE 5 — `runcmd`'s tree walk.  LANDED; see the record above.**
+    The stage-0 guesses that did NOT survive contact: EXEC needs no
+    pinned-exec prover at all (`wp_uk_ecall_exec` is TOTAL — a successful
+    exec has no continuation, so the failure arm is the whole contract);
+    `fork`'s two continuations were already built by upstream
+    (`UkFork.wp_uk_ecall_fork`), so the third "unbuilt leaf" was not;
+    and the diagnostic paths are NOT refutable — the fork row permits −1
+    and the exec row IS the −1 arm — so they are cut at one premise
+    (`ush_diag_leaf`) instead.  PIPE's missing null guard (ask 4) cost
+    nothing: sh passes a stack address, and the walk owns the eight bytes
+    it hands over, so the row's licence to write at a null pointer is
+    never exercised.
   * **STAGE 6 — the top theorem, stated honestly.**  The first-generation
     statement is the target shape and the ceiling: `wp_sh_execs_echo` says
     *on one fixed input*, the shell reaches `exec` naming the right path
@@ -1766,22 +2058,57 @@ things, and the answer differs:
      seven tainted lemmas become unconditional by application to
      `ush_read_leaf_holds`; the Hypothesis text above is kept for the
      record.
-  2. **`wp_uk_ecall_fork`** (the two-continuation arm) and
-     **`wp_uk_ecall_sbrk`** — stages 3–5.
+  2. ~~**`wp_uk_ecall_fork`** (the two-continuation arm)~~ **DONE
+     upstream** (`UkFork.v`, with the `Forkable` payload class); stage 5
+     consumes it through `wp_kshr_fork` / `wp_kshr_fork1`.  Still open:
+     **`wp_uk_ecall_sbrk`** — stage 3.
   3. **Relocate `UkRunBr.v`'s remaining leaf into `UkRunLeaf.v`** —
      `wp_uk_btype0`, the x0 branch.  Half the ask is discharged:
      `wp_uk_btype_later` now lives in `UkRunLeaf.v` (upstream put it there
      for init's loops) and `UkRunBr.v`'s copy is gone.  Take `urun_x0`
      (`UkSh.v`) with it: it is the same defect — x0's value is not
      readable off the register file — for a STORE rather than a branch.
-  4. **`pipe`'s row has no null guard** while `wait`'s now does — the
-     same defect 9dc84f919 fixed, one row over.  Upstream's contract.
-  5. **The eleven first-generation `UProofSh*.v` files.**  Precedent says
+     **And take stage 5's four (`UkShRun.v`) with them**: `wp_uk_cldq`,
+     `wp_uk_clwq`, `wp_uk_lwuq` belong in `UkRunMem.v` AS THE STATEMENTS
+     OF `wp_uk_cld`/`wp_uk_clw`/`wp_uk_lwu` (the dfrac is free — the
+     bridge already takes one — and the `DfracOwn 1` spelling is what
+     stops any read-only structure being read), and `wp_uk_clw_text` is a
+     genuinely new leaf: the four-byte load out of the TEXT half.
+  4. ~~**`pipe`'s row has no null guard**~~ **NOT A BLOCKER after all**:
+     stage 5 hands the row eight bytes it OWNS (the `int p[2]` on
+     runcmd's own frame), so the row's licence to write at a null pointer
+     is never exercised and nothing about `p` has to be argued from the
+     code.  Worth fixing upstream for symmetry with `wait`'s, not for
+     this lane.
+  6. ~~**Strengthen `wp_ksh_memset`'s postcondition**~~ (stage 4's
+     blocker) — **RESOLVED IN-TREE by stage 5**; see the stage-5 record.
+  7. **`ush_diag_leaf` — the diagnostic subtree.**  Stage 5's one
+     Hypothesis, and the only thing between `wp_kshr_runcmd` and an
+     unconditional theorem.  Discharging it is the printf walk (`panic`
+     11 instructions on top of `fprintf` 0x10aa and `vprintf` 0xdea,
+     ~280 in all) plus a persistent view of sh's .rodata at the TEXT
+     gname, in the shape `UkInit.init_rodata` / `UkInitLit.init_lit_str`
+     already have for init.  Everything the premise needs is in that
+     shape; nothing about it is unsatisfiable.
+  5. **RULED (owner, 2026-08-31): DELETE.**  Done same day — the eleven
+     `UProofSh*.v` + `UCodeSh.v` + `USpecSh.v` + `USpecShParse.v` are
+     deleted; `sh_img_sub` + halves relocated verbatim into
+     `SpecKexecPin.v` (their one outside consumer); tombstone in
+     `_CoqProject`.  The original ask, for the record: precedent says
      the old proofs are DELETED when a program is ported (4f088971f did
      exactly that for sync).  That is 33k green lines and a closed
      theorem; deleting them is a coordinator/owner call, not this lane's.
      Until it is made, both catalogs stay on-build and the port carries
      the `shk_` prefix.
+
+**FD-ROW PILOT P4 provenance note (owner discussion, Aug 31).** The
+solo/quiescence premise the enriched loop needs at era 0 is NOT a new
+assumption — it is a reading of landed ghosts: `SpecProcinit.
+procs_inv_alloc` deposits all 64 slots UNUSED at procinit;
+`ProofUserinit`'s paid park allocates exactly ONE (init's, with its
+trap-loop WP); nothing before init's own fork touches another slot;
+the landed scheduler proofs run only table entries.  P4 must source
+its quiescence from these — do not seal it as a Parameter.
 
 ## WINDOW LEAF (in-house) — ASK 1 ANSWERED, LANDED 2026-08-30
 
@@ -1979,36 +2306,170 @@ durable-notes warns about.
 
 ## RULING BRIEFS (drafted 2026-08-30, coordinator; each is a yes/no)
 
-- [ ] **RULING A — the WRITE/copyin content seam.**  SCOPE NARROWED
-  2026-08-30: **the read direction is out of this ruling, because upstream
-  delivered its half.**  `f9eed7297` made consoleread's window predicate
-  take the return value and gave fileread and sys_read the output conjunct
-  `r = mword_of_int (Z.of_nat d) \/ r = mword_of_int (-1)` — a non-negative
-  answer IS the number of bytes written — and the read-AU family relays it
-  in both storeys (as-landed note in lane W above).  What read still does
-  not say is the destination's CONTENT, and that is not a copyin question
-  and not this ruling's: readi's user arm promises only `uptd_ext` about
-  the destination, and the AU contract inherits the silence deliberately
-  (`SpecSysReadAU`'s WHAT "DELIVERED" DOES NOT MEAN — the slice is
-  vocabulary tying the count to the OBSERVED state, not a memory
-  postcondition).  So what is left to rule is the write direction alone:
-  THE GAP: `either_copyin`'s
-  success arm binds the copied bytes existentially, so write's receipts
-  say "SOME bytes of the right length landed" and console-write's say
-  "length and order" — never "MY bytes."  THE ASK: an output equation on
-  the success arm tying the copied run to the USER SOURCE bytes at the
-  instant's `M` (the vocabulary exists post-M-threading: copyinstr's
-  same-M contracts are the precedent).  THE COST, honestly: it is a
-  `SpecWritei`-class ripple — the equation must relay
-  either_copyin → writei → filewrite → the syscall arms (and the
-  console chain separately), i.e. one output conjunct each on two or
-  three landed contracts with their proofs re-elaborated; the write
-  precedent measured that class at zero proof content + a relay through
-  3 signatures + a handful of caller sites, but writei's is the tree's
-  big proof, so budget a full lane.  THE PAYOFF: "printf printed MY
-  bytes" and write's content-pinned receipts, in one ruling — the last
-  honesty gap in the write family.  RECOMMEND: YES, as a lane when the
-  current pair lands.
+- [x] **RULING A — the WRITE/copyin content seam.  RULED YES 2026-08-30;
+  AS LANDED 2026-08-31.**  Scope as ruled: the write direction only (the
+  read direction stayed out — upstream's `f9eed7297` delivered read's count
+  half, and read's DESTINATION content is not a copyin question).
+
+  **What the gap was.**  `SpecEitherCopyin.either_copyin_post`'s user arm
+  bound the copied run existentially, so write's receipts said "SOME bytes
+  of the right length landed" and console-write's said "length and order" —
+  never "MY bytes".  It was never a limit of the code:
+  `SpecCopyin.wp_copyin_sconf_mem` has promised `copyin_got M srcva len
+  dst_new` since the image campaign's tier 3, and `ProofEitherCopy` was
+  *discarding* it with the comment "its caller owns no user memory to state
+  them against".  That stopped being true once writei and consolewrite
+  began threading `proc_priv_core`, whose block carries the image `us_M U`.
+
+  **THE CONJUNCT, AT EACH STOREY (exact spelling).**
+
+  1. `SpecEitherCopyin.either_copyin_post`, user arm, inside the existing
+     `∃ dst_new` (the outer three-conjunct shape did NOT move):
+
+     ```
+     ⌜r = (mword_of_int 0 : mword 64) -> copyin_got (us_M U) src len dst_new⌝
+     ```
+
+     Guarded by the SUCCESS exit: `-1` still promises nothing, because a
+     part-way copy wrote a prefix and which prefix is not observable
+     (`SpecCopyin`'s own stance, relayed).
+
+  2. `SpecWritei`, BOTH bodies (`wp_writei_sconf_body`, `wp_writei_gen_body`),
+     as the user-arm twin of the landed kernel-arm clause:
+
+     ```
+     ⌜user = true -> copyin_got (us_M U) src tot wrote⌝ -∗
+     ```
+
+     Range is `tot`, not `n`: a chunk whose copy failed part-way is
+     committed into `dist`, and those bytes stay unnamed.
+
+  3. `SpecCopyin` gained the LIST spelling of the same fact, beside
+     `copyin_got`, because every receipt layer above carries lists:
+
+     ```
+     Definition ubytes_at (M : gmap Z (bv 8)) (ua : mword 64)
+         (bs : list (bv 8)) : Prop :=
+       forall (d : nat) (c : bv 8), bs !! d = Some c ->
+         M !! uint (add_vec_int ua (Z.of_nat d)) = Some c.
+     ```
+
+     with `ubytes_at_nil`, `ubytes_at_app` (adjacent runs, no no-wrap side
+     condition — `add_vec_int_nat_assoc`), `ubytes_at_of_got` (the ONE
+     bridge from the function spelling, applied once per chain) and
+     `add_vec_moi_comm` (gcc emits the index first at both chunk loops;
+     the receipts are stated at the base).
+
+  4. `SpecSysWriteAUEra.write_post_ok_at` / `write_post_fail_at` /
+     `write_arms_at` / `write_stable_arms_at` (and their frozen non-`_at`
+     twins in `SpecSysWriteAU`) gained `(M : gmap Z (bv 8)) (ua : mword 64)`
+     and, inside the `∃ bss`, exactly one conjunct:
+
+     ```
+     ⌜ubytes_at M ua (concat bss)⌝
+     ```
+
+     **THE PER-CHUNK EXISTENTIAL OFFSETS STAY; THE CONTENT EXISTENTIAL
+     DIES.**  Stated on the CONCATENATION and not per chunk, and that is
+     the honest shape: the per-chunk FILE offsets are existential on
+     purpose (another writer through the same struct file moves `f->off`
+     between our chunks), while the SOURCE offsets chain by construction —
+     filewrite reads `addr + i` with `i` its own running total.  So the
+     source side can be pinned end to end where the destination side
+     cannot.  `SpecFilewriteAU.fw_au_raw` carries the same conjunct as its
+     content half (INSIDE the iProp, unlike `t = FW_MAX * p`, because it is
+     true of every state the loop hands out), and `fw_au_raw_take`'s closer
+     gained the premise `⌜ubytes_at M (add_vec_int ua t) bs⌝`.
+
+  5. `SpecConsolewriteLoc.cons_sent_cnt` gained `(M) (ua)` and the same
+     conjunct beside the length:
+
+     ```
+     Definition cons_sent_cnt (γu : uart_names) (tr0 : list (bv 8))
+         (M : gmap Z (bv 8)) (ua : mword 64) (r : Z) : iProp Σ :=
+       (∃ bs, ⌜Z.of_nat (length bs) = r⌝ ∗ ⌜ubytes_at M ua bs⌝ ∗
+              uart_sent_from γu tr0 bs)%I.
+     ```
+
+     …and so did `SpecSysWriteConsAU.wcons_ok` / `wcons_short` /
+     `write_cons_arms`, on ALL THREE arms.  **WHAT THE CONSOLE RECEIPTS NOW
+     SAY:** `r` bytes were accepted by the UART, in order, after the seed,
+     AND they are the process's own bytes at `[v1 .. v1+r)` in the image
+     it lent — where `v1` is syscall argument 1, which had to stop being
+     existentially quantified in the premise (`pv_tf (us_V U) !!
+     tf_arg_idx 1 = Some v1`, a named binder now, in both
+     `SpecSysWriteConsAU` and `SpecSysWriteAU`/`Era`).  With
+     `UartAccepted.run_out_accepted` (lane C) that is "init's printf
+     printed THESE characters", end to end.  `SpecSysWriteConsAU`'s own
+     header had predicted the shape exactly — "the receipt gains an
+     equation, not a new resource" — and it held: three arms, one pure
+     conjunct each, no resource moved.
+
+  **THE BYTE STRING IS STILL ∃-BOUND EVERYWHERE, and that is not slack:**
+  `M` is a PARTIAL map, so "the bytes at `ua`" is not a function any of
+  these layers can apply.  The equation determines every byte.
+
+  **MEASURED COST vs THE `SpecWritei` PRECEDENT** (which was "zero proof
+  content + a relay through 3 signatures + a handful of caller sites").
+  The writei relay came in AT the precedent, not above it, and the budget
+  ceiling (3×) was never approached:
+
+  | file | what changed | new proof content |
+  |---|---|---|
+  | `SpecEitherCopyin.v` | 1 conjunct + header | — |
+  | `ProofEitherCopy.v` | `HU5a3` (a3 named, copied from the copyout half) + the `0`-guard extraction | ~18 lines, no new lemma |
+  | `SpecCopyin.v` | `ubytes_at` + 4 pure lemmas | ~40 lines, all one-liners |
+  | `SpecWritei.v` | 1 conjunct × 2 bodies | — |
+  | `ProofWriteiParts.v` | `wi_usr_step`, `wi_usr_le` | ~25 lines (mirrors `wi_ker_step`) |
+  | `ProofWritei.v` (5091 lines, the tree's biggest) | ~30 threading points, all beside the existing `Hker` | one `wi_usr_step` application beside the existing `wi_ker_step` one, and two `discriminate`/`exact` conjuncts in the chunk normalisation — **no new lemma, no new block** |
+  | 6 writei callers (dirlink, filewrite, filewriteAU, 3× sysunlink) | one token in the `iIntros` pattern | — |
+  | `SpecConsolewriteLoc.v` + `ProofConsolewriteLoc.v` | 2 binders on 5 lemmas, the `a1`/`a2` names the landed walk never needed, the chunk join | ~30 lines |
+  | `SpecFilewriteCons.v` + `ProofFilewriteCons.v` | 2 binders, 3 bridge lemmas, `HE2a1` | ~25 lines |
+  | `SpecSysWriteConsAU.v` + `ProofSysWriteConsAU.v` | 2 binders on 3 arms, `HS4a1` | ~15 lines |
+  | `SpecSysWriteAU{,Era}.v`, `SpecFilewriteAU.v` | 2 binders + 1 conjunct per arm | ~15 lines |
+  | `ProofFilewriteAU.v` | `HQ3a2` (a2 named — the landed walk left it deliberately unconstrained), `Hchunkb` at the fire | ~25 lines |
+  | `ProofSysWriteAU{,Stable}.v` | `HS4a1` + one `iEval` | ~10 lines |
+
+  Whole seam, `git diff --numstat` over 24 files: **+740 / −235**, of
+  which the three biggest are `ProofConsolewriteLoc` (+90/−34),
+  `ProofWritei` (+69/−22 in 5091 lines) and `SpecCopyin` (+69/−0, the new
+  vocabulary).  Compile iterations: 3 for the writei relay, 4 for the
+  console chain, 3 for the fs-AU chain.
+
+  THE ONE GENUINE OBSTACLE, hit twice: `rget` carries the ambient `CpuId`,
+  so an `a2` equation has to be asserted at the `set` that BUILT the
+  register file, not at the consumer block several harts' instances later
+  (`ProofConsolewriteLoc`'s `HB5a2` and `ProofFilewriteAU`'s `HQ3a2` both
+  moved for this reason).  Worth knowing before the next walk names a
+  register the landed one left unconstrained.
+
+  **AUDIT.**  `Print Assumptions` on ALL ELEVEN reseals the lane touched —
+  `EitherCopyin.wp_either_copyin_sconf`, `Writei.wp_writei_gen` /
+  `wp_writei_sconf`, `Filewrite.wp_filewrite_sconf`,
+  `Consolewrite.wp_consolewrite_sconf`,
+  `ConsolewriteLoc.wp_consolewrite_loc_sconf`,
+  `FilewriteCons.wp_filewrite_cons`, `SysWriteConsAU.wp_sys_write_cons_au`,
+  `FilewriteAU.wp_filewrite_au`, `SysWriteAU.wp_sys_write_au_era`,
+  `SysWriteStable.wp_sys_write_au_era_stable` — is **the standing three and
+  nothing else** (`resv_matches`, `resv_is_valid`,
+  `functional_extensionality_dep`).  Zero `Admitted`, zero new `Axiom`.
+  Mirror evidence: the whole `SpecCopyin` reverse closure, 236 files, `make
+  -k` with **zero** errors and zero missing `.vo`.
+
+  **WHAT THE EQUATION COULD NOT REACH, and why.**
+  - writei's DISTURBED REGION (`dist`, the committed partial chunk).  A
+    failed `either_copyin` returns `-1` and its post promises nothing about
+    the prefix it wrote; the bytes are on disk and unnamed.  Closing this
+    needs a copied-prefix invariant threaded through copyin's own
+    `memmove` loop — `SpecCopyin`'s `-1` arm, not this seam.
+  - the STABLE corollary's CHAINED disjunct.  Unchanged: the content
+    conjunct rides through the escape disjunct untouched (it is about the
+    SOURCE, which no chaining question touches), so open question 2 is
+    exactly where it was.
+  - `SpecSysWriteConsAU`'s returned image `M'` is still existential.  The
+    receipts are stated against the INPUT image `us_M U`, which is what the
+    caller lent and what makes them usable; pinning the OUTPUT image is a
+    different question and not one write's honesty needs.
 - [ ] **RULING B — the A(iv) offset carrier.**  THE GAP: `f->off` lives
   behind `file_pay`'s existential, so write/read receipts carry
   per-instant existential offsets and dup's same-description fact stops
@@ -2026,6 +2487,15 @@ durable-notes warns about.
   read, dup, and any future lseek.  RECOMMEND: (a) YES but AFTER
   ruling A's lane (they touch the same file-layer proofs; sequencing
   them avoids a double re-elaboration).
+  **RULED (owner, 2026-08-31): POSTPONED until a consumer exists** —
+  ruled AFTER ruling A's lane landed, so the sequencing condition is
+  moot and the postponement is the standing word.
+  The "consumers waiting" above are all *would-benefit*, none *blocked*:
+  today's write/read/dup theorems close over the existential offsets.
+  The trigger to re-raise this: the first proof that needs a POSITION
+  across two syscalls — an lseek spec, a sequential-write client
+  ("these two writes concatenated"), or the app-facing API's fd layer.
+  Whoever hits it, cite this entry and re-brief.
 
 Sizing: D is spike-sized — the readings exist, the work is assembly and
 statement.  S0 is one design session.  A and W are the campaign's bulk.
@@ -2190,7 +2660,20 @@ frozen touched; all EC2-green, zero `Admitted`, zero new `Axiom`):
   `uslot_uslot_fs : uslot W -∗ uslot_fs γm W` (Löb; audit = the standing
   `resv` pair, no funext), `uexec_ret_fs_of`, `ukont_fs_ukont`,
   `urun_fs_urun`, `uheap_ustrq`.  SEALED: `FDROW_UKFS_ENGINE.
-  wp_uk_ecall_fs`, the enriched ecall leaf (stage P2).
+  wp_uk_ecall_fs`, the enriched ecall leaf (stage P2) — DISCHARGED by
+  `UkRunSysFs.v` over the smaller `FDROW_UKFS_STEP`.
+- `iris/UkRunSysFs.v` (stage P2, landed) — the enriched ecall leaf:
+  `UkRunSys.wp_uk_ecall_quiet`'s shape on `urun_fs`, with the caller's
+  `mcur` half deposited into the arm's RIGHT disjunct and handed back
+  stepped by `ufs_step_at` AT THE CALLER'S OWN STRING (the `ustrq` /
+  `ufs_step_pin` collapse).  Plus the enriched `ukc_fs`, the enriched
+  slot at the bumped trap-out key, `UkRun`'s two closes at `urun_fs`,
+  and the quiet-row reading of `uenr_dom`.  ONE seal remains,
+  `FDROW_UKFS_STEP.wp_uk_ecall_fs_step` = `UkStep.wp_uk_ecall` with
+  `uvb`/`uexec_ret` swapped for their enriched twins; the functor
+  `FdRowUkfsEngineOfStep … <: FDROW_UKFS_ENGINE` is the compiled receipt
+  that nothing else is owed.  The file header measures why the plain
+  engine cannot be reused (see the P2 row).
 - `iris/FdRowPilot.v` — the era-0 seed (`era0_seed`, INSTANTIATED
   against the checked image: `era0_seed_boot`, `fsimg_console_miss`) and
   the pilot theorems: `pilot_console_pure` (**Closed under the global
@@ -2199,6 +2682,31 @@ frozen touched; all EC2-green, zero `Admitted`, zero new `Axiom`):
   resolved row = `ADev CONSOLE 0`) and the functor
   `FdRowPilotWalk.wp_pilot_open2` (the same read through one sealed-leaf
   application — the shape the enriched init walk consumes).
+- `iris/UkRunFsLeaf.v` (stage P5, landed) — the enriched LEAF TOWER: the
+  plain leaves init's console preamble uses (`c.li`, `addi`, `auipc`,
+  `jal`, `c.jr`, `c.j`, the x0 branch) re-threaded on `urun_fs` /
+  `ukc_fs`, plus `ustrt` (the path string on the READ-ONLY TEXT half) and
+  the two enriched ecall leaves (`wp_uk_ecall_fs_text` for the path rows,
+  `wp_uk_ecall_fs_nopath` for dup).  ONE new seal,
+  `FDROW_UKFS_RETIRE.wp_uk_retire_fs_later` = `UkStep.wp_uk_retire_later`
+  with `uvb`/`ukc` swapped — the retire FUNNEL, which every non-ecall leaf
+  kind in the slice goes through (branches included).
+- `iris/UkInitFs.v` (stage P5, landed) — init's console preamble WALKED
+  on the enriched tier, 0xc through the two dups to the restart head
+  0x32, refining `FdRowPilot.pilot_console_dups`; plus the composition
+  receipt into upstream's landed, untouched restart loop.  An image-check
+  consumer, so a LEAF: nothing may require it.
+- `iris/FdRowMint.v` — **stage P3, LANDED** (619 lines vs a 508-line
+  budget; 138 statement/proof lines, the rest the era-0 argument and the
+  §6 ask).  The era-0 mirror value `era0_u S`, the two halves' HOMES
+  (`mirror_entry` = init's entry package, `mirror_tied` = the enriched
+  loop's residue), the mint, and the userinit-park arm in parallel form.
+  Sealed with `Global Typeclasses Opaque mirror_entry mirror_tied`
+  (`fd_frags` is a `big_sepL` two `Definition`s down — the standing
+  `iFrame`-delta rule).  **Nothing is sealed as a `Parameter` and no
+  `Axiom` is added: 0 sealed / 12 statements discharged.**  It is the
+  PILOT CONE's leaf now (it requires `FdRowPilot`, which requires
+  `FsImgCheck`); nothing may require `FdRowMint`.
 
 AS-LANDED FINDINGS:
 1. **A wand-shaped kernel seal would be a GAP-premise trap in Module-Type
@@ -2227,21 +2735,156 @@ AS-LANDED FINDINGS:
    And `assert (… /\ …) as [-> ->] by (split; congruence)` beats nested
    `injection` on `MkAnode`/`ADir` equations (recursion depth is
    version-dependent).
+5. **A PLAIN-RETURN ARGUMENT IS A GAP PREMISE FOR AN ENRICHED CALLER**
+   (P2's measurement).  `UkStep.wp_uk_ecall` and `uk_ecall_post_fetch`
+   take `uexec_ret uecall_scause W0` as an ARGUMENT.  A leaf can route
+   an enriched bundle through the plain engine and have its own trap-out
+   closure discard that argument — but it must still INHABIT it, and its
+   ecall arm says "plain-safe after the syscall at every `r`", which an
+   enriched-only caller is not (`ukont ⊬ ukont_fs`).  So "reuse the
+   engine and smuggle the enrichment" is not merely expensive, it is
+   unprovable; the engine has to be generic in the slot family, which is
+   upstream ask (4).  The same shape is worth checking before any future
+   parallel-contract lane assumes an upstream driver is reusable: ask
+   first which of its ARGUMENTS the parallel form can still inhabit.
 
 THE STAGES (prover lanes; budgets keyed to the landed analogues):
 
-- [ ] **P2 — the engine leaf** (discharges `FDROW_UKFS_ENGINE`).  A
-  `UkStep.wp_uk_ecall` twin fired at `uvb_fs` (the trap-out hands
-  `uexec_ret_fs`; the leaf takes the RIGHT disjunct with the caller's
-  deposit) + the `wp_uk_ecall_fs` wrapper (open `urun_fs`, pin the path
-  via `uheap_ustrq`, re-close with `urun_close_upd`'s twin).  BUDGET:
-  `UkStep.wp_uk_ecall` measures 126 lines and `wp_uk_ecall_window` ~100;
-  budget 300 with the re-close plumbing.  Opus-sized, blocked on nothing.
-- [ ] **P3 — the era-0 mint** at the userinit park: allocate the `mcur`
-  pair (`mcur_alloc`), seed = `era0_seed_boot` at the boot snapshot's S,
-  user half + seed into init's entry deposit, kernel half parked beside
-  the residue.  BUDGET: lane-P scale (`FsInitPin` port = 508 lines).
-  Sequenced with P4 (the kernel half's home is the enriched loop's).
+- [x] **P2 — the engine leaf** — AS LANDED (`iris/UkRunSysFs.v`, 391
+  lines of which 220 are statements+proofs; EC2-green, zero `Admitted`, zero new
+  `Axiom`, audit = the standing three).  **The wrapper is DISCHARGED and
+  the seal SHRANK; it did not vanish.**
+  - UNSEALED (all proven, no premise but the machine step):
+    `uvb_fs_x0`; `ukc_fs` / `uslot_fs_ukc` / `uslot_fs_bump_run` (the
+    enriched `ukc` and the enriched slot at the BUMPED trap-out key);
+    `urun_fs_close` / `urun_fs_close_upd` (`UkRun`'s closes at
+    `urun_fs`); `uenr_dom_num` / `uenr_dom_rows` (open = 15 and
+    mknod = 17 are neither exit nor fork and are QUIET rows, so the arm's
+    own case analysis lands on the enriched branch and
+    `usys_mem_ok_quiet` pins image/perm/break across the trap);
+    `ufs_step_at_blanket` / `ufs_step_pin` (owning `ustrq` collapses the
+    contract's `ufs_step` — which reads the path off the image, with the
+    unreadable-string escape into the −1 blanket — onto the CALLER's
+    `pl`, which is what makes the returned tie usable); and
+    `wp_uk_ecall_fs_of_step`, the leaf itself: open `urun_fs`, pin the
+    path, take the arm's RIGHT (deposit) disjunct with the caller's
+    `mcur`, read the quiet row, re-close at `<[a0 := r]> m` / `pc+4`.
+    `FDROW_UKFS_ENGINE` is then discharged by the compiled functor
+    `FdRowUkfsEngineOfStep (S : FDROW_UKFS_STEP) <: FDROW_UKFS_ENGINE`.
+  - STILL SEALED, one statement: `FDROW_UKFS_STEP.wp_uk_ecall_fs_step` =
+    `UkStep.wp_uk_ecall` with `uvb → uvb_fs` and
+    `uexec_ret → uexec_ret_fs`.  Two type substitutions; ZERO fs content.
+  - WHY IT COULD NOT BE STATED AWAY (the measured obstacle; see the
+    file header for the full argument).  `UkStep.wp_uk_ecall` takes the
+    PLAIN return as an argument, and `uk_ecall_post_fetch` — the only
+    trap-out in the tree — demands it too.  That argument must be
+    INHABITED even when the leaf's own trap-out closure discards it, and
+    its ecall arm is "the process is PLAIN-safe after the syscall at
+    every `r`": `uslot (bump W0 r M' π' szv')`.  The pilot's caller is
+    enriched-safe only (its continuation eats `urun_fs`), and `urun_fs`
+    cannot be rebuilt from the plain `uvb` a plain slot receives —
+    `ukont ⊬ ukont_fs`, i.e. `uslot_fs ⊬ uslot`, the direction AS-LANDED
+    finding 1 already refutes.  Nor can the enrichment reach the
+    trap-out by another channel: `uk_step_obl` re-binds `C`/`pt`/`Rut`
+    universally (so a `ukb_fs` fixed at one triple cannot ride `Kc`); the
+    bundle's own promise slot is `ukb`-typed; and the `Rut` slot — the
+    one channel re-bound WITH the bundle — is later-free in `uvb_F`
+    while the enriched promise is `ukont_fs = ▷ ukb_fs`.
+  - BUDGET vs MEASURED: budget 300; the pilot content came in at 220
+    (391-line file, 71-line header + Require block + section prose).
+    The transitional alternative (copy the engine at the enriched
+    fixpoint) measures `uvb_elim` 24 + `uk_step_obl`/`uk_ih`/`uk_payload`
+    40 + `uk_psi_active` 62 + `uk_arm_intr` ~60 + `wp_uk_step_gen` 207 +
+    `wp_uk_step` 10 + `uk_ecall_post_fetch` 229 + `wp_uk_ecall` 126
+    ≈ 760 lines of VERBATIM upstream duplication — past the 3× stop
+    rule, and a maintenance liability the parallel-form discipline
+    exists to avoid.  Filed as upstream ask (4) below instead.
+- [x] **P3 — the era-0 mint** at the userinit park.  LANDED in
+  `iris/FdRowMint.v` (EC2-green, zero `Admitted`, zero new `Axiom`).
+
+  THE MINT, as landed:
+
+  ```coq
+  Theorem mirror_era0_mint_tied (γfd : gname) Γ (S : fs_state_rec) :
+    snap_ok S era0_D ->
+    fd_frags γfd fdt0 -∗
+    astate Γ (abs_view (fss_inodes S)) -∗
+    |==> ∃ γm : gname,
+      mirror_tied γm γfd Γ FsImg.ROOTINO (era0_u S)
+      ∗ mirror_entry γm (era0_u S).
+  ```
+
+  with `era0_u S := MkUmirror fdt0 (abs_view (fss_inodes S)) ROOTINO` and
+  the two halves' homes
+
+  ```coq
+  mirror_entry γm u        := mcur γm u ∗ ⌜era0_seed u⌝
+  mirror_tied γm γfd Γ cw u := mcur γm u ∗ fd_frags γfd (um_fdt u)
+                              ∗ astate Γ (um_av u) ∗ ⌜um_cwd u = cw⌝
+  ```
+
+  WHERE THE HALVES LAND, and why the residue is shaped that way:
+  `mirror_entry` is init's entry deposit — the user half beside the seed,
+  i.e. exactly `pilot_console_pure`'s first premise packed with the
+  resource the enriched arm's right disjunct takes.  `mirror_tied` is the
+  enriched loop's residue: the kernel half held BESIDE the real ghosts, at
+  their reading, so faithfulness is DEFINITIONAL at the residue's index
+  rather than a conjunct that could quietly be false — the fd leg IS
+  `fd_frags`' list, the av leg IS `astate`'s view.  P4's obligation is
+  therefore to RE-INDEX the pair, which is what `mirror_tied_round` (the
+  join + the caller's real-ghost move + the re-index, with `⌜ud = u⌝` as
+  the anti-drift receipt) is shaped for.  Also proven: `mirror_tied_agree`
+  / `_open` / `_close` / `_fdlen` / `_row` (a `nview` share agrees with
+  the MIRROR's row — the move that justifies open's observed `anode` at
+  P4), `mirror_tied_quiet` (a non-`uenr_dom` row moves nothing),
+  `astate_era0_console_miss` and `mirror_tied_era0_console_miss` (the
+  console-miss read at the live authority and off the residue —
+  `FsInitPin` §6's route (a), for the pilot's own facts),
+  `mirror_era0_mint` (the bare mint, pure premise only),
+  `mirror_park_family_of_gen` / `_box` and `mirror_era0_park_arm`.
+
+  **THE SOLO SCOPING, CASHED OUT IN ONE CONJUNCT.**  The owner's ruling
+  costs exactly this: the residue holds `astate Γ (um_av u)` — the
+  EXCLUSIVE authority — rather than a share or an observation.  A residue
+  owning the whole authority across a process's excursion is inhabitable
+  only in a quiescent single-process era, so the scoping is a condition on
+  who may HOLD the residue, not a hedge inside it.  The post-fork row
+  weakens that ONE conjunct to existential observations + persistent
+  certificates and changes nothing else.
+
+  AUDIT (`Print Assumptions`, EC2): `mirror_era0_mint` and
+  `mirror_era0_mint_tied` report the SAME TEN as `FsInitPin.
+  era0_init_path_pin` and `FdRowPilot.era0_seed_boot` — the
+  `PrimInt63`/`PrimString` primitives entries 3–12 of the standing
+  thirteen, which the adequacy baseline records as image-backed, not
+  assumptions.  So the era-0 leg matches its budgeted analogue EXACTLY,
+  with no delta.  `mirror_tied_round` and `fd_frags_fdt0` are **Closed
+  under the global context**.  `mirror_park_family_of_gen` reports only
+  `resv_matches` + `resv_is_valid` (the machine layer, entering with
+  `uslot`/`uslot_fs`) and `mirror_era0_park_arm` the union — twelve of the
+  standing thirteen.  `functional_extensionality_dep` appears NOWHERE.
+
+  AS-LANDED FINDING (the ask's whole cost): **allocproc's fresh table is
+  minted at its VALUE and existentially closed one line later.**
+  `ProcInv.v:2403` builds `fd_frags γd (replicate NOFILE FdClosed)` — which
+  IS `fdt0` — and `ProcInv.v:2408` closes it into `fd_frags_any`, in which
+  form it travels through `SpecAllocproc`'s post (`SpecAllocproc.v:195`)
+  and `ParkCap.park_token_park` to the userinit park.  The value CANNOT be
+  recovered downstream (`fd_frags_any` yields the length and nothing else;
+  `FdRowMint.fd_frags_any_len` is everything it gives), so it has to be
+  CARRIED.  `FdSlots.v`'s own header already prices this class as a change
+  of parameter at the holder, not a re-plumb.
+
+  THE DIFF-SHAPED ASK for the upstream mint arm is `FdRowMint.v` §6,
+  verbatim; the one-line summary is that `ProofUserinit`'s MINT SITE #1
+  gains three `iMod` lines between two untouched blocks, the park's family
+  argument keeps its NAME and POSITION and changes only its type
+  (`∀ W, uslot W` → `∀ W, uslot_fs γm W`, discharged by the proven
+  `mirror_park_family_of_gen`), and the arm needs three things the site
+  does not have today: the pinned `fd_frags (pv_fdg V) fdt0` (finding
+  above), the founded `astate Γ (abs_view (fss_inodes S))` at the boot
+  instant (`FsInitPin` §6's posture; the mint is one `|==>`, so opening it
+  under an invariant is atomic), and the pure `snap_ok S era0_D`.
 - [ ] **P4 — the enriched loop round** (the kernel side; milestone-J
   shaped, upstream's with our support).  The excursion relays the AU
   receipts (the AU dispatch arms are landed; the relay is a
@@ -2249,23 +2892,208 @@ THE STAGES (prover lanes; budgets keyed to the landed analogues):
   `ProofSysOpenTails`' resource-generic continuations are the precedent
   that priced the AU walks) and the loop's right branch joins the mirror
   halves, steps them off `open_fd_ok`'s explicit `sts` /
-  `mknod_post_ok_era`, and supplies the `ufs_step` tie.  Also owes the
+  `mknod_post_ok_era`, and supplies the `ufs_step` tie.  The ghost
+  skeleton of that round is already proven — `FdRowMint.mirror_tied_round`
+  takes the real-ghost move as a wand and re-indexes both halves — so what
+  P4 owes on top is exactly the `ufs_step` tie and the wand's discharge.
+  Also owes the
   mirror-faithfulness invariant and the resolve-vs-namex alignment
   (design §5's caveat) BEFORE `uenr_dom` widens past dot-free paths.
   BUDGET: a full lane; do not start before the upstream arm ruling
   (design §8.1).
-- [ ] **P5 — the enriched init preamble walk + widening.**  The
-  `UkInit` stage-1 preamble re-walked on `urun_fs` (after the upstream
-  arm lands, the engine is THE engine and no leaf twins exist; if walked
-  transitionally instead, budget one `urun_fs` twin per leaf kind the
-  preamble uses — the reason the plan prefers adoption-first).  Then:
-  the dup row (fds 1-2 = console), fork's mirror retirement/downgrade
-  (the solo flip), and the post-fork general row (av leg → existential
-  observations + persistent certs).  BUDGET for the walk: UkInit stage 1
-  measured 1520 + 3249 + 1020 lines; the preamble slice ~1500.
+- [x] **P5 — the enriched init preamble walk** — AS LANDED
+  (`iris/UkRunFsLeaf.v` 1020 lines, `iris/UkInitFs.v` 1158 lines, plus
+  +64 `FsFdMirror.v` / +48 `UkRunSysFs.v` / +138 `FdRowPilot.v`;
+  EC2-green, zero `Admitted`, zero new `Axiom`).  Walked
+  TRANSITIONALLY, against the P2 seal, without waiting for upstream.
+  The widening half (fork's mirror retirement, the post-fork general
+  row) is NOT done and stays queued below.
+
+  THE TOP LEMMA, verbatim (`UkInitFs.wp_kinit_console_arm_fs`, inside
+  the functor `UkInitFsWalk (R : FDROW_UKFS_RETIRE) (S : FDROW_UKFS_STEP)`):
+
+  ```coq
+  Lemma wp_kinit_console_arm_fs (γm : gname) (h : CpuId) (m : regfile)
+      (u0 : umirror) (avail : nat) :
+    era0_seed u0 ->
+    init_code γt -∗ init_rodata γt -∗
+    urun_fs γm γt γd γs h m (mword_of_int 0xc) avail -∗
+    mcur γm u0 -∗
+    (∀ (h' : CpuId) (m' : regfile) (u2 u3 : umirror)
+       (r3 rd1 rd2 : mword 64),
+       ⌜r3 <> (mword_of_int (-1) : mword 64) ->
+        rd1 <> (mword_of_int (-1) : mword 64) ->
+        rd2 <> (mword_of_int (-1) : mword 64) ->
+        um_fdt u3 !! 0%nat = Some (FdOpen true true (FdDevice CONSOLE))
+        /\ um_fdt u3 !! 1%nat = Some (FdOpen true true (FdDevice CONSOLE))
+        /\ um_fdt u3 !! 2%nat = Some (FdOpen true true (FdDevice CONSOLE))
+        /\ (exists i : Z,
+              um_resolve u2 console_str = Some i
+              /\ um_av u3 !! i = Some (MkAnode (ADev CONSOLE 0) 1%nat))⌝ -∗
+       ⌜m' !!! Regidx s2_idx = (mword_of_int LIT_START : mword 64)⌝ -∗
+       mcur γm u3 -∗
+       urun_fs γm γt γd γs h' m' (mword_of_int 0x32) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  ```
+
+  THE REFINEMENT.  The pure storey it cites is the NEW
+  `FdRowPilot.pilot_console_dups` (the design's §7 "first extension",
+  now built), which is `pilot_console_pure`'s chain continued through
+  two enriched dup rows.  Both come off one new `pilot_console_core` —
+  `pilot_console_pure` read with the fd leg WHOLE
+  (`um_fdt u3 = <[0%nat := FdOpen true true (FdDevice CONSOLE)]> fdt0`)
+  rather than at row 0, because `fd_lowest_closed` of that table (= 1,
+  then 2) is what the dups read and row 0 alone does not determine it.
+  **`pilot_console_pure`'s STATEMENT is unchanged, verbatim**; it is now
+  one line off the core, and still audits *Closed under the global
+  context*.  So the walk's `u3'` IS the pure theorem's, with no
+  "definitionally era0-stepped" gap to bridge.
+
+  ALSO LANDED, the composition receipt
+  `UkInitFs.wp_kinit_console_arm_then_loop`: the enriched preamble hands
+  its run back through the proven `urun_fs_urun` and upstream's LANDED,
+  UNTOUCHED `UkInitMain.wp_kinit_main_loop` runs from 0x32 exactly as
+  before.  The enrichment is therefore a drop-in for the preamble, not a
+  fork of the program proof.
+
+  THE TWIN INVENTORY (per kind, seal/proven).  **ONE new seal, covering
+  every leaf kind in the slice**, plus P2's:
+
+  | kind | where | status |
+  |---|---|---|
+  | retire funnel (`wp_uk_retire_later`) | `FDROW_UKFS_RETIRE` | **SEALED** (1) |
+  | ecall step (`wp_uk_ecall`) | `FDROW_UKFS_STEP` (P2) | **SEALED** (0 new) |
+  | `wp_uk_retire_fs` (later-free) | UkRunFsLeaf §2 | proven |
+  | `wp_uk_alu0_fs` / `wp_uk_alu1_fs` | §2 | proven |
+  | `c.li`, `addi`, `auipc` | §2 | proven |
+  | `jal`, `c.jr`, `c.j` | §2 | proven |
+  | `btype_gen_later`, `btype_later`, `btype0` | §2 | proven |
+  | the seven `urun_fs`-level re-threads | §3 | proven |
+  | `ustrt` / `uheap_ustrt` (the TEXT string) | §3/§4 | proven, **closed** |
+  | `wp_uk_ecall_fs_text` (path rows) | §4 | proven over P2's seal |
+  | `wp_uk_ecall_fs_nopath` (dup) | §4 | proven over P2's seal |
+
+  WHY ONE SEAL AND NOT TEN.  Every non-ecall leaf in the slice funnels
+  through `UkStep.wp_uk_retire[_later]` — including the branches, since
+  `UkBranch.wp_uk_btype_gen_later` is itself one application of it — so
+  sealing the FUNNEL at the enriched bundle covers all of them, and
+  UkLeaf.v/UkBranch.v's per-kind wrappers are re-derived here (they never
+  open the bundle, so the derivation is their own proof with one name
+  changed).  `wp_uk_retire_later_folded` is the compiled receipt that the
+  seal's premise set is the plain funnel's, folded.
+
+  THE ASK-4 COLLAPSE NOTE.  Under upstream ask (4) (the X-generic
+  engine) **both** seals become instantiations, not copies:
+  `FDROW_UKFS_RETIRE.wp_uk_retire_fs_later` is `wp_uk_retire_later` at
+  `(uexec_ret_fs_F γm, uslot_fs γm)` and `FDROW_UKFS_STEP.
+  wp_uk_ecall_fs_step` is `wp_uk_ecall` at the same pair — and
+  `UkRunFsLeaf.v` §2 (the re-derived per-kind wrappers, ~360 lines)
+  becomes redundant with UkLeaf.v/UkBranch.v outright.  P5 therefore
+  measures ask (4)'s payoff exactly: 1 seal + ~360 lines of parallel
+  wrappers per parallel contract, forever, versus one section header
+  upstream.
+
+  AS-LANDED FINDINGS:
+  1. **THE `Rut` SMUGGLE DIES ON A SECOND, INDEPENDENT OBSTRUCTION** —
+     worth recording beside P2's.  P2 refuted "route the enriched bundle
+     through the plain engine" by the ecall driver's plain-return
+     ARGUMENT.  For a non-ecall leaf there is no such argument, and the
+     obvious next idea is to smuggle the enriched promise through the
+     bundle's caller-chosen `Rut` slot (the kernel hands `Rut pt` back at
+     the trap).  It still fails, and earlier: `ukc` RE-BINDS `Rut`
+     universally, so the continuation receives a bundle at an ARBITRARY
+     `Rut` and nothing smuggled in comes back out.  A later-shifting
+     variant fails too — the promise is `▷ ukb`, and the trap-out needs
+     `ukb` NOW.  Ask first which of a driver's BINDERS a parallel form
+     can still control, not only which of its arguments it can inhabit.
+  2. **A `ustrq` PREMISE AT init's PATH LITERAL WOULD HAVE BEEN AN
+     UNSATISFIABLE PREMISE.**  P2's leaf pins the fetched path with
+     `UexecRetFs.ustrq`, a run of WRITABLE data bytes; init's "console"
+     lives at 0x970 in the program's READ-ONLY image, whose bytes are on
+     the TEXT half (`utext`).  A walk that simply took `ustrq γd dq 0x970
+     console_str` as a hypothesis would have compiled and been VACUOUS at
+     the state init runs in.  `UkRunFsLeaf.ustrt` (the same resource on
+     the text half, PERSISTENT) and `uheap_ustrt` (`uheap_ustrq`'s twin
+     through `uheap_text`) are the fix, and `UkInitFs.init_console_ustrt`
+     DERIVES the resource from `init_rodata` rather than assuming it —
+     one `vm_compute` (`console_lit_ok_holds`) says the bytes at 0x970
+     are `console_str` followed by NUL.  Any future enriched walk over a
+     string argument must check which half its string lives on.
+  3. **THE FALL-THROUGH ARM OF init's `blt` IS UNREACHABLE AT ERA 0, AND
+     THE WALK PROVES IT** rather than assuming it.  `era0_seed` forces
+     `um_resolve u0 console_str = None`, so the open row's success arm is
+     unsatisfiable and r1 = −1, so `uv_btaken BLT (−1) x0 = true`.  That
+     is `pilot_console_pure`'s first conclusion read at the machine: both
+     arms are walked, one of them to `exfalso`.
+  4. **THE DUP ROW NEEDED `uenr_dom` TO SPLIT.**  `ufs_step` fetched a
+     path string at argument 0 for every enriched row.  dup's argument 0
+     is a descriptor NUMBER, so that fetch would have pinned dup's row to
+     the −1 blanket — a contract the enriched loop could NOT discharge on
+     a dup that succeeds (an inconsistency that compiles).  `uenr_path`
+     (open, mknod) now keys the fetch and `uenr_dom = uenr_path ∪ {dup}`;
+     `ufs_step_at`'s `pl` is simply unused off the path rows, so P2's
+     `ufs_step_pin` and the whole `FDROW_UKFS_ENGINE` statement are
+     UNCHANGED.  The dup row itself is keyed on `bv_signed vfd` (argfd's
+     own reading) rather than on "some index whose encoding is the
+     argument", which is what makes it usable without an injectivity
+     argument.
+
+  SCOPE, stated honestly: the slice starts at main's CONSOLE ARM (0xc),
+  after the prologue.  main's four `c.sdsp` spills go through
+  `UkStore.wp_uk_store_later`, a SECOND engine driver over
+  `UkStep.wp_uk_step`, so re-walking the prologue costs one more funnel
+  seal (`wp_uk_store_fs_later`) for zero fs content.  Priced, not paid.
+
+  BUDGET vs MEASURED: the walk budgeted ~1500, measured 1158; the twins
+  measured 1020 (of which ~360 is §2's re-derived wrappers and ~75 the
+  two `Local` `_zca` exec facts UkLeaf.v keeps `Local`, copied for the
+  fourth time in the tree — their relocation to WpMmodeLeafBase.v is the
+  second half of ask (4)'s cost).  Total new/changed 2428 lines, well
+  inside the 3× stop rule.
+
+  AUDIT (`Print Assumptions`, EC2, against `Declare Module` stand-ins for
+  the two seals): `ufs_dup_at_hit`, `ufs_step_np`, `ufs_step_pin`,
+  `pilot_console_core`, `pilot_console_pure`, `pilot_console_dups`,
+  `console_lit_ok_holds`, `console_lit_body`, `console_lit_nul`,
+  `console_str_forall_nonul` and `uheap_ustrt` are all **Closed under the
+  global context**.  The `urun_fs` register/branch leaves report
+  `wp_uk_retire_fs_later` + the `resv` pair.  The two ecall leaves report
+  `wp_uk_ecall_fs_step` + the standing three.  Every walk lemma
+  (`wp_kinit_open_fs`, `wp_kinit_dup_fs`, `wp_kinit_repair_fs`,
+  `wp_kinit_console_arm_fs`, `wp_kinit_console_arm_then_loop`) reports
+  exactly the TWO seals + the standing three (`resv_matches`,
+  `resv_is_valid`, `functional_extensionality_dep`).  ZERO new axioms.
+
+- [ ] **P5b — the widening** (not started).  fork's mirror
+  retirement/downgrade (the solo flip) and the post-fork general row (av
+  leg → existential observations + persistent certs).  The fd leg needs
+  nothing new; the design's §5 records the shape.
 
 UPSTREAM ASKS (design §8, each a yes/no brief there): (1) the arm diff
 in `UexecRet.v` (conservative — the bridge is the compiled receipt;
-recommend YES); (2) the era-0 entry deposit at the userinit park (with
-P3); (3) the pure return-range conjuncts on open/mknod's rows
-(WINDOW-LEAF-style, independent; recommend YES).
+recommend YES); (2) the era-0 entry deposit at the userinit park —
+SPECIFIED, `FdRowMint.v` §6 is the diff and its three inputs (A) pinned
+`fd_frags … fdt0`, (B) the founded `astate` at the boot instant, (C) the
+pure `snap_ok S era0_D` are the whole cost; (3) the pure return-range
+conjuncts on open/mknod's rows (WINDOW-LEAF-style, independent;
+recommend YES).
+
+(4) **NEW, filed by P2 and the cheapest of the four — THE X-GENERIC
+ENGINE.**  Parameterise `UkStep.v`'s §3 (`uk_step_obl` / `uk_ih` /
+`uk_payload`), §5 (`wp_uk_step_gen` / `wp_uk_step`) and §8
+(`uk_ecall_post_fetch` / `wp_uk_ecall`) over the slot family instead of
+hardwiring `UexecRet`'s: a section `Context (RetF : (uvis -d> iPropO Σ)
+-> mword 64 -> uvis -> iProp Σ) (X : uvis -d> iPropO Σ)` with the TWO
+facts the engine actually uses — `X W ⊣⊢ ∀ h C pt Rut, … -∗ uvb_F' RetF
+X … -∗ WP Loop` (the fixpoint unfolding, used at the interrupt arm via
+`uslot_run`) and `sc ≠ uecall_scause → RetF X sc W ⊣⊢ X W` (the
+transparent arm, `uexec_ret_transparent`).  NO engine proof inspects
+either beyond those two; `uvb`/`ukb`/`uexec_ret` become
+`uvb_F'`/`ukb_F'`/`RetF X` throughout and the plain instance is
+`(uexec_ret_F, uslot)`, verbatim.  With it, `FDROW_UKFS_STEP` is
+`wp_uk_ecall` at `(uexec_ret_fs_F γm, uslot_fs γm)` — one instantiation,
+no copy — and P5's "one `urun_fs` twin per leaf kind" collapses to zero
+for every leaf, not just this one.  RECOMMEND YES; it is strictly
+smaller than ask (1) and independent of it (it does not change any
+landed statement, only generalises).

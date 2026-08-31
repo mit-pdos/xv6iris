@@ -93,6 +93,7 @@ Require Import SpecEitherCopyin.
 Require Import SpecUartwriteLoc.   (* the located callee contract *)
 Require Import CodeConsolewrite.
 Require Import SpecConsolewrite.
+Require Import SpecCopyin.   (* [ubytes_at], [add_vec_moi_comm] *)
 Require Import SpecConsolewriteLoc.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -299,7 +300,11 @@ Section CwBodies.
 
   Definition cw_ret `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (eb : bool) (pid : mword 32) (U : ustate) (n : Z) (lks : gset string)
-      (γu : uart_names) (tr0 : list (bv 8)) : iProp Σ :=
+      (γu : uart_names) (tr0 : list (bv 8))
+      (* RULING A: the image and the user base the receipt is stated at.
+         FIXED for the whole call -- unlike [U], which the loop moves --
+         so they ride here rather than being read off [U] and [m0]. *)
+      (Mu : gmap Z (bv 8)) (ua : mword 64) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CID : CpuId) =>
        (* the image does not move: either_copyin is same-[U] *)
        ∀ (mf : regfile) (r : Z) (P' : uptd),
@@ -312,17 +317,18 @@ Section CwBodies.
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          proc_priv_core (proc_addr jp) pid (us_upt U P') -∗
          (* THE RECEIPT AT THE RETURNED COUNT (diff item 2) *)
-         cons_sent_cnt γu tr0 r -∗
+         cons_sent_cnt γu tr0 Mu ua r -∗
          WP (Loop : expr riscv_lang)))%I.
 
   (* the loop re-enters its own continuation at a MOVED descriptor; both the
      extension and the record compose, so the exit weakens along the loop. *)
   Lemma cw_ret_weaken `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (eb : bool) (pid : mword 32) (U : ustate) (P1 : uptd) (n : Z) (lks : gset string)
-      (γu : uart_names) (tr0 : list (bv 8)) :
+      (γu : uart_names) (tr0 : list (bv 8))
+      (Mu : gmap Z (bv 8)) (ua : mword 64) :
     uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1 ->
-    cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 -∗
-    cw_ret (CID0 := CID0) jp m0 av eb pid (us_upt U P1) n lks γu tr0.
+    cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 Mu ua -∗
+    cw_ret (CID0 := CID0) jp m0 av eb pid (us_upt U P1) n lks γu tr0 Mu ua.
   Proof.
     intro Hext. rewrite /cw_ret /wp_next.
     iIntros "H" (CID) "%Hg".
@@ -341,7 +347,8 @@ Section CwBodies.
   Lemma cw_epi `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (U : ustate) (n r : Z) (lks : gset string)
-      (γu : uart_names) (tr0 : list (bv 8)) :
+      (γu : uart_names) (tr0 : list (bv 8))
+      (Mu : gmap Z (bv 8)) (ua : mword 64) :
     let pj := proc_addr jp in
     m0 !!! Regidx csp_rs1 = sp0 ->
     M !!! Regidx csp_rs1 = pa_stk sp0 16%nat ->
@@ -357,8 +364,8 @@ Section CwBodies.
     pc_is (mword_of_int (CW + 0x96)) -∗
     proc_priv_core pj pid U -∗
     cw_saved sp0 m0 -∗ cw_rest sp0 -∗
-    cons_sent_cnt γu tr0 r -∗
-    cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 -∗
+    cons_sent_cnt γu tr0 Mu ua r -∗
+    cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 Mu ua -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hm0sp HMsp HMs1 HMcs Hr Hav Heb Hcr.
@@ -536,7 +543,8 @@ Section CwBodies.
   Lemma cw_exit_done `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (U : ustate) (n r : Z) (lks : gset string)
-      (γu : uart_names) (tr0 : list (bv 8)) :
+      (γu : uart_names) (tr0 : list (bv 8))
+      (Mu : gmap Z (bv 8)) (ua : mword 64) :
     let pj := proc_addr jp in
     m0 !!! Regidx csp_rs1 = sp0 ->
     M !!! Regidx csp_rs1 = pa_stk sp0 16%nat ->
@@ -554,8 +562,8 @@ Section CwBodies.
     pc_is (mword_of_int (CW + 0x6c)) -∗
     proc_priv_core pj pid U -∗
     cw_saved sp0 m0 -∗ cw_spill sp0 m0 -∗ cw_buf sp0 -∗
-    cons_sent_cnt γu tr0 r -∗
-    cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 -∗
+    cons_sent_cnt γu tr0 Mu ua r -∗
+    cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 Mu ua -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hm0sp HMsp HMs1 HMs11 Hr Hav Heb Hal Hcr.
@@ -751,7 +759,7 @@ Section CwBodies.
     { iApply (cnwi_7e with "Ht"). }
     iIntros (CIDj Hsj). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Hjt) in "Hpc".
-    iApply (cw_epi (CID := CIDj) CID0 jp m0 R8 av eb sp0 pid U n r lks γu tr0
+    iApply (cw_epi (CID := CIDj) CID0 jp m0 R8 av eb sp0 pid U n r lks γu tr0 Mu ua
               Hm0sp HR8sp Hs1v Hhi Hr Hav Heb ltac:(wp_next_chain)
               with "Ht Hcg Hcnt Hpc Hpriv Hsaved Hrest Hrcpt Hcont").
   Qed.
@@ -761,7 +769,8 @@ Section CwBodies.
   Lemma cw_exit_break `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (U : ustate) (n r : Z) (lks : gset string)
-      (γu : uart_names) (tr0 : list (bv 8)) :
+      (γu : uart_names) (tr0 : list (bv 8))
+      (Mu : gmap Z (bv 8)) (ua : mword 64) :
     let pj := proc_addr jp in
     m0 !!! Regidx csp_rs1 = sp0 ->
     M !!! Regidx csp_rs1 = pa_stk sp0 16%nat ->
@@ -779,8 +788,8 @@ Section CwBodies.
     pc_is (mword_of_int (CW + 0x84)) -∗
     proc_priv_core pj pid U -∗
     cw_saved sp0 m0 -∗ cw_spill sp0 m0 -∗ cw_buf sp0 -∗
-    cons_sent_cnt γu tr0 r -∗
-    cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 -∗
+    cons_sent_cnt γu tr0 Mu ua r -∗
+    cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 Mu ua -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hm0sp HMsp HMs1 HMs11 Hr Hav Heb Hal Hcr.
@@ -964,7 +973,7 @@ Section CwBodies.
     iDestruct (cw_rest_of sp0 m0 Hal with "[S4 S5 S6 S7 S8 S9 S10 S11 S12] Hbuf")
       as "Hrest".
     { rewrite /cw_spill. iFrame "S4 S5 S6 S7 S8 S9 S10 S11 S12". }
-    iApply (cw_epi (CID := CIDl8) CID0 jp m0 R8 av eb sp0 pid U n r lks γu tr0
+    iApply (cw_epi (CID := CIDl8) CID0 jp m0 R8 av eb sp0 pid U n r lks γu tr0 Mu ua
               Hm0sp HR8sp Hs1v Hhi Hr Hav Heb ltac:(wp_next_chain)
               with "Ht Hcg Hcnt Hpc Hpriv Hsaved Hrest Hrcpt Hcont").
   Qed.
@@ -981,7 +990,10 @@ Section CwBodies.
       (γu : uart_names) (γv : disk_names)
       (m0 : regfile) (av : nat) (eb : bool)
       (pid : mword 32) (n : Z) (sp0 src : mword 64) (lks : gset string)
-      (tr0 : list (bv 8)) :
+      (tr0 : list (bv 8))
+      (* RULING A: the image the receipt is stated at.  The user BASE is
+         already a binder here -- it is [src] -- so only the image is new. *)
+      (Mu : gmap Z (bv 8)) :
     (jp < NPROC)%nat -> γs !! jp = Some γlp -> length γs = NPROC ->
     (n < 2 ^ 31)%Z ->
     (consolewrite_stack <= av)%nat ->
@@ -992,6 +1004,11 @@ Section CwBodies.
     forall (CID : CpuId) (M : regfile) (U : ustate) (i : Z),
       (0 <= i < n)%Z ->
       (Z.to_nat (n - i) <= mrem)%nat ->
+      (* RULING A: the block the loop carries is at the receipt's image.  The
+         loop MOVES [U] (the descriptor grows at every copy) but never its
+         image, so this is a loop invariant that holds by conversion at the
+         back edge -- [us_M (us_upt U P) = us_M U]. *)
+      us_M U = Mu ->
       cw_regs M (pa_stk sp0 16%nat) sp0 src n i ->
       M !!! Regidx Rs11 = m0 !!! Regidx Rs11 ->
       (true = false \/ proc_addr jp = zero_reg -> (CID : CPU) = CID0) ->
@@ -1017,12 +1034,12 @@ Section CwBodies.
       cw_saved sp0 m0 -∗ cw_spill sp0 m0 -∗ cw_buf sp0 -∗
       (* THE LOOP INVARIANT'S TRACE HALF (diff item 3): the receipt at the
          same [i] the register invariant pins in s1. *)
-      cons_sent_cnt γu tr0 i -∗
-      cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 -∗
+      cons_sent_cnt γu tr0 Mu src i -∗
+      cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 Mu src -∗
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hj Hjlp Hlens Hn31 Hav Heb Hm0sp Hal.
-    induction mrem as [| mrem IH]; intros CID M U i Hi Hrem Hregs Hs11 Hcr Hbelow.
+    induction mrem as [| mrem IH]; intros CID M U i Hi Hrem HMu Hregs Hs11 Hcr Hbelow.
     { (* fuel 0 is unreachable: the head is entered only with [i < n] *)
       exfalso. lia. }
     iIntros "#Ht Hcg Hcnt Hpc Hpriv #Hkenv #Hdinv #Htxl #Hpinv
@@ -1138,6 +1155,13 @@ Section CwBodies.
       assert (HB5a3 : B5 !!! Regidx Ra3 = (mword_of_int nn : mword 64)).
       { rewrite /B5 upd_ne; [| reg_neq]. rewrite /B4 upd_ne; [| reg_neq].
         rewrite /B3 upd_ne; [| reg_neq]. exact HB2a3. }
+      (* a2, THE USER SOURCE, named -- the landed walk never needed it
+         (either_copyin promised nothing about the bytes); the content seam
+         states its equation at exactly this address. *)
+      assert (HB5a2 : B5 !!! Regidx Ra2
+                      = add_vec (mword_of_int i : mword 64) src).
+      { rewrite /B5 upd_ne; [| reg_neq]. rewrite /B4 upd_ne; [| reg_neq].
+        rewrite /B3 upd_eq. reflexivity. }
       assert (Pb46 : add_vec_int (mword_of_int (CW + 0x44) : mword 64) 2
                      = mword_of_int (CW + 0x46)) by pcw.
       iEval (rewrite Pb46) in "Hpc".
@@ -1189,7 +1213,9 @@ Section CwBodies.
       (* either_copyin is SAME-image, so the block comes back at [us_M U]
          and consolewrite's loop carries no moved image at all. *)
       iDestruct "Hpv" as (P1) "(%Hext1 & Hpriv)".
-      iDestruct "Hb1" as (fb') "Hb1".
+      (* the content seam (RULING A): the run comes back with its equation
+         to the process's image, guarded by the [0] exit. *)
+      iDestruct "Hb1" as (fb') "[%Hfbc Hb1]".
       iEval (rewrite HB6a0) in "Hb1".
       (* the register shape survives the call *)
       assert (Hregc : cw_regs mf1 (pa_stk sp0 16%nat) sp0 src n i).
@@ -1301,8 +1327,8 @@ Section CwBodies.
         (* THE SEED FOR THIS CHUNK (diff item 4): the accumulated receipt's
            own trace witness.  Persistent and pure throughout, so [Hrcpt]
            survives for the copy-failed exit below. *)
-        iDestruct (cons_sent_cnt_seed γu tr0 i with "Hrcpt")
-          as (tracc bsacc) "(%Hbsacc & %Hpacc & %Hsacc & #Htracc)".
+        iDestruct (cons_sent_cnt_seed γu tr0 Mu src i with "Hrcpt")
+          as (tracc bsacc) "(%Hbsacc & %Hbyacc & %Hpacc & %Hsacc & #Htracc)".
         iApply (Uartwrite.wp_uartwrite_loc_sconf γu γv γs jp γlp γl D3 (av - 16)%nat
                   eb nnN fb' (DfracOwn 1) true pid (DfracOwn (1/2)) lks tracc
                   Hj Hjlp ltac:(rewrite HD3a1 HnnN; reflexivity)
@@ -1318,13 +1344,32 @@ Section CwBodies.
         (* the chunk's bytes land AFTER everything already receipted, so the
            two receipts concatenate: the count and the trace advance in the
            same step, one instruction ahead of the [i += nn] at +0x56. *)
-        iAssert (cons_sent_cnt γu tr0 (nn + i)) as "#Hrcpt'".
+        (* THE CHUNK'S CONTENT (RULING A).  We are on the arm where
+           either_copyin returned 0 ([Hr0]), so its post pins the buffer to
+           the process's run at [a2 = i + src]; [add_vec_moi_comm] turns the
+           loop's index-first [add] into the base-bumped form the receipt's
+           append step wants, and [Hbsacc] rewrites the accumulated length
+           to the index the register invariant carries. *)
+        assert (HB6a2 : B6 !!! Regidx Ra2
+                        = add_vec (mword_of_int i : mword 64) src)
+          by (rewrite /B6 upd_ne; [exact HB5a2 | reg_neq]).
+        assert (Hgotc : copyin_got Mu
+                          (add_vec (mword_of_int i : mword 64) src) nnN fb').
+        { rewrite -HMu -HB6a2. exact (Hfbc Hr0). }
+        assert (Hchunkb : ubytes_at Mu
+                            (add_vec_int src (Z.of_nat (length bsacc)))
+                            ((fb' <$> seq 0 nnN) : list (bv 8))).
+        { rewrite Hbsacc -add_vec_moi_comm.
+          exact (ubytes_at_of_got Mu (add_vec (mword_of_int i : mword 64) src)
+                   nnN fb' Hgotc). }
+        iAssert (cons_sent_cnt γu tr0 Mu src (nn + i)) as "#Hrcpt'".
         { assert (Hcnt : (nn + i)%Z
                          = (i + Z.of_nat (length ((fb' <$> seq 0 nnN) : list (bv 8))))%Z).
           { rewrite length_fmap length_seq. lia. }
           rewrite Hcnt.
-          iApply (cons_sent_cnt_chunk γu tr0 tracc i bsacc (fb' <$> seq 0 nnN)
-                    Hbsacc Hpacc Hsacc with "Hsent"). }
+          iApply (cons_sent_cnt_chunk γu tr0 tracc Mu src i bsacc
+                    (fb' <$> seq 0 nnN)
+                    Hbsacc Hpacc Hsacc Hbyacc Hchunkb with "Hsent"). }
         iEval (rewrite HD3ra) in "Hpc".
         assert (P56 : ret_pc (add_vec_int (mword_of_int (CW + 0x52) : mword 64) 4)
                       = mword_of_int (CW + 0x56)) by pcw.
@@ -1404,10 +1449,10 @@ Section CwBodies.
           { iApply (cnwi_5a with "Ht"). }
           iApply bi.later_intro. iIntros (CIDce Hsce) "Hcg Hpc".
           iEval (rewrite Htgt) in "Hpc".
-          iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 n lks γu tr0 Hext1
+          iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 n lks γu tr0 Mu src Hext1
                        with "Hcont") as "Hcont".
           iApply (cw_exit_done (CID := CIDce) CID0 jp m0 F1 av eb sp0 pid
-                    (us_upt U P1) n (nn + i)%Z lks γu tr0
+                    (us_upt U P1) n (nn + i)%Z lks γu tr0 Mu src
                     Hm0sp ltac:(destruct HF1regs as (Y1 & _); exact Y1)
                     HF1s1 HF1s11 ltac:(lia) Hav Heb Hal ltac:(wp_next_chain)
                     with "Ht Hcg Hcnt Hpc Hpriv Hsaved Hspill Hbuf Hrcpt' Hcont").
@@ -1423,10 +1468,14 @@ Section CwBodies.
           assert (Pbk : add_vec_int (mword_of_int (CW + 0x5a) : mword 64) 4
                         = mword_of_int (CW + 0x5e)) by pcw.
           iEval (rewrite Pbk) in "Hpc".
-          iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 n _ γu tr0 Hext1
+          iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 n _ γu tr0 Mu src Hext1
                        with "Hcont") as "Hcont".
           iApply (IH CIDce F1 (us_upt U P1) (nn + i)%Z
-                    ltac:(lia) ltac:(lia) HF1regs HF1s11 ltac:(wp_next_chain) Hbelow
+                    ltac:(lia) ltac:(lia)
+                    (* the image tie survives the descriptor's move by
+                       conversion: [us_M (us_upt U P1)] IS [us_M U]. *)
+                    HMu
+                    HF1regs HF1s11 ltac:(wp_next_chain) Hbelow
                     with "Ht Hcg Hcnt Hpc Hpriv Hkenv Hdinv Htxl Hpinv
                           Hsaved Hspill Hbuf Hrcpt' Hcont").
       - (* the copy failed: the branch IS taken, and [i] is the answer *)
@@ -1446,10 +1495,10 @@ Section CwBodies.
         { rewrite /cw_buf H32 (bytes_own_app (KTR := KT1)).
           iDestruct (bytes_own_of_name (KTR := KT1) nnN buf fb' with "Hb1") as "Hb1".
           iSplitL "Hb1"; [iExact "Hb1" | iExact "Hb2"]. }
-        iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 n lks γu tr0 Hext1
+        iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 n lks γu tr0 Mu src Hext1
                      with "Hcont") as "Hcont".
         iApply (cw_exit_break (CID := CIDc8) CID0 jp m0 mf1 av eb sp0 pid
-                  (us_upt U P1) n i lks γu tr0
+                  (us_upt U P1) n i lks γu tr0 Mu src
                   Hm0sp Csp Cs1 Hs11c ltac:(lia) Hav Heb Hal ltac:(wp_next_chain)
                   with "Ht Hcg Hcnt Hpc Hpriv Hsaved Hspill Hbuf Hrcpt Hcont"). }
     (* ---------------------------------------------------------------- *)
@@ -1596,10 +1645,11 @@ Section CwBodies.
     (* [Hbelow] is SpecConsolewrite.v's own [locks_below lks (lock_rank
        "proc")] premise -- see the companion note at [cw_loop] above for why
        "proc" (11), not "kmem" (13), is the cone's true floor. *)
-    intros pcE pj ret_tgt Hj Hjlp Hlens Ha0 Ha2 Hnr Hav Heb Hbelow.
+    intros pcE pj ret_tgt uaddr Hj Hjlp Hlens Ha0 Ha2 Hnr Hav Heb Hbelow.
     iIntros "Hcg Hcnt #Ht Hpc Hpriv #Hkenv #Hdinv #Htxl #Hpinv #Hseed Hcont".
     (* the entry receipt: nothing accepted after the seed yet (diff item 5) *)
-    iDestruct (cons_sent_cnt_zero γu tr0 with "Hseed") as "#Hrcpt0".
+    iDestruct (cons_sent_cnt_zero γu tr0 (us_M U) (m !!! Regidx Ra1 : mword 64)
+                 with "Hseed") as "#Hrcpt0".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     assert (Hbt : b = true) by (rewrite -Hbm; exact Heb).
     clear Hbm. subst b.
@@ -1761,6 +1811,7 @@ Section CwBodies.
         iFrame "F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 F14 F15 F16".
         all: try done. }
       iApply (cw_epi (CID := CID8) CID jp m A2 av eb sp0 pid U n 0 lks γu tr0
+                (us_M U) (m !!! Regidx Ra1 : mword 64)
                 Hspm HA2sp HA2s1 HA2hi ltac:(lia) Hav Heb ltac:(wp_next_chain)
                 with "Ht Hcg Hcnt Hpc Hpriv Hsaved Hrest Hrcpt0 [Hcont]").
       (* [n <= 0]: the loop never runs, so [cw_epi] here never touches a
@@ -2065,10 +2116,15 @@ Section CwBodies.
       iDestruct (slotsn_bytes_own (KTR := KT1) sp0 16 4 ltac:(lia) with "Hbs") as "[%Hal Hbuf]".
       iApply (cw_loop (Z.to_nat n) CID γa γf γs jp γlp γl γu γv m av eb pid n sp0
                 (m !!! Regidx Ra1) lks tr0
+                (* RULING A: the receipt is stated at the image the caller
+                   lent; the base is [src], already passed above. *)
+                (us_M U)
                 Hj Hjlp Hlens ltac:(exact (proj2 Hnr))
                 Hav Heb Hspm Hal
                 CIDg9 G8 U 0 ltac:(split; [apply Z.le_refl | exact Hnpos])
                 ltac:(rewrite Z.sub_0_r; reflexivity)
+                (* the image tie, at entry: reflexivity *)
+                eq_refl
                 HA9regs HA9s11 ltac:(wp_next_chain) Hbelow
                 with "Ht Hcg Hcnt Hpc Hpriv Hkenv Hdinv Htxl Hpinv
                       Hsaved Hspill [Hbuf] Hrcpt0 [Hcont]").

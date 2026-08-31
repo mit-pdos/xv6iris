@@ -57,6 +57,7 @@ Require Import UserExec.     (* [user_trap_frame_at] *)
 Require Import UsysMemOk.    (* [usys_num] / [usys_mem_ok] / [bump_tf] *)
 Require Import SpecUserret.  (* [userret_gpr] -- the 31-insert register file *)
 Require Import UexecSlot.    (* [uvis] / [tf_w] / [tf_resume_gpr] / [ret_pc_idem] *)
+Require Import FdSlots.      (* [fdstate] -- the key's descriptor view *)
 Require Import UexecRet.     (* [tf_resume_gpr0] / [tf_of] / [uslot] / [uexec_ret] *)
 Require Import UexecRound.   (* the round this vocabulary is applied under *)
 Require Import TsoCtx.
@@ -293,7 +294,7 @@ Qed.
 Definition uvis_run (W : uvis) : uvis :=
   uvis_of_run (tf_resume_gpr0 (uvis_tf W))
               (ret_pc (tf_w (uvis_tf W) tf_epc_idx))
-              (uvis_M W) (uvis_perm W) (uvis_sz W).
+              (uvis_M W) (uvis_perm W) (uvis_sz W) (uvis_fd W).
 
 Lemma uvis_run_length (W : uvis) : length (uvis_tf (uvis_run W)) = TFWORDS.
 Proof. exact (tf_of_length _ _). Qed.
@@ -349,14 +350,15 @@ Section Apply.
     uvis_M W = uvis_M W' ->
     uvis_perm W = uvis_perm W' ->
     uvis_sz W = uvis_sz W' ->
+    uvis_fd W = uvis_fd W' ->
     (* the type ascription pins [Σ]: [uvis] is Σ-free, so without it the
        [⊣⊢] notation cannot elaborate [uslot]'s implicit [Σ] before it
        has to unify against [bi_car]. *)
     (uslot W : iProp Σ) ⊣⊢ uslot W'.
   Proof.
-    intros Hg Hp HM Hpi Hsz.
+    intros Hg Hp HM Hpi Hsz Hfd.
     rewrite (uslot_ukc W) (uslot_ukc W').
-    rewrite Hg Hp HM Hpi Hsz. reflexivity.
+    rewrite Hg Hp HM Hpi Hsz Hfd. reflexivity.
   Qed.
 
   (* ...AND THE RETURN CHANNEL SEES THOSE FOUR PLUS THE NUMBER AND THE TWO
@@ -375,17 +377,20 @@ Section Apply.
     uvis_M W = uvis_M W' ->
     uvis_perm W = uvis_perm W' ->
     uvis_sz W = uvis_sz W' ->
+    uvis_fd W = uvis_fd W' ->
     (uexec_ret sc W : iProp Σ) ⊣⊢ uexec_ret sc W'.
   Proof.
-    intros HlW HlW' Hn Ha0 Ha1 Ha2 Hg Hp HM Hpi Hsz.
+    intros HlW HlW' Hn Ha0 Ha1 Ha2 Hg Hp HM Hpi Hsz Hfd.
     (* the BUMPED keys agree too, at every return value and every
        image/permission pair the row allows *)
     assert (Hb : forall (r : mword 64) (M' : gmap Z (bv 8))
-                        (pi' : gmap (mword 27) uperm) (szv' : Z),
-                   (uslot (bump W r M' pi' szv') : iProp Σ)
-                     ⊣⊢ uslot (bump W' r M' pi' szv')).
-    { intros r M' pi' szv'.
-      apply uslot_key_cong; cbn [bump uvis_tf uvis_M uvis_perm uvis_sz].
+                        (pi' : gmap (mword 27) uperm) (szv' : Z)
+                        (fdv' : list fdstate),
+                   (uslot (bump W r M' pi' szv' fdv') : iProp Σ)
+                     ⊣⊢ uslot (bump W' r M' pi' szv' fdv')).
+    { intros r M' pi' szv' fdv'.
+      apply uslot_key_cong;
+        cbn [bump uvis_tf uvis_M uvis_perm uvis_sz uvis_fd].
       - unfold tf_resume_gpr0 in Hg |- *.
         rewrite (tf_resume_gpr_bump zero_rf (uvis_tf W) r
                    ltac:(rewrite HlW; unfold tf_arg_idx, TFWORDS; lia)).
@@ -399,10 +404,11 @@ Section Apply.
         exact (ret_pc_add4_cong _ _ Hp).
       - reflexivity.
       - reflexivity.
+      - reflexivity.
       - reflexivity. }
     rewrite /uexec_ret /uexec_ret_F. cbv zeta.
     destruct (decide (sc = uecall_scause)) as [_ | _];
-      [ | exact (uslot_key_cong W W' Hg Hp HM Hpi Hsz) ].
+      [ | exact (uslot_key_cong W W' Hg Hp HM Hpi Hsz Hfd) ].
     rewrite Hn HM Hpi Hsz.
     destruct (decide (usys_num (uvis_tf W') = USYS_exit)) as [_ | _];
       [ reflexivity | ].
@@ -410,23 +416,29 @@ Section Apply.
     - (* fork: two arms, both at the [(M, pi)] the key already carries *)
       iSplit.
       + iIntros "[H1 H2]". iSplitL "H1".
-        * iIntros (r Hr). rewrite -(Hb r (uvis_M W') (uvis_perm W') (uvis_sz W')).
-          iApply ("H1" $! r). iPureIntro. exact Hr.
-        * rewrite -(Hb (mword_of_int 0) (uvis_M W') (uvis_perm W') (uvis_sz W')).
-          iExact "H2".
+        * iIntros (r fdv' Hr).
+          rewrite -(Hb r (uvis_M W') (uvis_perm W') (uvis_sz W') fdv').
+          iApply ("H1" $! r fdv'). iPureIntro. exact Hr.
+        * iIntros (fdv').
+          rewrite -(Hb (mword_of_int 0) (uvis_M W') (uvis_perm W') (uvis_sz W') fdv').
+          iApply ("H2" $! fdv').
       + iIntros "[H1 H2]". iSplitL "H1".
-        * iIntros (r Hr). rewrite (Hb r (uvis_M W') (uvis_perm W') (uvis_sz W')).
-          iApply ("H1" $! r). iPureIntro. exact Hr.
-        * rewrite (Hb (mword_of_int 0) (uvis_M W') (uvis_perm W') (uvis_sz W')).
-          iExact "H2".
+        * iIntros (r fdv' Hr).
+          rewrite (Hb r (uvis_M W') (uvis_perm W') (uvis_sz W') fdv').
+          iApply ("H1" $! r fdv'). iPureIntro. exact Hr.
+        * iIntros (fdv').
+          rewrite (Hb (mword_of_int 0) (uvis_M W') (uvis_perm W') (uvis_sz W') fdv').
+          iApply ("H2" $! fdv').
     - (* the returning arms: the row transports by SS3 *)
       iSplit.
-      + iIntros "H" (r M' pi' szv' Hmo).
-        rewrite -(Hb r M' pi' szv'). iApply ("H" $! r M' pi' szv'). iPureIntro.
+      + iIntros "H" (r M' pi' szv' fdv' Hmo).
+        rewrite -(Hb r M' pi' szv' fdv').
+        iApply ("H" $! r M' pi' szv' fdv'). iPureIntro.
         exact (usys_mem_ok_args _ (uvis_tf W') (uvis_tf W) r _ _ _ _ _ _
                  (eq_sym Ha0) (eq_sym Ha1) (eq_sym Ha2) Hmo).
-      + iIntros "H" (r M' pi' szv' Hmo).
-        rewrite (Hb r M' pi' szv'). iApply ("H" $! r M' pi' szv'). iPureIntro.
+      + iIntros "H" (r M' pi' szv' fdv' Hmo).
+        rewrite (Hb r M' pi' szv' fdv').
+        iApply ("H" $! r M' pi' szv' fdv'). iPureIntro.
         exact (usys_mem_ok_args _ (uvis_tf W) (uvis_tf W') r _ _ _ _ _ _
                  Ha0 Ha1 Ha2 Hmo).
   Qed.
@@ -444,7 +456,7 @@ Section Apply.
              (eq_sym (uvis_run_num W)) (eq_sym (uvis_run_arg0 W))
              (eq_sym (uvis_run_arg1 W)) (eq_sym (uvis_run_arg2 W))
              (eq_sym (uvis_run_gpr W))
-             (eq_sym (uvis_run_pc W)) eq_refl eq_refl eq_refl).
+             (eq_sym (uvis_run_pc W)) eq_refl eq_refl eq_refl eq_refl).
   Qed.
 
 End Apply.
@@ -556,13 +568,23 @@ Section LoopApply.
   (* ------------------------------------------------------------------ *)
   (* STEPS A + B: the returned [uexec_ret], re-keyed at the resume state. *)
   (* ------------------------------------------------------------------ *)
+  (* THE DESCRIPTOR VIEW CROSSES THE TRAP UNCHANGED, and that is a PREMISE
+     rather than a conclusion of the round: [UexecRound.uround_ok] relates
+     the four record fields the trap moves (trapframe, image, permission
+     map, break) and knows nothing about descriptors, so the resumed key's
+     fd component is the LOOP's to choose.  It chooses the entry view --
+     which is exact for every arm but the four entries that touch
+     [p->ofile[]] (pipe, dup, open, close), whose rows are what will later
+     move it (see the ecall arm of [UexecRet.uexec_ret_F], which ∀-binds
+     [fdv'] precisely so that they can). *)
   Lemma uexec_ret_round_slot (sc : mword 64) (W W' : uvis) :
     length (uvis_tf W) = TFWORDS ->
+    uvis_fd W' = uvis_fd W ->
     uround_ok sc (uvis_tf (uvis_run W)) (uvis_M W) (uvis_perm W) (uvis_sz W)
       (uvis_tf W') (uvis_M W') (uvis_perm W') (uvis_sz W') ->
     (∀ W'' : uvis, uslot W'') -∗ uexec_ret sc W -∗ uslot W'.
   Proof.
-    intros Hl Hr.
+    intros Hl Hfd Hr.
     iIntros "Hmk Hret".
     (* STEP A: the trapped key and its run projection are the same key *)
     iEval (rewrite (uexec_ret_run sc W Hl)) in "Hret".
@@ -589,7 +611,8 @@ Section LoopApply.
         * (* fork: nothing says [r <> 0] (K2) -- MINT *)
           iApply "Hmk".
         * (* the returning arms: the row is the round's own conjunct *)
-          iDestruct ("Hret" $! r (uvis_M W') (uvis_perm W') with "[%]") as "Hs";
+          iDestruct ("Hret" $! r (uvis_M W') (uvis_perm W') (uvis_sz W')
+                       (uvis_fd W') with "[%]") as "Hs";
             [ exact Hm | ].
           (* the bump's two readers, hoisted out of argument position
              (claude-notes/optimization.md, "Inline [ltac:]") *)
@@ -603,8 +626,8 @@ Section LoopApply.
             exact (eq_sym Hb2). }
           iEval (rewrite (uslot_key_cong
                             (bump (uvis_run W) r (uvis_M W') (uvis_perm W')
-                               (uvis_sz W')) W'
-                            Hg1 Hp1 eq_refl eq_refl eq_refl)) in "Hs".
+                               (uvis_sz W') (uvis_fd W')) W'
+                            Hg1 Hp1 eq_refl eq_refl eq_refl eq_refl)) in "Hs".
           iExact "Hs".
     - (* ---- TRANSPARENT: interrupt, page fault, anything else ---- *)
       rewrite (uexec_ret_transparent sc (uvis_run W) Hne).
@@ -614,13 +637,18 @@ Section LoopApply.
                   (uvis_tf W') Hne Hr) as [[Hi1 Hi2] [HM [Hpi Hsz]]].
       iEval (rewrite (uslot_key_cong (uvis_run W) W'
                         (eq_sym Hi1) (eq_sym Hi2)
-                        (eq_sym HM) (eq_sym Hpi) (eq_sym Hsz))) in "Hret".
+                        (eq_sym HM) (eq_sym Hpi) (eq_sym Hsz)
+                        (eq_sym Hfd))) in "Hret".
       iExact "Hret".
   Qed.
 
   (* ...at the key the loop actually holds: the round's post is stated at
      the trapped machine's own register file and epc word, and the resume
      key is [UexecSlot.uvis_of] of the record the round left. *)
+  (* ...at the resumed record, keyed at the fd view that crossed the trap.
+     [UexecSlot.uvis_of] takes the descriptor states as a parameter, and
+     what the loop has to hand at this point is exactly the view the
+     trapped key carried. *)
   Lemma uexec_ret_round_slot_of (sc : mword 64) (W : uvis) (g : regfile)
       (sepc_v : mword 64) (U' : ustate) :
     length (uvis_tf W) = TFWORDS ->
@@ -630,37 +658,44 @@ Section LoopApply.
       (pv_tf (us_V U')) (us_M U')
       (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
       (uint (pv_sz (us_V U'))) ->
-    (∀ W'' : uvis, uslot W'') -∗ uexec_ret sc W -∗ uslot (uvis_of U').
+    (∀ W'' : uvis, uslot W'') -∗ uexec_ret sc W -∗
+    uslot (uvis_of U' (uvis_fd W)).
   Proof.
     intros Hl -> -> Hr.
-    exact (uexec_ret_round_slot sc W (uvis_of U') Hl Hr).
+    exact (uexec_ret_round_slot sc W (uvis_of U' (uvis_fd W)) Hl eq_refl Hr).
   Qed.
 
   (* ------------------------------------------------------------------ *)
   (* STEP D (and C): [uvb], row by row, and the continuation applied.     *)
   (* ------------------------------------------------------------------ *)
-  Lemma ukc_apply (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (sz : Z) (M : gmap Z (bv 8)) (m : regfile)
+  (* THE DESCRIPTOR RESOURCE IS A PREMISE, beside the image's.  This is
+     where the loop pays for the key's fd view: it hands over [Rfd fdv] --
+     instantiated at [FdSlots.fd_frags γfd] -- exactly as it hands over
+     [user_ptm_inv pt sz M] for [uvis_M]. *)
+  Lemma ukc_apply (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+      (Rut : uptd -> iProp Σ)
+      (sz : Z) (fdv : list fdstate) (M : gmap Z (bv 8)) (m : regfile)
       (ms_v sc_v stv_v sepc_v pc : mword 64) :
     loop_ok C pt ->
     usz_ok sz ->
     user_mstatus_ok ms_v ->
-    ukc (perm_of (ud_um pt) sz) M sz m pc -∗
+    ukc (perm_of (ud_um pt) sz) M sz fdv m pc -∗
     hw_config -∗ minstret_inv -∗ wire_inv -∗
     u_regs (HART_ACTIVE tt) ms_v sc_v stv_v sepc_v pc pc m -∗
     user_ptm_inv pt sz M -∗
+    Rfd fdv -∗
     user_cfg C -∗
     Rut pt -∗
-    ▷ ukb C pt Rut sz (perm_of (ud_um pt) sz) -∗
+    ▷ ukb C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hlo Hsz Hms.
-    iIntros "Hkc Hhw Hmi Hwi Hregs Hupt Hcfg Hrut Hk".
+    iIntros "Hkc Hhw Hmi Hwi Hregs Hupt Hfrag Hcfg Hrut Hk".
     (* the cell bundle splits into the U-mode residue, the file and the pc *)
     iDestruct (u_regs_uv_regs ms_v sc_v stv_v sepc_v pc m Hms with "Hregs")
       as "(Hur & Hg & Hpc)".
-    iApply ("Hkc" $! CID XI C pt Rut
-              with "[%] [%] [Hhw Hmi Hwi Hur Hg Hpc Hupt Hcfg Hrut Hk]").
+    iApply ("Hkc" $! CID XI C pt Rfd Rut
+              with "[%] [%] [Hhw Hmi Hwi Hur Hg Hpc Hupt Hfrag Hcfg Hrut Hk]").
     - exact Hlo.
     - reflexivity.
     - (* THE BUNDLE, ROW BY ROW -- it carries [gpr_file], so never [iFrame]
@@ -670,6 +705,7 @@ Section LoopApply.
       iSplitL "Hur"; [ iExact "Hur" | ].
       iSplitR; [ iPureIntro; exact Hsz | ].
       iSplitL "Hupt"; [ iExact "Hupt" | ].
+      iSplitL "Hfrag"; [ iExact "Hfrag" | ].
       iSplitL "Hcfg"; [ iExact "Hcfg" | ].
       iSplitL "Hg"; [ iExact "Hg" | ].
       iSplitL "Hpc"; [ iExact "Hpc" | ].
@@ -680,8 +716,9 @@ Section LoopApply.
   (* ...and the slot at a KEY, which is what the loop holds: the FIVE
      projections the slot reads, supplied as equations.  The break joined
      them when it joined the key. *)
-  Lemma uslot_apply_loop (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (sz : Z) (W : uvis) (M : gmap Z (bv 8)) (m : regfile)
+  Lemma uslot_apply_loop (C : ucfg) (pt : uptd)
+      (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
+      (sz : Z) (fdv : list fdstate) (W : uvis) (M : gmap Z (bv 8)) (m : regfile)
       (ms_v sc_v stv_v sepc_v pc : mword 64) :
     loop_ok C pt ->
     usz_ok sz ->
@@ -689,24 +726,26 @@ Section LoopApply.
     uvis_perm W = perm_of (ud_um pt) sz ->
     uvis_M W = M ->
     uvis_sz W = sz ->
+    uvis_fd W = fdv ->
     tf_resume_gpr0 (uvis_tf W) = m ->
     tf_resume_pc (uvis_tf W) = pc ->
     uslot W -∗
     hw_config -∗ minstret_inv -∗ wire_inv -∗
     u_regs (HART_ACTIVE tt) ms_v sc_v stv_v sepc_v pc pc m -∗
     user_ptm_inv pt sz M -∗
+    Rfd fdv -∗
     user_cfg C -∗
     Rut pt -∗
-    ▷ ukb C pt Rut sz (perm_of (ud_um pt) sz) -∗
+    ▷ ukb C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hlo Hsz Hms Hpi HM Hsw Hg Hpc.
+    intros Hlo Hsz Hms Hpi HM Hsw Hfd Hg Hpc.
     iIntros "Hs".
     (* the seal comes off the HYPOTHESIS only *)
     iEval (rewrite uslot_ukc) in "Hs".
-    iEval (rewrite Hpi HM Hsw Hg Hpc) in "Hs".
-    iApply (ukc_apply C pt Rut sz M m ms_v sc_v stv_v sepc_v pc Hlo Hsz Hms
-              with "Hs").
+    iEval (rewrite Hpi HM Hsw Hfd Hg Hpc) in "Hs".
+    iApply (ukc_apply C pt Rfd Rut sz fdv M m ms_v sc_v stv_v sepc_v pc
+              Hlo Hsz Hms with "Hs").
   Qed.
 
 End LoopApply.

@@ -84,15 +84,15 @@ Section ProofStable.
 
   Lemma wp_sys_write_au_era_stable
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
-      (fn : fwrite_names) (pidv : mword 32) (U : ustate) (v v2 : mword 64)
+      (fn : fwrite_names) (pidv : mword 32) (U : ustate) (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
-    : wp_sys_write_au_era_stable_body γf γs j γlp fn pidv U v v2 m K eb b
+    : wp_sys_write_au_era_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
         lks fd fv rb i q bs0 nl Φw.
   Proof.
-    pose proof (W.wp_sys_write_au_era γf γs j γlp fn pidv U v v2 m K eb b
+    pose proof (W.wp_sys_write_au_era γf γs j γlp fn pidv U v v1 v2 m K eb b
                   lks fd fv rb i Φw) as HW.
     cbv beta delta [wp_sys_write_au_era_body wp_sys_write_au_frame] in HW.
     cbv beta delta [wp_sys_write_au_era_stable_body wp_sys_write_au_frame].
@@ -120,10 +120,14 @@ Section ProofStable.
     iDestruct "Harms" as "[[%Hok Hpost] | [%Hm1 Hpost]]".
     - iLeft. iSplitR; [by iPureIntro |].
       rewrite /write_post_ok_at.
-      iDestruct "Hpost" as (bss) "(%Htot & %Hlen & Hrs & Hcm)".
+      iDestruct "Hpost" as (bss) "(%Htot & %Hlen & %Hby & Hrs & Hcm)".
       iExists 0%nat, bss.
       iSplitR; [iPureIntro; lia |].
       iSplitR; [by iPureIntro |].
+      iSplitR; [by iPureIntro |].
+      (* the content equation rides through the escape disjunct untouched
+         (RULING A): it is about the SOURCE, which no chaining question
+         touches. *)
       iSplitR; [by iPureIntro |].
       iSplitL "Hrs"; [iRight; iExact "Hrs" |]. iExact "Hcm".
     - iRight. iSplitR; [by iPureIntro |]. iExact "Hpost".

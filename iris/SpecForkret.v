@@ -242,7 +242,7 @@ End SpecForkret.
    into named definitions"). *)
 Definition forkret_closer
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
-    (URes : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (W : iProp Σ) (γf : gname) (p ksp : mword 64)
     (* the parked process's fd-state ghost name *)
     (g : gname)
@@ -281,7 +281,10 @@ Definition forkret_closer
         here -- see [ParkCap.park_pkg], of which this is the forkret-side
         spelling, and projects/user-wp-slot.md SS4c (R-b) for why the key
         cannot be the parked one (the boot arm's kexec moves it). *)
-     (URes h pt' ksp U' ∗ uslot (uvis_of U')))%I.
+     (* one [sts] for both: the residue's fragments and the slot's key --
+        see [ParkCap.park_pkg], of which this is the forkret-side spelling *)
+     (∃ sts : list fdstate,
+        URes h pt' ksp U' sts ∗ uslot (uvis_of U' sts)))%I.
 
 
 (* THE CONTRACT.  One statement, no [first] premise and no [first] reading:
@@ -292,7 +295,7 @@ Definition wp_forkret_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (* the trap loop's kernel-side bundle, abstract exactly as
        [SpecUserretClosed] takes it *)
-    (URes : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (* WHAT THE RESIDUE CLOSER IS HANDED BESIDE [first_done] -- the park
        token ([ParkCap.park_token]) in practice, abstract here: forkret
        holds it ([W -∗] below), reads nothing off it, and hands it to the

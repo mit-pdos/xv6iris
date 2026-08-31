@@ -115,6 +115,9 @@ Definition wp_filewrite_cons_body
   let pcE : mword 64 := mword_of_int KernelSyms.filewrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (* THE USER SOURCE (RULING A).  filewrite hands a1 to the device's write
+     UNTOUCHED, so this IS consolewrite's [uaddr]; a [let], not a premise. *)
+  let uaddr : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
   (filewrite_stack <= K)%nat ->
   (k < NFILE)%nat ->
   (j < NPROC)%nat ->
@@ -175,7 +178,7 @@ Definition wp_filewrite_cons_body
       file_ref γf k q st -∗
       proc_priv_core pj pidv (us_upt U P') -∗
       filewrite_env_out fn st -∗
-      write_cons_arms fsc_uart tr0 n r -∗
+      write_cons_arms fsc_uart tr0 (us_M U) uaddr n r -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -197,20 +200,22 @@ Section ConsArmsOfCount.
             !irefslotG Σ, !pavG Σ}.
 
   (* the OK arm: consolewrite delivered all [n] *)
-  Lemma wcons_ok_of_cnt (γu : uart_names) (tr0 : list (bv 8)) (n : Z) :
-    cons_sent_cnt γu tr0 n -∗ wcons_ok γu tr0 n.
+  Lemma wcons_ok_of_cnt (γu : uart_names) (tr0 : list (bv 8))
+      (M : gmap Z (bv 8)) (ua : mword 64) (n : Z) :
+    cons_sent_cnt γu tr0 M ua n -∗ wcons_ok γu tr0 M ua n.
   Proof. iIntros "H". iExact "H". Qed.
 
   (* the SHORT arm: a copy faulted mid-loop and the count already pushed is
      the answer -- [r] both the return value and the receipt's length *)
   Lemma wcons_short_of_cnt (γu : uart_names) (tr0 : list (bv 8))
-      (n r : Z) :
+      (M : gmap Z (bv 8)) (ua : mword 64) (n r : Z) :
     (r < n)%Z ->
-    cons_sent_cnt γu tr0 r -∗
-    wcons_short γu tr0 n (mword_of_int r : mword 64).
+    cons_sent_cnt γu tr0 M ua r -∗
+    wcons_short γu tr0 M ua n (mword_of_int r : mword 64).
   Proof.
-    iIntros (Hlt) "H". iDestruct "H" as (bs) "[%Hlen Hfrom]".
+    iIntros (Hlt) "H". iDestruct "H" as (bs) "(%Hlen & %Hby & Hfrom)".
     iExists bs. iSplitR; [by rewrite Hlen|]. iSplitR; [iPureIntro; lia|].
+    iSplitR; [iPureIntro; exact Hby|].
     iExact "Hfrom".
   Qed.
 
@@ -219,15 +224,15 @@ Section ConsArmsOfCount.
      given [0 <= r <= n] (consolewrite's own range fact) and [0 <= n] (the
      sign guard's fall-through) *)
   Lemma write_cons_arms_of_cnt (γu : uart_names) (tr0 : list (bv 8))
-      (n r : Z) :
+      (M : gmap Z (bv 8)) (ua : mword 64) (n r : Z) :
     (0 <= n)%Z -> (0 <= r <= n)%Z ->
-    cons_sent_cnt γu tr0 r -∗
-    write_cons_arms γu tr0 n (mword_of_int r : mword 64).
+    cons_sent_cnt γu tr0 M ua r -∗
+    write_cons_arms γu tr0 M ua n (mword_of_int r : mword 64).
   Proof.
     iIntros (Hn Hr) "H".
     destruct (Z.eq_dec r n) as [-> | Hne].
     - iLeft. iSplitR; [by iPureIntro|]. by iApply wcons_ok_of_cnt.
-    - iRight. iLeft. iApply (wcons_short_of_cnt γu tr0 n r with "H"). lia.
+    - iRight. iLeft. iApply (wcons_short_of_cnt γu tr0 M ua n r with "H"). lia.
   Qed.
 
 End ConsArmsOfCount.

@@ -108,7 +108,8 @@ Section UservecAllPt.
 
 
   Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (j : nat) (vksp : mword 64) (U : ustate) (M : gmap Z (bv 8))
+      (j : nat) (vksp : mword 64) (U : ustate) (sts : list fdstate)
+      (M : gmap Z (bv 8))
       (g : regfile) (ms_v sc_v stval_v sepc_v : mword 64) :
     (* [UT.]-qualified, not the section alias: inside a section that FIXES
        [CID], the alias has no [CID] implicit left to instantiate (section
@@ -116,7 +117,7 @@ Section UservecAllPt.
        still does, and the two are convertible, so the [: USERVEC] check
        accepts it. *)
     wp_uservec_pt_body (fun h : CpuId => UT.usertrap_res_bare (CID := h))
-      C pt Rut j vksp U M g ms_v sc_v stval_v sepc_v.
+      C pt Rut j vksp U sts M g ms_v sc_v stval_v sepc_v.
   Proof.
     cbv beta zeta delta [wp_uservec_pt_body].
     (* [tf_pa] deliberately NOT unfolded here: its 35 trapframe cells ride in
@@ -1603,12 +1604,13 @@ Section UservecAllPt.
     iDestruct (usertrap_res_tlb_close with "Hures' Hkres") as "Hures'".
     iEval (rewrite Hstvec) in "Hstvec".
     iApply (UT.wp_usertrap pt j (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> M7)
-              ms_v sc_v stval_v sepc_v vksp (uc_mie C) (uc_mideleg C) MENVCFG_S _
+              ms_v sc_v stval_v sepc_v vksp (uc_mie C) (uc_mideleg C) MENVCFG_S _ sts
               Hums Hjlt Hspv' Htpv' Hmie Hmm Hmenvval0
               with "Hkt Hpc Hhw Hinv Hhs Hpriv Hms Hsc Hstval Hsepc Hstvec Hmie Hmdl Hmenv Hfile Hures'").
     iApply wp_next_intro. iIntros (CID2).
     iEval (rewrite /usertrap_post).
-    iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2)
+    (* [usertrap_post] names where the round left the descriptor states *)
+    iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2)
       "%Huptpt2 %Hrd2 %Hpcret
        %Hmask %Hpttf %Haccwf %Hmapwf %Hretms %Hsconf2 %Hcalleesaved %Htpcid %Ha0usatp %Hsatprooted
        Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2".

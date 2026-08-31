@@ -1606,6 +1606,15 @@ Section ProofEitherCopyin.
         rewrite /Uz upd_ne; [| reg_neq].
         rewrite /U3 upd_eq. rewrite /U2 upd_ne; [| reg_neq].
         rewrite /U1 upd_ne; [| reg_neq]. rewrite HAs4. apply add_vec_zero_l. }
+      (* a3 IS the caller's [src].  Needed only since the content seam
+         (RULING A): [copyin_got] is stated at copyin's OWN a3 and the post
+         states it at either_copyin's [src].  Same register chain as the
+         copyout half's [HU5a3] one file-half above. *)
+      assert (HU5a3 : U5 !!! Regidx Ra3 = src).
+      { rewrite /U5 upd_ne; [| reg_neq]. rewrite /U4 upd_ne; [| reg_neq].
+        rewrite /Uz upd_ne; [| reg_neq].
+        rewrite /U3 upd_ne; [| reg_neq]. rewrite /U2 upd_eq.
+        rewrite /U1 upd_ne; [| reg_neq]. rewrite HAs3. apply add_vec_zero_l. }
       assert (HU5a4 : U5 !!! Regidx Ra4 = (mword_of_int (Z.of_nat len) : mword 64)).
       { rewrite /U5 upd_ne; [| reg_neq]. rewrite /U4 upd_ne; [| reg_neq].
         rewrite /Uz upd_ne; [| reg_neq].
@@ -1650,12 +1659,23 @@ Section ProofEitherCopyin.
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hdst").
       all: try lkbelow.
       iIntros (CID21 Hs21 mr P' dst_new) "Hcg Hcpu Hpc Hpt Hdst %Hcsr %Hext %Hgot".
-      (* the memory-indexed contract additionally names the bytes it read;
-         this contract does not relay them (its caller owns no user memory
-         to state them against), so only the return value survives. *)
+      rewrite HU5a3 in Hgot.
+      (* THE CONTENT SEAM (RULING A).  The memory-indexed contract names the
+         bytes it read, and this contract now RELAYS them: the return value
+         AND, on the [0] exit, [copyin_got] at either_copyin's own [src].
+         (It used to drop the fact -- "its caller owns no user memory to
+         state them against" -- which stopped being true once writei and
+         consolewrite began threading [proc_priv_core].) *)
       assert (Hret : mr !!! Regidx Ra0 = (mword_of_int 0 : mword 64)
                      \/ mr !!! Regidx Ra0 = (mword_of_int (-1) : mword 64))
         by (destruct Hgot as [(Hz & _) | Hm]; [by left | by right]).
+      assert (Hgot0 : mr !!! Regidx Ra0 = (mword_of_int 0 : mword 64) ->
+                      copyin_got (us_M U) src len dst_new).
+      { intros Hz. destruct Hgot as [(_ & Hg) | Hm]; [exact Hg |].
+        (* the [-1] exit is refuted by the hypothesis, not answered *)
+        exfalso. rewrite Hm in Hz.
+        apply (f_equal (@bv_unsigned 64)) in Hz.
+        rewrite !moi64_unsigned in Hz. vm_compute in Hz. discriminate. }
       assert (Hpc2c : ret_pc (U5 !!! Regidx Rra) = mword_of_int (KernelSyms.either_copyin + 0x2c))
         by (rewrite HU5ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc2c) in "Hpc".
@@ -1697,7 +1717,7 @@ Section ProofEitherCopyin.
       iSplitR; [iPureIntro; exact Hret|].
       iSplitL "Hres".
       { iExists P'. iSplitR; [iPureIntro; exact Hext|]. iExact "Hres". }
-      iExists dst_new. iExact "Hdst".
+      iExists dst_new. iSplitR; [iPureIntro; exact Hgot0|]. iExact "Hdst".
     - (* ================= user_src == 0: memmove ================= *)
       assert (Hz : eq_vec (Am !!! Regidx Rs1) zero_reg = true)
         by (rewrite HAs1; exact Hflag).

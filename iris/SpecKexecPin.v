@@ -183,9 +183,24 @@ Require Import FsInitPinBoot.   (* [era0_pins], [era0_pins_of_snap]          *)
 Require Import ElfFile.         (* [elf_image] -- the ELF decode             *)
 Require Import UmodeAbi.        (* [uimg_sub]                                *)
 Require Import UCodeInit.       (* [init_img_sub] -- USpecInit's premise     *)
-Require Import UCodeSh.         (* [sh_img_sub]                              *)
 Require Import ElfUser.         (* [init_elf], [sh_elf], length/entry facts  *)
-From User Require Import InitData ShData.   (* [initEntry], [shEntry]       *)
+From User Require Import InitData ShData ShInstrs.   (* [initEntry], [shEntry], [sh_bytes] *)
+
+(* [sh_img_sub] and its halves lived in UCodeSh.v until the first-generation
+   sh proofs were deleted on port (owner ruling, 2026-08-31); they reference
+   only the shared user-rocq dump maps, so they moved here verbatim — the
+   one fact of that file the pinned-exec contract ever consumed. *)
+Definition sh_text_sub (M : gmap Z (bv 8)) : Prop :=
+  uimg_sub ShInstrs.sh_bytes M.
+Definition sh_data_sub (M : gmap Z (bv 8)) : Prop :=
+  uimg_sub ShData.sh_data M.
+Definition sh_img_sub (M : gmap Z (bv 8)) : Prop :=
+  sh_text_sub M /\ sh_data_sub M.
+Lemma sh_img_text (M : gmap Z (bv 8)) : sh_img_sub M -> sh_text_sub M.
+Proof. intros [ H _ ]. exact H. Qed.
+Lemma sh_img_data (M : gmap Z (bv 8)) : sh_img_sub M -> sh_data_sub M.
+Proof. intros [ _ H ]. exact H. Qed.
+
 (* ---- SpecKexec.v's tail, verbatim ---- *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

@@ -14,8 +14,8 @@
      [wp_uk_ecall]   for [ecall].
 
    The statements are WpUmodeLeaf.v's with [uv_cap_gpr C pt Ψ M m ∗ pc_is pc]
-   read as [uvb C pt Rut sz π M m pc] and the continuation
-   [∀ CID0, uv_cap_gpr … M m' -∗ pc_is pc' -∗ WP] read as [ukc π M sz m' pc'];
+   read as [uvb C pt Rfd Rut sz π fdv M m pc] and the continuation
+   [∀ CID0, uv_cap_gpr … M m' -∗ pc_is pc' -∗ WP] read as [ukc π M sz fdv m' pc'];
    the pure premises, the value convention and the proofs are unchanged
    (each proof is one application of the funnel).  The section carries the
    ambient table's guard ([loop_ok C pt], [perm_of (ud_um pt) sz = π]), which
@@ -38,6 +38,7 @@ Require UserTotalU.
 Require Import UserPtTree UserExec.
 Require Import WpUmodeStep.
 Require Import UserPerm UexecWp UexecRet UkStep.
+Require Import FdSlots.      (* [fdstate] -- the key's descriptor view *)
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
 Local Open Scope Z_scope.
 Import Defs.
@@ -166,7 +167,7 @@ Qed.
 Section UkLeaf.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-  Context (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+  Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
 
@@ -211,7 +212,7 @@ Section UkLeaf.
   (* zero sources: the value is fixed by the leaf, and the pc is offered  *)
   (* to the premise because AUIPC -- alone in this family -- reads it.    *)
   Lemma wp_uk_alu0 (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (is_rvc : bool) (i : instruction) (o : option instruction)
+      (pc : mword 64) (fdv : list fdstate) (is_rvc : bool) (i : instruction) (o : option instruction)
       (rd : mword 5) (wval : mword 64) :
     uk_instr π M pc is_rvc i ->
     uv_redirect i o ->
@@ -226,13 +227,13 @@ Section UkLeaf.
                if Z.eqb (uint rd) 0 then s
                else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
                       (regval_into_reg wval))) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hrd Hg1 Hg2 Hop.
     iIntros "Hb Hcont".
-    iApply (wp_uk_retire C pt Rut π sz Hlo Hpm M m pc is_rvc i o None (Some (rd, wval))
+    iApply (wp_uk_retire C pt Rfd Rut π sz Hlo Hpm M m pc fdv is_rvc i o None (Some (rd, wval))
               Hui Hred Hlpad Hrd
               (fun s _ _ _ _ _ => Hg1 s) (fun s _ _ _ _ _ => Hg2 s)
               with "Hb Hcont").
@@ -246,7 +247,7 @@ Section UkLeaf.
 
   (* one source. *)
   Lemma wp_uk_alu1 (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (is_rvc : bool) (i : instruction) (o : option instruction)
+      (pc : mword 64) (fdv : list fdstate) (is_rvc : bool) (i : instruction) (o : option instruction)
       (rs1 rd : mword 5) (vf : mword 64 -> mword 64) (wval : mword 64) :
     uk_instr π M pc is_rvc i ->
     uv_redirect i o ->
@@ -261,13 +262,13 @@ Section UkLeaf.
                else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
                       (regval_into_reg (vf (gpr_src rs1 s))))) ->
     wval = vf (m !!! Regidx rs1) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hrd Hg1 Hg2 Hop Hwval.
     iIntros "Hb Hcont".
-    iApply (wp_uk_retire C pt Rut π sz Hlo Hpm M m pc is_rvc i o None (Some (rd, wval))
+    iApply (wp_uk_retire C pt Rfd Rut π sz Hlo Hpm M m pc fdv is_rvc i o None (Some (rd, wval))
               Hui Hred Hlpad Hrd
               (fun s _ _ _ _ _ => Hg1 s) (fun s _ _ _ _ _ => Hg2 s)
               with "Hb Hcont").
@@ -284,7 +285,7 @@ Section UkLeaf.
   (* register-read rewrites below never collide even when a call site      *)
   (* instantiates them to the same index (c.add is rd += rs2).             *)
   Lemma wp_uk_alu2 (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (is_rvc : bool) (i : instruction) (o : option instruction)
+      (pc : mword 64) (fdv : list fdstate) (is_rvc : bool) (i : instruction) (o : option instruction)
       (rs1 rs2 rd : mword 5) (vf : mword 64 -> mword 64 -> mword 64)
       (wval : mword 64) :
     uk_instr π M pc is_rvc i ->
@@ -300,13 +301,13 @@ Section UkLeaf.
                else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
                       (regval_into_reg (vf (gpr_src rs1 s) (gpr_src rs2 s))))) ->
     wval = vf (m !!! Regidx rs1) (m !!! Regidx rs2) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hrd Hg1 Hg2 Hop Hwval.
     iIntros "Hb Hcont".
-    iApply (wp_uk_retire C pt Rut π sz Hlo Hpm M m pc is_rvc i o None (Some (rd, wval))
+    iApply (wp_uk_retire C pt Rfd Rut π sz Hlo Hpm M m pc fdv is_rvc i o None (Some (rd, wval))
               Hui Hred Hlpad Hrd
               (fun s _ _ _ _ _ => Hg1 s) (fun s _ _ _ _ _ => Hg2 s)
               with "Hb Hcont").
@@ -333,17 +334,17 @@ Section UkLeaf.
   (* to [C_LI]).  Every real call site discharges it by [vm_compute].       *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_cli (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 6) (rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 6) (rd : mword 5) (wval : mword 64) :
     uk_instr π M pc true (C_LI (imm, Regidx rd)) ->
     uint rd <> 0 ->
     wval = add_vec zero_reg (sign_extend' 64 (sign_extend' 12 imm)) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
     iIntros "Hb Hcont".
-    iApply (wp_uk_retire C pt Rut π sz Hlo Hpm M m pc true (C_LI (imm, Regidx rd))
+    iApply (wp_uk_retire C pt Rfd Rut π sz Hlo Hpm M m pc fdv true (C_LI (imm, Regidx rd))
               (Some (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)))
               None (Some (rd, wval)) Hui
               ltac:(intro s; apply exec_execute_C_LI)
@@ -375,16 +376,16 @@ Section UkLeaf.
   (* just an arithmetic write.                                            *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_caddi (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 6) (rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 6) (rd : mword 5) (wval : mword 64) :
     uk_instr π M pc true (C_ADDI (imm, Regidx rd)) ->
     uint rd <> 0 ->
     wval = add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
-    exact (wp_uk_alu1 M m pc true (C_ADDI (imm, Regidx rd))
+    exact (wp_uk_alu1 M m pc fdv true (C_ADDI (imm, Regidx rd))
              (Some (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI)))
              rd rd (fun a => add_vec a (sign_extend' 64 (sign_extend' 12 imm)))
              wval Hui (fun s => exec_execute_C_ADDI imm (Regidx rd) s) eq_refl Hrd
@@ -405,15 +406,15 @@ Section UkLeaf.
   (* value form is taken verbatim from the execute fact.                   *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_caddi4spn (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (cr : mword 3) (nzimm : mword 8) (rd : mword 5)
+      (pc : mword 64) (fdv : list fdstate) (cr : mword 3) (nzimm : mword 8) (rd : mword 5)
       (wval : mword 64) :
     uk_instr π M pc true (C_ADDI4SPN (Cregidx cr, nzimm)) ->
     creg2reg_idx (Cregidx cr) = Regidx rd ->
     uint rd <> 0 ->
     wval = add_vec (m !!! Regidx csp_rs1)
              (sign_extend' 64 (caddi4spn_imm nzimm)) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr Hrd Hwval.
@@ -422,7 +423,7 @@ Section UkLeaf.
                                    Regidx rd, ADDI)))).
     { intro s. rewrite (exec_execute_C_ADDI4SPN (Cregidx cr) nzimm s).
       rewrite Hcr. reflexivity. }
-    exact (wp_uk_alu1 M m pc true (C_ADDI4SPN (Cregidx cr, nzimm))
+    exact (wp_uk_alu1 M m pc fdv true (C_ADDI4SPN (Cregidx cr, nzimm))
              (Some (ITYPE (caddi4spn_imm nzimm, Regidx csp_rs1, Regidx rd, ADDI)))
              csp_rs1 rd (fun a => add_vec a (sign_extend' 64 (caddi4spn_imm nzimm)))
              wval Hui Hred eq_refl Hrd
@@ -460,19 +461,19 @@ Section UkLeaf.
   (* every call site discharges by [vm_compute]).                          *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_jal (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 21) (rd : mword 5) (tgt wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 21) (rd : mword 5) (tgt wval : mword 64) :
     uk_instr π M pc false (JAL (imm, Regidx rd)) ->
     uint rd <> 0 ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     wval = add_vec_int pc 4 ->
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) tgt -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) tgt -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Htgt Hwval Hal0.
     iIntros "Hb Hcont".
-    iApply (wp_uk_retire C pt Rut π sz Hlo Hpm M m pc false (JAL (imm, Regidx rd)) None
+    iApply (wp_uk_retire C pt Rfd Rut π sz Hlo Hpm M m pc fdv false (JAL (imm, Regidx rd)) None
               (Some tgt) (Some (rd, wval)) Hui
               ltac:(intro s; exact I)
               eq_refl Hrd
@@ -508,17 +509,17 @@ Section UkLeaf.
   (* Zca for [jump_to]) come off the funnel's config agreement.            *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_cjr (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (rs1 : mword 5) (tgt : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (rs1 : mword 5) (tgt : mword 64) :
     uk_instr π M pc true (C_JR (Regidx rs1)) ->
     uint rs1 <> 0 ->
     tgt = ret_pc (m !!! Regidx rs1) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz m tgt -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv m tgt -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrs1 Htgt.
     iIntros "Hb Hcont".
-    iApply (wp_uk_retire C pt Rut π sz Hlo Hpm M m pc true (C_JR (Regidx rs1))
+    iApply (wp_uk_retire C pt Rfd Rut π sz Hlo Hpm M m pc fdv true (C_JR (Regidx rs1))
               (Some (JALR (zeros' 12, Regidx rs1, zreg)))
               (Some tgt) None Hui
               ltac:(intro s; apply exec_execute_C_JR)
@@ -566,17 +567,17 @@ Section UkLeaf.
   (* caller).  The immediate is the model's own [caddi16sp_imm].           *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_caddi16sp (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 6) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 6) (wval : mword 64) :
     uk_instr π M pc true (C_ADDI16SP imm) ->
     wval = add_vec (m !!! Regidx csp_rs1)
              (sign_extend' 64 (caddi16sp_imm imm)) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx csp_rs1 := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx csp_rs1 := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hwval.
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
-    exact (wp_uk_alu1 M m pc true (C_ADDI16SP imm)
+    exact (wp_uk_alu1 M m pc fdv true (C_ADDI16SP imm)
              (Some (ITYPE (caddi16sp_imm imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)))
              csp_rs1 csp_rs1
              (fun a => add_vec a (sign_extend' 64 (caddi16sp_imm imm)))
@@ -601,17 +602,17 @@ Section UkLeaf.
   (* x0 case.                                                             *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_cmv (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (rd rs2 : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (rd rs2 : mword 5) (wval : mword 64) :
     uk_instr π M pc true (C_MV (Regidx rd, Regidx rs2)) ->
     uint rd <> 0 ->
     wval = add_vec zero_reg (m !!! Regidx rs2) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
     iIntros "Hb Hcont".
-    iApply (wp_uk_retire C pt Rut π sz Hlo Hpm M m pc true (C_MV (Regidx rd, Regidx rs2))
+    iApply (wp_uk_retire C pt Rfd Rut π sz Hlo Hpm M m pc fdv true (C_MV (Regidx rd, Regidx rs2))
               (Some (RTYPE (Regidx rs2, zreg, Regidx rd, ADD)))
               None (Some (rd, wval)) Hui
               ltac:(intro s; apply exec_execute_C_MV)
@@ -646,19 +647,19 @@ Section UkLeaf.
   (* leaf must not silently present it as 64-bit.                          *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_caddiw (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 6) (rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 6) (rd : mword 5) (wval : mword 64) :
     uk_instr π M pc true (C_ADDIW (imm, Regidx rd)) ->
     uint rd <> 0 ->
     wval = sign_extend' 64
              (subrange_vec_dec
                 (add_vec (m !!! Regidx rd)
                          (sign_extend' 64 (sign_extend' 12 imm))) 31 0) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
-    exact (wp_uk_alu1 M m pc true (C_ADDIW (imm, Regidx rd))
+    exact (wp_uk_alu1 M m pc fdv true (C_ADDIW (imm, Regidx rd))
              (Some (ADDIW (sign_extend' 12 imm, Regidx rd, Regidx rd)))
              rd rd
              (fun a => sign_extend' 64
@@ -684,17 +685,17 @@ Section UkLeaf.
   (* immediate is [imm ++ 0]) stays a call-site [vm_compute].              *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_cj (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 11) (tgt : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 11) (tgt : mword 64) :
     uk_instr π M pc true (C_J imm) ->
     tgt = add_vec pc (sign_extend' 64 (sign_extend' 21 (concat_vec imm ('b"0")))) ->
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz m tgt -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv m tgt -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htgt Hal0.
     iIntros "Hb Hcont".
-    iApply (wp_uk_retire C pt Rut π sz Hlo Hpm M m pc true (C_J imm)
+    iApply (wp_uk_retire C pt Rfd Rut π sz Hlo Hpm M m pc fdv true (C_J imm)
               (Some (JAL (sign_extend' 21 (concat_vec imm ('b"0")), zreg)))
               (Some tgt) None Hui
               ltac:(intro s; apply exec_execute_C_J)
@@ -734,12 +735,12 @@ Section UkLeaf.
   (* fact is uniform in the x0 case.                                       *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_addi (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 12) (rs1 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 12) (rs1 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) ->
     uint rd <> 0 ->
     wval = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -748,7 +749,7 @@ Section UkLeaf.
                 s ∅ = true)
       by (intro s; exact (goodmb_execute_ITYPE_total Du_r Du_w imm rs1 rd ADDI s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu1 M m pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI))
+    exact (wp_uk_alu1 M m pc fdv false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI))
              None rs1 rd (fun a => add_vec a (sign_extend' 64 imm)) wval Hui
              (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_ITYPE_ADDI_gpr rs1 rd imm s) Hwval).
@@ -761,12 +762,12 @@ Section UkLeaf.
   (* operand-generically.  Both sources may be x0.                         *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_add (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (rs1 rs2 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (rs1 rs2 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) ->
     uint rd <> 0 ->
     wval = add_vec (m !!! Regidx rs1) (m !!! Regidx rs2) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -775,7 +776,7 @@ Section UkLeaf.
                 (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD))) s ∅ = true)
       by (intro s; exact (goodmb_execute_RTYPE_total Du_r Du_w rs2 rs1 rd ADD s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu2 M m pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD))
+    exact (wp_uk_alu2 M m pc fdv false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD))
              None rs1 rs2 rd (fun a b => add_vec a b) wval Hui
              (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_RTYPE_ADD_gpr rs2 rs1 rd s) Hwval).
@@ -793,13 +794,13 @@ Section UkLeaf.
 
   (* slli rd, rs1, shamt -- [wp_uk_alu1] at SLLI. *)
   Lemma wp_uk_slli (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (shamt : mword 6) (rs1 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (shamt : mword 6) (rs1 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) ->
     uint rd <> 0 ->
     wval = shift_bits_left (m !!! Regidx rs1)
              (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -808,7 +809,7 @@ Section UkLeaf.
                 (execute (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI))) s ∅ = true)
       by (intro s; exact (goodmb_execute_SHIFTIOP_total Du_r Du_w shamt rs1 rd SLLI s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu1 M m pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI))
+    exact (wp_uk_alu1 M m pc fdv false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI))
              None rs1 rd
              (fun a => shift_bits_left a (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
              wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg
@@ -817,13 +818,13 @@ Section UkLeaf.
 
   (* srli rd, rs1, shamt -- [wp_uk_alu1] at SRLI. *)
   Lemma wp_uk_srli (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (shamt : mword 6) (rs1 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (shamt : mword 6) (rs1 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI)) ->
     uint rd <> 0 ->
     wval = shift_bits_right (m !!! Regidx rs1)
              (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -832,7 +833,7 @@ Section UkLeaf.
                 (execute (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI))) s ∅ = true)
       by (intro s; exact (goodmb_execute_SHIFTIOP_total Du_r Du_w shamt rs1 rd SRLI s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu1 M m pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI))
+    exact (wp_uk_alu1 M m pc fdv false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI))
              None rs1 rd
              (fun a => shift_bits_right a (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
              wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg
@@ -847,14 +848,14 @@ Section UkLeaf.
   (* presented [sub_vec] on the full 64 bits would be wrong.               *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_subw (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (rs1 rs2 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (rs1 rs2 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)) ->
     uint rd <> 0 ->
     wval = sign_extend' 64
              (sub_vec (subrange_vec_dec (m !!! Regidx rs1) 31 0 : mword 32)
                       (subrange_vec_dec (m !!! Regidx rs2) 31 0 : mword 32)) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -863,7 +864,7 @@ Section UkLeaf.
                 (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW))) s ∅ = true)
       by (intro s; exact (goodmb_execute_RTYPEW_total Du_r Du_w rs2 rs1 rd SUBW s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu2 M m pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW))
+    exact (wp_uk_alu2 M m pc fdv false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW))
              None rs1 rs2 rd
              (fun a b => sign_extend' 64
                            (sub_vec (subrange_vec_dec a 31 0 : mword 32)
@@ -882,12 +883,12 @@ Section UkLeaf.
   (* the instruction's own address -- the pc tick is the funnel's job.     *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_auipc (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 20) (rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 20) (rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (UTYPE (imm, Regidx rd, AUIPC)) ->
     uint rd <> 0 ->
     wval = add_vec pc (auipc_off imm) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -895,7 +896,7 @@ Section UkLeaf.
               goodmb Du_r Du_w (execute (UTYPE (imm, Regidx rd, AUIPC))) s ∅ = true)
       by (intro s; exact (goodmb_execute_UTYPE_total Du_r Du_w imm rd AUIPC s
                             UserTotalU.Du_r_PC (Du_gpr_of_Z rd))).
-    apply (wp_uk_alu0 M m pc false (UTYPE (imm, Regidx rd, AUIPC)) None rd wval
+    apply (wp_uk_alu0 M m pc fdv false (UTYPE (imm, Regidx rd, AUIPC)) None rd wval
              Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg).
     intros s Lpc. rewrite (exec_execute_UTYPE_AUIPC_gpr rd imm s).
     rewrite Lpc. rewrite Hwval. reflexivity.
@@ -910,12 +911,12 @@ Section UkLeaf.
   (* instance with no bridge.                                             *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_sub (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (rs1 rs2 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (rs1 rs2 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) ->
     uint rd <> 0 ->
     wval = sub_vec (m !!! Regidx rs1) (m !!! Regidx rs2) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -924,7 +925,7 @@ Section UkLeaf.
                 (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB))) s ∅ = true)
       by (intro s; exact (goodmb_execute_RTYPE_total Du_r Du_w rs2 rs1 rd SUB s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu2 M m pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB))
+    exact (wp_uk_alu2 M m pc fdv false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB))
              None rs1 rs2 rd (fun a b => sub_vec a b) wval Hui
              (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_RTYPE_SUB_gpr rs2 rs1 rd s) Hwval).
@@ -939,12 +940,12 @@ Section UkLeaf.
   (* consumers of a hypothesis-form fact.                                  *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_and (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (rs1 rs2 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (rs1 rs2 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) ->
     uint rd <> 0 ->
     wval = and_vec (m !!! Regidx rs1) (m !!! Regidx rs2) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -963,7 +964,7 @@ Section UkLeaf.
                 (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND))) s ∅ = true)
       by (intro s; exact (goodmb_execute_RTYPE_total Du_r Du_w rs2 rs1 rd AND s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu2 M m pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND))
+    exact (wp_uk_alu2 M m pc fdv false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND))
              None rs1 rs2 rd (fun a b => and_vec a b) wval Hui
              (fun _ : mstate => I) eq_refl Hrd Hg Hg Hop Hwval).
   Qed.
@@ -976,13 +977,13 @@ Section UkLeaf.
   (* comparison in the caller's own vocabulary.                            *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_sltu (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (rs1 rs2 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (rs1 rs2 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU)) ->
     uint rd <> 0 ->
     wval = zero_extend' 64
              (bool_to_bit (zopz0zI_u (m !!! Regidx rs1) (m !!! Regidx rs2))) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -1004,7 +1005,7 @@ Section UkLeaf.
                 (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU))) s ∅ = true)
       by (intro s; exact (goodmb_execute_RTYPE_total Du_r Du_w rs2 rs1 rd SLTU s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu2 M m pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU))
+    exact (wp_uk_alu2 M m pc fdv false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU))
              None rs1 rs2 rd
              (fun a b => zero_extend' 64 (bool_to_bit (zopz0zI_u a b)))
              wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg Hop Hwval).
@@ -1016,14 +1017,14 @@ Section UkLeaf.
   (* value must expose the truncation of BOTH sources before the add.      *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_addw (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (rs1 rs2 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (rs1 rs2 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW)) ->
     uint rd <> 0 ->
     wval = sign_extend' 64
              (add_vec (subrange_vec_dec (m !!! Regidx rs1) 31 0 : mword 32)
                       (subrange_vec_dec (m !!! Regidx rs2) 31 0 : mword 32)) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -1032,7 +1033,7 @@ Section UkLeaf.
                 (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW))) s ∅ = true)
       by (intro s; exact (goodmb_execute_RTYPEW_total Du_r Du_w rs2 rs1 rd ADDW s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu2 M m pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW))
+    exact (wp_uk_alu2 M m pc fdv false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW))
              None rs1 rs2 rd
              (fun a b => sign_extend' 64
                            (add_vec (subrange_vec_dec a 31 0 : mword 32)
@@ -1049,13 +1050,13 @@ Section UkLeaf.
   (* model's [sign_extend' 64 imm] verbatim rather than a zero-extension.  *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_sltiu (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 12) (rs1 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 12) (rs1 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU)) ->
     uint rd <> 0 ->
     wval = zero_extend' 64
              (bool_to_bit (zopz0zI_u (m !!! Regidx rs1) (sign_extend' 64 imm))) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -1064,7 +1065,7 @@ Section UkLeaf.
                 (execute (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU))) s ∅ = true)
       by (intro s; exact (goodmb_execute_ITYPE_total Du_r Du_w imm rs1 rd SLTIU s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu1 M m pc false (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU))
+    exact (wp_uk_alu1 M m pc fdv false (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU))
              None rs1 rd
              (fun a => zero_extend' 64
                          (bool_to_bit (zopz0zI_u a (sign_extend' 64 imm))))
@@ -1078,12 +1079,12 @@ Section UkLeaf.
   (* bits at all.                                                          *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_andi (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 12) (rs1 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 12) (rs1 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (ITYPE (imm, Regidx rs1, Regidx rd, ANDI)) ->
     uint rd <> 0 ->
     wval = and_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -1092,7 +1093,7 @@ Section UkLeaf.
                 (execute (ITYPE (imm, Regidx rs1, Regidx rd, ANDI))) s ∅ = true)
       by (intro s; exact (goodmb_execute_ITYPE_total Du_r Du_w imm rs1 rd ANDI s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu1 M m pc false (ITYPE (imm, Regidx rs1, Regidx rd, ANDI))
+    exact (wp_uk_alu1 M m pc fdv false (ITYPE (imm, Regidx rs1, Regidx rd, ANDI))
              None rs1 rd (fun a => and_vec a (sign_extend' 64 imm))
              wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_ITYPE_ANDI_gpr rs1 rd imm s) Hwval).
@@ -1103,12 +1104,12 @@ Section UkLeaf.
   (* instruction.                                                          *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_xori (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 12) (rs1 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 12) (rs1 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (ITYPE (imm, Regidx rs1, Regidx rd, XORI)) ->
     uint rd <> 0 ->
     wval = xor_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -1117,7 +1118,7 @@ Section UkLeaf.
                 (execute (ITYPE (imm, Regidx rs1, Regidx rd, XORI))) s ∅ = true)
       by (intro s; exact (goodmb_execute_ITYPE_total Du_r Du_w imm rs1 rd XORI s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu1 M m pc false (ITYPE (imm, Regidx rs1, Regidx rd, XORI))
+    exact (wp_uk_alu1 M m pc fdv false (ITYPE (imm, Regidx rs1, Regidx rd, XORI))
              None rs1 rd (fun a => xor_vec a (sign_extend' 64 imm))
              wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_ITYPE_XORI_gpr rs1 rd imm s) Hwval).
@@ -1132,14 +1133,14 @@ Section UkLeaf.
   (* with rd <> rs has no compressed encoding at all.                      *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_addiw (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 12) (rs1 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 12) (rs1 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (ADDIW (imm, Regidx rs1, Regidx rd)) ->
     uint rd <> 0 ->
     wval = sign_extend' 64
              (subrange_vec_dec
                 (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) 31 0) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -1147,7 +1148,7 @@ Section UkLeaf.
               goodmb Du_r Du_w (execute (ADDIW (imm, Regidx rs1, Regidx rd))) s ∅ = true)
       by (intro s; exact (goodmb_execute_ADDIW_total Du_r Du_w imm rs1 rd s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu1 M m pc false (ADDIW (imm, Regidx rs1, Regidx rd))
+    exact (wp_uk_alu1 M m pc fdv false (ADDIW (imm, Regidx rs1, Regidx rd))
              None rs1 rd
              (fun a => sign_extend' 64
                          (subrange_vec_dec (add_vec a (sign_extend' 64 imm)) 31 0))
@@ -1163,14 +1164,14 @@ Section UkLeaf.
   (* and srliw/sraiw would each be one corollary.                          *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_slliw (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (shamt : mword 5) (rs1 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (shamt : mword 5) (rs1 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SLLIW)) ->
     uint rd <> 0 ->
     wval = sign_extend' 64
              (shift_bits_left (subrange_vec_dec (m !!! Regidx rs1) 31 0 : mword 32)
                               shamt) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -1179,7 +1180,7 @@ Section UkLeaf.
                 (execute (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SLLIW))) s ∅ = true)
       by (intro s; exact (goodmb_execute_SHIFTIWOP_total Du_r Du_w shamt rs1 rd SLLIW s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu1 M m pc false (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SLLIW))
+    exact (wp_uk_alu1 M m pc fdv false (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SLLIW))
              None rs1 rd
              (fun a => sign_extend' 64
                          (shift_bits_left (subrange_vec_dec a 31 0 : mword 32) shamt))
@@ -1193,12 +1194,12 @@ Section UkLeaf.
   (* premise is offered the pc: LUI ignores it, AUIPC does not.            *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_lui (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 20) (rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 20) (rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (UTYPE (imm, Regidx rd, LUI)) ->
     uint rd <> 0 ->
     wval = luival imm ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -1206,7 +1207,7 @@ Section UkLeaf.
               goodmb Du_r Du_w (execute (UTYPE (imm, Regidx rd, LUI))) s ∅ = true)
       by (intro s; exact (goodmb_execute_UTYPE_total Du_r Du_w imm rd LUI s
                             UserTotalU.Du_r_PC (Du_gpr_of_Z rd))).
-    apply (wp_uk_alu0 M m pc false (UTYPE (imm, Regidx rd, LUI)) None rd wval
+    apply (wp_uk_alu0 M m pc fdv false (UTYPE (imm, Regidx rd, LUI)) None rd wval
              Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg).
     intros s _. rewrite Hwval. exact (exec_execute_UTYPE_LUI_gpr rd imm s).
   Qed.
@@ -1222,14 +1223,14 @@ Section UkLeaf.
   (* model's signed-overflow fixup.                                        *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_divu (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (rs1 rs2 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (rs1 rs2 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (DIV (Regidx rs2, Regidx rs1, Regidx rd, true)) ->
     uint rd <> 0 ->
     wval = to_bits_truncate 64
              (if Z.eqb (uint (m !!! Regidx rs2)) 0 then -1
               else Z.quot (uint (m !!! Regidx rs1)) (uint (m !!! Regidx rs2))) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -1252,7 +1253,7 @@ Section UkLeaf.
                 (execute (DIV (Regidx rs2, Regidx rs1, Regidx rd, true))) s ∅ = true)
       by (intro s; exact (goodmb_execute_DIV_total Du_r Du_w rs2 rs1 rd true s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu2 M m pc false (DIV (Regidx rs2, Regidx rs1, Regidx rd, true))
+    exact (wp_uk_alu2 M m pc fdv false (DIV (Regidx rs2, Regidx rs1, Regidx rd, true))
              None rs1 rs2 rd
              (fun a b => to_bits_truncate 64
                            (if Z.eqb (uint b) 0 then -1 else Z.quot (uint a) (uint b)))
@@ -1260,14 +1261,14 @@ Section UkLeaf.
   Qed.
 
   Lemma wp_uk_remu (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (rs1 rs2 rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (rs1 rs2 rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false (REM (Regidx rs2, Regidx rs1, Regidx rd, true)) ->
     uint rd <> 0 ->
     wval = to_bits_truncate 64
              (if Z.eqb (uint (m !!! Regidx rs2)) 0 then uint (m !!! Regidx rs1)
               else Z.rem (uint (m !!! Regidx rs1)) (uint (m !!! Regidx rs2))) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
@@ -1291,7 +1292,7 @@ Section UkLeaf.
                 (execute (REM (Regidx rs2, Regidx rs1, Regidx rd, true))) s ∅ = true)
       by (intro s; exact (goodmb_execute_REM_total Du_r Du_w rs2 rs1 rd true s
                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
-    exact (wp_uk_alu2 M m pc false (REM (Regidx rs2, Regidx rs1, Regidx rd, true))
+    exact (wp_uk_alu2 M m pc fdv false (REM (Regidx rs2, Regidx rs1, Regidx rd, true))
              None rs1 rs2 rd
              (fun a b => to_bits_truncate 64
                            (if Z.eqb (uint b) 0 then uint a else Z.rem (uint a) (uint b)))
@@ -1314,22 +1315,22 @@ Section UkLeaf.
   (* base register through the nonzero branch.                             *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_jalr (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 12) (rs1 rd : mword 5)
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 12) (rs1 rd : mword 5)
       (wr : option (mword 5 * mword 64)) (tgt : mword 64) :
     uk_instr π M pc false (JALR (imm, Regidx rs1, Regidx rd)) ->
     uint rs1 <> 0 ->
     (uint rd = 0 /\ wr = None) \/
     (uint rd <> 0 /\ wr = Some (rd, add_vec_int pc 4)) ->
     tgt = ret_pc (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (uv_upd m wr) tgt -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (uv_upd m wr) tgt -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrs1 Hwr Htgt.
     assert (Hwrok : uv_wrok wr).
     { destruct Hwr as [[_ ->] | [Hrd ->]]; [ exact I | exact Hrd ]. }
     iIntros "Hb Hcont".
-    iApply (wp_uk_retire C pt Rut π sz Hlo Hpm M m pc false (JALR (imm, Regidx rs1, Regidx rd))
+    iApply (wp_uk_retire C pt Rfd Rut π sz Hlo Hpm M m pc fdv false (JALR (imm, Regidx rs1, Regidx rd))
               None (Some tgt) wr Hui (fun _ : mstate => I) eq_refl Hwrok
               ltac:(intros s _ _ _ Hag _;
                     exact (goodmb_execute_JALR_total Du_r Du_w imm rs1 rd s
@@ -1370,17 +1371,17 @@ Section UkLeaf.
   (* untouched.  (`ret' is the COMPRESSED form of this and has its own     *)
   (* leaf, [wp_uk_cjr].) *)
   Lemma wp_uk_jr (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 12) (rs1 rd : mword 5) (tgt : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 12) (rs1 rd : mword 5) (tgt : mword 64) :
     uk_instr π M pc false (JALR (imm, Regidx rs1, Regidx rd)) ->
     uint rs1 <> 0 ->
     uint rd = 0 ->
     tgt = ret_pc (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz m tgt -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv m tgt -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrs1 Hrd Htgt.
-    exact (wp_uk_jalr M m pc imm rs1 rd None tgt Hui Hrs1
+    exact (wp_uk_jalr M m pc fdv imm rs1 rd None tgt Hui Hrs1
              (or_introl (conj Hrd eq_refl)) Htgt).
   Qed.
 
@@ -1397,16 +1398,16 @@ Section UkLeaf.
   (* expansion's rs1 and rd COINCIDE, which is harmless: [wp_uk_alu2]'s   *)
   (* two register-read rewrites are over its own distinct binders.        *)
   Lemma wp_uk_cadd (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (rd rs2 : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (rd rs2 : mword 5) (wval : mword 64) :
     uk_instr π M pc true (C_ADD (Regidx rd, Regidx rs2)) ->
     uint rd <> 0 ->
     wval = add_vec (m !!! Regidx rd) (m !!! Regidx rs2) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
-    exact (wp_uk_alu2 M m pc true (C_ADD (Regidx rd, Regidx rs2))
+    exact (wp_uk_alu2 M m pc fdv true (C_ADD (Regidx rd, Regidx rs2))
              (Some (RTYPE (Regidx rs2, Regidx rd, Regidx rd, ADD)))
              rd rs2 rd (fun a b => add_vec a b) wval Hui
              (fun s => exec_execute_C_ADD (Regidx rd) (Regidx rs2) s) eq_refl Hrd
@@ -1419,14 +1420,14 @@ Section UkLeaf.
 
   (* c.and rd', rs2' -- creg-form, expanding to RTYPE AND. *)
   Lemma wp_uk_cand (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (crd crs2 : mword 3) (rd rs2 : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (crd crs2 : mword 3) (rd rs2 : mword 5) (wval : mword 64) :
     uk_instr π M pc true (C_AND (Cregidx crd, Cregidx crs2)) ->
     creg2reg_idx (Cregidx crd) = Regidx rd ->
     creg2reg_idx (Cregidx crs2) = Regidx rs2 ->
     uint rd <> 0 ->
     wval = and_vec (m !!! Regidx rd) (m !!! Regidx rs2) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcrd Hcrs2 Hrd Hwval.
@@ -1444,7 +1445,7 @@ Section UkLeaf.
       replace (Z.eqb (uint rd) 0) with false
         by (symmetry; apply Z.eqb_neq; exact Hrd).
       exact (exec_execute_RTYPE_AND_gpr rs2 rd rd s Hrd). }
-    exact (wp_uk_alu2 M m pc true (C_AND (Cregidx crd, Cregidx crs2))
+    exact (wp_uk_alu2 M m pc fdv true (C_AND (Cregidx crd, Cregidx crs2))
              (Some (RTYPE (Regidx rs2, Regidx rd, Regidx rd, AND)))
              rd rs2 rd (fun a b => and_vec a b) wval Hui Hred eq_refl Hrd
              (fun s => UserTotalU.goodmb_execute_C_AND Du_r Du_w
@@ -1457,7 +1458,7 @@ Section UkLeaf.
   (* c.addw rd', rs2' -- creg-form, expanding to RTYPEW ADDW (C's `int'    *)
   (* add-assign). *)
   Lemma wp_uk_caddw (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (crd crs2 : mword 3) (rd rs2 : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (crd crs2 : mword 3) (rd rs2 : mword 5) (wval : mword 64) :
     uk_instr π M pc true (C_ADDW (Cregidx crd, Cregidx crs2)) ->
     creg2reg_idx (Cregidx crd) = Regidx rd ->
     creg2reg_idx (Cregidx crs2) = Regidx rs2 ->
@@ -1465,8 +1466,8 @@ Section UkLeaf.
     wval = sign_extend' 64
              (add_vec (subrange_vec_dec (m !!! Regidx rd) 31 0 : mword 32)
                       (subrange_vec_dec (m !!! Regidx rs2) 31 0 : mword 32)) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcrd Hcrs2 Hrd Hwval.
@@ -1474,7 +1475,7 @@ Section UkLeaf.
                      (Some (RTYPEW (Regidx rs2, Regidx rd, Regidx rd, ADDW)))).
     { intro s. rewrite (exec_execute_C_ADDW (Cregidx crd) (Cregidx crs2) s).
       rewrite Hcrd. rewrite Hcrs2. reflexivity. }
-    exact (wp_uk_alu2 M m pc true (C_ADDW (Cregidx crd, Cregidx crs2))
+    exact (wp_uk_alu2 M m pc fdv true (C_ADDW (Cregidx crd, Cregidx crs2))
              (Some (RTYPEW (Regidx rs2, Regidx rd, Regidx rd, ADDW)))
              rd rs2 rd
              (fun a b => sign_extend' 64
@@ -1492,16 +1493,16 @@ Section UkLeaf.
   (* [luival] shifts it, which is what lets c.lui reach the negative       *)
   (* constants gcc uses for address bases.                                 *)
   Lemma wp_uk_clui (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 6) (rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 6) (rd : mword 5) (wval : mword 64) :
     uk_instr π M pc true (C_LUI (imm, Regidx rd)) ->
     uint rd <> 0 ->
     wval = luival (sign_extend' 20 imm) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
-    apply (wp_uk_alu0 M m pc true (C_LUI (imm, Regidx rd))
+    apply (wp_uk_alu0 M m pc fdv true (C_LUI (imm, Regidx rd))
              (Some (UTYPE (sign_extend' 20 imm, Regidx rd, LUI))) rd wval Hui
              (fun s => exec_execute_C_LUI imm (Regidx rd) s) eq_refl Hrd
              (fun s => UserTotalU.goodmb_execute_C_LUI Du_r Du_w imm (Regidx rd) s)
@@ -1513,17 +1514,17 @@ Section UkLeaf.
 
   (* c.slli rd, shamt -- register-form (NOT creg), source = destination.   *)
   Lemma wp_uk_cslli (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (shamt : mword 6) (rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (shamt : mword 6) (rd : mword 5) (wval : mword 64) :
     uk_instr π M pc true (C_SLLI (shamt, Regidx rd)) ->
     uint rd <> 0 ->
     wval = shift_bits_left (m !!! Regidx rd)
              (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
-    exact (wp_uk_alu1 M m pc true (C_SLLI (shamt, Regidx rd))
+    exact (wp_uk_alu1 M m pc fdv true (C_SLLI (shamt, Regidx rd))
              (Some (SHIFTIOP (shamt, Regidx rd, Regidx rd, SLLI))) rd rd
              (fun a => shift_bits_left a (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
              wval Hui (fun s => exec_execute_C_SLLI shamt (Regidx rd) s) eq_refl Hrd
@@ -1535,15 +1536,15 @@ Section UkLeaf.
 
   (* c.srli rd', shamt -- creg-form, source = destination. *)
   Lemma wp_uk_csrli (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (shamt : mword 6) (crd : mword 3) (rd : mword 5)
+      (pc : mword 64) (fdv : list fdstate) (shamt : mword 6) (crd : mword 3) (rd : mword 5)
       (wval : mword 64) :
     uk_instr π M pc true (C_SRLI (shamt, Cregidx crd)) ->
     creg2reg_idx (Cregidx crd) = Regidx rd ->
     uint rd <> 0 ->
     wval = shift_bits_right (m !!! Regidx rd)
              (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcrd Hrd Hwval.
@@ -1551,7 +1552,7 @@ Section UkLeaf.
                      (Some (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRLI)))).
     { intro s. rewrite (exec_execute_C_SRLI shamt (Cregidx crd) s).
       rewrite Hcrd. reflexivity. }
-    exact (wp_uk_alu1 M m pc true (C_SRLI (shamt, Cregidx crd))
+    exact (wp_uk_alu1 M m pc fdv true (C_SRLI (shamt, Cregidx crd))
              (Some (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRLI))) rd rd
              (fun a => shift_bits_right a (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
              wval Hui Hred eq_refl Hrd
@@ -1568,19 +1569,19 @@ Section UkLeaf.
   (* (init's vprintf has two: [li s5,37] and [li s8,100].)                 *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_li (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 12) (rd : mword 5) (wval : mword 64) :
+      (pc : mword 64) (fdv : list fdstate) (imm : mword 12) (rd : mword 5) (wval : mword 64) :
     uk_instr π M pc false
       (ITYPE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rd, ADDI)) ->
     uint rd <> 0 ->
     wval = add_vec zero_reg (sign_extend' 64 imm) ->
-    uvb C pt Rut sz π M m pc -∗
-    ukc π M sz (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
+    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwv.
     iIntros "Hb Hcont".
     iDestruct (uvb_x0 with "Hb") as "[%Hz Hb]".
-    iApply (wp_uk_addi M m pc imm (mword_of_int 0 : mword 5) rd wval
+    iApply (wp_uk_addi M m pc fdv imm (mword_of_int 0 : mword 5) rd wval
               Hui Hrd ltac:(rewrite Hz; exact Hwv)
               with "Hb Hcont").
   Qed.

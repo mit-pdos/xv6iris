@@ -210,7 +210,13 @@ Section PilotPure.
     rewrite Hmiss. reflexivity.
   Qed.
 
-  Theorem pilot_console_pure (u0 u1 u2 u3 : umirror)
+  (* THE CORE, which is [pilot_console_pure] with the fd leg read WHOLE
+     rather than at row 0.  The extra conjuncts cost the proof nothing (the
+     open row's success arm names the whole table), and they are what a
+     CONTINUING walk needs: init's two dups read [fd_lowest_closed] of this
+     very table, which row 0 alone does not determine.  P5's
+     [pilot_console_dups] is the reason it is stated. *)
+  Theorem pilot_console_core (u0 u1 u2 u3 : umirror)
       (vom1 vom3 wma wmi r1 r2 r3 : mword 64) :
     era0_seed u0 ->
     ufs_open_at console_str vom1 r1 u0 u1 ->
@@ -222,7 +228,8 @@ Section PilotPure.
     r3 <> (mword_of_int (-1) : mword 64) ->
     r1 = (mword_of_int (-1) : mword 64)
     /\ r3 = (mword_of_int 0 : mword 64)
-    /\ um_fdt u3 !! 0%nat = Some (FdOpen true true (FdDevice CONSOLE))
+    /\ um_fdt u3 = <[0%nat := FdOpen true true (FdDevice CONSOLE)]> fdt0
+    /\ um_av u3 = um_av u2
     /\ (exists i : Z,
           um_resolve u2 console_str = Some i
           /\ um_av u3 !! i = Some (MkAnode (ADev CONSOLE 0) 1%nat)).
@@ -310,11 +317,142 @@ Section PilotPure.
     split_and!.
     - exact Hr1.
     - rewrite Hr3. reflexivity.
-    - rewrite Hu3. cbn [um_fdt].
-      apply list_lookup_insert.
-      rewrite fdt0_length. cbv [NOFILE]. lia.
+    - rewrite Hu3. cbn [um_fdt]. reflexivity.
+    - rewrite Hu3. cbn [um_av]. reflexivity.
     - exists i0. split; [exact Hres2' |].
       rewrite Hu3. cbn [um_av]. exact Hchild2.
+  Qed.
+
+  (* the pilot theorem, VERBATIM as it landed -- now one line off the core *)
+  Theorem pilot_console_pure (u0 u1 u2 u3 : umirror)
+      (vom1 vom3 wma wmi r1 r2 r3 : mword 64) :
+    era0_seed u0 ->
+    ufs_open_at console_str vom1 r1 u0 u1 ->
+    ufs_mknod_at console_str (dev_arg wma) (dev_arg wmi) r2 u1 u2 ->
+    bv_unsigned wma mod 2 ^ 16 = CONSOLE ->
+    bv_unsigned wmi mod 2 ^ 16 = 0 ->
+    ufs_open_at console_str vom3 r3 u2 u3 ->
+    om_arg vom3 = 2 ->
+    r3 <> (mword_of_int (-1) : mword 64) ->
+    r1 = (mword_of_int (-1) : mword 64)
+    /\ r3 = (mword_of_int 0 : mword 64)
+    /\ um_fdt u3 !! 0%nat = Some (FdOpen true true (FdDevice CONSOLE))
+    /\ (exists i : Z,
+          um_resolve u2 console_str = Some i
+          /\ um_av u3 !! i = Some (MkAnode (ADev CONSOLE 0) 1%nat)).
+  Proof.
+    intros Hseed Hop1 Hmk Hma Hmi Hop3 Hom Hne3.
+    destruct (pilot_console_core u0 u1 u2 u3 vom1 vom3 wma wmi r1 r2 r3
+                Hseed Hop1 Hmk Hma Hmi Hop3 Hom Hne3)
+      as (Hr1 & Hr3 & Hfdt & _ & Hav).
+    split_and!; [ exact Hr1 | exact Hr3 | | exact Hav ].
+    rewrite Hfdt. apply list_lookup_insert.
+    rewrite fdt0_length. cbv [NOFILE]. lia.
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE DUP EXTENSION (P5): init's [dup(0); dup(0)] after the console     *)
+  (* open, on the enriched dup row.  This is the pure storey of the        *)
+  (* preamble slice's target -- "fd 0 is the console AND fds 1 and 2 are   *)
+  (* its dups" -- and it is the reason the core exposes the whole table:   *)
+  (* [fd_lowest_closed] of a table with row 0 taken is 1, then 2, and      *)
+  (* neither is a function of row 0 alone.                                 *)
+  (*                                                                       *)
+  (* THE GUARDS ARE THE LANDED STANCE, unchanged: each call carries its    *)
+  (* own [<> -1], because no kernel contract promises a syscall succeeds.  *)
+  (* What is forced is that they cannot succeed WRONGLY.                   *)
+  (* ------------------------------------------------------------------- *)
+  Theorem pilot_console_dups (u0 u1 u2 u3 ud1 ud2 : umirror)
+      (vom1 vom3 wma wmi r1 r2 r3 vfd1 vfd2 rd1 rd2 : mword 64) :
+    era0_seed u0 ->
+    ufs_open_at console_str vom1 r1 u0 u1 ->
+    ufs_mknod_at console_str (dev_arg wma) (dev_arg wmi) r2 u1 u2 ->
+    bv_unsigned wma mod 2 ^ 16 = CONSOLE ->
+    bv_unsigned wmi mod 2 ^ 16 = 0 ->
+    ufs_open_at console_str vom3 r3 u2 u3 ->
+    om_arg vom3 = 2 ->
+    r3 <> (mword_of_int (-1) : mword 64) ->
+    ufs_dup_at vfd1 rd1 u3 ud1 ->
+    bv_signed vfd1 = 0 ->
+    rd1 <> (mword_of_int (-1) : mword 64) ->
+    ufs_dup_at vfd2 rd2 ud1 ud2 ->
+    bv_signed vfd2 = 0 ->
+    rd2 <> (mword_of_int (-1) : mword 64) ->
+    r1 = (mword_of_int (-1) : mword 64)
+    /\ r3 = (mword_of_int 0 : mword 64)
+    /\ rd1 = (mword_of_int 1 : mword 64)
+    /\ rd2 = (mword_of_int 2 : mword 64)
+    /\ um_fdt ud2 !! 0%nat = Some (FdOpen true true (FdDevice CONSOLE))
+    /\ um_fdt ud2 !! 1%nat = Some (FdOpen true true (FdDevice CONSOLE))
+    /\ um_fdt ud2 !! 2%nat = Some (FdOpen true true (FdDevice CONSOLE))
+    /\ (exists i : Z,
+          um_resolve u2 console_str = Some i
+          /\ um_av ud2 !! i = Some (MkAnode (ADev CONSOLE 0) 1%nat)).
+  Proof.
+    intros Hseed Hop1 Hmk Hma Hmi Hop3 Hom Hne3 Hd1 Hv1 Hnd1 Hd2 Hv2 Hnd2.
+    destruct (pilot_console_core u0 u1 u2 u3 vom1 vom3 wma wmi r1 r2 r3
+                Hseed Hop1 Hmk Hma Hmi Hop3 Hom Hne3)
+      as (Hr1 & Hr3 & Hfdt3 & _ & Hres).
+    (* ---- the first dup: row 0 is open, the least closed row is 1 ---- *)
+    destruct (ufs_dup_at_hit vfd1 rd1 u3 ud1 Hd1 Hnd1)
+      as (nfd1 & st1 & _ & Hlk1 & _ & Hlow1 & Hrd1 & Hu1').
+    rewrite Hv1 in Hlk1. cbn [Z.to_nat] in Hlk1.
+    rewrite Hfdt3 in Hlk1. rewrite Hfdt3 in Hlow1.
+    assert (Hst1 : st1 = FdOpen true true (FdDevice CONSOLE)).
+    { assert (Hc : (<[0%nat := FdOpen true true (FdDevice CONSOLE)]> fdt0)
+                     !! 0%nat = Some (FdOpen true true (FdDevice CONSOLE)))
+        by (vm_compute; reflexivity).
+      rewrite Hc in Hlk1. exact (eq_sym (Some_inj _ _ Hlk1)). }
+    assert (Hn1 : nfd1 = 1%nat).
+    { assert (Hc : fd_lowest_closed
+                     (<[0%nat := FdOpen true true (FdDevice CONSOLE)]> fdt0)
+                   = Some 1%nat) by (vm_compute; reflexivity).
+      rewrite Hc in Hlow1. exact (eq_sym (Some_inj _ _ Hlow1)). }
+    subst st1 nfd1.
+    assert (Hfdt1 : um_fdt ud1
+                    = <[1%nat := FdOpen true true (FdDevice CONSOLE)]>
+                        (<[0%nat := FdOpen true true (FdDevice CONSOLE)]> fdt0)).
+    { rewrite Hu1'. cbn [um_fdt]. rewrite Hfdt3. reflexivity. }
+    assert (Hav1 : um_av ud1 = um_av u3)
+      by (rewrite Hu1'; cbn [um_av]; reflexivity).
+    (* ---- the second dup: row 0 still open, the least closed row is 2 ---- *)
+    destruct (ufs_dup_at_hit vfd2 rd2 ud1 ud2 Hd2 Hnd2)
+      as (nfd2 & st2 & _ & Hlk2 & _ & Hlow2 & Hrd2 & Hu2').
+    rewrite Hv2 in Hlk2. cbn [Z.to_nat] in Hlk2.
+    rewrite Hfdt1 in Hlk2. rewrite Hfdt1 in Hlow2.
+    assert (Hst2 : st2 = FdOpen true true (FdDevice CONSOLE)).
+    { assert (Hc : (<[1%nat := FdOpen true true (FdDevice CONSOLE)]>
+                      (<[0%nat := FdOpen true true (FdDevice CONSOLE)]> fdt0))
+                     !! 0%nat = Some (FdOpen true true (FdDevice CONSOLE)))
+        by (vm_compute; reflexivity).
+      rewrite Hc in Hlk2. exact (eq_sym (Some_inj _ _ Hlk2)). }
+    assert (Hn2 : nfd2 = 2%nat).
+    { assert (Hc : fd_lowest_closed
+                     (<[1%nat := FdOpen true true (FdDevice CONSOLE)]>
+                        (<[0%nat := FdOpen true true (FdDevice CONSOLE)]> fdt0))
+                   = Some 2%nat) by (vm_compute; reflexivity).
+      rewrite Hc in Hlow2. exact (eq_sym (Some_inj _ _ Hlow2)). }
+    subst st2 nfd2.
+    assert (Hfdt2' : um_fdt ud2
+                     = <[2%nat := FdOpen true true (FdDevice CONSOLE)]>
+                         (<[1%nat := FdOpen true true (FdDevice CONSOLE)]>
+                            (<[0%nat := FdOpen true true (FdDevice CONSOLE)]>
+                               fdt0))).
+    { rewrite Hu2'. cbn [um_fdt]. rewrite Hfdt1. reflexivity. }
+    assert (Hav2 : um_av ud2 = um_av u3)
+      by (rewrite Hu2'; cbn [um_av]; rewrite Hav1; reflexivity).
+    (* ---- assemble ---- *)
+    split_and!.
+    - exact Hr1.
+    - exact Hr3.
+    - rewrite Hrd1. reflexivity.
+    - rewrite Hrd2. reflexivity.
+    - rewrite Hfdt2'. vm_compute. reflexivity.
+    - rewrite Hfdt2'. vm_compute. reflexivity.
+    - rewrite Hfdt2'. vm_compute. reflexivity.
+    - destruct Hres as (i & Hres1 & Hres2).
+      exists i. split; [ exact Hres1 | ].
+      rewrite Hav2. exact Hres2.
   Qed.
 
 End PilotPure.

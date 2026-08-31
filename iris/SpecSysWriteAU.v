@@ -57,12 +57,18 @@
    item (iv), the offset seam, still owed); when that seam lands, a
    refined parallel form can pin the start offset.
 
-   THE BYTES' SOURCE IS NOT NAMED.  The written bytes come from USER
-   memory (a1, fetched per-chunk by either_copyin), and the kernel
-   contracts deliberately say nothing about which bytes arrive -- the
-   same stance as mknod's fetched path.  So [bss] is existential and no
-   premise can pin it; what the caller learns is that SOME bytes of the
-   stated total were spliced in, chunk by chunk, at the observed states.
+   THE BYTES' SOURCE IS NAMED SINCE RULING A (2026-08-31, the content
+   seam).  This paragraph used to say it was not: the written bytes come
+   from USER memory (a1, fetched per-chunk by either_copyin) and the
+   kernel contracts said nothing about which bytes arrive.  They do now --
+   either_copyin's success arm relays [SpecCopyin.copyin_got], writei
+   relays it to its written range, and filewrite's loop appends the chunks
+   -- so the arms below carry [SpecCopyin.ubytes_at (us_M U) v1 (concat
+   bss)]: the DECOMPOSITION [bss] is still existential (the kernel picks
+   the boundaries), but the BYTES are the caller's own run at syscall
+   argument 1, in the image it lent.  On the CONCATENATION, not per chunk:
+   the per-chunk file offsets stay existential for the concurrency reason
+   above, while the SOURCE offsets chain by construction.
 
    ==== WHAT IT DELIBERATELY DOES NOT SAY ==============================
 
@@ -257,6 +263,7 @@ Require Import FsBlocks.       (* [blk_splice]: the landed byte splice --
                                   second take/drop sandwich               *)
 Require Import InodeInv.       (* [MAXFILE]                                 *)
 Require Import SpecFilewrite.  (* [FW_MAX], [fwrite_names], the env bundles *)
+Require Import SpecCopyin.     (* [ubytes_at]: the content seam (RULING A)  *)
 Require Import SpecSysWrite.   (* the landed contract this file states a
                                   parallel form beside; [sys_write_stack]  *)
 From Kernel Require KernelSyms.
@@ -574,10 +581,15 @@ Section SysWriteAU.
      concatenate to the whole count; the unfired tail of the bundle (the
      kernel may have used fewer, larger chunks than the bound) refunds. *)
   Definition write_post_ok Γ (i : Z) (n : Z)
+      (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (∃ bss : list (list (bv 8)),
        ⌜Z.of_nat (length (concat bss)) = n⌝ ∗
        ⌜(length bss <= wchunks n)%nat⌝ ∗
+       (* the content seam, RULING A -- see [SpecSysWriteAUEra]'s copy of
+          this arm for the long note.  The DECOMPOSITION stays existential;
+          the BYTES are the caller's own run at [ua]. *)
+       ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
        awrite_commits Γ ∅ i Φ (length bss)
          (wchunks n - length bss)%nat)%I.
@@ -588,10 +600,12 @@ Section SysWriteAU.
      falls short of the count, the rest of the bundle refunds, and the
      value does not say where the loop died (DETERMINISM: none). *)
   Definition write_post_fail Γ (i : Z) (n : Z)
+      (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (∃ bss : list (list (bv 8)),
        ⌜Z.of_nat (length (concat bss)) < n \/ (n < 0 /\ bss = [])⌝ ∗
        ⌜(length bss <= wchunks n)%nat⌝ ∗
+       ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
        awrite_commits Γ ∅ i Φ (length bss)
          (wchunks n - length bss)%nat)%I.
@@ -601,11 +615,13 @@ Section SysWriteAU.
      failures (header, THE FD SIDE), and the inode arm answers [n] or
      [-1] and nothing between (SpecFilewrite decode fact 3). *)
   Definition write_arms Γ (i : Z) (n : Z)
+      (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
       (r : mword 64) : iProp Σ :=
-    ((⌜r = (mword_of_int n : mword 64) /\ 0 <= n⌝ ∗ write_post_ok Γ i n Φ)
+    ((⌜r = (mword_of_int n : mword 64) /\ 0 <= n⌝
+      ∗ write_post_ok Γ i n M ua Φ)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ write_post_fail Γ i n Φ))%I.
+        ∗ write_post_fail Γ i n M ua Φ))%I.
 
   (* ------------------------------------------------------------------ *)
   (*  2d.  The stable corollary's arms (statement; header's caveats)      *)
@@ -616,6 +632,7 @@ Section SysWriteAU.
      un-keyed honesty valve the header explains *)
   Definition write_stable_arms Γ (i : Z) (n : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
+      (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
       (r : mword 64) : iProp Σ :=
     (nview Γ q i (MkAnode (AFile bs0) nl) ∗
@@ -624,12 +641,13 @@ Section SysWriteAU.
            ⌜(off0 <= length bs0)%nat⌝ ∗
            ⌜Z.of_nat (length (concat bss)) = n⌝ ∗
            ⌜(length bss <= wchunks n)%nat⌝ ∗
+           ⌜ubytes_at M ua (concat bss)⌝ ∗
            (wri_receipts_chained i bs0 nl off0 Φ bss
             ∨ wri_receipts i Φ bss) ∗
            awrite_commits Γ ∅ i Φ (length bss)
              (wchunks n - length bss)%nat)
       ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-         ∗ write_post_fail Γ i n Φ)))%I.
+         ∗ write_post_fail Γ i n M ua Φ)))%I.
 
 End SysWriteAU.
 
@@ -660,7 +678,7 @@ Definition wp_sys_write_au_frame
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process    *)
     (fn : fwrite_names)                          (* the fs ghosts          *)
     (pidv : mword 32) (U : ustate)
-    (v v2 : mword 64)                            (* syscall args 0, 2      *)
+    (v v1 v2 : mword 64)                         (* syscall args 0, 1, 2   *)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64)                   (* the descriptor's slot  *)
     (rb : bool) (i : Z)                          (* its mode bit and inum  *)
@@ -675,7 +693,9 @@ Definition wp_sys_write_au_frame
   fwn_j fn = j ->
   fwn_procs fn = γs ->
   pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
-  (exists v1 : mword 64, pv_tf (us_V U) !! tf_arg_idx 1 = Some v1) ->
+  (* NAMED, not existential, since RULING A: the arms speak about the bytes
+     at THIS address. *)
+  pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
   pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
   fwn_wp fn = ConsoleInv.devsw_write_val ->
   fwn_dqv fn = (fun _ => DfracDiscarded) ->
@@ -730,16 +750,16 @@ Definition wp_sys_write_au_body
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fwrite_names)
     (pidv : mword 32) (U : ustate)
-    (v v2 : mword 64)
+    (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
     (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
-  wp_sys_write_au_frame γf γs j γlp fn pidv U v v2 m K eb b lks
+  wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv rb i
     (awrite_commits Γfs ∅ i Φw 0%nat (wchunks n))
-    (write_arms Γfs i n Φw).
+    (write_arms Γfs i n (us_M U) v1 Φw).
 
 (* THE STABLE COROLLARY'S STATEMENT (header: THE STABLE COROLLARY, AND ITS
    HONESTY CAVEAT; its derivation is the sealer's, expected from the AU
@@ -758,18 +778,18 @@ Definition wp_sys_write_au_stable_body
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fwrite_names)
     (pidv : mword 32) (U : ustate)
-    (v v2 : mword 64)
+    (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
     (q : Qp) (bs0 : list (bv 8)) (nl : nat)
     (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
-  wp_sys_write_au_frame γf γs j γlp fn pidv U v v2 m K eb b lks
+  wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv rb i
     (nview Γfs q i (MkAnode (AFile bs0) nl)
      ∗ awrite_commits Γfs ∅ i Φw 0%nat (wchunks n))%I
-    (write_stable_arms Γfs i n q bs0 nl Φw).
+    (write_stable_arms Γfs i n q bs0 nl (us_M U) v1 Φw).
 
 (* ===================================================================== *)
 (*  4.  THE SEAL                                                          *)
@@ -783,11 +803,11 @@ Module Type SYSWRITE_AU.
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)
       (pidv : mword 32) (U : ustate)
-      (v v2 : mword 64)
+      (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ),
-      wp_sys_write_au_body γf γs j γlp fn pidv U v v2 m K eb b lks
+      wp_sys_write_au_body γf γs j γlp fn pidv U v v1 v2 m K eb b lks
         fd fv rb i Φw.
 
   (* owed as a DERIVATION from [wp_sys_write_au] + the agreement seed
@@ -800,11 +820,11 @@ Module Type SYSWRITE_AU.
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)
       (pidv : mword 32) (U : ustate)
-      (v v2 : mword 64)
+      (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ),
-      wp_sys_write_au_stable_body γf γs j γlp fn pidv U v v2 m K eb b
+      wp_sys_write_au_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
         lks fd fv rb i q bs0 nl Φw.
 End SYSWRITE_AU.

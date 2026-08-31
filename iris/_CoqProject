@@ -280,22 +280,16 @@ UEchoKernel.v
 UkAbi.v
 UexecCond.v
 UCodeEcho.v
-UCodeSh.v
-USpecSh.v
-USpecShParse.v
+# TOMBSTONE (owner ruling, 2026-08-31): the FIRST-GENERATION sh proof --
+# UCodeSh.v, USpecSh.v, USpecShParse.v and the eleven UProofSh*.v files
+# (33k lines, zero Admitted/Axiom, closing at wp_sh_execs_echo) -- is
+# DELETED on port, per the precedent (4f088971f).  The port's stack is
+# UCodeShK.v/UCodeShP.v + UkSh.v/UkShParse.v/UkShRun.v; the pure parser
+# vocabulary was transposed into UkShParse.v (ushp_*), and the one fact
+# the pinned-exec contract consumed (sh_img_sub + halves) moved verbatim
+# into SpecKexecPin.v.  Design of record: claude-notes/completed/user-sh.md.
 UmodeFrame.v
 UmodeStub.v
-UProofShLib.v
-UProofShMem.v
-UProofShHeap.v
-UProofShLex.v
-UProofShIo.v
-UProofShInput.v
-UProofShParse.v
-UProofShCmd.v
-UProofShTop.v
-UProofShMain.v
-UProofShEcho.v
 UCodeInit.v
 # CAT.  The first verified program whose SYSCALLS WRITE ITS MEMORY: its
 # inner loop is read(fd, buf, 512) into a 512-byte global, and the theorem
@@ -1687,10 +1681,14 @@ LinkSysUnlinkAU.v
 # while the port gets [shk_text_sub] / [uis_shk_*] / [shk_code] over the
 # same ShInstrs.sh_bytes.  It covers 192 instructions in 10 functions:
 # start, main, getcmd, memset, gets and the open/close/exit/write/read
-# stubs.  IT IS THE LANE'S COMPILE-TIME BUDGET: measured serially a catalog
-# costs ~22 s fixed plus ~1.9 s PER INSTRUCTION (91 instr = 191 s, 192 =
-# 380 s), so the parser's ~500 more belong in a SECOND catalog file, not
-# appended here.
+# stubs.  IT IS NO LONGER THE LANE'S COMPILE-TIME BUDGET.  A catalog used
+# to cost ~22 s fixed plus ~1.9 s PER INSTRUCTION (192 instr = 320 s), and
+# that is why this note used to say the parser's ~500 more belonged in a
+# SECOND catalog file; the whole of it was ONE inline [ltac:] in [uis_run]
+# (see the tactic's own comment, and optimization.md's "unshelve hoist").
+# Hoisted, this file is 10.6 s and an instruction costs ~0.03 s, so a
+# 700-instruction catalog would be well under a minute -- split it for
+# readability if you like, but not for the build.
 #   UkRunBr.v is the ONE branch leaf UkRunLeaf.v does not have and should
 # ([wp_uk_btype0], the base branch against x0, whose value is not readable
 # off the register file) -- a six-line re-thread of an existing UkBranch
@@ -1714,15 +1712,86 @@ LinkSysUnlinkAU.v
 # continuation that takes the LOOP HEAD as its own premise, because the
 # rest of main's body falls back into it.  Audit = the standing three,
 # zero Admitted.
+#   STAGE 5 grows the catalog to 326 instructions in 18 functions (runcmd,
+# fork1 and the fork/exec/pipe/wait/dup/chdir stubs join it) and adds
+# UkShRun.v, the COMMAND TREE walk: runcmd's prologue and its 0x1398 jump
+# table, the five arms (EXEC, REDIR, PIPE, LIST, BACK) and fork1.  The
+# recursion is ORDINARY STRUCTURAL INDUCTION on a finite tree -- the node
+# predicate [ush_cmd] is a premise, not a parse, and stage 4 is what builds
+# one -- with the stack budget [6 * ush_ht c] words, one 48-byte frame per
+# level.  [ush_cmd] is PERSISTENT (every byte DfracDiscarded), which is
+# what lets it cross a fork as a [UkFork.Forkable] payload; the three
+# forking arms carry it, the jump table and (PIPE) the two fd words over.
+# ONE Hypothesis, [ush_diag_leaf]: the diagnostic subtree -- panic and the
+# two fprintf-and-die tails -- at its three entry pcs, which no stage of
+# this lane has walked and whose format strings are .rodata under the TEXT
+# gname.  FOUR lane leaves, all RELOCATION ASKS: [wp_uk_cldq]/[wp_uk_clwq]/
+# [wp_uk_lwuq] are UkRunMem's compressed loads and lwu at a DFRAC (their
+# proofs already are), and [wp_uk_clw_text] is a real gap -- a four-byte
+# load out of the TEXT half, which the jump table needs and which
+# [wp_uk_lbu_text] only does one byte wide.  Audit = the standing three,
+# zero Admitted, zero new Axiom.
 UCodeShK.v
 UkRunBr.v
 UkSh.v
+UkShRun.v
+
+# ... STAGE 4: the parser.  UCodeShP.v is a THIRD catalog over the same
+# dump (tools/ucode_shp.txt, [--prog shp]) -- 564 instructions in eleven
+# functions: parsecmd, parseline, parsepipe, parseexec, parseredirs,
+# nulterminate, peek, gettoken, execcmd, strlen, strchr.  It is a file of
+# its own for the MEASURED reason recorded above: the catalog's cost is
+# linear in instructions, ~22 s fixed plus ~1.9 s each, and it came in at
+# 18 min 58 s serially -- 4 % over what that law predicts for 564.  Folding
+# it into UCodeShK.v would make one 756-instruction file (~24 min) that
+# every stage-1/2 edit rebuilds.  [shp_code] and [shk_code] are the SAME
+# proposition ([utext_img g ShInstrs.sh_bytes]); UkShParse.v's
+# [ushp_code_shk] is the one-line bridge.
+#   UkShParse.v is stage 4's walk.  Landed: the pure vocabulary
+# ([ushp_skipws]/[ushp_toklen]/[ushp_tokens]/[ushp_find], USpecShParse.v's
+# and USpecSh.v's predicates transposed from [list (bv 8)] onto the index
+# functions [ubytes]/[ustr] carry), the TREE PREDICATE [ushp_tree] that is
+# stages 5-6's interface, the two-word frame proven once
+# ([wp_kshp_pro2]/[wp_kshp_epi2], shared by both walks and by strchr's
+# three exits), and the two leaf walks the lexer and parsecmd sit on:
+# [wp_kshp_strchr] and [wp_kshp_strlen], both parametric in the string and
+# both closing their loop by bounded Rocq induction on the [ustr]
+# resource's own terminator rather than an iLoeb.  ONE Hypothesis,
+# [ushp_malloc_ok] (stage 3's allocator, blocked on [wp_uk_ecall_sbrk]);
+# it taints NOTHING yet -- every lemma in the file is unconditional today.
+# Audit = the standing three, zero Admitted, zero Axiom.
+UCodeShP.v
+UkShParse.v
 
 # FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
 # u-tier syscall row.  FsFdMirror = the pure mirror + step table;
 # UexecRetFs = the parallel enriched trap contract + the conservativity
-# bridge + the engine seal; FdRowPilot = the era-0 pilot theorems (an
-# image-check consumer -- the leaf rule applies, nothing may require it).
+# bridge + the engine seal; UkRunSysFs = the enriched ecall leaf (the
+# deposit arm taken, the row read at the caller's own string, the re-close
+# on urun_fs) over ONE remaining seal, FDROW_UKFS_STEP -- UkStep.wp_uk_ecall
+# with uvb/uexec_ret swapped for their enriched twins, which the plain
+# engine cannot supply (its file header measures why, and files the
+# X-generic-engine ask); FdRowPilot = the era-0 pilot theorems;
+# FdRowMint = the era-0 mirror mint at the userinit park (both halves'
+# homes + the park arm in parallel form).  FdRowPilot and FdRowMint are
+# image-check consumers, so the leaf rule applies to the PILOT CONE:
+# FdRowMint and UkInitFs are its leaves and nothing may require either;
+# FdRowPilot is required by those two alone.
+#   UkRunFsLeaf = the enriched LEAF TOWER (stage P5): the plain leaves
+# init's console preamble uses, re-threaded on urun_fs/ukc_fs, plus the
+# text-string and no-path enriched ecall leaves, over ONE more seal --
+# FDROW_UKFS_RETIRE.wp_uk_retire_fs_later = UkStep.wp_uk_retire_later with
+# uvb/ukc swapped for their enriched twins.  That single funnel seal covers
+# EVERY non-ecall leaf kind in the slice (registers, auipc, the three
+# jumps, the x0 branch); both it and UkRunSysFs's collapse to nothing under
+# upstream ask (4), the X-generic engine.
+#   UkInitFs = init's console preamble WALKED on the enriched tier (0xc
+# through the two dups to the restart head 0x32), refining
+# FdRowPilot.pilot_console_dups.
 FsFdMirror.v
 UexecRetFs.v
+UkRunSysFs.v
+UkRunFsLeaf.v
 FdRowPilot.v
+FdRowMint.v
+UkInitFs.v

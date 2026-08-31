@@ -1,0 +1,74 @@
+# ucode_shp.txt -- the pc set of iris/UCodeShP.v, for tools/gen_ucode.py.
+#
+#   tools/gen_ucode.py --module Sh --prog shp --out iris/UCodeShP.v \
+#       --spec tools/ucode_shp.txt
+#
+# THE THIRD CATALOG OVER THE SAME DUMP, AND THE REASON THERE IS A THIRD.
+# tools/ucode_sh.txt drives iris/UCodeSh.v (the [uinstr] / page-table form the
+# first-generation UProofSh*.v proofs take); tools/ucode_shk.txt drives
+# iris/UCodeShK.v (the urun form, SH lane stages 1-2: start, main, getcmd,
+# memset, gets and their syscall stubs).  This file drives the SH lane's
+# STAGE 4 -- the parser -- and it is a file of its own for a MEASURED reason,
+# not a stylistic one: stage 1 re-measured the catalog's cost serially and
+# found it LINEAR in instructions, ~22 s fixed + ~1.9 s per instruction, with
+# no superlinear term to remove.  Folding the parser's 564 instructions into
+# UCodeShK.v would make ONE file of 756 instructions (~24 min) that every
+# stage-1/2 edit has to rebuild; two files pay one extra ~22 s prelude and
+# let the two halves compile in parallel.
+#
+# [--prog shp] names what this file DEFINES ([shp_text_sub], [uis_shp_*],
+# [shp_code]) while the dump maps it READS stay [ShInstrs.sh_bytes] /
+# [ShData.sh_data], so all three catalogs sit on-build without colliding.
+# [shp_code] and [shk_code] are the SAME proposition (both are
+# [utext_img g ShInstrs.sh_bytes]) -- iris/UkShParse.v has the one-line
+# bridge, which is what lets the parser walk reuse UkSh.v's [memset].
+
+note SH LANE STAGE 4: the recursive-descent PARSER and the lexer under it.
+note [parsecmd] takes the line [main]'s blank scan left, measures it with
+note [strlen], and calls [parseline] -> [parsepipe] -> [parseexec], each of
+note which guards its own constructor with a [peek] for a symbol byte; the
+note argument loop in [parseexec] calls [gettoken] once per token and records
+note the token's two boundaries in the execcmd node [execcmd] allocated.
+note [nulterminate] then writes a NUL at every recorded end, turning the token
+note BOUNDARIES into the argv vector [exec] observes.  [peek] and [gettoken]
+note both run over the two static tables at 0x2000 (symbols) and 0x2008
+note (whitespace) with [strchr].
+note
+note WHAT IS NOT HERE, AND WHY IT IS NOT A GAP.  [malloc] is stage 3's, and
+note stage 4 states its contract as the one named local Hypothesis
+note [ushp_malloc_ok] in iris/UkShParse.v -- the Hypothesis consumes the run
+note at malloc's ENTRY pc and hands it back at the return address, so no
+note instruction of malloc is ever fetched by this walk and a catalog fact
+note about one would be a claim nothing reads.  [memset], which [execcmd]
+note calls, is already catalogued in UCodeShK.v and the walk reuses
+note [UkSh.wp_ksh_memset] across the [shp_code]/[shk_code] bridge.
+
+# ---- the parser proper -----------------------------------------------
+func parsecmd
+func parseline
+func parsepipe
+func parseexec
+func parseredirs
+func nulterminate
+
+# ---- the lexer -------------------------------------------------------
+func peek
+func gettoken
+
+# ---- the one cmd constructor a symbol-free line reaches --------------
+func execcmd
+
+# ---- the C library the above calls (memset is UCodeShK.v's) ----------
+func strlen
+func strchr
+
+# ---- and what is deliberately absent ---------------------------------
+skipfunc parseblock reached only through [peek(ps,es,"(")] in parseexec, and a '(' is a symbol byte -- excluded by the walk's [ushp_no_symbols] premise on the line, so no instruction of it is ever fetched
+skipfunc redircmd reached only from parseredirs' switch, which runs only when [peek(ps,es,"<>")] is true -- excluded by [ushp_no_symbols]
+skipfunc pipecmd reached only from parsepipe's [peek(ps,es,"|")] arm -- excluded by [ushp_no_symbols]
+skipfunc listcmd reached only from parseline's [peek(ps,es,";")] arm -- excluded by [ushp_no_symbols]
+skipfunc backcmd reached only from parseline's [peek(ps,es,"&")] loop -- excluded by [ushp_no_symbols]
+skipfunc malloc stage 3's; stage 4 states its contract as the named local Hypothesis [ushp_malloc_ok], which crosses the call without fetching a single instruction of the allocator
+skipfunc memset already catalogued in iris/UCodeShK.v; the walk reuses [UkSh.wp_ksh_memset] across the [shp_code]/[shk_code] bridge
+skipfunc panic the two [panic] calls this walk crosses -- parseexec's "syntax" and "too many args" -- are REFUTED, not proved: on a symbol-free line every token [gettoken] returns is 'a' or 0, and the argument count is bounded by the token list's length
+skipdefault not on the parser's path: the command loop and the ELF entry are UCodeShK.v's (SH lane stages 1-2), the allocator is stage 3's, and runcmd's tree walk with its fork/exec arms is stage 5's

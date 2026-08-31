@@ -141,8 +141,15 @@ mentions; and the console tie is a function of the shared fs state.
 State-dependent content needs a state carrier, i.e. the seam.
 
 **(c1) enrich the KEY instead (a `uvis` fd-table projection field — the
-`uvis_perm`/`uvis_sz` precedent, stage 3, owner-ruled) — runner-up,
-loses on two counts.**  It could carry the fd HALF purely (rows relate
+`uvis_perm`/`uvis_sz` precedent, stage 3, owner-ruled) — OWNER-RULED IN,
+and landed: `uvis` carries `uvis_fd : list fdstate`
+([`user-wp-slot.md`](user-wp-slot.md) stage 4).  The two objections
+below stand as written and are what the landed field does NOT do — it
+carries the fd half only, and the av half stays this design's business —
+but the tax argument (ii) was mispriced: `urun` hides the field
+existentially, so no program proof names it and the ~250 `urun` sites did
+not move.  The record below is kept for the fs half's argument, which is
+unchanged.  Runner-up on the two counts:**  It could carry the fd HALF purely (rows relate
 the field; the loop pins it the way it pins `uvis_perm`).  But (i) the
 fs half cannot follow: a per-process key field mirroring the SHARED
 abstract view is not a faithful projection under concurrency, so the
@@ -307,6 +314,16 @@ seal), `FdRowPilot.v` (the era-0 seed + the pilot theorems), the enriched
 ecall leaf's proof once the arm lands (stage P2), and the enriched
 `UkInit` preamble walk (stage P4).
 
+**WHAT THE LANDED `uvis_fd` FIELD CHANGES HERE.**  The mirror's `um_fdt`
+leg is now a SECOND copy of something the key already carries.  When the
+enriched loop lands, `umirror` should shed `um_fdt` and keep `um_av` /
+`um_cwd`: the fd half rides the key (per-process, unconditionally
+faithful, and free across non-syscall traps by `ukb_F`'s new pin), the
+shared-fs half is what needs the deposit.  That also splits the payload
+along the line §5's solo-scoping note already draws.  Not done: the
+pilot's pure chain reads `um_fdt` throughout, so the split is a rewrite of
+`FsFdMirror`'s arm tables, not a deletion.
+
 ## 7. Non-goals, explicit
 
 - **No general app-facing fs API.**  Two rows, one process, one theorem.
@@ -320,9 +337,19 @@ ecall leaf's proof once the arm lands (stage P2), and the enriched
   facts stay with `fs-syscall-specs.md` §5's three principles.
 - **No offset carrier.**  `f->off` stays behind `file_pay` (RULING B's
   business); the pilot's rows never mention it.
-- **No dup/close/read rows yet** — dup is the obvious third row (init's
-  `dup(0); dup(0)` finishing the fds-0-1-2-are-console story) and is
-  listed as the first extension, not built.
+- **No close/read rows yet.**  ~~dup is the obvious third row~~
+  **SUPERSEDED (prover stage P5, 2026-08-31): the DUP ROW IS BUILT.**
+  `FsFdMirror.ufs_dup_at` (argfd + fdalloc + filedup: the `-1` blanket, or
+  the argument names an open row, the new fd is `fd_lowest_closed` and the
+  two rows are EQUAL because filedup shares the `struct file`), and
+  `FdRowPilot.pilot_console_dups` finishes the fds-0-1-2-are-console
+  story.  Its one structural cost: `uenr_dom` had to split into
+  `uenr_path` (open, mknod — the rows whose argument 0 is a POINTER and
+  which therefore fetch a string off the image) and the rest, because
+  forcing that fetch on dup's row would have pinned it to the `-1`
+  blanket — a contract the enriched loop could not discharge on a dup
+  that succeeds.  `ufs_step_at`'s `pl` is simply unused off the path
+  rows, so no landed statement moved.  close and read stay unbuilt.
 
 ## 8. Owner / upstream rulings this design flags (each a yes/no)
 
@@ -336,6 +363,8 @@ ecall leaf's proof once the arm lands (stage P2), and the enriched
    row deferred.  The alternative (build the certificate-backed
    nondeterministic row now) triples the payload design for a consumer
    that does not exist yet.  RECOMMEND YES.
+   **RULED YES (owner, 2026-08-31).**  Prover stages P2+P3 launched on
+   the ruling.
 3. **UPSTREAM — the pure return-range conjuncts (§6.4).**  YES/NO,
    independent of the pilot; the WINDOW LEAF's precedent priced this
    class at one conjunct per row + the dispatcher's existing facts.

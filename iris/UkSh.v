@@ -145,7 +145,7 @@ Section UkSh.
   Local Lemma shp_write  : ShSyms.write  = 0xca6.
   Proof. destruct shk_syms_pins as (_&_&_&_&_&_&_&_&H&_). exact H. Qed.
   Local Lemma shp_read   : ShSyms.read   = 0xc9e.
-  Proof. destruct shk_syms_pins as (_&_&_&_&_&_&_&_&_&H). exact H. Qed.
+  Proof. destruct shk_syms_pins as (_&_&_&_&_&_&_&_&_&H&_). exact H. Qed.
 
 
   (* ===================================================================== *)
@@ -244,7 +244,7 @@ Section UkSh.
     urun γt γd γs h m pc avail -∗ ubyteq γd dq a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (xi C pt Rut sz M pm) "(_ & _ & Hh & _ & _)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(_ & _ & Hh & _ & _)".
     iDestruct (uheap_ubyte with "Hh Hb") as %(_ & _ & Hbnd).
     iPureIntro. exact Hbnd.
   Qed.
@@ -275,10 +275,10 @@ Section UkSh.
     ⌜ m !!! Regidx x0_idx = zero_reg ⌝ ∗ urun γt γd γs h m pc avail.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (xi C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iSplitR; [ iPureIntro; exact Hx0 | ].
-    iExists xi, C, pt, Rut, sz, M, pm. iFrame "Hheap Hstk Hb".
+    iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv. iFrame "Hheap Hstk Hb".
     iPureIntro. split; [ exact Hlo | exact Hpm ].
   Qed.
 
@@ -680,16 +680,24 @@ Section UkSh.
        sb a1,0(a5) ; c.addi a5,a5,1 ; bne a5,a4,0xa70
      [k] is the number of bytes still to come AFTER this one, so the
      measure is the loop's own trip count and the [bne] decides it. *)
-  Local Lemma wp_ksh_memset_loop (a : Z) (N : nat) :
+  (* THE LOOP CARRIES THE BYTE IT IS WRITING.  [memset] does not merely
+     leave SOME contents behind, it leaves [c] at every index -- and the
+     [NULL] cap at an [execcmd] node's argv is exactly that fact, so the
+     postcondition names the byte rather than existentially quantifying it.
+     The invariant is the prefix already written ([Hpre]); the constant is
+     stable across iterations because the loop writes only a5. *)
+  Local Lemma wp_ksh_memset_loop (a : Z) (N : nat) (c : bv 8) :
     forall (k j : nat) (h : CpuId) (mc : regfile) (f : nat -> bv 8) (nn : nat),
     (N = j + 1 + k)%nat ->
     0 <= a -> a + Z.of_nat N < Z64 ->
+    nth_byte (mc !!! Regidx a1_idx) 0 = c ->
+    (forall i : nat, (i < j)%nat -> f i = c) ->
     mc !!! Regidx a5_idx = mword_of_int (a + Z.of_nat j) ->
     mc !!! Regidx a4_idx = mword_of_int (a + Z.of_nat N) ->
     shk_code γt -∗
     ubytes γd a N f -∗
     urun γt γd γs h mc (mword_of_int 0xa70) nn -∗
-    ((∃ g : nat -> bv 8, ubytes γd a N g) -∗
+    (ubytes γd a N (fun _ => c) -∗
        ∀ (h' : CpuId) (mc' : regfile),
          ⌜ forall r : mword 5, Regidx r <> Regidx a5_idx ->
              mc' !!! Regidx r = mc !!! Regidx r ⌝ -∗
@@ -698,7 +706,7 @@ Section UkSh.
     WP (Loop : expr riscv_lang).
   Proof.
     intros k. induction k as [| k IH ];
-      intros j h mc f nn HN Ha0 Ha64 Ha5 Ha4;
+      intros j h mc f nn HN Ha0 Ha64 Hc Hpre Ha5 Ha4;
       iIntros "#Hcode Hbs Hrun Hcont".
     - (* the LAST byte: after it a5 = a4 and the branch falls through *)
       iDestruct (ush_bytes_upd a N j f ltac:(lia) with "Hbs") as "[Hb Hcl]".
@@ -764,7 +772,12 @@ Section UkSh.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite Ea76. iIntros (h3) "Hrun".
       iApply ("Hcont" with "[Hbs] [] Hrun").
-      { iExists (ush_set f j (nth_byte (mc !!! Regidx a1_idx) 0)). iExact "Hbs". }
+      { iApply (ush_bytes_ext (DfracOwn 1) a N
+                  (ush_set f j (nth_byte (mc !!! Regidx a1_idx) 0))
+                  (fun _ => c) with "Hbs").
+        intros i Hi. unfold ush_set.
+        destruct (Nat.eqb_spec i j) as [-> | Hne];
+          [ exact Hc | apply Hpre; lia ]. }
       { iPureIntro. exact Hpres. }
     - (* a body byte: a5 moves on and the branch goes back to 0xa70 *)
       iDestruct (ush_bytes_upd a N j f ltac:(lia) with "Hbs") as "[Hb Hcl]".
@@ -827,7 +840,13 @@ Section UkSh.
       iIntros (h3) "Hrun".
       iApply (IH (j + 1)%nat h3 m1
                 (ush_set f j (nth_byte (mc !!! Regidx a1_idx) 0)) nn
-                ltac:(lia) Ha0 Ha64 Ha5_1 Ha4_1
+                ltac:(lia) Ha0 Ha64
+                ltac:(rewrite (Hpres a1_idx ltac:(vm_compute; discriminate));
+                      exact Hc)
+                ltac:(intros i Hi; unfold ush_set;
+                      destruct (Nat.eqb_spec i j) as [-> | Hne];
+                        [ exact Hc | apply Hpre; lia ])
+                Ha5_1 Ha4_1
                 with "Hcode Hbs Hrun").
       iIntros "Hbs" (h4 mc') "%Hpres' Hrun".
       iApply ("Hcont" with "Hbs [] Hrun").
@@ -856,7 +875,7 @@ Section UkSh.
     shk_code γt -∗
     ubytes γd a N f -∗
     urun γt γd γs h m (mword_of_int ShSyms.memset) (2 + nn) -∗
-    ((∃ g : nat -> bv 8, ubytes γd a N g) -∗
+    (ubytes γd a N (fun _ => nth_byte (m !!! Regidx a1_idx) 0) -∗
        ∀ (h' : CpuId) (m' : regfile),
          ⌜ ucallee_saved m m' ⌝ -∗
          urun γt γd γs h' m' (ret_pc (m !!! Regidx ra_idx)) (2 + nn) -∗
@@ -1083,8 +1102,19 @@ Section UkSh.
       exact (upd_eq m2 (Regidx a5_idx)
                (regval_into_reg (mword_of_int a : mword 64))). }
     (* ---- 0xa70..0xa76  the byte loop ---- *)
-    iApply (wp_ksh_memset_loop a N (N - 1)%nat 0%nat h9 m6 f nn
-              ltac:(lia) Halo ltac:(unfold Z64; lia) Ha5_6 Ha4_6
+    assert (Ha1_6 : m6 !!! Regidx a1_idx = m !!! Regidx a1_idx).
+    { rewrite (Hm6 a1_idx ltac:(vm_compute; discriminate)).
+      rewrite (Hm5 a1_idx ltac:(vm_compute; discriminate)).
+      rewrite (Hm4 a1_idx ltac:(vm_compute; discriminate)).
+      rewrite (Hm3 a1_idx ltac:(vm_compute; discriminate)).
+      rewrite (Hm2 a1_idx ltac:(vm_compute; discriminate)).
+      exact (Hm1 a1_idx ltac:(vm_compute; discriminate)). }
+    iApply (wp_ksh_memset_loop a N (nth_byte (m !!! Regidx a1_idx) 0)
+              (N - 1)%nat 0%nat h9 m6 f nn
+              ltac:(lia) Halo ltac:(unfold Z64; lia)
+              ltac:(rewrite Ha1_6; reflexivity)
+              ltac:(intros i Hi; lia)
+              Ha5_6 Ha4_6
               with "Hcode Hbs Hrun").
     iIntros "Hbs" (h10 mc) "%Hmc Hrun".
     assert (Hspc : mc !!! Regidx csp_rs1 = add_vec_int sp0 (- (8 * Z.of_nat 2))).
@@ -3323,6 +3353,8 @@ Section UkSh.
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Er2a.
     replace (2 + (10 + nn))%nat with (12 + nn)%nat by lia.
+    iAssert (∃ g : nat -> bv 8, ubytes γd a N g)%I with "[Hbs]" as "Hbs".
+    { iExists _. iExact "Hbs". }
     iDestruct "Hbs" as (fm) "Hbs".
     (* ---- 0x2a..0x2e  gets(buf, nbuf) ---- *)
     assert (Hs2_M : mM !!! Regidx s2_idx = mword_of_int (Z.of_nat N)).

@@ -264,7 +264,7 @@ Section ProofFilewriteCons.
         rb ma tr0.
   Proof.
     cbv beta delta [wp_filewrite_cons_body].
-    intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Hst Hma
+    intros pcE pj ret_tgt uaddr HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Hst Hma
            Hcell Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv
@@ -886,6 +886,27 @@ Section ProofFilewriteCons.
       rewrite /G3 upd_ne; [| vm_compute; discriminate].
       rewrite /G2 upd_ne; [| vm_compute; discriminate].
       rewrite /G1 upd_ne; [exact HMa2 | vm_compute; discriminate]. }
+    (* a1, THE USER SOURCE, survives to the indirect call untouched: it is
+       filewrite's own second argument and nothing on the device path writes
+       it (RULING A -- the landed walk never needed to say so, because
+       consolewrite promised nothing about the bytes there).  Same register
+       tower as [HE2a2] one assert above. *)
+    assert (HE2a1 : E2 !!! Regidx Ra1 = (m !!! Regidx Ra1 : mword 64)).
+    { rewrite /E2 upd_ne; [| vm_compute; discriminate].
+      rewrite /E1 upd_ne; [| vm_compute; discriminate].
+      rewrite (HDrthr Ra1 ltac:(vm_compute; discriminate)
+                ltac:(vm_compute; discriminate)).
+      rewrite /D4 upd_ne; [| vm_compute; discriminate].
+      rewrite /D3 upd_ne; [| vm_compute; discriminate].
+      rewrite /D2 upd_ne; [| vm_compute; discriminate].
+      rewrite /D1 upd_ne; [| vm_compute; discriminate].
+      rewrite /G6 upd_ne; [| vm_compute; discriminate].
+      rewrite /G5 upd_ne; [| vm_compute; discriminate].
+      rewrite /G4 upd_ne; [| vm_compute; discriminate].
+      rewrite /G3g upd_ne; [| vm_compute; discriminate].
+      rewrite /G3 upd_ne; [| vm_compute; discriminate].
+      rewrite /G2 upd_ne; [| vm_compute; discriminate].
+      rewrite /G1 upd_ne; [exact HMa1 | vm_compute; discriminate]. }
     assert (HE2ra : E2 !!! Regidx Rra
                     = add_vec_int (mword_of_int (FW + 0x86) : mword 64) 2)
       by (rewrite /E2; apply upd_eq).
@@ -971,7 +992,11 @@ Section ProofFilewriteCons.
     { iApply (fwc_env_out_dev fn st rb true ma Hst).
       iApply (fwc_dev_in_back fn ma Hinma with "[%] Hslot Hdevinv Htxlk").
       by right. }
-    { iApply (write_cons_arms_of_cnt (fsc_uart) tr0 n r Hn0 Hrn with "Hrcpt"). }
+    { (* the receipt comes back stated at the callee's a1; [HE2a1] is what
+         says that IS filewrite's own [uaddr] (RULING A). *)
+      rewrite /uaddr -HE2a1.
+      iApply (write_cons_arms_of_cnt (fsc_uart) tr0 (us_M U)
+                (E2 !!! Regidx Ra1 : mword 64) n r Hn0 Hrn with "Hrcpt"). }
   Qed.
 
 End ProofFilewriteCons.
