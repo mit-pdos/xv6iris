@@ -33,7 +33,7 @@
    that fileread needs NO ghost state to tell a pipe from an inode.  The
    branch at +0x1e reads [f->type] out of the reference's own content
    fraction, so the loaded word IS [fc_type Cf]; the branch being taken is
-   therefore the COQ fact [fc_type Cf = FD_PIPE], and [FileInv.file_payload]
+   therefore the COQ fact [fc_type Cf = FD_PIPE], and [FileInvDefs.file_core]
    -- a function of the content -- then reduces to the pipe end that piperead
    wants.  The "what kind of thing a descriptor names" ghost state that
    design/file-table.md defers is a problem for fileread's CALLERS, which
@@ -78,8 +78,9 @@
    [fileread_pay_carve] below hands them out and takes the share back; the
    per-slot escrow and sleeplock then come out of the two FAMILIES
    ([ic_escrows], [IcacheEscrow.ic_sleeplocks]) at the slot the payload named,
-   and the off-borrow CINV comes out of the SAME carve, since it too rides
-   the payload ([FileInvDefs.off_hold]).  The postcondition carries no share at all, so nothing is
+   and the off LEDGER FRAGMENT comes out of the SAME carve, since it too
+   rides the payload ([FileInvDefs.ioff_ref], the FD_INODE arm of
+   [file_core_off]).  The postcondition carries no share at all, so nothing is
    left for the generation to be lost through
    ([SpecIunlock] returns the arity-preserving [inode_shr]; the LEND-HALF /
    KEEP-HALF discipline is what re-pins it -- [inode_shr_regen2]).
@@ -104,22 +105,23 @@
    block comes back at an EXTENDED page table ([uptd_ext]).  piperead's and
    consoleread's user arms say the same.  So there is nothing about file
    content for fileread to pass on, and in particular the file's OFFSET,
-   which the borrow protocol keeps inside the per-slot invariant and which no
+   which the borrow protocol keeps inside the inode's ledger and which no
    caller-held resource records, never has to appear.
 
    ==== THE OFFSET, AND THE ONE PREMISE IT FORCES =======================
 
-   [f->off] is not a content field: it lives in a per-slot CANCELLABLE
-   invariant ([FileInvDefs.off_cinv]) and is BORROWED across the readi call
-   under [ip->lock] (design/file-table.md).  fileread is the whole reason
-   that protocol exists.  Two consequences for this contract:
+   [f->off] is not a content field: it lives in its INODE's off ledger
+   ([FileInvDefs.ioff_escrow]) and is BORROWED across the readi call under
+   [ip->lock] ([FileOff.ioff_checkout]/[ioff_checkin], off-ledger ruling).
+   fileread is the whole reason that protocol exists.  Two consequences for
+   this contract:
 
-   * the environment carries NOTHING about the offset.  The invariant's
-     assertion and the fraction that opens it ride the descriptor's own
-     payload ([FileInvDefs.off_hold]) and come out of
-     [fileread_pay_carve] -- a fixed persistent FAMILY cannot exist, because
-     the cinv is minted afresh at every open (R-open-1b).  The value is
-     existential in the invariant, and the invariant's [off_wf] bound is what
+   * the environment carries the LEDGER FAMILY and nothing per-file: the
+     cell lives in the file's INODE's ledger ([FileInvDefs.ioff_escrow],
+     one permanent invariant per itable slot), the membership fragment
+     rides the descriptor's own payload and comes out of
+     [fileread_pay_carve], and ilock's valid cell is the checkout marker.
+     The value is existential in the ledger, and its [off_wf] bound is what
      makes it usable;
    * readi's joint numeric premise [off + n < 2^32] has to be discharged from
      a bound on [n] ALONE, because nothing in memory bounds a freshly loaded
@@ -221,7 +223,7 @@ Definition fileread_ret (n : Z) (r : mword 64) : Prop := pipe_rw_ret n r.
 Lemma fileread_ret_m1 (n : Z) : fileread_ret n (mword_of_int (-1) : mword 64).
 Proof. left. reflexivity. Qed.
 
-(* THE OFFSET STAYS IN RANGE.  [FileOff.off_wf] is an inductive invariant and
+(* THE OFFSET STAYS IN RANGE.  [FileInvDefs.off_wf] is an inductive invariant and
    this is fileread's step of the induction: [f->off += r] cannot leave the
    bound, because readi clamps [r] to the file's size and the size is itself
    bounded.  Both of rd_clamp's cases are needed and neither is slack --
@@ -469,6 +471,10 @@ Section SpecFileread.
      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      ic_sleeplocks fsc_ic ∗
+     (* ...AND EVERY ENTRY'S OFF LEDGER (off-ledger ruling): the FD_INODE
+        arm's [f->off] cell lives in its inode's ledger and the borrow
+        window opens it ([FileOff.ioff_checkout]/[ioff_checkin]). *)
+     ioff_escrows ∗
      sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int icfg_ist : mword 32) ∗
      (* the disk fabric *)
@@ -522,7 +528,7 @@ Section SpecFileread.
     fileread_fs_env γf fn -∗ fileread_fs_out fn.
   Proof.
     rewrite /fileread_fs_env /fileread_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
     iFrame "Hsb Hbs".
   Qed.
 
@@ -637,20 +643,42 @@ Section SpecFileread.
      ([SpecSysWriteAUEra]'s third arm) and gives read its "FdInode => AFile
      or ADir" tie ([SpecSysReadAU]'s owner question 2).  The invariant-level
      statement of the same fact is [FileInvDefs.inode_pay_not_dev]. *)
+  (* THE OFF OUTPUT IS TYPE-INDEXED (off-ledger ruling): the FD_INODE arm
+     hands out the LEDGER FRAGMENT at the payload's own slot [ik] -- the
+     arm's [ioff_ref] existential is identified with the share's [ik] by
+     [ientry_inj] -- and the FD_DEVICE arm hands out the dead cell.  Both
+     come back through the wand at the same fraction. *)
+  Definition carve_off (tyc : mword 32) (ik k : nat) (q : Qp) : iProp Σ :=
+    (if bool_decide (tyc = FD_INODE)
+     then ioff_frag ik k q else foff_dead k q)%I.
+
+  Lemma carve_off_inode (tyc : mword 32) (ik k : nat) (q : Qp) :
+    tyc = FD_INODE -> carve_off tyc ik k q = ioff_frag ik k q.
+  Proof.
+    intros ->. rewrite /carve_off. case_bool_decide; [reflexivity | congruence].
+  Qed.
+
+  Lemma carve_off_dev (tyc : mword 32) (ik k : nat) (q : Qp) :
+    tyc = FD_DEVICE -> carve_off tyc ik k q = foff_dead k q.
+  Proof.
+    intros ->. rewrite /carve_off. case_bool_decide as Hc; [|reflexivity].
+    exfalso. apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
+  Qed.
+
   Lemma fileread_pay_carve (γf : gname) (k : nat) (q : Qp) (Cf : fcontent)
       (st : fdstate) :
     fc_type Cf = FD_INODE \/ fc_type Cf = FD_DEVICE ->
     file_pay_st γf k q Cf st -∗
-    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16)
-      (γx : gname),
+    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16),
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
       ⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
       ⌜fc_type Cf = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝ ∗
       IcacheRef.ity_shot g ty ∗
       IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
-      off_hold γf k γx true q ∗
-      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ off_hold γf k γx true q -∗
+      carve_off (fc_type Cf) ik k q ∗
+      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗
+       carve_off (fc_type Cf) ik k q -∗
          file_pay_st γf k q Cf st).
   Proof.
     intros Hty. iIntros "(%pn & %Hst & Hpn & Hpl)".
@@ -663,12 +691,25 @@ Section SpecFileread.
       - by rewrite (bool_decide_eq_true_2 (FD_INODE = FD_INODE) eq_refl).
       - by rewrite (bool_decide_eq_true_2 (FD_DEVICE = FD_DEVICE) eq_refl)
                    orb_true_r. }
-    assert (Harm : file_armed Cf = true) by (rewrite /file_armed; exact Hyes).
-    rewrite /file_payload /file_core Hnp Hyes Harm /inode_pay.
+    rewrite {1}/file_core /file_core_noff /file_core_off Hnp Hyes /inode_pay.
     iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
     iDestruct "Hs" as (ik) "(%Hipk & %Hik & %Hinb & Hshr)".
     iDestruct "Hwt" as (ty) "(#Hshot & %Hnd & %Hdv)".
-    iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty, (fp_ocv pn).
+    (* the arm's off conjunct, re-keyed at the share's own [ik] *)
+    iAssert (carve_off (fc_type Cf) ik k q ∗
+             (carve_off (fc_type Cf) ik k q -∗
+              (if bool_decide (fc_type Cf = FD_INODE)
+               then ioff_ref (fc_ip Cf) k q else foff_dead k q)))%I
+      with "[Hop]" as "[Hop Hopback]".
+    { rewrite /carve_off. case_bool_decide as Hin.
+      - iDestruct "Hop" as (i) "(%Hv & %Hi & Hfrag)".
+        assert (i = ik) as ->.
+        { apply (ientry_inj i ik); [lia | lia | congruence]. }
+        iFrame "Hfrag". iIntros "Hf". iExists ik.
+        iSplitR; [iPureIntro; exact Hipk|].
+        iSplitR; [iPureIntro; exact Hik|]. iExact "Hf".
+      - iFrame "Hop". iIntros "$". }
+    iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty.
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [done|].
     iSplitR; [iExact "Hshot"|].
@@ -678,8 +719,9 @@ Section SpecFileread.
     iSplitL "Hshr"; [iExact "Hshr"|].
     iSplitL "Hop"; [iExact "Hop"|].
     iIntros "Hshr Hop". iExists pn. iFrame "%". iFrame "Hpn".
-    rewrite /file_payload /file_core Hnp Hyes Harm /inode_pay.
-    iSplitR "Hop"; [| iExact "Hop"].
+    rewrite /file_core /file_core_noff /file_core_off Hnp Hyes /inode_pay.
+    iSplitR "Hop Hopback"; last first.
+    { iApply "Hopback". iExact "Hop". }
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
     iSplitL "Hshr"; [iExists ik; iFrame "%"; iExact "Hshr"|].
     iExists ty. iSplitR; [iExact "Hshot"|].

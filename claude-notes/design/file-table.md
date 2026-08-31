@@ -62,7 +62,8 @@ Three different disciplines, and the model has to keep them apart:
    that is safe only because `ref == 1` and the only other reader of a
    non-owned entry is filealloc's scan, which touches `ref` alone.
    `fileclose` writes `type = FD_NONE` under the lock, at `ref == 0`.
-3. **`off` is mutable and protected by `ip->lock`** (the inode sleeplock) when
+3. **`off` is mutable and protected by `ip->lock`** (its ownership lives in
+   the per-inode off LEDGER, below) (the inode sleeplock) when
    `type == FD_INODE`; for `FD_PIPE`/`FD_DEVICE` it is dead (note: it is *not*
    zero — `sys_open` only assigns `f->off = 0` on the `FD_INODE` path, so a
    device file inherits whatever the previous generation of the slot left).
@@ -465,167 +466,104 @@ undischargeable for every file that had ever been `dup`ed.)
   construction: reaching `n = 0` requires holding the only fragment, and any
   concurrent reader would be a second fragment.
 
-## `off` — the borrow protocol
+## `off` — the LEDGER (off-ledger ruling, landed 2026-08-31)
 
-`off` is the one field that is neither lock-free-immutable nor ftable-protected,
-and it is the only genuinely hard part of the model. It is **not** needed by
-`fileinit`, `filealloc`, `filedup`, `fileclose`, `filestat`, `sys_open` or
-`pipealloc` — only by `fileread`/`filewrite` on an `FD_INODE` file. (gcc does
-not even emit the `off` load of `fileclose`'s `ff = *f`: nothing in the tree
-touched the cell before this.)
+`off` is the one field that is neither lock-free-immutable nor
+ftable-protected: it is mutable, under `ip->lock`, by a holder of an
+arbitrarily small fraction of the reference (fileread does `f->off += r`
+with whatever share its descriptor has).  Its ownership now FOLLOWS the
+inode's lock discipline (owner's ask; the full design-of-record is
+`claude-notes/projects/off-ledger.md` until its content is folded in here):
 
-It is now **`FileOff.v`**, and `fcontent`/`file_fields` no longer mention it at
-all — the swap took one definition out of `FileInv.v` and one field out of the
-record, exactly as the staging note intended. The obligations were:
+- **Each itable slot `i` carries a permanent per-era invariant, its off
+  LEDGER** (`FileInvDefs.ioff_escrow i`, family `ioff_escrows`, allocated
+  by the era fupd `FsCfgSnap.fs_cfg_alloc_snap` over the ambient
+  `fsc_foff` gname family):
 
-  (a) a holder of ANY positive fraction plus the inode's lock may take the cell
-      out across several instructions;
-  (b) the EXCLUSIVE holder (`q = 1`) must be able to take it back with **no**
-      inode lock at all, because `fileclose` never holds `ip->lock`.
+  ```coq
+  ioff_slot_res i k := off_resident k                    (* ∃v, cell ∗ off_wf *)
+                       ∨ (off_mark (ientry i) ∗ flive_tok k)
+  ioff_body i := ∃ S : gmap nat unit,
+                   ghost_map_auth (fsc_foff i) 1 S ∗
+                   [∗ set] k ∈ dom S, ioff_slot_res i k
+  ```
 
-```coq
-Definition off_body γ k : iProp Σ :=
-  ∃ ip, a_fip k ↦₈{#(1/2)} ip ∗
-        ( (∃ v, a_foff k ↦₄ v ∗ ⌜off_wf v⌝)        (* resident   *)
-        ∨ (i_valid ip ↦₄ 1 ∗ flive_tok γ k) ).     (* checked out *)
+  `S` is THE SET OF FILE SLOTS HOLDING AN FD_INODE REFERENCE ON INODE `i`.
+- **An FD_INODE file's payload carries a FRAGMENT of that map**
+  (`ioff_ref (fc_ip C) k q` = `∃i, ⌜fc_ip C = ientry i⌝ ∗ k ↪[fsc_foff i]{#q} ()`,
+  the FD_INODE arm of `file_core_off`); every other file — pipe, device,
+  free — owns its cell directly at its own fraction (`foff_dead k q`,
+  unconstrained value: the cell is dead memory there).
+- **The checkout marker is ilock's valid cell**, `off_mark ip = i_valid ip
+  ↦₄ 1` — exclusive, keyed by the inode's ADDRESS, pinned at 1 (fungible),
+  untouched by readi/writei/iupdate.  Because the ledger is per-INODE it
+  names `ientry i` outright; the old design's `a_fip`-half hack (the
+  per-FILE invariant permanently holding half the `f->ip` cell so it could
+  say which inode it meant) is RETIRED and `file_fields` is symmetric
+  again.
 
-Definition off_inv γ k := inv (offN .@ k) (off_body γ k).
-```
+### The four movers
 
-### The invariant HAS TO NAME THE INODE, and that is what the first sketch missed
+| step | who | credential | resolution |
+|---|---|---|---|
+| `FileOff.ioff_publish` | sys_open's FD_INODE arm, under `ip->lock` (`ProofSysOpenParts.so_deposit`, run by `so_tail_pub` BEFORE iunlock spends the valid cell) | marker + the freshly-written cell (`off_wf` by `off_wf_zero`) | `k ∈ dom S` is REFUTED, not assumed: a resident arm clashes with the publisher's own cell, a checked-out arm with its marker; then insert + mint the fragment at 1 |
+| `FileOff.ioff_checkout` | fileread/filewrite FD_INODE arm, under `ip->lock` | fragment (membership) + marker + one `flive_tok` | resident arm selected (checked-out clashes with the marker); marker and unit parked, cell out with `off_wf` |
+| `FileOff.ioff_checkin` | the same window's end | fragment + the cell (`off_wf` re-proven from the advance) | resident arm refuted by cell clash; marker and unit come home |
+| `FileInv.file_off_reclaim` | fileclose's LAST-reference arm, under ftable.lock, NO inode lock | whole fragment + `ftable_auth` at count 1 + own `flive_tok` | delete the entry; a stale checked-out arm's parked unit would be a SECOND unit against an authority recording ONE (`flive_excl_last`) — obligation (b), unchanged in spirit |
 
-Mutual exclusion between two borrowers of one slot is the exclusivity of **one
-inode's lock**. To *appeal* to that, the invariant must be able to say which
-inode it is talking about: a per-slot invariant that knows only `k` cannot, so a
-borrower opening it has nothing to contradict a stale checked-out state with —
-two files can name two different inodes, and "some inode's lock is held" is not
-a contradiction. The sketch's "exclusion between borrowers is `ilocked ip`'s own
-exclusivity" is therefore **not dischargeable as written**.
+**Why the cells are NOT parked in the sleeplock's resource itself** (the
+one amendment to the owner's ask, and it is forced): `SleepLock.sl_res_gen`
+rides with the HOLDER while the lock is held, and fileclose's last arm must
+reclaim SYNCHRONOUSLY with no inode lock — the freed slot needs the cell
+before ftable.lock releases, and the next `sys_open` on that slot writes
+`f->off` under a DIFFERENT inode's lock.  A closer racing any holder of the
+old inode's lock could never reach a sleeplock-parked cell.  So the cells
+live in the always-openable per-inode invariant, and `ip->lock` is the
+checkout CREDENTIAL (the marker) rather than the container.
 
-The fix is one conjunct: the invariant holds, permanently, **half of the `f->ip`
-cell**, and `FileInv.file_fields` holds that cell at *half* the nominal fraction
-(the one asymmetry in the predicate, and the only edit the swap forced on the
-six remaining fields). Points-to agreement then hands a reference holder "the
-invariant's inode is *my* inode" for free — no ghost, no second copy of the
-pointer, and `file_fields_frac_split` still goes through because halving
-distributes over `+`. The cost is that a future `sys_open` writing `f->ip` needs
-the invariant's half, which it will have open anyway to write `f->off = 0`.
+### The liveness counter is AMBIENT now
 
-### There is no `ilocked ip`; the marker is `ip->valid`
-
-Nothing `ilock` produces is both **exclusive** and **keyed by the inode's
-address**. `InodeLock.inode_locked`, `inode_key` and `SleepLock.sleeplocked` are
-all keyed by GHOST NAMES (`gi`, `gisl`), which a second borrower has no way to
-match against its own — the icache seam that would map `ip ↦ gi` is exactly what
-`InodeLock.v` defers. What works is a cell:
-
-> **`off_mark ip := i_valid ip ↦₄ 1`.**
-
-* **exclusive** — two full points-tos at one address are `False`;
-* **address-keyed** — `i_valid ip` is a function of `ip` alone, so the half-`ip`
-  agreement above turns the invariant's inode into the borrower's;
-* **fungible** — `inode_locked` pins the value at `1`, so what the borrower
-  takes back is provably what it parked. A slice of the borrower's own fraction
-  is *not* fungible (the invariant returns it existentially quantified, and the
-  reference's three components must stay at one common `q`), which is the
-  concrete reason the marker cannot be one;
-* and `readi`/`writei`/`iupdate` never touch `ip->valid`, so it can be held out
-  of `inode_locked` for the whole call and put back before `iunlock`.
-
-### (b) is the liveness counter, and it works as sketched
-
-The exclusive holder has no inode lock, hence nothing to contradict the marker
-with. What contradicts it is a COUNT. `fileUR` gained a third component
-`fliveUR := authUR (gmapUR nat positiveR)`, whose map is `M`'s count column
-(`Mcount`); `ftable_auth` bundles both authorities so no ghost step's statement
-and no caller changed. Every `file_ref` carries one `flive_tok γ k`; the
-checked-out disjunct parks one. At the last reference the authority records
-`1`, so a second unit is invalid — `FileInv.flive_excl_last` — and the cell must
-be resident. `positiveR`, not the sketch's `natR`: a unit-free count has no zero
-fragment, so the entry can be **deleted** at close; with `natR` a stale
-`◯{[k := 0]}` is a legal frame and blocks the deallocating local update.
-
-That holder's access is a SINGLE instruction, so `FileOff.off_acc_excl` is an
-accessor (`={E,E∖↑N}=∗ … ∗ (… ={E∖↑N,E}=∗ True)`) rather than a borrow — which
-is what it has to be, having no marker to park.
+`flive_tok k` — one fungible unit per outstanding reference, authority
+beside the reference-count authority inside ftable.lock — kept its role
+(the closer's refutation) but moved ghost location: its gname is the
+`fscfg` field `fsc_fol` and its camera the `xv6G` member
+`Xv6Cameras.flivG`, NOT a `fileUR` component under γf.  That is what makes
+the ledger bodies γf-FREE, hence allocatable by the era fupd and carriable
+as ONE persistent conjunct of `FsReady.fs_ready` (LAST, plus one conjunct
+in each `*_fs_env`).  Do not re-home either: a `ghost_mapG Σ nat unit`
+field on `fileG` is the measured 703 GB `subG_fileΣ → fscfg → file_fscfg`
+search cycle, and a second field on `xv6G` is the measured two-instance-path
+`iFrame` failure against the log's own `↪[ln_tx …]` elements — the
+capacity is `logG`'s `logtx_inG`, reused (`Xv6G.v`'s note).
 
 ### The value bound is load-bearing, not decoration
 
-`off_wf v := bv_unsigned v ≤ MAXFILE * BSIZE` rides in the resident disjunct.
-`readi`'s contract demands `off + n < 2^32` and **nothing in memory bounds a
-freshly loaded `off`**, so without a bound in the invariant `fileread` cannot
-call `readi` at all. It is inductive: the BSS starts zeroed, `sys_open` writes
-0, every advance is `off + r` with `r` clamped by readi/writei to the file's
-size, which is itself `≤ MAXFILE*BSIZE`; a pipe or device file never writes the
-cell.
+`off_wf v := bv_unsigned v <= MAXFILE * BSIZE` rides the RESIDENT arm.
+`readi`'s contract demands `off + n < 2^32` and **nothing in memory bounds
+a freshly loaded `off`**, so without the bound in the ledger fileread could
+not call `readi` at all.  It is inductive: sys_open deposits 0, every
+advance is `off + r` with `r` clamped by readi/writei to the file's size
+(itself ≤ MAXFILE*BSIZE), and non-inode files never read the cell — their
+`foff_dead` carries NO bound, which is fine because sys_open re-establishes
+it by writing 0 at the next FD_INODE publication.
 
-Two consequences for `fileread`'s contract:
+Two consequences for `fileread`'s contract are unchanged from the cinv era
+(the joint numeric premise discharged from a bound on `n` alone, and the
+delivered bytes not being describable) — see SpecFileread.v's header, which
+is the live text for both.
 
-* **the joint numeric obligation becomes a premise on `n` ALONE**
-  (`MAXFILE*BSIZE + n < 2^31`, `SpecFileread.v`). This is **an obligation
-  fileread PASSES UPWARD, not one it creates.** `readi` and `writei` both state
-  the numeric bound *jointly* precisely because two separate bounds let the sum
-  wrap the `c.addw`; `SpecWritei.v`'s header carries the coverage note that
-  this makes xv6's own `off + n < off` overflow check dead by premise rather
-  than proven.
+### What the ledger REPLACED, so nobody reintroduces it
 
-  **AND IT IS NOW RETIREABLE — the constant is `2^32` on readi's side.**
-  fs-sysfile S4 read this against the object code and concluded that
-  bounding `n` at the syscall boundary is not open (sys_read's only branch is
-  argfd's, so the kernel genuinely does not bound `n`) and that proving
-  readi's wrapping arm was therefore the only repair. A third way landed
-  instead: `SpecReadi` now takes `off` and `n` at the full 32-bit range under
-  `off + n < 2^32`, so from `off ≤ MAXFILE*BSIZE` the obligation on `n` is
-  only `n < 2^32 - 274432` — free from the `n < 2^31` that sys_read has for
-  nothing (`sys_rw_count_lt`, a 32-bit signed value) and that fileread needs
-  anyway for piperead's and consoleread's `int` contracts. What is left is
-  mechanical: restate `SpecFileread`'s premise as `0 <= n < 2^31` and
-  re-thread the three uses in `ProofFileread.v` (one is readi's, two are
-  `fr_n_range`). See completed/fs-sysfile.md, "THE SYS_READ NUMERIC PREMISE".
-
-  The OTHER half of the S4 debt is untouched by this: **`0 <= n` is owed by
-  sys_read AND sys_write**, because `SpecReadi`/`SpecWritei` type `n` as a
-  `nat` and so cannot express the negative case.
-
-  **AMENDED TWICE ON 2026-08-20, and the second one retires it.**  The text
-  here used to read "a modelling premise rather than a kernel fact", which is
-  TRUE of sys_write and was FALSE of sys_read: a negative `int n` reached
-  readi's `uint n` as `2^32 - k`, the `off + n < off` overflow test caught only
-  the WRAPPING case `k <= off`, and otherwise the `n = ip->size - off` clamp
-  fired and readi read the rest of the file into the user's buffer.  At
-  `f->off = 0` that was every negative `n`.
-
-  **`XV6_REV` 31f115a fixes it in the source** -- `if (f->readable == 0 ||
-  n < 0)` and its write twin -- so the premise is now DISCHARGED BY THE CODE
-  rather than owed upward.  Both contracts take the `int` range
-  `-2^31 <= n < 2^31`, which `SpecSysRead.sys_rw_count_range` gives a trapframe
-  word for free; the guard restores `0 <= n` past the branch, so everything
-  below keeps the premises it already had, `fileread_ret` stays `pipe_rw_ret`,
-  and readi's overflow arm stays dead by premise.  The defect entry is in
-  `kernel-defects.md`; the bump's ledger is in
-  `completed/syscall-dispatch.md`, "THE BUMP TO `31f115a`".
-
-* **the delivered bytes are not describable, and this too is inherited.**
-  `readi`'s postcondition describes the destination bytes only on its KERNEL
-  arm; on the user arm — the one fileread takes, `a1 = 1` at `+0x3a` — it says
-  only that the process block comes back at an extended page table
-  (`uptd_ext`). `piperead`'s and the assumed `consoleread`'s user arms say the
-  same. So there is nothing about file content for fileread to pass on, and the
-  question of whether the starting offset is observable never arises: the
-  postcondition is the return-value bound `fileread_ret` (= `pipe_rw_ret`) plus
-  the resources. Do NOT weaken the borrow protocol to expose the offset —
-  making it observable would mean putting it back on the reference, which is
-  stage 1 and is exactly what does not work.
-
-### The five lemmas
-
-| lemma | who |
-|---|---|
-| `off_checkout` | (a): reads the ip half for agreement, parks marker + unit, hands out the cell |
-| `off_checkin` | (a): holding the cell refutes *resident*, so marker + unit come back |
-| `off_acc_excl` | (b): authority + the holder's unit refute *checked out*; one-instruction accessor |
-| `off_inv_alloc` / `off_invs_alloc` | boot, alongside `ftable_ghosts_alloc` (still uncalled: the ftable lock is not wired at boot) |
-| `off_invs_lookup` | slot `k` out of the `NFILE`-way persistent bundle |
+The previous design (R-open-1b) was a per-FILE-slot CANCELLABLE invariant
+(`off_hold`, armed/unarmed, name recorded in `fpnames.fp_ocv`, minted at
+every publication and cancelled at every retire), because a permanent
+per-file invariant could not appeal to "which inode governs this slot" and
+a cancellable one could not be a fixed family.  The per-INODE ledger
+dissolves both horns: it is permanent AND names its inode, so
+`fpnames` lost `fp_ocv`, `file_armed`/`off_hold`/`off_body`/`off_raw`/
+`off_content` are gone, the boot mints no per-slot cinvs, and — the M3
+payoff — `fslot`'s ξ-dependence is now points-tos and `own`s only, with no
+invariant assertion inside the ftable lock's resource at all.
 
 ## The pid fraction lives in the KERNEL arm — `SpecReadi` / `SpecWritei`
 
@@ -720,9 +658,9 @@ per-slot share out of the `FileInvDefs.inode_pay` already inside the
   with a written `icfg_dev`; the carve does exactly that.
 
 An environment a SYSCALL can own may not name the fd SLOT either, because
-`ProcInv.ofile_slot` quantifies it existentially — hence `FileOff.off_invs` +
-`off_invs_lookup` (a family and a selector, with the lookup happening at the
-call off the contract's own `k < NFILE`) rather than `off_inv γf k`, and
+`ProcInv.ofile_slot` quantifies it existentially — hence the ledger FAMILY
+`ioff_escrows` + `ioff_escrows_acc` (with the lookup happening at the call
+off the payload's own `ik < NINODE`) rather than a per-slot handle, and
 likewise `ic_escrows` / `IcacheBoot.ic_sleeplocks` rather than the per-slot
 `ic_escrow` / `is_sleeplock`.
 

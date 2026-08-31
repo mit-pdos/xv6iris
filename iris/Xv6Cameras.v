@@ -426,6 +426,26 @@ Global Instance subG_logΣ {Σ} : subG logΣ Σ -> logG Σ.
 Proof. solve_inG. Qed.
 
 (* ===================================================================== *)
+(*  8b.  THE OFF-BORROW LIVENESS COUNTER  (theory: FileInvDefs.v)         *)
+(* ===================================================================== *)
+
+(* One unit per outstanding reference on a file slot, authority beside the
+   reference-count authority inside ftable.lock ([FileInvDefs.flive_own]).
+   Its gname is the ambient [FsCfg.fsc_fol]; the CAMERA is a member here
+   because the off LEDGERS ([FileInvDefs.ioff_body], allocated by the era
+   fupd at [xv6G] with no [fileG] in sight) park a unit in their
+   checked-out arms -- so the capacity cannot ride [fileG]'s own [inG]
+   (that is [fileUR]'s, keyed by the table's threaded [γf]).  [positiveR]
+   for [FileInvDefs.fliveUR]'s reason: a unit-free count has no zero
+   fragment, so an entry can be DELETED at the last close. *)
+Class flivG (Σ : gFunctors) := FlivG {
+  fliv_inG :: inG Σ (authUR (gmapUR nat positiveR));
+}.
+Definition flivΣ : gFunctors := #[GFunctor (authUR (gmapUR nat positiveR))].
+Global Instance subG_flivΣ {Σ} : subG flivΣ Σ -> flivG Σ.
+Proof. solve_inG. Qed.
+
+(* ===================================================================== *)
 (*  9.  THE FS CRASH LAYER  (theory: FsCrash.v)                           *)
 (* ===================================================================== *)
 

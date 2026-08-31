@@ -270,6 +270,8 @@ Section ProofSysOpenAUEntryC.
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     ic_sleeplocks fsc_ic -∗
+    (* ...and the off LEDGERS (off-ledger ruling) *)
+    ioff_escrows -∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     ireg_open -∗
     sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
@@ -319,7 +321,8 @@ Section ProofSysOpenAUEntryC.
                               HKiu & HKit & HKip & HKup & HKfc & HKfa & HKfd &
                               HK10 & HK24 & Kpop).
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpre #Hftab #Hbio
-              #Hlog Hseam Hgen #Hkenv #Hitab #Hitinv #Hescrows #Hslks #Hireg
+              #Hlog Hseam Hgen #Hkenv #Hitab #Hitinv #Hescrows #Hslks #Hoffs
+              #Hireg
               #Hropen
               Hsbn Hsbi Hsbs Hsbb #Hbmres Hpriv #Hprocs #Hdev #Hgeo #Hdlk HopS Htx
               Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
@@ -688,7 +691,7 @@ Section ProofSysOpenAUEntryC.
                 Hdirw Hom Hal23 Hsp0 HP1sp HP1thr HP1s0 HP1s1i HP1s2 HP1s3
                 Hal ltac:(cbn in Hns1; unfold sys_open_slots, create_slots in *; lia)
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
-                      Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hslk Hslkd Hdep
+                      Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hoffs Hslk Hslkd Hdep
                       Hidev Hiinum Hivalid Hflat Hshot Hfrz Href Hru Hpriv Hprocs
                       Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
@@ -768,7 +771,7 @@ Section ProofSysOpenAUEntryC.
                 Hdirw Hom Hal23 Hsp0 HP1sp HP1thr HP1s0 HP1s1i HP1s2 HP1s3
                 Hal ltac:(cbn in Hns1; unfold sys_open_slots, create_slots in *; lia)
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
-                      Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hslk Hslkd Hdep
+                      Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hoffs Hslk Hslkd Hdep
                       Hidev Hiinum Hivalid Hflat Hshot Hfrz Href Hru Hpriv Hprocs
                       Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24

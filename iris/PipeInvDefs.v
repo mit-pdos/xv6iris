@@ -103,7 +103,7 @@
    ---- why this is its own file ----
 
    This is the slice of PipeInv.v every HOLDER of a pipe reference needs
-   ([FileInv]'s [file_payload], and every whole-function proof that only
+   ([FileInvDefs]' [file_core], and every whole-function proof that only
    reads/writes through an existing pipe): the geometry, the reference
    algebra, and [is_pipe]/[pipe_held].  PipeInv.v itself keeps the page-carving
    and construction lemmas ([pipe_raw], [page_own_pipe_raw], [new_pipe], ...),
@@ -338,7 +338,7 @@ Section PipeInv.
   (* ---- THE reference: a share of one END of the pipe ----
 
      Held by whoever holds the [struct file] for that end (FileInv's
-     [file_payload]); split by filedup along with the file's own content
+     [file_core]); split by filedup along with the file's own content
      fraction, and recombined by the last fileclose, which then hands the full
      [pipe_ref γp w 1] to pipeclose.  q = 1 is "I am the only holder of this
      end", which is precisely the right to close it.
@@ -656,7 +656,7 @@ Section PipeInv.
      [writable] flag selects, with the ghost names quantified away -- keyed by
      the pipe's ADDRESS, since that is all [fcontent] records.
 
-     THIS IS NOT WHAT [FileInv.file_payload] USES, and the reason is the
+     THIS IS NOT WHAT [FileInvDefs.file_core] USES, and the reason is the
      caveat this comment used to record as future work: two shares of one
      address cannot be RECOMBINED without knowing they name the same [γp], and
      recombining them is exactly what the last fileclose does when it takes

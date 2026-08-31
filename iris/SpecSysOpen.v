@@ -340,6 +340,10 @@ Definition wp_sys_open_sconf_body
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
+  (* ...and the off LEDGERS (off-ledger ruling): the FD_INODE publication
+     deposits the fresh [f->off] cell in its inode's ledger, under the very
+     [ip->lock] the walk holds ([ProofSysOpenParts.so_deposit]). *)
+  ioff_escrows -∗
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  Persistent,
      borrowed and never spent; it rides the SAME channel [ireg_inv] does,

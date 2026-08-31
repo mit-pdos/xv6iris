@@ -81,7 +81,8 @@ Require Import IcacheRef.             (* the reference algebra the publication
    sweep still calls them dead against THIS tree, they can go then. *)
 Require Import FsTree.
 Require Import IcacheEscrow.          (* [ic_loaded] -- the O_TRUNC bridge *)
-Require Import FileInvDefs.           (* [fcontent], [fc_wbool] -- the omode
+Require Import FileInvDefs.
+Require Import FileOff.   (* [ioff_publish] -- the ledger deposit *)           (* [fcontent], [fc_wbool] -- the omode
                                          bit cluster's target *)
 Require Import SpecArgstr.
 Require Import SpecBeginOp.
@@ -723,12 +724,11 @@ Section ProofSysOpenPublish.
      has to carry filealloc's type fact here -- the state it already holds
      says it. *)
   Lemma so_open_slot `{XI : CurCtx} (E : coPset) (gf : gname) (kf : nat) :
-    ↑(offN .@ kf) ⊆ E ->
     file_ref gf kf 1 FdClosed ={E}=∗
     ∃ (Cf : fcontent) (pn : fpnames) (voff : mword 32),
-      ⌜fc_type Cf = FD_NONE⌝ ∗ ⌜off_wf voff⌝ ∗
+      ⌜fc_type Cf = FD_NONE⌝ ∗
       iref_slot ∗
-      fref_tok gf kf 1 ∗ flive_tok gf kf ∗ fpay_tok gf kf 1 pn ∗
+      fref_tok gf kf 1 ∗ flive_tok kf ∗ fpay_tok gf kf 1 pn ∗
       a_ftype kf     ↦₄ fc_type Cf ∗
       a_freadable kf ↦ₘ fc_readable Cf ∗
       a_fwritable kf ↦ₘ fc_writable Cf ∗
@@ -737,28 +737,64 @@ Section ProofSysOpenPublish.
       a_fip kf       ↦₈ fc_ip Cf ∗
       a_foff kf      ↦₄ voff.
   Proof.
-    intros HE.
-    iIntros "(%Cf & Href & Hflds & (%pn & %Hok & Hnames & Hcore & Hoff) & Hlive)".
+    iIntros "(%Cf & Href & Hflds & (%pn & %Hok & Hnames & Hcore) & Hlive)".
     (* [fdstate_ok]'s [FdClosed] arm IS the type equation *)
     cbn in Hok. set (Ht := Hok : fc_type Cf = FD_NONE).
-    rewrite (file_armed_none Cf Ht).
-    iMod (off_hold_cancel_raw E gf kf (fp_ocv pn) HE with "Hoff") as "Hraw".
-    iMod "Hraw" as "(%ipold & %voff & Hip2 & Hoffc & %Hwf)".
-    iDestruct "Hflds" as "(Hty & Hrd & Hwr & Hpip & Hip1 & Hmaj)".
-    iDestruct (ctx_word_pointsto_agree with "Hip2 Hip1") as %->.
-    iDestruct (so_word_half_join with "Hip1 Hip2") as "Hip".
-    iEval (rewrite (file_core_none 1 pn Cf Ht)) in "Hcore".
-    iEval (rewrite -iref_slot_frac) in "Hcore".
+    iEval (rewrite (file_core_none kf 1 pn Cf Ht)) in "Hcore".
+    iDestruct "Hcore" as "[Hiru Hoffd]".
+    iDestruct "Hoffd" as (voff) "Hoffc".
+    iEval (rewrite -iref_slot_frac) in "Hiru".
+    iDestruct "Hflds" as "(Hty & Hrd & Hwr & Hpip & Hip & Hmaj)".
     iModIntro. iExists Cf, pn, voff.
     iSplitR; [iPureIntro; exact Ht |].
-    iSplitR; [iPureIntro; exact Hwf |].
-    iFrame "Hcore Href Hlive Hnames Hty Hrd Hwr Hpip Hmaj Hip Hoffc".
+    iFrame "Hiru Href Hlive Hnames Hty Hrd Hwr Hpip Hmaj Hip Hoffc".
+  Qed.
+
+  (* the DEVICE arm's vacuous bound: an FD_DEVICE store is not the inode
+     arm, so the conditional [off_wf] premise costs it nothing *)
+  Lemma so_wf_dev `{XI : CurCtx} (v : mword 32) :
+    FD_DEVICE = FD_INODE -> off_wf v.
+  Proof.
+    intro Hc. exfalso. apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
+  Qed.
+
+  (* THE LEDGER DEPOSIT (off-ledger ruling), and it runs where the code
+     runs it: UNDER [ip->lock].  The marker is ilock's valid cell, held
+     here because [so_tail_pub] has not yet reached iunlock; it comes back
+     untouched.  On the FD_INODE arm the cell -- freshly written 0, hence
+     the conditional bound -- goes into inode [kk]'s ledger and the
+     fragment comes out; on the device arm the cell simply becomes the
+     payload's own [foff_dead]. *)
+  Lemma so_deposit `{XI : CurCtx} (E : coPset) (kk kf : nat) (C : fcontent)
+      (voff : mword 32) :
+    ↑(offN .@ kk) ⊆ E ->
+    (kk < NINODE)%nat ->
+    fc_ip C = ientry kk ->
+    (fc_type C = FD_INODE -> off_wf voff) ->
+    ioff_escrows -∗
+    i_valid (ientry kk) ↦₄ valid_word true -∗
+    a_foff kf ↦₄ voff ={E}=∗
+    i_valid (ientry kk) ↦₄ valid_word true ∗ file_core_off kf 1 C.
+  Proof.
+    intros HE Hkk Hip Hwf.
+    iIntros "#Hfam Hvalid Hoff".
+    rewrite /file_core_off. case_bool_decide as Hin; last first.
+    { iModIntro. iFrame "Hvalid". rewrite /foff_dead. iExists voff.
+      iExact "Hoff". }
+    iDestruct (ioff_escrows_acc kk Hkk with "Hfam") as "#Hesc".
+    iMod (ioff_publish E kk kf voff HE (Hwf Hin) with "Hesc [Hvalid] Hoff")
+      as "[Hmk Hfrag]".
+    { rewrite /off_mark. iExact "Hvalid". }
+    iModIntro. iSplitL "Hmk"; [iExact "Hmk"|].
+    iExists kk. rewrite Hip.
+    iSplitR; [iPureIntro; reflexivity|].
+    iSplitR; [iPureIntro; exact Hkk|]. iExact "Hfrag".
   Qed.
 
   Lemma so_publish `{XI : CurCtx} (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)
       (gy : gname) (inum : mword 32) (ty : bv 16) (C : fcontent)
-      (pn : fpnames) (om : mword 32) (voff : mword 32) (rb wb : bool) :
-    ↑fileipN ⊆ E -> ↑(offN .@ kf) ⊆ E ->
+      (pn : fpnames) (om : mword 32) (rb wb : bool) :
+    ↑fileipN ⊆ E ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
     fc_ip C = ientry kk ->
@@ -779,7 +815,7 @@ Section ProofSysOpenPublish.
        free at the one site that installs the payload.  [so_tdev_zne] on the
        inode arm, [so_dev_vac] on the device arm. *)
     (fc_type C = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z) ->
-    off_wf voff ->
+
     (* the parent the walk kept, short by the share it lent ilock ... *)
     inode_ref_short_gen kk (qi + s)%Qp qi icfg_dev inum gy -∗
     (* ... its PROVENANCE UNIT, which travels with the parent into the fd
@@ -791,22 +827,25 @@ Section ProofSysOpenPublish.
     inode_shr kk s icfg_dev inum -∗
     ity_shot gy ty -∗
     (* the exclusive reference filealloc handed over, with the field cells
-       already carrying the stored content *)
+       already carrying the stored content -- [f->ip] WHOLE inside
+       [file_fields] since the off-ledger ruling retired the halving *)
     fref_tok gf kf 1 -∗
-    flive_tok gf kf -∗
+    flive_tok kf -∗
     file_fields kf 1 C -∗
     fpay_tok gf kf 1 pn -∗
-    (* the two cells the publisher wrote with the UNARMED cinv cancelled *)
-    a_fip kf ↦₈{DfracOwn (1/2)} (ientry kk) -∗
-    a_foff kf ↦₄ voff -∗
+    (* THE OFF CONJUNCT, ALREADY DEPOSITED (off-ledger ruling): the ledger
+       step ran under [ip->lock] -- [so_deposit] below, called by
+       [ProofSysOpen.so_tail_pub] before iunlock spends the valid cell --
+       so what reaches the publication is the finished [file_core_off]. *)
+    file_core_off kf 1 C -∗
     (* AT THE STATE THE PUBLISHED FILE GIVES ITS DESCRIPTOR, which is the
        output sys_open then installs in the fd's ghost.  [st] is determined
        by [C] and [inum] ([fdstate_ok_inj]); it is a parameter rather than a
        projection because [fdstate_ok] is a relation -- see its note. *)
     |={E}=> ∃ st : fdstate, ⌜fdstate_ok inum C st⌝ ∗ file_ref gf kf 1 st.
   Proof.
-    intros HEi HEo Hkk Hinb Hip Hty Hwrb Hrdb Hwdb Hdir Hdvw Hwf.
-    iIntros "Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hip Hoff".
+    intros HEi Hkk Hinb Hip Hty Hwrb Hrdb Hwdb Hdir Hdvw.
+    iIntros "Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hcoff".
     (* ---- the generation: name the returned share and pin it ---- *)
     rewrite inode_shr_gen_intro. iDestruct "Hshr" as (g2) "Hshr".
     iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr") as %<-.
@@ -828,22 +867,19 @@ Section ProofSysOpenPublish.
     iMod (inode_pay_alloc E (ientry kk) s gy inum (fc_type C) (fc_wbool C) ty
             (so_pay_witness om ty C Hwrb Hdir) Hdvw with "Hsh Hs Hshot")
       as (gx) "Hpay".
-    (* ---- the off cinv, re-armed ---- *)
-    iMod (off_hold_alloc E gf kf true with "[Hip Hoff]") as (go) "Hoff".
-    { iExists (ientry kk), voff. iFrame "Hip Hoff". iPureIntro. exact Hwf. }
-    (* ---- ONE names update installs both ---- *)
+    (* ---- ONE names update installs the payload's ---- *)
     iMod (fpay_tok_update gf kf pn
-            (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy go inum) with "Hnames")
+            (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy inum) with "Hnames")
       as "Hnames".
     iModIntro.
-    (* ---- and that is [file_ref] ---- *)
-    assert (Harm : file_armed C = true).
-    { rewrite /file_armed. destruct Hty as [Ht | Ht]; rewrite Ht.
-      - rewrite bool_decide_true; [reflexivity | reflexivity].
-      - rewrite orb_true_r. reflexivity. }
     assert (Hnp : bool_decide (fc_type C = FD_PIPE) = false).
     { apply bool_decide_false. destruct Hty as [Ht | Ht]; rewrite Ht;
         intro Hc; by vm_compute in Hc. }
+    assert (Hor : (bool_decide (fc_type C = FD_INODE)
+                   || bool_decide (fc_type C = FD_DEVICE))%bool = true).
+    { destruct Hty as [Ht | Ht]; rewrite Ht.
+      - rewrite bool_decide_true; [reflexivity | reflexivity].
+      - rewrite orb_true_r. reflexivity. }
     (* the state the file now gives: its type, and -- on the FD_INODE arm --
        the inum of the reference it just parked *)
     set (stpub := if bool_decide (fc_type C = FD_INODE)
@@ -857,16 +893,13 @@ Section ProofSysOpenPublish.
             apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc. }
         cbn. by repeat split. }
     iExists stpub. iSplitR; [iPureIntro; exact Hokpub|].
-    rewrite /file_ref /file_pay_st /file_payload /file_core.
+    rewrite /file_ref /file_pay_st /file_core /file_core_noff.
     iExists C. iFrame "Href Hflds Hlive".
-    iExists (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy go inum).
+    iExists (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy inum).
     cbn [fp_inum]. iSplitR; [iPureIntro; exact Hokpub|].
-    iFrame "Hnames". rewrite Harm Hnp.
-    assert (Hor : (bool_decide (fc_type C = FD_INODE)
-                   || bool_decide (fc_type C = FD_DEVICE))%bool = true)
-      by exact Harm.
-    rewrite Hor. cbn [fp_icv fp_iq fp_ig fp_ocv].
-    rewrite Hip. iFrame "Hpay Hoff".
+    iFrame "Hnames". rewrite Hnp Hor.
+    cbn [fp_icv fp_iq fp_ig].
+    rewrite Hip. iFrame "Hpay Hcoff".
   Qed.
 
   (* ==== THE O_TRUNC BRIDGE ============================================

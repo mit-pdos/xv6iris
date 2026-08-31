@@ -903,6 +903,8 @@ Definition wp_sys_open_au_frame
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
+  (* ...and the off LEDGERS (off-ledger ruling) *)
+  ioff_escrows -∗
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   ireg_open -∗
   sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗

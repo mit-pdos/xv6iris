@@ -1874,9 +1874,9 @@ End UsertrapRes.
                         TERM (tso-port.md §0.16′) and so it crosses for
                         nothing -- but it stays in this bundle, because the
                         rest of the bundle does not.  It used to be the
-                        blocker: [ftable_res] reached [FileInvDefs.off_hold]'s
-                        [cinv] over a ξ-indexed [off_content], i.e. an
-                        invariant whose BODY is ξ-indexed, which no
+                        blocker: [ftable_res] reached the old off-borrow
+                        [cinv] over a ξ-indexed body (now the off LEDGER,
+                        outside the lock resource entirely), which no
                         [CtxMorph] can cross.  The off-borrow ruling made
                         that body ξ-free and the payload was then
                         λ-converted, exactly as [KallocInv]'s [kmem_res] was;

@@ -60,6 +60,7 @@ Require Import DiskPtsto.      (* [disk_names] *)
 Require Import WpLockAt BioInitAt KallocInv IrefSlots BioDefs.
 Require Import LogInv.
 Require Import FsCfg.
+Require Import FileInvDefs.   (* the off ledger's boot face (off-ledger ruling) *)
 Require Import FsBoot FsCfgBoot.
 Require Import Xv6G.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -801,6 +802,9 @@ Definition snap_spent (S : fs_state_rec) (nib : nat) : gset Z :=
 Section SnapMint.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
+  (* the off ledgers' bodies hold ξ-indexed cells (off-ledger ruling), so
+     the era mint runs at an ambient context, exactly as the kits do *)
+  Context `{XI : TsoCtx.CurCtx}.
 
   Lemma fs_cfg_alloc_snap (γd : uart_names) (γv : disk_names)
       (dk : Z -> bv 8) (ndisk : nat) (S : fs_state_rec) (cov : gset Z)
@@ -860,7 +864,13 @@ Section SnapMint.
       ⌜fsc_size = sb_size (fss_sb S)⌝ ∗
       ⌜fsc_ninodes = sb_ninodes (fss_sb S)⌝ ∗
       fs_kit_icache ICFG FSC ∗
-      fs_kit_fsinit_ghost ICFG FSC (fs_blocks dk) (snap_spent S nib) Pb Xexc.
+      fs_kit_fsinit_ghost ICFG FSC (fs_blocks dk) (snap_spent S nib) Pb Xexc ∗
+      (* the off LEDGERS and the off-borrow liveness authority (off-ledger
+         ruling): the ledgers are per-era persistent invariants over the
+         [fsc_foff] family, minted EMPTY; the authority is what
+         [FileInv.ftable_res_boot] parks inside ftable.lock. *)
+      ioff_escrows_at fsc_fol fsc_foff ∗
+      flive_auth_at fsc_fol.
   Proof.
     intros HlPb HXsub HX1 Hagr Hnibeq Hnib32 Hcovin Hcovmeta.
     (* the WAL's own row (b) at the boot's ledger: every block of the
@@ -1201,15 +1211,21 @@ Section SnapMint.
     { iApply (big_sepL_mono with "Hgid"). intros idx k _. iIntros "H".
       iExists false, (mword_of_int 0 : mword 32),
               (mword_of_int 0 : mword 32). iExact "H". }
+    (* ---- 8b. the off ledger (off-ledger ruling): the liveness
+       authority's gname, the NINODE ghost-map family, and the NINODE
+       per-inode invariants over it, all minted empty ---- *)
+    iMod flive_auth_at_alloc as (γfol) "Hfol".
+    iMod (foff_fun_alloc NINODE 0) as (γfoff) "Hfoffa".
+    iMod (ioff_escrows_alloc_at E γfol γfoff with "Hfoffa") as "#Hioffs".
     iModIntro.
     iExists ICFG,
       (MkFscfg gpr gkm gkp γd γv gdl bn γfs γi cn git
                cov (sb_logstart (fss_sb S)) (sb_bmapstart (fss_sb S))
-               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S))).
+               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol γfoff).
     rewrite /fs_kit_icache /fs_kit_fsinit_ghost.
     cbn [fsc_printk fsc_kalloc fsc_kpages fsc_uart fsc_disk fsc_dlock
          fsc_bio fsc_fs fsc_ireg fsc_ic fsc_itlock fsc_cov fsc_logst
-         fsc_bmapstart fsc_size fsc_ninodes].
+         fsc_bmapstart fsc_size fsc_ninodes fsc_fol fsc_foff].
     rewrite Hdev Histq Hlogq.
     assert (Hset : (((((cov ∖ ({[ (1:Z) ]} : gset Z))
                          ∖ log_region_set (sb_logstart (fss_sb S)))
@@ -1251,22 +1267,26 @@ Section SnapMint.
       iSplitL "Hkauth"; [iExact "Hkauth" |].
       iSplitL "Hhpn"; [iExact "Hhpn" |].
       iSplitL "Htkey"; [iExact "Htkey" | iExact "Hckey"]. }
-    iSplitL "Hlogtok"; [iExact "Hlogtok" |].
-    iSplitL "Hboot"; [iExact "Hboot" |].
-    iSplitR; [iExact "Hireginv" |].
-    iEval (rewrite (Hagr 1 (H1home 1 (elem_of_singleton_2 1 1 eq_refl)) HX1))
-      in "Hb1".
-    iSplitL "Hb1"; [iExact "Hb1" |].
-    iSplitL "HaL HaD".
-    { iExists (fs_C0 dk cov), (fs_D0 dk cov).
-      iSplitR; [iPureIntro; exact (fs_C0_lookup dk cov) |].
-      iSplitL "HaL"; [iExact "HaL" | iExact "HaD"]. }
-    iSplitL "Hdty"; [iExact "Hdty" |].
-    iSplitL "Hhdr"; [iExact "Hhdr" |].
-    iSplitL "Hslots"; [iExact "Hslots" |].
-    iSplitL "Hbmres"; [iExact "Hbmres" |].
-    iSplitL "Hrem"; [iExact "Hrem" |].
-    iSplitR; [iExact "Hbinv" | iExact "Hxo"].
+    (* kit 2 is a GROUP now (the ledger rows follow it), so its body's
+       splits go under one [iSplitL] bracket *)
+    iSplitL "Hlogtok Hboot Hb1 HaL HaD Hdty Hhdr Hslots Hbmres Hrem Hxo".
+    { iSplitL "Hlogtok"; [iExact "Hlogtok" |].
+      iSplitL "Hboot"; [iExact "Hboot" |].
+      iSplitR; [iExact "Hireginv" |].
+      iEval (rewrite (Hagr 1 (H1home 1 (elem_of_singleton_2 1 1 eq_refl)) HX1))
+        in "Hb1".
+      iSplitL "Hb1"; [iExact "Hb1" |].
+      iSplitL "HaL HaD".
+      { iExists (fs_C0 dk cov), (fs_D0 dk cov).
+        iSplitR; [iPureIntro; exact (fs_C0_lookup dk cov) |].
+        iSplitL "HaL"; [iExact "HaL" | iExact "HaD"]. }
+      iSplitL "Hdty"; [iExact "Hdty" |].
+      iSplitL "Hhdr"; [iExact "Hhdr" |].
+      iSplitL "Hslots"; [iExact "Hslots" |].
+      iSplitL "Hbmres"; [iExact "Hbmres" |].
+      iSplitL "Hrem"; [iExact "Hrem" |].
+      iSplitR; [iExact "Hbinv" | iExact "Hxo"]. }
+    iSplitR; [iExact "Hioffs" | iExact "Hfol"].
   Qed.
 
 End SnapMint.

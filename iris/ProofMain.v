@@ -1322,6 +1322,12 @@ Section ProofMain.
       (λ ξ : CtxId, kmem_res (XIk := ξ) fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
     gen_cert -∗
     FsCrash.fs_crash_seam fsc_cov fsc_logst -∗
+    (* ---- off-ledger ruling: the era's off LEDGERS (persistent; parked
+       into [FirstTok.first_boot_persist] at +0x9e) and the off-borrow
+       liveness AUTHORITY ([FileInv.ftable_res_boot]'s premise, spent at
+       fileinit's return). ---- *)
+    ioff_escrows -∗
+    flive_own ((● ∅) : fliveUR) -∗
     (* ---- `static int first = 1', PINNED (fs-cfg-boot.md (f-2)).  One of
        the image's two writable initialized .data words, carved at
        [BootShared]'s boot data run and threaded pinned-not-existential the
@@ -1431,7 +1437,7 @@ Section ProofMain.
     intros Hn Hlen Hlive Hdevq Hnibq Hcov0 Hnibeq Hpures
            Huartq Hdiskq Hgeomok Hpkc.
     iIntros "Hcg #Htext #Hkdata #Hdev #Hwire #Htramp #Hccaps #Hcready #Htl #Hwaitlk
-             #Hpenv #Hkmem #Hcert #Hseam Hfirst
+             #Hpenv #Hkmem #Hcert #Hseam #Hioffs Hfolauth Hfirst
              #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail #Hlpidlk Hkenv".
     iIntros "Hlbc Hbufl Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
              Hsbb Hlogr Hmir Hirslot Hirauth Hient Hlft Hfents Hirfile Hfdauth
@@ -1611,7 +1617,7 @@ Section ProofMain.
        nothing in the tree could build -- exists. ---- *)
     iIntros (mfi) "Hcg Hpc %Hcsfi Hftw Hftnm Hftc".
     iApply fupd_wp.
-    iMod (ftable_res_boot ⊤ with "Hfents Hfdauth Hirfile") as (γf) "Hfres".
+    iMod (ftable_res_boot ⊤ with "Hfolauth Hfents Hfdauth Hirfile") as (γf) "Hfres".
     iMod (newlock ⊤ (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string
             <{ ftable_res γf }> with "Hftnm Hftw [Hftc] Hfres") as (γft) "#Hftable".
     { iApply (lk_cpu_ready_intro with "Hftc"). }
@@ -1822,7 +1828,8 @@ Section ProofMain.
       iSplitR; [iExact "Hireg"|].
       iSplitR; [iExact "Hbminv"|].
       iSplitR; [iExact "Hkmem"|].
-      iPureIntro; exact Hgeomok. }
+      iSplitR; [iPureIntro; exact Hgeomok|].
+      iExact "Hioffs". }
     (* BOTH BUNDLES GO TO USERINIT (fs-cfg-boot.md (f-5)), beside the pinned
        `first` cell: userinit is the one function that PARKS, and forkret --
        the token's only consumer -- runs on the context that park saves.
@@ -2176,7 +2183,10 @@ Section ProofMain.
            are stage (f)'s, at the [fs_ready] seal. ---- *)
     iDestruct "Hfs" as "(%Hdevq & %Hnibq & %Histq & %Huartq & %Hdiskq &
                          %Hcovq & %Hlogstq & %Hbmapq & %Hsizeq & %Hninq &
-                         Hkit1 & Hkit2)".
+                         Hkit1 & Hkit2 & #Hioffat & Hfolat)".
+    (* the boot face IS the classy family / authority (off-ledger ruling) *)
+    iEval (rewrite ioff_escrows_at_eq) in "Hioffat".
+    iEval (rewrite flive_auth_at_eq) in "Hfolat".
     assert (Hnibpos : (0 < icfg_nib)%nat) by (rewrite Hnibq; exact Hnib0).
     assert (Hcovpos : (0 : Z) ∉ fsc_cov) by (rewrite Hcovq; exact Hcov0).
     (* ---- STAGE (f)'S TWO PURE BLOCKS, produced HERE and nowhere else:
@@ -2253,7 +2263,7 @@ Section ProofMain.
               Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
               Huartq Hdiskq Hgeomok Hpkc
               with "Hcg Htext Hkdata Hdev Hwire Htramp Hccaps Hcready Htl Hwaitlock
-                    Hpenvc Hkmem Hcert Hseamc Hfirst
+                    Hpenvc Hkmem Hcert Hseamc Hioffat Hfolat Hfirst
                     [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail
                     Hpidlock Hkenv Hlbc Hbufl
                     Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2

@@ -68,6 +68,7 @@ Require Import IcacheBoot.
    consumption site names, while the era fupd BELOW is the one-site proof that
    boot can produce them ([LogDefs] vs [LogInv], same split, same reason).
    EXPORTED, so every existing spelling of a kit name still resolves here. *)
+Require Import FileInvDefs.   (* the off ledger's boot face (off-ledger ruling) *)
 Require Export FsCfgKits.
 Require Import FsBoot.
 (* debt (D): the bitmap block's resource and the free pool.  [BioDefs] for
@@ -710,6 +711,7 @@ Definition fs_boot_snap_wf (dk : Z -> bv 8) (ndisk : nat)
     [FirstTok.first_fsinit] reads any of them, so all three travel
     existentially. *)
 Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
+    `{XI : TsoCtx.CurCtx}
     (ICFG : icfg) (FSC : fscfg) (dk : Z -> bv 8)
     (sb : fs_sb) (nib : nat) (cov : gset Z)
     (γd : uart_names) (γv : disk_names)
@@ -721,4 +723,9 @@ Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
    ⌜fsc_bmapstart = FsImg.sb_bmapstart sb⌝ ∗
    ⌜fsc_size = FsImg.sb_size sb⌝ ∗ ⌜fsc_ninodes = FsImg.sb_ninodes sb⌝ ∗
    fs_kit_icache ICFG FSC ∗
-   fs_kit_fsinit_ghost ICFG FSC (FsCrash.fs_blocks dk) Rspent Pb Xexc)%I.
+   fs_kit_fsinit_ghost ICFG FSC (FsCrash.fs_blocks dk) Rspent Pb Xexc ∗
+   (* the off LEDGERS and the off-borrow liveness authority (off-ledger
+      ruling); see [FsCfgSnap.fs_cfg_alloc_snap]'s conclusion, which this
+      body restates verbatim. *)
+   FileInvDefs.ioff_escrows_at fsc_fol fsc_foff ∗
+   FileInvDefs.flive_auth_at fsc_fol)%I.

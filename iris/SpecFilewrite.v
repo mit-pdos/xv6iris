@@ -96,7 +96,7 @@
 
    writei's joint bound is [off + n1 < 2^31].  Here it is DISCHARGEABLE
    RATHER THAN INHERITED, and that is the chunking's doing: [n1 <= 3072] by
-   construction and [off <= MAXFILE*BSIZE] by [FileOff.off_wf], so the sum is
+   construction and [off <= MAXFILE*BSIZE] by [FileInvDefs.off_wf], so the sum is
    at most 277504 -- a closed fact.  So this contract does NOT carry
    fileread's [MAXFILE*BSIZE + n < 2^31] premise, and sys_write will be able
    to take [n] from unchecked user input where sys_read cannot.  (See
@@ -118,7 +118,7 @@
    The WRITTEN BYTES are not describable here, and that is inherited rather
    than lost: writei's range clause is about [data'], which lives inside the
    escrow's parked payload and no caller-held resource names.  The file's
-   OFFSET likewise stays in the per-slot off-borrow cinv. *)
+   OFFSET likewise stays in its inode's off LEDGER (off-ledger ruling). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -215,7 +215,7 @@ Proof. intro Hn. right. exists n. split; [reflexivity | lia]. Qed.
 
 (* THE CHUNKING'S ARITHMETIC, in one lemma: writei's joint premise is a
    CLOSED FACT here, not an inherited obligation.  [off] is bounded by
-   [FileOff.off_wf] and the chunk by the [max] the code computes, so the sum
+   [FileInvDefs.off_wf] and the chunk by the [max] the code computes, so the sum
    cannot approach 2^31 whatever the caller's [n] is.  This is why
    SpecFilewrite has no counterpart of [SpecFileread]'s
    [MAXFILE*BSIZE + n < 2^31] premise. *)
@@ -465,6 +465,10 @@ Section SpecFilewrite.
      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      ic_sleeplocks fsc_ic ∗
+     (* ...AND EVERY ENTRY'S OFF LEDGER (off-ledger ruling): the FD_INODE
+        arm's [f->off] cell lives in its inode's ledger and the borrow
+        window opens it ([FileOff.ioff_checkout]/[ioff_checkin]). *)
+     ioff_escrows ∗
      (* THE LENT SHARE AND ITS GENERATION'S TYPE WITNESS ARE NOT HERE.
         Both used to be: the generation-named share (design fs-icache.md
         §17.3, ratified §17.4) and [ity_shot] at that generation (§17.6 (5),
@@ -535,7 +539,7 @@ Section SpecFilewrite.
   Proof.
     rewrite /filewrite_fs_env /filewrite_fs_out.
     iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-              Hsbi & Hsbs & Hsbb & _ & _ & _ & _ & Hbsl)".
+              _ & Hsbi & Hsbs & Hsbb & _ & _ & _ & _ & Hbsl)".
     iFrame "Hsbi Hsbs Hsbb Hbsl".
   Qed.
 

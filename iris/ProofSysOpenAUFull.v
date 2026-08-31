@@ -187,7 +187,7 @@ Section ProofSysOpenAUFullBody.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpre #Hftab #Hbio #Hlog
              Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
-             #Hireg #Hropen Hsbn Hsbi Hsbs Hsbb #Hbmres #Hkenv #Hprocs Hisl
+             #Hoffs #Hireg #Hropen Hsbn Hsbi Hsbs Hsbb #Hbmres #Hkenv #Hprocs Hisl
              Hfds Hpriv Hfrag Hau Hcont".
     iEval (rewrite /open_au_pre_create) in "Hau".
     iDestruct "Hau" as "(Hwp & Hac & Hdl & Hoc & Htc)".
@@ -863,7 +863,7 @@ Section ProofSysOpenAUFullBody.
               Hni3 Hush Hprkc Hnsb Hj Hgl Heb Hlkempty eq_refl Hal23
               ltac:(reflexivity) HS2sp HS2thr HS2s0 HS2s2 HS2s3 Hal
               with "Hcg Hown [] [] Htext Hdata Hpc Hpre Hftab Hbio
-                    Hlog Hseam Hgen Hkenv Hitab Hitinv Hescrows Hslks Hireg Hropen
+                    Hlog Hseam Hgen Hkenv Hitab Hitinv Hescrows Hslks Hoffs Hireg Hropen
                     Hsbn Hsbi Hsbs Hsbb Hbmres Hpriv Hprocs Hdev Hgeo Hdlk
                     HopS Htx Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hbuf H23lo
                     H23hi H24 Hwp Hac Hdl Hoc Htc Hcont0").

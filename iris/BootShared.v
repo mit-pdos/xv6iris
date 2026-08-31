@@ -487,7 +487,7 @@ Section BootBssChain.
     fd_slots FDSLOTS -∗
     (* the iref supply's PROC-LAYER SHARE.  The remaining [NFILE] units of
        [IrefSlots.IREFSLOTS] belong to the file table, which does not park
-       them yet ([FileInv.file_payload]'s FD_INODE arm is still a
+       them yet ([FileInvDefs.file_core]'s FD_INODE arm is still a
        placeholder), so boot mints the whole supply and routes this part;
        the file share is dropped at the mint site, marked there. *)
     iref_slots (NPROC * (1 + IREFSPARE)) -∗

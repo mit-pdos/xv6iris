@@ -58,7 +58,7 @@
     with "Cannot infer this placeholder"), the field below, and a row in
     [xv6GΣ].  *)
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own cancelable_invariants.
+From iris.base_logic.lib Require Import own cancelable_invariants ghost_map.
 Require Export Xv6Cameras.
 
 Class xv6G (Σ : gFunctors) := Xv6G {
@@ -99,7 +99,22 @@ Class xv6G (Σ : gFunctors) := Xv6G {
   xv6_pipe       :: pipeG Σ;
   xv6_cinv       :: cinvG Σ;
   xv6_uio        :: uioG Σ;
+  (* the off-borrow liveness counter's camera (off-ledger ruling); its
+     gname is [FsCfg.fsc_fol].  See [Xv6Cameras.flivG]. *)
+  xv6_fliv       :: flivG Σ;
 }.
+
+(* THE OFF LEDGER ([FileInvDefs.ioff_body]) DELIBERATELY HAS NO FIELD HERE.
+   Its capacity is [ghost_mapG Σ nat unit], and that class ALREADY has a
+   member on this bundle -- [logG]'s [logtx_inG] ([Xv6Cameras]).  A second
+   field is the duplicate-class trap this file's members exist to prevent,
+   and it was MEASURED, twice in one day (2026-08-31): as a [fileG] field it
+   is a search cycle ([subG_fileΣ] -> [fscfg] -> [file_fscfg] -> [fileG],
+   [BootShared]'s 400 GB bomb, re-measured at 703 GB); as a field HERE it is
+   two instance paths to one class, and [IcacheEscrow.ic_pin_enter]'s
+   [iFrame] fails on a [t ↪[ln_tx icfg_log] tt] that prints identically on
+   both sides.  [TxPin] already reads the capacity off [logG]; the ledger
+   does the same, through this bundle. *)
 
 (* THE FUNCTOR LIST, and the [subG] instance adequacy resolves the bundle
    through.  Every member is pure capacity, so this is exactly the union of
@@ -109,7 +124,8 @@ Class xv6G (Σ : gFunctors) := Xv6G {
    [xv6G xv6Σ]" even when every constituent is present. *)
 Definition xv6GΣ : gFunctors :=
   #[ sieΣ; lockΣ; kallocΣ; bioΣ; diskGhostΣ; uartGhostΣ; fsLogΣ; logΣ;
-     fsCrashΣ; iregΣ; fsTopΣ; fsLinkΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ ].
+     fsCrashΣ; iregΣ; fsTopΣ; fsLinkΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ;
+     flivΣ ].
 
 Global Instance subG_xv6GΣ {Σ} : subG xv6GΣ Σ -> xv6G Σ.
 Proof. solve_inG. Qed.

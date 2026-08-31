@@ -220,7 +220,7 @@
       [i] with the loaded payload's node ([FsAbs.abs_view_lookup] + the
       [abs_of] readings over [fileread_pay_carve]'s outputs), and fire
       the commit at the checked-out offset.  [ard_pre]'s caps come from
-      [FileOff.off_wf] (the offset) and the region's size invariant
+      [FileInvDefs.off_wf] (the offset) and the region's size invariant
       (the bytes; readi's own [di_size <= MAXFILE*BSIZE] premise is
       discharged from the same source).
    2. THE COUNT BRIDGE on the file arm: readi's arm 2 gives

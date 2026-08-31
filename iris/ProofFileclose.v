@@ -636,25 +636,39 @@ Section ProofFileclose.
       iDestruct (file_rest_join γf k q Cf Hqt1 with "Hrfields Hrpay Hrest")
         as "[Hfl Hpy]".
       iDestruct "Hpy" as (pn) "[Hpn Hpl]".
-      iDestruct "Hpl" as "[Hcore Hoh]".
-      (* ---- R-open-1b: RETIRE THE OFF-BORROW CINV, and it has to happen
-             HERE.  The refutation of a stale checked-out state is the
-             liveness COUNT, which reads the authority entry the ghost step
-             below deletes; and the join above is what makes the cancel token
-             whole.  The type is not tested for another two hundred lines, so
-             the cancel is uniform in [file_armed] -- an unarmed body has no
-             disjunction to refute.  What comes back is the [f->off] cell,
-             which goes straight into a FRESH unarmed cinv for the free slot
-             ([f->ip] is not in the invariant since the off-borrow ruling; it
-             came back with the reference, whole). ---- *)
+      iDestruct "Hpl" as "[Hcore Hoffc]".
+      (* ---- off-ledger ruling: RECLAIM THE CELL, and it has to happen
+             HERE.  The refutation of a stale checked-out arm is the
+             liveness COUNT, which reads the very authority entry the ghost
+             step below deletes.  On the FD_INODE arm this is the ledger
+             reclaim ([FileInv.file_off_reclaim]), and the family comes off
+             the environment's own [fs_ready]: an FD_INODE-typed file's
+             descriptor state is [FdInode] ([fdstate_ok_inode]), so the
+             dispatch selected the fs arm.  On every other arm the payload
+             already carried the dead cell and the premise is [emp].  The
+             environment is rebuilt intact -- its pures and its two
+             persistent rows come straight back, only [bslots 3] is moved
+             through. ---- *)
+      iAssert ((if bool_decide (fc_type Cf = FD_INODE)
+                then ioff_escrows else emp) ∗
+               fileclose_env fn on n eb p st)%I
+        with "[Henv]" as "[Hoffam Henv]".
+      { case_bool_decide as Hin; [|by iFrame].
+        destruct (fdstate_ok_inode _ _ _ Hok Hin) as (bdr & bdw & Hsti).
+        iEval (rewrite Hsti /fileclose_env /fileclose_fs_env
+                       /fileclose_fs_env_nopid) in "Henv".
+        iDestruct "Henv" as "(%He1 & %He2 & %He3 & %He4 & #Hprocs & #Hrdy
+                              & Hbs)".
+        iDestruct (FsReady.fs_ready_ioff with "Hrdy") as "#Hioffs".
+        iFrame "Hioffs".
+        rewrite Hsti /fileclose_env /fileclose_fs_env
+                /fileclose_fs_env_nopid.
+        iFrame "Hprocs Hrdy Hbs".
+        iPureIntro. by repeat split. }
       iApply fupd_wp.
-      iMod (off_hold_cancel ⊤ γf (fp_ocv pn) (file_armed Cf) Mg k q
-              ltac:(solve_ndisj) HMk with "Hoh Hauth Hrlv")
-        as "(Hauth & Hrlv & Hraw)".
-      iMod (off_hold_alloc ⊤ γf k false with "Hraw") as (γo0) "Hoh0".
-      set (pn0 := MkFPNames (fp_lock pn) (fp_pipe pn) (fp_icv pn) (fp_iq pn)
-                    (fp_ig pn) γo0 (fp_inum pn)).
-      iMod (fpay_tok_update γf k pn pn0 with "Hpn") as "Hpn".
+      iMod (file_off_reclaim ⊤ γf k Cf Mg q ltac:(solve_ndisj) HMk
+              with "Hoffam Hoffc Hauth Hrlv")
+        as "(Hauth & Hrlv & Hdead)".
       iMod (file_close_last_ghost γf Mg k q HMk with "Hauth Hrtok Hrlv")
         as "Hauth".
       iModIntro.
@@ -863,14 +877,11 @@ Section ProofFileclose.
          released BEFORE the type is tested, so on the FD_INODE arm the unit
          [iput] will make does not exist yet.  Each arm repays the loan below
          from what it does have. *)
-      iAssert (file_pay γf k 1 C0) with "[Hpn Hoh0 Hiru]" as "Hpy0".
-      { iExists pn0. iFrame "Hpn".
-        rewrite /file_payload /file_core /C0 /pn0; cbn [fc_type fc_ip fp_ocv].
-        rewrite bool_decide_eq_false_2; [|by vm_compute].
-        rewrite bool_decide_eq_false_2; [|by vm_compute].
-        rewrite bool_decide_eq_false_2; [|by vm_compute].
-        rewrite (file_armed_none C0 ltac:(rewrite /C0 /FD_NONE; reflexivity)).
-        iSplitL "Hiru"; [iApply iref_slot_frac; iExact "Hiru" | iExact "Hoh0"]. }
+      iAssert (file_pay γf k 1 C0) with "[Hpn Hdead Hiru]" as "Hpy0".
+      { iExists pn. iFrame "Hpn".
+        rewrite (file_core_none k 1 pn C0
+                   ltac:(rewrite /C0 /FD_NONE; reflexivity)).
+        iSplitL "Hiru"; [iApply iref_slot_frac; iExact "Hiru" | iExact "Hdead"]. }
       (* NB: [Hfd] is NOT handed over.  The free arm of [fslot] holds no fd
          slots, and the unit the destroyed reference was accounted by is
          exactly what the postcondition returns -- framing it here would
@@ -1140,7 +1151,7 @@ Section ProofFileclose.
         assert (HP3sp : P3 !!! Regidx csp_rs1 = pa_stk sp0 8)
           by (rewrite (HP3cs csp_rs1 ltac:(vm_compute; reflexivity)); exact HH1sp).
         (* the payload IS the pipe end this call closes *)
-        iEval (rewrite /file_core Hpipe bool_decide_eq_true_2; [|reflexivity])
+        iEval (rewrite /file_core_noff Hpipe bool_decide_eq_true_2; [|reflexivity])
           in "Hcore".
         (* the pipe arm's own iref unit REPAYS the loan deposited above: a pipe
            never spent it, so [file_core] still has it and pipeclose has no
@@ -1337,7 +1348,7 @@ Section ProofFileclose.
           iAssert (inode_pay (fp_icv pn) (fp_iq pn) (fp_ig pn) (fp_inum pn)
                      (fc_ip Cf) (fc_type Cf) (fc_wbool Cf) 1)
             with "[Hcore]" as "Hpl".
-          { rewrite /file_core bool_decide_eq_false_2; [|exact Hnpipe].
+          { rewrite /file_core_noff bool_decide_eq_false_2; [|exact Hnpipe].
             rewrite Hib. iExact "Hcore". }
           iApply fupd_wp.
           (* THE GATHER IS INSIDE THE CANCEL (B3).  The cinv parks the
@@ -1749,7 +1760,7 @@ Section ProofFileclose.
              the entry is provisioned for, so closing an untyped file repays
              the loan out of the payload itself -- no [iput] and no pipe. *)
           { iApply iref_slot_frac.
-            rewrite /file_core bool_decide_eq_false_2; [|exact Hnpipe].
+            rewrite /file_core_noff bool_decide_eq_false_2; [|exact Hnpipe].
             rewrite bool_decide_eq_false_2;
               [| intro Hc; apply Hnone; by left].
             rewrite bool_decide_eq_false_2;

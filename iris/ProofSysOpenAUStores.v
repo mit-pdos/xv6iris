@@ -208,7 +208,7 @@ Section ProofSysOpenAUStores.
     fd_frees (pv_ofile (us_V U)) = fd :: l ->
     (tyw = FD_INODE \/ tyw = FD_DEVICE) ->
     (bv_unsigned (di_type dn) = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
-    off_wf voff ->
+    (tyw = FD_INODE -> off_wf voff) ->
     (* ---- the AU side: the omode word is the caller's argument, and the
        two type-dependent cells the block above wrote agree with the record
        (the DEVICE arm's major bound is the join's [bltu], relayed) ---- *)
@@ -258,7 +258,7 @@ Section ProofSysOpenAUStores.
     runit_any (bv_unsigned inum) -∗
     (* the fresh slot, six cells PLAIN and [f->ip] WHOLE *)
     fref_tok gf kf 1 -∗
-    flive_tok gf kf -∗
+    flive_tok kf -∗
     fpay_tok gf kf 1 pn -∗
     a_ftype kf     ↦₄ tyw -∗
     a_freadable kf ↦ₘ rd0 -∗
@@ -267,6 +267,8 @@ Section ProofSysOpenAUStores.
     a_fmajor kf    ↦₂ maj -∗
     a_fip kf       ↦₈ ipold -∗
     a_foff kf      ↦₄ voff -∗
+    (* the off LEDGERS (off-ledger ruling), forwarded to the tail's deposit *)
+    ioff_escrows -∗
     (* the untyped slot's own unit, on its way back to the ledger -- see
        [so_tail_pub]'s row for why the entry ends up owing nothing *)
     iref_slot -∗
@@ -323,7 +325,7 @@ Section ProofSysOpenAUStores.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitinv #Hesck #Hireg #Hslkk Hslkd Hdep Hidev Hiinum
               Hivalid Hflat #Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd Hfwr
-              Hfpip Hfmaj Hfip Hfoff Hiru Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop
+              Hfpip Hfmaj Hfip Hfoff #Hoffs Hiru Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop
               Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP
               H23lo H23hi H24 HP Hobs Htc Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -496,14 +498,13 @@ Section ProofSysOpenAUStores.
     (* ---- the published CONTENT, and the six cells as [file_fields] ---- *)
     set (C := MkFContent tyw (trunc8 (so_rd_word om)) (trunc8 (so_wr_word om))
                 pip (ientry kk) maj).
-    iDestruct (so_ip_split with "Hfip") as "[Hfip1 Hfip2]".
-    iAssert (file_fields kf 1 C) with "[Hfty Hfrd Hfwr Hfpip Hfip1 Hfmaj]"
+    iAssert (file_fields kf 1 C) with "[Hfty Hfrd Hfwr Hfpip Hfip Hfmaj]"
       as "Hflds".
     { rewrite /file_fields /C; cbn [fc_type fc_readable fc_writable fc_pipe
                                     fc_ip fc_major].
       rewrite /a_ftype /a_freadable /a_fwritable /a_fpipe /a_fip /a_fmajor
               /foff_of.
-      iFrame "Hfty Hfrd Hfwr Hfpip Hfip1 Hfmaj". }
+      iFrame "Hfty Hfrd Hfwr Hfpip Hfip Hfmaj". }
     (* the published content's type, in the shape the publication asks for *)
     assert (Hfdty : (fc_type C = FD_INODE /\ t = FdInode (bv_unsigned inum))
                    \/ (fc_type C = FD_DEVICE
@@ -595,7 +596,7 @@ Section ProofSysOpenAUStores.
                 Hsp0 HN6sp HN6thr HN6s1 HN6s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
-                      Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip2 Hfoff
+                      Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff Hoffs
                       Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                       Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                       Harm Hcont"). }
@@ -704,7 +705,7 @@ Section ProofSysOpenAUStores.
                 Hsp0 HN8sp HN8thr HN8s1 HN8s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
-                      Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip2 Hfoff
+                      Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff Hoffs
                       Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                       Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                       Harm Hcont"). }
@@ -931,7 +932,7 @@ Section ProofSysOpenAUStores.
               Hsp0 Hitsp Hitthr Hits1 Hits3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
-                    Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip2 Hfoff
+                    Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff Hoffs
                     Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                     Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                     Harm Hcont").

@@ -2177,6 +2177,9 @@ Section SyscallVocab.
       "( _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2 )".
     iDestruct (sysc_bm_cells with "Hfs") as "(_ & #Hisp & _)".
+    iAssert FsReady.fs_ready as "#Hrdy".
+    { iDestruct "Hfs" as "(_ & _ & _ & _ & $)". }
+    iDestruct (FsReady.fs_ready_ioff with "Hrdy") as "#Hioffs".
     iSplitL "Hsl".
     { rewrite /SpecFileread.fileread_fs_env /sysc_fread_names; cbn.
       (* conjunct by conjunct, not [iFrame]: the tail is [dev_inv] /
@@ -2192,6 +2195,7 @@ Section SyscallVocab.
       iSplitR; [ iExact "Hesc"   |].
       iSplitR; [ iExact "Hireg"  |].
       iSplitR; [ iExact "Hsl2"   |].
+      iSplitR; [ iExact "Hioffs" |].
       iSplitR; [ iExact "Hisp"   |].
       iSplitR; [ iExact "Hdevi"  |].
       iSplitR; [ iExact "Hgeom"  |].
@@ -2354,6 +2358,9 @@ Section SyscallVocab.
       "( _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2 )".
     iDestruct (sysc_bm_cells with "Hfs") as "(#Hbmst & #Hisp & #Hbmr)".
+    iAssert FsReady.fs_ready as "#Hrdy2".
+    { iDestruct "Hfs" as "(_ & _ & _ & _ & $)". }
+    iDestruct (FsReady.fs_ready_ioff with "Hrdy2") as "#Hioffs".
     rewrite /SpecFilewrite.filewrite_fs_env /sysc_fwrite_names; cbn.
     iSplit; [ iPureIntro; exact Hlg |].
     iSplit; [ iPureIntro; exact Hist0 |].
@@ -2376,6 +2383,7 @@ Section SyscallVocab.
     iSplitR; [ iExact "Hesc"   |].
     iSplitR; [ iExact "Hireg"  |].
     iSplitR; [ iExact "Hsl2"   |].
+    iSplitR; [ iExact "Hioffs" |].
     iSplitR; [ iExact "Hisp"   |].
     iSplitR; [ iExact "Hsz"    |].
     iSplitR; [ iExact "Hbmst"  |].
@@ -4921,6 +4929,9 @@ Section SyscallArms.
         #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2 )".
     destruct Hnin as (Hn1 & Hn2 & Hn3 & Hn4).
     iDestruct (sysc_bm_cells with "Hfsenv") as "(#Hbmp & #Hisp & #Hbmr)".
+    iAssert FsReady.fs_ready as "#Hrdy3".
+    { iDestruct "Hfsenv" as "(_ & _ & _ & _ & $)". }
+    iDestruct (FsReady.fs_ready_ioff with "Hrdy3") as "#Hioffs2".
     (* the one fd unit the local [struct file *f] rides in, out of the four *)
     iDestruct (fd_slots_split 1 3 with "Hfd") as "[Hfd0 Hfd]".
     iPoseProof sysc_trap_ext_true as "Htcx".
@@ -4939,7 +4950,7 @@ Section SyscallArms.
               ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hftable Hbio Hlog
                     Hseam Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2
-                    Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
+                    Hioffs2 Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
                     Hfd0 Hpriv Hufrag").
     iIntros (CIDy Hsy mf ns' P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpost".

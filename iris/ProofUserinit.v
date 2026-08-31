@@ -723,7 +723,7 @@ Section ProofUserinit.
     { iPoseProof "Hpersist" as "Hp".
       iEval (rewrite /first_boot_persist) in "Hp".
       iDestruct "Hp" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-                         _ & _ & _ & _ & %Hg)".
+                         _ & _ & _ & _ & %Hg & _)".
       iPureIntro. exact Hg. }
     pose (N := MkUtNames γft γf γw γs j γl pd pav pu
                  γtl

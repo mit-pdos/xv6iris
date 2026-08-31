@@ -1,101 +1,73 @@
-(* FileOff.v -- the BORROW PROTOCOL over [struct file]'s [off] field.
-   Design: claude-notes/design/file-table.md, "`off` -- staged".
+(* FileOff.v -- the off LEDGER's protocol: publish, checkout, checkin.
+   Design: claude-notes/projects/off-ledger.md (design of record until it
+   lands in design/file-table.md).
 
    ---- WHY [off] IS NOT A CONTENT FIELD --------------------------------
 
    Three disciplines govern a [struct file]'s cells and the model keeps them
-   apart (FileInv.v): [ref] is protected by ftable.lock; [type], [readable],
-   [writable], [pipe], [ip] and [major] are immutable while [ref > 0] and so
-   ride with a reference as ordinary points-to FRACTIONS; and [off] is
-   neither.  [off] is MUTABLE, under [ip->lock], by a holder of an
-   arbitrarily small fraction -- fileread does [f->off += r] holding
+   apart (FileInvDefs.v): [ref] is protected by ftable.lock; [type],
+   [readable], [writable], [pipe], [ip] and [major] are immutable while
+   [ref > 0] and so ride with a reference as ordinary points-to FRACTIONS;
+   and [off] is neither.  [off] is MUTABLE, under [ip->lock], by a holder of
+   an arbitrarily small fraction -- fileread does [f->off += r] holding
    whatever share its descriptor happens to have.  A fractional content
    field cannot express that: a write wants fraction one, and the last
    fraction is inside ftable.lock, which fileread never takes.
 
-   So the cell lives in a per-slot invariant and is BORROWED across the
-   instructions that use it.  The two obligations, from the design note:
+   ---- THE LEDGER ------------------------------------------------------
 
-     (a) a holder of ANY positive fraction of the reference, plus the
-         inode's lock, may take the cell out across several instructions;
-     (b) the EXCLUSIVE holder (q = 1) must be able to take it back with NO
-         inode lock at all -- fileclose and sys_open reach [f->off] holding
-         only ftable.lock, or none.
+   So ownership follows the inode: each ITABLE slot [i] carries a permanent
+   per-era invariant, its off LEDGER ([FileInvDefs.ioff_escrow]), whose
+   ghost map records WHICH file slots hold an FD_INODE reference on that
+   inode, and which owns each member's [f->off] cell while it is resident.
+   An FD_INODE reference carries a FRAGMENT of that map at its own fraction
+   ([ioff_ref], inside [file_core]'s inode arm); every other file owns its
+   cell directly ([foff_dead]).
 
-   ---- WHERE THE INVARIANT LIVES, AND WHY IT IS CANCELLABLE ------------
+   The four ownership transfers:
 
-   The definitions -- [off_resident], [off_mark], [off_body], [off_raw],
-   [off_hold] and the [off_wf] bound -- are in FileInvDefs.v, beside
-   [inode_pay], whose discipline they copy one field over.  THIS FILE IS THE
-   PROTOCOL ONLY.
+     ioff_publish   sys_open's FD_INODE arm, under [ip->lock]: deposit the
+                    cell (freshly written 0), mint the fragment.
+     ioff_checkout  fileread/filewrite's FD_INODE arm, under [ip->lock]:
+                    take the cell out across the readi/writei window,
+                    parking the MARKER and one liveness unit.
+     ioff_checkin   the same window's end: the cell comes back (bound
+                    re-proven), the marker and the unit come out.
+     ioff_reclaim   fileclose's last-reference arm, under ftable.lock and
+                    NO inode lock: spend the whole fragment, delete the
+                    entry, take the cell back for the freed slot.  It
+                    needs the liveness AUTHORITY, so it lives in FileInv.v.
 
-   The invariant is CANCELLABLE, AND UNARMED WHILE THE SLOT IS UNTYPED, and
-   that pair is obligation (b)'s whole answer.  A permanent invariant cannot
-   work: sys_open is the table's first WRITER of [f->ip] and [f->off], it
-   holds the exclusive reference with ftable.lock RELEASED, and nothing it
-   can hold refutes a stale checked-out disjunct -- [flive_tok] is
-   fraction-free but composes, and any fractional witness the invariant could
-   park comes back existentially quantified, which is not what its depositor
-   needs (the thirteenth stop, fs-sysfile.md).  So the cinv an UNTYPED slot
-   carries has no disjunction in its body at all, only the two cells: the
-   publisher (sys_open, pipealloc) cancels it at fraction one, writes them
-   with nothing in the way, mints an ARMED one with
-   [FileInvDefs.off_hold_alloc] and records its name in [fpnames] with the
-   same ghost step that installs the payload's.  [fileclose]'s
-   last-reference arm cancels whichever it finds with
-   [FileInv.off_hold_cancel] -- which is where obligation (b) is discharged,
-   by the COUNT, inside the lock, with the authority -- and mints an unarmed
-   one for the free slot it puts back.  A borrower opens the armed cinv at
-   its own fraction, which rides [file_payload] proportionally as
-   [FileInvDefs.off_hold].
+   ---- WHAT MAKES THE ARMS RESOLVE -------------------------------------
 
-   Consequence: there is NO fixed persistent family of off-invariants (a
-   cancelled cinv cannot be re-armed at the same name, and the name changes
-   on every publication), so no environment carries one.  A borrower reads
-   the assertion out of its OWN reference --
-   [SpecFileread.fileread_pay_carve] hands it out beside the inode share.
-   Nothing about the off cell reaches [SpecFilealloc]'s post,
-   [SpecFileclose]'s environment or [FileInvDefs.fslot]: a slot carries its
-   cinv for its whole referenced life.
+   Mutual exclusion between two borrowers of one inode's cells is the
+   exclusivity of THAT INODE'S LOCK, and the ledger can appeal to it
+   directly because it is per-inode: the parked marker is
+   [off_mark (ientry i)] = [i_valid (ientry i) ↦₄ 1], the valid cell only
+   the sleeplock holder has (ilock hands it out at 1; readi/writei/iupdate
+   never touch it).  It is EXCLUSIVE (two full points-tos at one address),
+   ADDRESS-KEYED (no ghost name to fail to match) and CLOSED (pinned at 1,
+   so what a borrower takes back is provably what it parked).  The
+   publisher refutes stale membership the same two ways: a resident arm
+   clashes with the cell it is about to deposit, a checked-out arm clashes
+   with the marker it holds.
 
-   ---- WHAT MAKES (a) WORK ---------------------------------------------
-
-   Mutual exclusion between two borrowers of one slot is the exclusivity of
-   ONE INODE'S LOCK: both would have to hold [ip->lock] for the same [ip].
-   To APPEAL to that, the invariant has to be able to say which inode it is
-   talking about -- a per-slot invariant that only knows [k] cannot, and a
-   borrower then has nothing to contradict a stale checked-out state with.
-   (Two files can name two DIFFERENT inodes, so "some inode's lock is held"
-   is not a contradiction.)
-
-   The body therefore holds, permanently, HALF OF THE [f->ip] CELL.  That is
-   the cheapest possible record -- no ghost, no redundant copy of the
-   pointer, and the arithmetic is invisible outside
-   [FileInvDefs.file_fields] (which holds the ip cell at half the nominal
-   fraction for exactly this reason).  Points-to agreement then hands a
-   reference holder "the invariant's inode is MY inode" for free.
-
-   The MARKER a borrower parks is [off_mark ip] = [i_valid ip ↦₄ 1]:
-
-   * it is EXCLUSIVE and keyed by the INODE'S ADDRESS -- unlike
-     [SleepLock.sleeplocked] / [IcacheEscrow.ic_tok], which are keyed by
-     GHOST NAMES that a second borrower has no way to match;
-   * it is FUNGIBLE -- a checked-out entry's valid cell is pinned at 1
-     ([InodeLock.valid_word true]), so what a borrower takes back on return
-     is provably what it parked.  A slice of the borrower's own points-to
-     fraction is NOT fungible (the invariant hands it back existentially
-     quantified) which is why the marker cannot be one;
-   * and readi / writei / iupdate do not touch [ip->valid], so a borrower
-     can hold it out of ilock's bundle for the whole call. *)
+   The last closer holds neither cell nor lock; what it holds is the COUNT
+   ([flive_tok], the ambient off-borrow liveness counter): at the last
+   reference the authority inside ftable.lock records ONE unit, the closer
+   has it, and the checked-out arm's parked unit would be a second --
+   [FileInv.flive_excl_last].  That refutation reads the authority, so
+   [ioff_reclaim] is FileInv.v's. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions namespaces.
 From iris.algebra Require Import auth gmap frac numbers.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants own cancelable_invariants.
+From iris.base_logic.lib Require Import gen_heap invariants own ghost_map.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.
 Require Import FdSlots.
+Require Import IcacheRef.   (* [ientry] -- the marker's address key *)
 Require Import FileInvDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -110,56 +82,104 @@ Section FileOff.
   Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
-  (*  OBLIGATION (a): the borrow, under the inode's lock                  *)
+  (*  PUBLISH: sys_open's FD_INODE arm, under the inode's lock            *)
   (* ------------------------------------------------------------------ *)
 
-  (* CHECK OUT.  The [a_fip] share is only READ (agreement does not consume
-     it) and comes straight back: it is the borrower's proof that the
-     invariant's inode is the one whose lock it holds.  What is surrendered
-     is the marker and one liveness unit.  The cinv token is likewise only
-     an opening credential and comes back untouched -- which is what lets a
-     borrower hand its whole [file_ref] back at the SAME fraction. *)
-  Lemma off_checkout (γ γx : gname) (k : nat) (qc : Qp) (dq : dfrac)
-      (ip : mword 64) (E : coPset) :
-    ↑(offN .@ k) ⊆ E ->
-    off_hold γ k γx true qc -∗ a_fip k ↦₈{dq} ip -∗ off_mark ip -∗
-    flive_tok γ k ={E}=∗
-    off_hold γ k γx true qc ∗ a_fip k ↦₈{dq} ip ∗
-    ∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝.
+  (* The marker is only the REFUTATION CREDENTIAL here (a stale checked-out
+     arm would clash with it) and comes straight back; what is surrendered
+     is the cell.  [k ∉ dom S] is not a premise -- the publisher PROVES it,
+     from its own cell against the resident arm and its own marker against
+     the checked-out one, which is exactly why membership needs no global
+     bookkeeping. *)
+  Lemma ioff_publish (E : coPset) (i k : nat) (v : mword 32) :
+    ↑(offN .@ i) ⊆ E ->
+    off_wf v ->
+    ioff_escrow i -∗ off_mark (ientry i) -∗ a_foff k ↦₄ v ={E}=∗
+    off_mark (ientry i) ∗ ioff_frag i k 1.
   Proof.
-    iIntros (HE) "[#Hinv Hoc] Hip Hmk Hlv".
-    iMod (cinv_acc _ _ _ _ _ HE with "Hinv Hoc") as "(>Hbody & Hoc & Hclose)".
-    iDestruct "Hbody" as (ip') "[Hip' Hd]".
-    iDestruct (ctx_word_pointsto_agree with "Hip Hip'") as %<-.
-    iDestruct "Hd" as "[Hres | [Hmk' _]]"; last first.
-    { iExFalso. iApply (word4_pointsto_excl with "Hmk Hmk'"). }
-    iDestruct "Hres" as (v) "[Hc %Hwf]".
-    iMod ("Hclose" with "[Hip' Hmk Hlv]") as "_".
-    { iApply bi.later_intro. iExists ip. iFrame "Hip'". iRight. iFrame. }
-    iModIntro. iFrame "Hinv Hoc Hip". iExists v. iFrame. done.
+    iIntros (HE Hwf) "#Hinv Hmk Hc".
+    rewrite /ioff_escrow.
+    iMod (inv_acc with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as ">(%S & Ha & Hslots)".
+    destruct (S !! k) as [[]|] eqn:HSk.
+    { (* stale membership: both arms clash *)
+      assert (Hdom : k ∈ dom S) by (apply elem_of_dom; by rewrite HSk).
+      iDestruct (big_sepS_elem_of _ _ k Hdom with "Hslots") as "Hk".
+      rewrite /ioff_slot_res.
+      iDestruct "Hk" as "[Hres | [Hmk' _]]".
+      - iDestruct "Hres" as (v') "[Hc' _]".
+        iExFalso. iApply (word4_pointsto_excl with "Hc Hc'").
+      - iExFalso. rewrite /off_mark.
+        iApply (word4_pointsto_excl with "Hmk Hmk'"). }
+    iMod (ghost_map_insert k () HSk with "Ha") as "[Ha Hfrag]".
+    assert (Hnk : k ∉ dom S) by (by apply not_elem_of_dom).
+    iMod ("Hclose" with "[Ha Hslots Hc]") as "_".
+    { iApply bi.later_intro. iExists (<[k := ()]> S). iFrame "Ha".
+      rewrite dom_insert_L (big_sepS_insert _ _ _ Hnk).
+      iFrame "Hslots". iLeft. iExists v. iFrame. done. }
+    iModIntro. iFrame "Hmk". rewrite /ioff_frag. iExact "Hfrag".
   Qed.
 
-  (* CHECK IN.  Holding the cell refutes the resident disjunct, so what
-     comes back is the marker -- at the SAME value, [off_mark] being closed
-     -- and the liveness unit. *)
-  Lemma off_checkin (γ γx : gname) (k : nat) (qc : Qp) (dq : dfrac)
-      (ip : mword 64) (v : mword 32) (E : coPset) :
-    ↑(offN .@ k) ⊆ E ->
-    off_wf v ->
-    off_hold γ k γx true qc -∗ a_fip k ↦₈{dq} ip -∗ a_foff k ↦₄ v
+  (* ------------------------------------------------------------------ *)
+  (*  CHECKOUT / CHECKIN: the borrow, under the inode's lock              *)
+  (* ------------------------------------------------------------------ *)
+
+  (* CHECK OUT.  The fragment proves membership (so the big-op HAS a slot
+     for [k]); the marker refutes a stale checked-out arm; marker and one
+     liveness unit are parked and the cell comes out, [off_wf] riding it.
+     The fragment itself comes straight back -- it is only the membership
+     witness -- which is what lets a borrower hand its whole [file_ref]
+     back at the SAME fraction. *)
+  Lemma ioff_checkout (E : coPset) (i k : nat) (q : Qp) :
+    ↑(offN .@ i) ⊆ E ->
+    ioff_escrow i -∗ ioff_frag i k q -∗ off_mark (ientry i) -∗ flive_tok k
     ={E}=∗
-    off_hold γ k γx true qc ∗ a_fip k ↦₈{dq} ip ∗ off_mark ip ∗ flive_tok γ k.
+    ioff_frag i k q ∗ ∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝.
   Proof.
-    iIntros (HE Hwf) "[#Hinv Hoc] Hip Hc".
-    iMod (cinv_acc _ _ _ _ _ HE with "Hinv Hoc") as "(>Hbody & Hoc & Hclose)".
-    iDestruct "Hbody" as (ip') "[Hip' Hd]".
-    iDestruct (ctx_word_pointsto_agree with "Hip Hip'") as %<-.
-    iDestruct "Hd" as "[Hres | [Hmk Hlv]]".
+    iIntros (HE) "#Hinv Hfrag Hmk Hlv".
+    rewrite /ioff_escrow.
+    iMod (inv_acc with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as ">(%S & Ha & Hslots)".
+    iDestruct (ghost_map_lookup with "Ha Hfrag") as %HSk.
+    assert (Hdom : k ∈ dom S) by (apply elem_of_dom; by rewrite HSk).
+    iDestruct (big_sepS_delete _ _ k Hdom with "Hslots") as "[Hk Hrest]".
+    rewrite {1}/ioff_slot_res.
+    iDestruct "Hk" as "[Hres | [Hmk' _]]"; last first.
+    { iExFalso. rewrite /off_mark.
+      iApply (word4_pointsto_excl with "Hmk Hmk'"). }
+    iDestruct "Hres" as (v) "[Hc %Hwf]".
+    iMod ("Hclose" with "[Ha Hrest Hmk Hlv]") as "_".
+    { iApply bi.later_intro. iExists S. iFrame "Ha".
+      rewrite (big_sepS_delete _ _ k Hdom).
+      iFrame "Hrest". iRight. iFrame. }
+    iModIntro. iFrame "Hfrag". iExists v. iFrame. done.
+  Qed.
+
+  (* CHECK IN.  Holding the cell refutes the resident arm, so what comes
+     back is the marker -- at the SAME value, [off_mark] being closed --
+     and the liveness unit. *)
+  Lemma ioff_checkin (E : coPset) (i k : nat) (q : Qp) (v : mword 32) :
+    ↑(offN .@ i) ⊆ E ->
+    off_wf v ->
+    ioff_escrow i -∗ ioff_frag i k q -∗ a_foff k ↦₄ v ={E}=∗
+    ioff_frag i k q ∗ off_mark (ientry i) ∗ flive_tok k.
+  Proof.
+    iIntros (HE Hwf) "#Hinv Hfrag Hc".
+    rewrite /ioff_escrow.
+    iMod (inv_acc with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as ">(%S & Ha & Hslots)".
+    iDestruct (ghost_map_lookup with "Ha Hfrag") as %HSk.
+    assert (Hdom : k ∈ dom S) by (apply elem_of_dom; by rewrite HSk).
+    iDestruct (big_sepS_delete _ _ k Hdom with "Hslots") as "[Hk Hrest]".
+    rewrite {1}/ioff_slot_res.
+    iDestruct "Hk" as "[Hres | [Hmk Hlv]]".
     { iDestruct "Hres" as (v') "[Hc' _]".
       iExFalso. iApply (word4_pointsto_excl with "Hc Hc'"). }
-    iMod ("Hclose" with "[Hip' Hc]") as "_".
-    { iApply bi.later_intro. iExists ip. iFrame "Hip'". iLeft. iExists v. iFrame. done. }
-    iModIntro. iFrame "Hinv Hoc". iFrame.
+    iMod ("Hclose" with "[Ha Hrest Hc]") as "_".
+    { iApply bi.later_intro. iExists S. iFrame "Ha".
+      rewrite (big_sepS_delete _ _ k Hdom).
+      iFrame "Hrest". iLeft. iExists v. iFrame. done. }
+    iModIntro. iFrame.
   Qed.
 
 End FileOff.

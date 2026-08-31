@@ -28,7 +28,7 @@
    at [max = ((MAXOPBLOCKS-1-1-2)/2)*BSIZE = 3072] bytes, so writei's joint
    numeric premise is a CLOSED fact inside filewrite's own proof
    ([SpecFilewrite]'s [fw_chunk_joint]: [n1 <= 3072] by construction and
-   [off <= MAXFILE*BSIZE] by [FileOff.off_wf]) rather than something passed
+   [off <= MAXFILE*BSIZE] by [FileInvDefs.off_wf]) rather than something passed
    up.  fs-sysfile S3f banked exactly this: sys_write may take [n] straight
    from user input where sys_read cannot.
 

@@ -171,7 +171,7 @@ Section ProofSysOpenAUPub.
        directions ([so_stores_au]'s [Htd]/[Hti]), because the AU's [t] is
        read off the same test. *)
     (fc_type C = FD_INODE -> bv_unsigned (di_type dn) <> FsImg.T_DEVICE_z) ->
-    off_wf voff ->
+    (fc_type C = FD_INODE -> off_wf voff) ->
     (* ---- the AU side: the omode word IS the caller's argument, and the
        descriptor's type is the one the published content names ---- *)
     om = arg_int32 vom ->
@@ -212,11 +212,13 @@ Section ProofSysOpenAUPub.
     runit_any (bv_unsigned inum) -∗
     (* the six raw pieces the walk carries across the tail *)
     fref_tok gf kf 1 -∗
-    flive_tok gf kf -∗
+    flive_tok kf -∗
     file_fields kf 1 C -∗
     fpay_tok gf kf 1 pn -∗
-    a_fip kf ↦₈{DfracOwn (1/2)} (ientry kk) -∗
     a_foff kf ↦₄ voff -∗
+    (* the off LEDGERS (off-ledger ruling): [ProofSysOpenParts.so_deposit]
+       runs here, under the lock, before iunlock spends the valid cell *)
+    ioff_escrows -∗
     (* THE UNTYPED SLOT'S OWN UNIT, released when [so_open_slot] took the
        reference apart and handed straight back to the ledger here: the
        publication below parks the walk's inode in this same entry, so the
@@ -271,11 +273,16 @@ Section ProofSysOpenAUPub.
            HMs1 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitinv #Hesck #Hslkk Hslkd Hdep Hidev Hiinum Hivalid
-              Hload #Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip Hfoff
+              Hload #Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff #Hoffs
               Hiru Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl
               Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Harm Hcont".
     iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
+    (* ---- THE LEDGER DEPOSIT, under the lock (off-ledger ruling) ---- *)
+    iApply fupd_wp.
+    iMod (so_deposit ⊤ kk kf C voff ltac:(solve_ndisj) Hkk Hip Hwf
+            with "Hoffs Hivalid Hfoff") as "[Hivalid Hcoff]".
+    iModIntro.
     iApply (Tails.so_tail_s (CID0 := CID0) gs jx gl pd pav pu
               gil gisl kk s gy inum dn bm
               (mword_of_int (Z.of_nat fd) : mword 64) u pidv (DfracOwn (1/4))
@@ -287,7 +294,7 @@ Section ProofSysOpenAUPub.
                     Hload Hshot Hfrz Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3
                     Hf4
                     Hf5 Hf6 HbP H23 H24
-                    [Hkeep Hru Hfref Hflive Hflds Hfpn Hfip Hfoff Hiru Hcback Howe
+                    [Hkeep Hru Hfref Hflive Hflds Hfpn Hcoff Hiru Hcback Howe
                      Hsbb Hsbi Hbsl Hisl Hfds Hfrag Hauth Harm Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
@@ -300,12 +307,11 @@ Section ProofSysOpenAUPub.
     destruct (so_rd_byte_bool om) as [rb Hrdb].
     destruct (so_wr_byte_bool om) as [wb Hwdb].
     iApply fupd_wp.
-    iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn om voff rb wb
-            ltac:(solve_ndisj) ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb
+    iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn om rb wb
+            ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb
             ltac:(rewrite Hrdw; exact Hrdb) ltac:(rewrite Hwrb; exact Hwdb)
             Hdir Hdvw
-            Hwf
-            with "Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hfip Hfoff")
+            with "Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hcoff")
       as (stpub) "[%Hokpub Href]".
     (* the descriptor's ghost state: the file is FD_INODE or FD_DEVICE, so
        the descriptor sys_open returns is OPEN at that type -- [stpub] is the

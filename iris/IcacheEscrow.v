@@ -2100,7 +2100,7 @@ Section IcacheEscrow.
      step, [apply _] only at the leaves.  One monolithic [apply _] over an
      arm backtracks across the whole ∃/∗ tower: 2-3 s each, ~11 s of this
      file, for facts whose every leaf instance already exists.  Same rule as
-     [FileOff.off_body_timeless]; see optimization.md.
+     [FileInvDefs.ioff_body_timeless]; see optimization.md.
 
      THE DISPATCH MUST BE SYNTACTIC, i.e. a [lazymatch] on the goal and NOT
      a [first [apply bi.sep_timeless | …]].  [apply] unifies up to delta, so

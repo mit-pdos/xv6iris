@@ -218,6 +218,8 @@ Section ProofSysOpenAUAlloc.
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     ireg_open -∗
+    (* the off LEDGERS (off-ledger ruling), rode down to the deposit *)
+    ioff_escrows -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ic_tx_dep fsc_ic kk s icfg_dev inum gy -∗
@@ -285,7 +287,7 @@ Section ProofSysOpenAUAlloc.
     assert (Hu2 : (2 <= u)%nat) by (revert Hiu; unfold iput_units; lia).
 
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpe #Hftab #Hbio #Hlog
-              Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep
+              Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hoffs #Hslkk Hslkd Hdep
               Hidev Hiinum Hivalid Hflat #Hshot Hfrz Hkeep Hru Hpriv #Hprocs #Hdev #Hgeo
               #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
               HbP H23lo H23hi H24 HP Hobs Htc Hcont".
@@ -651,8 +653,8 @@ Section ProofSysOpenAUAlloc.
       by (rewrite HM4s3; exact Hfdv).
     (* ---- THE FRESH SLOT, OPENED: six cells plain, [f->ip] WHOLE ---- *)
     iApply fupd_wp.
-    iMod (so_open_slot ⊤ gf kf ltac:(solve_ndisj) with "Href")
-      as (Cf pn voff) "(%Hty0 & %Hwf & Hiru & Hfref & Hflive & Hfpn & Hfty
+    iMod (so_open_slot ⊤ gf kf with "Href")
+      as (Cf pn voff) "(%Hty0 & Hiru & Hfref & Hflive & Hfpn & Hfty
                         & Hfrd & Hfwr & Hfpip & Hfmaj & Hfip & Hfoff)".
     iModIntro.
     (* the loan is not spent on this arm -- the file is about to be PUBLISHED,
@@ -838,7 +840,8 @@ Section ProofSysOpenAUAlloc.
                 (FdDevice (bv_unsigned (di_major dn)))
                 HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl
-                Hlkempty Hkf Hfdlt Hlen Hfrees (or_intror eq_refl) Hdir Hwf
+                Hlkempty Hkf Hfdlt Hlen Hfrees (or_intror eq_refl) Hdir
+                (so_wf_dev voff)
                 Hom
                 ltac:(intros _;
                       exact (conj eq_refl
@@ -849,7 +852,7 @@ Section ProofSysOpenAUAlloc.
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hireg Hslkk Hslkd Hdep Hidev Hiinum
                       Hivalid Hflat Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd
-                      Hfwr Hfpip Hfmaj Hfip Hfoff Hiru Hcore Howe Hprocs Hdev Hgeo
+                      Hfwr Hfpip Hfmaj Hfip Hfoff Hoffs Hiru Hcore Howe Hprocs Hdev Hgeo
                       Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4
                       Hf5 Hf6 HbP H23lo H23hi H24 HP Hobs Htc Hcont"). }
     (* ---- not a device: the FD_INODE pair ---- *)
@@ -947,7 +950,8 @@ Section ProofSysOpenAUAlloc.
               data vom pl P Pmiss Φo Φt (FdInode (bv_unsigned inum))
               HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
               Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty
-              Hkf Hfdlt Hlen Hfrees (or_introl eq_refl) Hdir off_wf_zero
+              Hkf Hfdlt Hlen Hfrees (or_introl eq_refl) Hdir
+              (fun _ => off_wf_zero)
               Hom
               ltac:(intros Hq; exfalso; exact (Hndz Hq))
               ltac:(intros _; split; reflexivity)
@@ -955,7 +959,7 @@ Section ProofSysOpenAUAlloc.
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                     Hitinv Hesck Hireg Hslkk Hslkd Hdep Hidev Hiinum
                     Hivalid Hflat Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd
-                    Hfwr Hfpip Hfmaj Hfip Hfoff Hiru Hcore Howe Hprocs Hdev Hgeo
+                    Hfwr Hfpip Hfmaj Hfip Hfoff Hoffs Hiru Hcore Howe Hprocs Hdev Hgeo
                     Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4
                     Hf5 Hf6 HbP H23lo H23hi H24 HP Hobs Htc Hcont").
   Qed.

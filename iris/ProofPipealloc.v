@@ -1591,34 +1591,28 @@ Section ProofPipealloc.
        authority.  Both [file_pay]s are built HERE, at their FINAL contents,
        because the payload is a function of the content and nothing between
        here and the epilogue can touch it. *)
-    (* R-open-1b: an untyped slot's payload is [emp] BESIDE the off-borrow
-       cinv's assertion and token, which are what its [off] cell and the
-       other half of its [ip] cell live in.  A pipe never touches either, so
-       the cinv stays UNARMED and pipealloc has no ghost step to perform on
-       it -- it only has to keep the name when it overwrites [fpnames]. *)
-    (* the untyped file's payload IS the entry's iref unit ([file_core_none]);
-       retyping to FD_PIPE moves it into the pipe arm, so it is NOT dropped. *)
-    iDestruct "Hpay0" as (pn0) "(_ & Hpn0 & Hiru0 & Hoh0)".
-    iEval (rewrite (file_core_none 1 pn0 Cf0 Hk0ty)) in "Hiru0".
-    iDestruct "Hpay1" as (pn1) "(_ & Hpn1 & Hiru1 & Hoh1)".
-    iEval (rewrite (file_core_none 1 pn1 Cf1 Hk1ty)) in "Hiru1".
-    iEval (rewrite (file_armed_none Cf0 Hk0ty)) in "Hoh0".
-    iEval (rewrite (file_armed_none Cf1 Hk1ty)) in "Hoh1".
+    (* off-ledger ruling: an untyped slot's payload is the entry's iref
+       unit BESIDE the dead [f->off] cell ([file_core_none]).  A pipe never
+       touches the cell, so it simply rides into the pipe arm's own
+       [foff_dead] -- pipealloc still has no off-side ghost step. *)
+    iDestruct "Hpay0" as (pn0) "(_ & Hpn0 & Hiru0 & Hoffd0)".
+    iEval (rewrite (file_core_noff_none 1 pn0 Cf0 Hk0ty)) in "Hiru0".
+    iEval (rewrite (file_core_off_none k0 1 Cf0 Hk0ty)) in "Hoffd0".
+    iDestruct "Hpay1" as (pn1) "(_ & Hpn1 & Hiru1 & Hoffd1)".
+    iEval (rewrite (file_core_noff_none 1 pn1 Cf1 Hk1ty)) in "Hiru1".
+    iEval (rewrite (file_core_off_none k1 1 Cf1 Hk1ty)) in "Hoffd1".
     iMod (fpay_tok_update γf k0 pn0
-            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn0)
-               (fp_inum pn0))
+            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_inum pn0))
             with "Hpn0") as "Hpn0".
     iMod (fpay_tok_update γf k1 pn1
-            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn1)
-               (fp_inum pn1))
+            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_inum pn1))
             with "Hpn1") as "Hpn1".
     iAssert (file_pay_st γf k0 1
                (MkFContent FD_PIPE (mword_of_int 1 : mword 8)
                   (mword_of_int 0 : mword 8) pi
                   (fc_ip Cf0) (fc_major Cf0)) (FdOpen true false FdPipe))
-      with "[Hpn0 Hrd Hiru0 Hoh0]" as "Hpay0".
-    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn0)
-                 (fp_inum pn0)).
+      with "[Hpn0 Hrd Hiru0 Hoffd0]" as "Hpay0".
+    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_inum pn0)).
       (* the retype IS the descriptor's state change: a pipe end reports
          [FdOpen r w FdPipe] at the flags it stores, and [fp_inum] is
          meaningless on this arm *)
@@ -1629,26 +1623,22 @@ Section ProofPipealloc.
          "[iPureIntro. done.] on a goal you can read at a glance". *)
       iSplitR; [iPureIntro; exact (conj eq_refl (conj eq_refl eq_refl))|].
       iFrame "Hpn0".
-      rewrite /file_payload /file_core /fc_wbool;
+      rewrite /file_core /file_core_noff /file_core_off /fc_wbool;
         cbn [fc_type fc_pipe fc_writable].
       rewrite bool_decide_eq_true_2; [|reflexivity].
+      rewrite bool_decide_eq_false_2; [|by vm_compute].
       rewrite (_ : negb (eq_vec (mword_of_int 0 : mword 8) (mword_of_int 0 : mword 8))
                    = false); [|vm_compute; reflexivity].
-      rewrite (file_armed_pipe
-                 (MkFContent FD_PIPE (mword_of_int 1 : mword 8)
-                    (mword_of_int 0 : mword 8) pi (fc_ip Cf0) (fc_major Cf0))
-                 ltac:(reflexivity)).
-      cbn [fp_lock fp_pipe fp_ocv].
+      cbn [fp_lock fp_pipe].
       iSplitL "Hrd Hiru0";
         [iSplitR; [iExact "Hpipe" | iSplitL "Hrd"; [iExact "Hrd" | iExact "Hiru0"]]
-        | iExact "Hoh0"]. }
+        | iExact "Hoffd0"]. }
     iAssert (file_pay_st γf k1 1
                (MkFContent FD_PIPE (mword_of_int 0 : mword 8)
                   (mword_of_int 1 : mword 8) pi
                   (fc_ip Cf1) (fc_major Cf1)) (FdOpen false true FdPipe))
-      with "[Hpn1 Hwr Hiru1 Hoh1]" as "Hpay1".
-    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn1)
-                 (fp_inum pn1)).
+      with "[Hpn1 Hwr Hiru1 Hoffd1]" as "Hpay1".
+    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_inum pn1)).
       (* NOT [by split]: the goal is three [eq_refl]s between concrete
          mwords, but [done] ends in a no-argument [discriminate], which
          head-normalises every hypothesis type in a whole-function
@@ -1656,19 +1646,16 @@ Section ProofPipealloc.
          "[iPureIntro. done.] on a goal you can read at a glance". *)
       iSplitR; [iPureIntro; exact (conj eq_refl (conj eq_refl eq_refl))|].
       iFrame "Hpn1".
-      rewrite /file_payload /file_core /fc_wbool;
+      rewrite /file_core /file_core_noff /file_core_off /fc_wbool;
         cbn [fc_type fc_pipe fc_writable].
       rewrite bool_decide_eq_true_2; [|reflexivity].
+      rewrite bool_decide_eq_false_2; [|by vm_compute].
       rewrite (_ : negb (eq_vec (mword_of_int 1 : mword 8) (mword_of_int 0 : mword 8))
                    = true); [|vm_compute; reflexivity].
-      rewrite (file_armed_pipe
-                 (MkFContent FD_PIPE (mword_of_int 0 : mword 8)
-                    (mword_of_int 1 : mword 8) pi (fc_ip Cf1) (fc_major Cf1))
-                 ltac:(reflexivity)).
-      cbn [fp_lock fp_pipe fp_ocv].
+      cbn [fp_lock fp_pipe].
       iSplitL "Hwr Hiru1";
         [iSplitR; [iExact "Hpipe" | iSplitL "Hwr"; [iExact "Hwr" | iExact "Hiru1"]]
-        | iExact "Hoh1"]. }
+        | iExact "Hoffd1"]. }
     (* +0x54 load the file pointer, +0x56 store the field *)
     assert (Hld54 : pf0 = add_vec (mH !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 0 : mword 12))).
     { rewrite (_ : mH !!! Regidx Rs1 = pf0); [symmetry; apply addv_sext0 | assumption]. }

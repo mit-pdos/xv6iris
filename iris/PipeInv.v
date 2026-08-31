@@ -4,7 +4,7 @@
    pipealloc / pipeclose / pipewrite need.
 
    The geometry, reference algebra, and [is_pipe] well-formedness predicate
-   that everything ELSE (starting with [FileInv]'s [file_payload]) needs to
+   that everything ELSE (starting with [FileInvDefs]' [file_core]) needs to
    merely HOLD a pipe reference now live in PipeInvDefs.v.  This file is that
    Defs file plus the page-carving/bitvector machinery below it, split out so
    the latter -- needed only by the four proofs above -- compiles IN PARALLEL

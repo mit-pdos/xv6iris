@@ -146,4 +146,17 @@ Class fscfg := MkFscfg {
   fsc_bmapstart : Z;
   fsc_size      : Z;
   fsc_ninodes   : Z;
+  (* THE OFF LEDGER's two names (claude-notes/projects/off-ledger.md): the
+     per-inode-slot ghost maps tracking WHICH file slots refer to each
+     inode ([fsc_foff], a family over the itable slot exactly as
+     [icfg_isl] is), and the off-borrow liveness counter's gname
+     ([fsc_fol] -- it used to be the third component of the file table's
+     own [γf], and moved here so that the ledger invariants
+     ([FileInvDefs.ioff_escrow]) can be γf-FREE and hence ride
+     [FsReady.fs_ready] as an ambient persistent conjunct).  Ambient for
+     [fsc_ireg]'s reason: the fragments ride [FileInvDefs.file_core]'s
+     FD_INODE arm, i.e. every predicate that mentions a file reference,
+     so a threaded name would enter the whole descriptor surface. *)
+  fsc_fol       : gname;
+  fsc_foff      : nat -> gname;
 }.

@@ -24,7 +24,7 @@
    * the TYPE is read out of the reference's own content fraction, so the
      loaded word IS [fc_type Cf] and taking a branch is the Coq fact
      [fc_type Cf = FD_PIPE] (resp. FD_DEVICE, FD_INODE).  Rewriting that
-     reduces [FileInv.file_payload] -- a FUNCTION of the content -- to
+     reduces [FileInvDefs.file_core] -- a FUNCTION of the content -- to
      exactly the credential the arm's callee wants.  No ghost state tells a
      pipe from an inode; fileread learns the type by reading it.
 
@@ -38,12 +38,12 @@
      call goes through [WpSconfCtl.wp_cjalr_s_sconf].
 
    * FD_INODE: ilock's post is peeled for [IcacheEscrow.ic_loaded], whose
-     [i_valid ip ↦₄ 1] conjunct IS [FileOff.off_mark ip] -- the borrow marker.
-     [FileOff.off_checkout] trades it (plus the [a_fip] share out of
-     [FileInv.file_fields], which the invariant permanently holds the other
-     half of, and one [flive_tok]) for the [f->off] cell; readi runs; the
+     [i_valid ip ↦₄ 1] conjunct IS the borrow MARKER
+     ([FileInvDefs.off_mark], off-ledger ruling).  [FileOff.ioff_checkout]
+     trades it (plus the payload's ledger fragment and one [flive_tok]) for
+     the [f->off] cell out of the inode's LEDGER; readi runs; the
      [c.addw]/[c.sw] pair advances it, [SpecFileread.fileread_off_advance]
-     keeps [off_wf]; [off_checkin] gives the marker back; the bundle is
+     keeps [off_wf]; [ioff_checkin] gives the marker back; the bundle is
      rebuilt and iunlock takes it.
 
    THE PID QUARTER.  ilock and iunlock each want [p_pid pj ↦₄{dq} pidv]
@@ -199,7 +199,7 @@ Proof.
 Qed.
 
 (* [off + n < 2^31] from a bound on [off] and the contract's premise on [n] --
-   the whole reason [FileOff.off_wf] exists. *)
+   the whole reason [FileInvDefs.off_wf] exists. *)
 (* READI'S JOINT BOUND, and it is 32-bit.  The contract no longer carries
    [MAXFILE*BSIZE + n < 2^31]; what it has is [n < 2^31], and the offset is
    inside the file by [off_wf], so the sum is under 274432 + 2^31 < 2^32 --
@@ -1039,12 +1039,12 @@ Section ProofFileread.
       + (* ============================ FD_PIPE ====================
            The branch read [f->type] out of the reference's OWN content
            fraction, so [Hp1] is the Coq fact [fc_type Cf = FD_PIPE], and
-           [FileInv.file_payload] -- a function of the content -- reduces to
+           [FileInvDefs.file_core] -- a function of the content -- reduces to
            exactly piperead's premise pair. *)
         assert (Htyp : fc_type Cf = FD_PIPE)
           by (apply eq_vec_true_iff; exact Hp1).
         iDestruct "Hrpay" as (pn) "(%Hstp & Hpn & Hpl)".
-        iEval (rewrite /file_payload /file_core Htyp bool_decide_eq_true_2;
+        iEval (rewrite /file_core /file_core_noff Htyp bool_decide_eq_true_2;
                [| reflexivity]) in "Hpl".
         (* the entry's iref unit rides the pipe arm now ([file_core]); it is
            not piperead's business, so it stays here and goes back below. *)
@@ -1249,7 +1249,7 @@ Section ProofFileread.
         { rewrite /file_ref /file_fields /file_pay_st.
           iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrlv".
           iExists pn. iSplitR; [iPureIntro; exact Hstp|]. iFrame "Hpn".
-          rewrite /file_payload /file_core Htyp bool_decide_eq_true_2;
+          rewrite /file_core /file_core_noff Htyp bool_decide_eq_true_2;
             [| reflexivity].
           iFrame "Hpipe Hpref Hiru Hoh". }
         { by iApply fileread_env_out_of_env. }
@@ -1964,7 +1964,7 @@ Section ProofFileread.
              rewrite /fileread_fs_env.
              iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
                                    #Hbio & #Hitbl & #Hescs &
-                                   #Hireg & #Hslks & Hsb &
+                                   #Hireg & #Hslks & #Hoffs & Hsb &
                                    #Hdevi & #Hdgeom & #Hdlock & Hbslot)".
              (* ---- THE CARVE (fs-sysfile S4', blocker 2's ratified
                 alternative; ProofFilestat is the landed instance).  The
@@ -1977,9 +1977,12 @@ Section ProofFileread.
                 of the off FAMILY by the slot THIS CONTRACT names. ---- *)
              iDestruct (fileread_pay_carve γf k q Cf _ (or_introl Htyi)
                           with "Hrpay")
-               as (ikk inm ssh gsh ty0 γox)
+               as (ikk inm ssh gsh ty0)
                   "(%Hipk & %Hik & %Hinlt & %Hnd0 & %Hdv0 & #Hshot0 & Hshr0 &
                     Hoh & Hpayback)".
+             (* the off output IS the ledger fragment on this arm *)
+             iEval (rewrite (carve_off_inode _ _ _ _ Htyi)) in "Hoh".
+             iDestruct (ioff_escrows_acc ikk Hik with "Hoffs") as "#Hoesc".
              assert (Hibcov : IBLOCK inm icfg_ist ∈ fsc_cov)
                by (apply Hgeo; exact Hinlt).
              iDestruct (ic_escrows_acc2
@@ -2155,7 +2158,7 @@ Section ProofFileread.
                exact (HI2thr c Hcs N2 N8 N9 N18 N19). }
              (* ---- PEEL the checked-out bundle.  The valid cell is no longer
                     inside it (SpecIlock v2 hands it out beside the content)
-                    and it IS [FileOff.off_mark], the borrow marker.  The
+                    and it IS [FileInvDefs.off_mark], the borrow marker.  The
                     cells arrive addressed by SLOT; the file layer speaks the
                     [ip] its own [f->ip] cell holds. ---- *)
              (* ---- THE READ ARM (durable-fs-plan.md section 3, [ilock]
@@ -2190,17 +2193,18 @@ Section ProofFileread.
              iEval (rewrite -Hipk) in "Hmeta".
              iEval (rewrite -Hipk) in "Haddrs".
              iEval (rewrite -Hipk) in "Hidev".
-             iAssert (i_valid (fc_ip Cf) ↦₄ (mword_of_int 1 : mword 32))%I
-               with "[Hvalid]" as "Hvalid"; [rewrite Hipk; iExact "Hvalid" |].
              iAssert (inode_map_q fsc_fs (DfracOwn (1/4)) (fc_ip Cf) bml)
                with "[Haddrs Hindres]" as "Hmap".
              { rewrite /inode_map_q. iFrame. }
-             (* ---- CHECK OUT the offset cell ---- *)
+             (* ---- CHECK OUT the offset cell, from the inode's LEDGER
+                    (off-ledger ruling): the fragment proves membership, the
+                    valid cell -- ilock's, at the slot the payload named --
+                    is the marker, and one liveness unit is parked. ---- *)
              iApply fupd_wp.
-             iEval (rewrite -off_mark_acc) in "Hvalid".
-             iMod (off_checkout γf γox k q (DfracOwn (q/2)) (fc_ip Cf) ⊤
-                     ltac:(solve_ndisj) with "Hoh Hcip Hvalid Hrlv")
-               as "(Hoh & Hcip & Hoffc)".
+             iMod (ioff_checkout ⊤ ikk k q ltac:(solve_ndisj)
+                     with "Hoesc Hoh [Hvalid] Hrlv")
+               as "(Hoh & Hoffc)".
+             { rewrite /off_mark. iExact "Hvalid". }
              iModIntro.
              iDestruct "Hoffc" as (v) "[Hoff %Hwf]".
              pose proof (bv_unsigned_in_range _ v) as Hvr.
@@ -2504,17 +2508,16 @@ Section ProofFileread.
                 iEval (rewrite Htgt54) in "Hpc".
                 (* CHECK IN the cell, at the value it went out with *)
                 iApply fupd_wp.
-                iMod (off_checkin γf γox k q (DfracOwn (q/2)) (fc_ip Cf) v ⊤
-                        ltac:(solve_ndisj) Hwf with "Hoh Hcip Hoff")
-                  as "(Hoh & Hcip & Hvalid & Hrlv)".
+                iMod (ioff_checkin ⊤ ikk k q v ltac:(solve_ndisj) Hwf
+                        with "Hoesc Hoh Hoff")
+                  as "(Hoh & Hvalid & Hrlv)".
                 iModIntro.
                 (* ---- THE READ ARM COMES HOME (B''-join).  readi changed
                    no byte, so the quarter goes back exactly as it came out
                    and the escrow re-forms the payload against its own
                    residue; the pure clauses never left the arm. ---- *)
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
-                  with "[Hvalid]" as "Hvalid";
-                  [rewrite -Hipk -off_mark_acc; iExact "Hvalid" |].
+                  with "[Hvalid]" as "Hvalid"; [iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".
                 iDestruct "Hmap" as "[Haddrs Hindres]".
                 iEval (rewrite Hipk) in "Haddrs".
@@ -2613,6 +2616,7 @@ Section ProofFileread.
                 iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp
  inm gsh with "Hkeep Hrefout") as "Hshr".
                 iEval (rewrite Qp.div_2) in "Hshr".
+                iEval (rewrite -(carve_off_inode _ _ _ _ Htyi)) in "Hoh".
                 iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x5a)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2802,18 +2806,17 @@ Section ProofFileread.
                 iEval (rewrite Hpp54) in "Hpc".
                 (* CHECK IN the advanced cell *)
                 iApply fupd_wp.
-                iMod (off_checkin γf γox k q (DfracOwn (q/2)) (fc_ip Cf)
-                        (mword_of_int (bv_unsigned v + Z.of_nat tot)) ⊤
-                        ltac:(solve_ndisj) Hwf2 with "Hoh Hcip Hoff")
-                  as "(Hoh & Hcip & Hvalid & Hrlv)".
+                iMod (ioff_checkin ⊤ ikk k q
+                        (mword_of_int (bv_unsigned v + Z.of_nat tot))
+                        ltac:(solve_ndisj) Hwf2 with "Hoesc Hoh Hoff")
+                  as "(Hoh & Hvalid & Hrlv)".
                 iModIntro.
                 (* ---- THE READ ARM COMES HOME (B''-join).  readi changed
                    no byte, so the quarter goes back exactly as it came out
                    and the escrow re-forms the payload against its own
                    residue; the pure clauses never left the arm. ---- *)
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
-                  with "[Hvalid]" as "Hvalid";
-                  [rewrite -Hipk -off_mark_acc; iExact "Hvalid" |].
+                  with "[Hvalid]" as "Hvalid"; [iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".
                 iDestruct "Hmap" as "[Haddrs Hindres]".
                 iEval (rewrite Hipk) in "Haddrs".
@@ -2912,6 +2915,7 @@ Section ProofFileread.
                 iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp
  inm gsh with "Hkeep Hrefout") as "Hshr".
                 iEval (rewrite Qp.div_2) in "Hshr".
+                iEval (rewrite -(carve_off_inode _ _ _ _ Htyi)) in "Hoh".
                 iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x5a)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }

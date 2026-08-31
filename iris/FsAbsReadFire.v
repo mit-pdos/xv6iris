@@ -56,7 +56,7 @@
    window (SpecSysReadAU's THE ONE INSTANT), so no walk lend is involved
    and the fragment goes straight back.  The two caps [ard_pre] asks for
    ride as premises about the SAME node, which is where the caller has
-   them: the offset's from [FileOff.off_wf], the row's from the loaded
+   them: the offset's from [FileInvDefs.off_wf], the row's from the loaded
    record's size ([arf_size_ok] turns [fn_size <= MAXFILE*BSIZE] into
    [anode_size_ok]).
 

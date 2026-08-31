@@ -254,7 +254,10 @@ Section FirstTok.
      bitmap_reg fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
        (λ ξ : CtxId, kmem_res (XIk := ξ) fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
-     ⌜fs_geom_ok⌝)%I.
+     ⌜fs_geom_ok⌝ ∗
+     (* the off ledgers (off-ledger ruling), straight off the era's boot
+        supply.  LAST, so no destructuring pattern above moved. *)
+     ioff_escrows)%I.
 
   Global Instance first_boot_persist_persistent : Persistent first_boot_persist.
   Proof. rewrite /first_boot_persist. apply _. Qed.
@@ -572,7 +575,7 @@ Section FirstTok.
   Proof.
     iIntros "HP HK HL #HC". rewrite /fs_ready_pre /first_boot_persist.
     iDestruct "HP" as "(H1 & H2 & H3 & %H4 & H5 & H7 & H8 & H9 & H10 & H11 &
-                        H12 & H13 & H14 & H15 & H16 & H17 & %H18)".
+                        H12 & H13 & H14 & H15 & H16 & H17 & %H18 & #H19)".
     (* RECOVERY IS DONE (durable-disk lane E-except): [initlog] sealed the
        byte view's exception set into [log_ctx], so the region and the
        bitmap main built at PowerOn are upgraded to the SEALED forms every
@@ -599,7 +602,8 @@ Section FirstTok.
        the frame needs no resource bookkeeping, is FIVE TIMES WORSE
        (13.7 s -> 74.3 s) -- [iFrame] then searches the intuitionistic
        context once per goal conjunct. *)
-    iFrame "H1 H2 H3 H5 HLp H7 H8 H9 H10 H11 H12 H13 H14 H15s H17 HK HC H16s".
+    iFrame "H1 H2 H3 H5 HLp H7 H8 H9 H10 H11 H12 H13 H14 H15s H17 HK HC H16s
+            H19".
     iFrame "%".
   Qed.
 
