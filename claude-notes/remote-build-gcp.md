@@ -537,3 +537,29 @@ so it removes the very log it was asked for.  Measured: a whole round's
 - and never keep anything on the VM that is not either in the local tree
   or matched by an exclude.
 
+
+## Gotcha: a "mysteriously killed" round is usually the OOM killer, and
+## the runaway is ONE worker (2026-08-31)
+
+A diverging conversion/unification does not just crawl — at h4d scale it
+eats memory until the KERNEL OOM killer fires: measured, single
+`rocqworker` processes at 250–740 GB anon-RSS on the 708 GB box (five
+kills in one evening, all from one bad payload spelling that sent
+`wp_acquire` proofs into unbounded unification).  Two consequences:
+
+- The kill takes CGROUP NEIGHBORS with it: the tmux server, the round's
+  driver shell, and sibling workers in the same ssh session scope all
+  die together, which reads as "someone pattern-killed my round" or "the
+  watcher is stuck".  `journalctl | grep "Out of memory"` is the FIRST
+  diagnostic when a round dies with `Terminated`/`Error 137` and no Coq
+  error — check it before blaming neighbors, tmux, or the harness.
+- A `.vo`-existence check taken WHILE such a build runs reports stale
+  files as green; certify only from a finished run's error roots.
+
+Related launch-pattern note: `nohup ... &` inside a `run-on-gcp bash -c`
+does NOT survive the ssh close (sshd reaps the session; nohup only
+blocks SIGHUP) — the grandchild `make` survives as an orphan but the
+driver (and its final sentinel lines) die.  The reliable simple form is
+a fully SYNCHRONOUS `run-on-gcp <build-cmd>` with the ssh held open for
+the build's duration; reserve tmux for runs that must survive the
+caller.
