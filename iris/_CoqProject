@@ -313,6 +313,7 @@ UkInitPutc.v
 UkInitLit.v
 UkInitVprintf.v
 UkInitPrintf.v
+UkInitMain.v
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
