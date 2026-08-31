@@ -1785,6 +1785,22 @@ things, and the answer differs:
 
 ## WINDOW LEAF (in-house) — ASK 1 ANSWERED, LANDED 2026-08-30
 
+**TWIN NOTE (Aug 31 merge).** Upstream's cat batch landed its own
+`wp_uk_ecall_read` (UkRunSys.v, "the first syscall leaf in this tier
+that WRITES user memory") built WITHOUT our window leaf (the push
+raced).  Theirs: exact non-negative count, address as a
+`mword_of_int` literal, continuation gets the buffer back at
+unconstrained contents (no `d`, no untouched tail — cat's loop
+doesn't need them).  Ours: the general four-row leaf + read instance,
+any owned run covering the cap, written-prefix `d` named and the tail
+pinned.  RESOLVED at merge by renaming OUR instance
+`wp_uk_ecall_read_win` (their name keeps cat's many call sites; our
+one call site in UkSh.v updated).  RELAY: the two should merge —
+theirs is derivable from `wp_uk_ecall_window` modulo the
+address-spelling bookkeeping (`mword_of_int a` vs `uint (m !!! a1)`),
+and wait-with-status / pipe / fstat will want the general leaf
+anyway.
+
 `UkRunSys.wp_uk_ecall_window` exists.  One commit, ONE file
 (`iris/UkRunSys.v`, +330), EC2-green; audit = the standing three
 (`resv_matches`, `resv_is_valid`, funext), zero `Admitted`, zero new

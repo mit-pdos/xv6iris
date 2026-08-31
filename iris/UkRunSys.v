@@ -687,12 +687,18 @@ Section UkRunSys.
   Qed.
 
   (* ------------------------------------------------------------------- *)
-  (* THE READ ROW'S INSTANCE -- sh's [getcmd] shape, and the reason the     *)
-  (* window leaf exists.  Nothing but [usyswin]'s read branch, taken once   *)
-  (* here so a program does not have to unfold it: the buffer is a1, the    *)
-  (* count is a2 as an [int], and the caller owns at least the count.       *)
+  (* THE READ ROW'S INSTANCE OF THE WINDOW LEAF -- sh's [getcmd] shape.     *)
+  (* Nothing but [usyswin]'s read branch, taken once here so a program      *)
+  (* does not have to unfold it: the buffer is a1, the count is a2 as an    *)
+  (* [int], and the caller owns AT LEAST the count.  NOT the same lemma as  *)
+  (* [wp_uk_ecall_read] above (cat's): that one asks for the exact          *)
+  (* non-negative count and returns the buffer at unconstrained contents;   *)
+  (* this one allows any owned run covering the cap and returns the         *)
+  (* written prefix's length [d] with the tail pinned unchanged.  The two   *)
+  (* should eventually merge (this one generalizes, modulo the address      *)
+  (* spelling) -- relay note in the worklist.                               *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_ecall_read (γt γd γs : gname) (h : CpuId) (m : regfile)
+  Lemma wp_uk_ecall_read_win (γt γd γs : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (cnt : Z) (k : nat) (f : nat -> bv 8) (avail : nat) :
     usysno m = USYS_read ->
     bv_signed (subrange_vec_dec (m !!! Regidx (mword_of_int 12)) 31 0 : mword 32)

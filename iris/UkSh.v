@@ -5234,7 +5234,7 @@ End UkSh.
 
 (* ===================================================================== *)
 (* THE READ LEAF, DISCHARGED.  [ush_read_leaf] was a Hypothesis while     *)
-(* the general window leaf did not exist; [UkRunSys.wp_uk_ecall_read] is  *)
+(* the general window leaf did not exist; [UkRunSys.wp_uk_ecall_read_win] is  *)
 (* that leaf's read instance, and the two spellings differ only in how    *)
 (* the count is read: the hypothesis takes a2 as the unsigned word equal  *)
 (* to the buffer's size, the leaf takes it as the C [int] the kernel      *)
@@ -5300,7 +5300,7 @@ Section UkShLeaf.
                   k Ha2) as Hbound.
     subst a.
     iIntros "#Hi Hbuf Hrun Hcont".
-    iApply (wp_uk_ecall_read γt γd γs h m pc
+    iApply (wp_uk_ecall_read_win γt γd γs h m pc
               (bv_signed (subrange_vec_dec
                             (m !!! Regidx (mword_of_int 12 : mword 5)) 31 0
                           : mword 32))
