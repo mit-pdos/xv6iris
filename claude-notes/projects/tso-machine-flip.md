@@ -17564,3 +17564,17 @@ crossing tail), ProofMain + ProofMainSecondary installers
 (`intr_res_intro` at `kernelvec_env` + `#Hcaps`-rewrite + the witness
 lemma).  r63 round launched.
 
+
+### A6.139 fallout sweep (r63a → r63b)
+
+r63a: ONE new true red — ProofUsertrap:697.  `ud_hold`'s premise was the
+old binary `intr_handler_spec KT1 kernelvec`; now `ihs_env KT1
+kernelvec` (the ∃E pack), and its builder site (the "cashed here and
+nowhere else" comment, ~:776) drops `Hdc` from the spec call and packs
+via `ihs_env_intro` + a `rewrite /kernelvec_env`-then-`iExact "Hdc"`
+bullet + `kernelvec_env_move` (top-level in SpecKernelvec — the KV
+module parameter carries only the Parameter, so the env constants are
+referenced unqualified).  ProofKerneltrap needed NOTHING (kerneltrap
+sits below the env threading).  The rest of r63a's RED list was the
+standing out-of-scope cone (ProofUser / UptWalkTramp / UserretPt /
+Pt2WalkPt / ProofForkretPark roots).  r63b relaunched.
