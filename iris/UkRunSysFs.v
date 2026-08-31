@@ -339,8 +339,8 @@ Section UkRunSysFs.
   (* =================================================================== *)
   Lemma wp_uk_ecall_fs_of_step
       (STEP : forall (γm' : gname) (h' : CpuId) (C : ucfg) (pt : uptd)
-                (Rfd : list fdstate -> iProp Σ)
-                (Rut : uptd -> iProp Σ) (π : gmap (mword 27) uperm) (sz : Z)
+                (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
+      (π : gmap (mword 27) uperm) (sz : Z)
                 (M : gmap Z (bv 8)) (fdv' : list fdstate)
                 (m' : regfile) (pc' : mword 64),
                 loop_ok C pt ->
@@ -419,8 +419,8 @@ Module Type FDROW_UKFS_STEP.
     forall `{!riscvGS Σ} `{GEN : GenId} `{XI : CurCtx}
            `{!ghost_varG Σ Z} `{!ghost_varG Σ umirror}
       (γm : gname) (h : CpuId) (C : ucfg) (pt : uptd)
-      (Rfd : list fdstate -> iProp Σ)
-                (Rut : uptd -> iProp Σ) (π : gmap (mword 27) uperm) (sz : Z)
+      (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
+      (π : gmap (mword 27) uperm) (sz : Z)
       (M : gmap Z (bv 8)) (fdv : list fdstate) (m : regfile) (pc : mword 64),
       loop_ok C pt ->
       perm_of (ud_um pt) sz = π ->
