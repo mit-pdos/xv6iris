@@ -16,6 +16,7 @@ __pycache__
 /sail-riscv
 /aws/
 *.pem
+/mystuff/
 
 # vtest build artifacts
 tools/vtest/build/
