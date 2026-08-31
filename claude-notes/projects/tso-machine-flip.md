@@ -17931,3 +17931,24 @@ ledger_read_pinw_latest at the floor row; count stores via pinw_write_c;
 arm/retire via pinw mint/drop + a fresh (g, lo) generation); icM_wf
 gains n <= IREFSLOTS (fed by iref_slots_no_overflow's credit argument);
 then the 7 AU-consumer proof files + cred threading + IcacheBoot.
+
+## A6.145 cont.: the FLOORED-SLICE architecture (4b-ii banked at `7703294ca9d`)
+
+The credential-threading question is CLOSED, by binder placement:
+- `live_genlo k s g lo` (the real agree element) -- floor-free, ξ-free.
+  THE ONLY FORM ALLOWED INSIDE PLAIN INVARIANT BODIES: itable's
+  live_norm/live_frzn arms and anything ic_escrow parks.  `iref_tok`
+  (frag + live_frac + slh) is PURE GHOST and parks inside ic_escrow's
+  inv, so it too stays floor-free.
+- `live_fracc k s := ∃ g lo tl, live_genlo k s g lo ∗ ⌜lo <= tl⌝ ∗
+  ctx_floor cur_ctx tl` (to add, Section IcacheRef at :2642 which has
+  riscvGS+XI) -- the FLOORED slice.  Its home: the CELL-carrying bundle
+  tier (inode_ref / inode_shr / the _gen(_bare) forms), which is already
+  ξ-relative (inode_ident's ↦₄ cells) and provably never parks inside a
+  plain inv.  inode_ref must be RESTATED flat (frag ∗ slh ∗ ident ∗
+  live_fracc) rather than via iref_tok, so the ∃lo binder scopes over
+  both the slice and the floor; conversion lemmas keep old consumers.
+- Every inode_ref/inode_shr holder then carries the racy-read credential
+  FOR FREE; iget/idup mint the floor from the A6.144 row (tl >= lo since
+  arm <= last store <= row's tl); iput/park drop it (affine); un-parkers
+  re-mint under the lock.
