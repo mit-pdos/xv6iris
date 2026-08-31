@@ -17505,3 +17505,40 @@ unblocking):
   □-premise.
 GREEN: IntrDefs, WpIntrInv, SchedCtx.
 
+### A6.139 (cont. 3) — THE FAMILY FIXPOINT (the post-problem's resolution)
+
+Landed so far: WpSconfSret/WpSconfCsr flip sites (intuitionistic witness
+auto-boxes fine — the earlier failure was the CID mismatch, since fixed
+by env_move's ∀CIDm), ProofPrepareReturn's dismantle (drops env+witness),
+UsertrapRes folds via the witness-extended `ihs_env`, SpecDevintr's
+member CtxMove instances (console_caps/disk_geom/tick_keeper +
+devintr_caps — the CLASS hart and the BUNDLE hart are SPLIT: instances
+take a `CIDc` content-hart parameter, section-ambient class hart; a
+section-local `(XI := ξ)` on a not-yet-generalized constant is "Wrong
+argument name" — state after-section, SchedCtx's A6.129 pattern), and
+`SpecKernelvec.kernelvec_env` + `kernelvec_env_move` (⊢ □ env_move,
+via ctx_move at content-CID := the lemma's ambient).
+
+**The post problem**: with `ihs kt E` E-fixed, the contract's post hands
+back `sie_cap_gpr_of kt (ires_of (ihs kt E))` — but the cap kerneltrap
+returns is the REAL (∃E′-packed) one, and E′ is existential: the
+E-specific generic form is unrecoverable.  RESOLUTION — the fixpoint is
+over the FAMILY and the body instantiates the resource slot at ITS OWN
+context:
+- `ires_pack_of S := λ ξ c, ∃ E′, ires_of (S E′) c ∗ □ E′ ξ ∗
+  □ env_move E′` (ctx-indexed packed family; ▷-guard inside ires_of
+  keeps contractivity);
+- `ihs_body_of kt E Rp h := □ ∀ XIb …, ihs_trap_of … E (Rp XIb) …
+  (post at (Rp XIb))` — the funnel's `R : CPU -d> iPropO` shape is
+  UNCHANGED (each body instance passes `Rp XIb`);
+- `ihs kt := fixpoint (λ S E, ihs_of kt E (ires_pack_of S))`;
+  `intr_handler_spec kt E h := ihs kt E cpu_id h`;
+  `intr_res kt := ires_pack_of (ihs kt) XI cpu_id` (definitionally the
+  current ∃-packed shape — the refl bridges to
+  `sie_*_of (ires_pack kt)` SURVIVE).
+Consequences: the contract's entry/post R-slot IS the real intr_res at
+the body's ambient — ProofKernelvec's four bridge conversions go back to
+(near-)refl; the engine assembles the entry with the packed arm directly
+(no E-fixing of the entry), destructuring the pack only to APPLY the
+contract (spec at some E + □E + witness).
+
