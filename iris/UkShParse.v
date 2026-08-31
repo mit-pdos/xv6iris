@@ -65,6 +65,34 @@
 (* EVERY LEMMA THAT DEPENDS ON IT SAYS SO IN ITS OWN HEADER, exactly as    *)
 (* stage 2 labelled the seven lemmas that carried [ush_read_leaf].         *)
 (*                                                                        *)
+(* THE OBSTACLE THIS FILE IS PARKED AGAINST, MEASURED, so that whoever    *)
+(* picks peek up does not pay for the same four dead ends.  peek's four    *)
+(* pieces are here and green -- [wp_kshp_peek_scan], [_enter], [_epi] and  *)
+(* [ushp_peek_res] -- and the BODY that glues them (~750 lines, written    *)
+(* and complete) is NOT, because ONE TACTIC in it does not terminate.      *)
+(* Bisected by cutting the proof at successive points with [Admitted] in a *)
+(* scratch copy (~20 s a step, since the file is otherwise ~4 ms a line):  *)
+(* everything up to and including the generalised spill run's continuation *)
+(* is fast, and THE VERY NEXT TACTIC -- any of them -- runs to 15.2 GB of  *)
+(* RSS in 268 s and is still climbing when killed.  Even                   *)
+(* [iDestruct (urun_stack with "Hrun")], which touches nothing else, does  *)
+(* not finish in 100 s there.                                             *)
+(*                                                                        *)
+(* WHAT IT IS NOT.  Four hypotheses tested and all four REFUTED, each by   *)
+(* its own timed run: (a) not the leaf's [Prop] premises -- a premise-free *)
+(* step lemma ([wp_kshp_fp] below) reproduces it; (b) not the [""[]""]     *)
+(* spec pattern -- naming the instruction fact reproduces it; (c) not the  *)
+(* proofmode context -- [iClear]ing EVERY spatial hypothesis but the run   *)
+(* reproduces it; (d) not the durable notes' unsealed-big-op rule --       *)
+(* [Typeclasses Opaque] on [ubytesq]/[ubytes]/[uwordq]/[uword]/[ustr]/     *)
+(* [ustack]/[ustack_body] (none of which carries a seal today) changes     *)
+(* nothing.  execcmd's IDENTICAL [iApply] at the same instruction costs    *)
+(* milliseconds, so what differs is something in the term [wp_kshp_spill]  *)
+(* hands back at SEVEN spills that is benign at THREE.  That is where the  *)
+(* next look should start: give the two runs an explicit end-pc PARAMETER  *)
+(* so their continuation's pc is a literal rather than                     *)
+(* [pcs (length rs)] awaiting a [cbn].                                     *)
+(*                                                                        *)
 (* (4) THE WALKS, bottom-up, so that every landed lemma is a theorem about *)
 (* real code and nothing is stated that is not proved.  This file has ZERO *)
 (* [Admitted] and ZERO [Axiom]; its audit is the standing three            *)
@@ -96,6 +124,8 @@ Require Import TsoCtx.
 Require User.ShSyms User.ShInstrs.
 Local Open Scope Z_scope.
 Import Defs.
+
+
 
 (* ===================================================================== *)
 (* §1 THE PURE VOCABULARY.                                                *)
@@ -586,6 +616,39 @@ Section UkShParse.
   Local Lemma ushp_pc_step (x d : Z) :
     add_vec_int (mword_of_int x : mword 64) d = mword_of_int (x + d).
   Proof. unfold add_vec_int. apply moi_add. Qed.
+
+  (* THE FRAME POINTER, AS A PREMISE-FREE STEP.  [c.addi4spn s0,sp,N] is
+     the last instruction of every prologue in this catalog and no function
+     in the parser reads s0 except through its own epilogue, so what a walk
+     needs of it is only "s0 gets SOMETHING" -- hiding the value behind a
+     [∀ v] is both tidier at the call site and one fewer term for the
+     unifier to carry.  NOT YET USED: it was written for peek's 0x458 and
+     peek's body is parked (see the header's OBSTACLE note); gettoken,
+     parsecmd, parseline, parsepipe, parseredirs and nulterminate all want
+     it too. *)
+  Local Lemma wp_kshp_fp (h : CpuId) (m : regfile) (p : Z) (nz : mword 8)
+      (nn : nat) :
+    uinstr_is γt (mword_of_int p) true
+      (C_ADDI4SPN (Cregidx (mword_of_int 0), nz)) -∗
+    urun γt γd γs h m (mword_of_int p) nn -∗
+    (∀ (h' : CpuId) (v : mword 64),
+       urun γt γd γs h' (<[Regidx s0_idx := regval_into_reg v]> m)
+         (mword_of_int (p + 2)) nn -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "#Hi Hrun Hcont".
+    iApply (wp_uk_caddi4spn γt γd γs h m (mword_of_int p)
+              (mword_of_int 0 : mword 3) nz s0_idx
+              (add_vec (m !!! Regidx csp_rs1)
+                 (sign_extend' 64 (caddi4spn_imm nz))) nn
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
+              eq_refl
+              with "Hi Hrun").
+    rewrite (ushp_pc_step p 2). iIntros (h1) "Hrun".
+    iApply ("Hcont" $! h1 with "Hrun").
+  Qed.
 
   (* THE PROLOGUE.  It hands back the two spilled words as [uword]s at the
      caller's own [sp], which is what makes the epilogue below a pure
@@ -2894,6 +2957,7 @@ Section UkShParse.
     then (match ushp_find tlen 0%nat tf (f k) with
           | Some _ => 1 | None => 0 end)
     else 0.
+
 
 
   (* ===================================================================== *)
