@@ -2642,9 +2642,10 @@ Definition intr_psi `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI 
                    sepc ↦ᵣ pc0 ∗ scause ↦ᵣ sc ∗ stval ↦ᵣ (zeros' 64) ∗
                    sie_cap kt m (trap_res true + av) false p ∗
                    kpt_on cpu_id ∗ cpu_hart 0 false p ∅ ∗ cpu_claim p ∗
-                   intr_res kt ∗
-                   intr_handler_spec kt
-                     (register_lookup (R_bitvector_64 nextPC) rs2) ∗
+                   (∃ E : CurCtx -d> iPropO Σ,
+                      intr_res_at kt E ∗ □ E XI ∗ □ env_move E ∗
+                      intr_handler_spec kt E
+                        (register_lookup (R_bitvector_64 nextPC) rs2)) ∗
                    gpr_file (tp_pin m) ∗ resv_any cpu_id ∗
                    wp_next true p (fun CID =>
                      intr_cb_clock kt m av p pc0 is_rvc i b' R (CID := CID))))%I.
@@ -2676,8 +2677,9 @@ Proof.
   (* the installed handler comes out ONCE, at the top: [#Hsp] is persistent
      and therefore survives every later split, which is what lets the trap
      arm apply the contract in the cycle's continuation. *)
-  iEval (rewrite /intr_res) in "Hires".
-  iDestruct "Hires" as (handler vb) "(%Htvd & %Hsb & Hq4 & Hstv & #Hsp)".
+  iEval (rewrite /intr_res /intr_res_at) in "Hires".
+  iDestruct "Hires" as (Ecap) "(Hiat & #HEcap & #HEmvcap)".
+  iDestruct "Hiat" as (handler vb) "(%Htvd & %Hsb & Hq4 & Hstv & #Hsp)".
   iDestruct (sconf_to_cells with "Hsc") as (mst0 mdv0)
     "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie & Hmdl &
       Hmenv)".
@@ -2899,11 +2901,15 @@ Proof.
             iSplitL "Hcells Hcnt".
             { rewrite /cpu_hart /intr_count. iFrame "Hcells Hcnt". }
             iFrame "Hclm".
-            iSplitL "Hq4 Hstv".
-            { iApply (intr_res_intro handler ('b"0" : mword 1) Htvd Hsb
-                        with "Hq4 Hstv"). iNext. iExact "Hsp". }
             srs. rewrite Hsb.
-            iFrame "Hsp Hfile Hwn".
+            iSplitL "Hq4 Hstv".
+            { iExists Ecap.
+              iSplitL "Hq4 Hstv".
+              { rewrite /intr_res_at. iExists handler, ('b"0" : mword 1).
+                iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+                iFrame "Hq4 Hstv". iNext. iExact "Hsp". }
+              iFrame "HEcap HEmvcap Hsp". }
+            iFrame "Hfile Hwn".
             iApply (resv_any_intro with "Hfrag").
             (* ---------- THE INSTRUCTION ---------- *)
             iIntros (tlbf) "HW Hbit1 Hsnap' Hresv' Hsrw Hsro".
@@ -2944,7 +2950,8 @@ Proof.
                           with "Hsatp Htlb Hpcfg Hpaddr Hsnap' Hkinv Hcreds"). }
               rewrite /sie_arm.
               iFrame "Hq1 Hkpt Hsepcx Hscausex Hstvalx Hsppc Hclm Hcpu".
-              iApply (intr_res_intro handler vb Htvd Hsb with "Hq4 Hstv").
+              iApply (intr_res_intro Ecap handler vb Htvd Hsb
+                        with "Hq4 Hstv [] HEcap HEmvcap").
               iNext. iExact "Hsp". }
             iDestruct (wp_next_at true p _ CID0 (fun _ => eq_refl) with "Hwn")
               as "[Hobl Hcont]".
@@ -3108,25 +3115,30 @@ Proof.
       iDestruct "HTrap" as (sc mstT mdvT)
         "(%HscT & %HmsfT & %HmmT & HmsT & HhalfT & HtieT & HmieT &
           HmdlT & HmenvT & Hsret & HsepcT & HscauseT & HstvalT & HcapT &
-          #HkptT & HcpuT & HclmT & HiresT & HspT & HfileT & HresvT & Hwn)".
+          #HkptT & HcpuT & HclmT & HEpackT & HfileT & HresvT & Hwn)".
+      iDestruct "HEpackT" as (Etrap) "(HiresT & #HET & #HETmv & #HspT)".
       iAssert (sconf) with "[Hpriv3 HmsT HhalfT HtieT HmieT HmdlT HmenvT]"
         as "HscT".
       { iApply (sconf_of_cells mstT mdvT HmsfT HmmT
                   with "Hhw Hminv Hpriv3 HmsT HhalfT HtieT HmieT HmdlT
                         HmenvT"). }
       iApply ("Hmkpc" with "[-HresvT] HresvT"). iIntros "Hpc'".
-      iAssert (ihs_entry_of kt (ires_of (ihs kt)) m av p pc0 sc (zeros' 64)
+      iAssert (ihs_entry_of kt (ires_pack_of (ihs kt) XI) m av p pc0 sc
+                 (zeros' 64)
                  (register_lookup (R_bitvector_64 nextPC) rs2))
         with "[Hhs3 HscT HcapT HfileT Hsret HsepcT HscauseT HstvalT HcpuT
                HclmT HiresT Hpc']" as "Hentry".
       { rewrite /ihs_entry_of /sie_cap_gpr_of.
         iFrame "Hhs3 HscT HcapT HfileT Hsret HsepcT HscauseT HstvalT HkptT
                 HcpuT HclmT Hpc'".
-        iEval (rewrite intr_res_of_eq) in "HiresT". iExact "HiresT". }
-      iApply (intr_handler_spec_apply
+        rewrite /ires_pack_of. iExists Etrap.
+        iEval (rewrite intr_res_at_of_eq) in "HiresT".
+        iFrame "HiresT HET HETmv". }
+      iApply (intr_handler_spec_apply Etrap
                 (register_lookup (R_bitvector_64 nextPC) rs2) m av p pc0 sc
-                (zeros' 64) Hpc0 HscT with "HspT Hentry").
+                (zeros' 64) Hpc0 HscT with "HspT HET Hentry").
       iIntros (c' Hs'). rewrite /ihs_post_of. iIntros "Hcg Hpc".
+      iEval (rewrite -sie_cap_gpr_of_eq) in "Hcg".
       iDestruct (wp_next_retarget CID0 c' true p _ Hs' with "Hwn") as "Hwn".
       iApply ("IH" $! c' with "Hcg Hpc [Hwn]"). iNext. iExact "Hwn". }
 Qed.

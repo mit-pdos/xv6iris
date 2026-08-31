@@ -1446,10 +1446,15 @@ Section KernelvecHandler.
     kernelvec_handler_spec_body γu γv γdk γtl γs pd pav pu.
   Proof.
     cbv beta delta [kernelvec_handler_spec_body].
-    iIntros (Hgs) "#Hhw #Hinv #Htext #Hcaps".
-    iApply intr_handler_spec_intro.
+    iIntros (Hgs) "#Hhw #Hinv #Htext".
+    iApply (intr_handler_spec_intro
+              (kernelvec_env γu γv γdk γtl γs pd pav pu)).
     iModIntro.
-    iIntros (XIc m av p pc0 sc tv) "%Hpc0 %Hsc Hentry Hnext".
+    iIntros (XIc m av p pc0 sc tv) "%Hpc0 %Hsc #HEc Hentry Hnext".
+    (* the environment IS the credentials, at the trap-time context *)
+    iPoseProof "HEc" as "HEcaps".
+    iEval (rewrite /kernelvec_env) in "HEcaps".
+    iDestruct "HEcaps" as "#Hcaps".
     iEval (rewrite /ihs_entry_of) in "Hentry".
     (* [Hrcpt] is the KPT receipt (IntrDefs §6b), the tenth conjunct: the trap
        hands it over because the handler owes the ENABLED arm back, and the
@@ -1484,8 +1489,9 @@ Section KernelvecHandler.
        HANDLER does -- [intr_res] owns the stvec cell and so does the Bare
        arm. *)
     iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
-    { iEval (rewrite /intr_res) in "Hires".
-      iDestruct "Hires" as (h0 vb0) "(_ & _ & _ & Hstv & _)".
+    { iEval (rewrite /intr_res /intr_res_at) in "Hires".
+      iDestruct "Hires" as (E0h) "(Hires0 & _ & _)".
+      iDestruct "Hires0" as (h0 vb0) "(_ & _ & _ & Hstv & _)".
       iDestruct "Hbstv" as (v0) "Hbstv".
       iDestruct (reg_pointsto_conflict stvec (DfracOwn 1) with "Hstv Hbstv") as %[]. }
     iDestruct "Hkpt" as (root_ppn) "Htlbinv".
@@ -1704,11 +1710,8 @@ Section KernelvecHandler.
     iApply (Kerneltrap.wp_kerneltrap_sconf (GEN := GEN) (CID := CID) (XI := XIc) γu γv γdk γtl γs pd pav pu
               (kv_m2 Me) (58 + av) p pc0 sc tv ∅
               Hgs ltac:(lia) Hdi Hpc0
-              with "Hcgk Hsret Hires Hrcpt [Hcpu] Htext Hpc Hsepc Hscause Hstval").
-    all: try lkbelow.
-    { iFrame "Hcpu". }
-    Set Printing Implicit.
-    iExact "Hcaps".
+              with "Hcgk Hsret Hires Hrcpt [Hcpu] Htext Hpc Hsepc Hscause Hstval
+                    Hcaps Hclm").
     all: try lkbelow.
     { iFrame "Hcpu". }
     (* ---- THE CROSSING: everything below is at the RESUMING hart ---- *)
@@ -1739,8 +1742,9 @@ Section KernelvecHandler.
     { apply WpGprCsrwC.legalize_sie_clear_idem;
         [ exact HSIE0f | exact HXSf | exact HFSf | exact HVSf | exact HSDf | exact HMPPf ]. }
     iDestruct "Htrf" as "[(Hbit0f & Hbaref & Hbstvf) | (Hbit1f & Hkptf)]".
-    { iEval (rewrite /intr_res) in "Hiresf".
-      iDestruct "Hiresf" as (h0 vb0) "(_ & _ & _ & Hstv & _)".
+    { iEval (rewrite /intr_res /intr_res_at) in "Hiresf".
+      iDestruct "Hiresf" as (E0f) "(Hiresf0 & _ & _)".
+      iDestruct "Hiresf0" as (h0 vb0) "(_ & _ & _ & Hstv & _)".
       iDestruct "Hbstvf" as (v0) "Hbstvf".
       iDestruct (reg_pointsto_conflict stvec (DfracOwn 1) with "Hstv Hbstvf") as %[]. }
     iDestruct "Hkptf" as (root_ppnf) "Htlbinvf".
@@ -1762,9 +1766,9 @@ Section KernelvecHandler.
               (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 3 : mword 5)) (m !!! Regidx (mword_of_int 5 : mword 5)) (m !!! Regidx (mword_of_int 6 : mword 5)) (m !!! Regidx (mword_of_int 7 : mword 5)) (m !!! Regidx (mword_of_int 10 : mword 5)) (m !!! Regidx (mword_of_int 11 : mword 5)) (m !!! Regidx (mword_of_int 12 : mword 5)) (m !!! Regidx (mword_of_int 13 : mword 5)) (m !!! Regidx (mword_of_int 14 : mword 5)) (m !!! Regidx (mword_of_int 15 : mword 5)) (m !!! Regidx (mword_of_int 16 : mword 5)) (m !!! Regidx (mword_of_int 17 : mword 5)) (m !!! Regidx (mword_of_int 28 : mword 5)) (m !!! Regidx (mword_of_int 29 : mword 5)) (m !!! Regidx (mword_of_int 30 : mword 5)) (m !!! Regidx (mword_of_int 31 : mword 5))
               HSIEf HMPRVf HSXLf Hmmf HPBMTEf eq_refl Hspf
               with "Hhwf Hinvf Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinvf Hpcf Hfilef
-                    Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx").
+                    Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctxf").
     iIntros "Hhsf Hprivf Hmsf Hhalff Hmief Hmdlf Hmenvf Htlbinvf Hpcf Hfilef
-             Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctx".
+             Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hctxf".
 
     (* ---- the file is back at [tp_pin m], register for register ---- *)
     assert (Hcsm : forall k : mword 5, is_cs_idx k = true ->

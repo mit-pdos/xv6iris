@@ -2117,11 +2117,17 @@ Section IntrDefsBase.
   (* ONE TRAP'S OBLIGATION, at the ambient hart, with the continuation left
      as a parameter -- because the continuation is the one thing that is NOT
      at this hart.  [K] is what [wp_next] quantifies. *)
-  Definition ihs_trap_of (kt : ktier) (R : CPU -d> iPropO Σ) (m : regfile) (av : nat)
+  (* A6.139: [E] is the HANDLER ENVIRONMENT -- the per-context bundle the
+     handler's proof closes over (kernelvec: the device/lock credentials,
+     which §0.35′ made context-relative).  It rides the trap as a premise
+     at the TRAP-TIME context, so the □-contract can serve every thread. *)
+  Definition ihs_trap_of (kt : ktier) (E : CurCtx -d> iPropO Σ)
+      (R : CPU -d> iPropO Σ) (m : regfile) (av : nat)
       (p pc0 sc tv handler : mword 64)
       (K : forall CID : CpuId, iProp Σ) : iProp Σ :=
     (⌜ ret_pc pc0 = pc0 ⌝ -∗
      ⌜ s_cause_ok sc ⌝ -∗
+     □ E XI -∗
      ihs_entry_of kt R m av p pc0 sc tv handler -∗
      wp_next true p K -∗
      WP (Loop : expr riscv_lang))%I.
@@ -2197,50 +2203,92 @@ Section IntrDefs.
      [XIb]: a trap that reschedules moves the hart, never the context.
      [ihs]/[intr_res]/[trap_csrs] therefore do NOT depend on the ambient
      [XI]; the per-hart resource stays one per hart, not one per thread. *)
-  Definition ihs_body_of (kt : ktier) (R : CPU -d> iPropO Σ) `{CIDb : CpuId}
+  Definition ihs_body_of (kt : ktier) (E : CurCtx -d> iPropO Σ)
+      (Rp : CurCtx -d> CPU -d> iPropO Σ) `{CIDb : CpuId}
       (handler : mword 64) : iProp Σ :=
     (□ ∀ (XIb : CurCtx) (m : regfile) (av : nat) (p pc0 sc tv : mword 64),
-        ihs_trap_of (CID := CIDb) (XI := XIb) kt R m av p pc0 sc tv handler
-          (fun c' => ihs_post_of (CID := c') (XI := XIb) kt R m av p pc0))%I.
+        ihs_trap_of (CID := CIDb) (XI := XIb) kt E (Rp XIb) m av p pc0 sc tv
+          handler
+          (fun c' => ihs_post_of (CID := c') (XI := XIb) kt (Rp XIb)
+                       m av p pc0))%I.
 
-  Definition ihs_of (kt : ktier) (R : CPU -d> iPropO Σ)
+  Definition ihs_of (kt : ktier) (E : CurCtx -d> iPropO Σ)
+      (Rp : CurCtx -d> CPU -d> iPropO Σ)
       : CPU -d> mword 64 -d> iPropO Σ :=
-    fun (c : CPU) (handler : mword 64) => ihs_body_of kt R (CIDb := c) handler.
+    fun (c : CPU) (handler : mword 64) =>
+      ihs_body_of kt E Rp (CIDb := c) handler.
 
-  Global Instance ihs_of_ne (kt : ktier) : NonExpansive (ihs_of kt).
+  Global Instance ihs_of_ne (kt : ktier) (E : CurCtx -d> iPropO Σ) :
+    NonExpansive (ihs_of kt E).
   Proof.
     rewrite /ihs_of /ihs_body_of /ihs_trap_of /ihs_entry_of /ihs_post_of
             /sie_cap_gpr_of /sie_cap_of /sie_arm_of /wp_next.
     solve_proper.
   Qed.
 
-  Definition ihs_pre (kt : ktier) (S : CPU -d> mword 64 -d> iPropO Σ)
-      : CPU -d> mword 64 -d> iPropO Σ := ihs_of kt (ires_of S).
+  (* the environment's SWTCH-CROSSING witness: with both crossing parties'
+     run tokens in hand, the env re-homes.  Packed beside the env so the
+     scheduler's [p_sched] move (SchedCtx) can relocate a parked world's
+     handler environment without knowing what it is.  For the concrete
+     kernelvec env (the device/lock credentials) it is provable because
+     every member is a lock handle (CtxMove) or context-free. *)
+  Definition env_move (E : CurCtx -d> iPropO Σ) : iProp Σ :=
+    (∀ (CIDm : CpuId) (ξ0 ξ1 : CtxId),
+       TsoCtx.own_context (CID := CIDm) ξ0 -∗
+       TsoCtx.own_context (CID := CIDm) ξ1 -∗ □ E ξ0 ==∗
+       TsoCtx.own_context (CID := CIDm) ξ0 ∗
+       TsoCtx.own_context (CID := CIDm) ξ1 ∗ □ E ξ1)%I.
+
+  (* A6.139: the RECURSION IS OVER THE ENVIRONMENT FAMILY, and the body
+     instantiates its resource slot AT ITS OWN CONTEXT ([ires_pack_of S
+     XIb]) -- the packed form is what the machine's arm really carries, so
+     the producer's and the engine's conversions stay reflexivity. *)
+  Definition ihs_fam := ((CurCtx -d> iPropO Σ) -d> CPU -d> mword 64 -d>
+                         iPropO Σ)%type.
+
+  Definition ires_pack_of (S : ihs_fam)
+      : CurCtx -d> CPU -d> iPropO Σ :=
+    fun ξ c =>
+      (∃ E' : CurCtx -d> iPropO Σ,
+         ires_of (S E') c ∗ □ E' ξ ∗ □ env_move E')%I.
+
+  Global Instance ires_pack_of_contractive : Contractive ires_pack_of.
+  Proof.
+    intros n S1 S2 HS ξ c. rewrite /ires_pack_of.
+    apply bi.exist_ne. intros E'.
+    apply bi.sep_ne; [ | done ].
+    apply ires_of_contractive.
+    split. intros m Hm. destruct HS as [HSlt]. exact (HSlt m Hm E').
+  Qed.
+
+  Definition ihs_pre (kt : ktier) (S : ihs_fam) : ihs_fam :=
+    fun E => ihs_of kt E (ires_pack_of S).
 
   Global Instance ihs_pre_contractive (kt : ktier) : Contractive (ihs_pre kt).
   Proof.
-    intros n S1 S2 HS. rewrite /ihs_pre.
-    apply ihs_of_ne. by apply ires_of_contractive.
+    intros n S1 S2 HS E. rewrite /ihs_pre.
+    apply ihs_of_ne. by apply ires_pack_of_contractive.
   Qed.
 
-  Definition ihs (kt : ktier) : CPU -d> mword 64 -d> iPropO Σ :=
-    fixpoint (ihs_pre kt).
+  Definition ihs (kt : ktier) : ihs_fam := fixpoint (ihs_pre kt).
 
   (* THE CONTRACT AT THE AMBIENT HART, AT THE HART'S REGIME [kt].  A trap on
      a [kt]-regime hart runs and resumes at [kt]; the handler's own proof is
      tier-generic, so [intr_handler_spec kt h] is available at whatever
      regime its holder is running. *)
-  Definition intr_handler_spec (kt : ktier) (handler : mword 64) : iProp Σ :=
-    ihs kt cpu_id handler.
+  Definition intr_handler_spec (kt : ktier) (E : CurCtx -d> iPropO Σ)
+      (handler : mword 64) : iProp Σ :=
+    ihs kt E cpu_id handler.
 
   (* PERSISTENCE HAS TO NAME THE INSTANCE.  The body is [□ _], so there is
      exactly one, but [apply _] after the [fixpoint_unfold] rewrite searches
      the whole unfolded contract and does not come back (>90s, measured).
      The pre-fixpoint definition could afford [apply _]; this one cannot. *)
-  Global Instance intr_handler_spec_persistent (kt : ktier) handler :
-    Persistent (intr_handler_spec kt handler).
+  Global Instance intr_handler_spec_persistent (kt : ktier) E handler :
+    Persistent (intr_handler_spec kt E handler).
   Proof.
-    rewrite /intr_handler_spec /ihs (fixpoint_unfold (ihs_pre kt) cpu_id handler)
+    rewrite /intr_handler_spec /ihs
+            (fixpoint_unfold (ihs_pre kt) E cpu_id handler)
             /ihs_pre /ihs_of /ihs_body_of.
     apply bi.intuitionistically_persistent.
   Qed.
@@ -2248,11 +2296,13 @@ Section IntrDefs.
   (* THE ONE-STEP UNFOLDING, which every consumer of the contract needs: the
      spec is not syntactically a [□ ∀ …] any more, so [iApply "Hspec"] must
      be preceded by a rewrite with this. *)
-  Lemma intr_handler_spec_unfold {kt : ktier} (handler : mword 64) :
-    intr_handler_spec kt handler ⊣⊢ ihs_body_of kt (ires_of (ihs kt)) handler.
+  Lemma intr_handler_spec_unfold {kt : ktier} (E : CurCtx -d> iPropO Σ)
+      (handler : mword 64) :
+    intr_handler_spec kt E handler ⊣⊢
+    ihs_body_of kt E (ires_pack_of (ihs kt)) handler.
   Proof.
     rewrite /intr_handler_spec /ihs.
-    apply (fixpoint_unfold (ihs_pre kt) cpu_id handler).
+    apply (fixpoint_unfold (ihs_pre kt) E cpu_id handler).
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -2265,33 +2315,40 @@ Section IntrDefs.
   (*   - the ENGINE ([WpIntrInv.wp_exec_step_intr]) applies the spec;        *)
   (*   - the PRODUCER ([ProofKernelvec.kernelvec_handler_spec]) builds it.   *)
   (* ------------------------------------------------------------------- *)
-  Lemma intr_handler_spec_apply {kt : ktier} (handler : mword 64)
+  Lemma intr_handler_spec_apply {kt : ktier} (E : CurCtx -d> iPropO Σ)
+      (handler : mword 64)
       (m : regfile) (av : nat) (p pc0 sc tv : mword 64) :
     ret_pc pc0 = pc0 ->
     s_cause_ok sc ->
-    intr_handler_spec kt handler -∗
-    ihs_entry_of kt (ires_of (ihs kt)) m av p pc0 sc tv handler -∗
+    intr_handler_spec kt E handler -∗
+    □ E XI -∗
+    ihs_entry_of kt (ires_pack_of (ihs kt) XI) m av p pc0 sc tv handler -∗
     wp_next true p
-      (fun c' => ihs_post_of (CID := c') kt (ires_of (ihs kt)) m av p pc0) -∗
+      (fun c' => ihs_post_of (CID := c') kt (ires_pack_of (ihs kt) XI)
+                   m av p pc0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hpc0 Hsc) "Hsp Hentry Hnext".
+    iIntros (Hpc0 Hsc) "Hsp #HE Hentry Hnext".
     iEval (rewrite intr_handler_spec_unfold /ihs_body_of) in "Hsp".
     (* the contract is context-generic; consume it at the ambient thread *)
     iSpecialize ("Hsp" $! XI m av p pc0 sc tv).
     iEval (rewrite /ihs_trap_of) in "Hsp".
-    iApply ("Hsp" with "[%] [%] Hentry Hnext"); done.
+    iApply ("Hsp" with "[%] [%] HE Hentry Hnext"); done.
   Qed.
 
-  Lemma intr_handler_spec_intro {kt : ktier} (handler : mword 64) :
+  Lemma intr_handler_spec_intro {kt : ktier} (E : CurCtx -d> iPropO Σ)
+      (handler : mword 64) :
     □ (∀ (XIc : CurCtx) (m : regfile) (av : nat) (p pc0 sc tv : mword 64),
          ⌜ ret_pc pc0 = pc0 ⌝ -∗
          ⌜ s_cause_ok sc ⌝ -∗
-         ihs_entry_of (XI := XIc) kt (ires_of (ihs kt)) m av p pc0 sc tv handler -∗
+         □ E XIc -∗
+         ihs_entry_of (XI := XIc) kt (ires_pack_of (ihs kt) XIc)
+           m av p pc0 sc tv handler -∗
          wp_next true p
-           (fun c' => ihs_post_of (CID := c') (XI := XIc) kt (ires_of (ihs kt)) m av p pc0) -∗
+           (fun c' => ihs_post_of (CID := c') (XI := XIc) kt
+                        (ires_pack_of (ihs kt) XIc) m av p pc0) -∗
          WP (Loop : expr riscv_lang)) -∗
-    intr_handler_spec kt handler.
+    intr_handler_spec kt E handler.
   Proof.
     iIntros "#H".
     iEval (rewrite intr_handler_spec_unfold /ihs_body_of).
@@ -2382,13 +2439,46 @@ Section IntrDefs.
      HART".  It is NOT tier-covariant in either direction (the contract has
      the bundle in both a negative and a positive position), which is what
      restricts [sie_cap_ktier_up] to the DISABLED arm -- see there. *)
-  Definition intr_res (kt : ktier) : iProp Σ :=
+  (* A6.139: the resource ∃-packs the handler ENVIRONMENT beside the
+     contract, pinned at the carried thread's context.  The ∃ keeps every
+     carrier's arity; the □-conjunct is what the trap engine feeds the
+     contract's ∀XIb body.  This AMENDS the M2 sentence above ("does not
+     depend on the ambient XI"): the E-slot is at the carried thread's
+     context, and "a trap moves the hart, never the context" is exactly
+     why entry and post share one [E].  Crossing a PARK re-homes it --
+     the forkret-park lane's trap_csrs crossing morphs it like the other
+     context-relative members. *)
+  Definition intr_res_at (kt : ktier) (E : CurCtx -d> iPropO Σ) : iProp Σ :=
     (∃ (h : mword 64) (b : mword 1),
        ⌜ trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ⌝ ∗
        ⌜ stvec_base h = h ⌝ ∗
        ghost_var sie_gname (1/4) b ∗
        stvec ↦ᵣ h ∗
-       ▷ intr_handler_spec kt h)%I.
+       ▷ intr_handler_spec kt E h)%I.
+
+  Definition intr_res (kt : ktier) : iProp Σ :=
+    (∃ E : CurCtx -d> iPropO Σ,
+       intr_res_at kt E ∗ □ E XI ∗ □ env_move E)%I.
+
+  Lemma intr_res_pack {kt : ktier} (E : CurCtx -d> iPropO Σ) :
+    intr_res_at kt E -∗ □ E XI -∗ □ env_move E -∗ intr_res kt.
+  Proof. iIntros "Hat #HE #Hmv". iExists E. iFrame "Hat HE Hmv". Qed.
+
+  (* the CONTRACT with its environment, ∃-packed at the ambient context --
+     the arity-stable spelling every carrier of a bare
+     [intr_handler_spec kt h] row moves to (A6.139). *)
+  Definition ihs_env (kt : ktier) (h : mword 64) : iProp Σ :=
+    (∃ E : CurCtx -d> iPropO Σ,
+       intr_handler_spec kt E h ∗ □ E XI ∗ □ env_move E)%I.
+
+  Global Instance ihs_env_persistent kt h : Persistent (ihs_env kt h).
+  Proof. rewrite /ihs_env. apply _. Qed.
+
+  Lemma ihs_env_intro {kt : ktier} (E : CurCtx -d> iPropO Σ) (h : mword 64) :
+    intr_handler_spec kt E h -∗ □ E XI -∗ □ env_move E -∗ ihs_env kt h.
+  Proof. iIntros "#Hs #HE #Hmv". iExists E. iFrame "Hs HE Hmv". Qed.
+
+  Global Typeclasses Opaque ihs_env.
 
   (* THE constructor.  No fupd -- there is no invariant to allocate, which is
      why the boot chain's [intr_inv_alloc_off] site loses its [iMod].  There
@@ -2397,16 +2487,19 @@ Section IntrDefs.
      ([iDestruct "H" as (h vb) "(%Htvd & %Hsb & Hq & Hstv & #Hspec)"]) and
      rebuild with this.  The five old [iInv]/[inv_acc] sites are all that
      shape now. *)
-  Lemma intr_res_intro {kt : ktier} (h : mword 64) (b : mword 1) :
+  Lemma intr_res_intro {kt : ktier} (E : CurCtx -d> iPropO Σ)
+      (h : mword 64) (b : mword 1) :
     trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ->
     stvec_base h = h ->
     ghost_var sie_gname (1/4) b -∗
     stvec ↦ᵣ h -∗
-    ▷ intr_handler_spec kt h -∗
+    ▷ intr_handler_spec kt E h -∗
+    □ E XI -∗
+    □ env_move E -∗
     intr_res kt.
   Proof.
-    iIntros (Htvd Hsb) "Hq Hstv #Hspec".
-    iExists h, b. iFrame "Hq Hstv Hspec". by iSplit.
+    iIntros (Htvd Hsb) "Hq Hstv #Hspec #HE #Hmv".
+    iExists E. iFrame "HE Hmv". iExists h, b. iFrame "Hq Hstv Hspec". by iSplit.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -2432,6 +2525,11 @@ Section IntrDefs.
   (* exactly the set of places that should be looking inside.             *)
   (* ------------------------------------------------------------------- *)
   Global Typeclasses Opaque intr_res.
+  (* A6.139: the new faces get the SAME load-bearing seal -- an unsealed
+     [intr_res_at]/[ires_pack]/[ihs_env] lets unification walk into the
+     [ihs] fixpoint (measured: [apply is_lock_move] against a payload
+     carrying a parked [trap_csrs] DIVERGED). *)
+  Global Typeclasses Opaque intr_res_at.
   (* SPELLED FLAT, not as [trap_csrs_raw ∗ intr_res]: the tier destructures
      this bundle positionally in dozens of places, and a nested pair would
      silently rebind the fourth name to a pair instead of failing loudly. *)
@@ -3178,22 +3276,76 @@ Section IntrDefs.
   (* form after [intr_handler_spec_unfold] -- and each is a conversion, not   *)
   (* a proof.                                                                *)
   (* ------------------------------------------------------------------- *)
-  Lemma intr_res_of_eq {kt : ktier} : intr_res kt ⊣⊢ ires_of (ihs kt) cpu_id.
+  (* A6.139: the generic face is the ∃E-PACKED family, at the ambient
+     context -- definitionally [ires_pack_of (ihs kt) XI]. *)
+  Definition ires_pack (kt : ktier) : CPU -d> iPropO Σ :=
+    ires_pack_of (ihs kt) XI.
+
+  Lemma intr_res_at_of_eq {kt : ktier} (E : CurCtx -d> iPropO Σ) :
+    intr_res_at kt E ⊣⊢ ires_of (ihs kt E) cpu_id.
+  Proof. reflexivity. Qed.
+
+  Lemma intr_res_of_eq {kt : ktier} :
+    intr_res kt ⊣⊢ ires_pack_of (ihs kt) XI cpu_id.
   Proof. reflexivity. Qed.
 
   Lemma sie_arm_of_eq {kt : ktier} (b : bool) (p : mword 64) :
-    sie_arm kt b p ⊣⊢ sie_arm_of (ires_of (ihs kt)) b p.
+    sie_arm kt b p ⊣⊢ sie_arm_of (ires_pack_of (ihs kt) XI) b p.
   Proof. reflexivity. Qed.
 
   Lemma sie_cap_of_eq {kt : ktier}
       (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
-    sie_cap kt m avail b p ⊣⊢ sie_cap_of kt (ires_of (ihs kt)) m avail b p.
+    sie_cap kt m avail b p ⊣⊢
+    sie_cap_of kt (ires_pack_of (ihs kt) XI) m avail b p.
   Proof. reflexivity. Qed.
 
   Lemma sie_cap_gpr_of_eq {kt : ktier}
       (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
-    sie_cap_gpr kt m avail b p ⊣⊢ sie_cap_gpr_of kt (ires_of (ihs kt)) m avail b p.
+    sie_cap_gpr kt m avail b p ⊣⊢
+    sie_cap_gpr_of kt (ires_pack_of (ihs kt) XI) m avail b p.
   Proof. reflexivity. Qed.
+
+  Global Typeclasses Opaque ires_pack.
+
+  (* A6.139: PACKING an E-FIXED generic capability back to the real one --
+     what the trap engines' Löb re-entry needs after running a handler
+     whose contract fixed E.  Direction matters: generic-at-E + the □env
+     packs; the real form never unpacks to a caller-chosen E. *)
+  Lemma sie_arm_pack {kt : ktier} (E : CurCtx -d> iPropO Σ)
+      (b : bool) (p : mword 64) :
+    sie_arm_of (ires_of (ihs kt E)) b p -∗ □ E XI -∗ □ env_move E -∗
+    sie_arm kt b p.
+  Proof.
+    iIntros "Harm #HE #Hmv". rewrite sie_arm_of_eq /sie_arm_of.
+    destruct b; last by iExact "Harm".
+    iDestruct "Harm" as "(Hq & Hres & Hkpt & Ha & Hb & Hc & Hd & He & Hf)".
+    iFrame "Hq Hkpt Ha Hb Hc Hd He Hf".
+    rewrite /ires_pack. iExists E. iFrame "Hres HE Hmv".
+  Qed.
+
+  Lemma sie_cap_pack {kt : ktier} (E : CurCtx -d> iPropO Σ)
+      (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
+    sie_cap_of kt (ires_of (ihs kt E)) m avail b p -∗ □ E XI -∗
+    □ env_move E -∗
+    sie_cap kt m avail b p.
+  Proof.
+    iIntros "(Hstk & Htr & Harm & Hctx & Htc & Hwit) #HE #Hmv".
+    iDestruct (sie_arm_pack E with "Harm HE Hmv") as "Harm".
+    rewrite sie_cap_of_eq /sie_cap_of.
+    iFrame "Hstk Htr Hctx Htc Hwit".
+    iEval (rewrite sie_arm_of_eq) in "Harm". iExact "Harm".
+  Qed.
+
+  Lemma sie_cap_gpr_pack {kt : ktier} (E : CurCtx -d> iPropO Σ)
+      (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
+    sie_cap_gpr_of kt (ires_of (ihs kt E)) m avail b p -∗ □ E XI -∗
+    □ env_move E -∗
+    sie_cap_gpr kt m avail b p.
+  Proof.
+    iIntros "(Hhs & Hsc & Hcap & Hfile) #HE #Hmv".
+    iDestruct (sie_cap_pack E with "Hcap HE Hmv") as "Hcap".
+    rewrite /sie_cap_gpr. iFrame "Hhs Hsc Hcap Hfile".
+  Qed.
 
   Global Instance sie_cap_gpr_into_sep {kt : ktier} m avail b p :
     IntoSep (sie_cap_gpr kt m avail b p)
@@ -3532,6 +3684,7 @@ End IntrDefs.
 (* with [wp_next_chain] and apply this once, exactly as for [cpu_own].    *)
 (* ===================================================================== *)
 Lemma trap_csrs_ext_transport `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId}
+    `{XI : CurCtx}
     {kt : ktier} (CID0 CID1 : CpuId) (eb : bool) (p : mword 64) :
   (eb = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
   trap_csrs_ext (CID := CID0) kt eb -∗ trap_csrs_ext (CID := CID1) kt eb.

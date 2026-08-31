@@ -1,0 +1,27 @@
+DIGEST 7c764677400ccb3c94bddd50bd08a825
+Fxv6iris.LinkUsertrap
+R1144:1154 xv6iris.LinkSyscall <> <> lib
+R1156:1165 xv6iris.LinkPrintk <> <> lib
+R1167:1176 xv6iris.LinkMyproc <> <> lib
+R1178:1187 xv6iris.LinkKilled <> <> lib
+R1189:1201 xv6iris.LinkSetkilled <> <> lib
+R1219:1229 xv6iris.LinkDevintr <> <> lib
+R1231:1241 xv6iris.LinkVmfault <> <> lib
+R1243:1251 xv6iris.LinkYield <> <> lib
+R1253:1269 xv6iris.LinkPrepareReturn <> <> lib
+R1271:1279 xv6iris.LinkKexit <> <> lib
+R1297:1309 xv6iris.LinkKernelvec <> <> lib
+R1327:1339 xv6iris.ProofUsertrap <> <> lib
+R1362:1374 xv6iris.ProofUsertrap UsertrapProof <> modtype
+R1376:1382 xv6iris.LinkSyscall Syscall <> modtype
+R1384:1392 xv6iris.LinkPrintk PrintkGen <> modtype
+R1394:1399 xv6iris.LinkMyproc Myproc <> modtype
+R1401:1406 xv6iris.LinkKilled Killed <> modtype
+R1408:1416 xv6iris.LinkSetkilled Setkilled <> modtype
+R1451:1457 xv6iris.LinkDevintr Devintr <> modtype
+R1459:1465 xv6iris.LinkVmfault Vmfault <> modtype
+R1467:1471 xv6iris.LinkYield Yield <> modtype
+R1473:1485 xv6iris.LinkPrepareReturn PrepareReturn <> modtype
+R1487:1491 xv6iris.LinkKexit Kexit <> modtype
+R1526:1534 xv6iris.LinkKernelvec Kernelvec <> modtype
+mod 1350:1357 <> Usertrap

@@ -2287,11 +2287,15 @@ Section ProofMain.
       iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv". }
     iDestruct (mn_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
     iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γk γtl γs pd pav pu
-                  Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
-    iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
-                 kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec []")
+                  Hnproc with "Hhw Hmin Htext") as "#Hkvs".
+    iPoseProof (kernelvec_env_move γd γv γk γtl γs pd pav pu) as "#HEmv".
+    iDestruct (intr_res_intro (kernelvec_env γd γv γk γtl γs pd pav pu)
+                 (mword_of_int KernelSyms.kernelvec : mword 64) _
+                 kernelvec_tv_direct kernelvec_stvec_base
+                 with "Hq Hstvec [] [] HEmv")
       as "Hintr".
     { iApply bi.later_intro. iExact "Hkvs". }
+    { iEval (rewrite /kernelvec_env). iModIntro. iExact "Hcaps". }
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started fsc_printk γk fsc_kalloc γs γd γv m5 (K - 2)%nat p0 pd pav pu
               root pas γi ξd P ltac:(lia) Hp0 Hcid

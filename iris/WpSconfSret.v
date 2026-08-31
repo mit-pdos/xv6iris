@@ -198,11 +198,14 @@ Section WpSconfSret.
                    MENVCFG_S sepc0 with "[$Hrw $Hro]")
         as "(Hms & Hpriv & HnPC & _ & Hmenv & Hsepc)".
       iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
-      iEval (rewrite /intr_res) in "Hhx".
-      iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
+      iEval (rewrite /intr_res /intr_res_at) in "Hhx".
+      iDestruct "Hhx" as (Ehx) "(Hhxat & #HEhx & #HEhxmv)".
+      iDestruct "Hhxat" as (handler vb)
+        "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
       iMod (sie_ghost_flip_on _ _ _ _ _ with "Hhalf Harm Htok Hqi")
         as "(Hhalf & Hqcap & Hqcnt & Hqi)".
-      iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec")
+      iDestruct (intr_res_intro Ehx handler _ Htvd Hsb
+                   with "Hqi Hstv Hspec HEhx HEhxmv")
         as "Hintr".
       (* ---- THE TIE MOVES: ('1','1') -> ('0','1') on BOTH halves at once. *)
       iMod (sret_bits_update ('b"1") ('b"1") ('b"1") ('b"1") ('b"0") ('b"1")

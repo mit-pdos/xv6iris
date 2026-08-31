@@ -694,7 +694,7 @@ Section UtDispatch.
      the whole walk where [intr_handler_spec kernelvec] is needed. *)
   Local Lemma ud_hold (N : ut_names) (V : pprivate)
       (ep sc st : mword 64) :
-    intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    ihs_env KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     cpu_own 0%nat false (un_pj N) false ∅ -∗
     cpu_claim (un_pj N) -∗
     sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ st -∗
@@ -775,7 +775,13 @@ Section UtDispatch.
     iDestruct (ut_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
     iPoseProof (KV.kernelvec_handler_spec (un_u N) (un_v N) (un_k N) (un_tk N)
                   (un_s N) (un_pd N) (un_pav N) (un_pu N) Hlen
-                  with "Hhw Hmin Htext Hdc") as "#Hih".
+                  with "Hhw Hmin Htext") as "#Hihs".
+    iPoseProof (kernelvec_env_move (un_u N) (un_v N) (un_k N) (un_tk N)
+                  (un_s N) (un_pd N) (un_pav N) (un_pu N)) as "#HEmv".
+    iAssert (ihs_env KT1 (mword_of_int KernelSyms.kernelvec : mword 64))
+      with "[]" as "#Hih".
+    { iApply (ihs_env_intro with "Hihs [] HEmv").
+      iEval (rewrite /kernelvec_env). iModIntro. iExact "Hdc". }
     iDestruct "Hraw" as "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt)".
     (* ---- +0x30: csrr a4,scause ---- *)
     iApply (wp_csrr_scause_s_sconf (mword_of_int (UT + 0x30)) Ra4 m nx

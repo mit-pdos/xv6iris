@@ -247,7 +247,7 @@ Section SchedCtxPay.
                        mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ :=
     fun h A' c cret tpv p back ξ =>
     (⌜tpv = cid_word_of h⌝ ∗
-     trap_csrs KT1 (CID := h) ∗
+     trap_csrs (XI := ξ) KT1 (CID := h) ∗
      ( (* c = the CPU/scheduler context, resumed by a PARKING PROC [cret]
           (sched's swtch): the proc hands over its held lock and the cpu
           cells; its state is one of the two parked states.  [A'] -- the
@@ -345,9 +345,31 @@ Section SchedCtxPay.
   Proof. rewrite /is_lock. ctx_move_solve. Qed.
   Global Instance is_lock_morph γ lk s R : CtxMorph (λ ξ, is_lock (XI := ξ) γ lk s R).
   Proof. rewrite /is_lock. ctx_morph_solve. Qed.
+  (* A6.139: the handler ENVIRONMENT re-homes across the crossing by the
+     witness packed beside it in [intr_res]; everything else in the bundle
+     is context-free.  These two instances are what lets the payload rows
+     stay pinned at the box's own ξ. *)
+  Global Instance intr_res_move (kt : ktier) (CIDh : CpuId) :
+    CtxMove (CID := CID) (λ ξ, intr_res (XI := ξ) (CID := CIDh) kt).
+  Proof.
+    iIntros (ξ0 ξ1) "H0 H1 Hres".
+    iEval (rewrite /intr_res) in "Hres".
+    iDestruct "Hres" as (E) "(Hat & #HE & #Hmv)".
+    iMod ("Hmv" $! _ ξ0 ξ1 with "H0 H1 HE") as "(H0 & H1 & #HE')".
+    iModIntro. iFrame "H0 H1".
+    iEval (rewrite /intr_res). iExists E. iFrame "Hat HE' Hmv".
+  Qed.
+
+  Global Instance trap_csrs_move (kt : ktier) (CIDh : CpuId) :
+    CtxMove (CID := CID) (λ ξ, trap_csrs (XI := ξ) (CID := CIDh) kt).
+  Proof. rewrite /trap_csrs. ctx_move_solve. Qed.
+
   Global Instance p_sched_move h A' c cret tpv p back :
     CtxMove (λ ξ, p_sched h A' c cret tpv p back ξ).
-  Proof. rewrite /p_sched. ctx_move_solve. Qed.
+  Proof.
+    rewrite /p_sched. ctx_move_solve.
+    all: apply (trap_csrs_move KT1 h).
+  Qed.
 
   (* the scheduler-chain valid context, PINNED at hart [h]
      (fixed Phi / P instantiation); [p] = the context's c->proc

@@ -718,11 +718,15 @@ Section ProofMainSecondary.
     { rewrite /devintr_caps.
       iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv". }
     iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γk γk γs pd pav pu
-                  Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
-    iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
-                 kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec []")
+                  Hnproc with "Hhw Hmin Htext") as "#Hkvs".
+    iPoseProof (kernelvec_env_move γd γv γk γk γs pd pav pu) as "#HEmv".
+    iDestruct (intr_res_intro (kernelvec_env γd γv γk γk γs pd pav pu)
+                 (mword_of_int KernelSyms.kernelvec : mword 64) _
+                 kernelvec_tv_direct kernelvec_stvec_base
+                 with "Hq Hstvec [] [] HEmv")
       as "Hintr".
     { iApply bi.later_intro. iExact "Hkvs". }
+    { iEval (rewrite /kernelvec_env). iModIntro. iExact "Hcaps". }
     (* ---- +0x3a jal plicinithart ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x3a)) (mword_of_int 1 : mword 5)
               (mword_of_int 18334 : mword 21) mth n false

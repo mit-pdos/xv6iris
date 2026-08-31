@@ -1,0 +1,19 @@
+DIGEST 50cde1ca1b54e16b4971b264c38a8ed3
+Fxv6iris.LinkMainSecondary
+R212:220 xv6iris.LinkCpuid <> <> lib
+R222:231 xv6iris.LinkPrintk <> <> lib
+R233:247 xv6iris.LinkKvminithart <> <> lib
+R249:264 xv6iris.LinkTrapinithart <> <> lib
+R282:297 xv6iris.LinkPlicinithart <> <> lib
+R299:311 xv6iris.LinkScheduler <> <> lib
+R313:325 xv6iris.LinkKernelvec <> <> lib
+R343:360 xv6iris.ProofMainSecondary <> <> lib
+R390:407 xv6iris.ProofMainSecondary MainSecondaryProof <> modtype
+R409:413 xv6iris.LinkCpuid Cpuid <> modtype
+R415:423 xv6iris.LinkPrintk PrintkGen <> modtype
+R425:435 xv6iris.LinkKvminithart Kvminithart <> modtype
+R437:448 xv6iris.LinkTrapinithart Trapinithart <> modtype
+R450:461 xv6iris.LinkPlicinithart Plicinithart <> modtype
+R484:492 xv6iris.LinkScheduler Scheduler <> modtype
+R494:502 xv6iris.LinkKernelvec Kernelvec <> modtype
+mod 371:383 <> MainSecondary

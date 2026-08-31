@@ -1,0 +1,7 @@
+DIGEST 1de94881336a5303e01baf280a5fb222
+Fxv6iris.LinkKernelvec
+R310:323 xv6iris.LinkKerneltrap <> <> lib
+R325:338 xv6iris.ProofKernelvec <> <> lib
+R362:375 xv6iris.ProofKernelvec KernelvecProof <> modtype
+R377:386 xv6iris.LinkKerneltrap Kerneltrap <> modtype
+mod 349:357 <> Kernelvec
