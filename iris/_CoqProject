@@ -1648,14 +1648,18 @@ ProofSysUnlinkAUW5D.v
 ProofSysUnlinkAU.v
 LinkSysUnlinkAU.v
 
-# fs-syscall-specs lane SH-TO-URUN, STAGE 1: the shell's program proof on
-# the urun engine.  UCodeShK.v is a SECOND code catalog over the SAME dump
-# as UCodeSh.v -- generated at [--prog shk] (tools/ucode_shk.txt) so the
-# first-generation sh proofs (UProofSh*.v, still on-build over WpUmode* and
-# UmodeIo's io-protocol) keep [sh_text_sub] / [ui_sh_*] / [sh_code] while
-# the port gets [shk_text_sub] / [uis_shk_*] / [shk_code] over the same
-# ShInstrs.sh_bytes.  It covers 91 instructions in 5 functions: start,
-# main, and the open/close/exit stubs.
+# fs-syscall-specs lane SH-TO-URUN, STAGES 1-2: the shell's program proof
+# on the urun engine.  UCodeShK.v is a SECOND code catalog over the SAME
+# dump as UCodeSh.v -- generated at [--prog shk] (tools/ucode_shk.txt) so
+# the first-generation sh proofs (UProofSh*.v, still on-build over WpUmode*
+# and UmodeIo's io-protocol) keep [sh_text_sub] / [ui_sh_*] / [sh_code]
+# while the port gets [shk_text_sub] / [uis_shk_*] / [shk_code] over the
+# same ShInstrs.sh_bytes.  It covers 192 instructions in 10 functions:
+# start, main, getcmd, memset, gets and the open/close/exit/write/read
+# stubs.  IT IS THE LANE'S COMPILE-TIME BUDGET: measured serially a catalog
+# costs ~22 s fixed plus ~1.9 s PER INSTRUCTION (91 instr = 191 s, 192 =
+# 380 s), so the parser's ~500 more belong in a SECOND catalog file, not
+# appended here.
 #   UkRunBr.v is the ONE branch leaf UkRunLeaf.v does not have and should
 # ([wp_uk_btype0], the base branch against x0, whose value is not readable
 # off the register file) -- a six-line re-thread of an existing UkBranch
@@ -1664,13 +1668,21 @@ LinkSysUnlinkAU.v
 # loops needed the same rule and it now lives in UkRunLeaf.v, which is
 # where both always belonged.
 #   UkSh.v is the walk: the quiet-row stub shape once ([wp_ksh_qstub],
-# instantiated at open and close), exit, start, main's prologue, and main's
-# console preamble -- the first UNBOUNDED loop proven on this engine, under
-# one iLoeb whose invariant is EMPTY (the branch conditions are case split
-# on the abstract [uv_btaken] boolean, so the walk never learns what fd the
-# kernel returned).  It stops at the command loop's head 0x914, taken as
-# the single Prop [ush_cmd_head]; stage 2 discharges it.  Audit = the
-# standing three, zero Admitted.
+# instantiated at open, close and write), exit, start, main's prologue, the
+# console preamble (an iLoeb whose invariant is EMPTY -- its branches are
+# case split on the abstract [uv_btaken] boolean, so the walk never learns
+# what fd the kernel returned), and the COMMAND LOOP: getcmd -> write +
+# memset + gets -> read, the leading-blank scan, and a second iLoeb whose
+# invariant is the BUFFER plus five register constants.  The scan
+# terminates on the NUL gets plants, which is the one place a fact about
+# memory decides control flow.  ONE Hypothesis, [ush_read_leaf]: the
+# general window ecall leaf, which UkRunSys.v does not have yet; it is
+# spelled at [wp_uk_ecall_wait_null]'s idiom and every lemma that depends
+# on it says so and carries it as an explicit argument.  memset and the
+# scan do not.  The walk stops at 0x97a, taken as [ush_rest] -- an abstract
+# continuation that takes the LOOP HEAD as its own premise, because the
+# rest of main's body falls back into it.  Audit = the standing three,
+# zero Admitted.
 UCodeShK.v
 UkRunBr.v
 UkSh.v

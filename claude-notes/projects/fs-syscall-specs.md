@@ -1564,10 +1564,15 @@ things, and the answer differs:
     `<M>Instrs.<prefix>_bytes`.  Fixed here (5 lines, plus the geometry
     scalars, which read `<prog>Entry` and silently printed 0).
     `tools/ucode_shk.txt` is the new pc spec and grows per stage.
-  * **Compile-time finding: the catalog does not scale to all of sh.**
-    91 instructions cost **3 m 20 s**; `ucode_sh.txt`'s 1032 would be
-    ~11× that, far past the per-file budget.  The catalog must be SPLIT
-    per stage (or per function group) before the parser lands.
+  * **Compile-time finding: the catalog does not scale to all of sh, and
+    the cost is LINEAR IN INSTRUCTIONS.**  Re-measured serially under the
+    `kernel_text`-shaped catalog: 91 instructions = **191 s**, 192
+    instructions = **380 s**, i.e. **~22 s fixed + ~1.9 s per
+    instruction**.  The rework did not change that; there is no
+    superlinear blow-up to remove, only a per-instruction bill.  So
+    `ucode_sh.txt`'s 1032 would be ~32 min in one file, and **the split
+    plan stands**: the parser's ~500 instructions go in a SECOND catalog
+    file, which costs one more ~22 s prelude and divides the wall clock.
   * **Two engine leaves were missing, and both are UkRunLeaf's.**
     `wp_uk_btype0` — the base branch against x0 (`bltz`/`bgez`/…): the
     value of x0 is not readable off the register file, so `wp_uk_btype`'s
@@ -1575,8 +1580,11 @@ things, and the answer differs:
     `wp_uk_btype_later` — every leaf in `UkRunLeaf.v` is later-FREE, which
     is right for a bounded Rocq induction (echo's two scans) and leaves an
     UNBOUNDED loop unprovable, since an `iLöb` hypothesis is `□ ▷ …`.
-    Both are six-line re-threads of leaves `UkBranch.v` already has; they
-    are in `UkRunBr.v` only because UkRunLeaf.v is not this lane's file.
+    Both are six-line re-threads of leaves `UkBranch.v` already has.
+    `wp_uk_btype_later` is now UPSTREAM'S, in `UkRunLeaf.v` beside
+    `wp_uk_btype` (init's loops needed the same rule), and `UkRunBr.v`'s
+    copy is deleted; `wp_uk_btype0` is still the lane's, because
+    `UkRunLeaf.v` has no x0-branch leaf of any kind to hang it on.
   * **The first unbounded loop on urun, and its invariant is EMPTY.**
     `while ((fd = open("console", O_RDWR)) >= 0) if (fd >= 3) { close(fd);
     break; }` — 0x900..0x910, back edge `bge s1,a0,0x900` at 0x90c.  One
@@ -1594,19 +1602,107 @@ things, and the answer differs:
     pc is reachable, and 0x914..0x926 rewrites every register the loop
     reads.  Everything below it in the file is unconditional.
 
+  **STAGE 2 AS LANDED (2026-08-31; `iris/UCodeShK.v` 3545 lines / 192
+  instructions, `iris/UkSh.v` 5236 lines, `iris/UkRunBr.v` 82; audit = the
+  standing three (`resv_matches`, `resv_is_valid`, funext) on
+  `wp_ksh_start`, `wp_ksh_cmd_head`, `wp_ksh_getcmd` AND `wp_ksh_memset`;
+  zero `Admitted`, zero new `Axiom`).**  0x914 → the command loop → getcmd
+  → write + memset + gets → read → the leading-blank scan → the blank-line
+  test.  `ush_cmd_head` is DISCHARGED.
+  * **ONE Hypothesis, and it is the missing leaf.**  `ush_read_leaf`, in
+    `UkSh.v`, stated at the idiom of the landed
+    `UkRunSys.wp_uk_ecall_wait_null` (same section variables, same binder
+    order, same resource spellings) so the discharge against the sibling's
+    `wp_uk_ecall_window` is `intros` + `exact` or a thin adapter:
+
+        Hypothesis ush_read_leaf :
+          forall (h : CpuId) (m : regfile) (pc : mword 64) (a : Z)
+                 (k : nat) (f : nat -> bv 8) (avail : nat),
+            usysno m = USYS_read ->
+            uint (m !!! Regidx a1_idx) = a ->
+            uint (m !!! Regidx a2_idx) = Z.of_nat k ->
+            is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+            uinstr_is γt pc false (ECALL tt) -∗
+            ubytes γd a k f -∗
+            urun γt γd γs h m pc avail -∗
+            (∀ (h' : CpuId) (r : mword 64) (d : nat) (g : nat -> bv 8),
+               ⌜ (d <= k)%nat ⌝ -∗
+               ⌜ forall j : nat, (d <= j < k)%nat -> g j = f j ⌝ -∗
+               ubytes γd a k g -∗
+               urun γt γd γs h' (<[Regidx a0_idx := r]> m)
+                 (add_vec_int pc 4) avail -∗
+               WP (Loop : expr riscv_lang)) -∗
+            WP (Loop : expr riscv_lang).
+
+    IT TAINTS SEVEN LEMMAS, each labelled in its own header and each
+    carrying it as an explicit argument once the section closes:
+    `wp_ksh_read`, `wp_ksh_gets`, `wp_ksh_getcmd`, `wp_ksh_cmd_head`,
+    `wp_ksh_console`, `wp_ksh_main`, `wp_ksh_start`.  Everything else is
+    unconditional — the byte-run algebra, the quiet stubs, `exit`,
+    `memset`, the scan step and the scan.  **The row does NOT tie the
+    returned count `r` to the number of bytes `d` written, and gets does
+    not need it**: gets tests `r` to decide whether to keep reading and
+    stores whatever byte is in its one-byte window either way, so the walk
+    is correct at every `d ≤ k` the row permits.
+  * **THE COMMAND LOOP'S INVARIANT.**  Stage 1's console loop carried
+    NOTHING round its cycle.  This one carries exactly two things:
+    `∃ f, ubytes γd sh_buf 100 f` — the `.bss` line buffer at 0x2020, at an
+    existential content function — and `ush_regs`, the five register
+    constants 0x914..0x926 loads once (s2 = &buf, s3 = 100, s4 = '\n',
+    s5 = 'c', s6 = ' ').  The CONTENTS are never carried: getcmd
+    re-establishes from scratch what the next turn needs, which is a NUL
+    below 100 and nothing else.  Two one-line lemmas do all the register
+    plumbing — `ush_regs_upd` (a write outside s2..s6) and `ush_regs_cs`
+    (a call that honours the ABI).
+  * **THE SCAN IS THE ONE PLACE A FACT ABOUT MEMORY DECIDES CONTROL
+    FLOW.**  `while (*cmd == ' ' || *cmd == '\t') cmd++` has no bound in
+    the code; what bounds it is gets' postcondition — `f i2 = 0` for some
+    `i2 < 100` — because 0 is neither a space nor a tab.  The measure is
+    `i2 - k`, so the scan is a bounded Rocq induction (echo's strlen mold)
+    nested inside the loop's `iLöb`.  Everything else that branches is
+    either computed from a register the walk set itself (memset's `bne`,
+    gets' `bge`, the two blank tests) or case split on the abstract
+    `uv_btaken` boolean (getcmd's return test, `read`'s count test, the
+    newline and carriage-return tests).
+  * **WHERE IT STOPS, AND WHY THAT SHAPE.**  0x97a is `ush_rest`, an
+    abstract continuation **that takes the loop head as its own premise**:
+    the rest of main's body (the cd builtin at 0x98e, fork1/parsecmd/
+    runcmd at 0x92c) ends by falling back into 0x938, so body and head are
+    mutually recursive and the honest cut is a premise that says so.  It
+    is `□`, so the loop may use it every turn.  Stages 4–5 discharge it by
+    supplying the body; nothing here assumes anything about it.
+  * **THREE THINGS THE ENGINE STILL DID NOT HAVE, all solved in-lane.**
+    (1) `ubytes` could be READ a byte at a time (`ustr_byte`'s shape) but
+    not WRITTEN: `ush_bytes_upd` takes one byte out and puts ANY byte
+    back, and it is what memset, gets and the NUL store all run on.
+    (2) x0's VALUE is not readable off `m` — the same defect
+    `wp_uk_btype0` exists for, one instruction class over — and gets ends
+    on `sb zero,0(s8)`, whose stored byte IS x0.  `urun_x0` reads it off
+    the bundle (`UkStep.uvb_x0`) and re-packs the run.  RELOCATION ASK,
+    with `wp_uk_btype0`.  (3) `ustack_12` existed but only as a `⊣⊢`;
+    `UserHeap.v`'s own header records what a `⊣⊢` split costs under
+    `rewrite` in a proofmode goal, so gets uses directed
+    open/close wrappers instead.
+  * **THE FRAMES, AND WHAT THE LOOPS ACTUALLY CARRY.**  gets' loop carries
+    ONE byte — `c` at `s0-81`, the only local in its twelve-word frame —
+    plus the buffer; the ten spilled words and the other seven bytes of
+    that word never enter the loop lemma at all and stay in the caller's
+    context.  The stack budget is the call chain spelled out: main's 8 on
+    top of getcmd's 4 on top of gets' 12, so `wp_ksh_start` asks for
+    `2 + (8 + (16 + n))`.
+  * **A LANE GOTCHA WORTH THE LINE.**  `rewrite (_ : A = B) by tac` does
+    not parse in this tree — ssreflect's `rewrite` is in scope and takes
+    `by` differently — so a one-off equation is an `assert … by …` plus a
+    `rewrite`.  And a C pointer dereference inside a comment (`if(*cmd`)
+    opens a NESTED Rocq comment exactly the way a cast's `*)` closes one;
+    write `if ( *cmd`.
+
   **THE PLAN (stages 2–6).**
-  * **STAGE 2 — the command loop's head, and the READ window.**  `getcmd`
-    (0x0, 29 instrs) → `write(2,"$ ",2)` (quiet) + `memset` (0xa5c, 16) +
-    `gets` (0xaaa, 50) → `read(0,&c,1)`, plus main's blank-line arm
-    (`while (*cmd==' '||*cmd=='\t') cmd++;  if (*cmd=='\n') continue;`) and
-    the outer `while (getcmd(...) >= 0)` back edge to 0x938 — a second
-    iLöb, at the head that matters.  Discharges `ush_cmd_head`.
-    **Blocked on one leaf**: `wp_uk_ecall_window`, the read row's consumer.
-    Its statement is forced — the caller hands over `ubytes γd a k f` for
-    the buffer it named in a1 with `k ≥ count`, and gets back
-    `∃ d ≤ count, ubytes γd a k g` with `g` agreeing with `f` above `d`;
-    the re-assembly primitive already exists and is
-    `UserHeap.uheap_store_run`.  ASK below.
+  * **STAGE 2 — the command loop's head, and the READ window.  LANDED;
+    see the record above.**  The one leaf it could not build,
+    `wp_uk_ecall_window`, is the named local Hypothesis `ush_read_leaf`,
+    and ASK 1 is now "land the leaf and delete the Hypothesis", not "build
+    the walk".
   * **STAGE 3 — the allocator.**  `malloc` (0x118c, 91) → `morecore` →
     `sbrk` (0xc52, 10) → `sys_sbrk` (0xd0e), and `free` (0x1106, 46).  The
     first call is the only one the old stack proved (`freep == 0`), and
@@ -1659,13 +1755,21 @@ things, and the answer differs:
     at sh's text and entry pc, not echo's nine.
 
   **ASKS (relay, in priority order).**
-  1. **`wp_uk_ecall_window` in `UkRunSys.v`** — blocks stage 2 and every
-     stage above it, and blocks upstream's init port at exactly the same
-     place (`wait((int*)0)`).  Owner question: ours or upstream's?  The
-     row and the re-assembly lemma both exist; this is the leaf.
+  1. **`wp_uk_ecall_window` in `UkRunSys.v`** — no longer blocks stage 2,
+     which landed against it as the local Hypothesis `ush_read_leaf`
+     (statement above, spelled to match `wp_uk_ecall_wait_null`).  What is
+     left is to land the leaf and replace the Hypothesis by an `intros` +
+     `exact`; until then seven of `UkSh.v`'s lemmas carry it as an
+     explicit argument, `wp_ksh_start` among them.  The row and the
+     re-assembly lemma (`UserHeap.uheap_store_run`) both exist.
   2. **`wp_uk_ecall_fork`** (the two-continuation arm) and
      **`wp_uk_ecall_sbrk`** — stages 3–5.
-  3. **Relocate `UkRunBr.v`'s two leaves into `UkRunLeaf.v`.**
+  3. **Relocate `UkRunBr.v`'s remaining leaf into `UkRunLeaf.v`** —
+     `wp_uk_btype0`, the x0 branch.  Half the ask is discharged:
+     `wp_uk_btype_later` now lives in `UkRunLeaf.v` (upstream put it there
+     for init's loops) and `UkRunBr.v`'s copy is gone.  Take `urun_x0`
+     (`UkSh.v`) with it: it is the same defect — x0's value is not
+     readable off the register file — for a STORE rather than a branch.
   4. **`pipe`'s row has no null guard** while `wait`'s now does — the
      same defect 9dc84f919 fixed, one row over.  Upstream's contract.
   5. **The eleven first-generation `UProofSh*.v` files.**  Precedent says
