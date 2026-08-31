@@ -82,6 +82,10 @@ Require Import FsFdMirror.   (* [umirror]/[mcur]/[ufs_step]/[uenr_dom] *)
 Section UexecRetFs.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* ONE ambient [CurCtx] for the whole section: every fs definition binds
+     it and the section close abstracts it, so the closed constants take
+     {XI} uniformly -- the per-definition-binder alternative loses to the
+     oldest-candidate rule wherever the ambient exists. *)
   Context `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context `{!ghost_varG Σ umirror}.
@@ -152,7 +156,7 @@ Section UexecRetFs.
       (π : gmap (mword 27) uperm) (fdv : list fdstate) : iProp Σ :=
     (▷ ukb_fs_F γm X C pt Rfd Rut sz π fdv)%I.
 
-  Definition uvb_fs_F (γm : gname) (X : uvis -d> iPropO Σ) `{CID : CpuId} `{XI : TsoCtx.CurCtx}
+  Definition uvb_fs_F (γm : gname) (X : uvis -d> iPropO Σ) `{CID : CpuId}
       (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (fdv : list fdstate)
@@ -164,11 +168,11 @@ Section UexecRetFs.
   Definition uslot_fs_F (γm : gname) (X : uvis -d> iPropO Σ)
       : uvis -d> iPropO Σ :=
     fun W =>
-      (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+      (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
          (Rut : uptd -> iProp Σ),
          ⌜loop_ok C pt⌝ -∗
          ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
-         uvb_fs_F γm X (CID := h) (XI := xi) C pt Rfd Rut (uvis_sz W) (uvis_perm W)
+         uvb_fs_F γm X (CID := h) C pt Rfd Rut (uvis_sz W) (uvis_perm W)
            (uvis_fd W) (uvis_M W)
            (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
          -∗
@@ -185,15 +189,15 @@ Section UexecRetFs.
     fixpoint (uslot_fs_F γm).
   Definition uexec_ret_fs (γm : gname) : mword 64 -> uvis -> iProp Σ :=
     uexec_ret_fs_F γm (uslot_fs γm).
-  Definition ukb_fs `{CID : CpuId} `{XI : TsoCtx.CurCtx} (γm : gname) (C : ucfg) (pt : uptd)
+  Definition ukb_fs `{CID : CpuId} (γm : gname) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (fdv : list fdstate)
       : iProp Σ := ukb_fs_F γm (uslot_fs γm) C pt Rfd Rut sz π fdv.
-  Definition ukont_fs `{CID : CpuId} `{XI : TsoCtx.CurCtx} (γm : gname) (C : ucfg) (pt : uptd)
+  Definition ukont_fs `{CID : CpuId} (γm : gname) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (fdv : list fdstate)
       : iProp Σ := ukont_fs_F γm (uslot_fs γm) C pt Rfd Rut sz π fdv.
-  Definition uvb_fs `{CID : CpuId} `{XI : TsoCtx.CurCtx} (γm : gname) (C : ucfg) (pt : uptd)
+  Definition uvb_fs `{CID : CpuId} (γm : gname) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (fdv : list fdstate)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
@@ -201,11 +205,11 @@ Section UexecRetFs.
 
   Lemma uslot_fs_unfold (γm : gname) (W : uvis) :
     uslot_fs γm W ⊣⊢
-    (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
        (Rut : uptd -> iProp Σ),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
-       uvb_fs (CID := h) (XI := xi) γm C pt Rfd Rut (uvis_sz W) (uvis_perm W) (uvis_fd W)
+       uvb_fs (CID := h) γm C pt Rfd Rut (uvis_sz W) (uvis_perm W) (uvis_fd W)
          (uvis_M W)
          (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
        WP (Loop : expr riscv_lang)).
@@ -253,12 +257,15 @@ Section UexecRetFs.
     iLöb as "IH" forall (W).
     iIntros "Hs".
     rewrite uslot_fs_unfold.
-    iIntros (h xi C pt Rfd Rut) "%Hlo %Hpm Hb".
+    iIntros (h C pt Rfd Rut) "%Hlo %Hpm Hb".
     rewrite /uvb_fs /uvb_fs_F.
     iDestruct "Hb" as
       "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
     iEval (rewrite uslot_unfold) in "Hs".
-    iApply ("Hs" $! h xi C pt Rfd Rut with "[%] [%] [-]");
+    (* the fs bundle is pinned at this section's ambient context (its own
+       ∀ xi is vacuous), so the PLAIN slot -- honestly ∀-quantified -- is
+       instantiated at the ambient, not at the intro'd xi *)
+    iApply ("Hs" $! h XI C pt Rfd Rut with "[%] [%] [-]");
       [exact Hlo | exact Hpm |].
     rewrite /uvb /uvb_F.
     iFrame "Hamb Hur Hpt Hfrag Hcfg Hg Hpc Hrut".
@@ -286,7 +293,7 @@ Section UexecRetFs.
   (* ...and the fallback direction: the enriched kernel promise implies
      the plain one (the enrichment is FORGOTTEN, not refunded -- the
      one-way street the design note records) *)
-  Lemma ukont_fs_ukont `{CID : CpuId} `{XI : TsoCtx.CurCtx} (γm : gname) (C : ucfg) (pt : uptd)
+  Lemma ukont_fs_ukont `{CID : CpuId} (γm : gname) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm)
       (fdv : list fdstate) :
@@ -309,23 +316,25 @@ Section UexecRetFs.
 
   Definition urun_fs (γm γt γd γs : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) : iProp Σ :=
-    (∃ (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd)
+    (∃ (C : ucfg) (pt : uptd)
        (Rfd : list fdstate -> iProp Σ)
        (Rut : uptd -> iProp Σ) (sz : Z)
        (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (fdv : list fdstate),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        uheap γt γd γs M pm ∗
        ustack γd (m !!! Regidx csp_rs1) avail ∗
-       uvb_fs (CID := h) (XI := xi) γm C pt Rfd Rut sz pm fdv M m pc)%I.
+       uvb_fs (CID := h) γm C pt Rfd Rut sz pm fdv M m pc)%I.
 
   Lemma urun_fs_urun (γm γt γd γs : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) :
     urun_fs γm γt γd γs h m pc avail -∗ urun γt γd γs h m pc avail.
   Proof.
     iIntros "H".
-    iDestruct "H" as (xi C pt Rfd Rut sz M pm fdv)
+    iDestruct "H" as (C pt Rfd Rut sz M pm fdv)
       "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
-    rewrite /urun. iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv.
+    (* the fs bundle's pieces are pinned at the ambient (its ∃ xi is
+       vacuous), so the plain urun repacks at the ambient *)
+    rewrite /urun. iExists XI, C, pt, Rfd, Rut, sz, M, pm, fdv.
     iSplitR; [iPureIntro; exact Hlo |].
     iSplitR; [iPureIntro; exact Hpm |].
     iFrame "Hheap Hstk".
