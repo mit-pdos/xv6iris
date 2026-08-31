@@ -213,7 +213,7 @@ Section UkShDiagStr.
     urun γt γd γs h m pc avail -∗ shd_sb γt γd tx a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun #Hb".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(_ & _ & Hh & _ & _)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(_ & _ & Hh & _ & _)".
     destruct tx.
     - iDestruct (uheap_text with "Hh Hb") as %(_ & _ & Hbnd).
       iPureIntro. exact Hbnd.
@@ -3002,7 +3002,7 @@ Section UkShDiagVprintfS.
     urun γt γd γs h m pc avail -∗ ubyteq γd dq a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(_ & _ & Hh & _ & _)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(_ & _ & Hh & _ & _)".
     iDestruct (uheap_ubyte with "Hh Hb") as %(_ & _ & Hbnd).
     iPureIntro. exact Hbnd.
   Qed.
