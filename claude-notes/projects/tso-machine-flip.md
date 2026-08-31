@@ -17693,3 +17693,71 @@ ProofUservec, ProofUser, HartSMemTok (new), with TrampStepPt/TransPt/
 UptWalkPt/UsertrapRes/UtResFits/ProofUsertrap staying green under the
 new shapes.  All five r63 error roots except ProofForkretPark:318 are
 gone.
+
+## A6.141 — THE FORK CROSSING, TWO-THIRDS DISSOLVED: park_globals and
+## proc_priv measured to the true wall (owner's "context-relative where
+## it just works out" directive)
+
+### §1. THE r54 WALL IS GONE FOR park_globals
+
+A6.129 §4 recorded "[park_globals] cannot move as a whole because of ONE
+row: [is_ftable]".  Re-measured this session: the payload story changed
+under it (pipe λ'd at A6.130, wait/nextpid at A6.129 §3, cons/ticks/disk
+already λ), and the ONLY thing keeping [is_ftable] stuck was its
+CONSTANT payload embedding [<{ ftable_res γ }>] — [is_lock (XI := ξ)]
+with a ξ-VARYING payload ARGUMENT, the one shape [is_lock_move] cannot
+take.  THE FIX IS ONE DEFINITION: [FileInv.is_ftable]'s payload is now
+the context-λ [(fun ξ => ftable_res (XI := ξ) γ)], defined AFTER the
+section (a section-local constant cannot take [(XI := ξ)] — the standing
+trap).  Ambient consumers are TEXTUALLY UNCHANGED (measured: the whole
+FileInv cone recompiled without an edit): the λ applied at [cur_ctx] is
+the spelling they always used.  With that, [CtxMove park_globals] is
+PROVEN ([ProofForkretPark.park_globals_move], an unfold list + the
+A6.128 solver), and [forkret_park_paid]'s [park_globals]/[procs_inv]
+bullets at the twin's ξ go through by the SAME ctx_move-at-park-time the
+file already used for cells/stack/is_kstack: both tokens are live until
+the twin parks.
+
+### §2. MEASUREMENT GOTCHAS (the probe that lied, and the eta trap)
+
+- [tryif (repeat tac) then "OK"] is VACUOUS: [repeat] never fails, so
+  the probe reports success for every goal it merely left untouched.
+  Probe with the full [Qed] or count goals.
+- ξ-free rows survive the solver ETA-CONTRACTED
+  ([CtxMove (@first_tok …)] with no visible λ), invisible to the step's
+  [(λ _, ?body)] pattern; and a row that PRINTS ξ-free can still be
+  ξ-varying through an implicit [CurCtx] argument (devsw_table's [↦₈□]
+  cells; first_boot_persist; fs_ready).  [apply ctx_move_const] failing
+  is the honest test for ξ-freedom.
+
+### §3. THE TRUE WALL, NAMED: TWO ξ-BODIED INVARIANTS (owner review)
+
+[CtxMove proc_priv] reduces — through ~15 unfolds, every step either
+cells (solver), ghosts (const), or lock handles ([is_lock_move]) — to
+exactly TWO residual constants, both of the one untransportable shape
+(§0.16′: an [inv] whose BODY owns ξ-indexed cells):
+
+  - [IcacheInv.itable_inv] = [inv icacheN (∃M, itable_half M ∗ ⌜wf⌝ ∗
+    iref_cells M ∗ live_pool M)] — the iref words are ambient-ξ [↦₄]
+    cells inside the inv;
+  - [BioInv.buf_escrow bn V k] = [inv bioN (buf_escrow_body …)] — same
+    class.
+
+  Reached through BOTH deep rows of [proc_priv]: [first_tok] →
+  [fs_ready] → {itable_inv, bio_ctx → buf_escrow}, and [cwd_ref]/
+  [ofile_slot] → the icache references.  NOTE [bio_ctx] itself is NOT an
+  inv — it is the bcache [is_lock] (payload still a CONSTANT embedding
+  [<{ bcache_res bn V }>], flippable exactly like is_ftable) ∗ sleep-lock
+  handles ∗ [buf_escrow].
+
+THE DESIGNED REMEDY IS §0.47′ (rooted invariants): restate the two
+bodies at an establishment context ξe packed inside (contents as
+[ctx_values]/rooted records, access gated on dominating ξe).  Both invs
+then become ξ-FREE propositions, [proc_priv] moves like everything else,
+and the fork's crossing closes — note the child twin is BORN dominating
+everything its parker dominated ([own_context_twin] copies the bound),
+so the domination gate costs the fork nothing.  A6.129 §4's per-lock
+mono_nat stamp is the concrete instrument for the re-base step.
+DEFERRED FOR OWNER REVIEW; until the ruling, [ProofForkretPark] is red
+at its ONE remaining bullet (the [proc_priv] row), with the blocker
+recorded in place.
