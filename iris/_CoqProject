@@ -1686,3 +1686,12 @@ LinkSysUnlinkAU.v
 UCodeShK.v
 UkRunBr.v
 UkSh.v
+
+# FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
+# u-tier syscall row.  FsFdMirror = the pure mirror + step table;
+# UexecRetFs = the parallel enriched trap contract + the conservativity
+# bridge + the engine seal; FdRowPilot = the era-0 pilot theorems (an
+# image-check consumer -- the leaf rule applies, nothing may require it).
+FsFdMirror.v
+UexecRetFs.v
+FdRowPilot.v

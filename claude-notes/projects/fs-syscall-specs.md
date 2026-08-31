@@ -2153,3 +2153,103 @@ Neither is needed by what landed: the pure route proves the acceptance
 content of the trace outright, and the ledger is only the vehicle for the
 LOCATED, era-attached form.  Recorded here rather than in uart-trace.md so
 the plan's own "Open" list is not duplicated.
+
+## FD-ROW PILOT — the enriched u-tier syscall row (design lane landed 2026-08-31)
+
+Design of record: [`../design/fd-row-pilot.md`](../design/fd-row-pilot.md)
+(the seam ruling with the refuted alternatives, the target theorem, the
+era-0 story, upstream-vs-ours, non-goals).  Files (all NEW; nothing
+frozen touched; all EC2-green, zero `Admitted`, zero new `Axiom`):
+
+- `iris/FsFdMirror.v` — the per-process mirror `umirror` (fdt/av/cwd),
+  the `mcur` ghost halves, `ustr_read`, `um_resolve`, and the PURE step
+  table `ufs_step` for the two pilot rows (open = 15, mknod = 17), every
+  arm a reading of the landed AU contracts' arms (delta_create,
+  delta_trunc, om_*, dev_arg, NDEV_max), the `-1` blanket kept on every
+  row (the landed determinism stance).
+- `iris/UexecRetFs.v` — the enriched trap contract as a PARALLEL guarded
+  fixpoint (`uslot_fs`): `uexec_ret_fs_F` = UexecRet's arm with ONE
+  disjunct spliced in at `uenr_dom n` (plain-verbatim ∨ deposit-the-
+  mirror-half / get-it-back-stepped).  PROVEN: the conservativity bridge
+  `uslot_uslot_fs : uslot W -∗ uslot_fs γm W` (Löb; audit = the standing
+  `resv` pair, no funext), `uexec_ret_fs_of`, `ukont_fs_ukont`,
+  `urun_fs_urun`, `uheap_ustrq`.  SEALED: `FDROW_UKFS_ENGINE.
+  wp_uk_ecall_fs`, the enriched ecall leaf (stage P2).
+- `iris/FdRowPilot.v` — the era-0 seed (`era0_seed`, INSTANTIATED
+  against the checked image: `era0_seed_boot`, `fsimg_console_miss`) and
+  the pilot theorems: `pilot_console_pure` (**Closed under the global
+  context — zero axioms**: the three-call chain forces r1 = −1, and
+  r3 ≠ −1 ⇒ r3 = 0 ∧ fd 0 = `FdOpen true true (FdDevice CONSOLE)` ∧ the
+  resolved row = `ADev CONSOLE 0`) and the functor
+  `FdRowPilotWalk.wp_pilot_open2` (the same read through one sealed-leaf
+  application — the shape the enriched init walk consumes).
+
+AS-LANDED FINDINGS:
+1. **A wand-shaped kernel seal would be a GAP-premise trap in Module-Type
+   clothing.**  `mirror_boot γm ∗ uslot_fs γm W -∗ uslot W` is
+   UNDISCHARGEABLE at its own altitude: from a plain `ukont` nothing can
+   conjure the `ufs_step` tie — the receipts live in the dispatcher's
+   post, which only the loop's Löb sees.  So the kernel-side enrichment
+   is a LOOP-altitude stage (P4), never a sealed wand; only the
+   engine-level leaf is sealed (its discharge needs no kernel change —
+   the deposit arm is the process's to take).
+2. **Certificates alone cannot carry the pilot** (design §2's refutation
+   of route (b)): nothing outside the arm can refute `r ≠ 0` under the
+   arm's ∀ (UexecRet.v:495-499), and located receipts hit the position
+   problem, whose only fix is a linear cursor crossing the trap — i.e.
+   the arm enrichment.  Pure-row enrichment can carry return RANGES
+   (worth asking upstream for, WINDOW-LEAF-style) but never fd numbering.
+3. **The mirror can be in a two-generation `.vo` state** while a sibling
+   lane's build wave runs: `UexecRetFs` deliberately does NOT require
+   `UkRunSys` (its `usysno` premise is spelled `usys_num (tf_of m pc)`
+   and `uheap_ubytes_run` is restated locally at UserHeap altitude) so
+   the pilot cone never loads a freshly-rebuilt `.vo` beside the
+   `SystemAdequacy` generation.  Compile single files only after the
+   wave quiesces (`find -newermt` on `*.vo`).
+4. **`Some_inj`, not `injection`, on closed `bv` options** — `injection`
+   recurses into the `BV` records and emits positive-match garbage.
+   And `assert (… /\ …) as [-> ->] by (split; congruence)` beats nested
+   `injection` on `MkAnode`/`ADir` equations (recursion depth is
+   version-dependent).
+
+THE STAGES (prover lanes; budgets keyed to the landed analogues):
+
+- [ ] **P2 — the engine leaf** (discharges `FDROW_UKFS_ENGINE`).  A
+  `UkStep.wp_uk_ecall` twin fired at `uvb_fs` (the trap-out hands
+  `uexec_ret_fs`; the leaf takes the RIGHT disjunct with the caller's
+  deposit) + the `wp_uk_ecall_fs` wrapper (open `urun_fs`, pin the path
+  via `uheap_ustrq`, re-close with `urun_close_upd`'s twin).  BUDGET:
+  `UkStep.wp_uk_ecall` measures 126 lines and `wp_uk_ecall_window` ~100;
+  budget 300 with the re-close plumbing.  Opus-sized, blocked on nothing.
+- [ ] **P3 — the era-0 mint** at the userinit park: allocate the `mcur`
+  pair (`mcur_alloc`), seed = `era0_seed_boot` at the boot snapshot's S,
+  user half + seed into init's entry deposit, kernel half parked beside
+  the residue.  BUDGET: lane-P scale (`FsInitPin` port = 508 lines).
+  Sequenced with P4 (the kernel half's home is the enriched loop's).
+- [ ] **P4 — the enriched loop round** (the kernel side; milestone-J
+  shaped, upstream's with our support).  The excursion relays the AU
+  receipts (the AU dispatch arms are landed; the relay is a
+  uservec/usertrap-post conjunct in the block-reuse mold —
+  `ProofSysOpenTails`' resource-generic continuations are the precedent
+  that priced the AU walks) and the loop's right branch joins the mirror
+  halves, steps them off `open_fd_ok`'s explicit `sts` /
+  `mknod_post_ok_era`, and supplies the `ufs_step` tie.  Also owes the
+  mirror-faithfulness invariant and the resolve-vs-namex alignment
+  (design §5's caveat) BEFORE `uenr_dom` widens past dot-free paths.
+  BUDGET: a full lane; do not start before the upstream arm ruling
+  (design §8.1).
+- [ ] **P5 — the enriched init preamble walk + widening.**  The
+  `UkInit` stage-1 preamble re-walked on `urun_fs` (after the upstream
+  arm lands, the engine is THE engine and no leaf twins exist; if walked
+  transitionally instead, budget one `urun_fs` twin per leaf kind the
+  preamble uses — the reason the plan prefers adoption-first).  Then:
+  the dup row (fds 1-2 = console), fork's mirror retirement/downgrade
+  (the solo flip), and the post-fork general row (av leg → existential
+  observations + persistent certs).  BUDGET for the walk: UkInit stage 1
+  measured 1520 + 3249 + 1020 lines; the preamble slice ~1500.
+
+UPSTREAM ASKS (design §8, each a yes/no brief there): (1) the arm diff
+in `UexecRet.v` (conservative — the bridge is the compiled receipt;
+recommend YES); (2) the era-0 entry deposit at the userinit park (with
+P3); (3) the pure return-range conjuncts on open/mknod's rows
+(WINDOW-LEAF-style, independent; recommend YES).
