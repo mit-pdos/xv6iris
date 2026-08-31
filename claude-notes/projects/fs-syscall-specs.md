@@ -1723,6 +1723,156 @@ things, and the answer differs:
     `nulterminate`'s jump table is the one novelty (a computed control
     transfer) and the old `UProofShCmd.nt_mem` model ports.
     Catalog: split it — see the compile-time finding.
+
+    **STAGE 4 AS LANDED — PARTIAL, 2026-08-31** (`iris/UCodeShP.v` 8190
+    lines / 564 instructions, `iris/UkShParse.v` 1845 lines; EC2-green;
+    audit = the standing three (`resv_matches`, `resv_is_valid`, funext) on
+    `wp_kshp_strchr` and `wp_kshp_strlen`, and *closed under the global
+    context* on the pure layer; zero `Admitted`, zero new `Axiom`).
+
+    * **THE CATALOG IS THE STAGE'S BIG DELIVERABLE, and the cost law
+      HOLDS.**  `tools/ucode_shp.txt` → `iris/UCodeShP.v` at `--prog shp`:
+      **564 instructions in eleven functions** (parsecmd, parseline,
+      parsepipe, parseexec, parseredirs, nulterminate, peek, gettoken,
+      execcmd, strlen, strchr), 359 distinct decode lemmas.  Measured
+      serially on the mirror: **18 min 58 s**.  Stage 1's law (~22 s fixed
+      + ~1.9 s/instruction) predicts 18 min 13 s — **4 % under**, so the
+      law is confirmed at 3× the sample it was fitted on and the split
+      plan's economics stand exactly as stated.  A monolithic
+      `UCodeShK.v` + parser would be 756 instructions ≈ 24 min *on every
+      stage-1/2 edit*; as two files, stage 4's 19 min is paid once and the
+      two halves build in parallel.  Five whole functions are OUT with the
+      reason recorded in the spec file — `parseblock`, `redircmd`,
+      `pipecmd`, `listcmd`, `backcmd` are each reached only through a
+      `peek` for a symbol byte, which `ushp_no_symbols` excludes — as are
+      `malloc` (stage 3's; the Hypothesis crosses the call without fetching
+      an instruction) and `memset` (already `UCodeShK.v`'s).
+    * **THE HYPOTHESIS, VERBATIM, AND ITS TAINT SET (empty today).**
+      `ushp_malloc_ok`, in `UkShParse.v` §6, at the idiom of the landed
+      function contracts in `UkSh.v` (same binder order, `ucallee_saved`
+      read-back, `ret_pc` return) so stage 3's discharge is `intros` +
+      `exact` or a thin adapter:
+
+          Hypothesis ushp_malloc_ok :
+            forall (h : CpuId) (m : regfile) (nbytes : Z) (avail : nat),
+              m !!! Regidx a0_idx = mword_of_int nbytes ->
+              0 < nbytes -> nbytes < Z31 ->
+              shp_code γt -∗
+              urun γt γd γs h m (mword_of_int ShSyms.malloc) (10 + avail) -∗
+              (∀ (h' : CpuId) (m' : regfile) (p : Z) (g : nat -> bv 8),
+                 ⌜ ucallee_saved m m' ⌝ -∗
+                 ⌜ m' !!! Regidx a0_idx = mword_of_int p ⌝ -∗
+                 ⌜ 0 < p /\ p mod 16 = 0 /\ p + nbytes < 2 ^ 38 ⌝ -∗
+                 ubytes γd p (Z.to_nat nbytes) g -∗
+                 urun γt γd γs h' m' (ret_pc (m !!! Regidx ra_idx))
+                   (10 + avail) -∗
+                 WP (Loop : expr riscv_lang)) -∗
+              WP (Loop : expr riscv_lang).
+
+      `10 + avail` is the call chain spelled out, not a round number:
+      malloc's own frame is 64 bytes (8 words) and the deepest thing it
+      calls is `free` or `sbrk`, 2 words each.  **It has NO failure arm,
+      deliberately**: sh's constructors never test malloc's result
+      (`execcmd` goes straight into `memset(cmd, 0, 168)`), so a NULL
+      return is a fault in sh rather than a branch, and a contract with a
+      NULL arm would be unusable by the code it is for — the first
+      generation drew the same line and named it (its
+      `wp_sh_malloc_first_body` is first-call-only).  **IT TAINTS NOTHING
+      YET**: the two landed walks call no constructor, so every lemma in
+      the file is unconditional today.  The moment `wp_kshp_execcmd` lands
+      it becomes the first tainted lemma and parseexec/parsepipe/parseline/
+      parsecmd follow, each labelled in its own header as stage 2 labelled
+      its seven.
+    * **THE TREE PREDICATE — stage 6's interface.**  `ushp_tree s0 p t`
+      over `Inductive ushp_cmd := UshpExec (toks : list (nat * nat)) |
+      UshpRedir c q eq mode fd | UshpPipe l r | UshpList l r | UshpBack c`.
+      It is an **`iProp`, not a `Prop` over a `gmap`** (on urun a node's
+      bytes are OWNED, which is also what makes it usable as `parseexec`'s
+      loop invariant), and it is sh's own struct layout, not an abstraction
+      of it: `ushp_exec_at s0 p toks` = the type word at `p`, its four
+      bytes of padding, and ten `ushp_slot`s at `p+8` and ten at `p+88` —
+      slot `i` being the token boundary while `i` indexes a token, the NULL
+      cap at `i = |toks|`, and an unconstrained cell above that, which is
+      the honest reading of what `memset` left.  **A token is a PAIR OF
+      INDEXES into the line, not a string** — that is what the parser
+      records, and `nulterminate` (not `parseexec`) is what turns the pair
+      into a C string, so keeping the predicate at indexes lets one
+      predicate state both sides of that step.  Only the EXEC arm is
+      reachable under `ushp_no_symbols`; the other four are stated because
+      stage 5 walks `runcmd`'s five-way table.  The sibling stage-5 lane
+      states its own copy — **stage 6 reconciles, per the lane brief**.
+    * **THE PURE VOCABULARY, ported not required.**  `ushp_is_ws` /
+      `ushp_is_sym` / `ushp_skipws` / `ushp_toklen` / `ushp_tokens` /
+      `ushp_find` are `USpecSh.v`'s and `USpecShParse.v`'s definitions
+      transposed from `list (bv 8)` onto the **index function** `nat -> bv
+      8` that `UserHeap.ubytes`/`ustr` actually carry.  They are re-stated
+      rather than `Require`d for the reason `UkSh.v` re-stated
+      `USpecSh.SH_BUF` as `sh_buf`: requiring `USpecShParse.v` drags
+      `UCodeSh.v` (10 148 lines), `UmodeIo` and `Xv6G` — the whole
+      first-generation engine — into a urun-tier file.  R10 keeps the old
+      statements where they are; stage 6 reconciles the two spellings.
+      `ushp_tokens_in` (tokens are ordered, non-empty and inside the line)
+      is proved, not assumed.
+    * **THE TWO-WORD FRAME, PROVEN ONCE — and this is the economy the rest
+      of the stage needs.**  `wp_kshp_pro2` / `wp_kshp_epi2` take the four
+      PCs as parameters and the four `uinstr_is` facts as premises, so a
+      call site is four one-line `iApply`s of its own catalog rows.  They
+      already save six copies (two functions, and `strchr` reaches its
+      epilogue three ways).  With them, `ushp_pc_step` retires stage 2's
+      per-instruction `assert (E0xNNN : add_vec_int (mword_of_int 0xNNN) k
+      = mword_of_int 0xMMM) by (apply bv_eq; vm_compute; reflexivity)`
+      — one unconditional lemma instead of one `vm_compute` per step.
+      **Generalising the pair over the frame size `k` is the next thing to
+      build**: peek (8 words), gettoken (8), parseredirs (14), parseexec
+      (16), parsecmd (8) all have the same shape at a different size, and
+      it needs one `ustack_k` split per size.
+    * **WHAT WALKED: `strchr` (17 instructions) and `strlen` (18).**  Both
+      are stated over an arbitrary `ustr γd dq s len f` at an arbitrary
+      dfrac, so the two static tables (which a caller may hold
+      persistently) and the command buffer (which it owns) are the same
+      instance — there is no table-specific version.
+      `wp_kshp_strchr` returns `ushp_chr s len 0 f c`, i.e. `s + i` at the
+      first `i` with `f i = c` and **0 when there is none, including when
+      `c` is NUL** — xv6's strchr does not return a pointer to the
+      terminator, and `ushp_find` agrees because a `ustr`'s body bytes are
+      all non-NUL.  `wp_kshp_strlen` returns `len` EXACTLY, the length the
+      resource already pins.  **Both loops are BOUNDED ROCQ INDUCTIONS,
+      not iLöbs** — what bounds them is the `ustr` RESOURCE, whose
+      terminator conjunct is the byte the back edge tests; echo's strlen
+      mold, one tier down.  strlen's count comes back through a 32-bit
+      `subw`, which is why `ustr` carrying `len < 2^31` as part of what a
+      string IS (rather than as a caller's side condition) pays for itself.
+    * **WHAT DID NOT WALK, AND THE ONE MEASURED OBSTACLE.**  peek,
+      gettoken, parseredirs, parseexec, parsepipe, parseline, nulterminate
+      and execcmd are NOT walked; ~510 of the 564 catalogued instructions
+      are still owed, and with them the parser theorem.  Beyond raw volume
+      (stage 2 measured ~45 lines of walk per instruction, so the balance
+      is ~20 k lines at that rate) there is ONE hard blocker, and it is a
+      CONTRACT, not a proof: **`UkSh.wp_ksh_memset`'s postcondition is
+      `∃ g, ubytes γd a N g` — the buffer comes back owned with UNKNOWN
+      CONTENTS.**  That is enough for stage 2 (getcmd only needs the buffer
+      back) and not enough for stage 4: `execcmd` is `malloc(168);
+      memset(cmd,0,168); cmd->type = EXEC`, and the only reason
+      `cmd->argv[0] == 0` — the NULL cap `ushp_exec_at` and
+      `nulterminate`'s loop both turn on — is that the memset ZEROED it.
+      The fact is present in stage 2's proof (its loop stores
+      `nth_byte (mc !!! a1) 0` at every index) and absent from its
+      statement.  **ASK (new, #6 below): strengthen `wp_ksh_memset` to hand
+      back `ubytes γd a N (fun _ => nth_byte (m !!! a1_idx) 0)`**; the
+      existential form is one `iExists` away, so no stage-2 call site
+      moves.  Until it lands `execcmd` cannot be walked and the constructor
+      chain above it cannot start.  A second, smaller relocation ask: six
+      pieces of engine algebra (`ushp_ridx_eq`/`_ne`, `ushp_cs_ne`,
+      `ushp_byte_rng`, `ushp_zext_eq`, `ushp_zext_nul`) are re-stated here
+      because stage 2 made them `Local Lemma`s inside `Section UkSh`; with
+      `UkSh.ush_bytes_upd` and `urun_x0` they belong beside
+      `UserHeap.ustr_byte`.
+    * **MIRROR HAZARD, recorded.**  The sibling stage-5 lane edits
+      `iris/UCodeShK.v` and `iris/UkSh.v` in the shared mirror's working
+      tree, which invalidated `UkSh.vo` mid-run.  `UkShParse.v`'s only use
+      of that half is `ushp_code_shk`, which unfolds `shk_code` — stable
+      under any catalog regrowth — and the walks were additionally verified
+      green under a scratch variant that requires `UCodeShP.v` alone.
   * **STAGE 5 — `runcmd`'s tree walk.**  0x8e, 102 instructions, five arms
     off the 0x1398 jump table.  EXEC needs the exec −1 arm plus, for
     success, the pinned-exec prover (lane X's `SpecKexecPin.Q_pin`) —
@@ -1776,6 +1926,12 @@ things, and the answer differs:
      readable off the register file — for a STORE rather than a branch.
   4. **`pipe`'s row has no null guard** while `wait`'s now does — the
      same defect 9dc84f919 fixed, one row over.  Upstream's contract.
+  6. **Strengthen `UkSh.wp_ksh_memset`'s postcondition** to name the
+     bytes it wrote — `ubytes γd a N (fun _ => nth_byte (m !!! a1_idx) 0)`
+     instead of `∃ g, ubytes γd a N g`.  Stage 4's `execcmd` is blocked on
+     it and nothing else; the proof already establishes it, and the
+     existential form is one `iExists` from the strong one, so no existing
+     call site moves.  UkSh.v is stage 2's file, not this lane's to edit.
   5. **The eleven first-generation `UProofSh*.v` files.**  Precedent says
      the old proofs are DELETED when a program is ported (4f088971f did
      exactly that for sync).  That is 33k green lines and a closed

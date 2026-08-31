@@ -1716,6 +1716,33 @@ UCodeShK.v
 UkRunBr.v
 UkSh.v
 
+# ... STAGE 4: the parser.  UCodeShP.v is a THIRD catalog over the same
+# dump (tools/ucode_shp.txt, [--prog shp]) -- 564 instructions in eleven
+# functions: parsecmd, parseline, parsepipe, parseexec, parseredirs,
+# nulterminate, peek, gettoken, execcmd, strlen, strchr.  It is a file of
+# its own for the MEASURED reason recorded above: the catalog's cost is
+# linear in instructions, ~22 s fixed plus ~1.9 s each, and it came in at
+# 18 min 58 s serially -- 4 % over what that law predicts for 564.  Folding
+# it into UCodeShK.v would make one 756-instruction file (~24 min) that
+# every stage-1/2 edit rebuilds.  [shp_code] and [shk_code] are the SAME
+# proposition ([utext_img g ShInstrs.sh_bytes]); UkShParse.v's
+# [ushp_code_shk] is the one-line bridge.
+#   UkShParse.v is stage 4's walk.  Landed: the pure vocabulary
+# ([ushp_skipws]/[ushp_toklen]/[ushp_tokens]/[ushp_find], USpecShParse.v's
+# and USpecSh.v's predicates transposed from [list (bv 8)] onto the index
+# functions [ubytes]/[ustr] carry), the TREE PREDICATE [ushp_tree] that is
+# stages 5-6's interface, the two-word frame proven once
+# ([wp_kshp_pro2]/[wp_kshp_epi2], shared by both walks and by strchr's
+# three exits), and the two leaf walks the lexer and parsecmd sit on:
+# [wp_kshp_strchr] and [wp_kshp_strlen], both parametric in the string and
+# both closing their loop by bounded Rocq induction on the [ustr]
+# resource's own terminator rather than an iLoeb.  ONE Hypothesis,
+# [ushp_malloc_ok] (stage 3's allocator, blocked on [wp_uk_ecall_sbrk]);
+# it taints NOTHING yet -- every lemma in the file is unconditional today.
+# Audit = the standing three, zero Admitted, zero Axiom.
+UCodeShP.v
+UkShParse.v
+
 # FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
 # u-tier syscall row.  FsFdMirror = the pure mirror + step table;
 # UexecRetFs = the parallel enriched trap contract + the conservativity
