@@ -1712,9 +1712,29 @@ LinkSysUnlinkAU.v
 # continuation that takes the LOOP HEAD as its own premise, because the
 # rest of main's body falls back into it.  Audit = the standing three,
 # zero Admitted.
+#   STAGE 5 grows the catalog to 326 instructions in 18 functions (runcmd,
+# fork1 and the fork/exec/pipe/wait/dup/chdir stubs join it) and adds
+# UkShRun.v, the COMMAND TREE walk: runcmd's prologue and its 0x1398 jump
+# table, the five arms (EXEC, REDIR, PIPE, LIST, BACK) and fork1.  The
+# recursion is ORDINARY STRUCTURAL INDUCTION on a finite tree -- the node
+# predicate [ush_cmd] is a premise, not a parse, and stage 4 is what builds
+# one -- with the stack budget [6 * ush_ht c] words, one 48-byte frame per
+# level.  [ush_cmd] is PERSISTENT (every byte DfracDiscarded), which is
+# what lets it cross a fork as a [UkFork.Forkable] payload; the three
+# forking arms carry it, the jump table and (PIPE) the two fd words over.
+# ONE Hypothesis, [ush_diag_leaf]: the diagnostic subtree -- panic and the
+# two fprintf-and-die tails -- at its three entry pcs, which no stage of
+# this lane has walked and whose format strings are .rodata under the TEXT
+# gname.  FOUR lane leaves, all RELOCATION ASKS: [wp_uk_cldq]/[wp_uk_clwq]/
+# [wp_uk_lwuq] are UkRunMem's compressed loads and lwu at a DFRAC (their
+# proofs already are), and [wp_uk_clw_text] is a real gap -- a four-byte
+# load out of the TEXT half, which the jump table needs and which
+# [wp_uk_lbu_text] only does one byte wide.  Audit = the standing three,
+# zero Admitted, zero new Axiom.
 UCodeShK.v
 UkRunBr.v
 UkSh.v
+UkShRun.v
 
 # ... STAGE 4: the parser.  UCodeShP.v is a THIRD catalog over the same
 # dump (tools/ucode_shp.txt, [--prog shp]) -- 564 instructions in eleven

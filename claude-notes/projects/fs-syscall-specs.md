@@ -1697,6 +1697,113 @@ things, and the answer differs:
     opens a NESTED Rocq comment exactly the way a cast's `*)` closes one;
     write `if ( *cmd`.
 
+  **STAGE 5 AS LANDED (2026-08-31; `iris/UkShRun.v` 3863 lines,
+  `iris/UCodeShK.v` 5195 lines / 326 instructions in 18 functions;
+  audit = the standing three (`resv_matches`, `resv_is_valid`, funext) on
+  `wp_kshr_runcmd`, `wp_kshr_runcmd_null` and `wp_kshr_fork1`; zero
+  `Admitted`, zero new `Axiom`).**  `runcmd`'s prologue, its 0x1398 jump
+  table, ALL FIVE ARMS and `fork1`.
+
+  * **PER-ARM STATUS.**  All five walked to a leaf, plus the null-argument
+    arm as its own lemma.
+    | arm | walked | consumes |
+    |---|---|---|
+    | EXEC (0xce) | argv[0]-null → `exit(1)`; else `exec`, which the row lets return ONLY at −1, then the diagnostic tail | `wp_kshr_exec` (the −1 arm), `wp_ksh_exit` |
+    | REDIR (0xf6) | `close(fd)`, `open(file,mode)`, then either the failure tail or `runcmd(rcmd->cmd)` | `wp_ksh_close`, `wp_ksh_open`, ITSELF |
+    | LIST (0x124) | `fork1`; child runs left, parent `wait(0)` then runs right | `wp_kshr_fork1`, `wp_kshr_wait0`, ITSELF ×2 |
+    | PIPE (0x13c) | `pipe(p)` (window row, cap 8 at a0) or `panic`; two `fork1`s; fd plumbing; two `wait(0)`; `exit(0)` | `wp_kshr_pipe`, `wp_kshr_fork1` ×2, `wp_ksh_close` ×6, `wp_kshr_dup` ×2, `wp_kshr_wait0` ×2, ITSELF ×2 |
+    | BACK (0x1c4) | `fork1`; child runs the subtree, parent `exit(0)` | `wp_kshr_fork1`, ITSELF |
+    | null (0xba) | `runcmd(0)` = `exit(1)`, `wp_kshr_runcmd_null` | `wp_ksh_exit` |
+    The DEFAULT arm (`panic("runcmd")` at 0xc2) is **refuted, not walked**:
+    the node predicate pins the type word to 1..5, so `bltu a5,a4` at 0xa0
+    is not taken.  So is the null test at 0x96 inside `wp_kshr_runcmd`.
+
+  * **THE TREE PREDICATE, AND WHY IT IS PERSISTENT.**  `ush_cmd g t c`
+    over `Inductive ushcmd := UExec (args : list uarg) | URedir | UPipe |
+    UList | UBack`, with the measure `ush_ht` (the tree's HEIGHT, which is
+    the depth of the runcmd call chain).  Every byte it names is
+    `DfracDiscarded` — the type word, the pointer slots, REDIR's mode and
+    fd, and the argv vector (which is `UserHeap.uargv` verbatim, plus its
+    NUL cap).  That is not decoration: **three of the five arms fork, and
+    a child runs a subtree under a FRESH gname triple**, so the tree has
+    to cross as a `UkFork.Forkable` payload — `ush_cmd_forkable`, proved
+    by the same induction as the walk and `Closed under the global
+    context`.  An exclusive tree would need the same instance and could
+    not also be read twice.  Stage 4 builds a node with exclusive bytes
+    and must PERSIST them (`UserHeap.uarea_persist`) before handing it
+    over; that is the one thing stage 6 has to reconcile.
+
+  * **THE BUDGET IS A HEIGHT.**  `wp_kshr_runcmd c` asks for
+    `6 * ush_ht c + (2 + (Dg + n))` words: 6 per 48-byte frame, 2 for
+    fork1's own frame, `Dg` for the diagnostic subtree, `n` the caller's
+    tail.  A child's instance is the SAME theorem with the surplus rolled
+    into `n` (`n' := 6 * (max - ht sub) + n`), which is what makes the
+    induction hypothesis applicable at a smaller height without weakening
+    the statement.  Nothing is ever popped — runcmd does not return.
+
+  * **ONE HYPOTHESIS, `ush_diag_leaf`, AND ITS TAINT SET.**  Three pcs
+    hand control to sh's printer and none returns: `panic` (0x4a — from
+    fork1's −1 arm and from PIPE's failing `pipe`), the "exec … failed"
+    tail (0xda) and the "open … failed" tail (0x10e).  Each runs `fprintf`
+    (0x10aa, ~280 instructions with vprintf under it) and then `exit`.
+    The premise is stated at those three pcs with exactly what each site
+    holds: panic with a0 pinned to one of sh's THREE message addresses
+    (0x1298 "fork", 0x12a0 "runcmd", 0x12c8 "pipe") and no resource, the
+    two tails with the node's pointer word and its string, both
+    `DfracDiscarded` and both straight out of `ush_cmd`.  **It is
+    satisfiable by construction** — its discharger holds sh's read-only
+    image persistently and OUTSIDE the premise, so nothing is quantified
+    away (cf. the durable notes' unsatisfiable-gap rule).  TAINT SET:
+    `wp_kshr_fork1`, `wp_kshr_runcmd`.  Everything else in the file —
+    the four leaves, the stubs, the tree algebra, the entry walk,
+    `wp_kshr_runcmd_null` — is unconditional.
+
+  * **FOUR LANE LEAVES, ALL RELOCATION ASKS.**  `wp_uk_cldq`,
+    `wp_uk_clwq`, `wp_uk_lwuq` are UkRunMem's `wp_uk_cld` / `wp_uk_clw` /
+    `wp_uk_lwu` at a DFRAC.  Those three are stated at `DfracOwn 1` though
+    their bridge (`uheap_access`) already takes a `dq` and their base-form
+    siblings (`wp_uk_ld`, `wp_uk_lbu`) already expose it — so the
+    generalisation is the same proof with `dq` threaded, and **without it
+    a read-only data structure cannot be read at all**.  `wp_uk_clw_text`
+    is the fourth and is a real gap, not a spelling: the 0x1398 jump table
+    is .rodata, which the heap files under the TEXT gname as X-and-not-W,
+    and the tier's only text reader is `wp_uk_lbu_text` — one byte wide.
+
+  * **THE JUMP TABLE IS A RESOURCE.**  `ush_jtab g` is the five reachable
+    rows of 0x1398 as `utext` runs (row 0 is the default arm's and the
+    node predicate makes it unreachable); it is persistent, `Forkable`,
+    and a premise of `wp_kshr_runcmd` beside `shk_code`.  The six
+    dispatch identities (`ush_bltu_false`, `ush_slli_eq`, `ush_jarm_eq`,
+    `ush_jarm_even`, `ush_jtab_align`, `ush_jtab_bnd`) are all
+    `destruct c; vm_compute` — closed in each of the five cases.
+
+  * **CATALOG DELTA.**  `tools/ucode_shk.txt` gains `runcmd`, `fork1` and
+    the fork/exec/pipe/wait/dup/chdir stubs; 192 → **326** instructions,
+    18 functions.  `panic`, `fprintf`, `printf` and `vprintf` are
+    `skipfunc`ed with the reason: under the diagnostic cut no instruction
+    of them is ever fetched.  Regenerating grew `shk_syms_pins` from 10 to
+    18 conjuncts, which broke `UkSh.v`'s positional `shp_read`
+    (`&_&_&…&H` now binds a nested conjunction); fixed forward, one
+    character.
+
+  * **ASK 6, RESOLVED IN-TREE.**  Stage 4's blocker — `wp_ksh_memset`'s
+    postcondition was `∃ g, ubytes γd a N g`, forgetting that memset
+    ZEROES, which is the only source of the NULL cap at `cmd->argv` —
+    is folded into this commit: the loop now carries the byte it writes
+    and the prefix already written, and hands back
+    `ubytes γd a N (fun _ => nth_byte (m !!! a1_idx) 0)`.  `getcmd`'s call
+    site re-weakens with one `iAssert`, so no stage-2 shape moved.
+    `iris/UkShParse.v` recompiles unchanged against it (checked).
+
+  * **TWO LANE GOTCHAS WORTH THE LINE.**  (1) A `"` in a Rocq comment
+    opens a string and the comment's `*)` then does not close it — the
+    error surfaces as `Unterminated string` at END OF FILE, hundreds of
+    lines away.  Same family as the C-cast trap already recorded, and
+    both bit here.  (2) `Require Import UkLoad` AFTER `UkRunMem` shadows
+    every `wp_uk_<load>` with the low-level twin whose first argument is
+    a `ucfg`; the error names the wrong lemma.  Use `Require UkLoad` and
+    qualify.
+
   **THE PLAN (stages 2–6).**
   * **STAGE 2 — the command loop's head, and the READ window.  LANDED;
     see the record above.**  The one leaf it could not build,
@@ -1873,19 +1980,18 @@ things, and the answer differs:
       of that half is `ushp_code_shk`, which unfolds `shk_code` — stable
       under any catalog regrowth — and the walks were additionally verified
       green under a scratch variant that requires `UCodeShP.v` alone.
-  * **STAGE 5 — `runcmd`'s tree walk.**  0x8e, 102 instructions, five arms
-    off the 0x1398 jump table.  EXEC needs the exec −1 arm plus, for
-    success, the pinned-exec prover (lane X's `SpecKexecPin.Q_pin`) —
-    that is the same seam init's stage 3 sits on.  LIST and BACK need
-    `fork`'s TWO continuations (`uexec_ret_F`'s separating conjunction —
-    a `wp_uk_ecall_fork` leaf, third unbuilt).  REDIR needs open/close
-    (have them).  PIPE needs `pipe`'s window row + `dup` (quiet) — and
-    note the pipe row has **no null guard**, unlike wait's; if `p` can be
-    argued non-null from the code the row still permits a write at 0, so
-    this may become a fourth upstream contract ask.  `fork1`'s
-    `panic("fork")` arm and every `fprintf` diagnostic are REFUTABLE the
-    way UkInitPrintf refuted init's %-tree, or scoped out the way
-    `ucode_sh.txt` scoped them out; decide once, at the top.
+  * **STAGE 5 — `runcmd`'s tree walk.  LANDED; see the record above.**
+    The stage-0 guesses that did NOT survive contact: EXEC needs no
+    pinned-exec prover at all (`wp_uk_ecall_exec` is TOTAL — a successful
+    exec has no continuation, so the failure arm is the whole contract);
+    `fork`'s two continuations were already built by upstream
+    (`UkFork.wp_uk_ecall_fork`), so the third "unbuilt leaf" was not;
+    and the diagnostic paths are NOT refutable — the fork row permits −1
+    and the exec row IS the −1 arm — so they are cut at one premise
+    (`ush_diag_leaf`) instead.  PIPE's missing null guard (ask 4) cost
+    nothing: sh passes a stack address, and the walk owns the eight bytes
+    it hands over, so the row's licence to write at a null pointer is
+    never exercised.
   * **STAGE 6 — the top theorem, stated honestly.**  The first-generation
     statement is the target shape and the ceiling: `wp_sh_execs_echo` says
     *on one fixed input*, the shell reaches `exec` naming the right path
@@ -1916,22 +2022,38 @@ things, and the answer differs:
      seven tainted lemmas become unconditional by application to
      `ush_read_leaf_holds`; the Hypothesis text above is kept for the
      record.
-  2. **`wp_uk_ecall_fork`** (the two-continuation arm) and
-     **`wp_uk_ecall_sbrk`** — stages 3–5.
+  2. ~~**`wp_uk_ecall_fork`** (the two-continuation arm)~~ **DONE
+     upstream** (`UkFork.v`, with the `Forkable` payload class); stage 5
+     consumes it through `wp_kshr_fork` / `wp_kshr_fork1`.  Still open:
+     **`wp_uk_ecall_sbrk`** — stage 3.
   3. **Relocate `UkRunBr.v`'s remaining leaf into `UkRunLeaf.v`** —
      `wp_uk_btype0`, the x0 branch.  Half the ask is discharged:
      `wp_uk_btype_later` now lives in `UkRunLeaf.v` (upstream put it there
      for init's loops) and `UkRunBr.v`'s copy is gone.  Take `urun_x0`
      (`UkSh.v`) with it: it is the same defect — x0's value is not
      readable off the register file — for a STORE rather than a branch.
-  4. **`pipe`'s row has no null guard** while `wait`'s now does — the
-     same defect 9dc84f919 fixed, one row over.  Upstream's contract.
-  6. **Strengthen `UkSh.wp_ksh_memset`'s postcondition** to name the
-     bytes it wrote — `ubytes γd a N (fun _ => nth_byte (m !!! a1_idx) 0)`
-     instead of `∃ g, ubytes γd a N g`.  Stage 4's `execcmd` is blocked on
-     it and nothing else; the proof already establishes it, and the
-     existential form is one `iExists` from the strong one, so no existing
-     call site moves.  UkSh.v is stage 2's file, not this lane's to edit.
+     **And take stage 5's four (`UkShRun.v`) with them**: `wp_uk_cldq`,
+     `wp_uk_clwq`, `wp_uk_lwuq` belong in `UkRunMem.v` AS THE STATEMENTS
+     OF `wp_uk_cld`/`wp_uk_clw`/`wp_uk_lwu` (the dfrac is free — the
+     bridge already takes one — and the `DfracOwn 1` spelling is what
+     stops any read-only structure being read), and `wp_uk_clw_text` is a
+     genuinely new leaf: the four-byte load out of the TEXT half.
+  4. ~~**`pipe`'s row has no null guard**~~ **NOT A BLOCKER after all**:
+     stage 5 hands the row eight bytes it OWNS (the `int p[2]` on
+     runcmd's own frame), so the row's licence to write at a null pointer
+     is never exercised and nothing about `p` has to be argued from the
+     code.  Worth fixing upstream for symmetry with `wait`'s, not for
+     this lane.
+  6. ~~**Strengthen `wp_ksh_memset`'s postcondition**~~ (stage 4's
+     blocker) — **RESOLVED IN-TREE by stage 5**; see the stage-5 record.
+  7. **`ush_diag_leaf` — the diagnostic subtree.**  Stage 5's one
+     Hypothesis, and the only thing between `wp_kshr_runcmd` and an
+     unconditional theorem.  Discharging it is the printf walk (`panic`
+     11 instructions on top of `fprintf` 0x10aa and `vprintf` 0xdea,
+     ~280 in all) plus a persistent view of sh's .rodata at the TEXT
+     gname, in the shape `UkInit.init_rodata` / `UkInitLit.init_lit_str`
+     already have for init.  Everything the premise needs is in that
+     shape; nothing about it is unsatisfiable.
   5. **The eleven first-generation `UProofSh*.v` files.**  Precedent says
      the old proofs are DELETED when a program is ported (4f088971f did
      exactly that for sync).  That is 33k green lines and a closed
