@@ -486,6 +486,19 @@ things, and the answer differs:
     15 s, first try.
   - `iris/ProofSysWriteAUStable.v` — `SYSWRITE_AU_ERA -> …_STABLE`, 14
     lines, lands in the escape disjunct at `off0 := 0`.
+  **SINCE 2026-08-31 THE ARMS NAME THE BYTES (RULING A, as landed at the
+  ruling briefs below).**  `write_post_ok_at` / `write_post_fail_at` /
+  `write_stable_arms_at` — and their frozen non-`_at` twins — carry
+  `⌜SpecCopyin.ubytes_at M ua (concat bss)⌝` and take `(M) (ua)`;
+  `fw_au_raw` carries the same conjunct as its content half and
+  `fw_au_raw_take`'s closer gained `⌜ubytes_at M (add_vec_int ua t) bs⌝`,
+  discharged at the fire from `SpecWritei`'s new user-arm clause.  The
+  chunk DECOMPOSITION is still existential and the per-chunk FILE offsets
+  still are; only the CONTENT existential died.  Syscall argument 1 is a
+  named binder now (`v1`), because the arms speak about the bytes there.
+  Finding 2 below is unaffected — the disturbed tail still carries no
+  receipt and still has no nameable bytes.
+
   AS-LANDED FINDINGS:
   1. **The astate-shaped commit is not dischargeable — again.**
      `FsAbsMknodFire`'s first finding repeats verbatim at the write
@@ -1400,6 +1413,19 @@ things, and the answer differs:
     (3) `SpecFilewriteCons.v` is BYTE-IDENTICAL (R10): its shape had
     already been validated by the syscall seal above it, and it needed no
     edit to be provable.
+  - **SINCE 2026-08-31 THE RECEIPT NAMES THE BYTES (RULING A, as landed at
+    the ruling briefs below).**  Note (3) no longer holds: `cons_sent_cnt`,
+    `wcons_ok`, `wcons_short` and `write_cons_arms` all take
+    `(M : gmap Z (bv 8)) (ua : mword 64)` and carry
+    `⌜SpecCopyin.ubytes_at M ua bs⌝` beside the length, so the three bridge
+    lemmas grew one `iSplitR` each and the walk grew ONE new register fact,
+    `HE2a1` (a1 survives to the `c.jalr a5` untouched — the landed walk
+    never needed to say so, because consolewrite promised nothing about the
+    bytes there).  The syscall shell grew `HS4a1` and one `iEval`, and
+    syscall argument 1 stopped being existentially quantified.  What the
+    printf theorem now says: `write(1, buf, n)` returns a count that IS the
+    UART's accepted-byte receipt AND those bytes are `buf`'s own, at the
+    image the caller lent.
 
 - [ ] **INIT — the init.c program theorem (three stages; scoped
   2026-08-29 after upstream's echo landed the Uk pattern).**
@@ -2391,7 +2417,7 @@ durable-notes warns about.
   | `SpecCopyin.v` | `ubytes_at` + 4 pure lemmas | ~40 lines, all one-liners |
   | `SpecWritei.v` | 1 conjunct × 2 bodies | — |
   | `ProofWriteiParts.v` | `wi_usr_step`, `wi_usr_le` | ~25 lines (mirrors `wi_ker_step`) |
-  | `ProofWritei.v` (5091 lines, the tree's biggest) | ~30 threading points, all beside the existing `Hker` | **ZERO** |
+  | `ProofWritei.v` (5091 lines, the tree's biggest) | ~30 threading points, all beside the existing `Hker` | one `wi_usr_step` application beside the existing `wi_ker_step` one, and two `discriminate`/`exact` conjuncts in the chunk normalisation — **no new lemma, no new block** |
   | 6 writei callers (dirlink, filewrite, filewriteAU, 3× sysunlink) | one token in the `iIntros` pattern | — |
   | `SpecConsolewriteLoc.v` + `ProofConsolewriteLoc.v` | 2 binders on 5 lemmas, the `a1`/`a2` names the landed walk never needed, the chunk join | ~30 lines |
   | `SpecFilewriteCons.v` + `ProofFilewriteCons.v` | 2 binders, 3 bridge lemmas, `HE2a1` | ~25 lines |
