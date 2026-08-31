@@ -46,6 +46,7 @@ Require Import UserPtTree UserExec.
 Require Import UexecWp.
 Require Import SpecUser.
 Require TsoCtx.   (* qualified: the class only, no notation flip *)
+Require TsoCtxShim.  (* [rut_ctx_sc]: the SC-minted residue-token accessor *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -65,18 +66,23 @@ Section ProofUexecWp.
        context too and unfold [IH] -- which has to stay AT [uexec_wp], since
        that is what it is handed back as. *)
     iEval (rewrite uexec_wp_unfold /uexec_F).
-    iIntros (h C pt Rut M g ms_v sc_v stval_v sepc_v va).
+    iIntros (h xi C pt Rut M g ms_v sc_v stval_v sepc_v va).
     iIntros (Hok Hms) "Hhw Hmin Hwire Hregs Hpt Hcfg Hrut Hh".
     (* THE OLD-SHAPE HANDLER, out of the PAIRED one: the safety theorem
        below takes [▷ stvec_handler_wp], i.e. "hand me a trap frame and I
        run forever", and what this slot was given is "hand me a trap frame
        AND the next WP".  The missing half is [IH], which lives under the
        same later -- so one [iNext] strips both and the two compose. *)
-    iAssert (▷ stvec_handler_wp (CID := h) C pt Rut)%I
+    iAssert (▷ stvec_handler_wp (CID := h) (XI := xi) C pt Rut)%I
       with "[Hh]" as "Hhandler".
     { iNext. rewrite /stvec_handler_wp. iIntros "Hframe".
       iApply "Hh". iSplitL "Hframe"; [iExact "Hframe" | iExact "IH"]. }
-    iApply (US.wp_user_exec_closed (CID := h) C pt Rut
+    (* the residue-token accessor for a ∀-bound [Rut]: the SC mint
+       ([TsoCtxShim.rut_ctx_sc]) -- the T-leg replaces this with the real
+       borrow from the concrete residue. *)
+    iApply (US.wp_user_exec_closed (CID := h) (XI := xi) C pt Rut
+              (fun pt' : uptd =>
+                 TsoCtxShim.rut_ctx_sc (CID := h) (@TsoCtx.cur_ctx xi) (Rut pt'))
               with "Hhw Hmin Hwire [Hregs Hpt Hcfg Hrut] Hhandler").
     (* the concrete state, packed into the loop invariant: the hart is
        ACTIVE (so [user_hart_ok] is [I] and the PC/nextPC lock-step fact is
@@ -94,15 +100,6 @@ Section ProofUexecWp.
     iSplitL "Hpt"; [ iApply (user_pt_any_intro pt M with "Hpt") | ].
     iSplitL "Hcfg"; [ iExact "Hcfg" | ].
     iExact "Hrut".
-    (* THE U-MODE BOUNDARY, held OUT of context-awareness on purpose.
-       §0.37' defers the U-mode context-token question entirely (the
-       user-mode WP machinery is still moving on main), so this proof does
-       not thread a context: the [TsoCtx.CurCtx] the flipped vocabulary demands is
-       discharged at a CONCRETE throwaway identity, which is the runbook's
-       kernel_data_string idiom for a proof that uses [TsoCtx.cur_ctx] under a
-       statement that does not quantify it.  When U-mode gets its real
-       context home this instantiation is the single site that names it. *)
-    Unshelve. exact (TsoCtx.MkCtxId inhabitant inhabitant).
   Qed.
 
 End ProofUexecWp.

@@ -995,6 +995,13 @@ Section ProofWalk.
                        apply page_in_range_addr_is_kdata; [exact Hpv | exact Hj])
                  with "Hkmapb Hbytes") as "Hbytes".
     iEval (rewrite -Hpb) in "Hbytes".
+    (* ...and back INTO the ambient context at the physical tier: the node's
+       slots are the thread's own registered cells ([pt_slot_own (UTier
+       cur_ctx)]); at SC the registration is the shim's one-liner. *)
+    iDestruct (TsoCtxShim.ctx_phys_run_of_mem TsoCtx.cur_ctx
+                 (fun j => pa_add (zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))) j)
+                 (fun _ => (mword_of_int 0 : mword 8)) 4096 (DfracOwn 1)
+                 with "Hbytes") as "Hbytes".
     (* the freshly-allocated PT page's identity claim (uniform-claims PHYSICAL
        TIER): it is a kdata page, so [pt_node_claim bppn] comes off the static
        bundle -- what [zero_page_to_node] now needs to build the node. *)

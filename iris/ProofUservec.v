@@ -95,6 +95,8 @@ Section UservecAllPt.
   Definition usertrap_res_ptm_close := UT.usertrap_res_ptm_close.
   Definition usertrap_res_ptm_open := UT.usertrap_res_ptm_open.
   Definition usertrap_res_bare_norm := UT.usertrap_res_bare_norm.
+  Definition usertrap_res_bare_fd_open := UT.usertrap_res_bare_fd_open.
+  Definition usertrap_res_bare_fd_tf_open := UT.usertrap_res_bare_fd_tf_open.
 
   (* the user invariant already carries the map well-formedness the exit
      switch needs *)
@@ -128,6 +130,9 @@ Section UservecAllPt.
     unfold uservec_gpr.
     intros Hstvec Hdqc Hmie Hjlt Hnorm Hptwf.
     iIntros "#Hkt #Hhw #Hinv #Hclaim Hframe Hures Hcont".
+    (* the walk's running token: SC-minted here (TsoCtxShim seam); the
+       T-leg borrows it from the residue's [ut_trap_parked] conjunct *)
+    iPoseProof (TsoCtxShim.own_context_sc XI) as "HctxSC".
     (* ============ open the trapped machine ============ *)
     (* AT NAMED DATA (milestone J1a).  [user_trap_frame] is definitionally the
        ∃ over [user_trap_frame_at], so this is the same premise with its five
@@ -217,8 +222,10 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(intros _; vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hpc Hfile Hi_csrw_ss").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hpc Hfile".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb HctxSC
+                    Hpc Hfile Hi_csrw_ss").
+    iClear "HctxSC".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hctx Hpc Hfile".
     iClear "Hi_csrw_ss".
     assert (Hpcx_0x00 : add_vec_int (uva 0x00) (if false then 2 else 4) = uva 0x04)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -237,7 +244,7 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_lui").
+              with "[] Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_lui").
     { iIntros "#Hcert Hf".
       assert (Hluiv : luival (mword_of_int 0x2000 : mword 20)
                       = (mword_of_int 33554432 : mword 64))
@@ -251,7 +258,7 @@ Section UservecAllPt.
                                  Regidx (mword_of_int 10 : mword 5), LUI)))
                 RETIRE_SUCCESS (luival (mword_of_int 0x2000 : mword 20))
                 eq_refl ltac:(vm_compute; lia) with "Hcert Hf"). }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile".
     iClear "Hi_lui".
     assert (Hpcx_0x04 : add_vec_int (uva 0x04) (if false then 2 else 4) = uva 0x08)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -274,7 +281,7 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_addiw").
+              with "[] Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_addiw").
     { iIntros "#Hcert Hf".
       assert (Haddiwv : sign_extend' 64 (subrange_vec_dec
                 (add_vec ((<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> g) !!! Regidx (mword_of_int 10 : mword 5))
@@ -295,7 +302,7 @@ Section UservecAllPt.
                    (add_vec a (sign_extend' 64
                       (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))
                 eq_refl ltac:(vm_compute; lia) with "Hcert Hf"). }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile".
     iClear "Hi_addiw".
     assert (Hpcx_0x08 : add_vec_int (uva 0x08) (if true then 2 else 4) = uva 0x0a)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -318,7 +325,7 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_slli").
+              with "[] Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_slli").
     { iIntros "#Hcert Hf".
       assert (Hslliv : shift_bits_left
                 ((<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554431 : mword 64)]> (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> g)) !!! Regidx (mword_of_int 10 : mword 5))
@@ -340,7 +347,7 @@ Section UservecAllPt.
                    (subrange_vec_dec (mword_of_int 13 : mword 6)
                       (Z.sub log2_xlen 1) 0))
                 eq_refl ltac:(vm_compute; lia) with "Hcert Hf"). }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile".
     iClear "Hi_slli".
     assert (Hpcx_0x0a : add_vec_int (uva 0x0a) (if true then 2 else 4) = uva 0x0c)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -467,8 +474,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_ra Htf40").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf40".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_ra Htf40").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf40".
     iClear "Hi_sd_ra".
     iEval (rewrite Hg1) in "Htf40".
     assert (Hpcx_0x0c : add_vec_int (uva 0x0c) (if false then 2 else 4) = uva 0x10)
@@ -496,8 +503,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_sp Htf48").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf48".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_sp Htf48").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf48".
     iClear "Hi_sd_sp".
     iEval (rewrite Hg2) in "Htf48".
     assert (Hpcx_0x10 : add_vec_int (uva 0x10) (if false then 2 else 4) = uva 0x14)
@@ -525,8 +532,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_gp Htf56").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf56".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_gp Htf56").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf56".
     iClear "Hi_sd_gp".
     iEval (rewrite Hg3) in "Htf56".
     assert (Hpcx_0x14 : add_vec_int (uva 0x14) (if false then 2 else 4) = uva 0x18)
@@ -554,8 +561,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_tp Htf64").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf64".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_tp Htf64").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf64".
     iClear "Hi_sd_tp".
     iEval (rewrite Hg4) in "Htf64".
     assert (Hpcx_0x18 : add_vec_int (uva 0x18) (if false then 2 else 4) = uva 0x1c)
@@ -583,8 +590,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t0 Htf72").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf72".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_t0 Htf72").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf72".
     iClear "Hi_sd_t0".
     iEval (rewrite Hg5) in "Htf72".
     assert (Hpcx_0x1c : add_vec_int (uva 0x1c) (if false then 2 else 4) = uva 0x20)
@@ -612,8 +619,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t1 Htf80").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf80".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_t1 Htf80").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf80".
     iClear "Hi_sd_t1".
     iEval (rewrite Hg6) in "Htf80".
     assert (Hpcx_0x20 : add_vec_int (uva 0x20) (if false then 2 else 4) = uva 0x24)
@@ -641,8 +648,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t2 Htf88").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf88".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_t2 Htf88").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf88".
     iClear "Hi_sd_t2".
     iEval (rewrite Hg7) in "Htf88".
     assert (Hpcx_0x24 : add_vec_int (uva 0x24) (if false then 2 else 4) = uva 0x28)
@@ -671,8 +678,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_s0 Htf96").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf96".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_csd_s0 Htf96").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf96".
     iClear "Hi_csd_s0".
     iEval (rewrite Hg8) in "Htf96".
     assert (Hpcx_0x28 : add_vec_int (uva 0x28) (if true then 2 else 4) = uva 0x2a)
@@ -701,8 +708,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_s1 Htf104").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf104".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_csd_s1 Htf104").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf104".
     iClear "Hi_csd_s1".
     iEval (rewrite Hg9) in "Htf104".
     assert (Hpcx_0x2a : add_vec_int (uva 0x2a) (if true then 2 else 4) = uva 0x2c)
@@ -731,8 +738,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_a1 Htf120").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf120".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_csd_a1 Htf120").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf120".
     iClear "Hi_csd_a1".
     iEval (rewrite Hg11) in "Htf120".
     assert (Hpcx_0x2c : add_vec_int (uva 0x2c) (if true then 2 else 4) = uva 0x2e)
@@ -761,8 +768,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_a2 Htf128").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf128".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_csd_a2 Htf128").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf128".
     iClear "Hi_csd_a2".
     iEval (rewrite Hg12) in "Htf128".
     assert (Hpcx_0x2e : add_vec_int (uva 0x2e) (if true then 2 else 4) = uva 0x30)
@@ -791,8 +798,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_a3 Htf136").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf136".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_csd_a3 Htf136").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf136".
     iClear "Hi_csd_a3".
     iEval (rewrite Hg13) in "Htf136".
     assert (Hpcx_0x30 : add_vec_int (uva 0x30) (if true then 2 else 4) = uva 0x32)
@@ -821,8 +828,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_a4 Htf144").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf144".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_csd_a4 Htf144").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf144".
     iClear "Hi_csd_a4".
     iEval (rewrite Hg14) in "Htf144".
     assert (Hpcx_0x32 : add_vec_int (uva 0x32) (if true then 2 else 4) = uva 0x34)
@@ -851,8 +858,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_a5 Htf152").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf152".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_csd_a5 Htf152").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf152".
     iClear "Hi_csd_a5".
     iEval (rewrite Hg15) in "Htf152".
     assert (Hpcx_0x34 : add_vec_int (uva 0x34) (if true then 2 else 4) = uva 0x36)
@@ -880,8 +887,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_a6 Htf160").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf160".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_a6 Htf160").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf160".
     iClear "Hi_sd_a6".
     iEval (rewrite Hg16) in "Htf160".
     assert (Hpcx_0x36 : add_vec_int (uva 0x36) (if false then 2 else 4) = uva 0x3a)
@@ -909,8 +916,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_a7 Htf168").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf168".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_a7 Htf168").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf168".
     iClear "Hi_sd_a7".
     iEval (rewrite Hg17) in "Htf168".
     assert (Hpcx_0x3a : add_vec_int (uva 0x3a) (if false then 2 else 4) = uva 0x3e)
@@ -938,8 +945,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s2 Htf176").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf176".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_s2 Htf176").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf176".
     iClear "Hi_sd_s2".
     iEval (rewrite Hg18) in "Htf176".
     assert (Hpcx_0x3e : add_vec_int (uva 0x3e) (if false then 2 else 4) = uva 0x42)
@@ -967,8 +974,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s3 Htf184").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf184".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_s3 Htf184").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf184".
     iClear "Hi_sd_s3".
     iEval (rewrite Hg19) in "Htf184".
     assert (Hpcx_0x42 : add_vec_int (uva 0x42) (if false then 2 else 4) = uva 0x46)
@@ -996,8 +1003,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s4 Htf192").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf192".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_s4 Htf192").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf192".
     iClear "Hi_sd_s4".
     iEval (rewrite Hg20) in "Htf192".
     assert (Hpcx_0x46 : add_vec_int (uva 0x46) (if false then 2 else 4) = uva 0x4a)
@@ -1025,8 +1032,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s5 Htf200").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf200".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_s5 Htf200").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf200".
     iClear "Hi_sd_s5".
     iEval (rewrite Hg21) in "Htf200".
     assert (Hpcx_0x4a : add_vec_int (uva 0x4a) (if false then 2 else 4) = uva 0x4e)
@@ -1054,8 +1061,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s6 Htf208").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf208".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_s6 Htf208").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf208".
     iClear "Hi_sd_s6".
     iEval (rewrite Hg22) in "Htf208".
     assert (Hpcx_0x4e : add_vec_int (uva 0x4e) (if false then 2 else 4) = uva 0x52)
@@ -1083,8 +1090,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s7 Htf216").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf216".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_s7 Htf216").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf216".
     iClear "Hi_sd_s7".
     iEval (rewrite Hg23) in "Htf216".
     assert (Hpcx_0x52 : add_vec_int (uva 0x52) (if false then 2 else 4) = uva 0x56)
@@ -1112,8 +1119,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s8 Htf224").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf224".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_s8 Htf224").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf224".
     iClear "Hi_sd_s8".
     iEval (rewrite Hg24) in "Htf224".
     assert (Hpcx_0x56 : add_vec_int (uva 0x56) (if false then 2 else 4) = uva 0x5a)
@@ -1141,8 +1148,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s9 Htf232").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf232".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_s9 Htf232").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf232".
     iClear "Hi_sd_s9".
     iEval (rewrite Hg25) in "Htf232".
     assert (Hpcx_0x5a : add_vec_int (uva 0x5a) (if false then 2 else 4) = uva 0x5e)
@@ -1170,8 +1177,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s10 Htf240").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf240".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_s10 Htf240").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf240".
     iClear "Hi_sd_s10".
     iEval (rewrite Hg26) in "Htf240".
     assert (Hpcx_0x5e : add_vec_int (uva 0x5e) (if false then 2 else 4) = uva 0x62)
@@ -1199,8 +1206,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s11 Htf248").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf248".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_s11 Htf248").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf248".
     iClear "Hi_sd_s11".
     iEval (rewrite Hg27) in "Htf248".
     assert (Hpcx_0x62 : add_vec_int (uva 0x62) (if false then 2 else 4) = uva 0x66)
@@ -1228,8 +1235,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t3 Htf256").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf256".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_t3 Htf256").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf256".
     iClear "Hi_sd_t3".
     iEval (rewrite Hg28) in "Htf256".
     assert (Hpcx_0x66 : add_vec_int (uva 0x66) (if false then 2 else 4) = uva 0x6a)
@@ -1257,8 +1264,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t4 Htf264").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf264".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_t4 Htf264").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf264".
     iClear "Hi_sd_t4".
     iEval (rewrite Hg29) in "Htf264".
     assert (Hpcx_0x6a : add_vec_int (uva 0x6a) (if false then 2 else 4) = uva 0x6e)
@@ -1286,8 +1293,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t5 Htf272").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf272".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_t5 Htf272").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf272".
     iClear "Hi_sd_t5".
     iEval (rewrite Hg30) in "Htf272".
     assert (Hpcx_0x6e : add_vec_int (uva 0x6e) (if false then 2 else 4) = uva 0x72)
@@ -1315,8 +1322,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t6 Htf280").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf280".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_t6 Htf280").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf280".
     iClear "Hi_sd_t6".
     iEval (rewrite Hg31) in "Htf280".
     assert (Hpcx_0x72 : add_vec_int (uva 0x72) (if false then 2 else 4) = uva 0x76)
@@ -1340,8 +1347,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(intro Hf; vm_compute in Hf; discriminate)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hpc Hfile Hi_csrr_ss").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hpc Hfile".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hctx Hpc Hfile Hi_csrr_ss").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hctx Hpc Hfile".
     iClear "Hi_csrr_ss".
     assert (Hpcx_0x76 : add_vec_int (uva 0x76) (if false then 2 else 4) = uva 0x7a)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1374,8 +1381,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_a0 Htf112").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf112".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_sd_a0 Htf112").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Htf112".
     iClear "Hi_sd_a0".
     iEval (rewrite Hg112) in "Htf112".
     assert (Hpcx_0x7a : add_vec_int (uva 0x7a) (if false then 2 else 4) = uva 0x7e)
@@ -1404,8 +1411,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_ld_sp Hk8").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hk8".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_ld_sp Hk8").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hk8".
     iClear "Hi_ld_sp".
     assert (Hpcx_0x7e : add_vec_int (uva 0x7e) (if false then 2 else 4) = uva 0x82)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1437,8 +1444,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_ld_tp Hk32").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hk32".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_ld_tp Hk32").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hk32".
     iClear "Hi_ld_tp".
     assert (Hpcx_0x82 : add_vec_int (uva 0x82) (if false then 2 else 4) = uva 0x86)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1470,8 +1477,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_ld_t0 Hk16").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hk16".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_ld_t0 Hk16").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hk16".
     iClear "Hi_ld_t0".
     assert (Hpcx_0x86 : add_vec_int (uva 0x86) (if false then 2 else 4) = uva 0x8a)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1503,8 +1510,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_ld_t1 Hk0").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hk0".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hi_ld_t1 Hk0").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile Hk0".
     iClear "Hi_ld_t1".
     assert (Hpcx_0x8a : add_vec_int (uva 0x8a) (if false then 2 else 4) = uva 0x8e)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1526,9 +1533,9 @@ Section UservecAllPt.
               (vksat : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
               HSIE HMPRV HSXL HTVM Hmm HPBMTE Hmenvval0 Hwfu Ht1v HkMode Hkasid Hkppn
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hclaim Hutlb Hkfr Hpc Hfile
-                    Hi_sf1 Hi_csrw_satp Hi_sf2 Hi_cjalr").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hufr Hkres Hpc Hfile".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hclaim Hutlb Hkfr Hctx
+                    Hpc Hfile Hi_sf1 Hi_csrw_satp Hi_sf2 Hi_cjalr").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hufr Hkres Hctx Hpc Hfile".
     iClear "Hi_sf1".
     iClear "Hi_csrw_satp".
     iClear "Hi_sf2".
@@ -1606,7 +1613,7 @@ Section UservecAllPt.
     iEval (rewrite /usertrap_post).
     (* [usertrap_post] names where the round left the descriptor states *)
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2)
-      "%Huptpt2 %Hrd2 %Hpcret
+      "%Huptpt2 %Hrd2 %Hfdk2 %Hpcret
        %Hmask %Hpttf %Haccwf %Hmapwf %Hretms %Hsconf2 %Hcalleesaved %Htpcid %Ha0usatp %Hsatprooted
        Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2".
     (* x0 IS ZERO in the file usertrap handed back -- the one fact the
@@ -1684,12 +1691,14 @@ Section UservecAllPt.
        name the ENTRY hart's resources and are a different (if
        identically-printed) proposition whenever usertrap crossed harts.
        See [SpecUsertrap.usertrap_post]'s comment. *)
-    iApply ("Hwup" with "Hkt Hhw2 Hmin2 Hhs2 Hpriv2 Hms2 Hmie3 Hmdl3 Hmenv3 Hsenv2 Hsepc2 Hclaim Hkres2 Hufr' Hpc2 Hfile2
+    (* the resuming hart's running token: SC-minted (TsoCtxShim seam) *)
+    iPoseProof (TsoCtxShim.own_context_sc (CID := CID2) TsoCtx.cur_ctx) as "Hctx2".
+    iApply ("Hwup" with "Hkt Hhw2 Hmin2 Hhs2 Hpriv2 Hms2 Hmie3 Hmdl3 Hmenv3 Hsenv2 Hsepc2 Hclaim Hkres2 Hufr' Hctx2 Hpc2 Hfile2
                     Hutf40 Hutf48 Hutf56 Hutf64 Hutf72 Hutf80 Hutf88 Hutf96 Hutf104
                     Hutf120 Hutf128 Hutf136 Hutf144 Hutf152 Hutf160 Hutf168 Hutf176 Hutf184
                     Hutf192 Hutf200 Hutf208 Hutf216 Hutf224 Hutf232 Hutf240 Hutf248 Hutf256
                     Hutf264 Hutf272 Hutf280 Hutf112").
-    iIntros "Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hsenv3 Hsepc3 Hutlb3 Hpc3 Hfile3
+    iIntros "Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hsenv3 Hsepc3 Hutlb3 _ Hpc3 Hfile3
              Hutf40' Hutf48' Hutf56' Hutf64' Hutf72' Hutf80' Hutf88' Hutf96' Hutf104'
              Hutf120' Hutf128' Hutf136' Hutf144' Hutf152' Hutf160' Hutf168' Hutf176' Hutf184'
              Hutf192' Hutf200' Hutf208' Hutf216' Hutf224' Hutf232' Hutf240' Hutf248' Hutf256'
@@ -1743,7 +1752,7 @@ Section UservecAllPt.
                 have to solve [us_M ?U' =?= us_M U2], which is not a pattern;
                 deferred to a goal, [?U'] is already resolved by the time the
                 (purely iota) conversion is checked. *)
-             with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
+             with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
                     [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2").
     - (* the descriptor the residue is keyed at IS the one handed over *)
       reflexivity.
@@ -1776,6 +1785,11 @@ Section UservecAllPt.
       + cbn [us_V pv_upt pv_sz us_upt upd_upt upd_usV us_tf upd_tf].
         rewrite Huptpt2. reflexivity.
       + cbn [us_V pv_sz us_upt upd_upt upd_usV us_tf upd_tf]. reflexivity.
+    - (* THE ROUND'S DESCRIPTOR HALF, forwarded verbatim: this boundary
+         moves no descriptor state of its own -- it saves and restores a
+         trapframe -- so whatever usertrap certified about the states is
+         what uservec passes on. *)
+      exact Hfdk2.
     - (* the resume pc, straight off usertrap's own row *)
       cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. exact Hpcret.
     - (* THE REGISTER-FILE TIE (S9).  [userret_gpr] at the words

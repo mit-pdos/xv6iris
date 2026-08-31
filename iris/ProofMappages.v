@@ -760,7 +760,7 @@ Section ProofMappages.
     }
     (* ---- walk returned the L0 slot: store the leaf ---- *)
     iDestruct (ptree_own_level0_upd (DfracOwn 1) t' (vpn_at vpn0 k) p2 p1 w0 Hl0 with "Hptree") as "[#Hcl0 [Hcell Hupd]]".
-    iDestruct (phys_word_pointsto_ram with "Hcell") as %Hslotram.
+    iDestruct (pt_slot_own_ram with "Hcell") as %Hslotram.
     (* the L0 slot is owned PHYSICALLY ([↦ₚ₈]); the remap-check load and the
        leaf store go THROUGH translation, so convert to the VA tier ([↦₈]) via
        the node's own claim (uniform-claims PHYSICAL TIER), and convert back

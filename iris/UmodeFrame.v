@@ -99,7 +99,7 @@ Section UmodeFrame.
      frame carve needs -- [T] survives an 8-byte store at or above [lim],
      the image's key bound.  Nothing about sh is left, so this belongs in a
      shared file beside WpUmodeStore.v. *)
-  Lemma wp_uv_prologue16 (CIDp : CpuId) (Ps : usys_protocol Σ) (pro : Z)
+  Lemma wp_uv_prologue16 (CIDp : CpuId) {XICIDp : TsoCtx.CurCtx} (Ps : usys_protocol Σ) (pro : Z)
       (T : gmap Z (bv 8) -> Prop) (lim : Z)
       (M : gmap Z (bv 8)) (m : regfile) (sp0 : mword 64) :
     T M ->
@@ -125,8 +125,8 @@ Section UmodeFrame.
     add_vec_int (mword_of_int (pro + 6) : mword 64) 2 = mword_of_int (pro + 8) ->
     uv_cap_gpr (CID := CIDp) C pt Ps M m -∗
     pc_is (CID := CIDp) (mword_of_int pro) -∗
-    (∀ CID : CpuId,
-       uv_cap_gpr (CID := CID) C pt Ps
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID) (XI := XIC) C pt Ps
          (uM_store8 (uM_store8 M (uint sp0 - 8) (m !!! Regidx ra_idx))
             (uint sp0 - 16) (m !!! Regidx s0_idx))
          (<[Regidx s0_idx := (mword_of_int (uint sp0) : mword 64)]>
@@ -157,7 +157,7 @@ Section UmodeFrame.
               (mword_of_int 48 : mword 6) sp_idx (mword_of_int (uint sp0 - 16))
               Hu0 ltac:(vm_compute; discriminate) Hwsp
               with "Hcg Hpc").
-    iIntros (CID1) "Hcg Hpc".
+    iIntros (CID1 ?) "Hcg Hpc".
     set (m1 := <[Regidx sp_idx
                  := regval_into_reg (mword_of_int (uint sp0 - 16) : mword 64)]> m).
     iEval (rewrite E0) in "Hpc".
@@ -184,7 +184,7 @@ Section UmodeFrame.
               (Hu2 M HT)
               Htg8 Hwra Hl8 Hok8s Hcanon8 Hpg8 Hal8 Hb8
               with "Hcg Hpc").
-    iIntros (CID2) "Hcg Hpc".
+    iIntros (CID2 ?) "Hcg Hpc".
     iEval (rewrite Hq8) in "Hcg".
     set (M1 := uM_store8 M (uint sp0 - 8) (m !!! Regidx ra_idx)).
     assert (HT1 : T M1)
@@ -216,7 +216,7 @@ Section UmodeFrame.
               (Hu4 M1 HT1)
               Htg0 Hws0 Hl0 Hok0s Hcanon0 Hpg0 Hal0 Hb0'
               with "Hcg Hpc").
-    iIntros (CID3) "Hcg Hpc".
+    iIntros (CID3 ?) "Hcg Hpc".
     iEval (rewrite Hq0) in "Hcg".
     set (M2 := uM_store8 M1 (uint sp0 - 16) (m !!! Regidx s0_idx)).
     assert (HT2 : T M2)
@@ -237,13 +237,13 @@ Section UmodeFrame.
               (Hu6 M2 HT2)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hw16
               with "Hcg Hpc").
-    iIntros (CID4) "Hcg Hpc".
+    iIntros (CID4 ?) "Hcg Hpc".
     iEval (rewrite E6) in "Hpc".
-    iApply ("Hcont" $! CID4 with "Hcg Hpc").
+    iApply ("Hcont" $! CID4 _ with "Hcg Hpc").
   Qed.
 
   (* ---- the EPILOGUE: ld ra,8 ; ld s0,0 ; addi sp,16 ; ret ------------- *)
-  Lemma wp_uv_epilogue16 (CIDp : CpuId) (Ps : usys_protocol Σ) (epi : Z)
+  Lemma wp_uv_epilogue16 (CIDp : CpuId) {XICIDp : TsoCtx.CurCtx} (Ps : usys_protocol Σ) (epi : Z)
       (Mx : gmap Z (bv 8)) (mF : regfile) (sp0 v8 v0 : mword 64) :
     uv_stack pt Mx sp0 16 ->
     is_aligned_vaddr (Virtaddr v8) 2 = true ->
@@ -262,13 +262,13 @@ Section UmodeFrame.
     add_vec_int (mword_of_int (epi + 4) : mword 64) 2 = mword_of_int (epi + 6) ->
     uv_cap_gpr (CID := CIDp) C pt Ps Mx mF -∗
     pc_is (CID := CIDp) (mword_of_int epi) -∗
-    (∀ (CID : CpuId) (m' : regfile),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx) (m' : regfile),
        ⌜m' !!! Regidx sp_idx = sp0⌝ -∗
        ⌜m' !!! Regidx s0_idx = v0⌝ -∗
        ⌜forall r : mword 5,
           Regidx r <> Regidx ra_idx -> Regidx r <> Regidx sp_idx ->
           Regidx r <> Regidx s0_idx -> m' !!! Regidx r = mF !!! Regidx r⌝ -∗
-       uv_cap_gpr (CID := CID) C pt Ps Mx m' -∗
+       uv_cap_gpr (CID := CID) (XI := XIC) C pt Ps Mx m' -∗
        pc_is (CID := CID) v8 -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -302,7 +302,7 @@ Section UmodeFrame.
               Hu0 ltac:(vm_compute; discriminate) Hva8 Hl8 Hok8 Hcanon8 Hpg8
               Hal8 Hb8 Hwv8
               with "Hcg Hpc").
-    iIntros (CID1) "Hcg Hpc".
+    iIntros (CID1 ?) "Hcg Hpc".
     set (mF1 := <[Regidx ra_idx := regval_into_reg v8]> mF).
     iEval (rewrite E0) in "Hpc".
     (* ---- epi+2  c.ldsp s0,0(sp) ---- *)
@@ -327,7 +327,7 @@ Section UmodeFrame.
               Hu2 ltac:(vm_compute; discriminate) Hva0 Hl0 Hok0 Hcanon0 Hpg0
               Hal0 Hb0 Hwv0
               with "Hcg Hpc").
-    iIntros (CID2) "Hcg Hpc".
+    iIntros (CID2 ?) "Hcg Hpc".
     set (mF2 := <[Regidx s0_idx := regval_into_reg v0]> mF1).
     iEval (rewrite E2) in "Hpc".
     (* ---- epi+4  c.addi sp,sp,16 ---- *)
@@ -348,7 +348,7 @@ Section UmodeFrame.
               (mword_of_int 16 : mword 6) sp_idx sp0
               Hu4 ltac:(vm_compute; discriminate) Hwsp
               with "Hcg Hpc").
-    iIntros (CID3) "Hcg Hpc".
+    iIntros (CID3 ?) "Hcg Hpc".
     set (mF3 := <[Regidx sp_idx := regval_into_reg sp0]> mF2).
     iEval (rewrite E4) in "Hpc".
     (* ---- epi+6  c.jr ra ---- *)
@@ -366,7 +366,7 @@ Section UmodeFrame.
     iApply (wp_uv_cjr C pt Ps Mx mF3 (mword_of_int (epi + 6))
               ra_idx v8 Hu6 ltac:(vm_compute; discriminate) Htgt
               with "Hcg Hpc").
-    iIntros (CID4) "Hcg Hpc".
+    iIntros (CID4 ?) "Hcg Hpc".
     assert (HA : mF3 !!! Regidx sp_idx = sp0)
       by exact (upd_eq mF2 (Regidx sp_idx) (regval_into_reg sp0)).
     assert (HB : mF3 !!! Regidx s0_idx = v0).
@@ -382,7 +382,7 @@ Section UmodeFrame.
                (eq_trans
                   (upd_ne mF1 (Regidx s0_idx) (Regidx r) (regval_into_reg v0) Hs0)
                   (upd_ne mF (Regidx ra_idx) (Regidx r) (regval_into_reg v8) Hra))). }
-    iApply ("Hcont" $! CID4 mF3 with "[] [] [] Hcg Hpc").
+    iApply ("Hcont" $! CID4 _ mF3 with "[] [] [] Hcg Hpc").
     - iPureIntro. exact HA.
     - iPureIntro. exact HB.
     - iPureIntro. exact HC.
@@ -403,7 +403,7 @@ Section UmodeFrame.
   (* protocol; init needs it at frame sizes 16, 32 and 96, which is what   *)
   (* made hoisting it worthwhile.)                                        *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uv_frame_store (CIDp : CpuId) (Ps : usys_protocol Σ)
+  Lemma wp_uv_frame_store (CIDp : CpuId) {XICIDp : TsoCtx.CurCtx} (Ps : usys_protocol Σ)
       (M : gmap Z (bv 8)) (m : regfile) (sp0 pc : mword 64)
       (uimm : mword 6) (rs2 : mword 5) (n d : Z) :
     uinstr pt M pc true (C_SDSP (uimm, Regidx rs2)) ->
@@ -414,8 +414,8 @@ Section UmodeFrame.
       = mword_of_int d ->
     uv_cap_gpr (CID := CIDp) C pt Ps M m -∗
     pc_is (CID := CIDp) pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ps
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ps
          (uM_store8 M (uint sp0 - n + d) (m !!! Regidx rs2)) m -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -432,12 +432,12 @@ Section UmodeFrame.
               ltac:(rewrite Hsp; rewrite Himm; rewrite moi_add; reflexivity)
               eq_refl Hl Hok Hcanon Hpg Hal Hb
               with "Hcg Hpc [Hcont]").
-    iIntros (CID0) "Hcg Hpc".
+    iIntros (CID0 XI0) "Hcg Hpc".
     iEval (rewrite Hu) in "Hcg".
     iApply ("Hcont" with "Hcg Hpc").
   Qed.
 
-  Lemma wp_uv_frame_load (CIDp : CpuId) (Ps : usys_protocol Σ)
+  Lemma wp_uv_frame_load (CIDp : CpuId) {XICIDp : TsoCtx.CurCtx} (Ps : usys_protocol Σ)
       (M : gmap Z (bv 8)) (m : regfile) (sp0 pc : mword 64)
       (uimm : mword 6) (rd : mword 5) (n d : Z) (wval : mword 64) :
     uinstr pt M pc true (C_LDSP (uimm, Regidx rd)) ->
@@ -450,8 +450,8 @@ Section UmodeFrame.
     wval = uM_word M (uint sp0 - n + d) 8 ->
     uv_cap_gpr (CID := CIDp) C pt Ps M m -∗
     pc_is (CID := CIDp) pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ps M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ps M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗

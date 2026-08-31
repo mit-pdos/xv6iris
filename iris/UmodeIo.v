@@ -166,7 +166,7 @@ Section UmodeIo.
   (* the resume continuation every returning arm shares *)
   Definition uio_ret (g : regfile) (va : mword 64)
       (M : gmap Z (bv 8)) : iProp Σ :=
-    (∀ (CID : CpuId) (ret : mword 64),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx) (ret : mword 64),
        uv_run C pt M (<[Regidx a0_idx := ret]> g) (add_vec_int va 4) -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -202,13 +202,13 @@ Section UmodeIo.
 
     | IoOpen =>
         (⌜uio_str_arg M (uint (g !!! Regidx a0_idx))⌝ ∗
-         ∀ (CID : CpuId) (ret : mword 64),
+         ∀ (CID : CpuId) (XIC : TsoCtx.CurCtx) (ret : mword 64),
            ⌜3 <= sint ret⌝ -∗          (* ASSUMED: fds 0,1,2 are already open *)
            uv_run C pt M (<[Regidx a0_idx := ret]> g) (add_vec_int va 4) -∗
            WP (Loop : expr riscv_lang))%I
 
     | IoFork =>
-        (∀ (CID : CpuId) (ret : mword 64),
+        (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx) (ret : mword 64),
            ⌜uint ret = 0 \/ 0 < sint ret⌝ -∗   (* ASSUMED: fork does not fail *)
            uv_run C pt M (<[Regidx a0_idx := ret]> g) (add_vec_int va 4) -∗
            WP (Loop : expr riscv_lang))%I
@@ -225,7 +225,7 @@ Section UmodeIo.
         (∃ str : list (bv 8),
            ustdin gin str ∗
            ⌜uv_wr pt M (uint (g !!! Regidx a1_idx)) (uint (g !!! Regidx a2_idx))⌝ ∗
-           ∀ (CID : CpuId) (k : nat) (M' : gmap Z (bv 8)),
+           ∀ (CID : CpuId) (XIC : TsoCtx.CurCtx) (k : nat) (M' : gmap Z (bv 8)),
              ⌜(k <= length str)%nat⌝ -∗
              ⌜Z.of_nat k <= uint (g !!! Regidx a2_idx)⌝ -∗
              ⌜(k = 0)%nat -> str = []⌝ -∗       (* only EOF returns nothing *)
@@ -240,7 +240,7 @@ Section UmodeIo.
            ubrk gbrk b ∗
            ⌜hbase <= b /\ 0 <= sint (g !!! Regidx a0_idx) /\
             b + sint (g !!! Regidx a0_idx) <= hbase + hlen⌝ ∗
-           ∀ (CID : CpuId) (M' : gmap Z (bv 8)),
+           ∀ (CID : CpuId) (XIC : TsoCtx.CurCtx) (M' : gmap Z (bv 8)),
              ⌜uM_grown M M' b (sint (g !!! Regidx a0_idx))⌝ -∗
              ubrk gbrk (b + sint (g !!! Regidx a0_idx)) -∗
              uv_run C pt M' (<[Regidx a0_idx := (mword_of_int b : mword 64)]> g)

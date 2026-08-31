@@ -2472,6 +2472,18 @@ Section Bridge.
      same read at index 7 -- and it is what the PMA RAM class needs: the
      platform's DRAM region ends at PHYSTOP, so an 8-byte access is inside it
      only if its END is ([RiscvExtras.pma_access_ram]). *)
+  Lemma phys_word_pointsto_ram7 a dq w : a ↦ₚ₈{dq} w ⊢ ⌜addr_is_ram (pa_add a 7)⌝.
+  Proof.
+    iIntros "Hw". iDestruct (phys_word_pointsto_bytes with "Hw") as "Hbs".
+    iDestruct (big_sepL_lookup _ _ 7%nat 7%nat with "Hbs") as "Hb7".
+    { rewrite lookup_seq_lt; [reflexivity | lia]. }
+    iDestruct (phys_ram with "Hb7") as %Hram7. iPureIntro. exact Hram7.
+  Qed.
+
+  (* ...AND ITS LAST BYTE.  The cell owns all eight bytes, so this is the
+     same read at index 7 -- and it is what the PMA RAM class needs: the
+     platform's DRAM region ends at PHYSTOP, so an 8-byte access is inside it
+     only if its END is ([RiscvExtras.pma_access_ram]). *)
 
   Global Instance phys_pointsto_discarded_persistent a b : Persistent (a ↦ₚ□ b).
   Proof. rewrite /phys_pointsto. apply _. Qed.

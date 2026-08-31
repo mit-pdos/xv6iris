@@ -232,6 +232,26 @@ Definition ut_round (sepc_v sc_v : mword 64) (U U' : ustate) : Prop :=
     (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
     (uint (pv_sz (us_V U'))).
 
+(* THE DESCRIPTOR HALF OF THE ROUND, and the reason it is CONDITIONAL.
+   [ut_round] speaks the trapframe, image, permission map and break; it says
+   nothing about [p->ofile[]], because for every cause but one there is
+   nothing to say -- a page fault or an interrupt runs no kernel code that
+   can retype a descriptor, so the states come back on the nose.  The one
+   exception is the ecall, where open/close/dup/pipe are exactly the entries
+   that move them.
+
+   WHY THE CALLER NEEDS THIS AND NOT MERELY THE RESIDUE'S INDEX.  The loop
+   resumes the process at a key, and the key names the descriptor view
+   ([UexecSlot.uvis_fd]).  On a transparent trap it must resume at the view
+   that TRAPPED -- [UexecApply.uexec_ret_round_slot]'s transparent arm hands
+   back the process's own continuation at the same key, and a key with a
+   different fd view is a different contract.  So "the kernel did not move
+   them" is a fact the loop has to be TOLD; it cannot read it off the
+   fragments it holds ([FdSlots.fd_st_agree] against the authority only ever
+   says the fragments agree with themselves). *)
+Definition ut_fd_kept (sc_v : mword 64) (sts sts' : list fdstate) : Prop :=
+  sc_v <> uecall_scause -> sts' = sts.
+
 (* THE PROLOGUE'S OWN MOVE: [U'] is [U] with the epc word rewritten, which
    is what usertrap's +0x28..+0x2e block does and all it does.  Every block
    below the entry carries this (or the round it grows into) as a premise. *)
@@ -328,6 +348,8 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
        resume trapframe's own. *)
     ⌜pv_upt (us_V U') = pt'⌝ -∗
     ⌜ut_round sepc_v sc_v U U'⌝ -∗
+    (* ...and its descriptor half *)
+    ⌜ut_fd_kept sc_v sts sts'⌝ -∗
     ⌜ret_pc uepc = tf_resume_pc (pv_tf (us_V U'))⌝ -∗
     (* [mideleg]'s VALUE is not pinned to whatever usertrap was handed at
        entry -- unlike [mie_v]/[menvcfg0] (each a unique architectural
@@ -622,6 +644,35 @@ Module Type USERTRAP_RES.
      loop hand the user tier a descriptor whose [udata_cov] side condition
      holds by construction, which is the fact this file's [usertrap_post]
      explains it cannot ask usertrap for. *)
+  (* THE DESCRIPTOR VIEW, BORROWED OUT OF THE RUNNING RESIDUE -- the fd half
+     of what [usertrap_res_ptm_open] does for the image.  The trap loop puts
+     what comes out into [UexecRet.uvb] as its [Rfd fdv] and hands it back at
+     the trap; the closer is ∀-GENERAL in the states, which is what lets a
+     syscall retype a descriptor.  The AUTHORITY does not move -- it rides in
+     [ProcInv.ofile_slot], hence inside the residue -- so the kernel keeps the
+     array and the process only ever gets the view. *)
+  (* BOTH BORROWS AT ONCE -- see [UsertrapRes.ut_res_bare_fd_tf_open] for why
+     userret's entry cannot get them by two applications. *)
+  Parameter usertrap_res_bare_fd_tf_open :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate),
+    usertrap_res_bare pt ksp U sts -∗
+    FdSlots.fd_frags (pv_fdg (us_V U)) sts ∗
+    ∃ kroot : mword 44,
+      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
+      tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
+      (∀ (ws' : list (mword 64)) (sts' : list fdstate),
+         ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
+         FdSlots.fd_frags (pv_fdg (us_V U)) sts' -∗
+         usertrap_res_bare pt ksp (us_tf U ws') sts').
+
+  Parameter usertrap_res_bare_fd_open :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate),
+      usertrap_res_bare pt ksp U sts -∗
+      FdSlots.fd_frags (pv_fdg (us_V U)) sts ∗
+      (∀ sts' : list fdstate,
+         FdSlots.fd_frags (pv_fdg (us_V U)) sts' -∗
+         usertrap_res_bare pt ksp U sts').
+
   Parameter usertrap_res_bare_norm :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate),
       usertrap_res_bare pt ksp U sts -∗

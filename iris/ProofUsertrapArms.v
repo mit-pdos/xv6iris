@@ -601,8 +601,8 @@ Section Ut56.
     (* ---- the bundle back together, and on to +0xa6 ---- *)
     iDestruct ("Hownback" $! U sts with "Hpv Hufr Hsy") as "Hown".
     iApply (T.ut_a6 Rsys N U0 U pt ksp m0 S1 av nx false
-              mie_v menvcfg0 epv scv lks sts
-              Hwf' Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
+              mie_v menvcfg0 epv scv lks sts sts
+              Hwf' ltac:(intros _; reflexivity) Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
               Hmiev Hmenvv Hrd
               with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
     all: try lkbelow.
@@ -1006,8 +1006,8 @@ Section UtD0.
           exact (perm_of_uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) Pd Hextd).
         - cbn [us_V]. exact HV'sz. }
       iApply (T.ut_a6 Rsys N U0 (MkUstate V' (us_M U)) pt ksp m0 mr av nx false
-                mie_v menvcfg0 epv scv lks sts
-                Hwf' Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
+                mie_v menvcfg0 epv scv lks sts sts
+                Hwf' ltac:(intros _; reflexivity) Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv Hrd'
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       all: try lkbelow.
@@ -1159,8 +1159,8 @@ Section UtE8.
                      = mword_of_int (UT + 0xfc)) by pcw.
       iEval (rewrite Hpfc) in "Hpc".
       iApply (T.ut_fa Rsys N U0 U pt ksp m0 mf av nx false
-                mie_v menvcfg0 epv scv lks sts
-                Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
+                mie_v menvcfg0 epv scv lks sts sts
+                Hwf' ltac:(intros _; reflexivity) Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       iApply (ua_hold_on Rsys N U _ sts with "Hcpu Hcsrs Hclm [-]").

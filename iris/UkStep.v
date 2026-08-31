@@ -96,6 +96,7 @@ Require Import UsysMemOk.
 Require Import UexecWp UexecSlot UexecRet.
 Require Import FdSlots.      (* [fdstate] -- the key's descriptor view *)
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
+Require Import TsoCtxShim.  (* [own_context_sc]: SC-minted token (cutover seam) *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -456,7 +457,8 @@ Section UkObl.
   Definition uk_step_obl (π : gmap (mword 27) uperm) (Kc : iProp Σ) (sz : Z)
       (fdv : list fdstate)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
-    (∀ (R : iProp Σ) (CIDo : CpuId) (C : ucfg) (pt : uptd)
+    (∀ (R : iProp Σ) (CIDo : CpuId) (XIo : TsoCtx.CurCtx)
+       (C : ucfg) (pt : uptd)
        (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
        (Mp : gmap Z (bv 8)) (t : ptree) (rs1 rsA : regstate)
        (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
@@ -470,8 +472,8 @@ Section UkObl.
        resv_any cpu_id -∗
        hreg_frame rsA u_Drw -∗
        hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
-       bytes_own (uv_mm t (upa_map pt Mp)) -∗
-       uv_res (CID := CIDo) pt Mp t usatp pcfg paddr -∗
+       bytes_own (XI := XIo) (uv_mm t (upa_map pt Mp)) -∗
+       uv_res (CID := CIDo) (XI := XIo) pt Mp t usatp pcfg paddr -∗
        swp (fetch tt)
          (run_fetch_post u_Drw u_Dro (u_Df (uc_dqc C))
             (fun (r : ExecutionResult) (ib : mword 32) =>
@@ -484,10 +486,10 @@ Section UkObl.
   Definition uk_ih (π : gmap (mword 27) uperm) (Kc : iProp Σ)
       (fdv : list fdstate)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
-    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+    (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
        (Rut : uptd -> iProp Σ) (sz : Z),
        ⌜loop_ok C pt⌝ -∗ ⌜perm_of (ud_um pt) sz = π⌝ -∗
-       uvb (CID := h) C pt Rfd Rut sz π fdv M m pc -∗
+       uvb (CID := h) (XI := xi) C pt Rfd Rut sz π fdv M m pc -∗
        □ uk_step_obl π Kc sz fdv M m pc -∗ ▷ Kc -∗ WP (Loop : expr riscv_lang))%I.
 
   (* the payload the wrapper hands the closer at the cycle's tail *)
@@ -695,7 +697,7 @@ Section UkStepEngine.
     intros Hal2.
     rewrite /uk_ih.
     iLöb as "IH".
-    iIntros (CID C pt Rfd Rut sz) "%Hlo %Hpm Hb #Hobl Hkc".
+    iIntros (CID XIv C pt Rfd Rut sz) "%Hlo %Hpm Hb #Hobl Hkc".
     iDestruct (uvb_elim with "Hb")
       as (Mp) "(%Hpure & #Hamb & Hregs & Hutlb & Humem & Hfdv & Hcfg & Hgpr & Hpc & Hrut & Hk)".
     iPoseProof "Hamb" as "(#Hhw & _ & _)".
@@ -877,7 +879,7 @@ Section UkStepEngine.
         iIntros "HWd Hrw Hro".
         iDestruct "HWd" as "(Hfrag & Hmm & Hres)".
         iDestruct (resv_any_intro cpu_id None with "Hfrag") as "Hany".
-        iApply ("Hobl" $! (uk_payload sz π fdv Kc M m pc C pt Rfd Rut) CID C pt Rfd Rut Mp t RS
+        iApply ("Hobl" $! (uk_payload sz π fdv Kc M m pc C pt Rfd Rut) CID XIv C pt Rfd Rut Mp t RS
                   (wrap_pre RS) usatp pcfg paddr
                   with "[%] [%] [%] [%] Hamb [] Hany Hrw Hro Hmm Hres");
           [ exact Hlo | exact Hpm | exact Hpure | exact Hpre | ].
@@ -892,9 +894,9 @@ Section UkStepEngine.
          that name is taken twice below, by the fetch's [HWd] split. *)
       iSplitL "Hkc"; [ | iFrame "Hrut Hfdv Hk" ].
       iSplit; [ iExact "Hkc" | ].
-      rewrite /ukc. iIntros (h' C' pt' Rfd' Rut') "%Hlo' %Hpm' Hb".
+      rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' Hb".
       rewrite /uk_ih.
-      iApply ("IH" $! h' C' pt' Rfd' Rut' sz with "[%] [%] Hb Hobl [Hkc]");
+      iApply ("IH" $! h' xi' C' pt' Rfd' Rut' sz with "[%] [%] Hb Hobl [Hkc]");
         [ exact Hlo' | exact Hpm' | iNext; iExact "Hkc" ].
   Qed.
 
@@ -919,7 +921,7 @@ Section UkFunnel.
     intros Hal2.
     iIntros "Hb #Hobl Hkc".
     iPoseProof (wp_uk_step_gen π Kc M m pc fdv Hal2) as "H". rewrite /uk_ih.
-    iApply ("H" $! CID C pt Rfd Rut sz with "[%] [%] Hb Hobl Hkc"); [ exact Hlo | exact Hpm ].
+    iApply ("H" $! CID XI C pt Rfd Rut sz with "[%] [%] Hb Hobl Hkc"); [ exact Hlo | exact Hpm ].
   Qed.
 
 End UkFunnel.
@@ -1465,7 +1467,7 @@ Section UkRetire.
     iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm _ M m pc fdv Hal2 with "Hb [] Hcont").
     iModIntro.
     rewrite /uk_step_obl.
-    iIntros (R CIDo C' pt' Rfd' Rut' Mp' t rs1 rsA usatp pcfg paddr)
+    iIntros (R CIDo XIo C' pt' Rfd' Rut' Mp' t rs1 rsA usatp pcfg paddr)
       "%Hlo' %Hpm' %Hpure %Hpre #Hamb Hk Hany Hrw Hro Hmm Hres".
     destruct (uk_instr_mapped π M Mp' pc _ i pt' sz
                 (loop_ok_wf C' pt' Hlo') Hpm' Hpure Hui)
@@ -1487,7 +1489,7 @@ Section UkRetire.
       iDestruct "Hkc" as "[Hkc _]".
       iFrame "Hrut Hfdr Hkb". iIntros "Hb".
       rewrite /ukc.
-      iApply ("Hkc" $! CIDo C' pt' Rfd' Rut' with "[%] [%] Hb");
+      iApply ("Hkc" $! CIDo XIo C' pt' Rfd' Rut' with "[%] [%] Hb");
         [ exact Hlo' | exact Hpm' ]. }
     destruct is_rvc.
     - (* ================= COMPRESSED ================= *)
@@ -1727,8 +1729,9 @@ Section UkEcallPost.
     iIntros "#Hcert Hk Hany Hmm Hres Hrw Hro".
     iAssert (bytes_own (∅ : gmap Arch.pa (bv 8))) as "#Hemp";
       [ by rewrite /bytes_own big_sepM_empty |].
+    iPoseProof (TsoCtxShim.own_context_sc XI) as "Hrun".
     (* ---- the execute: one node, no memory ---- *)
-    iApply (swp_mono with "[Hk Hmm Hres] [Hany Hrw Hro]").
+    iApply (swp_mono with "[Hk Hmm Hres] [Hany Hrw Hro Hrun]").
     2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df (uc_dqc C))
                   (execute (ECALL tt)) (u_state rsx ∅) (u_state rsx ∅)
                   (rv64d_types.Trap
@@ -1736,9 +1739,10 @@ Section UkEcallPost.
                   rsx ∅ u_disj Du_r_sub Du_w_sub
                   ltac:(intros q _; reflexivity) (map_empty_subseteq _)
                   (Hg (u_state rsx ∅) Lcpx Lpcx) Hex
-                  with "Hcert Hany Hrw Hro Hemp"). }
+                  with "Hcert Hany Hrw Hro Hrun Hemp"). }
     iIntros (v) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs3 mm3) "(%Hag3 & _ & _ & Hrw & Hro & _ & Hany)".
+    iDestruct "Hpost" as (rs3 mm3)
+      "(%Hag3 & _ & _ & Hrw & Hro & _ & _ & Hany)".
     iApply (run_exec_post_direct
               (fun (r : ExecutionResult) (ib' : mword 32) =>
                  uv_step_post C R rs1 (Step_Execute (r, ib'))) ib
@@ -1866,7 +1870,7 @@ Section UkEcall.
     2:{ iNext. iExact "Hret". }
     iModIntro.
     rewrite /uk_step_obl.
-    iIntros (R CIDo C' pt' Rfd' Rut' Mp' t rs1 rsA usatp pcfg paddr)
+    iIntros (R CIDo XIo C' pt' Rfd' Rut' Mp' t rs1 rsA usatp pcfg paddr)
       "%Hlo' %Hpm' %Hpure %Hpre #Hamb Hk Hany Hrw Hro Hmm Hres".
     iAssert (R -∗ Rut' pt' ∗ Rfd' fdv ∗ ukb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv ∗
              uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv))%I with "[Hk]" as "Hk".

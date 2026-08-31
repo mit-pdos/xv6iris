@@ -82,6 +82,10 @@ Require Import FsFdMirror.   (* [umirror]/[mcur]/[ufs_step]/[uenr_dom] *)
 Section UexecRetFs.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* ONE ambient [CurCtx] for the whole section: every fs definition binds
+     it and the section close abstracts it, so the closed constants take
+     {XI} uniformly -- the per-definition-binder alternative loses to the
+     oldest-candidate rule wherever the ambient exists. *)
   Context `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context `{!ghost_varG Σ umirror}.
@@ -258,7 +262,10 @@ Section UexecRetFs.
     iDestruct "Hb" as
       "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
     iEval (rewrite uslot_unfold) in "Hs".
-    iApply ("Hs" $! h C pt Rfd Rut with "[%] [%] [-]");
+    (* the fs bundle is pinned at this section's ambient context (its own
+       ∀ xi is vacuous), so the PLAIN slot -- honestly ∀-quantified -- is
+       instantiated at the ambient, not at the intro'd xi *)
+    iApply ("Hs" $! h XI C pt Rfd Rut with "[%] [%] [-]");
       [exact Hlo | exact Hpm |].
     rewrite /uvb /uvb_F.
     iFrame "Hamb Hur Hpt Hfrag Hcfg Hg Hpc Hrut".
@@ -309,7 +316,8 @@ Section UexecRetFs.
 
   Definition urun_fs (γm γt γd γs : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) : iProp Σ :=
-    (∃ (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+    (∃ (C : ucfg) (pt : uptd)
+       (Rfd : list fdstate -> iProp Σ)
        (Rut : uptd -> iProp Σ) (sz : Z)
        (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (fdv : list fdstate),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
@@ -324,7 +332,9 @@ Section UexecRetFs.
     iIntros "H".
     iDestruct "H" as (C pt Rfd Rut sz M pm fdv)
       "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
-    rewrite /urun. iExists C, pt, Rfd, Rut, sz, M, pm, fdv.
+    (* the fs bundle's pieces are pinned at the ambient (its ∃ xi is
+       vacuous), so the plain urun repacks at the ambient *)
+    rewrite /urun. iExists XI, C, pt, Rfd, Rut, sz, M, pm, fdv.
     iSplitR; [iPureIntro; exact Hlo |].
     iSplitR; [iPureIntro; exact Hpm |].
     iFrame "Hheap Hstk".

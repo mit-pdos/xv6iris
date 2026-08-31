@@ -60,6 +60,7 @@ Require Import UexecSlot.    (* [uvis] / [tf_w] / [tf_resume_gpr] / [ret_pc_idem
 Require Import FdSlots.      (* [fdstate] -- the key's descriptor view *)
 Require Import UexecRet.     (* [tf_resume_gpr0] / [tf_of] / [uslot] / [uexec_ret] *)
 Require Import UexecRound.   (* the round this vocabulary is applied under *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -471,7 +472,7 @@ End Apply.
 (* ===================================================================== *)
 Section Frame.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : TsoCtx.CurCtx}.
 
   Lemma trapped_machine_frame (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (sz : Z) (sc stv : mword 64) (W : uvis) :
@@ -562,7 +563,7 @@ Qed.
 
 Section LoopApply.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : TsoCtx.CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* STEPS A + B: the returned [uexec_ret], re-keyed at the resume state. *)
@@ -576,9 +577,22 @@ Section LoopApply.
      [p->ofile[]] (pipe, dup, open, close), whose rows are what will later
      move it (see the ecall arm of [UexecRet.uexec_ret_F], which ∀-binds
      [fdv'] precisely so that they can). *)
+  (* THE DESCRIPTOR PIN IS THE TRANSPARENT ARM'S ALONE, and stating it that
+     way is what lets a syscall move the process's fd view.
+
+     Read the proof below for why the other three arms do not want it.  The
+     exec and fork arms [iApply "Hmk"] -- a kernel MINT, free at ANY key.
+     The returning ecall arm instantiates [uexec_ret]'s own ∀-bound [fdv']
+     at [uvis_fd W'], which is arbitrary: "the process is safe at every
+     return value AND every descriptor view the kernel hands back" is
+     exactly what that binder says.  Only the TRANSPARENT arm -- an
+     interrupt or a page fault -- hands back the process's continuation at
+     the SAME key, and there the pin is not a restriction but the truth: no
+     kernel code ran that could retype a descriptor, which is precisely what
+     [SpecUsertrap.ut_fd_kept] certifies on the other side. *)
   Lemma uexec_ret_round_slot (sc : mword 64) (W W' : uvis) :
     length (uvis_tf W) = TFWORDS ->
-    uvis_fd W' = uvis_fd W ->
+    (sc <> uecall_scause -> uvis_fd W' = uvis_fd W) ->
     uround_ok sc (uvis_tf (uvis_run W)) (uvis_M W) (uvis_perm W) (uvis_sz W)
       (uvis_tf W') (uvis_M W') (uvis_perm W') (uvis_sz W') ->
     (∀ W'' : uvis, uslot W'') -∗ uexec_ret sc W -∗ uslot W'.
@@ -637,7 +651,7 @@ Section LoopApply.
       iEval (rewrite (uslot_key_cong (uvis_run W) W'
                         (eq_sym Hi1) (eq_sym Hi2)
                         (eq_sym HM) (eq_sym Hpi) (eq_sym Hsz)
-                        (eq_sym Hfd))) in "Hret".
+                        (eq_sym (Hfd Hne)))) in "Hret".
       iExact "Hret".
   Qed.
 
@@ -648,20 +662,25 @@ Section LoopApply.
      [UexecSlot.uvis_of] takes the descriptor states as a parameter, and
      what the loop has to hand at this point is exactly the view the
      trapped key carried. *)
+  (* ...and the [_of] form takes the view to resume AT, rather than
+     hardwiring the trapped one.  The loop passes the states the round
+     actually left ([SpecUservec.uservec_post]'s [sts']); on a transparent
+     trap those ARE the trapped ones, and [ut_fd_kept] is what says so. *)
   Lemma uexec_ret_round_slot_of (sc : mword 64) (W : uvis) (g : regfile)
-      (sepc_v : mword 64) (U' : ustate) :
+      (sepc_v : mword 64) (U' : ustate) (fdv' : list fdstate) :
     length (uvis_tf W) = TFWORDS ->
     g = tf_resume_gpr0 (uvis_tf W) ->
     sepc_v = tf_w (uvis_tf W) tf_epc_idx ->
+    (sc <> uecall_scause -> fdv' = uvis_fd W) ->
     uround_ok sc (tf_of g (ret_pc sepc_v)) (uvis_M W) (uvis_perm W) (uvis_sz W)
       (pv_tf (us_V U')) (us_M U')
       (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
       (uint (pv_sz (us_V U'))) ->
     (∀ W'' : uvis, uslot W'') -∗ uexec_ret sc W -∗
-    uslot (uvis_of U' (uvis_fd W)).
+    uslot (uvis_of U' fdv').
   Proof.
-    intros Hl -> -> Hr.
-    exact (uexec_ret_round_slot sc W (uvis_of U' (uvis_fd W)) Hl eq_refl Hr).
+    intros Hl -> -> Hfd Hr.
+    exact (uexec_ret_round_slot sc W (uvis_of U' fdv') Hl Hfd Hr).
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -693,7 +712,7 @@ Section LoopApply.
     (* the cell bundle splits into the U-mode residue, the file and the pc *)
     iDestruct (u_regs_uv_regs ms_v sc_v stv_v sepc_v pc m Hms with "Hregs")
       as "(Hur & Hg & Hpc)".
-    iApply ("Hkc" $! CID C pt Rfd Rut
+    iApply ("Hkc" $! CID XI C pt Rfd Rut
               with "[%] [%] [Hhw Hmi Hwi Hur Hg Hpc Hupt Hfrag Hcfg Hrut Hk]").
     - exact Hlo.
     - reflexivity.

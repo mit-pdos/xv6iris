@@ -114,21 +114,24 @@ Section UexecWp.
   Context `{!riscvGS Σ} `{GEN : GenId}.
 
   Definition uexec_F (X : iProp Σ) : iProp Σ :=
-    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+    (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd)
+       (Rut : uptd -> iProp Σ)
        (M : gmap Z (bv 8)) (g : regfile)
        (ms_v sc_v stval_v sepc_v va : mword 64),
        ⌜loop_ok C pt⌝ -∗
        ⌜user_mstatus_ok ms_v⌝ -∗
        hw_config (CID := h) -∗ minstret_inv -∗ wire_inv -∗
        u_regs (CID := h) (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
-       user_pt_inv (CID := h) pt M -∗
+       user_pt_inv (CID := h) (XI := xi) pt M -∗
        user_cfg (CID := h) C -∗
        Rut pt -∗
        (* THE TRAP SEAM, in both directions at once: the kernel promises to
           handle the trap frame, user execution promises to hand back the WP
           the NEXT round is to run.  [X] occurs nowhere else, hence the
-          guard. *)
-       ▷ (user_trap_frame (CID := h) C pt Rut ∗ X -∗
+          guard.  Like the hart, the CONTEXT is the resuming round's: a slot
+          in hand is good at whatever hart-and-thread runs the process
+          next. *)
+       ▷ (user_trap_frame (CID := h) (XI := xi) C pt Rut ∗ X -∗
           WP (Loop : expr riscv_lang)) -∗
        WP (Loop : expr riscv_lang))%I.
 

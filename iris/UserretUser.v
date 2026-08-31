@@ -76,6 +76,7 @@ Require Import SpecUserret.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxShim.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -161,37 +162,37 @@ Section UserretUser.
     pt_frame (upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt)) -∗
     pc_is (uva 0x9c) -∗
     gpr_file m -∗
-    tf_pa (ud_tfp pt) 40 ↦ₚ₈{ dqm } vra -∗
-    tf_pa (ud_tfp pt) 48 ↦ₚ₈{ dqm } vsp -∗
-    tf_pa (ud_tfp pt) 56 ↦ₚ₈{ dqm } vgp -∗
-    tf_pa (ud_tfp pt) 64 ↦ₚ₈{ dqm } vtp -∗
-    tf_pa (ud_tfp pt) 72 ↦ₚ₈{ dqm } vt0 -∗
-    tf_pa (ud_tfp pt) 80 ↦ₚ₈{ dqm } vt1 -∗
-    tf_pa (ud_tfp pt) 88 ↦ₚ₈{ dqm } vt2 -∗
-    tf_pa (ud_tfp pt) 96 ↦ₚ₈{ dqm } vs0 -∗
-    tf_pa (ud_tfp pt) 104 ↦ₚ₈{ dqm } vs1 -∗
-    tf_pa (ud_tfp pt) 120 ↦ₚ₈{ dqm } va1 -∗
-    tf_pa (ud_tfp pt) 128 ↦ₚ₈{ dqm } va2 -∗
-    tf_pa (ud_tfp pt) 136 ↦ₚ₈{ dqm } va3 -∗
-    tf_pa (ud_tfp pt) 144 ↦ₚ₈{ dqm } va4 -∗
-    tf_pa (ud_tfp pt) 152 ↦ₚ₈{ dqm } va5 -∗
-    tf_pa (ud_tfp pt) 160 ↦ₚ₈{ dqm } va6 -∗
-    tf_pa (ud_tfp pt) 168 ↦ₚ₈{ dqm } va7 -∗
-    tf_pa (ud_tfp pt) 176 ↦ₚ₈{ dqm } vs2 -∗
-    tf_pa (ud_tfp pt) 184 ↦ₚ₈{ dqm } vs3 -∗
-    tf_pa (ud_tfp pt) 192 ↦ₚ₈{ dqm } vs4 -∗
-    tf_pa (ud_tfp pt) 200 ↦ₚ₈{ dqm } vs5 -∗
-    tf_pa (ud_tfp pt) 208 ↦ₚ₈{ dqm } vs6 -∗
-    tf_pa (ud_tfp pt) 216 ↦ₚ₈{ dqm } vs7 -∗
-    tf_pa (ud_tfp pt) 224 ↦ₚ₈{ dqm } vs8 -∗
-    tf_pa (ud_tfp pt) 232 ↦ₚ₈{ dqm } vs9 -∗
-    tf_pa (ud_tfp pt) 240 ↦ₚ₈{ dqm } vs10 -∗
-    tf_pa (ud_tfp pt) 248 ↦ₚ₈{ dqm } vs11 -∗
-    tf_pa (ud_tfp pt) 256 ↦ₚ₈{ dqm } vt3 -∗
-    tf_pa (ud_tfp pt) 264 ↦ₚ₈{ dqm } vt4 -∗
-    tf_pa (ud_tfp pt) 272 ↦ₚ₈{ dqm } vt5 -∗
-    tf_pa (ud_tfp pt) 280 ↦ₚ₈{ dqm } vt6 -∗
-    tf_pa (ud_tfp pt) 112 ↦ₚ₈{ dqm } va0f -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 40) dqm vra -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 48) dqm vsp -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 56) dqm vgp -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 64) dqm vtp -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 72) dqm vt0 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 80) dqm vt1 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 88) dqm vt2 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 96) dqm vs0 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 104) dqm vs1 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 120) dqm va1 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 128) dqm va2 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 136) dqm va3 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 144) dqm va4 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 152) dqm va5 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 160) dqm va6 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 168) dqm va7 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 176) dqm vs2 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 184) dqm vs3 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 192) dqm vs4 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 200) dqm vs5 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 208) dqm vs6 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 216) dqm vs7 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 224) dqm vs8 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 232) dqm vs9 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 240) dqm vs10 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 248) dqm vs11 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 256) dqm vt3 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 264) dqm vt4 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 272) dqm vt5 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 280) dqm vt6 -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 112) dqm va0f -∗
     (* ---- the cells userret never touches, needed by the bridge ---- *)
     scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗
@@ -220,37 +221,37 @@ Section UserretUser.
        in hand, which is after userret's continuation and before the user
        WP.  The values are userret's own, unchanged: it restores registers
        FROM the trapframe and writes none of it. *)
-    (tf_pa (ud_tfp pt) 40 ↦ₚ₈{ dqm } vra -∗
-       tf_pa (ud_tfp pt) 48 ↦ₚ₈{ dqm } vsp -∗
-       tf_pa (ud_tfp pt) 56 ↦ₚ₈{ dqm } vgp -∗
-       tf_pa (ud_tfp pt) 64 ↦ₚ₈{ dqm } vtp -∗
-       tf_pa (ud_tfp pt) 72 ↦ₚ₈{ dqm } vt0 -∗
-       tf_pa (ud_tfp pt) 80 ↦ₚ₈{ dqm } vt1 -∗
-       tf_pa (ud_tfp pt) 88 ↦ₚ₈{ dqm } vt2 -∗
-       tf_pa (ud_tfp pt) 96 ↦ₚ₈{ dqm } vs0 -∗
-       tf_pa (ud_tfp pt) 104 ↦ₚ₈{ dqm } vs1 -∗
-       tf_pa (ud_tfp pt) 120 ↦ₚ₈{ dqm } va1 -∗
-       tf_pa (ud_tfp pt) 128 ↦ₚ₈{ dqm } va2 -∗
-       tf_pa (ud_tfp pt) 136 ↦ₚ₈{ dqm } va3 -∗
-       tf_pa (ud_tfp pt) 144 ↦ₚ₈{ dqm } va4 -∗
-       tf_pa (ud_tfp pt) 152 ↦ₚ₈{ dqm } va5 -∗
-       tf_pa (ud_tfp pt) 160 ↦ₚ₈{ dqm } va6 -∗
-       tf_pa (ud_tfp pt) 168 ↦ₚ₈{ dqm } va7 -∗
-       tf_pa (ud_tfp pt) 176 ↦ₚ₈{ dqm } vs2 -∗
-       tf_pa (ud_tfp pt) 184 ↦ₚ₈{ dqm } vs3 -∗
-       tf_pa (ud_tfp pt) 192 ↦ₚ₈{ dqm } vs4 -∗
-       tf_pa (ud_tfp pt) 200 ↦ₚ₈{ dqm } vs5 -∗
-       tf_pa (ud_tfp pt) 208 ↦ₚ₈{ dqm } vs6 -∗
-       tf_pa (ud_tfp pt) 216 ↦ₚ₈{ dqm } vs7 -∗
-       tf_pa (ud_tfp pt) 224 ↦ₚ₈{ dqm } vs8 -∗
-       tf_pa (ud_tfp pt) 232 ↦ₚ₈{ dqm } vs9 -∗
-       tf_pa (ud_tfp pt) 240 ↦ₚ₈{ dqm } vs10 -∗
-       tf_pa (ud_tfp pt) 248 ↦ₚ₈{ dqm } vs11 -∗
-       tf_pa (ud_tfp pt) 256 ↦ₚ₈{ dqm } vt3 -∗
-       tf_pa (ud_tfp pt) 264 ↦ₚ₈{ dqm } vt4 -∗
-       tf_pa (ud_tfp pt) 272 ↦ₚ₈{ dqm } vt5 -∗
-       tf_pa (ud_tfp pt) 280 ↦ₚ₈{ dqm } vt6 -∗
-       tf_pa (ud_tfp pt) 112 ↦ₚ₈{ dqm } va0f -∗
+    (TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 40) dqm vra -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 48) dqm vsp -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 56) dqm vgp -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 64) dqm vtp -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 72) dqm vt0 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 80) dqm vt1 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 88) dqm vt2 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 96) dqm vs0 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 104) dqm vs1 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 120) dqm va1 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 128) dqm va2 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 136) dqm va3 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 144) dqm va4 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 152) dqm va5 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 160) dqm va6 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 168) dqm va7 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 176) dqm vs2 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 184) dqm vs3 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 192) dqm vs4 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 200) dqm vs5 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 208) dqm vs6 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 216) dqm vs7 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 224) dqm vs8 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 232) dqm vs9 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 240) dqm vs10 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 248) dqm vs11 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 256) dqm vt3 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 264) dqm vt4 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 272) dqm vt5 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 280) dqm vt6 -∗
+       TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 112) dqm va0f -∗
      Rut pt) -∗
     (* ---- THE CONTINUATION TO RUN (milestone J, stage S5).  It used to be
            the forall-state [UexecWp.uexec_wp]; it is now the per-process
@@ -286,6 +287,9 @@ Section UserretUser.
              Htf272 Htf280 Htf112
              Hsc Hstval Hstvec Hmedl Hmse Hsse #Hmcen #Hscen #Hhpm
              Hdata Hfdr Hrutw Huwp Hhandler".
+    (* the running token: SC-minted here (TsoCtxShim seam); the T-leg
+       borrows it from the residue it holds through [Hrutw]'s source *)
+    iPoseProof (TsoCtxShim.own_context_sc TsoCtx.cur_ctx) as "Hctx".
     iApply (R.wp_userret_pt kroot (ud_root pt) (ud_tfp pt) (ud_um pt) m usatp
               mstatus0 (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0) sepc0
               vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
@@ -295,12 +299,12 @@ Section UserretUser.
               ltac:(vm_compute; reflexivity)
               eq_refl eq_refl Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
               with "Hkt Hhw Hmi Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc
-                    Hclaim Hktlb Hufr Hpc Hfile
+                    Hclaim Hktlb Hufr Hctx Hpc Hfile
                     Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104
                     Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176
                     Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240
                     Htf248 Htf256 Htf264 Htf272 Htf280 Htf112").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc Hfile
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb _ Hpc Hfile
              Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120
              Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264

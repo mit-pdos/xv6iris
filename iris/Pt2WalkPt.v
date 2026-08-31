@@ -189,6 +189,10 @@ Section Pt2OwnedWalk.
         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
            (Z.sub pagesize_bits 1) 0)) = pa ->
     gen_cert -∗ resv_frag cpu_id rr -∗
+    (* the user tree's slots are LEDGER words (tso-flip A6.28/A6.55): the
+       walk's own A/D write-back owes the era log's append and therefore
+       takes the running token; it is handed straight back *)
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     ptree_own 2 (DfracOwn 1) t -∗
     hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
     swp (translateAddr (Virtaddr va) acc)
@@ -206,14 +210,15 @@ Section Pt2OwnedWalk.
                         t' = ptree_set_leaf t (svpn_of va)
                                (pte_set_ad w a1 d1))) ⌝ ∗
                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
-                  ptree_own 2 (DfracOwn 1) t' ∗ resv_any cpu_id).
+                  ptree_own 2 (DfracOwn 1) t' ∗ TsoCtx.own_context TsoCtx.cur_ctx ∗
+                  resv_any cpu_id).
   Proof.
     intros Hdisjf HDr HDw Hacc Hmisa Hmenv Hhtif Hcp Hms HSXL HMPRV
            Hsatp Htlb Hpcfg Hpaddr Hpma Hsatpok Hpmpok Hall
            Hbase Hmaps Hslotok Hvar Hchk Hgchk Hcanon Hout.
     pose proof Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
     pose proof Hpmpok as (HA & Hord & HX & HW & HR & Hcov).
-    iIntros "#Hcert Hfrag Htree Hrw Hro".
+    iIntros "#Hcert Hfrag Hrun Htree Hrw Hro".
     iDestruct (ptree_own_bytes 2 t with "Htree") as "(#Hclaims & %Hdisj & Hmm)".
     iDestruct (bytes_own_ram with "Hmm") as %Hram.
     assert (Hwf : pt_tmem t (ptree_bytes 2 t)).
@@ -428,10 +433,11 @@ Section Pt2OwnedWalk.
                    (MState rs (ptree_bytes 2 t) dev0_state) _ _ rs
                    (ptree_bytes 2 t) Hdisjf HDr HDw (fun r _ => eq_refl)
                    ltac:(reflexivity) Htrg Htr
-                   with "Hcert [Hfrag] Hrw Hro Hmm") ].
+                   with "Hcert [Hfrag] Hrw Hro Hrun Hmm") ].
     2:{ iExists rr. iExact "Hfrag". }
     iIntros (v) "(-> & Hf)".
-    iDestruct "Hf" as (rs' mm') "(%Hag' & %Hsub' & %Hdom' & Hrw & Hro & Hmm' & Hany)".
+    iDestruct "Hf" as (rs' mm')
+      "(%Hag' & %Hsub' & %Hdom' & Hrw & Hro & Hrun & Hmm' & Hany)".
     assert (Hmmeq : mm' = ptree_bytes 2 t')
       by exact (u_map_eq mm' (ptree_bytes 2 t') Hsub'
                   ltac:(rewrite Hdom' Hdomt; reflexivity)).
@@ -443,7 +449,7 @@ Section Pt2OwnedWalk.
     rewrite (hreg_frame_ro_ext Df rs' rsf Dro
                (fun r Hr => Hag' r (elem_of_union_r _ _ _ Hr))).
     iSplitR; [iPureIntro; exact Hshapef |].
-    iFrame "Hrw Hro Hany".
+    iFrame "Hrw Hro Hrun Hany".
     iApply (ptree_own_of_bytes 2 t' Hdisj' with "Hclaims' Hmm'").
   Qed.
 
@@ -500,6 +506,10 @@ Section Pt2OwnedWalk.
         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
            (Z.sub pagesize_bits 1) 0)) = pa ->
     gen_cert -∗ resv_frag cpu_id rr -∗
+    (* the user tree's slots are LEDGER words (tso-flip A6.28/A6.55): the
+       walk's own A/D write-back owes the era log's append and therefore
+       takes the running token; it is handed straight back *)
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     ptree_own 2 (DfracOwn 1) t -∗
     hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
     swp (translateAddr (Virtaddr va) acc)
@@ -517,14 +527,15 @@ Section Pt2OwnedWalk.
                         t' = ptree_set_leaf t (svpn_of va)
                                (pte_set_ad w a1 d1))) ⌝ ∗
                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
-                  ptree_own 2 (DfracOwn 1) t' ∗ resv_any cpu_id).
+                  ptree_own 2 (DfracOwn 1) t' ∗ TsoCtx.own_context TsoCtx.cur_ctx ∗
+                  resv_any cpu_id).
   Proof.
     intros Hdisjf HDr HDw Hacc Hmisa Hmenv Hhtif Hcp Hms HSXL HMPRV
            Hsatp Htlb Hpcfg Hpaddr Hpma Hsatpok Hpmpok Hall
            Hmaps Hslot Hvar Hchk Hgchk Hcanon Hout.
     pose proof Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
     pose proof Hpmpok as (HA & Hord & HX & HW & HR & Hcov).
-    iIntros "#Hcert Hfrag Htree Hrw Hro".
+    iIntros "#Hcert Hfrag Hrun Htree Hrw Hro".
     iDestruct (ptree_own_bytes 2 t with "Htree") as "(#Hclaims & %Hdisj & Hmm)".
     iDestruct (bytes_own_ram with "Hmm") as %Hram.
     assert (Hwf : pt_tmem t (ptree_bytes 2 t)).
@@ -739,10 +750,11 @@ Section Pt2OwnedWalk.
                    (MState rs (ptree_bytes 2 t) dev0_state) _ _ rs
                    (ptree_bytes 2 t) Hdisjf HDr HDw (fun r _ => eq_refl)
                    ltac:(reflexivity) Htrg Htr
-                   with "Hcert [Hfrag] Hrw Hro Hmm") ].
+                   with "Hcert [Hfrag] Hrw Hro Hrun Hmm") ].
     2:{ iExists rr. iExact "Hfrag". }
     iIntros (v) "(-> & Hf)".
-    iDestruct "Hf" as (rs' mm') "(%Hag' & %Hsub' & %Hdom' & Hrw & Hro & Hmm' & Hany)".
+    iDestruct "Hf" as (rs' mm')
+      "(%Hag' & %Hsub' & %Hdom' & Hrw & Hro & Hrun & Hmm' & Hany)".
     assert (Hmmeq : mm' = ptree_bytes 2 t')
       by exact (u_map_eq mm' (ptree_bytes 2 t') Hsub'
                   ltac:(rewrite Hdom' Hdomt; reflexivity)).
@@ -754,7 +766,7 @@ Section Pt2OwnedWalk.
     rewrite (hreg_frame_ro_ext Df rs' rsf Dro
                (fun r Hr => Hag' r (elem_of_union_r _ _ _ Hr))).
     iSplitR; [iPureIntro; exact Hshapef |].
-    iFrame "Hrw Hro Hany".
+    iFrame "Hrw Hro Hrun Hany".
     iApply (ptree_own_of_bytes 2 t' Hdisj' with "Hclaims' Hmm'").
   Qed.
 
@@ -1580,6 +1592,7 @@ Section Pt2Window.
          (Z.sub pagesize_bits 1) 0)) = pa ->
     kmap_at (svpn_of va) ppn kp -∗
     gen_cert -∗ resv_frag cpu_id rr -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     pt2_res_kcur rc Sp tlbv -∗
     hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
     swp (translateAddr (Virtaddr va) acc)
@@ -1588,6 +1601,7 @@ Section Pt2Window.
                   ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                   pt2_res_kcur rc Sp (register_lookup tlb rsf) ∗
+                  TsoCtx.own_context TsoCtx.cur_ctx ∗
                   resv_any cpu_id).
   Proof.
     intros Hdisjf HDr HDw Hacc Hmisa Hmenv Hhtif Hcp Hms HSXL HMPRV
@@ -1595,7 +1609,7 @@ Section Pt2Window.
            Hsel Hpres Hchk Hgchk Hcanon Hident.
     pose proof Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
     pose proof Hpmpok as (HA & Hord & HX & HW & HR & Hcov).
-    iIntros "#Hat #Hcert Hfrag Hres Hrw Hro".
+    iIntros "#Hat #Hcert Hfrag Hrun Hres Hrw Hro".
     iDestruct "Hres" as (tp tc0) "(%Hok2 & %HSp & Htp & #Hlb0 & #Hkinv)".
     destruct (Hsel tp HSp) as (pp2 & pp1 & ap & dp & Hmaps_p).
     assert (Hout : zero_extend' 64 (concat_vec
@@ -1644,10 +1658,10 @@ Section Pt2Window.
                     Hdisjf HDr HDw Hacc Hmisa Hmenv Hhtif Hcp Hms HSXL HMPRV
                     Hsatp Htlb Hpcfg Hpaddr Hpma Hsatpok Hpmpok Hall
                     Hmaps_p Hslot Hvar Hchk Hgchk Hcanon Hout
-                    with "Hcert Hfrag Htp Hrw Hro"). }
+                    with "Hcert Hfrag Hrun Htp Hrw Hro"). }
       iIntros (v) "(-> & Hf)".
-      iDestruct "Hf" as (rsf t') "(%Hshapef & Hrw & Hro & Htp & Hany)".
-      iSplitR; [done|]. iExists rsf. iFrame "Hrw Hro Hany".
+      iDestruct "Hf" as (rsf t') "(%Hshapef & Hrw & Hro & Htp & Hrun & Hany)".
+      iSplitR; [done|]. iExists rsf. iFrame "Hrw Hro Hrun Hany".
       destruct Hshapef as [(-> & ->) | (a1 & d1 & -> & Ht')].
       + iSplitR; [iPureIntro; left; reflexivity |].
         rewrite Htlb. iExists tp, tc0. iFrame "Htp Hlb0 Hkinv". iPureIntro.
@@ -1711,7 +1725,7 @@ Section Pt2Window.
       assert (LSXL : _get_Mstatus_SXL
                 (register_lookup mstatus dst.(sregs)) = 'b"10")
         by (unfold dst; cbn [sregs]; rewrite Hms; exact HSXL).
-      iApply (swp_mono with "[Htp] [-]").
+      iApply (swp_mono with "[Htp Hrun] [-]").
       2:{ iApply (swp_translate_kpt_slot acc Drw Dro Df rs dst upt_Dr
                     rc tc0 va pa satp0 MENVCFG_S ppn kp tlbv pmar0 pcfg paddr rr
                     Hdisjf Lmst Lpriv Lsatpin Ltlbw Lpmain Lpcfgin Lpaddrin
@@ -1733,7 +1747,7 @@ Section Pt2Window.
                     with "Hat Hkinv Hlb0 Hcert Hfrag Hrw Hro"). }
       iIntros (v) "(-> & Hf)".
       iDestruct "Hf" as (rsf) "(%Hland & Hrw & Hro & Hany)".
-      iSplitR; [done|]. iExists rsf. iFrame "Hrw Hro Hany".
+      iSplitR; [done|]. iExists rsf. iFrame "Hrw Hro Hrun Hany".
       destruct Hland as [-> | (q2 & q1 & q0 & qf & aq & dq & Hm & -> & ->)].
       + iSplitR; [iPureIntro; left; reflexivity |].
         rewrite Htlb. iExists tp, tc0. iFrame "Htp Hlb0 Hkinv". iPureIntro.
@@ -1798,6 +1812,7 @@ Section Pt2Window.
          (Z.sub pagesize_bits 1) 0)) = pa ->
     kmap_at (svpn_of va) ppn kp -∗
     gen_cert -∗ resv_frag cpu_id rr -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     pt2_res_kprev rc kroot Sc tlbv -∗
     hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
     swp (translateAddr (Virtaddr va) acc)
@@ -1806,6 +1821,7 @@ Section Pt2Window.
                   ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                   pt2_res_kprev rc kroot Sc (register_lookup tlb rsf) ∗
+                  TsoCtx.own_context TsoCtx.cur_ctx ∗
                   resv_any cpu_id).
   Proof.
     intros Hdisjf HDr HDw Hacc Hmisa Hmenv Hhtif Hcp Hms HSXL HMPRV
@@ -1813,7 +1829,7 @@ Section Pt2Window.
            Hbc Hsel Hpres Hchk Hgchk Hcanon Hident.
     pose proof Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
     pose proof Hpmpok as (HA & Hord & HX & HW & HR & Hcov).
-    iIntros "#Hat #Hcert Hfrag Hres Hrw Hro".
+    iIntros "#Hat #Hcert Hfrag Hrun Hres Hrw Hro".
     iDestruct "Hres" as (tp0 tc) "(%Hok2 & %HSc & Htc & #Hlb0 & #Hkinv)".
     destruct (Hsel tc HSc) as (uc2 & uc1 & au & du & Hmaps_c).
     assert (Hout : zero_extend' 64 (concat_vec
@@ -1876,7 +1892,7 @@ Section Pt2Window.
       assert (LSXL : _get_Mstatus_SXL
                 (register_lookup mstatus dst.(sregs)) = 'b"10")
         by (unfold dst; cbn [sregs]; rewrite Hms; exact HSXL).
-      iApply (swp_mono with "[Htc] [-]").
+      iApply (swp_mono with "[Htc Hrun] [-]").
       2:{ iApply (swp_translate_kpt_hit_slot acc Drw Dro Df rs dst upt_Dr
                     rc kroot tp0 va pa satp0 MENVCFG_S ppn kp tlbv pmar0
                     pcfg paddr rr
@@ -1899,7 +1915,7 @@ Section Pt2Window.
                     with "Hat Hkinv Hlb0 Hcert Hfrag Hrw Hro"). }
       iIntros (v) "(-> & Hf)".
       iDestruct "Hf" as (rsf) "(%Hland & Hrw & Hro & Hany)".
-      iSplitR; [done|]. iExists rsf. iFrame "Hrw Hro Hany".
+      iSplitR; [done|]. iExists rsf. iFrame "Hrw Hro Hrun Hany".
       destruct Hland as [-> | (q2 & q1 & q0 & qf & aq & dq & Hm & -> & ->)].
       + iSplitR; [iPureIntro; left; reflexivity |].
         rewrite Htlb. iExists tp0, tc. iFrame "Htc Hlb0 Hkinv". iPureIntro.
@@ -1919,10 +1935,10 @@ Section Pt2Window.
                     Hdisjf HDr HDw Hacc Hmisa Hmenv Hhtif Hcp Hms HSXL HMPRV
                     Hsatp Htlb Hpcfg Hpaddr Hpma Hsatpok Hpmpok Hall
                     (Hbc tc HSc) Hmaps_c Hslotc Hvar Hchk Hgchk Hcanon Hout
-                    with "Hcert Hfrag Htc Hrw Hro"). }
+                    with "Hcert Hfrag Hrun Htc Hrw Hro"). }
       iIntros (v) "(-> & Hf)".
-      iDestruct "Hf" as (rsf t') "(%Hshapef & Hrw & Hro & Htc & Hany)".
-      iSplitR; [done|]. iExists rsf. iFrame "Hrw Hro Hany".
+      iDestruct "Hf" as (rsf t') "(%Hshapef & Hrw & Hro & Htc & Hrun & Hany)".
+      iSplitR; [done|]. iExists rsf. iFrame "Hrw Hro Hrun Hany".
       destruct Hshapef as [(-> & ->) | (a1 & d1 & -> & Ht')].
       + iSplitR; [iPureIntro; left; reflexivity |].
         rewrite Htlb. iExists tp0, tc. iFrame "Htc Hlb0 Hkinv". iPureIntro.
@@ -2057,7 +2073,7 @@ Section Pt2Tramp.
   Proof.
     intros Hmisa Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma HSp.
     iIntros "#Hat #Hcert". rewrite /tramp_tr_obl. iModIntro.
-    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag HRes Hrw Hro".
+    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag Hrun HRes Hrw Hro".
     iAssert (kmap_at (svpn_of va) tramp_ppn KP_rx) as "#Hatva".
     { rewrite Hvpn. iApply "Hat". }
     iApply (swp_mono with "[] [-]").
@@ -2076,11 +2092,11 @@ Section Pt2Tramp.
                   Hsatpok Hpmpok Hpma
                   (rx_sel Sp va Hvpn HSp) (rx_pres Sp va Hvpn HSp)
                   rx_chk rx_gchk Hcanon Hident
-                  with "Hatva Hcert Hfrag HRes Hrw Hro"). }
-    iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & HRes & Hany)".
+                  with "Hatva Hcert Hfrag Hrun HRes Hrw Hro"). }
+    iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & HRes & Hrun & Hany)".
     iSplitR; [done |].
     destruct Hshape as [-> | (tvx & ->)].
-    - iExists tv. rewrite s_rs_tlb. iFrame "Hany Hrw Hro HRes".
+    - iExists tv. rewrite s_rs_tlb. iFrame "Hrun Hany Hrw Hro HRes".
     - assert (Ltlbv : register_lookup tlb
                 (register_set tlb tvx
                    (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
@@ -2122,7 +2138,7 @@ Section Pt2Tramp.
           | tlbpeel; apply s_rs_menv ]. }
       iDestruct (s_rw_ext _ _ Hag with "Hrw") as "Hrw".
       iDestruct (s_ro_ext_gen Df _ _ Hag with "Hro") as "Hro".
-      iExists tvx. rewrite Ltlbv. iFrame "Hany Hrw Hro HRes".
+      iExists tvx. rewrite Ltlbv. iFrame "Hrun Hany Hrw Hro HRes".
   Qed.
 
   Lemma pt2_tramp_fetch_tr_kcur (rc : mword 44) (Sp : ptree -> Prop)
@@ -2145,7 +2161,7 @@ Section Pt2Tramp.
     rewrite /tramp_fetch_tr.
     iIntros (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0 elp0).
     rewrite /tramp_tr_obl. iModIntro.
-    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag HRes Hrw Hro".
+    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag Hrun HRes Hrw Hro".
     iAssert (⌜ misa0 = MISA_C /\ pma_allows_all pmar0 ⌝)%I as %[Hmisa Hpma].
     { iEval (rewrite s_ro_split_mix) in "Hro".
       iDestruct "Hro" as "(_ & _ & _ & _ & _ & _ & _ & Hmisac & _ & Hpmac & _)".
@@ -2161,7 +2177,7 @@ Section Pt2Tramp.
                  pcfg paddr mc micfg MISA_C mseccfg0 senv0 pmar0 elp0 satp0
                  mie0 mdv0 menv0 eq_refl Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma
                  HSp with "Hat Hcert") as "#Hobl".
-    iApply ("Hobl" $! va pax tv rr with "[%] [%] [%] Hfrag HRes Hrw Hro");
+    iApply ("Hobl" $! va pax tv rr with "[%] [%] [%] Hfrag Hrun HRes Hrw Hro");
       [ exact Hcanon | exact Hvpn | exact Hident ].
   Qed.
 
@@ -2192,7 +2208,7 @@ Section Pt2Tramp.
   Proof.
     intros Hmisa Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma HSc Hbc.
     iIntros "#Hat #Hcert". rewrite /tramp_tr_obl. iModIntro.
-    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag HRes Hrw Hro".
+    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag Hrun HRes Hrw Hro".
     iAssert (kmap_at (svpn_of va) tramp_ppn KP_rx) as "#Hatva".
     { rewrite Hvpn. iApply "Hat". }
     iApply (swp_mono with "[] [-]").
@@ -2212,11 +2228,11 @@ Section Pt2Tramp.
                   Hsatpok Hpmpok Hpma Hbc
                   (rx_sel Sc va Hvpn HSc) (rx_pres Sc va Hvpn HSc)
                   rx_chk rx_gchk Hcanon Hident
-                  with "Hatva Hcert Hfrag HRes Hrw Hro"). }
-    iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & HRes & Hany)".
+                  with "Hatva Hcert Hfrag Hrun HRes Hrw Hro"). }
+    iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & HRes & Hrun & Hany)".
     iSplitR; [done |].
     destruct Hshape as [-> | (tvx & ->)].
-    - iExists tv. rewrite s_rs_tlb. iFrame "Hany Hrw Hro HRes".
+    - iExists tv. rewrite s_rs_tlb. iFrame "Hrun Hany Hrw Hro HRes".
     - assert (Ltlbv : register_lookup tlb
                 (register_set tlb tvx
                    (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
@@ -2258,7 +2274,7 @@ Section Pt2Tramp.
           | tlbpeel; apply s_rs_menv ]. }
       iDestruct (s_rw_ext _ _ Hag with "Hrw") as "Hrw".
       iDestruct (s_ro_ext_gen Df _ _ Hag with "Hro") as "Hro".
-      iExists tvx. rewrite Ltlbv. iFrame "Hany Hrw Hro HRes".
+      iExists tvx. rewrite Ltlbv. iFrame "Hrun Hany Hrw Hro HRes".
   Qed.
 
   Lemma pt2_tramp_fetch_tr_kprev (rc kroot : mword 44) (Sc : ptree -> Prop)
@@ -2282,7 +2298,7 @@ Section Pt2Tramp.
     rewrite /tramp_fetch_tr.
     iIntros (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0 elp0).
     rewrite /tramp_tr_obl. iModIntro.
-    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag HRes Hrw Hro".
+    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag Hrun HRes Hrw Hro".
     iAssert (⌜ misa0 = MISA_C /\ pma_allows_all pmar0 ⌝)%I as %[Hmisa Hpma].
     { iEval (rewrite s_ro_split_mix) in "Hro".
       iDestruct "Hro" as "(_ & _ & _ & _ & _ & _ & _ & Hmisac & _ & Hpmac & _)".
@@ -2298,7 +2314,7 @@ Section Pt2Tramp.
                  mst0 pcfg paddr mc micfg MISA_C mseccfg0 senv0 pmar0 elp0 satp0
                  mie0 mdv0 menv0 eq_refl Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma
                  HSc Hbc with "Hat Hcert") as "#Hobl".
-    iApply ("Hobl" $! va pax tv rr with "[%] [%] [%] Hfrag HRes Hrw Hro");
+    iApply ("Hobl" $! va pax tv rr with "[%] [%] [%] Hfrag Hrun HRes Hrw Hro");
       [ exact Hcanon | exact Hvpn | exact Hident ].
   Qed.
 
@@ -2356,6 +2372,7 @@ Section Pt2Engine.
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     tlb_inv_pt2_kcur rc Sp -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     pc_is pc -∗
     instr pa is_rvc i -∗
     (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
@@ -2373,6 +2390,7 @@ Section Pt2Engine.
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        resv_any cpu_id -∗
+       TsoCtx.own_context TsoCtx.cur_ctx -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    cur_privilege ↦ᵣ{ dq } Supervisor ∗
@@ -2387,6 +2405,7 @@ Section Pt2Engine.
                       mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
+                   TsoCtx.own_context TsoCtx.cur_ctx ∗
                    resv_any cpu_id)) -∗
     ▷ (∀ npc ms1 mdv1 : mword 64,
          hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -2396,13 +2415,14 @@ Section Pt2Engine.
          mideleg ↦ᵣ{ dq } mdv1 -∗
          menvcfg ↦ᵣ{ dq } menvcfg0 -∗
          tlb_inv_pt2_kcur rc Sp -∗
+         TsoCtx.own_context TsoCtx.cur_ctx -∗
          pc_is npc -∗ Rl npc ms1 mdv1 -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HSp
            Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
-    iIntros "#Hat #Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv
+    iIntros "#Hat #Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hrun
              Hpc Hinstr Hex Hcont".
     iDestruct (pt2_kcur_swp_open with "Hinv") as (satp0 tlbv pcfg paddr)
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & Hres)".
@@ -2413,22 +2433,22 @@ Section Pt2Engine.
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
-                    Hpcfg Hpaddr Htlbc Hres Hpc Hinstr [] [Hex] [Hcont]").
+                    Hpcfg Hpaddr Htlbc Hres Hrun Hpc Hinstr [] [Hex] [Hcont]").
     - iApply (pt2_tramp_fetch_tr_kcur rc Sp dq pc mstatus0 satp0 mie_v mdv0
                 menvcfg0 pcfg paddr Hmenvval HSXL HMPRV Hsatpok Hpmpok HSp
                 with "Hat Hhw").
     - iIntros (tv') "%Hpmp2 Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg
-                     Hpaddr Htlbc HRes Hclk Hpcc Hnpcc Hany".
+                     Hpaddr Htlbc HRes Hclk Hpcc Hnpcc Hany Hrun".
       iApply ("Hex" $! satp0 pcfg paddr tv' with
                 "[%] [%] Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr
-                 Htlbc HRes Hclk Hpcc Hnpcc Hany");
+                 Htlbc HRes Hclk Hpcc Hnpcc Hany Hrun");
         [ exact Hpmp2 | exact Hsatpok ].
     - iNext. iIntros (npc ms1 mdv1 tv1)
         "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
-         HRes Hpc HRl".
+         HRes Hrun Hpc HRl".
       iApply ("Hcont" $! npc ms1 mdv1 with
                 "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
-                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
+                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hrun Hpc HRl").
       iApply (pt2_kcur_swp_close rc Sp satp0 tv1 pcfg paddr Hsatpok Hpmpok
                 with "Hsatp Htlbc Hpcfg Hpaddr HRes").
   Qed.
@@ -2467,6 +2487,7 @@ Section Pt2Engine.
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     tlb_inv_pt2_kprev rc kroot Sc -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     pc_is pc -∗
     instr pa is_rvc i -∗
     (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
@@ -2484,6 +2505,7 @@ Section Pt2Engine.
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        resv_any cpu_id -∗
+       TsoCtx.own_context TsoCtx.cur_ctx -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    cur_privilege ↦ᵣ{ dq } Supervisor ∗
@@ -2498,6 +2520,7 @@ Section Pt2Engine.
                       mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
+                   TsoCtx.own_context TsoCtx.cur_ctx ∗
                    resv_any cpu_id)) -∗
     ▷ (∀ npc ms1 mdv1 : mword 64,
          hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -2507,13 +2530,14 @@ Section Pt2Engine.
          mideleg ↦ᵣ{ dq } mdv1 -∗
          menvcfg ↦ᵣ{ dq } menvcfg0 -∗
          tlb_inv_pt2_kprev rc kroot Sc -∗
+         TsoCtx.own_context TsoCtx.cur_ctx -∗
          pc_is npc -∗ Rl npc ms1 mdv1 -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval HSc Hbc
            Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
-    iIntros "#Hat #Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv
+    iIntros "#Hat #Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hrun
              Hpc Hinstr Hex Hcont".
     iDestruct (pt2_kprev_swp_open with "Hinv") as (satp0 tlbv pcfg paddr)
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & Hres)".
@@ -2524,22 +2548,22 @@ Section Pt2Engine.
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
-                    Hpcfg Hpaddr Htlbc Hres Hpc Hinstr [] [Hex] [Hcont]").
+                    Hpcfg Hpaddr Htlbc Hres Hrun Hpc Hinstr [] [Hex] [Hcont]").
     - iApply (pt2_tramp_fetch_tr_kprev rc kroot Sc dq pc mstatus0 satp0 mie_v
                 mdv0 menvcfg0 pcfg paddr Hmenvval HSXL HMPRV Hsatpok Hpmpok
                 HSc Hbc with "Hat Hhw").
     - iIntros (tv') "%Hpmp2 Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg
-                     Hpaddr Htlbc HRes Hclk Hpcc Hnpcc Hany".
+                     Hpaddr Htlbc HRes Hclk Hpcc Hnpcc Hany Hrun".
       iApply ("Hex" $! satp0 pcfg paddr tv' with
                 "[%] [%] Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr
-                 Htlbc HRes Hclk Hpcc Hnpcc Hany");
+                 Htlbc HRes Hclk Hpcc Hnpcc Hany Hrun");
         [ exact Hpmp2 | exact Hsatpok ].
     - iNext. iIntros (npc ms1 mdv1 tv1)
         "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
-         HRes Hpc HRl".
+         HRes Hrun Hpc HRl".
       iApply ("Hcont" $! npc ms1 mdv1 with
                 "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
-                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
+                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hrun Hpc HRl").
       iApply (pt2_kprev_swp_close rc kroot Sc satp0 tv1 pcfg paddr
                 Hsatpok Hpmpok with "Hsatp Htlbc Hpcfg Hpaddr HRes").
   Qed.

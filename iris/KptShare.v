@@ -46,6 +46,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import PtAdBits.
 Require Import PtTree PtTreeAdue KMap KptTree.
+Require Import PtTreeShim.
 Require Import KptPt.
 Require Import Pt4kWalk.
 Require Import SmodePte.
@@ -66,9 +67,16 @@ Section KptShare.
   (* [kptN] itself lives in KptGhost.v -- SRegime's absorb field names it in
      its mask premise. *)
 
+  (* A6.20/A6.21: [kpt_body] is the body of a BARE [inv] shared by every
+     S-mode thread, and an invariant body may not name a context
+     (tso-port.md §0.8' ruling 2).  The tree it holds is therefore at the
+     CONTEXT-FREE ledger tier ([kptree_own] = [PtTree.ptree_own_at
+     (KTier B)]), with the bound existential in the BODY, arity-stable --
+     tso-flip KptShare.v's shape, minus the T-leg pin receipt
+     ([kpt_bound]/[llb]), which has no SC content. *)
   Definition kpt_body (root_ppn : mword 44) : iProp Σ :=
-    (∃ (t : ptree) (M : gmap (mword 27) (mword 44 * kperm)),
-       ptree_own 2 (DfracOwn 1) t ∗
+    (∃ (t : ptree) (M : gmap (mword 27) (mword 44 * kperm)) (B : nat),
+       kptree_own B 2 (DfracOwn 1) t ∗
        kpt_lb t ∗
        kmap_auth M ∗
        ⌜ kpt_tree_spec_gen root_ppn M t ⌝)%I.
@@ -82,16 +90,16 @@ Section KptShare.
   Global Instance kpt_inv_persistent root_ppn : Persistent (kpt_inv root_ppn).
   Proof. apply _. Qed.
 
-  Lemma kpt_inv_alloc (root_ppn : mword 44)
+  Lemma kpt_inv_alloc (root_ppn : mword 44) (B : nat)
       (t : ptree) (M : gmap (mword 27) (mword 44 * kperm)) (E : coPset) :
     kpt_tree_spec_gen root_ppn M t ->
-    ptree_own 2 (DfracOwn 1) t -∗ kmap_auth M -∗ kpt_unset ={E}=∗
+    kptree_own B 2 (DfracOwn 1) t -∗ kmap_auth M -∗ kpt_unset ={E}=∗
     kpt_inv root_ppn ∗ kpt_lb t.
   Proof.
     intros Hspec. iIntros "Ht HM Hunset".
     iMod (kpt_shoot t with "Hunset") as "#Hlb".
     iMod (inv_alloc kptN _ (kpt_body root_ppn) with "[Ht HM]") as "#Hinv".
-    { iApply bi.later_intro. iExists t, M. iFrame "Ht HM Hlb". iPureIntro. exact Hspec. }
+    { iApply bi.later_intro. iExists t, M, B. iFrame "Ht HM Hlb". iPureIntro. exact Hspec. }
     iModIntro. iFrame "Hinv Hlb".
   Qed.
 
@@ -109,9 +117,9 @@ Section KptShare.
   Proof.
     iIntros (HE) "#Hinv".
     iMod (inv_acc E kptN with "Hinv") as "[>Hbody Hclose]"; [ exact HE | ].
-    iDestruct "Hbody" as (t M) "(Ht & #Hlb & HM & %Hspec)".
+    iDestruct "Hbody" as (t M B) "(Ht & #Hlb & HM & %Hspec)".
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iApply bi.later_intro. iExists t, M. iFrame "Ht HM Hlb". iPureIntro. exact Hspec. }
+    { iApply bi.later_intro. iExists t, M, B. iFrame "Ht HM Hlb". iPureIntro. exact Hspec. }
     iModIntro. iExists t. iExact "Hlb".
   Qed.
 
@@ -315,7 +323,7 @@ Section KptShareTranslate.
     (* ---- open the shared table ---- *)
     iInv "Hkinv" as ">Hbody" "Hclose".
     iEval (rewrite /kpt_body) in "Hbody".
-    iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
+    iDestruct "Hbody" as (t M B) "(Ht & #Hlbt & HM & %Hspec)".
     iDestruct (kmap_at_lookup with "HM Hat") as %HMlk.
     iDestruct (kpt_lb_agree t0 t with "Hlb0 Hlbt") as %Hcan0.
     (* the hart's cached entries are coherent with the LIVE tree: coherence
@@ -329,14 +337,18 @@ Section KptShareTranslate.
     assert (Hlf : kpt_leaf_pte_of vpn (ppn, pc) = mk_pte ppn (kperm_flags pc))
       by reflexivity.
     rewrite Hlf in Hmaps.
-    iMod (ptree_translateAddr_own acc Supervisor root_ppn t
+    iPoseProof (PtTreeShim.pt_slot_payer_sc (KTier B) True%I
+                  σ.(mem) (pt_addr0 p1 vpn) (pte_set_ad (mk_pte ppn (kperm_flags pc)) a0 d0))
+      as "Hpay".
+    iAssert (True)%I as "Hsto"; [done |].
+    iMod (ptree_translateAddr_own acc Supervisor (KTier B) root_ppn t
             (mk_pte ppn (kperm_flags pc)) va pa satp0
-            tlbvec p2 p1 a0 d0 σ
+            tlbvec p2 p1 a0 d0 σ (fun _ : PtBytes.pamap => True%I)
             Hchk Hvar Hcanon Hout Hbase Hmaps Htlbok
             Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
             HA' Hord' HR' HW' Hcov' Hpmar Hpmaw
-            with "Hri Hgh Htlb Ht")
-      as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & Hri & Hgh & Htlb & Ht)".
+            with "Hpay Hsto Hri Hgh Htlb Ht")
+      as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & _ & Hri & Hgh & Htlb & Ht)".
     (* ---- the write-back does NOT move the canonical table, so the
        snapshot is re-derived by a rewrite: no ghost update at all ---- *)
     assert (Hcan' : ptree_canon t = ptree_canon t').
@@ -354,7 +366,7 @@ Section KptShareTranslate.
                Hspec Hmaps HMlk).
       exists a0, d0. rewrite Hlf. reflexivity. }
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iApply bi.later_intro. iExists t', M. iFrame "Ht HM Hlb'". iPureIntro. exact Hspec'. }
+    { iApply bi.later_intro. iExists t', M, B. iFrame "Ht HM Hlb'". iPureIntro. exact Hspec'. }
     iModIntro. iExists σ'.
     iSplit; [iPureIntro; exact Htrans |].
     iSplit; [iPureIntro; exact Hmdev |].

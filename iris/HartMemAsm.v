@@ -377,6 +377,13 @@ Qed.
 
 (* the read kinds and write kinds that reach a RAM node (the others are the
    model's [internal_error] placeholders for unused Sail access kinds) *)
+(* [Read_ttw] IS GONE with the A6.7(B) Sail patch (RULING 1 overruled): the
+   pinned model has no walk kind, and every read this tree performs -- fetch,
+   page walk and data load alike -- arrives as [Read_plain] or one of the
+   reserved kinds.  If the de-confliction project restores the patch, this
+   list gets [Read_ttw] back, and note the hazard the wildcard creates:
+   omitting it costs no error, just a walk silently classified as
+   not-reaching-RAM. *)
 Definition rk_ram_ok (rk : read_kind) : bool :=
   match rk with
   | Read_plain | Read_ifetch | Read_RISCV_reserved

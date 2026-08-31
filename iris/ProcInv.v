@@ -791,8 +791,9 @@ Section ProcInv.
   Lemma tf_page_word (tfp : mword 44) (ws : list (mword 64)) (i : nat) (w : mword 64) :
     ws !! i = Some w ->
     tf_page tfp ws -∗
-    tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈ w ∗
-    (tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈ w -∗ tf_page tfp ws).
+    TsoCtx.ctx_phys_word_pointsto XI (tf_pa tfp (8 * Z.of_nat i)) (DfracOwn 1) w ∗
+    (TsoCtx.ctx_phys_word_pointsto XI (tf_pa tfp (8 * Z.of_nat i)) (DfracOwn 1) w -∗
+       tf_page tfp ws).
   Proof.
     rewrite /tf_page. iIntros (Hi) "(%Hlen & Hws & Htail)".
     iDestruct (big_sepL_lookup_acc _ _ i w Hi with "Hws") as "[$ Hback]".
@@ -808,8 +809,10 @@ Section ProcInv.
   Lemma tf_page_word_upd (tfp : mword 44) (ws : list (mword 64)) (i : nat) (w : mword 64) :
     ws !! i = Some w ->
     tf_page tfp ws -∗
-    tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈ w ∗
-    (∀ w' : mword 64, tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈ w' -∗ tf_page tfp (<[i := w']> ws)).
+    TsoCtx.ctx_phys_word_pointsto XI (tf_pa tfp (8 * Z.of_nat i)) (DfracOwn 1) w ∗
+    (∀ w' : mword 64,
+       TsoCtx.ctx_phys_word_pointsto XI (tf_pa tfp (8 * Z.of_nat i)) (DfracOwn 1) w' -∗
+       tf_page tfp (<[i := w']> ws)).
   Proof.
     rewrite /tf_page. iIntros (Hi) "(%Hlen & Hws & Htail)".
     iDestruct (big_sepL_insert_acc _ _ i w Hi with "Hws") as "[$ Hback]".
@@ -909,10 +912,11 @@ Section ProcInv.
   Lemma tf_word_phys_to_mem (tfp : mword 44) (i : nat) (dq : dfrac) (w : mword 64) :
     (i < 512)%nat ->
     pt_node_claim tfp -∗
-    tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈{dq} w -∗
+    TsoCtx.ctx_phys_word_pointsto XI (tf_pa tfp (8 * Z.of_nat i)) dq w -∗
     tf_pa tfp (8 * Z.of_nat i) ↦₈{dq} w.
   Proof.
     iIntros (Hi) "(%Hkd & %Hpv & #Hk) Hw".
+    iEval (rewrite TsoCtxShim.ctx_phys_word_shim) in "Hw".
     iApply ctx_word_pointsto_intro; [exact (tf_pa_aligned8 tfp i Hi) |].
     iDestruct (phys_word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").
@@ -930,9 +934,10 @@ Section ProcInv.
     (i < 512)%nat ->
     pt_node_claim tfp -∗
     tf_pa tfp (8 * Z.of_nat i) ↦₈{dq} w -∗
-    tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈{dq} w.
+    TsoCtx.ctx_phys_word_pointsto XI (tf_pa tfp (8 * Z.of_nat i)) dq w.
   Proof.
     iIntros (Hi) "(%Hkd & %Hpv & #Hk) Hw".
+    iEval (rewrite TsoCtxShim.ctx_phys_word_shim).
     iApply phys_word_pointsto_intro; [exact (tf_pa_aligned8 tfp i Hi) |].
     iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").

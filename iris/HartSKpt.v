@@ -46,6 +46,7 @@ Require Import HartSwp HartLift HartSpan HartMStore.
 Require Import WpDecodeBridge.
 Require Import CommonWalk HartSTrans.
 Require Import TsoCtx.
+Require Import PtTreeShim.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -99,10 +100,10 @@ Section kptnode.
     intros HE Hmaps. iIntros "#Hlb0 #Hkinv Hgh".
     iMod (inv_acc E kptN with "Hkinv") as "[>Hbody Hclose]"; [ exact HE | ].
     iEval (rewrite /kpt_body) in "Hbody".
-    iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
+    iDestruct "Hbody" as (t M B) "(Ht & #Hlbt & HM & %Hspec)".
     iDestruct (kpt_lb_agree t0 t with "Hlb0 Hlbt") as %Hcan.
     destruct (kpt_maps_across t0 t vpn p2 p1 p0 Hcan Hmaps) as (q0 & Hm' & Hq).
-    iDestruct (ptree_own_path_mem σ (DfracOwn 1) t vpn p2 p1 q0 Hm'
+    iDestruct (ptree_own_path_mem_at (KTier B) σ (DfracOwn 1) t vpn p2 p1 q0 Hm'
                  with "Hgh Ht") as %(H2 & H1 & H0).
     (* the addresses are the SNAPSHOT's, and they agree: [ptree_canon]
        preserves [pt_base], so the roots coincide. *)
@@ -110,7 +111,7 @@ Section kptnode.
     { change (pt_base (ptree_canon t0) = pt_base (ptree_canon t)).
       rewrite Hcan. reflexivity. }
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iApply bi.later_intro. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+    { iApply bi.later_intro. iExists t, M, B. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
     iModIntro. iFrame "Hgh". iExists q0. iPureIntro.
     unfold pt_addr2. rewrite Hbase.
     split; [exact H2 |]. split; [exact H1 |]. split; [exact H0 | exact Hq].
@@ -270,7 +271,7 @@ Section kptnode.
     intros HE. iIntros "#Hat #Hlb0 #Hkinv".
     iMod (inv_acc E kptN with "Hkinv") as "[>Hbody Hclose]"; [ exact HE | ].
     iEval (rewrite /kpt_body) in "Hbody".
-    iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
+    iDestruct "Hbody" as (t M B) "(Ht & #Hlbt & HM & %Hspec)".
     iDestruct (kmap_at_lookup with "HM Hat") as %HMlk.
     iDestruct (kpt_lb_agree t0 t with "Hlb0 Hlbt") as %Hcan.
     pose proof Hspec as Hsp. destruct Hsp as (Hbase & Hall).
@@ -285,11 +286,19 @@ Section kptnode.
     destruct (pte_canon_inv _ _ Hcr) as (a1 & d1 & Hr0).
     rewrite pte_set_ad_absorb in Hr0.
     (* the three slots' address facts, off the tree's own points-to *)
-    iDestruct (ptree_own_path_ro (DfracOwn 1) t vpn q2 q1 _ Hmaps with "Ht")
+    iDestruct (ptree_own_path_ro_at (KTier B) (DfracOwn 1) t vpn q2 q1 _ Hmaps with "Ht")
       as "(Hs2 & Hs1 & Hs0 & Hrest)".
-    iDestruct (kpt_addr_ok_own with "Hs2") as %Ha2.
-    iDestruct (kpt_addr_ok_own with "Hs1") as %Ha1.
-    iDestruct (kpt_addr_ok_own with "Hs0") as %Ha0.
+    (* the address facts are PURE, so the tiered slot serves them through
+       its forgetful projection without being consumed *)
+    iAssert (⌜kpt_addr_ok (pt_addr2 t vpn)⌝)%I as %Ha2.
+    { iDestruct (pt_slot_own_forget with "Hs2") as "H2".
+      iApply (kpt_addr_ok_own with "H2"). }
+    iAssert (⌜kpt_addr_ok (pt_addr1 q2 vpn)⌝)%I as %Ha1.
+    { iDestruct (pt_slot_own_forget with "Hs1") as "H1".
+      iApply (kpt_addr_ok_own with "H1"). }
+    iAssert (⌜kpt_addr_ok (pt_addr0 q1 vpn)⌝)%I as %Ha0.
+    { iDestruct (pt_slot_own_forget with "Hs0") as "H0".
+      iApply (kpt_addr_ok_own with "H0"). }
     iDestruct ("Hrest" with "Hs2 Hs1 Hs0") as "Ht".
     assert (Hb0 : pt_base t0 = pt_base t).
     { change (pt_base (ptree_canon t0) = pt_base (ptree_canon t)).
@@ -298,7 +307,7 @@ Section kptnode.
     assert (Ha2' : kpt_addr_ok (pt_addr2 t0 vpn))
       by (unfold pt_addr2; rewrite Hb0; exact Ha2).
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iApply bi.later_intro. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+    { iApply bi.later_intro. iExists t, M, B. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
     iModIntro. iExists q2, q1, a1, d1. iPureIntro. rewrite <- Hr0.
     exact (conj Hbt0 (conj Hm0 (conj Ha2' (conj Ha1 Ha0)))).
   Qed.
@@ -495,7 +504,7 @@ Section kptnode.
     iIntros "#Hat #Hlb0 #Hkinv" (σ) "%Hrb (Hreg & Hgh & Hdev)".
     iMod (inv_acc ⊤ kptN with "Hkinv") as "[>Hbody Hclose]"; [ solve_ndisj | ].
     iEval (rewrite /kpt_body) in "Hbody".
-    iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
+    iDestruct "Hbody" as (t M B) "(Ht & #Hlbt & HM & %Hspec)".
     iDestruct (kmap_at_lookup with "HM Hat") as %HMlk.
     iDestruct (kpt_lb_agree t0 t with "Hlb0 Hlbt") as %Hcan.
     destruct (kpt_maps_across t0 t vpn p2 p1 _ Hcan Hmaps) as (q0 & Hm' & Hq).
@@ -505,10 +514,13 @@ Section kptnode.
     assert (Hset : m0' = pte_set_ad q0 a d)
       by (rewrite Hq0 pte_set_ad_absorb; exact Hm0').
     (* the live leaf slot, at full ownership *)
-    iDestruct (ptree_own_path_upd (DfracOwn 1) t vpn p2 p1 q0 Hm' with "Ht")
+    iDestruct (ptree_own_path_upd_at (KTier B) (DfracOwn 1) t vpn p2 p1 q0 Hm' with "Ht")
       as "(Hs2 & Hs1 & Hs0 & Hback)".
+    iDestruct (pt_slot_own_forget with "Hs0") as "Hs0".
     iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 p1 vpn) q0 m0'
             with "Hgh Hs0") as "[Hgh Hs0]".
+    iDestruct (PtTreeShim.pt_slot_own_of_raw_sc (KTier B)
+                 with "Hs0") as "Hs0".
     iDestruct ("Hback" $! m0' with "Hs2 Hs1 Hs0") as "Ht".
     (* the canonical table does not move, so the snapshot is a rewrite *)
     assert (Hcan' : ptree_canon (ptree_set_leaf t vpn m0') = ptree_canon t).
@@ -521,7 +533,7 @@ Section kptnode.
                Hspec Hm' HMlk).
       exists a1, d1. exact Hq0. }
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iApply bi.later_intro. iExists (ptree_set_leaf t vpn m0'), M.
+    { iApply bi.later_intro. iExists (ptree_set_leaf t vpn m0'), M, B.
       iFrame "Ht HM Hlb'". iPureIntro. exact Hspec'. }
     iMod (fupd_mask_subseteq (∅ : coPset)) as "Hback2"; [ set_solver | ].
     iModIntro. iApply bi.later_intro. iMod "Hback2" as "_". iModIntro.

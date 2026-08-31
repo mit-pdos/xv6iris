@@ -58,6 +58,8 @@ TsoCtxAbsorbLb.v
 CtxMorphTac.v
 TsoCtxPark.v
 TsoCtxMove.v
+PtTreeMove.v
+PtTreeShim.v
 CtxRecord.v
 PermInv.v
 PageGeom.v

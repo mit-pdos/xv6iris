@@ -589,6 +589,12 @@ Section ProofUvmcreate.
     { rewrite <- (page_base_unsigned bppn). rewrite Hpbase. reflexivity. }
     assert (Hnpv : page_valid (page_base bppn)).
     { unfold page_base. rewrite Hpbase. exact Hpv. }
+    (* ...and into the ambient context at the physical tier (the node's
+       slots are the thread's own registered cells; SC: the shim's step) *)
+    iDestruct (TsoCtxShim.ctx_phys_run_of_mem TsoCtx.cur_ctx
+                 (fun j => pa_add (zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))) j)
+                 (fun _ => (mword_of_int 0 : mword 8)) 4096 (DfracOwn 1)
+                 with "Hbytes") as "Hbytes".
     iDestruct (pt_node_claim_from_static bppn Hnpv with "Hkmapb") as "#Hbclaim".
     iDestruct (zero_page_to_node 2 (DfracOwn 1) bppn with "Hbclaim Hbytes") as "Hptree".
     (* register facts through memset *)

@@ -222,17 +222,16 @@ Section SfenceLeaf.
                 (bool_decide_eq_true_2 _ Htlb_in) Hpriv HTVM)
       as (tv & Hex & Hprop & Hgm).
     iIntros "#Hcert Hany Hrw Hro".
-    (* [bytes_own ∅] is [emp], hence persistent: it lands in the □ context *)
-    iAssert (bytes_own (∅ : gmap Arch.pa (bv 8))) with "[]" as "#Hemp";
-      [ by rewrite /bytes_own big_sepM_empty |].
+    (* register-only stretch: the throwaway-token form (A6.22's walk owns
+       no bytes, so it needs no thread identity) *)
     iApply (swp_mono _ _ _ with "[] [-]"); last first.
-    { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+    { iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df
                 (execute (SFENCE_VMA (zreg, zreg))) (MState rs ∅ dev0_state)
-                _ _ rs ∅ Hdisj HDr_in HDw_in (reg_agree_refl _ _)
+                _ _ rs Hdisj HDr_in HDw_in (reg_agree_refl _ _)
                 (map_empty_subseteq _) (Hgm ∅) Hex
-                with "Hcert Hany Hrw Hro Hemp"). }
+                with "Hcert Hany Hrw Hro"). }
     iIntros (v) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs' mm') "(%Hag & _ & _ & Hrw & Hro & _ & Hany)".
+    iDestruct "Hpost" as (rs') "(%Hag & Hrw & Hro & Hany)".
     iSplitR; [done|].
     iExists rs', tv. iFrame "Hrw Hro Hany".
     iSplitR; [| iPureIntro; exact Hprop].

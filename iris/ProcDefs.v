@@ -21,6 +21,7 @@ Require Import CstringInv.
    file that unfolds the dormant block needs the vocabulary in scope. *)
 Require Export BioDefs.
 Require Import TsoCtx.
+Require Import CtxMorphTac.
 
 Local Open Scope Z_scope.
 
@@ -235,12 +236,26 @@ Section ProcDefs.
   Definition ofile_cells (pa : mword 64) (fs : list (mword 64)) : iProp Σ :=
     ([∗ list] fd ↦ v ∈ fs, p_ofile pa fd ↦₈ v)%I.
 
+  (* A6.58: THE TRAPFRAME PAGE IS A LEDGER PAGE, and the tier is FORCED,
+     not chosen -- exactly as A6.49 measured for the other four user-memory
+     files.  Its supplier is [ProcPtOwn.phys_page_words8] / [phys_byte_any],
+     which hand out [TsoCtx.ctx_phys_word_pointsto] / [ctx_phys_pointsto]
+     because the era's allocation is the only source of the byte's
+     timestamp element; the raw [↦ₚ₈]/[↦ₚ] the SC text used here cannot be
+     re-entered from them (A6.9).  So the two cells move tier and NOTHING
+     else in the definition changes: the context is the ambient [XI], the
+     addresses and the shape are identical, and [Typeclasses Opaque] below
+     still keeps the 4 KiB big-op folded for [iFrame]. *)
   Definition tf_words (tfp : mword 44) (ws : list (mword 64)) : iProp Σ :=
-    ([∗ list] i ↦ w ∈ ws, tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈ w)%I.
+    ([∗ list] i ↦ w ∈ ws,
+       TsoCtx.ctx_phys_word_pointsto XI (tf_pa tfp (8 * Z.of_nat i))
+         (DfracOwn 1) w)%I.
 
   Definition tf_tail (tfp : mword 44) : iProp Σ :=
     ([∗ list] j ∈ seq (Z.to_nat TFBYTES) (4096 - Z.to_nat TFBYTES),
-       ∃ b : bv 8, pa_add (page_base tfp) j ↦ₚ b)%I.
+       ∃ b : bv 8,
+         TsoCtx.ctx_phys_pointsto XI (pa_add (page_base tfp) j)
+           (DfracOwn 1) b)%I.
 
   Definition tf_page (tfp : mword 44) (ws : list (mword 64)) : iProp Σ :=
     (⌜length ws = TFWORDS⌝ ∗ tf_words tfp ws ∗ tf_tail tfp)%I.
@@ -621,6 +636,18 @@ Section ProcDefsMorph.
     iFrame.
   Qed.
 
+  (* A6.58 fallout: the trapframe page is a ledger page now, so its three
+     predicates owe transport too (tso-flip SchedCtx.v's instances). *)
+  Global Instance tf_words_morph (tfp : mword 44) (ws : list (mword 64)) :
+    CtxMorph (fun xi : CtxId => tf_words (XI := xi) tfp ws).
+  Proof. rewrite /tf_words. ctx_morph_solve. Qed.
+  Global Instance tf_tail_morph (tfp : mword 44) :
+    CtxMorph (fun xi : CtxId => tf_tail (XI := xi) tfp).
+  Proof. rewrite /tf_tail. ctx_morph_solve. Qed.
+  Global Instance tf_page_morph (tfp : mword 44) (ws : list (mword 64)) :
+    CtxMorph (fun xi : CtxId => tf_page (XI := xi) tfp ws).
+  Proof. rewrite /tf_page. ctx_morph_solve. Qed.
+
   Global Instance is_kstack_morph (pa ks : mword 64) :
     CtxMorph (fun xi : CtxId => is_kstack (XI := xi) pa ks).
   Proof.
@@ -655,7 +682,7 @@ Section ProcDefsMorph.
              (if bool_decide (st = ZOMBIE)
               then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
                    (∃ M : gmap Z (bv 8), proc_pt_at (XI := ξ') pa (pv_upt V) M) ∗
-                   tf_page (ud_tfp (pv_upt V)) (pv_tf V)
+                   tf_page (XI := ξ') (ud_tfp (pv_upt V)) (pv_tf V)
               else ctx_word_pointsto ξ' (p_pagetable pa) (DfracOwn 1)
                      (zero_reg : mword 64) ∗
                    ctx_word_pointsto ξ' (p_trapframe pa) (DfracOwn 1)
@@ -664,6 +691,7 @@ Section ProcDefsMorph.
     { destruct (bool_decide (st = ZOMBIE)).
       - iDestruct "Haddr" as "(%Hu & (%M & Hpt) & Htf)".
         iDestruct (proc_pt_at_morph pa (pv_upt V) M ξ ξ' with "Hd Hpt") as "[Hd Hpt]".
+        iDestruct (tf_page_morph (ud_tfp (pv_upt V)) (pv_tf V) ξ ξ' with "Hd Htf") as "[Hd Htf]".
         iFrame "Hd". iSplitR; [iPureIntro; exact Hu|]. iFrame "Htf". iExists M. iFrame.
       - iDestruct "Haddr" as "[H1 H2]".
         iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".

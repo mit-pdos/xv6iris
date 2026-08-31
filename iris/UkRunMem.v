@@ -180,7 +180,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm _ a 8 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -214,7 +214,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm _ a 4 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
@@ -248,7 +248,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm _ a 8 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -285,7 +285,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros He1 He2 Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm _ a 8 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -322,7 +322,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros He1 He2 Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm _ a 4 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
@@ -358,7 +358,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_ubyte with "Hheap Hw") as %(HM & Hok & Hbnd).
     destruct (ucanon_of_bound a Hbnd) as [Hua Hcan].
@@ -394,7 +394,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm _ a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -429,7 +429,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm _ a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -468,7 +468,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm _ a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -502,7 +502,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm _ a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
@@ -535,7 +535,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm _ a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
@@ -571,7 +571,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm _ a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
@@ -607,7 +607,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_ubyte with "Hheap Hw") as %(HM & Hok & Hbnd).
     destruct (ucanon_of_bound a Hbnd) as [Hua Hcan].
@@ -650,7 +650,7 @@ Section UkRunMem.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Ha Hrd. iIntros "#Hi #Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_text with "Hheap Hw") as %(HM & Hok & Hbnd).
     destruct (ucanon_of_bound a Hbnd) as [Hua Hcan].

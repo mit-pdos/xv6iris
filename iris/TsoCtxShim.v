@@ -142,6 +142,60 @@ Section shim.
     word_pointsto (KTR := KTR) a dq w.
   Proof. rewrite ctx_word_shim. auto. Qed.
 
+  (* THE PHYSICAL-TIER BRIDGES (the U-mode threading): the registered
+     physical byte/word against the raw [↦ₚ]/[↦ₚ₈].  Same charter as
+     [ctx_word_shim] -- at TSO the registered cell carries a stamp and a
+     justification a raw cell cannot conjure, so these die with the file
+     and each surviving import is an unconverted construction site
+     (page-table build/free, the process image's carve). *)
+  Lemma ctx_phys_shim (ξ : CtxId) (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    ctx_phys_pointsto ξ a dq v ⊣⊢ phys_pointsto a dq v.
+  Proof. rewrite ctx_phys_pointsto_unseal. done. Qed.
+
+  Lemma ctx_phys_of_mem (ξ : CtxId) a dq v :
+    phys_pointsto a dq v -∗ ctx_phys_pointsto ξ a dq v.
+  Proof. rewrite ctx_phys_shim. auto. Qed.
+
+  Lemma ctx_phys_to_mem (ξ : CtxId) a dq v :
+    ctx_phys_pointsto ξ a dq v -∗ phys_pointsto a dq v.
+  Proof. rewrite ctx_phys_shim. auto. Qed.
+
+  Lemma ctx_phys_word_shim (ξ : CtxId) (a : Arch.pa) (dq : dfrac) (w : bv 64) :
+    ctx_phys_word_pointsto ξ a dq w ⊣⊢ phys_word_pointsto a dq w.
+  Proof.
+    rewrite /ctx_phys_word_pointsto /phys_word_pointsto.
+    apply bi.sep_proper; [done|].
+    apply big_opL_proper. intros ? j ?. apply ctx_phys_shim.
+  Qed.
+
+  Lemma ctx_phys_word_of_mem (ξ : CtxId) a dq w :
+    phys_word_pointsto a dq w -∗ ctx_phys_word_pointsto ξ a dq w.
+  Proof. rewrite ctx_phys_word_shim. auto. Qed.
+
+  Lemma ctx_phys_word_to_mem (ξ : CtxId) a dq w :
+    ctx_phys_word_pointsto ξ a dq w -∗ phys_word_pointsto a dq w.
+  Proof. rewrite ctx_phys_word_shim. auto. Qed.
+
+  (* the byte-RUN form of the physical bridge: what a page build hands
+     over (kalloc's zeroed page becoming a PT node or a process page) *)
+  Lemma ctx_phys_run_of_mem (ξ : CtxId) (f : nat -> Arch.pa)
+      (g : nat -> bv 8) (n : nat) (dq : dfrac) :
+    ([∗ list] j ∈ seq 0 n, phys_pointsto (f j) dq (g j)) -∗
+    ([∗ list] j ∈ seq 0 n, ctx_phys_pointsto ξ (f j) dq (g j)).
+  Proof.
+    iIntros "H". iApply (big_sepL_impl with "H").
+    iIntros "!>" (k j _) "Hj". iApply (ctx_phys_of_mem with "Hj").
+  Qed.
+
+  Lemma ctx_phys_run_to_mem (ξ : CtxId) (f : nat -> Arch.pa)
+      (g : nat -> bv 8) (n : nat) (dq : dfrac) :
+    ([∗ list] j ∈ seq 0 n, ctx_phys_pointsto ξ (f j) dq (g j)) -∗
+    ([∗ list] j ∈ seq 0 n, phys_pointsto (f j) dq (g j)).
+  Proof.
+    iIntros "H". iApply (big_sepL_impl with "H").
+    iIntros "!>" (k j _) "Hj". iApply (ctx_phys_to_mem with "Hj").
+  Qed.
+
   (* THE 2- AND 4-BYTE WORD BRIDGES (M1 flip stage 2): the flipped
      [↦₂]/[↦₄] against the kit's raw word facts.  Same charter as
      [ctx_word_shim] above -- the leaf/gen_heap conversion, one line, dead
@@ -251,5 +305,26 @@ Section shim.
   Proof.
     iIntros "H". iApply (big_sepL_impl with "H").
     iIntros "!>" (k j Hj) "Hb". by iApply ctx_pointsto_to_mem.
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE FREE RUNNING TOKEN (SC-only).  The M-leg [own_context] body is    *)
+  (* [True ∨ …], so the token is mintable at ANY context on this leg.      *)
+  (* Every use of these two marks a seam where the T-leg needs a REAL       *)
+  (* token source (the thread's own, borrowed from the residue it parked   *)
+  (* -- UsertrapRes.ut_trap_parked's conjunct -- or threaded down from the  *)
+  (* caller): the grep for them is the cutover worklist for the U-mode     *)
+  (* funnel, exactly like this file's other bridges.                        *)
+  (* ------------------------------------------------------------------- *)
+  Lemma own_context_sc `{CID : CpuId} (ξ : CtxId) : ⊢ own_context ξ.
+  Proof. rewrite own_context_unseal /own_context_def. by iLeft. Qed.
+
+  (* the [UserActiveClass.Rut_ctx]-shaped borrow accessor, for a residue    *)
+  (* nobody can open (a quantified [Rut]): mint the token, drop the one     *)
+  (* handed back.  T-leg: the accessor must come from the concrete residue. *)
+  Lemma rut_ctx_sc `{CID : CpuId} (ξ : CtxId) (P : iProp Σ) :
+    ⊢ P -∗ own_context ξ ∗ (own_context ξ -∗ P).
+  Proof.
+    iIntros "HP". iSplitR; [ iApply own_context_sc |]. iIntros "_". iExact "HP".
   Qed.
 End shim.

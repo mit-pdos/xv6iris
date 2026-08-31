@@ -292,13 +292,13 @@ Section SchedCtxPay.
     CtxMove (λ ξ, ofile_cells (XI := ξ) pa fs).
   Proof. rewrite /ofile_cells. ctx_move_solve. Qed.
   Global Instance tf_words_move tfp ws :
-    CtxMove (λ ξ, tf_words tfp ws).
+    CtxMove (λ ξ, tf_words (XI := ξ) tfp ws).
   Proof. rewrite /tf_words. ctx_move_solve. Qed.
   Global Instance tf_tail_move tfp :
-    CtxMove (λ ξ, tf_tail tfp).
+    CtxMove (λ ξ, tf_tail (XI := ξ) tfp).
   Proof. rewrite /tf_tail. ctx_move_solve. Qed.
   Global Instance tf_page_move tfp ws :
-    CtxMove (λ ξ, tf_page tfp ws).
+    CtxMove (λ ξ, tf_page (XI := ξ) tfp ws).
   Proof. rewrite /tf_page. ctx_move_solve. Qed.
   Global Instance is_kstack_move pa ks :
     CtxMove (λ ξ, is_kstack (XI := ξ) pa ks).
@@ -307,19 +307,19 @@ Section SchedCtxPay.
     CtxMove (λ ξ, kstack_free (XI := ξ) pa).
   Proof. rewrite /kstack_free. ctx_move_solve. Qed.
   Global Instance phys_byte_any_move a :
-    CtxMove (λ ξ, phys_byte_any a).
+    CtxMove (λ ξ, phys_byte_any (XI := ξ) a).
   Proof. rewrite /phys_byte_any. ctx_move_solve. Qed.
   Global Instance phys_page_own_move ppn :
-    CtxMove (λ ξ, phys_page_own ppn).
+    CtxMove (λ ξ, phys_page_own (XI := ξ) ppn).
   Proof. rewrite /phys_page_own. ctx_move_solve. Qed.
   Global Instance upt_pages_own_move um :
-    CtxMove (λ ξ, upt_pages_own um).
+    CtxMove (λ ξ, upt_pages_own (XI := ξ) um).
   Proof. rewrite /upt_pages_own. ctx_move_solve. Qed.
   Global Instance proc_pt_own_move P :
-    CtxMove (λ ξ, proc_pt_own P).
+    CtxMove (λ ξ, proc_pt_own (XI := ξ) P).
   Proof. rewrite /proc_pt_own. ctx_move_solve. Qed.
   Global Instance proc_pt_move P M :
-    CtxMove (λ ξ, proc_pt P M).
+    CtxMove (λ ξ, proc_pt (XI := ξ) P M).
   Proof. rewrite /proc_pt. ctx_move_solve. Qed.
   Global Instance proc_pt_at_move pa P M :
     CtxMove (λ ξ, proc_pt_at (XI := ξ) pa P M).

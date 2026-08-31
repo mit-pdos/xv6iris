@@ -110,10 +110,12 @@ Section UmodeFrames.
 End UmodeFrames.
 
 (* ===================================================================== *)
-(* The trap capability.  Defined OUTSIDE any CpuId section: the contracts  *)
-(* quantify BOTH the hart the trap is taken on and the hart execution      *)
-(* resumes on, so the capability itself is hart-free and survives a        *)
-(* migration as an ordinary persistent frame.                              *)
+(* The trap capability.  Defined OUTSIDE any CpuId/CurCtx section: the     *)
+(* contracts quantify BOTH the hart-and-context the trap is taken on and   *)
+(* the pair execution resumes on, so the capability itself is hart- and    *)
+(* context-free and survives a migration as an ordinary persistent frame.  *)
+(* (A migration is exactly a hart change plus the same-hart hand-off's     *)
+(* context change, §0.43'/§0.44'; at SC both indices are phantom.)         *)
 (* ===================================================================== *)
 Section UmodeCap.
   Context `{!riscvGS Σ}.
@@ -129,11 +131,11 @@ Section UmodeCap.
   (* but is spelled as an update of the old).                              *)
   (* ------------------------------------------------------------------- *)
   Definition uv_intr_wp : iProp Σ :=
-    (□ ∀ (CID : CpuId)
+    (□ ∀ (CID : CpuId) (XI : TsoCtx.CurCtx)
          (g : regfile) (M : gmap Z (bv 8)) (va : mword 64)
          (i : InterruptType) (sc0 stval_v : mword 64),
        uv_trap_frame C pt (utrap_scause (Interrupt i) sc0) stval_v va g M -∗
-       (∀ CID : CpuId, uv_run C pt M g va -∗
+       (∀ (CID : CpuId) (XI : TsoCtx.CurCtx), uv_run C pt M g va -∗
           WP (Loop : expr riscv_lang)) -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -143,7 +145,7 @@ Section UmodeCap.
   (* according to the process's protocol [Ψ] at the number in a7.          *)
   (* ------------------------------------------------------------------- *)
   Definition uv_sys_wp (Ψ : usys_protocol Σ) : iProp Σ :=
-    (□ ∀ (CID : CpuId)
+    (□ ∀ (CID : CpuId) (XI : TsoCtx.CurCtx)
          (g : regfile) (M : gmap Z (bv 8)) (va : mword 64)
          (sc0 stval_v : mword 64),
        uv_trap_frame C pt (utrap_scause (rv64d_types.Exception (E_U_EnvCall tt)) sc0)

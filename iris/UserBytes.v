@@ -150,6 +150,9 @@ Section UserBytesTree.
     rewrite /pt_page_own /pt_page_maps big_sepL_fmap.
     apply bi.sep_proper; [reflexivity |].
     apply big_sepL_proper. intros k i _.
+    (* the USER tier's slot IS [ctx_phys_word_pointsto] (PtTree's tiered
+       [pt_slot_own] at [Some ξ]); one iota step exposes it. *)
+    rewrite /pt_slot_own. cbn match.
     rewrite phys_word_bytes_own_full.
     rewrite (bi.pure_True _ (pte_addr_at_aligned8 (pt_base t) (mword_of_int i))).
     by rewrite left_id.
@@ -773,7 +776,8 @@ Section UserBytesData.
     intros Hinj. iIntros "H".
     rewrite umem_any_set.
     rewrite (bigset_gather_reindex (uva_pa P) (uva_dom P) (u_data_pa P)
-               (fun (a : Arch.pa) (b : bv 8) => (a ↦ₚ b)%I)
+               (fun (a : Arch.pa) (b : bv 8) =>
+                  TsoCtx.ctx_phys_pointsto XI a (DfracOwn 1) b)
                (uva_dom_inj P Hinj) (u_data_pa_img P)).
     iDestruct "H" as (md) "[%Hdom Hmd]".
     iExists md. rewrite /bytes_own. iFrame "Hmd". done.
@@ -787,7 +791,8 @@ Section UserBytesData.
     intros Hinj Hdom. iIntros "Hmd".
     rewrite umem_any_set.
     rewrite (bigset_gather_reindex (uva_pa P) (uva_dom P) (u_data_pa P)
-               (fun (a : Arch.pa) (b : bv 8) => (a ↦ₚ b)%I)
+               (fun (a : Arch.pa) (b : bv 8) =>
+                  TsoCtx.ctx_phys_pointsto XI a (DfracOwn 1) b)
                (uva_dom_inj P Hinj) (u_data_pa_img P)).
     iExists md. rewrite /bytes_own. iFrame "Hmd". done.
   Qed.

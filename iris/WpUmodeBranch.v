@@ -290,8 +290,8 @@ Section WpUmodeBranch.
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    ▷ (∀ CID0 : CpuId,
-         uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+    ▷ (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+         uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M m -∗
          pc_is (CID := CID0)
            (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
          WP (Loop : expr riscv_lang)) -∗
@@ -300,8 +300,8 @@ Section WpUmodeBranch.
     intros Hui Hred Hlpad Hg1 Hexp Htaken Htgt Halign.
     iIntros "Hcg Hpc Hcont".
     (* re-shape the continuation into the funnel's [uv_upd]/[uv_next] form *)
-    iAssert (▷ (∀ CID0 : CpuId,
-                  uv_cap_gpr (CID := CID0) C pt Ψ M (uv_upd m None) -∗
+    iAssert (▷ (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+                  uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M (uv_upd m None) -∗
                   pc_is (CID := CID0)
                     (uv_next (if taken then Some tgt else None)
                        (add_vec_int pc (if is_rvc then 2 else 4))) -∗
@@ -351,8 +351,8 @@ Section WpUmodeBranch.
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M m -∗
        pc_is (CID := CID0)
          (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -383,8 +383,8 @@ Section WpUmodeBranch.
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M m -∗
        pc_is (CID := CID0) (if taken then tgt else add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -414,8 +414,8 @@ Section WpUmodeBranch.
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    ▷ (∀ CID0 : CpuId,
-         uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+    ▷ (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+         uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M m -∗
          pc_is (CID := CID0) (if taken then tgt else add_vec_int pc 4) -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -450,8 +450,8 @@ Section WpUmodeBranch.
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    ▷ (∀ CID0 : CpuId,
-         uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+    ▷ (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+         uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M m -∗
          pc_is (CID := CID0) (if taken then tgt else add_vec_int pc 4) -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -478,8 +478,8 @@ Section WpUmodeBranch.
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M m -∗
        pc_is (CID := CID0) (if taken then tgt else add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -514,8 +514,8 @@ Section WpUmodeBranch.
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M m -∗
        pc_is (CID := CID0) (if taken then tgt else add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -560,8 +560,8 @@ Section WpUmodeBranch.
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M m -∗
        pc_is (CID := CID0) (if taken then tgt else add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

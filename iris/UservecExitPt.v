@@ -201,6 +201,7 @@ Section UservecExitPt.
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     utlb_inv_pt uroot tfp um -∗
     kpt_inv kroot -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     pc_is (uva 0x8e) -∗
     gpr_file m -∗
     instr (upa 0x8e) false ai_sfence -∗
@@ -218,14 +219,15 @@ Section UservecExitPt.
          caller that goes on to userret's own entry switch needs it as
          ITS precondition (see SpecUserret.v's own header). *)
       tlb_res_pt kroot -∗
+      TsoCtx.own_context TsoCtx.cur_ctx -∗
       pc_is (ret_pc (m !!! Regidx (mword_of_int 5))) -∗
       gpr_file (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> m) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM Hmm HPBMTE Hmenvval0 Hwf Ht1 HkMode Hkasid Hkppn.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv #Hclaim Hutlb #Hkinv Hpc
-             Hfmap Hi1 Hi2 Hi3 Hi4 Hcont".
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv #Hclaim Hutlb #Hkinv Hctx
+             Hpc Hfmap Hi1 Hi2 Hi3 Hi4 Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -262,11 +264,11 @@ Section UservecExitPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hi1
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hi1
                     [] [Hfmap Hi2 Hi3 Hi4 Hcont]").
     { iIntros (satp0 pcfg paddr tv') "%Hsok %Hpok
         Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-        Hresv".
+        Hresv Hctx".
       iDestruct "HRes" as (t0) "(%Hokt0 & %Hspect0 & %Hwft0 & Ht0)".
       iDestruct (sda_frames_in dq mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'
                    with "Htlbc Hms Hpriv Hmenv Hsatp Hpma Hpcfg Hpaddr Hhtif
@@ -277,7 +279,7 @@ Section UservecExitPt.
         by (rewrite sda_rs_mst; exact HTVM).
       change (execute ai_sfence)
         with (execute (SFENCE_VMA (zreg, zreg))).
-      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC Ht0] [-]").
+      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC Ht0 Hctx] [-]").
       2:{ iApply (swp_execute_SFENCE_VMA_S_gen sda_Drw sda_Dro (sda_Df dq)
                     (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
                     sda_disj sda_in_priv sda_in_mst sda_w_tlb
@@ -302,12 +304,12 @@ Section UservecExitPt.
                      (fun vpn' => Hnone _ (tlb_hash_range vpn')))
           | exact Hspect0 | exact Hwft0 ]. }
       iFrame "Hclk".
-      iSplitR "Hresv"; [| iExact "Hresv"].
+      iSplitR "Hctx Hresv"; [| by iFrame "Hctx Hresv"].
       iExists mstatus0, mdv0, _.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [iPureIntro; exact Hva01 |]. iSplitR; [done|]. done. }
     iApply bi.later_intro. iIntros (npc1 ms11 mdv11)
-      "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc (-> & -> & ->)".
+      "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc (-> & -> & ->)".
     (* ============ STEP 2: csrw satp,t1 -- ENTER the window =============
        The user residue does not mention satp, so this is an ORDINARY
        [Res]-preserving step of the raw engine at a MOVED landing satp; the
@@ -338,13 +340,13 @@ Section UservecExitPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
-                    Htlbc HRes Hpc Hi2 [] [Hfmap] [Hi3 Hi4 Hcont]").
+                    Htlbc HRes Hctx Hpc Hi2 [] [Hfmap] [Hi3 Hi4 Hcont]").
     { iApply (utramp_fetch_tr uroot tfp um dq (uva 0x92) mstatus0 usatp2 mie_v
                 mdv0 menvcfg0 pcfg2 paddr2 Hmenvval0 HSXL HMPRV Hsok2 Hpok2
                 with "Hhw"). }
     { iIntros (tv') "%Hpok3
         Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-        Hresv".
+        Hresv Hctx".
       iDestruct (pw2_frames_in Supervisor dq dq satp usatp2 mstatus mstatus0
                    Hcw2 with "Hsatp Hms Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
       assert (LTVM2 : eq_vec (_get_Mstatus_TVM (register_lookup mstatus
@@ -358,7 +360,7 @@ Section UservecExitPt.
                 zreg CSRRW).
       iApply (swp_mono with
                 "[Hmie Hmdl Hmenv Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-                  Hresv] [Hrw Hro Hfmap]").
+                  Hresv Hctx] [Hrw Hro Hfmap]").
       2:{ iApply (swp_execute_CSRReg_w_p (cw_Drw satp) (cw2_Dro mstatus)
                     (cw2_Df dq dq mstatus)
                     (pw2_rs Supervisor satp usatp2 mstatus mstatus0)
@@ -396,13 +398,13 @@ Section UservecExitPt.
       iFrame "Hpriv Hmie Hmenv Hsatp Hpcfg Hpaddr".
       iSplitL "Htlbc HRes". { iExists tv'. iFrame "Htlbc HRes". }
       iFrame "Hclk".
-      iSplitR "Hresv"; [| iExact "Hresv"].
+      iSplitR "Hctx Hresv"; [| by iFrame "Hctx Hresv"].
       iExists mstatus0, mdv0, _.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [iPureIntro; exact Hva02 |]. iSplitR; [done|]. iSplitR; [done|].
       iExact "Hfmap". }
     iApply bi.later_intro. iIntros (npc2 ms12 mdv12 tv2)
-      "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hpc
+      "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hctx Hpc
        (-> & -> & -> & Hfmap)".
     (* dissolve the USER invariant into the two-table window; the KERNEL
        side is sourced from the ambient [kpt_inv] -- a fresh snapshot, no
@@ -445,14 +447,14 @@ Section UservecExitPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
-                    Htlbc HRes Hpc Hi3 [] [] [Hfmap Hi4 Hcont]").
+                    Htlbc HRes Hctx Hpc Hi3 [] [] [Hfmap Hi4 Hcont]").
     { iApply (pt2_tramp_fetch_tr_kcur kroot (upt_tree_spec uroot tfp um) dq
                 (uva 0x96) mstatus0 satp3 mie_v mdv0 menvcfg0 pcfg3 paddr3
                 Hmenvval0 HSXL HMPRV Hsok3 Hpok3
                 (upt_pt2_tramp_spec uroot tfp um Hwf) with "Hclaim Hhw"). }
     { iIntros (tv') "%Hpok4
         Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-        Hresv".
+        Hresv Hctx".
       iDestruct "HRes" as (tp tc0) "(%Hok2 & %HSp & Htp & #Hlb0 & #Hkinv3)".
       iDestruct (sda_frames_in dq mstatus0 menvcfg0 satp3 pmar0 pcfg3 paddr3
                    tv' with "Htlbc Hms Hpriv Hmenv Hsatp Hpma Hpcfg Hpaddr
@@ -463,7 +465,7 @@ Section UservecExitPt.
         by (rewrite sda_rs_mst; exact HTVM).
       change (execute ai_sfence)
         with (execute (SFENCE_VMA (zreg, zreg))).
-      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC Htp] [-]").
+      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC Htp Hctx] [-]").
       2:{ iApply (swp_execute_SFENCE_VMA_S_gen sda_Drw sda_Dro (sda_Df dq)
                     (sda_rs mstatus0 menvcfg0 satp3 pmar0 pcfg3 paddr3 tv')
                     sda_disj sda_in_priv sda_in_mst sda_w_tlb
@@ -489,12 +491,12 @@ Section UservecExitPt.
                    (fun vpn' => Hnone _ (tlb_hash_range vpn'))). }
         iExists tp. iFrame "Htp". iPureIntro. exact HSp. }
       iFrame "Hclk".
-      iSplitR "Hresv"; [| iExact "Hresv"].
+      iSplitR "Hctx Hresv"; [| by iFrame "Hctx Hresv"].
       iExists mstatus0, mdv0, _.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [iPureIntro; exact Hva03 |]. iSplitR; [done|]. done. }
     iApply bi.later_intro. iIntros (npc3 ms13 mdv13 tv3)
-      "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hpc
+      "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hctx Hpc
        (-> & -> & ->)".
     iDestruct "HRes" as "[Hkres Hufr]".
     iDestruct (kpt_swp_close kroot satp3 tv3 pcfg3 paddr3 Hksok3 Hpok3
@@ -519,14 +521,14 @@ Section UservecExitPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hclaim Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Hpc Hi4
-                    [Hfmap] [Hufr Hcont]").
+              with "Hclaim Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Hctx Hpc
+                    Hi4 [Hfmap] [Hufr Hcont]").
     { iIntros (satp4 pcfg paddr tv') "%Hsok4 %Hpok4
         Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-        Hresv".
+        Hresv Hctx".
       iApply (swp_mono with
-                "[Hms Hmdl Hmie Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC Hresv]
-                 [Hfmap HnPC Hpriv Hmenv]").
+                "[Hms Hmdl Hmie Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC Hresv
+                  Hctx] [Hfmap HnPC Hpriv Hmenv]").
       2:{ iApply (swp_cj_JALR_link dq (mword_of_int 5) (mword_of_int 1) m
                     (add_vec_int (uva 0x9a) 2) menvcfg0 Hrd1 Hmenvval0
                     with "Hcert Hfmap HnPC Hpriv Hmenv Hmisa"). }
@@ -536,14 +538,15 @@ Section UservecExitPt.
       iFrame "Hpriv Hmie Hmenv Hsatp Hpcfg Hpaddr".
       iSplitL "Htlbc HRes". { iExists tv'. iFrame "Htlbc HRes". }
       iFrame "Hclk".
-      iSplitR "Hresv"; [| iExact "Hresv"].
+      iSplitR "Hctx Hresv"; [| by iFrame "Hctx Hresv"].
       iExists mstatus0, mdv0, _.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       iExact "Hfmap". }
     iApply bi.later_intro. iIntros (npc4 ms14 mdv14)
-      "Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Hpc (-> & -> & -> & Hfmap)".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hufr Hktlb Hpc Hfmap").
+      "Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Hctx Hpc (-> & -> & -> & Hfmap)".
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hufr Hktlb Hctx Hpc
+                          Hfmap").
   Qed.
 
 End UservecExitPt.
