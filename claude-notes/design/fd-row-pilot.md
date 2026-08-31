@@ -162,25 +162,26 @@ Two storeys.  The PURE storey is compiled and PROVEN
 (`FdRowPilot.pilot_console_pure`):
 
 ```coq
-Theorem pilot_console_pure `{XI : CurCtx} (u0 u1 u2 u3 : umirror)
-    (vom1 vom3 tf2a tf2b : mword 64) (r1 r2 r3 : mword 64) :
+Theorem pilot_console_pure (u0 u1 u2 u3 : umirror)
+    (vom1 vom3 wma wmi r1 r2 r3 : mword 64) :
   era0_seed u0 ->
-  ufs_open_at  console_str vom1 r1 u0 u1 ->
-  ufs_mknod_at console_str (dev_arg tf2a) (dev_arg tf2b) r2 u1 u2 ->
-  bv_unsigned tf2a mod 2 ^ 16 = ConsoleInv.CONSOLE ->
-  bv_unsigned tf2b mod 2 ^ 16 = 0 ->
-  ufs_open_at  console_str vom3 r3 u2 u3 ->
+  ufs_open_at console_str vom1 r1 u0 u1 ->
+  ufs_mknod_at console_str (dev_arg wma) (dev_arg wmi) r2 u1 u2 ->
+  bv_unsigned wma mod 2 ^ 16 = CONSOLE ->
+  bv_unsigned wmi mod 2 ^ 16 = 0 ->
+  ufs_open_at console_str vom3 r3 u2 u3 ->
   om_arg vom3 = 2 ->
   r3 <> (mword_of_int (-1) : mword 64) ->
   r1 = (mword_of_int (-1) : mword 64)
   /\ r3 = (mword_of_int 0 : mword 64)
-  /\ um_fdt u3 !! 0%nat
-       = Some (FdOpen true true (FdDevice ConsoleInv.CONSOLE))
+  /\ um_fdt u3 !! 0%nat = Some (FdOpen true true (FdDevice CONSOLE))
   /\ (exists i : Z,
         um_resolve u2 console_str = Some i
-        /\ um_av u3 !! i
-             = Some (MkAnode (ADev ConsoleInv.CONSOLE 0) 1%nat)).
+        /\ um_av u3 !! i = Some (MkAnode (ADev CONSOLE 0) 1%nat)).
 ```
+
+(compiled verbatim, `FdRowPilot.v` §3, in a section binding `XI : CurCtx`;
+audits **Closed under the global context** — zero axioms)
 
 `era0_seed u0` (compiled, and INSTANTIATED against the boot image:
 `FdRowPilot.era0_seed_boot`) says: cwd = ROOTINO, fd table = 16 closed
