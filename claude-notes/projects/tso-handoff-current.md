@@ -1,4 +1,4 @@
-# TSO port: LIVE HANDOFF CHECKPOINT (2026-08-31, post-A6.141 — r65 pending)
+# TSO port: LIVE HANDOFF CHECKPOINT (2026-08-31, r67 CERTIFIED)
 
 This file is the resumption point for a FRESH agent taking over the TSO
 port.  It is updated at green boundaries; trust the newest git commit of
@@ -19,6 +19,13 @@ Reading order for a fresh agent:
 6. `projects/main-tso-readiness.md` — the SEPARATE main-branch track.
 
 ## 1. WHERE THE PROJECT STANDS (post-A6.140/A6.141)
+
+**r67 CERTIFIED: GREEN = 1298/1306, zero admits/axioms, snapshot
+`d876d3cd070` on `tso-flip` (parent r63 `bfe7168564bc0`); mirror
+refreshed.  RED = 8: ProofForkretPark (the single true error root, at
+its park_globals bullet :345) + its cone (LinkForkretParkPaid,
+LinkUserinit, LinkMain, BootChain, BootShared, FsAdequacyImg,
+SystemAdequacy).**
 
 r63 was 1283/1305 with five error roots.  This round LANDED, per the
 owner's direction ("the per-binary proofs don't need to be done … but
