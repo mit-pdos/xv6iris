@@ -2238,10 +2238,15 @@ Section UCodeShP.
     let j := fresh "j" in let Hj := fresh "Hj" in
     intros j Hj; do 4 (destruct j as [|j]; [uis_byte|]); lia.
 
+  (* The byte side condition is discharged as a GOAL, not spliced into the
+     term as an [ltac:] ARGUMENT -- claude-notes/optimization.md's "unshelve
+     hoist", under "Inline [ltac:] in argument position".  Upstream applied
+     this to the five catalogs it had (e2f14406b, 17x); this file postdates
+     that patch's sweep, so the identical hoist is applied here by hand. *)
   Ltac uis_run g off n w :=
-    iApply (utext_img_run g ShInstrs.sh_bytes
-              (uint (mword_of_int off : mword 64)) n w
-              ltac:(first [ uis_bytes2 | uis_bytes4 ]));
+    unshelve iApply (utext_img_run g ShInstrs.sh_bytes
+              (uint (mword_of_int off : mword 64)) n w _);
+    [ first [ uis_bytes2 | uis_bytes4 ] | ];
     iApply (shp_code_img with "Ht").
 
   (* compressed at a 2-mod-4 pc: the resource is the two bytes there *)
