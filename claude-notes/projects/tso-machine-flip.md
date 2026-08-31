@@ -17838,3 +17838,51 @@ SOUND but costs operational-semantics surgery (observations in prim_step,
 proph_map in the interp, adequacy erasure) -- deferred pending the
 itable_inv comparison: if itable needs the anchor anyway, prophecy buys
 nothing.
+
+## A6.143/A6.144: THE WORD-SET PIN and THE FLOORED PAYLOAD MINT (the itable instruments)
+
+The owner's ruling: ctx_values for `ip->ref` at value set [1..2^31), never
+0; CtxAnchor for the bcache; `f->off` delegated to the main-side agent.
+Measurement forced one model extension: the byte pin cannot say "the word
+is never 0" (IREFSLOTS = 422 needs two bytes, and the per-byte box of the
+observable sets readmits the all-zero word via torn per-byte settles the
+machine never actually produces).  The honest instrument is a WORD-set
+pin, and the model already had its skeleton: `ts_win`'s whole-window
+clause (§12c) and the floored window toolkit (§12d).
+
+**A6.143 (`TsoMemPa` §12f + `TsoCtx` wrappers, all GREEN, snapshots
+`d3ad9125761` and `fc0de6bf8b7`):**
+- `ts_pinw` (base/n/j/lo/S : member predicate on byte-wise words);
+  `pinw_ok1` = every message at/above the floor touching this byte writes
+  the WHOLE window with a member word + the floor itself holds a member
+  word; hangs on every byte (§12c's frame rule); `pinw_ok1_app_frame` /
+  `_app_member` / `_mint` (floor := log top) / `pinw_read` (one member
+  word serves every byte at any view where the floor is visible;
+  own-last-free via the new `racy_read_window_any_fl`).
+- ts_pay gained the 4th arm (`tsp_pinw`); ts_ok the 5th conjunct; all
+  construction/frame sites patched (3 frame blocks in TsoCtx + the win
+  store gate + rpay mint/drop + 2 RiscvAdequacy boot ties).
+- TsoCtx wrappers: `phys_ledger_pinw`, `ledger_pinw_ok` (pure claim off
+  the fragment), `ledger_pinw_mint1` (at a PURE pinw_ok1 premise -- arm
+  and member-store both route through it, no store-gate clone),
+  `ledger_pinw_drop`, `ledger_read_pinw_ok` (read gate at a view receipt
+  at the floor).
+- The STORE route (planned, CtxPinw.v): extract pure ok's, drop to _at,
+  `ledger_store_win_at_ok` (existing generic gate), re-mint via
+  `pinw_ok1_app_member` -- the rpay author-store pattern verbatim.
+- The RACY READ leaf needs NO clone: `wp_load_s_sconf_au_rel` is already
+  the generic predicate-at-every-view load leaf; `ledger_read_pinw_ok`
+  discharges its obligation.
+
+**A6.144 (`WpLock.lock_pay_intro_llb`, GREEN):** the release-side answer
+to the fresh-stores asymmetry at the PAYLOAD tier.  A releaser cannot
+floor a position covering its buffered stores at its own context, but the
+lock's RECORD has no hart: `TsoCtxPark.ctx_parked_raise` lifts the
+record's stamp past any `llb` for free and hands back the floor, which
+folds into the payload row before packing.  Acquire side unchanged (row
+rides `ctx_floor_dom`; winner cashes with `own_context_floor_view`).
+Two clients: the itable's EXACT count read under itable.lock (row floors
+the last count store's position, llb off the store leaf), and the
+CtxAnchor guard's slot mint (row floors the anchor's stamp, llb off
+`anchor_deposit`) -- this closes the A6.142 "guard mint at release" gap
+with no per-site measurement needed.
