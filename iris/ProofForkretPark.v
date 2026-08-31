@@ -160,6 +160,8 @@ Section Res.
   Definition usertrap_res_ptm_close := FR.usertrap_res_ptm_close.
   Definition usertrap_res_ptm_open := FR.usertrap_res_ptm_open.
   Definition usertrap_res_bare_norm := FR.usertrap_res_bare_norm.
+  Definition usertrap_res_bare_fd_open := FR.usertrap_res_bare_fd_open.
+  Definition usertrap_res_bare_fd_tf_open := FR.usertrap_res_bare_fd_tf_open.
   Definition usertrap_res_csrs_open := FR.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := FR.usertrap_res_sstc.
   Definition usertrap_res_bare_sz := FR.usertrap_res_bare_sz.

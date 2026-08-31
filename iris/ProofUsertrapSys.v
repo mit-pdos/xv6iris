@@ -686,8 +686,8 @@ Section UtSysBlock.
                        Hnex Hnsb eq_refl (f_equal uint Hszq) Hmemg). }
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N U0 (MkUstate V2 M2) pt ksp m0 mg av
                 n2 true
-                mie_v menvcfg0 epv scv lks sts2
-                Hwf' Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
+                mie_v menvcfg0 epv scv lks sts sts2
+                Hwf' ltac:(intros Hne; exfalso; exact (Hne Hscec)) Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg
                 Hmiev Hmenvv Hrda

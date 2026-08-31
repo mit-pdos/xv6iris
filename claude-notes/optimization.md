@@ -713,6 +713,76 @@ under `Set Default Proof Using "All"`, the seven per-file blocks of ~45
 `FsEffBase.v`, which carries the entire common-ground section, is **3.4 s**,
 and it did not move.
 
+#### `ProofFilewriteAU`: 234.7 s → 34.2 s from twelve one-line side conditions (measured 2026-08-31)
+
+The same rule at a WHOLE-FUNCTION proof rather than a pure band, and the
+worked example to copy — because the file looked innocent by every other
+diagnostic. Isolated `coqc -time -async-proofs off` on the VM:
+
+| | wall | peak RSS | this file's `.lia.cache` |
+|---|---|---|---|
+| baseline, cache WARM | 45.0 s | 3.54 GB | |
+| baseline, cache COLD | **234.7 s** | 2.74 GB | **190 MB** |
+| after, cache COLD | **34.2 s** | 1.87 GB | **0.76 MB** |
+
+Cold against cold, and the AFTER arm ran at load 29–47 against the baseline's
+5 — so the 7× is the conservative direction. Warm against warm it is
+45.0 → 34.5 s.
+
+- **`.lia.cache` hid it 5.2×, which is the Diagnosis section's warning seen
+  live.** 45 s warm reads like an ordinary file; nothing in the warm profile
+  is over 3.5 s and the shape is a flat RULE ONE tail. Cold, the top TWELVE
+  sentences are 196 s of 234 (84 %) and every one of them is a `lia`. **If a
+  file is reported slow and your warm reading disagrees, delete the cache
+  before believing the reading.**
+- **The certificates are the tell, and they are visible without any
+  profiling.** This one file had put **190 MB into the directory's 463 MB
+  `.lia.cache`** — 41 % of it — because a certificate carries the hypotheses
+  it was handed and `fw_loop` hands over ~300 of them (~40 arithmetic, over
+  `Z.to_nat` / `bv_unsigned` / `MAXFILE * BSIZE`). After the fix the same
+  file contributes 0.76 MB. `ls -laS` on the per-directory cache is not a
+  ranking tool, but a file that can be shown to own a large share of it is a
+  confirmed instance of this section.
+- **NEGATIVE RESULT — the cache's SIZE is not itself a cost, do not chase
+  it.** The fixed file compiled against the full 463 MB cache and against an
+  empty one measured 30.7 s and 34.2 s, the gap being load and not the file.
+  micromega does not pay for entries it does not look up.
+- **AN `ltac:(lia)` IN ARGUMENT POSITION CANNOT BE FIXED BY `clear -` — the
+  goal is an evar whose instance names every variable in scope, so there is
+  nothing to clear. Hoist it.** This is the "Inline `ltac:` in argument
+  position" rule with its largest measured instance: the loop's back edge
+  spells `iApply (IH … ltac:(lia) ltac:(lia) ltac:(… lia) ltac:(… lia) …)`,
+  and that ONE sentence was **43.4 s**, the most expensive in the file. Four
+  named `assert`s above it, passed positionally, take it to 0.46 s. The
+  second and third worst (37.5 s at `fw_au_raw_fail`'s `ltac:(left; lia)`,
+  13.1 s at `fw_au_raw_take`'s two) are the same edit.
+- **One `Tactic Notation` per file makes the rest a `sed`.** The keep-lists
+  differ per site, so a bare `Local Ltac` cannot carry them; `hyp_list` can,
+  and this is `FastSetSolver.v`'s own `set_solver +` idiom:
+
+  ```coq
+  Tactic Notation "fwclear" hyp_list(Hs) := clear - XI Hs.
+  Tactic Notation "zlia"    hyp_list(Hs) := clear - XI Hs; lia.
+  ```
+
+  **Keep the section's `CurCtx` instance (`XI`) in every list.** Half of this
+  file's bounds are stated over `SpecFilewrite.FW_MAX`, which is a
+  section-parameterized definition, so `clear - Hcrange` alone fails at
+  *"Could not find an instance for CurCtx"* — an error that reads like a
+  broken proof and is a scoping accident. Sixteen sites converted, no proof
+  restructured, and the two `clear`-free repairs found on the way are the
+  file's other closer bugs: a bare `discriminate` after `exfalso` (which
+  walks the whole context — `discriminate Hex` instead) at two sites, and an
+  `f_equal. lia.` closing `c + iz = iz + c` (`exact (Z.add_comm c iz)`).
+- **What is left is honest.** 32.9 s over 2742 sentences, top sentence a
+  4.05 s `Qed`, nothing else above 1.7 s. The continuation fold was NOT
+  attempted: this file's blocks are already lemmas and its return closer is
+  ~0.9 kB, under the ~1 kB floor "THE PRIZE IS ABSOLUTE BYTES OFF Δ" gives.
+- **The sibling has the same shape and was not touched.** `ProofFilewrite.v`
+  carries five `ltac:(lia)` splices at the same four sites (its `IH` apply,
+  `fw_addw_moi`, `fw_tail`'s width premise, `fw_offupd`) and reads 107 s of
+  `.v.timing`. Nobody has measured it cold.
+
 ## Framing: name the context side, construct the goal side
 
 - **Never bare `iFrame` in a large context** — it searches the whole spatial

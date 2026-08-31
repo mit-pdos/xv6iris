@@ -212,7 +212,10 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
        [UserExec.user_trap_frame_atm] at [(uint (pv_sz (us_V U)), M)] and the
        exit switch parks exactly that map into the residue.  So the round
        below is the FULL [UexecRound.uround_ok], image half included. *)
-    (M : gmap Z (bv 8)) (g : regfile) (sepc_v sc_v : mword 64) : iProp Σ :=
+    (M : gmap Z (bv 8)) (g : regfile)
+    (* THE ROUND'S ENTRY DESCRIPTOR STATES, named for the same reason the
+       image is: the row below is stated against them. *)
+    (sts : list fdstate) (sepc_v sc_v : mword 64) : iProp Σ :=
   ( ∀ (pt' : uptd) (mf : regfile) (ms' usatp uepc sc' stval' mdv0 : mword 64)
       (U' : ustate)
       (* the round may have moved the descriptor states; the post names
@@ -230,6 +233,9 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
        the resume projection of the trapframe the round left. *)
     ⌜pv_upt (us_V U') = pt'⌝ -∗
     ⌜uv_round U M g sepc_v sc_v U'⌝ -∗
+    (* the round's DESCRIPTOR half, forwarded from usertrap's own post --
+       see [SpecUsertrap.ut_fd_kept] for why the loop cannot do without it *)
+    ⌜SpecUsertrap.ut_fd_kept sc_v sts sts'⌝ -∗
     ⌜ret_pc uepc = tf_resume_pc (pv_tf (us_V U'))⌝ -∗
     ⌜mf = tf_resume_gpr0 (pv_tf (us_V U'))⌝ -∗
     ⌜ud_tfp pt' = ud_tfp pt⌝ -∗
@@ -418,7 +424,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
      [proc_addr j <> zero_reg]) the pinning condition is vacuous, so the
      caller owes the post at every hart. *)
   wp_next true (proc_addr j) (fun CID' : CpuId =>
-    uservec_post (CID := CID') (URes CID') C pt vksp U M g sepc_v sc_v) -∗
+    uservec_post (CID := CID') (URes CID') C pt vksp U M g sts sepc_v sc_v) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type USERVEC.

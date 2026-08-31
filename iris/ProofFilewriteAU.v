@@ -1075,6 +1075,19 @@ Section ProofFilewriteAU.
 
   Local Ltac regne := reg_ne_side.
 
+  (* ---- [lia] MUST NOT SEE THIS FILE'S AMBIENT CONTEXT ------------------
+     [fw_loop]'s body carries ~300 hypotheses, ~40 of them arithmetic over
+     [Z.to_nat]/[bv_unsigned]/[MAXFILE * BSIZE], and [lia] reifies every one
+     of them at every call: twelve one-line side conditions were 200 s of a
+     234 s cold compile (optimization.md, "[lia] IS A GENERAL-PURPOSE CLOSER
+     TOO, AND 180 HYPOTHESES IS A LARGE CONTEXT").  [zlia H1 H2 ..] keeps
+     exactly the named facts and closes; [fwclear] is its bare half for the
+     sites that run another tactic first.  [XI] is always kept because
+     [SpecFilewrite.FW_MAX] is stated over it, so a [Hcrange]-style bound
+     does not typecheck without it. *)
+  Tactic Notation "fwclear" hyp_list(Hs) := clear - XI Hs.
+  Tactic Notation "zlia" hyp_list(Hs) := clear - XI Hs; lia.
+
   (* =================================================================== *)
   (*  THE CARVE, PLUS THE ONE FACT [SpecFileread]'s DOES NOT HAND OUT     *)
   (* =================================================================== *)
@@ -2783,20 +2796,20 @@ Section ProofFilewriteAU.
     { rewrite Hnum.
       destruct (decide (rz = c)) as [Hfc | Hnokey].
       - (* ---- THE CHUNK FIRES ---- *)
-        assert (Hrzpos : (0 < rz)%Z) by lia.
+        assert (Hrzpos : (0 < rz)%Z) by (zlia Hfc Hcrange).
         destruct (Hsucc Hrzpos) as (Hrztot & Hdnwi & Hfo).
-        assert (Htotc : (tot = Z.to_nat c)%nat) by lia.
+        assert (Htotc : (tot = Z.to_nat c)%nat) by (zlia Hfc Hrztot).
         assert (Hd0 : dist = 0%nat) by (apply Hdistn; exact Htotc).
-        assert (Htotpos : (0 < tot)%nat) by lia.
+        assert (Htotpos : (0 < tot)%nat) by (zlia Htotc Hcrange).
         (* the two numeric side conditions, both off [Hrzadv] *)
         assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
           by apply fw_maxfile_bsize.
         assert (Hcapt : (Z.to_nat (bv_unsigned v) + tot <= MAXFILE * BSIZE)%nat)
-          by lia.
+          by (zlia Hrzadv Hrztot Hoffz Hmb).
         assert (Hszb' : (Z.to_nat (bv_unsigned (di_size dnl))
-                         <= MAXFILE * BSIZE)%nat) by lia.
+                         <= MAXFILE * BSIZE)%nat) by (zlia Hszb Hmb).
         assert (Hoff32 : (Z.of_nat (Z.to_nat (bv_unsigned v) + tot) < 2 ^ 32)%Z).
-        { change (2 ^ 32)%Z with 4294967296%Z. lia. }
+        { change (2 ^ 32)%Z with 4294967296%Z. zlia Hcapt Hmb. }
         (* writei's range clause at [dist = 0] IS the pointwise splice *)
         assert (Hrng : forall kk : nat, (kk < MAXFILE * BSIZE)%nat ->
                   file_byte data' kk
@@ -2838,7 +2851,7 @@ Section ProofFilewriteAU.
           by (rewrite wrf_run_length; exact Hcapt).
         assert (Hlenc : (t + Z.of_nat (length (wrf_run wrote tot)))%Z
                         = (t + c)%Z)
-          by (rewrite wrf_run_length; lia).
+          by (rewrite wrf_run_length; zlia Htotc Hcz).
         (* THE CHUNK'S CONTENT (RULING A).  writei's user-arm clause pins
            the run it wrote to the process's image at ITS a2, which the
            [add a2,s4,s6] at +0x9e made [i + addr]; [add_vec_moi_comm] turns
@@ -2856,9 +2869,15 @@ Section ProofFilewriteAU.
         { rewrite Htiz -add_vec_moi_comm -HQ6a2.
           exact (ubytes_at_of_got _ _ tot wrote (Hubytes eq_refl)). }
         (* ONE COMMIT OUT OF THE BUNDLE, at this chunk's index *)
+        (* the two bounds the peel wants, HOISTED out of argument position:
+           an inline [ltac:(lia)] there is priced by the depth of the call
+           site and reifies this block's whole 300-hypothesis context
+           (optimization.md, "Inline [ltac:] in argument position"). *)
+        assert (Htge0 : (0 <= t)%Z) by (zlia Htiz Hiz).
+        assert (Htltn : (t < n)%Z) by (zlia Htiz Hiz).
         iDestruct (fw_au_raw_take (fs_gamma_L fsc_fs) (bv_unsigned inum) n (us_M U)
                      (m !!! Regidx Ra1) Φw
-                     t p ltac:(lia) ltac:(lia) Hmul with "Hau")
+                     t p Htge0 Htltn Hmul with "Hau")
           as "[Hcm Hback]".
         iMod (wrf_awrite_fire fsc_fs ⊤ (bv_unsigned inum) p Φw
                 (Z.to_nat (bv_unsigned v)) (wrf_run wrote tot)
@@ -3083,7 +3102,7 @@ Section ProofFilewriteAU.
                      = negb (Z.eqb c rz)).
     { rewrite (rget_ne meo Rs3 ltac:(vm_compute; discriminate)).
       rewrite (rget_ne meo Rs1 ltac:(vm_compute; discriminate)).
-      rewrite Heos3 Heos1. apply fw_neq_r; [exact Hclt31 | lia]. }
+      rewrite Heos3 Heos1. apply fw_neq_r; [exact Hclt31 | zlia Hrzr Hclt31]. }
     assert (Htgtea : add_vec (mword_of_int (FW + 0xc8) : mword 64)
               (sign_extend' 64 (mword_of_int 26 : mword 13))
               = mword_of_int (FW + 0xe2))
@@ -3114,12 +3133,18 @@ Section ProofFilewriteAU.
                        (subrange_vec_dec (meo !!! Regidx Rs1) 31 0 : mword 32)
                        (subrange_vec_dec (meo !!! Regidx Rs4) 31 0 : mword 32)))]> meo).
       assert (Hstep : (0 <= iz + c <= n)%Z /\ (n - (iz + c) < n - iz)%Z)
-        by (apply fw_i_advance; lia).
+        by (fwclear Hiz Hcrange Hcrem; apply fw_i_advance; lia).
+      (* the three width side conditions, NAMED rather than spliced: see
+         [Htge0] above for why an [ltac:(lia)] in argument position is
+         priced by this loop's whole context. *)
+      assert (Hiz0 : (0 <= iz)%Z) by (zlia Hiz).
+      assert (Hc0 : (0 <= c)%Z) by (zlia Hcrange).
+      assert (Hic31 : (iz + c < 2 ^ 31)%Z) by (zlia Hcrem Hn).
       assert (HY1s4 : Y1 !!! Regidx Rs4 = (mword_of_int (iz + c) : mword 64)).
       { rewrite /Y1 upd_eq. unfold regval_into_reg.
         rewrite Heos1 Heos4 Hcrz.
-        rewrite (fw_addw_moi iz c ltac:(lia) ltac:(lia) ltac:(lia)).
-        f_equal. lia. }
+        rewrite (fw_addw_moi iz c Hiz0 Hc0 Hic31).
+        f_equal. exact (Z.add_comm c iz). }
       assert (HY1s5 : Y1 !!! Regidx Rs5 = (mword_of_int n : mword 64))
         by (rewrite /Y1 upd_ne; [exact Heos5 | vm_compute; discriminate]).
       assert (HY1sp : Y1 !!! Regidx csp_rs1 = pa_stk sp0 12)
@@ -3133,7 +3158,8 @@ Section ProofFilewriteAU.
                        = Z.geb (iz + c) n).
       { rewrite (rget_ne Y1 Rs4 ltac:(vm_compute; discriminate)).
         rewrite (rget_ne Y1 Rs5 ltac:(vm_compute; discriminate)).
-        rewrite HY1s4 HY1s5. apply fw_bge_moi; lia. }
+        rewrite HY1s4 HY1s5.
+        apply fw_bge_moi; zlia Hiz Hcrange Hcrem Hn Hic31. }
       assert (Htgtda : add_vec (mword_of_int (FW + 0xd0) : mword 64)
                 (sign_extend' 64 (mword_of_int 18 : mword 13))
                 = mword_of_int (FW + 0xe2))
@@ -3141,7 +3167,7 @@ Section ProofFilewriteAU.
       destruct (Z.geb (iz + c) n) eqn:Hex.
       + (* ---- EXHAUSTED: i = n, the write completed ---- *)
         assert (Hizn : (iz + c = n)%Z)
-          by (pose proof (proj1 (Z.geb_le _ _) Hex); lia).
+          by (fwclear Hex Hcrem; pose proof (proj1 (Z.geb_le _ _) Hex); lia).
         (* NO RESTORES HERE any more: 31f115a's gcc lets the exhaustion
            test branch straight into the tail, which owns the six. *)
         iApply (wp_bge_taken_s_sconf (mword_of_int (FW + 0xd0))
@@ -3153,6 +3179,8 @@ Section ProofFilewriteAU.
         { iApply (fwri_0d0 with "Htext"). }
         iApply bi.later_intro. iIntros (CIDc3 Hsc3) "Hcg Hpc".
         iEval (rewrite Htgtda) in "Hpc".
+        assert (Hizc31 : (0 <= iz + c < 2 ^ 31)%Z)
+          by (zlia Hiz Hcrange Hcrem Hn).
         assert (HY1thr2 : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                   r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> r <> Rs4 ->
                   r <> Rs5 -> r <> Rs6 -> r <> Rs7 -> r <> Rs8 -> r <> Rs9 ->
@@ -3166,7 +3194,7 @@ Section ProofFilewriteAU.
                   (m !!! Regidx Rs1) (m !!! Regidx Rs3) (m !!! Regidx Rs7)
                   (m !!! Regidx Rs8) (m !!! Regidx Rs9)
                   n (iz + c)%Z w12 (proc_addr jx) b
-                  (fw_K12 K HK) Hn ltac:(lia) Hspm eq_refl eq_refl eq_refl
+                  (fw_K12 K HK) Hn Hizc31 Hspm eq_refl eq_refl eq_refl
                   eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                   eq_refl HY1sp HY1s5 HY1s4 HY1thr2
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
@@ -3193,15 +3221,15 @@ Section ProofFilewriteAU.
              exit takes the ok arm and no other. *)
           assert (Htfn : tf = n).
           { destruct Hfire as [[_ [_ E3]] | [E1 _]];
-              [exfalso; exact (E3 Hcrz) | rewrite E1; lia]. }
+              [exfalso; exact (E3 Hcrz) | rewrite E1; zlia Htiz Hizn]. }
           rewrite /write_arms_at. subst tf. iLeft.
-          iSplitR; [iPureIntro; split; [exact Hrvn | lia] |].
+          iSplitR; [iPureIntro; split; [exact Hrvn | zlia Hn] |].
           iApply (fw_au_raw_ok (fs_gamma_L fsc_fs) nx n (us_M U) (m !!! Regidx Ra1) Φw pf with "Hau"). }
       + (* ---- NOT EXHAUSTED: the FALL is the back edge to +0xcc ---- *)
         assert (Hlt : (iz + c < n)%Z).
-        { destruct (Z.le_gt_cases n (iz + c)) as [Hle | Hgt]; [| lia].
+        { destruct (Z.le_gt_cases n (iz + c)) as [Hle | Hgt]; [| exact Hgt].
           exfalso. rewrite (proj2 (Z.geb_le (iz + c)%Z n) Hle) in Hex.
-          discriminate. }
+          discriminate Hex. }
         iApply (wp_bge_fall_s_sconf (mword_of_int (FW + 0xd0))
                   (mword_of_int 18 : mword 13) Rs5 Rs4 Y1 (K - 12)%nat b
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -3229,13 +3257,23 @@ Section ProofFilewriteAU.
         (* AU EDIT: the chunk that did NOT exhaust the count IS the cap
            ([Hcpick]), which is what re-proves the tie at the new [pf]. *)
         assert (Hcfm : c = SpecFilewrite.FW_MAX)
-          by (destruct Hcpick as [Hp1 | Hp2]; lia).
+          by (fwclear Hcpick Hlt; destruct Hcpick as [Hp1 | Hp2]; lia).
+        (* THE BACK EDGE'S FOUR ARITHMETIC PREMISES, NAMED.  Spliced as
+           [ltac:(lia)] into [IH]'s argument list they were the single most
+           expensive sentence in the file (43 s of 234 cold): the goal is an
+           evar, so [clear] is not available inside the splice and every one
+           of them reified this loop's ~300-hypothesis context. *)
+        assert (Hfuel2 : (n - (iz + c) <= Z.of_nat W)%Z)
+          by (zlia Hfuel Hcrange).
+        assert (Hiz2 : (0 <= iz + c < n)%Z) by (zlia Hiz Hcrange Hlt).
+        assert (Htiz2 : tf = (iz + c)%Z).
+        { destruct Hfire as [[_ [_ E3]] | [E1 _]];
+            [exfalso; exact (E3 Hcrz) | rewrite E1; zlia Htiz]. }
+        assert (Hmul2 : tf = (SpecFilewrite.FW_MAX * Z.of_nat pf)%Z).
+        { destruct Hfire as [[_ [_ E3]] | [E1 [E2 _]]];
+            [exfalso; exact (E3 Hcrz) | rewrite E1 E2; zlia Hmul Hcfm]. }
         iApply (IH CIDc3 (iz + c)%Z tf pf P' Y1
-                  ltac:(lia) ltac:(lia)
-                  ltac:(destruct Hfire as [[_ [_ E3]] | [E1 _]];
-                        [exfalso; exact (E3 Hcrz) | rewrite E1; lia])
-                  ltac:(destruct Hfire as [[_ [_ E3]] | [E1 [E2 _]]];
-                        [exfalso; exact (E3 Hcrz) | rewrite E1 E2; lia])
+                  Hfuel2 Hiz2 Htiz2 Hmul2
                   Hupt2
                   HY1sp
                   ltac:(rewrite (HY1cs Rs2 ltac:(vm_compute; reflexivity)
@@ -3299,10 +3337,11 @@ Section ProofFilewriteAU.
          [-1]; and the chunk that ended the loop was not full, so it did
          not fire and the carried total is still [t]. *)
       assert (Hrvm1 : rv = (mword_of_int (-1) : mword 64)).
-      { destruct Hdisj as [[Hq _] | [_ Hq]]; [exfalso; lia | exact Hq]. }
+      { destruct Hdisj as [[Hq _] | [_ Hq]];
+          [exfalso; zlia Hq Hiz | exact Hq]. }
       assert (Htft : tf = t).
       { destruct Hfire as [[E1 _] | [_ [_ E3]]]; [exact E1 |].
-        exfalso. rewrite E3 Z.eqb_refl in Hce. discriminate. }
+        exfalso. rewrite E3 Z.eqb_refl in Hce. discriminate Hce. }
       iDestruct (cpu_own_transport CIDeo CIDe 0%nat eb (proc_addr jx) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
@@ -3314,8 +3353,10 @@ Section ProofFilewriteAU.
       { iApply (fw_env_out_fs fn stx Cf inumx Hokx Htyi). iExact "Hout". }
       { rewrite /write_arms_at. iRight.
         iSplitR; [iPureIntro; exact Hrvm1 |].
+        assert (Hfailex : (tf < n)%Z \/ (n < 0)%Z /\ pf = 0%nat)
+          by (fwclear Htft Htiz Hiz; left; lia).
         iApply (fw_au_raw_fail (fs_gamma_L fsc_fs) nx n (us_M U) (m !!! Regidx Ra1) Φw tf pf
-                  ltac:(left; lia) with "Hau"). }
+                  Hfailex with "Hau"). }
   Qed.
 
   Lemma wp_filewrite_au
