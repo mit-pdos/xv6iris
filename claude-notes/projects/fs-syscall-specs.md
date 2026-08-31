@@ -2430,10 +2430,14 @@ durable-notes warns about.
   which the three biggest are `ProofConsolewriteLoc` (+90/−34),
   `ProofWritei` (+69/−22 in 5091 lines) and `SpecCopyin` (+69/−0, the new
   vocabulary).  Compile iterations: 3 for the writei relay, 4 for the
-  console chain, 3 for the fs-AU chain.  The one genuine obstacle, twice: `rget` carries the
-  ambient `CpuId`, so an `a2` equation must be asserted at the `set` that
-  built it, not at the consumer block (both `ProofConsolewriteLoc` and
-  `ProofFilewriteAU` hit it).
+  console chain, 3 for the fs-AU chain.
+
+  THE ONE GENUINE OBSTACLE, hit twice: `rget` carries the ambient `CpuId`,
+  so an `a2` equation has to be asserted at the `set` that BUILT the
+  register file, not at the consumer block several harts' instances later
+  (`ProofConsolewriteLoc`'s `HB5a2` and `ProofFilewriteAU`'s `HQ3a2` both
+  moved for this reason).  Worth knowing before the next walk names a
+  register the landed one left unconstrained.
 
   **AUDIT.**  `Print Assumptions` on ALL ELEVEN reseals the lane touched —
   `EitherCopyin.wp_either_copyin_sconf`, `Writei.wp_writei_gen` /
@@ -2478,7 +2482,8 @@ durable-notes warns about.
   touched upstream when fdstate landed).  CONSUMERS WAITING: write,
   read, dup, and any future lseek.  RECOMMEND: (a) YES but AFTER
   ruling A's lane (they touch the same file-layer proofs; sequencing
-  them avoids a double re-elaboration).
+  them avoids a double re-elaboration).  **UNBLOCKED 2026-08-31: ruling A's
+  lane has landed, so the sequencing condition is met.**
 
 Sizing: D is spike-sized — the readings exist, the work is assembly and
 statement.  S0 is one design session.  A and W are the campaign's bulk.
