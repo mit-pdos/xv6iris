@@ -116,12 +116,24 @@ Local Open Scope Z_scope.
 (* leaf reaches the enriched branch, and [usys_mem_ok_quiet] pins the      *)
 (* image, the permission map and the break across the trap.                *)
 (* ===================================================================== *)
-Lemma uenr_dom_num (n : Z) :
-  uenr_dom n = true -> n = FsFdMirror.USYS_open \/ n = FsFdMirror.USYS_mknod.
+Lemma uenr_path_num (n : Z) :
+  uenr_path n = true -> n = FsFdMirror.USYS_open \/ n = FsFdMirror.USYS_mknod.
 Proof.
-  unfold uenr_dom. intros H.
+  unfold uenr_path. intros H.
   apply orb_true_iff in H. destruct H as [H | H];
     apply bool_decide_eq_true in H; [ left | right ]; exact H.
+Qed.
+
+Lemma uenr_dom_num (n : Z) :
+  uenr_dom n = true ->
+  n = FsFdMirror.USYS_open \/ n = FsFdMirror.USYS_mknod
+  \/ n = FsFdMirror.USYS_dup.
+Proof.
+  unfold uenr_dom. intros H.
+  apply orb_true_iff in H. destruct H as [H | H].
+  - destruct (uenr_path_num n H) as [H' | H']; [ left | right; left ];
+      exact H'.
+  - right. right. apply bool_decide_eq_true in H. exact H.
 Qed.
 
 Lemma uenr_dom_rows (n : Z) :
@@ -129,8 +141,8 @@ Lemma uenr_dom_rows (n : Z) :
   n <> USYS_exit /\ n <> USYS_fork /\ n <> USYS_exec /\ n <> USYS_sbrk /\
   n <> USYS_wait /\ n <> USYS_pipe /\ n <> USYS_read /\ n <> USYS_fstat.
 Proof.
-  intros H. destruct (uenr_dom_num n H) as [-> | ->];
-    unfold FsFdMirror.USYS_open, FsFdMirror.USYS_mknod,
+  intros H. destruct (uenr_dom_num n H) as [-> | [-> | ->]];
+    unfold FsFdMirror.USYS_open, FsFdMirror.USYS_mknod, FsFdMirror.USYS_dup,
            USYS_exit, USYS_fork, USYS_exec, USYS_sbrk,
            USYS_wait, USYS_pipe, USYS_read, USYS_fstat;
     split_and!; discriminate.
@@ -146,7 +158,7 @@ Section StepPin.
     ufs_step_at n pl tf (mword_of_int (-1) : mword 64) u u.
   Proof.
     intros H. unfold ufs_step_at.
-    destruct (uenr_dom_num n H) as [-> | ->].
+    destruct (uenr_dom_num n H) as [-> | [-> | ->]].
     - destruct (decide (FsFdMirror.USYS_open = FsFdMirror.USYS_open))
         as [_ | Hc]; [| exfalso; exact (Hc eq_refl) ].
       left. exact (conj eq_refl eq_refl).
@@ -155,6 +167,37 @@ Section StepPin.
       destruct (decide (FsFdMirror.USYS_mknod = FsFdMirror.USYS_mknod))
         as [_ | Hc]; [| exfalso; exact (Hc eq_refl) ].
       left. exact (conj eq_refl eq_refl).
+    - destruct (decide (FsFdMirror.USYS_dup = FsFdMirror.USYS_open))
+        as [Hc | _]; [ discriminate Hc |].
+      destruct (decide (FsFdMirror.USYS_dup = FsFdMirror.USYS_mknod))
+        as [Hc | _]; [ discriminate Hc |].
+      destruct (decide (FsFdMirror.USYS_dup = FsFdMirror.USYS_dup))
+        as [_ | Hc]; [| exfalso; exact (Hc eq_refl) ].
+      left. exact (conj eq_refl eq_refl).
+  Qed.
+
+  (* THE NON-PATH ENRICHED ROW (dup): its step reads no image at all, so
+     the contract's [ufs_step] IS the row, at any [pl] -- [ufs_step_at]
+     does not mention [pl] off the path rows. *)
+  Lemma ufs_step_np (n : Z) (tf : list (mword 64)) (Mi : gmap Z (bv 8))
+      (r : mword 64) (u u' : umirror) (pl : list (bv 8)) :
+    uenr_path n = false ->
+    ufs_step n tf Mi r u u' ->
+    ufs_step_at n pl tf r u u'.
+  Proof.
+    intros Hnp Hst. unfold ufs_step in Hst. rewrite Hnp in Hst.
+    unfold ufs_step_at in Hst |- *.
+    destruct (decide (n = FsFdMirror.USYS_open)) as [-> | _].
+    { exfalso. unfold uenr_path in Hnp.
+      rewrite (bool_decide_eq_true_2 (FsFdMirror.USYS_open
+                                      = FsFdMirror.USYS_open) eq_refl)
+        in Hnp. discriminate Hnp. }
+    destruct (decide (n = FsFdMirror.USYS_mknod)) as [-> | _].
+    { exfalso. unfold uenr_path in Hnp.
+      rewrite (bool_decide_eq_true_2 (FsFdMirror.USYS_mknod
+                                      = FsFdMirror.USYS_mknod) eq_refl)
+        in Hnp. rewrite orb_true_r in Hnp. discriminate Hnp. }
+    exact Hst.
   Qed.
 
   (* OWNING THE STRING IS WHAT MAKES THE ROW CONCRETE.  The contract's
@@ -169,9 +212,14 @@ Section StepPin.
     ufs_step n tf Mi r u u' ->
     ufs_step_at n pl tf r u u'.
   Proof.
-    intros Hdom Hread [[-> ->] | (pl' & Hread' & Hst)].
-    - exact (ufs_step_at_blanket n pl tf u Hdom).
-    - rewrite Hread in Hread'. apply Some_inj in Hread'. subst pl'. exact Hst.
+    intros Hdom Hread Hst.
+    destruct (uenr_path n) eqn:Hp.
+    - unfold ufs_step in Hst. rewrite Hp in Hst.
+      destruct Hst as [[-> ->] | (pl' & Hread' & Hst)].
+      + exact (ufs_step_at_blanket n pl tf u Hdom).
+      + rewrite Hread in Hread'. apply Some_inj in Hread'. subst pl'.
+        exact Hst.
+    - exact (ufs_step_np n tf Mi r u u' pl Hp Hst).
   Qed.
 
 End StepPin.

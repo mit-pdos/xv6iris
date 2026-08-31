@@ -2221,6 +2221,20 @@ frozen touched; all EC2-green, zero `Admitted`, zero new `Axiom`):
   resolved row = `ADev CONSOLE 0`) and the functor
   `FdRowPilotWalk.wp_pilot_open2` (the same read through one sealed-leaf
   application — the shape the enriched init walk consumes).
+- `iris/UkRunFsLeaf.v` (stage P5, landed) — the enriched LEAF TOWER: the
+  plain leaves init's console preamble uses (`c.li`, `addi`, `auipc`,
+  `jal`, `c.jr`, `c.j`, the x0 branch) re-threaded on `urun_fs` /
+  `ukc_fs`, plus `ustrt` (the path string on the READ-ONLY TEXT half) and
+  the two enriched ecall leaves (`wp_uk_ecall_fs_text` for the path rows,
+  `wp_uk_ecall_fs_nopath` for dup).  ONE new seal,
+  `FDROW_UKFS_RETIRE.wp_uk_retire_fs_later` = `UkStep.wp_uk_retire_later`
+  with `uvb`/`ukc` swapped — the retire FUNNEL, which every non-ecall leaf
+  kind in the slice goes through (branches included).
+- `iris/UkInitFs.v` (stage P5, landed) — init's console preamble WALKED
+  on the enriched tier, 0xc through the two dups to the restart head
+  0x32, refining `FdRowPilot.pilot_console_dups`; plus the composition
+  receipt into upstream's landed, untouched restart loop.  An image-check
+  consumer, so a LEAF: nothing may require it.
 - `iris/FdRowMint.v` — **stage P3, LANDED** (619 lines vs a 508-line
   budget; 138 statement/proof lines, the rest the era-0 argument and the
   §6 ask).  The era-0 mirror value `era0_u S`, the two halves' HOMES
@@ -2426,15 +2440,174 @@ THE STAGES (prover lanes; budgets keyed to the landed analogues):
   (design §5's caveat) BEFORE `uenr_dom` widens past dot-free paths.
   BUDGET: a full lane; do not start before the upstream arm ruling
   (design §8.1).
-- [ ] **P5 — the enriched init preamble walk + widening.**  The
-  `UkInit` stage-1 preamble re-walked on `urun_fs` (after the upstream
-  arm lands, the engine is THE engine and no leaf twins exist; if walked
-  transitionally instead, budget one `urun_fs` twin per leaf kind the
-  preamble uses — the reason the plan prefers adoption-first).  Then:
-  the dup row (fds 1-2 = console), fork's mirror retirement/downgrade
-  (the solo flip), and the post-fork general row (av leg → existential
-  observations + persistent certs).  BUDGET for the walk: UkInit stage 1
-  measured 1520 + 3249 + 1020 lines; the preamble slice ~1500.
+- [x] **P5 — the enriched init preamble walk** — AS LANDED
+  (`iris/UkRunFsLeaf.v` 1020 lines, `iris/UkInitFs.v` 1158 lines, plus
+  +64 `FsFdMirror.v` / +48 `UkRunSysFs.v` / +138 `FdRowPilot.v`;
+  EC2-green, zero `Admitted`, zero new `Axiom`).  Walked
+  TRANSITIONALLY, against the P2 seal, without waiting for upstream.
+  The widening half (fork's mirror retirement, the post-fork general
+  row) is NOT done and stays queued below.
+
+  THE TOP LEMMA, verbatim (`UkInitFs.wp_kinit_console_arm_fs`, inside
+  the functor `UkInitFsWalk (R : FDROW_UKFS_RETIRE) (S : FDROW_UKFS_STEP)`):
+
+  ```coq
+  Lemma wp_kinit_console_arm_fs (γm : gname) (h : CpuId) (m : regfile)
+      (u0 : umirror) (avail : nat) :
+    era0_seed u0 ->
+    init_code γt -∗ init_rodata γt -∗
+    urun_fs γm γt γd γs h m (mword_of_int 0xc) avail -∗
+    mcur γm u0 -∗
+    (∀ (h' : CpuId) (m' : regfile) (u2 u3 : umirror)
+       (r3 rd1 rd2 : mword 64),
+       ⌜r3 <> (mword_of_int (-1) : mword 64) ->
+        rd1 <> (mword_of_int (-1) : mword 64) ->
+        rd2 <> (mword_of_int (-1) : mword 64) ->
+        um_fdt u3 !! 0%nat = Some (FdOpen true true (FdDevice CONSOLE))
+        /\ um_fdt u3 !! 1%nat = Some (FdOpen true true (FdDevice CONSOLE))
+        /\ um_fdt u3 !! 2%nat = Some (FdOpen true true (FdDevice CONSOLE))
+        /\ (exists i : Z,
+              um_resolve u2 console_str = Some i
+              /\ um_av u3 !! i = Some (MkAnode (ADev CONSOLE 0) 1%nat))⌝ -∗
+       ⌜m' !!! Regidx s2_idx = (mword_of_int LIT_START : mword 64)⌝ -∗
+       mcur γm u3 -∗
+       urun_fs γm γt γd γs h' m' (mword_of_int 0x32) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  ```
+
+  THE REFINEMENT.  The pure storey it cites is the NEW
+  `FdRowPilot.pilot_console_dups` (the design's §7 "first extension",
+  now built), which is `pilot_console_pure`'s chain continued through
+  two enriched dup rows.  Both come off one new `pilot_console_core` —
+  `pilot_console_pure` read with the fd leg WHOLE
+  (`um_fdt u3 = <[0%nat := FdOpen true true (FdDevice CONSOLE)]> fdt0`)
+  rather than at row 0, because `fd_lowest_closed` of that table (= 1,
+  then 2) is what the dups read and row 0 alone does not determine it.
+  **`pilot_console_pure`'s STATEMENT is unchanged, verbatim**; it is now
+  one line off the core, and still audits *Closed under the global
+  context*.  So the walk's `u3'` IS the pure theorem's, with no
+  "definitionally era0-stepped" gap to bridge.
+
+  ALSO LANDED, the composition receipt
+  `UkInitFs.wp_kinit_console_arm_then_loop`: the enriched preamble hands
+  its run back through the proven `urun_fs_urun` and upstream's LANDED,
+  UNTOUCHED `UkInitMain.wp_kinit_main_loop` runs from 0x32 exactly as
+  before.  The enrichment is therefore a drop-in for the preamble, not a
+  fork of the program proof.
+
+  THE TWIN INVENTORY (per kind, seal/proven).  **ONE new seal, covering
+  every leaf kind in the slice**, plus P2's:
+
+  | kind | where | status |
+  |---|---|---|
+  | retire funnel (`wp_uk_retire_later`) | `FDROW_UKFS_RETIRE` | **SEALED** (1) |
+  | ecall step (`wp_uk_ecall`) | `FDROW_UKFS_STEP` (P2) | **SEALED** (0 new) |
+  | `wp_uk_retire_fs` (later-free) | UkRunFsLeaf §2 | proven |
+  | `wp_uk_alu0_fs` / `wp_uk_alu1_fs` | §2 | proven |
+  | `c.li`, `addi`, `auipc` | §2 | proven |
+  | `jal`, `c.jr`, `c.j` | §2 | proven |
+  | `btype_gen_later`, `btype_later`, `btype0` | §2 | proven |
+  | the seven `urun_fs`-level re-threads | §3 | proven |
+  | `ustrt` / `uheap_ustrt` (the TEXT string) | §3/§4 | proven, **closed** |
+  | `wp_uk_ecall_fs_text` (path rows) | §4 | proven over P2's seal |
+  | `wp_uk_ecall_fs_nopath` (dup) | §4 | proven over P2's seal |
+
+  WHY ONE SEAL AND NOT TEN.  Every non-ecall leaf in the slice funnels
+  through `UkStep.wp_uk_retire[_later]` — including the branches, since
+  `UkBranch.wp_uk_btype_gen_later` is itself one application of it — so
+  sealing the FUNNEL at the enriched bundle covers all of them, and
+  UkLeaf.v/UkBranch.v's per-kind wrappers are re-derived here (they never
+  open the bundle, so the derivation is their own proof with one name
+  changed).  `wp_uk_retire_later_folded` is the compiled receipt that the
+  seal's premise set is the plain funnel's, folded.
+
+  THE ASK-4 COLLAPSE NOTE.  Under upstream ask (4) (the X-generic
+  engine) **both** seals become instantiations, not copies:
+  `FDROW_UKFS_RETIRE.wp_uk_retire_fs_later` is `wp_uk_retire_later` at
+  `(uexec_ret_fs_F γm, uslot_fs γm)` and `FDROW_UKFS_STEP.
+  wp_uk_ecall_fs_step` is `wp_uk_ecall` at the same pair — and
+  `UkRunFsLeaf.v` §2 (the re-derived per-kind wrappers, ~360 lines)
+  becomes redundant with UkLeaf.v/UkBranch.v outright.  P5 therefore
+  measures ask (4)'s payoff exactly: 1 seal + ~360 lines of parallel
+  wrappers per parallel contract, forever, versus one section header
+  upstream.
+
+  AS-LANDED FINDINGS:
+  1. **THE `Rut` SMUGGLE DIES ON A SECOND, INDEPENDENT OBSTRUCTION** —
+     worth recording beside P2's.  P2 refuted "route the enriched bundle
+     through the plain engine" by the ecall driver's plain-return
+     ARGUMENT.  For a non-ecall leaf there is no such argument, and the
+     obvious next idea is to smuggle the enriched promise through the
+     bundle's caller-chosen `Rut` slot (the kernel hands `Rut pt` back at
+     the trap).  It still fails, and earlier: `ukc` RE-BINDS `Rut`
+     universally, so the continuation receives a bundle at an ARBITRARY
+     `Rut` and nothing smuggled in comes back out.  A later-shifting
+     variant fails too — the promise is `▷ ukb`, and the trap-out needs
+     `ukb` NOW.  Ask first which of a driver's BINDERS a parallel form
+     can still control, not only which of its arguments it can inhabit.
+  2. **A `ustrq` PREMISE AT init's PATH LITERAL WOULD HAVE BEEN AN
+     UNSATISFIABLE PREMISE.**  P2's leaf pins the fetched path with
+     `UexecRetFs.ustrq`, a run of WRITABLE data bytes; init's "console"
+     lives at 0x970 in the program's READ-ONLY image, whose bytes are on
+     the TEXT half (`utext`).  A walk that simply took `ustrq γd dq 0x970
+     console_str` as a hypothesis would have compiled and been VACUOUS at
+     the state init runs in.  `UkRunFsLeaf.ustrt` (the same resource on
+     the text half, PERSISTENT) and `uheap_ustrt` (`uheap_ustrq`'s twin
+     through `uheap_text`) are the fix, and `UkInitFs.init_console_ustrt`
+     DERIVES the resource from `init_rodata` rather than assuming it —
+     one `vm_compute` (`console_lit_ok_holds`) says the bytes at 0x970
+     are `console_str` followed by NUL.  Any future enriched walk over a
+     string argument must check which half its string lives on.
+  3. **THE FALL-THROUGH ARM OF init's `blt` IS UNREACHABLE AT ERA 0, AND
+     THE WALK PROVES IT** rather than assuming it.  `era0_seed` forces
+     `um_resolve u0 console_str = None`, so the open row's success arm is
+     unsatisfiable and r1 = −1, so `uv_btaken BLT (−1) x0 = true`.  That
+     is `pilot_console_pure`'s first conclusion read at the machine: both
+     arms are walked, one of them to `exfalso`.
+  4. **THE DUP ROW NEEDED `uenr_dom` TO SPLIT.**  `ufs_step` fetched a
+     path string at argument 0 for every enriched row.  dup's argument 0
+     is a descriptor NUMBER, so that fetch would have pinned dup's row to
+     the −1 blanket — a contract the enriched loop could NOT discharge on
+     a dup that succeeds (an inconsistency that compiles).  `uenr_path`
+     (open, mknod) now keys the fetch and `uenr_dom = uenr_path ∪ {dup}`;
+     `ufs_step_at`'s `pl` is simply unused off the path rows, so P2's
+     `ufs_step_pin` and the whole `FDROW_UKFS_ENGINE` statement are
+     UNCHANGED.  The dup row itself is keyed on `bv_signed vfd` (argfd's
+     own reading) rather than on "some index whose encoding is the
+     argument", which is what makes it usable without an injectivity
+     argument.
+
+  SCOPE, stated honestly: the slice starts at main's CONSOLE ARM (0xc),
+  after the prologue.  main's four `c.sdsp` spills go through
+  `UkStore.wp_uk_store_later`, a SECOND engine driver over
+  `UkStep.wp_uk_step`, so re-walking the prologue costs one more funnel
+  seal (`wp_uk_store_fs_later`) for zero fs content.  Priced, not paid.
+
+  BUDGET vs MEASURED: the walk budgeted ~1500, measured 1158; the twins
+  measured 1020 (of which ~360 is §2's re-derived wrappers and ~75 the
+  two `Local` `_zca` exec facts UkLeaf.v keeps `Local`, copied for the
+  fourth time in the tree — their relocation to WpMmodeLeafBase.v is the
+  second half of ask (4)'s cost).  Total new/changed 2428 lines, well
+  inside the 3× stop rule.
+
+  AUDIT (`Print Assumptions`, EC2, against `Declare Module` stand-ins for
+  the two seals): `ufs_dup_at_hit`, `ufs_step_np`, `ufs_step_pin`,
+  `pilot_console_core`, `pilot_console_pure`, `pilot_console_dups`,
+  `console_lit_ok_holds`, `console_lit_body`, `console_lit_nul`,
+  `console_str_forall_nonul` and `uheap_ustrt` are all **Closed under the
+  global context**.  The `urun_fs` register/branch leaves report
+  `wp_uk_retire_fs_later` + the `resv` pair.  The two ecall leaves report
+  `wp_uk_ecall_fs_step` + the standing three.  Every walk lemma
+  (`wp_kinit_open_fs`, `wp_kinit_dup_fs`, `wp_kinit_repair_fs`,
+  `wp_kinit_console_arm_fs`, `wp_kinit_console_arm_then_loop`) reports
+  exactly the TWO seals + the standing three (`resv_matches`,
+  `resv_is_valid`, `functional_extensionality_dep`).  ZERO new axioms.
+
+- [ ] **P5b — the widening** (not started).  fork's mirror
+  retirement/downgrade (the solo flip) and the post-fork general row (av
+  leg → existential observations + persistent certs).  The fd leg needs
+  nothing new; the design's §5 records the shape.
 
 UPSTREAM ASKS (design §8, each a yes/no brief there): (1) the arm diff
 in `UexecRet.v` (conservative — the bridge is the compiled receipt;
