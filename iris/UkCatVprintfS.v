@@ -209,6 +209,22 @@ Section UkCatVprintfS.
       iPureIntro. lia.
   Qed.
 
+  Local Lemma urun_uword_bnd (h : CpuId) (m : regfile) (pc : mword 64)
+      (avail : nat) (dq : dfrac) (a : Z) (w : mword 64) :
+    urun γt γd γs h m pc avail -∗ uwordq γd dq a w -∗
+    ⌜ 0 <= a /\ a + 8 <= 2 ^ 38 ⌝.
+  Proof.
+    iIntros "Hrun Hw". rewrite /uwordq /ubytesq.
+    iDestruct (big_sepL_lookup_acc _ (seq 0 8) 0%nat 0%nat ltac:(reflexivity)
+                 with "Hw") as "[H0 Hcl]".
+    iDestruct (urun_ubyte_bnd with "Hrun H0") as %Hb0.
+    iDestruct ("Hcl" with "H0") as "Hw".
+    iDestruct (big_sepL_lookup_acc _ (seq 0 8) 7%nat 7%nat ltac:(reflexivity)
+                 with "Hw") as "[H7 _]".
+    iDestruct (urun_ubyte_bnd with "Hrun H7") as %Hb7.
+    iPureIntro. lia.
+  Qed.
+
   (* ===================================================================== *)
   (* [vp_inv] WITH s3 FREE.                                                 *)
   (*                                                                        *)
@@ -2412,6 +2428,159 @@ Section UkCatVprintfS.
               ltac:(rewrite /m12 (upd_ne m11 (Regidx a0_idx) (Regidx a5_idx) _
                                    ltac:(vm_compute; discriminate)); exact Ha5_11)
               with "Hcode Hc1 Hw Hstr Hrun Hcont").
+  Qed.
+
+  (* ===================================================================== *)
+  (* vprintf(fd, fmt, ap) FOR A FORMAT WITH ONE '%s' IN IT.                 *)
+  (*                                                                        *)
+  (* cat has exactly one such format -- "cat: cannot open %s\n", with the   *)
+  (* directive at index 17 of 20 -- and the contract is that one's shape:   *)
+  (* a prefix with no '%' at all, the directive, and at least one character *)
+  (* after it.  The walk is [pro], then [seg] to the '%', then the two      *)
+  (* rounds the directive takes, then [loop] for what is left.              *)
+  (* ===================================================================== *)
+  Lemma wp_kcat_vprintf_s (a : Z) (len q : nat) (f : nat -> mword 8)
+      (apz sa : Z) (dq : dfrac) (slen : nat) (sf : nat -> bv 8)
+      (h : CpuId) (m : regfile) (n : nat) :
+    0 <= a -> a + Z.of_nat len + 2 < 2 ^ 31 ->
+    (S (S q) < len)%nat ->
+    bv_unsigned (f q) = 37 ->
+    bv_unsigned (f (S q)) = 115 ->
+    (forall j : nat, (j < len)%nat -> j <> q -> bv_unsigned (f j) <> 37) ->
+    bv_unsigned (f (S (S q))) <> 100 ->
+    bv_unsigned (f (S (S q))) <> 117 ->
+    bv_unsigned (f (S (S q))) <> 120 ->
+    ((S (S (S q)) < len)%nat ->
+       bv_unsigned (f (S (S (S q)))) <> 100 /\
+       bv_unsigned (f (S (S (S q)))) <> 117 /\
+       bv_unsigned (f (S (S (S q)))) <> 120) ->
+    apz mod 8 = 0 ->
+    sa <> 0 ->
+    m !!! Regidx a1_idx = mword_of_int a ->
+    m !!! Regidx a2_idx = mword_of_int apz ->
+    cat_code γt -∗
+    utext_str γt a len f -∗
+    uwordq γd dq apz (mword_of_int sa) -∗
+    ustr γd DfracDiscarded sa slen sf -∗
+    urun γt γd γs h m (mword_of_int CatSyms.vprintf) (12 + (4 + n)) -∗
+    (∀ (h' : CpuId) (m' : regfile),
+       uwordq γd dq apz (mword_of_int sa) -∗
+       ⌜ ucallee_saved m m' ⌝ -∗
+       urun γt γd γs h' m' (ret_pc (m !!! Regidx ra_idx)) (12 + (4 + n)) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Ha0 Habnd Hq2 Hfq Hfsq Hpct Hc1d Hc1u Hc1x Hc2set Hapal Hsanz Ha1 Ha2.
+    iIntros "#Hcode #Hstr Hw #Hsstr Hrun Hcont".
+    iDestruct (urun_uword_bnd with "Hrun Hw") as %[Hap0 Haphi].
+    iDestruct (utext_str_nonul with "Hstr") as %Hnn.
+    (* the byte two past the directive: a body byte if there is one, and
+       otherwise the terminator, whose value clears every test by itself *)
+    iAssert (∃ c2 : mword 8,
+               utext γt (a + Z.of_nat (S (S (S q)))) c2
+               ∗ ⌜ bv_unsigned c2 <> 100 ⌝ ∗ ⌜ bv_unsigned c2 <> 117 ⌝
+               ∗ ⌜ bv_unsigned c2 <> 120 ⌝)%I as "#Hc2".
+    { destruct (Nat.lt_ge_cases (S (S (S q))) len) as [Hlt | Hge].
+      - iDestruct (utext_str_byte γt a len f (S (S (S q))) Hlt with "Hstr")
+          as "#Hb".
+        destruct (Hc2set Hlt) as (Hd & Hu & Hx).
+        iExists (f (S (S (S q)))). iFrame "Hb". iPureIntro. done.
+      - assert (Heq : (S (S (S q)))%nat = len) by lia.
+        iDestruct (utext_str_nul with "Hstr") as "#Hnul".
+        iExists (ubyte0 : mword 8). rewrite Heq. iFrame "Hnul".
+        iPureIntro. repeat split; vm_compute; discriminate. }
+    iDestruct "Hc2" as (c2) "(#Hc2b & %Hc2d & %Hc2u & %Hc2x)".
+    (* ---- the prologue ---- *)
+    iApply (wp_kcat_vprintf_pro γt γd γs a len f h m n Ha0 Habnd ltac:(lia) Ha1
+              with "Hcode Hstr Hrun").
+    iIntros (h0 mA fd ap) "%Hal8 %Hlo %Hinv0 %Hs1z %Hapeq
+                           Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10
+                           Hw11 Hw12 Hrun".
+    assert (Hapz : ap = mword_of_int apz) by (rewrite Hapeq; exact Ha2).
+    rewrite Hapz in Hinv0.
+    (* ---- the prefix, up to the '%' ---- *)
+    iApply (wp_kcat_vprintf_seg m (m !!! Regidx csp_rs1) fd
+              (mword_of_int apz) a len f q Ha0 Habnd 0%nat h0 mA n
+              ltac:(lia) ltac:(intros j Hj; apply Hpct; lia) Hinv0 Hs1z
+              with "Hcode Hstr Hrun
+                    [Hw Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12
+                     Hcont]").
+    iIntros (h1 mB) "%HinvB %Hs1B Hrun".
+    rewrite Nat.add_0_l in HinvB, Hs1B.
+    (* ---- the '%' round ---- *)
+    iDestruct (utext_str_byte γt a len f (S q) ltac:(lia) with "Hstr")
+      as "#Hbsq".
+    iApply (wp_kcat_vprintf_pct m (m !!! Regidx csp_rs1) fd
+              (mword_of_int apz) a q (f (S q)) h1 mB n Ha0 ltac:(lia) HinvB
+              ltac:(rewrite Hs1B Hfq; reflexivity)
+              with "Hcode Hbsq Hrun
+                    [Hw Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12
+                     Hcont]").
+    iIntros (h2 mC) "%HinvC %Hs1C %Ha4C Hrun".
+    (* ---- 0x562, not taken: 's' is not the terminator ---- *)
+    assert (Hnt1 : false = uv_btaken BEQ (mC !!! Regidx s1_idx) zero_reg).
+    { rewrite Hs1C Hfsq. cbn [uv_btaken].
+      rewrite (moi_eq_zero 115 ltac:(unfold Z64; lia)). reflexivity. }
+    iApply (wp_uk_btype0 γt γd γs h2 mC (mword_of_int 0x562)
+              (mword_of_int 468 : mword 13) s1_idx BEQ false
+              (add_vec (mword_of_int 0x562 : mword 64)
+                 (sign_extend' 64 (mword_of_int 468 : mword 13)))
+              (4 + n) Hnt1 eq_refl ltac:(discriminate)
+              with "[] Hrun").
+    { iApply (uis_cat_562 with "Hcode"). }
+    assert (E562 : add_vec_int (mword_of_int 0x562 : mword 64) 4
+                   = mword_of_int 0x566)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E562.
+    iIntros (h3) "Hrun".
+    (* ---- the directive's round ---- *)
+    iDestruct (utext_str_byte γt a len f (S (S q)) ltac:(lia) with "Hstr")
+      as "#Hbssq".
+    iApply (wp_kcat_vprintf_pcs m (m !!! Regidx csp_rs1) fd a (S q) apz sa dq
+              (f (S (S q))) c2 slen sf h3 mC n Ha0 ltac:(lia) Hap0 Haphi Hapal
+              Hsanz
+              ltac:(intro He; apply (Hnn (S (S q)) ltac:(lia)); apply bv_eq;
+                    rewrite He; vm_compute; reflexivity)
+              Hc1d Hc1u Hc1x Hc2d Hc2u Hc2x HinvC
+              ltac:(rewrite Hs1C Hfsq; reflexivity) Ha4C
+              with "Hcode Hbssq Hc2b Hw Hsstr Hrun
+                    [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12
+                     Hcont]").
+    iIntros (h4 mD) "Hw %HinvD %Hs1D Hrun".
+    (* ---- 0x562, not taken again: there IS a character after the "%s" ---- *)
+    assert (Hnzc1 : bv_unsigned (f (S (S q))) <> 0).
+    { intro He. apply (Hnn (S (S q)) ltac:(lia)). apply bv_eq.
+      rewrite He. vm_compute. reflexivity. }
+    assert (Hrc1 : 0 <= bv_unsigned (f (S (S q))) < Z64).
+    { assert (HH : 0 <= bv_unsigned (f (S (S q))) < 256).
+      { pose proof (bv_unsigned_in_range 8 (f (S (S q)))) as H0.
+        assert (Em8 : bv_modulus 8 = 256) by (vm_compute; reflexivity).
+        rewrite Em8 in H0. exact H0. }
+      unfold Z64. lia. }
+    assert (Hnt2 : false = uv_btaken BEQ (mD !!! Regidx s1_idx) zero_reg).
+    { rewrite Hs1D. cbn [uv_btaken].
+      rewrite (moi_eq_zero (bv_unsigned (f (S (S q)))) Hrc1).
+      destruct (Z.eqb_spec (bv_unsigned (f (S (S q)))) 0) as [He | _];
+        [ exfalso; exact (Hnzc1 He) | reflexivity ]. }
+    iApply (wp_uk_btype0 γt γd γs h4 mD (mword_of_int 0x562)
+              (mword_of_int 468 : mword 13) s1_idx BEQ false
+              (add_vec (mword_of_int 0x562 : mword 64)
+                 (sign_extend' 64 (mword_of_int 468 : mword 13)))
+              (4 + n) Hnt2 eq_refl ltac:(discriminate)
+              with "[] Hrun").
+    { iApply (uis_cat_562 with "Hcode"). }
+    rewrite E562.
+    iIntros (h5) "Hrun".
+    (* ---- and the rest of the string, which has no '%' left in it ---- *)
+    iApply (wp_kcat_vprintf_loop γt γd γs m (m !!! Regidx csp_rs1) fd
+              (mword_of_int (apz + 8)) a len f (S (S q))
+              (len - S (S (S q)))%nat Ha0 Habnd
+              ltac:(intros j Hj; apply Hpct; lia) eq_refl Hal8 Hlo
+              (S (S q)) h5 mD n ltac:(lia) ltac:(lia) HinvD Hs1D
+              with "Hcode Hstr Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10
+                    Hw11 Hw12 Hrun [Hw Hcont]").
+    iIntros (h6 mE) "%Hcs Hrun".
+    iApply ("Hcont" $! h6 mE with "Hw [] Hrun"). iPureIntro. exact Hcs.
   Qed.
 
 End UkCatVprintfS.

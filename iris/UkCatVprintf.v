@@ -1195,13 +1195,18 @@ Section UkCatVprintf.
   (* unbounded ones.                                                         *)
   (* --------------------------------------------------------------------- *)
   Lemma wp_kcat_vprintf_loop (m0 : regfile) (sp0 fd ap : mword 64) (a : Z)
-      (len : nat) (f : nat -> mword 8) (k : nat) :
+      (len : nat) (f : nat -> mword 8) (lo : nat) (k : nat) :
     0 <= a -> a + Z.of_nat len + 2 < 2 ^ 31 ->
-    (forall j : nat, (j < len)%nat -> bv_unsigned (f j) <> 37) ->
+    (* only the SUFFIX the walk covers has to be free of '%'.  A format
+       string with a directive in it is walked by this same loop once the
+       directive is behind it, and everything before [lo] is then somebody
+       else's business. *)
+    (forall j : nat, (lo <= j < len)%nat -> bv_unsigned (f j) <> 37) ->
     m0 !!! Regidx csp_rs1 = sp0 ->
     uint sp0 mod 8 = 0 ->
     96 <= uint sp0 ->
     forall (i : nat) (h : CpuId) (m : regfile) (n : nat),
+      (lo <= i)%nat ->
       (i + S k)%nat = len ->
       vp_inv m0 m sp0 a fd ap i ->
       m !!! Regidx s1_idx = mword_of_int (bv_unsigned (f i)) ->
@@ -1228,7 +1233,7 @@ Section UkCatVprintf.
   Proof.
     intros Ha0 Habnd Hpct Hsp0 Hal8 Hlo.
     induction k as [| k IH ];
-      intros i h m n Hik Hinv Hs1;
+      intros i h m n Hlo_i Hik Hinv Hs1;
       iIntros "#Hcode #Hstr Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont";
       iDestruct (utext_str_nonul with "Hstr") as %Hnn;
       assert (Hilt : (i < len)%nat) by lia.
@@ -1236,7 +1241,7 @@ Section UkCatVprintf.
       assert (Ei : (S i)%nat = len) by lia.
       iDestruct (utext_str_nul with "Hstr") as "#Hnul".
       iApply (wp_kcat_vprintf_step m0 sp0 fd ap a i (f i) ubyte0 h m n
-                Ha0 ltac:(lia) (Hpct i Hilt) Hinv Hs1
+                Ha0 ltac:(lia) (Hpct i ltac:(lia)) Hinv Hs1
                 with "Hcode [] Hrun").
       { rewrite Ei. iExact "Hnul". }
       iIntros (h1 m1) "%Hinv1 %Hs11 Hrun".
@@ -1264,7 +1269,7 @@ Section UkCatVprintf.
       assert (Hslt : (S i < len)%nat) by lia.
       iDestruct (utext_str_byte γt a len f (S i) Hslt with "Hstr") as "#Hb1".
       iApply (wp_kcat_vprintf_step m0 sp0 fd ap a i (f i) (f (S i)) h m n
-                Ha0 ltac:(lia) (Hpct i Hilt) Hinv Hs1
+                Ha0 ltac:(lia) (Hpct i ltac:(lia)) Hinv Hs1
                 with "Hcode Hb1 Hrun").
       iIntros (h1 m1) "%Hinv1 %Hs11 Hrun".
       (* ---- 0x562  beqz s1,0x736 -- NOT taken: a body byte is not NUL ---- *)
@@ -1298,7 +1303,7 @@ Section UkCatVprintf.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite E528.
       iIntros (h2) "Hrun".
-      iApply (IH (S i) h2 m1 n ltac:(lia) Hinv1 Hs11
+      iApply (IH (S i) h2 m1 n ltac:(lia) ltac:(lia) Hinv1 Hs11
                 with "Hcode Hstr Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont").
   Qed.
 
@@ -1329,6 +1334,7 @@ Section UkCatVprintf.
        ⌜ 96 <= uint (m !!! Regidx csp_rs1) ⌝ -∗
        ⌜ vp_inv m m' (m !!! Regidx csp_rs1) a fd ap 0%nat ⌝ -∗
        ⌜ m' !!! Regidx s1_idx = mword_of_int (bv_unsigned (f 0%nat)) ⌝ -∗
+       ⌜ ap = m !!! Regidx a2_idx ⌝ -∗
        uword γd (uint (m !!! Regidx csp_rs1) - 8) (m !!! Regidx ra_idx) -∗
        uword γd (uint (m !!! Regidx csp_rs1) - 16) (m !!! Regidx s0_idx) -∗
        uword γd (uint (m !!! Regidx csp_rs1) - 24) (m !!! Regidx s1_idx) -∗
@@ -2030,12 +2036,24 @@ Section UkCatVprintf.
     iApply ("Hcont" $! h22 mp11
               (add_vec zero_reg (mp3 !!! Regidx a0_idx))
               (add_vec zero_reg (mp5 !!! Regidx a2_idx))
-              with "[] [] [] [] Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10
+              with "[] [] [] [] [] Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10
                     Hw11 Hw12 Hrun").
     - iPureIntro. exact Hal8.
     - iPureIntro. exact Hlo.
     - iPureIntro. exact Hinv0.
     - iPureIntro. exact Hs1z.
+    - iPureIntro.
+      rewrite /mp5 (upd_ne mp4 (Regidx s4_idx) (Regidx a2_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite /mp4 (upd_ne mp3 (Regidx s6_idx) (Regidx a2_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite /mp3 (upd_ne mp2 (Regidx s1_idx) (Regidx a2_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite /mp2 (upd_ne mp1 (Regidx s0_idx) (Regidx a2_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite /mp1 (upd_ne m (Regidx csp_rs1) (Regidx a2_idx) _
+                 ltac:(vm_compute; discriminate)).
+      apply add_vec_zero_l.
   Qed.
 
 
@@ -2067,13 +2085,13 @@ Section UkCatVprintf.
     iIntros "#Hcode #Hstr Hrun Hcont".
     iApply (wp_kcat_vprintf_pro a len f h m n Ha0 Habnd Hlen Ha1
               with "Hcode Hstr Hrun").
-    iIntros (h' m' fd ap) "%Hal8 %Hlo %Hinv0 %Hs1z
+    iIntros (h' m' fd ap) "%Hal8 %Hlo %Hinv0 %Hs1z %Hap
                            Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10
                            Hw11 Hw12 Hrun".
     assert (Hk0 : (0 + S (len - 1))%nat = len) by lia.
     iApply (wp_kcat_vprintf_loop m (m !!! Regidx csp_rs1) fd ap a len f
-              (len - 1)%nat Ha0 Habnd Hpct eq_refl Hal8 Hlo
-              0%nat h' m' n Hk0 Hinv0 Hs1z
+              0%nat (len - 1)%nat Ha0 Habnd ltac:(intros j Hj; apply Hpct; lia)
+              eq_refl Hal8 Hlo 0%nat h' m' n ltac:(lia) Hk0 Hinv0 Hs1z
               with "Hcode Hstr Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hrun Hcont").
   Qed.
 
