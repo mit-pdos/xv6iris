@@ -4572,17 +4572,177 @@ Section UkSh.
   Qed.
 
   (* ===================================================================== *)
-  (* THE STAGE BOUNDARY.  0x914 is where the console preamble hands over    *)
-  (* to the command loop.  Quantified over EVERY register file, because     *)
-  (* main's frame is dead from here on: main does not return (0x9cc is a    *)
-  (* [jal exit]), so the eight words its prologue spilled are never         *)
-  (* reloaded, and 0x914..0x926 writes every register the loop reads.       *)
+  (* 0x914..0x92a -- THE LOOP'S SETUP, and what stage 1 left open.          *)
+  (*                                                                       *)
+  (* Six instructions load the five constants the loop runs on: the buffer  *)
+  (* address (an auipc/addi pair), its size, and the three character        *)
+  (* literals for newline, 'c' and space.  main's frame is dead from here   *)
+  (* on -- main does not return (0x9cc is a [jal exit]), so the eight words *)
+  (* its prologue spilled are never reloaded -- which is why nothing about  *)
+  (* the entry register file survives into the loop and the invariant is    *)
+  (* exactly [ush_regs] plus the buffer.                                    *)
+  (*                                                                       *)
+  (* DEPENDS ON [ush_read_leaf] (through the loop).                         *)
   (* ===================================================================== *)
-  Hypothesis ush_cmd_head :
-    forall (h : CpuId) (m : regfile) (n : nat),
-      shk_code γt -∗
-      urun γt γd γs h m (mword_of_int 0x914) n -∗
-      WP (Loop : expr riscv_lang).
+  Lemma wp_ksh_cmd_head (h : CpuId) (m : regfile) (f : nat -> bv 8) (n : nat) :
+    ush_rest -∗
+    shk_code γt -∗
+    ubytes γd sh_buf sh_nbuf f -∗
+    urun γt γd γs h m (mword_of_int 0x914) (16 + n) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "#Hrest #Hcode Hbs Hrun".
+    (* ---- 0x914  li s3,100 ---- *)
+    iApply (wp_uk_li γt γd γs h m (mword_of_int 0x914)
+              (mword_of_int 100 : mword 12) s3_idx (mword_of_int 100) (16 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              ltac:(assert (E : (sign_extend' 64 (mword_of_int 100 : mword 12)
+                                 : mword 64) = mword_of_int 100)
+                      by (apply bv_eq; vm_compute; reflexivity);
+                    rewrite E moi_add_zero_l; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_shk_914 with "Hcode"). }
+    assert (E914 : add_vec_int (mword_of_int 0x914 : mword 64) 4
+                   = mword_of_int 0x918)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E914. iIntros (h1) "Hrun".
+    set (m1 := <[Regidx s3_idx
+                 := regval_into_reg (mword_of_int 100 : mword 64)]> m).
+    (* ---- 0x918/0x91c  auipc+addi: s2 := the buffer's address ---- *)
+    iApply (wp_uk_auipc γt γd γs h1 m1 (mword_of_int 0x918)
+              (mword_of_int 1 : mword 20) s2_idx
+              (add_vec (mword_of_int 0x918 : mword 64)
+                 (auipc_off (mword_of_int 1 : mword 20))) (16 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) eq_refl
+              with "[] Hrun").
+    { iApply (uis_shk_918 with "Hcode"). }
+    assert (E918 : add_vec_int (mword_of_int 0x918 : mword 64) 4
+                   = mword_of_int 0x91c)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E918. iIntros (h2) "Hrun".
+    set (m2 := <[Regidx s2_idx
+                 := regval_into_reg
+                      (add_vec (mword_of_int 0x918 : mword 64)
+                         (auipc_off (mword_of_int 1 : mword 20)))]> m1).
+    iApply (wp_uk_addi γt γd γs h2 m2 (mword_of_int 0x91c)
+              (mword_of_int 1800 : mword 12) s2_idx s2_idx
+              (mword_of_int sh_buf) (16 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite (upd_eq m1 (Regidx s2_idx)
+                               (regval_into_reg
+                                  (add_vec (mword_of_int 0x918 : mword 64)
+                                     (auipc_off (mword_of_int 1 : mword 20)))));
+                    apply bv_eq; vm_compute; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_shk_91c with "Hcode"). }
+    assert (E91c : add_vec_int (mword_of_int 0x91c : mword 64) 4
+                   = mword_of_int 0x920)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E91c. iIntros (h3) "Hrun".
+    set (m3 := <[Regidx s2_idx
+                 := regval_into_reg (mword_of_int sh_buf : mword 64)]> m2).
+    (* ---- 0x920  c.li s4,10 ---- *)
+    iApply (wp_uk_cli γt γd γs h3 m3 (mword_of_int 0x920)
+              (mword_of_int 10 : mword 6) s4_idx (16 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) with "[] Hrun").
+    { iApply (uis_shk_920 with "Hcode"). }
+    assert (Em920 : <[Regidx s4_idx
+                      := regval_into_reg (sign_extend' 64
+                                            (mword_of_int 10 : mword 6)
+                                          : mword 64)]> m3
+                    = <[Regidx s4_idx
+                        := regval_into_reg (mword_of_int 10 : mword 64)]> m3)
+      by (f_equal; apply bv_eq; vm_compute; reflexivity).
+    assert (E920 : add_vec_int (mword_of_int 0x920 : mword 64) 2
+                   = mword_of_int 0x922)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite Em920 E920. iIntros (h4) "Hrun".
+    set (m4 := <[Regidx s4_idx
+                 := regval_into_reg (mword_of_int 10 : mword 64)]> m3).
+    (* ---- 0x922  li s5,99 ---- *)
+    iApply (wp_uk_li γt γd γs h4 m4 (mword_of_int 0x922)
+              (mword_of_int 99 : mword 12) s5_idx (mword_of_int 99) (16 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              ltac:(assert (E : (sign_extend' 64 (mword_of_int 99 : mword 12)
+                                 : mword 64) = mword_of_int 99)
+                      by (apply bv_eq; vm_compute; reflexivity);
+                    rewrite E moi_add_zero_l; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_shk_922 with "Hcode"). }
+    assert (E922 : add_vec_int (mword_of_int 0x922 : mword 64) 4
+                   = mword_of_int 0x926)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E922. iIntros (h5) "Hrun".
+    set (m5 := <[Regidx s5_idx
+                 := regval_into_reg (mword_of_int 99 : mword 64)]> m4).
+    (* ---- 0x926  li s6,32 ---- *)
+    iApply (wp_uk_li γt γd γs h5 m5 (mword_of_int 0x926)
+              (mword_of_int 32 : mword 12) s6_idx (mword_of_int 32) (16 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              ltac:(assert (E : (sign_extend' 64 (mword_of_int 32 : mword 12)
+                                 : mword 64) = mword_of_int 32)
+                      by (apply bv_eq; vm_compute; reflexivity);
+                    rewrite E moi_add_zero_l; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_shk_926 with "Hcode"). }
+    assert (E926 : add_vec_int (mword_of_int 0x926 : mword 64) 4
+                   = mword_of_int 0x92a)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E926. iIntros (h6) "Hrun".
+    set (m6 := <[Regidx s6_idx
+                 := regval_into_reg (mword_of_int 32 : mword 64)]> m5).
+    (* ---- 0x92a  c.j 0x938 ---- *)
+    iApply (wp_uk_cj γt γd γs h6 m6 (mword_of_int 0x92a)
+              (mword_of_int 7 : mword 11) (mword_of_int 0x938) (16 + n)
+              ltac:(apply bv_eq; vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_shk_92a with "Hcode"). }
+    iIntros (h7) "Hrun".
+    assert (Hregs : ush_regs m6).
+    { split_and!.
+      - rewrite (upd_ne m5 (Regidx s6_idx) (Regidx s2_idx) _
+                   ltac:(vm_compute; discriminate)).
+        rewrite (upd_ne m4 (Regidx s5_idx) (Regidx s2_idx) _
+                   ltac:(vm_compute; discriminate)).
+        rewrite (upd_ne m3 (Regidx s4_idx) (Regidx s2_idx) _
+                   ltac:(vm_compute; discriminate)).
+        exact (upd_eq m2 (Regidx s2_idx)
+                 (regval_into_reg (mword_of_int sh_buf : mword 64))).
+      - rewrite (upd_ne m5 (Regidx s6_idx) (Regidx s3_idx) _
+                   ltac:(vm_compute; discriminate)).
+        rewrite (upd_ne m4 (Regidx s5_idx) (Regidx s3_idx) _
+                   ltac:(vm_compute; discriminate)).
+        rewrite (upd_ne m3 (Regidx s4_idx) (Regidx s3_idx) _
+                   ltac:(vm_compute; discriminate)).
+        rewrite (upd_ne m2 (Regidx s2_idx) (Regidx s3_idx) _
+                   ltac:(vm_compute; discriminate)).
+        rewrite (upd_ne m1 (Regidx s2_idx) (Regidx s3_idx) _
+                   ltac:(vm_compute; discriminate)).
+        exact (upd_eq m (Regidx s3_idx)
+                 (regval_into_reg (mword_of_int 100 : mword 64))).
+      - rewrite (upd_ne m5 (Regidx s6_idx) (Regidx s4_idx) _
+                   ltac:(vm_compute; discriminate)).
+        rewrite (upd_ne m4 (Regidx s5_idx) (Regidx s4_idx) _
+                   ltac:(vm_compute; discriminate)).
+        exact (upd_eq m3 (Regidx s4_idx)
+                 (regval_into_reg (mword_of_int 10 : mword 64))).
+      - rewrite (upd_ne m5 (Regidx s6_idx) (Regidx s5_idx) _
+                   ltac:(vm_compute; discriminate)).
+        exact (upd_eq m4 (Regidx s5_idx)
+                 (regval_into_reg (mword_of_int 99 : mword 64))).
+      - exact (upd_eq m5 (Regidx s6_idx)
+                 (regval_into_reg (mword_of_int 32 : mword 64))). }
+    iDestruct (wp_ksh_loop with "Hrest Hcode") as "Hhead".
+    iApply ("Hhead" $! h7 m6 f n with "[] Hbs Hrun").
+    iPureIntro. exact Hregs.
+  Qed.
 
   (* ===================================================================== *)
   (* THE CONSOLE PREAMBLE, 0x900..0x910 -- the loop, under iLöb.            *)
@@ -4598,14 +4758,18 @@ Section UkSh.
   (* computes what the kernel returned -- and the only thing carried round  *)
   (* the cycle is [urun … 0x900 n] itself.                                  *)
   (* ===================================================================== *)
-  Local Lemma wp_ksh_console (h : CpuId) (m : regfile) (n : nat) :
+  Local Lemma wp_ksh_console (h : CpuId) (m : regfile) (f : nat -> bv 8)
+      (n0 : nat) :
+    ush_rest -∗
     shk_code γt -∗
-    urun γt γd γs h m (mword_of_int 0x900) n -∗
+    ubytes γd sh_buf sh_nbuf f -∗
+    urun γt γd γs h m (mword_of_int 0x900) (16 + n0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode".
+    iIntros "#Hrest #Hcode".
+    set (n := (16 + n0)%nat).
     iLöb as "IH" forall (h m).
-    iIntros "Hrun".
+    iIntros "Hbs Hrun".
     (* ---- 0x900  c.mv a1,s1 ---- *)
     iApply (wp_uk_cmv γt γd γs h m (mword_of_int 0x900) a1_idx s1_idx
               (add_vec zero_reg (m !!! Regidx s1_idx)) n
@@ -4667,7 +4831,8 @@ Section UkSh.
     { iApply (uis_shk_908 with "Hcode"). }
     destruct t1.
     { (* open failed -- straight to the command loop's head *)
-      iIntros (h5) "Hrun". iApply (ush_cmd_head h5 mD n with "Hcode Hrun"). }
+      iIntros (h5) "Hrun".
+      iApply (wp_ksh_cmd_head h5 mD f n0 with "Hrest Hcode Hbs Hrun"). }
     assert (E908 : add_vec_int (mword_of_int 0x908 : mword 64) 4
                    = mword_of_int 0x90c)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -4685,7 +4850,7 @@ Section UkSh.
     { iApply (uis_shk_90c with "Hcode"). }
     destruct t2.
     { (* fd <= 2 -- round again, on the Löb hypothesis *)
-      iNext. iIntros (h6) "Hrun". iApply ("IH" with "Hrun"). }
+      iNext. iIntros (h6) "Hrun". iApply ("IH" with "Hbs Hrun"). }
     iNext.
     assert (E90c : add_vec_int (mword_of_int 0x90c : mword 64) 4
                    = mword_of_int 0x910)
@@ -4713,7 +4878,7 @@ Section UkSh.
     assert (Eret2 : ret_pc (mword_of_int 0x914 : mword 64) = mword_of_int 0x914)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Eret2.
-    iApply (ush_cmd_head h8 _ n with "Hcode Hrun").
+    iApply (wp_ksh_cmd_head h8 _ f n0 with "Hrest Hcode Hbs Hrun").
   Qed.
 
 
@@ -4724,12 +4889,15 @@ Section UkSh.
   (* main never returns.  0x8f6..0x8fc load O_RDWR and the address of the   *)
   (* "console" literal, and 0x900 is the loop above.                        *)
   (* ===================================================================== *)
-  Lemma wp_ksh_main (h : CpuId) (m : regfile) (n : nat) :
+  Lemma wp_ksh_main (h : CpuId) (m : regfile) (f : nat -> bv 8) (n0 : nat) :
+    ush_rest -∗
     shk_code γt -∗
-    urun γt γd γs h m (mword_of_int ShSyms.main) (8 + n) -∗
+    ubytes γd sh_buf sh_nbuf f -∗
+    urun γt γd γs h m (mword_of_int ShSyms.main) (8 + (16 + n0)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun".
+    iIntros "#Hrest #Hcode Hbs Hrun".
+    set (n := (16 + n0)%nat).
     rewrite shp_main.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0.
@@ -4939,7 +5107,7 @@ Section UkSh.
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E8fc. iIntros (he) "Hrun".
     (* ---- 0x900  the console loop ---- *)
-    iApply (wp_ksh_console he _ n with "Hcode Hrun").
+    iApply (wp_ksh_console he _ f n0 with "Hrest Hcode Hbs Hrun").
   Qed.
 
 
@@ -4950,12 +5118,15 @@ Section UkSh.
   (* appears here.  The [avail] arithmetic is the call chain spelled out:   *)
   (* start's two words and main's eight.                                    *)
   (* ===================================================================== *)
-  Lemma wp_ksh_start (h : CpuId) (m : regfile) (n : nat) :
+  Lemma wp_ksh_start (h : CpuId) (m : regfile) (f : nat -> bv 8) (n0 : nat) :
+    ush_rest -∗
     shk_code γt -∗
-    urun γt γd γs h m (mword_of_int ShSyms.start) (2 + (8 + n)) -∗
+    ubytes γd sh_buf sh_nbuf f -∗
+    urun γt γd γs h m (mword_of_int ShSyms.start) (2 + (8 + (16 + n0))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun".
+    iIntros "#Hrest #Hcode Hbs Hrun".
+    set (n := (16 + n0)%nat).
     rewrite shp_start.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0.
@@ -5053,7 +5224,7 @@ Section UkSh.
        had work to do while the wide catalog destruct was dumping unused
        [uinstr_is] hypotheses holding the literal into the context. *)
     rewrite <- ?shp_main.
-    iApply (wp_ksh_main h5 _ n with "Hcode Hrun").
+    iApply (wp_ksh_main h5 _ f n0 with "Hrest Hcode Hbs Hrun").
   Qed.
 
 End UkSh.
