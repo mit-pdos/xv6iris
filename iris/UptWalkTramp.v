@@ -89,7 +89,7 @@ Section UptTramp.
   Proof.
     intros Hmisa Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma.
     iIntros "#Hcert". rewrite /tramp_tr_obl. iModIntro.
-    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag HRes Hrw Hro".
+    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag Htok HRes Hrw Hro".
     assert (Hout : zero_extend' 64 (concat_vec
         ((autocast (T := mword) ((autocast (T := mword)
             (PPN_of_PTE (pte_tramp : mword 64))) : mword 44)) : mword 44)
@@ -116,11 +116,11 @@ Section UptTramp.
                   (fun a d mxr do_sum Db s0 =>
                      tramp_variant_goodb_check_fetch a d mxr do_sum Db s0)
                   Hcanon Hout
-                  with "Hcert Hfrag HRes Hrw Hro"). }
-    iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & HRes & Hany)".
+                  with "Hcert Hfrag Htok HRes Hrw Hro"). }
+    iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & HRes & Htok & Hany)".
     iSplitR; [done |].
     destruct Hshape as [-> | (tvx & ->)].
-    - iExists tv. rewrite s_rs_tlb. iFrame "Hany Hrw Hro HRes".
+    - iExists tv. rewrite s_rs_tlb. iFrame "Htok Hany Hrw Hro HRes".
     - assert (Ltlbv : register_lookup tlb
                 (register_set tlb tvx
                    (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
@@ -162,7 +162,7 @@ Section UptTramp.
           | tlbpeel; apply s_rs_menv ]. }
       iDestruct (s_rw_ext _ _ Hag with "Hrw") as "Hrw".
       iDestruct (s_ro_ext_gen Df _ _ Hag with "Hro") as "Hro".
-      iExists tvx. rewrite Ltlbv. iFrame "Hany Hrw Hro HRes".
+      iExists tvx. rewrite Ltlbv. iFrame "Htok Hany Hrw Hro HRes".
   Qed.
 
   (* the whole-tower form the engine takes.  [tramp_fetch_tr] ∀-quantifies
@@ -188,7 +188,7 @@ Section UptTramp.
     rewrite /tramp_fetch_tr.
     iIntros (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0 elp0).
     rewrite /tramp_tr_obl. iModIntro.
-    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag HRes Hrw Hro".
+    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag Htok HRes Hrw Hro".
     iAssert (⌜ misa0 = MISA_C /\ pma_allows_all pmar0 ⌝)%I as %[Hmisa Hpma].
     { iEval (rewrite s_ro_split_mix) in "Hro".
       iDestruct "Hro" as "(_ & _ & _ & _ & _ & _ & _ & Hmisac & _ & Hpmac & _)".
@@ -204,7 +204,7 @@ Section UptTramp.
                  pcfg paddr mc micfg MISA_C mseccfg0 senv0 pmar0 elp0 satp0
                  mie0 mdv0 menv0 eq_refl Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma
                  with "Hcert") as "#Hobl".
-    iApply ("Hobl" $! va pax tv rr with "[%] [%] [%] Hfrag HRes Hrw Hro");
+    iApply ("Hobl" $! va pax tv rr with "[%] [%] [%] Hfrag Htok HRes Hrw Hro");
       [ exact Hcanon | exact Hvpn | exact Hident ].
   Qed.
 
@@ -256,6 +256,7 @@ Section UptTramp.
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     utlb_inv_pt uroot tfp um -∗
+    own_context XI -∗
     pc_is pc -∗
     instr pa is_rvc i -∗
     (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
@@ -268,6 +269,7 @@ Section UptTramp.
        menvcfg ↦ᵣ{ dq } menvcfg0 -∗
        satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
        tlb ↦ᵣ tv' -∗ upt_res_pt uroot tfp um tv' -∗
+       own_context XI -∗
        clock_res -∗
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
@@ -286,6 +288,7 @@ Section UptTramp.
                       mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
+                   own_context XI ∗
                    resv_any cpu_id)) -∗
     ▷ (∀ npc ms1 mdv1 : mword 64,
          hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -295,13 +298,14 @@ Section UptTramp.
          mideleg ↦ᵣ{ dq } mdv1 -∗
          menvcfg ↦ᵣ{ dq } menvcfg1 -∗
          utlb_inv_pt uroot tfp um -∗
+         own_context XI -∗
          pc_is npc -∗ Rl npc ms1 mdv1 -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval
            Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
-    iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc
+    iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Htok Hpc
              Hinstr Hex Hcont".
     iDestruct (upt_swp_open uroot tfp um with "Hinv")
       as (satp0 tlbv pcfg paddr)
@@ -313,7 +317,7 @@ Section UptTramp.
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
-                    Hpcfg Hpaddr Htlbc HRes Hpc Hinstr [] [Hex] [Hcont]").
+                    Hpcfg Hpaddr Htlbc HRes Htok Hpc Hinstr [] [Hex] [Hcont]").
     - iApply (utramp_fetch_tr uroot tfp um dq pc mstatus0 satp0 mie_v mdv0
                 menvcfg0 pcfg paddr Hmenvval HSXL HMPRV Hsatpok Hpmpok
                 with "Hhw").
@@ -322,10 +326,10 @@ Section UptTramp.
         [ exact Hsatpok | exact Hpmpok ].
     - iNext. iIntros (npc ms1 mdv1 tv1)
         "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
-         HRes Hpc HRl".
+         HRes Htok Hpc HRl".
       iApply ("Hcont" $! npc ms1 mdv1 with
                 "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
-                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
+                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Htok Hpc HRl").
       iApply (upt_swp_close uroot tfp um satp0 tv1 pcfg paddr Hsatpok Hpmpok
                 with "Hsatp Htlbc Hpcfg Hpaddr HRes").
   Qed.
@@ -373,6 +377,7 @@ Section UptTramp.
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     utlb_inv_pt uroot tfp um -∗
+    own_context XI -∗
     pc_is pc -∗
     instr pa is_rvc i -∗
     (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
@@ -385,6 +390,7 @@ Section UptTramp.
        menvcfg ↦ᵣ{ dq } menvcfg0 -∗
        satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
        tlb ↦ᵣ tv' -∗ upt_res_pt uroot tfp um tv' -∗
+       own_context XI -∗
        clock_res -∗
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
@@ -403,6 +409,7 @@ Section UptTramp.
                       mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
+                   own_context XI ∗
                    resv_any cpu_id)) -∗
     ▷ (∀ npc ms1 mdv1 : mword 64,
          hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -412,13 +419,14 @@ Section UptTramp.
          mideleg ↦ᵣ{ dq } mdv1 -∗
          menvcfg ↦ᵣ{ dq } menvcfg1 -∗
          utlb_inv_pt uroot tfp um -∗
+         own_context XI -∗
          pc_is npc -∗ Rl npc ms1 mdv1 -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval
            Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
-    iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc
+    iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Htok Hpc
              Hinstr Hex Hcont".
     iDestruct (upt_swp_open uroot tfp um with "Hinv")
       as (satp0 tlbv pcfg paddr)
@@ -430,7 +438,7 @@ Section UptTramp.
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
-                    Hpcfg Hpaddr Htlbc HRes Hpc Hinstr [] [Hex] [Hcont]").
+                    Hpcfg Hpaddr Htlbc HRes Htok Hpc Hinstr [] [Hex] [Hcont]").
     - iApply (utramp_fetch_tr uroot tfp um dq pc mstatus0 satp0 mie_v mdv0
                 menvcfg0 pcfg paddr Hmenvval HSXL HMPRV Hsatpok Hpmpok
                 with "Hhw").
@@ -439,10 +447,10 @@ Section UptTramp.
         [ exact Hsatpok | exact Hpmpok ].
     - iNext. iIntros (npc ms1 mdv1 tv1)
         "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
-         HRes Hpc HRl".
+         HRes Htok Hpc HRl".
       iApply ("Hcont" $! npc ms1 mdv1 with
                 "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
-                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
+                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Htok Hpc HRl").
       iApply (upt_swp_close uroot tfp um satp0 tv1 pcfg paddr Hsatpok Hpmpok
                 with "Hsatp Htlbc Hpcfg Hpaddr HRes").
   Qed.

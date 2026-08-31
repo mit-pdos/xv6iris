@@ -1,0 +1,177 @@
+DIGEST f61782bfedcbf2dee38d31f2872c1276
+Fxv6iris.ProofUser
+R1594:1599 Stdlib.ZArith.ZArith <> <> lib
+R1601:1604 Stdlib.Bool.Bool <> <> lib
+R1606:1608 Stdlib.micromega.Lia <> <> lib
+R1637:1640 stdpp.gmap <> <> lib
+R1642:1662 stdpp.bitvector.definitions <> <> lib
+R1700:1708 iris.proofmode.proofmode <> <> lib
+R1751:1760 iris.base_logic.lib.invariants <> <> lib
+R1762:1769 iris.base_logic.lib.gen_heap <> <> lib
+R1811:1818 iris.program_logic.language <> <> lib
+R1820:1826 iris.program_logic.lifting <> <> lib
+R1844:1873 SailStdpp.ConcurrencyInterface <> <> lib
+R1875:1912 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R1914:1948 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R1950:1975 SailStdpp.Operators_mwords <> <> lib
+R1993:2009 Riscv.rv64d_types <> <> lib
+R2011:2021 Riscv.rv64d <> <> lib
+R2039:2052 SailStdpp.Base <> <> lib
+R2054:2072 SailStdpp.TypeCasts <> <> lib
+R2074:2089 SailStdpp.Values <> <> lib
+R2091:2111 SailStdpp.MachineWord <> <> lib
+R2129:2137 xv6iris.RiscvLang <> <> lib
+R2139:2148 xv6iris.RiscvPtsto <> <> lib
+R2166:2175 xv6iris.UserPtTree <> <> lib
+R2177:2184 xv6iris.UserExec <> <> lib
+R2186:2200 xv6iris.UserClassifyAsm <> <> lib
+R2218:2227 xv6iris.UserTotalU <> <> lib
+R2229:2243 xv6iris.UserActiveClass <> <> lib
+R2261:2275 xv6iris.UserMemArmsBase <> <> lib
+R2277:2288 xv6iris.UserMemArmsC <> <> lib
+R2290:2301 xv6iris.UserMemArmsA <> <> lib
+R2303:2320 xv6iris.UserMemClassifyAmo <> <> lib
+R2338:2345 xv6iris.SpecUser <> <> lib
+R2363:2368 xv6iris.TsoCtx <> <> lib
+R2404:2407 Riscv.rv64d_types Defs <> mod
+R2430:2433 xv6iris.SpecUser USER <> mod
+mod 2418:2426 <> UserProof
+sec 2445:2453 UserProof ProofUser
+R2469:2475 xv6iris.RiscvPtsto <> riscvGS class
+var  2494:2496 UserProof.ProofUser GEN
+var  2509:2511 UserProof.ProofUser CID
+var  2524:2525 UserProof.ProofUser XI
+R2500:2504 xv6iris.RiscvLang <> GenId class
+R2515:2519 xv6iris.RiscvLang <> CpuId class
+R2529:2534 xv6iris.TsoCtx <> CurCtx class
+var  2549:2549 UserProof.ProofUser C
+var  2560:2561 UserProof.ProofUser pt
+R2553:2556 xv6iris.UserExec <> ucfg rec
+R2565:2568 xv6iris.UserPtTree <> uptd rec
+var  2583:2585 UserProof.ProofUser Rut
+R2593:2596 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2589:2592 xv6iris.UserPtTree <> uptd rec
+R2597:2601 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R2603:2604 xv6iris.ProofUser <> UserProof.ProofUser.Σ var
+prf 2767:2790 UserProof base_exec_total_u_closed
+R2798:2802 SailStdpp.Values <> mword def
+binder 2793:2794 <> va:9
+R2814:2817 Corelib.Init.Datatypes <> bool ind
+binder 2809:2810 <> mi:10
+R2826:2842 xv6iris.UserClassifyAsm <> base_exec_total_u def
+R2844:2845 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2847:2848 xv6iris.ProofUser <> va:9 var
+R2850:2851 xv6iris.ProofUser <> mi:10 var
+R2874:2896 xv6iris.UserTotalU <> base_exec_total_u_holds thm
+R3015:3026 xv6iris.UserMemClassifyAmo <> arm_ZICBOP_u thm
+R3028:3029 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2995:3008 xv6iris.UserMemArmsA <> arm_STORECON_u thm
+R3010:3011 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2976:2988 xv6iris.UserMemArmsA <> arm_LOADRES_u thm
+R2990:2991 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2948:2956 xv6iris.UserMemArmsA <> arm_AMO_u thm
+R2958:2959 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2931:2941 xv6iris.UserMemArmsBase <> arm_STORE_u thm
+R2943:2944 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2915:2924 xv6iris.UserMemArmsBase <> arm_LOAD_u thm
+R2926:2927 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2898:2899 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2874:2896 xv6iris.UserTotalU <> base_exec_total_u_holds thm
+R3015:3026 xv6iris.UserMemClassifyAmo <> arm_ZICBOP_u thm
+R3028:3029 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2995:3008 xv6iris.UserMemArmsA <> arm_STORECON_u thm
+R3010:3011 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2976:2988 xv6iris.UserMemArmsA <> arm_LOADRES_u thm
+R2990:2991 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2948:2956 xv6iris.UserMemArmsA <> arm_AMO_u thm
+R2958:2959 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2931:2941 xv6iris.UserMemArmsBase <> arm_STORE_u thm
+R2943:2944 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2915:2924 xv6iris.UserMemArmsBase <> arm_LOAD_u thm
+R2926:2927 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R2898:2899 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+prf 3179:3201 UserProof rvc_exec_total_u_closed
+R3209:3213 SailStdpp.Values <> mword def
+binder 3204:3205 <> va:11
+R3225:3228 Corelib.Init.Datatypes <> bool ind
+binder 3220:3221 <> mi:12
+R3237:3252 xv6iris.UserClassifyAsm <> rvc_exec_total_u def
+R3254:3255 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3257:3258 xv6iris.ProofUser <> va:11 var
+R3260:3261 xv6iris.ProofUser <> mi:12 var
+R3284:3305 xv6iris.UserTotalU <> rvc_exec_total_u_holds thm
+R3565:3574 xv6iris.UserMemArmsC <> arm_C_SH_u thm
+R3576:3577 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3549:3558 xv6iris.UserMemArmsC <> arm_C_SB_u thm
+R3560:3561 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3519:3529 xv6iris.UserMemArmsC <> arm_C_LHU_u thm
+R3531:3532 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3503:3512 xv6iris.UserMemArmsC <> arm_C_LH_u thm
+R3514:3515 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3486:3496 xv6iris.UserMemArmsC <> arm_C_LBU_u thm
+R3498:3499 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3455:3466 xv6iris.UserMemArmsC <> arm_C_SDSP_u thm
+R3468:3469 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3437:3448 xv6iris.UserMemArmsC <> arm_C_SWSP_u thm
+R3450:3451 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3421:3430 xv6iris.UserMemArmsC <> arm_C_SD_u thm
+R3432:3433 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3405:3414 xv6iris.UserMemArmsC <> arm_C_SW_u thm
+R3416:3417 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3374:3385 xv6iris.UserMemArmsC <> arm_C_LDSP_u thm
+R3387:3388 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3356:3367 xv6iris.UserMemArmsC <> arm_C_LWSP_u thm
+R3369:3370 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3340:3349 xv6iris.UserMemArmsC <> arm_C_LD_u thm
+R3351:3352 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3324:3333 xv6iris.UserMemArmsC <> arm_C_LW_u thm
+R3335:3336 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3307:3308 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3284:3305 xv6iris.UserTotalU <> rvc_exec_total_u_holds thm
+R3565:3574 xv6iris.UserMemArmsC <> arm_C_SH_u thm
+R3576:3577 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3549:3558 xv6iris.UserMemArmsC <> arm_C_SB_u thm
+R3560:3561 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3519:3529 xv6iris.UserMemArmsC <> arm_C_LHU_u thm
+R3531:3532 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3503:3512 xv6iris.UserMemArmsC <> arm_C_LH_u thm
+R3514:3515 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3486:3496 xv6iris.UserMemArmsC <> arm_C_LBU_u thm
+R3498:3499 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3455:3466 xv6iris.UserMemArmsC <> arm_C_SDSP_u thm
+R3468:3469 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3437:3448 xv6iris.UserMemArmsC <> arm_C_SWSP_u thm
+R3450:3451 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3421:3430 xv6iris.UserMemArmsC <> arm_C_SD_u thm
+R3432:3433 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3405:3414 xv6iris.UserMemArmsC <> arm_C_SW_u thm
+R3416:3417 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3374:3385 xv6iris.UserMemArmsC <> arm_C_LDSP_u thm
+R3387:3388 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3356:3367 xv6iris.UserMemArmsC <> arm_C_LWSP_u thm
+R3369:3370 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3340:3349 xv6iris.UserMemArmsC <> arm_C_LD_u thm
+R3351:3352 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3324:3333 xv6iris.UserMemArmsC <> arm_C_LW_u thm
+R3335:3336 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3307:3308 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+prf 3746:3764 UserProof wp_user_exec_closed
+R3772:3795 xv6iris.SpecUser <> wp_user_exec_closed_body def
+R3802:3804 xv6iris.ProofUser <> UserProof.ProofUser.Rut var
+R3799:3800 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3797:3797 xv6iris.ProofUser <> UserProof.ProofUser.C var
+R3836:3859 xv6iris.SpecUser <> wp_user_exec_closed_body def
+R3894:3910 xv6iris.UserActiveClass <> wp_user_exec_full thm
+R3942:3965 xv6iris.ProofUser UserProof base_exec_total_u_closed thm
+R3967:3989 xv6iris.ProofUser UserProof rvc_exec_total_u_closed thm
+R3917:3919 xv6iris.ProofUser <> UserProof.ProofUser.Rut var
+R3914:3915 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3912:3912 xv6iris.ProofUser <> UserProof.ProofUser.C var
+R3894:3910 xv6iris.UserActiveClass <> wp_user_exec_full thm
+R3942:3965 xv6iris.ProofUser UserProof base_exec_total_u_closed thm
+R3967:3989 xv6iris.ProofUser UserProof rvc_exec_total_u_closed thm
+R3917:3919 xv6iris.ProofUser <> UserProof.ProofUser.Rut var
+R3914:3915 xv6iris.ProofUser <> UserProof.ProofUser.pt var
+R3912:3912 xv6iris.ProofUser <> UserProof.ProofUser.C var
+R4005:4013 xv6iris.ProofUser UserProof.ProofUser <> sec
+R4021:4029 xv6iris.ProofUser UserProof <> mod

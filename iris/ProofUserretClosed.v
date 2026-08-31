@@ -72,6 +72,26 @@ Import Defs.
 (* ===================================================================== *)
 (* §3 THE LOOP.                                                            *)
 (* ===================================================================== *)
+(* [tlb_res_pt]'s creds conjunct, read off without consuming the residue
+   (A6.91's ninth, persistent, member). *)
+Lemma urc_tlb_res_creds `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (r : mword 44) :
+  KptShare.tlb_res_pt r -∗ KptShare.kpt_creds ∗ KptShare.tlb_res_pt r.
+Proof.
+  iIntros "H".
+  iDestruct "H" as (s0 tv) "(Hsatp & %A & %B & %C & Htlb & Hsnap & Hpmp & #Hk & #Hcr)".
+  iSplitR; [ iExact "Hcr" | ].
+  iExists s0, tv.
+  iSplitL "Hsatp"; [ iExact "Hsatp" | ].
+  iSplitR; [iPureIntro; exact A |].
+  iSplitR; [iPureIntro; exact B |].
+  iSplitR; [iPureIntro; exact C |].
+  iSplitL "Htlb"; [ iExact "Htlb" | ].
+  iSplitL "Hsnap"; [ iExact "Hsnap" | ].
+  iSplitL "Hpmp"; [ iExact "Hpmp" | ].
+  iSplitR; [ iExact "Hk" | iExact "Hcr" ].
+Qed.
+
 Module UserretClosed (R : USERRET) (US : USER) (UV : USERVEC).
 Section UserretClosed.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
@@ -86,6 +106,19 @@ Section UserretClosed.
   Definition Rut_at (h : CpuId) : uptd -> iProp Σ :=
     fun p => (∃ ksp : mword 64, UV.usertrap_res_bare (CID := h) p ksp)%I.
 
+  (* the token borrow at the instantiated residue -- what
+     [SpecUser.wp_user_exec_closed_body]'s [Rut_ctx] premise asks for *)
+  Lemma Rut_at_ctx (h : CpuId) : forall pt' : uptd,
+    ⊢ Rut_at h pt' -∗
+      TsoCtx.own_context (CID := h) TsoCtx.cur_ctx ∗
+      (TsoCtx.own_context (CID := h) TsoCtx.cur_ctx -∗ Rut_at h pt').
+  Proof.
+    intros pt'. iIntros "H". iDestruct "H" as (ksp) "H".
+    iDestruct (UV.usertrap_res_bare_ctx (CID := h) pt' ksp with "H")
+      as "[Htok Hback]".
+    iFrame "Htok". iIntros "Htok". iExists ksp. iApply ("Hback" with "Htok").
+  Qed.
+
   Lemma stvec_handler_loop (j : nat) :
     (j < NPROC)%nat ->
     kernel_text -∗
@@ -96,13 +129,14 @@ Section UserretClosed.
          hw_config (CID := h) -∗
          (* [minstret_inv] is [emp] post-port: no hart index left *)
          minstret_inv -∗
+         KptShare.kpt_creds (CID := h) -∗
          user_trap_frame (CID := h) C pt (Rut_at h) -∗
          WP (Loop : expr riscv_lang)).
   Proof.
     intros Hj.
     iIntros "#Hkt #Hclaim #Hwire".
     iLöb as "IH".
-    iIntros "!>" (h C pt) "%Hok #Hhw #Hmin Hframe".
+    iIntros "!>" (h C pt) "%Hok #Hhw #Hmin #Hcreds Hframe".
     destruct Hok as (Hstv & Hdqc & Hmie & Hmedl & Hnorm & Hptwf).
     (* ---- open the frame: the residue comes OUT, so uservec is not handed
            it twice (see the header) ---- *)
@@ -135,13 +169,13 @@ Section UserretClosed.
     (* ---- one round ---- *)
     iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) j ksp
               Hstv Hdqc Hmie Hj Hnorm Hptwf
-              with "Hkt Hhw Hmin Hclaim Hframe Hures [-]").
+              with "Hkt Hhw Hmin Hclaim Hcreds Hframe Hures [-]").
     iApply wp_next_intro. iIntros (CID').
     rewrite /uservec_post.
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0)
       "%Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
-       Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin'".
+       Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin' #Hcreds'".
     (* the three frozen CSRs, duplicated out of the residue for [user_cfg] *)
     iDestruct (UV.usertrap_res_csrs_open (CID := CID') pt' ksp with "Hures'")
       as "[Hcsrs Hcback]".
@@ -156,6 +190,7 @@ Section UserretClosed.
        [clock_res] and [resv_any] beside the two cells, so splitting it off
        into PC/nextPC drops the riders on the floor (worklist 13.2). *)
     iApply (US.wp_user_exec_closed (loop_ucfg mdv0 Hmm) pt' (Rut_at CID')
+              (Rut_at_ctx CID')
               with "Hhw' Hmin' Hwire
                     [Hhs' Hpriv' Hms' Hsc' Hstval' Hsepc' Hpc' Hgpr'
                      Hupt' Hstvec' Hmie' Hmdl' Hmenv' Hures'] []").
@@ -184,7 +219,8 @@ Section UserretClosed.
     - (* the next round's handler contract, under the later the user WP takes
          it at -- which is exactly the shape of the Löb hypothesis *)
       iNext. iIntros "Hframe2".
-      iApply ("IH" $! CID' (loop_ucfg mdv0 Hmm) pt' with "[%] Hhw' Hmin' Hframe2").
+      iApply ("IH" $! CID' (loop_ucfg mdv0 Hmm) pt'
+                with "[%] Hhw' Hmin' Hcreds' Hframe2").
       exact (loop_ok_loop_ucfg mdv0 Hmm pt' Hnorm' Hptwf').
   Qed.
 
@@ -217,6 +253,7 @@ Section Res.
   Definition usertrap_res_sstc := UV.usertrap_res_sstc.
   Definition usertrap_res_tf_csrs_open := UV.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tf_open := UV.usertrap_res_tf_open.
+  Definition usertrap_res_bare_ctx := UV.usertrap_res_bare_ctx.
   (* ...and the park's one producer-side entry, threaded like the rest.
      A file that merely passes the residue through has nothing to say about
      it; the entry exists so that whoever PARKS a never-run process can
@@ -267,8 +304,9 @@ End Res.
     iDestruct (hw_config_counters with "Hhw") as (scen hpm) "[#Hscen #Hhpm]".
     iDestruct (usertrap_res_sstc pt ksp with "Hures") as "[Hsstc Hures]".
     iDestruct "Hsstc" as (mcen) "[#Hmcen _]".
+    iDestruct (urc_tlb_res_creds kroot with "Hktlb") as "[#Hcreds Hktlb]".
     iDestruct (usertrap_res_tf_open pt ksp with "Hures")
-      as (kroot' ws) "(#Hkpt' & %Hokws & Htfp & Hclose)".
+      as (kroot' ws) "(#Hkpt' & %Hokws & Htfp & Htok & Hclose)".
     iDestruct (tf_page_length with "Htfp") as %Hlenws.
     iDestruct (tf_page_open36 (ud_tfp pt) ws Hlenws with "Htfp") as
       (u0 u1 u2 u3 u4 u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280) "(-> & Hu0 & Hu8 & Hu16 & Hu24 & Hu32 & Htf40 & Htf48 & Htf56 & Htf64 & Htf72 & Htf80 & Htf88 & Htf96 & Htf104 & Htf112 & Htf120 & Htf128 & Htf136 & Htf144 & Htf152 & Htf160 & Htf168 & Htf176 & Htf184 & Htf192 & Htf200 & Htf208 & Htf216 & Htf224 & Htf232 & Htf240 & Htf248 & Htf256 & Htf264 & Htf272 & Htf280 & Htail)".
@@ -278,23 +316,24 @@ End Res.
               mcen scen hpm
               HSIE HMPRV HSXL HTVM HMXR (uc_mm C) Hwf HTSR Hsup Ha0
               HuMode Huasid Huppn HFS HVS HXS HSD HMPP HSPIE Hdqc Hinj Hacc
+              (LP.Rut_at_ctx CID)
               with "Hkt Hhw Hmin Hwire Hhs Hpriv Hms Hmiec Hmdlc Hmenvc Hsenvc
-                    Hsepc Hclaim Hktlb Hufr Hpc Hfile
+                    Hsepc Hclaim Hcreds Hktlb Hufr Htok Hpc Hfile
                     Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272 Htf280 Htf112
                     Hsc Hstval Hstvec Hmedlc Hmsec Hssec Hmcen Hscen Hhpm Hdata
                     [Hclose Hu0 Hu8 Hu16 Hu24 Hu32 Htail] [-]").
     - (* [Rut] at this hart, as a CLOSER: the residue minus the save slots,
          completed by the words userret gives back *)
-      iIntros "K40 K48 K56 K64 K72 K80 K88 K96 K104 K120 K128 K136 K144 K152 K160 K168 K176 K184 K192 K200 K208 K216 K224 K232 K240 K248 K256 K264 K272 K280 K112".
+      iIntros "K40 K48 K56 K64 K72 K80 K88 K96 K104 K120 K128 K136 K144 K152 K160 K168 K176 K184 K192 K200 K208 K216 K224 K232 K240 K248 K256 K264 K272 K280 K112 Ktok".
       iExists ksp.
       iDestruct (tf_page_close36 (ud_tfp pt) u0 u1 u2 u3 u4 u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280
                 with "Hu0 Hu8 Hu16 Hu24 Hu32 K40 K48 K56 K64 K72 K80 K88 K96 K104 K112 K120 K128 K136 K144 K152 K160 K168 K176 K184 K192 K200 K208 K216 K224 K232 K240 K248 K256 K264 K272 K280 Htail") as "Htfp'".
       (* the kernel words are untouched: userret only READ the page *)
-      iApply ("Hclose" with "[%] Htfp'").
+      iApply ("Hclose" with "[%] Htfp' Ktok").
       refine (tf_kernel_words_ok_tail _ _ _ _ _ _ _ _ _ Hokws).
     - (* the handler contract, under the later the user WP takes it at *)
       iNext. iIntros "Hframe".
-      iApply ("Hloop" $! CID C pt with "[%] Hhw Hmin Hframe").
+      iApply ("Hloop" $! CID C pt with "[%] Hhw Hmin Hcreds Hframe").
       rewrite /loop_ok.
       split; [exact Hstv | split; [exact Hdqc | split; [exact Hmie |
         split; [exact Hmedl | split; [exact Hnorm | exact Hptwf]]]]].

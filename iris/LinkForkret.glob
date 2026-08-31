@@ -1,0 +1,19 @@
+DIGEST 2d6def1af02153fc32c9a04b35b1269b
+Fxv6iris.LinkForkret
+R810:819 xv6iris.LinkMyproc <> <> lib
+R821:831 xv6iris.LinkRelease <> <> lib
+R833:849 xv6iris.LinkPrepareReturn <> <> lib
+R851:867 xv6iris.LinkUserretClosed <> <> lib
+R885:894 xv6iris.LinkFsinit <> <> lib
+R896:904 xv6iris.LinkKexec <> <> lib
+R906:914 xv6iris.LinkPanic <> <> lib
+R932:943 xv6iris.ProofForkret <> <> lib
+R965:976 xv6iris.ProofForkret ForkretProof <> modtype
+R978:983 xv6iris.LinkMyproc Myproc <> modtype
+R985:991 xv6iris.LinkRelease Release <> modtype
+R993:1005 xv6iris.LinkPrepareReturn PrepareReturn <> modtype
+R1037:1042 xv6iris.LinkFsinit Fsinit <> modtype
+R1044:1048 xv6iris.LinkKexec Kexec <> modtype
+R1050:1054 xv6iris.LinkPanic Panic <> modtype
+R1056:1069 xv6iris.LinkUserretClosed UserretClosedD <> modtype
+mod 954:960 <> Forkret

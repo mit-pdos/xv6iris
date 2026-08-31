@@ -214,6 +214,7 @@ KptTree.v
 KptGoodb.v
 KptShare.v
 HartSMem.v
+HartSMemTok.v
 SmodeCorePt.v
 WpSmodePtFetch.v
 WpSmodeGpr.v

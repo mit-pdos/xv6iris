@@ -48,14 +48,6 @@ Section FileInv.
        ⌜∀ k, is_Some (M !! k) -> (k < NFILE)%nat⌝ ∗
        [∗ list] k ∈ seq 0 NFILE, fslot γ M k)%I.
 
-  (* the whole table: the spinlock named "ftable" over that resource.
-     Persistent, so every core shares it. *)
-  Definition is_ftable (γl γ : gname) : iProp Σ :=
-    is_lock γl ftable_addr "ftable"%string <{ ftable_res γ }>.
-
-  Global Instance is_ftable_persistent γl γ : Persistent (is_ftable γl γ).
-  Proof. apply _. Qed.
-
   (* ------------------------------------------------------------------ *)
   (*  Content: agreement and the fractional split                         *)
   (* ------------------------------------------------------------------ *)
@@ -582,6 +574,25 @@ Section FileInv.
       { apply Qp.sub_Some. rewrite -Hqt Hsub. apply Qp.add_comm. }
       rewrite Hr. iIntros "_ Hf Hp". iExists C. iFrame.
   Qed.
+
+  (* the whole table: the spinlock named "ftable" over that resource.
+     Persistent, so every core shares it.
+
+     A6.141 NOTE: the payload MUST stay the constant embedding
+     [<{ ftable_res γ }>] for now.  Flipping it to the context-λ (the
+     A6.129 λ-payload recipe, which is what would let the handle cross a
+     fork by [is_lock_move]) was BUILT AND REVERTED this round:
+     [WpLock.newlock]'s [CtxMorph R] premise then demands a morphable
+     payload, and [ftable_res]'s content contains ξ-BODIED cinvs
+     ([inode_pay]'s [cinv fileipN _ (inode_held_short …)], [off_hold]'s
+     cinv over [off_content]) -- the one untransportable shape.  The flip
+     lands together with the §0.47′ rooted-invariant treatment of those
+     bodies, not before.  See tso-machine-flip.md A6.141 §3. *)
+  Definition is_ftable (γl γ : gname) : iProp Σ :=
+    is_lock γl ftable_addr "ftable"%string <{ ftable_res γ }>.
+
+  Global Instance is_ftable_persistent γl γ : Persistent (is_ftable γl γ).
+  Proof. apply _. Qed.
 
 End FileInv.
 

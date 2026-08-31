@@ -136,6 +136,7 @@ Section Res.
   Definition usertrap_res_sstc := UC.usertrap_res_sstc.
   Definition usertrap_res_tf_csrs_open := UC.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tf_open := UC.usertrap_res_tf_open.
+  Definition usertrap_res_bare_ctx := UC.usertrap_res_bare_ctx.
   (* ...and the park's one producer-side entry, threaded like the rest.
      A file that merely passes the residue through has nothing to say about
      it; the entry exists so that whoever PARKS a never-run process can

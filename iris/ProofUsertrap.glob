@@ -1,4 +1,4 @@
-DIGEST 18fcaf4a3149eabae0cd0e7547e42d68
+DIGEST a398d38ac311526debce31ae5ec7d76a
 Fxv6iris.ProofUsertrap
 R3172:3177 Stdlib.ZArith.ZArith <> <> lib
 R3179:3181 Stdlib.micromega.Lia <> <> lib
@@ -5321,442 +5321,504 @@ R64134:64149 xv6iris.UsertrapRes <> ut_res_bare_norm thm
 R64151:64164 xv6iris.ProofUsertrap SY syscall_env defax
 R64134:64149 xv6iris.UsertrapRes <> ut_res_bare_norm thm
 R64151:64164 xv6iris.ProofUsertrap SY syscall_env defax
-prf 64187:64206 UsertrapProof usertrap_res_tf_open
-R64215:64221 xv6iris.RiscvPtsto <> riscvGS class
-binder 64223:64224 <> Σ:165
-binder 64214:64224 <> riscvGS0:166
-R64228:64231 xv6iris.Xv6G <> xv6G class
-R64233:64234 xv6iris.ProofUsertrap <> Σ:165 var
-binder 64227:64234 <> xv6G0:167
-R64238:64245 xv6iris.Xv6Cameras <> bioslotG class
-R64247:64248 xv6iris.ProofUsertrap <> Σ:165 var
-binder 64237:64248 <> bioslotG0:168
-R64252:64258 xv6iris.FdSlots <> fdslotG class
-R64260:64261 xv6iris.ProofUsertrap <> Σ:165 var
-binder 64251:64261 <> fdslotG0:169
-R64265:64269 xv6iris.FileInvDefs <> fileG class
-R64271:64272 xv6iris.ProofUsertrap <> Σ:165 var
-binder 64264:64272 <> fileG0:170
-R64276:64284 xv6iris.IrefSlots <> irefslotG class
-R64286:64287 xv6iris.ProofUsertrap <> Σ:165 var
-binder 64275:64287 <> irefslotG0:171
-R64291:64294 xv6iris.ProcAvail <> pavG class
-R64296:64297 xv6iris.ProofUsertrap <> Σ:165 var
-binder 64290:64297 <> pavG0:172
-R64308:64312 xv6iris.RiscvLang <> GenId class
-binder 64302:64304 <> GEN:173
-R64323:64327 xv6iris.RiscvLang <> CpuId class
-binder 64317:64319 <> CID:174
-R64337:64342 xv6iris.TsoCtx <> CurCtx class
-binder 64332:64333 <> XI:175
-R64351:64354 xv6iris.UserPtTree <> uptd rec
-binder 64346:64347 <> pt:176
-R64364:64368 SailStdpp.Values <> mword def
-binder 64358:64360 <> ksp:177
-R64402:64409 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R64378:64394 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
-R64399:64401 xv6iris.ProofUsertrap <> ksp:177 var
-R64396:64397 xv6iris.ProofUsertrap <> pt:176 var
-R64410:64414 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R64454:64460 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R64423:64427 SailStdpp.Values <> mword def
-binder 64415:64419 <> kroot:178
-R64439:64442 Corelib.Init.Datatypes <> list ind
-R64445:64449 SailStdpp.Values <> mword def
-binder 64434:64435 <> ws:179
-R64474:64478 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R64461:64467 xv6iris.KptShare <> kpt_inv def
-R64469:64473 xv6iris.ProofUsertrap <> kroot:178 var
-R64516:64520 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R64479:64481 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R64513:64515 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R64482:64499 xv6iris.ProcGeom <> tf_kernel_words_ok def
-R64511:64512 xv6iris.ProofUsertrap <> ws:179 var
-R64507:64509 xv6iris.ProofUsertrap <> ksp:177 var
-R64501:64505 xv6iris.ProofUsertrap <> kroot:178 var
-R64543:64552 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R64691:64691 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R64521:64527 xv6iris.ProcDefs <> tf_page def
-R64530:64535 xv6iris.UserPtTree <> ud_tfp proj
-R64537:64538 xv6iris.ProofUsertrap <> pt:176 var
-R64541:64542 xv6iris.ProofUsertrap <> ws:179 var
-R64553:64556 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R64578:64586 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R64563:64566 Corelib.Init.Datatypes <> list ind
-R64569:64573 SailStdpp.Values <> mword def
-binder 64557:64559 <> ws':180
-R64625:64630 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R64587:64589 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R64622:64624 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R64590:64607 xv6iris.ProcGeom <> tf_kernel_words_ok def
-R64619:64621 xv6iris.ProofUsertrap <> ws':180 var
-R64615:64617 xv6iris.ProofUsertrap <> ksp:177 var
-R64609:64613 xv6iris.ProofUsertrap <> kroot:178 var
-R64654:64666 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R64631:64637 xv6iris.ProcDefs <> tf_page def
-R64640:64645 xv6iris.UserPtTree <> ud_tfp proj
-R64647:64648 xv6iris.ProofUsertrap <> pt:176 var
-R64651:64653 xv6iris.ProofUsertrap <> ws':180 var
-R64667:64683 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
-R64688:64690 xv6iris.ProofUsertrap <> ksp:177 var
-R64685:64686 xv6iris.ProofUsertrap <> pt:176 var
-R64708:64726 xv6iris.UsertrapRes <> ut_res_bare_tf_open thm
-R64728:64741 xv6iris.ProofUsertrap SY syscall_env defax
-R64708:64726 xv6iris.UsertrapRes <> ut_res_bare_tf_open thm
-R64728:64741 xv6iris.ProofUsertrap SY syscall_env defax
-def 64911:64932 UsertrapProof usertrap_res_bare_park
-R64941:64947 xv6iris.RiscvPtsto <> riscvGS class
-binder 64949:64950 <> Σ:181
-binder 64940:64950 <> riscvGS0:182
-R64954:64957 xv6iris.Xv6G <> xv6G class
-R64959:64960 xv6iris.ProofUsertrap <> Σ:181 var
-binder 64953:64960 <> xv6G0:183
-R64964:64971 xv6iris.Xv6Cameras <> bioslotG class
-R64973:64974 xv6iris.ProofUsertrap <> Σ:181 var
-binder 64963:64974 <> bioslotG0:184
-R64978:64984 xv6iris.FdSlots <> fdslotG class
-R64986:64987 xv6iris.ProofUsertrap <> Σ:181 var
-binder 64977:64987 <> fdslotG0:185
-R64991:64995 xv6iris.FileInvDefs <> fileG class
-R64997:64998 xv6iris.ProofUsertrap <> Σ:181 var
-binder 64990:64998 <> fileG0:186
-R65002:65010 xv6iris.IrefSlots <> irefslotG class
-R65012:65013 xv6iris.ProofUsertrap <> Σ:181 var
-binder 65001:65013 <> irefslotG0:187
-R65017:65020 xv6iris.ProcAvail <> pavG class
-R65022:65023 xv6iris.ProofUsertrap <> Σ:181 var
-binder 65016:65023 <> pavG0:188
-R65034:65038 xv6iris.RiscvLang <> GenId class
-binder 65028:65030 <> GEN:189
-R65048:65053 xv6iris.TsoCtx <> CurCtx class
-binder 65043:65044 <> XI:190
-R65065:65072 xv6iris.UsertrapRes <> ut_names rec
-binder 65061:65061 <> N:191
-R65081:65083 Corelib.Init.Datatypes <> nat ind
-binder 65076:65077 <> av:192
-R65090:65107 xv6iris.UsertrapRes <> ut_park_intro_body def
-R65227:65228 xv6iris.ProofUsertrap <> av:192 var
-R65225:65225 xv6iris.ProofUsertrap <> N:191 var
-R65204:65213 xv6iris.ParkCap <> park_token def
-R65216:65219 xv6iris.UsertrapRes <> un_s proj
-R65221:65221 xv6iris.ProofUsertrap <> N:191 var
-R65125:65129 xv6iris.RiscvLang <> CpuId class
-binder 65121:65121 <> h:193
-R65138:65143 xv6iris.TsoCtx <> CurCtx class
-binder 65133:65134 <> Xc:194
-R65149:65170 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
-R65190:65191 xv6iris.ProofUsertrap <> Xc:194 var
-R65180:65180 xv6iris.ProofUsertrap <> h:193 var
-R65235:65261 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare_park thm
-R65265:65266 xv6iris.ProofUsertrap <> av:192 var
-R65263:65263 xv6iris.ProofUsertrap <> N:191 var
-prf 65276:65297 UsertrapProof usertrap_res_csrs_open
-R65306:65312 xv6iris.RiscvPtsto <> riscvGS class
-binder 65314:65315 <> Σ:195
-binder 65305:65315 <> riscvGS0:196
-R65319:65322 xv6iris.Xv6G <> xv6G class
-R65324:65325 xv6iris.ProofUsertrap <> Σ:195 var
-binder 65318:65325 <> xv6G0:197
-R65329:65336 xv6iris.Xv6Cameras <> bioslotG class
-R65338:65339 xv6iris.ProofUsertrap <> Σ:195 var
-binder 65328:65339 <> bioslotG0:198
-R65343:65349 xv6iris.FdSlots <> fdslotG class
-R65351:65352 xv6iris.ProofUsertrap <> Σ:195 var
-binder 65342:65352 <> fdslotG0:199
-R65356:65360 xv6iris.FileInvDefs <> fileG class
-R65362:65363 xv6iris.ProofUsertrap <> Σ:195 var
-binder 65355:65363 <> fileG0:200
-R65367:65375 xv6iris.IrefSlots <> irefslotG class
-R65377:65378 xv6iris.ProofUsertrap <> Σ:195 var
-binder 65366:65378 <> irefslotG0:201
-R65382:65385 xv6iris.ProcAvail <> pavG class
-R65387:65388 xv6iris.ProofUsertrap <> Σ:195 var
-binder 65381:65388 <> pavG0:202
-R65399:65403 xv6iris.RiscvLang <> GenId class
-binder 65393:65395 <> GEN:203
-R65414:65418 xv6iris.RiscvLang <> CpuId class
-binder 65408:65410 <> CID:204
-R65428:65433 xv6iris.TsoCtx <> CurCtx class
-binder 65423:65424 <> XI:205
-R65442:65445 xv6iris.UserPtTree <> uptd rec
-binder 65437:65438 <> pt:206
-R65455:65459 SailStdpp.Values <> mword def
-binder 65449:65451 <> ksp:207
-R65493:65500 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R65469:65485 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
-R65490:65492 xv6iris.ProofUsertrap <> ksp:207 var
-R65487:65488 xv6iris.ProofUsertrap <> pt:206 var
-R65510:65515 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R65555:65555 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R65501:65509 xv6iris.IntrDefs <> hart_csrs def
-R65525:65530 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R65516:65524 xv6iris.IntrDefs <> hart_csrs def
-R65531:65547 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
-R65552:65554 xv6iris.ProofUsertrap <> ksp:207 var
-R65549:65550 xv6iris.ProofUsertrap <> pt:206 var
-R65572:65592 xv6iris.UsertrapRes <> ut_res_bare_csrs_open thm
-R65594:65607 xv6iris.ProofUsertrap SY syscall_env defax
-R65572:65592 xv6iris.UsertrapRes <> ut_res_bare_csrs_open thm
-R65594:65607 xv6iris.ProofUsertrap SY syscall_env defax
-prf 65630:65646 UsertrapProof usertrap_res_sstc
-R65655:65661 xv6iris.RiscvPtsto <> riscvGS class
-binder 65663:65664 <> Σ:208
-binder 65654:65664 <> riscvGS0:209
-R65668:65671 xv6iris.Xv6G <> xv6G class
-R65673:65674 xv6iris.ProofUsertrap <> Σ:208 var
-binder 65667:65674 <> xv6G0:210
-R65678:65685 xv6iris.Xv6Cameras <> bioslotG class
-R65687:65688 xv6iris.ProofUsertrap <> Σ:208 var
-binder 65677:65688 <> bioslotG0:211
-R65692:65698 xv6iris.FdSlots <> fdslotG class
-R65700:65701 xv6iris.ProofUsertrap <> Σ:208 var
-binder 65691:65701 <> fdslotG0:212
-R65705:65709 xv6iris.FileInvDefs <> fileG class
-R65711:65712 xv6iris.ProofUsertrap <> Σ:208 var
-binder 65704:65712 <> fileG0:213
-R65716:65724 xv6iris.IrefSlots <> irefslotG class
-R65726:65727 xv6iris.ProofUsertrap <> Σ:208 var
-binder 65715:65727 <> irefslotG0:214
-R65731:65734 xv6iris.ProcAvail <> pavG class
-R65736:65737 xv6iris.ProofUsertrap <> Σ:208 var
-binder 65730:65737 <> pavG0:215
-R65748:65752 xv6iris.RiscvLang <> GenId class
-binder 65742:65744 <> GEN:216
-R65763:65767 xv6iris.RiscvLang <> CpuId class
-binder 65757:65759 <> CID:217
-R65777:65782 xv6iris.TsoCtx <> CurCtx class
-binder 65772:65773 <> XI:218
-R65791:65794 xv6iris.UserPtTree <> uptd rec
-binder 65786:65787 <> pt:219
-R65804:65808 SailStdpp.Values <> mword def
-binder 65798:65800 <> ksp:220
-R65842:65847 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R65818:65834 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
-R65839:65841 xv6iris.ProofUsertrap <> ksp:220 var
-R65836:65837 xv6iris.ProofUsertrap <> pt:219 var
-R65860:65864 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R65848:65859 xv6iris.TimerCap <> sstc_enabled def
-R65865:65881 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
-R65886:65888 xv6iris.ProofUsertrap <> ksp:220 var
-R65883:65884 xv6iris.ProofUsertrap <> pt:219 var
-R65905:65920 xv6iris.UsertrapRes <> ut_res_bare_sstc thm
-R65922:65935 xv6iris.ProofUsertrap SY syscall_env defax
-R65905:65920 xv6iris.UsertrapRes <> ut_res_bare_sstc thm
-R65922:65935 xv6iris.ProofUsertrap SY syscall_env defax
-prf 65958:65982 UsertrapProof usertrap_res_tf_csrs_open
-R65991:65997 xv6iris.RiscvPtsto <> riscvGS class
-binder 65999:66000 <> Σ:221
-binder 65990:66000 <> riscvGS0:222
-R66004:66007 xv6iris.Xv6G <> xv6G class
-R66009:66010 xv6iris.ProofUsertrap <> Σ:221 var
-binder 66003:66010 <> xv6G0:223
-R66014:66021 xv6iris.Xv6Cameras <> bioslotG class
-R66023:66024 xv6iris.ProofUsertrap <> Σ:221 var
-binder 66013:66024 <> bioslotG0:224
-R66028:66034 xv6iris.FdSlots <> fdslotG class
-R66036:66037 xv6iris.ProofUsertrap <> Σ:221 var
-binder 66027:66037 <> fdslotG0:225
-R66041:66045 xv6iris.FileInvDefs <> fileG class
-R66047:66048 xv6iris.ProofUsertrap <> Σ:221 var
-binder 66040:66048 <> fileG0:226
-R66052:66060 xv6iris.IrefSlots <> irefslotG class
-R66062:66063 xv6iris.ProofUsertrap <> Σ:221 var
-binder 66051:66063 <> irefslotG0:227
-R66067:66070 xv6iris.ProcAvail <> pavG class
-R66072:66073 xv6iris.ProofUsertrap <> Σ:221 var
-binder 66066:66073 <> pavG0:228
-R66084:66088 xv6iris.RiscvLang <> GenId class
-binder 66078:66080 <> GEN:229
-R66099:66103 xv6iris.RiscvLang <> CpuId class
-binder 66093:66095 <> CID:230
-R66113:66118 xv6iris.TsoCtx <> CurCtx class
-binder 66108:66109 <> XI:231
-R66127:66130 xv6iris.UserPtTree <> uptd rec
-binder 66122:66123 <> pt:232
-R66140:66144 SailStdpp.Values <> mword def
-binder 66134:66136 <> ksp:233
-R66178:66185 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R66154:66170 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
-R66175:66177 xv6iris.ProofUsertrap <> ksp:233 var
-R66172:66173 xv6iris.ProofUsertrap <> pt:232 var
-R66186:66190 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R66230:66236 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R66199:66203 SailStdpp.Values <> mword def
-binder 66191:66195 <> kroot:234
-R66215:66218 Corelib.Init.Datatypes <> list ind
-R66221:66225 SailStdpp.Values <> mword def
-binder 66210:66211 <> ws:235
-R66250:66254 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R66237:66243 xv6iris.KptShare <> kpt_inv def
-R66245:66249 xv6iris.ProofUsertrap <> kroot:234 var
-R66292:66300 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R66255:66257 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R66289:66291 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R66258:66275 xv6iris.ProcGeom <> tf_kernel_words_ok def
-R66287:66288 xv6iris.ProofUsertrap <> ws:235 var
-R66283:66285 xv6iris.ProofUsertrap <> ksp:233 var
-R66277:66281 xv6iris.ProofUsertrap <> kroot:234 var
-R66323:66327 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R66301:66307 xv6iris.ProcDefs <> tf_page def
-R66310:66315 xv6iris.UserPtTree <> ud_tfp proj
-R66317:66318 xv6iris.ProofUsertrap <> pt:232 var
-R66321:66322 xv6iris.ProofUsertrap <> ws:235 var
-R66337:66346 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R66500:66500 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R66328:66336 xv6iris.IntrDefs <> hart_csrs def
-R66347:66350 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R66372:66380 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R66357:66360 Corelib.Init.Datatypes <> list ind
-R66363:66367 SailStdpp.Values <> mword def
-binder 66351:66353 <> ws':236
-R66419:66424 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R66381:66383 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R66416:66418 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R66384:66401 xv6iris.ProcGeom <> tf_kernel_words_ok def
-R66413:66415 xv6iris.ProofUsertrap <> ws':236 var
-R66409:66411 xv6iris.ProofUsertrap <> ksp:233 var
-R66403:66407 xv6iris.ProofUsertrap <> kroot:234 var
-R66448:66453 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R66425:66431 xv6iris.ProcDefs <> tf_page def
-R66434:66439 xv6iris.UserPtTree <> ud_tfp proj
-R66441:66442 xv6iris.ProofUsertrap <> pt:232 var
-R66445:66447 xv6iris.ProofUsertrap <> ws':236 var
-R66463:66475 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R66454:66462 xv6iris.IntrDefs <> hart_csrs def
-R66476:66492 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
-R66497:66499 xv6iris.ProofUsertrap <> ksp:233 var
-R66494:66495 xv6iris.ProofUsertrap <> pt:232 var
-R66517:66540 xv6iris.UsertrapRes <> ut_res_bare_tf_csrs_open thm
-R66542:66555 xv6iris.ProofUsertrap SY syscall_env defax
-R66517:66540 xv6iris.UsertrapRes <> ut_res_bare_tf_csrs_open thm
-R66542:66555 xv6iris.ProofUsertrap SY syscall_env defax
-sec 66580:66585 UsertrapProof UtSeal
-R66601:66607 xv6iris.RiscvPtsto <> riscvGS class
-R66614:66617 xv6iris.Xv6G <> xv6G class
-R66619:66620 xv6iris.ProofUsertrap <> Σ:237 var
-R66624:66631 xv6iris.Xv6Cameras <> bioslotG class
-R66633:66634 xv6iris.ProofUsertrap <> Σ:237 var
-R66638:66644 xv6iris.FdSlots <> fdslotG class
-R66646:66647 xv6iris.ProofUsertrap <> Σ:237 var
-R66651:66655 xv6iris.FileInvDefs <> fileG class
-R66657:66658 xv6iris.ProofUsertrap <> Σ:237 var
-R66662:66670 xv6iris.IrefSlots <> irefslotG class
-R66672:66673 xv6iris.ProofUsertrap <> Σ:237 var
-R66677:66680 xv6iris.ProcAvail <> pavG class
-R66682:66683 xv6iris.ProofUsertrap <> Σ:237 var
-var  66699:66701 UsertrapProof.UtSeal GEN
-var  66714:66716 UsertrapProof.UtSeal CID
-var  66729:66730 UsertrapProof.UtSeal XI
-R66705:66709 xv6iris.RiscvLang <> GenId class
-R66720:66724 xv6iris.RiscvLang <> CpuId class
-R66734:66739 xv6iris.TsoCtx <> CurCtx class
-prf 66886:66894 UsertrapProof ut_printk
-R66904:66908 iris.base_logic.lib.iprop <> gname def
-binder 66897:66900 <> γpr:248
-R66918:66927 xv6iris.WpUart <> uart_names rec
-binder 66912:66914 <> γd:249
-R66937:66946 xv6iris.DiskPtsto <> disk_names rec
-binder 66931:66933 <> γv:250
-R66955:66973 xv6iris.SpecPrintk <> printk_gen_contract def
-R66996:66998 xv6iris.ProofUsertrap <> γv:250 var
-R66992:66994 xv6iris.ProofUsertrap <> γd:249 var
-R66987:66990 xv6iris.ProofUsertrap <> γpr:248 var
-R66982:66984 xv6iris.Ktier <> KT1 constr
-R67071:67092 xv6iris.ProofUsertrap PK wp_printk_gen_sconf defax
-R67094:67096 xv6iris.Ktier <> KT1 constr
-R67071:67092 xv6iris.ProofUsertrap PK wp_printk_gen_sconf defax
-R67094:67096 xv6iris.Ktier <> KT1 constr
-prf 67206:67216 UsertrapProof wp_usertrap
-R67224:67227 xv6iris.UserPtTree <> uptd rec
-binder 67219:67220 <> pt:251
-R67235:67237 Corelib.Init.Datatypes <> nat ind
-binder 67231:67231 <> j:252
-R67245:67251 xv6iris.RegFile <> regfile def
-binder 67241:67241 <> m:253
-R67292:67296 SailStdpp.Values <> mword def
-binder 67261:67264 <> ms_v:254
-binder 67266:67269 <> sc_v:255
-binder 67271:67277 <> stval_v:256
-binder 67279:67284 <> sepc_v:257
-binder 67286:67288 <> ksp:258
-R67331:67335 SailStdpp.Values <> mword def
-binder 67309:67313 <> mie_v:259
-binder 67315:67318 <> mdv0:260
-binder 67320:67327 <> menvcfg0:261
-R67347:67362 xv6iris.SpecUsertrap <> wp_usertrap_body def
-R67460:67467 xv6iris.ProofUsertrap <> menvcfg0:261 var
-R67455:67458 xv6iris.ProofUsertrap <> mdv0:260 var
-R67449:67453 xv6iris.ProofUsertrap <> mie_v:259 var
-R67445:67447 xv6iris.ProofUsertrap <> ksp:258 var
-R67438:67443 xv6iris.ProofUsertrap <> sepc_v:257 var
-R67430:67436 xv6iris.ProofUsertrap <> stval_v:256 var
-R67425:67428 xv6iris.ProofUsertrap <> sc_v:255 var
-R67420:67423 xv6iris.ProofUsertrap <> ms_v:254 var
-R67418:67418 xv6iris.ProofUsertrap <> m:253 var
-R67416:67416 xv6iris.ProofUsertrap <> j:252 var
-R67413:67414 xv6iris.ProofUsertrap <> pt:251 var
-R67373:67377 xv6iris.RiscvLang <> CpuId class
-binder 67369:67369 <> h:262
-R67382:67393 xv6iris.ProofUsertrap UsertrapProof usertrap_res def
-R67403:67403 xv6iris.ProofUsertrap <> h:262 var
-R67499:67514 xv6iris.SpecUsertrap <> wp_usertrap_body def
-R67842:67853 xv6iris.ProofUsertrap UsertrapProof usertrap_res def
-R67856:67861 xv6iris.UsertrapRes <> ut_res def
-R67842:67853 xv6iris.ProofUsertrap UsertrapProof usertrap_res def
-R67842:67853 xv6iris.ProofUsertrap UsertrapProof usertrap_res def
-R67856:67861 xv6iris.UsertrapRes <> ut_res def
-R67856:67861 xv6iris.UsertrapRes <> ut_res def
-R67989:67993 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
-R68013:68013 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
-R68005:68009 SailStdpp.Values <> mword def
-R67994:68001 Riscv.rv64d <> zero_reg def
-R68032:68048 xv6iris.SchedCtx <> proc_addr_nonzero thm
-R67989:67993 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
-R68013:68013 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
-R68005:68009 SailStdpp.Values <> mword def
-R67994:68001 Riscv.rv64d <> zero_reg def
-R68032:68048 xv6iris.SchedCtx <> proc_addr_nonzero thm
-R68071:68071 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68110:68115 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68123:68123 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68072:68088 xv6iris.UsertrapRes <> wp_next_true_swap thm
-R68094:68098 xv6iris.UsertrapRes <> un_pj def
-R68071:68071 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68110:68115 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68123:68123 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68072:68088 xv6iris.UsertrapRes <> wp_next_true_swap thm
-R68094:68098 xv6iris.UsertrapRes <> un_pj def
-R68148:68148 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68293:68312 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68429:68429 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68149:68156 xv6iris.ProofUsertrap UsertrapProof ut_entry thm
-R68158:68171 xv6iris.ProofUsertrap SY syscall_env defax
-R68148:68148 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68293:68312 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68429:68429 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68149:68156 xv6iris.ProofUsertrap UsertrapProof ut_entry thm
-R68158:68171 xv6iris.ProofUsertrap SY syscall_env defax
-R68528:68528 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68834:68853 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68899:68899 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68529:68539 xv6iris.ProofUsertrap UsertrapProof ut_dispatch thm
-R68563:68565 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
-R68637:68645 xv6iris.ProofUsertrap UsertrapProof ut_printk thm
-R68648:68652 xv6iris.UsertrapRes <> un_pr proj
-R68658:68661 xv6iris.UsertrapRes <> un_u proj
-R68667:68670 xv6iris.UsertrapRes <> un_v proj
-R68699:68710 xv6iris.IntrDefs <> trap_res_off thm
-R68715:68717 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
-R68528:68528 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68834:68853 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68899:68899 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R68529:68539 xv6iris.ProofUsertrap UsertrapProof ut_dispatch thm
-R68563:68565 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
-R68637:68645 xv6iris.ProofUsertrap UsertrapProof ut_printk thm
-R68648:68652 xv6iris.UsertrapRes <> un_pr proj
-R68658:68661 xv6iris.UsertrapRes <> un_u proj
-R68667:68670 xv6iris.UsertrapRes <> un_v proj
-R68699:68710 xv6iris.IntrDefs <> trap_res_off thm
-R68715:68717 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
-R68914:68919 xv6iris.ProofUsertrap UsertrapProof.UtSeal <> sec
-R68927:68939 xv6iris.ProofUsertrap UsertrapProof <> mod
+prf 64187:64207 UsertrapProof usertrap_res_bare_ctx
+R64216:64222 xv6iris.RiscvPtsto <> riscvGS class
+binder 64224:64225 <> Σ:165
+binder 64215:64225 <> riscvGS0:166
+R64229:64232 xv6iris.Xv6G <> xv6G class
+R64234:64235 xv6iris.ProofUsertrap <> Σ:165 var
+binder 64228:64235 <> xv6G0:167
+R64239:64246 xv6iris.Xv6Cameras <> bioslotG class
+R64248:64249 xv6iris.ProofUsertrap <> Σ:165 var
+binder 64238:64249 <> bioslotG0:168
+R64253:64259 xv6iris.FdSlots <> fdslotG class
+R64261:64262 xv6iris.ProofUsertrap <> Σ:165 var
+binder 64252:64262 <> fdslotG0:169
+R64266:64270 xv6iris.FileInvDefs <> fileG class
+R64272:64273 xv6iris.ProofUsertrap <> Σ:165 var
+binder 64265:64273 <> fileG0:170
+R64277:64285 xv6iris.IrefSlots <> irefslotG class
+R64287:64288 xv6iris.ProofUsertrap <> Σ:165 var
+binder 64276:64288 <> irefslotG0:171
+R64292:64295 xv6iris.ProcAvail <> pavG class
+R64297:64298 xv6iris.ProofUsertrap <> Σ:165 var
+binder 64291:64298 <> pavG0:172
+R64309:64313 xv6iris.RiscvLang <> GenId class
+binder 64303:64305 <> GEN:173
+R64324:64328 xv6iris.RiscvLang <> CpuId class
+binder 64318:64320 <> CID:174
+R64338:64343 xv6iris.TsoCtx <> CurCtx class
+binder 64333:64334 <> XI:175
+R64352:64355 xv6iris.UserPtTree <> uptd rec
+binder 64347:64348 <> pt:176
+R64365:64369 SailStdpp.Values <> mword def
+binder 64359:64361 <> ksp:177
+R64403:64410 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R64379:64395 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
+R64400:64402 xv6iris.ProofUsertrap <> ksp:177 var
+R64397:64398 xv6iris.ProofUsertrap <> pt:176 var
+R64430:64435 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R64485:64485 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R64411:64421 xv6iris.TsoCtx <> own_context def
+R64423:64429 xv6iris.TsoCtx <> cur_ctx def
+R64455:64460 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R64436:64446 xv6iris.TsoCtx <> own_context def
+R64448:64454 xv6iris.TsoCtx <> cur_ctx def
+R64461:64477 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
+R64482:64484 xv6iris.ProofUsertrap <> ksp:177 var
+R64479:64480 xv6iris.ProofUsertrap <> pt:176 var
+R64502:64520 xv6iris.UsertrapRes <> ut_res_bare_ctx_acc thm
+R64522:64535 xv6iris.ProofUsertrap SY syscall_env defax
+R64502:64520 xv6iris.UsertrapRes <> ut_res_bare_ctx_acc thm
+R64522:64535 xv6iris.ProofUsertrap SY syscall_env defax
+prf 64558:64577 UsertrapProof usertrap_res_tf_open
+R64586:64592 xv6iris.RiscvPtsto <> riscvGS class
+binder 64594:64595 <> Σ:178
+binder 64585:64595 <> riscvGS0:179
+R64599:64602 xv6iris.Xv6G <> xv6G class
+R64604:64605 xv6iris.ProofUsertrap <> Σ:178 var
+binder 64598:64605 <> xv6G0:180
+R64609:64616 xv6iris.Xv6Cameras <> bioslotG class
+R64618:64619 xv6iris.ProofUsertrap <> Σ:178 var
+binder 64608:64619 <> bioslotG0:181
+R64623:64629 xv6iris.FdSlots <> fdslotG class
+R64631:64632 xv6iris.ProofUsertrap <> Σ:178 var
+binder 64622:64632 <> fdslotG0:182
+R64636:64640 xv6iris.FileInvDefs <> fileG class
+R64642:64643 xv6iris.ProofUsertrap <> Σ:178 var
+binder 64635:64643 <> fileG0:183
+R64647:64655 xv6iris.IrefSlots <> irefslotG class
+R64657:64658 xv6iris.ProofUsertrap <> Σ:178 var
+binder 64646:64658 <> irefslotG0:184
+R64662:64665 xv6iris.ProcAvail <> pavG class
+R64667:64668 xv6iris.ProofUsertrap <> Σ:178 var
+binder 64661:64668 <> pavG0:185
+R64679:64683 xv6iris.RiscvLang <> GenId class
+binder 64673:64675 <> GEN:186
+R64694:64698 xv6iris.RiscvLang <> CpuId class
+binder 64688:64690 <> CID:187
+R64708:64713 xv6iris.TsoCtx <> CurCtx class
+binder 64703:64704 <> XI:188
+R64722:64725 xv6iris.UserPtTree <> uptd rec
+binder 64717:64718 <> pt:189
+R64735:64739 SailStdpp.Values <> mword def
+binder 64729:64731 <> ksp:190
+R64773:64780 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R64749:64765 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
+R64770:64772 xv6iris.ProofUsertrap <> ksp:190 var
+R64767:64768 xv6iris.ProofUsertrap <> pt:189 var
+R64781:64785 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R64825:64831 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R64794:64798 SailStdpp.Values <> mword def
+binder 64786:64790 <> kroot:191
+R64810:64813 Corelib.Init.Datatypes <> list ind
+R64816:64820 SailStdpp.Values <> mword def
+binder 64805:64806 <> ws:192
+R64845:64849 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R64832:64838 xv6iris.KptShare <> kpt_inv def
+R64840:64844 xv6iris.ProofUsertrap <> kroot:191 var
+R64887:64891 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R64850:64852 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R64884:64886 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R64853:64870 xv6iris.ProcGeom <> tf_kernel_words_ok def
+R64882:64883 xv6iris.ProofUsertrap <> ws:192 var
+R64878:64880 xv6iris.ProofUsertrap <> ksp:190 var
+R64872:64876 xv6iris.ProofUsertrap <> kroot:191 var
+R64914:64926 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R64892:64898 xv6iris.ProcDefs <> tf_page def
+R64901:64906 xv6iris.UserPtTree <> ud_tfp proj
+R64908:64909 xv6iris.ProofUsertrap <> pt:189 var
+R64912:64913 xv6iris.ProofUsertrap <> ws:192 var
+R64946:64955 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R65128:65128 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R64927:64937 xv6iris.TsoCtx <> own_context def
+R64939:64945 xv6iris.TsoCtx <> cur_ctx def
+R64956:64959 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R64981:64989 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R64966:64969 Corelib.Init.Datatypes <> list ind
+R64972:64976 SailStdpp.Values <> mword def
+binder 64960:64962 <> ws':193
+R65028:65033 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R64990:64992 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R65025:65027 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R64993:65010 xv6iris.ProcGeom <> tf_kernel_words_ok def
+R65022:65024 xv6iris.ProofUsertrap <> ws':193 var
+R65018:65020 xv6iris.ProofUsertrap <> ksp:190 var
+R65012:65016 xv6iris.ProofUsertrap <> kroot:191 var
+R65057:65071 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R65034:65040 xv6iris.ProcDefs <> tf_page def
+R65043:65048 xv6iris.UserPtTree <> ud_tfp proj
+R65050:65051 xv6iris.ProofUsertrap <> pt:189 var
+R65054:65056 xv6iris.ProofUsertrap <> ws':193 var
+R65091:65103 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R65072:65082 xv6iris.TsoCtx <> own_context def
+R65084:65090 xv6iris.TsoCtx <> cur_ctx def
+R65104:65120 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
+R65125:65127 xv6iris.ProofUsertrap <> ksp:190 var
+R65122:65123 xv6iris.ProofUsertrap <> pt:189 var
+R65145:65163 xv6iris.UsertrapRes <> ut_res_bare_tf_open thm
+R65165:65178 xv6iris.ProofUsertrap SY syscall_env defax
+R65145:65163 xv6iris.UsertrapRes <> ut_res_bare_tf_open thm
+R65165:65178 xv6iris.ProofUsertrap SY syscall_env defax
+def 65348:65369 UsertrapProof usertrap_res_bare_park
+R65378:65384 xv6iris.RiscvPtsto <> riscvGS class
+binder 65386:65387 <> Σ:194
+binder 65377:65387 <> riscvGS0:195
+R65391:65394 xv6iris.Xv6G <> xv6G class
+R65396:65397 xv6iris.ProofUsertrap <> Σ:194 var
+binder 65390:65397 <> xv6G0:196
+R65401:65408 xv6iris.Xv6Cameras <> bioslotG class
+R65410:65411 xv6iris.ProofUsertrap <> Σ:194 var
+binder 65400:65411 <> bioslotG0:197
+R65415:65421 xv6iris.FdSlots <> fdslotG class
+R65423:65424 xv6iris.ProofUsertrap <> Σ:194 var
+binder 65414:65424 <> fdslotG0:198
+R65428:65432 xv6iris.FileInvDefs <> fileG class
+R65434:65435 xv6iris.ProofUsertrap <> Σ:194 var
+binder 65427:65435 <> fileG0:199
+R65439:65447 xv6iris.IrefSlots <> irefslotG class
+R65449:65450 xv6iris.ProofUsertrap <> Σ:194 var
+binder 65438:65450 <> irefslotG0:200
+R65454:65457 xv6iris.ProcAvail <> pavG class
+R65459:65460 xv6iris.ProofUsertrap <> Σ:194 var
+binder 65453:65460 <> pavG0:201
+R65471:65475 xv6iris.RiscvLang <> GenId class
+binder 65465:65467 <> GEN:202
+R65485:65490 xv6iris.TsoCtx <> CurCtx class
+binder 65480:65481 <> XI:203
+R65502:65509 xv6iris.UsertrapRes <> ut_names rec
+binder 65498:65498 <> N:204
+R65518:65520 Corelib.Init.Datatypes <> nat ind
+binder 65513:65514 <> av:205
+R65527:65544 xv6iris.UsertrapRes <> ut_park_intro_body def
+R65664:65665 xv6iris.ProofUsertrap <> av:205 var
+R65662:65662 xv6iris.ProofUsertrap <> N:204 var
+R65641:65650 xv6iris.ParkCap <> park_token def
+R65653:65656 xv6iris.UsertrapRes <> un_s proj
+R65658:65658 xv6iris.ProofUsertrap <> N:204 var
+R65562:65566 xv6iris.RiscvLang <> CpuId class
+binder 65558:65558 <> h:206
+R65575:65580 xv6iris.TsoCtx <> CurCtx class
+binder 65570:65571 <> Xc:207
+R65586:65607 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
+R65627:65628 xv6iris.ProofUsertrap <> Xc:207 var
+R65617:65617 xv6iris.ProofUsertrap <> h:206 var
+R65672:65698 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare_park thm
+R65702:65703 xv6iris.ProofUsertrap <> av:205 var
+R65700:65700 xv6iris.ProofUsertrap <> N:204 var
+prf 65713:65734 UsertrapProof usertrap_res_csrs_open
+R65743:65749 xv6iris.RiscvPtsto <> riscvGS class
+binder 65751:65752 <> Σ:208
+binder 65742:65752 <> riscvGS0:209
+R65756:65759 xv6iris.Xv6G <> xv6G class
+R65761:65762 xv6iris.ProofUsertrap <> Σ:208 var
+binder 65755:65762 <> xv6G0:210
+R65766:65773 xv6iris.Xv6Cameras <> bioslotG class
+R65775:65776 xv6iris.ProofUsertrap <> Σ:208 var
+binder 65765:65776 <> bioslotG0:211
+R65780:65786 xv6iris.FdSlots <> fdslotG class
+R65788:65789 xv6iris.ProofUsertrap <> Σ:208 var
+binder 65779:65789 <> fdslotG0:212
+R65793:65797 xv6iris.FileInvDefs <> fileG class
+R65799:65800 xv6iris.ProofUsertrap <> Σ:208 var
+binder 65792:65800 <> fileG0:213
+R65804:65812 xv6iris.IrefSlots <> irefslotG class
+R65814:65815 xv6iris.ProofUsertrap <> Σ:208 var
+binder 65803:65815 <> irefslotG0:214
+R65819:65822 xv6iris.ProcAvail <> pavG class
+R65824:65825 xv6iris.ProofUsertrap <> Σ:208 var
+binder 65818:65825 <> pavG0:215
+R65836:65840 xv6iris.RiscvLang <> GenId class
+binder 65830:65832 <> GEN:216
+R65851:65855 xv6iris.RiscvLang <> CpuId class
+binder 65845:65847 <> CID:217
+R65865:65870 xv6iris.TsoCtx <> CurCtx class
+binder 65860:65861 <> XI:218
+R65879:65882 xv6iris.UserPtTree <> uptd rec
+binder 65874:65875 <> pt:219
+R65892:65896 SailStdpp.Values <> mword def
+binder 65886:65888 <> ksp:220
+R65930:65937 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R65906:65922 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
+R65927:65929 xv6iris.ProofUsertrap <> ksp:220 var
+R65924:65925 xv6iris.ProofUsertrap <> pt:219 var
+R65947:65952 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R65992:65992 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R65938:65946 xv6iris.IntrDefs <> hart_csrs def
+R65962:65967 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R65953:65961 xv6iris.IntrDefs <> hart_csrs def
+R65968:65984 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
+R65989:65991 xv6iris.ProofUsertrap <> ksp:220 var
+R65986:65987 xv6iris.ProofUsertrap <> pt:219 var
+R66009:66029 xv6iris.UsertrapRes <> ut_res_bare_csrs_open thm
+R66031:66044 xv6iris.ProofUsertrap SY syscall_env defax
+R66009:66029 xv6iris.UsertrapRes <> ut_res_bare_csrs_open thm
+R66031:66044 xv6iris.ProofUsertrap SY syscall_env defax
+prf 66067:66083 UsertrapProof usertrap_res_sstc
+R66092:66098 xv6iris.RiscvPtsto <> riscvGS class
+binder 66100:66101 <> Σ:221
+binder 66091:66101 <> riscvGS0:222
+R66105:66108 xv6iris.Xv6G <> xv6G class
+R66110:66111 xv6iris.ProofUsertrap <> Σ:221 var
+binder 66104:66111 <> xv6G0:223
+R66115:66122 xv6iris.Xv6Cameras <> bioslotG class
+R66124:66125 xv6iris.ProofUsertrap <> Σ:221 var
+binder 66114:66125 <> bioslotG0:224
+R66129:66135 xv6iris.FdSlots <> fdslotG class
+R66137:66138 xv6iris.ProofUsertrap <> Σ:221 var
+binder 66128:66138 <> fdslotG0:225
+R66142:66146 xv6iris.FileInvDefs <> fileG class
+R66148:66149 xv6iris.ProofUsertrap <> Σ:221 var
+binder 66141:66149 <> fileG0:226
+R66153:66161 xv6iris.IrefSlots <> irefslotG class
+R66163:66164 xv6iris.ProofUsertrap <> Σ:221 var
+binder 66152:66164 <> irefslotG0:227
+R66168:66171 xv6iris.ProcAvail <> pavG class
+R66173:66174 xv6iris.ProofUsertrap <> Σ:221 var
+binder 66167:66174 <> pavG0:228
+R66185:66189 xv6iris.RiscvLang <> GenId class
+binder 66179:66181 <> GEN:229
+R66200:66204 xv6iris.RiscvLang <> CpuId class
+binder 66194:66196 <> CID:230
+R66214:66219 xv6iris.TsoCtx <> CurCtx class
+binder 66209:66210 <> XI:231
+R66228:66231 xv6iris.UserPtTree <> uptd rec
+binder 66223:66224 <> pt:232
+R66241:66245 SailStdpp.Values <> mword def
+binder 66235:66237 <> ksp:233
+R66279:66284 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R66255:66271 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
+R66276:66278 xv6iris.ProofUsertrap <> ksp:233 var
+R66273:66274 xv6iris.ProofUsertrap <> pt:232 var
+R66297:66301 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R66285:66296 xv6iris.TimerCap <> sstc_enabled def
+R66302:66318 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
+R66323:66325 xv6iris.ProofUsertrap <> ksp:233 var
+R66320:66321 xv6iris.ProofUsertrap <> pt:232 var
+R66342:66357 xv6iris.UsertrapRes <> ut_res_bare_sstc thm
+R66359:66372 xv6iris.ProofUsertrap SY syscall_env defax
+R66342:66357 xv6iris.UsertrapRes <> ut_res_bare_sstc thm
+R66359:66372 xv6iris.ProofUsertrap SY syscall_env defax
+prf 66395:66419 UsertrapProof usertrap_res_tf_csrs_open
+R66428:66434 xv6iris.RiscvPtsto <> riscvGS class
+binder 66436:66437 <> Σ:234
+binder 66427:66437 <> riscvGS0:235
+R66441:66444 xv6iris.Xv6G <> xv6G class
+R66446:66447 xv6iris.ProofUsertrap <> Σ:234 var
+binder 66440:66447 <> xv6G0:236
+R66451:66458 xv6iris.Xv6Cameras <> bioslotG class
+R66460:66461 xv6iris.ProofUsertrap <> Σ:234 var
+binder 66450:66461 <> bioslotG0:237
+R66465:66471 xv6iris.FdSlots <> fdslotG class
+R66473:66474 xv6iris.ProofUsertrap <> Σ:234 var
+binder 66464:66474 <> fdslotG0:238
+R66478:66482 xv6iris.FileInvDefs <> fileG class
+R66484:66485 xv6iris.ProofUsertrap <> Σ:234 var
+binder 66477:66485 <> fileG0:239
+R66489:66497 xv6iris.IrefSlots <> irefslotG class
+R66499:66500 xv6iris.ProofUsertrap <> Σ:234 var
+binder 66488:66500 <> irefslotG0:240
+R66504:66507 xv6iris.ProcAvail <> pavG class
+R66509:66510 xv6iris.ProofUsertrap <> Σ:234 var
+binder 66503:66510 <> pavG0:241
+R66521:66525 xv6iris.RiscvLang <> GenId class
+binder 66515:66517 <> GEN:242
+R66536:66540 xv6iris.RiscvLang <> CpuId class
+binder 66530:66532 <> CID:243
+R66550:66555 xv6iris.TsoCtx <> CurCtx class
+binder 66545:66546 <> XI:244
+R66564:66567 xv6iris.UserPtTree <> uptd rec
+binder 66559:66560 <> pt:245
+R66577:66581 SailStdpp.Values <> mword def
+binder 66571:66573 <> ksp:246
+R66615:66622 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R66591:66607 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
+R66612:66614 xv6iris.ProofUsertrap <> ksp:246 var
+R66609:66610 xv6iris.ProofUsertrap <> pt:245 var
+R66623:66627 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R66667:66673 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R66636:66640 SailStdpp.Values <> mword def
+binder 66628:66632 <> kroot:247
+R66652:66655 Corelib.Init.Datatypes <> list ind
+R66658:66662 SailStdpp.Values <> mword def
+binder 66647:66648 <> ws:248
+R66687:66691 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R66674:66680 xv6iris.KptShare <> kpt_inv def
+R66682:66686 xv6iris.ProofUsertrap <> kroot:247 var
+R66729:66737 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R66692:66694 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R66726:66728 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R66695:66712 xv6iris.ProcGeom <> tf_kernel_words_ok def
+R66724:66725 xv6iris.ProofUsertrap <> ws:248 var
+R66720:66722 xv6iris.ProofUsertrap <> ksp:246 var
+R66714:66718 xv6iris.ProofUsertrap <> kroot:247 var
+R66760:66764 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R66738:66744 xv6iris.ProcDefs <> tf_page def
+R66747:66752 xv6iris.UserPtTree <> ud_tfp proj
+R66754:66755 xv6iris.ProofUsertrap <> pt:245 var
+R66758:66759 xv6iris.ProofUsertrap <> ws:248 var
+R66774:66778 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R66765:66773 xv6iris.IntrDefs <> hart_csrs def
+R66798:66807 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R66986:66986 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R66779:66789 xv6iris.TsoCtx <> own_context def
+R66791:66797 xv6iris.TsoCtx <> cur_ctx def
+R66808:66811 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R66833:66841 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R66818:66821 Corelib.Init.Datatypes <> list ind
+R66824:66828 SailStdpp.Values <> mword def
+binder 66812:66814 <> ws':249
+R66880:66885 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R66842:66844 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R66877:66879 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R66845:66862 xv6iris.ProcGeom <> tf_kernel_words_ok def
+R66874:66876 xv6iris.ProofUsertrap <> ws':249 var
+R66870:66872 xv6iris.ProofUsertrap <> ksp:246 var
+R66864:66868 xv6iris.ProofUsertrap <> kroot:247 var
+R66909:66914 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R66886:66892 xv6iris.ProcDefs <> tf_page def
+R66895:66900 xv6iris.UserPtTree <> ud_tfp proj
+R66902:66903 xv6iris.ProofUsertrap <> pt:245 var
+R66906:66908 xv6iris.ProofUsertrap <> ws':249 var
+R66924:66929 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R66915:66923 xv6iris.IntrDefs <> hart_csrs def
+R66949:66961 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R66930:66940 xv6iris.TsoCtx <> own_context def
+R66942:66948 xv6iris.TsoCtx <> cur_ctx def
+R66962:66978 xv6iris.ProofUsertrap UsertrapProof usertrap_res_bare def
+R66983:66985 xv6iris.ProofUsertrap <> ksp:246 var
+R66980:66981 xv6iris.ProofUsertrap <> pt:245 var
+R67003:67026 xv6iris.UsertrapRes <> ut_res_bare_tf_csrs_open thm
+R67028:67041 xv6iris.ProofUsertrap SY syscall_env defax
+R67003:67026 xv6iris.UsertrapRes <> ut_res_bare_tf_csrs_open thm
+R67028:67041 xv6iris.ProofUsertrap SY syscall_env defax
+sec 67066:67071 UsertrapProof UtSeal
+R67087:67093 xv6iris.RiscvPtsto <> riscvGS class
+R67100:67103 xv6iris.Xv6G <> xv6G class
+R67105:67106 xv6iris.ProofUsertrap <> Σ:250 var
+R67110:67117 xv6iris.Xv6Cameras <> bioslotG class
+R67119:67120 xv6iris.ProofUsertrap <> Σ:250 var
+R67124:67130 xv6iris.FdSlots <> fdslotG class
+R67132:67133 xv6iris.ProofUsertrap <> Σ:250 var
+R67137:67141 xv6iris.FileInvDefs <> fileG class
+R67143:67144 xv6iris.ProofUsertrap <> Σ:250 var
+R67148:67156 xv6iris.IrefSlots <> irefslotG class
+R67158:67159 xv6iris.ProofUsertrap <> Σ:250 var
+R67163:67166 xv6iris.ProcAvail <> pavG class
+R67168:67169 xv6iris.ProofUsertrap <> Σ:250 var
+var  67185:67187 UsertrapProof.UtSeal GEN
+var  67200:67202 UsertrapProof.UtSeal CID
+var  67215:67216 UsertrapProof.UtSeal XI
+R67191:67195 xv6iris.RiscvLang <> GenId class
+R67206:67210 xv6iris.RiscvLang <> CpuId class
+R67220:67225 xv6iris.TsoCtx <> CurCtx class
+prf 67372:67380 UsertrapProof ut_printk
+R67390:67394 iris.base_logic.lib.iprop <> gname def
+binder 67383:67386 <> γpr:261
+R67404:67413 xv6iris.WpUart <> uart_names rec
+binder 67398:67400 <> γd:262
+R67423:67432 xv6iris.DiskPtsto <> disk_names rec
+binder 67417:67419 <> γv:263
+R67441:67459 xv6iris.SpecPrintk <> printk_gen_contract def
+R67482:67484 xv6iris.ProofUsertrap <> γv:263 var
+R67478:67480 xv6iris.ProofUsertrap <> γd:262 var
+R67473:67476 xv6iris.ProofUsertrap <> γpr:261 var
+R67468:67470 xv6iris.Ktier <> KT1 constr
+R67557:67578 xv6iris.ProofUsertrap PK wp_printk_gen_sconf defax
+R67580:67582 xv6iris.Ktier <> KT1 constr
+R67557:67578 xv6iris.ProofUsertrap PK wp_printk_gen_sconf defax
+R67580:67582 xv6iris.Ktier <> KT1 constr
+prf 67692:67702 UsertrapProof wp_usertrap
+R67710:67713 xv6iris.UserPtTree <> uptd rec
+binder 67705:67706 <> pt:264
+R67721:67723 Corelib.Init.Datatypes <> nat ind
+binder 67717:67717 <> j:265
+R67731:67737 xv6iris.RegFile <> regfile def
+binder 67727:67727 <> m:266
+R67778:67782 SailStdpp.Values <> mword def
+binder 67747:67750 <> ms_v:267
+binder 67752:67755 <> sc_v:268
+binder 67757:67763 <> stval_v:269
+binder 67765:67770 <> sepc_v:270
+binder 67772:67774 <> ksp:271
+R67817:67821 SailStdpp.Values <> mword def
+binder 67795:67799 <> mie_v:272
+binder 67801:67804 <> mdv0:273
+binder 67806:67813 <> menvcfg0:274
+R67833:67848 xv6iris.SpecUsertrap <> wp_usertrap_body def
+R67946:67953 xv6iris.ProofUsertrap <> menvcfg0:274 var
+R67941:67944 xv6iris.ProofUsertrap <> mdv0:273 var
+R67935:67939 xv6iris.ProofUsertrap <> mie_v:272 var
+R67931:67933 xv6iris.ProofUsertrap <> ksp:271 var
+R67924:67929 xv6iris.ProofUsertrap <> sepc_v:270 var
+R67916:67922 xv6iris.ProofUsertrap <> stval_v:269 var
+R67911:67914 xv6iris.ProofUsertrap <> sc_v:268 var
+R67906:67909 xv6iris.ProofUsertrap <> ms_v:267 var
+R67904:67904 xv6iris.ProofUsertrap <> m:266 var
+R67902:67902 xv6iris.ProofUsertrap <> j:265 var
+R67899:67900 xv6iris.ProofUsertrap <> pt:264 var
+R67859:67863 xv6iris.RiscvLang <> CpuId class
+binder 67855:67855 <> h:275
+R67868:67879 xv6iris.ProofUsertrap UsertrapProof usertrap_res def
+R67889:67889 xv6iris.ProofUsertrap <> h:275 var
+R67985:68000 xv6iris.SpecUsertrap <> wp_usertrap_body def
+R68328:68339 xv6iris.ProofUsertrap UsertrapProof usertrap_res def
+R68342:68347 xv6iris.UsertrapRes <> ut_res def
+R68328:68339 xv6iris.ProofUsertrap UsertrapProof usertrap_res def
+R68328:68339 xv6iris.ProofUsertrap UsertrapProof usertrap_res def
+R68342:68347 xv6iris.UsertrapRes <> ut_res def
+R68342:68347 xv6iris.UsertrapRes <> ut_res def
+R68475:68479 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R68499:68499 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R68491:68495 SailStdpp.Values <> mword def
+R68480:68487 Riscv.rv64d <> zero_reg def
+R68518:68534 xv6iris.SchedCtx <> proc_addr_nonzero thm
+R68475:68479 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R68499:68499 Corelib.Init.Logic <> ::type_scope:x_'<>'_x not
+R68491:68495 SailStdpp.Values <> mword def
+R68480:68487 Riscv.rv64d <> zero_reg def
+R68518:68534 xv6iris.SchedCtx <> proc_addr_nonzero thm
+R68557:68557 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R68596:68601 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R68609:68609 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R68558:68574 xv6iris.UsertrapRes <> wp_next_true_swap thm
+R68580:68584 xv6iris.UsertrapRes <> un_pj def
+R68557:68557 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R68596:68601 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R68609:68609 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R68558:68574 xv6iris.UsertrapRes <> wp_next_true_swap thm
+R68580:68584 xv6iris.UsertrapRes <> un_pj def
+R68634:68634 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R68779:68798 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R68915:68915 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R68635:68642 xv6iris.ProofUsertrap UsertrapProof ut_entry thm
+R68644:68657 xv6iris.ProofUsertrap SY syscall_env defax
+R68634:68634 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R68779:68798 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R68915:68915 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R68635:68642 xv6iris.ProofUsertrap UsertrapProof ut_entry thm
+R68644:68657 xv6iris.ProofUsertrap SY syscall_env defax
+R69014:69014 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R69320:69339 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R69385:69385 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R69015:69025 xv6iris.ProofUsertrap UsertrapProof ut_dispatch thm
+R69049:69051 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R69123:69131 xv6iris.ProofUsertrap UsertrapProof ut_printk thm
+R69134:69138 xv6iris.UsertrapRes <> un_pr proj
+R69144:69147 xv6iris.UsertrapRes <> un_u proj
+R69153:69156 xv6iris.UsertrapRes <> un_v proj
+R69185:69196 xv6iris.IntrDefs <> trap_res_off thm
+R69201:69203 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R69014:69014 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R69320:69339 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R69385:69385 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R69015:69025 xv6iris.ProofUsertrap UsertrapProof ut_dispatch thm
+R69049:69051 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R69123:69131 xv6iris.ProofUsertrap UsertrapProof ut_printk thm
+R69134:69138 xv6iris.UsertrapRes <> un_pr proj
+R69144:69147 xv6iris.UsertrapRes <> un_u proj
+R69153:69156 xv6iris.UsertrapRes <> un_v proj
+R69185:69196 xv6iris.IntrDefs <> trap_res_off thm
+R69201:69203 Corelib.Init.Peano <> ::nat_scope:x_'-'_x not
+R69400:69405 xv6iris.ProofUsertrap UsertrapProof.UtSeal <> sec
+R69413:69425 xv6iris.ProofUsertrap UsertrapProof <> mod

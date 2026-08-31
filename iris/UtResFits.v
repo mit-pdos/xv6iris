@@ -120,8 +120,10 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
     usertrap_res_bare pt ksp -∗
     ∃ (kroot : mword 44) (ws : list (mword 64)),
       kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+        own_context cur_ctx ∗
       (∀ ws' : list (mword 64),
          ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
+         own_context cur_ctx -∗
          usertrap_res_bare pt ksp).
   Proof. exact (ut_res_bare_tf_open (SY.syscall_env) pt ksp). Qed.
 
@@ -136,14 +138,20 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
     usertrap_res_bare pt ksp -∗ sstc_enabled ∗ usertrap_res_bare pt ksp.
   Proof. exact (ut_res_bare_sstc (SY.syscall_env) pt ksp). Qed.
 
+  Lemma usertrap_res_bare_ctx
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) :
+    usertrap_res_bare pt ksp -∗
+    own_context cur_ctx ∗ (own_context cur_ctx -∗ usertrap_res_bare pt ksp).
+  Proof. exact (ut_res_bare_ctx_acc (SY.syscall_env) pt ksp). Qed.
+
   Lemma usertrap_res_tf_csrs_open
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) :
     usertrap_res_bare pt ksp -∗
     ∃ (kroot : mword 44) (ws : list (mword 64)),
       kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗
-      tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
+      tf_page (ud_tfp pt) ws ∗ hart_csrs ∗ own_context cur_ctx ∗
       (∀ ws' : list (mword 64),
-         ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗
+         ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ own_context cur_ctx -∗
          usertrap_res_bare pt ksp).
   Proof. exact (ut_res_bare_tf_csrs_open (SY.syscall_env) pt ksp). Qed.
 

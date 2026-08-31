@@ -1,0 +1,16 @@
+DIGEST 66b69f42d51d390863b65c17bb3f8877
+Fxv6iris.LinkUserretClosed
+R410:420 xv6iris.LinkUserret <> <> lib
+R422:430 xv6iris.ProofUser <> <> lib
+R432:442 xv6iris.LinkUservec <> <> lib
+R444:455 xv6iris.LinkUsertrap <> <> lib
+R473:490 xv6iris.ProofUserretClosed <> <> lib
+R649:655 xv6iris.LinkUservec Uservec <> modtype
+R657:664 xv6iris.LinkUsertrap Usertrap <> modtype
+R666:672 xv6iris.LinkUserret Userret <> modtype
+mod 637:644 <> UservecI
+R703:720 xv6iris.ProofUserretClosed UserretClosedProof <> modtype
+R722:728 xv6iris.LinkUserret Userret <> modtype
+R730:738 xv6iris.ProofUser UserProof <> modtype
+R740:747 xv6iris.LinkUserretClosed UservecI <> modtype
+mod 683:696 <> UserretClosedD

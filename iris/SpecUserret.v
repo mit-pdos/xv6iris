@@ -119,8 +119,10 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : Cp
   sepc ↦ᵣ sepc0 -∗
   (* the trampoline claim, threaded to the entry switch *)
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
+  KptShare.kpt_creds -∗
   tlb_res_pt kroot -∗
   pt_frame (upt_tree_spec uroot tfp um) -∗
+  TsoCtx.own_context TsoCtx.cur_ctx -∗
   pc_is (uva 0x9c) -∗
   gpr_file m -∗
   tf_pa tfp 40 ↦ₚ₈c{ dqm } vra -∗
@@ -163,6 +165,7 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : Cp
     senvcfg ↦ᵣ□ senvcfg0 -∗
     sepc ↦ᵣ sepc0 -∗
     utlb_inv_pt uroot tfp um -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     pc_is (ret_pc sepc0) -∗
     gpr_file (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3
                 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11

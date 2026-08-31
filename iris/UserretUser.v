@@ -120,6 +120,11 @@ Section UserretUser.
     (* ---- the user data pages' pure facts ---- *)
     uva_pa_inj pt ->
     upt_acc_wf (ud_um pt) ->
+    (* the residue's token borrow, threaded to [U.wp_user_exec_closed]'s
+       own [Rut_ctx] premise (SpecUser.v) *)
+    (forall pt' : uptd,
+       ⊢ Rut pt' -∗ TsoCtx.own_context TsoCtx.cur_ctx ∗
+                    (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt')) ->
     kernel_text -∗
     hw_config -∗
     minstret_inv -∗
@@ -133,8 +138,10 @@ Section UserretUser.
     senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
     sepc ↦ᵣ sepc0 -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
+    kpt_creds -∗
     tlb_res_pt kroot -∗
     pt_frame (upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt)) -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     pc_is (uva 0x9c) -∗
     gpr_file m -∗
     tf_pa (ud_tfp pt) 40 ↦ₚ₈c{ dqm } vra -∗
@@ -223,15 +230,16 @@ Section UserretUser.
        tf_pa (ud_tfp pt) 272 ↦ₚ₈c{ dqm } vt5 -∗
        tf_pa (ud_tfp pt) 280 ↦ₚ₈c{ dqm } vt6 -∗
        tf_pa (ud_tfp pt) 112 ↦ₚ₈c{ dqm } va0f -∗
+     TsoCtx.own_context TsoCtx.cur_ctx -∗
      Rut pt) -∗
     (* ---- the (still assumed) kernel re-entry contract ---- *)
     ▷ stvec_handler_wp C pt Rut -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
-      HFS HVS HXS HSD HMPP HSPIE Hdqc Hinj Hacc.
+      HFS HVS HXS HSD HMPP HSPIE Hdqc Hinj Hacc Hrutctx.
     iIntros "#Hkt #Hhw #Hmi #Hwi Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc
-             #Hclaim Hktlb Hufr Hpc Hfile
+             #Hclaim #Hcreds Hktlb Hufr Htok Hpc Hfile
              Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120
              Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264
@@ -247,12 +255,12 @@ Section UserretUser.
               ltac:(vm_compute; reflexivity)
               eq_refl eq_refl Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
               with "Hkt Hhw Hmi Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc
-                    Hclaim Hktlb Hufr Hpc Hfile
+                    Hclaim Hcreds Hktlb Hufr Htok Hpc Hfile
                     Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104
                     Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176
                     Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240
                     Htf248 Htf256 Htf264 Htf272 Htf280 Htf112").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc Hfile
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Htok Hpc Hfile
              Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120
              Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264
@@ -262,7 +270,7 @@ Section UserretUser.
                              Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160
                              Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216
                              Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272
-                             Htf280 Htf112") as "Hrut".
+                             Htf280 Htf112 Htok") as "Hrut".
     iDestruct (userret_to_user_inv C pt Rut mstatus0 sepc0 sc_v stval_v
                  (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0)
                  (uc_stvec C) (uc_medeleg C)
@@ -281,7 +289,8 @@ Section UserretUser.
                        Hfile Hsc Hstval Hstvec Hmedl Hmse Hsse
                        Hmcen Hscen Hhpm Hdata Hrut")
       as "Hinv".
-    iApply (U.wp_user_exec_closed C pt Rut with "Hhw Hmi Hwi Hinv Hhandler").
+    iApply (U.wp_user_exec_closed C pt Rut Hrutctx
+              with "Hhw Hmi Hwi Hinv Hhandler").
   Qed.
 
 End UserretUser.

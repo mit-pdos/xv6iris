@@ -71,7 +71,8 @@ Section ProofUser.
     wp_user_exec_closed_body C pt Rut.
   Proof.
     cbv beta delta [wp_user_exec_closed_body].
-    apply (wp_user_exec_full C pt Rut
+    intros Rut_ctx.
+    apply (wp_user_exec_full C pt Rut Rut_ctx
              base_exec_total_u_closed rvc_exec_total_u_closed).
   Qed.
 

@@ -120,6 +120,7 @@ Section Res.
   Definition usertrap_res_sstc := FR.usertrap_res_sstc.
   Definition usertrap_res_tf_csrs_open := FR.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tf_open := FR.usertrap_res_tf_open.
+  Definition usertrap_res_bare_ctx := FR.usertrap_res_bare_ctx.
   (* ...and the park's one producer-side entry, threaded like the rest.
      A file that merely passes the residue through has nothing to say about
      it; the entry exists so that whoever PARKS a never-run process can
@@ -163,6 +164,32 @@ Proof. destruct b; rewrite /trap_res; lia. Qed.
 Lemma fkp_pstate_split `{!riscvGS Σ} (pa : mword 64) :
   pstate_whole pa RUNNING ⊣⊢ pstate_lock pa RUNNING ∗ pstate_at_hlf pa RUNNING.
 Proof. rewrite pstate_whole_split unclaimed_RUNNING. reflexivity. Qed.
+
+(* A6.141: [CtxMove park_globals] was PROVEN here (an unfold tower over
+   the A6.128 solver) once [is_ftable]'s payload went context-λ -- and
+   then REVERTED with that flip: [WpLock.newlock]'s [CtxMorph R] premise
+   makes a λ-payload lock demand a MORPHABLE payload, and [ftable_res]
+   contains ξ-BODIED cinvs ([inode_pay]'s over [inode_held_short],
+   [off_hold]'s over [off_content]) -- the untransportable shape.  So the
+   park's [park_globals] and [proc_priv] bullets are BOTH blocked on one
+   design point: the §0.47′ ROOTED restatement of the ξ-bodied
+   invariant/cinv bodies (itable_inv, buf_escrow, the two file-layer
+   cinvs).  Under it the flip re-lands, both moves close by the recorded
+   towers, and this file's frontier goes through.  OWNER REVIEW ITEM --
+   tso-machine-flip.md A6.141 §3. *)
+
+(* A6.141: [CtxMove proc_priv] does NOT close yet, and the blocker is now
+   exactly two named invariants -- [IcacheInv.itable_inv] (iref ↦₄ cells +
+   live_pool inside [inv icacheN]) and [BioInv.buf_escrow] (buf cells
+   inside [inv bioN]) -- reachable through BOTH of proc_priv's deep rows
+   ([first_tok] → [fs_ready], and [cwd_ref]/[ofile_slot] → the icache
+   references).  A ξ-indexed inv BODY is the one shape no transport
+   crosses (§0.16′); the designed remedy is §0.47′'s ROOTED form
+   (establishment context + ctx_values + domination-gated access), under
+   which both invs become ξ-free propositions and this file's remaining
+   row moves like the others.  OWNER REVIEW ITEM -- see
+   tso-machine-flip.md A6.141 §3.  Until then [forkret_park_paid] fails
+   below at the [proc_priv] bullet, its one remaining row. *)
 
 Theorem forkret_park_paid
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

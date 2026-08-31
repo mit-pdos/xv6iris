@@ -1,0 +1,9 @@
+DIGEST e4b62ed64e5ed74e045f024f5b0a2da2
+Fxv6iris.LinkUserretUser
+R368:378 xv6iris.LinkUserret <> <> lib
+R380:388 xv6iris.ProofUser <> <> lib
+R390:400 xv6iris.UserretUser <> <> lib
+R427:437 xv6iris.UserretUser UserretUser <> modtype
+R439:445 xv6iris.LinkUserret Userret <> modtype
+R447:455 xv6iris.ProofUser UserProof <> modtype
+mod 411:422 <> UserretUserD

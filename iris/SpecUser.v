@@ -57,6 +57,14 @@ Import Defs.
 
 Definition wp_user_exec_closed_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) :=
+  (* the residue's token borrow (the u-lane's [Rut_ctx]): the running token
+     lives inside [Rut] across a user excursion, and the step engine borrows
+     it per bridge.  For the concrete [Rut := fun p => ∃ ksp,
+     usertrap_res_bare p ksp] this is [ut_trap_parked]'s own_context
+     conjunct. *)
+  (forall pt' : uptd,
+     ⊢ Rut pt' -∗ TsoCtx.own_context TsoCtx.cur_ctx ∗
+                  (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt')) ->
   hw_config -∗ minstret_inv -∗ wire_inv -∗
   user_inv C pt Rut -∗ ▷ stvec_handler_wp C pt Rut -∗
   WP (Loop : expr riscv_lang).

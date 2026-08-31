@@ -1,4 +1,4 @@
-DIGEST a54121058b30fab96c069e86ce7e8e30
+DIGEST f0ef768cac5d0830234e945cc36a16c9
 Fxv6iris.SpecUsertrap
 R5537:5542 Stdlib.ZArith.ZArith <> <> lib
 R5571:5591 stdpp.bitvector.definitions <> <> lib
@@ -1061,181 +1061,241 @@ R31000:31006 xv6iris.ProcDefs <> tf_page def
 R31009:31014 xv6iris.UserPtTree <> ud_tfp proj
 R31016:31017 xv6iris.SpecUsertrap <> pt:211 var
 R31020:31021 xv6iris.SpecUsertrap <> ws:214 var
-R31036:31049 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R31211:31211 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R31036:31040 iris.bi.interface <> ::bi_scope:x_'∗'_x not
 R31027:31035 xv6iris.IntrDefs <> hart_csrs def
-R31050:31053 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R31075:31087 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R31060:31063 Corelib.Init.Datatypes <> list ind
-R31066:31070 SailStdpp.Values <> mword def
-binder 31054:31056 <> ws':215
-R31126:31131 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R31088:31090 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R31123:31125 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R31091:31108 xv6iris.ProcGeom <> tf_kernel_words_ok def
-R31120:31122 xv6iris.SpecUsertrap <> ws':215 var
-R31116:31118 xv6iris.SpecUsertrap <> ksp:212 var
-R31110:31114 xv6iris.SpecUsertrap <> kroot:213 var
-R31155:31160 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R31132:31138 xv6iris.ProcDefs <> tf_page def
-R31141:31146 xv6iris.UserPtTree <> ud_tfp proj
-R31148:31149 xv6iris.SpecUsertrap <> pt:211 var
-R31152:31154 xv6iris.SpecUsertrap <> ws':215 var
-R31170:31186 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R31161:31169 xv6iris.IntrDefs <> hart_csrs def
-R31187:31203 xv6iris.SpecUsertrap USERTRAP_RES usertrap_res_bare defax
-R31208:31210 xv6iris.SpecUsertrap <> ksp:212 var
-R31205:31206 xv6iris.SpecUsertrap <> pt:211 var
-ax 31227:31246 USERTRAP_RES usertrap_res_tf_open
-R31254:31262 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R31421:31556 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R31264:31270 xv6iris.RiscvPtsto <> riscvGS class
-binder 31272:31273 <> Σ:218
-binder 31263:31273 <> riscvGS0:219
-R31277:31280 xv6iris.Xv6G <> xv6G class
-R31282:31283 xv6iris.SpecUsertrap <> Σ:218 var
-binder 31276:31283 <> xv6G0:220
-R31287:31294 xv6iris.Xv6Cameras <> bioslotG class
-R31296:31297 xv6iris.SpecUsertrap <> Σ:218 var
-binder 31286:31297 <> bioslotG0:221
-R31301:31307 xv6iris.FdSlots <> fdslotG class
-R31309:31310 xv6iris.SpecUsertrap <> Σ:218 var
-binder 31300:31310 <> fdslotG0:222
-R31314:31318 xv6iris.FileInvDefs <> fileG class
-R31320:31321 xv6iris.SpecUsertrap <> Σ:218 var
-binder 31313:31321 <> fileG0:223
-R31325:31333 xv6iris.IrefSlots <> irefslotG class
-R31335:31336 xv6iris.SpecUsertrap <> Σ:218 var
-binder 31324:31336 <> irefslotG0:224
-R31340:31343 xv6iris.ProcAvail <> pavG class
-R31345:31346 xv6iris.SpecUsertrap <> Σ:218 var
-binder 31339:31346 <> pavG0:225
-R31357:31361 xv6iris.RiscvLang <> GenId class
-binder 31351:31353 <> GEN:226
-R31372:31376 xv6iris.RiscvLang <> CpuId class
-binder 31366:31368 <> CID:227
-R31386:31391 xv6iris.TsoCtx <> CurCtx class
-binder 31381:31382 <> XI:228
-R31400:31403 xv6iris.UserPtTree <> uptd rec
-binder 31395:31396 <> pt:229
-R31413:31417 SailStdpp.Values <> mword def
-binder 31407:31409 <> ksp:230
-R31581:31592 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R31557:31573 xv6iris.SpecUsertrap USERTRAP_RES usertrap_res_bare defax
-R31578:31580 xv6iris.SpecUsertrap <> ksp:230 var
-R31575:31576 xv6iris.SpecUsertrap <> pt:229 var
-R31593:31597 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R31637:31647 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R31606:31610 SailStdpp.Values <> mword def
-binder 31598:31602 <> kroot:231
-R31622:31625 Corelib.Init.Datatypes <> list ind
-R31628:31632 SailStdpp.Values <> mword def
-binder 31617:31618 <> ws:232
-R31661:31665 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R31648:31654 xv6iris.KptShare <> kpt_inv def
-R31656:31660 xv6iris.SpecUsertrap <> kroot:231 var
-R31703:31707 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R31666:31668 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R31700:31702 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R31669:31686 xv6iris.ProcGeom <> tf_kernel_words_ok def
-R31698:31699 xv6iris.SpecUsertrap <> ws:232 var
-R31694:31696 xv6iris.SpecUsertrap <> ksp:230 var
-R31688:31692 xv6iris.SpecUsertrap <> kroot:231 var
-R31730:31743 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R31890:31890 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R31708:31714 xv6iris.ProcDefs <> tf_page def
-R31717:31722 xv6iris.UserPtTree <> ud_tfp proj
-R31724:31725 xv6iris.SpecUsertrap <> pt:229 var
-R31728:31729 xv6iris.SpecUsertrap <> ws:232 var
-R31744:31747 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R31769:31781 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R31754:31757 Corelib.Init.Datatypes <> list ind
-R31760:31764 SailStdpp.Values <> mword def
-binder 31748:31750 <> ws':233
-R31820:31825 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R31782:31784 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R31817:31819 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R31785:31802 xv6iris.ProcGeom <> tf_kernel_words_ok def
-R31814:31816 xv6iris.SpecUsertrap <> ws':233 var
-R31810:31812 xv6iris.SpecUsertrap <> ksp:230 var
-R31804:31808 xv6iris.SpecUsertrap <> kroot:231 var
-R31849:31865 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R31826:31832 xv6iris.ProcDefs <> tf_page def
-R31835:31840 xv6iris.UserPtTree <> ud_tfp proj
-R31842:31843 xv6iris.SpecUsertrap <> pt:229 var
-R31846:31848 xv6iris.SpecUsertrap <> ws':233 var
-R31866:31882 xv6iris.SpecUsertrap USERTRAP_RES usertrap_res_bare defax
-R31887:31889 xv6iris.SpecUsertrap <> ksp:230 var
-R31884:31885 xv6iris.SpecUsertrap <> pt:229 var
-R31897:31908 xv6iris.SpecUsertrap USERTRAP_RES <> modtype
-modtype 31924:31931 <> USERTRAP
-R31944:31955 xv6iris.SpecUsertrap USERTRAP_RES <> mod
-ax 31970:31980 USERTRAP wp_usertrap
-R31988:31996 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R32255:32263 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R31998:32004 xv6iris.RiscvPtsto <> riscvGS class
-binder 32006:32007 <> Σ:236
-binder 31997:32007 <> riscvGS0:237
-R32011:32014 xv6iris.Xv6G <> xv6G class
-R32016:32017 xv6iris.SpecUsertrap <> Σ:236 var
-binder 32010:32017 <> xv6G0:238
-R32021:32028 xv6iris.Xv6Cameras <> bioslotG class
-R32030:32031 xv6iris.SpecUsertrap <> Σ:236 var
-binder 32020:32031 <> bioslotG0:239
-R32035:32041 xv6iris.FdSlots <> fdslotG class
-R32043:32044 xv6iris.SpecUsertrap <> Σ:236 var
-binder 32034:32044 <> fdslotG0:240
-R32048:32052 xv6iris.FileInvDefs <> fileG class
-R32054:32055 xv6iris.SpecUsertrap <> Σ:236 var
-binder 32047:32055 <> fileG0:241
-R32059:32067 xv6iris.IrefSlots <> irefslotG class
-R32069:32070 xv6iris.SpecUsertrap <> Σ:236 var
-binder 32058:32070 <> irefslotG0:242
-R32074:32077 xv6iris.ProcAvail <> pavG class
-R32079:32080 xv6iris.SpecUsertrap <> Σ:236 var
-binder 32073:32080 <> pavG0:243
-R32091:32095 xv6iris.RiscvLang <> GenId class
-binder 32085:32087 <> GEN:244
-R32106:32110 xv6iris.RiscvLang <> CpuId class
-binder 32100:32102 <> CID:245
-R32120:32125 xv6iris.TsoCtx <> CurCtx class
-binder 32115:32116 <> XI:246
-R32140:32143 xv6iris.UserPtTree <> uptd rec
-binder 32135:32136 <> pt:247
-R32151:32153 Corelib.Init.Datatypes <> nat ind
-binder 32147:32147 <> j:248
-R32167:32173 xv6iris.RegFile <> regfile def
-binder 32163:32163 <> m:249
-R32208:32212 SailStdpp.Values <> mword def
-binder 32177:32180 <> ms_v:250
-R32208:32212 SailStdpp.Values <> mword def
-binder 32182:32185 <> sc_v:251
-R32208:32212 SailStdpp.Values <> mword def
-binder 32187:32193 <> stval_v:252
-R32208:32212 SailStdpp.Values <> mword def
-binder 32195:32200 <> sepc_v:253
-R32208:32212 SailStdpp.Values <> mword def
-binder 32202:32204 <> ksp:254
-R32247:32251 SailStdpp.Values <> mword def
-binder 32225:32229 <> mie_v:255
-R32247:32251 SailStdpp.Values <> mword def
-binder 32231:32234 <> mdv0:256
-R32247:32251 SailStdpp.Values <> mword def
-binder 32236:32243 <> menvcfg0:257
-R32264:32279 xv6iris.SpecUsertrap <> wp_usertrap_body def
-R32379:32386 xv6iris.SpecUsertrap <> menvcfg0:257 var
-R32374:32377 xv6iris.SpecUsertrap <> mdv0:256 var
-R32368:32372 xv6iris.SpecUsertrap <> mie_v:255 var
-R32364:32366 xv6iris.SpecUsertrap <> ksp:254 var
-R32357:32362 xv6iris.SpecUsertrap <> sepc_v:253 var
-R32349:32355 xv6iris.SpecUsertrap <> stval_v:252 var
-R32344:32347 xv6iris.SpecUsertrap <> sc_v:251 var
-R32339:32342 xv6iris.SpecUsertrap <> ms_v:250 var
-R32337:32337 xv6iris.SpecUsertrap <> m:249 var
-R32335:32335 xv6iris.SpecUsertrap <> j:248 var
-R32332:32333 xv6iris.SpecUsertrap <> pt:247 var
-R32290:32294 xv6iris.RiscvLang <> CpuId class
-binder 32286:32286 <> h:258
-R32299:32310 xv6iris.SpecUsertrap USERTRAP usertrap_res defax
-R32320:32320 xv6iris.SpecUsertrap <> h:258 var
-R32393:32400 xv6iris.SpecUsertrap USERTRAP <> modtype
+R31060:31073 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R31260:31260 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R31041:31051 xv6iris.TsoCtx <> own_context def
+R31053:31059 xv6iris.TsoCtx <> cur_ctx def
+R31074:31077 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R31099:31111 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R31084:31087 Corelib.Init.Datatypes <> list ind
+R31090:31094 SailStdpp.Values <> mword def
+binder 31078:31080 <> ws':215
+R31150:31155 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31112:31114 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R31147:31149 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R31115:31132 xv6iris.ProcGeom <> tf_kernel_words_ok def
+R31144:31146 xv6iris.SpecUsertrap <> ws':215 var
+R31140:31142 xv6iris.SpecUsertrap <> ksp:212 var
+R31134:31138 xv6iris.SpecUsertrap <> kroot:213 var
+R31179:31184 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31156:31162 xv6iris.ProcDefs <> tf_page def
+R31165:31170 xv6iris.UserPtTree <> ud_tfp proj
+R31172:31173 xv6iris.SpecUsertrap <> pt:211 var
+R31176:31178 xv6iris.SpecUsertrap <> ws':215 var
+R31194:31199 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31185:31193 xv6iris.IntrDefs <> hart_csrs def
+R31219:31235 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31200:31210 xv6iris.TsoCtx <> own_context def
+R31212:31218 xv6iris.TsoCtx <> cur_ctx def
+R31236:31252 xv6iris.SpecUsertrap USERTRAP_RES usertrap_res_bare defax
+R31257:31259 xv6iris.SpecUsertrap <> ksp:212 var
+R31254:31255 xv6iris.SpecUsertrap <> pt:211 var
+ax 31338:31358 USERTRAP_RES usertrap_res_bare_ctx
+R31366:31374 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31533:31541 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31376:31382 xv6iris.RiscvPtsto <> riscvGS class
+binder 31384:31385 <> Σ:218
+binder 31375:31385 <> riscvGS0:219
+R31389:31392 xv6iris.Xv6G <> xv6G class
+R31394:31395 xv6iris.SpecUsertrap <> Σ:218 var
+binder 31388:31395 <> xv6G0:220
+R31399:31406 xv6iris.Xv6Cameras <> bioslotG class
+R31408:31409 xv6iris.SpecUsertrap <> Σ:218 var
+binder 31398:31409 <> bioslotG0:221
+R31413:31419 xv6iris.FdSlots <> fdslotG class
+R31421:31422 xv6iris.SpecUsertrap <> Σ:218 var
+binder 31412:31422 <> fdslotG0:222
+R31426:31430 xv6iris.FileInvDefs <> fileG class
+R31432:31433 xv6iris.SpecUsertrap <> Σ:218 var
+binder 31425:31433 <> fileG0:223
+R31437:31445 xv6iris.IrefSlots <> irefslotG class
+R31447:31448 xv6iris.SpecUsertrap <> Σ:218 var
+binder 31436:31448 <> irefslotG0:224
+R31452:31455 xv6iris.ProcAvail <> pavG class
+R31457:31458 xv6iris.SpecUsertrap <> Σ:218 var
+binder 31451:31458 <> pavG0:225
+R31469:31473 xv6iris.RiscvLang <> GenId class
+binder 31463:31465 <> GEN:226
+R31484:31488 xv6iris.RiscvLang <> CpuId class
+binder 31478:31480 <> CID:227
+R31498:31503 xv6iris.TsoCtx <> CurCtx class
+binder 31493:31494 <> XI:228
+R31512:31515 xv6iris.UserPtTree <> uptd rec
+binder 31507:31508 <> pt:229
+R31525:31529 SailStdpp.Values <> mword def
+binder 31519:31521 <> ksp:230
+R31566:31577 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R31542:31558 xv6iris.SpecUsertrap USERTRAP_RES usertrap_res_bare defax
+R31563:31565 xv6iris.SpecUsertrap <> ksp:230 var
+R31560:31561 xv6iris.SpecUsertrap <> pt:229 var
+R31597:31602 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R31652:31652 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R31578:31588 xv6iris.TsoCtx <> own_context def
+R31590:31596 xv6iris.TsoCtx <> cur_ctx def
+R31622:31627 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R31603:31613 xv6iris.TsoCtx <> own_context def
+R31615:31621 xv6iris.TsoCtx <> cur_ctx def
+R31628:31644 xv6iris.SpecUsertrap USERTRAP_RES usertrap_res_bare defax
+R31649:31651 xv6iris.SpecUsertrap <> ksp:230 var
+R31646:31647 xv6iris.SpecUsertrap <> pt:229 var
+ax 31668:31687 USERTRAP_RES usertrap_res_tf_open
+R31695:31703 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31862:31997 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R31705:31711 xv6iris.RiscvPtsto <> riscvGS class
+binder 31713:31714 <> Σ:233
+binder 31704:31714 <> riscvGS0:234
+R31718:31721 xv6iris.Xv6G <> xv6G class
+R31723:31724 xv6iris.SpecUsertrap <> Σ:233 var
+binder 31717:31724 <> xv6G0:235
+R31728:31735 xv6iris.Xv6Cameras <> bioslotG class
+R31737:31738 xv6iris.SpecUsertrap <> Σ:233 var
+binder 31727:31738 <> bioslotG0:236
+R31742:31748 xv6iris.FdSlots <> fdslotG class
+R31750:31751 xv6iris.SpecUsertrap <> Σ:233 var
+binder 31741:31751 <> fdslotG0:237
+R31755:31759 xv6iris.FileInvDefs <> fileG class
+R31761:31762 xv6iris.SpecUsertrap <> Σ:233 var
+binder 31754:31762 <> fileG0:238
+R31766:31774 xv6iris.IrefSlots <> irefslotG class
+R31776:31777 xv6iris.SpecUsertrap <> Σ:233 var
+binder 31765:31777 <> irefslotG0:239
+R31781:31784 xv6iris.ProcAvail <> pavG class
+R31786:31787 xv6iris.SpecUsertrap <> Σ:233 var
+binder 31780:31787 <> pavG0:240
+R31798:31802 xv6iris.RiscvLang <> GenId class
+binder 31792:31794 <> GEN:241
+R31813:31817 xv6iris.RiscvLang <> CpuId class
+binder 31807:31809 <> CID:242
+R31827:31832 xv6iris.TsoCtx <> CurCtx class
+binder 31822:31823 <> XI:243
+R31841:31844 xv6iris.UserPtTree <> uptd rec
+binder 31836:31837 <> pt:244
+R31854:31858 SailStdpp.Values <> mword def
+binder 31848:31850 <> ksp:245
+R32022:32033 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R31998:32014 xv6iris.SpecUsertrap USERTRAP_RES usertrap_res_bare defax
+R32019:32021 xv6iris.SpecUsertrap <> ksp:245 var
+R32016:32017 xv6iris.SpecUsertrap <> pt:244 var
+R32034:32038 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R32078:32088 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R32047:32051 SailStdpp.Values <> mword def
+binder 32039:32043 <> kroot:246
+R32063:32066 Corelib.Init.Datatypes <> list ind
+R32069:32073 SailStdpp.Values <> mword def
+binder 32058:32059 <> ws:247
+R32102:32106 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R32089:32095 xv6iris.KptShare <> kpt_inv def
+R32097:32101 xv6iris.SpecUsertrap <> kroot:246 var
+R32144:32148 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R32107:32109 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R32141:32143 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R32110:32127 xv6iris.ProcGeom <> tf_kernel_words_ok def
+R32139:32140 xv6iris.SpecUsertrap <> ws:247 var
+R32135:32137 xv6iris.SpecUsertrap <> ksp:245 var
+R32129:32133 xv6iris.SpecUsertrap <> kroot:246 var
+R32171:32183 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R32149:32155 xv6iris.ProcDefs <> tf_page def
+R32158:32163 xv6iris.UserPtTree <> ud_tfp proj
+R32165:32166 xv6iris.SpecUsertrap <> pt:244 var
+R32169:32170 xv6iris.SpecUsertrap <> ws:247 var
+R32203:32216 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R32397:32397 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R32184:32194 xv6iris.TsoCtx <> own_context def
+R32196:32202 xv6iris.TsoCtx <> cur_ctx def
+R32217:32220 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R32242:32254 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R32227:32230 Corelib.Init.Datatypes <> list ind
+R32233:32237 SailStdpp.Values <> mword def
+binder 32221:32223 <> ws':248
+R32293:32298 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R32255:32257 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R32290:32292 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R32258:32275 xv6iris.ProcGeom <> tf_kernel_words_ok def
+R32287:32289 xv6iris.SpecUsertrap <> ws':248 var
+R32283:32285 xv6iris.SpecUsertrap <> ksp:245 var
+R32277:32281 xv6iris.SpecUsertrap <> kroot:246 var
+R32322:32336 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R32299:32305 xv6iris.ProcDefs <> tf_page def
+R32308:32313 xv6iris.UserPtTree <> ud_tfp proj
+R32315:32316 xv6iris.SpecUsertrap <> pt:244 var
+R32319:32321 xv6iris.SpecUsertrap <> ws':248 var
+R32356:32372 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R32337:32347 xv6iris.TsoCtx <> own_context def
+R32349:32355 xv6iris.TsoCtx <> cur_ctx def
+R32373:32389 xv6iris.SpecUsertrap USERTRAP_RES usertrap_res_bare defax
+R32394:32396 xv6iris.SpecUsertrap <> ksp:245 var
+R32391:32392 xv6iris.SpecUsertrap <> pt:244 var
+R32404:32415 xv6iris.SpecUsertrap USERTRAP_RES <> modtype
+modtype 32431:32438 <> USERTRAP
+R32451:32462 xv6iris.SpecUsertrap USERTRAP_RES <> mod
+ax 32477:32487 USERTRAP wp_usertrap
+R32495:32503 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R32762:32770 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R32505:32511 xv6iris.RiscvPtsto <> riscvGS class
+binder 32513:32514 <> Σ:251
+binder 32504:32514 <> riscvGS0:252
+R32518:32521 xv6iris.Xv6G <> xv6G class
+R32523:32524 xv6iris.SpecUsertrap <> Σ:251 var
+binder 32517:32524 <> xv6G0:253
+R32528:32535 xv6iris.Xv6Cameras <> bioslotG class
+R32537:32538 xv6iris.SpecUsertrap <> Σ:251 var
+binder 32527:32538 <> bioslotG0:254
+R32542:32548 xv6iris.FdSlots <> fdslotG class
+R32550:32551 xv6iris.SpecUsertrap <> Σ:251 var
+binder 32541:32551 <> fdslotG0:255
+R32555:32559 xv6iris.FileInvDefs <> fileG class
+R32561:32562 xv6iris.SpecUsertrap <> Σ:251 var
+binder 32554:32562 <> fileG0:256
+R32566:32574 xv6iris.IrefSlots <> irefslotG class
+R32576:32577 xv6iris.SpecUsertrap <> Σ:251 var
+binder 32565:32577 <> irefslotG0:257
+R32581:32584 xv6iris.ProcAvail <> pavG class
+R32586:32587 xv6iris.SpecUsertrap <> Σ:251 var
+binder 32580:32587 <> pavG0:258
+R32598:32602 xv6iris.RiscvLang <> GenId class
+binder 32592:32594 <> GEN:259
+R32613:32617 xv6iris.RiscvLang <> CpuId class
+binder 32607:32609 <> CID:260
+R32627:32632 xv6iris.TsoCtx <> CurCtx class
+binder 32622:32623 <> XI:261
+R32647:32650 xv6iris.UserPtTree <> uptd rec
+binder 32642:32643 <> pt:262
+R32658:32660 Corelib.Init.Datatypes <> nat ind
+binder 32654:32654 <> j:263
+R32674:32680 xv6iris.RegFile <> regfile def
+binder 32670:32670 <> m:264
+R32715:32719 SailStdpp.Values <> mword def
+binder 32684:32687 <> ms_v:265
+R32715:32719 SailStdpp.Values <> mword def
+binder 32689:32692 <> sc_v:266
+R32715:32719 SailStdpp.Values <> mword def
+binder 32694:32700 <> stval_v:267
+R32715:32719 SailStdpp.Values <> mword def
+binder 32702:32707 <> sepc_v:268
+R32715:32719 SailStdpp.Values <> mword def
+binder 32709:32711 <> ksp:269
+R32754:32758 SailStdpp.Values <> mword def
+binder 32732:32736 <> mie_v:270
+R32754:32758 SailStdpp.Values <> mword def
+binder 32738:32741 <> mdv0:271
+R32754:32758 SailStdpp.Values <> mword def
+binder 32743:32750 <> menvcfg0:272
+R32771:32786 xv6iris.SpecUsertrap <> wp_usertrap_body def
+R32886:32893 xv6iris.SpecUsertrap <> menvcfg0:272 var
+R32881:32884 xv6iris.SpecUsertrap <> mdv0:271 var
+R32875:32879 xv6iris.SpecUsertrap <> mie_v:270 var
+R32871:32873 xv6iris.SpecUsertrap <> ksp:269 var
+R32864:32869 xv6iris.SpecUsertrap <> sepc_v:268 var
+R32856:32862 xv6iris.SpecUsertrap <> stval_v:267 var
+R32851:32854 xv6iris.SpecUsertrap <> sc_v:266 var
+R32846:32849 xv6iris.SpecUsertrap <> ms_v:265 var
+R32844:32844 xv6iris.SpecUsertrap <> m:264 var
+R32842:32842 xv6iris.SpecUsertrap <> j:263 var
+R32839:32840 xv6iris.SpecUsertrap <> pt:262 var
+R32797:32801 xv6iris.RiscvLang <> CpuId class
+binder 32793:32793 <> h:273
+R32806:32817 xv6iris.SpecUsertrap USERTRAP usertrap_res defax
+R32827:32827 xv6iris.SpecUsertrap <> h:273 var
+R32900:32907 xv6iris.SpecUsertrap USERTRAP <> modtype
