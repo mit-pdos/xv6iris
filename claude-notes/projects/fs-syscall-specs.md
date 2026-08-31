@@ -2435,6 +2435,19 @@ durable-notes warns about.
   built it, not at the consumer block (both `ProofConsolewriteLoc` and
   `ProofFilewriteAU` hit it).
 
+  **AUDIT.**  `Print Assumptions` on ALL ELEVEN reseals the lane touched —
+  `EitherCopyin.wp_either_copyin_sconf`, `Writei.wp_writei_gen` /
+  `wp_writei_sconf`, `Filewrite.wp_filewrite_sconf`,
+  `Consolewrite.wp_consolewrite_sconf`,
+  `ConsolewriteLoc.wp_consolewrite_loc_sconf`,
+  `FilewriteCons.wp_filewrite_cons`, `SysWriteConsAU.wp_sys_write_cons_au`,
+  `FilewriteAU.wp_filewrite_au`, `SysWriteAU.wp_sys_write_au_era`,
+  `SysWriteStable.wp_sys_write_au_era_stable` — is **the standing three and
+  nothing else** (`resv_matches`, `resv_is_valid`,
+  `functional_extensionality_dep`).  Zero `Admitted`, zero new `Axiom`.
+  Mirror evidence: the whole `SpecCopyin` reverse closure, 236 files, `make
+  -k` with **zero** errors and zero missing `.vo`.
+
   **WHAT THE EQUATION COULD NOT REACH, and why.**
   - writei's DISTURBED REGION (`dist`, the committed partial chunk).  A
     failed `either_copyin` returns `-1` and its post promises nothing about
