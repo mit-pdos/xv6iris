@@ -560,6 +560,7 @@ Fixpoint umem_wr (M : gmap Z (bv 8)) (dstva : mword 64) (n : nat)
              (umem_wr M dstva k src)
   end.
 
+
 Lemma umem_wr_step (M : gmap Z (bv 8)) (dstva : mword 64) (done n : nat)
     (src : nat -> bv 8) (a : Z) :
   (forall i, (i < n)%nat ->
@@ -783,6 +784,55 @@ Proof.
   induction n as [| k IH]; intros He; [reflexivity |].
   cbn [umem_write]. rewrite (IH ltac:(intros j Hj; apply He; lia)).
   rewrite (He k ltac:(lia)). reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* THE BRIDGE A PARTIAL-WRITE SYSCALL ROW NEEDS.                          *)
+(*                                                                        *)
+(* read's row says the kernel wrote [d] bytes at the caller's buffer, for  *)
+(* SOME [d] no larger than the count -- but the caller owns the whole      *)
+(* count, and the heap's [uheap_store_run] rewrites all of it at once.     *)
+(* These two lemmas say those are the same map, provided the bytes past    *)
+(* [d] are given back unchanged, which is exactly what the owner knows.    *)
+(*                                                                        *)
+(* [umem_wr] indexes through [add_vec_int] and [umem_write] through plain  *)
+(* [Z] addition, so the first lemma is where the absence of wrap is used.  *)
+(* ===================================================================== *)
+Lemma umem_wr_write (M : gmap Z (bv 8)) (a : Z) (n : nat) (src : nat -> bv 8) :
+  (forall k : nat, (k < n)%nat ->
+     uint (add_vec_int (mword_of_int a : mword 64) (Z.of_nat k)) = (a + Z.of_nat k)%Z) ->
+  umem_wr M (mword_of_int a) n src = umem_write M a n src.
+Proof.
+  induction n as [ | k IH ]; intro Hk; [ reflexivity | ].
+  cbn [umem_wr umem_write].
+  rewrite (IH ltac:(intros j Hj; apply Hk; lia)).
+  rewrite (Hk k ltac:(lia)). reflexivity.
+Qed.
+
+(* ...and the extension: writing [d] of [n] bytes is writing all [n], where
+   the tail is the value the map already holds. *)
+Lemma umem_write_prefix (M : gmap Z (bv 8)) (a : Z) (n : nat) :
+  forall (d : nat) (src f : nat -> bv 8),
+  (d <= n)%nat ->
+  (forall k : nat, (k < n)%nat -> M !! (a + Z.of_nat k)%Z = Some (f k)) ->
+  umem_write M a d src
+  = umem_write M a n (fun k => if decide (k < d)%nat then src k else f k).
+Proof.
+  induction n as [ | n IH ]; intros d src f Hdn HM.
+  - assert (Hd : d = 0%nat) by lia. rewrite Hd. reflexivity.
+  - destruct (decide (d = S n)) as [-> | Hne].
+    + cbn [umem_write].
+      destruct (decide (n < S n)%nat) as [_ | HH]; [ | exfalso; lia ].
+      f_equal. apply umem_write_ext.
+      intros k Hk. destruct (decide (k < S n)%nat) as [_ | HH];
+        [ reflexivity | exfalso; lia ].
+    + cbn [umem_write].
+      destruct (decide (n < d)%nat) as [Hlt | Hge]; [ exfalso; lia | ].
+      rewrite <- (IH d src f ltac:(lia) ltac:(intros k Hk; apply HM; lia)).
+      symmetry. apply insert_id.
+      rewrite (umem_write_lookup_out M a d src (a + Z.of_nat n)%Z
+                 ltac:(intros k Hk; lia)).
+      exact (HM n ltac:(lia)).
 Qed.
 
 Lemma umem_write_dom (M : gmap Z (bv 8)) (a : Z) (n : nat) (bs : nat -> bv 8) :
