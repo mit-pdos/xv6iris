@@ -1163,4 +1163,125 @@ Section UkInitVprintf.
       exact (zext8_moi b1). }
   Qed.
 
+
+  (* --------------------------------------------------------------------- *)
+  (* THE LOOP, by induction on the characters LEFT.  [k+1] of them remain,   *)
+  (* the current one is [f i], and the round's own [beqz s1] at 0x528 is     *)
+  (* what decides: at [k = 0] the byte it just loaded is the terminator, so  *)
+  (* the branch is taken and the walk falls into the epilogue; otherwise it  *)
+  (* is a body byte, the branch is not taken, and the head at 0x52c comes    *)
+  (* round again one character further on.                                   *)
+  (*                                                                        *)
+  (* NOTE this is an ORDINARY induction, not a Löb: the string is finite and *)
+  (* [utext_str] carries its length.  init's two loops in main are the       *)
+  (* unbounded ones.                                                         *)
+  (* --------------------------------------------------------------------- *)
+  Lemma wp_kinit_vprintf_loop (m0 : regfile) (sp0 fd : mword 64) (a : Z)
+      (len : nat) (f : nat -> mword 8) (k : nat) :
+    0 <= a -> a + Z.of_nat len + 2 < 2 ^ 31 ->
+    (forall j : nat, (j < len)%nat -> bv_unsigned (f j) <> 37) ->
+    m0 !!! Regidx csp_rs1 = sp0 ->
+    uint sp0 mod 8 = 0 ->
+    96 <= uint sp0 ->
+    forall (i : nat) (h : CpuId) (m : regfile) (n : nat),
+      (i + S k)%nat = len ->
+      vp_inv m0 m sp0 a fd i ->
+      m !!! Regidx s1_idx = mword_of_int (bv_unsigned (f i)) ->
+      init_code γt -∗
+      utext_str γt a len f -∗
+      uword γd (uint sp0 - 8) (m0 !!! Regidx ra_idx) -∗
+      uword γd (uint sp0 - 16) (m0 !!! Regidx s0_idx) -∗
+      uword γd (uint sp0 - 24) (m0 !!! Regidx s1_idx) -∗
+      uword γd (uint sp0 - 32) (m0 !!! Regidx s2_idx) -∗
+      uword γd (uint sp0 - 40) (m0 !!! Regidx s3_idx) -∗
+      uword γd (uint sp0 - 48) (m0 !!! Regidx s4_idx) -∗
+      uword γd (uint sp0 - 56) (m0 !!! Regidx s5_idx) -∗
+      uword γd (uint sp0 - 64) (m0 !!! Regidx s6_idx) -∗
+      uword γd (uint sp0 - 72) (m0 !!! Regidx s7_idx) -∗
+      uword γd (uint sp0 - 80) (m0 !!! Regidx s8_idx) -∗
+      (∃ w : mword 64, uword γd (uint sp0 - 88) w) -∗
+      (∃ w : mword 64, uword γd (uint sp0 - 96) w) -∗
+      urun γt γd γs h m (mword_of_int 0x52c) (4 + n) -∗
+      (∀ (h' : CpuId) (m' : regfile),
+         ⌜ ucallee_saved m0 m' ⌝ -∗
+         urun γt γd γs h' m' (ret_pc (m0 !!! Regidx ra_idx)) (12 + (4 + n)) -∗
+         WP (Loop : expr riscv_lang)) -∗
+      WP (Loop : expr riscv_lang).
+  Proof.
+    intros Ha0 Habnd Hpct Hsp0 Hal8 Hlo.
+    induction k as [| k IH ];
+      intros i h m n Hik Hinv Hs1;
+      iIntros "#Hcode #Hstr Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont";
+      iDestruct (utext_str_nonul with "Hstr") as %Hnn;
+      assert (Hilt : (i < len)%nat) by lia.
+    - (* the LAST character: the byte after it is the terminator *)
+      assert (Ei : (S i)%nat = len) by lia.
+      iDestruct (utext_str_nul with "Hstr") as "#Hnul".
+      iApply (wp_kinit_vprintf_step m0 sp0 fd a i (f i) ubyte0 h m n
+                Ha0 ltac:(lia) (Hpct i Hilt) Hinv Hs1
+                with "Hcode [] Hrun").
+      { rewrite Ei. iExact "Hnul". }
+      iIntros (h1 m1) "%Hinv1 %Hs11 Hrun".
+      (* ---- 0x528  beqz s1,0x6fc -- TAKEN: this was the terminator ---- *)
+      assert (Ht : true = uv_btaken BEQ (m1 !!! Regidx s1_idx) zero_reg).
+      { rewrite Hs11. cbn [uv_btaken].
+        replace (bv_unsigned ubyte0) with 0 by (vm_compute; reflexivity).
+        rewrite (moi_eq_zero 0 ltac:(unfold Z64; lia)). reflexivity. }
+      assert (Etgt : add_vec (mword_of_int 0x528 : mword 64)
+                       (sign_extend' 64 (mword_of_int 468 : mword 13))
+                     = mword_of_int 0x6fc)
+        by (apply bv_eq; vm_compute; reflexivity).
+      iApply (wp_uk_btype0 γt γd γs h1 m1 (mword_of_int 0x528)
+                (mword_of_int 468 : mword 13) s1_idx BEQ true
+                (mword_of_int 0x6fc) (4 + n) Ht (eq_sym Etgt)
+                ltac:(intros _; vm_compute; reflexivity)
+                with "[] Hrun").
+      { iApply (uis_init_528 with "Hcode"). }
+      iIntros (h2) "Hrun".
+      destruct Hinv1 as (Hsp1 & _ & _ & _ & _ & _ & _ & Hfr1).
+      iApply (wp_kinit_vprintf_epi h2 m1 m0 sp0 (4 + n)
+                Hsp1 Hsp0 Hal8 Hlo Hfr1
+                with "Hcode Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont").
+    - (* a BODY character: the byte after it is one too *)
+      assert (Hslt : (S i < len)%nat) by lia.
+      iDestruct (utext_str_byte γt a len f (S i) Hslt with "Hstr") as "#Hb1".
+      iApply (wp_kinit_vprintf_step m0 sp0 fd a i (f i) (f (S i)) h m n
+                Ha0 ltac:(lia) (Hpct i Hilt) Hinv Hs1
+                with "Hcode Hb1 Hrun").
+      iIntros (h1 m1) "%Hinv1 %Hs11 Hrun".
+      (* ---- 0x528  beqz s1,0x6fc -- NOT taken: a body byte is not NUL ---- *)
+      assert (Hnz : bv_unsigned (f (S i)) <> 0).
+      { intro He. apply (Hnn (S i) Hslt). apply bv_eq.
+        rewrite He. vm_compute. reflexivity. }
+      (* the inner assert is stated in the GOAL's spelling and closed by
+         [exact]: [bv_unsigned_in_range 8] fixes the width index at [8 : N]
+         while [f (S i) : mword 8] carries [Z_idx 8], and [lia] would see
+         two atoms. *)
+      assert (Hb1r : 0 <= bv_unsigned (f (S i)) < Z64).
+      { assert (HH : 0 <= bv_unsigned (f (S i)) < 256).
+        { pose proof (bv_unsigned_in_range 8 (f (S i))) as H0.
+          assert (Em8 : bv_modulus 8 = 256) by (vm_compute; reflexivity).
+          rewrite Em8 in H0. exact H0. }
+        unfold Z64. lia. }
+      assert (Hnt : false = uv_btaken BEQ (m1 !!! Regidx s1_idx) zero_reg).
+      { rewrite Hs11. cbn [uv_btaken].
+        rewrite (moi_eq_zero (bv_unsigned (f (S i))) Hb1r).
+        destruct (Z.eqb_spec (bv_unsigned (f (S i))) 0) as [He | _];
+          [ exfalso; exact (Hnz He) | reflexivity ]. }
+      iApply (wp_uk_btype0 γt γd γs h1 m1 (mword_of_int 0x528)
+                (mword_of_int 468 : mword 13) s1_idx BEQ false
+                (add_vec (mword_of_int 0x528 : mword 64)
+                   (sign_extend' 64 (mword_of_int 468 : mword 13)))
+                (4 + n) Hnt eq_refl ltac:(discriminate)
+                with "[] Hrun").
+      { iApply (uis_init_528 with "Hcode"). }
+      assert (E528 : add_vec_int (mword_of_int 0x528 : mword 64) 4
+                     = mword_of_int 0x52c)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E528.
+      iIntros (h2) "Hrun".
+      iApply (IH (S i) h2 m1 n ltac:(lia) Hinv1 Hs11
+                with "Hcode Hstr Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont").
+  Qed.
+
 End UkInitVprintf.
