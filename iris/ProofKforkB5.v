@@ -265,7 +265,16 @@ Section ProofKforkB5.
     iAssert (park_own N) with "[Hbsl]" as "Hown_park".
     { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
     iDestruct (ProcDefs.kstack_free_at with "Hks Hkfree") as "Hstack".
-    iMod (park_token_park N rest Uc Hwf Hrest
+    (* THE CHILD'S TABLE, NAMED AT THE PARK.  kfork retypes the child's
+       descriptors one at a time in the copy loop ([ProofKforkB3]'s
+       [fd_st_move _ i FdClosed stq stf], at the PARENT's file type), but
+       the bundle it threads is still [fd_frags_any], so the result of that
+       work is not available here under a name -- this destruct is where
+       the loss shows.  Naming it properly means carrying the partially
+       copied table through B3's loop invariant; until then the park gets
+       the states it actually has, just anonymously introduced. *)
+    iDestruct "Hfrag" as (stsc) "Hfrag".
+    iMod (park_token_park N rest Uc stsc Hwf Hrest
             with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirsp]")
       as "Hpctx".

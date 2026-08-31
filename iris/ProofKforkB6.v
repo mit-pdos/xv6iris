@@ -1354,6 +1354,17 @@ Section KforkPrologue.
           iEval (rgne) in "Hb6". iEval (rewrite Hslot6') in "Hb6".
           iFrame "Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7".
           iExists u8; iExact "Hb8". }
+        (* THE ONE REMAINING WEAKENING ON THIS ROUTE, and it is marked because
+           it is the next thing to remove.  allocproc now hands the child's
+           bundle PRECISELY, at [fdt0]; the copy loop below ([ProofKforkB3])
+           retypes descriptors one at a time and its invariant is still
+           stated at [fd_frags_any], so the precise bundle has to be forgotten
+           here to enter it.  Making that invariant carry the partially
+           copied table is what would let kfork say the child inherits the
+           parent's descriptors -- which the loop already PROVES, one
+           [fd_st_move] at a time, and then discards. *)
+        iAssert (FdSlots.fd_frags_any (ProcDefs.pv_fdg Vc)) with "[Hcfrag]"
+          as "Hcfrag"; [ iExists fdt0; iExact "Hcfrag" | ].
         iSpecialize ("Hcont4a" $! CID11 with "[%]"); [wp_next_chain|].
         iSpecialize ("Hcont4a" $! CID28 with "[%]"); [wp_next_chain|].
         iApply ("Hcont4a" $! N10 npa j γl2 pid_c ch

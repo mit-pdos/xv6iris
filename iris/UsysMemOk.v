@@ -272,13 +272,18 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        not changing this line.
 
        FORK.  This row is about the PARENT, whose table fork does not
-       touch.  It says nothing about the CHILD's, and nothing else does
-       either: allocproc mints [fd_frags] at [replicate NOFILE FdClosed]
-       and weakens it to [fd_frags_any] on the next line, so the value is
-       gone before the park (see [FdRowMint]'s note), and the ofile copy
-       loop is proved at the memory level with no ghost descriptor effect
-       at all ([ProofKforkB7] mentions neither [fd_st] nor [fd_frags]).
-       So "the child inherits the parent's descriptors" is unstated.
+       touch.  It says nothing about the CHILD's -- and the reason is worth
+       knowing, because it is not that the work is missing.  kfork's copy
+       loop DOES retype the child's descriptors in the ghost, one per
+       iteration: [ProofKforkB3]'s [fd_st_move _ i FdClosed stq stf] moves
+       slot [i] from closed to [stf], the type of the very file the
+       parent's slot names.  What is missing is a NAME for the result --
+       the loop's invariant is stated at [FdSlots.fd_frags_any], and
+       [fd_frags_any_acc]'s closer goes straight back to [fd_frags_any], so
+       the table the loop builds is forgotten as it is built.  "The child
+       inherits the parent's descriptors" is therefore proved and
+       unstatable, which is a different defect from unproved, and a
+       cheaper one to fix.
 
        EXIT closes every descriptor and needs no row, because it does not
        return. *)

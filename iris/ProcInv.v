@@ -2398,7 +2398,10 @@ Section ProcInv.
          existential because it is keyed on the [pv_fdg] this step just
          chose.  It travels with [fd_slots FDSPARE] from here to
          [UsertrapRes.ut_own] and is what every later fd operation spends. *)
-      fd_frags_any (pv_fdg V).
+      (* AT [fdt0], NOT [fd_frags_any].  This step proves the value one line
+         below and used to existentially forget it here; a forked child's
+         descriptors were unstateable as a direct consequence. *)
+      fd_frags (pv_fdg V) fdt0.
   Proof.
     iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hctx & Haddr)".
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
@@ -2410,7 +2413,7 @@ Section ProcInv.
     iExists (upd_fdg V γd), pid.
     cbn [upd_fdg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name].
     iSplit; [done|]. iFrame "Hpid Hf".
-    iSplitR "Hfrag"; [| iExists (replicate NOFILE FdClosed); iExact "Hfrag"].
+    iSplitR "Hfrag"; [| rewrite /fdt0; iExact "Hfrag"].
     iDestruct (fd_st_closed_to_any γd (replicate NOFILE (zero_reg : mword 64))
                  with "[Hauth]") as "Hst"; [by rewrite length_replicate|].
     rewrite /proc_ofiles /ofile_cells Hof length_replicate. iSplit; [done|].

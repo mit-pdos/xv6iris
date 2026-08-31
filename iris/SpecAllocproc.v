@@ -192,7 +192,7 @@ Definition allocproc_post
           into [UsertrapRes.ut_own], where every fd operation spends it.
           A FAILURE TAIL simply drops it -- the name dies with the
           incarnation that never started. *)
-       fd_frags_any (pv_fdg (us_V U)) ∗
+       fd_frags (pv_fdg (us_V U)) fdt0 ∗
        (* THE SLOT IS NOW ALLOCATED.  Persistent, minted here out of
           [procs_avail]'s authority, and what the caller hands to
           [SchedCtx.proc_slots_park] when it releases the slot at USED or

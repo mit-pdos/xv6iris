@@ -470,7 +470,21 @@ Section FdSlots.
   Definition fd_frags (γ : gname) (sts : list fdstate) : iProp Σ :=
     (⌜length sts = NOFILE⌝ ∗ [∗ list] fd ↦ st ∈ sts, fd_st γ fd st)%I.
 
-  (* THE VALUES ARE EXISTENTIAL FOR NOW, and that is a staging decision, not
+  (* [fd_frags_any] IS BEING RETIRED, and this note records what it cost.
+     The values were existential as a staging decision -- nothing outside
+     the kernel read them, so quantifying kept the bundle a plain in-and-out
+     family on the syscall channel.  What that bought in uniformity it paid
+     for in silence: the weakening DISCARDS a value the producer had in
+     hand, and once discarded it cannot be recovered, since this predicate
+     pins the length and nothing else.  [ProcInv]'s mint is the worked
+     example -- it proves [fd_frags γ fdt0] and existentially forgets it on
+     the next line, which is why nothing can say a forked child's
+     descriptors are anything in particular.  Every remaining use is a
+     place where a caller is being told less than the callee knew.
+
+     THE ORIGINAL NOTE, for the record:
+
+     The values are existential for now, and that is a staging decision, not
      a limitation of the shape.  Nothing outside the kernel reads them yet,
      and quantifying keeps the bundle a plain in-and-out family on the
      syscall channel -- the same shape [fd_slots FDSPARE] has, so
@@ -478,6 +492,16 @@ Section FdSlots.
      client that wants to state a DELTA ("fd 3 is closed now") takes
      [fd_frags] at an explicit [sts] instead; that is a change of parameter
      at the holder, not a re-plumb. *)
+  (* THE TABLE A FRESH PROCESS IS BORN WITH.  It lives HERE rather than at
+     the mirror because [ProcInv]'s slot-open mint is what produces it, and
+     that mint is below every consumer -- a name defined above it could not
+     be used to state what it hands out.  [fdst_map0] is the same fact at
+     the ghost. *)
+  Definition fdt0 : list fdstate := replicate NOFILE FdClosed.
+
+  Lemma fdt0_length : length fdt0 = NOFILE.
+  Proof. apply length_replicate. Qed.
+
   Definition fd_frags_any (γ : gname) : iProp Σ := (∃ sts, fd_frags γ sts)%I.
 
   Global Instance fd_frags_timeless γ sts : Timeless (fd_frags γ sts).
