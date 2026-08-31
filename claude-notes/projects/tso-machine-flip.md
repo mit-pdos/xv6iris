@@ -17952,3 +17952,25 @@ The credential-threading question is CLOSED, by binder placement:
   FOR FREE; iget/idup mint the floor from the A6.144 row (tl >= lo since
   arm <= last store <= row's tl); iput/park drop it (affine); un-parkers
   re-mint under the lock.
+
+## A6.146: THE COMPLETE ξ-BODIED INVENTORY (corrects A6.141's four)
+
+Systematic sweep of every `inv`/`cinv` body in the tree for physical
+cells (the A6.141 measurement was failure-driven and stopped at the
+newlock wall, so it undercounted).  The wall is FIVE:
+1. `IcacheInv.itable_inv` -- A6.145, in progress (word-set pin).
+2. `BioInv.buf_escrow` -- designed (anchor, the agreed three-way split).
+3. **`IcacheEscrow.ic_escrow` -- NEWLY IDENTIFIED**: five arms
+   (parked/out/mid/empty/held), every arm owns i_dev/i_inum/i_valid
+   `↦₄` halves + `inode_raw`/payload cells at the ambient ξ.  It is the
+   icache's exact buf_escrow analogue (the itable.lock <-> ip->lock
+   transit custodian), so the agreed bcache anchor design transfers
+   verbatim: motion into the two lock domains + anchor custody for the
+   transit windows + the cross-lock residue.  Phase 4.5, after the
+   bcache proves the pattern.
+4. `FileInv.inode_pay`'s cinv -- design pending (main-side churn).
+5. `FileOff.off_hold`'s cinv -- delegated (main-side agent).
+CLEAN (ghost/register-tier only, verified): ireg_reg_inv, fs_bytes_inv,
+ftop_inv, escA (EscrowInode), perm_inv, wire_inv, uart/plic/disk_inv,
+stimecmp_free (a ↦ᵣ CSR cell -- registers are hart state, no ctx axis),
+kpt_inv (already ctx_values), crash_inv, pipes (lock-payload tier).
