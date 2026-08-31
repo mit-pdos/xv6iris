@@ -1427,10 +1427,15 @@ Section KernelvecHandler.
     kernelvec_handler_spec_body γu γv γdk γtl γs pd pav pu.
   Proof.
     cbv beta delta [kernelvec_handler_spec_body].
-    iIntros (Hgs) "#Hhw #Hinv #Htext #Hcaps".
-    iApply intr_handler_spec_intro.
+    iIntros (Hgs) "#Hhw #Hinv #Htext".
+    iApply (intr_handler_spec_intro
+              (kernelvec_env γu γv γdk γtl γs pd pav pu)).
     iModIntro.
-    iIntros (m av p pc0 sc tv) "%Hpc0 %Hsc Hentry Hnext".
+    iIntros (XIc m av p pc0 sc tv) "%Hpc0 %Hsc #HEc Hentry Hnext".
+    (* the environment IS the credentials, at the trap-time context *)
+    iPoseProof "HEc" as "HEcaps".
+    iEval (rewrite /kernelvec_env) in "HEcaps".
+    iDestruct "HEcaps" as "#Hcaps".
     iEval (rewrite /ihs_entry_of) in "Hentry".
     (* [Hrcpt] is the KPT receipt (IntrDefs §6b), the tenth conjunct: the trap
        hands it over because the handler owes the ENABLED arm back, and the
@@ -1465,8 +1470,9 @@ Section KernelvecHandler.
        HANDLER does -- [intr_res] owns the stvec cell and so does the Bare
        arm. *)
     iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
-    { iEval (rewrite /intr_res) in "Hires".
-      iDestruct "Hires" as (h0 vb0) "(_ & _ & _ & Hstv & _)".
+    { iEval (rewrite /intr_res /intr_res_at) in "Hires".
+      iDestruct "Hires" as (E0h) "(Hires0 & _ & _)".
+      iDestruct "Hires0" as (h0 vb0) "(_ & _ & _ & Hstv & _)".
       iDestruct "Hbstv" as (v0) "Hbstv".
       iDestruct (reg_pointsto_conflict stvec (DfracOwn 1) with "Hstv Hbstv") as %[]. }
     iDestruct "Hkpt" as (root_ppn) "Htlbinv".
@@ -1716,8 +1722,9 @@ Section KernelvecHandler.
     { apply WpGprCsrwC.legalize_sie_clear_idem;
         [ exact HSIE0f | exact HXSf | exact HFSf | exact HVSf | exact HSDf | exact HMPPf ]. }
     iDestruct "Htrf" as "[(Hbit0f & Hbaref & Hbstvf) | (Hbit1f & Hkptf)]".
-    { iEval (rewrite /intr_res) in "Hiresf".
-      iDestruct "Hiresf" as (h0 vb0) "(_ & _ & _ & Hstv & _)".
+    { iEval (rewrite /intr_res /intr_res_at) in "Hiresf".
+      iDestruct "Hiresf" as (E0f) "(Hiresf0 & _ & _)".
+      iDestruct "Hiresf0" as (h0 vb0) "(_ & _ & _ & Hstv & _)".
       iDestruct "Hbstvf" as (v0) "Hbstvf".
       iDestruct (reg_pointsto_conflict stvec (DfracOwn 1) with "Hstv Hbstvf") as %[]. }
     iDestruct "Hkptf" as (root_ppnf) "Htlbinvf".

@@ -872,12 +872,12 @@ Section ProofMain.
         (* THE nextpid LOCK, built here out of procinit's [lk_fresh] and the
            cell above.  Persistent.  allocproc takes it, so kfork, sys_fork
            and -- at its real contract -- userinit all do. *)
-        is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
+        is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
         (* THE wait_lock, built the same way and for the first time.  Every
            consumer in the tree takes it -- kexit, kwait, reparent, the
            syscall environment -- and nothing has ever built one; see
            projects/forkret-park.md E3. *)
-        is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
+        is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
         (* the KPT receipt kvminithart minted, on its way to [trap_csrs] *)
         kpt_on cpu_id -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
@@ -1075,7 +1075,7 @@ Section ProofMain.
            writable .data words; see [KernelDataInv]'s header. ---- *)
     iDestruct (lk_fresh_pieces pid_lock_addr "nextpid"%string with "Hlpidf")
       as "(#Hpnm & Hpw & Hpc0)".
-    iMod (newlock ⊤ alp_pid_lock "nextpid"%string <{ nextpid_res }>
+    iMod (newlock ⊤ alp_pid_lock "nextpid"%string nextpid_res_at
             with "Hpnm Hpw [Hpc0] [Hnpid]") as (γp) "#Hpidlock".
     { iApply (lk_cpu_ready_intro with "Hpc0"). }
     { rewrite /nextpid_res. iExact "Hnpid". }
@@ -1085,7 +1085,7 @@ Section ProofMain.
            [p_parent] cells was a resource for it to be over. ---- *)
     iDestruct (lk_fresh_pieces wait_lock_addr "wait_lock"%string with "Hlwaitf")
       as "(#Hwnm & Hww & Hwc0)".
-    iMod (newlock ⊤ wait_lock_addr "wait_lock"%string <{ wait_res }>
+    iMod (newlock ⊤ wait_lock_addr "wait_lock"%string wait_res_at
             with "Hwnm Hww [Hwc0] Hwres") as (γw) "#Hwaitlock".
     { iApply (lk_cpu_ready_intro with "Hwc0"). }
     iModIntro.
@@ -1311,7 +1311,7 @@ Section ProofMain.
     console_caps γd -∗
     ConsoleInv.console_ready -∗
     is_tickslock γtl -∗
-    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
+    is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
     (* ---- ...AND ITS FOUR FORWARDED PERSISTENT ROWS.  [printk_env] is
        [mn_grp_printk]'s product and the kmem [is_lock] is [mn_grp_kvm]'s;
        [gen_cert] and [FsCrash.fs_crash_seam] come down the boot chain from
@@ -1346,7 +1346,7 @@ Section ProofMain.
     (* ...and the [nextpid] lock, for the same reason and to the same place:
        userinit's real contract takes it (allocproc's own premise), the weak
        one does not.  Persistent, so carrying it costs a frame. *)
-    is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
+    is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
     kalloc_env_at fsc_kalloc fsc_kpages (avail_sub (Some (length ps)) K_kvmmake) -∗
     lk_raw bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
@@ -2280,11 +2280,15 @@ Section ProofMain.
       iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv". }
     iDestruct (mn_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
     iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γk γtl γs pd pav pu
-                  Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
-    iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
-                 kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec []")
+                  Hnproc with "Hhw Hmin Htext") as "#Hkvs".
+    iPoseProof (kernelvec_env_move γd γv γk γtl γs pd pav pu) as "#HEmv".
+    iDestruct (intr_res_intro (kernelvec_env γd γv γk γtl γs pd pav pu)
+                 (mword_of_int KernelSyms.kernelvec : mword 64) _
+                 kernelvec_tv_direct kernelvec_stvec_base
+                 with "Hq Hstvec [] [] HEmv")
       as "Hintr".
     { iApply bi.later_intro. iExact "Hkvs". }
+    { iEval (rewrite /kernelvec_env). iModIntro. iExact "Hcaps". }
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started fsc_printk γk fsc_kalloc γs γd γv m5 (K - 2)%nat p0 pd pav pu
               root pas xid P ltac:(lia) Hp0

@@ -220,7 +220,8 @@ Section ParkCap.
   (* ------------------------------------------------------------------- *)
   (* USING IT: what userinit and kfork do at their park.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma park_token_park (N : ut_names) (rest : list (mword 64)) (U : ustate) :
+  Lemma park_token_park (N : ut_names) (rest : list (mword 64)) (U : ustate)
+      (sts : list fdstate) :
     ut_wf N ->
     length rest = 12%nat ->
     park_token (un_s N) -∗
@@ -237,7 +238,13 @@ Section ParkCap.
        built here.  allocproc minted them with the block; the resume hands
        them to [UsertrapRes.ut_own], re-keyed by the closer's own
        [pv_fdg V' = pv_fdg V] premise. *)
-    fd_frags_any (pv_fdg (us_V U)) -∗
+    (* AT A NAMED TABLE.  This used to take the bundle [∃]-weakened, which
+       threw away exactly the fact the parker had just been handed:
+       allocproc proves [fd_frags γ fdt0] and a park that forgets it makes
+       a fresh process's descriptors unstateable.  The states the package
+       resumes at are THESE, which is what lets the caller say what the
+       child's table is. *)
+    fd_frags (pv_fdg (us_V U)) sts -∗
     (* THE GENERIC SLOT FAMILY, captured on the fd fragments' route exactly:
        not part of [park_child] (that bundle goes straight to the cap) but
        captured by the package's RESUME closer, built here, and instantiated
@@ -281,7 +288,6 @@ Section ParkCap.
          The bundle is handed on to the residue unchanged (re-weakened to
          [fd_frags_any] below), so the view the slot is keyed at and the
          view the residue carries are the same list by construction. *)
-      iDestruct "Hfrag" as (sts) "Hfrag".
       (* ONE [sts] FOR BOTH: the same list names the residue's fragments and
          the slot's key, which is what the shared existential says. *)
       iExists sts.

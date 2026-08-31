@@ -3334,8 +3334,10 @@ Section WpSconfCsr.
       destruct (csrsi_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
       (* the quarter comes straight out of the resource the caller handed in;
          this used to be an [inv_acc] on [intrN] whose body supplied it. *)
-      iEval (rewrite /intr_res) in "Hhx".
-      iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
+      iEval (rewrite /intr_res /intr_res_at) in "Hhx".
+      iDestruct "Hhx" as (Ehx) "(Hhxat & #HEhx & #HEhxmv)".
+      iDestruct "Hhxat" as (handler vb)
+        "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
       iDestruct (pw_frames_in Supervisor (DfracOwn 1) (R_bitvector_64 mstatus)
                    ms0 Hfresh with "Hms Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
       change (execute (CSRImm (csr_sstatus, mword_of_int 2,
@@ -3381,7 +3383,8 @@ Section WpSconfCsr.
                      _ Hfresh with "[$Hrw $Hro]") as "(Hms & Hpriv & _ & _)".
         iMod (sie_ghost_flip_on _ _ _ _ _ with "Hhalf Harm Htok Hqi")
           as "(Hhalf & Hqcap & Hqcnt & Hqi)".
-        iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec")
+        iDestruct (intr_res_intro Ehx handler _ Htvd Hsb
+                   with "Hqi Hstv Hspec HEhx HEhxmv")
           as "Hintr".
         iEval (rewrite -Hsie') in "Hhalf".
         iDestruct (sret_tie_congr ms0 _ Hspp' Hspie' with "Hspp") as "Hspp".
@@ -3754,8 +3757,10 @@ Section WpSconfCsr.
       destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
       (* the handler resource: take the quarter out, flip, re-form.  This used
          to open [intrN] across the step and re-seal it. *)
-      iEval (rewrite /intr_res) in "Hhx".
-      iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
+      iEval (rewrite /intr_res /intr_res_at) in "Hhx".
+      iDestruct "Hhx" as (Ehx) "(Hhxat & #HEhx & #HEhxmv)".
+      iDestruct "Hhxat" as (handler vb)
+        "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
       iDestruct (pw_frames_in (CID := CID) Supervisor (DfracOwn 1)
                    (R_bitvector_64 mstatus) ms0 Hfresh
                    with "Hms Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
@@ -3804,7 +3809,8 @@ Section WpSconfCsr.
           as "(Hms & Hpriv & _ & _)".
         iMod (sie_ghost_flip_off _ _ _ _ _ with "Hhalf Hq1 Hcnt2 Hqi")
           as "(Hhalf & Hq & Htok & Hqi)".
-        iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec")
+        iDestruct (intr_res_intro Ehx handler _ Htvd Hsb
+                   with "Hqi Hstv Hspec HEhx HEhxmv")
           as "Hintr".
         iEval (rewrite -Hsie') in "Hhalf".
         (* SPP and SPIE are untouched by an SIE flip, so the tie only needs
@@ -3944,8 +3950,10 @@ Section WpSconfCsr.
         iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
         iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hcnt2)".
         destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
-        iEval (rewrite /intr_res) in "Hhx".
-        iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
+        iEval (rewrite /intr_res /intr_res_at) in "Hhx".
+        iDestruct "Hhx" as (Ehx) "(Hhxat & #HEhx & #HEhxmv)".
+        iDestruct "Hhxat" as (handler vb)
+          "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
         iDestruct (pw_frames_in (CID := CID) Supervisor (DfracOwn 1)
                      (R_bitvector_64 mstatus) ms0 Hfresh
                      with "Hms Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
@@ -3995,7 +4003,8 @@ Section WpSconfCsr.
             as "(Hms & Hpriv & _ & _)".
           iMod (sie_ghost_flip_off _ _ _ _ _ with "Hhalf Hq1 Hcnt2 Hqi")
             as "(Hhalf & Hq & Htok & Hqi)".
-          iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec")
+          iDestruct (intr_res_intro Ehx handler _ Htvd Hsb
+                   with "Hqi Hstv Hspec HEhx HEhxmv")
             as "Hintr".
           iEval (rewrite -Hsie') in "Hhalf".
           iDestruct (sret_tie_congr (CID := CID) ms0 _ Hspp' Hspie' with "Hspp")

@@ -425,20 +425,23 @@ Section UsertrapRes.
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     kpt_on cpu_id -∗
-    intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    ihs_env KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     trap_csrs KT1.
   Proof.
     iIntros "Hep Hsc Hst Hsret Hstv Hq Hkpt #Hih".
+    iEval (rewrite /ihs_env) in "Hih".
+    iDestruct "Hih" as (E0) "(#Hspec & #HE0 & #HE0mv)".
     iApply (trap_csrs_of_raw with "[Hep Hsc Hst Hsret] [Hq Hstv] Hkpt").
     - rewrite /trap_csrs_raw.
       iSplitL "Hep"; [iExists ep; iExact "Hep" |].
       iSplitL "Hsc"; [iExists sc; iExact "Hsc" |].
       iSplitL "Hst"; [iExists st; iExact "Hst" |].
       iExists ('b"0" : mword 1), ('b"1" : mword 1). iExact "Hsret".
-    - iApply (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64)
+    - iApply (intr_res_intro E0
+                (mword_of_int KernelSyms.kernelvec : mword 64)
                 ('b"0" : mword 1) kernelvec_tv_direct kernelvec_stvec_base
-                with "Hq Hstv [Hih]").
-      iApply bi.later_intro. iExact "Hih".
+                with "Hq Hstv [] HE0 HE0mv").
+      iApply bi.later_intro. iExact "Hspec".
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -622,7 +625,7 @@ Section UsertrapRes.
      devintr_caps_any (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
      printk_env (fsc_printk) (fsc_uart) (fsc_disk) ∗
-     is_lock (un_w N) wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
+     is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res_at ∗
      is_ftable (un_ft N) (un_f N) ∗
      is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
        (λ ξ : CtxId, kmem_res (XIk := ξ) (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
@@ -693,7 +696,7 @@ Section UsertrapRes.
      is_kstack (un_pj N) (un_ks N) ∗
      devintr_caps_any (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
-     is_lock (un_w N) wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
+     is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res_at ∗
      is_ftable (un_ft N) (un_f N) ∗
      disk_geom (fsc_disk) (un_pd N) (un_pav N) (un_pu N) ∗
      park_world (un_s N))%I.
@@ -1780,7 +1783,7 @@ Section UsertrapRes.
 
   Lemma ut_csrs_raw_fold (ep sc st : mword 64) :
     ut_csrs_raw ep sc st -∗
-    intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    ihs_env KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     trap_csrs KT1.
   Proof.
     iIntros "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt) #Hih".

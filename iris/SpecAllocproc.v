@@ -192,7 +192,7 @@ Definition allocproc_post
           into [UsertrapRes.ut_own], where every fd operation spends it.
           A FAILURE TAIL simply drops it -- the name dies with the
           incarnation that never started. *)
-       fd_frags_any (pv_fdg (us_V U)) ∗
+       fd_frags (pv_fdg (us_V U)) fdt0 ∗
        (* THE SLOT IS NOW ALLOCATED.  Persistent, minted here out of
           [procs_avail]'s authority, and what the caller hands to
           [SchedCtx.proc_slots_park] when it releases the slot at USED or
@@ -286,7 +286,7 @@ Definition wp_allocproc_sconf_body
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
+  is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
   kalloc_env_at γa γk on -∗
   (* the proc table's regime, threaded exactly as [kalloc_env] is *)
   procs_avail op -∗
@@ -321,7 +321,7 @@ Definition wp_allocproc_core_body
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
+  is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
   kalloc_env_at γa γk on -∗
   (* the proc table's regime, threaded exactly as [kalloc_env] is *)
   procs_avail op -∗

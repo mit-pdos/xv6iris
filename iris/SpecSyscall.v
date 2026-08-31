@@ -116,6 +116,7 @@ Require Import ProcGeom CpuOwn.
 Require Import WpMmodeLeafBase.  (* [csp_rs1] *)
 Require Import ProcDefs.  (* [kstack_closer] -- the exit slot's right conjunct *)
 Require Import FdSlots.
+Require Import UsysMemOk.   (* [usys_fd_ok] -- the descriptor rows, shared *)
 Require Import FileInvDefs.
 Require Import UserPtTree.
 Require Import ProcInv.
@@ -242,6 +243,27 @@ Definition sysc_mem_ok (V V' : pprivate) (M M' : gmap Z (bv 8)) : Prop :=
     exists (d : nat) (bs : nat -> bv 8),
       (d <= 24)%nat /\ M' = umem_wr M (pv_tf V !!! tf_arg_idx 1) d bs
   else M' = M.
+
+(* THE DESCRIPTOR TABLE'S ROWS, beside the image's.  [sysc_mem_ok] above
+   says what syscall() does to the process's memory; this says what it does
+   to [p->ofile[]], keyed on the same [sysc_num V] and in the same shape.
+
+   TWO PREDICATES RATHER THAN ONE, for the reason the two halves of the
+   round are separate everywhere else on this path: a syscall proof
+   discharges them against different resources -- the page table and the
+   image on one side, [FdSlots.fd_frags] and the ofile array on the other --
+   so a single conjunction would force every entry's proof to have both in
+   hand at once.  They are stated adjacently so that "what this entry
+   moves" is still one thing to read.
+
+   THE STATES ARE A PARAMETER, not a field of [pprivate].  [pv_fdg V] is the
+   per-incarnation GHOST NAME; the states under it are what
+   [FdSlots.fd_frags (pv_fdg V) sts] holds, so the row takes them the way
+   [UsysMemOk.usys_fd_ok] does.  [UsysMemOkSpec.sysc_fd_ok_usys] is the
+   bridge, exactly as [sysc_mem_ok_usys] is for the image. *)
+Definition sysc_fd_ok (V : pprivate) (r : mword 64)
+    (sts sts' : list fdstate) : Prop :=
+  UsysMemOk.usys_fd_ok (sysc_num V) (pv_tf V) r sts sts'.
 
 (* syscall's own frame is 4 slots; below it the deepest table entry, which is
    sys_exit at [K_sys_exit] = 4 + kexit's 74.  Written as an expression, not
@@ -495,7 +517,7 @@ Module Type SYSCALL.
       fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
       fcn_dq fn = DfracOwn (1/4) ->
       sysc_park_extra γtk -∗
-      is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
+      is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
       is_ftable γft γf -∗
       procs_inv (fcn_procs fn) -∗
       disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗

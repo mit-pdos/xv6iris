@@ -119,12 +119,8 @@ Record umirror := MkUmirror {
 (*  2.  THE FD TABLE, PURELY                                              *)
 (* ===================================================================== *)
 
-(* the table a fresh process is born with (allocproc; FdSlots.fdst_map0
-   is the same fact at the ghost) *)
-Definition fdt0 : list fdstate := replicate NOFILE FdClosed.
-
-Lemma fdt0_length : length fdt0 = NOFILE.
-Proof. reflexivity. Qed.
+(* [fdt0] and [fdt0_length] now live in [FdSlots], beside the mint that
+   produces them. *)
 
 (* fdalloc's scan: the first closed row.  [fd_frees]'s head, read at the
    mirror. *)

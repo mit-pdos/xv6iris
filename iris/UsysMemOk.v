@@ -56,6 +56,7 @@ Require Import TfUser.       (* [tf_ueq] -- the resume-visible word equality *)
 Require Import UserPtTree.   (* [umem_wr] / [umem_grow] / [umem_del] *)
 Require Import ProcPtOwn.    (* [pgroundup] on words *)
 Require Import UserPerm.     (* [uperm] / [uperm_rw] -- the permission view *)
+Require Import FdSlots.      (* [fdstate] / [fdtype] -- the descriptor view *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -83,6 +84,14 @@ Definition USYS_wait  : Z := 3.
 Definition USYS_pipe  : Z := 4.
 Definition USYS_read  : Z := 5.
 Definition USYS_fstat : Z := 8.
+
+(* ...and the four that move the DESCRIPTOR table (kernel/syscall.h).
+   [USYS_pipe] is in both lists, and that is the point: it is the one entry
+   that writes user memory AND allocates descriptors, so the two tables have
+   to agree about it. *)
+Definition USYS_dup   : Z := 10.
+Definition USYS_open  : Z := 15.
+Definition USYS_close : Z := 21.
 
 (* [read]'s count, as the C reads it: argument 2 into an [int].  The read
    row is the one whose length is not a constant.  Definitionally
@@ -172,6 +181,154 @@ Definition usys_mem_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        (d <= 24)%nat /\ M' = umem_wr M (tf !!! tf_arg_idx 1) d bs)
     /\ π' = π /\ szv' = szv
   else M' = M /\ π' = π /\ szv' = szv.
+
+(* ===================================================================== *)
+(* SS2b THE DESCRIPTOR TABLE'S OWN ROWS.                                   *)
+(*                                                                        *)
+(* [usys_mem_ok] above says what a syscall does to the process's IMAGE;    *)
+(* this says what it does to the process's DESCRIPTORS, in the same shape  *)
+(* and keyed on the same number.  The two are separate predicates rather   *)
+(* than one because they are separate obligations -- a syscall proof       *)
+(* discharges each against different resources (the page table on one      *)
+(* side, [FdSlots.fd_frags] on the other) -- but they are stated together  *)
+(* so that "what this entry moves" is one thing to read.                   *)
+(*                                                                        *)
+(* THE SHAPE OF EVERY ROW IS THE SAME: on failure the table is untouched,  *)
+(* and on success ONE OR TWO SLOTS MOVE and the rest do not.  That second  *)
+(* half is the whole content -- [list_insert] is what says a descriptor a  *)
+(* program was holding is still what it was, which is what lets a proof    *)
+(* carry a fd across an unrelated syscall.                                 *)
+(*                                                                        *)
+(* LENGTH IS PRESERVED BY CONSTRUCTION ([list_insert] on a list keeps its  *)
+(* length, and an out-of-range index is a no-op), which matters because    *)
+(* [FdSlots.fd_frags] carries [length sts = NOFILE] inside it.  See        *)
+(* [usys_fd_ok_length] below.                                             *)
+(* ===================================================================== *)
+
+Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
+    (sts sts' : list fdstate) : Prop :=
+  if decide (n = USYS_close) then
+    (* close(fd): argument 0 IS the descriptor number, and the slot becomes
+       CLOSED.  sys_close returns 0 on success and -1 when [argfd] rejects
+       the number -- out of range, or already closed -- and a rejected close
+       moves nothing, which is what a program that closes twice needs. *)
+    (if decide (uint r = 0)
+     then sts' = <[Z.to_nat (uint (tf !!! tf_arg_idx 0)) := FdClosed]> sts
+     else sts' = sts)
+  else if decide (n = USYS_dup) then
+    (* dup(fd): the RETURNED descriptor is a COPY of the argument's -- same
+       type, same mode -- because filedup only bumps [f->ref] and the two
+       descriptors then name the same [struct file].  The old slot keeps
+       what it had, which [list_insert] says by leaving it alone. *)
+    (if decide (0 <= bv_signed r)%Z
+     then sts' = <[Z.to_nat (uint r)
+                     := sts !!! Z.to_nat (uint (tf !!! tf_arg_idx 0))]> sts
+     else sts' = sts)
+  else if decide (n = USYS_open) then
+    (* open(path, omode): the returned descriptor becomes OPEN at some type
+       and mode.  Both are existential HERE and both are pinnable: the mode
+       is a function of [omode] (argument 1 -- xv6 sets [f->readable] to
+       [!(omode & O_WRONLY)] and [f->writable] to [(omode & O_WRONLY) ||
+       (omode & O_RDWR)]) and the type is [FdDevice] exactly when the inode
+       it resolved is [T_DEVICE], [FdInode] otherwise.  Pinning either needs
+       vocabulary this table does not have yet -- the mode wants omode's
+       bits decoded, the type wants the path lookup -- so the row says what
+       it can honestly say: the slot is now OPEN, and no other slot moved. *)
+    (if decide (0 <= bv_signed r)%Z
+     then (exists (rd wr : bool) (t : fdtype),
+             sts' = <[Z.to_nat (uint r) := FdOpen rd wr t]> sts)
+     else sts' = sts)
+  else if decide (n = USYS_pipe) then
+    (* pipe(fdarray): TWO descriptors, and the row says which end is which
+       -- [FdOpen true false FdPipe] reads and [FdOpen false true FdPipe]
+       writes, per [FdSlots]'s note that on a pipe the mode flags ARE the
+       identity of the end.  sys_pipe returns 0 on success.
+
+       THE TWO NUMBERS ARE EXISTENTIAL, and that is the row's one real gap:
+       pipe reports them by WRITING them, as the two four-byte words the
+       image row above puts at [tf_arg_idx 0], so tying [a] and [b] to the
+       descriptors a caller can actually use means relating them to that
+       row's [bs].  The two tables would have to be read together, which is
+       the refinement this entry is waiting on. *)
+    (if decide (uint r = 0)
+     then (exists a b : nat,
+             a <> b /\
+             sts' = <[a := FdOpen true false FdPipe]>
+                      (<[b := FdOpen false true FdPipe]> sts))
+     else sts' = sts)
+  else
+    (* EVERY OTHER ENTRY LEAVES THE TABLE ALONE -- but read that carefully
+       for the three entries where it is easy to claim too much.
+
+       EXEC.  This row does NOT say a successful exec keeps the table, and
+       cannot: the only exec that reaches this row is the FAILING one
+       ([usys_mem_ok]'s exec row pins [r = -1]).  A successful exec never
+       returns to this WP -- its successor is a kernel MINT, at an
+       arbitrary key, so the contract currently says nothing about the fd
+       view across it.  xv6 has no FD_CLOEXEC and really does keep the
+       table (that is how the shell hands a redirected descriptor to the
+       program it runs), so this is a GAP in the specification rather than
+       a property of the code: pinning it means giving exec's mint a row,
+       not changing this line.
+
+       FORK.  This row is about the PARENT, whose table fork does not
+       touch.  It says nothing about the CHILD's -- and the reason is worth
+       knowing, because it is not that the work is missing.  kfork's copy
+       loop DOES retype the child's descriptors in the ghost, one per
+       iteration: [ProofKforkB3]'s [fd_st_move _ i FdClosed stq stf] moves
+       slot [i] from closed to [stf], the type of the very file the
+       parent's slot names.  What is missing is a NAME for the result --
+       the loop's invariant is stated at [FdSlots.fd_frags_any], and
+       [fd_frags_any_acc]'s closer goes straight back to [fd_frags_any], so
+       the table the loop builds is forgotten as it is built.  "The child
+       inherits the parent's descriptors" is therefore proved and
+       unstatable, which is a different defect from unproved, and a
+       cheaper one to fix.
+
+       EXIT closes every descriptor and needs no row, because it does not
+       return. *)
+    sts' = sts.
+
+(* the entries that leave the descriptor table alone -- the fd counterpart
+   of [usys_mem_ok_quiet], and what a program carrying an open fd across an
+   unrelated syscall reads off the row *)
+Lemma usys_fd_ok_quiet (n : Z) (tf : list (mword 64)) (r : mword 64)
+    (sts sts' : list fdstate) :
+  n <> USYS_close -> n <> USYS_dup -> n <> USYS_open -> n <> USYS_pipe ->
+  usys_fd_ok n tf r sts sts' -> sts' = sts.
+Proof.
+  intros Hc Hd Ho Hp H. unfold usys_fd_ok in H.
+  destruct (decide (n = USYS_close)); [contradiction |].
+  destruct (decide (n = USYS_dup)); [contradiction |].
+  destruct (decide (n = USYS_open)); [contradiction |].
+  destruct (decide (n = USYS_pipe)); [contradiction |].
+  exact H.
+Qed.
+
+(* THE LENGTH SURVIVES EVERY ROW, which is what [FdSlots.fd_frags] needs of
+   any table it is asked to hold: it carries [length sts = NOFILE] inside
+   it, so a row that could change the length would be a row no bundle could
+   accept. *)
+Lemma usys_fd_ok_length (n : Z) (tf : list (mword 64)) (r : mword 64)
+    (sts sts' : list fdstate) :
+  usys_fd_ok n tf r sts sts' -> length sts' = length sts.
+Proof.
+  unfold usys_fd_ok. intros H.
+  destruct (decide (n = USYS_close)) as [_ | _].
+  { destruct (decide (uint r = 0)); subst; [ apply length_insert | reflexivity ]. }
+  destruct (decide (n = USYS_dup)) as [_ | _].
+  { destruct (decide (0 <= bv_signed r)%Z); subst;
+      [ apply length_insert | reflexivity ]. }
+  destruct (decide (n = USYS_open)) as [_ | _].
+  { destruct (decide (0 <= bv_signed r)%Z) as [_ | _].
+    - destruct H as (rd & wr & t & ->). apply length_insert.
+    - subst. reflexivity. }
+  destruct (decide (n = USYS_pipe)) as [_ | _].
+  { destruct (decide (uint r = 0)) as [_ | _].
+    - destruct H as (a & b & _ & ->). rewrite length_insert. apply length_insert.
+    - subst. reflexivity. }
+  subst. reflexivity.
+Qed.
 
 (* the sixteen quiet entries, by name: what a program calling one of them
    learns.  Stated for the row shape rather than per number so a program

@@ -220,6 +220,35 @@ Section Move.
     iModIntro. iFrame "H0 H1". iSplit; [done|]. iExact "H".
   Qed.
 
+  (* the dirty-arm crossing (A6.128's registry row): SC mints the
+     receiver's witness outright ([ctx_wrote]'s M-leg body is [True]);
+     the T-leg re-registers the row in the receiver's dirty set. *)
+  Lemma ctx_move_wrote `{CID : CpuId} (ξ0 ξ1 : CtxId) (t : nat) (a : Arch.pa) :
+    own_context ξ0 -∗ own_context ξ1 -∗ ctx_wrote ξ0 t a ==∗
+    own_context ξ0 ∗ own_context ξ1 ∗ (ctx_floor ξ1 t ∨ ctx_wrote ξ1 t a).
+  Proof.
+    iIntros "H0 H1 _". iModIntro. iFrame "H0 H1". iRight.
+    rewrite ctx_wrote_unseal /ctx_wrote_def. auto.
+  Qed.
+
+  (* FORK'S MINT (A6.129, owner ruling §0.44′): a RUNNING TWIN of a
+     running context.  A new kernel thread's context is not born empty at
+     stamp 0 -- that is boot's mint, [TsoCtx.own_context_boot], for the
+     per-hart contexts that become the schedulers' -- it is born as a copy
+     of its PARKER's: the same bound and watermark (the parker's own view
+     receipts vouch for it), an empty dirty set (the rows the parker hands
+     over re-register as they cross, [ctx_move]).  While both tokens are
+     running every row moves by [ctx_move]; then the twin parks
+     ([TsoCtxPark.ctx_park_box]) into the record the parker is building.
+     STATEMENT from tso-flip r67; the M-leg body mints through the
+     [True] disjunct exactly as [own_context_boot] does. *)
+  Lemma own_context_twin `{CID : CpuId} (ξ : CtxId) :
+    own_context ξ ==∗ own_context ξ ∗ ∃ ξc : CtxId, own_context ξc.
+  Proof.
+    iIntros "H". iModIntro. iFrame "H". iExists inhabitant.
+    rewrite own_context_unseal /own_context_def. by iLeft.
+  Qed.
+
 End Move.
 
 (* THE DRIVER ([CtxMorphTac.ctx_morph_solve]'s mirror): [cur_ctx] unfolded

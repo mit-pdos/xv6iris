@@ -31,6 +31,7 @@ Require Import ProcDefs.
 Require Import UserPtTree ProcPtOwn.
 Require Import SpecSyscall.
 Require Import UserPerm UsysMemOk.
+Require Import FdSlots.     (* [fdstate] -- the descriptor rows' vocabulary *)
 Require Import UmodeArith.
 Local Open Scope Z_scope.
 
@@ -69,6 +70,29 @@ Proof.
   destruct (decide (sysc_num V = 8)); [ exact (conj H (conj Hp Hs)) | ].
   exact (conj H (conj Hp Hs)).
 Qed.
+
+(* THE DESCRIPTOR BRIDGE, AND IT IS AN IDENTITY -- which is the point.
+   [sysc_mem_ok_usys] above is real work because the two image rows are
+   written in different vocabularies: the kernel's speaks [uptd_ext_sz] and
+   [zero_reg], the user's speaks [usys_sbrk_perm] and [uint _ = 0], so the
+   bridge has to translate.  The DESCRIPTOR rows have no such gap: both
+   sides speak [list fdstate], and [sysc_num]/[pv_tf] are projections the
+   user side takes as arguments.  So there is one table
+   ([UsysMemOk.usys_fd_ok]) and [SpecSyscall.sysc_fd_ok] is its reading at
+   the kernel's vocabulary.
+
+   Keeping the lemma anyway, rather than letting callers unfold: it is what
+   makes the correspondence a STATEMENT, and if either side ever grows a row
+   the other cannot express, this is the line that stops compiling. *)
+Lemma sysc_fd_ok_usys (V : pprivate) (r : mword 64) (sts sts' : list fdstate) :
+  sysc_fd_ok V r sts sts' ->
+  usys_fd_ok (sysc_num V) (pv_tf V) r sts sts'.
+Proof. exact (fun H => H). Qed.
+
+Lemma usys_fd_ok_sysc (V : pprivate) (r : mword 64) (sts sts' : list fdstate) :
+  usys_fd_ok (sysc_num V) (pv_tf V) r sts sts' ->
+  sysc_fd_ok V r sts sts'.
+Proof. exact (fun H => H). Qed.
 
 (* sbrk: the dispatcher's row, read at the two sizes it is keyed by.  The
    permission half is the row's own relation, and it is now DERIVABLE from

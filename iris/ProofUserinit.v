@@ -773,7 +773,7 @@ Section ProofUserinit.
     iAssert (∀ W : uvis, uslot W)%I as "Hjslot".
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
       iIntros (W). iApply (UexecCond.cond_entry_slot W with "Hgen"). }
-    iMod (park_token_park N rest (MkUstate (upd_cwd V ipv) M) Hwf Hrest
+    iMod (park_token_park N rest (MkUstate (upd_cwd V ipv) M) fdt0 Hwf Hrest
             with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirs]")
       as "Hpctx".
@@ -787,6 +787,8 @@ Section ProofUserinit.
     iDestruct "Hpctx" as (ξb Tb) "[Hbox Hpctx]".
     iDestruct (proc_slots_park_at γs ξb (proc_addr j) RUNNABLE needs_ctx_RUNNABLE
                  with "Hpctx Hhart Hmk") as "Hslots".
+    iDestruct (proc_cells_reindex_sc TsoCtx.cur_ctx ξb (proc_addr j) RUNNABLE ch
+                 with "Hpstcell Hpchan Hppub") as "(Hpstcell & Hpchan & Hppub)".
     iDestruct (proc_lock_res_at_intro γs ξb γl (proc_addr j) RUNNABLE ch
                  with "Hpstcell Hplock Hpchan Hppub Hslots") as "HR".
     (* ===== +0x2c c.mv a0,s1 ===== *)

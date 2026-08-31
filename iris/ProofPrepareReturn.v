@@ -285,8 +285,9 @@ Section ProofPrepareReturn.
        What survives is the cell (to be overwritten) and the quarter, which
        the post hands back dangling: with it loose, [sie_ghost_flip] cannot
        assemble and interrupts cannot come back on before the sret. *)
-    rewrite /intr_res.
-    iDestruct "Hintr" as (tv0 vb) "(%Htvmode & %Htvbase & Hq4 & Hstvec & _)".
+    rewrite /intr_res /intr_res_at.
+    iDestruct "Hintr" as (E0) "(Hintrat & _ & _)".
+    iDestruct "Hintrat" as (tv0 vb) "(%Htvmode & %Htvbase & Hq4 & Hstvec & _)".
     (* =============================================================== *)
     (*  +0x10 .. +0x2c: the stvec computation and its write.            *)
     (* =============================================================== *)

@@ -647,7 +647,16 @@ Section BootBssChain.
       iIntros "[Hc $]". iDestruct "Hc" as (ch) "Hc". iExists ch.
       iApply (TsoCtxShim.ctx_word_of_mem with "Hc"). }
     (* the parent cells, gathered into wait_lock's resource.  The carve hands
-       one existential per slot; [WaitInv.wait_res] is one list. *)
+       one existential per slot; [WaitInv.wait_res] is one list.  Same seam
+       as [p_chan] above: the carve is BELOW the seam and hands the RAW
+       [word_pointsto]; [parents_own_at] (A6.129) reads the cells at the
+       lock holder's context.  One named mint per cell (tso-port.md §0.16′). *)
+    iAssert ([∗ list] i ∈ seq 0 NPROC,
+               ∃ pv : SailStdpp.Values.mword 64,
+                 p_parent (proc_addr i) ↦₈ pv)%I with "[Hpar]" as "Hpar".
+    { iApply (big_sepL_mono with "Hpar"). intros k i _.
+      iIntros "Hc". iDestruct "Hc" as (pv) "Hc". iExists pv.
+      iApply (TsoCtxShim.ctx_word_of_mem with "Hc"). }
     iDestruct (WaitInv.wait_res_of_cells with "Hpar") as "Hwres".
     (* ---- tickslock, bcache.lock, the 30 buffers, the list sentinel ---- *)
     iDestruct (bss_cut g (KernelSyms.proc + proc_size * Z.of_nat NPROC)
