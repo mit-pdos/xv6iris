@@ -473,8 +473,13 @@ Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    an agreed GENERATION gname.  Two slices of one slot AGREE on the
    generation ([IcacheRef.live_gen_agree]), which is the mechanism the
    whole §17' design runs on. *)
+(* A6.145: the generation agree carries the generation's gname AND its
+   EPOCH FLOOR (the arm store's log position, the word-set pin's [pw_lo]).
+   Two slices of one slot agreeing on the pair is what hands a racy
+   [ip->ref] reader the CURRENT epoch's floor with no extra ghost: a
+   stale (g, lo) is unownable exactly as a stale g was. *)
 Definition iliveUR : ucmra :=
-  gmapUR nat (prodR fracR (agreeR (leibnizO gname))).
+  gmapUR nat (prodR fracR (agreeR (leibnizO (gname * nat)))).
 
 (* THE PER-GENERATION TYPE ONE-SHOT (design §17.2 piece 2).  The generation's
    [agree] carries a fresh GNAME rather than a type, and the type attaches

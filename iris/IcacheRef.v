@@ -887,12 +887,12 @@ Class icfg := MkIcfg {
    [live_boot_map_valid] does not move. *)
 Definition live_boot_map (g : gname) : iliveUR :=
   ([^op list] k ∈ seq 0 (NINODE + NINODE),
-     ({[ k := (1%Qp, to_agree (g : leibnizO gname)) ]} : iliveUR)).
+     ({[ k := (1%Qp, to_agree ((g, 0%nat) : leibnizO (gname * nat))) ]} : iliveUR)).
 
 Local Lemma live_seq_lookup_lt (g : gname) (n m i : nat) :
   (i < n)%nat ->
   ([^op list] k ∈ seq n m,
-     ({[ k := (1%Qp, to_agree (g : leibnizO gname)) ]} : iliveUR)) !! i = None.
+     ({[ k := (1%Qp, to_agree ((g, 0%nat) : leibnizO (gname * nat))) ]} : iliveUR)) !! i = None.
 Proof.
   revert n. induction m as [|m IH]; intros n Hi.
   - assert (Hnil : seq n 0 = []) by reflexivity.
@@ -904,7 +904,7 @@ Qed.
 
 Local Lemma live_seq_valid (g : gname) (n m : nat) :
   ✓ ([^op list] k ∈ seq n m,
-       ({[ k := (1%Qp, to_agree (g : leibnizO gname)) ]} : iliveUR)).
+       ({[ k := (1%Qp, to_agree ((g, 0%nat) : leibnizO (gname * nat))) ]} : iliveUR)).
 Proof.
   revert n. induction m as [|m IH]; intros n.
   - assert (Hnil : seq n 0 = []) by reflexivity.
@@ -2314,37 +2314,67 @@ Section IcacheRefGhost.
      ANY slice of it refutes freeness ([IcacheInv.live_slot_live]).  Nothing
      here is an authority, so this splits and joins with no fupd at all --
      but the generation is an [agree], so a JOIN also PINS it. *)
-  Definition live_gen (k : nat) (s : Qp) (g : gname) : iProp Σ :=
+  (* A6.145: THE REAL ELEMENT -- generation AND epoch floor, agree'd
+     together.  [live_gen] below keeps §17.2's arity so no consumer moves;
+     the racy [ip->ref] credential is the one client of THIS form. *)
+  Definition live_genlo (k : nat) (s : Qp) (g : gname) (lo : nat) : iProp Σ :=
     own icfg_live
-      ({[ k := (s, to_agree (g : leibnizO gname)) ]} : iliveUR).
+      ({[ k := (s, to_agree ((g, lo) : leibnizO (gname * nat))) ]} : iliveUR).
 
-  (* THE ARITY-PRESERVING WRAPPER (design §17.2 piece 1).  Every consumer of
-     the pool -- [iref_tok], [inode_shr], [inode_ref_short] and the thirty-odd
-     Specs stated over them -- uses THIS, so not one of their statements moved
-     when the generation went in. *)
+  (* THE ARITY-PRESERVING WRAPPER, TWICE (design §17.2 piece 1; A6.145):
+     every consumer of the pool uses [live_frac]; every GENERATION-aware
+     consumer uses [live_gen] at its A6.140-era arity.  Neither moved when
+     the epoch floor went in. *)
+  Definition live_gen (k : nat) (s : Qp) (g : gname) : iProp Σ :=
+    (∃ lo : nat, live_genlo k s g lo)%I.
+
   Definition live_frac (k : nat) (s : Qp) : iProp Σ :=
     (∃ g : gname, live_gen k s g)%I.
 
-  Lemma live_gen_split k s1 s2 g :
-    live_gen k (s1 + s2)%Qp g ⊣⊢ live_gen k s1 g ∗ live_gen k s2 g.
+  Lemma live_genlo_split k s1 s2 g lo :
+    live_genlo k (s1 + s2)%Qp g lo ⊣⊢
+    live_genlo k s1 g lo ∗ live_genlo k s2 g lo.
   Proof.
-    rewrite /live_gen -own_op singleton_op -pair_op.
+    rewrite /live_genlo -own_op singleton_op -pair_op.
     by rewrite (frac_op s1 s2) agree_idemp.
   Qed.
 
-  (* TWO SLICES OF ONE SLOT NAME ONE GENERATION.  This is the mechanism the
-     whole §17' design runs on: a share held since sys_open and the escrow
-     arm's own slice cannot disagree, so a stale generation is not merely
-     unhelpful, it is UNOWNABLE. *)
-  Lemma live_gen_agree k s1 g1 s2 g2 :
-    live_gen k s1 g1 -∗ live_gen k s2 g2 -∗ ⌜g1 = g2⌝.
+  (* TWO SLICES OF ONE SLOT NAME ONE GENERATION -- and now one EPOCH FLOOR.
+     A stale (g, lo) is not merely unhelpful, it is UNOWNABLE. *)
+  Lemma live_genlo_agree k s1 g1 lo1 s2 g2 lo2 :
+    live_genlo k s1 g1 lo1 -∗ live_genlo k s2 g2 lo2 -∗
+    ⌜g1 = g2 /\ lo1 = lo2⌝.
   Proof.
     iIntros "H1 H2".
     iDestruct (own_valid_2 with "H1 H2") as %Hv.
     iPureIntro. specialize (Hv k).
     rewrite singleton_op lookup_singleton -pair_op in Hv.
     apply Some_valid, pair_valid in Hv as [_ Hag].
-    exact (to_agree_op_inv_L _ _ Hag).
+    pose proof (to_agree_op_inv_L _ _ Hag) as Heq.
+    injection Heq as <- <-. done.
+  Qed.
+
+  Lemma live_genlo_join k s1 s2 g lo :
+    live_genlo k s1 g lo -∗ live_genlo k s2 g lo -∗
+    live_genlo k (s1 + s2)%Qp g lo.
+  Proof. iIntros "H1 H2". rewrite live_genlo_split. iFrame. Qed.
+
+  Lemma live_gen_split k s1 s2 g :
+    live_gen k (s1 + s2)%Qp g ⊣⊢ live_gen k s1 g ∗ live_gen k s2 g.
+  Proof.
+    rewrite /live_gen. iSplit.
+    - iIntros "[%lo H]". rewrite live_genlo_split.
+      iDestruct "H" as "[H1 H2]". iSplitL "H1"; by iExists lo.
+    - iIntros "[[%lo1 H1] [%lo2 H2]]".
+      iDestruct (live_genlo_agree with "H1 H2") as %[_ <-].
+      iExists lo1. iApply (live_genlo_join with "H1 H2").
+  Qed.
+
+  Lemma live_gen_agree k s1 g1 s2 g2 :
+    live_gen k s1 g1 -∗ live_gen k s2 g2 -∗ ⌜g1 = g2⌝.
+  Proof.
+    iIntros "[%lo1 H1] [%lo2 H2]".
+    iDestruct (live_genlo_agree with "H1 H2") as %[<- _]. done.
   Qed.
 
   Lemma live_gen_join k s1 s2 g :
@@ -2377,8 +2407,8 @@ Section IcacheRefGhost.
     live_gen k q g -∗ live_gen k (q/2)%Qp g ∗ live_gen k (q/2)%Qp g.
   Proof. iIntros "H". rewrite -live_gen_split Qp.div_2. iFrame. Qed.
 
-  Lemma live_gen_bound k s1 g1 s2 g2 :
-    live_gen k s1 g1 -∗ live_gen k s2 g2 -∗ ⌜(s1 + s2 ≤ 1)%Qp⌝.
+  Lemma live_genlo_bound k s1 g1 lo1 s2 g2 lo2 :
+    live_genlo k s1 g1 lo1 -∗ live_genlo k s2 g2 lo2 -∗ ⌜(s1 + s2 ≤ 1)%Qp⌝.
   Proof.
     iIntros "H1 H2".
     iDestruct (own_valid_2 with "H1 H2") as %Hv.
@@ -2386,6 +2416,13 @@ Section IcacheRefGhost.
     rewrite singleton_op lookup_singleton -pair_op in Hv.
     apply Some_valid, pair_valid in Hv as [Hfr _].
     by apply frac_valid in Hfr.
+  Qed.
+
+  Lemma live_gen_bound k s1 g1 s2 g2 :
+    live_gen k s1 g1 -∗ live_gen k s2 g2 -∗ ⌜(s1 + s2 ≤ 1)%Qp⌝.
+  Proof.
+    iIntros "[%lo1 H1] [%lo2 H2]".
+    iApply (live_genlo_bound with "H1 H2").
   Qed.
 
   Lemma live_frac_bound k s1 s2 :
@@ -2415,18 +2452,30 @@ Section IcacheRefGhost.
      The fresh generation is minted here together with its PENDING one-shot,
      because the two are born at the same instant and a generation with no
      pending token could never be filled. *)
-  Lemma live_gen_bump k (g : gname) :
-    live_gen k 1%Qp g ==∗ ∃ g' : gname, live_gen k 1%Qp g' ∗ ity_pending g'.
+  (* A6.145: the recycle CHOOSES the fresh epoch's floor [lo'] -- the arm
+     store's log position, supplied by the caller at the mint. *)
+  Lemma live_genlo_bump k (g : gname) (lo lo' : nat) :
+    live_genlo k 1%Qp g lo ==∗
+    ∃ g' : gname, live_genlo k 1%Qp g' lo' ∗ ity_pending g'.
   Proof.
     iIntros "H".
     iMod (own_alloc (Cinl (Excl ()) : ityR)) as (g') "Hp"; [done|].
-    rewrite /live_gen.
+    rewrite /live_genlo.
     iMod (own_update _ _
-            ({[ k := (1%Qp, to_agree (g' : leibnizO gname)) ]} : iliveUR)
+            ({[ k := (1%Qp, to_agree ((g', lo') : leibnizO (gname * nat))) ]}
+             : iliveUR)
            with "H") as "H".
     { apply singleton_update, cmra_update_exclusive.
       split; [by apply frac_valid | done]. }
     iModIntro. iExists g'. iFrame.
+  Qed.
+
+  Lemma live_gen_bump k (g : gname) :
+    live_gen k 1%Qp g ==∗ ∃ g' : gname, live_gen k 1%Qp g' ∗ ity_pending g'.
+  Proof.
+    iIntros "[%lo H]".
+    iMod (live_genlo_bump k g lo 0%nat with "H") as (g') "[H Hp]".
+    iModIntro. iExists g'. iFrame "Hp". by iExists 0%nat.
   Qed.
 
   Lemma live_frac_bump k :
@@ -2442,7 +2491,7 @@ Section IcacheRefGhost.
     iIntros "H".
     iDestruct (big_opL_own_1 with "H") as "H".
     iApply (big_sepL_mono with "H").
-    intros idx j _. iIntros "H". by iExists g.
+    intros idx j _. iIntros "H". by iExists g, 0%nat.
   Qed.
 
   (* ================================================================== *)
@@ -2470,24 +2519,26 @@ Section IcacheRefGhost.
      thing because THEIR keyspace (the inum's [Z]) is not ours to reserve. *)
   Definition frzname (b : bool) : gname := if b then 2%positive else 1%positive.
 
+  (* A6.145: the selector's [lo] is pinned 0 -- the reserved keyspace
+     carries no epoch. *)
   Definition frzsel (k : nat) (q : Qp) (b : bool) : iProp Σ :=
-    live_gen (NINODE + k)%nat q (frzname b).
+    live_genlo (NINODE + k)%nat q (frzname b) 0%nat.
 
   Global Instance frzsel_timeless k q b : Timeless (frzsel k q b).
-  Proof. rewrite /frzsel /live_gen. apply _. Qed.
+  Proof. rewrite /frzsel /live_genlo. apply _. Qed.
 
   Lemma frzsel_agree k q1 b1 q2 b2 :
     frzsel k q1 b1 -∗ frzsel k q2 b2 -∗ ⌜b1 = b2⌝.
   Proof.
     iIntros "H1 H2". rewrite /frzsel.
-    iDestruct (live_gen_agree with "H1 H2") as %Heq.
+    iDestruct (live_genlo_agree with "H1 H2") as %[Heq _].
     iPureIntro. rewrite /frzname in Heq.
     destruct b1, b2; [reflexivity | discriminate | discriminate | reflexivity].
   Qed.
 
   Lemma frzsel_split k q1 q2 b :
     frzsel k (q1 + q2)%Qp b ⊣⊢ frzsel k q1 b ∗ frzsel k q2 b.
-  Proof. rewrite /frzsel. apply live_gen_split. Qed.
+  Proof. rewrite /frzsel. apply live_genlo_split. Qed.
 
   Lemma frzsel_join k q1 q2 b :
     frzsel k q1 b -∗ frzsel k q2 b -∗ frzsel k (q1 + q2)%Qp b.
@@ -2513,10 +2564,11 @@ Section IcacheRefGhost.
      park's ½, and the retirement the arm's ½ and the two quarters. *)
   Lemma frzsel_flip k b b' : frzsel k 1%Qp b ==∗ frzsel k 1%Qp b'.
   Proof.
-    rewrite /frzsel /live_gen. iIntros "H".
+    rewrite /frzsel /live_genlo. iIntros "H".
     iMod (own_update _ _
             ({[ (NINODE + k)%nat
-                := (1%Qp, to_agree (frzname b' : leibnizO gname)) ]} : iliveUR)
+                := (1%Qp, to_agree ((frzname b', 0%nat)
+                                    : leibnizO (gname * nat))) ]} : iliveUR)
            with "H") as "H".
     { apply singleton_update, cmra_update_exclusive.
       split; [by apply frac_valid | done]. }
@@ -2529,10 +2581,12 @@ Section IcacheRefGhost.
   Lemma frzsel_boot (k : nat) :
     live_frac (NINODE + k)%nat 1%Qp ==∗ frzsel k 1%Qp false.
   Proof.
-    rewrite /frzsel /live_frac /live_gen. iIntros "[%g H]".
+    rewrite /frzsel /live_frac /live_gen /live_genlo.
+    iIntros "[%g [%lo H]]".
     iMod (own_update _ _
             ({[ (NINODE + k)%nat
-                := (1%Qp, to_agree (frzname false : leibnizO gname)) ]} : iliveUR)
+                := (1%Qp, to_agree ((frzname false, 0%nat)
+                                    : leibnizO (gname * nat))) ]} : iliveUR)
            with "H") as "H".
     { apply singleton_update, cmra_update_exclusive.
       split; [by apply frac_valid | done]. }

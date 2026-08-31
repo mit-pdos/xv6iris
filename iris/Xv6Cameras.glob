@@ -1,4 +1,4 @@
-DIGEST 090d62af3c9cd61b9d855326f0aa898d
+DIGEST db424c4ea411a25fa2c6056d459888c8
 Fxv6iris.Xv6Cameras
 R3440:3445 Stdlib.ZArith.ZArith <> <> lib
 R3447:3450 Stdlib.Lists.List <> <> lib
@@ -580,358 +580,360 @@ R23950:23954 iris.algebra.cmra <> prodR canonstruc
 R23962:23970 iris.algebra.numbers <> positiveR canonstruc
 R23956:23960 iris.algebra.frac <> fracR canonstruc
 R23945:23947 Corelib.Init.Datatypes <> nat ind
-def 24236:24242 <> iliveUR
-R24246:24250 iris.algebra.cmra <> ucmra rec
-R24257:24262 iris.algebra.gmap <> gmapUR canonstruc
-R24269:24273 iris.algebra.cmra <> prodR canonstruc
-R24282:24287 iris.algebra.agree <> agreeR canonstruc
-R24290:24297 iris.algebra.ofe <> leibnizO abbrev
-R24299:24303 iris.base_logic.lib.iprop <> gname def
-R24275:24279 iris.algebra.frac <> fracR canonstruc
-R24264:24266 Corelib.Init.Datatypes <> nat ind
-def 24680:24683 <> ityR
-R24687:24690 iris.algebra.cmra <> cmra rec
-R24695:24699 iris.algebra.csum <> csumR canonstruc
-R24716:24721 iris.algebra.agree <> agreeR canonstruc
-R24724:24731 iris.algebra.ofe <> leibnizO abbrev
-R24734:24735 stdpp.bitvector.definitions <> bv rec
-R24702:24706 iris.algebra.excl <> exclR canonstruc
-R24708:24712 iris.algebra.ofe <> unitO canonstruc
-ind 25002:25004 <> frz
-constr 25009:25014 <> FrzOff
-constr 25018:25023 <> FrzPre
-constr 25039:25045 <> FrzPost
-R25031:25034 Corelib.Init.Datatypes <> bool ind
-binder 25026:25027 <> rg:80
-R25053:25056 Corelib.Init.Datatypes <> bool ind
-binder 25048:25049 <> rg:81
-scheme 25002:25004 <> frz_rect
-scheme 25002:25004 <> frz_ind
-scheme 25002:25004 <> frz_rec
-scheme 25002:25004 <> frz_sind
-inst 25077:25086 <> frz_eq_dec
-R25090:25099 stdpp.base <> EqDecision abbrev
-R25101:25103 xv6iris.Xv6Cameras <> frz ind
-inst 25154:25166 <> frz_inhabited
-R25170:25178 stdpp.base <> Inhabited class
-R25180:25182 xv6iris.Xv6Cameras <> frz ind
-R25187:25194 stdpp.base <> populate constr
-R25196:25201 xv6iris.Xv6Cameras <> FrzOff constr
-def 25573:25576 <> frzR
-R25581:25584 iris.algebra.cmra <> cmra rec
-R25590:25594 iris.algebra.excl <> exclR canonstruc
-R25597:25604 iris.algebra.ofe <> leibnizO abbrev
-R25606:25608 xv6iris.Xv6Cameras <> frz ind
-def 25623:25627 <> frzUR
-R25631:25635 iris.algebra.cmra <> ucmra rec
-R25640:25647 iris.algebra.cmra <> optionUR canonstruc
-R25649:25652 xv6iris.Xv6Cameras <> frzR def
-def 25880:25883 <> ctyR
-R25888:25891 iris.algebra.cmra <> cmra rec
-R25897:25901 iris.algebra.excl <> exclR canonstruc
-R25904:25911 iris.algebra.ofe <> leibnizO abbrev
-R25914:25915 stdpp.bitvector.definitions <> bv rec
-def 25934:25938 <> ctyUR
-R25942:25946 iris.algebra.cmra <> ucmra rec
-R25951:25958 iris.algebra.cmra <> optionUR canonstruc
-R25960:25963 xv6iris.Xv6Cameras <> ctyR def
-def 26306:26316 <> linkElemUR0
-R26320:26324 iris.algebra.cmra <> ucmra rec
-R26331:26336 iris.algebra.cmra <> prodUR canonstruc
-R26446:26453 iris.algebra.cmra <> optionUR canonstruc
-R26456:26467 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
-R26470:26477 iris.algebra.ofe <> leibnizO abbrev
-R26479:26479 Corelib.Numbers.BinNums <> Z ind
-R26339:26344 iris.algebra.cmra <> prodUR canonstruc
-R26429:26433 iris.algebra.numbers <> natUR canonstruc
-R26347:26352 iris.algebra.cmra <> prodUR canonstruc
-R26422:26426 xv6iris.Xv6Cameras <> ctyUR def
-R26355:26360 iris.algebra.cmra <> prodUR canonstruc
-R26398:26402 iris.algebra.numbers <> natUR canonstruc
-R26363:26368 iris.algebra.cmra <> prodUR canonstruc
-R26377:26382 iris.algebra.cmra <> prodUR canonstruc
-R26390:26394 iris.algebra.numbers <> natUR canonstruc
-R26384:26388 iris.algebra.numbers <> natUR canonstruc
-R26370:26374 iris.algebra.numbers <> natUR canonstruc
-def 26497:26507 <> linkElemUR1
-R26511:26515 iris.algebra.cmra <> ucmra rec
-R26520:26525 iris.algebra.cmra <> prodUR canonstruc
-R26539:26543 xv6iris.Xv6Cameras <> frzUR def
-R26527:26537 xv6iris.Xv6Cameras <> linkElemUR0 def
-def 26805:26814 <> linkElemUR
-R26818:26822 iris.algebra.cmra <> ucmra rec
-R26827:26832 iris.algebra.cmra <> prodUR canonstruc
-R26846:26850 iris.algebra.numbers <> natUR canonstruc
-R26834:26844 xv6iris.Xv6Cameras <> linkElemUR1 def
-def 26865:26870 <> linkUR
-R26874:26878 iris.algebra.cmra <> ucmra rec
-R26883:26888 iris.algebra.gmap <> gmapUR canonstruc
-R26893:26897 iris.algebra.auth <> authR def
-R26899:26908 xv6iris.Xv6Cameras <> linkElemUR def
-R26890:26890 Corelib.Numbers.BinNums <> Z ind
-def 27180:27185 <> icntUR
-R27189:27193 iris.algebra.cmra <> ucmra rec
-R27198:27203 iris.algebra.gmap <> gmapUR canonstruc
-R27208:27219 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
-R27222:27229 iris.algebra.ofe <> leibnizO abbrev
-R27231:27233 Corelib.Init.Datatypes <> nat ind
-R27205:27205 Corelib.Numbers.BinNums <> Z ind
-def 27312:27317 <> frzoUR
-R27321:27325 iris.algebra.cmra <> ucmra rec
-R27330:27335 iris.algebra.gmap <> gmapUR canonstruc
-R27340:27344 iris.algebra.excl <> exclR canonstruc
-R27346:27350 iris.algebra.ofe <> unitO canonstruc
-R27337:27337 Corelib.Numbers.BinNums <> Z ind
-def 27592:27597 <> frzmUR
-R27601:27605 iris.algebra.cmra <> ucmra rec
-R27610:27615 iris.algebra.gmap <> gmapUR canonstruc
-R27620:27631 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
-R27634:27641 iris.algebra.ofe <> leibnizO abbrev
-R27643:27646 Corelib.Init.Datatypes <> bool ind
-R27617:27617 Corelib.Numbers.BinNums <> Z ind
-def 28352:28358 <> dviewUR
-R28362:28366 iris.algebra.cmra <> ucmra rec
-R28373:28378 iris.algebra.gmap <> gmapUR canonstruc
-R28383:28394 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
-R28397:28404 iris.algebra.ofe <> leibnizO abbrev
-R28407:28410 stdpp.gmap <> gmap rec
-R28426:28426 Corelib.Numbers.BinNums <> Z ind
-R28413:28416 Corelib.Init.Datatypes <> list ind
-R28419:28420 stdpp.bitvector.definitions <> bv rec
-R28380:28380 Corelib.Numbers.BinNums <> Z ind
-def 29059:29065 <> fviewUR
-R29069:29073 iris.algebra.cmra <> ucmra rec
-R29080:29085 iris.algebra.gmap <> gmapUR canonstruc
-R29090:29101 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
-R29104:29111 iris.algebra.ofe <> leibnizO abbrev
-R29114:29117 Corelib.Init.Datatypes <> list ind
-R29120:29121 stdpp.bitvector.definitions <> bv rec
-R29087:29087 Corelib.Numbers.BinNums <> Z ind
-ind 29388:29393 <> ic_dep
-constr 29409:29415 <> DepNone
-constr 29421:29426 <> DepRef
-constr 29492:29497 <> DepShr
-constr 29563:29568 <> DepFrz
-R29433:29434 stdpp.numbers <> Qp rec
-binder 29429:29429 <> q:84
-R29449:29470 SailStdpp.Values <> mword def
-binder 29438:29440 <> dev:85
-binder 29442:29445 <> inum:86
-R29481:29485 iris.base_logic.lib.iprop <> gname def
-binder 29477:29477 <> g:87
-R29504:29505 stdpp.numbers <> Qp rec
-binder 29500:29500 <> s:88
-R29520:29541 SailStdpp.Values <> mword def
-binder 29509:29511 <> dev:89
-binder 29513:29516 <> inum:90
-R29552:29556 iris.base_logic.lib.iprop <> gname def
-binder 29548:29548 <> g:91
-R29575:29576 stdpp.numbers <> Qp rec
-binder 29571:29571 <> q:92
-R29591:29612 SailStdpp.Values <> mword def
-binder 29580:29582 <> dev:93
-binder 29584:29587 <> inum:94
-scheme 29388:29393 <> ic_dep_rect
-scheme 29388:29393 <> ic_dep_ind
-scheme 29388:29393 <> ic_dep_rec
-scheme 29388:29393 <> ic_dep_sind
-rec 30033:30039 <> icacheG
-proj 30073:30082 <> icache_inG
-proj 30106:30115 <> icache_idG
-proj 30200:30211 <> icache_liveG
-proj 30234:30244 <> icache_depG
-proj 30273:30283 <> icache_ityG
-proj 30303:30314 <> icache_linkG
-proj 30415:30426 <> icache_tickG
-proj 30455:30465 <> icache_regG
-proj 30510:30520 <> icache_cntG
-proj 30542:30553 <> icache_frzoG
-proj 30575:30586 <> icache_frzmG
-proj 30608:30620 <> icache_dviewG
-proj 30643:30655 <> icache_fviewG
-R30047:30055 iris.base_logic.lib.iprop <> gFunctors rec
-binder 30042:30043 <> Σ:95
-R30087:30089 iris.base_logic.lib.own <> inG class
-R30091:30092 xv6iris.Xv6Cameras <> Σ:95 var
-R30094:30101 xv6iris.Xv6Cameras <> icacheUR def
-R30120:30129 iris.base_logic.lib.ghost_var <> ghost_varG class
-R30131:30132 xv6iris.Xv6Cameras <> Σ:95 var
-R30167:30169 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
-R30139:30141 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
-R30135:30138 Corelib.Init.Datatypes <> bool ind
-R30142:30163 SailStdpp.Values <> mword def
-R30170:30191 SailStdpp.Values <> mword def
-R30216:30218 iris.base_logic.lib.own <> inG class
-R30220:30221 xv6iris.Xv6Cameras <> Σ:95 var
-R30223:30229 xv6iris.Xv6Cameras <> iliveUR def
-R30249:30258 iris.base_logic.lib.ghost_var <> ghost_varG class
-R30260:30261 xv6iris.Xv6Cameras <> Σ:95 var
-R30263:30268 xv6iris.Xv6Cameras <> ic_dep ind
-R30288:30290 iris.base_logic.lib.own <> inG class
-R30292:30293 xv6iris.Xv6Cameras <> Σ:95 var
-R30295:30298 xv6iris.Xv6Cameras <> ityR def
-R30319:30321 iris.base_logic.lib.own <> inG class
-R30323:30324 xv6iris.Xv6Cameras <> Σ:95 var
-R30326:30331 xv6iris.Xv6Cameras <> linkUR def
-R30431:30433 iris.base_logic.lib.own <> inG class
-R30435:30436 xv6iris.Xv6Cameras <> Σ:95 var
-R30439:30443 iris.algebra.excl <> exclR canonstruc
-R30445:30449 iris.algebra.ofe <> unitO canonstruc
-R30470:30479 iris.base_logic.lib.ghost_map <> ghost_mapG class
-R30492:30494 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
-R30487:30491 iris.base_logic.lib.iprop <> gname def
-R30495:30499 iris.base_logic.lib.iprop <> gname def
-R30484:30484 Corelib.Numbers.BinNums <> Z ind
+def 24578:24584 <> iliveUR
+R24588:24592 iris.algebra.cmra <> ucmra rec
+R24599:24604 iris.algebra.gmap <> gmapUR canonstruc
+R24611:24615 iris.algebra.cmra <> prodR canonstruc
+R24624:24629 iris.algebra.agree <> agreeR canonstruc
+R24632:24639 iris.algebra.ofe <> leibnizO abbrev
+R24647:24649 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R24642:24646 iris.base_logic.lib.iprop <> gname def
+R24650:24652 Corelib.Init.Datatypes <> nat ind
+R24617:24621 iris.algebra.frac <> fracR canonstruc
+R24606:24608 Corelib.Init.Datatypes <> nat ind
+def 25030:25033 <> ityR
+R25037:25040 iris.algebra.cmra <> cmra rec
+R25045:25049 iris.algebra.csum <> csumR canonstruc
+R25066:25071 iris.algebra.agree <> agreeR canonstruc
+R25074:25081 iris.algebra.ofe <> leibnizO abbrev
+R25084:25085 stdpp.bitvector.definitions <> bv rec
+R25052:25056 iris.algebra.excl <> exclR canonstruc
+R25058:25062 iris.algebra.ofe <> unitO canonstruc
+ind 25352:25354 <> frz
+constr 25359:25364 <> FrzOff
+constr 25368:25373 <> FrzPre
+constr 25389:25395 <> FrzPost
+R25381:25384 Corelib.Init.Datatypes <> bool ind
+binder 25376:25377 <> rg:80
+R25403:25406 Corelib.Init.Datatypes <> bool ind
+binder 25398:25399 <> rg:81
+scheme 25352:25354 <> frz_rect
+scheme 25352:25354 <> frz_ind
+scheme 25352:25354 <> frz_rec
+scheme 25352:25354 <> frz_sind
+inst 25427:25436 <> frz_eq_dec
+R25440:25449 stdpp.base <> EqDecision abbrev
+R25451:25453 xv6iris.Xv6Cameras <> frz ind
+inst 25504:25516 <> frz_inhabited
+R25520:25528 stdpp.base <> Inhabited class
+R25530:25532 xv6iris.Xv6Cameras <> frz ind
+R25537:25544 stdpp.base <> populate constr
+R25546:25551 xv6iris.Xv6Cameras <> FrzOff constr
+def 25923:25926 <> frzR
+R25931:25934 iris.algebra.cmra <> cmra rec
+R25940:25944 iris.algebra.excl <> exclR canonstruc
+R25947:25954 iris.algebra.ofe <> leibnizO abbrev
+R25956:25958 xv6iris.Xv6Cameras <> frz ind
+def 25973:25977 <> frzUR
+R25981:25985 iris.algebra.cmra <> ucmra rec
+R25990:25997 iris.algebra.cmra <> optionUR canonstruc
+R25999:26002 xv6iris.Xv6Cameras <> frzR def
+def 26230:26233 <> ctyR
+R26238:26241 iris.algebra.cmra <> cmra rec
+R26247:26251 iris.algebra.excl <> exclR canonstruc
+R26254:26261 iris.algebra.ofe <> leibnizO abbrev
+R26264:26265 stdpp.bitvector.definitions <> bv rec
+def 26284:26288 <> ctyUR
+R26292:26296 iris.algebra.cmra <> ucmra rec
+R26301:26308 iris.algebra.cmra <> optionUR canonstruc
+R26310:26313 xv6iris.Xv6Cameras <> ctyR def
+def 26656:26666 <> linkElemUR0
+R26670:26674 iris.algebra.cmra <> ucmra rec
+R26681:26686 iris.algebra.cmra <> prodUR canonstruc
+R26796:26803 iris.algebra.cmra <> optionUR canonstruc
+R26806:26817 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
+R26820:26827 iris.algebra.ofe <> leibnizO abbrev
+R26829:26829 Corelib.Numbers.BinNums <> Z ind
+R26689:26694 iris.algebra.cmra <> prodUR canonstruc
+R26779:26783 iris.algebra.numbers <> natUR canonstruc
+R26697:26702 iris.algebra.cmra <> prodUR canonstruc
+R26772:26776 xv6iris.Xv6Cameras <> ctyUR def
+R26705:26710 iris.algebra.cmra <> prodUR canonstruc
+R26748:26752 iris.algebra.numbers <> natUR canonstruc
+R26713:26718 iris.algebra.cmra <> prodUR canonstruc
+R26727:26732 iris.algebra.cmra <> prodUR canonstruc
+R26740:26744 iris.algebra.numbers <> natUR canonstruc
+R26734:26738 iris.algebra.numbers <> natUR canonstruc
+R26720:26724 iris.algebra.numbers <> natUR canonstruc
+def 26847:26857 <> linkElemUR1
+R26861:26865 iris.algebra.cmra <> ucmra rec
+R26870:26875 iris.algebra.cmra <> prodUR canonstruc
+R26889:26893 xv6iris.Xv6Cameras <> frzUR def
+R26877:26887 xv6iris.Xv6Cameras <> linkElemUR0 def
+def 27155:27164 <> linkElemUR
+R27168:27172 iris.algebra.cmra <> ucmra rec
+R27177:27182 iris.algebra.cmra <> prodUR canonstruc
+R27196:27200 iris.algebra.numbers <> natUR canonstruc
+R27184:27194 xv6iris.Xv6Cameras <> linkElemUR1 def
+def 27215:27220 <> linkUR
+R27224:27228 iris.algebra.cmra <> ucmra rec
+R27233:27238 iris.algebra.gmap <> gmapUR canonstruc
+R27243:27247 iris.algebra.auth <> authR def
+R27249:27258 xv6iris.Xv6Cameras <> linkElemUR def
+R27240:27240 Corelib.Numbers.BinNums <> Z ind
+def 27530:27535 <> icntUR
+R27539:27543 iris.algebra.cmra <> ucmra rec
+R27548:27553 iris.algebra.gmap <> gmapUR canonstruc
+R27558:27569 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
+R27572:27579 iris.algebra.ofe <> leibnizO abbrev
+R27581:27583 Corelib.Init.Datatypes <> nat ind
+R27555:27555 Corelib.Numbers.BinNums <> Z ind
+def 27662:27667 <> frzoUR
+R27671:27675 iris.algebra.cmra <> ucmra rec
+R27680:27685 iris.algebra.gmap <> gmapUR canonstruc
+R27690:27694 iris.algebra.excl <> exclR canonstruc
+R27696:27700 iris.algebra.ofe <> unitO canonstruc
+R27687:27687 Corelib.Numbers.BinNums <> Z ind
+def 27942:27947 <> frzmUR
+R27951:27955 iris.algebra.cmra <> ucmra rec
+R27960:27965 iris.algebra.gmap <> gmapUR canonstruc
+R27970:27981 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
+R27984:27991 iris.algebra.ofe <> leibnizO abbrev
+R27993:27996 Corelib.Init.Datatypes <> bool ind
+R27967:27967 Corelib.Numbers.BinNums <> Z ind
+def 28702:28708 <> dviewUR
+R28712:28716 iris.algebra.cmra <> ucmra rec
+R28723:28728 iris.algebra.gmap <> gmapUR canonstruc
+R28733:28744 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
+R28747:28754 iris.algebra.ofe <> leibnizO abbrev
+R28757:28760 stdpp.gmap <> gmap rec
+R28776:28776 Corelib.Numbers.BinNums <> Z ind
+R28763:28766 Corelib.Init.Datatypes <> list ind
+R28769:28770 stdpp.bitvector.definitions <> bv rec
+R28730:28730 Corelib.Numbers.BinNums <> Z ind
+def 29409:29415 <> fviewUR
+R29419:29423 iris.algebra.cmra <> ucmra rec
+R29430:29435 iris.algebra.gmap <> gmapUR canonstruc
+R29440:29451 iris.algebra.lib.dfrac_agree <> dfrac_agreeR def
+R29454:29461 iris.algebra.ofe <> leibnizO abbrev
+R29464:29467 Corelib.Init.Datatypes <> list ind
+R29470:29471 stdpp.bitvector.definitions <> bv rec
+R29437:29437 Corelib.Numbers.BinNums <> Z ind
+ind 29738:29743 <> ic_dep
+constr 29759:29765 <> DepNone
+constr 29771:29776 <> DepRef
+constr 29842:29847 <> DepShr
+constr 29913:29918 <> DepFrz
+R29783:29784 stdpp.numbers <> Qp rec
+binder 29779:29779 <> q:84
+R29799:29820 SailStdpp.Values <> mword def
+binder 29788:29790 <> dev:85
+binder 29792:29795 <> inum:86
+R29831:29835 iris.base_logic.lib.iprop <> gname def
+binder 29827:29827 <> g:87
+R29854:29855 stdpp.numbers <> Qp rec
+binder 29850:29850 <> s:88
+R29870:29891 SailStdpp.Values <> mword def
+binder 29859:29861 <> dev:89
+binder 29863:29866 <> inum:90
+R29902:29906 iris.base_logic.lib.iprop <> gname def
+binder 29898:29898 <> g:91
+R29925:29926 stdpp.numbers <> Qp rec
+binder 29921:29921 <> q:92
+R29941:29962 SailStdpp.Values <> mword def
+binder 29930:29932 <> dev:93
+binder 29934:29937 <> inum:94
+scheme 29738:29743 <> ic_dep_rect
+scheme 29738:29743 <> ic_dep_ind
+scheme 29738:29743 <> ic_dep_rec
+scheme 29738:29743 <> ic_dep_sind
+rec 30383:30389 <> icacheG
+proj 30423:30432 <> icache_inG
+proj 30456:30465 <> icache_idG
+proj 30550:30561 <> icache_liveG
+proj 30584:30594 <> icache_depG
+proj 30623:30633 <> icache_ityG
+proj 30653:30664 <> icache_linkG
+proj 30765:30776 <> icache_tickG
+proj 30805:30815 <> icache_regG
+proj 30860:30870 <> icache_cntG
+proj 30892:30903 <> icache_frzoG
+proj 30925:30936 <> icache_frzmG
+proj 30958:30970 <> icache_dviewG
+proj 30993:31005 <> icache_fviewG
+R30397:30405 iris.base_logic.lib.iprop <> gFunctors rec
+binder 30392:30393 <> Σ:95
+R30437:30439 iris.base_logic.lib.own <> inG class
+R30441:30442 xv6iris.Xv6Cameras <> Σ:95 var
+R30444:30451 xv6iris.Xv6Cameras <> icacheUR def
+R30470:30479 iris.base_logic.lib.ghost_var <> ghost_varG class
 R30481:30482 xv6iris.Xv6Cameras <> Σ:95 var
-R30525:30527 iris.base_logic.lib.own <> inG class
-R30529:30530 xv6iris.Xv6Cameras <> Σ:95 var
-R30532:30537 xv6iris.Xv6Cameras <> icntUR def
-R30558:30560 iris.base_logic.lib.own <> inG class
-R30562:30563 xv6iris.Xv6Cameras <> Σ:95 var
-R30565:30570 xv6iris.Xv6Cameras <> frzoUR def
-R30591:30593 iris.base_logic.lib.own <> inG class
-R30595:30596 xv6iris.Xv6Cameras <> Σ:95 var
-R30598:30603 xv6iris.Xv6Cameras <> frzmUR def
-R30625:30627 iris.base_logic.lib.own <> inG class
-R30629:30630 xv6iris.Xv6Cameras <> Σ:95 var
-R30632:30638 xv6iris.Xv6Cameras <> dviewUR def
-R30660:30662 iris.base_logic.lib.own <> inG class
-R30664:30665 xv6iris.Xv6Cameras <> Σ:95 var
-R30667:30673 xv6iris.Xv6Cameras <> fviewUR def
-def 30690:30697 <> icacheΣ
-R30701:30709 iris.base_logic.lib.iprop <> gFunctors rec
-R30716:30717 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R30735:30736 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R30811:30816 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R30833:30834 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R30853:30854 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R30868:30869 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R30885:30890 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R30913:30914 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R30949:30954 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R30970:30971 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R30987:30988 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R31004:31005 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R31022:31027 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R31044:31044 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R30718:30725 iris.base_logic.lib.iprop <> GFunctor constr
-R30727:30734 xv6iris.Xv6Cameras <> icacheUR def
-R30737:30747 iris.base_logic.lib.ghost_var <> ghost_varΣ def
-R30782:30784 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
-R30754:30756 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
-R30750:30753 Corelib.Init.Datatypes <> bool ind
-R30757:30778 SailStdpp.Values <> mword def
-R30785:30806 SailStdpp.Values <> mword def
-R30817:30824 iris.base_logic.lib.iprop <> GFunctor constr
-R30826:30832 xv6iris.Xv6Cameras <> iliveUR def
-R30835:30845 iris.base_logic.lib.ghost_var <> ghost_varΣ def
-R30847:30852 xv6iris.Xv6Cameras <> ic_dep ind
-R30855:30862 iris.base_logic.lib.iprop <> GFunctor constr
-R30864:30867 xv6iris.Xv6Cameras <> ityR def
-R30870:30877 iris.base_logic.lib.iprop <> GFunctor constr
-R30879:30884 xv6iris.Xv6Cameras <> linkUR def
-R30891:30898 iris.base_logic.lib.iprop <> GFunctor constr
-R30901:30905 iris.algebra.excl <> exclR canonstruc
-R30907:30911 iris.algebra.ofe <> unitO canonstruc
-R30915:30925 iris.base_logic.lib.ghost_map <> ghost_mapΣ def
-R30935:30937 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
-R30930:30934 iris.base_logic.lib.iprop <> gname def
-R30938:30942 iris.base_logic.lib.iprop <> gname def
-R30927:30927 Corelib.Numbers.BinNums <> Z ind
-R30955:30962 iris.base_logic.lib.iprop <> GFunctor constr
-R30964:30969 xv6iris.Xv6Cameras <> icntUR def
-R30972:30979 iris.base_logic.lib.iprop <> GFunctor constr
-R30981:30986 xv6iris.Xv6Cameras <> frzoUR def
-R30989:30996 iris.base_logic.lib.iprop <> GFunctor constr
-R30998:31003 xv6iris.Xv6Cameras <> frzmUR def
-R31006:31013 iris.base_logic.lib.iprop <> GFunctor constr
-R31015:31021 xv6iris.Xv6Cameras <> dviewUR def
-R31028:31035 iris.base_logic.lib.iprop <> GFunctor constr
-R31037:31043 xv6iris.Xv6Cameras <> fviewUR def
-inst 31063:31075 <> subG_icacheΣ
-binder 31078:31079 <> Σ:110
-R31100:31103 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R31084:31087 iris.base_logic.lib.iprop <> subG class
-R31098:31099 xv6iris.Xv6Cameras <> Σ:110 var
-R31089:31096 xv6iris.Xv6Cameras <> icacheΣ def
-R31104:31110 xv6iris.Xv6Cameras <> icacheG class
-R31112:31113 xv6iris.Xv6Cameras <> Σ:110 var
-rec 31376:31380 <> pipeG
-proj 31412:31419 <> pipe_inG
-proj 31477:31489 <> pipe_mark_inG
-R31388:31396 iris.base_logic.lib.iprop <> gFunctors rec
-binder 31383:31384 <> Σ:111
-R31424:31426 iris.base_logic.lib.own <> inG class
-R31428:31429 xv6iris.Xv6Cameras <> Σ:111 var
-R31431:31435 iris.algebra.frac <> fracR canonstruc
-R31494:31496 iris.base_logic.lib.own <> inG class
-R31498:31499 xv6iris.Xv6Cameras <> Σ:111 var
-R31501:31506 iris.algebra.dfrac <> dfracR canonstruc
-def 31558:31563 <> pipeΣ
-R31567:31575 iris.base_logic.lib.iprop <> gFunctors rec
-R31580:31581 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R31596:31597 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R31613:31613 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R31582:31589 iris.base_logic.lib.iprop <> GFunctor constr
-R31591:31595 iris.algebra.frac <> fracR canonstruc
-R31598:31605 iris.base_logic.lib.iprop <> GFunctor constr
-R31607:31612 iris.algebra.dfrac <> dfracR canonstruc
-inst 31632:31642 <> subG_pipeΣ
-binder 31645:31646 <> Σ:115
-R31665:31668 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R31651:31654 iris.base_logic.lib.iprop <> subG class
-R31663:31664 xv6iris.Xv6Cameras <> Σ:115 var
-R31656:31661 xv6iris.Xv6Cameras <> pipeΣ def
-R31669:31673 xv6iris.Xv6Cameras <> pipeG class
-R31675:31676 xv6iris.Xv6Cameras <> Σ:115 var
-rec 32046:32049 <> sieG
-proj 32078:32084 <> sie_inG
-R32057:32065 iris.base_logic.lib.iprop <> gFunctors rec
-binder 32052:32053 <> Σ:116
-R32089:32098 iris.base_logic.lib.ghost_var <> ghost_varG class
-R32100:32101 xv6iris.Xv6Cameras <> Σ:116 var
-R32104:32125 SailStdpp.Values <> mword def
-def 32144:32148 <> sieΣ
-R32152:32160 iris.base_logic.lib.iprop <> gFunctors rec
-R32165:32167 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R32206:32207 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R32168:32178 iris.base_logic.lib.ghost_var <> ghost_varΣ def
-R32181:32202 SailStdpp.Values <> mword def
-inst 32226:32235 <> subG_sieΣ
-binder 32238:32239 <> Σ:119
-R32257:32260 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R32244:32247 iris.base_logic.lib.iprop <> subG class
-R32255:32256 xv6iris.Xv6Cameras <> Σ:119 var
-R32249:32253 xv6iris.Xv6Cameras <> sieΣ def
-R32261:32264 xv6iris.Xv6Cameras <> sieG class
-R32266:32267 xv6iris.Xv6Cameras <> Σ:119 var
-rec 32530:32533 <> uioG
-proj 32559:32568 <> uio_stdinG
-proj 32604:32611 <> uio_brkG
-R32541:32549 iris.base_logic.lib.iprop <> gFunctors rec
-binder 32536:32537 <> Σ:120
-R32573:32582 iris.base_logic.lib.ghost_var <> ghost_varG class
-R32584:32585 xv6iris.Xv6Cameras <> Σ:120 var
-R32588:32591 Corelib.Init.Datatypes <> list ind
-R32594:32595 stdpp.bitvector.definitions <> bv rec
-R32618:32627 iris.base_logic.lib.ghost_var <> ghost_varG class
-R32629:32630 xv6iris.Xv6Cameras <> Σ:120 var
-R32632:32632 Corelib.Numbers.BinNums <> Z ind
-def 32649:32653 <> uioΣ
-R32657:32665 iris.base_logic.lib.iprop <> gFunctors rec
-R32670:32672 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R32698:32699 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R32713:32714 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
-R32673:32683 iris.base_logic.lib.ghost_var <> ghost_varΣ def
-R32686:32689 Corelib.Init.Datatypes <> list ind
-R32692:32693 stdpp.bitvector.definitions <> bv rec
-R32700:32710 iris.base_logic.lib.ghost_var <> ghost_varΣ def
-R32712:32712 Corelib.Numbers.BinNums <> Z ind
-inst 32733:32742 <> subG_uioΣ
-binder 32745:32746 <> Σ:124
-R32764:32767 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R32751:32754 iris.base_logic.lib.iprop <> subG class
-R32762:32763 xv6iris.Xv6Cameras <> Σ:124 var
-R32756:32760 xv6iris.Xv6Cameras <> uioΣ def
-R32768:32771 xv6iris.Xv6Cameras <> uioG class
-R32773:32774 xv6iris.Xv6Cameras <> Σ:124 var
+R30517:30519 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R30489:30491 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R30485:30488 Corelib.Init.Datatypes <> bool ind
+R30492:30513 SailStdpp.Values <> mword def
+R30520:30541 SailStdpp.Values <> mword def
+R30566:30568 iris.base_logic.lib.own <> inG class
+R30570:30571 xv6iris.Xv6Cameras <> Σ:95 var
+R30573:30579 xv6iris.Xv6Cameras <> iliveUR def
+R30599:30608 iris.base_logic.lib.ghost_var <> ghost_varG class
+R30610:30611 xv6iris.Xv6Cameras <> Σ:95 var
+R30613:30618 xv6iris.Xv6Cameras <> ic_dep ind
+R30638:30640 iris.base_logic.lib.own <> inG class
+R30642:30643 xv6iris.Xv6Cameras <> Σ:95 var
+R30645:30648 xv6iris.Xv6Cameras <> ityR def
+R30669:30671 iris.base_logic.lib.own <> inG class
+R30673:30674 xv6iris.Xv6Cameras <> Σ:95 var
+R30676:30681 xv6iris.Xv6Cameras <> linkUR def
+R30781:30783 iris.base_logic.lib.own <> inG class
+R30785:30786 xv6iris.Xv6Cameras <> Σ:95 var
+R30789:30793 iris.algebra.excl <> exclR canonstruc
+R30795:30799 iris.algebra.ofe <> unitO canonstruc
+R30820:30829 iris.base_logic.lib.ghost_map <> ghost_mapG class
+R30842:30844 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R30837:30841 iris.base_logic.lib.iprop <> gname def
+R30845:30849 iris.base_logic.lib.iprop <> gname def
+R30834:30834 Corelib.Numbers.BinNums <> Z ind
+R30831:30832 xv6iris.Xv6Cameras <> Σ:95 var
+R30875:30877 iris.base_logic.lib.own <> inG class
+R30879:30880 xv6iris.Xv6Cameras <> Σ:95 var
+R30882:30887 xv6iris.Xv6Cameras <> icntUR def
+R30908:30910 iris.base_logic.lib.own <> inG class
+R30912:30913 xv6iris.Xv6Cameras <> Σ:95 var
+R30915:30920 xv6iris.Xv6Cameras <> frzoUR def
+R30941:30943 iris.base_logic.lib.own <> inG class
+R30945:30946 xv6iris.Xv6Cameras <> Σ:95 var
+R30948:30953 xv6iris.Xv6Cameras <> frzmUR def
+R30975:30977 iris.base_logic.lib.own <> inG class
+R30979:30980 xv6iris.Xv6Cameras <> Σ:95 var
+R30982:30988 xv6iris.Xv6Cameras <> dviewUR def
+R31010:31012 iris.base_logic.lib.own <> inG class
+R31014:31015 xv6iris.Xv6Cameras <> Σ:95 var
+R31017:31023 xv6iris.Xv6Cameras <> fviewUR def
+def 31040:31047 <> icacheΣ
+R31051:31059 iris.base_logic.lib.iprop <> gFunctors rec
+R31066:31067 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31085:31086 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31161:31166 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31183:31184 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31203:31204 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31218:31219 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31235:31240 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31263:31264 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31299:31304 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31320:31321 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31337:31338 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31354:31355 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31372:31377 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31394:31394 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31068:31075 iris.base_logic.lib.iprop <> GFunctor constr
+R31077:31084 xv6iris.Xv6Cameras <> icacheUR def
+R31087:31097 iris.base_logic.lib.ghost_var <> ghost_varΣ def
+R31132:31134 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R31104:31106 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R31100:31103 Corelib.Init.Datatypes <> bool ind
+R31107:31128 SailStdpp.Values <> mword def
+R31135:31156 SailStdpp.Values <> mword def
+R31167:31174 iris.base_logic.lib.iprop <> GFunctor constr
+R31176:31182 xv6iris.Xv6Cameras <> iliveUR def
+R31185:31195 iris.base_logic.lib.ghost_var <> ghost_varΣ def
+R31197:31202 xv6iris.Xv6Cameras <> ic_dep ind
+R31205:31212 iris.base_logic.lib.iprop <> GFunctor constr
+R31214:31217 xv6iris.Xv6Cameras <> ityR def
+R31220:31227 iris.base_logic.lib.iprop <> GFunctor constr
+R31229:31234 xv6iris.Xv6Cameras <> linkUR def
+R31241:31248 iris.base_logic.lib.iprop <> GFunctor constr
+R31251:31255 iris.algebra.excl <> exclR canonstruc
+R31257:31261 iris.algebra.ofe <> unitO canonstruc
+R31265:31275 iris.base_logic.lib.ghost_map <> ghost_mapΣ def
+R31285:31287 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R31280:31284 iris.base_logic.lib.iprop <> gname def
+R31288:31292 iris.base_logic.lib.iprop <> gname def
+R31277:31277 Corelib.Numbers.BinNums <> Z ind
+R31305:31312 iris.base_logic.lib.iprop <> GFunctor constr
+R31314:31319 xv6iris.Xv6Cameras <> icntUR def
+R31322:31329 iris.base_logic.lib.iprop <> GFunctor constr
+R31331:31336 xv6iris.Xv6Cameras <> frzoUR def
+R31339:31346 iris.base_logic.lib.iprop <> GFunctor constr
+R31348:31353 xv6iris.Xv6Cameras <> frzmUR def
+R31356:31363 iris.base_logic.lib.iprop <> GFunctor constr
+R31365:31371 xv6iris.Xv6Cameras <> dviewUR def
+R31378:31385 iris.base_logic.lib.iprop <> GFunctor constr
+R31387:31393 xv6iris.Xv6Cameras <> fviewUR def
+inst 31413:31425 <> subG_icacheΣ
+binder 31428:31429 <> Σ:110
+R31450:31453 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R31434:31437 iris.base_logic.lib.iprop <> subG class
+R31448:31449 xv6iris.Xv6Cameras <> Σ:110 var
+R31439:31446 xv6iris.Xv6Cameras <> icacheΣ def
+R31454:31460 xv6iris.Xv6Cameras <> icacheG class
+R31462:31463 xv6iris.Xv6Cameras <> Σ:110 var
+rec 31726:31730 <> pipeG
+proj 31762:31769 <> pipe_inG
+proj 31827:31839 <> pipe_mark_inG
+R31738:31746 iris.base_logic.lib.iprop <> gFunctors rec
+binder 31733:31734 <> Σ:111
+R31774:31776 iris.base_logic.lib.own <> inG class
+R31778:31779 xv6iris.Xv6Cameras <> Σ:111 var
+R31781:31785 iris.algebra.frac <> fracR canonstruc
+R31844:31846 iris.base_logic.lib.own <> inG class
+R31848:31849 xv6iris.Xv6Cameras <> Σ:111 var
+R31851:31856 iris.algebra.dfrac <> dfracR canonstruc
+def 31908:31913 <> pipeΣ
+R31917:31925 iris.base_logic.lib.iprop <> gFunctors rec
+R31930:31931 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31946:31947 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31963:31963 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R31932:31939 iris.base_logic.lib.iprop <> GFunctor constr
+R31941:31945 iris.algebra.frac <> fracR canonstruc
+R31948:31955 iris.base_logic.lib.iprop <> GFunctor constr
+R31957:31962 iris.algebra.dfrac <> dfracR canonstruc
+inst 31982:31992 <> subG_pipeΣ
+binder 31995:31996 <> Σ:115
+R32015:32018 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32001:32004 iris.base_logic.lib.iprop <> subG class
+R32013:32014 xv6iris.Xv6Cameras <> Σ:115 var
+R32006:32011 xv6iris.Xv6Cameras <> pipeΣ def
+R32019:32023 xv6iris.Xv6Cameras <> pipeG class
+R32025:32026 xv6iris.Xv6Cameras <> Σ:115 var
+rec 32396:32399 <> sieG
+proj 32428:32434 <> sie_inG
+R32407:32415 iris.base_logic.lib.iprop <> gFunctors rec
+binder 32402:32403 <> Σ:116
+R32439:32448 iris.base_logic.lib.ghost_var <> ghost_varG class
+R32450:32451 xv6iris.Xv6Cameras <> Σ:116 var
+R32454:32475 SailStdpp.Values <> mword def
+def 32494:32498 <> sieΣ
+R32502:32510 iris.base_logic.lib.iprop <> gFunctors rec
+R32515:32517 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R32556:32557 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R32518:32528 iris.base_logic.lib.ghost_var <> ghost_varΣ def
+R32531:32552 SailStdpp.Values <> mword def
+inst 32576:32585 <> subG_sieΣ
+binder 32588:32589 <> Σ:119
+R32607:32610 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R32594:32597 iris.base_logic.lib.iprop <> subG class
+R32605:32606 xv6iris.Xv6Cameras <> Σ:119 var
+R32599:32603 xv6iris.Xv6Cameras <> sieΣ def
+R32611:32614 xv6iris.Xv6Cameras <> sieG class
+R32616:32617 xv6iris.Xv6Cameras <> Σ:119 var
+rec 32880:32883 <> uioG
+proj 32909:32918 <> uio_stdinG
+proj 32954:32961 <> uio_brkG
+R32891:32899 iris.base_logic.lib.iprop <> gFunctors rec
+binder 32886:32887 <> Σ:120
+R32923:32932 iris.base_logic.lib.ghost_var <> ghost_varG class
+R32934:32935 xv6iris.Xv6Cameras <> Σ:120 var
+R32938:32941 Corelib.Init.Datatypes <> list ind
+R32944:32945 stdpp.bitvector.definitions <> bv rec
+R32968:32977 iris.base_logic.lib.ghost_var <> ghost_varG class
+R32979:32980 xv6iris.Xv6Cameras <> Σ:120 var
+R32982:32982 Corelib.Numbers.BinNums <> Z ind
+def 32999:33003 <> uioΣ
+R33007:33015 iris.base_logic.lib.iprop <> gFunctors rec
+R33020:33022 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R33048:33049 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R33063:33064 iris.base_logic.lib.iprop <> :::'#['_x_';'_'..'_';'_x_']' not
+R33023:33033 iris.base_logic.lib.ghost_var <> ghost_varΣ def
+R33036:33039 Corelib.Init.Datatypes <> list ind
+R33042:33043 stdpp.bitvector.definitions <> bv rec
+R33050:33060 iris.base_logic.lib.ghost_var <> ghost_varΣ def
+R33062:33062 Corelib.Numbers.BinNums <> Z ind
+inst 33083:33092 <> subG_uioΣ
+binder 33095:33096 <> Σ:124
+R33114:33117 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R33101:33104 iris.base_logic.lib.iprop <> subG class
+R33112:33113 xv6iris.Xv6Cameras <> Σ:124 var
+R33106:33110 xv6iris.Xv6Cameras <> uioΣ def
+R33118:33121 xv6iris.Xv6Cameras <> uioG class
+R33123:33124 xv6iris.Xv6Cameras <> Σ:124 var
