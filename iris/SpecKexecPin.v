@@ -151,8 +151,6 @@ Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import IcacheEscrow.    (* the payload arms *)
-Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcInv.
 Require Import FileInvDefs.

@@ -64,9 +64,7 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
 Require Import SpecPanic.
-Require Import SpecPrintk.
 Require Import WpUart.
-Require Import ByteBuf.
 Require Import DiskInv.
 Require Import Xv6Cameras.
 Require Import BioInv.
@@ -88,29 +86,19 @@ Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import FsTree.
 Require Import IcacheEscrow.
-Require Import IregLinkNz.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import ProcInv.
-Require Import SpecArgstr.
-Require Import SpecBeginOp.
 Require Import SpecEndOp.
 Require Import SpecIlock.
 Require Import SpecIput.
-Require Import SpecIupdate.
 Require Import SpecIunlockput.
-Require Import SpecNamecmp.
 Require Import SpecDirlookup.
 Require Import SpecDirlink.
-Require Import SpecMemset.
 Require Import SpecReadi.
-Require Import SpecWritei.
-Require Import SpecNamex.
 Require Import PathElems.
-Require Import SpecNparEra.       (* [inode_held_ty_at]                    *)
-Require Import SpecNparWrapEra.   (* [NPAR_WRAP_ERA]: the era walk         *)
 Require Import CodeSysUnlink.
 Require Import SysUnlinkBudget.
 Require Import SpecSysUnlink.
@@ -118,10 +106,6 @@ Require Import ProofSysUnlinkParts.
 Require Import ProofSysUnlinkTails.
 Require Import ProofSysUnlink.
 Require Import SpecSysMknodAU.
-Require Import FsAbsEraMknod.
-Require Import FsAbsNpar.
-Require Import FsAbsStart.
-Require Import FsAbsNparMknod.
 Require Import FsAbsMknodFire.
 Require Import SpecSysUnlinkAU.
 Require Import FsAbsUnlinkFire.

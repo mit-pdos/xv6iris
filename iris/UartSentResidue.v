@@ -41,7 +41,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
-Require Import DevModel DiskPtsto WpUart.
+Require Import DevModel WpUart.
 Require Import UartTxInv UartSentLoc.
 Require Import ObsTrace UartAccepted.
 Require Import Xv6G.

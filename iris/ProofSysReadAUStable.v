@@ -76,7 +76,7 @@ Require Import RegFile.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import IrefSlots.
-Require Import ProcInv.
+Require Import ProcDefs.
 Require Import FileInvDefs.
 Require Import Xv6Cameras.
 Require Import SpecArgfd SpecArgint SpecArgaddr SpecFileread.

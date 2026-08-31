@@ -94,8 +94,7 @@ Require Import Xv6G.
 Require Import SpecItrunc.       (* [di_trunc]                              *)
 Require Import SpecSysMknodAU.   (* [abs_view_insert]                       *)
 Require Import SpecSysOpenAU.    (* the contract this file serves           *)
-Require Import FsAbsStart.       (* [ex_start]                              *)
-Require Import FsAbsNparMknod.   (* [np_rootino_agree]                      *)
+Require Import FsAbsEra.       (* [ex_start]                              *)
 Require Import FsAbsMknodFire.   (* [mkf_abs_of_dir], [mkf_era_is_dir]      *)
 Require FsImg.                   (* [T_FILE_z], [ROOTINO] -- Require, NOT
                                     Import (SpecSysOpenAU's reason)         *)

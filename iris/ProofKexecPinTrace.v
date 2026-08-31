@@ -81,11 +81,6 @@ Require Import BitmapInv.
 Require Import InodeInv.
 Require Import InodeRegion.     (* [ftop_inv], [ftop_body], [ftopN]         *)
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheInv.
-Require Import IcacheEscrow.    (* the payload arms                         *)
-Require Import UserPtTree.
-Require Import KvmSpec.
 Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import DinodeEnc.
@@ -98,7 +93,6 @@ Require Import FsStateEra.
 Require Import FsState.
 Require Import KexecOkQ.
 Require Import FsAbsEra.        (* [elend], [ex_hop], [ex_hops_from]        *)
-Require Import FsAbsStart.      (* [ex_start]: the deferred start           *)
 Require Import FsAbs.           (* LAST of the fs-abs stack (its own rule)  *)
 Require Import FsBytesGamma.
 Require Import FsInitPin.

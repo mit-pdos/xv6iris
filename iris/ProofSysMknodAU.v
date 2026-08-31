@@ -132,7 +132,6 @@ Require Import SpecSysMknod.
 Require Import DirentEnc.        (* [bview]                             *)
 Require Import FsTree.
 Require Import SpecSysMknodAU.   (* [dev_arg]                           *)
-Require Import FsAbsNparMknod.   (* [np_start_of_mknod]                 *)
 Require Import FsAbsMknodFire.   (* the commits and [mkf_dev_arg]       *)
 Require Import SpecCreateAU.     (* [CREATE_AU], [cau_ok] / [cau_fail]  *)
 Require Import SpecSysMknodAUEra. (* the contract this file seals       *)

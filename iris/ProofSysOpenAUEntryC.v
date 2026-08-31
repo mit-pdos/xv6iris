@@ -118,8 +118,6 @@ Require Import DirentEnc.        (* [bview]                                 *)
 Require Import FsTree.
 Require Import FsBytesGamma.
 Require Import SpecSysOpenAU.
-Require Import FsAbsEraMknod.
-Require Import FsAbsNparMknod.   (* [np_start_of_mknod]                     *)
 Require Import FsAbsMknodFire.
 Require Import FsAbsOpenFire.
 Require Import ProofSysOpenAUParts.

@@ -109,9 +109,6 @@ Local Open Scope Z_scope.
 
 Require Import SpecNameiEra.
 Require Import SpecSysOpenAU.
-Require Import FsAbsEra.
-Require Import FsAbsStart.
-Require Import FsAbsOpenFire.
 Require Import ProofSysOpenAUBits.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUWalk.

@@ -50,7 +50,6 @@ Require Import WpUmodeStore.
 Require Import WpUmodeStep.
 Require Import UkStep.
 Require Import RiscvExtras.
-Require Import UmodeAbi.
 Require Import UserHeap.
 Require Import TsoCtx.
 Local Open Scope Z_scope.

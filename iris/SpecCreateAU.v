@@ -123,8 +123,7 @@ Require Import SpecIput.
 Require Import SpecCreate.      (* the landed contract this parallels       *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ                 *)
 Require Import SpecSysMknodAU.  (* [cre_pre], [mknod_parent_elems]          *)
-Require Import FsAbsStart.      (* [ep_start]: the DEFERRED start           *)
-Require Import FsAbsEraMknod.   (* [mknod_walk_dead_era]                    *)
+Require Import FsAbsEra.      (* [ep_start]: the DEFERRED start           *)
 Require Import FsAbsMknodFire.  (* the authority-shaped commits             *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

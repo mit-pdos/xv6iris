@@ -51,65 +51,41 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import RegFile HartTp WpNext.
-Require Import RiscvExtras.
-Require Import StackOwn.
-Require Import CalleeSaved KernelText KernelDataInv.
-Require Import WpLock.
+Require Import RegFile.
+Require Import CalleeSaved KernelDataInv.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FdSlots.
-Require Import ProcGeom.
-Require Import SchedCtx.
-Require Import SpecPanic.
-Require Import SpecPrintk.
 Require Import WpUart.
 Require Import ByteBuf.
 Require Import DiskInv.
 Require Import Xv6Cameras.
-Require Import BioInv.
+Require Import BioDefs.
 (* the payload's own vocabulary, IMPORTED BEFORE [FsBlocks] on purpose --
    ProofSysUnlink's banner: the [FsState*] stack exports [fs_view] and
    [byte_range], both of which have live twins below, and the LAST import
    wins. *)
-Require Import FsState.
-Require Import FsBytesGamma.
+Require Import FsStateInode.
 Require Import FsStateEra.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
+Require Import LogInv.
 Require Import BitmapInv.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import SleepLock.
-Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import FsTree.
 Require Import IcacheEscrow.
-Require Import IregLinkNz.
-Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import ProcInv.
-Require Import SpecDirlink.      (* [ic_sleeplocks]                        *)
-Require Import SpecNamex.
 Require Import SpecReadi.        (* [rd_delivered]                         *)
 Require Import PathElems.        (* [path_elems], [nameiparent_of]         *)
-Require Import CodeSysUnlink.
-Require Import SysUnlinkBudget.
 Require Import SpecSysUnlink.
-Require Import ProofSysUnlinkParts.
 Require Import ProofSysUnlink.   (* the top-level pure layer; see header   *)
-Require Import SpecSysMknodAU.   (* [mknod_parent_elems]                   *)
-Require Import FsAbsEraMknod.
-Require Import FsAbsNpar.
-Require Import FsAbsStart.
-Require Import FsAbsNparMknod.
 Require Import FsAbsMknodFire.
 Require Import SpecSysUnlinkAU.
 Require Import FsAbsUnlinkFire.

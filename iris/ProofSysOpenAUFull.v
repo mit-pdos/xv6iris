@@ -102,9 +102,6 @@ Local Open Scope Z_scope.
 Require Import FsTree.
 Require Import SpecNameiEra.
 Require Import SpecSysOpenAU.
-Require Import FsAbsEra.
-Require Import FsAbsStart.
-Require Import FsAbsOpenFire.
 Require Import ProofSysOpenAUBits.
 Require Import SpecCreateAUF.        (* the T_FILE create-AU carry        *)
 Require Import ProofSysOpenAU.       (* [SysOpenAUPlainProof]: the plain arm *)
