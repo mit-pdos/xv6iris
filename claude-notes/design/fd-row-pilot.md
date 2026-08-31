@@ -336,6 +336,8 @@ ecall leaf's proof once the arm lands (stage P2), and the enriched
    row deferred.  The alternative (build the certificate-backed
    nondeterministic row now) triples the payload design for a consumer
    that does not exist yet.  RECOMMEND YES.
+   **RULED YES (owner, 2026-08-31).**  Prover stages P2+P3 launched on
+   the ruling.
 3. **UPSTREAM — the pure return-range conjuncts (§6.4).**  YES/NO,
    independent of the pilot; the WINDOW LEAF's precedent priced this
    class at one conjunct per row + the dispatcher's existing facts.
