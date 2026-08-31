@@ -55,6 +55,8 @@ Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import ProcInv.
+Require Import UserPtTree.   (* [add_vec_int_nat_assoc]: the va-run algebra *)
+Require Import SpecCopyin.   (* [copyin_got]: the content seam's vocabulary *)
 Require Import SpecWritei.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -731,6 +733,38 @@ Proof.
   intros H1 H2 Hu i Hi. case_decide as Hd; [exact (H1 Hu i Hd)|].
   rewrite (H2 Hu (i - tot)%nat ltac:(lia)). f_equal. lia.
 Qed.
+
+(* THE USER-ARM TIE, extended by one chunk -- [wi_ker_step]'s twin at the
+   content seam (RULING A).  The loop's accumulated run is pinned to the
+   image at [src]; the chunk just copied is pinned at [src + tot], because
+   writei advances the source pointer by [m] each iteration.  The two runs
+   join because [pa_add] composes ([UserPtTree.add_vec_int_nat_assoc], the
+   no-wrap-free algebra of the va-keyed run), so no bound on [src + tot] is
+   needed and none is available. *)
+Lemma wi_usr_step (user : bool) (M : gmap Z (bv 8)) (src : mword 64)
+    (wroteI g : nat -> bv 8) (tot mm : nat) :
+  (user = true -> copyin_got M src tot wroteI) ->
+  (user = true -> copyin_got M (pa_add src tot) mm g) ->
+  user = true ->
+  copyin_got M src (tot + mm)
+    (fun i : nat => if decide (i < tot)%nat then wroteI i else g (i - tot)%nat).
+Proof.
+  intros H1 H2 Hu i Hi. cbn beta.
+  case_decide as Hd; [exact (H1 Hu i Hd)|].
+  specialize (H2 Hu (i - tot)%nat ltac:(lia)).
+  rewrite /pa_add add_vec_int_nat_assoc in H2.
+  rewrite (_ : (tot + (i - tot))%nat = i) in H2; [exact H2 | lia].
+Qed.
+
+(* the accumulated run does not shrink: a clause at [tot] reads at any
+   [t <= tot].  The break arms leave [tot] where the invariant had it, so
+   this is only ever used to weaken, never to guess. *)
+Lemma wi_usr_le (user : bool) (M : gmap Z (bv 8)) (src : mword 64)
+    (wrote : nat -> bv 8) (t tot : nat) :
+  (t <= tot)%nat ->
+  (user = true -> copyin_got M src tot wrote) ->
+  user = true -> copyin_got M src t wrote.
+Proof. intros Hle H Hu i Hi. exact (H Hu i ltac:(lia)). Qed.
 
 Lemma wi_nat_u (k : nat) : (Z.of_nat k < 18446744073709551616)%Z ->
   bv_unsigned (mword_of_int (Z.of_nat k) : mword 64) = Z.of_nat k.

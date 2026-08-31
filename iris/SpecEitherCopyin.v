@@ -26,11 +26,23 @@
    - the DESTINATION is a kernel buffer on both arms, so the caller hands it
      over unconditionally -- but what it ends up holding depends on the arm.
      On the kernel arm it holds [src_bytes] (memmove's guarantee).  On the
-     user arm it holds NOTHING NAMEABLE: the bytes come from user memory,
-     about which the kernel may assume nothing, and a copyin that gives up
-     part-way has still written a prefix, so [∃ dst_new] is the right
-     statement on both of copyin's exits (SpecCopyin.v).  A caller that
-     needs to constrain what it read must validate it.
+     user arm it holds THE PROCESS'S OWN BYTES AT [src], read off the image
+     [us_M U] the caller lent -- [SpecCopyin.copyin_got], relayed (see THE
+     CONTENT SEAM below).  A copy that gives up part-way has still written a
+     prefix and which prefix is not observable from [-1], so the run is
+     still bound existentially and the equation is guarded by the [0] exit.
+
+   *** THE CONTENT SEAM (RULING A, 2026-08-31) ***  This arm used to say
+   [∃ dst_new] and NOTHING ELSE: "some bytes of the right length landed".
+   That was never a limit of the code -- [SpecCopyin.wp_copyin_sconf_mem]
+   has promised [copyin_got M srcva len dst_new] since the image campaign's
+   tier 3 -- it was a limit of this relay, which dropped the fact because
+   its callers held no user memory to state it against.  They do now
+   (writei / consolewrite thread [proc_priv_core], whose block CARRIES the
+   image [us_M U], and either_copyin is SAME-image), so the fact travels:
+   ONE extra pure conjunct inside the existential, guarded by [r = 0].
+   It is what lets write's receipts say "MY bytes" instead of "some bytes"
+   and console-write's say which characters reached the UART.
    - the SOURCE is a user virtual address on the user arm ([proc_priv], the
      descriptor coming back EXTENDED at the SAME memory image -- see
      [either_copyin_post]) and a kernel buffer on the kernel arm (returned
@@ -54,6 +66,7 @@ Require Import CpuOwn.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
+Require Import SpecCopyin.   (* [copyin_got]: the content seam's vocabulary *)
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 From Kernel Require KernelSyms.
@@ -94,6 +107,14 @@ Section SpecEitherCopyin.
           (∃ P' : uptd,
              ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ ∗ proc_priv_core p pid (us_upt U P')) ∗
           (∃ dst_new : nat -> bv 8,
+             (* THE CONTENT SEAM, guarded by the SUCCESS exit: byte [j] of
+                the destination IS the byte the process has at user va
+                [src + j], in the image the caller lent.  [-1] promises
+                nothing -- a part-way copy wrote a prefix and which prefix
+                is not observable from the return value ([SpecCopyin]'s own
+                stance, relayed unchanged). *)
+             ⌜r = (mword_of_int 0 : mword 64) ->
+              copyin_got (us_M U) src len dst_new⌝ ∗
              [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_new j)
      else ⌜r = (mword_of_int 0 : mword 64)⌝ ∗
           ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[kts] src_bytes j) ∗

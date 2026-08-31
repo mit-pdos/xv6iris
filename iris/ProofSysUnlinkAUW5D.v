@@ -780,7 +780,7 @@ Section ProofSysUnlinkAUW5D.
     iIntros (D13 Hd13 mfw tot bm' data' dnW dn0W nw wrote dist dstb Pw
              Sbw)
       "%Hcsw %Hwf' %Hhz' %Haddr' %Hszlt' %Hcov' %Hcapp %Hszp %Hdistle
-       %Hdisttot %Hdist0f %Hrng %Hwr %Harm %Hspend %Hsbsub %Hpost16 %Hspendany
+       %Hdisttot %Hdist0f %Hrng %Hwr %Hwru %Harm %Hspend %Hsbsub %Hpost16 %Hspendany
        %Hatomic %Hupw Hcg Hown _ _ Hpc Hidevd Hiinumd Hmetad Hmapd Hblocksd
        Hsbi Hsbs Hsbb Hdiatd [HbD Hpidq] Hbsl HopS".
     iEval (rewrite HB6a2) in "HbD".

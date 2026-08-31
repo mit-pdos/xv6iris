@@ -134,6 +134,75 @@ Definition copyin_got (M : gmap Z (bv 8)) (srcva : mword 64) (len : nat)
   forall j : nat, (j < len)%nat ->
     M !! uint (add_vec_int srcva (Z.of_nat j)) = Some (dst_new j).
 
+(* ===================================================================== *)
+(*  THE SAME FACT ABOUT A BYTE LIST -- the receipt layers' spelling.       *)
+(*                                                                        *)
+(*  [copyin_got]'s carrier is a FUNCTION because that is what the copy     *)
+(*  loops hand back.  Everything that RECEIPTS a copy carries a LIST       *)
+(*  instead: console-write's acceptance receipts ([SpecConsolewriteLoc]),  *)
+(*  write's per-chunk receipts ([SpecSysWriteAU.wri_receipts]).  Stating   *)
+(*  the tie once here is what keeps those layers from each re-deriving     *)
+(*  the indexing -- and [ubytes_at_of_got] is the single bridge between    *)
+(*  the two spellings, applied at exactly one place per chain.             *)
+(*                                                                        *)
+(*  RULING A (2026-08-31), the write/copyin content seam.                  *)
+(* ===================================================================== *)
+
+(* [bs] IS the process's byte run at user va [ua] *)
+Definition ubytes_at (M : gmap Z (bv 8)) (ua : mword 64)
+    (bs : list (bv 8)) : Prop :=
+  forall (d : nat) (c : bv 8), bs !! d = Some c ->
+    M !! uint (add_vec_int ua (Z.of_nat d)) = Some c.
+
+Lemma ubytes_at_nil (M : gmap Z (bv 8)) (ua : mword 64) : ubytes_at M ua [].
+Proof. intros d c Hd. rewrite lookup_nil in Hd. discriminate. Qed.
+
+(* ADJACENT RUNS APPEND, at the bumped base -- the chunked writer's step.
+   No no-wrap side condition, because [add_vec_int] composes modulo 2^64
+   ([UserPtTree.add_vec_int_nat_assoc]). *)
+Lemma ubytes_at_app (M : gmap Z (bv 8)) (ua : mword 64) (bs1 bs2 : list (bv 8)) :
+  ubytes_at M ua bs1 ->
+  ubytes_at M (add_vec_int ua (Z.of_nat (length bs1))) bs2 ->
+  ubytes_at M ua (bs1 ++ bs2).
+Proof.
+  intros H1 H2 d c Hd.
+  destruct (decide (d < length bs1)%nat) as [Hlt | Hge].
+  - apply H1. rewrite lookup_app_l in Hd; [exact Hd | exact Hlt].
+  - rewrite lookup_app_r in Hd; [| lia].
+    specialize (H2 (d - length bs1)%nat c Hd).
+    rewrite add_vec_int_nat_assoc in H2.
+    rewrite (_ : (length bs1 + (d - length bs1))%nat = d) in H2;
+      [exact H2 | lia].
+Qed.
+
+(* THE BRIDGE from the function spelling.  [f <$> seq 0 len] is the shape
+   every receipt in the tree already builds its byte list at. *)
+Lemma ubytes_at_of_got (M : gmap Z (bv 8)) (ua : mword 64) (len : nat)
+    (f : nat -> bv 8) :
+  copyin_got M ua len f -> ubytes_at M ua (f <$> seq 0 len).
+Proof.
+  intros Hg d c Hd.
+  rewrite list_lookup_fmap in Hd.
+  destruct (seq 0 len !! d) as [e |] eqn:Hs; [| discriminate].
+  rewrite lookup_seq in Hs. destruct Hs as [He Hlt].
+  cbn in Hd. injection Hd as <-. rewrite He. exact (Hg d Hlt).
+Qed.
+
+(* the run's length is the count it was received at *)
+Lemma ubytes_at_of_got_len (M : gmap Z (bv 8)) (ua : mword 64) (len : nat)
+    (f : nat -> bv 8) : length (f <$> seq 0 len) = len.
+Proof. rewrite length_fmap length_seq //. Qed.
+
+(* THE BASE COMMUTES with the loop's [add rd,ri,rbase] spelling: gcc emits
+   the INDEX first at both of this seam's chunk loops, and the receipt is
+   stated at the base.  (Not a lemma about copyin; it lives here because
+   both users of [ubytes_at] need it and neither can see the other.) *)
+Lemma add_vec_moi_comm (p : mword 64) (i : Z) :
+  add_vec (mword_of_int i : mword 64) p = add_vec_int p i.
+Proof.
+  unfold add_vec_int. apply bv_eq. rewrite !add_vec64_unsigned. f_equal. ring.
+Qed.
+
 Definition wp_copyin_sconf_mem_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
     (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
