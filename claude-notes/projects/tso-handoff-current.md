@@ -340,3 +340,27 @@ trailing `/\` and can mis-terminate — write edit scripts to a file.
   A6.141 §3 review item; the ONLY blocker of the last kernel red).
 - The C-leg cutover gate (§0.23′/§0.25′) once SystemAdequacy is green.
 - The main-side slices (separate agent, main-tso-readiness.md).
+
+## A6.145 4b-iii FRONTIER (live worktree state, tree RED at ~8 proof files)
+
+The floored-bundle swap is COMPLETE AND GREEN through: IcacheRef (the
+whole vocabulary: live_genlo/live_gen/live_frac wrappers, live_fracc,
+live_frac0 interim kit + absorb/pin, floored inode_ref/inode_shr/_short/
+_held_ty/_shr_held_gen, genlo-exposed intro equivalences, iref_tok0),
+IcacheInv (pool arms at live_frac0, the five movers, live_slot_alloc/
+regen lo-exposed, pool-sourced AU posts at iref_tok0), IcacheEscrow,
+FileInvDefs, IcacheBoot/FsCfgBoot (boot rows at live_frac0).
+
+REMAINING RED (the consumer wave; each is the same 3 adaptations):
+ProofIunlockput:279 ProofIput:1006 ProofIreclaim:1687 ProofIget:1450
+ProofCreateFreshTy:572 ProofSysOpenParts:715 ProofSysMkdir:1272
+ProofSysMknod:1735 SpecFilestat:435 SpecFileread:666 (+ their cones).
+The adaptations: (1) `inode_shr_gen_intro`-style destructures gain
+(g lo tl) + ⌜lo<=tl⌝ + #floor (KEEP the floor aside -- persistent -- for
+any later rebuild/forget, whose new signatures take it); (2) pool-sourced
+AU outputs arrive as iref_tok0 (weaken via iref_tok0_tok, or keep frac0
+for the floored-bundle mint via live_frac0_fracc); (3) Spec-level
+accessors that expose `inode_shr_gen` through a round trip (SpecFilestat/
+SpecFileread pay-accessors, SpecIlock/SpecIunlock posts) should expose
+the GENLO form instead so the return re-ties lo, floors held outside.
+Pre-cutover every lo is 0 (live_frac0 kit; ctx_floor _ 0 free).
