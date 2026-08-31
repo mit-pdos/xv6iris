@@ -65,6 +65,7 @@ CtxMorphTac.v
 TsoCtxShim.v
 TsoCtxAbsorbLb.v
 TsoCtxPark.v
+CtxAnchor.v
 TsoCtxMove.v
 CtxValues.v
 CtxKMap.v
