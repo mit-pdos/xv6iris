@@ -644,6 +644,35 @@ Module Type USERTRAP_RES.
      loop hand the user tier a descriptor whose [udata_cov] side condition
      holds by construction, which is the fact this file's [usertrap_post]
      explains it cannot ask usertrap for. *)
+  (* THE DESCRIPTOR VIEW, BORROWED OUT OF THE RUNNING RESIDUE -- the fd half
+     of what [usertrap_res_ptm_open] does for the image.  The trap loop puts
+     what comes out into [UexecRet.uvb] as its [Rfd fdv] and hands it back at
+     the trap; the closer is ∀-GENERAL in the states, which is what lets a
+     syscall retype a descriptor.  The AUTHORITY does not move -- it rides in
+     [ProcInv.ofile_slot], hence inside the residue -- so the kernel keeps the
+     array and the process only ever gets the view. *)
+  (* BOTH BORROWS AT ONCE -- see [UsertrapRes.ut_res_bare_fd_tf_open] for why
+     userret's entry cannot get them by two applications. *)
+  Parameter usertrap_res_bare_fd_tf_open :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate),
+    usertrap_res_bare pt ksp U sts -∗
+    FdSlots.fd_frags (pv_fdg (us_V U)) sts ∗
+    ∃ kroot : mword 44,
+      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
+      tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
+      (∀ (ws' : list (mword 64)) (sts' : list fdstate),
+         ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
+         FdSlots.fd_frags (pv_fdg (us_V U)) sts' -∗
+         usertrap_res_bare pt ksp (us_tf U ws') sts').
+
+  Parameter usertrap_res_bare_fd_open :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate),
+      usertrap_res_bare pt ksp U sts -∗
+      FdSlots.fd_frags (pv_fdg (us_V U)) sts ∗
+      (∀ sts' : list fdstate,
+         FdSlots.fd_frags (pv_fdg (us_V U)) sts' -∗
+         usertrap_res_bare pt ksp U sts').
+
   Parameter usertrap_res_bare_norm :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate),
       usertrap_res_bare pt ksp U sts -∗

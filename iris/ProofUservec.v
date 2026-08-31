@@ -95,6 +95,8 @@ Section UservecAllPt.
   Definition usertrap_res_ptm_close := UT.usertrap_res_ptm_close.
   Definition usertrap_res_ptm_open := UT.usertrap_res_ptm_open.
   Definition usertrap_res_bare_norm := UT.usertrap_res_bare_norm.
+  Definition usertrap_res_bare_fd_open := UT.usertrap_res_bare_fd_open.
+  Definition usertrap_res_bare_fd_tf_open := UT.usertrap_res_bare_fd_tf_open.
 
   (* the user invariant already carries the map well-formedness the exit
      switch needs *)

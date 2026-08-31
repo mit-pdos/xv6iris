@@ -1222,6 +1222,27 @@ Lemma usertrap_res_ptm_open
   proc_ptm pt (uint (pv_sz (us_V U))) (us_M U) ∗ usertrap_res_bare pt ksp U sts.
 Proof. exact (ut_res_ptm_open SY.syscall_env pt ksp U sts). Qed.
 
+Lemma usertrap_res_bare_fd_tf_open
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+  usertrap_res_bare pt ksp U sts -∗
+  FdSlots.fd_frags (pv_fdg (us_V U)) sts ∗
+  ∃ kroot : mword 44,
+    kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
+    tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
+    (∀ (ws' : list (mword 64)) (sts' : list fdstate),
+       ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
+       FdSlots.fd_frags (pv_fdg (us_V U)) sts' -∗
+       usertrap_res_bare pt ksp (us_tf U ws') sts').
+Proof. exact (ut_res_bare_fd_tf_open SY.syscall_env pt ksp U sts). Qed.
+
+Lemma usertrap_res_bare_fd_open
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+  usertrap_res_bare pt ksp U sts -∗
+  FdSlots.fd_frags (pv_fdg (us_V U)) sts ∗
+  (∀ sts' : list fdstate,
+     FdSlots.fd_frags (pv_fdg (us_V U)) sts' -∗ usertrap_res_bare pt ksp U sts').
+Proof. exact (ut_res_bare_fd_open SY.syscall_env pt ksp U sts). Qed.
+
 Lemma usertrap_res_bare_norm
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
   usertrap_res_bare pt ksp U sts -∗
