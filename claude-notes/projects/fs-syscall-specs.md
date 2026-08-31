@@ -2306,6 +2306,7 @@ durable-notes warns about.
   bytes" and write's content-pinned receipts, in one ruling — the last
   honesty gap in the write family.  RECOMMEND: YES, as a lane when the
   current pair lands.
+  **RULED YES (owner, 2026-08-31).  Lane launched same day.**
 - [ ] **RULING B — the A(iv) offset carrier.**  THE GAP: `f->off` lives
   behind `file_pay`'s existential, so write/read receipts carry
   per-instant existential offsets and dup's same-description fact stops
