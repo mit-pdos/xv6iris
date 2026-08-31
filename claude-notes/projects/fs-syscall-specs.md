@@ -2137,6 +2137,210 @@ things, and the answer differs:
       of that half is `ushp_code_shk`, which unfolds `shk_code` — stable
       under any catalog regrowth — and the walks were additionally verified
       green under a scratch variant that requires `UCodeShP.v` alone.
+    **STAGE 4 — ROUND 2, 2026-08-31** (`iris/UCodeShP.v` UNCHANGED at 8190
+    lines / 564 instructions — the catalog's 18 min 58 s was NOT paid
+    again; `iris/UkShParse.v` 1845 → 3520 lines; EC2-green; audit = the
+    standing three (`resv_matches`, `resv_is_valid`, funext) on every walk
+    and *closed under the global context* on the pure layer, plus
+    `ushp_malloc_ok` as an explicit argument on `wp_kshp_execcmd` alone;
+    zero `Admitted`, zero new `Axiom`).  Round 1's record is above; this is
+    the delta, against the continuation brief's priority list.
+
+    | # | item | status |
+    |---|---|---|
+    | 1 | the k-generalised frame | **LANDED** — `wp_kshp_spill` / `wp_kshp_restore` |
+    | 2 | `execcmd` | **LANDED** — `wp_kshp_execcmd`, the file's first tainted lemma |
+    | 3 | `peek` | **PARTIAL** — its scan, entry test, epilogue and answer are landed and green; the ~750-line body that glues them is written, complete, and PARKED against a measured non-termination |
+    | 3 | `gettoken` | not started — 104 instructions, the stage's biggest single function |
+    | 4 | `parseexec`'s arg loop, `nulterminate` | not started |
+    | 5 | `parsepipe` / `parseline` / `parsecmd` | not started |
+    | 6 | the parser theorem | not reached |
+
+    * **THE k-GENERALISED FRAME, §4b — item 1, LANDED.**  `wp_kshp_spill`
+      and `wp_kshp_restore` are the `c.sdsp` and `c.ldsp` runs of ANY gcc
+      frame in this catalog, by induction on a list of (register,
+      immediate) PAIRS — the immediates are the caller's own catalog
+      spelling, so no call site argues that `mword_of_int (Z.of_nat
+      (k - 1 - i))` is the word the decoder produced.  **There is no index
+      arithmetic inside either induction**: the pcs and the slot addresses
+      are FUNCTIONS `pcs` / `ad` of the spill index and the step passes
+      `fun i => pcs (S i)` / `fun i => ad (S i)`, a beta-reduction rather
+      than a `lia`.  What a call site owes instead is one pure fact per
+      instruction at CONCRETE numbers, which is the `vm_compute` stage 2
+      was paying per step anyway.  `ushp_frame_split` / `ushp_frame_join`
+      carve the fresh `ustack` into the spill slots plus the locals and put
+      it back; `ushp_spillback` NAMES the register file a restore leaves (a
+      fold of inserts, later wins), which is why no no-duplicates premise
+      is needed — a call site `cbn`s it into the insert tower it already
+      reads with `upd_eq` / `upd_ne`.
+      The push and the pop are deliberately NOT in it: they are
+      `wp_uk_caddi_sp_dn` or `wp_uk_caddi16sp_dn`, gcc picks by size and
+      picks INCONSISTENTLY (execcmd pushes with `c.addi` and pops with
+      `c.addi16sp`), and folding them in would need a two-armed premise for
+      no saving.  Sizes in this catalog: execcmd and nulterminate k=4 j=3,
+      peek k=8 j=7, gettoken k=8 j=8, parseline/parsepipe k=6 j=6, parsecmd
+      k=8 j=5, parseredirs k=14 j=11 — and **parseexec is the one that will
+      not fit**: its prologue is SPLIT (five spills at 0x592, eight more at
+      0x5b0 after the first `peek`) and so is its epilogue.
+      `wp_kshp_fp` joins them: `c.addi4spn s0,sp,N` with the value hidden
+      behind a `∀ v`, because no function in the parser reads s0 except
+      through its own epilogue.
+
+    * **execcmd, §7 — item 2, LANDED, and it is the file's FIRST TAINTED
+      LEMMA.**  19 instructions, a four-word frame, no branch:
+      `malloc(168)` across `ushp_malloc_ok`, `memset` across the
+      `shp_code`/`shk_code` bridge to `UkSh.wp_ksh_memset` — whose
+      STRENGTHENED postcondition (stage 5's ASK-6 fix) is exactly what
+      unblocked it — `cmd->type = EXEC` through `c.sw`, and the node handed
+      back as **`ushp_exec_at s0 p []`**: an EXEC node at the EMPTY token
+      list.  That is not a weakening but `parseexec`'s argument-loop BASE
+      CASE, and the NULL cap at slot 0 that `ushp_slot` demands at
+      `|toks| = 0` is precisely the byte the memset zeroed.  `s0` is
+      unconstrained because an empty token list mentions no line.
+      Four byte-run helpers went in with it, all reusable:
+      `ushp_ubytes_ext` (pointwise — the honest form of a funext the
+      content function does not deserve), `ushp_peel` / `ushp_peel0` (a
+      split at a NAMED address, so no caller carries an `a + Z.of_nat k` it
+      then has to normalise; the `0` variant keeps the content function
+      literally constant, which is what lets the next lemma's `f` argument
+      be written out instead of left as an evar an `ltac:` cannot see),
+      and `ushp_slots_nil` (eighty zeroed bytes to the ten argv slots).
+      TAINT SET, as it stands: `{ wp_kshp_execcmd }`.  Everything else in
+      the file is unconditional and §6's header says so.
+
+    * **THE LEXER'S TABLE VOCABULARY, and the two engine reads under it.**
+      `ushp_ws_f` is the whitespace table as the INDEX FUNCTION a `ustr`
+      carries, beside `ushp_ws_bytes`'s list; both spellings are needed and
+      `ushp_ws_mem` / `ushp_ws_mem_inv` / `ushp_ws_chr_z` / `ushp_ws_chr_nz`
+      are the bridge, over the completed find algebra
+      (`ushp_find_some_val` — a hit means the byte IS there — and
+      `ushp_find_some_of` — a byte that is there IS found).  What they buy
+      is the ONE fact every lexer scan turns on: `strchr(whitespace, c)` is
+      0 exactly when `ushp_is_ws c` is false, so **`ushp_skipws` is the
+      measure of the CODE** and not merely a definition nothing connects.
+      gettoken's `symbols` table at 0x2000 wants the same four lemmas and
+      they are a copy-paste at a different list.
+      Two engine reads came with it, both RELOCATION ASKS: `urun_x0` (x0's
+      VALUE off the run's bundle — stage 2 has the identical lemma sealed
+      inside `Section UkSh` for a STORE; peek needs it for `sltu a0,x0,a0`,
+      which is how the decoder gives `snez`), and `ushp_snez_val`.
+
+    * **peek, §8 — item 3, PARTIAL.**  40 instructions, an EIGHT-word
+      frame, one scan, two `strchr` calls and a branch that converges.  It
+      is the parser's one-token lookahead — parsecmd, parseline, parsepipe,
+      parseexec and parseredirs all ask it whether the next non-blank byte
+      is in a given set, and it is what `ushp_no_symbols` answers "no" to
+      at four of those five sites — and it is the only function in the
+      parser that MOVES THE LEXER'S CURSOR AS A SIDE EFFECT (`*ps = s`),
+      which is why the cursor cell is a `uword` in the contract rather than
+      a value.  THREE of its four pieces are landed:
+      `wp_kshp_peek_scan` (0x46e..0x480, the bounded induction),
+      `wp_kshp_peek_enter` (0x46a's `bgeu` folded in FRONT of the scan, so
+      the cursor's index ranges over `0..len` and the whole of
+      0x46a..0x482 has ONE postcondition), and `wp_kshp_peek_epi`
+      (0x48e..0x49e, stated once because the epilogue is reached BOTH
+      ways), with `ushp_peek_res` naming the answer.  `wp_kshp_peek` itself
+      — the ~750 lines that glue them, written and complete — is parked in
+      `claude-notes/projects/sh-peek-body.v.parked`, out of the build, with
+      a header saying where to paste it back.
+      **THE SCAN IS BOUNDED BY `es`, NOT BY THE NUL**: `s2` holds the end
+      pointer and the back edge tests against it, so the scan reads only
+      BODY bytes and the terminator never enters it.  That is the opposite
+      of strchr's loop one level down, and it is why `ushp_skipws` (not
+      `ushp_find`) is its answer.  Only the CALLEE-SAVED half of the
+      register file is promised across it, minus `s1`: every turn calls
+      strchr and that is all strchr's contract gives.
+
+    * **THE MEASURED OBSTACLE OF THIS ROUND — one tactic that does not
+      terminate, and FOUR REFUTED EXPLANATIONS.**  In `wp_kshp_peek`,
+      everything up to and including the generalised spill run's
+      continuation is fast, and THE VERY NEXT TACTIC — any of them — runs
+      to **15.2 GB of RSS in 268 s** and is still climbing when killed at
+      five minutes.  Even `iDestruct (urun_stack with "Hrun")`, which
+      touches nothing else, does not finish in 100 s there.  Bisected by
+      cutting the proof at successive points with `Admitted` in a scratch
+      copy — cheap, because the file is otherwise ~4 ms per line, so a
+      bisect step is a ~20 s compile.
+      **WHAT IT IS NOT** — four hypotheses, each killed by its own timed
+      run, recorded so nobody pays for them twice:
+      (a) NOT the leaf's `Prop` premises: a premise-free step lemma
+      (`wp_kshp_fp`) reproduces it, and so does passing `_` for the leaf's
+      `wval` instead of the term;
+      (b) NOT the `[]` spec pattern: naming the instruction fact as a
+      persistent hypothesis first reproduces it;
+      (c) NOT the proofmode context: `iClear`ing EVERY spatial hypothesis
+      but the run reproduces it;
+      (d) NOT the durable notes' unsealed-big-op rule: `Typeclasses Opaque`
+      on `ubytesq`/`ubytes`/`uwordq`/`uword`/`ustr`/`ustack`/`ustack_body`
+      changes nothing.  (Worth knowing anyway: **none of those seven
+      carries a seal today** — `grep` over `UserHeap.v`, `UkRun.v`,
+      `UkSh.v`, `UkShRun.v` finds zero `Typeclasses Opaque` — and adding
+      them costs nothing, since the directive stops INSTANCE search only
+      and every `rewrite /ustack` still sees through.  It is simply not
+      the cause of THIS.)
+      **WHERE THE NEXT LOOK SHOULD START.**  execcmd's IDENTICAL `iApply`
+      at the same instruction, in the same file, costs milliseconds — and
+      the difference is that its spill list has THREE entries and peek's
+      has SEVEN.  So the suspect is the term `wp_kshp_spill` hands its
+      continuation, and the cheapest probe is to give both runs an explicit
+      END-PC PARAMETER (`pend`, with the premise `pend = pcs (length rs)`)
+      so the continuation's pc is a LITERAL rather than `pcs (length rs)`
+      awaiting a `cbn` — the `cbn [length]` that resolves it today
+      normalises the WHOLE `envs_entails`, context included.
+
+    * **WHAT IS STILL OWED, HONESTLY SIZED.**  Of the 564 catalogued
+      instructions, strchr (17), strlen (18) and execcmd (19) are walked
+      end to end and peek's 40 are walked except for their glue;
+      **gettoken (104), parseexec (92), parseredirs (85), nulterminate
+      (50), parseline (56), parsepipe (41) and parsecmd (42) — 470
+      instructions — are not started**, and with them the parser theorem.
+      At stage 2's measured ~45 lines of walk per instruction that balance
+      is ~20 k lines, and NOTHING in this round changed that number: §4b
+      takes a constant ~15 lines off each function's prologue and epilogue
+      (call it 700 lines over the seven), which is real but is 3 % of the
+      balance.  The parser theorem is several lanes away, and the honest
+      next increments in order are (0) unpark peek, (a) gettoken, whose
+      three scans reuse §8's scan mould at the `symbols` table as well as
+      `whitespace`, (b) parseexec's argument loop with `ushp_exec_at` as
+      the invariant, (c) nulterminate's jump table, (d) the three
+      one-line-body parsers.
+
+    * **BUDGET vs MEASURED.**  `iris/UkShParse.v` compiled serially on the
+      mirror under a scratch name, nothing else rebuilt — `UCodeShP.vo` was
+      untouched all round, so round 1's 18 min 58 s was NOT paid again:
+      1845 lines (round 1's landing state) 8.8 s; + §4b 9.8 s; + §5's byte
+      helpers and §7 execcmd 13.2 s; + the table vocabulary and the two
+      engine reads 13.4 s; + §8's scan 14.3 s; + §8's enter and epilogue
+      16.2 s.  So the file costs ~4 ms a line and the ROUND's whole compile
+      budget was under twenty minutes of wall clock across ~30
+      edit/compile cycles — which is the number that made attempting the
+      k-generalised frame BEFORE execcmd the right call rather than a
+      gamble.  Round 1's "18 min 58 s" is the CATALOG's cost and is paid
+      only when `tools/ucode_shp.txt` changes; it did not change.
+
+    * **FOUR LANE GOTCHAS WORTH THE LINE.**
+      (1) `rewrite !big_sepL_cons` in a proofmode goal fires on the WHOLE
+      `envs_entails`, context included, so it splits the CONTINUATION's
+      copy of the big-op too — the matching `rewrite` where that
+      continuation is applied then has nothing to rewrite and errors.
+      Frame the pieces directly instead.
+      (2) A `_` among the arguments of a lemma applied with
+      `iApply`/`iDestruct` leaves an EVAR that an accompanying `ltac:`
+      CANNOT see: the ltac's goal is `?rs !! i = Some (r,u)` and
+      `cbn in Hi` does nothing.  Write the list out.  (That is why
+      `ushp_peel0` exists beside `ushp_peel`.)
+      (3) `f_equal` does not see through `regval_into_reg`: after a
+      `rewrite (upd_eq ...)` the left-hand side is
+      `regval_into_reg (mword_of_int x)`, and `f_equal; lia` fails with
+      "cannot find witness" pointing at the `lia`.  An `assert`ed equation
+      plus `rewrite` then `reflexivity` is the fix — delta closes it.
+      (4) `set (x := e)` does NOT fold `e` in the HYPOTHESES unless you
+      write `in *`, and `lia` then treats `uint x` and `uint e` as two
+      unrelated atoms and reports "cannot find witness" on a goal that is
+      arithmetically trivial.  The same trap bites a hypothesis created
+      AFTER the `set`: fold it by hand with an `assert ... by reflexivity`
+      and a `rewrite ... in`.
+
   * **STAGE 5 — `runcmd`'s tree walk.  LANDED; see the record above.**
     The stage-0 guesses that did NOT survive contact: EXEC needs no
     pinned-exec prover at all (`wp_uk_ecall_exec` is TOTAL — a successful
