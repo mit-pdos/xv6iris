@@ -17223,3 +17223,28 @@ Remaining roots: `ProofForkretPark:318` (stamped_rec ruling pending),
 `UserMemPt:427` (§0.37′, deliberately red).  Mirror refreshed; `.vo`
 pulled so the snapshot matches the build.
 
+### A6.136 (kernel lane, in flight) — ProofKernelvec:1704 measurement checkpoint
+
+The §0.39′ red measured: the failure is the `iApply
+(Kerneltrap.wp_kerneltrap_sconf …)` at ProofKernelvec:1704 —
+`iSpecialize: cannot instantiate (devintr_caps γu γv γdk γtl γs pd pav
+pu -∗ …) with (devintr_caps γu γv γdk γtl γs pd pav pu)` — the printed
+forms are IDENTICAL, so the mismatch is in an implicit/instance.
+Checked so far: `devintr_caps` (SpecDevintr:146) takes no CID/ktier
+params, only the Σ-instances `{riscvGS, xv6G, bioslotG, fdslotG,
+irefslotG, pavG}`; `timer_cap` (TimerCap:83) is CID-free; the call's
+with-list positions all line up against `wp_kerneltrap_sconf_body`'s
+premise order (SpecKerneltrap).  NEXT: diff the elaborated implicits —
+likely one of the Σ-instance arguments differs (two instances in scope
+at the call, e.g. via the handler-spec's own section context vs the
+lemma's), or a `γs`-type universe; print with `Set Printing All` on a
+scratch copy of the failing goal, or check whether SpecKerneltrap's
+section context ORDER of the six Σ-classes differs from
+SpecDevintr's/ProofKernelvec's (instance-argument permutation makes
+syntactically-equal-looking terms non-unifiable only if resolution
+picked different instances — inspect with About/Check on both).
+
+Also this session: the U-mode cone was handed to a separate agent —
+brief in `tso-umode-lane.md` (scope: the generic U-mode WP theorem;
+NOT per-binary proofs; file-ownership fences recorded there).
+
