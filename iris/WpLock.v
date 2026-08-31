@@ -56,6 +56,9 @@ Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Require Import Ktier KMap RiscvExtras.  (* A6.84: [ktier_pin] / [kmap_at] --
    a ledger cell carries no MAPPING, so [lk_addr_claim] states one here *)
 Require Import TsoCtx.
+Require Import TsoCtxPark.  (* A6.144: [ctx_parked_raise] -- the record's
+   stamp rises at any log-length receipt, minting the floor a payload row
+   needs (the [lock_pay_intro_llb] mint below) *)
 (* [lock_name_intro] mints the deliberately-RAW name-field metadata
    (tso-port.md §0.8' ruling 2) out of a context-indexed store result, so it
    leaves the ledger through [TsoCtx.ctx_word_pointsto_forget] -- the named
@@ -1282,6 +1285,41 @@ Section Lock.
     iMod (ctx_deposit R cur_ctx ξc 0 with "Hrun Hpk HR")
       as "(Hrun & %T' & _ & Hpk & HR)".
     iModIntro. iFrame "Hrun". iExists ξc, T'. iFrame "Hpk HR".
+  Qed.
+
+  (* >>> A6.144: THE FLOORED MINT -- the release-side answer to the
+     fresh-stores asymmetry (A6.113's, arriving at the PAYLOAD tier).  A
+     releaser cannot floor a position covering its own buffered stores at
+     its own context (its bound is capped by its view), so a payload row
+     [λ ξ, ctx_floor ξ tl] with [tl] at or above those stores is
+     unmintable through the plain deposit.  But the RECORD has no hart:
+     [TsoCtxPark.ctx_parked_raise] lifts its stamp past ANY legal log
+     position for free and hands back exactly the floor.  So the mint is:
+     deposit as always, raise the record at the row's [llb], fold the
+     floor in.  The acquire side is unchanged -- the row rides the
+     ordinary payload transport ([TsoCtx.ctx_floor_dom]) and the winner
+     cashes it against its own running token
+     ([TsoCtx.own_context_floor_view]).
+
+     THE TWO CLIENTS this was built for (both measured in the A6.141-43
+     line): the itable's exact count read under itable.lock (the row
+     floors the last count store's position, [llb] off the store leaf),
+     and the CtxAnchor guard's slot mint (the row floors the anchor's
+     raised stamp, [llb] off [CtxAnchor.anchor_deposit]). <<< *)
+  Lemma lock_pay_intro_llb `{CID : CpuId} (R R' : CtxId -> iProp Σ)
+      `{!CtxMorph R} (tl : nat) :
+    (forall ξ : TsoCtx.CtxId, R ξ ∗ TsoCtx.ctx_floor ξ tl ⊢ R' ξ) ->
+    TsoGhost.llb loglen_name tl -∗
+    own_context cur_ctx -∗ R cur_ctx ==∗ own_context cur_ctx ∗ lock_pay R'.
+  Proof.
+    iIntros (Hfold) "#Hllb Hrun HR".
+    iMod ctx_parked_alloc as (ξc) "Hpk".
+    iMod (ctx_deposit R cur_ctx ξc 0 with "Hrun Hpk HR")
+      as "(Hrun & %T' & _ & Hpk & HR)".
+    iMod (TsoCtxPark.ctx_parked_raise ξc T' tl with "Hllb Hpk")
+      as "[Hpk #Hfl]".
+    iModIntro. iFrame "Hrun". iExists ξc, (Nat.max T' tl). iFrame "Hpk".
+    iApply Hfold. iFrame "HR Hfl".
   Qed.
 
   (* THE TWO ADDRESS CLAIMS RIDE HERE, LAST, and outside the ∃: they are
