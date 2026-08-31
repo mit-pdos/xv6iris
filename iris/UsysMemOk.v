@@ -305,6 +305,25 @@ Proof.
   exact H.
 Qed.
 
+(* THE QUIET ROW, IN THE DIRECTION A PROVER NEEDS IT.  [usys_fd_ok_quiet]
+   above READS a row ("this entry moved nothing"); an arm has to SUPPLY one,
+   and supplies it at the only table it has.  Keyed on the entry's own
+   number so a dispatch arm discharges it with its [Hnum] and four
+   [discriminate]s. *)
+Lemma usys_fd_ok_refl_at (n k : Z) (tf : list (mword 64)) (r : mword 64)
+    (sts : list fdstate) :
+  n = k ->
+  k <> USYS_close -> k <> USYS_dup -> k <> USYS_open -> k <> USYS_pipe ->
+  usys_fd_ok n tf r sts sts.
+Proof.
+  intros -> Hc Hd Ho Hp. unfold usys_fd_ok.
+  destruct (decide (k = USYS_close)); [contradiction |].
+  destruct (decide (k = USYS_dup)); [contradiction |].
+  destruct (decide (k = USYS_open)); [contradiction |].
+  destruct (decide (k = USYS_pipe)); [contradiction |].
+  reflexivity.
+Qed.
+
 (* THE LENGTH SURVIVES EVERY ROW, which is what [FdSlots.fd_frags] needs of
    any table it is asked to hold: it carries [length sts = NOFILE] inside
    it, so a row that could change the length would be a row no bundle could

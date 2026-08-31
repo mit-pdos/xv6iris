@@ -265,6 +265,18 @@ Definition sysc_fd_ok (V : pprivate) (r : mword 64)
     (sts sts' : list fdstate) : Prop :=
   UsysMemOk.usys_fd_ok (sysc_num V) (pv_tf V) r sts sts'.
 
+(* ...and the same at the kernel's vocabulary, which is what a dispatch arm
+   applies: it knows [sysc_num (us_V U) = k] for its own literal [k]. *)
+Lemma sysc_fd_ok_refl_at (V : pprivate) (r : mword 64) (sts : list fdstate)
+    (k : Z) :
+  sysc_num V = k ->
+  k <> 21 -> k <> 10 -> k <> 15 -> k <> 4 ->
+  sysc_fd_ok V r sts sts.
+Proof.
+  intros Hk Hc Hd Ho Hp. unfold sysc_fd_ok.
+  exact (UsysMemOk.usys_fd_ok_refl_at _ k (pv_tf V) r sts Hk Hc Hd Ho Hp).
+Qed.
+
 (* syscall's own frame is 4 slots; below it the deepest table entry, which is
    sys_exit at [K_sys_exit] = 4 + kexit's 74.  Written as an expression, not
    a literal, so a change to kexit's budget cannot silently leave this one
