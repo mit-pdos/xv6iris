@@ -148,11 +148,19 @@ Section MainDepositMorph.
   Global Instance disk_geom_morph γ pd pav pu : CtxMorph (λ ξ, disk_geom (XI := ξ) γ pd pav pu).
   Proof. rewrite /disk_geom. ctx_morph_solve. Qed.
 
-  Definition main_dep (γd : uart_names) (γv : disk_names) : CtxId -> iProp Σ :=
-    λ ξ, main_deposit (XI := ξ) γd γv.
-  Global Instance main_dep_persistent γd γv ξ : Persistent (main_dep γd γv ξ).
+  (* A6.138: the deposit is POSITION-INDEXED -- it learns the flag store's
+     log position, and records that the kernel table's publication bound is
+     BELOW it.  That pure tie is what turns a secondary's read receipt
+     ([view_lb] at the flag's position) into the pin credentials
+     ([KptShare.kpt_creds]) its kvminithart call needs. *)
+  Definition main_dep (γd : uart_names) (γv : disk_names)
+      : nat -> CtxId -> iProp Σ :=
+    λ pos ξ, (main_deposit (XI := ξ) γd γv ∗
+              ∃ B : nat, KptGhost.kpt_bound B ∗ ⌜(B <= pos)%nat⌝)%I.
+  Global Instance main_dep_persistent γd γv pos ξ :
+    Persistent (main_dep γd γv pos ξ).
   Proof. rewrite /main_dep. apply _. Qed.
-  Global Instance main_dep_morph γd γv : CtxMorph (main_dep γd γv).
+  Global Instance main_dep_morph γd γv pos : CtxMorph (main_dep γd γv pos).
   Proof. rewrite /main_dep /main_deposit. ctx_morph_solve. Qed.
 End MainDepositMorph.
 
@@ -199,17 +207,13 @@ Section SpecMainSecondaryBody.
        it because it is a member of [SpecDevintr.devintr_caps], which the
        handler contract closes over -- clockintr is on kerneltrap's cone. *)
     timer_cap -∗
-    (* A6.70: THE CANON PIN'S CREDENTIALS, this hart's
-       ([KptShare.kpt_creds] -- the publication bound plus THIS hart's
-       receipt that its view has passed it).  kvminithart needs it to seal
-       the KPT arm (SpecKvminithart.v), and a secondary hart's honest source
-       is its own acquire of [started]: the spin is a plain load but the
-       [__sync_synchronize] after it DRAINS ([RiscvLang.fence_drains]), so
-       the hart emerges at the log top and dominates any published bound.
-       Taking it as a premise here is A6.55's ruling one level down -- the
-       obligation is explicit rather than assumed -- and it is what the
-       started-handshake tranche has to discharge.  Persistent. *)
-    KptShare.kpt_creds -∗
+    (* A6.138: [KptShare.kpt_creds] is NO LONGER A PREMISE -- a secondary's
+       honest source is its own acquire of [started], and that is now
+       exactly where it is DERIVED: the deposit carries
+       [∃B, kpt_bound B ∗ ⌜B ≤ pos⌝] at the flag's position, the armed
+       read hands a [view_lb] receipt at that position, and
+       [view_lb_le] + [cv_boot_cred_view] + [kpt_creds_intro] mint the
+       credentials inside the spin's continuation. *)
     main_hart_raw tlbvec0 -∗
     WP (Loop : expr riscv_lang).
 

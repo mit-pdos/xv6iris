@@ -768,12 +768,13 @@ Section BootPrimary.
                     Hdev Hwire Htx Hsent Hlb Hdlab
                     Hcfg Hclaim Hdone Htimc Hraw Hkpt Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
-       nine conjuncts at exactly its eight existential witnesses, so the wand
-       is intro + exists + frame and nothing else. *)
+       nine conjuncts at exactly its eight existential witnesses, plus
+       (A6.138) the position-indexed bound tie the store site supplies. *)
     iModIntro.
-    iIntros (γpr γs γk pd pav pu root pas)
-      "Hpr Hpi Hcc Hdl Hgeom Hkpti Hroot Htramp Hkst".
-    rewrite /main_deposit.
+    iIntros (pos γpr γs γk pd pav pu root pas)
+      "Hpr Hpi Hcc Hdl Hgeom Hkpti Hroot Htramp Hkst Hbnd".
+    rewrite /main_dep /main_deposit.
+    iSplitR "Hbnd"; last iExact "Hbnd".
     iExists γpr, γk, γs, pd, pav, pu, root, pas.
     iFrame "Hpr Hpi Hcc Hdl Hgeom Hkpti Hroot Htramp Hkst".
   Qed.

@@ -142,21 +142,30 @@ Section StartedInv.
      into the registration. *)
   Definition started_prim (γi : gname) : iProp Σ := dset_auth γi (1/2) ∅.
 
-  Definition started_right (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ) : iProp Σ :=
+  (* A6.138: the payload is POSITION-INDEXED -- [P (S i)] in the armed arm,
+     where [S i] is the flag store's log position.  This is how a deposit
+     can record store-time facts (the kernel table's bound is BELOW the
+     flag: [∃ B, kpt_bound B ∗ ⌜B ≤ pos⌝]) that the boot-time payload
+     could not name: the store obligation receives a position-generic
+     builder and applies it at its own append position. *)
+  Definition started_right (γi : gname) (ξd : CtxId)
+      (P : nat -> CtxId -> iProp Σ) : iProp Σ :=
     (* the window itself names the author (agent 0, the zero-cid hart) and
        carries the release's bytes in its history entry, so no message
        fragment is needed (A6.126 §6.3). *)
     (∃ (i : nat) (T : nat),
        started_win_rel i ∗
        dset_auth γi 1 {[(S i, started_addr)]} ∗
-       ctx_parked ξd T ∗ ⌜(T ≤ S i)%nat⌝ ∗ P ξd)%I.
+       ctx_parked ξd T ∗ ⌜(T ≤ S i)%nat⌝ ∗ P (S i) ξd)%I.
 
-  Definition started_body (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ) : iProp Σ :=
+  Definition started_body (γi : gname) (ξd : CtxId)
+      (P : nat -> CtxId -> iProp Σ) : iProp Σ :=
     (wordw_claim (KTR := KT0) 4 started_addr ∗ ⌜started_img⌝ ∗
      (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_parked ξd 0
       ∨ started_right γi ξd P))%I.
 
-  Definition started_inv (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ) : iProp Σ :=
+  Definition started_inv (γi : gname) (ξd : CtxId)
+      (P : nat -> CtxId -> iProp Σ) : iProp Σ :=
     inv startedN (started_body γi ξd P).
 
   Global Instance started_inv_persistent γi ξd P : Persistent (started_inv γi ξd P).
@@ -168,7 +177,7 @@ Section StartedInv.
   (* is boot's stamp-0 mint (a RECORD, not a process: §0.44′), the index  *)
   (* authority is fresh.  The primary keeps half of it.                   *)
   (* ------------------------------------------------------------------- *)
-  Lemma started_alloc (E : coPset) (ξd : CtxId) (P : CtxId -> iProp Σ) :
+  Lemma started_alloc (E : coPset) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ) :
     started_img ->
     wordw_claim (KTR := KT0) 4 started_addr -∗
     started_win_plain -∗ ctx_parked ξd 0 ={E}=∗
@@ -216,12 +225,16 @@ Section StartedInv.
      0 -- exactly [started_store_obl]'s resource -- and closing takes the
      armed disjunct back. *)
   Lemma started_store_open (Em : coPset) (γi : gname) (ξd : CtxId)
-      (P : CtxId -> iProp Σ) :
+      (P : nat -> CtxId -> iProp Σ) (B0 : nat) :
     ↑startedN ⊆ Em ->
-    started_inv γi ξd P -∗ started_prim γi -∗ P cur_ctx -∗
+    started_inv γi ξd P -∗ started_prim γi -∗
+    (llb loglen_name B0 ∗
+     □ (∀ pos : nat, ⌜(B0 <= pos)%nat⌝ -∗ P pos cur_ctx)) -∗
     (|={Em, Em ∖ ↑startedN}=>
        (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_parked ξd 0 ∗
-        started_prim γi ∗ P cur_ctx) ∗
+        started_prim γi ∗
+        (llb loglen_name B0 ∗
+         □ (∀ pos : nat, ⌜(B0 <= pos)%nat⌝ -∗ P pos cur_ctx))) ∗
        (started_right γi ξd P ={Em ∖ ↑startedN, Em}=∗ True)).
   Proof.
     iIntros (HE) "#Hinv Hprim HP".
@@ -234,7 +247,8 @@ Section StartedInv.
       iExFalso. iApply (dset_auth_excl with "Hda"). rewrite /started_prim. iExact "Hprim".
   Qed.
 
-  Lemma started_inv_claim (E : coPset) (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ) :
+  Lemma started_inv_claim (E : coPset) (γi : gname) (ξd : CtxId)
+      (P : nat -> CtxId -> iProp Σ) :
     ↑startedN ⊆ E ->
     started_inv γi ξd P ={E}=∗ wordw_claim (KTR := KT0) 4 started_addr.
   Proof.
@@ -282,20 +296,22 @@ Section StartedInv.
     dset_auth γ (q1 + q2) S ⊣⊢ dset_auth γ q1 S ∗ dset_auth γ q2 S.
   Proof. rewrite /dset_auth -own_op -auth_auth_dfrac_op dfrac_op_own. done. Qed.
 
-  Definition started_res (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ) : iProp Σ :=
+  Definition started_res (γi : gname) (ξd : CtxId)
+      (P : nat -> CtxId -> iProp Σ) : iProp Σ :=
     (⌜started_img⌝ ∗
      (started_win_plain ∗ dset_auth γi (1/4) ∅
       ∨ ∃ i : nat,
-          started_win_rel i ∗ started_idx γi i ∗ ▷ P ξd))%I.
+          started_win_rel i ∗ started_idx γi i ∗ ▷ P (S i) ξd))%I.
 
-  Definition started_W (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ)
+  Definition started_W (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
       (v : mword 32) (tv : nat) : iProp Σ :=
     (⌜v = started_clear⌝
      ∨ ∃ i : nat, ⌜v = started_clear \/ (v = started_set /\ (S i <= tv)%nat)⌝ ∗
-                  started_idx γi i ∗ ▷ P ξd)%I.
+                  started_idx γi i ∗ ▷ P (S i) ξd)%I.
 
-  Lemma started_read_open (Em : coPset) (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ)
-      `{!∀ ξ, Persistent (P ξ)} :
+  Lemma started_read_open (Em : coPset) (γi : gname) (ξd : CtxId)
+      (P : nat -> CtxId -> iProp Σ)
+      `{!∀ pos ξ, Persistent (P pos ξ)} :
     ↑startedN ⊆ Em ->
     started_inv γi ξd P -∗
     (|={Em, Em ∖ ↑startedN}=> started_res γi ξd P ∗
@@ -340,8 +356,8 @@ Section StartedInv.
   (* position, the store; so a reader that sees [started_set] settled on   *)
   (* the store, which is visible to it and not its own message.            *)
   (* ------------------------------------------------------------------- *)
-  Lemma started_read_obl (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ)
-      `{!∀ ξ, Persistent (P ξ)} (p : mword 64) :
+  Lemma started_read_obl (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
+      `{!∀ pos ξ, Persistent (P pos ξ)} (p : mword 64) :
     cid_word <> zero_reg ->
     forall (CIDw : CpuId) (img : bytemap) (sigma : mstate)
            (log : list pwmsg) (V : agent -> nat) (ppn : mword 44),
@@ -475,11 +491,13 @@ Section StartedInv.
   (* deposit comes into its own context; the token goes back at the same *)
   (* stamp, so the claim is repeatable by every hart.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma started_absorb (E : coPset) (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ)
-      `{!CtxMorph P} `{!∀ ξ, Persistent (P ξ)} (i V0 : nat) :
+  Lemma started_absorb (E : coPset) (γi : gname) (ξd : CtxId)
+      (P : nat -> CtxId -> iProp Σ)
+      `{!∀ pos, CtxMorph (P pos)} `{!∀ pos ξ, Persistent (P pos ξ)} (i V0 : nat) :
     ↑startedN ⊆ E -> (S i <= V0)%nat ->
     started_inv γi ξd P -∗ started_idx γi i -∗ hart_view_lb V0 -∗
-    own_context cur_ctx -∗ P ξd ={E}=∗ own_context cur_ctx ∗ P cur_ctx.
+    own_context cur_ctx -∗ P (S i) ξd ={E}=∗
+    own_context cur_ctx ∗ P (S i) cur_ctx.
   Proof.
     iIntros (HE HiV) "#Hinv #Hidx #HK Hrun HP".
     iMod (inv_acc E startedN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
@@ -489,7 +507,8 @@ Section StartedInv.
     - iDestruct "Hr" as (i' T) "(>Hw & >Ha & >Hpk & >%HT & #HPd)".
       iDestruct (dset_lookup with "Ha Hidx") as %Hin.
       apply elem_of_singleton in Hin. injection Hin as Hii. subst i'.
-      iMod (ctx_absorb_lb P ξd cur_ctx T V0 ltac:(lia) with "Hrun HK Hpk HP")
+      iMod (ctx_absorb_lb (P (S i)) ξd cur_ctx T V0 ltac:(lia)
+              with "Hrun HK Hpk HP")
         as "(Hrun & Hpk & HP)".
       iMod ("Hclose" with "[Hw Ha Hpk]") as "_".
       { iNext. rewrite /started_body. iFrame "Hcl". iSplitR; [by iPureIntro|].
@@ -511,8 +530,8 @@ Section StartedInv.
     iExists D. iFrame "Hat Hllb". by iPureIntro.
   Qed.
 
-  Lemma started_store_obl (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ)
-      `{!CtxMorph P} (p : mword 64) :
+  Lemma started_store_obl (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
+      `{!∀ pos, CtxMorph (P pos)} (B0 : nat) (p : mword 64) :
     cid_word = zero_reg ->
     forall (CIDw : CpuId) (img : bytemap) (sigma : mstate)
            (log : list pwmsg) (V : agent -> nat) (ppn : mword 44),
@@ -525,7 +544,9 @@ Section StartedInv.
       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_parked ξd 0 ∗
-       started_prim γi ∗ P TsoCtx.cur_ctx) ==∗
+       started_prim γi ∗
+       (llb loglen_name B0 ∗
+        □ (∀ pos : nat, ⌜(B0 <= pos)%nat⌝ -∗ P pos TsoCtx.cur_ctx))) ==∗
       gen_heap_interp (hG := riscv_memGS)
         (write_bytes sigma.(mem) (pa_of ppn started_addr) (Z.to_N 4) started_set) ∗
       tso_interp_of riscv_eraGS img
@@ -541,14 +562,21 @@ Section StartedInv.
     intros Hz CIDw img sigma log V ppn Hcan Hoff Hid Hmig.
     rewrite (ktier_pin_id ppn started_addr Hid).
     pose proof (Hmig (or_introl eq_refl)) as HCw.
-    iIntros "#Hk Hm Htso Hctx (Hw & Ha1 & Hpk & Ha2 & HP)".
+    iIntros "#Hk Hm Htso Hctx (Hw & Ha1 & Hpk & Ha2 & [#HllbB #Hmk])".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     iDestruct (tso_interp_of_bound with "Htso") as %Hbd.
     rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
                sigma.(sregs) sigma.(mdev) Hpin).
     set (g := gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev)).
+    (* A6.138: the store's position is [length log]; the payload builder
+       fires at [S (length log)], where the caller's bound receipt gives
+       the pure tie [B0 ≤ length log] against the interp's log length. *)
+    iDestruct (tso_interp_llb_valid g B0 with "Htso HllbB") as "[Htso %HB0len]".
+    iDestruct ("Hmk" $! (S (length log)) with "[%]") as "HPmk".
+    { cbn in HB0len. lia. }
     (* the deposit, at the old log *)
-    iMod (ctx_deposit (CID := CIDw) P TsoCtx.cur_ctx ξd 0%nat with "Hctx Hpk HP")
+    iMod (ctx_deposit (CID := CIDw) (P (S (length log))) TsoCtx.cur_ctx ξd 0%nat
+            with "Hctx Hpk HPmk")
       as "(Hctx & %T & _ & Hpk & HP)".
     iDestruct (started_parked_llb with "Hpk") as "[Hpk #Hllb]".
     iDestruct (tso_interp_llb_valid g T with "Htso Hllb") as "[Htso %HTlen]".

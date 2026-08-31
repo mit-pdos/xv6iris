@@ -311,8 +311,8 @@ Section ProofMainSecondary.
   (* 0x16 .. 0x1e -- [while (started == 0) ;] with the acquire fence.     *)
   (* =================================================================== *)
   Local Lemma ms_spin
-      (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ)
-      `{!∀ ξ, Persistent (P ξ)} `{!CtxMorph P}
+      (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
+      `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)}
       (m : regfile) (n : nat) (p0 : mword 64) :
     add_vec (rget m (mword_of_int 14 : mword 5))
         (sign_extend' 64 (mword_of_int 0 : mword 12)) = started_addr ->
@@ -323,7 +323,9 @@ Section ProofMainSecondary.
     ( ∀ m' : regfile,
         sie_cap_gpr KT0 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x20) : mword 64) -∗
-        P cur_ctx -∗
+        (∃ pos : nat,
+           P pos cur_ctx ∗
+           TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) pos) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -457,8 +459,13 @@ Section ProofMainSecondary.
         iMod (started_absorb ⊤ γi ξd P i V0 ltac:(solve_ndisj) Hle
                 with "Hsinv Hidx Hlb Hctx HPd") as "[Hctx #HP]".
         iDestruct ("Hcg" with "Hctx") as "Hcg".
+        (* A6.138: the read receipt, weakened to the flag's own position *)
+        iEval (rewrite hart_view_lb_unseal /hart_view_lb_def) in "Hlb".
+        iDestruct (TsoGhost.view_lb_le view_name loglen_name
+                     (hart_agent cpu_id) V0 (S i) Hle with "Hlb") as "#Hvpos".
         iModIntro.
-        iApply ("Hcont" $! M2 with "Hcg Hpc HP").
+        iApply ("Hcont" $! M2 with "Hcg Hpc [ ]").
+        iExists (S i). iFrame "HP Hvpos".
   Qed.
 
   (* =================================================================== *)
@@ -781,7 +788,7 @@ Section ProofMainSecondary.
     cbv beta delta [wp_main_secondary_sconf_body].
     intros pcE Hcid Hdc HK Hp0.
     pose proof (ms_bounds K HK) as (Hc2 & Hn38 & Hn20).
-    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Htimc #Hcreds Hhart".
+    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Htimc Hhart".
     (* printk wants the ambient form; the scheduler join wants the generic one
        (its acquire does), so keep both. *)
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
@@ -789,8 +796,16 @@ Section ProofMainSecondary.
     iIntros (m1) "Hcg Hpc %Ha4".
     iApply (ms_spin γi ξd (main_dep γd γv) m1 (K - 2)%nat p0 Ha4 Hcid with "Hcg Htext Hpc Hsinv").
     iIntros (m2) "Hcg Hpc #Hdep".
-    iEval (rewrite /main_dep) in "Hdep".
-    iDestruct "Hdep" as (γpr γk γs pd pav pu root pas)
+    iDestruct "Hdep" as (pos) "[#Hdepp #Hvpos]".
+    iEval (rewrite /main_dep) in "Hdepp".
+    iDestruct "Hdepp" as "[#Hdepm Hbnd]".
+    iDestruct "Hbnd" as (Bk) "[#Hbd %HBpos]".
+    (* A6.138: THE CREDENTIALS, minted from the hart's own acquire *)
+    iDestruct (TsoGhost.view_lb_le view_name loglen_name
+                 (hart_agent cpu_id) pos Bk ltac:(lia) with "Hvpos") as "#HvB".
+    iDestruct (CtxValues.cv_boot_cred_view Bk with "HvB") as "#Hbc".
+    iDestruct (KptShare.kpt_creds_intro Bk with "Hbd Hbc") as "#Hcreds".
+    iDestruct "Hdepm" as (γpr γk γs pd pav pu root pas)
       "(#Hpenv & #Hpinv & #Hccaps & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".
     iPoseProof "Hpenv" as "Hpenv2".
     iDestruct "Hpenv2" as "(_ & _ & #Hdev & _ & _)".

@@ -898,9 +898,12 @@ Section ProofMain.
         (* the KPT receipt kvminithart minted, on its way to [trap_csrs] *)
         kpt_on cpu_id -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
-        (* what kvminithart published about the kernel page table: all four
-           PERSISTENT, and exactly what the [started] deposit carries *)
+        (* what kvminithart published about the kernel page table: all
+           PERSISTENT, and exactly what the [started] deposit carries.
+           A6.138: the creds travel too -- mn_grp_started needs the BOUND
+           (and its llb) to tie the deposit to the flag's position. *)
         kpt_inv root -∗
+        KptShare.kpt_creds -∗
         (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
           (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
         kmap_at tramp_vpn tramp_ppn KP_rx -∗
@@ -1142,7 +1145,7 @@ Section ProofMain.
     iModIntro.
     iApply ("Hcont" $! γp γw γs mpr (pt_base t) pas
               with "Hcg Hpc Hfree Hcpu Hkenv Hkmem Hpinv Hpidlock Hwaitlock
-                    Hkptr Hstvec Hkinv Hkptp Htramp Hkstx").
+                    Hkptr Hstvec Hkinv Hcreds Hkptp Htramp Hkstx").
   Qed.
 
   (* =================================================================== *)
@@ -1920,8 +1923,8 @@ Section ProofMain.
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) (pd pav pu : mword 64)
       (root : mword 44) (pas : nat -> mword 44)
-      (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ)
-      `{!∀ ξ, Persistent (P ξ)} `{!CtxMorph P} :
+      (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
+      `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)} :
     (* the scheduler this block tail-calls enables interrupts at its loop head
        and must fund [kv_frame_slots] there; see [SpecScheduler]. *)
     (kv_frame_slots + 22 <= n)%nat ->
@@ -1934,7 +1937,8 @@ Section ProofMain.
     cpu_own 0 false p0 false ∅ -∗
     trap_csrs KT1 -∗
     started_inv γi ξd P -∗ started_prim γi -∗
-    □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
+    □ (∀ (pos : nat)
+         (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
          (root' : mword 44) (pas' : nat -> mword 44),
          printk_env γpr' γd γv -∗
          procs_inv γs' -∗
@@ -1946,7 +1950,9 @@ Section ProofMain.
            (zero_extend' 64 (concat_vec root' (zeros' 12 : mword 12))) -∗
          kmap_at tramp_vpn tramp_ppn KP_rx -∗
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas' i) KP_rw) -∗
-         P cur_ctx) -∗
+         (∃ B : nat, KptGhost.kpt_bound B ∗ ⌜(B <= pos)%nat⌝) -∗
+         P pos cur_ctx) -∗
+    KptShare.kpt_creds -∗
     printk_env γpr γd γv -∗
     procs_inv γs -∗
     console_caps γd -∗
@@ -1960,12 +1966,19 @@ Section ProofMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hp0 Hcid.
-    iIntros "Hcg #Htext Hpc Hfree Hcpu Htcsr #Hsinv Hprim #Hwand".
+    iIntros "Hcg #Htext Hpc Hfree Hcpu Htcsr #Hsinv Hprim #Hwand #Hcreds".
     iIntros "#Hpenv #Hpinv #Hccaps #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
-    (* the deposit itself: everything main built, through the □-wand *)
-    iAssert (P cur_ctx) as "#HP".
-    { iApply ("Hwand" $! γpr γs γk pd pav pu root pas
-                with "Hpenv Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx"). }
+    (* A6.138: the deposit is POSITION-GENERIC -- the builder fires at the
+       flag store's own position, where [B ≤ pos] is the bound-below-flag
+       tie the secondaries' credentials need. *)
+    iDestruct "Hcreds" as (Bk) "[#Hbd #Hbc]".
+    iDestruct (CtxValues.cv_boot_cred_llb with "Hbc") as "#HllbB".
+    iAssert (□ (∀ pos : nat, ⌜(Bk <= pos)%nat⌝ -∗ P pos cur_ctx))%I as "#HPmk".
+    { iIntros "!>" (pos) "%Hpos".
+      iApply ("Hwand" $! pos γpr γs γk pd pav pu root pas
+                with "Hpenv Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx
+                      [ ]").
+      iExists Bk. iFrame "Hbd". by iPureIntro. }
     (* The release sequence.  Note the shape: the address is materialized
        BEFORE the barrier and the store is the compressed [c.sw], so the
        fence separates the whole deposit from the store alone -- and it is
@@ -2050,18 +2063,22 @@ Section ProofMain.
               (trunc32 (rget S3 (mword_of_int 14 : mword 5))) True%I
               ((⊤ ∖ ↑minstretN) ∖ ↑startedN) false
               (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_parked ξd 0 ∗
-               started_prim γi ∗ P cur_ctx)%I
+               started_prim γi ∗
+               (llb loglen_name Bk ∗
+                □ (∀ pos : nat, ⌜(Bk <= pos)%nat⌝ -∗ P pos cur_ctx)))%I
               (started_right γi ξd P)
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_write_ram_plain_4
               (store_ext_4 (rget S3 (mword_of_int 14 : mword 5)))
               ltac:(solve_ndisj)
-              ltac:(cbv zeta; rewrite Hsa Hsvst; exact (started_store_obl γi ξd P p0 Hcid))
-              with "Hcg Hpc [] [] [Hprim HP]").
+              ltac:(cbv zeta; rewrite Hsa Hsvst;
+                    exact (started_store_obl γi ξd P Bk p0 Hcid))
+              with "Hcg Hpc [] [] [Hprim]").
     { iApply (mni_b0 with "Htext"). }
     { rewrite Hsa. iExact "Hstcl". }
-    { iApply (started_store_open (⊤ ∖ ↑minstretN) γi ξd P ltac:(solve_ndisj)
-                with "Hsinv Hprim HP"). }
+    { iApply (started_store_open (⊤ ∖ ↑minstretN) γi ξd P Bk ltac:(solve_ndisj)
+                with "Hsinv Hprim [ ]").
+      iFrame "HllbB HPmk". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc _".
     iEval (change (if true then 2%Z else 4%Z) with 2%Z) in "Hpc".
@@ -2111,8 +2128,8 @@ Section ProofMain.
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (ndisk : nat)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (γi : gname) (ξd : CtxId) (P : CtxId -> iProp Σ)
-      `{!∀ ξ, Persistent (P ξ)} `{!CtxMorph P}
+      (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
+      `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)}
     : wp_main_boot_sconf_body m K p0 ps s1entry phystop
         γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 γi ξd P.
   Proof.
@@ -2232,7 +2249,7 @@ Section ProofMain.
                     Hbss Hparks Hpst").
     iIntros (γp γw γs m3 root pas)
       "Hcg Hpc Hfree Hcpu Hkenv #Hkmem #Hpinv #Hpidlock #Hwaitlock Hkpt Hstvec
-       #Hkinv #Hkptp #Htramp #Hkstx".
+       #Hkinv #Hcreds #Hkptp #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
     iApply (mn_grp_trap γd γv m3 (K - 2)%nat p0 Hn50 Hcid
               with "Hcg Htext Hkdata Hdev Hpc Hltick Hticks Hstvec Hq").
@@ -2278,7 +2295,8 @@ Section ProofMain.
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started fsc_printk γk fsc_kalloc γs γd γv m5 (K - 2)%nat p0 pd pav pu
               root pas γi ξd P ltac:(lia) Hp0 Hcid
-              with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hprim Hwand Hpenv
+              with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hprim Hwand
+                    Hcreds Hpenv
                     Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
     (* fold the boot cells and the freshly built handler resource into the
        [trap_csrs] the scheduler consumes. *)
