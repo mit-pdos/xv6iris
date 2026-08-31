@@ -17542,3 +17542,25 @@ the body's ambient — ProofKernelvec's four bridge conversions go back to
 (no E-fixing of the entry), destructuring the pack only to APPLY the
 contract (spec at some E + □E + witness).
 
+### A6.139 (cont. 4) — THE KERNELVEC CHAIN IS GREEN
+
+Family fixpoint landed (`ihs_fam`, `ires_pack_of` with the manual
+dist_later plumbing — `solve_contractive` and the bracketed `f_equiv`
+both fail on the pack shape; the record is built by hand:
+`split; intros m Hm; exact (HSlt m Hm E')`).  The four funnel bridges'
+RHS respelled at `ires_pack_of (ihs kt) XI` (still reflexivity — and the
+rewrite sites need the SPELLED form, not the `ires_pack` alias).  Green
+in sequence: IntrDefs, WpIntrInv (entry asserted at the packed slot;
+the Löb re-entry back to a refl rewrite — `sie_cap_gpr_pack` no longer
+needed there), SchedCtx, WpSconfSret, WpSconfCsr, ProofPrepareReturn,
+UsertrapRes (folds via witness-extended `ihs_env` — `Typeclasses
+Opaque` blocks `iDestruct`'s IntoExist: unfold before destructuring),
+SpecDevintr (+ member CtxMove instances, CID-split), SpecKernelvec
+(`kernelvec_env`, caps premise GONE, `kernelvec_env_move`),
+**ProofKernelvec** (the §0.39′ red root: body takes `□ E XIc`, caps
+derived by one rewrite; the stale r60 diagnostic edit was still lodged
+in the kerneltrap call; two token-name drifts in the never-compiled
+crossing tail), ProofMain + ProofMainSecondary installers
+(`intr_res_intro` at `kernelvec_env` + `#Hcaps`-rewrite + the witness
+lemma).  r63 round launched.
+
