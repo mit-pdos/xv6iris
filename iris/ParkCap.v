@@ -89,13 +89,7 @@ Section ParkCap.
      procs_inv γs ∗
      pslot_used_at pa ∗
      stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) av ∗
-     (* [sts] IS THE RESUMED RECORD'S DESCRIPTOR VIEW, and it is ∀-bound for
-        the same reason [U'] is: the party that resumes may have replaced
-        the address space AND retyped descriptors between the park and the
-        resume, so the only honest key is the one the RESUME names.  What
-        the parker captured is the generic family, which inhabits every
-        [sts] at no cost. *)
-     (∀ (h : CpuId) (pt' : uptd) (U' : ustate) (sts : list fdstate),
+     (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
         ⌜pv_upt (us_V U') = pt'⌝ -∗
         ⌜ud_data pt' = ud_pas pt'⌝ -∗
         ⌜proc_pt_wf pt'⌝ -∗
@@ -119,7 +113,23 @@ Section ParkCap.
            record, so a key captured at userinit's park is stale by then
            (projects/user-wp-slot.md SS4c, refutation R-b). *)
         (URB h pt' (add_vec ks (mword_of_int 4096)) U'
-         ∗ uslot (uvis_of U' sts))))%I.
+         (* ...AT THE RECORD'S OWN DESCRIPTOR VIEW.  [sts] is EXISTENTIAL,
+            i.e. the PRODUCER picks it, and the producer is the party
+            holding [FdSlots.fd_frags]: [park_token_park] below reads it
+            off the very bundle it is about to hand to the residue.  That
+            is what makes [uvis_fd] a READING of [p->ofile[]] rather than a
+            choice -- holding the fragments pins the states
+            ([FdSlots.fd_st_agree]), and nothing can move them between the
+            park and the resume, since an update needs BOTH halves
+            ([fd_st_both_update]) and this closure holds one of them.  (Not
+            even forkret's boot arm, which runs kexec("/init") in between:
+            exec does not touch the descriptor array.)
+
+            ∀-BOUND WOULD BE THE WRONG SHAPE.  It would let the CONSUMER
+            name any view at all, including one the process does not have,
+            which is exactly the sense in which the field would carry no
+            information. *)
+         ∗ ∃ sts : list fdstate, uslot (uvis_of U' sts))))%I.
 
   (* the child's own rows, the ones the park spends *)
   Definition park_child (γs : list gname) (γf : gname) (pa ks : mword 64)
@@ -260,19 +270,28 @@ Section ParkCap.
       iNext.
       iFrame "Htext Hwire Hkmap Hprocs Hmk Hstack".
       iDestruct ("Hclose" with "Henv Hown") as "Hclose'".
-      iIntros (h pt' U' sts) "%Hupt %Hnorm %Hptwf %Hfg #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+      iIntros (h pt' U') "%Hupt %Hnorm %Hptwf %Hfg #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
       (* the parked bundle, re-keyed onto the resumed record *)
       iEval (rewrite -Hfg) in "Hfrag".
+      (* ...AND ITS STATES, NAMED.  This is the only place in the park
+         channel where the descriptor states are in hand as a value, and it
+         is the place the key is minted -- so the key is minted AT them.
+         The bundle is handed on to the residue unchanged (re-weakened to
+         [fd_frags_any] below), so the view the slot is keyed at and the
+         view the residue carries are the same list by construction. *)
+      iDestruct "Hfrag" as (sts) "Hfrag".
       (* row by row, never a frame past a bundle carrying a slot
          (claude-notes/optimization.md): the residue on the left, the
          instantiated slot on the right. *)
       iSplitR "Hslot".
       + iApply ("Hclose'" $! h pt' U'
-                  with "[%] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag").
-        exact Hupt.
+                  with "[%] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref [Hfrag]").
+        * exact Hupt.
+        * rewrite /fd_frags_any. iExists sts. iExact "Hfrag".
       + (* THE INSTANTIATION -- the whole of milestone J's park channel:
-           a generic family in, the resumed record's key out. *)
-        iApply ("Hslot" $! (uvis_of U' sts)).
+           a generic family in, the resumed record's key out, keyed at the
+           descriptor states the parked bundle carries. *)
+        iExists sts. iApply ("Hslot" $! (uvis_of U' sts)).
     - iNext. iExact "Htok".
   Qed.
 

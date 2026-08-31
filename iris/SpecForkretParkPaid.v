@@ -187,7 +187,7 @@ Definition forkret_park_pkg
           forkret pays both instead (SpecForkret.v, "...AND THE CLOSER IS
           HANDED [first_done]") and the builder here owes only the
           persistent rows neither supplies. *)
-   (∀ (h : CpuId) (pt' : uptd) (U' : ustate) (sts : list fdstate),
+   (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
       ⌜pv_upt (us_V U') = pt'⌝ -∗
       ⌜ud_data pt' = ud_pas pt'⌝ -∗
       ⌜proc_pt_wf pt'⌝ -∗
@@ -216,7 +216,10 @@ Definition forkret_park_pkg
          the residue.  [ParkCap.park_pkg] is this verbatim; the note there
          says why the key is [uvis_of U'] and not the parked one. *)
       (URes h pt' (add_vec ks (mword_of_int 4096)) U'
-       ∗ uslot (uvis_of U' sts))))%I.
+       (* the descriptor view is EXISTENTIAL: the producer holds the
+          fragments and reads it off them -- [ParkCap.park_pkg], of which
+          this is the forkret-side spelling, has the argument *)
+       ∗ ∃ sts : list fdstate, uslot (uvis_of U' sts))))%I.
 
 Definition forkret_park_paid_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

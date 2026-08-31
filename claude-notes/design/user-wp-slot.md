@@ -494,12 +494,35 @@ against it, and was overruled).
   (`UexecApply.uexec_ret_round_slot` takes `uvis_fd W' = uvis_fd W` as a
   premise), which is exact for every entry but the four that touch
   `p->ofile[]` — pipe (4), dup (10), open (15), close (21).
-- **What is NOT yet tied.**  The key's fd component is a reading of the
-  kernel's `fd_frags` only where a boundary instantiates it from a bundle
-  in hand.  At the park/resume closers (`ParkCap.park_pkg`,
-  `SpecForkret.forkret_closer`) `sts` is ∀-bound and the resumer picks;
-  `ProofForkret` holds no bundle of its own and passes `[]`.  Making it
-  exact means indexing the parked residue — `UsertrapRes.ut_own` carries
-  `fd_frags_any`, and it would carry `fd_frags γ sts` at an `sts` the
-  residue names — which is also what the four rows above need.  That is
-  ONE change and it buys both.
+- **The value is a READING, and the park channel is where it is read.**
+  `FdSlots.fd_frags` lives in exactly one place on this route: allocproc
+  mints it with the block (`SpecAllocproc`), the parker CAPTURES it into
+  the resume closer (`ParkCap.park_token_park`'s `Hfrag` premise —
+  deliberately not part of `park_child`, which goes straight to the cap),
+  and at the resume the closer re-keys it onto `U'` and spends it into
+  `park_chan`'s closer, which is what manufactures the residue
+  (`UsertrapRes.ut_own`'s `fd_frags_any` conjunct).  So the bundle is in
+  hand at exactly the point the key is minted, and that is where `sts`
+  comes from.
+- **Hence `∃ sts`, not `∀ sts`, in the closers' conclusion.**  The
+  PRODUCER picks the descriptor view, because the producer is the party
+  holding the fragments; a ∀ would let the CONSUMER name any view at all,
+  including one the process does not have — which is precisely the sense
+  in which the field would carry no information.  `park_token_park` reads
+  `sts` off `Hfrag` and re-weakens to `fd_frags_any` for the residue, so
+  the view the slot is keyed at and the view the residue carries are the
+  same list by construction.
+- **Why the reading stays true across the park.**  Holding
+  `fd_frags γ sts` pins the states (`FdSlots.fd_st_agree`: either half
+  pins it, and the authority rides with the array in
+  `ProcInv.proc_ofiles`), and nothing can move them between the park and
+  the resume, because an update needs BOTH halves (`fd_st_both_update`)
+  and the closure holds one.  Not even forkret's boot arm, which runs
+  `kexec("/init")` in between: exec does not touch `p->ofile[]`.
+- **What is still not STATED.**  The tie is by construction, not by a
+  proposition: no consumer can yet PROVE `uvis_fd W = sts` against the
+  residue it holds, because `ut_own` carries `fd_frags_any` and not
+  `fd_frags γ sts` at an `sts` the residue names.  Indexing the residue is
+  what would state it — and it is the same change the four fd-touching
+  syscall rows need, since their receipts have to travel with an explicit
+  bundle.
