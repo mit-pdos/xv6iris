@@ -530,4 +530,132 @@ Section UkInitMain.
     iApply (wp_kinit_main_die_de hc6 _ n with "Hcode Hro Hrun").
   Qed.
 
+
+  (* --------------------------------------------------------------------- *)
+  (* WHAT CROSSES THE FORK.  The child needs init's text and its read-only   *)
+  (* image at ITS OWN names, and both are [utext_img] at a constant map, so  *)
+  (* [forkable_utext_map] gives them.  Nothing else crosses: main's frame    *)
+  (* words are never read again (main does not return), and the break is     *)
+  (* carried by the leaf itself.                                             *)
+  (* --------------------------------------------------------------------- *)
+  Local Instance forkable_init_img :
+    Forkable (fun gt _ _ => (init_code gt ∗ init_rodata gt)%I).
+  Proof.
+    eapply Forkable_ext;
+      [ | apply (forkable_sep
+                   (fun gt _ _ => ([∗ map] a ↦ b ∈ InitInstrs.init_bytes,
+                                     utext gt a b)%I)
+                   (fun gt _ _ => ([∗ map] a ↦ b ∈ init_ro, utext gt a b)%I)
+                   (forkable_utext_map InitInstrs.init_bytes)
+                   (forkable_utext_map init_ro)) ].
+    intros gt gd gs. rewrite /init_code /init_rodata /utext_img. reflexivity.
+  Qed.
+
+  (* --------------------------------------------------------------------- *)
+  (* fork's STUB @0x36a -- the one syscall entry whose contract returns      *)
+  (* TWICE.  Both arms come back through the same [c.jr ra] at 0x370, the    *)
+  (* child's under its own names, which is why the payload has to carry the  *)
+  (* catalog: without [init_code γt'] the child cannot even walk its return. *)
+  (* --------------------------------------------------------------------- *)
+  Lemma wp_kinit_fork (szv : Z) (h : CpuId) (m : regfile) (avail : nat) :
+    init_code γt -∗ init_rodata γt -∗ usz γs szv -∗
+    urun γt γd γs h m (mword_of_int InitSyms.fork) avail -∗
+    ((∀ (h' : CpuId) (r : mword 64),
+        ⌜ r <> (mword_of_int 0 : mword 64) ⌝ -∗
+        (init_code γt ∗ init_rodata γt) -∗ usz γs szv -∗
+        urun γt γd γs h'
+          (<[Regidx a0_idx := r]>
+             (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m))
+          (ret_pc (m !!! Regidx ra_idx)) avail -∗
+        WP (Loop : expr riscv_lang)) ∗
+     (∀ (gt' gd' gs' : gname) (h' : CpuId),
+        (init_code gt' ∗ init_rodata gt') -∗ usz gs' szv -∗
+        urun gt' gd' gs' h'
+          (<[Regidx a0_idx := (mword_of_int 0 : mword 64)]>
+             (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m))
+          (ret_pc (m !!! Regidx ra_idx)) avail -∗
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "#Hcode #Hro Hsz Hrun [Hpar Hchi]".
+    destruct init_syms_pins
+      as (_ & _ & _ & _ & _ & _ & _ & _ & Hfork & _ & _ & _ & _).
+    rewrite Hfork.
+    (* ---- 0x36a  c.li a7,1 ---- *)
+    iApply (wp_uk_cli γt γd γs h m (mword_of_int 0x36a)
+              (mword_of_int 1 : mword 6) a7_idx avail
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) with "[] Hrun").
+    { iApply (uis_init_36a with "Hcode"). }
+    assert (E36a : add_vec_int (mword_of_int 0x36a : mword 64) 2
+                   = mword_of_int 0x36c)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Em1 : <[Regidx a7_idx
+                    := regval_into_reg
+                         (sign_extend' 64 (mword_of_int 1 : mword 6)
+                          : mword 64)]> m
+                  = <[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m)
+      by (f_equal; apply bv_eq; vm_compute; reflexivity).
+    rewrite E36a Em1.
+    iIntros (h1) "Hrun".
+    set (mf1 := <[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m).
+    (* ---- 0x36c  ecall -- the leaf that returns twice ---- *)
+    iApply (wp_uk_ecall_fork γt γd γs h1 mf1 (mword_of_int 0x36c) avail szv
+              (fun gt _ _ => (init_code gt ∗ init_rodata gt)%I)
+              ltac:(unfold mf1, usysno;
+                    rewrite (upd_eq m (Regidx a7_idx)
+                               (mword_of_int 1 : mword 64));
+                    vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              with "[] [] Hsz Hrun").
+    { iApply (uis_init_36c with "Hcode"). }
+    { iFrame "Hcode Hro". }
+    assert (E36c : add_vec_int (mword_of_int 0x36c : mword 64) 4
+                   = mword_of_int 0x370)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E36c.
+    assert (Hraf : forall (M : regfile) (v : mword 64),
+               M = <[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m ->
+               M !!! Regidx ra_idx = m !!! Regidx ra_idx).
+    { intros M v ->.
+      exact (upd_ne m (Regidx a7_idx) (Regidx ra_idx) _
+               ltac:(vm_compute; discriminate)). }
+    iSplitL "Hpar".
+    - (* the PARENT resumes under the names it already had *)
+      iIntros (hp r) "%Hrnz Hpay Hsz Hrun".
+      set (mp := <[Regidx a0_idx := r]> mf1).
+      assert (Hrap : mp !!! Regidx ra_idx = m !!! Regidx ra_idx).
+      { rewrite /mp (upd_ne mf1 (Regidx a0_idx) (Regidx ra_idx) r
+                       ltac:(vm_compute; discriminate)).
+        exact (Hraf mf1 r eq_refl). }
+      iDestruct "Hpay" as "[#Hcp #Hrp]".
+      iApply (wp_uk_cjr γt γd γs hp mp (mword_of_int 0x370) ra_idx
+                (ret_pc (m !!! Regidx ra_idx)) avail
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hrap; reflexivity)
+                with "[] Hrun").
+      { iApply (uis_init_370 with "Hcp"). }
+      iIntros (hp2) "Hrun".
+      iApply ("Hpar" $! hp2 r with "[] [] Hsz Hrun").
+      { iPureIntro. exact Hrnz. }
+      { iFrame "Hcp Hrp". }
+    - (* ...and the CHILD under fresh ones *)
+      iIntros (gt' gd' gs' hc) "Hpay Hsz Hrun".
+      set (mk := <[Regidx a0_idx := (mword_of_int 0 : mword 64)]> mf1).
+      assert (Hrak : mk !!! Regidx ra_idx = m !!! Regidx ra_idx).
+      { rewrite /mk (upd_ne mf1 (Regidx a0_idx) (Regidx ra_idx) _
+                       ltac:(vm_compute; discriminate)).
+        exact (Hraf mf1 (mword_of_int 0) eq_refl). }
+      iDestruct "Hpay" as "[#Hck #Hrk]".
+      iApply (wp_uk_cjr gt' gd' gs' hc mk (mword_of_int 0x370) ra_idx
+                (ret_pc (m !!! Regidx ra_idx)) avail
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hrak; reflexivity)
+                with "[] Hrun").
+      { iApply (uis_init_370 with "Hck"). }
+      iIntros (hc2) "Hrun".
+      iApply ("Hchi" $! gt' gd' gs' hc2 with "[] Hsz Hrun").
+      { iFrame "Hck Hrk". }
+  Qed.
+
 End UkInitMain.
