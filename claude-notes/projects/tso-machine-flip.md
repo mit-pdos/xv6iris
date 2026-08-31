@@ -17248,3 +17248,63 @@ Also this session: the U-mode cone was handed to a separate agent —
 brief in `tso-umode-lane.md` (scope: the generic U-mode WP theorem;
 NOT per-binary proofs; file-ownership fences recorded there).
 
+### A6.137 — §0.39′ MEASURED TO ROOT CAUSE: the trap handler's capability
+### bundle is context-relative, and the handler contract is ∀-context
+
+**The red** (`ProofKernelvec:1704`): `iApply (Kerneltrap.wp_kerneltrap_sconf
+(XI := XIc) …)` fails on the `devintr_caps` premise with both sides
+printing identically.  `Set Printing Implicit` (scratch diagnostic) shows
+the mismatch: the hypothesis is `devintr_caps (XI := XI)` (the section's
+ambient context, bound OUTSIDE the handler contract) while the premise
+wants `(XI := XIc)` (the ∀-bound trap-time context of
+`intr_handler_spec`'s □-body).
+
+**Why it is not a drift but a ruling surfacing**: `devintr_caps` =
+dev_inv ∗ console_caps ∗ disk_geom ∗ is_lock(disk) ∗ timer_cap ∗
+tick_keeper ∗ procs_inv.  `About` on every constituent shows the XI
+enters ONLY through `is_lock` (WpLock:1416) — §0.35′(i): a lock handle is
+context-relative, carrying `lk_floor cur_ctx lo` internally; "a handle
+cannot be conjured; it must be RECEIVED through a real crossing".  Under
+SC the caps were context-free and the outside-the-□ premise was fine;
+A6.96 measured the is_lock arity change as "invisible" (all 136 files
+bind a CurCtx) — syntactically true, semantically THIS site is the one
+consumer that must serve every future context (`ihs_trap_of` ∀-quantifies
+XIc because a trap arrives at whatever context the hart then runs:
+today a hart's boot/started context; post-forkret-park, any process
+twin).
+
+**What exists to build on**: `is_lock_morph : CtxMorph (λ ξ, is_lock
+(XI:=ξ) …)` (SchedCtx:346) — handles DO transport along a `ctx_dom ξ ξ'`
+receipt; every other caps member is ξ-free or morphable; the entry
+payload `ihs_entry_of` already threads a per-hart resource slot
+(`R cpu_id` = the intr_res family) plus `own_context XIc` inside the
+capability.  The missing resource at trap time is only the DOMINATION
+receipt from the deposit context to XIc.
+
+**Three candidate designs (owner ruling wanted; recommendation = 1):**
+1. **Thread the caps in the handler resource** (the same file's own
+   precedent: intr_res "used to be a persistent credential … the
+   persistence was per-hart and bought nothing across the one boundary
+   (the park) that mattered — IT IS THREADED, NOT PERSISTENT").  Put
+   `devintr_caps` (at cur_ctx) beside/inside the threaded intr_res /
+   trap_csrs member; the trap entry then hands the handler caps at XIc;
+   crossings (started ✓ landed; forkret-park's park/dispatch, pending)
+   morph it with `is_lock_morph` — they hold the dom receipt at crossing
+   time, and forkret-park must morph trap_csrs' members anyway.  COST:
+   intr_res/trap_csrs arity (the γu γv γdk γtl γs pd pav pu parameters,
+   or ∃-quantified inside with lock-name agreement lemmas), touched
+   wherever intr_res is built/opened (mn_grp_trap, WpSconfSret,
+   WpIntrInv, SpecKerneltrap, the yield/park path).
+2. **A global domination anchor**: mint a persistent `ctx_dom ξ0 ξ` at
+   every context creation (fork/started receive), for the deposit
+   context ξ0; the handler morphs caps on demand.  COST: a Σ-level-ish
+   addition to the context-creation gates + a "every running context
+   dominates the deposit" invariant; cleaner consumption, wider blast
+   radius in the creation lanes.
+3. **Weaken the contract's ∀XIc** to the installation context — sound
+   only while no process contexts run; explicitly a dead end once
+   forkret-park lands.  Not recommended.
+
+Nothing else in ProofKernelvec looks red: the failure is this single
+premise at the single `wp_kerneltrap_sconf` application.
+
