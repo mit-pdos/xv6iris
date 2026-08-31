@@ -967,7 +967,7 @@ Section KexitPark.
     cpu_claim_ext eb pj -∗
     kernel_text -∗ pc_is (mword_of_int (KX + 0x60)) -∗
     procs_inv γs -∗
-    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
+    is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
     (* the cwd's unit REJOINED with the allowance: [iput] handed the [1]
@@ -1060,7 +1060,7 @@ Section KexitPark.
       rewrite /P0 upd_ne; [exact Hs4 | vm_compute; discriminate]. }
     iDestruct (cpu_own_transport CID0 CIDw 0 eb pj b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDw) γw "wait_lock"%string <{ wait_res }>
+    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDw) γw "wait_lock"%string wait_res_at
               P2 0 eb pj av b lks ltac:(lia) ltac:(lia)
               Hfresh
               with "Hcg Hown Htext Hpc []").
@@ -1180,9 +1180,8 @@ Section KexitPark.
               Mrp (trap_res b + av)%nat w false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [Hpcell]").
     { iApply (kxi_72 with "Htext"). }
-    { iEval (rewrite Hrgr19 Hrp_s3 p_parent_sext). iApply (TsoCtxShim.ctx_word_of_mem with "Hpcell"). }
+    { iEval (rewrite Hrgr19 Hrp_s3 p_parent_sext). iExact "Hpcell". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpcell".
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hpcell") as "Hpcell".
     iEval (rewrite Hrgr19 Hrp_s3 p_parent_sext) in "Hpcell".
     iDestruct ("Hpback" with "Hpcell") as "Hpar".
     set (P5 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg w]> Mrp).
@@ -1453,7 +1452,7 @@ Section KexitPark.
                  [av].  Level 2 -> 1 is itself carve-neutral ([trap_res false]
                  on entry), so both sides of this call sit at
                  [trap_res b + av]. *)
-              <{ wait_res }> PC 1%nat eb pj (trap_res b + av)%nat
+              wait_res_at PC 1%nat eb pj (trap_res b + av)%nat
               ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
               ltac:(rewrite HPCa0; apply addv_sext0) ltac:(lia)
               with "Hcg Htext Hpc Hwl Hlkw [Hpar] Hown Hpay2").
@@ -1582,7 +1581,7 @@ Section KexitRest.
     cpu_claim_ext eb pj -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KX + 0x4c)) -∗
     procs_inv γs -∗ panic_env -∗
-    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
+    is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
     bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
     log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗

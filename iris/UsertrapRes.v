@@ -622,7 +622,7 @@ Section UsertrapRes.
      devintr_caps_any (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
      printk_env (fsc_printk) (fsc_uart) (fsc_disk) ∗
-     is_lock (un_w N) wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
+     is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res_at ∗
      is_ftable (un_ft N) (un_f N) ∗
      is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
        (λ ξ : CtxId, kmem_res (XIk := ξ) (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
@@ -693,7 +693,7 @@ Section UsertrapRes.
      is_kstack (un_pj N) (un_ks N) ∗
      devintr_caps_any (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
-     is_lock (un_w N) wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
+     is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res_at ∗
      is_ftable (un_ft N) (un_f N) ∗
      disk_geom (fsc_disk) (un_pd N) (un_pav N) (un_pu N) ∗
      park_world (un_s N))%I.

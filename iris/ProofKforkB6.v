@@ -308,7 +308,7 @@ Section KforkPrologue.
         IntrDefs.arm_pay KT1 lvl eb pme -∗
         cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
         kalloc_env_at fsc_kalloc fsc_kpages None -∗
-        is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
+        is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
         is_ftable γl γf -∗
         is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
         itable_inv -∗
@@ -427,8 +427,8 @@ Section KforkPrologue.
     kernel_text -∗
     pc_is (mword_of_int KF : mword 64) -∗
     procs_inv γs -∗
-    is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
-    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
+    is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
+    is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
     is_ftable γl γf -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗

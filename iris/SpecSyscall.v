@@ -495,7 +495,7 @@ Module Type SYSCALL.
       fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
       fcn_dq fn = DfracOwn (1/4) ->
       sysc_park_extra γtk -∗
-      is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
+      is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
       is_ftable γft γf -∗
       procs_inv (fcn_procs fn) -∗
       disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗

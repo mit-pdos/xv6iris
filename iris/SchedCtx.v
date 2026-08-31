@@ -50,7 +50,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import IntrDefs.
 Require Import HartTp.
-Require Import WpLock.
+Require Import WpLock CtxMorphTac.
 Require Import ProcGeom.
 (* the proc table's two regimes: [pslot_used_at] is the marker
    [proc_slots] carries on every arm but UNUSED.  EXPORTed because every
@@ -343,6 +343,7 @@ Section SchedCtxPay.
     CtxMove (λ ξ, p_sched h A' c cret tpv p back ξ).
   Proof. rewrite /p_sched. ctx_move_solve. Qed.
 
+
   (* the scheduler-chain valid context, PINNED at hart [h]
      (fixed Phi / P instantiation); [p] = the context's c->proc
      index (see SwtchCtx).  This is the CPU/scheduler record: [cpus[h].context]
@@ -537,11 +538,40 @@ Section SchedCtxPay.
      tag half collapses it to the ambient hart, timelessly.  [cpus[h].proc]
      is NOT here: it is private to hart [h] and stays whole in that hart's
      [IntrDefs.cpu_cells].  See claude-notes/design/proc-struct.md. *)
-  Definition run_slot (pa : mword 64) : iProp Σ :=
-    (own_ctx (p_context pa) ∗
+  (* A6.129: AT THE LOCK'S CONTEXT [ξl], like every other row of the
+     payload -- the cells a lock holder receives are at ITS context, and
+     the payload has to transport ([CtxMorph]) for real.  [run_slot] is the
+     ambient spelling the consumers keep. *)
+  Definition run_slot_at (ξl : CtxId) (pa : mword 64) : iProp Σ :=
+    (own_ctx (XI := ξl) (p_context pa) ∗
      ∃ h : CPU,
        hart_at pa (1/2) h ∗
        ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) pa)%I.
+  Definition run_slot (pa : mword 64) : iProp Σ := run_slot_at cur_ctx pa.
+  (* A6.129: the transports the forked child's record needs -- the context
+     field's cells, the running slot, and the lock HANDLES (a handle is the
+     name, the invariant and a floor; a floor's dirty arm moves by
+     [TsoCtxMove.ctx_move_wrote]). *)
+  Global Instance ctx_cells_morph c vs : CtxMorph (λ ξ, ctx_cells (XI := ξ) c vs).
+  Proof. rewrite /ctx_cells. apply ctx_cells_at_morph. Qed.
+  Global Instance own_ctx_morph pa : CtxMorph (λ ξ, own_ctx (XI := ξ) pa).
+  Proof. rewrite /own_ctx. ctx_morph_solve. Qed.
+  Global Instance run_slot_at_morph pa : CtxMorph (λ ξ, run_slot_at ξ pa).
+  Proof. rewrite /run_slot_at. ctx_morph_solve. Qed.
+  Global Instance lk_floor_move (lo : nat) : CtxMove (λ ξ, WpLock.lk_floor ξ lo).
+  Proof.
+    iIntros (ξ0 ξ1) "H0 H1 [Hfl | (%a & Hw)]".
+    - iMod (ctx_move_floor ξ0 ξ1 lo with "H0 H1 Hfl") as "(H0 & H1 & Hfl)".
+      iModIntro. iFrame "H0 H1". by iLeft.
+    - iMod (ctx_move_wrote ξ0 ξ1 lo a with "H0 H1 Hw") as "(H0 & H1 & [Hfl | Hw])".
+      + iModIntro. iFrame "H0 H1". by iLeft.
+      + iModIntro. iFrame "H0 H1". iRight. iExists a. iExact "Hw".
+  Qed.
+  (* NOT here (deliberately, unlike tso-flip r67): [is_lock_move]/[is_lock_morph]
+     need [lock_inv] to be a ξ-CLOSED term, which is the M4 lock kit's reshape
+     (lock_body with the exposed bound) -- a tranche main has not taken.  The
+     fork-record path that wants them keeps its documented SC stub
+     (ProofForkretPark, Amendment 9/6.3), so nothing on main consumes them yet. *)
 
   (* ---- THE ALLOCATION MARKER ([ProcAvail.v]).  PERSISTENT, and present on
      every arm but UNUSED: it is what lets allocproc's scan accumulate a
@@ -557,7 +587,7 @@ Section SchedCtxPay.
      on each. *)
   Definition proc_slots_at (ξl : CtxId) (pa : mword 64) (st : mword 32) : iProp Σ :=
     ((if needs_ctx st   then proc_ctx_at ξl pa   else emp) ∗
-     (if is_running st  then run_slot pa else emp) ∗
+     (if is_running st  then run_slot_at ξl pa else emp) ∗
      (if inv_dormant st then proc_dormant pa st else emp) ∗
      (if not_running st then hart_at_any pa else emp) ∗
      (if is_unused st   then emp else pslot_used_at pa))%I.
@@ -883,7 +913,7 @@ Section SchedCtxPay.
     rewrite needs_ctx_RUNNING inv_dormant_RUNNING is_running_RUNNING
             is_unused_RUNNING.
     iDestruct "Hslot" as "(_ & Harm & _ & _ & #Hused)".
-    rewrite /run_slot.
+    rewrite /run_slot /run_slot_at.
     iDestruct "Harm" as "(Hown & (%h' & Hhlf' & Hrec))".
     iDestruct (hart_at_elim j (1/2) h' Hj with "Hhlf'") as "Hhlf'".
     iDestruct (hart_own_agree j (1/2) (1/2) h h' with "Hhlf Hhlf'") as %Hhh.
@@ -903,7 +933,7 @@ Section SchedCtxPay.
     pslot_used_at (proc_addr j) -∗
     proc_slots (proc_addr j) RUNNING.
   Proof.
-    iIntros (Hj) "Hhlf Hown Hrec #Hused". rewrite /proc_slots /proc_slots_at /run_slot.
+    iIntros (Hj) "Hhlf Hown Hrec #Hused". rewrite /proc_slots /proc_slots_at /run_slot_at.
     rewrite needs_ctx_RUNNING inv_dormant_RUNNING not_running_RUNNING
             is_running_RUNNING is_unused_RUNNING.
     iSplitR; [done|]. iSplitR "Hused"; [| iSplitR; [done | iFrame "Hused"]].

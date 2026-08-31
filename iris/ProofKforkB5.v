@@ -178,7 +178,7 @@ Section ProofKforkB5.
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
     SchedCtx.procs_inv γs -∗
-    WpLock.is_lock γw SpecProcinit.wait_lock_addr "wait_lock"%string <{ WaitInv.wait_res }> -∗
+    WpLock.is_lock γw SpecProcinit.wait_lock_addr "wait_lock"%string WaitInv.wait_res_at -∗
     (* THE PAID PARK'S ROWS: the open-file table, the world
        ([SyscParkEnv.park_world] -- device complement, console, the two
        global locks, the slot ledger, wire invariant, trampoline claim, an
@@ -398,7 +398,7 @@ Section ProofKforkB5.
       rewrite /M3. apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
     (* carry [cpu_own] hart-generically across the three plain leaves *)
     iDestruct (cpu_own_transport CID1 CID4 lvl eb pme b ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (AQ.wp_acquire_sconf KT1 (CID := CID4) γw "wait_lock"%string <{ WaitInv.wait_res }>
+    iApply (AQ.wp_acquire_sconf KT1 (CID := CID4) γw "wait_lock"%string WaitInv.wait_res_at
               M5 lvl eb pme (K - 8)%nat b lks Hlvl (kfkb5_stack_ok K HK)
               Hfresh
               with "Hcg Hown Htext Hpc [Hwl]").
@@ -426,9 +426,8 @@ Section ProofKforkB5.
     iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0xd4)) Rs5 Rs4 (mword_of_int 56 : mword 12)
               mr5 (trap_res b + (K - 8))%nat vold false with "Hcg Hpc [] [Hpcell]").
     { iApply (kfk_0d4 with "Htext"). }
-    { iEval (rewrite Hea_d4). iApply (TsoCtxShim.ctx_word_of_mem with "Hpcell"). }
+    { iEval (rewrite Hea_d4). iExact "Hpcell". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpcell".
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hpcell") as "Hpcell".
     iEval (rewrite Hea_d4) in "Hpcell".
     assert (Hst_rs5 : rget mr5 Rs5 = pme) by (rewrite (rget_ne mr5 Rs5 ltac:(vm_compute; discriminate)); exact Hr5s5).
     iEval (rewrite Hst_rs5) in "Hpcell".
@@ -495,7 +494,7 @@ Section ProofKforkB5.
        for what the release hands back.) *)
     iEval (rewrite Hb) in "Hcg".
     iApply (RL.wp_release_sconf KT1 (CID := CID5) γw SpecProcinit.wait_lock_addr "wait_lock"%string
-              <{ WaitInv.wait_res }> M8 lvl eb pme (K - 8)%nat
+              WaitInv.wait_res_at M8 lvl eb pme (K - 8)%nat
               ({["wait_lock"]} ∪ lks)
               Hlka2 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc Hwl Htokw Hwaitres Hown Hpay").
