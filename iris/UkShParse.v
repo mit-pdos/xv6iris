@@ -1665,6 +1665,243 @@ Section UkShParse.
   Qed.
 
   (* ===================================================================== *)
+  (* §4b THE FRAME, GENERALISED OVER ITS SIZE AND ITS SPILL LIST.           *)
+  (*                                                                       *)
+  (* [wp_kshp_pro2] / [wp_kshp_epi2] above are the two-word frame written   *)
+  (* out once.  Every other function in this catalog has the SAME frame     *)
+  (* code at a different size [k] and with a different number [j] of        *)
+  (* callee-saved spills:                                                   *)
+  (*                                                                       *)
+  (*   c.addi / c.addi16sp  sp,sp,-8k                                       *)
+  (*   c.sdsp r0,8(k-1)(sp) ; ... ; c.sdsp r(j-1),8(k-j)(sp)                *)
+  (*   c.addi4spn s0,sp,8k                                                  *)
+  (*     ... the body ...                                                   *)
+  (*   c.ldsp r0,8(k-1)(sp) ; ... ; c.ldsp r(j-1),8(k-j)(sp)                *)
+  (*   c.addi / c.addi16sp  sp,sp,8k  ;  c.jr ra                            *)
+  (*                                                                       *)
+  (* execcmd and nulterminate are k=4 j=3, peek k=8 j=7, gettoken k=8 j=8,  *)
+  (* parseline and parsepipe k=6 j=6, parsecmd k=8 j=5, parseredirs k=14    *)
+  (* j=11.  So the economy is a lemma over the LIST of spills, and the two  *)
+  (* below are that: the SPILL run and the RESTORE run, by induction on a   *)
+  (* list of (register, c.sdsp immediate) PAIRS.  The immediates are the    *)
+  (* caller's own catalog spelling, so no call site ever has to argue that  *)
+  (* [mword_of_int (Z.of_nat (k - 1 - i))] is the word the decoder made.    *)
+  (*                                                                       *)
+  (* THERE IS NO INDEX ARITHMETIC INSIDE EITHER INDUCTION.  The pcs and the *)
+  (* slot addresses are FUNCTIONS [pcs] / [ad] of the spill index, and the  *)
+  (* step hands the tail [fun i => pcs (S i)] / [fun i => ad (S i)] -- a    *)
+  (* beta-reduction, not a [lia].  What a call site owes instead is one     *)
+  (* pure fact per instruction, at concrete numbers, which is exactly the   *)
+  (* [vm_compute] stage 2 was paying per step anyway.                       *)
+  (*                                                                       *)
+  (* THE PUSH AND THE POP ARE NOT IN HERE, deliberately: they are           *)
+  (* [wp_uk_caddi_sp_dn] or [wp_uk_caddi16sp_dn] (gcc picks by size, and    *)
+  (* picks INCONSISTENTLY -- execcmd pushes with [c.addi] and pops with     *)
+  (* [c.addi16sp]), each one [iApply] at the call site, and folding them in *)
+  (* would need a two-armed premise for no saving.                          *)
+  (* ===================================================================== *)
+
+  (* the same [∗ list] over a list and over [seq 0 (length l)] -- the shape *)
+  (* [ustack_body] hands a frame out in, and the shape the two runs below   *)
+  (* consume it in *)
+  Local Lemma ushp_sepL_seq {A : Type} (l : list A) (Φ : nat -> iProp Σ) :
+    ([∗ list] i ∈ seq 0 (length l), Φ i) ⊣⊢ ([∗ list] i ↦ _ ∈ l, Φ i).
+  Proof.
+    revert Φ. induction l as [| x l IH ]; intros Φ; [ reflexivity | ].
+    cbn [length seq]. rewrite !big_sepL_cons.
+    rewrite <- (seq_shift (length l) 0), big_sepL_fmap.
+    rewrite (IH (fun i => Φ (S i))). reflexivity.
+  Qed.
+
+  (* a slot of an 8-aligned frame is itself 8-aligned *)
+  Local Lemma ushp_slot_al (sp : Z) (i : nat) :
+    sp mod 8 = 0 -> (sp - 8 * (Z.of_nat i + 1)) mod 8 = 0.
+  Proof.
+    intro H. rewrite Zminus_mod H.
+    assert (E : (8 * (Z.of_nat i + 1)) mod 8 = 0)
+      by (rewrite Z.mul_comm; apply Z_mod_mult).
+    rewrite E. reflexivity.
+  Qed.
+
+  (* THE FRESH FRAME, SPLIT: the top [length rs] words are the spill slots  *)
+  (* the runs below address, the rest are the function's locals. *)
+  Local Lemma ushp_frame_split (sp0 sp1 : mword 64) (n : nat)
+      (rs : list (mword 5 * mword 6)) :
+    uint sp1 = uint sp0 - 8 * Z.of_nat (length rs) ->
+    ustack γd sp0 (length rs + n) -∗
+      ([∗ list] i ↦ _ ∈ rs,
+         ∃ w : mword 64, uword γd (uint sp0 - 8 * (Z.of_nat i + 1)) w) ∗
+      ustack γd sp1 n.
+  Proof.
+    intros Hsp1. rewrite (ustack_app γd sp0 sp1 (length rs) n Hsp1).
+    rewrite /ustack /ustack_body.
+    rewrite (ushp_sepL_seq rs
+      (fun i => ∃ w : mword 64, uword γd (uint sp0 - 8 * (Z.of_nat i + 1)) w)%I).
+    iIntros "[[_ $] $]".
+  Qed.
+
+  (* ...and put back together, which is what the pop consumes *)
+  Local Lemma ushp_frame_join (sp0 sp1 : mword 64) (n : nat)
+      (rs : list (mword 5 * mword 6)) (vals : nat -> mword 64) :
+    uint sp1 = uint sp0 - 8 * Z.of_nat (length rs) ->
+    ([∗ list] i ↦ _ ∈ rs,
+       uword γd (uint sp0 - 8 * (Z.of_nat i + 1)) (vals i)) -∗
+    ustack γd sp1 n -∗
+    ustack γd sp0 (length rs + n).
+  Proof.
+    intros Hsp1. rewrite (ustack_app γd sp0 sp1 (length rs) n Hsp1).
+    rewrite /ustack /ustack_body.
+    rewrite (ushp_sepL_seq rs
+      (fun i => ∃ w : mword 64, uword γd (uint sp0 - 8 * (Z.of_nat i + 1)) w)%I).
+    iIntros "Hs [%Hal Hr]".
+    iSplitR "Hr".
+    - iSplit.
+      + iPureIntro.
+        assert (E : uint sp0 = uint sp1 + 8 * Z.of_nat (length rs)) by lia.
+        assert (H8 : (8 * Z.of_nat (length rs)) mod 8 = 0)
+          by (rewrite Z.mul_comm; apply Z_mod_mult).
+        rewrite E Zplus_mod Hal H8. reflexivity.
+      + iApply (big_sepL_mono with "Hs"). intros i x _.
+        iIntros "H". iExists (vals i). iExact "H".
+    - iSplit; [ iPureIntro; exact Hal | iExact "Hr" ].
+  Qed.
+
+  (* THE SPILL RUN.  [c.sdsp] writes no register, so [m] is the SAME at     *)
+  (* every step -- which is why this induction carries nothing but the pc.  *)
+  Local Lemma wp_kshp_spill (spn : mword 64) (nn : nat) :
+    forall (rs : list (mword 5 * mword 6)) (pcs ad : nat -> Z)
+           (h : CpuId) (m : regfile),
+    m !!! Regidx csp_rs1 = spn ->
+    (forall i : nat, (i < length rs)%nat -> pcs (S i) = pcs i + 2) ->
+    (forall (i : nat) (r : mword 5) (u : mword 6),
+       rs !! i = Some (r, u) ->
+       ad i = uint spn + uoff_sdsp u /\ ad i mod 8 = 0) ->
+    ([∗ list] i ↦ ru ∈ rs,
+       uinstr_is γt (mword_of_int (pcs i)) true
+         (C_SDSP (snd ru, Regidx (fst ru)))) -∗
+    ([∗ list] i ↦ _ ∈ rs, ∃ w : mword 64, uword γd (ad i) w) -∗
+    urun γt γd γs h m (mword_of_int (pcs 0%nat)) nn -∗
+    (([∗ list] i ↦ ru ∈ rs, uword γd (ad i) (m !!! Regidx (fst ru))) -∗
+       ∀ h' : CpuId,
+         urun γt γd γs h' m (mword_of_int (pcs (length rs))) nn -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    induction rs as [| ru rs IH ];
+      intros pcs ad h m Hsp Hpc Hoff; iIntros "#Hi Hw Hrun Hcont".
+    - iSpecialize ("Hcont" with "Hw"). cbn [length].
+      iApply ("Hcont" $! h with "Hrun").
+    - rewrite !big_sepL_cons.
+      iDestruct "Hi" as "[#Hi0 #Hir]".
+      iDestruct "Hw" as "[[%w0 Hw0] Hwr]".
+      destruct (Hoff 0%nat (fst ru) (snd ru)
+                  ltac:(destruct ru; reflexivity)) as [ Had0 Hal0 ].
+      iApply (wp_uk_csdsp γt γd γs h m (mword_of_int (pcs 0%nat))
+                (snd ru) (fst ru) (ad 0%nat) w0 nn
+                ltac:(rewrite Hsp; exact Had0) Hal0
+                with "Hi0 Hw0 Hrun").
+      iIntros "Hw0".
+      rewrite (ushp_pc_step (pcs 0%nat) 2).
+      rewrite <- (Hpc 0%nat ltac:(cbn [length]; lia)).
+      iIntros (h1) "Hrun".
+      iApply (IH (fun i => pcs (S i)) (fun i => ad (S i)) h1 m Hsp
+                ltac:(intros i Hi; exact (Hpc (S i) ltac:(cbn [length]; lia)))
+                ltac:(intros i r u Hi; exact (Hoff (S i) r u Hi))
+                with "Hir Hwr Hrun").
+      iIntros "Hwr" (h2) "Hrun".
+      (* the [rewrite !big_sepL_cons] above already split [Hcont]'s premise *)
+      iApply ("Hcont" with "[Hw0 Hwr]"); [ | iApply "Hrun" ].
+      iFrame "Hw0 Hwr".
+  Qed.
+
+  (* the register file a RESTORE run leaves behind: the spills written back *)
+  (* in order, so a later one overrides an earlier one.  At a concrete list *)
+  (* this [cbn]s into the insert tower a call site already reads with       *)
+  (* [upd_eq] / [upd_ne], which is why no no-duplicates premise is needed.  *)
+  Fixpoint ushp_spillback (rs : list (mword 5 * mword 6))
+      (vals : nat -> mword 64) (me : regfile) : regfile :=
+    match rs with
+    | [] => me
+    | ru :: rs' =>
+        ushp_spillback rs' (fun i => vals (S i))
+          (<[Regidx (fst ru) := regval_into_reg (vals 0%nat)]> me)
+    end.
+
+  Lemma ushp_spillback_ne (rs : list (mword 5 * mword 6))
+      (vals : nat -> mword 64) (me : regfile) (q : mword 5) :
+    (forall (i : nat) (r : mword 5) (u : mword 6),
+       rs !! i = Some (r, u) -> Regidx q <> Regidx r) ->
+    ushp_spillback rs vals me !!! Regidx q = me !!! Regidx q.
+  Proof.
+    revert vals me. induction rs as [| ru rs IH ]; intros vals me Hne;
+      [ reflexivity | ].
+    cbn [ushp_spillback].
+    rewrite (IH (fun i => vals (S i))
+               (<[Regidx (fst ru) := regval_into_reg (vals 0%nat)]> me)
+               ltac:(intros i r u Hi; exact (Hne (S i) r u Hi))).
+    apply (upd_ne me (Regidx (fst ru)) (Regidx q)).
+    exact (Hne 0%nat (fst ru) (snd ru) ltac:(destruct ru; reflexivity)).
+  Qed.
+
+  (* THE RESTORE RUN.  Each [c.ldsp] DOES write a register, so the register *)
+  (* file the continuation gets is [ushp_spillback] of the list.            *)
+  Local Lemma wp_kshp_restore (spn : mword 64) (nn : nat) :
+    forall (rs : list (mword 5 * mword 6)) (pcs ad : nat -> Z)
+           (vals : nat -> mword 64) (h : CpuId) (m : regfile),
+    m !!! Regidx csp_rs1 = spn ->
+    (forall i : nat, (i < length rs)%nat -> pcs (S i) = pcs i + 2) ->
+    (forall (i : nat) (r : mword 5) (u : mword 6),
+       rs !! i = Some (r, u) ->
+       ad i = uint spn + uoff_sdsp u /\ ad i mod 8 = 0 /\
+       unot_sp r /\ uint r <> 0) ->
+    ([∗ list] i ↦ ru ∈ rs,
+       uinstr_is γt (mword_of_int (pcs i)) true
+         (C_LDSP (snd ru, Regidx (fst ru)))) -∗
+    ([∗ list] i ↦ _ ∈ rs, uword γd (ad i) (vals i)) -∗
+    urun γt γd γs h m (mword_of_int (pcs 0%nat)) nn -∗
+    (([∗ list] i ↦ _ ∈ rs, uword γd (ad i) (vals i)) -∗
+       ∀ h' : CpuId,
+         urun γt γd γs h' (ushp_spillback rs vals m)
+           (mword_of_int (pcs (length rs))) nn -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    induction rs as [| ru rs IH ];
+      intros pcs ad vals h m Hsp Hpc Hoff; iIntros "#Hi Hw Hrun Hcont".
+    - iSpecialize ("Hcont" with "Hw"). cbn [length ushp_spillback].
+      iApply ("Hcont" $! h with "Hrun").
+    - rewrite !big_sepL_cons.
+      iDestruct "Hi" as "[#Hi0 #Hir]".
+      iDestruct "Hw" as "[Hw0 Hwr]".
+      destruct (Hoff 0%nat (fst ru) (snd ru)
+                  ltac:(destruct ru; reflexivity))
+        as [ Had0 [ Hal0 [ Hnsp0 Hnz0 ] ] ].
+      iApply (wp_uk_cldsp γt γd γs h m (mword_of_int (pcs 0%nat))
+                (snd ru) (fst ru) (ad 0%nat) (vals 0%nat) nn
+                Hnsp0 ltac:(rewrite Hsp; exact Had0) Hal0 Hnz0
+                with "Hi0 Hw0 Hrun").
+      iIntros "Hw0".
+      rewrite (ushp_pc_step (pcs 0%nat) 2).
+      rewrite <- (Hpc 0%nat ltac:(cbn [length]; lia)).
+      iIntros (h1) "Hrun".
+      assert (Hsp1 : (<[Regidx (fst ru) := regval_into_reg (vals 0%nat)]> m)
+                       !!! Regidx csp_rs1 = spn).
+      { rewrite (upd_ne m (Regidx (fst ru)) (Regidx csp_rs1)
+                   (regval_into_reg (vals 0%nat)) Hnsp0). exact Hsp. }
+      cbn [ushp_spillback].
+      iApply (IH (fun i => pcs (S i)) (fun i => ad (S i))
+                (fun i => vals (S i)) h1
+                (<[Regidx (fst ru) := regval_into_reg (vals 0%nat)]> m)
+                Hsp1
+                ltac:(intros i Hi; exact (Hpc (S i) ltac:(cbn [length]; lia)))
+                ltac:(intros i r u Hi; exact (Hoff (S i) r u Hi))
+                with "Hir Hwr Hrun").
+      iIntros "Hwr" (h2) "Hrun".
+      iApply ("Hcont" with "[Hw0 Hwr]"); [ | iApply "Hrun" ].
+      iFrame "Hw0 Hwr".
+  Qed.
+
+  (* ===================================================================== *)
   (* §5 THE TREE PREDICATE -- the deliverable interface for stages 5-6.     *)
   (*                                                                       *)
   (* -- a well-formed cmd tree for this token list sits at this address   *)
