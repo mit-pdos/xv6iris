@@ -727,3 +727,78 @@ new-generation sh files take the plain tier's xi binders at their
   instantiated at the ambient (`uslot_uslot_fs`, `urun_fs_urun`).
   Making the enrichment migration-honest is the fs lane's, when it
   cares.
+
+## Amendment 14 (2026-08-31, LANDED ON MAIN): the ready-now flip tranches -- A6.129 remainder + A6.139 family, with real is_lock transports
+
+Two commits on main (`A6.129 remainder ported`, `A6.139 ported from
+tso-flip r63`), both green 1454/1454.  What landed, what was
+substituted at the SC seam, and what was measured and deferred.
+
+**A6.129 remainder (the M3 λ-payload completion):**
+- `WaitInv.parents_own_at/wait_res_at` (ctx cells at explicit ξ, real
+  `CtxMorph`), `SpecAllocpid.nextpid_res_at`, 51 handle-spelling sites
+  (`<{ X }>` -> `X_at`), `SchedCtx.run_slot_at` + morphs +
+  `lk_floor_move`, `TsoCtxMove.ctx_move_wrote/own_context_twin`.
+- Consumers of `parents_own` hand ctx cells END TO END now, so the
+  `ctx_word_of_mem/to_mem` seam conversions DROPPED at the p_parent
+  sites (ProofKexit/ProofKwait/ProofReparent/ProofKforkB5) and
+  `BootShared` mints the parent cells at the carve like `p_chan`.
+- The hunks the first pass missed, surfaced by instance search (a
+  CtxMove leaf fails EXACTLY where a definition still reads the
+  ambient context -- the leftover-goal probe is the diagnostic):
+  `proc_lock_res_at` pins its cells at ξl (flip's honest spelling),
+  `proc_slots_at` pins `proc_dormant (XI := ξl)`, `procs_inv` gains
+  its move/morph section, `proc_pub_morph`/`proc_lock_res_at_morph`.
+
+**is_lock_move/is_lock_morph are ON MAIN, and the M4 blocker note is
+retired**: main's `lock_inv` is ξ-INDEPENDENT under SC because
+`TsoCtxShim.ctx_word_shim/_word4_shim` are `⊣⊢` against the raw cell,
+so the handle re-homes by `inv` properness (`setoid_rewrite` -- plain
+ssreflect `rewrite` cannot reach under the ∃-binders).  STATEMENTS are
+flip's verbatim (`SchedCtx.v`, at the site); only the proof bodies are
+the seam and become flip's one-line `ctx_move_solve` at the M4 lock-kit
+reshape.  This unblocked the whole `devintr_caps_move` chain.
+
+**A6.139 (flip r63, the kernelvec handler-environment family):**
+- `IntrDefs`: `ihs_fam`/`ires_pack_of`/`env_move`, `ihs_trap_of` takes
+  the env family E with a `□ E XI` premise at the trap-time context,
+  `ihs_body_of` quantifies ∀XIb (the M2 context-generic contract,
+  which main had never taken), `intr_res` ∃-packs the env + its
+  swtch-crossing witness, `intr_res_at`/`ihs_env` (arity-stable
+  carrier row), the `sie_*_pack` lemmas, seals on the new faces.
+- `SpecKernelvec.kernelvec_env` is the REAL ξ-relative credentials
+  family (not a const-family stub) and `kernelvec_env_move` is the
+  real transport, funded by `SpecDevintr`'s CtxMove pile ->
+  `is_lock_move`.
+- `SchedCtx`: `p_sched` pins `trap_csrs (XI := ξ)`; `intr_res_move`
+  (uses the packed witness), `trap_csrs_move`, `p_sched_move` fixed.
+- Engine/leaves/producer/installers/usertrap rows: r63's hunks applied
+  (7 of 11 files verbatim by `git apply`, the rest 3-way with main's
+  fd-tier spellings kept -- `ud_hold` keeps `(U : ustate)(sts)`, the
+  devintr caps spell `fsc_uart/fsc_disk/fsc_dlock`).
+
+**SC seams ADDED (cutover worklist, grep these):**
+- `TsoCtxShim.ctx_word_reindex` (8-byte sibling of `ctx_word4_reindex`).
+- `SchedCtx.proc_cells_reindex_sc` (three producer sites:
+  ProofKforkB5/ProofUserinit/ProofScheduler) and the `ctx_dom_sc`
+  retier in `proc_slots_park_box`'s ZOMBIE arm -- each stands where
+  tso-flip DEPOSITS into the record's box (`proc_lock_res_deposit` /
+  `TsoCtx.ctx_deposit`, which raises the box's stamp).  At the cutover
+  the three sites adopt the deposit shape and both seams die.
+- `SchedCtx.lock_inv_reindex_sc/is_lock_reindex_sc` (Local; the
+  is_lock transport proof bodies).
+
+**Measured and deferred (unchanged from the survey, now with reasons
+verified in-tree):**
+- A6.126 §4 view-carrying read leaf: its premise names
+  `tso_interp_of/tso_read_bytes` (interp tier); main's `ms_spin`
+  already stands on the quarantined `hart_view_lb_any` idiom.
+- A6.135 §5 ghost-hooked write engines + kvminithart establishment
+  hook: the hook's statement names `tso_interp_at riscv_eraGS g`;
+  main has `gstate` but no interp tier, and a hook minus the tso
+  conjunct would be a guessed narrowing.  Wait for the owner's call.
+- A6.138 position-indexed started payload: depends on kpt_creds
+  decisions; measure separately.
+- `ctx_deposit` itself (and the deposit-shaped park/release sites):
+  T-leg vocabulary main does not have yet; the SC seams above are its
+  stand-ins.
