@@ -310,6 +310,7 @@ UkProgAbi.v
 # own.
 UkInit.v
 UkInitPutc.v
+UkInitLit.v
 UkInitVprintf.v
 UkInitPrintf.v
 UserMemArms.v
