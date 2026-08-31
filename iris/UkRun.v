@@ -111,12 +111,13 @@ Section UkRun.
      [sz] follows, and the reason [urun_close] takes [fdv] as a parameter. *)
   Definition urun (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (avail : nat) : iProp Σ :=
-    (∃ (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
+    (∃ (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+       (Rut : uptd -> iProp Σ) (sz : Z)
        (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (fdv : list fdstate),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        uheap γt γd γs M pm ∗
        ustack γd (m !!! Regidx csp_rs1) avail ∗
-       uvb (CID := h) C pt Rut sz pm fdv M m pc)%I.
+       uvb (CID := h) C pt Rfd Rut sz pm fdv M m pc)%I.
 
   (* "this instruction does not write sp".  Every leaf that writes a general
      register carries it; a concrete [rd] decides it by [vm_compute]. *)
@@ -140,8 +141,8 @@ Section UkRun.
     ukc pm M sz fdv m pc.
   Proof.
     iIntros "Hheap Hstk Hcont".
-    rewrite /ukc. iIntros (h C pt Rut) "%Hlo %Hpm Hb".
-    iApply ("Hcont" $! h). iExists C, pt, Rut, sz, M, pm, fdv.
+    rewrite /ukc. iIntros (h C pt Rfd Rut) "%Hlo %Hpm Hb".
+    iApply ("Hcont" $! h). iExists C, pt, Rfd, Rut, sz, M, pm, fdv.
     iFrame "Hheap Hstk Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
   Qed.
 
@@ -406,7 +407,7 @@ Section UkRun.
       /\ 8 * Z.of_nat avail <= uint (m !!! Regidx csp_rs1) ⌝.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (C pt Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (ustack_align with "Hstk") as %Hal.
     iDestruct (ustack_room with "Hheap Hstk") as %Hroom.
     iPureIntro. exact (conj Hal Hroom).
@@ -480,14 +481,14 @@ Section UkRun.
     -∗ uslot W.
   Proof.
     intros Hal8 Hroom Hstk. iIntros "Hprog". rewrite uslot_ukc /ukc.
-    iIntros (h C pt Rut) "%Hlo %Hpm Hb".
+    iIntros (h C pt Rfd Rut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
       by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
     rewrite /uvb /uvb_F /user_ptm_inv.
     iDestruct "Hb" as
       "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
-        Hcfg & Hgpr & Hpc & Hrut & Hkont)".
+        Hfrag & Hcfg & Hgpr & Hpc & Hrut & Hkont)".
     iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
     iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan)
       as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
@@ -505,12 +506,12 @@ Section UkRun.
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
     iSpecialize ("Hprog" $! γt γd γs h with "[%] Hszf Ht"); [ exact Hsz | ].
     iApply "Hprog".
-    iExists C, pt, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W).
+    iExists C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iFrame "Hheap Hstk".
     rewrite /uvb /uvb_F /user_ptm_inv.
-    iFrame "Hamb Hregs Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
+    iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
   Qed.
 
@@ -552,14 +553,14 @@ Section UkRun.
     -∗ uslot W.
   Proof.
     intros Hal8 Hroom Hstk. iIntros "Hprog". rewrite uslot_ukc /ukc.
-    iIntros (h C pt Rut) "%Hlo %Hpm Hb".
+    iIntros (h C pt Rfd Rut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
       by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
     rewrite /uvb /uvb_F /user_ptm_inv.
     iDestruct "Hb" as
       "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
-        Hcfg & Hgpr & Hpc & Hrut & Hkont)".
+        Hfrag & Hcfg & Hgpr & Hpc & Hrut & Hkont)".
     iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
     iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan)
       as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
@@ -589,12 +590,12 @@ Section UkRun.
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
     iSpecialize ("Hprog" $! γt γd γs h with "[%] Hszf Ht Dhi"); [ exact Hsz | ].
     iApply "Hprog".
-    iExists C, pt, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W).
+    iExists C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iFrame "Hheap Hstk".
     rewrite /uvb /uvb_F /user_ptm_inv.
-    iFrame "Hamb Hregs Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
+    iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
   Qed.
 

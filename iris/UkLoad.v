@@ -307,7 +307,7 @@ End UkLoadExecErr.
 Section UkLoadPostFetch.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-  Context (C : ucfg) (pt : uptd).
+  Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
 
   (* ------------------------------------------------------------------- *)
   (* The geometry-agnostic middle: from the FETCHED file, write nextPC,    *)
@@ -367,8 +367,8 @@ Section UkLoadPostFetch.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ Rut pt ∗ ukb C pt Rut sz π fdv ∗
-          (uvb C pt Rut sz π fdv M (<[Regidx lrd := regval_into_reg wval]> m)
+    (R -∗ Rut pt ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
+          (uvb C pt Rfd Rut sz π fdv M (<[Regidx lrd := regval_into_reg wval]> m)
              (add_vec_int pc dpc) -∗
            WP (Loop : expr riscv_lang))) -∗
     resv_any cpu_id -∗
@@ -540,7 +540,7 @@ Section UkLoadPostFetch.
                  (uv_post_rs rsr None (Some (lrd, wval))) u_Dro
                  ltac:(intros q Hq; apply Hag3, elem_of_union_r, Hq)).
     iFrame "Hrw Hro".
-    iApply (uk_psi_active C pt R Rut sz π M Mp
+    iApply (uk_psi_active C pt Rfd R Rut sz π M Mp
               (<[Regidx lrd := regval_into_reg wval]> m) (add_vec_int pc dpc)
               t'' usatp pcfg paddr
               (uv_post_rs rsr None (Some (lrd, wval))) fdv
@@ -638,7 +638,7 @@ Section UkLoadPostFetch.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ Rut pt ∗ ukb C pt Rut sz π fdv ∗ uslot (uvis_of_run m pc M π sz fdv)) -∗
+    (R -∗ Rut pt ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗ uslot (uvis_of_run m pc M π sz fdv)) -∗
     resv_any cpu_id -∗
     bytes_own (uv_mm t' (upa_map pt Mp)) -∗
     uv_res pt Mp t' usatp pcfg paddr -∗
@@ -846,16 +846,19 @@ Section UkLoadPostFetch.
               ltac:(uv_trap_peel; exact Htlbok2)
               with "Hany Hmm Hres [Hk]").
     iIntros "Hframe HR".
-    iDestruct ("Hk" with "HR") as "(Hrut & Hkb & Hret)".
+    iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hret)".
     iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv)
               (utrap_scause (rv64d_types.Exception (E_Load_Page_Fault tt))
                  (register_lookup (R_bitvector_64 scause) rsx))
               (tval (xtval_exception_value (E_Load_Page_Fault tt) va))
-              with "[%] [%] [%] [Hframe Hrut Hret]");
+              with "[%] [%] [%] [Hframe Hrut Hfdr Hret]");
       [ reflexivity | reflexivity | reflexivity | ].
     iSplitL "Hframe Hrut".
     { iApply (trapped_of_uv_trap_frame C pt Rut _ _ m pc M Mp sz π fdv Hpure Hx0
                 with "Hframe Hrut"). }
+    (* the bundle takes the descriptor view back at the trap ([ukb_F]'s
+       second conjunct); the key is built AT [fdv], so this is [Rfd fdv] *)
+    iSplitL "Hfdr"; [ iExact "Hfdr" | ].
     iApply (bi.equiv_entails_1_2 _ _
               (uexec_ret_transparent _ (uvis_of_run m pc M π sz fdv)
                  (utrap_scause_load_ne
@@ -868,7 +871,7 @@ End UkLoadPostFetch.
 Section UkLoadObl.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-  Context (C : ucfg) (pt : uptd).
+  Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
 
   (* ------------------------------------------------------------------- *)
   (* §5 THE OBLIGATION, once per FETCH SHAPE -- the load twins of          *)
@@ -911,8 +914,8 @@ Section UkLoadObl.
     Z.rem (uint va) 4096 <= 4096 - kk ->
     is_aligned_vaddr (Virtaddr va) kk = true ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ Rut pt ∗ ukb C pt Rut sz π fdv ∗
-          ((uvb C pt Rut sz π fdv M (<[Regidx lrd := regval_into_reg wval]> m)
+    (R -∗ Rut pt ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
+          ((uvb C pt Rfd Rut sz π fdv M (<[Regidx lrd := regval_into_reg wval]> m)
               (add_vec_int pc 4) -∗ WP (Loop : expr riscv_lang))
            ∧ uslot (uvis_of_run m pc M π sz fdv))) -∗
     resv_any cpu_id -∗
@@ -976,7 +979,7 @@ Section UkLoadObl.
     iFrame "Hrw Hro".
     iIntros "Hrw Hro".
     destruct Hdisp as [ (w_ld & Hl & Hchk & Hbw) | Hfault ].
-    - iApply (uk_load_post_fetch C pt R Rut sz π M Mp m pc 4 kk i o imm lr1 lrd
+    - iApply (uk_load_post_fetch C pt Rfd R Rut sz π M Mp m pc 4 kk i o imm lr1 lrd
                 is_unsigned w_ld va wval dv (zero_extend' 32 w) t' usatp pcfg
                 paddr rs1 rs2 fdv
                 Hkw Hred Hg1 Hexp Hrd Hva Hwval Hl Hchk Hcanon Hpg Hal Hbw Hinj
@@ -1000,9 +1003,9 @@ Section UkLoadObl.
                 (T2 _ _ u_in_mi ltac:(vm_compute; reflexivity) LmiA)
                 Hagd2 Htok' Hpure
                 with "Hcert Hamb [Hk] Hany Hmm Hres Hrw Hro").
-      iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hkb & Hkc)".
-      iDestruct "Hkc" as "[Hkc _]". iFrame "Hrut Hkb Hkc".
-    - iApply (uk_load_fault_post_fetch C pt R Rut sz π M Mp m pc 4 kk i o imm
+      iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
+      iDestruct "Hkc" as "[Hkc _]". iFrame "Hrut Hfdr Hkb Hkc".
+    - iApply (uk_load_fault_post_fetch C pt Rfd R Rut sz π M Mp m pc 4 kk i o imm
                 lr1 lrd is_unsigned va (zero_extend' 32 w) t' usatp pcfg paddr
                 rs1 rs2 fdv
                 Hkw Hred Hexp Hva Hfault Hpg Hg1
@@ -1026,8 +1029,8 @@ Section UkLoadObl.
                 (T2 _ _ u_in_mi ltac:(vm_compute; reflexivity) LmiA)
                 Hagd2 Htok' Hpure
                 with "Hcert Hamb [Hk] Hany Hmm Hres Hrw Hro").
-      iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hkb & Hkc)".
-      iDestruct "Hkc" as "[_ Hkc]". iFrame "Hrut Hkb Hkc".
+      iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
+      iDestruct "Hkc" as "[_ Hkc]". iFrame "Hrut Hfdr Hkb Hkc".
   Qed.
 
   Lemma uk_load_obl_rvc (R : iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
@@ -1065,8 +1068,8 @@ Section UkLoadObl.
     Z.rem (uint va) 4096 <= 4096 - kk ->
     is_aligned_vaddr (Virtaddr va) kk = true ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ Rut pt ∗ ukb C pt Rut sz π fdv ∗
-          ((uvb C pt Rut sz π fdv M (<[Regidx lrd := regval_into_reg wval]> m)
+    (R -∗ Rut pt ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
+          ((uvb C pt Rfd Rut sz π fdv M (<[Regidx lrd := regval_into_reg wval]> m)
               (add_vec_int pc 2) -∗ WP (Loop : expr riscv_lang))
            ∧ uslot (uvis_of_run m pc M π sz fdv))) -∗
     resv_any cpu_id -∗
@@ -1135,7 +1138,7 @@ Section UkLoadObl.
     iFrame "Hrw Hro".
     iIntros "Hrw Hro".
     destruct Hdisp as [ (w_ld & Hl & Hchk & Hbw) | Hfault ].
-    - iApply (uk_load_post_fetch C pt R Rut sz π M Mp m pc 2 kk i o imm lr1 lrd
+    - iApply (uk_load_post_fetch C pt Rfd R Rut sz π M Mp m pc 2 kk i o imm lr1 lrd
                 is_unsigned w_ld va wval dv (zero_extend' 32 h) t' usatp pcfg
                 paddr rs1 rs2 fdv
                 Hkw Hred Hg1 Hexp Hrd Hva Hwval Hl Hchk Hcanon Hpg Hal Hbw Hinj
@@ -1159,9 +1162,9 @@ Section UkLoadObl.
                 (T2 _ _ u_in_mi ltac:(vm_compute; reflexivity) LmiA)
                 Hagd2 Htok' Hpure
                 with "Hcert Hamb [Hk] Hany Hmm Hres Hrw Hro").
-      iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hkb & Hkc)".
-      iDestruct "Hkc" as "[Hkc _]". iFrame "Hrut Hkb Hkc".
-    - iApply (uk_load_fault_post_fetch C pt R Rut sz π M Mp m pc 2 kk i o imm
+      iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
+      iDestruct "Hkc" as "[Hkc _]". iFrame "Hrut Hfdr Hkb Hkc".
+    - iApply (uk_load_fault_post_fetch C pt Rfd R Rut sz π M Mp m pc 2 kk i o imm
                 lr1 lrd is_unsigned va (zero_extend' 32 h) t' usatp pcfg paddr
                 rs1 rs2 fdv
                 Hkw Hred Hexp Hva Hfault Hpg Hg1
@@ -1185,8 +1188,8 @@ Section UkLoadObl.
                 (T2 _ _ u_in_mi ltac:(vm_compute; reflexivity) LmiA)
                 Hagd2 Htok' Hpure
                 with "Hcert Hamb [Hk] Hany Hmm Hres Hrw Hro").
-      iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hkb & Hkc)".
-      iDestruct "Hkc" as "[_ Hkc]". iFrame "Hrut Hkb Hkc".
+      iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
+      iDestruct "Hkc" as "[_ Hkc]". iFrame "Hrut Hfdr Hkb Hkc".
   Qed.
 
 End UkLoadObl.
@@ -1194,7 +1197,7 @@ End UkLoadObl.
 Section UkLoad.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-  Context (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+  Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
 
@@ -1241,7 +1244,7 @@ Section UkLoad.
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     wval = extend_value is_unsigned (uM_word M (uint va) k) ->
-    uvb C pt Rut sz π fdv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
     ▷ ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m)
         (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
@@ -1250,10 +1253,10 @@ Section UkLoad.
     pose proof (Hui pt sz (loop_ok_wf C pt Hlo) Hpm) as Hui0.
     pose proof (ui_al2 _ _ _ _ _ Hui0) as Hal2.
     iIntros "Hb Hcont".
-    iApply (wp_uk_step C pt Rut π sz Hlo Hpm _ M m pc fdv Hal2 with "Hb [] Hcont").
+    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm _ M m pc fdv Hal2 with "Hb [] Hcont").
     iModIntro.
     rewrite /uk_step_obl.
-    iIntros (R CIDo C' pt' Rut' Mp' t rs1s rsA usatp pcfg paddr)
+    iIntros (R CIDo C' pt' Rfd' Rut' Mp' t rs1s rsA usatp pcfg paddr)
       "%Hlo' %Hpm' %Hpure %Hpre #Hamb Hk Hany Hrw Hro Hmm Hres".
     destruct (uk_instr_mapped π M Mp' pc _ i pt' sz
                 (loop_ok_wf C' pt' Hlo') Hpm' Hpure Hui)
@@ -1295,17 +1298,17 @@ Section UkLoad.
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
     (* the continuation at THIS table, out of the table-generic one *)
-    iAssert (R -∗ Rut' pt' ∗ ukb C' pt' Rut' sz π fdv ∗
-             ((uvb (CID := CIDo) C' pt' Rut' sz π fdv M
+    iAssert (R -∗ Rut' pt' ∗ Rfd' fdv ∗ ukb C' pt' Rfd' Rut' sz π fdv ∗
+             ((uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv M
                  (<[Regidx rd := regval_into_reg wval]> m)
                  (add_vec_int pc (if is_rvc then 2 else 4)) -∗
                WP (Loop : expr riscv_lang))
               ∧ uslot (uvis_of_run m pc M π sz fdv)))%I with "[Hk]" as "Hk".
-    { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hkb & Hkc)".
-      iFrame "Hrut Hkb". iSplit.
+    { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
+      iFrame "Hrut Hfdr Hkb". iSplit.
       - iDestruct "Hkc" as "[Hkc _]".
         iIntros "Hb". rewrite /ukc.
-        iApply ("Hkc" $! CIDo C' pt' Rut' with "[%] [%] Hb");
+        iApply ("Hkc" $! CIDo C' pt' Rfd' Rut' with "[%] [%] Hb");
           [ exact Hlo' | exact Hpm' ].
       - iDestruct "Hkc" as "[_ Hkc]".
         rewrite (uslot_run m pc M π sz fdv Hx0 Hal2). iExact "Hkc". }
@@ -1325,7 +1328,7 @@ Section UkLoad.
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite urvc4_low HisRVC in Hfe.
-        iApply (uk_load_obl_rvc C' pt' R Rut' sz π M Mp' m pc h i o k imm
+        iApply (uk_load_obl_rvc C' pt' Rfd' R Rut' sz π M Mp' m pc h i o k imm
                   rs1 rd is_unsigned va wval (uM_word M (uint va) k)
                   t t' usatp pcfg paddr rs1s rsA rsf fdv Hpre Hpure Hfe Hfg Tr
                   Htlbok' Htok' Hshape Hdecrvc Hkw Hred Hg1 Hexp Hrd Hva Hwval
@@ -1335,7 +1338,7 @@ Section UkLoad.
                     Hinj Hum Hlok Hcanonpc Hal2' Hal4 Hbytes HisRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
-        iApply (uk_load_obl_rvc C' pt' R Rut' sz π M Mp' m pc h i o k imm
+        iApply (uk_load_obl_rvc C' pt' Rfd' R Rut' sz π M Mp' m pc h i o k imm
                   rs1 rd is_unsigned va wval (uM_word M (uint va) k)
                   t t' usatp pcfg paddr rs1s rsA rsf fdv Hpre Hpure Hfe Hfg Tr
                   Htlbok' Htok' Hshape Hdecrvc Hkw Hred Hg1 Hexp Hrd Hva Hwval
@@ -1349,7 +1352,7 @@ Section UkLoad.
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite HnRVC in Hfe.
-        iApply (uk_load_obl_base C' pt' R Rut' sz π M Mp' m pc w i o k imm
+        iApply (uk_load_obl_base C' pt' Rfd' R Rut' sz π M Mp' m pc w i o k imm
                   rs1 rd is_unsigned va wval (uM_word M (uint va) k)
                   t t' usatp pcfg paddr rs1s rsA rsf fdv Hpre Hpure Hfe Hfg Tr
                   Htlbok' Htok' Hshape Hdecbase Hkw Hred Hg1 Hexp Hrd Hva Hwval
@@ -1359,7 +1362,7 @@ Section UkLoad.
                     Hinj Hum Hlok Hcanonpc Hinpage Hal2' Hal4 Hbytes HnRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
-        iApply (uk_load_obl_base C' pt' R Rut' sz π M Mp' m pc w i o k imm
+        iApply (uk_load_obl_base C' pt' Rfd' R Rut' sz π M Mp' m pc w i o k imm
                   rs1 rd is_unsigned va wval (uM_word M (uint va) k)
                   t t' usatp pcfg paddr rs1s rsA rsf fdv Hpre Hpure Hfe Hfg Tr
                   Htlbok' Htok' Hshape Hdecbase Hkw Hred Hg1 Hexp Hrd Hva Hwval
@@ -1391,7 +1394,7 @@ Section UkLoad.
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     wval = extend_value is_unsigned (uM_word M (uint va) k) ->
-    uvb C pt Rut sz π fdv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
     ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m)
         (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
@@ -1422,7 +1425,7 @@ Section UkLoad.
     (forall j : nat, (j < 8)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     wval = uM_word M (uint va) 8 ->
-    uvb C pt Rut sz π fdv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
     ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1456,7 +1459,7 @@ Section UkLoad.
     (forall j : nat, (j < 8)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     wval = uM_word M (uint va) 8 ->
-    uvb C pt Rut sz π fdv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
     ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1492,7 +1495,7 @@ Section UkLoad.
     uva_canon va ->
     M !! (uint va) = Some bb ->
     wval = zero_extend' 64 bb ->
-    uvb C pt Rut sz π fdv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
     ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1529,7 +1532,7 @@ Section UkLoad.
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     uM_bytes M (uint va) 4 wv ->
     wval = sign_extend' 64 wv ->
-    uvb C pt Rut sz π fdv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
     ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1560,7 +1563,7 @@ Section UkLoad.
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     uM_bytes M (uint va) 4 wv ->
     wval = zero_extend' 64 wv ->
-    uvb C pt Rut sz π fdv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
     ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1595,7 +1598,7 @@ Section UkLoad.
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     uM_bytes M (uint va) 4 wv ->
     wval = sign_extend' 64 wv ->
-    uvb C pt Rut sz π fdv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
     ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1637,7 +1640,7 @@ Section UkLoad.
     Z.rem (uint va) 4096 <= 4088 ->
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     uM_bytes M (uint va) 8 wval ->
-    uvb C pt Rut sz π fdv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv M m pc -∗
     ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.

@@ -667,7 +667,12 @@ Section LoopApply.
   (* ------------------------------------------------------------------ *)
   (* STEP D (and C): [uvb], row by row, and the continuation applied.     *)
   (* ------------------------------------------------------------------ *)
-  Lemma ukc_apply (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+  (* THE DESCRIPTOR RESOURCE IS A PREMISE, beside the image's.  This is
+     where the loop pays for the key's fd view: it hands over [Rfd fdv] --
+     instantiated at [FdSlots.fd_frags γfd] -- exactly as it hands over
+     [user_ptm_inv pt sz M] for [uvis_M]. *)
+  Lemma ukc_apply (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+      (Rut : uptd -> iProp Σ)
       (sz : Z) (fdv : list fdstate) (M : gmap Z (bv 8)) (m : regfile)
       (ms_v sc_v stv_v sepc_v pc : mword 64) :
     loop_ok C pt ->
@@ -677,18 +682,19 @@ Section LoopApply.
     hw_config -∗ minstret_inv -∗ wire_inv -∗
     u_regs (HART_ACTIVE tt) ms_v sc_v stv_v sepc_v pc pc m -∗
     user_ptm_inv pt sz M -∗
+    Rfd fdv -∗
     user_cfg C -∗
     Rut pt -∗
-    ▷ ukb C pt Rut sz (perm_of (ud_um pt) sz) fdv -∗
+    ▷ ukb C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hlo Hsz Hms.
-    iIntros "Hkc Hhw Hmi Hwi Hregs Hupt Hcfg Hrut Hk".
+    iIntros "Hkc Hhw Hmi Hwi Hregs Hupt Hfrag Hcfg Hrut Hk".
     (* the cell bundle splits into the U-mode residue, the file and the pc *)
     iDestruct (u_regs_uv_regs ms_v sc_v stv_v sepc_v pc m Hms with "Hregs")
       as "(Hur & Hg & Hpc)".
-    iApply ("Hkc" $! CID C pt Rut
-              with "[%] [%] [Hhw Hmi Hwi Hur Hg Hpc Hupt Hcfg Hrut Hk]").
+    iApply ("Hkc" $! CID C pt Rfd Rut
+              with "[%] [%] [Hhw Hmi Hwi Hur Hg Hpc Hupt Hfrag Hcfg Hrut Hk]").
     - exact Hlo.
     - reflexivity.
     - (* THE BUNDLE, ROW BY ROW -- it carries [gpr_file], so never [iFrame]
@@ -698,6 +704,7 @@ Section LoopApply.
       iSplitL "Hur"; [ iExact "Hur" | ].
       iSplitR; [ iPureIntro; exact Hsz | ].
       iSplitL "Hupt"; [ iExact "Hupt" | ].
+      iSplitL "Hfrag"; [ iExact "Hfrag" | ].
       iSplitL "Hcfg"; [ iExact "Hcfg" | ].
       iSplitL "Hg"; [ iExact "Hg" | ].
       iSplitL "Hpc"; [ iExact "Hpc" | ].
@@ -708,7 +715,8 @@ Section LoopApply.
   (* ...and the slot at a KEY, which is what the loop holds: the FIVE
      projections the slot reads, supplied as equations.  The break joined
      them when it joined the key. *)
-  Lemma uslot_apply_loop (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+  Lemma uslot_apply_loop (C : ucfg) (pt : uptd)
+      (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (sz : Z) (fdv : list fdstate) (W : uvis) (M : gmap Z (bv 8)) (m : regfile)
       (ms_v sc_v stv_v sepc_v pc : mword 64) :
     loop_ok C pt ->
@@ -724,9 +732,10 @@ Section LoopApply.
     hw_config -∗ minstret_inv -∗ wire_inv -∗
     u_regs (HART_ACTIVE tt) ms_v sc_v stv_v sepc_v pc pc m -∗
     user_ptm_inv pt sz M -∗
+    Rfd fdv -∗
     user_cfg C -∗
     Rut pt -∗
-    ▷ ukb C pt Rut sz (perm_of (ud_um pt) sz) fdv -∗
+    ▷ ukb C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hlo Hsz Hms Hpi HM Hsw Hfd Hg Hpc.
@@ -734,8 +743,8 @@ Section LoopApply.
     (* the seal comes off the HYPOTHESIS only *)
     iEval (rewrite uslot_ukc) in "Hs".
     iEval (rewrite Hpi HM Hsw Hfd Hg Hpc) in "Hs".
-    iApply (ukc_apply C pt Rut sz fdv M m ms_v sc_v stv_v sepc_v pc Hlo Hsz Hms
-              with "Hs").
+    iApply (ukc_apply C pt Rfd Rut sz fdv M m ms_v sc_v stv_v sepc_v pc
+              Hlo Hsz Hms with "Hs").
   Qed.
 
 End LoopApply.

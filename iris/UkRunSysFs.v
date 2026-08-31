@@ -238,18 +238,19 @@ Section UkRunSysFs.
 
   (* x0 is pinned inside the bundle -- [UkStep.uvb_x0] at [uvb_fs] *)
   Lemma uvb_fs_x0 (γm : gname) (h : CpuId) (C : ucfg) (pt : uptd)
+      (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ) (sz : Z) (π : gmap (mword 27) uperm)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) :
-    uvb_fs (CID := h) γm C pt Rut sz π fdv M m pc -∗
+    uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv M m pc -∗
     ⌜m !!! Regidx (mword_of_int 0) = zero_reg⌝ ∗
-    uvb_fs (CID := h) γm C pt Rut sz π fdv M m pc.
+    uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv M m pc.
   Proof.
     rewrite /uvb_fs /uvb_fs_F.
-    iIntros "(Hamb & Hur & %Hsz & Hpt & Hcfg & Hg & Hpc & Hrut & Hk)".
+    iIntros "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
     iDestruct (gpr_file_x0 m (mword_of_int 0) ltac:(vm_compute; reflexivity)
                  with "Hg") as "[%Hx0 Hg]".
     iSplitR; [ iPureIntro; exact Hx0 | ].
-    iFrame "Hamb Hur Hpt Hcfg Hg Hpc Hrut Hk";
+    iFrame "Hamb Hur Hpt Hfrag Hcfg Hg Hpc Hrut Hk";
       try (iPureIntro; exact Hsz).
   Qed.
 
@@ -259,10 +260,11 @@ Section UkRunSysFs.
   Definition ukc_fs (γm : gname) (π : gmap (mword 27) uperm)
       (M : gmap Z (bv 8)) (szv : Z) (fdv : list fdstate)
       (m : regfile) (pc : mword 64) : iProp Σ :=
-    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ),
+    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+       (Rut : uptd -> iProp Σ),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) szv = π⌝ -∗
-       uvb_fs (CID := h) γm C pt Rut szv π fdv M m pc -∗
+       uvb_fs (CID := h) γm C pt Rfd Rut szv π fdv M m pc -∗
        WP (Loop : expr riscv_lang))%I.
 
   Lemma uslot_fs_ukc (γm : gname) (W : uvis) :
@@ -302,9 +304,9 @@ Section UkRunSysFs.
     ukc_fs γm pm M sz fdv m pc.
   Proof.
     iIntros "Hheap Hstk Hcont".
-    rewrite /ukc_fs. iIntros (h C pt Rut) "%Hlo %Hpm Hb".
+    rewrite /ukc_fs. iIntros (h C pt Rfd Rut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h). rewrite /urun_fs.
-    iExists C, pt, Rut, sz, M, pm, fdv.
+    iExists C, pt, Rfd, Rut, sz, M, pm, fdv.
     iFrame "Hheap Hstk Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
   Qed.
 
@@ -337,13 +339,14 @@ Section UkRunSysFs.
   (* =================================================================== *)
   Lemma wp_uk_ecall_fs_of_step
       (STEP : forall (γm' : gname) (h' : CpuId) (C : ucfg) (pt : uptd)
+                (Rfd : list fdstate -> iProp Σ)
                 (Rut : uptd -> iProp Σ) (π : gmap (mword 27) uperm) (sz : Z)
                 (M : gmap Z (bv 8)) (fdv' : list fdstate)
                 (m' : regfile) (pc' : mword 64),
                 loop_ok C pt ->
                 perm_of (ud_um pt) sz = π ->
                 uk_instr π M pc' false (ECALL tt) ->
-                uvb_fs (CID := h') γm' C pt Rut sz π fdv' M m' pc' -∗
+                uvb_fs (CID := h') γm' C pt Rfd Rut sz π fdv' M m' pc' -∗
                 uexec_ret_fs γm' uecall_scause
                   (uvis_of_run m' pc' M π sz fdv') -∗
                 WP (Loop : expr riscv_lang))
@@ -357,7 +360,7 @@ Section UkRunSysFs.
     intros Hn Hdom Hal4.
     rewrite /wp_uk_ecall_fs_body.
     iIntros "#Hi Hrun Hmc Hstr Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm fdv)
+    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv)
       "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_fs_x0 with "Hb") as "[%Hx0 Hb]".
@@ -365,7 +368,7 @@ Section UkRunSysFs.
     iDestruct (uheap_ustrq with "Hheap Hstr") as %Hread.
     assert (Hread0 : ustr_read M (uint (ufs_arg (tf_of m pc) 0)) = Some pl)
       by exact Hread.
-    iApply (STEP γm h C pt Rut pm sz M fdv m pc Hlo Hpm Hui with "Hb").
+    iApply (STEP γm h C pt Rfd Rut pm sz M fdv m pc Hlo Hpm Hui with "Hb").
     (* ---- the ENRICHED return, at the trap-out key ---- *)
     rewrite /uexec_ret_fs /uexec_ret_fs_F.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hc];
@@ -416,12 +419,13 @@ Module Type FDROW_UKFS_STEP.
     forall `{!riscvGS Σ} `{GEN : GenId} `{XI : CurCtx}
            `{!ghost_varG Σ Z} `{!ghost_varG Σ umirror}
       (γm : gname) (h : CpuId) (C : ucfg) (pt : uptd)
-      (Rut : uptd -> iProp Σ) (π : gmap (mword 27) uperm) (sz : Z)
+      (Rfd : list fdstate -> iProp Σ)
+                (Rut : uptd -> iProp Σ) (π : gmap (mword 27) uperm) (sz : Z)
       (M : gmap Z (bv 8)) (fdv : list fdstate) (m : regfile) (pc : mword 64),
       loop_ok C pt ->
       perm_of (ud_um pt) sz = π ->
       uk_instr π M pc false (ECALL tt) ->
-      uvb_fs (CID := h) γm C pt Rut sz π fdv M m pc -∗
+      uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv M m pc -∗
       uexec_ret_fs γm uecall_scause (uvis_of_run m pc M π sz fdv) -∗
       WP (Loop : expr riscv_lang).
 End FDROW_UKFS_STEP.

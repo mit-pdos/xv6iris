@@ -535,7 +535,7 @@ Section UexecRet.
 
   (* (B) the kernel obligation: its later-free BODY, and the guarded form *)
   Definition ukb_F (X : uvis -d> iPropO Σ) `{CID : CpuId}
-      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
+      (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (fdv : list fdstate)
       : iProp Σ :=
     (∀ (W' : uvis) (sc stv : mword 64),
@@ -545,49 +545,90 @@ Section UexecRet.
           already says which permission map. *)
        ⌜uvis_sz W' = sz⌝ -∗
        (* ...and its DESCRIPTOR VIEW is the bundle's.  The third pin of the
-          same kind, and the one that gives the fd field its shape: user
-          execution runs no kernel code, so the key a process trapped at
-          carries the descriptor view it was resumed at, and the arms that
-          do NOT go through a syscall -- the transparent arm, i.e. every
-          page fault, timer interrupt and device interrupt -- hand [W']
-          straight to the continuation, so the view survives them.  (The
-          SYSCALL arms rebind it; see [uexec_ret_F].)
-
-          WHAT THIS DOES NOT YET SAY.  [uvis_fd] is a KEY component, and
-          nothing here ties its value to the kernel's own
-          [FdSlots.fd_frags]: the boundaries that mint the key
-          ([UexecSlot.uvis_of]) take the states as a parameter and the
-          park/resume closers ∀-bind them.  So this pin is "the view the
-          contract names does not move across a non-syscall trap", which
-          becomes "an interrupt cannot retype a descriptor" exactly when
-          the residue is indexed by the states it is holding
-          (claude-notes/design/user-wp-slot.md, stage 4). *)
+          same kind, and it says what it looks like it says, because the
+          bundle BACKS it with the fragments ([uvb_F] below carries
+          [Rfd fdv], the way it carries [user_ptm_inv pt sz M] for
+          the image): user execution runs no kernel code, so the key a
+          process trapped at carries the descriptor view it was resumed at,
+          and every arm that does not go through a syscall -- the
+          transparent arm, i.e. every page fault, timer interrupt and
+          device interrupt -- hands [W'] straight to the continuation.  AN
+          INTERRUPT CANNOT RETYPE A DESCRIPTOR.  (The SYSCALL arms rebind
+          it; see [uexec_ret_F].) *)
        ⌜uvis_fd W' = fdv⌝ -∗
-       trapped_machine C pt Rut sz sc stv W' ∗ uexec_ret_F X sc W' -∗
+       (* THE FRAGMENTS COME BACK, at the trap-out key's own view.  This is
+          the other half of the hand-out, and it is the IMAGE's arrangement
+          again: the image returns inside [trapped_machine] (whose
+          [user_trap_frame_atm] carries [uvis_M W']), and the descriptor
+          fragments return here.  Without this the resource would be lost
+          at the first trap and the kernel could not resume the process a
+          second time -- and, more to the point, the kernel could not learn
+          what the process's table now reads: joined with the AUTHORITY it
+          kept, [FdSlots.fd_st_agree] turns [Rfd (uvis_fd W')]
+          into "the array really is [uvis_fd W']". *)
+       trapped_machine C pt Rut sz sc stv W' ∗ Rfd (uvis_fd W') ∗
+       uexec_ret_F X sc W' -∗
        WP (Loop : expr riscv_lang))%I.
 
   Definition ukont_F (X : uvis -d> iPropO Σ) `{CID : CpuId}
-      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
+      (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (fdv : list fdstate)
       : iProp Σ :=
-    (▷ ukb_F X C pt Rut sz π fdv)%I.
+    (▷ ukb_F X C pt Rfd Rut sz π fdv)%I.
 
   (* (C) the bundle *)
+  (* THE DESCRIPTOR FRAGMENTS RIDE HERE, at the key's own view, exactly as
+     the IMAGE does.  [user_ptm_inv pt sz M] is what makes [uvis_M] a
+     READING rather than a decoration -- the kernel cannot run the process
+     without handing over the points-to's AT the key's [M] -- and
+     [Rfd fdv] is the same construction for [uvis_fd]:
+     [FdSlots.fd_st_agree] says either half pins a descriptor's state, so a
+     process holding the fragments at [fdv] IS a process whose table reads
+     [fdv].
+
+     THE TWO HALVES SPLIT ALONG THE TRAP.  The AUTHORITY stays kernel-side
+     ([fd_st_auth] rides inside [ProcInv.ofile_slot], hence inside
+     [proc_priv_nopt], hence in the residue [Rut pt]); the FRAGMENT comes
+     out to the process.  Neither half alone can move a descriptor's state
+     ([fd_st_both_update]), which is exactly the property wanted: the
+     kernel cannot silently retype a descriptor the process is holding, and
+     the process cannot invent a change without the kernel's step.  This is
+     the hand-out [FdSlots.v]'s header parks ("the fragment is what will
+     later be handed OUT, to user-space proofs that want to say 'fd 1 is
+     the console' across a syscall").
+
+     [Rfd] IS ABSTRACT, and for [Rut]'s reason.  [FdSlots.fd_frags] needs
+     [fdslotG Σ], and putting it here literally would widen the class
+     context of [uslot] / [uvb] / [ukc] and hence of the whole U-tier
+     engine, which today asks for [riscvGS] and nothing else.  So the
+     bundle takes the RESOURCE AS A PARAMETER, exactly as it takes the
+     kernel residue [Rut] -- the loop instantiates it at
+     [FdSlots.fd_frags γfd] and the engine never learns what it is.  The
+     anchoring lives at that instantiation, again like [Rut]: [uslot]
+     ∀-binds [Rfd], so the PROCESS is safe at any of them, and it is the
+     KERNEL that has to produce [Rfd fdv] to resume and gets
+     [Rfd (uvis_fd W')] back at the trap.
+
+     [Rfd] IS NOT IN THE KEY, for the reason the realizing table is not: a
+     process does not observe which resource realizes its descriptor view,
+     only what the view IS. *)
   Definition uvb_F (X : uvis -d> iPropO Σ) `{CID : CpuId}
-      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
+      (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (fdv : list fdstate)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
-    (uv_amb ∗ uv_regs ∗ ⌜usz_ok sz⌝ ∗ user_ptm_inv pt sz M ∗ user_cfg C ∗
-     gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ukont_F X C pt Rut sz π fdv)%I.
+    (uv_amb ∗ uv_regs ∗ ⌜usz_ok sz⌝ ∗ user_ptm_inv pt sz M ∗
+     Rfd fdv ∗ user_cfg C ∗
+     gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ukont_F X C pt Rfd Rut sz π fdv)%I.
 
   (* NOTE the ∀ over [sz] is GONE: the key carries the break, so the slot is
      at THE process's size rather than at every size a table might realize. *)
   Definition uslot_F (X : uvis -d> iPropO Σ) : uvis -d> iPropO Σ :=
     fun W =>
-      (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ),
+      (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+         (Rut : uptd -> iProp Σ),
          ⌜loop_ok C pt⌝ -∗
          ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
-         uvb_F X (CID := h) C pt Rut (uvis_sz W) (uvis_perm W) (uvis_fd W)
+         uvb_F X (CID := h) C pt Rfd Rut (uvis_sz W) (uvis_perm W) (uvis_fd W)
            (uvis_M W) (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
          WP (Loop : expr riscv_lang))%I.
 
@@ -599,16 +640,19 @@ Section UexecRet.
 
   Definition uslot : uvis -> iProp Σ := fixpoint uslot_F.
   Definition uexec_ret : mword 64 -> uvis -> iProp Σ := uexec_ret_F uslot.
-  Definition ukb `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+  Definition ukb `{CID : CpuId} (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+      (Rut : uptd -> iProp Σ)
       (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) : iProp Σ :=
-    ukb_F uslot C pt Rut sz π fdv.
-  Definition ukont `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+    ukb_F uslot C pt Rfd Rut sz π fdv.
+  Definition ukont `{CID : CpuId} (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+      (Rut : uptd -> iProp Σ)
       (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) : iProp Σ :=
-    ukont_F uslot C pt Rut sz π fdv.
-  Definition uvb `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+    ukont_F uslot C pt Rfd Rut sz π fdv.
+  Definition uvb `{CID : CpuId} (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+      (Rut : uptd -> iProp Σ)
       (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
-    uvb_F uslot C pt Rut sz π fdv M m pc.
+    uvb_F uslot C pt Rfd Rut sz π fdv M m pc.
 
   (* THE U-MODE CONTINUATION at a natural state: what every U-mode leaf's
      continuation is, and what a program function proves -- "safe from
@@ -616,18 +660,21 @@ Section UexecRet.
      slot is this at the key's state ([uslot_ukc]). *)
   Definition ukc (π : gmap (mword 27) uperm) (M : gmap Z (bv 8))
       (szv : Z) (fdv : list fdstate) (m : regfile) (pc : mword 64) : iProp Σ :=
-    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ),
+    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+       (Rut : uptd -> iProp Σ),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) szv = π⌝ -∗
-       uvb (CID := h) C pt Rut szv π fdv M m pc -∗
+       uvb (CID := h) C pt Rfd Rut szv π fdv M m pc -∗
        WP (Loop : expr riscv_lang))%I.
 
   Lemma uslot_unfold (W : uvis) :
     uslot W ⊣⊢
-    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ),
+    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+       (Rut : uptd -> iProp Σ),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
-       uvb (CID := h) C pt Rut (uvis_sz W) (uvis_perm W) (uvis_fd W) (uvis_M W)
+       uvb (CID := h) C pt Rfd Rut (uvis_sz W) (uvis_perm W) (uvis_fd W)
+         (uvis_M W)
          (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
        WP (Loop : expr riscv_lang)).
   Proof. exact (fixpoint_unfold uslot_F W). Qed.
@@ -641,9 +688,9 @@ Section UexecRet.
   Lemma uslot_bupd (W : uvis) : (|==> uslot W) -∗ uslot W.
   Proof.
     rewrite !(uslot_unfold W).
-    iIntros "H" (h C pt Rut) "%Hl %Hp Hb".
+    iIntros "H" (h C pt Rfd Rut) "%Hl %Hp Hb".
     iMod "H".
-    iApply ("H" $! h C pt Rut with "[//] [//] Hb").
+    iApply ("H" $! h C pt Rfd Rut with "[//] [//] Hb").
   Qed.
 
   Lemma uslot_ukc (W : uvis) :
@@ -683,9 +730,10 @@ Section UexecRet.
     reflexivity.
   Qed.
 
-  Lemma ukont_unfold `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+  Lemma ukont_unfold `{CID : CpuId} (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
+      (Rut : uptd -> iProp Σ)
       (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) :
-    ukont C pt Rut sz π fdv ⊣⊢ ▷ ukb C pt Rut sz π fdv.
+    ukont C pt Rfd Rut sz π fdv ⊣⊢ ▷ ukb C pt Rfd Rut sz π fdv.
   Proof. reflexivity. Qed.
 
   (* the arms, read at the fixpoint *)
@@ -761,9 +809,10 @@ Section UexecRetGen.
     iIntros "#Hwp".
     iLöb as "IH" forall (W).
     rewrite uslot_unfold.
-    iIntros (h C pt Rut) "%Hlo %Hpm Hb".
+    iIntros (h C pt Rfd Rut) "%Hlo %Hpm Hb".
     rewrite /uvb /uvb_F.
-    iDestruct "Hb" as "(#Hamb & Hur & %Hsz & Hpt & Hcfg & Hg & Hpc & Hrut & Hk)".
+    iDestruct "Hb" as
+      "(#Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
     iDestruct (user_ptm_inv_pt with "Hpt") as (Mp) "Hpt".
     iDestruct (uv_regs_u_regs with "Hur Hg Hpc") as (ms_v sc_v stval_v sepc_v) "[%Hms Hregs]".
     iDestruct "Hamb" as "(Hhw & Hmi & Hwi)".
@@ -771,16 +820,18 @@ Section UexecRetGen.
     iEval (rewrite uexec_wp_unfold /uexec_F) in "Hwp0".
     iApply ("Hwp0" $! h C pt Rut Mp (tf_resume_gpr0 (uvis_tf W))
               ms_v sc_v stval_v sepc_v (tf_resume_pc (uvis_tf W))
-              with "[] [] Hhw Hmi Hwi Hregs Hpt Hcfg Hrut [Hk]");
+              with "[] [] Hhw Hmi Hwi Hregs Hpt Hcfg Hrut [Hk Hfrag]");
       [ iPureIntro; exact Hlo | iPureIntro; exact Hms | ].
     rewrite /ukont_F /ukb_F.
     iNext. iIntros "[Hframe _]".
     iDestruct (user_trap_frame_trapped C pt Rut (uvis_sz W) (uvis_perm W)
                  (uvis_fd W) with "Hframe")
       as (W' sc stv) "[%Hperm [%Hszw [%Hfdw Htm]]]".
-    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [Htm]");
+    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [Htm Hfrag]");
       [ exact Hperm | exact Hszw | exact Hfdw | ].
-    iFrame "Htm".
+    (* the fragments were carried across the excursion and go back at the
+       trap-out key's view, which [Hfdw] says is the one they are held at *)
+    rewrite Hfdw. iFrame "Htm Hfrag".
     iApply uexec_ret_of_all. iModIntro. iIntros (W''). iApply "IH".
   Qed.
 
