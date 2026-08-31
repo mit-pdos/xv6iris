@@ -227,6 +227,25 @@ Notation K_sys_open := (148%nat) (only parsing).
    the header's reference ledger. *)
 Definition sys_open_slots : nat := create_slots.
 
+(* ===================================================================== *)
+(* THE TWO MODE FLAGS, AS FUNCTIONS OF omode.  These are xv6's own two      *)
+(* lines, read at the argument rather than at the stored bytes:            *)
+(*                                                                        *)
+(*     f->readable = !(omode & O_WRONLY);                                  *)
+(*     f->writable = (omode & O_WRONLY) || (omode & O_RDWR);               *)
+(*                                                                        *)
+(* with O_WRONLY = 0x001 and O_RDWR = 0x002 -- so READABLE is "bit 0       *)
+(* clear" and WRITABLE is "bit 0 or bit 1 set", which is what the two      *)
+(* [mod]s below say.  The post used to bind both booleans existentially;   *)
+(* naming them here is what lets a caller of open KNOW whether the         *)
+(* descriptor it just got back can be read or written, rather than only    *)
+(* that it is open.                                                       *)
+(* ===================================================================== *)
+Definition so_rd_of (om : mword 32) : bool :=
+  bool_decide (bv_unsigned om `mod` 2 = 0).
+Definition so_wr_of (om : mword 32) : bool :=
+  negb (bool_decide (bv_unsigned om `mod` 4 = 0)).
+
 Section SpecSysOpen.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
@@ -247,17 +266,24 @@ Section SpecSysOpen.
      [sts] back on the nose, and the success arm hands back [sts] with ONE
      row replaced.
 
-     THE MODE AND THE TYPE ARE EXISTENTIAL, and this is where they honestly
-     live.  [f->readable]/[f->writable] are a function of the omode argument
-     and the type is [FdDevice] exactly when the path resolved to a
-     T_DEVICE inode -- neither is a fact about the DESCRIPTOR TABLE, so
-     pinning them here would mean this row reaching into argument decoding
-     and the path walk.  [SpecSysOpenAU.open_fd_ok] is where they are named,
-     because the AU frame observes the inode.  What the caller needs and
-     gets here is that the slot is now OPEN and that no other slot moved --
-     which is [UsysMemOk.usys_fd_ok]'s open row exactly. *)
+     THE MODE IS PINNED TO THE FLAGS; ONLY THE TYPE IS EXISTENTIAL.
+     [f->readable] and [f->writable] are functions of the omode argument --
+     xv6's own two lines, [so_rd_of] and [so_wr_of] above -- so a caller
+     that passed [O_RDONLY] learns its descriptor READS and one that passed
+     [O_WRONLY] learns its descriptor WRITES.  That is the difference
+     between knowing a descriptor is open and knowing what it is for.
+
+     THE TYPE STAYS EXISTENTIAL, and honestly so: it is [FdDevice] exactly
+     when the path resolved to a T_DEVICE inode, which is a fact about the
+     PATH WALK and not about the descriptor table.
+     [SpecSysOpenAU.open_fd_ok] names it, because the AU frame observes the
+     inode. *)
   Definition sys_open_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
-      (UW : ustate) (sts : list fdstate) (r : mword 64) : iProp Σ :=
+      (UW : ustate) (sts : list fdstate)
+      (* the omode argument, as [argint] read it -- what the two mode bits
+         are functions OF *)
+      (om : mword 32)
+      (r : mword 64) : iProp Σ :=
     ((* FAILURE, on any of the seven arms.  The descriptor array is EXACTLY
         as it came in: no arm that installed a descriptor can fail after
         doing so -- fdalloc is the last thing that can refuse.  The bundle
@@ -271,11 +297,12 @@ Section SpecSysOpen.
         descriptor fdalloc opened is retyped from [FdClosed] to the new
         file's type ([ProcInv.proc_priv_settle]), and that ONE row is the
         only one that moves. *)
-     (∃ (fd : nat) (l : list nat) (k : nat) (rb wb : bool) (t : fdtype),
+     (∃ (fd : nat) (l : list nat) (k : nat) (t : fdtype),
        ⌜r = (mword_of_int (Z.of_nat fd) : mword 64) /\
         fd_frees (pv_ofile (us_V UW)) = fd :: l⌝ ∗
        proc_priv γf p pid (us_ofile UW fd (fnode k)) ∗
-       fd_frags (pv_fdg (us_V UW)) (<[fd := FdOpen rb wb t]> sts)))
+       fd_frags (pv_fdg (us_V UW))
+         (<[fd := FdOpen (so_rd_of om) (so_wr_of om) t]> sts)))
     ∗ fd_slot.
 
   (* THE LANDED SHAPE, DERIVED.  Callers that do not yet name their table --
@@ -286,8 +313,9 @@ Section SpecSysOpen.
      weakening HERE, as a named lemma, means there is one place to delete
      when the last caller is updated. *)
   Lemma sys_open_post_any `{XI : CurCtx} (γf : gname) (p : mword 64)
-      (pid : mword 32) (UW : ustate) (sts : list fdstate) (r : mword 64) :
-    sys_open_post γf p pid UW sts r ⊢
+      (pid : mword 32) (UW : ustate) (sts : list fdstate) (om : mword 32)
+      (r : mword 64) :
+    sys_open_post γf p pid UW sts om r ⊢
     ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf p pid UW
       ∨ ∃ (fd : nat) (l : list nat) (k : nat),
           ⌜r = (mword_of_int (Z.of_nat fd) : mword 64) /\
@@ -296,10 +324,11 @@ Section SpecSysOpen.
      ∗ fd_frags_any (pv_fdg (us_V UW)) ∗ fd_slot).
   Proof.
     rewrite /sys_open_post /fd_frags_any.
-    iIntros "[[(%Hr & Hp & Hb) | (%fd & %l & %k & %rb & %wb & %t & %Hpu & Hp & Hb)] Hfd]".
+    iIntros "[[(%Hr & Hp & Hb) | (%fd & %l & %k & %t & %Hpu & Hp & Hb)] Hfd]".
     - iFrame "Hfd". iSplitR "Hb"; [| by iExists sts].
       iLeft. by iFrame "Hp".
-    - iFrame "Hfd". iSplitR "Hb"; [| by iExists (<[fd := FdOpen rb wb t]> sts)].
+    - iFrame "Hfd". iSplitR "Hb";
+        [| by iExists (<[fd := FdOpen (so_rd_of om) (so_wr_of om) t]> sts)].
       iRight. iExists fd, l, k. by iFrame "Hp".
   Qed.
 
@@ -452,7 +481,7 @@ Definition wp_sys_open_sconf_body
       ⌜ns' = ns⌝ -∗
       iref_slots ns' -∗
       (* the descriptor table, the fd unit and the return value *)
-      sys_open_post γf pj pid (us_upt U P') sts
+      sys_open_post γf pj pid (us_upt U P') sts (trunc32 vom)
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

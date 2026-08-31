@@ -647,6 +647,27 @@ Qed.
 
 (* the three ways a descriptor's file can be typed, as ONE fact -- what
    every producer of an [ofile_slot] file disjunct actually has to pay. *)
+(* THE MODE FLAGS ARE DETERMINED BY THE FILE, which is what lets a caller
+   that knows the stored bytes name the state's booleans instead of
+   existentially quantifying them.  [fdstate_ok] says [fc_readable C] IS the
+   0/1 encoding of [r]; the encoding is injective on booleans, so two
+   readings of the same field agree. *)
+Lemma fdstate_ok_flags (inum : mword 32) (C : fcontent)
+    (r w : bool) (t : fdtype) (rb wb : bool) :
+  fdstate_ok inum C (FdOpen r w t) ->
+  fc_readable C = ((if rb then mword_of_int 1 else mword_of_int 0) : mword 8) ->
+  fc_writable C = ((if wb then mword_of_int 1 else mword_of_int 0) : mword 8) ->
+  r = rb /\ w = wb.
+Proof.
+  intros (Hr & Hw & _) Hrb Hwb.
+  rewrite Hrb in Hr. rewrite Hwb in Hw.
+  split.
+  - destruct r, rb; try reflexivity; exfalso;
+      (apply (f_equal bv_unsigned) in Hr; vm_compute in Hr; discriminate Hr).
+  - destruct w, wb; try reflexivity; exfalso;
+      (apply (f_equal bv_unsigned) in Hw; vm_compute in Hw; discriminate Hw).
+Qed.
+
 (* ...and the SHAPE the three per-type readings share: an open descriptor is
    [FdOpen] at some mode and type.  [sys_open]'s post wants exactly this and
    nothing finer -- which mode and which type are facts about the omode

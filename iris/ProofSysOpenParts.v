@@ -97,6 +97,8 @@ Require Import SpecCreate.
 Require Import SpecFdalloc.
 Require Import SpecFileclose.
 Require Import CodeSysOpen.
+Require Import UmodeArith.  (* [moi_of_unsigned] *)
+Require Import DinodeSlot.   (* [iu_sext_mod16] -- the low bits survive sext *)
 Require Import SpecSysOpen.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -531,6 +533,27 @@ Proof. rewrite so_wr_rdonly. apply bv_eq; vm_compute; reflexivity. Qed.
 
    The mask is a bit because [Z.land _ 1] is [_ mod 2]; from there the word
    is one of two closed terms and the byte follows by [vm_compute]. *)
+(* THE MASK'S VALUE, extracted from [so_and1_01]'s own computation: an
+   [andi] against a low-bit mask IS the residue.  Naming it is what lets the
+   two byte lemmas below say WHICH boolean the store leaves, rather than
+   that there is one. *)
+Lemma so_and_val `{XI : CurCtx} (om : mword 32) (k n : Z) :
+  bv_unsigned (sign_extend' 64 (mword_of_int k : mword 12) : mword 64) = Z.ones n ->
+  0 <= n ->
+  bv_unsigned (so_and om k) = bv_unsigned (so_omv om) `mod` (2 ^ n).
+Proof.
+  intros Hk Hn. unfold so_and. rewrite and_vec64_unsigned Hk Z.land_ones; [| exact Hn].
+  reflexivity.
+Qed.
+
+Lemma so_and1_val `{XI : CurCtx} (om : mword 32) :
+  bv_unsigned (so_and om 1) = bv_unsigned (so_omv om) `mod` 2.
+Proof. apply (so_and_val om 1 1); [vm_compute; reflexivity | lia]. Qed.
+
+Lemma so_and3_val `{XI : CurCtx} (om : mword 32) :
+  bv_unsigned (so_and om 3) = bv_unsigned (so_omv om) `mod` 4.
+Proof. apply (so_and_val om 3 2); [vm_compute; reflexivity | lia]. Qed.
+
 Lemma so_and1_01 `{XI : CurCtx} (om : mword 32) :
   so_and om 1 = (mword_of_int 0 : mword 64)
   \/ so_and om 1 = (mword_of_int 1 : mword 64).
@@ -547,6 +570,26 @@ Proof.
   - right. apply bv_eq. rewrite Hv.
     assert (Heq : bv_unsigned (so_omv om) mod 2 = 1) by lia.
     rewrite Heq. by vm_compute.
+Qed.
+
+(* THE LOW BITS SURVIVE THE SIGN EXTENSION, which is what connects the
+   machine's 64-bit [andi] to [SpecSysOpen]'s statement about the 32-bit
+   omode argument.  Both moduli divide 16, so [DinodeSlot.iu_sext_mod16]
+   carries them. *)
+Lemma so_sext_mod2 `{XI : CurCtx} (w : mword 32) :
+  bv_unsigned (sign_extend' 64 w : mword 64) `mod` 2 = bv_unsigned w `mod` 2.
+Proof.
+  rewrite <- (Z.mod_mod_divide _ 16 2 ltac:(exists 8; reflexivity)).
+  rewrite iu_sext_mod16.
+  apply (Z.mod_mod_divide _ 16 2 ltac:(exists 8; reflexivity)).
+Qed.
+
+Lemma so_sext_mod4 `{XI : CurCtx} (w : mword 32) :
+  bv_unsigned (sign_extend' 64 w : mword 64) `mod` 4 = bv_unsigned w `mod` 4.
+Proof.
+  rewrite <- (Z.mod_mod_divide _ 16 4 ltac:(exists 4; reflexivity)).
+  rewrite iu_sext_mod16.
+  apply (Z.mod_mod_divide _ 16 4 ltac:(exists 4; reflexivity)).
 Qed.
 
 Lemma so_rd_byte_bool `{XI : CurCtx} (om : mword 32) :
@@ -566,6 +609,60 @@ Proof.
   destruct (zopz0zI_u (zero_reg : mword 64) (so_and om 3)).
   - exists true. apply bv_eq; vm_compute; reflexivity.
   - exists false. apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+(* THE READABLE BYTE, AT ITS VALUE.  [so_rd_byte_bool] above says the store
+   leaves SOME boolean; this says which one -- [SpecSysOpen.so_rd_of], i.e.
+   xv6's [!(omode & O_WRONLY)].  The [xor] with 1 is the C's [!]. *)
+Lemma so_rd_byte_at `{XI : CurCtx} (om : mword 32) :
+  trunc8 (so_rd_word om)
+  = ((if so_rd_of om then mword_of_int 1 else mword_of_int 0) : mword 8).
+Proof.
+  unfold so_rd_word, so_rd_of.
+  pose proof (so_and1_val om) as Hv.
+  rewrite so_sext_mod2 in Hv.
+  destruct (decide (bv_unsigned om `mod` 2 = 0)) as [Hz | Hnz].
+  - rewrite bool_decide_eq_true_2; [| exact Hz].
+    assert (Ha : so_and om 1 = (mword_of_int 0 : mword 64))
+      by (apply bv_eq; rewrite Hv Hz; by vm_compute).
+    rewrite Ha. apply bv_eq; vm_compute; reflexivity.
+  - rewrite bool_decide_eq_false_2; [| exact Hnz].
+    pose proof (Z.mod_pos_bound (bv_unsigned om) 2 ltac:(lia)) as Hb.
+    assert (Ha : so_and om 1 = (mword_of_int 1 : mword 64))
+      by (apply bv_eq; rewrite Hv; assert (He : bv_unsigned om `mod` 2 = 1) by lia;
+          rewrite He; by vm_compute).
+    rewrite Ha. apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+(* THE WRITABLE BYTE, AT ITS VALUE.  The [snez] is [0 <? (omode & 3)], which
+   for an unsigned residue is "the mask is nonzero" -- xv6's
+   [(omode & O_WRONLY) || (omode & O_RDWR)], i.e. [SpecSysOpen.so_wr_of]. *)
+Lemma so_wr_byte_at `{XI : CurCtx} (om : mword 32) :
+  trunc8 (so_wr_word om)
+  = ((if so_wr_of om then mword_of_int 1 else mword_of_int 0) : mword 8).
+Proof.
+  unfold so_wr_word, so_wr_of.
+  pose proof (so_and3_val om) as Hv.
+  rewrite so_sext_mod4 in Hv.
+  assert (Hz0 : (zero_reg : mword 64) = (mword_of_int 0 : mword 64))
+    by (apply bv_eq; vm_compute; reflexivity).
+  pose proof (bv_unsigned_in_range _ (so_and om 3)) as Hr.
+  assert (Hr' : 0 <= bv_unsigned (so_and om 3) < 18446744073709551616)
+    by (revert Hr; unfold bv_modulus; cbn; lia).
+  pose proof (moi_of_unsigned (so_and om 3)) as Hcm.
+  assert (Hlt : zopz0zI_u (zero_reg : mword 64) (so_and om 3)
+                = Z.ltb 0 (bv_unsigned (so_and om 3))).
+  { rewrite Hz0. rewrite <- Hcm at 1.
+    apply ds_bltu_moi; [lia | exact Hr']. }
+  (* speak the omode residue from here on, so both branches decide on it *)
+  rewrite Hlt Hv.
+  destruct (decide (bv_unsigned om `mod` 4 = 0)) as [Hz | Hnz].
+  - rewrite bool_decide_eq_true_2; [| exact Hz]. cbn [negb].
+    rewrite Hz. apply bv_eq; vm_compute; reflexivity.
+  - rewrite bool_decide_eq_false_2; [| exact Hnz]. cbn [negb].
+    pose proof (Z.mod_pos_bound (bv_unsigned om) 4 ltac:(lia)) as Hb.
+    rewrite (proj2 (Z.ltb_lt 0 (bv_unsigned om `mod` 4)) ltac:(lia)).
+    apply bv_eq; vm_compute; reflexivity.
 Qed.
 
 (* the readable byte at O_RDONLY, for completeness: [!(0 & 1)] is ONE.  The

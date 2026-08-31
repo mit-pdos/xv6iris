@@ -199,6 +199,7 @@ Section ProofSysOpenBody.
       (gf : gname)
       (nsj : nat) (dqb dqs : dfrac)
       (pj : mword 64) (pidv : mword 32) (U : ustate) (sts : list fdstate)
+      (om : mword 32)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string)
       : CpuId -> iProp Σ :=
     fun (CIDx : CpuId) =>
@@ -220,7 +221,7 @@ Section ProofSysOpenBody.
          sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
          bslots 3 -∗
          iref_slots ns' -∗
-         sys_open_post gf pj pidv U sts (mf !!! Regidx Ra0 : mword 64) -∗
+         sys_open_post gf pj pidv U sts om (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
 
   (* ================================================================== *)
@@ -352,7 +353,7 @@ Section ProofSysOpenBody.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf nsj
-               dqb dqs (proc_addr jx) pidv U sts m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv U sts om m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf Hfdlt
@@ -392,12 +393,27 @@ Section ProofSysOpenBody.
     (* the two mode cells are C bools, and THAT is what the descriptor's
        [FdOpen rb wb] will claim: [f->readable] is [!(omode & O_WRONLY)] and
        [f->writable] the [snez], both a bit by construction. *)
-    destruct (so_rd_byte_bool om) as [rb Hrdb].
-    destruct (so_wr_byte_bool om) as [wb Hwdb].
+    (* THE TWO MODE BITS, AT THEIR VALUES.  [so_rd_byte_bool] said each store
+       leaves SOME boolean; [so_rd_byte_at] says WHICH -- xv6's
+       [!(omode & O_WRONLY)] and [(omode & O_WRONLY) || (omode & O_RDWR)], as
+       [SpecSysOpen.so_rd_of]/[so_wr_of].  Hoisting the two cell equations
+       into NAMED facts is what lets [FileInvDefs.fdstate_ok_flags] identify
+       the published descriptor's booleans with them below. *)
+    pose proof (so_rd_byte_at om) as Hrdb.
+    pose proof (so_wr_byte_at om) as Hwdb.
+    assert (Hrdc : fc_readable C
+                   = ((if so_rd_of om then mword_of_int 1 else mword_of_int 0)
+                      : mword 8))
+      by (rewrite Hrdw; exact Hrdb).
+    assert (Hwrc : fc_writable C
+                   = ((if so_wr_of om then mword_of_int 1 else mword_of_int 0)
+                      : mword 8))
+      by (rewrite Hwrb; exact Hwdb).
     iApply fupd_wp.
-    iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn om rb wb
+    iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn om
+            (so_rd_of om) (so_wr_of om)
             ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb
-            ltac:(rewrite Hrdw; exact Hrdb) ltac:(rewrite Hwrb; exact Hwdb)
+            Hrdc Hwrc
             Hdir Hdvw
             with "Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hcoff")
       as (stpub) "[%Hokpub Href]".
@@ -426,10 +442,14 @@ Section ProofSysOpenBody.
        the omode argument's and the inode's business, not the table's *)
     destruct (fdstate_ok_opened _ C stpub Hokpub (or_intror Htyor))
       as (rbp & wbp & tp & Hstpub).
-    iAssert (sys_open_post gf (proc_addr jx) pidv U sts (mf !!! Regidx Ra0 : mword 64))
+    (* ...and the published booleans ARE the omode's: [fdstate_ok] pins them
+       to [fc_readable]/[fc_writable], and the 0/1 encoding is injective. *)
+    destruct (fdstate_ok_flags inum C rbp wbp tp (so_rd_of om) (so_wr_of om)
+                ltac:(rewrite <- Hstpub; exact Hokpub) Hrdc Hwrc) as [-> ->].
+    iAssert (sys_open_post gf (proc_addr jx) pidv U sts om (mf !!! Regidx Ra0 : mword 64))
       with "[Hpriv Hfds Hfrag]" as "Hpost".
     { rewrite /sys_open_post. iSplitR "Hfds"; [| iFrame "Hfds"].
-      iRight. iExists fd, l, kf, rbp, wbp, tp.
+      iRight. iExists fd, l, kf, tp.
       rewrite <- Hstpub.
       iSplitR.
       { iPureIntro. split; [| exact Hfrees]. rewrite Ha0f. reflexivity. }
@@ -627,7 +647,7 @@ Section ProofSysOpenBody.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf nsj
-               dqb dqs (proc_addr jx) pidv U sts m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv U sts om m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize Hbm0
@@ -1284,7 +1304,7 @@ Section ProofSysOpenBody.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf nsj
-               dqb dqs (proc_addr jx) pidv U sts m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv U sts om m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
@@ -2066,7 +2086,7 @@ Section ProofSysOpenBody.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf nsj
-               dqb dqs (proc_addr jx) pidv U sts m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv U sts om m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
@@ -2379,6 +2399,7 @@ Section ProofSysOpenBody.
       (gf : gname)
       (ns : nat) (dqb dqs dqbs dqn : dfrac)
       (pj : mword 64) (pidv : mword 32) (U : ustate) (sts : list fdstate)
+      (om : mword 32)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string)
       : CpuId -> iProp Σ :=
     fun (CIDx : CpuId) =>
@@ -2401,7 +2422,7 @@ Section ProofSysOpenBody.
          sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
          bslots 3 -∗
          iref_slots ns' -∗
-         sys_open_post gf pj pidv U sts (mf !!! Regidx Ra0 : mword 64) -∗
+         sys_open_post gf pj pidv U sts om (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
 
   (* ================================================================== *)
@@ -2514,7 +2535,7 @@ Section ProofSysOpenBody.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont0 gf ns
-                dqb dqs dqbs dqn (proc_addr jx) pidv U sts m K eb b lks) -∗
+                dqb dqs dqbs dqn (proc_addr jx) pidv U sts om m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
@@ -2824,7 +2845,7 @@ Section ProofSysOpenBody.
        plus the join's [ns1 <= ns' <= S ns1]. ---- *)
     iAssert (wp_next true (proc_addr jx)
                (so_cont gf
-                        ns1 dqb dqs (proc_addr jx) pidv U sts m K eb b lks))
+                        ns1 dqb dqs (proc_addr jx) pidv U sts om m K eb b lks))
       with "[Hcont Hsbn Hsbs]" as "Hcontj".
     { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
       iEval (rewrite /so_cont). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -2974,7 +2995,7 @@ Section ProofSysOpenBody.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont0 gf ns
-                dqb dqs dqbs dqn (proc_addr jx) pidv U sts m K eb b lks) -∗
+                dqb dqs dqbs dqn (proc_addr jx) pidv U sts om m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
@@ -3397,7 +3418,7 @@ Section ProofSysOpenBody.
          spent one of the three. *)
       iAssert (wp_next true (proc_addr jx)
                  (so_cont gf
-                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv U sts m K eb b lks))
+                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv U sts om m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
         iEval (rewrite /so_cont). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -3484,7 +3505,7 @@ Section ProofSysOpenBody.
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iAssert (wp_next true (proc_addr jx)
                  (so_cont gf
-                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv U sts m K eb b lks))
+                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv U sts om m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
         iEval (rewrite /so_cont). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -4232,7 +4253,7 @@ Section ProofSysOpenBody.
     iAssert (wp_next (CID0 := CID21) true (proc_addr j)
                (so_cont0 gf
  ns dqb dqs dqbs dqn (proc_addr j) pid
-                         (us_upt U P') sts m K eb b lks))
+                         (us_upt U P') sts (trunc32 vom) m K eb b lks))
       with "[Hcont]" as "Hcont0".
     { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
       iEval (rewrite /so_cont0). iIntros (mf ns2) "%Hcsf %Hns2".
