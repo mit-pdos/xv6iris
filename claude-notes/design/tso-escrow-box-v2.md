@@ -1,7 +1,11 @@
 # ESCROW BOX v2: audit of the endgame plan and a re-cut of the box (2026-09-01)
 
-STATUS: PROPOSAL for owner ruling.  Not authoritative until adopted into
-tso-escrow-endgame.md (which stays the design of record until then).
+STATUS: ADOPTED 2026-09-01 (owner rulings R-a..R-d approved) into
+tso-escrow-endgame.md §2/§3, with ONE amendment: the L1 out-window
+between (a) and (b) is an arm WITH cells (OUT_L1 := hdr_out ∗ P_rest ξb,
+P := P_hdr ∗ P_rest) so the park can refute it by ctx_word4_excl_x.
+This file is now the adoption record; the endgame doc is the design of
+record.
 
 ## 1. Verdicts
 

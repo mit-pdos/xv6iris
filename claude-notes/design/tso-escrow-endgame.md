@@ -2,6 +2,9 @@
 
 STATUS: AUTHORITATIVE.  This document supersedes the escrow-related parts
 of A6.142/A6.147/A6.148/A6.149 as the *current* statement of the design.
+2026-09-01: the BOX v2 re-cut (tso-escrow-box-v2.md, owner rulings
+R-a..R-d) is ADOPTED into §2/§3 below, with the L1 out-window amendment;
+the deposit-register design it replaces is history (changelog).
 The A6-series remains the historical record; when this file and an A6
 entry disagree, this file wins.  RULE: corrections to this design are
 made by EDITING THIS FILE IN PLACE (with a one-line changelog entry at
@@ -76,9 +79,9 @@ context-λs (CtxMorph).  TWO floor-shaped objects, each with ONE job
 (clarified 2026-09-01, answering R1-pre note (iv)):
   - `ctx_floor ξ K` — the RAW floor.  It is what R1/R2 below deliver at
     the winner's context, and it is what T2 BOX WITHDRAWS consume
-    (`aguard_intro` → `anchor_withdraw`; CtxAnchor's guard is
-    deliberately on ctx_floor alone — a wrote-arm holder can cash only
-    ledger_vis and cannot borrow other harts' cells).  Acquire posts and
+    (`ctx_absorb_lb` needs a view receipt at the stamp; a wrote-arm
+    holder can cash only ledger_vis and cannot borrow other harts'
+    cells — CtxAnchor's guard made the same choice).  Acquire posts and
     payload floor rows are stated as ctx_floor, NEVER weakened to
     cred_floor.
   - `cred_floor lo tl := ctx_floor cur_ctx tl ∨ ctx_wrote cur_ctx lo _`
@@ -111,322 +114,197 @@ error; stop and come back here.  (The existing _bare/_gen/pin0 strata
 are green and LEFT ALONE until the post-endgame cleanup, §6; they may
 gain no new dependents.)
 
-## 2. The Transit Box, finalized (3 arms, forever)
+## 2. The Transit Box (v2, adopted 2026-09-01: two custody arms + the L1 out-window)
 
 One custody shape covers every remaining cross-lock protocol.  A box
 instance is declared by:
 
-  - bundle  P : CtxId → iProp   (CtxMorph; the travelling cells+pay)
-  - residue Q : iProp           (ξ-FREE, ghost-only checkout residue:
-                                 for bcache, bchain ∗ bown ∗ the park
-                                 half + its witnesses — §3.3 site notes)
-  - guard locks L1, L2          (bcache: bcache.lock / b->sleeplock;
-                                 icache: itable.lock / ip->sleeplock)
-  - a presence/identity ghost (below)
+  - bundle  P := P_hdr ∗ P_rest  (CtxId → iProp, CtxMorph each):
+        P_hdr = the cells the L1-side code reads or writes
+                (bcache: valid/dev/blockno; icache: valid);
+        P_rest = everything else (bcache: data, disk, pay; icache: the
+                in-memory dinode fields).
+  - residue Q : iProp   (ξ-FREE ghost — the chain's reference, the L2
+                         exclusivity token, the L2 payload's slot_p
+                         half: A6.155's shape)
+  - guard locks L1, L2  (bcache: bcache.lock / b->sleeplock;
+                         icache: itable.lock / ip->sleeplock)
+  - the stamped-shares ghost (§3.2)
 
-and its body is, FOREVER, three arms:
+Body:
 
-  box_body := ∃ n T ξb rb rp,
-     anchor γa n ξb T ∗ astamp γa n T ∗ llb T ∗
-     pres_core rb ∗ regs rb rp ∗ ⌜tie n T rb rp⌝ ∗
-     ( P ξb              (* IN:   bundle parked at ξb            *)
-     ∨ Q                 (* OUT:  checked out; ghost residue      *)
-     ∨ pres_none ∗ H ξb ) (* IDLE: refs 0; content in L1's payload;
-                             H = the park's IDLE credential: a cell
-                             HALF at ξb, split/joined INSIDE the box
-                             at drop/bump — never withdrawn alone *)
+  box_body := ∃ T ξb m Tp Td,
+     ctx_parked ξb T ∗ llb loglen_name T ∗
+     stamps ● m ∗ cnt ½ (Σ m) ∗ slot_p ½ Tp ∗ slot_d ½ Td ∗
+     ⌜(∀ t ∈ dom m, T ≤ t) ∨ T ≤ Tp⌝ ∗        (C: the L2-side cover)
+     ⌜T ≤ Td ∨ T ∈ dom m⌝ ∗                     (D: the L1-side cover)
+     ( P_hdr ξb ∗ P_rest ξb                     (* IN                      *)
+     ∨ Q                                        (* OUT_L2: out under L2    *)
+     ∨ hdr_out ∗ P_rest ξb )                    (* OUT_L1: header out, L1  *)
 
-Transitions (the four from BioBox, keep the names):
-  bump      IDLE→IN   deposit under L1 (refs 0→1)
-  checkout  IN→OUT    withdraw under L2 (the sleeplock win)
-  park      OUT→IN    deposit under L2 (before releasesleep)
-  drop      IN→IDLE   withdraw under L1 (refs 1→0)
+  hdr_out := the L1 withdrawer's whole unit ◯ m_D when c = 1; emp at c = 0.
 
-HARD RULES:
-  - Exactly these three arms and four transitions.  A protocol that
-    seems to need a fourth arm or a fifth transition puts the extra
-    STATE INSIDE Q (Q is ξ-free ghost — clients may structure it as any
-    disjunction they like without touching custody or freshness) or
-    dissolves it into a lock payload.  A genuine fourth custody arm is
-    a design error — stop.
-  - The IN-arm refutation stays the client's full-cell/token clash
-    (ctx_word4_excl_x etc.); OUT refutation = Q-exclusivity; IDLE
-    refutation = pres validity.  These are the only per-client lemmas.
+NO IDLE ARM: refs-0 content stays in the box (owner ruling R-a, reversing
+A6.142's payload custody; the recycler is (a) + stores + (b)).  No
+generations, no anchor ledger, no presence auth, no tags, no pile:
+custody is ctx_parked/llb directly (TsoCtxPark's ctx_deposit /
+ctx_absorb_lb / ctx_parked_raise); CtxAnchor retires (R-d).
 
-**Rule of two**: land the bcache concretely first (BioBox is 90%
-there); extract the generic `CtxBox.v` (arms + registers + transitions
-+ cover lemmas, parameterized by P/Q/locks) WHILE building the icache
-instance, so both instantiate one core and cannot drift.  Do not
-functorize before the second client exists.
+Transitions — the SIX, and only these (§3.5):
+  (a) withdraw_L1   under L1   IN → OUT_L1     (P_hdr out)
+  (b) deposit_L1    under L1   OUT_L1 → IN     (P_hdr back, new stamp)
+  (c) ref_incr      under L1
+  (d) ref_decr      under L1                   (refs 1→0 is (d), not a withdraw)
+  (e) checkout      under L2   IN → OUT_L2     (whole bundle out)
+  (f) park          under L2   OUT_L2 → IN     (whole bundle back)
 
-## 3. THE FRESHNESS DESIGN (the deposit-register pattern)
+THE PARK PRINCIPLE (why the out-window is an arm WITH cells): every arm
+the park can meet must contain a cell the parker's bundle clashes with.
+IN has the full valid cell; OUT_L1 has P_rest (its b_disk against the
+parker's full one); OUT_L2 is the expected arm.  An arm with no cells
+forces a ghost refutation at the park, that ghost would have to be in
+the holder's hand, and the handle is frozen — that was the IDLE arm
+(A6.155 → A6.157), and it is why v2 has none.
 
-This section is the load-bearing new content: a closed, total answer to
-"the withdrawer's floor covers the current stamp", replacing BioBox's
-undischargeable `□(∀ n T, astamp …)` premise and A6.149's per-case
-hand-wave.
+HARD RULES: exactly these three arm shapes and six lemmas.  Protocol
+substates go inside Q (ξ-free ghost).  A seventh lemma, a fourth arm
+shape, or a second reference form is a design error — stop (§5).
 
-### 3.1 The principle
+**Rule of two**: bcache first (R1'); extract the generic `CtxBox.v`
+(P_hdr/P_rest, Q, the token, the six lemmas, rows (C)/(D)) WHILE
+instantiating the icache (R3), so both instantiate one core.
 
-Freshness cannot be a persistent snapshot (a snapshot can't prove
-currency) and cannot be an exclusive ticket (the checkout right is
-genuinely shared among ref-holders — any of them may win the
-sleeplock first).  The only sound device is: **every deposit publishes
-its (generation, stamp, llb) into a register that every one of ITS
-legal withdrawers can reach, and the box's pure invariant says which
-register is current.**  Withdraw = open box, case-split the tie, agree
-with the reachable register, cash its llb/floor by R1 or R2.
+## 3. THE FRESHNESS DESIGN (v2: stamped shares — two rows, no agreement)
 
-### 3.2 The registers (bcache instance; icache is isomorphic)
+### 3.1 The one inherent fact
 
-Ghosts (all tiny, additive; no model or Σ-arm changes):
+A withdrawer of cells stamped T needs `ctx_floor ξ K`, `T ≤ K`, from R1
+or R2.  Every deposit is followed in the same critical section by a
+release that can fold its llb — EXCEPT the L2 park (releasesleep): the
+eventual L1-side withdrawer (recycler at refs 0, iput at ref 1) may
+never acquire L2, and its chain to the parker runs through the parker's
+later refs-- under L1.  So the box must state "T is covered by L1's
+floor, OR some outstanding reference still owes its park", and the L1
+withdrawer must discharge the second disjunct from what it holds.  v2
+attaches that debt to the thing the withdrawer holds exclusively at
+those sites: the references themselves.  Everything the register design
+had (generations, agreement, the pile) was scaffolding for that one
+disjunct.
 
-  - **pres, enriched**: `authR (optionUR (prodUR (agreeR (prodO natO natO))
-    positiveR))` replacing `auth (option positive)`.
-    ● Some((n_b,T_b), count) — where (n_b,T_b) is the generation and
-    stamp of the LAST BUMP — lives **in the box body** across IN/OUT
-    (not in L1's payload as A6.148 had it; the withdrawer must reach it
-    at the box open).  ● None is the IDLE arm.  Every reference carries
-    ◯ Some((n_b,T_b), 1) plus a persistent `llb T_b` (minted from the
-    bump's anchor_deposit export; later refs copy it out of the box at
-    their refs++, which opens the box for the count edge).
-    Validity at any box open gives the fragment (n_b,T_b) = the body's
-    — THE CURRENCY ARGUMENT FOR THE BUMP CASE, by ◯/● validity NOW,
-    not by history.
-  - **reg_park**: `ghost_var γp (1/2) (n,T)` — one half in the box
-    body, the other half + `astamp γa n T ∗ llb T` as a ROW IN THE
-    SLEEPLOCK'S PAYLOAD R.  Updated at PARK: the parker holds R (it
-    holds the sleeplock) AND opens the box — both halves in hand.
-    The llb becomes a floor for the next winner via R2 at releasesleep
-    (the SleepLock record threading listed as NEXT in r77 — build it
-    as this row).
-  - **reg_drop**: `ghost_var γd (1/2) (n,T)` — one half in the box,
-    the other half + astamp/llb row in L1's (bcache.lock's) payload.
-    Synced (rd := rp) at every refs-- decrement: the decrementer holds
-    L1's payload and opens the box.  Floor delivered by R2 at the
-    decrementer's L1 release.
-  - **the TAGGED parked-fragment PILE** (replaces reg_last; refined
-    2026-09-01, vetted + tagged the same day).  Every PARK deposits the
-    parker's pres fragment into the body, where fragments compose into
-    a single `◯ Some(to_agree rb, o)` pile (o ∃-bound, row absent at
-    o = 0), AND adds its park generation to a tag multiset
-    `S : gmultiset nat` (`authR (gmultisetUR natO)`, ● S in the body),
-    handing the parker the CLAIM `◯ {[+ n_P +]}`.  An ex-parker's
-    refs-- decrement presents its claim, removes n_P from S, retrieves
-    ONE pile fragment and absorbs it into the count.  EVERY decrement
-    syncs rd := rp (it holds L1 + the box).  The tags are NOT optional:
-    an anonymous pile cannot make the drop site total in-logic (the
-    state "the one pile fragment is an un-decremented P ≠ D's, rp = P's
-    park ≠ rd" is unrefutable without identity — "the caller knows
-    which by program flow" is not a resource).  Three pure rows in the
-    body, each maintained by inspection:
-      (r1) `size S = o`          — fragment and tag move together, so
-                                   `o ≤ c` (hence `size S ≤ c`) is free
-                                   by auth validity;
-      (r2) `rp ≠ rd → rp.n ∈ S`  — park sets rp and tags; any decrement
-                                   syncs (antecedent false).  The
-                                   corollary `o = 0 → rp = rd` is what
-                                   the non-parker's drop uses;
-      (r3) `∀ m ∈ S, rb.n < m`   — a park's gen exceeds the bump's; S is
-                                   empty at bump (o = 0 in IDLE).
-    Needs one CtxAnchor lemma: `astamp_le : anchor γ n XI T -∗
-    astamp γ n' T' -∗ ⌜n' ≤ n⌝` (from the existing dom bound).
-  - **reg_cnt** (count sync; added 2026-09-01): `ghost_var γc (1/2) c`
-    with one half beside the slot's Some-arm count (= M's count) and
-    one in the box beside the pres ●.  This makes the count READABLE
-    at any box open: the IDLE refutation at refs ≥ 1 is a γc value
-    clash, and the last-drop's fragment accounting is against c = 1.
+### 3.2 The ghosts (per box)
 
-The box's pure tie (maintained by inspection at each of the four
-transitions, all of which hold the needed halves):
+  - `stamps : authR (gmapUR nat ufracR)` — THE STAMPED SHARES.  A map
+    stamp ↦ fraction; `● m` in the box.  Each COUNTED reference owns ONE
+    UNIT (fractions summing to 1); a share owns part of its parent's
+    unit at the share's own fraction s (split/merge = the gmap op).  The
+    row `Σ m = c` ties the total to the refcount.  A holder's stamp is
+    the stamp of the LAST deposit it witnessed: ref_incr mints
+    `◯{[T := 1]}` at the box's current T; a park MOVES the parker's
+    fraction from its old stamp to the park stamp (dealloc + alloc; Qp
+    addition is cancelable).  ufrac, not frac: several units may sit at
+    one stamp.
+  - `slot_p`, `slot_d : ghost_var nat` — half in the box, half in the
+    L2 / L1 payload beside that payload's floor row `ctx_floor ξ Tp` /
+    `ctx_floor ξ Td`.
+  - `cnt : ghost_var Qp` — half in the box (`Σ m`), half in L1's payload
+    beside the refcount word.
 
-  tie n T rb rp  :=  (n,T) = rb ∨ (n,T) = rp
+### 3.3 The reference: ONE spelling, ghost-only
 
-plus the pile rows (r1)–(r3) above.
+    ref / share := ∃ m, stamps ◯ m ∗ llb loglen_name (max (dom m))
 
-### 3.3 The covers, per site (total case splits)
+plus the client's token/cells: bcache `bref := bref_tok ∗ ref ∗ the
+dev/bno fractions` (bpin's / the log layer's), `bchain := bref_tok0 ∗
+ref` (the chain; A6.155's option-Qp share, ruling R-c); icache: `◯ m`
+rides beside live_fracc at the share's fraction s and merges at
+fileclose by gmap union.  Holder, parked, or inside Q — the same form.
+NO floor inside a reference: the floor is minted by R1 at the acquire
+where it is needed.
 
-  CHECKOUT (under L2; winner holds: its pres fragment + llb T_b, the
-  sleeplock payload R, its win floors):
-    case (n,T) = rb:  fragment agrees with pres ● (validity now);
-        cash `llb T_b` via R1 — the llb-tier acquiresleep, Tl := T_b,
-        which the caller knew BEFORE the acquire from its fragment.
-    case (n,T) = rp:  R's reg_park half agrees with the body's half;
-        R's row carries the floor (folded by R2 at the last
-        releasesleep — no releasesleep, no winner, so no gap).
-    Both cases end in `ctx_floor ξ K, T ≤ K` → aguard_intro →
-    anchor_withdraw.  No other case exists (the tie).
+### 3.4 The floor rule (routes unchanged)
 
-  DROP (under L1; dropper D holds: L1's payload (rd half + floor row,
-  M!!k = Some(q,1), γc half ⇒ c = 1 ⇒ o ≤ 1 ⇒ size S ≤ 1), persistent
-  copies (n_b,T_b) + llb T_b, and EITHER its pres fragment in hand (it
-  never parked — the bunpin dropper) OR its claim ◯{[+ n_mine +]} +
-  astamp(n_mine,T_mine) + llb T_mine (it parked — brelse)).  ONE
-  acquire: present Tl := max T_b T_mine (llb is downward-monotone, so
-  llb (max) follows from the two); the R1 post K ≥ Tl serves both
-  routes below.
-    D did NOT park (fragment in hand):
-      case (n,T) = rb:  fragment agrees with pres ● (currency NOW);
-                        R1 floor covers T_b.
-      case (n,T) = rp:  if S ≠ ∅ a pile fragment exists beside D's
-                        in-hand one, so o + 1 ≤ c = 1 fails by
-                        validity; hence S = ∅, (r2) gives rp = rd,
-                        L1-payload row's floor via R2.
-    D PARKED (claim n_mine):
-      case (n,T) = rb:  REFUTED: (r3) rb.n < n_mine, astamp_le gives
-                        n_mine ≤ n = rb.n.
-      case (n,T) = rp:  n_mine ∈ S and size S ≤ 1 ⇒ S = {n_mine}.
-                        If rp ≠ rd: (r2) rp.n = n_mine, astamp_agree
-                        gives T = T_mine, own llb via R1.
-                        If rp = rd: L1-payload row's floor via R2.
-    Totality is in-logic: every branch closes by validity, (r1)–(r3),
-    or agreement — no "the other parker must have decremented"
-    history argument remains.  THE rb-CASE CURRENCY ARGUMENT REQUIRES
-    THE FRAGMENT IN HAND; for a parker (fragment in the pile) the rb
-    case is refuted by (r3), never proved by agreement.  Do not try to
-    carry rb as a persistent copy — every persistent-witness variant
-    fails on currency.
+  - R1 at EVERY acquire by a reference holder: `Tl := max (dom m)`.
+  - R2 at every L1 release (ALL through `_in`): fold `max Td (paid)`;
+    at every L2 release (always `_in`): fold the park stamp.  Tp / Td
+    ARE what those payloads' floor rows say.
 
-  SITE NOTES: every count edge (bump, refs++, refs--, drop) now opens
-  the box (γc, the pile and S live there) — so ProofBpin/ProofBunpin,
-  which never touched the escrow, gain one box open each; refs++
-  copies (rb, llb T_b) out for the new fragment.  The last drop's OUT
-  refutation is the COUNT route, not Q-exclusivity: the dropper holds
-  L1's ● M at (q,1) and its own bref_tok, and Q exhibits a second
-  bref_tok (bref_tok_two) — bown is in R at that moment, not in hand.
-  Boot is IDLE for every buffer (content in the payload; anchor at
-  generation 0, stamp 0; S = ∅; rp = rd = (0,0)) — no boot deposit.
-  The reference has TWO spellings, BY ROLE (2026-09-01, build agent —
-  the holder handle is frozen, see below):
-    bref   := bref_tok (share Some q) ∗ (∃ rb, pres_frag rb ∗ llb rb.T)
-              ∗ the dev/bno fractions {q}
-              — bpin's / the log layer's reference; the fractions pin
-              its (dev, bno) to the cells (ProofLogWrite agrees them
-              against the handle); passed opaquely.
-    bchain := bref_tok0 (share None) ∗ (∃ rb, pres_frag rb ∗ llb rb.T)
-              — bread's CHAIN reference, ghost-only: the chain reads
-              dev/bno through its handle rows, so it takes NO fraction
-              off the slot.  The auth map's share component is
-              [option Qp] (bioUR := auth (gmap nat (option frac ×
-              positive))); the count component counts BOTH kinds, and
-              the slot's tie [Σ fractioned shares + qr = 1/2] is exact
-              with no extra register.
-  WHY: bio_held/bio_locked (the sleeplock holder's handle) is unfolded
-  structurally by ~25 fs-layer files, so NOTHING may be added to it.
-  Everything the checkout leaves with the holder must therefore be
-  ξ-free ghost and live in the OUT arm's residue Q:
-    Q := bchain ∗ bown ∗ (∃ rp, reg_park rp ∗ astamp rp ∗ llb rp.T)
-  (the sleeplock payload's γp half moves from R into Q for the length
-  of the hold; the box's own half stays in the prefix and agrees).
-  box_swap_checkout takes bchain + R's rows and stores them; box_swap_park
-  hands bown, bchain (its fragment now in the pile under a fresh tag),
-  the claim and the UPDATED park half + witnesses back — which is
-  exactly releasesleep's Rdep row plus the refs-- inputs.  The holder
-  carries only bio_locked across bread→brelse, as today.
-  THE PARK's IDLE CREDENTIAL (2026-09-01, build agent, on the vetted
-  simplification): with the fragment in Q the parker holds NOTHING ghost
-  that refutes the IDLE arm (pres_frag_none_absurd did that job; the
-  bundle only refutes IN, by b_valid exclusivity), and the box cannot
-  see L1's None arm.  The parker's only credential is the bundle's
-  CELLS, so IDLE holds a cell fraction that clashes with them:
-    H ξb := ∃ dsk, b_disk (bpa k) ↦ξb{1/2} dsk
-  — b_disk is written only by rw, under the sleeplock, by a holder who
-  has the FULL bundle; the recycler never touches it.  L1's None arm
-  keeps the content with b_disk at HALF (spelling buf_bundle_h: the
-  bundle with the disk cell halved); the bump deposits buf_bundle_h and
-  JOINS the halves at ξb into the IN arm's full bundle; checkout/park
-  move the full bundle; the last drop withdraws the full bundle, halves
-  b_disk, DEPOSITS the half back (a free deposit; IDLE's generation
-  advances) and returns buf_bundle_h to L1's None arm.  The park's
-  IDLE refutation is ctx_word4_excl_x (full at ξ vs half at ξb).  Boot
-  makes ONE deposit per buffer (the b_disk half, generation 0 → 1)
-  because the anchor's context is a fresh parked context; rp = rd =
-  (0,0) and S = ∅ are unchanged.  bio_locked is untouched (buf_own's
-  b_disk row is already in the handle).
-  VETTED 2026-09-01 (A6.157 accepted in substance — the diagnosis is
-  right and the vetted simplification caused it; b_disk is the right
-  cell; the half at ξb is T2 custody; checkout/drop keep their IDLE
-  refutations).  THREE REFINEMENTS, binding:
-    (1) NO DEPOSIT AT THE DROP.  Split b_disk at ξb INSIDE the box (a
-        same-context fractional split, pure ghost) and withdraw only the
-        bundle-with-half; the IDLE half never leaves ξb, the stamp and
-        generation are untouched, IDLE stays "no deposit, no cover".
-        The bump is the mirror: deposit the payload's half (ξ→ξb via
-        anchor_deposit) and JOIN at ξb — agreement is the fractional
-        points-to law (trivially: nobody writes b_disk without the full
-        cell).  Bump = deposit-then-join; drop = split-then-withdraw.
-    (2) DO NOT NAME buf_bundle_h.  The travelling bundle stays ONE
-        spelling (full).  L1's None arm in bio_slot_res2 is already an
-        inline cell listing — halve its b_disk row there.  A named
-        "bundle with the disk cell halved" is a second bundle flavor.
-    (3) The one boot deposit is fine but is PART OF BOX CONSTRUCTION:
-        wrap anchor_alloc + the half's deposit in a single buf_box_alloc
-        whose post states rp = rd = (0,0), S = ∅.  Gen 0→1 at boot is
-        harmless (the tie lives in the Some arm; the prefix's astamp at
-        generation 0 stays valid).
-  IDLE arm, final: pres_none ∗ reg_cnt 0 ∗ ⌜S = ∅⌝ ∗ ∃ dsk,
-  b_disk (bpa k) ↦ξb{1/2} dsk.  Nothing else in §3 changes.
-  VETTED 2026-09-01 (approved; proceed with ProofBread sites 1–5):
-    - This is §2's rule applied literally (state into Q, never into a
-      handle or a new arm) and is continuity with v1, whose chain
-      reference already rode the escrow's OUT arm (BioInv.v:260).
-    - SIMPLIFY box_swap_park: during OUT both γp halves are inside the
-      box (prefix + Q), so the park's premises reduce to own_context ∗
-      buf_bundle — the bundle is the holder's only (and sufficient)
-      credential; drop the caller-supplied pres_frag rb' / reg_park rp'.
-      Symmetrically box_swap_checkout gains the R row (bown, the half,
-      the witnesses) as a premise and stops returning them.
-    - option share: optionUR fracR has None as unit, so (None,1) ⋅
-      (Some q,1) = (Some q,2); the count-1 equality case is the same
-      gmap/option arm the drop's OUT refutation already uses
-      (Some_included, then pos_included) — write the tok kit once
-      against that idiom.  Slot tie by match: None ⇒ qr = 1/2 (the
-      other half rides the bundle); Some q ⇒ q + qr = 1/2.
-    - Fragment accounting: during OUT one UNTAGGED fragment sits in Q
-      (the holder who has not parked yet).  Keep it a separate resource
-      from the pile: (r1) size S = o counts PILE fragments only; never
-      fold Q's fragment into the pile row.  Consistent with (r3): that
-      holder tags at its park with a generation above rb.1.  Neither
-      cover changes (both withdraw sites have the box IN, where Q does
-      not exist); o ≤ c stays free by validity.
-    - bref/bchain by ROLE is compatible with the two-spellings rule:
-      the difference is a capability (the fraction pins (dev,bno) for
-      the log layer; the chain reads them off the withdrawn cells), not
-      a compatibility flavor.  Exactly these two.
-    - Refutations unchanged: OUT at checkout = bown exclusivity (the
-      winner's from R vs Q's); OUT at drop = the count route (any second
-      tok, fractioned or None, overflows Some(_,1)).  pres ●, the γc half, the pile, ● S and the
-  γp/γd halves sit in the body's COMMON PREFIX outside the three arms;
-  IDLE adds only ● None (which forces o = 0 by validity).  The payload's
-  None-arm keeps the γd/γc halves (the tie must hold in IDLE).  bunpin
-  can drop to 0 (bpin, brelse, bunpin) and is a drop site.
+### 3.5 The six lemmas (each re-establishes (C), (D), Σ m = c)
 
-  BUMP and PARK are deposits: no cover needed (anchor_deposit is free);
-  they UPDATE their registers and export astamp/llb.
+  (a) withdraw_L1 (under L1; IN → OUT_L1).  Premises: `ctx_floor ξ Kd`,
+      `Td ≤ Kd` (L1's row); the cnt half at c; if c ≠ 0 the caller's
+      WHOLE unit `◯ m_D` (Σ m_D = c) with `ctx_floor ξ Kt`,
+      `max (dom m_D) ≤ Kt` (R1).  Cover: c = 0 ⇒ m = ∅ (Σ) ⇒ (D) gives
+      T ≤ Td; c = Σ m_D ⇒ m = m_D (pointwise ≤ and equal sums) ⇒ (D)
+      gives T ≤ Td ∨ T ∈ dom m_D.  OUT_L2 refuted: Q's fraction breaks
+      Σ.  P_hdr comes out at ξ; hdr_out := the unit (c = 1) / emp.
+      Sites: bget recycle (c = 0), iput's ref == 1 valid read (c = 1).
+  (b) deposit_L1 (under L1; OUT_L1 → IN).  Deposit P_hdr at the new
+      stamp T'; m := {[T' := 1]} (mint if c = 0, move if c = 1);
+      Td := T'; hand out `◯{[T' := 1]} ∗ llb T'`.  (C) left holds (m is
+      a singleton at T'); (D) via Td.  Sites: the recycle's re-park,
+      iput's re-deposit before its acquiresleep.
+  (c) ref_incr (under L1).  m ⊎= {[T := 1]}; cnt += 1; the new ref gets
+      the box's own `llb T`.  (C)/(D) untouched.
+  (d) ref_decr (under L1).  Present `◯ m_D` (Σ = 1); m -= m_D;
+      Td := max Td (max (dom m_D)); cnt -= 1.  (D) preserved (a removed
+      witness is now ≤ Td); the release folds Td by R2.  refs 1 → 0 IS
+      (d) — the content stays in the box.
+  (e) checkout (under L2; IN → OUT_L2).  Premises: my `◯ m_h` with
+      `ctx_floor ξ Kt`, `max (dom m_h) ≤ Kt` (R1 at the acquiresleep);
+      the payload's `slot_p ½ Tp` with `ctx_floor ξ Kp`, `Tp ≤ Kp` (R2);
+      the L2 token.  (C) gives T ≤ Kt ∨ T ≤ Kp.  OUT_L2 refuted by the
+      token; OUT_L1 refuted by Σ (my fraction vs c = 0, or vs the whole
+      unit in hdr_out).  Whole bundle out at ξ; Q := token ∗ ref ∗ the
+      slot_p half (A6.155).
+  (f) park (under L2; OUT_L2 → IN).  Q out; deposit P at T'; my fraction
+      moves to T'; Tp := T'; hand back the token, the ref at T',
+      `llb T'`, `slot_p ½ T'` for the `_in` releasesleep.  IN refuted by
+      the full valid cell; OUT_L1 refuted by P_rest's cell
+      (ctx_word4_excl_x).  The parker holds ONLY bio_locked and the
+      bundle, and that suffices (the park principle, §2).
 
-The four BioBox transition lemmas keep their shapes but their withdraw
-premises become: `astamp γa n T` for the body's n (delivered inside the
-lemma by the case split) `∗ ctx_floor ξ Kfl ∗ ⌜T ≤ Kfl⌝` — i.e. exactly
-`aguard` at the current generation, produced by TWO reusable cover
-lemmas (`box_cover_checkout`, `box_cover_drop`) stated once in the box
-file.  Delete the `□(∀ n T, …)` premises.
+### 3.6 Cases the register design needed agreement for — now by rows
 
-### 3.4 What this buys
+  - bump then own checkout (bget miss): (a)(b), then (e) with Tl := T'.
+  - cross-thread checkout after a park: (C) via Tp (R2 on the sleeplock).
+  - share W2 checks out after share W1 parked: W2's stamp is old, (C)'s
+    left disjunct fails, Tp covers.  No agreement.
+  - recycle after all refs gone: c = 0 ⇒ (D) ⇒ Td, which every (d)
+    raised past every park it owed.
+  - iput at ref == 1 holding the merged unit (SpecIput's inode_refp,
+    Σ m_D = 1): (a) with the unit's own max stamp, (b), acquiresleep at
+    Tl := T'.  No third tie arm, no re-bump.
+  - a SHARE parks (fileread's iunlock): its fraction moves to T'; (D)
+    via T' ∈ dom m; the stamp travels inside the share and merges into
+    the unit at fileclose.  (The register design had no unit for a
+    share to deposit — the R3 wall v2 removes.)
+  - "D never parked" vs "D parked": one lemma, (a); only max (dom m_D)
+    differs.
+  Boot: bio_init deposits the content (IN, m = ∅, stamp T_boot = the
+  boot hart's K⊔W); (C) is vacuous; (D) needs Td = T_boot, and the boot
+  hart cannot floor its own deposit, so L1 is minted WITH the fold: a
+  `newlock` twin over `lock_pay_intro_llb` (WpLock, ~10 lines).  Tp := 0.
 
-- No per-site freshness improvisation: every future withdraw site is
-  one of the two cover lemmas.
-- Both landed instruments (R1 llb-tier acquires; R2
-  lock_pay_intro_llb) are used, each in a fixed role: R1 cashes an llb
-  the withdrawer personally carries (fragment or own park); R2 delivers
-  floors that must cross threads (payload rows).  A6.149's "both stay"
-  becomes a rule instead of a shrug.
-- The registers are ghost_var pairs (γp, γd, γc), one enriched auth
-  (pres) and one auth gmultiset (the tags) — no new model arms, no Σ
-  churn beyond small per-box cmras (anchorR precedent).
+### 3.7 What v2 deletes / keeps (relative to A6.153–A6.157)
+
+DELETED: CtxAnchor.v (dead until §6; R-d), the pres kit, pile,
+tag_auth/tag_claim, reg_park/reg_drop as (n,T) registers, rows
+(r1)–(r3) and the tie, the IDLE arm, A6.157's b_disk half + split/join
++ buf_box_alloc's deposit, box_swap_drop_hand/pile and
+box_ref_drop_hand/pile (→ (d), (a)), bio_slot_res2's None-arm content
+(both arms: dev{qr} ∗ bno{qr}, q + qr = 1/2, the option-share match),
+the astamp rows.
+KEPT: the SleepLock relay (genl/genin tiers, R1-pre), the holdingsleep
+genl tier + ProofBwrite, bslp minus astamp (bown ∗ slot_p ½ Tp ∗
+ctx_floor ξ Tp), bcache_res2's floor slot, the camera bundle (one
+stampsG replaces presG/btagG/anchorG), A6.156's slot accessors and
+ProofBpin (refs++ is (c) exactly), ProofLogWrite's fragment rows (now
+`◯{[t := 1]} ∗ llb t`), the A6.154 site map.  bcache_scan2_recycle
+changes shape: (a) + three stores + (b).
 
 ## 4. Instance plans
 
-### 4.1 bcache (finish Phase 5) — rounds R1–R2
+### 4.1 bcache (finish Phase 5) — R1-pre (landed), R1', R2
 
 R1-pre (PREREQUISITE; measured 2026-09-01 by the build agent, design
   settled by the owner the same day): THE SLEEPLOCK PAYLOAD λ-FLIP, AS A
@@ -484,12 +362,12 @@ R1-pre (PREREQUISITE; measured 2026-09-01 by the build agent, design
   5's ctx_move_const test on every lock payload), not as a type: the
   bundle travels through the BOX, never through the sleeplock payload.
 
-  bcache INSTANTIATES [R ξ := bown ∗ ∃ np Tp, reg_park (np,Tp) ∗
-  astamp np Tp ∗ llb Tp ∗ ctx_floor ξ Tp] — the checkout's rp-case
-  cover — and releases through _in with [Rdep := the same row minus the
-  floor] and [tl := Tp] (the park's anchor_deposit export).  The boot
-  row (rp = (0,0)) needs astamp 0 0: BioInitAt already mints the anchors
-  before its sleeplock loop.
+  bcache INSTANTIATES (v2 form) [R ξ := bown ∗ ∃ Tp, slot_p ½ Tp ∗
+  ctx_floor ξ Tp] — the (C) right-disjunct cover for the checkout — and
+  releases through _in with [Rdep := bown ∗ slot_p ½ Tp] and [tl := Tp]
+  (the park's stamp; llb Tp from the deposit).  (The A6.153 landing had
+  an astamp row beside it; v2 drops it — §3.7.)  Boot: Tp := 0 with
+  ctx_floor_0 (§3.6); no anchor ordering constraint remains.
 
   THREADING (file list): SleepLock.v (sl_body at explicit ξ; _at forms
   of sl_free_hold/sleeplocked_q, ambient = cur_ctx instances; the open/
@@ -504,49 +382,49 @@ R1-pre (PREREQUISITE; measured 2026-09-01 by the build agent, design
   Gate: SleepLock cone green (the four sleeplock proofs + SleepLockAt +
   IcacheBoot/BioInitAt builders); then a -B round (interface change).
 
-R1 (design retrofit, small):
-  - Enrich bn_pres's cmra ((n_b,T_b) agree × positive); move ● into
-    buf_box_body's IN/OUT arms; IDLE keeps ● None.  (BioInv pres kit:
-    ~4 lemmas touched.)
-  - Add γp/γd/γc ghost_vars + the tag-multiset gname to bio_names; add
-    the reg halves, the pile, ● S and rows (r1)–(r3) + the tie to
-    buf_box_body's common prefix; add the astamp/llb/floor rows to the
-    sleeplock payload (the SleepLock record threading — this IS r77's
-    "NEXT" item, shaped as a payload row) and the rd/γc halves to
-    bio_slot_res2 (both arms).  Add CtxAnchor.astamp_le.
-  - Restate the four transitions' premises per §3.3; prove the two
-    cover lemmas.
-  Gate: BioBox/BioInv/SleepLock green.
-R2 (the cutover): ProofBread/ProofBrelse at the six measured sites
-  (A6.147 map): sites 1–4 become bcache_res2 payload cell ops; site 5 =
-  checkout (llb-tier acquiresleep with Tl := fragment's T_b); site 6 =
-  park + releasesleep row.  brelse's refs-- syncs reg_drop.  bio_ctx's
-  `<{ bcache_res bn V }>` takes the λ-flip (bcache_res2).  DELETE:
-  buf_escrow, escrow_recyc_*, buf_mid.
-  Gate: full -B round green (interface change ⇒ -B is mandatory,
-  r76's lesson).
+R1' (the v2 box; replaces R1 as landed in A6.153 — same BioInv slice):
+  BioInv's box section rewritten to §2/§3 (three arm shapes, rows
+  (C)/(D), Σ m = c, the six lemmas, boot v5: IN at T_boot); bref/bchain
+  to §3.3; bslp minus astamp; the ufrac/gmap kit (~40 lines: frag_sum,
+  whole-unit agreement `◯ m_D ≼ ● m ∧ Σ m_D = Σ m → m = m_D`, split/
+  merge, the move-stamp local update); the `newlock` twin over
+  lock_pay_intro_llb.  Gate: BioInv/BioInitAt/SleepLock cone green.
+R2 (the cutover): the A6.154 site map as written, with (a)–(f) in place
+  of the eight lemmas: sites 1–4 (the recycler) = (a) + three stores +
+  (b); site 5 = (e) at the genl_llb acquiresleep with Tl := max (dom m);
+  site 6 = (f) + the genin releasesleep; brelse's refs-- = (d) (no
+  withdraw at 0); bpin = (c); bunpin = (d).  bio_ctx's
+  `<{ bcache_res bn V }>` takes the λ-flip (bcache_res2).  DELETE the v1
+  escrow (buf_escrow(_body/_inv), escrow_swap_*, escrow_recyc_*,
+  buf_mid, buf_parked, buf_chain, bio_slot_res/bcache_scan/bcache_res v1
+  + accessors) and the register-design remnants (§3.7).
+  Gate: full -B round green (interface change ⇒ -B is mandatory).
 
 ### 4.2 icache escrow (Phase 4.5) — round R3
 
-DO NOT transfer the box "verbatim" onto the five arms.  First redo the
-A6.147-style measurement (every iInv icEscN site in
-ProofIget/Ilock/Iunlock/Iput + the Spec rows, with lock context), then
-apply the SPLIT:
-  - empty arm  → itable.lock payload (itable_res2 already exists —
-    the refs-0 custody rows), like bcache's IDLE.
-  - mid arm    → dissolves into payload ops under itable.lock (the
-    recycler runs inside the lock, as buf_mid died).
-  - held arm   → dies as an arm: iput's ip->valid read under
-    itable.lock becomes a drop-pattern withdraw/deposit pair (the
-    refcnt==1 read is IN-state by the same argument as bcache's drop).
-  - parked/out → the box's IN/OUT.  Q := ic_tok/ic_id ghost residue.
-Expected outcome: ic box = an instantiation of the SAME 3-arm shape;
-extract CtxBox.v now (rule of two) and re-express BioBox over it.
-Registers: bump under itable.lock (iget), park under ip->sleeplock
-(iunlock), drop-sync at iput's refs--.  The withdrawing fragment is the
-inode reference's existing genlo bundle — enrich the ic presence ghost
-the same way as bn_pres; DO NOT add new inode_* spellings (two-
-spellings rule: the holder form already carries cred_floor).
+NOT "isomorphic" (corrected 2026-09-01).  Two icache facts the register
+design could not express are exactly what v2's rows handle:
+  - SHARE HOLDERS PARK.  fileread/filewrite call ilock/iunlock on an
+    `inode_shr` (SpecIlock: ONE share, consumed), which carries no count
+    fragment.  v2: the share's fraction s carries its stamps (`◯ m`
+    beside live_fracc); its park moves them; (D) holds via dom m; the
+    debt merges back into the unit at fileclose and is paid by the unit
+    holder's (a)/(d).
+  - iput's ref == 1 valid read under itable.lock, then re-deposit: (a)
+    then (b) at a fresh stamp, then acquiresleep at Tl := T'.  No third
+    tie arm.
+Procedure: measure first (every iInv icEscN site in ProofIget/Ilock/
+Iunlock/Iput + the Spec rows, with lock context), then the SPLIT:
+  - empty arm  → refs-0 content stays in the box (R-a); the slot's
+    identity fractions in itable_res2.
+  - mid arm    → the recycler is (a) + stores + (b) under itable.lock.
+  - held arm   → iput's (a)/(b).
+  - parked/out → IN / OUT_L2; Q := ic_tok ∗ share-ref ∗ the slot_p half.
+P_hdr := valid; P_rest := the in-memory dinode fields.  Extract
+`CtxBox.v` NOW (rule of two) and re-express the bcache over it.  The
+reference spelling gains `∃ m, ◯ m ∗ llb (max (dom m))` beside
+live_fracc — ONE sweep of the inode_ref/inode_shr destructures to the
+final form (§5 rule 2); no other new inode_* spelling.
 Gate: -B green; ic_escrow's five-arm body and its ~13 open/swap lemmas
 deleted.
 
@@ -625,31 +503,43 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
 
 ## 5. Anti-sprawl process rules (additions to the §4 process law)
 
-1. The §1 allowed-forms law and the §2 three-arm law are LAW.  A need
-   that doesn't fit is an owner-ruling item, not a local extension.
-2. Two spellings per resource (holder/parked).  Interim wrappers are
-   forbidden; if a sweep is needed, sweep once to the final form.
-3. Freshness only by §3's registers + R1/R2.  No new floor routes, no
-   new acquire exports, no per-site inventions.
+1. The §1 allowed-forms law and the §2 arm/lemma law (three arm shapes,
+   six lemmas) are LAW.  A need that doesn't fit is an owner-ruling
+   item, not a local extension.
+2. Two spellings per resource (holder/parked); references have ONE
+   ghost-only spelling (§3.3).  Interim wrappers are forbidden; if a
+   sweep is needed, sweep once to the final form.
+3. Freshness only by rows (C)/(D) + R1/R2.  No new floor routes, no new
+   acquire exports, no per-site inventions.
 4. A premise you can't discharge means the DESIGN is wrong: stop,
    update this file (in place), get the ruling if Σ-level, then build.
 5. Site-map-first: before building any box client, write the table of
-   every inv-open site (lock context, transition, which register serves
-   its withdraw) and check every withdraw row has a cover.  The §3.3
-   bcache table is the template.  For any lock touched, apply the
+   every inv-open site (lock context, which of (a)–(f), which row
+   discharges its cover) and check every withdraw row has a cover.
+   A6.154 is the template.  For any lock touched, apply the
    `ctx_move_const` test to its payload (§4.4b): a const payload with
    cells is the is_ftable class and must be λ'd.
 6. This file is edited in place; the A6 log records history, not
    current design.
+7. TRIPWIRES (stop and come here if any fires):
+   - a seventh lemma on the box, a fourth arm shape, or a second
+     reference form;
+   - any per-site floor that is not "R1 at Tl := max (dom m)" or a
+     payload floor row;
+   - any need to AGREE a stamp between two holders — (C)/(D) with
+     Σ m = c make agreement unnecessary; if it seems needed, a row is
+     being maintained wrongly;
+   - anything ξ-indexed proposed for Q or for a reference;
+   - an arm without a cell that the park can meet (the IDLE lesson).
 
 ## 6. Post-endgame cleanup (do NOT do before SystemAdequacy is green)
 
 - Collapse the IcacheRef flavor zoo to the two-spellings rule
   (retire _bare/_gen intermediates with one final sweep).
-- Retire CtxAnchor routes the register design obsoleted at clients
-  (aguard_receipt stays — R1 uses it; aguard_boot stays for gen 0).
-- Delete ZZFloorProbe/scratch instruments; fold the A6.147–149
-  narrative into a short historical note pointing here.
+- Delete CtxAnchor.v and the dead presG/btagG/anchorG cameras (R-d).
+- Delete ZZFloorProbe/scratch instruments; fold the A6.147–A6.157
+  narrative into a short historical note pointing here; mark
+  tso-escrow-box-v2.md as the adoption record.
 
 ## Changelog
 
@@ -775,3 +665,20 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   buf_bundle_h (halve the None arm's b_disk row inline; the bundle stays
   one spelling); the boot deposit is wrapped in buf_box_alloc.  §2 IDLE
   comment and §3.3 amended in place.
+- 2026-09-01 (OWNER RULING — box v2 ADOPTED; rulings R-a..R-d of
+  tso-escrow-box-v2.md approved): §2/§3 rewritten.  The box has two
+  custody arms (IN / OUT_L2) plus the L1 out-window (OUT_L1 = hdr_out ∗
+  P_rest ξb — the amendment: the recycler's and iput's (a)…(b) window
+  needs an arm, and by the park principle it is an arm WITH cells);
+  the bundle splits P_hdr ∗ P_rest; six lemmas; freshness by the two
+  rows (C)/(D) over the stamped-shares cmra authR (gmapUR nat ufracR)
+  with Σ m = c; references are one ghost-only spelling; refs-0 content
+  stays in the box (A6.142 reversed); CtxAnchor retires.  The
+  deposit-register design (enriched pres, registers, tagged pile, rows
+  (r1)–(r3), the tie, IDLE, A6.157's b_disk half) is SUPERSEDED — it
+  could not express share-parks (fileread's iunlock) or iput's
+  re-deposit.  §4.1 re-pointed (R1' replaces R1; R2 over (a)–(f)), §4.2
+  corrected (not isomorphic — the two icache cases), §5 rule 7
+  tripwires, §6 updated.  Reviewer's own error acknowledged: the
+  A6.155/A6.157 vettings approved a park with no in-hand refutation and
+  then a cell patch — the §0 pattern in miniature.
