@@ -676,7 +676,7 @@ Section ProofSysOpenPublish.
 
   Lemma so_publish `{XI : CurCtx} (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)
       (gy : gname) (inum : mword 32) (ty : bv 16) (C : fcontent)
-      (pn : fpnames) (om : mword 32) (voff : mword 32) :
+      (pn : fpnames) (om : mword 32) (voff : mword 32) (lo tl : nat) :
     ↑fileipN ⊆ E -> ↑(offN .@ kf) ⊆ E ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
@@ -687,8 +687,10 @@ Section ProofSysOpenPublish.
     fc_writable C = trunc8 (so_wr_word om) ->
     (bv_unsigned ty = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
     off_wf voff ->
+    (lo <= tl)%nat ->
     (* the parent the walk kept, short by the share it lent ilock ... *)
-    inode_ref_short_gen kk (qi + s)%Qp qi icfg_dev inum gy -∗
+    TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗
+    IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi icfg_dev inum gy lo -∗
     (* ... its PROVENANCE UNIT, which travels with the parent into the fd
        slot's [cinv] and comes back out at fileclose's withdraw (item
        7a-wire, iclaim-ledger.md §5''.3's step 6: the fd slot is one of the
@@ -708,11 +710,13 @@ Section ProofSysOpenPublish.
     a_foff kf ↦₄ voff -∗
     |={E}=> file_ref gf kf 1 C.
   Proof.
-    intros HEi HEo Hkk Hinb Hip Hty Hwrb Hdir Hwf.
-    iIntros "Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hip Hoff".
+    intros HEi HEo Hkk Hinb Hip Hty Hwrb Hdir Hwf Hle.
+    iIntros "#Hfl Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hip Hoff".
     (* ---- the generation: name the returned share and pin it ---- *)
-    rewrite inode_shr_gen_intro. iDestruct "Hshr" as (g2) "Hshr".
-    iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr") as %<-.
+    rewrite inode_shr_gen_intro.
+    iDestruct "Hshr" as (g2 lo2 tl2) "(%Hle2 & #Hfl2 & Hshr)".
+    iDestruct (IcacheRef.inode_ref_short_shr_genlo_agree with "Hkeep Hshr")
+      as %[<- <-].
     (* ---- the parked reference: the parent, short by exactly [s] ---- *)
     iAssert (inode_held_short (ientry kk) s) with "[Hkeep Hru]" as "Hsh".
     { iExists kk, (qi + s)%Qp, qi, inum.
@@ -720,12 +724,15 @@ Section ProofSysOpenPublish.
       iSplitR; [iPureIntro; exact Hkk|].
       iSplitR; [iPureIntro; exact Hinb|].
       iSplitR; [iPureIntro; reflexivity|]. iFrame "Hru".
-      iApply (inode_ref_short_gen_forget with "Hkeep"). }
+      iApply (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hle
+                with "Hfl Hkeep"). }
     iAssert (inode_shr_held_gen (ientry kk) s gy) with "[Hshr]" as "Hs".
-    { iExists kk, inum.
+    { iExists kk, inum, lo, tl2.
       iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; exact Hkk|].
-      iSplitR; [iPureIntro; exact Hinb|]. iExact "Hshr". }
+      iSplitR; [iPureIntro; exact Hinb|].
+      iSplitR; [iPureIntro; exact Hle2|].
+      iFrame "Hfl2". iExact "Hshr". }
     (* ---- the FD-type witness, and it is [so_pay_witness] ---- *)
     iMod (inode_pay_alloc E (ientry kk) s gy (fc_wbool C) ty
             (so_pay_witness om ty C Hwrb Hdir) with "Hsh Hs Hshot")

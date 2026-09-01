@@ -849,8 +849,12 @@ Section FileInv.
   Proof.
     rewrite /inode_shr_held /inode_shr_held_gen.
     iIntros "(%k & %inum & %Hv & %Hk & %Hb & Hs)".
-    rewrite inode_shr_gen_intro. iDestruct "Hs" as (g) "Hs".
-    iExists g, k, inum. by iFrame.
+    rewrite inode_shr_gen_intro.
+    iDestruct "Hs" as (g lo tl) "(%Hle & #Hfl & Hs)".
+    iExists g, k, inum, lo, tl.
+    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+    iFrame "Hfl Hs".
   Qed.
 
   Lemma inode_held_shed_gen (v : mword 64) :

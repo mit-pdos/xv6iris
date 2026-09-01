@@ -1369,7 +1369,7 @@ Section FsCfgBootEra.
   Definition fs_kit_icache (ICFG : icfg) (FSC : fscfg) : iProp Σ :=
     ((* --- [icache_boot_at]'s ghost premises, in its own order --- *)
      own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
-     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) ∗
+     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
      ([∗ list] k ∈ seq 0 NINODE,
         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
      (* THE STOCKED POOL (R5): image-accurate before [userinit] runs, so
@@ -1400,7 +1400,7 @@ Section FsCfgBootEra.
   Lemma fs_kit_icache_open (ICFG : icfg) (FSC : fscfg) :
     fs_kit_icache ICFG FSC -∗
       own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
-      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) ∗
+      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
       ([∗ list] k ∈ seq 0 NINODE,
          sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
       ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
@@ -1549,7 +1549,7 @@ Section FsCfgBootEra.
       the vdisk [newlock_at] take between main+0x8e and +0xa2.             *)
   Definition fs_kit_icache_rest (ICFG : icfg) (FSC : fscfg) : iProp Σ :=
     (own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
-     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) ∗
+     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
      ([∗ list] k ∈ seq 0 NINODE,
         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
      ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
@@ -1587,7 +1587,7 @@ Section FsCfgBootEra.
   Lemma fs_kit_icache_rest_open (ICFG : icfg) (FSC : fscfg) :
     fs_kit_icache_rest ICFG FSC -∗
       own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
-      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) ∗
+      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
       ([∗ list] k ∈ seq 0 NINODE,
          sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
       ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗

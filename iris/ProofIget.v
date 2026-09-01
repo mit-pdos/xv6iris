@@ -1412,7 +1412,7 @@ Section ProofIget.
                       (mword_of_int 8 : mword 12) V1 (trap_res b + (K - 6))%nat
                       (itable_half (<[e := ((1/2/2)%Qp, 1%positive)]> M) ∗
                        isl_slot (<[e := ((1/2/2)%Qp, 1%positive)]> M) e ∗
-                       iref_tok e (1/2/2)%Qp ∗
+                       iref_tok0 e (1/2/2)%Qp ∗
                        (∃ g : gname, live_gen e (1/2) g ∗ ity_pending g) ∗
                        IcacheRef.frzsel e (1/2)%Qp false ∗
                        iname γi γfs inodestart inum l ∗
@@ -1681,7 +1681,10 @@ Section ProofIget.
             iApply ("Hcont2" $! mr e (1/2/2)%Qp with "[%] Hcg Hcnt Hpc [Htok2 Hid2] Hru Hlic").
             * split; [exact He|]. split; [exact Hmrs3|].
               split; [exact Hmrsp | exact Hmrcs].
-            * rewrite /IcacheRef.inode_ref. iFrame "Htok2 Hid2".
+            * rewrite /IcacheRef.inode_ref.
+              iDestruct "Htok2" as "(Hf2 & Hl2 & Hs2)".
+              iDestruct (IcacheRef.live_frac0_fracc with "Hl2") as "Hl2".
+              iFrame "Hf2 Hl2 Hs2 Hid2".
         - (* ===== the back edge to +0x44, at cursor [S j] ===== *)
           assert (Hfall : eq_vec (N1 !!! Regidx Rs1) (N1 !!! Regidx Ra3) = false).
           { rewrite Hcmp. by apply Nat.eqb_neq. }
@@ -2014,7 +2017,7 @@ Section ProofIget.
                   (mword_of_int 8 : mword 12) L4 (trap_res b + (K - 6))%nat
                   (itable_half (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) ∗
                    isl_slot (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) j ∗
-                   iref_tok j (qj'/2)%Qp ∗
+                   iref_tok0 j (qj'/2)%Qp ∗
                    IcacheRef.frzsel j (1/2)%Qp false ∗
                    iname γi γfs inodestart inum l ∗
                    icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ nj)) ∗
@@ -2206,7 +2209,10 @@ Section ProofIget.
         iSpecialize ("Hcont2" $! CIDh2 with "[]"); [ iPureIntro; wp_next_chain | ].
         iApply ("Hcont2" $! Z1 j (qj'/2)%Qp with "[%] Hcg Hcnt Hpc [Htok2 Hid2] Hru Hlic").
         + split; [exact Hk|]. split; [exact HZ1s3|]. split; [exact HZ1sp | exact HZ1cs].
-        + rewrite /IcacheRef.inode_ref. iFrame "Htok2 Hid2".
+        + rewrite /IcacheRef.inode_ref.
+          iDestruct "Htok2" as "(Hf2 & Hl2 & Hs2)".
+          iDestruct (IcacheRef.live_frac0_fracc with "Hl2") as "Hl2".
+          iFrame "Hf2 Hl2 Hs2 Hid2".
       - (* ===== A FREE SLOT: [bge x0,a5] is TAKEN, to +0x34 ===== *)
         assert (Hiw : iref_word M j = (mword_of_int 0 : mword 32))
           by (rewrite /iref_word HMj; reflexivity).

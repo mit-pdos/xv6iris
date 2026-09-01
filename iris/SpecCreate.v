@@ -483,7 +483,11 @@ Section CreateSpec.
           over) and hands it on to whichever of sys_open / sys_mkdir /
           sys_mknod releases the child. *)
        ifreeze_off (bv_unsigned inum) ∗
-       inode_ref_short_gen k (qi + s)%Qp qi dev inum g ∗
+       (* A6.145: the retained parent travels FLOORED (genlo + the carrier's
+          floor receipt), so the eventual forget can rebuild the credential *)
+       (∃ lo tl : nat,
+          ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+          inode_ref_short_genlo k (qi + s)%Qp qi dev inum g lo) ∗
        (* ...AND ITS PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md §5''.3).
           This bundle IS [SpecIunlockput]'s precondition, and since item
           7a-wire that precondition includes the unit the closing iput
@@ -509,7 +513,9 @@ Section CreateSpec.
     ic_loaded γfs γi cov logstart k inum dn bm -∗
     ity_shot g (di_type dn) -∗
     ifreeze_off (bv_unsigned inum) -∗
-    inode_ref_short_gen k (qi + s)%Qp qi dev inum g -∗
+    (∃ lo tl : nat,
+       ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+       inode_ref_short_genlo k (qi + s)%Qp qi dev inum g lo) -∗
     runit_any (bv_unsigned inum) -∗
     create_locked cn γfs γi cov logstart dev pidv k qi s g inum dn bm.
   Proof.

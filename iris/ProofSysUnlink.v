@@ -1238,13 +1238,16 @@ Section ProofSysUnlinkBody.
       destruct ok1.
       + (* ---------- the parent RESOLVED: the SEAM ---------- *)
         iDestruct "Hres1" as "(%Hnp & Hhelddp & Hir1)".
-        iDestruct "Hhelddp" as (kd qd dinum gyd)
-          "(%Hdpe & %Hkd & %Hdinumc & Hrefdp & #Hshotd & Hrud)".
+        iDestruct "Hhelddp" as (kd qd dinum gyd lod tld)
+          "(%Hdpe & %Hkd & %Hdinumc & %Hled & #Hfld &
+            Hrefdp & #Hshotd & Hrud)".
         assert (Hdpnz : dpv <> (zero_reg : mword 64))
           by (rewrite Hdpe; apply ientry_ne_zero; lia).
         iAssert (inode_held_ty dpv T_DIR) with "[Hrefdp Hrud]" as "Hhelddp".
-        { iExists kd, qd, dinum, gyd. iSplitR; [done |]. iSplitR; [done |].
-          iSplitR; [done |]. iFrame "Hrefdp Hrud". iExact "Hshotd". }
+        { iExists kd, qd, dinum, gyd, lod, tld.
+          iSplitR; [done |]. iSplitR; [done |].
+          iSplitR; [done |]. iSplitR; [done |]. iSplitR; [iExact "Hfld" |].
+          iFrame "Hrefdp Hrud". iExact "Hshotd". }
         iApply (wp_cbeqz_fall_s_sconf (CID := CID18)
                   (mword_of_int (SU + 0x2e)) (mword_of_int 90 : mword 8)
                   (Cregidx (mword_of_int 2)) Ra0 N4 (K - 30)%nat b
@@ -1834,15 +1837,18 @@ Section ProofSysUnlinkBody.
        one-shot names.  That is what lets [ity_shot_agree] below turn
        nameiparent's promise into [di_type dnd = T_DIR] at ilock's own
        record, which is dirlookup's first premise. ---- *)
-    iDestruct "Hheld" as (kd qd dinum gyd)
-      "(%Hdpe & %Hkd & %Hdinumc & Hrefdp & #Hshotd & Hrud)".
+    iDestruct "Hheld" as (kd qd dinum gyd lod tld)
+      "(%Hdpe & %Hkd & %Hdinumc & %Hled & #Hfld &
+        Hrefdp & #Hshotd & Hrud)".
     assert (Hdinb : bv_unsigned dinum < 16 * Z.of_nat nib)
       by (rewrite Hcnib; exact Hdinumc).
     destruct (Hiregb dinum Hdinb) as [Hdiblk Hdiblog].
     iEval (rewrite -Hcdev) in "Hrefdp".
-    iEval (rewrite su_shed_gen) in "Hrefdp".
+    iEval (rewrite IcacheRef.inode_ref_genlo_shed) in "Hrefdp".
     iDestruct "Hrefdp" as "[Hkeepd Hshrd]".
-    iDestruct (inode_ref_short_gen_forget with "Hkeepd") as "Hkeepd".
+    iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshrd") as "Hshrd".
+    iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hled
+                 with "Hfld Hkeepd") as "Hkeepd".
     iDestruct (su_esc_acc cn gfs gi cov logstart kd Hkd with "Hescrows")
       as "#Hescd".
     iDestruct (su_slk_acc cn kd Hkd with "Hslks") as (gild gisld) "#Hslkd0".
@@ -3788,10 +3794,12 @@ Section ProofSysUnlinkBody.
     (* ip's reference: generation NAMED (the share ilock consumes and the
        one-shot it returns must agree), then shed *)
     iEval (rewrite inode_ref_gen_intro) in "Hchild".
-    iDestruct "Hchild" as (gyi) "Hchild".
-    iEval (rewrite su_shed_gen) in "Hchild".
+    iDestruct "Hchild" as (gyi loyi tlyi) "(%Hleyi & #Hflyi & Hchild)".
+    iEval (rewrite IcacheRef.inode_ref_genlo_shed) in "Hchild".
     iDestruct "Hchild" as "[Hkeepi Hshri]".
-    iDestruct (inode_ref_short_gen_forget with "Hkeepi") as "Hkeepi".
+    iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshri") as "Hshri".
+    iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hleyi
+                 with "Hflyi Hkeepi") as "Hkeepi".
     iDestruct (su_esc_acc cn gfs gi cov logstart kd Hkd with "Hescrows")
       as "#Hescd".
     iDestruct (su_esc_acc cn gfs gi cov logstart ks Hks with "Hescrows")

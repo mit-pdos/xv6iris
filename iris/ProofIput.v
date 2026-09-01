@@ -1002,7 +1002,10 @@ Section IputTail.
     iIntros "#Htext #Hlock #Hinv #Hesc #Hireg Hpc Hcg Hcnt Hpay Hextc Hextm Htok
              Hhalf Hiauth Hipool Hslots Hpool Href Hru Hgreg Hr24 Hr16 Hr8 Hg4 Hg5 Hg6
              Hppid Hbms Hins Hbslots Hop Hcont".
-    iDestruct "Href" as "[Hrtok Hrident]".
+    iDestruct "Href" as "(Hrfrag & Hrlv & Hrslh & Hrident)".
+    iDestruct (IcacheRef.live_fracc_frac with "Hrlv") as "Hrlv".
+    iAssert (iref_tok k q) with "[Hrfrag Hrlv Hrslh]" as "Hrtok";
+      [ rewrite /iref_tok; iFrame |].
     iDestruct (iref_lookup with "Hhalf Hrtok") as %(qt & cnt & HMk & Hqt1 & Hone & Hone').
     iDestruct (ip_ref_sub with "Hhalf Hrtok") as %(qt2 & cnt2 & HMk2 & Hsubq).
     rewrite HMk in HMk2. injection HMk2 as <- <-.
@@ -3882,7 +3885,10 @@ Section IputFreePath.
        MINT at +0x50 flips. *)
     iDestruct "Hslot" as "(Hrest & Hiu & Hgid & Hcnt1 & Hpark)".
     iDestruct (fe_rest_sum with "Hrest") as %[qr Hsum].
-    iDestruct "Href" as "[Hrtok Hrident]".
+    iDestruct "Href" as "(Hrfrag & Hrlv & Hrslh & Hrident)".
+    iDestruct (IcacheRef.live_fracc_frac with "Hrlv") as "Hrlv".
+    iAssert (iref_tok k q) with "[Hrfrag Hrlv Hrslh]" as "Hrtok";
+      [ rewrite /iref_tok; iFrame |].
     iAssert (⌜cdev = dev /\ cinum = inum⌝)%I as %[-> ->].
     { iEval (rewrite /islot_rest_at) in "Hrest".
       destruct (1/2 - q)%Qp as [q'|] eqn:Et; [| iDestruct "Hrest" as "[]"].
@@ -4049,13 +4055,24 @@ Section IputFreePath.
         iSplitL "Hrest"; [iExact "Hrest" |].
         iApply (frz_park_intro_off with "Hmirf Hself"). }
       iDestruct "Hex" as "[HcA _]".
+      iApply fupd_wp.
+      iDestruct "Hrtok" as "(Hrfrg1 & Hrlv1 & Hrslh1)".
+      iDestruct "Hrlv1" as (g1) "Hrlv1".
+      iDestruct "Hrlv1" as (lo1) "Hrlv1".
+      iMod (iref_share_pin0 ⊤ k q g1 lo1 ltac:(solve_ndisj) Hk
+              with "Hitinv Hrlv1") as "[%Hlo10 Hrlv1]".
+      subst lo1.
+      iModIntro.
       iApply ("HcA" $! F1 vg4 vg5 vg6
                 with "[%] [%] Hcg Hcnt Hpay Hextc Hclm Hpc Htok Hhalf Hiauth Hipool
-                      Hslots Hpool [Hrtok Hrident] Hropen Hbms Hins Hppid Hbslots Hvlb
+                      Hslots Hpool [Hrfrg1 Hrlv1 Hrslh1 Hrident] Hropen Hbms Hins
+                      Hppid Hbslots Hvlb
                       Hcrd Hop Hr1 Hr2 Hr3 Hg4 Hg5 Hg6").
       { exact HF1regs. }
       { exact HF1a5. }
-      { rewrite /IcacheRef.inode_ref. iFrame. } }
+      { rewrite /IcacheRef.inode_ref.
+        iFrame "Hrfrg1 Hrslh1 Hrident".
+        iApply IcacheRef.live_frac0_fracc. by iExists g1. } }
     (* ===== valid == 1: fall through, WITH the payload in hand ===== *)
     iDestruct "Hrem" as "(Hrd & Htd & Hvb & (%ga & Hpayl & Hoff & Hlvh))".
     iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.iput + 0x3c))
@@ -4426,13 +4443,24 @@ Section IputFreePath.
       assert (HG2a5 : G2 !!! Regidx Ra5 = sign_extend' 64 (iref_word Mt k)).
       { rewrite /G2 upd_ne; [| nz]. rewrite /G1 upd_ne; [| nz]. exact HF4a5. }
       iDestruct "Hex" as "[HcA _]".
+      iApply fupd_wp.
+      iDestruct "Hrtok" as "(Hrfrg1 & Hrlv1 & Hrslh1)".
+      iDestruct "Hrlv1" as (g1) "Hrlv1".
+      iDestruct "Hrlv1" as (lo1) "Hrlv1".
+      iMod (iref_share_pin0 ⊤ k q g1 lo1 ltac:(solve_ndisj) Hk
+              with "Hitinv Hrlv1") as "[%Hlo10 Hrlv1]".
+      subst lo1.
+      iModIntro.
       iApply ("HcA" $! G2 (m !!! Regidx Rs2) vg5 (m !!! Regidx Rs4)
                 with "[%] [%] Hcg Hcnt Hpay Hextc Hclm Hpc Htok Hhalf Hiauth Hipool
-                      Hslots Hpool [Hrtok Hrd Hrn] Hropen Hbms Hins Hppid Hbslots Hvlb
+                      Hslots Hpool [Hrfrg1 Hrlv1 Hrslh1 Hrd Hrn] Hropen Hbms Hins
+                      Hppid Hbslots Hvlb
                       Hcrd Hop Hr1 Hr2 Hr3 Hg4 Hg5 Hg6").
       { exact HG2regs. }
       { exact HG2a5. }
-      { rewrite /IcacheRef.inode_ref /IcacheRef.inode_ident. iFrame. } }
+      { rewrite /IcacheRef.inode_ref /IcacheRef.inode_ident.
+        iFrame "Hrfrg1 Hrslh1 Hrd Hrn".
+        iApply IcacheRef.live_frac0_fracc. by iExists g1. } }
     (* ===== nlink == 0: fall through at 0x4e -- the FREE path ===== *)
     iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.iput + 0x4e))
               (mword_of_int 63 : mword 8) (Cregidx (mword_of_int 6)) Ra4
@@ -4894,8 +4922,9 @@ Section ProofIput.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     (* ===== the critical section (literal [false]) ===== *)
     iDestruct "HRres" as (Mt ci) "(Hhalf & %Hwf & %Hciwf & Hiauth & Hipool & Hslots & Hpool)".
-    iDestruct "Href" as "[Hrtok Hrident]".
-    iDestruct (iref_lookup with "Hhalf Hrtok") as %(qt & cnt & HMk & Hqt1 & Hone & Hone').
+    iDestruct "Href" as "(Hrfrag & Hrlv & Hrslh & Hrident)".
+    iDestruct (iref_frag_lookup with "Hhalf Hrfrag")
+      as %(qt & cnt & HMk & Hqt1 & Hone & Hone').
     pose proof (icM_wf_count Mt k qt cnt Hwf HMk) as Hcntb.
     assert (Hiw : iref_word Mt k = (mword_of_int (Z.pos cnt) : mword 32))
       by (rewrite /iref_word HMk; reflexivity).
@@ -4987,7 +5016,8 @@ Section ProofIput.
                 ltac:(cbn; lia) ltac:(lia) ltac:(reflexivity)
                 ltac:(discriminate) ltac:(intros _; reflexivity) ltac:(lkbelow)
                 with "Htext Hitab Hinv Hesc Hireg Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hipool Hslots
-                      Hpool [Hrtok Hrident] Hru Hropen Hr24 Hr16 Hr8 Hg4 Hg5 Hg6 Hppid Hbms Hins
+                      Hpool [Hrfrag Hrlv Hrslh Hrident] Hru Hropen Hr24 Hr16 Hr8
+                      Hg4 Hg5 Hg6 Hppid Hbms Hins
                       Hbslots Hop Hcont").
       rewrite /IcacheRef.inode_ref. iFrame. }
 
@@ -5029,7 +5059,7 @@ Section ProofIput.
               Hfresh Hitne
               with "Hcg Hcnt Hpay Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlogc
                     Hitab Hinv Hesc Htok Hhalf Hiauth Hipool Hslots Hpool
-                    [Hrtok Hrident] Hslk Hireg Hropen Hbms Hins Hbmi Hppid
+                    [Hrfrag Hrlv Hrslh Hrident] Hslk Hireg Hropen Hbms Hins Hbmi Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hbslots Hlb0 Hcrd Hop
                     Hr24 Hr16 Hr8 Hg4 Hg5 Hg6 [-]").
     { rewrite /IcacheRef.inode_ref. iFrame. }

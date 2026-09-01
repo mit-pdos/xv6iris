@@ -1730,8 +1730,9 @@ Section ProofFilewrite.
        names below are local to the iteration and everything derived from
        them is re-derived on the next one. ---- *)
     iDestruct (fileread_pay_carve gf kx qx Cf (or_introl Htyi) with "Hrpay")
-      as (ik inum sh g ty γox)
-         "(%P8 & %P9 & %P5 & %P10 & #Hty & Hshr & Hoh & Hpayback)".
+      as (ik inum sh g ty γox lox tlx)
+         "(%P8 & %P9 & %P5 & %P10 & %Hlex & #Hflx & #Hty & Hshr & Hoh &
+           Hpayback)".
     assert (P3 : IBLOCK inum (fwn_inodestart fn) ∈ fwn_cov fn)
       by (apply P3q; exact P5).
     assert (P4 : IBLOCK inum (fwn_inodestart fn)
@@ -1834,8 +1835,9 @@ Section ProofFilewrite.
     (* THE SHARE, HALVED (fs-icache 17.3): ilock is lent [s/2] and the
        retained half's [live_gen] is what pins the generation of the share
        iunlock hands back ([fw_shr_regen] on the way out). *)
-    iEval (rewrite fw_shr_gen_halve) in "Hshr".
+    iEval (rewrite (IcacheRef.inode_shr_genlo_halve ik sh)) in "Hshr".
     iDestruct "Hshr" as "[Hshrk Hshrl]".
+    iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshrl") as "Hshrl".
     iEval (rewrite fw_bslots3) in "Hbsl".
     iDestruct "Hbsl" as "[Hbsl1 Hbsl2]".
     iDestruct (proc_priv_core_bare_acc (proc_addr jx) pidv (upd_upt V PI) with "Hpriv")
@@ -2335,7 +2337,7 @@ Section ProofFilewrite.
     all: try lkbelow.
     { rewrite Htyq. iExact "Hshot". }
     iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshrb".
-    iDestruct (inode_shr_gen_forget with "Hshrb") as "Hshrb".
+
     iDestruct ("Hpbk3" with "Hppid") as "Hpriv".
     assert (Hpcbc : ret_pc (X2 !!! Regidx Rra) = mword_of_int (FW + 0xc4)).
     { rewrite HX2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2349,9 +2351,11 @@ Section ProofFilewrite.
     { rewrite (callee_saved_lookup Hcsiu_cs Rs1 ltac:(vm_compute; reflexivity)).
       exact HX2s1. }
     (* THE SHARE, WHOLE AGAIN, at the generation the retained half names *)
-    iDestruct (fw_shr_regen ik (sh / 2)%Qp (sh / 2)%Qp
-                 icfg_dev inum g with "Hshrk Hshrb") as "Hshr".
-    iEval (rewrite fw_qp_halves) in "Hshr".
+    iDestruct (IcacheRef.inode_shr_gen_pin_on_keep
+                 with "Hshrk Hshrb") as "[Hshrk Hshrb]".
+    iAssert (IcacheRef.inode_shr_genlo ik sh icfg_dev inum g lox)
+      with "[Hshrk Hshrb]" as "Hshr".
+    { rewrite (IcacheRef.inode_shr_genlo_halve ik sh). iFrame. }
     (* ...and back into the payload it came from.  From here the reference is
        intact again and the postcondition carries no share at all. *)
     iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".

@@ -423,9 +423,10 @@ Section FwShare.
   Proof.
     iIntros "Hkeep Hback".
     iEval (rewrite inode_shr_gen_intro) in "Hback".
-    iDestruct "Hback" as (g') "Hback".
+    iDestruct "Hback" as (g2 lo2 tl2) "(%Hle2 & #Hfl2 & Hback)".
     iDestruct "Hkeep" as "(Hid9 & Hlv1 & Hs1)".
     iDestruct "Hback" as "(Hida & Hlv2 & Hs2)".
+    iAssert (live_gen k s2 g2) with "[Hlv2]" as "Hlv2"; [by iExists lo2|].
     iDestruct (live_gen_agree with "Hlv1 Hlv2") as %<-.
     rewrite /inode_shr_gen inode_ident_split live_gen_split slh_tok_split. iFrame.
   Qed.

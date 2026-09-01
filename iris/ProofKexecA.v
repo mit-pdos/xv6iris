@@ -1057,7 +1057,8 @@ Section KexecABody.
        ([IcacheRef.inode_shr_gen]); the conversion is the one every existing
        caller does ([inode_shr_gen_intro] -- SpecIlock's own porting note). *)
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
-    iDestruct "Hshr" as (gy) "Hshr".
+    iDestruct "Hshr" as (gy loy tly) "(%Hley & #Hfly & Hshr)".
+    iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
     assert (Hib' : bv_unsigned inum < 16 * Z.of_nat nib)
       by (rewrite Hnib; exact Hib).
     destruct (Hiregb inum Hib') as [Hibc Hibl].

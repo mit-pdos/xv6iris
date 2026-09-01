@@ -2623,7 +2623,10 @@ Section ProofNamexTrMain.
                    iDestruct (cpu_claim_ext_transport CIDt CIDV2 eb (proc_addr j)
                                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                    iEval (rewrite inode_shr_gen_intro) in "Hshr".
-                   iDestruct "Hshr" as (gsh) "Hshr".
+                   iDestruct "Hshr" as (gsh losh tlsh)
+                     "(%Hlesh & #Hflsh & Hshr)".
+                   iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr")
+                     as "Hshr".
                    (* NAME THE RETAINED PARENT'S GENERATION TOO (fs-log.md
                       §G.24).  The share and the short parent are two slices
                       of one slot, so [live_gen_agree] pins them to ONE
@@ -2631,9 +2634,10 @@ Section ProofNamexTrMain.
                       ilock's one-shot against the reference it re-forms,
                       since iunlock hands the share back generation-ERASED. *)
                    iEval (rewrite inode_ref_short_gen_intro) in "Hkeep".
-                   iDestruct "Hkeep" as (gkp) "Hkeep".
-                   iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr")
-                     as %->.
+                   iDestruct "Hkeep" as (gkp lokp tlkp)
+                     "(%Hlekp & #Hflkp & Hkeep)".
+                   iDestruct (inode_ref_short_genlo_shr_gen_agree
+                                with "Hkeep Hshr") as %->.
                    iApply (IL.wp_ilock_sconf gs j gl gu gd gk pd pav pu bn
                              gfs gi cn gilk gislk cov logstart inodestart nib
                              ik (iq/2)%Qp gsh PlainK dev iinum pidv dq dqs
@@ -2854,8 +2858,8 @@ Section ProofNamexTrMain.
                      iDestruct (cpu_claim_ext_transport CIDil CIDN2 eb (proc_addr j)
                                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                      iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
-                     iDestruct (inode_ref_short_gen_forget with "Hkeep")
-                       as "Hkeep2".
+                     iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _
+                                  Hlekp with "Hflkp Hkeep") as "Hkeep2".
                      iApply (IUP.wp_iunlockput_gen gs j gl gu gd gk pd pav pu
                                bn g gfs gi cn gtl gilk gislk cov logstart
                                bmapstart inodestart nib size dev
@@ -3466,7 +3470,8 @@ Section ProofNamexTrMain.
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
                            iDestruct (cpu_claim_ext_transport CIDdl CIDG8 eb (proc_addr j)
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-                           iDestruct (inode_ref_short_gen_forget with "Hkeep")
+                           iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _
+                                        _ _ Hlekp with "Hflkp Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_gen gs j gl gu gd gk
                                      pd pav pu bn g gfs gi cn gtl gilk gislk
@@ -3724,7 +3729,8 @@ Section ProofNamexTrMain.
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
                            iDestruct (cpu_claim_ext_transport CIDdl CIDG8 eb (proc_addr j)
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-                           iDestruct (inode_ref_short_gen_forget with "Hkeep")
+                           iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _
+                                        _ _ Hlekp with "Hflkp Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_gen gs j gl gu gd gk
                                      pd pav pu bn g gfs gi cn gtl gilk gislk
@@ -3969,8 +3975,8 @@ Section ProofNamexTrMain.
                      iDestruct (cpu_claim_ext_transport CIDil CIDN2 eb (proc_addr j)
                                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                      iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
-                     iDestruct (inode_ref_short_gen_forget with "Hkeep")
-                       as "Hkeep2".
+                     iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _
+                                  Hlekp with "Hflkp Hkeep") as "Hkeep2".
                      iApply (IUP.wp_iunlockput_gen gs j gl gu gd gk pd pav pu
                                bn g gfs gi cn gtl gilk gislk cov logstart
                                bmapstart inodestart nib size dev

@@ -1886,9 +1886,9 @@ Section ProofFileread.
                 of the off FAMILY by the slot THIS CONTRACT names. ---- *)
              iDestruct (fileread_pay_carve γf k q Cf (or_introl Htyi)
                           with "Hrpay")
-               as (ikk inm ssh gsh ty0 γox)
-                  "(%Hipk & %Hik & %Hinlt & %Hnd0 & #Hshot0 & Hshr0 & Hoh &
-                    Hpayback)".
+               as (ikk inm ssh gsh ty0 γox losh tlsh)
+                  "(%Hipk & %Hik & %Hinlt & %Hnd0 & %Hlesh & #Hflsh &
+                    #Hshot0 & Hshr0 & Hoh & Hpayback)".
              assert (Hibcov : IBLOCK inm (frn_inodestart fn) ∈ frn_cov fn)
                by (apply Hgeo; exact Hinlt).
              iDestruct (ic_escrows_acc2 (frn_ic fn) (frn_fs fn) (frn_ireg fn)
@@ -1901,7 +1901,7 @@ Section ProofFileread.
                 pinned on the way back, and the kept half is what pins it
                 ([inode_shr_regen2]).  filestat and filewrite both do
                 exactly this. *)
-             iEval (rewrite inode_shr_gen_halve2) in "Hshr0".
+             iEval (rewrite IcacheRef.inode_shr_genlo_halve) in "Hshr0".
              iDestruct "Hshr0" as "[Href Hkeep]".
              assert (HB7a0 : B7 !!! Regidx Ra0 = fnode k).
              { rewrite /B7 upd_ne; [| vm_compute; discriminate].
@@ -2012,6 +2012,7 @@ Section ProofFileread.
                 the payload's slice already does, so nothing has to be
                 introduced here -- the [inode_shr_gen_intro] this call used
                 to open with is gone with the caller-supplied [inode_shr]. *)
+             iDestruct (IcacheRef.inode_shr_genlo_gen with "Href") as "Href".
              iApply (Ilock.wp_ilock_sconf γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) (frn_ireg fn) (frn_ic fn)
@@ -2452,16 +2453,15 @@ Section ProofFileread.
                                 Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
                 all: try lkbelow.
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
-                iDestruct (inode_shr_gen_forget with "Hrefout") as "Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
-                (* THE GATHER: iunlock gives the half back WITHOUT its
-                   generation; the half that never left pins it
-                   ([IcacheRef.live_gen_agree], inside [inode_shr_regen2]),
-                   and the payload takes the whole slice back.  From here the
-                   reference is intact again. *)
-                iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp
-                             icfg_dev inm gsh with "Hkeep Hrefout") as "Hshr".
-                iEval (rewrite Qp.div_2) in "Hshr".
+                (* THE GATHER (A6.145): the kept half PINS the returned
+                   half's (g, lo) by agreement; the genlo halves rejoin. *)
+                iDestruct (IcacheRef.inode_shr_gen_pin_on_keep
+                             with "Hkeep Hrefout") as "[Hkeep Hrefout]".
+                iAssert (IcacheRef.inode_shr_genlo ikk ssh icfg_dev inm
+                           gsh losh)
+                  with "[Hkeep Hrefout]" as "Hshr".
+                { rewrite (IcacheRef.inode_shr_genlo_halve ikk ssh). iFrame. }
                 iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x5a)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2735,16 +2735,15 @@ Section ProofFileread.
                                 Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
                 all: try lkbelow.
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
-                iDestruct (inode_shr_gen_forget with "Hrefout") as "Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
-                (* THE GATHER: iunlock gives the half back WITHOUT its
-                   generation; the half that never left pins it
-                   ([IcacheRef.live_gen_agree], inside [inode_shr_regen2]),
-                   and the payload takes the whole slice back.  From here the
-                   reference is intact again. *)
-                iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp
-                             icfg_dev inm gsh with "Hkeep Hrefout") as "Hshr".
-                iEval (rewrite Qp.div_2) in "Hshr".
+                (* THE GATHER (A6.145): the kept half PINS the returned
+                   half's (g, lo) by agreement; the genlo halves rejoin. *)
+                iDestruct (IcacheRef.inode_shr_gen_pin_on_keep
+                             with "Hkeep Hrefout") as "[Hkeep Hrefout]".
+                iAssert (IcacheRef.inode_shr_genlo ikk ssh icfg_dev inm
+                           gsh losh)
+                  with "[Hkeep Hrefout]" as "Hshr".
+                { rewrite (IcacheRef.inode_shr_genlo_halve ikk ssh). iFrame. }
                 iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x5a)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }

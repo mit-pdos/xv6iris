@@ -40,6 +40,7 @@ Require Import FsBlocks LogInv.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import IcacheRef.
+Require Import IcacheInv.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
 Require Import CodeIunlockput.
@@ -276,7 +277,10 @@ Section ProofIunlockputMain.
                     Hprocs Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz").
     all: try lkbelow.
     iIntros (CID8 Hq8 mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr".
-    iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
+    iApply fupd_wp.
+    iMod (inode_shr_gen_pin0 ⊤ k s dev inum gy ltac:(solve_ndisj) Hk
+            with "Hitbl Hshr") as "Hshr".
+    iModIntro.
     assert (Hpc10 : ret_pc (R4 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlockput + 0x10))
       by (rewrite HR4ra; pcw).

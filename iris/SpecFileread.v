@@ -598,8 +598,11 @@ Section SpecFileread.
   Proof.
     iIntros "H1 H2".
     iEval (rewrite IcacheRef.inode_shr_gen_intro) in "H2".
-    iDestruct "H2" as (g2) "H2".
-    iDestruct "H1" as "(Hid1 & Hlv1 & Hs1)". iDestruct "H2" as "(Hid2 & Hlv2 & Hs2)".
+    iDestruct "H2" as (g2 lo2 tl2) "(%Hle2 & #Hfl2 & H2)".
+    iDestruct "H1" as "(Hid1 & Hlv1 & Hs1)".
+    iDestruct "H2" as "(Hid2 & Hlv2 & Hs2)".
+    iAssert (IcacheRef.live_gen ik s2 g2) with "[Hlv2]" as "Hlv2";
+      [by iExists lo2|].
     iDestruct (IcacheRef.live_gen_agree with "Hlv1 Hlv2") as %<-.
     rewrite inode_shr_gen_split2. iFrame.
   Qed.
@@ -634,14 +637,16 @@ Section SpecFileread.
     fc_type Cf = FD_INODE \/ fc_type Cf = FD_DEVICE ->
     file_pay γf k q Cf -∗
     ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16)
-      (γx : gname),
+      (γx : gname) (lo tl : nat),
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
       ⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
+      ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
       IcacheRef.ity_shot g ty ∗
-      IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
+      IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo ∗
       off_hold γf k γx true q ∗
-      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ off_hold γf k γx true q -∗
+      (IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo -∗
+         off_hold γf k γx true q -∗
          file_pay γf k q Cf).
   Proof.
     intros Hty. iIntros "(%pn & Hpn & Hpl)".
@@ -657,10 +662,12 @@ Section SpecFileread.
     assert (Harm : file_armed Cf = true) by (rewrite /file_armed; exact Hyes).
     rewrite /file_payload /file_core Hnp Hyes Harm /inode_pay.
     iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
-    iDestruct "Hs" as (ik inum) "(%Hipk & %Hik & %Hinb & Hshr)".
+    iDestruct "Hs" as (ik inum lo tl)
+      "(%Hipk & %Hik & %Hinb & %Hle & #Hfl & Hshr)".
     iDestruct "Hwt" as (ty) "[#Hshot %Hnd]".
-    iExists ik, inum, (q * fp_iq pn)%Qp, (fp_ig pn), ty, (fp_ocv pn).
+    iExists ik, inum, (q * fp_iq pn)%Qp, (fp_ig pn), ty, (fp_ocv pn), lo, tl.
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|]. iSplitR; [iExact "Hfl"|].
     iSplitR; [iExact "Hshot"|].
     (* [iExact], not [iFrame]: both sides are the same FOLDED
        [IcacheRef.inode_shr_gen] and conversion closes it, while the [Frame]
@@ -671,7 +678,8 @@ Section SpecFileread.
     rewrite /file_payload /file_core Hnp Hyes Harm /inode_pay.
     iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
-    iSplitL "Hshr"; [iExists ik, inum; iFrame "%"; iExact "Hshr"|].
+    iSplitL "Hshr";
+      [iExists ik, inum, lo, tl; iFrame "% Hfl"; iExact "Hshr"|].
     iExists ty. iSplitR; [iExact "Hshot"|]. done.
   Qed.
 

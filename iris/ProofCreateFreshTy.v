@@ -566,10 +566,12 @@ Proof.
     iEval (rewrite inode_ref_shed) in "Href".
     iDestruct "Href" as "[Hkeep Hshr]".
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
-    iDestruct "Hshr" as (gsh) "Hshr".
+    iDestruct "Hshr" as (gsh losh tlsh) "(%Hlesh & #Hflsh & Hshr)".
     iEval (rewrite inode_ref_short_gen_intro) in "Hkeep".
-    iDestruct "Hkeep" as (gkp) "Hkeep".
-    iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr") as %->.
+    iDestruct "Hkeep" as (gkp lokp tlkp) "(%Hlekp & #Hflkp & Hkeep)".
+    iDestruct (inode_ref_short_shr_genlo_agree with "Hkeep Hshr") as %[-> ->].
+    iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
+    iDestruct (IcacheRef.inode_ref_short_genlo_gen with "Hkeep") as "Hkeep".
     iDestruct (cpu_own_transport CID4 CID7 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Hil CID7 XI γs j γl γu γd γk pd pav pu bn γfs γi cn gilc gislc cov logstart

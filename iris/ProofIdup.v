@@ -382,6 +382,7 @@ Section ProofIdup.
        one opens [itable_inv] and closes it again with nothing moved, so it is
        a fupd where [iref_lookup] was a pure wand -- hence the [fupd_wp]. *)
     iDestruct "Href" as "(Hrident & Hrlive & Hrslh)".
+    iDestruct (IcacheRef.live_fracc_frac with "Hrlive") as "Hrlive".
     iApply fupd_wp.
     iMod (iref_share_lookup_au ⊤ M k s ltac:(solve_ndisj) Hk
             with "Hinv Hhalf Hrlive") as "(%HMk0 & Hhalf & Hrlive)".
@@ -524,7 +525,7 @@ Section ProofIdup.
               (mword_of_int 8 : mword 12) D2 (trap_res b + (K - 4))%nat
               (itable_half (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ∗
                isl_slot (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) k ∗
-               iref_tok k (qr/2)%Qp ∗ live_frac k s ∗
+               iref_tok0 k (qr/2)%Qp ∗ live_frac0 k s ∗
                frzm_h (bv_unsigned inum) false ∗
                icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ cnt)) ∗
                runit false (bv_unsigned inum) ∗ runit false (bv_unsigned inum))%I
@@ -798,11 +799,17 @@ Section ProofIdup.
     iDestruct (cpu_own_transport CIDr CIDe6 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe6 with "[]"); [ iPureIntro; wp_next_chain | ].
+    (* A6.145 interim: the AU handed the ride back PINNED (zero epoch), so
+       the fracc rebuild is free. *)
+    iDestruct (IcacheRef.live_frac0_fracc with "Hrlive") as "Hrlive".
     iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] [Hrident Hrlive Hrslh] [Ht1 Hid2]
                                  [Hru] [Hru2]").
     5:{ iApply (runit_any_intro with "Hru2"). }
     4:{ iApply (runit_any_intro with "Hru"). }
-    3:{ iExists (qr/2)%Qp. rewrite /inode_ref. iFrame "Ht1 Hid2". }
+    3:{ iExists (qr/2)%Qp. rewrite /inode_ref.
+        iDestruct "Ht1" as "(Hf1 & Hl1 & Hs1)".
+        iDestruct (IcacheRef.live_frac0_fracc with "Hl1") as "Hl1".
+        iFrame "Hf1 Hl1 Hs1 Hid2". }
     2:{ rewrite /IcacheRef.inode_shr. iFrame "Hrident Hrlive Hrslh". }
     (* callee_saved m P5, and a0 = ip *)
     split; [| exact HP5a0].

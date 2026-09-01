@@ -1332,7 +1332,8 @@ Section ProofSysLinkBody.
           iEval (rewrite inode_ref_shed) in "Hrefip".
           iDestruct "Hrefip" as "[Hkeep Hshr]".
           iEval (rewrite inode_shr_gen_intro) in "Hshr".
-          iDestruct "Hshr" as (gsh) "Hshr".
+          iDestruct "Hshr" as (gsh losh tlsh) "(%Hlesh & #Hflsh & Hshr)".
+          iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
           iDestruct (sl_esc_acc cn gfs gi cov logstart kk Hkk with "Hescrows")
             as "#Hesck".
           iDestruct (ic_sleeplocks_lookup cn kk Hkk with "Hslks") as (gil gisl) "#Hslkk".
@@ -2128,8 +2129,9 @@ Section ProofSysLinkBody.
                 destruct ok2.
                 ** (* ---------- the parent RESOLVED ---------- *)
                    iDestruct "Hres2" as "(%Hnpe & Hhelddp & Hir1c)".
-                   iDestruct "Hhelddp" as (kd qd dinum gyd)
-                     "(%Hdpe & %Hkd & %Hdinumc & Hrefdp & #Hshotd & Hrud)".
+                   iDestruct "Hhelddp" as (kd qd dinum gyd lod tld)
+                     "(%Hdpe & %Hkd & %Hdinumc & %Hled & #Hfld &
+                       Hrefdp & #Hshotd & Hrud)".
                    assert (Hdpnz : dpv <> (zero_reg : mword 64))
                      by (rewrite Hdpe; apply ientry_ne_zero; lia).
                    assert (Hu3 : (sl_u3 w1 w2 <= n2)%nat)
@@ -2152,11 +2154,14 @@ Section ProofSysLinkBody.
                       one-shot names -- which is what lets [ity_shot_agree]
                       turn nameiparent's [inode_held_ty] into
                       [di_type dnd = T_DIR] at ilock's own record. *)
-                   iEval (rewrite sl_shed_gen) in "Hrefdp".
+                   iEval (rewrite IcacheRef.inode_ref_genlo_shed) in "Hrefdp".
                    iDestruct "Hrefdp" as "[Hkeepd Hshrd]".
                    iEval (rewrite -Hcdev) in "Hkeepd".
                    iEval (rewrite -Hcdev) in "Hshrd".
-                   iDestruct (inode_ref_short_gen_forget with "Hkeepd") as "Hkeepd".
+                   iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshrd")
+                     as "Hshrd".
+                   iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hled
+                                with "Hfld Hkeepd") as "Hkeepd".
                    assert (Hdinb : bv_unsigned dinum < 16 * Z.of_nat nib)
                      by (rewrite Hcnib; exact Hdinumc).
                    destruct (Hiregb dinum Hdinb) as [Hdiblk Hdiblog].
@@ -3165,8 +3170,17 @@ Section ProofSysLinkBody.
                                   [exact Hcsra | exact HW2regs]).
                             (* this arm hands the reference to [iput] and
                                wants nothing from the name: forget here. *)
-                            iDestruct (inode_shr_gen_forget with "Hshr")
-                              as "Hshr".
+                            iEval (rewrite inode_ref_short_gen_intro)
+                              in "Hkeep".
+                            iDestruct "Hkeep" as (gk2 lok2 tlk2)
+                              "(%Hlek2 & #Hflk2 & Hkeep)".
+                            iDestruct (inode_shr_gen_forget_on_keep
+                                         _ _ _ _ _ _ _ _ _ _ _ _ Hlek2
+                                         with "Hflk2 Hkeep Hshr")
+                              as "[Hkeep Hshr]".
+                            iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _
+                                         _ _ Hlek2 with "Hflk2 Hkeep")
+                              as "Hkeep".
                             iDestruct (inode_ref_gather with "Hkeep Hshr") as "Hrefip".
                             sl_own_transport CID64 CID66 eb pj b.
                             iApply (Iput.wp_iput_sconf (CID := CID66) gs j gl gu gd gk

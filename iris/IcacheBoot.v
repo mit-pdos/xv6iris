@@ -1693,7 +1693,7 @@ Section IcacheBootTable.
        ([NINODE + k], the per-slot freeze selector) in the same [own_alloc],
        so this premise simply runs to [NINODE + NINODE] and
        [live_pool_empty] retags the upper half to [false] on the way in. *)
-    ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) -∗
+    ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) -∗
     (* THE PER-SLOT SLEEPLOCK GHOSTS, as [IcacheRef.icfg_alloc] hands them
        over: an unbuilt lock's free arm, and the AUTHORITATIVE ZERO of its
        outstanding-share count.  A PREMISE for the same reason the count
@@ -1851,7 +1851,7 @@ Section IcacheBootTable.
       (E : coPset) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
     own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) -∗
-    ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) -∗
+    ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) -∗
     ([∗ list] k ∈ seq 0 NINODE,
        sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) -∗
     itable_lock ↦₄ (mword_of_int 0 : mword 32) -∗

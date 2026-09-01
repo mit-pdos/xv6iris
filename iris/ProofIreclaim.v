@@ -1683,7 +1683,8 @@ Section IreclaimOrphan.
     iDestruct (iu_slots_split 2 1 with "Hsl") as "[Hsl Hsl1]".
     (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)) *)
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
-    iDestruct "Hshr" as (gsh) "Hshr".
+    iDestruct "Hshr" as (gsh losh tlsh) "(%Hlesh & #Hflsh & Hshr)".
+    iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
     iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gil gisl
               cov logstart inodestart nib kslot (q/2)%Qp gsh PlainK dev inum
               pidv dq dqs OC (K - 8)%nat eb b lks Vpr
@@ -1808,7 +1809,10 @@ Section IreclaimOrphan.
                     Hppid Hprocs Hdep Hidev Hiinum Hvalid Hloaded Hshot Hfrz").
     all: try lkbelow.
     iIntros (CID21 Hq21 mU) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
-    iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
+    iApply fupd_wp.
+    iMod (inode_shr_gen_pin0 ⊤ kslot (q/2)%Qp dev inum gsh
+            ltac:(solve_ndisj) Hkslot with "Hitbl Hshr") as "Hshr".
+    iModIntro.
     assert (Hpc64 : ret_pc (OE !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x64))
       by (rewrite HOEra; pcw).

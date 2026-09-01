@@ -1269,7 +1269,9 @@ Section ProofSysMkdirBody.
         (* create's payout is GENERATION-NAMED now; iunlockput takes the
            erased reference, so weaken it back here.  One line, and the
            name is what sys_open's O_CREATE arm needs kept. *)
-        iDestruct (inode_ref_short_gen_forget with "Href") as "Href".
+        iDestruct "Href" as (lo tl) "(%Hle & #Hfl & Href)".
+        iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hle
+                     with "Hfl Href") as "Href".
         iDestruct (md_esc_acc cn gfs gi cov logstart kk ltac:(lia)
                      with "Hescrows") as "#Hesc".
         destruct (Hiregb inum ltac:(lia)) as [Hibcov Hiblog].

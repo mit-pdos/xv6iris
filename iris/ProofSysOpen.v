@@ -379,11 +379,22 @@ Section ProofSysOpenBody.
     iDestruct ("Hcback" with "Hpbare") as "Hcore".
     (* ---- THE PUBLICATION: one ghost step ---- *)
     iApply fupd_wp.
+    (* A6.145 interim: pin both the retained parent's slice and the returned
+       share to the zero epoch; the floors are then free. *)
+    iDestruct "Hkeep" as "(Hkf & Hklv & Hkid & Hksl)".
+    iDestruct "Hklv" as (loK) "Hklv".
+    iMod (iref_share_pin0 ⊤ kk qi gy loK ltac:(solve_ndisj) Hkk
+            with "Hitinv Hklv") as "[%HloK0 Hklv]".
+    subst loK.
     iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn om voff
+            0%nat 0%nat
             ltac:(solve_ndisj) ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb Hdir
-            Hwf
-            with "Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hfip Hfoff")
+            Hwf (Nat.le_refl 0)
+            with "[] [Hkf Hklv Hkid Hksl] Hru Hshr Hshot Hfref Hflive Hflds
+                  Hfpn Hfip Hfoff")
       as "Href".
+    { iApply TsoCtx.ctx_floor_0. }
+    { rewrite /IcacheRef.inode_ref_short_genlo. iFrame. }
     iModIntro.
     iDestruct (proc_priv_settle gf (proc_addr jx) pidv V fd kf 1 C Hfdlt Hlen
                  Hkf with "Hcore Howe Href") as "Hpriv".
@@ -1352,7 +1363,10 @@ Section ProofSysOpenBody.
       iEval (rewrite Htg66) in "Hpc".
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
       iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback]".
-      iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep".
+      iApply fupd_wp.
+      iMod (inode_ref_short_gen_pin0 ⊤ kk (qi + s)%Qp qi _ inum gy
+              ltac:(solve_ndisj) Hkk with "Hitinv Hkeep") as "Hkeep".
+      iModIntro.
       iDestruct (cpu_own_transport CID3 CID5 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iDestruct (trap_csrs_ext_transport CID3 CID5 eb (proc_addr jx)
@@ -1526,7 +1540,10 @@ Section ProofSysOpenBody.
       iEval (rewrite Htg70) in "Hpc".
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
       iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
-      iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep".
+      iApply fupd_wp.
+      iMod (inode_ref_short_gen_pin0 ⊤ kk (qi + s)%Qp qi _ inum gy
+              ltac:(solve_ndisj) Hkk with "Hitinv Hkeep") as "Hkeep".
+      iModIntro.
       iDestruct (cpu_own_transport CID8 CID10 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iDestruct (trap_csrs_ext_transport CID8 CID10 eb (proc_addr jx)
@@ -2185,7 +2202,10 @@ Section ProofSysOpenBody.
       iEval (rewrite Htg5a) in "Hpc".
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
       iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback]".
-      iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep".
+      iApply fupd_wp.
+      iMod (inode_ref_short_gen_pin0 ⊤ kk (qi + s)%Qp qi _ inum gy
+              ltac:(solve_ndisj) Hkk with "Hitinv Hkeep") as "Hkeep".
+      iModIntro.
       iDestruct (cpu_own_transport CID0 CID6 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iDestruct (trap_csrs_ext_transport CID0 CID6 eb (proc_addr jx)
@@ -2729,6 +2749,8 @@ Section ProofSysOpenBody.
     iDestruct "Hlocked" as (gil gisl)
       "(Hslk & Hslkd & Hdep & Hidev & Hiinum & Hivalid & Hload &
         Hshot & Hfrz & Href & Hru)".
+    iDestruct "Href" as (lo0 tl0) "(%Hle0 & #Hfl0 & Href)".
+    iDestruct (IcacheRef.inode_ref_short_genlo_gen with "Href") as "Href".
     iApply (wp_cbeqz_fall_s_sconf (CID := CID7) (mword_of_int (SO + 0x48))
               (mword_of_int 69 : mword 8) (Cregidx (mword_of_int 2)) Ra0
               P1 (K - 24)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
@@ -3134,10 +3156,11 @@ Section ProofSysOpenBody.
     iEval (rewrite inode_ref_shed) in "Hrefip".
     iDestruct "Hrefip" as "[Hkeep Hshr]".
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
-    iDestruct "Hshr" as (gy) "Hshr".
+    iDestruct "Hshr" as (gy loy tly) "(%Hley & #Hfly & Hshr)".
+    iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
     iEval (rewrite inode_ref_short_gen_intro) in "Hkeep".
-    iDestruct "Hkeep" as (gp) "Hkeep".
-    iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr") as %->.
+    iDestruct "Hkeep" as (gp lop tlp) "(%Hlep & #Hflp & Hkeep)".
+    iDestruct (inode_ref_short_genlo_shr_gen_agree with "Hkeep Hshr") as %->.
     iDestruct (so_esc_acc cn gfs gi cov logstart kk Hkk with "Hescrows")
       as "#Hesck".
     iDestruct (so_slk_acc cn kk Hkk with "Hslks") as (gil gisl) "#Hslkk".
@@ -3318,6 +3341,7 @@ Section ProofSysOpenBody.
                   Hsbn Hsbi Hsbs Hsbb Hbsl Hisl Hpost").
         { exact Hcsf. }
         { unfold sys_open_slots, create_slots in *. lia. } }
+      iDestruct (IcacheRef.inode_ref_short_genlo_gen with "Hkeep") as "Hkeep".
       iApply (so_join (CID0 := CID10) gfl gf gs jx gl gu gd gk pd pav pu bn g
                 gfs gi cn gtl gil gisl cov logstart bmapstart inodestart nib
                 size dev kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm om lo
@@ -3405,6 +3429,7 @@ Section ProofSysOpenBody.
                   Hsbn Hsbi Hsbs Hsbb Hbsl Hisl Hpost").
         { exact Hcsf. }
         { unfold sys_open_slots, create_slots in *. lia. } }
+      iDestruct (IcacheRef.inode_ref_short_genlo_gen with "Hkeep") as "Hkeep".
       iApply (so_alloc (CID0 := CID12) gfl gf gs jx gl gu gd gk pd pav pu bn g
                 gfs gi cn gtl gil gisl cov logstart bmapstart inodestart nib
                 size dev kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm om lo
@@ -3435,7 +3460,8 @@ Section ProofSysOpenBody.
     assert (Hppfa : add_vec_int (mword_of_int (SO + 0xfa) : mword 64) 2
                     = mword_of_int (SO + 0xfc)) by pcw.
     iEval (rewrite Hppfa) in "Hpc".
-    iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeepe".
+    iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hlep
+                 with "Hflp Hkeep") as "Hkeepe".
     iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback2]".
     iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
     iDestruct (log_opS_op with "HopS") as "Hop".

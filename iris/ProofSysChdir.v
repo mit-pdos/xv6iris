@@ -1506,7 +1506,8 @@ Section ProofSysChdirBody.
         iEval (rewrite inode_ref_shed) in "Hrefip".
         iDestruct "Hrefip" as "[Hkeep Hshr]".
         iEval (rewrite inode_shr_gen_intro) in "Hshr".
-        iDestruct "Hshr" as (gsh) "Hshr".
+        iDestruct "Hshr" as (gsh losh tlsh) "(%Hlesh & #Hflsh & Hshr)".
+        iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
         iDestruct (sc_esc_acc cn gfs gi cov logstart kk Hkk with "Hescrows")
           as "#Hesck".
         iDestruct (sc_slk_acc cn kk Hkk with "Hslks") as (gil gisl) "#Hslkk".
@@ -1728,7 +1729,12 @@ Section ProofSysChdirBody.
                           Hpbare Hprocs Hdep Hidev Hiinum Hivalid Hload
                           Hshot Hfrz").
           iIntros (CID30 Hq30 miu) "%Hcsiu Hcg Hown Hpc Hpbare Hshr".
-          iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
+          iEval (rewrite inode_ref_short_gen_intro) in "Hkeep".
+          iDestruct "Hkeep" as (gkp lokp tlkp) "(%Hlekp & #Hflkp & Hkeep)".
+          iDestruct (inode_shr_gen_forget_on_keep _ _ _ _ _ _ _ _ _ _ _ _
+                       Hlekp with "Hflkp Hkeep Hshr") as "[Hkeep Hshr]".
+          iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hlekp
+                       with "Hflkp Hkeep") as "Hkeep".
           assert (Hpc48 : ret_pc (P4 !!! Regidx Rra : mword 64)
                           = mword_of_int (SC + 0x48)) by (rewrite HP4ra; pcw).
           iEval (rewrite Hpc48) in "Hpc".
