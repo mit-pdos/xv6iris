@@ -3807,3 +3807,30 @@ dispatcher already discharges the table (`SpecSyscall.sysc_fd_ok`,
 `fd_frags` side condition.  No binder moves, each leaf passes one more
 pure premise through, and it is the precondition for retiring the pilot's
 `um_fdt` leg onto the key.  RECOMMEND YES.
+**STATUS: LANDED Sep 1 (`e0bfa5d4e`), verbatim plus more** — the fork
+guards, the length row, and `usys_pipe_ok` (pipe's join).  Ask closed.
+
+(6) **THE REDIR RULING (owner, Sep 1) — one pure conjunct on the open
+row: the returned descriptor is the LEAST closed slot.**  Upstream's own
+runner round (`351804ea1`) found the gap: xv6 redirection is
+`close(fd); open(path)` and relies on `fdalloc` returning the LOWEST
+free descriptor, but `usys_fd_ok`'s open row says only that the slot it
+returned was free — sound, and too weak to say a REDIR redirects.  Their
+commit left the choice open (strengthen the plain row vs widen sh's
+runner to the enriched channel) and cited this campaign's pin
+(design/fd-row-pilot.md: open = the least closed row, fdalloc's own scan
+order).  THE RULING: strengthen the PLAIN row — the fact is pure and
+channel-independent, the kernel's `fdalloc` loop is its proof, and the
+enriched row then READS it, the same delegation `ufs_step_fd_agrees`
+already performs for every other row.  Concretely: the open case's
+success disjunct gains `fd_lowest_closed sts = Some fd`
+(`FsFdMirror.fd_lowest_closed`, with `fd_lowest_closed_is_closed`
+already beside it; the predicate can move down to `FdSlots`/`UsysMemOk`
+so the table does not import the mirror).  dup and pipe allocate through
+the same scan and can take the same conjunct (pipe: lowest, then next
+lowest) — optional, REDIR needs only open.  NO RECEIPT BUILT, and
+deliberately: the fd rows and the runner are upstream's active workspace
+this week (twelve commits on Sep 1 alone), and our compiled-receipt play
+would land in files they are mid-edit on.  This entry IS the relay;
+the mirror's open row holds the fact if a refinement receipt is wanted
+later.  RECOMMEND upstream lands it as part of wiring REDIR.
