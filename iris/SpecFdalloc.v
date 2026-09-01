@@ -194,6 +194,56 @@ Proof.
   exact (fd_frees_head fs j l Heq).
 Qed.
 
+(* ...AND NOTHING BELOW THE HEAD IS FREE.  The scan runs in index order and
+   CONSES, so the first entry of the free list is the LEAST free
+   descriptor -- which is the whole content of "fdalloc returns the lowest
+   free fd", and what [FdSlots.fd_least_closed] is stated to capture at the
+   state list.  The head lemma above says the slot it returns is free; this
+   says no smaller one was. *)
+Lemma fd_frees_from_below (fs : list (mword 64)) (i j : nat) (l : list nat) :
+  fd_frees_from i fs = j :: l ->
+  forall k : nat, (i <= k < j)%nat ->
+    fs !! (k - i)%nat <> Some (zero_reg : mword 64).
+Proof.
+  revert i j l. induction fs as [|a fs' IH]; intros i j l Heq k Hk; [discriminate|].
+  cbn in Heq. case_decide as Ha.
+  - (* the head IS free, so it is [j] itself and the range is empty *)
+    injection Heq as Hij _. subst i. lia.
+  - (* the head is not free; below [j] we are either AT it or further on *)
+    destruct (Nat.eq_dec k i) as [-> | Hne].
+    + rewrite Nat.sub_diag. cbn. intros Hc. apply Ha. by injection Hc.
+    + replace (k - i)%nat with (S (k - S i))%nat by lia. cbn.
+      exact (IH (S i) j l Heq k ltac:(lia)).
+Qed.
+
+(* THE LIST IS INCREASING, which is what a caller allocating TWO
+   descriptors needs: sys_pipe's second fdalloc runs on the array the first
+   left, and to know its own scan is undisturbed below the first descriptor
+   it has to know the first came earlier.  One step of the fixpoint says it
+   -- the tail is scanned from [S j]. *)
+Lemma fd_frees_from_snd (fs : list (mword 64)) (i j k : nat) (l : list nat) :
+  fd_frees_from i fs = j :: k :: l -> (j < k)%nat.
+Proof.
+  revert i j k l. induction fs as [|a fs' IH]; intros i j k l Heq; [discriminate|].
+  cbn in Heq. case_decide as Ha.
+  - injection Heq as Hij Htl. subst i.
+    destruct (fd_frees_from_head fs' (S j) k l Htl) as [Hle _]. lia.
+  - exact (IH _ _ _ _ Heq).
+Qed.
+
+Lemma fd_frees_snd (fs : list (mword 64)) (j k : nat) (l : list nat) :
+  fd_frees fs = j :: k :: l -> (j < k)%nat.
+Proof. exact (fd_frees_from_snd fs 0%nat j k l). Qed.
+
+Lemma fd_frees_below (fs : list (mword 64)) (j : nat) (l : list nat) :
+  fd_frees fs = j :: l ->
+  forall k : nat, (k < j)%nat -> fs !! k <> Some (zero_reg : mword 64).
+Proof.
+  intros Heq k Hk.
+  pose proof (fd_frees_from_below fs 0%nat j l Heq k ltac:(lia)) as H.
+  by rewrite Nat.sub_0_r in H.
+Qed.
+
 Section SpecFdalloc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
 

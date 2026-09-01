@@ -1841,12 +1841,19 @@ LinkSysUnlinkAU.v
 # Of the four files that ARE parked, nothing outside them refers to them,
 # so parking those costs the rest of the tree nothing.  Un-parking is the
 # follow-on to closing (c) above.
+#
+# THE FOUR PARKED ROWS BELOW ARE BARE '# Foo.v' COMMENTS, AND THE SPELLING
+# MATTERS.  tools/proof_coverage.py --check treats a comment whose body is
+# exactly a filename as a DELIBERATE descope and exempts it; anything else
+# -- '# PARKED: Foo.v', say -- is prose, so the file reads as an accident
+# ("added to iris/ and forgotten") and CI's coverage step fails.  Put the
+# explanation in prose lines like these and leave the row itself bare.
 # ---------------------------------------------------------------------
 UCodeShK.v
 UkRunBr.v
 UkSh.v
-# PARKED: UkShRun.v
-# PARKED: UkShDiag.v
+# UkShRun.v
+# UkShDiag.v
 
 # ... STAGE 4: the parser.  UCodeShP.v is a THIRD catalog over the same
 # dump (tools/ucode_shp.txt, [--prog shp]) -- 564 instructions in eleven
@@ -1872,8 +1879,8 @@ UkSh.v
 # [ushp_malloc_ok] (stage 3's allocator, blocked on [wp_uk_ecall_sbrk]);
 # it taints NOTHING yet -- every lemma in the file is unconditional today.
 # Audit = the standing three, zero Admitted, zero Axiom.
-# PARKED: UCodeShP.v
-# PARKED: UkShParse.v
+# UCodeShP.v
+# UkShParse.v
 
 # FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
 # u-tier syscall row.  FsFdMirror = the pure mirror + step table;
