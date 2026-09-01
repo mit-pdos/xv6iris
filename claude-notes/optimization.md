@@ -59,6 +59,14 @@ so the last line in the log is the stalling sentence. If the slow line is a
 - **To find which hypothesis is big**, `iClear` it *before* the block you are
   measuring (clearing at the end measures nothing — the earlier steps already
   paid) and diff the tree size.
+- **RANK BY ms PER SENTENCE BEFORE YOU OPEN THE FILE — it decides whether you
+  are hunting a bug or looking at a floor.** One `awk` over every `.v.timing`
+  (sum the `secs`, divide by the sentence count) separates the two kinds of
+  expensive file: `ProofUvmcopy` 30.0, `ProofSysLink` 28.9, `ProofSysUnlink`
+  25.6 — against `ProofCreate` **21.0**, which is the tree's single most
+  expensive file and is merely the biggest (6475 sentences). A file at or
+  below its peers' rate has no hot statement to find; see "ProofCreate IS THE
+  FLOOR" below for what that verdict costs to reach the long way.
 - **`.v.timing` roll-ups beat reading the proof.** After a build that felt slow,
   list every sentence ≥ 5 s across the tree and cross off the honest `Qed`s;
   what remains is the bug list. These sentences are exactly the ones a reader
@@ -588,6 +596,118 @@ worth 20× on individual files.
   The name-free branch must use `match` (not `lazymatch`) over the hypotheses so
   it picks the right one of the six-to-nine disequalities a transport carries —
   an Ltac body cannot mention a hypothesis its own `injection` introduced.
+
+### A BESPOKE SIDE-CONDITION TACTIC IS THE SAME BUG, AND IT HIDES BETTER: `wp_next_chain` WAS 26 % OF ProofNamex (measured 2026-08-31)
+
+Everything above is about a STDLIB closer meeting a large context. This is the
+same mechanism in a tactic this tree wrote itself, and it hid for much longer
+because a hand-written tactic reads as "the thing that discharges this
+obligation" rather than as a search. **Read every `Ltac` that a leaf's
+`ltac:(…)` slot invokes as a closer, and price it by the context it runs in,
+not by the goal it proves.** The tell is the same as ever: the goal is one
+equation you can read.
+
+`wp_next_chain` (`WpNext.v`) discharges a leaf's hart-crossing side condition —
+`b = false ∨ p = zero_reg → (CIDb : CPU) = (CIDa : CPU)` — from the conditional
+equalities a straight-line stretch accumulates, one per instruction. As landed
+it was two `repeat match goal … specialize` loops over the WHOLE context, so it
+proved a one-hop equation by specializing every link in scope. A whole-function
+walk accumulates ~69 of them by its deepest point, and ProofNamex calls it 127
+times: **8800 `specialize`s plus 8900 `destruct`s, 26 % of the file**, for
+goals that need a handful of links.
+
+**The chain is a PATH, so follow it from the goal.** At `?x = ?z` the only link
+that can matter is the one whose conclusion is `?x = _`; consume it with
+`eq_trans`, land on `?y = ?z`, stop at `reflexivity`:
+
+```coq
+Ltac wp_next_link Hd :=
+  match goal with
+  | H : _ = false \/ _ = _ -> ?x = _ |- ?x = _ =>
+      refine (eq_trans (H Hd) _); clear H
+  end.
+```
+
+Three things make it drop-in and worth copying:
+
+- **`refine (eq_trans …)`, never `rewrite`.** The equation lands in the proof
+  TERM and the context is never touched. The `rewrite He` spelling of the very
+  same walk is a **REGRESSION** — ssr `rewrite` became 47 % of the file (2573
+  calls) and ProofNamex read 110 s against the `specialize` version's 100 s.
+  Measured, so do not re-run it.
+- **Keep the old loops as branches four and five.** The fast path fails
+  cheaply (nothing is specialized, `first` rolls the state back), so no call
+  site can regress and a shape the walk cannot follow still closes. ~25 of
+  ProofNamex's 127 calls still take a fallback.
+- **`clear H` after the `refine`** is what makes `repeat` terminate against a
+  cyclic pair; the already-built term keeps its own reference, so clearing it
+  from the residual goal is sound.
+
+240 files call this tactic. Whole-tree clean builds, TIMED, same box:
+
+| | ΣCPU | ProofNamex | ProofNparEra | ProofNamexEra | ProofSysLink | ProofBmap |
+|---|---|---|---|---|---|---|
+| before | 9128 s | 121.1 | 111.7 | 97.7 | 81.2 | 47.6 |
+| after (with the `rdok` fix below) | **8821 s (−3.4 %)** | **92.6 (−24 %)** | 91.6 (−18 %) | 80.0 (−18 %) | 71.2 (−12 %) | 38.0 (−20 %) |
+
+Isolated, min of two, ProofNamex **114.6 s → 84.3 s (−26 %)**; its `.lia.cache`
+cold reading agrees with its warm one, so none of this was certificate work.
+
+**`rdok_tpne`'s bare `congruence` is the second instance, and it is the
+`discriminate` bullet above at 3673 call sites.** `IntrDefs.rdok` — the
+`ltac:(rdok)` sitting positionally in nearly every gpr leaf's premise slot —
+ends in `intro H1; injection H1 as H2; vm_compute in H2; congruence`, where
+the goal at that point is `False` and `H2 : 9%positive = 4%positive`.
+`congruence` head-normalises every hypothesis in scope to get there.
+`first [ discriminate H2 | congruence ]` (the fallback for a site whose two
+indices are not both concrete costs nothing, because a NAMED `discriminate`
+fails immediately) took ProofCreate's 419 calls out of the profile and the
+file **133.6 s → 130.8 s**, isolated, arms interleaved, both reps agreeing.
+The same edit is in `rgne`, whose side condition is the identical script.
+
+### ProofCreate IS THE FLOOR, NOT A BUG (measured 2026-08-31)
+
+`ProofCreate.v` is the tree's most expensive file (142 s CPU) and it has **no
+pathology at all** — this is the record of what was measured, so nobody
+re-runs it looking for one.
+
+- **Per SENTENCE it is CHEAPER than its peers**: 21.0 ms over 6475 sentences,
+  against ProofSysUnlink's 25.6, ProofUvmcopy's 30.0, ProofSysLink's 28.9.
+  It is the top file because it is the tree's biggest walk — five halves
+  (`cr_found_half` 38 s, `cr_mkdir_half` 42 s, `cr_alloc_half` 26 s, and the
+  two failure halves) of a straight-line-with-branches function. Compute this
+  ratio from the `.v.timing` roll-up BEFORE opening a slow file; it decides
+  whether you are looking for a bug or at a floor.
+- **Δ is already flat and already folded.** Dumped mid-walk in `cr_mkdir_half`
+  (the recipe in "Seal a whole-function proof's continuation"): 90 rows,
+  ~7 kB, no entry over ~160 B once the last intuitionistic row's absorbed
+  spatial prefix is discounted — the artefact that section warns about, seen
+  again. The parked bodies (`cr_alloc_body`, `cr_mkdir_body`, `cr_fail_body`,
+  `cr_cont_body`, `cr_tail_body`) are already named `Definition`s, so the
+  ProofSysUnlink lever was spent here before it was written down.
+- **The tail is 57 % of the file**: 6428 sentences under 0.3 s. The 47
+  sentences above it are 55 s, of which 32 s is five honest `Qed`s.
+- **The `.lia.cache` is not hiding anything**: cold 138.0 s against warm
+  134.8 s, and this file contributes 6 MB to the directory cache where
+  `ProofFilewriteAU` contributed 190 MB.
+- **`Strategy opaque [rget] [tp_pin] [rf_upd]`** is already on in this file;
+  adding the same three to `ProofNamex` — the obvious next candidate, a
+  register-chain-heavy whole-function proof — is a **NULL** (88.1 s → 87.4 s,
+  min of two, interleaved). That lever is still confined to
+  `ProofVirtioDiskInit`'s shape.
+- What is left is `|Δ| × steps` and nothing else: 31 % `iSpecializePat_go`
+  (21873 pattern items), 25 % `notypeclasses refine`, 14 % `tc_solve`, 12 %
+  `_iIntros_go`. **The only lever that could still move it is fewer RESOURCE
+  ROWS per callee call** — ~30 names go out at each fs-callee `iApply` and
+  ~20 come back at the `iIntros` — i.e. bundling the two 20-row open-inode
+  bundles behind one abstraction with a constructor and an accessor. That is
+  a spec-layer change across `SpecIlock`/`SpecDirlink`/… , and it is the same
+  one ProofSysUnlink's case study declined ("the cost would move rather than
+  go"); it has NOT been measured, and it should not be attempted as a perf
+  edit alone.
+- **It is not on the critical path**, so splitting the file buys nothing:
+  `tools/proof_profile.py` puts the 414 s path through ProofSysUnlink, with
+  avg parallelism 21.8× and ~3 s effectively serial.
 
 ### ProofIput RESISTS ALL FOUR OF THIS FILE'S LEVERS (measured 2026-08-27)
 

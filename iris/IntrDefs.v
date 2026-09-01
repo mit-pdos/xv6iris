@@ -3536,9 +3536,19 @@ Ltac tp_refold Hrdtp H := iEval (rewrite (tp_pin_upd _ _ _ Hrdtp)) in H.
    settles, while [Regidx rd <> Regidx Rtp] has to go through [Regidx]'s
    injectivity first, and [src_ok]'s guarded conjunct is an implication.
    So they are three NAMED pieces, composed by [rdok] below. *)
+(* NAME THE EQUATION FOR [discriminate] -- claude-notes/optimization.md,
+   "`done` ENDS IN A NO-ARGUMENT `discriminate`".  After the [vm_compute] the
+   goal is [False] from [H2 : 9%positive = 4%positive], which [discriminate H2]
+   closes without looking at anything else; a bare [congruence] instead
+   head-normalises EVERY hypothesis in scope, and this script runs inside a
+   whole-function proof's context at 3673 [ltac:(rdok)] sites.  Measured on
+   ProofCreate (419 calls): 2.4 % of the file's tactic time, 133.6 s -> 130.8 s.
+   The [congruence] arm stays as a fallback for a site where the two indices
+   are not both concrete, where [discriminate H2] fails immediately and cheaply. *)
 Ltac rdok_tpne :=
   let H1 := fresh in let H2 := fresh in
-  intro H1; injection H1 as H2; vm_compute in H2; congruence.
+  intro H1; injection H1 as H2; vm_compute in H2;
+  first [ discriminate H2 | congruence ].
 
 Ltac rdok_rd := split; [ vm_compute; discriminate | rdok_tpne ].
 
@@ -3584,7 +3594,8 @@ Ltac rdok :=
 Ltac rgne :=
   rewrite rget_ne;
   [ | let H1 := fresh in let H2 := fresh in
-      intro H1; injection H1 as H2; vm_compute in H2; congruence ].
+      intro H1; injection H1 as H2; vm_compute in H2;
+      first [ discriminate H2 | congruence ] ].
 
 (* CAUTION, ORDER MATTERS in an endgame peel loop: a [rewrite Htp] for the tp
    slot must come BEFORE [rgne].  Otherwise [rewrite rget_ne] instantiates at

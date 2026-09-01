@@ -233,13 +233,49 @@ Ltac wp_next_close :=
    indication of which link is missing.
      Found by probing ProofIlock's first [wp_next_shift] after ilock's
    crossing moved to [true]: all eight links were in context and the manual
-   chain closed, while the loop above did not.  Branch one is verbatim the
-   old tactic, so no existing call site can regress. *)
+   chain closed, while the loop above did not.  These two are now branches
+   FOUR and FIVE, kept verbatim behind the goal-directed fast path described
+   next, so no existing call site can regress. *)
+(* THE GOAL-DIRECTED FAST PATH, and why the two [specialize] loops below it
+   are now only a fallback (claude-notes/optimization.md, "wp_next_chain").
+   Both of those loops walk the WHOLE context and rewrite EVERY conditional
+   equality in it, and a whole-function walk accumulates one per instruction:
+   at [ProofNamex]'s deepest point that is ~69 of them per call and 127 calls,
+   i.e. 8800 [specialize]s -- 26 % of the file -- to prove one equation that
+   needs a handful of links.  The chain is a PATH, so follow it from the goal
+   instead: at [?x = ?z], the only link that can matter is the one whose
+   conclusion is [?x = _]; [eq_trans] consumes it and leaves [?y = ?z], and
+   the walk stops at [reflexivity].  Nothing is specialized that the goal
+   does not reach, and no hypothesis is rewritten.
+     [refine (eq_trans ...)], not [rewrite]: the equation lands in the proof
+   TERM, so the context is never touched.  (Measured: the [rewrite] spelling
+   of this same walk is a REGRESSION -- ssr [rewrite] in a 200-hypothesis
+   context cost more than the [specialize]s it replaced.)
+     [clear H] is what makes [repeat] terminate against a cyclic pair; the
+   already-built term keeps its own reference to [H], so clearing it from the
+   residual goal is sound. *)
+Ltac wp_next_link Hd :=
+  match goal with
+  | H : _ = false \/ _ = _ -> ?x = _ |- ?x = _ =>
+      refine (eq_trans (H Hd) _); clear H
+  end.
+
+Ltac wp_next_link_r Hg :=
+  match goal with
+  | H : _ = false \/ _ = _ -> ?x = _ |- ?x = _ =>
+      refine (eq_trans (H (or_intror Hg)) _); clear H
+  end.
+
 Ltac wp_next_chain :=
   let Hd := fresh "Hd" in
   intros Hd;
   first
-    [ solve [ repeat match goal with
+    [ reflexivity
+    | solve [ repeat wp_next_link Hd; reflexivity ]
+    | let Hg := fresh "Hg" in
+      destruct Hd as [Hd | Hg]; [ discriminate Hd | ];
+      solve [ repeat wp_next_link_r Hg; reflexivity ]
+    | solve [ repeat match goal with
                      | H : _ = false \/ _ = _ -> _ = _ |- _ =>
                          first
                            [ specialize (H Hd)
