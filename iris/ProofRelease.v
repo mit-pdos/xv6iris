@@ -34,7 +34,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecRelease.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import SieCapCtx.    (* [sie_cap_gpr_own_ctx_acc]: the releaser's own running token *)
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
+Require Import SieCapCtx.
 Import Defs.
 
 
@@ -74,26 +76,28 @@ Section ProofRelease.
     pose (outb := match n with O => eb | S _ => false end).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg #Htext Hpc #Hlock Htoken Hfin Hown Hpay Hcont".
-    (* THE DEPOSIT (tso-port §0.18′).  The payload arrives at the caller's
-       own context and is PUBLISHED as a parked record: mint a fresh
-       context ([TsoCtx.ctx_parked_alloc], pure) and hand the facts to it
-       with [TsoCtx.ctx_deposit], which raises the record's stamp to cover
-       them.  The releaser's own running token is borrowed out of
-       [sie_cap_gpr]'s fourth conjunct and put straight back
-       ([SieCapCtx]).  No shim, no [ctx_dom]: at cutover this IS the
-       release transport ([TsoCtxTwin2.twin_deposit]).
-       THE STAMP TIE, recorded because it is load-bearing at cutover:
-       [ctx_deposit] returns some [T'] with [0 <= T'], and what makes the
-       record claimable is [T' <= t_release] -- every fact deposited here
-       was written before release's word clear, and the acquirer's AMO
-       receipt dominates that store.  A record is minted PER RELEASE, so
-       [T'] covers exactly this publication; see WpLock.v's [lock_pay]. *)
-    (* A6.120: THE FINISHER'S PRELUDE runs here, at release's entry, against
-       the running token borrowed from the capability -- for a closing
-       release it is the honest deposit ([WpLock.lock_pay_intro]); the body
-       goes on to the word-clear leaf with what the prelude left. *)
+    (* the deposit arrives at the caller's own context; the invariant parks
+       it ∃-closed (tso-port M3 -- at cutover this introduction becomes the
+       transport into the lock's internal context,
+       [TsoCtxTwin2.ctx_dom_to_parked]) *)
+    (* A6.119 (§0.18′): THE HONEST DEPOSIT, replacing the SC-era ∃-closure
+       this very comment predicted.  [lock_pay_intro] parks the payload on a
+       fresh context ([ctx_deposit] / [ctx_dom_to_parked]) and hands the
+       running token straight back. *)
+    (* A6.119 (§0.18′): the honest deposit, and it needs NO new premise --
+       [own_context] is a component of [sie_cap] (IntrDefs), and
+       [SieCapCtx.sie_cap_gpr_own_ctx_acc] borrows it and puts it back with
+       the bundle reassembled, "so no downstream spec premise changes
+       shape".  The token never crosses [wp_next] on its own, which is what
+       makes this immune to the CpuId re-park hazard. *)
+    (* A6.120: the deposit is the FINISHER'S PRELUDE, not this proof's
+       choice -- a closing finisher parks the payload here, a destroying one
+       keeps it at [cur_ctx] (its completion wand speaks there, and the
+       word clear below is a plain store with nothing to bring a parked
+       record back).  [Pay] is whatever the finisher chose; the leaf at
+       +0x1a hands it to the finisher's body. *)
     iDestruct "Hfin" as (Pay) "[Hpre Hfin]".
-    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod ("Hpre" with "Hrun") as "[Hrun HR]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* ---- 0x00: c.addi sp,-32 -- the frame trade (k := 4) ---- *)
@@ -268,7 +272,7 @@ Section ProofRelease.
     iDestruct (cpu_own_locks_swap with "Hown") as "[Hlks [%Hsz Hownback]]".
     iApply (wp_sd_zero_lkcpu_lockopen_s_sconf (CID:=CID) γl lka s R Dc (mword_of_int (KernelSyms.release + 0x12))
               (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) mh (trap_res outb + (av - 4))%nat false lks
-              ltac:(rgne; exact Hacpu) Href
+              ltac:(rgne; exact Hacpu) ltac:(left; reflexivity) Href
               with "Hcg Hpc [] Hlock Htoken Hlks").
     { iApply (rli_12 with "Htext"). }
     iApply wp_next_off_intro.
@@ -629,15 +633,16 @@ Section CancelOfGen.
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav Href Hrefpre.
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hbuild Hown Hpay Hcont".
     iApply (G.wp_release_gen_sconf kt γl lka s R D
-              (lka ↦₄ (mword_of_int 0 : mword 32) ∗ WpLock.lk_cpu_ready lka ∗ Out)%I
+              (WpLock.lock_word_fresh lka ∗ WpLock.lk_cpu_ready lka ∗ Out)%I
               m n eb p av lks
               Hlka Hav Href Hrefpre
               with "Hcg Htext Hpc Hlock Htoken HR [Hbuild] Hown Hpay").
-    { (* A6.120 (tso-flip ProofRelease.v:594): THE SHIM USE §0.18′ COULD NOT
-         RETIRE IS GONE.  The finisher is two-part now: the destroyer's
-         prelude is the identity, so the word-clear leaf hands the
-         completion wand [R cur_ctx] itself -- no parked record to absorb
-         inside the store's atomic update, no [ctx_dom_sc] bridge. *)
+    { (* A6.120: the destroyer's completion wand speaks at ITS context, and
+         so does the payload the finisher's body receives -- the finisher's
+         prelude never parks it (the word clear is a plain [sw]; there is no
+         log-top evidence to bring a parked record back, which is what the
+         retired SC shim [ctx_dom_sc] used to conjure here).  Nothing to
+         bridge. *)
       iApply lock_finisher_destroy. iExact "Hbuild". }
     iIntros (CIDg Hsg mr) "(Hword & Hcpu & HOut) Hcg Hpc %Hcs Hown".
     iSpecialize ("Hcont" $! CIDg with "[%]"); [exact Hsg|].

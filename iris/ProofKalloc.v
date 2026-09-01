@@ -232,7 +232,7 @@ Section ProofKalloc.
                 with "Hcg Hpc []").
       { iApply (kai_1e with "Htext"). }
       iApply wp_next_off_intro.
-      iApply bi.later_intro. iIntros "Hcg Hpc".
+      iNext. iIntros "Hcg Hpc".
       assert (Htgtbeq : add_vec (mword_of_int (KernelSyms.kalloc + 0x1e) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 23 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.kalloc + 0x4c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtbeq) in "Hpc".
@@ -321,7 +321,7 @@ Section ProofKalloc.
                 with "Hcg Hpc []").
       { iApply (kai_58 with "Htext"). }
       iIntros (CIDe1 Hse1).
-      iApply bi.later_intro. iIntros "Hcg Hpc".
+      iNext. iIntros "Hcg Hpc".
       assert (Htgtj : add_vec (mword_of_int (KernelSyms.kalloc + 0x58) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.kalloc + 0x40))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtj) in "Hpc".
@@ -674,7 +674,8 @@ Section ProofKalloc.
         rewrite /Mli upd_ne; [| vm_compute; discriminate].
         rewrite /Mlui upd_ne; [| vm_compute; discriminate].
         rewrite Hmrcsp. exact HR12csp. }
-      iApply (MemsetPage.wp_memset_page_sconf kt Mms (K - 4)%nat (mword_of_int 5 : mword 64) b p
+      (* A6.87: kalloc's post is the VALUED run its own memset writes. *)
+      iApply (MemsetPage.wp_memset_page_val_sconf kt Mms (K - 4)%nat (mword_of_int 5 : mword 64) b p
                 ltac:(lia)
                 ltac:(rewrite HMmsa0; exact Hpv) HMmsa1 HMmsa2
                 with "Hcg Htext Hpc [Hpage]").
@@ -821,7 +822,11 @@ Section ProofKalloc.
           rewrite /Q44 upd_eq.
           rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]. }
         repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate]. }
-      { rewrite /kalloc_post HQ45a0. iRight. iFrame "Hpage Havail". iPureIntro. exact Hpv. }
+      { rewrite /kalloc_post HQ45a0. iRight. iFrame "Havail".
+        iSplitR; [iPureIntro; exact Hpv |].
+        rewrite /page_filled /kalloc_junk.
+        iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H".
+        iExact "H". }
   Qed.
 
 End ProofKalloc.

@@ -508,7 +508,7 @@ Section ProofIinit.
                 ltac:(rewrite Htgt3a; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (iii_46 with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDh Hsh) "Hcg Hpc".
+      iNext. iIntros (CIDh Hsh) "Hcg Hpc".
       iEval (rewrite Htgt3a) in "Hpc".
       (* recurse via [IHf] at the hart THIS iteration ended up on: re-anchor
          [Hpost] there first ([wp_next_shift]), matching

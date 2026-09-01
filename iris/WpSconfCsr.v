@@ -87,8 +87,8 @@ Require Import SRegime.
    adds no edge to the require graph -- only the import. *)
 Require Import KptShare.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* helper copy (Local in WpSmodePtCtl.v) *)
 Local Definition csr_sstatus : mword 12 := Ox"100".
@@ -1334,6 +1334,171 @@ Section SWrites.
   (* statements stand side by side, sharing                                *)
   (* [WpGprCsrwB.hval_legalize_satp_p], the parameterised transport.        *)
   (* ------------------------------------------------------------------- *)
+  (* A6.135 §5: the OWNED register write with a [ghost_step]-shaped hook
+     run against the live interp at the node -- the seam the kernel-table
+     establishment rides ([wp_csrw_satp_s_sconf_gs] below). *)
+  Lemma swp_write_reg_owned_gs (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (r : register)
+      (v : type_of_register r) (P Q : iProp Σ) :
+    Drw ## Dro ->
+    r ∈ Drw ->
+    gen_cert -∗
+    (∀ g : gstate,
+       gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+       tso_interp_at riscv_eraGS g -∗ P ={⊤}=∗
+       gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+       tso_interp_at riscv_eraGS g ∗ Q) -∗
+    P -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (Defs.write_reg r v)
+      (fun _ => Q ∗ hreg_frame (register_set r v rs) Drw ∗
+                hreg_frame_ro Df (register_set r v rs) Dro).
+  Proof.
+    intros Hdisj Hin.
+    iIntros "#Hcert Hhook HP Hrw Hro".
+    iApply (HartRegNode.swp_hart_regwrite_gs r v (Defs.write_reg r v) _ P Q
+              (HartRegNode.hregwrite_val_at_write_reg r v)
+              with "Hcert Hhook HP [Hrw Hro]").
+    iIntros (σ) "HQ Hσ". rewrite /mstate_interp.
+    iDestruct "Hσ" as "(Hreg & Hmem & Hdev)".
+    iMod (hreg_frame_update rs Drw r v σ.(sregs) Hin with "Hreg Hrw")
+      as "[Hreg Hrw]".
+    iApply fupd_mask_intro; [apply empty_subseteq|].
+    iIntros "Hcl". iNext. iMod "Hcl" as "_". iModIntro.
+    iSplitL "Hreg Hmem Hdev".
+    { rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
+      iFrame "Hreg Hmem Hdev". }
+    iDestruct (hreg_frame_ro_ext Df rs (register_set r v rs) Dro with "Hro")
+      as "Hro".
+    { intros r' Hr'.
+      assert (Hne : r' <> r).
+      { intros ->. exact (Hdisj r Hin Hr'). }
+      by rewrite (irrelevant_register_set r' r rs v
+                    (register_beq_false r' r Hne)). }
+    iApply swp_ret. iFrame "HQ Hrw Hro".
+  Qed.
+
+  Lemma swp_write_CSR_satp_S_gs (dq dq2 : dfrac) (satp0 ms0 v : mword 64)
+      (P Q : iProp Σ) :
+    cw2_ok satp mstatus ->
+    _get_Mstatus_SXL ms0 = 'b"10" ->
+    gen_cert -∗
+    (∀ g : gstate,
+       gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+       tso_interp_at riscv_eraGS g -∗ P ={⊤}=∗
+       gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+       tso_interp_at riscv_eraGS g ∗ Q) -∗
+    P -∗
+    (hreg_frame (pw2_rs Supervisor satp satp0 mstatus ms0) (cw_Drw satp) -∗
+     hreg_frame_ro (cw2_Df dq dq2 mstatus) (pw2_rs Supervisor satp satp0 mstatus ms0)
+       (cw2_Dro mstatus) -∗
+     swp (write_CSR csr_satp v)
+       (fun x => ⌜x = Ok (satp_legalized satp0 v)⌝ ∗ Q ∗
+          hreg_frame (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0)
+            (cw_Drw satp) ∗
+          hreg_frame_ro (cw2_Df dq dq2 mstatus)
+            (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0)
+            (cw2_Dro mstatus))).
+  Proof.
+    intros Hok HSXL. iIntros "#Hcert Hhook HP Hrw Hro".
+    rewrite write_CSR_satp_red.
+    (* 1. the architecture read, walked *)
+    iApply (swp_bind_use (architecture Supervisor) _
+              (fun a => ⌜a = RV64⌝ ∗
+                 hreg_frame (pw2_rs Supervisor satp satp0 mstatus ms0) (cw_Drw satp) ∗
+                 hreg_frame_ro (cw2_Df dq dq2 mstatus)
+                   (pw2_rs Supervisor satp satp0 mstatus ms0) (cw2_Dro mstatus))%I _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 4 (cw_Drw satp) (cw2_Dro mstatus)
+                (cw2_Df dq dq2 mstatus) (pw2_rs Supervisor satp satp0 mstatus ms0) _ _ _
+                (cw2_disj satp mstatus Hok)
+                (hfrun_architecture_Supervisor
+                   (cw_Drw satp ∪ cw2_Dro mstatus) (cw_Drw satp)
+                   (pw2_rs Supervisor satp satp0 mstatus ms0)
+                   (cw2_in_r2 satp mstatus)
+                   ltac:(rewrite (pw2_rs_r2 Supervisor satp satp0 mstatus ms0);
+                         exact HSXL))
+                with "Hcert Hrw Hro"). }
+    iIntros (a) "(-> & Hrw & Hro)".
+    (* 2. the satp read, at the frame *)
+    iApply (swp_bind_use (Defs.read_reg satp) _
+              (fun o => ⌜o = satp0⌝ ∗
+                 hreg_frame (pw2_rs Supervisor satp satp0 mstatus ms0) (cw_Drw satp) ∗
+                 hreg_frame_ro (cw2_Df dq dq2 mstatus)
+                   (pw2_rs Supervisor satp satp0 mstatus ms0) (cw2_Dro mstatus))%I _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_mono with "[] [-]");
+        [| iApply (swp_read_reg_pinned (cw_Drw satp) (cw2_Dro mstatus)
+                     (cw2_Df dq dq2 mstatus) (pw2_rs Supervisor satp satp0 mstatus ms0)
+                     satp (cw2_disj satp mstatus Hok)
+                     (cw2_in_r satp mstatus) with "Hcert Hrw Hro") ].
+      iIntros (o) "(-> & Hrw & Hro)".
+      rewrite (pw2_rs_r Supervisor satp satp0 mstatus ms0 Hok). by iFrame. }
+    iIntros (o) "(-> & Hrw & Hro)".
+    (* 3. the legalization, goodb-transported *)
+    iApply (swp_bind_use (legalize_satp RV64 satp0 v) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_span (cw_Drw satp) (cw2_Dro mstatus)
+                (cw2_Df dq dq2 mstatus) (pw2_rs Supervisor satp satp0 mstatus ms0)
+                (pw2_rs Supervisor satp satp0 mstatus ms0) _ _
+                (cw2_disj satp mstatus Hok)
+                (hval_legalize_satp_S (cw_Drw satp ∪ cw2_Dro mstatus)
+                   (cw_Drw satp) (pw2_rs Supervisor satp satp0 mstatus ms0) satp0 v
+                   (cw2_in_priv satp mstatus) (cw2_in_sec satp mstatus)
+                   (cw2_in_misa satp mstatus)
+                   (pw2_rs_priv Supervisor satp satp0 mstatus ms0 Hok)
+                   (pw2_rs_sec Supervisor satp satp0 mstatus ms0 Hok)
+                   (pw2_rs_misa Supervisor satp satp0 mstatus ms0 Hok))
+                with "Hcert Hrw Hro"). }
+    iIntros (c) "(-> & Hrw & Hro)".
+    (* 4. the write and the readback *)
+    iApply (swp_bind_use _ _
+              (fun c2 => ⌜c2 = satp_legalized satp0 v⌝ ∗ Q ∗
+                 hreg_frame (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0)
+                   (cw_Drw satp) ∗
+                 hreg_frame_ro (cw2_Df dq dq2 mstatus)
+                   (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0)
+                   (cw2_Dro mstatus))%I _
+              with "[Hhook HP Hrw Hro] [-]").
+    { iApply (swp_bind0_use _ _
+                (fun _ => Q ∗ hreg_frame
+                   (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0)
+                   (cw_Drw satp) ∗
+                   hreg_frame_ro (cw2_Df dq dq2 mstatus)
+                     (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0)
+                     (cw2_Dro mstatus))%I _
+                with "[Hhook HP Hrw Hro] [-]").
+      { iApply (swp_mono with "[] [-]");
+          [| iApply (swp_write_reg_owned_gs (cw_Drw satp) (cw2_Dro mstatus)
+                       (cw2_Df dq dq2 mstatus)
+                       (pw2_rs Supervisor satp satp0 mstatus ms0) satp _ P Q
+                       (cw2_disj satp mstatus Hok) (cw2_w_r satp mstatus)
+                       with "Hcert Hhook HP Hrw Hro") ].
+        iIntros (u) "(HQ & Hrw & Hro)".
+        iDestruct (cw2_rw_ext satp _ _
+                     (reg_agree_l _ _ _ _
+                        (pw2_set_agree Supervisor satp satp0 _ mstatus ms0 Hok))
+                     with "Hrw") as "Hrw".
+        iDestruct (cw2_ro_ext dq dq2 mstatus _ _
+                     (reg_agree_r _ _ _ _
+                        (pw2_set_agree Supervisor satp satp0 _ mstatus ms0 Hok))
+                     with "Hro") as "Hro".
+        by iFrame. }
+      iIntros (u) "(HQ & Hrw & Hro)".
+      iApply (swp_mono with "[HQ] [-]");
+        [| iApply (swp_read_reg_pinned (cw_Drw satp) (cw2_Dro mstatus)
+                     (cw2_Df dq dq2 mstatus)
+                     (pw2_rs Supervisor satp (satp_legalized satp0 v) mstatus ms0) satp
+                     (cw2_disj satp mstatus Hok) (cw2_in_r satp mstatus)
+                     with "Hcert Hrw Hro") ].
+      iIntros (c2) "(-> & Hrw & Hro)".
+      rewrite (pw2_rs_r Supervisor satp (satp_legalized satp0 v) mstatus ms0 Hok).
+      by iFrame. }
+    iIntros (c2) "(-> & HQ & Hrw & Hro)".
+    iApply swp_ret. iSplitR; [done|]. iFrame.
+  Qed.
+
   Lemma swp_write_CSR_satp_S (dq dq2 : dfrac) (satp0 ms0 v : mword 64) :
     cw2_ok satp mstatus ->
     _get_Mstatus_SXL ms0 = 'b"10" ->
@@ -1924,7 +2089,7 @@ Section WpSconfCsr.
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  stvec ↦ᵣ wval)%I
               with "Hcg Hpc Hinstr [Hstv Hcont]").
-    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitL "Hstv".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
@@ -2017,6 +2182,158 @@ Section WpSconfCsr.
      THE INDEX IS THE LITERAL [false] -- see [THE PINNED INDEX] above; and
      here it is doubly forced, since [strans_pending] and the slot are this
      hart's. ---- *)
+  (* A6.135 §5: THE HOOKED SWITCH.  Same instruction, same slot move,
+     and one addition: a caller-supplied fupd-callback runs against the
+     LIVE INTERP at the satp write node, borrowing the capability's own
+     context token -- which is where hart 0 establishes the shared kernel
+     table (publish at own stamps + [kpt_inv_alloc] + boot creds) before
+     the first translated fetch.  The [Q] it produces rides the
+     [_ex_p]-engine's threaded slot back to the continuation. *)
+  Lemma wp_csrw_satp_s_sconf_gs
+      (pc : mword 64) (rs1 : mword 5)
+      (m : regfile) (n : nat) (wval : mword 64) (Rout P Q : iProp Σ) :
+    uint rs1 <> 0 ->
+    rget m rs1 = wval ->
+    sie_cap_gpr kt m n false p -∗
+    strans_pending -∗
+    (* THE ESTABLISHMENT HOOK, at the write node *)
+    (∀ g : gstate,
+       gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+       tso_interp_at riscv_eraGS g -∗ own_context cur_ctx -∗ P ={⊤}=∗
+       gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+       tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗ Q) -∗
+    P -∗
+    (* THE CALLER'S SLOT MOVE, Bare -> KPT -- handed the hook's [Q]
+       (the established table + credentials) alongside the cells. *)
+    (∀ satp0 : mword 64,
+       Q -∗
+       satp ↦ᵣ (satp_legalized satp0 wval) -∗
+       SmodePte.pmp_config (mword_of_int 0 : mword 44) -∗
+       (∃ v : mword 64, stvec ↦ᵣ v) -∗
+       strans_pending -∗ strans_pending -∗
+       |={⊤}=> strans_inv ∗ Rout) -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csr_satp, Regidx rs1, zreg, CSRRW)) -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n false p -∗
+      Rout -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrs1 Hwval) "Hcg Hbit Hhook HP Hslot Hpc Hinstr Hcont".
+    assert (Hok : cw2_ok satp mstatus).
+    { rewrite /cw2_ok /cw_fresh. split_and!;
+        first [ vm_compute; reflexivity | intros HX; discriminate HX ]. }
+    iApply (wp_instr_s_sconf m n false false pc false
+              (CSRReg (csr_satp, Regidx rs1, zreg, CSRRW))
+              (fun (_ : CpuId) npc ms' m' n' =>
+                 ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗ Rout)%I
+              with "Hcg Hpc Hinstr [Hbit Hhook HP Hslot Hcont]").
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iSplitL "Hbit Hhook HP Hslot".
+    - (* ---- the instruction ---- *)
+      iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
+      (* the still-Bare receipt pins the arm and opens it *)
+      iDestruct (strans_inv_acc_bare with "Hbit Htr")
+        as "(Hbit & Hbit2 & Hbare & Hstv)".
+      iDestruct "Hbare" as (satp0) "(Hsatpc & %HbareMode & Hpmp)".
+      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+        "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
+          Hmdl & Hmenv)".
+      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iPoseProof "Hhw" as "#Hhwc".
+      iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+      subst misa0 mseccfg0.
+      pose proof Hmsf as (_ & HSXL & _ & _ & _ & _ & _ & _ & _ & HTVM).
+      iDestruct (pw2_frames_in Supervisor (DfracOwn 1) (DfracOwn 1)
+                   satp satp0 mstatus ms0 Hok
+                   with "Hsatpc Hms Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
+      change (execute (CSRReg (csr_satp, Regidx rs1, zreg, CSRRW)))
+        with (execute_CSRReg csr_satp (Regidx rs1) zreg CSRRW).
+      (* the slot move is a [bupd] under the caller's wand, and
+         [HartSwp.swp_fupd_post] is what lets it run in the swp's POST. *)
+      iApply swp_fupd_post.
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
+      iApply (swp_mono with
+                "[Hstk Harm Hhalf Hspp Hmie Hmdl Hmenv Hpmp Hstv Hbit Hbit2
+                  Hslot HPC HnPC Hresv] [Hrw Hro Hfile Hhook Hctx HP]");
+        [| iApply (swp_execute_CSRReg_w_ex_p (cw_Drw satp) (cw2_Dro mstatus)
+                     (cw2_Df (DfracOwn 1) (DfracOwn 1) mstatus)
+                     (pw2_rs Supervisor satp satp0 mstatus ms0)
+                     (pw2_rs Supervisor satp (satp_legalized satp0 wval)
+                        mstatus ms0)
+                     (tp_pin m) csr_satp Supervisor rs1
+                     ((own_context cur_ctx ∗ Q)%I)
+                     (cw2_disj satp mstatus Hok) (cw2_in_priv satp mstatus)
+                     (pw2_rs_priv Supervisor satp satp0 mstatus ms0 Hok)
+                     ltac:(by vm_compute)
+                     ltac:(by vm_compute) ltac:(by vm_compute)
+                     ltac:(intros cf; by vm_compute)
+                     with "Hcert Hfile Hrw Hro [Hcert] [Hcert Hhook Hctx HP]") ].
+      + iIntros (e) "(-> & Hf & [Hctx HQ] & Hrw & Hro)".
+        iDestruct (pw2_frames_out Supervisor (DfracOwn 1) (DfracOwn 1)
+                     satp (satp_legalized satp0 wval) mstatus ms0 Hok
+                     with "[$Hrw $Hro]") as "(Hsatpc & Hms & Hpriv & _ & _)".
+        iMod ("Hslot" $! satp0 with "HQ Hsatpc Hpmp Hstv Hbit Hbit2")
+          as "[Htr Hout]".
+        iModIntro.
+        iSplitR; [done|].
+        iExists (add_vec_int pc 4), ms0, m, n.
+        iFrame "HPC HnPC Hresv".
+        iSplitL "Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+        { rewrite /sconf_at_priv. iExists mdv0.
+          iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
+          iPureIntro. split; [exact Hmsf | exact Hmm]. }
+        iSplitL "Hstk Htr Harm Hctx". { iFrame "Hstk Htr Harm Hctx Htc Hwit". }
+        iFrame "Hf".
+        iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+        iExact "Hout".
+      + (* the CSR check, at the frame (the [_ex_p] engine asks for it) *)
+        iIntros "Hrw Hro".
+        iApply (swp_span (cw_Drw satp) (cw2_Dro mstatus)
+                  (cw2_Df (DfracOwn 1) (DfracOwn 1) mstatus)
+                  (pw2_rs Supervisor satp satp0 mstatus ms0)
+                  (pw2_rs Supervisor satp satp0 mstatus ms0) _
+                  (CSR_Check_OK tt) (cw2_disj satp mstatus Hok)
+                  (hval_check_CSR_result_satp_S_w
+                     (cw_Drw satp ∪ cw2_Dro mstatus) (cw_Drw satp)
+                     (pw2_rs Supervisor satp satp0 mstatus ms0)
+                     (cw2_in_priv satp mstatus) (cw2_in_sec satp mstatus)
+                     (cw2_in_misa satp mstatus) (cw2_in_r2 satp mstatus)
+                     ltac:(rewrite (pw2_rs_r2 Supervisor satp satp0
+                                      mstatus ms0); exact HTVM))
+                  with "Hcert Hrw Hro").
+      + (* the write itself, hooked *)
+        iIntros "Hrw Hro".
+        change (tp_pin m !!! Regidx rs1) with (rget m rs1). rewrite Hwval.
+        iApply (swp_mono with "[] [-]");
+          [| iApply (swp_write_CSR_satp_S_gs (DfracOwn 1) (DfracOwn 1)
+                       satp0 ms0 wval
+                       ((own_context cur_ctx ∗ P)%I)
+                       ((own_context cur_ctx ∗ Q)%I)
+                       Hok HSXL with "Hcert [Hhook] [Hctx HP] Hrw Hro") ].
+        { iIntros (x) "(-> & HQ & Hrw & Hro)".
+          iSplitR; [by iExists (satp_legalized satp0 wval) |].
+          iFrame "HQ Hrw Hro". }
+        { iIntros (g) "Hgh Hint [Hctx HP]".
+          iMod ("Hhook" $! g with "Hgh Hint Hctx HP")
+            as "(Hgh & Hint & Hctx & HQ)".
+          iModIntro. iFrame "Hgh Hint Hctx HQ". }
+        { iFrame "Hctx HP". }
+    - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & Hout)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hout Hpc'"). done.
+  Qed.
+
+
+
   Lemma wp_csrw_satp_s_sconf
       (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (n : nat) (wval : mword 64) (Rout : iProp Σ) :
@@ -2049,7 +2366,7 @@ Section WpSconfCsr.
               (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗ Rout)%I
               with "Hcg Hpc Hinstr [Hbit Hslot Hcont]").
-    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitL "Hbit Hslot".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -2077,6 +2394,9 @@ Section WpSconfCsr.
       (* the slot move is a [bupd] under the caller's wand, and
          [HartSwp.swp_fupd_post] is what lets it run in the swp's POST. *)
       iApply swp_fupd_post.
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono with
                 "[Hstk Harm Hctx Hhalf Hspp Hmie Hmdl Hmenv Hpmp Hstv Hbit Hbit2
                   Hslot HPC HnPC Hresv] [Hrw Hro Hfile]");
@@ -2221,7 +2541,7 @@ Section WpSconfCsr.
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  sepc ↦ᵣ mepc_val wval)%I
               with "Hcg Hpc Hinstr [Hsepc Hcont]").
-    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitL "Hsepc".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
@@ -2395,7 +2715,7 @@ Section WpSconfCsr.
               with "Hcg Hpc Hinstr [Hrdcsr Hcell Hcont]").
     (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic callback
        is discharged at the ambient hart and nothing is renamed. *)
-    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitL "Hrdcsr Hcell".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -2656,7 +2976,7 @@ Section WpSconfCsr.
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  ⌜∃ ms : mword 64, sconf_ms_facts ms⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitR "Hcont".
     - (* ---- the instruction: a read-MODIFY-write at x0 ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -2681,6 +3001,9 @@ Section WpSconfCsr.
                                Regidx (mword_of_int 0), CSRRC)))
         with (execute_CSRImm csr_sstatus (mword_of_int 2)
                 (Regidx (mword_of_int 0)) CSRRC).
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono with
                 "[Hstk Htr Harm Hctx Hhalf Hspp Hmie Hmdl Hmenv HPC HnPC Hresv]
                  [Hrw Hro Hfile]");
@@ -2788,7 +3111,7 @@ Section WpSconfCsr.
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  ⌜∃ ms : mword 64, sconf_ms_facts ms⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iApply bi.later_intro.
+    iNext.
     (* FREE THE NAME [CID] FOR THE REBOUND HART: with interrupts enabled the
        instruction can be trapped and the thread resumed elsewhere, so every
        resource below is about the hart the callback binds. *)
@@ -2819,9 +3142,12 @@ Section WpSconfCsr.
                                Regidx (mword_of_int 0), CSRRS)))
         with (execute_CSRImm csr_sstatus (mword_of_int 2)
                 (Regidx (mword_of_int 0)) CSRRS).
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono (CID := CID) with
-                "[Hstk Htr Hq1 Harest Hctx Hhalf Hspp Hmie Hmdl Hmenv HPC HnPC Hresv]
-                 [Hrw Hro Hfile]");
+                "[Hstk Htr Hq1 Harest Hctx Hhalf Hspp Hmie Hmdl Hmenv
+                  HPC HnPC Hresv] [Hrw Hro Hfile]");
         [| iApply (swp_execute_CSRImm_rw_p (CID := CID)
                      (cw_Drw (R_bitvector_64 mstatus))
                      cw_Dro (cw_Df (DfracOwn 1))
@@ -2962,7 +3288,7 @@ Section WpSconfCsr.
                  ⌜_get_Mstatus_SPIE ms' = _get_Sstatus_SPIE wval⌝ ∗
                  sret_bits (_get_Mstatus_SPP ms') (_get_Mstatus_SPIE ms'))%I
               with "Hcg Hpc Hinstr [Hsppc Hcont]").
-    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitL "Hsppc".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -3006,9 +3332,12 @@ Section WpSconfCsr.
          and the only one holding both halves.  The update is a [bupd], and
          [HartSwp.swp_fupd_post] is what lets it happen in the swp's POST. *)
       iApply swp_fupd_post.
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono with
-                "[Hstk Htr Harm Hctx Hhalf Hspp Hsppc Hmie Hmdl Hmenv HPC HnPC Hresv]
-                 [Hrw Hro Hfile]");
+                "[Hstk Htr Harm Hctx Hhalf Hspp Hsppc Hmie Hmdl Hmenv
+                  HPC HnPC Hresv] [Hrw Hro Hfile]");
         [| iApply (swp_execute_CSRReg_w_p (cw_Drw (R_bitvector_64 mstatus))
                      cw_Dro (cw_Df (DfracOwn 1))
                      (pw_rs Supervisor (R_bitvector_64 mstatus) ms)
@@ -3167,7 +3496,7 @@ Section WpSconfCsr.
                       (satp_to_ppn (autocast (T := mword) sp0 : mword 64))
                       = root⌝ ∗ kpt_inv root)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitR "Hcont".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -3197,6 +3526,9 @@ Section WpSconfCsr.
                    with "Hms Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
       change (execute (CSRReg (csr_satp, zreg, Regidx rd, CSRRS)))
         with (execute_CSRReg csr_satp zreg (Regidx rd) CSRRS).
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono with
                 "[Hstk Harm Hctx Hsie Hsret Hmie Hmdl Hmenv Htrback Htlbback
                   HPC HnPC Hresv] [Hrw Hro Hfile Hcell]");
@@ -3316,7 +3648,7 @@ Section WpSconfCsr.
               with "Hcg Hpc Hinstr
                     [Htok Hhx Hkptr Hsepcx Hscausex Hstvalx Hsppc Hcells Hclm
                      Hcont]").
-    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitR "Hcont".
     - (* ---- the instruction, and the four-piece ghost flip ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -3345,9 +3677,13 @@ Section WpSconfCsr.
         with (execute_CSRImm csr_sstatus (mword_of_int 2)
                 (Regidx (mword_of_int 0)) CSRRS).
       iApply swp_fupd_post.
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono with
-                "[Hstk Htr Harm Hctx Htok Hhalf Hspp Hqi Hstv Hkptr Hsepcx Hscausex
-                  Hstvalx Hsppc Hclm Hcells Hmie Hmdl Hmenv HPC HnPC Hresv]
+                "[Hstk Htr Harm Hctx Htok Hhalf Hspp Hqi Hstv Hkptr Hsepcx
+                  Hscausex Hstvalx Hsppc Hclm Hcells Hmie Hmdl Hmenv
+                  HPC HnPC Hresv]
                  [Hrw Hro Hfile]");
         [| iApply (swp_execute_CSRImm_rw_p (cw_Drw (R_bitvector_64 mstatus))
                      cw_Dro (cw_Df (DfracOwn 1))
@@ -3519,11 +3855,13 @@ Section WpSconfCsr.
                      !!! Regidx csp_rs1) (trap_res b + n) ∗
         ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝ ∗
         sie_arm kt b p ∗
-        (* AND SO DOES THE THREAD-OF-CONTROL TOKEN (tso-port M2): the one
-           member of the give-back that is NOT persistent.  This is the single
-           leaf that takes [IntrDefs.sie_cap] apart across the σ-callback, so a
+        (* AND SO DOES THE THREAD-OF-CONTROL TOKEN -- the bundle carries it
+           for the same reason as the two below, but it is the one member of
+           the give-back that is NOT persistent.  This is the single leaf
+           that takes [IntrDefs.sie_cap] apart across the σ-callback, so a
            give-back that did not NAME [own_context] would drop the thread's
-           identity here, with nothing to conjure it back from. *)
+           identity here and leave every caller unable to re-fold the
+           capability -- there is nothing to conjure it back from. *)
         own_context cur_ctx ∗
         (* AND SO DOES THE TIMER CAPABILITY, for exactly the reason the
            witness does: it is a conjunct of [IntrDefs.sie_cap] (see the note
@@ -3551,7 +3889,7 @@ Section WpSconfCsr.
                  ⌜m' = <[Regidx rd := regval_into_reg (sstatus_read ms')]> m⌝ ∗
                  ⌜n' = n⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iApply bi.later_intro.
+    iNext.
     (* FREE THE NAME [CID] FOR THE REBOUND HART: at [b = true] the read can be
        trapped and the thread resumed elsewhere, and every resource the
        continuation hands on is then about THAT hart. *)
@@ -3730,7 +4068,7 @@ Section WpSconfCsr.
                  trap_csrs (CID := CIDr) kt ∗ cpu_claim (CID := CIDr) p ∗
                  cpu_priv_pay (CID := CIDr) true p)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iApply bi.later_intro.
+    iNext.
     rename CID into CID0.
     iIntros (CID Hs). rewrite /sconf_step_obl.
     iSplitR "Hcont".
@@ -3769,9 +4107,13 @@ Section WpSconfCsr.
         with (execute_CSRImm csr_sstatus (mword_of_int 2)
                 (Regidx (mword_of_int 0)) CSRRC).
       iApply (swp_fupd_post (CID := CID)).
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono (CID := CID) with
-                "[Hstk Htr Hq1 Hctx Hhalf Hspp Hcnt2 Hqi Hstv Hkptr Hsepcx Hscausex
-                  Hstvalx Hsppc Hclmx Hcells Hmie Hmdl Hmenv HPC HnPC Hresv]
+                "[Hstk Htr Hq1 Hctx Hhalf Hspp Hcnt2 Hqi Hstv Hkptr Hsepcx
+                  Hscausex Hstvalx Hsppc Hclmx Hcells Hmie Hmdl Hmenv
+                  HPC HnPC Hresv]
                  [Hrw Hro Hfile]");
         [| iApply (swp_execute_CSRImm_rw_p (CID := CID)
                      (cw_Drw (R_bitvector_64 mstatus))
@@ -3925,7 +4267,7 @@ Section WpSconfCsr.
                    cpu_claim_pay (CID := CIDr) 0 true p ∗
                    cpu_priv_pay (CID := CIDr) true p)%I
                 with "Hcg Hpc Hinstr [Hcont]").
-      iApply bi.later_intro.
+      iNext.
       rename CID into CID0.
       iIntros (CID Hs). rewrite /sconf_step_obl.
       iSplitR "Hcont".
@@ -3961,9 +4303,13 @@ Section WpSconfCsr.
                                  Regidx rd, CSRRC)))
           with (execute_CSRImm csr_sstatus (mword_of_int 2) (Regidx rd) CSRRC).
         iApply (swp_fupd_post (CID := CID)).
+        (* [Hctx] -- the thread-of-control token -- travels with the rest of
+           the capability into the POST side of the [swp_mono], which is where
+           [sie_cap] is rebuilt; the [swp] side never touches it. *)
         iApply (swp_mono (CID := CID) with
-                  "[Hstk Htr Hq1 Hctx Hhalf Hspp Hcnt2 Hqi Hstv Hkptr Hsepcx Hscausex
-                    Hstvalx Hsppc Hclmx Hcells Hmie Hmdl Hmenv HPC HnPC Hresv]
+                  "[Hstk Htr Hq1 Hctx Hhalf Hspp Hcnt2 Hqi Hstv Hkptr Hsepcx
+                    Hscausex Hstvalx Hsppc Hclmx Hcells Hmie Hmdl Hmenv
+                    HPC HnPC Hresv]
                    [Hrw Hro Hfile]");
           [| iApply (swp_execute_CSRImm_rw_p (CID := CID)
                        (cw_Drw (R_bitvector_64 mstatus))
@@ -4086,7 +4432,7 @@ Section WpSconfCsr.
                    cpu_claim_pay (CID := CIDr) k eb p ∗
                    cpu_priv_pay (CID := CIDr) false p)%I
                 with "Hcg Hpc Hinstr [Hcnt Hcont]").
-      iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+      iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
       iSplitR "Hcont".
       + iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
         iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
@@ -4114,8 +4460,12 @@ Section WpSconfCsr.
         change (execute (CSRImm (csr_sstatus, mword_of_int 2,
                                  Regidx rd, CSRRC)))
           with (execute_CSRImm csr_sstatus (mword_of_int 2) (Regidx rd) CSRRC).
+        (* [Hctx] -- the thread-of-control token -- travels with the rest of
+           the capability into the POST side of the [swp_mono], which is where
+           [sie_cap] is rebuilt; the [swp] side never touches it. *)
         iApply (swp_mono with
-                  "[Hstk Htr Harm Hctx Hcnt Hhalf Hspp Hmie Hmdl Hmenv HPC HnPC Hresv]
+                  "[Hstk Htr Harm Hctx Hcnt Hhalf Hspp Hmie Hmdl Hmenv
+                    HPC HnPC Hresv]
                    [Hrw Hro Hfile]");
           [| iApply (swp_execute_CSRImm_rw_p
                        (cw_Drw (R_bitvector_64 mstatus))

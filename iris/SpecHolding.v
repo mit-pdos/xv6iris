@@ -74,6 +74,9 @@ Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenI
   (⊢ Tc -∗ Dc -∗ False) ->
   sie_cap_gpr kt m n false p -∗
   kernel_text -∗ pc_is pcE -∗
+  (* A6.120: the PLAIN opener -- the racy read cashes [lk_floor] on either
+     arm against the running token ([WpLock.lk_floor_vis]); the absorbed
+     opener of A6.112/A6.119 is retired. *)
   lock_openable γl lka s R Dc -∗
   Tc -∗
   (* threaded in and back out: it is not persistent, and it lives in the

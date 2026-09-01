@@ -42,8 +42,10 @@ Require Import KernelRvcDecode.
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
-   leg M); this caller is not yet -- the shim marks the open seam *)
+Require Import CtxKMap.   (* [ctx_mem_page_to_phys]: the tower's identity disassembly *)
+Require Import TsoCtx.
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -693,7 +695,7 @@ Section KvmmakeHouse.
     ptree_own 2 (DfracOwn 1) tf -∗
     kalloc_env_at γa γk (avail_sub on K_kvmmake) -∗
     ([∗ list] i ∈ seq 0 64,
-       page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
+       page_filled (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12))) kalloc_junk) -∗
     wp_next (CID0 := CID) b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t : ptree) (pas' : nat -> mword 44),
       sie_cap_gpr KT0 mr K b p -∗ cpu_own lvl eb p b lks -∗ pc_is ret_tgt -∗
@@ -706,7 +708,7 @@ Section KvmmakeHouse.
       ⌜callee_saved mm mr⌝ -∗
       ⌜kvm_pas_ok pas'⌝ -∗
       ([∗ list] i ∈ seq 0 64,
-         page_own (zero_extend' 64 (concat_vec (pas' i) (zeros' 12 : mword 12)))) -∗
+         page_filled (zero_extend' 64 (concat_vec (pas' i) (zeros' 12 : mword 12))) kalloc_junk) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -936,8 +938,8 @@ Section KvmmakeBody.
      site below mints its own context, this file not being converted yet. *)
   Hypothesis wp_memset :
     forall `{CID : CpuId} `{XI0 : CurCtx} (m0 : regfile) (n : nat) (len : nat)
-      (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
-      wp_memset_sconf_body KT0 KT0 m0 n len cval olds b pcur.
+      (cval : mword 64) (b : bool) (pcur : mword 64),
+      wp_memset_free_sconf_body KT0 KT0 m0 n len cval b pcur.
   Hypothesis wp_kvmmap :
     forall `{CID : CpuId} (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
@@ -1154,16 +1156,14 @@ Section KvmmakeBody.
     assert (HM4a2 : M4 !!! Regidx (mword_of_int 12 : mword 5) = mword_of_int (Z.of_nat 4096)).
     { rewrite /M4 /M3. repeat (rewrite upd_ne; [| reg_neq]). rewrite /M2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite /page_own /byte_any) in "Hpage".
-    iDestruct (bb_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
     (* memset's contract is context-indexed AND so is [page_own] since the M1
        flip: both sides are the SAME ctx fact, so there is no crossing here
        any more (only the per-byte tier annotation is re-fixed below). *)
-    iApply (wp_memset M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
+    iApply (wp_memset M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) b p
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
-              with "Hcg Htext Hpc [Hbuf]").
-    { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
+              with "Hcg Htext Hpc [Hpage]").
+    { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
     iIntros (CID12 Hs12 mfin) "Hcg Hpc Hbytes %Hmcs".
-    iDestruct (ctx_buf_to_mem with "Hbytes") as "Hbytes".
     assert (Hret18 : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x18)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret18) in "Hpc".
@@ -1184,7 +1184,11 @@ Section KvmmakeBody.
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
-    iDestruct (mem_page_to_phys root0 (DfracOwn 1) (mword_of_int 0 : mword 8)
+    (* A6.68: [KMap] sits BELOW [TsoCtx], so its [mem_page_to_phys] would
+       drop the ledger residue and the return trip is the direction the
+       flip makes false.  [CtxKMap.ctx_mem_page_to_phys] is the same
+       identity disassembly carried out AT THE TOWER. *)
+    iDestruct (ctx_mem_page_to_phys cur_ctx root0 (DfracOwn 1) (mword_of_int 0 : mword 8)
                  ltac:(intros j Hj; apply kdata_svpn_class; apply page_in_range_addr_is_kdata; [exact Hpv | exact Hj])
                  with "Hkmapb Hbytes") as "Hbytes".
     iEval (rewrite -Hpbase) in "Hbytes".
@@ -1192,12 +1196,6 @@ Section KvmmakeBody.
     { rewrite <- (page_base_unsigned bppn). rewrite Hpbase. reflexivity. }
     assert (Hnpv : page_valid (page_base bppn)).
     { unfold page_base. rewrite Hpbase. exact Hpv. }
-    (* ...and into the ambient context at the physical tier (the node's
-       slots are the thread's own registered cells; SC: the shim's step) *)
-    iDestruct (TsoCtxShim.ctx_phys_run_of_mem TsoCtx.cur_ctx
-                 (fun j => pa_add (zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))) j)
-                 (fun _ => (mword_of_int 0 : mword 8)) 4096 (DfracOwn 1)
-                 with "Hbytes") as "Hbytes".
     iDestruct (pt_node_claim_from_static bppn Hnpv with "Hkmapb") as "#Hbclaim".
     iDestruct (zero_page_to_node 2 (DfracOwn 1) bppn with "Hbclaim Hbytes") as "Hptree".
     (* callee-saved recovery for the output register-map [mfin] *)
@@ -2297,7 +2295,7 @@ Module KvmmakeProof (AK : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTAC
       : wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks :=
     wp_kvmmake_sconf_gen
       (fun (CID' : CpuId) => AK.wp_kalloc_sconf KT0 (CID := CID'))
-      (fun (CID' : CpuId) (XI' : CurCtx) => MS.wp_memset_sconf KT0 KT0 (CID := CID') (XI := XI'))
+      (fun (CID' : CpuId) (XI' : CurCtx) => MS.wp_memset_free_sconf KT0 KT0 (CID := CID') (XI := XI'))
       (fun (CID' : CpuId) => KM.wp_kvmmap_sconf (CID := CID'))
       (fun (CID' : CpuId) => PM.wp_proc_mapstacks_sconf (CID := CID'))
       γa γk mm lvl K eb p on b lks.

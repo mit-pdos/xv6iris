@@ -105,13 +105,18 @@ Section ProofMemset.
        [Regidx ra{1,4,5} <> Regidx Rtp] facts -- which arrive as [SrcOk]
        instances now, not as premises, and are read off with
        [src_ok_not_tp] once at the top. *)
-  Lemma wp_memset_loop_sconf
+  (* §0.26′ / A6.85: PROVED AT THE VISIBILITY-FREE INPUT.  The only line
+     that moves is the [sb] leaf -- [wp_sb_free_s_sconf] instead of
+     [wp_sb_s_sconf] -- because that leaf is where the mint happens.  The
+     filled bytes come back REGISTERED exactly as before, so the
+     recombination, the IH and the continuation are untouched. *)
+  Lemma wp_memset_loop_free_sconf
       (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5)
       `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13)
-      (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64)
-    : wp_memset_loop_sconf_body kt ktb N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.
+      (n : nat) (b : bool) (pcur : mword 64)
+    : wp_memset_loop_free_sconf_body kt ktb N p e cval ra1 ra4 ra5 imm_bne n b pcur.
   Proof.
-    cbv beta delta [wp_memset_loop_sconf_body].
+    cbv beta delta [wp_memset_loop_free_sconf_body].
     intros pc0 pc4 pc6 cbyte Hra1 Hra4 Hra5 Hback Hal0
       Hincr Hcmp Hra4ne Hra1ne Hra5sp Hext0 Hext4 Hext6.
     (* the three tp exclusions, read off the [SrcOk] instances the statement
@@ -145,7 +150,7 @@ Section ProofMemset.
     assert (Hm1' : forall H : CpuId, rget (CID := H) m ra1 = cval).
     { intro H. rewrite (rget_ne (CID := H) m ra1 Hra1tp). exact Hm1. }
     (* --- 0xce0: sb a1, 0(a5) : fill byte [off] --- *)
-    iApply (wp_sb_s_sconf (kt := kt) (ktd := ktb) pc0 ra1 ra5 (mword_of_int 0) m n (olds off) b
+    iApply (wp_sb_free_s_sconf (kt := kt) (ktd := ktb) pc0 ra1 ra5 (mword_of_int 0) m n b
               with "Hcg Hpc [] [Hb0]").
     { iApply (Hext0 with "Htext"). }
     { rewrite Hcur'. rewrite -ms_pa_sb_pa. iExact "Hb0". }
@@ -231,6 +236,28 @@ Section ProofMemset.
         change (seq off (S (S rem''))) with (off :: seq (S off) (S rem'')).
         rewrite big_sepL_cons.
         iSplitL "Hb0"; [ iEval (rewrite -ms_pa_sb_pa trunc8_nth0 Hcur' Hm1') in "Hb0"; iExact "Hb0" | iExact "Hbuf'" ].
+  Qed.
+
+  (* THE REGISTERED FORM, unchanged for every client: a caller whose
+     buffer is already registered to its own context owns strictly more
+     than the loop asks ([TsoCtx.ctx_pointsto_free]). *)
+  Lemma wp_memset_loop_sconf
+      (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5)
+      `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13)
+      (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64)
+    : wp_memset_loop_sconf_body kt ktb N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.
+  Proof.
+    cbv beta delta [wp_memset_loop_sconf_body].
+    intros pc0 pc4 pc6 cbyte Hra1 Hra4 Hra5 Hback Hal0
+      Hincr Hcmp Hra4ne Hra1ne Hra5sp Hext0 Hext4 Hext6.
+    intros rem off m Hoff Hrem Hcur Hm4 Hm1.
+    iIntros "Hcg #Htext Hpc Hbuf Hcont".
+    iApply (wp_memset_loop_free_sconf N p e cval ra1 ra4 ra5 imm_bne n b pcur
+              Hra1 Hra4 Hra5 Hback Hal0 Hincr Hcmp Hra4ne Hra1ne Hra5sp
+              Hext0 Hext4 Hext6 rem off m Hoff Hrem Hcur Hm4 Hm1
+              with "Hcg Htext Hpc [Hbuf] Hcont").
+    iApply (big_sepL_mono with "Hbuf"). iIntros (k j _) "H".
+    by iApply (TsoCtx.ctx_pointsto_free (KTR := ktb)).
   Qed.
 
   Lemma wp_memset_suffix_sconf

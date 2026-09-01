@@ -56,7 +56,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
-Require Import SchedCtx.  (* [procs_inv_len]: the accessor, not a destruct *)
 Require Import HartTp WpNext.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import RiscvExtras.
@@ -126,7 +125,8 @@ Section ProofPipeclose.
       by (intro i; apply mycpu_ret_nonzero, tp_ok_cid_of).
     iIntros "Hcg Hown #Htext Hpc #Hpipe Href #Hkmem Havail #Hpinv Hcont".
     iDestruct (sie_b_agree m n av eb b pme lks with "Hcg Hown") as %Houtb.
-    iDestruct (procs_inv_len with "Hpinv") as %Hlen.
+    iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
+    { iDestruct "Hpinv" as "[%Hl _]". iPureIntro. exact Hl. }
     iDestruct (is_pipe_valid with "Hpipe") as %Hpv.
     iPoseProof (is_pipe_openable with "Hpipe") as "#Hopen".
     (* ---- 0x00: c.addi sp,-32 -- the frame trade (k := 4) ---- *)
@@ -421,7 +421,7 @@ Section ProofPipeclose.
     (* ================================================================= *)
     iDestruct (cpu_own_transport CID CID9 n eb pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_gen_sconf KT1 γl "pipe" <{ pipe_res γp pi }>
+    iApply (Acquire.wp_acquire_gen_sconf KT1 γl "pipe" (pipe_res_at γp pi)
               (pipe_ref γp w 1) (pipe_dead γl γp) A4 n eb pme (av - 4)%nat b lks
               ltac:(lia) ltac:(lia) Hno
               ltac:(iApply pipe_ref_dead) ltac:(intro i; iApply locked_pre_dead)
@@ -521,7 +521,7 @@ Section ProofPipeclose.
            what [Hbeq]/[Houtb] records).  Pure re-spelling -- it is what makes
            the acquire/release pair compose back to [N]. *)
         iEval (rewrite Houtb) in "Hcg".
-        iApply (Release.wp_release_gen_sconf KT1 γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp) emp%I
+        iApply (Release.wp_release_gen_sconf KT1 γl pi "pipe" (pipe_res_at γp pi) (pipe_dead γl γp) emp%I
                   V2 n eb pme (av - 4)%nat ({["pipe"%string]} ∪ lks)
                   HlkaV2 ltac:(lia)
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
@@ -676,7 +676,7 @@ Section ProofPipeclose.
         apply kv_addv_zero. }
       (* same re-spelling as at the other release: [b] IS [outb]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (ReleaseCancel.wp_release_cancel_sconf KT1 γl pi "pipe" <{ pipe_res γp pi }>
+      iApply (ReleaseCancel.wp_release_cancel_sconf KT1 γl pi "pipe" (pipe_res_at γp pi)
                 (pipe_dead γl γp) (pipe_bytes pi) K2 n eb pme (av - 4)%nat
                 ({["pipe"%string]} ∪ lks)
                 HlkaK2 ltac:(lia)
@@ -745,6 +745,10 @@ Section ProofPipeclose.
                 ltac:(lkbelow)
                 with "Hcg Hown Htext Hpc Hkmem [Hword Hcpu Hbytes] Havail").
       all: try lkbelow.
+      (* §0.26′ / A6.85: THE SITE THAT FORCED THE RULING.  A lock on a
+         kalloc'd page must be able to DIE; after the M4 flip its owner
+         word is a ledger cell that cannot re-enter the ctx tower, and it
+         does not have to -- kfree wants only the page's FUTURE. *)
       { rewrite /kfree_pre. iEval (rewrite Ha0K4). iSplitR; [done|].
         iApply (pipe_bytes_page_own with "Hword Hcpu Hbytes"). }
       iIntros (CIDkf Hskf mk) "Hcg Hown Hpc %Hcsk Havail".

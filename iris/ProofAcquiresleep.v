@@ -150,8 +150,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* M1 stage 2: [asl_word4_nonzero] reads the RAM fact off
-                         a flipped byte through the gen_heap accessor *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -214,14 +212,16 @@ Qed.
    conjunct, at the IDENTITY address given by its fourth), and RAM starts at
    [ram_base = 0x80000000].  So the premise is discharged where the resource
    is, and no caller of acquiresleep has to carry it. *)
-Lemma asl_word4_nonzero `{XI : CurCtx} `{!riscvGS Σ} (a : mword 64) (dq : dfrac) (w : mword 32) :
+Lemma asl_word4_nonzero `{!riscvGS Σ} `{XI : CurCtx} (a : mword 64) (dq : dfrac) (w : mword 32) :
   a ↦₄{dq} w ⊢ ⌜eq_vec a (zero_reg : mword 64) = false⌝.
 Proof.
   iIntros "H".
   iDestruct (ctx_word4_pointsto_bytes with "H") as "Hbs".
   iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbs") as "Hb0".
   { rewrite lookup_seq_lt; [reflexivity | lia]. }
-  iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb0") as "Hb0".
+  (* A6.68: [↦₄] is the CONTEXT tower now, so the raw byte law wants the
+     forgetful projection first ([WpSconfMem.mem_pointsto_claim]'s shape). *)
+  iDestruct (TsoCtx.ctx_pointsto_forget with "Hb0") as "Hb0".
   iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(_ & _ & %Hram & %Hid & _)".
   iPureIntro.
   rewrite Hid pa_add_0 in Hram.

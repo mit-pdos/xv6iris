@@ -527,6 +527,8 @@ End UserExec.
 Section MainCompatUserExec.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context (C : ucfg) (pt : uptd).
+  Context (Rut : uptd -> iProp Σ).
 
   (* THE SAME FRAME AT NAMED VALUES.  [user_trap_frame] below is this with
      its five data existentially quantified; a caller that KNOWS which state
@@ -547,7 +549,7 @@ Section MainCompatUserExec.
       pc_is (stvec_base (uc_stvec C)) ∗
       gpr_file g ∗
       user_pt_any pt ∗
-      user_cfg ∗
+      user_cfg C ∗
       Rut pt)%I.
 
 
@@ -561,7 +563,7 @@ Section MainCompatUserExec.
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ ms' -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ stv' -∗ sepc ↦ᵣ sep' -∗
     pc_is (stvec_base (uc_stvec C)) -∗
-    gpr_file g -∗ user_pt_any pt -∗ user_cfg -∗ Rut pt -∗
+    gpr_file g -∗ user_pt_any pt -∗ user_cfg C -∗ Rut pt -∗
     user_trap_frame_at ms' sc' stv' sep' g.
   Proof.
     iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr Hupt Hcfg Hrut".
@@ -600,7 +602,7 @@ Section MainCompatUserExec.
       pc_is (stvec_base (uc_stvec C)) ∗
       gpr_file g ∗
       user_ptm_inv pt sz M ∗
-      user_cfg ∗
+      user_cfg C ∗
       Rut pt)%I.
 
 
@@ -637,7 +639,7 @@ Section MainCompatUserExec.
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ ms' -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ stv' -∗ sepc ↦ᵣ sep' -∗
     pc_is (stvec_base (uc_stvec C)) -∗
-    gpr_file g -∗ user_ptm_inv pt sz M -∗ user_cfg -∗ Rut pt -∗
+    gpr_file g -∗ user_ptm_inv pt sz M -∗ user_cfg C -∗ Rut pt -∗
     user_trap_frame_atm sz M ms' sc' stv' sep' g.
   Proof.
     iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr Hupt Hcfg Hrut".
@@ -656,7 +658,7 @@ Section MainCompatUserExec.
   Qed.
 
 Lemma user_trap_frame_unfold :
-    user_trap_frame ⊣⊢
+    user_trap_frame C pt Rut ⊣⊢
     ∃ (ms_v sc_v stval_v sepc_v : mword 64) (g : regfile),
       user_trap_frame_at ms_v sc_v stval_v sepc_v g.
   Proof. reflexivity. Qed.

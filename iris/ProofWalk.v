@@ -21,6 +21,7 @@ Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KallocInv.
 Require Import KMap.   (* mem_page_to_phys: kalloc-page ↦ₘ → ↦ₚ for the PT node *)
+Require Import CtxKMap.   (* A6.68: the same disassembly AT THE CONTEXT TOWER *)
 Require Import WpLock.
 Require Import CommonWalk PtTree.
 Require Import KptTree.   (* pt_slot_phys_to_mem / pt_slot_mem_to_phys / pt_node_claim_from_static *)
@@ -38,9 +39,15 @@ From Kernel Require KernelSyms.
 Require Import SpecWalk.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
-   leg M); this caller is not yet -- the shim marks the open seam *)
+Require Import TsoCtx.
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Import Defs.
+Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving
+                            ([ctx_word_pointsto_split4]/[_join4]) and the
+                            window forget ([ctx_buf_forget]) live here --
+                            the lowest file importing both [InstrBytes]'
+                            pure halves and [TsoCtx]'s tier. *)
 Local Open Scope Z_scope.
 
 
@@ -682,17 +689,15 @@ Section ProofWalk.
     (* bridge [page_own p] to memset's per-byte buffer, then hand it to the
        general array-memset spec at len = 4096 (KEEPING the written bytes). *)
     iEval (rewrite /page_own /byte_any) in "Hpage".
-    iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add p j) ↦ₘ b)%I) with "Hpage")
-      as (olds) "Hbuf".
     assert (Ha2' : m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
     (* memset's contract is context-indexed AND so is [page_own] since the M1
        flip: both sides are the SAME ctx fact now, so the crossing is gone --
        only the tier annotation is re-fixed, per byte. *)
-    iApply (MemsetArray.wp_memset_sconf kt KT0 m0 n 4096 cval olds b pcur
+    iApply (MemsetArray.wp_memset_free_sconf kt KT0 m0 n 4096 cval b pcur
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
-              with "Hcg Htext Hpc [Hbuf]").
-    { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }
+              with "Hcg Htext Hpc [Hpage]").
+    { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". iExact "H". }
     iIntros (CIDm Hsm mfin) "Hcg Hpc Hbuf %Hcs".
     iSpecialize ("Hcont" $! CIDm with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! mfin with "Hcg Hpc Hbuf [%]").
@@ -866,7 +871,7 @@ Section ProofWalk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (wi_7c with "Htext"). }
-      iIntros (CIDa5 Hsa5). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iIntros (CIDa5 Hsa5). iNext. iIntros "Hcg Hpc".
       assert (Htgt52 : add_vec (mword_of_int (KernelSyms.walk + 0x7c) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 235 : mword 8) ('b"0"))))
               = mword_of_int (KernelSyms.walk + 0x52)) by (apply bv_eq; vm_compute; reflexivity).
@@ -971,7 +976,9 @@ Section ProofWalk.
               ltac:(rewrite /N4 upd_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hpage]").
-    { iEval (rewrite HN4a0). iExact "Hpage". }
+    (* A6.87: kalloc hands back its own memset run; this memset only wants
+       the ownership, so it downgrades. *)
+    { iEval (rewrite HN4a0). iApply (page_own_of_filled with "Hpage"). }
     iIntros (CIDa9 Hsa9 mfin) "Hcg Hpc Hbytes %Hmcs".
     assert (Hret86 : ret_pc (N4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.walk + 0x86)).
     { rewrite /N4 upd_eq. apply bv_eq; vm_compute; reflexivity. }
@@ -987,21 +994,15 @@ Section ProofWalk.
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
-    (* [KMap] is BELOW the seam -- its [↦ₘ] is the raw byte -- so the memset
-       window crosses out of the context here, by name. *)
-    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hbytes") as "Hbytes".
-    iDestruct (mem_page_to_phys (mr !!! Regidx (mword_of_int 10 : mword 5)) (DfracOwn 1) (mword_of_int 0 : mword 8)
+    (* A6.68: [KMap] is BELOW the seam -- its [↦ₘ]/[↦ₚ] are the RAW families
+       -- so the crossing runs through [CtxKMap.ctx_mem_page_to_phys], the
+       same identity disassembly carried out AT THE TOWER.  The window does
+       NOT leave the context: [ptree_own] is the ctx phys tier now. *)
+    iDestruct (ctx_mem_page_to_phys cur_ctx (mr !!! Regidx (mword_of_int 10 : mword 5)) (DfracOwn 1) (mword_of_int 0 : mword 8)
                  ltac:(intros j Hj; apply kdata_svpn_class;
                        apply page_in_range_addr_is_kdata; [exact Hpv | exact Hj])
                  with "Hkmapb Hbytes") as "Hbytes".
     iEval (rewrite -Hpb) in "Hbytes".
-    (* ...and back INTO the ambient context at the physical tier: the node's
-       slots are the thread's own registered cells ([pt_slot_own (UTier
-       cur_ctx)]); at SC the registration is the shim's one-liner. *)
-    iDestruct (TsoCtxShim.ctx_phys_run_of_mem TsoCtx.cur_ctx
-                 (fun j => pa_add (zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))) j)
-                 (fun _ => (mword_of_int 0 : mword 8)) 4096 (DfracOwn 1)
-                 with "Hbytes") as "Hbytes".
     (* the freshly-allocated PT page's identity claim (uniform-claims PHYSICAL
        TIER): it is a kdata page, so [pt_node_claim bppn] comes off the static
        bundle -- what [zero_page_to_node] now needs to build the node. *)
@@ -1085,7 +1086,7 @@ Section ProofWalk.
               P3 (K - 8)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (wi_94 with "Htext"). }
-    iIntros (CIDa14 Hsa14). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iIntros (CIDa14 Hsa14). iNext. iIntros "Hcg Hpc".
     assert (Htgt40 : add_vec (mword_of_int (KernelSyms.walk + 0x94) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.walk + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1461,7 +1462,7 @@ Section ProofWalk.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (wi_42 with "Htext"). }
-        iIntros (CIDb6' Hsb6'). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iIntros (CIDb6' Hsb6'). iNext. iIntros "Hcg Hpc".
         assert (Hbk26 : add_vec (mword_of_int (KernelSyms.walk + 0x42) : mword 64) (sign_extend' 64 (mword_of_int 8164 : mword 13)) = mword_of_int (KernelSyms.walk + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hbk26) in "Hpc".
         assert (Hchainb2 : b = false \/ p = zero_reg -> (CIDb6' : CPU) = (CID : CPU)) by wp_next_chain.
@@ -1504,7 +1505,7 @@ Section ProofWalk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (wi_3a with "Htext"). }
-      iIntros (CIDc0 Hsc0). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iIntros (CIDc0 Hsc0). iNext. iIntros "Hcg Hpc".
       assert (Htgt72 : add_vec (mword_of_int (KernelSyms.walk + 0x3a) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.walk + 0x72)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt72) in "Hpc".
       iCombine "Hrestore Hcont" as "HF".
@@ -1655,7 +1656,7 @@ Section ProofWalk.
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (wi_42 with "Htext"). }
-          iIntros (CIDc2' Hsc2'). iApply bi.later_intro. iIntros "Hcg Hpc".
+          iIntros (CIDc2' Hsc2'). iNext. iIntros "Hcg Hpc".
           assert (Hbk26 : add_vec (mword_of_int (KernelSyms.walk + 0x42) : mword 64) (sign_extend' 64 (mword_of_int 8164 : mword 13)) = mword_of_int (KernelSyms.walk + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hbk26) in "Hpc".
           assert (Hchainc2 : b = false \/ p = zero_reg -> (CIDc2' : CPU) = (CID : CPU)) by wp_next_chain.

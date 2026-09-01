@@ -105,6 +105,8 @@ Section ProofHolding.
       symmetry. apply kv_addv_zero. }
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg #Htext Hpc #Hlock HTc Hlks Hcont".
+    (* A6.119: the reads want the ABSORBED opener; the other leaves take
+       the plain one, one weakening away. *)
     (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
     iApply (wp_clw_lockopen_s_sconf γl lka s R Tc Dc pcE (mword_of_int 15) (mword_of_int 10)
               (mword_of_int 0) m n false
@@ -174,7 +176,7 @@ Section ProofHolding.
               with "Hcg Hpc []").
     { iApply (hi_02 with "Htext"). }
     iApply wp_next_off_intro.
-    iApply bi.later_intro.
+    iNext.
     iIntros "Hcg Hpc".
     assert (Htgt08 : add_vec (mword_of_int (KernelSyms.holding + 0x02) : mword 64)
                (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.holding + 0x08))
@@ -281,7 +283,10 @@ Section ProofHolding.
     iApply (wp_cld_lkcpu_lockopen_notheld_s_sconf γl lka s R Tc Dc (mword_of_int (KernelSyms.holding + 0x12))
               (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 16 : mword 12) S2 (n - 4)%nat false lks
-              Hacpu ltac:(vm_compute; discriminate) ltac:(rdok) Hfresh Href
+              Hacpu ltac:(vm_compute; discriminate) ltac:(rdok) Hfresh
+              (* A6.119: the no-migration side condition, discharged literally
+                 -- this leaf runs at [b = false]. *)
+              ltac:(left; reflexivity) Href
               with "Hcg Hpc [] Hlock HTc Hlks").
     { iApply (his_12 with "Htext"). }
     iIntros (cpuv). iApply wp_next_off_intro.
@@ -517,10 +522,10 @@ Section ProofHolding.
       symmetry. apply kv_addv_zero. }
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg #Htext Hpc #Hlock Htok Hcont".
-    (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
     iApply (wp_clw_lockopen_locked_s_sconf γl lka s R Dc pcE (mword_of_int 15) (mword_of_int 10)
               (mword_of_int 0) m n false
-              Hlka ltac:(vm_compute; discriminate) ltac:(rdok) Href
+              Hlka ltac:(vm_compute; discriminate) ltac:(rdok)
+              (or_introl eq_refl) Href
               with "Hcg Hpc [] Hlock Htok").
     { iApply (hi_00 with "Htext"). }
     iIntros (lockv). iApply wp_next_off_intro.
@@ -541,7 +546,7 @@ Section ProofHolding.
               with "Hcg Hpc []").
     { iApply (hi_02 with "Htext"). }
     iApply wp_next_off_intro.
-    iApply bi.later_intro.
+    iNext.
     iIntros "Hcg Hpc".
     assert (Htgt08 : add_vec (mword_of_int (KernelSyms.holding + 0x02) : mword 64)
                (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.holding + 0x08))
@@ -644,7 +649,8 @@ Section ProofHolding.
     iApply (wp_cld_lkcpu_lockopen_locked_s_sconf γl lka s R Dc (mword_of_int (KernelSyms.holding + 0x12))
               (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 16 : mword 12) S2 (n - 4)%nat false
-              Hacpu ltac:(vm_compute; discriminate) ltac:(rdok) Href
+              Hacpu ltac:(vm_compute; discriminate) ltac:(rdok)
+              ltac:(left; reflexivity) Href
               with "Hcg Hpc [] Hlock Htok").
     { iApply (his_12 with "Htext"). }
     iApply wp_next_off_intro.

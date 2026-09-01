@@ -22,17 +22,6 @@ Local Open Scope Z_scope.
 Definition BSIZE : nat := 1024%nat.
 Definition BSLOTS : nat := 1024%nat.
 
-(* ...and the SAME constant at [Z].  The geometry arithmetic above the bio
-   layer is at [Z] ([FsImg]'s block/byte conversions, [FsStateDefs]'s byte
-   points-to) while [InodeDefs.file_byte] indexes at [nat]; this pair is the
-   one bridge, and it lives beside [BSIZE] rather than in [FsImg] because it
-   IS [BSIZE] -- a file that needs only the block size should not have to
-   name the on-disk image's encoding vocabulary to get it. *)
-Definition BSIZE_z : Z := 1024.
-
-Lemma BSIZE_z_nat : Z.of_nat BSIZE = BSIZE_z.
-Proof. vm_compute. reflexivity. Qed.
-
 (* THE SUPPLY SPLITS ONCE, AT BOOT, AND THE TWO SHARES NEVER MIX.
    [BSLOTS_PROC] is the proc layer's: three units per process slot, parked in
    [ProcDefs.proc_dormant] so that a slot which has never run still owns what
@@ -44,6 +33,8 @@ Proof. vm_compute. reflexivity. Qed.
 Definition BSLOTS_PROC : nat := 192%nat.
 Definition BSLOTS_FS : nat := 832%nat.
 
+Lemma bslots_shares : BSLOTS = (BSLOTS_PROC + BSLOTS_FS)%nat.
+Proof. reflexivity. Qed.
 
 Record bio_names := MkBioNames {
   bn_lk   : gname;                (* the "bcache" spinlock               *)
@@ -83,6 +74,8 @@ Section BioSlots.
 
   Lemma bslots_split a b : bslots (a + b) -∗ bslots a ∗ bslots b.
   Proof. rewrite bslots_op. iIntros "$". Qed.
+  Lemma bslots_combine a b : bslots a -∗ bslots b -∗ bslots (a + b).
+  Proof. iIntros "Ha Hb". rewrite bslots_op. iFrame. Qed.
 
   Lemma bslots_bound n : bslots_auth -∗ bslots n -∗ ⌜(n <= BSLOTS)%nat⌝.
   Proof.
@@ -154,3 +147,18 @@ Global Instance bio_view_clean_timeless {Σ} (V : bio_view Σ) b bs :
   Timeless (bv_clean V b bs) := bv_clean_tl V b bs.
 Global Instance bio_view_dirty_timeless {Σ} (V : bio_view Σ) b bs :
   Timeless (bv_dirty V b bs) := bv_dirty_tl V b bs.
+
+(* MAIN-COMPAT: BSIZE at Z (main's spelling) *)
+Definition BSIZE_z : Z := 1024.
+
+Lemma BSIZE_z_nat : Z.of_nat BSIZE = BSIZE_z.
+Proof. vm_compute. reflexivity. Qed.
+
+(* THE SUPPLY SPLITS ONCE, AT BOOT, AND THE TWO SHARES NEVER MIX.
+   [BSLOTS_PROC] is the proc layer's: three units per process slot, parked in
+   [ProcDefs.proc_dormant] so that a slot which has never run still owns what
+   its first syscall will need.  [BSLOTS_FS] is everything else -- the file
+   system's own working supply, which is what [bio_init] hands back.
+   Spelled as literals here because [BioDefs] sits below [ProcGeom] and must
+   not name [NPROC]; [SpecProcinit] carries the equation [BSLOTS_PROC =
+   NPROC * 3] where both are in scope. *)

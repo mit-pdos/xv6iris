@@ -31,8 +31,10 @@ Require Import SpecKalloc SpecMemset SpecUvmcreate.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
-   leg M); this caller is not yet -- the shim marks the open seam *)
+Require Import CtxKMap.   (* [ctx_mem_page_to_phys]: the tower's identity disassembly *)
+Require Import TsoCtx.
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -468,7 +470,7 @@ Section ProofUvmcreate.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uvci_10 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID9 Hs9) "Hcg Hpc".
+      iNext. iIntros (CID9 Hs9) "Hcg Hpc".
       assert (Htgt1a : add_vec (mword_of_int (KernelSyms.uvmcreate + 0x10) : mword 64)
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 5 : mword 8) ('b"0"))))
                        = mword_of_int (KernelSyms.uvmcreate + 0x1a))
@@ -547,20 +549,21 @@ Section ProofUvmcreate.
     { rewrite /M4. rewrite upd_ne; [| reg_neq]. rewrite /M3 upd_eq. reflexivity. }
     assert (HM4a2 : M4 !!! Regidx (mword_of_int 12 : mword 5) = mword_of_int (Z.of_nat 4096)).
     { rewrite /M4 /M3. repeat (rewrite upd_ne; [| reg_neq]). rewrite /M2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
+    (* A6.87: kalloc hands back its own memset run; this memset only wants
+       the ownership, so it downgrades. *)
+    iDestruct (page_own_of_filled with "Hpage") as "Hpage".
     iEval (rewrite /page_own /byte_any) in "Hpage".
-    iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
-    (* memset's contract is context-indexed; this caller is not yet
-       converted -- the buffer crosses through the shim at the ambient
-       context (the bundle carries the thread token). *)
-    iApply (MS.wp_memset_sconf KT1 KT0 M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
+    (* A6.68: memset's contract is context-indexed AND so is the buffer
+       ([↦ₘ] is the ctx tower), so the two shim crossings that used to
+       bracket this call were IDENTITIES and are simply gone. *)
+    iApply (MS.wp_memset_free_sconf KT1 KT0 M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) b p
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
-              with "Hcg Htext Hpc [Hbuf]").
+              with "Hcg Htext Hpc [Hpage]").
     { (* [page_own]'s bytes are ALREADY context-indexed (KallocInv's [byte_any]
          flipped with ↦ₘ), so no shim crossing here: only the address form
          differs. *)
-      iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
+      iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
     iIntros (CID13 Hs13 mfin) "Hcg Hpc Hbytes %Hmcs".
-    iDestruct (ctx_buf_to_mem with "Hbytes") as "Hbytes".
     assert (Hret1a : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uvmcreate + 0x1a)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret1a) in "Hpc".
@@ -581,7 +584,11 @@ Section ProofUvmcreate.
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
-    iDestruct (mem_page_to_phys root0 (DfracOwn 1) (mword_of_int 0 : mword 8)
+    (* A6.68: [KMap] sits BELOW [TsoCtx], so its [mem_page_to_phys] would
+       drop the ledger residue and the return trip is the direction the
+       flip makes false.  [CtxKMap.ctx_mem_page_to_phys] is the same
+       identity disassembly carried out AT THE TOWER. *)
+    iDestruct (ctx_mem_page_to_phys cur_ctx root0 (DfracOwn 1) (mword_of_int 0 : mword 8)
                  ltac:(intros j Hj; apply kdata_svpn_class; apply page_in_range_addr_is_kdata; [exact Hpv | exact Hj])
                  with "Hkmapb Hbytes") as "Hbytes".
     iEval (rewrite -Hpbase) in "Hbytes".
@@ -589,12 +596,6 @@ Section ProofUvmcreate.
     { rewrite <- (page_base_unsigned bppn). rewrite Hpbase. reflexivity. }
     assert (Hnpv : page_valid (page_base bppn)).
     { unfold page_base. rewrite Hpbase. exact Hpv. }
-    (* ...and into the ambient context at the physical tier (the node's
-       slots are the thread's own registered cells; SC: the shim's step) *)
-    iDestruct (TsoCtxShim.ctx_phys_run_of_mem TsoCtx.cur_ctx
-                 (fun j => pa_add (zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))) j)
-                 (fun _ => (mword_of_int 0 : mword 8)) 4096 (DfracOwn 1)
-                 with "Hbytes") as "Hbytes".
     iDestruct (pt_node_claim_from_static bppn Hnpv with "Hkmapb") as "#Hbclaim".
     iDestruct (zero_page_to_node 2 (DfracOwn 1) bppn with "Hbclaim Hbytes") as "Hptree".
     (* register facts through memset *)

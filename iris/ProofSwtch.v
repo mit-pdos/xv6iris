@@ -214,7 +214,7 @@ Section ProofSwtch.
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               (SRegime.sr_ktier_wit_KT0 strans_regime) swtch_run
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
-                    Hpc Hfile [] [Holdcells Hnewcells] []").
+                    Hpc Hfile [] [Holdcells Hnewcells] [] Hctx").
     { iApply (swtch_code with "Ht"). }
     { rewrite /vheap_own /swtch_heap0 big_sepL_app.
       rewrite (seg_cells_ctx rho 10 oldc 0 _ Hrho10).
@@ -223,7 +223,7 @@ Section ProofSwtch.
       rewrite -/(ctx_cells oldc old_vs) -/(ctx_cells newc new_vs).
       iFrame "Holdcells Hnewcells". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpc Hfile Hheap _".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpc Hfile Hheap _ Hctx".
     (* ---- split the post-block heap into old's (now current callee regs) and new's ---- *)
     iEval (rewrite /vheap_own /swtch_heap1 big_sepL_app
                    (seg_cells_ctx rho 10 oldc 0 ctx_regs_nat Hrho10)
