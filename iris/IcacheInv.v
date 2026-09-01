@@ -4474,6 +4474,302 @@ Section IcacheRefInvReg.
     iExists gnew. iFrame "Hlvh Hpend".
   Qed.
 
+  (* ================================================================== *)
+  (* THE ARM (recycle 0 -> 1), pinw-faced.  The physical leg runs on the  *)
+  (* CALLER's payload cell through [CtxPinw.ledger_arm_pinw_ok] inside    *)
+  (* the store leaf's obligation (the free slot's cell rides the lock,    *)
+  (* not the invariant), so the icache side is one ghost INSTALL: the     *)
+  (* minted window enters the invariant, the liveness unit regenerates    *)
+  (* at a fresh (g', loA), and the stamp half moves in.                   *)
+  (* ================================================================== *)
+  Lemma iref_alloc_step_noarm M k (q : Qp) :
+    M !! k = None ->
+    (q < 1/2)%Qp ->
+    own icfg_iref (● M) -∗ isl_slot M k ==∗
+    own icfg_iref (● (<[k := (q, 1%positive)]> M)) ∗
+    isl_slot (<[k := (q, 1%positive)]> M) k ∗
+    iref_frag k q ∗ slh_tok (icfg_isl k) q.
+  Proof.
+    iIntros (HM Hq) "Ha Hisl".
+    rewrite (isl_slot_none M k HM).
+    iMod (slh_mint_none (icfg_isl k) q with "Hisl") as "[Hisl Hshare]".
+    assert (Hv : ✓ q).
+    { apply frac_valid. etrans; [apply Qp.lt_le_incl; exact Hq | compute_done]. }
+    iMod (own_update _ _ _ (ic_alloc_upd M k q HM Hv) with "Ha") as "H".
+    rewrite own_op. iDestruct "H" as "[Ha Hfr]".
+    iModIntro. iFrame "Ha".
+    rewrite (isl_slot_some (<[k := (q, 1%positive)]> M) k q 1%positive
+               (lookup_insert M k (q, 1%positive))).
+    iFrame "Hisl". rewrite /iref_frag. iFrame.
+  Qed.
+
+  Lemma pinw_arm_alloc (q : Qp) (k : nat) (g0 : gname) (lo0 loA : nat) :
+    (q < 1/2)%Qp ->
+    IcacheRef.live_genlo k 1%Qp g0 lo0 ==∗
+    ∃ (g' : gname) (c : Qp), ⌜(1/2 - q)%Qp = Some c⌝ ∗
+      IcacheRef.live_genlo k q g' loA ∗
+      IcacheRef.live_genlo k (1/2)%Qp g' loA ∗
+      IcacheRef.live_genlo k c g' loA ∗
+      IcacheRef.ity_pending g'.
+  Proof.
+    iIntros (Hq) "Hfull".
+    iMod (IcacheRef.live_genlo_bump k g0 lo0 loA with "Hfull")
+      as (g') "[Hfull Hpend]".
+    apply Qp.lt_sum in Hq as [c Hc].
+    assert (Hc' : ((1/2)%Qp - q)%Qp = Some c) by (apply Qp.sub_Some; exact Hc).
+    assert (Hone : (1 : Qp) = ((1/2)%Qp + (q + c))%Qp).
+    { rewrite -Hc (Qp.div_2 1). reflexivity. }
+    iEval (rewrite Hone (IcacheRef.live_genlo_split k (1/2)%Qp (q+c)%Qp))
+      in "Hfull".
+    iDestruct "Hfull" as "[Hesc Hqc]".
+    iEval (rewrite (IcacheRef.live_genlo_split k q c)) in "Hqc".
+    iDestruct "Hqc" as "[Hq Hc]".
+    iModIntro. iExists g', c. iFrame "Hq Hesc Hc Hpend". by iPureIntro.
+  Qed.
+
+  Lemma iref_alloc_pinw_install (Eo : coPset)
+      (γi : gname) (γfs : fs_names) (inodestart : Z) (nib : nat)
+      (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32) (l : ilic)
+      (q : Qp) (tstp loA : nat) :
+    ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo -> ↑logN ⊆ Eo ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    (k < NINODE)%nat ->
+    M !! k = None ->
+    (q < 1/2)%Qp ->
+    itable_inv_pinw -∗ ireg_inv γi γfs inodestart nib -∗
+    itable_half M -∗ isl_slot M k -∗
+    iname γi γfs inodestart inum l -∗
+    ifreeze_off (bv_unsigned inum) -∗
+    icnt_half (bv_unsigned inum) 0%nat -∗
+    mono_nat_auth_own (icfg_istmp k) 1 tstp -∗
+    TsoGhost.llb loglen_name tstp -∗
+    TsoGhost.llb loglen_name loA -∗
+    iref_pin_rows k (mword_of_int 1 : mword 32) loA loA -∗
+    |={Eo}=>
+      itable_half (<[k := (q, 1%positive)]> M) ∗
+      isl_slot (<[k := (q, 1%positive)]> M) k ∗
+      (∃ g : gname,
+         iref_tok_genlo k q g loA ∗
+         IcacheRef.live_genlo k (1/2)%Qp g loA ∗ IcacheRef.ity_pending g) ∗
+      frzsel k (1/2)%Qp false ∗
+      iname γi γfs inodestart inum l ∗
+      ifreeze_off (bv_unsigned inum) ∗
+      icnt_half (bv_unsigned inum) 1%nat ∗
+      runit (is_claim l) (bv_unsigned inum) ∗
+      (∃ tstn : nat, ⌜(loA <= tstn)%nat⌝ ∗
+         mono_nat_auth_own (icfg_istmp k) (1/2) tstn ∗
+         TsoGhost.llb loglen_name tstn).
+  Proof.
+    iIntros (HE HER HEL Hin Hk HMk Hq)
+      "#Hinv #Hrinv Hhalf Hislot Hl Hoff Hcnt Hstf #Hllbtp #HllbA Hpin".
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hrows)".
+    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
+    iDestruct (pinw_slot_acc_upd M k Hk with "Hrows") as "[Hslot Hback]".
+    iEval (rewrite {1}/pinw_slot HMk) in "Hslot".
+    iDestruct "Hslot" as (g0 lo0) "[Hfull Hselfull]".
+    (* the region's 0 -> 1 *)
+    iMod (ireg_icnt_lic_acc (Eo ∖ ↑icacheN) γi γfs inodestart nib inum
+            l 0%nat ltac:(solve_ndisj)
+            ltac:(apply subseteq_difference_r; [solve_ndisj | exact HEL]) Hin
+            with "Hrinv Hl Hcnt") as "[Hl Hrback]".
+    (* the liveness regeneration at the fresh epoch *)
+    iMod (pinw_arm_alloc q k g0 lo0 loA Hq with "Hfull")
+      as (g' c) "(%Hc & Htokl & Hesc & Hres & Hpend)".
+    (* the selector splits: half in, half out *)
+    iEval (rewrite -(Qp.div_2 1)
+                   (frzsel_split k (1/2)%Qp (1/2)%Qp false)) in "Hselfull".
+    iDestruct "Hselfull" as "[Hselin Hselout]".
+    (* the auth mint *)
+    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
+    iMod (iref_alloc_step_noarm M k q HMk Hq with "Hauth Hislot")
+      as "(Hauth & Hislot & Hfr & Hshare)".
+    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
+    (* the stamp: bump the full auth, split a half into the slot row *)
+    iMod (mono_nat_own_update (Nat.max tstp loA) with "Hstf")
+      as "[Hstf _]"; [lia|].
+    iEval (rewrite -(Qp.div_2 1)) in "Hstf".
+    iDestruct "Hstf" as "[Hstin Hstout]".
+    iMod ("Hrback" $! 1%nat with "[%]") as "[Hcnt Hu]"; [reflexivity |].
+    iAssert (iref_pin_rows k (mword_of_int 1 : mword 32) loA
+               (Nat.max tstp loA))%I with "[Hpin]" as "Hpin".
+    { iApply (big_sepL_mono with "Hpin"). iIntros (i j Hij) "H".
+      iDestruct "H" as (t) "[%Ht H]". iExists t. iFrame "H".
+      iPureIntro. lia. }
+    iMod ("Hclose" with "[Ha Hstin Hpin Hres Hselin Hback]") as "_".
+    { iNext. iExists (<[k := (q, 1%positive)]> M). iFrame "Ha".
+      iSplitR.
+      { iPureIntro. destruct Hwf as [Hdom Hcnt']. split.
+        - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
+          rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
+        - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
+          + rewrite lookup_insert in Hj. apply Some_inj in Hj.
+            injection Hj as _ Hn. subst nj. vm_compute. reflexivity.
+          + rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym].
+            by apply (Hcnt' j qj). }
+      iApply ("Hback" $! (<[k := (q, 1%positive)]> M) with "[%]").
+      { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
+      rewrite /pinw_slot lookup_insert.
+      iExists g', loA, (Nat.max tstp loA).
+      iSplitR; [iPureIntro; lia|].
+      iFrame "Hstin".
+      iSplitL "Hpin".
+      { rewrite /iref_word lookup_insert. iExact "Hpin". }
+      iLeft. iExists c. iSplitR; [by iPureIntro|]. iFrame "Hres Hselin". }
+    iModIntro.
+    iFrame "Hhalf Hislot Hselout Hl Hoff Hcnt Hu".
+    iSplitL "Hfr Htokl Hshare Hesc Hpend".
+    { iExists g'. iFrame "Hesc Hpend". rewrite /iref_tok_genlo. iFrame. }
+    iExists (Nat.max tstp loA). iFrame "Hstout".
+    iSplitR; [iPureIntro; lia|].
+    iApply (TsoGhost.llb_max with "Hllbtp HllbA").
+  Qed.
+
+  Lemma iref_close_last_step_noarm M k (qt : Qp) :
+    M !! k = Some (qt, 1%positive) ->
+    own icfg_iref (● M) -∗ iref_frag k qt -∗ slh_tok (icfg_isl k) qt -∗
+    isl_slot M k ==∗
+    own icfg_iref (● (delete k M)) ∗ isl_slot (delete k M) k.
+  Proof.
+    iIntros (HM) "Ha Hf Hsh Hisl".
+    (* THE LAST reference's share returns and leaves the AUTHORITATIVE ZERO,
+       which is what a free slot's [isl_slot] is -- and what iput needs. *)
+    rewrite (isl_slot_some M k qt 1%positive HM)
+            (isl_slot_none (delete k M) k (lookup_delete M k)).
+    iMod (slh_return_last (icfg_isl k) qt with "Hisl Hsh") as "$".
+    rewrite /iref_frag.
+    iApply (own_update_2 _ _ _ (● (delete k M)) with "Ha Hf").
+    apply auth_update_dealloc, gmap_local_update. intros i.
+    destruct (decide (i = k)) as [->|Hne]; last first.
+    { assert (Hki : k <> i) by auto.
+      pose proof (lookup_singleton_ne (M:=gmap nat) k i (qt, 1%positive) Hki) as Hs.
+      pose proof (lookup_delete_ne M k i Hki) as Hm.
+      apply local_update_discrete. intros mz Hv Hz.
+      rewrite Hs in Hz. rewrite Hm. split; [exact Hv | exact Hz]. }
+    pose proof (lookup_singleton (M:=gmap nat) k (qt, 1%positive)) as Hs.
+    pose proof (lookup_delete M k) as Hm.
+    apply local_update_discrete. intros mz Hv Hz.
+    rewrite HM in Hz. rewrite Hs in Hz. rewrite Hm.
+    destruct mz as [[[qf nf]|]|]; simpl in Hz.
+    - exfalso. apply Some_equiv_inj in Hz. destruct Hz as [_ Hn]; simpl in Hn.
+      rewrite ic_pos_op_add in Hn.
+      assert (Hn' : 1%positive = (1 + nf)%positive) by exact Hn. lia.
+    - split; done.
+    - split; done.
+  Qed.
+
+  (* ================================================================== *)
+  (* THE RETIRE (last close 1 -> 0), pinw-faced.  The window is yielded   *)
+  (* to the zeroing store leaf, whose obligation runs                     *)
+  (* [CtxPinw.ledger_retire_pinw_ok]: the pin drops and the cells come    *)
+  (* back CTX-TIER -- the caller stashes them in itable.lock's payload    *)
+  (* (the free-slot row), together with the reassembled full stamp auth.  *)
+  (* The liveness unit reassembles from the closer's token, the escrow's  *)
+  (* returned half and the pool residual, and parks in the free arm at    *)
+  (* the SAME (g, lo) -- the next arm's bump is what moves the epoch.     *)
+  (* ================================================================== *)
+  Lemma iref_close_last_store_pinw_au (Eo : coPset)
+      (γi : gname) (γfs : fs_names) (inodestart : Z) (nib : nat)
+      (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32) (qt : Qp)
+      (bfl : bool) (ph : frz) (g : gname) (lo tstp : nat) :
+    ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    M !! k = Some (qt, 1%positive) ->
+    itable_inv_pinw -∗ ireg_inv γi γfs inodestart nib -∗
+    itable_half M -∗ iref_tok_genlo k qt g lo -∗
+    IcacheRef.live_genlo k (1/2)%Qp g lo -∗
+    frzsel k (1/2)%Qp false -∗
+    isl_slot M k -∗
+    runit bfl (bv_unsigned inum) -∗
+    ifreeze ph (bv_unsigned inum) -∗ icnt_half (bv_unsigned inum) 1%nat -∗
+    frz_rcpt_pre ph (bv_unsigned inum) -∗
+    frz_mir ph (bv_unsigned inum) -∗
+    mono_nat_auth_own (icfg_istmp k) (1/2) tstp -∗
+    |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
+      ⌜(lo <= tstp)%nat⌝ ∗
+      iref_pin_rows k (iref_word M k) lo tstp ∗
+      (∀ P : iProp Σ,
+         P ={Eo ∖ ↑icacheN ∖ ↑iregN, Eo}=∗
+         itable_half (delete k M) ∗ isl_slot (delete k M) k ∗
+         ifreeze (frz_close ph) (bv_unsigned inum) ∗
+         icnt_half (bv_unsigned inum) 0%nat ∗
+         frz_mir_back ph (frz_close ph) (bv_unsigned inum) ∗
+         mono_nat_auth_own (icfg_istmp k) 1 tstp ∗
+         P).
+  Proof.
+    iIntros (HE HER Hin HMk)
+      "#Hinv #Hrinv Hhalf Htok Hesc Hsel Hislot Hu Hfz Hcnt Hrpre Hmir Hstp".
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hrows)".
+    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
+    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
+    iDestruct (pinw_slot_acc_upd M k Hk with "Hrows") as "[Hslot Hback]".
+    iEval (rewrite {1}/pinw_slot HMk) in "Hslot".
+    iDestruct "Hslot" as (g0 lo0 tst) "(%Hlot & Hst & Hpin & Harm)".
+    iDestruct "Htok" as "(Hf & Hlv & Hsh)".
+    iDestruct "Harm" as "[Harm | [Hfull _]]"; last first.
+    { iDestruct (IcacheRef.live_genlo_bound with "Hfull Hlv") as %Hb.
+      exfalso. exact (Qp.not_add_le_l 1 qt Hb). }
+    iDestruct "Harm" as (c) "(%Hc & Hres & Hselh)".
+    iDestruct (IcacheRef.live_genlo_agree with "Hres Hlv") as %[<- <-].
+    iDestruct (mono_nat_auth_own_agree with "Hst Hstp") as %[_ ->].
+    (* the region's 1 -> 0, with the freeze bookkeeping -- verbatim from
+       [iref_close_last_store_au] *)
+    iMod (ireg_icnt_frz_acc (Eo ∖ ↑icacheN) γi γfs inodestart nib inum
+            ph 1%nat ltac:(solve_ndisj) Hin
+            with "Hrinv Hfz Hcnt Hmir") as (dsl) "(%Hpin & Hrcpt & Hrback)".
+    iDestruct (frz_rcpt_split ph (bv_unsigned inum) with "Hrcpt Hrpre")
+      as "Hown".
+    iModIntro.
+    iSplitR; [by iPureIntro|]. iFrame "Hpin".
+    iIntros (P) "HP".
+    (* the liveness unit reassembles and parks in the free arm *)
+    iDestruct (IcacheRef.live_genlo_join with "Hlv Hres") as "Hqc".
+    iDestruct (IcacheRef.live_genlo_join with "Hqc Hesc") as "Hfull".
+    assert (Hone : ((qt + c) + (1/2))%Qp = 1%Qp).
+    { apply Qp.sub_Some in Hc. rewrite -Hc (Qp.div_2 1). reflexivity. }
+    iEval (rewrite Hone) in "Hfull".
+    iDestruct (frzsel_join with "Hselh Hsel") as "Hself".
+    iEval (rewrite (Qp.div_2 1)) in "Hself".
+    (* the auth delete *)
+    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
+    iMod (iref_close_last_step_noarm M k qt HMk with "Hauth Hf Hsh Hislot")
+      as "(Hauth & Hislot)".
+    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
+    (* the stamp halves rejoin: the FULL auth leaves for the payload *)
+    iCombine "Hst Hstp" as "Hstf".
+    assert (Hstep : ireg_frz_ok (Some (Excl (frz_close ph))) 0%nat dsl).
+    { apply (ireg_frz_ok_phase ph (frz_close ph) 1%nat 0%nat dsl Hpin).
+      - intros ->. reflexivity.
+      - intros rg; destruct ph; cbn [frz_close]; intros Hcx; discriminate Hcx.
+      - intros rg _. reflexivity. }
+    iMod ("Hrback" $! (frz_close ph) 0%nat bfl with "[%] [%] [%] Hu [%] [Hown]")
+      as "(Hfz2 & Hcnt & Hmirb)";
+      [ exact Hstep
+      | right; exact (frz_close_reg ph)
+      | reflexivity
+      | destruct ph; cbn [frz_close frz_bit]; intros Hcx;
+        [discriminate Hcx | reflexivity | discriminate Hcx]
+      | iApply (frz_rcpt_close ph (bv_unsigned inum) with "Hown") |].
+    iMod ("Hclose" with "[Ha Hfull Hself Hback]") as "_".
+    { iNext. iExists (delete k M). iFrame "Ha".
+      iSplitR.
+      { iPureIntro. destruct Hwf as [Hdom Hcnt']. split.
+        - intros j Hj. destruct (decide (j = k)) as [->|Hne].
+          + rewrite lookup_delete in Hj. by destruct Hj.
+          + rewrite lookup_delete_ne in Hj; [|by apply not_eq_sym].
+            by apply Hdom.
+        - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
+          + rewrite lookup_delete in Hj. discriminate Hj.
+          + rewrite lookup_delete_ne in Hj; [|by apply not_eq_sym].
+            by apply (Hcnt' j qj). }
+      iApply ("Hback" $! (delete k M) with "[%]").
+      { intros j Hj. rewrite lookup_delete_ne; [reflexivity | by apply not_eq_sym]. }
+      rewrite /pinw_slot lookup_delete.
+      iExists g0, lo0. iFrame "Hfull Hself". }
+    iModIntro. iFrame "Hhalf Hislot Hfz2 Hcnt Hmirb Hstf HP".
+  Qed.
+
 End IcacheRefInvReg.
 
 (* ===================================================================== *)
