@@ -525,7 +525,7 @@ Section UmodeFetchOk.
   (* (a) a 4-ALIGNED pc holding a NON-compressed instruction: one 4-byte
      read, result [F_Base iw]. *)
   Lemma umode_fetch_base_4 (pt : uptd) (M : gmap Z (bv 8))
-      (w_leaf pc : mword 64) (iw : mword 32) (σ : mstate) :
+      (w_leaf pc : mword 64) (iw : mword 32) (σ : mstate) (S : TsoMemPa.bytemap -> iProp Σ) :
     ud_um pt !! svpn_of pc = Some w_leaf ->
     uleaf_ok (InstructionFetch tt) w_leaf ->
     uva_canon pc ->
@@ -540,6 +540,14 @@ Section UmodeFetchOk.
     register_lookup cur_privilege σ.(sregs) = User ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    (* A6.30's payer, threaded (the walk's A/D write-back appends): *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
     utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem pt M ==∗
     ∃ σ' : mstate,
@@ -549,20 +557,21 @@ Section UmodeFetchOk.
         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type⌝ ∗
       ⌜forall r : register, register_beq r tlb = false ->
          register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
       utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M.
   Proof.
     intros Hl Hchk Hcanon Hpg Hal Hbytes HnRVC Lpc Hmisa Hmenv Hhtif Hcp HSXL Hall.
-    iIntros "Hri Hgh Hinv HM".
+    iIntros "#Hpay HS Hri Hgh Hinv HM".
     iDestruct (utlb_inv_pt_pmp_facts (ud_root pt) (ud_tfp pt) (ud_um pt) σ with "Hri Hinv")
       as %(HA & Hord & HX & HR & HW & Hcovp).
     iMod (utlb_inv_pt_translateAddr_u (InstructionFetch tt)
-            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf pc (u_walk_pa w_leaf pc) σ
+            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf pc (u_walk_pa w_leaf pc) σ S
             Hl Hchk Hcanon eq_refl Hmisa Hmenv Hhtif Hcp HSXL
             (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
             (exec_is_shadow_stack_fetch σ) Hall
-            with "Hri Hgh Hinv")
-      as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
+            with "Hpay HS Hri Hgh Hinv")
+      as (σ') "(%Htr & %Hmdev & %Hsregs & HS & Hri & Hgh & Hinv)".
     assert (Tr : forall r : register, register_beq r tlb = false ->
               register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)).
     { intros r Hne.
@@ -608,7 +617,7 @@ Section UmodeFetchOk.
     iSplit; [ iPureIntro; exact Hmdev | ].
     iSplit; [ iPureIntro; exact Hsregs | ].
     iSplit; [ iPureIntro; exact Tr | ].
-    iFrame "Hri Hgh Hinv HM".
+    iFrame "HS Hri Hgh Hinv HM".
   Qed.
 
 End UmodeFetchOk.
@@ -645,7 +654,7 @@ Section UmodeFetchRvc4.
   (* (b) a 4-ALIGNED pc holding a COMPRESSED instruction: still ONE 4-byte
      read, result [F_RVC h]. *)
   Lemma umode_fetch_rvc_4 (pt : uptd) (M : gmap Z (bv 8))
-      (w_leaf pc : mword 64) (h : mword 16) (b2 b3 : bv 8) (σ : mstate) :
+      (w_leaf pc : mword 64) (h : mword 16) (b2 b3 : bv 8) (σ : mstate) (S : TsoMemPa.bytemap -> iProp Σ) :
     ud_um pt !! svpn_of pc = Some w_leaf ->
     uleaf_ok (InstructionFetch tt) w_leaf ->
     uva_canon pc ->
@@ -662,6 +671,14 @@ Section UmodeFetchRvc4.
     register_lookup cur_privilege σ.(sregs) = User ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    (* A6.30's payer, threaded (the walk's A/D write-back appends): *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
     utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem pt M ==∗
     ∃ σ' : mstate,
@@ -671,21 +688,22 @@ Section UmodeFetchRvc4.
         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type⌝ ∗
       ⌜forall r : register, register_beq r tlb = false ->
          register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
       utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M.
   Proof.
     intros Hl Hchk Hcanon Hpg Hal Hbytes Hb2 Hb3 HisRVC
            Lpc Hmisa Hmenv Hhtif Hcp HSXL Hall.
-    iIntros "Hri Hgh Hinv HM".
+    iIntros "#Hpay HS Hri Hgh Hinv HM".
     iDestruct (utlb_inv_pt_pmp_facts (ud_root pt) (ud_tfp pt) (ud_um pt) σ with "Hri Hinv")
       as %(HA & Hord & HX & HR & HW & Hcovp).
     iMod (utlb_inv_pt_translateAddr_u (InstructionFetch tt)
-            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf pc (u_walk_pa w_leaf pc) σ
+            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf pc (u_walk_pa w_leaf pc) σ S
             Hl Hchk Hcanon eq_refl Hmisa Hmenv Hhtif Hcp HSXL
             (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
             (exec_is_shadow_stack_fetch σ) Hall
-            with "Hri Hgh Hinv")
-      as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
+            with "Hpay HS Hri Hgh Hinv")
+      as (σ') "(%Htr & %Hmdev & %Hsregs & HS & Hri & Hgh & Hinv)".
     assert (Tr : forall r : register, register_beq r tlb = false ->
               register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)).
     { intros r Hne.
@@ -733,7 +751,7 @@ Section UmodeFetchRvc4.
     iSplit; [ iPureIntro; exact Hmdev | ].
     iSplit; [ iPureIntro; exact Hsregs | ].
     iSplit; [ iPureIntro; exact Tr | ].
-    iFrame "Hri Hgh Hinv HM".
+    iFrame "HS Hri Hgh Hinv HM".
   Qed.
 
 End UmodeFetchRvc4.
@@ -753,7 +771,7 @@ Section UmodeFetchSplit.
   (* (c) a 2-mod-4 pc holding a COMPRESSED instruction: one 2-byte read,
      result [F_RVC h]. *)
   Lemma umode_fetch_rvc_2 (pt : uptd) (M : gmap Z (bv 8))
-      (w_leaf pc : mword 64) (h : mword 16) (σ : mstate) :
+      (w_leaf pc : mword 64) (h : mword 16) (σ : mstate) (S : TsoMemPa.bytemap -> iProp Σ) :
     ud_um pt !! svpn_of pc = Some w_leaf ->
     uleaf_ok (InstructionFetch tt) w_leaf ->
     uva_canon pc ->
@@ -769,6 +787,14 @@ Section UmodeFetchSplit.
     register_lookup cur_privilege σ.(sregs) = User ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    (* A6.30's payer, threaded (the walk's A/D write-back appends): *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
     utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem pt M ==∗
     ∃ σ' : mstate,
@@ -778,6 +804,7 @@ Section UmodeFetchSplit.
         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type⌝ ∗
       ⌜forall r : register, register_beq r tlb = false ->
          register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
       utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M.
   Proof.
@@ -786,16 +813,16 @@ Section UmodeFetchSplit.
     assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true)
       by (rewrite Hmisa; vm_compute; reflexivity).
     destruct (align2_not4_facts pc Hal2 Hnal4) as (_ & Hbit0 & Hbit1).
-    iIntros "Hri Hgh Hinv HM".
+    iIntros "#Hpay HS Hri Hgh Hinv HM".
     iDestruct (utlb_inv_pt_pmp_facts (ud_root pt) (ud_tfp pt) (ud_um pt) σ with "Hri Hinv")
       as %(HA & Hord & HX & HR & HW & Hcovp).
     iMod (utlb_inv_pt_translateAddr_u (InstructionFetch tt)
-            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf pc (u_walk_pa w_leaf pc) σ
+            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf pc (u_walk_pa w_leaf pc) σ S
             Hl Hchk Hcanon eq_refl Hmisa Hmenv Hhtif Hcp HSXL
             (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
             (exec_is_shadow_stack_fetch σ) Hall
-            with "Hri Hgh Hinv")
-      as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
+            with "Hpay HS Hri Hgh Hinv")
+      as (σ') "(%Htr & %Hmdev & %Hsregs & HS & Hri & Hgh & Hinv)".
     assert (Tr : forall r : register, register_beq r tlb = false ->
               register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)).
     { intros r Hne.
@@ -834,7 +861,7 @@ Section UmodeFetchSplit.
     iSplit; [ iPureIntro; exact Hmdev | ].
     iSplit; [ iPureIntro; exact Hsregs | ].
     iSplit; [ iPureIntro; exact Tr | ].
-    iFrame "Hri Hgh Hinv HM".
+    iFrame "HS Hri Hgh Hinv HM".
   Qed.
 
 End UmodeFetchSplit.
@@ -848,7 +875,7 @@ Section UmodeFetchSplitBase.
      state shape is reported as the lookup-transport property (every
      non-[tlb] register unchanged), exactly as [user_pt_fetch_instr_2]. *)
   Lemma umode_fetch_base_2 (pt : uptd) (M : gmap Z (bv 8))
-      (w_leaf pc : mword 64) (iw : mword 32) (σ : mstate) :
+      (w_leaf pc : mword 64) (iw : mword 32) (σ : mstate) (S : TsoMemPa.bytemap -> iProp Σ) :
     ud_um pt !! svpn_of pc = Some w_leaf ->
     uleaf_ok (InstructionFetch tt) w_leaf ->
     uva_canon pc ->
@@ -864,6 +891,14 @@ Section UmodeFetchSplitBase.
     register_lookup cur_privilege σ.(sregs) = User ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    (* A6.30's payer, threaded (the walk's A/D write-back appends): *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
+         gen_heap_interp m -∗ S m -∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
     utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem pt M ==∗
     ∃ σ' : mstate,
@@ -871,6 +906,7 @@ Section UmodeFetchSplitBase.
       ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
       ⌜forall r : register, register_beq r tlb = false ->
          register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
       utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M.
   Proof.
@@ -896,17 +932,17 @@ Section UmodeFetchSplitBase.
       pose proof (Hbytes (2 + j)%nat ltac:(lia)) as Hb.
       rewrite Nat2Z.inj_add in Hb. change (Z.of_nat 2) with 2 in Hb.
       rewrite Hu2. rewrite <- Z.add_assoc. exact Hb. }
-    iIntros "Hri Hgh Hinv HM".
+    iIntros "#Hpay HS Hri Hgh Hinv HM".
     iDestruct (utlb_inv_pt_pmp_facts (ud_root pt) (ud_tfp pt) (ud_um pt) σ with "Hri Hinv")
       as %(HA & Hord & HX & HR & HW & Hcovp).
     (* --- the low halfword: translate at pc, read 2 bytes --- *)
     iMod (utlb_inv_pt_translateAddr_u (InstructionFetch tt)
-            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf pc (u_walk_pa w_leaf pc) σ
+            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf pc (u_walk_pa w_leaf pc) σ S
             Hl Hchk Hcanon eq_refl Hmisa Hmenv Hhtif Hcp HSXL
             (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
             (exec_is_shadow_stack_fetch σ) Hall
-            with "Hri Hgh Hinv")
-      as (σ1) "(%Htr1 & %Hmdev1 & %Hsregs1 & Hri & Hgh & Hinv)".
+            with "Hpay HS Hri Hgh Hinv")
+      as (σ1) "(%Htr1 & %Hmdev1 & %Hsregs1 & HS & Hri & Hgh & Hinv)".
     assert (Tr1 : forall r : register, register_beq r tlb = false ->
               register_lookup r σ1.(sregs) = register_lookup r σ.(sregs)).
     { intros r Hne.
@@ -942,7 +978,7 @@ Section UmodeFetchSplitBase.
     (* --- the high halfword: translate at pc+2 (same leaf), read 2 bytes --- *)
     iMod (utlb_inv_pt_translateAddr_u (InstructionFetch tt)
             (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf (add_vec_int pc 2)
-            (u_walk_pa w_leaf (add_vec_int pc 2)) σ1
+            (u_walk_pa w_leaf (add_vec_int pc 2)) σ1 S
             Hl2 Hchk Hcanon2 eq_refl
             (ltac:(rewrite (Tr1 misa ltac:(vm_compute; reflexivity)); exact Hmisa))
             (ltac:(rewrite (Tr1 menvcfg ltac:(vm_compute; reflexivity)); exact Hmenv))
@@ -952,8 +988,8 @@ Section UmodeFetchSplitBase.
             (exec_effectivePrivilege_fetch (register_lookup mstatus σ1.(sregs)) User σ1)
             (exec_is_shadow_stack_fetch σ1)
             (ltac:(rewrite (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall))
-            with "Hri Hgh Hinv")
-      as (σ2) "(%Htr2 & %Hmdev2 & %Hsregs2 & Hri & Hgh & Hinv)".
+            with "Hpay HS Hri Hgh Hinv")
+      as (σ2) "(%Htr2 & %Hmdev2 & %Hsregs2 & HS & Hri & Hgh & Hinv)".
     assert (Tr2 : forall r : register, register_beq r tlb = false ->
               register_lookup r σ2.(sregs) = register_lookup r σ1.(sregs)).
     { intros r Hne.
@@ -1005,7 +1041,7 @@ Section UmodeFetchSplitBase.
     iSplit; [ iPureIntro; rewrite Hmdev2; exact Hmdev1 | ].
     iSplit; [ iPureIntro;
               intros r Hne; rewrite (Tr2 r Hne); exact (Tr1 r Hne) | ].
-    iFrame "Hri Hgh Hinv HM".
+    iFrame "HS Hri Hgh Hinv HM".
   Qed.
 
 End UmodeFetchSplitBase.
