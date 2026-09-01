@@ -116,6 +116,13 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   stated against the kernel's trap contract, where the program-GENERIC
   key-level vocabulary lives (`UkAbi.v`), and `sync` and `echo` on it —
   including what echo's port gave up and why.
+- **[`user-fd.md`](design/user-fd.md)** — the PROGRAM's own descriptor
+  table: one ghost map read three ways (a tail handle, a shut standard
+  stream, the LEDGER of the low `NSTD`), why the low slots are tracked
+  totally and the rest only when open, the one allocation rule that decides
+  WHICH descriptor came back from the caller's own ledger, close's two
+  footprints and the row that makes closing an open descriptor total, and
+  who has to carry a ledger and why nobody can escape it.
 - **[`user-heap.md`](design/user-heap.md)** — the SEPARATION-LOGIC HEAP over
   user memory: the two `ghost_map`s (text persistent/X, data exclusive/W)
   and why that is what makes an exclusive points-to imply writability, the

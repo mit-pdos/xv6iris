@@ -145,7 +145,8 @@ Section USyncKernel.
   Proof.
     intros Hpc Hsub Hx Hroom Hal8 Hdata Hfdlen.
     iApply (uslot_of_urun W 4 Hal8 ltac:(lia) Hdata Hfdlen).
-    iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht Hrun".
+    (* sync makes no descriptor call, so its ledger is dropped here *)
+    iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht _ Hrun".
     rewrite Hpc.
     iApply (wp_ksync_start γt γd γs γfd h (tf_resume_gpr0 (uvis_tf W))
               (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) 0

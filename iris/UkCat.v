@@ -69,9 +69,18 @@ Section UkCat.
   Local Notation a6_idx := (mword_of_int 16 : mword 5).
 
 
-  Lemma wp_kcat_open (h : CpuId) (m : regfile) (avail : nat) :
+  (* CAT OPENS ABOVE ITS STANDARD STREAMS, and the ledger is what says so.
+     [fdalloc] returns the LOWEST free descriptor, so "the open returns a
+     descriptor cat may close" is a fact about slots 0..2 -- cat is exec'd
+     with all three open (its own [fprintf(2, ...)] assumes as much) and
+     therefore never opens onto one.  The ledger goes in and comes straight
+     back: cat's open does not touch it, and neither does its close. *)
+  Lemma wp_kcat_open (h : CpuId) (m : regfile) (l : list fdstate)
+      (avail : nat) :
+    fd_lowest_closed l = None ->
     cat_code γt -∗
     urun γt γd γs γfd h m (mword_of_int CatSyms.open) avail -∗
+    ustd γfd l -∗
     (∀ (h' : CpuId) (ret : mword 64),
        (* THE HANDLE FOR WHAT WAS OPENED, forwarded rather than dropped --
           it is what cat's own [close] will spend. *)
@@ -80,6 +89,7 @@ Section UkCat.
             /\ (fd < NOFILE)%nat⌝ ∗
            ufd γfd fd (FdOpen rd wr t))
         ∨ ⌜ret = (mword_of_int (-1) : mword 64)⌝) -∗
+       ustd γfd l -∗
        urun γt γd γs γfd h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
@@ -87,7 +97,7 @@ Section UkCat.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    intros Hnone. iIntros "#Hcode Hrun Hstd Hcont".
     destruct cat_syms_pins
       as (_ & _ & _ & _ & _ & _ & _ & Hwrite & Hopen & Hclose & _).
     rewrite Hopen.
@@ -112,19 +122,33 @@ Section UkCat.
     (* ---- 0x3ee  ecall -- the QUIET row ---- *)
     (* open moves the table: the dedicated leaf, whose handle cat does not
        yet carry *)
-    iApply (wp_uk_ecall_open γt γd γs γfd h1 m1 (mword_of_int 0x3ee) avail
+    iApply (wp_uk_ecall_open γt γd γs γfd h1 m1 (mword_of_int 0x3ee) l avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 15 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
+              with "[] Hrun Hstd").
     { iApply (uis_cat_3ee with "Hcode"). }
     assert (E1open : add_vec_int (mword_of_int 0x3ee : mword 64) 4
                    = mword_of_int 0x3f2)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E1open.
-    iIntros (h2 ret) "Hfdh Hrun".
+    iIntros (h2 ret) "Hal Hrun".
+    (* the allocation landed ABOVE the standard streams, because none of them
+       is closed -- so it is a handle, and the ledger did not move *)
+    iAssert (((∃ (fd : nat) (rd wr : bool) (t : fdtype),
+                 ⌜ret = (mword_of_int (Z.of_nat fd) : mword 64)
+                  /\ (fd < NOFILE)%nat⌝ ∗ ufd γfd fd (FdOpen rd wr t))
+              ∨ ⌜ret = (mword_of_int (-1) : mword 64)⌝) ∗ ustd γfd l)%I
+      with "[Hal]" as "[Hfdh Hstd]".
+    { iDestruct "Hal" as "[Hal | [%Hrm Hstd]]";
+        [| iSplitR; [ by iRight | iExact "Hstd" ]].
+      iDestruct "Hal" as (fd rd wr t) "[%Hr Hal]".
+      iDestruct (ualloc_hi γfd l fd (FdOpen rd wr t) Hnone with "Hal")
+        as "(_ & Hstd & Hh)".
+      iFrame "Hstd". iLeft. iExists fd, rd, wr, t. iFrame "Hh".
+      iPureIntro. exact Hr. }
     set (m2 := <[Regidx a0_idx := ret]> m1).
     (* ---- 0x3f2  c.jr ra ---- *)
     assert (Hraopen : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
@@ -142,7 +166,7 @@ Section UkCat.
               with "[] Hrun").
     { iApply (uis_cat_3f2 with "Hcode"). }
     iIntros (h3) "Hrun".
-    iApply ("Hcont" $! h3 ret with "Hfdh Hrun").
+    iApply ("Hcont" $! h3 ret with "Hfdh Hstd Hrun").
   Qed.
 
   (* close SPENDS THE HANDLE cat's own open produced.  The premise says the
@@ -204,7 +228,8 @@ Section UkCat.
                    = mword_of_int 0x3da)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E1close.
-    iIntros (h2 ret) "Hrun".
+    (* close of an OPEN descriptor returns 0; cat does not read it *)
+    iIntros (h2 ret) "_ Hrun".
     set (m2 := <[Regidx a0_idx := ret]> m1).
     (* ---- 0x3da  c.jr ra ---- *)
     assert (Hraclose : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).

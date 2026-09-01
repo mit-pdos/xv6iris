@@ -152,7 +152,7 @@ Qed.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
-Require Import UkRunSys.  (* [ufd_auth_move] -- the untracked authority step *)
+Require Import UkRunSys.  (* [ufd_state_move] -- the untracked authority step *)
 Section StepPin.
   Context `{XI : CurCtx}.
 
@@ -305,7 +305,7 @@ Section UkRunSysFs.
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     (* the descriptor authority, exactly as [UkRun.urun_close] takes it *)
-    ufd_auth γfd fdv -∗
+    ufd_state γfd fdv -∗
     (∀ h : CpuId,
        urun_fs γm γt γd γs γfd h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
     ukc_fs γm pm M sz fdv m pc.
@@ -324,7 +324,7 @@ Section UkRunSysFs.
     unot_sp rd ->
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
-    ufd_auth γfd fdv -∗
+    ufd_state γfd fdv -∗
     (∀ h : CpuId,
        urun_fs γm γt γd γs γfd h (<[Regidx rd := v]> m) pc' avail -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -401,10 +401,12 @@ Section UkRunSysFs.
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run].
     (* THE ENRICHED ROWS INCLUDE open AND dup, so the table may have moved.
        The program is not tracking these descriptors, so the authority moves
-       and no handle comes back ([UkRunSys.ufd_auth_move]); close is not in
-       [uenr_dom], which is exactly the row that rule cannot serve. *)
+       -- carrying its ledger, which is what pays for an allocation that
+       lands on a standard stream -- and no handle comes back
+       ([UkRunSys.ufd_state_move]); close is not in [uenr_dom], which is
+       exactly the row that rule cannot serve. *)
     iApply uslot_fs_bupd.
-    iMod (ufd_auth_move γfd n (tf_of m pc) r fdv fdv'
+    iMod (ufd_state_move γfd n (tf_of m pc) r fdv fdv'
             (uenr_dom_ne_close n Hdom) Hfdok with "Hufd") as "Hufd".
     iModIntro.
     rewrite (uslot_fs_bump_run γm m pc M M pm pm sz sz fdv fdv' r Hx0 Hal4).

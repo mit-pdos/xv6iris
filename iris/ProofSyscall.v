@@ -4690,22 +4690,49 @@ Section SyscallArms.
       destruct (decide (21 = USYS_close)) as [_ | Hcc];
         [| exfalso; exact (Hcc eq_refl)].
       iDestruct "Hpost" as "[[[%Hr %Hnone] [Hpv Hfr]] | (%fd & %fv & [%Hr %Hsome] & [Hpv Hfr])]".
-      - iExists (us_V U), sts. iFrame "Hpv Hfr". iPureIntro.
+      - (* THE FAILURE ARM.  The guard is false, so nothing moved -- and the
+           row's second conjunct is the reason a caller can rule this arm
+           out: [argfd] refused the number, which for an in-range index means
+           the slot was null, which the array/state agreement turns into
+           [FdClosed].  So no OPEN descriptor reaches here. *)
+        iDestruct (proc_priv_ofile_len with "Hpv") as %Hoflen.
+        iDestruct (fd_frags_len with "Hfr") as %Hstslen.
+        iDestruct (proc_priv_states_agree with "Hpv Hfr") as %Hag.
+        iExists (us_V U), sts. iFrame "Hpv Hfr". iPureIntro.
         split_and!; [reflexivity | reflexivity | reflexivity
                     | apply uptd_ext_sz_refl | reflexivity |].
-        (* the failure arm returns -1, so the guard is false *)
-        rewrite decide_False; [reflexivity |].
-        rewrite Hr. vm_compute. discriminate.
+        split.
+        + (* the failure arm returns -1, so the guard is false *)
+          rewrite decide_False; [reflexivity |].
+          rewrite Hr. vm_compute. discriminate.
+        + intros fd st Harg Hst Hne. exfalso.
+          (* the row reads argument 0 where [arg_fd] read it *)
+          assert (Hz : bv_signed (trunc32 v0) = Z.of_nat fd).
+          { rewrite <- Harg. unfold usys_argfd.
+            rewrite (list_lookup_total_correct _ _ _ Hv0). reflexivity. }
+          assert (HfdN : (fd < NOFILE)%nat)
+            by (rewrite <- Hstslen; exact (lookup_lt_Some _ _ _ Hst)).
+          destruct (lookup_lt_is_Some_2 (pv_ofile (us_V U)) fd
+                      ltac:(rewrite Hoflen; exact HfdN)) as [fv Hfv].
+          unfold arg_fd in Hnone. cbv zeta in Hnone. rewrite Hz in Hnone.
+          rewrite decide_True in Hnone; [| lia].
+          rewrite Nat2Z.id Hfv in Hnone.
+          destruct (decide (fv = (zero_reg : mword 64))) as [Hz0 | Hz0];
+            [| discriminate Hnone].
+          exact (Hne (proj1 (Hag fd fv st Hfv Hst) Hz0)).
       - iExists (upd_ofile (us_V U) fd (zero_reg : mword 64)),
                 (<[fd := FdClosed]> sts).
         iFrame "Hpv Hfr". iPureIntro.
         split_and!; [reflexivity | reflexivity | reflexivity
                     | apply uptd_ext_sz_refl | reflexivity |].
-        (* success returns 0, and the row's index is [arg_fd]'s own *)
-        rewrite decide_True; [| rewrite Hr; vm_compute; reflexivity].
-        unfold usys_argfd.
-        rewrite (list_lookup_total_correct _ _ _ Hv0)
-                (arg_fd_index v0 _ fd fv Hsome) Nat2Z.id. reflexivity. }
+        split.
+        + (* success returns 0, and the row's index is [arg_fd]'s own *)
+          rewrite decide_True; [| rewrite Hr; vm_compute; reflexivity].
+          unfold usys_argfd.
+          rewrite (list_lookup_total_correct _ _ _ Hv0)
+                  (arg_fd_index v0 _ fd fv Hsome) Nat2Z.id. reflexivity.
+        + (* ...and this arm IS the success, so the conjunct is free *)
+          intros fd' st' _ _ _. rewrite Hr. vm_compute. reflexivity. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).

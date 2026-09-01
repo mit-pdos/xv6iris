@@ -372,17 +372,30 @@ Section UexecRetFs.
        uheap γt γd γs M pm ∗
        ustack γd (m !!! Regidx csp_rs1) avail ∗
        (* the program's own descriptor authority, exactly as [UkRun.urun]
-          carries it -- see its note *)
-       ufd_auth γfd fdv ∗
+          carries it -- see its note -- WITH ITS LEDGER, which [UkRun.urun]
+          leaves outside.  This channel does not track descriptors (its
+          clients learn nothing about them from its rows), but its rows do
+          MOVE the table, and an allocation landing on a standard stream
+          needs that slot's fragment.  Bundling the two is what keeps every
+          lemma that opens and closes a [urun_fs] unchanged. *)
+       ufd_state γfd fdv ∗
        uvb_fs (CID := h) γm C pt Rfd Rut sz pm fdv M m pc)%I.
 
+  (* ...AND THE LEDGER COMES OUT WITH IT.  [urun_fs] bundles the ledger with
+     the authority because its own rows move the table without naming it;
+     [urun] leaves the ledger outside, so the conversion hands it over
+     rather than dropping it -- which is what lets a program leave the
+     enriched channel and still call an allocating syscall. *)
   Lemma urun_fs_urun (γm γt γd γs γfd : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) :
-    urun_fs γm γt γd γs γfd h m pc avail -∗ urun γt γd γs γfd h m pc avail.
+    urun_fs γm γt γd γs γfd h m pc avail -∗
+    urun γt γd γs γfd h m pc avail ∗ ustd_any γfd.
   Proof.
     iIntros "H".
     iDestruct "H" as (C pt Rfd Rut sz M pm fdv)
       "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hufd" as "[Hufd Hstd]".
+    iSplitR "Hstd"; [| iExact "Hstd"].
     (* the fs bundle's pieces are pinned at the ambient (its ∃ xi is
        vacuous), so the plain urun repacks at the ambient *)
     rewrite /urun. iExists XI, C, pt, Rfd, Rut, sz, M, pm, fdv.

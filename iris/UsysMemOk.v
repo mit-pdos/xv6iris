@@ -242,9 +242,27 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        CLOSED.  sys_close returns 0 on success and -1 when [argfd] rejects
        the number -- out of range, or already closed -- and a rejected close
        moves nothing, which is what a program that closes twice needs. *)
-    (if decide (uint r = 0)
-     then sts' = <[Z.to_nat (usys_argfd tf) := FdClosed]> sts
-     else sts' = sts)
+    ((if decide (uint r = 0)
+      then sts' = <[Z.to_nat (usys_argfd tf) := FdClosed]> sts
+      else sts' = sts)
+     (* ...AND CLOSING AN OPEN DESCRIPTOR CANNOT FAIL.  The guard above is
+        sound and, alone, useless to a caller that does not check the return
+        value -- which is every caller: xv6's sh writes [close(fd);
+        open(path)] and reads neither result, and a row that leaves [r] free
+        leaves the descriptor still open on an arm no program can rule out.
+        [argfd] rejects exactly two things, an index outside [0, NOFILE) and
+        a null [p->ofile] slot, and a caller naming an OPEN descriptor has
+        refuted both -- so the return is a function of the slot's state, and
+        this says so in the direction a caller has it.
+
+        The premise is stated at a [nat] index rather than on [usys_argfd]
+        directly because that is what makes it true: [Z.to_nat] of a
+        NEGATIVE argument is 0, and close(-1) must not be licensed to
+        conclude anything about slot 0.  [ProofSyscall]'s arm 21 proves it
+        from [ProcInv.proc_priv_states_agree]. *)
+     /\ (forall (fd : nat) (st : fdstate),
+           usys_argfd tf = Z.of_nat fd -> sts !! fd = Some st ->
+           st <> FdClosed -> uint r = 0))
   else if decide (n = USYS_dup) then
     (* dup(fd): the RETURNED descriptor is a COPY of the argument's -- same
        type, same mode -- because filedup only bumps [f->ref] and the two
@@ -504,7 +522,8 @@ Lemma usys_fd_ok_length (n : Z) (tf : list (mword 64)) (r : mword 64)
 Proof.
   unfold usys_fd_ok. intros H.
   destruct (decide (n = USYS_close)) as [_ | _].
-  { destruct (decide (uint r = 0)); subst; [ apply length_insert | reflexivity ]. }
+  { destruct H as [H _].
+    destruct (decide (uint r = 0)); subst; [ apply length_insert | reflexivity ]. }
   destruct (decide (n = USYS_dup)) as [_ | _].
   { destruct H as [(fd1 & _ & _ & ->) | [_ ->]];
       [apply length_insert | reflexivity]. }

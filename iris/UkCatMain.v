@@ -434,26 +434,36 @@ Section UkCatMain.
   (* walked; the failing one ends in the diagnostic above and never comes   *)
   (* back, which is why it simply drops the continuation.                   *)
   (* --------------------------------------------------------------------- *)
+  (* THE LEDGER RIDES THROUGH THE BODY UNCHANGED.  cat's open lands above
+     the standard streams (none of them is closed, which is [Hnone]) and its
+     close spends the handle that open minted, so neither touches the ledger
+     -- it goes in, is spent on the open, comes back, and is handed to the
+     next iteration.  It is in the statement because the OPEN needs it, not
+     because the body does anything to it. *)
   Lemma wp_kcat_main_body (sp0 : mword 64) (av : Z) (args : list uarg)
-      (i : nat) (h : CpuId) (m : regfile) (f : nat -> bv 8) (n : nat) :
+      (i : nat) (h : CpuId) (m : regfile) (l : list fdstate)
+      (f : nat -> bv 8) (n : nat) :
     0 <= av -> av + 8 * Z.of_nat (length args) <= 2 ^ 38 ->
     (forall (j : nat) (g : uarg), args !! j = Some g -> ua_ptr g <> 0) ->
     (i < length args)%nat ->
+    fd_lowest_closed l = None ->
     cm_inv sp0 av (length args) i m ->
     cat_code γt -∗
     cat_rodata γt -∗
     uargv γd av args -∗
     ubytes γd CatSyms.buf 512 f -∗
+    ustd γfd l -∗
     urun γt γd γs γfd h m (mword_of_int 0xa6) (8 + (10 + (12 + (4 + n)))) -∗
     (∀ (h' : CpuId) (m' : regfile) (f' : nat -> bv 8),
        ⌜ cm_inv sp0 av (length args) (S i) m' ⌝ -∗
        ubytes γd CatSyms.buf 512 f' -∗
+       ustd γfd l -∗
        urun γt γd γs γfd h' m' (mword_of_int 0xc2) (8 + (10 + (12 + (4 + n)))) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hav0 Havhi Hptr Hilt Hinv.
-    iIntros "#Hcode #Hro #Hargv Hbuf Hrun Hcont".
+    intros Hav0 Havhi Hptr Hilt Hnone Hinv.
+    iIntros "#Hcode #Hro #Hargv Hbuf Hstd Hrun Hcont".
     iDestruct (uargv_align with "Hargv") as %[Hal Hargc].
     destruct (lookup_lt_is_Some_2 args i Hilt) as [g Hg].
     iDestruct (uargv_acc γd av args i g Hg with "Hargv") as "[[#Hw _] _]".
@@ -531,12 +541,12 @@ Section UkCatMain.
     assert (Hinv3 : cm_inv sp0 av (length args) i m3)
       by exact (cm_inv_upd sp0 av (length args) i m2 ra_idx _
                   ltac:(vm_compute; reflexivity) Hinv2).
-    iApply (wp_kcat_open γt γd γs γfd h3 m3 (8 + (10 + (12 + (4 + n))))
-              with "Hcode Hrun").
+    iApply (wp_kcat_open γt γd γs γfd h3 m3 l (8 + (10 + (12 + (4 + n))))
+              Hnone with "Hcode Hrun Hstd").
     (* THE HANDLE FOR THE FILE CAT JUST OPENED.  Carried from here to the
        close at 0xbe -- it is a separate resource, so it simply rides in the
        context across every step in between. *)
-    iIntros (h4 ret) "Hfdh Hrun".
+    iIntros (h4 ret) "Hfdh Hstd Hrun".
     assert (Eopen : ret_pc (m3 !!! Regidx ra_idx)
                     = (mword_of_int 0xb0 : mword 64))
       by (rewrite Hra3; apply bv_eq; vm_compute; reflexivity).
@@ -761,7 +771,7 @@ Section UkCatMain.
                     := regval_into_reg
                          (mword_of_int (av + 8 * Z.of_nat (S i))
                           : mword 64)]> m10).
-      iApply ("Hcont" $! h12 m11 f' with "[] Hbuf Hrun").
+      iApply ("Hcont" $! h12 m11 f' with "[] Hbuf Hstd Hrun").
       iPureIntro. unfold cm_inv.
       rewrite /m11 (upd_ne m10 (Regidx s2_idx) (Regidx csp_rs1) _
                       ltac:(vm_compute; discriminate)).
@@ -780,9 +790,10 @@ Section UkCatMain.
   (* carries it.                                                             *)
   (* --------------------------------------------------------------------- *)
   Lemma wp_kcat_main_loop (sp0 : mword 64) (av : Z) (args : list uarg)
-      (k : nat) :
+      (l : list fdstate) (k : nat) :
     0 <= av -> av + 8 * Z.of_nat (length args) <= 2 ^ 38 ->
     (forall (j : nat) (g : uarg), args !! j = Some g -> ua_ptr g <> 0) ->
+    fd_lowest_closed l = None ->
     forall (i : nat) (h : CpuId) (m : regfile) (f : nat -> bv 8) (n : nat),
       (i + S k)%nat = length args ->
       cm_inv sp0 av (length args) i m ->
@@ -790,18 +801,19 @@ Section UkCatMain.
       cat_rodata γt -∗
       uargv γd av args -∗
       ubytes γd CatSyms.buf 512 f -∗
+      ustd γfd l -∗
       urun γt γd γs γfd h m (mword_of_int 0xa6) (8 + (10 + (12 + (4 + n)))) -∗
       WP (Loop : expr riscv_lang).
   Proof.
-    intros Hav0 Havhi Hptr.
+    intros Hav0 Havhi Hptr Hnone.
     induction k as [| k IH ];
       intros i h m f n Hik Hinv;
-      iIntros "#Hcode #Hro #Hargv Hbuf Hrun";
+      iIntros "#Hcode #Hro #Hargv Hbuf Hstd Hrun";
       destruct cat_syms_pins
         as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hexit);
-      iApply (wp_kcat_main_body sp0 av args i h m f n Hav0 Havhi Hptr
-                ltac:(lia) Hinv with "Hcode Hro Hargv Hbuf Hrun");
-      iIntros (h1 m1 f1) "%Hinv1 Hbuf Hrun";
+      iApply (wp_kcat_main_body sp0 av args i h m l f n Hav0 Havhi Hptr
+                ltac:(lia) Hnone Hinv with "Hcode Hro Hargv Hbuf Hstd Hrun");
+      iIntros (h1 m1 f1) "%Hinv1 Hbuf Hstd Hrun";
       pose proof Hinv1 as Hd1;
       destruct Hd1 as (Hsp1 & Hs2_1 & Hs3_1);
       assert (Hlo2 : 0 <= av + 8 * Z.of_nat (S i) < Z64) by (unfold Z64; lia);
@@ -877,7 +889,7 @@ Section UkCatMain.
       { iApply (uis_cat_c2 with "Hcode"). }
       iIntros (h2) "Hrun".
       iApply (IH (S i) h2 m1 f1 n ltac:(lia) Hinv1
-                with "Hcode Hro Hargv Hbuf Hrun").
+                with "Hcode Hro Hargv Hbuf Hstd Hrun").
   Qed.
 
   (* ===================================================================== *)
@@ -889,20 +901,22 @@ Section UkCatMain.
   (* nothing is ever loaded back and main has no continuation.              *)
   (* ===================================================================== *)
   Lemma wp_kcat_main (h : CpuId) (m : regfile) (av : Z) (args : list uarg)
-      (f : nat -> bv 8) (n : nat) :
+      (l : list fdstate) (f : nat -> bv 8) (n : nat) :
     (forall (j : nat) (g : uarg), args !! j = Some g -> ua_ptr g <> 0) ->
     m !!! Regidx a0_idx = mword_of_int (Z.of_nat (length args)) ->
     m !!! Regidx a1_idx = mword_of_int av ->
+    fd_lowest_closed l = None ->
     cat_code γt -∗
     cat_rodata γt -∗
     uargv γd av args -∗
     ubytes γd CatSyms.buf 512 f -∗
+    ustd γfd l -∗
     urun γt γd γs γfd h m (mword_of_int CatSyms.main)
       (6 + (8 + (10 + (12 + (4 + n))))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hptr Ha0 Ha1.
-    iIntros "#Hcode #Hro #Hargv Hbuf Hrun".
+    intros Hptr Ha0 Ha1 Hnone.
+    iIntros "#Hcode #Hro #Hargv Hbuf Hstd Hrun".
     iDestruct (uargv_align with "Hargv") as %[Hal Hargc].
     change (2 ^ 31) with 2147483648 in Hargc.
     destruct cat_syms_pins
@@ -1405,9 +1419,9 @@ Section UkCatMain.
                    := regval_into_reg
                         (mword_of_int (av + 8 * Z.of_nat (length args))
                          : mword 64)]> m8).
-      iApply (wp_kcat_main_loop sp0 av args (length args - 2)%nat
-                Hav0' Havhi' Hptr 1%nat h14 m9 f n ltac:(lia)
-                with "Hcode Hro Hargv Hbuf Hrun").
+      iApply (wp_kcat_main_loop sp0 av args l (length args - 2)%nat
+                Hav0' Havhi' Hptr Hnone 1%nat h14 m9 f n ltac:(lia)
+                with "Hcode Hro Hargv Hbuf Hstd Hrun").
       unfold cm_inv.
       split.
       { rewrite /m9 (upd_ne m8 (Regidx s3_idx) (Regidx csp_rs1) _
@@ -1444,20 +1458,22 @@ Section UkCatMain.
   (* reached and nothing here has to say what it would do.                  *)
   (* ===================================================================== *)
   Lemma wp_kcat_start (h : CpuId) (m : regfile) (av : Z) (args : list uarg)
-      (f : nat -> bv 8) (n : nat) :
+      (l : list fdstate) (f : nat -> bv 8) (n : nat) :
     (forall (j : nat) (g : uarg), args !! j = Some g -> ua_ptr g <> 0) ->
     m !!! Regidx a0_idx = mword_of_int (Z.of_nat (length args)) ->
     m !!! Regidx a1_idx = mword_of_int av ->
+    fd_lowest_closed l = None ->
     cat_code γt -∗
     cat_rodata γt -∗
     uargv γd av args -∗
     ubytes γd CatSyms.buf 512 f -∗
+    ustd γfd l -∗
     urun γt γd γs γfd h m (mword_of_int CatSyms.start)
       (2 + (6 + (8 + (10 + (12 + (4 + n)))))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hptr Ha0 Ha1.
-    iIntros "#Hcode #Hro #Hargv Hbuf Hrun".
+    intros Hptr Ha0 Ha1 Hnone.
+    iIntros "#Hcode #Hro #Hargv Hbuf Hstd Hrun".
     destruct cat_syms_pins
       as (Hstart & Hmain & _ & _ & _ & _ & _ & _ & _ & _ & _).
     rewrite Hstart.
@@ -1561,7 +1577,7 @@ Section UkCatMain.
     iIntros (h4) "Hrun".
     set (m3 := <[Regidx ra_idx
                  := regval_into_reg (mword_of_int 0x102 : mword 64)]> m2).
-    iApply (wp_kcat_main h4 m3 av args f n Hptr
+    iApply (wp_kcat_main h4 m3 av args l f n Hptr
               ltac:(rewrite <- Ha0;
                     rewrite /m3 (upd_ne m2 (Regidx ra_idx) (Regidx a0_idx) _
                                    ltac:(vm_compute; discriminate));
@@ -1578,7 +1594,8 @@ Section UkCatMain.
                     rewrite /m1;
                     exact (upd_ne m (Regidx csp_rs1) (Regidx a1_idx) _
                              ltac:(vm_compute; discriminate)))
-              with "Hcode Hro Hargv Hbuf Hrun").
+              Hnone
+              with "Hcode Hro Hargv Hbuf Hstd Hrun").
   Qed.
 
 End UkCatMain.

@@ -82,10 +82,19 @@ Section UkInit.
   (*                             that returns here at all                    *)
   (*   fork                      two successors; see the fork leaf           *)
   (* ===================================================================== *)
+  (* THE LEDGER GOES IN AND COMES BACK AT A STATE THIS PROOF DOES NOT NAME.
+     open allocates, and an allocation that lands on a standard stream
+     rewrites that slot's fragment -- which lives in the ledger -- so the
+     table cannot move without it.  init does not read the result here
+     (it drops the descriptor), so [ustd_any] is all it needs to carry;
+     what it would take to say init's own open lands on 0 is the ledger at
+     a NAMED state, which is [UserFd.ualloc]'s business. *)
   Lemma wp_kinit_open (h : CpuId) (m : regfile) (avail : nat) :
     init_code γt -∗
     urun γt γd γs γfd h m (mword_of_int InitSyms.open) avail -∗
+    ustd_any γfd -∗
     (∀ (h' : CpuId) (ret : mword 64),
+       ustd_any γfd -∗
        urun γt γd γs γfd h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
@@ -93,7 +102,8 @@ Section UkInit.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    iIntros "#Hcode Hrun Hstd Hcont".
+    iDestruct "Hstd" as (l) "Hstd".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hopen.
     (* ---- 0x3b2  c.li a7,15 ---- *)
     iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x3b2)
@@ -117,19 +127,24 @@ Section UkInit.
        dedicated one mints the handle for whatever descriptor came back.
        init does not yet carry that handle -- it is dropped here -- but the
        leaf is what will hand it over when it does. *)
-    iApply (wp_uk_ecall_open γt γd γs γfd h1 m1 (mword_of_int 0x3b4) avail
+    iApply (wp_uk_ecall_open γt γd γs γfd h1 m1 (mword_of_int 0x3b4) l avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 15 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
+              with "[] Hrun Hstd").
     { iApply (uis_init_3b4 with "Hcode"). }
     assert (E1 : add_vec_int (mword_of_int 0x3b4 : mword 64) 4
                  = mword_of_int 0x3b8)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E1.
-    iIntros (h2 ret) "_ Hrun".
+    iIntros (h2 ret) "Hal Hrun".
+    (* the ledger, off whichever arm the allocation took *)
+    iAssert (ustd_any γfd) with "[Hal]" as "Hstd".
+    { iDestruct "Hal" as "[Hal | [_ Hstd]]"; [| by iExists l].
+      iDestruct "Hal" as (fd rd wr t) "[_ Hal]".
+      iDestruct (ualloc_ledger with "Hal") as "Hstd". by iExists _. }
     set (m2 := <[Regidx a0_idx := ret]> m1).
     (* ---- 0x3b8  c.jr ra ---- *)
     assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
@@ -147,7 +162,7 @@ Section UkInit.
               with "[] Hrun").
     { iApply (uis_init_3b8 with "Hcode"). }
     iIntros (h3) "Hrun".
-    iApply ("Hcont" $! h3 ret with "Hrun").
+    iApply ("Hcont" $! h3 ret with "Hstd Hrun").
   Qed.
 
   Lemma wp_kinit_mknod (h : CpuId) (m : regfile) (avail : nat) :
@@ -222,7 +237,9 @@ Section UkInit.
   Lemma wp_kinit_dup (h : CpuId) (m : regfile) (avail : nat) :
     init_code γt -∗
     urun γt γd γs γfd h m (mword_of_int InitSyms.dup) avail -∗
+    ustd_any γfd -∗
     (∀ (h' : CpuId) (ret : mword 64),
+       ustd_any γfd -∗
        urun γt γd γs γfd h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 10 : mword 64)]> m))
@@ -230,7 +247,8 @@ Section UkInit.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    iIntros "#Hcode Hrun Hstd Hcont".
+    iDestruct "Hstd" as (l) "Hstd".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hdup.
     (* ---- 0x3ea  c.li a7,10 ---- *)
     iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0x3ea)
@@ -257,19 +275,19 @@ Section UkInit.
        "init's dup is specified" will mean, and needs the handle from
        [wp_kinit_open] threaded down to here. *)
     iApply (wp_uk_ecall_dup_untracked γt γd γs γfd h1 m1
-              (mword_of_int 0x3ec) avail
+              (mword_of_int 0x3ec) l avail
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 10 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
+              with "[] Hrun Hstd").
     { iApply (uis_init_3ec with "Hcode"). }
     assert (E1 : add_vec_int (mword_of_int 0x3ec : mword 64) 4
                  = mword_of_int 0x3f0)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E1.
-    iIntros (h2 ret) "Hrun".
+    iIntros (h2 ret l') "Hstd Hrun".
     set (m2 := <[Regidx a0_idx := ret]> m1).
     (* ---- 0x3f0  c.jr ra ---- *)
     assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
@@ -287,7 +305,7 @@ Section UkInit.
               with "[] Hrun").
     { iApply (uis_init_3f0 with "Hcode"). }
     iIntros (h3) "Hrun".
-    iApply ("Hcont" $! h3 ret with "Hrun").
+    iApply ("Hcont" $! h3 ret with "[Hstd] Hrun"). by iExists l'.
   Qed.
 
   Lemma wp_kinit_write (h : CpuId) (m : regfile) (avail : nat) :
