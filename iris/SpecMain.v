@@ -204,6 +204,7 @@ Require Import TsoCtx.
 Require Import CtxRecord.   (* [ctx_parked_inv] -- the boot deposit's record *)
 
 Notation K_main := (122%nat) (only parsing).
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Section SpecMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
@@ -682,7 +683,7 @@ End SpecMain.
 
 Module Type MAIN.
   Parameter wp_main_boot_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       
       (m : regfile) (K : nat)
       (p0 : mword 64)

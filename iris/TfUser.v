@@ -57,6 +57,15 @@ Proof. intros [He _]. exact He. Qed.
 (* An insert at an index OUTSIDE {3} u [5,35] -- i.e. at one of the four *)
 (* kernel words -- is invisible to [tf_ueq], on either side.             *)
 (* ------------------------------------------------------------------- *)
+(* ...and the ARGUMENT words, the same way: [tf_arg_idx k] is [14 + k], so
+   a0..a7 sit at 14..21, well inside the user range.  What wants this is a
+   round that reads the SYSCALL's argument or return value off a trapframe
+   prepare_return has already re-armed -- the four words it rewrites are the
+   kernel ones, and [tf_ueq] is exactly the blindness to them. *)
+Lemma tf_ueq_arg (tf tf' : list (mword 64)) (k : nat) :
+  (k < 8)%nat -> tf_ueq tf tf' -> tf !!! tf_arg_idx k = tf' !!! tf_arg_idx k.
+Proof. intros Hk [_ Hg]. apply Hg. unfold tf_arg_idx. lia. Qed.
+
 Lemma tf_ueq_insert_r (tf tf' : list (mword 64)) (i : nat) (v : mword 64) :
   i <> tf_epc_idx -> (i < 5 \/ 35 < i)%nat ->
   tf_ueq tf tf' -> tf_ueq tf (<[i := v]> tf').

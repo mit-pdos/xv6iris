@@ -186,8 +186,12 @@ Record uarg : Type := UArg {
   ua_bytes : nat -> bv 8;
 }.
 
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section UserHeap.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   (* the break ghost's class.  It already exists in the tree --
      Xv6Cameras.uioG's [uio_brkG] is the same [ghost_varG Σ Z], introduced
      for the old tier's sbrk -- so nothing new enters Σ. *)

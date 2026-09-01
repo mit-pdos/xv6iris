@@ -98,6 +98,7 @@ Require Import CodeUsertrap.
 Require Import SpecKilled SpecSetkilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecVmfault.
 Require Import SpecPrintk.
+Require Import UsysMemOk.   (* [uecall_scause] -- the transparent arms' defining cause *)
 Require Import SpecUsertrap UsertrapRes.
 Require Import UserPerm.   (* [perm_of_uptd_ext_sz] -- the fill is transparent *)
 Require Import ProofUsertrapParts.
@@ -114,6 +115,7 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module UtArms (PR : PREPARE_RETURN) (KI : KILLED) (KE : KEXIT) (YI : YIELD)
               (SK : SETKILLED) (VM : VMFAULT).
 
@@ -145,6 +147,7 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section UtArmsCommon.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
@@ -204,6 +207,7 @@ End UtArmsCommon.
 
 Section Ut56.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
@@ -236,6 +240,14 @@ Section Ut56.
     menvcfg0 = MENVCFG_S ->
     (* THE ROUND SO FAR (milestone J1a) -- see [SpecUsertrap.ut_round]. *)
     ut_round epv scv U0 U ->
+    (* ...AND THE CAUSE IS NOT AN ECALL, which is what makes this a
+       transparent arm at all.  Free at every call site -- the dispatch's
+       own [c.li a5,8; bne] at usertrap+0x50 is what selected this branch --
+       and what it buys is [SpecUsertrap.ut_fd_ecall]: the descriptor row is
+       the SYSCALL table's, so an arm that runs no syscall discharges it by
+       refuting its premise rather than by proving a row it has no number
+       for. *)
+    scv <> uecall_scause ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x56)) -∗
     sie_cap_gpr KT1 m nx false (un_pj N) -∗
@@ -247,7 +259,7 @@ Section Ut56.
                      mie_v menvcfg0 U0 sts epv scv) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
+    intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hnec.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -602,7 +614,10 @@ Section Ut56.
     iDestruct ("Hownback" $! U sts with "Hpv Hufr Hsy") as "Hown".
     iApply (T.ut_a6 Rsys N U0 U pt ksp m0 S1 av nx false
               mie_v menvcfg0 epv scv lks sts sts
-              Hwf' ltac:(intros _; reflexivity) Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
+              Hwf' ltac:(intros _; reflexivity)
+              ltac:(intros Hc; exfalso; exact (Hnec Hc))
+                (* ...and pipe's join, refuted through the same cause *)
+                ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
               Hmiev Hmenvv Hrd
               with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
     all: try lkbelow.
@@ -621,6 +636,7 @@ End Ut56.
 
 Section UtD0.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
@@ -663,6 +679,14 @@ Section UtD0.
     menvcfg0 = MENVCFG_S ->
     (* THE ROUND SO FAR (milestone J1a) -- see [SpecUsertrap.ut_round]. *)
     ut_round epv scv U0 U ->
+    (* ...AND THE CAUSE IS NOT AN ECALL, which is what makes this a
+       transparent arm at all.  Free at every call site -- the dispatch's
+       own [c.li a5,8; bne] at usertrap+0x50 is what selected this branch --
+       and what it buys is [SpecUsertrap.ut_fd_ecall]: the descriptor row is
+       the SYSCALL table's, so an arm that runs no syscall discharges it by
+       refuting its premise rather than by proving a row it has no number
+       for. *)
+    scv <> uecall_scause ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xd0)) -∗
     sie_cap_gpr KT1 m nx false (un_pj N) -∗
@@ -674,7 +698,7 @@ Section UtD0.
                      mie_v menvcfg0 U0 sts epv scv) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
+    intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hnec.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -945,7 +969,7 @@ Section UtD0.
       iApply (ut_56 Rsys N U0 U pt ksp m0 mr av nx
                 mie_v menvcfg0 epv scv lks sts
                 Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
-                Hmiev Hmenvv Hrd
+                Hmiev Hmenvv Hrd Hnec
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       iApply (ua_hold_on Rsys N U _ sts with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
@@ -1007,7 +1031,10 @@ Section UtD0.
         - cbn [us_V]. exact HV'sz. }
       iApply (T.ut_a6 Rsys N U0 (MkUstate V' (us_M U)) pt ksp m0 mr av nx false
                 mie_v menvcfg0 epv scv lks sts sts
-                Hwf' ltac:(intros _; reflexivity) Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
+                Hwf' ltac:(intros _; reflexivity)
+                ltac:(intros Hc; exfalso; exact (Hnec Hc))
+                (* ...and pipe's join, refuted through the same cause *)
+                ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv Hrd'
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       all: try lkbelow.
@@ -1020,6 +1047,7 @@ End UtD0.
 
 Section UtE8.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
@@ -1053,6 +1081,14 @@ Section UtE8.
     menvcfg0 = MENVCFG_S ->
     (* THE ROUND SO FAR (milestone J1a) -- see [SpecUsertrap.ut_round]. *)
     ut_round epv scv U0 U ->
+    (* ...AND THE CAUSE IS NOT AN ECALL, which is what makes this a
+       transparent arm at all.  Free at every call site -- the dispatch's
+       own [c.li a5,8; bne] at usertrap+0x50 is what selected this branch --
+       and what it buys is [SpecUsertrap.ut_fd_ecall]: the descriptor row is
+       the SYSCALL table's, so an arm that runs no syscall discharges it by
+       refuting its premise rather than by proving a row it has no number
+       for. *)
+    scv <> uecall_scause ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xea)) -∗
     sie_cap_gpr KT1 m nx false (un_pj N) -∗
@@ -1064,7 +1100,7 @@ Section UtE8.
                      mie_v menvcfg0 U0 sts epv scv) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hnec.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -1160,7 +1196,10 @@ Section UtE8.
       iEval (rewrite Hpfc) in "Hpc".
       iApply (T.ut_fa Rsys N U0 U pt ksp m0 mf av nx false
                 mie_v menvcfg0 epv scv lks sts sts
-                Hwf' ltac:(intros _; reflexivity) Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
+                Hwf' ltac:(intros _; reflexivity)
+                ltac:(intros Hc; exfalso; exact (Hnec Hc))
+                (* ...and pipe's join, refuted through the same cause *)
+                ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       iApply (ua_hold_on Rsys N U _ sts with "Hcpu Hcsrs Hclm [-]").

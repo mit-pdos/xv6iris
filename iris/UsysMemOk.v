@@ -59,6 +59,7 @@ Require Import UserPerm.     (* [uperm] / [uperm_rw] -- the permission view *)
 Require Import VcGen.       (* [trunc32_unsigned]/[trunc32_mword_of_int] *)
 Require Import RiscvExtras.  (* [trunc32] -- the C [int] reading *)
 Require Import FdSlots.      (* [fdstate] / [fdtype] -- the descriptor view *)
+Require Import RiscvModelBytes. (* [nth_byte] -- pipe's two stored words *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -70,6 +71,15 @@ Local Open Scope Z_scope.
 (* ===================================================================== *)
 Definition usys_num (tf : list (mword 64)) : Z :=
   bv_signed (subrange_vec_dec (tf !!! tf_arg_idx 7) 31 0 : mword 32).
+
+(* the number is ONE WORD of the trapframe, so two frames that agree at a7
+   name the same entry.  What wants this is a boundary that restates a row
+   at a different-but-agreeing trapframe -- uservec's save walk stores the
+   31 user registers and then speaks [tf_of g], where usertrap spoke the
+   saved list. *)
+Lemma usys_num_arg_cong (tf1 tf2 : list (mword 64)) :
+  tf1 !!! tf_arg_idx 7 = tf2 !!! tf_arg_idx 7 -> usys_num tf1 = usys_num tf2.
+Proof. intros He. unfold usys_num. rewrite He. reflexivity. Qed.
 
 (* the syscall numbers this table names (kernel/syscall.h) *)
 Definition USYS_fork : Z := 1.
@@ -242,8 +252,20 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        what it had, which [list_insert] says by leaving it alone. *)
     ((exists fd1 : nat,
         usys_ret_is r fd1 /\
+        (* ...AND THE SLOT IT LANDED IN WAS FREE.  fdalloc scans for a null
+           entry, so this is what the code does; stating it is what makes
+           the row usable by a holder of descriptors.  Without it dup would
+           be licensed to retype a descriptor the caller is already using,
+           and no party above could keep a fact about its own table across
+           the call ([UserFd.ufd_dup] is the consumer). *)
+        sts !! fd1 = Some FdClosed /\
         sts' = <[fd1 := sts !!! Z.to_nat (usys_argfd tf)]> sts)
-     \/ sts' = sts)
+     (* ...OR THE CALL FAILED, AND THE ROW SAYS SO BY NAMING [-1].  An
+        unguarded [sts' = sts] here would be useless to a caller: it would
+        permit "returned a descriptor and changed nothing", which sys_dup
+        never does, and a caller holding [r] could not tell the two arms
+        apart.  Both failure exits of sys_dup return -1. *)
+     \/ (r = (mword_of_int (-1) : mword 64) /\ sts' = sts))
   else if decide (n = USYS_open) then
     (* open(path, omode): the returned descriptor becomes OPEN at some type
        and mode.  Both are existential HERE and both are pinnable: the mode
@@ -255,8 +277,14 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        bits decoded, the type wants the path lookup -- so the row says what
        it can honestly say: the slot is now OPEN, and no other slot moved. *)
     ((exists (fd : nat) (rd wr : bool) (t : fdtype),
-        usys_ret_is r fd /\ sts' = <[fd := FdOpen rd wr t]> sts)
-     \/ sts' = sts)
+        usys_ret_is r fd /\
+        (* ...AND THE SLOT WAS FREE -- same fdalloc scan, same reason as
+           dup's row above. *)
+        sts !! fd = Some FdClosed /\
+        sts' = <[fd := FdOpen rd wr t]> sts)
+     (* ...or the call failed, which it reports as -1 -- see dup's row for
+        why the failure arm is guarded rather than bare. *)
+     \/ (r = (mword_of_int (-1) : mword 64) /\ sts' = sts))
   else if decide (n = USYS_pipe) then
     (* pipe(fdarray): TWO descriptors, and the row says which end is which
        -- [FdOpen true false FdPipe] reads and [FdOpen false true FdPipe]
@@ -272,6 +300,10 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
     (if decide (uint r = 0)
      then (exists a b : nat,
              a <> b /\
+             (* ...AND BOTH SLOTS WERE FREE, both read against the INCOMING
+                table: the two are distinct, so writing one does not disturb
+                the other's freedom.  Two fdalloc calls, two scans. *)
+             sts !! a = Some FdClosed /\ sts !! b = Some FdClosed /\
              sts' = <[a := FdOpen true false FdPipe]>
                       (<[b := FdOpen false true FdPipe]> sts))
      else sts' = sts)
@@ -343,6 +375,111 @@ Proof.
   reflexivity.
 Qed.
 
+(* THE ROW READS THE TRAPFRAME ONLY AT ARGUMENT 0.  Two trapframes that
+   agree there satisfy the same row, whatever else differs between them --
+   and the difference that matters is the EPC WORD, which usertrap's
+   prologue rewrites (on the way in) and its epilogue bumps (on the way
+   out).  The image table has the same fact under the same name pattern
+   ([usys_mem_ok_epc], [usys_num_epc]); this is the descriptor table's.
+
+   Note the argument is read at the ENTRY trapframe, before the return
+   value is stored over it -- [usys_argfd] is a0 as the kernel FOUND it,
+   not a0 as it left it. *)
+(* ===================================================================== *)
+(* SS2c PIPE'S TWO ROWS, JOINED.                                           *)
+(*                                                                         *)
+(* [usys_mem_ok] says pipe wrote [d <= 8] bytes at a0 -- SOME bytes, from  *)
+(* an existential [bs] -- and [usys_fd_ok] says pipe opened two free slots *)
+(* [a] and [b].  Separately, neither says the words it wrote NAME the      *)
+(* slots it opened, and that tie is the whole content of pipe() to a       *)
+(* caller: sh reads fd[0] and fd[1] back out of that buffer and closes     *)
+(* them.  This row is the join, and it is what the two halves could never  *)
+(* be strengthened into individually -- [usys_mem_ok] has no [sts] to      *)
+(* speak of and [usys_fd_ok] has no [M].                                   *)
+(*                                                                         *)
+(* GUARDED ON SUCCESS, at pipe's OWN return convention: pipe answers 0 or  *)
+(* -1, and the failure arm allocated nothing and wrote nothing.  The guard *)
+(* is [uint r = 0] rather than [r = 0] because that is the shape the       *)
+(* dispatch's [beqz] leaves behind.                                        *)
+(*                                                                         *)
+(* THE BYTES ARE STATED ON THE WRITTEN FUNCTION, not on lookups in [M'].   *)
+(* Reading them back out of [M'] needs the no-wrap side condition on a0,   *)
+(* which is the CALLER's fact about its own buffer, not pipe's -- so the   *)
+(* row hands over [bs] itself and lets the caller do that step with the    *)
+(* window lemma it already has. *)
+Definition usys_pipe_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
+    (M M' : gmap Z (bv 8)) (sts sts' : list fdstate) : Prop :=
+  n = USYS_pipe ->
+  uint r = 0 ->
+  exists (a b : nat) (bs : nat -> bv 8),
+    a <> b /\
+    (* THE TWO SLOTS WERE FREE, restated here rather than left to
+       [usys_fd_ok]'s own pipe row.  The two rows bind their [a]/[b]
+       INDEPENDENTLY, so a leaf that mints handles off this one cannot
+       borrow the other's promise without first arguing the witnesses
+       agree -- and the promise costs the kernel nothing extra, being the
+       same fact [ProofSysPipe] already proves once. *)
+    sts !! a = Some FdClosed /\
+    sts !! b = Some FdClosed /\
+    M' = umem_wr M (tf !!! tf_arg_idx 0) 8 bs /\
+    (forall i : nat, (i < 8)%nat ->
+       bs i = if (i <? 4)%nat
+              then nth_byte (trunc32 (mword_of_int (Z.of_nat a) : mword 64)) i
+              else nth_byte (trunc32 (mword_of_int (Z.of_nat b) : mword 64))
+                     (i - 4)%nat) /\
+    sts' = <[a := FdOpen true false FdPipe]>
+             (<[b := FdOpen false true FdPipe]> sts).
+
+(* the quiet reading: the other twenty-one entries owe nothing here *)
+Lemma usys_pipe_ok_quiet (n : Z) (tf : list (mword 64)) (r : mword 64)
+    (M M' : gmap Z (bv 8)) (sts sts' : list fdstate) :
+  n <> USYS_pipe -> usys_pipe_ok n tf r M M' sts sts'.
+Proof. intros Hne Hp. contradiction (Hne Hp). Qed.
+
+(* THE ROW READS THE ENTRY TRAPFRAME AT ONE WORD, a0 -- the buffer pointer
+   -- so a frame that agrees there carries it across.  Stated separately
+   from the number, exactly as [usys_fd_ok_arg_cong] is, because the two
+   congruences are used at different places. *)
+Lemma usys_pipe_ok_arg_cong (n : Z) (tf1 tf2 : list (mword 64)) (r : mword 64)
+    (M M' : gmap Z (bv 8)) (sts sts' : list fdstate) :
+  tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
+  usys_pipe_ok n tf1 r M M' sts sts' -> usys_pipe_ok n tf2 r M M' sts sts'.
+Proof. intros He. unfold usys_pipe_ok. rewrite He. exact id. Qed.
+
+(* ...and the epc rewrite, invisible here for the same reason it is
+   invisible to the descriptor row: different words. *)
+Lemma usys_pipe_ok_epc (n : Z) (tf : list (mword 64)) (w r : mword 64)
+    (M M' : gmap Z (bv 8)) (sts sts' : list fdstate) :
+  (tf_epc_idx < length tf)%nat ->
+  usys_pipe_ok n (<[tf_epc_idx := w]> tf) r M M' sts sts' ->
+  usys_pipe_ok n tf r M M' sts sts'.
+Proof.
+  intros Hlen. apply usys_pipe_ok_arg_cong.
+  rewrite list_lookup_total_insert_ne; [reflexivity |].
+  unfold tf_epc_idx, tf_arg_idx. lia.
+Qed.
+
+Lemma usys_fd_ok_arg_cong (n : Z) (tf1 tf2 : list (mword 64)) (r : mword 64)
+    (sts sts' : list fdstate) :
+  tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
+  usys_fd_ok n tf1 r sts sts' -> usys_fd_ok n tf2 r sts sts'.
+Proof.
+  intros He. unfold usys_fd_ok, usys_argfd. rewrite He. exact id.
+Qed.
+
+(* ...and the instance every caller wants: an epc rewrite is invisible to
+   the row, because the two indices are different words. *)
+Lemma usys_fd_ok_epc (n : Z) (tf : list (mword 64)) (w r : mword 64)
+    (sts sts' : list fdstate) :
+  (tf_epc_idx < length tf)%nat ->
+  usys_fd_ok n (<[tf_epc_idx := w]> tf) r sts sts' ->
+  usys_fd_ok n tf r sts sts'.
+Proof.
+  intros Hlen. apply usys_fd_ok_arg_cong.
+  rewrite list_lookup_total_insert_ne; [reflexivity |].
+  unfold tf_epc_idx, tf_arg_idx. lia.
+Qed.
+
 (* THE LENGTH SURVIVES EVERY ROW, which is what [FdSlots.fd_frags] needs of
    any table it is asked to hold: it carries [length sts = NOFILE] inside
    it, so a row that could change the length would be a row no bundle could
@@ -355,13 +492,15 @@ Proof.
   destruct (decide (n = USYS_close)) as [_ | _].
   { destruct (decide (uint r = 0)); subst; [ apply length_insert | reflexivity ]. }
   destruct (decide (n = USYS_dup)) as [_ | _].
-  { destruct H as [(fd1 & _ & ->) | ->]; [apply length_insert | reflexivity]. }
+  { destruct H as [(fd1 & _ & _ & ->) | [_ ->]];
+      [apply length_insert | reflexivity]. }
   destruct (decide (n = USYS_open)) as [_ | _].
-  { destruct H as [(fd & rd & wr & t & _ & ->) | ->];
+  { destruct H as [(fd & rd & wr & t & _ & _ & ->) | [_ ->]];
       [apply length_insert | reflexivity]. }
   destruct (decide (n = USYS_pipe)) as [_ | _].
   { destruct (decide (uint r = 0)) as [_ | _].
-    - destruct H as (a & b & _ & ->). rewrite length_insert. apply length_insert.
+    - destruct H as (a & b & _ & _ & _ & ->).
+      rewrite length_insert. apply length_insert.
     - subst. reflexivity. }
   subst. reflexivity.
 Qed.

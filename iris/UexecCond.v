@@ -62,6 +62,7 @@ Require Import UEchoKernel.
 Require User.SyncInstrs.
 Require User.EchoSyms User.EchoInstrs.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
+Require Import ProcGeom.  (* [NOFILE] -- how many slots a table has *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -155,7 +156,11 @@ Definition sync_gate (W : uvis) : Prop :=
   sync_xopage (uvis_perm W) /\
   32 <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) /\
   uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 /\
-  sync_stkdata W.
+  sync_stkdata W /\
+  (* ...and the descriptor table is a table.  Decidable like the rest, and
+     what the process's own fd authority is minted at
+     ([UserFd.ufd_auth] carries the length). *)
+  length (uvis_fd W) = NOFILE.
 
 Global Instance sync_gate_dec (W : uvis) : Decision (sync_gate W).
 Proof. unfold sync_gate. apply _. Defined.
@@ -185,13 +190,19 @@ Definition echo_gate (W : uvis) : Prop :=
   uk_args_c (uvis_perm W) (uvis_M W) (uvis_av W) (uvis_argc W)
     (uint (uvis_sp W)) /\
   echo_avd_arr W /\
-  echo_avd_str W.
+  echo_avd_str W /\
+  (* ...and the descriptor table is a table -- see [sync_gate] *)
+  length (uvis_fd W) = NOFILE.
 
 Global Instance echo_gate_dec (W : uvis) : Decision (echo_gate W).
 Proof. unfold echo_gate. apply _. Defined.
 
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section UexecCond.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   (* the break's ghost class, for [UkRun.usz].  It already exists in the
      tree -- [Xv6Cameras.uioG]'s [uio_brkG] is the same [ghost_varG Σ Z] --
@@ -207,22 +218,23 @@ Section UexecCond.
   (* the gate's yes branch: sync's own slot *)
   Lemma sync_gate_slot (W : uvis) : sync_gate W -> ⊢ uslot W.
   Proof.
-    intros (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk).
+    intros (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hfdlen).
     exact (sync_uexec_slot W Hpc
              (text_region_eq_uimg_sub (uvis_M W) Hteq)
              (sync_xopage_addrs (uvis_perm W) Hxo)
-             Hroom Hal8 (sync_stkdata_all W Hstk)).
+             Hroom Hal8 (sync_stkdata_all W Hstk) Hfdlen).
   Qed.
 
   (* ...and echo's *)
   Lemma echo_gate_slot (W : uvis) : echo_gate W -> ⊢ uslot W.
   Proof.
-    intros (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hargs & Havd & Havs).
+    intros (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hargs & Havd & Havs
+            & Hfdlen).
     exact (echo_uexec_slot W Hpc
              (text_region_eq_of_uimg_sub EchoInstrs.echo_bytes (uvis_M W) Hteq)
              (sync_xopage_addrs (uvis_perm W) Hxo)
              Hroom Hal8 (echo_stkdata_all W Hstk) Hargs
-             (echo_avd_arr_all W Havd) (echo_avd_str_all W Havs)).
+             (echo_avd_arr_all W Havd) (echo_avd_str_all W Havs) Hfdlen).
   Qed.
 
   Lemma cond_entry_slot (W : uvis) : □ uexec_wp -∗ uslot W.
@@ -252,6 +264,7 @@ End UexecCond.
 (* ===================================================================== *)
 Section UexecCondCongr.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
 
   Lemma uslot_congr (U1 U2 : ustate) (sts : list fdstate) :

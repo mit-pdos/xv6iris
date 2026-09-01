@@ -215,8 +215,10 @@ Import Defs.
    and release's 10.  Written as an expression so a change to a callee's
    budget cannot silently leave this one behind. *)
 Notation K_forkret := ((6 + K_kexec)%nat) (only parsing).
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Section SpecForkret.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* WHAT forkret'S TAIL HANDS THE TRAP LOOP.  [ut_trap_parked] is the
@@ -362,7 +364,7 @@ Module Type FORKRET.
      PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
   Include UtResFits.USERTRAP_RES_PARK.
   Parameter wp_forkret :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
       (j : nat) (γs : list gname) (γl γf : gname)
       (pid : mword 32) (U : ustate)

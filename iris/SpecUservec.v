@@ -234,8 +234,22 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
     ⌜pv_upt (us_V U') = pt'⌝ -∗
     ⌜uv_round U M g sepc_v sc_v U'⌝ -∗
     (* the round's DESCRIPTOR half, forwarded from usertrap's own post --
-       see [SpecUsertrap.ut_fd_kept] for why the loop cannot do without it *)
+       see [SpecUsertrap.ut_fd_kept] for why the loop cannot do without it,
+       and [SpecUsertrap.ut_fd_ecall] for the syscall table's own row beside
+       it.  The loop consumes only the first today: the u-tier's ecall arm
+       ∀-binds the descriptor view ([UexecApply.uexec_ret_round_slot]'s own
+       note), so the row is carried here and not yet read.  It is carried
+       anyway because the alternative is what the kfork loop does -- prove
+       the fact and leave it unstatable. *)
     ⌜SpecUsertrap.ut_fd_kept sc_v sts sts'⌝ -∗
+    ⌜SpecUsertrap.ut_fd_ecall sc_v (tf_of g (ret_pc sepc_v))
+       (pv_tf (us_V U')) sts sts'⌝ -∗
+    (* ...and pipe's join, off the same two frames.  The ENTRY image is [M],
+       the one the frame names above, so this boundary states the row at a
+       map anchored to a resource on both ends -- see
+       [SpecUsertrap.ut_pipe_ecall]. *)
+    ⌜SpecUsertrap.ut_pipe_ecall sc_v (tf_of g (ret_pc sepc_v))
+       (pv_tf (us_V U')) M (us_M U') sts sts'⌝ -∗
     ⌜ret_pc uepc = tf_resume_pc (pv_tf (us_V U'))⌝ -∗
     ⌜mf = tf_resume_gpr0 (pv_tf (us_V U'))⌝ -∗
     ⌜ud_tfp pt' = ud_tfp pt⌝ -∗
@@ -427,6 +441,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
     uservec_post (CID := CID') (URes CID') C pt vksp U M g sts sepc_v sc_v) -∗
   WP (Loop : expr riscv_lang).
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module Type USERVEC.
   (* ...AND THE PARK'S ONE PRODUCER-SIDE ENTRY, threaded with the rest.
      [UtResFits.USERTRAP_RES_PARK] is [USERTRAP_RES] plus
@@ -436,7 +451,7 @@ Module Type USERVEC.
      PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
   Include UtResFits.USERTRAP_RES_PARK.
   Parameter wp_uservec_pt :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (j : nat) (vksp : mword 64) (U : ustate) (sts : list fdstate)
       (M : gmap Z (bv 8))

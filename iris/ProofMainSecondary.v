@@ -108,6 +108,7 @@ Lemma ms_bounds (K : nat) : (K_main_secondary <= K)%nat ->
 Proof. lia. Qed.
 
 (* ===================================================================== *)
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module MainSecondaryProof
   (Cpuid : CPUID) (PrintkGen : PRINTK_GEN) (Kvminithart : KVMINITHART)
   (Trapinithart : TRAPINITHART) (Plicinithart : PLICINITHART)
@@ -116,6 +117,7 @@ Module MainSecondaryProof
 
 Section ProofMainSecondary.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Ltac reg_neq :=

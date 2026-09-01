@@ -80,9 +80,11 @@ Require Import TsoCtxShim.
 Local Open Scope Z_scope.
 Import Defs.
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module UserretUser (R : USERRET).
 Section UserretUser.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_userret_user (C : ucfg) (pt : uptd)

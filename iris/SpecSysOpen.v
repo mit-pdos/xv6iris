@@ -246,8 +246,10 @@ Definition so_rd_of (om : mword 32) : bool :=
 Definition so_wr_of (om : mword 32) : bool :=
   negb (bool_decide (bv_unsigned om `mod` 4 = 0)).
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Section SpecSysOpen.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!ufdG Σ}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
      carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
      definitions below mention the block, so the section has to bind it. *)
@@ -299,7 +301,16 @@ Section SpecSysOpen.
         only one that moves. *)
      (∃ (fd : nat) (l : list nat) (k : nat) (t : fdtype),
        ⌜r = (mword_of_int (Z.of_nat fd) : mword 64) /\
-        fd_frees (pv_ofile (us_V UW)) = fd :: l⌝ ∗
+        fd_frees (pv_ofile (us_V UW)) = fd :: l /\
+        (* ...AND THE SLOT WAS CLOSED.  fdalloc handed its authority back at
+           [FdClosed] and the caller's own bundle yields the matching
+           fragment, so this is one [FdSlots.fd_st_agree] inside the proof
+           -- it is EXPOSED here because no caller can re-derive it, and
+           without it the row licenses an open() that retypes a descriptor
+           its caller is already holding.  [UserFd.ufd_open] is what needs
+           it: minting a handle for the returned descriptor is an insert,
+           and an insert needs the key free. *)
+        sts !! fd = Some FdClosed⌝ ∗
        proc_priv γf p pid (us_ofile UW fd (fnode k)) ∗
        fd_frags (pv_fdg (us_V UW))
          (<[fd := FdOpen (so_rd_of om) (so_wr_of om) t]> sts)))
@@ -329,7 +340,8 @@ Section SpecSysOpen.
       iLeft. by iFrame "Hp".
     - iFrame "Hfd". iSplitR "Hb";
         [| by iExists (<[fd := FdOpen (so_rd_of om) (so_wr_of om) t]> sts)].
-      iRight. iExists fd, l, k. by iFrame "Hp".
+      iRight. iExists fd, l, k. iFrame "Hp". iPureIntro.
+      destruct Hpu as (Hr1 & Hfl1 & _). exact (conj Hr1 Hfl1).
   Qed.
 
 End SpecSysOpen.

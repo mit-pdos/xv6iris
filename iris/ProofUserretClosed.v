@@ -112,10 +112,14 @@ Import Defs.
    arms -- exec-success and fork -- are kernel mints by design, so the loop
    needs a generic inhabitant to fall back on.  Everything else it runs is
    the continuation the process itself handed back. *)
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Module UserretClosed (R : USERRET) (UV : USERVEC) (UG : UEXEC_GEN).
 
 Section UserretClosed.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
   (* userret runs AS the thread, so its residue is at the AMBIENT context
      (tso-port.md: this-thread sites take the ambient ξ). *)
@@ -263,7 +267,7 @@ Section UserretClosed.
     iApply wp_next_intro. iIntros (CID').
     rewrite /uservec_post.
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2)
-      "%Huptpt' %Hround' %Hfdkept %Hpcret' %Hgprtie'
+      "%Huptpt' %Hround' %Hfdkept %Hfdecall %Hpipecall %Hpcret' %Hgprtie'
        %Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
        Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin'".
@@ -328,7 +332,17 @@ Section UserretClosed.
        exactly the transparent arm's premise. *)
     iDestruct (uexec_ret_round_slot_of sc W (tf_resume_gpr0 (uvis_tf W))
                  (tf_w (uvis_tf W) tf_epc_idx) U2 sts2
-                 Hlen eq_refl eq_refl Hfdkept Hround'
+                 Hlen eq_refl eq_refl Hfdkept
+                 (* ...and the ECALL arm's row, which is what stops the
+                    process resuming at an ARBITRARY descriptor view.  It
+                    arrives from uservec's post ([Hfdecall]), which got it
+                    from usertrap, which got it from the dispatcher -- and
+                    it is stated at the same trapframe on both sides, so it
+                    goes in verbatim. *)
+                 Hfdecall
+                 (* ...and pipe's join beside it, from the same three hops
+                    and stated at the same trapframe pair *)
+                 Hpipecall Hround'
                  with "Hmk Hret") as "Hslot".
     (* ---- STEPS C/D: the guard, and the bundle, both inside the named
            lemma -- the loop only says which key it is at. ---- *)
@@ -388,6 +402,7 @@ Module UserretClosedProof (R : USERRET) (UV : USERVEC) (UG : UEXEC_GEN)
 
 Section Res.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the residue is uservec's, re-exported unchanged *)
@@ -423,7 +438,7 @@ Section Res.
 End Res.
 
   Theorem wp_userret_closed
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
       (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)

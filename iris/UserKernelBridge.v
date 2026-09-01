@@ -61,8 +61,10 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Section UserKernelBridge.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* -------------------------------------------------------------------- *)

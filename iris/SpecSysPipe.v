@@ -129,6 +129,8 @@ Local Open Scope Z_scope.
    so pipealloc sets the bound, and what makes pipealloc the deepest is the
    fileclose on its own error path. *)
 Notation sys_pipe_stack := (98%nat) (only parsing).
+Require Import RiscvModelBytes.  (* [nth_byte] -- pipe reports its
+                                    descriptors by writing them *)
 Section SpecSysPipe.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
@@ -158,8 +160,13 @@ Section SpecSysPipe.
      fact about the array this post already carries ([fd_frees … = fd0 ::
      fd1 :: l]).  When the two tables are read together, this is the row
      that lets the existential be discharged. *)
+  (* [d]/[bs] are the WINDOW pipe wrote -- carried here so the success arm
+     can say the two descriptors it allocated ARE the two words it put in
+     the caller's buffer.  Without that a caller learns two numbers it
+     cannot act on. *)
   Definition sys_pipe_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
-      (UW : ustate) (sts : list fdstate) (r : mword 64) : iProp Σ :=
+      (UW : ustate) (sts : list fdstate) (d : nat) (bs : nat -> bv 8)
+      (r : mword 64) : iProp Σ :=
     ((* FAILURE.  Whichever tail ran, the descriptor array is EXACTLY as it
         came in: the two arms that had already installed a descriptor null
         it again, and writing 0 back over a slot that was 0 is the identity
@@ -176,7 +183,33 @@ Section SpecSysPipe.
           has the fact already (the second descriptor is still free after
           the first is installed). *)
        ⌜r = (zero_reg : mword 64) /\ fd_frees (pv_ofile (us_V UW)) = fd0 :: fd1 :: l
-        /\ fd0 <> fd1⌝ ∗
+        /\ fd0 <> fd1
+        (* ...AND BOTH SLOTS WERE CLOSED, both read against the INCOMING
+           table -- see [SpecSysOpen]'s note on the same conjunct.  Two
+           fdalloc calls, two scans; the proof already names both facts
+           (they are what make its two re-nulls the identity on the failure
+           arms), so exposing them costs nothing. *)
+        /\ sts !! fd0 = Some FdClosed /\ sts !! fd1 = Some FdClosed
+        (* ...AND THE TWO DESCRIPTORS ARE THE TWO WORDS IN THE CALLER'S
+           BUFFER.  This is the conjunct that makes the row USABLE by a
+           program: pipe reports its descriptors by WRITING them, so a
+           caller that is handed [fd0]/[fd1] existentially and eight
+           unconstrained bytes has learned nothing it can act on -- it
+           cannot later close what it was given.  The proof has had the
+           fact all along (it copies out exactly these bytes); it simply
+           was not said.  Stated against [UW]'s image, which IS the written
+           one, and at the buffer argument 0 names. *)
+        (* ...AND THE BYTES PIPE WROTE ARE THE TWO DESCRIPTORS.  Stated on
+           the WRITTEN FUNCTION rather than on lookups, because the no-wrap
+           side condition a lookup needs is the CALLER's fact (it comes
+           from owning the run), not something the kernel establishes. *)
+        /\ d = 8%nat
+        /\ (forall i : nat, (i < 8)%nat ->
+              bs i = if (i <? 4)%nat
+                     then nth_byte (trunc32 (mword_of_int (Z.of_nat fd0)
+                                             : mword 64)) i
+                     else nth_byte (trunc32 (mword_of_int (Z.of_nat fd1)
+                                             : mword 64)) (i - 4)%nat)⌝ ∗
        proc_priv γf p pid
          (upd_usV UW (upd_ofile (upd_ofile (us_V UW) fd0 (fnode k0)) fd1 (fnode k1))) ∗
        (* written in the order the two settles run: fd0's read end first,
@@ -193,8 +226,9 @@ Section SpecSysPipe.
      One named weakening beats a scatter of [iExists], and it is the line to
      delete when the arm bundle is indexed. *)
   Lemma sys_pipe_post_any `{XI : CurCtx} (γf : gname) (p : mword 64)
-      (pid : mword 32) (UW : ustate) (sts : list fdstate) (r : mword 64) :
-    sys_pipe_post γf p pid UW sts r ⊢
+      (pid : mword 32) (UW : ustate) (sts : list fdstate)
+      (d : nat) (bs : nat -> bv 8) (r : mword 64) :
+    sys_pipe_post γf p pid UW sts d bs r ⊢
     ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf p pid UW
       ∨ ∃ (fd0 fd1 : nat) (l : list nat) (k0 k1 : nat),
           ⌜r = (zero_reg : mword 64) /\
@@ -211,7 +245,8 @@ Section SpecSysPipe.
     - iFrame "Hu0 Hu1". iSplitR "Hb";
         [| by iExists (<[fd1 := FdOpen false true FdPipe]>
                          (<[fd0 := FdOpen true false FdPipe]> sts))].
-      iRight. iExists fd0, fd1, l, k0, k1. by iFrame "Hp".
+      iRight. iExists fd0, fd1, l, k0, k1. iFrame "Hp". iPureIntro.
+      destruct Hpu as (H1 & H2 & H3 & _ & _). exact (conj H1 (conj H2 H3)).
   Qed.
 
 End SpecSysPipe.
@@ -337,7 +372,7 @@ Definition wp_sys_pipe_sconf_body
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
       sys_pipe_post γf p pid (upd_usM (us_upt U P') (umem_wr (us_M U) v d bs)) sts
-        (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+        d bs (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       iref_slot -∗
       (* the environment back; the page count has moved if either close was
          the pipe's last end *)

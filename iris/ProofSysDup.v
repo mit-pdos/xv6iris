@@ -1044,6 +1044,11 @@ Section ProofSysDup.
     destruct Hst1x as [stq Hst1].
     iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd1 stq Hst1 with "Hfrag")
       as "[Hfr Hfrback]".
+    (* THE DESTINATION SLOT WAS FREE -- fdalloc's authority is still at
+       [FdClosed], the bundle yielded the fragment, [fd_st_agree] joins
+       them.  [sys_dup_post] exposes it; see [SpecSysOpen]'s note. *)
+    iDestruct (fd_st_agree (pv_fdg (us_V U)) fd1 FdClosed stq with "Hauth1 Hfr")
+      as "%Hstqcl".
     iMod (fd_st_move _ fd1 FdClosed stq stf with "Hauth1 Hfr")
       as "[Hauth1 Hfr]".
     iDestruct ("Hfrback" with "Hfr") as "Hfrag".
@@ -1143,7 +1148,9 @@ Section ProofSysDup.
     iApply ("Hcont" $! Fz3 with "[%] Hcg Hcpu Hpc [Hpriv Hfrag]"); [exact HcsF|].
     rewrite /sys_dup_post. iRight. iRight.
     iExists fd0, fd1, fv, l. iSplitR.
-    { iPureIntro. split; [exact HFa0|]. split; [exact Hsome | exact Hfr1]. }
+    { iPureIntro. split_and!;
+        [ exact HFa0 | exact Hsome | exact Hfr1 |].
+      rewrite <- Hstqcl in Hst1. exact Hst1. }
     (* the post says the destination lands at [sts !!! fd0]; the ghost step
        landed it at [stf], and [Hst0] -- the source row [fd_st_agree]
        identified with the loan's authority -- is what says those are the

@@ -84,8 +84,13 @@ Proof.
   rewrite (lookup_seq_lt 0 argcn i Hi). reflexivity.
 Qed.
 
+Require Import ProcGeom.  (* [NOFILE] -- how many slots a table has *)
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section UEchoKernel.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
 
@@ -401,17 +406,20 @@ Section UEchoKernel.
        is_Some (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)
                  !! (uk_argv_p (uvis_M W) (uvis_av W) (Z.of_nat i)
                      + Z.of_nat j)%Z)) ->
+    (* the process's table is [NOFILE] slots -- what its own descriptor
+       authority is minted at ([UserFd.ufd_auth] carries it) *)
+    length (uvis_fd W) = NOFILE ->
     ⊢ uslot W.
   Proof.
-    intros Hpc Hsub Hx Hroom Hal8 Hstk Hargs Havd Havs.
+    intros Hpc Hsub Hx Hroom Hal8 Hstk Hargs Havd Havs Hfdlen.
     assert (Hsp0 : 0 <= uint (uvis_sp W)) by lia.
     assert (Hargc0 : 0 <= uvis_argc W)
       by exact (proj1 (uka_argc _ _ _ _ _ _ Hargs)).
     iApply (uslot_of_urun_ro W 12 Hal8
-              ltac:(unfold uvis_sp in Hroom; lia) Hstk).
-    iIntros (γt γd γs h) "%Hsz Hszf #Ht #HA Hrun".
+              ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen).
+    iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht #HA Hrun".
     rewrite Hpc.
-    iApply (wp_kecho_start γt γd γs h (tf_resume_gpr0 (uvis_tf W))
+    iApply (wp_kecho_start γt γd γs γfd h (tf_resume_gpr0 (uvis_tf W))
               (uvis_av W)
               (echo_args (uvis_M W) (uvis_av W) (Z.to_nat (uvis_argc W))) 0
               ltac:(rewrite echo_args_length;

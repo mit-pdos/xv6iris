@@ -111,6 +111,7 @@ Local Open Scope Z_scope.
 Require Import TsoCtx.
 Set Printing Depth 40.
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module UsertrapProof (SY : SYSCALL) (PK : PRINTK_GEN) (MP : MYPROC)
                      (KI : KILLED) (SK : SETKILLED) (DE : DEVINTR)
                      (VM : VMFAULT) (YI : YIELD) (PR : PREPARE_RETURN)
@@ -148,6 +149,7 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 (* ===================================================================== *)
 Section UtEntry.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
@@ -683,6 +685,7 @@ End UtEntry.
 (* ===================================================================== *)
 Section UtDispatch.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [hw_config] + [minstret_inv], both persistent, out of the ambient
@@ -980,6 +983,9 @@ Section UtDispatch.
                   mie_v menvcfg0 ep sc ∅ sts
                   Hwf' Hav Hnx Htfpe Hksp Hm0sp HD4sp HD4s1 HcsD4
                   Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
+                  (* the transparent arms' defining cause, off the dispatch's own
+                     [c.li a5,8; bne] at +0x50 *)
+                  Hscne
                   with "Htext Hpc Hcg Hhold Hframe Hcont").
       + (* no device: the two page-fault causes, then the fall-through *)
         iApply (wp_cbnez_fall_s_sconf (mword_of_int (UT + 0x40))
@@ -1056,6 +1062,9 @@ Section UtDispatch.
                     mie_v menvcfg0 ep sc ∅ sts
                     Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD6sp HD6s1 HcsD6
                     Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
+                    (* the transparent arms' defining cause, off the dispatch's own
+                       [c.li a5,8; bne] at +0x50 *)
+                    Hscne
                     with "Htext Hpc Hcg Hhold Hframe Hcont").
         *
           iApply (wp_beq_fall_s_sconf (mword_of_int (UT + 0x48))
@@ -1134,6 +1143,9 @@ Section UtDispatch.
                        mie_v menvcfg0 ep sc ∅ sts
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
+                       (* the transparent arms' defining cause, off the dispatch's own
+                          [c.li a5,8; bne] at +0x50 *)
+                       Hscne
                        with "Htext Hpc Hcg Hhold Hframe Hcont").
           -- (* the unexpected-scause arm *)
              iApply (wp_beq_fall_s_sconf (mword_of_int (UT + 0x52))
@@ -1155,6 +1167,9 @@ Section UtDispatch.
                        mie_v menvcfg0 ep sc ∅ sts
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
+                       (* the transparent arms' defining cause, off the dispatch's own
+                          [c.li a5,8; bne] at +0x50 *)
+                       Hscne
                        with "Htext Hpc Hcg Hhold Hframe Hcont").
   Qed.
 
@@ -1176,30 +1191,30 @@ End UtDispatch.
      whole walk runs at [un_pj N]; [UsertrapRes.wp_next_true_swap] moves it,
      and at index [true] that is sound and free (usertrap.md finding 4b). *)
 Definition usertrap_res
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} : uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ :=
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} : uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ :=
   ut_res SY.syscall_env.
 
 Definition usertrap_res_parked
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} : uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ :=
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} : uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ :=
   ut_res_parked SY.syscall_env.
 
 Lemma usertrap_res_tlb_close
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (kroot : mword 44) (U : ustate) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (kroot : mword 44) (U : ustate) (sts : list fdstate) :
   usertrap_res_parked pt ksp U sts -∗ tlb_res_pt kroot -∗ usertrap_res pt ksp U sts.
 Proof. exact (ut_res_tlb_close SY.syscall_env pt ksp kroot U sts). Qed.
 
 Lemma usertrap_res_tlb_open
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
   usertrap_res pt ksp U sts -∗
   ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp U sts.
 Proof. exact (ut_res_tlb_open SY.syscall_env pt ksp U sts). Qed.
 
 Definition usertrap_res_bare
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} : uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ :=
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} : uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ :=
   ut_res_bare SY.syscall_env.
 
 Lemma usertrap_res_pt_close
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
   usertrap_res_bare pt ksp U sts -∗ (∃ M : gmap Z (bv 8), proc_pt pt M) -∗
   ∃ Mz : gmap Z (bv 8), usertrap_res_parked pt ksp (upd_usM U Mz) sts.
 Proof.
@@ -1210,26 +1225,26 @@ Proof.
 Qed.
 
 Lemma usertrap_res_pt_open
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
   usertrap_res_parked pt ksp U sts -∗ (∃ M : gmap Z (bv 8), proc_pt pt M) ∗ usertrap_res_bare pt ksp U sts.
 Proof. exact (ut_res_pt_open SY.syscall_env pt ksp U sts). Qed.
 
 (* ...and the same two at the NAMED lazy image (milestone J, S3) *)
 Lemma usertrap_res_ptm_close
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (M : gmap Z (bv 8)) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (M : gmap Z (bv 8)) (sts : list fdstate) :
   usertrap_res_bare pt ksp U sts -∗
   proc_ptm pt (uint (pv_sz (us_V U))) M -∗
   usertrap_res_parked pt ksp (upd_usM U M) sts.
 Proof. exact (ut_res_ptm_close SY.syscall_env pt ksp U M sts). Qed.
 
 Lemma usertrap_res_ptm_open
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
   usertrap_res_parked pt ksp U sts -∗
   proc_ptm pt (uint (pv_sz (us_V U))) (us_M U) ∗ usertrap_res_bare pt ksp U sts.
 Proof. exact (ut_res_ptm_open SY.syscall_env pt ksp U sts). Qed.
 
 Lemma usertrap_res_bare_fd_tf_open
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
   usertrap_res_bare pt ksp U sts -∗
   FdSlots.fd_frags (pv_fdg (us_V U)) sts ∗
   ∃ kroot : mword 44,
@@ -1242,7 +1257,7 @@ Lemma usertrap_res_bare_fd_tf_open
 Proof. exact (ut_res_bare_fd_tf_open SY.syscall_env pt ksp U sts). Qed.
 
 Lemma usertrap_res_bare_fd_open
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
   usertrap_res_bare pt ksp U sts -∗
   FdSlots.fd_frags (pv_fdg (us_V U)) sts ∗
   (∀ sts' : list fdstate,
@@ -1250,13 +1265,13 @@ Lemma usertrap_res_bare_fd_open
 Proof. exact (ut_res_bare_fd_open SY.syscall_env pt ksp U sts). Qed.
 
 Lemma usertrap_res_bare_norm
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
   usertrap_res_bare pt ksp U sts -∗
   usertrap_res_bare (ud_norm pt) ksp (us_upt U (ud_norm pt)) sts.
 Proof. exact (ut_res_bare_norm SY.syscall_env pt ksp U sts). Qed.
 
 Lemma usertrap_res_tf_open
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
   usertrap_res_bare pt ksp U sts -∗
   ∃ kroot : mword 44,
     kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
@@ -1269,7 +1284,7 @@ Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp U sts). Qed.
 (* THE PARK'S PRODUCER, re-exported off the fit check.  See [Module Fits]
    above: it is proved under the same [SY], so this is a rename. *)
 Definition usertrap_res_bare_park
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{XI : CurCtx}
     (N : ut_names) (av : nat)
   : ut_park_intro_body
       (fun h : CpuId => Fits.usertrap_res_bare (CID := h))
@@ -1277,24 +1292,24 @@ Definition usertrap_res_bare_park
   := Fits.usertrap_res_bare_park N av.
 
 Lemma usertrap_res_csrs_open
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
   usertrap_res_bare pt ksp U sts -∗
   hart_csrs ∗ (hart_csrs -∗ usertrap_res_bare pt ksp U sts).
 Proof. exact (ut_res_bare_csrs_open SY.syscall_env pt ksp U sts). Qed.
 
 Lemma usertrap_res_sstc
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
   usertrap_res_bare pt ksp U sts -∗ sstc_enabled ∗ usertrap_res_bare pt ksp U sts.
 Proof. exact (ut_res_bare_sstc SY.syscall_env pt ksp U sts). Qed.
 
 (* the [p->sz] bound, off the residue -- see [SpecUsertrap]'s Parameter *)
 Lemma usertrap_res_bare_sz
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
   usertrap_res_bare pt ksp U sts -∗ ⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝.
 Proof. exact (ut_res_bare_sz SY.syscall_env pt ksp U sts). Qed.
 
 Lemma usertrap_res_tf_csrs_open
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
   usertrap_res_bare pt ksp U sts -∗
   ∃ kroot : mword 44,
     kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
@@ -1306,6 +1321,7 @@ Proof. exact (ut_res_bare_tf_csrs_open SY.syscall_env pt ksp U sts). Qed.
 
 Section UtSeal.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* printk's contract, as the [Prop] the arms take -- from the functor

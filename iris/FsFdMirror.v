@@ -146,6 +146,21 @@ Fixpoint fd_lowest_closed (l : list fdstate) : option nat :=
 Lemma fd_lowest_closed_fdt0 : fd_lowest_closed fdt0 = Some 0%nat.
 Proof. reflexivity. Qed.
 
+(* ...and the slot it names really is closed.  What wants this is the
+   agreement below: upstream's open and dup rows now PROMISE that the
+   descriptor they installed was free beforehand (see
+   [UsysMemOk.usys_fd_ok]), and the mirror's own rows pick their descriptor
+   with this scan, so the promise is one induction away. *)
+Lemma fd_lowest_closed_is_closed (l : list fdstate) (fd : nat) :
+  fd_lowest_closed l = Some fd -> l !! fd = Some FdClosed.
+Proof.
+  revert fd. induction l as [| st l IH]; intros fd H; [discriminate H |].
+  cbn in H. destruct st.
+  - injection H as <-. reflexivity.
+  - destruct (fd_lowest_closed l) as [k |] eqn:Hk; [| discriminate H].
+    cbn in H. injection H as <-. cbn. exact (IH k eq_refl).
+Qed.
+
 Lemma fd_lowest_closed_bound (l : list fdstate) (fd : nat) :
   fd_lowest_closed l = Some fd -> (fd < length l)%nat.
 Proof.
@@ -269,6 +284,16 @@ Definition uenr_path (n : Z) : bool :=
 Definition uenr_dom (n : Z) : bool :=
   uenr_path n || bool_decide (n = USYS_dup).
 
+(* the enriched set is {open, mknod, dup} -- CLOSE IS NOT IN IT, which is
+   what lets the enriched leaf move the program's descriptor authority
+   without holding a handle ([UkRunSys.ufd_auth_move] serves every row but
+   close's). *)
+Lemma uenr_dom_ne_close (n : Z) : uenr_dom n = true -> n <> UsysMemOk.USYS_close.
+Proof.
+  unfold uenr_dom, uenr_path. intros H Hc. subst n.
+  vm_compute in H. discriminate H.
+Qed.
+
 Lemma uenr_path_dom (n : Z) : uenr_path n = true -> uenr_dom n = true.
 Proof. intros H. unfold uenr_dom. rewrite H. reflexivity. Qed.
 
@@ -365,8 +390,10 @@ Proof.
   destruct (decide (n = UsysMemOk.USYS_close)) as [_ | _].
   { destruct (decide (uint (mword_of_int (-1) : mword 64) = 0%Z))
       as [Hc | _]; [ exfalso; exact (Hnz Hc) | reflexivity ]. }
-  destruct (decide (n = UsysMemOk.USYS_dup)) as [_ | _]; [ by right | ].
-  destruct (decide (n = UsysMemOk.USYS_open)) as [_ | _]; [ by right | ].
+  destruct (decide (n = UsysMemOk.USYS_dup)) as [_ | _];
+    [ right; split; reflexivity | ].
+  destruct (decide (n = UsysMemOk.USYS_open)) as [_ | _];
+    [ right; split; reflexivity | ].
   destruct (decide (n = UsysMemOk.USYS_pipe)) as [_ | _].
   { destruct (decide (uint (mword_of_int (-1) : mword 64) = 0%Z))
       as [Hc | _]; [ exfalso; exact (Hnz Hc) | reflexivity ]. }
@@ -658,21 +685,26 @@ Section Steps.
       destruct Hst as [[-> ->] | (i & a & fd & Hres & Hrow & Hfd & -> & Harm)].
       - (* the blanket: a failing open installs nothing, which is their
            row's right disjunct *)
-        right. reflexivity.
+        right. split; reflexivity.
       - (* the success arm: ours pins the descriptor, and theirs MATCHES the
            returned word against it -- [usys_ret_is] is an equation on the
            word, not a decode of it, so exhibiting [fd] closes the goal with
            no bitvector arithmetic at all. *)
         left. exists fd.
+        (* the slot was FREE: the mirror picks it with [fd_lowest_closed],
+           which is the same scan fdalloc runs, so upstream's new promise is
+           our own row's [Hfd] read through [fd_lowest_closed_is_closed]. *)
+        pose proof (fd_lowest_closed_is_closed (um_fdt u) fd Hfd) as Hcl.
         destruct Harm as [(ma & mi & nl & _ & _ & ->)
                          | [(bs & nl & _ & ->) | (e & nl & _ & _ & ->)]].
         + exists (om_readable (ufs_arg tf 1)), (om_writable (ufs_arg tf 1)),
                  (FdDevice ma).
-          split; reflexivity.
+          split_and!; [reflexivity | exact Hcl | reflexivity].
         + exists (om_readable (ufs_arg tf 1)), (om_writable (ufs_arg tf 1)),
                  (FdInode i).
-          split; reflexivity.
-        + exists true, false, (FdInode i). split; reflexivity. }
+          split_and!; [reflexivity | exact Hcl | reflexivity].
+        + exists true, false, (FdInode i).
+          split_and!; [reflexivity | exact Hcl | reflexivity]. }
     destruct (decide (n = USYS_mknod)) as [-> | Hnm].
     { (* ---- mknod = 17: NEITHER table moves a descriptor.  Upstream has
            no mknod row at all, and that is right against the C: sys_mknod
@@ -700,7 +732,7 @@ Section Steps.
       destruct Hst as [[-> ->]
                       | (nfd & st & Hnn & Hlk & _ & Hfd & -> & ->)].
       - (* a failing dup installs nothing: the row's right disjunct *)
-        right. reflexivity.
+        right. split; reflexivity.
       - (* the success arm.  The DESCRIPTOR needs no argument -- the row
            matches the returned word against it, and the post's [r] IS that
            word.  THE ARGUMENT'S INDEX is the one thing to bridge: ours keys
@@ -708,7 +740,9 @@ Section Steps.
            reading), theirs on the C [int] [usys_argfd], and the row's
            lookup into a [NOFILE]-slot table is what puts the argument in
            the range where the two agree. *)
-        left. exists nfd. split; [ reflexivity | ].
+        left. exists nfd. split_and!;
+          [ reflexivity
+          | exact (fd_lowest_closed_is_closed (um_fdt u) nfd Hfd) | ].
         pose proof (lookup_lt_Some _ _ _ Hlk) as Hlt.
         rewrite Hlen HN in Hlt.
         apply (proj1 (Nat2Z.inj_lt _ _)) in Hlt.

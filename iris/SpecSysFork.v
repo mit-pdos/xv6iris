@@ -160,10 +160,12 @@ Definition wp_sys_fork_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module Type SYSFORK.
   Parameter wp_sys_fork_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ} `{!ufdG Σ}
+      `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (U : ustate) (lks : gset string),

@@ -143,10 +143,12 @@ Require Import TsoCtxShim.   (* [ctx_parked_any] -- the record's token, SC stub 
 (* are already stated at [cur_ctx = XIp], exactly as with the stack.      *)
 (* ===================================================================== *)
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module ForkretParkProof (FR : FORKRET) : FORKRET_PARK_PAID.
 
 Section Res.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the residue is forkret's, re-exported unchanged *)
@@ -206,7 +208,7 @@ Proof. destruct b; rewrite /trap_res; lia. Qed.
    CLAIMED state, so what the lock holder carries splits into the lock's
    own half #1 and the claimant's half #2 -- the guard resolved once, here,
    rather than as an [if] the proofmode would have to reduce under. *)
-Lemma fkp_pstate_split `{!riscvGS Σ} (pa : mword 64) :
+Lemma fkp_pstate_split `{!riscvGS Σ} `{!ufdG Σ} (pa : mword 64) :
   pstate_whole pa RUNNING ⊣⊢ pstate_lock pa RUNNING ∗ pstate_at_hlf pa RUNNING.
 Proof. rewrite pstate_whole_split unclaimed_RUNNING. reflexivity. Qed.
 
@@ -216,7 +218,7 @@ Global Instance fkp_is_kstack_morph `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
 Proof. rewrite /is_kstack. ctx_morph_solve. Qed.
 
 Theorem forkret_park_paid
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (U : ustate) (av : nat) :
@@ -367,7 +369,7 @@ Qed.
 (* the knot well-founded: see ParkCap.v.                                   *)
 (* ===================================================================== *)
 Theorem park_token_intro
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{XI : CurCtx}
     (γs : list gname) :
     ⊢ park_token γs.
 Proof.

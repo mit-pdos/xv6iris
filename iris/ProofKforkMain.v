@@ -165,6 +165,9 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
    printing one takes tens of minutes, so a one-line mistake reads as a hang.
    durable-notes.md's rule. *)
 Require Import TsoCtx.
+Require Import UserFd.   (* [ufdG] -- MUST precede the first `{!ufdG Σ}:
+                            an unbound name inside `{ } is auto-generalized
+                            into a fresh opaque class instead. *)
 
 Set Printing Depth 40.
 
@@ -186,7 +189,7 @@ Proof. lia. Qed.
    is anchored at the function's entry hart -- to a block that resumed
    somewhere else.  [ProofKwait.kw_next_reanchor] is the same four lines,
    but it is section-local to a file this one must not depend on. *)
-Lemma kfk_reanchor `{!riscvGS Σ, FSC : fscfg} `{GEN : GenId} (CIDa CIDb : CpuId)
+Lemma kfk_reanchor `{!riscvGS Σ, FSC : fscfg} `{!ufdG Σ} `{GEN : GenId} (CIDa CIDb : CpuId)
     (b : bool) (pv : mword 64) (K : forall (CID : CpuId), iProp Σ) :
   (b = false \/ pv = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
   wp_next (CID0 := CIDa) b pv K -∗ wp_next (CID0 := CIDb) b pv K.
@@ -208,6 +211,7 @@ Module KforkProof (MP : MYPROC) (AP : ALLOCPROC_GEN) (UC : UVMCOPY)
 
 Section KforkArms.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -719,6 +723,7 @@ End KforkArms.
 (* =================================================================== *)
 Section KforkMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
