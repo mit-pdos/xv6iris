@@ -2974,6 +2974,230 @@ Section UkShParse.
   Qed.
 
   (* ===================================================================== *)
+  (* §5b THE NODE WHILE IT IS BEING FILLED.                                 *)
+  (*                                                                       *)
+  (* [ushp_exec_at] is the node as stages 5-6 read it, and it FORGETS what  *)
+  (* is above the NULL cap -- slot [i > |toks|] is an unconstrained cell.   *)
+  (* That is the right reading of a finished node and the WRONG loop        *)
+  (* invariant: [parseexec] writes slot [argc] and then needs slot          *)
+  (* [argc + 1] to be the new cap, which an unconstrained cell cannot       *)
+  (* become.  So the loop carries [ushp_exec_pre], which says the truth --  *)
+  (* [memset] zeroed all eighty bytes and the loop has only written the     *)
+  (* slots below [argc], so every slot at or above it is still ZERO -- and  *)
+  (* [ushp_exec_pre_at] is the one-way door to the published form.          *)
+  (* ===================================================================== *)
+
+  Definition ushp_slot0 (s0 base : Z) (toks : list (nat * nat))
+      (sel : nat * nat -> nat) (i : nat) : iProp Σ :=
+    match toks !! i with
+    | Some tk =>
+        uword γd (base + 8 * Z.of_nat i)
+          (mword_of_int (s0 + Z.of_nat (sel tk)))
+    | None => uword γd (base + 8 * Z.of_nat i) (mword_of_int 0)
+    end.
+
+  Definition ushp_exec_pre (s0 p : Z) (toks : list (nat * nat)) : iProp Σ :=
+    (⌜ (length toks < 10)%nat ⌝ ∗ ⌜ 0 < p ⌝ ∗ ⌜ p mod 8 = 0 ⌝ ∗
+     ushp_type_at p (UshpExec toks) ∗
+     ([∗ list] i ∈ seq 0 10, ushp_slot0 s0 (p + 8) toks fst i) ∗
+     ([∗ list] i ∈ seq 0 10, ushp_slot0 s0 (p + 88) toks snd i))%I.
+
+  Local Lemma ushp_slots_weaken (s0 base : Z) (toks : list (nat * nat))
+      (sel : nat * nat -> nat) :
+    ([∗ list] i ∈ seq 0 10, ushp_slot0 s0 base toks sel i) -∗
+    ([∗ list] i ∈ seq 0 10, ushp_slot  s0 base toks sel i).
+  Proof.
+    iIntros "H". iApply (big_sepL_mono with "H").
+    intros k y Hy. apply lookup_seq in Hy as [ -> Hlt ].
+    rewrite Nat.add_0_l /ushp_slot0 /ushp_slot.
+    destruct (toks !! k) as [ tk | ] eqn:Htk; [ iIntros "$" | ].
+    destruct (bool_decide (k = length toks)); [ iIntros "$" | ].
+    iIntros "H". iExists (mword_of_int 0). iExact "H".
+  Qed.
+
+  Lemma ushp_exec_pre_at (s0 p : Z) (toks : list (nat * nat)) :
+    ushp_exec_pre s0 p toks -∗ ushp_exec_at s0 p toks.
+  Proof.
+    rewrite /ushp_exec_pre /ushp_exec_at.
+    iIntros "(%H1 & %H2 & %H3 & Hty & Hav & Hev)".
+    iSplitR; [ iPureIntro; exact H1 | ].
+    iSplitR; [ iPureIntro; exact H2 | ].
+    iSplitR; [ iPureIntro; exact H3 | ].
+    iFrame "Hty".
+    iSplitL "Hav"; [ iApply (ushp_slots_weaken with "Hav")
+                   | iApply (ushp_slots_weaken with "Hev") ].
+  Qed.
+
+  Lemma ushp_exec_pre_addr (s0 p : Z) (toks : list (nat * nat)) :
+    ushp_exec_pre s0 p toks -∗ ⌜ 0 < p /\ p mod 8 = 0 ⌝.
+  Proof.
+    rewrite /ushp_exec_pre. iIntros "(_ & %Hp & %Hal & _)".
+    iPureIntro. exact (conj Hp Hal).
+  Qed.
+
+  (* the FRESH node's ten slots, all of them the zero the memset left *)
+  Local Lemma ushp_slots_nil0 (t0 base : Z) (sel : nat * nat -> nat)
+      (f : nat -> bv 8) :
+    (forall j : nat, (j < 80)%nat -> f j = ubyte0) ->
+    ubytes γd base 80 f -∗
+    [∗ list] i ∈ seq 0 10, ushp_slot0 t0 base [] sel i.
+  Proof.
+    intros Hf. iIntros "Hb".
+    iDestruct (ushp_ubytes_ext base 80 f (fun _ : nat => ubyte0) Hf
+                 with "Hb") as "Hb".
+    iDestruct (ushp_peel0 base (base + 8) 8 72 ltac:(lia) with "Hb")
+      as "[H0 Hb]".
+    iDestruct (ushp_peel0 (base + 8) (base + 16) 8 64 ltac:(lia) with "Hb")
+      as "[H1 Hb]".
+    iDestruct (ushp_peel0 (base + 16) (base + 24) 8 56 ltac:(lia) with "Hb")
+      as "[H2 Hb]".
+    iDestruct (ushp_peel0 (base + 24) (base + 32) 8 48 ltac:(lia) with "Hb")
+      as "[H3 Hb]".
+    iDestruct (ushp_peel0 (base + 32) (base + 40) 8 40 ltac:(lia) with "Hb")
+      as "[H4 Hb]".
+    iDestruct (ushp_peel0 (base + 40) (base + 48) 8 32 ltac:(lia) with "Hb")
+      as "[H5 Hb]".
+    iDestruct (ushp_peel0 (base + 48) (base + 56) 8 24 ltac:(lia) with "Hb")
+      as "[H6 Hb]".
+    iDestruct (ushp_peel0 (base + 56) (base + 64) 8 16 ltac:(lia) with "Hb")
+      as "[H7 Hb]".
+    iDestruct (ushp_peel0 (base + 64) (base + 72) 8 8 ltac:(lia) with "Hb")
+      as "[H8 Hb]".
+    rewrite /ushp_slot0 /=.
+    assert (A0 : base + 8 * Z.of_nat 0 = base) by lia.
+    assert (A1 : base + 8 * Z.of_nat 1 = base + 8) by lia.
+    assert (A2 : base + 8 * Z.of_nat 2 = base + 16) by lia.
+    assert (A3 : base + 8 * Z.of_nat 3 = base + 24) by lia.
+    assert (A4 : base + 8 * Z.of_nat 4 = base + 32) by lia.
+    assert (A5 : base + 8 * Z.of_nat 5 = base + 40) by lia.
+    assert (A6 : base + 8 * Z.of_nat 6 = base + 48) by lia.
+    assert (A7 : base + 8 * Z.of_nat 7 = base + 56) by lia.
+    assert (A8 : base + 8 * Z.of_nat 8 = base + 64) by lia.
+    assert (A9 : base + 8 * Z.of_nat 9 = base + 72) by lia.
+    rewrite A0 A1 A2 A3 A4 A5 A6 A7 A8 A9.
+    iSplitL "H0".
+    { rewrite /uword /uwordq.
+      iApply (ushp_ubytes_ext base 8 (fun _ : nat => ubyte0)
+                (nth_byte (mword_of_int 0 : mword 64)) with "H0").
+      intros j Hj. rewrite (ushp_nth_byte_zero j Hj). reflexivity. }
+    iSplitL "H1".
+    { rewrite /uword /uwordq.
+      iApply (ushp_ubytes_ext (base + 8) 8 (fun _ : nat => ubyte0)
+                (nth_byte (mword_of_int 0 : mword 64)) with "H1").
+      intros j Hj. rewrite (ushp_nth_byte_zero j Hj). reflexivity. }
+    iSplitL "H2".
+    { rewrite /uword /uwordq.
+      iApply (ushp_ubytes_ext (base + 16) 8 (fun _ : nat => ubyte0)
+                (nth_byte (mword_of_int 0 : mword 64)) with "H2").
+      intros j Hj. rewrite (ushp_nth_byte_zero j Hj). reflexivity. }
+    iSplitL "H3".
+    { rewrite /uword /uwordq.
+      iApply (ushp_ubytes_ext (base + 24) 8 (fun _ : nat => ubyte0)
+                (nth_byte (mword_of_int 0 : mword 64)) with "H3").
+      intros j Hj. rewrite (ushp_nth_byte_zero j Hj). reflexivity. }
+    iSplitL "H4".
+    { rewrite /uword /uwordq.
+      iApply (ushp_ubytes_ext (base + 32) 8 (fun _ : nat => ubyte0)
+                (nth_byte (mword_of_int 0 : mword 64)) with "H4").
+      intros j Hj. rewrite (ushp_nth_byte_zero j Hj). reflexivity. }
+    iSplitL "H5".
+    { rewrite /uword /uwordq.
+      iApply (ushp_ubytes_ext (base + 40) 8 (fun _ : nat => ubyte0)
+                (nth_byte (mword_of_int 0 : mword 64)) with "H5").
+      intros j Hj. rewrite (ushp_nth_byte_zero j Hj). reflexivity. }
+    iSplitL "H6".
+    { rewrite /uword /uwordq.
+      iApply (ushp_ubytes_ext (base + 48) 8 (fun _ : nat => ubyte0)
+                (nth_byte (mword_of_int 0 : mword 64)) with "H6").
+      intros j Hj. rewrite (ushp_nth_byte_zero j Hj). reflexivity. }
+    iSplitL "H7".
+    { rewrite /uword /uwordq.
+      iApply (ushp_ubytes_ext (base + 56) 8 (fun _ : nat => ubyte0)
+                (nth_byte (mword_of_int 0 : mword 64)) with "H7").
+      intros j Hj. rewrite (ushp_nth_byte_zero j Hj). reflexivity. }
+    iSplitL "H8".
+    { rewrite /uword /uwordq.
+      iApply (ushp_ubytes_ext (base + 64) 8 (fun _ : nat => ubyte0)
+                (nth_byte (mword_of_int 0 : mword 64)) with "H8").
+      intros j Hj. rewrite (ushp_nth_byte_zero j Hj). reflexivity. }
+    iSplitL "Hb"; [ | done ].
+    { rewrite /uword /uwordq.
+      iApply (ushp_ubytes_ext (base + 72) 8 (fun _ : nat => ubyte0)
+                (nth_byte (mword_of_int 0 : mword 64)) with "Hb").
+      intros j Hj. rewrite (ushp_nth_byte_zero j Hj). reflexivity. }
+  Qed.
+
+  (* [(done ++ [tk]) !! y] is [done !! y] anywhere but at the new slot *)
+  Local Lemma ushp_lookup_app_ne (done : list (nat * nat)) (tk : nat * nat)
+      (y : nat) :
+    y <> length done -> (done ++ [tk]) !! y = done !! y.
+  Proof.
+    intro Hy. destruct (Nat.lt_ge_cases y (length done)) as [ Hlt | Hge ].
+    - apply lookup_app_l. exact Hlt.
+    - assert (Hla : (done ++ [tk]) !! y = [tk] !! (y - length done)%nat)
+        by (apply lookup_app_r; lia).
+      rewrite Hla (lookup_ge_None_2 done y Hge).
+      remember (y - length done)%nat as d eqn:Hd.
+      destruct d as [| d' ]; [ exfalso; lia | reflexivity ].
+  Qed.
+
+  Local Lemma ushp_lookup_app_mid (done : list (nat * nat)) (tk : nat * nat) :
+    (done ++ [tk]) !! (length done) = Some tk.
+  Proof.
+    assert (Hla : (done ++ [tk]) !! (length done)
+                  = [tk] !! (length done - length done)%nat)
+      by (apply lookup_app_r; lia).
+    rewrite Hla.
+    assert (Hz : (length done - length done)%nat = 0%nat) by lia.
+    rewrite Hz. reflexivity.
+  Qed.
+
+  (* THE LOOP'S ONE RESOURCE STEP: slot [argc] is the zero the memset left,
+     and writing a token boundary into it appends that token.  Nothing else
+     in the vector moves, which is the whole content of [big_sepL_delete]
+     here -- the other nine slots' predicates do not even mention the
+     token that was appended. *)
+  Local Lemma ushp_slots_upd (s0 base : Z) (done : list (nat * nat))
+      (tk : nat * nat) (sel : nat * nat -> nat) :
+    (length done < 10)%nat ->
+    ([∗ list] i ∈ seq 0 10, ushp_slot0 s0 base done sel i) -∗
+    uword γd (base + 8 * Z.of_nat (length done)) (mword_of_int 0) ∗
+    (uword γd (base + 8 * Z.of_nat (length done))
+       (mword_of_int (s0 + Z.of_nat (sel tk))) -∗
+     [∗ list] i ∈ seq 0 10, ushp_slot0 s0 base (done ++ [tk]) sel i).
+  Proof.
+    intro Hlt. iIntros "H".
+    assert (Hj : seq 0 10 !! (length done) = Some (length done))
+      by (apply lookup_seq; lia).
+    assert (Hnone : ushp_slot0 s0 base done sel (length done)
+                    = uword γd (base + 8 * Z.of_nat (length done))
+                        (mword_of_int 0)).
+    { rewrite /ushp_slot0 (lookup_ge_None_2 done (length done) ltac:(lia)).
+      reflexivity. }
+    assert (Hsome : ushp_slot0 s0 base (done ++ [tk]) sel (length done)
+                    = uword γd (base + 8 * Z.of_nat (length done))
+                        (mword_of_int (s0 + Z.of_nat (sel tk)))).
+    { rewrite /ushp_slot0 (ushp_lookup_app_mid done tk). reflexivity. }
+    rewrite (big_sepL_delete (fun _ i : nat => ushp_slot0 s0 base done sel i)
+               (seq 0 10) (length done) (length done) Hj).
+    rewrite Hnone.
+    iDestruct "H" as "[Hj Hrest]". iFrame "Hj". iIntros "Hj".
+    rewrite (big_sepL_delete
+               (fun _ i : nat => ushp_slot0 s0 base (done ++ [tk]) sel i)
+               (seq 0 10) (length done) (length done) Hj).
+    rewrite Hsome.
+    iSplitL "Hj"; [ iExact "Hj" | ].
+    iApply (big_sepL_mono with "Hrest").
+    intros k y Hy. apply lookup_seq in Hy as [ -> Hlt10 ].
+    rewrite Nat.add_0_l.
+    destruct (decide (k = length done)) as [ Ek | Ek ]; [ done | ].
+    assert (Heq : ushp_slot0 s0 base (done ++ [tk]) sel k
+                  = ushp_slot0 s0 base done sel k).
+    { rewrite /ushp_slot0 (ushp_lookup_app_ne done tk k Ek). reflexivity. }
+    rewrite Heq. done.
+  Qed.
+
+  (* ===================================================================== *)
   (* §6 THE ONE HYPOTHESIS OF STAGE 4: MALLOC.                              *)
   (*                                                                       *)
   (* All five cmd constructors begin [cmd = malloc(sizeof( *cmd))], and     *)
@@ -4564,7 +4788,7 @@ Section UkShParse.
        ⌜ ucallee_saved m m' ⌝ -∗
        ⌜ m' !!! Regidx a0_idx = mword_of_int p ⌝ -∗
        ⌜ 0 < p /\ p mod 16 = 0 /\ p + 168 < 2 ^ 38 ⌝ -∗
-       ushp_exec_at s0 p [] -∗
+       ushp_exec_pre s0 p [] -∗
        urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx)) (4 + (10 + nn)) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -5058,7 +5282,7 @@ Section UkShParse.
       exact (upd_eq m11 (Regidx a0_idx)
                (regval_into_reg (mword_of_int p : mword 64))).
     - iPureIntro. exact (conj Hp0 (conj Hp16 Hpsz)).
-    - rewrite /ushp_exec_at /ushp_type_at.
+    - rewrite /ushp_exec_pre /ushp_type_at.
       iSplitR; [ iPureIntro; cbn [length]; lia | ].
       iSplitR; [ iPureIntro; exact Hp0 | ].
       iSplitR; [ iPureIntro; exact Hp8 | ].
@@ -5072,9 +5296,9 @@ Section UkShParse.
             | vm_compute; reflexivity | vm_compute; reflexivity | lia ].
         * iExists (fun _ : nat => ubyte0). iExact "Hpad".
       + iSplitL "Hav".
-        * iApply (ushp_slots_nil s0 (p + 8) fst (fun _ : nat => ubyte0)
+        * iApply (ushp_slots_nil0 s0 (p + 8) fst (fun _ : nat => ubyte0)
                     ltac:(intros j _; reflexivity) with "Hav").
-        * iApply (ushp_slots_nil s0 (p + 88) snd (fun _ : nat => ubyte0)
+        * iApply (ushp_slots_nil0 s0 (p + 88) snd (fun _ : nat => ubyte0)
                     ltac:(intros j _; reflexivity) with "Hev").
   Qed.
 
