@@ -18029,3 +18029,24 @@ box body's [astamp].  W1 rides bcache.lock's payload; W2 rides the
 sleeplock's INNER spinlock record (releasesleep seals it, the
 acquiresleep winner won it) -- so the one real change is threading a
 floor row through SleepLock's record payload, internal to SleepLock.v.
+
+### A6.148: the box's third arm and the presence auth (Phase 5 design
+### completion, coordinator-resolved with standard instruments)
+
+The box protocol has THREE states, not two: PARKED (bundle at ξb), OUT
+(chain residue at ξb), IDLE (refs=0; content home in bcache.lock's
+payload per the ruling).  Every transition must locally refute the
+other arms.  PARKED/OUT discriminate as today (bown; cell-fraction
+clashes; count overflow against the payload auth).  THE GAP: the
+checkout (b->lock only, holding bref_tok + bown) cannot refute IDLE --
+a count FRAGMENT clashes with nothing, and the global refcount auth is
+payload-resident, invisible under b->lock.  RESOLUTION: a per-slot
+PRESENCE AUTH (bn_pres k : auth (option positive)): ● None sits in the
+box's IDLE arm at refs=0; ● Some in the payload's refs>=1 arm; every
+reference carries a ◯ fragment beside bref_tok.  Checkout's fragment
+vs ● None is a direct validity clash.  Both presence edges ride the
+existing 0<->1 refcount transitions, where the mover holds bcache.lock
+AND the box -- the tie is maintained with both authorities in hand.
+Additive ghost only (BioDefs bn_pres; bref_tok gains the fragment);
+no model change.  Box arms final: (bundle ξb) ∨ (chain_res ξb) ∨
+(pres ● None).
