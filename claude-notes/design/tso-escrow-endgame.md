@@ -364,6 +364,34 @@ R1-pre (PREREQUISITE, measured 2026-09-01 by the build agent): THE
   would compile unchanged and still block CtxMove — the ambient XI
   rides inside R).  Build-order note: the sleeplock's boot row needs
   astamp 0 0, so BioInitAt allocates the anchors BEFORE the sleeplocks.
+  IMPLEMENTATION NOTES (build agent, 2026-09-01, for vetting):
+    (i)  Tier layout: the bound-indexed forms are the BASE tiers —
+         [wp_acquiresleep_genb_sconf_body] / [_genb_llb_sconf_body]
+         (post row [∃ tl, ctx_floor cur_ctx tl ∗ Rb tl]) and
+         [wp_releasesleep_genb_sconf_body] (premises [llb tl ∗ Rb tl]);
+         the existing gen/llb/plain tiers DERIVE at [Rb := λ _, R],
+         [tl := 0] (dropping the floor), exactly as ACQUIRE derives
+         from ACQUIRE_GEN.  The nested (S n) and nb tiers stay on the
+         derived const form (their proofs strip the ∃tl internally).
+         This is one spelling plus its instance, not a third spelling.
+    (ii) Held-arm re-closes (the three inside acquiresleep, the one in
+         holdingsleep) rebuild the λ at [tl := 0] with [ctx_floor_0]:
+         the floor slot is meaningful only for the FREE arm's [Rb tl];
+         a held arm carries no Rb, so no bound is lost.
+    (iii) The fold lives at releasesleep's INNER release, which must be
+         the [wp_release_in_sconf] form ([lock_finisher_close_in_llb]
+         / [lock_pay_intro_llb] with [Rdep := λ ξ, sl_body … tl' ξ]).
+         That Parameter is in RELEASE_IN, not RELEASE, so
+         [ReleasesleepProof] gains a functor argument
+         [(ReleaseIn : RELEASE_IN)] and LinkReleasesleep.v passes the
+         existing [ReleaseIn := ReleaseInOfGen ReleaseGen]
+         (LinkRelease.v:12).  One-line link ripple.
+    (iv) The winner's floor row is a plain [ctx_floor cur_ctx tl], the
+         same output shape as R1's llb-tier post — i.e. the LEFT arm
+         of [cred_floor]; I read §1's one-form rule as governing the
+         HOLDER-side credential bundle, not the raw R1/R2 outputs.
+         Flagging for the reviewer in case the post should be stated
+         as [cred_floor] instead.
 
 R1 (design retrofit, small):
   - Enrich bn_pres's cmra ((n_b,T_b) agree × positive); move ● into
@@ -548,6 +576,10 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   l_out/l_cmt/l_ncommit at ambient XI under <{ }> and sits in fs_ready;
   not in any inventory; lands as a λ-flip with R5 after the
   ctx_move_const test.  Full <{ }> table recorded; §5 rule 5 extended.
+- 2026-09-01 (build agent, R1-pre implementation notes): tier layout
+  (genb base, const derived; nested/nb stay const), held-arm re-closes
+  at tl := 0, the RELEASE_IN functor argument on ReleasesleepProof, and
+  a question on the post's floor spelling vs cred_floor.
 - 2026-09-01 (build agent, corroboration of §4.4b): log_res CONFIRMED
   in code (l_out/l_cmt/l_ncommit as ambient ↦₄ under <{ }>, reached
   through log_ctx_at → log_ctx → fs_ready).  A full grep of every
