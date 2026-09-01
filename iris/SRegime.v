@@ -54,6 +54,7 @@ Require Import WpDecodeBridge CommonWalk.
 Require Import HartSwp HartLift HartSpan HartSpanChar.
 Require Import HartSKpt KptGoodb.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoMemPa TsoGhost.   (* A6.55: [view_lb] for the pin receipt *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
@@ -387,7 +388,7 @@ Section SRegimeDef.
          unshelve iMod (sr_absorb R acc va pa ppn pc σ _ <pure args> _
                           with "...") as ...; [solve_ndisj |].            *)
     sr_absorb : forall (acc : MemoryAccessType mem_payload) (va pa : mword 64)
-        (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset),
+        (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset) (S : TsoMemPa.bytemap -> iProp Σ),
       s_acc_ok acc ->
       kperm_allows pc acc ->
       neq_vec (bits_of_virtaddr (Virtaddr va))
@@ -405,7 +406,25 @@ Section SRegimeDef.
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
       sr_adm va ppn ->
       ↑kptN ⊆ E ->
-      ⊢ kmap_at (svpn_of va) ppn pc -∗
+      (* A6.24/A6.30: THE A/D WRITE-BACK'S PAYER, THREADED.  Nothing above
+         this face ever holds the memory-model bundle -- the closure was
+         computed and every ancestor's statement tested -- so the exec lane
+         can only PASS a payer along; the lane that actually pays is the swp
+         one, where [PtTreeAdue.wpte_obl_at] HANDS the bundle to
+         [HartSKpt.kpt_leaf_write_node].  The shared kernel table's slot is
+         the CONTEXT-FREE ledger word (A6.20), so this wand mentions no
+         context and no token, and it is ADDRESS-generic because which leaf
+         slot the walk lands on is decided inside the callee. *)
+      ⊢ □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64)
+             (B : nat),
+             ⌜PtTree.pte_wb_ok wold wnew⌝ -∗
+             gen_heap_interp m -∗ S m -∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wold ==∗
+             gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wnew) -∗
+        S σ.(mem) -∗
+        kmap_at (svpn_of va) ppn pc -∗
         reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ sr_inv ={E}=∗
         ∃ σ' : mstate,
           ⌜ exec (translateAddr (Virtaddr va) acc) σ
@@ -414,6 +433,7 @@ Section SRegimeDef.
           ⌜ (σ'.(sregs) = σ.(sregs) \/
              exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
           ⌜ pmp_grant_facts σ' ⌝ ∗
+          S σ'.(mem) ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ sr_inv;
     sr_transform : forall (acc : MemoryAccessType mem_payload) (ea : mword 64) (σ : mstate),
       s_acc_ok acc ->
@@ -454,7 +474,7 @@ Section SRegimeDef.
     sr_kwit : iProp Σ;
     sr_kwit_pers : Persistent sr_kwit;
     sr_absorb_wit : forall (acc : MemoryAccessType mem_payload) (va pa : mword 64)
-        (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset),
+        (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset) (S : TsoMemPa.bytemap -> iProp Σ),
       s_acc_ok acc ->
       kperm_allows pc acc ->
       neq_vec (bits_of_virtaddr (Virtaddr va))
@@ -471,7 +491,25 @@ Section SRegimeDef.
       exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
       ↑kptN ⊆ E ->
-      ⊢ sr_kwit -∗ kmap_at (svpn_of va) ppn pc -∗
+      (* A6.24/A6.30: THE A/D WRITE-BACK'S PAYER, THREADED.  Nothing above
+         this face ever holds the memory-model bundle -- the closure was
+         computed and every ancestor's statement tested -- so the exec lane
+         can only PASS a payer along; the lane that actually pays is the swp
+         one, where [PtTreeAdue.wpte_obl_at] HANDS the bundle to
+         [HartSKpt.kpt_leaf_write_node].  The shared kernel table's slot is
+         the CONTEXT-FREE ledger word (A6.20), so this wand mentions no
+         context and no token, and it is ADDRESS-generic because which leaf
+         slot the walk lands on is decided inside the callee. *)
+      ⊢ □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64)
+             (B : nat),
+             ⌜PtTree.pte_wb_ok wold wnew⌝ -∗
+             gen_heap_interp m -∗ S m -∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wold ==∗
+             gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wnew) -∗
+        S σ.(mem) -∗
+        sr_kwit -∗ kmap_at (svpn_of va) ppn pc -∗
         reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ sr_inv ={E}=∗
         ∃ σ' : mstate,
           ⌜ exec (translateAddr (Virtaddr va) acc) σ
@@ -480,6 +518,7 @@ Section SRegimeDef.
           ⌜ (σ'.(sregs) = σ.(sregs) \/
              exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
           ⌜ pmp_grant_facts σ' ⌝ ∗
+          S σ'.(mem) ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ sr_inv;
 
   (* THE SWP TRANSLATION FIELD, and the two things [sr_absorb] did not need.
@@ -798,7 +837,7 @@ Section SRegimeDef.
        pmp_config (mword_of_int 0))%I.
 
   Lemma bare_absorb :
-    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset) (S : TsoMemPa.bytemap -> iProp Σ), s_acc_ok acc ->
       kperm_allows pc acc ->
       neq_vec (bits_of_virtaddr (Virtaddr va))
          (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
@@ -815,7 +854,25 @@ Section SRegimeDef.
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
       kadm_ident va ppn ->
       ↑kptN ⊆ E ->
-      ⊢ kmap_at (svpn_of va) ppn pc -∗
+      (* A6.24/A6.30: THE A/D WRITE-BACK'S PAYER, THREADED.  Nothing above
+         this face ever holds the memory-model bundle -- the closure was
+         computed and every ancestor's statement tested -- so the exec lane
+         can only PASS a payer along; the lane that actually pays is the swp
+         one, where [PtTreeAdue.wpte_obl_at] HANDS the bundle to
+         [HartSKpt.kpt_leaf_write_node].  The shared kernel table's slot is
+         the CONTEXT-FREE ledger word (A6.20), so this wand mentions no
+         context and no token, and it is ADDRESS-generic because which leaf
+         slot the walk lands on is decided inside the callee. *)
+      ⊢ □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64)
+             (B : nat),
+             ⌜PtTree.pte_wb_ok wold wnew⌝ -∗
+             gen_heap_interp m -∗ S m -∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wold ==∗
+             gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wnew) -∗
+        S σ.(mem) -∗
+        kmap_at (svpn_of va) ppn pc -∗
         reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ bare_inv ={E}=∗
         ∃ σ' : mstate,
           ⌜ exec (translateAddr (Virtaddr va) acc) σ
@@ -824,10 +881,11 @@ Section SRegimeDef.
           ⌜ (σ'.(sregs) = σ.(sregs) \/
              exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
           ⌜ pmp_grant_facts σ' ⌝ ∗
+          S σ'.(mem) ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ bare_inv.
   Proof.
-    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall Hadm HE.
-    iIntros "Hat Hri Hgh Hinv".
+    intros acc va pa ppn pc σ E S Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall Hadm HE.
+    iIntros "#Hpay Hsto Hat Hri Hgh Hinv". iClear "Hpay".
     iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp)".
     (* honoring: the claim is ADMISSIBLE, i.e. the identity -- so the pa the
        caller derived from it is va itself, which is what Bare translates to *)
@@ -844,7 +902,9 @@ Section SRegimeDef.
     iSplit; [iPureIntro; reflexivity |].
     iSplit; [iPureIntro; left; reflexivity |].
     iSplit; [iPureIntro; exact Hpmp |].
-    iFrame "Hri Hgh".
+    (* Bare translates without touching memory ([σ' = σ]), so the currency
+       comes back at the very same index. *)
+    iFrame "Hsto Hri Hgh".
     iExists satp0. iFrame "Hsatp Hpmp". iPureIntro. exact Hmode.
   Qed.
 
@@ -886,6 +946,56 @@ Section SRegimeDef.
      [kadm_ident]'s), so the witness that would let [sr_absorb_wit] skip
      the identity premise must be UNSATISFIABLE here -- unsoundness shows
      up as an unpayable WITNESS, never an unpayable premise. *)
+  Lemma bare_absorb_wit :
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset) (S : TsoMemPa.bytemap -> iProp Σ), s_acc_ok acc ->
+      kperm_allows pc acc ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ↑kptN ⊆ E ->
+      (* A6.24/A6.30: THE A/D WRITE-BACK'S PAYER, THREADED.  Nothing above
+         this face ever holds the memory-model bundle -- the closure was
+         computed and every ancestor's statement tested -- so the exec lane
+         can only PASS a payer along; the lane that actually pays is the swp
+         one, where [PtTreeAdue.wpte_obl_at] HANDS the bundle to
+         [HartSKpt.kpt_leaf_write_node].  The shared kernel table's slot is
+         the CONTEXT-FREE ledger word (A6.20), so this wand mentions no
+         context and no token, and it is ADDRESS-generic because which leaf
+         slot the walk lands on is decided inside the callee. *)
+      ⊢ □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64)
+             (B : nat),
+             ⌜PtTree.pte_wb_ok wold wnew⌝ -∗
+             gen_heap_interp m -∗ S m -∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wold ==∗
+             gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wnew) -∗
+        S σ.(mem) -∗
+        (False : iProp Σ) -∗ kmap_at (svpn_of va) ppn pc -∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ bare_inv ={E}=∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          S σ'.(mem) ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ bare_inv.
+  Proof.
+    intros acc va pa ppn pc σ E S Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
+    iIntros "_ _ H". iDestruct "H" as %[].
+  Qed.
 
   (* ---------------- the BARE instance ---------------- *)
 
@@ -1077,7 +1187,7 @@ Section SRegimeShared.
   Qed.
 
   Lemma res_absorb (root_ppn : mword 44) :
-    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset) (S : TsoMemPa.bytemap -> iProp Σ), s_acc_ok acc ->
       kperm_allows pc acc ->
       neq_vec (bits_of_virtaddr (Virtaddr va))
          (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
@@ -1094,7 +1204,25 @@ Section SRegimeShared.
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
       True ->
       ↑kptN ⊆ E ->
-      ⊢ kmap_at (svpn_of va) ppn pc -∗
+      (* A6.24/A6.30: THE A/D WRITE-BACK'S PAYER, THREADED.  Nothing above
+         this face ever holds the memory-model bundle -- the closure was
+         computed and every ancestor's statement tested -- so the exec lane
+         can only PASS a payer along; the lane that actually pays is the swp
+         one, where [PtTreeAdue.wpte_obl_at] HANDS the bundle to
+         [HartSKpt.kpt_leaf_write_node].  The shared kernel table's slot is
+         the CONTEXT-FREE ledger word (A6.20), so this wand mentions no
+         context and no token, and it is ADDRESS-generic because which leaf
+         slot the walk lands on is decided inside the callee. *)
+      ⊢ □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64)
+             (B : nat),
+             ⌜PtTree.pte_wb_ok wold wnew⌝ -∗
+             gen_heap_interp m -∗ S m -∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wold ==∗
+             gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wnew) -∗
+        S σ.(mem) -∗
+        kmap_at (svpn_of va) ppn pc -∗
         reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_res_pt root_ppn ={E}=∗
         ∃ σ' : mstate,
           ⌜ exec (translateAddr (Virtaddr va) acc) σ
@@ -1103,19 +1231,24 @@ Section SRegimeShared.
           ⌜ (σ'.(sregs) = σ.(sregs) \/
              exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
           ⌜ pmp_grant_facts σ' ⌝ ∗
+          S σ'.(mem) ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_res_pt root_ppn.
   Proof.
-    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall _ HE.
-    iIntros "Hat Hri Hgh Hres".
-    iMod (tlb_res_pt_translateAddr_at acc root_ppn va pa ppn pc σ E HE
+    intros acc va pa ppn pc σ E S Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall _ HE.
+    iIntros "#Hpay Hsto Hat Hri Hgh Hres".
+    iMod (tlb_res_pt_translateAddr_at acc root_ppn va pa ppn pc σ E S HE
             (fun a d mxr do_sum =>
                kperm_variant_check ppn pc acc a d mxr do_sum Hacc Hallow)
             Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
-            with "Hat Hri Hgh Hres")
-      as (σ') "(%Htr & %Hmdev & %Hsh & Hri & Hgh & Hres)".
+            with "Hpay Hsto Hat Hri Hgh Hres")
+      as (σ') "(%Htr & %Hmdev & %Hsh & Hcur & Hri & Hgh & Hres)".
     iDestruct (tlb_res_pt_grant_facts root_ppn σ' with "Hri Hres") as %Hpmp.
-    iModIntro. iExists σ'. iFrame "Hri Hgh Hres". iPureIntro.
-    unfold pmp_grant_facts. tauto.
+    iModIntro. iExists σ'.
+    iSplitR; [iPureIntro; exact Htr |].
+    iSplitR; [iPureIntro; exact Hmdev |].
+    iSplitR; [iPureIntro; exact Hsh |].
+    iSplitR; [iPureIntro; unfold pmp_grant_facts; exact Hpmp |].
+    iFrame "Hcur Hri Hgh Hres".
   Qed.
 
   Lemma res_tmode (root_ppn : mword 44) :
@@ -1138,7 +1271,7 @@ Section SRegimeShared.
      dropped premise's argument supplied as [I] exactly as [res_absorb]
      already takes it. *)
   Lemma res_absorb_wit (root_ppn : mword 44) :
-    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset) (S : TsoMemPa.bytemap -> iProp Σ), s_acc_ok acc ->
       kperm_allows pc acc ->
       neq_vec (bits_of_virtaddr (Virtaddr va))
          (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
@@ -1154,7 +1287,25 @@ Section SRegimeShared.
       exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
       ↑kptN ⊆ E ->
-      ⊢ emp -∗ kmap_at (svpn_of va) ppn pc -∗
+      (* A6.24/A6.30: THE A/D WRITE-BACK'S PAYER, THREADED.  Nothing above
+         this face ever holds the memory-model bundle -- the closure was
+         computed and every ancestor's statement tested -- so the exec lane
+         can only PASS a payer along; the lane that actually pays is the swp
+         one, where [PtTreeAdue.wpte_obl_at] HANDS the bundle to
+         [HartSKpt.kpt_leaf_write_node].  The shared kernel table's slot is
+         the CONTEXT-FREE ledger word (A6.20), so this wand mentions no
+         context and no token, and it is ADDRESS-generic because which leaf
+         slot the walk lands on is decided inside the callee. *)
+      ⊢ □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64)
+             (B : nat),
+             ⌜PtTree.pte_wb_ok wold wnew⌝ -∗
+             gen_heap_interp m -∗ S m -∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wold ==∗
+             gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wnew) -∗
+        S σ.(mem) -∗
+        emp -∗ kmap_at (svpn_of va) ppn pc -∗
         reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_res_pt root_ppn ={E}=∗
         ∃ σ' : mstate,
           ⌜ exec (translateAddr (Virtaddr va) acc) σ
@@ -1163,20 +1314,28 @@ Section SRegimeShared.
           ⌜ (σ'.(sregs) = σ.(sregs) \/
              exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
           ⌜ pmp_grant_facts σ' ⌝ ∗
+          S σ'.(mem) ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_res_pt root_ppn.
   Proof.
-    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
-    iIntros "_ Hat Hri Hgh Hres".
-    iApply (res_absorb root_ppn acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall I HE
-              with "Hat Hri Hgh Hres").
+    intros acc va pa ppn pc σ E S Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
+    iIntros "#Hpay Hsto _ Hat Hri Hgh Hres".
+    iApply (res_absorb root_ppn acc va pa ppn pc σ E S Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall I HE
+              with "Hpay Hsto Hat Hri Hgh Hres").
   Qed.
 
   (* ---------------- the SHARED-KERNEL-TABLE instance ---------------- *)
 
   (* the residue: the hart's TLB coherence at THIS file's vector, and the
      shared table's invariant (persistent, so it rides along for free) *)
+  (* A6.55: ...and the CANON PIN's credentials -- the publication bound the
+     shared table's slots are pinned at, plus a receipt that this hart's own
+     view is at or past it.  Both are PERSISTENT, so the residue carries them
+     for free and [kpt_swp_translate]'s signature (and IntrDefs' two call
+     sites) does not move.  The receipt is where A6.41's open question now
+     lives: a secondary gets it from the boot MP read, hart 0 from the
+     [__sync_synchronize] drain (pin-memo §5.6(b)). *)
   Definition kpt_swp_res (root_ppn : mword 44) (rs : regstate) : iProp Σ :=
-    (tlb_snap_ok (register_lookup tlb rs) ∗ kpt_inv root_ppn)%I.
+    (tlb_snap_ok (register_lookup tlb rs) ∗ kpt_inv root_ppn ∗ kpt_creds)%I.
 
   (* the side condition: the satp facts that make this hart's frame an Sv39
      file rooted at [root_ppn], the mode reduction and its footprint
@@ -1277,13 +1436,15 @@ Section SRegimeShared.
     assert (HADUE : eq_vec (_get_MEnvcfg_ADUE (register_lookup menvcfg dst.(sregs)))
                       ('b"1") = true)
       by (rewrite Hmenv; vm_compute; reflexivity).
-    iIntros "#Hat #Hcert Hfrag [Hsnap #Hkinv] Hrw Hro".
+    iIntros "#Hat #Hcert Hfrag (Hsnap & #Hkinv & #Hpin) Hrw Hro".
+    iDestruct "Hpin" as (Bp) "[#Hbd #Hvlb]".
     iApply (swp_mono with "[] [-]").
     2:{ iApply (swp_translate_kpt acc Drw Dro Df rs dst Db root_ppn va pa
                   (register_lookup satp rs)
                   (register_lookup menvcfg dst.(sregs)) ppn kp
                   (register_lookup tlb rs) (register_lookup pma_regions rs)
                   (register_lookup pmpcfg_n rs) (register_lookup pmpaddr_n rs) rr
+                  Bp
                   Hdisj HDmst HDpriv HDsatp HWtlb HDpma HDcfg HDaddr HDhtif
                   HDb Hag HDlc Haglc Hcp eq_refl eq_refl Hhtif eq_refl eq_refl
                   eq_refl Hmstag Hmisa eq_refl HPBMTE HADUE
@@ -1291,10 +1452,11 @@ Section SRegimeShared.
                   HA Hord HR HW Hcov Hpallow
                   (fun a d mxr do_sum =>
                      kperm_variant_check ppn kp acc a d mxr do_sum Hacc Hallow)
-                  with "Hat Hkinv Hsnap Hcert Hfrag Hrw Hro"). }
+                  with "Hat Hkinv Hbd Hvlb Hsnap Hcert Hfrag Hrw Hro"). }
     iIntros (v) "(-> & %rsf & %Hshape & Hrw & Hro & Hsnap & Hany)".
     iSplitR; [done |]. iExists rsf. iFrame "Hrw Hro Hany Hsnap Hkinv".
-    iPureIntro. exact Hshape.
+    iSplitR; [ iPureIntro; exact Hshape |].
+    iApply (kpt_creds_intro Bp with "Hbd Hvlb").
   Qed.
 
   (* the SHARED-KERNEL-TABLE bundle face.  [tlb_res_pt]'s destructor and
@@ -1303,7 +1465,7 @@ Section SRegimeShared.
      table invariant left as the residue. *)
   Definition kpt_res_at (root_ppn : mword 44) (satp0 : mword 64)
       (tv : type_of_register tlb) : iProp Σ :=
-    (tlb_snap_ok tv ∗ kpt_inv root_ppn)%I.
+    (tlb_snap_ok tv ∗ kpt_inv root_ppn ∗ kpt_creds)%I.
 
   Definition kpt_satp_ok (root_ppn : mword 44) (satp0 : mword 64) : Prop :=
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4)
@@ -1327,7 +1489,7 @@ Section SRegimeShared.
       kpt_res_at root_ppn satp0 tlbv.
   Proof.
     iIntros "H". iDestruct "H" as (satp0 tlbv)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkpt)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkpt & #Hcreds)".
     iDestruct "Hpmp" as (pcfg paddr)
       "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iExists satp0, tlbv, pcfg, paddr.
@@ -1335,7 +1497,7 @@ Section SRegimeShared.
       [ iPureIntro; unfold kpt_satp_ok; split_and!; assumption |].
     iSplitR;
       [ iPureIntro; unfold pmp_ent0_ok; split_and!; assumption |].
-    rewrite /kpt_res_at. iFrame "Hsatp Htlb Hpcfg Hpaddr Hsnap Hkpt".
+    rewrite /kpt_res_at. iFrame "Hsatp Htlb Hpcfg Hpaddr Hsnap Hkpt Hcreds".
   Qed.
 
   Lemma kpt_swp_close (root_ppn : mword 44) (satp0 : mword 64)
@@ -1348,9 +1510,9 @@ Section SRegimeShared.
       kpt_res_at root_ppn satp0 tlbv -∗ tlb_res_pt root_ppn.
   Proof.
     intros (Hmode & Hasid & Hppn) (HA & Hord & HX & HW & HR & Hcov).
-    iIntros "Hsatp Htlb Hpcfg Hpaddr [Hsnap #Hkpt]".
+    iIntros "Hsatp Htlb Hpcfg Hpaddr (Hsnap & #Hkpt & #Hcreds)".
     rewrite /tlb_res_pt. iExists satp0, tlbv.
-    iFrame "Hsatp Htlb Hsnap Hkpt".
+    iFrame "Hsatp Htlb Hsnap Hkpt Hcreds".
     iSplitR; [iPureIntro; exact Hmode |].
     iSplitR; [iPureIntro; exact Hasid |].
     iSplitR; [iPureIntro; exact Hppn |].
@@ -1631,6 +1793,73 @@ Section SRegimeKtier.
        kt' = KT0 -- the pin IS [kadm_ident], fed to [sr_adm]/[sr_absorb];
        kt' = KT1 -- [KtierLe KT1 kt] forces kt = KT1, so the witness IS
                     [sr_kwit R] and [sr_absorb_wit] applies one-for-one. *)
+  Lemma sr_absorb_ktier (R : s_regime) (kt kt' : ktier) `{Hle : !KtierLe kt' kt} :
+    forall (acc : MemoryAccessType mem_payload) (va pa : mword 64)
+        (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset) (S : TsoMemPa.bytemap -> iProp Σ),
+      s_acc_ok acc ->
+      kperm_allows pc acc ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ktier_pin kt' ppn va ->
+      ↑kptN ⊆ E ->
+      (* A6.24/A6.30: THE A/D WRITE-BACK'S PAYER, THREADED.  Nothing above
+         this face ever holds the memory-model bundle -- the closure was
+         computed and every ancestor's statement tested -- so the exec lane
+         can only PASS a payer along; the lane that actually pays is the swp
+         one, where [PtTreeAdue.wpte_obl_at] HANDS the bundle to
+         [HartSKpt.kpt_leaf_write_node].  The shared kernel table's slot is
+         the CONTEXT-FREE ledger word (A6.20), so this wand mentions no
+         context and no token, and it is ADDRESS-generic because which leaf
+         slot the walk lands on is decided inside the callee. *)
+      ⊢ □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64)
+             (B : nat),
+             ⌜PtTree.pte_wb_ok wold wnew⌝ -∗
+             gen_heap_interp m -∗ S m -∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wold ==∗
+             gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wnew) -∗
+        S σ.(mem) -∗
+        sr_ktier_wit R kt -∗ kmap_at (svpn_of va) ppn pc -∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ sr_inv R ={E}=∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          S σ'.(mem) ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ sr_inv R.
+  Proof.
+    intros acc va pa ppn pc σ E S Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp
+           HSXL Heff Hss Hall Hpin HE.
+    destruct kt' as [|].
+    - (* KT0: the pin IS [kadm_ident va ppn]; the witness is [emp]. *)
+      iIntros "#Hpay Hsto _ Hk Hri Hgh Hinv".
+      iApply (sr_absorb R acc va pa ppn pc σ E S Hacc Hallow Hcanon Hconcat Hmisa
+                Hmenv Hhtif Hcp HSXL Heff Hss Hall (sr_adm_id R va ppn Hpin) HE
+                with "Hpay Hsto Hk Hri Hgh Hinv").
+    - (* KT1: [KtierLe KT1 kt] leaves only kt = KT1, so the witness IS
+         [sr_kwit R] and there is nothing to reconcile per-address. *)
+      destruct (ktier_le_cases _ _ Hle) as [Heq | [Hbad _]]; [| discriminate Hbad].
+      rewrite -Heq.
+      iIntros "#Hpay Hsto Hw Hk Hri Hgh Hinv".
+      iApply (sr_absorb_wit R acc va pa ppn pc σ E S Hacc Hallow Hcanon Hconcat Hmisa
+                Hmenv Hhtif Hcp HSXL Heff Hss Hall HE
+                with "Hpay Hsto Hw Hk Hri Hgh Hinv").
+  Qed.
 
 End SRegimeKtier.
 

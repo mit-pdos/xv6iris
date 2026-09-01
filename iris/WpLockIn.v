@@ -13,13 +13,7 @@
    finisher is the special case ([lock_finisher_to_in]).
 
    WHY ITS OWN FILE: [WpLock.v] sits under 684 files; this is thirty lines
-   off its public definitions ([TsoCtxAbsorbLb] / [TsoCtxPark] precedent).
-
-   ON MAIN (main-tso-readiness.md Amendment 9): this file is tso-flip r51's
-   text; the one deviation is [lock_finisher_close_body]'s proof tail, which
-   is main's [WpLock.lock_finisher_close] tail because main's [lock_inv] has
-   no [lock_word_fresh] / [lk_cpu_fresh] ledger pieces (A6.89, below the
-   seal). *)
+   off its public definitions ([TsoCtxAbsorbLb] / [TsoCtxPark] precedent). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -27,6 +21,7 @@ From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
+Require Import IntrDefs.
 Require Import Xv6G.
 Require Import TsoCtx.
 Require Import WpLock.
@@ -56,11 +51,12 @@ Section LockIn.
   Lemma lock_finisher_close_body γ lk s R D E :
     ⊢ lock_finisher_body γ lk s R D emp E (lock_pay R).
   Proof.
-    iIntros (lo) "[Hclose _] Hauth Hfrag Hword Hcpu _ HR".
+    iIntros (lo) "[Hclose _] Hauth Hfrag [#Hc4 Hword] [#Hc8 Hcpu] _ HR".
     iDestruct "Hauth" as (B) "Hauth".
     iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| by iModIntro].
-    iApply bi.later_intro. iExists (mword_of_int 0 : mword 32), None, B.
-    rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Hauth".
+    iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8".
+    iExists (mword_of_int 0 : mword 32), None, B.
+    rewrite lk_cpu_res_free. iFrame "Hword Hcpu Hauth".
     iLeft. by iFrame "Hfrag HR".
   Qed.
 

@@ -40,16 +40,18 @@ Section TicksInv.
   Definition a_tickslock : mword 64 := mword_of_int KernelSyms.tickslock.
 
   (* the protected resource: the counter cell, contents existential. *)
-  (* A6.121 (the M3 λ-conversion, PILOT; tso-flip TicksInv.v:51): the payload
-     over an EXPLICIT context.  [ticks_res_at ξ] is what the lock surface
-     takes as its [CtxId → iProp] -- the invariant's free arm holds the cell
-     at the PARKED record's context and acquire's absorb re-indexes it to
-     the winner's by a REAL transport ([CtxMorph]) instead of the constant
-     embedding [<{ }>], which froze the payload at whichever context spelled
-     it.  [ticks_res] stays as the ambient spelling every consumer reads. *)
+  (* >>> A6.121 (the M3 λ-conversion, PILOT): the payload over an EXPLICIT
+     context.  [ticks_res_at ξ] is what the lock surface takes as its
+     [CtxId → iProp] -- so the invariant's free arm holds the cell at the
+     PARKED record's context and acquire's absorb re-indexes it to the
+     winner's, by a REAL transport proof ([CtxMorph], discharged here by the
+     structural instances) instead of the constant embedding [<{ }>], which
+     froze the payload at whichever context spelled it.  [ticks_res] stays
+     as the ambient spelling every consumer already reads and writes. <<< *)
   Definition ticks_res_at (ξ : CtxId) : iProp Σ :=
     (∃ t : mword 32, ctx_word4_pointsto ξ a_ticks (DfracOwn 1) t)%I.
   Definition ticks_res : iProp Σ := ticks_res_at cur_ctx.
+
   Global Instance ticks_res_at_morph : CtxMorph ticks_res_at.
   Proof.
     rewrite /ticks_res_at.
@@ -78,13 +80,14 @@ Section TicksInv.
      it is handed straight back, so a caller that has one loses nothing. *)
   Lemma new_tickslock `{CID : RiscvLang.CpuId} E (t : mword 32) :
     lock_name a_tickslock "time"%string -∗
+    own_context cur_ctx -∗
     a_tickslock ↦₄ (mword_of_int 0 : mword 32) -∗
     WpLock.lk_cpu_ready a_tickslock -∗
-    a_ticks ↦₄ t ={E}=∗ ∃ γl : gname, is_tickslock γl.
+    a_ticks ↦₄ t ={E}=∗ own_context cur_ctx ∗ ∃ γl : gname, is_tickslock γl.
   Proof.
-    iIntros "#Hnm Hlkw Hcpu Hticks".
+    iIntros "#Hnm Hrun Hlkw Hcpu Hticks".
     iApply (newlock E a_tickslock "time"%string ticks_res_at
-              with "Hnm Hlkw Hcpu [Hticks]").
+              with "Hnm Hrun Hlkw Hcpu [Hticks]").
     iApply (ticks_res_intro with "Hticks").
   Qed.
 

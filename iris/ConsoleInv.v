@@ -80,7 +80,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto RiscvExtras.
 Require Import WpLock.
-Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
+Require Import TsoCtx CtxMorphTac.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -215,8 +215,7 @@ Section ConsoleInv.
 
 End ConsoleInv.
 
-(* ==================================================================
-   THE PAYLOAD'S CtxMorph INSTANCES (tso-port M3, §4 step 1) and the
+(* THE PAYLOAD'S CtxMorph INSTANCES (tso-port M3, §4 step 1) and the
    lock handle over the CONVERTED payload.  Outside the section above
    because each quantifies over the context that section fixes -- the
    [KallocInv.v:388] template, line for line.  [cons_res] is ▷-free,
@@ -228,40 +227,28 @@ Section ConsoleCtx.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{XI : CurCtx}.
 
-  (* Instance search cannot do the higher-order big-op unification, so the
-     structural instance is applied AS A TERM (recipe rule 2). *)
-  Global Instance cons_data_morph (bs : list (bv 8)) :
-    CtxMorph (λ ξ0 : CtxId, cons_data (XI := ξ0) bs).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /cons_data.
-    iDestruct (ctx_morph_big_sepL bs
-                 (λ (j : nat) (b : bv 8) (ξ0 : CtxId),
-                    ctx_pointsto ξ0 (pa_add a_cons (cons_buf_off + j))
-                                 (DfracOwn 1) b)
-                 (λ i x, ctx_morph_pointsto _ _ _ _)
-                 ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame.
-  Qed.
-
-  (* A6.121 (tso-flip ConsoleInv.v:224): the payload over an EXPLICIT
-     context -- [cons_res] at [ξ], what the lock surface takes as its
-     [CtxId → iProp]; every consumer keeps reading and writing [cons_res]. *)
-  Definition cons_res_at (ξ : CtxId) : iProp Σ := cons_res (XI := ξ).
+  (* >>> A6.121 (the M3 λ-conversion): the payload over an EXPLICIT context.
+     [cons_res_at ξ] is the same body with the context spelled out -- it is
+     [cons_res] at [cur_ctx] by [reflexivity] -- and it is what the lock
+     surface takes as its [CtxId → iProp], so the invariant's free arm holds
+     the console cells at the PARKED record's context and acquire's absorb
+     re-indexes them by a REAL transport ([CtxMorph], the structural
+     instances) instead of the constant embedding [<{ }>].  Every consumer
+     keeps reading and writing [cons_res]. <<< *)
+  Definition cons_data_at (ξ : CtxId) (bs : list (bv 8)) : iProp Σ :=
+    ([∗ list] j ↦ b ∈ bs,
+       ctx_pointsto ξ (pa_add a_cons (cons_buf_off + j)) (DfracOwn 1) b)%I.
+  Definition cons_res_at (ξ : CtxId) : iProp Σ :=
+    (∃ (r w e : mword 32) (bs : list (bv 8)),
+       ctx_word4_pointsto ξ a_cons_r (DfracOwn 1) r ∗
+       ctx_word4_pointsto ξ a_cons_w (DfracOwn 1) w ∗
+       ctx_word4_pointsto ξ a_cons_e (DfracOwn 1) e ∗
+       ⌜length bs = INPUT_BUF_SIZE⌝ ∗
+       cons_data_at ξ bs)%I.
   Lemma cons_res_at_cur : cons_res_at cur_ctx = cons_res.
   Proof. reflexivity. Qed.
-  Global Instance cons_res_morph : CtxMorph (λ ξ0 : CtxId, cons_res (XI := ξ0)).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /cons_res.
-    iDestruct "H" as (r w e bs) "(Hr & Hw & He & Hlen & Hdat)".
-    iDestruct (cons_data_morph bs ξ ξ' with "Hd Hdat") as "[Hd Hdat]".
-    (* the three ring counters became [↦₄] ctx cells at M1 stage 2 *)
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hr") as "[Hd Hr]".
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hw") as "[Hd Hw]".
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd He") as "[Hd He]".
-    iFrame "Hd". iExists r, w, e, bs. iFrame.
-  Qed.
   Global Instance cons_res_at_morph : CtxMorph cons_res_at.
-  Proof. rewrite /cons_res_at. apply cons_res_morph. Qed.
+  Proof. rewrite /cons_res_at /cons_data_at. ctx_morph_solve. Qed.
 
   (* THE WHOLE CREDENTIAL.  Persistent, singleton, and taken by value: a
      caller of consoleread passes this and nothing else about the console.
@@ -589,7 +576,7 @@ Section ConsoleMorph.
     CtxMorph (λ ξ0 : CtxId, devsw_table (XI := ξ0)).
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /devsw_table.
-    iDestruct (ctx_morph_big_sepL (seq 0 (Z.to_nat NDEV_max + 1))
+    iMod (ctx_morph_big_sepL (seq 0 (Z.to_nat NDEV_max + 1))
                  (λ (_ : nat) (i : nat) (ξ0 : CtxId),
                     (ctx_word_pointsto ξ0 (a_devsw_read (Z.of_nat i))
                        DfracDiscarded (devsw_read_val (Z.of_nat i)) ∗
@@ -598,8 +585,17 @@ Section ConsoleMorph.
                  (λ i x, ctx_morph_sep _ _
                            (ctx_morph_word _ _ _ _) (ctx_morph_word _ _ _ _))
                  ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame.
+    iModIntro. iFrame.
   Qed.
+
+  (* the lock handle's transport: flip proves this once in SchedCtx (build
+     order puts it after the lock kit); the console sits earlier, so the
+     instance is restated locally -- the body is ξ-free post-M4, only the
+     floor moves ([WpLock.lk_floor_morph]). *)
+  Local Instance is_lock_morph_local (γ : gname) (lk : mword 64) (s : string)
+      (R : TsoCtx.CtxId → iProp Σ) :
+    CtxMorph (λ ξ0 : TsoCtx.CtxId, is_lock (XI := ξ0) γ lk s R).
+  Proof. rewrite /is_lock. ctx_morph_solve. Qed.
 
   (* [console_inv] / [console_ready] at another context (tso-port M2: a
      forkret park carries [console_ready] in [UsertrapRes.park_globals]).
@@ -610,10 +606,10 @@ Section ConsoleMorph.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /console_inv /is_conslock.
     iDestruct "H" as "[#Hlk Ht]".
-    iDestruct (devsw_table_morph ξ ξ' with "Hd Ht") as "[Hd Ht]".
-    iDestruct (is_lock_morph γ a_cons "cons"%string cons_res_at ξ ξ' with "Hd Hlk")
+    iMod (devsw_table_morph ξ ξ' with "Hd Ht") as "[Hd Ht]".
+    iMod (is_lock_morph_local γ a_cons "cons"%string cons_res_at ξ ξ' with "Hd Hlk")
       as "[Hd #Hlk']".
-    iFrame "Hd Ht Hlk'".
+    iModIntro. iFrame "Hd Ht Hlk'".
   Qed.
 
   Global Instance console_ready_morph :
@@ -621,8 +617,8 @@ Section ConsoleMorph.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /console_ready.
     iDestruct "H" as (γ) "H".
-    iDestruct (console_inv_morph γ ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame "Hd". iExists γ. iExact "H".
+    iMod (console_inv_morph γ ξ ξ' with "Hd H") as "[Hd H]".
+    iModIntro. iFrame "Hd". iExists γ. iExact "H".
   Qed.
 
 

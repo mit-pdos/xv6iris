@@ -26,14 +26,13 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Export WpLock.
-Require Import TsoCtx.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Local Open Scope Z_scope.
 
 Section LockAt.
   Context `{!riscvGS Σ, !lockG Σ}.
-  (* §0.35': the handle is context-relative; the T-leg binds the index in
-     this section too. *)
-  Context `{XI : TsoCtx.CurCtx}.
+  (* the creator deposits the payload at its own context; see WpLock.v *)
+  Context `{XI : CurCtx}.
 
   (* the free arm's ghost pair.  GHOST-ONLY on purpose (SleepLock's
      [sl_free_tok] makes the same choice and says why): a client that mints
@@ -51,9 +50,11 @@ Section LockAt.
 
   Lemma lock_ghost_alloc : ⊢ |==> ∃ γ : gname, lock_free_tok γ.
   Proof.
-    iMod (own_alloc (((●E (None : leibnizO lock_state), ●E (0%nat : leibnizO nat))
-                      ⋅ (◯E (None : leibnizO lock_state), ◯E (0%nat : leibnizO nat)))
-                     : lockUR)) as (γ) "H"; [ split; apply excl_auth_valid | ].
+    iMod (own_alloc ((((●E (None : leibnizO lock_state)),
+                       (●E (0%nat : leibnizO nat)))
+                      ⋅ ((◯E (None : leibnizO lock_state)),
+                         (◯E (0%nat : leibnizO nat)))) : lockUR)) as (γ) "H";
+      [ split; apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ.
     rewrite /lock_free_tok /lock_auth /lock_frag.
@@ -63,35 +64,40 @@ Section LockAt.
   (* [WpLock.newlock] with its [own_alloc] taken out: a free physical lock
      (word 0, cpu word 0), its name, its resource and the pre-minted ghost
      pair become THE lock at the gname the caller already published. *)
-  (* [tso-flip WpLockAt.v]: the seventh creator, and it pays the same cascade
-     as the newlock family -- the running token in, deposited, straight back
-     out.  A6.105: the floor travels bundled with the cell, so it is unbundled
-     here and handed to [is_lock_intro], which is where the handle's floor
-     lives. *)
-  (* the seventh creator.  PROPAGATED SHAPE: the [lk_cpu_ready] owner cell
-     and the lambda payload are the T-leg's, because they travel to every
-     caller.  INTERNAL: the mint is the M-leg's SC form -- no running token,
-     the transport quarantined in [lock_pay_intro]'s one shim use.  A6.105:
-     the floor travels bundled with the cell, so it is unbundled here and
-     handed to [is_lock_intro], which is where the handle's floor lives. *)
-  Lemma newlock_at E (γ : gname) (lk : mword 64)
-      (s : string) (R : TsoCtx.CtxId -> iProp Σ) `{!TsoCtx.CtxMorph R} :
+  (* A6.67: the free arm is the parked record, so this creator DEPOSITS.
+     [own_context] in and straight back out -- the honest mint's price
+     (A6.66), paid once here for all seven [newlock_at] callers. *)
+  Lemma newlock_at `{CID : RiscvLang.CpuId} E (γ : gname) (lk : mword 64) (s : string)
+      (R : CtxId → iProp Σ) `{!CtxMorph R} :
     lock_free_tok γ -∗
     lock_name lk s -∗
+    own_context cur_ctx -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     WpLock.lk_cpu_ready lk -∗
-    R TsoCtx.cur_ctx ={E}=∗ is_lock γ lk s R.
+    R cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock γ lk s R.
   Proof.
-    iIntros "[Ha Hf] #Hnm Hword Hready HR".
+    iIntros "[Ha Hf] #Hnm Hrun Hword Hready HR".
+    (* A6.105: the floor travels bundled with the cell; unbundle it here and
+       hand it to [is_lock_intro], which is where the handle's floor lives. *)
     rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
     iDestruct "Hready" as (lo) "[Hcpu #Hfl]".
-    iMod (lock_pay_intro_sc R with "HR") as "HR".
-    iDestruct "Ha" as (B) "Ha".
+    iMod (lock_pay_intro R with "Hrun HR") as "[Hrun HR]".
+    iFrame "Hrun".
+    iDestruct (WpLock.lk_addr_claim_of4 lk (DfracOwn 1) (mword_of_int 0 : mword 32)
+                 with "Hword") as "#Hc4".
+    iDestruct "Hcpu" as "[#Hc8 Hcell]".
     iMod (inv_alloc lockN E (lock_inv γ lk s R lo)
-            with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
-    { iApply bi.later_intro. iExists (mword_of_int 0 : mword 32), None, B.
-      rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
-      iLeft. iFrame "Hf HR". done. }
+            with "[Hword Hcell Ha Hf HR]") as "#Hinv".
+    { iNext. rewrite /lock_inv. iFrame "Hc4 Hc8".
+      (* A6.119: the pre-allocated token's position is whatever it was
+         allocated at; a FREE lock's word arm does not mention it. *)
+      iDestruct "Ha" as (B0) "Ha".
+      iExists (mword_of_int 0 : mword 32), None, B0.
+      iDestruct (lock_word_intro with "Hword") as "Hword".
+      rewrite lk_cpu_res_free. iFrame "Hword Ha".
+      iSplitL "Hcell"; [ iExact "Hcell" | ].
+      iLeft. iSplitR; [done|]. iSplitR; [done|].
+      iSplitL "Hf"; [ iExact "Hf" | iExact "HR" ]. }
     iModIntro. iApply (is_lock_intro with "Hnm Hinv Hfl").
   Qed.
 

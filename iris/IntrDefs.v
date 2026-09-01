@@ -76,8 +76,9 @@ Require Import TimerCap.   (* [timer_cap]: per-hart, M-mode-initialised, so it r
 Require WpGprCsrwCommon.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
+Require Import TsoMemPa.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
@@ -90,7 +91,35 @@ Import Defs.
    trapped mstatus.  Preserved by the trap+SRET round trip
    ([intr_ms_facts_roundtrip]; the SIE=1 restoration is the headline
    [roundtrip_SIE_true]). *)
+Definition intr_ms_facts (ms : mword 64) : Prop :=
+  eq_vec (_get_Mstatus_SIE ms) ('b"1") = true /\
+  eq_vec (_get_Mstatus_MPRV ms) ('b"1") = false /\
+  _get_Mstatus_SXL ms = 'b"10" /\
+  eq_vec (_get_Mstatus_MXR ms) ('b"0") = true /\
+  eq_vec (_get_Mstatus_TSR ms) ('b"1") = false /\
+  _get_Mstatus_XS ms = extStatus_map_forwards Off /\
+  _get_Mstatus_FS ms = extStatus_map_forwards Off /\
+  _get_Mstatus_VS ms = extStatus_map_forwards Off /\
+  _get_Mstatus_SD ms = 'b"0" /\
+  WpGprCsrwCommon.have_nom_val (_get_Mstatus_MPP ms) = true /\
+  eq_vec (_get_Mstatus_TVM ms) ('b"1") = false.
 
+Lemma intr_ms_facts_roundtrip (elp_v : mword 1) (ms : mword 64) :
+  intr_ms_facts ms -> intr_ms_facts (sret_ms5 (trap_ms elp_v ms)).
+Proof.
+  intros (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11).
+  split; [exact (roundtrip_SIE_true elp_v ms H1) |].
+  split; [exact (roundtrip_MPRV_false elp_v ms) |].
+  split; [exact (roundtrip_SXL_eq elp_v ms H3) |].
+  split; [exact (roundtrip_MXR_true elp_v ms H4) |].
+  split; [exact (roundtrip_TSR_false elp_v ms H5) |].
+  split; [rewrite roundtrip_XS; exact H6 |].
+  split; [rewrite roundtrip_FS; exact H7 |].
+  split; [rewrite roundtrip_VS; exact H8 |].
+  split; [rewrite roundtrip_SD; exact H9 |].
+  split; [rewrite roundtrip_MPP; exact H10 |].
+  exact (roundtrip_TVM_false elp_v ms H11).
+Qed.
 
 (* ===================================================================== *)
 (* THE CAUSE SET [RiscvFetchExec.MIE_S] IMPLIES.  [sconf] pins [mie] to    *)
@@ -196,6 +225,10 @@ Proof.
   rewrite HMPP. reflexivity.
 Qed.
 
+Lemma intr_ms_facts_iff (ms : mword 64) :
+  intr_ms_facts ms
+  <-> (eq_vec (_get_Mstatus_SIE ms) ('b"1") = true /\ sconf_ms_facts ms).
+Proof. unfold intr_ms_facts, sconf_ms_facts. tauto. Qed.
 
 (* WHAT THE TRAP LEAVES, as the fact set the interrupts-OFF tier wants.  The
    engine hands the handler a [sconf] at [trap_ms elp_v ms], so it owes this;
@@ -349,6 +382,17 @@ Section IntrDefsBase.
      sight, and one of their consumers (the per-trap tie ProofKernelvec.v
      mints) is deliberately NOT the canonical name.  Callers in the sconf
      tier instantiate them at [sie_gname]. *)
+  Lemma sie_ghost_alloc (v : mword 1) :
+    ⊢ |==> ∃ γ : gname,
+        ghost_var γ (1/2) v ∗ ghost_var γ (1/4) v ∗ ghost_var γ (1/4) v.
+  Proof.
+    iMod (ghost_var_alloc v) as (γ) "Hg".
+    iEval (rewrite -Qp.half_half) in "Hg".
+    iDestruct (ghost_var_split with "Hg") as "[H1 H2]".
+    iEval (rewrite -Qp.quarter_quarter) in "H2".
+    iDestruct (ghost_var_split with "H2") as "[H2 H3]".
+    iModIntro. iExists γ. iFrame.
+  Qed.
 
   (* flipping SIE needs all three pieces -- which is what makes "you cannot
      enable interrupts without an installed handler" a THEOREM rather than a
@@ -627,6 +671,9 @@ Section IntrDefsBase.
 
   (* the mstatus facts are readable straight off the flavour, without
      closing it -- what a caller reasoning about SPP/SPIE needs. *)
+  Lemma sconf_at_facts (ms : mword 64) :
+    sconf_at ms -∗ ⌜ sconf_ms_facts ms ⌝.
+  Proof. iIntros "[(_ & _ & _ & %H) _]". iPureIntro. exact H. Qed.
 
   (* READING THE TWO sret BITS OFF THE BUNDLE.  A holder of the travelling
      half turns it into a fact about the LIVE mstatus by agreement with the
@@ -1239,7 +1286,7 @@ Section IntrDefsBase.
   (* kept folded (no skolem-root open/repack at leaf level).               *)
   (* ------------------------------------------------------------------- *)
   Lemma strans_absorb :
-    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset) (S : TsoMemPa.bytemap -> iProp Σ), s_acc_ok acc ->
       kperm_allows pc acc ->
       neq_vec (bits_of_virtaddr (Virtaddr va))
          (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
@@ -1256,7 +1303,18 @@ Section IntrDefsBase.
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
       kadm_ident va ppn ->
       ↑kptN ⊆ E ->
-      ⊢ kmap_at (svpn_of va) ppn pc -∗
+      (* A6.24/A6.30: the A/D write-back's payer, THREADED (the exec lane
+         never holds the bundle -- see A6.30). *)
+      ⊢ □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64)
+             (B : nat),
+             ⌜PtTree.pte_wb_ok wold wnew⌝ -∗
+             gen_heap_interp m -∗ S m -∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wold ==∗
+             gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wnew) -∗
+        S σ.(mem) -∗
+        kmap_at (svpn_of va) ppn pc -∗
         reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ={E}=∗
         ∃ σ' : mstate,
           ⌜ exec (translateAddr (Virtaddr va) acc) σ
@@ -1265,21 +1323,22 @@ Section IntrDefsBase.
           ⌜ (σ'.(sregs) = σ.(sregs) \/
              exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
           ⌜ pmp_grant_facts σ' ⌝ ∗
+          S σ'.(mem) ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ strans_inv.
   Proof.
-    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall Hadm HE.
-    iIntros "Hat Hri Hgh [(Hbit & Hb & Hstv) | (Hbit & Hk)]".
-    - iMod (bare_absorb acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall Hadm HE
-              with "Hat Hri Hgh Hb") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Hb)".
+    intros acc va pa ppn pc σ E S Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall Hadm HE.
+    iIntros "#Hpay Hsto Hat Hri Hgh [(Hbit & Hb & Hstv) | (Hbit & Hk)]".
+    - iMod (bare_absorb acc va pa ppn pc σ E S Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall Hadm HE
+              with "Hpay Hsto Hat Hri Hgh Hb") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hcur & Hri & Hgh & Hb)".
       iModIntro. iExists σ'.
       iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
-      iFrame "Hri Hgh". iLeft. iFrame "Hbit Hb Hstv".
+      iFrame "Hcur Hri Hgh". iLeft. iFrame "Hbit Hb Hstv".
     - iDestruct "Hk" as (root_ppn) "Ht".
-      iMod (res_absorb root_ppn acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall I HE
-              with "Hat Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Ht)".
+      iMod (res_absorb root_ppn acc va pa ppn pc σ E S Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall I HE
+              with "Hpay Hsto Hat Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hcur & Hri & Hgh & Ht)".
       iModIntro. iExists σ'.
       iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
-      iFrame "Hri Hgh". iRight. iFrame "Hbit". iExists root_ppn. iExact "Ht".
+      iFrame "Hcur Hri Hgh". iRight. iFrame "Hbit". iExists root_ppn. iExact "Ht".
   Qed.
 
   Lemma strans_transform :
@@ -1320,7 +1379,7 @@ Section IntrDefsBase.
      [kpt_on cpu_id] by [kpt_on_pending_False]; the KPT arm delegates to
      [res_absorb] exactly as [strans_absorb]'s right branch does. *)
   Lemma strans_absorb_wit :
-    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset) (S : TsoMemPa.bytemap -> iProp Σ), s_acc_ok acc ->
       kperm_allows pc acc ->
       neq_vec (bits_of_virtaddr (Virtaddr va))
          (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
@@ -1336,7 +1395,18 @@ Section IntrDefsBase.
       exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
       ↑kptN ⊆ E ->
-      ⊢ kpt_on cpu_id -∗ kmap_at (svpn_of va) ppn pc -∗
+      (* A6.24/A6.30: the A/D write-back's payer, THREADED (the exec lane
+         never holds the bundle -- see A6.30). *)
+      ⊢ □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64)
+             (B : nat),
+             ⌜PtTree.pte_wb_ok wold wnew⌝ -∗
+             gen_heap_interp m -∗ S m -∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wold ==∗
+             gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+             PtTree.pt_slot_own (PtTree.KTier B) a (DfracOwn 1) wnew) -∗
+        S σ.(mem) -∗
+        kpt_on cpu_id -∗ kmap_at (svpn_of va) ppn pc -∗
         reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ={E}=∗
         ∃ σ' : mstate,
           ⌜ exec (translateAddr (Virtaddr va) acc) σ
@@ -1345,17 +1415,18 @@ Section IntrDefsBase.
           ⌜ (σ'.(sregs) = σ.(sregs) \/
              exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
           ⌜ pmp_grant_facts σ' ⌝ ∗
+          S σ'.(mem) ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ strans_inv.
   Proof.
-    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
-    iIntros "Hwit Hat Hri Hgh [(Hbit & Hb & Hstv) | (Hbit & Hk)]".
+    intros acc va pa ppn pc σ E S Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
+    iIntros "#Hpay Hsto Hwit Hat Hri Hgh [(Hbit & Hb & Hstv) | (Hbit & Hk)]".
     - iDestruct (kpt_on_pending_False with "Hwit Hbit") as %[].
     - iDestruct "Hk" as (root_ppn) "Ht".
-      iMod (res_absorb root_ppn acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall I HE
-              with "Hat Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Ht)".
+      iMod (res_absorb root_ppn acc va pa ppn pc σ E S Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall I HE
+              with "Hpay Hsto Hat Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hcur & Hri & Hgh & Ht)".
       iModIntro. iExists σ'.
       iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
-      iFrame "Hri Hgh". iRight. iFrame "Hbit". iExists root_ppn. iExact "Ht".
+      iFrame "Hcur Hri Hgh". iRight. iFrame "Hbit". iExists root_ppn. iExact "Ht".
   Qed.
 
   (* =================================================================== *)
@@ -1482,6 +1553,12 @@ Section IntrDefsBase.
     rewrite irrelevant_register_set; [ reflexivity | vm_compute; reflexivity ].
   Qed.
 
+  Lemma strans_root_landing (rs rsf : regstate) :
+    (rsf = rs \/ exists tv, rsf = register_set tlb tv rs) ->
+    strans_root rsf = strans_root rs.
+  Proof.
+    intros H. rewrite /strans_root (strans_satp_landing rs rsf H). reflexivity.
+  Qed.
 
   Lemma strans_swp_translate :
     forall (acc : MemoryAccessType mem_payload)
@@ -1856,6 +1933,8 @@ Section IntrDefsBase.
 
   (* [sr_inv strans_regime] is definitionally [strans_inv] -- the bridge the
      leaf/engine call sites use without unfolding the record. *)
+  Lemma strans_regime_inv : sr_inv strans_regime ⊣⊢ strans_inv.
+  Proof. reflexivity. Qed.
 
   (* =================================================================== *)
   (* §6c THE BUNDLE WITH THE INSTALLED-HANDLER CONJUNCT LEFT OPEN --      *)
@@ -2543,6 +2622,9 @@ Section IntrDefs.
     arm_pay kt n eb p ⊣⊢ trap_csrs_pay kt n eb ∗ cpu_claim_pay n eb p.
   Proof. reflexivity. Qed.
 
+  Lemma arm_pay_on {kt : ktier} (p : mword 64) :
+    arm_pay kt 0 true p ⊣⊢ trap_csrs kt ∗ cpu_claim p.
+  Proof. reflexivity. Qed.
 
   (* ------------------------------------------------------------------- *)
   (* THE INDEX SPLIT AT LEVEL 0, IN BOTH DIRECTIONS.                      *)
@@ -2616,6 +2698,23 @@ Section IntrDefs.
     - iDestruct (ghost_var_agree with "Hhalf Harm") as %H. iPureIntro. exact H.
   Qed.
 
+  Lemma sie_arm_of_ex {kt : ktier} (p : mword 64) :
+    (∃ b : bool, sie_arm kt b p) ⊣⊢
+    (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∨
+     (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+      intr_res kt ∗
+      kpt_on cpu_id ∗
+      (∃ v : mword 64, sepc ↦ᵣ v) ∗
+      (∃ v : mword 64, scause ↦ᵣ v) ∗
+      (∃ v : mword 64, stval ↦ᵣ v) ∗
+      (∃ a b : mword 1, sret_bits a b) ∗
+      cpu_claim p ∗
+      cpu_hart 0 true p ∅)).
+  Proof.
+    iSplit.
+    - iIntros "H". iDestruct "H" as ([]) "H"; [ iRight | iLeft ]; iExact "H".
+    - iIntros "[H|H]"; [ iExists false | iExists true ]; iExact "H".
+  Qed.
 
   (* THE TWO MOVES push_off / pop_off make.  The enabled arm's per-cpu
      bookkeeping comes OUT (push_off, right after its [csrci] has already
@@ -2624,7 +2723,21 @@ Section IntrDefs.
      else in the arm is untouched, so these are pure re-associations. *)
   (* [intr_res] is no longer handed out BESIDE [trap_csrs]: it is a conjunct
      OF it, so these two are pure re-associations of the same five cells. *)
+  Lemma sie_arm_on_out {kt : ktier} (p : mword 64) :
+    sie_arm kt true p -∗
+    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+    trap_csrs kt ∗
+    cpu_claim p ∗
+    cpu_hart 0 true p ∅.
+  Proof. iIntros "(Hbit & Hres & Hkpt & Hsep & Hsca & Hstv & Hspp & Hclm & Hcpu)". iFrame. Qed.
 
+  Lemma sie_arm_on_in {kt : ktier} (p : mword 64) :
+    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
+    trap_csrs kt -∗
+    cpu_claim p -∗
+    cpu_hart 0 true p ∅ -∗
+    sie_arm kt true p.
+  Proof. iIntros "Hbit (Hsep & Hsca & Hstv & Hspp & Hres & Hkpt) Hclm Hcpu". iFrame. Qed.
 
   (* THE PUBLIC CAPABILITY, at the hart's regime [kt] -- see [sie_cap_of]
      above for what the index means.  Written out verbatim rather than as
@@ -2734,6 +2847,14 @@ Section IntrDefs.
      unindexed capability could only be mined at [b = true], and it had no
      consumers.  The tier here is the capability's OWN ambient tier -- at
      KT0 the result is [emp] (true and useless), at KT1 it is the receipt. *)
+  Lemma sie_cap_wit {kt : ktier}
+      (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
+    sie_cap kt m avail b p -∗
+    sie_cap kt m avail b p ∗ sr_ktier_wit strans_regime kt.
+  Proof.
+    iIntros "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
+    iFrame "Hstk Htr Harm Hctx Htc Hwit".
+  Qed.
 
   (* THERE IS DELIBERATELY NO "CONJURE THE WITNESS AT THE DEFAULT TIER"
      LEMMA HERE.  [sie_cap_wit_KT0] used to be it, and every one of its six
@@ -2749,6 +2870,14 @@ Section IntrDefs.
 
   (* ... and so is [trap_csrs], the bundle an interrupts-OFF handler body
      threads: the receipt is one of its members for the same reason. *)
+  Lemma trap_csrs_ktier_wit {kt0 : ktier} (kt : ktier) :
+    trap_csrs kt0 -∗ trap_csrs kt0 ∗ sr_ktier_wit strans_regime kt.
+  Proof.
+    iIntros "(Ha & Hb & Hc & Hd & Hres & #Hkpt)".
+    iSplitL "Ha Hb Hc Hd Hres".
+    - iFrame "Ha Hb Hc Hd Hres Hkpt".
+    - iApply (strans_ktier_wit_intro with "Hkpt").
+  Qed.
 
   (* ... and the RECEIPT ITSELF, for a consumer that has to PIN THE ARM
      rather than merely attest a tier.  [WpSmodeWfi.wp_wfi_s_sconf] is the
@@ -2925,6 +3054,15 @@ Section IntrDefs.
     - exact (src_ok_ne b _ H2).
   Qed.
 
+  Lemma ops_ok_sp_conc (b : bool) (rd rs1 rs2 : mword 5) :
+    Regidx rd <> Regidx Rtp ->
+    Regidx rs1 <> Regidx Rtp -> Regidx rs2 <> Regidx Rtp ->
+    ops_ok_sp b rd rs1 rs2.
+  Proof.
+    intros Hrd H1 H2. split; [ exact Hrd | split ].
+    - exact (src_ok_ne b _ H1).
+    - exact (src_ok_ne b _ H2).
+  Qed.
 
   (* ===================================================================== *)
   (* THE PAYOFF: what [src_ok] actually buys, so the premise is proved and   *)
@@ -2942,6 +3080,16 @@ Section IntrDefs.
   (* ... and for a leaf's two sources at once, which is the shape a converted
      leaf's σ-obligation will arrive in: the engine reads [rget m rsa] and
      [rget m rsb], and both have to survive the hart rebinding. *)
+  Lemma rget_ops_indep (b : bool) (m : regfile) (rd rs1 rs2 : mword 5) :
+    b = true -> ops_ok b rd rs1 rs2 ->
+    forall c1 c2 : CpuId,
+      rget (CID := c1) m rs1 = rget (CID := c2) m rs1
+      /\ rget (CID := c1) m rs2 = rget (CID := c2) m rs2.
+  Proof.
+    intros Hb Hops c1 c2. split.
+    - exact (rget_src_indep b m rs1 Hb (ops_ok_s1 _ _ _ _ Hops) c1 c2).
+    - exact (rget_src_indep b m rs2 Hb (ops_ok_s2 _ _ _ _ Hops) c1 c2).
+  Qed.
 
   (* THE FORM A CONVERTED LEAF ACTUALLY USES.  Inside the funnel's σ-callback a
      leaf does not hold a bare [b = true]: it holds the [WpNext.wp_next] GUARD
@@ -2977,6 +3125,17 @@ Section IntrDefs.
   Qed.
 
   (* the two-source form, for a leaf whose engine reads [rsa] and [rsb] *)
+  Lemma rget_next_ops_indep (b : bool) (pv : mword 64) (CIDn : CpuId)
+      (m : regfile) (rd rs1 rs2 : mword 5) :
+    (b = false \/ pv = zero_reg -> (CIDn : CPU) = (CID : CPU)) ->
+    ops_ok b rd rs1 rs2 ->
+    rget (CID := CIDn) m rs1 = rget (CID := CID) m rs1
+    /\ rget (CID := CIDn) m rs2 = rget (CID := CID) m rs2.
+  Proof.
+    intros Hs Hops. split.
+    - exact (rget_next_indep b pv CIDn m rs1 Hs (ops_ok_s1 _ _ _ _ Hops)).
+    - exact (rget_next_indep b pv CIDn m rs2 Hs (ops_ok_s2 _ _ _ _ Hops)).
+  Qed.
 
   (* THE sp BRIDGE.  The bundle owns [gpr_file (tp_pin m)] while [sie_cap] and
      [intr_frame] are keyed on [m !!! Regidx csp_rs1], and a step engine takes
@@ -3265,6 +3424,15 @@ Section IntrDefs.
      copy of the bundle in its own geometry resource.  Both are persistent
      conclusions and CONSUME NOTHING -- the bundle is handed straight back, so
      the call is [iDestruct (… with "Hcg") as "[#Hkm Hcg]"]. *)
+  Lemma sconf_kmap_claims :
+    sconf -∗ kmap_static_claims ∗ sconf.
+  Proof.
+    iIntros "Hsc".
+    iEval (rewrite /sconf) in "Hsc". iDestruct "Hsc" as "(#Hhw & Hrest)".
+    iDestruct (hw_config_kmap_claims with "Hhw") as "#Hkm".
+    iSplitR; [iExact "Hkm"|].
+    rewrite /sconf. iSplitR; [iExact "Hhw" | iExact "Hrest"].
+  Qed.
 
   Lemma sie_cap_gpr_kmap_claims {kt : ktier} m avail b p :
     sie_cap_gpr kt m avail b p -∗ kmap_static_claims ∗ sie_cap_gpr kt m avail b p.
@@ -3362,8 +3530,32 @@ Section IntrDefs.
 
   (* custody transfer at the DEEP end (no sp move): absorb k adjacent
      slots below the owned region into [avail]... *)
+  Lemma sie_cap_grow {kt : ktier}
+      (m : regfile) (avail k : nat) (b : bool) {p : mword 64} :
+    stack_own (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) (trap_res b + avail)) k -∗
+    sie_cap kt m avail b p -∗
+    sie_cap kt m (avail + k) b p.
+  Proof.
+    iIntros "Hdeep (Hstk & Htr & Harm & Hctx & #Htc & #Hwit)". iFrame "Htr Harm Hctx Htc Hwit".
+    rewrite Nat.add_assoc. iApply (stack_own_app (KTR := kt)).
+    iFrame "Hstk Hdeep".
+  Qed.
 
   (* ... and release the k deepest slots back out. *)
+  Lemma sie_cap_shrink {kt : ktier}
+      (m : regfile) (avail k : nat) (b : bool) {p : mword 64} :
+    (k <= avail)%nat ->
+    sie_cap kt m avail b p -∗
+    sie_cap kt m (avail - k) b p ∗
+    stack_own (KTR := kt)
+      (pa_stk (m !!! Regidx csp_rs1) (trap_res b + (avail - k))) k.
+  Proof.
+    iIntros (Hk) "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)". iFrame "Htr Harm Hctx Htc Hwit".
+    replace (trap_res b + avail)%nat
+      with ((trap_res b + (avail - k)) + k)%nat by lia.
+    iDestruct (stack_own_app (KTR := kt) with "Hstk") as "[Htop Hdeep]".
+    iFrame "Htop Hdeep".
+  Qed.
 
   (* =================================================================== *)
   (* §6b THE PUSH/POP COUNTING TOKEN.  [intr_count n eb] is the       *)
@@ -3426,8 +3618,16 @@ Section IntrDefs.
   Qed.
 
   (* the '0'-arm POP at eb = false (never re-enables): level decrement *)
+  Lemma intr_count_pop_off (n : nat) :
+    intr_count (S n) false -∗ intr_count n false.
+  Proof.
+    iIntros "Htok". destruct n; [iExact "Htok" | iFrame].
+  Qed.
 
   (* an interior POP (n+1 ≥ 2 → n+1 ≥ 1) *)
+  Lemma intr_count_dec (n : nat) (eb : bool) :
+    intr_count (S (S n)) eb -∗ intr_count (S n) eb.
+  Proof. iIntros "Htok". iFrame. Qed.
 
   (* at the '1' arm (cap-eighth-'1'), [intr_count n eb] forces n = 0 and
      eb = true, and yields the two '1' eighths -- the S-case and the
@@ -3484,7 +3684,7 @@ End IntrDefs.
 (* with [wp_next_chain] and apply this once, exactly as for [cpu_own].    *)
 (* ===================================================================== *)
 Lemma trap_csrs_ext_transport `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId}
-    `{XI : TsoCtx.CurCtx}
+    `{XI : CurCtx}
     {kt : ktier} (CID0 CID1 : CpuId) (eb : bool) (p : mword 64) :
   (eb = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
   trap_csrs_ext (CID := CID0) kt eb -∗ trap_csrs_ext (CID := CID1) kt eb.
@@ -3536,19 +3736,9 @@ Ltac tp_refold Hrdtp H := iEval (rewrite (tp_pin_upd _ _ _ Hrdtp)) in H.
    settles, while [Regidx rd <> Regidx Rtp] has to go through [Regidx]'s
    injectivity first, and [src_ok]'s guarded conjunct is an implication.
    So they are three NAMED pieces, composed by [rdok] below. *)
-(* NAME THE EQUATION FOR [discriminate] -- claude-notes/optimization.md,
-   "`done` ENDS IN A NO-ARGUMENT `discriminate`".  After the [vm_compute] the
-   goal is [False] from [H2 : 9%positive = 4%positive], which [discriminate H2]
-   closes without looking at anything else; a bare [congruence] instead
-   head-normalises EVERY hypothesis in scope, and this script runs inside a
-   whole-function proof's context at 3673 [ltac:(rdok)] sites.  Measured on
-   ProofCreate (419 calls): 2.4 % of the file's tactic time, 133.6 s -> 130.8 s.
-   The [congruence] arm stays as a fallback for a site where the two indices
-   are not both concrete, where [discriminate H2] fails immediately and cheaply. *)
 Ltac rdok_tpne :=
   let H1 := fresh in let H2 := fresh in
-  intro H1; injection H1 as H2; vm_compute in H2;
-  first [ discriminate H2 | congruence ].
+  intro H1; injection H1 as H2; vm_compute in H2; congruence.
 
 Ltac rdok_rd := split; [ vm_compute; discriminate | rdok_tpne ].
 
@@ -3594,8 +3784,7 @@ Ltac rdok :=
 Ltac rgne :=
   rewrite rget_ne;
   [ | let H1 := fresh in let H2 := fresh in
-      intro H1; injection H1 as H2; vm_compute in H2;
-      first [ discriminate H2 | congruence ] ].
+      intro H1; injection H1 as H2; vm_compute in H2; congruence ].
 
 (* CAUTION, ORDER MATTERS in an endgame peel loop: a [rewrite Htp] for the tp
    slot must come BEFORE [rgne].  Otherwise [rewrite rget_ne] instantiates at
@@ -3745,6 +3934,9 @@ Global Hint Extern 0 (SrcOk _) =>
    premise about [m] into the [rget] the funnel hands it, at WHATEVER hart the
    σ-callback was instantiated at.  Stated as an [∀ c] so a leaf never has to
    name the hart it happens to be run at today. *)
+Lemma src_ok_rget_all (m : regfile) (rs : mword 5) `{!SrcOk rs} :
+  forall c : CpuId, rget (CID := c) m rs = m !!! Regidx rs.
+Proof. intros c. exact (rget_ne (CID := c) m rs src_ok_not_tp). Qed.
 
 (* ... and the two-hart form, which is [HartTp.rget_hart_indep] under the
    class: this is the shape the σ-obligation actually arrives in once the
@@ -3782,20 +3974,32 @@ Proof. exact (rget_hart_indep m rs src_ok_not_tp). Qed.
 
 (* arm (1), and the shape 2100-odd of the 2173 references have: a concrete
    register, decided by [rdok_tpne]'s [vm_compute]. *)
+Definition srcok_pos_concrete : SrcOk (mword_of_int 1 : mword 5) := _.
+Definition srcok_pos_concrete_a5 : SrcOk (mword_of_int 15 : mword 5) := _.
+Definition srcok_pos_sp : SrcOk csp_rs1 := _.
 
 (* THE NEGATIVE, and the reason the class is worth anything: at the thread
    pointer there is NO instance, so a leaf applied at tp fails AT THE CALL SITE
    instead of accumulating an obligation nobody can discharge.  If this [Fail]
    ever stops failing, the class has become provable and every converted leaf's
    side condition has silently evaporated. *)
+Fail Definition srcok_neg_tp : SrcOk Rtp := _.
 
 (* arms (2)-(4): resolution at a VARIABLE register, from each of the three
    hypothesis shapes the tree actually carries.  These are the arms whose
    absence produces the shelved-[Qed] failure, so each gets a positive test. *)
+Definition srcok_pos_assumption (rs : mword 5) (H : Regidx rs <> Regidx Rtp)
+  : SrcOk rs := _.
+Definition srcok_pos_rd_ok (rs : mword 5) (H : rd_ok rs) : SrcOk rs := _.
+Definition srcok_pos_raw_mword (rs : mword 5) (H : rs <> Rtp) : SrcOk rs := _.
+Definition srcok_pos_raw_flipped (rs : mword 5) (H : Rtp <> rs) : SrcOk rs := _.
 
 (* ... and the negative at a variable with NOTHING in the context: resolution
    must fail, or the arms would be closing goals they have no proof of. *)
+Fail Definition srcok_neg_bare (rs : mword 5) : SrcOk rs := _.
 
 (* the guarded premise does NOT satisfy the unguarded class at a variable [b] --
    this is the "no [ops_ok] arm" note above, stated as a check so nobody adds
    such an arm and quietly weakens the class. *)
+Fail Definition srcok_neg_src_ok (b : bool) (rs : mword 5) (H : src_ok b rs)
+  : SrcOk rs := _.
