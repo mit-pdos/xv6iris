@@ -722,3 +722,36 @@ the itable releases pass Rdep := unfloored + a finisher built on
 lock_pay_intro_llb with the twins' llb(tstn).  itable_res2 then becomes
 the ξ-INDEXED λ (floors at ξ) -- the is_itable2 λ-flip -- and the
 constant <{ }> coercion at its call sites goes away.
+
+## A6.144 CLOSED: lock_finisher_close_in_llb (WpLockIn, GREEN)
+
+The release seam needs NO machinery generalization: the _in finisher
+family absorbs the deposit, so ONE new intro does it all --
+  lock_finisher_close_in_llb :
+    (∀ξ, Rdep ξ ∗ ctx_floor ξ tl ⊢ R ξ) ->
+    llb tl -∗ Rdep cur_ctx -∗ lock_finisher_in γ lk s R D emp E
+(Pay := lock_pay R via lock_pay_intro_llb; body :=
+lock_finisher_close_body verbatim).  The itable releases switch to the
+wp_release_*in* forms with this finisher: the caller hands the payload
+UNFLOORED plus the store twins' llb(tstn); the park mints the floors at
+the parked ξ; they transport to the next acquirer.
+
+EXECUTION PLAN for the payload (the ξ-MIXTURE -- checked against
+CtxMorph: cells morph (TsoCtxTwin2:570), floors morph, ghost constant):
+  itable_res2 (ξ : CtxId) ... := <the existing constant body unchanged>
+    ∗ ([∗ list] k, itable_slot_res ξ M k)
+  with itable_slot_res ξ M k's live arm's floor AT ξ (free arm's ctx
+  cell stays ambient-cur_ctx for now -- the constant part's debt is
+  A6.141's known one).  is_itable2 := is_lock at the REAL λ (no <{ }>).
+  Acquire sites get R cur_ctx with floors at cur_ctx ✓ exact reads.
+  Release sites: wp_release_in_sconf + close_in_llb at
+  Rdep := λξ. <body with live rows floor-FREE>, fold inserts floors.
+THEN: ProofIget (arm site -> wp_sw_au_dat + pinw_arm_write_c +
+iref_alloc_pinw_install; incr site -> + pinw_write_c +
+iref_incr_store_pinw_au; locked reads -> iref_load_locked_pinw_au +
+iref_read_locked_obl + wp_lw_au_rel; destructures gain the slot-res
+piece), ProofIput (retire via pinw_retire_write_c +
+iref_close_last_store_pinw_au + the ordinary ctx sw for the zeroing...
+NOTE the retire choreography revision: the conversion happens at the
+STORE leaf obligation with the A6.144 floor), ProofIdup, IcacheBoot,
+relink, sweep, bank.
