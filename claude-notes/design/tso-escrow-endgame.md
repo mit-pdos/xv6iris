@@ -171,6 +171,48 @@ forces a ghost refutation at the park, that ghost would have to be in
 the holder's hand, and the handle is frozen — that was the IDLE arm
 (A6.155 → A6.157), and it is why v2 has none.
 
+BUILD-AGENT FINDINGS ON v2 (2026-09-01, after A6.153–A6.157 landed and
+the R2 twins were half-written; TO VET — F1 changes hdr_out):
+  F1  (a) has no refutation of OUT_L1.  hdr_out = ◯ m' with Σ m' = Σ m
+      is the UNIT of the cmra at c = 0, and the withdrawer holds only
+      cnt ½ 0 and L1's floor row: a second withdraw_L1 opened on
+      OUT_L1 cannot be closed (nothing the caller holds clashes with
+      `◯ ∅ ∗ P_rest ξb`; P_hdr is what it wants).  (e) refutes OUT_L1
+      by Σ and (f) by P_rest's cell, but (a) needs its own credential.
+      FIX (no new ghost, no new lemma): (a) CONSUMES L1's `slot_d ½ Td`
+      half into hdr_out (the window token) and (b) returns it at
+      Td := T' — hdr_out := slot_d ½ Td ∗ ∃ m', ⌜Σ m' = Σ m⌝ ∗ ◯ m'.
+      A second (a) then presents a third half of slot_d (½+½+½ > 1,
+      ghost_var validity); (b)'s OUT_L2 refutation is unchanged (the
+      cnt half stays with the caller); (c)/(d) are arm-agnostic (they
+      touch only the prefix) and need no refutation.
+  F2  bcache's P_hdr must include buf_pay: the recycler rewrites the
+      block IDENTITY (dev/blockno) and performs the pool exchange, both
+      under L1, and pay is indexed by that identity.  So P_hdr :=
+      valid ∗ dev½ ∗ blockno½ (buf_own's) ∗ buf_pay v dev bno bs and
+      P_rest := disk ∗ data.  (b) deposits at v = false, where buf_pay
+      does not depend on bs (the data stays in the box) — the lemma's
+      bcache instance takes P_hdr at any bs0 and rewrites.
+  F3  `cnt : ghost_var Qp` cannot hold c = 0 (Qp has no zero).  Keep the
+      count as nat (the slot's refcount word) and state Σ as the two-
+      case row ⌜(c = 0 ∧ m = ∅) ∨ (0 < c ∧ Σ m = Qp.of_nat c)⌝ (or an
+      option share as in A6.155).  Purely an encoding note.
+  F4  The boot fold needs TWO twins: `newlock_delayed` (bio_init) and
+      `newlock_at` (bio_init_at) both mint L1; each gets an `_llb` form
+      over lock_pay_intro_llb (~10 lines each, WpLock / WpLockAt).
+  F5  What of A6.153–A6.157 survives v2 verbatim: the option-share tok
+      kit and bchain (R-c), the v2 slot accessors, bcache_res2's floor
+      slot + llb row (= the L1 row of §3.2 with the second reviewer's
+      `llb Td`), ProofBpin on the refs++ twin ((c) has the same call
+      shape), the decrement twins' SHAPE (`bd_scan2_after`: the scan at
+      tl' ≥ tl with llb tl', the caller re-flooring through `_in`),
+      ProofBunpin's conversion, the holdingsleep genl tier, ProofBwrite,
+      ProofLogWrite's fragment rows (their form changes to
+      ◯{[t := 1]} ∗ llb t), the ProofBread loops.  Deleted: the box
+      section's internals (pres kit, pile, tags, the (n,T) registers,
+      the eight lemmas, CtxAnchor's use, A6.157's half cell, the boot
+      deposit loop).
+
 HARD RULES: exactly these three arm shapes and six lemmas.  Protocol
 substates go inside Q (ξ-free ghost).  A seventh lemma, a fourth arm
 shape, or a second reference form is a design error — stop (§5).
@@ -700,3 +742,13 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   still fold through `_in`; hdr_out stated uniformly as
   `∃ m', ⌜Σ m' = Σ m⌝ ∗ stamps ◯ m'` (no c = 0 / c = 1 case split in the
   arm).  §2, §3.2, §3.4, §3.5 (a), §4.2 amended in place.
+- 2026-09-01 (build agent, evaluation of v2): agreed in substance —
+  the two rows (C)/(D) over stamped shares discharge every cover the
+  register design needed agreement for, and the landed option-share
+  kit, slot accessors, ProofBpin, the decrement-twin shape and the
+  sleeplock/holdingsleep tiers carry over.  Findings recorded in §2
+  (F1–F5): F1 is a gap — withdraw_L1 has no OUT_L1 refutation; fix by
+  moving L1's slot_d half into hdr_out for the window (no new ghost,
+  no new lemma).  F2–F4 are instance/encoding notes (buf_pay is
+  L1-side, cnt as nat with a two-case Σ row, two newlock twins).
+  R1' starts on F1's shape unless the vetting says otherwise.
