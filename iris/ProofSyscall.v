@@ -4788,7 +4788,7 @@ Section SyscallArms.
       iDestruct "Hpv" as
         "[(%Hr & Hpv & Hb)
           | (%fd0 & %fd1 & %l & %k0 & %k1 &
-             (%Hr & %Hfl & %Hne & %Hcl0 & %Hcl1) & Hpv & Hb)]".
+             (%Hr & %Hfl & %Hne & %Hcl0 & %Hcl1 & %Hd8 & %Hbytes) & Hpv & Hb)]".
       - iExists (upd_upt (us_V U) P'), sts. iFrame "Hpv Hb". iPureIntro.
         split_and!; [exact Htfpe | reflexivity | reflexivity | exact Huptz | reflexivity |].
         rewrite decide_False; [reflexivity |].

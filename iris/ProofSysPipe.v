@@ -1247,7 +1247,7 @@ Section ProofSysPipe.
         (∃ lo hi : mword 32,
            ctx_word4_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) lo ∗
            ctx_word4_pointsto (KTR := KT1) cur_ctx (pa_add (pa_stk sp0 8) 4) (DfracOwn 1) hi) -∗
-        sys_pipe_post γf p pid (upd_usM (us_upt U P') (umem_wr (us_M U) v d bs)) sts res -∗
+        sys_pipe_post γf p pid (upd_usM (us_upt U P') (umem_wr (us_M U) v d bs)) sts d bs res -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hb1 Hb2 Hb3 Hb4]" as "Hepi".
     { rewrite /EPI.
@@ -3060,9 +3060,15 @@ Section ProofSysPipe.
         by (rewrite <- (list_lookup_insert_ne sts fd0 fd1
                           (FdOpen true false FdPipe) Hne01);
             exact Hlkstq1).
+      (* ...AND THE BYTES ARE THE TWO DESCRIPTORS.  [bsc] IS that function
+         by construction -- it is what the two copyouts were handed -- so
+         the conjunct the row now carries is [reflexivity] at every one of
+         the eight indices. *)
       iSplitR;
         [iPureIntro; split_and!;
-          [reflexivity | exact Hfr1' | exact Hne01 | exact Hlkstq0 | exact Hst1c']|].
+          [reflexivity | exact Hfr1' | exact Hne01 | exact Hlkstq0 | exact Hst1c'
+          | reflexivity
+          | intros i Hi; reflexivity]|].
       rewrite -sp_us_upt_ofile_comm. iFrame "Hpriv Hfrag".
     - (* ============ copyout(&fd1) failed: the shared tail ============ *)
       (* the second run landed only a [d2 <= 4] prefix: the composed window
