@@ -1,0 +1,244 @@
+DIGEST 36da0ad3371ad13526bc203c6d617b3d
+Fxv6iris.IcachePinwObl
+R1251:1256 Stdlib.ZArith.ZArith <> <> lib
+R1258:1260 Stdlib.micromega.Lia <> <> lib
+R1262:1265 Stdlib.Lists.List <> <> lib
+R1294:1297 stdpp.gmap <> <> lib
+R1299:1302 stdpp.list <> <> lib
+R1304:1324 stdpp.bitvector.definitions <> <> lib
+R1362:1370 iris.proofmode.proofmode <> <> lib
+R1406:1409 iris.algebra.auth <> <> lib
+R1411:1415 iris.algebra.dfrac <> <> lib
+R1458:1467 iris.base_logic.lib.invariants <> <> lib
+R1469:1476 iris.base_logic.lib.gen_heap <> <> lib
+R1478:1480 iris.base_logic.lib.own <> <> lib
+R1482:1489 iris.base_logic.lib.mono_nat <> <> lib
+R1507:1520 SailStdpp.Base <> <> lib
+R1522:1547 SailStdpp.Operators_mwords <> <> lib
+R1565:1581 Riscv.rv64d_types <> <> lib
+R1583:1593 Riscv.rv64d <> <> lib
+R1611:1625 xv6iris.RiscvModelBytes <> <> lib
+R1627:1636 xv6iris.RiscvPtsto <> <> lib
+R1638:1646 xv6iris.RiscvLang <> <> lib
+R1648:1656 xv6iris.RiscvExec <> <> lib
+R1658:1662 xv6iris.Ktier <> <> lib
+R1680:1687 xv6iris.TsoMemPa <> <> lib
+R1689:1696 xv6iris.TsoGhost <> <> lib
+R1698:1703 xv6iris.TsoCtx <> <> lib
+R1721:1726 xv6iris.HartTp <> <> lib
+R1744:1752 xv6iris.IrefSlots <> <> lib
+R1770:1778 xv6iris.IcacheRef <> <> lib
+R1796:1804 xv6iris.IcacheInv <> <> lib
+R1822:1825 xv6iris.Xv6G <> <> lib
+sec 1837:1849 <> IcachePinwObl
+R1865:1871 xv6iris.RiscvPtsto <> riscvGS class
+R1878:1881 xv6iris.Xv6G <> xv6G class
+R1883:1884 xv6iris.IcachePinwObl <> Σ:1 var
+var  1900:1903 IcachePinwObl ICFG
+R1907:1910 xv6iris.IcacheRef <> icfg class
+var  1926:1928 IcachePinwObl GEN
+R1932:1936 xv6iris.RiscvLang <> GenId class
+var  1952:1953 IcachePinwObl XI
+R1957:1962 xv6iris.TsoCtx <> CurCtx class
+prf 1975:1987 <> iref_read_obl
+R1998:2002 xv6iris.RiscvLang <> CpuId class
+binder 1991:1994 <> CIDw:7
+R2010:2015 xv6iris.RiscvLang <> gstate rec
+binder 2006:2006 <> g:8
+R2023:2025 Corelib.Init.Datatypes <> nat ind
+binder 2019:2019 <> k:9
+R2039:2043 SailStdpp.Values <> mword def
+binder 2035:2035 <> w:10
+R2062:2064 Corelib.Init.Datatypes <> nat ind
+binder 2050:2051 <> lo:11
+binder 2053:2055 <> tst:12
+binder 2057:2058 <> tl:13
+R2087:2094 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2076:2079 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R2074:2075 xv6iris.IcachePinwObl <> lo:11 var
+R2080:2081 xv6iris.IcachePinwObl <> tl:13 var
+R2122:2131 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R2095:2107 xv6iris.RiscvPtsto <> tso_interp_at def
+R2121:2121 xv6iris.IcachePinwObl <> g:8 var
+R2109:2119 xv6iris.RiscvPtsto <> riscv_eraGS meth
+R2165:2174 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R2132:2149 xv6iris.TsoCtx <> own_context def
+R2151:2164 xv6iris.TsoCtx <> cur_ctx def
+R2209:2218 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R2175:2190 xv6iris.TsoCtx <> ctx_floor def
+R2192:2205 xv6iris.TsoCtx <> cur_ctx def
+R2207:2208 xv6iris.IcachePinwObl <> tl:13 var
+R2243:2252 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R2219:2231 xv6iris.IcacheInv <> iref_pin_rows def
+R2233:2233 xv6iris.IcachePinwObl <> k:9 var
+R2235:2235 xv6iris.IcachePinwObl <> w:10 var
+R2237:2238 xv6iris.IcachePinwObl <> lo:11 var
+R2240:2242 xv6iris.IcachePinwObl <> tst:12 var
+R2253:2255 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R2624:2626 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R2256:2262 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R2272:2273 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R2269:2271 Corelib.Init.Datatypes <> nat ind
+binder 2263:2265 <> tvr:14
+R2301:2311 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2289:2292 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R2278:2280 xv6iris.RiscvLang <> gtv proj
+R2275:2275 xv6iris.IcachePinwObl <> g:8 var
+R2283:2288 xv6iris.RiscvLang <> cpu_id def
+R2293:2295 xv6iris.IcachePinwObl <> tvr:14 var
+R2312:2312 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R2435:2447 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R2623:2623 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R2313:2319 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R2332:2343 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R2324:2328 SailStdpp.Values <> mword def
+binder 2320:2320 <> v:15
+R2344:2357 xv6iris.TsoMemPa <> tso_read_bytes def
+R2434:2434 xv6iris.IcachePinwObl <> v:15 var
+R2414:2418 xv6iris.IcacheRef <> i_ref def
+R2421:2426 xv6iris.IcacheRef <> ientry def
+R2428:2428 xv6iris.IcachePinwObl <> k:9 var
+R2397:2399 xv6iris.IcachePinwObl <> tvr:14 var
+R2378:2387 xv6iris.RiscvLang <> hart_agent def
+R2389:2394 xv6iris.RiscvLang <> cpu_id def
+R2371:2374 xv6iris.RiscvLang <> glog proj
+R2368:2368 xv6iris.IcachePinwObl <> g:8 var
+R2362:2365 xv6iris.RiscvLang <> gimg proj
+R2359:2359 xv6iris.IcachePinwObl <> g:8 var
+R2448:2454 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R2467:2481 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R2459:2463 SailStdpp.Values <> mword def
+binder 2455:2455 <> v:16
+R2576:2592 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2482:2495 xv6iris.TsoMemPa <> tso_read_bytes def
+R2575:2575 xv6iris.IcachePinwObl <> v:16 var
+R2555:2559 xv6iris.IcacheRef <> i_ref def
+R2562:2567 xv6iris.IcacheRef <> ientry def
+R2569:2569 xv6iris.IcachePinwObl <> k:9 var
+R2535:2537 xv6iris.IcachePinwObl <> tvr:14 var
+R2516:2525 xv6iris.RiscvLang <> hart_agent def
+R2527:2532 xv6iris.RiscvLang <> cpu_id def
+R2509:2512 xv6iris.RiscvLang <> glog proj
+R2506:2506 xv6iris.IcachePinwObl <> g:8 var
+R2500:2503 xv6iris.RiscvLang <> gimg proj
+R2497:2497 xv6iris.IcachePinwObl <> g:8 var
+R2595:2597 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x_'<'_x not
+R2611:2613 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x_'<'_x not
+R2598:2608 stdpp.bitvector.definitions <> bv_unsigned proj
+R2610:2610 xv6iris.IcachePinwObl <> v:16 var
+R2598:2608 stdpp.bitvector.definitions <> bv_unsigned proj
+R2610:2610 xv6iris.IcachePinwObl <> v:16 var
+R2615:2617 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R2696:2696 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2744:2749 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2760:2760 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2697:2725 xv6iris.TsoCtx <> own_context_floor_view thm
+R2727:2740 xv6iris.TsoCtx <> cur_ctx def
+R2696:2696 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2744:2749 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2760:2760 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2697:2725 xv6iris.TsoCtx <> own_context_floor_view thm
+R2727:2740 xv6iris.TsoCtx <> cur_ctx def
+R2846:2846 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2932:2937 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2943:2943 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2847:2856 xv6iris.TsoGhost <> view_lb_le thm
+R2858:2866 xv6iris.RiscvPtsto <> view_name def
+R2868:2878 xv6iris.RiscvPtsto <> loglen_name def
+R2881:2890 xv6iris.RiscvLang <> hart_agent def
+R2892:2897 xv6iris.RiscvLang <> cpu_id def
+R2846:2846 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2932:2937 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2943:2943 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2847:2856 xv6iris.TsoGhost <> view_lb_le thm
+R2858:2866 xv6iris.RiscvPtsto <> view_name def
+R2868:2878 xv6iris.RiscvPtsto <> loglen_name def
+R2881:2890 xv6iris.RiscvLang <> hart_agent def
+R2892:2897 xv6iris.RiscvLang <> cpu_id def
+R2970:2980 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R2982:2986 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R2994:2995 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 2981:2981 <> j:17
+binder 2981:2981 <> j:18
+R2996:2999 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3007:3016 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3004:3006 Corelib.Init.Datatypes <> nat ind
+binder 3000:3000 <> t:19
+R3017:3039 xv6iris.TsoCtx <> phys_ledger_pinw def
+R3042:3047 xv6iris.RiscvModelBytes <> pa_add def
+R3050:3054 xv6iris.IcacheRef <> i_ref def
+R3057:3062 xv6iris.IcacheRef <> ientry def
+R3068:3068 xv6iris.IcachePinwObl <> j:17 var
+R3072:3079 iris.algebra.dfrac <> DfracOwn constr
+R3095:3102 xv6iris.RiscvModelBytes <> nth_byte def
+R3106:3106 xv6iris.IcachePinwObl <> j:17 var
+R3109:3109 xv6iris.IcachePinwObl <> t:19 var
+R3122:3136 xv6iris.TsoMemPa <> TsPinw constr
+R3139:3143 xv6iris.IcacheRef <> i_ref def
+R3146:3151 xv6iris.IcacheRef <> ientry def
+R3159:3159 xv6iris.IcachePinwObl <> j:17 var
+R3164:3171 xv6iris.IcacheInv <> iref_set def
+R2987:2989 Corelib.Lists.ListDef <> seq def
+R2970:2980 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R2982:2986 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R2994:2995 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 2981:2981 <> j:20
+binder 2981:2981 <> j:21
+R2996:2999 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3007:3016 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3004:3006 Corelib.Init.Datatypes <> nat ind
+binder 3000:3000 <> t:22
+R3017:3039 xv6iris.TsoCtx <> phys_ledger_pinw def
+R3042:3047 xv6iris.RiscvModelBytes <> pa_add def
+R3050:3054 xv6iris.IcacheRef <> i_ref def
+R3057:3062 xv6iris.IcacheRef <> ientry def
+R3068:3068 xv6iris.IcachePinwObl <> j:20 var
+R3072:3079 iris.algebra.dfrac <> DfracOwn constr
+R3095:3102 xv6iris.RiscvModelBytes <> nth_byte def
+R3106:3106 xv6iris.IcachePinwObl <> j:20 var
+R3109:3109 xv6iris.IcachePinwObl <> t:22 var
+R3122:3136 xv6iris.TsoMemPa <> TsPinw constr
+R3139:3143 xv6iris.IcacheRef <> i_ref def
+R3146:3151 xv6iris.IcacheRef <> ientry def
+R3159:3159 xv6iris.IcachePinwObl <> j:20 var
+R3164:3171 xv6iris.IcacheInv <> iref_set def
+R2987:2989 Corelib.Lists.ListDef <> seq def
+R3223:3223 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3237:3242 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3250:3250 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3224:3236 iris.bi.big_op <> big_sepL_mono thm
+R3223:3223 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3237:3242 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3250:3250 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3224:3236 iris.bi.big_op <> big_sepL_mono thm
+R3351:3351 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3467:3489 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3507:3507 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3352:3377 xv6iris.TsoCtx <> ledger_read_pinw_ok thm
+R3445:3452 xv6iris.RiscvModelBytes <> nth_byte def
+R3432:3439 iris.algebra.dfrac <> DfracOwn constr
+R3405:3412 xv6iris.IcacheInv <> iref_set def
+R3382:3386 xv6iris.IcacheRef <> i_ref def
+R3389:3394 xv6iris.IcacheRef <> ientry def
+R3351:3351 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3467:3489 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3507:3507 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3352:3377 xv6iris.TsoCtx <> ledger_read_pinw_ok thm
+R3445:3452 xv6iris.RiscvModelBytes <> nth_byte def
+R3432:3439 iris.algebra.dfrac <> DfracOwn constr
+R3405:3412 xv6iris.IcacheInv <> iref_set def
+R3382:3386 xv6iris.IcacheRef <> i_ref def
+R3389:3394 xv6iris.IcacheRef <> ientry def
+R3685:3689 SailStdpp.Values <> mword def
+R3668:3679 SailStdpp.Values <> mword_of_int def
+R3685:3689 SailStdpp.Values <> mword def
+R3668:3679 SailStdpp.Values <> mword_of_int def
+R3738:3740 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R3738:3740 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R3844:3856 xv6iris.IcacheInv <> iref_set_read thm
+R3844:3856 xv6iris.IcacheInv <> iref_set_read thm
+R3932:3934 Stdlib.NArith.BinNat <> ::N_scope:x_'<'_x not
+R3922:3929 Stdlib.NArith.BinNat N of_nat def
+R3932:3934 Stdlib.NArith.BinNat <> ::N_scope:x_'<'_x not
+R3922:3929 Stdlib.NArith.BinNat N of_nat def
+R4046:4058 xv6iris.IcachePinwObl IcachePinwObl <> sec

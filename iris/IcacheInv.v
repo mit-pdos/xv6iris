@@ -1528,49 +1528,125 @@ Section IcacheRefInv.
   Proof. apply _. Qed.
 
   (* ================================================================== *)
-  (* A6.145: THE PINNED SLOT -- a LIVE slot's custody under the word-set  *)
-  (* pin.  [lo] is the epoch's arm position (the pin floor), [tst] the    *)
-  (* last count store's position; the invariant holds HALF of each        *)
-  (* mono_nat (the other half: [tst]'s rides the itable lock's payload    *)
-  (* under the A6.144 floor row -- the holder's EXACT read; [lo]'s is     *)
-  (* cut into 1/1024 quanta riding each reference's credential -- the     *)
-  (* racy reader's currency agreement).  The four cells are RAW pinw      *)
-  (* ledger bytes: NO context appears, which is the entire point.         *)
+  (* A6.145 4b-iii: THE PINNED SLOT, v2 -- the ratified (g, lo) design.   *)
+  (* The epoch IS the liveness generation: each live slot's row binds ONE *)
+  (* (g, lo) pair across the four pinw ledger bytes (window floor = lo)   *)
+  (* and the liveness arm (the pool residual at [live_genlo _ _ g lo]).   *)
+  (* A reference's floored slice ([IcacheRef.live_fracc], carried by      *)
+  (* every inode_ref/inode_shr) AGREES (g, lo) with the residual on open, *)
+  (* so its ctx floor IS the current epoch's pin floor -- the racy-read   *)
+  (* credential, with no separate currency.  [icfg_ieplo] is superseded   *)
+  (* (kept allocated, unused); [icfg_istmp]'s half stays for the A6.144   *)
+  (* exact-read row on itable.lock's payload.                             *)
   (* ================================================================== *)
-  Definition iref_pin_slot (k : nat) (w : mword 32) : iProp Σ :=
-    (∃ lo tst : nat,
-       mono_nat_auth_own (icfg_ieplo k) (1/2) lo ∗
-       mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
-       [∗ list] j ∈ seq 0 4, ∃ t : nat, ⌜(t <= tst)%nat⌝ ∗
-          TsoCtx.phys_ledger_pinw (pa_add (i_ref (ientry k)) j) (DfracOwn 1)
-            (nth_byte w j) t
-            (TsoMemPa.TsPinw (i_ref (ientry k)) 4 j lo iref_set))%I.
 
-  (* the pinw body: live slots pinned, free slots' cells OUT (they ride
-     the itable lock's payload as plain ctx cells -- the motion rule).
-     NOT yet [itable_body]: the cutover swaps them once the accessor
-     family is green (tso-machine-flip.md A6.145). *)
+  Definition iref_pin_rows (k : nat) (w : mword 32) (lo tst : nat) : iProp Σ :=
+    ([∗ list] j ∈ seq 0 4, ∃ t : nat, ⌜(t <= tst)%nat⌝ ∗
+        TsoCtx.phys_ledger_pinw (pa_add (i_ref (ientry k)) j) (DfracOwn 1)
+          (nth_byte w j) t
+          (TsoMemPa.TsPinw (i_ref (ientry k)) 4 j lo iref_set))%I.
+
+  (* the merged per-slot row: the pin custody AND the liveness arm, one
+     (g, lo) binder over both.  Free slots keep only the liveness unit --
+     their count cells ride itable.lock's payload as plain ctx cells (the
+     motion rule).  The two live sub-arms are [live_norm]/[live_frzn]'s
+     shapes, genlo-ized at the slot's own epoch. *)
+  Definition pinw_slot (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
+    match M !! k with
+    | None =>
+        (∃ (g : gname) (lo : nat),
+           IcacheRef.live_genlo k 1%Qp g lo ∗ frzsel k 1%Qp false)%I
+    | Some (qt, _) =>
+        (∃ (g : gname) (lo tst : nat),
+           mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
+           iref_pin_rows k (iref_word M k) lo tst ∗
+           ((∃ c : Qp, ⌜(1/2 - qt)%Qp = Some c⌝ ∗
+               IcacheRef.live_genlo k c g lo ∗ frzsel k (1/2)%Qp false)
+            ∨ (IcacheRef.live_genlo k 1%Qp g lo ∗ frzsel k (1/2)%Qp true)))%I
+    end.
+
   Definition itable_body_pinw : iProp Σ :=
     (∃ M : gmap nat (Qp * positive),
        itable_half M ∗ ⌜icM_wf M⌝ ∗
-       ([∗ list] k ∈ seq 0 NINODE,
-          match M !! k with
-          | Some _ => iref_pin_slot k (iref_word M k)
-          | None => emp
-          end) ∗
-       live_pool M)%I.
+       [∗ list] k ∈ seq 0 NINODE, pinw_slot M k)%I.
 
-  (* THE CREDENTIAL a reference carries for the racy read: a 1/1024
-     quantum of the slot's epoch auth (auth-fraction agreement with the
-     invariant's half is what proves "my floor IS the current epoch's")
-     plus the floor at it on the CARRIER's context.  ξ-relative only
-     through the floor, which transports ([TsoCtx.ctx_floor_dom]) -- the
-     credential crosses fork beside its reference. *)
-  Definition iref_cred_q : Qp := (1 / pos_to_Qp 1024)%Qp.
+  Definition itable_inv_pinw : iProp Σ := inv icacheN itable_body_pinw.
 
-  Definition iref_cred (k : nat) (lo : nat) : iProp Σ :=
-    (mono_nat_auth_own (icfg_ieplo k) iref_cred_q lo ∗
-     TsoCtx.ctx_floor TsoCtx.cur_ctx lo)%I.
+  Global Instance itable_inv_pinw_persistent : Persistent itable_inv_pinw.
+  Proof. apply _. Qed.
+
+  Lemma pinw_slot_acc (M : gmap nat (Qp * positive)) (k : nat) :
+    (k < NINODE)%nat ->
+    ([∗ list] j ∈ seq 0 NINODE, pinw_slot M j) -∗
+      pinw_slot M k ∗
+      (pinw_slot M k -∗ [∗ list] j ∈ seq 0 NINODE, pinw_slot M j).
+  Proof.
+    intros Hk.
+    iApply (big_sepL_lookup_acc (fun (_ : nat) (j : nat) => pinw_slot M j)
+              (seq 0 NINODE) k k (seq_ninode_lookup k Hk)).
+  Qed.
+
+  (* an outstanding slice finds its slot LIVE and UNFROZEN, and pins the
+     slot's (g, lo) to its own: the free and frozen arms hold the FULL
+     liveness unit, which no outstanding slice can coexist with, and the
+     norm residual agrees by the pair-agree camera.  The residual's
+     subtraction witness comes out AT THE SLOT's [qt] so the opener can
+     reclose the arm it took. *)
+  Lemma pinw_slot_slice (M : gmap nat (Qp * positive)) (k : nat)
+      (s : Qp) (g : gname) (lo : nat) :
+    pinw_slot M k -∗ IcacheRef.live_genlo k s g lo -∗
+    ∃ (qt : Qp) (n : positive) (tst : nat) (c : Qp),
+      ⌜M !! k = Some (qt, n)⌝ ∗ ⌜(1/2 - qt)%Qp = Some c⌝ ∗
+      mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
+      iref_pin_rows k (iref_word M k) lo tst ∗
+      IcacheRef.live_genlo k c g lo ∗ frzsel k (1/2)%Qp false ∗
+      IcacheRef.live_genlo k s g lo.
+  Proof.
+    iIntros "Hslot Hlv". rewrite /pinw_slot.
+    destruct (M !! k) as [[qt n]|] eqn:HMk.
+    - iDestruct "Hslot" as (g0 lo0 tst) "(Hst & Hrows & Harm)".
+      iDestruct "Harm" as "[Harm | [Hfull _]]"; last first.
+      { iDestruct (IcacheRef.live_genlo_bound with "Hfull Hlv") as %Hb.
+        exfalso. exact (Qp.not_add_le_l 1 s Hb). }
+      iDestruct "Harm" as (c) "(%Hc & Hres & Hsel)".
+      iDestruct (IcacheRef.live_genlo_agree with "Hres Hlv") as %[<- <-].
+      iExists qt, n, tst, c.
+      iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+      iFrame "Hst Hrows Hres Hsel Hlv".
+    - iDestruct "Hslot" as (g0 lo0) "[Hfull _]".
+      iDestruct (IcacheRef.live_genlo_bound with "Hfull Hlv") as %Hb.
+      exfalso. exact (Qp.not_add_le_l 1 s Hb).
+  Qed.
+
+  (* THE LOCK-FREE GUARD READ's atomic accessor: a slice-holder opens the
+     invariant, finds its slot pinned AT ITS OWN (g, lo), and borrows the
+     window across the load step ([wp_load_s_sconf_au_rel]'s [Res]).  The
+     bounds on the read value come out of the OBLIGATION side
+     ([IcachePinwObl.iref_read_obl]), not here. *)
+  Lemma iref_load_pinw_au (Eo : coPset) (k : nat) (s : Qp) (g : gname)
+      (lo : nat) :
+    ↑icacheN ⊆ Eo -> (k < NINODE)%nat ->
+    itable_inv_pinw -∗ IcacheRef.live_genlo k s g lo -∗
+    |={Eo, Eo ∖ ↑icacheN}=> ∃ (w : mword 32) (tst : nat),
+      iref_pin_rows k w lo tst ∗
+      (iref_pin_rows k w lo tst ={Eo ∖ ↑icacheN, Eo}=∗
+         IcacheRef.live_genlo k s g lo).
+  Proof.
+    iIntros (HE Hk) "#Hinv Hlv".
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (M) "(>Ha & >%Hwf & >Hrows)".
+    iDestruct (pinw_slot_acc M k Hk with "Hrows") as "[Hslot Hback]".
+    iDestruct (pinw_slot_slice M k s g lo with "Hslot Hlv")
+      as (qt n tst c) "(%HMk & %Hc & Hst & Hpin & Hres & Hsel & Hlv)".
+    iModIntro. iExists (iref_word M k), tst. iFrame "Hpin".
+    iIntros "Hpin".
+    iMod ("Hclose" with "[Ha Hst Hpin Hres Hsel Hback]") as "_".
+    { iNext. iExists M. iFrame "Ha". iSplitR; [iPureIntro; exact Hwf|].
+      iApply "Hback". rewrite /pinw_slot HMk.
+      iExists g, lo, tst. iFrame "Hst Hpin". iLeft.
+      iExists c. iSplitR; [by iPureIntro|]. iFrame "Hres Hsel". }
+    iModIntro. iFrame "Hlv".
+  Qed.
 
   Lemma iref_cells_acc (M : gmap nat (Qp * positive)) (k : nat) :
     (k < NINODE)%nat ->

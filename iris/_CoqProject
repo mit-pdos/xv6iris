@@ -1115,6 +1115,7 @@ ProofWritei.v
 SpecReadi.v
 IrefSlots.v
 IcacheInv.v
+IcachePinwObl.v
 InodeRef.v
 InodeLock.v
 FsImgBridge.v
