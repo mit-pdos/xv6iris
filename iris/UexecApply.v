@@ -438,20 +438,25 @@ Section Apply.
           iApply ("H2" $! fdv').
     - (* the returning arms: the row transports by SS3 *)
       iSplit.
-      + iIntros "H" (r M' pi' szv' fdv' Hmo Hfo).
+      + iIntros "H" (r M' pi' szv' fdv' Hmo Hfo Hpo).
         rewrite -(Hb r M' pi' szv' fdv').
-        iApply ("H" $! r M' pi' szv' fdv' with "[%] [%]").
+        iApply ("H" $! r M' pi' szv' fdv' with "[%] [%] [%]").
         * exact (usys_mem_ok_args _ (uvis_tf W') (uvis_tf W) r _ _ _ _ _ _
                    (eq_sym Ha0) (eq_sym Ha1) (eq_sym Ha2) Hmo).
         * exact (usys_fd_ok_arg_cong _ (uvis_tf W') (uvis_tf W) _ _ _
                    (eq_sym Ha0) Hfo).
-      + iIntros "H" (r M' pi' szv' fdv' Hmo Hfo).
+        (* pipe's join reads a0 too, and by the same congruence *)
+        * exact (usys_pipe_ok_arg_cong _ (uvis_tf W') (uvis_tf W) _ _ _ _ _
+                   (eq_sym Ha0) Hpo).
+      + iIntros "H" (r M' pi' szv' fdv' Hmo Hfo Hpo).
         rewrite (Hb r M' pi' szv' fdv').
-        iApply ("H" $! r M' pi' szv' fdv' with "[%] [%]").
+        iApply ("H" $! r M' pi' szv' fdv' with "[%] [%] [%]").
         * exact (usys_mem_ok_args _ (uvis_tf W) (uvis_tf W') r _ _ _ _ _ _
                    Ha0 Ha1 Ha2 Hmo).
         * exact (usys_fd_ok_arg_cong _ (uvis_tf W) (uvis_tf W') _ _ _
                    Ha0 Hfo).
+        * exact (usys_pipe_ok_arg_cong _ (uvis_tf W) (uvis_tf W') _ _ _ _ _
+                   Ha0 Hpo).
   Qed.
 
   (* THE INSTANCE THE LOOP USES: the key the kernel trapped with and the
@@ -628,11 +633,20 @@ Section LoopApply.
     (sc = uecall_scause ->
        usys_fd_ok (usys_num (uvis_tf (uvis_run W))) (uvis_tf (uvis_run W))
          (uvis_tf W' !!! tf_arg_idx 0) (uvis_fd W) (uvis_fd W')) ->
+    (* ...and PIPE'S JOIN, forwarded on the same arm and read at the same
+       two words.  The images are the key's own, before and after -- which
+       is what makes this statable here at all: [uvis] carries the image,
+       so the u-tier can say the bytes pipe wrote name the slots it
+       opened.  See [UsysMemOk.v]'s SS2c. *)
+    (sc = uecall_scause ->
+       usys_pipe_ok (usys_num (uvis_tf (uvis_run W))) (uvis_tf (uvis_run W))
+         (uvis_tf W' !!! tf_arg_idx 0) (uvis_M W) (uvis_M W')
+         (uvis_fd W) (uvis_fd W')) ->
     uround_ok sc (uvis_tf (uvis_run W)) (uvis_M W) (uvis_perm W) (uvis_sz W)
       (uvis_tf W') (uvis_M W') (uvis_perm W') (uvis_sz W') ->
     (∀ W'' : uvis, uslot W'') -∗ uexec_ret sc W -∗ uslot W'.
   Proof.
-    intros Hl Hfd Hfdrow Hr.
+    intros Hl Hfd Hfdrow Hpiperow Hr.
     iIntros "Hmk Hret".
     (* STEP A: the trapped key and its run projection are the same key *)
     iEval (rewrite (uexec_ret_run sc W Hl)) in "Hret".
@@ -687,8 +701,9 @@ Section LoopApply.
                               (bump_tf (uvis_tf (uvis_run W)) r))
                            (bump_tf_a0 (uvis_tf (uvis_run W)) r Hla)))). }
           iDestruct ("Hret" $! r (uvis_M W') (uvis_perm W') (uvis_sz W')
-                       (uvis_fd W') with "[%] [%]") as "Hs";
-            [ exact Hm | rewrite <- Ha0; exact (Hfdrow Hec) | ].
+                       (uvis_fd W') with "[%] [%] [%]") as "Hs";
+            [ exact Hm | rewrite <- Ha0; exact (Hfdrow Hec)
+            | rewrite <- Ha0; exact (Hpiperow Hec) | ].
           assert (Hp1 : tf_resume_pc (bump_tf (uvis_tf (uvis_run W)) r)
                         = tf_resume_pc (uvis_tf W')).
           { rewrite (tf_resume_pc_bump (uvis_tf (uvis_run W)) r Hle).
@@ -735,6 +750,11 @@ Section LoopApply.
     (sc = uecall_scause ->
        usys_fd_ok (usys_num (tf_of g (ret_pc sepc_v))) (tf_of g (ret_pc sepc_v))
          (pv_tf (us_V U') !!! tf_arg_idx 0) (uvis_fd W) fdv') ->
+    (* ...and pipe's join, forwarded verbatim beside it *)
+    (sc = uecall_scause ->
+       usys_pipe_ok (usys_num (tf_of g (ret_pc sepc_v))) (tf_of g (ret_pc sepc_v))
+         (pv_tf (us_V U') !!! tf_arg_idx 0) (uvis_M W) (us_M U')
+         (uvis_fd W) fdv') ->
     uround_ok sc (tf_of g (ret_pc sepc_v)) (uvis_M W) (uvis_perm W) (uvis_sz W)
       (pv_tf (us_V U')) (us_M U')
       (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
@@ -742,8 +762,9 @@ Section LoopApply.
     (∀ W'' : uvis, uslot W'') -∗ uexec_ret sc W -∗
     uslot (uvis_of U' fdv').
   Proof.
-    intros Hl -> -> Hfd Hfdrow Hr.
-    exact (uexec_ret_round_slot sc W (uvis_of U' fdv') Hl Hfd Hfdrow Hr).
+    intros Hl -> -> Hfd Hfdrow Hpiperow Hr.
+    exact (uexec_ret_round_slot sc W (uvis_of U' fdv') Hl Hfd Hfdrow
+             Hpiperow Hr).
   Qed.
 
   (* ------------------------------------------------------------------ *)

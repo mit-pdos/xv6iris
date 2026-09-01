@@ -306,6 +306,47 @@ Lemma ut_fd_ecall_out (sc_v : mword 64) (tf tf1 tf2 : list (mword 64))
   ut_fd_ecall sc_v tf tf1 sts sts' -> ut_fd_ecall sc_v tf tf2 sts sts'.
 Proof. intros He H Hc. rewrite <- He. exact (H Hc). Qed.
 
+(* ...AND PIPE'S JOIN, carried out of the ecall arm beside the row above.
+   [ut_fd_ecall] says pipe opened two free slots and [ut_round]'s image half
+   says it wrote up to eight bytes at a0; ONLY THIS says the bytes name the
+   slots, which is the whole of pipe() to the program that called it.  Same
+   two trapframes, read at the same two words, so the two travel together
+   and cross the prologue's epc rewrite by the same lemma
+   ([UsysMemOk.usys_pipe_ok_epc]).  See [UsysMemOk.v]'s SS2c. *)
+Definition ut_pipe_ecall (sc_v : mword 64) (tf tf' : list (mword 64))
+    (M M' : gmap Z (bv 8)) (sts sts' : list fdstate) : Prop :=
+  sc_v = uecall_scause ->
+  UsysMemOk.usys_pipe_ok (UsysMemOk.usys_num tf) tf
+    (tf' !!! tf_arg_idx 0) M M' sts sts'.
+
+(* the two congruences, in the shapes [ut_fd_ecall] has them: the entry
+   frame at a7 and a0, the outgoing frame at a0. *)
+Lemma ut_pipe_ecall_in (sc_v : mword 64) (tf1 tf2 tf' : list (mword 64))
+    (M M' : gmap Z (bv 8)) (sts sts' : list fdstate) :
+  tf1 !!! tf_arg_idx 7 = tf2 !!! tf_arg_idx 7 ->
+  tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
+  ut_pipe_ecall sc_v tf1 tf' M M' sts sts' ->
+  ut_pipe_ecall sc_v tf2 tf' M M' sts sts'.
+Proof.
+  intros H7 H0 H Hc.
+  rewrite <- (UsysMemOk.usys_num_arg_cong _ _ H7).
+  exact (UsysMemOk.usys_pipe_ok_arg_cong _ tf1 tf2 _ _ _ _ _ H0 (H Hc)).
+Qed.
+
+Lemma ut_pipe_ecall_out (sc_v : mword 64) (tf tf1 tf2 : list (mword 64))
+    (M M' : gmap Z (bv 8)) (sts sts' : list fdstate) :
+  tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
+  ut_pipe_ecall sc_v tf tf1 M M' sts sts' ->
+  ut_pipe_ecall sc_v tf tf2 M M' sts sts'.
+Proof. intros He H Hc. rewrite <- He. exact (H Hc). Qed.
+
+(* the quiet reading, for the four non-ecall causes: they never reach the
+   dispatch, so the guard is unreachable through [sc_v]. *)
+Lemma ut_pipe_ecall_quiet (sc_v : mword 64) (tf tf' : list (mword 64))
+    (M M' : gmap Z (bv 8)) (sts sts' : list fdstate) :
+  sc_v <> uecall_scause -> ut_pipe_ecall sc_v tf tf' M M' sts sts'.
+Proof. intros Hne Hc. contradiction (Hne Hc). Qed.
+
 (* THE PROLOGUE'S OWN MOVE: [U'] is [U] with the epc word rewritten, which
    is what usertrap's +0x28..+0x2e block does and all it does.  Every block
    below the entry carries this (or the round it grows into) as a premise. *)
@@ -407,6 +448,9 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
        did. *)
     ⌜ut_fd_kept sc_v sts sts'⌝ -∗
     ⌜ut_fd_ecall sc_v (pv_tf (us_V U)) (pv_tf (us_V U')) sts sts'⌝ -∗
+    (* ...and pipe's join, off the same pair -- see [ut_pipe_ecall] *)
+    ⌜ut_pipe_ecall sc_v (pv_tf (us_V U)) (pv_tf (us_V U'))
+                   (us_M U) (us_M U') sts sts'⌝ -∗
     ⌜ret_pc uepc = tf_resume_pc (pv_tf (us_V U'))⌝ -∗
     (* [mideleg]'s VALUE is not pinned to whatever usertrap was handed at
        entry -- unlike [mie_v]/[menvcfg0] (each a unique architectural

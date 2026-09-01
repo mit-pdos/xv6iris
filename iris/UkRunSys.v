@@ -43,6 +43,7 @@ Require Import UserPerm.    (* [uperm] -- the row's permission-map argument *)
 Require Import UserPtTree.  (* [umem_wr] / [umem_write] -- the window's image *)
 Require Import UserBits.    (* [uint_add_vec_int_small] -- the window's no-wrap *)
 Require Import RiscvExtras. (* [uint_unsigned] *)
+Require Import RiscvModelBytes. (* [nth_byte] -- pipe's two reported words *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
@@ -387,7 +388,7 @@ Section UkRunSys.
        and has nowhere to say it.  Named and discarded here; the leaves that
        will read it are open/close/dup, once [urun] carries the program's
        own descriptor authority. *)
-    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok %Hpiperow".
     destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _ Hexec Hsbrk H3 H4 H5 H8 Hok)
       as [-> [-> ->]].
     (* ...AND THE TABLE DID NOT MOVE.  This is the row being READ rather
@@ -470,7 +471,7 @@ Section UkRunSys.
       [ exfalso; vm_compute in He; discriminate | ].
     destruct (decide (USYS_open = USYS_fork)) as [He | _];
       [ exfalso; vm_compute in He; discriminate | ].
-    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok %Hpiperow".
     (* the IMAGE half is the quiet row: open touches no user byte *)
     destruct (usys_mem_ok_quiet USYS_open _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
@@ -567,7 +568,7 @@ Section UkRunSys.
       [ exfalso; vm_compute in He; discriminate | ].
     destruct (decide (USYS_dup = USYS_fork)) as [He | _];
       [ exfalso; vm_compute in He; discriminate | ].
-    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok %Hpiperow".
     destruct (usys_mem_ok_quiet USYS_dup _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
@@ -652,7 +653,7 @@ Section UkRunSys.
       [ exfalso; vm_compute in He; discriminate | ].
     destruct (decide (USYS_dup = USYS_fork)) as [He | _];
       [ exfalso; vm_compute in He; discriminate | ].
-    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok %Hpiperow".
     destruct (usys_mem_ok_quiet USYS_dup _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
@@ -731,7 +732,7 @@ Section UkRunSys.
       [ exfalso; vm_compute in He; discriminate | ].
     destruct (decide (USYS_close = USYS_fork)) as [He | _];
       [ exfalso; vm_compute in He; discriminate | ].
-    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok %Hpiperow".
     destruct (usys_mem_ok_quiet USYS_close _ r _ _ _ _ _ _
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
@@ -828,7 +829,7 @@ Section UkRunSys.
       [ exfalso; vm_compute in He; discriminate | ].
     destruct (decide (USYS_read = USYS_fork)) as [He | _];
       [ exfalso; vm_compute in He; discriminate | ].
-    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok %Hpiperow".
     (* unfold the row down to its read arm *)
     unfold usys_mem_ok in Hok.
     destruct (decide (USYS_read = USYS_exec)) as [He | _];
@@ -934,7 +935,7 @@ Section UkRunSys.
       [ exfalso; unfold USYS_exec, USYS_exit in He; discriminate He | ].
     destruct (decide (USYS_exec = USYS_fork)) as [He | _];
       [ exfalso; unfold USYS_exec, USYS_fork in He; discriminate He | ].
-    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok %Hpiperow".
     destruct (usys_mem_ok_exec_row USYS_exec _ r _ _ _ _ _ _ eq_refl Hok)
       as [-> [-> [-> ->]]].
     cbn [uvis_M uvis_perm uvis_of_run].
@@ -997,7 +998,7 @@ Section UkRunSys.
       [ exfalso; unfold USYS_wait, USYS_exit in He; discriminate He | ].
     destruct (decide (USYS_wait = USYS_fork)) as [He | _];
       [ exfalso; unfold USYS_wait, USYS_fork in He; discriminate He | ].
-    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok %Hpiperow".
     destruct (usys_mem_ok_wait_null USYS_wait _ r _ _ _ _ _ _
                 eq_refl Ha0 Hok) as [-> [-> ->]].
     cbn [uvis_M uvis_perm uvis_of_run].
@@ -1110,7 +1111,7 @@ Section UkRunSys.
     rewrite Hnum. cbv zeta.
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
     destruct (decide (n = USYS_fork)) as [He | _]; [ exfalso; exact (Hfork He) | ].
-    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok %Hpiperow".
     destruct (usys_mem_ok_window n _ r _ _ _ _ _ _ dst cap Hw Hok)
       as ((d & bs & Hdcap & HM') & -> & ->).
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run] in HM' |- *.
@@ -1159,6 +1160,240 @@ Section UkRunSys.
       [ iIntros (h'') "Hrun";
         iApply ("Hcont" $! h'' r d g with "[%] [%] Hrun Hbuf");
         [ exact Hdcap | intros j Hj; apply Hgf; lia ] | ].
+    iApply ("Hkc" $! h' xi' C' pt' Rfd' Rut' with "[%] [%] Hb'");
+      [ exact Hlo' | exact Hpm' ].
+  Qed.
+
+
+  (* ------------------------------------------------------------------- *)
+  (* ecall, at PIPE -- the one entry that is BOTH a window call and a      *)
+  (* descriptor call, and the reason the joined row exists.                *)
+  (*                                                                       *)
+  (* Every other allocating entry reports its descriptor in a0, where the  *)
+  (* bump puts it and [wp_uk_ecall_open] can simply read it off.  pipe     *)
+  (* returns 0 and reports its TWO descriptors by writing them into the    *)
+  (* caller's [int fd[2]] -- so a leaf built out of [usys_mem_ok] and      *)
+  (* [usys_fd_ok] alone would hand back eight bytes of unknown content     *)
+  (* beside two handles for unknown slots, and a caller could never close  *)
+  (* what it was given.  [UsysMemOk.usys_pipe_ok] is the row that ties the *)
+  (* two, and this leaf is where the tie is spent: the bytes the caller    *)
+  (* reads back ARE the two descriptors it holds handles for.              *)
+  (*                                                                       *)
+  (* THE BUFFER IS A PRECONDITION, exactly as in [wp_uk_ecall_window]: a   *)
+  (* caller owns the eight bytes at a0 going in and gets them back written.*)
+  (* The no-wrap fact is again off the ownership, not off a premise.       *)
+  (*                                                                       *)
+  (* ON FAILURE nothing is promised about the buffer.  The image row lets  *)
+  (* pipe write up to eight bytes unconditionally, and the joined row is   *)
+  (* guarded on [uint r = 0], so a failed call may legitimately have       *)
+  (* scribbled -- the caller gets its run back at an arbitrary [g] and no  *)
+  (* handles.  That is what the kernel actually promises.                  *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uk_ecall_pipe (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+      (pc : mword 64) (f : nat -> bv 8) (avail : nat) :
+    usysno m = USYS_pipe ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is γt pc false (ECALL tt) -∗
+    urun γt γd γs γfd h m pc avail -∗
+    ubytes γd (uint (m !!! Regidx (mword_of_int 10))) 8 f -∗
+    (∀ (h' : CpuId) (r : mword 64) (g : nat -> bv 8),
+       ((∃ a b : nat,
+           (* the two slots, their bound (so the caller can read either
+              back as a C [int] and feed it to close), and -- the point of
+              the whole row -- that the eight bytes it just got back SPELL
+              them, read end first *)
+           ⌜ uint r = 0 /\ a <> b /\ (a < NOFILE)%nat /\ (b < NOFILE)%nat
+             /\ (forall i : nat, (i < 8)%nat ->
+                   g i = if (i <? 4)%nat
+                         then nth_byte
+                                (trunc32 (mword_of_int (Z.of_nat a) : mword 64)) i
+                         else nth_byte
+                                (trunc32 (mword_of_int (Z.of_nat b) : mword 64))
+                                (i - 4)%nat) ⌝ ∗
+           ufd γfd a (FdOpen true false FdPipe) ∗
+           ufd γfd b (FdOpen false true FdPipe))
+        ∨ ⌜ uint r <> 0 ⌝) -∗
+       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       ubytes γd (uint (m !!! Regidx (mword_of_int 10))) 8 g -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hn Hal4.
+    set (dst := m !!! Regidx (mword_of_int 10)).
+    iIntros "#Hi Hrun Hbuf Hcont".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
+    iDestruct (uheap_ubytes_run γt γd γs M pm (DfracOwn 1) (uint dst) 8 f
+                 with "Hheap Hbuf") as %Hbnd.
+    assert (Hlin : forall i : nat, (i < 8)%nat ->
+              uint (add_vec_int dst (Z.of_nat i)) = (uint dst + Z.of_nat i)%Z).
+    { intros i Hi. destruct (Hbnd i Hi) as [_ Hc].
+      change (2 ^ 38) with 274877906944 in Hc.
+      rewrite !uint_unsigned in Hc |- *.
+      apply uint_add_vec_int_small; lia. }
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm M m pc fdv Hui
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s pc ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hp Hc)
+              with "Hb").
+    rewrite (uexec_ret_ecall _ _ eq_refl).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv)) = USYS_pipe).
+    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hw : usys_win USYS_pipe (uvis_tf (uvis_of_run m pc M pm sz fdv))
+                 = Some (dst, 8%nat)).
+    { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of.
+      unfold usyswin.
+      destruct (decide (USYS_pipe = USYS_wait)) as [Hc | _];
+        [ exfalso; vm_compute in Hc; discriminate | ].
+      destruct (decide (USYS_pipe = USYS_pipe)) as [_ | Hc];
+        [ reflexivity | exfalso; exact (Hc eq_refl) ]. }
+    (* the row reads a0 at the trapframe; the buffer is owned at the
+       REGISTER's spelling.  They are the same word. *)
+    assert (Ha0 : uvis_tf (uvis_of_run m pc M pm sz fdv) !!! tf_arg_idx 0 = dst)
+      by (cbn [uvis_tf uvis_of_run]; reflexivity).
+    rewrite Hnum. cbv zeta.
+    destruct (decide (USYS_pipe = USYS_exit)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    destruct (decide (USYS_pipe = USYS_fork)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok %Hpiperow".
+    destruct (usys_mem_ok_window USYS_pipe _ r _ _ _ _ _ _ dst 8%nat Hw Hok)
+      as ((d & bs & Hdcap & HM') & -> & ->).
+    cbn [uvis_M uvis_perm uvis_sz uvis_fd uvis_of_run] in HM', Hfdok, Hpiperow |- *.
+    (* ---- THE JOIN, AS ONE PURE FACT.  Both branches end at the same
+           shape -- a written prefix, the caller's own bytes above it, and
+           a statement about where the descriptors went -- so the tail
+           below is written once. ---- *)
+    assert (Hjoin : exists (dd : nat) (gg : nat -> bv 8),
+              (dd <= 8)%nat /\
+              M' = umem_wr M dst dd gg /\
+              (forall j : nat, (dd <= j < 8)%nat -> gg j = f j) /\
+              (uint r = 0 ->
+                 exists a b : nat,
+                   a <> b /\
+                   fdv !! a = Some FdClosed /\ fdv !! b = Some FdClosed /\
+                   fdv' = <[a := FdOpen true false FdPipe]>
+                            (<[b := FdOpen false true FdPipe]> fdv) /\
+                   (forall i : nat, (i < 8)%nat ->
+                      gg i = if (i <? 4)%nat
+                             then nth_byte
+                                    (trunc32 (mword_of_int (Z.of_nat a) : mword 64)) i
+                             else nth_byte
+                                    (trunc32 (mword_of_int (Z.of_nat b) : mword 64))
+                                    (i - 4)%nat)) /\
+              (uint r <> 0 -> fdv' = fdv)).
+    { destruct (decide (uint r = 0)) as [Hr0 | Hr0].
+      - (* SUCCESS: the joined row pins the image on the nose -- all eight
+           bytes, from the naming function -- so it, not the window row, is
+           what the tail runs on.  The window row's own [d]/[bs] are
+           discarded here: two descriptions of one map, and this is the
+           informative one. *)
+        destruct (Hpiperow eq_refl Hr0)
+          as (a & b & bs2 & Hne & Hca & Hcb & HM2 & Hbytes & Hfdv').
+        exists 8%nat, bs2.
+        split_and!;
+          [ lia
+          | rewrite HM2 Ha0; reflexivity
+          | intros j Hj; exfalso; lia
+          | intros _; exists a, b; split_and!;
+              [ exact Hne | exact Hca | exact Hcb | exact Hfdv' | exact Hbytes ]
+          | intros Hc; exfalso; exact (Hc Hr0) ].
+      - (* FAILURE: nothing is claimed about the descriptors beyond "they
+           did not move", which is the fd row's own else-branch, and the
+           buffer comes back at the window join. *)
+        exists d, (fun j => if decide (j < d)%nat then bs j else f j).
+        split_and!.
+        + exact Hdcap.
+        + rewrite HM'. apply (umem_wr_ext M dst d bs).
+          intros i Hi. case_decide as Hc; [ reflexivity | exfalso; lia ].
+        + intros j Hj. case_decide as Hc; [ exfalso; lia | reflexivity ].
+        + intros Hc; exfalso; exact (Hr0 Hc).
+        + intros _. unfold usys_fd_ok in Hfdok.
+          destruct (decide (USYS_pipe = USYS_close)) as [Hc | _];
+            [ discriminate Hc | ].
+          destruct (decide (USYS_pipe = USYS_dup)) as [Hc | _];
+            [ discriminate Hc | ].
+          destruct (decide (USYS_pipe = USYS_open)) as [Hc | _];
+            [ discriminate Hc | ].
+          destruct (decide (USYS_pipe = USYS_pipe)) as [_ | Hc];
+            [ | exfalso; exact (Hc eq_refl) ].
+          destruct (decide (uint r = 0)) as [Hc | _];
+            [ exfalso; exact (Hr0 Hc) | exact Hfdok ]. }
+    destruct Hjoin as (dd & gg & Hdd8 & HMj & Hgf & Hsucc & Hfail).
+    rewrite (umem_wr_write M dst dd gg
+               ltac:(intros i Hi; apply Hlin; lia)) in HMj.
+    (* the window row's own description of [M'] is the weaker of the two and
+       has served its purpose (it is where [d] came from); dropping it is
+       what lets [subst] pick the joined one. *)
+    clear HM'. subst M'.
+    rewrite (uslot_bump_run m pc M (umem_write M (uint dst) dd gg) pm pm sz sz
+               fdv fdv' r Hx0 Hal4).
+    rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' Hb'".
+    iEval (rewrite (ubytes_split γd (uint dst) dd 8 f Hdd8)) in "Hbuf".
+    iDestruct "Hbuf" as "[Hblo Hbhi]".
+    iMod (uheap_store_run γt γd γs M pm (uint dst) dd f gg with "Hheap Hblo")
+      as "[Hheap Hblo]".
+    (* hoisted out of argument position: the tail bound [j < 8 - dd] is what
+       [Hgf] needs and an [ltac:] there would be run before it is in scope
+       (claude-notes/optimization.md, "Inline [ltac:]"). *)
+    assert (Htail : forall j : nat, (j < 8 - dd)%nat ->
+              f (dd + j)%nat = gg (dd + j)%nat)
+      by (intros j Hj; symmetry; apply Hgf; lia).
+    iDestruct (ubytes_ext γd (uint dst + Z.of_nat dd) (8 - dd)
+                 (fun j => f (dd + j)%nat) (fun j => gg (dd + j)%nat)
+                 Htail with "Hbhi")
+      as "Hbhi".
+    iAssert (ubytes γd (uint dst) 8 gg) with "[Hblo Hbhi]" as "Hbuf".
+    { rewrite (ubytes_split γd (uint dst) dd 8 gg Hdd8). iFrame "Hblo Hbhi". }
+    (* ---- THE AUTHORITY MOVES TO [fdv'], and on success it pays out the
+           two handles.  [b]'s end is installed first so that [a] is still
+           free when its own insert runs -- the two are distinct, which is
+           what the row promises. ---- *)
+    iAssert (|==> ufd_auth γfd fdv' ∗
+              ((∃ a b : nat,
+                  ⌜ uint r = 0 /\ a <> b /\ (a < NOFILE)%nat /\ (b < NOFILE)%nat
+                    /\ (forall i : nat, (i < 8)%nat ->
+                          gg i = if (i <? 4)%nat
+                                 then nth_byte
+                                        (trunc32 (mword_of_int (Z.of_nat a) : mword 64)) i
+                                 else nth_byte
+                                        (trunc32 (mword_of_int (Z.of_nat b) : mword 64))
+                                        (i - 4)%nat) ⌝ ∗
+                  ufd γfd a (FdOpen true false FdPipe) ∗
+                  ufd γfd b (FdOpen false true FdPipe))
+               ∨ ⌜ uint r <> 0 ⌝))%I with "[Hufd]" as ">[Hufd Hhs]".
+    { destruct (decide (uint r = 0)) as [Hr0 | Hr0].
+      - destruct (Hsucc Hr0) as (a & b & Hne & Hca & Hcb & Hfdv' & Hbytes).
+        iMod (ufd_open γfd fdv b (FdOpen false true FdPipe) Hcb
+                ltac:(discriminate) with "Hufd") as "[Hufd Hhb]".
+        assert (Hca' : <[b := FdOpen false true FdPipe]> fdv !! a
+                       = Some FdClosed)
+          by (rewrite list_lookup_insert_ne;
+              [ exact Hca | exact (not_eq_sym Hne) ]).
+        iMod (ufd_open γfd (<[b := FdOpen false true FdPipe]> fdv) a
+                (FdOpen true false FdPipe) Hca' ltac:(discriminate)
+                with "Hufd") as "[Hufd Hha]".
+        rewrite <- Hfdv'. iModIntro. iFrame "Hufd".
+        iLeft. iExists a, b. iFrame "Hha Hhb". iPureIntro.
+        split_and!;
+          [ exact Hr0 | exact Hne
+          | rewrite <- Hfdlen; exact (lookup_lt_Some _ _ _ Hca)
+          | rewrite <- Hfdlen; exact (lookup_lt_Some _ _ _ Hcb)
+          | exact Hbytes ].
+      - rewrite (Hfail Hr0). iModIntro. iFrame "Hufd".
+        iRight. iPureIntro. exact Hr0. }
+    iDestruct (urun_close_upd γt γd γs γfd (umem_write M (uint dst) dd gg) pm m
+                 (mword_of_int 10) r sz fdv' (add_vec_int pc 4) avail
+                 ltac:(unfold unot_sp; vm_compute; discriminate)
+                 with "Hheap Hstk Hufd [Hcont Hbuf Hhs]") as "Hkc";
+      [ iIntros (h'') "Hrun";
+        iApply ("Hcont" $! h'' r gg with "Hhs Hrun Hbuf") | ].
     iApply ("Hkc" $! h' xi' C' pt' Rfd' Rut' with "[%] [%] Hb'");
       [ exact Hlo' | exact Hpm' ].
   Qed.

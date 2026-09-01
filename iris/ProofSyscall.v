@@ -1600,6 +1600,9 @@ Section SyscallVocab.
            construction.  [UsysMemOk.usys_fd_ok] is the table this reads. *)
         ⌜ sysc_fd_ok (us_V U)
                      (pv_tf (us_V U') !!! tf_arg_idx 0) sts sts' ⌝ -∗
+        (* ...and pipe's two rows joined -- see [SpecSyscall.sysc_pipe_ok] *)
+        ⌜ sysc_pipe_ok (us_V U) (us_M U) (us_M U')
+                       (pv_tf (us_V U') !!! tf_arg_idx 0) sts sts' ⌝ -∗
         (* ...and THIS ARM RETURNED, exactly as [SpecSyscall]'s post says
            it: [sysc_mem_ok] cannot rule [exit] out (exit is in its quiet
            row), and the user-execution contract hands back nothing at
@@ -1781,6 +1784,9 @@ Section SyscallVocab.
        stored it there, and the epilogue restores registers and touches no
        trapframe, so it carries the row unchanged. *)
     sysc_fd_ok (us_V U) (pv_tf (us_V U') !!! tf_arg_idx 0) sts sts' ->
+    (* ...and pipe's joined row, carried the same way *)
+    sysc_pipe_ok (us_V U) (us_M U) (us_M U')
+                 (pv_tf (us_V U') !!! tf_arg_idx 0) sts sts' ->
     (* ...and the resume record -- [sysc_hcont_ty]'s three new clauses, in
        the same order.  The a0 clause arrives here ALREADY COMPOSED with the
        [sd a0,112(s2)] store: [sysc_ret_tail] (and the printk fallback) is
@@ -1817,7 +1823,7 @@ Section SyscallVocab.
     sysc_hcont_ty γf pj fn dqi ip pid U sts lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp Hrest Hav4 Hmem Hfdrow Ha0 Hupte Hszv Hud Hfg Hne2.
+    intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hne2.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont".
     assert (Hb1 : pa_stk sp0 1 = add_vec (pa_stk sp0 4) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))))
@@ -1964,7 +1970,7 @@ Section SyscallVocab.
               (Hst3 (or_intror Hgood)) (Hst2 (or_intror Hgood)) (Hst1 (or_intror Hgood)).
       reflexivity. }
     iApply ("Hcont" $! T5 U' sts'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc").
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc").
     { unfold callee_saved.
       split_and!.
       - exact HT5sp.
@@ -1984,6 +1990,7 @@ Section SyscallVocab.
     (* the descriptor row, beside the image's -- the ARM established it and
        the epilogue only carries it *)
     { exact Hfdrow. }
+    { exact Hpiperow. }
     { exact Hne2. }
     { exact Ha0. }
     { exact Hupte. }
@@ -2480,6 +2487,8 @@ Section SyscallRet.
     sysc_mem_ok (us_V U) (us_V U') (us_M U) (us_M U') ->
     (* ...and which descriptors moved *)
     sysc_fd_ok (us_V U) (E !!! Regidx (mword_of_int 10 : mword 5)) sts sts' ->
+    sysc_pipe_ok (us_V U) (us_M U) (us_M U')
+                 (E !!! Regidx (mword_of_int 10 : mword 5)) sts sts' ->
     (* ...and the resume record.  The a0 clause is the IMMOBILITY of the
        trapframe here -- the [sd a0,112(s2)] at +0x3a below is what turns it
        into the insert form [sysc_epilogue_tail] (and [sysc_hcont_ty]) want,
@@ -2515,7 +2524,7 @@ Section SyscallRet.
     sysc_hcont_ty γf pj fn dqi ip pid U sts lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Ha0 Hupte Hszv Hud Hfg Hne2.
+    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hne2.
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont".
     set (tfp := ud_tfp (pv_upt (us_V U'))).
     (* the trapframe page, opened for WRITING out of [proc_priv] *)
@@ -2550,6 +2559,12 @@ Section SyscallRet.
               sts sts').
     { rewrite list_lookup_total_insert; [| exact Hi14].
       rgne. exact Hfdrow. }
+    (* ...and pipe's joined row makes the same move, for the same reason *)
+    assert (Hpipestored : sysc_pipe_ok (us_V U) (us_M U) (us_M U')
+              (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U')) !!! tf_arg_idx 0)
+              sts sts').
+    { rewrite list_lookup_total_insert; [| exact Hi14].
+      rgne. exact Hpiperow. }
     assert (Hp3e : add_vec_int (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64) 4
                    = mword_of_int (KernelSyms.syscall + 0x3e)) by pcw.
     iEval (rewrite Hp3e) in "Hpc".
@@ -2583,7 +2598,7 @@ Section SyscallRet.
                  and the only reading a caller with no register file can
                  compose against.  The [sd] just executed is what makes the
                  two the same word, and this is the one line that says so. *)
-              Hstored
+              Hstored Hpipestored
               (* THE A0 STORE, COMPOSED.  [Ha0] says the dispatch left
                  [pv_tf] alone; the [sd] just executed is the insert, so the
                  witness is the word that was stored. *)
@@ -2830,6 +2845,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
@@ -3031,6 +3048,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; left; rewrite Hnum; reflexivity)
               ltac:(right; left; rewrite Hnum; reflexivity)
@@ -3116,6 +3135,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hext)
               ltac:(right; right; reflexivity)
@@ -3194,6 +3215,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
@@ -3266,6 +3289,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
@@ -3338,6 +3363,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
@@ -3491,6 +3518,7 @@ Section SyscallArms.
               (* dup DOES move the table, so its row is the real one, off the
                  arm's own post rather than the identity *)
               Hfdrow
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
@@ -3583,6 +3611,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
@@ -3745,6 +3775,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(left; rewrite Hnum; reflexivity)
               ltac:(left; rewrite Hnum; reflexivity)
               ltac:(left; rewrite Hnum; reflexivity)
@@ -3912,6 +3944,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
@@ -4039,6 +4073,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
@@ -4142,6 +4178,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
@@ -4229,6 +4267,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
@@ -4341,6 +4381,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
@@ -4449,6 +4491,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
@@ -4543,6 +4587,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
@@ -4666,6 +4712,7 @@ Section SyscallArms.
                  (sysc_num_ne12 _ _ Hnum eq_refl))
               (* close DOES move the table, so its row is the real one *)
               Hfdrow
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
@@ -4777,9 +4824,16 @@ Section SyscallArms.
                ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
                ⌜sysc_fd_ok (us_V U) (mf !!! Regidx (mword_of_int 10 : mword 5))
                            sts sts'⌝ ∗
+               (* ...and pipe's JOINED row: the two descriptors it opened
+                  are the two words it wrote.  Built here, where the arm
+                  still has [fd0]/[fd1] and the copied-out bytes. *)
+               ⌜sysc_pipe_ok (us_V U) (us_M U) M'
+                             (mf !!! Regidx (mword_of_int 10 : mword 5))
+                             sts sts'⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' M') ∗
                fd_frags (pv_fdg (us_V U)) sts')%I with "[Hpv]" as
-      (V' sts') "(%Htfp' & %Hfg' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag)".
+      (V' sts') "(%Htfp' & %Hfg' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow
+                  & %Hpiperow & Hpriv & Hufrag)".
     { rewrite /sysc_fd_ok /usys_fd_ok Hnum.
       destruct (decide (4 = USYS_close)) as [Hcc | _]; [discriminate Hcc |].
       destruct (decide (4 = USYS_dup)) as [Hcd | _]; [discriminate Hcd |].
@@ -4790,15 +4844,18 @@ Section SyscallArms.
           | (%fd0 & %fd1 & %l & %k0 & %k1 &
              (%Hr & %Hfl & %Hne & %Hcl0 & %Hcl1 & %Hd8 & %Hbytes) & Hpv & Hb)]".
       - iExists (upd_upt (us_V U) P'), sts. iFrame "Hpv Hb". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Huptz | reflexivity |].
-        rewrite decide_False; [reflexivity |].
-        rewrite Hr. vm_compute. discriminate.
+        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Huptz | reflexivity | |].
+        { rewrite decide_False; [reflexivity |].
+          rewrite Hr. vm_compute. discriminate. }
+        (* a failed pipe returned -1, so the joined row's [uint r = 0]
+           premise is refuted and it owes nothing *)
+        intros _ Hz. exfalso. rewrite Hr in Hz. vm_compute in Hz. discriminate.
       - iExists (upd_ofile (upd_ofile (upd_upt (us_V U) P') fd0 (fnode k0)) fd1 (fnode k1)),
                 (<[fd1 := FdOpen false true FdPipe]>
                    (<[fd0 := FdOpen true false FdPipe]> sts)).
         iFrame "Hpv Hb". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Huptz | reflexivity |].
-        rewrite decide_True; [| rewrite Hr; vm_compute; reflexivity].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Huptz | reflexivity | |].
+        { rewrite decide_True; [| rewrite Hr; vm_compute; reflexivity].
         (* the table's row binds the two NUMBERS existentially -- at this
            vocabulary they are reported by being WRITTEN -- and the post
            names them, so the arm simply exhibits them.  The two inserts
@@ -4807,6 +4864,22 @@ Section SyscallArms.
         symmetry.
         apply (list_insert_commute sts fd0 fd1
                  (FdOpen true false FdPipe) (FdOpen false true FdPipe) Hne). }
+        (* ...AND THE JOINED ROW: the same two descriptors, and the bytes
+           pipe copied out are theirs ([Hbytes], off the entry's own
+           post).  This is the conjunct that lets a caller close what
+           pipe gave it. *)
+        intros _ _. exists fd0, fd1, bsw.
+        assert (Hv0t : pv_tf (us_V U) !!! tf_arg_idx 0 = v0)
+          by (apply list_lookup_total_correct, Hv0).
+        split_and!;
+          [ exact Hne
+          | exact Hcl0
+          | exact Hcl1
+          | rewrite Hv0t /M' Hd8; reflexivity
+          | exact Hbytes
+          | symmetry;
+            apply (list_insert_commute sts fd0 fd1
+                     (FdOpen true false FdPipe) (FdOpen false true FdPipe) Hne) ]. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
@@ -4835,6 +4908,7 @@ Section SyscallArms.
               (* pipe DOES move the table -- two rows -- so its row is the
                  real one, off the arm's own post *)
               Hfdrow
+              Hpiperow
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
@@ -4961,6 +5035,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
@@ -5069,6 +5145,8 @@ Section SyscallArms.
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ Hnum); discriminate)
+              (* ...and pipe's joined row: not this entry's number *)
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
@@ -5236,6 +5314,7 @@ Section SyscallArms.
                  (sysc_num_ne12 _ _ Hnum eq_refl))
               (* open DOES move the table, so its row is the real one *)
               Hfdrow
+              ltac:(apply sysc_pipe_ok_quiet; rewrite Hnum; discriminate)
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
@@ -5635,6 +5714,8 @@ Section SyscallArms.
               (* the out-of-range fallback runs no entry at all, so the
                  descriptor table is untouched *)
               ltac:(apply (sysc_fd_ok_refl_at _ _ _ _ eq_refl); lia)
+              (* out of range, so certainly not pipe's number *)
+              ltac:(apply sysc_pipe_ok_quiet; unfold UsysMemOk.USYS_pipe; lia)
               ltac:(right; exists (rget G1 Ra4); reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)

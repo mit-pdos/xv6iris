@@ -130,6 +130,12 @@ Section UexecRetFs.
              (* the descriptor row, beside the image's -- see
                 [UexecRet.uexec_ret_F]'s own note *)
              ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
+             (* ...AND PIPE'S JOIN, the one row neither of the two above can
+                state.  [usys_mem_ok] says pipe wrote eight bytes at a0 from
+                SOME function, [usys_fd_ok] says it opened two free slots, and
+                only this says the bytes NAME the slots -- which is the whole
+                of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
+             ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
              X (bump W r M' π' szv' fdv'))
           ∨ (∃ u : umirror,
                mcur γm u ∗
@@ -139,6 +145,12 @@ Section UexecRetFs.
                   ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W)
                                (uvis_sz W) M' π' szv'⌝ -∗
                   ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
+                  (* ...AND PIPE'S JOIN, the one row neither of the two above can
+                     state.  [usys_mem_ok] says pipe wrote eight bytes at a0 from
+                     SOME function, [usys_fd_ok] says it opened two free slots, and
+                     only this says the bytes NAME the slots -- which is the whole
+                     of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
+                  ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
                   ⌜ufs_step n (uvis_tf W) (uvis_M W) r u u'⌝ -∗
                   mcur γm u' -∗
                   X (bump W r M' π' szv' fdv'))))
@@ -147,6 +159,12 @@ Section UexecRetFs.
                ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W)
                             (uvis_sz W) M' π' szv'⌝ -∗
                ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
+               (* ...AND PIPE'S JOIN, the one row neither of the two above can
+                  state.  [usys_mem_ok] says pipe wrote eight bytes at a0 from
+                  SOME function, [usys_fd_ok] says it opened two free slots, and
+                  only this says the bytes NAME the slots -- which is the whole
+                  of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
+               ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
                X (bump W r M' π' szv' fdv'))
      else X W)%I.
 
@@ -267,14 +285,14 @@ Section UexecRetFs.
       - iIntros (fdv') "%Hfvl". iApply "Hup".
         iApply ("Hc" $! fdv' with "[%]"). exact Hfvl. }
     destruct (uenr_dom (usys_num (uvis_tf W))) eqn:He.
-    - iLeft. iIntros (r M' π' szv' fdv') "%Hok %Hfdok".
+    - iLeft. iIntros (r M' π' szv' fdv') "%Hok %Hfdok %Hpiperow".
       iApply "Hup".
-      iApply ("Hret" $! r M' π' szv' fdv' with "[%] [%]");
-        [exact Hok | exact Hfdok].
-    - iIntros (r M' π' szv' fdv') "%Hok %Hfdok".
+      iApply ("Hret" $! r M' π' szv' fdv' with "[%] [%] [%]");
+        [exact Hok | exact Hfdok | exact Hpiperow].
+    - iIntros (r M' π' szv' fdv') "%Hok %Hfdok %Hpiperow".
       iApply "Hup".
-      iApply ("Hret" $! r M' π' szv' fdv' with "[%] [%]");
-        [exact Hok | exact Hfdok].
+      iApply ("Hret" $! r M' π' szv' fdv' with "[%] [%] [%]");
+        [exact Hok | exact Hfdok | exact Hpiperow].
   Qed.
 
   (* THE BRIDGE: every plain-safe process is enriched-safe.  This is what

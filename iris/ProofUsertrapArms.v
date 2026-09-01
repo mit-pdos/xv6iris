@@ -615,7 +615,9 @@ Section Ut56.
     iApply (T.ut_a6 Rsys N U0 U pt ksp m0 S1 av nx false
               mie_v menvcfg0 epv scv lks sts sts
               Hwf' ltac:(intros _; reflexivity)
-              ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
+              ltac:(intros Hc; exfalso; exact (Hnec Hc))
+                (* ...and pipe's join, refuted through the same cause *)
+                ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
               Hmiev Hmenvv Hrd
               with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
     all: try lkbelow.
@@ -1030,6 +1032,8 @@ Section UtD0.
       iApply (T.ut_a6 Rsys N U0 (MkUstate V' (us_M U)) pt ksp m0 mr av nx false
                 mie_v menvcfg0 epv scv lks sts sts
                 Hwf' ltac:(intros _; reflexivity)
+                ltac:(intros Hc; exfalso; exact (Hnec Hc))
+                (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv Hrd'
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
@@ -1193,6 +1197,8 @@ Section UtE8.
       iApply (T.ut_fa Rsys N U0 U pt ksp m0 mf av nx false
                 mie_v menvcfg0 epv scv lks sts sts
                 Hwf' ltac:(intros _; reflexivity)
+                ltac:(intros Hc; exfalso; exact (Hnec Hc))
+                (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").

@@ -956,7 +956,7 @@ Section UkRunFsLeaf.
       [ exfalso; exact (Hfork He) |].
     rewrite Hdom.
     iRight. iExists u. iFrame "Hmc".
-    iIntros (r M' pm' sz' fdv' u') "%Hok %Hfdok %Hstep Hmc".
+    iIntros (r M' pm' sz' fdv' u') "%Hok %Hfdok %Hpiperow %Hstep Hmc".
     destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _
                 Hexec Hsbrk Hwait Hpipe Hrd Hfst Hok) as [-> [-> ->]].
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run].
@@ -1021,7 +1021,7 @@ Section UkRunFsLeaf.
       [ exfalso; exact (Hfork He) |].
     rewrite Hdom.
     iRight. iExists u. iFrame "Hmc".
-    iIntros (r M' pm' sz' fdv' u') "%Hok %Hfdok %Hstep Hmc".
+    iIntros (r M' pm' sz' fdv' u') "%Hok %Hfdok %Hpiperow %Hstep Hmc".
     destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _
                 Hexec Hsbrk Hwait Hpipe Hrd Hfst Hok) as [-> [-> ->]].
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run].

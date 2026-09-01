@@ -244,6 +244,12 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
     ⌜SpecUsertrap.ut_fd_kept sc_v sts sts'⌝ -∗
     ⌜SpecUsertrap.ut_fd_ecall sc_v (tf_of g (ret_pc sepc_v))
        (pv_tf (us_V U')) sts sts'⌝ -∗
+    (* ...and pipe's join, off the same two frames.  The ENTRY image is [M],
+       the one the frame names above, so this boundary states the row at a
+       map anchored to a resource on both ends -- see
+       [SpecUsertrap.ut_pipe_ecall]. *)
+    ⌜SpecUsertrap.ut_pipe_ecall sc_v (tf_of g (ret_pc sepc_v))
+       (pv_tf (us_V U')) M (us_M U') sts sts'⌝ -∗
     ⌜ret_pc uepc = tf_resume_pc (pv_tf (us_V U'))⌝ -∗
     ⌜mf = tf_resume_gpr0 (pv_tf (us_V U'))⌝ -∗
     ⌜ud_tfp pt' = ud_tfp pt⌝ -∗

@@ -535,7 +535,7 @@ Section UtSysBlock.
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
       iIntros (CID2 Hk2 mg U2 stsR)
-        "%Hcsg %Hmemg %Hfdrow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc".
+        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
@@ -708,10 +708,32 @@ Section UtSysBlock.
         rewrite <- Hp1.
         apply (usys_fd_ok_epc _ _ (rget S3 Ra5) _ _ _ Hlen1).
         rewrite <- HV1tf. exact Hfdrow. }
+      (* ...AND PIPE'S JOIN, carried out beside it and by the same lens.
+         The two epc inserts peel off by [usys_pipe_ok_epc] for the reason
+         the descriptor row's do -- the row reads a7 and a0, never the epc
+         -- and the IMAGE side crosses on the nose: the prologue rewrites a
+         trapframe word, and [ut_pro]'s fourth conjunct is exactly that it
+         leaves [us_M] alone. *)
+      assert (Hpipe : ut_pipe_ecall scv (pv_tf (us_V U0))
+                        (pv_tf (us_V (MkUstate V2 M2)))
+                        (us_M U0) (us_M (MkUstate V2 M2)) sts stsR).
+      { intros _. destruct Hpro as (Hp1 & _ & _ & HM1).
+        assert (Hlen1 : (tf_epc_idx < length (pv_tf (us_V U)))%nat)
+          by (rewrite Htflen0; unfold tf_epc_idx, TFWORDS; lia).
+        assert (Hlen0 : (tf_epc_idx < length (pv_tf (us_V U0)))%nat).
+        { pose proof Htflen0 as HL. rewrite Hp1 length_insert in HL.
+          rewrite HL. unfold tf_epc_idx, TFWORDS. lia. }
+        assert (Hnum0 : usys_num (pv_tf (us_V U0)) = sysc_num V1).
+        { rewrite Hnumeq Hp1 usys_num_epc. reflexivity. }
+        cbn [us_V us_M pv_tf]. rewrite Hnum0. rewrite <- HM1.
+        apply (usys_pipe_ok_epc _ _ (ret_pc epv) _ _ _ _ _ Hlen0).
+        rewrite <- Hp1.
+        apply (usys_pipe_ok_epc _ _ (rget S3 Ra5) _ _ _ _ _ Hlen1).
+        rewrite <- HV1tf. exact Hpiperow. }
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N U0 (MkUstate V2 M2) pt ksp m0 mg av
                 n2 true
                 mie_v menvcfg0 epv scv lks sts stsR
-                Hwf' ltac:(intros Hne; exfalso; exact (Hne Hscec)) Hfde Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
+                Hwf' ltac:(intros Hne; exfalso; exact (Hne Hscec)) Hfde Hpipe Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg
                 Hmiev Hmenvv Hrda

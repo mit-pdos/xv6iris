@@ -267,7 +267,7 @@ Section UserretClosed.
     iApply wp_next_intro. iIntros (CID').
     rewrite /uservec_post.
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2)
-      "%Huptpt' %Hround' %Hfdkept %Hfdecall %Hpcret' %Hgprtie'
+      "%Huptpt' %Hround' %Hfdkept %Hfdecall %Hpipecall %Hpcret' %Hgprtie'
        %Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
        Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin'".
@@ -339,7 +339,10 @@ Section UserretClosed.
                     from usertrap, which got it from the dispatcher -- and
                     it is stated at the same trapframe on both sides, so it
                     goes in verbatim. *)
-                 Hfdecall Hround'
+                 Hfdecall
+                 (* ...and pipe's join beside it, from the same three hops
+                    and stated at the same trapframe pair *)
+                 Hpipecall Hround'
                  with "Hmk Hret") as "Hslot".
     (* ---- STEPS C/D: the guard, and the bundle, both inside the named
            lemma -- the loop only says which key it is at. ---- *)

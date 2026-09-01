@@ -565,6 +565,12 @@ Section UexecRet.
                   [fdv' = uvis_fd W]; open, close, dup and pipe say which
                   slot moved and to what. *)
                ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
+               (* ...AND PIPE'S JOIN, the one row neither of the two above can
+                  state.  [usys_mem_ok] says pipe wrote eight bytes at a0 from
+                  SOME function, [usys_fd_ok] says it opened two free slots, and
+                  only this says the bytes NAME the slots -- which is the whole
+                  of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
+               ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
                X (bump W r M' π' szv' fdv'))
      else X W)%I.
 
@@ -790,6 +796,12 @@ Section UexecRet.
              ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
                           M' π' szv'⌝ -∗
              ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
+             (* ...AND PIPE'S JOIN, the one row neither of the two above can
+                state.  [usys_mem_ok] says pipe wrote eight bytes at a0 from
+                SOME function, [usys_fd_ok] says it opened two free slots, and
+                only this says the bytes NAME the slots -- which is the whole
+                of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
+             ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
              uslot (bump W r M' π' szv' fdv'))).
   Proof.
     intros ->. rewrite /uexec_ret /uexec_ret_F.
@@ -813,7 +825,7 @@ Section UexecRet.
     destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ done | ].
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
     { iSplitR; [ iIntros (r fdv' _ _); iApply "H" | iIntros (fdv' _); iApply "H" ]. }
-    iIntros (r M' π' szv' fdv' _ _). iApply "H".
+    iIntros (r M' π' szv' fdv' _ _ _). iApply "H".
   Qed.
 
 End UexecRet.
