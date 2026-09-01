@@ -263,6 +263,11 @@ WpUmodeLoad.v
 UCodeSync.v
 UmodeKernelTie.v
 UkStep.v
+# UkStepGen = UkStep's SS3/SS5/SS8 (and its retire funnel) with the SLOT
+# FAMILY as a Context parameter -- the compiled receipt for upstream ask
+# (4).  It RECOVERS UkStep's own wp_uk_ecall by [exact] at
+# (uexec_ret_F, uslot); landing the ask in place deletes this file.
+UkStepGen.v
 UkLeaf.v
 UkBranch.v
 UkStore.v
@@ -1801,10 +1806,18 @@ UkShParse.v
 #   UkInitFs = init's console preamble WALKED on the enriched tier (0xc
 # through the two dups to the restart head 0x32), refining
 # FdRowPilot.pilot_console_dups.
+#   UkStepGenFs = the X-generic engine (UkStepGen, below UkStep) at the
+# ENRICHED family: it DISCHARGES both of the seals above -- one
+# instantiation each, no copy -- so FDROW_UKFS_STEP and FDROW_UKFS_RETIRE
+# are theorems.  UkStepGenSeals is the LEAF that applies the two walk
+# functors at them (it is the one file allowed to require UkInitFs, and
+# nothing may require IT).
 FsFdMirror.v
 UexecRetFs.v
 UkRunSysFs.v
 UkRunFsLeaf.v
+UkStepGenFs.v
 FdRowPilot.v
 FdRowMint.v
 UkInitFs.v
+UkStepGenSeals.v

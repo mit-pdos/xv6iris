@@ -3305,8 +3305,8 @@ THE STAGES (prover lanes; budgets keyed to the landed analogues):
 
   | kind | where | status |
   |---|---|---|
-  | retire funnel (`wp_uk_retire_later`) | `FDROW_UKFS_RETIRE` | **SEALED** (1) |
-  | ecall step (`wp_uk_ecall`) | `FDROW_UKFS_STEP` (P2) | **SEALED** (0 new) |
+  | retire funnel (`wp_uk_retire_later`) | `FDROW_UKFS_RETIRE` | ~~SEALED~~ **DISCHARGED** (UkStepGenFs) |
+  | ecall step (`wp_uk_ecall`) | `FDROW_UKFS_STEP` (P2) | ~~SEALED~~ **DISCHARGED** (UkStepGenFs) |
   | `wp_uk_retire_fs` (later-free) | UkRunFsLeaf §2 | proven |
   | `wp_uk_alu0_fs` / `wp_uk_alu1_fs` | §2 | proven |
   | `c.li`, `addi`, `auipc` | §2 | proven |
@@ -3336,6 +3336,20 @@ THE STAGES (prover lanes; budgets keyed to the landed analogues):
   measures ask (4)'s payoff exactly: 1 seal + ~360 lines of parallel
   wrappers per parallel contract, forever, versus one section header
   upstream.
+
+  **THE COLLAPSE NOTE IS NOW COMPILED, AND IT WAS RIGHT (lane 2,
+  2026-09-01).**  `iris/UkStepGen.v` is the X-generic twin;
+  `iris/UkStepGenFs.v` instantiates it and BOTH seals fall out as one
+  application each, no copy — exactly the two lines this note predicted.
+  `iris/UkStepGenSeals.v` then applies `FdRowPilotWalk` and
+  `UkInitFsWalk` at the discharged modules, so the pilot's headline
+  theorems are unconditional (`Print Assumptions` = the two platform
+  axioms + funext).  The measured price of ask (4) itself is in the
+  UPSTREAM ASKS entry below: 130 substitution lines out of 1585 carried
+  over, ZERO new proof steps, and one extra `Context` line (`Q`) for
+  families whose fixpoint pins the ambient `CurCtx`.  §2's ~360 lines of
+  re-derived wrappers are now formally redundant — they still compile,
+  and they are what the in-place landing deletes.
 
   AS-LANDED FINDINGS:
   1. **THE `Rut` SMUGGLE DIES ON A SECOND, INDEPENDENT OBSTRUCTION** —
@@ -3562,6 +3576,87 @@ landed statement, only generalises).  **The convergence round found the
 SAME shape one layer up:** `ParkCap`'s park channel hardwires `uslot`
 inside its own fixpoint (`ParkCap.v:134`), so ask (2b) is ask (4) for the
 PARK.  Worth ruling on together.
+
+**COMPILED RECEIPT (2026-09-01, lane 2).  `iris/UkStepGen.v` §10 is the
+verbatim-current diff; the twin, the plain recovery and BOTH pilot seals
+are green on the mirror (18.4s / 4.7s / 2.5s for the three new files, and
+the full strict pass is a no-op afterwards).**
+
+- **THE MEASURED DELTA.**  1585 lines of `UkStep.v` carried over (§2's
+  two movers, §3, §4, §5, §6, §6b, §6c, §7, §8 — §1's pure facts and
+  `trapped_of_uv_trap_frame` mention no slot family and are REUSED by
+  `Require Import UkStep`, not copied).  The substitution
+  (`uvb`→`uvb_F'`, `ukb`→`ukb_F'`, `ukc`→`ukc'`, `uexec_ret`→`RetF X`,
+  `uslot_run`→`ukc'_run`, `uexec_ret_transparent`→`Ret_transparent`)
+  touches **130 of those 1585 lines: 52 statement/section/definition, 70
+  proof-body, 8 comment** — and **ZERO new proof steps.**  Not one tactic
+  was added, deleted or reordered for the generalisation; the
+  substitution IS the diff, which is why the twin compiled first try.
+  New hand-written text: 249 lines in `UkStepGen.v` (header + the four
+  generic definitions + the two hypotheses + the plain-instance recovery),
+  264 in `UkStepGenFs.v`, 32 in `UkStepGenSeals.v` — 2142 total new lines
+  against ~1000 saved immediately (see the seals below).
+- **THE TWO-FACTS CLAIM HELD, VERBATIM.**  No third fact.  `X_unfold` and
+  `Ret_transparent` are each used EXACTLY ONCE, both inside
+  `uk_arm_intr'`; every other proof in §3/§5/§6b/§6c/§7/§8 threads the
+  family as opaque payload, exactly as filed.
+- **ONE THING THE ASK DID NOT ANTICIPATE, AND IT IS A `Context` LINE, NOT
+  A FACT.**  A slot family also fixes WHICH ambient `CurCtx` it covers.
+  `uslot` quantifies `xi` INSIDE the fixpoint; `UexecRetFs.uslot_fs` is
+  pinned to its section's ambient — so at the enriched family the
+  unfolding fact is not even STATEABLE against a `ukc'` that binds `xi`
+  freely.  Fix: a third parameter `Q : CurCtx -> Prop` with `ukc'`
+  binding `xi` under `⌜Q xi⌝`; upstream is `Q := fun _ => True`, the
+  pilot `Q := fun xi => xi = XI`.  **Measured cost of `Q` on top of the
+  substitution: +24 / −14 lines across the whole 1585** — two statement
+  lines (`⌜Q XIo⌝` in `uk_step_obl'`, `⌜Q xi⌝` in `uk_ih'`), three
+  `Hypothesis (HQ0 : Q XI)` lines (one per driver section), nine call
+  sites passing one more `[%]`/`exact`.  The engine never INSPECTS `Q`.
+  The alternative — making `uslot_fs` context-generic like `uslot` —
+  is OUR file, not upstream's, but it moves the ambient out of five
+  files (UexecRetFs, UkRunSysFs, UkRunFsLeaf, FdRowPilot, UkInitFs) and
+  buys nothing else.  24 lines is cheaper, and it is what keeps the
+  generic engine usable by the NEXT parallel family without first
+  demanding that family be context-generic.
+- **THE RECOVERY IS `exact`, NOT "equivalent".**  `UkStepGen.v` §9
+  states UkStep's exported ecall-driver type ONCE (`uk_ecall_ty`) and
+  inhabits it TWICE: `uk_ecall_ty_upstream := UkStep.wp_uk_ecall …` and
+  `uk_ecall_ty_gen := wp_uk_ecall' uexec_ret_F uslot (fun _ => True)
+  uslot_unfold_gen uexec_ret_transparent_gen …`.  Both are `exact`, so
+  `uvb_F' uexec_ret_F uslot` is CONVERTIBLE with `uvb`, and the two
+  constants have the SAME `Print Assumptions` (the two platform axioms +
+  funext).
+- **BOTH PILOT SEALS ARE NOW DISCHARGED IN-HOUSE.**  `UkStepGenFs.v`
+  proves `FDROW_UKFS_STEP.wp_uk_ecall_fs_step` = `wp_uk_ecall'` at
+  `(uexec_ret_fs_F γm, uslot_fs γm)` and
+  `FDROW_UKFS_RETIRE.wp_uk_retire_fs_later` = `wp_uk_retire_later'` at
+  the same pair — one instantiation each, no copy, as the collapse note
+  predicted.  The only per-family work is the two facts
+  (`uslot_fs_unfold_gen`, ~12 lines; `uexec_ret_fs_transparent`, 5 —
+  UexecRetFs never needed to state the transparent arm before) plus the
+  `goodmb` side condition the STEP seal's statement leaves out, which is
+  `UserExecFacts.goodmb_execute_ECALL_U` exactly as `UkRunSys.v` passes
+  it.  `UkStepGenSeals.v` then applies `FdRowPilotWalk` and
+  `UkInitFsWalk` at the discharged modules: `PilotW.wp_pilot_open2` and
+  `InitW.wp_kinit_console_arm_then_loop` audit to the two platform axioms
+  + funext with NO `Parameter`/`Declare Module` stand-in beneath them.
+  The pilot's sealed surface is empty.
+- **HONEST NOTE.**  `UkStepGen.v` is the RECEIPT, not the destination.
+  Landing ask (4) IN PLACE deletes it: §0 becomes UkStep.v's own section
+  header, the copied region becomes UkStep.v, §9's check becomes UkStep's
+  re-export.  `UkStepGenFs.v` and `UkStepGenSeals.v` survive, shrunk to
+  the two instantiations and the two functor applications; and
+  `UkRunFsLeaf.v` §2 (~360 lines of re-derived per-kind wrappers) goes
+  away with them, since UkLeaf.v/UkBranch.v's own leaves instantiate.
+- **ASK (2b) — the park — takes the SAME `Context` shape**, unchanged by
+  this measurement: `ParkCap.park_pkg` hardwires `uslot` inside the
+  `park_token` fixpoint (`ParkCap.v:134`), so generalising it is
+  `Context (X : uvis -d> iPropO Σ)` over the park channel with whatever
+  the park actually uses of the slot (the pilot's twin says that is the
+  `∀ W, X W` premise of `park_token_park` and nothing else).  No code
+  was written for it here — the pilot deliberately does not touch
+  `ParkCap.v` — but the receipt above is the price list: a `Context`
+  line plus a substitution, no new proof steps.
 
 (5) **NEW, filed by the convergence round and the cheapest of the five —
 ATTACH `usys_fd_ok` TO THE ARM.**  `uexec_ret_F`'s returning-syscall arm
