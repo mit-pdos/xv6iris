@@ -48,6 +48,9 @@ Require Import RiscvModelBytes RiscvPtsto.
 Require Import InstrBytes.
 Require Import KallocInv.
 Require Import TsoCtx.
+(* M1 STAGE 2 LANDED: the ↦₄ window and this file's byte tower are on the
+   SAME side of the seal now, so the shim crossings that used to sit in
+   [bb_word4_acc] are gone -- no [TsoCtxShim] import at all. *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -662,12 +665,122 @@ Section ByteBufPage.
   Context `{!riscvGS Σ}.
   Context `{XI : CurCtx}.
 
-  Lemma bb_page_named (q : mword 64) :
-    page_own q ⊢ ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 4096, pa_add q j ↦ₘ f j.
-  Proof. rewrite /page_own /byte_any. apply bb_any_named. Qed.
+  (* A6.87: [bb_page_named] IS GONE.  It read a named byte run out of
+     [page_own], and [page_own] is the visibility-free page now -- naming
+     bytes nobody has written is exactly the claim the ruling removes.
+     What its three callers actually held is the page kalloc MEMSET, so
+     they take the run off [KallocInv.page_filled] instead, which is what
+     [page_filled_named] hands them. *)
+  Lemma page_filled_named (q : mword 64) (c : bv 8) :
+    page_filled q c ⊢ ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 4096, pa_add q j ↦ₘ f j.
+  Proof. rewrite /page_filled. iIntros "H". by iExists (fun _ => c). Qed.
 
   Lemma bb_page_of_named (q : mword 64) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 4096, pa_add q j ↦ₘ f j) ⊢ page_own q.
-  Proof. rewrite /page_own /byte_any. apply bb_named_any. Qed.
+  Proof. apply page_own_of_named. Qed.
 End ByteBufPage.
 
+
+(* ===================================================================== *)
+(* THE CONTEXT-TIER WORD HALVES, AND THE HONEST WINDOW FORGET            *)
+(* (the machine flip; tso-machine-flip.md §6 amendment A6.58).            *)
+(*                                                                        *)
+(* WHY THEY ARE HERE.  M1 stage 2 made [↦₄]/[↦₂] the CONTEXT-indexed      *)
+(* towers, so a proof that splits an owned doubleword into halves for a   *)
+(* 4-byte access can no longer route through                              *)
+(* [InstrBytes.word_pointsto_split4]: that lemma lives BELOW [TsoCtx] and  *)
+(* its [↦₈]/[↦₄] are the RAW towers.  The SC-era route -- drop to raw with *)
+(* [TsoCtxShim.ctx_word_to_mem], split, come back with [ctx_word_of_mem]  *)
+(* -- is DEAD at TSO in its RETURN direction: the [_of_mem] family is     *)
+(* FALSE (the byte's timestamp fragment and its clean/dirty bit were      *)
+(* handed out once by the era's allocation and cannot be re-minted above  *)
+(* the interp -- [TsoCtx.ctx_pointsto_forget]'s header states the price). *)
+(*                                                                        *)
+(* So the halving has to happen INSIDE the tier, and it can: the ctx      *)
+(* tower is a byte window exactly as the raw one is, and [InstrBytes]'    *)
+(* half-byte lemmas ([nth_byte_word_lo]/[_hi],                             *)
+(* [nth_byte_word_of_words_lo]/[_hi]) and its two alignment facts are     *)
+(* PURE and therefore tier-blind.  The two proofs below are               *)
+(* [word_pointsto_split4] / [word_pointsto_join4] VERBATIM, one tier up.  *)
+(*                                                                        *)
+(* THIS FILE is the home because it is the lowest one importing BOTH      *)
+(* [InstrBytes] (the pure halves) and [TsoCtx] (the tier), and because    *)
+(* every consumer of the raw pair already imports it.                     *)
+(*                                                                        *)
+(* THE CONTEXT IS EXPLICIT ([ξ], not [cur_ctx]): a caller that holds the  *)
+(* doubleword at its ambient identity passes [cur_ctx] and reads the      *)
+(* halves back at the same one, and a caller holding a record's word --   *)
+(* the escrow/park cases -- is not silently re-indexed.                    *)
+(* ===================================================================== *)
+Section CtxWordHalves.
+  Context `{!riscvGS Σ}.
+  Context `{KTR : !CurKtier}.
+
+  (* [InstrBytes.big_sepL_seq_shift]'s copy: that one is [Local] to its own
+     section and the statement is three lines. *)
+  Local Lemma cbb_seq_shift (P : nat -> iProp Σ) (o n : nat) :
+    ([∗ list] j ∈ seq o n, P j) ⊣⊢ ([∗ list] j ∈ seq 0 n, P ((o + j)%nat)).
+  Proof.
+    assert (Hf : seq o n = (Nat.add o) <$> seq 0 n).
+    { rewrite fmap_add_seq. by rewrite Nat.add_0_r. }
+    rewrite Hf big_sepL_fmap. reflexivity.
+  Qed.
+
+  Lemma ctx_word_pointsto_split4 (ξ : TsoCtx.CtxId) (a : Arch.pa)
+      (dq : dfrac) (w : bv 64) :
+    TsoCtx.ctx_word_pointsto ξ a dq w ⊢
+    TsoCtx.ctx_word4_pointsto ξ a dq (word_lo w) ∗
+    TsoCtx.ctx_word4_pointsto ξ (pa_add a 4) dq (word_hi w).
+  Proof.
+    iIntros "[%Hal Hbs]".
+    assert (Hs : seq 0 8 = (seq 0 4 ++ seq 4 4)%list) by reflexivity.
+    rewrite Hs big_sepL_app.
+    iDestruct "Hbs" as "[Hlo Hhi]".
+    iSplitL "Hlo".
+    - iSplit; [iPureIntro; by apply aligned8_aligned4|].
+      iApply (big_sepL_mono with "Hlo").
+      intros k j Hk. apply lookup_seq in Hk as [-> Hlt].
+      rewrite nth_byte_word_lo; [reflexivity | lia].
+    - iSplit; [iPureIntro; by apply aligned8_aligned4_hi|].
+      iEval (rewrite (cbb_seq_shift _ 4 4)) in "Hhi".
+      iApply (big_sepL_mono with "Hhi").
+      intros k j Hk. apply lookup_seq in Hk as [-> Hlt].
+      rewrite pa_add_add. rewrite nth_byte_word_hi; [reflexivity | lia].
+  Qed.
+
+  Lemma ctx_word_pointsto_join4 (ξ : TsoCtx.CtxId) (a : Arch.pa)
+      (dq : dfrac) (lo hi : bv 32) :
+    is_aligned_paddr (Physaddr a) 8 = true ->
+    TsoCtx.ctx_word4_pointsto ξ a dq lo -∗
+    TsoCtx.ctx_word4_pointsto ξ (pa_add a 4) dq hi -∗
+    TsoCtx.ctx_word_pointsto ξ a dq (word_of_words lo hi).
+  Proof.
+    iIntros (Hal) "[_ Hlo] [_ Hhi]".
+    iSplit; [done|].
+    assert (Hs : seq 0 8 = (seq 0 4 ++ seq 4 4)%list) by reflexivity.
+    rewrite Hs big_sepL_app.
+    iSplitL "Hlo".
+    - iApply (big_sepL_mono with "Hlo").
+      intros k j Hk. apply lookup_seq in Hk as [-> Hlt].
+      rewrite nth_byte_word_of_words_lo; [reflexivity | lia].
+    - rewrite (cbb_seq_shift _ 4 4).
+      iApply (big_sepL_mono with "Hhi").
+      intros k j Hk. apply lookup_seq in Hk as [-> Hlt].
+      rewrite pa_add_add. rewrite nth_byte_word_of_words_hi; [reflexivity | lia].
+  Qed.
+
+  (* THE WINDOW FORGET: [TsoCtxShim.ctx_buf_to_mem]'s honest successor, and
+     the ONLY direction of that pair that survives.  Named so that
+     [grep ctx_buf_forget] is, like [grep ctx_pointsto_forget], the
+     inventory of places where a byte run leaves the ledger. *)
+  Lemma ctx_buf_forget (ξ : TsoCtx.CtxId) (p : Arch.pa) (len : nat)
+      (f : nat -> bv 8) (dq : dfrac) :
+    ([∗ list] j ∈ seq 0 len,
+       TsoCtx.ctx_pointsto ξ (pa_add p j) dq (f j))
+    -∗
+    ([∗ list] j ∈ seq 0 len, mem_pointsto (pa_add p j) dq (f j)).
+  Proof.
+    iIntros "H". iApply (big_sepL_impl with "H").
+    iIntros "!>" (k j Hj) "Hb". by iApply TsoCtx.ctx_pointsto_forget.
+  Qed.
+End CtxWordHalves.

@@ -53,6 +53,12 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
    whole contribution to the process's memory is that the page it maps reads
    as ZERO.  This form hands the bytes back NAMED; the form above is derived
    from it by forgetting them. *)
+(* A6.87: THE FREE/REGISTERED PAGE PAIR COLLAPSED.  [page_own] IS the
+   visibility-free page now, so the two "_free_" forms A6.85 added are the
+   two below, character for character, and the duplication is gone.
+   Regain-by-write is the standard story: the val form hands the page back
+   REGISTERED and NAMED, which is where kalloc's [page_filled] comes from
+   and where kfree's [r->next] slot comes from. *)
 Definition wp_memset_page_val_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in

@@ -24,8 +24,9 @@ Local Open Scope Z_scope.
 Require Import Riscv.rv64d.
 Require Import SpecMemsetPage.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
-   leg M); this caller is not yet -- the shim marks the open seam *)
+Require Import TsoCtx.
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Import Defs.
 
 
@@ -43,24 +44,17 @@ Section ProofMemsetPage.
     cbv beta delta [wp_memset_page_val_sconf_body].
     intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hpv Hcval Ha2.
     iIntros "Hcg #Htext Hpc Hpage Hcont".
-    (* --- bridge [page_own p] to memset's per-byte buffer --- *)
+    (* A6.87: [page_own] IS the visibility-free page, so the buffer goes
+       straight to the free engine and comes back REGISTERED. *)
     iEval (rewrite /page_own /byte_any) in "Hpage".
-    iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add p j) ↦ₘ b)%I) with "Hpage")
-      as (olds) "Hbuf".
-    (* --- the count register holds 4096 --- *)
     assert (Ha2' : m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
-    (* --- apply the general memset spec at len = 4096 --- *)
-    (* memset's contract is context-indexed; this caller is not yet
-       converted -- the buffer crosses through the shim at the ambient
-       context (the bundle carries the thread token). *)
-    iApply (MemsetArray.wp_memset_sconf kt KT0 m0 n 4096 cval olds b pcur
+    iApply (MemsetArray.wp_memset_free_sconf kt KT0 m0 n 4096 cval b pcur
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
-              with "Hcg Htext Hpc [Hbuf]").
-    { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }
+              with "Hcg Htext Hpc [Hpage]").
+    { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". iExact "H". }
     iIntros (CID1 Hs1 mfin) "Hcg Hpc Hbuf %Hcs".
     iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
-    (* the bytes come back NAMED -- that is the whole of this form *)
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
     - iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H".
     - exact Hcs.
@@ -80,9 +74,7 @@ Section ProofMemsetPage.
     iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
     iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]"); [| exact Hcs].
-    iEval (rewrite /page_own /byte_any).
-    iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
-    iExists _. iExact "H".
+    iApply page_own_of_named. iExact "Hbuf".
   Qed.
 
 End ProofMemsetPage.

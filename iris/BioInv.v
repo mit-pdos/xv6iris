@@ -73,7 +73,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
 Require Import WpLock.
-Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
+Require Import TsoCtx TsoCtxAbsorbLb.
+Require Import SepThread.   (* A6.68: the token threaded through the NBUF *)   (* the lock payload's context axis; [<{ }>] *)
 Require Import SleepLock.
 Require Import BufOwn.
 Require Import DiskPtsto.
@@ -1153,15 +1154,15 @@ Section BioEscrow.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /buf_own.
     iDestruct "H" as "(Hbno & Hdisk & %Hlen & Hdata)".
-    iDestruct (ctx_morph_big_sepL bs
+    iMod (ctx_morph_big_sepL bs
                  (λ j byte ξ0, ctx_pointsto ξ0 (pa_add (b_data b) j)
                                  (DfracOwn 1) byte)
                  (λ i x, ctx_morph_pointsto _ _ _ _) ξ ξ' with "Hd Hdata")
       as "[Hd Hdata]".
     (* the blockno half and the disk flag became [↦₄] ctx cells at stage 2 *)
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdisk") as "[Hd Hdisk]".
-    iFrame "Hd Hbno Hdisk Hdata". done.
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdisk") as "[Hd Hdisk]".
+    iModIntro. iFrame "Hd Hbno Hdisk Hdata". done.
   Qed.
 
   (* [bref]'s two fractional identity cells are [↦₄], so the whole payload
@@ -1173,9 +1174,9 @@ Section BioEscrow.
     CtxMorph (λ ξ, bref (XI := ξ) bn k q dev bno).
   Proof.
     iIntros (ξ ξ') "Hd (Htok & Hdev & Hbno)".
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
-    iFrame.
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
+    by iFrame.
   Qed.
 
   Global Instance bio_pay_morph (bn : bio_names) (V : bio_view Σ) (k : nat)
@@ -1184,9 +1185,9 @@ Section BioEscrow.
   Proof.
     rewrite /bio_pay. destruct d.
     - iIntros (ξ ξ') "Hd [Hdy [%q Hb]]".
-      iDestruct (bref_morph bn k q dev bno ξ ξ' with "Hd Hb") as "[Hd Hb]".
-      iFrame "Hd Hdy". iExists q. iExact "Hb".
-    - iIntros (ξ ξ') "Hd H". iFrame.
+      iMod (bref_morph bn k q dev bno ξ ξ' with "Hd Hb") as "[Hd Hb]".
+      iModIntro. iFrame "Hd Hdy". iExists q. iExact "Hb".
+    - iIntros (ξ ξ') "Hd H". by iFrame.
   Qed.
 
   Global Instance buf_pay_morph (bn : bio_names) (V : bio_view Σ) (k : nat)
@@ -1195,11 +1196,11 @@ Section BioEscrow.
   Proof.
     rewrite /buf_pay. destruct (decide (uint bno ∈ bv_cov V));
       [| iIntros (ξ ξ') "Hd H"; by iFrame ].
-    destruct v; [| iIntros (ξ ξ') "Hd H"; iFrame ].
+    destruct v; [| iIntros (ξ ξ') "Hd H"; by iFrame ].
     iIntros (ξ ξ') "Hd [%Heq H]". iDestruct "H" as (bsd dd) "[Hdb Hp]".
-    iDestruct (bio_pay_morph bn V k dev bno bs bsd dd ξ ξ' with "Hd Hp")
+    iMod (bio_pay_morph bn V k dev bno bs bsd dd ξ ξ' with "Hd Hp")
       as "[Hd Hp]".
-    iFrame "Hd". iSplit; [done|]. iExists bsd, dd. iFrame.
+    iModIntro. iFrame "Hd". iSplit; [done|]. iExists bsd, dd. iFrame.
   Qed.
 
   Global Instance buf_parked_morph (bn : bio_names) (V : bio_view Σ) (k : nat) :
@@ -1207,14 +1208,14 @@ Section BioEscrow.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /buf_parked.
     iDestruct "H" as (v dev bno bs) "(Hvld & Hdev & Hown & Hpay & Hmid)".
-    iDestruct (buf_own_morph (bpa k) bno (mword_of_int 0 : mword 32) bs ξ ξ'
+    iMod (buf_own_morph (bpa k) bno (mword_of_int 0 : mword 32) bs ξ ξ'
                  with "Hd Hown") as "[Hd Hown]".
     (* the valid and dev cells became [↦₄] ctx cells at M1 stage 2 *)
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hvld") as "[Hd Hvld]".
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
-    iDestruct (buf_pay_morph bn V k v dev bno bs ξ ξ' with "Hd Hpay")
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hvld") as "[Hd Hvld]".
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
+    iMod (buf_pay_morph bn V k v dev bno bs ξ ξ' with "Hd Hpay")
       as "[Hd Hpay]".
-    iFrame "Hd". iExists v, dev, bno, bs. iFrame.
+    iModIntro. iFrame "Hd". iExists v, dev, bno, bs. iFrame.
   Qed.
 
   (* A2's two fractional identity cells are [↦₄] too, so this arm is no
@@ -1224,9 +1225,9 @@ Section BioEscrow.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /buf_chain.
     iDestruct "H" as (q dev bno) "(Href & Hdev & Hbno & Hown & Hmid)".
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
-    iFrame "Hd". iExists q, dev, bno. iFrame.
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
+    iModIntro. iFrame "Hd". iExists q, dev, bno. iFrame.
   Qed.
 
   Global Instance buf_mid_morph (V : bio_view Σ) (k : nat) :
@@ -1234,11 +1235,11 @@ Section BioEscrow.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /buf_mid.
     iDestruct "H" as (vld bno bs) "(%Hv & Hvld & Hdev & Hown)".
-    iDestruct (buf_own_morph (bpa k) bno (mword_of_int 0 : mword 32) bs ξ ξ'
+    iMod (buf_own_morph (bpa k) bno (mword_of_int 0 : mword 32) bs ξ ξ'
                  with "Hd Hown") as "[Hd Hown]".
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hvld") as "[Hd Hvld]".
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
-    iFrame "Hd". iExists vld, bno, bs. iFrame. done.
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hvld") as "[Hd Hvld]".
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
+    iModIntro. iFrame "Hd". iExists vld, bno, bs. iFrame. done.
   Qed.
 
   (* the three arms, AS A TERM.  [ctx_morph_or] is the instance this
@@ -1300,7 +1301,7 @@ Section BioEscrow.
     own_context cur_ctx ∗ ctx_parked ξ T ∗ buf_escrow_body (XI := XI) bn V k.
   Proof.
     iIntros (HTK) "Hrun HK Hpk Hbody".
-    iApply (ctx_absorb (λ ξ0, buf_escrow_body (XI := ξ0) bn V k)
+    iApply (TsoCtxAbsorbLb.ctx_absorb_lb (λ ξ0, buf_escrow_body (XI := ξ0) bn V k)
               ξ cur_ctx T K HTK with "Hrun HK Hpk Hbody").
   Qed.
 
@@ -1332,16 +1333,16 @@ Section BioEscrow.
   Proof.
     rewrite /bio_slot_res. destruct (M !! k) as [[q n]|].
     - iIntros (ξ ξ') "Hd (%Hn & Hcnt & Hsl & %qr & %Hq & Hdev & Hbno)".
-      iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hcnt") as "[Hd Hcnt]".
-      iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
-      iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
-      iFrame "Hd". iSplit; [done|]. iFrame "Hcnt Hsl".
+      iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hcnt") as "[Hd Hcnt]".
+      iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
+      iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
+      iModIntro. iFrame "Hd". iSplit; [done|]. iFrame "Hcnt Hsl".
       iExists qr. iSplit; [done|]. iFrame.
     - iIntros (ξ ξ') "Hd (Hcnt & Hdev & Hbno)".
-      iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hcnt") as "[Hd Hcnt]".
-      iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
-      iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
-      iFrame.
+      iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hcnt") as "[Hd Hcnt]".
+      iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
+      iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
+      by iFrame.
   Qed.
 
   Global Instance bcache_scan_morph (bn : bio_names) (V : bio_view Σ)
@@ -1351,12 +1352,12 @@ Section BioEscrow.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /bcache_scan.
     iDestruct "H" as "(Hauth & Hsa & %H1 & %H2 & %H3 & %H4 & Hlru & Hpool & Hslots)".
-    iDestruct (ctx_morph_big_sepL (seq 0 NBUF)
+    iMod (ctx_morph_big_sepL (seq 0 NBUF)
                  (λ _ (k : nat) (ξ0 : CtxId),
                     bio_slot_res (XI := ξ0) bn M k (devs k) (bnos k))
                  (λ _ k, bio_slot_res_morph bn M k (devs k) (bnos k))
                  ξ ξ' with "Hd Hslots") as "[Hd Hslots]".
-    iFrame "Hd Hauth Hsa Hlru Hpool Hslots". iPureIntro. auto.
+    iModIntro. iFrame "Hd Hauth Hsa Hlru Hpool Hslots". iPureIntro. auto.
   Qed.
 
   Global Instance bcache_res_morph (bn : bio_names) (V : bio_view Σ) :
@@ -1364,9 +1365,9 @@ Section BioEscrow.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /bcache_res.
     iDestruct "H" as (M ord devs bnos) "H".
-    iDestruct (bcache_scan_morph bn V M ord devs bnos ξ ξ' with "Hd H")
+    iMod (bcache_scan_morph bn V M ord devs bnos ξ ξ' with "Hd H")
       as "[Hd H]".
-    iFrame "Hd". iExists M, ord, devs, bnos. iExact "H".
+    iModIntro. iFrame "Hd". iExists M, ord, devs, bnos. iExact "H".
   Qed.
 
   (* ---- the caller-facing handle ---- *)
@@ -1456,8 +1457,9 @@ Section BioInit.
     own_context cur_ctx -∗
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name bcache_addr "bcache"%string -∗
-    add_vec bcache_addr (sign_extend' 64 (mword_of_int 16 : mword 12)) ↦₈
-      (zero_reg : mword 64) -∗
+    (* M4: the owner cell is a LEDGER cell; the ready arm arrives built
+       (the boot chain's carve mints it), not minted from a raw word *)
+    WpLock.lk_cpu_ready bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_fresh (buf_lock (bnode k)) "buffer"%string) -∗
     ([∗ list] k ∈ seq 0 NBUF,
        b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
@@ -1488,19 +1490,34 @@ Section BioInit.
     iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : bioUR)) as (γb) "Hauth".
     { apply auth_auth_valid. intros i. rewrite lookup_empty. done. }
     (* the bcache spinlock's gname, BEFORE its resource can be stated *)
-    iMod (newlock_delayed E bcache_addr "bcache"%string with "Hnm Hlkw [Hcpu]")
-      as (γlk) "Hmk"; [ iApply (WpLock.lk_cpu_ready_intro with "Hcpu") | ].
+    iMod (newlock_delayed E bcache_addr "bcache"%string with "Hnm Hlkw Hcpu")
+      as (γlk) "Hmk".
     (* every buffer's sleeplock, sealing exactly its checkout token *)
     iDestruct (big_sepL_sep_2 with "Hfresh Htoks") as "Hsl".
+    (* A6.68: SEQUENTIAL, not NBUF independent fupds -- each
+       [sl_fresh_new] borrows the running token and returns it. *)
+    iAssert ([∗ list] idx↦k ∈ seq 0 NBUF,
+               own_context cur_ctx -∗
+               (sl_fresh (buf_lock (bnode k)) "buffer"%string ∗
+                lock_tok_excl (fown k))
+               ={E}=∗ own_context cur_ctx ∗
+               (∃ p : gname * gname,
+                  is_sleeplock (fst p) (snd p) (buf_lock (bnode k))
+                    "buffer"%string (lock_tok_excl (fown k))))%I
+      as "Hstep".
+    { iApply big_sepL_intro. iIntros "!>" (idx k _) "Hrun [Hf Ht]".
+      iMod (sl_fresh_new E (buf_lock (bnode k)) "buffer"%string
+              (lock_tok_excl (fown k)) with "Hf Hrun Ht") as "[Hrun Hlk]".
+      iDestruct "Hlk" as (γl γsl) "Hlk".
+      iModIntro. iFrame "Hrun". iExists (γl, γsl). iExact "Hlk". }
+    iMod (big_sepL_fupd_thread E (own_context cur_ctx)
+            with "Hrun Hstep Hsl") as "[Hrun Hsl]".
     iAssert ([∗ list] k ∈ seq 0 NBUF, |={E}=> ∃ p : gname * gname,
                is_sleeplock (fst p) (snd p) (buf_lock (bnode k))
                  "buffer"%string (lock_tok_excl (fown k)))%I
       with "[Hsl]" as "Hsl".
     { iApply (big_sepL_mono with "Hsl"). intros i k Hk.
-      iIntros "[Hf Ht]".
-      iMod (sl_fresh_new E (buf_lock (bnode k)) "buffer"%string
-              (lock_tok_excl (fown k)) with "Hf Ht") as (γl γsl) "Hlk".
-      iModIntro. iExists (γl, γsl). iExact "Hlk". }
+      iIntros "H". by iModIntro. }
     iMod (seq_fun_alloc E
             (fun k p => is_sleeplock (fst p) (snd p) (buf_lock (bnode k))
                           "buffer"%string (lock_tok_excl (fown k)))
@@ -1555,8 +1572,8 @@ Section BioInit.
     (* [newlock_delayed]'s continuation is now lambda-payloaded and asks for
        the payload's [CtxMorph] -- discharged by the const embedding's own
        instance ([TsoCtx.ctx_morph_const_pay]). *)
-    iMod ("Hmk" $! <{ bcache_res bn V }> with "[%] [Hauth Hsa Hslots Hlru Hpool]")
-      as "#Hlock"; [ apply ctx_morph_const_pay | | ].
+    iMod ("Hmk" $! (<{ bcache_res bn V }>) with "[%] Hrun [Hauth Hsa Hslots Hlru Hpool]")
+      as "[Hrun #Hlock]"; [ apply ctx_morph_const_pay | | ].
     { rewrite /bcache_res /bcache_scan.
       iExists ∅, (rev (seq 0 NBUF)),
         (fun _ => (mword_of_int 0 : mword 32)),

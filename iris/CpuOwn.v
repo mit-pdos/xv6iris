@@ -107,7 +107,7 @@ Section CpuOwn.
     iDestruct (ctx_word4_pointsto_bytes with "Hn") as "Hb".
     iDestruct (ctx_word4_pointsto_bytes with "Hn'") as "Hb'".
     cbn [seq]. iDestruct "Hb" as "[H0 _]". iDestruct "Hb'" as "[H0' _]".
-    iDestruct (ctx_pointsto_ne with "H0 H0'") as %Hne. done.
+    iDestruct (TsoCtx.ctx_pointsto_ne with "H0 H0'") as %Hne. done.
   Qed.
 
   Lemma cpu_own_arm_excl (n n' : nat) (eb eb' : bool) (p p' : mword 64)
@@ -340,23 +340,23 @@ Proof.
   iIntros (ξ ξ') "Hd H". rewrite /cpu_own. destruct b; [ by iFrame |].
   rewrite /cpu_hart /cpu_priv /cpu_cells.
   iDestruct "H" as "(((%Hb & Hnoff & Hint & Hproc) & Hlks) & Hcnt)".
-  iDestruct (cur_proc_morph p ξ ξ' with "Hd Hproc") as "[Hd Hproc]".
+  iMod (cur_proc_morph p ξ ξ' with "Hd Hproc") as "[Hd Hproc]".
   (* the two [↦₄] hart cells became ξ-indexed at M1 stage 2 *)
-  iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hnoff") as "[Hd Hnoff]".
-  iAssert (ctx_dom ξ ξ' ∗
+  iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hnoff") as "[Hd Hnoff]".
+  iAssert (|==> (ctx_dom ξ ξ' ∗
            match n with
            | O => (∃ iv : mword 32,
                      ctx_word4_pointsto ξ' (a_cpu_int cid_word) (DfracOwn 1) iv)%I
            | S _ => ctx_word4_pointsto ξ' (a_cpu_int cid_word) (DfracOwn 1)
                       (intena_val eb)
-           end)%I with "[Hd Hint]" as "[Hd Hint]".
+           end))%I with "[Hd Hint]" as ">[Hd Hint]".
   { destruct n.
     - iDestruct "Hint" as (iv) "Hint".
-      iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hint") as "[Hd Hint]".
-      iFrame "Hd". iExists iv. iExact "Hint".
-    - iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hint") as "[Hd Hint]".
-      iFrame "Hd Hint". }
-  iFrame "Hd Hnoff Hint Hproc Hlks Hcnt". iPureIntro; exact Hb.
+      iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hint") as "[Hd Hint]".
+      iModIntro. iFrame "Hd". iExists iv. iExact "Hint".
+    - iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hint") as "[Hd Hint]".
+      iModIntro. iFrame "Hd Hint". }
+  iModIntro. iFrame "Hd Hnoff Hint Hproc Hlks Hcnt". iPureIntro; exact Hb.
 Qed.
 
 (* ===================================================================== *)
