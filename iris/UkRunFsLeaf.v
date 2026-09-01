@@ -962,9 +962,9 @@ Section UkRunFsLeaf.
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run].
     (* the enriched rows include open and dup, so the table may have moved;
        the program is not tracking these descriptors, so the authority moves
-       and no handle comes back ([UkRunSys.ufd_auth_move]) *)
+       and no handle comes back ([UkRunSys.ufd_state_move]) *)
     iApply uslot_fs_bupd.
-    iMod (ufd_auth_move γfd n (tf_of m pc) r fdv fdv'
+    iMod (ufd_state_move γfd n (tf_of m pc) r fdv fdv'
             (uenr_dom_ne_close n Hdom) Hfdok with "Hufd") as "Hufd".
     iModIntro.
     rewrite (uslot_fs_bump_run γm m pc M M pm pm sz sz fdv fdv' r Hx0 Hal4).
@@ -1027,9 +1027,9 @@ Section UkRunFsLeaf.
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run].
     (* the enriched rows include open and dup, so the table may have moved;
        the program is not tracking these descriptors, so the authority moves
-       and no handle comes back ([UkRunSys.ufd_auth_move]) *)
+       and no handle comes back ([UkRunSys.ufd_state_move]) *)
     iApply uslot_fs_bupd.
-    iMod (ufd_auth_move γfd n (tf_of m pc) r fdv fdv'
+    iMod (ufd_state_move γfd n (tf_of m pc) r fdv fdv'
             (uenr_dom_ne_close n Hdom) Hfdok with "Hufd") as "Hufd".
     iModIntro.
     rewrite (uslot_fs_bump_run γm m pc M M pm pm sz sz fdv fdv' r Hx0 Hal4).

@@ -417,7 +417,8 @@ Section UEchoKernel.
       by exact (proj1 (uka_argc _ _ _ _ _ _ Hargs)).
     iApply (uslot_of_urun_ro W 12 Hal8
               ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen).
-    iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht #HA Hrun".
+    (* echo makes no descriptor call, so its ledger is dropped here *)
+    iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht _ #HA Hrun".
     rewrite Hpc.
     iApply (wp_kecho_start γt γd γs γfd h (tf_resume_gpr0 (uvis_tf W))
               (uvis_av W)

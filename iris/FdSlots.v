@@ -598,6 +598,60 @@ Section FdSlots.
     forall j : nat, (j < fd)%nat -> sts !! j <> Some FdClosed.
   Proof. exact (fd_lowest_closed_below sts fd). Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* THE SCAN SPLITS AT A PREFIX, and that is the whole reason a user      *)
+  (* program can predict where [fdalloc] lands.  The scan reads the table  *)
+  (* from 0, so knowing the first [n] slots EXACTLY -- open or closed --   *)
+  (* decides the answer whenever one of them is closed, and bounds it      *)
+  (* below by [n] when none is.  [UserFd]'s ledger is that knowledge and   *)
+  (* [UserFd.ufd_alloc_least] is this lemma with the ghost state attached. *)
+  (* ------------------------------------------------------------------ *)
+  Lemma fd_lowest_closed_app (l1 l2 : list fdstate) :
+    fd_lowest_closed (l1 ++ l2) =
+      match fd_lowest_closed l1 with
+      | Some k => Some k
+      | None => (fun j => (length l1 + j)%nat) <$> fd_lowest_closed l2
+      end.
+  Proof.
+    induction l1 as [| st l1 IH].
+    - cbn [app length fd_lowest_closed].
+      destruct (fd_lowest_closed l2) as [j |]; reflexivity.
+    - cbn [app length]. destruct st.
+      + reflexivity.
+      + cbn [fd_lowest_closed]. rewrite IH.
+        destruct (fd_lowest_closed l1) as [k |]; [ reflexivity |].
+        destruct (fd_lowest_closed l2) as [j |]; reflexivity.
+  Qed.
+
+  (* the reading a proof actually applies it in: the table's own scan,
+     answered by the prefix the caller can see. *)
+  Lemma fd_least_closed_prefix (sts : list fdstate) (n fd k : nat) :
+    fd_least_closed sts fd ->
+    fd_lowest_closed (take n sts) = Some k ->
+    fd = k.
+  Proof.
+    unfold fd_least_closed. intros Hl Hk.
+    rewrite <- (take_drop n sts) in Hl.
+    rewrite fd_lowest_closed_app Hk in Hl. by injection Hl.
+  Qed.
+
+  Lemma fd_least_closed_prefix_none (sts : list fdstate) (n fd : nat) :
+    fd_least_closed sts fd ->
+    fd_lowest_closed (take n sts) = None ->
+    (n <= fd)%nat.
+  Proof.
+    unfold fd_least_closed. intros Hl Hk.
+    rewrite <- (take_drop n sts) in Hl.
+    rewrite fd_lowest_closed_app Hk in Hl.
+    destruct (fd_lowest_closed (drop n sts)) as [j |] eqn:Hj;
+      [| discriminate Hl].
+    (* the tail's own answer is what says the prefix was the WHOLE prefix:
+       a [drop] with a closed slot in it is non-empty. *)
+    pose proof (fd_lowest_closed_bound _ _ Hj) as Hb. rewrite length_drop in Hb.
+    cbn in Hl. injection Hl as <-.
+    rewrite length_take. lia.
+  Qed.
+
   (* it names ONE descriptor -- free from the function form, and the whole
      point: a caller that knows the table knows which descriptor it got. *)
   Lemma fd_least_closed_unique (sts : list fdstate) (a b : nat) :
@@ -617,6 +671,7 @@ Section FdSlots.
      rather than beside the scan because it needs [fdt0]. *)
   Lemma fd_lowest_closed_fdt0 : fd_lowest_closed fdt0 = Some 0%nat.
   Proof. reflexivity. Qed.
+
 
   Definition fd_frags_any (γ : gname) : iProp Σ := (∃ sts, fd_frags γ sts)%I.
 

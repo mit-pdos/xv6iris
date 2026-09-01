@@ -257,6 +257,11 @@ Definition uenr_dom (n : Z) : bool :=
    what lets the enriched leaf move the program's descriptor authority
    without holding a handle ([UkRunSys.ufd_auth_move] serves every row but
    close's). *)
+Lemma uenr_path_ne_close (n : Z) : uenr_path n = true -> n <> UsysMemOk.USYS_close.
+Proof.
+  unfold uenr_path. intros H Hc. subst n. vm_compute in H. discriminate H.
+Qed.
+
 Lemma uenr_dom_ne_close (n : Z) : uenr_dom n = true -> n <> UsysMemOk.USYS_close.
 Proof.
   unfold uenr_dom, uenr_path. intros H Hc. subst n.
@@ -350,15 +355,22 @@ Proof. vm_compute. reflexivity. Qed.
 (*  untouched table is simply its right side.  [-1] needs no argument at   *)
 (*  all on those two -- the right disjunct is available unconditionally.   *)
 (* ===================================================================== *)
+(* CLOSE IS EXCLUDED, and cannot not be: its row now also says that closing
+   an OPEN descriptor returns 0, so "-1 moved nothing" is not a fact about
+   close at an arbitrary table -- it is only a fact about a close whose
+   argument named no open slot.  Every caller here has the exclusion for
+   free: the blanket is the PATH rows' escape, and [uenr_path] is
+   {open, mknod}. *)
 Lemma usys_fd_ok_neg1 (n : Z) (tf : list (mword 64)) (sts : list fdstate) :
+  n <> UsysMemOk.USYS_close ->
   usys_fd_ok n tf (mword_of_int (-1) : mword 64) sts sts.
 Proof.
+  intros Hnc.
   assert (Hnz : uint (mword_of_int (-1) : mword 64) <> 0%Z).
   { rewrite um_uint_moi_neg1. discriminate. }
   unfold usys_fd_ok.
-  destruct (decide (n = UsysMemOk.USYS_close)) as [_ | _].
-  { destruct (decide (uint (mword_of_int (-1) : mword 64) = 0%Z))
-      as [Hc | _]; [ exfalso; exact (Hnz Hc) | reflexivity ]. }
+  destruct (decide (n = UsysMemOk.USYS_close)) as [Hc | _];
+    [ exfalso; exact (Hnc Hc) | ].
   destruct (decide (n = UsysMemOk.USYS_dup)) as [_ | _];
     [ right; split; reflexivity | ].
   destruct (decide (n = UsysMemOk.USYS_open)) as [_ | _];
@@ -747,7 +759,7 @@ Section Steps.
     intros Hlen Hst. unfold ufs_step in Hst.
     destruct (uenr_path n) eqn:Hp.
     - destruct Hst as [[-> ->] | (pl & _ & Hst)].
-      + exact (usys_fd_ok_neg1 n tf (um_fdt u)).
+      + exact (usys_fd_ok_neg1 n tf (um_fdt u) (uenr_path_ne_close n Hp)).
       + exact (ufs_step_at_fd_agrees n pl tf r u u' Hlen Hst).
     - exact (ufs_step_at_fd_agrees n [] tf r u u' Hlen Hst).
   Qed.

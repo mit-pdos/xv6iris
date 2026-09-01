@@ -498,6 +498,15 @@ Section UkRun.
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz γs (uvis_sz W) -∗
        utext_all γt (uvis_M W) (uvis_perm W) -∗
+       (* THE LEDGER OF THE STANDARD STREAMS, at the states the resumed key
+          carries.  It comes out here because it has to: the low [NSTD] keys
+          are in [UserFd.ufd_map] by construction, so their fragments exist
+          from the moment the authority does, and an exclusive fragment for
+          a key already in the map can never be minted later.  A program
+          that does not care about its standard streams drops it -- and then
+          calls no allocating syscall, which is the honest reading of "it is
+          not tracking its descriptors". *)
+       ustd γfd (take NSTD (uvis_fd W)) -∗
        urun γt γd γs γfd h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
          avail -∗
        WP (Loop : expr riscv_lang))
@@ -519,7 +528,8 @@ Section UkRun.
        heap's three names.  This is where a process's [urun] is created, so
        it is where its own view of its table begins -- at the view the
        resumed KEY carries, which is the view the kernel is handing it. *)
-    iMod (ufd_alloc (uvis_fd W) Hfdlen) as (γfd) "Hufd".
+    iMod (ufd_alloc_std (uvis_fd W) ∅ Hfdlen (map_empty_subseteq _))
+      as (γfd) "(Hufd & Hstd & _)".
     rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
     (* ---- the carve ---- *)
     set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
@@ -532,7 +542,8 @@ Section UkRun.
       unfold f. unfold D, base in *. rewrite Hb. reflexivity. }
     iDestruct (ubytes_of_map γd D base (8 * avail) f Hf with "Hd") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht"); [ exact Hsz | ].
+    iSpecialize ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht Hstd");
+      [ exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W).
     iSplitR; [ iPureIntro; exact Hlo | ].
@@ -573,6 +584,15 @@ Section UkRun.
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz γs (uvis_sz W) -∗
        utext_all γt (uvis_M W) (uvis_perm W) -∗
+       (* THE LEDGER OF THE STANDARD STREAMS, at the states the resumed key
+          carries.  It comes out here because it has to: the low [NSTD] keys
+          are in [UserFd.ufd_map] by construction, so their fragments exist
+          from the moment the authority does, and an exclusive fragment for
+          a key already in the map can never be minted later.  A program
+          that does not care about its standard streams drops it -- and then
+          calls no allocating syscall, which is the honest reading of "it is
+          not tracking its descriptors". *)
+       ustd γfd (take NSTD (uvis_fd W)) -∗
        ([∗ map] k ↦ b ∈ base.filter
              (fun kv : Z * bv 8 =>
                 ~ (kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)))
@@ -599,7 +619,8 @@ Section UkRun.
        heap's three names.  This is where a process's [urun] is created, so
        it is where its own view of its table begins -- at the view the
        resumed KEY carries, which is the view the kernel is handing it. *)
-    iMod (ufd_alloc (uvis_fd W) Hfdlen) as (γfd) "Hufd".
+    iMod (ufd_alloc_std (uvis_fd W) ∅ Hfdlen (map_empty_subseteq _))
+      as (γfd) "(Hufd & Hstd & _)".
     rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
     (* ---- the cut at the entry sp ---- *)
     set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
@@ -624,7 +645,8 @@ Section UkRun.
                  (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D)
                  base (8 * avail) f Hf with "Dlo") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht Dhi"); [ exact Hsz | ].
+    iSpecialize ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht Hstd Dhi");
+      [ exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W).
     iSplitR; [ iPureIntro; exact Hlo | ].
