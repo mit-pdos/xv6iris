@@ -18140,3 +18140,73 @@ acquiresleep/acquire).  Structural prerequisite: BioBox's content merges
 into BioInv (bio_ctx must reference buf_box; import direction forces the
 merge; CtxAnchor is upstream of BioInv so no cycle).  Old escrow defs
 retained during the grind, deleted at the end.
+
+### A6.151: THE STALE-GENERATION LEG, SETTLED -- the drained-hook tier
+### (checkout AT the winning AMO), and the gen-half tie for the recycler
+
+The A6.149 §3 decision point, resolved.  The presented-tier covers only
+stamps the acquirer knew BEFORE its acquire; a park by the previous
+holder advances the box generation to a stamp the waiter cannot have
+presented.  Every passive-receipt design fails on the same temporal
+gap: a receipt (record row in the slot, in the sleeplock payload, or
+minted by a payload-lens at the AMO) certifies (n1, T1) at some past
+instant, and the withdraw at :688 cannot LOCALLY refute a deposit in
+the window between the receipt and the use -- the refutations (bown
+exclusivity against OUT, pres/auth validity against bump, b->lock
+against park) are global protocol facts, not resources the lemma holds.
+Chasing the gap with gen-freeze half-tokens fails structurally at the
+refs 0<->1 boundary: a token that must live in the sleeplock's inner
+payload while refs>=1 (so waiters receive it) and in the slot while
+refs=0 (so the recycler can) transitions at drop time, when neither
+lock covers both homes.
+
+THE FIX THAT CLOSES: no receipt at all -- run the withdraw INSIDE the
+winning AMO's lock-open, where the instrument holds tso_interp and the
+drained-hart fact.  [wp_amoswap_lockopen_s_sconf] gains a HOOK tier: a
+caller-provided fupd, run in the winner arm with (own_context,
+tso_interp + drained, the payload BORROWED, mask allowing user invs),
+producing a caller Psi exported beside the floor pair.  The bcache
+checkout hook: borrow bown from the payload's free arm (v=0), open
+buf_box (per-k namespace bioxN.@k), refute OUT with the borrowed bown
+(the chain's deposit is THE same unique token), read the body's own
+llb T, mint T <= K + floor K against it SAME-INSTANT
+(hart_view_lb_get + ctx_bound_raise -- the A6.149 mint with T from the
+box instead of presented), aguard_intro, anchor_withdraw, close box
+OUT.  Currency is trivial: the (n, T) used are the ones in the open.
+The acquiresleep-with-checkout spec then DELIVERS the bundle at
+cur_ctx in its post; ProofBread:688's standalone checkout fupd dies.
+
+CONSEQUENT REVISIONS to the r77 BioBox layer:
+- resting content moves BACK into the box (BUNDLE arm), not the slot:
+  the slot reverts to v1 bookkeeping + gains, in the None arm, the
+  ROAMING GEN-HALF + nothing else; recycler field writes become
+  guarded withdraw/deposit round trips again (guards below).
+- gen tie: per-k [own (bn_gen k) (dfrac_agree ½ n)] twice: one half
+  pinned in the box body (tied to the anchor's n by the body's ∃), the
+  ROAMING half homed by refs-state: slot None arm (refs=0), box BUNDLE
+  arm (refs>=1 resting), the chain thread (OUT).  Every deposit
+  (gen-advance) consumes BOTH halves; holding the roaming half
+  freezes the generation.  Homes exchange under locks that hold both
+  sides: bget 0->1 swaps pres-none(box)<->gen-half(slot); drop swaps
+  back; checkout takes the half from the arm (pres_frag refutes the
+  refs=0 alternative); park returns it.
+- the box arms become BUNDLE(bundle xi_b ∗ (gen-half ∨ pres_none)) ∨
+  OUT(bown ∗ bref_tok q); pres ● None lives in the BUNDLE arm's
+  refs=0 alternative; ● Some n stays in the slot's Some arm.
+- the RECYCLER's guard: hook at the bcache.lock acquire AMO mints
+  per-k receipts (astamp n T ∗ ⌜T<=K⌝ ∗ floor K) by opening each box
+  (bioxN.@k namespaces make the NBUF opens legal); in-CS the
+  withdraw ties receipt-n to current-n by the SLOT-HELD roaming half
+  (refs=0 ⟹ the half is in the slot ⟹ deposits frozen for the whole
+  CS) + dfrac_agree agreement + astamp_agree.
+- bown cycles: R(free arm) -> winner -> box OUT arm (checkout) ->
+  parker (park) -> R (releasesleep).  bref never changes shape beyond
+  the A6.148 pres_frag addition.
+
+Threading: WpSconfLock hook binders (Psi, hook premise, winner-arm
+run, export in the node's user slot beside the A6.149 pair);
+SpecAcquire/ProofAcquire hook-tier bodies (loop lends the hook's
+resources each iteration, losing iterations return them, the winning
+Psi exports); SpecAcquiresleep/ProofAcquiresleep pass-through; old
+tiers derived at trivial hook (Psi := emp).  The same instrument is
+what the ic_escrow W1/W2/W3 legs need (Phase 4.5).
