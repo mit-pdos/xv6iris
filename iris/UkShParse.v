@@ -2401,6 +2401,71 @@ Section UkShParse.
     exact (upd_eq me (Regidx ra_idx) (regval_into_reg (vals 0%nat))).
   Qed.
 
+  (* THE READ-BACK, ONCE.  A restore run leaves an insert tower, and every
+     landed contract then has to say [ucallee_saved m m'] about it.  peek
+     paid ~90 lines peeling that tower one [Z.eq_dec] per spill; this is
+     the same argument by INDUCTION on the list, so a call site owes only
+     the two facts it actually knows -- what the run spilled, and that the
+     body left the OTHER callee-saved registers alone.
+
+     [ushp_spillback_eq] is the peel: a register the list writes gets the
+     value the list carries, and one it does not gets whatever the body
+     left -- and the two premises are exactly those two cases, so a
+     DUPLICATE in the list needs no argument (a later entry simply
+     overrides an earlier one, and both are asked for the same value). *)
+  Lemma ushp_spillback_eq (rs : list (mword 5 * mword 6))
+      (vals : nat -> mword 64) (me : regfile) (w : mword 64) (r : mword 5) :
+    ((forall (i : nat) (r' : mword 5) (u : mword 6),
+        rs !! i = Some (r', u) -> Regidx r' <> Regidx r) ->
+     me !!! Regidx r = w) ->
+    (forall (i : nat) (r' : mword 5) (u : mword 6),
+       rs !! i = Some (r', u) -> Regidx r' = Regidx r -> vals i = w) ->
+    ushp_spillback rs vals me !!! Regidx r = w.
+  Proof.
+    revert vals me. induction rs as [| ru rs' IH ]; intros vals me Hmiss Hhit.
+    - cbn [ushp_spillback]. apply Hmiss.
+      intros i r' u Hi. rewrite lookup_nil in Hi. discriminate.
+    - cbn [ushp_spillback]. apply IH.
+      + intros Hmiss'.
+        destruct (decide (Regidx (fst ru) = Regidx r)) as [ E | E ].
+        * rewrite <- E.
+          rewrite (upd_eq me (Regidx (fst ru)) (regval_into_reg (vals 0%nat))).
+          exact (Hhit 0%nat (fst ru) (snd ru)
+                   ltac:(destruct ru; reflexivity) E).
+        * rewrite (upd_ne me (Regidx (fst ru)) (Regidx r) _
+                     ltac:(intro He; exact (E (eq_sym He)))).
+          apply Hmiss. intros i r' u Hi.
+          destruct i as [| i ]; cbn in Hi.
+          { injection Hi as Hru. subst ru. exact E. }
+          exact (Hmiss' i r' u Hi).
+      + intros i r' u Hi He. exact (Hhit (S i) r' u Hi He).
+  Qed.
+
+  (* ...and the contract's own conjunct, assembled from it. *)
+  Lemma ushp_frame_cs (rs : list (mword 5 * mword 6))
+      (vals : nat -> mword 64) (m me : regfile) (sp0 : mword 64) :
+    m !!! Regidx csp_rs1 = sp0 ->
+    (forall (i : nat) (r : mword 5) (u : mword 6),
+       rs !! i = Some (r, u) -> vals i = m !!! Regidx r) ->
+    (forall r : mword 5, ucallee_saved_idx r = true ->
+       Regidx r <> Regidx csp_rs1 ->
+       (forall (i : nat) (r' : mword 5) (u : mword 6),
+          rs !! i = Some (r', u) -> Regidx r' <> Regidx r) ->
+       me !!! Regidx r = m !!! Regidx r) ->
+    ucallee_saved m
+      (<[Regidx csp_rs1 := regval_into_reg sp0]> (ushp_spillback rs vals me)).
+  Proof.
+    intros Hsp Hvals Hkeep r Hr.
+    destruct (decide (Regidx r = Regidx csp_rs1)) as [ E | E ].
+    - rewrite E.
+      rewrite (upd_eq _ (Regidx csp_rs1) (regval_into_reg sp0)).
+      exact (eq_sym Hsp).
+    - rewrite (upd_ne _ (Regidx csp_rs1) (Regidx r) _ E).
+      apply ushp_spillback_eq.
+      + intro Hmiss. exact (Hkeep r Hr E Hmiss).
+      + intros i r' u Hi He. rewrite (Hvals i r' u Hi) He. reflexivity.
+  Qed.
+
   (* THE RESTORE RUN.  Each [c.ldsp] DOES write a register, so the register *)
   (* file the continuation gets is [ushp_spillback] of the list.            *)
   Local Lemma wp_kshp_restore (spn : mword 64) (nn : nat) :
