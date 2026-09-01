@@ -1217,7 +1217,7 @@ Section BioInv.
             (fun k p => is_sleeplock (fst p) (snd p) (buf_lock (bnode k))
                           "buffer"%string (lock_tok_excl (fown k)))
             NBUF 0 with "Hsl") as (fslk) "#Hsls".
-    set (bn := MkBioNames γlk γb fslk fown fmid).
+    set (bn := MkBioNames γlk γb fslk fown fmid fmid).
     (* every initial payload is empty: blockno 0 is uncovered *)
     assert (Hpay0 : forall k bs,
         buf_pay bn V k false (mword_of_int 0 : mword 32)

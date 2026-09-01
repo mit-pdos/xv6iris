@@ -1,0 +1,352 @@
+DIGEST 004c777264ca3ab60218df004edcfcdc
+Fxv6iris.BioBox
+R2002:2007 Stdlib.ZArith.ZArith <> <> lib
+R2009:2011 Stdlib.micromega.Lia <> <> lib
+R2013:2016 Stdlib.Lists.List <> <> lib
+R2045:2048 stdpp.gmap <> <> lib
+R2050:2053 stdpp.list <> <> lib
+R2055:2075 stdpp.bitvector.definitions <> <> lib
+R2113:2121 iris.proofmode.proofmode <> <> lib
+R2157:2160 iris.algebra.excl <> <> lib
+R2162:2165 iris.algebra.auth <> <> lib
+R2167:2170 iris.algebra.gmap <> <> lib
+R2172:2175 iris.algebra.frac <> <> lib
+R2177:2183 iris.algebra.numbers <> <> lib
+R2226:2233 iris.base_logic.lib.gen_heap <> <> lib
+R2235:2244 iris.base_logic.lib.invariants <> <> lib
+R2246:2248 iris.base_logic.lib.own <> <> lib
+R2266:2295 SailStdpp.ConcurrencyInterface <> <> lib
+R2297:2334 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R2336:2370 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R2372:2397 SailStdpp.Operators_mwords <> <> lib
+R2415:2428 SailStdpp.Base <> <> lib
+R2430:2448 SailStdpp.TypeCasts <> <> lib
+R2450:2465 SailStdpp.Values <> <> lib
+R2467:2487 SailStdpp.MachineWord <> <> lib
+R2505:2519 xv6iris.RiscvModelBytes <> <> lib
+R2537:2546 xv6iris.RiscvPtsto <> <> lib
+R2564:2569 xv6iris.WpLock <> <> lib
+R2587:2594 xv6iris.TsoMemPa <> <> lib
+R2596:2603 xv6iris.TsoGhost <> <> lib
+R2621:2626 xv6iris.TsoCtx <> <> lib
+R2644:2653 xv6iris.TsoCtxPark <> <> lib
+R2671:2679 xv6iris.CtxAnchor <> <> lib
+R2697:2705 xv6iris.SleepLock <> <> lib
+R2723:2728 xv6iris.BufOwn <> <> lib
+R2746:2754 xv6iris.DiskPtsto <> <> lib
+R2772:2780 xv6iris.BcacheInv <> <> lib
+R2798:2804 xv6iris.BioDefs <> <> lib
+R2827:2836 Kernel.KernelSyms <> <> lib
+R2854:2870 Riscv.rv64d_types <> <> lib
+R2872:2882 Riscv.rv64d <> <> lib
+R2884:2901 Riscv.riscv_extras <> <> lib
+R2919:2927 xv6iris.SepThread <> <> lib
+R2945:2948 xv6iris.Xv6G <> <> lib
+R2966:2971 xv6iris.BioInv <> <> lib
+sec 2983:2988 <> BioBox
+R3004:3010 xv6iris.RiscvPtsto <> riscvGS class
+R3017:3020 xv6iris.Xv6G <> xv6G class
+R3022:3023 xv6iris.BioBox <> Σ:1 var
+R3027:3034 xv6iris.Xv6Cameras <> bioslotG class
+R3036:3037 xv6iris.BioBox <> Σ:1 var
+R3041:3047 xv6iris.CtxAnchor <> anchorG class
+R3049:3050 xv6iris.BioBox <> Σ:1 var
+def 3504:3513 <> buf_bundle
+R3521:3529 xv6iris.BioDefs <> bio_names rec
+binder 3516:3517 <> bn:6
+R3537:3544 xv6iris.BioDefs <> bio_view rec
+R3546:3547 xv6iris.BioBox <> BioBox.Σ var
+binder 3533:3533 <> V:7
+R3555:3557 Corelib.Init.Datatypes <> nat ind
+binder 3551:3551 <> k:8
+R3572:3576 xv6iris.TsoCtx <> CtxId rec
+binder 3567:3568 <> ξ:9
+R3581:3585 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R3587:3588 xv6iris.BioBox <> BioBox.Σ var
+R3598:3602 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3651:3660 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R3607:3610 Corelib.Init.Datatypes <> bool ind
+binder 3603:3603 <> v:10
+R3624:3628 SailStdpp.Values <> mword def
+binder 3614:3616 <> dev:11
+R3624:3628 SailStdpp.Values <> mword def
+binder 3618:3620 <> bno:12
+R3640:3643 Corelib.Init.Datatypes <> list ind
+R3646:3647 stdpp.bitvector.definitions <> bv rec
+binder 3635:3636 <> bs:13
+R3795:3806 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3661:3678 xv6iris.TsoCtx <> ctx_word4_pointsto def
+R3724:3726 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R3728:3734 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R3760:3767 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R3793:3793 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R3785:3789 SailStdpp.Values <> mword def
+R3768:3779 SailStdpp.Values <> mword_of_int def
+R3752:3756 SailStdpp.Values <> mword def
+R3735:3746 SailStdpp.Values <> mword_of_int def
+R3727:3727 xv6iris.BioBox <> v:10 var
+R3702:3709 iris.algebra.dfrac <> DfracOwn constr
+R3684:3690 xv6iris.BufOwn <> b_valid def
+R3693:3695 xv6iris.BioInv <> bpa def
+R3697:3697 xv6iris.BioBox <> k:8 var
+R3680:3681 xv6iris.BioBox <> ξ:9 var
+R3865:3876 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3807:3824 xv6iris.TsoCtx <> ctx_word4_pointsto def
+R3862:3864 xv6iris.BioBox <> dev:11 var
+R3846:3853 iris.algebra.dfrac <> DfracOwn constr
+R3857:3857 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R3830:3834 xv6iris.BufOwn <> b_dev def
+R3837:3839 xv6iris.BioInv <> bpa def
+R3841:3841 xv6iris.BioBox <> k:8 var
+R3826:3827 xv6iris.BioBox <> ξ:9 var
+R3938:3949 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3877:3883 xv6iris.BufOwn <> buf_own def
+R3936:3937 xv6iris.BioBox <> bs:13 var
+R3926:3930 SailStdpp.Values <> mword def
+R3909:3920 SailStdpp.Values <> mword_of_int def
+R3904:3906 xv6iris.BioBox <> bno:12 var
+R3897:3899 xv6iris.BioInv <> bpa def
+R3901:3901 xv6iris.BioBox <> k:8 var
+R3892:3893 xv6iris.BioBox <> ξ:9 var
+R3950:3956 xv6iris.BioInv <> buf_pay def
+R3969:3970 xv6iris.BioBox <> bn:6 var
+R3972:3972 xv6iris.BioBox <> V:7 var
+R3974:3974 xv6iris.BioBox <> k:8 var
+R3976:3976 xv6iris.BioBox <> v:10 var
+R3978:3980 xv6iris.BioBox <> dev:11 var
+R3982:3984 xv6iris.BioBox <> bno:12 var
+R3986:3987 xv6iris.BioBox <> bs:13 var
+R3965:3966 xv6iris.BioBox <> ξ:9 var
+def 4205:4217 <> buf_chain_res
+R4225:4233 xv6iris.BioDefs <> bio_names rec
+binder 4220:4221 <> bn:14
+R4241:4243 Corelib.Init.Datatypes <> nat ind
+binder 4237:4237 <> k:15
+R4252:4256 xv6iris.TsoCtx <> CtxId rec
+binder 4247:4248 <> ξ:16
+R4261:4265 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4267:4268 xv6iris.BioBox <> BioBox.Σ var
+R4278:4282 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R4310:4319 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R4287:4288 stdpp.numbers <> Qp rec
+binder 4283:4283 <> q:17
+R4302:4306 SailStdpp.Values <> mword def
+binder 4292:4294 <> dev:18
+R4302:4306 SailStdpp.Values <> mword def
+binder 4296:4298 <> bno:19
+R4335:4346 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4320:4327 xv6iris.BioInv <> bref_tok def
+R4329:4330 xv6iris.BioBox <> bn:14 var
+R4332:4332 xv6iris.BioBox <> k:15 var
+R4334:4334 xv6iris.BioBox <> q:17 var
+R4401:4412 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4347:4364 xv6iris.TsoCtx <> ctx_word4_pointsto def
+R4398:4400 xv6iris.BioBox <> dev:18 var
+R4386:4393 iris.algebra.dfrac <> DfracOwn constr
+R4395:4395 xv6iris.BioBox <> q:17 var
+R4370:4374 xv6iris.BufOwn <> b_dev def
+R4377:4379 xv6iris.BioInv <> bpa def
+R4381:4381 xv6iris.BioBox <> k:15 var
+R4366:4367 xv6iris.BioBox <> ξ:16 var
+R4471:4482 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4413:4430 xv6iris.TsoCtx <> ctx_word4_pointsto def
+R4468:4470 xv6iris.BioBox <> bno:19 var
+R4456:4463 iris.algebra.dfrac <> DfracOwn constr
+R4465:4465 xv6iris.BioBox <> q:17 var
+R4436:4444 xv6iris.BufOwn <> b_blockno def
+R4447:4449 xv6iris.BioInv <> bpa def
+R4451:4451 xv6iris.BioBox <> k:15 var
+R4432:4433 xv6iris.BioBox <> ξ:16 var
+R4483:4486 xv6iris.BioInv <> bown def
+R4488:4489 xv6iris.BioBox <> bn:14 var
+R4491:4491 xv6iris.BioBox <> k:15 var
+def 4739:4743 <> bioxN
+R4747:4755 stdpp.namespaces <> namespace def
+R4765:4768 stdpp.namespaces <> ::stdpp_scope:x_'.@'_x not
+R4760:4764 stdpp.namespaces <> nroot def
+def 4794:4805 <> buf_box_body
+R4813:4821 xv6iris.BioDefs <> bio_names rec
+binder 4808:4809 <> bn:20
+R4829:4836 xv6iris.BioDefs <> bio_view rec
+R4838:4839 xv6iris.BioBox <> BioBox.Σ var
+binder 4825:4825 <> V:21
+R4847:4849 Corelib.Init.Datatypes <> nat ind
+binder 4843:4843 <> k:22
+R4854:4858 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4860:4861 xv6iris.BioBox <> BioBox.Σ var
+R4871:4875 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R4899:4908 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R4882:4884 Corelib.Init.Datatypes <> nat ind
+binder 4876:4876 <> n:23
+R4882:4884 Corelib.Init.Datatypes <> nat ind
+binder 4878:4878 <> T:24
+R4894:4898 xv6iris.TsoCtx <> CtxId rec
+binder 4888:4890 <> ξb:25
+R4937:4948 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4909:4914 xv6iris.CtxAnchor <> anchor def
+R4917:4922 xv6iris.BioDefs <> bn_anc proj
+R4924:4925 xv6iris.BioBox <> bn:20 var
+R4927:4927 xv6iris.BioBox <> k:22 var
+R4930:4930 xv6iris.BioBox <> n:23 var
+R4932:4934 xv6iris.BioBox <> ξb:25 var
+R4936:4936 xv6iris.BioBox <> T:24 var
+R4973:4984 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4949:4954 xv6iris.CtxAnchor <> astamp def
+R4957:4962 xv6iris.BioDefs <> bn_anc proj
+R4964:4965 xv6iris.BioBox <> bn:20 var
+R4967:4967 xv6iris.BioBox <> k:22 var
+R4970:4970 xv6iris.BioBox <> n:23 var
+R4972:4972 xv6iris.BioBox <> T:24 var
+R5002:5014 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5063:5063 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4985:4987 xv6iris.TsoGhost <> llb def
+R4989:4999 xv6iris.RiscvPtsto <> loglen_name def
+R5001:5001 xv6iris.BioBox <> T:24 var
+R5036:5040 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R5015:5024 xv6iris.BioBox <> buf_bundle def
+R5026:5027 xv6iris.BioBox <> bn:20 var
+R5029:5029 xv6iris.BioBox <> V:21 var
+R5031:5031 xv6iris.BioBox <> k:22 var
+R5033:5035 xv6iris.BioBox <> ξb:25 var
+R5041:5053 xv6iris.BioBox <> buf_chain_res def
+R5055:5056 xv6iris.BioBox <> bn:20 var
+R5058:5058 xv6iris.BioBox <> k:22 var
+R5060:5062 xv6iris.BioBox <> ξb:25 var
+def 5083:5089 <> buf_box
+R5097:5105 xv6iris.BioDefs <> bio_names rec
+binder 5092:5093 <> bn:26
+R5113:5120 xv6iris.BioDefs <> bio_view rec
+R5122:5123 xv6iris.BioBox <> BioBox.Σ var
+binder 5109:5109 <> V:27
+R5131:5133 Corelib.Init.Datatypes <> nat ind
+binder 5127:5127 <> k:28
+R5138:5142 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R5144:5145 xv6iris.BioBox <> BioBox.Σ var
+R5154:5156 iris.base_logic.lib.invariants <> inv def
+R5165:5176 xv6iris.BioBox <> buf_box_body def
+R5178:5179 xv6iris.BioBox <> bn:26 var
+R5181:5181 xv6iris.BioBox <> V:27 var
+R5183:5183 xv6iris.BioBox <> k:28 var
+R5158:5162 xv6iris.BioBox <> bioxN def
+inst 5434:5449 <> buf_bundle_morph
+binder 5451:5452 <> bn:29
+binder 5454:5454 <> V:30
+binder 5456:5456 <> k:31
+R5460:5467 xv6iris.TsoCtx <> CtxMorph class
+R5470:5479 xv6iris.BioBox <> buf_bundle def
+R5481:5482 xv6iris.BioBox <> bn:29 var
+R5484:5484 xv6iris.BioBox <> V:30 var
+R5486:5486 xv6iris.BioBox <> k:31 var
+R5512:5521 xv6iris.BioBox <> buf_bundle def
+R5512:5521 xv6iris.BioBox <> buf_bundle def
+R5512:5521 xv6iris.BioBox <> buf_bundle def
+R5530:5544 xv6iris.TsoCtx <> ctx_morph_exist inst
+R5530:5544 xv6iris.TsoCtx <> ctx_morph_exist inst
+R5562:5576 xv6iris.TsoCtx <> ctx_morph_exist inst
+R5562:5576 xv6iris.TsoCtx <> ctx_morph_exist inst
+R5592:5606 xv6iris.TsoCtx <> ctx_morph_exist inst
+R5592:5606 xv6iris.TsoCtx <> ctx_morph_exist inst
+R5626:5640 xv6iris.TsoCtx <> ctx_morph_exist inst
+R5626:5640 xv6iris.TsoCtx <> ctx_morph_exist inst
+R5659:5671 xv6iris.TsoCtx <> ctx_morph_sep inst
+R5681:5695 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R5659:5671 xv6iris.TsoCtx <> ctx_morph_sep inst
+R5681:5695 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R5710:5722 xv6iris.TsoCtx <> ctx_morph_sep inst
+R5732:5746 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R5710:5722 xv6iris.TsoCtx <> ctx_morph_sep inst
+R5732:5746 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R5761:5773 xv6iris.TsoCtx <> ctx_morph_sep inst
+R5761:5773 xv6iris.TsoCtx <> ctx_morph_sep inst
+R5791:5797 xv6iris.BufOwn <> buf_own def
+R5791:5797 xv6iris.BufOwn <> buf_own def
+R5791:5797 xv6iris.BufOwn <> buf_own def
+R5812:5824 xv6iris.TsoCtx <> ctx_morph_sep inst
+R5834:5848 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R5812:5824 xv6iris.TsoCtx <> ctx_morph_sep inst
+R5834:5848 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R5865:5877 xv6iris.TsoCtx <> ctx_morph_sep inst
+R5887:5901 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R5865:5877 xv6iris.TsoCtx <> ctx_morph_sep inst
+R5887:5901 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R5918:5930 xv6iris.TsoCtx <> ctx_morph_sep inst
+R5940:5954 xv6iris.TsoCtx <> ctx_morph_const inst
+R5918:5930 xv6iris.TsoCtx <> ctx_morph_sep inst
+R5940:5954 xv6iris.TsoCtx <> ctx_morph_const inst
+R5971:5988 xv6iris.TsoCtx <> ctx_morph_big_sepL inst
+R5971:5988 xv6iris.TsoCtx <> ctx_morph_big_sepL inst
+R6009:6026 xv6iris.TsoCtx <> ctx_morph_pointsto inst
+R6009:6026 xv6iris.TsoCtx <> ctx_morph_pointsto inst
+R6044:6050 xv6iris.BioInv <> buf_pay def
+R6044:6050 xv6iris.BioInv <> buf_pay def
+R6044:6050 xv6iris.BioInv <> buf_pay def
+R6080:6094 xv6iris.TsoCtx <> ctx_morph_const inst
+R6080:6094 xv6iris.TsoCtx <> ctx_morph_const inst
+R6110:6122 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6132:6146 xv6iris.TsoCtx <> ctx_morph_const inst
+R6110:6122 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6132:6146 xv6iris.TsoCtx <> ctx_morph_const inst
+R6183:6197 xv6iris.TsoCtx <> ctx_morph_exist inst
+R6183:6197 xv6iris.TsoCtx <> ctx_morph_exist inst
+R6213:6227 xv6iris.TsoCtx <> ctx_morph_exist inst
+R6213:6227 xv6iris.TsoCtx <> ctx_morph_exist inst
+R6249:6261 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6271:6285 xv6iris.TsoCtx <> ctx_morph_const inst
+R6249:6261 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6271:6285 xv6iris.TsoCtx <> ctx_morph_const inst
+R6307:6313 xv6iris.BioInv <> bio_pay def
+R6307:6313 xv6iris.BioInv <> bio_pay def
+R6307:6313 xv6iris.BioInv <> bio_pay def
+R6344:6356 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6366:6380 xv6iris.TsoCtx <> ctx_morph_const inst
+R6344:6356 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6366:6380 xv6iris.TsoCtx <> ctx_morph_const inst
+R6401:6415 xv6iris.TsoCtx <> ctx_morph_exist inst
+R6401:6415 xv6iris.TsoCtx <> ctx_morph_exist inst
+R6442:6445 xv6iris.BioInv <> bref def
+R6442:6445 xv6iris.BioInv <> bref def
+R6442:6445 xv6iris.BioInv <> bref def
+R6464:6476 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6486:6500 xv6iris.TsoCtx <> ctx_morph_const inst
+R6464:6476 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6486:6500 xv6iris.TsoCtx <> ctx_morph_const inst
+R6521:6533 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6542:6556 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R6521:6533 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6542:6556 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R6542:6556 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R6575:6589 xv6iris.TsoCtx <> ctx_morph_const inst
+R6575:6589 xv6iris.TsoCtx <> ctx_morph_const inst
+R6606:6620 xv6iris.TsoCtx <> ctx_morph_const inst
+R6606:6620 xv6iris.TsoCtx <> ctx_morph_const inst
+inst 6649:6667 <> buf_chain_res_morph
+binder 6669:6670 <> bn:32
+binder 6672:6672 <> k:33
+R6676:6683 xv6iris.TsoCtx <> CtxMorph class
+R6686:6698 xv6iris.BioBox <> buf_chain_res def
+R6700:6701 xv6iris.BioBox <> bn:32 var
+R6703:6703 xv6iris.BioBox <> k:33 var
+R6729:6741 xv6iris.BioBox <> buf_chain_res def
+R6729:6741 xv6iris.BioBox <> buf_chain_res def
+R6729:6741 xv6iris.BioBox <> buf_chain_res def
+R6750:6764 xv6iris.TsoCtx <> ctx_morph_exist inst
+R6750:6764 xv6iris.TsoCtx <> ctx_morph_exist inst
+R6782:6796 xv6iris.TsoCtx <> ctx_morph_exist inst
+R6782:6796 xv6iris.TsoCtx <> ctx_morph_exist inst
+R6812:6826 xv6iris.TsoCtx <> ctx_morph_exist inst
+R6812:6826 xv6iris.TsoCtx <> ctx_morph_exist inst
+R6846:6858 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6868:6882 xv6iris.TsoCtx <> ctx_morph_const inst
+R6846:6858 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6868:6882 xv6iris.TsoCtx <> ctx_morph_const inst
+R6897:6909 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6919:6933 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R6897:6909 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6919:6933 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R6948:6960 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6970:6984 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R6948:6960 xv6iris.TsoCtx <> ctx_morph_sep inst
+R6970:6984 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R6999:7013 xv6iris.TsoCtx <> ctx_morph_const inst
+R6999:7013 xv6iris.TsoCtx <> ctx_morph_const inst
+R7028:7033 xv6iris.BioBox BioBox <> sec

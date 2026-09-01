@@ -107,7 +107,7 @@ Section BioInitAt.
     iMod (bio_buf_ghost_alloc NBUF 0) as (f) "Hbufs".
     iModIntro.
     iExists (MkBioNames γlk γb (fun k => (f k).1.1) (fun k => (f k).1.2)
-                        (fun k => (f k).2)).
+                        (fun k => (f k).2) (fun k => (f k).2)).
     rewrite /bio_free_tok /bslots_auth /bslots.
     cbn [bn_lk bn_auth bn_slk bn_own bn_mid].
     iFrame "Hlk Hauth Hsa Hsf Hbufs".

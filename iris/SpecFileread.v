@@ -307,7 +307,7 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
     (MkBioNames 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
-       (fun _ => 1%positive))
+       (fun _ => 1%positive) (fun _ => 1%positive))
     (MkFsNames 1%positive 1%positive 1%positive 1%positive 1%positive)
     1%positive (MkIcNames (fun _ => 1%positive) (fun _ => 1%positive)
                           (fun _ => 1%positive))

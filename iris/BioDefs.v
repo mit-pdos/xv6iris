@@ -42,6 +42,7 @@ Record bio_names := MkBioNames {
   bn_slk  : nat -> gname * gname; (* buffer k's sleeplock (γl, γsl)      *)
   bn_own  : nat -> gname;         (* buffer k's checkout token           *)
   bn_mid  : nat -> gname;         (* buffer k's recycle token            *)
+  bn_anc  : nat -> gname;         (* buffer k's transit anchor (Phase 5)  *)
 }.
 
 (* ---------------------------------------------------------------------- *)

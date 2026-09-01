@@ -1,4 +1,4 @@
-DIGEST e7af63cd886300aa4aab8705cfeecd03
+DIGEST 3b78775b3aaaebada0c6e92ee1b8dd7a
 Fxv6iris.BioDefs
 R468:473 Stdlib.ZArith.ZArith <> <> lib
 R475:477 Stdlib.micromega.Lia <> <> lib
@@ -36,6 +36,7 @@ proj 1955:1961 <> bn_auth
 proj 2033:2038 <> bn_slk
 proj 2111:2116 <> bn_own
 proj 2187:2192 <> bn_mid
+proj 2263:2268 <> bn_anc
 R1889:1893 iris.base_logic.lib.iprop <> gname def
 R1965:1969 iris.base_logic.lib.iprop <> gname def
 R2046:2049 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
@@ -49,323 +50,326 @@ R2128:2132 iris.base_logic.lib.iprop <> gname def
 R2200:2203 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
 R2197:2199 Corelib.Init.Datatypes <> nat ind
 R2204:2208 iris.base_logic.lib.iprop <> gname def
-sec 3305:3312 <> BioSlots
-R3328:3335 xv6iris.Xv6Cameras <> bioslotG class
-def 3356:3361 <> bslots
-R3368:3370 Corelib.Init.Datatypes <> nat ind
-binder 3364:3364 <> n:9
-R3375:3379 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R3381:3382 xv6iris.BioDefs <> BioSlots.Σ var
-R3387:3389 iris.base_logic.lib.own <> own def
-R3405:3408 iris.algebra.auth <> :::'◯'_x not
-R3409:3409 xv6iris.BioDefs <> n:9 var
-R3391:3402 xv6iris.Xv6Cameras <> bioslot_name meth
-def 3426:3430 <> bslot
-R3434:3438 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R3440:3441 xv6iris.BioDefs <> BioSlots.Σ var
-R3446:3451 xv6iris.BioDefs <> bslots def
-def 3469:3479 <> bslots_auth
-R3483:3487 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R3489:3490 xv6iris.BioDefs <> BioSlots.Σ var
-R3495:3497 iris.base_logic.lib.own <> own def
-R3513:3515 iris.algebra.auth <> :::'●'_x_x not
-R3516:3516 iris.algebra.auth <> :::'●'_x_x not
-R3517:3522 xv6iris.BioDefs <> BSLOTS def
-R3499:3510 xv6iris.Xv6Cameras <> bioslot_name meth
-prf 3535:3543 <> bslots_op
-binder 3545:3545 <> a:10
-binder 3547:3547 <> b:11
-R3565:3572 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
-R3551:3556 xv6iris.BioDefs <> bslots def
-R3560:3562 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
-R3559:3559 xv6iris.BioDefs <> a:10 var
-R3563:3563 xv6iris.BioDefs <> b:11 var
-R3581:3585 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R3573:3578 xv6iris.BioDefs <> bslots def
-R3580:3580 xv6iris.BioDefs <> a:10 var
-R3586:3591 xv6iris.BioDefs <> bslots def
-R3593:3593 xv6iris.BioDefs <> b:11 var
-R3618:3623 xv6iris.BioDefs <> bslots def
-R3618:3623 xv6iris.BioDefs <> bslots def
-R3618:3623 xv6iris.BioDefs <> bslots def
-R3644:3644 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R3672:3675 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R3663:3671 xv6iris.Xv6Cameras <> bioslotUR def
-R3645:3648 iris.algebra.auth <> :::'◯'_x not
-R3651:3653 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
-R3681:3685 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
-R3676:3679 iris.algebra.auth <> :::'◯'_x not
-R3686:3689 iris.algebra.auth <> :::'◯'_x not
-R3712:3723 iris.algebra.auth <> auth_frag_op thm
-R3644:3644 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R3672:3675 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R3663:3671 xv6iris.Xv6Cameras <> bioslotUR def
-R3645:3648 iris.algebra.auth <> :::'◯'_x not
-R3651:3653 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
-R3681:3685 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
-R3676:3679 iris.algebra.auth <> :::'◯'_x not
-R3686:3689 iris.algebra.auth <> :::'◯'_x not
-R3712:3723 iris.algebra.auth <> auth_frag_op thm
-R3712:3723 iris.algebra.auth <> auth_frag_op thm
-R3756:3761 iris.base_logic.lib.own <> own_op thm
-R3756:3761 iris.base_logic.lib.own <> own_op thm
-R3756:3761 iris.base_logic.lib.own <> own_op thm
-prf 3793:3804 <> bslots_split
-binder 3806:3806 <> a:12
-binder 3808:3808 <> b:13
-R3826:3831 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R3812:3817 xv6iris.BioDefs <> bslots def
-R3821:3823 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
-R3820:3820 xv6iris.BioDefs <> a:12 var
-R3824:3824 xv6iris.BioDefs <> b:13 var
-R3840:3844 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R3832:3837 xv6iris.BioDefs <> bslots def
-R3839:3839 xv6iris.BioDefs <> a:12 var
-R3845:3850 xv6iris.BioDefs <> bslots def
-R3852:3852 xv6iris.BioDefs <> b:13 var
-R3872:3880 xv6iris.BioDefs <> bslots_op thm
-R3872:3880 xv6iris.BioDefs <> bslots_op thm
-R3872:3880 xv6iris.BioDefs <> bslots_op thm
-prf 3909:3922 <> bslots_combine
-binder 3924:3924 <> a:14
-binder 3926:3926 <> b:15
-R3938:3943 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R3930:3935 xv6iris.BioDefs <> bslots def
-R3937:3937 xv6iris.BioDefs <> a:14 var
-R3952:3957 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R3944:3949 xv6iris.BioDefs <> bslots def
-R3951:3951 xv6iris.BioDefs <> b:15 var
-R3958:3963 xv6iris.BioDefs <> bslots def
-R3967:3969 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
-R3966:3966 xv6iris.BioDefs <> a:14 var
-R3970:3970 xv6iris.BioDefs <> b:15 var
-R4008:4016 xv6iris.BioDefs <> bslots_op thm
-R4008:4016 xv6iris.BioDefs <> bslots_op thm
-R4008:4016 xv6iris.BioDefs <> bslots_op thm
-prf 4041:4052 <> bslots_bound
-binder 4054:4054 <> n:16
-R4069:4074 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R4058:4068 xv6iris.BioDefs <> bslots_auth def
-R4083:4088 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R4075:4080 xv6iris.BioDefs <> bslots def
-R4082:4082 xv6iris.BioDefs <> n:16 var
-R4089:4091 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R4109:4111 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R4094:4097 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
-R4093:4093 xv6iris.BioDefs <> n:16 var
-R4098:4103 xv6iris.BioDefs <> BSLOTS def
-R4136:4146 xv6iris.BioDefs <> bslots_auth def
-R4149:4154 xv6iris.BioDefs <> bslots def
-R4136:4146 xv6iris.BioDefs <> bslots_auth def
-R4136:4146 xv6iris.BioDefs <> bslots_auth def
-R4149:4154 xv6iris.BioDefs <> bslots def
-R4149:4154 xv6iris.BioDefs <> bslots def
-R4188:4188 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4200:4205 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4213:4213 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4189:4199 iris.base_logic.lib.own <> own_valid_2 thm
-R4229:4252 iris.algebra.auth <> auth_both_valid_discrete thm
-R4188:4188 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4200:4205 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4213:4213 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4189:4199 iris.base_logic.lib.own <> own_valid_2 thm
-R4229:4252 iris.algebra.auth <> auth_both_valid_discrete thm
-R4280:4291 iris.algebra.numbers <> nat_included thm
-R4280:4291 iris.algebra.numbers <> nat_included thm
-prf 4458:4475 <> bslots_no_overflow
-R4482:4489 Corelib.Numbers.BinNums <> positive ind
-binder 4478:4478 <> n:17
-R4509:4514 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R4498:4508 xv6iris.BioDefs <> bslots_auth def
-R4536:4545 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R4515:4520 xv6iris.BioDefs <> bslots def
-R4523:4532 Stdlib.PArith.BinPos Pos to_nat def
-R4534:4534 xv6iris.BioDefs <> n:17 var
-R4546:4548 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R4604:4606 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R4569:4572 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
-R4557:4559 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
-R4550:4554 Stdlib.ZArith.BinInt Z pos abbrev
-R4556:4556 xv6iris.BioDefs <> n:17 var
-R4561:4563 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R4592:4594 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
-R4574:4578 Stdlib.ZArith.BinInt Z pos abbrev
-R4581:4588 Stdlib.PArith.BinPos Pos succ def
-R4590:4590 xv6iris.BioDefs <> n:17 var
-R4596:4598 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R4653:4653 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4666:4671 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4679:4679 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4654:4665 xv6iris.BioDefs <> bslots_bound thm
-R4653:4653 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4666:4671 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4679:4679 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4654:4665 xv6iris.BioDefs <> bslots_bound thm
-R4731:4733 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R4726:4728 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R4731:4733 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R4726:4728 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
-R4802:4804 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R4796:4801 xv6iris.BioDefs <> BSLOTS def
-R4802:4804 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R4796:4801 xv6iris.BioDefs <> BSLOTS def
-R4893:4896 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
-R4886:4890 Stdlib.ZArith.BinInt Z pos abbrev
-R4919:4932 Stdlib.ZArith.Znat <> positive_nat_Z thm
-R4893:4896 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
-R4886:4890 Stdlib.ZArith.BinInt Z pos abbrev
-R4919:4932 Stdlib.ZArith.Znat <> positive_nat_Z thm
-R4919:4932 Stdlib.ZArith.Znat <> positive_nat_Z thm
-R4974:4981 xv6iris.BioDefs BioSlots <> sec
-prf 5292:5303 <> bslots_alloc
-R5308:5319 xv6iris.Xv6Cameras <> bioslotGpreS class
-binder 5321:5322 <> Σ:18
-binder 5307:5322 <> bioslotGpreS0:19
-R5329:5332 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
-R5333:5337 iris.bi.updates <> ::bi_scope:'|==>'_x not
-R5338:5341 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R5357:5358 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R5346:5353 xv6iris.Xv6Cameras <> bioslotG class
-R5355:5356 xv6iris.BioDefs <> Σ:18 var
-R5370:5374 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R5359:5369 xv6iris.BioDefs <> bslots_auth def
-R5393:5397 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R5375:5380 xv6iris.BioDefs <> bslots def
-R5382:5392 xv6iris.BioDefs <> BSLOTS_PROC def
-R5398:5403 xv6iris.BioDefs <> bslots def
-R5405:5413 xv6iris.BioDefs <> BSLOTS_FS def
-R5431:5439 iris.base_logic.lib.own <> own_alloc thm
-R5472:5480 xv6iris.Xv6Cameras <> bioslotUR def
-R5453:5457 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
-R5443:5445 iris.algebra.auth <> :::'●'_x_x not
-R5446:5446 iris.algebra.auth <> :::'●'_x_x not
-R5447:5452 xv6iris.BioDefs <> BSLOTS def
-R5458:5461 iris.algebra.auth <> :::'◯'_x not
-R5462:5467 xv6iris.BioDefs <> BSLOTS def
-R5431:5439 iris.base_logic.lib.own <> own_alloc thm
-R5472:5480 xv6iris.Xv6Cameras <> bioslotUR def
-R5453:5457 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
-R5443:5445 iris.algebra.auth <> :::'●'_x_x not
-R5446:5446 iris.algebra.auth <> :::'●'_x_x not
-R5447:5452 xv6iris.BioDefs <> BSLOTS def
-R5458:5461 iris.algebra.auth <> :::'◯'_x not
-R5462:5467 xv6iris.BioDefs <> BSLOTS def
-R5513:5536 iris.algebra.auth <> auth_both_valid_discrete thm
-R5513:5536 iris.algebra.auth <> auth_both_valid_discrete thm
-R5585:5592 xv6iris.Xv6Cameras <> BioSlotG constr
-R5585:5592 xv6iris.Xv6Cameras <> BioSlotG constr
-R5628:5633 xv6iris.BioDefs <> bslots def
-R5628:5633 xv6iris.BioDefs <> bslots def
-R5628:5633 xv6iris.BioDefs <> bslots def
-R5652:5652 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5675:5678 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5666:5674 xv6iris.Xv6Cameras <> bioslotUR def
-R5653:5656 iris.algebra.auth <> :::'◯'_x not
-R5657:5662 xv6iris.BioDefs <> BSLOTS def
-R5694:5698 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
-R5679:5682 iris.algebra.auth <> :::'◯'_x not
-R5683:5693 xv6iris.BioDefs <> BSLOTS_PROC def
-R5699:5702 iris.algebra.auth <> :::'◯'_x not
-R5703:5711 xv6iris.BioDefs <> BSLOTS_FS def
-R5731:5742 iris.algebra.auth <> auth_frag_op thm
-R5652:5652 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5675:5678 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5666:5674 xv6iris.Xv6Cameras <> bioslotUR def
-R5653:5656 iris.algebra.auth <> :::'◯'_x not
-R5657:5662 xv6iris.BioDefs <> BSLOTS def
-R5694:5698 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
-R5679:5682 iris.algebra.auth <> :::'◯'_x not
-R5683:5693 xv6iris.BioDefs <> BSLOTS_PROC def
-R5699:5702 iris.algebra.auth <> :::'◯'_x not
-R5703:5711 xv6iris.BioDefs <> BSLOTS_FS def
-R5731:5742 iris.algebra.auth <> auth_frag_op thm
-R5731:5742 iris.algebra.auth <> auth_frag_op thm
-R5773:5778 iris.base_logic.lib.own <> own_op thm
-R5773:5778 iris.base_logic.lib.own <> own_op thm
-R5773:5778 iris.base_logic.lib.own <> own_op thm
-rec 6264:6271 <> bio_view
-proj 6307:6311 <> bv_gd
-proj 6332:6337 <> bv_dev
-proj 6372:6377 <> bv_cov
-proj 6393:6400 <> bv_clean
-proj 6436:6443 <> bv_dirty
-proj 6593:6603 <> bv_clean_tl
-proj 6648:6658 <> bv_dirty_tl
-R6279:6287 iris.base_logic.lib.iprop <> gFunctors rec
-binder 6274:6275 <> Σ:20
-R6318:6327 xv6iris.DiskPtsto <> disk_names rec
-R6343:6364 SailStdpp.Values <> mword def
-R6383:6386 stdpp.gmap <> gset def
-R6388:6388 Corelib.Numbers.BinNums <> Z ind
-R6405:6408 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R6404:6404 Corelib.Numbers.BinNums <> Z ind
-R6420:6423 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R6409:6412 Corelib.Init.Datatypes <> list ind
-R6415:6416 stdpp.bitvector.definitions <> bv rec
-R6424:6428 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R6430:6431 xv6iris.BioDefs <> Σ:20 var
-R6448:6451 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R6447:6447 Corelib.Numbers.BinNums <> Z ind
-R6463:6466 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R6452:6455 Corelib.Init.Datatypes <> list ind
-R6458:6459 stdpp.bitvector.definitions <> bv rec
-R6467:6471 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R6473:6474 xv6iris.BioDefs <> Σ:20 var
-R6607:6613 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R6618:6619 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-binder 6614:6614 <> b:27
-binder 6616:6617 <> bs:28
-R6620:6627 iris.bi.derived_connectives <> Timeless class
-R6630:6637 xv6iris.BioDefs <> bv_clean:25 meth
-R6641:6642 xv6iris.BioDefs <> bs:28 var
-R6639:6639 xv6iris.BioDefs <> b:27 var
-R6662:6668 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R6673:6674 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-binder 6669:6669 <> b:30
-binder 6671:6672 <> bs:31
-R6675:6682 iris.bi.derived_connectives <> Timeless class
-R6685:6692 xv6iris.BioDefs <> bv_dirty:26 meth
-R6696:6697 xv6iris.BioDefs <> bs:31 var
-R6694:6694 xv6iris.BioDefs <> b:30 var
-R6714:6718 xv6iris.BioDefs <> bv_gd proj
-R6714:6718 xv6iris.BioDefs <> bv_gd proj
-R6738:6743 xv6iris.BioDefs <> bv_dev proj
-R6738:6743 xv6iris.BioDefs <> bv_dev proj
-R6763:6768 xv6iris.BioDefs <> bv_cov proj
-R6763:6768 xv6iris.BioDefs <> bv_cov proj
-R6788:6795 xv6iris.BioDefs <> bv_clean proj
-R6788:6795 xv6iris.BioDefs <> bv_clean proj
-R6815:6822 xv6iris.BioDefs <> bv_dirty proj
-R6815:6822 xv6iris.BioDefs <> bv_dirty proj
-R6842:6852 xv6iris.BioDefs <> bv_clean_tl proj
-R6842:6852 xv6iris.BioDefs <> bv_clean_tl proj
-R6876:6886 xv6iris.BioDefs <> bv_dirty_tl proj
-R6876:6886 xv6iris.BioDefs <> bv_dirty_tl proj
-R6910:6918 xv6iris.BioDefs <> MkBioView constr
-R6910:6918 xv6iris.BioDefs <> MkBioView constr
-inst 6957:6979 <> bio_view_clean_timeless
-binder 6982:6983 <> Σ:33
-R6991:6998 xv6iris.BioDefs <> bio_view rec
-R7000:7001 xv6iris.BioDefs <> Σ:33 var
-binder 6987:6987 <> V:34
-binder 7004:7004 <> b:35
-binder 7006:7007 <> bs:36
-R7013:7020 iris.bi.derived_connectives <> Timeless class
-R7023:7030 xv6iris.BioDefs <> bv_clean proj
-R7036:7037 xv6iris.BioDefs <> bs:36 var
-R7034:7034 xv6iris.BioDefs <> b:35 var
-R7032:7032 xv6iris.BioDefs <> V:34 var
-R7043:7053 xv6iris.BioDefs <> bv_clean_tl proj
-inst 7079:7101 <> bio_view_dirty_timeless
-binder 7104:7105 <> Σ:37
-R7113:7120 xv6iris.BioDefs <> bio_view rec
-R7122:7123 xv6iris.BioDefs <> Σ:37 var
-binder 7109:7109 <> V:38
-binder 7126:7126 <> b:39
-binder 7128:7129 <> bs:40
-R7135:7142 iris.bi.derived_connectives <> Timeless class
-R7145:7152 xv6iris.BioDefs <> bv_dirty proj
-R7158:7159 xv6iris.BioDefs <> bs:40 var
-R7156:7156 xv6iris.BioDefs <> b:39 var
-R7154:7154 xv6iris.BioDefs <> V:38 var
-R7165:7175 xv6iris.BioDefs <> bv_dirty_tl proj
+R2276:2279 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2273:2275 Corelib.Init.Datatypes <> nat ind
+R2280:2284 iris.base_logic.lib.iprop <> gname def
+sec 3382:3389 <> BioSlots
+R3405:3412 xv6iris.Xv6Cameras <> bioslotG class
+def 3433:3438 <> bslots
+R3445:3447 Corelib.Init.Datatypes <> nat ind
+binder 3441:3441 <> n:10
+R3452:3456 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R3458:3459 xv6iris.BioDefs <> BioSlots.Σ var
+R3464:3466 iris.base_logic.lib.own <> own def
+R3482:3485 iris.algebra.auth <> :::'◯'_x not
+R3486:3486 xv6iris.BioDefs <> n:10 var
+R3468:3479 xv6iris.Xv6Cameras <> bioslot_name meth
+def 3503:3507 <> bslot
+R3511:3515 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R3517:3518 xv6iris.BioDefs <> BioSlots.Σ var
+R3523:3528 xv6iris.BioDefs <> bslots def
+def 3546:3556 <> bslots_auth
+R3560:3564 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R3566:3567 xv6iris.BioDefs <> BioSlots.Σ var
+R3572:3574 iris.base_logic.lib.own <> own def
+R3590:3592 iris.algebra.auth <> :::'●'_x_x not
+R3593:3593 iris.algebra.auth <> :::'●'_x_x not
+R3594:3599 xv6iris.BioDefs <> BSLOTS def
+R3576:3587 xv6iris.Xv6Cameras <> bioslot_name meth
+prf 3612:3620 <> bslots_op
+binder 3622:3622 <> a:11
+binder 3624:3624 <> b:12
+R3642:3649 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R3628:3633 xv6iris.BioDefs <> bslots def
+R3637:3639 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R3636:3636 xv6iris.BioDefs <> a:11 var
+R3640:3640 xv6iris.BioDefs <> b:12 var
+R3658:3662 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3650:3655 xv6iris.BioDefs <> bslots def
+R3657:3657 xv6iris.BioDefs <> a:11 var
+R3663:3668 xv6iris.BioDefs <> bslots def
+R3670:3670 xv6iris.BioDefs <> b:12 var
+R3695:3700 xv6iris.BioDefs <> bslots def
+R3695:3700 xv6iris.BioDefs <> bslots def
+R3695:3700 xv6iris.BioDefs <> bslots def
+R3721:3721 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3749:3752 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3740:3748 xv6iris.Xv6Cameras <> bioslotUR def
+R3722:3725 iris.algebra.auth <> :::'◯'_x not
+R3728:3730 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R3758:3762 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R3753:3756 iris.algebra.auth <> :::'◯'_x not
+R3763:3766 iris.algebra.auth <> :::'◯'_x not
+R3789:3800 iris.algebra.auth <> auth_frag_op thm
+R3721:3721 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3749:3752 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3740:3748 xv6iris.Xv6Cameras <> bioslotUR def
+R3722:3725 iris.algebra.auth <> :::'◯'_x not
+R3728:3730 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R3758:3762 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R3753:3756 iris.algebra.auth <> :::'◯'_x not
+R3763:3766 iris.algebra.auth <> :::'◯'_x not
+R3789:3800 iris.algebra.auth <> auth_frag_op thm
+R3789:3800 iris.algebra.auth <> auth_frag_op thm
+R3833:3838 iris.base_logic.lib.own <> own_op thm
+R3833:3838 iris.base_logic.lib.own <> own_op thm
+R3833:3838 iris.base_logic.lib.own <> own_op thm
+prf 3870:3881 <> bslots_split
+binder 3883:3883 <> a:13
+binder 3885:3885 <> b:14
+R3903:3908 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R3889:3894 xv6iris.BioDefs <> bslots def
+R3898:3900 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R3897:3897 xv6iris.BioDefs <> a:13 var
+R3901:3901 xv6iris.BioDefs <> b:14 var
+R3917:3921 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3909:3914 xv6iris.BioDefs <> bslots def
+R3916:3916 xv6iris.BioDefs <> a:13 var
+R3922:3927 xv6iris.BioDefs <> bslots def
+R3929:3929 xv6iris.BioDefs <> b:14 var
+R3949:3957 xv6iris.BioDefs <> bslots_op thm
+R3949:3957 xv6iris.BioDefs <> bslots_op thm
+R3949:3957 xv6iris.BioDefs <> bslots_op thm
+prf 3986:3999 <> bslots_combine
+binder 4001:4001 <> a:15
+binder 4003:4003 <> b:16
+R4015:4020 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4007:4012 xv6iris.BioDefs <> bslots def
+R4014:4014 xv6iris.BioDefs <> a:15 var
+R4029:4034 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4021:4026 xv6iris.BioDefs <> bslots def
+R4028:4028 xv6iris.BioDefs <> b:16 var
+R4035:4040 xv6iris.BioDefs <> bslots def
+R4044:4046 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R4043:4043 xv6iris.BioDefs <> a:15 var
+R4047:4047 xv6iris.BioDefs <> b:16 var
+R4085:4093 xv6iris.BioDefs <> bslots_op thm
+R4085:4093 xv6iris.BioDefs <> bslots_op thm
+R4085:4093 xv6iris.BioDefs <> bslots_op thm
+prf 4118:4129 <> bslots_bound
+binder 4131:4131 <> n:17
+R4146:4151 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4135:4145 xv6iris.BioDefs <> bslots_auth def
+R4160:4165 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4152:4157 xv6iris.BioDefs <> bslots def
+R4159:4159 xv6iris.BioDefs <> n:17 var
+R4166:4168 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4186:4188 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4171:4174 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R4170:4170 xv6iris.BioDefs <> n:17 var
+R4175:4180 xv6iris.BioDefs <> BSLOTS def
+R4213:4223 xv6iris.BioDefs <> bslots_auth def
+R4226:4231 xv6iris.BioDefs <> bslots def
+R4213:4223 xv6iris.BioDefs <> bslots_auth def
+R4213:4223 xv6iris.BioDefs <> bslots_auth def
+R4226:4231 xv6iris.BioDefs <> bslots def
+R4226:4231 xv6iris.BioDefs <> bslots def
+R4265:4265 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4277:4282 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4290:4290 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4266:4276 iris.base_logic.lib.own <> own_valid_2 thm
+R4306:4329 iris.algebra.auth <> auth_both_valid_discrete thm
+R4265:4265 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4277:4282 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4290:4290 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4266:4276 iris.base_logic.lib.own <> own_valid_2 thm
+R4306:4329 iris.algebra.auth <> auth_both_valid_discrete thm
+R4357:4368 iris.algebra.numbers <> nat_included thm
+R4357:4368 iris.algebra.numbers <> nat_included thm
+prf 4535:4552 <> bslots_no_overflow
+R4559:4566 Corelib.Numbers.BinNums <> positive ind
+binder 4555:4555 <> n:18
+R4586:4591 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4575:4585 xv6iris.BioDefs <> bslots_auth def
+R4613:4622 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4592:4597 xv6iris.BioDefs <> bslots def
+R4600:4609 Stdlib.PArith.BinPos Pos to_nat def
+R4611:4611 xv6iris.BioDefs <> n:18 var
+R4623:4625 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4681:4683 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4646:4649 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R4634:4636 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R4627:4631 Stdlib.ZArith.BinInt Z pos abbrev
+R4633:4633 xv6iris.BioDefs <> n:18 var
+R4638:4640 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R4669:4671 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R4651:4655 Stdlib.ZArith.BinInt Z pos abbrev
+R4658:4665 Stdlib.PArith.BinPos Pos succ def
+R4667:4667 xv6iris.BioDefs <> n:18 var
+R4673:4675 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R4730:4730 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4743:4748 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4756:4756 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4731:4742 xv6iris.BioDefs <> bslots_bound thm
+R4730:4730 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4743:4748 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4756:4756 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4731:4742 xv6iris.BioDefs <> bslots_bound thm
+R4808:4810 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4803:4805 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R4808:4810 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4803:4805 Stdlib.ZArith.BinInt <> ::Z_scope:x_'^'_x not
+R4879:4881 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4873:4878 xv6iris.BioDefs <> BSLOTS def
+R4879:4881 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4873:4878 xv6iris.BioDefs <> BSLOTS def
+R4970:4973 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R4963:4967 Stdlib.ZArith.BinInt Z pos abbrev
+R4996:5009 Stdlib.ZArith.Znat <> positive_nat_Z thm
+R4970:4973 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<='_x not
+R4963:4967 Stdlib.ZArith.BinInt Z pos abbrev
+R4996:5009 Stdlib.ZArith.Znat <> positive_nat_Z thm
+R4996:5009 Stdlib.ZArith.Znat <> positive_nat_Z thm
+R5051:5058 xv6iris.BioDefs BioSlots <> sec
+prf 5369:5380 <> bslots_alloc
+R5385:5396 xv6iris.Xv6Cameras <> bioslotGpreS class
+binder 5398:5399 <> Σ:19
+binder 5384:5399 <> bioslotGpreS0:20
+R5406:5409 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R5410:5414 iris.bi.updates <> ::bi_scope:'|==>'_x not
+R5415:5418 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5434:5435 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5423:5430 xv6iris.Xv6Cameras <> bioslotG class
+R5432:5433 xv6iris.BioDefs <> Σ:19 var
+R5447:5451 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5436:5446 xv6iris.BioDefs <> bslots_auth def
+R5470:5474 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5452:5457 xv6iris.BioDefs <> bslots def
+R5459:5469 xv6iris.BioDefs <> BSLOTS_PROC def
+R5475:5480 xv6iris.BioDefs <> bslots def
+R5482:5490 xv6iris.BioDefs <> BSLOTS_FS def
+R5508:5516 iris.base_logic.lib.own <> own_alloc thm
+R5549:5557 xv6iris.Xv6Cameras <> bioslotUR def
+R5530:5534 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R5520:5522 iris.algebra.auth <> :::'●'_x_x not
+R5523:5523 iris.algebra.auth <> :::'●'_x_x not
+R5524:5529 xv6iris.BioDefs <> BSLOTS def
+R5535:5538 iris.algebra.auth <> :::'◯'_x not
+R5539:5544 xv6iris.BioDefs <> BSLOTS def
+R5508:5516 iris.base_logic.lib.own <> own_alloc thm
+R5549:5557 xv6iris.Xv6Cameras <> bioslotUR def
+R5530:5534 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R5520:5522 iris.algebra.auth <> :::'●'_x_x not
+R5523:5523 iris.algebra.auth <> :::'●'_x_x not
+R5524:5529 xv6iris.BioDefs <> BSLOTS def
+R5535:5538 iris.algebra.auth <> :::'◯'_x not
+R5539:5544 xv6iris.BioDefs <> BSLOTS def
+R5590:5613 iris.algebra.auth <> auth_both_valid_discrete thm
+R5590:5613 iris.algebra.auth <> auth_both_valid_discrete thm
+R5662:5669 xv6iris.Xv6Cameras <> BioSlotG constr
+R5662:5669 xv6iris.Xv6Cameras <> BioSlotG constr
+R5705:5710 xv6iris.BioDefs <> bslots def
+R5705:5710 xv6iris.BioDefs <> bslots def
+R5705:5710 xv6iris.BioDefs <> bslots def
+R5729:5729 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5752:5755 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5743:5751 xv6iris.Xv6Cameras <> bioslotUR def
+R5730:5733 iris.algebra.auth <> :::'◯'_x not
+R5734:5739 xv6iris.BioDefs <> BSLOTS def
+R5771:5775 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R5756:5759 iris.algebra.auth <> :::'◯'_x not
+R5760:5770 xv6iris.BioDefs <> BSLOTS_PROC def
+R5776:5779 iris.algebra.auth <> :::'◯'_x not
+R5780:5788 xv6iris.BioDefs <> BSLOTS_FS def
+R5808:5819 iris.algebra.auth <> auth_frag_op thm
+R5729:5729 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5752:5755 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5743:5751 xv6iris.Xv6Cameras <> bioslotUR def
+R5730:5733 iris.algebra.auth <> :::'◯'_x not
+R5734:5739 xv6iris.BioDefs <> BSLOTS def
+R5771:5775 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R5756:5759 iris.algebra.auth <> :::'◯'_x not
+R5760:5770 xv6iris.BioDefs <> BSLOTS_PROC def
+R5776:5779 iris.algebra.auth <> :::'◯'_x not
+R5780:5788 xv6iris.BioDefs <> BSLOTS_FS def
+R5808:5819 iris.algebra.auth <> auth_frag_op thm
+R5808:5819 iris.algebra.auth <> auth_frag_op thm
+R5850:5855 iris.base_logic.lib.own <> own_op thm
+R5850:5855 iris.base_logic.lib.own <> own_op thm
+R5850:5855 iris.base_logic.lib.own <> own_op thm
+rec 6341:6348 <> bio_view
+proj 6384:6388 <> bv_gd
+proj 6409:6414 <> bv_dev
+proj 6449:6454 <> bv_cov
+proj 6470:6477 <> bv_clean
+proj 6513:6520 <> bv_dirty
+proj 6670:6680 <> bv_clean_tl
+proj 6725:6735 <> bv_dirty_tl
+R6356:6364 iris.base_logic.lib.iprop <> gFunctors rec
+binder 6351:6352 <> Σ:21
+R6395:6404 xv6iris.DiskPtsto <> disk_names rec
+R6420:6441 SailStdpp.Values <> mword def
+R6460:6463 stdpp.gmap <> gset def
+R6465:6465 Corelib.Numbers.BinNums <> Z ind
+R6482:6485 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6481:6481 Corelib.Numbers.BinNums <> Z ind
+R6497:6500 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6486:6489 Corelib.Init.Datatypes <> list ind
+R6492:6493 stdpp.bitvector.definitions <> bv rec
+R6501:6505 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R6507:6508 xv6iris.BioDefs <> Σ:21 var
+R6525:6528 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6524:6524 Corelib.Numbers.BinNums <> Z ind
+R6540:6543 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6529:6532 Corelib.Init.Datatypes <> list ind
+R6535:6536 stdpp.bitvector.definitions <> bv rec
+R6544:6548 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R6550:6551 xv6iris.BioDefs <> Σ:21 var
+R6684:6690 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R6695:6696 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 6691:6691 <> b:28
+binder 6693:6694 <> bs:29
+R6697:6704 iris.bi.derived_connectives <> Timeless class
+R6707:6714 xv6iris.BioDefs <> bv_clean:26 meth
+R6718:6719 xv6iris.BioDefs <> bs:29 var
+R6716:6716 xv6iris.BioDefs <> b:28 var
+R6739:6745 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R6750:6751 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 6746:6746 <> b:31
+binder 6748:6749 <> bs:32
+R6752:6759 iris.bi.derived_connectives <> Timeless class
+R6762:6769 xv6iris.BioDefs <> bv_dirty:27 meth
+R6773:6774 xv6iris.BioDefs <> bs:32 var
+R6771:6771 xv6iris.BioDefs <> b:31 var
+R6791:6795 xv6iris.BioDefs <> bv_gd proj
+R6791:6795 xv6iris.BioDefs <> bv_gd proj
+R6815:6820 xv6iris.BioDefs <> bv_dev proj
+R6815:6820 xv6iris.BioDefs <> bv_dev proj
+R6840:6845 xv6iris.BioDefs <> bv_cov proj
+R6840:6845 xv6iris.BioDefs <> bv_cov proj
+R6865:6872 xv6iris.BioDefs <> bv_clean proj
+R6865:6872 xv6iris.BioDefs <> bv_clean proj
+R6892:6899 xv6iris.BioDefs <> bv_dirty proj
+R6892:6899 xv6iris.BioDefs <> bv_dirty proj
+R6919:6929 xv6iris.BioDefs <> bv_clean_tl proj
+R6919:6929 xv6iris.BioDefs <> bv_clean_tl proj
+R6953:6963 xv6iris.BioDefs <> bv_dirty_tl proj
+R6953:6963 xv6iris.BioDefs <> bv_dirty_tl proj
+R6987:6995 xv6iris.BioDefs <> MkBioView constr
+R6987:6995 xv6iris.BioDefs <> MkBioView constr
+inst 7034:7056 <> bio_view_clean_timeless
+binder 7059:7060 <> Σ:34
+R7068:7075 xv6iris.BioDefs <> bio_view rec
+R7077:7078 xv6iris.BioDefs <> Σ:34 var
+binder 7064:7064 <> V:35
+binder 7081:7081 <> b:36
+binder 7083:7084 <> bs:37
+R7090:7097 iris.bi.derived_connectives <> Timeless class
+R7100:7107 xv6iris.BioDefs <> bv_clean proj
+R7113:7114 xv6iris.BioDefs <> bs:37 var
+R7111:7111 xv6iris.BioDefs <> b:36 var
+R7109:7109 xv6iris.BioDefs <> V:35 var
+R7120:7130 xv6iris.BioDefs <> bv_clean_tl proj
+inst 7156:7178 <> bio_view_dirty_timeless
+binder 7181:7182 <> Σ:38
+R7190:7197 xv6iris.BioDefs <> bio_view rec
+R7199:7200 xv6iris.BioDefs <> Σ:38 var
+binder 7186:7186 <> V:39
+binder 7203:7203 <> b:40
+binder 7205:7206 <> bs:41
+R7212:7219 iris.bi.derived_connectives <> Timeless class
+R7222:7229 xv6iris.BioDefs <> bv_dirty proj
+R7235:7236 xv6iris.BioDefs <> bs:41 var
+R7233:7233 xv6iris.BioDefs <> b:40 var
+R7231:7231 xv6iris.BioDefs <> V:39 var
+R7242:7252 xv6iris.BioDefs <> bv_dirty_tl proj
