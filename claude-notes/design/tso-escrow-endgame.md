@@ -548,3 +548,14 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   l_out/l_cmt/l_ncommit at ambient XI under <{ }> and sits in fs_ready;
   not in any inventory; lands as a λ-flip with R5 after the
   ctx_move_const test.  Full <{ }> table recorded; §5 rule 5 extended.
+- 2026-09-01 (build agent, corroboration of §4.4b): log_res CONFIRMED
+  in code (l_out/l_cmt/l_ncommit as ambient ↦₄ under <{ }>, reached
+  through log_ctx_at → log_ctx → fs_ready).  A full grep of every
+  `<{ … }>` in the tree against the table finds two spellings the table
+  omits, both ξ-FREE and hence legal: <{ pr_res γd }> (SpecPrintk,
+  ProofMain; pr_res := emp) and <{ tx_res γd }> (the uart family the
+  table lists under γu).  The <{ ticks_res }> / <{ pipe_res }> hits are
+  comment text at their λ'd sites.  Inventory closed as stated.  The
+  anchor-before-sleeplock build order already holds: BioInitAt mints
+  the anchors in bio_names_ghost_alloc (the free-tok row), and
+  BioInv.bio_init mints them before its sleeplock loop.
