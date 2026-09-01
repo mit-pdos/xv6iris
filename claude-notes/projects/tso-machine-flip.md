@@ -18236,3 +18236,28 @@ what the ic_escrow W1/W2/W3 legs need (Phase 4.5).
   PILE-UP on the VM (each killed make leaves its rocqworkers running;
   the user slice peaked at 705 GiB), not a divergence.  Kill pattern:
   pkill -x (never -f -- the wrapper's own path contains "rocq").
+
+### A6.152: ENDGAME DOC ADOPTED; the A6.150/151 branch REVERTED
+
+claude-notes/design/tso-escrow-endgame.md is now the authoritative
+design (edited in place from here on; this log is history only).  In
+consequence:
+- The A6.151 drained-hook tier (TsoCtx.amo_drained_hook, the
+  WpSconfLock/Acquire/Acquiresleep hook threading, SleepLock's
+  sl_res_hooked/slk_hook) is REVERTED to the r77 snapshot: it was a
+  third floor route, which §1 forbids -- R1 (llb-tier acquires) and R2
+  (lock_pay_intro_llb payload rows) are the only floor deliveries, and
+  the §3 register pattern makes them sufficient (the pres fragment
+  carries T_b, so the presented tier covers the bump case; the
+  releasesleep-folded payload row covers the park case).
+- The A6.151 content-in-box + gen-half revision of BioBox is dropped;
+  BioInv restored to the green merge+swap state (the merge, the
+  in-place bio_ctx λ-flip and BioInitAt's v2 free-tok stay -- they are
+  §4.1's shape).
+- The remaining bcache work follows §4.1 R1/R2 verbatim, with one
+  encoding refinement to be recorded in the doc's changelog: a fourth
+  tiny register γc (a count-sync ghost_var pairing the slot's Some-arm
+  count with the box's pres count) makes the receipt-out refutation at
+  the drop local; and the drop's "mine" case selects by deciding
+  n = n_park (pure nat) against the parker's own astamp, so γl carries
+  no value (unit), only whole-vs-half + the parked fragment.
