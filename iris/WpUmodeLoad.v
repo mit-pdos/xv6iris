@@ -714,6 +714,7 @@ Section UvLoadPostFetch.
        pc_is (CID := CID0) (add_vec_int pc dpc) -∗
        WP (Loop : expr riscv_lang)) -∗
     resv_any cpu_id -∗
+    TsoCtx.own_context XI -∗
     bytes_own (uv_mm t' (upa_map pt M)) -∗
     uv_res pt M t' usatp pcfg paddr -∗
     hreg_frame (register_set nextPC (add_vec_int pc dpc) rs2) u_Drw -∗
@@ -861,12 +862,12 @@ Section UvLoadPostFetch.
                     = register_lookup tlb rsr)
       by exact (uv_post_rs_other rsr None (Some (lrd, wval)) tlb
                   ltac:(vm_compute; reflexivity) uv_nogpr_tlb).
-    iIntros "#Hcert #Hamb #Hcap Hk Hany Hmm Hres Hrw Hro".
+    iIntros "#Hcert #Hamb #Hcap Hk Hany Hctx Hmm Hres Hrw Hro".
     iApply (uv_swp_exec_mem (uc_dqc C) (uv_mm t' md) (uv_mm t'' md)
               rsx (uv_post_rs rsr None (Some (lrd, wval))) i o ib _
               Hred Hg1 Hexg Hex Hdomall
-              with "Hcert Hany Hrw Hro Hmm [Hk Hres]").
-    iIntros (rs3) "%Hag3 Hrw Hro Hmm Hany".
+              with "Hcert Hany Hrw Hro Hctx Hmm [Hk Hres]").
+    iIntros (rs3) "%Hag3 Hrw Hro Hctx Hmm Hany".
     rewrite /uv_step_post.
     iExists (uv_post_rs rsr None (Some (lrd, wval))).
     iSplitR.
@@ -921,7 +922,7 @@ Section UvLoadPostFetch.
               (Tw _ _ Lpaddr2 ltac:(vm_compute; reflexivity)
                  ltac:(vm_compute; reflexivity) uv_nogpr_paddr)
               Htok'' ltac:(rewrite Ltlbw; exact Htlbok'')
-              with "Hamb Hcap Hany Hmm [Hres] Hk").
+              with "Hamb Hcap Hany Hmm [Hres] Hctx Hk").
     iApply (uv_res_move pt M t' t'' usatp pcfg paddr Hshape with "Hres").
   Qed.
 
@@ -977,6 +978,7 @@ Section UvLoadObl.
        pc_is (CID := CID0) (add_vec_int pc 4) -∗ WP (Loop : expr riscv_lang)) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
+    TsoCtx.own_context XI -∗
     bytes_own (uv_mm t (upa_map pt M)) -∗
     uv_res pt M t usatp pcfg paddr -∗
     swp (fetch tt)
@@ -992,10 +994,10 @@ Section UvLoadObl.
     pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
-    iIntros "#Hcert #Hamb #Hcap Hk Hany Hrw Hro Hmm Hres".
+    iIntros "#Hcert #Hamb #Hcap Hk Hany Hrw Hro Hctx Hmm Hres".
     iApply (uv_swp_fetch pt M t t' (uc_dqc C) rsA rsf (F_Base w) _ _ _
-              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hmm [Hk Hres]").
-    iIntros (rs2) "%Hag Hrw Hro Hmm Hany".
+              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hctx Hmm [Hk Hres]").
+    iIntros (rs2) "%Hag Hrw Hro Hctx Hmm Hany".
     iDestruct (uv_res_move pt M t t' usatp pcfg paddr Hshape with "Hres")
       as "Hres".
     assert (T2 : forall (r : register) (val : type_of_register r),
@@ -1057,7 +1059,7 @@ Section UvLoadObl.
               (T2 _ _ u_in_paddr ltac:(vm_compute; reflexivity) LpaddrA)
               (T2 _ _ u_in_mi ltac:(vm_compute; reflexivity) LmiA)
               Hagd2 Htok'
-              with "Hcert Hamb Hcap Hk Hany Hmm Hres Hrw Hro").
+              with "Hcert Hamb Hcap Hk Hany Hctx Hmm Hres Hrw Hro").
   Qed.
 
   Lemma uv_load_obl_rvc (R : iProp Σ) (Ψ : usys_protocol Σ)
@@ -1101,6 +1103,7 @@ Section UvLoadObl.
        pc_is (CID := CID0) (add_vec_int pc 2) -∗ WP (Loop : expr riscv_lang)) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
+    TsoCtx.own_context XI -∗
     bytes_own (uv_mm t (upa_map pt M)) -∗
     uv_res pt M t usatp pcfg paddr -∗
     swp (fetch tt)
@@ -1116,10 +1119,10 @@ Section UvLoadObl.
     pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
-    iIntros "#Hcert #Hamb #Hcap Hk Hany Hrw Hro Hmm Hres".
+    iIntros "#Hcert #Hamb #Hcap Hk Hany Hrw Hro Hctx Hmm Hres".
     iApply (uv_swp_fetch pt M t t' (uc_dqc C) rsA rsf (F_RVC h) _ _ _
-              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hmm [Hk Hres]").
-    iIntros (rs2) "%Hag Hrw Hro Hmm Hany".
+              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hctx Hmm [Hk Hres]").
+    iIntros (rs2) "%Hag Hrw Hro Hctx Hmm Hany".
     iDestruct (uv_res_move pt M t t' usatp pcfg paddr Hshape with "Hres")
       as "Hres".
     assert (T2 : forall (r : register) (val : type_of_register r),
@@ -1186,7 +1189,7 @@ Section UvLoadObl.
               (T2 _ _ u_in_paddr ltac:(vm_compute; reflexivity) LpaddrA)
               (T2 _ _ u_in_mi ltac:(vm_compute; reflexivity) LmiA)
               Hagd2 Htok'
-              with "Hcert Hamb Hcap Hk Hany Hmm Hres Hrw Hro").
+              with "Hcert Hamb Hcap Hk Hany Hctx Hmm Hres Hrw Hro").
   Qed.
 
 End UvLoadObl.
@@ -1253,7 +1256,7 @@ Section WpUmodeLoad.
     iApply (wp_uv_step C pt _ Ψ M m pc with "Hcg Hpc [] Hcont").
     rewrite /uv_step_obl.
     iIntros (R CIDo XIo t rs1s rsA usatp pcfg paddr)
-      "%Hpre #Hamb #Hcap Hk Hany Hrw Hro Hmm Hres".
+      "%Hpre #Hamb #Hcap Hk Hany Hrw Hro Hctx Hmm Hres".
     iPoseProof "Hamb" as "(#Hhw & _ & _)".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
@@ -1281,7 +1284,7 @@ Section WpUmodeLoad.
                   w_ld va wval t t' usatp pcfg paddr rs1s rsA rsf Hpre Hfe Hfg Tr
                   Htlbok' Htok' Hshape Hdecrvc Hkw Hred Hg1 Hexp Hrd Hva Hwval
                   Hl Hchk Hcanon Hpg Hal HMb
-                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hmm Hres").
+                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hctx Hmm Hres").
       + destruct (uv_fetch_rvc_2 pt M t rsA w_leaf pc h
                     Hinj Hum Hlok Hcanonpc Hal2 Hal4 Hbytes HisRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
@@ -1290,7 +1293,7 @@ Section WpUmodeLoad.
                   w_ld va wval t t' usatp pcfg paddr rs1s rsA rsf Hpre Hfe Hfg Tr
                   Htlbok' Htok' Hshape Hdecrvc Hkw Hred Hg1 Hexp Hrd Hva Hwval
                   Hl Hchk Hcanon Hpg Hal HMb
-                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hmm Hres").
+                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hctx Hmm Hres").
     - (* ================= BASE (4-byte) ================= *)
       destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
@@ -1303,7 +1306,7 @@ Section WpUmodeLoad.
                   w_ld va wval t t' usatp pcfg paddr rs1s rsA rsf Hpre Hfe Hfg Tr
                   Htlbok' Htok' Hshape Hdecbase Hkw Hred Hg1 Hexp Hrd Hva Hwval
                   Hl Hchk Hcanon Hpg Hal HMb
-                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hmm Hres").
+                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hctx Hmm Hres").
       + destruct (uv_fetch_base_2_pg pt M t rsA w_leaf pc w
                     Hinj Hum Hlok Hcanonpc Hinpage Hal2 Hal4 Hbytes HnRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
@@ -1312,7 +1315,7 @@ Section WpUmodeLoad.
                   w_ld va wval t t' usatp pcfg paddr rs1s rsA rsf Hpre Hfe Hfg Tr
                   Htlbok' Htok' Hshape Hdecbase Hkw Hred Hg1 Hexp Hrd Hva Hwval
                   Hl Hchk Hcanon Hpg Hal HMb
-                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hmm Hres").
+                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hctx Hmm Hres").
   Qed.
 
   (* the later-free restatement: the shape every instance takes *)

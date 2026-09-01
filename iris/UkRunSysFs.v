@@ -369,14 +369,14 @@ Section UkRunSysFs.
     rewrite /wp_uk_ecall_fs_body.
     iIntros "#Hi Hrun Hmc Hstr Hcont".
     iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv)
-      "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_fs_x0 with "Hb") as "[%Hx0 Hb]".
     (* THE PATH, PINNED: the caller's string is the one the row reads *)
     iDestruct (uheap_ustrq with "Hheap Hstr") as %Hread.
     assert (Hread0 : ustr_read M (uint (ufs_arg (tf_of m pc) 0)) = Some pl)
       by exact Hread.
-    iApply (STEP γm h C pt Rfd Rut pm sz M fdv m pc Hlo Hpm Hui with "Hb").
+    iApply (STEP γm h C pt Rfd Rut pm sz M fdv m pc Hlo Hpm HRut Hui with "Hb").
     (* ---- the ENRICHED return, at the trap-out key ---- *)
     rewrite /uexec_ret_fs /uexec_ret_fs_F.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hc];

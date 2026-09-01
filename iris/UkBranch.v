@@ -56,6 +56,10 @@ Section UkBranch.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
+  (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
+  Hypothesis (HRut : forall pt' : uptd,
+                       ⊢ Rut pt' -∗ TsoCtx.own_context XI ∗
+                                    (TsoCtx.own_context XI -∗ Rut pt')).
 
   (* RELOCATION DEBT: reads naturally beside [uv_next] in WpUmodeStep.v;
      kept here (as WpUmodeBranch.v keeps its own copy) so adding it does
@@ -122,7 +126,7 @@ Section UkBranch.
                   (add_vec_int pc (if is_rvc then 2 else 4))))%I
       with "[Hcont]" as "Hcont".
     { iNext. rewrite uk_next_bool. iExact "Hcont". }
-    iApply (wp_uk_retire_later C pt Rfd Rut π sz Hlo Hpm M m pc fdv is_rvc i o
+    iApply (wp_uk_retire_later C pt Rfd Rut π sz Hlo Hpm HRut M m pc fdv is_rvc i o
               (if taken then Some tgt else None) None
               Hui Hred Hlpad I Hg1
               ltac:(intros s_pc Lpc Lnpc Lcp Hag Hvals;

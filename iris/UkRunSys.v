@@ -365,10 +365,10 @@ Section UkRunSys.
   Proof.
     intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hcl Hdp Hop Hal4.
     iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm M m pc fdv Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -452,10 +452,10 @@ Section UkRunSys.
   Proof.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm M m pc fdv Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -546,13 +546,13 @@ Section UkRunSys.
   Proof.
     intros Hn Harg Hal4.
     iIntros "#Hi Hrun Hh0 Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     (* the handle READS the view: this is what says the source descriptor is
        open, and at which state -- which is what dup's row copies. *)
     iDestruct (ufd_agree with "Hufd Hh0") as %Hsrc.
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm M m pc fdv Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -634,10 +634,10 @@ Section UkRunSys.
   Proof.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm M m pc fdv Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -713,10 +713,10 @@ Section UkRunSys.
   Proof.
     intros Hn Harg Hal4.
     iIntros "#Hi Hrun Hh Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm M m pc fdv Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -808,12 +808,12 @@ Section UkRunSys.
   Proof.
     intros Hn Ha1 Hcnt Hal4.
     iIntros "#Hi Hbs Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     (* the run is in the image, and does not wrap *)
     iDestruct (uheap_ubytes_img with "Hheap Hbs") as %Himg.
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm M m pc fdv Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -916,10 +916,10 @@ Section UkRunSys.
   Proof.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm M m pc fdv Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -977,10 +977,10 @@ Section UkRunSys.
   Proof.
     intros Hn Hz Hal4.
     iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm M m pc fdv Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -1081,7 +1081,7 @@ Section UkRunSys.
   Proof.
     intros Hn Hwin Hcapk Hcl Hdp Hop Hpp Hal4.
     iIntros "#Hi Hrun Hbuf Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     (* THE NO-WRAP FACT, off the ownership rather than off a premise *)
@@ -1093,7 +1093,7 @@ Section UkRunSys.
       change (2 ^ 38) with 274877906944 in Hc.
       rewrite !uint_unsigned in Hc |- *.
       apply uint_add_vec_int_small; lia. }
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm M m pc fdv Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -1222,7 +1222,7 @@ Section UkRunSys.
     intros Hn Hal4.
     set (dst := m !!! Regidx (mword_of_int 10)).
     iIntros "#Hi Hrun Hbuf Hcont".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
@@ -1234,7 +1234,7 @@ Section UkRunSys.
       change (2 ^ 38) with 274877906944 in Hc.
       rewrite !uint_unsigned in Hc |- *.
       apply uint_add_vec_int_small; lia. }
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm M m pc fdv Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -1458,9 +1458,9 @@ Section UkRunSys.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn. iIntros "#Hi Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm M m pc fdv Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>

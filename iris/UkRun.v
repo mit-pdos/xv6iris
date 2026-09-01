@@ -121,6 +121,11 @@ Section UkRun.
        (Rut : uptd -> iProp Σ) (sz : Z)
        (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (fdv : list fdstate),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
+       (* A6.140: the residue-token accessor rides the bundle as a PURE
+          fact, so a leaf that re-enters [ukc] can hand it back over *)
+       ⌜ forall pt' : uptd,
+           ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h) (cur_ctx (CurCtx := xi)) ∗
+                        (TsoCtx.own_context (CID := h) (cur_ctx (CurCtx := xi)) -∗ Rut pt') ⌝ ∗
        uheap γt γd γs M pm ∗
        ustack γd (m !!! Regidx csp_rs1) avail ∗
        (* THE PROGRAM'S OWN VIEW OF ITS DESCRIPTORS, keyed at the very [fdv]
@@ -160,9 +165,10 @@ Section UkRun.
     ukc pm M sz fdv m pc.
   Proof.
     iIntros "Hheap Hstk Hufd Hcont".
-    rewrite /ukc. iIntros (h xi C pt Rfd Rut) "%Hlo %Hpm Hb".
+    rewrite /ukc. iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h). iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv.
-    iFrame "Hheap Hstk Hufd Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
+    iFrame "Hheap Hstk Hufd Hb". iPureIntro.
+    split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 
   (* [uv_upd] is the OTHER way a leaf writes a register (jalr's, where the
@@ -427,7 +433,7 @@ Section UkRun.
       /\ 8 * Z.of_nat avail <= uint (m !!! Regidx csp_rs1) ⌝.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (ustack_align with "Hstk") as %Hal.
     iDestruct (ustack_room with "Hheap Hstk") as %Hroom.
     iPureIntro. exact (conj Hal Hroom).
@@ -504,7 +510,7 @@ Section UkRun.
     -∗ uslot W.
   Proof.
     intros Hal8 Hroom Hstk Hfdlen. iIntros "Hprog". rewrite uslot_ukc /ukc.
-    iIntros (h xi C pt Rfd Rut) "%Hlo %Hpm Hb".
+    iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
       by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
@@ -537,6 +543,7 @@ Section UkRun.
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
+    iSplitR; [ iPureIntro; exact HRut | ].
     iFrame "Hheap Hstk Hufd".
     rewrite /uvb /uvb_F /user_ptm_inv.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
@@ -584,7 +591,7 @@ Section UkRun.
     -∗ uslot W.
   Proof.
     intros Hal8 Hroom Hstk Hfdlen. iIntros "Hprog". rewrite uslot_ukc /ukc.
-    iIntros (h xi C pt Rfd Rut) "%Hlo %Hpm Hb".
+    iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
       by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
@@ -629,6 +636,7 @@ Section UkRun.
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
+    iSplitR; [ iPureIntro; exact HRut | ].
     iFrame "Hheap Hstk Hufd".
     rewrite /uvb /uvb_F /user_ptm_inv.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".

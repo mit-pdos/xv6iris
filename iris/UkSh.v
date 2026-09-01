@@ -261,7 +261,7 @@ Section UkSh.
     urun γt γd γs γfd h m pc avail -∗ ubyteq γd dq a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(_ & _ & Hh & _ & _)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(_ & _ & _ & Hh & _ & _)".
     iDestruct (uheap_ubyte with "Hh Hb") as %(_ & _ & Hbnd).
     iPureIntro. exact Hbnd.
   Qed.
@@ -292,12 +292,12 @@ Section UkSh.
     ⌜ m !!! Regidx x0_idx = zero_reg ⌝ ∗ urun γt γd γs γfd h m pc avail.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iSplitR; [ iPureIntro; exact Hx0 | ].
     iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv.
     iFrame "Hheap Hstk Hufd Hb".
-    iPureIntro. split; [ exact Hlo | exact Hpm ].
+    iPureIntro. split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 
   Local Lemma ush_nth_byte0_zero : nth_byte (zero_reg : mword 64) 0 = ubyte0.

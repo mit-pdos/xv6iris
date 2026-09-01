@@ -172,8 +172,8 @@ Lemma wp_uk_retire_later_folded `{!riscvGS Σ} `{!ufdG Σ} `{GEN : GenId} `{CID 
       (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
   WP (Loop : expr riscv_lang).
 Proof.
-  intros Hlo Hpm M m pc is_rvc i o jt wr Hui Hred Hlpad Hwrok Hg1 Hg2 Hex.
-  exact (wp_uk_retire_later C pt Rfd Rut π sz Hlo Hpm M m pc fdv is_rvc i o jt wr
+  intros Hlo Hpm HRut M m pc is_rvc i o jt wr Hui Hred Hlpad Hwrok Hg1 Hg2 Hex.
+  exact (wp_uk_retire_later C pt Rfd Rut π sz Hlo Hpm HRut M m pc fdv is_rvc i o jt wr
            Hui Hred Hlpad Hwrok Hg1 Hg2 Hex).
 Qed.
 
@@ -307,7 +307,7 @@ Section UkLeafFs.
   Proof.
     intros Hui Hred Hlpad Hwrok Hg1 Hg2 Hex.
     iIntros "Hb Hcont".
-    iApply (R.wp_uk_retire_fs_later γm C pt Rfd Rut π sz fdv Hlo Hpm M m pc is_rvc
+    iApply (R.wp_uk_retire_fs_later γm C pt Rfd Rut π sz fdv Hlo Hpm HRut M m pc is_rvc
               i o jt wr Hui Hred Hlpad Hwrok Hg1 Hg2 Hex with "Hb [Hcont]").
     iNext. iExact "Hcont".
   Qed.
@@ -617,7 +617,7 @@ Section UkLeafFs.
                   (add_vec_int pc (if is_rvc then 2 else 4))))%I
       with "[Hcont]" as "Hcont".
     { iNext. rewrite uk_next_bool_fs. iExact "Hcont". }
-    iApply (R.wp_uk_retire_fs_later γm C pt Rfd Rut π sz fdv Hlo Hpm M m pc is_rvc i o
+    iApply (R.wp_uk_retire_fs_later γm C pt Rfd Rut π sz fdv Hlo Hpm HRut M m pc is_rvc i o
               (if taken then Some tgt else None) None
               Hui Hred Hlpad I Hg1
               ltac:(intros s_pc Lpc Lnpc Lcp Hag Hvals;
@@ -706,9 +706,9 @@ Section UkRunFsLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Hrd. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iApply (wp_uk_cli_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm M m pc imm rd
+    iApply (wp_uk_cli_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm HRut M m pc imm rd
               (sign_extend' 64 imm) Hui Hrd (eq_sym (uimm6_norm imm))
               with "Hb [Hheap Hstk Hufd Hcont]").
     iApply (urun_fs_close_upd γm γt γd γs γfd M pm m rd _ sz fdv (add_vec_int pc 2)
@@ -730,9 +730,9 @@ Section UkRunFsLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Hrd Hwval. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iApply (wp_uk_addi_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm M m pc imm rs1 rd wval
+    iApply (wp_uk_addi_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm HRut M m pc imm rs1 rd wval
               Hui Hrd Hwval with "Hb [Hheap Hstk Hufd Hcont]").
     iApply (urun_fs_close_upd γm γt γd γs γfd M pm m rd _ sz fdv (add_vec_int pc 4)
               avail Hns with "Hheap Hstk Hufd Hcont").
@@ -753,9 +753,9 @@ Section UkRunFsLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Hrd Hwval. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iApply (wp_uk_auipc_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm M m pc imm rd wval
+    iApply (wp_uk_auipc_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm HRut M m pc imm rd wval
               Hui Hrd Hwval with "Hb [Hheap Hstk Hufd Hcont]").
     iApply (urun_fs_close_upd γm γt γd γs γfd M pm m rd _ sz fdv (add_vec_int pc 4)
               avail Hns with "Hheap Hstk Hufd Hcont").
@@ -778,9 +778,9 @@ Section UkRunFsLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hns Hrd H2 H3 H4. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iApply (wp_uk_jal_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm M m pc imm rd tgt wval
+    iApply (wp_uk_jal_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm HRut M m pc imm rd tgt wval
               Hui Hrd H2 H3 H4 with "Hb [Hheap Hstk Hufd Hcont]").
     iApply (urun_fs_close_upd γm γt γd γs γfd M pm m rd _ sz fdv tgt avail Hns
               with "Hheap Hstk Hufd Hcont").
@@ -798,9 +798,9 @@ Section UkRunFsLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iApply (wp_uk_cjr_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm M m pc rs1 tgt Hui H1 H2
+    iApply (wp_uk_cjr_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm HRut M m pc rs1 tgt Hui H1 H2
               with "Hb [Hheap Hstk Hufd Hcont]").
     iApply (urun_fs_close γm γt γd γs γfd M pm sz fdv m tgt avail
               with "Hheap Hstk Hufd Hcont").
@@ -818,9 +818,9 @@ Section UkRunFsLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iApply (wp_uk_cj_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm M m pc imm tgt Hui H1 H2
+    iApply (wp_uk_cj_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm HRut M m pc imm tgt Hui H1 H2
               with "Hb [Hheap Hstk Hufd Hcont]").
     iApply (urun_fs_close γm γt γd γs γfd M pm sz fdv m tgt avail
               with "Hheap Hstk Hufd Hcont").
@@ -842,9 +842,9 @@ Section UkRunFsLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2 H3. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iApply (wp_uk_btype0_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm M m pc imm rs1 op
+    iApply (wp_uk_btype0_fs γm C pt Rfd Rut pm sz fdv Hlo Hpm HRut M m pc imm rs1 op
               taken tgt Hui H1 H2 H3 with "Hb [Hheap Hstk Hufd Hcont]").
     iApply (urun_fs_close γm γt γd γs γfd M pm sz fdv m
               (if taken then tgt else add_vec_int pc 4) avail
@@ -933,13 +933,13 @@ Section UkRunFsLeaf.
     intros Hn Hdom Hal4.
     iIntros "#Hi Hrun Hmc #Hstr Hcont".
     iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv)
-      "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_fs_x0 with "Hb") as "[%Hx0 Hb]".
     iDestruct (uheap_ustrt with "Hheap Hstr") as %Hread.
     assert (Hread0 : ustr_read M (uint (ufs_arg (tf_of m pc) 0)) = Some pl)
       by exact Hread.
-    iApply (S.wp_uk_ecall_fs_step γm h C pt Rfd Rut pm sz M fdv m pc Hlo Hpm Hui
+    iApply (S.wp_uk_ecall_fs_step γm h C pt Rfd Rut pm sz M fdv m pc Hlo Hpm HRut Hui
               with "Hb").
     rewrite /uexec_ret_fs /uexec_ret_fs_F.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hc];
@@ -1001,10 +1001,10 @@ Section UkRunFsLeaf.
     intros Hn Hdom Hnp Hal4.
     iIntros "#Hi Hrun Hmc Hcont".
     iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv)
-      "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_fs_x0 with "Hb") as "[%Hx0 Hb]".
-    iApply (S.wp_uk_ecall_fs_step γm h C pt Rfd Rut pm sz M fdv m pc Hlo Hpm Hui
+    iApply (S.wp_uk_ecall_fs_step γm h C pt Rfd Rut pm sz M fdv m pc Hlo Hpm HRut Hui
               with "Hb").
     rewrite /uexec_ret_fs /uexec_ret_fs_F.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hc];

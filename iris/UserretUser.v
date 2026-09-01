@@ -76,7 +76,6 @@ Require Import SpecUserret.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxShim.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -101,6 +100,12 @@ Section UserretUser.
          the process's descriptor view as an ABSTRACT predicate, so this
          layer never needs [fdslotG] to pass it through. *)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
+      (* A6.140: the accessor the resumed loop borrows the running token
+         with; the concrete caller proves it off [ut_trap_parked]'s
+         own_context conjunct *)
+      (HRut : forall pt' : uptd,
+                ⊢ Rut pt' -∗ TsoCtx.own_context TsoCtx.cur_ctx ∗
+                             (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt'))
       (kroot : mword 44)
       (m : regfile) (usatp : mword 64)
       (mstatus0 sepc0 : mword 64)
@@ -210,6 +215,12 @@ Section UserretUser.
        the image because that is what it is: the second thing [uvb] hands
        the running process and takes back at the trap. *)
     Rfd fdv -∗
+    (* the kernel-table walk credentials the flip's userret walk demands *)
+    KptShare.kpt_creds -∗
+    (* ---- THE RUNNING TOKEN, the kernel's own: userret's walk spends and
+       returns it, and the closer below folds it into the residue, where
+       the resumed loop's accessor ([HRut]) finds it (A6.140) ---- *)
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     (* ---- THE RESIDUE, COMPLETED BY THE WORDS userret READS ----------------
        The 31 save slots are OWNED BY the kernel-side bundle that parks
        across user execution ([UsertrapRes.ut_res_bare]'s [tf_page], via
@@ -254,6 +265,7 @@ Section UserretUser.
        TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 272) dqm vt5 -∗
        TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 280) dqm vt6 -∗
        TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (tf_pa (ud_tfp pt) 112) dqm va0f -∗
+     TsoCtx.own_context TsoCtx.cur_ctx -∗
      Rut pt) -∗
     (* ---- THE CONTINUATION TO RUN (milestone J, stage S5).  It used to be
            the forall-state [UexecWp.uexec_wp]; it is now the per-process
@@ -288,10 +300,7 @@ Section UserretUser.
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264
              Htf272 Htf280 Htf112
              Hsc Hstval Hstvec Hmedl Hmse Hsse #Hmcen #Hscen #Hhpm
-             Hdata Hfdr Hrutw Huwp Hhandler".
-    (* the running token: SC-minted here (TsoCtxShim seam); the T-leg
-       borrows it from the residue it holds through [Hrutw]'s source *)
-    iPoseProof (TsoCtxShim.own_context_sc TsoCtx.cur_ctx) as "Hctx".
+             Hdata Hfdr #Hcreds Hctx Hrutw Huwp Hhandler".
     iApply (R.wp_userret_pt kroot (ud_root pt) (ud_tfp pt) (ud_um pt) m usatp
               mstatus0 (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0) sepc0
               vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
@@ -301,12 +310,12 @@ Section UserretUser.
               ltac:(vm_compute; reflexivity)
               eq_refl eq_refl Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
               with "Hkt Hhw Hmi Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc
-                    Hclaim Hktlb Hufr Hctx Hpc Hfile
+                    Hclaim Hcreds Hktlb Hufr Hctx Hpc Hfile
                     Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104
                     Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176
                     Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240
                     Htf248 Htf256 Htf264 Htf272 Htf280 Htf112").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb _ Hpc Hfile
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hctx Hpc Hfile
              Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120
              Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264
@@ -316,7 +325,7 @@ Section UserretUser.
                              Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160
                              Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216
                              Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272
-                             Htf280 Htf112") as "Hrut".
+                             Htf280 Htf112 Hctx") as "Hrut".
     (* the machine, UNPACKED into the triple the bundle consumes -- AT THE
        NAMED LAZY IMAGE (milestone J, S5): [UexecRet.uvb]'s image conjunct
        IS [user_ptm_inv pt sz M], so the name the caller supplied is no
@@ -342,7 +351,7 @@ Section UserretUser.
     (* AND THE CONTINUATION RUNS.  The bundle is built row by row inside
        [UexecApply.ukc_apply] -- where the context is that lemma's own
        premises -- rather than inline here (optimization.md, RULE ONE). *)
-    iApply (ukc_apply C pt Rfd Rut sz fdv M
+    iApply (ukc_apply C pt Rfd Rut HRut sz fdv M
               (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
                  va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
                  vs11 vt3 vt4 vt5 vt6 va0f)

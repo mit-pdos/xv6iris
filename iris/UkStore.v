@@ -67,7 +67,6 @@ Require Import WpUmodeStep WpUmodeStore.
 Require Import ProcPtOwn UserPerm UexecWp UexecRet UkStep.
 Require Import FdSlots.      (* [fdstate] -- the key's descriptor view *)
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
-Require Import TsoCtxShim.  (* [own_context_sc]: SC-minted token (cutover seam) *)
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -343,18 +342,19 @@ Section UkStoreTrapWrap.
     (match er with ExecuteAs _ => False | _ => True end) ->
     gen_cert -∗ resv_any cpu_id -∗
     hreg_frame rsx u_Drw -∗ hreg_frame_ro (u_Df dq) rsx u_Dro -∗
+    TsoCtx.own_context XI -∗
     bytes_own mm -∗
     (∀ rs2 : regstate,
        ⌜reg_agree_on (u_Drw ∪ u_Dro) rs2 rsx⌝ -∗
        hreg_frame rs2 u_Drw -∗ hreg_frame_ro (u_Df dq) rs2 u_Dro -∗
+       TsoCtx.own_context XI -∗
        bytes_own mm -∗ resv_any cpu_id -∗ Pe er ib) -∗
     swp (execute i) (run_exec_post Pe ib).
   Proof.
     intros Hred Hg1 Hg2 He Hnr.
-    iIntros "#Hcert Hany Hrw Hro Hmm Hk".
-    iPoseProof (TsoCtxShim.own_context_sc XI) as "Hrun".
+    iIntros "#Hcert Hany Hrw Hro Hrun Hmm Hk".
     destruct o as [j | ].
-    - iApply (swp_mono with "[Hk] [Hany Hrw Hro Hmm]").
+    - iApply (swp_mono with "[Hk] [Hany Hrw Hro Hrun Hmm]").
       2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
                     (execute i) (u_state rsx mm) (u_state rsx mm) (ExecuteAs j)
                     rsx mm u_disj Du_r_sub Du_w_sub
@@ -364,11 +364,11 @@ Section UkStoreTrapWrap.
                     with "Hcert Hany Hrw Hro Hrun Hmm"). }
       iIntros (v) "(-> & Hpost)".
       iDestruct "Hpost" as (rs1 mm1)
-        "(%Hag1 & %Hsub1 & %Hdom1 & Hrw & Hro & _ & Hmm & Hany)".
+        "(%Hag1 & %Hsub1 & %Hdom1 & Hrw & Hro & Hrun & Hmm & Hany)".
       assert (Hmm1 : mm1 = mm) by (apply (u_map_eq mm1 mm Hsub1); exact Hdom1).
       subst mm1.
       iApply run_exec_post_redirect.
-      iApply (swp_mono with "[Hk] [Hany Hrw Hro Hmm]").
+      iApply (swp_mono with "[Hk] [Hany Hrw Hro Hrun Hmm]").
       2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
                     (execute j) (u_state rsx mm) (u_state rsx mm) er
                     rs1 mm u_disj Du_r_sub Du_w_sub Hag1 ltac:(reflexivity)
@@ -376,12 +376,12 @@ Section UkStoreTrapWrap.
                     with "Hcert Hany Hrw Hro Hrun Hmm"). }
       iIntros (v) "(-> & Hpost)".
       iDestruct "Hpost" as (rs2 mm3)
-        "(%Hag & %Hsub & %Hdm & Hrw & Hro & _ & Hmm & Hany)".
+        "(%Hag & %Hsub & %Hdm & Hrw & Hro & Hrun & Hmm & Hany)".
       assert (Hmm3 : mm3 = mm)
         by (apply (u_map_eq mm3 mm Hsub); exact Hdm).
       subst mm3.
-      iApply ("Hk" $! rs2 with "[%] Hrw Hro Hmm Hany"). exact Hag.
-    - iApply (swp_mono with "[Hk] [Hany Hrw Hro Hmm]").
+      iApply ("Hk" $! rs2 with "[%] Hrw Hro Hrun Hmm Hany"). exact Hag.
+    - iApply (swp_mono with "[Hk] [Hany Hrw Hro Hrun Hmm]").
       2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
                     (execute i) (u_state rsx mm) (u_state rsx mm) er
                     rsx mm u_disj Du_r_sub Du_w_sub
@@ -390,12 +390,12 @@ Section UkStoreTrapWrap.
                     with "Hcert Hany Hrw Hro Hrun Hmm"). }
       iIntros (v) "(-> & Hpost)".
       iDestruct "Hpost" as (rs2 mm3)
-        "(%Hag & %Hsub & %Hdm & Hrw & Hro & _ & Hmm & Hany)".
+        "(%Hag & %Hsub & %Hdm & Hrw & Hro & Hrun & Hmm & Hany)".
       assert (Hmm3 : mm3 = mm)
         by (apply (u_map_eq mm3 mm Hsub); exact Hdm).
       subst mm3.
       iApply (run_exec_post_direct Pe ib er Hnr).
-      iApply ("Hk" $! rs2 with "[%] Hrw Hro Hmm Hany"). exact Hag.
+      iApply ("Hk" $! rs2 with "[%] Hrw Hro Hrun Hmm Hany"). exact Hag.
   Qed.
 
 End UkStoreTrapWrap.
@@ -463,10 +463,11 @@ Section UkStorePostFetch.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ Rut pt ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
           (uvb C pt Rfd Rut sz π fdv (uM_store M (uint va) kk wval) m (add_vec_int pc dpc) -∗
            WP (Loop : expr riscv_lang))) -∗
     resv_any cpu_id -∗
+    TsoCtx.own_context XI -∗
     bytes_own (uv_mm t' (upa_map pt Mp)) -∗
     uv_res pt Mp t' usatp pcfg paddr -∗
     hreg_frame (register_set nextPC (add_vec_int pc dpc) rs2) u_Drw -∗
@@ -657,12 +658,12 @@ Section UkStorePostFetch.
               register_beq r (tlb : register) = false ->
               register_lookup r rsw = vv).
     { intros r vv Hv Hne Hnt2. rewrite (Tonly r Hnt2). exact (Tn r vv Hv Hne). }
-    iIntros "#Hcert #Hamb Hk Hany Hmm [#Hclaims Hcl] Hrw Hro".
+    iIntros "#Hcert #Hamb Hk Hany Hctx Hmm [#Hclaims Hcl] Hrw Hro".
     iApply (uv_swp_exec_mem (uc_dqc C) (uv_mm t' md) (uv_mm t'' (upa_map pt Mp'))
               rsx rsw i o ib _ Hred Hg1
               Hexg Hex Hdomall
-              with "Hcert Hany Hrw Hro Hmm [Hk Hcl]").
-    iIntros (rs3) "%Hag3 Hrw Hro Hmm Hany".
+              with "Hcert Hany Hrw Hro Hctx Hmm [Hk Hcl]").
+    iIntros (rs3) "%Hag3 Hrw Hro Hctx Hmm Hany".
     rewrite /uv_step_post.
     iExists rsw.
     iSplitR.
@@ -708,7 +709,7 @@ Section UkStorePostFetch.
               (Tw _ _ Lpaddr2 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity))
               Htokn Htlbok''
               (uk_pt_pure_store pt sz M Mp (uint va) kk wval Hpure Hmapw)
-              with "Hamb Hany Hmm [] Hk").
+              with "Hamb Hany Hmm [] Hctx Hk").
     iApply (uv_res_reimg pt Mp' t'' usatp pcfg paddr Hinj'
               ltac:(pose proof Hpins2 as (_ & _ & ((us & Hok & Hsa) & _) & _);
                     rewrite Lsatp2 in Hsa; rewrite Hsa; exact Hok)
@@ -781,8 +782,9 @@ Section UkStorePostFetch.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ Rut pt ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗ uslot (uvis_of_run m pc M π sz fdv)) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗ uslot (uvis_of_run m pc M π sz fdv)) -∗
     resv_any cpu_id -∗
+    TsoCtx.own_context XI -∗
     bytes_own (uv_mm t' (upa_map pt Mp)) -∗
     uv_res pt Mp t' usatp pcfg paddr -∗
     hreg_frame (register_set nextPC (add_vec_int pc dpc) rs2) u_Drw -∗
@@ -906,13 +908,13 @@ Section UkStorePostFetch.
                Lcpx Heff Heffg Hpml Hpmlg Htm Htmg Hbase Hvv
                ltac:(rewrite <- Hva; exact Hvwa)
                ltac:(rewrite <- Hva; exact Hvwag)). }
-    iIntros "#Hcert #Hamb Hk Hany Hmm Hres Hrw Hro".
+    iIntros "#Hcert #Hamb Hk Hany Hctx Hmm Hres Hrw Hro".
     iApply (uk_swp_exec_trap (uc_dqc C) (uv_mm t' md) rsx i o ib
               (rv64d_types.Trap (User,
                  make_sync_exception (E_SAMO_Page_Fault tt) va, pc))
               _ Hred Hg1 Hexg Hex I
-              with "Hcert Hany Hrw Hro Hmm [Hk Hres]").
-    iIntros (rs3) "%Hag3 Hrw Hro Hmm Hany".
+              with "Hcert Hany Hrw Hro Hctx Hmm [Hk Hres]").
+    iIntros (rs3) "%Hag3 Hrw Hro Hctx Hmm Hany".
     (* ---- the trap tower ---- *)
     iDestruct (u_ro_elp_acc with "Hro") as "[#Help Hro]".
     assert (Lelp3 : register_lookup (R_bitvector_1 elp) rs3
@@ -923,10 +925,10 @@ Section UkStorePostFetch.
     iExists (u_trap_rs rsx (rv64d_types.Exception (E_SAMO_Page_Fault tt))
                (xtval_exception_value (E_SAMO_Page_Fault tt) va) pc
                (uc_stvec C)).
-    iSplitR "Hany Hrw Hro Hmm Hres Hk".
+    iSplitR "Hany Hrw Hro Hctx Hmm Hres Hk".
     { iPureIntro. rewrite /uv_land. split_and!;
         [ uv_trap_peel; exact Lhs2 | uv_trap_peel; exact Lmi2 | exact I ]. }
-    iApply (swp_mono with "[Hk Hmm Hres] [Hany Hrw Hro]").
+    iApply (swp_mono with "[Hk Hmm Hres Hctx] [Hany Hrw Hro]").
     2:{ iApply (swp_exec_trap_u (u_state rsx (uv_mm t' md))
                   (rv64d_types.Exception (E_SAMO_Page_Fault tt))
                   (xtval_exception_value (E_SAMO_Page_Fault tt) va) pc
@@ -990,9 +992,10 @@ Section UkStorePostFetch.
               ltac:(uv_trap_peel; exact Lpaddr2)
               Htok'
               ltac:(uv_trap_peel; exact Htlbok2)
-              with "Hany Hmm Hres [Hk]").
-    iIntros "Hframe HR".
-    iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hret)".
+              with "Hany Hmm Hres Hctx [Hk]").
+    iIntros "Hframe Hctx HR".
+    iDestruct ("Hk" with "HR") as "(Hbak & Hfdr & Hkb & Hret)".
+    iDestruct ("Hbak" with "Hctx") as "Hrut".
     iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv)
               (utrap_scause (rv64d_types.Exception (E_SAMO_Page_Fault tt))
                  (register_lookup (R_bitvector_64 scause) rsx))
@@ -1057,12 +1060,13 @@ Section UkStoreObl.
     Z.rem (uint va) 4096 <= 4096 - kk ->
     is_aligned_vaddr (Virtaddr va) kk = true ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ Rut pt ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
           ((uvb C pt Rfd Rut sz π fdv (uM_store M (uint va) kk wval) m (add_vec_int pc 4) -∗
             WP (Loop : expr riscv_lang))
            ∧ uslot (uvis_of_run m pc M π sz fdv))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
+    TsoCtx.own_context XI -∗
     bytes_own (uv_mm t (upa_map pt Mp)) -∗
     uv_res pt Mp t usatp pcfg paddr -∗
     swp (fetch tt)
@@ -1078,10 +1082,10 @@ Section UkStoreObl.
     pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
-    iIntros "#Hcert #Hamb Hk Hany Hrw Hro Hmm Hres".
+    iIntros "#Hcert #Hamb Hk Hany Hrw Hro Hctx Hmm Hres".
     iApply (uv_swp_fetch pt Mp t t' (uc_dqc C) rsA rsf (F_Base w) _ _ _
-              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hmm [Hk Hres]").
-    iIntros (rs2) "%Hag Hrw Hro Hmm Hany".
+              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hctx Hmm [Hk Hres]").
+    iIntros (rs2) "%Hag Hrw Hro Hctx Hmm Hany".
     iDestruct (uv_res_move pt Mp t t' usatp pcfg paddr Hshape with "Hres")
       as "Hres".
     assert (T2 : forall (r : register) (val : type_of_register r),
@@ -1144,7 +1148,7 @@ Section UkStoreObl.
               (T2 _ _ u_in_paddr ltac:(vm_compute; reflexivity) LpaddrA)
               (T2 _ _ u_in_mi ltac:(vm_compute; reflexivity) LmiA)
               Hagd2 Htok' Hpure
-              with "Hcert Hamb [Hk] Hany Hmm Hres Hrw Hro").
+              with "Hcert Hamb [Hk] Hany Hctx Hmm Hres Hrw Hro").
       iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
       iDestruct "Hkc" as "[Hkc _]". iFrame "Hrut Hfdr Hkb Hkc".
     - iApply (uk_store_fault_post_fetch C pt Rfd R Rut sz π M Mp m pc 4 kk i o imm sr1 sr2 va wval
@@ -1169,7 +1173,7 @@ Section UkStoreObl.
               (T2 _ _ u_in_paddr ltac:(vm_compute; reflexivity) LpaddrA)
               (T2 _ _ u_in_mi ltac:(vm_compute; reflexivity) LmiA)
               Hagd2 Htok' Hpure
-              with "Hcert Hamb [Hk] Hany Hmm Hres Hrw Hro").
+              with "Hcert Hamb [Hk] Hany Hctx Hmm Hres Hrw Hro").
       iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
       iDestruct "Hkc" as "[_ Hkc]". iFrame "Hrut Hfdr Hkb Hkc".
   Qed.
@@ -1207,12 +1211,13 @@ Section UkStoreObl.
     Z.rem (uint va) 4096 <= 4096 - kk ->
     is_aligned_vaddr (Virtaddr va) kk = true ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ Rut pt ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
           ((uvb C pt Rfd Rut sz π fdv (uM_store M (uint va) kk wval) m (add_vec_int pc 2) -∗
             WP (Loop : expr riscv_lang))
            ∧ uslot (uvis_of_run m pc M π sz fdv))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
+    TsoCtx.own_context XI -∗
     bytes_own (uv_mm t (upa_map pt Mp)) -∗
     uv_res pt Mp t usatp pcfg paddr -∗
     swp (fetch tt)
@@ -1228,10 +1233,10 @@ Section UkStoreObl.
     pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
-    iIntros "#Hcert #Hamb Hk Hany Hrw Hro Hmm Hres".
+    iIntros "#Hcert #Hamb Hk Hany Hrw Hro Hctx Hmm Hres".
     iApply (uv_swp_fetch pt Mp t t' (uc_dqc C) rsA rsf (F_RVC h) _ _ _
-              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hmm [Hk Hres]").
-    iIntros (rs2) "%Hag Hrw Hro Hmm Hany".
+              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hctx Hmm [Hk Hres]").
+    iIntros (rs2) "%Hag Hrw Hro Hctx Hmm Hany".
     iDestruct (uv_res_move pt Mp t t' usatp pcfg paddr Hshape with "Hres")
       as "Hres".
     assert (T2 : forall (r : register) (val : type_of_register r),
@@ -1299,7 +1304,7 @@ Section UkStoreObl.
               (T2 _ _ u_in_paddr ltac:(vm_compute; reflexivity) LpaddrA)
               (T2 _ _ u_in_mi ltac:(vm_compute; reflexivity) LmiA)
               Hagd2 Htok' Hpure
-              with "Hcert Hamb [Hk] Hany Hmm Hres Hrw Hro").
+              with "Hcert Hamb [Hk] Hany Hctx Hmm Hres Hrw Hro").
       iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
       iDestruct "Hkc" as "[Hkc _]". iFrame "Hrut Hfdr Hkb Hkc".
     - iApply (uk_store_fault_post_fetch C pt Rfd R Rut sz π M Mp m pc 2 kk i o imm sr1 sr2 va wval
@@ -1324,7 +1329,7 @@ Section UkStoreObl.
               (T2 _ _ u_in_paddr ltac:(vm_compute; reflexivity) LpaddrA)
               (T2 _ _ u_in_mi ltac:(vm_compute; reflexivity) LmiA)
               Hagd2 Htok' Hpure
-              with "Hcert Hamb [Hk] Hany Hmm Hres Hrw Hro").
+              with "Hcert Hamb [Hk] Hany Hctx Hmm Hres Hrw Hro").
       iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
       iDestruct "Hkc" as "[_ Hkc]". iFrame "Hrut Hfdr Hkb Hkc".
   Qed.
@@ -1337,6 +1342,10 @@ Section UkStore.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
+  (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
+  Hypothesis (HRut : forall pt' : uptd,
+                       ⊢ Rut pt' -∗ TsoCtx.own_context XI ∗
+                                    (TsoCtx.own_context XI -∗ Rut pt')).
 
   (* ------------------------------------------------------------------- *)
   (* THE STORE LEAF.                                                       *)
@@ -1384,11 +1393,11 @@ Section UkStore.
     pose proof (Hui pt sz (loop_ok_wf C pt Hlo) Hpm) as Hui0.
     pose proof (ui_al2 _ _ _ _ _ Hui0) as Hal2.
     iIntros "Hb Hcont".
-    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm _ M m pc fdv Hal2 with "Hb [] Hcont").
+    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ M m pc fdv Hal2 with "Hb [] Hcont").
     iModIntro.
     rewrite /uk_step_obl.
-    iIntros (R CIDo XIo C' pt' Rfd' Rut' Mp' t rs1s rsA usatp pcfg paddr)
-      "%Hlo' %Hpm' %Hpure %Hpre #Hamb Hk Hany Hrw Hro Hmm Hres".
+    iIntros (R CIDo XIo C' pt' Rfd' Rut' HRut' Mp' t rs1s rsA usatp pcfg paddr)
+      "%Hlo' %Hpm' %Hpure %Hpre #Hamb Hk Hany Hrw Hro Hctx Hmm Hres".
     destruct (uk_instr_mapped π M Mp' pc _ i pt' sz
                 (loop_ok_wf C' pt' Hlo') Hpm' Hpure Hui)
       as [Hal2' Hcanonpc Hleaf Hinpage Hcode].
@@ -1438,7 +1447,7 @@ Section UkStore.
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
     (* the continuation at THIS table, out of the table-generic one *)
-    iAssert (R -∗ Rut' pt' ∗ Rfd' fdv ∗ ukb C' pt' Rfd' Rut' sz π fdv ∗
+    iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗ ukb C' pt' Rfd' Rut' sz π fdv ∗
              ((uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv (uM_store M (uint va) k wval) m
                  (add_vec_int pc (if is_rvc then 2 else 4)) -∗
                WP (Loop : expr riscv_lang))
@@ -1447,7 +1456,7 @@ Section UkStore.
       iFrame "Hrut Hfdr Hkb". iSplit.
       - iDestruct "Hkc" as "[Hkc _]".
         iIntros "Hb". rewrite /ukc.
-        iApply ("Hkc" $! CIDo XIo C' pt' Rfd' Rut' with "[%] [%] Hb");
+        iApply ("Hkc" $! CIDo XIo C' pt' Rfd' Rut' HRut' with "[%] [%] Hb");
           [ exact Hlo' | exact Hpm' ].
       - iDestruct "Hkc" as "[_ Hkc]".
         rewrite (uslot_run m pc M π sz fdv Hx0 Hal2). iExact "Hkc". }
@@ -1471,7 +1480,7 @@ Section UkStore.
                   t t' usatp pcfg paddr rs1s rsA rsf fdv Hpre Hpure Hfe Hfg Tr Htlbok'
                   Htok' Hshape Hdecrvc Hkw Hred Hg1 Hexp Hva Hwval Hdisp
                   Hcanon Hpg Hal
-                  with "Hcert Hamb Hk Hany Hrw Hro Hmm Hres").
+                  with "Hcert Hamb Hk Hany Hrw Hro Hctx Hmm Hres").
       + destruct (uv_fetch_rvc_2 pt' Mp' t rsA w_leaf pc h
                     Hinj Hum Hlok Hcanonpc Hal2' Hal4 Hbytes HisRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
@@ -1480,7 +1489,7 @@ Section UkStore.
                   t t' usatp pcfg paddr rs1s rsA rsf fdv Hpre Hpure Hfe Hfg Tr Htlbok'
                   Htok' Hshape Hdecrvc Hkw Hred Hg1 Hexp Hva Hwval Hdisp
                   Hcanon Hpg Hal
-                  with "Hcert Hamb Hk Hany Hrw Hro Hmm Hres").
+                  with "Hcert Hamb Hk Hany Hrw Hro Hctx Hmm Hres").
     - (* ================= BASE (4-byte) ================= *)
       destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
@@ -1493,7 +1502,7 @@ Section UkStore.
                   t t' usatp pcfg paddr rs1s rsA rsf fdv Hpre Hpure Hfe Hfg Tr Htlbok'
                   Htok' Hshape Hdecbase Hkw Hred Hg1 Hexp Hva Hwval Hdisp
                   Hcanon Hpg Hal
-                  with "Hcert Hamb Hk Hany Hrw Hro Hmm Hres").
+                  with "Hcert Hamb Hk Hany Hrw Hro Hctx Hmm Hres").
       + destruct (uv_fetch_base_2_pg pt' Mp' t rsA w_leaf pc w
                     Hinj Hum Hlok Hcanonpc Hinpage Hal2' Hal4 Hbytes HnRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
@@ -1502,7 +1511,7 @@ Section UkStore.
                   t t' usatp pcfg paddr rs1s rsA rsf fdv Hpre Hpure Hfe Hfg Tr Htlbok'
                   Htok' Hshape Hdecbase Hkw Hred Hg1 Hexp Hva Hwval Hdisp
                   Hcanon Hpg Hal
-                  with "Hcert Hamb Hk Hany Hrw Hro Hmm Hres").
+                  with "Hcert Hamb Hk Hany Hrw Hro Hctx Hmm Hres").
   Qed.
 
   (* the later-free restatement: the shape every instance takes *)

@@ -791,6 +791,11 @@ Section LoopApply.
      [user_ptm_inv pt sz M] for [uvis_M]. *)
   Lemma ukc_apply (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ)
+      (* A6.140: [ukc]'s ∀ carries the residue-token accessor; the entry
+         supplies it from the concrete residue it was built from *)
+      (HRut : forall pt' : uptd,
+                ⊢ Rut pt' -∗ TsoCtx.own_context XI ∗
+                             (TsoCtx.own_context XI -∗ Rut pt'))
       (sz : Z) (fdv : list fdstate) (M : gmap Z (bv 8)) (m : regfile)
       (ms_v sc_v stv_v sepc_v pc : mword 64) :
     loop_ok C pt ->
@@ -811,7 +816,7 @@ Section LoopApply.
     (* the cell bundle splits into the U-mode residue, the file and the pc *)
     iDestruct (u_regs_uv_regs ms_v sc_v stv_v sepc_v pc m Hms with "Hregs")
       as "(Hur & Hg & Hpc)".
-    iApply ("Hkc" $! CID XI C pt Rfd Rut
+    iApply ("Hkc" $! CID XI C pt Rfd Rut HRut
               with "[%] [%] [Hhw Hmi Hwi Hur Hg Hpc Hupt Hfrag Hcfg Hrut Hk]").
     - exact Hlo.
     - reflexivity.
@@ -835,6 +840,9 @@ Section LoopApply.
      them when it joined the key. *)
   Lemma uslot_apply_loop (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
+      (HRut : forall pt' : uptd,
+                ⊢ Rut pt' -∗ TsoCtx.own_context XI ∗
+                             (TsoCtx.own_context XI -∗ Rut pt'))
       (sz : Z) (fdv : list fdstate) (W : uvis) (M : gmap Z (bv 8)) (m : regfile)
       (ms_v sc_v stv_v sepc_v pc : mword 64) :
     loop_ok C pt ->
@@ -861,7 +869,7 @@ Section LoopApply.
     (* the seal comes off the HYPOTHESIS only *)
     iEval (rewrite uslot_ukc) in "Hs".
     iEval (rewrite Hpi HM Hsw Hfd Hg Hpc) in "Hs".
-    iApply (ukc_apply C pt Rfd Rut sz fdv M m ms_v sc_v stv_v sepc_v pc
+    iApply (ukc_apply C pt Rfd Rut HRut sz fdv M m ms_v sc_v stv_v sepc_v pc
               Hlo Hsz Hms with "Hs").
   Qed.
 

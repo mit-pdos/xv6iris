@@ -675,7 +675,13 @@ Section UexecRet.
   Definition uslot_F (X : uvis -d> iPropO Σ) : uvis -d> iPropO Σ :=
     fun W =>
       (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
-         (Rut : uptd -> iProp Σ),
+         (Rut : uptd -> iProp Σ)
+       (* A6.140: the residue-token accessor rides the ∀ as a Coq-level
+          fact, exactly [UexecWp.uexec_F]'s row -- the loop engine borrows
+          the running token out of [Rut pt] per step and restores it *)
+       (HRut : forall pt' : uptd,
+                 ⊢ Rut pt' -∗ TsoCtx.own_context TsoCtx.cur_ctx ∗
+                              (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt')),
          ⌜loop_ok C pt⌝ -∗
          ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
          uvb_F X (CID := h) (XI := xi) C pt Rfd Rut (uvis_sz W) (uvis_perm W) (uvis_fd W)
@@ -711,7 +717,13 @@ Section UexecRet.
   Definition ukc (π : gmap (mword 27) uperm) (M : gmap Z (bv 8))
       (szv : Z) (fdv : list fdstate) (m : regfile) (pc : mword 64) : iProp Σ :=
     (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
-       (Rut : uptd -> iProp Σ),
+       (Rut : uptd -> iProp Σ)
+       (* A6.140: the residue-token accessor rides the ∀ as a Coq-level
+          fact, exactly [UexecWp.uexec_F]'s row -- the loop engine borrows
+          the running token out of [Rut pt] per step and restores it *)
+       (HRut : forall pt' : uptd,
+                 ⊢ Rut pt' -∗ TsoCtx.own_context TsoCtx.cur_ctx ∗
+                              (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt')),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) szv = π⌝ -∗
        uvb (CID := h) (XI := xi) C pt Rfd Rut szv π fdv M m pc -∗
@@ -720,7 +732,13 @@ Section UexecRet.
   Lemma uslot_unfold (W : uvis) :
     uslot W ⊣⊢
     (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
-       (Rut : uptd -> iProp Σ),
+       (Rut : uptd -> iProp Σ)
+       (* A6.140: the residue-token accessor rides the ∀ as a Coq-level
+          fact, exactly [UexecWp.uexec_F]'s row -- the loop engine borrows
+          the running token out of [Rut pt] per step and restores it *)
+       (HRut : forall pt' : uptd,
+                 ⊢ Rut pt' -∗ TsoCtx.own_context TsoCtx.cur_ctx ∗
+                              (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt')),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
        uvb (CID := h) (XI := xi) C pt Rfd Rut (uvis_sz W) (uvis_perm W) (uvis_fd W)
@@ -738,9 +756,9 @@ Section UexecRet.
   Lemma uslot_bupd (W : uvis) : (|==> uslot W) -∗ uslot W.
   Proof.
     rewrite !(uslot_unfold W).
-    iIntros "H" (h xi C pt Rfd Rut) "%Hl %Hp Hb".
+    iIntros "H" (h xi C pt Rfd Rut HRut) "%Hl %Hp Hb".
     iMod "H".
-    iApply ("H" $! h xi C pt Rfd Rut with "[//] [//] Hb").
+    iApply ("H" $! h xi C pt Rfd Rut HRut with "[//] [//] Hb").
   Qed.
 
   Lemma uslot_ukc (W : uvis) :
@@ -869,7 +887,7 @@ Section UexecRetGen.
     iIntros "#Hwp".
     iLöb as "IH" forall (W).
     rewrite uslot_unfold.
-    iIntros (h xi C pt Rfd Rut) "%Hlo %Hpm Hb".
+    iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     rewrite /uvb /uvb_F.
     iDestruct "Hb" as
       "(#Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
@@ -878,7 +896,7 @@ Section UexecRetGen.
     iDestruct "Hamb" as "(Hhw & Hmi & Hwi)".
     iPoseProof "Hwp" as "Hwp0".
     iEval (rewrite uexec_wp_unfold /uexec_F) in "Hwp0".
-    iApply ("Hwp0" $! h xi C pt Rut Mp (tf_resume_gpr0 (uvis_tf W))
+    iApply ("Hwp0" $! h xi C pt Rut HRut Mp (tf_resume_gpr0 (uvis_tf W))
               ms_v sc_v stval_v sepc_v (tf_resume_pc (uvis_tf W))
               with "[] [] Hhw Hmi Hwi Hregs Hpt Hcfg Hrut [Hk Hfrag]");
       [ iPureIntro; exact Hlo | iPureIntro; exact Hms | ].

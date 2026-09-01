@@ -83,9 +83,11 @@ Section UmodeKernelTie.
     u_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
     user_pt_inv pt M -∗
     user_cfg C -∗
+    (* A6.140: the RUNNING TOKEN goes into [uv_lin]'s new conjunct *)
+    TsoCtx.own_context XI -∗
     uv_cap_gpr C pt Psi M g ∗ pc_is va.
   Proof.
-    iIntros (Hms) "#Hcap Hhw Hmi Hwi Hregs Hpt Hcfg".
+    iIntros (Hms) "#Hcap Hhw Hmi Hwi Hregs Hpt Hcfg Hctx".
     iDestruct (uv_amb_intro with "Hhw Hmi Hwi") as "#Hamb".
     iDestruct (u_regs_uv_regs ms_v sc_v stval_v sepc_v va g Hms with "Hregs")
       as "(Hur & Hg & Hpc)".
@@ -98,6 +100,7 @@ Section UmodeKernelTie.
     iFrame "Htlb".
     iFrame "Hmem".
     iFrame "Hcfg".
+    iFrame "Hctx".
     iFrame "Hg".
   Qed.
 

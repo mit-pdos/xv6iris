@@ -46,15 +46,9 @@ Require Import BcacheInv.
 Require Import BioInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-(* M1 FLIP, STAGE 2.  This file is GENUINELY MIXED, and the split is
-   spelled out rather than implied: [Section BreadSlots]'s [↦₄] slot cells
-   are [BioInv]'s and take the flip (BioInv imports TsoCtx), while
-   [Section BreadLru]'s SIX link words are [BcacheInv.bcache_lru]'s and
-   BcacheInv stays RAW -- so those six statements spell [word_pointsto]
-   explicitly.  A file that imports TsoCtx for one family and needs another
-   raw spells the raw one out; it must NOT re-declare the notation, because
-   a non-[Local] [Notation] escapes to importers and silently un-flips
-   theirs (tso-machine-flip.md A6.15). *)
+(* M1 STAGE 2: this file's ↦₄ cells are bcache slot data -- thread data --
+   so it takes the flip.  LAST, after RiscvPtsto, as pass 1 of the replay
+   runbook requires. *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 
@@ -149,11 +143,21 @@ Proof. rewrite map_app. reflexivity. Qed.
 
 Section BreadLru.
   Context `{!riscvGS Σ}.
+  (* A6.61: [BcacheInv] RE-TIERED, so [bcache_lru]'s link cells are the ctx
+     tower and these four accessors -- which named the RAW [word_pointsto]
+     explicitly -- move with their owner.  The ambient binder the old header
+     said was "not wanted" is exactly what the ctx tower needs. *)
+  Context `{XI : CurCtx}.
+  (* M1 STAGE 2 NOTE: this section's cells are the bcache LRU LINK words,
+     which [BcacheInv] keeps deliberately RAW (it does not import
+     [TsoCtx]).  The file's [↦₈] notation flipped with the import above,
+     so the six link-cell statements spell [word_pointsto] explicitly --
+     no ambient context here, and none wanted. *)
 
   (* the sentinel's own two link fields *)
   Lemma bcache_lru_head_next_acc (h : mword 64) (l : list (mword 64)) :
     bcache_lru h l -∗
-    word_pointsto (bnext h) (DfracOwn 1) (List.hd h l) ∗ (word_pointsto (bnext h) (DfracOwn 1) (List.hd h l) -∗ bcache_lru h l).
+    (bnext h) ↦₈ (List.hd h l) ∗ ((bnext h) ↦₈ (List.hd h l) -∗ bcache_lru h l).
   Proof.
     rewrite /bcache_lru. iIntros "(Hhn & Hhp & Hseg)".
     iFrame "Hhn". iIntros "Hhn". iFrame "Hhn Hhp Hseg".
@@ -161,7 +165,7 @@ Section BreadLru.
 
   Lemma bcache_lru_head_prev_acc (h : mword 64) (l : list (mword 64)) :
     bcache_lru h l -∗
-    word_pointsto (bprev h) (DfracOwn 1) (List.last l h) ∗ (word_pointsto (bprev h) (DfracOwn 1) (List.last l h) -∗ bcache_lru h l).
+    (bprev h) ↦₈ (List.last l h) ∗ ((bprev h) ↦₈ (List.last l h) -∗ bcache_lru h l).
   Proof.
     rewrite /bcache_lru. iIntros "(Hhn & Hhp & Hseg)".
     iFrame "Hhp". iIntros "Hhp". iFrame "Hhn Hhp Hseg".
@@ -172,8 +176,8 @@ Section BreadLru.
      and the segment is rebuilt at the same decomposition. *)
   Lemma bcache_lru_next_acc (h a : mword 64) (l1 l2 : list (mword 64)) :
     bcache_lru h (l1 ++ a :: l2)%list -∗
-    word_pointsto (bnext a) (DfracOwn 1) (List.hd h l2) ∗
-    (word_pointsto (bnext a) (DfracOwn 1) (List.hd h l2) -∗ bcache_lru h (l1 ++ a :: l2)%list).
+    (bnext a) ↦₈ (List.hd h l2) ∗
+    ((bnext a) ↦₈ (List.hd h l2) -∗ bcache_lru h (l1 ++ a :: l2)%list).
   Proof.
     rewrite /bcache_lru. iIntros "(Hhn & Hhp & Hseg)".
     iDestruct (bseg_app_split h h l1 (a :: l2) with "Hseg") as "[Hs1 Hs2]".
@@ -189,8 +193,8 @@ Section BreadLru.
      when [a] is first. *)
   Lemma bcache_lru_prev_acc (h a : mword 64) (l1 l2 : list (mword 64)) :
     bcache_lru h (l1 ++ a :: l2)%list -∗
-    word_pointsto (bprev a) (DfracOwn 1) (List.last l1 h) ∗
-    (word_pointsto (bprev a) (DfracOwn 1) (List.last l1 h) -∗ bcache_lru h (l1 ++ a :: l2)%list).
+    (bprev a) ↦₈ (List.last l1 h) ∗
+    ((bprev a) ↦₈ (List.last l1 h) -∗ bcache_lru h (l1 ++ a :: l2)%list).
   Proof.
     rewrite /bcache_lru. iIntros "(Hhn & Hhp & Hseg)".
     iDestruct (bseg_app_split h h l1 (a :: l2) with "Hseg") as "[Hs1 Hs2]".
@@ -230,7 +234,9 @@ Proof. unfold neq_vec. by rewrite bd_sext_eqv. Qed.
 
 Section BreadSlots.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{XI : CurCtx}.   (* M1 stage 2: [bio_slot_res]'s [↦₄] cells *)
+  (* M1 stage 2: [bio_slot_res] and this section's own ↦₄ cells are
+     context-indexed. *)
+  Context `{XI : CurCtx}.
 
   (* THE FORWARD SCAN's borrow.  The scan reads [b->dev] and [b->blockno] of
      a buffer it knows nothing about, so the two arms of [bio_slot_res] are

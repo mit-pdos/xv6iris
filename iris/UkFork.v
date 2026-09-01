@@ -768,7 +768,7 @@ Section UkFork.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hal4. iIntros "#Hi HP Hsz HD Hrun [Hpar Hchild]".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     (* the caller's handles ARE the parent's table, at the slots they name --
@@ -790,7 +790,7 @@ Section UkFork.
       "(Hheap' & Hsz' & #Htf' & #Hpf' & Hdf')".
     iMod ("Hrebuild" $! γt' γd' γs' with "Htf' Hpf' Hdf'") as "[HP' Hstk']".
     (* ---- the trap ---- *)
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm M m pc fdv Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>

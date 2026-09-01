@@ -382,7 +382,7 @@ Section UexecRetFs.
   Proof.
     iIntros "H".
     iDestruct "H" as (C pt Rfd Rut sz M pm fdv)
-      "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     (* the fs bundle's pieces are pinned at the ambient (its ∃ xi is
        vacuous), so the plain urun repacks at the ambient *)
     rewrite /urun. iExists XI, C, pt, Rfd, Rut, sz, M, pm, fdv.
