@@ -1726,6 +1726,23 @@ Proof.
 Qed.
 
 
+Local Lemma foldr_ins_dom (l : list nat) (pa : Arch.pa) (f : nat -> bv 8)
+    (mm : gmap Arch.pa (bv 8)) :
+  dom (foldr (fun j acc => <[pa_add pa j := f j]> acc) mm l)
+  = list_to_set (pa_add pa <$> l) ∪ dom mm.
+Proof.
+  induction l as [|j l IH].
+  - cbn [foldr fmap list_fmap list_to_set]. set_solver.
+  - cbn [foldr fmap list_fmap list_to_set]. rewrite dom_insert_L IH. set_solver.
+Qed.
+
+Lemma dom_snap_of {w : N} (pa : Arch.pa) (n : N) (v : bv w) :
+  dom (snap_of pa n v) = footprint pa n.
+Proof.
+  unfold snap_of, write_bytes, footprint. rewrite foldr_ins_dom dom_empty_L.
+  set_solver.
+Qed.
+
 Lemma snap_of_lookup_Some {w : N} (pa : Arch.pa) (n : N) (v : bv w)
     (a : Arch.pa) (b : bv 8) :
   snap_of pa n v !! a = Some b ->

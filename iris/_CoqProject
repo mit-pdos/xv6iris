@@ -9,6 +9,7 @@
 -arg -w
 -arg -notation-overridden
 SetShrink.v
+SepThread.v
 FastSetSolver.v
 FastSetSolverTests.v
 BvShift.v
@@ -19,6 +20,9 @@ TsoMem.v
 TsoMemPa.v
 TsoGhost.v
 TsoLitmus.v
+TsoCtxTwin.v
+TsoCtxRehearsal.v
+TsoCtxTwin2.v
 VirtioModel.v
 DiskImg.v
 DevModel.v
@@ -28,6 +32,7 @@ HartBlock.v
 HartSwp.v
 HartLift.v
 HartEvents.v
+HartBarrier.v
 HartRegNode.v
 HartSpan.v
 HartSpanChar.v
@@ -62,6 +67,10 @@ TsoCtxAbsorbLb.v
 CtxMorphTac.v
 TsoCtxPark.v
 TsoCtxMove.v
+CtxValues.v
+CtxPinw.v
+CtxKMap.v
+CtxPinMint.v
 PtTreeMove.v
 PtTreeShim.v
 CtxRecord.v
@@ -211,6 +220,7 @@ KptTree.v
 KptGoodb.v
 KptShare.v
 HartSMem.v
+HartSMemTok.v
 SmodeCorePt.v
 WpSmodePtFetch.v
 WpSmodeGpr.v
@@ -234,6 +244,7 @@ PlicPlan.v
 WpUart.v
 RiscvAdequacy.v
 CommonWalk.v
+KptPublish.v
 DecodeTotalU.v
 DecodeSetU.v
 UserExec.v
@@ -360,6 +371,7 @@ WpSconfMem.v
 WpSmodeHalf.v
 WpSconfBtype.v
 WpSconfCtl.v
+WpSconfFencePub.v
 WpSconfLock.v
 SpecUart.v
 ProofUart.v

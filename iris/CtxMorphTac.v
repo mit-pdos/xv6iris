@@ -109,8 +109,11 @@ Ltac ctx_morph_step :=
   | |- CtxMorph (fun _ => ctx_word2_pointsto _ _ _ _)  => apply ctx_morph_word2
   | |- CtxMorph (fun _ => ctx_word4_pointsto _ _ _ _)  => apply ctx_morph_word4
   | |- CtxMorph (fun _ => ctx_string_pointsto _ _ _ _) => apply ctx_morph_string
-  | |- CtxMorph (fun _ => ctx_phys_pointsto _ _ _ _)      => apply ctx_morph_phys_pointsto
-  | |- CtxMorph (fun _ => ctx_phys_word_pointsto _ _ _ _) => apply ctx_morph_phys_word
+  (* the SC-era phys rows are GONE at the cutover: a full [ctx_phys_pointsto]
+     does not transport by domination under TSO (the dirty arm's fragment is
+     the author's).  A payload holding phys cells states its own instance
+     over the clean half ([ctx_phys_pointsto_h]) or re-shapes (the T-leg's
+     per-site treatments). *)
   (* the boolean guards are a [match] on a [bool], which an Ltac1 pattern
      cannot name; they are cheap to try, and [ctx_morph_const] behind them
      is the ξ-constant leaf (pure facts, ghost state, invariant handles). *)

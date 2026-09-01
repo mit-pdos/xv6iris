@@ -1,7 +1,6 @@
 (* TsoCtxMove.v -- THE SAME-HART HAND-OFF (tso-port.md §0.43′; tso-machine-flip.md
    A6.128): moving a context-indexed fact between two RUNNING contexts on one
-   hart, with both running tokens in hand.  On main: the STATEMENTS verbatim,
-   the bodies SC-trivial.
+   hart, with both running tokens in hand.
 
    WHERE IT IS NEEDED.  swtch hands cells from the caller's thread to the
    target's with no fence between: the scheduler's [p->state = RUNNING] /
@@ -24,56 +23,238 @@
    structural instances mirror [CtxMorph]'s.  Nothing here consults the
    interpretation: both premises are running tokens.
 
-   WHAT IS TRIVIAL HERE, AND WHY.  Main is SC: [own_context] is sealed with
-   the body [True ∨ …], [ctx_floor] with [True], and [ctx_pointsto]'s index
-   is PHANTOM (its body is [RiscvPtsto.mem_pointsto]), so both leaf laws
-   discharge by the unseal lemmas -- there is no bound to raise, no dirty set
-   to register in and no [TsoGhost] below the seal to do it with.  The
-   STATEMENTS are the T-leg's exactly, which is the seal principle: at the
-   TSO cutover the bodies are replaced and no consumer above this file moves.
-   [TsoCtxPark.v] / [TsoCtxAbsorbLb.v] are the precedent for exactly this
-   arrangement.  The T-leg's [view_lb_max'] is below the seal and not
-   stated; the two physical-tier leaves ([ctx_phys_pointsto] /
-   [ctx_phys_word_pointsto], the U-mode cells) are stated below with their
-   two solver rows.
-
    WHY ITS OWN FILE: [TsoCtx.v] is under the whole tree; this is a derivation
    off its public unseal lemmas ([TsoCtxAbsorbLb] / [TsoCtxPark] precedent). *)
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own ghost_var invariants.
+From iris.algebra Require Import auth.
+From iris.base_logic.lib Require Import ghost_map mono_nat.
 Require Import SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto Ktier.
+Require Import TsoMemPa TsoGhost.
 Require Import TsoCtx.
 
 Section Move.
   Context `{!riscvGS Σ}.
 
+  Local Lemma view_lb_max' (gv gl : gname) (h : agent) (K1 K2 : nat) :
+    view_lb gv gl h K1 -∗ view_lb gv gl h K2 -∗ view_lb gv gl h (Nat.max K1 K2).
+  Proof.
+    iIntros "H1 H2".
+    destruct (Nat.le_ge_cases K1 K2) as [Hle|Hle].
+    - rewrite (Nat.max_r _ _ Hle). iExact "H2".
+    - rewrite (Nat.max_l _ _ Hle). iExact "H1".
+  Qed.
+
   (* THE CLEAN HALF: a bound ξ0 has passed, ξ1 passes too -- ξ1's bound
      rises to ξ0's.  Both are under the hart's view, so the raised bound
      keeps [B ≤ K] with the joined receipt; ξ1's dirty justifications are
-     monotone in the bound.  (SC: the floor is [True] and the two tokens
-     pass straight through.) *)
+     monotone in the bound. *)
   Lemma ctx_move_floor `{CID : CpuId} (ξ0 ξ1 : CtxId) (lo : nat) :
     own_context ξ0 -∗ own_context ξ1 -∗ ctx_floor ξ0 lo ==∗
     own_context ξ0 ∗ own_context ξ1 ∗ ctx_floor ξ1 lo.
   Proof.
-    rewrite !ctx_floor_unseal /ctx_floor_def.
-    iIntros "H0 H1 _". iModIntro. iFrame "H0 H1".
+    rewrite !own_context_unseal /own_context_def.
+    iIntros "(%B0 & %K0 & %W0 & %D0 & [Hb0 Hd0] & #HK0 & %HBK0 & #HW0 & %HDW0 & #Hoks0)
+             (%B1 & %K1 & %W1 & %D1 & [Hb1 Hd1] & #HK1 & %HBK1 & #HW1 & %HDW1 & #Hoks1) #Hfl".
+    iDestruct (llb_valid with "Hb0 Hfl") as %HloB0.
+    iMod (mono_nat_own_update (Nat.max B1 B0) with "Hb1") as "[Hb1 #Hlb1]"; first lia.
+    iDestruct (view_lb_max' _ _ _ K1 K0 with "HK1 HK0") as "#HKj".
+    iAssert ([∗ set] k ∈ D1,
+               dirty_ok logm_name (hart_agent cpu_id) (Nat.max B1 B0) k)%I as "#Hoks1'".
+    { iApply (big_sepS_impl with "Hoks1"). iIntros "!>" (k _) "Hok".
+      iApply (dirty_ok_mono with "Hok"). lia. }
+    iModIntro.
+    iSplitL "Hb0 Hd0".
+    { iExists B0, K0, W0, D0. iFrame "Hb0 Hd0 HK0 HW0 Hoks0". by iPureIntro. }
+    iSplitL "Hb1 Hd1".
+    { iExists (Nat.max B1 B0), (Nat.max K1 K0), W1, D1.
+      iFrame "Hb1 Hd1 HKj HW1 Hoks1'". iPureIntro. split; [lia | exact HDW1]. }
+    rewrite /ctx_floor /llb. iLeft. iApply (mono_nat_lb_own_le with "Hlb1"). lia.
   Qed.
 
-  (* THE CELL MOVES, EITHER ARM.  (SC: the index is phantom -- the cell's
-     clean/dirty bit and the whole case split live under the seal.) *)
+  (* THE CELL MOVES, EITHER ARM. *)
   Lemma ctx_move_pointsto `{CID : CpuId} `{KTR : !CurKtier} (ξ0 ξ1 : CtxId)
       (a : Arch.pa) (dq : dfrac) (v : bv 8) :
     own_context ξ0 -∗ own_context ξ1 -∗ ctx_pointsto (KTR := KTR) ξ0 a dq v ==∗
     own_context ξ0 ∗ own_context ξ1 ∗ ctx_pointsto (KTR := KTR) ξ1 a dq v.
   Proof.
-    iIntros "H0 H1 HP". iModIntro. iFrame "H0 H1".
-    iEval (rewrite ctx_pointsto_unseal) in "HP".
-    rewrite ctx_pointsto_unseal. iExact "HP".
+    iIntros "H0 H1 HP".
+    rewrite !ctx_pointsto_unseal /ctx_pointsto_def.
+    iDestruct "HP" as "(%ppn & %t & #Hk & %Hc & %Hr & %Hpin & Hpt & Hts & Hbit)".
+    iDestruct "Hbit" as "[#Hcl | #Hdt]".
+    - (* clean: raise ξ1's bound to ξ0's *)
+      iMod (ctx_move_floor ξ0 ξ1 t with "H0 H1 Hcl") as "(H0 & H1 & #Hfl1)".
+      iModIntro. iFrame "H0 H1". iExists ppn, t. iFrame "Hk Hpt Hts".
+      iSplit; [done|]. iSplit; [done|]. iSplit; [done|].
+      iLeft. iExact "Hfl1".
+    - (* dirty: the key is ξ0's registration; look at its justification *)
+      iEval (rewrite own_context_unseal /own_context_def) in "H0".
+      iDestruct "H0" as "(%B0 & %K0 & %W0 & %D0 & [Hb0 Hd0] & #HK0 & %HBK0 & #HW0 & %HDW0 & #Hoks0)".
+      iDestruct (dset_lookup with "Hd0 Hdt") as %HD0.
+      iDestruct (big_sepS_elem_of _ _ _ HD0 with "Hoks0") as "#Hok0".
+      pose proof (HDW0 _ HD0) as HtW0. simpl in HtW0.
+      iDestruct "Hok0" as "[%HtB0 | #Hown]".
+      + (* morally clean at ξ0: treat as clean *)
+        simpl in HtB0.
+        iDestruct (mono_nat_lb_own_get with "Hb0") as "#Hlb0".
+        iAssert (ctx_floor ξ0 t) as "#Hfl0".
+        { rewrite /ctx_floor /llb. iLeft. iApply (mono_nat_lb_own_le with "Hlb0"). lia. }
+        iAssert (own_context ξ0) with "[Hb0 Hd0]" as "H0".
+        { rewrite own_context_unseal /own_context_def.
+          iExists B0, K0, W0, D0. iFrame "Hb0 Hd0 HK0 HW0 Hoks0". by iPureIntro. }
+        iMod (ctx_move_floor ξ0 ξ1 t with "H0 H1 Hfl0") as "(H0 & H1 & #Hfl1)".
+        iModIntro. iFrame "H0 H1". iExists ppn, t. iFrame "Hk Hpt Hts".
+        iSplit; [done|]. iSplit; [done|]. iSplit; [done|].
+        iLeft. iExact "Hfl1".
+      + (* this hart's own message: register at ξ1 *)
+        iEval (rewrite own_context_unseal /own_context_def) in "H1".
+        iDestruct "H1" as "(%B1 & %K1 & %W1 & %D1 & [Hb1 Hd1] & #HK1 & %HBK1 & #HW1 & %HDW1 & #Hoks1)".
+        iMod (dset_insert _ D1 (t, pa_of ppn a) with "Hd1") as "[Hd1 #Hdt1]".
+        iDestruct (llb_max with "HW1 HW0") as "#HW1'".
+        iAssert ([∗ set] k ∈ D1 ∪ {[(t, pa_of ppn a)]},
+                   dirty_ok logm_name (hart_agent cpu_id) B1 k)%I as "#Hoks1'".
+        { destruct (decide ((t, pa_of ppn a) ∈ D1)) as [Hin | Hnin].
+          - assert (Heq : D1 ∪ {[(t, pa_of ppn a)]} = D1) by set_solver.
+            rewrite Heq. iExact "Hoks1".
+          - rewrite (union_comm_L D1) big_sepS_insert; last exact Hnin.
+            iSplit; [| iExact "Hoks1"]. rewrite /dirty_ok. iRight. iExact "Hown". }
+        iModIntro. rewrite !own_context_unseal /own_context_def.
+        iSplitL "Hb0 Hd0".
+        { iExists B0, K0, W0, D0. iFrame "Hb0 Hd0 HK0 HW0 Hoks0". by iPureIntro. }
+        iSplitL "Hb1 Hd1".
+        { iExists B1, K1, (Nat.max W1 W0), (D1 ∪ {[(t, pa_of ppn a)]}).
+          iFrame "Hb1 Hd1 HK1 HW1' Hoks1'". iPureIntro. split; [exact HBK1|].
+          intros k Hk. apply elem_of_union in Hk as [Hk | Hk].
+          - have := HDW1 _ Hk. lia.
+          - apply elem_of_singleton in Hk. subst k. simpl. lia. }
+        iExists ppn, t. iFrame "Hk Hpt Hts".
+        iSplit; [done|]. iSplit; [done|]. iSplit; [done|]. iRight. iExact "Hdt1".
+  Qed.
+
+  (* The physical-tier byte ([TsoCtx.ctx_phys_pointsto]: the ledger pages --
+     trapframes, kernel stacks) moves the same way; its seal has no ppn. *)
+  Lemma ctx_move_phys_pointsto `{CID : CpuId} (ξ0 ξ1 : CtxId)
+      (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    own_context ξ0 -∗ own_context ξ1 -∗ ctx_phys_pointsto ξ0 a dq v ==∗
+    own_context ξ0 ∗ own_context ξ1 ∗ ctx_phys_pointsto ξ1 a dq v.
+  Proof.
+    iIntros "H0 H1 HP".
+    rewrite !ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
+    iDestruct "HP" as "(%t & Hpt & Hts & Hbit)".
+    iDestruct "Hbit" as "[#Hcl | #Hdt]".
+    - iMod (ctx_move_floor ξ0 ξ1 t with "H0 H1 Hcl") as "(H0 & H1 & #Hfl1)".
+      iModIntro. iFrame "H0 H1". iExists t. iFrame "Hpt Hts". iLeft. iExact "Hfl1".
+    - iEval (rewrite own_context_unseal /own_context_def) in "H0".
+      iDestruct "H0" as "(%B0 & %K0 & %W0 & %D0 & [Hb0 Hd0] & #HK0 & %HBK0 & #HW0 & %HDW0 & #Hoks0)".
+      iDestruct (dset_lookup with "Hd0 Hdt") as %HD0.
+      iDestruct (big_sepS_elem_of _ _ _ HD0 with "Hoks0") as "#Hok0".
+      pose proof (HDW0 _ HD0) as HtW0. simpl in HtW0.
+      iDestruct "Hok0" as "[%HtB0 | #Hown]".
+      + simpl in HtB0.
+        iDestruct (mono_nat_lb_own_get with "Hb0") as "#Hlb0".
+        iAssert (ctx_floor ξ0 t) as "#Hfl0".
+        { rewrite /ctx_floor /llb. iLeft. iApply (mono_nat_lb_own_le with "Hlb0"). lia. }
+        iAssert (own_context ξ0) with "[Hb0 Hd0]" as "H0".
+        { rewrite own_context_unseal /own_context_def.
+          iExists B0, K0, W0, D0. iFrame "Hb0 Hd0 HK0 HW0 Hoks0". by iPureIntro. }
+        iMod (ctx_move_floor ξ0 ξ1 t with "H0 H1 Hfl0") as "(H0 & H1 & #Hfl1)".
+        iModIntro. iFrame "H0 H1". iExists t. iFrame "Hpt Hts". iLeft. iExact "Hfl1".
+      + iEval (rewrite own_context_unseal /own_context_def) in "H1".
+        iDestruct "H1" as "(%B1 & %K1 & %W1 & %D1 & [Hb1 Hd1] & #HK1 & %HBK1 & #HW1 & %HDW1 & #Hoks1)".
+        iMod (dset_insert _ D1 (t, a) with "Hd1") as "[Hd1 #Hdt1]".
+        iDestruct (llb_max with "HW1 HW0") as "#HW1'".
+        iAssert ([∗ set] k ∈ D1 ∪ {[(t, a)]},
+                   dirty_ok logm_name (hart_agent cpu_id) B1 k)%I as "#Hoks1'".
+        { destruct (decide ((t, a) ∈ D1)) as [Hin | Hnin].
+          - assert (Heq : D1 ∪ {[(t, a)]} = D1) by set_solver.
+            rewrite Heq. iExact "Hoks1".
+          - rewrite (union_comm_L D1) big_sepS_insert; last exact Hnin.
+            iSplit; [| iExact "Hoks1"]. rewrite /dirty_ok. iRight. iExact "Hown". }
+        iModIntro. rewrite !own_context_unseal /own_context_def.
+        iSplitL "Hb0 Hd0".
+        { iExists B0, K0, W0, D0. iFrame "Hb0 Hd0 HK0 HW0 Hoks0". by iPureIntro. }
+        iSplitL "Hb1 Hd1".
+        { iExists B1, K1, (Nat.max W1 W0), (D1 ∪ {[(t, a)]}).
+          iFrame "Hb1 Hd1 HK1 HW1' Hoks1'". iPureIntro. split; [exact HBK1|].
+          intros k Hk. apply elem_of_union in Hk as [Hk | Hk].
+          - have := HDW1 _ Hk. lia.
+          - apply elem_of_singleton in Hk. subst k. simpl. lia. }
+        iExists t. iFrame "Hpt Hts". iRight. iExact "Hdt1".
+  Qed.
+
+  (* A DIRTY WITNESS moves the way a dirty cell's arm does: at ξ0 the key
+     is either under ξ0's bound -- then it is a FLOOR at ξ1 -- or this
+     hart's own message -- then it registers at ξ1.  The receiver gets the
+     disjunction, which is what a lock's [WpLock.lk_floor] is. *)
+  Lemma ctx_move_wrote `{CID : CpuId} (ξ0 ξ1 : CtxId) (t : nat) (a : Arch.pa) :
+    own_context ξ0 -∗ own_context ξ1 -∗ ctx_wrote ξ0 t a ==∗
+    own_context ξ0 ∗ own_context ξ1 ∗ (ctx_floor ξ1 t ∨ ctx_wrote ξ1 t a).
+  Proof.
+    iIntros "H0 H1 #Hdt". rewrite /ctx_wrote.
+    iEval (rewrite own_context_unseal /own_context_def) in "H0".
+    iDestruct "H0" as "(%B0 & %K0 & %W0 & %D0 & [Hb0 Hd0] & #HK0 & %HBK0 & #HW0 & %HDW0 & #Hoks0)".
+    iDestruct (dset_lookup with "Hd0 Hdt") as %HD0.
+    iDestruct (big_sepS_elem_of _ _ _ HD0 with "Hoks0") as "#Hok0".
+    pose proof (HDW0 _ HD0) as HtW0. simpl in HtW0.
+    iDestruct "Hok0" as "[%HtB0 | #Hown]".
+    - simpl in HtB0.
+      iDestruct (mono_nat_lb_own_get with "Hb0") as "#Hlb0".
+      iAssert (ctx_floor ξ0 t) as "#Hfl0".
+      { rewrite /ctx_floor /llb. iLeft. iApply (mono_nat_lb_own_le with "Hlb0"). lia. }
+      iAssert (own_context ξ0) with "[Hb0 Hd0]" as "H0".
+      { rewrite own_context_unseal /own_context_def.
+        iExists B0, K0, W0, D0. iFrame "Hb0 Hd0 HK0 HW0 Hoks0". by iPureIntro. }
+      iMod (ctx_move_floor ξ0 ξ1 t with "H0 H1 Hfl0") as "(H0 & H1 & #Hfl1)".
+      iModIntro. iFrame "H0 H1". iLeft. iExact "Hfl1".
+    - iEval (rewrite own_context_unseal /own_context_def) in "H1".
+      iDestruct "H1" as "(%B1 & %K1 & %W1 & %D1 & [Hb1 Hd1] & #HK1 & %HBK1 & #HW1 & %HDW1 & #Hoks1)".
+      iMod (dset_insert _ D1 (t, a) with "Hd1") as "[Hd1 #Hdt1]".
+      iDestruct (llb_max with "HW1 HW0") as "#HW1'".
+      iAssert ([∗ set] k ∈ D1 ∪ {[(t, a)]},
+                 dirty_ok logm_name (hart_agent cpu_id) B1 k)%I as "#Hoks1'".
+      { destruct (decide ((t, a) ∈ D1)) as [Hin | Hnin].
+        - assert (Heq : D1 ∪ {[(t, a)]} = D1) by set_solver.
+          rewrite Heq. iExact "Hoks1".
+        - rewrite (union_comm_L D1) big_sepS_insert; last exact Hnin.
+          iSplit; [| iExact "Hoks1"]. rewrite /dirty_ok. iRight. iExact "Hown". }
+      iModIntro. rewrite !own_context_unseal /own_context_def.
+      iSplitL "Hb0 Hd0".
+      { iExists B0, K0, W0, D0. iFrame "Hb0 Hd0 HK0 HW0 Hoks0". by iPureIntro. }
+      iSplitL "Hb1 Hd1".
+      { iExists B1, K1, (Nat.max W1 W0), (D1 ∪ {[(t, a)]}).
+        iFrame "Hb1 Hd1 HK1 HW1' Hoks1'". iPureIntro. split; [exact HBK1|].
+        intros k Hk. apply elem_of_union in Hk as [Hk | Hk].
+        - have := HDW1 _ Hk. lia.
+        - apply elem_of_singleton in Hk. subst k. simpl. lia. }
+      iRight. iExact "Hdt1".
+  Qed.
+
+  (* FORK'S MINT (A6.129, owner ruling §0.44′): a RUNNING TWIN of a
+     running context.  A new kernel thread's context is not born empty at
+     stamp 0 -- that is boot's mint, [TsoCtx.own_context_boot], for the
+     per-hart contexts that become the schedulers' -- it is born as a copy
+     of its PARKER's: the same bound and watermark (the parker's own view
+     receipts vouch for it), an empty dirty set (the rows the parker hands
+     over re-register as they cross, [ctx_move]).  While both tokens are
+     running every row moves by [ctx_move]; then the twin parks
+     ([TsoCtxPark.ctx_park_box]) into the record the parker is building. *)
+  Lemma own_context_twin `{CID : CpuId} (ξ : CtxId) :
+    own_context ξ ==∗ own_context ξ ∗ ∃ ξc : CtxId, own_context ξc.
+  Proof.
+    iIntros "H". rewrite own_context_unseal /own_context_def.
+    iDestruct "H" as "(%B & %K & %W & %D & Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
+    iMod (mono_nat_own_alloc B) as (γb) "[Hb _]".
+    iMod dset_alloc as (γd) "Hd".
+    iModIntro. iSplitL "Hat".
+    { iExists B, K, W, D. iFrame "Hat HK HW Hoks". by iPureIntro. }
+    iExists (MkCtxId γb γd). rewrite own_context_unseal /own_context_def.
+    iExists B, K, W, ∅. rewrite /ctx_at. iFrame "Hb Hd HK HW".
+    iSplitR; first done.
+    iSplitR; first (iPureIntro; intros k Hk; set_solver).
+    by iApply big_sepS_empty.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -191,21 +372,6 @@ Section Move.
     iModIntro. iFrame "H0 H1". iSplit; [done|]. iExact "H".
   Qed.
 
-  (* THE PHYSICAL-TIER LEAVES (tso-flip TsoCtxMove.v): the U-mode cells --
-     a dormant process's memory and page-table pages cross swtch between
-     two running contexts.  SC: the index is phantom, the tokens pass
-     straight through; TSO: the clean half moves by the floor, the dirty
-     half is re-registered under the same-hart authorship justification. *)
-  Lemma ctx_move_phys_pointsto `{CID : CpuId} (ξ0 ξ1 : CtxId)
-      (a : Arch.pa) (dq : dfrac) (v : bv 8) :
-    own_context ξ0 -∗ own_context ξ1 -∗ ctx_phys_pointsto ξ0 a dq v ==∗
-    own_context ξ0 ∗ own_context ξ1 ∗ ctx_phys_pointsto ξ1 a dq v.
-  Proof.
-    iIntros "H0 H1 HP". iFrame "H0 H1".
-    iEval (rewrite ctx_phys_pointsto_unseal) in "HP".
-    rewrite ctx_phys_pointsto_unseal. by iFrame "HP".
-  Qed.
-
   Global Instance ctx_move_phys_pointsto_inst `{CID : CpuId} a dq v :
     CtxMove (λ ξ, ctx_phys_pointsto ξ a dq v).
   Proof. intros ξ0 ξ1. apply ctx_move_phys_pointsto. Qed.
@@ -218,35 +384,6 @@ Section Move.
             (λ _ j ξ, ctx_phys_pointsto ξ (pa_add a j) dq (nth_byte w j))
             (λ i x, ctx_move_phys_pointsto_inst _ _ _) ξ0 ξ1 with "H0 H1 H") as "(H0 & H1 & H)".
     iModIntro. iFrame "H0 H1". iSplit; [done|]. iExact "H".
-  Qed.
-
-  (* the dirty-arm crossing (A6.128's registry row): SC mints the
-     receiver's witness outright ([ctx_wrote]'s M-leg body is [True]);
-     the T-leg re-registers the row in the receiver's dirty set. *)
-  Lemma ctx_move_wrote `{CID : CpuId} (ξ0 ξ1 : CtxId) (t : nat) (a : Arch.pa) :
-    own_context ξ0 -∗ own_context ξ1 -∗ ctx_wrote ξ0 t a ==∗
-    own_context ξ0 ∗ own_context ξ1 ∗ (ctx_floor ξ1 t ∨ ctx_wrote ξ1 t a).
-  Proof.
-    iIntros "H0 H1 _". iModIntro. iFrame "H0 H1". iRight.
-    rewrite ctx_wrote_unseal /ctx_wrote_def. auto.
-  Qed.
-
-  (* FORK'S MINT (A6.129, owner ruling §0.44′): a RUNNING TWIN of a
-     running context.  A new kernel thread's context is not born empty at
-     stamp 0 -- that is boot's mint, [TsoCtx.own_context_boot], for the
-     per-hart contexts that become the schedulers' -- it is born as a copy
-     of its PARKER's: the same bound and watermark (the parker's own view
-     receipts vouch for it), an empty dirty set (the rows the parker hands
-     over re-register as they cross, [ctx_move]).  While both tokens are
-     running every row moves by [ctx_move]; then the twin parks
-     ([TsoCtxPark.ctx_park_box]) into the record the parker is building.
-     STATEMENT from tso-flip r67; the M-leg body mints through the
-     [True] disjunct exactly as [own_context_boot] does. *)
-  Lemma own_context_twin `{CID : CpuId} (ξ : CtxId) :
-    own_context ξ ==∗ own_context ξ ∗ ∃ ξc : CtxId, own_context ξc.
-  Proof.
-    iIntros "H". iModIntro. iFrame "H". iExists inhabitant.
-    rewrite own_context_unseal /own_context_def. by iLeft.
   Qed.
 
 End Move.
