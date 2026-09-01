@@ -441,3 +441,45 @@ NEXT (unchanged from the map): 4b-iii itable_body cutover (itable_body :=
 itable_body_pinw, live arms bound per-slot lo), itable_res extension +
 accessor rewiring, icM_wf n <= IREFSLOTS, IcacheBoot construction,
 ilock/iunlock racy reads; then Phase 5 bcache anchors; then 4.5 ic_escrow.
+
+## r65 BANKED (snapshot 1a1555e8d4f): 4b-iii Stage A -- the racy-read leg
+
+Additive, world still 1304/1305.  What is now CERTIFIED:
+- The v2 per-slot body (`IcacheInv.pinw_slot`): one (g, lo) binder spans
+  the four pinw ledger rows (`iref_pin_rows k w lo tst`, each byte
+  ⌜t<=tst⌝-bounded for the A6.144 exact read) and the genlo-ized
+  liveness arm (norm residual / frozen full / free full -- the old
+  live_norm/live_frzn shapes at the slot's own epoch).
+  `itable_body_pinw` = half + wf + the merged rows; `itable_inv_pinw`
+  is the parallel inv name (cutover: itable_body := itable_body_pinw).
+- `pinw_slot_slice`: an outstanding genlo slice REFUTES the free and
+  frozen arms (full unit + slice > 1, Qp.not_add_le_l) and pins the norm
+  arm's (g, lo) to its own by pair-agree; the subtraction witness comes
+  out at the slot's qt so the opener can reclose.
+- `iref_load_pinw_au`: the wp_load_s_sconf_au_rel Res-accessor -- open
+  icacheN, slice finds its window, borrow rows across the step, reclose.
+- `IcachePinwObl.iref_read_obl` (NEW FILE, after IcacheInv in
+  _CoqProject): floor(tl>=lo) --own_context_floor_view--> view_lb --
+  ledger_read_pinw_ok --> at EVERY drain view the four bytes assemble an
+  iref_set member --> 0 < v < 2^31 (iref_set_read).  This is the
+  ilock/iunlock panic-killer, end to end, at the gstate tier; consumers
+  do the tso_interp_of_at_gs rewrite + KT0 identity at their sites
+  (StartedInv.started_read_obl is the worked model).
+- DESIGN NOTE MADE CONCRETE: the epoch credential IS the (g, lo)
+  liveness generation (flip notes A6.145 correction); the r64-era
+  iref_cred/icfg_ieplo quantum forms are REMOVED from IcacheInv (ieplo
+  gnames stay allocated, unused).
+
+NEXT LEGS (4b-iii remaining, in order): (1) the count-store leg --
+strengthen CtxPinw's two store faces to expose the re-mint bound
+(rows return ∃t ⌜t <= length g'.(glog)⌝; line ~220's iExists (S len) is
+the witness), then the incr/decr AU faces yielding iref_pin_rows and
+taking back rows at w' + msg_at + llb, stamp halves joined with the
+A6.144 payload row and max-bumped; floors deferred to release
+(WpLock.lock_pay_intro_llb re-floors the payload).  (2) arm/retire --
+ctx cell <-> pinw rows conversion + live_genlo_bump at full unit (fresh
+g', lo' = the arm store's position); free-slot cells + istmp halves +
+floor row into IcacheEscrow.itable_res2; is_itable2 λ-flip.  (3) the
+swap + the 11 cell-faced AU rewrites + icM_wf n <= IREFSLOTS +
+IcacheBoot + the consumer wave (the r64 interim pin0 seams get replaced
+by real floors from lock rows -- un-parkers re-mint under the lock).
