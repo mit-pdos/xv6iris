@@ -157,6 +157,9 @@ Lemma wp_uk_retire_later_folded `{!riscvGS Σ} `{!ufdG Σ} `{GEN : GenId} `{CID 
     (π : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate) :
   loop_ok C pt ->
   perm_of (ud_um pt) sz = π ->
+  (forall pt' : uptd,
+     ⊢ Rut pt' -∗ TsoCtx.own_context TsoCtx.cur_ctx ∗
+                  (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt')) ->
   forall (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (is_rvc : bool)
     (i : instruction) (o : option instruction) (jt : option (mword 64))
     (wr : option (mword 5 * mword 64)),
@@ -189,6 +192,10 @@ Module Type FDROW_UKFS_RETIRE.
       (π : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate),
       loop_ok C pt ->
       perm_of (ud_um pt) sz = π ->
+      (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
+      (forall pt' : uptd,
+         ⊢ Rut pt' -∗ TsoCtx.own_context TsoCtx.cur_ctx ∗
+                      (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt')) ->
       forall (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (is_rvc : bool)
         (i : instruction) (o : option instruction) (jt : option (mword 64))
         (wr : option (mword 5 * mword 64)),
@@ -962,9 +969,9 @@ Section UkRunFsLeaf.
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run].
     (* the enriched rows include open and dup, so the table may have moved;
        the program is not tracking these descriptors, so the authority moves
-       and no handle comes back ([UkRunSys.ufd_auth_move]) *)
+       and no handle comes back ([UkRunSys.ufd_state_move]) *)
     iApply uslot_fs_bupd.
-    iMod (ufd_auth_move γfd n (tf_of m pc) r fdv fdv'
+    iMod (ufd_state_move γfd n (tf_of m pc) r fdv fdv'
             (uenr_dom_ne_close n Hdom) Hfdok with "Hufd") as "Hufd".
     iModIntro.
     rewrite (uslot_fs_bump_run γm m pc M M pm pm sz sz fdv fdv' r Hx0 Hal4).
@@ -1027,9 +1034,9 @@ Section UkRunFsLeaf.
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run].
     (* the enriched rows include open and dup, so the table may have moved;
        the program is not tracking these descriptors, so the authority moves
-       and no handle comes back ([UkRunSys.ufd_auth_move]) *)
+       and no handle comes back ([UkRunSys.ufd_state_move]) *)
     iApply uslot_fs_bupd.
-    iMod (ufd_auth_move γfd n (tf_of m pc) r fdv fdv'
+    iMod (ufd_state_move γfd n (tf_of m pc) r fdv fdv'
             (uenr_dom_ne_close n Hdom) Hfdok with "Hufd") as "Hufd".
     iModIntro.
     rewrite (uslot_fs_bump_run γm m pc M M pm pm sz sz fdv fdv' r Hx0 Hal4).

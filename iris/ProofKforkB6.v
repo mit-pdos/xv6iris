@@ -235,7 +235,7 @@ Section KforkPrologue.
      4614 B in Delta at every step of that walk
      (optimization.md, fold block continuations). *)
   Definition kfk_pro_exit3
- (γw : gname) (γl : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Up : ustate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
+ (γw : gname) (γl : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
         (pid_c : mword 32) (ch : mword 64) (Uc' : ustate)
         (tfsrc tfdst : mword 44),
@@ -267,11 +267,15 @@ Section KforkPrologue.
         kfk_frame_at sp0 ra0 s00 s10 s50
           (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
         proc_priv γf pme pid_p Up -∗
+        (* ...and its descriptor states, which travel beside the block on
+           every arm: kfork reads them and hands them back
+           ([SpecKfork.kfork_post]). *)
+        FdSlots.fd_frags (ProcDefs.pv_fdg (us_V Up)) stsP -∗
         proc_priv_nocwd γf npa pid_c Uc' -∗
         (* the child's descriptor-state fragments, out of allocproc with its
-           block -- kfork spends them duplicating descriptors and parks the
-           rest in the child's residue. *)
-        FdSlots.fd_frags_any (ProcDefs.pv_fdg (us_V Uc')) -∗
+           block AT [fdt0] -- the copy loop retypes them at the parent's own
+           entries and the whole table parks with the child. *)
+        FdSlots.fd_frags (ProcDefs.pv_fdg (us_V Uc')) fdt0 -∗
         (* the new slot's ALLOCATION MARKER, minted by allocproc and needed
            by whoever finally parks the slot at USED / RUNNABLE
            ([SchedCtx.proc_slots_park]).  Persistent. *)
@@ -319,7 +323,7 @@ Section KforkPrologue.
      2790 B in Delta at every step of that walk
      (optimization.md, fold block continuations). *)
   Definition kfk_pro_exit2
- (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Up : ustate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
+ (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
         (pid_c : mword 32) (ch : mword 64) (Uc : ustate),
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
@@ -350,6 +354,10 @@ Section KforkPrologue.
         (∃ w4 w5 : mword 64,
            kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
         proc_priv γf pme pid_p Up -∗
+        (* ...and its descriptor states, which travel beside the block on
+           every arm: kfork reads them and hands them back
+           ([SpecKfork.kfork_post]). *)
+        FdSlots.fd_frags (ProcDefs.pv_fdg (us_V Up)) stsP -∗
         proc_priv_nocwd γf npa pid_c Uc -∗
         SchedCtx.proc_held cpu_id j γl2 USED ch -∗
         ProcGeom.hart_at_any npa -∗
@@ -374,7 +382,7 @@ Section KforkPrologue.
      1033 B in Delta at every step of that walk
      (optimization.md, fold block continuations). *)
   Definition kfk_pro_exit1
- (γf : gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (on : option nat) (b : bool) (pid_p : mword 32) (Up : ustate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
+ (γf : gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (on : option nat) (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
     (∀ (Mt : regfile),
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
         ⌜ forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -390,6 +398,10 @@ Section KforkPrologue.
         pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
         kfk_frame sp0 ra0 s00 s10 s50 -∗
         proc_priv γf pme pid_p Up -∗
+        (* ...and its descriptor states, which travel beside the block on
+           every arm: kfork reads them and hands them back
+           ([SpecKfork.kfork_post]). *)
+        FdSlots.fd_frags (ProcDefs.pv_fdg (us_V Up)) stsP -∗
         ( kalloc_env_at fsc_kalloc fsc_kpages on
           ∨ (∃ n : nat, ⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝ ∗
              kalloc_env_at fsc_kalloc fsc_kpages None) ) -∗
@@ -409,7 +421,7 @@ Section KforkPrologue.
  (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (on : option nat) (b : bool) (pid_p : mword 32) (Up : ustate)
-      (R : iProp Σ) (lks : gset string) :
+      (stsP : list fdstate) (R : iProp Σ) (lks : gset string) :
     let sp0 : mword 64 := m !!! Regidx csp_rs1 in
     let ra0 : mword 64 := m !!! Regidx Rra in
     let s00 : mword 64 := m !!! Regidx Rs0 in
@@ -438,6 +450,10 @@ Section KforkPrologue.
        nothing. *)
     procs_avail None -∗
     proc_priv γf pme pid_p Up -∗
+    (* the parent's descriptor states: read by the fd scan, handed back by
+       [SpecKfork.kfork_post], and passed to whichever exit fires -- one
+       resource, three alternatives, exactly as the exit [R] below. *)
+    FdSlots.fd_frags (ProcDefs.pv_fdg (us_V Up)) stsP -∗
     (* THE CALLER'S EXIT, THREADED -- kwait's [kw_exit_fn] recipe.  The three
        continuations below are three DIFFERENT closures and exactly one of
        them runs, but a caller has only ONE exit and it is linear, so making
@@ -448,7 +464,7 @@ Section KforkPrologue.
        back as its LAST argument. *)
     R -∗
     (* ---- Hcont10a : allocproc found no free slot ---- *)
-    wp_next b pme (fun CID : CpuId => kfk_pro_exit1 γf m lvl K eb pme on b pid_p Up R lks sp0 ra0 s00 s10 s50 CID) -∗
+    wp_next b pme (fun CID : CpuId => kfk_pro_exit1 γf m lvl K eb pme on b pid_p Up stsP R lks sp0 ra0 s00 s10 s50 CID) -∗
     (* ---- Hcont7c : uvmcopy failed ---- *)
     (* [wp_next]'s own reference hart is bound EXPLICITLY (rather than left to
        resolve at this Section's [CID0]): once allocproc's found arm commits
@@ -465,7 +481,7 @@ Section KforkPrologue.
        the leaves run so far -- it was simply never surfaced. *)
     (∀ CIDh : CpuId,
        ⌜ b = false \/ pme = zero_reg -> (CIDh : CPU) = (CID0 : CPU) ⌝ -∗
-       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit2 γf γs m lvl K eb pme b pid_p Up R lks sp0 ra0 s00 s10 s50 CID)) -∗
+       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit2 γf γs m lvl K eb pme b pid_p Up stsP R lks sp0 ra0 s00 s10 s50 CID)) -∗
     (* ---- Hcont4a : uvmcopy succeeded -- the trapframe copy loop's head --- *)
     (* THE CROSSING PREMISE IS NOT OPTIONAL.  Without it this antecedent is
        "prove the continuation at a hart nobody has said anything about":
@@ -476,13 +492,13 @@ Section KforkPrologue.
        the leaves run so far -- it was simply never surfaced. *)
     (∀ CIDh : CpuId,
        ⌜ b = false \/ pme = zero_reg -> (CIDh : CPU) = (CID0 : CPU) ⌝ -∗
-       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit3 γw γl γf γs m lvl K eb pme b pid_p Up R lks sp0 ra0 s00 s10 s50 CID)) -∗
+       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit3 γw γl γf γs m lvl K eb pme b pid_p Up stsP R lks sp0 ra0 s00 s10 s50 CID)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 ra0 s00 s10 s50 HK Hlvl Hbelow.
     
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl #Hitbl
-             #Hitinv Henv #Hpav Hpv HR Hcont10a Hcont7c Hcont4a".
+             #Hitinv Henv #Hpav Hpv Hpfrag HR Hcont10a Hcont7c Hcont4a".
     set (K1 := (K - 8)%nat).
     (* =================================================================
        PROLOGUE: push 8 slots, spill ra/s0/s1/s5, set the frame pointer.
@@ -737,7 +753,7 @@ Section KforkPrologue.
         iSplitL "Hb6"; [iExists u6; iExact "Hb6"|].
         iExists u8; iExact "Hb8". }
       iSpecialize ("Hcont10a" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv [Henv'] HR").
+      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv Hpfrag [Henv'] HR").
       + exact HBsp.
       + intros r Hr Ncsp N8 N9 N21. apply HBthr; assumption.
       + iLeft. iExact "Henv'".
@@ -1093,6 +1109,7 @@ Section KforkPrologue.
         iSpecialize ("Hcont7c" with "Hpc").
         iSpecialize ("Hcont7c" with "Hframe_alloc").
         iSpecialize ("Hcont7c" with "HPpriv").
+        iSpecialize ("Hcont7c" with "Hpfrag").
         iSpecialize ("Hcont7c" with "HCpriv").
         iSpecialize ("Hcont7c" with "Hheld").
         iSpecialize ("Hcont7c" with "Hhart").
@@ -1354,23 +1371,12 @@ Section KforkPrologue.
           iEval (rgne) in "Hb6". iEval (rewrite Hslot6') in "Hb6".
           iFrame "Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7".
           iExists u8; iExact "Hb8". }
-        (* THE ONE REMAINING WEAKENING ON THIS ROUTE, and it is marked because
-           it is the next thing to remove.  allocproc now hands the child's
-           bundle PRECISELY, at [fdt0]; the copy loop below ([ProofKforkB3])
-           retypes descriptors one at a time and its invariant is still
-           stated at [fd_frags_any], so the precise bundle has to be forgotten
-           here to enter it.  Making that invariant carry the partially
-           copied table is what would let kfork say the child inherits the
-           parent's descriptors -- which the loop already PROVES, one
-           [fd_st_move] at a time, and then discards. *)
-        iAssert (FdSlots.fd_frags_any (ProcDefs.pv_fdg Vc)) with "[Hcfrag]"
-          as "Hcfrag"; [ iExists fdt0; iExact "Hcfrag" | ].
         iSpecialize ("Hcont4a" $! CID11 with "[%]"); [wp_next_chain|].
         iSpecialize ("Hcont4a" $! CID28 with "[%]"); [wp_next_chain|].
         iApply ("Hcont4a" $! N10 npa j γl2 pid_c ch
                   (MkUstate (upd_pt (upd_sz Vc (pv_sz (us_V Up))) P' (pv_tf Vc)) MCs)
                   (ud_tfp (pv_upt (us_V Up))) (ud_tfp (pv_upt Vc))
-                  with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv HCpriv
+                  with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv Hpfrag HCpriv
                         Hcfrag
                         Hmk Hheld Hhart Hfdsp Hirsp Hbslp Hkstk [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv HR").
         * exact HN10sp.
@@ -1410,7 +1416,7 @@ Section KforkPrologue.
         iSplitL "Hb6"; [iExists u6; iExact "Hb6"|].
         iExists u8; iExact "Hb8". }
       iSpecialize ("Hcont10a" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv [Henv'] HR").
+      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv Hpfrag [Henv'] HR").
       + exact HBsp.
       + intros r Hr Ncsp N8 N9 N21. apply HBthr; assumption.
       + destruct Hwit as (n & Hn1 & Hn2). iRight. iExists n. iSplitR; [iPureIntro; split; assumption|]. iExact "Henv'".

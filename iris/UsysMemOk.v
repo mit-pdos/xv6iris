@@ -242,9 +242,27 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        CLOSED.  sys_close returns 0 on success and -1 when [argfd] rejects
        the number -- out of range, or already closed -- and a rejected close
        moves nothing, which is what a program that closes twice needs. *)
-    (if decide (uint r = 0)
-     then sts' = <[Z.to_nat (usys_argfd tf) := FdClosed]> sts
-     else sts' = sts)
+    ((if decide (uint r = 0)
+      then sts' = <[Z.to_nat (usys_argfd tf) := FdClosed]> sts
+      else sts' = sts)
+     (* ...AND CLOSING AN OPEN DESCRIPTOR CANNOT FAIL.  The guard above is
+        sound and, alone, useless to a caller that does not check the return
+        value -- which is every caller: xv6's sh writes [close(fd);
+        open(path)] and reads neither result, and a row that leaves [r] free
+        leaves the descriptor still open on an arm no program can rule out.
+        [argfd] rejects exactly two things, an index outside [0, NOFILE) and
+        a null [p->ofile] slot, and a caller naming an OPEN descriptor has
+        refuted both -- so the return is a function of the slot's state, and
+        this says so in the direction a caller has it.
+
+        The premise is stated at a [nat] index rather than on [usys_argfd]
+        directly because that is what makes it true: [Z.to_nat] of a
+        NEGATIVE argument is 0, and close(-1) must not be licensed to
+        conclude anything about slot 0.  [ProofSyscall]'s arm 21 proves it
+        from [ProcInv.proc_priv_states_agree]. *)
+     /\ (forall (fd : nat) (st : fdstate),
+           usys_argfd tf = Z.of_nat fd -> sts !! fd = Some st ->
+           st <> FdClosed -> uint r = 0))
   else if decide (n = USYS_dup) then
     (* dup(fd): the RETURNED descriptor is a COPY of the argument's -- same
        type, same mode -- because filedup only bumps [f->ref] and the two
@@ -252,13 +270,17 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        what it had, which [list_insert] says by leaving it alone. *)
     ((exists fd1 : nat,
         usys_ret_is r fd1 /\
-        (* ...AND THE SLOT IT LANDED IN WAS FREE.  fdalloc scans for a null
-           entry, so this is what the code does; stating it is what makes
-           the row usable by a holder of descriptors.  Without it dup would
-           be licensed to retype a descriptor the caller is already using,
-           and no party above could keep a fact about its own table across
-           the call ([UserFd.ufd_dup] is the consumer). *)
-        sts !! fd1 = Some FdClosed /\
+        (* ...AND IT IS THE LOWEST FREE SLOT.  This used to say only that
+           the slot was free, which is what the code does but not all of
+           it: fdalloc scans from 0 and takes the FIRST null entry, so the
+           descriptor is DETERMINED by the table rather than merely
+           constrained by it ([SpecFdalloc.fd_frees] is that scan, and its
+           head is this).  Without the strengthening dup would be licensed
+           to retype a descriptor the caller is already using; with only
+           the weak form a caller that closes a descriptor and reallocates
+           still cannot say which one it got back, which is what sh's REDIR
+           turns on.  [UserFd.ufd_dup] is the consumer. *)
+        fd_least_closed sts fd1 /\
         sts' = <[fd1 := sts !!! Z.to_nat (usys_argfd tf)]> sts)
      (* ...OR THE CALL FAILED, AND THE ROW SAYS SO BY NAMING [-1].  An
         unguarded [sts' = sts] here would be useless to a caller: it would
@@ -278,9 +300,11 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        it can honestly say: the slot is now OPEN, and no other slot moved. *)
     ((exists (fd : nat) (rd wr : bool) (t : fdtype),
         usys_ret_is r fd /\
-        (* ...AND THE SLOT WAS FREE -- same fdalloc scan, same reason as
-           dup's row above. *)
-        sts !! fd = Some FdClosed /\
+        (* ...AND IT IS THE LOWEST FREE SLOT -- same fdalloc scan, same
+           reason as dup's row above.  This is the conjunct sh's REDIR
+           needs: [close(fd); open(path)] reopens the descriptor just
+           closed precisely because the scan starts at 0. *)
+        fd_least_closed sts fd /\
         sts' = <[fd := FdOpen rd wr t]> sts)
      (* ...or the call failed, which it reports as -1 -- see dup's row for
         why the failure arm is guarded rather than bare. *)
@@ -300,12 +324,18 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
     (if decide (uint r = 0)
      then (exists a b : nat,
              a <> b /\
-             (* ...AND BOTH SLOTS WERE FREE, both read against the INCOMING
-                table: the two are distinct, so writing one does not disturb
-                the other's freedom.  Two fdalloc calls, two scans. *)
-             sts !! a = Some FdClosed /\ sts !! b = Some FdClosed /\
-             sts' = <[a := FdOpen true false FdPipe]>
-                      (<[b := FdOpen false true FdPipe]> sts))
+             (* ...AND EACH IS THE LOWEST FREE SLOT AT THE MOMENT ITS OWN
+                fdalloc RAN, which is what makes the pair deterministic.
+                sys_pipe allocates the READ end first
+                ([fd0 = fdalloc(rf)]) and the WRITE end second against the
+                table the first call left, so the second scan is stated at
+                [<[a := ...]> sts] and not at [sts].  The inserts below are
+                written in that same order for the same reason; they
+                commute ([a <> b]), so a caller may read them either way. *)
+             fd_least_closed sts a /\
+             fd_least_closed (<[a := FdOpen true false FdPipe]> sts) b /\
+             sts' = <[b := FdOpen false true FdPipe]>
+                      (<[a := FdOpen true false FdPipe]> sts))
      else sts' = sts)
   else
     (* EVERY OTHER ENTRY LEAVES THE TABLE ALONE -- but read that carefully
@@ -413,22 +443,24 @@ Definition usys_pipe_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
   uint r = 0 ->
   exists (a b : nat) (bs : nat -> bv 8),
     a <> b /\
-    (* THE TWO SLOTS WERE FREE, restated here rather than left to
-       [usys_fd_ok]'s own pipe row.  The two rows bind their [a]/[b]
-       INDEPENDENTLY, so a leaf that mints handles off this one cannot
-       borrow the other's promise without first arguing the witnesses
-       agree -- and the promise costs the kernel nothing extra, being the
-       same fact [ProofSysPipe] already proves once. *)
-    sts !! a = Some FdClosed /\
-    sts !! b = Some FdClosed /\
+    (* THE TWO SLOTS WERE THE LOWEST FREE ONES, restated here rather than
+       left to [usys_fd_ok]'s own pipe row.  The two rows bind their
+       [a]/[b] INDEPENDENTLY, so a leaf that mints handles off this one
+       cannot borrow the other's promise without first arguing the
+       witnesses agree -- and the promise costs the kernel nothing extra,
+       being the same fact [ProofSysPipe] already proves once.  Same
+       allocation order as there: read end first, write end against the
+       table the first call left. *)
+    fd_least_closed sts a /\
+    fd_least_closed (<[a := FdOpen true false FdPipe]> sts) b /\
     M' = umem_wr M (tf !!! tf_arg_idx 0) 8 bs /\
     (forall i : nat, (i < 8)%nat ->
        bs i = if (i <? 4)%nat
               then nth_byte (trunc32 (mword_of_int (Z.of_nat a) : mword 64)) i
               else nth_byte (trunc32 (mword_of_int (Z.of_nat b) : mword 64))
                      (i - 4)%nat) /\
-    sts' = <[a := FdOpen true false FdPipe]>
-             (<[b := FdOpen false true FdPipe]> sts).
+    sts' = <[b := FdOpen false true FdPipe]>
+             (<[a := FdOpen true false FdPipe]> sts).
 
 (* the quiet reading: the other twenty-one entries owe nothing here *)
 Lemma usys_pipe_ok_quiet (n : Z) (tf : list (mword 64)) (r : mword 64)
@@ -490,7 +522,8 @@ Lemma usys_fd_ok_length (n : Z) (tf : list (mword 64)) (r : mword 64)
 Proof.
   unfold usys_fd_ok. intros H.
   destruct (decide (n = USYS_close)) as [_ | _].
-  { destruct (decide (uint r = 0)); subst; [ apply length_insert | reflexivity ]. }
+  { destruct H as [H _].
+    destruct (decide (uint r = 0)); subst; [ apply length_insert | reflexivity ]. }
   destruct (decide (n = USYS_dup)) as [_ | _].
   { destruct H as [(fd1 & _ & _ & ->) | [_ ->]];
       [apply length_insert | reflexivity]. }

@@ -30,6 +30,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   the two scripts, daily use, pulling `.vo` back for a local single-file
   recheck, preemption and cost, and the two things that silently break (the
   VM's Ubuntu must match, and the opam switch must be byte-identical).
+- **[`rocq-warm.md`](rocq-warm.md)** — using
+  [`rocq-warm`](https://github.com/zeldovich/rocq-warm) here: it checks a
+  `.v` file against a warm `rocq repl` session, so editing one proof
+  re-executes only from the edit onwards. How to get it, the memory budget
+  this tree needs, and what it deliberately does not do. The tool is not
+  vendored here and its internals are documented in its own repo.
 - **[`kernel-defects.md`](kernel-defects.md)** — how to tell a defect in the xv6
   SOURCE from a problem in a spec, the register of open ones, and the provably
   dead code.  The newest entry -- `read(fd, buf, -1)` delivering the rest of
@@ -116,6 +122,15 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   stated against the kernel's trap contract, where the program-GENERIC
   key-level vocabulary lives (`UkAbi.v`), and `sync` and `echo` on it —
   including what echo's port gave up and why.
+- **[`user-fd.md`](design/user-fd.md)** — the PROGRAM's own descriptor
+  table: one ghost map read three ways (a tail handle, a shut standard
+  stream, the LEDGER of the low `NSTD`), why the low slots are tracked
+  totally and the rest only when open, the one allocation rule that decides
+  WHICH descriptor came back from the caller's own ledger, close's two
+  footprints and the row that makes closing an open descriptor total, and
+  who has to carry a ledger and why nobody can escape it, and why a forked
+  child's table IS its parent's -- what kfork's copy loop proves, what
+  [`SpecKfork`] therefore states, and the one u-tier seam still open.
 - **[`user-heap.md`](design/user-heap.md)** — the SEPARATION-LOGIC HEAP over
   user memory: the two `ghost_map`s (text persistent/X, data exclusive/W)
   and why that is what makes an exclusive points-to imply writability, the

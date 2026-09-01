@@ -773,10 +773,15 @@ Section ProofUserinit.
        [uexec_wp_uslot]: a process whose key qualifies picks up sync's own
        constructor instead, which is the whole point of the conditional
        probe.  The family, not a keyed slot -- the park cannot know the key
-       the resume will land on (projects/user-wp-slot.md SS4c, R-b). *)
-    iAssert (∀ W : uvis, uslot W)%I as "Hjslot".
+       the resume will land on (projects/user-wp-slot.md SS4c, R-b) -- but
+       RESTRICTED to the table the park is at, which for userinit's fresh
+       process is [fdt0]: the resume mints its key at that list and at no
+       other, so a family covering every other view is asking for what is
+       never used.  The generic inhabitant satisfies the restriction by
+       ignoring it. *)
+    iAssert (∀ W : uvis, ⌜uvis_fd W = fdt0⌝ -∗ uslot W)%I as "Hjslot".
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
-      iIntros (W). iApply (UexecCond.cond_entry_slot W with "Hgen"). }
+      iIntros (W) "_". iApply (UexecCond.cond_entry_slot W with "Hgen"). }
     iMod (park_token_park N rest (MkUstate (upd_cwd V ipv) M) fdt0 Hwf Hrest
             with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirs]")

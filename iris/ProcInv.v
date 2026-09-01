@@ -507,6 +507,104 @@ Section ProcInv.
     rewrite -(big_sepL_delete_insert _ fs fd v v' Hfd). iFrame "Hrest".
   Qed.
 
+  (* =================================================================== *)
+  (* WHAT A NON-NULL CELL SAYS ABOUT THE STATE LIST.                     *)
+  (*                                                                     *)
+  (* [ofile_slot_agree] is the per-descriptor reading and it needs the    *)
+  (* slot in hand; this is the same fact against the WHOLE array and the  *)
+  (* process's own fragment bundle, which is the shape a caller holding   *)
+  (* [proc_ofiles_owe] and [fd_frags] actually has.  It is what turns     *)
+  (* fdalloc's scan -- stated on p->ofile's POINTERS ([SpecFdalloc]'s     *)
+  (* [fd_frees]) -- into a statement about the STATES the syscall rows    *)
+  (* speak in, and hence what makes                                       *)
+  (* [FdSlots.fd_least_closed] provable at all.                           *)
+  (*                                                                     *)
+  (* THE LENT DESCRIPTORS ARE EXCLUDED, and they have to be: a slot in    *)
+  (* [D] has given its ghost authority away, so the array knows its cell  *)
+  (* is non-null and knows NOTHING about its state.  A caller that needs  *)
+  (* the reading at a lent slot knows that slot's state some other way -- *)
+  (* it is holding the authority itself -- and reads it off that.         *)
+  (* =================================================================== *)
+  Lemma proc_ofiles_owe_nonnull_open (γf γd : gname) (pa : mword 64)
+      (fs : list (mword 64)) (D : gset nat) (sts : list fdstate)
+      (fd : nat) (v : mword 64) :
+    fs !! fd = Some v ->
+    v <> (zero_reg : mword 64) ->
+    fd ∉ D ->
+    proc_ofiles_owe γf γd pa fs D -∗ fd_frags γd sts -∗
+    ⌜sts !! fd <> Some FdClosed⌝.
+  Proof.
+    iIntros (Hfd Hnn Hout) "Ho Hfr".
+    iDestruct (proc_ofiles_owe_len with "Ho") as %Hlen.
+    assert (HfdN : (fd < NOFILE)%nat)
+      by (rewrite <- Hlen; exact (lookup_lt_Some _ _ _ Hfd)).
+    iDestruct (proc_ofiles_owe_acc γf γd pa fs D D fd v Hfd
+                 ltac:(intros j _; reflexivity) with "Ho") as "[Hslot _]".
+    rewrite (ofile_lent_or_slot_out γf γd pa D fd v Hout).
+    iDestruct (fd_frags_acc_lt γd sts fd HfdN with "Hfr")
+      as (st) "(%Hst & Hfrag & _)".
+    iDestruct (ofile_slot_agree with "Hfrag Hslot") as %[[Hz _] | [_ Hne]];
+      [ contradiction (Hnn Hz) | ].
+    iPureIntro. rewrite Hst. intros Hc. apply Hne. by injection Hc.
+  Qed.
+
+  (* ...AND THE SAME READING AT EVERY SLOT AT ONCE.                       *)
+  (*                                                                     *)
+  (* The single-slot form above CONSUMES the array and the bundle, so it  *)
+  (* answers for one descriptor and then it is spent.                     *)
+  (* [FdSlots.fd_least_closed] needs an answer for every slot BELOW the   *)
+  (* one allocated, and [fd] separate applications is not available -- so *)
+  (* this is one induction down the two lists together, peeling a slot    *)
+  (* and its fragment at each step.                                       *)
+  (*                                                                     *)
+  (* At the EMPTY deficit, which is what [proc_priv] carries: a caller    *)
+  (* mid-syscall with descriptors on loan has a [D] to worry about, and   *)
+  (* the sites that need this (the dispatch arms, reading a completed     *)
+  (* call's post) are past that point and hold the whole array again.     *)
+  Local Lemma ofile_slots_states_agree (γf γd : gname) (pa : mword 64)
+      (n : nat) (fs : list (mword 64)) (sts : list fdstate) :
+    ([∗ list] i ↦ v ∈ fs, ofile_slot γf γd pa (n + i)%nat v) -∗
+    ([∗ list] i ↦ st ∈ sts, fd_st γd (n + i)%nat st) -∗
+    ⌜forall (j : nat) (v : mword 64) (st : fdstate),
+       fs !! j = Some v -> sts !! j = Some st ->
+       (v = (zero_reg : mword 64) <-> st = FdClosed)⌝.
+  Proof.
+    revert n sts. induction fs as [| a fs' IH]; intros n sts.
+    { iIntros "_ _". iPureIntro. intros j v st Hv. rewrite lookup_nil in Hv.
+      discriminate Hv. }
+    destruct sts as [| b sts'].
+    { iIntros "_ _". iPureIntro. intros j v st _ Hst.
+      rewrite lookup_nil in Hst. discriminate Hst. }
+    iIntros "[Hh Ht] [Hbh Hbt]".
+    rewrite Nat.add_0_r.
+    iDestruct (ofile_slot_agree with "Hbh Hh") as %Hhead.
+    iDestruct (IH (S n) sts' with "[Ht] [Hbt]") as %Htail.
+    { iApply (big_sepL_mono with "Ht").
+      intros i v _. by replace (n + S i)%nat with (S n + i)%nat by lia. }
+    { iApply (big_sepL_mono with "Hbt").
+      intros i st _. by replace (n + S i)%nat with (S n + i)%nat by lia. }
+    iPureIntro. intros j v st Hv Hst.
+    destruct j as [| j'].
+    - cbn in Hv, Hst. injection Hv as <-. injection Hst as <-.
+      destruct Hhead as [[-> ->] | [Hnz Hno]]; [ by split |].
+      split; [ intros Hc; contradiction (Hnz Hc)
+             | intros Hc; contradiction (Hno Hc) ].
+    - exact (Htail j' v st Hv Hst).
+  Qed.
+
+  Lemma proc_ofiles_states_agree (γf γd : gname) (pa : mword 64)
+      (fs : list (mword 64)) (sts : list fdstate) :
+    proc_ofiles γf γd pa fs -∗ fd_frags γd sts -∗
+    ⌜forall (j : nat) (v : mword 64) (st : fdstate),
+       fs !! j = Some v -> sts !! j = Some st ->
+       (v = (zero_reg : mword 64) <-> st = FdClosed)⌝.
+  Proof.
+    iIntros "[_ Ho] [_ Hs]".
+    iApply (ofile_slots_states_agree γf γd pa 0%nat fs sts with "[Ho] [Hs]").
+    - iApply (big_sepL_mono with "Ho"). intros i v _. by rewrite Nat.add_0_l.
+    - iApply (big_sepL_mono with "Hs"). intros i st _. by rewrite Nat.add_0_l.
+  Qed.
+
   (* LEND: a descriptor that names a file gives its reference up, and joins
      the deficit.  The caller only has to know the cell is non-null -- which
      is exactly what [SpecArgfd.arg_fd] reports.
@@ -1134,6 +1232,68 @@ Section ProcInv.
 
   Definition proc_priv (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) : iProp Σ :=
     (proc_priv_core pa pid U ∗ proc_ofiles γf (pv_fdg (us_V U)) pa (pv_ofile (us_V U)))%I.
+
+  (* =================================================================== *)
+  (* fdalloc's SCAN, CONVERTED.                                          *)
+  (*                                                                     *)
+  (* This is the lemma the allocating dispatch arms apply.  What they     *)
+  (* hold after the call is the block at the UPDATED array and the bundle *)
+  (* at the UPDATED states -- the insert touched only the slot allocated  *)
+  (* -- so both still describe every slot BELOW it, and the scan fact the *)
+  (* call returns ([SpecFdalloc.fd_frees_below], on p->ofile's pointers)  *)
+  (* converts into [FdSlots.fd_least_closed] on the INCOMING table with   *)
+  (* nothing re-opened.                                                  *)
+  (* =================================================================== *)
+  (* the whole-array agreement at the block a caller actually holds *)
+  Lemma proc_priv_states_agree (γf : gname) (pa : mword 64) (pid : mword 32)
+      (U : ustate) (sts : list fdstate) :
+    proc_priv γf pa pid U -∗ fd_frags (pv_fdg (us_V U)) sts -∗
+    ⌜forall (j : nat) (v : mword 64) (st : fdstate),
+       pv_ofile (us_V U) !! j = Some v -> sts !! j = Some st ->
+       (v = (zero_reg : mword 64) <-> st = FdClosed)⌝.
+  Proof.
+    iIntros "[_ Hof] Hfr". iApply (proc_ofiles_states_agree with "Hof Hfr").
+  Qed.
+
+  (* STATED AT AGREEMENT BELOW [fd], not at a particular insert.  A caller
+     that allocated ONE descriptor holds the block and bundle one insert
+     past the table the scan is about; sys_pipe, which allocates TWO, holds
+     them two inserts past, and both inserts land at or above the first
+     descriptor.  So what the lemma can actually ask for is that the
+     resources it is given agree with the table below [fd] -- which both
+     callers have by [list_lookup_insert_ne] -- rather than that they be
+     any particular update of it. *)
+  Lemma proc_priv_frags_least (γf : gname) (pa : mword 64) (pid : mword 32)
+      (U : ustate) (sts0 sts : list fdstate) (fs0 : list (mword 64))
+      (fd : nat) :
+    (fd < NOFILE)%nat ->
+    sts0 !! fd = Some FdClosed ->
+    (forall j : nat, (j < fd)%nat -> fs0 !! j <> Some (zero_reg : mword 64)) ->
+    (forall j : nat, (j < fd)%nat -> pv_ofile (us_V U) !! j = fs0 !! j) ->
+    (forall j : nat, (j < fd)%nat -> sts !! j = sts0 !! j) ->
+    proc_priv γf pa pid U -∗
+    fd_frags (pv_fdg (us_V U)) sts -∗
+    ⌜fd_least_closed sts0 fd⌝.
+  Proof.
+    intros HfdN Hcl Hbelow Hfsag Hstag. iIntros "[_ Hof] Hfr".
+    iDestruct "Hof" as "[%Hflen Hofb]".
+    iDestruct (proc_ofiles_states_agree with "[Hofb] Hfr") as %Hag.
+    { iSplitR; [ iPureIntro; exact Hflen | iExact "Hofb" ]. }
+    iPureIntro. apply (fd_least_closed_intro sts0 fd Hcl).
+    intros j Hj Hc.
+    (* the slot is closed in the table the scan is about, hence in the one
+       the caller is holding -- they agree below [fd] *)
+    assert (Hjs : sts !! j = Some FdClosed) by (rewrite (Hstag j Hj); exact Hc).
+    (* ...and it is a slot of the array, which the scan walked past *)
+    assert (Hjv : is_Some (pv_ofile (us_V U) !! j))
+      by (apply lookup_lt_is_Some_2; rewrite Hflen; lia).
+    destruct Hjv as [w Hw].
+    pose proof (Hag j w FdClosed Hw Hjs) as [_ Hz].
+    (* so its cell is null -- and the scan says no cell below [fd] is *)
+    exact (Hbelow j Hj (eq_trans (eq_sym (Hfsag j Hj))
+                          (eq_trans Hw (f_equal Some (Hz eq_refl))))).
+  Qed.
+
 
   (* ---- THE CONSTRUCTION WINDOW -------------------------------------
      [cwd_ref] has no null arm, so a process whose [p->cwd] is still 0 does

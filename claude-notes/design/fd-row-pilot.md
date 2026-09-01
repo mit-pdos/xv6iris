@@ -519,3 +519,56 @@ convergence round changed about it:
    the enriched loop exists to consume it, and the tied mint is
    uninhabitable at the park regardless (the fd bundle is the park's).
    RECOMMEND YES (3a now, 3b with P4).
+6. **UPSTREAM — the X-GENERIC ENGINE (worklist ask 4).**  YES/NO on
+   parameterising `UkStep.v`'s §3/§4/§5/§6/§6b/§6c/§7/§8 over the slot
+   family — `Context (RetF : (uvis -d> iPropO Σ) -> mword 64 -> uvis ->
+   iProp Σ) (X : uvis -d> iPropO Σ) (Q : CurCtx -> Prop)` with two
+   hypotheses (the fixpoint unfolding and the transparent arm) — instead
+   of hardwiring `UexecRet`'s.  **COMPILED RECEIPT: `iris/UkStepGen.v`
+   (the twin, §10 is the diff), `iris/UkStepGenFs.v` (the enriched
+   instance), `iris/UkStepGenSeals.v` (the walks over the discharged
+   seals); all green on the mirror, 25.6s for the three.**
+
+   - **Measured delta:** 1585 lines of `UkStep.v` carried over; the
+     substitution (`uvb`→`uvb_F'`, `ukb`→`ukb_F'`, `ukc`→`ukc'`,
+     `uexec_ret`→`RetF X`, `uslot_run`→`ukc'_run`,
+     `uexec_ret_transparent`→`Ret_transparent`) touches **130** of them
+     — 52 statement/section/definition, 70 proof-body, 8 comment — and
+     **adds ZERO proof steps**.  §1's pure facts and
+     `trapped_of_uv_trap_frame` mention no slot family and are reused,
+     not copied.  New hand-written text: 249 + 264 + 32 = 545 lines
+     (2142 counting the carried-over copy, which the in-place landing
+     does not duplicate).
+   - **The two-facts claim HELD.**  Both are used exactly once, both in
+     `uk_arm_intr'` (the interrupt arm); nothing else inspects the
+     family.  No third fact was needed.
+   - **One unanticipated `Context` line, and it is not a fact.**  A
+     family also fixes which ambient `CurCtx` its slot covers: `uslot`
+     quantifies `xi` inside the fixpoint, `UexecRetFs.uslot_fs` is
+     pinned to its section's ambient, and the unfolding fact is not
+     stateable at the latter against a freely-`xi`-binding `ukc'`.  The
+     predicate `Q` (with `ukc'` binding `xi` under `⌜Q xi⌝`) covers
+     both: `True` upstream, `= XI` for the pilot.  Cost on top of the
+     substitution: **+24 / −14 lines** (two statement lines, three
+     `Hypothesis (HQ0 : Q XI)`, nine call sites passing one more
+     premise).  The engine never inspects `Q`.
+   - **The plain recovery is `exact`, not "equivalent":** `UkStepGen.v`
+     §9 states UkStep's exported ecall-driver type once and inhabits it
+     twice — by `UkStep.wp_uk_ecall` and by the generic engine at
+     `(uexec_ret_F, uslot, True)` — with identical `Print Assumptions`.
+   - **What it buys, compiled:** both of the pilot's seals become one
+     instantiation each (`FDROW_UKFS_STEP`, `FDROW_UKFS_RETIRE`), the
+     walk functors apply, `wp_pilot_open2` and init's console walk audit
+     to the two platform axioms + funext with no assumed module beneath
+     them, and `UkRunFsLeaf.v` §2 (~360 lines) becomes redundant.
+   - **Honest note:** the twin is the receipt, not the destination.
+     Landing ask 4 in place DELETES `UkStepGen.v`.
+   - **Ask 2b is this ask for the PARK**, unchanged by the measurement:
+     `ParkCap.park_pkg` hardwires `uslot` inside the `park_token`
+     fixpoint (`ParkCap.v:134`), and the same `Context` shape serves it —
+     the pilot's twin says the park uses only the `∀ W, X W` premise of
+     `park_token_park`, so its price list is the same one: a `Context`
+     line plus a substitution, no new proof steps.  No code was written
+     for it (the pilot does not touch `ParkCap.v`).
+   RECOMMEND YES; strictly smaller than ask 1, changes no landed
+   statement, and rules together with 2b.

@@ -153,6 +153,7 @@ Section ProofKforkB5.
       (γs : list gname) (γf γw γft γl : gname) (j : nat)
       (Mt : regfile) (K lvl : nat) (eb b : bool)
       (pme ks : mword 64) (pid_c : mword 32) (Uc : ustate)
+      (stsP : list fdstate)
       (ch : mword 64) (rest : list (mword 64)) (rv : mword 64)
       (lks : gset string) :
     (18 <= K)%nat ->
@@ -193,15 +194,20 @@ Section ProofKforkB5.
     SchedCtx.proc_held cpu_id j γl USED ch -∗
     ProcGeom.hart_at_any (ProcGeom.proc_addr j) -∗
     ProcInv.proc_priv γf (ProcGeom.proc_addr j) pid_c Uc -∗
-    (* the child's descriptor-state fragments, minted with its block by
-       allocproc; the park captures them into the resume closer. *)
-    FdSlots.fd_frags_any (ProcDefs.pv_fdg (us_V Uc)) -∗
-    (* ...and the GENERIC SLOT FAMILY for the child, on the very same route:
+    (* THE CHILD'S DESCRIPTOR STATES, AT THE PARENT'S OWN TABLE.  allocproc
+       minted the bundle at [fdt0] and kfork's copy loop
+       ([ProofKforkB3.kfkb3_fd_loop]) retyped every slot at the state the
+       parent's list records, so what arrives here is that list -- and the
+       park is keyed at it, which is how a forked child's descriptors become
+       stateable at all. *)
+    FdSlots.fd_frags (ProcDefs.pv_fdg (us_V Uc)) stsP -∗
+    (* ...and the SLOT FAMILY for the child, on the very same route:
        kfork's caller supplies it ([SpecKfork]'s premise of the same name),
        the park captures it into the resume closer, and that closer
-       instantiates it at the record the child actually resumes with.
-       LINEAR -- see claude-notes/design/user-wp-slot.md. *)
-    (∀ W : uvis, uslot W) -∗
+       instantiates it at the record the child actually resumes with -- whose
+       descriptor view is [stsP], which is why the family is restricted to
+       that table.  LINEAR -- see claude-notes/design/user-wp-slot.md. *)
+    (∀ W : uvis, ⌜uvis_fd W = stsP⌝ -∗ uslot W) -∗
     (* the slot's ALLOCATION MARKER, minted by allocproc and carried here
        through kfork's body: every non-UNUSED arm of the lock invariant
        holds it, so both releases below need it ([ProcAvail.v]).
@@ -267,16 +273,12 @@ Section ProofKforkB5.
     iAssert (park_own N) with "[Hbsl]" as "Hown_park".
     { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
     iDestruct (ProcDefs.kstack_free_at with "Hks Hkfree") as "Hstack".
-    (* THE CHILD'S TABLE, NAMED AT THE PARK.  kfork retypes the child's
-       descriptors one at a time in the copy loop ([ProofKforkB3]'s
-       [fd_st_move _ i FdClosed stq stf], at the PARENT's file type), but
-       the bundle it threads is still [fd_frags_any], so the result of that
-       work is not available here under a name -- this destruct is where
-       the loss shows.  Naming it properly means carrying the partially
-       copied table through B3's loop invariant; until then the park gets
-       the states it actually has, just anonymously introduced. *)
-    iDestruct "Hfrag" as (stsc) "Hfrag".
-    iMod (park_token_park N rest Uc stsc Hwf Hrest
+    (* THE CHILD'S TABLE, NAMED AT THE PARK -- and it is the PARENT's.  The
+       copy loop ([ProofKforkB3]'s [fd_st_move] at the parent's own entry,
+       one descriptor per turn) carries the partially copied table in its
+       invariant, so the list arrives here under a name and the park is
+       keyed at it. *)
+    iMod (park_token_park N rest Uc stsP Hwf Hrest
             with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirsp]")
       as "Hpctx".

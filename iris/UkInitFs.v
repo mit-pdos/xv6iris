@@ -1151,10 +1151,10 @@ Section UkInitFs.
     iApply (wp_kinit_console_arm_fs γm h m u0 (12 + (12 + (4 + n))) Hseed
               with "Hcode Hro Hrun Hmc").
     iIntros (h' m' u2 u3 r3 rd1 rd2) "_ %Hs2 Hmc Hrun".
-    iDestruct (urun_fs_urun with "Hrun") as "Hrun".
+    iDestruct (urun_fs_urun with "Hrun") as "[Hrun Hstd]".
     iDestruct (UkInitMain.wp_kinit_main_loop γt γd γs γfd szv n
                  with "Hcode Hro") as "[Hloop _]".
-    iApply ("Hloop" $! h' m' with "[] Hsz Hrun").
+    iApply ("Hloop" $! h' m' with "[] Hsz Hstd Hrun").
     iPureIntro. exact Hs2.
   Qed.
 

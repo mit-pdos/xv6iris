@@ -201,7 +201,13 @@ Section UexecRetFs.
       : uvis -d> iPropO Σ :=
     fun W =>
       (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
-         (Rut : uptd -> iProp Σ),
+         (Rut : uptd -> iProp Σ)
+         (* A6.140: the residue-token accessor rides the ∀ as a Coq-level
+            fact, exactly [UexecRet.uslot_F]'s row -- the loop engine borrows
+            the running token out of [Rut pt] per step and restores it *)
+         (HRut : forall pt' : uptd,
+                 ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h) TsoCtx.cur_ctx ∗
+                              (TsoCtx.own_context (CID := h) TsoCtx.cur_ctx -∗ Rut pt')),
          ⌜loop_ok C pt⌝ -∗
          ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
          uvb_fs_F γm X (CID := h) C pt Rfd Rut (uvis_sz W) (uvis_perm W)
@@ -238,7 +244,10 @@ Section UexecRetFs.
   Lemma uslot_fs_unfold (γm : gname) (W : uvis) :
     uslot_fs γm W ⊣⊢
     (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
-       (Rut : uptd -> iProp Σ),
+       (Rut : uptd -> iProp Σ)
+       (HRut : forall pt' : uptd,
+                 ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h) TsoCtx.cur_ctx ∗
+                              (TsoCtx.own_context (CID := h) TsoCtx.cur_ctx -∗ Rut pt')),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
        uvb_fs (CID := h) γm C pt Rfd Rut (uvis_sz W) (uvis_perm W) (uvis_fd W)
@@ -254,8 +263,8 @@ Section UexecRetFs.
     (|==> uslot_fs γm W) -∗ uslot_fs γm W.
   Proof.
     rewrite !(uslot_fs_unfold γm W).
-    iIntros "H" (h C pt Rfd Rut) "%Hl %Hp Hb".
-    iMod "H". iApply ("H" $! h C pt Rfd Rut with "[%] [%] Hb");
+    iIntros "H" (h C pt Rfd Rut HRut) "%Hl %Hp Hb".
+    iMod "H". iApply ("H" $! h C pt Rfd Rut HRut with "[%] [%] Hb");
       [ exact Hl | exact Hp ].
   Qed.
 
@@ -305,7 +314,7 @@ Section UexecRetFs.
     iLöb as "IH" forall (W).
     iIntros "Hs".
     rewrite uslot_fs_unfold.
-    iIntros (h C pt Rfd Rut) "%Hlo %Hpm Hb".
+    iIntros (h C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     rewrite /uvb_fs /uvb_fs_F.
     iDestruct "Hb" as
       "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
@@ -313,7 +322,7 @@ Section UexecRetFs.
     (* the fs bundle is pinned at this section's ambient context (its own
        ∀ xi is vacuous), so the PLAIN slot -- honestly ∀-quantified -- is
        instantiated at the ambient, not at the intro'd xi *)
-    iApply ("Hs" $! h XI C pt Rfd Rut with "[%] [%] [-]");
+    iApply ("Hs" $! h XI C pt Rfd Rut HRut with "[%] [%] [-]");
       [exact Hlo | exact Hpm |].
     rewrite /uvb /uvb_F.
     iFrame "Hamb Hur Hpt Hfrag Hcfg Hg Hpc Hrut".
@@ -369,25 +378,44 @@ Section UexecRetFs.
        (Rut : uptd -> iProp Σ) (sz : Z)
        (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (fdv : list fdstate),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
+       (* A6.140: the residue-token accessor rides the bundle as a PURE
+          fact, exactly as [UkRun.urun] carries it (pinned at the ambient) *)
+       ⌜ forall pt' : uptd,
+           ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h) TsoCtx.cur_ctx ∗
+                        (TsoCtx.own_context (CID := h) TsoCtx.cur_ctx -∗ Rut pt') ⌝ ∗
        uheap γt γd γs M pm ∗
        ustack γd (m !!! Regidx csp_rs1) avail ∗
        (* the program's own descriptor authority, exactly as [UkRun.urun]
-          carries it -- see its note *)
-       ufd_auth γfd fdv ∗
+          carries it -- see its note -- WITH ITS LEDGER, which [UkRun.urun]
+          leaves outside.  This channel does not track descriptors (its
+          clients learn nothing about them from its rows), but its rows do
+          MOVE the table, and an allocation landing on a standard stream
+          needs that slot's fragment.  Bundling the two is what keeps every
+          lemma that opens and closes a [urun_fs] unchanged. *)
+       ufd_state γfd fdv ∗
        uvb_fs (CID := h) γm C pt Rfd Rut sz pm fdv M m pc)%I.
 
+  (* ...AND THE LEDGER COMES OUT WITH IT.  [urun_fs] bundles the ledger with
+     the authority because its own rows move the table without naming it;
+     [urun] leaves the ledger outside, so the conversion hands it over
+     rather than dropping it -- which is what lets a program leave the
+     enriched channel and still call an allocating syscall. *)
   Lemma urun_fs_urun (γm γt γd γs γfd : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) :
-    urun_fs γm γt γd γs γfd h m pc avail -∗ urun γt γd γs γfd h m pc avail.
+    urun_fs γm γt γd γs γfd h m pc avail -∗
+    urun γt γd γs γfd h m pc avail ∗ ustd_any γfd.
   Proof.
     iIntros "H".
     iDestruct "H" as (C pt Rfd Rut sz M pm fdv)
       "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hufd" as "[Hufd Hstd]".
+    iSplitR "Hstd"; [| iExact "Hstd"].
     (* the fs bundle's pieces are pinned at the ambient (its ∃ xi is
        vacuous), so the plain urun repacks at the ambient *)
     rewrite /urun. iExists XI, C, pt, Rfd, Rut, sz, M, pm, fdv.
     iSplitR; [iPureIntro; exact Hlo |].
     iSplitR; [iPureIntro; exact Hpm |].
+    iSplitR; [iPureIntro; exact HRut |].
     iFrame "Hheap Hstk Hufd".
     rewrite /uvb /uvb_F /uvb_fs /uvb_fs_F.
     iDestruct "Hb" as

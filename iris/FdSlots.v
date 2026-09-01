@@ -476,11 +476,17 @@ Section FdSlots.
      family on the syscall channel.  What that bought in uniformity it paid
      for in silence: the weakening DISCARDS a value the producer had in
      hand, and once discarded it cannot be recovered, since this predicate
-     pins the length and nothing else.  [ProcInv]'s mint is the worked
-     example -- it proves [fd_frags γ fdt0] and existentially forgets it on
-     the next line, which is why nothing can say a forked child's
-     descriptors are anything in particular.  Every remaining use is a
-     place where a caller is being told less than the callee knew.
+     pins the length and nothing else.  Every remaining use is a place where
+     a caller is being told less than the callee knew.
+
+     THE WORKED EXAMPLE IS FORK, AND IT IS RETIRED.  allocproc's mint proves
+     [fd_frags γ fdt0]; kfork's copy loop retypes the child's ghost one
+     descriptor at a time, at the state the PARENT's own list records; and
+     the park is keyed at the list that comes out.  While either end
+     forgot -- the mint on the line after it, or the loop's invariant -- a
+     forked child's descriptors were unstateable, which is what parked sh's
+     command-tree runner.  Both ends name the list now
+     (claude-notes/design/user-fd.md SS4).
 
      THE ORIGINAL NOTE, for the record:
 
@@ -497,10 +503,181 @@ Section FdSlots.
      that mint is below every consumer -- a name defined above it could not
      be used to state what it hands out.  [fdst_map0] is the same fact at
      the ghost. *)
+  (* =================================================================== *)
+  (* fdalloc's SCAN, AND WHY IT IS A SPEC AND NOT A DETAIL.               *)
+  (*                                                                     *)
+  (* xv6's fdalloc walks [p->ofile] from 0 and takes the FIRST null slot, *)
+  (* so every syscall that allocates a descriptor allocates the LOWEST    *)
+  (* free one.  That is not an implementation accident to be abstracted   *)
+  (* away: it is what makes redirection work.  sh's REDIR is              *)
+  (* [close(fd); open(path)] and relies on the open landing back on the   *)
+  (* descriptor just closed, and a row saying only "the slot it returned  *)
+  (* was free" licenses open to answer any free slot at all.              *)
+  (*                                                                     *)
+  (* TWO READINGS OF ONE FACT, and both are wanted.  [fd_lowest_closed]   *)
+  (* is the scan as a FUNCTION -- it computes, which is what the mirror's *)
+  (* rows want ([FsFdMirror], which is where it used to live; it moved    *)
+  (* down because [UsysMemOk]'s rows are below that file).                *)
+  (* [fd_least_closed] is the same fact as a RELATION, and that is the    *)
+  (* form a PROOF wants: "this slot is closed and no smaller one is" is   *)
+  (* what fdalloc's own postcondition yields, via                          *)
+  (* [SpecFdalloc.fd_frees_below] and the array/state bridge in           *)
+  (* [ProcInv].  [fd_least_closed_intro] is the join.                     *)
+  (* =================================================================== *)
+  Fixpoint fd_lowest_closed (l : list fdstate) : option nat :=
+    match l with
+    | [] => None
+    | FdClosed :: _ => Some 0%nat
+    | _ :: l' => S <$> fd_lowest_closed l'
+    end.
+
+  Definition fd_least_closed (sts : list fdstate) (fd : nat) : Prop :=
+    fd_lowest_closed sts = Some fd.
+
+  (* ...and the slot it names really is closed. *)
+  Lemma fd_lowest_closed_is_closed (l : list fdstate) (fd : nat) :
+    fd_lowest_closed l = Some fd -> l !! fd = Some FdClosed.
+  Proof.
+    revert fd. induction l as [| st l IH]; intros fd H; [discriminate H |].
+    cbn in H. destruct st.
+    - injection H as <-. reflexivity.
+    - destruct (fd_lowest_closed l) as [k |] eqn:Hk; [| discriminate H].
+      cbn in H. injection H as <-. cbn. exact (IH k eq_refl).
+  Qed.
+
+  Lemma fd_lowest_closed_bound (l : list fdstate) (fd : nat) :
+    fd_lowest_closed l = Some fd -> (fd < length l)%nat.
+  Proof.
+    revert fd. induction l as [| st l IH]; intros fd H; [discriminate H |].
+    cbn in H. destruct st.
+    - injection H as <-. cbn. lia.
+    - destruct (fd_lowest_closed l) as [k |] eqn:Hk; [| discriminate H].
+      cbn in H. injection H as <-. cbn. specialize (IH k eq_refl). lia.
+  Qed.
+
+  (* NOTHING SMALLER IS CLOSED -- the half a caller reasons with, and the
+     half the function form hides. *)
+  Lemma fd_lowest_closed_below (l : list fdstate) (fd : nat) :
+    fd_lowest_closed l = Some fd ->
+    forall j : nat, (j < fd)%nat -> l !! j <> Some FdClosed.
+  Proof.
+    revert fd. induction l as [| st l IH]; intros fd H j Hj; [discriminate H |].
+    cbn in H. destruct st.
+    - injection H as <-. lia.
+    - destruct (fd_lowest_closed l) as [k |] eqn:Hk; [| discriminate H].
+      cbn in H. injection H as <-.
+      destruct j as [| j']; [ cbn; discriminate |].
+      cbn. exact (IH k eq_refl j' ltac:(lia)).
+  Qed.
+
+  (* ...and the converse, which is what a PROOF has in hand: fdalloc gives
+     "the slot is free" and "no smaller slot is free", and this turns the
+     pair into the scan's own answer. *)
+  Lemma fd_least_closed_intro (l : list fdstate) (fd : nat) :
+    l !! fd = Some FdClosed ->
+    (forall j : nat, (j < fd)%nat -> l !! j <> Some FdClosed) ->
+    fd_least_closed l fd.
+  Proof.
+    revert fd. induction l as [| st l IH]; intros fd Hc Hb;
+      [ rewrite lookup_nil in Hc; discriminate Hc |].
+    unfold fd_least_closed. cbn. destruct st.
+    - (* the head is closed, so it is the answer -- and [fd] is 0, since a
+         positive [fd] would make the head a smaller closed slot *)
+      destruct fd as [| fd']; [ reflexivity |].
+      exfalso. exact (Hb 0%nat ltac:(lia) eq_refl).
+    - (* the head is open, so [fd] is positive and the scan recurses *)
+      all: destruct fd as [| fd']; try (cbn in Hc; discriminate Hc);
+           rewrite (IH fd' Hc ltac:(intros j Hj; exact (Hb (S j) ltac:(lia))));
+           reflexivity.
+  Qed.
+
+  Lemma fd_least_closed_free (sts : list fdstate) (fd : nat) :
+    fd_least_closed sts fd -> sts !! fd = Some FdClosed.
+  Proof. exact (fd_lowest_closed_is_closed sts fd). Qed.
+
+  Lemma fd_least_closed_lt (sts : list fdstate) (fd : nat) :
+    fd_least_closed sts fd -> (fd < length sts)%nat.
+  Proof. exact (fd_lowest_closed_bound sts fd). Qed.
+
+  Lemma fd_least_closed_below (sts : list fdstate) (fd : nat) :
+    fd_least_closed sts fd ->
+    forall j : nat, (j < fd)%nat -> sts !! j <> Some FdClosed.
+  Proof. exact (fd_lowest_closed_below sts fd). Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE SCAN SPLITS AT A PREFIX, and that is the whole reason a user      *)
+  (* program can predict where [fdalloc] lands.  The scan reads the table  *)
+  (* from 0, so knowing the first [n] slots EXACTLY -- open or closed --   *)
+  (* decides the answer whenever one of them is closed, and bounds it      *)
+  (* below by [n] when none is.  [UserFd]'s ledger is that knowledge and   *)
+  (* [UserFd.ufd_alloc_least] is this lemma with the ghost state attached. *)
+  (* ------------------------------------------------------------------ *)
+  Lemma fd_lowest_closed_app (l1 l2 : list fdstate) :
+    fd_lowest_closed (l1 ++ l2) =
+      match fd_lowest_closed l1 with
+      | Some k => Some k
+      | None => (fun j => (length l1 + j)%nat) <$> fd_lowest_closed l2
+      end.
+  Proof.
+    induction l1 as [| st l1 IH].
+    - cbn [app length fd_lowest_closed].
+      destruct (fd_lowest_closed l2) as [j |]; reflexivity.
+    - cbn [app length]. destruct st.
+      + reflexivity.
+      + cbn [fd_lowest_closed]. rewrite IH.
+        destruct (fd_lowest_closed l1) as [k |]; [ reflexivity |].
+        destruct (fd_lowest_closed l2) as [j |]; reflexivity.
+  Qed.
+
+  (* the reading a proof actually applies it in: the table's own scan,
+     answered by the prefix the caller can see. *)
+  Lemma fd_least_closed_prefix (sts : list fdstate) (n fd k : nat) :
+    fd_least_closed sts fd ->
+    fd_lowest_closed (take n sts) = Some k ->
+    fd = k.
+  Proof.
+    unfold fd_least_closed. intros Hl Hk.
+    rewrite <- (take_drop n sts) in Hl.
+    rewrite fd_lowest_closed_app Hk in Hl. by injection Hl.
+  Qed.
+
+  Lemma fd_least_closed_prefix_none (sts : list fdstate) (n fd : nat) :
+    fd_least_closed sts fd ->
+    fd_lowest_closed (take n sts) = None ->
+    (n <= fd)%nat.
+  Proof.
+    unfold fd_least_closed. intros Hl Hk.
+    rewrite <- (take_drop n sts) in Hl.
+    rewrite fd_lowest_closed_app Hk in Hl.
+    destruct (fd_lowest_closed (drop n sts)) as [j |] eqn:Hj;
+      [| discriminate Hl].
+    (* the tail's own answer is what says the prefix was the WHOLE prefix:
+       a [drop] with a closed slot in it is non-empty. *)
+    pose proof (fd_lowest_closed_bound _ _ Hj) as Hb. rewrite length_drop in Hb.
+    cbn in Hl. injection Hl as <-.
+    rewrite length_take. lia.
+  Qed.
+
+  (* it names ONE descriptor -- free from the function form, and the whole
+     point: a caller that knows the table knows which descriptor it got. *)
+  Lemma fd_least_closed_unique (sts : list fdstate) (a b : nat) :
+    fd_least_closed sts a -> fd_least_closed sts b -> a = b.
+  Proof.
+    unfold fd_least_closed. intros Ha Hb.
+    rewrite Ha in Hb. by injection Hb.
+  Qed.
+
   Definition fdt0 : list fdstate := replicate NOFILE FdClosed.
 
   Lemma fdt0_length : length fdt0 = NOFILE.
   Proof. apply length_replicate. Qed.
+
+  (* ...and the scan on it answers 0: a fresh process's first open lands on
+     descriptor 0, which is how init gets the console there.  Stated here
+     rather than beside the scan because it needs [fdt0]. *)
+  Lemma fd_lowest_closed_fdt0 : fd_lowest_closed fdt0 = Some 0%nat.
+  Proof. reflexivity. Qed.
+
 
   Definition fd_frags_any (γ : gname) : iProp Σ := (∃ sts, fd_frags γ sts)%I.
 

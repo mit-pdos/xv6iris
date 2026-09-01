@@ -134,42 +134,11 @@ Record umirror := MkUmirror {
 (* [fdt0] and [fdt0_length] now live in [FdSlots], beside the mint that
    produces them. *)
 
-(* fdalloc's scan: the first closed row.  [fd_frees]'s head, read at the
-   mirror. *)
-Fixpoint fd_lowest_closed (l : list fdstate) : option nat :=
-  match l with
-  | [] => None
-  | FdClosed :: _ => Some 0%nat
-  | _ :: l' => S <$> fd_lowest_closed l'
-  end.
-
-Lemma fd_lowest_closed_fdt0 : fd_lowest_closed fdt0 = Some 0%nat.
-Proof. reflexivity. Qed.
-
-(* ...and the slot it names really is closed.  What wants this is the
-   agreement below: upstream's open and dup rows now PROMISE that the
-   descriptor they installed was free beforehand (see
-   [UsysMemOk.usys_fd_ok]), and the mirror's own rows pick their descriptor
-   with this scan, so the promise is one induction away. *)
-Lemma fd_lowest_closed_is_closed (l : list fdstate) (fd : nat) :
-  fd_lowest_closed l = Some fd -> l !! fd = Some FdClosed.
-Proof.
-  revert fd. induction l as [| st l IH]; intros fd H; [discriminate H |].
-  cbn in H. destruct st.
-  - injection H as <-. reflexivity.
-  - destruct (fd_lowest_closed l) as [k |] eqn:Hk; [| discriminate H].
-    cbn in H. injection H as <-. cbn. exact (IH k eq_refl).
-Qed.
-
-Lemma fd_lowest_closed_bound (l : list fdstate) (fd : nat) :
-  fd_lowest_closed l = Some fd -> (fd < length l)%nat.
-Proof.
-  revert fd. induction l as [| st l IH]; intros fd H; [discriminate H |].
-  cbn in H. destruct st.
-  - injection H as <-. cbn. lia.
-  - destruct (fd_lowest_closed l) as [k |] eqn:Hk; [| discriminate H].
-    cbn in H. injection H as <-. cbn. specialize (IH k eq_refl). lia.
-Qed.
+(* fdalloc's scan -- [fd_lowest_closed], with [_is_closed] and [_bound] --
+   now lives in [FdSlots.v], beside [fd_least_closed], which is the same
+   scan as a RELATION and is what [UsysMemOk]'s open/dup/pipe rows are
+   stated against.  It moved down because the rows below this file need it;
+   nothing here changed but the address. *)
 
 (* ===================================================================== *)
 (*  3.  THE PATH STRING, READ OFF THE IMAGE                               *)
@@ -288,6 +257,11 @@ Definition uenr_dom (n : Z) : bool :=
    what lets the enriched leaf move the program's descriptor authority
    without holding a handle ([UkRunSys.ufd_auth_move] serves every row but
    close's). *)
+Lemma uenr_path_ne_close (n : Z) : uenr_path n = true -> n <> UsysMemOk.USYS_close.
+Proof.
+  unfold uenr_path. intros H Hc. subst n. vm_compute in H. discriminate H.
+Qed.
+
 Lemma uenr_dom_ne_close (n : Z) : uenr_dom n = true -> n <> UsysMemOk.USYS_close.
 Proof.
   unfold uenr_dom, uenr_path. intros H Hc. subst n.
@@ -381,15 +355,22 @@ Proof. vm_compute. reflexivity. Qed.
 (*  untouched table is simply its right side.  [-1] needs no argument at   *)
 (*  all on those two -- the right disjunct is available unconditionally.   *)
 (* ===================================================================== *)
+(* CLOSE IS EXCLUDED, and cannot not be: its row now also says that closing
+   an OPEN descriptor returns 0, so "-1 moved nothing" is not a fact about
+   close at an arbitrary table -- it is only a fact about a close whose
+   argument named no open slot.  Every caller here has the exclusion for
+   free: the blanket is the PATH rows' escape, and [uenr_path] is
+   {open, mknod}. *)
 Lemma usys_fd_ok_neg1 (n : Z) (tf : list (mword 64)) (sts : list fdstate) :
+  n <> UsysMemOk.USYS_close ->
   usys_fd_ok n tf (mword_of_int (-1) : mword 64) sts sts.
 Proof.
+  intros Hnc.
   assert (Hnz : uint (mword_of_int (-1) : mword 64) <> 0%Z).
   { rewrite um_uint_moi_neg1. discriminate. }
   unfold usys_fd_ok.
-  destruct (decide (n = UsysMemOk.USYS_close)) as [_ | _].
-  { destruct (decide (uint (mword_of_int (-1) : mword 64) = 0%Z))
-      as [Hc | _]; [ exfalso; exact (Hnz Hc) | reflexivity ]. }
+  destruct (decide (n = UsysMemOk.USYS_close)) as [Hc | _];
+    [ exfalso; exact (Hnc Hc) | ].
   destruct (decide (n = UsysMemOk.USYS_dup)) as [_ | _];
     [ right; split; reflexivity | ].
   destruct (decide (n = UsysMemOk.USYS_open)) as [_ | _];
@@ -691,10 +672,13 @@ Section Steps.
            word, not a decode of it, so exhibiting [fd] closes the goal with
            no bitvector arithmetic at all. *)
         left. exists fd.
-        (* the slot was FREE: the mirror picks it with [fd_lowest_closed],
-           which is the same scan fdalloc runs, so upstream's new promise is
-           our own row's [Hfd] read through [fd_lowest_closed_is_closed]. *)
-        pose proof (fd_lowest_closed_is_closed (um_fdt u) fd Hfd) as Hcl.
+        (* the slot was the LOWEST free one, and upstream's row now says so
+           in the mirror's OWN words: [FdSlots.fd_least_closed] IS
+           [fd_lowest_closed _ = Some _], the scan this row already picks
+           its descriptor with, so [Hfd] goes in verbatim.  It used to be
+           weakened through [fd_lowest_closed_is_closed] because the row
+           asked only that the slot be free. *)
+        pose proof Hfd as Hcl.
         destruct Harm as [(ma & mi & nl & _ & _ & ->)
                          | [(bs & nl & _ & ->) | (e & nl & _ & _ & ->)]].
         + exists (om_readable (ufs_arg tf 1)), (om_writable (ufs_arg tf 1)),
@@ -742,7 +726,10 @@ Section Steps.
            the range where the two agree. *)
         left. exists nfd. split_and!;
           [ reflexivity
-          | exact (fd_lowest_closed_is_closed (um_fdt u) nfd Hfd) | ].
+          (* the row asks for the LOWEST free slot now, which is this
+             mirror's own scan verbatim -- it used to be weakened to "free"
+             through [fd_lowest_closed_is_closed] *)
+          | exact Hfd | ].
         pose proof (lookup_lt_Some _ _ _ Hlk) as Hlt.
         rewrite Hlen HN in Hlt.
         apply (proj1 (Nat2Z.inj_lt _ _)) in Hlt.
@@ -772,7 +759,7 @@ Section Steps.
     intros Hlen Hst. unfold ufs_step in Hst.
     destruct (uenr_path n) eqn:Hp.
     - destruct Hst as [[-> ->] | (pl & _ & Hst)].
-      + exact (usys_fd_ok_neg1 n tf (um_fdt u)).
+      + exact (usys_fd_ok_neg1 n tf (um_fdt u) (uenr_path_ne_close n Hp)).
       + exact (ufs_step_at_fd_agrees n pl tf r u u' Hlen Hst).
     - exact (ufs_step_at_fd_agrees n [] tf r u u' Hlen Hst).
   Qed.

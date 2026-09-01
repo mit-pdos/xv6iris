@@ -152,7 +152,7 @@ Qed.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
-Require Import UkRunSys.  (* [ufd_auth_move] -- the untracked authority step *)
+Require Import UkRunSys.  (* [ufd_state_move] -- the untracked authority step *)
 Section StepPin.
   Context `{XI : CurCtx}.
 
@@ -266,7 +266,10 @@ Section UkRunSysFs.
       (M : gmap Z (bv 8)) (szv : Z) (fdv : list fdstate)
       (m : regfile) (pc : mword 64) : iProp Σ :=
     (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
-       (Rut : uptd -> iProp Σ),
+       (Rut : uptd -> iProp Σ)
+       (HRut : forall pt' : uptd,
+                 ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h) TsoCtx.cur_ctx ∗
+                              (TsoCtx.own_context (CID := h) TsoCtx.cur_ctx -∗ Rut pt')),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) szv = π⌝ -∗
        uvb_fs (CID := h) γm C pt Rfd Rut szv π fdv M m pc -∗
@@ -305,16 +308,17 @@ Section UkRunSysFs.
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     (* the descriptor authority, exactly as [UkRun.urun_close] takes it *)
-    ufd_auth γfd fdv -∗
+    ufd_state γfd fdv -∗
     (∀ h : CpuId,
        urun_fs γm γt γd γs γfd h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
     ukc_fs γm pm M sz fdv m pc.
   Proof.
     iIntros "Hheap Hstk Hufd Hcont".
-    rewrite /ukc_fs. iIntros (h C pt Rfd Rut) "%Hlo %Hpm Hb".
+    rewrite /ukc_fs. iIntros (h C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h). rewrite /urun_fs.
     iExists C, pt, Rfd, Rut, sz, M, pm, fdv.
-    iFrame "Hheap Hstk Hufd Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
+    iFrame "Hheap Hstk Hufd Hb". iPureIntro.
+    split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 
   Lemma urun_fs_close_upd (γm γt γd γs γfd : gname) (M : gmap Z (bv 8))
@@ -324,7 +328,7 @@ Section UkRunSysFs.
     unot_sp rd ->
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
-    ufd_auth γfd fdv -∗
+    ufd_state γfd fdv -∗
     (∀ h : CpuId,
        urun_fs γm γt γd γs γfd h (<[Regidx rd := v]> m) pc' avail -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -353,6 +357,9 @@ Section UkRunSysFs.
                 (m' : regfile) (pc' : mword 64),
                 loop_ok C pt ->
                 perm_of (ud_um pt) sz = π ->
+                (forall pt' : uptd,
+         ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h') TsoCtx.cur_ctx ∗
+                      (TsoCtx.own_context (CID := h') TsoCtx.cur_ctx -∗ Rut pt')) ->
                 uk_instr π M pc' false (ECALL tt) ->
                 uvb_fs (CID := h') γm' C pt Rfd Rut sz π fdv' M m' pc' -∗
                 uexec_ret_fs γm' uecall_scause
@@ -401,10 +408,12 @@ Section UkRunSysFs.
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run].
     (* THE ENRICHED ROWS INCLUDE open AND dup, so the table may have moved.
        The program is not tracking these descriptors, so the authority moves
-       and no handle comes back ([UkRunSys.ufd_auth_move]); close is not in
-       [uenr_dom], which is exactly the row that rule cannot serve. *)
+       -- carrying its ledger, which is what pays for an allocation that
+       lands on a standard stream -- and no handle comes back
+       ([UkRunSys.ufd_state_move]); close is not in [uenr_dom], which is
+       exactly the row that rule cannot serve. *)
     iApply uslot_fs_bupd.
-    iMod (ufd_auth_move γfd n (tf_of m pc) r fdv fdv'
+    iMod (ufd_state_move γfd n (tf_of m pc) r fdv fdv'
             (uenr_dom_ne_close n Hdom) Hfdok with "Hufd") as "Hufd".
     iModIntro.
     rewrite (uslot_fs_bump_run γm m pc M M pm pm sz sz fdv fdv' r Hx0 Hal4).
@@ -440,6 +449,10 @@ Module Type FDROW_UKFS_STEP.
       (M : gmap Z (bv 8)) (fdv : list fdstate) (m : regfile) (pc : mword 64),
       loop_ok C pt ->
       perm_of (ud_um pt) sz = π ->
+      (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
+      (forall pt' : uptd,
+         ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h) TsoCtx.cur_ctx ∗
+                      (TsoCtx.own_context (CID := h) TsoCtx.cur_ctx -∗ Rut pt')) ->
       uk_instr π M pc false (ECALL tt) ->
       uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv M m pc -∗
       uexec_ret_fs γm uecall_scause (uvis_of_run m pc M π sz fdv) -∗

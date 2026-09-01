@@ -247,19 +247,26 @@ Section ParkCap.
        resumes at are THESE, which is what lets the caller say what the
        child's table is. *)
     fd_frags (pv_fdg (us_V U)) sts -∗
-    (* THE GENERIC SLOT FAMILY, captured on the fd fragments' route exactly:
-       not part of [park_child] (that bundle goes straight to the cap) but
-       captured by the package's RESUME closer, built here, and instantiated
-       at [uvis_of U'] when the record resumes.  A FAMILY rather
-       than a slot at the parked key: the party that resumes this record may
-       have replaced its address space first (forkret's boot arm runs
-       kexec("/init") between the park and the resume), so the only key that
-       is honest here is the one the resume itself produces -- see
-       [park_pkg]'s closer above and projects/user-wp-slot.md SS4c (R-b).
+    (* THE SLOT FAMILY, captured on the fd fragments' route exactly: not part
+       of [park_child] (that bundle goes straight to the cap) but captured by
+       the package's RESUME closer, built here, and instantiated at
+       [uvis_of U'] when the record resumes.  A FAMILY rather than a slot at
+       the parked key: the party that resumes this record may have replaced
+       its address space first (forkret's boot arm runs kexec("/init")
+       between the park and the resume), so the only key that is honest here
+       is the one the resume itself produces -- see [park_pkg]'s closer above
+       and projects/user-wp-slot.md SS4c (R-b).
+       ...BUT THE FAMILY IS RESTRICTED TO THE TABLE THE PARK IS AT.  The
+       resume mints its key at [sts] and at no other list, so demanding a
+       slot at every OTHER descriptor view would be asking for what is never
+       used -- and it is exactly what a caller with something better than
+       the generic inhabitant cannot supply.  A parent forking a VERIFIED
+       program has a continuation for its child at the parent's own table
+       and at nothing else; this premise is the shape that accepts it.
        LINEAR: the parker has to own one, which is what makes a slot enter
        the world only at the two mint sites (userinit's park and sys_fork's
        kfork call), each eliminating [UEXEC_GEN.uexec_wp_gen]'s [box] once. *)
-    (∀ W : uvis, uslot W) -∗
+    (∀ W : uvis, ⌜uvis_fd W = sts⌝ -∗ uslot W) -∗
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U -∗
     |==> proc_ctx_boxed (un_s N) (un_pj N).
   Proof.
@@ -287,9 +294,9 @@ Section ParkCap.
       (* ...AND ITS STATES, NAMED.  This is the only place in the park
          channel where the descriptor states are in hand as a value, and it
          is the place the key is minted -- so the key is minted AT them.
-         The bundle is handed on to the residue unchanged (re-weakened to
-         [fd_frags_any] below), so the view the slot is keyed at and the
-         view the residue carries are the same list by construction. *)
+         The bundle is handed on to the residue unchanged, so the view the
+         slot is keyed at and the view the residue carries are the same list
+         by construction. *)
       (* ONE [sts] FOR BOTH: the same list names the residue's fragments and
          the slot's key, which is what the shared existential says. *)
       iExists sts.
@@ -301,9 +308,10 @@ Section ParkCap.
                   with "[%] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag").
         exact Hupt.
       + (* THE INSTANTIATION -- the whole of milestone J's park channel:
-           a generic family in, the resumed record's key out, keyed at the
-           descriptor states the residue is about to carry. *)
-        iApply ("Hslot" $! (uvis_of U' sts)).
+           a family in, the resumed record's key out, keyed at the
+           descriptor states the residue is about to carry.  The family's own
+           side condition is that very keying, so it is [reflexivity]. *)
+        iApply ("Hslot" $! (uvis_of U' sts)). iPureIntro. reflexivity.
     - iNext. iExact "Htok".
   Qed.
 

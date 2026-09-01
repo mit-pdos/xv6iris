@@ -288,50 +288,79 @@ Section UkRunSys.
   (* MOVING THE AUTHORITY WITHOUT LEARNING ANYTHING.                       *)
   (*                                                                       *)
   (* Every row but close's can be followed by a program that holds no      *)
-  (* handle: open and pipe insert at slots the row says were FREE, dup     *)
-  (* copies into one, and the other eighteen move nothing.  Each of those  *)
-  (* is [UserFd.ufd_open]'s insert with the minted handle dropped -- or,   *)
-  (* when the copied slot was itself closed, no change at all.             *)
+  (* handle: open and pipe allocate, dup copies, and the other eighteen    *)
+  (* move nothing.  What none of them can do is move the authority without *)
+  (* THE LEDGER: an allocation that lands on a standard stream updates     *)
+  (* that slot's fragment, and the fragment lives in the ledger.  So the   *)
+  (* ledger goes in and comes back -- at a state the caller is told        *)
+  (* nothing about, which is the whole difference between this and         *)
+  (* [UserFd.ufd_alloc_least].                                             *)
   (*                                                                       *)
-  (* CLOSE IS THE EXCEPTION AND MUST BE: it makes a slot free, which is a  *)
-  (* DELETE on the program's map, and an authority cannot shrink without   *)
-  (* the element.  That is the whole content of "a program that closed a   *)
-  (* descriptor must stop claiming it is open", and it is why close has no *)
-  (* untracked leaf.                                                       *)
+  (* CLOSE IS THE EXCEPTION AND MUST BE: it makes a slot free, which above *)
+  (* the standard streams is a DELETE on the program's map, and an         *)
+  (* authority cannot shrink without the element.  That is the whole       *)
+  (* content of "a program that closed a descriptor must stop claiming it  *)
+  (* is open", and it is why close has no untracked leaf.                  *)
   (* ------------------------------------------------------------------- *)
   Lemma ufd_auth_move (γfd : gname) (n : Z) (tf : list (mword 64))
+      (r : mword 64) (fdv fdv' l : list fdstate) :
+    n <> USYS_close ->
+    usys_fd_ok n tf r fdv fdv' ->
+    ufd_auth γfd fdv -∗ ustd γfd l ==∗
+    ufd_auth γfd fdv' ∗ ∃ l' : list fdstate, ustd γfd l'.
+  Proof.
+    intros Hnc Hrow. iIntros "Hufd Hstd". unfold usys_fd_ok in Hrow.
+    destruct (decide (n = USYS_close)) as [Hc | _]; [ contradiction (Hnc Hc) | ].
+    destruct (decide (n = USYS_dup)) as [_ | _].
+    { destruct Hrow as [(fd1 & _ & Hcl & ->) | [_ ->]];
+        [| iModIntro; iFrame "Hufd"; by iExists l ].
+      (* the copied state may itself be CLOSED -- dup's row does not say the
+         argument was open -- and then the table did not move at all *)
+      destruct (decide (fdv !!! Z.to_nat (usys_argfd tf) = FdClosed))
+        as [He | Hne].
+      - rewrite He.
+        iDestruct (ufd_alloc_least_closed γfd fdv fd1 Hcl with "Hufd") as "$".
+        iModIntro. by iExists l.
+      - iMod (ufd_alloc_least_any γfd fdv l fd1 _ Hcl Hne with "Hufd Hstd")
+          as "[$ $]". by iModIntro. }
+    destruct (decide (n = USYS_open)) as [_ | _].
+    { destruct Hrow as [(fd & rd & wr & t & _ & Hcl & ->) | [_ ->]];
+        [| iModIntro; iFrame "Hufd"; by iExists l ].
+      iMod (ufd_alloc_least_any γfd fdv l fd (FdOpen rd wr t) Hcl
+              ltac:(discriminate) with "Hufd Hstd") as "[$ $]".
+      by iModIntro. }
+    destruct (decide (n = USYS_pipe)) as [_ | _].
+    { destruct (decide (uint r = 0)) as [_ | _];
+        [| subst fdv'; iModIntro; iFrame "Hufd"; by iExists l ].
+      destruct Hrow as (a & b & Hne & Hca & Hcb & ->).
+      (* THE TWO ALLOCATIONS RUN IN THE ROW'S OWN ORDER: read end first,
+         write end against the table the first left.  That is the order
+         sys_pipe allocates in, and stating it that way is what lets the
+         second scan's least-closed fact be read at the table it is actually
+         about -- no commuting needed here at all. *)
+      iMod (ufd_alloc_least_any γfd fdv l a (FdOpen true false FdPipe) Hca
+              ltac:(discriminate) with "Hufd Hstd") as "[Hufd Hstd]".
+      iDestruct "Hstd" as (l1) "Hstd".
+      iMod (ufd_alloc_least_any γfd (<[a := FdOpen true false FdPipe]> fdv) l1 b
+              (FdOpen false true FdPipe) Hcb ltac:(discriminate)
+              with "Hufd Hstd") as "[$ $]".
+      by iModIntro. }
+    subst fdv'. iModIntro. iFrame "Hufd". by iExists l.
+  Qed.
+
+  (* ...and the same at [UserFd.ufd_state], which is what a run predicate on
+     an untracking channel carries: the ledger goes in and comes back inside
+     the same resource, so nothing between here and the client mentions it. *)
+  Lemma ufd_state_move (γfd : gname) (n : Z) (tf : list (mword 64))
       (r : mword 64) (fdv fdv' : list fdstate) :
     n <> USYS_close ->
     usys_fd_ok n tf r fdv fdv' ->
-    ufd_auth γfd fdv ==∗ ufd_auth γfd fdv'.
+    ufd_state γfd fdv ==∗ ufd_state γfd fdv'.
   Proof.
-    intros Hnc Hrow. iIntros "Hufd". unfold usys_fd_ok in Hrow.
-    destruct (decide (n = USYS_close)) as [Hc | _]; [ contradiction (Hnc Hc) | ].
-    destruct (decide (n = USYS_dup)) as [_ | _].
-    { destruct Hrow as [(fd1 & _ & Hcl & ->) | [_ ->]]; [| by iModIntro].
-      iMod (ufd_dup_untracked γfd fdv _ fd1 Hcl with "Hufd") as "$".
-      by iModIntro. }
-    destruct (decide (n = USYS_open)) as [_ | _].
-    { destruct Hrow as [(fd & rd & wr & t & _ & Hcl & ->) | [_ ->]];
-        [| by iModIntro].
-      iMod (ufd_open γfd fdv fd (FdOpen rd wr t) Hcl ltac:(discriminate)
-              with "Hufd") as "[$ _]".
-      by iModIntro. }
-    destruct (decide (n = USYS_pipe)) as [_ | _].
-    { destruct (decide (uint r = 0)) as [_ | _]; [| subst fdv'; by iModIntro].
-      destruct Hrow as (a & b & Hne & Hca & Hcb & ->).
-      iMod (ufd_open γfd fdv b (FdOpen false true FdPipe) Hcb
-              ltac:(discriminate) with "Hufd") as "[Hufd _]".
-      (* [a] is still free after [b]'s end is installed: the two are
-         distinct, which is what pipe's row promises *)
-      assert (Hca' : <[b := FdOpen false true FdPipe]> fdv !! a
-                     = Some FdClosed)
-        by (rewrite list_lookup_insert_ne; [exact Hca | exact (not_eq_sym Hne)]).
-      iMod (ufd_open γfd (<[b := FdOpen false true FdPipe]> fdv) a
-              (FdOpen true false FdPipe) Hca'
-              ltac:(discriminate) with "Hufd") as "[$ _]".
-      by iModIntro. }
-    subst fdv'. by iModIntro.
+    intros Hnc Hrow. rewrite /ufd_state /ustd_any.
+    iIntros "[Ha Hl]". iDestruct "Hl" as (l) "Hl".
+    iMod (ufd_auth_move γfd n tf r fdv fdv' l Hnc Hrow with "Ha Hl") as "[$ $]".
+    by iModIntro.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -416,11 +445,15 @@ Section UkRunSys.
   (* be the quiet one, and the difference is the whole point: it MINTS the *)
   (* handle for the descriptor that came back.                            *)
   (*                                                                      *)
-  (* THE HANDLE IS WHAT THE CALLER KEEPS.  [ufd γfd fd (FdOpen …)] is a    *)
-  (* separable resource: a program can carry it into a subroutine, frame   *)
-  (* it across unrelated calls, and read it back with [UserFd.ufd_agree].  *)
-  (* That is what the kernel-side fragments could never do -- the process  *)
-  (* hands those back whole at every trap and never learns their name.     *)
+  (* THE LEDGER DECIDES WHICH DESCRIPTOR CAME BACK.  fdalloc scans from 0, *)
+  (* so a caller that knows the state of its standard streams knows the    *)
+  (* answer: [UserFd.ualloc] is that case analysis, and it is a case       *)
+  (* analysis on the CALLER's ledger rather than on the kernel's choice.   *)
+  (* At an all-open ledger it delivers a handle above the standard streams *)
+  (* -- [UserFd.ufd γfd fd (FdOpen …)], a separable resource a program can *)
+  (* carry into a subroutine and read back with [UserFd.ufd_agree]; at a   *)
+  (* ledger with a closed slot it names THAT slot, which is what makes a   *)
+  (* redirection ([close(1); open(path)]) provable at all.                 *)
   (*                                                                      *)
   (* THE FAILURE ARM NAMES [-1], and that is what makes the disjunction    *)
   (* USABLE.  A bare [emp] on the right would be sound and worthless: the  *)
@@ -431,11 +464,12 @@ Section UkRunSys.
   (* guard, for the same reason.)                                          *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_ecall_open (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
-      (pc : mword 64) (avail : nat) :
+      (pc : mword 64) (l : list fdstate) (avail : nat) :
     usysno m = USYS_open ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is γt pc false (ECALL tt) -∗
     urun γt γd γs γfd h m pc avail -∗
+    ustd γfd l -∗
     (∀ (h' : CpuId) (r : mword 64),
        ((∃ (fd : nat) (rd wr : bool) (t : fdtype),
            (* the number AND its bound: a caller that wants to feed this
@@ -443,15 +477,15 @@ Section UkRunSys.
               and [fd < NOFILE] is what makes that reading exact *)
            ⌜r = (mword_of_int (Z.of_nat fd) : mword 64)
             /\ (fd < NOFILE)%nat⌝ ∗
-           ufd γfd fd (FdOpen rd wr t))
-        ∨ ⌜r = (mword_of_int (-1) : mword 64)⌝) -∗
+           ualloc γfd l fd (FdOpen rd wr t))
+        ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ ustd γfd l)) -∗
        urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hal4.
-    iIntros "#Hi Hrun Hcont".
+    iIntros "#Hi Hrun Hstd Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -487,12 +521,11 @@ Section UkRunSys.
     iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
     iApply uslot_bupd.
     destruct Hfdok as [(fd & rd & wr & t & Hr & Hcl & ->) | [Hrm ->]].
-    - (* A DESCRIPTOR CAME BACK.  The slot was FREE -- that is the promise
-         [sys_open_post] now makes and the row carries -- so minting its
-         handle is an insert, and the authority lands at exactly the view
-         the process resumes at. *)
-      iMod (ufd_open γfd fdv fd (FdOpen rd wr t) Hcl ltac:(discriminate)
-              with "Hufd") as "[Hufd Hh]".
+    - (* A DESCRIPTOR CAME BACK, at the LOWEST free slot -- which is the
+         promise [sys_open_post] makes and the row carries, and which the
+         caller's ledger turns into a NUMBER. *)
+      iMod (ufd_alloc_least γfd fdv l fd (FdOpen rd wr t) Hcl
+              ltac:(discriminate) with "Hufd Hstd") as "[Hufd Hh]".
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
                  (<[fd := FdOpen rd wr t]> fdv) r Hx0 Hal4).
@@ -504,54 +537,69 @@ Section UkRunSys.
       iLeft. iExists fd, rd, wr, t. iFrame "Hh". iPureIntro.
       split; [ exact Hr | ].
       (* the slot the kernel chose is a slot of the table *)
-      rewrite <- Hfdlen. exact (lookup_lt_Some _ _ _ Hcl).
-    - (* the call failed: nothing moved, and there is no handle to give *)
+      rewrite <- Hfdlen. exact (fd_least_closed_lt _ _ Hcl).
+    - (* the call failed: nothing moved, and the ledger comes straight back *)
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv r Hx0 Hal4).
       iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd").
       iIntros (h') "Hrun".
-      iApply ("Hcont" $! h' r with "[] Hrun").
-      iRight. iPureIntro. exact Hrm.
+      iApply ("Hcont" $! h' r with "[Hstd] Hrun").
+      iRight. iFrame "Hstd". iPureIntro. exact Hrm.
   Qed.
 
 
   (* ------------------------------------------------------------------- *)
-  (* ecall, at DUP.  The source handle is a PRECONDITION, not a courtesy:  *)
-  (* dup's row says the new descriptor holds a COPY of the argument's      *)
-  (* state, so without knowing what that state IS there is nothing to hand *)
-  (* back.  The handle is what says it ([UserFd.ufd_agree]), and it comes  *)
-  (* back untouched beside the new one -- dup does not disturb its source. *)
+  (* ecall, at DUP.  TWO resources go in: the LEDGER, which decides where  *)
+  (* the copy lands, and a CLAIM on the source, which says what state is   *)
+  (* copied.  Both are load-bearing -- dup's row says the new descriptor   *)
+  (* holds a copy of the ARGUMENT's state, so without knowing that state   *)
+  (* there is nothing to hand back -- and the claim is a disjunction       *)
+  (* ([UserFd.ufd_own]) because both arms are used on the first day:       *)
+  (* init's [dup(0)] duplicates a STANDARD STREAM, described by the ledger *)
+  (* it already handed in, and sh's [dup(p[1])] duplicates a pipe end it   *)
+  (* holds a handle for.  The claim comes back untouched -- dup does not   *)
+  (* disturb its source, and the slot the copy lands in was CLOSED, so it  *)
+  (* is not the source's.                                                  *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_ecall_dup (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
-      (pc : mword 64) (fd0 : nat) (st : fdstate) (avail : nat) :
+      (pc : mword 64) (l : list fdstate) (fd0 : nat) (st : fdstate)
+      (avail : nat) :
     usysno m = USYS_dup ->
-    (* the argument register IS the descriptor the handle is for, read the
+    (* the argument register IS the descriptor the claim is for, read the
        way [argfd] reads it -- as a C [int] *)
     bv_signed (trunc32 (m !!! Regidx (mword_of_int 10))) = Z.of_nat fd0 ->
+    st <> FdClosed ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is γt pc false (ECALL tt) -∗
     urun γt γd γs γfd h m pc avail -∗
-    ufd γfd fd0 st -∗
+    ustd γfd l -∗
+    ufd_own γfd l fd0 st -∗
     (∀ (h' : CpuId) (r : mword 64),
-       ufd γfd fd0 st -∗
        ((∃ fd1 : nat,
-           ⌜r = (mword_of_int (Z.of_nat fd1) : mword 64)⌝ ∗ ufd γfd fd1 st)
-        ∨ ⌜r = (mword_of_int (-1) : mword 64)⌝) -∗
+           ⌜r = (mword_of_int (Z.of_nat fd1) : mword 64)
+            /\ (fd1 < NOFILE)%nat⌝ ∗
+           ualloc γfd l fd1 st ∗ ufd_own γfd (ustd_after l st) fd0 st)
+        ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
+           ustd γfd l ∗ ufd_own γfd l fd0 st)) -∗
        urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Harg Hal4.
-    iIntros "#Hi Hrun Hh0 Hcont".
+    intros Hn Harg Hstne Hal4.
+    iIntros "#Hi Hrun Hstd Hh0 Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    (* the handle READS the view: this is what says the source descriptor is
+    (* the claim READS the view: this is what says the source descriptor is
        open, and at which state -- which is what dup's row copies. *)
-    iDestruct (ufd_agree with "Hufd Hh0") as %Hsrc.
+    iDestruct (ufd_own_agree with "Hufd Hstd Hh0") as %[Hsrc _].
+    iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
+    (* ...and the slot the copy lands in is never the source's, which is
+       what lets the claim come back at the ledger the copy left *)
+    iDestruct (ufd_own_ne_lowest γfd l fd0 st Hstne with "Hstd Hh0") as %Hnel.
     iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
@@ -585,11 +633,12 @@ Section UkRunSys.
     iApply uslot_bupd.
     destruct Hfdok as [(fd1 & Hr & Hcl & ->) | [Hrm ->]].
     - (* DUPLICATED.  [Hai] turns the row's copied state into the caller's
-         own [st] ([Hsrc], off the handle), and the destination slot was
-         free, so the new handle is an insert. *)
+         own [st] ([Hsrc], off the claim), and the destination slot was the
+         LOWEST free one, which the ledger reads as a number. *)
       rewrite Hai (list_lookup_total_correct fdv fd0 st Hsrc).
-      iMod (ufd_dup γfd fdv fd0 fd1 st Hcl with "Hufd Hh0")
-        as "(Hufd & Hh0 & Hh1)".
+      iDestruct (ufd_own_after γfd l fd0 st st Hnel with "Hh0") as "Hh0".
+      iMod (ufd_alloc_least γfd fdv l fd1 st Hcl Hstne with "Hufd Hstd")
+        as "[Hufd Hh1]".
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
                  (<[fd1 := st]> fdv) r Hx0 Hal4).
@@ -597,43 +646,49 @@ Section UkRunSys.
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd").
       iIntros (h') "Hrun".
-      iApply ("Hcont" $! h' r with "Hh0 [Hh1] Hrun").
-      iLeft. iExists fd1. iFrame "Hh1". iPureIntro. exact Hr.
+      iApply ("Hcont" $! h' r with "[Hh1 Hh0] Hrun").
+      iLeft. iExists fd1. iFrame "Hh1 Hh0". iPureIntro.
+      split; [ exact Hr | ].
+      rewrite <- Hfdlen. exact (fd_least_closed_lt _ _ Hcl).
     - (* the table was full, or the argument was not an open descriptor:
-         nothing moved, and the source handle comes straight back *)
+         nothing moved, and both resources come straight back *)
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv r Hx0 Hal4).
       iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd").
       iIntros (h') "Hrun".
-      iApply ("Hcont" $! h' r with "Hh0 [] Hrun").
-      iRight. iPureIntro. exact Hrm.
+      iApply ("Hcont" $! h' r with "[Hstd Hh0] Hrun").
+      iRight. iFrame "Hstd Hh0". iPureIntro. exact Hrm.
   Qed.
 
 
   (* ------------------------------------------------------------------- *)
   (* ecall, at DUP, WITHOUT TRACKING THE SOURCE.  A program that holds no    *)
-  (* handle still has to move the authority -- the table moved whether or    *)
-  (* not it was watching -- and [UserFd.ufd_dup_untracked] is what lets it.  *)
-  (* It learns nothing: no handle comes back.  This is the leaf for a proof  *)
-  (* that has not yet started tracking its descriptors; [wp_uk_ecall_dup]    *)
-  (* is the one that pays a handle and gets two.                             *)
+  (* claim still has to move the authority -- the table moved whether or     *)
+  (* not it was watching -- and the LEDGER is what pays for it: the copy     *)
+  (* either lands on a standard stream, whose fragment is in the ledger, or  *)
+  (* above them, and then the minted handle is dropped.  It learns nothing;  *)
+  (* the ledger comes back at a state this leaf does not name.  This is the  *)
+  (* leaf for a proof that has not started tracking its descriptors;         *)
+  (* [wp_uk_ecall_dup] is the one that pays a claim and gets two.            *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_ecall_dup_untracked (γt γd γs γfd : gname) (h : CpuId)
-      (m : regfile) (pc : mword 64) (avail : nat) :
+      (m : regfile) (pc : mword 64) (l : list fdstate) (avail : nat) :
     usysno m = USYS_dup ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is γt pc false (ECALL tt) -∗
     urun γt γd γs γfd h m pc avail -∗
-    (∀ (h' : CpuId) (r : mword 64),
+    ustd γfd l -∗
+    (∀ (h' : CpuId) (r : mword 64) (l' : list fdstate),
+       ustd γfd l' -∗
        urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hal4.
-    iIntros "#Hi Hrun Hcont".
+    iIntros "#Hi Hrun Hstd Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -665,9 +720,18 @@ Section UkRunSys.
     cbn [uvis_M uvis_perm uvis_fd uvis_of_run] in Hfdok |- *.
     iApply uslot_bupd.
     destruct Hfdok as [(fd1 & Hr & Hcl & ->) | [Hrm ->]].
-    - iMod (ufd_dup_untracked γfd fdv
-              (Z.to_nat (usys_argfd (tf_of m pc))) fd1 Hcl with "Hufd")
-        as "Hufd".
+    - iAssert (|==> ufd_auth γfd
+                 (<[fd1 := fdv !!! Z.to_nat (usys_argfd (tf_of m pc))]> fdv) ∗
+                 ∃ l' : list fdstate, ustd γfd l')%I
+        with "[Hufd Hstd]" as ">[Hufd Hstd]".
+      { destruct (decide (fdv !!! Z.to_nat (usys_argfd (tf_of m pc)) = FdClosed))
+          as [He | Hne].
+        - rewrite He.
+          iDestruct (ufd_alloc_least_closed γfd fdv fd1 Hcl with "Hufd") as "$".
+          iModIntro. by iExists l.
+        - iMod (ufd_alloc_least_any γfd fdv l fd1 _ Hcl Hne with "Hufd Hstd")
+            as "[$ $]". by iModIntro. }
+      iDestruct "Hstd" as (l') "Hstd".
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
                  (<[fd1 := fdv !!! Z.to_nat (usys_argfd (tf_of m pc))]> fdv)
@@ -675,27 +739,66 @@ Section UkRunSys.
       iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd").
-      iIntros (h') "Hrun". iApply ("Hcont" $! h' r with "Hrun").
+      iIntros (h') "Hrun". iApply ("Hcont" $! h' r l' with "Hstd Hrun").
     - iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv r Hx0 Hal4).
       iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd").
-      iIntros (h') "Hrun". iApply ("Hcont" $! h' r with "Hrun").
+      iIntros (h') "Hrun". iApply ("Hcont" $! h' r l with "Hstd Hrun").
   Qed.
 
   (* ------------------------------------------------------------------- *)
-  (* ecall, at CLOSE.  The handle is SPENT: close(fd) makes the slot free  *)
-  (* again, so the caller gives its handle up and gets nothing back.  That *)
-  (* is the right reading -- a program that closed a descriptor must not   *)
-  (* keep saying it is open -- and it is what makes double-close visible:  *)
-  (* the second call has no handle to offer.                              *)
-  (*                                                                      *)
-  (* THE HANDLE IS SPENT ON BOTH ARMS, which is the honest reading of the  *)
-  (* row: close returns 0 on success and -1 when argfd rejects the number, *)
-  (* and this leaf takes the handle for a descriptor it KNOWS is open, so  *)
-  (* argfd cannot reject it -- but the row does not say so, and until it   *)
-  (* does the leaf may not hand the handle back on the failure arm.        *)
+  (* CLOSE'S ROW, READ AT A DESCRIPTOR THE CALLER KNOWS IS OPEN.           *)
+  (* Both close leaves want the same two facts out of it -- the call        *)
+  (* returned 0, and the slot the caller named is the one that became       *)
+  (* closed -- and the row's second conjunct is what makes the first        *)
+  (* available at all.  Pure, so it is proved once here.                    *)
+  (* ------------------------------------------------------------------- *)
+  Lemma uk_close_row (m : regfile) (pc : mword 64) (fd : nat) (st : fdstate)
+      (fdv fdv' : list fdstate) (r : mword 64) :
+    bv_signed (trunc32 (m !!! Regidx (mword_of_int 10))) = Z.of_nat fd ->
+    fdv !! fd = Some st -> st <> FdClosed ->
+    usys_fd_ok USYS_close (tf_of m pc) r fdv fdv' ->
+    uint r = 0 /\ fdv' = <[fd := FdClosed]> fdv.
+  Proof.
+    intros Harg Hi Hne Hrow.
+    assert (Haz : usys_argfd (tf_of m pc) = Z.of_nat fd)
+      by (unfold usys_argfd; cbn [tf_of]; exact Harg).
+    assert (Hai : Z.to_nat (usys_argfd (tf_of m pc)) = fd)
+      by (rewrite Haz; exact (Nat2Z.id fd)).
+    unfold usys_fd_ok in Hrow.
+    destruct (decide (USYS_close = USYS_close)) as [_ | Hc];
+      [| exfalso; exact (Hc eq_refl)].
+    destruct Hrow as [Hmove Hdet].
+    pose proof (Hdet fd st Haz Hi Hne) as Hr0.
+    split; [exact Hr0 |].
+    destruct (decide (uint r = 0)) as [_ | Hc]; [| exfalso; exact (Hc Hr0)].
+    rewrite Hai in Hmove. exact Hmove.
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* ecall, at CLOSE, IN ITS TWO FOOTPRINTS.                               *)
+  (*                                                                       *)
+  (* A TAIL descriptor's handle is SPENT and nothing comes back: the slot  *)
+  (* leaves the program's map, which is the right reading (a program that  *)
+  (* closed a descriptor must not keep saying it is open) and is what      *)
+  (* makes a double close visible -- the second call has no handle to      *)
+  (* offer.  No ledger is involved, which is what keeps close out of the   *)
+  (* way of every program that opens a file and closes it.                 *)
+  (*                                                                       *)
+  (* A STANDARD STREAM cannot leave the map, so its fragment comes back    *)
+  (* SHUT, inside the ledger -- and THAT is the resource the next          *)
+  (* allocation spends.  It is the whole mechanism behind [close(1);       *)
+  (* dup(x)] landing on 1.                                                 *)
+  (*                                                                       *)
+  (* NEITHER ARM CASES ON THE RETURN VALUE, and that is a promise the row  *)
+  (* now makes rather than something these leaves assume: closing an OPEN  *)
+  (* descriptor returns 0 ([UsysMemOk.usys_fd_ok]'s close row, second      *)
+  (* conjunct; [argfd] rejects only an out-of-range index and a null slot, *)
+  (* and an open state refutes both).  Without it every caller would carry *)
+  (* a failure arm it can never discharge -- xv6's sh writes [close(fd);   *)
+  (* open(path)] and checks neither result.                                *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_ecall_close (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (fd : nat) (st : fdstate) (avail : nat) :
@@ -706,6 +809,7 @@ Section UkRunSys.
     urun γt γd γs γfd h m pc avail -∗
     ufd γfd fd st -∗
     (∀ (h' : CpuId) (r : mword 64),
+       ⌜uint r = 0⌝ -∗
        urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -716,6 +820,8 @@ Section UkRunSys.
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    iDestruct (ufd_agree with "Hufd Hh") as %Hi.
+    iDestruct (ufd_ne with "Hh") as %Hne.
     iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
@@ -737,34 +843,80 @@ Section UkRunSys.
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
                 ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
       as [-> [-> ->]].
-    unfold usys_fd_ok in Hfdok.
-    destruct (decide (USYS_close = USYS_close)) as [_ | Hc];
-      [ | exfalso; exact (Hc eq_refl) ].
     cbn [uvis_M uvis_perm uvis_fd uvis_of_run] in Hfdok |- *.
-    (* the row's index is the caller's, read as [argfd] reads it *)
-    assert (Hai : Z.to_nat (usys_argfd (tf_of m pc)) = fd).
-    { unfold usys_argfd. cbn [tf_of]. rewrite Harg. exact (Nat2Z.id fd). }
+    destruct (uk_close_row m pc fd st fdv fdv' r Harg Hi Hne Hfdok)
+      as [Hr0 ->].
     iApply uslot_bupd.
-    destruct (decide (uint r = 0)) as [_ | _].
-    - (* CLOSED.  The slot goes back to [FdClosed], which is a delete on the
-         program's map -- and the handle is what pays for it. *)
-      rewrite Hai in Hfdok. subst fdv'.
-      iMod (ufd_close γfd fdv fd st with "Hufd Hh") as "Hufd".
-      iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-                 (<[fd := FdClosed]> fdv) r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _
-                ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd").
-      iIntros (h') "Hrun". iApply ("Hcont" $! h' r with "Hrun").
-    - (* argfd rejected the number: nothing moved.  The handle is dropped --
-         see the header. *)
-      subst fdv'. iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv r Hx0 Hal4).
-      iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _
-                ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd").
-      iIntros (h') "Hrun". iApply ("Hcont" $! h' r with "Hrun").
+    iMod (ufd_close_hi γfd fdv fd st with "Hufd Hh") as "Hufd".
+    iModIntro.
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
+               (<[fd := FdClosed]> fdv) r Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              with "Hheap Hstk Hufd").
+    iIntros (h') "Hrun". iApply ("Hcont" $! h' r with "[%] Hrun"). exact Hr0.
+  Qed.
+
+  (* ...and the STANDARD-STREAM close, which spends the ledger's own entry
+     and hands it back at [FdClosed]. *)
+  Lemma wp_uk_ecall_close_std (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+      (pc : mword 64) (l : list fdstate) (fd : nat) (st : fdstate)
+      (avail : nat) :
+    usysno m = USYS_close ->
+    bv_signed (trunc32 (m !!! Regidx (mword_of_int 10))) = Z.of_nat fd ->
+    (fd < NSTD)%nat -> l !! fd = Some st -> st <> FdClosed ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is γt pc false (ECALL tt) -∗
+    urun γt γd γs γfd h m pc avail -∗
+    ustd γfd l -∗
+    (∀ (h' : CpuId) (r : mword 64),
+       ⌜uint r = 0⌝ -∗
+       ustd γfd (<[fd := FdClosed]> l) -∗
+       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hn Harg Hs Hkl Hne Hal4.
+    iIntros "#Hi Hrun Hstd Hcont".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    iDestruct (ustd_agree with "Hufd Hstd") as %Hst.
+    assert (Hi : fdv !! fd = Some st).
+    { rewrite <- (lookup_take fdv NSTD fd Hs). by rewrite Hst. }
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s pc ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hp Hc)
+              with "Hb").
+    rewrite (uexec_ret_ecall _ _ eq_refl).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv)) = USYS_close).
+    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    rewrite Hnum. cbv zeta.
+    destruct (decide (USYS_close = USYS_exit)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    destruct (decide (USYS_close = USYS_fork)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok %Hpiperow".
+    destruct (usys_mem_ok_quiet USYS_close _ r _ _ _ _ _ _
+                ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
+                ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
+      as [-> [-> ->]].
+    cbn [uvis_M uvis_perm uvis_fd uvis_of_run] in Hfdok |- *.
+    destruct (uk_close_row m pc fd st fdv fdv' r Harg Hi Hne Hfdok) as [Hr0 ->].
+    iApply uslot_bupd.
+    iMod (ufd_close_std γfd fdv l fd st Hs Hkl with "Hufd Hstd") as "[Hufd Hstd]".
+    iModIntro.
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
+               (<[fd := FdClosed]> fdv) r Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              with "Hheap Hstk Hufd").
+    iIntros (h') "Hrun". iApply ("Hcont" $! h' r with "[%] Hstd Hrun"). exact Hr0.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1190,11 +1342,12 @@ Section UkRunSys.
   (* handles.  That is what the kernel actually promises.                  *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_ecall_pipe (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
-      (pc : mword 64) (f : nat -> bv 8) (avail : nat) :
+      (pc : mword 64) (l : list fdstate) (f : nat -> bv 8) (avail : nat) :
     usysno m = USYS_pipe ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is γt pc false (ECALL tt) -∗
     urun γt γd γs γfd h m pc avail -∗
+    ustd γfd l -∗
     ubytes γd (uint (m !!! Regidx (mword_of_int 10))) 8 f -∗
     (∀ (h' : CpuId) (r : mword 64) (g : nat -> bv 8),
        ((∃ a b : nat,
@@ -1210,9 +1363,18 @@ Section UkRunSys.
                          else nth_byte
                                 (trunc32 (mword_of_int (Z.of_nat b) : mword 64))
                                 (i - 4)%nat) ⌝ ∗
-           ufd γfd a (FdOpen true false FdPipe) ∗
-           ufd γfd b (FdOpen false true FdPipe))
-        ∨ ⌜ uint r <> 0 ⌝) -∗
+           (* PIPE ALLOCATES TWICE, so its post is two ARMS and ONE
+              ledger: the read end's scan runs on the caller's ledger and
+              the write end's on the ledger that left.  At an all-open
+              ledger -- which is where any program that has not just closed
+              a standard stream is -- both arms are handles and the ledger
+              does not move at all. *)
+           ualloc_at γfd l a (FdOpen true false FdPipe) ∗
+           ualloc_at γfd (ustd_after l (FdOpen true false FdPipe)) b
+             (FdOpen false true FdPipe) ∗
+           ustd γfd (ustd_after (ustd_after l (FdOpen true false FdPipe))
+                       (FdOpen false true FdPipe)))
+        ∨ (⌜ uint r <> 0 ⌝ ∗ ustd γfd l)) -∗
        urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        ubytes γd (uint (m !!! Regidx (mword_of_int 10))) 8 g -∗
@@ -1221,7 +1383,7 @@ Section UkRunSys.
   Proof.
     intros Hn Hal4.
     set (dst := m !!! Regidx (mword_of_int 10)).
-    iIntros "#Hi Hrun Hbuf Hcont".
+    iIntros "#Hi Hrun Hstd Hbuf Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
@@ -1277,9 +1439,17 @@ Section UkRunSys.
               (uint r = 0 ->
                  exists a b : nat,
                    a <> b /\
-                   fdv !! a = Some FdClosed /\ fdv !! b = Some FdClosed /\
-                   fdv' = <[a := FdOpen true false FdPipe]>
-                            (<[b := FdOpen false true FdPipe]> fdv) /\
+                   (* THE SCANS, NOT MERELY THE FREENESS.  The summary used
+                      to weaken both to "the slot was free", which is what
+                      the mint needed then; the ledger needs the scan -- it
+                      is what says WHICH descriptor came back -- and the row
+                      states the write end's scan against the table the read
+                      end's install left, so the summary carries it in that
+                      same shape. *)
+                   fd_least_closed fdv a /\
+                   fd_least_closed (<[a := FdOpen true false FdPipe]> fdv) b /\
+                   fdv' = <[b := FdOpen false true FdPipe]>
+                            (<[a := FdOpen true false FdPipe]> fdv) /\
                    (forall i : nat, (i < 8)%nat ->
                       gg i = if (i <? 4)%nat
                              then nth_byte
@@ -1302,7 +1472,8 @@ Section UkRunSys.
           | rewrite HM2 Ha0; reflexivity
           | intros j Hj; exfalso; lia
           | intros _; exists a, b; split_and!;
-              [ exact Hne | exact Hca | exact Hcb | exact Hfdv' | exact Hbytes ]
+              [ exact Hne | exact Hca | exact Hcb
+              | exact Hfdv' | exact Hbytes ]
           | intros Hc; exfalso; exact (Hc Hr0) ].
       - (* FAILURE: nothing is claimed about the descriptors beyond "they
            did not move", which is the fd row's own else-branch, and the
@@ -1365,29 +1536,34 @@ Section UkRunSys.
                                  else nth_byte
                                         (trunc32 (mword_of_int (Z.of_nat b) : mword 64))
                                         (i - 4)%nat) ⌝ ∗
-                  ufd γfd a (FdOpen true false FdPipe) ∗
-                  ufd γfd b (FdOpen false true FdPipe))
-               ∨ ⌜ uint r <> 0 ⌝))%I with "[Hufd]" as ">[Hufd Hhs]".
+                  ualloc_at γfd l a (FdOpen true false FdPipe) ∗
+                  ualloc_at γfd (ustd_after l (FdOpen true false FdPipe)) b
+                    (FdOpen false true FdPipe) ∗
+                  ustd γfd (ustd_after
+                              (ustd_after l (FdOpen true false FdPipe))
+                              (FdOpen false true FdPipe)))
+               ∨ (⌜ uint r <> 0 ⌝ ∗ ustd γfd l)))%I
+      with "[Hufd Hstd]" as ">[Hufd Hhs]".
     { destruct (decide (uint r = 0)) as [Hr0 | Hr0].
       - destruct (Hsucc Hr0) as (a & b & Hne & Hca & Hcb & Hfdv' & Hbytes).
-        iMod (ufd_open γfd fdv b (FdOpen false true FdPipe) Hcb
-                ltac:(discriminate) with "Hufd") as "[Hufd Hhb]".
-        assert (Hca' : <[b := FdOpen false true FdPipe]> fdv !! a
-                       = Some FdClosed)
-          by (rewrite list_lookup_insert_ne;
-              [ exact Hca | exact (not_eq_sym Hne) ]).
-        iMod (ufd_open γfd (<[b := FdOpen false true FdPipe]> fdv) a
-                (FdOpen true false FdPipe) Hca' ltac:(discriminate)
-                with "Hufd") as "[Hufd Hha]".
+        (* allocated in the ROW's own order: read end first, write end
+           against the table -- and the ledger -- that left *)
+        iMod (ufd_alloc_least γfd fdv l a (FdOpen true false FdPipe) Hca
+                ltac:(discriminate) with "Hufd Hstd") as "[Hufd [Hstd Hha]]".
+        iMod (ufd_alloc_least γfd (<[a := FdOpen true false FdPipe]> fdv)
+                (ustd_after l (FdOpen true false FdPipe)) b
+                (FdOpen false true FdPipe) Hcb ltac:(discriminate)
+                with "Hufd Hstd") as "[Hufd [Hstd Hhb]]".
         rewrite <- Hfdv'. iModIntro. iFrame "Hufd".
-        iLeft. iExists a, b. iFrame "Hha Hhb". iPureIntro.
+        iLeft. iExists a, b. iFrame "Hha Hhb Hstd". iPureIntro.
         split_and!;
           [ exact Hr0 | exact Hne
-          | rewrite <- Hfdlen; exact (lookup_lt_Some _ _ _ Hca)
-          | rewrite <- Hfdlen; exact (lookup_lt_Some _ _ _ Hcb)
+          | rewrite <- Hfdlen; exact (fd_least_closed_lt _ _ Hca)
+          | rewrite <- Hfdlen; rewrite <- (length_insert fdv a
+              (FdOpen true false FdPipe)); exact (fd_least_closed_lt _ _ Hcb)
           | exact Hbytes ].
       - rewrite (Hfail Hr0). iModIntro. iFrame "Hufd".
-        iRight. iPureIntro. exact Hr0. }
+        iRight. iFrame "Hstd". iPureIntro. exact Hr0. }
     iDestruct (urun_close_upd γt γd γs γfd (umem_write M (uint dst) dd gg) pm m
                  (mword_of_int 10) r sz fdv' (add_vec_int pc 4) avail
                  ltac:(unfold unot_sp; vm_compute; discriminate)
