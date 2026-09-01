@@ -15,6 +15,10 @@ BvShift.v
 ResvAxioms.v
 ArchReset.v
 RiscvModelBytes.v
+TsoMem.v
+TsoMemPa.v
+TsoGhost.v
+TsoLitmus.v
 VirtioModel.v
 DiskImg.v
 DevModel.v
