@@ -18074,3 +18074,19 @@ consumer changes.  The caller reads the box's astamp/llb BEFORE the
 acquire; if the generation advanced meanwhile (a cross-thread park),
 the lock_pay_intro_llb record floor covers that case -- the freshness
 theorem picks per case.  Both instruments stay.
+
+### A6.149 §2 (correction, caught at the acquiresleep relay): the receipt
+### row must be the CONTEXT FLOOR, not hart_view_lb
+
+hart_view_lb is HART-indexed; acquiresleep returns at b=true (the
+thread can migrate during sleep), so a pair minted at the entry hart is
+not the return hart's fact -- the wrap at the exit cannot typecheck,
+and semantically must not.  The honest export: at the AMO, immediately
+cash the view into the thread's own context ([ctx_bound_raise] -- the
+node slot carries own_context; the release leaf's exact idiom) and
+export [∃K, ⌜Tl<=K⌝ ∗ ctx_floor cur_ctx K].  ctx_floor is
+thread-stable (cur_ctx binds OUTSIDE the wp_next binder, the same
+stability the payload row uses) and is aguard_intro's direct input --
+aguard_receipt drops out of the story.  The llb tiers' receipt row is
+the floor pair; the plain (∃K, hart_view_lb K) row stays separately
+(restored from the record-floor route at the pinned exit).
