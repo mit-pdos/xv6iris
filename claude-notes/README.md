@@ -30,6 +30,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   the two scripts, daily use, pulling `.vo` back for a local single-file
   recheck, preemption and cost, and the two things that silently break (the
   VM's Ubuntu must match, and the opam switch must be byte-identical).
+- **[`rocq-warm.md`](rocq-warm.md)** — using
+  [`rocq-warm`](https://github.com/zeldovich/rocq-warm) here: it checks a
+  `.v` file against a warm `rocq repl` session, so editing one proof
+  re-executes only from the edit onwards. How to get it, the memory budget
+  this tree needs, and what it deliberately does not do. The tool is not
+  vendored here and its internals are documented in its own repo.
 - **[`kernel-defects.md`](kernel-defects.md)** — how to tell a defect in the xv6
   SOURCE from a problem in a spec, the register of open ones, and the provably
   dead code.  The newest entry -- `read(fd, buf, -1)` delivering the rest of
