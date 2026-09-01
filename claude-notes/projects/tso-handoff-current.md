@@ -592,3 +592,36 @@ accessors + racy read + locked exact read + 4 count-store twins + arm
 NEXT: close_last_freeze twin (only when a consumer demands it),
 itable_res2 extension + is_itable2 flip (IcacheEscrow), icM_wf bound,
 THE SWAP, IcacheBoot, consumers.
+
+## THE SWAP IS IN (worktree, NOT yet banked -- r69 = last green)
+
+itable_body := the merged pinw body (IcacheInv surgery done, GREEN):
+icM_wf's count clause is the member bound (n <= IREFSLOTS; icM_wf_count
+kept as a < 2^31 corollary, icM_wf_count_slots the new reading); the 20
+old cell-faced inv-openers are DELETED (loads, lookups, pin0 seams,
+freeze/kill, regen, all 8 store AUs); live_whole_share_absurd rewritten
+slot-shaped; frz_park_shr_off routes through frz_slot_kill_pinw; the
+_pinw body/inv names survive as ALIASES of the real ones.  IcacheEscrow
+GREEN with one fix (the ref-1 share refutation at 2339 destructures the
+arm's live_gen to genlo and uses the pinw kill).  Pre-swap IcacheInv
+saved at scratchpad/IcacheInv.v.preswap.
+
+RED WAVE (the 4c/4d leaf rewiring): IcacheBoot:1763 (body
+construction), ProofIunlock:441 (iref_live_load_au -> the pinw racy
+composition: iref_load_pinw_au + wp_load_s_sconf_au_rel +
+IcachePinwObl.iref_read_obl), ProofIlock:2337 (same, at
+iref_live_gen_load_au), ProofIget:1404 + ProofIput:1045
+(iref_load_locked_au -> iref_load_locked_pinw_au + au_rel +
+iref_read_locked_obl), ProofIdup:387 (share_lookup ->
+iref_share_lookup_pinw_au), ProofIreclaim:1813 + ProofIunlockput:281
+(the r64 pin0 seams -> retained-floor threading: the caller KEPT
+#floor/pure from its shed -- persistent! -- so rebuild the erased forms
+from those pieces; no pin needed), then the store sites (wp_sw_au ->
+wp_store_s_sconf_au_dat + pinw_write_c obligations + the store twins),
+then the downstream seam files (SysOpen/Create/etc. surface after).
+
+OPEN DESIGN DETAIL (decided, being built): the racy/exact read leaves
+need [wordw_claim (KTR:=KT0) 4 (i_ref (ientry k))] -- pre-swap it was
+read off the ↦₄ cell; post-swap mint ONCE at boot into a persistent
+[iref_claims] big-sepL and carry it in [is_itable2] (extended to
+is_lock ∗ iref_claims); SpecIunlock gains it as a premise where needed.
