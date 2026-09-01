@@ -222,6 +222,140 @@ Section CtxPinw.
     iFrame "H". iPureIntro. rewrite Hlog length_app /=. lia.
   Qed.
 
+  (* ==================================================================
+     THE ARM: a ctx word cell becomes a pinned window AT the store.  The
+     lock payload's free-slot cell drops to the ledger tier, the member
+     store (the count-1 word) lands through the generic at-gate, and the
+     window is minted with lo := the store's own position -- the epoch's
+     arm point.  [pinw_ok1_mint]'s member premise is the message itself.
+     ================================================================== *)
+  Lemma ledger_arm_pinw_ok `{CID : CpuId} (g g' : gstate) (ξ : CtxId)
+      (base : Arch.pa) {m : N} (vold vnew : bv m) (n : N)
+      (Sw : (nat -> bv 8) -> Prop) :
+    (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->
+    (0 < N.to_nat n)%nat ->
+    Sw (nth_byte vnew) ->
+    g'.(gimg) = g.(gimg) ->
+    g'.(glog) = (g.(glog) ++
+                 [TsoMemPa.PWMsg (snap_of base n vnew)
+                    (hart_agent cpu_id)])%list ->
+    g'.(gmem) = write_bytes g.(gmem) base n vnew ->
+    (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(glog))%nat) ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n),
+       ctx_phys_pointsto ξ (pa_add base j) (DfracOwn 1) (nth_byte vold j)) ==∗
+    gen_heap_interp (hG := riscv_memGS) g'.(gmem) ∗
+    tso_interp_at riscv_eraGS g' ∗
+    ledger_msg_at (length g.(glog))
+      (TsoMemPa.PWMsg (snap_of base n vnew) (hart_agent cpu_id)) ∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n), ∃ t : nat,
+       ⌜(t <= length g'.(glog))%nat⌝ ∗
+       phys_ledger_pinw (pa_add base j) (DfracOwn 1) (nth_byte vnew j) t
+         (TsPinw base (N.to_nat n) j (length g'.(glog)) Sw)).
+  Proof.
+    intros Hn H0n HSw Himg Hlog Hmem Htv Htvok'.
+    iIntros "Hgh Hint Hcells".
+    (* the ctx bits drop; the bytes stay *)
+    iAssert ([∗ list] j ∈ seq 0 (N.to_nat n),
+        phys_ledger (pa_add base j) (DfracOwn 1) (nth_byte vold j))%I
+      with "[Hcells]" as "Hwin".
+    { iApply (big_sepL_mono with "Hcells"). iIntros (i j Hij) "H".
+      iApply (ctx_phys_pointsto_ledger with "H"). }
+    (* the store, at the generic gate *)
+    iMod (ledger_store_win_at_ok g g' base n vold vnew Hn Himg Hlog Hmem
+            Htv Htvok' with "Hgh Hint Hwin") as "($ & Hint & $ & Hnew)".
+    (* the message's window bytes, for the mint's member premise *)
+    assert (Hsnap : forall j : nat, (j < N.to_nat n)%nat ->
+              TsoMemPa.msg_byte
+                (TsoMemPa.PWMsg (snap_of base n vnew) (hart_agent cpu_id))
+                (pa_add base j)
+              = Some (nth_byte vnew j)).
+    { intros j Hj. rewrite /TsoMemPa.msg_byte /=.
+      assert (Hin : pa_add base j ∈ dom (snap_of base n vnew)).
+      { rewrite dom_snap_of. apply elem_of_footprint. exists j.
+        split; [lia | reflexivity]. }
+      apply elem_of_dom in Hin as [b Hb].
+      destruct (snap_of_lookup_Some _ _ _ _ _ Hb) as (j' & Hj' & Heq & ->).
+      assert (Hjj : j = j')
+        by (apply (cpw_pa_add_inj base j j'); [lia | lia | exact Heq]).
+      subst j'. exact Hb. }
+    (* the mint, at lo := the store's own position *)
+    iMod (ledger_pinw_mint_run g' base (nth_byte vnew)
+            (fun _ => S (length g.(glog)))
+            (fun j => TsPinw base (N.to_nat n) j (length g'.(glog)) Sw)
+            (seq 0 (N.to_nat n))
+            with "Hint Hnew") as "(Hint & Hnew)".
+    { intros j Hj. apply elem_of_seq in Hj.
+      apply (pinw_ok1_mint g'.(gimg) g'.(glog) base (N.to_nat n) j Sw
+               (nth_byte vnew) ltac:(lia) H0n HSw).
+      intros k Hk.
+      rewrite Hlog length_app /= Nat.add_1_r log_byte_top.
+      exact (Hsnap k Hk). }
+    iModIntro. iFrame "Hint".
+    iApply (big_sepL_impl with "Hnew").
+    iIntros "!>" (i j Hij) "H". iExists (S (length g.(glog))).
+    iFrame "H". iPureIntro. rewrite Hlog length_app /=. lia.
+  Qed.
+
+  (* ==================================================================
+     THE RETIRE: the pinned window drops back to a ctx word cell at the
+     zeroing store.  The pin drops, the (non-member) store lands at the
+     generic gate, and the fresh rows convert to ctx cells: the storer's
+     own view is AT THE TOP after its own store, so [ctx_bound_raise]
+     mints the floor the conversion needs.
+     ================================================================== *)
+  Lemma ledger_retire_pinw_ok `{CID : CpuId} (g g' : gstate) (ξ : CtxId)
+      (base : Arch.pa) {m : N} (vold vnew : bv m) (n : N) (lo : nat)
+      (Sw : (nat -> bv 8) -> Prop) :
+    (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->
+    g'.(gimg) = g.(gimg) ->
+    g'.(glog) = (g.(glog) ++
+                 [TsoMemPa.PWMsg (snap_of base n vnew)
+                    (hart_agent cpu_id)])%list ->
+    g'.(gmem) = write_bytes g.(gmem) base n vnew ->
+    (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(glog))%nat) ->
+    (length g'.(glog) <= g'.(gtv) cpu_id)%nat ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    TsoCtx.own_context (CID := CID) ξ -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n), ∃ t : nat,
+       phys_ledger_pinw (pa_add base j) (DfracOwn 1) (nth_byte vold j) t
+         (TsPinw base (N.to_nat n) j lo Sw)) ==∗
+    gen_heap_interp (hG := riscv_memGS) g'.(gmem) ∗
+    tso_interp_at riscv_eraGS g' ∗
+    TsoCtx.own_context (CID := CID) ξ ∗
+    ledger_msg_at (length g.(glog))
+      (TsoMemPa.PWMsg (snap_of base n vnew) (hart_agent cpu_id)) ∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n),
+       ctx_phys_pointsto ξ (pa_add base j) (DfracOwn 1) (nth_byte vnew j)).
+  Proof.
+    intros Hn Himg Hlog Hmem Htv Htvok' Htop.
+    iIntros "Hgh Hint Hctx Hpw".
+    iMod (ledger_pinw_drop_run g base (nth_byte vold)
+            (fun j => TsPinw base (N.to_nat n) j lo Sw) (seq 0 (N.to_nat n))
+            with "Hint Hpw") as "(Hint & Hwin)".
+    iMod (ledger_store_win_at_ok g g' base n vold vnew Hn Himg Hlog Hmem
+            Htv Htvok' with "Hgh Hint Hwin") as "($ & Hint & $ & Hnew)".
+    (* my own store put my view at the top: cash it into a floor *)
+    iDestruct (hart_view_lb_get g' 0 Htop with "Hint []")
+      as "(Hint & #Hvlb & _)".
+    { iApply TsoGhost.llb_0. }
+    iMod (TsoCtx.ctx_bound_raise ξ (g'.(gtv) cpu_id) with "Hctx Hvlb")
+      as "[Hctx #Hfl]".
+    iModIntro. iFrame "Hint Hctx".
+    iApply (big_sepL_impl with "Hnew").
+    iIntros "!>" (i j Hij) "H".
+    iApply (ctx_phys_pointsto_of_at_floor ξ (pa_add base j)
+              (nth_byte vnew j) (S (length g.(glog))) with "H").
+    iApply (TsoCtx.ctx_floor_le ξ (g'.(gtv) cpu_id) (S (length g.(glog)))).
+    { pose proof (Htvok' (@cpu_id CID)) as Hto.
+      rewrite Hlog length_app /= in Htop. lia. }
+    iExact "Hfl".
+  Qed.
+
   (* ---- THE EXACT READ, for a receipt that covers the stamps: a LOCK
      HOLDER's read.  All writes to a pinw window happen under its guarding
      lock; the A6.144 floor row hands the holder [ctx_floor ξ tl] with
