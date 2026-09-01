@@ -583,6 +583,111 @@ Lemma ushp_toklen_step (n i : nat) (f : nat -> bv 8) :
   ushp_toklen (S n) i f = S (ushp_toklen n (S i) f).
 Proof. intro H. cbn. rewrite H. reflexivity. Qed.
 
+(* ---- WHAT [parseexec]'s LOOP NEEDS OF THE MODEL, ONCE ----------------- *)
+(* Every turn of the argument loop moves the cursor twice for free -- peek
+   skips whitespace before the guard, and parseredirs skips it again after
+   the token -- so the loop's invariant has to survive a skip.  It does,
+   and the reason is that the scan is IDEMPOTENT: it stops either at the
+   end of the line or on a non-blank byte, and in both cases a second scan
+   from where it stopped moves nothing. *)
+
+Lemma ushp_skipws_end (n i : nat) (f : nat -> bv 8) :
+  (ushp_skipws n i f < n)%nat ->
+  ushp_is_ws (f (i + ushp_skipws n i f)%nat) = false.
+Proof.
+  revert i. induction n as [| n IH ]; intros i H.
+  - cbn [ushp_skipws] in H. lia.
+  - cbn [ushp_skipws] in H |- *. destruct (ushp_is_ws (f i)) eqn:Hw.
+    + assert (E : (i + S (ushp_skipws n (S i) f))%nat
+                  = (S i + ushp_skipws n (S i) f)%nat) by lia.
+      rewrite E. apply IH. lia.
+    + rewrite Nat.add_0_r. exact Hw.
+Qed.
+
+Lemma ushp_skipws_idem (len off : nat) (f : nat -> bv 8) :
+  (off <= len)%nat ->
+  ushp_skipws (len - (off + ushp_skipws (len - off) off f))
+    (off + ushp_skipws (len - off) off f) f = 0%nat.
+Proof.
+  intro Hoff.
+  destruct (Nat.eq_dec (off + ushp_skipws (len - off) off f) len)
+    as [ Hend | Hend ].
+  - rewrite Hend Nat.sub_diag. reflexivity.
+  - pose proof (ushp_skipws_le (len - off) off f) as Hle.
+    apply ushp_skipws_stop. apply ushp_skipws_end. lia.
+Qed.
+
+(* the two constructors, at the shape a walk can APPLY -- the [let]s in
+   [ushp_tokens]'s own constructors make them unusable by [apply] once the
+   cursor has been moved by anything the term does not mention *)
+Lemma ushp_tokens_nil' (len i : nat) (f : nat -> bv 8) :
+  i = len -> ushp_tokens len f i [].
+Proof.
+  intros ->. apply UshpTokNil. rewrite Nat.sub_diag.
+  cbn [ushp_skipws]. lia.
+Qed.
+
+Lemma ushp_tokens_cons' (len : nat) (f : nat -> bv 8) (i n : nat)
+    (toks : list (nat * nat)) :
+  ushp_skipws (len - i) i f = 0%nat ->
+  ushp_toklen (len - i) i f = n ->
+  (0 < n)%nat ->
+  ushp_tokens len f (i + n)%nat toks ->
+  ushp_tokens len f i ((i, (i + n)%nat) :: toks).
+Proof.
+  intros Hk Hn Hpos Ht.
+  assert (E : (i + ushp_skipws (len - i) i f)%nat = i) by (rewrite Hk; lia).
+  assert (C := UshpTokCons len f i toks).
+  cbv zeta in C. rewrite E in C. rewrite Hn in C.
+  exact (C Hpos Ht).
+Qed.
+
+(* ...and the two inversions *)
+Lemma ushp_tokens_nil_inv (len i : nat) (f : nat -> bv 8) :
+  ushp_tokens len f i [] -> (i + ushp_skipws (len - i) i f)%nat = len.
+Proof. inversion 1. assumption. Qed.
+
+Lemma ushp_tokens_cons_inv (len i : nat) (f : nat -> bv 8)
+    (tk : nat * nat) (rest : list (nat * nat)) :
+  ushp_tokens len f i (tk :: rest) ->
+  (0 < ushp_toklen (len - (i + ushp_skipws (len - i) i f))
+         (i + ushp_skipws (len - i) i f) f)%nat /\
+  tk = ((i + ushp_skipws (len - i) i f)%nat,
+        (i + ushp_skipws (len - i) i f
+         + ushp_toklen (len - (i + ushp_skipws (len - i) i f))
+             (i + ushp_skipws (len - i) i f) f)%nat) /\
+  ushp_tokens len f
+    (i + ushp_skipws (len - i) i f
+     + ushp_toklen (len - (i + ushp_skipws (len - i) i f))
+         (i + ushp_skipws (len - i) i f) f)%nat rest.
+Proof.
+  inversion 1 as [ | off toks0 Hn Ht Eoff Etoks ]; subst.
+  cbv zeta in *. split; [ assumption | ].
+  split; [ reflexivity | assumption ].
+Qed.
+
+(* THE SKIP THE LOOP SURVIVES *)
+Lemma ushp_tokens_skip (len : nat) (f : nat -> bv 8) (off : nat)
+    (toks : list (nat * nat)) :
+  (off <= len)%nat ->
+  ushp_tokens len f off toks ->
+  ushp_tokens len f (off + ushp_skipws (len - off) off f)%nat toks.
+Proof.
+  intros Hoff H.
+  pose proof (ushp_skipws_idem len off f Hoff) as Hk0.
+  pose proof (ushp_skipws_le (len - off) off f) as Hle.
+  destruct toks as [| tk rest ].
+  - apply ushp_tokens_nil'.
+    pose proof (ushp_tokens_nil_inv len off f H) as Hnil. lia.
+  - destruct (ushp_tokens_cons_inv len off f tk rest H)
+      as (Hn & Htk & Hrest).
+    subst tk.
+    exact (ushp_tokens_cons' len f (off + ushp_skipws (len - off) off f)
+             (ushp_toklen (len - (off + ushp_skipws (len - off) off f))
+                (off + ushp_skipws (len - off) off f) f) rest
+             Hk0 eq_refl Hn Hrest).
+Qed.
+
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
