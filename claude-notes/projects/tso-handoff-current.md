@@ -673,3 +673,28 @@ need a wp_sw_au_dat-style wrapper in WpAu4 over wp_store_s_sconf_au_dat
 whose obligation is CtxPinw.pinw_write_c, plus the locked-exact-read
 rewiring via iref_load_locked_pinw_au + iref_read_locked_obl), and
 IcacheBoot (construct the pinw body + iref_claims + the payload rows).
+
+## Swap-wave: the leaf toolkit is COMPLETE (worktree)
+
+WpAu4.wp_sw_au_dat_s_sconf (the raw-store sw glue over au_dat; its
+obligation goal arrives at the AMBIENT ea -- no CID rewrites needed,
+unlike the load's) and the two CtxPinw interp-of shells:
+- pinw_arm_write_c: ctx window cells -> member store -> window minted
+  at lo := S (length log); rows return iref_pin_rows-shaped at
+  (S len, S len) + llb (S len) + msg receipt.
+- pinw_retire_write_c REDESIGNED: no view fact (TSO stores do NOT
+  advance the writer's view -- vstep keeps tv'!); instead the rows'
+  ⌜t <= tst⌝ bounds meet the A6.144 payload FLOOR (ctx_floor tst, in
+  the retiring lock holder's hand): ledger_retire_pinw_cells converts
+  pinw -> ctx cells at the OLD value per byte
+  (ledger_pinw_drop keeps the stamp; ctx_phys_pointsto_of_at_floor +
+  ctx_floor_le close), then the zeroing store is an ORDINARY ctx store
+  (ctx_store_win_ok, own_context registers dirty).
+Also: itable_res2 gained the per-slot payload rows (itable_slot_res:
+free = ctx cell 0 + FULL stamp auth + llb; live = stamp half + llb +
+floor) + itable_slot_res_acc_upd; IcacheEscrow imports mono_nat.
+ProofIget in progress: is_itable2 handle split (is_itable2_lock/claims
+at the intro), next the arm site (~1400) onto pinw_arm_write_c +
+iref_alloc_pinw_install, the incr site (~2050) onto
+wp_sw_au_dat_s_sconf + pinw_write_c + iref_incr_store_pinw_au, and the
+locked reads onto iref_load_locked_pinw_au + iref_read_locked_obl.
