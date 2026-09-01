@@ -192,7 +192,7 @@ Definition kfork_post
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γf : gname) (lvl : nat) (eb : bool)
     (pme : mword 64)
-    (b : bool) (pid_p : mword 32) (Up : ustate)
+    (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
     (K : nat) (mr : regfile) (rv : mword 64) (lks : gset string) : iProp Σ :=
   ( sie_cap_gpr KT1 mr K b pme ∗
     cpu_own lvl eb pme b lks ∗
@@ -202,6 +202,15 @@ Definition kfork_post
        and [ProcInv.cwd_ref] hides the fraction, so the block is stated at
        the very same [Vp] either way. *)
     proc_priv γf pme pid_p Up ∗
+    (* ...AND ITS DESCRIPTOR STATES, AT THE VERY LIST THEY WENT IN AT.
+       kfork reads every slot of [p->ofile] and writes none, so this is
+       verbatim like the block beside it -- and naming it is what lets the
+       CHILD's be named at all: the copy loop retypes the child's ghost, one
+       descriptor at a time, at the state the PARENT's list records, so the
+       table the child is parked with IS this one.  That is the whole
+       content of "a forked child inherits its parent's descriptors", and it
+       is stated here because this is the last place both are in hand. *)
+    fd_frags (pv_fdg (us_V Up)) stsP ∗
     (* THE ALLOCATOR'S STATE IS THE SAME ON EVERY ARM, so it is stated ONCE
        here rather than per-disjunct.  See the header: with no page count
        there is nothing left for the arms to disagree about. *)
@@ -218,7 +227,8 @@ Definition wp_kfork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γp γw γl γf : gname)  (γs : list gname)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
-    (b : bool) (pid_p : mword 32) (Up : ustate) (lks : gset string) :=
+    (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
+    (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfork in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_kfork <= K)%nat ->
@@ -281,8 +291,15 @@ Definition wp_kfork_sconf_body
      contract: a key chosen here would be stale by the time forkret's boot
      arm has run kexec("/init") (projects/user-wp-slot.md SS4c, R-b).  When
      the parent is verified, this premise takes the parent's own
-     fork-continuation deposit instead of the generic inhabitant. *)
-  (∀ W : uvis, uslot W) -∗
+     fork-continuation deposit instead of the generic inhabitant.
+     ...AND IT IS RESTRICTED TO THE PARENT'S OWN TABLE, which is what makes
+     that sentence payable rather than aspirational: the child is parked
+     with [stsP] and resumed at a key whose descriptor view is [stsP], so a
+     family covering every OTHER view is asking for what is never used --
+     and a parent with a continuation for its child has one at its own
+     table and at no other.  [ParkCap.park_token_park] carries the same
+     restriction and discharges it by [reflexivity]. *)
+  (∀ W : uvis, ⌜uvis_fd W = stsP⌝ -∗ uslot W) -∗
   (* THE STEADY ARM OF [FirstTok.first_tok], and the ONE thing fork cannot
      take out of the parent's block: the parent's token may be the EXCLUSIVE
      boot arm, and the child needs a token of its own.  [first_done] is
@@ -291,11 +308,14 @@ Definition wp_kfork_sconf_body
      [sd a0,336(s4)] that closes the child's construction window. *)
   first_done -∗
   proc_priv γf pme pid_p Up -∗
+  (* THE PARENT'S DESCRIPTOR STATES.  kfork needs them to say what it copies
+     into the child; it changes none of them and hands them back. *)
+  fd_frags (pv_fdg (us_V Up)) stsP -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      kfork_post γf lvl eb pme b pid_p Up K mr
+      kfork_post γf lvl eb pme b pid_p Up stsP K mr
         (mr !!! Regidx (mword_of_int 10 : mword 5)) lks -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -306,7 +326,8 @@ Module Type KFORK.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
-      (b : bool) (pid_p : mword 32) (Up : ustate) (lks : gset string),
+      (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate)
+      (lks : gset string),
       wp_kfork_sconf_body γp γw γl γf γs
- m lvl K eb pme b pid_p Up lks.
+ m lvl K eb pme b pid_p Up stsP lks.
 End KFORK.

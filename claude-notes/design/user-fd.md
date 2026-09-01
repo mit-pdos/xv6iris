@@ -139,16 +139,65 @@ process entry and someone owns it.  Consequences:
 - `fork` takes the parent's ledger and hands one back to EACH process, at the
   same states and at that process's own ghost name: fork copies the table, so
   a forked child's standard streams are its parent's.  That is what lets a
-  child redirect one.
+  child redirect one.  **The kernel earns that** — see §5.
 - The ENRICHED channel (`UexecRetFs.urun_fs`) buries the ledger inside
   `ufd_state γfd fdv = ufd_auth ∗ ustd_any`, because its rows move the table
   and its clients learn nothing from them.  One resource, so every lemma that
   opens and closes a `urun_fs` is unchanged by the ledger's existence;
   `urun_fs_urun` hands it out when a program leaves that channel.
 
-## 5  What this does NOT yet do
+## 5  Why a forked child's table IS its parent's
+
+`fork` is the one place a descriptor table is created from another one, and
+the fact is proved where the copy happens rather than assumed at either end.
+
+xv6's `kfork` runs `np->ofile[i] = filedup(p->ofile[i])` for all sixteen
+slots.  The scan's invariant carries BOTH halves of the copy-so-far, at one
+shape (`ProofKforkB3.kfk_at src dst i = take i src ++ drop i dst`,
+polymorphic for exactly that reason): the child's `struct file *` array at
+`kfk_at (parent's array) (child's array) i`, and the child's ghost states at
+`kfk_at stsP fdt0 i`.  Per turn:
+
+- the parent's slot is **null** — then it is `FdClosed` in the parent's own
+  list (`ProcInv.proc_priv_states_agree`, read once per turn while the block
+  is whole), so neither half moves;
+- the parent's slot **names a file** — then `filedup`'s duplicated reference
+  comes out at a state `stf`, the parent's AUTHORITY for that slot is at
+  `stf`, and the parent's FRAGMENT (from the caller's `fd_frags`) agrees, so
+  `stsP !! i = Some stf` and the child's ghost is retyped to it
+  (`FdSlots.fd_st_move`, the one place kfork changes a descriptor's
+  user-visible state).
+
+At `i = NOFILE` the child's list is `stsP`, and that is the list the child is
+parked at (`ParkCap.park_token_park`) and therefore the `uvis_fd` of the key
+it resumes on.
+
+Two consequences in the CONTRACTS, and they are the point:
+
+- `SpecKfork.wp_kfork_sconf_body` takes the parent's `fd_frags (pv_fdg (us_V
+  Up)) stsP` and `kfork_post` hands it back at the very same list — kfork
+  reads every slot and writes none.  Naming the parent's table is what makes
+  the child's nameable at all.
+- the child's SLOT premise is restricted to that table:
+  `∀ W, ⌜uvis_fd W = stsP⌝ -∗ uslot W` rather than `∀ W, uslot W`.  The park
+  mints the child's key at `stsP` and at no other list, so a family covering
+  every other view was asking for what is never used — and a parent forking a
+  VERIFIED program has a continuation for its child at its own table and at
+  nothing else.  `ParkCap.park_token_park` carries the same restriction and
+  discharges it by `reflexivity`; the generic inhabitant satisfies it by
+  ignoring it (`ProofSysFork`, `ProofUserinit`, whose park is at `fdt0`).
+
+What is still NOT earned is the other side of that premise:
+`UexecApply.uexec_ret_round_slot`'s fork case MINTS a slot from the family
+instead of INSTANTIATING the program's own child arm, so a verified parent's
+fork continuation has no route to its child yet
+(`projects/user-wp-slot.md` §4c, R-b).
+
+## 6  What this does NOT yet do
 
 `UkSh.ush_std l` is the ledger plus `⌜fd_lowest_closed l = None⌝` — sh's
 entry precondition, and what its console loop's open reads.  Spending it on
 a REDIR is the parked runner's business: see the parking note in
-`iris/_CoqProject`, whose remaining blocker is the fork arm, not this.
+`iris/_CoqProject`, whose remaining blocker is R-b — the fork ecall arm
+MINTING the child's slot rather than instantiating the program's own child
+continuation — and not the descriptor table, which §5 settled.

@@ -26,11 +26,11 @@
    the child's slot [i] holding EXACTLY [pv_ofile Vp !! i] -- the null arm
    because that is what was already there, the non-null arm because
    filedup hands back the SAME pointer it was given.  So the child's
-   private block after [i] turns is [kfk_ofile_at (pv_ofile Vp) (pv_ofile
+   private block after [i] turns is [kfk_at (pv_ofile Vp) (pv_ofile
    V0) i] = [take i (pv_ofile Vp) ++ drop i (pv_ofile V0)], and the single
-   step lemma [kfk_ofile_at_step] (an insert at position [i]) proves BOTH
+   step lemma [kfk_at_step] (an insert at position [i]) proves BOTH
    arms: the null arm is the case where the inserted value is the one
-   already there ([kfk_ofile_at_step_null], via [list_insert_id]).
+   already there ([kfk_at_step_null], via [list_insert_id]).
 
    THE PARENT'S BLOCK NEVER MOVES.  [ProcInv.ofile_slot]'s file disjunct
    quantifies the reference's fraction EXISTENTIALLY, and filedup only
@@ -117,44 +117,51 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(*  THE CHILD'S ofile ARRAY AS A FUNCTION OF THE SCAN INDEX.              *)
+(*  THE COPY-SO-FAR, AS A FUNCTION OF THE SCAN INDEX.                     *)
+(*                                                                        *)
+(*  POLYMORPHIC, because a descriptor has TWO halves and the scan moves    *)
+(*  both in lockstep: the [struct file *] array the C writes, and the      *)
+(*  fdstate list its ghost carries.  Stating the shape once is what lets   *)
+(*  the loop invariant carry the child's TABLE rather than the fact that   *)
+(*  it has one -- and that, in turn, is what makes "a forked child        *)
+(*  inherits its parent's descriptors" a statement kfork can make.         *)
 (* ===================================================================== *)
 
-Definition kfk_ofile_at (Vp_of V0_of : list (mword 64)) (i : nat) : list (mword 64) :=
-  (take i Vp_of ++ drop i V0_of)%list.
+Definition kfk_at {A : Type} (src dst : list A) (i : nat) : list A :=
+  (take i src ++ drop i dst)%list.
 
-Lemma kfk_ofile_at_0 (Vp_of V0_of : list (mword 64)) :
-  kfk_ofile_at Vp_of V0_of 0 = V0_of.
+Lemma kfk_at_0 {A : Type} (Vp_of V0_of : list A) :
+  kfk_at Vp_of V0_of 0 = V0_of.
 Proof. reflexivity. Qed.
 
-Lemma kfk_ofile_at_full (Vp_of V0_of : list (mword 64)) :
+Lemma kfk_at_full {A : Type} (Vp_of V0_of : list A) :
   length Vp_of = NOFILE -> length V0_of = NOFILE ->
-  kfk_ofile_at Vp_of V0_of NOFILE = Vp_of.
+  kfk_at Vp_of V0_of NOFILE = Vp_of.
 Proof.
-  intros H1 H2. unfold kfk_ofile_at.
+  intros H1 H2. unfold kfk_at.
   rewrite (take_ge Vp_of NOFILE ltac:(lia)) (drop_ge V0_of NOFILE ltac:(lia)).
   by rewrite app_nil_r.
 Qed.
 
-Lemma kfk_ofile_at_lookup_i (Vp_of V0_of : list (mword 64)) (i : nat) :
+Lemma kfk_at_lookup_i {A : Type} (Vp_of V0_of : list A) (i : nat) :
   length Vp_of = NOFILE -> (i < NOFILE)%nat ->
-  kfk_ofile_at Vp_of V0_of i !! i = V0_of !! i.
+  kfk_at Vp_of V0_of i !! i = V0_of !! i.
 Proof.
-  intros HVp Hi. unfold kfk_ofile_at.
+  intros HVp Hi. unfold kfk_at.
   rewrite lookup_app_r; [| rewrite length_take; lia].
   rewrite length_take.
   replace (i - Nat.min i (length Vp_of))%nat with 0%nat by lia.
   rewrite lookup_drop. f_equal. lia.
 Qed.
 
-Lemma kfk_ofile_at_step (Vp_of V0_of : list (mword 64)) (i : nat) (v : mword 64) :
+Lemma kfk_at_step {A : Type} (Vp_of V0_of : list A) (i : nat) (v : A) :
   length Vp_of = NOFILE -> length V0_of = NOFILE ->
   Vp_of !! i = Some v -> (i < NOFILE)%nat ->
-  <[i := v]> (kfk_ofile_at Vp_of V0_of i) = kfk_ofile_at Vp_of V0_of (S i).
+  <[i := v]> (kfk_at Vp_of V0_of i) = kfk_at Vp_of V0_of (S i).
 Proof.
   intros HVp HV0 Hv Hi.
   destruct (lookup_lt_is_Some_2 V0_of i ltac:(rewrite HV0; lia)) as [v0 Hv0].
-  unfold kfk_ofile_at.
+  unfold kfk_at.
   rewrite (insert_app_r_alt (take i Vp_of) (drop i V0_of) i v
              ltac:(rewrite length_take; lia)).
   rewrite length_take.
@@ -165,17 +172,17 @@ Proof.
   by rewrite <- app_assoc.
 Qed.
 
-Lemma kfk_ofile_at_step_null (Vp_of V0_of : list (mword 64)) (i : nat) :
+Lemma kfk_at_step_null {A : Type} (Vp_of V0_of : list A) (i : nat) :
   length Vp_of = NOFILE -> length V0_of = NOFILE -> (i < NOFILE)%nat ->
   Vp_of !! i = V0_of !! i ->
-  kfk_ofile_at Vp_of V0_of i = kfk_ofile_at Vp_of V0_of (S i).
+  kfk_at Vp_of V0_of i = kfk_at Vp_of V0_of (S i).
 Proof.
   intros HVp HV0 Hi Heq.
   destruct (lookup_lt_is_Some_2 V0_of i ltac:(rewrite HV0; lia)) as [v Hv].
   assert (Hvp : Vp_of !! i = Some v) by (rewrite Heq; exact Hv).
-  rewrite <- (kfk_ofile_at_step Vp_of V0_of i v HVp HV0 Hvp Hi).
+  rewrite <- (kfk_at_step Vp_of V0_of i v HVp HV0 Hvp Hi).
   symmetry. apply list_insert_id.
-  rewrite (kfk_ofile_at_lookup_i Vp_of V0_of i HVp Hi). exact Hv.
+  rewrite (kfk_at_lookup_i Vp_of V0_of i HVp Hi). exact Hv.
 Qed.
 
 (* ===================================================================== *)
@@ -184,11 +191,11 @@ Qed.
 
 Definition kfk_childV (V0 : pprivate) (Vp_of : list (mword 64)) (i : nat) : pprivate :=
   MkPPriv (pv_sz V0) (pv_upt V0) (pv_tf V0)
-          (kfk_ofile_at Vp_of (pv_ofile V0) i) (pv_fdg V0) (pv_cwd V0) (pv_name V0).
+          (kfk_at Vp_of (pv_ofile V0) i) (pv_fdg V0) (pv_cwd V0) (pv_name V0).
 
 Lemma kfk_childV_0 (V0 : pprivate) (Vp_of : list (mword 64)) :
   kfk_childV V0 Vp_of 0 = V0.
-Proof. unfold kfk_childV. rewrite kfk_ofile_at_0. by destruct V0. Qed.
+Proof. unfold kfk_childV. rewrite kfk_at_0. by destruct V0. Qed.
 
 (* the same at the record: kfork's child state is the child's [ustate] with
    the first [i] descriptor slots copied from the parent.  The IMAGE is
@@ -204,7 +211,7 @@ Proof. rewrite /kfk_childU /upd_usV kfk_childV_0. by destruct U0. Qed.
 Lemma kfk_childV_full (V0 : pprivate) (Vp_of : list (mword 64)) :
   length Vp_of = NOFILE -> length (pv_ofile V0) = NOFILE ->
   pv_ofile (kfk_childV V0 Vp_of NOFILE) = Vp_of.
-Proof. intros. unfold kfk_childV. cbn [pv_ofile pv_fdg]. apply kfk_ofile_at_full; assumption. Qed.
+Proof. intros. unfold kfk_childV. cbn [pv_ofile pv_fdg]. apply kfk_at_full; assumption. Qed.
 
 Lemma kfk_childV_step (V0 : pprivate) (Vp_of : list (mword 64)) (i : nat) (v : mword 64) :
   length Vp_of = NOFILE -> length (pv_ofile V0) = NOFILE ->
@@ -212,7 +219,7 @@ Lemma kfk_childV_step (V0 : pprivate) (Vp_of : list (mword 64)) (i : nat) (v : m
   upd_ofile (kfk_childV V0 Vp_of i) i v = kfk_childV V0 Vp_of (S i).
 Proof.
   intros HVp HV0 Hv Hi. unfold upd_ofile, kfk_childV. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
-  f_equal. apply (kfk_ofile_at_step Vp_of (pv_ofile V0) i v HVp HV0 Hv Hi).
+  f_equal. apply (kfk_at_step Vp_of (pv_ofile V0) i v HVp HV0 Hv Hi).
 Qed.
 
 Lemma kfk_childV_step_null (V0 : pprivate) (Vp_of : list (mword 64)) (i : nat) :
@@ -221,7 +228,7 @@ Lemma kfk_childV_step_null (V0 : pprivate) (Vp_of : list (mword 64)) (i : nat) :
   kfk_childV V0 Vp_of i = kfk_childV V0 Vp_of (S i).
 Proof.
   intros HVp HV0 Hi Heq. unfold kfk_childV. f_equal.
-  apply (kfk_ofile_at_step_null Vp_of (pv_ofile V0) i HVp HV0 Hi Heq).
+  apply (kfk_at_step_null Vp_of (pv_ofile V0) i HVp HV0 Hi Heq).
 Qed.
 
 (* ===================================================================== *)
@@ -274,7 +281,8 @@ Section KforkB3Proof.
      [ProofAllocproc.ap_tail]; see claude-notes/completed/kerneltrap.md.) *)
   Lemma kfkb3_fd_loop
       (γl γf : gname) (pme npa : mword 64) (pid_p pid_c : mword 32)
-      (Up U0 : ustate) (m0 : regfile) (rsv K n : nat) (eb b : bool)
+      (Up U0 : ustate) (stsP : list fdstate)
+      (m0 : regfile) (rsv K n : nat) (eb b : bool)
       (sp0v s00v : mword 64) (lks : gset string) :
     (22 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
@@ -300,14 +308,16 @@ Section KforkB3Proof.
           pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
           proc_priv γf pme pid_p Up -∗
           proc_priv_nocwd γf npa pid_c (kfk_childU U0 (pv_ofile (us_V Up)) NOFILE) -∗
-          fd_frags_any (pv_fdg (us_V U0)) -∗
+          fd_frags (pv_fdg (us_V Up)) stsP -∗
+          fd_frags (pv_fdg (us_V U0)) stsP -∗
           WP (Loop : expr riscv_lang)) -∗
       sie_cap_gpr KT1 M (rsv + (K - 8))%nat b pme -∗
       cpu_own n eb pme b lks -∗
       pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
       proc_priv γf pme pid_p Up -∗
       proc_priv_nocwd γf npa pid_c (kfk_childU U0 (pv_ofile (us_V Up)) i) -∗
-      fd_frags_any (pv_fdg (us_V U0)) -∗
+      fd_frags (pv_fdg (us_V Up)) stsP -∗
+      fd_frags (pv_fdg (us_V U0)) (kfk_at stsP fdt0 i) -∗
       WP (Loop : expr riscv_lang)).
   Proof.
     intros HK Hn HV0 Hbelow.
@@ -338,20 +348,22 @@ Section KforkB3Proof.
               pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
               proc_priv γf pme pid_p Up -∗
               proc_priv_nocwd γf npa pid_c (kfk_childU U0 (pv_ofile (us_V Up)) NOFILE) -∗
-              fd_frags_any (pv_fdg (us_V U0)) -∗
+              fd_frags (pv_fdg (us_V Up)) stsP -∗
+              fd_frags (pv_fdg (us_V U0)) stsP -∗
               WP (Loop : expr riscv_lang)) -∗
           sie_cap_gpr KT1 M (rsv + (K - 8))%nat b pme -∗
           cpu_own n eb pme b lks -∗
           pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
           proc_priv γf pme pid_p Up -∗
           proc_priv_nocwd γf npa pid_c (kfk_childU U0 (pv_ofile (us_V Up)) i) -∗
-          fd_frags_any (pv_fdg (us_V U0)) -∗
+          fd_frags (pv_fdg (us_V Up)) stsP -∗
+          fd_frags (pv_fdg (us_V U0)) (kfk_at stsP fdt0 i) -∗
           WP (Loop : expr riscv_lang)))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hcfrag".
+      { iIntros (CIDk Hsk i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
         exfalso. lia. }
-      iIntros (CIDk Hsk i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hcfrag".
+      iIntros (CIDk Hsk i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
       destruct Hregs as (Hcsp & Hs0 & Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hthr).
       (* --------------------------------------------------------------- *)
       (*  Htail: the increment+test at +0x8e..+0x92, shared by both arms *)
@@ -368,10 +380,11 @@ Section KforkB3Proof.
           pc_is (mword_of_int (KF + 0x8e) : mword 64) -∗
           proc_priv γf pme pid_p Up -∗
           proc_priv_nocwd γf npa pid_c (kfk_childU U0 (pv_ofile (us_V Up)) (S i)) -∗
-          fd_frags_any (pv_fdg (us_V U0)) -∗
+          fd_frags (pv_fdg (us_V Up)) stsP -∗
+          fd_frags (pv_fdg (us_V U0)) (kfk_at stsP fdt0 (S i)) -∗
           WP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
-      { iIntros (CIDta Hsta Mt) "%Hregst Hcg Hown Hpc Hpv Hpv2 Hcfrag".
+      { iIntros (CIDta Hsta Mt) "%Hregst Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
         destruct Hregst as (Ht0 & Ht0' & Ht1 & Ht2 & Ht3 & Ht4 & Ht5 & Htthr).
         (* ---- +0x8e: c.addi s1,s1,8 ---- *)
         iApply (wp_caddi_s_sconf (mword_of_int (KF + 0x8e)) Rs1 (mword_of_int 8 : mword 6)
@@ -457,10 +470,15 @@ Section KforkB3Proof.
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Htgta4) in "Hpc".
           iEval (rewrite Heos) in "Hpv2".
+          (* THE CHILD'S TABLE IS THE PARENT'S, and this is where the scan
+             says so: [kfk_at] at the full width is the source list. *)
+          iDestruct (fd_frags_len with "Hpfrag") as %HlenP.
+          iEval (rewrite Heos (kfk_at_full stsP fdt0 HlenP fdt0_length))
+            in "Hcfrag".
           iDestruct (cpu_own_transport CIDta CID3 n eb pme b ltac:(wp_next_chain) with "Hown")
             as "Hown".
           iSpecialize ("Hqx" $! CID3 with "[%]"); [wp_next_chain|].
-          iApply ("Hqx" $! T2 with "[%] Hcg Hown Hpc Hpv Hpv2 Hcfrag").
+          iApply ("Hqx" $! T2 with "[%] Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag").
           split; [exact HT2csp|]. split; [exact HT2s0|].
           split; [exact HT2s4|]. split; [exact HT2s5|]. exact HT2thr.
         - (* FALL: one more slot to look at *)
@@ -482,7 +500,7 @@ Section KforkB3Proof.
           iDestruct (cpu_own_transport CIDta CID3 n eb pme b ltac:(wp_next_chain) with "Hown")
             as "Hown".
           iSpecialize ("IHf" $! CID3 with "[%]"); [wp_next_chain|].
-          iApply ("IHf" $! (S i) T2 with "[%] [%] [%] Hqx Hcg Hown Hpc Hpv Hpv2 Hcfrag").
+          iApply ("IHf" $! (S i) T2 with "[%] [%] [%] Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag").
           + unfold NOFILE in Hfuel |- *. lia.
           + unfold NOFILE in Hne, Hi |- *. lia.
           + split; [exact HT2csp|]. split; [exact HT2s0|]. split; [exact HT2s1|].
@@ -492,6 +510,16 @@ Section KforkB3Proof.
       (*  THE BODY, +0x96 .. +0xa2, at index [i].                          *)
       (* ================================================================= *)
       iDestruct (proc_priv_ofile_len with "Hpv") as "%HlenVp".
+      (* THE PARENT'S TABLE, READ ONCE PER TURN.  Both arms need it: the
+         null one to say the slot the scan skips is CLOSED in the parent's
+         own list (so the child's list does not move either), and the
+         filedup one to say the type it copies is the one that list records.
+         Taken before the slot is opened, while the block is whole. *)
+      iDestruct (fd_frags_len with "Hpfrag") as %HlenP.
+      iDestruct (proc_priv_states_agree γf pme pid_p Up stsP
+                   with "Hpv Hpfrag") as %Hagree.
+      destruct (lookup_lt_is_Some_2 stsP i ltac:(rewrite HlenP; unfold NOFILE in *; lia))
+        as [stp HstpL].
       destruct (lookup_lt_is_Some_2 (pv_ofile (us_V Up)) i ltac:(rewrite HlenVp; lia)) as [v Hv].
       iDestruct (proc_priv_ofile γf pme pid_p Up i v Hv with "Hpv") as "[[Hcell Hpay] Hback]".
       (* ---- +0x96: c.ld a0,0(s1) ---- *)
@@ -558,10 +586,20 @@ Section KforkB3Proof.
             (kfk_childV_step_null (us_V U0) (pv_ofile (us_V Up)) i
                HlenVp HlenV0 Hi HeqVV0). reflexivity. }
         iEval (rewrite HstepU) in "Hpv2".
+        (* ...AND THE SAME AT THE GHOST.  A null cell is a CLOSED descriptor
+           in the parent's own list ([proc_priv_states_agree]), and the
+           child's list is closed there too, so the step is the identity. *)
+        assert (HstpC : stp = FdClosed)
+          by exact (proj1 (Hagree i v stp Hv HstpL) Hvz).
+        assert (HstepS : kfk_at stsP fdt0 i = kfk_at stsP fdt0 (S i)).
+        { apply (kfk_at_step_null stsP fdt0 i HlenP fdt0_length Hi).
+          rewrite HstpL HstpC. symmetry.
+          apply lookup_replicate. split; [reflexivity | unfold NOFILE in *; lia]. }
+        iEval (rewrite HstepS) in "Hcfrag".
         iDestruct (cpu_own_transport CIDk CIDm n eb pme b ltac:(wp_next_chain) with "Hown")
           as "Hown".
         iSpecialize ("Htail" $! CIDm with "[%]"); [wp_next_chain|].
-        iApply ("Htail" $! L1 with "[%] Hcg Hown Hpc Hpv Hpv2 Hcfrag").
+        iApply ("Htail" $! L1 with "[%] Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag").
         split; [exact HL1csp|]. split; [exact HL1s0|]. split; [exact HL1s1|].
         split; [exact HL1s2|]. split; [exact HL1s3|]. split; [exact HL1s4|].
         split; [exact HL1s5|]. exact HL1thr.
@@ -583,7 +621,7 @@ Section KforkB3Proof.
            [FdSlots.fd_slot] unit filedup's precondition wants. *)
         assert (Hvc : pv_ofile (kfk_childV (us_V U0) (pv_ofile (us_V Up)) i) !! i = Some (zero_reg : mword 64)).
         { unfold kfk_childV. cbn [pv_ofile pv_fdg].
-          rewrite (kfk_ofile_at_lookup_i (pv_ofile (us_V Up)) (pv_ofile (us_V U0)) i HlenVp Hi).
+          rewrite (kfk_at_lookup_i (pv_ofile (us_V Up)) (pv_ofile (us_V U0)) i HlenVp Hi).
           rewrite HV0. apply lookup_replicate. split; [reflexivity | lia]. }
         iDestruct (proc_priv_nocwd_ofile γf npa pid_c (kfk_childU U0 (pv_ofile (us_V Up)) i) i
                      (zero_reg : mword 64) Hvc with "Hpv2") as "[Hslot2 Hback2]".
@@ -672,12 +710,29 @@ Section KforkB3Proof.
         (* THE CHILD'S RETYPE, and it is what kfork spends the child's own
            fragment bundle on: the array holds only the authority, so opening
            the child's descriptor takes both halves ([FdSlots.fd_st_move]). *)
-        iDestruct (fd_frags_any_acc (pv_fdg (kfk_childV (us_V U0) (pv_ofile (us_V Up)) i)) i
-                     ltac:(unfold NOFILE in *; lia) with "Hcfrag")
-          as (stq) "[Hcfr Hcfrback]".
-        iMod (fd_st_move _ i FdClosed stq stf with "Hst2 Hcfr")
+        (* THE STATE THE CHILD LANDS AT IS THE PARENT'S OWN ENTRY.  [stf]
+           came out of the parent's slot with the reference filedup
+           duplicated, and the parent's AUTHORITY agrees with the list the
+           caller handed in -- so this is where "a copy of the pointers"
+           becomes "a copy of the TABLE". *)
+        iDestruct (fd_frags_acc (pv_fdg (us_V Up)) stsP i stp HstpL with "Hpfrag")
+          as "[Hpfr Hpfrback]".
+        iDestruct (fd_st_agree with "Hst Hpfr") as %Heqst. subst stp.
+        iDestruct ("Hpfrback" with "Hpfr") as "Hpfrag".
+        iEval (rewrite (list_insert_id stsP i stf HstpL)) in "Hpfrag".
+        (* the child's slot [i] is CLOSED in the list the scan has built so
+           far -- which is what [kfk_at] says at the index it has reached *)
+        assert (HcC : kfk_at stsP fdt0 i !! i = Some FdClosed).
+        { rewrite (kfk_at_lookup_i stsP fdt0 i HlenP Hi).
+          apply lookup_replicate. split; [reflexivity | unfold NOFILE in *; lia]. }
+        iDestruct (fd_frags_acc (pv_fdg (kfk_childV (us_V U0) (pv_ofile (us_V Up)) i))
+                     (kfk_at stsP fdt0 i) i FdClosed HcC with "Hcfrag")
+          as "[Hcfr Hcfrback]".
+        iMod (fd_st_move _ i FdClosed FdClosed stf with "Hst2 Hcfr")
           as "[Hst2 Hcfr]".
         iDestruct ("Hcfrback" with "Hcfr") as "Hcfrag".
+        iEval (rewrite (kfk_at_step stsP fdt0 i stf HlenP fdt0_length HstpL Hi))
+          in "Hcfrag".
         iDestruct (ofile_slot_file γf _ npa i k (q/2)%Qp stf Hk Hty
                      with "Hcell2 Hslotb Hst2") as "Hslot2".
         iDestruct ("Hback2" $! (fnode k) with "Hslot2") as "Hpv2".
@@ -710,14 +765,14 @@ Section KforkB3Proof.
         iDestruct (cpu_own_transport CIDo CIDq n eb pme b ltac:(wp_next_chain) with "Hown")
           as "Hown".
         iSpecialize ("Htail" $! CIDq with "[%]"); [wp_next_chain|].
-        iApply ("Htail" $! mr with "[%] Hcg Hown Hpc Hpv Hpv2 Hcfrag").
+        iApply ("Htail" $! mr with "[%] Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag").
         split; [exact Hmrcsp|]. split; [exact Hmrs0|]. split; [exact Hmrs1|].
         split; [exact Hmrs2|]. split; [exact Hmrs3|]. split; [exact Hmrs4|].
         split; [exact Hmrs5|]. exact Hmrthr. }
-    iIntros (i M) "%Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hcfrag".
+    iIntros (i M) "%Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
     iSpecialize ("Hloop" $! (NOFILE - i)%nat).
     iSpecialize ("Hloop" $! CID0 with "[%]"); [by intros|].
-    iApply ("Hloop" $! i M with "[%] [%] [%] Hqx Hcg Hown Hpc Hpv Hpv2 Hcfrag");
+    iApply ("Hloop" $! i M with "[%] [%] [%] Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag");
       [lia | exact Hi | exact Hregs].
   Qed.
 

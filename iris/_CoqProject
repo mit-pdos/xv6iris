@@ -1784,27 +1784,32 @@ LinkSysUnlinkAU.v
 #       [wp_ksh_start] out through [ush_rest] to exactly this file's front
 #       door.
 #
-#   (c) HALF CLOSED.  The u-tier now CARRIES the fork fact:
-#       [UexecRet.uexec_ret_F]'s child arm reads [fdv' = uvis_fd W], like
-#       the parent's, and [UkFork.wp_uk_ecall_fork] takes a handle set and
-#       hands it back to BOTH processes at their own ghost names.
+#   (c) THE KERNEL HALF IS CLOSED; ONE U-TIER SEAM IS LEFT.  The u-tier
+#       CARRIES the fork fact: [UexecRet.uexec_ret_F]'s child arm reads
+#       [fdv' = uvis_fd W], like the parent's, and
+#       [UkFork.wp_uk_ecall_fork] takes a handle set and a LEDGER and hands
+#       both back to the two processes at their own ghost names.
 #       [UkShRun]'s [wp_kshr_fork]/[wp_kshr_fork1] thread it, and
 #       [wp_kshr_rcall] (new, §4') is the call shape close needs -- a stub
 #       with an [R] going in and an [S r] coming back, stated at the ONE
 #       register file it is applied to because close's precondition reads
 #       a0 and no fact about a0 holds for an arbitrary frame.
 #
-#       WHAT IS NOT EARNED: the kernel never supplies the new premise.
-#       [UexecApply.uexec_ret_round_slot]'s fork case MINTS a slot from the
-#       ∀-key family instead of instantiating the program's arm, and the
-#       child's real fdstate view arrives through the park, where
-#       [ProofForkretPark]'s closure mints [uslot (uvis_of U' sts)] at an
-#       EXISTENTIAL [sts].  [ProofKforkParts.kfk_childV_full] proves the
-#       POINTER array is a copy; the fdstate list is dropped by
-#       [fd_frags_any], which [FdSlots.v]'s own retirement note names as
-#       "why nothing can say a forked child's descriptors are anything in
-#       particular".  Threading [fd_frags] at an explicit state list through
-#       kfork's filedup scan and the park is what earns it.
+#       WHAT THE KERNEL NOW EARNS: kfork's copy loop
+#       ([ProofKforkB3.kfkb3_fd_loop]) carries the PARTIALLY COPIED TABLE in
+#       its invariant and retypes the child's ghost at the state the
+#       PARENT's own list records, so the child is parked
+#       ([ParkCap.park_token_park]) at that very list and resumed at a key
+#       whose [uvis_fd] is it.  [SpecKfork]'s slot premise is restricted to
+#       that table accordingly -- which is the shape a VERIFIED parent's
+#       fork-continuation can be handed in as, where the ∀-key family could
+#       not be.  See claude-notes/design/user-fd.md SS4.
+#
+#       WHAT IS STILL NOT EARNED: [UexecApply.uexec_ret_round_slot]'s fork
+#       case MINTS a slot from that family instead of INSTANTIATING the
+#       program's own child arm, so a verified parent's continuation still
+#       has no route to the child (projects/user-wp-slot.md SS4c, R-b).
+#       That is now the only thing between sh's runner and its REDIR.
 #
 #   (d) HALF OPEN, and it is REDIR's.
 #

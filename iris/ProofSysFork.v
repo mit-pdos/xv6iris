@@ -105,9 +105,10 @@ Section ProofSysFork.
   Lemma wp_sys_fork_sconf
       (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
-      (b : bool) (pid : mword 32) (U : ustate) (lks : gset string)
+      (b : bool) (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (lks : gset string)
     : wp_sys_fork_sconf_body γp γw γl γf γs
- m lvl av eb p b pid U lks.
+ m lvl av eb p b pid U sts lks.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
     intros pcE ret_tgt Hav Hlvl Hbelow.
@@ -122,7 +123,7 @@ Section ProofSysFork.
     set (M1 := <[Regidx csp_rs1 := regval_into_reg sp']> m).
     set (M2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> M1).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl
-             #Hitbl #Hitinv #Hireg Henv #Hpav #Hworld #Htoken #Hfdone Hpriv Hcont".
+             #Hitbl #Hitinv #Hireg Henv #Hpav #Hworld #Htoken #Hfdone Hpriv Hpfrag Hcont".
     assert (Hcsp1 : M1 !!! Regidx csp_rs1 = sp') by (apply upd_eq).
     assert (Hpush : sp' = pa_stk (m !!! Regidx csp_rs1) 2).
     { unfold sp', pa_stk, add_vec_int, imm_entry.
@@ -203,17 +204,22 @@ Section ProofSysFork.
        constructor instead, which is the whole point of the conditional
        probe.  The family, not a keyed slot -- the park cannot know the key
        the resume will land on (projects/user-wp-slot.md SS4c, R-b). *)
-    iAssert (∀ W : uvis, uslot W)%I as "Hjslot".
+    (* AT THE PARENT'S OWN TABLE.  kfork's premise is the family restricted
+       to the descriptor view the child is parked and resumed at, which the
+       generic inhabitant satisfies by ignoring the restriction -- and which
+       is the shape a VERIFIED parent's fork-continuation can be handed in
+       instead. *)
+    iAssert (∀ W : uvis, ⌜uvis_fd W = sts⌝ -∗ uslot W)%I as "Hjslot".
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
-      iIntros (W). iApply (UexecCond.cond_entry_slot W with "Hgen"). }
+      iIntros (W) "_". iApply (UexecCond.cond_entry_slot W with "Hgen"). }
     iApply (Kfork.wp_kfork_sconf γp γw γl γf γs
 
-              Bj lvl (av - 2)%nat eb p b pid U lks
+              Bj lvl (av - 2)%nat eb p b pid U sts lks
               ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
-                    Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken Hjslot Hfdone Hpriv").
+                    Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken Hjslot Hfdone Hpriv Hpfrag").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
-    iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & #Henv & %Hrv)".
+    iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Hpfrag & #Henv & %Hrv)".
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_fork + 0x0c))
       by (rewrite HBjra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0c) in "Hpc".
@@ -320,7 +326,7 @@ Section ProofSysFork.
     (* [Hcpu] has sat at [CID6] (kfork's own resumed hart) since the
        crossing; the four leaf steps since then never touched it. *)
     iDestruct (cpu_own_transport CID6 CID11 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply ("Hcont" $! E10 with "[%] Hcg Hcpu Hpc Hpriv Henv [%]").
+    iApply ("Hcont" $! E10 with "[%] Hcg Hcpu Hpc Hpriv Hpfrag Henv [%]").
     - unfold callee_saved.
       split_and!.
       + exact HE10csp.

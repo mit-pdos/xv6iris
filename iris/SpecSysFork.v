@@ -94,7 +94,8 @@ Definition wp_sys_fork_sconf_body
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γp γw γl γf : gname) (γs : list gname)
     (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
-    (b : bool) (pid : mword 32) (U : ustate) (lks : gset string) :=
+    (b : bool) (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_fork in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_sys_fork <= av)%nat ->
@@ -143,6 +144,11 @@ Definition wp_sys_fork_sconf_body
      [sd a0,336(s4)] that closes the child's construction window. *)
   first_done -∗
   proc_priv γf p pid U -∗
+  (* THE PARENT'S DESCRIPTOR STATES.  fork's whole effect on descriptors is
+     that the CHILD gets these -- [SpecKfork]'s copy loop retypes the child's
+     ghost at exactly this list, one slot per [filedup] -- so the caller has
+     to name them, and gets them back untouched. *)
+  fd_frags (pv_fdg (us_V U)) sts -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
@@ -151,6 +157,7 @@ Definition wp_sys_fork_sconf_body
       pc_is ret_tgt -∗
       (* the caller's block comes back verbatim: kfork only reads it *)
       proc_priv γf p pid U -∗
+      fd_frags (pv_fdg (us_V U)) sts -∗
       kalloc_env_at fsc_kalloc fsc_kpages None -∗
       (* ... and the return value is kfork's own, unchanged *)
       ⌜ mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64)
@@ -168,7 +175,8 @@ Module Type SYSFORK.
       `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
-      (b : bool) (pid : mword 32) (U : ustate) (lks : gset string),
+      (b : bool) (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (lks : gset string),
       wp_sys_fork_sconf_body γp γw γl γf γs
- m lvl av eb p b pid U lks.
+ m lvl av eb p b pid U sts lks.
 End SYSFORK.

@@ -3600,11 +3600,14 @@ Section SyscallArms.
     iApply (SysFork.wp_sys_fork_sconf γp γw γft γf
               (fcn_procs fn)
 
-              M 0%nat (av - 4)%nat true pj true pid U ∅
+              M 0%nat (av - 4)%nat true pj true pid U sts ∅
               ltac:(lia) sysc_noff0b
               (locks_below_empty "wait_lock")
-              with "Hcg Hcpu Htext Hpc Hprocs' Hnextpid Hwaitlk Hftable Hitable Hitinv Hireg Hkat Hpav Hworld Htoken Hfdone Hpriv").
-    iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu Hpc Hpriv Hka %Hrv".
+              with "Hcg Hcpu Htext Hpc Hprocs' Hnextpid Hwaitlk Hftable Hitable Hitinv Hireg Hkat Hpav Hworld Htoken Hfdone Hpriv Hufrag").
+    (* THE PARENT'S DESCRIPTOR STATES COME BACK AT THE VERY LIST THEY WENT
+       IN AT: fork reads [p->ofile] and writes none of it, and what the CHILD
+       got is that same list ([SpecKfork]'s post says so). *)
+    iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu Hpc Hpriv Hufrag Hka %Hrv".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (us_V U)))).

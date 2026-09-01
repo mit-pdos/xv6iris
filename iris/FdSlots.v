@@ -476,11 +476,17 @@ Section FdSlots.
      family on the syscall channel.  What that bought in uniformity it paid
      for in silence: the weakening DISCARDS a value the producer had in
      hand, and once discarded it cannot be recovered, since this predicate
-     pins the length and nothing else.  [ProcInv]'s mint is the worked
-     example -- it proves [fd_frags γ fdt0] and existentially forgets it on
-     the next line, which is why nothing can say a forked child's
-     descriptors are anything in particular.  Every remaining use is a
-     place where a caller is being told less than the callee knew.
+     pins the length and nothing else.  Every remaining use is a place where
+     a caller is being told less than the callee knew.
+
+     THE WORKED EXAMPLE IS FORK, AND IT IS RETIRED.  allocproc's mint proves
+     [fd_frags γ fdt0]; kfork's copy loop retypes the child's ghost one
+     descriptor at a time, at the state the PARENT's own list records; and
+     the park is keyed at the list that comes out.  While either end
+     forgot -- the mint on the line after it, or the loop's invariant -- a
+     forked child's descriptors were unstateable, which is what parked sh's
+     command-tree runner.  Both ends name the list now
+     (claude-notes/design/user-fd.md SS4).
 
      THE ORIGINAL NOTE, for the record:
 

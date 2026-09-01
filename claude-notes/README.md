@@ -122,7 +122,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   totally and the rest only when open, the one allocation rule that decides
   WHICH descriptor came back from the caller's own ledger, close's two
   footprints and the row that makes closing an open descriptor total, and
-  who has to carry a ledger and why nobody can escape it.
+  who has to carry a ledger and why nobody can escape it, and why a forked
+  child's table IS its parent's -- what kfork's copy loop proves, what
+  [`SpecKfork`] therefore states, and the one u-tier seam still open.
 - **[`user-heap.md`](design/user-heap.md)** — the SEPARATION-LOGIC HEAP over
   user memory: the two `ghost_map`s (text persistent/X, data exclusive/W)
   and why that is what makes an exclusive points-to imply writability, the
