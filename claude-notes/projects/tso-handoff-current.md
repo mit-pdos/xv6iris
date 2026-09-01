@@ -541,3 +541,29 @@ the locked exact-read accessor (ledger_read_pinw_latest at the A6.144
 row), itable_res2 extension (free cells + stamp halves + llb + floor
 row), is_itable2 λ-flip, icM_wf n<=IREFSLOTS, THE SWAP, IcacheBoot, and
 the consumer wave.
+
+## r68 BANKED (snapshot 9caa3f015dd): arm/retire AU twins
+
+- iref_alloc_pinw_install: the ARM's icache-side ghost install.  The
+  physical leg runs on the CALLER's payload cell through
+  CtxPinw.ledger_arm_pinw_ok inside the store leaf's obligation; this
+  fupd then: opens icacheN, takes the FREE arm (full unit at (g0,lo0)),
+  pinw_arm_alloc bumps to a fresh (g', loA) and splits
+  1 = 1/2(escrow) + q(tok) + c(residual), frzsel splits, the FULL stamp
+  auth (payload-held for free slots, with llb tstp) max-bumps and one
+  half enters the slot row, the minted rows (at loA, from the face)
+  rebound and install, M inserts (q,1).  Posts iref_tok_genlo + escrow
+  slice + pending + selector half + stamp half back (max tstp loA).
+- iref_close_last_store_pinw_au: the RETIRE.  Store-twin-shaped: yields
+  the window at (lo,tstp), the closing wand is ∀P (the ctx cells from
+  ledger_retire_pinw_ok thread through as P); the unit reassembles
+  (tok qt + escrow 1/2 + residual c at agreed (g,lo)) and parks in the
+  free arm AT THE SAME (g,lo); frzsel halves rejoin; the FULL stamp
+  auth (iCombine normalizes 1/2+1/2 to 1 -- no div_2 rewrite needed)
+  leaves for the payload; the ireg 1->0 freeze choreography is copied
+  verbatim from iref_close_last_store_au.
+REMAINING before the swap: the locked exact-read accessor, the
+freeze-path movers over pinw_slot (frz_slot_freeze/kill + the
+share-lookup family + regen), close_last_freeze twin, itable_res2
+extension + is_itable2 flip, icM_wf bound, THE SWAP, IcacheBoot,
+consumers.
