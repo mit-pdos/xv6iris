@@ -625,3 +625,33 @@ need [wordw_claim (KTR:=KT0) 4 (i_ref (ientry k))] -- pre-swap it was
 read off the ↦₄ cell; post-swap mint ONCE at boot into a persistent
 [iref_claims] big-sepL and carry it in [is_itable2] (extended to
 is_lock ∗ iref_claims); SpecIunlock gains it as a premise where needed.
+
+## Swap-wave progress: THE KEYSTONE IS IN (worktree)
+
+ProofIunlock GREEN under the full pinw racy-read composition:
+- WpAu4.wp_lw_au_rel_s_sconf (NEW): the lw glue over
+  wp_load_s_sconf_au_rel; GOTCHA: state the obligation premise's [ea]
+  at (rget (CID := CID) ...) -- inside the premise's ∀ CIDw the
+  instance resolution grabs CIDw otherwise; use `unshelve iApply` and
+  prove the obligation as the FIRST goal.
+- The consumer shape (ProofIunlock ~437): claim from
+  IcacheInv.iref_claims_at; Res := floor ∗ (∃ w tst, rows ∗ CLOSER)
+  -- the pinw AU's closing wand rides INSIDE Res (the leaf returns Res
+  verbatim, so the closer meets its own rows); the obligation
+  destructures Res, does tso_interp_of_pin/at_gs + ktier_pin_id, and
+  IcachePinwObl.iref_read_obl finishes.  The obligation goal has the
+  COQ context (pures like Hle) but NOT the outer IPM context --
+  persistent floors must ride Res.
+- The AU: iInv Hesc; ic_open_out_genlo (NEW -- (g,lo)-preserving
+  borrow off the lo-carrying descriptor); iref_load_pinw_au; pack.
+- The park return: inode_shr_genlo_bare_gen weakens before
+  bare_split.
+- SpecIunlock rows: (lo tl) binders, ⌜lo<=tl⌝/floor/iref_claims
+  premises, DepShr..g lo; SpecIlock/SpecIunlockput carry (lo/loy)
+  descriptor args (credential rows to be added when their racy reads
+  get rewired).  ic_dep carries lo (Xv6Cameras);
+  inode_{shr,ref}_genlo_bare + _gen weakenings (IcacheRef);
+  ic_dep_own/half/res + own_live/half_intro/res_live_genlo/
+  ic_open_out_genlo genlo-ized (IcacheEscrow).
+REMAINING RED: ProofIlock, ProofIget, ProofIput, ProofIdup,
+ProofIreclaim, ProofIunlockput, IcacheBoot, + linking follow-ons.
