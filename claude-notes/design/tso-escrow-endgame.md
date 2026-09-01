@@ -121,7 +121,9 @@ instance is declared by:
 
   - bundle  P := P_hdr ∗ P_rest  (CtxId → iProp, CtxMorph each):
         P_hdr = the cells the L1-side code reads or writes
-                (bcache: valid/dev/blockno; icache: valid);
+                (bcache: valid/dev/blockno; icache: valid AND nlink —
+                iput's guard `ip->valid && ip->nlink == 0` is read
+                under itable.lock before its acquiresleep);
         P_rest = everything else (bcache: data, disk, pay; icache: the
                 in-memory dinode fields).
   - residue Q : iProp   (ξ-FREE ghost — the chain's reference, the L2
@@ -142,7 +144,10 @@ Body:
      ∨ Q                                        (* OUT_L2: out under L2    *)
      ∨ hdr_out ∗ P_rest ξb )                    (* OUT_L1: header out, L1  *)
 
-  hdr_out := the L1 withdrawer's whole unit ◯ m_D when c = 1; emp at c = 0.
+  hdr_out := ∃ m', ⌜Σ m' = Σ m⌝ ∗ stamps ◯ m'
+             (the withdrawer's unit at c = 1; m' = ∅ at c = 0 — ONE
+             shape, no case split in the arm; any other holder's
+             fraction overflows Σ against it).
 
 NO IDLE ARM: refs-0 content stays in the box (owner ruling R-a, reversing
 A6.142's payload custody; the recycler is (a) + stores + (b)).  No
@@ -205,7 +210,8 @@ disjunct.
     one stamp.
   - `slot_p`, `slot_d : ghost_var nat` — half in the box, half in the
     L2 / L1 payload beside that payload's floor row `ctx_floor ξ Tp` /
-    `ctx_floor ξ Td`.
+    `ctx_floor ξ Td`.  The L1 row also carries `llb loglen_name Td`, so
+    a release that leaves Td unchanged can re-fold it (§3.4).
   - `cnt : ghost_var Qp` — half in the box (`Σ m`), half in L1's payload
     beside the refcount word.
 
@@ -224,9 +230,12 @@ where it is needed.
 ### 3.4 The floor rule (routes unchanged)
 
   - R1 at EVERY acquire by a reference holder: `Tl := max (dom m)`.
-  - R2 at every L1 release (ALL through `_in`): fold `max Td (paid)`;
-    at every L2 release (always `_in`): fold the park stamp.  Tp / Td
-    ARE what those payloads' floor rows say.
+  - R2 at every L1 release (ALL through `_in`): fold `max Td (paid)`
+    — the llb is the payload row's `llb Td` joined with the decrement's
+    `llb (max (dom m_D))` (llb_max); a release that leaves Td unchanged
+    ((c), the hit path) folds the row's own `llb Td`.  At every L2
+    release (always `_in`): fold the park stamp.  Tp / Td ARE what
+    those payloads' floor rows say.
 
 ### 3.5 The six lemmas (each re-establishes (C), (D), Σ m = c)
 
@@ -236,7 +245,8 @@ where it is needed.
       `max (dom m_D) ≤ Kt` (R1).  Cover: c = 0 ⇒ m = ∅ (Σ) ⇒ (D) gives
       T ≤ Td; c = Σ m_D ⇒ m = m_D (pointwise ≤ and equal sums) ⇒ (D)
       gives T ≤ Td ∨ T ∈ dom m_D.  OUT_L2 refuted: Q's fraction breaks
-      Σ.  P_hdr comes out at ξ; hdr_out := the unit (c = 1) / emp.
+      Σ.  P_hdr comes out at ξ; hdr_out := ◯ m' with Σ m' = Σ m (the
+      unit at c = 1, ∅ at c = 0).
       Sites: bget recycle (c = 0), iput's ref == 1 valid read (c = 1).
   (b) deposit_L1 (under L1; OUT_L1 → IN).  Deposit P_hdr at the new
       stamp T'; m := {[T' := 1]} (mint if c = 0, move if c = 1);
@@ -420,7 +430,9 @@ Iunlock/Iput + the Spec rows, with lock context), then the SPLIT:
   - mid arm    → the recycler is (a) + stores + (b) under itable.lock.
   - held arm   → iput's (a)/(b).
   - parked/out → IN / OUT_L2; Q := ic_tok ∗ share-ref ∗ the slot_p half.
-P_hdr := valid; P_rest := the in-memory dinode fields.  Extract
+P_hdr := valid ∗ nlink (both read by iput's guard under itable.lock);
+P_rest := the remaining in-memory dinode fields (type/major/minor/size/
+addrs — non-empty, so the park principle holds).  Extract
 `CtxBox.v` NOW (rule of two) and re-express the bcache over it.  The
 reference spelling gains `∃ m, ◯ m ∗ llb (max (dom m))` beside
 live_fracc — ONE sweep of the inode_ref/inode_shr destructures to the
@@ -682,3 +694,9 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   tripwires, §6 updated.  Reviewer's own error acknowledged: the
   A6.155/A6.157 vettings approved a park with no in-hand refutation and
   then a cell patch — the §0 pattern in miniature.
+- 2026-09-01 (post-adoption clarifications, proposer): icache P_hdr is
+  valid ∗ nlink (iput's guard reads both under itable.lock); L1's payload
+  row carries `llb Td` so an L1 release that leaves Td unchanged can
+  still fold through `_in`; hdr_out stated uniformly as
+  `∃ m', ⌜Σ m' = Σ m⌝ ∗ stamps ◯ m'` (no c = 0 / c = 1 case split in the
+  arm).  §2, §3.2, §3.4, §3.5 (a), §4.2 amended in place.
