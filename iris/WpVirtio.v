@@ -39,6 +39,10 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Import DevModel.
+(* A6.48 ruling 4: the DMA lease is a LEDGER lease now -- the device's write
+   set has to pay the era log's append, and the timestamp elements that pay it
+   ride inside the bytes the lease holds. *)
+Require Import TsoCtx.
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)
 (* and the nightly dead-import sweep skips [Require Export] lines.         *)
@@ -75,11 +79,17 @@ Section WpVirtio.
   (* ==================================================================== *)
 
   (* Ownership of a finite set of PHYSICAL bytes, as a map from address to
-     current contents.  [↦ₚ] is the right points-to: DMA is a physical-address
-     transaction, and it carries the [addr_is_ram] side condition, so a lease
-     can never name a device register. *)
+     current contents.  The tier is [TsoCtx.phys_ledger] -- the physical byte
+     WITH its latest-write timestamp element (A6.48 ruling 4).  A raw [↦ₚ]
+     was right while the device's write was invisible to the memory model;
+     post-flip the completion APPENDS to the era log, and the four ghost steps
+     that append owes ([Wobl_ram]) need exactly those elements.  [phys_ledger]
+     still carries [addr_is_ram] underneath, so a lease still cannot name a
+     device register.  It licenses no plain LOAD (no clean/dirty bit, A6.20),
+     which is correct: nothing reads a leased byte through the ledger -- the
+     driver reads it back through its own ctx tier after reclaim. *)
   Definition dma_own (dma : gmap Arch.pa (bv 8)) : iProp Σ :=
-    ([∗ map] a ↦ b ∈ dma, phys_pointsto a (DfracOwn 1) b)%I.
+    ([∗ map] a ↦ b ∈ dma, phys_ledger a (DfracOwn 1) b)%I.
 
   Global Instance phys_pointsto_timeless a dq b :
     Timeless (phys_pointsto a dq b).
@@ -95,88 +105,30 @@ Section WpVirtio.
     revert m. induction dma as [|a b dma' Hnew IH] using map_ind; iIntros (m) "Hm Hd".
     { iPureIntro. apply map_empty_subseteq. }
     rewrite /dma_own big_sepM_insert; [|exact Hnew].
-    iDestruct "Hd" as "[Hp Hd']".
+    iDestruct "Hd" as "[Hl Hd']".
+    iDestruct (phys_ledger_forget with "Hl") as "Hp".
     iEval (rewrite /phys_pointsto) in "Hp". iDestruct "Hp" as "[Hp _]".
     iDestruct (gen_heap_valid with "Hm Hp") as %Hma.
     iDestruct (IH m with "Hm Hd'") as %Hsub.
     iPureIntro. by apply insert_subseteq_l.
   Qed.
 
-  (* Overwrite the leased bytes the device just wrote.  The lease's DOMAIN is
-     unchanged (a write set inside the lease), so the same lease is handed
-     back with fresh contents.
-
-     THIS IS NOW AN ENGINE, not an interface: the device tier reaches memory
-     through the accessor [dma_acc] and the store gate [phys_map_store]
-     below, and only the gate calls this. *)
-  Lemma dma_update (w m dma : gmap Arch.pa (bv 8)) :
-    dom w ⊆ dom dma ->
-    gen_heap_interp m -∗ dma_own dma ==∗
-      gen_heap_interp (w ∪ m) ∗ dma_own (w ∪ dma).
-  Proof.
-    revert m dma.
-    induction w as [|a b w' Hnew IH] using map_ind; iIntros (m dma Hdom) "Hm Hd".
-    { rewrite !left_id_L. by iFrame. }
-    rewrite dom_insert_L in Hdom.
-    assert (Hdw : dom w' ⊆ dom dma) by set_solver.
-    assert (Ha : a ∈ dom dma) by set_solver.
-    iMod (IH m dma Hdw with "Hm Hd") as "[Hm Hd]".
-    assert (Ha' : a ∈ dom (w' ∪ dma)) by (rewrite dom_union_L; set_solver).
-    apply elem_of_dom in Ha' as [b0 Hb0].
-    rewrite /dma_own.
-    iDestruct (big_sepM_insert_acc _ _ a b0 Hb0 with "Hd") as "[Hp Hback]".
-    iEval (rewrite /phys_pointsto) in "Hp". iDestruct "Hp" as "[Hp %Hram]".
-    iMod (gen_heap_update _ a b0 b with "Hm Hp") as "[Hm Hp]".
-    iDestruct ("Hback" $! b with "[Hp]") as "Hd".
-    { rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact Hram. }
-    iModIntro. rewrite -!insert_union_l. iFrame "Hm Hd".
-  Qed.
-
-
-  (* THE STORE GATE, AT THE SHAPE THE DEVICE'S CALLER WANTS: the caller hands
-     in the write set's OLD bytes and takes the NEW ones back, and the heap
-     moves with them.  Stated over a bare big-op (not [dma_own]) because that
-     is what travels through [VirtioProto.virtio_proto_step]'s accessor -- the
-     lease itself is rebuilt by the wand, not by this lemma. *)
-  Lemma phys_map_store (w old m : gmap Arch.pa (bv 8)) :
-    dom old = dom w ->
-    gen_heap_interp m -∗
-    ([∗ map] a ↦ b ∈ old, phys_pointsto a (DfracOwn 1) b) ==∗
-      gen_heap_interp (w ∪ m) ∗
-      ([∗ map] a ↦ b ∈ w, phys_pointsto a (DfracOwn 1) b).
-  Proof.
-    intros Hdom. iIntros "Hm Hold".
-    iMod (dma_update w m old ltac:(rewrite Hdom; reflexivity)
-            with "Hm Hold") as "[Hm Hd]".
-    iModIntro. iFrame "Hm".
-    assert (Hwo : w ∪ old = w).
-    { apply map_eq. intros a. destruct (w !! a) as [b|] eqn:Hw.
-      - by rewrite (lookup_union_Some_l _ _ _ _ Hw).
-      - rewrite (lookup_union_r _ _ _ Hw).
-        apply not_elem_of_dom. rewrite Hdom.
-        by apply not_elem_of_dom. }
-    rewrite /dma_own Hwo. iFrame "Hd".
-  Qed.
-
-  (* THE LEASE IS AN ACCESSOR, NOT AN UPDATER.  The lease hands its
-     written-to bytes OUT, the CALLER performs the one store gate, and the
-     wand takes the new bytes back.  The domain is unchanged (a write set
-     inside the lease), so the same lease comes back with fresh contents.
-
-     WHY THE SPLIT, and it has nothing to do with which memory model is
-     underneath: a value-changing law may not split two authorities the
-     state interpretation ties together.  At SC the two are
-     [gen_heap_interp] and the leased bytes and [dma_update] may hold both;
-     under a weak-memory semantics the flat cell and its log element move
-     together, so the store belongs to the ONE caller that holds both --
-     [WpUart.wp_disk_loop].  Turning the lemma inside out is what lets that
-     caller do the write. *)
+  (* THE LEASE IS AN ACCESSOR NOW, NOT AN UPDATER (A6.48 ruling 4, the
+     inside-out).  [dma_update] used to do the [gen_heap] write itself; it
+     cannot any more, because a device write APPENDS to the era log and
+     [TsoCtx.ledger_store_ok] moves [gen_heap_interp] and [tso_interp_at]
+     TOGETHER -- the interpretation's own tie relates the flat cell and the
+     timestamp element, so the two authorities cannot be split across two
+     lemmas.  So the lease hands its written-to bytes OUT at the ledger tier,
+     the CALLER performs the one store gate, and the wand takes the new bytes
+     back.  The domain is unchanged (a write set inside the lease), so the
+     same lease comes back with fresh contents. *)
   Lemma dma_acc (w dma : gmap Arch.pa (bv 8)) :
     dom w ⊆ dom dma ->
     dma_own dma -∗
     ∃ old : gmap Arch.pa (bv 8), ⌜dom old = dom w⌝ ∗ ⌜old ⊆ dma⌝ ∗
-      ([∗ map] a ↦ b ∈ old, phys_pointsto a (DfracOwn 1) b) ∗
-      (([∗ map] a ↦ b ∈ w, phys_pointsto a (DfracOwn 1) b) -∗ dma_own (w ∪ dma)).
+      ([∗ map] a ↦ b ∈ old, phys_ledger a (DfracOwn 1) b) ∗
+      (([∗ map] a ↦ b ∈ w, phys_ledger a (DfracOwn 1) b) -∗ dma_own (w ∪ dma)).
   Proof.
     intros Hdom. iIntros "Hd".
     iExists (filter (fun p => p.1 ∈ dom w) dma).
@@ -291,8 +243,8 @@ Section WpVirtio.
     gen_heap_interp m -∗ virtio_lease v -∗
       gen_heap_interp m ∗
       ∃ old : gmap Arch.pa (bv 8), ⌜dom old = dom w⌝ ∗
-        ([∗ map] a ↦ b ∈ old, phys_pointsto a (DfracOwn 1) b) ∗
-        (([∗ map] a ↦ b ∈ w, phys_pointsto a (DfracOwn 1) b) -∗ virtio_lease v').
+        ([∗ map] a ↦ b ∈ old, phys_ledger a (DfracOwn 1) b) ∗
+        (([∗ map] a ↦ b ∈ w, phys_ledger a (DfracOwn 1) b) -∗ virtio_lease v').
   Proof.
     iIntros (Hview Hstep) "Hm Hl".
     iDestruct "Hl" as (ctl dma S ai) "(Hd & %Hctl & %Hok)".

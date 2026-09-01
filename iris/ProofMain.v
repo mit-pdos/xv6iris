@@ -1658,7 +1658,8 @@ Section ProofMain.
     all: try lkbelow.
     rewrite /vdi_post.
     iIntros (mvd pd pav pu) "Hcg Hcpu Hpc %Hcsvd %Hpvd %Hpva %Hpvu Hkenv".
-    iIntros "Hpub Hrdat Hstg #Hdcfg Hdescpg Havpg Hdd Hda Hdu Hdfree Hdlkw Hdlnm Hdcpu".
+    iIntros "Hpub Hrdat Hstg #Hdcfg Hdescpg Havpg Hdd Hda Hdu Hdfree Hdlkw Hdlnm Hdcpu Havh Hfloors Hringh".
+    iDestruct "Hfloors" as (t0 t1) "(Hfl & Hflr & #Hfl0 & #Hfl1)".
     assert (Hretvd : ret_pc (tp_pin F4 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x9e) : mword 64)).
     { rewrite (mn_tp_pin_ne F4 (mword_of_int 1 : mword 5) ltac:(reg_neq)).
@@ -1696,8 +1697,9 @@ Section ProofMain.
                 apply page_in_range_addr_is_kdata; [exact Hpva | exact Hj]|].
       iPureIntro; intros j Hj;
         apply page_in_range_addr_is_kdata; [exact Hpvu | exact Hj]. }
-    iPoseProof (disk_res_boot γv pd pav pu Hal
-                  with "Hpub Hrdat Hstg Hdescpg Hdfree Hdusedidx Hdslots Hdone Hclaim Hcmauth")
+    iPoseProof (disk_res_boot γv pd pav pu t0 t1 Hal
+                  with "Hpub Hrdat Hstg Hdescpg Hdfree Hdusedidx Hdslots Hdone Hclaim Hcmauth
+                        Havh Hfl Hflr Hfl0 Hfl1 Hringh")
       as "HRdisk".
     (* [newlock_at], NOT [newlock] (fs-cfg-boot.md stage (e), row (P3)): the
        lock's gname is the AMBIENT [fsc_dlock], minted by
@@ -1706,10 +1708,14 @@ Section ProofMain.
        γ chosen here could never be shown equal to the field.  The free
        token [Hdllk] is kit 1's row; everything else is what the old
        [newlock] took, in the same order. *)
+    (* A6.68: the honest creator deposit wants the running token; borrow it
+       out of the kernel bundle and put it back
+       ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock_at ⊤ fsc_dlock d_lock "virtio_disk"%string
             (disk_res_at γv pd pav pu)
-            with "Hdllk Hdlnm Hdlkw [Hdcpu] HRdisk") as "#Hdlock".
-    { iApply (lk_cpu_ready_intro with "Hdcpu"). }
+            with "Hdllk Hdlnm Hrun Hdlkw Hdcpu HRdisk") as "[Hrun #Hdlock]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
     (* ---- +0x9e jal userinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x9e)) (mword_of_int 1 : mword 5)

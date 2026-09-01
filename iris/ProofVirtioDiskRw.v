@@ -61,7 +61,7 @@ Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
 Require Import VirtioDiskRwDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* ↦₄ splits cross the seam *)
+Require Import ByteBuf.   (* A6.69: [ctx_word_pointsto_split4], the tower's own halving *)
 
 Module VirtioDiskRwPhases (Acquire : ACQUIRE) (Release : RELEASE)
                           (Sleep : SLEEP) (FreeDesc : FREEDESC).
@@ -1243,19 +1243,16 @@ Section ProofVirtioDiskRw.
        pa_stk sp0 11 ↦₄[KT1] v2 ∗ pa_add (pa_stk sp0 11) 4 ↦₄[KT1] vp).
   Proof.
     iIntros "H". iDestruct "H" as (w11 w12) "[H11 H12]".
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "H11") as "H11".
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "H12") as "H12".
-    iDestruct (word_pointsto_aligned_p with "H11") as %Hal11.
-    iDestruct (word_pointsto_aligned_p with "H12") as %Hal12.
+    (* A6.69: the conclusion's halves are [↦₄], the CONTEXT tower, so the
+       split stays inside it -- forgetting to the raw window here loses the
+       ledger residue and the return leg is the direction the flip makes
+       false ([ByteBuf.ctx_word_pointsto_split4] is the tower's own). *)
+    iDestruct (TsoCtx.ctx_word_pointsto_aligned_p with "H11") as %Hal11.
+    iDestruct (TsoCtx.ctx_word_pointsto_aligned_p with "H12") as %Hal12.
     iSplitR; [ iPureIntro; split; [exact Hal11 | exact Hal12] |].
-    iEval (rewrite word_pointsto_split4) in "H11".
-    iEval (rewrite word_pointsto_split4) in "H12".
+    iEval (rewrite ctx_word_pointsto_split4) in "H11".
+    iEval (rewrite ctx_word_pointsto_split4) in "H12".
     iDestruct "H11" as "[H11lo H11hi]". iDestruct "H12" as "[H12lo H12hi]".
-    (* M1 stage 2: the four halves face a flipped 4-byte statement *)
-    iDestruct (TsoCtxShim.ctx_word4_of_mem with "H11lo") as "H11lo".
-    iDestruct (TsoCtxShim.ctx_word4_of_mem with "H11hi") as "H11hi".
-    iDestruct (TsoCtxShim.ctx_word4_of_mem with "H12lo") as "H12lo".
-    iDestruct (TsoCtxShim.ctx_word4_of_mem with "H12hi") as "H12hi".
     iExists (word_lo w12), (word_hi w12), (word_lo w11), (word_hi w11).
     iFrame "H12lo H12hi H11lo H11hi".
   Qed.

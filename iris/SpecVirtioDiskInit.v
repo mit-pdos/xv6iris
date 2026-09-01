@@ -98,6 +98,8 @@ Require Import KvmSpec.
 Require Import VirtioModel.
 Require Import DiskPtsto.
 Require Import VirtioProto.
+Require Import VirtioQueue.   (* [ring_bytes] *)
+Require Import DiskAvail.
 Require Import WpUart.
 Require Import IntrDefs.
 Require Import RegFile HartTp.
@@ -181,7 +183,24 @@ Definition vdi_post
     (* the name field is written once and then DISCARDED: what comes back is
        the persistent [lock_name], ready to be sealed into [is_lock]. *)
     lock_name disk_lock "virtio_disk"%string -∗
-    c_cpu ↦₈ (zero_reg : mword 64) -∗
+    (* the cpu word at zero WITH its floor: what initlock hands back and
+       what [newlock_at] takes (A6.89) *)
+    WpLock.lk_cpu_ready disk_lock -∗
+    (* A6.124: the vdisk_lock payload's half of the avail-index word, with
+       its floors -- the boot creator's arm (DiskAvail.v) *)
+    avail_half pav 0%nat -∗
+    (* A6.126 §6: the reader's floors -- the two floor stamps of the used
+       index word with the init hart's floors at them (its own byte writes,
+       DiskAvail.used_split_init) and the reader floor at 0
+       (VirtioProto.virtio_proto_intro) -- what [DiskBoot.disk_res_boot]
+       seats in the vdisk_lock's payload.  The reclaimed count at 0 is
+       [disk_read_at γv 0] above. *)
+    (∃ t0 t1 : nat,
+       disk_fl γv t0 t1 ∗ disk_flr γv 0%nat ∗
+       lk_floor cur_ctx t0 ∗ lk_floor cur_ctx t1) -∗
+    (* A6.126 §6 on the pop model (decision 4): the holder's half ctx cells
+       of the eight ring cells; the lease holds the sealed halves *)
+    ring_hcells cur_ctx pav -∗
     WP (Loop : expr riscv_lang))%I.
 Global Typeclasses Opaque vdi_post.
 

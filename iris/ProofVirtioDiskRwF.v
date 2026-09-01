@@ -56,7 +56,7 @@ Require Import HartTp WpNext.
 Require Import CpuOwn SchedCtx FdSlots.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeHalf.
-Require Import VirtioQueue DiskPtsto VirtioProto DiskInv.
+Require Import VirtioQueue DiskPtsto VirtioProto DiskInv DiskAvail.
 Require Import VirtioModel.
 Require Import WpUart.
 Require Import PermInv.
@@ -355,63 +355,66 @@ Qed.
 
 Section VdrwfBridges.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{XI : CurCtx}.
 
-  Lemma vdrwf_w2b (a : Arch.pa) (w : bv 16) :
+  (* A6.125 step 5: the ctx-cell forms of the three bridges, and the region
+     split over full ctx cells -- the pin's cells come back as the lease's
+     sealed halves plus the publisher's half ctx cells (kept in the claim
+     row), join to full ctx cells and become words again *)
+  Definition cm_list (ξ : CtxId) (l : list _) : iProp Σ :=
+    ([∗ list] m ∈ l, ccell_map ξ m)%I.
+
+  Lemma cm_split (ξ : CtxId) (l : list _) :
+    pm_ok l -> ccell_map ξ (foldr union ∅ l) -∗ cm_list ξ l.
+  Proof.
+    induction l as [|m l IH]; intro Hok.
+    - iIntros "_". rewrite /cm_list. done.
+    - destruct Hok as [Hd Hokl].
+      iIntros "H". cbn [foldr].
+      rewrite /ccell_map (big_sepM_union _ m (foldr union ∅ l) Hd).
+      iDestruct "H" as "[Hm Hl]".
+      rewrite /cm_list. iSplitL "Hm"; [iExact "Hm"|].
+      iApply (IH Hokl with "Hl").
+  Qed.
+
+  Lemma vdrwf_c2b `{XI : CurCtx} (a : Arch.pa) (w : bv 16) :
     is_aligned_paddr (Physaddr a) 2 = true ->
     (forall j, (j < 2)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     (forall j, (j < 2)%nat ->
        (uint (pa_add a j : SailStdpp.Values.mword 64) < 274877906944)%Z) ->
-    kmap_static_claims -∗ phys_map (range_map a 2 (nth_byte w)) -∗ a ↦₂ w.
+    kmap_static_claims -∗ ccell_map cur_ctx (range_map a 2 (nth_byte w)) -∗ a ↦₂ w.
   Proof.
     iIntros (Hal Hs Hc) "#Hb H".
-    iEval (rewrite <- phys_word2_map) in "H".
-    iApply (phys_to_word2 a w Hal Hs Hc with "Hb H").
+    iDestruct (ctx_win_of_ccell a 2 (nth_byte w) ltac:(lia) Hs Hc with "Hb H") as "H".
+    rewrite /ctx_word2_pointsto. iSplitR; [iPureIntro; exact Hal|]. iExact "H".
   Qed.
 
-  Lemma vdrwf_w4b (a : Arch.pa) (w : bv 32) :
+  Lemma vdrwf_c4b `{XI : CurCtx} (a : Arch.pa) (w : bv 32) :
     is_aligned_paddr (Physaddr a) 4 = true ->
     (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     (forall j, (j < 4)%nat ->
        (uint (pa_add a j : SailStdpp.Values.mword 64) < 274877906944)%Z) ->
-    kmap_static_claims -∗ phys_map (range_map a 4 (nth_byte w)) -∗ a ↦₄ w.
+    kmap_static_claims -∗ ccell_map cur_ctx (range_map a 4 (nth_byte w)) -∗ a ↦₄ w.
   Proof.
     iIntros (Hal Hs Hc) "#Hb H".
-    iEval (rewrite <- phys_word4_map) in "H".
-    iApply (phys_to_word4 a w Hal Hs Hc with "Hb H").
+    iDestruct (ctx_win_of_ccell a 4 (nth_byte w) ltac:(lia) Hs Hc with "Hb H") as "H".
+    rewrite /ctx_word4_pointsto. iSplitR; [iPureIntro; exact Hal|]. iExact "H".
   Qed.
 
-  Lemma vdrwf_w8b (a : Arch.pa) (w : bv 64) :
+  Lemma vdrwf_c8b `{XI : CurCtx} (a : Arch.pa) (w : bv 64) :
     is_aligned_paddr (Physaddr a) 8 = true ->
     (forall j, (j < 8)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     (forall j, (j < 8)%nat ->
        (uint (pa_add a j : SailStdpp.Values.mword 64) < 274877906944)%Z) ->
-    kmap_static_claims -∗ phys_map (range_map a 8 (nth_byte w)) -∗ a ↦₈ w.
+    kmap_static_claims -∗ ccell_map cur_ctx (range_map a 8 (nth_byte w)) -∗ a ↦₈ w.
   Proof.
     iIntros (Hal Hs Hc) "#Hb H".
-    iEval (rewrite <- vdrwd_pw8_map) in "H".
-    iApply (phys_to_word8 a w Hal Hs Hc with "Hb H").
+    iDestruct (ctx_win_of_ccell a 8 (nth_byte w) ltac:(lia) Hs Hc with "Hb H") as "H".
+    rewrite /ctx_word_pointsto. iSplitR; [iPureIntro; exact Hal|]. iExact "H".
   Qed.
 
-  (* the buffer, back at the VA tier where [buf_own] wants it *)
-  Lemma vdrwf_plist_mem (a : Arch.pa) (bs : list (bv 8)) :
-    (forall j, (j < length bs)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
-    (forall j, (j < length bs)%nat ->
-       (uint (pa_add a j : SailStdpp.Values.mword 64) < 274877906944)%Z) ->
-    kmap_static_claims -∗ phys_list a bs -∗
-    ([∗ list] j ↦ x ∈ bs, pa_add a j ↦ₘ x).
-  Proof.
-    iIntros (Hs Hc) "#Hb H". rewrite /phys_list.
-    iApply (big_sepL_impl with "H").
-    iIntros "!>" (k x Hk) "Hx".
-    assert (Hlt : (k < length bs)%nat) by (apply lookup_lt_Some in Hk; lia).
-    iApply (phys_to_byte (pa_add a k) x (Hs k Hlt) (Hc k Hlt) with "Hb Hx").
-  Qed.
-
-  Lemma vdrwf_map_plist (a : Arch.pa) (bs : list (bv 8)) :
-    (Z.of_nat (length bs) < 18446744073709551616)%Z ->
-    phys_map (range_map a (length bs) (fun j => bs !!! j)) -∗ phys_list a bs.
-  Proof. intro Hn. rewrite (phys_list_map a bs Hn). iIntros "$". Qed.
+  (* [vdrwf_plist_mem]/[vdrwf_map_plist] DELETED (A6.126 §6.7): the raw
+     [phys_list] never re-enters the ctx tier; the IN buffer comes back
+     STAMPED and re-enters through the reader floor ([ctx_bytes_of_at_seq]). *)
 
 End VdrwfBridges.
 
@@ -763,7 +766,7 @@ Section VdrwfP6.
   (* that arm, which is interruptible whenever [eb = true].                 *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_vdrw_p6_seam `{GEN : GenId} `{CID : CpuId} (γk : gname)
-      (γs : list gname) (j : nat) (γd : disk_names)
+      (γs : list gname) (j : nat) (γu : uart_names) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (m : regfile) (wr sector : SailStdpp.Values.mword 64)
       (bno : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
@@ -786,6 +789,8 @@ Section VdrwfP6.
        returned chain carries is at exactly this [kq]. *)
     perm_inv gen_id (dn_perm γd) -∗
     perm_receipt kq.2 Q -∗
+    (* THE ROW DESIGN: the collect goes through the protocol *)
+    dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res_at γd pd pav pu) -∗
     vdrw_saved (KTR := KT1) sp0 m -∗
@@ -814,11 +819,11 @@ Section VdrwfP6.
                     bs_disk m kq lks.
   Proof.
     intros HK Hglen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m Hbelow.
-    iIntros "#Htext #Hpinv #Hqinv #Hrcpt #Hgeom #Hlk Hsaved Hbno Hcont".
+    iIntros "#Htext #Hpinv #Hqinv #Hrcpt #Hdinv #Hgeom #Hlk Hsaved Hbno Hcont".
     rewrite /P5.vdrw_p5_exit.
     iIntros (CIDx Hsx M q np nr cm fr h m2 t pin)
             "%Hrh %Hok %Hpinr %Hal Hcg Hown Htc Hclm Hpc Htok
-             Hbody Hfragh Hclaim Hinfob Hbdisk Hback Hfm Hft Hrm Hrt Hidx".
+             Hbody Hact Hinfob Hhcm Hbdisk Hu Hfm Hft Hrm Hrt Hidx".
     (* SPLIT AT THE INDEX, ONCE, RIGHT HERE: [Hpay] rides UNCHANGED through
        the whole free-chain/release stretch below exactly as it always did,
        and the complement [Hext] rides alongside it, untouched, until the
@@ -847,18 +852,37 @@ Section VdrwfP6.
               (uint (pa_add (b_data b) k : SailStdpp.Values.mword 64)
                < 274877906944)%Z)
       by (intros k Hk; apply vdrwf_kdata_canon, Hbufkd, Hk).
-    (* ================= STEP 1: retire the claim, open the chain ========= *)
-    rewrite /vdrw_body.
-    iDestruct "Hbody" as "(%Hcm & Hpub & #Hlb & Hrd & Hstg & Hcl & Huidx & Hfb)".
+    (* ================= STEP 1: collect the chain, retire the claim ====== *)
+    rewrite /vdrw_body_ex.
+    iDestruct "Hbody" as "(%Hcm & Hpub & #Hlb & Hrd & Hdfl & Hstg & Hcl & Hrows & Huidx & Hfb & Hring & Havh)".
+    iDestruct "Hdfl" as (t0 t1 F) "(Hfl & Hflr & #Hfl0 & #Hfl1 & #HflF)".
+    iDestruct "Hu" as (u) "[#Hordu %Hunr]".
+    (* THE COLLECT, through the protocol: the row's completion record below
+       the payload's watermark refutes "the chain is still out", the receipt
+       retires, and the chain's stamp sits under the reader floor *)
+    iApply fupd_wp.
+    iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
+    iInv "Hvinv" as ">Hdb" "Hdclose".
+    iDestruct "Hdb" as (vst) "(Hvf & Hproto & %Hvok)".
+    iMod (virtio_proto_collect_acc γd vst np q u nr F h
+            (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) pin q)
+            (vdrwd_slot_hd kq b h wr sector _ Hh8) eq_refl Hunr
+            with "Hproto Hpub Hrd Hflr Hordu Hact")
+      as "(Hproto & Hpub & Hrd & Hflr & Hfragh & Hclaim & Hcb)".
+    iMod ("Hdclose" with "[Hvf Hproto]") as "_".
+    { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
+    iModIntro.
+    iDestruct "Hcb" as (qc bs) "[%HqF Hback]".
+    iAssert (TsoCtx.ctx_floor cur_ctx qc) as "#Hflqc".
+    { iApply (TsoCtx.ctx_floor_le _ _ _ HqF with "HflF"). }
     (* the three descriptors are ours, so none is in the free pool *)
     iDestruct (vdrwf_fr_false γd pd fr h Hh8 with "Hfb Hfragh") as %Hfrh.
     iDestruct (vdrwf_fr_false γd pd fr m2 Hm8 with "Hfb Hfm") as %Hfrm.
     iDestruct (vdrwf_fr_false γd pd fr t Ht8 with "Hfb Hft") as %Hfrt.
     iMod (ghost_map_delete with "Hcl Hclaim") as "Hcl".
     (* ---- the chain, with the slot's projections named ---- *)
-    rewrite /chain_back.
-    iDestruct "Hback" as "(Hpinm & Hstat & Hperm & Hbs)".
-    iDestruct "Hbs" as (bs) "(%Hbslen & %Hbsdata & Hdbytes & Hbufp)".
+    rewrite /chain_back_at.
+    iDestruct "Hback" as "(Hpinm & Hperm & %Hbslen & %Hbsdata & Hdbytes & Hstat & Hbufp)".
     (* ======== COLLECT THE RECEIPT (PermInv.v) ========================= *)
     (* The returned chain carries the SPENT permit's token at our own [kq]
        (the claim pinned [vs_perm] of the slot WE published), so this is the
@@ -899,85 +923,88 @@ Section VdrwfP6.
     iEval (rewrite Hvsout) in "Hbufp".
     iEval (rewrite Hvsbuf) in "Hbufp".
     (* ---- the residual pin, split into its fifteen (+1) windows ---- *)
-    iEval (rewrite Hpineq) in "Hpinm".
-    iDestruct (pm_split _ Hpmok with "Hpinm") as "Hpl".
-    rewrite /pm_list /vdrwd_pinr_regions.
+    iEval (rewrite Hpineq) in "Hpinm". iEval (rewrite Hpineq) in "Hhcm".
+    (* A6.125 step 5: the lease's sealed halves and our half ctx cells make
+       the full ctx cells again, region by region *)
+    iDestruct (hcell_map_join with "Hhcm Hpinm") as "Hpinm".
+    iDestruct (cm_split _ _ Hpmok with "Hpinm") as "Hpl".
+    rewrite /cm_list /vdrwd_pinr_regions.
     iDestruct "Hpl" as "(Wd0 & Wl0 & Wf0 & Wn0 & Wd1 & Wl1 & Wf1 & Wn1 &
                          Wd2 & Wl2 & Wf2 & Wn2 & Wo0 & Wo1 & Wo2 & Wbuf & _)".
-    iDestruct (vdrwf_w8b (d_desc pd h) (d_ops h : SailStdpp.Values.mword 64)
+    iDestruct (vdrwf_c8b (d_desc pd h) (d_ops h : SailStdpp.Values.mword 64)
                  (vdrwf_desc_align pd h Hald Hh8)
                  (vdrwd_off_static pd _ (16 * h)%nat 8 eq_refl Bh1 Hspd)
                  (vdrwf_off_canon pd _ (16 * h)%nat 8 eq_refl Bh1 Hcpd)
                  with "Hkm Wd0") as "Wd0".
-    iDestruct (vdrwf_w4b (pa_add pd (16 * h + 8)) (Z_to_bv 32 16)
+    iDestruct (vdrwf_c4b (pa_add pd (16 * h + 8)) (Z_to_bv 32 16)
                  (vdrwf_dlen_align pd h Hald Hh8)
                  (vdrwd_off_static pd _ (16 * h + 8)%nat 4 eq_refl Bh2 Hspd)
                  (vdrwf_off_canon pd _ (16 * h + 8)%nat 4 eq_refl Bh2 Hcpd)
                  with "Hkm Wl0") as "Wl0".
-    iDestruct (vdrwf_w2b (pa_add pd (16 * h + 12)) (Z_to_bv 16 1)
+    iDestruct (vdrwf_c2b (pa_add pd (16 * h + 12)) (Z_to_bv 16 1)
                  (vdrwf_dflags_align pd h Hald Hh8)
                  (vdrwd_off_static pd _ (16 * h + 12)%nat 2 eq_refl Bh3 Hspd)
                  (vdrwf_off_canon pd _ (16 * h + 12)%nat 2 eq_refl Bh3 Hcpd)
                  with "Hkm Wf0") as "Wf0".
-    iDestruct (vdrwf_w2b (pa_add pd (16 * h + 14)) (Z_to_bv 16 (Z.of_nat m2))
+    iDestruct (vdrwf_c2b (pa_add pd (16 * h + 14)) (Z_to_bv 16 (Z.of_nat m2))
                  (vdrwf_dnext_align pd h Hald Hh8)
                  (vdrwd_off_static pd _ (16 * h + 14)%nat 2 eq_refl Bh4 Hspd)
                  (vdrwf_off_canon pd _ (16 * h + 14)%nat 2 eq_refl Bh4 Hcpd)
                  with "Hkm Wn0") as "Wn0".
-    iDestruct (vdrwf_w8b (d_desc pd m2) (b_data b : SailStdpp.Values.mword 64)
+    iDestruct (vdrwf_c8b (d_desc pd m2) (b_data b : SailStdpp.Values.mword 64)
                  (vdrwf_desc_align pd m2 Hald Hm8)
                  (vdrwd_off_static pd _ (16 * m2)%nat 8 eq_refl Bm1 Hspd)
                  (vdrwf_off_canon pd _ (16 * m2)%nat 8 eq_refl Bm1 Hcpd)
                  with "Hkm Wd1") as "Wd1".
-    iDestruct (vdrwf_w4b (pa_add pd (16 * m2 + 8)) (Z_to_bv 32 1024)
+    iDestruct (vdrwf_c4b (pa_add pd (16 * m2 + 8)) (Z_to_bv 32 1024)
                  (vdrwf_dlen_align pd m2 Hald Hm8)
                  (vdrwd_off_static pd _ (16 * m2 + 8)%nat 4 eq_refl Bm2 Hspd)
                  (vdrwf_off_canon pd _ (16 * m2 + 8)%nat 4 eq_refl Bm2 Hcpd)
                  with "Hkm Wl1") as "Wl1".
-    iDestruct (vdrwf_w2b (pa_add pd (16 * m2 + 12)) (vdrw_flags wr)
+    iDestruct (vdrwf_c2b (pa_add pd (16 * m2 + 12)) (vdrw_flags wr)
                  (vdrwf_dflags_align pd m2 Hald Hm8)
                  (vdrwd_off_static pd _ (16 * m2 + 12)%nat 2 eq_refl Bm3 Hspd)
                  (vdrwf_off_canon pd _ (16 * m2 + 12)%nat 2 eq_refl Bm3 Hcpd)
                  with "Hkm Wf1") as "Wf1".
-    iDestruct (vdrwf_w2b (pa_add pd (16 * m2 + 14)) (Z_to_bv 16 (Z.of_nat t))
+    iDestruct (vdrwf_c2b (pa_add pd (16 * m2 + 14)) (Z_to_bv 16 (Z.of_nat t))
                  (vdrwf_dnext_align pd m2 Hald Hm8)
                  (vdrwd_off_static pd _ (16 * m2 + 14)%nat 2 eq_refl Bm4 Hspd)
                  (vdrwf_off_canon pd _ (16 * m2 + 14)%nat 2 eq_refl Bm4 Hcpd)
                  with "Hkm Wn1") as "Wn1".
-    iDestruct (vdrwf_w8b (d_desc pd t) (d_info_status h : SailStdpp.Values.mword 64)
+    iDestruct (vdrwf_c8b (d_desc pd t) (d_info_status h : SailStdpp.Values.mword 64)
                  (vdrwf_desc_align pd t Hald Ht8)
                  (vdrwd_off_static pd _ (16 * t)%nat 8 eq_refl Bt1 Hspd)
                  (vdrwf_off_canon pd _ (16 * t)%nat 8 eq_refl Bt1 Hcpd)
                  with "Hkm Wd2") as "Wd2".
-    iDestruct (vdrwf_w4b (pa_add pd (16 * t + 8)) (Z_to_bv 32 1)
+    iDestruct (vdrwf_c4b (pa_add pd (16 * t + 8)) (Z_to_bv 32 1)
                  (vdrwf_dlen_align pd t Hald Ht8)
                  (vdrwd_off_static pd _ (16 * t + 8)%nat 4 eq_refl Bt2 Hspd)
                  (vdrwf_off_canon pd _ (16 * t + 8)%nat 4 eq_refl Bt2 Hcpd)
                  with "Hkm Wl2") as "Wl2".
-    iDestruct (vdrwf_w2b (pa_add pd (16 * t + 12)) (Z_to_bv 16 2)
+    iDestruct (vdrwf_c2b (pa_add pd (16 * t + 12)) (Z_to_bv 16 2)
                  (vdrwf_dflags_align pd t Hald Ht8)
                  (vdrwd_off_static pd _ (16 * t + 12)%nat 2 eq_refl Bt3 Hspd)
                  (vdrwf_off_canon pd _ (16 * t + 12)%nat 2 eq_refl Bt3 Hcpd)
                  with "Hkm Wf2") as "Wf2".
-    iDestruct (vdrwf_w2b (pa_add pd (16 * t + 14)) (Z_to_bv 16 0)
+    iDestruct (vdrwf_c2b (pa_add pd (16 * t + 14)) (Z_to_bv 16 0)
                  (vdrwf_dnext_align pd t Hald Ht8)
                  (vdrwd_off_static pd _ (16 * t + 14)%nat 2 eq_refl Bt4 Hspd)
                  (vdrwf_off_canon pd _ (16 * t + 14)%nat 2 eq_refl Bt4 Hcpd)
                  with "Hkm Wn2") as "Wn2".
-    iDestruct (vdrwf_w4b (d_ops h) (vdrw_ty wr) (vdrwf_ops_align h Hh8)
+    iDestruct (vdrwf_c4b (d_ops h) (vdrw_ty wr) (vdrwf_ops_align h Hh8)
                  (vdrwd_off_static disk_base _ (168 + 16 * h)%nat 4 eq_refl Bh5
                     vdrwd_disk_static)
                  (vdrwf_off_canon disk_base _ (168 + 16 * h)%nat 4 eq_refl Bh5
                     vdrwf_disk_canon)
                  with "Hkm Wo0") as "Wo0".
-    iDestruct (vdrwf_w4b (pa_add disk_base (168 + 16 * h + 4))
+    iDestruct (vdrwf_c4b (pa_add disk_base (168 + 16 * h + 4))
                  (SailStdpp.Values.mword_of_int (len := 32) 0) (vdrwf_opsr_align h Hh8)
                  (vdrwd_off_static disk_base _ (168 + 16 * h + 4)%nat 4 eq_refl Bh6
                     vdrwd_disk_static)
                  (vdrwf_off_canon disk_base _ (168 + 16 * h + 4)%nat 4 eq_refl Bh6
                     vdrwf_disk_canon)
                  with "Hkm Wo1") as "Wo1".
-    iDestruct (vdrwf_w8b (pa_add disk_base (168 + 16 * h + 8)) sector
+    iDestruct (vdrwf_c8b (pa_add disk_base (168 + 16 * h + 8)) sector
                  (vdrwf_opss_align h Hh8)
                  (vdrwd_off_static disk_base _ (168 + 16 * h + 8)%nat 8 eq_refl Bh7
                     vdrwd_disk_static)
@@ -992,8 +1019,10 @@ Section VdrwfP6.
     assert (Hcanst : (uint (d_info_status h : SailStdpp.Values.mword 64)
                       < 274877906944)%Z)
       by (unfold d_info_status; apply vdrwf_disk_canon; lia).
-    iDestruct (phys_to_byte (d_info_status h) byte_zero Hstatst Hcanst
-                 with "Hkm Hstat") as "Hstat".
+    (* the status byte, STAMPED at the completion: it re-enters through the
+       reader floor this holder carries *)
+    iDestruct (ctx_byte_of_at (d_info_status h) byte_zero qc Hstatst Hcanst
+                 with "Hkm Hflqc Hstat") as "Hstat".
     (* ================= +0x1d2 .. +0x1f0 ============================== *)
     iDestruct "Hidx" as "(Hx0 & Hx1 & Hx2 & Hxp)".
     assert (Hidxa : add_vec (M !!! Regidx Rs0)
@@ -1315,11 +1344,12 @@ Section VdrwfP6.
     (* ================= the lock resource, re-folded =================== *)
     set (fr' := fr_upd (fr_upd (fr_upd fr h true) m2 true) t true).
     iAssert (disk_res γd pd pav pu)
-      with "[Hpub Hrd Hstg Hcl Huidx Hfb]" as "HR".
+      with "[Hpub Hrd Hfl Hflr Hstg Hcl Hrows Huidx Hfb Hring Havh]" as "HR".
     { iApply (vdrw_body_close γd pd pav pu np nr (delete q cm) fr').
       rewrite /vdrw_body.
       iSplitR; [iPureIntro; exact (vdrwf_cm_del np q cm Hcm)|].
-      iFrame "Hpub Hlb Hrd Hstg Hcl Huidx Hfb". }
+      iFrame "Hpub Hlb Hrd Hstg Hcl Hrows Huidx Hfb Hring Havh".
+      iExists t0, t1, F. iFrame "Hfl Hflr Hfl0 Hfl1 HflF". }
     (* ================= +0x210 .. +0x218: release ====================== *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x210) : mword 64) Ra0
               (mword_of_int 30 : mword 20) G3 (trap_res eb + (K - 12))%nat false
@@ -1735,17 +1765,27 @@ Section VdrwfP6.
       - rewrite (Hsl_out eq_refl).
         iEval (rewrite (Hbufwin_out eq_refl)) in "Wbuf".
         iEval (rewrite -Hlenbuf) in "Wbuf".
-        iDestruct (vdrwf_map_plist (b_data b) bs_buf
-                     ltac:(rgall; rewrite Hlenbuf; exact vdrwf_1024_lt) with "Wbuf") as "Wbuf".
-        iApply (vdrwf_plist_mem (b_data b) bs_buf
-                  ltac:(rgall; rewrite Hlenbuf; exact Hsbuf)
-                  ltac:(rgall; rewrite Hlenbuf; exact Hcbuf) with "Hkm Wbuf").
+        iDestruct (ctx_win_of_ccell (b_data b) (length bs_buf) (fun j => bs_buf !!! j)
+                     ltac:(rgall; rewrite Hlenbuf; exact vdrwf_1024_lt)
+                     ltac:(rgall; rewrite Hlenbuf; exact Hsbuf)
+                     ltac:(rgall; rewrite Hlenbuf; exact Hcbuf) with "Hkm Wbuf") as "Wbuf".
+        iEval (rewrite -(vdrwd_ctx_bytes_of_fun (b_data b) (length bs_buf)
+                            (fun j => bs_buf !!! j) bs_buf (list_eq_total bs_buf))) in "Wbuf".
+        iExact "Wbuf".
       - assert (Hbsd : bs = bs_disk)
           by (rewrite Hbs; exact (Hsl_in eq_refl)).
+        (* A6.126 §6: the buffer's bytes come STAMPED at the completion's
+           position with the holder's floor past it; this context (which
+           has the buffer page's claims) re-registers them *)
+        assert (Hlbs : length bs = 1024%nat) by (rewrite Hbsd; exact Hlendisk).
+        iEval (rewrite Hslen -Hlbs) in "Hbufp".
         rewrite (Hsl_in eq_refl) -Hbsd.
-        iApply (vdrwf_plist_mem (b_data b) bs
-                  ltac:(rgall; rewrite Hbsd Hlendisk; exact Hsbuf)
-                  ltac:(rgall; rewrite Hbsd Hlendisk; exact Hcbuf) with "Hkm Hbufp"). }
+        iDestruct (ctx_bytes_of_at_seq (b_data b) (length bs) (fun j => bs !!! j) qc
+                     ltac:(rgall; rewrite Hlbs; exact Hsbuf)
+                     ltac:(rgall; rewrite Hlbs; exact Hcbuf) with "Hkm Hflqc Hbufp") as "Hbufp".
+        iEval (rewrite -(vdrwd_ctx_bytes_of_fun (b_data b) (length bs)
+                            (fun j => bs !!! j) bs (list_eq_total bs))) in "Hbufp".
+        iExact "Hbufp". }
     (* [Hown] stopped transporting for free the moment the epilogue's SIE
        index became the VARIABLE [eb] instead of the literal [true]: at
        [b = true], [cpu_own]'s payload sits entirely in [sie_arm true] and
@@ -1886,12 +1926,12 @@ Section ProofVirtioDiskRwF.
               (vdrwf_bnz _ (Hbufkd 0%nat ltac:(lia))) ltac:(lkbelow)
               with "Htext Hpinv Hdinv Hlk").
     (* ---- P6: the payoff, free_chain, release, epilogue ---- *)
-    iApply (wp_vdrw_p6_seam (CID := CIDa) γk γs j γd pd pav pu K eb
+    iApply (wp_vdrw_p6_seam (CID := CIDa) γk γs j γu γd pd pav pu K eb
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) m (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) bno bs_buf bs_disk Q kq lks
               HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl
               ltac:(lkbelow)
-              with "Htext Hpinv Hqinv Hrcpt Hgeom Hlk Hsaved Hbno").
+              with "Htext Hpinv Hqinv Hrcpt Hdinv Hgeom Hlk Hsaved Hbno").
     iIntros (CIDf Hsf mf) "%Hcsf Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ".
     iEval (rewrite Hsld) in "Hbufo".
     iEval (rewrite Hsld) in "Hdisko".

@@ -87,6 +87,7 @@ VirtioQueue.v
 DiskPtsto.v
 DiskAddrs.v
 VirtioProto.v
+DiskAvail.v
 RiscvExtras.v
 PowerBoot.v
 ColdBoot.v

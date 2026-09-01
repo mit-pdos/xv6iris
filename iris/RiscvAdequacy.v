@@ -697,7 +697,11 @@ Section power.
       { iPureIntro.
         (* the step is OBSERVED: a power loss is a trace event (§3b') *)
         exists [ObsPowerOff], PowerLoopE,
-          (GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv)), [].
+          (* the TSO bundle rides the power cycle unchanged: the image, the
+             log and the views are the DURABLE record of RAM across a power
+             cycle -- [RiscvLang]'s own arm spells it exactly this way. *)
+          (GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv)
+             g.(gimg) g.(glog) g.(gtv)), [].
         do 4 right. split_and!; [done|done|].
         left. split_and!; done. }
       iIntros (e2 g2 efs Hstep) "!>".

@@ -26,7 +26,9 @@ Require Import RegFile.
 Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import WpSconfMem.
-Require Import VirtioModel DiskPtsto DiskInv.
+Require Import WpLock.     (* [lk_floor] (A6.126 §6.6) *)
+Require Import VirtioModel DiskPtsto DiskInv DiskAvail.
+Require Import ByteBuf.  (* A6.61: the ctx tower's own 8<->4 halving *)
 Require Import SpecFreeDesc.
 Require Import SpecVirtioDiskRw.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -521,13 +523,54 @@ Section VdrwbDefs.
      disk_done_lb γ nr ∗
      (* the READ WATERMARK's half, at the same [nr] the cell below holds *)
      disk_read_at γ nr ∗
+     (* A6.126 §6: the reader's floors row (DiskInv.disk_res) *)
+     (∃ t0 t1 F : nat,
+        disk_fl γ t0 t1 ∗ disk_flr γ F ∗
+        lk_floor cur_ctx t0 ∗ lk_floor cur_ctx t1 ∗ TsoCtx.ctx_floor cur_ctx F) ∗
      (* nothing half-published while the lock is not held mid-publish *)
      disk_stage γ None ∗
      (* the CLAIM MAP's authority: the publisher inserts its row under the
         lock, the woken publisher deletes it under the lock *)
      ghost_map_auth (dn_claim γ) 1 cm ∗
+     (* the claim ROWS (DiskInv.claim_cells, the row design) *)
+     ([∗ map] p ↦ dc ∈ cm, claim_cells γ nr p dc) ∗
      d_used_idx ↦₂ wrap16 nr ∗
-     free_bundles γ pd fr)%I.
+     free_bundles γ pd fr ∗
+     (* decision 4: the holder's half ctx cells of the ring *)
+     ring_hcells cur_ctx pav ∗
+     (* A6.124: the holder's half of the avail-index word, LAST *)
+     avail_half pav np)%I.
+
+  (* THE ROW DESIGN: the seam between the poll and the collect -- the body
+     with the SLEEPER'S OWN ROW taken out (its pieces travel beside it: the
+     poll read [b->disk = 0] off the Right arm and must not forget which arm
+     it saw).  P6 collects, retires the claim and closes at [delete q cm]. *)
+  Definition vdrw_body_ex (γ : disk_names) (pd pav : mword 64)
+      (np nr : nat)
+      (cm : gmap nat dclaim) (fr : nat -> bool) (q : nat) : iProp Σ :=
+    (⌜forall p dc, cm !! p = Some dc ->
+        (p < np)%nat /\ dc_pos dc = p /\ slot_buf_link (dc_slot dc) (dc_buf dc)⌝ ∗
+     disk_pub γ np ∗
+     disk_done_lb γ nr ∗
+     (* the READ WATERMARK's half, at the same [nr] the cell below holds *)
+     disk_read_at γ nr ∗
+     (* A6.126 §6: the reader's floors row (DiskInv.disk_res) *)
+     (∃ t0 t1 F : nat,
+        disk_fl γ t0 t1 ∗ disk_flr γ F ∗
+        lk_floor cur_ctx t0 ∗ lk_floor cur_ctx t1 ∗ TsoCtx.ctx_floor cur_ctx F) ∗
+     (* nothing half-published while the lock is not held mid-publish *)
+     disk_stage γ None ∗
+     (* the CLAIM MAP's authority: the publisher inserts its row under the
+        lock, the woken publisher deletes it under the lock *)
+     ghost_map_auth (dn_claim γ) 1 cm ∗
+     (* the claim ROWS (DiskInv.claim_cells, the row design) *)
+     ([∗ map] p ↦ dc ∈ delete q cm, claim_cells γ nr p dc) ∗
+     d_used_idx ↦₂ wrap16 nr ∗
+     free_bundles γ pd fr ∗
+     (* decision 4: the holder's half ctx cells of the ring *)
+     ring_hcells cur_ctx pav ∗
+     (* A6.124: the holder's half of the avail-index word, LAST *)
+     avail_half pav np)%I.
 
   Lemma vdrw_body_close (γ : disk_names) (pd pav pu : mword 64)
       (np nr : nat)
@@ -557,20 +600,13 @@ Section VdrwbDefs.
   Proof.
     intros Hal11 Hal12. iIntros "(Hx0 & Hx1 & Hx2 & Hxp)".
     iDestruct "Hxp" as (vp) "Hxp".
-    (* M1 stage 2: [word_pointsto_join4] is InstrBytes' RAW law, so the four
-       flipped halves leave the ledger for the join and the doubleword comes
-       back through [ctx_word_of_mem] below. *)
-    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hx0") as "Hx0".
-    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hx1") as "Hx1".
-    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hx2") as "Hx2".
-    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hxp") as "Hxp".
-    iDestruct (word_pointsto_join4 (pa_stk sp0 12) (DfracOwn 1) v0 v1 Hal12
+    iDestruct (ctx_word_pointsto_join4 TsoCtx.cur_ctx (pa_stk sp0 12) (DfracOwn 1) v0 v1 Hal12
                  with "Hx0 Hx1") as "H12".
-    iDestruct (word_pointsto_join4 (pa_stk sp0 11) (DfracOwn 1) v2 vp Hal11
+    iDestruct (ctx_word_pointsto_join4 TsoCtx.cur_ctx (pa_stk sp0 11) (DfracOwn 1) v2 vp Hal11
                  with "Hx2 Hxp") as "H11".
     rewrite /vdrw_scratch. iExists (word_of_words v2 vp), (word_of_words v0 v1).
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "H11") as "H11".
-    iDestruct (TsoCtxShim.ctx_word_of_mem with "H12") as "H12".
+    (* A6.61: the join stays in tier ([ByteBuf.ctx_word_pointsto_join4]);
+       the two crossings were a round trip and the return leg is FALSE. *)
     iFrame "H11 H12".
   Qed.
 

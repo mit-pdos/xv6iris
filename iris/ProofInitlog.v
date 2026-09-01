@@ -106,6 +106,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Require Import TsoCtx.
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the creator's borrow *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
 
@@ -2736,10 +2737,14 @@ Section ProofInitlog.
        the caller already owns the free ghost state of -- the era fupd's
        [lock_ghost_alloc] minted it as [ln_lk γ], so this is a FILL, not a
        mint. *)
+    (* A6.68: the honest creator deposit (A6.66) wants the running token; this
+       proof holds the kernel bundle, so it borrows its own and puts it back
+       ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string
             <{ log_res γ bn γfs cov logstart }>
-            with "Hlkf Hlnm Hlock [Hcpu] Hres") as "#Hislk".
-    { iApply (lk_cpu_ready_intro with "Hcpu"). }
+            with "Hlkf Hlnm Hrun Hlock Hcpu Hres") as "[Hrun #Hislk]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* BLOCK 1'S PARK, ALLOCATED (durable-disk lane C-3a).  It is minted
        in the same ghost step as the lock's seal, which is the one place in
        this walk where the run is free and the bundle it belongs to is

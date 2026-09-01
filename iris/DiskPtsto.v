@@ -83,6 +83,16 @@ Record disk_names := DiskNames {
      [PermInv.perm_inv (dn_perm γ)], allocated per era beside [disk_inv], and
      its ELEMENTS ([PermInv.perm_tok]) ride the timeless request slots. *)
   dn_perm  : gname;
+  (* A6.126 §6 (the release arm's reader side, ported onto the pop-era
+     protocol): the used index's two floor stamps [ghost_var nat], the
+     READER floor [ghost_var nat] -- halves in VirtioProto's live arm and in
+     DiskInv.disk_res -- and the positions of the completions in the era
+     LOG, a ghost map whose fragments are persistent
+     ([VirtioProto.disk_done_pos]; typing rides [disk_ord_inG]). *)
+  dn_fl0   : gname;
+  dn_fl1   : gname;
+  dn_flr   : gname;
+  dn_pos   : gname;
 }.
 
 (* ---------------------------------------------------------------------- *)
@@ -256,7 +266,33 @@ Section DiskPtsto.
          disk_view dmap dk -> disk_view dmap' (disk_write dk o bs')⌝.
   Proof. exact (disk_img_bytes_update (dn_img γ) dmap o bs bs'). Qed.
 
+  (* ...and the GENERAL form, exposing the two pointwise clauses instead of
+     the [disk_view] transfer -- what the A6.126 §6 completion needs, since
+     its write set is stated per byte rather than per window. *)
+  Lemma disk_bytes_update_gen (γ : disk_names) (dmap : gmap Z (bv 8))
+      (o : Z) (bs bs' : list (bv 8)) :
+    length bs' = length bs ->
+    ghost_map_auth (dn_img γ) 1 dmap -∗ disk_bytes γ o bs ==∗
+    ∃ dmap' : gmap Z (bv 8),
+      ghost_map_auth (dn_img γ) 1 dmap' ∗ disk_bytes γ o bs' ∗
+      ⌜forall (j : nat) (b : bv 8), bs' !! j = Some b ->
+         dmap' !! (o + Z.of_nat j)%Z = Some b⌝ ∗
+      ⌜forall x : Z,
+         (forall j : nat, (j < length bs')%nat -> (x ≠ o + Z.of_nat j)%Z) ->
+         dmap' !! x = dmap !! x⌝.
+  Proof. exact (disk_img_bytes_update_gen (dn_img γ) dmap o bs bs'). Qed.
+
   (* -- minting: fragments for untouched offsets ------------------------- *)
 
+  Lemma disk_bytes_mint (γ : disk_names) (dmap : gmap Z (bv 8))
+      (dk : Z -> bv 8) (o : Z) (n : nat) :
+    disk_view dmap dk ->
+    (forall j : nat, (j < n)%nat -> dmap !! (o + Z.of_nat j) = None) ->
+    ghost_map_auth (dn_img γ) 1 dmap ==∗
+    ∃ dmap' : gmap Z (bv 8),
+      ghost_map_auth (dn_img γ) 1 dmap' ∗
+      disk_bytes γ o (disk_read dk o n) ∗
+      ⌜disk_view dmap' dk⌝.
+  Proof. exact (disk_img_bytes_mint (dn_img γ) dmap dk o n). Qed.
 
 End DiskPtsto.
