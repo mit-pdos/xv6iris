@@ -519,3 +519,25 @@ ctx_phys_pointsto_ledger per byte -> at-store -> pinw mint
 live_genlo_bump (fresh g', lo' := S len) in the AU.  Then close_last/
 alloc AU twins, the locked exact read, itable_res2 extension, swap,
 consumers.
+
+## r67 BANKED (snapshot 3c7eadaef5151c62e19232728fd1a570f54a1020): arm/retire machine faces
+
+CtxPinw gains the two conversion faces, closing the machine-tier
+accessor vocabulary:
+- ledger_arm_pinw_ok: ctx window cells drop to the ledger
+  (ctx_phys_pointsto_ledger), the member store lands at the generic
+  at-gate, and the window is MINTED (pinw_ok1_mint via log_byte_top on
+  the appended message) at lo := the store's own position -- the arm
+  point.  Returns rows bounded by length g'.glog.
+- ledger_retire_pinw_ok: pinw drop_run -> at-gate store (non-member ok)
+  -> the storer's own view is at the top (premise: length g'.glog <=
+  gtv' cpu), so hart_view_lb_get + TsoCtx.ctx_bound_raise mint the ctx
+  floor and ctx_phys_pointsto_of_at_floor converts each byte back to a
+  ctx cell.  own_context threads through.
+REMAINING 4b-iii: alloc/close_last AU twins over the faces (arm:
+live_genlo_bump fresh (g', lo'=S len) + M insert + stamp into the inv;
+retire: full-unit gather + M delete + cells/stamp back to the payload),
+the locked exact-read accessor (ledger_read_pinw_latest at the A6.144
+row), itable_res2 extension (free cells + stamp halves + llb + floor
+row), is_itable2 λ-flip, icM_wf n<=IREFSLOTS, THE SWAP, IcacheBoot, and
+the consumer wave.
