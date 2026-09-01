@@ -3504,6 +3504,25 @@ THE STAGES (prover lanes; budgets keyed to the landed analogues):
      before ask 5 would delete the only carrier that says anything about
      init's fd 0.
 
+     **STATUS AFTER THE Sep-1 FD WAVE (`bae68f25bc`): everything BELOW
+     the arm landed.**  The dispatcher's post now binds `sts'` with
+     `sysc_fd_ok` beside `sysc_mem_ok` (`SpecSyscall.v`,
+     `wp_syscall_sconf_body` takes the entry `sts`; the four movers
+     state their delta, the eighteen quiet rows discharge by
+     `usys_fd_ok_refl_at`), and usertrap carries the row up at NAMED
+     states — the ∃-weakening and the future-tense comment at
+     `ProofUsertrapSys.v` are both gone, the residue is rebuilt at the
+     call's own `stsR` with the row in hand.  The row now dies exactly
+     one file below the arm: `UexecRet.v` is the only edit left, and the
+     premise upstream would write is the fact usertrap already holds.
+     (The wave also RESHAPED the rows — dup/open now MATCH the returned
+     word via `usys_ret_is`, an equation, with an unconditional
+     `∨ sts' = sts` escape; close/argfd read arg0 as a C `int` via
+     `usys_argfd` — and upstream re-proved OUR `ufs_step_fd_agrees`
+     against the new shapes themselves, simpler than before: exhibiting
+     `fd` closes dup/open with no bitvector arithmetic.  The refinement
+     receipt survives without us touching it.)
+
 - [ ] **P5b — the widening** (not started).  fork's mirror
   retirement/downgrade (the solo flip) and the post-fork general row (av
   leg → existential observations + persistent certs).  The fd leg needs
