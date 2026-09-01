@@ -72,9 +72,20 @@ absorb/withdraw (T2→T1, pay a floor); pin mint/forget (T1↔T3).
 
 THE LAW for invariant and cinv bodies: only (a) ξ-free ghosts, (b) T2
 custody with ξb ∃-packed inside, (c) T3 pins.  Lock payloads are
-context-λs (CtxMorph).  Credentials appear in exactly one form:
-`cred_floor lo tl := ctx_floor cur_ctx tl ∨ ctx_wrote cur_ctx lo _`
-(A6.146), and floors are DELIVERED only by:
+context-λs (CtxMorph).  TWO floor-shaped objects, each with ONE job
+(clarified 2026-09-01, answering R1-pre note (iv)):
+  - `ctx_floor ξ K` — the RAW floor.  It is what R1/R2 below deliver at
+    the winner's context, and it is what T2 BOX WITHDRAWS consume
+    (`aguard_intro` → `anchor_withdraw`; CtxAnchor's guard is
+    deliberately on ctx_floor alone — a wrote-arm holder can cash only
+    ledger_vis and cannot borrow other harts' cells).  Acquire posts and
+    payload floor rows are stated as ctx_floor, NEVER weakened to
+    cred_floor.
+  - `cred_floor lo tl := ctx_floor cur_ctx tl ∨ ctx_wrote cur_ctx lo _`
+    (A6.146) — the HOLDER-side credential for T3 RACY READS only (the
+    author rides its own fresh store).  ctx_floor ⊢ cred_floor
+    (`cred_floor_of_ctx`); never the other way.
+Floors are DELIVERED only by:
 
   R1  the llb-tier acquire posts (SpecAcquire/SpecAcquiresleep,
       LANDED): present `llb Tl` before the acquire, receive
@@ -315,83 +326,81 @@ file.  Delete the `□(∀ n T, …)` premises.
 
 ### 4.1 bcache (finish Phase 5) — rounds R1–R2
 
-R1-pre (PREREQUISITE, measured 2026-09-01 by the build agent): THE
-  SLEEPLOCK PAYLOAD λ-FLIP.  Today the inner spinlock's payload is the
-  CONST [<{ sl_res_gen γ slk R H }>], and sl_res_gen embeds the lock
-  word and the pid field as ambient-XI cells ([slk ↦₄ v] inside
-  sl_free_hold/sleeplocked_q) — the is_ftable shape §1 forbids, and a
-  const payload has no floor slot, so R2's park-case delivery has no
-  carrier.  The flip: [sl_body γ slk Rb H tl ξ] with ξ-explicit cells
-  (ctx_word4_pointsto ξ for the word and the pid) and a BOUND-INDEXED
-  client payload [Rb : nat → iProp]; the lock's λ is
-  [sl_pay γ slk Rb H := λ ξ, ∃ tl, ctx_floor ξ tl ∗ sl_body … tl ξ]
-  (CtxMorph: floors morph, cells morph, Rb tl is ξ-free).  The old
-  [is_sleeplock γl γ slk s R] := the λ form at [Rb := λ _, R] — every
-  const consumer is textually unchanged; only the sleeplock's own
-  proofs strip the ∃tl at their payload opens.  Threading:
-    - SleepLock.v: sl_free_hold/sleeplocked_q gain _at ξ forms (the
-      ambient ones are the cur_ctx instances); sl_res_open/close kit
-      stated over sl_body at cur_ctx; sl_pay + its CtxMorph.
-    - SleepLockAt.v / new_sleeplock_gen(_at): build at tl := 0 with
-      ctx_floor_0; the CtxMorph side goal by ctx_morph_solve.
-    - Spec/ProofAcquiresleep: the gen + llb tiers become bound-indexed
-      (post row [∃ tl, ctx_floor cur_ctx tl ∗ Rb tl]); the inner
-      re-closes inside acquiresleep use tl := 0 (held arm, no Rb);
-      the const tiers derive by dropping the floor.  4 payload-open
-      sites (entry, post-sleep, nested entry, nb).
-    - Spec/ProofReleasesleep: premises [llb tl ∗ Rb tl]; the inner
-      release goes through [wp_release_in_sconf] with
-      [lock_pay_intro_llb] folding the caller's tl into the free arm —
-      THIS is R2 for the sleeplock; the const tier derives at tl := 0.
-    - ProofHoldingsleep (2 opens), UartTxInv (check its tx sleeplock).
-  bcache instantiates Rb tl := bown ∗ ∃ np Tp, reg_park (np,Tp) ∗
-  astamp np Tp ∗ llb Tp ∗ ⌜Tp ≤ tl⌝ — the checkout's rp-case cover.
+R1-pre (PREREQUISITE; measured 2026-09-01 by the build agent, design
+  settled by the owner the same day): THE SLEEPLOCK PAYLOAD λ-FLIP, AS A
+  THIN RELAY OF WpLock's PAYLOAD DISCIPLINE.
+
+  THE MEASUREMENT (verified in code): the inner spinlock's payload is
+  the CONST [<{ sl_res_gen γ slk R H }>], and sl_res_gen embeds the lock
+  word and the pid field as ambient-XI cells ([slk ↦₄ v],
+  [sl_pid slk ↦₄ pid] inside sl_free_hold/sleeplocked_q) — the
+  is_ftable class (A6.141 §1), reached from proc_priv through bio_ctx
+  and ic_sleeplocks.  A6.146's inventory swept inv bodies only and
+  missed const lock payloads (§4.4b closes that class).
+
+  THE DESIGN — nothing sleeplock-specific is invented.  §1's law says
+  lock payloads are context-λs; the sleeplock's inner spinlock IS a
+  WpLock is_lock, which already takes a context-λ payload and already
+  has the two release forms the asymmetry needs.  So:
+    - [is_sleeplock_gen γl γ slk s (R : CtxId → iProp) H :=
+         sl_name slk s ∗
+         is_lock γl (sl_lk slk) "sleep lock"
+           (λ ξ, sl_body γ slk H ξ (free-arm: R ξ))]
+      with sl_body's own cells at the EXPLICIT ξ (ctx_word4_pointsto ξ
+      for the word and the pid) and [CtxMorph R] the client's one
+      obligation (ctx_morph_solve for ghost + floor rows).  The held
+      arm carries no R, so there is nothing to invent for it.
+    - acquiresleep RELAYS the inner acquire's post verbatim: the winner
+      receives [R cur_ctx] through the standard payload morph.  The
+      landed llb tier (R1) is orthogonal and stays.
+    - releasesleep RELAYS BOTH WpLock release forms: PLAIN (premise
+      [R cur_ctx] — every ghost-only client can produce it) and _IN
+      (premises [llb tl ∗ Rdep cur_ctx] + the one-line entailment
+      [∀ ξ, Rdep ξ ∗ ctx_floor ξ tl ⊢ R ξ], the lock record minting the
+      floor via lock_finisher_close_in_llb / lock_pay_intro_llb).  The
+      _in Parameter lives in RELEASE_IN, so [ReleasesleepProof] gains a
+      functor argument [(ReleaseIn : RELEASE_IN)] and LinkReleasesleep.v
+      passes the existing [ReleaseIn := ReleaseInOfGen ReleaseGen]
+      (LinkRelease.v:12).  THIS is R2 for the sleeplock.
+    - Const consumers derive at [R := λ _, R0]: [is_sleeplock γl γ slk s
+      R0 := is_sleeplock_gen … (λ _, R0) sl_untracked]; every existing
+      consumer is textually unchanged; the plain tiers are the λ tiers
+      at that instance (the same way ACQUIRE derives from ACQUIRE_GEN).
+      Note: that instance's CtxMorph goal is ctx_morph_const and holds
+      even for a cell-bearing R0 — harmless for newlock, but the reason
+      the const tier fixes CtxMove ONLY for ξ-free R0 (both current
+      clients, bown and ic_tok, are ghost-only).
+  WHAT WAS REJECTED, AND WHY: a sleeplock-only bound-indexed payload
+  [Rb : nat → iProp] with a built-in floor slot ([λ ξ, ∃ tl,
+  ctx_floor ξ tl ∗ sl_body … tl ξ], new genb spec tiers, held-arm
+  re-closes at tl := 0).  It bought a trivial CtxMorph goal and no
+  release entailment (both one-liners) and forbade ξ-cells in sleeplock
+  payloads BY TYPE; in exchange it made the sleeplock's payload algebra
+  differ from the spinlock's and added a spec family — a third payload
+  spelling of exactly the kind this document forbids.  The "no cells in
+  sleeplock payloads" discipline is kept as a CHECKLIST rule (§5 rule
+  5's ctx_move_const test on every lock payload), not as a type: the
+  bundle travels through the BOX, never through the sleeplock payload.
+
+  bcache INSTANTIATES [R ξ := bown ∗ ∃ np Tp, reg_park (np,Tp) ∗
+  astamp np Tp ∗ llb Tp ∗ ctx_floor ξ Tp] — the checkout's rp-case
+  cover — and releases through _in with [Rdep := the same row minus the
+  floor] and [tl := Tp] (the park's anchor_deposit export).  The boot
+  row (rp = (0,0)) needs astamp 0 0: BioInitAt already mints the anchors
+  before its sleeplock loop.
+
+  THREADING (file list): SleepLock.v (sl_body at explicit ξ; _at forms
+  of sl_free_hold/sleeplocked_q, ambient = cur_ctx instances; the open/
+  close kit at cur_ctx; the payload λ + its CtxMorph), SleepLockAt.v /
+  new_sleeplock_gen(_at) (CtxMorph side goal by ctx_morph_solve),
+  Spec/ProofAcquiresleep (4 payload-open sites: entry, post-sleep,
+  nested entry, nb — each now holds R cur_ctx), Spec/ProofReleasesleep
+  (plain + _in tiers; the RELEASE_IN functor argument), LinkReleasesleep
+  (one line), ProofHoldingsleep (2 opens).  The winner's floor row is
+  [ctx_floor cur_ctx Tp] — the raw floor, NOT cred_floor (§1's
+  two-object rule; the box withdraw consumes the left arm).
   Gate: SleepLock cone green (the four sleeplock proofs + SleepLockAt +
-  IcacheBoot/BioInitAt builders).
-  VETTED 2026-09-01: the measurement is right (sl_res_gen's word and pid
-  cells sit at ambient XI under a const <{ }> — the is_ftable class,
-  reached from proc_priv through bio_ctx and ic_sleeplocks; A6.146's
-  inventory swept inv bodies only and missed const lock payloads).  The
-  nat-indexed Rb is SUFFICIENT because every sleeplock client in the
-  tree is ghost-only (measured: exactly two families — bcache's bown,
-  the inode's ic_tok) — and it is preferable to a general CtxId-λ here
-  (client CtxMorph trivial; it encodes the fact that the bundle travels
-  through the BOX, never through the sleeplock payload).  RULE, so Rb
-  does not grow into a third payload mechanism: sleeplock payloads are
-  ξ-FREE plus ONE floor slot; a client wanting ξ-cells in a sleeplock
-  payload is a box client, not a new payload flavor.  Corollary: the
-  const tier Rb := λ _, R is legal ONLY for ξ-free R (a cell-bearing R
-  would compile unchanged and still block CtxMove — the ambient XI
-  rides inside R).  Build-order note: the sleeplock's boot row needs
-  astamp 0 0, so BioInitAt allocates the anchors BEFORE the sleeplocks.
-  IMPLEMENTATION NOTES (build agent, 2026-09-01, for vetting):
-    (i)  Tier layout: the bound-indexed forms are the BASE tiers —
-         [wp_acquiresleep_genb_sconf_body] / [_genb_llb_sconf_body]
-         (post row [∃ tl, ctx_floor cur_ctx tl ∗ Rb tl]) and
-         [wp_releasesleep_genb_sconf_body] (premises [llb tl ∗ Rb tl]);
-         the existing gen/llb/plain tiers DERIVE at [Rb := λ _, R],
-         [tl := 0] (dropping the floor), exactly as ACQUIRE derives
-         from ACQUIRE_GEN.  The nested (S n) and nb tiers stay on the
-         derived const form (their proofs strip the ∃tl internally).
-         This is one spelling plus its instance, not a third spelling.
-    (ii) Held-arm re-closes (the three inside acquiresleep, the one in
-         holdingsleep) rebuild the λ at [tl := 0] with [ctx_floor_0]:
-         the floor slot is meaningful only for the FREE arm's [Rb tl];
-         a held arm carries no Rb, so no bound is lost.
-    (iii) The fold lives at releasesleep's INNER release, which must be
-         the [wp_release_in_sconf] form ([lock_finisher_close_in_llb]
-         / [lock_pay_intro_llb] with [Rdep := λ ξ, sl_body … tl' ξ]).
-         That Parameter is in RELEASE_IN, not RELEASE, so
-         [ReleasesleepProof] gains a functor argument
-         [(ReleaseIn : RELEASE_IN)] and LinkReleasesleep.v passes the
-         existing [ReleaseIn := ReleaseInOfGen ReleaseGen]
-         (LinkRelease.v:12).  One-line link ripple.
-    (iv) The winner's floor row is a plain [ctx_floor cur_ctx tl], the
-         same output shape as R1's llb-tier post — i.e. the LEFT arm
-         of [cred_floor]; I read §1's one-form rule as governing the
-         HOLDER-side credential bundle, not the raw R1/R2 outputs.
-         Flagging for the reviewer in case the post should be stated
-         as [cred_floor] instead.
+  IcacheBoot/BioInitAt builders); then a -B round (interface change).
 
 R1 (design retrofit, small):
   - Enrich bn_pres's cmra ((n_b,T_b) agree × positive); move ● into
@@ -591,3 +600,20 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   anchor-before-sleeplock build order already holds: BioInitAt mints
   the anchors in bio_names_ghost_alloc (the free-tok row), and
   BioInv.bio_init mints them before its sleeplock loop.
+- 2026-09-01 (design vetting of the R1-pre implementation notes): (i)–(iii)
+  accepted (RELEASE_IN wiring verified at SpecRelease.v:317 /
+  LinkRelease.v:12; the close_in_llb fold closes with tl' := tl).  (iv)
+  answered: the acquire post and payload rows stay ctx_floor — required
+  by the box withdraw (aguard on ctx_floor alone).  §1 reworded from
+  "one credential form" to the two-object rule (ctx_floor for T2
+  withdraws; cred_floor for T3 racy reads only).  §4.4b corroboration
+  accepted; the anchor-before-sleeplock order already holds.
+- 2026-09-01 (owner ruling on R1-pre): the bound-indexed Rb / genb tier
+  is REJECTED as a third payload spelling.  The sleeplock is a THIN RELAY
+  of WpLock's payload discipline: R : CtxId → iProp threaded through
+  is_sleeplock_gen, acquiresleep relays the inner post (R cur_ctx),
+  releasesleep relays BOTH WpLock release forms (plain / _in), const
+  consumers derive at λ _, R0.  Notes (i)/(ii) collapse to "λ base,
+  const derived" / "nothing to do for the held arm"; (iii) RELEASE_IN
+  functor argument stands; (iv) posts stay ctx_floor.  Sleeplock
+  payloads ξ-free-plus-floor remains a checklist rule, not a type.
