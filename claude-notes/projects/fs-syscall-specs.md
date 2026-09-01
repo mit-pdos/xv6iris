@@ -3978,3 +3978,13 @@ this week (twelve commits on Sep 1 alone), and our compiled-receipt play
 would land in files they are mid-edit on.  This entry IS the relay;
 the mirror's open row holds the fact if a refinement receipt is wanted
 later.  RECOMMEND upstream lands it as part of wiring REDIR.
+**STATUS: LANDED Sep 1 (`cfea78b72`), same-day, exactly the ruled
+shape and MORE** — open, dup AND pipe all promise the lowest free
+descriptor; `fd_lowest_closed` moved down into `FdSlots` with the
+relational `fd_least_closed` beside it (`fd_least_closed_intro` the
+join); the kernel earns it bottom-up (`SpecFdalloc.fd_frees_below`/
+`fd_frees_snd`, `ProcInv.proc_ofiles_states_agree`,
+`proc_priv_frags_least` at agreement-below-fd so one lemma serves
+open/dup at one insert and pipe at two); and the mirror's open/dup
+rows now discharge the upstream promise VERBATIM where they used to
+weaken through `fd_lowest_closed_is_closed`.  Ask closed.
