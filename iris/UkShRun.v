@@ -780,6 +780,64 @@ Section UkShRun.
     iApply ("Hcont" $! h3 ret with "Hrun").
   Qed.
 
+  (* the QUIET stub's twin at DUP.  sh does not track the descriptors it
+     duplicates (they are pipe ends it will close later), so this is the
+     UNTRACKED leaf: it moves the program's authority and hands back no
+     handle.  See [UkRunSys.wp_uk_ecall_dup_untracked]. *)
+  Local Lemma wp_kshr_dstub (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc0 pc1 pc2 : Z)
+      (imm : mword 6) (avail : nat) :
+    (sign_extend' 64 imm : mword 64) = mword_of_int USYS_dup ->
+    usysno (<[Regidx a7_idx := (mword_of_int USYS_dup : mword 64)]> m) = USYS_dup ->
+    add_vec_int (mword_of_int pc0 : mword 64) 2 = mword_of_int pc1 ->
+    add_vec_int (mword_of_int pc1 : mword 64) 4 = mword_of_int pc2 ->
+    is_aligned_vaddr (Virtaddr (mword_of_int pc2 : mword 64)) 2 = true ->
+    uinstr_is γt (mword_of_int pc0) true (C_LI (imm, Regidx a7_idx)) -∗
+    uinstr_is γt (mword_of_int pc1) false (ECALL tt) -∗
+    uinstr_is γt (mword_of_int pc2) true (C_JR (Regidx ra_idx)) -∗
+    urun γt γd γs γfd h m (mword_of_int pc0) avail -∗
+    (∀ (h' : CpuId) (ret : mword 64),
+       urun γt γd γs γfd h'
+         (<[Regidx a0_idx := ret]>
+            (<[Regidx a7_idx := (mword_of_int USYS_dup : mword 64)]> m))
+         (ret_pc (m !!! Regidx ra_idx)) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Himm Hno E01 E12 Hal2.
+    iIntros "#Ci0 #Ci1 #Ci2 Hrun Hcont".
+    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int pc0) imm a7_idx avail
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) with "Ci0 Hrun").
+    assert (Em : <[Regidx a7_idx
+                   := regval_into_reg (sign_extend' 64 imm : mword 64)]> m
+                 = <[Regidx a7_idx := (mword_of_int USYS_dup : mword 64)]> m)
+      by (f_equal; exact Himm).
+    rewrite E01 Em.
+    iIntros (h1) "Hrun".
+    set (m1 := <[Regidx a7_idx := (mword_of_int USYS_dup : mword 64)]> m).
+    iApply (wp_uk_ecall_dup_untracked γt γd γs γfd h1 m1 (mword_of_int pc1)
+              avail Hno ltac:(rewrite E12; exact Hal2)
+              with "Ci1 Hrun").
+    rewrite E12.
+    iIntros (h2 ret) "Hrun".
+    set (m2 := <[Regidx a0_idx := ret]> m1).
+    assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
+    { unfold m2, m1.
+      exact (eq_trans
+               (upd_ne m1 (Regidx a0_idx) (Regidx ra_idx) ret
+                  ltac:(vm_compute; discriminate))
+               (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
+                  (mword_of_int USYS_dup : mword 64)
+                  ltac:(vm_compute; discriminate))). }
+    iApply (wp_uk_cjr γt γd γs γfd h2 m2 (mword_of_int pc2) ra_idx
+              (ret_pc (m !!! Regidx ra_idx)) avail
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite Hra; reflexivity)
+              with "Ci2 Hrun").
+    iIntros (h3) "Hrun".
+    iApply ("Hcont" $! h3 ret with "Hrun").
+  Qed.
+
   (* ---- dup @0xcfe, SYS_dup = 10 -- the PIPE arm's fd plumbing ---------- *)
   Lemma wp_kshr_dup (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (avail : nat) :
     shk_code γt -∗
@@ -794,17 +852,13 @@ Section UkShRun.
   Proof.
     iIntros "#Hcode Hrun Hcont".
     rewrite shr_dup.
-    iApply (wp_kshr_qstub γt γd γs γfd h m 0xcfe 0xd00 0xd04
-              (mword_of_int 10 : mword 6) 10 avail
+    iApply (wp_kshr_dstub γt γd γs γfd h m 0xcfe 0xd00 0xd04
+              (mword_of_int 10 : mword 6) avail
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(unfold usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 10 : mword 64));
                     vm_compute; reflexivity)
-              ltac:(discriminate) ltac:(discriminate)
-              ltac:(discriminate) ltac:(discriminate)
-              ltac:(discriminate) ltac:(discriminate)
-              ltac:(discriminate) ltac:(discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)

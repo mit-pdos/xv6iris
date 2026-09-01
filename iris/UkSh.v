@@ -96,6 +96,10 @@ Definition sh_nbuf : nat := 100.
 Definition ush_set (f : nat -> bv 8) (j : nat) (b : bv 8) : nat -> bv 8 :=
   fun i => if Nat.eqb i j then b else f i.
 
+Require Import VcGen.
+Require Import RiscvExtras.
+Require Import FdSlots.   (* [fdstate] -- what a handle names *)
+Require Import ProcGeom.  (* [NOFILE] *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
@@ -417,6 +421,10 @@ Section UkSh.
     uinstr_is γt (mword_of_int pc2) true (C_JR (Regidx ra_idx)) -∗
     urun γt γd γs γfd h m (mword_of_int pc0) avail -∗
     (∀ (h' : CpuId) (ret : mword 64),
+       ((∃ (fd : nat) (rd wr : bool) (t : fdtype),
+           ⌜ret = (mword_of_int (Z.of_nat fd) : mword 64)
+            /\ (fd < NOFILE)%nat⌝ ∗ ufd γfd fd (FdOpen rd wr t))
+        ∨ ⌜ret = (mword_of_int (-1) : mword 64)⌝) -∗
        urun γt γd γs γfd h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int USYS_open : mword 64)]> m))
@@ -441,8 +449,8 @@ Section UkSh.
               Hno ltac:(rewrite E12; exact Hal2)
               with "Ci1 Hrun").
     rewrite E12.
-    (* the shell does not track its descriptors, so the handle is dropped *)
-    iIntros (h2 ret) "_ Hrun".
+    (* the handle is FORWARDED: sh's console loop closes what it opened *)
+    iIntros (h2 ret) "Hfdh Hrun".
     set (m2 := <[Regidx a0_idx := ret]> m1).
     (* ---- pc2  c.jr ra ---- *)
     assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
@@ -459,6 +467,75 @@ Section UkSh.
               ltac:(rewrite Hra; reflexivity)
               with "Ci2 Hrun").
     iIntros (h3) "Hrun".
+    iApply ("Hcont" $! h3 ret with "Hfdh Hrun").
+  Qed.
+
+  (* ...and the twin at CLOSE.  Same three instructions; the middle one is
+     the close leaf, which SPENDS the caller's handle for the descriptor a0
+     names.  sh's handles come from its own entry precondition (fds 0 and 1,
+     which init opened and dup'd before exec'ing it) and from [pipe]. *)
+  Local Lemma wp_ksh_cstub (h : CpuId) (m : regfile) (pc0 pc1 pc2 : Z)
+      (imm : mword 6) (fd : nat) (st : fdstate) (avail : nat) :
+    bv_signed (trunc32 (m !!! Regidx a0_idx)) = Z.of_nat fd ->
+    (sign_extend' 64 imm : mword 64) = mword_of_int USYS_close ->
+    usysno (<[Regidx a7_idx := (mword_of_int USYS_close : mword 64)]> m) = USYS_close ->
+        (* the three exclusions are NOT here: this stub IS the open one. *)
+    add_vec_int (mword_of_int pc0 : mword 64) 2 = mword_of_int pc1 ->
+    add_vec_int (mword_of_int pc1 : mword 64) 4 = mword_of_int pc2 ->
+    is_aligned_vaddr (Virtaddr (mword_of_int pc2 : mword 64)) 2 = true ->
+    uinstr_is γt (mword_of_int pc0) true (C_LI (imm, Regidx a7_idx)) -∗
+    uinstr_is γt (mword_of_int pc1) false (ECALL tt) -∗
+    uinstr_is γt (mword_of_int pc2) true (C_JR (Regidx ra_idx)) -∗
+    urun γt γd γs γfd h m (mword_of_int pc0) avail -∗
+    ufd γfd fd st -∗
+    (∀ (h' : CpuId) (ret : mword 64),
+       urun γt γd γs γfd h'
+         (<[Regidx a0_idx := ret]>
+            (<[Regidx a7_idx := (mword_of_int USYS_close : mword 64)]> m))
+         (ret_pc (m !!! Regidx ra_idx)) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Harg Himm Hno E01 E12 Hal2.
+    iIntros "#Ci0 #Ci1 #Ci2 Hrun Hfdh Hcont".
+    (* ---- pc0  c.li a7,USYS_close ---- *)
+    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int pc0) imm a7_idx avail
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) with "Ci0 Hrun").
+    assert (Em : <[Regidx a7_idx := regval_into_reg (sign_extend' 64 imm : mword 64)]> m
+                 = <[Regidx a7_idx := (mword_of_int USYS_close : mword 64)]> m)
+      by (f_equal; exact Himm).
+    rewrite E01 Em.
+    iIntros (h1) "Hrun".
+    set (m1 := <[Regidx a7_idx := (mword_of_int USYS_close : mword 64)]> m).
+    (* ---- pc1  ecall -- CLOSE, spending the handle ---- *)
+    iApply (wp_uk_ecall_close γt γd γs γfd h1 m1 (mword_of_int pc1) fd st avail
+              Hno
+              ltac:(unfold m1;
+                    rewrite (upd_ne m (Regidx a7_idx) (Regidx a0_idx)
+                               (mword_of_int USYS_close : mword 64)
+                               ltac:(vm_compute; discriminate));
+                    exact Harg)
+              ltac:(rewrite E12; exact Hal2)
+              with "Ci1 Hrun Hfdh").
+    rewrite E12.
+    iIntros (h2 ret) "Hrun".
+    set (m2 := <[Regidx a0_idx := ret]> m1).
+    (* ---- pc2  c.jr ra ---- *)
+    assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
+    { unfold m2, m1.
+      exact (eq_trans
+               (upd_ne m1 (Regidx a0_idx) (Regidx ra_idx) ret
+                  ltac:(vm_compute; discriminate))
+               (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
+                  (mword_of_int USYS_close : mword 64)
+                  ltac:(vm_compute; discriminate))). }
+    iApply (wp_uk_cjr γt γd γs γfd h2 m2 (mword_of_int pc2) ra_idx
+              (ret_pc (m !!! Regidx ra_idx)) avail
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite Hra; reflexivity)
+              with "Ci2 Hrun").
+    iIntros (h3) "Hrun".
     iApply ("Hcont" $! h3 ret with "Hrun").
   Qed.
 
@@ -467,6 +544,11 @@ Section UkSh.
     shk_code γt -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.open) avail -∗
     (∀ (h' : CpuId) (ret : mword 64),
+       (* the handle for what was opened -- sh's console loop closes it *)
+       ((∃ (fd : nat) (rd wr : bool) (t : fdtype),
+           ⌜ret = (mword_of_int (Z.of_nat fd) : mword 64)
+            /\ (fd < NOFILE)%nat⌝ ∗ ufd γfd fd (FdOpen rd wr t))
+        ∨ ⌜ret = (mword_of_int (-1) : mword 64)⌝) -∗
        urun γt γd γs γfd h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
@@ -492,9 +574,14 @@ Section UkSh.
   Qed.
 
   (* ---- close @0xcae, SYS_close = 21 ----------------------------------- *)
-  Lemma wp_ksh_close (h : CpuId) (m : regfile) (avail : nat) :
+  (* close SPENDS the handle for the descriptor a0 names.  sh's handles come
+     from its entry precondition (fds 0 and 1) and from [pipe]. *)
+  Lemma wp_ksh_close (h : CpuId) (m : regfile) (fd : nat) (st : fdstate)
+      (avail : nat) :
+    bv_signed (trunc32 (m !!! Regidx a0_idx)) = Z.of_nat fd ->
     shk_code γt -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.close) avail -∗
+    ufd γfd fd st -∗
     (∀ (h' : CpuId) (ret : mword 64),
        urun γt γd γs γfd h'
          (<[Regidx a0_idx := ret]>
@@ -503,22 +590,19 @@ Section UkSh.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    intros Harg. iIntros "#Hcode Hrun Hfdh Hcont".
     rewrite shp_close.
-    iApply (wp_ksh_qstub h m 0xcae 0xcb0 0xcb4
-              (mword_of_int 21 : mword 6) 21 avail
+    iApply (wp_ksh_cstub h m 0xcae 0xcb0 0xcb4
+              (mword_of_int 21 : mword 6) fd st avail
+              Harg
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(unfold usysno;
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 21 : mword 64));
                     vm_compute; reflexivity)
-              ltac:(discriminate) ltac:(discriminate)
-              ltac:(discriminate) ltac:(discriminate)
-              ltac:(discriminate) ltac:(discriminate)
-              ltac:(discriminate) ltac:(discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] [] [] Hrun Hcont").
+              with "[] [] [] Hrun Hfdh Hcont").
     { iApply (uis_shk_cae with "Hcode"). }
     { iApply (uis_shk_cb0 with "Hcode"). }
     { iApply (uis_shk_cb4 with "Hcode"). }
@@ -583,6 +667,8 @@ Section UkSh.
               ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate)
+              (* ...and the three descriptor-moving numbers *)
+              ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -4915,7 +5001,10 @@ Section UkSh.
     assert (HraC : mC !!! Regidx ra_idx = mword_of_int 0x908)
       by exact (upd_eq mB (Regidx ra_idx) (mword_of_int 0x908 : mword 64)).
     iApply (wp_ksh_open h3 mC n with "Hcode Hrun").
-    iIntros (h4 ret) "Hrun".
+    (* THE HANDLE FOR THE CONSOLE sh just opened.  Carried to the close at
+       0x910 -- sh's loop opens "console" and closes the descriptor when it
+       is already >= 3, which is the one place sh closes what it opened. *)
+    iIntros (h4 ret) "Hfdh Hrun".
     rewrite HraC.
     assert (Eret : ret_pc (mword_of_int 0x908 : mword 64) = mword_of_int 0x908)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -4974,7 +5063,31 @@ Section UkSh.
                  := regval_into_reg (mword_of_int 0x914 : mword 64)]> mD).
     assert (HraE : mE !!! Regidx ra_idx = mword_of_int 0x914)
       by exact (upd_eq mD (Regidx ra_idx) (mword_of_int 0x914 : mword 64)).
-    iApply (wp_ksh_close h7 mE n with "Hcode Hrun").
+    (* sh reaches this close only when open SUCCEEDED -- the [bltz] at 0x908
+       fell through -- so the handle's failure arm is refuted by [Ht1], and
+       a0 still holds what open returned ([ra] is the only register touched
+       since).  This is the one place sh closes a descriptor it opened
+       itself; the others close INHERITED ones, which is what the entry
+       precondition is for. *)
+    assert (Ha0D : mD !!! Regidx a0_idx = ret)
+      by exact (upd_eq _ (Regidx a0_idx) ret).
+    iDestruct "Hfdh" as
+      "[(%fd & %rd & %wr & %t & [%Hretfd %Hfdlt] & Hh) | %Hretm1]";
+      [ | exfalso; rewrite Ha0D Hretm1 in Ht1; vm_compute in Ht1;
+          discriminate Ht1 ].
+    assert (Ha0E : bv_signed (trunc32 (mE !!! Regidx a0_idx)) = Z.of_nat fd).
+    { rewrite /mE (upd_ne mD (Regidx ra_idx) (Regidx a0_idx) _
+                     ltac:(vm_compute; discriminate)) Ha0D Hretfd
+              trunc32_mword_of_int.
+      assert (Hbw : bv_wrap 32 (Z.of_nat fd) = Z.of_nat fd)
+        by (apply bvw32_small; unfold NOFILE in Hfdlt; lia).
+      unfold bv_signed. rewrite moi32_unsigned Hbw.
+      apply bv_swrap_small.
+      assert (Hh32 : bv_half_modulus 32 = 2147483648%Z)
+        by (vm_compute; reflexivity).
+      rewrite Hh32. unfold NOFILE in Hfdlt. lia. }
+    iApply (wp_ksh_close h7 mE fd (FdOpen rd wr t) n Ha0E
+              with "Hcode Hrun Hh").
     iIntros (h8 ret2) "Hrun".
     rewrite HraE.
     assert (Eret2 : ret_pc (mword_of_int 0x914 : mword 64) = mword_of_int 0x914)

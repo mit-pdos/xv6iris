@@ -1753,7 +1753,28 @@ LinkSysUnlinkAU.v
 # string, sh's panic prints a .rodata literal -- so the '%s' arm is proved
 # once for both instead of twice.  Audit = the standing three.
 # ---------------------------------------------------------------------
-# SH IS PARKED (2026-09-01), and this is the reason -- not a build glitch.
+# SH'S COMMAND-TREE RUNNER IS PARKED; SH'S SYSCALL LAYER IS NOT.
+#
+# [UkSh.v] BUILDS: its open/close/dup stubs carry descriptor handles now,
+# and sh's console loop is fully threaded -- it opens "console" and, on the
+# [fd >= 3] path, closes what it opened, spending the handle its own open
+# minted.  The failure arm is refuted by sh's own [bltz].
+#
+# [UkShRun.v] and the files above it are parked on ONE remaining thing, and
+# it is not plumbing: sh's PIPE path closes p[0] and p[1], so it needs
+# HANDLES for them, which only a pipe leaf could mint.  It cannot yet:
+# [UsysMemOk.usys_fd_ok]'s pipe row binds the two descriptors
+# EXISTENTIALLY and does not tie them to the two words pipe WRITES into the
+# caller's buffer -- which is how a program learns them.  That gap is
+# recorded in the row itself and predates this work.  Closing it (reading
+# pipe's image row and its fd row together) is what un-parks these files.
+#
+# sh's REDIR path is the part the ENTRY PRECONDITION is for: it closes the
+# INHERITED fds, which init opened and dup'd before exec'ing sh.  It also
+# needs a well-formedness fact the parser satisfies but the proof does not
+# yet state -- a redirect's fd is DATA in the AST, so "0 or 1" has to be
+# said, not assumed.
+# ---------------------------------------------------------------------
 #
 # [UkRun.urun] now carries the program's own descriptor-table authority
 # ([UserFd.ufd_auth]), and in that design a CLOSED SLOT IS ABSENT from the
@@ -1777,7 +1798,7 @@ LinkSysUnlinkAU.v
 # ---------------------------------------------------------------------
 # PARKED: UCodeShK.v
 UkRunBr.v
-# PARKED: UkSh.v
+UkSh.v
 # PARKED: UkShRun.v
 # PARKED: UkShDiag.v
 
