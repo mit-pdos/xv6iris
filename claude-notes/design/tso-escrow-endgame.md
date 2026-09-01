@@ -144,10 +144,30 @@ Body:
      ∨ Q                                        (* OUT_L2: out under L2    *)
      ∨ hdr_out ∗ P_rest ξb )                    (* OUT_L1: header out, L1  *)
 
-  hdr_out := ∃ m', ⌜Σ m' = Σ m⌝ ∗ stamps ◯ m'
-             (the withdrawer's unit at c = 1; m' = ∅ at c = 0 — ONE
-             shape, no case split in the arm; any other holder's
-             fraction overflows Σ against it).
+  hdr_out := slot_d ½ Td ∗ ∃ m', ⌜Σ m' = Σ m⌝ ∗ stamps ◯ m'
+             (F1, vetted: L1's slot_d half is the WINDOW TOKEN — (a)
+             consumes it from L1's payload, (b) returns it at Td := T';
+             the ◯ m' is the withdrawer's unit at c = 1, ∅ at c = 0 —
+             one shape, no case split in the arm).
+
+  THE REFUTATION TABLE (binding; the site map cites it per site):
+    (a) IN expected.   OUT_L2: Σ (c = 0) / whole unit in hand + Q's
+                       fraction (c = 1).   OUT_L1: slot_d (½+½+½ > 1).
+    (b) OUT_L1 exp.    IN: the P_hdr cells.  OUT_L2: THE COUNT AUTH —
+                       L1's payload ● M (count c) + the caller's own
+                       count fragment + Q's chain fragment overflow
+                       (c = 1), or M !! k = None vs Q's fragment (c = 0).
+                       NOT Σ: at c = 1 the unit sits in hdr_out, absent
+                       from the OUT_L2 arm.
+    (c),(d)            OUT_L1: slot_d (they hold L1's payload).  Not
+                       arm-agnostic: hdr_out's ⌜Σ m' = Σ m⌝ would break
+                       if m changed under it.  IN / OUT_L2: untouched.
+    (e) IN expected.   OUT_L2: the L2 token.   OUT_L1: Σ (my fraction vs
+                       c = 0, or vs the whole unit in hdr_out).
+    (f) OUT_L2 exp.    IN: the full valid cell.  OUT_L1: P_rest's cell
+                       (ctx_word4_excl_x).
+  RULE: every L1-side lemma refutes OUT_L1 by the slot_d half; (e) by Σ;
+  (f) by a P_rest cell.
 
 NO IDLE ARM: refs-0 content stays in the box (owner ruling R-a, reversing
 A6.142's payload custody; the recycler is (a) + stores + (b)).  No
@@ -172,7 +192,13 @@ the holder's hand, and the handle is frozen — that was the IDLE arm
 (A6.155 → A6.157), and it is why v2 has none.
 
 BUILD-AGENT FINDINGS ON v2 (2026-09-01, after A6.153–A6.157 landed and
-the R2 twins were half-written; TO VET — F1 changes hdr_out):
+the R2 twins were half-written).  VETTED 2026-09-01: F1 ACCEPTED (gap
+real; the slot_d window token is the fix) with two corrections folded
+into the refutation table above — (b)'s OUT_L2 refutation is the COUNT
+AUTH, not "the cnt half" (Σ cannot do it at c = 1 with the unit in
+hdr_out), and (c)/(d) are NOT arm-agnostic (they refute OUT_L1 by
+slot_d).  F2 ACCEPTED (+ one regrouping lemma).  F3 ACCEPTED with the
+Q-valued sum.  F4/F5 ACCEPTED.  R1' may start on this shape.
   F1  (a) has no refutation of OUT_L1.  hdr_out = ◯ m' with Σ m' = Σ m
       is the UNIT of the cmra at c = 0, and the withdrawer holds only
       cnt ½ 0 and L1's floor row: a second withdraw_L1 opened on
@@ -183,20 +209,24 @@ the R2 twins were half-written; TO VET — F1 changes hdr_out):
       half into hdr_out (the window token) and (b) returns it at
       Td := T' — hdr_out := slot_d ½ Td ∗ ∃ m', ⌜Σ m' = Σ m⌝ ∗ ◯ m'.
       A second (a) then presents a third half of slot_d (½+½+½ > 1,
-      ghost_var validity); (b)'s OUT_L2 refutation is unchanged (the
-      cnt half stays with the caller); (c)/(d) are arm-agnostic (they
-      touch only the prefix) and need no refutation.
+      ghost_var validity).  [Vetting correction: (b) refutes OUT_L2 by
+      the COUNT AUTH (see the table); (c)/(d) refute OUT_L1 by slot_d.]
   F2  bcache's P_hdr must include buf_pay: the recycler rewrites the
       block IDENTITY (dev/blockno) and performs the pool exchange, both
       under L1, and pay is indexed by that identity.  So P_hdr :=
       valid ∗ dev½ ∗ blockno½ (buf_own's) ∗ buf_pay v dev bno bs and
       P_rest := disk ∗ data.  (b) deposits at v = false, where buf_pay
       does not depend on bs (the data stays in the box) — the lemma's
-      bcache instance takes P_hdr at any bs0 and rewrites.
+      bcache instance takes P_hdr at any bs0 and rewrites.  [Vetting:
+      this splits buf_own across P_hdr/P_rest (blockno vs disk/data);
+      R1' adds ONE equivalence lemma buf_own ⊣⊢ hdr-part ∗ rest-part so
+      (e) re-forms bio_locked's buf_own.  A regrouping, not a spelling.]
   F3  `cnt : ghost_var Qp` cannot hold c = 0 (Qp has no zero).  Keep the
       count as nat (the slot's refcount word) and state Σ as the two-
       case row ⌜(c = 0 ∧ m = ∅) ∨ (0 < c ∧ Σ m = Qp.of_nat c)⌝ (or an
-      option share as in A6.155).  Purely an encoding note.
+      option share as in A6.155).  Purely an encoding note.  [Vetting:
+      prefer the Q-VALUED sum — Σ : gmap nat Qp → Q, cnt : ghost_var
+      nat, one row ⌜Σ m = c⌝; m = ∅ ↔ c = 0 falls out, no case split.]
   F4  The boot fold needs TWO twins: `newlock_delayed` (bio_init) and
       `newlock_at` (bio_init_at) both mint L1; each gets an `_llb` form
       over lock_pay_intro_llb (~10 lines each, WpLock / WpLockAt).
@@ -254,8 +284,8 @@ disjunct.
     L2 / L1 payload beside that payload's floor row `ctx_floor ξ Tp` /
     `ctx_floor ξ Td`.  The L1 row also carries `llb loglen_name Td`, so
     a release that leaves Td unchanged can re-fold it (§3.4).
-  - `cnt : ghost_var Qp` — half in the box (`Σ m`), half in L1's payload
-    beside the refcount word.
+  - `cnt : ghost_var nat` — half in the box, half in L1's payload beside
+    the refcount word; the row ⌜Σ m = c⌝ with Σ taken in Q (F3).
 
 ### 3.3 The reference: ONE spelling, ghost-only
 
@@ -287,20 +317,27 @@ where it is needed.
       `max (dom m_D) ≤ Kt` (R1).  Cover: c = 0 ⇒ m = ∅ (Σ) ⇒ (D) gives
       T ≤ Td; c = Σ m_D ⇒ m = m_D (pointwise ≤ and equal sums) ⇒ (D)
       gives T ≤ Td ∨ T ∈ dom m_D.  OUT_L2 refuted: Q's fraction breaks
-      Σ.  P_hdr comes out at ξ; hdr_out := ◯ m' with Σ m' = Σ m (the
-      unit at c = 1, ∅ at c = 0).
+      Σ (c = 0) / overflows against the unit in hand (c = 1); OUT_L1
+      refuted: the caller's slot_d half is a third half.  P_hdr comes
+      out at ξ; hdr_out := slot_d ½ Td ∗ ◯ m' (Σ m' = Σ m) — L1's
+      payload row loses its slot_d half for the window (it keeps
+      ctx_floor ξ Td ∗ llb Td).
       Sites: bget recycle (c = 0), iput's ref == 1 valid read (c = 1).
   (b) deposit_L1 (under L1; OUT_L1 → IN).  Deposit P_hdr at the new
       stamp T'; m := {[T' := 1]} (mint if c = 0, move if c = 1);
-      Td := T'; hand out `◯{[T' := 1]} ∗ llb T'`.  (C) left holds (m is
-      a singleton at T'); (D) via Td.  Sites: the recycle's re-park,
-      iput's re-deposit before its acquiresleep.
+      Td := T' (both slot_d halves are in the box: hdr_out's + the
+      prefix's); the payload gets its half back; hand out
+      `◯{[T' := 1]} ∗ llb T'`.  (C) left holds (m is a singleton at T');
+      (D) via Td.  IN refuted by the P_hdr cells; OUT_L2 refuted by the
+      COUNT AUTH (table).  Sites: the recycle's re-park, iput's
+      re-deposit before its acquiresleep.
   (c) ref_incr (under L1).  m ⊎= {[T := 1]}; cnt += 1; the new ref gets
-      the box's own `llb T`.  (C)/(D) untouched.
+      the box's own `llb T`.  (C)/(D) untouched.  OUT_L1 refuted by
+      slot_d (the caller holds L1's payload).
   (d) ref_decr (under L1).  Present `◯ m_D` (Σ = 1); m -= m_D;
       Td := max Td (max (dom m_D)); cnt -= 1.  (D) preserved (a removed
       witness is now ≤ Td); the release folds Td by R2.  refs 1 → 0 IS
-      (d) — the content stays in the box.
+      (d) — the content stays in the box.  OUT_L1 refuted by slot_d.
   (e) checkout (under L2; IN → OUT_L2).  Premises: my `◯ m_h` with
       `ctx_floor ξ Kt`, `max (dom m_h) ≤ Kt` (R1 at the acquiresleep);
       the payload's `slot_p ½ Tp` with `ctx_floor ξ Kp`, `Tp ≤ Kp` (R2);
@@ -752,3 +789,14 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   no new lemma).  F2–F4 are instance/encoding notes (buf_pay is
   L1-side, cnt as nat with a two-case Σ row, two newlock twins).
   R1' starts on F1's shape unless the vetting says otherwise.
+- 2026-09-01 (design vetting of A6.158 + the proposer's clarifications):
+  ALL ACCEPTED.  F1's slot_d window token adopted into hdr_out with two
+  corrections: (b) refutes OUT_L2 by the COUNT AUTH (● M in L1's payload
+  + the caller's own count fragment + Q's chain fragment), not by Σ —
+  at c = 1 the unit is inside hdr_out, absent from the OUT_L2 arm; and
+  (c)/(d) are not arm-agnostic — they refute OUT_L1 by slot_d because
+  hdr_out's ⌜Σ m' = Σ m⌝ would break under a changed m.  A binding
+  REFUTATION TABLE now sits in §2.  F2: one buf_own regrouping lemma.
+  F3: Q-valued sum, cnt : ghost_var nat, one row.  F4/F5 as written.
+  Checked: (D) through iput's window; the full iput path (a)(b)(e)…(f)(d)
+  and the later recycler's (a) at c = 0.  R1' may start.
