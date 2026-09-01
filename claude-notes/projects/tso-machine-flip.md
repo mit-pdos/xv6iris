@@ -18104,3 +18104,25 @@ releasesleep record floor (lock_pay_intro_llb through SleepLock).
 Decide at the ProofBread cutover where the interleaving is concrete;
 the BioBox transition lemmas take "a guard at the current generation"
 as a premise and stay agnostic.
+
+### A6.148 §2: LANDED -- the box ghost core is green (BioBox.v complete)
+
+buf_box_body = ∃ n T ξb, anchor ∗ astamp ∗ llb ∗ (bundle ξb ∨ chain_res
+∨ pres_none); chain_res is GHOST-ONLY (revision: the checkout's dev/bno
+fractions stay thread-local -- the C code carries them anyway), so the
+OUT arm needs no anchor traffic and the park needs NO freshness premise.
+The four transitions: box_swap_bump (auth-None + full-valid-cell
+refutations; deposit), box_swap_checkout (bown + pres-frag refutations;
+guarded withdraw + plain residue), box_swap_park (full-valid + pres-frag;
+plain residue out + deposit), box_swap_drop (count-overflow + auth-auth;
+guarded withdraw + pres_last_drop).  Guards only on the two bundle
+withdraws, minted by aguard_intro from the A6.149 floor pair; freshness
+premise is a □-wand (∀ n T, astamp -∗ ⌜T <= Kfl⌝) discharged per site.
+Idioms that cost iterations: positive is Cancelable not Exclusive
+(delete_option_local_update_cancelable); count-overflow via the
+bref_tok_lookup file idiom (singleton_included_l + leibniz + Some_included
+two-case); CpuId must be qualified RiscvLang.CpuId in new files.
+NEXT: presence defs sink into BioInv (bref gains the ◯ beside bref_tok
+-- BioBox imports BioInv, so the class/defs must move down);
+bio_slot_res v2 (refs-0 arm absorbs the content; ● Some at refs>=1);
+boot allocation; then the ProofBread/ProofBrelse cutover.
