@@ -949,7 +949,7 @@ Global Instance cur_proc_morph `{!riscvGS Σ} `{CID : CpuId} (p : mword 64) :
   CtxMorph (fun xi : CtxId => cur_proc (XI := xi) p).
 Proof.
   iIntros (ξ ξ') "Hd H". rewrite /cur_proc.
-  iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]". iFrame.
+  iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]". by iFrame.
 Qed.
 
 (* ===================================================================== *)

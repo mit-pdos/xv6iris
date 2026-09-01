@@ -1126,10 +1126,6 @@ Section store.
     iIntros (v0) "(-> & Hrw & Hro)". s_glue.
     change (8 * (0 + 1) * 4 - 1) with 31. change (8 * 0 * 4) with 0.
     rewrite subrange_full_32 autocast_id.
-    (* the obligation is CONSUMED here (this is the innermost lemma of the
-       eight), so the abbreviation is opened; every lemma above just
-       forwards [Hmem] unopened. *)
-    rewrite /wobl_prem /wobl_ram.
     iApply (swp_use_cer4 (write_ram Write_plain (Physaddr pa) 4 v tt)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem Hfrag] [-]").
     { iApply (swp_hart_ram_write 4 (mwrite_req pa v) _
@@ -1222,10 +1218,6 @@ Section store.
     iIntros (v0) "(-> & Hrw & Hro)". s_glue.
     change (8 * (0 + 1) * 8 - 1) with 63. change (8 * 0 * 8) with 0.
     rewrite RiscvExtras.subrange_full_64 autocast_id.
-    (* the obligation is CONSUMED here (this is the innermost lemma of the
-       eight), so the abbreviation is opened; every lemma above just
-       forwards [Hmem] unopened. *)
-    rewrite /wobl_prem /wobl_ram.
     iApply (swp_use_cer4 (write_ram Write_plain (Physaddr pa) 8 v tt)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem Hfrag] [-]").
     { iApply (swp_hart_ram_write 8 (mwrite_req8 pa v) _

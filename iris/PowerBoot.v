@@ -152,15 +152,22 @@ Qed.
 (* 3. The reset MACHINE, and the PowerOn witness.                          *)
 (* ---------------------------------------------------------------------- *)
 
+(* THE ERA WIPE (tso-machine-flip.md §2): a power-on opens a FRESH era, so the
+   write log is empty and every hart's view sits at its bottom.  With no
+   messages to apply, [flat] is the identity, so the flat cache [gmem] and the
+   era-initial image [gimg] are the SAME map -- [boot_mem] -- which is what
+   makes [mm_ok] hold at the boot state by [reflexivity] rather than by an
+   argument about the log. *)
 Definition boot_gstate (g : gstate) : gstate :=
   GState (fun c => boot_regs c) boot_mem
          (DevState uart0_state plic0_state (virtio_reset g.(gdev).(dvirtio)))
-         g.(ggen) true (fun _ => None).
+         g.(ggen) true (fun _ => None)
+         boot_mem [] (fun _ => 0%nat).
 
 Lemma boot_shape_boot_gstate (g : gstate) : boot_shape g (boot_gstate g).
 Proof.
   unfold boot_shape, boot_facts, boot_gstate.
-  cbn [ggen gpow gregs gmem gdev gresv duart dplic dvirtio].
+  cbn [ggen gpow gregs gmem gdev gresv gimg glog gtv duart dplic dvirtio].
   (* NO blanket [try reflexivity]: on the memory clauses it would try to
      unify a lookup in the 134M-entry [list_to_map] with [Some _] and
      compute the whole list.  One tactic per conjunct. *)
@@ -176,5 +183,11 @@ Proof.
   - reflexivity.
   - reflexivity.
   - exists g.(gdev).(dvirtio). reflexivity.
+  - intro c. reflexivity.
+  (* the three TSO clauses, all by construction: empty log, image = cache,
+     every view at 0.  No [reflexivity] here touches [boot_mem]'s TERM --
+     the [gimg = gmem] clause is syntactically the same map on both sides. *)
+  - reflexivity.
+  - reflexivity.
   - intro c. reflexivity.
 Qed.
