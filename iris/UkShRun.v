@@ -163,6 +163,8 @@ Definition ush_jarm (c : ushcmd) : Z :=
   | UList _ _ => 0x124 | UBack _ => 0x1c4
   end.
 
+Require Import FdSlots.   (* [fdstate] / [fdtype] -- pipe's two ends *)
+Require Import ProcGeom.  (* [NOFILE] -- pipe's two slots are slots *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
@@ -997,11 +999,15 @@ Section UkShRun.
     iIntros (h3) "Hrun". iApply ("Hcont" $! h3 with "Hrun").
   Qed.
 
-  (* ---- pipe @0xc96, SYS_pipe = 4 -- THE WINDOW ROW --------------------- *)
-  (* [pipe] writes TWO ints at the address a0 names.  The row caps it at 8   *)
-  (* bytes and says nothing else moved, so the caller hands the eight bytes  *)
-  (* over and gets them back with a prefix rewritten -- which is exactly     *)
-  (* what a two-element [int] array on the frame is.                         *)
+  (* ---- pipe @0xc96, SYS_pipe = 4 -- THE JOINED ROW -------------------- *)
+  (* [pipe] writes TWO ints at the address a0 names, and this stub is the
+     one place sh learns which descriptors it got: the return value is only
+     0 or -1.  So it is NOT the window leaf -- that one re-closes the run at
+     the descriptor view it opened at and is explicitly barred from pipe --
+     but [UkRunSys.wp_uk_ecall_pipe], which hands back the two HANDLES
+     beside the eight bytes and says the bytes spell the handles.  That tie
+     is what PIPE's six closes below are paid for with; see
+     [UsysMemOk.usys_pipe_ok]. *)
   Lemma wp_kshr_pipe (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (a : Z) (f : nat -> bv 8)
       (avail : nat) :
     uint (m !!! Regidx a0_idx) = a ->
@@ -1009,6 +1015,18 @@ Section UkShRun.
     ubytes γd a 8 f -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.pipe) avail -∗
     (∀ (h' : CpuId) (ret : mword 64) (g : nat -> bv 8),
+       ((∃ p0 p1 : nat,
+           ⌜ uint ret = 0 /\ p0 <> p1 /\ (p0 < NOFILE)%nat /\ (p1 < NOFILE)%nat
+             /\ (forall i : nat, (i < 8)%nat ->
+                   g i = if (i <? 4)%nat
+                         then nth_byte
+                                (trunc32 (mword_of_int (Z.of_nat p0) : mword 64)) i
+                         else nth_byte
+                                (trunc32 (mword_of_int (Z.of_nat p1) : mword 64))
+                                (i - 4)%nat) ⌝ ∗
+           ufd γfd p0 (FdOpen true false FdPipe) ∗
+           ufd γfd p1 (FdOpen false true FdPipe))
+        ∨ ⌜ uint ret <> 0 ⌝) -∗
        ubytes γd a 8 g -∗
        urun γt γd γs γfd h'
          (<[Regidx a0_idx := ret]>
@@ -1037,28 +1055,23 @@ Section UkShRun.
     assert (Ha0_1 : m1 !!! Regidx a0_idx = m !!! Regidx a0_idx)
       by exact (upd_ne m (Regidx a7_idx) (Regidx a0_idx) _
                   ltac:(vm_compute; discriminate)).
-    assert (Hwin : usyswin m1 USYS_pipe
-                   = Some (m !!! Regidx a0_idx, 8%nat)).
-    { unfold usyswin.
-      destruct (decide (USYS_pipe = USYS_wait)) as [Hc | _];
-        [ exfalso; unfold USYS_pipe, USYS_wait in Hc; lia | ].
-      destruct (decide (USYS_pipe = USYS_pipe)) as [_ | Hc];
-        [ | exfalso; exact (Hc eq_refl) ].
-      rewrite Ha0_1. reflexivity. }
-    iApply (wp_uk_ecall_window γt γd γs γfd h1 m1 (mword_of_int 0xc98) USYS_pipe
-              (m !!! Regidx a0_idx) 8%nat 8%nat f avail
+    (* the leaf owns the buffer at the register's own spelling, which is a0
+       of the frame the ecall traps at -- and [c.li a7] did not touch it *)
+    assert (Habuf : uint (m1 !!! Regidx (mword_of_int 10)) = a)
+      by (rewrite Ha0_1; exact Ha0).
+    iApply (wp_uk_ecall_pipe γt γd γs γfd h1 m1 (mword_of_int 0xc98) f avail
               ltac:(rewrite /m1 /usysno
                       (upd_eq m (Regidx a7_idx) (mword_of_int 4 : mword 64));
                     vm_compute; reflexivity)
-              Hwin ltac:(lia)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun [Hbuf]").
     { iApply (uis_shk_c98 with "Hcode"). }
-    { rewrite Ha0. iExact "Hbuf". }
+    { rewrite Habuf. iExact "Hbuf". }
     assert (E1 : add_vec_int (mword_of_int 0xc98 : mword 64) 4
                  = mword_of_int 0xc9c)
       by (apply bv_eq; vm_compute; reflexivity).
-    rewrite E1. iIntros (h2 ret d g) "_ _ Hrun Hbuf".
+    rewrite E1. iIntros (h2 ret g) "Hhs Hrun Hbuf".
+    rewrite Habuf.
     set (m2 := <[Regidx a0_idx := ret]> m1).
     assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
     { unfold m2, m1.
@@ -1075,7 +1088,7 @@ Section UkShRun.
               with "[] Hrun").
     { iApply (uis_shk_c9c with "Hcode"). }
     iIntros (h3) "Hrun".
-    iApply ("Hcont" $! h3 ret g with "[Hbuf] Hrun"). rewrite <- Ha0. iExact "Hbuf".
+    iApply ("Hcont" $! h3 ret g with "Hhs Hbuf Hrun").
   Qed.
 
   (* ---- fork @0xc7e, SYS_fork = 1 -- THE STUB THAT RETURNS TWICE -------- *)
@@ -3094,7 +3107,7 @@ Section UkShRun.
       assert (Hp1 : forall qq : mword 5, Regidx qq <> Regidx a0_idx ->
                       p1 !!! Regidx qq = m1 !!! Regidx qq)
         by (intros qq Hq; exact (upd_ne m1 (Regidx a0_idx) (Regidx qq) _ Hq)).
-      (* ---- 0x140  jal ra,0xc96 <pipe> -- THE WINDOW ROW ---- *)
+      (* ---- 0x140  jal ra,0xc96 <pipe> -- THE JOINED ROW ---- *)
       iApply (wp_kshr_jal γt γd γs γfd h2 p1 0x140 ShSyms.pipe 0x144
                 (mword_of_int 2902 : mword 21) av
                 ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -3116,7 +3129,7 @@ Section UkShRun.
             apply bv_eq; vm_compute; reflexivity).
       iApply (wp_kshr_pipe γt γd γs γfd h3 p2 (uint sp0 - 40) (nth_byte wp0) av
                 Ha0_p2 with "Hcode Hp Hrun").
-      rewrite Hra_p2. iIntros (h4 rp gp) "Hp Hrun".
+      rewrite Hra_p2. iIntros (h4 rp gp) "Hphs Hp Hrun".
       set (p3 := <[Regidx a0_idx := rp]>
                    (<[Regidx a7_idx := (mword_of_int 4 : mword 64)]> p2)).
       assert (Hcs_p3 : forall qq : mword 5, ucallee_saved_idx qq = true ->
