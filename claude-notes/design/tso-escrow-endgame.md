@@ -617,3 +617,13 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   const derived" / "nothing to do for the held arm"; (iii) RELEASE_IN
   functor argument stands; (iv) posts stay ctx_floor.  Sleeplock
   payloads ξ-free-plus-floor remains a checklist rule, not a type.
+- 2026-09-01 (build agent, R1-pre landing note): the λ base tier is named
+  `is_sleeplock_genl` / `wp_acquiresleep_genl_llb_sconf` /
+  `wp_releasesleep_genl_sconf` (plain) + `wp_releasesleep_genin_sconf`
+  (_in); `is_sleeplock_gen` and the gen/llb/plain spec names KEEP their
+  const `R : iProp` types, since icache/bcache consumers spell them that
+  way -- the const tier is the instance at `λ _, R0`, as the doc says,
+  just under the old names.  SleepLock's kit stays stated on
+  `sl_res_gen` through `sl_body_eq : sl_body … R H cur_ctx =
+  sl_res_gen … (R cur_ctx) H` (reflexivity), so no open/close lemma
+  changed.
