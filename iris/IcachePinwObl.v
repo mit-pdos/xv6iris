@@ -29,6 +29,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExec Ktier.
 Require Import TsoMemPa TsoGhost TsoCtx.
 Require Import HartTp.
+Require Import CtxPinw.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
@@ -86,6 +87,44 @@ Section IcachePinwObl.
       assert (HjN : (N.of_nat j < 4)%N) by lia.
       specialize (Hv j HjN). rewrite (Hbytes j Hj4) in Hv.
       injection Hv. auto.
+  Qed.
+
+  (* THE LOCK HOLDER's EXACT READ obligation: the A6.144 floor row covers
+     every stamp in the window, so the read is the LATEST value -- exactly
+     [iref_word M k] -- at every view the drain may choose. *)
+  Lemma iref_read_locked_obl `{CIDw : CpuId} (g : gstate)
+      (k : nat) (w : mword 32) (lo tst tl : nat) :
+    (tst <= tl)%nat ->
+    tso_interp_at riscv_eraGS g -∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
+    TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗
+    iref_pin_rows k w lo tst -∗
+    ⌜forall tvr : nat, (g.(gtv) cpu_id <= tvr)%nat ->
+       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tvr
+         (i_ref (ientry k)) 4 w⌝.
+  Proof.
+    iIntros (Htsttl) "Hint Hgh Hctx #Hfl Hrows".
+    iDestruct (TsoCtx.own_context_floor_view TsoCtx.cur_ctx tl with "Hctx Hfl")
+      as "[Hctx Hview]".
+    iDestruct "Hview" as (K) "[#HvK %HtlK]".
+    iDestruct (view_lb_le view_name loglen_name (hart_agent cpu_id) K tl HtlK
+                 with "HvK") as "#Hvtl".
+    iAssert ([∗ list] j ∈ seq 0 4, ∃ t : nat, ⌜(t <= tl)%nat⌝ ∗
+        TsoCtx.phys_ledger_pinw (pa_add (i_ref (ientry k)) j) (DfracOwn 1)
+          (nth_byte w j) t
+          (TsoMemPa.TsPinw (i_ref (ientry k)) 4 j lo iref_set))%I
+      with "[Hrows]" as "Hrows".
+    { iApply (big_sepL_mono with "Hrows"). iIntros (i j Hij) "H".
+      iDestruct "H" as (t) "[%Ht H]". iExists t. iFrame "H".
+      iPureIntro. lia. }
+    iDestruct (CtxPinw.ledger_read_pinw_latest g (i_ref (ientry k)) 4 tl
+                 (DfracOwn 1) (nth_byte w)
+                 (fun j => TsoMemPa.TsPinw (i_ref (ientry k)) 4 j lo iref_set)
+                 with "Hint Hgh Hvtl Hrows") as %Hrd.
+    iPureIntro. intros tvr Htvr j HjN.
+    assert (Hj4 : (j < 4)%nat) by lia.
+    exact (Hrd tvr Htvr j Hj4).
   Qed.
 
 End IcachePinwObl.
