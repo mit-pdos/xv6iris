@@ -319,7 +319,37 @@ plus the pile rows (r1)–(r3) above.
   hands bown, bchain (its fragment now in the pile under a fresh tag),
   the claim and the UPDATED park half + witnesses back — which is
   exactly releasesleep's Rdep row plus the refs-- inputs.  The holder
-  carries only bio_locked across bread→brelse, as today.  pres ●, the γc half, the pile, ● S and the
+  carries only bio_locked across bread→brelse, as today.
+  VETTED 2026-09-01 (approved; proceed with ProofBread sites 1–5):
+    - This is §2's rule applied literally (state into Q, never into a
+      handle or a new arm) and is continuity with v1, whose chain
+      reference already rode the escrow's OUT arm (BioInv.v:260).
+    - SIMPLIFY box_swap_park: during OUT both γp halves are inside the
+      box (prefix + Q), so the park's premises reduce to own_context ∗
+      buf_bundle — the bundle is the holder's only (and sufficient)
+      credential; drop the caller-supplied pres_frag rb' / reg_park rp'.
+      Symmetrically box_swap_checkout gains the R row (bown, the half,
+      the witnesses) as a premise and stops returning them.
+    - option share: optionUR fracR has None as unit, so (None,1) ⋅
+      (Some q,1) = (Some q,2); the count-1 equality case is the same
+      gmap/option arm the drop's OUT refutation already uses
+      (Some_included, then pos_included) — write the tok kit once
+      against that idiom.  Slot tie by match: None ⇒ qr = 1/2 (the
+      other half rides the bundle); Some q ⇒ q + qr = 1/2.
+    - Fragment accounting: during OUT one UNTAGGED fragment sits in Q
+      (the holder who has not parked yet).  Keep it a separate resource
+      from the pile: (r1) size S = o counts PILE fragments only; never
+      fold Q's fragment into the pile row.  Consistent with (r3): that
+      holder tags at its park with a generation above rb.1.  Neither
+      cover changes (both withdraw sites have the box IN, where Q does
+      not exist); o ≤ c stays free by validity.
+    - bref/bchain by ROLE is compatible with the two-spellings rule:
+      the difference is a capability (the fraction pins (dev,bno) for
+      the log layer; the chain reads them off the withdrawn cells), not
+      a compatibility flavor.  Exactly these two.
+    - Refutations unchanged: OUT at checkout = bown exclusivity (the
+      winner's from R vs Q's); OUT at drop = the count route (any second
+      tok, fractioned or None, overflows Some(_,1)).  pres ●, the γc half, the pile, ● S and the
   γp/γd halves sit in the body's COMMON PREFIX outside the three arms;
   IDLE adds only ● None (which forces o = 0 by validity).  The payload's
   None-arm keeps the γd/γc halves (the tie must hold in IDLE).  bunpin
@@ -674,3 +704,12 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   returned by the park.  The (dev,bno)-pinning fractions stay on bpin's
   brefs, which the log layer needs.  §2's Q line and §3.3's site notes
   amended in place.
+- 2026-09-01 (design vetting of A6.155): APPROVED — the OUT-residue
+  refinement is §2's rule applied and v1 continuity.  Feedback recorded
+  in the §3.3 site notes: simplify box_swap_park to own_context ∗
+  buf_bundle (both γp halves are in the box during OUT) and move the R
+  row into box_swap_checkout's premises; option-share idiom; keep Q's
+  untagged fragment out of the pile row; bref/bchain by role is a
+  capability difference, not a flavor.  Encoding notes (a)/(b) accepted.
+  ProofBread sites 1–5, ProofBrelse, ProofBunpin, the v1 deletion and
+  the -B round may proceed.
