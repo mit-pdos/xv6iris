@@ -30,10 +30,26 @@ execcmd and wp_kshp_peek_epi do and this body does not -- identical;
 clearbody on every set (sp0 spn spl m1 vals kk) -- identical; iClear of
 every spatial hypothesis and clear of every pure one -- identical.  And
 "seven spills vs execcmd's three" is not the discriminator: wp_kshp_peek_epi
-applies wp_kshp_restore to the SAME seven-entry list in milliseconds.  What
-is left is spill's frame premise carrying an EXISTENTIAL UNDER THE BIG-OP
-where restore's does not; the worklist's stage-4 section spells out the next
-probe.
+applies wp_kshp_restore to the SAME seven-entry list in milliseconds.
+
+NOR IS IT THE EXISTENTIAL UNDER THE BIG-OP, and nor is it the arity.  A
+STANDALONE rig -- wp_kshp_spill applied at k = 3..7 in a two-line context,
+with this body's own list, pcs, slot addresses and inline ltac: premises --
+measures 0.075 / 0.096 / 0.118 / 0.139 / 0.167 s: LINEAR, ~24 ms a spill.
+An exists-FREE variant of the lemma measures the same.  Adding shp_code to
+the rig's persistent context: 0.170 s.  Moving the rig to the END of
+UkShParse.v: 0.171 s.  So the SAME lemma at the SAME seven entries is a
+sixth of a second there and 17.5 GB here -- a factor of >1800.
+
+WHAT IS LEFT is that the rig writes Hrun, Hsl, m and spn OUT BY HAND where
+this body gets the same propositions from TACTICS, and only five tactics
+separate the two states: rewrite shpp_peek, iDestruct (urun_stack ...), the
+push (iApply (wp_uk_caddi16sp_dn ...) + rewrite (ushp_pc_step 0x448 2) +
+iIntros), iDestruct (ushp_frame_split ...), and the set/assert block.  The
+next round bisects FORWARD from the rig, one tactic at a time.  Named
+favourite: this body pushes with c.addi16sp where execcmd -- the fast
+3-spill site -- pushes with c.addi, and wp_kshp_peek_epi -- the fast
+7-entry restore -- has no push in front of it at all.
 
 TO RESUME: paste this back into iris/UkShParse.v immediately before the
 "§7 execcmd" section header -- that is where it was written and where its

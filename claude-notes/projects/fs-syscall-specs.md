@@ -2320,25 +2320,57 @@ things, and the answer differs:
       `clearbody`, and clearing the entire spatial AND pure context all
       leave the 17 GB untouched.
 
-      **WHERE THE NEXT LOOK SHOULD START.**  What is left, after all of
-      the above, is a two-fact table: `wp_kshp_spill` @7 explodes,
-      `wp_kshp_spill` @3 (execcmd) is milliseconds, `wp_kshp_restore` @7
-      (`_epi`) is milliseconds.  The ONE structural difference between the
-      two runs' consumed premises is that spill's frame premise carries an
-      EXISTENTIAL UNDER THE BIG-OP —
-      `[∗ list] i ↦ _ ∈ rs, ∃ w : mword 64, uword γd (ad i) w`, the shape
-      `ushp_frame_split` hands out — where restore's is the ∃-free
-      `[∗ list] i ↦ _ ∈ rs, uword γd (ad i) (vals i)`.  So the next probe
-      is (i) measure the growth: apply `wp_kshp_spill` at k = 3,4,5,6,7 in
-      a STANDALONE lemma with a two-line context and see whether the curve
-      is exponential in k — if it is, the cause is `iSpecialize`'s
-      treatment of that ∃ and nothing about peek; and (ii) if so, give
-      `wp_kshp_spill` restore's ∃-free premise (a `pre : nat -> mword 64`
-      parameter) and have the CALLER open the seven existentials once, with
-      a helper lemma beside `ushp_frame_split` that turns
-      `[∗ list] i ↦ _ ∈ rs, ∃ w, uword γd (ad i) w` into
-      `∃ pre, [∗ list] i ↦ _ ∈ rs, uword γd (ad i) (pre i)` — which is
-      provable by the same `ushp_sepL_seq` induction already in the file.
+      (f) **NOT the ∃-under-the-big-op, and NOT the length k.  THE CURVE
+      IS FLAT** (lane 1, same day, same discipline).  A STANDALONE RIG —
+      `wp_kshp_spill` applied at k = 3..7 in a two-line context, the list,
+      the pcs, the slot addresses and the `vals` written out exactly as
+      peek writes them, both `ltac:` premises inline exactly as peek passes
+      them, cut with `Admitted` right after the `iApply`, each application
+      wrapped in `Time (first [ timeout 120 (…) | idtac ])` — measures:
+
+      | k | `wp_kshp_spill` (∃ under the big-op) | `wp_kshp_spill_nx` (∃-free, restore's shape) |
+      | - | ------------------------------------ | -------------------------------------------- |
+      | 3 | 0.075 s | 0.077 s |
+      | 4 | 0.096 s | 0.098 s |
+      | 5 | 0.118 s | 0.115 s |
+      | 6 | 0.139 s | 0.137 s |
+      | 7 | **0.167 s** | **0.162 s** |
+
+      (whole-file: 10.6 s / 1.06 GB and 10.9 s / 1.07 GB.)  **LINEAR, at
+      ~24 ms per spill, and the two shapes are indistinguishable.**  So the
+      ∃ is innocent, the arity is innocent, and `wp_kshp_spill` at SEVEN is
+      a sixth of a second — against peek's identical `iApply` at 17.5 GB
+      and still climbing at 300 s.  That is a factor of >1800 on the SAME
+      lemma at the SAME k.  The `wp_kshp_spill_nx` variant (a `pre : nat ->
+      mword 64` parameter in place of the `∃ w`) was written and proved for
+      this measurement and, since it buys nothing, was NOT landed.
+      Two gap-closers were run on the same rig and are also negative:
+      adding `shp_code γt` to the persistent context — 0.170 s; moving the
+      rig from just after `wp_kshp_spill` to the very END of the file, so
+      every intervening definition and lemma is in scope — 0.171 s.
+
+      **WHERE THE NEXT LOOK SHOULD START — BISECT FORWARD FROM THE FAST
+      END.**  The gap is now narrow and it is not in the lemma, not in the
+      list, not in the premises, not in the context and not in the file:
+      the rig writes `Hrun`, `Hsl`, `m` and `spn` OUT BY HAND, and peek
+      gets the very same propositions from TACTICS.  A tactic-produced term
+      can carry redexes, casts or evar instantiations that a hand-written
+      one does not, and only five tactics separate the two states —
+      `rewrite shpp_peek`, `iDestruct (urun_stack …)`, the push
+      (`iApply (wp_uk_caddi16sp_dn …)` + `rewrite (ushp_pc_step 0x448 2)` +
+      `iIntros "Hstk" (h1) "Hrun"`), `iDestruct (ushp_frame_split …)`, and
+      the `set`/`assert` block.  So: start from the rig (0.167 s) and add
+      peek's prologue back ONE TACTIC AT A TIME until it becomes 300 s.
+      That is at most five ~10 s compiles and it lands on the exact tactic
+      that poisons the term; `Set Printing All` on the run's pc and on
+      `Hsl` at that point then names the redex.
+      **AND THERE IS A NAMED FAVOURITE.**  peek pushes its frame with
+      `c.addi16sp` (`wp_uk_caddi16sp_dn`); execcmd — the fast 3-spill site
+      — pushes with `c.addi` (`wp_uk_caddi_sp_dn`), because gcc picks by
+      size and picks inconsistently (§4b's own header says so); and
+      `wp_kshp_peek_epi` — the fast 7-entry restore — takes its regfile as
+      a PARAMETER and has no push in front of it at all.  Every fast site
+      is a site with no `caddi16sp` push before it.  Test that one first.
 
     * **WHAT IS STILL OWED, HONESTLY SIZED.**  Of the 564 catalogued
       instructions, strchr (17), strlen (18) and execcmd (19) are walked
