@@ -131,7 +131,8 @@ and its body is, FOREVER, three arms:
      pres_core rb ∗ regs rb rp ∗ ⌜tie n T rb rp⌝ ∗
      ( P ξb              (* IN:   bundle parked at ξb            *)
      ∨ Q                 (* OUT:  checked out; ghost residue      *)
-     ∨ pres_none )       (* IDLE: refs 0; content in L1's payload *)
+     ∨ pres_none ∗ H ξb ) (* IDLE: refs 0; content in L1's payload;
+                             H = the park's IDLE credential (below)  *)
 
 Transitions (the four from BioBox, keep the names):
   bump      IDLE→IN   deposit under L1 (refs 0→1)
@@ -320,6 +321,26 @@ plus the pile rows (r1)–(r3) above.
   the claim and the UPDATED park half + witnesses back — which is
   exactly releasesleep's Rdep row plus the refs-- inputs.  The holder
   carries only bio_locked across bread→brelse, as today.
+  THE PARK's IDLE CREDENTIAL (2026-09-01, build agent, on the vetted
+  simplification): with the fragment in Q the parker holds NOTHING ghost
+  that refutes the IDLE arm (pres_frag_none_absurd did that job; the
+  bundle only refutes IN, by b_valid exclusivity), and the box cannot
+  see L1's None arm.  The parker's only credential is the bundle's
+  CELLS, so IDLE holds a cell fraction that clashes with them:
+    H ξb := ∃ dsk, b_disk (bpa k) ↦ξb{1/2} dsk
+  — b_disk is written only by rw, under the sleeplock, by a holder who
+  has the FULL bundle; the recycler never touches it.  L1's None arm
+  keeps the content with b_disk at HALF (spelling buf_bundle_h: the
+  bundle with the disk cell halved); the bump deposits buf_bundle_h and
+  JOINS the halves at ξb into the IN arm's full bundle; checkout/park
+  move the full bundle; the last drop withdraws the full bundle, halves
+  b_disk, DEPOSITS the half back (a free deposit; IDLE's generation
+  advances) and returns buf_bundle_h to L1's None arm.  The park's
+  IDLE refutation is ctx_word4_excl_x (full at ξ vs half at ξb).  Boot
+  makes ONE deposit per buffer (the b_disk half, generation 0 → 1)
+  because the anchor's context is a fresh parked context; rp = rd =
+  (0,0) and S = ∅ are unchanged.  bio_locked is untouched (buf_own's
+  b_disk row is already in the handle).
   VETTED 2026-09-01 (approved; proceed with ProofBread sites 1–5):
     - This is §2's rule applied literally (state into Q, never into a
       handle or a new arm) and is continuity with v1, whose chain
@@ -713,3 +734,11 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   capability difference, not a flavor.  Encoding notes (a)/(b) accepted.
   ProofBread sites 1–5, ProofBrelse, ProofBunpin, the v1 deletion and
   the -B round may proceed.
+- 2026-09-01 (build agent, on the vetted park simplification): the park
+  needs an IDLE credential once the fragment sits in Q — the IDLE arm
+  gains the b_disk half at ξb (H ξb), L1's None arm keeps buf_bundle_h
+  (b_disk halved), the bump joins, the last drop re-halves and
+  re-deposits, boot deposits the half once per buffer.  §2 IDLE line
+  and §3.3 site notes amended in place.  Everything else of the vetting
+  is taken as written (park: own_context ∗ buf_bundle; checkout takes
+  the R row; option-share tok kit once; Q's fragment outside the pile).

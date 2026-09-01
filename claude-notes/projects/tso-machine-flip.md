@@ -18417,3 +18417,17 @@ Pending the review: bioUR's option share + the tok kit, bchain, the OUT
 residue and the two swap signatures, then ProofBread sites 1-5,
 ProofBrelse (park, releasesleep _in, refs--), ProofBunpin (the decr twin),
 deletion of the v1 escrow, the -B round.
+
+### A6.157: the vetted A6.155 taken up; the park's IDLE credential
+
+The other agent APPROVED A6.155 (tso-flip 05c324ee7) with: park takes
+own_context ∗ buf_bundle only; checkout takes the R row; the tok kit
+once over the option share; Q's fragment stays out of the pile row.
+Taking the park simplification literally leaves the parker with no
+in-logic refutation of the IDLE arm (the fragment did it; the bundle
+only refutes IN), so the doc gains the b_disk-half credential in IDLE
+(details in §3.3 site notes / changelog).  Landing order: BioInv pass 1
+(v1 deletions, option-share kit, bchain, slot tie) is written; pass 2
+(Q residue, checkout/park/drop signatures, IDLE half, buf_bundle_h) +
+boot deposits next; then the scan2 twins, ProofBread sites 1-5,
+ProofBrelse, ProofBunpin, the -B round.
