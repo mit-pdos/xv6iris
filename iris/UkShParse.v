@@ -917,6 +917,14 @@ Section UkShParse.
     add_vec_int (mword_of_int x : mword 64) d = mword_of_int (x + d).
   Proof. unfold add_vec_int. apply moi_add. Qed.
 
+  (* ...and the same with the DESTINATION named, so a walk never carries a
+     [mword_of_int (0x420 + 4)] a later [rewrite] then fails to match. *)
+  Local Lemma ushp_pc_step' (x d y : Z) :
+    x + d = y ->
+    add_vec_int (mword_of_int x : mword 64) d = mword_of_int y.
+  Proof. intro H. rewrite ushp_pc_step. f_equal. exact H. Qed.
+
+
   (* THE FRAME POINTER, AS A PREMISE-FREE STEP.  [c.addi4spn s0,sp,N] is
      the last instruction of every prologue in this catalog and no function
      in the parser reads s0 except through its own epilogue, so what a walk
@@ -2373,6 +2381,26 @@ Section UkShParse.
     exact (Hne 0%nat (fst ru) (snd ru) ltac:(destruct ru; reflexivity)).
   Qed.
 
+  (* ...and the ONE entry a return address is read back out of.  gcc spills
+     [ra] first in every frame in this catalog, so the epilogue's [c.jr ra]
+     reads slot 0 -- provided no LATER spill is [ra] too, which is the
+     second premise and is a [vm_compute] at any concrete list. *)
+  Lemma ushp_spillback_ra (rs : list (mword 5 * mword 6)) (u0 : mword 6)
+      (vals : nat -> mword 64) (me : regfile) :
+    rs !! 0%nat = Some (ra_idx, u0) ->
+    (forall (i : nat) (r : mword 5) (u : mword 6),
+       rs !! (S i) = Some (r, u) -> Regidx ra_idx <> Regidx r) ->
+    ushp_spillback rs vals me !!! Regidx ra_idx = vals 0%nat.
+  Proof.
+    destruct rs as [| ru0 rs' ]; intros Hra0 Htl; [ discriminate | ].
+    cbn in Hra0. injection Hra0 as Hru0. subst ru0.
+    cbn [ushp_spillback fst].
+    rewrite (ushp_spillback_ne rs' (fun i : nat => vals (S i))
+               (<[Regidx ra_idx := regval_into_reg (vals 0%nat)]> me) ra_idx
+               ltac:(intros i r u Hi; exact (Htl i r u Hi))).
+    exact (upd_eq me (Regidx ra_idx) (regval_into_reg (vals 0%nat))).
+  Qed.
+
   (* THE RESTORE RUN.  Each [c.ldsp] DOES write a register, so the register *)
   (* file the continuation gets is [ushp_spillback] of the list.            *)
   Local Lemma wp_kshp_restore (spn : mword 64) (nn : nat) :
@@ -2429,6 +2457,214 @@ Section UkShParse.
       iIntros "Hwr" (h2) "Hrun".
       iApply ("Hcont" with "[Hw0 Hwr]"); [ | iApply "Hrun" ].
       iFrame "Hw0 Hwr".
+  Qed.
+
+  (* ===================================================================== *)
+  (* §4c THE WHOLE PROLOGUE AND THE WHOLE EPILOGUE, AT ANY FRAME SIZE.      *)
+  (*                                                                       *)
+  (* §4b generalised the two SPILL RUNS.  peek and gettoken still wrote the *)
+  (* push, the frame split, the [c.addi4spn] and their three mirrors out by *)
+  (* hand -- about 140 lines apiece, and the five parser functions would    *)
+  (* have paid it five more times.  These two lemmas are that boilerplate   *)
+  (* once, over [k] (the frame in words) and the spill list.                *)
+  (*                                                                       *)
+  (* ALL FIVE PARSER FUNCTIONS PUSH AND POP WITH [c.addi16sp], so unlike    *)
+  (* §4b's note there is no two-armed premise to write: [imm] is a          *)
+  (* parameter and the ONE pure fact about it is the [sign_extend'] the     *)
+  (* leaf wants, at the call site's own literal.                            *)
+  (*                                                                       *)
+  (* WHAT A CALL SITE OWES is the §4b bargain again -- pure facts at        *)
+  (* CONCRETE numbers: the pcs step by two, and each spill's [c.sdsp]       *)
+  (* immediate is the slot the frame split hands out.  Nothing here does    *)
+  (* index arithmetic; [pcs] and the offsets are functions of the spill     *)
+  (* index and the step passes their tails.                                 *)
+  (* ===================================================================== *)
+
+  Local Lemma wp_kshp_frame_pro (k n : nat) (rs : list (mword 5 * mword 6))
+      (p0 : Z) (pcs : nat -> Z) (imm : mword 6) (nz : mword 8)
+      (vals : nat -> mword 64) (nn : nat) (h : CpuId) (m : regfile) :
+    (length rs + n)%nat = k ->
+    (sign_extend' 64 (caddi16sp_imm imm) : mword 64)
+      = mword_of_int (- (8 * Z.of_nat k)) ->
+    pcs 0%nat = p0 + 2 ->
+    (forall i : nat, (i < length rs)%nat -> pcs (S i) = pcs i + 2) ->
+    (forall (i : nat) (r : mword 5) (u : mword 6),
+       rs !! i = Some (r, u) ->
+       uoff_sdsp u = 8 * Z.of_nat k - 8 * (Z.of_nat i + 1) /\
+       Regidx r <> Regidx csp_rs1 /\ vals i = m !!! Regidx r) ->
+    uinstr_is γt (mword_of_int p0) true (C_ADDI16SP imm) -∗
+    ([∗ list] i ↦ ru ∈ rs,
+       uinstr_is γt (mword_of_int (pcs i)) true
+         (C_SDSP (snd ru, Regidx (fst ru)))) -∗
+    uinstr_is γt (mword_of_int (pcs (length rs))) true
+      (C_ADDI4SPN (Cregidx (mword_of_int 0), nz)) -∗
+    urun γt γd γs γfd h m (mword_of_int p0) (k + nn) -∗
+    (∀ (h' : CpuId) (v : mword 64),
+       ⌜ uint (m !!! Regidx csp_rs1) mod 8 = 0 ⌝ -∗
+       ⌜ 8 * Z.of_nat k <= uint (m !!! Regidx csp_rs1) ⌝ -∗
+       ⌜ uint (m !!! Regidx csp_rs1) < Z64 ⌝ -∗
+       ([∗ list] i ↦ _ ∈ rs,
+          uword γd (uint (m !!! Regidx csp_rs1) - 8 * (Z.of_nat i + 1))
+            (vals i)) -∗
+       ustack γd
+         (mword_of_int
+            (uint (m !!! Regidx csp_rs1) - 8 * Z.of_nat (length rs)))
+         n -∗
+       urun γt γd γs γfd h'
+         (<[Regidx s0_idx := regval_into_reg v]>
+            (<[Regidx csp_rs1
+               := regval_into_reg
+                    (add_vec_int (m !!! Regidx csp_rs1)
+                       (- (8 * Z.of_nat k)))]> m))
+         (mword_of_int (pcs (length rs) + 2)) nn -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Ek Himm Hp0 Hpc Hoff.
+    iIntros "#Hi0 #Hisp #Hifp Hrun Hcont".
+    iDestruct (urun_stack with "Hrun") as %[Hal8 Hroom].
+    set (sp0 := m !!! Regidx csp_rs1) in *.
+    assert (Hlo : 8 * Z.of_nat k <= uint sp0) by lia.
+    assert (Hr0 : 0 <= uint sp0 < Z64).
+    { rewrite uint_unsigned. pose proof (bv_unsigned_in_range 64 sp0) as Hr.
+      assert (Em : bv_modulus 64 = Z64) by (vm_compute; reflexivity).
+      rewrite Em in Hr. exact Hr. }
+    (* ---- the push ---- *)
+    iApply (wp_uk_caddi16sp_dn γt γd γs γfd h m (mword_of_int p0) imm k nn
+              Himm with "Hi0 Hrun").
+    rewrite (ushp_pc_step' p0 2 (pcs 0%nat) ltac:(lia)).
+    iIntros "Hstk" (h1) "Hrun".
+    set (spn := add_vec_int sp0 (- (8 * Z.of_nat k))).
+    set (m1 := <[Regidx csp_rs1 := regval_into_reg spn]> m).
+    assert (Hsp1 : m1 !!! Regidx csp_rs1 = spn)
+      by exact (upd_eq m (Regidx csp_rs1) (regval_into_reg spn)).
+    assert (Hspu : uint spn = uint sp0 - 8 * Z.of_nat k).
+    { unfold spn. rewrite !uint_unsigned.
+      exact (uv_avi_neg sp0 (8 * Z.of_nat k) ltac:(lia)
+               ltac:(rewrite <- uint_unsigned; lia)). }
+    set (spl := (mword_of_int (uint sp0 - 8 * Z.of_nat (length rs))
+                 : mword 64)).
+    assert (Hsplu : uint spl = uint sp0 - 8 * Z.of_nat (length rs)).
+    { unfold spl. apply uint_moi.
+      assert (H8 : 8 * Z.of_nat (length rs) <= 8 * Z.of_nat k) by lia. lia. }
+    iDestruct (ushp_frame_split sp0 spl n rs Hsplu
+                 with "[Hstk]") as "[Hsl Hloc]"; [ rewrite Ek; iExact "Hstk" | ].
+    (* ---- the spills ---- *)
+    iApply (wp_kshp_spill spn nn rs pcs
+              (fun i : nat => uint sp0 - 8 * (Z.of_nat i + 1)) vals h1 m1
+              Hsp1 Hpc
+              ltac:(intros i r u Hi;
+                    destruct (Hoff i r u Hi) as [ Hu [ Hnsp Hv ] ];
+                    split;
+                    [ rewrite Hspu Hu; lia
+                    | split;
+                      [ exact (ushp_slot_al (uint sp0) i Hal8)
+                      | rewrite Hv;
+                        exact (eq_sym
+                                 (upd_ne m (Regidx csp_rs1) (Regidx r) _
+                                    Hnsp)) ] ])
+              with "Hisp Hsl Hrun").
+    iIntros "Hsl" (h2) "Hrun".
+    (* ---- the frame pointer ---- *)
+    iApply (wp_kshp_fp h2 m1 (pcs (length rs)) nz nn with "Hifp Hrun").
+    iIntros (h3 v) "Hrun".
+    iApply ("Hcont" $! h3 v with "[] [] [] Hsl Hloc Hrun").
+    - iPureIntro. exact Hal8.
+    - iPureIntro. exact Hlo.
+    - iPureIntro. lia.
+  Qed.
+
+  (* ...and its mirror: the restores, the pop and the [c.jr ra]. *)
+  Local Lemma wp_kshp_frame_epi (k n : nat) (rs : list (mword 5 * mword 6))
+      (u0 : mword 6) (pcs : nat -> Z) (imm : mword 6)
+      (sp0 spl : mword 64) (vals : nat -> mword 64) (nn : nat)
+      (h : CpuId) (me : regfile) :
+    (length rs + n)%nat = k ->
+    uint sp0 mod 8 = 0 -> 8 * Z.of_nat k <= uint sp0 -> uint sp0 < Z64 ->
+    uint spl = uint sp0 - 8 * Z.of_nat (length rs) ->
+    me !!! Regidx csp_rs1 = add_vec_int sp0 (- (8 * Z.of_nat k)) ->
+    (sign_extend' 64 (caddi16sp_imm imm) : mword 64)
+      = mword_of_int (8 * Z.of_nat k) ->
+    (forall i : nat, (i < length rs)%nat -> pcs (S i) = pcs i + 2) ->
+    (forall (i : nat) (r : mword 5) (u : mword 6),
+       rs !! i = Some (r, u) ->
+       uoff_sdsp u = 8 * Z.of_nat k - 8 * (Z.of_nat i + 1) /\
+       unot_sp r /\ uint r <> 0) ->
+    rs !! 0%nat = Some (ra_idx, u0) ->
+    (forall (i : nat) (r : mword 5) (u : mword 6),
+       rs !! (S i) = Some (r, u) -> Regidx ra_idx <> Regidx r) ->
+    shp_code γt -∗
+    ([∗ list] i ↦ ru ∈ rs,
+       uinstr_is γt (mword_of_int (pcs i)) true
+         (C_LDSP (snd ru, Regidx (fst ru)))) -∗
+    uinstr_is γt (mword_of_int (pcs (length rs))) true (C_ADDI16SP imm) -∗
+    uinstr_is γt (mword_of_int (pcs (length rs) + 2)) true
+      (C_JR (Regidx ra_idx)) -∗
+    ([∗ list] i ↦ _ ∈ rs,
+       uword γd (uint sp0 - 8 * (Z.of_nat i + 1)) (vals i)) -∗
+    ustack γd spl n -∗
+    urun γt γd γs γfd h me (mword_of_int (pcs 0%nat)) nn -∗
+    (∀ h' : CpuId,
+       urun γt γd γs γfd h'
+         (<[Regidx csp_rs1 := regval_into_reg sp0]> (ushp_spillback rs vals me))
+         (ret_pc (vals 0%nat)) (k + nn) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Ek Hal8 Hlo Hhi Hsplu Hsp Himm Hpc Hoff Hra0 Hratl.
+    iIntros "#Hcode #Hild #Hipop #Hijr Hsl Hloc Hrun Hcont".
+    set (spn := add_vec_int sp0 (- (8 * Z.of_nat k))).
+    assert (Hspu : uint spn = uint sp0 - 8 * Z.of_nat k).
+    { unfold spn. rewrite !uint_unsigned.
+      exact (uv_avi_neg sp0 (8 * Z.of_nat k) ltac:(lia)
+               ltac:(rewrite <- uint_unsigned; lia)). }
+    (* ---- the restores ---- *)
+    iApply (wp_kshp_restore spn nn rs pcs
+              (fun i : nat => uint sp0 - 8 * (Z.of_nat i + 1)) vals h me
+              Hsp Hpc
+              ltac:(intros i r u Hi;
+                    destruct (Hoff i r u Hi) as [ Hu [ Hnsp Hnz ] ];
+                    split;
+                    [ rewrite Hspu Hu; lia
+                    | split;
+                      [ exact (ushp_slot_al (uint sp0) i Hal8)
+                      | split; [ exact Hnsp | exact Hnz ] ] ])
+              with "Hild Hsl Hrun").
+    iIntros "Hsl" (h1) "Hrun".
+    set (mr := ushp_spillback rs vals me).
+    assert (Hspr : mr !!! Regidx csp_rs1 = spn).
+    { rewrite /mr (ushp_spillback_ne rs vals me csp_rs1
+                     ltac:(intros i r u Hi;
+                           exact (proj1 (proj2 (Hoff i r u Hi))))).
+      exact Hsp. }
+    assert (Hrar : mr !!! Regidx ra_idx = vals 0%nat)
+      by exact (ushp_spillback_ra rs u0 vals me Hra0 Hratl).
+    assert (Hup : add_vec_int spn (8 * Z.of_nat k) = sp0).
+    { apply bv_eq.
+      rewrite (uv_avi_pos spn (8 * Z.of_nat k) ltac:(lia)
+                 ltac:(rewrite <- uint_unsigned; lia)).
+      rewrite <- !uint_unsigned. lia. }
+    (* ---- the pop ---- *)
+    iApply (wp_uk_caddi16sp_up γt γd γs γfd h1 mr
+              (mword_of_int (pcs (length rs))) imm k nn Himm
+              with "Hipop [Hsl Hloc] Hrun").
+    { rewrite Hspr Hup.
+      iDestruct (ushp_frame_join sp0 spl n rs vals Hsplu with "Hsl Hloc")
+        as "H".
+      rewrite Ek. iExact "H". }
+    rewrite Hspr Hup (ushp_pc_step (pcs (length rs)) 2).
+    iIntros (h2) "Hrun".
+    (* ---- the [c.jr ra] ---- *)
+    iApply (wp_uk_cjr γt γd γs γfd h2
+              (<[Regidx csp_rs1 := regval_into_reg sp0]> mr)
+              (mword_of_int (pcs (length rs) + 2)) ra_idx
+              (ret_pc (vals 0%nat)) (k + nn)
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite (upd_ne mr (Regidx csp_rs1) (Regidx ra_idx) _
+                               ltac:(vm_compute; discriminate));
+                    rewrite Hrar; reflexivity)
+              with "Hijr Hrun").
+    iIntros (h3) "Hrun". iApply ("Hcont" $! h3 with "Hrun").
   Qed.
 
   (* ===================================================================== *)
@@ -4916,11 +5152,6 @@ Section UkShParse.
   (* [ushp_pc_step] at a pc the caller wants NAMED rather than summed: the
      walks below run at [p + 4], [p + 6], ... and every step would otherwise
      leave an [p + 6 + 4] the next [uinstr_is] does not match. *)
-  Local Lemma ushp_pc_step' (x d y : Z) :
-    x + d = y ->
-    add_vec_int (mword_of_int x : mword 64) d = mword_of_int y.
-  Proof. intro H. rewrite ushp_pc_step. f_equal. exact H. Qed.
-
   (* THE WHITESPACE SCAN, ONCE, FOR ALL THREE OF ITS COPIES.
        p+0   lbu a1,0(s1)     p+4   c.mv a0,s3      p+6   jal strchr
        p+10  c.beqz a0,p+20   p+12  c.addi s1,s1,1  p+14  bne s2,s1,p
