@@ -164,6 +164,7 @@ Section CtxPinw.
     ledger_msg_at (length g.(glog))
       (TsoMemPa.PWMsg (snap_of base n vnew) (hart_agent cpu_id)) ∗
     ([∗ list] j ∈ seq 0 (N.to_nat n), ∃ t : nat,
+       ⌜(t <= length g'.(glog))%nat⌝ ∗
        phys_ledger_pinw (pa_add base j) (DfracOwn 1) (nth_byte vnew j) t
          (TsPinw base (N.to_nat n) j lo Sw)).
   Proof.
@@ -217,7 +218,8 @@ Section CtxPinw.
       - intros k Hk. cbn in Hk. exact (Hsnap k Hk). }
     iModIntro. iFrame "Hint".
     iApply (big_sepL_impl with "Hnew").
-    iIntros "!>" (k j Hkj) "H". by iExists (S (length g.(glog))).
+    iIntros "!>" (k j Hkj) "H". iExists (S (length g.(glog))).
+    iFrame "H". iPureIntro. rewrite Hlog length_app /=. lia.
   Qed.
 
   (* ---- THE EXACT READ, for a receipt that covers the stamps: a LOCK
@@ -291,6 +293,7 @@ Section CtxPinw.
       (TsoMemPa.PWMsg (snap_of pa n vnew) (hart_agent cpu_id)) ∗
     TsoGhost.llb loglen_name (S (length log)) ∗
     ([∗ list] j ∈ seq 0 (N.to_nat n), ∃ t : nat,
+       ⌜(t <= S (length log))%nat⌝ ∗
        phys_ledger_pinw (pa_add pa j) (DfracOwn 1) (nth_byte vnew j) t
          (TsPinw pa (N.to_nat n) j lo Sw)).
   Proof.
@@ -334,8 +337,13 @@ Section CtxPinw.
     rewrite -(tso_interp_of_at_gs riscv_eraGS img
                 (write_bytes σ.(mem) pa n vnew) log' V'
                 σ.(sregs) σ.(mdev) Hpin').
-    iFrame "Hgh Htso Hpw Hmsg".
-    iApply (TsoGhost.llb_le with "Hllb"). rewrite Hlen'. lia.
+    iFrame "Hgh Htso Hmsg".
+    iSplitR.
+    { iApply (TsoGhost.llb_le with "Hllb"). rewrite Hlen'. lia. }
+    iApply (big_sepL_impl with "Hpw").
+    iIntros "!>" (i j Hij) "H". iDestruct "H" as (t) "[%Ht H]".
+    iExists t. iFrame "H". iPureIntro.
+    rewrite /log' length_app /= in Ht. lia.
   Qed.
 
 End CtxPinw.
