@@ -18210,3 +18210,29 @@ resources each iteration, losing iterations return them, the winning
 Psi exports); SpecAcquiresleep/ProofAcquiresleep pass-through; old
 tiers derived at trivial hook (Psi := emp).  The same instrument is
 what the ic_escrow W1/W2/W3 legs need (Phase 4.5).
+
+### A6.151 §2 (refinements while landing): transform-hook, Win-subsumes-R
+
+- The leaf hook is a PAYLOAD TRANSFORM, not a Psi export:
+  [TsoCtx.amo_drained_hook R Q] turns the winner's [lock_pay_won R] into
+  [lock_pay_won Q]; the loser row hands the (linear) hook back for the
+  next iteration.  The old tiers derive at the identity hook.
+- At the sleeplock level the reusable form is [SleepLock.slk_hook γ slk
+  R H Win L := □(L -∗ amo_drained_hook <{sl_res_gen}> <{sl_res_hooked}>)]
+  with [sl_res_hooked]'s free arm = [sl_free_hold ∗ Win] -- Win SUBSUMES
+  R (id instance: Win := R).  That lets the bcache hook move [bown] out
+  of the payload INTO the box's OUT arm at the checkout instant, which
+  is what makes the OUT arm refutable at the next winning AMO (the
+  borrowed payload exhibits bown; OUT holds bown; exclusivity closes
+  it) -- the deposit-timing problem the first sketch had.
+- Acquire gained hook tiers at both gen and static levels
+  (wp_acquire_gen_hook_{fresh_,}sconf, wp_acquire_hook_{fresh_,}sconf);
+  acquiresleep gained wp_acquiresleep_gen_hookllb_sconf; the asl_* level-0
+  chain (exit/loop/exit_body/post_sleep_body/loop_body) is parameterized
+  by (Win, L) with the llb tier re-derived at (R, emp, slk_hook_id).
+  The nested (S n) route is untouched (Phase 4.5 revisits).
+- BioInv post-merge compiles green in 7m01 (was 46s pre-merge; optimize
+  later); the serial "Terminated" kills were ORPHANED-COMPILER MEMORY
+  PILE-UP on the VM (each killed make leaves its rocqworkers running;
+  the user slice peaked at 705 GiB), not a divergence.  Kill pattern:
+  pkill -x (never -f -- the wrapper's own path contains "rocq").
