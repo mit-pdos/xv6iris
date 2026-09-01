@@ -1,129 +1,129 @@
 (* CtxMorphTac.v -- THE TRANSPORT-OBLIGATION DRIVER (A6.121, the M3
-   λ-conversion; tso-flip CtxMorphTac.v).
+   λ-conversion).
 
    A λ-converted lock payload owes [TsoCtx.CtxMorph] for real, and its proof
    is entirely structural: exists / sep / big-ops / boolean branches down to
-   the leaves, which are the context cells ([ctx_pointsto] and the word
-   widths) and ξ-constant parts (pure facts, ghost state, invariant
-   handles).
+   the leaves, which are the context cells ([ctx_pointsto] and the three
+   word widths) and ξ-constant parts (pure facts, ghost state, ledger cells,
+   invariant handles).  Typeclass search resolves these composites in some
+   files and not in others -- measured on identical goals, the difference
+   being only the file the goal is stated in -- so nothing here relies on
+   it: the tactic applies the structural instances BY NAME and stops at
+   whatever it cannot decompose, which a caller then closes with the
+   payload's own component instances (see DiskInv.v's [DiskResAt]).
 
-   WHY THIS IS A TACTIC AND NOT TYPECLASS SEARCH.  Three reasons, all
-   structural, and all of them get WORSE as the tree grows:
-
-   1. [CtxMorph]'s argument is a λ at every instance, so the hint
-      discrimination net has no key to index on -- every one of the ~55
-      [CtxMorph] instances in the tree is a WILDCARD tried on every goal,
-      in priority order, each with a full higher-order unification.
-   2. Search cannot be told where to STOP.  A payload component like
-      [DiskInv.free_slot_res] is a transparent [Definition], so
-      [ctx_morph_sep] matches THROUGH it and the search descends into a
-      body the component's own instance already covers -- and if that body
-      reaches one of the deliberately uncovered ξ-dependent leaves
-      ([pstate_lock], [hart_at_any], [own_context]) the whole descent
-      fails and backtracks over everything it just did.
-   3. [ctx_morph_const], which closes the majority of leaves, is pinned at
-      priority 100 by its evar guard, so it is reached only after ~54
-      failing instances.
-
-   Search is still the right answer at the CALL sites -- there the payload
-   is a named constant ([disk_res_at γ …]) with a keyed, zero-premise
-   instance, and it resolves in milliseconds.  It is the INSTANCE
-   CONSTRUCTION, whose goal is a raw payload body, that needs this file.
-
-   AND THE TACTIC MUST NOT IMITATE SEARCH, which is what the first version
-   did.  A blind [first [apply … | apply … | …]] is hand-rolled instance
-   search: it pays one failing higher-order unification per lemma per
-   node.  MEASURED on DiskInv.v's four obligations (GCP VM, isolated
-   [coqc -time], 2026-08-29): 161 s, of which [apply ctx_morph_exist] 30 %
-   over 1268 calls at 38 ms each, and the four word/string leaves 41 %
-   over 175 calls each with ZERO successes -- [ctx_morph_sep] matched the
-   unsealed [ctx_word_pointsto] tower first and took every [↦₈] apart byte
-   by byte.  586 leaf visits, each preceded by seven failing structural
-   [apply]s.  The syntactic dispatch below takes the same four
-   obligations to 0.15 s (53 steps, one [apply] each).
-
-   THE RULES IT ENCODES:
-
-   - DISPATCH ON THE HEAD, do not guess.  [ctx_morph_step] is a
-     [lazymatch] on the goal's syntactic head, so exactly one [apply]
-     runs per node and no lemma is ever unified against a node it cannot
-     match.  Adding a structural instance means adding a row here, not
-     lengthening a [first].
-   - THE LEAVES ARE DISPATCHED TOO, which is what stops the word towers
-     being decomposed: [ctx_word_pointsto] and its siblings are NOT
-     sealed (each is a tower over the sealed byte fact), so a [first]
-     that tries [ctx_morph_sep] before them always wins and the leaf
-     lemmas become dead weight.
-   - STOP AT AN UNRECOGNISED HEAD.  The default row tries only the two
-     boolean guards and [ctx_morph_const] (all cheap on a small term);
-     anything else is left as a goal for the caller to close with the
-     payload component's own instance -- see DiskInv.v's [DiskResAt],
-     whose [all: apply free_slot_res_morph] is exactly that contract.
-     The first version violated its own contract here: it descended
-     through the transparent component constants instead.
-   - DO NOT PUT [ctx_morph_const] FIRST.  It looks free -- the body
-     either mentions ξ or it does not -- and on a LEAF it is.  On a whole
-     payload body it is not: the unifier tries to eliminate ξ by delta
-     (every cell is spelled [ctx_pointsto (cur_ctx ξ) …]) and does not
-     come back.  Measured: >10 min at 1.3 GB on [disk_res], against 161 s
-     for the version that had it last.
-   - [cur_ctx] is unfolded first: a payload spelled with the ambient
-     notations elaborates its cells at [@cur_ctx XI], and once [XI] is
-     instantiated at the λ's binder the projection has to go before the
-     leaf lemmas can see the binder.  [cbv beta] then runs per STEP, not
-     once, because each [apply] leaves its subgoals with a β-redex under
-     the λ and the [lazymatch] has to see through it.
-
-   A separate file so that the tactic can grow without re-certifying
-   [TsoCtx]'s cone. *)
-
+   [cur_ctx] is unfolded first: a payload spelled with the ambient
+   notations elaborates its cells at [@cur_ctx XI], and once [XI] is
+   instantiated at the λ's binder the projection has to go before the leaf
+   lemmas can see the binder.  A separate file so that the tactic can grow
+   without re-certifying [TsoCtx]'s cone. *)
+From Stdlib Require Import ZArith Lia.
+From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
+From iris.algebra Require Import dfrac.
+From iris.base_logic.lib Require Import mono_nat.
+Require Import SailStdpp.Values SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto Ktier.
+Require Import TsoMemPa TsoGhost.
 Require Import TsoCtx.
 
-(* The leaf lemmas, for a caller that wants to close one by hand.  The
-   tactic itself dispatches to them by head and does not use this. *)
-Ltac ctx_morph_leaf :=
-  first [ apply ctx_morph_pointsto
-        | apply ctx_morph_word
-        | apply ctx_morph_word2
-        | apply ctx_morph_word4
-        | apply ctx_morph_string
-        | apply ctx_morph_const ].
+(* A6.129: THE LEAVES THE p->lock PAYLOAD NEEDS -- [or], [big_sepS], the
+   FULL physical-tier byte and word (the trapframe/page-table pages of a
+   dormant slot).  Structural proofs mirror TsoCtx's; the physical byte's
+   proof is [ctx_morph_phys_pointsto_h]'s with the full seal. *)
+Section MorphMore.
+  Context `{!riscvGS Σ}.
 
+  (* TsoCtx's [llb_valid_q], which is Local there *)
+  Lemma cmt_llb_valid_q (γ : gname) (q : Qp) (n K : nat) :
+    mono_nat_auth_own γ q n -∗ llb γ K -∗ ⌜(K ≤ n)%nat⌝.
+  Proof.
+    iIntros "Ha [Hlb|%Hz]".
+    - by iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ ?].
+    - iPureIntro. lia.
+  Qed.
+
+  Global Instance ctx_morph_or (R1 R2 : CtxId → iProp Σ) :
+    CtxMorph R1 → CtxMorph R2 → CtxMorph (λ ξ, R1 ξ ∨ R2 ξ)%I.
+  Proof.
+    iIntros (H1 H2 ξ ξ') "Hd [HR | HR]".
+    - iMod (ctx_morph with "Hd HR") as "[Hd HR]". iModIntro. iFrame "Hd". by iLeft.
+    - iMod (ctx_morph with "Hd HR") as "[Hd HR]". iModIntro. iFrame "Hd". by iRight.
+  Qed.
+
+  Global Instance ctx_morph_big_sepS `{Countable A} (X : gset A)
+      (Φ : A → CtxId → iProp Σ) :
+    (∀ x, CtxMorph (Φ x)) → CtxMorph (λ ξ, [∗ set] x ∈ X, Φ x ξ)%I.
+  Proof.
+    intros HΦ. induction X as [|x X Hx IH] using set_ind_L.
+    - iIntros (ξ ξ') "Hd _ !>". rewrite big_sepS_empty. by iFrame.
+    - iIntros (ξ ξ') "Hd HR".
+      iDestruct (big_sepS_insert _ _ _ Hx with "HR") as "[HR HRs]".
+      iMod (ctx_morph with "Hd HR") as "[Hd HR]".
+      iMod (IH ξ ξ' with "Hd HRs") as "[Hd HRs]".
+      iModIntro. iFrame "Hd". rewrite (big_sepS_insert _ _ _ Hx). iFrame.
+  Qed.
+
+  Global Instance ctx_morph_phys_pointsto (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    CtxMorph (λ ξ, ctx_phys_pointsto ξ a dq v).
+  Proof.
+    iIntros (ξ ξ') "Hd HP".
+    rewrite ctx_dom_unseal /ctx_dom_def !ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
+    iDestruct "Hd" as
+      "(%B & %W & %B' & %D & [Hb Hdm] & %HDW & %HBB' & %HWB' & #Hlb')".
+    iDestruct "HP" as "(%t & Hpt & Hts & Hbit)".
+    iAssert (⌜(t ≤ B')%nat⌝)%I as %HtB'.
+    { iDestruct "Hbit" as "[Hcl | Hdt]".
+      - iDestruct (cmt_llb_valid_q with "Hb Hcl") as %HtB.
+        iPureIntro. lia.
+      - iDestruct (dset_lookup with "Hdm Hdt") as %HDt.
+        have HtW : ((t, a).1 ≤ W)%nat by apply HDW.
+        simpl in HtW. iPureIntro. lia. }
+    iClear "Hbit". iModIntro.
+    iSplitL "Hb Hdm".
+    { iExists B, W, B', D. iFrame "Hb Hdm Hlb'". by iPureIntro. }
+    iExists t. iFrame "Hpt Hts".
+    iLeft. rewrite /llb. iLeft.
+    iApply (mono_nat_lb_own_le with "Hlb'"). lia.
+  Qed.
+
+  Global Instance ctx_morph_phys_word (a : Arch.pa) (dq : dfrac) (w : bv 64) :
+    CtxMorph (λ ξ, ctx_phys_word_pointsto ξ a dq w).
+  Proof.
+    iIntros (ξ ξ') "Hd [%Hal H]".
+    iMod (ctx_morph_big_sepL (seq 0 8)
+            (λ _ j ξ, ctx_phys_pointsto ξ (pa_add a j) dq (nth_byte w j))
+            (λ i x, ctx_morph_phys_pointsto _ _ _) ξ ξ' with "Hd H") as "[Hd H]".
+    iModIntro. iFrame "Hd". iSplit; [done|]. iExact "H".
+  Qed.
+End MorphMore.
+
+(* THE SOLVER IS SYNTACTIC (A6.129; TsoCtxMove.ctx_move_step's twin, and
+   for the same measured reason: an [apply ctx_morph_sep] or a leaf [apply]
+   against a NAMED piece δ-unfolds it and hangs).  Head-symbol dispatch;
+   a named ξ-dependent leaf goes to instance search, where the consumer's
+   per-piece instances live; [cur_ctx] is unfolded at every step. *)
 Ltac ctx_morph_step :=
-  cbv beta;
+  try rewrite /cur_ctx; cbv beta;
   lazymatch goal with
-  (* the ξ-CONSTANT leaf, dispatched SYNTACTICALLY: a pattern metavariable
-     cannot capture the binder, so this row fires exactly on bodies that do
-     not mention ξ -- no delta, none of the measured unifier blowups (the
-     tso-flip solver's shape) *)
-  | |- CtxMorph (fun _ => ?body) => apply ctx_morph_const
-  | |- CtxMorph (fun _ => bi_sep _ _)    => apply ctx_morph_sep
-  | |- CtxMorph (fun _ => bi_exist _)    => apply ctx_morph_exist; intros ?
-  | |- CtxMorph (fun _ => bi_or _ _)     => apply ctx_morph_or
-  | |- CtxMorph (fun _ => big_opL _ _ _) => apply ctx_morph_big_sepL; intros ? ?
-  | |- CtxMorph (fun _ => big_opM _ _ _) => apply ctx_morph_big_sepM; intros ? ?
-  | |- CtxMorph (fun _ => big_opS _ _ _) => apply ctx_morph_big_sepS; intros ?
-  | |- CtxMorph (fun _ => ctx_pointsto _ _ _ _)        => apply ctx_morph_pointsto
-  | |- CtxMorph (fun _ => ctx_word_pointsto _ _ _ _)   => apply ctx_morph_word
-  | |- CtxMorph (fun _ => ctx_word2_pointsto _ _ _ _)  => apply ctx_morph_word2
-  | |- CtxMorph (fun _ => ctx_word4_pointsto _ _ _ _)  => apply ctx_morph_word4
-  | |- CtxMorph (fun _ => ctx_string_pointsto _ _ _ _) => apply ctx_morph_string
-  (* the SC-era phys rows are GONE at the cutover: a full [ctx_phys_pointsto]
-     does not transport by domination under TSO (the dirty arm's fragment is
-     the author's).  A payload holding phys cells states its own instance
-     over the clean half ([ctx_phys_pointsto_h]) or re-shapes (the T-leg's
-     per-site treatments). *)
-  (* the boolean guards are a [match] on a [bool], which an Ltac1 pattern
-     cannot name; they are cheap to try, and [ctx_morph_const] behind them
-     is the ξ-constant leaf (pure facts, ghost state, invariant handles). *)
-  | |- _ => first [ apply ctx_morph_if_then
-                  | apply ctx_morph_if_else
-                  (* a named ξ-dependent leaf goes to instance search,
-                     where its file registers one keyed instance per name
-                     (PtTreeMove's tree; the tso-flip solver's tail) *)
-                  | apply _ ]
+  | |- CtxMorph (λ _, ?body) => apply ctx_morph_const
+  | |- CtxMorph (λ ξ, ctx_phys_pointsto_h ξ _ _) => apply ctx_morph_phys_pointsto_h
+  | |- CtxMorph (λ ξ, ctx_cell_keep ξ _) => apply ctx_morph_cell_keep
+  | |- CtxMorph (λ ξ, bi_exist _) => apply ctx_morph_exist; intros ?
+  | |- CtxMorph (λ ξ, bi_sep _ _) => apply ctx_morph_sep
+  | |- CtxMorph (λ ξ, bi_or _ _) => apply ctx_morph_or
+  | |- CtxMorph (λ ξ, big_opL bi_sep _ _) => apply ctx_morph_big_sepL; intros ? ?
+  | |- CtxMorph (λ ξ, big_opM bi_sep _ _) => apply ctx_morph_big_sepM; intros ? ?
+  | |- CtxMorph (λ ξ, big_opS bi_sep _ _) => apply ctx_morph_big_sepS; intros ?
+  | |- CtxMorph (λ ξ, if _ then _ else _) => apply ctx_morph_if
+  | |- CtxMorph (λ ξ, ctx_pointsto ξ _ _ _) => apply ctx_morph_pointsto
+  | |- CtxMorph (λ ξ, ctx_floor ξ _) => apply _
+  | |- CtxMorph (λ ξ, ctx_word_pointsto ξ _ _ _) => apply ctx_morph_word
+  | |- CtxMorph (λ ξ, ctx_word2_pointsto ξ _ _ _) => apply ctx_morph_word2
+  | |- CtxMorph (λ ξ, ctx_word4_pointsto ξ _ _ _) => apply ctx_morph_word4
+  | |- CtxMorph (λ ξ, ctx_phys_pointsto ξ _ _ _) => apply ctx_morph_phys_pointsto
+  | |- CtxMorph (λ ξ, ctx_phys_word_pointsto ξ _ _ _) => apply ctx_morph_phys_word
+  | |- _ => apply _
   end.
-
-Ltac ctx_morph_solve :=
-  try rewrite /cur_ctx; repeat ctx_morph_step.
+Ltac ctx_morph_solve := repeat ctx_morph_step.

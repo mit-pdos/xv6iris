@@ -46,19 +46,29 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import PtAdBits.
 Require Import PtTree PtTreeAdue KMap KptTree.
-Require Import PtTreeShim.
 Require Import KptPt.
 Require Import Pt4kWalk.
 Require Import SmodePte.
 Require Import KptGhost.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoMemPa.
+Require Import TsoGhost.   (* A6.55: [view_lb] for the pin receipt *)
 Require Import TsoCtx.
+Require Import CtxValues.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section KptShare.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  (* A6.20/A6.21: NO [CurCtx] HERE, DELIBERATELY.  [kpt_body] is the body of
+     a BARE [inv] shared by every S-mode thread, and an invariant body may
+     not name a context (tso-port.md §0.8' ruling 2).  The tree it holds is
+     therefore at the CONTEXT-FREE ledger tier ([kptree_own] =
+     [PtTree.ptree_own_at None]): a PTE is read by the hardware walker at
+     [Read_ttw] -- RULING 1's flat arm -- so no plain-load licence is ever
+     wanted, and the Svadu A/D write-back's append is paid by
+     [TsoCtx.ledger_store_ok], which needs neither a context nor a token. *)
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* §1 The shared invariant.                                            *)
@@ -67,17 +77,18 @@ Section KptShare.
   (* [kptN] itself lives in KptGhost.v -- SRegime's absorb field names it in
      its mask premise. *)
 
-  (* A6.20/A6.21: [kpt_body] is the body of a BARE [inv] shared by every
-     S-mode thread, and an invariant body may not name a context
-     (tso-port.md §0.8' ruling 2).  The tree it holds is therefore at the
-     CONTEXT-FREE ledger tier ([kptree_own] = [PtTree.ptree_own_at
-     (KTier B)]), with the bound existential in the BODY, arity-stable --
-     tso-flip KptShare.v's shape, minus the T-leg pin receipt
-     ([kpt_bound]/[llb]), which has no SC content. *)
+  (* A6.53: the slots are CANON-PINNED at the publication bound, and the
+     bound is EXISTENTIAL here with its agreement fragment beside it --
+     [kpt_inv]'s ARITY does not move (142 mention sites across 36 files),
+     and a reader learns [B] by opening and matches it against the
+     [kpt_bound B] in its own translation residue.  This is the memo's
+     §5.4 shape; the ∃ is in the INVARIANT BODY, not inside
+     [pt_slot_own]'s arm (A6.53 ruling 1). *)
   Definition kpt_body (root_ppn : mword 44) : iProp Σ :=
     (∃ (t : ptree) (M : gmap (mword 27) (mword 44 * kperm)) (B : nat),
        kptree_own B 2 (DfracOwn 1) t ∗
        kpt_lb t ∗
+       kpt_bound B ∗
        kmap_auth M ∗
        ⌜ kpt_tree_spec_gen root_ppn M t ⌝)%I.
 
@@ -90,17 +101,29 @@ Section KptShare.
   Global Instance kpt_inv_persistent root_ppn : Persistent (kpt_inv root_ppn).
   Proof. apply _. Qed.
 
+  (* the PUBLICATION, and it is where the pin's bound is fixed (A6.53
+     ruling 2 / pin-memo §5.6(b)): the table arrives ALREADY pinned at [B]
+     -- minted at the exclusive tier by [TsoCtx.ledger_pin_mint] before the
+     drain -- and publication only shoots the agreement. *)
+  (* A6.71: the shot's own log-position receipt.  [KptGhost.kpt_bound] now
+     carries [llb loglen_name B] (A6.70 finding 3), so publication has to
+     exhibit it -- and every publisher already does: the exclusive bundle
+     carries [view_lb ... B] and [TsoGhost.view_lb_llb] projects it, while
+     [KptPublish.kptree_publish] hands the two out together. *)
   Lemma kpt_inv_alloc (root_ppn : mword 44) (B : nat)
       (t : ptree) (M : gmap (mword 27) (mword 44 * kperm)) (E : coPset) :
     kpt_tree_spec_gen root_ppn M t ->
-    kptree_own B 2 (DfracOwn 1) t -∗ kmap_auth M -∗ kpt_unset ={E}=∗
-    kpt_inv root_ppn ∗ kpt_lb t.
+    kptree_own B 2 (DfracOwn 1) t -∗ kmap_auth M -∗
+    llb loglen_name B -∗
+    kpt_unset -∗ kptb_unset ={E}=∗
+    kpt_inv root_ppn ∗ kpt_lb t ∗ kpt_bound B.
   Proof.
-    intros Hspec. iIntros "Ht HM Hunset".
+    intros Hspec. iIntros "Ht HM #Hllb Hunset Hbunset".
     iMod (kpt_shoot t with "Hunset") as "#Hlb".
+    iMod (kptb_shoot B with "Hllb Hbunset") as "#Hbd".
     iMod (inv_alloc kptN _ (kpt_body root_ppn) with "[Ht HM]") as "#Hinv".
-    { iApply bi.later_intro. iExists t, M, B. iFrame "Ht HM Hlb". iPureIntro. exact Hspec. }
-    iModIntro. iFrame "Hinv Hlb".
+    { iNext. iExists t, M, B. iFrame "Ht HM Hlb Hbd". iPureIntro. exact Hspec. }
+    iModIntro. iFrame "Hinv Hlb Hbd".
   Qed.
 
   (* A SNAPSHOT off the shared invariant: the persistent [kpt_lb] of
@@ -117,9 +140,9 @@ Section KptShare.
   Proof.
     iIntros (HE) "#Hinv".
     iMod (inv_acc E kptN with "Hinv") as "[>Hbody Hclose]"; [ exact HE | ].
-    iDestruct "Hbody" as (t M B) "(Ht & #Hlb & HM & %Hspec)".
+    iDestruct "Hbody" as (t M B) "(Ht & #Hlb & #Hbd & HM & %Hspec)".
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iApply bi.later_intro. iExists t, M, B. iFrame "Ht HM Hlb". iPureIntro. exact Hspec. }
+    { iNext. iExists t, M, B. iFrame "Ht HM Hlb Hbd". iPureIntro. exact Hspec. }
     iModIntro. iExists t. iExact "Hlb".
   Qed.
 
@@ -131,6 +154,28 @@ Section KptShare.
   Definition tlb_snap_ok (tlbvec : vec (option TLB_Entry) (2 ^ 6)) : iProp Σ :=
     (∃ t0 : ptree, ⌜ tlb_ok_pt (mword_of_int 0) t0 tlbvec ⌝ ∗ kpt_lb t0)%I.
 
+  (* A6.55: THE WALK'S PIN CREDENTIALS, named once.  Persistent, and both
+     halves are per-HART facts, which is why they live in the translation
+     residue beside [tlb_snap_ok] rather than in [kpt_inv]. *)
+  Definition kpt_creds : iProp Σ :=
+    (∃ B : nat, kpt_bound B ∗ CtxValues.cv_boot_cred B)%I.
+
+  Global Instance kpt_creds_persistent : Persistent kpt_creds.
+  Proof. rewrite /kpt_creds. apply _. Qed.
+
+  Lemma kpt_creds_intro (B : nat) :
+    kpt_bound B -∗ CtxValues.cv_boot_cred B -∗ kpt_creds.
+  Proof. iIntros "H1 H2". iExists B. iFrame. Qed.
+
+  (* the boot hart's arm: no view receipt anywhere (A6.135) *)
+  Lemma kpt_creds_intro_boot (B : nat) :
+    hart_agent cpu_id = 0%nat ->
+    kpt_bound B -∗ TsoGhost.llb loglen_name B -∗ kpt_creds.
+  Proof.
+    intros H0. iIntros "H1 Hl". iExists B. iFrame "H1".
+    iApply (CtxValues.cv_boot_cred_boot B H0 with "Hl").
+  Qed.
+
   Definition tlb_res_pt (root_ppn : mword 44) : iProp Σ :=
     (∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
        satp ↦ᵣ satp0 ∗
@@ -139,24 +184,31 @@ Section KptShare.
        ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ⌝ ∗
        tlb ↦ᵣ tlbvec ∗ tlb_snap_ok tlbvec ∗
        pmp_config root_ppn ∗
-       kpt_inv root_ppn)%I.
+       (* A6.53 ruling 2: the hart's copy of the canon pin's publication
+          bound.  Persistent and agreement-only, so carrying it costs the
+          residue nothing and gives the walk the [B] its [view_lb] receipt
+          has to beat. *)
+       kpt_inv root_ppn ∗
+       kpt_creds)%I.
 
   Lemma tlb_res_pt_intro (root_ppn : mword 44) (satp0 : mword 64)
-      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (t0 : ptree) :
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (t0 : ptree) (B0 : nat) :
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     tlb_ok_pt (mword_of_int 0) t0 tlbvec ->
-    satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ kpt_lb t0 -∗
+    satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ kpt_lb t0 -∗ kpt_bound B0 -∗
+    CtxValues.cv_boot_cred B0 -∗
     pmp_config root_ppn -∗ kpt_inv root_ppn -∗
     tlb_res_pt root_ppn.
   Proof.
-    intros Hmode Hasid Hppn Hok. iIntros "Hsatp Htlb Hlb Hpmp Hinv".
+    intros Hmode Hasid Hppn Hok. iIntros "Hsatp Htlb Hlb Hbd Hvlb Hpmp Hinv".
     iExists satp0, tlbvec. iFrame "Hsatp Htlb Hpmp Hinv".
     iSplitR; [iPureIntro; exact Hmode |].
     iSplitR; [iPureIntro; exact Hasid |].
     iSplitR; [iPureIntro; exact Hppn |].
-    iExists t0. iFrame "Hlb". iPureIntro. exact Hok.
+    iSplitL "Hlb"; [iExists t0; iFrame "Hlb"; iPureIntro; exact Hok |].
+    iApply (kpt_creds_intro B0 with "Hbd Hvlb").
   Qed.
 
   Lemma tlb_res_pt_open (root_ppn : mword 44) :
@@ -167,7 +219,7 @@ Section KptShare.
       ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
       ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ⌝ ∗
       tlb ↦ᵣ tlbvec ∗ tlb_snap_ok tlbvec ∗
-      pmp_config root_ppn ∗ kpt_inv root_ppn.
+      pmp_config root_ppn ∗ kpt_inv root_ppn ∗ kpt_creds.
   Proof. iIntros "H". iExact "H". Qed.
 
   (* THE satp CELL, BORROWED.  [tlb_res_pt_open] hands the whole residue out
@@ -184,7 +236,7 @@ Section KptShare.
   (* the shared invariant, read off the slot (persistent, so it is a copy) *)
   Lemma tlb_res_pt_kpt_inv (root_ppn : mword 44) :
     tlb_res_pt root_ppn -∗ kpt_inv root_ppn.
-  Proof. iIntros "H". iDestruct "H" as (s t) "(_ & _ & _ & _ & _ & _ & _ & #$)". Qed.
+  Proof. iIntros "H". iDestruct "H" as (s t) "(_ & _ & _ & _ & _ & _ & _ & #$ & _)". Qed.
 
   Lemma tlb_res_pt_satp_acc (root_ppn : mword 44) :
     tlb_res_pt root_ppn -∗
@@ -230,6 +282,28 @@ Section KptShare.
   (* §3 The one-way door from the exclusive bundle.                      *)
   (* ------------------------------------------------------------------- *)
 
+  (* A6.53: the door also shoots the canon pin's BOUND -- the bound the
+     exclusive bundle's slots were minted at is the one every later reader
+     matches against. *)
+  (* A6.55: publication takes the PUBLISHER'S OWN RECEIPT.  This is where
+     pin-memo §5.6(b) lands: hart 0 reaches [__sync_synchronize] -- a
+     [Barrier_RISCV_rw_rw], which [RiscvLang.fence_drains] drains -- so it
+     emerges at the top of the log and its [view_lb] at the pin's bound is
+     free.  Taking it as a PREMISE here is what makes that obligation
+     explicit instead of assumed. *)
+  Lemma tlb_inv_pt_share (root_ppn : mword 44) (E : coPset) :
+    tlb_inv_pt root_ppn -∗ kpt_unset -∗ kptb_unset ={E}=∗ tlb_res_pt root_ppn.
+  Proof.
+    iIntros "Hinv Hnone Hbnone".
+    iDestruct (tlb_inv_pt_open with "Hinv") as (satp0 tlbvec t M B)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hok & %Hspec & HM & Ht & #Hvlb & Hpmp)".
+    iDestruct (CtxValues.cv_boot_cred_llb with "Hvlb") as "#Hllb".
+    iMod (kpt_inv_alloc root_ppn B t M E Hspec with "Ht HM Hllb Hnone Hbnone")
+      as "(#Hkinv & #Hlb & #Hbd)".
+    iModIntro.
+    iApply (tlb_res_pt_intro root_ppn satp0 tlbvec t B Hmode Hasid Hppn Hok
+              with "Hsatp Htlb Hlb Hbd Hvlb Hpmp Hkinv").
+  Qed.
 
 End KptShare.
 
@@ -241,11 +315,12 @@ End KptShare.
 
 Section KptShareTranslate.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload).
 
   Lemma tlb_res_pt_translateAddr_at (root_ppn : mword 44) (va pa : mword 64)
-      (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset) :
+      (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset)
+      (S : TsoMemPa.bytemap -> iProp Σ) :
     ↑kptN ⊆ E ->
     (forall (a d : mword 1) (mxr do_sum : bool),
        pte_check_ok acc Supervisor mxr do_sum
@@ -263,6 +338,18 @@ Section KptShareTranslate.
       = Some (Supervisor, σ) ->
     exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    (* A6.24's payer, threaded at the memory-indexed (CHAINABLE) currency
+       and PERSISTENT -- see [KptTree.tlb_inv_pt_translateAddr_at].  The
+       SHARED table is the [None] tier, so this is discharged with
+       [TsoCtx.ledger_store_ok] and needs no [own_context]. *)
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64) (B : nat),
+         ⌜pte_wb_ok wold wnew⌝ -∗
+         gen_heap_interp m -∗ S m -∗
+         pt_slot_own (KTier B) a (DfracOwn 1) wold ==∗
+         gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         S (RiscvModelBytes.write_bytes m a 8 wnew) ∗
+         pt_slot_own (KTier B) a (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     kmap_at (svpn_of va) ppn pc -∗
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_res_pt root_ppn
     ={E}=∗
@@ -272,12 +359,15 @@ Section KptShareTranslate.
       ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
       ⌜ (σ'.(sregs) = σ.(sregs) \/
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_res_pt root_ppn.
   Proof.
     intros HE Hchk Hcanon Hid4k Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
-    iIntros "Hat Hri Hgh Hres".
+    iIntros "#Hpay Hsto Hat Hri Hgh Hres".
     iDestruct (tlb_res_pt_open with "Hres") as (satp0 tlbvec)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkinv)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkinv & Hbres)".
+    iAssert kpt_creds with "Hbres" as "#Hcreds".
+    iDestruct "Hbres" as (Bres) "[#Hbres #Hvres]".
     iDestruct "Hsnap" as (t0) "(%Htlbok0 & #Hlb0)".
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iDestruct (reg_valid_dq with "Hri Htlb") as %Htlbv.
@@ -323,7 +413,7 @@ Section KptShareTranslate.
     (* ---- open the shared table ---- *)
     iInv "Hkinv" as ">Hbody" "Hclose".
     iEval (rewrite /kpt_body) in "Hbody".
-    iDestruct "Hbody" as (t M B) "(Ht & #Hlbt & HM & %Hspec)".
+    iDestruct "Hbody" as (t M B) "(Ht & #Hlbt & #Hbd & HM & %Hspec)".
     iDestruct (kmap_at_lookup with "HM Hat") as %HMlk.
     iDestruct (kpt_lb_agree t0 t with "Hlb0 Hlbt") as %Hcan0.
     (* the hart's cached entries are coherent with the LIVE tree: coherence
@@ -337,18 +427,29 @@ Section KptShareTranslate.
     assert (Hlf : kpt_leaf_pte_of vpn (ppn, pc) = mk_pte ppn (kperm_flags pc))
       by reflexivity.
     rewrite Hlf in Hmaps.
-    iPoseProof (PtTreeShim.pt_slot_payer_sc (KTier B) True%I
-                  σ.(mem) (pt_addr0 p1 vpn) (pte_set_ad (mk_pte ppn (kperm_flags pc)) a0 d0))
-      as "Hpay".
-    iAssert (True)%I as "Hsto"; [done |].
+    iAssert (∀ wnew : mword 64,
+               ⌜pte_wb_ok (pte_set_ad (mk_pte ppn (kperm_flags pc)) a0 d0)
+                   wnew⌝ -∗
+               gen_heap_interp σ.(mem) -∗ S σ.(mem) -∗
+               pt_slot_own (KTier B) (pt_addr0 p1 vpn) (DfracOwn 1)
+                 (pte_set_ad (mk_pte ppn (kperm_flags pc)) a0 d0) ==∗
+               gen_heap_interp
+                 (RiscvModelBytes.write_bytes σ.(mem) (pt_addr0 p1 vpn) 8
+                    wnew) ∗
+               S (RiscvModelBytes.write_bytes σ.(mem) (pt_addr0 p1 vpn) 8
+                    wnew) ∗
+               pt_slot_own (KTier B) (pt_addr0 p1 vpn) (DfracOwn 1) wnew)%I
+      as "Hpay'".
+    { iIntros (wnew) "%Hcn Hgh Hsto Hs".
+      iApply ("Hpay" $! σ.(mem) (pt_addr0 p1 vpn) _ wnew B with "[//] Hgh Hsto Hs"). }
     iMod (ptree_translateAddr_own acc Supervisor (KTier B) root_ppn t
             (mk_pte ppn (kperm_flags pc)) va pa satp0
-            tlbvec p2 p1 a0 d0 σ (fun _ : PtBytes.pamap => True%I)
+            tlbvec p2 p1 a0 d0 σ S
             Hchk Hvar Hcanon Hout Hbase Hmaps Htlbok
             Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
             HA' Hord' HR' HW' Hcov' Hpmar Hpmaw
-            with "Hpay Hsto Hri Hgh Htlb Ht")
-      as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & _ & Hri & Hgh & Htlb & Ht)".
+            with "Hpay' Hsto Hri Hgh Htlb Ht")
+      as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & Hcur & Hri & Hgh & Htlb & Ht)".
     (* ---- the write-back does NOT move the canonical table, so the
        snapshot is re-derived by a rewrite: no ghost update at all ---- *)
     assert (Hcan' : ptree_canon t = ptree_canon t').
@@ -366,17 +467,17 @@ Section KptShareTranslate.
                Hspec Hmaps HMlk).
       exists a0, d0. rewrite Hlf. reflexivity. }
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iApply bi.later_intro. iExists t', M, B. iFrame "Ht HM Hlb'". iPureIntro. exact Hspec'. }
+    { iNext. iExists t', M, B. iFrame "Ht HM Hlb' Hbd". iPureIntro. exact Hspec'. }
     iModIntro. iExists σ'.
     iSplit; [iPureIntro; exact Htrans |].
     iSplit; [iPureIntro; exact Hmdev |].
     iSplit; [iPureIntro; exact Hsregs |].
-    iFrame "Hri Hgh".
+    iFrame "Hcur Hri Hgh".
     iDestruct (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
                  HA Hord HX HW HR Hcov with "Hpc Hpa") as "Hpmp".
-    iApply (tlb_res_pt_intro root_ppn satp0 tlbvec' t'
+    iApply (tlb_res_pt_intro root_ppn satp0 tlbvec' t' Bres
               Hmode Hasid Hppn Htlbok'
-              with "Hsatp Htlb Hlb' Hpmp Hkinv").
+              with "Hsatp Htlb Hlb' Hbres Hvres Hpmp Hkinv").
   Qed.
 
 End KptShareTranslate.

@@ -72,6 +72,7 @@ Require Import WpDecodeBridge.
 Require Import CommonWalk.
 (* A6.21: the PT-slot TIER INDEX lives here now; see [pt_slot_own]. *)
 Require Import TsoCtx.
+Require Import CtxValues.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -925,29 +926,8 @@ Inductive ptier : Type :=
 (* out of the pin's tie by [PtAdBits.pte_bytes_canon]).                   *)
 (* ===================================================================== *)
 
-(* THE ALLOWED-BYTE SETS' CARRIER.  On the T-leg this type and its two
-   constructors live in TsoMemPa.v (below the seal) beside the pin
-   machinery that consumes them; the FAMILY itself ([pte_slot_set],
-   [pte_wb_ok]) is pure, so main states it verbatim over a local copy.
-   At leg C the copy collapses into TsoMemPa's. *)
-Definition byteset : Type := gset (bv 8).
-Definition byteset_sing (b : bv 8) : byteset := {[ b ]}.
-Definition byteset_of4 (b0 b1 b2 b3 : bv 8) : byteset := {[ b0; b1; b2; b3 ]}.
-
-Lemma elem_of_byteset_sing (b b' : bv 8) : b ∈ byteset_sing b' <-> b = b'.
-Proof. rewrite /byteset_sing elem_of_singleton //. Qed.
-
-Lemma byteset_sing_in (b : bv 8) : b ∈ byteset_sing b.
-Proof. by apply elem_of_byteset_sing. Qed.
-
-Lemma elem_of_byteset_of4 (b b0 b1 b2 b3 : bv 8) :
-  b ∈ byteset_of4 b0 b1 b2 b3 <-> (b = b0 \/ b = b1 \/ b = b2 \/ b = b3).
-Proof.
-  rewrite /byteset_of4 !elem_of_union !elem_of_singleton. tauto.
-Qed.
-
-Definition pte_ad_byte0 (w : mword 64) : byteset :=
-  byteset_of4
+Definition pte_ad_byte0 (w : mword 64) : TsoMemPa.byteset :=
+  TsoMemPa.byteset_of4
     (nth_byte (pte_set_ad w (mword_of_int 0) (mword_of_int 0)) 0%nat)
     (nth_byte (pte_set_ad w (mword_of_int 0) (mword_of_int 1)) 0%nat)
     (nth_byte (pte_set_ad w (mword_of_int 1) (mword_of_int 0)) 0%nat)
@@ -978,17 +958,17 @@ Proof. rewrite /pte_nonleafb /pte_leaf. reflexivity. Qed.
    levels 2 and 1 and A6.54 reported lost: it is not lost, it just does
    not come from [ledger_read_at_ok] + [⌜t ≤ B⌝] (which cannot apply to a
    pinned element at all).  It comes from the SET. *)
-Definition pte_slot_set (w : mword 64) (j : nat) : byteset :=
+Definition pte_slot_set (w : mword 64) (j : nat) : TsoMemPa.byteset :=
   if Nat.eqb j 0
   then (if pte_nonleafb w
-        then byteset_sing (nth_byte w 0%nat)
+        then TsoMemPa.byteset_sing (nth_byte w 0%nat)
         else pte_ad_byte0 w)
-  else byteset_sing (nth_byte w j).
+  else TsoMemPa.byteset_sing (nth_byte w j).
 
 Lemma pte_ad_byte0_set_ad (w : mword 64) (a d : mword 1) :
   nth_byte (pte_set_ad w a d) 0%nat ∈ pte_ad_byte0 w.
 Proof.
-  rewrite /pte_ad_byte0 elem_of_byteset_of4.
+  rewrite /pte_ad_byte0 TsoMemPa.elem_of_byteset_of4.
   destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
     tauto.
 Qed.
@@ -997,7 +977,7 @@ Lemma pte_ad_byte0_inv (w : mword 64) (b : bv 8) :
   b ∈ pte_ad_byte0 w ->
   exists a d : mword 1, b = nth_byte (pte_set_ad w a d) 0%nat.
 Proof.
-  rewrite /pte_ad_byte0 elem_of_byteset_of4.
+  rewrite /pte_ad_byte0 TsoMemPa.elem_of_byteset_of4.
   intros [-> | [-> | [-> | ->]]]; eauto.
 Qed.
 
@@ -1027,7 +1007,7 @@ Proof.
     rewrite (proj2 (pte_nonleafb_leaf w) Hlf). apply pte_ad_byte0_set_ad.
   - apply Nat.eqb_neq in Hj0.
     rewrite (pte_set_ad_nth_byte_high w a d j ltac:(lia)).
-    apply byteset_sing_in.
+    apply TsoMemPa.byteset_sing_in.
 Qed.
 
 (* THE READ'S CONCLUSION AT AN INTERIOR SLOT: all eight sets are
@@ -1041,13 +1021,13 @@ Proof.
   rewrite /pte_slot_set in Hm.
   destruct (Nat.eqb j 0) eqn:Hj0.
   - apply Nat.eqb_eq in Hj0. subst j.
-    rewrite Hnl in Hm. by apply elem_of_byteset_sing in Hm.
-  - by apply elem_of_byteset_sing in Hm.
+    rewrite Hnl in Hm. by apply TsoMemPa.elem_of_byteset_sing in Hm.
+  - by apply TsoMemPa.elem_of_byteset_sing in Hm.
 Qed.
 
 Lemma pte_slot_set_nonleaf_sing (w : mword 64) (j : nat) :
   pte_nonleafb w = true ->
-  pte_slot_set w j = byteset_sing (nth_byte w j).
+  pte_slot_set w j = TsoMemPa.byteset_sing (nth_byte w j).
 Proof.
   intros Hnl. rewrite /pte_slot_set. destruct (Nat.eqb j 0) eqn:Hj0.
   - apply Nat.eqb_eq in Hj0. subst j. by rewrite Hnl.
@@ -1074,7 +1054,7 @@ Proof.
     intros j Hj. have := H j ltac:(lia). rewrite /pte_slot_set.
     destruct (Nat.eqb j 0) eqn:Hj0.
     { apply Nat.eqb_eq in Hj0. lia. }
-    by rewrite elem_of_byteset_sing.
+    by rewrite TsoMemPa.elem_of_byteset_sing.
 Qed.
 
 (* ...and therefore the family is determined by the CANON CLASS of a LEAF,
@@ -1164,15 +1144,24 @@ Section PtTreeIris.
      seven files; the ~50 consumer files behind the notations do not move. *)
   Context (PTT : ptier).
 
-  (* THE KERNEL SLOT'S PIN (T-leg A6.135): per-byte floors under the
-     global bound [B], each byte pinned to its [pte_slot_set] family with
-     the boot hart's own-write anchor.  ALL of that is below the seal
-     (phys_ledger_pin / cv_own / view_lb), so on main the body is the raw
-     physical word with [B] phantom; at leg C the T-leg body swaps in and
-     the laws below ([_forget], [pt_slot_own_*]) hold of it unchanged. *)
+  (* A6.135: the kernel slot at PER-BYTE floors under the global bound
+     [B], each byte carrying the BOOT HART's persistent own-write anchor
+     (or floor 0, the image).  [Ba] is the byte's own publication floor --
+     establishment mints it at the byte's own write stamp, which is what
+     makes the publication UNCONDITIONAL (no drain, no log-top) and gives
+     hart 0 a token-free read credential ([CtxValues.cv_own]); a secondary
+     reads through [view_lb B] and [Ba <= B].  The A/D write-back restamps
+     the cell but keeps [(Ba, pte_slot_set w)] -- the [Bg]-generalized
+     store gate ([TsoCtx.ledger_store_win_pin_okf]). *)
   Definition kpt_slot_pin (a : Arch.pa) (dq : dfrac) (w : bv 64)
       (B : nat) : iProp Σ :=
-    phys_word_pointsto a dq w.
+    (⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
+     [∗ list] j ∈ seq 0 8, ∃ (Ba t : nat), ⌜(Ba <= B)%nat⌝ ∗
+       TsoCtx.phys_ledger_pin (pa_add a j) dq (nth_byte w j) t Ba
+         (pte_slot_set w j) ∗
+       (⌜Ba = 0%nat⌝ ∨
+        CtxValues.cv_own 0%nat (pa_add a j) Ba ∨
+        TsoGhost.view_lb RiscvPtsto.view_name RiscvPtsto.loglen_name 0%nat Ba))%I.
 
   Definition pt_slot_own (a : Arch.pa) (dq : dfrac) (w : bv 64) : iProp Σ :=
     match PTT with
@@ -1190,7 +1179,12 @@ Section PtTreeIris.
      is. *)
   Lemma kpt_slot_pin_forget a dq w B :
     kpt_slot_pin a dq w B ⊢ phys_word_pointsto a dq w.
-  Proof. rewrite /kpt_slot_pin. auto. Qed.
+  Proof.
+    iIntros "[%Hal Hb]". rewrite /phys_word_pointsto. iSplitR; first done.
+    iApply (big_sepL_impl with "Hb").
+    iIntros "!>" (k j _) "(%Ba & %t & %HBa & H & _)".
+    by iApply TsoCtx.phys_ledger_pin_forget.
+  Qed.
 
   Lemma pt_slot_own_forget a dq w :
     pt_slot_own a dq w ⊢ phys_word_pointsto a dq w.
