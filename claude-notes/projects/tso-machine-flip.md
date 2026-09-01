@@ -18304,3 +18304,69 @@ NEXT: R2 per §4.1 -- site-map first (the six ProofBread/ProofBrelse
 sites, bpin/bunpin's box opens, ProofLogWrite's two structural bref
 destructs, ProofForkretPark/SpecForkretParkPaid's bcache_res mentions),
 then the cutover and the mandatory -B round.
+
+### A6.154: R2 SITE MAP (endgame §4.1 R2; written BEFORE the cutover)
+
+Instruments available (all landed in R1/R1-pre; nothing new):
+  box_swap_bump / box_ref_another / box_ref_drop_hand / box_ref_drop_pile
+  / box_swap_checkout / box_swap_park / box_swap_drop_hand /
+  box_swap_drop_pile (BioInv, fupds over buf_box at ↑bioxN);
+  wp_acquire_gen_llb_sconf (λ payload, post: R cur_ctx + ctx_floor K ≥
+  Tl); wp_release_gen_in_sconf (lock_finisher_in, the R2 floor mint) and
+  wp_release_gen_sconf (plain, R cur_ctx); wp_acquiresleep_genl_llb_sconf
+  (post: R cur_ctx + ctx_floor K ≥ Tl); wp_releasesleep_genin_sconf
+  (llb tl ∗ Rdep cur_ctx + the fold) / wp_releasesleep_genl_sconf;
+  bslp/bslp_dep/bslp_fold; bcache_res2/bcache_scan2/bio_slot_res2 +
+  bcache_res2_fold; own_context via SieCapCtx.sie_cap_gpr_own_ctx_acc.
+
+(A) BioInv / BreadLru / ProofBreadParts -- the v1 accessors restated over
+    bcache_scan2 (same shapes + the register rows):
+    bcache_res2_to_scan; bio_slots_acc2; bio_slot_refcnt_acc2 (the tie
+    now also relates reg_cnt); bio_slot_devbno_acc2; bcache_scan2_incr
+    (refs 0->1: assemble buf_bundle cur_ctx from the None arm's cells,
+    box_swap_bump with own_context, the Some arm keeps reg_cnt 1 and the
+    L1 row; refs >= 1: box_ref_another with the Some arm's reg_cnt half);
+    both hand out the new bref (tok + fragment/llb + fractions);
+    bcache_scan2_recycle (the recycler's three field stores are PURE
+    payload ops on the None arm -- v1's escrow_recyc_dev/_bno/_valid
+    become cell updates on bio_slot_res2's None arm, no invariant open;
+    the refcnt store then bumps as above).
+(B) ProofBread: sites 1-4 (recycler stores) = the (A) payload ops;
+    site 5 = the checkout at bread+0xb4: bread_tail takes buf_box bn V k
+    (not inv bioN …), the winner's rows from the llb-tier acquiresleep
+    (Tl := rb.2 read off the bref's fragment; the acquire is called with
+    the persistent llb rb.2 from the bref) -- `bslp bn k cur_ctx` gives
+    bown + the rp half + astamp/llb rp + ctx_floor cur_ctx rp.2; then
+    box_swap_checkout (K1 := the acquire's K, K2 := rp.2) replaces the
+    escrow iInv and hands the bundle at cur_ctx.  Both acquiresleep
+    calls (hit 1232, miss 1627) switch to the genl_llb tier at bslp.
+(C) ProofBrelse: site 6 = the park at brelse+0x02: box_swap_park
+    (own_context from Hcg; bundle from the tail's cells; fragment from
+    the bref; rp' half from the sleeplock payload) returns the new park
+    half + tag claim + astamp/llb r + bown + bref_tok; releasesleep via
+    wp_releasesleep_genin_sconf with Rdep := bslp_dep bn k r, tl := r.2,
+    fold := bslp_fold; bcache.lock via wp_acquire_gen_llb_sconf at
+    Tl := r.2 over (λ ξ, bcache_res2 bn V ξ); the refs-- (brelse+0x2c…)
+    at cnt > 1 = box_ref_drop_pile (the claim), at cnt = 1 =
+    box_swap_drop_pile (Km := the acquire's K, Kd := the payload's tl,
+    the claim + astamp r) returning the bundle into the None arm; every
+    decrement syncs the L1 rd half (the lemma does it); release via the
+    _in form at tl' := max tl r.2 (llb of the max from the two llbs) or
+    plain when r.2 <= tl.
+(D) ProofBpin: refs++ under bcache.lock = box_ref_another (the Some
+    arm's reg_cnt half) and the new bref carries the fragment.
+    ProofBunpin: refs-- with the bref IN HAND: cnt > 1 =
+    box_ref_drop_hand; cnt = 1 = box_swap_drop_hand (Kb := K from the
+    llb-tier acquire at Tl := rb.2 of the consumed bref, Kd := payload
+    tl).  Both files' acquire/release switch to the gen tiers over
+    bcache_res2.
+(E) ProofBwrite: bio_ctx_buf's sleeplock row (genl at bslp) -- mechanical.
+(F) ProofLogWrite 2566/2671: the two structural bref destructs gain the
+    fragment conjunct (passed through opaquely).
+(G) Specs unchanged: bref is opaque in SpecBpin/SpecBunpin; bio_ctx,
+    bio_init, bio_init_at keep their statements.  ProofForkretPark /
+    SpecForkretParkPaid mention buf_escrow/bcache_res in comments only.
+(H) DELETE at the end: buf_escrow(_body/_inv), escrow_swap_*,
+    escrow_recyc_*, buf_mid, buf_parked, buf_chain, bio_slot_res /
+    bcache_scan / bcache_res (v1), bcache_res_to_scan, v1 accessors.
+Gate: full -B round (interface change).
