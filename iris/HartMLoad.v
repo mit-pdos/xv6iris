@@ -26,7 +26,13 @@
        peeled through [HartMFrame]'s [gpr_file] rules rather than walked.
 
    Like the store chain, this one is stated at [Machine] with
-   [mstatus.MPRV = 0]: a LOAD consults MPRV where a fetch short-circuits it. *)
+   [mstatus.MPRV = 0]: a LOAD consults MPRV where a fetch short-circuits it.
+
+   AND, since the TSO flip: this chain is the one place in the tree that
+   reads THROUGH the write log rather than off the flat cache, because its
+   access is [Read_plain] -- so its memory premise is [swp_hart_ram_read_plain]'s
+   view-indexed obligation ([robl_ram] below), carried down the whole chain
+   and discharged by nobody here.  See [robl_ram]'s comment. *)
 From Stdlib Require Import ZArith Zquot Lia.
 From stdpp Require Import gmap relations bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -39,6 +45,10 @@ Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartEvents HartMPmp HartMFetch HartMFrame.
 Require Import RiscvExtras RiscvFetchExec.
 Require Import RegFile WpGpr.
+(* [pwmsg]/[agent]/[tso_read_bytes]: [robl_ram] below is stated over the
+   write log, because a PLAIN data load is the one access in the tree that
+   reads THROUGH it rather than off the flat cache *)
+Require Import TsoMemPa.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 
@@ -276,51 +286,56 @@ Section load.
 
   (* ------------------------------------------------------------------ *)
   (* THE LOAD OBLIGATION, SPELLED ONCE (the read-side twin of            *)
-  (* [HartMStore.wobl_ram], and the same SHAPE back-ported at its         *)
-  (* SC-degenerate meaning).                                              *)
+  (* [HartMStore.wobl_ram]).  A plain [Load Data] is the ONE access that  *)
+  (* does not read the flat cache: [HartEvents.swp_hart_ram_read_plain]   *)
+  (* lets the hardware return any byte visible at any view between the    *)
+  (* hart's own [tv] and the log top, so what a caller owes is not a flat *)
+  (* [read_bytes] but this VIEW-INDEXED family: [bytes] is what the load  *)
+  (* sees at EVERY view it could legally land on.                         *)
   (*                                                                      *)
-  (* At SC a data load reads the flat cache, so what a caller owes is a    *)
-  (* [read_bytes] fact against [σ.(mem)].  Post-flip a plain [Load Data]   *)
-  (* is the ONE access in the tree that does not read the flat cache --    *)
-  (* the hardware may return any byte visible at any view between the      *)
-  (* hart's own [tv] and the log top -- so the same name denotes a         *)
-  (* VIEW-INDEXED family over the era's write log instead.                 *)
-  (*                                                                      *)
-  (* THE WHOLE CHAIN BELOW IS A PASS-THROUGH for it: nothing in this file  *)
-  (* owns a points-to, so no lemma here DISCHARGES the obligation; each    *)
-  (* one takes it as [robl_prem] and hands it down UNOPENED.  That is why  *)
-  (* the premise is a NAMED abbreviation and not inlined five times: the   *)
-  (* cutover changes these two definitions and not one of the five         *)
-  (* exported statements that forward them.                                *)
+  (* THE WHOLE CHAIN BELOW IS A PASS-THROUGH for it: nothing in this file *)
+  (* owns a points-to, so no lemma here DISCHARGES the obligation; each   *)
+  (* one takes it and hands it down, and the bundle                       *)
+  (* [tso_interp_of riscv_eraGS img σ.(mem) log V] goes down and comes    *)
+  (* back untouched (a plain load moves no view, so the [V] returned is   *)
+  (* the [V] received -- cf. [wobl_ram]'s [vstep], which is where the     *)
+  (* store side differs).                                                 *)
   (* ------------------------------------------------------------------ *)
-  (* ------------------------------------------------------------------ *)
-  (* THE LOAD OBLIGATION, SPELLED ONCE (the read-side twin of            *)
-  (* [HartMStore.wobl_ram]).                                              *)
-  (*                                                                      *)
-  (* A data load reads the flat memory, so what a caller owes is a         *)
-  (* [read_bytes] fact against [σ.(mem)].  Under a weak-memory semantics   *)
-  (* a plain [Load Data] is the one access in the tree that does not read  *)
-  (* the flat cache -- the hardware may return any byte visible at any     *)
-  (* view between the hart's own and the write log's top -- so the same    *)
-  (* name would denote a VIEW-INDEXED family instead.  Naming it is what   *)
-  (* keeps that a change to ONE definition body.                           *)
-  (*                                                                      *)
-  (* THE WHOLE CHAIN BELOW IS A PASS-THROUGH for it: nothing in this file  *)
-  (* owns a points-to, so no lemma here DISCHARGES the obligation; each    *)
-  (* one takes it as [robl_prem] and hands it down UNOPENED.  That is why  *)
-  (* the premise is a NAMED abbreviation and not inlined five times.       *)
-  (* ------------------------------------------------------------------ *)
-  Definition robl_ram (mm : gmap Arch.pa (bv 8)) (pa : Arch.pa)
-      (w : bv 64) : Prop :=
-    read_bytes mm pa 8 = Some w.
+  Definition robl_ram (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+      (tv : nat) (pa : Arch.pa) (w : bv 64) : Prop :=
+    ∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
+      tso_read_bytes img log (hart_agent cpu_id) tv' pa 8 w.
 
-  (* the callback that owes it.  Unlike the store's, this one hands the
-     machine state straight back: a load moves nothing. *)
-  Definition robl_prem (pa : Arch.pa) (bytes : bv 64)
-      (R : iProp Σ) : iProp Σ :=
-    (∀ σ : mstate, mstate_interp σ ={⊤,∅}=∗
-       ⌜robl_ram σ.(mem) pa bytes⌝ ∗
-       ▷ (|={∅,⊤}=> mstate_interp σ ∗ R))%I.
+  (* A6.27: WHO CAN PAY [robl_ram] WHEN THE BYTE IS NOT PRISTINE.
+     [robl_ram] says WHAT is owed; this says WHO can pay it for a byte that
+     is WRITTEN at run time.  A6.10's pristine gate serves an IMAGE byte
+     (timestamp 0, visible at every view); the M-mode boot stack's frame
+     slots are not image bytes -- [timerinit]'s prologue stores ra/s0 and
+     its epilogue reads them back -- so the load licence has to come from
+     the registered ledger, which is exactly [ctx_phys_load_bytes_ok].
+     This is [HartMStore.wobl_ram_ctx]'s mirror, and the [tv' <= length log]
+     premise of [robl_ram] is simply not needed: the gate's conclusion is
+     ∀ tv' above the hart's own view, with no upper bound. *)
+  Lemma robl_ram_ctx (img : gmap Arch.pa (bv 8)) (sg : mstate)
+      (log : list pwmsg) (V : agent -> nat) (xi : TsoCtx.CtxId)
+      (pa : Arch.pa) (w : bv 64) (dq : dfrac) (tv : nat) :
+    V (hart_agent cpu_id) = tv ->
+    gen_heap_interp (hG := riscv_memGS) sg.(mem) -∗
+    tso_interp_of riscv_eraGS img sg.(mem) log V -∗
+    TsoCtx.own_context xi -∗
+    ([∗ list] j ∈ seq 0 8,
+       TsoCtx.ctx_phys_pointsto xi (pa_add pa j) dq (nth_byte w j)) -∗
+    ⌜robl_ram img log tv pa w⌝.
+  Proof.
+    intros Htv. iIntros "Hgh Htso Hrun Hb".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log V
+               sg.(sregs) sg.(mdev) Hpin).
+    iDestruct (TsoCtx.ctx_phys_load_bytes_ok
+                 (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
+                 xi pa 8 w dq with "Hgh Htso Hrun Hb") as %Hok.
+    iPureIntro. intros tv' Hle _. apply Hok. cbn [gtv gs_of]. lia.
+  Qed.
 
   Lemma swp_checked_mem_read_load8 (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
@@ -342,7 +357,14 @@ Section load.
        swp (pmpCheck (Physaddr pa) 8 (Load Data) Machine)
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    robl_prem pa bytes R -∗
+    (* the obligation, threaded not discharged -- see [robl_ram] *)
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜robl_ram img log tv pa bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
     swp (checked_mem_read (Load Data) PBMT_PMA Machine
            (Physaddr pa) 8 false false false false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
@@ -388,15 +410,23 @@ Section load.
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 8 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_hart_ram_read 8 (mread_req8 pa) _
+    (* THE ONE EVENT: a [Read_plain] at RAM, so it is the PLAIN rule, and the
+       obligation it asks for is the view-indexed one -- which is exactly what
+       [Hmem] carries, unchanged, so this is a hand-over and not a proof.  The
+       last side condition is [ak_excl] at [Read_plain], which computes to
+       [false]; the [ak_strong] one went with the strong arm (A6.36). *)
+    { iApply (swp_hart_ram_read_plain 8 (mread_req8 pa) _
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R)%I)
                 (hread_req_at_read_ram8 pa)
-                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
+                (addr_is_ram_not_dev pa Hram)
+                ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
-      iIntros (σ) "Hσ". iMod ("Hmem" $! σ with "Hσ") as "[%Hrb Hclose]".
+      iIntros (σ img log tv V) "%Htv Hσ Htso".
+      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
-      iMod "Hclose" as "[Hσ HR]". iModIntro. iFrame "Hσ".
+      iMod "Hclose" as "(Hσ & Htso & HR)". iModIntro. iFrame "Hσ Htso".
+      iIntros (tvn _ _) "_".
       rewrite hread_resume_read_ram8. iApply swp_ret. by iFrame. }
     iIntros (v) "(-> & Hrw & Hro & HR)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
@@ -489,7 +519,14 @@ Section load.
        swp (pmpCheck (Physaddr pa) 8 (Load Data) Machine)
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    robl_prem pa bytes R -∗
+    (* threaded straight through to [swp_checked_mem_read_load8] *)
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜robl_ram img log tv pa bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
     swp (translate_and_read_value (Virtaddr pa) 8 (Load Data) false false false)
       (fun r => ⌜r = Values.Ok (Physaddr pa, bytes)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
@@ -548,7 +585,14 @@ Section load.
        swp (pmpCheck (Physaddr pa) 8 (Load Data) Machine)
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    robl_prem pa bytes R -∗
+    (* threaded straight through *)
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜robl_ram img log tv pa bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
     swp (vmem_read_addr (Virtaddr pa) 8 (Load Data) false false false)
       (fun r => ⌜r = Values.Ok bytes⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
@@ -679,7 +723,14 @@ Section load.
               (Load Data) Machine)
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    robl_prem (add_vec (m !!! Regidx i) offset) bytes R -∗
+    (* threaded straight through *)
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜robl_ram img log tv (add_vec (m !!! Regidx i) offset) bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
     swp (vmem_read (Regidx i) offset 8 (Load Data) false false false)
       (fun r => ⌜r = Values.Ok bytes⌝ ∗ gpr_file m ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
@@ -743,7 +794,16 @@ Section load.
        swp (pmpCheck (Physaddr ea) 8 (Load Data) Machine)
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    robl_prem ea bytes R -∗
+    (* the chain's TOP end of the obligation: this is what a caller with the
+       points-to actually has to prove, and the only place the flat
+       [read_bytes] used to sit *)
+    (∀ σ img log tv V,
+        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        mstate_interp σ -∗
+        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
+        ⌜robl_ram img log tv ea bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+             tso_interp_of riscv_eraGS img σ.(mem) log V ∗ R)) -∗
     swp (execute_LOAD imm (Regidx rs1) (Regidx rd) is_unsigned 8)
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                 gpr_file (<[Regidx rd := regval_into_reg bytes]> m) ∗

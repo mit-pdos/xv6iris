@@ -455,15 +455,34 @@ Section span.
     rewrite (HC _ oc k Hoc).
     iApply (wp_hart_step with "Hcert").
     { (* a span node is a register or silent node: it keeps the reservation *)
-      intros oth0 σ0 r0 m'0 σ'0 r'0 Hs.
-      destruct oc; try discriminate Hns; destruct Hs as (_ & _ & ->); reflexivity. }
-    iIntros (σ oth rv) "Hσ". destruct σ as [rsM mem0 dev0].
+      intros oth0 h0 img0 σ0 log0 tv0 r0 m'0 σ'0 log'0 tv'0 r'0 Hs.
+      destruct oc; try discriminate Hns;
+        destruct Hs as (_ & _ & _ & _ & ->); reflexivity. }
+    iIntros (σ oth rv img log tv V) "%Htv Hσ Htso".
+    destruct σ as [rsM mem0 dev0].
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (hreg_frame_agree rs Drw rsM with "Hri Hrf") as %HagW.
     iDestruct (hreg_frame_ro_agree Df rs Dro rsM with "Hri Hro") as %HagO.
     assert (Hag : reg_agree_on (Drw ∪ Dro) rs rsM).
     { intros r' Hr'. apply elem_of_union in Hr' as [Hr'|Hr'];
         [by apply HagW|by apply HagO]. }
+    (* THE MEMORY-MODEL SIDE, PAID ONCE, BEFORE THE ARM SPLIT.  A span node
+       is a register or silent node, so the only one with a memory-model
+       effect is the DRAINING BARRIER ([HartLift.hbar_tv]); doing the
+       (monotone) view advance here, at the unreduced [hbar_tv], keeps the
+       fourteen arms below uniform -- in each of them [hbar_tv] reduces by
+       iota to exactly that arm's [tv'], so the bundle matches by
+       conversion. *)
+    iAssert (⌜(tv <= length log)%nat⌝)%I as %Htvlen.
+    { iDestruct "Htso" as (TM LM) "(_&_&_&_&_&_&_&_&%Hb&_)".
+      iPureIntro. rewrite -Htv. apply Hb. }
+    assert (Hadv : (V (hart_agent cpu_id)
+                    <= hbar_tv (hart_agent cpu_id) log oc tv)%nat)
+      by (rewrite Htv; apply hbar_tv_ge).
+    iMod (tso_interp_of_advance _ img mem0 log V (hart_agent cpu_id)
+            (hbar_tv (hart_agent cpu_id) log oc tv)
+            (fin_to_nat_lt cpu_id) Hadv (hbar_tv_le _ _ _ _ Htvlen)
+           with "Htso") as "Htso".
     destruct oc; try discriminate Hns.
     (* 14 goals: RegRead, RegWrite, then the 12 silent classes *)
     2: { (* RegWrite: [hspan_stops = false] forces [reg ∈ Drw] *)
@@ -483,16 +502,18 @@ Section span.
                    (register_beq_false r' reg Hne)).
         by apply HagO. }
       iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
-      iExists (C (k tt)), (MState (register_set reg regval rsM) mem0 dev0), rv.
+      iExists (C (k tt)), (MState (register_set reg regval rsM) mem0 dev0),
+        log, tv, rv.
       iSplitR; [iPureIntro; split_and!; reflexivity|].
-      iNext. iIntros (m' σ' rv') "%Hstep".
-      destruct Hstep as (-> & Hσ' & ->).
+      iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
+      destruct Hstep as (-> & Hσ' & -> & -> & ->).
       assert (σ' = MState (register_set reg regval rsM) mem0 dev0) as ->
         by exact Hσ'.
       iMod (hreg_frame_update rs Drw reg regval rsM Hns with "Hri Hrf")
         as "[Hri Hrf]".
       iMod "Hmask" as "_". iModIntro.
-      iSplitR "H Hrf Hro"; [iFrame "Hri Hmem Hdev"|].
+      iSplitR "H Hrf Hro Htso"; [iFrame "Hri Hmem Hdev"|].
+      iSplitL "Htso"; [iExact "Htso"|].
       iApply ("H" $! (k tt) rsM (register_set reg regval rsM)
                 with "[%] [%] [Hrf] [Hro]").
       - exact Hag.
@@ -503,12 +524,13 @@ Section span.
                      Dro HagO'). }
     (* RegRead and the silent classes: the file does not move *)
     all: iApply fupd_mask_intro; [apply empty_subseteq|]; iIntros "Hmask";
-         iExists _, (MState rsM mem0 dev0), rv;
+         iExists _, (MState rsM mem0 dev0), log, _, rv;
          (iSplitR; [iPureIntro; split_and!; reflexivity|]);
-         iNext; iIntros (m' σ' rv') "%Hstep";
-         destruct Hstep as (-> & -> & ->);
+         iNext; iIntros (m' σ' log' tv' rv') "%Hstep";
+         destruct Hstep as (-> & -> & -> & -> & ->);
          iMod "Hmask" as "_"; iModIntro;
-         (iSplitR "H Hrf Hro"; [iFrame "Hri Hmem Hdev"|]);
+         (iSplitR "H Hrf Hro Htso"; [iFrame "Hri Hmem Hdev"|]);
+         (iSplitL "Htso"; [iExact "Htso"|]);
          iApply ("H" $! _ rsM rsM with "[%] [%] [Hrf] [Hro]");
          [ exact Hag
          | simpl; reflexivity
