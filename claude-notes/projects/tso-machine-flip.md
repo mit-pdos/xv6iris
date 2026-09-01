@@ -18001,3 +18001,17 @@ already uses), bcache.lock's acquire for the fold-back (deposit and
 withdraw under the same lock).  So aguard_receipt AT THE WITHDRAWER'S
 OWN ACQUIRE LEAF covers every case; the lock_pay_won route (and its
 WpLock stamp-ordering export) is NOT needed; gen-0 is boot-only.
+
+### A6.147 refinement (measured at hart_view_lb_get): the receipt route
+### needs ONE export -- the acquire-leaf llb cash-in
+
+[hart_view_lb_get] demands the drained-hart premise (length glog <=
+gtv cpu_id), true only at the AMO itself, and the interp -- so the
+withdrawer CANNOT mint its guard at an ordinary later AU leaf.  The
+mint must happen inside the acquire: WpSleeplock (and WpLock for the
+fold-back) gain a post row offering [∀ T, llb T -∗ hart_view_lb K ∗
+⌜T ≤ K⌝] at the acquire's drained point.  Same size as the WpLock
+stamp-ordering export the lock_pay_won route would have needed; this
+one is protocol-agnostic (cashes ANY llb), so it is the better export.
+The astamp/llb pair reaches the winner persistently through the box
+invariant body itself; only the view receipt needs the leaf.
