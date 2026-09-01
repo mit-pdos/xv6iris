@@ -698,3 +698,27 @@ at the intro), next the arm site (~1400) onto pinw_arm_write_c +
 iref_alloc_pinw_install, the incr site (~2050) onto
 wp_sw_au_dat_s_sconf + pinw_write_c + iref_incr_store_pinw_au, and the
 locked reads onto iref_load_locked_pinw_au + iref_read_locked_obl.
+
+## THE A6.144 RELEASE SEAM (design, being executed)
+
+The exact-read floor's life cycle is now fully understood:
+- Per slot, THE READ PRECEDES THE SECTION'S STORES (iget/iput/idup all
+  read-then-write), so the ACQUIRE-TIME floor covers every exact read;
+- the RELEASE cannot mint [ctx_floor cur_ctx tstn] for its own raw
+  count store (TSO: the writer's view does not pass its own buffered
+  store -- semantically correct that it is unmintable);
+- but the PARK can: program order puts the count store before the
+  release store, and [lock_pay_intro_llb]'s ctx_parked_raise lifts the
+  parked ξ's bound with just the store twin's llb(tstn) -- minting
+  [ctx_floor ξ_parked tstn], which TRANSPORTS to the next acquirer
+  (ctx_floor_dom through the payload morph).
+WHAT'S MISSING: the release specs' deposit row and the finisher's
+Pay-builder input are both the LOCK's R; the floored-R lock therefore
+cannot be released by a caller holding only the unfloored form.  THE
+GENERALIZATION: [lock_finisher] gains an [Rdep] (builder input) beside
+[R] (the inv's), gen release rows become [Rdep cur_ctx] +
+[lock_finisher_dep ... R Rdep ...]; existing consumers pass Rdep := R;
+the itable releases pass Rdep := unfloored + a finisher built on
+lock_pay_intro_llb with the twins' llb(tstn).  itable_res2 then becomes
+the ξ-INDEXED λ (floors at ξ) -- the is_itable2 λ-flip -- and the
+constant <{ }> coercion at its call sites goes away.
