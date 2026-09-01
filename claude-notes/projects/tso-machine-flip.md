@@ -18015,3 +18015,17 @@ stamp-ordering export the lock_pay_won route would have needed; this
 one is protocol-agnostic (cashes ANY llb), so it is the better export.
 The astamp/llb pair reaches the winner persistently through the box
 invariant body itself; only the view receipt needs the leaf.
+
+### A6.147 CORRECTION (supersedes the "acquire-leaf export" refinement):
+### NO new export -- the guard rides lock_pay_intro_llb, as designed
+
+The previous note was wrong: [hart_view_lb_get] at the acquire leaf is
+not the route, and nothing new is needed.  [WpLock.lock_pay_intro_llb]
+(built naming the CtxAnchor guard mint as its client) lets the DEPOSITOR
+fold [ctx_floor · T'] into the lock payload at its release by presenting
+[anchor_deposit]'s exported [llb T']; the winner receives the floor via
+[lock_pay_won] and mints its [aguard] with [aguard_intro] against the
+box body's [astamp].  W1 rides bcache.lock's payload; W2 rides the
+sleeplock's INNER spinlock record (releasesleep seals it, the
+acquiresleep winner won it) -- so the one real change is threading a
+floor row through SleepLock's record payload, internal to SleepLock.v.
