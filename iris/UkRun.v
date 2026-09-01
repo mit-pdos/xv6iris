@@ -86,8 +86,14 @@ Lemma uM_store8_umem_write (M : gmap Z (bv 8)) (a : Z) (v : mword 64) :
   uM_store8 M a v = umem_write M a 8 (nth_byte v).
 Proof. exact (uM_store_umem_write M a 8%nat v). Qed.
 
+Require Import FdSlots.  (* [fdstate] -- what a descriptor slot holds *)
+Require Import ProcGeom.  (* [NOFILE] -- how many of them there are *)
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section UkRun.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   (* NO ambient [CpuId]: the hart is an explicit argument of [urun], and the
      [WP] under that binder resolves to the one bound there -- the trick
@@ -109,7 +115,7 @@ Section UkRun.
      them.  A leaf that IS closing back up has just destructed the
      existential, so it can say which view it is at -- the same discipline
      [sz] follows, and the reason [urun_close] takes [fdv] as a parameter. *)
-  Definition urun (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+  Definition urun (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (avail : nat) : iProp Σ :=
     (∃ (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
        (Rut : uptd -> iProp Σ) (sz : Z)
@@ -117,6 +123,17 @@ Section UkRun.
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        uheap γt γd γs M pm ∗
        ustack γd (m !!! Regidx csp_rs1) avail ∗
+       (* THE PROGRAM'S OWN VIEW OF ITS DESCRIPTORS, keyed at the very [fdv]
+          the bundle is at.  This is the conjunct that makes a user-level fd
+          fact possible: [urun] is where [fdv] is bound and carried between
+          instructions, so it is the only place an authority can be pinned
+          to it.  The HANDLES ([UserFd.ufd]) live outside, in the program's
+          own context, which is what lets a proof say "I hold fd 1" without
+          naming the whole table.
+          Note this is NOT [Rfd] one line down: [Rfd] is the KERNEL's
+          fragment bundle, chosen by the loop and handed back whole at every
+          trap, and a program never learns its ghost name. *)
+       ufd_auth γfd fdv ∗
        uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv M m pc)%I.
 
   (* "this instruction does not write sp".  Every leaf that writes a general
@@ -133,17 +150,19 @@ Section UkRun.
   (* [sz] is a parameter: [urun] hides the break existentially, but a leaf
      that is closing back up has just destructed it, so it can say which one.
      Re-introducing the existential at THAT size is all this does. *)
-  Lemma urun_close (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+  Lemma urun_close (γt γd γs γfd : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (sz : Z) (fdv : list fdstate) (m : regfile) (pc : mword 64) (avail : nat) :
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
-    (∀ h : CpuId, urun γt γd γs h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
+    (* ...and the descriptor authority, at the same [fdv] the key is at *)
+    ufd_auth γfd fdv -∗
+    (∀ h : CpuId, urun γt γd γs γfd h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
     ukc pm M sz fdv m pc.
   Proof.
-    iIntros "Hheap Hstk Hcont".
+    iIntros "Hheap Hstk Hufd Hcont".
     rewrite /ukc. iIntros (h xi C pt Rfd Rut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h). iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv.
-    iFrame "Hheap Hstk Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
+    iFrame "Hheap Hstk Hufd Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
   Qed.
 
   (* [uv_upd] is the OTHER way a leaf writes a register (jalr's, where the
@@ -164,18 +183,19 @@ Section UkRun.
 
   (* ...and the same when the instruction WROTE a register: the free stack
      is keyed by sp, and [unot_sp] says this write was not to sp. *)
-  Lemma urun_close_upd (γt γd γs : gname) (M : gmap Z (bv 8))
+  Lemma urun_close_upd (γt γd γs γfd : gname) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5) (v : mword 64)
       (sz : Z) (fdv : list fdstate) (pc' : mword 64) (avail : nat) :
     unot_sp rd ->
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
-    (∀ h : CpuId, urun γt γd γs h (<[Regidx rd := v]> m) pc' avail -∗
+    ufd_auth γfd fdv -∗
+    (∀ h : CpuId, urun γt γd γs γfd h (<[Regidx rd := v]> m) pc' avail -∗
                   WP (Loop : expr riscv_lang)) -∗
     ukc pm M sz fdv (<[Regidx rd := v]> m) pc'.
   Proof.
-    intros Hns. iIntros "Hheap Hstk Hcont".
-    iApply (urun_close with "Hheap [Hstk] Hcont").
+    intros Hns. iIntros "Hheap Hstk Hufd Hcont".
+    iApply (urun_close with "Hheap [Hstk] Hufd Hcont").
     rewrite (unot_sp_upd rd v m Hns). iExact "Hstk".
   Qed.
 
@@ -400,14 +420,14 @@ Section UkRun.
 
   (* ...and what a PROGRAM can read off its own run, without opening it: the
      two stack facts every prologue used to take as premises. *)
-  Lemma urun_stack (γt γd γs : gname) (h : CpuId) (m : regfile)
+  Lemma urun_stack (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) :
-    urun γt γd γs h m pc avail -∗
+    urun γt γd γs γfd h m pc avail -∗
     ⌜ uint (m !!! Regidx csp_rs1) mod 8 = 0
       /\ 8 * Z.of_nat avail <= uint (m !!! Regidx csp_rs1) ⌝.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
     iDestruct (ustack_align with "Hstk") as %Hal.
     iDestruct (ustack_room with "Hheap Hstk") as %Hroom.
     iPureIntro. exact (conj Hal Hroom).
@@ -471,16 +491,19 @@ Section UkRun.
        is_Some (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)
                  !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
                      - 8 * Z.of_nat avail + Z.of_nat j)%Z)) ->
-    (∀ (γt γd γs : gname) (h : CpuId),
+    (* the descriptor table is [NOFILE] slots -- what the process's own
+       authority is minted with ([UserFd.ufd_auth] carries it) *)
+    length (uvis_fd W) = NOFILE ->
+    (∀ (γt γd γs γfd : gname) (h : CpuId),
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz γs (uvis_sz W) -∗
        utext_all γt (uvis_M W) (uvis_perm W) -∗
-       urun γt γd γs h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
+       urun γt γd γs γfd h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
          avail -∗
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    intros Hal8 Hroom Hstk. iIntros "Hprog". rewrite uslot_ukc /ukc.
+    intros Hal8 Hroom Hstk Hfdlen. iIntros "Hprog". rewrite uslot_ukc /ukc.
     iIntros (h xi C pt Rfd Rut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -492,6 +515,11 @@ Section UkRun.
     iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
     iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan)
       as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
+    (* ...AND THE PROGRAM'S DESCRIPTOR AUTHORITY, minted here beside the
+       heap's three names.  This is where a process's [urun] is created, so
+       it is where its own view of its table begins -- at the view the
+       resumed KEY carries, which is the view the kernel is handing it. *)
+    iMod (ufd_alloc (uvis_fd W) Hfdlen) as (γfd) "Hufd".
     rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
     (* ---- the carve ---- *)
     set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
@@ -504,12 +532,12 @@ Section UkRun.
       unfold f. unfold D, base in *. rewrite Hb. reflexivity. }
     iDestruct (ubytes_of_map γd D base (8 * avail) f Hf with "Hd") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! γt γd γs h with "[%] Hszf Ht"); [ exact Hsz | ].
+    iSpecialize ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht"); [ exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
-    iFrame "Hheap Hstk".
+    iFrame "Hheap Hstk Hufd".
     rewrite /uvb /uvb_F /user_ptm_inv.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
@@ -538,7 +566,10 @@ Section UkRun.
        is_Some (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)
                  !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
                      - 8 * Z.of_nat avail + Z.of_nat j)%Z)) ->
-    (∀ (γt γd γs : gname) (h : CpuId),
+    (* the descriptor table is [NOFILE] slots -- what the process's own
+       authority is minted with ([UserFd.ufd_auth] carries it) *)
+    length (uvis_fd W) = NOFILE ->
+    (∀ (γt γd γs γfd : gname) (h : CpuId),
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz γs (uvis_sz W) -∗
        utext_all γt (uvis_M W) (uvis_perm W) -∗
@@ -547,12 +578,12 @@ Section UkRun.
                 ~ (kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)))
              (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)),
           ubyteq γd DfracDiscarded k b) -∗
-       urun γt γd γs h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
+       urun γt γd γs γfd h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
          avail -∗
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    intros Hal8 Hroom Hstk. iIntros "Hprog". rewrite uslot_ukc /ukc.
+    intros Hal8 Hroom Hstk Hfdlen. iIntros "Hprog". rewrite uslot_ukc /ukc.
     iIntros (h xi C pt Rfd Rut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -564,6 +595,11 @@ Section UkRun.
     iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
     iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan)
       as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
+    (* ...AND THE PROGRAM'S DESCRIPTOR AUTHORITY, minted here beside the
+       heap's three names.  This is where a process's [urun] is created, so
+       it is where its own view of its table begins -- at the view the
+       resumed KEY carries, which is the view the kernel is handing it. *)
+    iMod (ufd_alloc (uvis_fd W) Hfdlen) as (γfd) "Hufd".
     rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
     (* ---- the cut at the entry sp ---- *)
     set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
@@ -588,12 +624,12 @@ Section UkRun.
                  (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D)
                  base (8 * avail) f Hf with "Dlo") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! γt γd γs h with "[%] Hszf Ht Dhi"); [ exact Hsz | ].
+    iSpecialize ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht Dhi"); [ exact Hsz | ].
     iApply "Hprog".
     iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
-    iFrame "Hheap Hstk".
+    iFrame "Hheap Hstk Hufd".
     rewrite /uvb /uvb_F /user_ptm_inv.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].

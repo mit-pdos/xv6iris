@@ -169,6 +169,9 @@ Proof. exact (era0_seed_boot S). Qed.
 (*  the cwd leg's is userinit's own call.                                  *)
 (* ===================================================================== *)
 
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section MirrorLegs.
   Context {Σ : gFunctors}.
   Context `{!fdslotG Σ}.
@@ -487,6 +490,7 @@ End MirrorMint.
 
 Section MirrorPark.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.

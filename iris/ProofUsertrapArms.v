@@ -115,6 +115,7 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module UtArms (PR : PREPARE_RETURN) (KI : KILLED) (KE : KEXIT) (YI : YIELD)
               (SK : SETKILLED) (VM : VMFAULT).
 
@@ -146,6 +147,7 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section UtArmsCommon.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
@@ -205,6 +207,7 @@ End UtArmsCommon.
 
 Section Ut56.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
@@ -612,7 +615,9 @@ Section Ut56.
     iApply (T.ut_a6 Rsys N U0 U pt ksp m0 S1 av nx false
               mie_v menvcfg0 epv scv lks sts sts
               Hwf' ltac:(intros _; reflexivity)
-              ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
+              ltac:(intros Hc; exfalso; exact (Hnec Hc))
+                (* ...and pipe's join, refuted through the same cause *)
+                ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
               Hmiev Hmenvv Hrd
               with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
     all: try lkbelow.
@@ -631,6 +636,7 @@ End Ut56.
 
 Section UtD0.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
@@ -1026,6 +1032,8 @@ Section UtD0.
       iApply (T.ut_a6 Rsys N U0 (MkUstate V' (us_M U)) pt ksp m0 mr av nx false
                 mie_v menvcfg0 epv scv lks sts sts
                 Hwf' ltac:(intros _; reflexivity)
+                ltac:(intros Hc; exfalso; exact (Hnec Hc))
+                (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv Hrd'
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
@@ -1039,6 +1047,7 @@ End UtD0.
 
 Section UtE8.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
@@ -1188,6 +1197,8 @@ Section UtE8.
       iApply (T.ut_fa Rsys N U0 U pt ksp m0 mf av nx false
                 mie_v menvcfg0 epv scv lks sts sts
                 Hwf' ltac:(intros _; reflexivity)
+                ltac:(intros Hc; exfalso; exact (Hnec Hc))
+                (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").

@@ -190,6 +190,9 @@ Qed.
 (*    recursion, patching the function one hart at a time).                 *)
 (* ---------------------------------------------------------------------- *)
 
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section reg_alloc.
   Context {Σ : gFunctors}.
   Context `{!ghost_mapG Σ register (sigT type_of_register)}.

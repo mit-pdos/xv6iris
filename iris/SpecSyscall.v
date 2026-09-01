@@ -118,7 +118,6 @@ Require Import ProcDefs.  (* [kstack_closer] -- the exit slot's right conjunct *
 Require Import FdSlots.
 Require Import UsysMemOk.   (* [usys_fd_ok] -- the descriptor rows, shared *)
 Require Import FileInvDefs.
-Require Import UserPtTree.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import IrefSlots.
@@ -147,6 +146,8 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import RiscvModelBytes.  (* [nth_byte] -- pipe's two words *)
+Require Import UserPtTree.       (* [umem_wr] *)
 Import Defs.
 
 (* ===================================================================== *)
@@ -261,6 +262,33 @@ Definition sysc_mem_ok (V V' : pprivate) (M M' : gmap Z (bv 8)) : Prop :=
    [FdSlots.fd_frags (pv_fdg V) sts] holds, so the row takes them the way
    [UsysMemOk.usys_fd_ok] does.  [UsysMemOkSpec.sysc_fd_ok_usys] is the
    bridge, exactly as [sysc_mem_ok_usys] is for the image. *)
+(* PIPE'S TWO ROWS, JOINED.  [sysc_mem_ok] says eight bytes appeared at
+   argument 0; [sysc_fd_ok] says two slots opened.  Separately they are two
+   existentials and a caller learns nothing it can act on -- it cannot close
+   what pipe gave it.  This says it ONCE: the two descriptors the table
+   moved ARE the two words the image gained.
+
+   Stated on the WRITTEN FUNCTION rather than on byte lookups, because the
+   no-wrap side condition a lookup needs is the caller's own (it comes from
+   owning the run).  See [SpecSysPipe.sys_pipe_post], which is where the
+   fact is proved, by [reflexivity]. *)
+(* ...and PIPE'S TWO ROWS JOINED, at the dispatcher's vocabulary.  The
+   statement itself is [UsysMemOk.usys_pipe_ok] -- the same table the
+   descriptor row is stated against -- so that the four layers above this
+   one carry ONE proposition rather than a chain of restatements, and its
+   two congruences ([usys_pipe_ok_arg_cong] / [..._epc]) serve all of them.
+   See [UsysMemOk.v]'s SS2c for what the join buys and why the bytes are
+   stated on the written function rather than on lookups in [M']. *)
+Definition sysc_pipe_ok (V : pprivate) (M M' : gmap Z (bv 8))
+    (r : mword 64) (sts sts' : list fdstate) : Prop :=
+  UsysMemOk.usys_pipe_ok (sysc_num V) (pv_tf V) r M M' sts sts'.
+
+(* the quiet reading: every other entry owes nothing here *)
+Lemma sysc_pipe_ok_quiet (V : pprivate) (M M' : gmap Z (bv 8))
+    (r : mword 64) (sts sts' : list fdstate) :
+  sysc_num V <> UsysMemOk.USYS_pipe -> sysc_pipe_ok V M M' r sts sts'.
+Proof. intros Hne. exact (UsysMemOk.usys_pipe_ok_quiet _ _ _ _ _ _ _ Hne). Qed.
+
 Definition sysc_fd_ok (V : pprivate) (r : mword 64)
     (sts sts' : list fdstate) : Prop :=
   UsysMemOk.usys_fd_ok (sysc_num V) (pv_tf V) r sts sts'.
@@ -412,6 +440,9 @@ Definition wp_syscall_sconf_body
          anyway; its row is the quiet one and reads no return value.) *)
       ⌜ sysc_fd_ok (us_V U)
                    (pv_tf (us_V U') !!! tf_arg_idx 0) sts sts' ⌝ -∗
+      (* ...and PIPE's two rows joined, so a caller can close what it got *)
+      ⌜ sysc_pipe_ok (us_V U) (us_M U) (us_M U')
+                     (pv_tf (us_V U') !!! tf_arg_idx 0) sts sts' ⌝ -∗
       (* ...AND THIS ARM RETURNED, WHICH RULES [exit] OUT (milestone J,
          K1).  [sysc_mem_ok] does NOT: exit falls into the quiet
          "nothing moved" row, so the table alone cannot tell a returning
@@ -487,6 +518,7 @@ Definition wp_syscall_sconf_body
    ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av)) -∗
   WP (Loop : expr riscv_lang).
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module Type SYSCALL.
   (* the kernel-side resources the syscall table's entries consume, for the
      process at [pj] whose open-file table is named by [γf].  Defined
@@ -581,7 +613,7 @@ Module Type SYSCALL.
 
   Parameter wp_syscall_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names)
       (ip : mword 64) (dqi : dfrac)

@@ -269,10 +269,11 @@ Definition wp_userinit_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module Type USERINIT.
   Parameter wp_userinit_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
-      `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γp : gname) (γs : list gname)
       (γft γf γw γtl : gname) (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64)

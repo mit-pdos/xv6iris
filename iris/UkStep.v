@@ -306,8 +306,10 @@ Qed.
 (* ===================================================================== *)
 (* §2 The bundle, opened and closed.                                      *)
 (* ===================================================================== *)
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Section UkBundle.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma uvb_elim (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)

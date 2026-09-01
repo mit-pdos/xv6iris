@@ -149,6 +149,10 @@ Proof.
     split_and!; discriminate.
 Qed.
 
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
+Require Import UkRunSys.  (* [ufd_auth_move] -- the untracked authority step *)
 Section StepPin.
   Context `{XI : CurCtx}.
 
@@ -227,6 +231,7 @@ End StepPin.
 
 Section UkRunSysFs.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
@@ -293,37 +298,40 @@ Section UkRunSysFs.
   (* =================================================================== *)
   (* §3 THE RE-CLOSE, at [urun_fs] -- [UkRun.urun_close(_upd)]'s twins.    *)
   (* =================================================================== *)
-  Lemma urun_fs_close (γm γt γd γs : gname) (M : gmap Z (bv 8))
+  Lemma urun_fs_close (γm γt γd γs γfd : gname) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate)
       (m : regfile) (pc : mword 64)
       (avail : nat) :
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
+    (* the descriptor authority, exactly as [UkRun.urun_close] takes it *)
+    ufd_auth γfd fdv -∗
     (∀ h : CpuId,
-       urun_fs γm γt γd γs h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
+       urun_fs γm γt γd γs γfd h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
     ukc_fs γm pm M sz fdv m pc.
   Proof.
-    iIntros "Hheap Hstk Hcont".
+    iIntros "Hheap Hstk Hufd Hcont".
     rewrite /ukc_fs. iIntros (h C pt Rfd Rut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h). rewrite /urun_fs.
     iExists C, pt, Rfd, Rut, sz, M, pm, fdv.
-    iFrame "Hheap Hstk Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
+    iFrame "Hheap Hstk Hufd Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
   Qed.
 
-  Lemma urun_fs_close_upd (γm γt γd γs : gname) (M : gmap Z (bv 8))
+  Lemma urun_fs_close_upd (γm γt γd γs γfd : gname) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5)
       (v : mword 64) (sz : Z) (fdv : list fdstate) (pc' : mword 64)
       (avail : nat) :
     unot_sp rd ->
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
+    ufd_auth γfd fdv -∗
     (∀ h : CpuId,
-       urun_fs γm γt γd γs h (<[Regidx rd := v]> m) pc' avail -∗
+       urun_fs γm γt γd γs γfd h (<[Regidx rd := v]> m) pc' avail -∗
        WP (Loop : expr riscv_lang)) -∗
     ukc_fs γm pm M sz fdv (<[Regidx rd := v]> m) pc'.
   Proof.
-    intros Hns. iIntros "Hheap Hstk Hcont".
-    iApply (urun_fs_close with "Hheap [Hstk] Hcont").
+    intros Hns. iIntros "Hheap Hstk Hufd Hcont".
+    iApply (urun_fs_close with "Hheap [Hstk] Hufd Hcont").
     rewrite (unot_sp_upd rd v m Hns). iExact "Hstk".
   Qed.
 
@@ -350,18 +358,18 @@ Section UkRunSysFs.
                 uexec_ret_fs γm' uecall_scause
                   (uvis_of_run m' pc' M π sz fdv') -∗
                 WP (Loop : expr riscv_lang))
-      (γm γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+      (γm γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (n : Z) (u : umirror) (pl : list (bv 8)) (dq : dfrac) (avail : nat) :
     usys_num (tf_of m pc) = n ->
     uenr_dom n = true ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    ⊢ wp_uk_ecall_fs_body γm γt γd γs h m pc n u pl dq avail.
+    ⊢ wp_uk_ecall_fs_body γm γt γd γs γfd h m pc n u pl dq avail.
   Proof.
     intros Hn Hdom Hal4.
     rewrite /wp_uk_ecall_fs_body.
     iIntros "#Hi Hrun Hmc Hstr Hcont".
     iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv)
-      "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+      "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_fs_x0 with "Hb") as "[%Hx0 Hb]".
     (* THE PATH, PINNED: the caller's string is the one the row reads *)
@@ -386,16 +394,24 @@ Section UkRunSysFs.
     rewrite Hdom.
     (* THE DEPOSIT: the process takes the arm's RIGHT disjunct *)
     iRight. iExists u. iFrame "Hmc".
-    iIntros (r M' pm' sz' fdv' u') "%Hok %Hfdok %Hstep Hmc".
+    iIntros (r M' pm' sz' fdv' u') "%Hok %Hfdok %Hpiperow %Hstep Hmc".
     (* the enriched rows are QUIET: nothing about the image moved *)
     destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _
                 Hexec Hsbrk Hwait Hpipe Hrd Hfst Hok) as [-> [-> ->]].
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run].
+    (* THE ENRICHED ROWS INCLUDE open AND dup, so the table may have moved.
+       The program is not tracking these descriptors, so the authority moves
+       and no handle comes back ([UkRunSys.ufd_auth_move]); close is not in
+       [uenr_dom], which is exactly the row that rule cannot serve. *)
+    iApply uslot_fs_bupd.
+    iMod (ufd_auth_move γfd n (tf_of m pc) r fdv fdv'
+            (uenr_dom_ne_close n Hdom) Hfdok with "Hufd") as "Hufd".
+    iModIntro.
     rewrite (uslot_fs_bump_run γm m pc M M pm pm sz sz fdv fdv' r Hx0 Hal4).
-    iApply (urun_fs_close_upd γm γt γd γs M pm m (mword_of_int 10) r sz fdv'
+    iApply (urun_fs_close_upd γm γt γd γs γfd M pm m (mword_of_int 10) r sz fdv'
               (add_vec_int pc 4) avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
-              with "Hheap Hstk").
+              with "Hheap Hstk Hufd").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r u' with "[%] Hmc Hstr Hrun").
     (* ...and the tie, read at the caller's own string *)
@@ -435,13 +451,13 @@ End FDROW_UKFS_STEP.
 Module FdRowUkfsEngineOfStep (S : FDROW_UKFS_STEP) <: FDROW_UKFS_ENGINE.
   Lemma wp_uk_ecall_fs :
     forall `{!riscvGS Σ} `{GEN : GenId} `{XI : CurCtx}
-           `{!ghost_varG Σ Z} `{!ghost_varG Σ umirror}
-      (γm γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+           `{!ghost_varG Σ Z} `{!ghost_varG Σ umirror} `{!ufdG Σ}
+      (γm γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (n : Z) (u : umirror) (pl : list (bv 8)) (dq : dfrac) (avail : nat),
       usys_num (tf_of m pc) = n ->
       uenr_dom n = true ->
       is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-      ⊢ wp_uk_ecall_fs_body γm γt γd γs h m pc n u pl dq avail.
+      ⊢ wp_uk_ecall_fs_body γm γt γd γs γfd h m pc n u pl dq avail.
   Proof.
     intros.
     apply (wp_uk_ecall_fs_of_step S.wp_uk_ecall_fs_step); assumption.

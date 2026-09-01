@@ -284,6 +284,16 @@ Definition uenr_path (n : Z) : bool :=
 Definition uenr_dom (n : Z) : bool :=
   uenr_path n || bool_decide (n = USYS_dup).
 
+(* the enriched set is {open, mknod, dup} -- CLOSE IS NOT IN IT, which is
+   what lets the enriched leaf move the program's descriptor authority
+   without holding a handle ([UkRunSys.ufd_auth_move] serves every row but
+   close's). *)
+Lemma uenr_dom_ne_close (n : Z) : uenr_dom n = true -> n <> UsysMemOk.USYS_close.
+Proof.
+  unfold uenr_dom, uenr_path. intros H Hc. subst n.
+  vm_compute in H. discriminate H.
+Qed.
+
 Lemma uenr_path_dom (n : Z) : uenr_path n = true -> uenr_dom n = true.
 Proof. intros H. unfold uenr_dom. rewrite H. reflexivity. Qed.
 
@@ -380,8 +390,10 @@ Proof.
   destruct (decide (n = UsysMemOk.USYS_close)) as [_ | _].
   { destruct (decide (uint (mword_of_int (-1) : mword 64) = 0%Z))
       as [Hc | _]; [ exfalso; exact (Hnz Hc) | reflexivity ]. }
-  destruct (decide (n = UsysMemOk.USYS_dup)) as [_ | _]; [ by right | ].
-  destruct (decide (n = UsysMemOk.USYS_open)) as [_ | _]; [ by right | ].
+  destruct (decide (n = UsysMemOk.USYS_dup)) as [_ | _];
+    [ right; split; reflexivity | ].
+  destruct (decide (n = UsysMemOk.USYS_open)) as [_ | _];
+    [ right; split; reflexivity | ].
   destruct (decide (n = UsysMemOk.USYS_pipe)) as [_ | _].
   { destruct (decide (uint (mword_of_int (-1) : mword 64) = 0%Z))
       as [Hc | _]; [ exfalso; exact (Hnz Hc) | reflexivity ]. }
@@ -673,7 +685,7 @@ Section Steps.
       destruct Hst as [[-> ->] | (i & a & fd & Hres & Hrow & Hfd & -> & Harm)].
       - (* the blanket: a failing open installs nothing, which is their
            row's right disjunct *)
-        right. reflexivity.
+        right. split; reflexivity.
       - (* the success arm: ours pins the descriptor, and theirs MATCHES the
            returned word against it -- [usys_ret_is] is an equation on the
            word, not a decode of it, so exhibiting [fd] closes the goal with
@@ -720,7 +732,7 @@ Section Steps.
       destruct Hst as [[-> ->]
                       | (nfd & st & Hnn & Hlk & _ & Hfd & -> & ->)].
       - (* a failing dup installs nothing: the row's right disjunct *)
-        right. reflexivity.
+        right. split; reflexivity.
       - (* the success arm.  The DESCRIPTOR needs no argument -- the row
            matches the returned word against it, and the post's [r] IS that
            word.  THE ARGUMENT'S INDEX is the one thing to bridge: ours keys

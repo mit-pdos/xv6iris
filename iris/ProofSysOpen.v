@@ -145,6 +145,7 @@ Lemma so_bud_iput `{XI : CurCtx} (n' : nat) (w ok : bool) :
   (iput_units <= n')%nat.
 Proof. unfold walk_spend, iput_units, MAXOPBLOCKS. destruct w, ok; lia. Qed.
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module SysOpenProof (Argint : ARGINT) (Argstr : ARGSTR) (BeginOp : BEGIN_OP)
                     (Create : CREATE) (Namei : NAMEI) (Ilock : ILOCK)
                     (Iunlock : IUNLOCK) (Iunlockput : IUNLOCKPUT)
@@ -157,6 +158,7 @@ Module Tails := SysOpenTails Iunlock Iunlockput EndOp Fileclose.
 Section ProofSysOpenBody.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
+  Context `{!ufdG Σ}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs1 := (mword_of_int 9 : mword 5).

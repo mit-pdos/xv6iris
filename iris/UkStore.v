@@ -244,6 +244,7 @@ Proof.
              Hk Hsp Hspg (or_intror Hpm) Heff Heffg Htm Htmg Htr Htrg Hme Hmeg).
 Qed.
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Section UkStoreExecErr.
   Context (k : Z).
   Context (Hkw : vmem_width k).
@@ -322,6 +323,7 @@ End UkStoreExecErr.
 
 Section UkStoreTrapWrap.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [WpUmodeStore.uv_swp_exec_mem] for an execute that TRAPS: the result is

@@ -421,8 +421,12 @@ Local Open Scope Z_scope.
    0 = h] is then a [vm_compute]. *)
 
 
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section UCodeSync.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context (gt : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm).
   Context (Hsub : sync_text_sub M).
   (* ...and the DATA image, for the .rodata half of the same pages *)

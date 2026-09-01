@@ -419,8 +419,12 @@ Proof. reflexivity. Qed.
 (* ===================================================================== *)
 (* SS2 The trapped machine, at hart [CID].                                 *)
 (* ===================================================================== *)
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section TrappedMachine.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : TsoCtx.CurCtx}.
 
   (* A THIN WRAPPER ON [UserExec.user_trap_frame_atm] (milestone J, stage
@@ -512,6 +516,7 @@ End TrappedMachine.
 (* ===================================================================== *)
 Section UexecRet.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
 
   (* (A) what user execution hands back, at the fixpoint variable [X] *)
@@ -523,8 +528,32 @@ Section UexecRet.
        else if decide (n = USYS_fork) then
          ((∀ (r : mword 64) (fdv' : list fdstate),
              ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
+             (* THE PARENT'S OWN TABLE DOES NOT MOVE.  fork copies the
+                parent's descriptors INTO THE CHILD and leaves the parent's
+                array alone, so the process that gets a nonzero return
+                resumes at the view it trapped at.  Free to add: the kernel
+                MINTS at this arm ([UexecApply.uexec_ret_round_slot]'s fork
+                case) rather than instantiating it, so nothing has to prove
+                the guard -- but it is what the code does, and without it a
+                program cannot keep a descriptor handle across its own
+                fork. *)
+             ⌜fdv' = uvis_fd W⌝ -∗
              X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')) ∗
           (∀ fdv' : list fdstate,
+             (* THE CHILD'S TABLE IS THE PARENT'S.  fork() copies it --
+                [np->ofile[i] = filedup(p->ofile[i])] -- and this is the arm
+                that says so.  It used to say only [length fdv' = NOFILE], a
+                table of the right SHAPE and nothing else, and that is what
+                made a forked child hold no handle for anything: not the
+                pipe ends its parent had just made, not the standard streams
+                it inherited.  THE DIRECTION MATTERS FOR WHO PAYS: the
+                PROGRAM proves this arm and the KERNEL instantiates it, so a
+                stronger guard is easier for the program (it learns the
+                table) and harder for the kernel (it must exhibit the copy).
+                [UkFork.wp_uk_ecall_fork] is what the program does with it;
+                the FORK ROW note in [UexecApply.uexec_ret_round_slot] is
+                what the kernel still owes. *)
+             ⌜fdv' = uvis_fd W⌝ -∗
              X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')))
        else (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
                (szv' : Z) (fdv' : list fdstate),
@@ -545,6 +574,12 @@ Section UexecRet.
                   [fdv' = uvis_fd W]; open, close, dup and pipe say which
                   slot moved and to what. *)
                ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
+               (* ...AND PIPE'S JOIN, the one row neither of the two above can
+                  state.  [usys_mem_ok] says pipe wrote eight bytes at a0 from
+                  SOME function, [usys_fd_ok] says it opened two free slots, and
+                  only this says the bytes NAME the slots -- which is the whole
+                  of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
+               ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
                X (bump W r M' π' szv' fdv'))
      else X W)%I.
 
@@ -760,14 +795,22 @@ Section UexecRet.
      else if decide (n = USYS_fork) then
        ((∀ (r : mword 64) (fdv' : list fdstate),
            ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
+           ⌜fdv' = uvis_fd W⌝ -∗
            uslot (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')) ∗
         (∀ fdv' : list fdstate,
+           ⌜fdv' = uvis_fd W⌝ -∗
            uslot (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')))
      else (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
              (szv' : Z) (fdv' : list fdstate),
              ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
                           M' π' szv'⌝ -∗
              ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
+             (* ...AND PIPE'S JOIN, the one row neither of the two above can
+                state.  [usys_mem_ok] says pipe wrote eight bytes at a0 from
+                SOME function, [usys_fd_ok] says it opened two free slots, and
+                only this says the bytes NAME the slots -- which is the whole
+                of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
+             ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
              uslot (bump W r M' π' szv' fdv'))).
   Proof.
     intros ->. rewrite /uexec_ret /uexec_ret_F.
@@ -790,8 +833,8 @@ Section UexecRet.
     destruct (decide (sc = uecall_scause)); [ | iApply "H" ].
     destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ done | ].
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
-    { iSplitR; [ iIntros (r fdv' _); iApply "H" | iIntros (fdv'); iApply "H" ]. }
-    iIntros (r M' π' szv' fdv' _ _). iApply "H".
+    { iSplitR; [ iIntros (r fdv' _ _); iApply "H" | iIntros (fdv' _); iApply "H" ]. }
+    iIntros (r M' π' szv' fdv' _ _ _). iApply "H".
   Qed.
 
 End UexecRet.
@@ -818,6 +861,7 @@ Global Typeclasses Opaque uslot uvb.
 (* ===================================================================== *)
 Section UexecRetGen.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
 
   Lemma uexec_wp_uslot (W : uvis) : □ uexec_wp -∗ uslot W.

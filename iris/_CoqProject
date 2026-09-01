@@ -509,6 +509,11 @@ WpLockIn.v
 WpLockAt.v
 ArrCursor.v
 FdSlots.v
+
+# the PROGRAM's own view of its descriptor table (γfd): the authority
+# rides inside [UkRun.urun], the handles are what a user-level proof carries.
+# Distinct from FdSlots' kernel/process split -- see UserFd.v's header.
+UserFd.v
 IcacheRef.v
 EscrowDefs.v
 FileInvDefs.v
@@ -1760,11 +1765,79 @@ LinkSysUnlinkAU.v
 # '%s' argument over WHICH HALF of the heap holds it -- cat's is a heap
 # string, sh's panic prints a .rodata literal -- so the '%s' arm is proved
 # once for both instead of twice.  Audit = the standing three.
+# ---------------------------------------------------------------------
+# SH'S COMMAND-TREE RUNNER IS PARKED; SH'S SYSCALL LAYER IS NOT.
+#
+# [UkSh.v] BUILDS: its open/close/dup stubs carry descriptor handles now,
+# and sh's console loop is fully threaded -- it opens "console" and, on the
+# [fd >= 3] path, closes what it opened, spending the handle its own open
+# minted.  The failure arm is refuted by sh's own [bltz].
+#
+# [UkShRun.v] and the files above it are parked, and BOTH REASONS THE NOTE
+# USED TO GIVE ARE NOW GONE.  What is left is a third one, found by actually
+# un-parking and building rather than by reading:
+#
+#   (a) CLOSED.  The pipe row used to bind its two descriptors existentially
+#       without tying them to the two words pipe WRITES into the caller's
+#       buffer, so no leaf could mint handles a program could identify.
+#       [UsysMemOk.usys_pipe_ok] is that tie and
+#       [UkRunSys.wp_uk_ecall_pipe] is the leaf.  [wp_kshr_pipe] in
+#       UkShRun.v is already rewritten onto it and its two extra imports
+#       (FdSlots, ProcGeom) are in place -- that stub is READY, and so are
+#       PIPE's two closes IN THE PARENT.
+#
+#   (b) CLOSED.  sh's REDIR closes the INHERITED fds, which it never opened.
+#       [UkSh.ush_std] is the entry precondition that hands sh handles for
+#       fd 0 and fd 1, threaded from [wp_ksh_start] out through [ush_rest]
+#       to exactly this file's front door.
+#
+#   (c) OPEN, and it is the real one: FORK'S CHILD ARM DOES NOT SAY THE
+#       CHILD'S DESCRIPTOR TABLE IS A COPY OF THE PARENT'S.
+#       [UexecRet.uexec_ret_F]'s fork arm gives the parent
+#       [fdv' = uvis_fd W] and gives the child only
+#       [length fdv' = NOFILE] -- a table of the right shape and nothing
+#       else.  xv6's fork() does [np->ofile[i] = filedup(p->ofile[i])], so
+#       the fact is TRUE and the kernel side has it; the u-tier drops it,
+#       because that arm MINTS rather than instantiating.
+#
+#       That is what PIPE and REDIR actually need.  Four of PIPE's six
+#       closes and all of REDIR's run IN THE CHILD after fork1, and a child
+#       whose table is only known to be NOFILE-long holds no handle for
+#       anything -- not the pipe ends its parent just made, not the
+#       standard streams it inherited.  Closing (c) means carrying the copy
+#       row up from sys_fork the way the pipe join was just carried up, and
+#       giving [wp_uk_ecall_fork]'s child arm an authority minted AT THE
+#       PARENT'S TABLE together with the handles matching what the parent
+#       held.
+#
+#       A second, smaller thing rides with it: [wp_kshr_qcall]'s [Hstub]
+#       argument has a FIXED type that takes and returns no resource, so
+#       [wp_ksh_close] -- which now takes a handle -- cannot be passed
+#       through it.  It needs a resource parameter.  And [UkFork.Forkable]
+#       is a THREE-gname footprint class; the child's [γfd] makes it four,
+#       and descriptor handles are not of its byte-footprint shape anyway.
+#
+# sh's REDIR also still needs the well-formedness fact that a redirect's fd
+# is 0 or 1: it is DATA in the AST ([URedir c1 file mode fd], constrained
+# only by [ush_w32 g (t + 36) fd]), so "0 or 1" has to be said by the
+# parser, not assumed here.
+# ---------------------------------------------------------------------
+# UCodeShK.v IS NOT PARKED AND MUST NOT BE: it is the [uis_shk_*] catalog
+# UkSh.v READS, so parking it while listing UkSh.v leaves a dangling
+# dependency -- a local tree with a stale UCodeShK.vo still builds and a
+# fresh checkout does not ("No rule to make target 'UCodeShK.vo', needed by
+# 'UkSh.vo'").  It costs 10.6 s (see the catalog note above), so there was
+# never a build-time reason to shelve it either.
+#
+# Of the four files that ARE parked, nothing outside them refers to them,
+# so parking those costs the rest of the tree nothing.  Un-parking is the
+# follow-on to closing (c) above.
+# ---------------------------------------------------------------------
 UCodeShK.v
 UkRunBr.v
 UkSh.v
-UkShRun.v
-UkShDiag.v
+# PARKED: UkShRun.v
+# PARKED: UkShDiag.v
 
 # ... STAGE 4: the parser.  UCodeShP.v is a THIRD catalog over the same
 # dump (tools/ucode_shp.txt, [--prog shp]) -- 564 instructions in eleven
@@ -1790,8 +1863,8 @@ UkShDiag.v
 # [ushp_malloc_ok] (stage 3's allocator, blocked on [wp_uk_ecall_sbrk]);
 # it taints NOTHING yet -- every lemma in the file is unconditional today.
 # Audit = the standing three, zero Admitted, zero Axiom.
-UCodeShP.v
-UkShParse.v
+# PARKED: UCodeShP.v
+# PARKED: UkShParse.v
 
 # FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
 # u-tier syscall row.  FsFdMirror = the pure mirror + step table;

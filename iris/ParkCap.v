@@ -64,8 +64,10 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Section ParkCap.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
 

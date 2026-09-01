@@ -262,8 +262,10 @@ Proof. vm_compute. reflexivity. Qed.
 (* hart's cpus[] cells) is the CARVE's, and is not this lemma's business.   *)
 (* ====================================================================== *)
 
+Require Import UserFd.   (* [ufdG] -- must precede any `{!ufdG Σ} binder *)
 Section BootChain.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma boot_entry_pre (E : coPset) (rs : regstate) :
@@ -396,6 +398,8 @@ End BootChain.
 
 Section BootRun.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!ufdG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ONE BUNDLE for what one hart's boot chain runs on, so §3 and §4 state it
@@ -641,6 +645,8 @@ End BootRun.
 
 Section BootSecondary.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma boot_hart_secondary (rs : regstate)
@@ -694,6 +700,8 @@ End BootSecondary.
 
 Section BootPrimary.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma boot_hart_primary (rs : regstate)

@@ -123,6 +123,7 @@ Proof. lia. Qed.
 (*  the piece the claimant (kfork) keeps -- [USED] is claimed          *)
 (*  ([unclaimed_USED : unclaimed USED = false]).                       *)
 (* ------------------------------------------------------------------ *)
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Section PstateUsedHelper.
   Context `{!riscvGS Σ}.
   Lemma kfkb5_pwhole_used (pa : mword 64) :
@@ -135,6 +136,7 @@ Module KforkB5 (AQ : ACQUIRE) (RL : RELEASE) (RLI : RELEASE_IN).
 Section ProofKforkB5.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
+  Context `{!ufdG Σ}.
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).

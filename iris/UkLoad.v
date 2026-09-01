@@ -230,6 +230,7 @@ Proof.
              Hk Hsp Hspg (or_intror Hpm) Heff Heffg Htm Htmg Htrv Htrvg).
 Qed.
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Section UkLoadExecErr.
   Context (k : Z).
   Context (Hkw : vmem_width k).
@@ -306,6 +307,7 @@ End UkLoadExecErr.
 
 Section UkLoadPostFetch.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ).
 

@@ -197,6 +197,9 @@ Qed.
 (*  3.  THE PURE PILOT THEOREM                                            *)
 (* ===================================================================== *)
 
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section PilotPure.
   Context `{XI : CurCtx}.
 
@@ -467,6 +470,7 @@ Proof. reflexivity. Qed.
 Module FdRowPilotWalk (E : FDROW_UKFS_ENGINE).
 Section Walk.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
@@ -482,7 +486,7 @@ Section Walk.
      with the mirror at its post-mknod value.  The continuation LEARNS,
      for any non-(-1) return: a0 = 0, fd 0's row is the console device,
      and the resolved inum's row is [ADev CONSOLE 0]. *)
-  Lemma wp_pilot_open2 (γm γt γd γs : gname) (h : CpuId) (m : regfile)
+  Lemma wp_pilot_open2 (γm γt γd γs γfd : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (dq : dfrac) (avail : nat)
       (u0 u1 u2 : umirror) (vom1 wma wmi r1 r2 : mword 64) :
     era0_seed u0 ->
@@ -494,7 +498,7 @@ Section Walk.
     om_arg (m !!! Regidx (mword_of_int 11)) = 2 ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is γt pc false (ECALL tt) -∗
-    urun_fs γm γt γd γs h m pc avail -∗
+    urun_fs γm γt γd γs γfd h m pc avail -∗
     mcur γm u2 -∗
     ustrq γd dq (uint (m !!! Regidx (mword_of_int 10))) console_str -∗
     (∀ (h' : CpuId) (r : mword 64) (u3 : umirror),
@@ -508,14 +512,14 @@ Section Walk.
                      = Some (MkAnode (ADev CONSOLE 0) 1%nat))⌝ -∗
        mcur γm u3 -∗
        ustrq γd dq (uint (m !!! Regidx (mword_of_int 10))) console_str -∗
-       urun_fs γm γt γd γs h' (<[Regidx (mword_of_int 10) := r]> m)
+       urun_fs γm γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
          (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hseed Hop1 Hmk Hma Hmi Hn Hom Hal.
     iIntros "#Hi Hrun Hm Hstr Hcont".
-    iPoseProof (E.wp_uk_ecall_fs γm γt γd γs h m pc FsFdMirror.USYS_open
+    iPoseProof (E.wp_uk_ecall_fs γm γt γd γs γfd h m pc FsFdMirror.USYS_open
                   u2 console_str dq avail Hn uenr_open Hal) as "Hleaf".
     iEval (rewrite /wp_uk_ecall_fs_body) in "Hleaf".
     iApply ("Hleaf" with "Hi Hrun Hm Hstr [Hcont]").
