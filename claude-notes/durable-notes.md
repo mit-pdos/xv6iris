@@ -2712,3 +2712,8 @@ culprit.  Build law: every GCP make runs under `timeout` now.
 - **Z_scope pairs**: `((0, 0) : nat * nat)` still elaborates the literals in
   `Z`; write `(0%nat, 0%nat)`.  A multiset binder named `S` shadows the
   successor (`S n` becomes an application of the multiset) -- name it `Sm`.
+- **A `={E}=∗` closing wand inside `WP (Loop …)` needs `iApply fupd_wp` first**
+  (then `iMod …`, and `iModIntro` once the resources are back in hand);
+  `iMod` alone reports "cannot eliminate modality … in (WP Loop)".  The v1
+  `==∗` wands never needed it; the v2 box-opening wands (`bcache_scan2_incr`
+  etc.) do.
