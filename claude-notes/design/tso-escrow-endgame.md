@@ -189,12 +189,22 @@ Ghosts (all tiny, additive; no model or Σ-arm changes):
     Synced (rd := rp) at every refs-- decrement: the decrementer holds
     L1's payload and opens the box.  Floor delivered by R2 at the
     decrementer's L1 release.
-  - **reg_last** (the self-park receipt): `ghost_var γl (1/2) (n,T)`.
-    The box holds one half; PARK hands the other half to the parker as
-    its receipt; the parker's later refs-- decrement returns it (same
-    step that syncs reg_drop).  Invariant: both halves in the box ⇒
-    reg_park = reg_drop.  This is what makes the drop-site case split
-    total without naming "the thread that parked last".
+  - **the parked-fragment PILE** (replaces reg_last; refined
+    2026-09-01): γl is NOT a ghost.  Every PARK deposits the parker's
+    pres fragment into the body, where fragments compose into a single
+    `◯ Some(to_agree rb, o)` pile (o ∃-bound, the row absent at o = 0);
+    an ex-parker's refs-- decrement retrieves one fragment from the
+    pile instead of presenting one from hand (the caller knows which —
+    program flow).  EVERY decrement syncs rd := rp (it holds L1 + the
+    box), so the body's pure row `⌜o = 0 → rp = rd⌝` is re-established
+    at each edge and vacuous at each park.  At the last drop (count 1)
+    the fragment total (pile + hand = count) makes the case split
+    total and local; receipts and the "mine" case selection disappear.
+  - **reg_cnt** (count sync; added 2026-09-01): `ghost_var γc (1/2) c`
+    with one half beside the slot's Some-arm count (= M's count) and
+    one in the box beside the pres ●.  This makes the count READABLE
+    at any box open: the IDLE refutation at refs ≥ 1 is a γc value
+    clash, and the last-drop's fragment accounting is against c = 1.
 
 The box's pure tie (maintained by inspection at each of the four
 transitions, all of which hold the needed halves):
@@ -372,3 +382,10 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
 
 - 2026-09-01: created (supersedes A6.147/148/149's guard-route text;
   replaces BioBox's □∀-cover premises with the §3 register design).
+- 2026-09-01 (build agent): reg_last replaced by the parked-fragment
+  PILE (fragments compose in the body; parks deposit, ex-parkers'
+  decrements retrieve; every decrement syncs rd := rp; pure row
+  ⌜o = 0 → rp = rd⌝); γc count-sync register added.  Reason: a single
+  γl half-pair cannot serve overlapping parkers, and its whole-in-box
+  case was refutable only globally; the pile + γc make every drop-site
+  case local, with no receipt choreography.  Registers: γp, γd, γc.
