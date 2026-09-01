@@ -38,13 +38,13 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import InstrBytes WpGpr RegFile.
+Require Import MinstretInv WireInv.
 Require Import WpIntrCore.
 Require Import UptTree UserPtTree UserExec UserTrap.
 Require Import UmodeMem.
 Require Import TsoCtx.
-Require Export UmodeRegs.  (* [uv_regs] / [uv_amb] and their movers *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -64,7 +64,30 @@ Section UmodeFrames.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
-  (* [uv_regs] and [uv_amb] live in UmodeRegs.v (re-exported above). *)
+  (* ------------------------------------------------------------------- *)
+  (* The machine-cell residue of a RUNNING verified process: hart ACTIVE   *)
+  (* (verified programs that execute no WRS never wait), privilege User,   *)
+  (* mstatus pinned up to [user_mstatus_ok], stale trap CSRs.              *)
+  (* ------------------------------------------------------------------- *)
+  Definition uv_regs : iProp Σ :=
+    (∃ ms_v sc_v stval_v sepc_v : mword 64,
+       ⌜user_mstatus_ok ms_v⌝ ∗
+       hart_state ↦ᵣ HART_ACTIVE tt ∗
+       cur_privilege ↦ᵣ User ∗
+       mstatus ↦ᵣ ms_v ∗
+       scause ↦ᵣ sc_v ∗
+       stval ↦ᵣ stval_v ∗
+       sepc ↦ᵣ sepc_v)%I.
+
+  (* the ambient per-hart persistent bundles.  PERSISTENT but PER-HART
+     (hw_config / minstret_inv own THIS hart's cells), so a migration
+     cannot carry them across -- the resume bundle re-delivers them at the
+     resuming hart. *)
+  Definition uv_amb : iProp Σ :=
+    (hw_config ∗ minstret_inv ∗ wire_inv)%I.
+
+  Global Instance uv_amb_persistent : Persistent uv_amb.
+  Proof. apply _. Qed.
 
   (* the linear running residue at image [M] (everything but the register
      file and the pc) *)
@@ -110,16 +133,14 @@ Section UmodeFrames.
 End UmodeFrames.
 
 (* ===================================================================== *)
-(* The trap capability.  Defined OUTSIDE any CpuId/CurCtx section: the     *)
-(* contracts quantify BOTH the hart-and-context the trap is taken on and   *)
-(* the pair execution resumes on, so the capability itself is hart- and    *)
-(* context-free and survives a migration as an ordinary persistent frame.  *)
-(* (A migration is exactly a hart change plus the same-hart hand-off's     *)
-(* context change, §0.43'/§0.44'; at SC both indices are phantom.)         *)
+(* The trap capability.  Defined OUTSIDE any CpuId section: the contracts  *)
+(* quantify BOTH the hart the trap is taken on and the hart execution      *)
+(* resumes on, so the capability itself is hart-free and survives a        *)
+(* migration as an ordinary persistent frame.                              *)
 (* ===================================================================== *)
 Section UmodeCap.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)
@@ -131,11 +152,11 @@ Section UmodeCap.
   (* but is spelled as an update of the old).                              *)
   (* ------------------------------------------------------------------- *)
   Definition uv_intr_wp : iProp Σ :=
-    (□ ∀ (CID : CpuId) (XI : TsoCtx.CurCtx)
+    (□ ∀ (CID : CpuId)
          (g : regfile) (M : gmap Z (bv 8)) (va : mword 64)
          (i : InterruptType) (sc0 stval_v : mword 64),
        uv_trap_frame C pt (utrap_scause (Interrupt i) sc0) stval_v va g M -∗
-       (∀ (CID : CpuId) (XI : TsoCtx.CurCtx), uv_run C pt M g va -∗
+       (∀ CID : CpuId, uv_run C pt M g va -∗
           WP (Loop : expr riscv_lang)) -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -145,7 +166,7 @@ Section UmodeCap.
   (* according to the process's protocol [Ψ] at the number in a7.          *)
   (* ------------------------------------------------------------------- *)
   Definition uv_sys_wp (Ψ : usys_protocol Σ) : iProp Σ :=
-    (□ ∀ (CID : CpuId) (XI : TsoCtx.CurCtx)
+    (□ ∀ (CID : CpuId)
          (g : regfile) (M : gmap Z (bv 8)) (va : mword 64)
          (sc0 stval_v : mword 64),
        uv_trap_frame C pt (utrap_scause (rv64d_types.Exception (E_U_EnvCall tt)) sc0)

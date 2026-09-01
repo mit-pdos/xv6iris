@@ -11,12 +11,14 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_var invariants.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvPtsto RiscvLang.
+Require Import RiscvPtsto RiscvLang HartTp.
+Require Import RegFile.
 Require Import IntrDefs.
 Require Import ProcGeom.
+Require Import LockSet.
 Require Import CpuOwn.
 Require Import Xv6G.
-Require Import TsoCtxMove.
+Require Import TsoCtx TsoCtxMove.
 Local Open Scope Z_scope.
 
 Section CpuOwnMove.

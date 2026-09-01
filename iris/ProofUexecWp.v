@@ -46,7 +46,6 @@ Require Import UserPtTree UserExec.
 Require Import UexecWp.
 Require Import SpecUser.
 Require TsoCtx.   (* qualified: the class only, no notation flip *)
-Require TsoCtxShim.  (* [rut_ctx_sc]: the SC-minted residue-token accessor *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -66,7 +65,7 @@ Section ProofUexecWp.
        context too and unfold [IH] -- which has to stay AT [uexec_wp], since
        that is what it is handed back as. *)
     iEval (rewrite uexec_wp_unfold /uexec_F).
-    iIntros (h xi C pt Rut M g ms_v sc_v stval_v sepc_v va).
+    iIntros (h xi C pt Rut HRut M g ms_v sc_v stval_v sepc_v va).
     iIntros (Hok Hms) "Hhw Hmin Hwire Hregs Hpt Hcfg Hrut Hh".
     (* THE OLD-SHAPE HANDLER, out of the PAIRED one: the safety theorem
        below takes [▷ stvec_handler_wp], i.e. "hand me a trap frame and I
@@ -77,12 +76,9 @@ Section ProofUexecWp.
       with "[Hh]" as "Hhandler".
     { iNext. rewrite /stvec_handler_wp. iIntros "Hframe".
       iApply "Hh". iSplitL "Hframe"; [iExact "Hframe" | iExact "IH"]. }
-    (* the residue-token accessor for a ∀-bound [Rut]: the SC mint
-       ([TsoCtxShim.rut_ctx_sc]) -- the T-leg replaces this with the real
-       borrow from the concrete residue. *)
-    iApply (US.wp_user_exec_closed (CID := h) (XI := xi) C pt Rut
-              (fun pt' : uptd =>
-                 TsoCtxShim.rut_ctx_sc (CID := h) (@TsoCtx.cur_ctx xi) (Rut pt'))
+    (* the residue-token accessor now arrives as the ∀-row's own fact
+       (A6.140; the SC mint died with the shim) *)
+    iApply (US.wp_user_exec_closed (CID := h) (XI := xi) C pt Rut HRut
               with "Hhw Hmin Hwire [Hregs Hpt Hcfg Hrut] Hhandler").
     (* the concrete state, packed into the loop invariant: the hart is
        ACTIVE (so [user_hart_ok] is [I] and the PC/nextPC lock-step fact is

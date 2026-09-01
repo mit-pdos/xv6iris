@@ -60,10 +60,9 @@ Require Export ProcAvail.
 Require Import FdSlots.
 Require Export IrefSlots.
 (* A6.128: [proc_pt]'s pieces are named by the payload's move instances.
-   [PtTreeMove] is NOT taken: main's page-table tree is over [↦ₚ₈], which is
-   not context-indexed here, so those pieces are ξ-free and the solver's
-   constant row closes them. *)
-Require Import ProcPtOwn.
+   [PtTreeMove] carries the tree; main's [proc_pt] keys the image bytes by
+   [M] beside it. *)
+Require Import ProcPtOwn PtTreeMove CtxMorphTac.
 Require Import ProcDefs.
 Require Import SwtchCtx.
 From Kernel Require KernelSyms.
@@ -71,6 +70,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Require Import TsoCtxPark.
 Require Import TsoCtxMove.
+Require Import CpuOwnMove.
 Local Open Scope Z_scope.
 
 (* the context-slot payload while nobody is parked in it: the raw
@@ -102,11 +102,9 @@ Definition cpu_ctx_free `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} : iProp Σ 
      At boot the stamp is 0 and [TsoGhost.view_lb_0] gives the receipt for
      nothing; every later publication (a park into this slot) stamps at a
      position its own hart has already passed. *)
-  (* main-tso-readiness (M2): the M-leg's SC shape -- the bare ∃-context
-     cell run; the claim is the shim's [ctx_dom_sc] (ProofScheduler).  The
-     T-leg's parked record + receipt is the cutover shape. *)
-  (∃ (vs : list (mword 64)) (ξ : CtxId),
+  (∃ (vs : list (mword 64)) (ξ : CtxId) (T : nat),
      ⌜ length vs = 14%nat ⌝ ∗
+     TsoCtx.ctx_parked ξ T ∗ TsoCtx.hart_view_lb T ∗
      ctx_cells (XI := ξ) (a_cpu_ctx cid_word) vs)%I.
 
 (* [cpus[h].proc = 0] and [cpus[h].proc = &proc[j]] are the two live values
@@ -277,11 +275,6 @@ Section SchedCtxPay.
   (* THE PAYLOAD MOVES BETWEEN CONTEXTS, one [CtxMove] instance per named
      piece: TsoCtxMove's leaf dispatch is syntactic, so a named piece is
      resolved by instance search rather than unfolded by [apply]. *)
-  (* EIGHT OF THE TWENTY ARE ξ-FREE ON MAIN and so carry no [(XI := ξ)]
-     annotation: [tf_words]/[tf_tail]/[tf_page] are over [↦ₚ₈]/[↦ₚ] and the
-     five page-table pieces ([phys_byte_any] … [proc_pt]) over main's
-     non-context-indexed physical tier -- which is also why the T-leg's
-     [PtTreeMove.v] has no counterpart here. *)
   Global Instance pname_cells_move pa dq bs :
     CtxMove (λ ξ, pname_cells (XI := ξ) pa dq bs).
   Proof. rewrite /pname_cells. ctx_move_solve. Qed.
@@ -339,6 +332,22 @@ Section SchedCtxPay.
   Global Instance park_pay_move pa st :
     CtxMove (λ ξ, park_pay (XI := ξ) pa st).
   Proof. rewrite /park_pay. ctx_move_solve. Qed.
+  (* the lock HANDLES move too (A6.129, for [procs_inv] into a forked
+     child's record): a handle is the name, the invariant and a floor, and
+     a floor's dirty arm moves by [TsoCtxMove.ctx_move_wrote] *)
+  Global Instance lk_floor_move (lo : nat) : CtxMove (λ ξ, WpLock.lk_floor ξ lo).
+  Proof.
+    iIntros (ξ0 ξ1) "H0 H1 [Hfl | (%a & Hw)]".
+    - iMod (ctx_move_floor ξ0 ξ1 lo with "H0 H1 Hfl") as "(H0 & H1 & Hfl)".
+      iModIntro. iFrame "H0 H1". by iLeft.
+    - iMod (ctx_move_wrote ξ0 ξ1 lo a with "H0 H1 Hw") as "(H0 & H1 & [Hfl | Hw])".
+      + iModIntro. iFrame "H0 H1". by iLeft.
+      + iModIntro. iFrame "H0 H1". iRight. iExists a. iExact "Hw".
+  Qed.
+  Global Instance is_lock_move γ lk s R : CtxMove (λ ξ, is_lock (XI := ξ) γ lk s R).
+  Proof. rewrite /is_lock. ctx_move_solve. Qed.
+  Global Instance is_lock_morph γ lk s R : CtxMorph (λ ξ, is_lock (XI := ξ) γ lk s R).
+  Proof. rewrite /is_lock. ctx_morph_solve. Qed.
   (* A6.139: the handler ENVIRONMENT re-homes across the crossing by the
      witness packed beside it in [intr_res]; everything else in the bundle
      is context-free.  These two instances are what lets the payload rows
@@ -364,7 +373,6 @@ Section SchedCtxPay.
     rewrite /p_sched. ctx_move_solve.
     all: apply (trap_csrs_move KT1 h).
   Qed.
-
 
   (* the scheduler-chain valid context, PINNED at hart [h]
      (fixed Phi / P instantiation); [p] = the context's c->proc
@@ -580,51 +588,8 @@ Section SchedCtxPay.
   Proof. rewrite /own_ctx. ctx_morph_solve. Qed.
   Global Instance run_slot_at_morph pa : CtxMorph (λ ξ, run_slot_at ξ pa).
   Proof. rewrite /run_slot_at. ctx_morph_solve. Qed.
-  Global Instance lk_floor_move (lo : nat) : CtxMove (λ ξ, WpLock.lk_floor ξ lo).
-  Proof.
-    iIntros (ξ0 ξ1) "H0 H1 [Hfl | (%a & Hw)]".
-    - iMod (ctx_move_floor ξ0 ξ1 lo with "H0 H1 Hfl") as "(H0 & H1 & Hfl)".
-      iModIntro. iFrame "H0 H1". by iLeft.
-    - iMod (ctx_move_wrote ξ0 ξ1 lo a with "H0 H1 Hw") as "(H0 & H1 & [Hfl | Hw])".
-      + iModIntro. iFrame "H0 H1". by iLeft.
-      + iModIntro. iFrame "H0 H1". iRight. iExists a. iExact "Hw".
-  Qed.
-  (* [tso-flip SchedCtx.v:344] has these by [ctx_move_solve]: flip's lock
-     word lives in the ξ-CLOSED phys ledger, so [lock_inv] is a ξ-closed
-     term there.  On main the word is the ambient ctx cell, so the handle
-     transports by the SC shim instead: [TsoCtxShim.ctx_word_shim] /
-     [ctx_word4_shim] are [⊣⊢] against the raw cell, hence [lock_inv] is
-     ξ-INDEPENDENT under SC and the [inv] re-homes by properness.  The
-     STATEMENTS are flip's verbatim; at the cutover (the M4 lock-kit
-     reshape, lock_body with the exposed bound) only these proof bodies
-     change back to [ctx_move_solve] and the two helpers die. *)
-  Local Lemma lock_inv_reindex_sc (ξ0 ξ1 : CtxId) γ lk s R lo :
-    WpLock.lock_inv (XI := ξ0) γ lk s R lo ⊣⊢
-    WpLock.lock_inv (XI := ξ1) γ lk s R lo.
-  Proof.
-    rewrite /WpLock.lock_inv /WpLock.lock_word /WpLock.lk_cpu_res.
-    setoid_rewrite TsoCtxShim.ctx_word_shim.
-    setoid_rewrite TsoCtxShim.ctx_word4_shim.
-    reflexivity.
-  Qed.
 
-  Local Lemma is_lock_reindex_sc (ξ0 ξ1 : CtxId) γ lk s R :
-    is_lock (XI := ξ0) γ lk s R -∗ is_lock (XI := ξ1) γ lk s R.
-  Proof.
-    rewrite /is_lock. setoid_rewrite (lock_inv_reindex_sc ξ0 ξ1).
-    iIntros "(%lo & Hname & Hinv & _)". iExists lo. iFrame "Hname Hinv".
-    iApply WpLock.lk_floor_of_ctx. iApply TsoCtxShim.ctx_floor_any.
-  Qed.
 
-  Global Instance is_lock_move γ lk s R : CtxMove (λ ξ, is_lock (XI := ξ) γ lk s R).
-  Proof.
-    iIntros (ξ0 ξ1) "H0 H1 Hlk". iModIntro. iFrame "H0 H1".
-    by iApply is_lock_reindex_sc.
-  Qed.
-  Global Instance is_lock_morph γ lk s R : CtxMorph (λ ξ, is_lock (XI := ξ) γ lk s R).
-  Proof.
-    iIntros (ξ ξ') "Hdom Hlk". iFrame "Hdom". by iApply is_lock_reindex_sc.
-  Qed.
 
   (* ---- THE ALLOCATION MARKER ([ProcAvail.v]).  PERSISTENT, and present on
      every arm but UNUSED: it is what lets allocproc's scan accumulate a
@@ -678,12 +643,43 @@ Section SchedCtxPay.
   Definition proc_lock_pay (γl : gname) (pa : mword 64) : CtxId → iProp Σ :=
     λ ξ, proc_lock_res_at ξ γl pa.
 
+  (* A6.129: THE TRANSPORT IS REAL NOW -- one [CtxMorph] instance per
+     named piece, the [CtxMove] pile's twin (the pieces of a dormant slot
+     down to its page table; [PtTreeMove] carries the tree). *)
+  Global Instance pname_cells_morph pa dq bs : CtxMorph (λ ξ, pname_cells (XI := ξ) pa dq bs).
+  Proof. rewrite /pname_cells. ctx_morph_solve. Qed.
+  Global Instance proc_fields_morph pa dq V : CtxMorph (λ ξ, proc_fields (XI := ξ) pa dq V).
+  Proof. rewrite /proc_fields. ctx_morph_solve. Qed.
+  Global Instance ofile_cells_morph pa fs : CtxMorph (λ ξ, ofile_cells (XI := ξ) pa fs).
+  Proof. rewrite /ofile_cells. ctx_morph_solve. Qed.
+  Global Instance tf_words_morph tfp ws : CtxMorph (λ ξ, tf_words (XI := ξ) tfp ws).
+  Proof. rewrite /tf_words. ctx_morph_solve. Qed.
+  Global Instance tf_tail_morph tfp : CtxMorph (λ ξ, tf_tail (XI := ξ) tfp).
+  Proof. rewrite /tf_tail. ctx_morph_solve. Qed.
+  Global Instance tf_page_morph tfp ws : CtxMorph (λ ξ, tf_page (XI := ξ) tfp ws).
+  Proof. rewrite /tf_page. ctx_morph_solve. Qed.
+  Global Instance is_kstack_morph pa ks : CtxMorph (λ ξ, is_kstack (XI := ξ) pa ks).
+  Proof. rewrite /is_kstack. ctx_morph_solve. Qed.
+  Global Instance kstack_free_morph pa : CtxMorph (λ ξ, kstack_free (XI := ξ) pa).
+  Proof. rewrite /kstack_free. ctx_morph_solve. Qed.
+  Global Instance phys_byte_any_morph a : CtxMorph (λ ξ, phys_byte_any (XI := ξ) a).
+  Proof. rewrite /phys_byte_any. ctx_morph_solve. Qed.
+  Global Instance phys_page_own_morph ppn : CtxMorph (λ ξ, phys_page_own (XI := ξ) ppn).
+  Proof. rewrite /phys_page_own. ctx_morph_solve. Qed.
+  Global Instance upt_pages_own_morph um : CtxMorph (λ ξ, upt_pages_own (XI := ξ) um).
+  Proof. rewrite /upt_pages_own. ctx_morph_solve. Qed.
+  Global Instance proc_pt_own_morph P : CtxMorph (λ ξ, proc_pt_own (XI := ξ) P).
+  Proof. rewrite /proc_pt_own. ctx_morph_solve. Qed.
+  (* [proc_pt]'s morphs are ProcPtOwn's (main keys the image by [M]);
+     [proc_dormant*] morphs are ProcDefs'; [own_ctx]/cell towers are
+     SwtchCtx's -- all imported, none restated here. *)
+  Global Instance proc_pub_morph pa : CtxMorph (λ ξ, proc_pub (XI := ξ) pa).
+  Proof. rewrite /proc_pub. ctx_morph_solve. Qed.
+
   Global Instance proc_ctx_at_morph pa : CtxMorph (λ ξ, proc_ctx_at ξ pa).
   Proof. rewrite /proc_ctx_at. apply _. Qed.
   Global Instance proc_slots_at_morph pa st : CtxMorph (λ ξ, proc_slots_at ξ pa st).
-  Proof. rewrite /proc_slots_at. apply _. Qed.
-  Global Instance proc_pub_morph pa : CtxMorph (λ ξ, proc_pub (XI := ξ) pa).
-  Proof. rewrite /proc_pub. ctx_morph_solve. Qed.
+  Proof. rewrite /proc_slots_at. ctx_morph_solve. Qed.
   Global Instance proc_lock_res_at_morph γl pa : CtxMorph (λ ξ, proc_lock_res_at ξ γl pa).
   Proof. rewrite /proc_lock_res_at. ctx_morph_solve. Qed.
   Global Instance proc_lock_pay_morph γl pa : CtxMorph (proc_lock_pay γl pa).

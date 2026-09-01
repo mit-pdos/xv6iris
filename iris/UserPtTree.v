@@ -34,7 +34,6 @@ Require Import UserBits.      (* [bv_subrange11] -- the page-offset arithmetic *
 Require Import PtAdBits.
 Require Import CommonWalk.
 Require Import PtTree.
-Require Import PtBytes.
 Require Import PtTreeAdue.
 Require Import TrampPt.
 Require Import Pt4kWalk.
@@ -567,7 +566,6 @@ Fixpoint umem_wr (M : gmap Z (bv 8)) (dstva : mword 64) (n : nat)
              (umem_wr M dstva k src)
   end.
 
-
 Lemma umem_wr_step (M : gmap Z (bv 8)) (dstva : mword 64) (done n : nat)
     (src : nat -> bv 8) (a : Z) :
   (forall i, (i < n)%nat ->
@@ -624,117 +622,6 @@ Proof.
   apply subseteq_union_1_L. apply singleton_subseteq_l.
   apply elem_of_dom. apply Hsome. lia.
 Qed.
-
-(* THE VA-KEYED RUN'S OWN ALGEBRA.  Two bumps off one base collapse into
-   one, MODULO 2^64 and therefore with NO no-wrap side condition -- which is
-   the whole reason [umem_wr] is keyed by [add_vec_int] rather than by an
-   integer base.  [ByteCursor.pa_add_bump] is the same fact about the
-   pointer; this file cannot see it (it is below ByteCursor), so the two
-   lines are repeated rather than shared. *)
-Lemma add_vec_int_nat_assoc (p : mword 64) (a b : nat) :
-  add_vec_int (add_vec_int p (Z.of_nat a)) (Z.of_nat b)
-  = add_vec_int p (Z.of_nat (a + b)).
-Proof.
-  unfold add_vec_int. apply bv_eq.
-  rewrite !add_vec64_unsigned !moi64_unsigned.
-  rewrite !bv_wrap_add_idemp_r !bv_wrap_add_idemp_l. f_equal.
-  rewrite Nat2Z.inj_add. ring.
-Qed.
-
-(* ADJACENT RUNS APPEND.  A CHUNKED writer into user memory -- readi's
-   block-at-a-time loop, consoleread's and piperead's byte-at-a-time ones
-   -- issues one [copyout] per chunk, each starting where the last stopped,
-   and its loop invariant has to say "the accumulated window is ONE run of
-   length [n+k]".
-   That is this equation, and unlike [umem_write_app] it needs no bound on
-   [n + k] at all: both sides key the same address by the same modular sum.
-
-   The source function is the OUTER one throughout ([src (n + i)] for the
-   second chunk), which is what a loop carrying "the file's bytes from
-   [off]" already has; a caller whose chunk names its bytes differently
-   closes the gap with [umem_wr_ext] below. *)
-Lemma umem_wr_app (M : gmap Z (bv 8)) (dstva : mword 64) (n k : nat)
-    (src : nat -> bv 8) :
-  umem_wr (umem_wr M dstva n src) (add_vec_int dstva (Z.of_nat n)) k
-          (fun i => src (n + i)%nat)
-  = umem_wr M dstva (n + k)%nat src.
-Proof.
-  induction k as [| k IH].
-  - rewrite Nat.add_0_r. reflexivity.
-  - cbn [umem_wr]. rewrite IH.
-    replace (n + S k)%nat with (S (n + k))%nat by lia.
-    cbn [umem_wr]. rewrite add_vec_int_nat_assoc. reflexivity.
-Qed.
-
-(* two source functions that agree on the run write the same thing *)
-Lemma umem_wr_ext (M : gmap Z (bv 8)) (dstva : mword 64) (n : nat)
-    (src src' : nat -> bv 8) :
-  (forall i, (i < n)%nat -> src i = src' i) ->
-  umem_wr M dstva n src = umem_wr M dstva n src'.
-Proof.
-  induction n as [| k IH]; intros He; [reflexivity |].
-  cbn [umem_wr]. rewrite (IH ltac:(intros i Hi; apply He; lia)).
-  rewrite (He k ltac:(lia)). reflexivity.
-Qed.
-
-(* ===================================================================== *)
-(*  THE WINDOW WITHOUT ITS CONTENTS                                       *)
-(* ===================================================================== *)
-(* A reader that fills user memory from a DEVICE -- the console ring, the
-   far end of a pipe -- cannot NAME the bytes it delivered: they are the
-   existential contents of an invariant, and the read is interleaved with
-   sleeps.  What it CAN say, and what its callers actually need, is that
-   nothing outside the window it wrote has moved.  That is this predicate:
-   the run is pinned, its contents are not.
-
-   It is strictly weaker than the [umem_wr] EQUATION a reader whose source
-   is nameable states (readi's, whose bytes are the file's), and strictly
-   stronger than "some image": [umem_wrote_out] hands a caller every
-   untouched byte back and [umem_wrote_dom] pins the domain. *)
-Definition umem_wrote (M M' : gmap Z (bv 8)) (dstva : mword 64) (d : nat)
-  : Prop := exists src : nat -> bv 8, M' = umem_wr M dstva d src.
-
-(* nothing written yet *)
-Lemma umem_wrote_0 (M : gmap Z (bv 8)) (dstva : mword 64) :
-  umem_wrote M M dstva 0.
-Proof. exists (fun _ => bv_0 8). reflexivity. Qed.
-
-(* ...and the run extends, one chunk at a time, at the address the run
-   stops at.  This is the loop step: the invariant carries the accumulated
-   [d], the round supplies its own chunk, and the two compose with no
-   no-wrap side condition. *)
-Lemma umem_wrote_app (M M1 M2 : gmap Z (bv 8)) (dstva : mword 64)
-    (d k : nat) (g : nat -> bv 8) :
-  umem_wrote M M1 dstva d ->
-  M2 = umem_wr M1 (add_vec_int dstva (Z.of_nat d)) k g ->
-  umem_wrote M M2 dstva (d + k)%nat.
-Proof.
-  intros [f ->] ->.
-  pose (h := fun i => if decide (i < d)%nat then f i else g (i - d)%nat).
-  exists h.
-  rewrite <- (umem_wr_app M dstva d k h).
-  rewrite (umem_wr_ext M dstva d f h
-             ltac:(intros i Hi; rewrite /h;
-                   case_decide as Hd; [reflexivity | exfalso; lia])).
-  apply umem_wr_ext. intros i _. rewrite /h.
-  case_decide as Hd; [exfalso; lia |]. f_equal. lia.
-Qed.
-
-(* WHAT THE CALLER GETS BACK: every byte outside the run, unchanged... *)
-Lemma umem_wrote_out (M M' : gmap Z (bv 8)) (dstva : mword 64) (d : nat)
-    (va : Z) :
-  umem_wrote M M' dstva d ->
-  (forall i, (i < d)%nat -> va <> uint (add_vec_int dstva (Z.of_nat i))) ->
-  M' !! va = M !! va.
-Proof. intros [src ->] Hne. exact (umem_wr_lookup_out M dstva d src va Hne). Qed.
-
-(* ...and the domain, which is what the block's own well-formedness needs *)
-Lemma umem_wrote_dom (M M' : gmap Z (bv 8)) (dstva : mword 64) (d : nat) :
-  umem_wrote M M' dstva d ->
-  (forall i, (i < d)%nat ->
-     is_Some (M !! uint (add_vec_int dstva (Z.of_nat i)))) ->
-  dom M' = dom M.
-Proof. intros [src ->] Hs. exact (umem_wr_dom M dstva d src Hs). Qed.
 
 (* overwriting the same run wins outright *)
 Lemma umem_write_overwrite (M : gmap Z (bv 8)) (a : Z) (n : nat) (f g : nat -> bv 8) :
@@ -793,55 +680,6 @@ Proof.
   rewrite (He k ltac:(lia)). reflexivity.
 Qed.
 
-(* ===================================================================== *)
-(* THE BRIDGE A PARTIAL-WRITE SYSCALL ROW NEEDS.                          *)
-(*                                                                        *)
-(* read's row says the kernel wrote [d] bytes at the caller's buffer, for  *)
-(* SOME [d] no larger than the count -- but the caller owns the whole      *)
-(* count, and the heap's [uheap_store_run] rewrites all of it at once.     *)
-(* These two lemmas say those are the same map, provided the bytes past    *)
-(* [d] are given back unchanged, which is exactly what the owner knows.    *)
-(*                                                                        *)
-(* [umem_wr] indexes through [add_vec_int] and [umem_write] through plain  *)
-(* [Z] addition, so the first lemma is where the absence of wrap is used.  *)
-(* ===================================================================== *)
-Lemma umem_wr_write (M : gmap Z (bv 8)) (a : Z) (n : nat) (src : nat -> bv 8) :
-  (forall k : nat, (k < n)%nat ->
-     uint (add_vec_int (mword_of_int a : mword 64) (Z.of_nat k)) = (a + Z.of_nat k)%Z) ->
-  umem_wr M (mword_of_int a) n src = umem_write M a n src.
-Proof.
-  induction n as [ | k IH ]; intro Hk; [ reflexivity | ].
-  cbn [umem_wr umem_write].
-  rewrite (IH ltac:(intros j Hj; apply Hk; lia)).
-  rewrite (Hk k ltac:(lia)). reflexivity.
-Qed.
-
-(* ...and the extension: writing [d] of [n] bytes is writing all [n], where
-   the tail is the value the map already holds. *)
-Lemma umem_write_prefix (M : gmap Z (bv 8)) (a : Z) (n : nat) :
-  forall (d : nat) (src f : nat -> bv 8),
-  (d <= n)%nat ->
-  (forall k : nat, (k < n)%nat -> M !! (a + Z.of_nat k)%Z = Some (f k)) ->
-  umem_write M a d src
-  = umem_write M a n (fun k => if decide (k < d)%nat then src k else f k).
-Proof.
-  induction n as [ | n IH ]; intros d src f Hdn HM.
-  - assert (Hd : d = 0%nat) by lia. rewrite Hd. reflexivity.
-  - destruct (decide (d = S n)) as [-> | Hne].
-    + cbn [umem_write].
-      destruct (decide (n < S n)%nat) as [_ | HH]; [ | exfalso; lia ].
-      f_equal. apply umem_write_ext.
-      intros k Hk. destruct (decide (k < S n)%nat) as [_ | HH];
-        [ reflexivity | exfalso; lia ].
-    + cbn [umem_write].
-      destruct (decide (n < d)%nat) as [Hlt | Hge]; [ exfalso; lia | ].
-      rewrite <- (IH d src f ltac:(lia) ltac:(intros k Hk; apply HM; lia)).
-      symmetry. apply insert_id.
-      rewrite (umem_write_lookup_out M a d src (a + Z.of_nat n)%Z
-                 ltac:(intros k Hk; lia)).
-      exact (HM n ltac:(lia)).
-Qed.
-
 Lemma umem_write_dom (M : gmap Z (bv 8)) (a : Z) (n : nat) (bs : nat -> bv 8) :
   (forall j, (j < n)%nat -> is_Some (M !! (a + Z.of_nat j)%Z)) ->
   dom (umem_write M a n bs) = dom M.
@@ -871,24 +709,6 @@ Definition pgroundup (sz : Z) : Z := ((sz + 4095) / 4096) * 4096.
 
 (* a va the process may touch -- mapped or not yet faulted in *)
 Definition uva_live (sz : Z) (va : Z) : Prop := (0 <= va < pgroundup sz)%Z.
-
-(* PGROUNDUP IS MONOTONE, hence so is the live region: raising [p->sz] only
-   ever raises the boundary, and never un-lives a va that was live.  This is
-   the arithmetic under sbrk's LAZY path, where the size moves and the table
-   does not -- see [ProcPtOwn.umem_lazy_grow_sz]. *)
-Lemma pgroundup_mono (sz sz' : Z) :
-  (sz <= sz')%Z -> (pgroundup sz <= pgroundup sz')%Z.
-Proof.
-  intros Hle. unfold pgroundup.
-  apply Z.mul_le_mono_nonneg_r; [lia | apply Z.div_le_mono; lia].
-Qed.
-
-Lemma uva_live_mono (sz sz' a : Z) :
-  (sz <= sz')%Z -> uva_live sz a -> uva_live sz' a.
-Proof.
-  intros Hle Hlv. unfold uva_live in *.
-  pose proof (pgroundup_mono sz sz' Hle). lia.
-Qed.
 
 (* THE PAGE OF A LIVE va IS LIVE.  vmfault maps the page of a va it has
    already checked against [p->sz]; this is what says every va of that page
@@ -1464,66 +1284,6 @@ Section UserPtInv.
     iSplitR; [iPureIntro; exact Hdom |]. iExact "Hm".
   Qed.
 
-  (* ------------------------------------------------------------------ *)
-  (* THE LAZY-IMAGE TWIN OF [user_pt_inv] -- added for the WP slot's key. *)
-  (*                                                                    *)
-  (* [user_ptm_inv P sz M] is [user_pt_inv P M] with the image conjunct  *)
-  (* re-keyed to the view the PROCESS has: [umem_lazy P sz M] instead of *)
-  (* [umem_own P M].  The two own exactly the same resource and differ   *)
-  (* only in what their map RECORDS -- the lazy one also carries a 0 at  *)
-  (* every live-but-unmapped va -- and the mapped sub-image is           *)
-  (* recoverable, because a submap is pinned by its domain.             *)
-  (*                                                                    *)
-  (* WHY THE TRAP CONTRACT NEEDS IT.  [UexecRet.uvb]'s image IS the WP   *)
-  (* slot's key, and the key is what the process can OBSERVE -- which    *)
-  (* under lazy allocation cannot tell a faulted-in page from an         *)
-  (* untouched one.  So the key's image is always the lazy view, and the *)
-  (* bundle must assert THIS at it: [user_pt_inv]'s [umem_own] pins      *)
-  (* [dom M = uva_dom P] and is therefore unsatisfiable at the key of a  *)
-  (* process with an unfaulted page (the GAP-premise trap).              *)
-  (*                                                                    *)
-  (* This is [ProcPtOwn.proc_ptm]'s twin on the INSTALLED table, exactly *)
-  (* as [user_pt_inv] is [ProcPtOwn.proc_pt]'s: [proc_ptm] carries the   *)
-  (* PARKED tree ([pt_frame]) and owns neither satp, nor the TLB, nor    *)
-  (* the PMP config, all three of which user execution needs to          *)
-  (* translate at all.                                                  *)
-  (* ------------------------------------------------------------------ *)
-  Definition user_ptm_inv (P : uptd) (sz : Z) (M : gmap Z (bv 8)) : iProp Σ :=
-    (utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) ∗
-     umem_lazy P sz M ∗
-     ⌜uva_pa_inj P⌝ ∗
-     ⌜upt_acc_wf P.(ud_um)⌝)%I.
-
-  Lemma user_ptm_inv_any (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
-    user_ptm_inv P sz M -∗ user_pt_any P.
-  Proof.
-    rewrite /user_ptm_inv user_pt_any_unfold.
-    iIntros "(Htlb & Hm & %Hinj & %Hacc)".
-    iFrame "Htlb".
-    iSplitL "Hm"; [ iApply (umem_lazy_any with "Hm") | ].
-    iPureIntro. split; [ exact Hinj | exact Hacc ].
-  Qed.
-
-  (* the MAPPED sub-image, at some map -- what a consumer that speaks
-     [user_pt_inv] (the generic user-safety tier) is handed *)
-  Lemma user_ptm_inv_pt (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
-    user_ptm_inv P sz M -∗ ∃ Mp : gmap Z (bv 8), user_pt_inv P Mp.
-  Proof.
-    iIntros "H". iDestruct (user_ptm_inv_any with "H") as "H".
-    rewrite /user_pt_any. iExact "H".
-  Qed.
-
-  (* ...and back: the user-execution bundle at SOME lazy image *)
-  Lemma user_ptm_inv_intro (P : uptd) (sz : Z) :
-    user_pt_any P -∗ ∃ M : gmap Z (bv 8), user_ptm_inv P sz M.
-  Proof.
-    rewrite user_pt_any_unfold /user_ptm_inv.
-    iIntros "(Htlb & Hm & %Hinj & %Hacc)".
-    iDestruct (umem_lazy_intro P sz with "Hm") as (M) "Hm".
-    iExists M. iFrame "Htlb Hm".
-    iPureIntro. split; [ exact Hinj | exact Hacc ].
-  Qed.
-
   (* on a MAPPED va the two halves agree, which is what makes the window
      accessor below read [M] and hand back [Mp] *)
   Lemma umem_lazy_mapped_lookup (P : uptd) (M Mp : gmap Z (bv 8)) (va : Z) :
@@ -1615,7 +1375,7 @@ Section UserPtTranslate.
 
   Lemma utlb_inv_pt_translateAddr_u (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (w va pa : mword 64) (σ : mstate)
-      (S : PtBytes.pamap -> iProp Σ) :
+      (S : TsoMemPa.bytemap -> iProp Σ) :
     um !! svpn_of va = Some w ->
     uleaf_ok acc w ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
@@ -1637,7 +1397,7 @@ Section UserPtTranslate.
        table is the [Some ξ] tier, so the discharge is
        [TsoCtx.ctx_store_win_ok] at the caller's OWN context -- a process IS
        its own page table. *)
-    □ (∀ (m : PtBytes.pamap) (a : Arch.pa) (wold wnew : mword 64),
+    □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
          gen_heap_interp m -∗ S m -∗
          TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
          gen_heap_interp (RiscvModelBytes.write_bytes m a 8 wnew) ∗
@@ -2041,3 +1801,223 @@ Section UserPtFaultCombined.
 
 End UserPtFaultCombined.
 
+
+(* ==== MAIN-COMPAT appendix (tso-cutover): main-side additions kept
+   beside flip's file; delete each when its last consumer migrates. ==== *)
+
+Lemma add_vec_int_nat_assoc (p : mword 64) (a b : nat) :
+  add_vec_int (add_vec_int p (Z.of_nat a)) (Z.of_nat b)
+  = add_vec_int p (Z.of_nat (a + b)).
+Proof.
+  unfold add_vec_int. apply bv_eq.
+  rewrite !add_vec64_unsigned !moi64_unsigned.
+  rewrite !bv_wrap_add_idemp_r !bv_wrap_add_idemp_l. f_equal.
+  rewrite Nat2Z.inj_add. ring.
+Qed.
+
+(* ADJACENT RUNS APPEND.  A CHUNKED writer into user memory -- readi's
+   block-at-a-time loop, consoleread's and piperead's byte-at-a-time ones
+   -- issues one [copyout] per chunk, each starting where the last stopped,
+   and its loop invariant has to say "the accumulated window is ONE run of
+   length [n+k]".
+   That is this equation, and unlike [umem_write_app] it needs no bound on
+   [n + k] at all: both sides key the same address by the same modular sum.
+
+   The source function is the OUTER one throughout ([src (n + i)] for the
+   second chunk), which is what a loop carrying "the file's bytes from
+   [off]" already has; a caller whose chunk names its bytes differently
+   closes the gap with [umem_wr_ext] below. *)
+
+Lemma umem_wr_app (M : gmap Z (bv 8)) (dstva : mword 64) (n k : nat)
+    (src : nat -> bv 8) :
+  umem_wr (umem_wr M dstva n src) (add_vec_int dstva (Z.of_nat n)) k
+          (fun i => src (n + i)%nat)
+  = umem_wr M dstva (n + k)%nat src.
+Proof.
+  induction k as [| k IH].
+  - rewrite Nat.add_0_r. reflexivity.
+  - cbn [umem_wr]. rewrite IH.
+    replace (n + S k)%nat with (S (n + k))%nat by lia.
+    cbn [umem_wr]. rewrite add_vec_int_nat_assoc. reflexivity.
+Qed.
+
+(* two source functions that agree on the run write the same thing *)
+
+Lemma umem_wr_ext (M : gmap Z (bv 8)) (dstva : mword 64) (n : nat)
+    (src src' : nat -> bv 8) :
+  (forall i, (i < n)%nat -> src i = src' i) ->
+  umem_wr M dstva n src = umem_wr M dstva n src'.
+Proof.
+  induction n as [| k IH]; intros He; [reflexivity |].
+  cbn [umem_wr]. rewrite (IH ltac:(intros i Hi; apply He; lia)).
+  rewrite (He k ltac:(lia)). reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(*  THE WINDOW WITHOUT ITS CONTENTS                                       *)
+(* ===================================================================== *)
+(* A reader that fills user memory from a DEVICE -- the console ring, the
+   far end of a pipe -- cannot NAME the bytes it delivered: they are the
+   existential contents of an invariant, and the read is interleaved with
+   sleeps.  What it CAN say, and what its callers actually need, is that
+   nothing outside the window it wrote has moved.  That is this predicate:
+   the run is pinned, its contents are not.
+
+   It is strictly weaker than the [umem_wr] EQUATION a reader whose source
+   is nameable states (readi's, whose bytes are the file's), and strictly
+   stronger than "some image": [umem_wrote_out] hands a caller every
+   untouched byte back and [umem_wrote_dom] pins the domain. *)
+
+Definition umem_wrote (M M' : gmap Z (bv 8)) (dstva : mword 64) (d : nat)
+  : Prop := exists src : nat -> bv 8, M' = umem_wr M dstva d src.
+
+(* nothing written yet *)
+
+Lemma umem_wrote_0 (M : gmap Z (bv 8)) (dstva : mword 64) :
+  umem_wrote M M dstva 0.
+Proof. exists (fun _ => bv_0 8). reflexivity. Qed.
+
+(* ...and the run extends, one chunk at a time, at the address the run
+   stops at.  This is the loop step: the invariant carries the accumulated
+   [d], the round supplies its own chunk, and the two compose with no
+   no-wrap side condition. *)
+
+Lemma umem_wrote_app (M M1 M2 : gmap Z (bv 8)) (dstva : mword 64)
+    (d k : nat) (g : nat -> bv 8) :
+  umem_wrote M M1 dstva d ->
+  M2 = umem_wr M1 (add_vec_int dstva (Z.of_nat d)) k g ->
+  umem_wrote M M2 dstva (d + k)%nat.
+Proof.
+  intros [f ->] ->.
+  pose (h := fun i => if decide (i < d)%nat then f i else g (i - d)%nat).
+  exists h.
+  rewrite <- (umem_wr_app M dstva d k h).
+  rewrite (umem_wr_ext M dstva d f h
+             ltac:(intros i Hi; rewrite /h;
+                   case_decide as Hd; [reflexivity | exfalso; lia])).
+  apply umem_wr_ext. intros i _. rewrite /h.
+  case_decide as Hd; [exfalso; lia |]. f_equal. lia.
+Qed.
+
+(* WHAT THE CALLER GETS BACK: every byte outside the run, unchanged... *)
+
+Lemma umem_wrote_out (M M' : gmap Z (bv 8)) (dstva : mword 64) (d : nat)
+    (va : Z) :
+  umem_wrote M M' dstva d ->
+  (forall i, (i < d)%nat -> va <> uint (add_vec_int dstva (Z.of_nat i))) ->
+  M' !! va = M !! va.
+Proof. intros [src ->] Hne. exact (umem_wr_lookup_out M dstva d src va Hne). Qed.
+
+(* ...and the domain, which is what the block's own well-formedness needs *)
+
+Lemma umem_wrote_dom (M M' : gmap Z (bv 8)) (dstva : mword 64) (d : nat) :
+  umem_wrote M M' dstva d ->
+  (forall i, (i < d)%nat ->
+     is_Some (M !! uint (add_vec_int dstva (Z.of_nat i)))) ->
+  dom M' = dom M.
+Proof. intros [src ->] Hs. exact (umem_wr_dom M dstva d src Hs). Qed.
+
+(* overwriting the same run wins outright *)
+
+Lemma umem_wr_write (M : gmap Z (bv 8)) (a : Z) (n : nat) (src : nat -> bv 8) :
+  (forall k : nat, (k < n)%nat ->
+     uint (add_vec_int (mword_of_int a : mword 64) (Z.of_nat k)) = (a + Z.of_nat k)%Z) ->
+  umem_wr M (mword_of_int a) n src = umem_write M a n src.
+Proof.
+  induction n as [ | k IH ]; intro Hk; [ reflexivity | ].
+  cbn [umem_wr umem_write].
+  rewrite (IH ltac:(intros j Hj; apply Hk; lia)).
+  rewrite (Hk k ltac:(lia)). reflexivity.
+Qed.
+
+(* ...and the extension: writing [d] of [n] bytes is writing all [n], where
+   the tail is the value the map already holds. *)
+
+Lemma umem_write_prefix (M : gmap Z (bv 8)) (a : Z) (n : nat) :
+  forall (d : nat) (src f : nat -> bv 8),
+  (d <= n)%nat ->
+  (forall k : nat, (k < n)%nat -> M !! (a + Z.of_nat k)%Z = Some (f k)) ->
+  umem_write M a d src
+  = umem_write M a n (fun k => if decide (k < d)%nat then src k else f k).
+Proof.
+  induction n as [ | n IH ]; intros d src f Hdn HM.
+  - assert (Hd : d = 0%nat) by lia. rewrite Hd. reflexivity.
+  - destruct (decide (d = S n)) as [-> | Hne].
+    + cbn [umem_write].
+      destruct (decide (n < S n)%nat) as [_ | HH]; [ | exfalso; lia ].
+      f_equal. apply umem_write_ext.
+      intros k Hk. destruct (decide (k < S n)%nat) as [_ | HH];
+        [ reflexivity | exfalso; lia ].
+    + cbn [umem_write].
+      destruct (decide (n < d)%nat) as [Hlt | Hge]; [ exfalso; lia | ].
+      rewrite <- (IH d src f ltac:(lia) ltac:(intros k Hk; apply HM; lia)).
+      symmetry. apply insert_id.
+      rewrite (umem_write_lookup_out M a d src (a + Z.of_nat n)%Z
+                 ltac:(intros k Hk; lia)).
+      exact (HM n ltac:(lia)).
+Qed.
+
+Lemma pgroundup_mono (sz sz' : Z) :
+  (sz <= sz')%Z -> (pgroundup sz <= pgroundup sz')%Z.
+Proof.
+  intros Hle. unfold pgroundup.
+  apply Z.mul_le_mono_nonneg_r; [lia | apply Z.div_le_mono; lia].
+Qed.
+
+Lemma uva_live_mono (sz sz' a : Z) :
+  (sz <= sz')%Z -> uva_live sz a -> uva_live sz' a.
+Proof.
+  intros Hle Hlv. unfold uva_live in *.
+  pose proof (pgroundup_mono sz sz' Hle). lia.
+Qed.
+
+(* THE PAGE OF A LIVE va IS LIVE.  vmfault maps the page of a va it has
+   already checked against [p->sz]; this is what says every va of that page
+   -- not just the faulting one -- was already in the process's view. *)
+
+  
+Section MainCompatPtInv.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+
+Definition user_ptm_inv (P : uptd) (sz : Z) (M : gmap Z (bv 8)) : iProp Σ :=
+    (utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) ∗
+     umem_lazy P sz M ∗
+     ⌜uva_pa_inj P⌝ ∗
+     ⌜upt_acc_wf P.(ud_um)⌝)%I.
+
+  Lemma user_ptm_inv_any (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    user_ptm_inv P sz M -∗ user_pt_any P.
+  Proof.
+    rewrite /user_ptm_inv user_pt_any_unfold.
+    iIntros "(Htlb & Hm & %Hinj & %Hacc)".
+    iFrame "Htlb".
+    iSplitL "Hm"; [ iApply (umem_lazy_any with "Hm") | ].
+    iPureIntro. split; [ exact Hinj | exact Hacc ].
+  Qed.
+
+  (* the MAPPED sub-image, at some map -- what a consumer that speaks
+     [user_pt_inv] (the generic user-safety tier) is handed *)
+
+  Lemma user_ptm_inv_pt (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    user_ptm_inv P sz M -∗ ∃ Mp : gmap Z (bv 8), user_pt_inv P Mp.
+  Proof.
+    iIntros "H". iDestruct (user_ptm_inv_any with "H") as "H".
+    rewrite /user_pt_any. iExact "H".
+  Qed.
+
+  (* ...and back: the user-execution bundle at SOME lazy image *)
+
+  Lemma user_ptm_inv_intro (P : uptd) (sz : Z) :
+    user_pt_any P -∗ ∃ M : gmap Z (bv 8), user_ptm_inv P sz M.
+  Proof.
+    rewrite user_pt_any_unfold /user_ptm_inv.
+    iIntros "(Htlb & Hm & %Hinj & %Hacc)".
+    iDestruct (umem_lazy_intro P sz with "Hm") as (M) "Hm".
+    iExists M. iFrame "Htlb Hm".
+    iPureIntro. split; [ exact Hinj | exact Hacc ].
+  Qed.
+
+  (* on a MAPPED va the two halves agree, which is what makes the window
+     accessor below read [M] and hand back [Mp] *)
+End MainCompatPtInv.

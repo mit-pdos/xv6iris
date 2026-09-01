@@ -728,17 +728,7 @@ Lemma uv_fetch_base_2_pg (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
     tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
     uv_tree_ok pt (upa_map pt M) t' /\
     pt_same_shape 2 t t'.
-Proof.
-  intros Hinj Hl Hleaf Hcanon Hpg Hal2 Hnal4 Hb HnRVC Lpc Lcp Lsxl Lmenv Hpins Htok.
-  pose proof (uinpage_nc pc 2 Hpg ltac:(lia)) as Hnc2.
-  assert (Hl2 : ud_um pt !! svpn_of (add_vec_int pc 2) = Some w_leaf)
-    by (rewrite (usvpn_window pc 2 ltac:(lia) Hnc2); exact Hl).
-  pose proof (uva_canon_add pc 2 Hcanon ltac:(lia) Hnc2) as Hcanon2.
-  destruct (uwin_shift pc 2 Hpg ltac:(lia)) as [Hu2 _].
-  exact (uv_fetch_base_2 pt M t rsf w_leaf w_leaf pc iw
-           Hinj Hl Hleaf Hcanon Hl2 Hleaf Hcanon2 Hu2 Hal2 Hnal4 Hb HnRVC
-           Lpc Lcp Lsxl Lmenv Hpins Htok).
-Qed.
+Proof. exact (uv_fetch_base_2 pt M t rsf w_leaf pc iw). Qed.
 
 
 (* ===================================================================== *)

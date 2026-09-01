@@ -116,6 +116,13 @@ Section UexecWp.
   Definition uexec_F (X : iProp Σ) : iProp Σ :=
     (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd)
        (Rut : uptd -> iProp Σ)
+       (* A6.140 (the residue-token contract): the running token lives
+          inside [Rut] across a user excursion and the step engine borrows
+          it per bridge -- the accessor rides the ∀ as a Coq-level fact,
+          exactly [SpecUser.wp_user_exec_closed_body]'s premise. *)
+       (HRut : forall pt' : uptd,
+                 ⊢ Rut pt' -∗ TsoCtx.own_context TsoCtx.cur_ctx ∗
+                              (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt'))
        (M : gmap Z (bv 8)) (g : regfile)
        (ms_v sc_v stval_v sepc_v va : mword 64),
        ⌜loop_ok C pt⌝ -∗

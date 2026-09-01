@@ -46,6 +46,7 @@ Require Import IntrDefs WpIntrInv WpSmodeIntr.
    (SmodePte).  [WpIntrInv] already requires all three, so no edge moves. *)
 Require Import KptShare PtTree SmodePte.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Require Import TsoCtx.
 Import Defs.
@@ -222,8 +223,12 @@ Section SfenceLeaf.
                 (bool_decide_eq_true_2 _ Htlb_in) Hpriv HTVM)
       as (tv & Hex & Hprop & Hgm).
     iIntros "#Hcert Hany Hrw Hro".
-    (* register-only stretch: the throwaway-token form (A6.22's walk owns
-       no bytes, so it needs no thread identity) *)
+    (* A6.22: THIS WALK OWNS NO BYTES, SO IT NEEDS NO THREAD IDENTITY.
+       The flip gave [swp_hmrun_of_exec] an [own_context XI] premise (the
+       byte tier is context-indexed now); at [mm := ∅] there is no byte to
+       index, and [HartMemRun.swp_hmrun_of_exec_reg] is the sanctioned
+       register-only instance that mints and drops a throwaway identity
+       internally.  Using it is what keeps this leaf's STATEMENT fixed. *)
     iApply (swp_mono _ _ _ with "[] [-]"); last first.
     { iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df
                 (execute (SFENCE_VMA (zreg, zreg))) (MState rs ∅ dev0_state)
@@ -388,8 +393,14 @@ Section SfenceLeaf.
       iDestruct (strans_inv_acc_kpt with "Hkptr Htr")
         as (root) "(Hres & Htrback)".
       iDestruct (tlb_res_pt_open with "Hres") as (ksatp tlbv)
-        "(Hsatp & %HkMode & %Hkasid & %Hkppn & Htlbc & Hsnap & Hpmp & #Hkinv)".
+        "(Hsatp & %HkMode & %Hkasid & %Hkppn & Htlbc & Hsnap & Hpmp & #Hkinv
+          & #Hcr)".
       iDestruct "Hsnap" as (kt3) "(_ & #Hlb3)".
+      (* A6.55: the reader's credentials ride in the residue as ONE
+         persistent conjunct.  The flush re-seals the arm at the SAME
+         credentials it opened it with -- an empty TLB coheres with any
+         tree, and nothing here moves the kernel tree's bound. *)
+      iDestruct "Hcr" as (Bc) "[#Hbdc #Hvlbc]".
       iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
           Hmdl & Hmenv)".
@@ -397,6 +408,9 @@ Section SfenceLeaf.
       pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD &
                           HMPP & HTVM).
       iDestruct (sf_frames_in ms0 tlbv with "Htlbc Hpriv Hms") as "[Hrw Hro]".
+      (* [Hctx] -- the thread-of-control token -- travels with the rest of
+         the capability into the POST side of the [swp_mono], which is where
+         [sie_cap] is rebuilt; the [swp] side never touches it. *)
       iApply (swp_mono with
                 "[Hstk Harm Hctx Hfile HPC HnPC Hhalf Hspp Hmie Hmdl Hmenv
                   Hsatp Hpmp Htrback] [Hrw Hro Hresv]");
@@ -418,10 +432,10 @@ Section SfenceLeaf.
         as "(Htlbc & Hpriv & Hms)".
       (* re-seal the arm at the flushed vector, at the residue's OWN
          snapshot -- an empty TLB is coherent with any tree. *)
-      iDestruct (tlb_res_pt_intro root ksatp tv kt3 HkMode Hkasid Hkppn
+      iDestruct (tlb_res_pt_intro root ksatp tv kt3 Bc HkMode Hkasid Hkppn
                    (tlb_ok_pt_empty (mword_of_int 0) kt3 tv
                       (fun vpn' => Hflush _ (tlb_hash_range vpn')))
-                   with "Hsatp Htlbc Hlb3 Hpmp Hkinv") as "Hres".
+                   with "Hsatp Htlbc Hlb3 Hbdc Hvlbc Hpmp Hkinv") as "Hres".
       iDestruct ("Htrback" with "Hres") as "Htr".
       iSplitR; [done|].
       iExists (add_vec_int pc 4), ms0, m, n.
