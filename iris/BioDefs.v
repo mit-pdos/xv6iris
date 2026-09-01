@@ -43,6 +43,7 @@ Record bio_names := MkBioNames {
   bn_own  : nat -> gname;         (* buffer k's checkout token           *)
   bn_mid  : nat -> gname;         (* buffer k's recycle token            *)
   bn_anc  : nat -> gname;         (* buffer k's transit anchor (Phase 5)  *)
+  bn_pres : nat -> gname;         (* buffer k's presence auth (A6.148)    *)
 }.
 
 (* ---------------------------------------------------------------------- *)

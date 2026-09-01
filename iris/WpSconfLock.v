@@ -2007,7 +2007,7 @@ Section WpSconfLock.
         (* A6.149: the drained-point receipt for the caller's llb -- the AMO
            put this hart's view at the log top, so any pre-presented llb is
            below it.  The BioBox guard mint ([aguard_receipt]) consumes it. *)
-        (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ hart_view_lb K) -∗
+        (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K) -∗
         (* >>> A6.119: THE WINNER RECEIVES THE WHOLE PARKED RECORD.  The
            invariant's free arm holds [lock_pay R] = [∃ ξ T, ctx_parked ξ T ∗
            R ξ]; this post used to promise only [∃ ξ, R ξ], i.e. to DROP
@@ -2038,7 +2038,7 @@ Section WpSconfLock.
                    ⌜npc = add_vec_int pc 4⌝ ∗
                    ⌜m' = <[Regidx rd := regval_into_reg (amoswap_loaded w)]> m⌝ ∗
                    ⌜n' = n⌝ ∗ Tc ∗
-                   (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ hart_view_lb (CID := CIDx) K) ∗
+                   (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K) ∗
                    (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ WpLock.lock_pay_won R
                     ∨ ⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝))%I
               with "Hcg Hpc Hinstr [HTc Hcont]").
@@ -2127,7 +2127,7 @@ Section WpSconfLock.
                        the continuation that rebuilds the capability. *)
                     (fun bytes => Tc ∗
                        TsoCtx.own_context (CID := CID) TsoCtx.cur_ctx ∗
-                       (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ hart_view_lb (CID := CID) K) ∗
+                       (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K) ∗
                        (⌜bytes = (mword_of_int 0 : mword 32)⌝ ∗
                           locked_pre γl h0 ∗ WpLock.lock_pay_won R
                         ∨ ⌜neq_vec (sign_extend' 64 bytes) zero_reg = true⌝))%I
@@ -2278,7 +2278,7 @@ Section WpSconfLock.
                             (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
                                        (hart_agent (@cpu_id CID))])%list V) ∗
                        TsoCtx.own_context (CID := CID) TsoCtx.cur_ctx ∗
-                       (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ hart_view_lb (CID := CID) K) ∗
+                       (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K) ∗
                        (⌜bytes = (mword_of_int 0 : mword 32)⌝ ∗
                           locked_pre γl h0 ∗ ▷ WpLock.lock_pay_won R
                         ∨ ⌜neq_vec (sign_extend' 64 bytes) zero_reg = true⌝))%I
@@ -2337,6 +2337,8 @@ Section WpSconfLock.
                   iExact "Htso". }
                 iDestruct (TsoCtx.hart_view_lb_get (CID := CID) _ Tl Htopa
                                  with "Htso Hllb") as "(Htso & #Hvlba & %HTlKa)".
+                iMod (TsoCtx.ctx_bound_raise (CID := CID) TsoCtx.cur_ctx _
+                        with "Hctx Hvlba") as "[Hctx #Hflba]".
                 iAssert (tso_interp_of riscv_eraGS img
                            (write_bytes sigma.(mem) pa 4%N (amoswap_stored (rget m rs2)))
                            (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
@@ -2348,8 +2350,8 @@ Section WpSconfLock.
                 { rewrite (tso_interp_of_at_gs riscv_eraGS img _ _ _
                                  sigma.(sregs) sigma.(mdev) Hpina).
                   iExact "Htso". }
-                iAssert (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ hart_view_lb (CID := CID) K)%I as "#Hpaira".
-                { iExists _. iSplit; [iPureIntro; exact HTlKa | iExact "Hvlba"]. }
+                iAssert (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K)%I as "#Hpaira".
+                { iExists _. iSplit; [iPureIntro; exact HTlKa | iExact "Hflba"]. }
                 iModIntro. iFrame "Hmem Htso Hctx Hpaira".
                 iLeft. iFrame "Hpre". iSplitR; [ iPureIntro; exact Hw0 | ].
                 iNext. iExists ξw, Tw. iFrame "Hpkw HR". iExact "Hflw0".
@@ -2382,6 +2384,8 @@ Section WpSconfLock.
                   iExact "Htso". }
                 iDestruct (TsoCtx.hart_view_lb_get (CID := CID) _ Tl Htopa
                                  with "Htso Hllb") as "(Htso & #Hvlba & %HTlKa)".
+                iMod (TsoCtx.ctx_bound_raise (CID := CID) TsoCtx.cur_ctx _
+                        with "Hctx Hvlba") as "[Hctx #Hflba]".
                 iAssert (tso_interp_of riscv_eraGS img
                            (write_bytes sigma.(mem) pa 4%N (amoswap_stored (rget m rs2)))
                            (log ++ [PWMsg (snap_of pa 4%N (amoswap_stored (rget m rs2)))
@@ -2393,8 +2397,8 @@ Section WpSconfLock.
                 { rewrite (tso_interp_of_at_gs riscv_eraGS img _ _ _
                                  sigma.(sregs) sigma.(mdev) Hpina).
                   iExact "Htso". }
-                iAssert (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ hart_view_lb (CID := CID) K)%I as "#Hpaira".
-                { iExists _. iSplit; [iPureIntro; exact HTlKa | iExact "Hvlba"]. }
+                iAssert (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K)%I as "#Hpaira".
+                { iExists _. iSplit; [iPureIntro; exact HTlKa | iExact "Hflba"]. }
                 iModIntro. iFrame "Hmem Htso Hctx Hpaira".
                 iRight. iPureIntro. exact Hwnz. }
             iMod (fupd_mask_subseteq ∅) as "Hclm"; [set_solver|].

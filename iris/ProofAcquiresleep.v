@@ -1127,18 +1127,18 @@ Section ProofAcquiresleep.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
-  Lemma wp_acquiresleep_gen_sconf
+  Lemma wp_acquiresleep_gen_llb_sconf
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool)
-      (b : bool) (lks : gset string)
-    : wp_acquiresleep_gen_sconf_body γs j γl γsl s R H q m pidv Vpr av eb b lks.
+      (b : bool) (lks : gset string) (Tl : nat)
+    : wp_acquiresleep_gen_llb_sconf_body γs j γl γsl s R H q m pidv Vpr av eb b lks Tl.
   Proof.
-    cbv beta delta [wp_acquiresleep_gen_sconf_body].
+    cbv beta delta [wp_acquiresleep_gen_llb_sconf_body].
     intros pcE slk pj ret_tgt Hj Hav Hbelow.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hslk HHq Hpid #Hpinv Hcont".
+    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hslk #Hllb HHq Hpid #Hpinv Hcont".
     (* LEVEL 0 TIES THE TWO INDICES: [cpu_own_eb_agree] gives [eb = b]
        outright, so the function runs at ONE index throughout and there is
        nothing left to pin.  This used to derive [b = true] from the
@@ -1309,15 +1309,15 @@ Section ProofAcquiresleep.
     (* ===== acquire(&slk->lk): cpu_own 0 -> 1, returns locked + sl_res + pay ===== *)
     iDestruct (cpu_own_transport CID CID10 0 eb pj eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "sleep lock"%string <{ sl_res_gen γsl slk R H }> Maq
-              0%nat eb pj (av - 4)%nat eb lks
+    iApply (Acquire.wp_acquire_llb_sconf KT1 γl "sleep lock"%string <{ sl_res_gen γsl slk R H }> Maq
+              0%nat eb pj (av - 4)%nat eb lks Tl
               ltac:(lia)
               ltac:(lia)
               Hbelow
-              with "Hcg Hown Htext Hpc []").
+              with "Hcg Hown Htext Hpc [] Hllb").
     all: try lkbelow.
     { iEval (rewrite HMaqa0). iApply (is_sleeplock_gen_lock with "Hslk"). }
-    iIntros (CID11 Hs11 ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR _ Hown Hpay".
+    iIntros (CID11 Hs11 ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR #Hpaira _ Hown Hpay".
     (* JOIN AT THE INDEX: the acquire's push_off freed the pair at
        [eb = true] and nothing at [eb = false], where the caller brought it.
        From here the loop carries [trap_csrs ∗ cpu_claim pj] index-free.
@@ -1354,7 +1354,12 @@ Section ProofAcquiresleep.
       iIntros (CIDx Hsx M) "%HaslE Hr24 Hr16 Hr8 Hr0 Htok Hstok HHq HRx Hw Hpid Hown Htc Hclm Hcg Hpc".
       iApply (asl_exit_body (CID := CIDx) CID γs j γl γsl s R H q m M pidv av Vpr slk spd sp0 eb lks
                 Hav Hsx Hspd Hsp0 HaslE Hbelow
-                with "Htext Hslk Hr24 Hr16 Hr8 Hr0 Htok Hstok HHq HRx Hw Hpid Hown Htc Hclm Hcg Hpc Hcont"). }
+                with "Htext Hslk Hr24 Hr16 Hr8 Hr0 Htok Hstok HHq HRx Hw Hpid Hown Htc Hclm Hcg Hpc [Hcont]").
+      iIntros (CIDz) "%Hsz".
+      iSpecialize ("Hcont" $! CIDz with "[%]"); [exact Hsz|].
+      iIntros (mf) "%Hcs Hcg2 Hown2 Htce2 Hcce2 Hpc2 Hstok2 HR2 Hpid2".
+      iApply ("Hcont" $! mf with "[%] Hcg2 Hown2 Htce2 Hcce2 Hpc2 Hpaira Hstok2 HR2 Hpid2").
+      exact Hcs. }
 
     (* ============ the WAIT LOOP (iLöb over the anchored invariant) ============ *)
     iAssert (asl_loop CID γs j γl γsl R H q m pidv av Vpr slk spd sp0 eb lks) with "[]" as "Hloop".
@@ -2081,6 +2086,28 @@ Section ProofAcquiresleep.
   (* the level-0 contract at the UNTRACKED instance: the deposit is [emp],
      the fraction invisible, and every existing caller (bget, ilock) reads
      exactly as before. *)
+  (* A6.149: the plain gen tier is the llb tier at [Tl := 0]. *)
+  Lemma wp_acquiresleep_gen_sconf
+      (γs : list gname) (j : nat)
+      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
+      (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool)
+      (b : bool) (lks : gset string)
+    : wp_acquiresleep_gen_sconf_body γs j γl γsl s R H q m pidv Vpr av eb b lks.
+  Proof.
+    cbv beta delta [wp_acquiresleep_gen_sconf_body].
+    intros pcE slk pj ret_tgt Hj Hav Hbelow.
+    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hslk HHq Hpid #Hpinv Hcont".
+    iApply (wp_acquiresleep_gen_llb_sconf γs j γl γsl s R H q m pidv Vpr av eb b lks 0
+              Hj Hav Hbelow
+              with "Hcg Hown Hextc Hextm Htext Hpc Hslk [] HHq Hpid Hpinv [Hcont]").
+    { iApply TsoGhost.llb_0. }
+    iIntros (CIDz) "%Hsz".
+    iSpecialize ("Hcont" $! CIDz with "[%]"); [exact Hsz|].
+    iIntros (mf) "%Hcs Hcg Hown Htce Hcce Hpc _ Hstok HR Hpid".
+    iApply ("Hcont" $! mf with "[%] Hcg Hown Htce Hcce Hpc Hstok HR Hpid").
+    exact Hcs.
+  Qed.
+
   Lemma wp_acquiresleep_sconf
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)

@@ -196,7 +196,7 @@ Global Instance fclose_names_inhabited : Inhabited fclose_names :=
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
     (MkBioNames 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
-       (fun _ => 1%positive) (fun _ => 1%positive))
+       (fun _ => 1%positive) (fun _ => 1%positive) (fun _ => 1%positive))
     (MkLogNames 1%positive 1%positive 1%positive 1%positive)
     (MkFsNames 1%positive 1%positive 1%positive 1%positive 1%positive)
     ∅ 0 (mword_of_int 0) (mword_of_int 0) (DfracOwn 1)

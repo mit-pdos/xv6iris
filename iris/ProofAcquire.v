@@ -116,7 +116,7 @@ Section ProofAcquire.
       pc_is (mword_of_int (KernelSyms.acquire + 0x24)) -∗
       (* A6.119/A6.120: the WHOLE parked record, with the acquirer's floor
          at its stamp -- what the absorb below consumes. *)
-      (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ hart_view_lb K) -∗
+      (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K) -∗
       locked_pre γl cpu_id -∗ lock_pay_won R -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -689,7 +689,9 @@ Section ProofAcquire.
             with "Hrun HK0s Hpk0 HRes") as "(Hrun & _ & HRes)".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iSpecialize ("Hcont" $! CIDpo with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! ms E4 with "[%] HTc Hcg Hpc [%] Htok HRes Hpaira Hown Hpay").
+    iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb".
+    { iExists K0. iExact "HK0s". }
+    iApply ("Hcont" $! ms E4 with "[%] HTc Hcg Hpc [%] Htok HRes Hpaira Hlb Hown Hpay").
     { exact Hmsf. }
     (* [s0]/[s1] never surface as separate goals below: each is restored by
        an epilogue [ldsp] as the LITERAL value [m !!! reg] (the leaf's own
@@ -841,11 +843,9 @@ Section ProofAcquire.
     { iApply TsoGhost.llb_0. }
     iIntros (CID2) "%Hs2".
     iSpecialize ("Hcont" $! CID2 with "[%]"); [exact Hs2|].
-    iIntros (ms mfin) "%Hms HTc Hcg Hpc %Hcs Htok HRes Hpair Hown Hpay".
-    iDestruct "Hpair" as (K) "[_ HK]".
-    iApply ("Hcont" $! ms mfin with "[%] HTc Hcg Hpc [%] Htok HRes [HK] Hown Hpay");
-      [exact Hms | exact Hcs |].
-    iExists K. iExact "HK".
+    iIntros (ms mfin) "%Hms HTc Hcg Hpc %Hcs Htok HRes _ Hlb Hown Hpay".
+    iApply ("Hcont" $! ms mfin with "[%] HTc Hcg Hpc [%] Htok HRes Hlb Hown Hpay");
+      [exact Hms | exact Hcs].
   Qed.
 
   (* A6.149: the llb BELOW tier, for the transit-box withdraw sites. *)
@@ -927,9 +927,9 @@ Section OfGen.
               with "Hcg Hown Htext Hpc [] Hllb []").
     { iApply (is_lock_openable with "Hlock"). }
     { done. }
-    iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hlb Hown Hpay".
+    iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hfl Hlb Hown Hpay".
     iSpecialize ("Hcont" $! CIDg with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hlb Hown Hpay").
+    iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hfl Hlb Hown Hpay").
   Qed.
 
   Lemma wp_acquire_llb_sconf

@@ -217,8 +217,19 @@ Proof.
   apply delete_singleton_local_update_cancelable; [apply _ | by rewrite HM].
 Qed.
 
+(* A6.148: the per-slot PRESENCE authority.  [● None] sits in the box's
+   IDLE arm at refs = 0; [● Some n] in bcache.lock's payload at refs >= 1;
+   every buffer reference carries a [◯ Some 1] fragment beside [bref_tok].
+   The checkout's fragment against [● None] is the IDLE refutation that no
+   count fragment could provide (fragments compose; authorities clash). *)
+Definition presR : cmra := authR (optionUR positiveR).
+Class presG (Σ : gFunctors) := PresG { pres_inG :: inG Σ presR }.
+Definition presΣ : gFunctors := #[GFunctor presR].
+Global Instance subG_presG {Σ} : subG presΣ Σ → presG Σ.
+Proof. solve_inG. Qed.
+
 Section BioInv.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !presG Σ}.
   Context `{XI : CurCtx}.
 
   (* full ownership of a 4-byte cell is exclusive: the escrow's park swap
@@ -255,6 +266,51 @@ Section BioInv.
     (bref_tok bn k q ∗
      b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
      b_blockno (bpa k) ↦₄{DfracOwn q} bno)%I.
+
+  Definition pres_none (bn : bio_names) (k : nat) : iProp Σ :=
+    own (bn_pres bn k) (● None).
+  Definition pres_auth (bn : bio_names) (k : nat) (n : positive) : iProp Σ :=
+    own (bn_pres bn k) (● Some n).
+  Definition pres_frag (bn : bio_names) (k : nat) : iProp Σ :=
+    own (bn_pres bn k) (◯ Some 1%positive).
+
+  Lemma pres_frag_none_absurd bn k :
+    pres_frag bn k -∗ pres_none bn k -∗ False.
+  Proof.
+    iIntros "Hf Ha".
+    iDestruct (own_valid_2 with "Ha Hf") as %Hv.
+    apply auth_both_valid_discrete in Hv as [Hincl _].
+    apply option_included in Hincl as [Hc | (a & b & Ha & Hb & _)];
+      [discriminate | discriminate].
+  Qed.
+
+  Lemma pres_auth_auth_absurd bn k on1 on2 :
+    own (bn_pres bn k) (● on1) -∗ own (bn_pres bn k) (● on2) -∗ False.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    by apply auth_auth_op_valid in Hv.
+  Qed.
+
+  Lemma pres_none_take bn k :
+    pres_none bn k ==∗ pres_auth bn k 1%positive ∗ pres_frag bn k.
+  Proof.
+    iIntros "Ha". rewrite -own_op.
+    iApply (own_update with "Ha").
+    apply auth_update_alloc.
+    apply (alloc_option_local_update 1%positive). done.
+  Qed.
+
+  Lemma pres_last_drop bn k :
+    pres_auth bn k 1%positive -∗ pres_frag bn k ==∗ pres_none bn k.
+  Proof.
+    iIntros "Ha Hf". iCombine "Ha Hf" as "H".
+    iApply (own_update with "H").
+    apply auth_update_dealloc.
+    apply (delete_option_local_update_cancelable (Some 1%positive)).
+    apply _.
+  Qed.
+
 
   (* ---- the checkout token: the buffer sleeplock's WHOLE resource ---- *)
   Definition bown (bn : bio_names) (k : nat) : iProp Σ :=
@@ -1217,7 +1273,7 @@ Section BioInv.
             (fun k p => is_sleeplock (fst p) (snd p) (buf_lock (bnode k))
                           "buffer"%string (lock_tok_excl (fown k)))
             NBUF 0 with "Hsl") as (fslk) "#Hsls".
-    set (bn := MkBioNames γlk γb fslk fown fmid fmid).
+    set (bn := MkBioNames γlk γb fslk fown fmid fmid fmid).
     (* every initial payload is empty: blockno 0 is uncovered *)
     assert (Hpay0 : forall k bs,
         buf_pay bn V k false (mword_of_int 0 : mword 32)
