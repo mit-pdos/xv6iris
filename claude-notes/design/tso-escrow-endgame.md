@@ -135,39 +135,54 @@ instance is declared by:
 
 Body:
 
-  box_body := ∃ T ξb m Tp Td,
+  box_body := ∃ T ξb m Tp Td (w : bool),
      ctx_parked ξb T ∗ llb loglen_name T ∗
-     stamps ● m ∗ cnt ½ (Σ m) ∗ slot_p ½ Tp ∗ slot_d ½ Td ∗
+     stamps ● m ∗ cnt ½ (Σ m) ∗ slot_p ½ Tp ∗ slot_d ½ (Td, w) ∗
      ⌜(∀ t ∈ dom m, T ≤ t) ∨ T ≤ Tp⌝ ∗        (C: the L2-side cover)
      ⌜T ≤ Td ∨ T ∈ dom m⌝ ∗                     (D: the L1-side cover)
-     ( P_hdr ξb ∗ P_rest ξb                     (* IN                      *)
-     ∨ Q                                        (* OUT_L2: out under L2    *)
-     ∨ hdr_out ∗ P_rest ξb )                    (* OUT_L1: header out, L1  *)
+     if w then hdr_out ∗ P_rest ξb              (* OUT_L1: header out, L1  *)
+     else ( P_hdr ξb ∗ P_rest ξb                (* IN                      *)
+          ∨ Q )                                 (* OUT_L2: out under L2    *)
 
-  hdr_out := slot_d ½ Td ∗ ∃ m', ⌜Σ m' = Σ m⌝ ∗ stamps ◯ m'
-             (F1, vetted: L1's slot_d half is the WINDOW TOKEN — (a)
-             consumes it from L1's payload, (b) returns it at Td := T';
-             the ◯ m' is the withdrawer's unit at c = 1, ∅ at c = 0 —
-             one shape, no case split in the arm).
+  hdr_out := ∃ m', ⌜Σ m' = Σ m⌝ ∗ stamps ◯ m'
+             (the withdrawer's unit at c = 1, ∅ at c = 0 — one shape).
+
+  THE WINDOW FLAG (F1, re-cut 2026-09-01 by the proposer; supersedes the
+  "slot_d half rides hdr_out" fix): slot_d's VALUE carries the window
+  bit, `slot_d : ghost_var (nat * bool)`, at rest (Td, false) in both
+  halves.  L1's payload row states `slot_d ½ (Td, false)` — so L1 cannot
+  be released mid-window — and every L1-side lemma SELECTS its arm shape
+  by agreement on w instead of refuting the other shape:
+    (a) takes (Td, false) ⇒ the body is IN ∨ OUT_L2; sets (Td, true) and
+        KEEPS its half (the unit ◯ m_D goes into hdr_out, as before);
+    (b) takes (Td, true)  ⇒ the body IS hdr_out ∗ P_rest — no case split,
+        for ANY client; sets (T', false) and returns the half to the row;
+    (c),(d) take (Td, false) ⇒ IN ∨ OUT_L2, and they touch neither arm —
+        arm-agnostic again.
+  WHY NOT THE VETTED FIX: moving the payload's half into hdr_out left
+  (b) with nothing in hand for the OUT_L2 branch; the count-auth
+  refutation chosen for it works for bcache (bchain carries bref_tok0)
+  but NOT for the icache, whose checkout holder is an inode_shr with NO
+  count fragment (IcacheRef, "positiveR has no zero") — Q would carry no
+  count mass and (b) would be stuck at iput's re-deposit.  It also made
+  (b) depend on the client's count cmra, which the generic CtxBox.v
+  must not.  The flag needs no new ghost (slot_d's type widens) and no
+  count-auth appeal anywhere.
 
   THE REFUTATION TABLE (binding; the site map cites it per site):
-    (a) IN expected.   OUT_L2: Σ (c = 0) / whole unit in hand + Q's
-                       fraction (c = 1).   OUT_L1: slot_d (½+½+½ > 1).
-    (b) OUT_L1 exp.    IN: the P_hdr cells.  OUT_L2: THE COUNT AUTH —
-                       L1's payload ● M (count c) + the caller's own
-                       count fragment + Q's chain fragment overflow
-                       (c = 1), or M !! k = None vs Q's fragment (c = 0).
-                       NOT Σ: at c = 1 the unit sits in hdr_out, absent
-                       from the OUT_L2 arm.
-    (c),(d)            OUT_L1: slot_d (they hold L1's payload).  Not
-                       arm-agnostic: hdr_out's ⌜Σ m' = Σ m⌝ would break
-                       if m changed under it.  IN / OUT_L2: untouched.
-    (e) IN expected.   OUT_L2: the L2 token.   OUT_L1: Σ (my fraction vs
-                       c = 0, or vs the whole unit in hdr_out).
-    (f) OUT_L2 exp.    IN: the full valid cell.  OUT_L1: P_rest's cell
-                       (ctx_word4_excl_x).
-  RULE: every L1-side lemma refutes OUT_L1 by the slot_d half; (e) by Σ;
-  (f) by a P_rest cell.
+    (a) w = false by agreement.  IN expected.  OUT_L2: Σ — Q's fraction
+                       vs Σ m = 0 (c = 0) / Q's fraction + the whole
+                       unit in hand > Σ m = 1 (c = 1).
+    (b) w = true  by agreement.  Only the OUT_L1 shape exists.
+    (c),(d) w = false by agreement.  IN / OUT_L2 untouched.
+    (e) no slot_d.     w = true:  Σ (my fraction vs c = 0, or vs the whole
+                       unit in hdr_out).   w = false: IN expected; OUT_L2
+                       refuted by the L2 token.
+    (f) no slot_d.     w = true:  P_rest's cell (ctx_word4_excl_x).
+                       w = false: OUT_L2 expected; IN refuted by the full
+                       valid cell.
+  RULE: L1-side lemmas select the shape by the flag; (e) refutes OUT_L1
+  by Σ; (f) by a P_rest cell.  No lemma appeals to the count auth.
 
 NO IDLE ARM: refs-0 content stays in the box (owner ruling R-a, reversing
 A6.142's payload custody; the recycler is (a) + stores + (b)).  No
@@ -280,10 +295,12 @@ disjunct.
     fraction from its old stamp to the park stamp (dealloc + alloc; Qp
     addition is cancelable).  ufrac, not frac: several units may sit at
     one stamp.
-  - `slot_p`, `slot_d : ghost_var nat` — half in the box, half in the
-    L2 / L1 payload beside that payload's floor row `ctx_floor ξ Tp` /
-    `ctx_floor ξ Td`.  The L1 row also carries `llb loglen_name Td`, so
-    a release that leaves Td unchanged can re-fold it (§3.4).
+  - `slot_p : ghost_var nat`, `slot_d : ghost_var (nat * bool)` — half
+    in the box, half in the L2 / L1 payload beside that payload's floor
+    row `ctx_floor ξ Tp` / `ctx_floor ξ Td`.  slot_d's bool is the
+    window flag (§2); the L1 row states it false, and also carries
+    `llb loglen_name Td`, so a release that leaves Td unchanged can
+    re-fold it (§3.4).
   - `cnt : ghost_var nat` — half in the box, half in L1's payload beside
     the refcount word; the row ⌜Σ m = c⌝ with Σ taken in Q (F3).
 
@@ -316,28 +333,29 @@ where it is needed.
       WHOLE unit `◯ m_D` (Σ m_D = c) with `ctx_floor ξ Kt`,
       `max (dom m_D) ≤ Kt` (R1).  Cover: c = 0 ⇒ m = ∅ (Σ) ⇒ (D) gives
       T ≤ Td; c = Σ m_D ⇒ m = m_D (pointwise ≤ and equal sums) ⇒ (D)
-      gives T ≤ Td ∨ T ∈ dom m_D.  OUT_L2 refuted: Q's fraction breaks
-      Σ (c = 0) / overflows against the unit in hand (c = 1); OUT_L1
-      refuted: the caller's slot_d half is a third half.  P_hdr comes
-      out at ξ; hdr_out := slot_d ½ Td ∗ ◯ m' (Σ m' = Σ m) — L1's
-      payload row loses its slot_d half for the window (it keeps
-      ctx_floor ξ Td ∗ llb Td).
+      gives T ≤ Td ∨ T ∈ dom m_D.  Premise `slot_d ½ (Td, false)` ⇒
+      the body is IN ∨ OUT_L2; OUT_L2 refuted: Q's fraction breaks Σ
+      (c = 0) / overflows against the unit in hand (c = 1).  P_hdr comes
+      out at ξ; the unit goes into hdr_out; both slot_d halves flip to
+      (Td, true) and the caller KEEPS its half (L1's row is re-formed
+      only by (b)).
       Sites: bget recycle (c = 0), iput's ref == 1 valid read (c = 1).
   (b) deposit_L1 (under L1; OUT_L1 → IN).  Deposit P_hdr at the new
-      stamp T'; m := {[T' := 1]} (mint if c = 0, move if c = 1);
-      Td := T' (both slot_d halves are in the box: hdr_out's + the
-      prefix's); the payload gets its half back; hand out
-      `◯{[T' := 1]} ∗ llb T'`.  (C) left holds (m is a singleton at T');
-      (D) via Td.  IN refuted by the P_hdr cells; OUT_L2 refuted by the
-      COUNT AUTH (table).  Sites: the recycle's re-park, iput's
-      re-deposit before its acquiresleep.
+      stamp T'; m := {[T' := 1]} (mint if c = 0, move if c = 1 — the
+      unit is in hdr_out, inside the box); both slot_d halves := (T',
+      false) (the caller's + the prefix's); hand out `◯{[T' := 1]} ∗
+      llb T' ∗ slot_d ½ (T', false)` for L1's row.  (C) left holds (m
+      is a singleton at T'); (D) via Td.  Premise `slot_d ½ (Td, true)`
+      ⇒ the body IS the OUT_L1 shape: nothing to refute.  Sites: the
+      recycle's re-park, iput's re-deposit before its acquiresleep.
   (c) ref_incr (under L1).  m ⊎= {[T := 1]}; cnt += 1; the new ref gets
-      the box's own `llb T`.  (C)/(D) untouched.  OUT_L1 refuted by
-      slot_d (the caller holds L1's payload).
+      the box's own `llb T`.  (C)/(D) untouched.  Premise `slot_d ½
+      (Td, false)` ⇒ IN ∨ OUT_L2, both untouched (arm-agnostic).
   (d) ref_decr (under L1).  Present `◯ m_D` (Σ = 1); m -= m_D;
       Td := max Td (max (dom m_D)); cnt -= 1.  (D) preserved (a removed
       witness is now ≤ Td); the release folds Td by R2.  refs 1 → 0 IS
-      (d) — the content stays in the box.  OUT_L1 refuted by slot_d.
+      (d) — the content stays in the box.  Premise `slot_d ½ (Td,
+      false)` ⇒ IN ∨ OUT_L2, both untouched (arm-agnostic).
   (e) checkout (under L2; IN → OUT_L2).  Premises: my `◯ m_h` with
       `ctx_floor ξ Kt`, `max (dom m_h) ≤ Kt` (R1 at the acquiresleep);
       the payload's `slot_p ½ Tp` with `ctx_floor ξ Kp`, `Tp ≤ Kp` (R2);
@@ -509,7 +527,11 @@ Iunlock/Iput + the Spec rows, with lock context), then the SPLIT:
   - mid arm    → the recycler is (a) + stores + (b) under itable.lock.
   - held arm   → iput's (a)/(b).
   - parked/out → IN / OUT_L2; Q := ic_tok ∗ share-ref ∗ the slot_p half.
-P_hdr := valid ∗ nlink (both read by iput's guard under itable.lock);
+P_hdr := valid ∗ nlink (both read by iput's guard under itable.lock)
+∗ the identity-keyed payload arm (F2's icache twin: iget's recycle
+re-identifies the slot under itable.lock and the dinode payload —
+ic_unloaded / ic_payload_arm — is keyed by inum the way buf_pay is by
+blockno; confirm the exact rows at R3's site map);
 P_rest := the remaining in-memory dinode fields (type/major/minor/size/
 addrs — non-empty, so the park principle holds).  Extract
 `CtxBox.v` NOW (rule of two) and re-express the bcache over it.  The
@@ -800,3 +822,15 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   F3: Q-valued sum, cnt : ghost_var nat, one row.  F4/F5 as written.
   Checked: (D) through iput's window; the full iput path (a)(b)(e)…(f)(d)
   and the later recycler's (a) at c = 0.  R1' may start.
+- 2026-09-01 (proposer's review of A6.158 + its vetting): F2–F5 and the
+  F1 diagnosis ACCEPTED.  F1's vetted fix REPLACED: the count-auth
+  refutation it needed for (b)'s OUT_L2 branch does not exist for the
+  icache (a share checkout puts no count fragment in Q) and made (b)
+  client-specific.  The window is now a FLAG in slot_d's value
+  (`ghost_var (nat * bool)`, (Td, false) at rest, L1's row states it
+  false): L1-side lemmas select their arm shape by agreement on the
+  flag — (a) at false, (b) at true, (c)/(d) at false and arm-agnostic
+  again; (e)/(f) refute OUT_L1 exactly as before.  No new ghost, no
+  count-auth appeal anywhere.  Also: icache P_hdr gains the
+  identity-keyed payload arm (F2's twin).  §2 body/table, §3.2, §3.5
+  (a)–(d), §4.2 amended in place.
