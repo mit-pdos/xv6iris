@@ -2225,7 +2225,7 @@ things, and the answer differs:
       inside `Section UkSh` for a STORE; peek needs it for `sltu a0,x0,a0`,
       which is how the decoder gives `snez`), and `ushp_snez_val`.
 
-    * **peek, §8 — item 3, PARTIAL.**  40 instructions, an EIGHT-word
+    * **peek, §8 — item 3, COMPLETE (2026-09-01).**  40 instructions, an EIGHT-word
       frame, one scan, two `strchr` calls and a branch that converges.  It
       is the parser's one-token lookahead — parsecmd, parseline, parsepipe,
       parseexec and parseredirs all ask it whether the next non-blank byte
@@ -2240,9 +2240,11 @@ things, and the answer differs:
       0x46a..0x482 has ONE postcondition), and `wp_kshp_peek_epi`
       (0x48e..0x49e, stated once because the epilogue is reached BOTH
       ways), with `ushp_peek_res` naming the answer.  `wp_kshp_peek` itself
-      — the ~750 lines that glue them, written and complete — is parked in
-      `claude-notes/projects/sh-peek-body.v.parked`, out of the build, with
-      a header saying where to paste it back.
+      — the ~790 lines that glue them — is now IN the file and green; the
+      parked copy is deleted.  Its statement gained ONE premise on the way
+      in, `w0 = mword_of_int (s0 + Z.of_nat off)` (the cursor cell holds
+      the position the postcondition's `off` refers to), without which it
+      was not merely unproven but false.
       **THE SCAN IS BOUNDED BY `es`, NOT BY THE NUL**: `s2` holds the end
       pointer and the back edge tests against it, so the scan reads only
       BODY bytes and the terminator never enters it.  That is the opposite
@@ -2251,8 +2253,75 @@ things, and the answer differs:
       register file is promised across it, minus `s1`: every turn calls
       strchr and that is all strchr's contract gives.
 
-    * **THE MEASURED OBSTACLE OF THIS ROUND — one tactic that does not
-      terminate, and FOUR REFUTED EXPLANATIONS.**  In `wp_kshp_peek`,
+    * **THE MEASURED OBSTACLE — FOUND, FIXED, AND PEEK IS UNPARKED
+      (2026-09-01, lane 1).**  `wp_kshp_peek` is IN `iris/UkShParse.v` and
+      the whole file compiles green on the mirror in **20.6 s / 1.3 GB**,
+      with ZERO `Admitted` and ZERO `Axiom`.
+      `claude-notes/projects/sh-peek-body.v.parked` is deleted; its content
+      is the file's.
+
+      **THE CAUSE WAS ONE LINE**, inside the second `ltac:` premise of the
+      body's seven-entry `iApply (wp_kshp_spill spn (2 + nn) …)`:
+
+      ```coq
+      exact (eq_sym (Hm1 _ ltac:(vm_compute; discriminate)))
+      ```
+
+      The `_` is the REGISTER, and it is still an EVAR when the nested
+      `ltac:` runs — so `vm_compute` is asked to evaluate
+      `Regidx ?q <> Regidx csp_rs1` with `?q` open.  That is the 17.5 GB.
+      This is **durable gotcha (2) of this lane** (a `_` among a lemma's
+      arguments leaves an evar the accompanying `ltac:` cannot see), and
+      the lesson this round adds is that **it does not merely fail — it can
+      DIVERGE**, and the divergence is reported at the enclosing `iApply`,
+      which is why five rounds of bisecting looked at the wrong things.
+      `wp_kshp_execcmd` never hit it because it writes the register
+      EXPLICITLY (`Hm1 ra_idx ltac:(…)`); `wp_kshp_peek_epi` has no such
+      script.
+
+      **THE FIX IS ALSO ONE LINE** — `refine` first, side condition after,
+      so the register is fixed by unification before anything computes:
+
+      ```coq
+      refine (eq_sym (Hm1 _ _)); vm_compute; discriminate
+      ```
+
+      **THE ISOLATING MEASUREMENT** (a standalone k=7 rig, everything else
+      held fixed, each apply wrapped in
+      `Time (first [ timeout 60 (…) | idtac ])`):
+
+      | rig at k=7 | `iApply` |
+      | ---------- | -------- |
+      | insert-tower regfile, third conjunct by `reflexivity` | 0.189 s |
+      | **peek's `exact (eq_sym (Hm1 _ ltac:(…)))`** | **BLEW — 60 s timeout** |
+      | **the same with `refine (eq_sym (Hm1 _ _)); vm_compute; discriminate`** | **0.191 s** |
+
+      **THE FORWARD BISECT THAT GOT THERE**, from the fast rig towards
+      peek, one delta at a time (all at k=7, `timeout 60`):
+      base 0.168 s; fuel `2 + nn` 0.167 s; `vals` as a `set` 0.150 s;
+      `spn` as a `set` of `add_vec_int sp0 (- (8 * Z.of_nat 8))` 0.162 s;
+      `uint sp0` with `sp0 : mword 64` instead of `sp0 : Z` 0.175 s;
+      the insert-tower regfile 0.189 s — **all fast**.  And from the other
+      end, two half-way lemmas that keep peek's third-conjunct script:
+      the `c.addi16sp` PUSH TRIPLE with a hand-written frame — **120 s
+      timeout, 7.8 GB**; a hand-written run with the frame from
+      `iDestruct (ushp_frame_split …)` — **120 s timeout, 7.4 GB**.  Two
+      independent halves both slow is what said the cause was in what they
+      SHARE, and the only thing they shared was that script.  (So the
+      round-3 "named favourite", `wp_uk_caddi16sp_dn`, is refuted too: the
+      push is innocent, and no upstream file needed touching.)
+
+      **ONE HONEST STATEMENT CHANGE CAME WITH THE UNPARKING.**  Compiling
+      the body past the obstacle for the first time exposed an authoring
+      gap: `wp_kshp_peek` never said where the scan STARTS.  Its
+      postcondition is in terms of `off`, but nothing related `off` to the
+      cursor cell's contents `w0`.  The premise
+      `w0 = mword_of_int (s0 + Z.of_nat off)` is now stated — without it
+      the lemma was not merely unproven but false — and `Hs1_8`'s proof
+      goes through it.  That is the only change to the statement.
+
+    * **THE ROUND-2 RECORD, kept for the trail — one tactic that does not
+      terminate, and the REFUTED EXPLANATIONS.**  In `wp_kshp_peek`,
       everything up to and including the generalised spill run's
       continuation is fast, and THE VERY NEXT TACTIC — any of them — runs
       to **15.2 GB of RSS in 268 s** and is still climbing when killed at
@@ -2349,32 +2418,15 @@ things, and the answer differs:
       rig from just after `wp_kshp_spill` to the very END of the file, so
       every intervening definition and lemma is in scope — 0.171 s.
 
-      **WHERE THE NEXT LOOK SHOULD START — BISECT FORWARD FROM THE FAST
-      END.**  The gap is now narrow and it is not in the lemma, not in the
-      list, not in the premises, not in the context and not in the file:
-      the rig writes `Hrun`, `Hsl`, `m` and `spn` OUT BY HAND, and peek
-      gets the very same propositions from TACTICS.  A tactic-produced term
-      can carry redexes, casts or evar instantiations that a hand-written
-      one does not, and only five tactics separate the two states —
-      `rewrite shpp_peek`, `iDestruct (urun_stack …)`, the push
-      (`iApply (wp_uk_caddi16sp_dn …)` + `rewrite (ushp_pc_step 0x448 2)` +
-      `iIntros "Hstk" (h1) "Hrun"`), `iDestruct (ushp_frame_split …)`, and
-      the `set`/`assert` block.  So: start from the rig (0.167 s) and add
-      peek's prologue back ONE TACTIC AT A TIME until it becomes 300 s.
-      That is at most five ~10 s compiles and it lands on the exact tactic
-      that poisons the term; `Set Printing All` on the run's pc and on
-      `Hsl` at that point then names the redex.
-      **AND THERE IS A NAMED FAVOURITE.**  peek pushes its frame with
-      `c.addi16sp` (`wp_uk_caddi16sp_dn`); execcmd — the fast 3-spill site
-      — pushes with `c.addi` (`wp_uk_caddi_sp_dn`), because gcc picks by
-      size and picks inconsistently (§4b's own header says so); and
-      `wp_kshp_peek_epi` — the fast 7-entry restore — takes its regfile as
-      a PARAMETER and has no push in front of it at all.  Every fast site
-      is a site with no `caddi16sp` push before it.  Test that one first.
+      (That round's proposed forward bisect IS what found the cause; see
+      the FOUND-AND-FIXED entry at the head of this stage-4 section.  Its
+      "named favourite", `wp_uk_caddi16sp_dn`, was wrong: the push is
+      innocent and no upstream file needed touching.)
 
     * **WHAT IS STILL OWED, HONESTLY SIZED.**  Of the 564 catalogued
       instructions, strchr (17), strlen (18) and execcmd (19) are walked
-      end to end and peek's 40 are walked except for their glue;
+      end to end and peek's 40 are walked end to end as well (76 of the
+      564 catalogued instructions, four functions);
       **gettoken (104), parseexec (92), parseredirs (85), nulterminate
       (50), parseline (56), parsepipe (41) and parsecmd (42) — 470
       instructions — are not started**, and with them the parser theorem.
