@@ -655,3 +655,21 @@ ProofIunlock GREEN under the full pinw racy-read composition:
   ic_open_out_genlo genlo-ized (IcacheEscrow).
 REMAINING RED: ProofIlock, ProofIget, ProofIput, ProofIdup,
 ProofIreclaim, ProofIunlockput, IcacheBoot, + linking follow-ons.
+
+## Swap-wave: Ilock/Iunlock/IUP/Ireclaim GREEN (worktree)
+
+ProofIlock rewired: SpecIlock rows are (lo tl)-bound with
+pure/floor/claims + the share premise at GENLO (the depositor's slice
+enters the arm at (g,lo)); the guard read follows the Iunlock model but
+SIMPLER (no escrow open -- the caller's own slice feeds
+iref_load_pinw_au; T := the slice back); il_cont/il_epilogue/il_load
+carry lo; the frozen-park refutation uses ic_dep_own_live's (g,lo) +
+frz_slot_kill_pinw.  ProofIunlockput/ProofIreclaim: the r64 pin0 seams
+became RETAINED-CREDENTIAL rebuilds (iExists g,lo,tl + kept floor);
+their iunlock/ilock calls pass (lo tl) + [%] floor claims rows
+(claims from is_itable2_claims where not ambient).
+REMAINING RED CORE: ProofIget, ProofIput, ProofIdup (the STORE sites --
+need a wp_sw_au_dat-style wrapper in WpAu4 over wp_store_s_sconf_au_dat
+whose obligation is CtxPinw.pinw_write_c, plus the locked-exact-read
+rewiring via iref_load_locked_pinw_au + iref_read_locked_obl), and
+IcacheBoot (construct the pinw body + iref_claims + the payload rows).
