@@ -400,3 +400,44 @@ SpecIput/SpecIunlockput's reference premises as ∃lo tl floored genlo
 rows (create_locked's shape) and adapt their proofs; the caller branches
 then pass the shed's floored pieces straight through instead of
 forgetting before the call.
+
+## r64 BANKED (snapshot 5c49e67e31d): the A6.145 consumer wave is COMPLETE
+
+GREEN = 1304/1305.  The ONLY red is the pre-existing ProofForkretPark:345.
+
+What landed since checkpoint 2:
+- ProofCreate end to end: the three parked-body ∀s (cr_mkdir_body 2127 /
+  cr_fail_body / the grey-links lemma) gained explicit (lo tl) binders with
+  pure+floor+genlo child rows; cr_alloc_body's parent row went ∃-packed;
+  the Hfbad box row is genlo at the shed's fixed lo; suppliers instantiate
+  (lo tl) or (0,0) and package via iExists/floor_0 blocks.  GOTCHA learned
+  twice: iApply spec-string side-goals for mid-spatial [%]/[] entries come
+  AFTER every earlier premise's goal -- put the new brace blocks at the END
+  of the existing run (pure [%] first, [] floor last... actually: in premise
+  order, empirically -- move blocks until the reported goal matches).
+- THE INTERIM PIN INSTRUMENTS (IcacheInv): live_slot_pin (every live_slot
+  arm carries a live_frac0 piece, so any outstanding genlo slice pins to
+  lo=0 by pair-agree), iref_share_pin0 (the same through itable_inv alone,
+  big_sepL_lookup_acc at the slot -- no itable_half needed),
+  inode_shr_gen_pin0 and inode_ref_short_gen_pin0 (share-/short-shaped
+  wrappers: _gen ={Eo}=∗ erased floored form at (g,0,0) via ctx_floor_0).
+  These are THE seam-closers everywhere a floor-free _gen comes back from a
+  spec post (iunlock returns, ilock posts) and an erased/floored form is
+  owed downstream.  SpecIunlock's post row stays _gen -- deliberately: five
+  green callers keep compiling, and the two that need floors (IUP:281,
+  Ireclaim:1813) pin at the seam.  ProofSysOpen so_tail_pub pins internally
+  (statement unchanged); its three interior forgets are pin0 fupds now.
+- ProofIput: the floored inode_ref premise destructures 4-part
+  (frag/fracc/slh/ident); pure lookups use iref_frag_lookup (frag-only);
+  rebuild sites re-pin via iref_share_pin0 + live_frac0_fracc.
+- ProofIdup: upgrade AU posts iref_tok0/live_frac0 (inline AU row updated);
+  exit rebuilds fracc via live_frac0_fracc.
+- ProofFilewrite/Parts: the loop carve is genlo end to end -- carve exposes
+  (lox tlx)+floor, halve via inode_shr_genlo_halve, lend weakened _gen to
+  ilock, on return inode_shr_gen_pin_on_keep + genlo_halve rejoin, payback
+  at genlo (fw_shr_regen retained but bypassed on the main path).
+
+NEXT (unchanged from the map): 4b-iii itable_body cutover (itable_body :=
+itable_body_pinw, live arms bound per-slot lo), itable_res extension +
+accessor rewiring, icM_wf n <= IREFSLOTS, IcacheBoot construction,
+ilock/iunlock racy reads; then Phase 5 bcache anchors; then 4.5 ic_escrow.
