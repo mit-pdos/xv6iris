@@ -189,17 +189,32 @@ Ghosts (all tiny, additive; no model or Σ-arm changes):
     Synced (rd := rp) at every refs-- decrement: the decrementer holds
     L1's payload and opens the box.  Floor delivered by R2 at the
     decrementer's L1 release.
-  - **the parked-fragment PILE** (replaces reg_last; refined
-    2026-09-01): γl is NOT a ghost.  Every PARK deposits the parker's
-    pres fragment into the body, where fragments compose into a single
-    `◯ Some(to_agree rb, o)` pile (o ∃-bound, the row absent at o = 0);
-    an ex-parker's refs-- decrement retrieves one fragment from the
-    pile instead of presenting one from hand (the caller knows which —
-    program flow).  EVERY decrement syncs rd := rp (it holds L1 + the
-    box), so the body's pure row `⌜o = 0 → rp = rd⌝` is re-established
-    at each edge and vacuous at each park.  At the last drop (count 1)
-    the fragment total (pile + hand = count) makes the case split
-    total and local; receipts and the "mine" case selection disappear.
+  - **the TAGGED parked-fragment PILE** (replaces reg_last; refined
+    2026-09-01, vetted + tagged the same day).  Every PARK deposits the
+    parker's pres fragment into the body, where fragments compose into
+    a single `◯ Some(to_agree rb, o)` pile (o ∃-bound, row absent at
+    o = 0), AND adds its park generation to a tag multiset
+    `S : gmultiset nat` (`authR (gmultisetUR natO)`, ● S in the body),
+    handing the parker the CLAIM `◯ {[+ n_P +]}`.  An ex-parker's
+    refs-- decrement presents its claim, removes n_P from S, retrieves
+    ONE pile fragment and absorbs it into the count.  EVERY decrement
+    syncs rd := rp (it holds L1 + the box).  The tags are NOT optional:
+    an anonymous pile cannot make the drop site total in-logic (the
+    state "the one pile fragment is an un-decremented P ≠ D's, rp = P's
+    park ≠ rd" is unrefutable without identity — "the caller knows
+    which by program flow" is not a resource).  Three pure rows in the
+    body, each maintained by inspection:
+      (r1) `size S = o`          — fragment and tag move together, so
+                                   `o ≤ c` (hence `size S ≤ c`) is free
+                                   by auth validity;
+      (r2) `rp ≠ rd → rp.n ∈ S`  — park sets rp and tags; any decrement
+                                   syncs (antecedent false).  The
+                                   corollary `o = 0 → rp = rd` is what
+                                   the non-parker's drop uses;
+      (r3) `∀ m ∈ S, rb.n < m`   — a park's gen exceeds the bump's; S is
+                                   empty at bump (o = 0 in IDLE).
+    Needs one CtxAnchor lemma: `astamp_le : anchor γ n XI T -∗
+    astamp γ n' T' -∗ ⌜n' ≤ n⌝` (from the existing dom bound).
   - **reg_cnt** (count sync; added 2026-09-01): `ghost_var γc (1/2) c`
     with one half beside the slot's Some-arm count (= M's count) and
     one in the box beside the pres ●.  This makes the count READABLE
@@ -211,7 +226,7 @@ transitions, all of which hold the needed halves):
 
   tie n T rb rp  :=  (n,T) = rb ∨ (n,T) = rp
 
-plus, carried by the γl pairing:  γl-whole-in-box → rp = rd.
+plus the pile rows (r1)–(r3) above.
 
 ### 3.3 The covers, per site (total case splits)
 
@@ -226,18 +241,52 @@ plus, carried by the γl pairing:  γl-whole-in-box → rp = rd.
     Both cases end in `ctx_floor ξ K, T ≤ K` → aguard_intro →
     anchor_withdraw.  No other case exists (the tie).
 
-  DROP (under L1; dropper holds: its fragment + llb T_b, L1's payload,
-  its own park receipt γl-half + own llb T_park if it parked, win
-  floors from its L1 acquire):
-    case (n,T) = rb:            fragment route, as above (R1 at the
-                                L1 llb-tier acquire, Tl := T_b).
-    case (n,T) = rp, I parked:  γl agree pins rp = my park; cash my
-                                own `llb T_park` via R1.
-    case (n,T) = rp, not mine:  γl is whole in the box ⇒ rp = rd;
-                                L1-payload row's floor via R2.
-    Totality: at refs=1 the previous holder's decrement (which synced
-    rd and returned its γl half) is L1-ordered before my acquire; the
-    pure tie + γl pairing make the split exhaustive in-logic.
+  DROP (under L1; dropper D holds: L1's payload (rd half + floor row,
+  M!!k = Some(q,1), γc half ⇒ c = 1 ⇒ o ≤ 1 ⇒ size S ≤ 1), persistent
+  copies (n_b,T_b) + llb T_b, and EITHER its pres fragment in hand (it
+  never parked — the bunpin dropper) OR its claim ◯{[+ n_mine +]} +
+  astamp(n_mine,T_mine) + llb T_mine (it parked — brelse)).  ONE
+  acquire: present Tl := max T_b T_mine (llb is downward-monotone, so
+  llb (max) follows from the two); the R1 post K ≥ Tl serves both
+  routes below.
+    D did NOT park (fragment in hand):
+      case (n,T) = rb:  fragment agrees with pres ● (currency NOW);
+                        R1 floor covers T_b.
+      case (n,T) = rp:  if S ≠ ∅ a pile fragment exists beside D's
+                        in-hand one, so o + 1 ≤ c = 1 fails by
+                        validity; hence S = ∅, (r2) gives rp = rd,
+                        L1-payload row's floor via R2.
+    D PARKED (claim n_mine):
+      case (n,T) = rb:  REFUTED: (r3) rb.n < n_mine, astamp_le gives
+                        n_mine ≤ n = rb.n.
+      case (n,T) = rp:  n_mine ∈ S and size S ≤ 1 ⇒ S = {n_mine}.
+                        If rp ≠ rd: (r2) rp.n = n_mine, astamp_agree
+                        gives T = T_mine, own llb via R1.
+                        If rp = rd: L1-payload row's floor via R2.
+    Totality is in-logic: every branch closes by validity, (r1)–(r3),
+    or agreement — no "the other parker must have decremented"
+    history argument remains.  THE rb-CASE CURRENCY ARGUMENT REQUIRES
+    THE FRAGMENT IN HAND; for a parker (fragment in the pile) the rb
+    case is refuted by (r3), never proved by agreement.  Do not try to
+    carry rb as a persistent copy — every persistent-witness variant
+    fails on currency.
+
+  SITE NOTES: every count edge (bump, refs++, refs--, drop) now opens
+  the box (γc, the pile and S live there) — so ProofBpin/ProofBunpin,
+  which never touched the escrow, gain one box open each; refs++
+  copies (rb, llb T_b) out for the new fragment.  The last drop's OUT
+  refutation is the COUNT route, not Q-exclusivity: the dropper holds
+  L1's ● M at (q,1) and its own bref_tok, and Q exhibits a second
+  bref_tok (bref_tok_two) — bown is in R at that moment, not in hand.
+  Boot is IDLE for every buffer (content in the payload; anchor at
+  generation 0, stamp 0; S = ∅; rp = rd = (0,0)) — no boot deposit.
+  The reference's holder form is ONE spelling: bref := bref_tok ∗
+  (∃ rb, pres_frag rb ∗ llb rb.T) ∗ the dev/bno fractions; the
+  log layer passes it opaquely.  pres ●, the γc half, the pile, ● S and the
+  γp/γd halves sit in the body's COMMON PREFIX outside the three arms;
+  IDLE adds only ● None (which forces o = 0 by validity).  The payload's
+  None-arm keeps the γd/γc halves (the tie must hold in IDLE).  bunpin
+  can drop to 0 (bpin, brelse, bunpin) and is a drop site.
 
   BUMP and PARK are deposits: no cover needed (anchor_deposit is free);
   they UPDATE their registers and export astamp/llb.
@@ -258,22 +307,58 @@ file.  Delete the `□(∀ n T, …)` premises.
   the withdrawer personally carries (fragment or own park); R2 delivers
   floors that must cross threads (payload rows).  A6.149's "both stay"
   becomes a rule instead of a shrug.
-- The registers are ghost_var pairs + one enriched auth — no new
-  model arms, no Σ churn beyond small per-box cmras (anchorR
-  precedent).
+- The registers are ghost_var pairs (γp, γd, γc), one enriched auth
+  (pres) and one auth gmultiset (the tags) — no new model arms, no Σ
+  churn beyond small per-box cmras (anchorR precedent).
 
 ## 4. Instance plans
 
 ### 4.1 bcache (finish Phase 5) — rounds R1–R2
 
+R1-pre (PREREQUISITE, measured 2026-09-01 by the build agent): THE
+  SLEEPLOCK PAYLOAD λ-FLIP.  Today the inner spinlock's payload is the
+  CONST [<{ sl_res_gen γ slk R H }>], and sl_res_gen embeds the lock
+  word and the pid field as ambient-XI cells ([slk ↦₄ v] inside
+  sl_free_hold/sleeplocked_q) — the is_ftable shape §1 forbids, and a
+  const payload has no floor slot, so R2's park-case delivery has no
+  carrier.  The flip: [sl_body γ slk Rb H tl ξ] with ξ-explicit cells
+  (ctx_word4_pointsto ξ for the word and the pid) and a BOUND-INDEXED
+  client payload [Rb : nat → iProp]; the lock's λ is
+  [sl_pay γ slk Rb H := λ ξ, ∃ tl, ctx_floor ξ tl ∗ sl_body … tl ξ]
+  (CtxMorph: floors morph, cells morph, Rb tl is ξ-free).  The old
+  [is_sleeplock γl γ slk s R] := the λ form at [Rb := λ _, R] — every
+  const consumer is textually unchanged; only the sleeplock's own
+  proofs strip the ∃tl at their payload opens.  Threading:
+    - SleepLock.v: sl_free_hold/sleeplocked_q gain _at ξ forms (the
+      ambient ones are the cur_ctx instances); sl_res_open/close kit
+      stated over sl_body at cur_ctx; sl_pay + its CtxMorph.
+    - SleepLockAt.v / new_sleeplock_gen(_at): build at tl := 0 with
+      ctx_floor_0; the CtxMorph side goal by ctx_morph_solve.
+    - Spec/ProofAcquiresleep: the gen + llb tiers become bound-indexed
+      (post row [∃ tl, ctx_floor cur_ctx tl ∗ Rb tl]); the inner
+      re-closes inside acquiresleep use tl := 0 (held arm, no Rb);
+      the const tiers derive by dropping the floor.  4 payload-open
+      sites (entry, post-sleep, nested entry, nb).
+    - Spec/ProofReleasesleep: premises [llb tl ∗ Rb tl]; the inner
+      release goes through [wp_release_in_sconf] with
+      [lock_pay_intro_llb] folding the caller's tl into the free arm —
+      THIS is R2 for the sleeplock; the const tier derives at tl := 0.
+    - ProofHoldingsleep (2 opens), UartTxInv (check its tx sleeplock).
+  bcache instantiates Rb tl := bown ∗ ∃ np Tp, reg_park (np,Tp) ∗
+  astamp np Tp ∗ llb Tp ∗ ⌜Tp ≤ tl⌝ — the checkout's rp-case cover.
+  Gate: SleepLock cone green (the four sleeplock proofs + SleepLockAt +
+  IcacheBoot/BioInitAt builders).
+
 R1 (design retrofit, small):
   - Enrich bn_pres's cmra ((n_b,T_b) agree × positive); move ● into
     buf_box_body's IN/OUT arms; IDLE keeps ● None.  (BioInv pres kit:
     ~4 lemmas touched.)
-  - Add γp/γd/γl ghost_vars to bio_names; add the reg halves + tie to
-    buf_box_body; add the astamp/llb/floor rows to the sleeplock
-    payload (the SleepLock record threading — this IS r77's "NEXT"
-    item, shaped as a payload row) and to bio_slot_res2's Some-arm.
+  - Add γp/γd/γc ghost_vars + the tag-multiset gname to bio_names; add
+    the reg halves, the pile, ● S and rows (r1)–(r3) + the tie to
+    buf_box_body's common prefix; add the astamp/llb/floor rows to the
+    sleeplock payload (the SleepLock record threading — this IS r77's
+    "NEXT" item, shaped as a payload row) and the rd/γc halves to
+    bio_slot_res2 (both arms).  Add CtxAnchor.astamp_le.
   - Restate the four transitions' premises per §3.3; prove the two
     cover lemmas.
   Gate: BioBox/BioInv/SleepLock green.
@@ -389,3 +474,19 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   γl half-pair cannot serve overlapping parkers, and its whole-in-box
   case was refutable only globally; the pile + γc make every drop-site
   case local, with no receipt choreography.  Registers: γp, γd, γc.
+- 2026-09-01 (build agent, after the vetting): tagged pile ADOPTED as
+  written (it subsumes the pair-tag ticket the build side had reached
+  independently; astamp_le + (r3) is the cleaner refutation).  Added
+  R1-pre: the SleepLock payload λ-flip with the floor slot, measured as
+  a 7-file self-contained prerequisite — the const [<{ sl_res_gen }>]
+  embeds ambient-XI cells and cannot carry R2's floor, so without it
+  the checkout's park-case cover has no floor source.  Site notes:
+  bpin/bunpin box opens, the last drop's OUT refutation by count,
+  IDLE boot, the single bref spelling.
+- 2026-09-01 (design vetting of the pile): pile ACCEPTED (the reg_last
+  overlap flaw was real) but TAGGED — an anonymous pile leaves the
+  drop's (o = 1, n ≠ n_mine) branch unrefutable in-logic.  Added the
+  tag multiset S with parker-held claims, rows (r1)–(r3), astamp_le,
+  the max-Tl single-acquire trick, and the site notes (every count edge
+  opens the box; rows in the common prefix; bunpin is a drop site).
+  Drop cover rewritten as a fully in-logic case split.
