@@ -1596,8 +1596,8 @@ Section SyscallVocab.
            can say anything here (open, close, dup, pipe); the other eighteen
            never receive the fragment bundle, so their row is [sts' = sts] by
            construction.  [UsysMemOk.usys_fd_ok] is the table this reads. *)
-        ⌜ sysc_fd_ok (us_V U) (mf !!! Regidx (mword_of_int 10 : mword 5))
-                     sts sts' ⌝ -∗
+        ⌜ sysc_fd_ok (us_V U)
+                     (pv_tf (us_V U') !!! tf_arg_idx 0) sts sts' ⌝ -∗
         (* ...and THIS ARM RETURNED, exactly as [SpecSyscall]'s post says
            it: [sysc_mem_ok] cannot rule [exit] out (exit is in its quiet
            row), and the user-execution contract hands back nothing at
@@ -1774,8 +1774,11 @@ Section SyscallVocab.
     (* which user bytes moved -- [sysc_hcont_ty]'s own clause, supplied to
        [Hcont] right after [callee_saved]. *)
     sysc_mem_ok (us_V U) (us_V U') (us_M U) (us_M U') ->
-    (* ...and which descriptors moved *)
-    sysc_fd_ok (us_V U) (E !!! Regidx (mword_of_int 10 : mword 5)) sts sts' ->
+    (* ...and which descriptors moved.  Stated at the OUTGOING TRAPFRAME's
+       a0 word: by this point [sysc_ret_tail]'s [sd a0,112(s2)] has already
+       stored it there, and the epilogue restores registers and touches no
+       trapframe, so it carries the row unchanged. *)
+    sysc_fd_ok (us_V U) (pv_tf (us_V U') !!! tf_arg_idx 0) sts sts' ->
     (* ...and the resume record -- [sysc_hcont_ty]'s three new clauses, in
        the same order.  The a0 clause arrives here ALREADY COMPOSED with the
        [sd a0,112(s2)] store: [sysc_ret_tail] (and the printk fallback) is
@@ -2539,6 +2542,11 @@ Section SyscallRet.
     iDestruct ("Hcback" $! (rget E Ra0) with "Hcell") as "Htfp".
     iDestruct ("Hpvback" $! (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U')))
                  with "Htfc Htfp") as "Hpriv".
+    assert (Hstored : sysc_fd_ok (us_V U)
+              (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U')) !!! tf_arg_idx 0)
+              sts sts').
+    { rewrite list_lookup_total_insert; [| exact Hi14].
+      rgne. exact Hfdrow. }
     assert (Hp3e : add_vec_int (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64) 4
                    = mword_of_int (KernelSyms.syscall + 0x3e)) by pcw.
     iEval (rewrite Hp3e) in "Hpc".
@@ -2565,9 +2573,14 @@ Section SyscallRet.
                  reads [us_M]/[pv_sz] of its outgoing state, neither of which
                  [us_tf]/[upd_tf] moves -- so [Hmem] transports on the nose. *)
               ltac:(cbn [us_M us_tf upd_usV upd_tf pv_sz]; exact Hmem)
-              (* the descriptor row transports for the same reason: it reads
-                 the a0 REGISTER, which the epilogue restores unchanged *)
-              Hfdrow
+              (* THE DESCRIPTOR ROW, MOVED FROM THE REGISTER TO THE SLOT.
+                 The arms state it at a0 (that is where their entry left the
+                 return value); the epilogue and everything above state it
+                 at the trapframe word, because that is what the user sees
+                 and the only reading a caller with no register file can
+                 compose against.  The [sd] just executed is what makes the
+                 two the same word, and this is the one line that says so. *)
+              Hstored
               (* THE A0 STORE, COMPOSED.  [Ha0] says the dispatch left
                  [pv_tf] alone; the [sd] just executed is the insert, so the
                  witness is the word that was stored. *)

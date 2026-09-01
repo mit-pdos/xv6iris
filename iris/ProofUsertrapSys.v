@@ -682,10 +682,34 @@ Section UtSysBlock.
               rewrite Hpi.
               exact (sysc_mem_ok_usys V1 V2 (us_M U) M2 w _ _ _ _
                        Hnex Hnsb eq_refl (f_equal uint Hszq) Hmemg). }
+      (* THE DESCRIPTOR ROW, CARRIED OUT OF THE DISPATCH.  [Hfdrow] reads the
+         syscall table at the record syscall() was CALLED with; what usertrap
+         owes is the same table at the record it was ENTERED with, and the
+         two differ by the prologue's epc rewrite composed with the
+         [epc += 4] at +0x9a.  The table looks at neither -- it reads the
+         NUMBER (a7) and the ARGUMENT (a0), and its return value comes out
+         of the outgoing trapframe -- so the two epc inserts peel off by
+         [UsysMemOk.usys_fd_ok_epc], the descriptor twin of the
+         [usys_mem_ok_epc] the image row above crosses by. *)
+      assert (Hfde : ut_fd_ecall scv (pv_tf (us_V U0))
+                       (pv_tf (us_V (MkUstate V2 M2))) sts stsR).
+      { intros _. destruct Hpro as (Hp1 & _ & _ & _).
+        assert (Hlen1 : (tf_epc_idx < length (pv_tf (us_V U)))%nat)
+          by (rewrite Htflen0; unfold tf_epc_idx, TFWORDS; lia).
+        assert (Hlen0 : (tf_epc_idx < length (pv_tf (us_V U0)))%nat).
+        { pose proof Htflen0 as HL. rewrite Hp1 length_insert in HL.
+          rewrite HL. unfold tf_epc_idx, TFWORDS. lia. }
+        assert (Hnum0 : usys_num (pv_tf (us_V U0)) = sysc_num V1).
+        { rewrite Hnumeq Hp1 usys_num_epc. reflexivity. }
+        cbn [us_V pv_tf]. rewrite Hnum0.
+        apply (usys_fd_ok_epc _ _ (ret_pc epv) _ _ _ Hlen0).
+        rewrite <- Hp1.
+        apply (usys_fd_ok_epc _ _ (rget S3 Ra5) _ _ _ Hlen1).
+        rewrite <- HV1tf. exact Hfdrow. }
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N U0 (MkUstate V2 M2) pt ksp m0 mg av
                 n2 true
                 mie_v menvcfg0 epv scv lks sts stsR
-                Hwf' ltac:(intros Hne; exfalso; exact (Hne Hscec)) Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
+                Hwf' ltac:(intros Hne; exfalso; exact (Hne Hscec)) Hfde Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg
                 Hmiev Hmenvv Hrda

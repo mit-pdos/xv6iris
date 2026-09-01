@@ -399,9 +399,19 @@ Definition wp_syscall_sconf_body
          of the twenty-two never receive the fragment bundle at all, so this
          reads [sts' = sts] for them; the four that do (open, close, dup,
          pipe) each say exactly which slot they changed and to what.  See
-         [sysc_fd_ok] above and [UsysMemOk.usys_fd_ok] beneath it. *)
-      ⌜ sysc_fd_ok (us_V U) (mf !!! Regidx (mword_of_int 10 : mword 5))
-                   sts sts' ⌝ -∗
+         [sysc_fd_ok] above and [UsysMemOk.usys_fd_ok] beneath it.
+
+         THE RETURN VALUE IS READ OUT OF THE OUTGOING TRAPFRAME, not out of
+         a register: the a0 slot is what the [sd a0,112(s2)] at
+         [syscall + 0x3a] just stored, and it is the word the USER will
+         see.  Reading it here rather than at [mf]'s a0 is what lets the
+         caller compose -- usertrap's own fd row and the user tier's ecall
+         arm both speak the trapframe word, and nothing above this frame
+         can see a register.  (The out-of-range fallback stores from a4,
+         not a0, so a register-keyed clause would have been false there
+         anyway; its row is the quiet one and reads no return value.) *)
+      ⌜ sysc_fd_ok (us_V U)
+                   (pv_tf (us_V U') !!! tf_arg_idx 0) sts sts' ⌝ -∗
       (* ...AND THIS ARM RETURNED, WHICH RULES [exit] OUT (milestone J,
          K1).  [sysc_mem_ok] does NOT: exit falls into the quiet
          "nothing moved" row, so the table alone cannot tell a returning

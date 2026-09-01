@@ -234,8 +234,16 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
     ⌜pv_upt (us_V U') = pt'⌝ -∗
     ⌜uv_round U M g sepc_v sc_v U'⌝ -∗
     (* the round's DESCRIPTOR half, forwarded from usertrap's own post --
-       see [SpecUsertrap.ut_fd_kept] for why the loop cannot do without it *)
+       see [SpecUsertrap.ut_fd_kept] for why the loop cannot do without it,
+       and [SpecUsertrap.ut_fd_ecall] for the syscall table's own row beside
+       it.  The loop consumes only the first today: the u-tier's ecall arm
+       ∀-binds the descriptor view ([UexecApply.uexec_ret_round_slot]'s own
+       note), so the row is carried here and not yet read.  It is carried
+       anyway because the alternative is what the kfork loop does -- prove
+       the fact and leave it unstatable. *)
     ⌜SpecUsertrap.ut_fd_kept sc_v sts sts'⌝ -∗
+    ⌜SpecUsertrap.ut_fd_ecall sc_v (tf_of g (ret_pc sepc_v))
+       (pv_tf (us_V U')) sts sts'⌝ -∗
     ⌜ret_pc uepc = tf_resume_pc (pv_tf (us_V U'))⌝ -∗
     ⌜mf = tf_resume_gpr0 (pv_tf (us_V U'))⌝ -∗
     ⌜ud_tfp pt' = ud_tfp pt⌝ -∗

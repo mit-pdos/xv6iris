@@ -980,6 +980,9 @@ Section UtDispatch.
                   mie_v menvcfg0 ep sc ∅ sts
                   Hwf' Hav Hnx Htfpe Hksp Hm0sp HD4sp HD4s1 HcsD4
                   Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
+                  (* the transparent arms' defining cause, off the dispatch's own
+                     [c.li a5,8; bne] at +0x50 *)
+                  Hscne
                   with "Htext Hpc Hcg Hhold Hframe Hcont").
       + (* no device: the two page-fault causes, then the fall-through *)
         iApply (wp_cbnez_fall_s_sconf (mword_of_int (UT + 0x40))
@@ -1056,6 +1059,9 @@ Section UtDispatch.
                     mie_v menvcfg0 ep sc ∅ sts
                     Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD6sp HD6s1 HcsD6
                     Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
+                    (* the transparent arms' defining cause, off the dispatch's own
+                       [c.li a5,8; bne] at +0x50 *)
+                    Hscne
                     with "Htext Hpc Hcg Hhold Hframe Hcont").
         *
           iApply (wp_beq_fall_s_sconf (mword_of_int (UT + 0x48))
@@ -1134,6 +1140,9 @@ Section UtDispatch.
                        mie_v menvcfg0 ep sc ∅ sts
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
+                       (* the transparent arms' defining cause, off the dispatch's own
+                          [c.li a5,8; bne] at +0x50 *)
+                       Hscne
                        with "Htext Hpc Hcg Hhold Hframe Hcont").
           -- (* the unexpected-scause arm *)
              iApply (wp_beq_fall_s_sconf (mword_of_int (UT + 0x52))
@@ -1155,6 +1164,9 @@ Section UtDispatch.
                        mie_v menvcfg0 ep sc ∅ sts
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        Hmiev Hmenvv (ut_round_entry ep sc U0 U Hscne Hpro)
+                       (* the transparent arms' defining cause, off the dispatch's own
+                          [c.li a5,8; bne] at +0x50 *)
+                       Hscne
                        with "Htext Hpc Hcg Hhold Hframe Hcont").
   Qed.
 

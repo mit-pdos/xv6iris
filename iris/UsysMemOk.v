@@ -71,6 +71,15 @@ Local Open Scope Z_scope.
 Definition usys_num (tf : list (mword 64)) : Z :=
   bv_signed (subrange_vec_dec (tf !!! tf_arg_idx 7) 31 0 : mword 32).
 
+(* the number is ONE WORD of the trapframe, so two frames that agree at a7
+   name the same entry.  What wants this is a boundary that restates a row
+   at a different-but-agreeing trapframe -- uservec's save walk stores the
+   31 user registers and then speaks [tf_of g], where usertrap spoke the
+   saved list. *)
+Lemma usys_num_arg_cong (tf1 tf2 : list (mword 64)) :
+  tf1 !!! tf_arg_idx 7 = tf2 !!! tf_arg_idx 7 -> usys_num tf1 = usys_num tf2.
+Proof. intros He. unfold usys_num. rewrite He. reflexivity. Qed.
+
 (* the syscall numbers this table names (kernel/syscall.h) *)
 Definition USYS_fork : Z := 1.
 Definition USYS_exit : Z := 2.
@@ -341,6 +350,37 @@ Proof.
   destruct (decide (k = USYS_open)); [contradiction |].
   destruct (decide (k = USYS_pipe)); [contradiction |].
   reflexivity.
+Qed.
+
+(* THE ROW READS THE TRAPFRAME ONLY AT ARGUMENT 0.  Two trapframes that
+   agree there satisfy the same row, whatever else differs between them --
+   and the difference that matters is the EPC WORD, which usertrap's
+   prologue rewrites (on the way in) and its epilogue bumps (on the way
+   out).  The image table has the same fact under the same name pattern
+   ([usys_mem_ok_epc], [usys_num_epc]); this is the descriptor table's.
+
+   Note the argument is read at the ENTRY trapframe, before the return
+   value is stored over it -- [usys_argfd] is a0 as the kernel FOUND it,
+   not a0 as it left it. *)
+Lemma usys_fd_ok_arg_cong (n : Z) (tf1 tf2 : list (mword 64)) (r : mword 64)
+    (sts sts' : list fdstate) :
+  tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
+  usys_fd_ok n tf1 r sts sts' -> usys_fd_ok n tf2 r sts sts'.
+Proof.
+  intros He. unfold usys_fd_ok, usys_argfd. rewrite He. exact id.
+Qed.
+
+(* ...and the instance every caller wants: an epc rewrite is invisible to
+   the row, because the two indices are different words. *)
+Lemma usys_fd_ok_epc (n : Z) (tf : list (mword 64)) (w r : mword 64)
+    (sts sts' : list fdstate) :
+  (tf_epc_idx < length tf)%nat ->
+  usys_fd_ok n (<[tf_epc_idx := w]> tf) r sts sts' ->
+  usys_fd_ok n tf r sts sts'.
+Proof.
+  intros Hlen. apply usys_fd_ok_arg_cong.
+  rewrite list_lookup_total_insert_ne; [reflexivity |].
+  unfold tf_epc_idx, tf_arg_idx. lia.
 Qed.
 
 (* THE LENGTH SURVIVES EVERY ROW, which is what [FdSlots.fd_frags] needs of

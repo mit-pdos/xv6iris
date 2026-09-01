@@ -1613,7 +1613,7 @@ Section UservecAllPt.
     iEval (rewrite /usertrap_post).
     (* [usertrap_post] names where the round left the descriptor states *)
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2)
-      "%Huptpt2 %Hrd2 %Hfdk2 %Hpcret
+      "%Huptpt2 %Hrd2 %Hfdk2 %Hfde2 %Hpcret
        %Hmask %Hpttf %Haccwf %Hmapwf %Hretms %Hsconf2 %Hcalleesaved %Htpcid %Ha0usatp %Hsatprooted
        Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2".
     (* x0 IS ZERO in the file usertrap handed back -- the one fact the
@@ -1752,7 +1752,7 @@ Section UservecAllPt.
                 have to solve [us_M ?U' =?= us_M U2], which is not a pattern;
                 deferred to a goal, [?U'] is already resolved by the time the
                 (purely iota) conversion is checked. *)
-             with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
+             with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
                     [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2").
     - (* the descriptor the residue is keyed at IS the one handed over *)
       reflexivity.
@@ -1790,6 +1790,15 @@ Section UservecAllPt.
          trapframe -- so whatever usertrap certified about the states is
          what uservec passes on. *)
       exact Hfdk2.
+    - (* ...AND THE ECALL'S OWN ROW, across the save walk.  The row reads the
+         entry trapframe at exactly two words -- a7 for the syscall number,
+         a0 for its argument -- and usertrap read them off the SAVED frame
+         where this boundary speaks [tf_of g].  Those are the same words the
+         round above crosses by; restricted to two indices the agreement is
+         definitional, so the two side goals close by computation. *)
+      refine (SpecUsertrap.ut_fd_ecall_in _ _ _ _ _ _ _ _ Hfde2);
+        cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf];
+        unfold tf_arg_idx, tf_of; reflexivity.
     - (* the resume pc, straight off usertrap's own row *)
       cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. exact Hpcret.
     - (* THE REGISTER-FILE TIE (S9).  [userret_gpr] at the words

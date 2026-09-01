@@ -196,6 +196,15 @@ Section UtRet2.
        [reflexivity]; the syscall arm may have moved them, and its cause IS
        the ecall, so its proof is vacuous. *)
     ut_fd_kept scw sts0 sts ->
+    (* ...and the ECALL's half, the row the syscall table states.  Relayed
+       exactly like [ut_fd_kept]: the tail re-closes the residue with the
+       fragments it borrowed, so whether the round moved the states -- and
+       how -- is its caller's statement to make.  The row reads the syscall
+       number and its argument off the trapframe usertrap was ENTERED at,
+       and the return value out of the one being
+       parked -- the ENTRY record is [U0], which these tails already carry
+       for [ut_wf]. *)
+    ut_fd_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U)) sts0 sts ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -241,7 +250,7 @@ Section UtRet2.
                      mie_v menvcfg0 U0 sts0 epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hfdk Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcs Hmiev Hmenvv Hrd Hepcw.
+    intros Hwf Hfdk Hfde Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcs Hmiev Hmenvv Hrd Hepcw.
     (* the budget, in numbers [lia] can see -- every one of these is a
        [Definition] and the index arithmetic below is what needs them *)
     pose proof Hav as Hav'.
@@ -607,7 +616,7 @@ Section UtRet2.
     iDestruct ("Hownback" $! U with "Hpv Hufr Hsy") as "Hown".
     iApply ("Hcont" $! (pv_upt (us_V U)) (tp_pin S9) msg
               (kvi_satp_word (ud_root (pv_upt (us_V U)))) (mepc_val uepc) scv stv mdv0 U
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     Hhs Hpriv Hms Hscause Hstval Hsepc [Hstvec] Hpc [Hfile]
                     Hmie Hmdl Hmenv Hhw Hmin [-]").
     - reflexivity.
@@ -617,6 +626,8 @@ Section UtRet2.
          what its caller handed it, and whether THAT moved the states is
          the caller's statement to make. *)
       exact Hfdk.
+    - (* ...and [ut_fd_ecall], the same way *)
+      exact Hfde.
     - (* [ret_pc (mepc_val uepc) = tf_resume_pc (pv_tf (us_V U))]: [mepc_val]
          IS [ret_pc], which is idempotent, and the epc word is [uepc]. *)
       unfold tf_resume_pc, tf_w. rewrite Hepcw. exact (ret_pc_idem uepc).
@@ -687,6 +698,15 @@ Section UtRet.
        [reflexivity]; the syscall arm may have moved them, and its cause IS
        the ecall, so its proof is vacuous. *)
     ut_fd_kept scw sts0 sts ->
+    (* ...and the ECALL's half, the row the syscall table states.  Relayed
+       exactly like [ut_fd_kept]: the tail re-closes the residue with the
+       fragments it borrowed, so whether the round moved the states -- and
+       how -- is its caller's statement to make.  The row reads the syscall
+       number and its argument off the trapframe usertrap was ENTERED at,
+       and the return value out of the one being
+       parked -- the ENTRY record is [U0], which these tails already carry
+       for [ut_wf]. *)
+    ut_fd_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U)) sts0 sts ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -710,7 +730,7 @@ Section UtRet.
                      mie_v menvcfg0 U0 sts0 epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hfdk Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
+    intros Hwf Hfdk Hfde Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -795,6 +815,17 @@ Section UtRet.
       - cbn [us_V]. rewrite HVrtf. apply prepare_return_tf_ueq.
       - cbn [us_V]. rewrite HVrupt HVrsz. reflexivity.
       - cbn [us_V]. exact HVrsz. }
+    (* THE DESCRIPTOR ROW ACROSS prepare_return.  The row reads the parked
+       trapframe at a0 alone, and prepare_return re-arms the four KERNEL
+       words -- which is exactly what [tf_ueq] is blind to -- so it crosses
+       by [TfUser.tf_ueq_arg], the argument-word twin of the [tf_ueq_epc]
+       the round above crosses by. *)
+    assert (Hfder : ut_fd_ecall scw (pv_tf (us_V U0))
+                      (pv_tf (us_V (MkUstate Vr (us_M U)))) sts0 sts).
+    { refine (ut_fd_ecall_out scw (pv_tf (us_V U0)) (pv_tf (us_V U)) _
+                sts0 sts _ Hfde).
+      cbn [us_V]. rewrite HVrtf.
+      exact (tf_ueq_arg _ _ 0 ltac:(lia) (prepare_return_tf_ueq _ _ _ _)). }
     assert (Hepcw : pv_tf (us_V (MkUstate Vr (us_M U))) !!! tf_epc_idx = uepc).
     { cbn [us_V]. rewrite HVrtf.
       rewrite <- (tf_ueq_epc _ _ (prepare_return_tf_ueq (pv_tf (us_V U)) ksat
@@ -802,7 +833,7 @@ Section UtRet.
       apply list_lookup_total_correct. exact Hepc. }
     iApply (ut_ret2 (CID := CIDp) Rsys N U0 (MkUstate Vr _) pt ksp m0 mf av nx b uepc vb
               mie_v menvcfg0 epw scw lks sts0 sts
-              Hwf' Hfdk Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp
+              Hwf' Hfdk Hfder Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp
               ltac:(rewrite (callee_saved_lookup Hcspr csp_rs1
                               ltac:(vm_compute; reflexivity)); exact HM1sp)
               ltac:(rewrite (callee_saved_lookup Hcspr Rs1
@@ -843,6 +874,15 @@ Section UtA6.
        [reflexivity]; the syscall arm may have moved them, and its cause IS
        the ecall, so its proof is vacuous. *)
     ut_fd_kept scw sts0 sts ->
+    (* ...and the ECALL's half, the row the syscall table states.  Relayed
+       exactly like [ut_fd_kept]: the tail re-closes the residue with the
+       fragments it borrowed, so whether the round moved the states -- and
+       how -- is its caller's statement to make.  The row reads the syscall
+       number and its argument off the trapframe usertrap was ENTERED at,
+       and the return value out of the one being
+       parked -- the ENTRY record is [U0], which these tails already carry
+       for [ut_wf]. *)
+    ut_fd_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U)) sts0 sts ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -871,7 +911,7 @@ Section UtA6.
                      mie_v menvcfg0 U0 sts0 epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hfdk Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hbelow.
+    intros Hwf Hfdk Hfde Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hbelow.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -1078,7 +1118,7 @@ Section UtA6.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID4) Rsys N U0 U pt ksp m0 mf av nx b
                 mie_v menvcfg0 epw scw lks sts0 sts
-                Hwf' Hfdk Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
+                Hwf' Hfdk Hfde Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
@@ -1116,6 +1156,15 @@ Section UtFa.
        [reflexivity]; the syscall arm may have moved them, and its cause IS
        the ecall, so its proof is vacuous. *)
     ut_fd_kept scw sts0 sts ->
+    (* ...and the ECALL's half, the row the syscall table states.  Relayed
+       exactly like [ut_fd_kept]: the tail re-closes the residue with the
+       fragments it borrowed, so whether the round moved the states -- and
+       how -- is its caller's statement to make.  The row reads the syscall
+       number and its argument off the trapframe usertrap was ENTERED at,
+       and the return value out of the one being
+       parked -- the ENTRY record is [U0], which these tails already carry
+       for [ut_wf]. *)
+    ut_fd_ecall scw (pv_tf (us_V U0)) (pv_tf (us_V U)) sts0 sts ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
     ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
@@ -1139,7 +1188,7 @@ Section UtFa.
                      mie_v menvcfg0 U0 sts0 epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hfdk Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
+    intros Hwf Hfdk Hfde Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -1198,7 +1247,7 @@ Section UtFa.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID2) Rsys N U0 U pt ksp m0 M1 av nx b
                 mie_v menvcfg0 epw scw lks sts0 sts
-                Hwf' Hfdk Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
+                Hwf' Hfdk Hfde Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
@@ -1286,7 +1335,7 @@ Section UtFa.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID5) Rsys N U0 U pt ksp m0 mf av nx b
                 mie_v menvcfg0 epw scw lks sts0 sts
-                Hwf' Hfdk Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
+                Hwf' Hfdk Hfde Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       (* the yield arm came back at the literal [∅]; [lks = ∅] at depth 0

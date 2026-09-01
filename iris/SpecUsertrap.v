@@ -252,6 +252,60 @@ Definition ut_round (sepc_v sc_v : mword 64) (U U' : ustate) : Prop :=
 Definition ut_fd_kept (sc_v : mword 64) (sts sts' : list fdstate) : Prop :=
   sc_v <> uecall_scause -> sts' = sts.
 
+(* ...AND THE ECALL'S OWN HALF, which used to be missing.  [ut_fd_kept]
+   above is the whole statement for four of the five causes and says
+   NOTHING for the fifth -- so "close(3) closed slot 3" was proved inside
+   sys_close, carried by the dispatcher, and then dropped at this frame.
+   This is the row that carries it out, and it is the same table
+   [SpecSyscall.sysc_fd_ok] states the dispatch against
+   ([UsysMemOk.usys_fd_ok]): eighteen entries move nothing, and open,
+   close, dup and pipe each say which slot they changed and to what.
+
+   BOTH TRAPFRAMES ARE READ, AND AT DIFFERENT WORDS.  The number and the
+   argument come from the ENTRY trapframe [tf] -- a0 as the kernel FOUND it
+   -- and the return value from the OUTGOING one [tf'], whose a0 word is
+   what the dispatch's [sd a0,112(s2)] stored over it.  Neither reading is
+   disturbed by the epc, which usertrap's prologue rewrites and its
+   epilogue bumps ([UsysMemOk.usys_fd_ok_epc]).
+
+   THE TWO HALVES ARE KEPT APART rather than fused into one [if]: the four
+   transparent arms prove [ut_fd_kept] by [reflexivity] and have no
+   trapframe pair to speak of, while the ecall arm proves this one and
+   nothing else.  A fused definition would make every arm carry both
+   trapframes to say the half it does not use. *)
+Definition ut_fd_ecall (sc_v : mword 64) (tf tf' : list (mword 64))
+    (sts sts' : list fdstate) : Prop :=
+  sc_v = uecall_scause ->
+  UsysMemOk.usys_fd_ok (UsysMemOk.usys_num tf) tf
+    (tf' !!! tf_arg_idx 0) sts sts'.
+
+(* THE ROW READS THE OUTGOING TRAPFRAME AT ONE WORD ONLY, so a tail that
+   parks a DIFFERENT record -- prepare_return re-arms the four kernel words
+   on the way out -- carries the row across by agreeing at that word.
+   [TfUser.tf_ueq_arg] is what supplies the agreement. *)
+(* ...and the ENTRY trapframe likewise, at the TWO words the row reads: a7
+   for the number and a0 for the argument.  Nothing else about the frame
+   matters, which is why this is stated at two lookups rather than at
+   [TfUser.tf_ueq] -- the caller that wants it (uservec, restating the row
+   at [tf_of g] after the save walk) has an epc rewrite in between, and
+   [tf_ueq] is not blind to the epc. *)
+Lemma ut_fd_ecall_in (sc_v : mword 64) (tf1 tf2 tf' : list (mword 64))
+    (sts sts' : list fdstate) :
+  tf1 !!! tf_arg_idx 7 = tf2 !!! tf_arg_idx 7 ->
+  tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
+  ut_fd_ecall sc_v tf1 tf' sts sts' -> ut_fd_ecall sc_v tf2 tf' sts sts'.
+Proof.
+  intros H7 H0 H Hc.
+  rewrite <- (UsysMemOk.usys_num_arg_cong _ _ H7).
+  exact (UsysMemOk.usys_fd_ok_arg_cong _ tf1 tf2 _ _ _ H0 (H Hc)).
+Qed.
+
+Lemma ut_fd_ecall_out (sc_v : mword 64) (tf tf1 tf2 : list (mword 64))
+    (sts sts' : list fdstate) :
+  tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
+  ut_fd_ecall sc_v tf tf1 sts sts' -> ut_fd_ecall sc_v tf tf2 sts sts'.
+Proof. intros He H Hc. rewrite <- He. exact (H Hc). Qed.
+
 (* THE PROLOGUE'S OWN MOVE: [U'] is [U] with the epc word rewritten, which
    is what usertrap's +0x28..+0x2e block does and all it does.  Every block
    below the entry carries this (or the round it grows into) as a premise. *)
@@ -348,8 +402,11 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
        resume trapframe's own. *)
     ⌜pv_upt (us_V U') = pt'⌝ -∗
     ⌜ut_round sepc_v sc_v U U'⌝ -∗
-    (* ...and its descriptor half *)
+    (* ...and its descriptor half, on both sides of the cause: nothing moved
+       unless this was an ecall, and if it was, the syscall table says what
+       did. *)
     ⌜ut_fd_kept sc_v sts sts'⌝ -∗
+    ⌜ut_fd_ecall sc_v (pv_tf (us_V U)) (pv_tf (us_V U')) sts sts'⌝ -∗
     ⌜ret_pc uepc = tf_resume_pc (pv_tf (us_V U'))⌝ -∗
     (* [mideleg]'s VALUE is not pinned to whatever usertrap was handed at
        entry -- unlike [mie_v]/[menvcfg0] (each a unique architectural
