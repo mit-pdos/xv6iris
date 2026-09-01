@@ -18431,3 +18431,20 @@ only refutes IN), so the doc gains the b_disk-half credential in IDLE
 (Q residue, checkout/park/drop signatures, IDLE half, buf_bundle_h) +
 boot deposits next; then the scan2 twins, ProofBread sites 1-5,
 ProofBrelse, ProofBunpin, the -B round.
+
+### A6.158: BOX v2 ADOPTED by the owner (tso-escrow-box-v2.md) -- course correction
+
+The register design (A6.153 R1, A6.155/A6.157) is superseded: two
+custody arms + the L1 out-window, freshness by rows (C)/(D) over the
+stamped-shares cmra authR (gmapUR nat ufracR), six lemmas, no anchor,
+no IDLE arm (refs-0 content stays in the box, A6.142 reversed).  My
+evaluation is in the endgame doc §2 (F1–F5) + changelog: agreed in
+substance; ONE gap (F1: withdraw_L1 cannot refute OUT_L1 -- fix: L1's
+slot_d half rides hdr_out for the window); three encoding notes.
+State of the tree: BioInv pass 1 of A6.157 (v1 deletions, option-share
+kit, bchain, slot tie) STANDS (R-c); pass 2 (the register box, the
+half cell, buf_box_alloc) is scratch and will be replaced by R1' (the
+v2 box section).  The R2 twins written against pass 2
+(bcache_scan2_incr/incr0/recycle/decr/decr0) keep their call shapes
+under (c)/(a)+(b)/(d); ProofBunpin's conversion stands.
+NEXT: R1' per §4.1 once F1 is vetted (or as F1 says, absent objection).
