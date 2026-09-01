@@ -741,6 +741,133 @@ Section UkShParse.
   Qed.
 
   (* ===================================================================== *)
+  (* §2c A C STRING IN EITHER HALF OF THE HEAP -- AND WHY THE PARSER        *)
+  (*      CANNOT BE WALKED WITHOUT IT.                                      *)
+  (*                                                                       *)
+  (* FOUND WHILE STARTING [parseredirs], AND IT IS A DEFECT IN THE LANDED   *)
+  (* CONTRACTS, NOT IN THE CODE.  [peek(ps, es, toks)] is called at seven   *)
+  (* sites and EVERY [toks] it is passed is a STRING LITERAL:               *)
+  (*                                                                       *)
+  (*   parseredirs  "<>"   @0x12f0     parseexec  "("    @0x12f8            *)
+  (*   parseexec    "|)&;" @0x1318     parsepipe  "|"    @0x1320            *)
+  (*   parseline    "&"    @0x1328     parseline  ";"    @0x1330            *)
+  (*   parsecmd     ""     @0x1288                                          *)
+  (*                                                                       *)
+  (* and all seven sit in .rodata (0x1280..0x13d9), which shares the        *)
+  (* EXECUTABLE segment's pages -- the same reason [UCodeShP.shp_rodata]    *)
+  (* exists and is a [utext_img] under GAMMA-T.  The landed [wp_kshp_peek]  *)
+  (* took its table as [ustr γd dt toks tlen tf], a DATA-half string, and   *)
+  (* [UserHeap.uheap_ubyte] says a γd byte's page is WRITABLE.  So at any   *)
+  (* of the seven real addresses that premise is not merely unproved: it    *)
+  (* CONTRADICTS the layout, and no caller could ever have supplied it.     *)
+  (* [wp_kshp_peek] was true and unusable.                                  *)
+  (*                                                                       *)
+  (* THE FIX IS ONE BOOLEAN, and it is [UkShDiag]'s [shd_str] idiom: a C    *)
+  (* string generalised over WHICH HALF holds it.  [ushp_sstr false dq] is  *)
+  (* [ustr γd dq] and [ushp_sstr true dq] is [utext_str γt], BOTH BY        *)
+  (* [reflexivity] -- the four conjuncts are literally the same -- so the   *)
+  (* five landed call sites that pass a γd table (the whitespace and symbol *)
+  (* tables at 0x2008 / 0x2000, which really are in .data) change by one    *)
+  (* argument and nothing else.  Only [strchr] -- the one function that     *)
+  (* LOADS from the table -- needs a real edit, and it is four [lbu] sites. *)
+  (*                                                                       *)
+  (* RELOCATION ASK: this is [UkShDiag.shd_sb]/[shd_str]/[wp_shd_lbu] a     *)
+  (* THIRD time (UkShDiag has it, this file now has it), which is exactly   *)
+  (* what ask 3 of the lane report already asks for -- move the family      *)
+  (* beside [UserHeap.ustr] and its load beside [UkRunMem.wp_uk_lbu].       *)
+  (* ===================================================================== *)
+
+  (* one byte of such a string *)
+  Definition ushp_sbq (tx : bool) (dq : dfrac) (a : Z) (b : bv 8) : iProp Σ :=
+    (if tx then utext γt a b else ubyteq γd dq a b)%I.
+
+  (* ...and the string, spelled exactly as [UserHeap.ustr] /
+     [UserHeap.utext_str] spell it, so both directions are [reflexivity] *)
+  Definition ushp_sstr (tx : bool) (dq : dfrac) (a : Z) (len : nat)
+      (f : nat -> bv 8) : iProp Σ :=
+    (⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝ ∗
+     ⌜ Z.of_nat len < 2 ^ 31 ⌝ ∗
+     ([∗ list] j ∈ seq 0 len, ushp_sbq tx dq (a + Z.of_nat j) (f j)) ∗
+     ushp_sbq tx dq (a + Z.of_nat len) ubyte0)%I.
+
+  Lemma ushp_sstr_data (dq : dfrac) (a : Z) (len : nat) (f : nat -> bv 8) :
+    ushp_sstr false dq a len f = ustr γd dq a len f.
+  Proof. reflexivity. Qed.
+
+  Lemma ushp_sstr_text (dq : dfrac) (a : Z) (len : nat) (f : nat -> bv 8) :
+    ushp_sstr true dq a len f = utext_str γt a len f.
+  Proof. reflexivity. Qed.
+
+  (* the three accessors [strchr]'s walk uses, at either half.  The
+     give-back wand is kept even in the text case (where the byte is
+     persistent and nothing has to come back) so that ONE script serves
+     both halves. *)
+  Lemma ushp_sstr_nonul (tx : bool) (dq : dfrac) (a : Z) (len : nat)
+      (f : nat -> bv 8) :
+    ushp_sstr tx dq a len f -∗ ⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝.
+  Proof. iIntros "(%H & _ & _ & _)". iPureIntro. exact H. Qed.
+
+  Lemma ushp_sstr_len (tx : bool) (dq : dfrac) (a : Z) (len : nat)
+      (f : nat -> bv 8) :
+    ushp_sstr tx dq a len f -∗ ⌜ Z.of_nat len < 2 ^ 31 ⌝.
+  Proof. iIntros "(_ & %H & _ & _)". iPureIntro. exact H. Qed.
+
+  Lemma ushp_sstr_byte (tx : bool) (dq : dfrac) (a : Z) (len : nat)
+      (f : nat -> bv 8) (j : nat) :
+    (j < len)%nat ->
+    ushp_sstr tx dq a len f -∗
+      ushp_sbq tx dq (a + Z.of_nat j) (f j) ∗
+      (ushp_sbq tx dq (a + Z.of_nat j) (f j) -∗ ushp_sstr tx dq a len f).
+  Proof.
+    intros Hj. iIntros "(#Hne & #Hlen & Hbs & Hnul)".
+    iDestruct (big_sepL_lookup_acc _ _ j j with "Hbs") as "[Hb Hcl]";
+      [ apply lookup_seq; split; [ lia | exact Hj ] | ].
+    iFrame "Hb". iIntros "Hb".
+    rewrite /ushp_sstr. iFrame "Hne Hlen Hnul". iApply ("Hcl" with "Hb").
+  Qed.
+
+  Lemma ushp_sstr_nul (tx : bool) (dq : dfrac) (a : Z) (len : nat)
+      (f : nat -> bv 8) :
+    ushp_sstr tx dq a len f -∗
+      ushp_sbq tx dq (a + Z.of_nat len) ubyte0 ∗
+      (ushp_sbq tx dq (a + Z.of_nat len) ubyte0 -∗ ushp_sstr tx dq a len f).
+  Proof.
+    iIntros "(#Hne & #Hlen & Hbs & Hnul)". iFrame "Hnul". iIntros "Hnul".
+    rewrite /ushp_sstr. iFrame "Hne Hlen Hbs Hnul".
+  Qed.
+
+  (* THE ONE LOAD, at either half.  [wp_uk_lbu] and [wp_uk_lbu_text] have
+     the same premises and the same register effect; they differ only in
+     which resource they consume, and the text one does not consume it. *)
+  Local Lemma wp_ushp_lbu (tx : bool) (dq : dfrac) (h : CpuId) (m : regfile)
+      (pc : mword 64) (imm : mword 12) (rs1 rd : mword 5) (a : Z)
+      (b0 : mword 8) (avail : nat) :
+    unot_sp rd ->
+    a = uint (m !!! Regidx rs1) + uoff_i12 imm ->
+    uint rd <> 0 ->
+    uinstr_is γt pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
+    ushp_sbq tx dq a b0 -∗
+    urun γt γd γs γfd h m pc avail -∗
+    (ushp_sbq tx dq a b0 -∗
+       ∀ h' : CpuId,
+         urun γt γd γs γfd h'
+           (<[Regidx rd := regval_into_reg (zero_extend' 64 b0)]> m)
+           (add_vec_int pc 4) avail -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hns Ha Hrd. iIntros "#Hi Hb Hrun Hcont".
+    destruct tx.
+    - rewrite /ushp_sbq. iDestruct "Hb" as "#Hb".
+      iApply (wp_uk_lbu_text γt γd γs γfd h m pc imm rs1 rd a b0 avail
+                Hns Ha Hrd with "Hi Hb Hrun").
+      iIntros (h') "Hrun". iApply ("Hcont" with "Hb Hrun").
+    - iApply (wp_uk_lbu γt γd γs γfd h m pc imm rs1 rd dq a b0 avail
+                Hns Ha Hrd with "Hi Hb Hrun").
+      iIntros "Hb" (h') "Hrun". iApply ("Hcont" with "Hb Hrun").
+  Qed.
+
+  (* ===================================================================== *)
   (* §3 strchr @0xa82 -- 17 instructions, a two-word frame, one loop.       *)
   (*                                                                       *)
   (*   char *strchr(const char *s, char c)                                  *)
@@ -1056,7 +1183,7 @@ Section UkShParse.
        beq a1,a5,0xa9e ; c.addi a0,a0,1 ; lbu a5,0(a0) ; c.bnez a5,0xa90
      [j] is the index the scan has reached, [r = len - j] the measure, and
      a5 already holds the byte AT [j] (the previous [lbu] loaded it). *)
-  Local Lemma wp_kshp_strchr_loop (dq : dfrac) (s : Z) (len : nat)
+  Local Lemma wp_kshp_strchr_loop (tx : bool) (dq : dfrac) (s : Z) (len : nat)
       (f : nat -> bv 8) (c : bv 8) (nn : nat) :
     forall (r j : nat) (h : CpuId) (mc : regfile),
     (len - j = r)%nat -> (j < len)%nat ->
@@ -1065,9 +1192,9 @@ Section UkShParse.
     mc !!! Regidx a5_idx = mword_of_int (bv_unsigned (f j)) ->
     mc !!! Regidx a1_idx = mword_of_int (bv_unsigned c) ->
     shp_code γt -∗
-    ustr γd dq s len f -∗
+    ushp_sstr tx dq s len f -∗
     urun γt γd γs γfd h mc (mword_of_int 0xa90) nn -∗
-    (ustr γd dq s len f -∗
+    (ushp_sstr tx dq s len f -∗
        ∀ (h' : CpuId) (mc' : regfile),
          ⌜ forall q : mword 5,
              Regidx q <> Regidx a0_idx -> Regidx q <> Regidx a5_idx ->
@@ -1081,7 +1208,7 @@ Section UkShParse.
     intros r. induction r as [| r IH ];
       intros j h mc Hr Hj Hs0 Hs64 Ha0 Ha5 Ha1;
       iIntros "#Hcode Hstr Hrun Hcont"; [ lia | ].
-    iDestruct (ustr_nonul with "Hstr") as %Hne.
+    iDestruct (ushp_sstr_nonul with "Hstr") as %Hne.
     destruct (decide (f j = c)) as [ Hhit | Hhit ].
     { (* ---- 0xa90  beq a1,a5 -- TAKEN: this byte IS the one ---- *)
       assert (Htk : true = uv_btaken BEQ (mc !!! Regidx a1_idx)
@@ -1157,9 +1284,9 @@ Section UkShParse.
     (* those are two different conjuncts of [ustr], so the walk splits.     *)
     destruct (Nat.eq_dec (S j) len) as [ Hend | Hend ].
     { (* ---- the terminator: the loop ends and strchr returns 0 ---- *)
-      iDestruct (ustr_nul with "Hstr") as "[Hb Hcl]".
-      iApply (wp_uk_lbu γt γd γs γfd h2 m1 (mword_of_int 0xa96)
-                (mword_of_int 0 : mword 12) a0_idx a5_idx dq
+      iDestruct (ushp_sstr_nul with "Hstr") as "[Hb Hcl]".
+      iApply (wp_ushp_lbu tx dq h2 m1 (mword_of_int 0xa96)
+                (mword_of_int 0 : mword 12) a0_idx a5_idx
                 (s + Z.of_nat len) ubyte0 nn
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(rewrite Ha0_1 Hend
@@ -1229,9 +1356,9 @@ Section UkShParse.
         apply bv_eq. vm_compute. reflexivity. }
     (* ---- a BODY byte: the loop goes round ---- *)
     assert (Hj1 : (S j < len)%nat) by lia.
-    iDestruct (ustr_byte γd dq s len f (S j) Hj1 with "Hstr") as "[Hb Hcl]".
-    iApply (wp_uk_lbu γt γd γs γfd h2 m1 (mword_of_int 0xa96)
-              (mword_of_int 0 : mword 12) a0_idx a5_idx dq
+    iDestruct (ushp_sstr_byte tx dq s len f (S j) Hj1 with "Hstr") as "[Hb Hcl]".
+    iApply (wp_ushp_lbu tx dq h2 m1 (mword_of_int 0xa96)
+              (mword_of_int 0 : mword 12) a0_idx a5_idx
               (s + Z.of_nat (S j)) (f (S j)) nn
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(rewrite Ha0_1
@@ -1287,15 +1414,16 @@ Section UkShParse.
   Qed.
 
   (* ---- strchr, the whole function ------------------------------------- *)
-  Lemma wp_kshp_strchr (h : CpuId) (m : regfile) (dq : dfrac) (s : Z)
+  Lemma wp_kshp_strchr (h : CpuId) (m : regfile) (tx : bool) (dq : dfrac)
+      (s : Z)
       (len : nat) (f : nat -> bv 8) (c : bv 8) (nn : nat) :
     m !!! Regidx a0_idx = mword_of_int s ->
     m !!! Regidx a1_idx = mword_of_int (bv_unsigned c) ->
     0 <= s -> s + Z.of_nat len < Z64 ->
     shp_code γt -∗
-    ustr γd dq s len f -∗
+    ushp_sstr tx dq s len f -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.strchr) (2 + nn) -∗
-    (ustr γd dq s len f -∗
+    (ushp_sstr tx dq s len f -∗
        ∀ (h' : CpuId) (m' : regfile),
          ⌜ ucallee_saved m m' ⌝ -∗
          ⌜ m' !!! Regidx a0_idx
@@ -1306,7 +1434,7 @@ Section UkShParse.
   Proof.
     intros Ha0 Ha1 Hs0 Hs64. iIntros "#Hcode Hstr Hrun Hcont".
     rewrite shpp_strchr.
-    iDestruct (ustr_nonul with "Hstr") as %Hne.
+    iDestruct (ushp_sstr_nonul with "Hstr") as %Hne.
     set (sp0 := m !!! Regidx csp_rs1).
     set (vra := m !!! Regidx ra_idx).
     set (vs0 := m !!! Regidx s0_idx).
@@ -1333,9 +1461,9 @@ Section UkShParse.
        byte 0 when it is non-empty and its TERMINATOR when it is not ---- *)
     destruct (Nat.eq_dec len 0) as [ Hlen0 | Hlen0 ].
     { (* ---- the EMPTY string: strchr returns 0 without the loop ---- *)
-      iDestruct (ustr_nul with "Hstr") as "[Hb Hcl]".
-      iApply (wp_uk_lbu γt γd γs γfd h4 m2 (mword_of_int 0xa8a)
-                (mword_of_int 0 : mword 12) a0_idx a5_idx dq
+      iDestruct (ushp_sstr_nul with "Hstr") as "[Hb Hcl]".
+      iApply (wp_ushp_lbu tx dq h4 m2 (mword_of_int 0xa8a)
+                (mword_of_int 0 : mword 12) a0_idx a5_idx
                 (s + Z.of_nat len) ubyte0 nn
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(rewrite Ha0_2 Hlen0;
@@ -1447,9 +1575,9 @@ Section UkShParse.
         apply bv_eq. vm_compute. reflexivity. }
     (* ---- a NON-EMPTY string: byte 0 is [f 0] and the loop is entered --- *)
     assert (H0len : (0 < len)%nat) by lia.
-    iDestruct (ustr_byte γd dq s len f 0%nat H0len with "Hstr") as "[Hb Hcl]".
-    iApply (wp_uk_lbu γt γd γs γfd h4 m2 (mword_of_int 0xa8a)
-              (mword_of_int 0 : mword 12) a0_idx a5_idx dq
+    iDestruct (ushp_sstr_byte tx dq s len f 0%nat H0len with "Hstr") as "[Hb Hcl]".
+    iApply (wp_ushp_lbu tx dq h4 m2 (mword_of_int 0xa8a)
+              (mword_of_int 0 : mword 12) a0_idx a5_idx
               (s + Z.of_nat 0) (f 0%nat) nn
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(rewrite Ha0_2;
@@ -1498,7 +1626,7 @@ Section UkShParse.
                    = mword_of_int 0xa90)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Ea8e. iIntros (h6) "Hrun".
-    iApply (wp_kshp_strchr_loop dq s len f c nn (len - 0)%nat 0%nat h6 m3
+    iApply (wp_kshp_strchr_loop tx dq s len f c nn (len - 0)%nat 0%nat h6 m3
               eq_refl H0len Hs0 Hs64 Ha0_3 Ha5_3 Ha1_3
               with "Hcode Hstr Hrun").
     iIntros "Hstr" (h7 mc') "%Hpres %Hret Hrun".
@@ -2723,7 +2851,7 @@ Section UkShParse.
       rewrite (Hm2 q (ushp_cs_ne q a0_idx Hq ltac:(vm_compute; reflexivity))).
       exact (Hm1 q (ushp_cs_ne q a1_idx Hq ltac:(vm_compute; reflexivity))). }
     rewrite <- shpp_strchr.
-    iApply (wp_kshp_strchr h3 m3 dw ushp_whitespace 5 ushp_ws_f (f j) nn
+    iApply (wp_kshp_strchr h3 m3 false dw ushp_whitespace 5 ushp_ws_f (f j) nn
               Ha0_3 Ha1_3 ltac:(unfold ushp_whitespace; lia)
               ltac:(unfold ushp_whitespace, Z64; lia)
               with "Hcode Hws Hrun").
@@ -3133,7 +3261,8 @@ Section UkShParse.
 
 
   (* ---- peek, the whole function --------------------------------------- *)
-  Lemma wp_kshp_peek (h : CpuId) (m : regfile) (dq dw dt : dfrac)
+  Lemma wp_kshp_peek (h : CpuId) (m : regfile) (dq dw : dfrac)
+      (tt : bool) (dt : dfrac)
       (ps s0 toks : Z) (len off tlen : nat) (f tf : nat -> bv 8)
       (w0 : mword 64) (nn : nat) :
     m !!! Regidx a0_idx = mword_of_int ps ->
@@ -3151,13 +3280,13 @@ Section UkShParse.
     uword γd ps w0 -∗
     ustr γd dq s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
-    ustr γd dt toks tlen tf -∗
+    ushp_sstr tt dt toks tlen tf -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.peek) (8 + (2 + nn)) -∗
     (uword γd ps
        (mword_of_int (s0 + Z.of_nat (off + ushp_skipws (len - off) off f))) -∗
      ustr γd dq s0 len f -∗
      ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
-     ustr γd dt toks tlen tf -∗
+     ushp_sstr tt dt toks tlen tf -∗
        ∀ (h' : CpuId) (m' : regfile),
          ⌜ ucallee_saved m m' ⌝ -∗
          ⌜ m' !!! Regidx a0_idx
@@ -3750,7 +3879,7 @@ Section UkShParse.
                  (regval_into_reg (mword_of_int 0x4a6 : mword 64))).
       apply bv_eq; vm_compute; reflexivity. }
     rewrite <- shpp_strchr.
-    iApply (wp_kshp_strchr h16 n12 dt toks tlen tf (f kk) nn
+    iApply (wp_kshp_strchr h16 n12 tt dt toks tlen tf (f kk) nn
               Ha0_12 Ha1_12 ltac:(lia) ltac:(unfold Z64 in *; lia)
               with "Hcode Htoks Hrun").
     iIntros "Htoks" (h17 n13) "%Hcs1213 %Ha0_13 Hrun".
@@ -4789,7 +4918,7 @@ Section UkShParse.
       rewrite (Hm2 q (ushp_cs_ne q a0_idx Hq ltac:(vm_compute; reflexivity))).
       exact (Hm1 q (ushp_cs_ne q a1_idx Hq ltac:(vm_compute; reflexivity))). }
     rewrite <- shpp_strchr.
-    iApply (wp_kshp_strchr h3 m3 dw ushp_whitespace 5 ushp_ws_f (f j) nn
+    iApply (wp_kshp_strchr h3 m3 false dw ushp_whitespace 5 ushp_ws_f (f j) nn
               Ha0_3 Ha1_3 ltac:(unfold ushp_whitespace; lia)
               ltac:(unfold ushp_whitespace, Z64; lia)
               with "Hcode Hws Hrun").
@@ -5180,7 +5309,7 @@ Section UkShParse.
       rewrite (Hm2 t (ushp_cs_ne t a0_idx Ht ltac:(vm_compute; reflexivity))).
       exact (Hm1 t (ushp_cs_ne t a1_idx Ht ltac:(vm_compute; reflexivity))). }
     rewrite <- shpp_strchr.
-    iApply (wp_kshp_strchr h3 m3 dw ushp_whitespace 5 ushp_ws_f (f j) nn
+    iApply (wp_kshp_strchr h3 m3 false dw ushp_whitespace 5 ushp_ws_f (f j) nn
               Ha0_3 Ha1_3 ltac:(unfold ushp_whitespace; lia)
               ltac:(unfold ushp_whitespace, Z64; lia)
               with "Hcode Hws Hrun").
@@ -5344,7 +5473,7 @@ Section UkShParse.
       rewrite (Hn2 t (ushp_cs_ne t a0_idx Ht ltac:(vm_compute; reflexivity))).
       exact (Hn1 t (ushp_cs_ne t a1_idx Ht ltac:(vm_compute; reflexivity))). }
     rewrite <- shpp_strchr.
-    iApply (wp_kshp_strchr h8 n3 dv ushp_symbols 7 ushp_sym_f (f j) nn
+    iApply (wp_kshp_strchr h8 n3 false dv ushp_symbols 7 ushp_sym_f (f j) nn
               Hc0_3 Hc1_3 ltac:(unfold ushp_symbols; lia)
               ltac:(unfold ushp_symbols, Z64; lia)
               with "Hcode Hsy Hrun").
