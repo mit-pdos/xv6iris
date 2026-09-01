@@ -849,3 +849,43 @@ measure ProofBget/ProofBrelse choreography + the guard-mint route at
 the real sites first), then Phase 4.5 (ic_escrow, the same design
 verbatim), then the main-side off/inode_pay rebase, the is_ftable
 λ-flip re-land, and ForkretPark's last bullet.
+
+
+## r76 BANKED (snapshot 00b27e0a9d9, -B CERTIFIED): BioBox Stage 1 + the
+## A6.149 llb-receipt instrument (acquire side complete)
+
+GREEN=1285/1293 from a FORCED -B round (every .vo rebuilt; the honest
+certification after the bn_anc interface change).  Single error root
+ProofForkretPark:345 + its 8-file cone.  What landed since r74:
+- **BioBox.v** (new, after BioInv in _CoqProject): buf_bundle /
+  buf_chain_res as CtxId-lambdas over ctx_word4_pointsto at explicit ξ
+  (the ↦₄ notation is cur_ctx-applied; the primitive takes ξ);
+  buf_box_body = ∃ n T ξb, anchor ∗ astamp ∗ llb ∗ (bundle ∨ chain_res)
+  -- A6.148's third arm (pres ● None) is designed, not yet in the body;
+  CtxMorph instances proved with EXPLICIT applies (blind `apply _`
+  fails: the !CurKtier instance-implicit blocks search).  bn_anc field
+  on bio_names; SIX MkBioNames sites patched (the 6th, SpecFilewrite,
+  hid behind a stale .vo through r75 -- -B found it).
+- **A6.149 instrument**: WpSconfLock.wp_amoswap_lockopen_s_sconf takes
+  (Tl, llb Tl) and returns (∃K, ⌜Tl<=K⌝ ∗ hart_view_lb K) through the
+  AMO node's user slot, minted per-arm inside the lock_inv open (the
+  drained-point idiom transplanted from the release leaf: assert the
+  vstep pin, goal-side of<->at conversions via two iAsserts -- hyp-side
+  rewrites do NOT match through let-unfolded state terms).  Gotchas
+  that cost iterations: the pair must ride the NODE SLOT (the post
+  branch is a separate entailment -- persistent context does not carry
+  over); the Phi's CpuId binder must be USED (hart_view_lb at the
+  callback hart, not the ambient); tactic blocks pasted after an
+  `iAssert ... as ">(...)".` line land INSIDE the assert's subproof
+  position.  SpecAcquire: gen+static llb pre-bodies (+_sconf/_fresh
+  bodies, weakens, Module Type Parameters); ProofAcquire: the spin
+  lemma threads (Tl,#Hllb), the fresh lemma GENERALIZED to the llb
+  pre-body (exit passes the leaf's pair straight through -- the whole
+  post-push_off stretch is at ONE ambient CID, no transport), old
+  tiers derived at Tl:=0 via TsoGhost.llb_0 + a 10-line wp_next
+  continuation adaptor stripping the pure.
+NEXT: the acquiresleep relay (SpecAcquiresleep/ProofAcquiresleep llb
+variant forwarding to Acquire.wp_acquire_llb_sconf at BOTH inner
+acquire sites), then the WpLock release-side lock_pay_intro_llb
+threading through SleepLock's record, then A6.148's presence auth +
+the four BioBox transition lemmas, then the ProofBread/Brelse cutover.
