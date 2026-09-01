@@ -18090,3 +18090,17 @@ stability the payload row uses) and is aguard_intro's direct input --
 aguard_receipt drops out of the story.  The llb tiers' receipt row is
 the floor pair; the plain (∃K, hart_view_lb K) row stays separately
 (restored from the record-floor route at the pinned exit).
+
+### A6.149 §3: instrument LANDED (floor form); the stale-generation leg
+### deferred to the cutover
+
+WpSconfLock/SpecAcquire/ProofAcquire/SpecAcquiresleep/ProofAcquiresleep
+all green with the floor-pair rows.  The exported pair always covers
+the PRESENTED Tl (the box read precedes the entry acquire).  The one
+open leg: if a park advanced the generation while the caller slept,
+the guard for the NEW stamp needs either the in-loop re-acquire
+exported too (same pattern, heavier helper interfaces) or the
+releasesleep record floor (lock_pay_intro_llb through SleepLock).
+Decide at the ProofBread cutover where the interleaving is concrete;
+the BioBox transition lemmas take "a guard at the current generation"
+as a premise and stay agnostic.
