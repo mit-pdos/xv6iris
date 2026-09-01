@@ -272,8 +272,17 @@ plus the pile rows (r1)–(r3) above.
     fails on currency.
 
   SITE NOTES: every count edge (bump, refs++, refs--, drop) now opens
-  the box (γc, the pile and S live there); refs++ copies (rb, llb T_b)
-  out for the new fragment.  pres ●, the γc half, the pile, ● S and the
+  the box (γc, the pile and S live there) — so ProofBpin/ProofBunpin,
+  which never touched the escrow, gain one box open each; refs++
+  copies (rb, llb T_b) out for the new fragment.  The last drop's OUT
+  refutation is the COUNT route, not Q-exclusivity: the dropper holds
+  L1's ● M at (q,1) and its own bref_tok, and Q exhibits a second
+  bref_tok (bref_tok_two) — bown is in R at that moment, not in hand.
+  Boot is IDLE for every buffer (content in the payload; anchor at
+  generation 0, stamp 0; S = ∅; rp = rd = (0,0)) — no boot deposit.
+  The reference's holder form is ONE spelling: bref := bref_tok ∗
+  (∃ rb, pres_frag rb ∗ llb rb.T) ∗ the dev/bno fractions; the
+  log layer passes it opaquely.  pres ●, the γc half, the pile, ● S and the
   γp/γd halves sit in the body's COMMON PREFIX outside the three arms;
   IDLE adds only ● None (which forces o = 0 by validity).  The payload's
   None-arm keeps the γd/γc halves (the tie must hold in IDLE).  bunpin
@@ -305,6 +314,40 @@ file.  Delete the `□(∀ n T, …)` premises.
 ## 4. Instance plans
 
 ### 4.1 bcache (finish Phase 5) — rounds R1–R2
+
+R1-pre (PREREQUISITE, measured 2026-09-01 by the build agent): THE
+  SLEEPLOCK PAYLOAD λ-FLIP.  Today the inner spinlock's payload is the
+  CONST [<{ sl_res_gen γ slk R H }>], and sl_res_gen embeds the lock
+  word and the pid field as ambient-XI cells ([slk ↦₄ v] inside
+  sl_free_hold/sleeplocked_q) — the is_ftable shape §1 forbids, and a
+  const payload has no floor slot, so R2's park-case delivery has no
+  carrier.  The flip: [sl_body γ slk Rb H tl ξ] with ξ-explicit cells
+  (ctx_word4_pointsto ξ for the word and the pid) and a BOUND-INDEXED
+  client payload [Rb : nat → iProp]; the lock's λ is
+  [sl_pay γ slk Rb H := λ ξ, ∃ tl, ctx_floor ξ tl ∗ sl_body … tl ξ]
+  (CtxMorph: floors morph, cells morph, Rb tl is ξ-free).  The old
+  [is_sleeplock γl γ slk s R] := the λ form at [Rb := λ _, R] — every
+  const consumer is textually unchanged; only the sleeplock's own
+  proofs strip the ∃tl at their payload opens.  Threading:
+    - SleepLock.v: sl_free_hold/sleeplocked_q gain _at ξ forms (the
+      ambient ones are the cur_ctx instances); sl_res_open/close kit
+      stated over sl_body at cur_ctx; sl_pay + its CtxMorph.
+    - SleepLockAt.v / new_sleeplock_gen(_at): build at tl := 0 with
+      ctx_floor_0; the CtxMorph side goal by ctx_morph_solve.
+    - Spec/ProofAcquiresleep: the gen + llb tiers become bound-indexed
+      (post row [∃ tl, ctx_floor cur_ctx tl ∗ Rb tl]); the inner
+      re-closes inside acquiresleep use tl := 0 (held arm, no Rb);
+      the const tiers derive by dropping the floor.  4 payload-open
+      sites (entry, post-sleep, nested entry, nb).
+    - Spec/ProofReleasesleep: premises [llb tl ∗ Rb tl]; the inner
+      release goes through [wp_release_in_sconf] with
+      [lock_pay_intro_llb] folding the caller's tl into the free arm —
+      THIS is R2 for the sleeplock; the const tier derives at tl := 0.
+    - ProofHoldingsleep (2 opens), UartTxInv (check its tx sleeplock).
+  bcache instantiates Rb tl := bown ∗ ∃ np Tp, reg_park (np,Tp) ∗
+  astamp np Tp ∗ llb Tp ∗ ⌜Tp ≤ tl⌝ — the checkout's rp-case cover.
+  Gate: SleepLock cone green (the four sleeplock proofs + SleepLockAt +
+  IcacheBoot/BioInitAt builders).
 
 R1 (design retrofit, small):
   - Enrich bn_pres's cmra ((n_b,T_b) agree × positive); move ● into
@@ -431,6 +474,15 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   γl half-pair cannot serve overlapping parkers, and its whole-in-box
   case was refutable only globally; the pile + γc make every drop-site
   case local, with no receipt choreography.  Registers: γp, γd, γc.
+- 2026-09-01 (build agent, after the vetting): tagged pile ADOPTED as
+  written (it subsumes the pair-tag ticket the build side had reached
+  independently; astamp_le + (r3) is the cleaner refutation).  Added
+  R1-pre: the SleepLock payload λ-flip with the floor slot, measured as
+  a 7-file self-contained prerequisite — the const [<{ sl_res_gen }>]
+  embeds ambient-XI cells and cannot carry R2's floor, so without it
+  the checkout's park-case cover has no floor source.  Site notes:
+  bpin/bunpin box opens, the last drop's OUT refutation by count,
+  IDLE boot, the single bref spelling.
 - 2026-09-01 (design vetting of the pile): pile ACCEPTED (the reg_last
   overlap flaw was real) but TAGGED — an anonymous pile leaves the
   drop's (o = 1, n ≠ n_mine) branch unrefutable in-logic.  Added the
