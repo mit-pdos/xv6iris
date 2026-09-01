@@ -348,6 +348,22 @@ R1-pre (PREREQUISITE, measured 2026-09-01 by the build agent): THE
   astamp np Tp ∗ llb Tp ∗ ⌜Tp ≤ tl⌝ — the checkout's rp-case cover.
   Gate: SleepLock cone green (the four sleeplock proofs + SleepLockAt +
   IcacheBoot/BioInitAt builders).
+  VETTED 2026-09-01: the measurement is right (sl_res_gen's word and pid
+  cells sit at ambient XI under a const <{ }> — the is_ftable class,
+  reached from proc_priv through bio_ctx and ic_sleeplocks; A6.146's
+  inventory swept inv bodies only and missed const lock payloads).  The
+  nat-indexed Rb is SUFFICIENT because every sleeplock client in the
+  tree is ghost-only (measured: exactly two families — bcache's bown,
+  the inode's ic_tok) — and it is preferable to a general CtxId-λ here
+  (client CtxMorph trivial; it encodes the fact that the bundle travels
+  through the BOX, never through the sleeplock payload).  RULE, so Rb
+  does not grow into a third payload mechanism: sleeplock payloads are
+  ξ-FREE plus ONE floor slot; a client wanting ξ-cells in a sleeplock
+  payload is a box client, not a new payload flavor.  Corollary: the
+  const tier Rb := λ _, R is legal ONLY for ξ-free R (a cell-bearing R
+  would compile unchanged and still block CtxMove — the ambient XI
+  rides inside R).  Build-order note: the sleeplock's boot row needs
+  astamp 0 0, so BioInitAt allocates the anchors BEFORE the sleeplocks.
 
 R1 (design retrofit, small):
   - Enrich bn_pres's cmra ((n_b,T_b) agree × positive); move ● into
@@ -424,12 +440,43 @@ as obligation (b) already argues).  If the main-side agent's refactor
 lands first and dissolves off into ip->lock's payload, take that
 instead; do NOT invent a bespoke third mechanism.
 
+### 4.4b The CONST-PAYLOAD class (found 2026-09-01; closes the inventory)
+
+A6.146 closed the ξ-bodied INV-BODY class.  The sleeplock (R1-pre) shows
+a second class with the same failure: a constant `<{ R }>` lock payload
+whose R embeds ambient-XI cells — is_lock with a ξ-varying payload
+argument in disguise, which `is_lock_move` cannot take (A6.141 §1).  Every
+`<{ … }>` in a DEFINITION file, measured:
+
+  <{ bcache_res bn V }>   BioInv/BioInitAt   cells   → bcache_res2 λ (R2)
+  <{ ftable_res γ }>      FileInv            cells   → recorded revert (R5)
+  <{ sl_res_gen … }>      SleepLock          cells   → R1-pre
+  <{ log_res … }>         LogInv:1112/1157   CELLS   → NEW: not in any
+                          inventory.  log_res owns l_out/l_cmt/l_ncommit
+                          as ambient ↦₄; log_ctx is in fs_ready
+                          (FsReady.v:300), hence in the fork-crossing
+                          cone.  Expected to be a plain λ-flip like
+                          is_ftable (everything is under log.lock, no
+                          transit), BUT run the A6.141 test first
+                          (`apply ctx_move_const` failing = ξ-varying;
+                          check for nested ξ-bodied pieces behind Psi /
+                          the bref rows).  Lands with R5's reverts.
+  <{ tx_res γu }>         UartTxInv          ghost   → fine (ghost_var)
+  <{ itable_res }>        IcacheInv:4439     DEAD    → is_itable2 at the
+                          real λ is the live one; delete with §6.
+  <{ P }> / <{P}>         WpLock generic     n/a
+
+RULE: a const `<{ R }>` payload is legal only for ξ-free R.  Every other
+lock payload is a CtxId-λ (WpLock's shape) or, for sleeplocks, the
+floor-slotted Rb.  Add the ctx_move_const test to the site-map checklist
+(§5 rule 5) for any new lock.
+
 ### 4.5 The endgame tail — rounds R5–R6
 
 R5: re-land the recorded reverts (FileInv.is_ftable λ-flip + the 9
 consumer re-spells + park_globals_move — all sitting in comments at
-their sites), the bio_ctx λ-flip if not done in R2, and
-ProofForkretPark's park_globals/proc_priv bullets (the A6.141 §3
+their sites), the bio_ctx λ-flip if not done in R2, the log_res λ-flip
+(§4.4b), and ProofForkretPark's park_globals/proc_priv bullets (the A6.141 §3
 unfold tower; the child twin is born dominating its parker, so the
 fork pays nothing).  Gate: ProofForkretPark green.
 R6: bucket C, in order: LinkForkretParkPaid → LinkUserinit → LinkMain
@@ -450,7 +497,9 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
 5. Site-map-first: before building any box client, write the table of
    every inv-open site (lock context, transition, which register serves
    its withdraw) and check every withdraw row has a cover.  The §3.3
-   bcache table is the template.
+   bcache table is the template.  For any lock touched, apply the
+   `ctx_move_const` test to its payload (§4.4b): a const payload with
+   cells is the is_ftable class and must be λ'd.
 6. This file is edited in place; the A6 log records history, not
    current design.
 
@@ -490,3 +539,23 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   the max-Tl single-acquire trick, and the site notes (every count edge
   opens the box; rows in the common prefix; bunpin is a drop site).
   Drop cover rewritten as a fully in-logic case split.
+- 2026-09-01 (design vetting of R1-pre + site notes): R1-pre and the
+  site notes ACCEPTED (sl_res_gen measurement verified in code; both
+  sleeplock clients ghost-only, so nat-indexed Rb suffices).  Added the
+  sleeplock-payload rule (ξ-free + one floor slot; const tier only for
+  ξ-free R) and the BioInitAt anchor-before-sleeplock order.  NEW
+  FINDING §4.4b: the const-payload class — log_res (LogInv) embeds
+  l_out/l_cmt/l_ncommit at ambient XI under <{ }> and sits in fs_ready;
+  not in any inventory; lands as a λ-flip with R5 after the
+  ctx_move_const test.  Full <{ }> table recorded; §5 rule 5 extended.
+- 2026-09-01 (build agent, corroboration of §4.4b): log_res CONFIRMED
+  in code (l_out/l_cmt/l_ncommit as ambient ↦₄ under <{ }>, reached
+  through log_ctx_at → log_ctx → fs_ready).  A full grep of every
+  `<{ … }>` in the tree against the table finds two spellings the table
+  omits, both ξ-FREE and hence legal: <{ pr_res γd }> (SpecPrintk,
+  ProofMain; pr_res := emp) and <{ tx_res γd }> (the uart family the
+  table lists under γu).  The <{ ticks_res }> / <{ pipe_res }> hits are
+  comment text at their λ'd sites.  Inventory closed as stated.  The
+  anchor-before-sleeplock build order already holds: BioInitAt mints
+  the anchors in bio_names_ghost_alloc (the free-tok row), and
+  BioInv.bio_init mints them before its sleeplock loop.
