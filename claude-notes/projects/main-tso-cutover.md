@@ -84,3 +84,59 @@ ports: main's FsAbs/Fd tier postdates the fork).
   (HartMFetch/HartMPmp/RiscvFetchExec were retaken wholesale).
 - ObsTrace-class arity fixes: hart node destructs gain (log' tv'), the
   disk arm gains (W log' … Hlog), MemRead's plain arm gains a tvn binder.
+
+
+## Round log, continued (2026-09-01, r4–r10)
+
+- r4 (`WpLock` keystone): flip's M4 lock kit lands whole (ledger-tier
+  lock word/owner cell, lock_body + address claims, A6.119 authorship
+  withdrawal, lock_pay_won, A6.144 floored mint); the pre-M4 reindex
+  shim block and consumer-less lemmas die.  The kpt/pt tier goes real
+  (PtTree's byteset collapses into TsoMemPa's; PtTreeAdue = §0.46′;
+  KptShare/HartSKpt/TransPt/KptTree/InstrBytes/WpInstrRun at flip's kpt
+  window; PtTreeShim = tombstone).  **Correction to r3's note: flip's
+  CtxMorphTac carries REAL full-phys morphs (the dirty fragment drop is
+  a ghost step) — taken wholesale, PtTreeMove compiles unchanged.**
+- r5: SRegime absorb tier (A6.30 payer threading), IntrDefs wholesale,
+  KptGhost's kpt_bound, WpMmodeLoad/Store log windows, WpLockAt/In
+  token-threaded newlock, BootCarve's timestamp-0 ctx mints, device
+  invariants' morph piles at the bupd class.
+- r6: §0.26′ visibility-free memset (mem_free) via WpMemsetArray/
+  SpecMemset*; SleepLockAt token mints; BioInv: absorb via
+  TsoCtxAbsorbLb.ctx_absorb_lb (the receipt absorb — flip's interp
+  absorb needs the drained gstate the opener lacks), lk_cpu_ready as a
+  built premise, the A6.68 sequential NBUF mints (SepThread).
+- r7: the proc/pt/pipe/umode tier — proc_pt_grow at the A6.87 FILLED
+  page (any-byte pages cannot enter the phys ledger), page_acc through
+  page_named (lossless registered round trip), tf page construction
+  filled; UptWalkTramp/TrampStepPt (A6.140 walk); SwtchCtx regains the
+  cell-tower instance faces; morph piles converted (tools/bupdfix.py).
+- r8: SchedCtx composed (flip's pile + main's M-keyed proc_pt moves +
+  flip's parked sched record); UexecWp/ProofUexecWp thread the A6.140
+  HRut accessor as the uexec_F ∀-row; UmodeCap/UmodeFetch/UserPtTree/
+  UserExec = flip + MAIN-COMPAT appendixes (appendix sections must
+  re-bind the ORIGINAL section variables — C/pt/Rut for UserExec).
+  **The mapped wall: flip descoped the binary-fetch tier (§0.24′) and
+  never threaded the walk payer through it; flip's own UmodeFetch text
+  calls the S-rowed walk without S (their stale-vo).  Main CANNOT
+  descope it — UkStep/UkRun import it — so that threading is new work
+  owed here.**
+- r9: the kernel function-proof wave (~30 proofs via tools/takeflip.sh
+  where main had no unique names); SpecInitlockWrapper's post yields
+  lk_cpu_ready (the M4 mint moved into the store leaf).
+- r10: the S-payer threads through umode_fetch_* (payer family + S at
+  the landing memory, five walk calls).
+
+**Frontier at r10 (12 roots):**
+deferred-by-design: DiskInv + WpUart (A6.125/126 virtio reshape over
+main's pop-era model), IcacheRef (inode ξ-body — flip's A6.145/146 in
+flux), ProofBrelse/(Bread) (bcache absorb — anchor-pending, Phase 5);
+the U-tier threading wave: UexecRet (HRut through uvb/uslot/ukc, ~65
+binder sites), UmodeFetch's cone (UmodeKernelTie, ProofUserret,
+UexecRet overlap); individual: ProofBinit (bhead word tower),
+ProofKvminit/ProofKvmmake (boot page forms at page_filled),
+ProofPipeclose (tactic-shape break at flip-identical text).
+
+**New tools:** tools/merge3.sh (3-way vs merge-base), tools/takeflip.sh
+(wholesale when main has no unique decl names), tools/bupdfix.py (morph
+piles to the ==∗ class).
