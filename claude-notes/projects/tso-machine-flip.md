@@ -18126,3 +18126,17 @@ NEXT: presence defs sink into BioInv (bref gains the ◯ beside bref_tok
 -- BioBox imports BioInv, so the class/defs must move down);
 bio_slot_res v2 (refs-0 arm absorbs the content; ● Some at refs>=1);
 boot allocation; then the ProofBread/ProofBrelse cutover.
+
+### A6.150: the bcache cutover plan (measured blast radius)
+
+[bio_ctx] rides in 89 files but is OPENED in only 7 (ProofBpin/Bread/
+BreadParts/Brelse/Bunpin/BreadLru + the boot).  Cutover = the is_ftable
+pattern: swap bio_ctx's BODY in place (is_lock over the bcache_res2
+context-λ ∗ sleeplocks-over-bown ∗ buf_box) so the 89 recompile with no
+text edits; rewrite the 7 deep files + BioInitAt in the same stroke
+against the A6.147 site map (recycler = pure payload ops, buf_mid dead;
+checkout/park/drop via the box_swap_* lemmas; guards from the llb-tier
+acquiresleep/acquire).  Structural prerequisite: BioBox's content merges
+into BioInv (bio_ctx must reference buf_box; import direction forces the
+merge; CtxAnchor is upstream of BioInv so no cycle).  Old escrow defs
+retained during the grind, deleted at the end.
