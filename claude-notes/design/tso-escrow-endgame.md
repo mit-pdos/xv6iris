@@ -132,7 +132,9 @@ and its body is, FOREVER, three arms:
      ( P ξb              (* IN:   bundle parked at ξb            *)
      ∨ Q                 (* OUT:  checked out; ghost residue      *)
      ∨ pres_none ∗ H ξb ) (* IDLE: refs 0; content in L1's payload;
-                             H = the park's IDLE credential (below)  *)
+                             H = the park's IDLE credential: a cell
+                             HALF at ξb, split/joined INSIDE the box
+                             at drop/bump — never withdrawn alone *)
 
 Transitions (the four from BioBox, keep the names):
   bump      IDLE→IN   deposit under L1 (refs 0→1)
@@ -341,6 +343,29 @@ plus the pile rows (r1)–(r3) above.
   because the anchor's context is a fresh parked context; rp = rd =
   (0,0) and S = ∅ are unchanged.  bio_locked is untouched (buf_own's
   b_disk row is already in the handle).
+  VETTED 2026-09-01 (A6.157 accepted in substance — the diagnosis is
+  right and the vetted simplification caused it; b_disk is the right
+  cell; the half at ξb is T2 custody; checkout/drop keep their IDLE
+  refutations).  THREE REFINEMENTS, binding:
+    (1) NO DEPOSIT AT THE DROP.  Split b_disk at ξb INSIDE the box (a
+        same-context fractional split, pure ghost) and withdraw only the
+        bundle-with-half; the IDLE half never leaves ξb, the stamp and
+        generation are untouched, IDLE stays "no deposit, no cover".
+        The bump is the mirror: deposit the payload's half (ξ→ξb via
+        anchor_deposit) and JOIN at ξb — agreement is the fractional
+        points-to law (trivially: nobody writes b_disk without the full
+        cell).  Bump = deposit-then-join; drop = split-then-withdraw.
+    (2) DO NOT NAME buf_bundle_h.  The travelling bundle stays ONE
+        spelling (full).  L1's None arm in bio_slot_res2 is already an
+        inline cell listing — halve its b_disk row there.  A named
+        "bundle with the disk cell halved" is a second bundle flavor.
+    (3) The one boot deposit is fine but is PART OF BOX CONSTRUCTION:
+        wrap anchor_alloc + the half's deposit in a single buf_box_alloc
+        whose post states rp = rd = (0,0), S = ∅.  Gen 0→1 at boot is
+        harmless (the tie lives in the Some arm; the prefix's astamp at
+        generation 0 stays valid).
+  IDLE arm, final: pres_none ∗ reg_cnt 0 ∗ ⌜S = ∅⌝ ∗ ∃ dsk,
+  b_disk (bpa k) ↦ξb{1/2} dsk.  Nothing else in §3 changes.
   VETTED 2026-09-01 (approved; proceed with ProofBread sites 1–5):
     - This is §2's rule applied literally (state into Q, never into a
       handle or a new arm) and is continuity with v1, whose chain
@@ -742,3 +767,11 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   and §3.3 site notes amended in place.  Everything else of the vetting
   is taken as written (park: own_context ∗ buf_bundle; checkout takes
   the R row; option-share tok kit once; Q's fragment outside the pile).
+- 2026-09-01 (design vetting of A6.157): ACCEPTED in substance (the
+  park's IDLE credential is a b_disk half at ξb; the vetted
+  simplification caused the gap).  Three binding refinements: the drop
+  SPLITS at ξb and withdraws the half-bundle (no deposit, no generation
+  bump at a withdraw site) and the bump deposits-then-joins; no named
+  buf_bundle_h (halve the None arm's b_disk row inline; the bundle stays
+  one spelling); the boot deposit is wrapped in buf_box_alloc.  §2 IDLE
+  comment and §3.3 amended in place.
