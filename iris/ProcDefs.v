@@ -609,32 +609,32 @@ Section ProcDefsMorph.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /pname_cells.
     iDestruct "H" as "[%Hwf H]".
-    iDestruct (ctx_morph_big_sepL bs
+    iMod (ctx_morph_big_sepL bs
         (fun i b xi => ctx_pointsto xi (p_name pa i) dq b)
         (fun i x => ctx_morph_pointsto _ _ _ _) ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame "Hd". by iFrame.
-  Qed.
+    iModIntro. iFrame "Hd". by iFrame.
+Qed.
 
   Global Instance proc_fields_morph (pa : mword 64) (dq : dfrac) (V : pprivate) :
     CtxMorph (fun xi : CtxId => proc_fields (XI := xi) pa dq V).
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /proc_fields.
     iDestruct "H" as "(H1 & H2 & %Hl & H3)".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
-    iDestruct (pname_cells_morph pa dq (pv_name V) ξ ξ' with "Hd H3") as "[Hd H3]".
-    iFrame. done.
-  Qed.
+    iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
+    iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
+    iMod (pname_cells_morph pa dq (pv_name V) ξ ξ' with "Hd H3") as "[Hd H3]".
+    iModIntro. iFrame. done.
+Qed.
 
   Global Instance ofile_cells_morph (pa : mword 64) (fs : list (mword 64)) :
     CtxMorph (fun xi : CtxId => ofile_cells (XI := xi) pa fs).
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /ofile_cells.
-    iDestruct (ctx_morph_big_sepL fs
+    iMod (ctx_morph_big_sepL fs
         (fun fd v xi => ctx_word_pointsto xi (p_ofile pa fd) (DfracOwn 1) v)
         (fun i x => ctx_morph_word _ _ _ _) ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame.
-  Qed.
+    iModIntro. iFrame.
+Qed.
 
   (* A6.58 fallout: the trapframe page is a ledger page now, so its three
      predicates owe transport too (tso-flip SchedCtx.v's instances). *)
@@ -652,7 +652,7 @@ Section ProcDefsMorph.
     CtxMorph (fun xi : CtxId => is_kstack (XI := xi) pa ks).
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /is_kstack.
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]". iFrame.
+    iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]". by iFrame.
   Qed.
 
   Context `{!fdslotG Σ, !irefslotG Σ, !bioslotG Σ}.
@@ -662,10 +662,10 @@ Section ProcDefsMorph.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /kstack_free.
     iDestruct "H" as (ks) "[H1 H2]".
-    iDestruct (is_kstack_morph pa ks ξ ξ' with "Hd H1") as "[Hd H1]".
-    iDestruct (stack_own_morph (KTR := KT1) _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
-    iFrame "Hd". iExists ks. iFrame.
-  Qed.
+    iMod (is_kstack_morph pa ks ξ ξ' with "Hd H1") as "[Hd H1]".
+    iMod (stack_own_morph (KTR := KT1) _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
+    iModIntro. iFrame "Hd". iExists ks. iFrame.
+Qed.
 
   Global Instance proc_dormant_noctx_morph (pa : mword 64) (st : mword 32) :
     CtxMorph (fun xi : CtxId => proc_dormant_noctx (XI := xi) pa st).
@@ -674,11 +674,11 @@ Section ProcDefsMorph.
     iDestruct "H" as (V pid)
       "(%Hf & Hpid & Hfl & Ho & Hs & Hsp & Hir & Hbs & Hkst & Haddr)".
     (* [p_pid] is [↦₄]: context-indexed since M1 stage 2 *)
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hpid") as "[Hd Hpid]".
-    iDestruct (proc_fields_morph pa (DfracOwn 1) V ξ ξ' with "Hd Hfl") as "[Hd Hfl]".
-    iDestruct (ofile_cells_morph pa (pv_ofile V) ξ ξ' with "Hd Ho") as "[Hd Ho]".
-    iDestruct (kstack_free_morph pa ξ ξ' with "Hd Hkst") as "[Hd Hkst]".
-    iAssert (ctx_dom ξ ξ' ∗
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hpid") as "[Hd Hpid]".
+    iMod (proc_fields_morph pa (DfracOwn 1) V ξ ξ' with "Hd Hfl") as "[Hd Hfl]".
+    iMod (ofile_cells_morph pa (pv_ofile V) ξ ξ' with "Hd Ho") as "[Hd Ho]".
+    iMod (kstack_free_morph pa ξ ξ' with "Hd Hkst") as "[Hd Hkst]".
+    iAssert (|==> (ctx_dom ξ ξ' ∗
              (if bool_decide (st = ZOMBIE)
               then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
                    (∃ M : gmap Z (bv 8), proc_pt_at (XI := ξ') pa (pv_upt V) M) ∗
@@ -686,18 +686,18 @@ Section ProcDefsMorph.
               else ctx_word_pointsto ξ' (p_pagetable pa) (DfracOwn 1)
                      (zero_reg : mword 64) ∗
                    ctx_word_pointsto ξ' (p_trapframe pa) (DfracOwn 1)
-                     (zero_reg : mword 64)))%I
-      with "[Hd Haddr]" as "[Hd Haddr]".
+                     (zero_reg : mword 64))))%I
+      with "[Hd Haddr]" as ">[Hd Haddr]".
     { destruct (bool_decide (st = ZOMBIE)).
       - iDestruct "Haddr" as "(%Hu & (%M & Hpt) & Htf)".
-        iDestruct (proc_pt_at_morph pa (pv_upt V) M ξ ξ' with "Hd Hpt") as "[Hd Hpt]".
-        iDestruct (tf_page_morph (ud_tfp (pv_upt V)) (pv_tf V) ξ ξ' with "Hd Htf") as "[Hd Htf]".
-        iFrame "Hd". iSplitR; [iPureIntro; exact Hu|]. iFrame "Htf". iExists M. iFrame.
+        iMod (proc_pt_at_morph pa (pv_upt V) M ξ ξ' with "Hd Hpt") as "[Hd Hpt]".
+        iMod (tf_page_morph (ud_tfp (pv_upt V)) (pv_tf V) ξ ξ' with "Hd Htf") as "[Hd Htf]".
+        iModIntro. iFrame "Hd". iSplitR; [iPureIntro; exact Hu|]. iFrame "Htf". iExists M. iFrame.
       - iDestruct "Haddr" as "[H1 H2]".
-        iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
-        iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
-        iFrame. }
-    iFrame "Hd". iExists V, pid.
+        iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
+        iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
+        by iFrame. }
+    iModIntro. iFrame "Hd". iExists V, pid.
     iSplitR; [iPureIntro; exact Hf|]. iFrame.
   Qed.
 
@@ -706,9 +706,9 @@ Section ProcDefsMorph.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite proc_dormant_split.
     iDestruct "H" as "[Hn Hc]".
-    iDestruct (proc_dormant_noctx_morph pa st ξ ξ' with "Hd Hn") as "[Hd Hn]".
-    iDestruct (own_ctx_morph (p_context pa) ξ ξ' with "Hd Hc") as "[Hd Hc]".
-    iFrame "Hd". rewrite proc_dormant_split. iFrame.
-  Qed.
+    iMod (proc_dormant_noctx_morph pa st ξ ξ' with "Hd Hn") as "[Hd Hn]".
+    iMod (own_ctx_morph (p_context pa) ξ ξ' with "Hd Hc") as "[Hd Hc]".
+    iModIntro. iFrame "Hd". rewrite proc_dormant_split. iFrame.
+Qed.
 
 End ProcDefsMorph.

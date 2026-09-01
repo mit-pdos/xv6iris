@@ -14,7 +14,7 @@
    the C code says it should be:
 
      is_pipe γl γp pi  :=  ⌜page_valid pi⌝ ∗
-                           inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }>
+                           inv lockN (lock_inv γl pi "pipe" (pipe_res_at γp pi)
                                       ∨ pipe_dead γl γp)
 
    persistent, and [pipe_res] owns every remaining byte of the page -- the
@@ -127,6 +127,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
 Require Import KallocInv.
 Require Import WpLock.
+Require Import TsoCtx CtxMorphTac.   (* the lock payload's context axis *)
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import TsoCtx.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
@@ -331,9 +332,7 @@ Definition pn_mark (γp : pipe_names) (w : bool) : gname :=
 
 Section PipeInv.
   Context `{!riscvGS Σ, !lockG Σ, !pipeG Σ}.
-  (* §0.35': the lock handle is context-relative, so the index is ambient in
-     this section -- the T-leg binds it here too. *)
-  Context `{XI : TsoCtx.CurCtx}.
+  Context `{XI : CurCtx}.
 
   (* ---- THE reference: a share of one END of the pipe ----
 
@@ -493,8 +492,12 @@ Section PipeInv.
      indices [nread, nwrite) mod PIPESIZE -- is not imposed here; it belongs
      with the read/write specs, and lands as an extra conjunct of
      [pipe_res].) *)
+  (* A6.130 (the M3 λ-conversion, A6.121's recipe): the bytes over an
+     EXPLICIT context; [pipe_data] is the ambient spelling. *)
+  Definition pipe_data_at (ξ : CtxId) (pi : mword 64) (bs : list (bv 8)) : iProp Σ :=
+    ([∗ list] j ↦ b ∈ bs, ctx_pointsto ξ (pa_add pi (pipe_data_off + j)) (DfracOwn 1) b)%I.
   Definition pipe_data (pi : mword 64) (bs : list (bv 8)) : iProp Σ :=
-    ([∗ list] j ↦ b ∈ bs, pa_add pi (pipe_data_off + j) ↦ₘ b)%I.
+    pipe_data_at cur_ctx pi bs.
 
   (* the bytes of the page that [struct pipe] does not name: the 4 padding
      bytes between [lock.locked] and [lock.name], and everything past
@@ -505,24 +508,37 @@ Section PipeInv.
      ([∗ list] j ∈ seq pipe_sizeof (pipe_pgbytes - pipe_sizeof),
         byte_any (pa_add pi j)))%I.
 
-  Typeclasses Opaque pipe_data pipe_slack.
+  Typeclasses Opaque pipe_data_at pipe_data pipe_slack.
 
   (* ---- the resource pi->lock protects: every byte of the page except the
      lock's own two WORDS (which belong to [lock_inv]).  The lock's NAME field
      is here: nothing reads it, and kfree memsets it, so holding it raw is
      what keeps the page reassemblable. ---- *)
-  Definition pipe_res (γp : pipe_names) (pi : mword 64) : iProp Σ :=
+  (* A6.130: THE PAYLOAD OVER AN EXPLICIT CONTEXT -- what the lock surface
+     takes as its [CtxId → iProp], so an acquirer on any hart receives the
+     pipe's words and bytes AT ITS context by the lock's own transport
+     ([CtxMorph] along the acquire floor), instead of the constant embedding
+     [<{ pipe_res }>], which froze them at whichever context spelled it.
+     [pipe_res] stays as the ambient spelling every consumer reads. *)
+  Definition pipe_res_at (γp : pipe_names) (pi : mword 64) (ξ : CtxId) : iProp Σ :=
     (∃ (nr nw ro wo : mword 32) (vname : mword 64) (bs : list (bv 8)),
-       lock_name_field pi ↦₈ vname ∗
-       a_pnread pi      ↦₄ nr ∗
-       a_pnwrite pi     ↦₄ nw ∗
-       a_popen pi false ↦₄ ro ∗
-       a_popen pi true  ↦₄ wo ∗
+       ctx_word_pointsto ξ (lock_name_field pi) (DfracOwn 1) vname ∗
+       ctx_word4_pointsto ξ (a_pnread pi) (DfracOwn 1) nr ∗
+       ctx_word4_pointsto ξ (a_pnwrite pi) (DfracOwn 1) nw ∗
+       ctx_word4_pointsto ξ (a_popen pi false) (DfracOwn 1) ro ∗
+       ctx_word4_pointsto ξ (a_popen pi true) (DfracOwn 1) wo ∗
        pipe_endstate γp false ro ∗
        pipe_endstate γp true wo ∗
        ⌜pipe_count_ok nr nw⌝ ∗
-       ⌜length bs = PIPESIZE⌝ ∗ pipe_data pi bs ∗
+       ⌜length bs = PIPESIZE⌝ ∗ pipe_data_at ξ pi bs ∗
        pipe_slack pi)%I.
+  Definition pipe_res (γp : pipe_names) (pi : mword 64) : iProp Σ :=
+    pipe_res_at γp pi cur_ctx.
+
+  Global Instance pipe_data_at_morph pi bs : CtxMorph (λ ξ, pipe_data_at ξ pi bs).
+  Proof. rewrite /pipe_data_at. ctx_morph_solve. Qed.
+  Global Instance pipe_res_at_morph γp pi : CtxMorph (pipe_res_at γp pi).
+  Proof. rewrite /pipe_res_at. ctx_morph_solve. Qed.
 
   (* every byte of the page except the lock's two WORDS, which release hands
      back separately: what [pipe_res] is once its ghosts are spent, and what
@@ -568,13 +584,20 @@ Section PipeInv.
     lock_frag γl st -∗ pipe_dead γl γp -∗ False.
   Proof. iIntros "Hf (Hf' & _ & _)". iApply (lock_frag_exclusive with "Hf Hf'"). Qed.
 
+  (* A6.119: [locked] is no longer DEFINITIONALLY [lock_frag] -- it carries
+     the acquire position's floor beside it (§0.34′) -- so the token is
+     unpacked here rather than applied through.  The arity did not move; what
+     moved is the definitional unfolding, and this is the one shape in the
+     sweep that noticed. *)
   Lemma locked_dead γl γp i : ⊢ locked γl i -∗ pipe_dead γl γp -∗ False.
   Proof.
-    iIntros "(%B & Hf & _) Hd". iApply (lock_frag_dead with "[Hf] Hd"). by iExists B.
+    iIntros "(%B & Hf & _) Hd".
+    iApply (lock_frag_dead with "[Hf] Hd"). by iExists B.
   Qed.
   Lemma locked_pre_dead γl γp i : ⊢ locked_pre γl i -∗ pipe_dead γl γp -∗ False.
   Proof.
-    iIntros "(%B & Hf & _) Hd". iApply (lock_frag_dead with "[Hf] Hd"). by iExists B.
+    iIntros "(%B & Hf & _) Hd".
+    iApply (lock_frag_dead with "[Hf] Hd"). by iExists B.
   Qed.
 
   (* THE reclamation step, and the reason the whole construction hangs
@@ -596,7 +619,7 @@ Section PipeInv.
     iDestruct (pipe_endstate_shut_elim with "Hs1 Hst1") as "[-> H1]".
     iSplitL "Hfrag H0 H1"; [ by iFrame "Hfrag H0 H1" | ].
     iExists vname, nr, nw, (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32), bs.
-    by iFrame.
+    rewrite /pipe_data. by iFrame.
   Qed.
 
   (* ---- THE predicate: a well-formed [struct pipe] ----
@@ -615,38 +638,38 @@ Section PipeInv.
   Definition is_pipe (γl : gname) (γp : pipe_names) (pi : mword 64) : iProp Σ :=
     (⌜page_valid pi⌝ ∗
      ∃ lo : nat,
-       inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }> lo ∨ pipe_dead γl γp) ∗
-       WpLock.lk_floor TsoCtx.cur_ctx lo)%I.
+       inv lockN (lock_inv γl pi "pipe" (pipe_res_at γp pi) lo ∨ pipe_dead γl γp) ∗
+       WpLock.lk_floor cur_ctx lo)%I.
 
   Global Instance is_pipe_persistent γl γp pi : Persistent (is_pipe γl γp pi).
   Proof. apply _. Qed.
 
   (* PERFORMANCE: seal it, for the same reason [WpLock.is_lock] is sealed --
      without this, every [iIntros "#Hpipe"] re-derives persistence by unfolding
-     into [lock_inv γl pi "pipe" <{ pipe_res γp pi }>] and descending through [pipe_res]
+     into [lock_inv γl pi "pipe" (pipe_res_at γp pi)] and descending through [pipe_res]
      instead of stopping at the instance above.  Worth 6.5 % of [ProofPiperead]
      on its own (104 s -> 97 s).  The three lemmas below are the interface. *)
   Global Typeclasses Opaque is_pipe.
 
   Lemma is_pipe_valid γl γp pi : is_pipe γl γp pi -∗ ⌜page_valid pi⌝.
   Proof. rewrite /is_pipe. by iIntros "[$ _]". Qed.
-  (* [tso-flip PipeInvDefs.v:633]: the projection EXHIBITS the floor, the same
-     way [is_lock_inv] does -- a leaf that opens the body needs the [lo] it was
-     allocated at. *)
+  (* A6.105: the lock's FLOOR rides inside [is_pipe], exactly as it rides
+     inside [is_lock] -- [is_pipe]'s arity is unchanged and no client of the
+     pipe ever names [lo]. *)
   Lemma is_pipe_inv γl γp pi :
     is_pipe γl γp pi -∗
     ∃ lo : nat,
-      inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }> lo ∨ pipe_dead γl γp) ∗
-      WpLock.lk_floor TsoCtx.cur_ctx lo.
-  Proof. rewrite /is_pipe. iIntros "[_ H]". iExact "H". Qed.
+      inv lockN (lock_inv γl pi "pipe" (pipe_res_at γp pi) lo ∨ pipe_dead γl γp) ∗
+      WpLock.lk_floor cur_ctx lo.
+  Proof. rewrite /is_pipe. by iIntros "[_ $]". Qed.
 
   (* what acquire / holding / release take.  The credential is left to the
      caller: a reference for acquire, the holder token for release. *)
   Lemma is_pipe_openable γl γp pi :
     is_pipe γl γp pi -∗
-    lock_openable γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp).
+    lock_openable γl pi "pipe" (pipe_res_at γp pi) (pipe_dead γl γp).
   Proof.
-    iIntros "H". iDestruct (is_pipe_inv with "H") as (lo) "[#Hi #Hf]".
+    iIntros "H". iDestruct (is_pipe_inv with "H") as (lo) "[Hi Hf]".
     iApply (lock_openable_of_dead with "Hi Hf").
   Qed.
 

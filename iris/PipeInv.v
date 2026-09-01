@@ -32,6 +32,7 @@ Require Import PageFields.
 Require Import WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export PipeInvDefs.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
@@ -71,8 +72,7 @@ Section PipeInv.
   Lemma pipe_data_rebase (pi : mword 64) (bs : list (bv 8)) :
     ([∗ list] j ↦ b ∈ bs, pa_add (pa_add pi pipe_data_off) j ↦ₘ b) ⊣⊢ pipe_data pi bs.
   Proof.
-    rewrite /pipe_data. apply big_sepL_proper. intros k b _. rewrite pa_add_add.
-    reflexivity.
+    rewrite /pipe_data /pipe_data_at. apply big_sepL_proper. intros k b _. by rewrite pa_add_add.
   Qed.
 
   (* the ten windows [struct pipe] divides its page into. *)
@@ -111,6 +111,41 @@ Section PipeInv.
     done.
   Qed.
 
+  Local Lemma pipe_windows_named (pi : mword 64) (c : bv 8) :
+    page_filled pi c ⊢
+      ([∗ list] j ∈ seq 0 4, (pa_add pi j) ↦ₘ c) ∗
+      ([∗ list] j ∈ seq 4 4, (pa_add pi j) ↦ₘ c) ∗
+      ([∗ list] j ∈ seq 8 8, (pa_add pi j) ↦ₘ c) ∗
+      ([∗ list] j ∈ seq 16 8, (pa_add pi j) ↦ₘ c) ∗
+      ([∗ list] j ∈ seq 24 512, (pa_add pi j) ↦ₘ c) ∗
+      ([∗ list] j ∈ seq 536 4, (pa_add pi j) ↦ₘ c) ∗
+      ([∗ list] j ∈ seq 540 4, (pa_add pi j) ↦ₘ c) ∗
+      ([∗ list] j ∈ seq 544 4, (pa_add pi j) ↦ₘ c) ∗
+      ([∗ list] j ∈ seq 548 4, (pa_add pi j) ↦ₘ c) ∗
+      ([∗ list] j ∈ seq 552 3544, (pa_add pi j) ↦ₘ c).
+  Proof.
+    rewrite /page_filled.
+    replace 4096%nat with (4 + 4092)%nat by lia.
+    rewrite (bwin_named_split pi 0 4 4092). replace (0 + 4)%nat with 4%nat by lia.
+    replace 4092%nat with (4 + 4088)%nat by lia.
+    rewrite (bwin_named_split pi 4 4 4088). replace (4 + 4)%nat with 8%nat by lia.
+    replace 4088%nat with (8 + 4080)%nat by lia.
+    rewrite (bwin_named_split pi 8 8 4080). replace (8 + 8)%nat with 16%nat by lia.
+    replace 4080%nat with (8 + 4072)%nat by lia.
+    rewrite (bwin_named_split pi 16 8 4072). replace (16 + 8)%nat with 24%nat by lia.
+    replace 4072%nat with (512 + 3560)%nat by lia.
+    rewrite (bwin_named_split pi 24 512 3560). replace (24 + 512)%nat with 536%nat by lia.
+    replace 3560%nat with (4 + 3556)%nat by lia.
+    rewrite (bwin_named_split pi 536 4 3556). replace (536 + 4)%nat with 540%nat by lia.
+    replace 3556%nat with (4 + 3552)%nat by lia.
+    rewrite (bwin_named_split pi 540 4 3552). replace (540 + 4)%nat with 544%nat by lia.
+    replace 3552%nat with (4 + 3548)%nat by lia.
+    rewrite (bwin_named_split pi 544 4 3548). replace (544 + 4)%nat with 548%nat by lia.
+    replace 3548%nat with (4 + 3544)%nat by lia.
+    rewrite (bwin_named_split pi 548 4 3544). replace (548 + 4)%nat with 552%nat by lia.
+    done.
+  Qed.
+
   (* THE carve: kalloc's page becomes the raw [struct pipe].  Every cell is in
      the exact shape the instruction that touches it produces, so pipealloc's
      stores need no address rewriting.  [pipe_raw] is the pipe analogue of
@@ -126,45 +161,50 @@ Section PipeInv.
      (∃ wo : mword 32, a_popen pi true ↦₄ wo) ∗
      pipe_slack pi)%I.
 
-  Lemma page_own_pipe_raw (pi : mword 64) :
-    page_valid pi -> page_own pi ⊢ pipe_raw pi.
+  (* A6.87: THE CARVE IS OFF THE *WRITE*.  [page_own] is the
+     visibility-free page now, so a pipe cannot be carved out of one --
+     [pipealloc] carves the page KALLOC MEMSET, which arrives as
+     [KallocInv.page_filled] and is a named window at every field. *)
+  Lemma page_filled_pipe_raw (pi : mword 64) (c : bv 8) :
+    page_valid pi -> page_filled pi c ⊢ pipe_raw pi.
   Proof.
-    intro Hpv. rewrite pipe_windows /pipe_raw /pipe_slack.
+    intro Hpv. rewrite pipe_windows_named /pipe_raw /pipe_slack.
     iIntros "(W0 & W4 & W8 & W16 & Wd & W536 & W540 & W544 & W548 & Wtail)".
     iSplitL "W0".
-    { rewrite (page_field4 pi 0 Hpv ltac:(lia) ltac:(exists 0; reflexivity)).
+    { rewrite (page_field4_named pi 0 (fun _ => c) Hpv ltac:(lia) ltac:(exists 0; reflexivity)).
       iDestruct "W0" as (w) "Hw". iExists w.
       iEval (rewrite pa_pipe_lock) in "Hw". iExact "Hw". }
     iSplitL "W8".
-    { rewrite (page_field8 pi 8 Hpv ltac:(lia) ltac:(exists 1; vm_compute; reflexivity)).
+    { rewrite (page_field8_named pi 8 (fun _ => c) Hpv ltac:(lia) ltac:(exists 1; vm_compute; reflexivity)).
       iDestruct "W8" as (w) "Hw". iExists w.
       iEval (rewrite pa_pipe_name) in "Hw". iExact "Hw". }
     iSplitL "W16".
-    { rewrite (page_field8 pi 16 Hpv ltac:(lia) ltac:(exists 2; vm_compute; reflexivity)).
+    { rewrite (page_field8_named pi 16 (fun _ => c) Hpv ltac:(lia) ltac:(exists 2; vm_compute; reflexivity)).
       iDestruct "W16" as (w) "Hw". iExists w.
       iEval (rewrite pa_pipe_cpu) in "Hw". iExact "Hw". }
     iSplitL "Wd".
-    { rewrite bwin_rebase (bwin_bytes_list (pa_add pi 24%nat) 512).
+    { rewrite bwin_named_rebase (bwin_named_bytes_list (pa_add pi 24%nat) 512 (fun _ => c)).
       iDestruct "Wd" as (bs) "[%Hlen Hbs]". iExists bs.
       iSplit; [iPureIntro; rewrite Hlen; reflexivity|].
       rewrite -pipe_data_rebase. iExact "Hbs". }
     iSplitL "W536".
-    { rewrite (page_field4 pi 536 Hpv ltac:(lia) ltac:(exists 134; vm_compute; reflexivity)).
+    { rewrite (page_field4_named pi 536 (fun _ => c) Hpv ltac:(lia) ltac:(exists 134; vm_compute; reflexivity)).
       iDestruct "W536" as (w) "Hw". iExists w.
       iEval (rewrite pa_pipe_nread) in "Hw". iExact "Hw". }
     iSplitL "W540".
-    { rewrite (page_field4 pi 540 Hpv ltac:(lia) ltac:(exists 135; vm_compute; reflexivity)).
+    { rewrite (page_field4_named pi 540 (fun _ => c) Hpv ltac:(lia) ltac:(exists 135; vm_compute; reflexivity)).
       iDestruct "W540" as (w) "Hw". iExists w.
       iEval (rewrite pa_pipe_nwrite) in "Hw". iExact "Hw". }
     iSplitL "W544".
-    { rewrite (page_field4 pi 544 Hpv ltac:(lia) ltac:(exists 136; vm_compute; reflexivity)).
+    { rewrite (page_field4_named pi 544 (fun _ => c) Hpv ltac:(lia) ltac:(exists 136; vm_compute; reflexivity)).
       iDestruct "W544" as (w) "Hw". iExists w.
       iEval (rewrite pa_pipe_ro) in "Hw". iExact "Hw". }
     iSplitL "W548".
-    { rewrite (page_field4 pi 548 Hpv ltac:(lia) ltac:(exists 137; vm_compute; reflexivity)).
+    { rewrite (page_field4_named pi 548 (fun _ => c) Hpv ltac:(lia) ltac:(exists 137; vm_compute; reflexivity)).
       iDestruct "W548" as (w) "Hw". iExists w.
       iEval (rewrite pa_pipe_wo) in "Hw". iExact "Hw". }
-    iFrame "W4 Wtail".
+    iSplitL "W4"; [ iApply bwin_named_any; iExact "W4" | ].
+    iApply bwin_named_any. iExact "Wtail".
   Qed.
 
   (* THE carve, run backwards: the object's fields become the page again.
@@ -223,27 +263,85 @@ Section PipeInv.
     by iApply (page_field4_back pi 548).
   Qed.
 
-  (* what release hands back, reassembled into what kfree wants.  This is the
-     last link of the chain: [pipe_res_dead] (the dead arm established) ->
-     two lock words + pipe_bytes -> pipe_raw -> page_own. *)
-  Lemma pipe_bytes_page_own (pi : mword 64) (v : mword 32) :
-    pi ↦₄ v -∗ WpLock.lk_cpu_ready pi -∗ pipe_bytes pi -∗ page_own pi.
+  (* §0.26′ / A6.86: THE SAME REASSEMBLY AT THE FREE TIER, and it is the
+     site that forced the whole ruling (A6.84 §(2)).  After the M4 flip the
+     owner window is eight LEDGER cells; they cannot re-enter the ctx tower
+     (that needs a drain) and they do not have to -- [kfree_pre] is
+     [page_free] now, so the page came down to meet the cell.  The proof is
+     [pipe_raw_page_own]'s, window for window, with [bwin_split] and a
+     [bwin_any_free] on each REGISTERED window; the owner window is already
+     free bytes ([WpLock.lk_cpu_fresh_free]). *)
+  (* what release hands back, reassembled into what kfree wants. *)
+  (* A6.105: takes the BUNDLED form -- the floor certificate is dropped on the
+     floor here, which is right: a page being freed has no readers left. *)
+  (* A6.120: the lock WORD comes back as [lock_word_fresh] too (A6.89/A6.92:
+     release cannot hand back a ctx cell), and it goes home the same way the
+     owner cell does -- [WpLock.lock_word_fresh_free]. *)
+  Lemma pipe_bytes_page_own (pi : mword 64) :
+    WpLock.lock_word_fresh pi -∗ WpLock.lk_cpu_ready pi -∗ pipe_bytes pi -∗
+    page_own pi.
   Proof.
-    iIntros "Hw Hcpu Hb".
+    iIntros "Hw Hready Hb".
+    iDestruct (WpLock.lock_word_fresh_free with "Hw") as "Hw".
     rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
-    iDestruct "Hcpu" as (lo) "[Hcpu _]".
+    iDestruct "Hready" as (lo) "[Hcpu _]".
     iDestruct "Hb" as (vname nr nw ro wo bs) "(Hnm & Hnr & Hnw & Hro & Hwo & %Hlen & Hdat & Hslack)".
-    iApply pipe_raw_page_own. rewrite /pipe_raw.
-    iSplitL "Hw"; [ by iExists v | ].
-    iSplitL "Hnm"; [ by iExists vname | ].
-    iSplitL "Hcpu"; [ by iExists (zero_reg : mword 64) | ].
-    iSplitL "Hdat"; [ iExists bs; by iFrame "Hdat" | ].
-    iSplitL "Hnr"; [ by iExists nr | ].
-    iSplitL "Hnw"; [ by iExists nw | ].
-    iSplitL "Hro"; [ by iExists ro | ].
-    iSplitL "Hwo"; [ by iExists wo | ].
-    iExact "Hslack".
+    iDestruct (WpLock.lk_cpu_fresh_free with "Hcpu") as "Hcpu".
+    rewrite /page_own /pipe_slack.
+    replace 4096%nat with (4 + 4092)%nat by lia.
+    rewrite (bwin_split pi 0 4 4092). replace (0 + 4)%nat with 4%nat by lia.
+    replace 4092%nat with (4 + 4088)%nat by lia.
+    rewrite (bwin_split pi 4 4 4088). replace (4 + 4)%nat with 8%nat by lia.
+    replace 4088%nat with (8 + 4080)%nat by lia.
+    rewrite (bwin_split pi 8 8 4080). replace (8 + 8)%nat with 16%nat by lia.
+    replace 4080%nat with (8 + 4072)%nat by lia.
+    rewrite (bwin_split pi 16 8 4072). replace (16 + 8)%nat with 24%nat by lia.
+    replace 4072%nat with (512 + 3560)%nat by lia.
+    rewrite (bwin_split pi 24 512 3560). replace (24 + 512)%nat with 536%nat by lia.
+    replace 3560%nat with (4 + 3556)%nat by lia.
+    rewrite (bwin_split pi 536 4 3556). replace (536 + 4)%nat with 540%nat by lia.
+    replace 3556%nat with (4 + 3552)%nat by lia.
+    rewrite (bwin_split pi 540 4 3552). replace (540 + 4)%nat with 544%nat by lia.
+    replace 3552%nat with (4 + 3548)%nat by lia.
+    rewrite (bwin_split pi 544 4 3548). replace (544 + 4)%nat with 548%nat by lia.
+    replace 3548%nat with (4 + 3544)%nat by lia.
+    rewrite (bwin_split pi 548 4 3544). replace (548 + 4)%nat with 552%nat by lia.
+    iDestruct "Hslack" as "[Hpad Htail]".
+    iSplitL "Hw".
+    { iExact "Hw". }
+    iSplitL "Hpad"; [ iExact "Hpad" | ].
+    iSplitL "Hnm".
+    {
+      iEval (rewrite -(pa_pipe_name pi)) in "Hnm".
+      by iApply (page_field8_back pi 8). }
+    iSplitL "Hcpu".
+    { rewrite (bwin_rebase pi 16 8).
+      iEval (rewrite (pa_pipe_cpu pi)). iExact "Hcpu". }
+    iSplitL "Hdat".
+    {
+      iEval (rewrite -pipe_data_rebase) in "Hdat".
+      rewrite (bwin_rebase pi 24 512).
+      iPoseProof (bytes_list_bwin (pa_add pi pipe_data_off) bs with "Hdat") as "Hdat".
+      rewrite Hlen. iExact "Hdat". }
+    iSplitL "Hnr".
+    {
+      iEval (rewrite -(pa_pipe_nread pi)) in "Hnr".
+      by iApply (page_field4_back pi 536). }
+    iSplitL "Hnw".
+    {
+      iEval (rewrite -(pa_pipe_nwrite pi)) in "Hnw".
+      by iApply (page_field4_back pi 540). }
+    iSplitL "Hro".
+    {
+      iEval (rewrite -(pa_pipe_ro pi)) in "Hro".
+      by iApply (page_field4_back pi 544). }
+    iSplitL "Hwo".
+    {
+      iEval (rewrite -(pa_pipe_wo pi)) in "Hwo".
+      by iApply (page_field4_back pi 548). }
+    iExact "Htail".
   Qed.
+
 
   (* ------------------------------------------------------------------ *)
   (*  Construction: pipealloc's ghost step                               *)
@@ -271,41 +369,45 @@ Section PipeInv.
      Note the data buffer is NOT zeroed by pipealloc -- [bs] is whatever kalloc
      handed over -- which is exactly right: no byte of it is readable until
      nwrite has passed it. *)
-  Lemma new_pipe E (pi : mword 64) (vname : mword 64) (bs : list (bv 8)) :
+  Lemma new_pipe `{CID : RiscvLang.CpuId} E (pi : mword 64) (vname : mword 64)
+      (bs : list (bv 8)) :
     page_valid pi ->
     length bs = PIPESIZE ->
     lock_name_field pi ↦₈ vname -∗
     pi ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_cpu pi ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_ready pi -∗
     a_pnread pi ↦₄ (mword_of_int 0 : mword 32) -∗
     a_pnwrite pi ↦₄ (mword_of_int 0 : mword 32) -∗
     a_popen pi false ↦₄ (mword_of_int 1 : mword 32) -∗
     a_popen pi true ↦₄ (mword_of_int 1 : mword 32) -∗
     pipe_data pi bs -∗
-    pipe_slack pi
-    ={E}=∗ ∃ (γl : gname) (γp : pipe_names),
+    pipe_slack pi -∗
+    own_context cur_ctx
+    ={E}=∗ own_context cur_ctx ∗ ∃ (γl : gname) (γp : pipe_names),
              is_pipe γl γp pi ∗ pipe_ref γp false 1 ∗ pipe_ref γp true 1.
   Proof.
-    iIntros (Hpv Hlen) "Hnm Hword Hcpu Hnr Hnw Hro Hwo Hdata Hslack".
+    iIntros (Hpv Hlen) "Hnm Hword Hready Hnr Hnw Hro Hwo Hdata Hslack Hrun".
+    (* A6.105: unbundle the floor that travels with the owner cell; it becomes
+       [is_pipe]'s floor below. *)
+    rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
+    iDestruct "Hready" as (lo) "[Hcpu #Hfl]".
     (* the lock's state gname FIRST: [pipe_dead] mentions it. *)
-    iMod (newlock_d E 0%nat pi with "Hword Hcpu") as (γl) "Hmake".
+    iMod (newlock_d E lo pi with "Hword Hcpu") as (γl) "Hmake".
     iMod pipe_ends_alloc as (γp) "(Hrd & Hwr & Hm0 & Hm1)".
-    iMod ("Hmake" $! <{ pipe_res γp pi }> (pipe_dead γl γp) with "[%]
-            [Hnm Hnr Hnw Hro Hwo Hdata Hslack Hm0 Hm1]") as "#Hlk";
-      [ apply ctx_morph_const_pay | | ].
+    (* A6.67: the DELAYED form takes [CtxMorph] as a pure premise and the
+       running token beside the payload (A6.66); both come straight back. *)
+    iMod ("Hmake" $! (pipe_res_at γp pi) (pipe_dead γl γp) with "[%] Hrun
+            [Hnm Hnr Hnw Hro Hwo Hdata Hslack Hm0 Hm1]") as "[Hrun #Hlk]".
+    { apply _. }
     { iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),
               (mword_of_int 1 : mword 32), (mword_of_int 1 : mword 32), vname, bs.
       iFrame "Hnm Hnr Hnw Hro Hwo Hdata Hslack".
       iSplitL "Hm0"; [by iApply (pipe_endstate_open_intro _ _ _ pflag_one_open with "Hm0")|].
       iSplitL "Hm1"; [by iApply (pipe_endstate_open_intro _ _ _ pflag_one_open with "Hm1")|].
       iSplit; [iPureIntro; exact pipe_count_ok_00 | done]. }
-    iModIntro. iExists γl, γp.
-    (* [is_pipe] carries the floor existential now (§0.38'); the invariant was
-       allocated at [lo = 0] by the [newlock_d] above, and the floor at that
-       position is the shim's SC-only install receipt. *)
+    iModIntro. iFrame "Hrun". iExists γl, γp.
     rewrite /is_pipe. iFrame "Hrd Hwr".
-    iSplit; [done|]. iExists 0%nat. iFrame "Hlk".
-    iApply WpLock.lk_floor_0.
+    iSplit; [done|]. iExists lo. iFrame "Hlk Hfl".
   Qed.
 
 End PipeInv.

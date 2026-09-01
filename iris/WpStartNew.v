@@ -951,6 +951,12 @@ Section WpStartThm.
     (* start's 4-slot stack region (own ra/s0 + child timerinit's ra/s0)
        as the bottom four slots of [stack_own_phys sp0 n] (any depth n >= 4). *)
     stack_own_phys sp0 n -∗
+    (* A6.17/A6.28: the M-mode boot stack is a LEDGER region, so its two
+       prologue stores go through [WpMmodeStore.wp_store_gpr], which owes the
+       era log's append and therefore takes the running token.  It arrives
+       here already ([BootChain.boot_entry_bridge] holds one across the whole
+       M-mode bracket) and is handed straight back. *)
+    own_context cur_ctx -∗
     kernel_text -∗
     (* the continuation is universally quantified over the (hidden) entry
        mstatus value [ms0] with its mmode_config invariant facts -- including
@@ -980,11 +986,12 @@ Section WpStartThm.
       mcounteren ↦ᵣ legalize_mcounteren mcounteren0 (ti_mcen1 mcounteren0) -∗
       stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline tv) -∗
       stack_own_phys sp0 n -∗
+      own_context cur_ctx -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn4 Hpmp HlpeE Hsp Hra Hs0 Hbnd_ra Hbnd_s0.
-    iIntros "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen Hstc Hstk #Htext Hcont".
+    iIntros "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen Hstc Hstk Hrun #Htext Hcont".
     iDestruct (stack_own_phys_split_1 sp0 4 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
     iDestruct (stack_own_phys_split_1 sp0 2 4 ltac:(lia) with "Htop") as "[Ht12 Ht34]".
     iDestruct (stack_own_phys_2_elim with "Ht12") as (vsra vss0) "[Hsra Hss0]".
@@ -1132,11 +1139,11 @@ Section WpStartThm.
       by (rewrite L31sp; reflexivity).
     iApply (wp_store_gpr st_pc31 true csp_rs1 ti_ra
               (zero_extend' 12 (concat_vec u10 ('b"000"))) (st_m30 m sp0) vsra pmpcfg0 (1/2)%Qp
-              Hpmp ltac:(boot_static) with "Hmm HpcfA Hpc Hfile [] [Hsra]").
+              Hpmp ltac:(boot_static) with "Hmm HpcfA Hpc Hfile [] [Hsra] Hrun").
     { iApply (st_instr31 with "Htext"). }
     { rewrite Hea31. iExact "Hsra". }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P31 Hea31 L31ra).
-    iIntros "Hmm HpcfA Hpc Hfile Hsra".
+    iIntros "Hmm HpcfA Hpc Hfile Hsra Hrun".
 
     (* ---- 32. c.sdsp s0, 0(sp) ---- *)
     assert (L32s0 : st_m30 m sp0 !!! Regidx ti_s0 = s00) by (st_unfold; st_look).
@@ -1145,11 +1152,11 @@ Section WpStartThm.
       by (rewrite L31sp; reflexivity).
     iApply (wp_store_gpr st_pc32 true csp_rs1 ti_s0
               (zero_extend' 12 (concat_vec u11 ('b"000"))) (st_m30 m sp0) vss0 pmpcfg0 (1/2)%Qp
-              Hpmp ltac:(boot_static) with "Hmm HpcfA Hpc Hfile [] [Hss0]").
+              Hpmp ltac:(boot_static) with "Hmm HpcfA Hpc Hfile [] [Hss0] Hrun").
     { iApply (st_instr32 with "Htext"). }
     { rewrite Hea32. iExact "Hss0". }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P32 Hea32 L32s0).
-    iIntros "Hmm HpcfA Hpc Hfile Hss0".
+    iIntros "Hmm HpcfA Hpc Hfile Hss0 Hrun".
 
     (* ---- 33. c.addi4spn s0, sp, 16 (s0 := sp0) ---- *)
     iApply (wp_addi_gpr st_pc33 true csp_rs1 ti_s0 (caddi4spn_imm nz12) (st_m30 m sp0)
@@ -1513,9 +1520,9 @@ Section WpStartThm.
               st_ra_link sp0 (st_menv_adue menvcfg0) stimecmp0 mcounteren0
               (st_pmpcfg1 pmpcfg0) (st_pmpaddr1 pmpcfg0 pmpaddr00) 2
               ltac:(lia) Hpmp1 Htor_ra Htor_s0 L59sp L59ra L59s0
-              with "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hstc Htistk Htext").
+              with "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hstc Htistk Hrun Htext").
     iEval (rewrite Hcretv).
-    iIntros (tv) "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hstc Htistk".
+    iIntros (tv) "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hstc Htistk Hrun".
     iDestruct (stack_own_phys_2_elim with "Htistk") as (v_tra v_ts0) "[Htra Hts0]".
     iEval (rewrite -Htb1) in "Htra". iEval (rewrite -Htb2) in "Hts0".
     iEval (change (ti_mout (st_m59 m sp0 ms0 mie0 mideleg0 menvcfg0) (ti_sp1 sp0)
@@ -1599,7 +1606,7 @@ Section WpStartThm.
     iDestruct (stack_own_phys_2_intro with "Htra Hts0") as "Ht34".
     iDestruct (stack_own_phys_split_2 sp0 2 4 ltac:(lia) with "[$Ht12 $Ht34]") as "Htop".
     iDestruct (stack_own_phys_split_2 sp0 4 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" $! tv ms0 HoIE HoPRV HoSXL HoKF with "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen Hstc Hstk").
+    iApply ("Hcont" $! tv ms0 HoIE HoPRV HoSXL HoKF with "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen Hstc Hstk Hrun").
   Qed.
 
 

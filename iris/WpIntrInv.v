@@ -111,8 +111,8 @@ Require Import SmodeCorePt.
 Require Import WpSmodePtEngine WpSmodePtFetch.
 Require Export IntrDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
@@ -296,6 +296,28 @@ Ltac lkp10 := peel1; reflexivity.
 
 (* the ONE file transport the engine needs: the cycle commits nextPC and the
    fetch may have filled the tlb, and the result is the tower again. *)
+Lemma s_rs_set_nPC_tlb (pc npc npc' ms : mword 64) (bmi : bool)
+    (cy ti ip mst0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+    (paddr : type_of_register pmpaddr_n) (mc : mword 32)
+    (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
+    (elp0 : type_of_register elp) (satp0 mie0 mdv0 menv0 : mword 64)
+    (tlbv tv : type_of_register tlb) :
+  reg_agree_on (s_Drw ∪ s_Dro)
+    (register_set (R_bitvector_64 nextPC) npc'
+       (register_set tlb tv
+          (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+             senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)))
+    (s_rs pc npc' ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+       senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv).
+Proof.
+  apply s_rs_agree;
+    [ lkp s_rs_PC | lkp0 | lkp s_rs_ms | lkp s_rs_mi | lkp s_rs_cy
+    | lkp s_rs_ti | lkp s_rs_ip | lkp0 | lkp s_rs_priv | lkp s_rs_mst
+    | lkp s_rs_hart | lkp s_rs_pcfg | lkp s_rs_paddr | lkp s_rs_mc
+    | lkp s_rs_micfg | lkp s_rs_misa | lkp s_rs_sec | lkp s_rs_pma
+    | lkp s_rs_htif | lkp s_rs_elp | lkp s_rs_senv | lkp s_rs_satp
+    | lkp s_rs_mie | lkp s_rs_mdl | lkp s_rs_menv ].
+Qed.
 
 (* ...and the same transport with the tlb ALREADY at the landing value: the
    per-node cycle body hands its frames back at the tower it walked to, so
@@ -424,6 +446,8 @@ Proof. rewrite /ti_Drw. set_solver. Qed.
 Lemma ti_in_se : (sepc : register) ∈ ti_Drw ∪ ti_Dro.
 Proof. rewrite /ti_Drw. set_solver. Qed.
 Lemma ti_in_priv : (cur_privilege : register) ∈ ti_Drw ∪ ti_Dro.
+Proof. rewrite /ti_Drw. set_solver. Qed.
+Lemma ti_in_npc : (R_bitvector_64 nextPC : register) ∈ ti_Drw ∪ ti_Dro.
 Proof. rewrite /ti_Drw. set_solver. Qed.
 Lemma ti_in_pc : (R_bitvector_64 PC : register) ∈ ti_Drw ∪ ti_Dro.
 Proof. rewrite /ti_Dro. set_solver. Qed.
@@ -1459,7 +1483,7 @@ Section IntrEngine.
     pmp_facts pcfg paddr ->
     gen_cert -∗
     instr pc0 is_rvc i -∗
-    strans_kpt -∗ kpt_inv root_ppn -∗ tlb_snap_ok tlbv -∗
+    strans_kpt -∗ kpt_inv root_ppn -∗ kpt_creds -∗ tlb_snap_ok tlbv -∗
     resv_frag cpu_id None -∗
     W -∗
     hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
@@ -1509,7 +1533,7 @@ Section IntrEngine.
     { right. rewrite /kpt_satp_ok Hroot. split_and!; assumption. }
     assert (Hpok : pmp_ent0_ok pcfg paddr)
       by (rewrite /pmp_ent0_ok; split_and!; apply Hpmpf).
-    iIntros "#Hcert Hinstr Hbit #Hkinv Hsnap Hfrag HW Hrw Hro Hqi Hex".
+    iIntros "#Hcert Hinstr Hbit #Hkinv #Hcreds Hsnap Hfrag HW Hrw Hro Hqi Hex".
     iApply (swp_run_hart_active_instr_S_res pc0 msr bmi cy ti ip mst0 pcfg
               paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv
               is_rvc i Q Rr W Qi
@@ -1517,7 +1541,7 @@ Section IntrEngine.
               with "Hcert Hinstr [Hbit Hsnap] Hfrag HW Hrw Hro [Hqi] [Hex]").
     - rewrite /strans_res_at. iRight. iFrame "Hbit".
       iSplitR; [iPureIntro; exact Hmode |].
-      rewrite /kpt_res_at Hroot. iFrame "Hsnap Hkinv".
+      rewrite /kpt_res_at Hroot. iFrame "Hsnap Hkinv Hcreds".
     - iIntros (ii pr) "%Hd HW HRes Hfrag Hrw Hro".
       iDestruct "HRes" as "[(_ & _ & %Hbad) | (Hbit & _ & Hsnap & _)]".
       { exfalso. rewrite /bare_satp_ok Hmode in Hbad.
@@ -1582,12 +1606,51 @@ Section IntrEngine.
     intros [[_ H] | [_ H]]; [ left; exact H | right; exact H ].
   Qed.
 
+  Lemma s_arm_frame_ok (SD : gset register) (satp0 : mword 64) :
+    s_arm_ok SD satp0 -> s_frame_ok SD.
+  Proof.
+    intros [[-> _] | [-> _]];
+      [ exact s_frame_ok_Drwb | exact s_frame_ok_Drw ].
+  Qed.
 
+  Lemma s_arm_cells (SD : gset register) (satp0 : mword 64) :
+    s_arm_ok SD satp0 -> SD = s_Drw \/ SD = s_Drwb.
+  Proof. intros [[-> _] | [-> _]]; [ right | left ]; reflexivity. Qed.
 
   (* the regime's FETCH side condition, out of the arm.  [sr_swp_side_ok]
      cannot serve: it demands [tlb ∈ Drw], which the Bare arm's empty-of-tlb
      set cannot pay -- and does not need to, since Bare's translateAddr never
      touches the cell. *)
+  Lemma strans_side_of_arm (SD : gset register) (satp0 : mword 64)
+      (acc : MemoryAccessType mem_payload) (va : mword 64) (ppn : mword 44)
+      (kp : kperm) (Db : register -> bool) (rs : regstate) (dst : mstate) :
+    s_arm_ok SD satp0 ->
+    s_acc_ok acc ->
+    register_lookup satp rs = satp0 ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs)) ('b"1") = false ->
+    pmp_ent0_ok (register_lookup pmpcfg_n rs) (register_lookup pmpaddr_n rs) ->
+    pma_allows_ram (register_lookup pma_regions rs) ->
+    Db mstatus = true -> Db satp = true ->
+    _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
+    register_lookup satp dst.(sregs) = satp0 ->
+    strans_swp_side acc va ppn kp Db SD s_Dro rs dst.
+  Proof.
+    intros Harm Hacc Hsatp HMPRV Hpok Hpma HDm HDs HSXL Hdsatp.
+    destruct Harm as [[-> Hb] | [-> Hk]].
+    - apply (strans_swp_side_bare acc va ppn kp Db s_Drwb s_Dro rs dst Hacc);
+        [ rewrite Hsatp; exact Hb | exact HMPRV ].
+    - right. unfold strans_root. rewrite Hsatp.
+      apply (kpt_swp_side_intro (strans_root_of satp0) acc va ppn kp Db
+               s_Drw s_Dro rs dst).
+      + rewrite Hsatp. exact Hk.
+      + exact Hpok.
+      + exact Hpma.
+      + exact HDm.
+      + exact HDs.
+      + exact HSXL.
+      + rewrite Hdsatp Hsatp. reflexivity.
+      + exact s_w_tlb.
+  Qed.
 
   Section SCells.
     Context (pc npc ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
@@ -1796,6 +1859,14 @@ Section IntrEngine.
     iPureIntro. split; assumption.
   Qed.
 
+  Lemma sconf_at_priv_close (ms : mword 64) : sconf_at_priv ms -∗ sconf.
+  Proof.
+    iIntros "H". iDestruct "H" as (mdv)
+      "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie &
+        Hmdl & Hmenv)".
+    iApply (sconf_of_cells ms mdv Hmsf Hmm
+              with "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv").
+  Qed.
 
   (* the accessor face, built from the cells: the closer is [sconf_of_cells]
      at the REPLACEMENT mstatus, whose facts ride in [sconf_msown] itself. *)
@@ -1817,6 +1888,14 @@ Section IntrEngine.
               with "Hhw Hminv Hpriv Hms' Hhalf' Htie' Hmie Hmdl Hmenv").
   Qed.
 
+  Lemma sconf_at_of_priv (ms : mword 64) : sconf_at_priv ms -∗ sconf_at ms.
+  Proof.
+    iIntros "H". iDestruct "H" as (mdv)
+      "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie &
+        Hmdl & Hmenv)".
+    iApply (sconf_at_of_cells ms mdv Hmsf Hmm
+              with "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv").
+  Qed.
 
   Lemma tlb_res_to_cells (root_ppn : mword 44) :
     tlb_res_pt root_ppn -∗
@@ -1825,14 +1904,14 @@ Section IntrEngine.
       ⌜ satp_facts satp0 root_ppn ⌝ ∗ ⌜ pmp_facts pcfg paddr ⌝ ∗
       satp ↦ᵣ satp0 ∗ tlb ↦ᵣ tlbv ∗
       pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
-      tlb_snap_ok tlbv ∗ kpt_inv root_ppn.
+      tlb_snap_ok tlbv ∗ kpt_inv root_ppn ∗ kpt_creds.
   Proof.
     iIntros "H". iDestruct "H" as (satp0 tlbv)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkinv)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkinv & #Hcreds)".
     iDestruct "Hpmp" as (pcfg paddr)
       "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iExists satp0, tlbv, pcfg, paddr.
-    iFrame "Hsatp Htlb Hpcfg Hpaddr Hsnap Hkinv".
+    iFrame "Hsatp Htlb Hpcfg Hpaddr Hsnap Hkinv Hcreds".
     iPureIntro. split.
     - rewrite /satp_facts. split_and!; assumption.
     - rewrite /pmp_facts. split_and!; assumption.
@@ -1844,11 +1923,11 @@ Section IntrEngine.
     satp_facts satp0 root_ppn -> pmp_facts pcfg paddr ->
     satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbv -∗
     pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-    tlb_snap_ok tlbv -∗ kpt_inv root_ppn -∗ tlb_res_pt root_ppn.
+    tlb_snap_ok tlbv -∗ kpt_inv root_ppn -∗ kpt_creds -∗ tlb_res_pt root_ppn.
   Proof.
     intros (Hmode & Hasid & Hppn) (HA & Hord & HX & HW & HR & Hcov).
-    iIntros "Hsatp Htlb Hpcfg Hpaddr Hsnap #Hkinv".
-    iExists satp0, tlbv. iFrame "Hsatp Htlb Hsnap Hkinv".
+    iIntros "Hsatp Htlb Hpcfg Hpaddr Hsnap #Hkinv #Hcreds".
+    iExists satp0, tlbv. iFrame "Hsatp Htlb Hsnap Hkinv Hcreds".
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iApply (pmp_config_intro root_ppn pcfg paddr HA Hord HX HW HR Hcov
               with "Hpcfg Hpaddr").
@@ -2472,6 +2551,28 @@ Definition intr_cb_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{XI : CurCtx}
 
 (* ...and the CLOCK-FREE reading, for the leaves that never touch a clock
    cell: the same callback with the three cells passed straight through. *)
+Definition intr_cb `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
+    (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
+    (i : instruction) (b' : bool)
+    (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
+    `{CID : CpuId} `{XI : CurCtx} : iProp Σ :=
+  ((sconf -∗
+    sie_cap kt m av true p -∗
+    gpr_file (tp_pin m) -∗
+    (R_bitvector_64 PC) ↦ᵣ pc0 -∗
+    (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc0 (if is_rvc then 2 else 4)) -∗
+    resv_any cpu_id -∗
+    swp (execute i)
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+         ∃ (npc ms' : mword 64) (m' : regfile) (av' : nat),
+           (R_bitvector_64 PC) ↦ᵣ pc0 ∗
+           (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+           resv_any cpu_id ∗
+           sconf_at_priv ms' ∗ sie_cap kt m' av' b' p ∗
+           gpr_file (tp_pin m') ∗ R CID npc ms' m' av'))
+   ∗ (∀ (npc ms' : mword 64) (m' : regfile) (av' : nat),
+        sie_cap_gpr_at kt ms' m' av' b' p -∗ pc_is npc -∗ R CID npc ms' m' av' -∗
+        WP (Loop : expr riscv_lang)))%I.
 
 (* WHAT THE INSTRUCTION HANDS BACK BESIDE THE FRAMES.  The cycle body owes
    [SmodeCorePt.spt_ex_obl] a frame at the file the instruction landed on,
@@ -2584,7 +2685,7 @@ Proof.
       Hmenv)".
   iDestruct (ghost_var_agree with "Hhalf Hq1") as %HSIE1.
   iDestruct (tlb_res_to_cells with "Htlbres") as (satp0 tlbv pcfg paddr)
-    "(%Hsatpf & %Hpmpf & Hsatp & Htlb & Hpcfg & Hpaddr & Hsnap & #Hkinv)".
+    "(%Hsatpf & %Hpmpf & Hsatp & Htlb & Hpcfg & Hpaddr & Hsnap & #Hkinv & #Hcreds)".
   iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)".
   iDestruct "Hmr" as (msr bmi mc micfg) "(Hmsr & Hmi & #Hmc & #Hmicfg)".
   iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
@@ -2714,7 +2815,7 @@ Proof.
                                     intr_psi kt m av p pc0 is_rvc i b' R rs2))%I
                       Hmisaval HSXL (proj1 Hmsf) Hmm Helpnp
                       (pma_all_ram Hpmaall) Hsatpf Hpmpf
-                      with "Hcert Hinstr Hbit1 Hkinv Hsnap Hfrag
+                      with "Hcert Hinstr Hbit1 Hkinv Hcreds Hsnap Hfrag
                             [$Hbody $Hhalf $Htie $Hstk $Hq1 $Hq4 $Hstv
                              $Hsepcx $Hscausex $Hstvalx $Hsppc $Hclm $Hcpu
                              $Hfile $Hctx]
@@ -2794,7 +2895,7 @@ Proof.
                           (conj Hmode (conj Hasid Hppn))
                           (conj HA (conj Hord (conj HX (conj HW
                              (conj HR Hcov)))))
-                          with "Hsatp Htlb Hpcfg Hpaddr Hsnap' Hkinv"). }
+                          with "Hsatp Htlb Hpcfg Hpaddr Hsnap' Hkinv Hcreds"). }
               rewrite /sie_arm. iExact "Hq1". }
             iFrame "Hkpt".
             iSplitL "Hcells Hcnt".
@@ -2846,7 +2947,7 @@ Proof.
                           (conj Hmode (conj Hasid Hppn))
                           (conj HA (conj Hord (conj HX (conj HW
                              (conj HR Hcov)))))
-                          with "Hsatp Htlb Hpcfg Hpaddr Hsnap' Hkinv"). }
+                          with "Hsatp Htlb Hpcfg Hpaddr Hsnap' Hkinv Hcreds"). }
               rewrite /sie_arm.
               iFrame "Hq1 Hkpt Hsepcx Hscausex Hstvalx Hsppc Hclm Hcpu".
               iApply (intr_res_intro Ecap handler vb Htvd Hsb
@@ -3047,4 +3148,32 @@ Qed.
    which is what every leaf that does not name one wants -- and it is what
    keeps the 68 call sites of the funnel unchanged.                        *)
 (* ===================================================================== *)
+Lemma wp_exec_step_intr `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+    {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
+    (is_rvc : bool) (i : instruction) (b' : bool)
+    (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
+  ret_pc pc0 = pc0 ->
+  sie_cap_gpr kt m av true p -∗
+  pc_is pc0 -∗
+  instr pc0 is_rvc i -∗
+  ▷ wp_next true p (fun CID => intr_cb kt m av p pc0 is_rvc i b' R (CID := CID)) -∗
+  WP (Loop : expr riscv_lang).
+Proof.
+  intros Hpc0. iIntros "Hcg Hpc Hinstr Hbody".
+  iApply (wp_exec_step_intr_clock pc0 m av p is_rvc i b' R Hpc0
+            with "Hcg Hpc Hinstr [Hbody]").
+  iNext. iIntros (CID Hs).
+  iDestruct (wp_next_at true p _ CID Hs with "Hbody") as "Hb".
+  iEval (rewrite /intr_cb) in "Hb".
+  iDestruct "Hb" as "[Hobl Hcont]".
+  rewrite /intr_cb_clock.
+  iSplitR "Hcont"; [| iExact "Hcont" ].
+  iIntros "Hsc Hcap Hfile HPC HnPC Hresv Hclk".
+  iApply (swp_mono (CID := CID) with "[Hclk] [-]");
+    [| iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hresv") ].
+  iIntros (e) "(-> & Hres)".
+  iDestruct "Hres" as (npc ms' m' av')
+    "(HPC & HnPC & Hresv2 & Hsc' & Hcap' & Hfile' & HRv)".
+  iSplitR; [done|]. iExists npc, ms', m', av'. iFrame.
+Qed.
 

@@ -59,7 +59,6 @@ Require Import Pt4kWalk.
 Require Import PtTree.
 Require Import KvmMap.
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the KT0 identity-map peek crosses the ctx/mem seam *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -185,11 +184,25 @@ Section rekey.
      ambient bundle and no side condition.  (The claim-carrying twins
      [KMap.mem_ident_phys] / [RiscvPtsto.mem_to_phys_claim] both ask for
      something the pin already provides.) *)
+  (* A6.16, ctx-native: the KT0 datum's PHYSICAL LEDGER byte.  The raw
+     [↦ₚ] projection below drops the timestamp element and the clean/dirty
+     bit, and A6.9 says neither can be recovered -- so the rekey, which has
+     to hand a LOADABLE byte back at the KT1 va, must travel at this tier
+     and not at the raw one. *)
+  Lemma ctx_kt0_phys (va : mword 64) dq b :
+    va ↦ₘ[KT0]{dq} b ⊢ TsoCtx.ctx_phys_pointsto XI va dq b.
+  Proof.
+    iIntros "H".
+    iEval (rewrite (TsoCtx.ctx_pointsto_phys (KTR := KT0) XI va dq b)) in "H".
+    iDestruct "H" as (ppn) "(_ & _ & %Hpin & Hp)".
+    cbn in Hpin. by rewrite Hpin.
+  Qed.
+
   Lemma mem_kt0_phys (va : mword 64) dq b :
     va ↦ₘ[KT0]{dq} b ⊢ va ↦ₚ{dq} b.
   Proof.
     iIntros "H".
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
+    iDestruct (TsoCtx.ctx_pointsto_forget with "H") as "H".
     iEval (rewrite /mem_pointsto) in "H".
     rewrite /phys_pointsto.
     iDestruct "H" as (ppn) "(_ & _ & %Hram & %Hpin & Hpt)".
@@ -208,15 +221,20 @@ Section rekey.
     (pa_add (kstack_va i) j) ↦ₘ[KT1]{dq} b.
   Proof.
     intros Hi Hkd Hj. iIntros "#Hcl H".
-    iDestruct (mem_kt0_phys with "H") as "Hp".
-    assert (Hram : addr_is_ram (pa_of ppn (pa_add (kstack_va i) j))).
-    { rewrite (kstack_va_pa_of ppn i j Hi Hj).
-      exact (kstack_ident_ram ppn j Hkd Hj). }
-    iApply TsoCtxShim.ctx_pointsto_of_mem.
-    iApply (phys_to_mem_map KT1 (pa_add (kstack_va i) j) ppn dq b
-              Hram (kstack_va_canon_add i j Hi Hj) I with "[] [Hp]").
-    - rewrite (kstack_va_svpn_add i j Hi Hj). iExact "Hcl".
-    - rewrite (kstack_va_pa_of ppn i j Hi Hj). iExact "Hp".
+    (* A6.16 verbatim: down to the PHYSICAL LEDGER byte at the KT0 side
+       (whose tier pin IS the identity, so the address does not move), and
+       back up at the KT1 va under this stack's own claim.  The registered
+       tier travels intact -- which is the whole point: the KT1 byte is
+       LOADED, so it needs the licence the raw crossing would have dropped. *)
+    iDestruct (ctx_kt0_phys with "H") as "Hp".
+    iEval (rewrite (TsoCtx.ctx_pointsto_phys (KTR := KT1) XI
+                      (pa_add (kstack_va i) j) dq b)).
+    iExists ppn.
+    rewrite (kstack_va_svpn_add i j Hi Hj).
+    iFrame "Hcl".
+    iSplitR; [iPureIntro; exact (kstack_va_canon_add i j Hi Hj) |].
+    iSplitR; [iPureIntro; exact I |].
+    rewrite (kstack_va_pa_of ppn i j Hi Hj). iExact "Hp".
   Qed.
 
   (* ...and eight of them, as one doubleword cell.  The KSTACK side's
@@ -225,11 +243,16 @@ Section rekey.
   Lemma kstack_word_rekey (i : nat) (ppn : mword 44) (o : nat) (w : bv 64) :
     (i < 64)%nat -> node_kdata ppn -> (o + 8 <= 4096)%nat -> (8 | Z.of_nat o) ->
     kmap_at (kstack_vpn i) ppn KP_rw -∗
-    word_pointsto (KTR := KT0) (pa_add (page_base ppn) o) (DfracOwn 1) w -∗
-    word_pointsto (KTR := KT1) (pa_add (kstack_va i) o) (DfracOwn 1) w.
+    (* A6.23: the WORD half leaves the raw [word_pointsto] tower too -- a
+       kernel stack word is thread data that is loaded AND stored, so it
+       must carry its ledger residue on both sides of the rekey. *)
+    TsoCtx.ctx_word_pointsto (KTR := KT0) XI (pa_add (page_base ppn) o)
+      (DfracOwn 1) w -∗
+    TsoCtx.ctx_word_pointsto (KTR := KT1) XI (pa_add (kstack_va i) o)
+      (DfracOwn 1) w.
   Proof.
     intros Hi Hkd Ho Hdvd. iIntros "#Hcl H".
-    rewrite /word_pointsto.
+    rewrite /TsoCtx.ctx_word_pointsto.
     iDestruct "H" as "[_ Hbs]".
     iSplitR.
     { iPureIntro. apply (kstack_va_aligned8 i o Hi); [lia | exact Hdvd]. }
@@ -237,8 +260,6 @@ Section rekey.
     iIntros "!>" (k j Hk) "Hb".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     rewrite !pa_add_add.
-    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb") as "Hb".
-    iApply TsoCtxShim.ctx_pointsto_to_mem.
     iApply (kstack_byte_rekey i ppn (o + (0 + k))%nat (DfracOwn 1) (nth_byte w (0 + k)%nat)
               Hi Hkd ltac:(lia) with "Hcl Hb").
   Qed.
@@ -259,30 +280,33 @@ Section ladder.
      is [kvm_pas_ok] = [node_kdata] (which is genuinely weaker -- a page
      between [etext] and [end] is RAM but not kalloc'able), and this ladder
      is also run at the KSTACK va, which is nowhere near [kmem_hi]. *)
-  Lemma bwin_words8 (p : mword 64) (n : nat) :
+  (* A6.87: NAMED, because the forward direction is off the write.  The
+     stack page this ladder runs on is the one [proc_mapstacks] just
+     memset; [byte_any] promises nothing to assemble. *)
+  Lemma bwin_words8 (p : mword 64) (n : nat) (f : nat -> bv 8) :
     (forall o : nat, (o + 8 <= 8 * n)%nat -> (8 | Z.of_nat o) ->
        is_aligned_paddr (Physaddr (pa_add p o)) 8 = true) ->
-    ([∗ list] j ∈ seq 0 (8 * n), byte_any (pa_add p j)) ⊢
+    ([∗ list] j ∈ seq 0 (8 * n), (pa_add p j) ↦ₘ (f j)) ⊢
     ∃ ws : list (bv 64), ⌜length ws = n⌝ ∗
       ([∗ list] k ↦ w ∈ ws,
-         word_pointsto (KTR := KT0) (pa_add p (8 * k)%nat) (DfracOwn 1) w).
+         TsoCtx.ctx_word_pointsto (KTR := KT0) XI (pa_add p (8 * k)%nat)
+           (DfracOwn 1) w).
   Proof.
     induction n as [|n IH]; intro Hal.
     - iIntros "_". iExists []. by iSplit.
     - replace (8 * S n)%nat with (8 * n + 8)%nat by lia.
-      rewrite (bwin_split p 0 (8 * n) 8).
+      rewrite (bwin_named_split p 0 (8 * n) 8).
       iIntros "[Hpre Hlast]".
       iDestruct (IH ltac:(intros o Ho Hd; apply Hal; [lia | exact Hd]) with "Hpre")
         as (ws) "[%Hlen Hws]".
-      rewrite Nat.add_0_l bwin_rebase.
-      iDestruct (bytes_word8 (pa_add p (8 * n)%nat)
+      rewrite Nat.add_0_l bwin_named_rebase.
+      iDestruct (bytes_named_word8 (pa_add p (8 * n)%nat) _
                    (Hal (8 * n)%nat ltac:(lia) (kstk_dvd8 n)) with "Hlast")
         as (w) "Hw".
       iExists (ws ++ [w])%list.
       iSplit; [iPureIntro; rewrite length_app Hlen /=; lia|].
       rewrite big_sepL_app big_sepL_singleton Hlen.
-      iFrame "Hws". rewrite Nat.add_0_r.
-      iApply (TsoCtxShim.ctx_word_to_mem with "Hw").
+      iFrame "Hws". rewrite Nat.add_0_r. iExact "Hw".
   Qed.
 
   (* forget the contents of an indexed run: [∗ list] over the values becomes
@@ -308,7 +332,8 @@ Section ladder.
       (ws : list (bv 64)) :
     length ws = n ->
     ([∗ list] k ↦ w ∈ ws,
-       word_pointsto (KTR := kt) (pa_add base (8 * k)%nat) (DfracOwn 1) w) ⊢
+       TsoCtx.ctx_word_pointsto (KTR := kt) XI (pa_add base (8 * k)%nat)
+         (DfracOwn 1) w) ⊢
     stack_own (KTR := kt) (pa_add base (8 * n)%nat) n.
   Proof.
     intro Hlen.
@@ -322,13 +347,14 @@ Section ladder.
     rewrite -Hlen.
     iIntros "H".
     iDestruct (bigsep_ws_seq
-                 (fun k w => word_pointsto (KTR := kt) (pa_add base (8 * k)%nat)
-                               (DfracOwn 1) w) ws with "H") as "H".
+                 (fun k w => TsoCtx.ctx_word_pointsto (KTR := kt) XI
+                               (pa_add base (8 * k)%nat) (DfracOwn 1) w)
+                 ws with "H") as "H".
     iApply (big_sepL_mono with "H").
     intros k j _. iIntros "H".
     assert (Hj : pa_add base (8 * j)%nat = add_vec_int base (8 * Z.of_nat j)).
     { unfold pa_add. rewrite Nat2Z.inj_mul. change (Z.of_nat 8) with 8. reflexivity. }
-    rewrite -Hj. iApply (TsoCtxShim.ctx_eslot_of_mem with "H").
+    rewrite -Hj. iExact "H".
   Qed.
 
 End ladder.
@@ -345,21 +371,25 @@ Section mint.
      out ARE the whole KSTACK(i) page owned at its virtual address, KT1 --
      512 doubleword slots below KSTACK(i)+4096, which is the sp a fresh
      process's context is parked at ([SpecForkretParkPaid]). *)
-  Lemma kstack_own_intro (i : nat) (ppn : mword 44) :
+  (* A6.87: the page comes in FILLED -- it is the one kalloc memset before
+     handing it over ([KallocInv.page_filled]), and a stack's slots are
+     word cells, which no visibility-free window can supply. *)
+  Lemma kstack_own_intro (i : nat) (ppn : mword 44) (c : bv 8) :
     (i < 64)%nat -> node_kdata ppn ->
     kmap_at (kstack_vpn i) ppn KP_rw -∗
-    page_own (page_base ppn) -∗
+    page_filled (page_base ppn) c -∗
     stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) 512.
   Proof.
     intros Hi Hkd. iIntros "#Hcl Hpg".
-    rewrite /page_own.
+    rewrite /page_filled.
     replace 4096%nat with (8 * 512)%nat by lia.
-    iDestruct (bwin_words8 (page_base ppn) 512
+    iDestruct (bwin_words8 (page_base ppn) 512 (fun _ => c)
                  ltac:(intros o Ho Hd; apply page_base_aligned8;
                        [exact Hkd | lia | exact Hd])
                  with "Hpg") as (ws) "[%Hlen Hws]".
     iAssert ([∗ list] k ↦ w ∈ ws,
-               word_pointsto (KTR := KT1) (pa_add (kstack_va i) (8 * k)%nat)
+               TsoCtx.ctx_word_pointsto (KTR := KT1) XI
+                 (pa_add (kstack_va i) (8 * k)%nat)
                  (DfracOwn 1) w)%I with "[Hws]" as "Hws".
     { iApply (big_sepL_impl with "Hws").
       iIntros "!>" (k w Hk) "Hw".
@@ -378,10 +408,10 @@ Section mint.
     ([∗ list] i ∈ seq 0 64,
        stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) 512)%I.
 
-  Lemma kstack_bank_intro (pas : nat -> mword 44) :
+  Lemma kstack_bank_intro (pas : nat -> mword 44) (c : bv 8) :
     kvm_pas_ok pas ->
     ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
-    ([∗ list] i ∈ seq 0 64, page_own (page_base (pas i))) -∗
+    ([∗ list] i ∈ seq 0 64, page_filled (page_base (pas i)) c) -∗
     kstack_bank.
   Proof.
     intros Hok. iIntros "#Hcl Hpg". rewrite /kstack_bank.
@@ -390,7 +420,7 @@ Section mint.
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     iDestruct (big_sepL_lookup _ (seq 0 64) k (0 + k)%nat with "Hcl") as "Hci".
     { apply lookup_seq. split; [reflexivity | lia]. }
-    iApply (kstack_own_intro (0 + k)%nat (pas (0 + k)%nat) ltac:(lia)
+    iApply (kstack_own_intro (0 + k)%nat (pas (0 + k)%nat) c ltac:(lia)
               (Hok (0 + k)%nat ltac:(lia)) with "Hci Hp").
   Qed.
 

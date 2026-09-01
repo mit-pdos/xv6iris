@@ -153,6 +153,7 @@ UptWalkPt.v
 Pt2Walk.v
 TransPt.v
 Pt2WalkPt.v
+UptWalkTramp.v
 UserretDefs.v
 UserretPt.v
 UserretEntryPt.v

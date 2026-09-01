@@ -731,18 +731,14 @@ Section ProcInv.
     a_tf_word tfp i = tf_pa tfp (8 * Z.of_nat i).
   Proof. intro Hi. rewrite /a_tf_word (tf_pa_eq_pa_add8 tfp i Hi). reflexivity. Qed.
 
-  (* CONSTRUCTION: what [kalloc] hands allocproc IS a trapframe page.  The 36
-     struct words come out with EXISTENTIAL contents (a fresh page's bytes are
-     arbitrary), and the 3808-byte tail is exactly the window [tf_tail] owns
-     anonymously.  Both cross to the physical tier ONCE, via the whole-page
-     [ProcPtOwn.page_own_to_phys] -- the same [kmap_static_claims] every
-     other kalloc'd page uses, no new per-page claim needed. *)
-  Lemma tf_page_of_page_own (tfp : mword 44) :
+  (* A6.87: the trapframe page comes in FILLED -- it is the one kalloc
+     memset, and a trapframe's slots are word cells. *)
+  Lemma tf_page_of_page_own (tfp : mword 44) (c : bv 8) :
     page_valid (page_base tfp) ->
-    kmap_static_claims -∗ page_own (page_base tfp) -∗ ∃ ws : list (mword 64), tf_page tfp ws.
+    kmap_static_claims -∗ page_filled (page_base tfp) c -∗ ∃ ws : list (mword 64), tf_page tfp ws.
   Proof.
     iIntros (Hpv) "#Hb Hp".
-    iDestruct (page_own_to_phys tfp Hpv with "Hb Hp") as "Hp".
+    iDestruct (page_filled_to_phys tfp c Hpv with "Hb Hp") as "Hp".
     rewrite /phys_page_own.
     replace 4096%nat with (8 * TFWORDS + 3808)%nat by (vm_compute; reflexivity).
     rewrite (phys_bwin_split (page_base tfp) 0 (8 * TFWORDS) 3808).

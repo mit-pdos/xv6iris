@@ -377,51 +377,45 @@ Section CtxCellsReindex.
     CtxMorph (λ ξ, ctx_cells_at (XI := ξ) c off vs).
   Proof.
     revert off. induction vs as [|v vs IH] => off; iIntros (ξ ξ') "Hd Hc".
-    - iFrame "Hd".
+    - iModIntro. iFrame "Hd".
     - iDestruct "Hc" as "[Hv Hrest]".
-      iDestruct (ctx_morph_word _ (add_vec c (mword_of_int off)) (DfracOwn 1) v
+      iMod (ctx_morph_word _ (add_vec c (mword_of_int off)) (DfracOwn 1) v
               ξ ξ' with "Hd Hv") as "[Hd Hv]".
-      iDestruct (IH (off + 8) ξ ξ' with "Hd Hrest") as "[Hd Hrest]".
-      iFrame.
-  Qed.
-
-  Global Instance ctx_cells_morph (c : mword 64) (vs : list (mword 64)) :
-    CtxMorph (λ ξ, ctx_cells (XI := ξ) c vs).
-  Proof.
-    iIntros (ξ ξ') "Hd H".
-    iDestruct (ctx_cells_at_morph c 0 vs ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame.
-  Qed.
-
-  (* [tso SwtchCtx.v:201] *)
-  Global Instance own_ctx_morph (pa : mword 64) :
-    CtxMorph (λ ξ0 : CtxId, own_ctx (XI := ξ0) pa).
-  Proof.
-    iIntros (ξ ξ') "Hd H". iDestruct "H" as (vs) "[%Hl H]".
-    iDestruct (ctx_cells_morph pa vs ξ ξ' with "Hd H") as "[Hd H]".
-    iFrame "Hd". iExists vs. by iFrame.
+      iMod (IH (off + 8) ξ ξ' with "Hd Hrest") as "[Hd Hrest]".
+      iModIntro. iFrame.
   Qed.
 
   Lemma ctx_cells_at_reindex (ξ ξ' : CtxId) (c : mword 64) (off : Z)
       (vs : list (mword 64)) :
     ctx_dom ξ ξ' -∗ ctx_cells_at (XI := ξ) c off vs ==∗
     ctx_dom ξ ξ' ∗ ctx_cells_at (XI := ξ') c off vs.
-  Proof.
-    iIntros "Hd H". iModIntro. iApply (ctx_cells_at_morph c off vs ξ ξ' with "Hd H").
-  Qed.
+  Proof. exact (ctx_cells_at_morph c off vs ξ ξ'). Qed.
 
   Lemma ctx_cells_reindex (ξ ξ' : CtxId) (c : mword 64)
       (vs : list (mword 64)) :
     ctx_dom ξ ξ' -∗ ctx_cells (XI := ξ) c vs ==∗
     ctx_dom ξ ξ' ∗ ctx_cells (XI := ξ') c vs.
   Proof. exact (ctx_cells_at_reindex ξ ξ' c 0 vs). Qed.
-  (* THE PARKED STACK'S TRANSPORT OBLIGATION (A6.127 §6) IS ALREADY ON MAIN:
-     [StackOwn.stack_own_morph] is a [Global Instance] there, in main's
-     NON-MODAL [CtxMorph] form and generic in [KTR], so it already covers
-     the [KTR := KT1] use a child-record producer's deposit needs.  The
-     T-leg restates it here because ITS [StackOwn] exports only the [==∗]
-     [stack_own_reindex]; on main the restatement would be a second
-     instance for the same payload, so it is deliberately NOT taken. *)
+
+  (* main's instance faces of the two cell towers (the ProcDefs/SchedCtx
+     morph piles consume them by name) *)
+  Global Instance ctx_cells_morph_i (c : mword 64) (vs : list (mword 64)) :
+    CtxMorph (λ ξ0 : CtxId, ctx_cells (XI := ξ0) c vs).
+  Proof. rewrite /ctx_cells. apply ctx_cells_at_morph. Qed.
+
+  Global Instance own_ctx_morph (pa : mword 64) :
+    CtxMorph (λ ξ0 : CtxId, own_ctx (XI := ξ0) pa).
+  Proof.
+    iIntros (ξ ξ') "Hd H". iDestruct "H" as (vs) "[%Hl H]".
+    iMod (ctx_cells_at_morph pa 0 vs ξ ξ' with "Hd H") as "[Hd H]".
+    iModIntro. iFrame "Hd". iExists vs. by iFrame.
+  Qed.
+  (* the parked stack's transport obligation, once ([StackOwn.stack_own_reindex]
+     as an instance): what a child-record producer's deposit into the fresh
+     child context needs (A6.127 §6). *)
+  Global Instance stack_own_morph (sp : Arch.pa) (n : nat) :
+    CtxMorph (λ ξ, stack_own (KTR := KT1) (XI := ξ) sp n).
+  Proof. iIntros (ξ ξ') "Hd H". iApply (stack_own_reindex ξ ξ' sp n with "Hd H"). Qed.
 
   (* A6.128: the SAME-HART hand-off of the same two payloads *)
   Global Instance ctx_cells_at_move `{CID : CpuId} (c : mword 64) (off : Z) (vs : list (mword 64)) :

@@ -31,6 +31,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import SleepLock.
 Require Import WpLockAt.
 Require Import SleepLockAt.
@@ -39,13 +40,14 @@ Require Import BcacheInv.
 Require Export BioInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SepThread.   (* A6.68: the token threaded through the NBUF *)
 Require Import Xv6G.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Section BioInitAt.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{XI : TsoCtx.CurCtx}.
+  Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (*  The free state of a [bio_names] record                              *)
@@ -149,20 +151,16 @@ Section BioInitAt.
      built AT [bn_slk bn k] rather than gathered into a function, and the
      bcache lock needs no [newlock_delayed] because [bcache_res bn V] is
      statable before it is sealed. *)
-  (* THE RUNNING TOKEN IS BORROWED, not consumed, for the reason
-     [BioInv.bio_init] records: every escrow is a PARKED RECORD, so its
-     initial content is [ctx_deposit]ed into that record's freshly minted
-     context, and a deposit runs at the depositor's own authority.  The one
-     caller ([ProofMain], at main+0x8e) peels it out of its [sie_cap_gpr]
-     with [SieCapCtx.sie_cap_gpr_own_ctx_acc] and puts it straight back. *)
+  (* A6.68: the honest creator deposit (A6.66) wants the running token; the
+     NBUF sleeplock loop threads it with [SepThread.big_sepL_fupd_thread]
+     because [own_context] is EXCLUSIVE ([BioInv.bio_init]'s shape). *)
   Lemma bio_init_at `{CID : RiscvLang.CpuId} (bn : bio_names) (V : bio_view Σ) E :
     (0 ∉ bv_cov V) ->
     own_context cur_ctx -∗
     bio_free_tok bn -∗
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name bcache_addr "bcache"%string -∗
-    add_vec bcache_addr (sign_extend' 64 (mword_of_int 16 : mword 12)) ↦₈
-      (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_ready bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_fresh (buf_lock (bnode k)) "buffer"%string) -∗
     ([∗ list] k ∈ seq 0 NBUF, buf_raw k) -∗
     bcache_lru bhead (blist 0 NBUF) -∗
@@ -175,17 +173,25 @@ Section BioInitAt.
     (* every buffer's sleeplock, at its published gname pair, sealing exactly
        its checkout token; the recycle tokens come back out. *)
     iDestruct (big_sepL_sep_2 with "Hfresh Hbg") as "Hsl".
-    iAssert (([∗ list] k ∈ seq 0 NBUF, |={E}=>
-                is_sleeplock (fst (bn_slk bn k)) (snd (bn_slk bn k))
-                  (buf_lock (bnode k)) "buffer"%string (bown bn k)) ∗
-             ([∗ list] k ∈ seq 0 NBUF, bmid bn k))%I
-      with "[Hsl]" as "[Hsl Hmids]".
-    { rewrite -big_sepL_sep. iApply (big_sepL_mono with "Hsl").
-      intros i k Hk. iIntros "[Hf (Hp & Ho & Hm)]".
-      iFrame "Hm".
-      iApply (sl_fresh_new_at2 E (bn_slk bn k) (buf_lock (bnode k))
-                "buffer"%string (bown bn k) with "Hp Hf Ho"). }
-    iMod (big_sepL_fupd with "Hsl") as "#Hsls".
+    (* A6.68: SEQUENTIAL, not NBUF independent fupds. *)
+    iAssert ([∗ list] idx↦k ∈ seq 0 NBUF,
+               own_context cur_ctx -∗
+               (sl_fresh (buf_lock (bnode k)) "buffer"%string ∗
+                (sl_free_pair (bn_slk bn k) ∗ lock_tok_excl (bn_own bn k) ∗
+                 lock_tok_excl (bn_mid bn k)))
+               ={E}=∗ own_context cur_ctx ∗
+               (is_sleeplock (fst (bn_slk bn k)) (snd (bn_slk bn k))
+                  (buf_lock (bnode k)) "buffer"%string (bown bn k) ∗
+                bmid bn k))%I
+      as "Hstep".
+    { iApply big_sepL_intro. iIntros "!>" (idx k _) "Hrun [Hf (Hp & Ho & Hm)]".
+      iMod (sl_fresh_new_at2 E (bn_slk bn k) (buf_lock (bnode k))
+              "buffer"%string (bown bn k) with "Hp Hf Hrun Ho") as "[Hrun Hlk]".
+      iModIntro. iFrame "Hrun Hlk Hm". }
+    iMod (big_sepL_fupd_thread E (own_context cur_ctx)
+            with "Hrun Hstep Hsl") as "[Hrun Hsl]".
+    iEval (rewrite big_sepL_sep) in "Hsl".
+    iDestruct "Hsl" as "[#Hsls Hmids]".
     (* every initial payload is empty: blockno 0 is uncovered *)
     assert (Hpay0 : forall k bs,
         buf_pay bn V k false (mword_of_int 0 : mword 32)
@@ -231,11 +237,9 @@ Section BioInitAt.
       rewrite Hc0. iExact "Hpool". }
     (* and seal the bcache lock, at its published gname, over the assembled
        resource *)
-    pose proof (TsoCtx.ctx_morph_const_pay (bcache_res bn V)) as Hcm.
     iMod (newlock_at E (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }>
-            with "Hlkg Hnm Hlkw [Hcpu] [Hauth Hsa Hslots Hlru Hpool]")
-      as "#Hlock".
-    { iApply (lk_cpu_ready_intro with "Hcpu"). }
+            with "Hlkg Hnm Hrun Hlkw Hcpu [Hauth Hsa Hslots Hlru Hpool]")
+      as "[Hrun #Hlock]".
     { rewrite /bcache_res /bcache_scan.
       iExists ∅, (rev (seq 0 NBUF)),
         (fun _ => (mword_of_int 0 : mword 32)),
