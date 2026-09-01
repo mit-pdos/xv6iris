@@ -2662,3 +2662,15 @@ green when it is not.  Grep case-insensitive `compile` (or `ROCQ compile`)
 for the pending-compile check, never `COQC`.  (Caught mid-GR-38, 2026-08-16;
 the older durable-notes guidance that said to look for COQC lines is wrong
 for this switch.)
+
+### Gotcha: the const-instance helper against a λ-generic hypothesis (2026-09-01)
+
+Applying a lemma stated over the CONST instance of a λ-indexed predicate
+(e.g. `is_sleeplock_gen_lock`, whose statement mentions
+`is_sleeplock_genb … (fun _ => ?R) H`) to a hypothesis at a GENERIC
+`is_sleeplock_genb … Rb H` makes the unifier chase `(fun _ => ?R) ≡ Rb` by
+unfolding forever -- a silent 45-minute "compile" at 1.4 GB, not a memory
+blow-up.  Use the generic helper (`is_sleeplock_genb_lock`) on generic
+hypotheses.  Diagnose any single-file compile past ~10 min with
+`COQEXTRAFLAGS="-time"` under `timeout`; the last printed sentence is the
+culprit.  Build law: every GCP make runs under `timeout` now.
