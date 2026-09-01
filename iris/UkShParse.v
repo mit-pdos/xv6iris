@@ -4054,6 +4054,160 @@ Section UkShParse.
 
 
   (* ===================================================================== *)
+  (* §8b THE SEVEN TOKEN TABLES, AS ONE PERSISTENT PREMISE.                 *)
+  (*                                                                       *)
+  (* peek's third argument is a string literal at all seven call sites, and *)
+  (* §2c established that a literal is a TEXT-half string.  All seven come  *)
+  (* out of the SAME resource -- [UCodeShP.shp_rodata], the read-only image *)
+  (* -- which is persistent, so a walk carries ONE premise for all of them  *)
+  (* and never has to thread a table in and out of a call.                  *)
+  (*                                                                       *)
+  (* THE BYTES ARE NOT WRITTEN OUT.  [ushp_lit base] reads them out of the  *)
+  (* dump, [ushp_lit_ok] decides whether that is a C string of that length, *)
+  (* and [ushp_lit_sym] decides whether every byte of it is one of sh-s     *)
+  (* seven symbol characters -- one [vm_compute] each, and the two together *)
+  (* are exactly what a REFUTED peek needs.  UkShDiag.v does the same for   *)
+  (* the printer's format strings; this is that idiom at a second consumer, *)
+  (* which is the third leg of relocation ask 3.                            *)
+  (* ===================================================================== *)
+
+  (* the byte function of the literal based at [base] *)
+  Definition ushp_lit (base : Z) : nat -> bv 8 :=
+    fun j => default ubyte0 (shp_ro !! (base + Z.of_nat j)%Z).
+
+  (* ...and what makes it a C string of length [len] *)
+  Definition ushp_lit_ok (base : Z) (len : nat) : bool :=
+    forallb (fun j => match shp_ro !! (base + Z.of_nat j)%Z with
+                      | Some b => negb (Z.eqb (bv_unsigned b) 0)
+                      | None => false
+                      end)
+            (seq 0 len)
+    && match shp_ro !! (base + Z.of_nat len)%Z with
+       | Some b => Z.eqb (bv_unsigned b) 0
+       | None => false
+       end.
+
+  (* ...and that every byte of it is one of [ushp_sym_bytes] *)
+  Definition ushp_lit_sym (base : Z) (len : nat) : bool :=
+    forallb (fun j => ushp_is_sym (ushp_lit base j)) (seq 0 len).
+
+  Local Lemma ushp_lit_ok_body (base : Z) (len j : nat) :
+    ushp_lit_ok base len = true -> (j < len)%nat ->
+    shp_ro !! (base + Z.of_nat j)%Z = Some (ushp_lit base j)
+    /\ ushp_lit base j <> ubyte0.
+  Proof.
+    unfold ushp_lit_ok, ushp_lit. intros H Hj.
+    apply andb_true_iff in H as [ H _ ].
+    rewrite forallb_forall in H.
+    specialize (H j ltac:(apply in_seq; lia)).
+    destruct (shp_ro !! (base + Z.of_nat j)%Z) as [ b | ] eqn:Hb;
+      [ | discriminate ].
+    apply negb_true_iff, Z.eqb_neq in H.
+    cbn [default from_option id]. split; [ reflexivity | ].
+    intro He. apply H. rewrite He. vm_compute. reflexivity.
+  Qed.
+
+  Local Lemma ushp_lit_ok_nul (base : Z) (len : nat) :
+    ushp_lit_ok base len = true ->
+    shp_ro !! (base + Z.of_nat len)%Z = Some ubyte0.
+  Proof.
+    unfold ushp_lit_ok. intro H.
+    apply andb_true_iff in H as [ _ H ].
+    destruct (shp_ro !! (base + Z.of_nat len)%Z) as [ b | ] eqn:Hb;
+      [ | discriminate ].
+    apply Z.eqb_eq in H. f_equal. apply bv_eq. rewrite H.
+    vm_compute. reflexivity.
+  Qed.
+
+  (* THE TABLE, AS THE RESOURCE peek TAKES.  [true] is the text half. *)
+  Lemma ushp_lit_str (base : Z) (len : nat) (dq : dfrac) :
+    ushp_lit_ok base len = true ->
+    Z.of_nat len < 2 ^ 31 ->
+    shp_rodata γt -∗ ushp_sstr true dq base len (ushp_lit base).
+  Proof.
+    intros Hok Hlen. iIntros "#Hro".
+    rewrite ushp_sstr_text /shp_rodata.
+    iApply (utext_str_of_img γt shp_ro base len (ushp_lit base)).
+    - intros j Hj. exact (proj2 (ushp_lit_ok_body base len j Hok Hj)).
+    - exact Hlen.
+    - intros j Hj. exact (proj1 (ushp_lit_ok_body base len j Hok Hj)).
+    - exact (ushp_lit_ok_nul base len Hok).
+    - iExact "Hro".
+  Qed.
+
+  (* [strchr] misses a table none of whose bytes is the one looked for *)
+  Local Lemma ushp_find_none (n i : nat) (f : nat -> bv 8) (b : bv 8) :
+    (forall j : nat, (i <= j < i + n)%nat -> f j <> b) ->
+    ushp_find n i f b = None.
+  Proof.
+    revert i. induction n as [| n IH ]; intros i Hne; [ reflexivity | ].
+    cbn [ushp_find].
+    destruct (bool_decide (f i = b)) eqn:Hb.
+    { apply bool_decide_eq_true in Hb. exfalso. exact (Hne i ltac:(lia) Hb). }
+    apply IH. intros j Hj. exact (Hne j ltac:(lia)).
+  Qed.
+
+  (* THE ONE FACT THE FIVE REFUTED PEEKS NEED.  On a line with no symbol
+     byte, a peek for a table of symbol bytes is 0 -- at the end of the
+     line because the cursor has run out, and inside it because the byte
+     there is not in the table. *)
+  Lemma ushp_peek_res_sym (len : nat) (f : nat -> bv 8) (k tlen : nat)
+      (base : Z) :
+    ushp_no_symbols len f -> ushp_lit_sym base tlen = true ->
+    ushp_peek_res len f k tlen (ushp_lit base) = 0.
+  Proof.
+    intros Hnos Hsym. rewrite /ushp_peek_res.
+    destruct (bool_decide (k < len)%nat) eqn:Hk; [ | reflexivity ].
+    apply bool_decide_eq_true in Hk.
+    rewrite (ushp_find_none tlen 0%nat (ushp_lit base) (f k)).
+    - reflexivity.
+    - intros j Hj He.
+      rewrite /ushp_lit_sym forallb_forall in Hsym.
+      specialize (Hsym j ltac:(apply in_seq; lia)).
+      rewrite He (Hnos k Hk) in Hsym. discriminate.
+  Qed.
+
+  (* ---- the seven bases, named ------------------------------------------ *)
+  Definition ushp_T_redir : Z := 0x12f0.   (* the two redirection bytes, parseredirs *)
+  Definition ushp_T_block : Z := 0x12f8.   (* the open paren, parseexec *)
+  Definition ushp_T_arg   : Z := 0x1318.   (* the four argument-loop stoppers, parseexec *)
+  Definition ushp_T_pipe  : Z := 0x1320.   (* the pipe byte, parsepipe *)
+  Definition ushp_T_back  : Z := 0x1328.   (* the ampersand, parseline *)
+  Definition ushp_T_list  : Z := 0x1330.   (* the semicolon, parseline *)
+  Definition ushp_T_none  : Z := 0x1288.   (* the empty table, parsecmd *)
+
+  (* ...and the two decidable checks, discharged once each *)
+  Local Lemma ushp_T_redir_ok : ushp_lit_ok ushp_T_redir 2 = true.
+  Proof. vm_compute. reflexivity. Qed.
+  Local Lemma ushp_T_block_ok : ushp_lit_ok ushp_T_block 1 = true.
+  Proof. vm_compute. reflexivity. Qed.
+  Local Lemma ushp_T_arg_ok   : ushp_lit_ok ushp_T_arg 4 = true.
+  Proof. vm_compute. reflexivity. Qed.
+  Local Lemma ushp_T_pipe_ok  : ushp_lit_ok ushp_T_pipe 1 = true.
+  Proof. vm_compute. reflexivity. Qed.
+  Local Lemma ushp_T_back_ok  : ushp_lit_ok ushp_T_back 1 = true.
+  Proof. vm_compute. reflexivity. Qed.
+  Local Lemma ushp_T_list_ok  : ushp_lit_ok ushp_T_list 1 = true.
+  Proof. vm_compute. reflexivity. Qed.
+  Local Lemma ushp_T_none_ok  : ushp_lit_ok ushp_T_none 0 = true.
+  Proof. vm_compute. reflexivity. Qed.
+
+  Local Lemma ushp_T_redir_sym : ushp_lit_sym ushp_T_redir 2 = true.
+  Proof. vm_compute. reflexivity. Qed.
+  Local Lemma ushp_T_block_sym : ushp_lit_sym ushp_T_block 1 = true.
+  Proof. vm_compute. reflexivity. Qed.
+  Local Lemma ushp_T_arg_sym   : ushp_lit_sym ushp_T_arg 4 = true.
+  Proof. vm_compute. reflexivity. Qed.
+  Local Lemma ushp_T_pipe_sym  : ushp_lit_sym ushp_T_pipe 1 = true.
+  Proof. vm_compute. reflexivity. Qed.
+  Local Lemma ushp_T_back_sym  : ushp_lit_sym ushp_T_back 1 = true.
+  Proof. vm_compute. reflexivity. Qed.
+  Local Lemma ushp_T_list_sym  : ushp_lit_sym ushp_T_list 1 = true.
+  Proof. vm_compute. reflexivity. Qed.
+  Local Lemma ushp_T_none_sym  : ushp_lit_sym ushp_T_none 0 = true.
+  Proof. reflexivity. Qed.
+
+  (* ===================================================================== *)
   (* §7 execcmd @0x1d2 -- 19 instructions, a four-word frame, NO branch.    *)
   (*                                                                       *)
   (*   struct cmd *execcmd(void) {                                          *)
