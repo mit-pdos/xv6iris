@@ -18050,3 +18050,27 @@ AND the box -- the tie is maintained with both authorities in hand.
 Additive ghost only (BioDefs bn_pres; bref_tok gains the fragment);
 no model change.  Box arms final: (bundle ξb) ∨ (chain_res ξb) ∨
 (pres ● None).
+
+### A6.149: THE GUARD ROUTE, SETTLED BY THE ic_escrow MEASUREMENT --
+### the receipt export returns; lock_pay_intro_llb is the complement
+
+The A6.147 CORRECTION was wrong on the general case (the ic_escrow
+measurement pass found it, and it bites bcache too): lock_pay_intro_llb
+covers only the CROSS-THREAD legs (a release/acquire pair on one lock
+between depositor and withdrawer).  It cannot cover SELF-WITHDRAW --
+the depositor later withdrawing its own deposit, which is the COMMON
+uncontended path in both caches (bget bumps, releases bcache.lock, wins
+its own acquiresleep; iput parks at +0x70 and evicts at +0x8a) -- nor
+the cross-lock W3 leg (park under ip->lock, withdraw under itable.lock).
+The universal instrument is the RECEIPT: every withdrawer sits just
+after an acquire AMO, where its own buffered deposit stores are drained,
+so [hart_view_lb_get] against a PRE-PRESENTED llb certifies T <= K and
+[aguard_receipt] mints the guard.  Concretely: a parallel acquire
+contract (wp_acquire_llb / acquiresleep relay) taking [llb T] as a
+premise and strengthening the existing view-receipt row to
+[∃K, ⌜T <= K⌝ ∗ hart_view_lb K]; ProofAcquire's proof refactored
+internally to prove both Parameters (old = None instance); NO existing
+consumer changes.  The caller reads the box's astamp/llb BEFORE the
+acquire; if the generation advanced meanwhile (a cross-thread park),
+the lock_pay_intro_llb record floor covers that case -- the freshness
+theorem picks per case.  Both instruments stay.
