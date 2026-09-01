@@ -112,10 +112,14 @@ Import Defs.
    arms -- exec-success and fork -- are kernel mints by design, so the loop
    needs a generic inhabitant to fall back on.  Everything else it runs is
    the continuation the process itself handed back. *)
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Module UserretClosed (R : USERRET) (UV : USERVEC) (UG : UEXEC_GEN).
 
 Section UserretClosed.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
   (* userret runs AS the thread, so its residue is at the AMBIENT context
      (tso-port.md: this-thread sites take the ambient ξ). *)
@@ -395,6 +399,7 @@ Module UserretClosedProof (R : USERRET) (UV : USERVEC) (UG : UEXEC_GEN)
 
 Section Res.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the residue is uservec's, re-exported unchanged *)
@@ -430,7 +435,7 @@ Section Res.
 End Res.
 
   Theorem wp_userret_closed
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
       (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)

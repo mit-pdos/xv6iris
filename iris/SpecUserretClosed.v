@@ -200,6 +200,7 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
   URes CID pt ksp U sts -∗
   WP (Loop : expr riscv_lang).
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module Type USERRET_CLOSED.
   (* the residue is the module-type parameter it is everywhere else *)
   (* ...AND THE PARK'S ONE PRODUCER-SIDE ENTRY, threaded with the rest.
@@ -210,7 +211,7 @@ Module Type USERRET_CLOSED.
      PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
   Include UtResFits.USERTRAP_RES_PARK.
   Parameter wp_userret_closed :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
       (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)

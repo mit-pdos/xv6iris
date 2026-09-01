@@ -208,8 +208,11 @@ Proof. intro H. split_and!; lia. Qed.
    unclaimed, so the claimant's half is [emp] and the lock takes the whole
    variable back.  [ProofKforkB5.kfkb5_pwhole_used] is the same move at the
    claimed state. *)
+Require Import UserFd.   (* [ufdG] -- the program's descriptor-table class,
+                            needed to mint a user slot *)
 Section PstateRunnableHelper.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Lemma uin_pwhole_runnable (pa : mword 64) :
     pstate_whole pa RUNNABLE ⊣⊢ pstate_lock pa RUNNABLE.
   Proof.
@@ -243,6 +246,7 @@ Local Ltac namidx := first [ vm_compute; reflexivity | vm_compute; discriminate 
 
 Section ProofUserinit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

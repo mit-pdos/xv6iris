@@ -79,8 +79,12 @@ Require Import TsoCtx.
 Require Import FdSlots.      (* [fdstate] -- the key's descriptor view *)
 Require Import FsFdMirror.   (* [umirror]/[mcur]/[ufs_step]/[uenr_dom] *)
 
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section UexecRetFs.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
   (* ONE ambient [CurCtx] for the whole section: every fs definition binds
      it and the section close abstracts it, so the closed constants take
@@ -109,8 +113,13 @@ Section UexecRetFs.
        else if decide (n = UsysMemOk.USYS_fork) then
          ((∀ (r : mword 64) (fdv' : list fdstate),
              ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
+             (* the parent's own table does not move -- see
+                [UexecRet.uexec_ret_F]'s note on the same guard *)
+             ⌜fdv' = uvis_fd W⌝ -∗
              X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')) ∗
           (∀ fdv' : list fdstate,
+             (* the child's table is a table -- see [UexecRet]'s note *)
+             ⌜length fdv' = NOFILE⌝ -∗
              X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
                   fdv')))
        else if uenr_dom n then
@@ -220,6 +229,18 @@ Section UexecRetFs.
        WP (Loop : expr riscv_lang)).
   Proof. exact (fixpoint_unfold (uslot_fs_F γm) W). Qed.
 
+  (* the fs slot absorbs a basic update, exactly as [UexecRet.uslot_bupd]
+     does -- what a leaf needs when its own ghost step runs before the key
+     is handed back *)
+  Lemma uslot_fs_bupd (γm : gname) (W : uvis) :
+    (|==> uslot_fs γm W) -∗ uslot_fs γm W.
+  Proof.
+    rewrite !(uslot_fs_unfold γm W).
+    iIntros "H" (h C pt Rfd Rut) "%Hl %Hp Hb".
+    iMod "H". iApply ("H" $! h C pt Rfd Rut with "[%] [%] Hb");
+      [ exact Hl | exact Hp ].
+  Qed.
+
   (* =================================================================== *)
   (* SS2 THE CONSERVATIVITY RECEIPTS.                                     *)
   (* =================================================================== *)
@@ -240,9 +261,11 @@ Section UexecRetFs.
     destruct (decide (usys_num (uvis_tf W) = UsysMemOk.USYS_fork)).
     { iDestruct "Hret" as "[Hp Hc]".
       iSplitL "Hp".
-      - iIntros (r fdv') "%Hr".
-        iApply "Hup". iApply ("Hp" $! r fdv' with "[%]"). exact Hr.
-      - iIntros (fdv'). iApply "Hup". iApply ("Hc" $! fdv'). }
+      - iIntros (r fdv') "%Hr %Hfv".
+        iApply "Hup". iApply ("Hp" $! r fdv' with "[%] [%]");
+          [ exact Hr | exact Hfv ].
+      - iIntros (fdv') "%Hfvl". iApply "Hup".
+        iApply ("Hc" $! fdv' with "[%]"). exact Hfvl. }
     destruct (uenr_dom (usys_num (uvis_tf W))) eqn:He.
     - iLeft. iIntros (r M' π' szv' fdv') "%Hok %Hfdok".
       iApply "Hup".
@@ -321,7 +344,7 @@ Section UexecRetFs.
   (* enriched leaf pins the fetched path with.                            *)
   (* =================================================================== *)
 
-  Definition urun_fs (γm γt γd γs : gname) (h : CpuId) (m : regfile)
+  Definition urun_fs (γm γt γd γs γfd : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) : iProp Σ :=
     (∃ (C : ucfg) (pt : uptd)
        (Rfd : list fdstate -> iProp Σ)
@@ -330,21 +353,24 @@ Section UexecRetFs.
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        uheap γt γd γs M pm ∗
        ustack γd (m !!! Regidx csp_rs1) avail ∗
+       (* the program's own descriptor authority, exactly as [UkRun.urun]
+          carries it -- see its note *)
+       ufd_auth γfd fdv ∗
        uvb_fs (CID := h) γm C pt Rfd Rut sz pm fdv M m pc)%I.
 
-  Lemma urun_fs_urun (γm γt γd γs : gname) (h : CpuId) (m : regfile)
+  Lemma urun_fs_urun (γm γt γd γs γfd : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) :
-    urun_fs γm γt γd γs h m pc avail -∗ urun γt γd γs h m pc avail.
+    urun_fs γm γt γd γs γfd h m pc avail -∗ urun γt γd γs γfd h m pc avail.
   Proof.
     iIntros "H".
     iDestruct "H" as (C pt Rfd Rut sz M pm fdv)
-      "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+      "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
     (* the fs bundle's pieces are pinned at the ambient (its ∃ xi is
        vacuous), so the plain urun repacks at the ambient *)
     rewrite /urun. iExists XI, C, pt, Rfd, Rut, sz, M, pm, fdv.
     iSplitR; [iPureIntro; exact Hlo |].
     iSplitR; [iPureIntro; exact Hpm |].
-    iFrame "Hheap Hstk".
+    iFrame "Hheap Hstk Hufd".
     rewrite /uvb /uvb_F /uvb_fs /uvb_fs_F.
     iDestruct "Hb" as
       "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
@@ -407,18 +433,18 @@ Section UexecRetFs.
   (* taking the RIGHT branch of the arm with the caller's deposit -- no    *)
   (* kernel-side enrichment is involved (header).                          *)
   (* =================================================================== *)
-  Definition wp_uk_ecall_fs_body (γm γt γd γs : gname) (h : CpuId)
+  Definition wp_uk_ecall_fs_body (γm γt γd γs γfd : gname) (h : CpuId)
       (m : regfile) (pc : mword 64) (n : Z) (u : umirror)
       (pl : list (bv 8)) (dq : dfrac) (avail : nat) : iProp Σ :=
     (uinstr_is γt pc false (ECALL tt) -∗
-     urun_fs γm γt γd γs h m pc avail -∗
+     urun_fs γm γt γd γs γfd h m pc avail -∗
      mcur γm u -∗
      ustrq γd dq (uint (m !!! Regidx (mword_of_int 10))) pl -∗
      (∀ (h' : CpuId) (r : mword 64) (u' : umirror),
         ⌜ufs_step_at n pl (tf_of m pc) r u u'⌝ -∗
         mcur γm u' -∗
         ustrq γd dq (uint (m !!! Regidx (mword_of_int 10))) pl -∗
-        urun_fs γm γt γd γs h' (<[Regidx (mword_of_int 10) := r]> m)
+        urun_fs γm γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
           (add_vec_int pc 4) avail -∗
         WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
@@ -439,11 +465,11 @@ Global Typeclasses Opaque uslot_fs uvb_fs.
 Module Type FDROW_UKFS_ENGINE.
   Parameter wp_uk_ecall_fs :
     forall `{!riscvGS Σ} `{GEN : GenId} `{XI : CurCtx}
-           `{!ghost_varG Σ Z} `{!ghost_varG Σ umirror}
-      (γm γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+           `{!ghost_varG Σ Z} `{!ghost_varG Σ umirror} `{!ufdG Σ}
+      (γm γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (n : Z) (u : umirror) (pl : list (bv 8)) (dq : dfrac) (avail : nat),
       usys_num (tf_of m pc) = n ->
       uenr_dom n = true ->
       is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-      ⊢ wp_uk_ecall_fs_body γm γt γd γs h m pc n u pl dq avail.
+      ⊢ wp_uk_ecall_fs_body γm γt γd γs γfd h m pc n u pl dq avail.
 End FDROW_UKFS_ENGINE.

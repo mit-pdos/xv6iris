@@ -419,8 +419,12 @@ Proof. reflexivity. Qed.
 (* ===================================================================== *)
 (* SS2 The trapped machine, at hart [CID].                                 *)
 (* ===================================================================== *)
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section TrappedMachine.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : TsoCtx.CurCtx}.
 
   (* A THIN WRAPPER ON [UserExec.user_trap_frame_atm] (milestone J, stage
@@ -512,6 +516,7 @@ End TrappedMachine.
 (* ===================================================================== *)
 Section UexecRet.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
 
   (* (A) what user execution hands back, at the fixpoint variable [X] *)
@@ -523,8 +528,23 @@ Section UexecRet.
        else if decide (n = USYS_fork) then
          ((∀ (r : mword 64) (fdv' : list fdstate),
              ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
+             (* THE PARENT'S OWN TABLE DOES NOT MOVE.  fork copies the
+                parent's descriptors INTO THE CHILD and leaves the parent's
+                array alone, so the process that gets a nonzero return
+                resumes at the view it trapped at.  Free to add: the kernel
+                MINTS at this arm ([UexecApply.uexec_ret_round_slot]'s fork
+                case) rather than instantiating it, so nothing has to prove
+                the guard -- but it is what the code does, and without it a
+                program cannot keep a descriptor handle across its own
+                fork. *)
+             ⌜fdv' = uvis_fd W⌝ -∗
              X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')) ∗
           (∀ fdv' : list fdstate,
+             (* the child's table is a table: [NOFILE] slots, like every
+                other.  Free for the same reason the parent's guard is --
+                the kernel MINTS at this arm -- and needed because the
+                child's own descriptor authority is minted at this view. *)
+             ⌜length fdv' = NOFILE⌝ -∗
              X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')))
        else (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
                (szv' : Z) (fdv' : list fdstate),
@@ -760,8 +780,10 @@ Section UexecRet.
      else if decide (n = USYS_fork) then
        ((∀ (r : mword 64) (fdv' : list fdstate),
            ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
+           ⌜fdv' = uvis_fd W⌝ -∗
            uslot (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')) ∗
         (∀ fdv' : list fdstate,
+           ⌜length fdv' = NOFILE⌝ -∗
            uslot (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')))
      else (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
              (szv' : Z) (fdv' : list fdstate),
@@ -790,7 +812,7 @@ Section UexecRet.
     destruct (decide (sc = uecall_scause)); [ | iApply "H" ].
     destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ done | ].
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
-    { iSplitR; [ iIntros (r fdv' _); iApply "H" | iIntros (fdv'); iApply "H" ]. }
+    { iSplitR; [ iIntros (r fdv' _ _); iApply "H" | iIntros (fdv' _); iApply "H" ]. }
     iIntros (r M' π' szv' fdv' _ _). iApply "H".
   Qed.
 
@@ -818,6 +840,7 @@ Global Typeclasses Opaque uslot uvb.
 (* ===================================================================== *)
 Section UexecRetGen.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
 
   Lemma uexec_wp_uslot (W : uvis) : □ uexec_wp -∗ uslot W.

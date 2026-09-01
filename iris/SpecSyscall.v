@@ -487,6 +487,7 @@ Definition wp_syscall_sconf_body
    ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av)) -∗
   WP (Loop : expr riscv_lang).
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module Type SYSCALL.
   (* the kernel-side resources the syscall table's entries consume, for the
      process at [pj] whose open-file table is named by [γf].  Defined
@@ -581,7 +582,7 @@ Module Type SYSCALL.
 
   Parameter wp_syscall_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names)
       (ip : mword 64) (dqi : dfrac)

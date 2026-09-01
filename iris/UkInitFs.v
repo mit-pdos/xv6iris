@@ -168,16 +168,20 @@ Qed.
 (* ===================================================================== *)
 (* THE WALK, over the two engine seals.                                   *)
 (* ===================================================================== *)
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Module UkInitFsWalk (R : FDROW_UKFS_RETIRE) (S : FDROW_UKFS_STEP).
 
 Module L := FdRowUkfsLeaf R S.
 
 Section UkInitFs.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
   Context `{!ghost_varG Σ umirror}.
-  Context (γt γd γs : gname).
+  Context (γt γd γs γfd : gname).
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation a0_idx := (mword_of_int 10 : mword 5).
@@ -217,12 +221,12 @@ Section UkInitFs.
       (u : umirror) (pl : list (bv 8)) (avail : nat) :
     init_code γt -∗
     L.ustrt γt (uint (m !!! Regidx a0_idx)) pl -∗
-    urun_fs γm γt γd γs h m (mword_of_int InitSyms.open) avail -∗
+    urun_fs γm γt γd γs γfd h m (mword_of_int InitSyms.open) avail -∗
     mcur γm u -∗
     (∀ (h' : CpuId) (ret : mword 64) (u' : umirror),
        ⌜ufs_open_at pl (m !!! Regidx a1_idx) ret u u'⌝ -∗
        mcur γm u' -∗
-       urun_fs γm γt γd γs h'
+       urun_fs γm γt γd γs γfd h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
@@ -234,7 +238,7 @@ Section UkInitFs.
       as (_ & _ & _ & _ & _ & Hopen & _ & _ & _ & _ & _ & _ & _).
     rewrite Hopen.
     (* ---- 0x3b2  c.li a7,15 ---- *)
-    iApply (L.wp_uk_cli_run_fs γm γt γd γs h m (mword_of_int 0x3b2)
+    iApply (L.wp_uk_cli_run_fs γm γt γd γs γfd h m (mword_of_int 0x3b2)
               (mword_of_int 15 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -261,7 +265,7 @@ Section UkInitFs.
     iAssert (L.ustrt γt (uint (m1 !!! Regidx a0_idx)) pl) as "#Hstr1".
     { rewrite Ha0. iExact "Hstr". }
     (* ---- 0x3b4  ecall -- the ENRICHED open row ---- *)
-    iApply (L.wp_uk_ecall_fs_text γm γt γd γs h1 m1 (mword_of_int 0x3b4)
+    iApply (L.wp_uk_ecall_fs_text γm γt γd γs γfd h1 m1 (mword_of_int 0x3b4)
               FsFdMirror.USYS_open u pl avail
               ltac:(unfold m1;
                     rewrite tf_of_num;
@@ -296,7 +300,7 @@ Section UkInitFs.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 15 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (L.wp_uk_cjr_run_fs γm γt γd γs h2 m2 (mword_of_int 0x3b8) ra_idx
+    iApply (L.wp_uk_cjr_run_fs γm γt γd γs γfd h2 m2 (mword_of_int 0x3b8) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
@@ -311,13 +315,13 @@ Section UkInitFs.
       (u : umirror) (pl : list (bv 8)) (avail : nat) :
     init_code γt -∗
     L.ustrt γt (uint (m !!! Regidx a0_idx)) pl -∗
-    urun_fs γm γt γd γs h m (mword_of_int InitSyms.mknod) avail -∗
+    urun_fs γm γt γd γs γfd h m (mword_of_int InitSyms.mknod) avail -∗
     mcur γm u -∗
     (∀ (h' : CpuId) (ret : mword 64) (u' : umirror),
        ⌜ufs_mknod_at pl (dev_arg (m !!! Regidx a1_idx))
           (dev_arg (m !!! Regidx a2_idx)) ret u u'⌝ -∗
        mcur γm u' -∗
-       urun_fs γm γt γd γs h'
+       urun_fs γm γt γd γs γfd h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 17 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
@@ -329,7 +333,7 @@ Section UkInitFs.
       as (_ & _ & _ & _ & _ & _ & Hmknod & _ & _ & _ & _ & _ & _).
     rewrite Hmknod.
     (* ---- 0x3ba  c.li a7,17 ---- *)
-    iApply (L.wp_uk_cli_run_fs γm γt γd γs h m (mword_of_int 0x3ba)
+    iApply (L.wp_uk_cli_run_fs γm γt γd γs γfd h m (mword_of_int 0x3ba)
               (mword_of_int 17 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -360,7 +364,7 @@ Section UkInitFs.
     iAssert (L.ustrt γt (uint (m1 !!! Regidx a0_idx)) pl) as "#Hstr1".
     { rewrite Ha0. iExact "Hstr". }
     (* ---- 0x3bc  ecall -- the ENRICHED mknod row ---- *)
-    iApply (L.wp_uk_ecall_fs_text γm γt γd γs h1 m1 (mword_of_int 0x3bc)
+    iApply (L.wp_uk_ecall_fs_text γm γt γd γs γfd h1 m1 (mword_of_int 0x3bc)
               FsFdMirror.USYS_mknod u pl avail
               ltac:(unfold m1;
                     rewrite tf_of_num;
@@ -400,7 +404,7 @@ Section UkInitFs.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 17 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (L.wp_uk_cjr_run_fs γm γt γd γs h2 m2 (mword_of_int 0x3c0) ra_idx
+    iApply (L.wp_uk_cjr_run_fs γm γt γd γs γfd h2 m2 (mword_of_int 0x3c0) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
@@ -414,12 +418,12 @@ Section UkInitFs.
   Lemma wp_kinit_dup_fs (γm : gname) (h : CpuId) (m : regfile)
       (u : umirror) (avail : nat) :
     init_code γt -∗
-    urun_fs γm γt γd γs h m (mword_of_int InitSyms.dup) avail -∗
+    urun_fs γm γt γd γs γfd h m (mword_of_int InitSyms.dup) avail -∗
     mcur γm u -∗
     (∀ (h' : CpuId) (ret : mword 64) (u' : umirror),
        ⌜ufs_dup_at (m !!! Regidx a0_idx) ret u u'⌝ -∗
        mcur γm u' -∗
-       urun_fs γm γt γd γs h'
+       urun_fs γm γt γd γs γfd h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 10 : mword 64)]> m))
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
@@ -431,7 +435,7 @@ Section UkInitFs.
       as (_ & _ & _ & _ & _ & _ & _ & Hdup & _ & _ & _ & _ & _).
     rewrite Hdup.
     (* ---- 0x3ea  c.li a7,10 ---- *)
-    iApply (L.wp_uk_cli_run_fs γm γt γd γs h m (mword_of_int 0x3ea)
+    iApply (L.wp_uk_cli_run_fs γm γt γd γs γfd h m (mword_of_int 0x3ea)
               (mword_of_int 10 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -452,7 +456,7 @@ Section UkInitFs.
                   (mword_of_int 10 : mword 64)
                   ltac:(vm_compute; discriminate)).
     (* ---- 0x3ec  ecall -- the ENRICHED dup row (no path) ---- *)
-    iApply (L.wp_uk_ecall_fs_nopath γm γt γd γs h1 m1 (mword_of_int 0x3ec)
+    iApply (L.wp_uk_ecall_fs_nopath γm γt γd γs γfd h1 m1 (mword_of_int 0x3ec)
               FsFdMirror.USYS_dup u avail
               ltac:(unfold m1;
                     rewrite tf_of_num;
@@ -491,7 +495,7 @@ Section UkInitFs.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 10 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (L.wp_uk_cjr_run_fs γm γt γd γs h2 m2 (mword_of_int 0x3f0) ra_idx
+    iApply (L.wp_uk_cjr_run_fs γm γt γd γs γfd h2 m2 (mword_of_int 0x3f0) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
@@ -508,7 +512,7 @@ Section UkInitFs.
   Lemma wp_kinit_dups_fs (γm : gname) (h : CpuId) (m : regfile)
       (u : umirror) (avail : nat) :
     init_code γt -∗
-    urun_fs γm γt γd γs h m (mword_of_int 0x1e) avail -∗
+    urun_fs γm γt γd γs γfd h m (mword_of_int 0x1e) avail -∗
     mcur γm u -∗
     (∀ (h' : CpuId) (m' : regfile) (ud1 ud2 : umirror)
        (vf rd1 rd2 : mword 64),
@@ -517,7 +521,7 @@ Section UkInitFs.
         /\ ufs_dup_at vf rd2 ud1 ud2
         /\ m' !!! Regidx s2_idx = (mword_of_int LIT_START : mword 64)⌝ -∗
        mcur γm ud2 -∗
-       urun_fs γm γt γd γs h' m' (mword_of_int 0x32) avail -∗
+       urun_fs γm γt γd γs γfd h' m' (mword_of_int 0x32) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -525,7 +529,7 @@ Section UkInitFs.
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & _ & _ & Hdup & _ & _ & _ & _ & _).
     (* ---- 0x1e  c.li a0,0 ---- *)
-    iApply (L.wp_uk_cli_run_fs γm γt γd γs h m (mword_of_int 0x1e)
+    iApply (L.wp_uk_cli_run_fs γm γt γd γs γfd h m (mword_of_int 0x1e)
               (mword_of_int 0 : mword 6) a0_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -539,7 +543,7 @@ Section UkInitFs.
                                 : mword 64)).
     set (mq1 := <[Regidx a0_idx := vf]> m).
     (* ---- 0x20  jal ra,dup ---- *)
-    iApply (L.wp_uk_jal_run_fs γm γt γd γs hq1 mq1 (mword_of_int 0x20)
+    iApply (L.wp_uk_jal_run_fs γm γt γd γs γfd hq1 mq1 (mword_of_int 0x20)
               (mword_of_int 970 : mword 21) ra_idx
               (mword_of_int InitSyms.dup) (mword_of_int 0x24) avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -571,7 +575,7 @@ Section UkInitFs.
     set (mq3 := <[Regidx a0_idx := rd1]>
                   (<[Regidx a7_idx := (mword_of_int 10 : mword 64)]> mq2)).
     (* ---- 0x24  c.li a0,0 ---- *)
-    iApply (L.wp_uk_cli_run_fs γm γt γd γs hq3 mq3 (mword_of_int 0x24)
+    iApply (L.wp_uk_cli_run_fs γm γt γd γs γfd hq3 mq3 (mword_of_int 0x24)
               (mword_of_int 0 : mword 6) a0_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -583,7 +587,7 @@ Section UkInitFs.
     iIntros (hq4) "Hrun".
     set (mq4 := <[Regidx a0_idx := vf]> mq3).
     (* ---- 0x26  jal ra,dup ---- *)
-    iApply (L.wp_uk_jal_run_fs γm γt γd γs hq4 mq4 (mword_of_int 0x26)
+    iApply (L.wp_uk_jal_run_fs γm γt γd γs γfd hq4 mq4 (mword_of_int 0x26)
               (mword_of_int 964 : mword 21) ra_idx
               (mword_of_int InitSyms.dup) (mword_of_int 0x2a) avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -615,7 +619,7 @@ Section UkInitFs.
     set (mq6 := <[Regidx a0_idx := rd2]>
                   (<[Regidx a7_idx := (mword_of_int 10 : mword 64)]> mq5)).
     (* ---- 0x2a  auipc s2 ; 0x2e  addi s2 -- the "starting sh" literal ---- *)
-    iApply (L.wp_uk_auipc_run_fs γm γt γd γs hq6 mq6 (mword_of_int 0x2a)
+    iApply (L.wp_uk_auipc_run_fs γm γt γd γs γfd hq6 mq6 (mword_of_int 0x2a)
               (mword_of_int 1 : mword 20) s2_idx
               (add_vec (mword_of_int 0x2a : mword 64)
                  (auipc_off (mword_of_int 1 : mword 20)))
@@ -636,7 +640,7 @@ Section UkInitFs.
                      (sign_extend' 64 (mword_of_int 2382 : mword 12))
                    = mword_of_int LIT_START)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (L.wp_uk_addi_run_fs γm γt γd γs hq7 mq7 (mword_of_int 0x2e)
+    iApply (L.wp_uk_addi_run_fs γm γt γd γs γfd hq7 mq7 (mword_of_int 0x2e)
               (mword_of_int 2382 : mword 12) s2_idx s2_idx
               (mword_of_int LIT_START) avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -667,7 +671,7 @@ Section UkInitFs.
   Lemma wp_kinit_repair_fs (γm : gname) (h : CpuId) (m : regfile)
       (u1 : umirror) (avail : nat) :
     init_code γt -∗ init_rodata γt -∗
-    urun_fs γm γt γd γs h m (mword_of_int 0x64) avail -∗
+    urun_fs γm γt γd γs γfd h m (mword_of_int 0x64) avail -∗
     mcur γm u1 -∗
     (∀ (h' : CpuId) (m' : regfile) (u2 u3 ud1 ud2 : umirror)
        (wma wmi vom3 vf r2 r3 rd1 rd2 : mword 64),
@@ -681,7 +685,7 @@ Section UkInitFs.
         /\ ufs_dup_at vf rd2 ud1 ud2
         /\ m' !!! Regidx s2_idx = (mword_of_int LIT_START : mword 64)⌝ -∗
        mcur γm ud2 -∗
-       urun_fs γm γt γd γs h' m' (mword_of_int 0x32) avail -∗
+       urun_fs γm γt γd γs γfd h' m' (mword_of_int 0x32) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -690,7 +694,7 @@ Section UkInitFs.
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & Hopen & Hmknod & _ & _ & _ & _ & _ & _).
     (* ---- 0x64  c.li a2,0 ---- *)
-    iApply (L.wp_uk_cli_run_fs γm γt γd γs h m (mword_of_int 0x64)
+    iApply (L.wp_uk_cli_run_fs γm γt γd γs γfd h m (mword_of_int 0x64)
               (mword_of_int 0 : mword 6) a2_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -704,7 +708,7 @@ Section UkInitFs.
                                  : mword 64)).
     set (mr1 := <[Regidx a2_idx := wmi]> m).
     (* ---- 0x66  c.li a1,1 -- CONSOLE ---- *)
-    iApply (L.wp_uk_cli_run_fs γm γt γd γs hr1 mr1 (mword_of_int 0x66)
+    iApply (L.wp_uk_cli_run_fs γm γt γd γs γfd hr1 mr1 (mword_of_int 0x66)
               (mword_of_int 1 : mword 6) a1_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -723,7 +727,7 @@ Section UkInitFs.
                    (sign_extend' 64 (mword_of_int 2312 : mword 12))
                  = mword_of_int 0x970)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (L.wp_uk_auipc_run_fs γm γt γd γs hr2 mr2 (mword_of_int 0x68)
+    iApply (L.wp_uk_auipc_run_fs γm γt γd γs γfd hr2 mr2 (mword_of_int 0x68)
               (mword_of_int 1 : mword 20) a0_idx
               (add_vec (mword_of_int 0x68 : mword 64)
                  (auipc_off (mword_of_int 1 : mword 20))) avail
@@ -738,7 +742,7 @@ Section UkInitFs.
     set (mr2a := <[Regidx a0_idx := regval_into_reg
                     (add_vec (mword_of_int 0x68 : mword 64)
                        (auipc_off (mword_of_int 1 : mword 20)))]> mr2).
-    iApply (L.wp_uk_addi_run_fs γm γt γd γs hr2a mr2a (mword_of_int 0x6c)
+    iApply (L.wp_uk_addi_run_fs γm γt γd γs γfd hr2a mr2a (mword_of_int 0x6c)
               (mword_of_int 2312 : mword 12) a0_idx a0_idx
               (mword_of_int 0x970) avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -755,7 +759,7 @@ Section UkInitFs.
     set (mr2b := <[Regidx a0_idx := regval_into_reg
                     (mword_of_int 0x970 : mword 64)]> mr2a).
     (* ---- 0x70  jal ra,mknod ---- *)
-    iApply (L.wp_uk_jal_run_fs γm γt γd γs hr2b mr2b (mword_of_int 0x70)
+    iApply (L.wp_uk_jal_run_fs γm γt γd γs γfd hr2b mr2b (mword_of_int 0x70)
               (mword_of_int 842 : mword 21) ra_idx
               (mword_of_int InitSyms.mknod) (mword_of_int 0x74) avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -816,7 +820,7 @@ Section UkInitFs.
     set (mr4 := <[Regidx a0_idx := r2]>
                   (<[Regidx a7_idx := (mword_of_int 17 : mword 64)]> mr3)).
     (* ---- 0x74  c.li a1,2 -- O_RDWR ---- *)
-    iApply (L.wp_uk_cli_run_fs γm γt γd γs hr4 mr4 (mword_of_int 0x74)
+    iApply (L.wp_uk_cli_run_fs γm γt γd γs γfd hr4 mr4 (mword_of_int 0x74)
               (mword_of_int 2 : mword 6) a1_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -835,7 +839,7 @@ Section UkInitFs.
                    (sign_extend' 64 (mword_of_int 2298 : mword 12))
                  = mword_of_int 0x970)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (L.wp_uk_auipc_run_fs γm γt γd γs hr5 mr5 (mword_of_int 0x76)
+    iApply (L.wp_uk_auipc_run_fs γm γt γd γs γfd hr5 mr5 (mword_of_int 0x76)
               (mword_of_int 1 : mword 20) a0_idx
               (add_vec (mword_of_int 0x76 : mword 64)
                  (auipc_off (mword_of_int 1 : mword 20))) avail
@@ -850,7 +854,7 @@ Section UkInitFs.
     set (mr5a := <[Regidx a0_idx := regval_into_reg
                     (add_vec (mword_of_int 0x76 : mword 64)
                        (auipc_off (mword_of_int 1 : mword 20)))]> mr5).
-    iApply (L.wp_uk_addi_run_fs γm γt γd γs hr5a mr5a (mword_of_int 0x7a)
+    iApply (L.wp_uk_addi_run_fs γm γt γd γs γfd hr5a mr5a (mword_of_int 0x7a)
               (mword_of_int 2298 : mword 12) a0_idx a0_idx
               (mword_of_int 0x970) avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -867,7 +871,7 @@ Section UkInitFs.
     set (mr5b := <[Regidx a0_idx := regval_into_reg
                     (mword_of_int 0x970 : mword 64)]> mr5a).
     (* ---- 0x7e  jal ra,open ---- *)
-    iApply (L.wp_uk_jal_run_fs γm γt γd γs hr5b mr5b (mword_of_int 0x7e)
+    iApply (L.wp_uk_jal_run_fs γm γt γd γs γfd hr5b mr5b (mword_of_int 0x7e)
               (mword_of_int 820 : mword 21) ra_idx
               (mword_of_int InitSyms.open) (mword_of_int 0x82) avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -924,7 +928,7 @@ Section UkInitFs.
                                (concat_vec (mword_of_int 1998 : mword 11)
                                   ('b"0")))))
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (L.wp_uk_cj_run_fs γm γt γd γs hr7 mr7 (mword_of_int 0x82)
+    iApply (L.wp_uk_cj_run_fs γm γt γd γs γfd hr7 mr7 (mword_of_int 0x82)
               (mword_of_int 1998 : mword 11) (mword_of_int 0x1e) avail
               Etgt82 ltac:(vm_compute; reflexivity) with "[] Hrun").
     { iApply (uis_init_82 with "Hcode"). }
@@ -953,7 +957,7 @@ Section UkInitFs.
       (u0 : umirror) (avail : nat) :
     era0_seed u0 ->
     init_code γt -∗ init_rodata γt -∗
-    urun_fs γm γt γd γs h m (mword_of_int 0xc) avail -∗
+    urun_fs γm γt γd γs γfd h m (mword_of_int 0xc) avail -∗
     mcur γm u0 -∗
     (∀ (h' : CpuId) (m' : regfile) (u2 u3 : umirror)
        (r3 rd1 rd2 : mword 64),
@@ -968,7 +972,7 @@ Section UkInitFs.
               /\ um_av u3 !! i = Some (MkAnode (ADev CONSOLE 0) 1%nat))⌝ -∗
        ⌜m' !!! Regidx s2_idx = (mword_of_int LIT_START : mword 64)⌝ -∗
        mcur γm u3 -∗
-       urun_fs γm γt γd γs h' m' (mword_of_int 0x32) avail -∗
+       urun_fs γm γt γd γs γfd h' m' (mword_of_int 0x32) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -978,7 +982,7 @@ Section UkInitFs.
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & Hopen & _ & _ & _ & _ & _ & _ & _).
     (* ---- 0xc  c.li a1,2 -- O_RDWR ---- *)
-    iApply (L.wp_uk_cli_run_fs γm γt γd γs h m (mword_of_int 0xc)
+    iApply (L.wp_uk_cli_run_fs γm γt γd γs γfd h m (mword_of_int 0xc)
               (mword_of_int 2 : mword 6) a1_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
@@ -997,7 +1001,7 @@ Section UkInitFs.
                      (sign_extend' 64 (mword_of_int 2402 : mword 12))
                    = mword_of_int 0x970)
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (L.wp_uk_auipc_run_fs γm γt γd γs hm6 mm3 (mword_of_int 0xe)
+    iApply (L.wp_uk_auipc_run_fs γm γt γd γs γfd hm6 mm3 (mword_of_int 0xe)
               (mword_of_int 1 : mword 20) a0_idx
               (add_vec (mword_of_int 0xe : mword 64)
                  (auipc_off (mword_of_int 1 : mword 20))) avail
@@ -1012,7 +1016,7 @@ Section UkInitFs.
     set (mm4 := <[Regidx a0_idx := regval_into_reg
                     (add_vec (mword_of_int 0xe : mword 64)
                        (auipc_off (mword_of_int 1 : mword 20)))]> mm3).
-    iApply (L.wp_uk_addi_run_fs γm γt γd γs hm7 mm4 (mword_of_int 0x12)
+    iApply (L.wp_uk_addi_run_fs γm γt γd γs γfd hm7 mm4 (mword_of_int 0x12)
               (mword_of_int 2402 : mword 12) a0_idx a0_idx
               (mword_of_int 0x970) avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1029,7 +1033,7 @@ Section UkInitFs.
     set (mm5 := <[Regidx a0_idx
                   := regval_into_reg (mword_of_int 0x970 : mword 64)]> mm4).
     (* ---- 0x16  jal ra,open ---- *)
-    iApply (L.wp_uk_jal_run_fs γm γt γd γs hm8 mm5 (mword_of_int 0x16)
+    iApply (L.wp_uk_jal_run_fs γm γt γd γs γfd hm8 mm5 (mword_of_int 0x16)
               (mword_of_int 924 : mword 21) ra_idx
               (mword_of_int InitSyms.open) (mword_of_int 0x1a) avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1092,7 +1096,7 @@ Section UkInitFs.
       by (apply bv_eq; vm_compute; reflexivity).
     destruct (uv_btaken BLT (mm7 !!! Regidx a0_idx) zero_reg) eqn:Hblt0.
     - (* the console was absent -- the only reachable arm at era 0 *)
-      iApply (L.wp_uk_btype0_run_fs γm γt γd γs hm10 mm7 (mword_of_int 0x1a)
+      iApply (L.wp_uk_btype0_run_fs γm γt γd γs γfd hm10 mm7 (mword_of_int 0x1a)
                 (mword_of_int 74 : mword 13) a0_idx BLT true
                 (mword_of_int 0x64) avail
                 (eq_sym Hblt0) (eq_sym Etgt1a)
@@ -1139,7 +1143,7 @@ Section UkInitFs.
       (m : regfile) (u0 : umirror) (n : nat) :
     era0_seed u0 ->
     init_code γt -∗ init_rodata γt -∗ usz γs szv -∗
-    urun_fs γm γt γd γs h m (mword_of_int 0xc) (12 + (12 + (4 + n))) -∗
+    urun_fs γm γt γd γs γfd h m (mword_of_int 0xc) (12 + (12 + (4 + n))) -∗
     mcur γm u0 -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1148,7 +1152,7 @@ Section UkInitFs.
               with "Hcode Hro Hrun Hmc").
     iIntros (h' m' u2 u3 r3 rd1 rd2) "_ %Hs2 Hmc Hrun".
     iDestruct (urun_fs_urun with "Hrun") as "Hrun".
-    iDestruct (UkInitMain.wp_kinit_main_loop γt γd γs szv n
+    iDestruct (UkInitMain.wp_kinit_main_loop γt γd γs γfd szv n
                  with "Hcode Hro") as "[Hloop _]".
     iApply ("Hloop" $! h' m' with "[] Hsz Hrun").
     iPureIntro. exact Hs2.

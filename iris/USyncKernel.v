@@ -42,8 +42,13 @@ Require User.SyncSyms User.SyncInstrs.
 Local Open Scope Z_scope.
 Import Defs.
 
+Require Import ProcGeom.  (* [NOFILE] -- how many slots a table has *)
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section USyncKernel.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
 
@@ -133,13 +138,16 @@ Section USyncKernel.
        is_Some (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)
                  !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
                      - 8 * Z.of_nat 4 + Z.of_nat j)%Z)) ->
+    (* the process's table is [NOFILE] slots -- what its own descriptor
+       authority is minted at ([UserFd.ufd_auth] carries it) *)
+    length (uvis_fd W) = NOFILE ->
     ⊢ uslot W.
   Proof.
-    intros Hpc Hsub Hx Hroom Hal8 Hdata.
-    iApply (uslot_of_urun W 4 Hal8 ltac:(lia) Hdata).
-    iIntros (γt γd γs h) "%Hsz Hszf #Ht Hrun".
+    intros Hpc Hsub Hx Hroom Hal8 Hdata Hfdlen.
+    iApply (uslot_of_urun W 4 Hal8 ltac:(lia) Hdata Hfdlen).
+    iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht Hrun".
     rewrite Hpc.
-    iApply (wp_ksync_start γt γd γs h (tf_resume_gpr0 (uvis_tf W))
+    iApply (wp_ksync_start γt γd γs γfd h (tf_resume_gpr0 (uvis_tf W))
               (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) 0
               eq_refl with "[] Hrun").
     iApply (sync_code_of_text γt (uvis_M W) (uvis_perm W) Hsub Hx with "Ht").

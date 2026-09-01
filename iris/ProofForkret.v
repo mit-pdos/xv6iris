@@ -98,6 +98,7 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module ForkretProof (MP : MYPROC) (RL : RELEASE) (PR : PREPARE_RETURN)
                     (FS : FSINIT) (KX : KEXEC) (PN : PANIC)
                     (UC : USERRET_CLOSED) : FORKRET.
@@ -127,6 +128,7 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section Res.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the residue is the closed loop's, re-exported unchanged *)
@@ -192,7 +194,7 @@ End Res.
    arm never spent it, and the boot arm rebuilt it from
    [FirstTok.first_tok_of_done] after persisting the store. *)
 Lemma fkr_tail
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ) (j : nat) (γf : gname)
     (pid : mword 32) (U : ustate)
     (ks : mword 64) (mt : regfile) (av av2 : nat) (eb : bool) :
@@ -773,7 +775,7 @@ Qed.
        ([ProofSyscall.sysc_tfp_valid] is the same lemma; restated here so the
        forkret cone does not depend on the syscall proof.) ---- *)
 Lemma fkr_tfp_valid
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
   proc_priv γf pa pid U -∗ ⌜page_valid (page_base (ud_tfp (pv_upt (us_V U))))⌝.
 Proof.
@@ -798,7 +800,7 @@ Proof.
 Qed.
 
 Lemma fkr_boot
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ) (j : nat) (γs : list gname) (γl γf : gname)
     (pid : mword 32) (U : ustate)
     (ks : mword 64) (mr : regfile) (av av2 : nat) (eb : bool) :
@@ -1634,9 +1636,12 @@ Proof.
     iDestruct (cpu_claim_ext_transport CIDk CIDk6 eb p
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     (* ...and the two arms MEET at +0x64, which is [fkr_tail]. *)
+    (* hoisted: an [ltac:] in argument position runs before the term's own
+       instance evars are solved, and then sees a goal with evars in it *)
+    assert (Hav2k : (K_prepare_return <= av2)%nat) by kxarith.
     iApply (fkr_tail W j γf pid
               (MkUstate (upd_tf V' (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V'))) M')
-              ks E4 av av2 eb Hjlt ltac:(kxarith) Havsum HE4sp HE4s1
+              ks E4 av av2 eb Hjlt Hav2k Havsum HE4sp HE4s1
               with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hextc Hclmc Hks Hf16
                     Hpriv Hdone HW [Hyield]").
     (* [upd_tf] does not touch [pv_fdg], so the closer the caller handed in
@@ -1645,7 +1650,7 @@ Proof.
 Qed.
 
 Theorem wp_forkret
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ) (j : nat) (γs : list gname) (γl γf : gname)
     (pid : mword 32) (U : ustate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :

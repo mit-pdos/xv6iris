@@ -89,11 +89,14 @@ Qed.
    from no linear hypothesis, so the argument costs the composition exactly
    one application: [LinkSysFork.v] passes [UexecGen UserProof].  See
    claude-notes/design/user-wp-slot.md. *)
+Require Import UserFd.   (* [ufdG] -- the program's descriptor-table class,
+                            needed to mint a user slot *)
 Module SysForkProof (Kfork : KFORK) (UG : UEXEC_GEN) : SYSFORK.
 
 Section ProofSysFork.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* =================================================================== *)

@@ -49,11 +49,19 @@ Require Import UkCatFprintf.
 Require Import UkCatCat.
 Require Import UkRunBr.
 
+Require Import FdSlots.   (* [fdstate] -- what a handle names *)
+Require Import VcGen.     (* [trunc32_mword_of_int] -- a0 read as a C [int] *)
+Require Import RiscvExtras. (* [moi32_unsigned]/[bvw32_small] *)
+Require Import ProcGeom.  (* [NOFILE] *)
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section UkCatMain.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
-  Context (γt γd γs : gname).
+  Context (γt γd γs γfd : gname).
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -200,7 +208,7 @@ Section UkCatMain.
   (* where the heap's own bounds come from *)
   Local Lemma urun_ubyte_bnd (h : CpuId) (m : regfile) (pc : mword 64)
       (avail : nat) (dq : dfrac) (a : Z) (b : bv 8) :
-    urun γt γd γs h m pc avail -∗ ubyteq γd dq a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
+    urun γt γd γs γfd h m pc avail -∗ ubyteq γd dq a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(_ & _ & Hh & _ & _)".
@@ -210,7 +218,7 @@ Section UkCatMain.
 
   Local Lemma urun_uword_bnd (h : CpuId) (m : regfile) (pc : mword 64)
       (avail : nat) (dq : dfrac) (a : Z) (w : mword 64) :
-    urun γt γd γs h m pc avail -∗ uwordq γd dq a w -∗
+    urun γt γd γs γfd h m pc avail -∗ uwordq γd dq a w -∗
     ⌜ 0 <= a /\ a + 8 <= 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hw". rewrite /uwordq /ubytesq.
@@ -238,7 +246,7 @@ Section UkCatMain.
     cat_code γt -∗
     cat_rodata γt -∗
     uargv γd av args -∗
-    urun γt γd γs h m (mword_of_int 0xde) (10 + (12 + (4 + n))) -∗
+    urun γt γd γs γfd h m (mword_of_int 0xde) (10 + (12 + (4 + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hi Hnz Hs2.
@@ -261,7 +269,7 @@ Section UkCatMain.
     assert (Hal8 : (av + 8 * Z.of_nat i) mod 8 = 0).
     { rewrite Z.add_mod; [ | lia ]. rewrite Hal Z.mul_comm Z_mod_mult.
       reflexivity. }
-    iApply (wp_uk_ld γt γd γs h m (mword_of_int 0xde)
+    iApply (wp_uk_ld γt γd γs γfd h m (mword_of_int 0xde)
               (mword_of_int 0 : mword 12) s2_idx a2_idx DfracDiscarded
               (av + 8 * Z.of_nat i) (mword_of_int (ua_ptr g))
               (10 + (12 + (4 + n)))
@@ -278,7 +286,7 @@ Section UkCatMain.
                  := regval_into_reg
                       (mword_of_int (ua_ptr g) : mword 64)]> m).
     (* ---- 0xe2  auipc a1,0x1 ---- *)
-    iApply (wp_uk_auipc γt γd γs h1 m1 (mword_of_int 0xe2)
+    iApply (wp_uk_auipc γt γd γs γfd h1 m1 (mword_of_int 0xe2)
               (mword_of_int 1 : mword 20) a1_idx (mword_of_int 0x10e2)
               (10 + (12 + (4 + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -299,7 +307,7 @@ Section UkCatMain.
                   = mword_of_int cm_msg).
     { rewrite (upd_eq m1 (Regidx a1_idx) (regval_into_reg _)).
       apply bv_eq. vm_compute. reflexivity. }
-    iApply (wp_uk_addi γt γd γs h2 m2 (mword_of_int 0xe6)
+    iApply (wp_uk_addi γt γd γs γfd h2 m2 (mword_of_int 0xe6)
               (mword_of_int 2302 : mword 12) a1_idx a1_idx
               (mword_of_int cm_msg) (10 + (12 + (4 + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -315,7 +323,7 @@ Section UkCatMain.
     set (m3 := <[Regidx a1_idx
                  := regval_into_reg (mword_of_int cm_msg : mword 64)]> m2).
     (* ---- 0xea  c.li a0,2 ---- *)
-    iApply (wp_uk_cli γt γd γs h3 m3 (mword_of_int 0xea)
+    iApply (wp_uk_cli γt γd γs γfd h3 m3 (mword_of_int 0xea)
               (mword_of_int 2 : mword 6) a0_idx (10 + (12 + (4 + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -331,7 +339,7 @@ Section UkCatMain.
                       (sign_extend' 64 (mword_of_int 2 : mword 6)
                        : mword 64)]> m3).
     (* ---- 0xec  jal ra,0x7d0 <fprintf> ---- *)
-    iApply (wp_uk_jal γt γd γs h4 m4 (mword_of_int 0xec)
+    iApply (wp_uk_jal γt γd γs γfd h4 m4 (mword_of_int 0xec)
               (mword_of_int 1764 : mword 21) ra_idx
               (mword_of_int CatSyms.fprintf) (mword_of_int 0xf0)
               (10 + (12 + (4 + n)))
@@ -364,7 +372,7 @@ Section UkCatMain.
                      ltac:(vm_compute; discriminate)).
       rewrite /m1. exact (upd_eq m (Regidx a2_idx) (regval_into_reg _)). }
     (* ---- fprintf(2, "cat: cannot open %s\n", argv[i]) ---- *)
-    iApply (wp_kcat_fprintf_s γt γd γs cm_msg cm_msg_len cm_msg_q cm_lit
+    iApply (wp_kcat_fprintf_s γt γd γs γfd cm_msg cm_msg_len cm_msg_q cm_lit
               (ua_ptr g) (ua_len g) (ua_bytes g) h5 m5 n
               ltac:(unfold cm_msg; lia)
               ltac:(unfold cm_msg, cm_msg_len; lia)
@@ -384,7 +392,7 @@ Section UkCatMain.
       by (rewrite Hra5; apply bv_eq; vm_compute; reflexivity).
     rewrite Eret.
     (* ---- 0xf0  c.li a0,1 ---- *)
-    iApply (wp_uk_cli γt γd γs h6 m6 (mword_of_int 0xf0)
+    iApply (wp_uk_cli γt γd γs γfd h6 m6 (mword_of_int 0xf0)
               (mword_of_int 1 : mword 6) a0_idx (10 + (12 + (4 + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -400,7 +408,7 @@ Section UkCatMain.
                       (sign_extend' 64 (mword_of_int 1 : mword 6)
                        : mword 64)]> m6).
     (* ---- 0xf2  jal ra,0x3ac <exit> ---- *)
-    iApply (wp_uk_jal γt γd γs h7 m7 (mword_of_int 0xf2)
+    iApply (wp_uk_jal γt γd γs γfd h7 m7 (mword_of_int 0xf2)
               (mword_of_int 698 : mword 21) ra_idx
               (mword_of_int CatSyms.exit) (mword_of_int 0xf6)
               (10 + (12 + (4 + n)))
@@ -412,7 +420,7 @@ Section UkCatMain.
               with "[] Hrun").
     { iApply (uis_cat_f2 with "Hcode"). }
     iIntros (h8) "Hrun".
-    iApply (wp_kcat_exit γt γd γs h8 _ (10 + (12 + (4 + n)))
+    iApply (wp_kcat_exit γt γd γs γfd h8 _ (10 + (12 + (4 + n)))
               with "Hcode Hrun").
   Qed.
 
@@ -436,11 +444,11 @@ Section UkCatMain.
     cat_rodata γt -∗
     uargv γd av args -∗
     ubytes γd CatSyms.buf 512 f -∗
-    urun γt γd γs h m (mword_of_int 0xa6) (8 + (10 + (12 + (4 + n)))) -∗
+    urun γt γd γs γfd h m (mword_of_int 0xa6) (8 + (10 + (12 + (4 + n)))) -∗
     (∀ (h' : CpuId) (m' : regfile) (f' : nat -> bv 8),
        ⌜ cm_inv sp0 av (length args) (S i) m' ⌝ -∗
        ubytes γd CatSyms.buf 512 f' -∗
-       urun γt γd γs h' m' (mword_of_int 0xc2) (8 + (10 + (12 + (4 + n)))) -∗
+       urun γt γd γs γfd h' m' (mword_of_int 0xc2) (8 + (10 + (12 + (4 + n)))) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -457,7 +465,7 @@ Section UkCatMain.
     { rewrite Z.add_mod; [ | lia ].
       rewrite Hal Z.mul_comm Z_mod_mult. reflexivity. }
     (* ---- 0xa6  c.li a1,0 ---- *)
-    iApply (wp_uk_cli γt γd γs h m (mword_of_int 0xa6)
+    iApply (wp_uk_cli γt γd γs γfd h m (mword_of_int 0xa6)
               (mword_of_int 0 : mword 6) a1_idx (8 + (10 + (12 + (4 + n))))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -484,7 +492,7 @@ Section UkCatMain.
       replace (uoff_i12 (mword_of_int 0 : mword 12)) with 0
         by (vm_compute; reflexivity).
       lia. }
-    iApply (wp_uk_ld γt γd γs h1 m1 (mword_of_int 0xa8)
+    iApply (wp_uk_ld γt γd γs γfd h1 m1 (mword_of_int 0xa8)
               (mword_of_int 0 : mword 12) s2_idx a0_idx DfracDiscarded
               (av + 8 * Z.of_nat i) (mword_of_int (ua_ptr g))
               (8 + (10 + (12 + (4 + n))))
@@ -504,7 +512,7 @@ Section UkCatMain.
       by exact (cm_inv_upd sp0 av (length args) i m1 a0_idx _
                   ltac:(vm_compute; reflexivity) Hinv1).
     (* ---- 0xac  jal ra,0x3ec <open> ---- *)
-    iApply (wp_uk_jal γt γd γs h2 m2 (mword_of_int 0xac)
+    iApply (wp_uk_jal γt γd γs γfd h2 m2 (mword_of_int 0xac)
               (mword_of_int 832 : mword 21) ra_idx
               (mword_of_int CatSyms.open) (mword_of_int 0xb0)
               (8 + (10 + (12 + (4 + n))))
@@ -523,9 +531,12 @@ Section UkCatMain.
     assert (Hinv3 : cm_inv sp0 av (length args) i m3)
       by exact (cm_inv_upd sp0 av (length args) i m2 ra_idx _
                   ltac:(vm_compute; reflexivity) Hinv2).
-    iApply (wp_kcat_open γt γd γs h3 m3 (8 + (10 + (12 + (4 + n))))
+    iApply (wp_kcat_open γt γd γs γfd h3 m3 (8 + (10 + (12 + (4 + n))))
               with "Hcode Hrun").
-    iIntros (h4 ret) "Hrun".
+    (* THE HANDLE FOR THE FILE CAT JUST OPENED.  Carried from here to the
+       close at 0xbe -- it is a separate resource, so it simply rides in the
+       context across every step in between. *)
+    iIntros (h4 ret) "Hfdh Hrun".
     assert (Eopen : ret_pc (m3 !!! Regidx ra_idx)
                     = (mword_of_int 0xb0 : mword 64))
       by (rewrite Hra3; apply bv_eq; vm_compute; reflexivity).
@@ -539,7 +550,7 @@ Section UkCatMain.
     assert (Ha0_4 : m4 !!! Regidx a0_idx = ret)
       by exact (upd_eq _ (Regidx a0_idx) ret).
     (* ---- 0xb0  c.mv s1,a0 -- the descriptor ---- *)
-    iApply (wp_uk_cmv γt γd γs h4 m4 (mword_of_int 0xb0) s1_idx a0_idx
+    iApply (wp_uk_cmv γt γd γs γfd h4 m4 (mword_of_int 0xb0) s1_idx a0_idx
               (add_vec zero_reg (m4 !!! Regidx a0_idx))
               (8 + (10 + (12 + (4 + n))))
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -572,7 +583,7 @@ Section UkCatMain.
                          (sign_extend' 64 (mword_of_int 44 : mword 13))
                        = mword_of_int 0xde)
         by (apply bv_eq; vm_compute; reflexivity).
-      iApply (wp_uk_btype0 γt γd γs h5 m5 (mword_of_int 0xb2)
+      iApply (wp_uk_btype0 γt γd γs γfd h5 m5 (mword_of_int 0xb2)
                 (mword_of_int 44 : mword 13) a0_idx BLT true
                 (mword_of_int 0xde) (8 + (10 + (12 + (4 + n))))
                 (eq_sym Hbt) (eq_sym Etgtde)
@@ -585,7 +596,7 @@ Section UkCatMain.
       iApply (wp_kcat_main_die h6 m5 av args i g (8 + n)%nat
                 Hg (Hptr i g Hg) Hs2_5 with "Hcode Hro Hargv Hrun").
     - (* IT SUCCEEDED: cat(fd), close(fd) *)
-      iApply (wp_uk_btype0 γt γd γs h5 m5 (mword_of_int 0xb2)
+      iApply (wp_uk_btype0 γt γd γs γfd h5 m5 (mword_of_int 0xb2)
                 (mword_of_int 44 : mword 13) a0_idx BLT false
                 (add_vec (mword_of_int 0xb2 : mword 64)
                    (sign_extend' 64 (mword_of_int 44 : mword 13)))
@@ -599,7 +610,7 @@ Section UkCatMain.
       rewrite Eb2.
       iIntros (h6) "Hrun".
       (* ---- 0xb6  jal ra,0x0 <cat> ---- *)
-      iApply (wp_uk_jal γt γd γs h6 m5 (mword_of_int 0xb6)
+      iApply (wp_uk_jal γt γd γs γfd h6 m5 (mword_of_int 0xb6)
                 (mword_of_int 2096970 : mword 21) ra_idx
                 (mword_of_int CatSyms.cat) (mword_of_int 0xba)
                 (8 + (10 + (12 + (4 + n))))
@@ -628,7 +639,7 @@ Section UkCatMain.
         exact (upd_ne m5 (Regidx ra_idx) (Regidx s1_idx) _
                  ltac:(vm_compute; discriminate)). }
       (* ---- cat(fd) ---- *)
-      iApply (wp_kcat_cat γt γd γs ret f h7 m6 n Ha0_6
+      iApply (wp_kcat_cat γt γd γs γfd ret f h7 m6 n Ha0_6
                 with "Hcode Hro Hbuf Hrun").
       iIntros (h8 m7 f') "%Hcs Hbuf Hrun".
       assert (Ecat : ret_pc (m6 !!! Regidx ra_idx)
@@ -641,7 +652,7 @@ Section UkCatMain.
                       = add_vec zero_reg (m4 !!! Regidx a0_idx)).
       { rewrite (Hcs s1_idx ltac:(vm_compute; reflexivity)). exact Hs1_6. }
       (* ---- 0xba  c.mv a0,s1 ---- *)
-      iApply (wp_uk_cmv γt γd γs h8 m7 (mword_of_int 0xba) a0_idx s1_idx
+      iApply (wp_uk_cmv γt γd γs γfd h8 m7 (mword_of_int 0xba) a0_idx s1_idx
                 (add_vec zero_reg (m7 !!! Regidx s1_idx))
                 (8 + (10 + (12 + (4 + n))))
                 ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -660,7 +671,7 @@ Section UkCatMain.
         by exact (cm_inv_upd sp0 av (length args) i m7 a0_idx _
                     ltac:(vm_compute; reflexivity) Hinv7).
       (* ---- 0xbc  jal ra,0x3d4 <close> ---- *)
-      iApply (wp_uk_jal γt γd γs h9 m8 (mword_of_int 0xbc)
+      iApply (wp_uk_jal γt γd γs γfd h9 m8 (mword_of_int 0xbc)
                 (mword_of_int 792 : mword 21) ra_idx
                 (mword_of_int CatSyms.close) (mword_of_int 0xc0)
                 (8 + (10 + (12 + (4 + n))))
@@ -679,8 +690,38 @@ Section UkCatMain.
       assert (Hinv9 : cm_inv sp0 av (length args) i m9)
         by exact (cm_inv_upd sp0 av (length args) i m8 ra_idx _
                     ltac:(vm_compute; reflexivity) Hinv8).
-      iApply (wp_kcat_close γt γd γs h10 m9 (8 + (10 + (12 + (4 + n))))
-                with "Hcode Hrun").
+      (* THE HANDLE IS SPENT HERE.  Its descriptor is the one a0 holds: cat
+         saved the open's result in s1 (callee-saved across [cat], hence
+         [Hs1_7]) and moved it back into a0 at 0xba.  The failure arm of the
+         handle is refuted by cat's own [bltz] -- this is the branch where
+         open did NOT return a negative. *)
+      iDestruct "Hfdh" as "[(%fd & %rd & %wr & %t & [%Hretfd %Hfdlt] & Hh)
+                           | %Hretm1]";
+        [ | exfalso; rewrite Ha0_5 Hretm1 in Hbt; vm_compute in Hbt;
+            discriminate Hbt ].
+      assert (Ha0_9 : bv_signed (trunc32 (m9 !!! Regidx a0_idx))
+                      = Z.of_nat fd).
+      { assert (Ea0 : m9 !!! Regidx a0_idx = ret).
+        { rewrite /m9 (upd_ne m8 (Regidx ra_idx) (Regidx a0_idx) _
+                         ltac:(vm_compute; discriminate)).
+          rewrite /m8 upd_eq Hs1_7 Ha0_4 !add_vec_zero_l. reflexivity. }
+        rewrite Ea0 Hretfd trunc32_mword_of_int.
+        assert (Hr31 : (0 <= Z.of_nat fd < 2 ^ 31)%Z).
+        { unfold NOFILE in Hfdlt.
+          assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
+          lia. }
+        (* hoisted out of argument position: an [ltac:] there would run
+           before the width was known *)
+        assert (Hbw : bv_wrap 32 (Z.of_nat fd) = Z.of_nat fd)
+          by (apply bvw32_small; lia).
+        unfold bv_signed. rewrite moi32_unsigned Hbw.
+        apply bv_swrap_small.
+        assert (Hh32 : bv_half_modulus 32 = 2147483648%Z)
+          by (vm_compute; reflexivity).
+        rewrite Hh32. lia. }
+      iApply (wp_kcat_close γt γd γs γfd h10 m9 fd (FdOpen rd wr t)
+                (8 + (10 + (12 + (4 + n)))) Ha0_9
+                with "Hcode Hrun Hh").
       iIntros (h11 ret2) "Hrun".
       assert (Eclose : ret_pc (m9 !!! Regidx ra_idx)
                        = (mword_of_int 0xc0 : mword 64))
@@ -702,7 +743,7 @@ Section UkCatMain.
                         (sign_extend' 64 (mword_of_int 8 : mword 6))
                       = mword_of_int (av + 8 * Z.of_nat (S i))).
       { rewrite Hs2_10 E8i moi_add. f_equal. lia. }
-      iApply (wp_uk_caddi γt γd γs h11 m10 (mword_of_int 0xc0)
+      iApply (wp_uk_caddi γt γd γs γfd h11 m10 (mword_of_int 0xc0)
                 (mword_of_int 8 : mword 6) s2_idx
                 (mword_of_int (av + 8 * Z.of_nat (S i)))
                 (8 + (10 + (12 + (4 + n))))
@@ -749,7 +790,7 @@ Section UkCatMain.
       cat_rodata γt -∗
       uargv γd av args -∗
       ubytes γd CatSyms.buf 512 f -∗
-      urun γt γd γs h m (mword_of_int 0xa6) (8 + (10 + (12 + (4 + n)))) -∗
+      urun γt γd γs γfd h m (mword_of_int 0xa6) (8 + (10 + (12 + (4 + n)))) -∗
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hav0 Havhi Hptr.
@@ -775,7 +816,7 @@ Section UkCatMain.
         rewrite (moi_neq_vec (av + 8 * Z.of_nat (length args))
                    (av + 8 * Z.of_nat (length args)) Hlo3 Hlo3).
         rewrite Z.eqb_refl. reflexivity. }
-      iApply (wp_uk_btype γt γd γs h1 m1 (mword_of_int 0xc2)
+      iApply (wp_uk_btype γt γd γs γfd h1 m1 (mword_of_int 0xc2)
                 (mword_of_int 8164 : mword 13) s3_idx s2_idx BNE false
                 (add_vec (mword_of_int 0xc2 : mword 64)
                    (sign_extend' 64 (mword_of_int 8164 : mword 13)))
@@ -788,7 +829,7 @@ Section UkCatMain.
       rewrite Ec2.
       iIntros (h2) "Hrun".
       (* ---- 0xc6  c.li a0,0 ; 0xc8  jal exit ---- *)
-      iApply (wp_uk_cli γt γd γs h2 m1 (mword_of_int 0xc6)
+      iApply (wp_uk_cli γt γd γs γfd h2 m1 (mword_of_int 0xc6)
                 (mword_of_int 0 : mword 6) a0_idx (8 + (10 + (12 + (4 + n))))
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
@@ -799,7 +840,7 @@ Section UkCatMain.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite Ec6.
       iIntros (h3) "Hrun".
-      iApply (wp_uk_jal γt γd γs h3 _ (mword_of_int 0xc8)
+      iApply (wp_uk_jal γt γd γs γfd h3 _ (mword_of_int 0xc8)
                 (mword_of_int 740 : mword 21) ra_idx
                 (mword_of_int CatSyms.exit) (mword_of_int 0xcc)
                 (8 + (10 + (12 + (4 + n))))
@@ -811,7 +852,7 @@ Section UkCatMain.
                 with "[] Hrun").
       { iApply (uis_cat_c8 with "Hcode"). }
       iIntros (h4) "Hrun".
-      iApply (wp_kcat_exit γt γd γs h4 _ (8 + (10 + (12 + (4 + n))))
+      iApply (wp_kcat_exit γt γd γs γfd h4 _ (8 + (10 + (12 + (4 + n))))
                 with "Hcode Hrun").
     - (* more files to come ---- *)
       assert (Hne : (S i)%nat <> length args) by lia.
@@ -828,7 +869,7 @@ Section UkCatMain.
                        (sign_extend' 64 (mword_of_int 8164 : mword 13))
                      = mword_of_int 0xa6)
         by (apply bv_eq; vm_compute; reflexivity).
-      iApply (wp_uk_btype γt γd γs h1 m1 (mword_of_int 0xc2)
+      iApply (wp_uk_btype γt γd γs γfd h1 m1 (mword_of_int 0xc2)
                 (mword_of_int 8164 : mword 13) s3_idx s2_idx BNE true
                 (mword_of_int 0xa6) (8 + (10 + (12 + (4 + n)))) Ht
                 (eq_sym Etgt) ltac:(intros _; vm_compute; reflexivity)
@@ -856,7 +897,7 @@ Section UkCatMain.
     cat_rodata γt -∗
     uargv γd av args -∗
     ubytes γd CatSyms.buf 512 f -∗
-    urun γt γd γs h m (mword_of_int CatSyms.main)
+    urun γt γd γs γfd h m (mword_of_int CatSyms.main)
       (6 + (8 + (10 + (12 + (4 + n))))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -892,7 +933,7 @@ Section UkCatMain.
     assert (Ho8 : uoff_sdsp (mword_of_int 1 : mword 6) = 8)
       by (vm_compute; reflexivity).
     (* ---- 0x7e  c.addi16sp sp,sp,-48 ---- *)
-    iApply (wp_uk_caddi16sp_dn γt γd γs h m (mword_of_int 0x7e)
+    iApply (wp_uk_caddi16sp_dn γt γd γs γfd h m (mword_of_int 0x7e)
               (mword_of_int 61 : mword 6) 6 (8 + (10 + (12 + (4 + n))))
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "[] Hrun").
@@ -913,7 +954,7 @@ Section UkCatMain.
       as "(_ & [%w1 Hw1] & [%w2 Hw2] & [%w3 Hw3] & [%w4 Hw4] & [%w5 Hw5]
             & [%w6 Hw6])".
     (* ---- 0x80  c.sdsp ra,40(sp) ---- *)
-    iApply (wp_uk_csdsp γt γd γs h0 m1 (mword_of_int 0x80)
+    iApply (wp_uk_csdsp γt γd γs γfd h0 m1 (mword_of_int 0x80)
               (mword_of_int 5 : mword 6) ra_idx (uint sp0 - 8) w1
               (8 + (10 + (12 + (4 + n))))
               ltac:(rewrite Hsp1 Hsp48 Ho40; lia)
@@ -927,7 +968,7 @@ Section UkCatMain.
     rewrite E80.
     iIntros (h1) "Hrun".
     (* ---- 0x82  c.sdsp s0,32(sp) ---- *)
-    iApply (wp_uk_csdsp γt γd γs h1 m1 (mword_of_int 0x82)
+    iApply (wp_uk_csdsp γt γd γs γfd h1 m1 (mword_of_int 0x82)
               (mword_of_int 4 : mword 6) s0_idx (uint sp0 - 16) w2
               (8 + (10 + (12 + (4 + n))))
               ltac:(rewrite Hsp1 Hsp48 Ho32; lia)
@@ -941,7 +982,7 @@ Section UkCatMain.
     rewrite E82.
     iIntros (h2) "Hrun".
     (* ---- 0x84  c.addi4spn s0,sp,48 -- the frame pointer ---- *)
-    iApply (wp_uk_caddi4spn γt γd γs h2 m1 (mword_of_int 0x84)
+    iApply (wp_uk_caddi4spn γt γd γs γfd h2 m1 (mword_of_int 0x84)
               (mword_of_int 0 : mword 3) (mword_of_int 12 : mword 8) s0_idx
               (add_vec (m1 !!! Regidx csp_rs1)
                  (sign_extend' 64 (caddi4spn_imm (mword_of_int 12 : mword 8))))
@@ -980,7 +1021,7 @@ Section UkCatMain.
       rewrite /m1. exact (upd_ne m (Regidx csp_rs1) (Regidx a1_idx) _
                             ltac:(vm_compute; discriminate)). }
     (* ---- 0x86  c.li a5,1 ---- *)
-    iApply (wp_uk_cli γt γd γs h3 m2 (mword_of_int 0x86)
+    iApply (wp_uk_cli γt γd γs γfd h3 m2 (mword_of_int 0x86)
               (mword_of_int 1 : mword 6) a5_idx (8 + (10 + (12 + (4 + n))))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1028,7 +1069,7 @@ Section UkCatMain.
                          (sign_extend' 64 (mword_of_int 68 : mword 13))
                        = mword_of_int 0xcc)
         by (apply bv_eq; vm_compute; reflexivity).
-      iApply (wp_uk_btype γt γd γs h4 m3 (mword_of_int 0x88)
+      iApply (wp_uk_btype γt γd γs γfd h4 m3 (mword_of_int 0x88)
                 (mword_of_int 68 : mword 13) a0_idx a5_idx BGE true
                 (mword_of_int 0xcc) (8 + (10 + (12 + (4 + n)))) Ht
                 (eq_sym Etgtcc) ltac:(intros _; vm_compute; reflexivity)
@@ -1036,7 +1077,7 @@ Section UkCatMain.
       { iApply (uis_cat_88 with "Hcode"). }
       iIntros (h5) "Hrun".
       (* ---- 0xcc/0xce/0xd0  the three extra spills ---- *)
-      iApply (wp_uk_csdsp γt γd γs h5 m3 (mword_of_int 0xcc)
+      iApply (wp_uk_csdsp γt γd γs γfd h5 m3 (mword_of_int 0xcc)
                 (mword_of_int 3 : mword 6) s1_idx (uint sp0 - 24) w3
                 (8 + (10 + (12 + (4 + n))))
                 ltac:(rewrite Hsp3 Hsp48 Ho24; lia)
@@ -1048,7 +1089,7 @@ Section UkCatMain.
                    = mword_of_int 0xce);
         [ | apply bv_eq; vm_compute; reflexivity ].
       iIntros (h6) "Hrun".
-      iApply (wp_uk_csdsp γt γd γs h6 m3 (mword_of_int 0xce)
+      iApply (wp_uk_csdsp γt γd γs γfd h6 m3 (mword_of_int 0xce)
                 (mword_of_int 2 : mword 6) s2_idx (uint sp0 - 32) w4
                 (8 + (10 + (12 + (4 + n))))
                 ltac:(rewrite Hsp3 Hsp48 Ho16; lia)
@@ -1060,7 +1101,7 @@ Section UkCatMain.
                    = mword_of_int 0xd0);
         [ | apply bv_eq; vm_compute; reflexivity ].
       iIntros (h7) "Hrun".
-      iApply (wp_uk_csdsp γt γd γs h7 m3 (mword_of_int 0xd0)
+      iApply (wp_uk_csdsp γt γd γs γfd h7 m3 (mword_of_int 0xd0)
                 (mword_of_int 1 : mword 6) s3_idx (uint sp0 - 40) w5
                 (8 + (10 + (12 + (4 + n))))
                 ltac:(rewrite Hsp3 Hsp48 Ho8; lia)
@@ -1073,7 +1114,7 @@ Section UkCatMain.
         [ | apply bv_eq; vm_compute; reflexivity ].
       iIntros (h8) "Hrun".
       (* ---- 0xd2  c.li a0,0 ; 0xd4  jal cat ---- *)
-      iApply (wp_uk_cli γt γd γs h8 m3 (mword_of_int 0xd2)
+      iApply (wp_uk_cli γt γd γs γfd h8 m3 (mword_of_int 0xd2)
                 (mword_of_int 0 : mword 6) a0_idx (8 + (10 + (12 + (4 + n))))
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
@@ -1087,7 +1128,7 @@ Section UkCatMain.
                    := regval_into_reg
                         (sign_extend' 64 (mword_of_int 0 : mword 6)
                          : mword 64)]> m3).
-      iApply (wp_uk_jal γt γd γs h9 m4 (mword_of_int 0xd4)
+      iApply (wp_uk_jal γt γd γs γfd h9 m4 (mword_of_int 0xd4)
                 (mword_of_int 2096940 : mword 21) ra_idx
                 (mword_of_int CatSyms.cat) (mword_of_int 0xd8)
                 (8 + (10 + (12 + (4 + n))))
@@ -1109,14 +1150,14 @@ Section UkCatMain.
       { rewrite /m5 (upd_ne m4 (Regidx ra_idx) (Regidx a0_idx) _
                        ltac:(vm_compute; discriminate)).
         rewrite /m4. exact (upd_eq m3 (Regidx a0_idx) (regval_into_reg _)). }
-      iApply (wp_kcat_cat γt γd γs _ f h10 m5 n Ha0_5
+      iApply (wp_kcat_cat γt γd γs γfd _ f h10 m5 n Ha0_5
                 with "Hcode Hro Hbuf Hrun").
       iIntros (h11 m6 f') "_ Hbuf Hrun".
       rewrite (_ : ret_pc (m5 !!! Regidx ra_idx)
                    = (mword_of_int 0xd8 : mword 64));
         [ | rewrite Hra5; apply bv_eq; vm_compute; reflexivity ].
       (* ---- 0xd8  c.li a0,0 ; 0xda  jal exit ---- *)
-      iApply (wp_uk_cli γt γd γs h11 m6 (mword_of_int 0xd8)
+      iApply (wp_uk_cli γt γd γs γfd h11 m6 (mword_of_int 0xd8)
                 (mword_of_int 0 : mword 6) a0_idx (8 + (10 + (12 + (4 + n))))
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
@@ -1126,7 +1167,7 @@ Section UkCatMain.
                    = mword_of_int 0xda);
         [ | apply bv_eq; vm_compute; reflexivity ].
       iIntros (h12) "Hrun".
-      iApply (wp_uk_jal γt γd γs h12 _ (mword_of_int 0xda)
+      iApply (wp_uk_jal γt γd γs γfd h12 _ (mword_of_int 0xda)
                 (mword_of_int 722 : mword 21) ra_idx
                 (mword_of_int CatSyms.exit) (mword_of_int 0xde)
                 (8 + (10 + (12 + (4 + n))))
@@ -1138,7 +1179,7 @@ Section UkCatMain.
                 with "[] Hrun").
       { iApply (uis_cat_da with "Hcode"). }
       iIntros (h13) "Hrun".
-      iApply (wp_kcat_exit γt γd γs h13 _ (8 + (10 + (12 + (4 + n))))
+      iApply (wp_kcat_exit γt γd γs γfd h13 _ (8 + (10 + (12 + (4 + n))))
                 with "Hcode Hrun").
     - (* AT LEAST ONE FILE: set up the walk over argv ---- *)
       assert (Hnt : false
@@ -1146,7 +1187,7 @@ Section UkCatMain.
                         (m3 !!! Regidx a0_idx)).
       { rewrite Hge. symmetry. apply not_true_is_false. intro HH.
         apply Z.geb_le in HH. lia. }
-      iApply (wp_uk_btype γt γd γs h4 m3 (mword_of_int 0x88)
+      iApply (wp_uk_btype γt γd γs γfd h4 m3 (mword_of_int 0x88)
                 (mword_of_int 68 : mword 13) a0_idx a5_idx BGE false
                 (add_vec (mword_of_int 0x88 : mword 64)
                    (sign_extend' 64 (mword_of_int 68 : mword 13)))
@@ -1170,7 +1211,7 @@ Section UkCatMain.
       assert (Hav0' : 0 <= av) by lia.
       assert (Havhi' : av + 8 * Z.of_nat (length args) <= 2 ^ 38) by lia.
       (* ---- 0x8c/0x8e/0x90  the three extra spills ---- *)
-      iApply (wp_uk_csdsp γt γd γs h5 m3 (mword_of_int 0x8c)
+      iApply (wp_uk_csdsp γt γd γs γfd h5 m3 (mword_of_int 0x8c)
                 (mword_of_int 3 : mword 6) s1_idx (uint sp0 - 24) w3
                 (8 + (10 + (12 + (4 + n))))
                 ltac:(rewrite Hsp3 Hsp48 Ho24; lia)
@@ -1182,7 +1223,7 @@ Section UkCatMain.
                    = mword_of_int 0x8e);
         [ | apply bv_eq; vm_compute; reflexivity ].
       iIntros (h6) "Hrun".
-      iApply (wp_uk_csdsp γt γd γs h6 m3 (mword_of_int 0x8e)
+      iApply (wp_uk_csdsp γt γd γs γfd h6 m3 (mword_of_int 0x8e)
                 (mword_of_int 2 : mword 6) s2_idx (uint sp0 - 32) w4
                 (8 + (10 + (12 + (4 + n))))
                 ltac:(rewrite Hsp3 Hsp48 Ho16; lia)
@@ -1194,7 +1235,7 @@ Section UkCatMain.
                    = mword_of_int 0x90);
         [ | apply bv_eq; vm_compute; reflexivity ].
       iIntros (h7) "Hrun".
-      iApply (wp_uk_csdsp γt γd γs h7 m3 (mword_of_int 0x90)
+      iApply (wp_uk_csdsp γt γd γs γfd h7 m3 (mword_of_int 0x90)
                 (mword_of_int 1 : mword 6) s3_idx (uint sp0 - 40) w5
                 (8 + (10 + (12 + (4 + n))))
                 ltac:(rewrite Hsp3 Hsp48 Ho8; lia)
@@ -1210,7 +1251,7 @@ Section UkCatMain.
       assert (E8i : (sign_extend' 64 (mword_of_int 8 : mword 12) : mword 64)
                     = mword_of_int 8)
         by (apply bv_eq; vm_compute; reflexivity).
-      iApply (wp_uk_addi γt γd γs h8 m3 (mword_of_int 0x92)
+      iApply (wp_uk_addi γt γd γs γfd h8 m3 (mword_of_int 0x92)
                 (mword_of_int 8 : mword 12) a1_idx s2_idx
                 (mword_of_int (av + 8 * Z.of_nat 1))
                 (8 + (10 + (12 + (4 + n))))
@@ -1237,7 +1278,7 @@ Section UkCatMain.
                      : mword 64)
                     = mword_of_int (-2))
         by (apply bv_eq; vm_compute; reflexivity).
-      iApply (wp_uk_addiw γt γd γs h9 m4 (mword_of_int 0x96)
+      iApply (wp_uk_addiw γt γd γs γfd h9 m4 (mword_of_int 0x96)
                 (mword_of_int 4094 : mword 12) a0_idx s3_idx
                 (mword_of_int (Z.of_nat (length args) - 2))
                 (8 + (10 + (12 + (4 + n))))
@@ -1261,7 +1302,7 @@ Section UkCatMain.
                       = mword_of_int (Z.of_nat (length args) - 2))
         by exact (upd_eq m4 (Regidx s3_idx) (regval_into_reg _)).
       (* ---- 0x9a  slli a5,s3,32 ---- *)
-      iApply (wp_uk_slli γt γd γs h10 m5 (mword_of_int 0x9a)
+      iApply (wp_uk_slli γt γd γs γfd h10 m5 (mword_of_int 0x9a)
                 (mword_of_int 32 : mword 6) s3_idx a5_idx
                 (shift_bits_left
                    (mword_of_int (Z.of_nat (length args) - 2) : mword 64)
@@ -1292,7 +1333,7 @@ Section UkCatMain.
                              (Z.sub log2_xlen 1) 0))
         by exact (upd_eq m5 (Regidx a5_idx) (regval_into_reg _)).
       (* ---- 0x9e  srli s3,a5,29 : s3 := 8 * (argc - 2) ---- *)
-      iApply (wp_uk_srli γt γd γs h11 m6 (mword_of_int 0x9e)
+      iApply (wp_uk_srli γt γd γs γfd h11 m6 (mword_of_int 0x9e)
                 (mword_of_int 29 : mword 6) a5_idx s3_idx
                 (mword_of_int ((Z.of_nat (length args) - 2) * 8))
                 (8 + (10 + (12 + (4 + n))))
@@ -1325,7 +1366,7 @@ Section UkCatMain.
       assert (E16 : (sign_extend' 64 (mword_of_int 16 : mword 6) : mword 64)
                     = mword_of_int 16)
         by (apply bv_eq; vm_compute; reflexivity).
-      iApply (wp_uk_caddi γt γd γs h12 m7 (mword_of_int 0xa2)
+      iApply (wp_uk_caddi γt γd γs γfd h12 m7 (mword_of_int 0xa2)
                 (mword_of_int 16 : mword 6) a1_idx (mword_of_int (av + 16))
                 (8 + (10 + (12 + (4 + n))))
                 ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1348,7 +1389,7 @@ Section UkCatMain.
       assert (Ha1_8 : m8 !!! Regidx a1_idx = mword_of_int (av + 16))
         by exact (upd_eq m7 (Regidx a1_idx) (regval_into_reg _)).
       (* ---- 0xa4  c.add s3,s3,a1 : s3 := &argv[argc] ---- *)
-      iApply (wp_uk_cadd γt γd γs h13 m8 (mword_of_int 0xa4) s3_idx a1_idx
+      iApply (wp_uk_cadd γt γd γs γfd h13 m8 (mword_of_int 0xa4) s3_idx a1_idx
                 (mword_of_int (av + 8 * Z.of_nat (length args)))
                 (8 + (10 + (12 + (4 + n))))
                 ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1411,7 +1452,7 @@ Section UkCatMain.
     cat_rodata γt -∗
     uargv γd av args -∗
     ubytes γd CatSyms.buf 512 f -∗
-    urun γt γd γs h m (mword_of_int CatSyms.start)
+    urun γt γd γs γfd h m (mword_of_int CatSyms.start)
       (2 + (6 + (8 + (10 + (12 + (4 + n)))))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1439,7 +1480,7 @@ Section UkCatMain.
     assert (Ho0 : uoff_sdsp (mword_of_int 0 : mword 6) = 0)
       by (vm_compute; reflexivity).
     (* ---- 0xf6  c.addi sp,sp,-16 ---- *)
-    iApply (wp_uk_caddi_sp_dn γt γd γs h m (mword_of_int 0xf6)
+    iApply (wp_uk_caddi_sp_dn γt γd γs γfd h m (mword_of_int 0xf6)
               (mword_of_int 48 : mword 6) 2
               (6 + (8 + (10 + (12 + (4 + n)))))
               ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -1460,7 +1501,7 @@ Section UkCatMain.
     iDestruct (ustack_2_open with "Hframe")
       as "(_ & [%w1 Hw1] & [%w2 Hw2])".
     (* ---- 0xf8  c.sdsp ra,8(sp) ---- *)
-    iApply (wp_uk_csdsp γt γd γs h0 m1 (mword_of_int 0xf8)
+    iApply (wp_uk_csdsp γt γd γs γfd h0 m1 (mword_of_int 0xf8)
               (mword_of_int 1 : mword 6) ra_idx (uint sp0 - 8) w1
               (6 + (8 + (10 + (12 + (4 + n)))))
               ltac:(rewrite Hsp1 Hsp16 Ho8; lia)
@@ -1473,7 +1514,7 @@ Section UkCatMain.
       [ | apply bv_eq; vm_compute; reflexivity ].
     iIntros (h1) "Hrun".
     (* ---- 0xfa  c.sdsp s0,0(sp) ---- *)
-    iApply (wp_uk_csdsp γt γd γs h1 m1 (mword_of_int 0xfa)
+    iApply (wp_uk_csdsp γt γd γs γfd h1 m1 (mword_of_int 0xfa)
               (mword_of_int 0 : mword 6) s0_idx (uint sp0 - 16) w2
               (6 + (8 + (10 + (12 + (4 + n)))))
               ltac:(rewrite Hsp1 Hsp16 Ho0; lia)
@@ -1486,7 +1527,7 @@ Section UkCatMain.
       [ | apply bv_eq; vm_compute; reflexivity ].
     iIntros (h2) "Hrun".
     (* ---- 0xfc  c.addi4spn s0,sp,16 ---- *)
-    iApply (wp_uk_caddi4spn γt γd γs h2 m1 (mword_of_int 0xfc)
+    iApply (wp_uk_caddi4spn γt γd γs γfd h2 m1 (mword_of_int 0xfc)
               (mword_of_int 0 : mword 3) (mword_of_int 4 : mword 8) s0_idx
               (add_vec (m1 !!! Regidx csp_rs1)
                  (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))
@@ -1506,7 +1547,7 @@ Section UkCatMain.
                          (sign_extend' 64
                             (caddi4spn_imm (mword_of_int 4 : mword 8))))]> m1).
     (* ---- 0xfe  jal ra,0x7e <main> ---- *)
-    iApply (wp_uk_jal γt γd γs h3 m2 (mword_of_int 0xfe)
+    iApply (wp_uk_jal γt γd γs γfd h3 m2 (mword_of_int 0xfe)
               (mword_of_int 2097024 : mword 21) ra_idx
               (mword_of_int CatSyms.main) (mword_of_int 0x102)
               (6 + (8 + (10 + (12 + (4 + n)))))

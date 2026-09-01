@@ -75,6 +75,7 @@ Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module UtSys (PR : PREPARE_RETURN) (KI : KILLED) (KE : KEXIT) (YI : YIELD)
              (SY : SYSCALL).
 
@@ -96,6 +97,7 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section UtSysBlock.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the trapframe page's own [page_valid], read off [proc_priv] without

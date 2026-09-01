@@ -496,6 +496,11 @@ WpLockIn.v
 WpLockAt.v
 ArrCursor.v
 FdSlots.v
+
+# the PROGRAM's own view of its descriptor table (γfd): the authority
+# rides inside [UkRun.urun], the handles are what a user-level proof carries.
+# Distinct from FdSlots' kernel/process split -- see UserFd.v's header.
+UserFd.v
 IcacheRef.v
 EscrowDefs.v
 FileInvDefs.v
@@ -1747,11 +1752,34 @@ LinkSysUnlinkAU.v
 # '%s' argument over WHICH HALF of the heap holds it -- cat's is a heap
 # string, sh's panic prints a .rodata literal -- so the '%s' arm is proved
 # once for both instead of twice.  Audit = the standing three.
-UCodeShK.v
+# ---------------------------------------------------------------------
+# SH IS PARKED (2026-09-01), and this is the reason -- not a build glitch.
+#
+# [UkRun.urun] now carries the program's own descriptor-table authority
+# ([UserFd.ufd_auth]), and in that design a CLOSED SLOT IS ABSENT from the
+# map.  That is what makes [open] able to mint a handle -- an insert needs
+# the key free -- but it also makes [close] have to SPEND one, because a
+# ghost_map authority can never shrink without the element.
+#
+# sh closes descriptors it never opened: its REDIR and PIPE paths close the
+# INHERITED fds 0 and 1, six times over.  There is no handle for those and
+# no sound way to make one, so sh cannot be re-proved against the new close
+# leaf without first changing the design so that "untracked" is a resource
+# a program holds rather than an absence it cannot name -- i.e. the process
+# starts holding a fragment for every one of the NOFILE slots.
+#
+# cat is NOT parked: its open and close sit in one proof, so its handle is
+# threaded (UkCatMain, open at 0xb0 -> s1 -> a0 -> close at 0xbe).
+#
+# Nothing outside these six files refers to them, so parking them costs the
+# rest of the tree nothing.  Un-parking is the follow-on to the
+# every-slot-a-fragment change.
+# ---------------------------------------------------------------------
+# PARKED: UCodeShK.v
 UkRunBr.v
-UkSh.v
-UkShRun.v
-UkShDiag.v
+# PARKED: UkSh.v
+# PARKED: UkShRun.v
+# PARKED: UkShDiag.v
 
 # ... STAGE 4: the parser.  UCodeShP.v is a THIRD catalog over the same
 # dump (tools/ucode_shp.txt, [--prog shp]) -- 564 instructions in eleven
@@ -1777,8 +1805,8 @@ UkShDiag.v
 # [ushp_malloc_ok] (stage 3's allocator, blocked on [wp_uk_ecall_sbrk]);
 # it taints NOTHING yet -- every lemma in the file is unconditional today.
 # Audit = the standing three, zero Admitted, zero Axiom.
-UCodeShP.v
-UkShParse.v
+# PARKED: UCodeShP.v
+# PARKED: UkShParse.v
 
 # FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
 # u-tier syscall row.  FsFdMirror = the pure mirror + step table;

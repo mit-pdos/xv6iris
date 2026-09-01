@@ -118,8 +118,10 @@ Require Import TsoCtx.
    sits BELOW [SpecSyscall] now (ParkCap.v says why), so it spells it out.
    Same term, so every consumer stated at [K_syscall] is unaffected. *)
 Notation K_usertrap := ((4 + kv_frame_slots + (4 + K_sys_exec))%nat) (only parsing).
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Section UsertrapRes.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
@@ -1951,7 +1953,7 @@ Qed.
    belong in [DiskInv.v] and [ProcDefs.v] beside their single-context
    twins; they are here so that this fix does not rebuild the whole tree
    for two four-line lemmas.  MOVE THEM WHEN THAT IS CHEAP. *)
-Lemma disk_geom_agree_x `{!riscvGS Σ, !xv6G Σ} (ξ1 ξ2 : CtxId) (γ : disk_names)
+Lemma disk_geom_agree_x `{!riscvGS Σ, !xv6G Σ} `{!ufdG Σ} (ξ1 ξ2 : CtxId) (γ : disk_names)
     (pd pav pu pd' pav' pu' : mword 64) :
   disk_geom (XI := ξ1) γ pd pav pu -∗ disk_geom (XI := ξ2) γ pd' pav' pu' -∗
   ⌜pd = pd' /\ pav = pav' /\ pu = pu'⌝.
@@ -1964,7 +1966,7 @@ Proof.
   done.
 Qed.
 
-Lemma is_kstack_agree_x `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !bioslotG Σ}
+Lemma is_kstack_agree_x `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !bioslotG Σ} `{!ufdG Σ}
     (ξ1 ξ2 : CtxId) (pa ks ks' : mword 64) :
   is_kstack (XI := ξ1) pa ks -∗ is_kstack (XI := ξ2) pa ks' -∗ ⌜ks = ks'⌝.
 Proof.
@@ -2070,7 +2072,7 @@ Definition ut_park_intro_body
 
 Lemma ut_res_bare_park
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{XI : CurCtx}
     (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
     (W : iProp Σ)
     (N : ut_names) (av : nat) :
@@ -2180,7 +2182,7 @@ Proof. exact I. Qed.
 (* was rejected for the reason the key is [(pt, ksp)] in the first place:   *)
 (* those are the only two things the TRAMPOLINE knows.                      *)
 (* ---------------------------------------------------------------------- *)
-Lemma wp_next_true_swap `{!riscvGS Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+Lemma wp_next_true_swap `{!riscvGS Σ} `{!ufdG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     (p q : mword 64) (K : forall CID : CpuId, iProp Σ) :
   p <> zero_reg ->
   wp_next true p K -∗ wp_next true q K.
@@ -2190,7 +2192,7 @@ Proof.
 Qed.
 
 Lemma ut_hold_transport
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{XI : CurCtx}
     (CID0 CID1 : CpuId) (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
     (N : ut_names) (U : ustate) (b : bool) (lks : gset string) (sts : list fdstate) :
   (b = false \/ un_pj N = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->

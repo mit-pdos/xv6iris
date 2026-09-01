@@ -337,8 +337,12 @@ Lemma uvis_run_arg2 (W : uvis) :
   uvis_tf (uvis_run W) !!! tf_arg_idx 2 = uvis_tf W !!! tf_arg_idx 2.
 Proof. exact (tf_resume_gpr0_a2 (uvis_tf W)). Qed.
 
+Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
+                            its descriptor table, the authority for
+                            which rides inside [urun] *)
 Section Apply.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
 
   (* THE SLOT SEES FOUR PROJECTIONS OF ITS KEY AND NOTHING ELSE.
@@ -479,6 +483,7 @@ End Apply.
 (* ===================================================================== *)
 Section Frame.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : TsoCtx.CurCtx}.
 
   Lemma trapped_machine_frame (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
@@ -570,6 +575,7 @@ Qed.
 
 Section LoopApply.
   Context `{!riscvGS Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : TsoCtx.CurCtx}.
 
   (* ------------------------------------------------------------------ *)

@@ -391,6 +391,7 @@ Set Printing Depth 40.
    an axiom in LinkSyscall.v; the fact was never missing from the tree, only
    from the invariant, so nothing had to be assumed. *)
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module SyscallProof
     (SysFork : SYSFORK) (SysExit : SYSEXIT) (SysWait : SYSWAIT)
     (SysPipe : SYSPIPE) (SysRead : SYSREAD) (SysKill : SYSKILL)
@@ -523,6 +524,7 @@ Record sysc_proc_ties `{ICFG : icfg} `{FSC : fscfg}
 Section SyscallVocab.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ===================================================================== *)
@@ -2454,6 +2456,7 @@ End SyscallVocab.
 Section SyscallRet.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* TWO IMAGES, and the split is the point: [Mu] is the one the caller's
@@ -2608,6 +2611,7 @@ End SyscallRet.
 Section SyscallArms.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE SIXTEEN QUIET ARMS' SHARED DISCHARGE.  [sysc_mem_ok]'s decision is
@@ -5646,6 +5650,7 @@ End SyscallArms.
 Section SyscallMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* CAPSTONE.  The shared scaffolding (`sysc_arm_pre`/`sysc_hcont_ty`/

@@ -63,10 +63,12 @@ Require Import UexecRet.  (* the round's vocabulary *)
 Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
 Import Defs.
 
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module UservecProof (UT : UtResFits.USERTRAP_PARK) (UR : SpecUserret.USERRET) : USERVEC.
 
 Section UservecAllPt.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!ufdG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition usertrap_res := UT.usertrap_res.

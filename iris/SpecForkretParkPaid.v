@@ -258,6 +258,7 @@ Definition forkret_park_paid_body
     iref_slots IREFSPARE -∗
     |==> proc_ctx_boxed γs pa.
 
+Require Import UserFd.   (* [ufdG] -- carried through the park/forkret seals *)
 Module Type FORKRET_PARK_PAID.
   (* the residue is the module-type parameter it is everywhere else *)
   (* ...AND THE PARK'S ONE PRODUCER-SIDE ENTRY, threaded with the rest.
@@ -268,7 +269,7 @@ Module Type FORKRET_PARK_PAID.
      PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
   Include UtResFits.USERTRAP_RES_PARK.
   Parameter forkret_park_paid :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
       (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (U : ustate) (av : nat),
@@ -279,7 +280,7 @@ Module Type FORKRET_PARK_PAID.
      residue's channel, tied into the fixpoint.  This is the one entry the
      parkers use; the statement above is its proof. *)
   Parameter park_token_intro :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γs : list gname),
       ⊢ park_token γs.
 End FORKRET_PARK_PAID.

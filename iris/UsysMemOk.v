@@ -259,7 +259,12 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
            the call ([UserFd.ufd_dup] is the consumer). *)
         sts !! fd1 = Some FdClosed /\
         sts' = <[fd1 := sts !!! Z.to_nat (usys_argfd tf)]> sts)
-     \/ sts' = sts)
+     (* ...OR THE CALL FAILED, AND THE ROW SAYS SO BY NAMING [-1].  An
+        unguarded [sts' = sts] here would be useless to a caller: it would
+        permit "returned a descriptor and changed nothing", which sys_dup
+        never does, and a caller holding [r] could not tell the two arms
+        apart.  Both failure exits of sys_dup return -1. *)
+     \/ (r = (mword_of_int (-1) : mword 64) /\ sts' = sts))
   else if decide (n = USYS_open) then
     (* open(path, omode): the returned descriptor becomes OPEN at some type
        and mode.  Both are existential HERE and both are pinnable: the mode
@@ -276,7 +281,9 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
            dup's row above. *)
         sts !! fd = Some FdClosed /\
         sts' = <[fd := FdOpen rd wr t]> sts)
-     \/ sts' = sts)
+     (* ...or the call failed, which it reports as -1 -- see dup's row for
+        why the failure arm is guarded rather than bare. *)
+     \/ (r = (mword_of_int (-1) : mword 64) /\ sts' = sts))
   else if decide (n = USYS_pipe) then
     (* pipe(fdarray): TWO descriptors, and the row says which end is which
        -- [FdOpen true false FdPipe] reads and [FdOpen false true FdPipe]
@@ -410,9 +417,10 @@ Proof.
   destruct (decide (n = USYS_close)) as [_ | _].
   { destruct (decide (uint r = 0)); subst; [ apply length_insert | reflexivity ]. }
   destruct (decide (n = USYS_dup)) as [_ | _].
-  { destruct H as [(fd1 & _ & _ & ->) | ->]; [apply length_insert | reflexivity]. }
+  { destruct H as [(fd1 & _ & _ & ->) | [_ ->]];
+      [apply length_insert | reflexivity]. }
   destruct (decide (n = USYS_open)) as [_ | _].
-  { destruct H as [(fd & rd & wr & t & _ & _ & ->) | ->];
+  { destruct H as [(fd & rd & wr & t & _ & _ & ->) | [_ ->]];
       [apply length_insert | reflexivity]. }
   destruct (decide (n = USYS_pipe)) as [_ | _].
   { destruct (decide (uint r = 0)) as [_ | _].

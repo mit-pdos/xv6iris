@@ -91,6 +91,7 @@ Set Printing Depth 40.
 (* arm's [fin_to_nat c <> 0] premise.                                      *)
 (* ---------------------------------------------------------------------- *)
 
+Require Import UserFd.   (* [ufdΣ]/[ufdG] *)
 Lemma cpu_enum_cons : (enum CPU : list CPU) = 0%fin :: (FS <$> enum (fin 7)).
 Proof. reflexivity. Qed.
 
@@ -270,6 +271,7 @@ Qed.
 
 Section SystemBoot.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!ufdG Σ}.
   Context `{!fileGpreS Σ, !fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ, !bioslotGpreS Σ}.
   (* B3's two classes are [xv6G] MEMBERS now (2b-inode-3 / 2b-inode-4), so
      nothing extra is bound here -- see [FsCfgBoot]'s era section. *)
@@ -595,6 +597,10 @@ End SystemBoot.
 Theorem xv6_power_adequacy_gen Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
       !irefslotGpreS Σ, !bioslotGpreS Σ}
+    (* the PROGRAM's descriptor-table class: [xv6Σ] supplies it, and the
+       user slot minted during boot is allocated at it.  NAMED, because the
+       boot application below is explicit ([@]) and passes it positionally. *)
+    `{Hufd : !ufdG Σ}
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
     (* THE TRACE INVARIANT, PASSED THROUGH TO
        [RiscvAdequacy.riscv_power_adequacy] (whose header is the full
@@ -792,8 +798,13 @@ Proof.
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & GT & ->).
   (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
      member now, so the section generalises one class less. *)
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov
+  (* one [_] MORE since the program's descriptor class ([UserFd.ufdG]) joined
+     the section: this application counts them positionally. *)
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ Hufd _ _ _ _ _ gen g' sb nib cov
             Hbf Hpure Hcovin Hlogsub Hls2 _ _).
+  (* the descriptor class comes back as a GOAL here rather than being
+     shelved, because the application is explicit ([@]); it is the section's
+     own instance. *)
   { reflexivity. }
   (* the UART thread's permit, at the record the era boots over *)
   intros γ. apply (Hperm _ gen γ).
@@ -813,6 +824,8 @@ Qed.
 Theorem xv6_power_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
       !irefslotGpreS Σ, !bioslotGpreS Σ}
+    (* the program's descriptor-table class -- supplied by [xv6Σ] *)
+    `{!ufdG Σ}
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
     (phi : gstate -> Prop)
     (Hphi : forall (Hinv : invGS Σ)
@@ -850,6 +863,7 @@ Qed.
 Theorem xv6_trace_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
       !irefslotGpreS Σ, !bioslotGpreS Σ}
+    `{!ufdG Σ}   (* the program's descriptor-table class (from [xv6Σ]) *)
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
     (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
     (HR0 : ⊢ |==> R [])
@@ -920,7 +934,11 @@ Qed.
    chain application in §2 above. *)
 
 Definition xv6Σ : gFunctors :=
-  #[ riscvΣ; xv6GΣ; fileΣ; fdslotΣ; irefslotΣ; pavΣ ].
+  (* [ufdΣ] is the PROGRAM's descriptor-table ghost map ([UserFd]): the
+     authority rides inside [UkRun.urun] and the handles are what a
+     user-level proof carries.  Distinct from [fdslotΣ], which is the
+     kernel/process split over the same descriptors. *)
+  #[ riscvΣ; xv6GΣ; fileΣ; fdslotΣ; irefslotΣ; pavΣ; ufdΣ ].
 
 (* THE POWER THEOREM AT THE CONCRETE FUNCTOR LIST: every class is
    discharged, so "nothing about the ghost state is assumed" is checked
