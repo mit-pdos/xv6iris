@@ -18261,3 +18261,46 @@ consequence:
   the drop local; and the drop's "mine" case selects by deciding
   n = n_park (pure nat) against the parker's own astamp, so γl carries
   no value (unit), only whole-vs-half + the parked fragment.
+
+### A6.153: R1-pre + R1 LANDED (endgame §4.1) -- gate green
+
+Both rounds of §4.1 are green on tso-flip (build: BioInv 2 500 lines,
+BioInitAt, the sleeplock cone, then a 148-file gate over BioInitAt +
+ProofAcquiresleep/Releasesleep/Holdingsleep + LinkReleasesleep +
+IcacheBoot + BootCarveMain + FsCfgBoot + FirstTok + FsReady, and a
+19-file gate over FsBoot).  What landed, per the doc:
+- R1-pre: SleepLock's payload is a context-λ under the inner WpLock
+  lock (sl_body/sl_pay at explicit ξ; is_sleeplock_genl the λ base;
+  the const names kept as the (λ _, R0) instance via sl_body_eq;
+  acquiresleep relays R cur_ctx; releasesleep relays BOTH WpLock forms
+  -- wp_releasesleep_genin_sconf with the RELEASE_IN functor argument,
+  wp_releasesleep_genl_sconf plain; ProofHoldingsleep's two opens).
+- R1: enriched pres ((n_b,T_b) agree × positive) with ● in the box's
+  IN/OUT arm and ● None in IDLE; every bref carries the fragment + llb;
+  registers γp/γd (pairs) and γc (count sync) as ghost_var halves; the
+  tag multiset ● S with parker claims; the pile of parked fragments;
+  rows (r2)/(r3)/tie/bound in the box body; the eight transitions
+  (bump, refs++, refs-- in hand, refs-- from the pile, checkout, park,
+  drop in hand, drop from the pile) as fupds over the box invariant;
+  bio_slot_res2/bcache_scan2/bcache_res2 (floor slot tl; the L1 row
+  bslot_regs); the sleeplock payload bslp (bown + park half + astamp +
+  llb + ctx_floor ξ rp.2) with bslp_dep/bslp_fold for the _in release;
+  bio_init v4 and bio_init_at v4 boot IDLE at generation 0.
+- ENCODING NOTE (doc changelog): the two cover lemmas of §3.3 are folded
+  INTO the transition lemmas -- box_swap_checkout takes the two floors
+  (K1 ≥ rb.2 from the llb-tier acquire, K2 ≥ rp.2 from the payload row)
+  and the tie picks inside; box_swap_drop_hand takes (Kb, Kd);
+  box_swap_drop_pile takes (Km ≥ T_mine, Kd) plus the claim and the
+  parker's astamp, and refutes the bump case by (r3) + astamp_le.  Same
+  case split, one lemma per site instead of cover + withdraw.
+- CAMERAS: the new classes (presG, btagG, anchorG, ghost_varG (nat*nat))
+  are bundled as Xv6Cameras.bioboxG and made a member of Xv6G.xv6G, so
+  no consumer of bio_ctx/bio_init changes its Context (the first gate
+  found FsBoot with undefined evars otherwise).  CtxAnchor's anchorG
+  moved to Xv6Cameras §15.
+- Gotchas of the round are in durable-notes ("Gotchas from the R1
+  box/register landing").
+NEXT: R2 per §4.1 -- site-map first (the six ProofBread/ProofBrelse
+sites, bpin/bunpin's box opens, ProofLogWrite's two structural bref
+destructs, ProofForkretPark/SpecForkretParkPaid's bcache_res mentions),
+then the cutover and the mandatory -B round.

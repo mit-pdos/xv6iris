@@ -2674,3 +2674,41 @@ blow-up.  Use the generic helper (`is_sleeplock_genb_lock`) on generic
 hypotheses.  Diagnose any single-file compile past ~10 min with
 `COQEXTRAFLAGS="-time"` under `timeout`; the last printed sentence is the
 culprit.  Build law: every GCP make runs under `timeout` now.
+
+### Gotchas from the R1 box/register landing (2026-09-01)
+
+- **New ghost classes never go on `BioInv`'s `Context`.**  `bio_ctx`/`bio_init`
+  are stated by ~100 files whose only binders are `!riscvGS Σ, !xv6G Σ,
+  !bioslotG Σ`; an extra `!presG Σ` (etc.) on the section surfaces there as
+  "UNDEFINED EVARS … riscvGS ?Σ" at the first consumer (`FsBoot.fs_boot_bundle`).
+  Define the camera class in `Xv6Cameras.v` (section 15: `presG`, `btagG`,
+  `anchorG`, bundled as `bioboxG`) and make it a member of `Xv6G.xv6G`.
+- **`Local Ltac` inside a `Section` is gone after `End`** (`BioInv.tl_struct`):
+  a later section must spell the `Timeless` proof structurally
+  (`bi.exist_timeless`/`bi.sep_timeless` + `apply _` at the leaves) or the
+  Ltac must be hoisted.
+- **`iFrame` of a persistent witness dives into an ∃ under a disjunct and
+  instantiates the existential** (`astamp γ (S n) T'` framed the IN arm's
+  `∃ rb` as well as the prefix).  Frame the ξ-free prefix with explicit
+  `iSplitR; [iExact …|]` before `iRight. iExists …`.
+- **`>` on a hypothesis that carries no ▷ is an error** in this Iris ("cannot
+  eliminate modality"), and `iDestruct "H" as "[>A | >B]"` on `▷ (A ∨ B)`
+  needs `Timeless` for both arms (`buf_bundle_timeless`,
+  `buf_chain_res_timeless`).  After that strip, no inner `>`.
+- **`iCombine` on two `own γ (◯ _)` already normalises `◯ a ⋅ ◯ b`**, so a
+  following `rewrite -auth_frag_op` finds nothing.  For a three-way clash use
+  `own_valid_3` and do the `-assoc -auth_frag_op …` rewrites on the pure
+  validity fact.
+- **`big_sepL_mono` leaves a plain Coq goal, losing the IPM intuitionistic
+  context** (`"Hsts" not found` inside the boot loop).  Use
+  `big_sepL_impl` with `iIntros "!>" (i k Hk)`.
+- **`gmultiset_local_update_dealloc X Y X'` has ONE premise (`X' ⊆ Y`)**, and
+  the unit must be spelled `{[+ n +]} ∖ {[+ n +]}` by hand for it to match;
+  `gmultiset_elem_of_subseteq` takes the membership FIRST.
+- **`op_local_update_discrete` wants the frame side as `z ⋅ y`**; for the
+  enriched presence element (`optionUR (prodR (agreeR _) positiveR)`) the
+  alloc/dealloc updates go through `local_update_unital_discrete` with an
+  explicit frame inversion (`BioInv.pres_frame_inv`).
+- **Z_scope pairs**: `((0, 0) : nat * nat)` still elaborates the literals in
+  `Z`; write `(0%nat, 0%nat)`.  A multiset binder named `S` shadows the
+  successor (`S n` becomes an application of the multiset) -- name it `Sm`.
