@@ -117,7 +117,9 @@ One custody shape covers every remaining cross-lock protocol.  A box
 instance is declared by:
 
   - bundle  P : CtxId → iProp   (CtxMorph; the travelling cells+pay)
-  - residue Q : iProp           (ξ-FREE, ghost-only checkout residue)
+  - residue Q : iProp           (ξ-FREE, ghost-only checkout residue:
+                                 for bcache, bchain ∗ bown ∗ the park
+                                 half + its witnesses — §3.3 site notes)
   - guard locks L1, L2          (bcache: bcache.lock / b->sleeplock;
                                  icache: itable.lock / ip->sleeplock)
   - a presence/identity ghost (below)
@@ -291,9 +293,33 @@ plus the pile rows (r1)–(r3) above.
   bref_tok (bref_tok_two) — bown is in R at that moment, not in hand.
   Boot is IDLE for every buffer (content in the payload; anchor at
   generation 0, stamp 0; S = ∅; rp = rd = (0,0)) — no boot deposit.
-  The reference's holder form is ONE spelling: bref := bref_tok ∗
-  (∃ rb, pres_frag rb ∗ llb rb.T) ∗ the dev/bno fractions; the
-  log layer passes it opaquely.  pres ●, the γc half, the pile, ● S and the
+  The reference has TWO spellings, BY ROLE (2026-09-01, build agent —
+  the holder handle is frozen, see below):
+    bref   := bref_tok (share Some q) ∗ (∃ rb, pres_frag rb ∗ llb rb.T)
+              ∗ the dev/bno fractions {q}
+              — bpin's / the log layer's reference; the fractions pin
+              its (dev, bno) to the cells (ProofLogWrite agrees them
+              against the handle); passed opaquely.
+    bchain := bref_tok0 (share None) ∗ (∃ rb, pres_frag rb ∗ llb rb.T)
+              — bread's CHAIN reference, ghost-only: the chain reads
+              dev/bno through its handle rows, so it takes NO fraction
+              off the slot.  The auth map's share component is
+              [option Qp] (bioUR := auth (gmap nat (option frac ×
+              positive))); the count component counts BOTH kinds, and
+              the slot's tie [Σ fractioned shares + qr = 1/2] is exact
+              with no extra register.
+  WHY: bio_held/bio_locked (the sleeplock holder's handle) is unfolded
+  structurally by ~25 fs-layer files, so NOTHING may be added to it.
+  Everything the checkout leaves with the holder must therefore be
+  ξ-free ghost and live in the OUT arm's residue Q:
+    Q := bchain ∗ bown ∗ (∃ rp, reg_park rp ∗ astamp rp ∗ llb rp.T)
+  (the sleeplock payload's γp half moves from R into Q for the length
+  of the hold; the box's own half stays in the prefix and agrees).
+  box_swap_checkout takes bchain + R's rows and stores them; box_swap_park
+  hands bown, bchain (its fragment now in the pile under a fresh tag),
+  the claim and the UPDATED park half + witnesses back — which is
+  exactly releasesleep's Rdep row plus the refs-- inputs.  The holder
+  carries only bio_locked across bread→brelse, as today.  pres ●, the γc half, the pile, ● S and the
   γp/γd halves sit in the body's COMMON PREFIX outside the three arms;
   IDLE adds only ● None (which forces o = 0 by validity).  The payload's
   None-arm keeps the γd/γc halves (the tie must hold in IDLE).  bunpin
@@ -639,3 +665,12 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   bslp := bown ∗ ∃ rp, reg_park rp ∗ astamp rp ∗ llb rp.2 ∗ ctx_floor ξ
   rp.2, exactly §4.1's instantiation; bslp_dep/bslp_fold are the _in
   release's Rdep and entailment.
+- 2026-09-01 (build agent, R2 site map finding): the holder handle
+  (bio_held/bio_locked) is frozen — ~25 fs-layer files unfold it — so
+  the checkout's residue cannot ride the handle.  Refinement, no new
+  instrument: the chain's reference is ghost-only (bchain: share None +
+  fragment; bioUR's share becomes option Qp; the slot tie stays exact),
+  and the OUT arm's Q carries bchain ∗ bown ∗ the park half + witnesses,
+  returned by the park.  The (dev,bno)-pinning fractions stay on bpin's
+  brefs, which the log layer needs.  §2's Q line and §3.3's site notes
+  amended in place.
