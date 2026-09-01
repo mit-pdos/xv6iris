@@ -18370,3 +18370,25 @@ Instruments available (all landed in R1/R1-pre; nothing new):
     escrow_recyc_*, buf_mid, buf_parked, buf_chain, bio_slot_res /
     bcache_scan / bcache_res (v1), bcache_res_to_scan, v1 accessors.
 Gate: full -B round (interface change).
+
+### A6.155: R2 finding -- the holder handle is frozen; bchain + OUT residue
+
+Mapping site 5 (the checkout) showed the holder walks away with ghost
+residue (its fragment, the sleeplock payload's park half) and, per the
+A6.148 note, its bref's dev/bno fractions.  The only holder-side home
+is bio_held/bio_locked, which ~25 fs-layer files unfold structurally
+(DinodeSlot, ProofInstallTrans, ProofBalloc, ProofEndOp, …) -- adding a
+conjunct is a tree-wide sweep, which §5 forbids.  Resolution, recorded
+in the endgame doc (§2 Q line, §3.3 site notes, changelog):
+- the chain's reference is GHOST-ONLY: bchain := bref_tok0 ∗ (∃ rb,
+  pres_frag rb ∗ llb rb.2), with bioUR's share component widened to
+  option Qp (the chain's tok is (None, 1); bpin's stay (Some q, 1) with
+  their fractions, which ProofLogWrite needs to pin (dev, bno));
+- the OUT arm's Q := bchain ∗ bown ∗ (∃ rp, reg_park rp ∗ astamp ∗ llb),
+  stored by box_swap_checkout and returned by box_swap_park (park half
+  updated) -- so bio_held is untouched and the handle crosses
+  bread→brelse exactly as today.
+Code consequences (all inside the R2 file set): BioDefs.bioUR + the tok
+kit (first_ref/incr/decr/lookup/two), bio_slot_res2's Some-arm tie by
+match on the option share, bchain, the two swap lemmas' signatures,
+bcache_scan2_incr/recycle mint bchain (no fraction split for the chain).
