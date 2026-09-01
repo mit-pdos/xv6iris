@@ -567,3 +567,28 @@ freeze-path movers over pinw_slot (frz_slot_freeze/kill + the
 share-lookup family + regen), close_last_freeze twin, itable_res2
 extension + is_itable2 flip, icM_wf bound, THE SWAP, IcacheBoot,
 consumers.
+
+## r69 BANKED (snapshot b784e0ec23d): the pre-swap accessor layer is COMPLETE
+
+The locked exact read (iref_load_locked_pinw_au yields the window at the
+holder's map word and payload stamp; IcachePinwObl.iref_read_locked_obl
+cashes the A6.144 floor row into "the read IS iref_word M k at every
+drain view") and the four movers over the merged body:
+- iref_share_lookup_pinw_au (bare slice finds its slot Some),
+- frz_slot_kill_pinw (positive slice + TRUE selector = False, decided
+  slot-shaped: true selector forces the frozen arm's full unit),
+- frz_slot_freeze_pinw (gather all mass at the agreed (g,lo) into the
+  frozen arm; the WINDOW ROWS STAY -- freeze stores nothing),
+- live_slot_regen_pinw (generation bumps AT THE SAME lo -- no store, so
+  the pin floor cannot move).
+IPM GOTCHA recorded: [live_genlo_agree ... as %[<- <-]] SUBSTITUTES the
+lemma-universal (g, lo) away, keeping the slot's ∃-bound (g0, lo0) --
+use g0/lo0 downstream (the incr twin avoided it by binding the slot's
+∃s AS (g, lo) directly).
+
+The complete additive pinw tier now spans: body v2 + slice/upd
+accessors + racy read + locked exact read + 4 count-store twins + arm
+(face + install) + retire (face + AU) + lookup/kill/freeze/regen.
+NEXT: close_last_freeze twin (only when a consumer demands it),
+itable_res2 extension + is_itable2 flip (IcacheEscrow), icM_wf bound,
+THE SWAP, IcacheBoot, consumers.
