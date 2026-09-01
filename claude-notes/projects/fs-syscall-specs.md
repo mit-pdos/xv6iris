@@ -2621,6 +2621,158 @@ things, and the answer differs:
       one-line-body parsers, which are `peek`-then-recurse and should be
       cheap now that peek is unconditional.
 
+    **STAGE 4 — ROUND 4, 2026-09-01 (parser-completion lane).  THE PARSER
+    IS COMPLETE AND THE PARSER THEOREM IS LANDED.**  `iris/UCodeShP.v`
+    UNCHANGED; `iris/UkShParse.v` 7567 → 14 902 lines; EC2-green at
+    **3 min 18 s** for the whole file; zero `Admitted`, zero `Axiom`;
+    `Print Assumptions wp_kshp_parser` on the mirror is **the standing
+    three and nothing else** (`resv_matches`, `resv_is_valid`, funext) —
+    the two Hypotheses are section variables and so appear as the
+    theorem's own premises.
+
+    * **THE THEOREM, `wp_kshp_parser`.**  *Given a NUL-terminated command
+      line at `s0` with no symbol byte in it, whose tokens (in the ported
+      `ushp_tokens` sense) are `toks` and number fewer than MAXARGS, and
+      sh's two static tables, sh's `parsecmd` returns a node `p` with
+      `ushp_tree s0 p (UshpExec toks)` — §5's deliverable interface —
+      with the line NUL-CUT at every token's end index (said both as the
+      byte run `ubytes γd s0 (S len) (ushp_nulfold toks …)` and as the
+      pure fact that each end byte is now zero), with `ucallee_saved`,
+      and at the return address.*  It carries `ushp_parses` as a pure
+      conjunct so the statement names the parse relation §5 already
+      defined.  **It is NOT parametric in the command's SHAPE**: a line
+      with a symbol byte reaches `parseblock`/`redircmd`/`pipecmd`/
+      `listcmd`/`backcmd`, none of which is catalogued, and the two
+      `panic`s are refuted only under `ushp_no_symbols`.  That premise is
+      the scope stage 4 was given and the scope the theorem keeps.
+    * **A DEFECT IN THE LANDED CONTRACTS, FOUND ON THE FIRST WALK AND
+      FIXED.**  `peek(ps, es, toks)` is called at seven sites and EVERY
+      `toks` is a STRING LITERAL — `"<>"`@0x12f0, `"("`@0x12f8,
+      `"|)&;"`@0x1318, `"|"`@0x1320, `"&"`@0x1328, `";"`@0x1330,
+      `""`@0x1288 — and all seven are in .rodata (0x1280..0x13d9), which
+      shares the EXECUTABLE segment's pages and is therefore the TEXT
+      half.  Round 3's `wp_kshp_peek` took the table as `ustr γd dt`, a
+      DATA-half string, and `UserHeap.uheap_ubyte` says a γd byte's page
+      is WRITABLE — so at every real call site that premise does not
+      merely go unproved, it **CONTRADICTS the layout**, and no caller
+      could ever have supplied it.  peek was true and unusable, and so
+      would every parser lemma built on it have been.
+      **THE FIX IS ONE BOOLEAN** and it is `UkShDiag`'s `shd_str` idiom a
+      third time: `ushp_sbq` / `ushp_sstr`, a C string generalised over
+      which half holds it, with `ushp_sstr false dq = ustr γd dq` and
+      `ushp_sstr true dq = utext_str γt` BOTH BY `reflexivity`.
+      `wp_ushp_lbu` is the one load at either half.  Only `strchr` — the
+      one function that LOADS from the table — needed a real edit (four
+      `lbu` sites, three accessors); `peek`'s `toks` argument took a
+      boolean; the five landed call sites that pass a genuinely-γd table
+      (the whitespace table at 0x2008 and the symbol table at 0x2000, in
+      .data) changed by one argument.  **RELAY: this is the third copy of
+      the same family, which is what ask 3 already asks to relocate.**
+    * **WHAT IS WALKED.  All eleven catalogued functions.**  Round 3 left
+      180 of 564 instructions walked in five functions; round 4 adds
+      **255 more on the live paths** of the remaining six —
+      `parseredirs` 42 of 85, `parseexec` 82 of 92, `parsepipe` 28 of 41,
+      `parseline` 35 of 56, `nulterminate` 33 of 50, `parsecmd` 35 of 42
+      — for **435 of the catalogue's 564**.  The 129 that are NOT walked
+      are not a gap: they are the five arms `ushp_no_symbols` refutes
+      (parseredirs' switch and its two `redircmd` calls, parseexec's
+      `parseblock` arm, parsepipe's `pipecmd` arm, parseline's `backcmd`
+      and `listcmd` arms, parsecmd's leftovers `fprintf`/`panic`) plus
+      parseexec's two `panic`s, and **the theorem refutes each of them
+      rather than assuming it away**.  That discharges all five
+      `skipfunc` claims in `tools/ucode_shp.txt` as theorems.
+    * **THE SECOND HYPOTHESIS, AND ROUND 3'S ONE MISREADING.**
+      `nulterminate`'s switch is a genuine computed transfer through the
+      table at 0x13b0, and .rodata is the text half, so the load at
+      0x814 is four bytes out of γt.  **It is the COMPRESSED `c.lw`, not
+      a base-encoding `lw`** — the catalog says so — which means the leaf
+      wanted is exactly `UkShRun.wp_uk_clw_text`, *which already exists*
+      (it was built for runcmd's own jump table) and is merely `Local` to
+      that file.  `ushp_clw_text_ok` is its statement VERBATIM; the
+      discharge is one `exact` the moment ask 3 moves it into
+      `UkRunMem.v`.  **So round 3's ask for a new `wp_uk_lw_text` should
+      be withdrawn**: nothing new has to be built, only un-`Local`'d.
+    * **THE MOULDS THIS ROUND ADDED, and they are what made it fit.**
+      (a) `wp_kshp_frame_pro` / `wp_kshp_frame_epi` — the WHOLE prologue
+      and the WHOLE epilogue at any frame size `k` with `n` locals, over
+      §4b's two spill runs.  All five parser functions push and pop with
+      `c.addi16sp`, so there is no two-armed premise; a call site owes
+      the §4b bargain (pure facts at concrete numbers) and nothing else.
+      Used verbatim by parseredirs, parsepipe, parseline and (epilogue
+      only) nulterminate and parsecmd.
+      (b) `ushp_spillback_eq` / `ushp_frame_cs` — **the callee-saved
+      read-back once, by induction on the spill list.**  peek paid ~90
+      lines peeling the restore run's insert tower one `Z.eq_dec` per
+      spill; this is that argument once, and a call site owes only what
+      the run spilled and that the body left the OTHER callee-saved
+      registers alone.  It is the single biggest line saving of the
+      round.
+      (c) `ushp_exec_pre` — the node WHILE IT IS BEING FILLED.
+      `ushp_exec_at` FORGETS what is above the NULL cap (slot `i > |toks|`
+      is an unconstrained cell), which is the right reading of a finished
+      node and the WRONG loop invariant, because parseexec writes slot
+      `argc` and then needs slot `argc+1` to be the new cap.
+      `ushp_exec_pre` says the truth (memset zeroed all eighty bytes, so
+      every slot at or above `argc` is still ZERO) and `ushp_exec_pre_at`
+      is the one-way door.  `wp_kshp_execcmd` now publishes the stronger
+      form.
+      (d) `ushp_tokens_skip` — the tokenization model survives a cursor
+      skip, because `ushp_skipws` is idempotent.  The argument loop moves
+      the cursor THREE times a turn (peek, gettoken, parseredirs) and
+      this is what carries the invariant across all three.
+    * **PARSEEXEC'S FRAME IS SPLIT IN TWO, BOTH WAYS**, and neither §4c
+      lemma fits it: gcc spills ra/s0/s1/s4/s5 before the `peek` that
+      decides whether this is a block and the other eight only on the
+      fall-through, and the restores mirror it (eight at 0x670, five at
+      0x5fa, with the `c.j 0x5f8` between them as the join).  So its
+      frame is FOUR separate runs over §4b's two, **at the slot addresses
+      rather than at consecutive indexes** — which is exactly what
+      `wp_kshp_spill`/`wp_kshp_restore`'s `ad` parameter was for.
+    * **THE EVAR GOTCHA BIT AGAIN, and it cost 300 s before it was
+      recognised.**  `rewrite (Hcs78 _ ltac:(vm_compute; reflexivity))`
+      inside a spill's side condition asks `vm_compute` to evaluate
+      `ucallee_saved_idx ?r` with `?r` open.  Same divergence, same fix:
+      hoist the fact with a NAMED register and close the call with
+      `refine (… _ _); vm_compute`.  **Audit every `ltac:` under a `_`.**
+    * **FIVE SMALLER NITS, each paid once, each worth the record.**
+      (i) `rewrite (upd_eq nK …)` does NOT match a goal that mentions the
+      `set` variable `n(K+1)` — name the read-back as its own `assert`
+      first.  (ii) A whole-goal `rewrite !big_sepL_cons` expands the
+      big-ops in the PROOFMODE CONTEXT too, so a later `iFrame` against a
+      folded goal fails; `iExact` goes through because the two forms are
+      convertible.  (iii) `big_sepL_delete` must have its `Φ` PINNED when
+      two big-ops of the same shape are in scope, or it rewrites the
+      wrong one.  (iv) `iIntros` does not take
+      `(idents) "str" (idents) "str"` in one command when it STARTS with
+      the ident group — split it.  (v) a body-preservation fact that
+      EXCLUDES `sp` cannot be used to read `sp` back; that wants its own
+      chain.
+    * **BUDGET vs MEASURED.**  Whole-file compiles throughout: 36 s (the
+      half-generic string fix) → 37 s (the frame moulds) → 56 s
+      (`ushp_exec_pre` and the token model) → 62 s (the argument loop) →
+      2 min 23 s (parseexec) → 2 min 48 s (parseline) → 3 min 18 s (the
+      theorem).  **7335 lines for 255 instructions, ~29 lines per
+      instruction** against round 3's measured 31 and stage 2's 45 — the
+      moulds are again what bought the difference, and the cost is now
+      dominated by the FILE, not by the walk: at 14 902 lines the whole
+      file recompiles in 198 s, i.e. ~13 ms a line.  A follow-on lane
+      should expect to pay that per edit and should batch accordingly.
+    * **WHAT IS OWED NEXT, in order.**  (a) **Ask 3, narrowed**: un-
+      `Local` `UkShRun.wp_uk_clw_text` and relocate it to `UkRunMem.v`;
+      that discharges `ushp_clw_text_ok` by name.  (b) **Stage 3**, which
+      discharges `ushp_malloc_ok` and makes the theorem unconditional.
+      (c) **The stage-6 seam**: `ushp_tree` owns its bytes at
+      `DfracOwn 1` while `UkShRun.ush_cmd` reads them at
+      `DfracDiscarded`, so the hop from this theorem to stage 5's
+      `wp_kshr_runcmd` is a DISCARD of the finished node plus the
+      `uarg`-vs-index-pair reconciliation the stage-4 header already
+      flagged; the NUL-cut fact this theorem publishes is exactly what
+      turns an index pair into a `uarg`.  (d) The URedir fd∈{0,1}
+      conjunct upstream asked for is **not said by this lane after all**:
+      `parseredirs` builds no node on a symbol-free line, so there is no
+      place in the walk that could prove it; it belongs wherever
+      `redircmd` is eventually walked.
+
   * **STAGE 5 — `runcmd`'s tree walk.  LANDED; see the record above.**
     The stage-0 guesses that did NOT survive contact: EXEC needs no
     pinned-exec prover at all (`wp_uk_ecall_exec` is TOTAL — a successful
@@ -2679,6 +2831,22 @@ things, and the answer differs:
      bridge already takes one — and the `DfracOwn 1` spelling is what
      stops any read-only structure being read), and `wp_uk_clw_text` is a
      genuinely new leaf: the four-byte load out of the TEXT half.
+     **RAISED IN PRIORITY BY STAGE 4 ROUND 4 (2026-09-01):
+     `wp_uk_clw_text` now has a SECOND consumer.**  sh's `nulterminate`
+     reads its jump table with the same compressed `c.lw` out of
+     .rodata, so `iris/UkShParse.v` carries the statement as its second
+     (and last) Hypothesis, `ushp_clw_text_ok`, VERBATIM.  Un-`Local`ing
+     the lemma and moving it into `UkRunMem.v` discharges that Hypothesis
+     by `exact` and leaves the parser theorem depending on the allocator
+     alone.  **And WITHDRAW round 3's separate ask for a base-encoding
+     `wp_uk_lw_text`**: the catalog says the instruction at 0x814 is
+     `c.lw`, so no new leaf is needed — only the relocation.
+     **The `shd_str` leg below is now real too**: round 4 needed a C
+     string generalised over WHICH HALF holds it for the THIRD time
+     (UkShDiag has one, UkShParse now has `ushp_sstr`), and the reason is
+     structural — `peek`'s token table is a .rodata string literal at all
+     seven of its call sites, so the DATA-half spelling was not merely
+     unproved there but contradictory.
      **And take the diagnostic subtree's two with them**: `shd_sb` /
      `shd_str` / `shd_str_byte` / `shd_str_nul` / `shd_str_nonul` (a C
      string generalised over WHICH HALF of the heap holds it — `ustr` and
