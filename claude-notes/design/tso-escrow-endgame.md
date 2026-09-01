@@ -189,22 +189,22 @@ Ghosts (all tiny, additive; no model or Σ-arm changes):
     Synced (rd := rp) at every refs-- decrement: the decrementer holds
     L1's payload and opens the box.  Floor delivered by R2 at the
     decrementer's L1 release.
-  - **reg_last** (the self-park receipt): `ghost_var γl (1/2) ()` —
-    UNIT-valued (refined 2026-09-01; the value was dead weight: the
-    "mine" case selects by DECIDING n = n_park against the dropper's
-    own park-export astamp, a pure nat test).  The box holds one half;
-    PARK takes the other half as the receipt WHEN AVAILABLE (a second
-    un-decremented parker finds it gone and simply gets no receipt —
-    its drop still closes by the decide-n route); the receipt-out arm
-    of the body holds the PARKER'S pres fragment in its stead
-    (deposited at park, retrieved at its decrement — the same box
-    open).  Invariant: γl whole in the box ⇒ reg_park = reg_drop.
+  - **the parked-fragment PILE** (replaces reg_last; refined
+    2026-09-01): γl is NOT a ghost.  Every PARK deposits the parker's
+    pres fragment into the body, where fragments compose into a single
+    `◯ Some(to_agree rb, o)` pile (o ∃-bound, the row absent at o = 0);
+    an ex-parker's refs-- decrement retrieves one fragment from the
+    pile instead of presenting one from hand (the caller knows which —
+    program flow).  EVERY decrement syncs rd := rp (it holds L1 + the
+    box), so the body's pure row `⌜o = 0 → rp = rd⌝` is re-established
+    at each edge and vacuous at each park.  At the last drop (count 1)
+    the fragment total (pile + hand = count) makes the case split
+    total and local; receipts and the "mine" case selection disappear.
   - **reg_cnt** (count sync; added 2026-09-01): `ghost_var γc (1/2) c`
     with one half beside the slot's Some-arm count (= M's count) and
-    one in the box beside the pres ●.  This makes "count = 1" READABLE
-    at the drop's box open, so the receipt-out arm is refuted LOCALLY:
-    ● Some(rb,1) ∗ the dropper's ◯ ∗ the arm's parked ◯ is 2 ≤ 1.
-    Without it the case-3 totality argument is global-only.
+    one in the box beside the pres ●.  This makes the count READABLE
+    at any box open: the IDLE refutation at refs ≥ 1 is a γc value
+    clash, and the last-drop's fragment accounting is against c = 1.
 
 The box's pure tie (maintained by inspection at each of the four
 transitions, all of which hold the needed halves):
@@ -382,9 +382,10 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
 
 - 2026-09-01: created (supersedes A6.147/148/149's guard-route text;
   replaces BioBox's □∀-cover premises with the §3 register design).
-- 2026-09-01 (build agent): γl refined to unit + receipt-carries-the-
-  parker's-fragment; γc count-sync register added; drop's "mine" case
-  selects by deciding n = n_park.  Reason: the drop cover's case-3
-  ("γl whole ⇒ rp = rd") was refutable only globally when a receipt is
-  out; the fragment-in-arm + γc make it local.  Multiple outstanding
-  receipts clarified: later parkers get no receipt and use decide-n.
+- 2026-09-01 (build agent): reg_last replaced by the parked-fragment
+  PILE (fragments compose in the body; parks deposit, ex-parkers'
+  decrements retrieve; every decrement syncs rd := rp; pure row
+  ⌜o = 0 → rp = rd⌝); γc count-sync register added.  Reason: a single
+  γl half-pair cannot serve overlapping parkers, and its whole-in-box
+  case was refutable only globally; the pile + γc make every drop-site
+  case local, with no receipt choreography.  Registers: γp, γd, γc.
