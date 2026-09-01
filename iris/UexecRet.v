@@ -540,11 +540,20 @@ Section UexecRet.
              ⌜fdv' = uvis_fd W⌝ -∗
              X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')) ∗
           (∀ fdv' : list fdstate,
-             (* the child's table is a table: [NOFILE] slots, like every
-                other.  Free for the same reason the parent's guard is --
-                the kernel MINTS at this arm -- and needed because the
-                child's own descriptor authority is minted at this view. *)
-             ⌜length fdv' = NOFILE⌝ -∗
+             (* THE CHILD'S TABLE IS THE PARENT'S.  fork() copies it --
+                [np->ofile[i] = filedup(p->ofile[i])] -- and this is the arm
+                that says so.  It used to say only [length fdv' = NOFILE], a
+                table of the right SHAPE and nothing else, and that is what
+                made a forked child hold no handle for anything: not the
+                pipe ends its parent had just made, not the standard streams
+                it inherited.  THE DIRECTION MATTERS FOR WHO PAYS: the
+                PROGRAM proves this arm and the KERNEL instantiates it, so a
+                stronger guard is easier for the program (it learns the
+                table) and harder for the kernel (it must exhibit the copy).
+                [UkFork.wp_uk_ecall_fork] is what the program does with it;
+                the FORK ROW note in [UexecApply.uexec_ret_round_slot] is
+                what the kernel still owes. *)
+             ⌜fdv' = uvis_fd W⌝ -∗
              X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')))
        else (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
                (szv' : Z) (fdv' : list fdstate),
@@ -789,7 +798,7 @@ Section UexecRet.
            ⌜fdv' = uvis_fd W⌝ -∗
            uslot (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')) ∗
         (∀ fdv' : list fdstate,
-           ⌜length fdv' = NOFILE⌝ -∗
+           ⌜fdv' = uvis_fd W⌝ -∗
            uslot (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')))
      else (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
              (szv' : Z) (fdv' : list fdstate),

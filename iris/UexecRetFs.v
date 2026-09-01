@@ -118,8 +118,8 @@ Section UexecRetFs.
              ⌜fdv' = uvis_fd W⌝ -∗
              X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')) ∗
           (∀ fdv' : list fdstate,
-             (* the child's table is a table -- see [UexecRet]'s note *)
-             ⌜length fdv' = NOFILE⌝ -∗
+             (* the child's table is the parent's -- see [UexecRet]'s note *)
+             ⌜fdv' = uvis_fd W⌝ -∗
              X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
                   fdv')))
        else if uenr_dom n then

@@ -713,18 +713,32 @@ Section UkFork.
   (* where shared, non-address-space resources (fds, protocol state) get   *)
   (* distributed, and the leaf neither knows nor cares.                    *)
   (* ===================================================================== *)
+  (* [D] IS THE CALLER'S OWN DESCRIPTOR HANDLES, and fork hands them back
+     TWICE -- once to each process, at that process's own ghost name.  That
+     is what fork does to descriptors: the child's table is a copy, so every
+     descriptor the parent held open the child holds open too, and each may
+     close its own.
+     STATED AT [D] RATHER THAN AT THE WHOLE TABLE because the table lives
+     inside [UkRun.urun]'s existential and no caller can name it.
+     [UserFd.ufd_sub] turns the caller's handles into the sub-map fact that
+     licenses re-minting them at the child's name, so a caller says only
+     what it actually holds; one holding nothing passes the empty map and
+     the two extra premises are [emp]. *)
   Lemma wp_uk_ecall_fork (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
-      (pc : mword 64) (avail : nat) (szv : Z)
+      (pc : mword 64) (avail : nat) (szv : Z) (D : gmap nat fdstate)
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P} :
     usysno m = USYS_fork ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is γt pc false (ECALL tt) -∗
     P γt γd γs -∗
     usz γs szv -∗
+    ([∗ map] fd ↦ st ∈ D, UserFd.ufd γfd fd st) -∗
     urun γt γd γs γfd h m pc avail -∗
     ((∀ (h' : CpuId) (r : mword 64),
         ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
         P γt γd γs -∗ usz γs szv -∗
+        (* the parent keeps what it had: fork writes nothing into its table *)
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd γfd fd st) -∗
         urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
           (add_vec_int pc 4) avail -∗
         WP (Loop : expr riscv_lang)) ∗
@@ -733,19 +747,34 @@ Section UkFork.
         authority is no different: parent and child each own a full map, and
         one name could not carry both.  (This is why γfd is a PARAMETER of
         [urun] rather than an ambient: an ambient name would make this arm
-        unprovable.) *)
+        unprovable.)
+        ...AND IT GETS THE HANDLES FOR EVERYTHING IT INHERITED, at that
+        fresh name.  [fdv] is the PARENT's table -- fork copies it, which is
+        what [UexecRet]'s child arm now says -- so the map is exactly what
+        the parent had open, and each entry is a handle the child can spend
+        on a close.  Without this the child could not close fd 0, the pipe
+        ends its parent had just made, or anything else it did not itself
+        open, which is what parked sh's runner.  The parent's own handles
+        are NOT consumed: it keeps its table and its authority, and the
+        child's are freshly minted at γfd'. *)
      (∀ (γt' γd' γs' γfd' : gname) (h' : CpuId),
         P γt' γd' γs' -∗ usz γs' szv -∗
+        (* ...and the child gets the same descriptors at its OWN name *)
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd γfd' fd st) -∗
         urun γt' γd' γs' γfd' h'
           (<[Regidx (mword_of_int 10) := (mword_of_int 0 : mword 64)]> m)
           (add_vec_int pc 4) avail -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hal4. iIntros "#Hi HP Hsz Hrun [Hpar Hchild]".
+    intros Hn Hal4. iIntros "#Hi HP Hsz HD Hrun [Hpar Hchild]".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    (* the caller's handles ARE the parent's table, at the slots they name --
+       which is what licenses re-minting them at the child's fresh name *)
+    iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
+    iDestruct (ufd_sub γfd fdv D with "Hufd HD") as %Hsub.
     (* ---- fork the payload TOGETHER WITH THE FREE STACK: [ustack] is a
        payload like any other, so the two cross through one reveal ---- *)
     pose proof (forkable_sep P
@@ -780,7 +809,7 @@ Section UkFork.
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run].
     (* the PARENT keeps the descriptor authority it had -- fork does not
        touch the parent's table -- and the CHILD mints its own below. *)
-    iSplitL "Hpar HP Hsz Hheap Hstk Hufd".
+    iSplitL "Hpar HP Hsz HD Hheap Hstk Hufd".
     (* ---- the parent: same heap, r <> 0, a quiet-shaped resume ---- *)
     - iIntros (r fdv') "%Hr %Hfv". subst fdv'.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv r Hx0 Hal4).
@@ -789,27 +818,31 @@ Section UkFork.
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd").
       iIntros (h') "Hrun".
-      iApply ("Hpar" $! h' r with "[%] HP Hsz Hrun"). exact Hr.
+      iApply ("Hpar" $! h' r with "[%] HP Hsz HD Hrun"). exact Hr.
     (* ---- the child: fresh heap, r = 0, payload rebuilt at the new names *)
-    - iIntros (fdv') "%Hfdl'".
+    - iIntros (fdv') "%Hfdv'". subst fdv'.
       (* THE CHILD'S OWN DESCRIPTOR AUTHORITY, minted at the view the kernel
          handed it -- BEFORE the key is rewritten to [ukc], since the update
          is absorbed by the [uslot] and not by what it unfolds to.  The
          parent's cannot be shared (both are full maps at the full
          fraction), which is exactly why [urun] takes the fd name as a
          PARAMETER: the child needs its own, as it needs its own heap
-         triple. *)
+         triple.
+         [ufd_alloc_open] rather than [ufd_alloc]: the child's table is the
+         parent's, so the map is non-empty and its fragments are the
+         inherited handles.  [ufd_alloc] would mint the same authority and
+         drop them. *)
       iApply uslot_bupd.
-      iMod (ufd_alloc fdv' Hfdl') as (γfd') "Hufd'".
+      iMod (ufd_alloc_sub fdv D Hfdlen Hsub) as (γfd') "[Hufd' Hfrag']".
       iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv'
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv
                  (mword_of_int 0) Hx0 Hal4).
       iApply (urun_close_upd γt' γd' γs' γfd' M pm m (mword_of_int 10)
-                (mword_of_int 0) sz fdv' (add_vec_int pc 4) avail
+                (mword_of_int 0) sz fdv (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap' Hstk' Hufd'").
       iIntros (h') "Hrun".
-      iApply ("Hchild" $! γt' γd' γs' γfd' h' with "HP' Hsz' Hrun").
+      iApply ("Hchild" $! γt' γd' γs' γfd' h' with "HP' Hsz' Hfrag' Hrun").
   Qed.
 
   (* ===================================================================== *)
@@ -833,17 +866,19 @@ Section UkFork.
   Lemma wp_uk_ecall_fork_argv (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) (szv : Z)
       (M0 : gmap Z (bv 8)) (pm0 : gmap (mword 27) uperm)
-      (av : Z) (args : list uarg) :
+      (av : Z) (args : list uarg) (D : gmap nat fdstate) :
     usysno m = USYS_fork ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is γt pc false (ECALL tt) -∗
     utext_all γt M0 pm0 -∗
     uargv γd av args -∗
     usz γs szv -∗
+    ([∗ map] fd ↦ st ∈ D, UserFd.ufd γfd fd st) -∗
     urun γt γd γs γfd h m pc avail -∗
     ((∀ (h' : CpuId) (r : mword 64),
         ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
         usz γs szv -∗
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd γfd fd st) -∗
         urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
           (add_vec_int pc 4) avail -∗
         WP (Loop : expr riscv_lang)) ∗
@@ -857,22 +892,25 @@ Section UkFork.
         utext_all γt' M0 pm0 -∗
         uargv γd' av args -∗
         usz γs' szv -∗
+        (* the inherited handles, forwarded verbatim -- see
+           [wp_uk_ecall_fork]'s own note *)
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd γfd' fd st) -∗
         urun γt' γd' γs' γfd' h'
           (<[Regidx (mword_of_int 10) := (mword_of_int 0 : mword 64)]> m)
           (add_vec_int pc 4) avail -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hal4. iIntros "#Hi #Htext #Hargv Hsz Hrun [Hpar Hchild]".
-    iApply (wp_uk_ecall_fork γt γd γs γfd h m pc avail szv
+    intros Hn Hal4. iIntros "#Hi #Htext #Hargv Hsz HD Hrun [Hpar Hchild]".
+    iApply (wp_uk_ecall_fork γt γd γs γfd h m pc avail szv D
               (fun γt0 γd0 γs0 => (utext_all γt0 M0 pm0 ∗ uargv γd0 av args)%I)
-              Hn Hal4 with "Hi [] Hsz Hrun [Hpar Hchild]").
+              Hn Hal4 with "Hi [] Hsz HD Hrun [Hpar Hchild]").
     { iSplitR; [ iExact "Htext" | iExact "Hargv" ]. }
     iSplitL "Hpar".
-    - iIntros (h' r) "%Hr _ Hsz Hrun".
-      iApply ("Hpar" $! h' r with "[%] Hsz Hrun"). exact Hr.
-    - iIntros (γt' γd' γs' γfd' h') "[Ht' Ha'] Hsz' Hrun".
-      iApply ("Hchild" $! γt' γd' γs' γfd' h' with "Ht' Ha' Hsz' Hrun").
+    - iIntros (h' r) "%Hr _ Hsz HD Hrun".
+      iApply ("Hpar" $! h' r with "[%] Hsz HD Hrun"). exact Hr.
+    - iIntros (γt' γd' γs' γfd' h') "[Ht' Ha'] Hsz' Hfrag' Hrun".
+      iApply ("Hchild" $! γt' γd' γs' γfd' h' with "Ht' Ha' Hsz' Hfrag' Hrun").
   Qed.
 
 End UkFork.

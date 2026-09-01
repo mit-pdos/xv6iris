@@ -606,16 +606,20 @@ Section UkInitMain.
     iIntros (h1) "Hrun".
     set (mf1 := <[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m).
     (* ---- 0x36c  ecall -- the leaf that returns twice ---- *)
+    (* init holds no descriptor handles at this point -- its console fds are
+       opened AFTER the fork, in the child's exec'd image -- so the handle
+       set fork carries across is empty and both extra premises are [emp]. *)
     iApply (wp_uk_ecall_fork γt γd γs γfd h1 mf1 (mword_of_int 0x36c) avail szv
-              (fun gt _ _ => (init_code gt ∗ init_rodata gt)%I)
+              ∅ (fun gt _ _ => (init_code gt ∗ init_rodata gt)%I)
               ltac:(unfold mf1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 1 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "[] [] Hsz Hrun").
+              with "[] [] Hsz [] Hrun").
     { iApply (uis_init_36c with "Hcode"). }
     { iFrame "Hcode Hro". }
+    { rewrite big_sepM_empty. done. }
     assert (E36c : add_vec_int (mword_of_int 0x36c : mword 64) 4
                    = mword_of_int 0x370)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -628,7 +632,7 @@ Section UkInitMain.
                ltac:(vm_compute; discriminate)). }
     iSplitL "Hpar".
     - (* the PARENT resumes under the names it already had *)
-      iIntros (hp r) "%Hrnz Hpay Hsz Hrun".
+      iIntros (hp r) "%Hrnz Hpay Hsz _ Hrun".
       set (mp := <[Regidx a0_idx := r]> mf1).
       assert (Hrap : mp !!! Regidx ra_idx = m !!! Regidx ra_idx).
       { rewrite /mp (upd_ne mf1 (Regidx a0_idx) (Regidx ra_idx) r
@@ -646,7 +650,7 @@ Section UkInitMain.
       { iPureIntro. exact Hrnz. }
       { iFrame "Hcp Hrp". }
     - (* ...and the CHILD under fresh ones *)
-      iIntros (gt' gd' gs' gfd' hc) "Hpay Hsz Hrun".
+      iIntros (gt' gd' gs' gfd' hc) "Hpay Hsz _ Hrun".
       set (mk := <[Regidx a0_idx := (mword_of_int 0 : mword 64)]> mf1).
       assert (Hrak : mk !!! Regidx ra_idx = m !!! Regidx ra_idx).
       { rewrite /mk (upd_ne mf1 (Regidx a0_idx) (Regidx ra_idx) _
