@@ -381,3 +381,22 @@ ProofIreclaim:1687 ProofIget:1450 ProofCreateFreshTy:572
 ProofFilestat:531 ProofSysOpenParts:715 ProofSysMkdir:1272
 ProofSysMknod:1735 ProofSysChdir:1545 ProofFileread:1892 ProofNamex:3129
 ProofKexecA:1152.
+
+## A6.145 4b-iii progress checkpoint 2 (live worktree)
+
+GREEN through the wave so far: IcacheRef (full genlo kit now incl.
+inode_ref_genlo_shed / _gather_genlo / shr_genlo_split+halve /
+pin_on_keep / forget_on_keep / genlo agrees / halve lemmas),
+SpecCreate (floored payout row), SpecFilestat/SpecFileread (genlo
+carves), ProofFilestat, ProofFileread, ProofNamex, ProofNamexTr,
+ProofSysChdir, ProofKexecA, ProofSysMkdir, ProofSysMknod, ProofIdup,
+ProofSysLink, ProofCreateFreshTy, FileInvDefs, boot chain.
+REMAINING RED: ProofCreate (tail branches -- keeps that round-tripped
+through IUP calls come back gen-erased; blocked on the iput specs),
+ProofSysUnlink (same), ProofSysOpenParts:715 (the file_ref builder --
+restate its Hkeep premise genlo+floor), ProofIget:1450, and the iput
+trio ProofIput/ProofIunlockput/ProofIreclaim.  NEXT UNIT: restate
+SpecIput/SpecIunlockput's reference premises as ∃lo tl floored genlo
+rows (create_locked's shape) and adapt their proofs; the caller branches
+then pass the shed's floored pieces straight through instead of
+forgetting before the call.
