@@ -666,6 +666,31 @@ Proof.
   split; [ reflexivity | assumption ].
 Qed.
 
+(* the same inversion with the two derived positions as PARAMETERS, so a
+   walk that has already named them gets the facts in its own vocabulary *)
+Lemma ushp_tokens_cons_inv' (len i j q : nat) (f : nat -> bv 8)
+    (tk : nat * nat) (rest : list (nat * nat)) :
+  j = (i + ushp_skipws (len - i) i f)%nat ->
+  q = ushp_toklen (len - j) j f ->
+  ushp_tokens len f i (tk :: rest) ->
+  (0 < q)%nat /\ tk = (j, (j + q)%nat) /\ ushp_tokens len f (j + q)%nat rest.
+Proof. intros -> ->. apply ushp_tokens_cons_inv. Qed.
+
+(* two list facts, self-contained so no naming drift bites *)
+Lemma ushp_len_app1 {A : Type} (l : list A) (x : A) :
+  length (l ++ [x]) = S (length l).
+Proof.
+  induction l as [| y l IH ]; cbn [length app]; [ reflexivity | ].
+  rewrite IH. reflexivity.
+Qed.
+
+Lemma ushp_app_cons {A : Type} (l : list A) (x : A) (r : list A) :
+  (l ++ [x]) ++ r = l ++ x :: r.
+Proof.
+  induction l as [| y l IH ]; cbn [app]; [ reflexivity | ].
+  rewrite IH. reflexivity.
+Qed.
+
 (* THE SKIP THE LOOP SURVIVES *)
 Lemma ushp_tokens_skip (len : nat) (f : nat -> bv 8) (off : nat)
     (toks : list (nat * nat)) :
@@ -2374,6 +2399,20 @@ Section UkShParse.
     assert (E : (8 * (Z.of_nat i + 1)) mod 8 = 0)
       by (rewrite Z.mul_comm; apply Z_mod_mult).
     rewrite E. reflexivity.
+  Qed.
+
+  (* ...and a SLOT of an 8-aligned node likewise: the argv and eargv
+     vectors both start at a multiple of eight from the node's base, so
+     every store into them is aligned by the node's own alignment. *)
+  Local Lemma ushp_slot_al8 (p c : Z) (k : nat) :
+    p mod 8 = 0 -> (p + 8 * c + 8 * Z.of_nat k) mod 8 = 0.
+  Proof.
+    intro Hp.
+    assert (Hm : (8 * (c + Z.of_nat k)) mod 8 = 0)
+      by (rewrite Z.mul_comm; apply Z_mod_mult).
+    replace (p + 8 * c + 8 * Z.of_nat k)
+      with (p + 8 * (c + Z.of_nat k)) by lia.
+    rewrite Zplus_mod Hp Hm. reflexivity.
   Qed.
 
   (* THE FRESH FRAME, SPLIT: the top [length rs] words are the spill slots  *)
@@ -9098,6 +9137,941 @@ Section UkShParse.
         destruct i as [| [| [| [| [| [| [| [| [| [| [| i ]]]]]]]]]]];
           cbn in Hi; try discriminate;
           injection Hi as Hr Hu0; subst; vm_compute in He; discriminate.
+  Qed.
+
+
+  (* ===================================================================== *)
+  (* §11 parseexec @0x590 -- the ARGUMENT LOOP.                             *)
+  (*                                                                       *)
+  (*   struct cmd *parseexec(char **ps, char *es) {                         *)
+  (*     if(peek(ps, es, "(")) return parseblock(ps, es);                   *)
+  (*     ret = execcmd();  cmd = (struct execcmd * )ret;  argc = 0;         *)
+  (*     ret = parseredirs(ret, ps, es);                                    *)
+  (*     while(!peek(ps, es, "|)&;")) {                                     *)
+  (*       if((tok = gettoken(ps, es, &q, &eq)) == 0) break;                *)
+  (*       if(tok != 'a') panic("syntax");                                  *)
+  (*       cmd->argv[argc] = q;  cmd->eargv[argc] = eq;  argc++;            *)
+  (*       if(argc >= MAXARGS) panic("too many args");                      *)
+  (*       ret = parseredirs(ret, ps, es);  }                               *)
+  (*     cmd->argv[argc] = 0;  cmd->eargv[argc] = 0;  return ret;  }        *)
+  (*                                                                       *)
+  (* THE INVARIANT IS ONE PREDICATE AND ONE EQUATION: the node holds the    *)
+  (* tokens consumed so far ([ushp_exec_pre s0 p done]) and the cursor is   *)
+  (* where the tokens still to come start ([ushp_tokens len f cur rest]).   *)
+  (* [s2] is [argc] and [s3] is [&argv[argc]], and both are DERIVED from    *)
+  (* [length done] rather than tracked, which is why the step does no index *)
+  (* arithmetic beyond one [c.addiw] and one [c.addi].                      *)
+  (*                                                                       *)
+  (* THREE ARMS ARE REFUTED, NOT WEAKENED.  [peek(ps,es,"|)&;")] is 0 by    *)
+  (* [ushp_peek_res_sym]; [tok != 'a'] cannot happen because gettoken's     *)
+  (* answer on a symbol-free line is 'a' or 0 and the 0 arm is the loop's   *)
+  (* exit; and [argc >= MAXARGS] cannot happen because the caller's         *)
+  (* [length toks < 10] bounds it.  So neither [panic] is fetched and       *)
+  (* [parseblock] is not either.                                            *)
+  (* ===================================================================== *)
+
+  Local Lemma wp_kshp_pex_loop (dq dw dv : dfrac) (s0 ps p fp : Z)
+      (len : nat) (f : nat -> bv 8) (nn : nat) :
+    forall (rest done : list (nat * nat)) (cur : nat) (h : CpuId)
+           (mc : regfile) (wq weq : mword 64),
+    ushp_no_symbols len f ->
+    0 <= s0 -> s0 + Z.of_nat len < Z64 ->
+    0 < ps -> ps mod 8 = 0 -> ps + 8 < Z64 ->
+    0 < fp - 128 -> (fp - 128) mod 8 = 0 -> 0 <= fp -> fp + 8 < Z64 ->
+    0 < p -> p mod 8 = 0 -> p + 168 < Z64 ->
+    (cur <= len)%nat ->
+    (length done + length rest < 10)%nat ->
+    ushp_tokens len f cur rest ->
+    mc !!! Regidx s0_idx = mword_of_int fp ->
+    mc !!! Regidx s1_idx = mword_of_int p ->
+    mc !!! Regidx s2_idx = mword_of_int (Z.of_nat (length done)) ->
+    mc !!! Regidx s3_idx
+      = mword_of_int (p + 8 + 8 * Z.of_nat (length done)) ->
+    mc !!! Regidx s4_idx = mword_of_int ps ->
+    mc !!! Regidx s5_idx = mword_of_int (s0 + Z.of_nat len) ->
+    mc !!! Regidx s6_idx = mword_of_int ushp_T_arg ->
+    mc !!! Regidx s7_idx = mword_of_int (fp - 120) ->
+    mc !!! Regidx s8_idx = mword_of_int (fp - 128) ->
+    mc !!! Regidx s9_idx = mword_of_int 10 ->
+    mc !!! Regidx s10_idx = mword_of_int 97 ->
+    mc !!! Regidx s11_idx = mword_of_int p ->
+    shp_code γt -∗
+    shp_rodata γt -∗
+    ushp_exec_pre s0 p done -∗
+    uword γd ps (mword_of_int (s0 + Z.of_nat cur)) -∗
+    uword γd (fp - 120) wq -∗
+    uword γd (fp - 128) weq -∗
+    ustr γd dq s0 len f -∗
+    ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
+    ustr γd dv ushp_symbols 7 ushp_sym_f -∗
+    urun γt γd γs γfd h mc (mword_of_int 0x622) (24 + nn) -∗
+    (ushp_exec_pre s0 p (done ++ rest) -∗
+     uword γd ps (mword_of_int (s0 + Z.of_nat len)) -∗
+     (∃ w : mword 64, uword γd (fp - 120) w) -∗
+     (∃ w : mword 64, uword γd (fp - 128) w) -∗
+     ustr γd dq s0 len f -∗
+     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
+     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
+       ∀ (h' : CpuId) (mc' : regfile),
+         ⌜ forall r : mword 5, ucallee_saved_idx r = true ->
+             Regidx r <> Regidx s1_idx -> Regidx r <> Regidx s2_idx ->
+             Regidx r <> Regidx s3_idx ->
+             mc' !!! Regidx r = mc !!! Regidx r ⌝ -∗
+         ⌜ mc' !!! Regidx s2_idx
+             = mword_of_int (Z.of_nat (length done + length rest)) ⌝ -∗
+         urun γt γd γs γfd h' mc' (mword_of_int 0x662) (24 + nn) -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intro rest.
+    induction rest as [| tk rest IH ];
+      intros done cur h mc wq weq Hnosym Hs0 Hs64 Hps0 Hps8 Hpssz
+        Hfp0 Hfp8 Hfpl Hfph Hp0 Hp8 Hpsz Hcur Hcnt Htoks
+        Hs0v Hs1v Hs2v Hs3v Hs4v Hs5v Hs6v Hs7v Hs8v Hs9v Hs10v Hs11v;
+      iIntros "#Hcode #Hro Hnode Hcur Hq Heq Hstr Hws Hsy Hrun Hcont".
+    (* ---- the frame's two out-cells are hygienic wherever the frame is -- *)
+    all: assert (Hq0 : 0 < fp - 120) by lia.
+    all: assert (Hq8 : (fp - 120) mod 8 = 0);
+      [ replace (fp - 120) with (fp - 128 + 8) by lia;
+        rewrite Zplus_mod Hfp8; reflexivity | ].
+    all: assert (Hqz : fp - 120 + 8 < Z64) by lia.
+    all: assert (Hez : fp - 128 + 8 < Z64) by lia.
+    all: assert (Hfp64 : 0 <= fp < Z64) by lia.
+    all: assert (Hnodelen : (length done < 10)%nat)
+      by (cbn [length] in Hcnt; lia).
+    (* ---- and the position peek is about to leave the cursor at -------- *)
+    all: pose (cur' := (cur + ushp_skipws (len - cur) cur f)%nat).
+    all: assert (Hcure : cur' = (cur + ushp_skipws (len - cur) cur f)%nat)
+      by reflexivity.
+    all: assert (Hcur' : (cur' <= len)%nat);
+      [ rewrite Hcure; pose proof (ushp_skipws_le (len - cur) cur f); lia | ].
+    all: assert (Hz' : ushp_skipws (len - cur') cur' f = 0%nat)
+      by exact (ushp_skipws_idem len cur f Hcur).
+    all: assert (Ekk : (cur' + ushp_skipws (len - cur') cur' f)%nat = cur')
+      by (rewrite Hz'; lia).
+    (* ---- 0x622  c.mv a2,s6 ---- *)
+    all: iApply (wp_uk_cmv γt γd γs γfd h mc (mword_of_int 0x622) a2_idx
+                   s6_idx (mword_of_int ushp_T_arg) (24 + nn)
+                   ltac:(unfold unot_sp; vm_compute; discriminate)
+                   ltac:(vm_compute; discriminate)
+                   ltac:(rewrite Hs6v; symmetry;
+                         exact (ushp_mv_val ushp_T_arg))
+                   with "[] Hrun");
+      [ iApply (uis_shp_622 with "Hcode") | ].
+    all: iIntros (h1) "Hrun".
+    all: set (n1 := <[Regidx a2_idx
+                      := regval_into_reg
+                           (mword_of_int ushp_T_arg : mword 64)]> mc).
+    all: assert (Hk1 : forall r : mword 5, ucallee_saved_idx r = true ->
+                   n1 !!! Regidx r = mc !!! Regidx r)
+      by (intros r Hr;
+          exact (upd_ne mc (Regidx a2_idx) (Regidx r) _
+                   (ushp_cs_ne r a2_idx Hr ltac:(vm_compute; reflexivity)))).
+    (* ---- 0x624  c.mv a1,s5 ---- *)
+    all: iApply (wp_uk_cmv γt γd γs γfd h1 n1 (mword_of_int 0x624) a1_idx
+                   s5_idx (mword_of_int (s0 + Z.of_nat len)) (24 + nn)
+                   ltac:(unfold unot_sp; vm_compute; discriminate)
+                   ltac:(vm_compute; discriminate)
+                   ltac:(rewrite (Hk1 s5_idx ltac:(vm_compute; reflexivity))
+                           Hs5v; symmetry;
+                         exact (ushp_mv_val (s0 + Z.of_nat len)))
+                   with "[] Hrun");
+      [ iApply (uis_shp_624 with "Hcode") | ].
+    all: iIntros (h2) "Hrun".
+    all: set (n2 := <[Regidx a1_idx
+                      := regval_into_reg
+                           (mword_of_int (s0 + Z.of_nat len)
+                            : mword 64)]> n1).
+    all: assert (Hk2 : forall r : mword 5, ucallee_saved_idx r = true ->
+                   n2 !!! Regidx r = mc !!! Regidx r)
+      by (intros r Hr;
+          rewrite (upd_ne n1 (Regidx a1_idx) (Regidx r) _
+                     (ushp_cs_ne r a1_idx Hr ltac:(vm_compute; reflexivity)));
+          exact (Hk1 r Hr)).
+    (* ---- 0x626  c.mv a0,s4 ---- *)
+    all: iApply (wp_uk_cmv γt γd γs γfd h2 n2 (mword_of_int 0x626) a0_idx
+                   s4_idx (mword_of_int ps) (24 + nn)
+                   ltac:(unfold unot_sp; vm_compute; discriminate)
+                   ltac:(vm_compute; discriminate)
+                   ltac:(rewrite (Hk2 s4_idx ltac:(vm_compute; reflexivity))
+                           Hs4v; symmetry; exact (ushp_mv_val ps))
+                   with "[] Hrun");
+      [ iApply (uis_shp_626 with "Hcode") | ].
+    all: iIntros (h3) "Hrun".
+    all: set (n3 := <[Regidx a0_idx
+                      := regval_into_reg (mword_of_int ps : mword 64)]> n2).
+    all: assert (Hk3 : forall r : mword 5, ucallee_saved_idx r = true ->
+                   n3 !!! Regidx r = mc !!! Regidx r)
+      by (intros r Hr;
+          rewrite (upd_ne n2 (Regidx a0_idx) (Regidx r) _
+                     (ushp_cs_ne r a0_idx Hr ltac:(vm_compute; reflexivity)));
+          exact (Hk2 r Hr)).
+    (* ---- 0x628  jal 448 <peek> ---- *)
+    all: iApply (wp_uk_jal γt γd γs γfd h3 n3 (mword_of_int 0x628)
+                   (mword_of_int 2096672 : mword 21) ra_idx
+                   (mword_of_int 0x448) (mword_of_int 0x62c) (24 + nn)
+                   ltac:(unfold unot_sp; vm_compute; discriminate)
+                   ltac:(vm_compute; discriminate)
+                   ltac:(apply bv_eq; vm_compute; reflexivity)
+                   ltac:(apply bv_eq; vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity)
+                   with "[] Hrun");
+      [ iApply (uis_shp_628 with "Hcode") | ].
+    all: iIntros (h4) "Hrun".
+    all: set (n4 := <[Regidx ra_idx
+                      := regval_into_reg
+                           (mword_of_int 0x62c : mword 64)]> n3).
+    all: assert (Hk4 : forall r : mword 5, ucallee_saved_idx r = true ->
+                   n4 !!! Regidx r = mc !!! Regidx r)
+      by (intros r Hr;
+          rewrite (upd_ne n3 (Regidx ra_idx) (Regidx r) _
+                     (ushp_cs_ne r ra_idx Hr ltac:(vm_compute; reflexivity)));
+          exact (Hk3 r Hr)).
+    all: assert (Eret4 : ret_pc (n4 !!! Regidx ra_idx) = mword_of_int 0x62c);
+      [ rewrite (upd_eq n3 (Regidx ra_idx)
+                   (regval_into_reg (mword_of_int 0x62c : mword 64)));
+        apply bv_eq; vm_compute; reflexivity | ].
+    all: assert (Ha0_4 : n4 !!! Regidx a0_idx = mword_of_int ps);
+      [ rewrite (upd_ne n3 (Regidx ra_idx) (Regidx a0_idx) _
+                   ltac:(vm_compute; discriminate));
+        exact (upd_eq n2 (Regidx a0_idx)
+                 (regval_into_reg (mword_of_int ps : mword 64))) | ].
+    all: assert (Ha1_4 : n4 !!! Regidx a1_idx
+                         = mword_of_int (s0 + Z.of_nat len));
+      [ rewrite (upd_ne n3 (Regidx ra_idx) (Regidx a1_idx) _
+                   ltac:(vm_compute; discriminate));
+        rewrite (upd_ne n2 (Regidx a0_idx) (Regidx a1_idx) _
+                   ltac:(vm_compute; discriminate));
+        exact (upd_eq n1 (Regidx a1_idx)
+                 (regval_into_reg
+                    (mword_of_int (s0 + Z.of_nat len) : mword 64))) | ].
+    all: assert (Ha2_4 : n4 !!! Regidx a2_idx = mword_of_int ushp_T_arg);
+      [ rewrite (upd_ne n3 (Regidx ra_idx) (Regidx a2_idx) _
+                   ltac:(vm_compute; discriminate));
+        rewrite (upd_ne n2 (Regidx a0_idx) (Regidx a2_idx) _
+                   ltac:(vm_compute; discriminate));
+        rewrite (upd_ne n1 (Regidx a1_idx) (Regidx a2_idx) _
+                   ltac:(vm_compute; discriminate));
+        exact (upd_eq mc (Regidx a2_idx)
+                 (regval_into_reg
+                    (mword_of_int ushp_T_arg : mword 64))) | ].
+    all: rewrite <- shpp_peek.
+    all: iApply (wp_kshp_peek h4 n4 dq dw true DfracDiscarded ps s0
+                   ushp_T_arg len cur 4 f (ushp_lit ushp_T_arg)
+                   (mword_of_int (s0 + Z.of_nat cur)) (14 + nn)
+                   Ha0_4 Ha1_4 Ha2_4 Hcur eq_refl Hs0 Hs64
+                   ltac:(unfold ushp_T_arg; lia)
+                   ltac:(unfold ushp_T_arg, Z64; lia) Hps0 Hps8 Hpssz
+                   with "Hcode Hcur Hstr Hws [] Hrun");
+      [ iApply (ushp_lit_str ushp_T_arg 4 DfracDiscarded
+                  ushp_T_arg_ok ltac:(cbn; lia) with "Hro") | ].
+    all: iIntros "Hcur Hstr Hws _" (h5 n5) "%Hcs45 %Ha0_5 Hrun".
+    all: rewrite Eret4.
+    all: rewrite (ushp_peek_res_sym len f
+                    (cur + ushp_skipws (len - cur) cur f)%nat 4 ushp_T_arg
+                    Hnosym ushp_T_arg_sym) in Ha0_5.
+    all: assert (Hk5 : forall r : mword 5, ucallee_saved_idx r = true ->
+                   n5 !!! Regidx r = mc !!! Regidx r)
+      by (intros r Hr; rewrite (Hcs45 r Hr); exact (Hk4 r Hr)).
+    (* ---- 0x62c  c.bnez a0 -- NOT taken: the guard is refuted ---- *)
+    all: iApply (wp_uk_cbnez γt γd γs γfd h5 n5 (mword_of_int 0x62c)
+                   (mword_of_int 27 : mword 8) (mword_of_int 2 : mword 3)
+                   a0_idx false (mword_of_int 0x662) (24 + nn)
+                   ltac:(vm_compute; reflexivity)
+                   ltac:(rewrite Ha0_5; vm_compute; reflexivity)
+                   ltac:(apply bv_eq; vm_compute; reflexivity)
+                   ltac:(discriminate)
+                   with "[] Hrun");
+      [ iApply (uis_shp_62c with "Hcode") | ].
+    all: iIntros (h6) "Hrun".
+    (* ---- 0x62e..0x634  the four argument moves ---- *)
+    all: iApply (wp_uk_cmv γt γd γs γfd h6 n5 (mword_of_int 0x62e) a3_idx
+                   s8_idx (mword_of_int (fp - 128)) (24 + nn)
+                   ltac:(unfold unot_sp; vm_compute; discriminate)
+                   ltac:(vm_compute; discriminate)
+                   ltac:(rewrite (Hk5 s8_idx ltac:(vm_compute; reflexivity))
+                           Hs8v; symmetry; exact (ushp_mv_val (fp - 128)))
+                   with "[] Hrun");
+      [ iApply (uis_shp_62e with "Hcode") | ].
+    all: iIntros (h7) "Hrun".
+    all: set (n6 := <[Regidx a3_idx
+                      := regval_into_reg
+                           (mword_of_int (fp - 128) : mword 64)]> n5).
+    all: assert (Hk6 : forall r : mword 5, ucallee_saved_idx r = true ->
+                   n6 !!! Regidx r = mc !!! Regidx r)
+      by (intros r Hr;
+          rewrite (upd_ne n5 (Regidx a3_idx) (Regidx r) _
+                     (ushp_cs_ne r a3_idx Hr ltac:(vm_compute; reflexivity)));
+          exact (Hk5 r Hr)).
+    all: iApply (wp_uk_cmv γt γd γs γfd h7 n6 (mword_of_int 0x630) a2_idx
+                   s7_idx (mword_of_int (fp - 120)) (24 + nn)
+                   ltac:(unfold unot_sp; vm_compute; discriminate)
+                   ltac:(vm_compute; discriminate)
+                   ltac:(rewrite (Hk6 s7_idx ltac:(vm_compute; reflexivity))
+                           Hs7v; symmetry; exact (ushp_mv_val (fp - 120)))
+                   with "[] Hrun");
+      [ iApply (uis_shp_630 with "Hcode") | ].
+    all: iIntros (h8) "Hrun".
+    all: set (n7 := <[Regidx a2_idx
+                      := regval_into_reg
+                           (mword_of_int (fp - 120) : mword 64)]> n6).
+    all: assert (Hk7 : forall r : mword 5, ucallee_saved_idx r = true ->
+                   n7 !!! Regidx r = mc !!! Regidx r)
+      by (intros r Hr;
+          rewrite (upd_ne n6 (Regidx a2_idx) (Regidx r) _
+                     (ushp_cs_ne r a2_idx Hr ltac:(vm_compute; reflexivity)));
+          exact (Hk6 r Hr)).
+    all: iApply (wp_uk_cmv γt γd γs γfd h8 n7 (mword_of_int 0x632) a1_idx
+                   s5_idx (mword_of_int (s0 + Z.of_nat len)) (24 + nn)
+                   ltac:(unfold unot_sp; vm_compute; discriminate)
+                   ltac:(vm_compute; discriminate)
+                   ltac:(rewrite (Hk7 s5_idx ltac:(vm_compute; reflexivity))
+                           Hs5v; symmetry;
+                         exact (ushp_mv_val (s0 + Z.of_nat len)))
+                   with "[] Hrun");
+      [ iApply (uis_shp_632 with "Hcode") | ].
+    all: iIntros (h9) "Hrun".
+    all: set (n8 := <[Regidx a1_idx
+                      := regval_into_reg
+                           (mword_of_int (s0 + Z.of_nat len)
+                            : mword 64)]> n7).
+    all: assert (Hk8 : forall r : mword 5, ucallee_saved_idx r = true ->
+                   n8 !!! Regidx r = mc !!! Regidx r)
+      by (intros r Hr;
+          rewrite (upd_ne n7 (Regidx a1_idx) (Regidx r) _
+                     (ushp_cs_ne r a1_idx Hr ltac:(vm_compute; reflexivity)));
+          exact (Hk7 r Hr)).
+    all: iApply (wp_uk_cmv γt γd γs γfd h9 n8 (mword_of_int 0x634) a0_idx
+                   s4_idx (mword_of_int ps) (24 + nn)
+                   ltac:(unfold unot_sp; vm_compute; discriminate)
+                   ltac:(vm_compute; discriminate)
+                   ltac:(rewrite (Hk8 s4_idx ltac:(vm_compute; reflexivity))
+                           Hs4v; symmetry; exact (ushp_mv_val ps))
+                   with "[] Hrun");
+      [ iApply (uis_shp_634 with "Hcode") | ].
+    all: iIntros (h10) "Hrun".
+    all: set (n9 := <[Regidx a0_idx
+                      := regval_into_reg (mword_of_int ps : mword 64)]> n8).
+    all: assert (Hk9 : forall r : mword 5, ucallee_saved_idx r = true ->
+                   n9 !!! Regidx r = mc !!! Regidx r)
+      by (intros r Hr;
+          rewrite (upd_ne n8 (Regidx a0_idx) (Regidx r) _
+                     (ushp_cs_ne r a0_idx Hr ltac:(vm_compute; reflexivity)));
+          exact (Hk8 r Hr)).
+    (* ---- 0x636  jal 310 <gettoken> ---- *)
+    all: iApply (wp_uk_jal γt γd γs γfd h10 n9 (mword_of_int 0x636)
+                   (mword_of_int 2096346 : mword 21) ra_idx
+                   (mword_of_int 0x310) (mword_of_int 0x63a) (24 + nn)
+                   ltac:(unfold unot_sp; vm_compute; discriminate)
+                   ltac:(vm_compute; discriminate)
+                   ltac:(apply bv_eq; vm_compute; reflexivity)
+                   ltac:(apply bv_eq; vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity)
+                   with "[] Hrun");
+      [ iApply (uis_shp_636 with "Hcode") | ].
+    all: iIntros (h11) "Hrun".
+    all: set (n10 := <[Regidx ra_idx
+                       := regval_into_reg
+                            (mword_of_int 0x63a : mword 64)]> n9).
+    all: assert (Hk10 : forall r : mword 5, ucallee_saved_idx r = true ->
+                   n10 !!! Regidx r = mc !!! Regidx r)
+      by (intros r Hr;
+          rewrite (upd_ne n9 (Regidx ra_idx) (Regidx r) _
+                     (ushp_cs_ne r ra_idx Hr ltac:(vm_compute; reflexivity)));
+          exact (Hk9 r Hr)).
+    all: assert (Eret10 : ret_pc (n10 !!! Regidx ra_idx)
+                          = mword_of_int 0x63a);
+      [ rewrite (upd_eq n9 (Regidx ra_idx)
+                   (regval_into_reg (mword_of_int 0x63a : mword 64)));
+        apply bv_eq; vm_compute; reflexivity | ].
+    all: assert (Ha0_10 : n10 !!! Regidx a0_idx = mword_of_int ps);
+      [ rewrite (upd_ne n9 (Regidx ra_idx) (Regidx a0_idx) _
+                   ltac:(vm_compute; discriminate));
+        exact (upd_eq n8 (Regidx a0_idx)
+                 (regval_into_reg (mword_of_int ps : mword 64))) | ].
+    all: assert (Ha1_10 : n10 !!! Regidx a1_idx
+                          = mword_of_int (s0 + Z.of_nat len));
+      [ rewrite (upd_ne n9 (Regidx ra_idx) (Regidx a1_idx) _
+                   ltac:(vm_compute; discriminate));
+        rewrite (upd_ne n8 (Regidx a0_idx) (Regidx a1_idx) _
+                   ltac:(vm_compute; discriminate));
+        exact (upd_eq n7 (Regidx a1_idx)
+                 (regval_into_reg
+                    (mword_of_int (s0 + Z.of_nat len) : mword 64))) | ].
+    all: assert (Ha2_10 : n10 !!! Regidx a2_idx = mword_of_int (fp - 120));
+      [ rewrite (upd_ne n9 (Regidx ra_idx) (Regidx a2_idx) _
+                   ltac:(vm_compute; discriminate));
+        rewrite (upd_ne n8 (Regidx a0_idx) (Regidx a2_idx) _
+                   ltac:(vm_compute; discriminate));
+        rewrite (upd_ne n7 (Regidx a1_idx) (Regidx a2_idx) _
+                   ltac:(vm_compute; discriminate));
+        exact (upd_eq n6 (Regidx a2_idx)
+                 (regval_into_reg
+                    (mword_of_int (fp - 120) : mword 64))) | ].
+    all: assert (Ha3_10 : n10 !!! Regidx a3_idx = mword_of_int (fp - 128));
+      [ rewrite (upd_ne n9 (Regidx ra_idx) (Regidx a3_idx) _
+                   ltac:(vm_compute; discriminate));
+        rewrite (upd_ne n8 (Regidx a0_idx) (Regidx a3_idx) _
+                   ltac:(vm_compute; discriminate));
+        rewrite (upd_ne n7 (Regidx a1_idx) (Regidx a3_idx) _
+                   ltac:(vm_compute; discriminate));
+        rewrite (upd_ne n6 (Regidx a2_idx) (Regidx a3_idx) _
+                   ltac:(vm_compute; discriminate));
+        exact (upd_eq n5 (Regidx a3_idx)
+                 (regval_into_reg
+                    (mword_of_int (fp - 128) : mword 64))) | ].
+    all: rewrite <- shpp_gettoken.
+    all: iApply (wp_kshp_gettoken h11 n10 dq dw dv ps (fp - 120) (fp - 128)
+                   s0 len cur' f (mword_of_int (s0 + Z.of_nat cur'))
+                   wq weq (14 + nn)
+                   Ha0_10 Ha1_10 Ha2_10 Ha3_10 Hcur' eq_refl Hnosym Hs0 Hs64
+                   Hps0 Hps8 Hpssz
+                   with "Hcode Hcur [Hq] [Heq] Hstr Hws Hsy Hrun");
+      [ iRight; iSplitR;
+        [ iPureIntro; exact (conj Hq0 (conj Hq8 Hqz)) | iExact "Hq" ]
+      | iRight; iSplitR;
+        [ iPureIntro; exact (conj Hfp0 (conj Hfp8 Hez)) | iExact "Heq" ]
+      | ].
+    all: iIntros "Hcur Hq Heq Hstr Hws Hsy" (h12 n11) "%Hcs1011 %Ha0_11 Hrun".
+    all: rewrite Eret10.
+    all: rewrite Ekk.
+    all: rewrite Ekk in Ha0_11.
+    all: iDestruct "Hq" as "[%Hbadq | [_ Hq]]"; [ exfalso; lia | ].
+    all: iDestruct "Heq" as "[%Hbade | [_ Heq]]"; [ exfalso; lia | ].
+    all: assert (Hk11 : forall r : mword 5, ucallee_saved_idx r = true ->
+                   n11 !!! Regidx r = mc !!! Regidx r)
+      by (intros r Hr; rewrite (Hcs1011 r Hr); exact (Hk10 r Hr)).
+    - (* =========== THE LOOP EXITS: no token is left =================== *)
+      assert (Hend : cur' = len)
+        by exact (ushp_tokens_nil_inv len cur f Htoks).
+      assert (Hres0 : ushp_gettok_res len f cur' = 0);
+        [ rewrite /ushp_gettok_res
+            (bool_decide_eq_false_2 (cur' < len)%nat ltac:(lia));
+          reflexivity | ].
+      rewrite Hres0 in Ha0_11.
+      assert (Heend : ushp_gettok_end len f cur' = len);
+        [ rewrite /ushp_gettok_end Hend Nat.sub_diag;
+          cbn [ushp_toklen]; lia | ].
+      assert (Hfin : ushp_gettok_fin len f cur' = len);
+        [ rewrite /ushp_gettok_fin; cbv zeta;
+          rewrite Heend Nat.sub_diag; cbn [ushp_skipws]; lia | ].
+      rewrite Hfin.
+      (* ---- 0x63a  c.beqz a0 -- TAKEN: the line is exhausted ---- *)
+      iApply (wp_uk_cbeqz γt γd γs γfd h12 n11 (mword_of_int 0x63a)
+                (mword_of_int 20 : mword 8) (mword_of_int 2 : mword 3)
+                a0_idx true (mword_of_int 0x662) (24 + nn)
+                ltac:(vm_compute; reflexivity)
+                ltac:(rewrite Ha0_11; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(intros _; vm_compute; reflexivity)
+                with "[] Hrun").
+      { iApply (uis_shp_63a with "Hcode"). }
+      iIntros (h13) "Hrun".
+      cbn [length]. rewrite app_nil_r Nat.add_0_r.
+      iApply ("Hcont" with "Hnode Hcur [Hq] [Heq] Hstr Hws Hsy [] [] Hrun").
+      + iExists (mword_of_int (s0 + Z.of_nat cur')). iExact "Hq".
+      + iExists (mword_of_int (s0 + Z.of_nat len)). rewrite Heend. iExact "Heq".
+      + iPureIntro. intros r Hr _ _ _. exact (Hk11 r Hr).
+      + iPureIntro.
+        rewrite (Hk11 s2_idx ltac:(vm_compute; reflexivity)). exact Hs2v.
+    - (* =========== A TOKEN: store it and go round ===================== *)
+      pose (q := ushp_toklen (len - cur') cur' f).
+      assert (Hqe : q = ushp_toklen (len - cur') cur' f) by reflexivity.
+      destruct (ushp_tokens_cons_inv' len cur cur' q f tk rest
+                  Hcure Hqe Htoks) as (Hn & Htkeq & Hrest).
+      pose (e := (cur' + q)%nat).
+      assert (Hee : e = (cur' + q)%nat) by reflexivity.
+      assert (Hele : (e <= len)%nat);
+        [ rewrite Hee Hqe;
+          pose proof (ushp_toklen_le (len - cur') cur' f); lia | ].
+      pose (nxt := (e + ushp_skipws (len - e) e f)%nat).
+      assert (Hnxte : nxt = (e + ushp_skipws (len - e) e f)%nat)
+        by reflexivity.
+      assert (Hnxt : (nxt <= len)%nat);
+        [ rewrite Hnxte; pose proof (ushp_skipws_le (len - e) e f); lia | ].
+      assert (Hres97 : ushp_gettok_res len f cur' = 97);
+        [ rewrite /ushp_gettok_res
+            (bool_decide_eq_true_2 (cur' < len)%nat
+               ltac:(rewrite Hqe in Hn; lia));
+          reflexivity | ].
+      rewrite Hres97 in Ha0_11.
+      assert (Hendv : ushp_gettok_end len f cur' = e) by reflexivity.
+      assert (Hfin : ushp_gettok_fin len f cur' = nxt) by reflexivity.
+      rewrite Hendv Hfin.
+      (* ---- 0x63a  c.beqz a0 -- NOT taken ---- *)
+      iApply (wp_uk_cbeqz γt γd γs γfd h12 n11 (mword_of_int 0x63a)
+                (mword_of_int 20 : mword 8) (mword_of_int 2 : mword 3)
+                a0_idx false (mword_of_int 0x662) (24 + nn)
+                ltac:(vm_compute; reflexivity)
+                ltac:(rewrite Ha0_11; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(discriminate)
+                with "[] Hrun").
+      { iApply (uis_shp_63a with "Hcode"). }
+      iIntros (h13) "Hrun".
+      (* ---- 0x63c  bne a0,s10 -- NOT taken: the token IS a word ---- *)
+      iApply (wp_uk_btype γt γd γs γfd h13 n11 (mword_of_int 0x63c)
+                (mword_of_int 8140 : mword 13) s10_idx a0_idx BNE false
+                (mword_of_int 0x608) (24 + nn)
+                ltac:(cbn [uv_btaken]; rewrite Ha0_11
+                        (Hk11 s10_idx ltac:(vm_compute; reflexivity)) Hs10v;
+                      vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(discriminate)
+                with "[] Hrun").
+      { iApply (uis_shp_63c with "Hcode"). }
+      iIntros (h14) "Hrun".
+      (* ---- 0x640  ld a5,-120(s0) -- q ---- *)
+      assert (Hs0_11 : n11 !!! Regidx s0_idx = mword_of_int fp)
+        by (rewrite (Hk11 s0_idx ltac:(vm_compute; reflexivity)); exact Hs0v).
+      iApply (wp_uk_ld γt γd γs γfd h14 n11 (mword_of_int 0x640)
+                (mword_of_int 3976 : mword 12) s0_idx a5_idx (DfracOwn 1)
+                (fp - 120) (mword_of_int (s0 + Z.of_nat cur')) (24 + nn)
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                ltac:(rewrite Hs0_11 (uint_moi fp Hfp64);
+                      vm_compute uoff_i12; lia)
+                Hq8
+                ltac:(vm_compute; discriminate)
+                with "[] Hq Hrun").
+      { iApply (uis_shp_640 with "Hcode"). }
+      iIntros "Hq" (h15) "Hrun".
+      set (n12 := <[Regidx a5_idx
+                    := regval_into_reg
+                         (mword_of_int (s0 + Z.of_nat cur')
+                          : mword 64)]> n11).
+      assert (Hk12 : forall r : mword 5, ucallee_saved_idx r = true ->
+                 n12 !!! Regidx r = mc !!! Regidx r)
+        by (intros r Hr;
+            rewrite (upd_ne n11 (Regidx a5_idx) (Regidx r) _
+                       (ushp_cs_ne r a5_idx Hr
+                          ltac:(vm_compute; reflexivity)));
+            exact (Hk11 r Hr)).
+      assert (Ha5_12 : n12 !!! Regidx a5_idx
+                       = mword_of_int (s0 + Z.of_nat cur'))
+        by exact (upd_eq n11 (Regidx a5_idx)
+                    (regval_into_reg
+                       (mword_of_int (s0 + Z.of_nat cur') : mword 64))).
+      assert (Hs3_12 : n12 !!! Regidx s3_idx
+                       = mword_of_int (p + 8 + 8 * Z.of_nat (length done)))
+        by (rewrite (Hk12 s3_idx ltac:(vm_compute; reflexivity)); exact Hs3v).
+      (* ---- 0x644  sd a5,0(s3) -- argv[argc] = q ---- *)
+      iDestruct "Hnode" as "(%Hdl & _ & _ & Hty & Hav & Hev)".
+      iDestruct (ushp_slots_upd s0 (p + 8) done tk fst Hnodelen with "Hav")
+        as "[Hav0 Havc]".
+      iApply (wp_uk_sd γt γd γs γfd h15 n12 (mword_of_int 0x644)
+                (mword_of_int 0 : mword 12) s3_idx a5_idx
+                (p + 8 + 8 * Z.of_nat (length done)) (mword_of_int 0)
+                (24 + nn)
+                ltac:(rewrite Hs3_12
+                        (uint_moi (p + 8 + 8 * Z.of_nat (length done))
+                           ltac:(unfold Z64 in *; lia));
+                      vm_compute uoff_i12; lia)
+                ltac:(exact (ushp_slot_al8 p 1 (length done) Hp8))
+                with "[] [Hav0] Hrun").
+      { iApply (uis_shp_644 with "Hcode"). }
+      { iExact "Hav0". }
+      iIntros "Hav0" (h16) "Hrun".
+      rewrite Ha5_12.
+      iDestruct ("Havc" with "[Hav0]") as "Hav";
+        [ rewrite Htkeq; iExact "Hav0" | ].
+      (* ---- 0x648  ld a5,-128(s0) -- eq ---- *)
+      assert (Hs0_12 : n12 !!! Regidx s0_idx = mword_of_int fp)
+        by (rewrite (Hk12 s0_idx ltac:(vm_compute; reflexivity)); exact Hs0v).
+      iApply (wp_uk_ld γt γd γs γfd h16 n12 (mword_of_int 0x648)
+                (mword_of_int 3968 : mword 12) s0_idx a5_idx (DfracOwn 1)
+                (fp - 128) (mword_of_int (s0 + Z.of_nat e)) (24 + nn)
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                ltac:(rewrite Hs0_12 (uint_moi fp Hfp64);
+                      vm_compute uoff_i12; lia)
+                Hfp8
+                ltac:(vm_compute; discriminate)
+                with "[] Heq Hrun").
+      { iApply (uis_shp_648 with "Hcode"). }
+      iIntros "Heq" (h17) "Hrun".
+      set (n13 := <[Regidx a5_idx
+                    := regval_into_reg
+                         (mword_of_int (s0 + Z.of_nat e) : mword 64)]> n12).
+      assert (Hk13 : forall r : mword 5, ucallee_saved_idx r = true ->
+                 n13 !!! Regidx r = mc !!! Regidx r)
+        by (intros r Hr;
+            rewrite (upd_ne n12 (Regidx a5_idx) (Regidx r) _
+                       (ushp_cs_ne r a5_idx Hr
+                          ltac:(vm_compute; reflexivity)));
+            exact (Hk12 r Hr)).
+      assert (Ha5_13 : n13 !!! Regidx a5_idx
+                       = mword_of_int (s0 + Z.of_nat e))
+        by exact (upd_eq n12 (Regidx a5_idx)
+                    (regval_into_reg
+                       (mword_of_int (s0 + Z.of_nat e) : mword 64))).
+      assert (Hs3_13 : n13 !!! Regidx s3_idx
+                       = mword_of_int (p + 8 + 8 * Z.of_nat (length done)))
+        by (rewrite (Hk13 s3_idx ltac:(vm_compute; reflexivity)); exact Hs3v).
+      (* ---- 0x64c  sd a5,80(s3) -- eargv[argc] = eq ---- *)
+      iDestruct (ushp_slots_upd s0 (p + 88) done tk snd Hnodelen with "Hev")
+        as "[Hev0 Hevc]".
+      iApply (wp_uk_sd γt γd γs γfd h17 n13 (mword_of_int 0x64c)
+                (mword_of_int 80 : mword 12) s3_idx a5_idx
+                (p + 88 + 8 * Z.of_nat (length done)) (mword_of_int 0)
+                (24 + nn)
+                ltac:(rewrite Hs3_13
+                        (uint_moi (p + 8 + 8 * Z.of_nat (length done))
+                           ltac:(unfold Z64 in *; lia));
+                      vm_compute uoff_i12; lia)
+                ltac:(exact (ushp_slot_al8 p 11 (length done) Hp8))
+                with "[] [Hev0] Hrun").
+      { iApply (uis_shp_64c with "Hcode"). }
+      { iExact "Hev0". }
+      iIntros "Hev0" (h18) "Hrun".
+      rewrite Ha5_13.
+      iDestruct ("Hevc" with "[Hev0]") as "Hev";
+        [ rewrite Htkeq; iExact "Hev0" | ].
+      (* ---- 0x650  c.addiw s2,s2,1 -- argc++ ---- *)
+      assert (Hs2_13 : n13 !!! Regidx s2_idx
+                       = mword_of_int (Z.of_nat (length done)))
+        by (rewrite (Hk13 s2_idx ltac:(vm_compute; reflexivity)); exact Hs2v).
+      assert (Esx : (sign_extend' 64 (mword_of_int 1 : mword 6) : mword 64)
+                    = mword_of_int 1)
+        by (apply bv_eq; vm_compute; reflexivity).
+      iApply (wp_uk_caddiw γt γd γs γfd h18 n13 (mword_of_int 0x650)
+                (mword_of_int 1 : mword 6) s2_idx
+                (mword_of_int (Z.of_nat (length done) + 1)) (24 + nn)
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hs2_13 Esx; symmetry;
+                      exact (moi_addw (Z.of_nat (length done)) 1
+                               ltac:(unfold Z31; lia)))
+                with "[] Hrun").
+      { iApply (uis_shp_650 with "Hcode"). }
+      iIntros (h19) "Hrun".
+      set (n14 := <[Regidx s2_idx
+                    := regval_into_reg
+                         (mword_of_int (Z.of_nat (length done) + 1)
+                          : mword 64)]> n13).
+      assert (Hk14 : forall r : mword 5, ucallee_saved_idx r = true ->
+                 Regidx r <> Regidx s2_idx ->
+                 n14 !!! Regidx r = mc !!! Regidx r)
+        by (intros r Hr Hr2;
+            rewrite (upd_ne n13 (Regidx s2_idx) (Regidx r) _ Hr2);
+            exact (Hk13 r Hr)).
+      assert (Hs2_14 : n14 !!! Regidx s2_idx
+                       = mword_of_int (Z.of_nat (length done) + 1))
+        by exact (upd_eq n13 (Regidx s2_idx)
+                    (regval_into_reg
+                       (mword_of_int (Z.of_nat (length done) + 1)
+                        : mword 64))).
+      (* ---- 0x652  bne s2,s9 -- TAKEN: MAXARGS is not reached ---- *)
+      iApply (wp_uk_btype γt γd γs γfd h19 n14 (mword_of_int 0x652)
+                (mword_of_int 8130 : mword 13) s9_idx s2_idx BNE true
+                (mword_of_int 0x614) (24 + nn)
+                ltac:(cbn [uv_btaken]; rewrite Hs2_14
+                        (Hk14 s9_idx ltac:(vm_compute; reflexivity)
+                           ltac:(vm_compute; discriminate)) Hs9v;
+                      rewrite (moi_neq_vec (Z.of_nat (length done) + 1) 10
+                                 ltac:(unfold Z64; cbn [length] in Hcnt; lia)
+                                 ltac:(unfold Z64; lia));
+                      assert (Hne : (Z.of_nat (length done) + 1 =? 10)
+                                    = false)
+                        by (apply Z.eqb_neq; cbn [length] in Hcnt; lia);
+                      rewrite Hne; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(intros _; vm_compute; reflexivity)
+                with "[] Hrun").
+      { iApply (uis_shp_652 with "Hcode"). }
+      iIntros (h20) "Hrun".
+      (* ---- 0x614  c.addi s3,s3,8 ---- *)
+      assert (Hs3_14 : n14 !!! Regidx s3_idx
+                       = mword_of_int (p + 8 + 8 * Z.of_nat (length done)))
+        by (rewrite (Hk14 s3_idx ltac:(vm_compute; reflexivity)
+                       ltac:(vm_compute; discriminate)); exact Hs3v).
+      assert (Esx8 : (sign_extend' 64 (mword_of_int 8 : mword 6) : mword 64)
+                     = mword_of_int 8)
+        by (apply bv_eq; vm_compute; reflexivity).
+      iApply (wp_uk_caddi γt γd γs γfd h20 n14 (mword_of_int 0x614)
+                (mword_of_int 8 : mword 6) s3_idx
+                (mword_of_int (p + 8 + 8 * Z.of_nat (length done) + 8))
+                (24 + nn)
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hs3_14 Esx8; symmetry; apply moi_add)
+                with "[] Hrun").
+      { iApply (uis_shp_614 with "Hcode"). }
+      iIntros (h21) "Hrun".
+      set (n15 := <[Regidx s3_idx
+                    := regval_into_reg
+                         (mword_of_int
+                            (p + 8 + 8 * Z.of_nat (length done) + 8)
+                          : mword 64)]> n14).
+      assert (Hk15 : forall r : mword 5, ucallee_saved_idx r = true ->
+                 Regidx r <> Regidx s2_idx -> Regidx r <> Regidx s3_idx ->
+                 n15 !!! Regidx r = mc !!! Regidx r)
+        by (intros r Hr Hr2 Hr3;
+            rewrite (upd_ne n14 (Regidx s3_idx) (Regidx r) _ Hr3);
+            exact (Hk14 r Hr Hr2)).
+      (* ---- 0x616..0x61a  parseredirs(ret, ps, es) ---- *)
+      iApply (wp_uk_cmv γt γd γs γfd h21 n15 (mword_of_int 0x616) a2_idx
+                s5_idx (mword_of_int (s0 + Z.of_nat len)) (24 + nn)
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite (Hk15 s5_idx ltac:(vm_compute; reflexivity)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate)) Hs5v;
+                      symmetry; exact (ushp_mv_val (s0 + Z.of_nat len)))
+                with "[] Hrun").
+      { iApply (uis_shp_616 with "Hcode"). }
+      iIntros (h22) "Hrun".
+      set (n16 := <[Regidx a2_idx
+                    := regval_into_reg
+                         (mword_of_int (s0 + Z.of_nat len)
+                          : mword 64)]> n15).
+      assert (Hk16 : forall r : mword 5, ucallee_saved_idx r = true ->
+                 Regidx r <> Regidx s2_idx -> Regidx r <> Regidx s3_idx ->
+                 n16 !!! Regidx r = mc !!! Regidx r)
+        by (intros r Hr Hr2 Hr3;
+            rewrite (upd_ne n15 (Regidx a2_idx) (Regidx r) _
+                       (ushp_cs_ne r a2_idx Hr
+                          ltac:(vm_compute; reflexivity)));
+            exact (Hk15 r Hr Hr2 Hr3)).
+      iApply (wp_uk_cmv γt γd γs γfd h22 n16 (mword_of_int 0x618) a1_idx
+                s4_idx (mword_of_int ps) (24 + nn)
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite (Hk16 s4_idx ltac:(vm_compute; reflexivity)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate)) Hs4v;
+                      symmetry; exact (ushp_mv_val ps))
+                with "[] Hrun").
+      { iApply (uis_shp_618 with "Hcode"). }
+      iIntros (h23) "Hrun".
+      set (n17 := <[Regidx a1_idx
+                    := regval_into_reg (mword_of_int ps : mword 64)]> n16).
+      assert (Hk17 : forall r : mword 5, ucallee_saved_idx r = true ->
+                 Regidx r <> Regidx s2_idx -> Regidx r <> Regidx s3_idx ->
+                 n17 !!! Regidx r = mc !!! Regidx r)
+        by (intros r Hr Hr2 Hr3;
+            rewrite (upd_ne n16 (Regidx a1_idx) (Regidx r) _
+                       (ushp_cs_ne r a1_idx Hr
+                          ltac:(vm_compute; reflexivity)));
+            exact (Hk16 r Hr Hr2 Hr3)).
+      iApply (wp_uk_cmv γt γd γs γfd h23 n17 (mword_of_int 0x61a) a0_idx
+                s1_idx (mword_of_int p) (24 + nn)
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite (Hk17 s1_idx ltac:(vm_compute; reflexivity)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate)) Hs1v;
+                      symmetry; exact (ushp_mv_val p))
+                with "[] Hrun").
+      { iApply (uis_shp_61a with "Hcode"). }
+      iIntros (h24) "Hrun".
+      set (n18 := <[Regidx a0_idx
+                    := regval_into_reg (mword_of_int p : mword 64)]> n17).
+      assert (Hk18 : forall r : mword 5, ucallee_saved_idx r = true ->
+                 Regidx r <> Regidx s2_idx -> Regidx r <> Regidx s3_idx ->
+                 n18 !!! Regidx r = mc !!! Regidx r)
+        by (intros r Hr Hr2 Hr3;
+            rewrite (upd_ne n17 (Regidx a0_idx) (Regidx r) _
+                       (ushp_cs_ne r a0_idx Hr
+                          ltac:(vm_compute; reflexivity)));
+            exact (Hk17 r Hr Hr2 Hr3)).
+      (* ---- 0x61c  jal 4ac <parseredirs> ---- *)
+      iApply (wp_uk_jal γt γd γs γfd h24 n18 (mword_of_int 0x61c)
+                (mword_of_int 2096784 : mword 21) ra_idx
+                (mword_of_int 0x4ac) (mword_of_int 0x620) (24 + nn)
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                ltac:(vm_compute; discriminate)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity)
+                with "[] Hrun").
+      { iApply (uis_shp_61c with "Hcode"). }
+      iIntros (h25) "Hrun".
+      set (n19 := <[Regidx ra_idx
+                    := regval_into_reg
+                         (mword_of_int 0x620 : mword 64)]> n18).
+      assert (Hk19 : forall r : mword 5, ucallee_saved_idx r = true ->
+                 Regidx r <> Regidx s2_idx -> Regidx r <> Regidx s3_idx ->
+                 n19 !!! Regidx r = mc !!! Regidx r)
+        by (intros r Hr Hr2 Hr3;
+            rewrite (upd_ne n18 (Regidx ra_idx) (Regidx r) _
+                       (ushp_cs_ne r ra_idx Hr
+                          ltac:(vm_compute; reflexivity)));
+            exact (Hk18 r Hr Hr2 Hr3)).
+      assert (Eret19 : ret_pc (n19 !!! Regidx ra_idx)
+                       = mword_of_int 0x620);
+        [ rewrite (upd_eq n18 (Regidx ra_idx)
+                     (regval_into_reg (mword_of_int 0x620 : mword 64)));
+          apply bv_eq; vm_compute; reflexivity | ].
+      assert (Ha0_19 : n19 !!! Regidx a0_idx = mword_of_int p);
+        [ rewrite (upd_ne n18 (Regidx ra_idx) (Regidx a0_idx) _
+                     ltac:(vm_compute; discriminate));
+          exact (upd_eq n17 (Regidx a0_idx)
+                   (regval_into_reg (mword_of_int p : mword 64))) | ].
+      assert (Ha1_19 : n19 !!! Regidx a1_idx = mword_of_int ps);
+        [ rewrite (upd_ne n18 (Regidx ra_idx) (Regidx a1_idx) _
+                     ltac:(vm_compute; discriminate));
+          rewrite (upd_ne n17 (Regidx a0_idx) (Regidx a1_idx) _
+                     ltac:(vm_compute; discriminate));
+          exact (upd_eq n16 (Regidx a1_idx)
+                   (regval_into_reg (mword_of_int ps : mword 64))) | ].
+      assert (Ha2_19 : n19 !!! Regidx a2_idx
+                       = mword_of_int (s0 + Z.of_nat len));
+        [ rewrite (upd_ne n18 (Regidx ra_idx) (Regidx a2_idx) _
+                     ltac:(vm_compute; discriminate));
+          rewrite (upd_ne n17 (Regidx a0_idx) (Regidx a2_idx) _
+                     ltac:(vm_compute; discriminate));
+          rewrite (upd_ne n16 (Regidx a1_idx) (Regidx a2_idx) _
+                     ltac:(vm_compute; discriminate));
+          exact (upd_eq n15 (Regidx a2_idx)
+                   (regval_into_reg
+                      (mword_of_int (s0 + Z.of_nat len) : mword 64))) | ].
+      rewrite <- shpp_parseredirs.
+      iApply (wp_kshp_parseredirs h25 n19 dq dw p ps s0 len nxt f
+                (mword_of_int (s0 + Z.of_nat nxt)) nn
+                Ha0_19 Ha1_19 Ha2_19 Hnxt eq_refl Hnosym Hs0 Hs64
+                Hps0 Hps8 Hpssz
+                with "Hcode Hro Hcur Hstr Hws Hrun").
+      iIntros "Hcur Hstr Hws" (h26 n20) "%Hcs1920 %Ha0_20 Hrun".
+      rewrite Eret19.
+      assert (Hnz : ushp_skipws (len - nxt) nxt f = 0%nat)
+        by exact (ushp_skipws_idem len e f Hele).
+      assert (Enx : (nxt + ushp_skipws (len - nxt) nxt f)%nat = nxt)
+        by (rewrite Hnz; lia).
+      rewrite Enx.
+      assert (Hk20 : forall r : mword 5, ucallee_saved_idx r = true ->
+                 Regidx r <> Regidx s2_idx -> Regidx r <> Regidx s3_idx ->
+                 n20 !!! Regidx r = mc !!! Regidx r)
+        by (intros r Hr Hr2 Hr3; rewrite (Hcs1920 r Hr);
+            exact (Hk19 r Hr Hr2 Hr3)).
+      (* ---- 0x620  c.mv s1,a0 ---- *)
+      iApply (wp_uk_cmv γt γd γs γfd h26 n20 (mword_of_int 0x620) s1_idx
+                a0_idx (mword_of_int p) (24 + nn)
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Ha0_20; symmetry; exact (ushp_mv_val p))
+                with "[] Hrun").
+      { iApply (uis_shp_620 with "Hcode"). }
+      iIntros (h27) "Hrun".
+      set (n21 := <[Regidx s1_idx
+                    := regval_into_reg (mword_of_int p : mword 64)]> n20).
+      assert (Hk21 : forall r : mword 5, ucallee_saved_idx r = true ->
+                 Regidx r <> Regidx s1_idx -> Regidx r <> Regidx s2_idx ->
+                 Regidx r <> Regidx s3_idx ->
+                 n21 !!! Regidx r = mc !!! Regidx r)
+        by (intros r Hr Hr1 Hr2 Hr3;
+            rewrite (upd_ne n20 (Regidx s1_idx) (Regidx r) _ Hr1);
+            exact (Hk20 r Hr Hr2 Hr3)).
+      assert (Hs3_15 : n15 !!! Regidx s3_idx
+                       = mword_of_int
+                           (p + 8 + 8 * Z.of_nat (length done) + 8))
+        by exact (upd_eq n14 (Regidx s3_idx)
+                    (regval_into_reg
+                       (mword_of_int
+                          (p + 8 + 8 * Z.of_nat (length done) + 8)
+                        : mword 64))).
+      assert (HIs3 : n21 !!! Regidx s3_idx
+                     = mword_of_int
+                         (p + 8 + 8 * Z.of_nat (length (done ++ [tk])))).
+      { rewrite ushp_len_app1.
+        rewrite (upd_ne n20 (Regidx s1_idx) (Regidx s3_idx) _
+                   ltac:(vm_compute; discriminate)).
+        rewrite (Hcs1920 s3_idx ltac:(vm_compute; reflexivity)).
+        rewrite (upd_ne n18 (Regidx ra_idx) (Regidx s3_idx) _
+                   ltac:(vm_compute; discriminate)).
+        rewrite (upd_ne n17 (Regidx a0_idx) (Regidx s3_idx) _
+                   ltac:(vm_compute; discriminate)).
+        rewrite (upd_ne n16 (Regidx a1_idx) (Regidx s3_idx) _
+                   ltac:(vm_compute; discriminate)).
+        rewrite (upd_ne n15 (Regidx a2_idx) (Regidx s3_idx) _
+                   ltac:(vm_compute; discriminate)).
+        rewrite Hs3_15. f_equal. rewrite Nat2Z.inj_succ. lia. }
+      (* ---- and round again, with the token banked ---- *)
+      iApply (IH (done ++ [tk]) nxt h27 n21
+                (mword_of_int (s0 + Z.of_nat cur'))
+                (mword_of_int (s0 + Z.of_nat e))
+                Hnosym Hs0 Hs64 Hps0 Hps8 Hpssz Hfp0 Hfp8 Hfpl Hfph
+                Hp0 Hp8 Hpsz Hnxt
+                ltac:(rewrite ushp_len_app1; cbn [length] in Hcnt; lia)
+                ltac:(exact (ushp_tokens_skip len f e rest Hele Hrest))
+                ltac:(rewrite (Hk21 s0_idx ltac:(vm_compute; reflexivity)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate));
+                      exact Hs0v)
+                ltac:(exact (upd_eq n20 (Regidx s1_idx)
+                               (regval_into_reg (mword_of_int p : mword 64))))
+                ltac:(rewrite ushp_len_app1;
+                      rewrite (upd_ne n20 (Regidx s1_idx) (Regidx s2_idx) _
+                                 ltac:(vm_compute; discriminate));
+                      rewrite (Hcs1920 s2_idx ltac:(vm_compute; reflexivity));
+                      rewrite (upd_ne n18 (Regidx ra_idx) (Regidx s2_idx) _
+                                 ltac:(vm_compute; discriminate));
+                      rewrite (upd_ne n17 (Regidx a0_idx) (Regidx s2_idx) _
+                                 ltac:(vm_compute; discriminate));
+                      rewrite (upd_ne n16 (Regidx a1_idx) (Regidx s2_idx) _
+                                 ltac:(vm_compute; discriminate));
+                      rewrite (upd_ne n15 (Regidx a2_idx) (Regidx s2_idx) _
+                                 ltac:(vm_compute; discriminate));
+                      rewrite (upd_ne n14 (Regidx s3_idx) (Regidx s2_idx) _
+                                 ltac:(vm_compute; discriminate));
+                      rewrite Hs2_14; f_equal; lia)
+                HIs3
+                ltac:(rewrite (Hk21 s4_idx ltac:(vm_compute; reflexivity)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate));
+                      exact Hs4v)
+                ltac:(rewrite (Hk21 s5_idx ltac:(vm_compute; reflexivity)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate));
+                      exact Hs5v)
+                ltac:(rewrite (Hk21 s6_idx ltac:(vm_compute; reflexivity)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate));
+                      exact Hs6v)
+                ltac:(rewrite (Hk21 s7_idx ltac:(vm_compute; reflexivity)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate));
+                      exact Hs7v)
+                ltac:(rewrite (Hk21 s8_idx ltac:(vm_compute; reflexivity)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate));
+                      exact Hs8v)
+                ltac:(rewrite (Hk21 s9_idx ltac:(vm_compute; reflexivity)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate));
+                      exact Hs9v)
+                ltac:(rewrite (Hk21 s10_idx ltac:(vm_compute; reflexivity)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate));
+                      exact Hs10v)
+                ltac:(rewrite (Hk21 s11_idx ltac:(vm_compute; reflexivity)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate)
+                                 ltac:(vm_compute; discriminate));
+                      exact Hs11v)
+                with "Hcode Hro [Hty Hav Hev] Hcur Hq Heq Hstr Hws Hsy Hrun").
+      { rewrite /ushp_exec_pre.
+        iSplitR; [ iPureIntro; rewrite ushp_len_app1;
+                   cbn [length] in Hcnt; lia | ].
+        iSplitR; [ iPureIntro; exact Hp0 | ].
+        iSplitR; [ iPureIntro; exact Hp8 | ].
+        iFrame "Hav Hev". rewrite /ushp_type_at. iExact "Hty". }
+      iIntros "Hnode Hcur Hq Heq Hstr Hws Hsy" (hf mf) "%Hpres %Hs2f Hrun".
+      rewrite ushp_app_cons.
+      iApply ("Hcont" with "Hnode Hcur Hq Heq Hstr Hws Hsy [] [] Hrun").
+      + iPureIntro. intros r Hr Hr1 Hr2 Hr3.
+        rewrite (Hpres r Hr Hr1 Hr2 Hr3). exact (Hk21 r Hr Hr1 Hr2 Hr3).
+      + iPureIntro. rewrite Hs2f ushp_len_app1.
+        assert (El : (S (length done) + length rest)%nat
+                     = (length done + length (tk :: rest))%nat)
+          by (cbn [length]; lia).
+        rewrite El. reflexivity.
   Qed.
 
 End UkShParse.
