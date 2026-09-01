@@ -433,6 +433,14 @@ Section ProofSysOpenBody.
     destruct Hstqx as [stq Hstq].
     iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd stq Hstq with "Hfrag")
       as "[Hfr Hfrback]".
+    (* THE SLOT WAS FREE, LEARNED FROM THE TWO HALVES.  fdalloc handed its
+       authority back still at [FdClosed] and the bundle just yielded the
+       matching fragment, so [fd_st_agree] identifies [stq] -- and that is
+       the conjunct [sys_open_post] now exposes, because no caller of
+       sys_open can re-derive it and [UserFd.ufd_open] cannot do without
+       it. *)
+    iDestruct (fd_st_agree (pv_fdg (us_V U)) fd FdClosed stq with "Hauth Hfr")
+      as "%Hstqcl".
     iMod (proc_priv_settle gf (proc_addr jx) pidv U fd kf 1 stpub FdClosed stq
                  Hfdlt Hlen Hkf (fdstate_ok_open _ C stpub Hokpub (or_intror Htyor))
                  with "Hcore Howe Href Hauth Hfr") as "[Hpriv Hfr]".
@@ -452,7 +460,9 @@ Section ProofSysOpenBody.
       iRight. iExists fd, l, kf, tp.
       rewrite <- Hstpub.
       iSplitR.
-      { iPureIntro. split; [| exact Hfrees]. rewrite Ha0f. reflexivity. }
+      { iPureIntro. split_and!; [| exact Hfrees |].
+        - rewrite Ha0f. reflexivity.
+        - rewrite <- Hstqcl in Hstq. exact Hstq. }
       iFrame "Hpriv Hfrag". }
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
     iDestruct (iref_slots_combine nsj 1 with "Hisl Hiru") as "Hisl".

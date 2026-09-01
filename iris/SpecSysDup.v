@@ -129,7 +129,12 @@ Section SpecSysDup.
      (∃ (fd0 fd1 : nat) (fv : mword 64) (l : list nat),
         ⌜r = (mword_of_int (Z.of_nat fd1) : mword 64) /\
          arg_fd v (pv_ofile (us_V U)) = Some (fd0, fv) /\
-         fd_frees (pv_ofile (us_V U)) = fd1 :: l⌝ ∗
+         fd_frees (pv_ofile (us_V U)) = fd1 :: l /\
+         (* ...AND THE DESTINATION SLOT WAS CLOSED -- see [SpecSysOpen]'s
+            note on the same conjunct.  Learned, not guessed: fdalloc hands
+            its authority back still at [FdClosed] and [fd_st_agree] against
+            the row the bundle yields turns that into this. *)
+         sts !! fd1 = Some FdClosed⌝ ∗
         proc_priv γf p pid (us_ofile U fd1 fv) ∗
         fd_frags (pv_fdg (us_V U)) (<[fd1 := sts !!! fd0]> sts)))%I.
 

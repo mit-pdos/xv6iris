@@ -319,7 +319,13 @@ Section UkRunSys.
     rewrite Hnum. cbv zeta.
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
     destruct (decide (n = USYS_fork)) as [He | _]; [ exfalso; exact (Hfork He) | ].
-    iIntros (r M' pm' sz' fdv') "%Hok".
+    (* THE ROW COMES IN BESIDE THE IMAGE'S NOW.  A quiet syscall's fd row is
+       [fdv' = fdv] ([UsysMemOk.usys_fd_ok_quiet]), so this leaf could pin
+       the descriptor view -- it does not yet, because [urun] hides the view
+       and has nowhere to say it.  Named and discarded here; the leaves that
+       will read it are open/close/dup, once [urun] carries the program's
+       own descriptor authority. *)
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
     destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _ Hexec Hsbrk H3 H4 H5 H8 Hok)
       as [-> [-> ->]].
     cbn [uvis_M uvis_perm uvis_of_run].
@@ -392,7 +398,7 @@ Section UkRunSys.
       [ exfalso; vm_compute in He; discriminate | ].
     destruct (decide (USYS_read = USYS_fork)) as [He | _];
       [ exfalso; vm_compute in He; discriminate | ].
-    iIntros (r M' pm' sz' fdv') "%Hok".
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
     (* unfold the row down to its read arm *)
     unfold usys_mem_ok in Hok.
     destruct (decide (USYS_read = USYS_exec)) as [He | _];
@@ -489,7 +495,7 @@ Section UkRunSys.
       [ exfalso; unfold USYS_exec, USYS_exit in He; discriminate He | ].
     destruct (decide (USYS_exec = USYS_fork)) as [He | _];
       [ exfalso; unfold USYS_exec, USYS_fork in He; discriminate He | ].
-    iIntros (r M' pm' sz' fdv') "%Hok".
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
     destruct (usys_mem_ok_exec_row USYS_exec _ r _ _ _ _ _ _ eq_refl Hok)
       as [-> [-> [-> ->]]].
     cbn [uvis_M uvis_perm uvis_of_run].
@@ -543,7 +549,7 @@ Section UkRunSys.
       [ exfalso; unfold USYS_wait, USYS_exit in He; discriminate He | ].
     destruct (decide (USYS_wait = USYS_fork)) as [He | _];
       [ exfalso; unfold USYS_wait, USYS_fork in He; discriminate He | ].
-    iIntros (r M' pm' sz' fdv') "%Hok".
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
     destruct (usys_mem_ok_wait_null USYS_wait _ r _ _ _ _ _ _
                 eq_refl Ha0 Hok) as [-> [-> ->]].
     cbn [uvis_M uvis_perm uvis_of_run].
@@ -640,7 +646,7 @@ Section UkRunSys.
     rewrite Hnum. cbv zeta.
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
     destruct (decide (n = USYS_fork)) as [He | _]; [ exfalso; exact (Hfork He) | ].
-    iIntros (r M' pm' sz' fdv') "%Hok".
+    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok".
     destruct (usys_mem_ok_window n _ r _ _ _ _ _ _ dst cap Hw Hok)
       as ((d & bs & Hdcap & HM') & -> & ->).
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run] in HM' |- *.

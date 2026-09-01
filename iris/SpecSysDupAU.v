@@ -335,7 +335,8 @@ Section SpecSysDupAU.
       iFrame "Hp Hb".
     - iRight. iRight. iExists fd0, fd1, fv, l.
       iSplitR.
-      { iPureIntro. split; [exact Hr | split; [exact Ha | exact Hfr]]. }
+      { iPureIntro. split_and!;
+          [exact Hr | exact Ha | exact Hfr | exact Hcl]. }
       rewrite (list_lookup_total_correct sts fd0 (FdOpen rb wb t) Hsrc).
       iFrame "Hp Hb".
   Qed.

@@ -3399,7 +3399,7 @@ Section SyscallArms.
                   | apply uptd_ext_sz_refl | reflexivity |].
       (* nothing was installed: the row's right disjunct *)
       by right.
-    - iDestruct "Hc" as (fd0 fd1 fv l) "[[%Hr [%Ha %Hfl]] [Hp Hfr]]".
+    - iDestruct "Hc" as (fd0 fd1 fv l) "[[%Hr [%Ha [%Hfl %Hcl]]] [Hp Hfr]]".
       destruct (arg_fd_lookup v (pv_ofile (us_V U)) fd0 fv Ha)
         as (Hfd0N & _ & _ & _).
       pose proof (fd_frees_head_lt (pv_ofile (us_V U)) fd1 l Hfl) as Hfd1lt.
@@ -3413,7 +3413,7 @@ Section SyscallArms.
          is one of sixteen values, so reading it back is the identity -- and
          [usys_argfd] IS how [argfd] computed its index
          ([SpecArgfd.arg_fd_index]). *)
-      left. exists fd1. split; [exact Hr |].
+      left. exists fd1. split_and!; [exact Hr | exact Hcl |].
       unfold usys_argfd. rewrite Harg (arg_fd_index v _ fd0 fv Ha) Nat2Z.id.
       reflexivity.
   Qed.
@@ -4782,7 +4782,9 @@ Section SyscallArms.
       destruct (decide (4 = USYS_open)) as [Hco | _]; [discriminate Hco |].
       destruct (decide (4 = USYS_pipe)) as [_ | Hcp]; [| exfalso; exact (Hcp eq_refl)].
       iDestruct "Hpv" as
-        "[(%Hr & Hpv & Hb) | (%fd0 & %fd1 & %l & %k0 & %k1 & (%Hr & %Hfl & %Hne) & Hpv & Hb)]".
+        "[(%Hr & Hpv & Hb)
+          | (%fd0 & %fd1 & %l & %k0 & %k1 &
+             (%Hr & %Hfl & %Hne & %Hcl0 & %Hcl1) & Hpv & Hb)]".
       - iExists (upd_upt (us_V U) P'), sts. iFrame "Hpv Hb". iPureIntro.
         split_and!; [exact Htfpe | reflexivity | reflexivity | exact Huptz | reflexivity |].
         rewrite decide_False; [reflexivity |].
@@ -4797,7 +4799,7 @@ Section SyscallArms.
            vocabulary they are reported by being WRITTEN -- and the post
            names them, so the arm simply exhibits them.  The two inserts
            commute because the descriptors are distinct. *)
-        exists fd0, fd1. split; [exact Hne |].
+        exists fd0, fd1. split_and!; [exact Hne | exact Hcl0 | exact Hcl1 |].
         symmetry.
         apply (list_insert_commute sts fd0 fd1
                  (FdOpen true false FdPipe) (FdOpen false true FdPipe) Hne). }
@@ -5200,14 +5202,14 @@ Section SyscallArms.
                 (<[fd := FdOpen (so_rd_of (trunc32 v1)) (so_wr_of (trunc32 v1)) tp]> sts).
         iFrame "Hpv Hb". iPureIntro.
         split_and!; [exact Htfpe | reflexivity | reflexivity | exact Hextz | reflexivity |].
-        destruct Hpu as [Hr _].
+        destruct Hpu as (Hr & _ & Hcl).
         (* the table's open row binds the descriptor, the mode bits and the
            type existentially; the post names all four, so the arm exhibits
            them.  The mode bits are not existential HERE -- they are the
            flags word [v1]'s bits, which is what the strengthened
            [sys_open_post] proves. *)
         left. exists fd, (so_rd_of (trunc32 v1)), (so_wr_of (trunc32 v1)), tp.
-        split; [exact Hr | reflexivity]. }
+        split_and!; [exact Hr | exact Hcl | reflexivity]. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).

@@ -530,6 +530,21 @@ Section UexecRet.
                (szv' : Z) (fdv' : list fdstate),
                ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
                             M' π' szv'⌝ -∗
+               (* ...AND THE DESCRIPTOR VIEW IS NOT ARBITRARY EITHER.  [fdv']
+                  used to be ∀-bound with nothing said about it -- "the
+                  process is safe at every descriptor view the kernel hands
+                  back" -- which is sound but is the reason a program could
+                  not carry a fact about its own descriptors across a
+                  syscall: after [open] it knew a fd had been returned and
+                  nothing at all about the table.  The row is the same table
+                  the kernel proves ([SpecSyscall.sysc_fd_ok], carried out
+                  through [SpecUsertrap.ut_fd_ecall] and
+                  [SpecUservec]'s post), read at the RETURN VALUE [r] --
+                  which is what the kernel stored into the a0 slot, so the
+                  two readings are the same word.  Eighteen entries say
+                  [fdv' = uvis_fd W]; open, close, dup and pipe say which
+                  slot moved and to what. *)
+               ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
                X (bump W r M' π' szv' fdv'))
      else X W)%I.
 
@@ -752,6 +767,7 @@ Section UexecRet.
              (szv' : Z) (fdv' : list fdstate),
              ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
                           M' π' szv'⌝ -∗
+             ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
              uslot (bump W r M' π' szv' fdv'))).
   Proof.
     intros ->. rewrite /uexec_ret /uexec_ret_F.
@@ -775,7 +791,7 @@ Section UexecRet.
     destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ done | ].
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
     { iSplitR; [ iIntros (r fdv' _); iApply "H" | iIntros (fdv'); iApply "H" ]. }
-    iIntros (r M' π' szv' fdv' _). iApply "H".
+    iIntros (r M' π' szv' fdv' _ _). iApply "H".
   Qed.
 
 End UexecRet.

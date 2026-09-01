@@ -386,7 +386,7 @@ Section UkRunSysFs.
     rewrite Hdom.
     (* THE DEPOSIT: the process takes the arm's RIGHT disjunct *)
     iRight. iExists u. iFrame "Hmc".
-    iIntros (r M' pm' sz' fdv' u') "%Hok %Hstep Hmc".
+    iIntros (r M' pm' sz' fdv' u') "%Hok %Hfdok %Hstep Hmc".
     (* the enriched rows are QUIET: nothing about the image moved *)
     destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _
                 Hexec Hsbrk Hwait Hpipe Hrd Hfst Hok) as [-> [-> ->]].

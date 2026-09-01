@@ -328,7 +328,14 @@ Section UserretClosed.
        exactly the transparent arm's premise. *)
     iDestruct (uexec_ret_round_slot_of sc W (tf_resume_gpr0 (uvis_tf W))
                  (tf_w (uvis_tf W) tf_epc_idx) U2 sts2
-                 Hlen eq_refl eq_refl Hfdkept Hround'
+                 Hlen eq_refl eq_refl Hfdkept
+                 (* ...and the ECALL arm's row, which is what stops the
+                    process resuming at an ARBITRARY descriptor view.  It
+                    arrives from uservec's post ([Hfdecall]), which got it
+                    from usertrap, which got it from the dispatcher -- and
+                    it is stated at the same trapframe on both sides, so it
+                    goes in verbatim. *)
+                 Hfdecall Hround'
                  with "Hmk Hret") as "Hslot".
     (* ---- STEPS C/D: the guard, and the bundle, both inside the named
            lemma -- the loop only says which key it is at. ---- *)

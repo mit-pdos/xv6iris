@@ -3052,7 +3052,17 @@ Section ProofSysPipe.
       iSplitR "Hu0 Hu1";
         [| iSplitL "Hu0"; [iExact "Hu0" | iExact "Hu1"]].
       iRight. iExists fd0, fd1, l1, k0, k1.
-      iSplitR; [iPureIntro; split; [reflexivity | split; [exact Hfr1' | exact Hne01]]|].
+      (* BOTH SLOTS WERE FREE, at the INCOMING table.  [Hlkstq0] is already
+         there; fd1's is read off [Hlkstq1] at the FIRST insert's table and
+         carried back to [sts] by [fd0 <> fd1] -- the same step the failure
+         tails make to see their re-nulls are the identity. *)
+      assert (Hst1c' : sts !! fd1 = Some FdClosed)
+        by (rewrite <- (list_lookup_insert_ne sts fd0 fd1
+                          (FdOpen true false FdPipe) Hne01);
+            exact Hlkstq1).
+      iSplitR;
+        [iPureIntro; split_and!;
+          [reflexivity | exact Hfr1' | exact Hne01 | exact Hlkstq0 | exact Hst1c']|].
       rewrite -sp_us_upt_ofile_comm. iFrame "Hpriv Hfrag".
     - (* ============ copyout(&fd1) failed: the shared tail ============ *)
       (* the second run landed only a [d2 <= 4] prefix: the composed window

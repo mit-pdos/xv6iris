@@ -251,6 +251,13 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        what it had, which [list_insert] says by leaving it alone. *)
     ((exists fd1 : nat,
         usys_ret_is r fd1 /\
+        (* ...AND THE SLOT IT LANDED IN WAS FREE.  fdalloc scans for a null
+           entry, so this is what the code does; stating it is what makes
+           the row usable by a holder of descriptors.  Without it dup would
+           be licensed to retype a descriptor the caller is already using,
+           and no party above could keep a fact about its own table across
+           the call ([UserFd.ufd_dup] is the consumer). *)
+        sts !! fd1 = Some FdClosed /\
         sts' = <[fd1 := sts !!! Z.to_nat (usys_argfd tf)]> sts)
      \/ sts' = sts)
   else if decide (n = USYS_open) then
@@ -264,7 +271,11 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        bits decoded, the type wants the path lookup -- so the row says what
        it can honestly say: the slot is now OPEN, and no other slot moved. *)
     ((exists (fd : nat) (rd wr : bool) (t : fdtype),
-        usys_ret_is r fd /\ sts' = <[fd := FdOpen rd wr t]> sts)
+        usys_ret_is r fd /\
+        (* ...AND THE SLOT WAS FREE -- same fdalloc scan, same reason as
+           dup's row above. *)
+        sts !! fd = Some FdClosed /\
+        sts' = <[fd := FdOpen rd wr t]> sts)
      \/ sts' = sts)
   else if decide (n = USYS_pipe) then
     (* pipe(fdarray): TWO descriptors, and the row says which end is which
@@ -281,6 +292,10 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
     (if decide (uint r = 0)
      then (exists a b : nat,
              a <> b /\
+             (* ...AND BOTH SLOTS WERE FREE, both read against the INCOMING
+                table: the two are distinct, so writing one does not disturb
+                the other's freedom.  Two fdalloc calls, two scans. *)
+             sts !! a = Some FdClosed /\ sts !! b = Some FdClosed /\
              sts' = <[a := FdOpen true false FdPipe]>
                       (<[b := FdOpen false true FdPipe]> sts))
      else sts' = sts)
@@ -395,13 +410,14 @@ Proof.
   destruct (decide (n = USYS_close)) as [_ | _].
   { destruct (decide (uint r = 0)); subst; [ apply length_insert | reflexivity ]. }
   destruct (decide (n = USYS_dup)) as [_ | _].
-  { destruct H as [(fd1 & _ & ->) | ->]; [apply length_insert | reflexivity]. }
+  { destruct H as [(fd1 & _ & _ & ->) | ->]; [apply length_insert | reflexivity]. }
   destruct (decide (n = USYS_open)) as [_ | _].
-  { destruct H as [(fd & rd & wr & t & _ & ->) | ->];
+  { destruct H as [(fd & rd & wr & t & _ & _ & ->) | ->];
       [apply length_insert | reflexivity]. }
   destruct (decide (n = USYS_pipe)) as [_ | _].
   { destruct (decide (uint r = 0)) as [_ | _].
-    - destruct H as (a & b & _ & ->). rewrite length_insert. apply length_insert.
+    - destruct H as (a & b & _ & _ & _ & ->).
+      rewrite length_insert. apply length_insert.
     - subst. reflexivity. }
   subst. reflexivity.
 Qed.

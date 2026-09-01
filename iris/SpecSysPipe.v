@@ -176,7 +176,13 @@ Section SpecSysPipe.
           has the fact already (the second descriptor is still free after
           the first is installed). *)
        ⌜r = (zero_reg : mword 64) /\ fd_frees (pv_ofile (us_V UW)) = fd0 :: fd1 :: l
-        /\ fd0 <> fd1⌝ ∗
+        /\ fd0 <> fd1
+        (* ...AND BOTH SLOTS WERE CLOSED, both read against the INCOMING
+           table -- see [SpecSysOpen]'s note on the same conjunct.  Two
+           fdalloc calls, two scans; the proof already names both facts
+           (they are what make its two re-nulls the identity on the failure
+           arms), so exposing them costs nothing. *)
+        /\ sts !! fd0 = Some FdClosed /\ sts !! fd1 = Some FdClosed⌝ ∗
        proc_priv γf p pid
          (upd_usV UW (upd_ofile (upd_ofile (us_V UW) fd0 (fnode k0)) fd1 (fnode k1))) ∗
        (* written in the order the two settles run: fd0's read end first,
@@ -211,7 +217,8 @@ Section SpecSysPipe.
     - iFrame "Hu0 Hu1". iSplitR "Hb";
         [| by iExists (<[fd1 := FdOpen false true FdPipe]>
                          (<[fd0 := FdOpen true false FdPipe]> sts))].
-      iRight. iExists fd0, fd1, l, k0, k1. by iFrame "Hp".
+      iRight. iExists fd0, fd1, l, k0, k1. iFrame "Hp". iPureIntro.
+      destruct Hpu as (H1 & H2 & H3 & _ & _). exact (conj H1 (conj H2 H3)).
   Qed.
 
 End SpecSysPipe.

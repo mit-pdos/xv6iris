@@ -118,6 +118,9 @@ Section UexecRetFs.
              (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate),
              ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W)
                           (uvis_sz W) M' π' szv'⌝ -∗
+             (* the descriptor row, beside the image's -- see
+                [UexecRet.uexec_ret_F]'s own note *)
+             ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
              X (bump W r M' π' szv' fdv'))
           ∨ (∃ u : umirror,
                mcur γm u ∗
@@ -126,6 +129,7 @@ Section UexecRetFs.
                   (fdv' : list fdstate) (u' : umirror),
                   ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W)
                                (uvis_sz W) M' π' szv'⌝ -∗
+                  ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
                   ⌜ufs_step n (uvis_tf W) (uvis_M W) r u u'⌝ -∗
                   mcur γm u' -∗
                   X (bump W r M' π' szv' fdv'))))
@@ -133,6 +137,7 @@ Section UexecRetFs.
                (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate),
                ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W)
                             (uvis_sz W) M' π' szv'⌝ -∗
+               ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
                X (bump W r M' π' szv' fdv'))
      else X W)%I.
 
@@ -239,12 +244,14 @@ Section UexecRetFs.
         iApply "Hup". iApply ("Hp" $! r fdv' with "[%]"). exact Hr.
       - iIntros (fdv'). iApply "Hup". iApply ("Hc" $! fdv'). }
     destruct (uenr_dom (usys_num (uvis_tf W))) eqn:He.
-    - iLeft. iIntros (r M' π' szv' fdv') "%Hok".
+    - iLeft. iIntros (r M' π' szv' fdv') "%Hok %Hfdok".
       iApply "Hup".
-      iApply ("Hret" $! r M' π' szv' fdv' with "[%]"). exact Hok.
-    - iIntros (r M' π' szv' fdv') "%Hok".
+      iApply ("Hret" $! r M' π' szv' fdv' with "[%] [%]");
+        [exact Hok | exact Hfdok].
+    - iIntros (r M' π' szv' fdv') "%Hok %Hfdok".
       iApply "Hup".
-      iApply ("Hret" $! r M' π' szv' fdv' with "[%]"). exact Hok.
+      iApply ("Hret" $! r M' π' szv' fdv' with "[%] [%]");
+        [exact Hok | exact Hfdok].
   Qed.
 
   (* THE BRIDGE: every plain-safe process is enriched-safe.  This is what
