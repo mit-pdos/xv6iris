@@ -33,6 +33,20 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
+Require Import TsoCtx.
+(* A6.61 THE RE-TIERING (A6.58's owner tranche, owner 2).  [bcache_lru]'s
+   link cells were the RAW word tower, so every ordinary [c.ld]/[c.sd] leaf
+   that touched a link had to cross in through [TsoCtxShim.ctx_word_of_mem]
+   -- and that direction is FALSE at TSO (A6.9: a ctx cell carries a
+   timestamp fragment and a clean/dirty bit that only the era's allocation
+   hands out).  The repair is not at the sixteen sites: the OWNER moves.
+   Importing TsoCtx here re-reads every [↦₈] below as
+   [TsoCtx.ctx_word_pointsto cur_ctx], which is what the leaves already
+   speak, and the sixteen crossings simply delete.  Checked before landing:
+   this file names no raw kit lemma and uses no other flipped notation, and
+   TsoCtx reaches only RiscvModelBytes/RiscvLang/RiscvPtsto/Ktier/TsoMemPa/
+   TsoGhost -- none of which reaches ArrCursor/ByteCursor/BufOwn -- so there
+   is no cycle. *)
 Require Import ArrCursor.
 Require ByteCursor.
 Require Import BufOwn.
@@ -200,6 +214,7 @@ Proof. rewrite last_app_gen. rewrite last_cons. reflexivity. Qed.
 
 Section BcacheInv.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* a node's two link fields, uninitialized *)
   Definition blink_raw (a : mword 64) : iProp Σ :=

@@ -1321,54 +1321,11 @@ Section BioEscrow.
     iModIntro. iFrame "Hrun". iExists T'. iFrame.
   Qed.
 
-  (* ---- THE BCACHE PAYLOAD'S TRANSPORT (M1 stage 2).  [bio_slot_res]'s
-     refcnt and the two fractional identity cells are all [↦₄], so
-     [bcache_res] stopped being a closed term at the flip and the bcache
-     lock's payload is λ-CONVERTED (§0.7′ recipe rule 1) rather than
-     constant-embedded.  [bcache_lru] is BcacheInv's and stays RAW, hence
-     ξ-constant, which is why only the slot big-op needs a transport. ---- *)
-  Global Instance bio_slot_res_morph (bn : bio_names)
-      (M : gmap nat (Qp * positive)) (k : nat) (dev bno : mword 32) :
-    CtxMorph (λ ξ, bio_slot_res (XI := ξ) bn M k dev bno).
-  Proof.
-    rewrite /bio_slot_res. destruct (M !! k) as [[q n]|].
-    - iIntros (ξ ξ') "Hd (%Hn & Hcnt & Hsl & %qr & %Hq & Hdev & Hbno)".
-      iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hcnt") as "[Hd Hcnt]".
-      iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
-      iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
-      iModIntro. iFrame "Hd". iSplit; [done|]. iFrame "Hcnt Hsl".
-      iExists qr. iSplit; [done|]. iFrame.
-    - iIntros (ξ ξ') "Hd (Hcnt & Hdev & Hbno)".
-      iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hcnt") as "[Hd Hcnt]".
-      iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
-      iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
-      by iFrame.
-  Qed.
+  (* the bcache payload stays the CONSTANT embedding [<{ bcache_res bn V }>]
+     (flip's shape): its lru links are ctx cells now (BcacheInv A6.61), so a
+     λ-payload would need a [bseg] transport nothing consumes -- the morph
+     pile main built here died with the re-tier. *)
 
-  Global Instance bcache_scan_morph (bn : bio_names) (V : bio_view Σ)
-      (M : gmap nat (Qp * positive)) (ord : list nat)
-      (devs bnos : nat -> mword 32) :
-    CtxMorph (λ ξ, bcache_scan (XI := ξ) bn V M ord devs bnos).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /bcache_scan.
-    iDestruct "H" as "(Hauth & Hsa & %H1 & %H2 & %H3 & %H4 & Hlru & Hpool & Hslots)".
-    iMod (ctx_morph_big_sepL (seq 0 NBUF)
-                 (λ _ (k : nat) (ξ0 : CtxId),
-                    bio_slot_res (XI := ξ0) bn M k (devs k) (bnos k))
-                 (λ _ k, bio_slot_res_morph bn M k (devs k) (bnos k))
-                 ξ ξ' with "Hd Hslots") as "[Hd Hslots]".
-    iModIntro. iFrame "Hd Hauth Hsa Hlru Hpool Hslots". iPureIntro. auto.
-  Qed.
-
-  Global Instance bcache_res_morph (bn : bio_names) (V : bio_view Σ) :
-    CtxMorph (λ ξ, bcache_res (XI := ξ) bn V).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /bcache_res.
-    iDestruct "H" as (M ord devs bnos) "H".
-    iMod (bcache_scan_morph bn V M ord devs bnos ξ ξ' with "Hd H")
-      as "[Hd H]".
-    iModIntro. iFrame "Hd". iExists M, ord, devs, bnos. iExact "H".
-  Qed.
 
   (* ---- the caller-facing handle ---- *)
 

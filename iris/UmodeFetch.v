@@ -1048,6 +1048,19 @@ End UmodeFetchSplitBase.
 
 (* ==== MAIN-COMPAT appendix (tso-cutover): main-side additions kept
    beside flip's file; delete each when its last consumer migrates. ==== *)
+Lemma ualign_page_off (pc : mword 64) (k : Z) :
+  0 < k -> (k | 4096) -> is_aligned_vaddr (Virtaddr pc) k = true ->
+  (bv_unsigned pc mod 4096) mod k = 0.
+Proof.
+  intros Hk Hdvd Hal.
+  unfold is_aligned_vaddr in Hal. apply Z.eqb_eq in Hal.
+  rewrite uint_unsigned in Hal.
+  rewrite Z.rem_mod_nonneg in Hal;
+    [ | exact (proj1 (bv_unsigned_in_range _ pc)) | lia ].
+  rewrite <- (Znumtheory.Zmod_div_mod k 4096 (bv_unsigned pc) Hk ltac:(lia) Hdvd).
+  exact Hal.
+Qed.
+
 Lemma ualign2_nc (pc : mword 64) (d : Z) :
   is_aligned_vaddr (Virtaddr pc) 2 = true -> 0 <= d <= 1 ->
   bv_unsigned pc mod 4096 + d < 4096.
@@ -1080,15 +1093,4 @@ Qed.
    (its low half sits at page offset 4094), and the way to support it is to
    give the second halfword its own leaf rather than to forbid the case with
    an in-page premise. *)
-Lemma ualign_page_off (pc : mword 64) (k : Z) :
-  0 < k -> (k | 4096) -> is_aligned_vaddr (Virtaddr pc) k = true ->
-  (bv_unsigned pc mod 4096) mod k = 0.
-Proof.
-  intros Hk Hdvd Hal.
-  unfold is_aligned_vaddr in Hal. apply Z.eqb_eq in Hal.
-  rewrite uint_unsigned in Hal.
-  rewrite Z.rem_mod_nonneg in Hal;
-    [ | exact (proj1 (bv_unsigned_in_range _ pc)) | lia ].
-  rewrite <- (Znumtheory.Zmod_div_mod k 4096 (bv_unsigned pc) Hk ltac:(lia) Hdvd).
-  exact Hal.
-Qed.
+

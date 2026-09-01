@@ -75,7 +75,7 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} 
     ⌜pt_rep0 t' (kvm_stacks pas 64 m)⌝ -∗
     ⌜(g <= kstacks_missing t)%nat⌝ -∗
     ([∗ list] i ∈ seq 0 64,
-       page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
+       page_filled (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12))) kalloc_junk) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

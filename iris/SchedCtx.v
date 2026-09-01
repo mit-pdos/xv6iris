@@ -1156,4 +1156,8 @@ End SchedCtxMove.
    [procs_inv_lookup] and the kstack one -- can still take it apart.  Those
    accessors are what a consumer should use; four files had been hand-rolling
    [iDestruct "Hpinv" as "[%Hl _]"] instead, and now call [procs_inv_len]. *)
-Global Typeclasses Opaque procs_inv.
+(* the [Typeclasses Opaque procs_inv] perf seal is DROPPED at the cutover:
+   flip-shaped proofs open the bundle raw ([iDestruct "Hpinv" as "[%Hl _]"],
+   ProofPipeclose-class), and TC-opacity turns those into "No matching
+   clauses" failures.  If the iFrame crawl cost returns, re-seal and give
+   the openers an accessor instead. *)
