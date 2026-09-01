@@ -195,13 +195,14 @@ Definition create_fresh_ty_body
      (pd' pav' pu' : mword 64) (bn' : bio_names)
      (γfs' : fs_names) (γi' : gname) (cn' : ic_names) (gil' gisl' : gname)
      (cov' : gset Z) (logstart' inodestart' : Z) (nib' : nat)
-     (k' : nat) (s' : Qp) (g' : gname) (o' : ilkc) (dev' inum' : mword 32)
+     (k' : nat) (s' : Qp) (g' : gname) (lo' tl' : nat) (o' : ilkc)
+     (dev' inum' : mword 32)
      (pidv' : mword 32) (dq' dqs' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string) (Vpr' : pprivate),
      wp_ilock_sconf_body (CID := CIDl) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
                          γfs' γi' cn' gil' gisl' cov' logstart' inodestart'
-                         nib' k' s' g' o' dev' inum' pidv' dq' dqs'
+                         nib' k' s' g' lo' tl' o' dev' inum' pidv' dq' dqs'
                          m' K' eb' b' lks' Vpr') ->
   (* ================= THE SPAN ================= *)
   sie_cap_gpr KT1 Ma K b pj -∗
@@ -265,7 +266,9 @@ Definition create_fresh_ty_body
          is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
                           (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) ∗
          sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv ∗
-         ic_deposit cn kslot (DepShr (q/2)%Qp dev inum g) ∗
+         (∃ loc tlc : nat,
+            ⌜(loc <= tlc)%nat⌝ ∗ IcacheRef.cred_floor loc tlc ∗
+            ic_deposit cn kslot (DepShr (q/2)%Qp dev inum g loc)) ∗
          i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev ∗
          i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} inum ∗
          i_valid (ientry kslot) ↦₄ valid_word true ∗
@@ -285,7 +288,9 @@ Definition create_fresh_ty_body
             comes straight back, and create returns it at the child's
             iunlock. *)
          ifreeze_off (bv_unsigned inum) ∗
-         inode_ref_short_gen kslot (q/2 + q/2)%Qp (q/2)%Qp dev inum g ∗
+         (∃ lo tl : nat,
+            ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
+            inode_ref_short_genlo kslot (q/2 + q/2)%Qp (q/2)%Qp dev inum g lo) ∗
          (* ...AND ITS PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md
             §5''.3): ialloc's [ClaimL] iget minted it, and the iunlockput
             that closes the child spends it. *)
@@ -567,20 +572,20 @@ Proof.
     iDestruct "Href" as "[Hkeep Hshr]".
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
     iDestruct "Hshr" as (gsh losh tlsh) "(%Hlesh & #Hflsh & Hshr)".
+    iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimsf".
     iEval (rewrite inode_ref_short_gen_intro) in "Hkeep".
     iDestruct "Hkeep" as (gkp lokp tlkp) "(%Hlekp & #Hflkp & Hkeep)".
     iDestruct (inode_ref_short_shr_genlo_agree with "Hkeep Hshr") as %[-> ->].
-    iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
-    iDestruct (IcacheRef.inode_ref_short_genlo_gen with "Hkeep") as "Hkeep".
     iDestruct (cpu_own_transport CID4 CID7 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Hil CID7 XI γs j γl γu γd γk pd pav pu bn γfs γi cn gilc gislc cov logstart
-              inodestart nib kslot (q/2)%Qp gsh (ClaimK ty) dev inum pidv dq dqs
+              inodestart nib kslot (q/2)%Qp gsh losh tlsh (ClaimK ty) dev inum pidv dq dqs
               B1 K eb b lks Vpr
               HKil Hkslt Hlg Hist Hcblk Hinb Hj Hgs HB1a0 ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescc Hireg
-                    Hslkc Hshr Hlic Hsbi Hppid Hprocs Hdevi Hdgeom
+                    Hslkc [%] Hflsh Hclaimsf Hshr Hlic Hsbi Hppid Hprocs Hdevi Hdgeom
                     Hdlk Hbs1").
+    all: try (exact Hlesh).
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CID8 Hq8 Mo dnc bmc filled)
@@ -612,14 +617,18 @@ Proof.
     iSplitR; [iExact "Hslkc" |].
     iSplitL "Hslq"; [iExact "Hslq" |].
 
-    iSplitL "Hdep"; [iExact "Hdep" |].
+    iSplitL "Hdep".
+    { iExists losh, tlsh. iSplitR; [iPureIntro; exact Hlesh |].
+      iSplitR; [iExact "Hflsh" | iExact "Hdep"]. }
     iSplitL "Hcidev"; [iExact "Hcidev" |].
     iSplitL "Hciinum"; [iExact "Hciinum" |].
     iSplitL "Hcivalid"; [iExact "Hcivalid" |].
     iSplitL "Hcload"; [iExact "Hcload" |].
     iSplitR; [iExact "Hcshot" |].
     iSplitL "Hcfrz"; [iExact "Hcfrz" |].
-    iSplitL "Hkeep"; [iExact "Hkeep" |].
+    iSplitL "Hkeep".
+    { iExists losh, tlkp. iSplitR; [iPureIntro; exact Hlekp |].
+      iSplitR; [iExact "Hflkp" | iExact "Hkeep"]. }
     iSplitL "Hwb"; [iExact "Hwb" | iExact "Hop"].
   - (* ============================================================== *)
     (*  NO INODES: a0 = 0, the branch is TAKEN, to +0xec               *)

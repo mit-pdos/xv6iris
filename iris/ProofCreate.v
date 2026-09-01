@@ -2029,7 +2029,9 @@ Section ProofCreateMain.
        is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q γisl (qd/2)%Qp (i_lock (ientry kd)) pidv -∗
-       ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
+       (∃ lodc tldc : nat,
+          ⌜(lodc <= tldc)%nat⌝ ∗ IcacheRef.cred_floor lodc tldc ∗
+          ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd lodc)) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -2052,7 +2054,7 @@ Section ProofCreateMain.
           at this half's [iunlockput(dp)]. *)
        ifreeze_off (bv_unsigned dind) -∗
        (∃ lo tl : nat,
-          ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+          ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
           IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp
             dev dind gd lo) -∗
        (* the parent's PROVENANCE UNIT (item 7a-wire): the iunlockput that
@@ -2204,7 +2206,9 @@ Section ProofCreateMain.
        is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q γisl (qd/2)%Qp (i_lock (ientry kd)) pidv -∗
-       ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
+       (∃ lodc tldc : nat,
+          ⌜(lodc <= tldc)%nat⌝ ∗ IcacheRef.cred_floor lodc tldc ∗
+          ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd lodc)) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -2227,7 +2231,7 @@ Section ProofCreateMain.
           at this half's [iunlockput(dp)]. *)
        ifreeze_off (bv_unsigned dind) -∗
        (∃ lo tl : nat,
-          ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+          ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
           IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp
             dev dind gd lo) -∗
        (* the parent's PROVENANCE UNIT (item 7a-wire): the iunlockput that
@@ -2237,7 +2241,9 @@ Section ProofCreateMain.
        is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
                     (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) -∗
        sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv -∗
-       ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g) -∗
+       (∃ locc tlcc : nat,
+          ⌜(locc <= tlcc)%nat⌝ ∗ IcacheRef.cred_floor locc tlcc ∗
+          ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g locc)) -∗
        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
        i_valid (ientry kslot) ↦₄ valid_word true -∗
@@ -2259,7 +2265,7 @@ Section ProofCreateMain.
        ity_shot g (di_type dnc) -∗
        (* ...and the CHILD's, for the same reason (§3.9). *)
        ifreeze_off (bv_unsigned cinum) -∗
-       ⌜(lo <= tl)%nat⌝ -∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗
+       ⌜(lo <= tl)%nat⌝ -∗ IcacheRef.cred_floor lo tl -∗
        IcacheRef.inode_ref_short_genlo kslot (q/2 + q/2)%Qp (q/2)%Qp dev cinum g lo -∗
        (* the child's PROVENANCE UNIT (item 7a-wire). *)
        runit_any (bv_unsigned cinum) -∗
@@ -2415,7 +2421,9 @@ Section ProofCreateMain.
        is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q γisl (qd/2)%Qp (i_lock (ientry kd)) pidv -∗
-       ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
+       (∃ lodc tldc : nat,
+          ⌜(lodc <= tldc)%nat⌝ ∗ IcacheRef.cred_floor lodc tldc ∗
+          ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd lodc)) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -2436,7 +2444,7 @@ Section ProofCreateMain.
           at this half's [iunlockput(dp)]. *)
        ifreeze_off (bv_unsigned dind) -∗
        (∃ lo tl : nat,
-          ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+          ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
           IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp
             dev dind gd lo) -∗
        (* the parent's PROVENANCE UNIT (item 7a-wire): the iunlockput that
@@ -2446,7 +2454,9 @@ Section ProofCreateMain.
        is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
                     (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) -∗
        sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv -∗
-       ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g) -∗
+       (∃ locc tlcc : nat,
+          ⌜(locc <= tlcc)%nat⌝ ∗ IcacheRef.cred_floor locc tlcc ∗
+          ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g locc)) -∗
        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
        i_valid (ientry kslot) ↦₄ valid_word true -∗
@@ -2468,7 +2478,7 @@ Section ProofCreateMain.
        ity_shot g (di_type dnc) -∗
        (* ...and the CHILD's, for the same reason (§3.9). *)
        ifreeze_off (bv_unsigned cinum) -∗
-       ⌜(lo <= tl)%nat⌝ -∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗
+       ⌜(lo <= tl)%nat⌝ -∗ IcacheRef.cred_floor lo tl -∗
        IcacheRef.inode_ref_short_genlo kslot (q/2 + q/2)%Qp (q/2)%Qp dev cinum g lo -∗
        (* the child's PROVENANCE UNIT (item 7a-wire). *)
        runit_any (bv_unsigned cinum) -∗
@@ -3005,7 +3015,7 @@ Section ProofCreateMain.
       iEval (rewrite -Hdev) in "Href".
       iEval (rewrite cr_shed_genlo) in "Href".
       iDestruct "Href" as "[Hkeep Hshr]".
-      iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
+      iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimscr".
       iDestruct (cr_esc_acc cn γfs γi cov logstart kd Hkd with "Hesc") as "#Hescd".
       iDestruct (ic_sleeplocks_lookup cn kd Hkd with "Hslks") as (gild gisld) "#Hslkd".
       iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
@@ -3037,12 +3047,12 @@ Section ProofCreateMain.
       iDestruct (cpu_own_transport CIDnp CID17 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn
-                gild gisld cov logstart inodestart nib kd (qd/2)%Qp gd PlainK
+                gild gisld cov logstart inodestart nib kd (qd/2)%Qp gd lod tld PlainK
                 dev dind
                 pidv (DfracOwn (1/4)) dqs Q2 (K - 10)%nat eb b lks
                 V ltac:(exact HKil) Hkd Hlg Hist0 Hdblk Hdib' Hj Hgs HQ2a0
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescd Hiregi
-                      Hslkd Hshr Hrud Hsbi Hppid Hprocs Hdevi Hgeom Hdlk Hbs1").
+                      Hslkd [//] Hfld Hclaimscr Hshr Hrud Hsbi Hppid Hprocs Hdevi Hgeom Hdlk Hbs1").
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
@@ -3172,14 +3182,14 @@ Section ProofCreateMain.
                      with "Hfld Hkeep") as "Hkeep2".
         iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                   gtl gild gisld cov logstart bmapstart inodestart nib size dev
-                  kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
+                  kd (qd/2)%Qp (qd/2)%Qp gd lod tld dind dnl bml n1 Sb1
                   false false false e0 pidv (DfracOwn (1/4)) dqb dqs
                   G2 (K - 10)%nat eb b lks
                   V ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HG2a0
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                        Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
+                        Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfld Hclaimscr Hdep Hidev Hiinum
                         Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                         Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
         all: try lkbelow.
@@ -3611,14 +3621,14 @@ Section ProofCreateMain.
                      with "Hfld Hkeep") as "Hkeep2".
           iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
                     cn gtl gild gisld cov logstart bmapstart inodestart nib size
-                    dev kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
+                    dev kd (qd/2)%Qp (qd/2)%Qp gd lod tld dind dnl bml n1 Sb1
                     false false false e0 pidv (DfracOwn (1/4)) dqb dqs
                     F3 (K - 10)%nat eb b lks
                     V ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                     ltac:(exact Hn1ip) Hj Hgs HF3a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                          Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
+                          Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfld Hclaimscr Hdep Hidev Hiinum
                           Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                           Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
           all: try lkbelow.
@@ -3684,11 +3694,10 @@ Section ProofCreateMain.
           iDestruct "Hchild" as "[Hckeep Hcshr]".
           iEval (rewrite inode_shr_gen_intro) in "Hcshr".
           iDestruct "Hcshr" as (gc loc tlc) "(%Hlec & #Hflc & Hcshr)".
-          iDestruct (IcacheRef.inode_shr_genlo_gen with "Hcshr") as "Hcshr".
           iEval (rewrite inode_ref_short_gen_intro) in "Hckeep".
           iDestruct "Hckeep" as (gck lock tlck) "(%Hleck & #Hflck & Hckeep)".
-          iDestruct (inode_ref_short_genlo_shr_gen_agree
-                       with "Hckeep Hcshr") as %->.
+          iDestruct (inode_ref_short_shr_genlo_agree
+                       with "Hckeep Hcshr") as %[-> <-].
           iDestruct (cr_esc_acc cn γfs γi cov logstart kslot Hkslot with "Hesc")
             as "#Hescc".
           iDestruct (ic_sleeplocks_lookup cn kslot Hkslot with "Hslks")
@@ -3698,11 +3707,11 @@ Section ProofCreateMain.
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
           iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn
                     gilc gislc cov logstart inodestart nib kslot (qq/2)%Qp gc
-                    PlainK
+                    lock tlc PlainK
                     dev cinum pidv (DfracOwn (1/4)) dqs F5 (K - 10)%nat eb b lks
                     V ltac:(exact HKil) Hkslot Hlg Hist0 Hcblk Hcinb Hj Hgs HF5a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescc
-                          Hiregi Hslkc Hcshr Hruc Hsbi Hppid Hprocs Hdevi Hgeom
+                          Hiregi Hslkc [//] Hflc Hclaimscr Hcshr Hruc Hsbi Hppid Hprocs Hdevi Hgeom
                           Hdlk Hbs1").
           all: try lkbelow.
           { rewrite Heb /trap_csrs_ext. done. }
@@ -3747,7 +3756,7 @@ Section ProofCreateMain.
                        ([∗ list] jj ∈ seq 14 2,
                           pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf0 jj) -∗
                        sleeplocked_q gislc (qq/2)%Qp (i_lock (ientry kslot)) pidv -∗
-                       ic_deposit cn kslot (DepShr (qq/2)%Qp dev cinum gc) -∗
+                       ic_deposit cn kslot (DepShr (qq/2)%Qp dev cinum gc lock) -∗
                        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
                        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
                        i_valid (ientry kslot) ↦₄ valid_word true -∗
@@ -3835,7 +3844,7 @@ Section ProofCreateMain.
                          with "Hflck Hckeep") as "Hckeep2".
             iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
                       cn gtl gilc gislc cov logstart bmapstart inodestart nib
-                      size dev kslot (qq/2)%Qp (qq/2)%Qp gc cinum dnc bmc
+                      size dev kslot (qq/2)%Qp (qq/2)%Qp gc lock tlc cinum dnc bmc
                       n2 Sb2 false false false ec pidv (DfracOwn (1/4)) dqb dqs
                       B2 (K - 10)%nat eb b lks
                       V ltac:(exact HKiup) Hkslot ltac:(discriminate)
@@ -3843,7 +3852,7 @@ Section ProofCreateMain.
                       Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
                       ltac:(exact Hn2ip) Hj Hgs HB2a0
                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
-                            Hitbl Hescc Hiregi Hiopen Hslkc Hcslkd Hcdep
+                            Hitbl Hescc Hiregi Hiopen Hslkc Hcslkd [//] Hflc Hclaimscr Hcdep
                             Hcidev Hciinum Hcivalid Hcload Hcshotb Hcfrz [$Hckeep2 $Hruc] Hsbb
                             Hsbi Hbmr Hppid Hprocs Hdevi Hgeom Hdlk Hbsl []
                             Hop").
@@ -4193,8 +4202,10 @@ Section ProofCreateMain.
                   exact (cr_trange_in (di_type dnc) Hrng). }
                 iApply (create_locked_mk cn γfs γi cov logstart
                           _ _ _ _ _ _ _ _ _ gilc gislc
-                          with "Hslkc Hcslkd Hcdep Hcidev Hciinum
+                          with "Hslkc Hcslkd [Hcdep] Hcidev Hciinum
                                 Hcivalid Hcload Hcshot Hcfrz [Hckeep] Hruc").
+                { iExists lock, tlc. iSplitR; [by iPureIntro|].
+                  iFrame "Hflc Hcdep". }
                 { iExists lock, tlck. iSplitR; [by iPureIntro|].
                   iFrame "Hflck Hckeep". }
           -- (* ===== ARM F-BAD (first entry): type != T_FILE ========== *)
@@ -4272,7 +4283,7 @@ Section ProofCreateMain.
           iPoseProof ("Halloc" $! CID25) as "Ha".
           iSpecialize ("Ha" with "[%]"); [wp_next_chain |].
           iAssert (∃ lo tl : nat,
-              ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+              ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
               IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp
                 dev dind gd lo)%I with "[Hkeep]" as "Hkeep".
           { iExists lod, tld. iSplitR; [by iPureIntro|]. iFrame "Hfld Hkeep". }
@@ -4281,7 +4292,7 @@ Section ProofCreateMain.
                     with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                           [%] [%] [%]
                           Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                          Hnb14 Hnb2 Hslkd Hslkdd Hdep Hidev Hiinum
+                          Hnb14 Hnb2 Hslkd Hslkdd [Hdep] Hidev Hiinum
                           Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview
                           Htop Hshotl Hfrzl Hkeep Hrud
                           Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath Hbsl Hisl Hop
@@ -4302,6 +4313,7 @@ Section ProofCreateMain.
           { exact Hsb1. }
           { exact Hwmem. }
           { exact Hnp1. }
+          { iExists lod, tld. iSplitR; [by iPureIntro|]. iFrame "Hfld Hdep". }
           - (* ===== ARM G2: the guard FIRES -- the parent is a full ====
                directory and the caller asked for another one.  The block
                is ARM G's, at +0x8e, and it closes the same way: the
@@ -4376,14 +4388,14 @@ Section ProofCreateMain.
                      with "Hfld Hkeep") as "Hkeep2".
         iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                   gtl gild gisld cov logstart bmapstart inodestart nib size dev
-                  kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
+                  kd (qd/2)%Qp (qd/2)%Qp gd lod tld dind dnl bml n1 Sb1
                   false false false e0 pidv (DfracOwn (1/4)) dqb dqs
                   J2 (K - 10)%nat eb b lks
                   V ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HJ2a0
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                        Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
+                        Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfld Hclaimscr Hdep Hidev Hiinum
                         Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                         Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
         all: try lkbelow.
@@ -4854,6 +4866,7 @@ Section ProofCreateMain.
              Hmeta Hmap Hblocks Hdview Hfview Htop #Hshotl Hfrzl Hkeep Hrud
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hpriv Hpath Hbsl Hisl Hop Hcont".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
+    iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimscr".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     assert (Hb : b = true) by (rewrite -Hbm; exact Heb). clear Hbm.
     (* THE HELD SET IS EMPTY, AND SAID SO ONCE.  create's contract carries no
@@ -4930,18 +4943,9 @@ Section ProofCreateMain.
                             Hcfrz & Hckeep & Hruc & Hop)".
       destruct Hpure as (Hs3 & Hkslt & Hcpos & Hcinb & Htyc & Hfresh).
       destruct (Hiregb cinum Hcinb) as [Hcblk Hcblog].
-      (* A6.145 interim: pin the fresh child's keep to the zero epoch so the
-         parked bodies can be fed a floored slice. *)
-      iApply fupd_wp.
-      iDestruct "Hckeep" as "(Hckf & Hcklv & Hckid & Hcksl)".
-      iDestruct "Hcklv" as (loC) "Hcklv".
-      iMod (iref_share_pin0 ⊤ kslot (q/2)%Qp g loC ltac:(solve_ndisj) Hkslt
-              with "Hitbl Hcklv") as "[%HloC0 Hcklv]".
-      subst loC.
-      iAssert (IcacheRef.inode_ref_short_genlo kslot (q/2 + q/2)%Qp (q/2)%Qp
-                 dev cinum g 0)%I with "[Hckf Hcklv Hckid Hcksl]" as "Hckeep".
-      { rewrite /IcacheRef.inode_ref_short_genlo. iFrame. }
-      iModIntro.
+      (* A6.146: the fresh child's keep arrives GENLO with its credential
+         (create_fresh_ty's post packs it); no interim pin needed. *)
+      iDestruct "Hckeep" as (loC tlC) "(%HleC & #HflC & Hckeep)".
       assert (HMoregs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
                           (ientry kslot) ty major minor Mo)
         by exact (cr_regs3_of_span m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -5251,11 +5255,11 @@ Section ProofCreateMain.
         iPoseProof ("Hmk" $! CIDB8) as "Hm".
         iSpecialize ("Hm" with "[%]"); [wp_next_chain |].
         iAssert (∃ lo tl : nat,
-            ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+            ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
             IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp
               dev dind gd lo)%I with "[Hkeep]" as "Hkeep".
         { iExists lod, tld. iSplitR; [by iPureIntro|]. iFrame "Hfld Hkeep". }
-        iApply ("Hm" $! W4 kslot q g gil gisl 0%nat 0%nat cinum dnc bmc datc
+        iApply ("Hm" $! W4 kslot q g gil gisl loC tlC cinum dnc bmc datc
                   (S q2) (Sb1 ∪ {[IBLOCK cinum inodestart]}
                           ∪ {[IBLOCK cinum inodestart]})
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
@@ -5301,8 +5305,8 @@ Section ProofCreateMain.
                      (cr_sub_union_sing _ _) _ (Hwmem eq_refl)).
           - right.
             exact (cr_n3_lo u q2 false Hu (proj1 Hnp1) eq_refl). }
-        { exact (Nat.le_refl 0). }
-        { iApply TsoCtx.ctx_floor_0. }
+        { exact HleC. }
+        { iExact "HflC". }
       + (* ============================================================ *)
         (*  +0xca FALLS THROUGH: the non-directory path                  *)
         (* ============================================================ *)
@@ -5794,16 +5798,17 @@ Section ProofCreateMain.
                      with "Hfld Hkeep") as "Hkeep2".
              iAssert (ity_shot gd (di_type dn')) as "#Hshotl'".
              { rewrite Hty'. iExact "Hshotl". }
+             iDestruct "Hdep" as (lodc tldc) "(%Hledc & #Hfldc & Hdep)".
              iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs
                        γi cn gtl γil γisl cov logstart bmapstart inodestart nib
-                       size dev kd (qd/2)%Qp (qd/2)%Qp gd dind dn' bm'
+                       size dev kd (qd/2)%Qp (qd/2)%Qp gd lodc tldc dind dn' bm'
                        n' Sb' false true false e0 pidv (DfracOwn (1/4)) dqb dqs
                        Y2 (K - 10)%nat eb b lks
                        V ltac:(exact HKiup) Hkdlt ltac:(discriminate) Hcruu
                        Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                        ltac:(exact Hipn') Hj Hgs HY2a0
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
-                             Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev
+                             Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hidev
                              Hiinum Hivalid Hload Hshotl' Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr
                              Hppid Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
              all: try lkbelow.
@@ -5988,8 +5993,8 @@ Section ProofCreateMain.
                        _ _ _ _ _ _ _ _ _ gil gisl
                        with "Hslkc Hcslkd Hcdep Hcidev Hciinum
                              Hcivalid Hcload Hcshot1 Hcfrz [Hckeep] Hruc").
-             { iExists 0%nat, 0%nat. iSplitR; [by iPureIntro|].
-               iSplitR; [iApply TsoCtx.ctx_floor_0|]. iFrame "Hckeep". }
+             { iExists loC, tlC. iSplitR; [iPureIntro; exact HleC|].
+               iSplitR; [iExact "HflC"|]. iFrame "Hckeep". }
           -- (* ======================================================== *)
              (*  ARM FAIL's non-directory entry: the append fell short    *)
              (* ======================================================== *)
@@ -6042,11 +6047,11 @@ Section ProofCreateMain.
              iPoseProof ("Hfl" $! CIDE1) as "Hf".
              iSpecialize ("Hf" with "[%]"); [wp_next_chain |].
              iAssert (∃ lo tl : nat,
-                 ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+                 ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
                  IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp
                    dev dind gd lo)%I with "[Hkeep]" as "Hkeep".
              { iExists lod, tld. iSplitR; [by iPureIntro|]. iFrame "Hfld Hkeep". }
-             iApply ("Hf" $! mdl kslot q g gil gisl 0%nat 0%nat cinum dnc bmc datc
+             iApply ("Hf" $! mdl kslot q g gil gisl loC tlC cinum dnc bmc datc
                        bm' data' dn' dn0' tot n' Sb'
                        with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                              [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
@@ -6106,8 +6111,8 @@ Section ProofCreateMain.
                 eight into the dirlink and [wi16_spend <= 4] out. *)
              { left.
                exact (cr_alloc_ip4 (S q2) n' _ _ _ _ _ ltac:(lia) Hspend). }
-             { exact (Nat.le_refl 0). }
-             { iApply TsoCtx.ctx_floor_0. }
+             { exact HleC. }
+             { iExact "HflC". }
     - (* ============================================================== *)
       (*  ARM A-FAIL (+0xec): ialloc returned 0, nothing was claimed     *)
       (* ============================================================== *)
@@ -6174,16 +6179,17 @@ Section ProofCreateMain.
       iDestruct (log_opS_named with "Hop") as (e0) "Hop".
       iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hled
                    with "Hfld Hkeep") as "Hkeep2".
+      iDestruct "Hdep" as (lodc tldc) "(%Hledc & #Hfldc & Hdep)".
       iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                 gtl γil γisl cov logstart bmapstart inodestart nib size dev
-                kd (qd/2)%Qp (qd/2)%Qp gd dind dn bm (S q1) Sb1
+                kd (qd/2)%Qp (qd/2)%Qp gd lodc tldc dind dn bm (S q1) Sb1
                 false false false e0 pidv (DfracOwn (1/4)) dqb dqs
                 Z2 (K - 10)%nat eb b lks
                 V ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
                 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                 ltac:(exact Hn1ip) Hj Hgs HZ2a0
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                      Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
+                      Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hidev Hiinum
                       Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                       Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
       all: try lkbelow.
@@ -6418,6 +6424,7 @@ Section ProofCreateMain.
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop
              Hcont".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
+    iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimscr".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     assert (Hb : b = true) by (rewrite -Hbm; exact Heb). clear Hbm.
     (* THE HELD SET IS EMPTY, AND SAID SO ONCE.  create's contract carries no
@@ -6659,9 +6666,10 @@ Section ProofCreateMain.
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iDestruct (cpu_own_transport CIDG4 CIDG6 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct "Hcdep" as (locc tlcc) "(%Hlecc & #Hflcc & Hcdep)".
     iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              kslot (q/2)%Qp (q/2)%Qp g cinum
+              kslot (q/2)%Qp (q/2)%Qp g locc tlcc cinum
               (cr_setf dnc major minor (mword_of_int 0 : mword 16)) bmc
               (S u0) (Sb4 ∪ {[IBLOCK cinum inodestart]})
               (bool_decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
@@ -6675,7 +6683,7 @@ Section ProofCreateMain.
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
               ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescc Hiregi Hiopen Hslkc Hcslkd Hcdep Hcidev Hciinum
+                    Hescc Hiregi Hiopen Hslkc Hcslkd [//] Hflcc Hclaimscr Hcdep Hcidev Hciinum
                     Hcivalid Hcload Hcshot' Hcfrz [$Hckp $Hruc] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -6862,16 +6870,17 @@ Section ProofCreateMain.
     iDestruct (log_opS_named with "Hop") as (e1) "Hop".
     iDestruct (cpu_own_transport CIDG7 CIDG9 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct "Hdep" as (lodc tldc) "(%Hledc & #Hfldc & Hdep)".
     iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl γil γisl cov logstart bmapstart inodestart nib size dev
-              kd (qd/2)%Qp (qd/2)%Qp gd dind dn' bm'
+              kd (qd/2)%Qp (qd/2)%Qp gd lodc tldc dind dn' bm'
               n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
               G6 (K - 10)%nat eb b lks
               V ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
+                    Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hidev Hiinum
                     Hivalid Hload Hshotl' Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -7136,7 +7145,9 @@ Section ProofCreateMain.
        is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q γisl (qd/2)%Qp (i_lock (ientry kd)) pidv -∗
-       ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
+       (∃ lodc tldc : nat,
+          ⌜(lodc <= tldc)%nat⌝ ∗ IcacheRef.cred_floor lodc tldc ∗
+          ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd lodc)) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -7157,7 +7168,7 @@ Section ProofCreateMain.
           at this half's [iunlockput(dp)]. *)
        ifreeze_off (bv_unsigned dind) -∗
        (∃ lo tl : nat,
-          ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+          ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
           IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp
             dev dind gd lo) -∗
        (* the parent's PROVENANCE UNIT (item 7a-wire): the iunlockput that
@@ -7167,7 +7178,9 @@ Section ProofCreateMain.
        is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
                     (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) -∗
        sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv -∗
-       ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g) -∗
+       (∃ locc tlcc : nat,
+          ⌜(locc <= tlcc)%nat⌝ ∗ IcacheRef.cred_floor locc tlcc ∗
+          ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g locc)) -∗
        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
        i_valid (ientry kslot) ↦₄ valid_word true -∗
@@ -7183,7 +7196,7 @@ Section ProofCreateMain.
        ity_shot g (di_type dc) -∗
        (* ...and the CHILD's, for the same reason (§3.9). *)
        ifreeze_off (bv_unsigned cinum) -∗
-       ⌜(lo <= tl)%nat⌝ -∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗
+       ⌜(lo <= tl)%nat⌝ -∗ IcacheRef.cred_floor lo tl -∗
        IcacheRef.inode_ref_short_genlo kslot (q/2 + q/2)%Qp (q/2)%Qp dev cinum g lo -∗
        (* the child's PROVENANCE UNIT (item 7a-wire). *)
        runit_any (bv_unsigned cinum) -∗
@@ -7295,6 +7308,7 @@ Section ProofCreateMain.
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop
              Hcont".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
+    iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimscr".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     assert (Hb : b = true) by (rewrite -Hbm; exact Heb). clear Hbm.
     (* THE HELD SET IS EMPTY, AND SAID SO ONCE -- the level-0 pose the
@@ -7573,9 +7587,10 @@ Section ProofCreateMain.
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iDestruct (cpu_own_transport CIDG4 CIDG6 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct "Hcdep" as (locc tlcc) "(%Hlecc & #Hflcc & Hcdep)".
     iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              kslot (q/2)%Qp (q/2)%Qp g cinum
+              kslot (q/2)%Qp (q/2)%Qp g locc tlcc cinum
               (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc
               (S u0) (Sb4 ∪ {[IBLOCK cinum inodestart]})
               (bool_decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
@@ -7589,7 +7604,7 @@ Section ProofCreateMain.
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
               ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescc Hiregi Hiopen Hslkc Hcslkd Hcdep Hcidev Hciinum
+                    Hescc Hiregi Hiopen Hslkc Hcslkd [//] Hflcc Hclaimscr Hcdep Hcidev Hciinum
                     Hcivalid Hcload Hcshot' Hcfrz [$Hckp $Hruc] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -7681,16 +7696,17 @@ Section ProofCreateMain.
     iDestruct (log_opS_named with "Hop") as (e1) "Hop".
     iDestruct (cpu_own_transport CIDG7 CIDG9 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct "Hdep" as (lodc tldc) "(%Hledc & #Hfldc & Hdep)".
     iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl γil γisl cov logstart bmapstart inodestart nib size dev
-              kd (qd/2)%Qp (qd/2)%Qp gd dind dp bmp
+              kd (qd/2)%Qp (qd/2)%Qp gd lodc tldc dind dp bmp
               n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
               G6 (K - 10)%nat eb b lks
               V ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
+                    Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hidev Hiinum
                     Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -7902,6 +7918,7 @@ Section ProofCreateMain.
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop
              Hcont".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
+    iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimscr".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     assert (Hb : b = true) by (rewrite -Hbm; exact Heb). clear Hbm.
     (* THE HELD SET IS EMPTY, AND SAID SO ONCE -- create's contract carries
@@ -9593,9 +9610,10 @@ Section ProofCreateMain.
           iDestruct (log_opS_named with "Hop") as (e0) "Hop".
           iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hled
                      with "Hfld Hkeep") as "Hkeep2".
+          iDestruct "Hdep" as (lodc tldc) "(%Hledc & #Hfldc & Hdep)".
           iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs
                     γi cn gtl γil γisl cov logstart bmapstart inodestart nib
-                    size dev kd (qd/2)%Qp (qd/2)%Qp gd dind
+                    size dev kd (qd/2)%Qp (qd/2)%Qp gd lodc tldc dind
                     (cr_setf dp3 (di_major dp3) (di_minor dp3)
                        (add_vec (di_nlink dp3 : mword 16) (mword_of_int 1 : mword 16)))
                     bm3 (S u6) (Sb6 ∪ {[IBLOCK dind inodestart]})
@@ -9605,7 +9623,7 @@ Section ProofCreateMain.
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                     ltac:(exact Hipn6) Hj Hgs HT2a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
-                          Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev
+                          Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hidev
                           Hiinum Hivalid Hload Hshotf Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr
                           Hppid Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
           all: try lkbelow.
@@ -9864,7 +9882,7 @@ Section ProofCreateMain.
                           (dir_nrec (bv_unsigned (di_size dn)))))%Z.
                 rewrite Nat.add_0_r Nat2Z.inj_mul. lia. }
           iAssert (∃ lo tl : nat,
-              ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+              ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
               IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp
                 dev dind gd lo)%I with "[Hkeep]" as "Hkeep".
           { iExists lod, tld. iSplitR; [by iPureIntro|]. iFrame "Hfld Hkeep". }
@@ -9970,7 +9988,7 @@ Section ProofCreateMain.
         iPoseProof ("Hfl" $! CIDX2) as "Hf".
         iSpecialize ("Hf" with "[%]"); [wp_next_chain |].
         iAssert (∃ lo tl : nat,
-            ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+            ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
             IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp
               dev dind gd lo)%I with "[Hkeep]" as "Hkeep".
         { iExists lod, tld. iSplitR; [by iPureIntro|]. iFrame "Hfld Hkeep". }
@@ -10074,7 +10092,7 @@ Section ProofCreateMain.
       iPoseProof ("Hfl" $! CIDX1) as "Hf".
       iSpecialize ("Hf" with "[%]"); [wp_next_chain |].
       iAssert (∃ lo tl : nat,
-          ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+          ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
           IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp
             dev dind gd lo)%I with "[Hkeep]" as "Hkeep".
       { iExists lod, tld. iSplitR; [by iPureIntro|]. iFrame "Hfld Hkeep". }

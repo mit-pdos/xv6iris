@@ -1370,6 +1370,7 @@ Section FsCfgBootEra.
     ((* --- [icache_boot_at]'s ghost premises, in its own order --- *)
      own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
+     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
      ([∗ list] k ∈ seq 0 NINODE,
         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
      (* THE STOCKED POOL (R5): image-accurate before [userinit] runs, so
@@ -1401,6 +1402,7 @@ Section FsCfgBootEra.
     fs_kit_icache ICFG FSC -∗
       own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
       ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
+      ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
       ([∗ list] k ∈ seq 0 NINODE,
          sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
       ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
@@ -1550,6 +1552,7 @@ Section FsCfgBootEra.
   Definition fs_kit_icache_rest (ICFG : icfg) (FSC : fscfg) : iProp Σ :=
     (own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
+     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
      ([∗ list] k ∈ seq 0 NINODE,
         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
      ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
@@ -1570,10 +1573,10 @@ Section FsCfgBootEra.
   Proof.
     iIntros "H".
     iDestruct (fs_kit_icache_open with "H")
-      as "(Hiref & Hlive & Hislg & Hipool & Hitlk & Htok & Hmid & Hgid &
+      as "(Hiref & Hlive & Histmp & Hislg & Hipool & Hitlk & Htok & Hmid & Hgid &
            Hbio & Hpool & Hkmlk & Hdllk & Hprlk & Hkav & Hkauth)".
     rewrite /fs_kit_printk /fs_kit_kalloc /fs_kit_icache_rest.
-    iFrame "Hprlk Hkmlk Hkav Hkauth Hiref Hlive Hislg Hipool Hitlk Htok
+    iFrame "Hprlk Hkmlk Hkav Hkauth Hiref Hlive Histmp Hislg Hipool Hitlk Htok
             Hmid Hgid Hbio Hpool Hdllk".
   Qed.
 
@@ -1588,6 +1591,7 @@ Section FsCfgBootEra.
     fs_kit_icache_rest ICFG FSC -∗
       own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
       ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
+      ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
       ([∗ list] k ∈ seq 0 NINODE,
          sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
       ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
@@ -2343,10 +2347,11 @@ Section FsCfgBootEra.
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     (* ---- kit 1 ---- *)
-    iSplitL "Hiref Hlive Hisl Hipool Hitlk Htok Hmid Hgid Hbio Hpool
+    iSplitL "Hiref Hlive Hstmp Hisl Hipool Hitlk Htok Hmid Hgid Hbio Hpool
              Hkmlk Hdllk Hprlk Hkav Hkauth".
     { iSplitL "Hiref"; [iExact "Hiref" |].
       iSplitL "Hlive"; [iExact "Hlive" |].
+      iSplitL "Hstmp"; [iExact "Hstmp" |].
       iSplitL "Hisl"; [iExact "Hisl" |].
       iSplitL "Hipool"; [iExact "Hipool" |].
       iSplitL "Hitlk"; [iExact "Hitlk" |].

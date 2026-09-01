@@ -291,7 +291,7 @@ Section KexecB2Res.
       (cn : ic_names) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z) (dev : mword 32)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
@@ -300,7 +300,7 @@ Section KexecB2Res.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) : iProp Σ :=
-    (kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+    (kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf loyf tlyf inumf dnf bmf
               gilf gislf ∗
      log_op g n2 ∗
      iref_slots 1 ∗
@@ -460,11 +460,14 @@ Section KexecB2Res.
   (* ------------------------------------------------------------------ *)
   Lemma kxc_open_intro `{XI : CurCtx} (gfs : fs_names) (gi : gname) (cn : ic_names)
       (cov : gset Z) (logstart : Z) (dev pidv : mword 32)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (gilf gislf : gname) :
     is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
     sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-    ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
+    ⌜(loyf <= tlyf)%nat⌝ -∗
+    IcacheRef.cred_floor loyf tlyf -∗
+    IcacheInv.iref_claims -∗
+    ic_deposit cn kf (DepShr sf dev inumf gyf loyf) -∗
     i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
     i_valid (ientry kf) ↦₄ valid_word true -∗
@@ -474,12 +477,14 @@ Section KexecB2Res.
     ifreeze_off (bv_unsigned inumf) -∗
     inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
     runit_any (bv_unsigned inumf) -∗
-    kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+    kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf loyf tlyf inumf dnf bmf
              gilf gislf.
   Proof.
     rewrite /kxc_open.
-    iIntros "A B D E F G H I I2 J K".
+    iIntros "A B %C1 #C2 #C3 D E F G H I I2 J K".
     iSplitL "A"; [iExact "A" |]. iSplitL "B"; [iExact "B" |].
+    iSplitR; [iPureIntro; exact C1 |].
+    iSplitR; [iExact "C2" |]. iSplitR; [iExact "C3" |].
     iSplitL "D"; [iExact "D" |].
     iSplitL "E"; [iExact "E" |]. iSplitL "F"; [iExact "F" |].
     iSplitL "G"; [iExact "G" |]. iSplitL "H"; [iExact "H" |].
@@ -599,7 +604,7 @@ Definition kxc_bad324_body
     (cn : ic_names) (gtl : gname) (gilf gislf : gname) (ga gf : gname)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+    (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -645,7 +650,7 @@ Definition kxc_bad324_body
   pc_is (mword_of_int (KXB + 0x31e) : mword 64) -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗
-  kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+  kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf loyf tlyf inumf dnf bmf
            gilf gislf -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -707,7 +712,7 @@ Definition kxc_ls_body
     (cn : ic_names) (gtl : gname) (gilf gislf : gname) (ga gf : gname)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+    (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -770,7 +775,7 @@ Definition kxc_ls_body
             cov logstart inodestart nib dev -∗
   kalloc_env ga None -∗
   kxc_res jp bn g gfs gi cn gf cov logstart bmapstart inodestart size dev
-          kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
+          kf qf sf gyf loyf tlyf inumf dnf bmf gilf gislf n2 plen pfun na avf
           aslen afun pidv V dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
           (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
           (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -822,7 +827,7 @@ Definition kxc_ls_body
       cpu_claim_ext eb (proc_addr jp) -∗
       pc_is (mword_of_int (KXB + 0x116) : mword 64) -∗
       kxc_res jp bn g gfs gi cn gf cov logstart bmapstart inodestart size dev
-              kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
+              kf qf sf gyf loyf tlyf inumf dnf bmf gilf gislf n2 plen pfun na avf
               aslen afun pidv V dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
               (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
               (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -862,7 +867,7 @@ Module Type KEXECB2.
       (cn : ic_names) (gtl : gname) (gilf gislf : gname) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -873,7 +878,7 @@ Module Type KEXECB2.
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string),
     kxc_bad324_body Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev
-      kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
+      kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P szf eb lks.
 
@@ -886,7 +891,7 @@ Module Type KEXECB2.
       (cn : ic_names) (gtl : gname) (gilf gislf : gname) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -898,7 +903,7 @@ Module Type KEXECB2.
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string),
     kxc_ls_body Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev
-      kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
+      kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P ip va fz po eb lks.
 End KEXECB2.

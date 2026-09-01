@@ -109,7 +109,7 @@ Definition wp_iunlock_sconf_body
     (cn : ic_names)
     (gil gisl : gname)
     (cov : gset Z) (logstart : Z)
-    (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (lo tl : nat) (dev inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64)
@@ -143,7 +143,14 @@ Definition wp_iunlock_sconf_body
      SpecIlock v3's postcondition, and exactly [ic_swap_park]'s input;
      [ic_loaded]'s [dinode_at] at [dn'] IS the flushed-record obligation, and
      the descriptor half is what selects this holder's own arm (§14.8). *)
-  ic_deposit cn k (DepShr s dev inum g) -∗
+  (* A6.145: the RACY GUARD READ's credential -- the caller's floored
+     slice pieces (kept from its own shed; persistent + pure) and the
+     window's address claims.  [lo] is the epoch the deposit names; the
+     floor bounds it. *)
+  ⌜(lo <= tl)%nat⌝ -∗
+  IcacheRef.cred_floor lo tl -∗
+  IcacheInv.iref_claims -∗
+  ic_deposit cn k (DepShr s dev inum g lo) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -179,7 +186,7 @@ Definition wp_iunlock_sconf_body
          caller the ability to carry an [ity_shot] across its own
          [iunlock]/re-[ilock] window.  A consumer that does not want the
          name applies [IcacheRef.inode_shr_gen_forget] here. *)
-      inode_shr_gen k s dev inum g -∗
+      IcacheRef.inode_shr_genlo k s dev inum g lo -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -192,11 +199,11 @@ Module Type IUNLOCK.
       (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z)
-      (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (lo tl : nat) (dev inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
+      wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g lo tl dev inum
                             dn' bm' pidv dq m K eb p b lks Vpr.
 End IUNLOCK.

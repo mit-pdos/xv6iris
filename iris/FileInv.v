@@ -732,7 +732,13 @@ Section FileGhostAlloc.
     iAssert ([∗ list] k ∈ seq 0 NFILE,
                (fentry_raw k ∗ (∃ pn, fpay_tok γ k 1 pn) ∗ iref_slot))%I
       with "[Hraw Htoks Hunits]" as "Hall".
-    { rewrite !big_sepL_sep. iFrame "Hraw Htoks Hunits". }
+    (* the WAND form, not the setoid rewrite: [big_sepL_sep] is a [⊣⊢], so
+       [rewrite !big_sepL_sep] rewrites the whole [envs_entails] and pays
+       [Proper] proofs over the three concrete predicates (measured 4.2 s of a
+       12.5 s file).  [big_sepL_sep_2] matches by head -- see the same fix in
+       [BootShared.boot_hart_pre_combine]. *)
+    { iApply (big_sepL_sep_2 with "Hraw [Htoks Hunits]").
+      iApply (big_sepL_sep_2 with "Htoks Hunits"). }
     iAssert (|={E}=> [∗ list] k ∈ seq 0 NFILE, fslot γ ∅ k)%I
       with "[Hall]" as ">Hslots".
     { iApply big_sepL_fupd. iApply (big_sepL_mono with "Hall").

@@ -1,4 +1,4 @@
-DIGEST f0c935334402065087583a550e20ff07
+DIGEST 17a960ba8f77530094945b74853a28f5
 Fxv6iris.LinkIdup
 R510:520 xv6iris.LinkAcquire <> <> lib
 R522:532 xv6iris.LinkRelease <> <> lib
@@ -6,4 +6,5 @@ R534:542 xv6iris.ProofIdup <> <> lib
 R561:569 xv6iris.ProofIdup IdupProof <> modtype
 R571:577 xv6iris.LinkAcquire Acquire <> modtype
 R579:585 xv6iris.LinkRelease Release <> modtype
+R587:595 xv6iris.LinkRelease ReleaseIn <> modtype
 mod 553:556 <> Idup

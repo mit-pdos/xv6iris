@@ -724,8 +724,16 @@ Qed.
 Definition ic_dep_gname (d : ic_dep) : option gname :=
   match d with
   | DepNone => None
-  | DepRef _ _ _ g => Some g
-  | DepShr _ _ _ g => Some g
+  | DepRef _ _ _ g _ => Some g
+  | DepShr _ _ _ g _ => Some g
+  | DepFrz _ _ _ => None
+  end.
+
+Definition ic_dep_lo (d : ic_dep) : option nat :=
+  match d with
+  | DepNone => None
+  | DepRef _ _ _ _ lo => Some lo
+  | DepShr _ _ _ _ lo => Some lo
   | DepFrz _ _ _ => None
   end.
 
@@ -2809,10 +2817,38 @@ Section IcacheRef.
      ξ-relative only through the floor, which rides every crossing the
      bundles already make ([TsoCtx.ctx_floor_dom]).  NEVER parked inside
      a plain invariant -- the arms keep [live_genlo]/[live_frac]. *)
+  (* A6.146: THE CREDENTIAL FLOOR, received-or-wrote (the §0.38' pair,
+     [WpLock.lk_floor]'s shape at the bundle tier).  The right arm is the
+     FRESH ARM's whole story: the arm store's author registered its own
+     message as a dirty key of its context ([TsoCtx.ctx_wrote_register]);
+     no [ctx_floor] covering its own buffered store is mintable (TSO), and
+     none is needed -- [TsoMemPa.visibleb]'s own-message arm serves the
+     author's read at EVERY view (store forwarding).  Cash-in:
+     [IcachePinwObl.cred_floor_vis]. *)
+  Definition cred_floor (lo tl : nat) : iProp Σ :=
+    (TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∨
+     ∃ a : Arch.pa, TsoCtx.ctx_wrote TsoCtx.cur_ctx lo a)%I.
+
+  Global Instance cred_floor_persistent lo tl : Persistent (cred_floor lo tl).
+  Proof. rewrite /cred_floor. apply _. Qed.
+  Global Instance cred_floor_timeless lo tl : Timeless (cred_floor lo tl).
+  Proof. rewrite /cred_floor. apply _. Qed.
+
+  Lemma cred_floor_of_ctx (lo tl : nat) :
+    TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗ cred_floor lo tl.
+  Proof. iIntros "H". by iLeft. Qed.
+
+  Lemma cred_floor_of_wrote (lo tl : nat) (a : Arch.pa) :
+    TsoCtx.ctx_wrote TsoCtx.cur_ctx lo a -∗ cred_floor lo tl.
+  Proof. iIntros "H". iRight. by iExists a. Qed.
+
+  Lemma cred_floor_0 : ⊢ cred_floor 0 0.
+  Proof. iApply cred_floor_of_ctx. iApply TsoCtx.ctx_floor_0. Qed.
+
   Definition live_fracc (k : nat) (s : Qp) : iProp Σ :=
     (∃ (g : gname) (lo tl : nat),
        live_genlo k s g lo ∗ ⌜(lo <= tl)%nat⌝ ∗
-       TsoCtx.ctx_floor TsoCtx.cur_ctx tl)%I.
+       cred_floor lo tl)%I.
 
   Lemma live_fracc_frac k s : live_fracc k s -∗ live_frac k s.
   Proof.
@@ -2843,12 +2879,12 @@ Section IcacheRef.
   Proof. iIntros "H". rewrite -live_fracc_split Qp.div_2. iFrame. Qed.
 
   Global Instance live_fracc_timeless k s : Timeless (live_fracc k s).
-  Proof. rewrite /live_fracc /live_genlo /TsoCtx.ctx_floor. apply _. Qed.
+  Proof. rewrite /live_fracc /live_genlo. apply _. Qed.
 
   Lemma live_frac0_fracc k s : live_frac0 k s -∗ live_fracc k s.
   Proof.
     iIntros "[%g H]". iExists g, 0%nat, 0%nat. iFrame "H".
-    iSplitR; [by iPureIntro | iApply TsoCtx.ctx_floor_0].
+    iSplitR; [by iPureIntro | iApply cred_floor_0].
   Qed.
 
 
@@ -2934,9 +2970,28 @@ Section IcacheRef.
       (g : gname) : iProp Σ :=
     (inode_ident k (DfracOwn s) dev inum ∗ live_gen k s g)%I.
 
+  (* A6.145: the genlo-named bare forms -- what the escrow's checked-out
+     arms hold now that the descriptor records (g, lo). *)
+  Definition inode_shr_genlo_bare (k : nat) (s : Qp) (dev inum : mword 32)
+      (g : gname) (lo : nat) : iProp Σ :=
+    (inode_ident k (DfracOwn s) dev inum ∗ live_genlo k s g lo)%I.
+
+  Lemma inode_shr_genlo_bare_gen k s dev inum g lo :
+    inode_shr_genlo_bare k s dev inum g lo -∗ inode_shr_gen_bare k s dev inum g.
+  Proof. iIntros "[$ H]". by iExists lo. Qed.
+
   Definition inode_ref_gen_bare (k : nat) (q : Qp) (dev inum : mword 32)
       (g : gname) : iProp Σ :=
     (iref_frag k q ∗ live_gen k q g ∗ inode_ident k (DfracOwn q) dev inum)%I.
+
+  Definition inode_ref_genlo_bare (k : nat) (q : Qp) (dev inum : mword 32)
+      (g : gname) (lo : nat) : iProp Σ :=
+    (iref_frag k q ∗ live_genlo k q g lo ∗
+     inode_ident k (DfracOwn q) dev inum)%I.
+
+  Lemma inode_ref_genlo_bare_gen k q dev inum g lo :
+    inode_ref_genlo_bare k q dev inum g lo -∗ inode_ref_gen_bare k q dev inum g.
+  Proof. iIntros "($ & H & $)". by iExists lo. Qed.
 
   Lemma inode_shr_gen_bare_split k s dev inum g :
     inode_shr_gen k s dev inum g ⊣⊢
@@ -2991,7 +3046,7 @@ Section IcacheRef.
   Lemma inode_shr_gen_intro k s dev inum :
     inode_shr k s dev inum ⊣⊢
     ∃ (g : gname) (lo tl : nat),
-      ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+      ⌜(lo <= tl)%nat⌝ ∗ cred_floor lo tl ∗
       inode_shr_genlo k s dev inum g lo.
   Proof.
     rewrite /inode_shr /inode_shr_genlo /live_fracc.
@@ -3005,7 +3060,7 @@ Section IcacheRef.
   Lemma inode_ref_gen_intro k q dev inum :
     inode_ref k q dev inum ⊣⊢
     ∃ (g : gname) (lo tl : nat),
-      ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+      ⌜(lo <= tl)%nat⌝ ∗ cred_floor lo tl ∗
       inode_ref_genlo k q dev inum g lo.
   Proof.
     rewrite /inode_ref /inode_ref_genlo /live_fracc.
@@ -3061,7 +3116,7 @@ Section IcacheRef.
   Lemma inode_ref_short_gen_intro k qt qi dev inum :
     inode_ref_short k qt qi dev inum ⊣⊢
     ∃ (g : gname) (lo tl : nat),
-      ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+      ⌜(lo <= tl)%nat⌝ ∗ cred_floor lo tl ∗
       inode_ref_short_genlo k qt qi dev inum g lo.
   Proof.
     rewrite /inode_ref_short /inode_ref_short_genlo /live_fracc.
@@ -3090,7 +3145,7 @@ Section IcacheRef.
      aside (it is persistent) from the intro that gave it the gen form. *)
   Lemma inode_shr_gen_forget k s dev inum g lo tl :
     (lo <= tl)%nat ->
-    TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗
+    cred_floor lo tl -∗
     inode_shr_genlo k s dev inum g lo -∗ inode_shr k s dev inum.
   Proof.
     iIntros (Hle) "#Hfl H". rewrite inode_shr_gen_intro.
@@ -3099,7 +3154,7 @@ Section IcacheRef.
 
   Lemma inode_ref_short_gen_forget k qt qi dev inum g lo tl :
     (lo <= tl)%nat ->
-    TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗
+    cred_floor lo tl -∗
     inode_ref_short_genlo k qt qi dev inum g lo -∗
     inode_ref_short k qt qi dev inum.
   Proof.
@@ -3123,7 +3178,7 @@ Section IcacheRef.
      the floor the shed kept aside. *)
   Lemma inode_shr_gen_forget_on_keep k s qt qi dev inum d2 n2 g gk lo tl :
     (lo <= tl)%nat ->
-    TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗
+    cred_floor lo tl -∗
     inode_ref_short_genlo k qt qi d2 n2 gk lo -∗
     inode_shr_gen k s dev inum g -∗
     inode_ref_short_genlo k qt qi d2 n2 gk lo ∗ inode_shr k s dev inum.
@@ -3198,6 +3253,17 @@ Section IcacheRef.
 
   (* the SHARE-keep pin: a generation-erased return re-pins on a kept
      share slice (A6.145) *)
+  Lemma inode_shr_gen_pin_on_keep_short k qt qi s dev inum d2 n2 g gk lo :
+    inode_ref_short_genlo k qt qi d2 n2 gk lo -∗
+    inode_shr_gen k s dev inum g -∗
+    inode_ref_short_genlo k qt qi d2 n2 gk lo ∗
+    inode_shr_genlo k s dev inum gk lo.
+  Proof.
+    iIntros "(Hf1 & Hl1 & Hid1 & Hs1) (Hid2 & [%lo2 Hl2] & Hs2)".
+    iDestruct (live_genlo_agree with "Hl2 Hl1") as %[-> ->].
+    iFrame "Hf1 Hl1 Hid1 Hs1 Hid2 Hl2 Hs2".
+  Qed.
+
   Lemma inode_shr_gen_pin_on_keep k s1 s2 dev inum d2 n2 g gk lo :
     inode_shr_genlo k s1 d2 n2 gk lo -∗
     inode_shr_gen k s2 dev inum g -∗
@@ -3533,7 +3599,7 @@ Section IcacheHeld.
     (∃ (k : nat) (q : Qp) (inum : mword 32) (g : gname) (lo tl : nat),
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
-       ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+       ⌜(lo <= tl)%nat⌝ ∗ cred_floor lo tl ∗
        inode_ref_genlo k q icfg_dev inum g lo ∗ ity_shot g ty ∗
        runit_any (bv_unsigned inum))%I.
 
@@ -3608,7 +3674,7 @@ Section IcacheHeld.
     (∃ (k : nat) (inum : mword 32) (lo tl : nat),
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
-       ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+       ⌜(lo <= tl)%nat⌝ ∗ cred_floor lo tl ∗
        inode_shr_genlo k s icfg_dev inum g lo)%I.
 
   Lemma inode_shr_held_gen_forget v s g :

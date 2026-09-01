@@ -1094,6 +1094,7 @@ Section KexecPinnedAMain.
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
+        (loyf tlyf : nat)
         (n2 : nat) (ef : nat -> bv 8) (intact : bool),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
@@ -1114,7 +1115,10 @@ Section KexecPinnedAMain.
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
                      (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
         sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-        ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
+        ⌜(loyf <= tlyf)%nat⌝ -∗
+        IcacheRef.cred_floor loyf tlyf -∗
+        IcacheInv.iref_claims -∗
+        ic_deposit cn kf (DepShr sf dev inumf gyf loyf) -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
@@ -1207,12 +1211,12 @@ Section KexecPinnedAMain.
        named. ---- *)
     iIntros (CIDb) "%Hsb".
     iSpecialize ("Hcont90" $! CIDb with "[%]"); [exact Hsb |].
-    iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf n2 ef)
-            "%Hregs90 %Hn2 Hpc Hcg2 Hcnt2 Hextc2 Hclmc2 Hslk Hslked Hdep Hidev
+    iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf loyf tlyf n2 ef)
+            "%Hregs90 %Hn2 Hpc Hcg2 Hcnt2 Hextc2 Hclmc2 Hslk Hslked %Hle90 #Hfl90 #Hclaims90 Hdep Hidev
              Hiinum Hival Hloaded Hity Hfrz Hiref Hru Hlog2 Hirs2 Hbm2 Hins2
              Hbits2 Hbs2 Hka2 Hpriv2 Hpath2 Hargv2 Hargs2 #Hhdr Hframe Hexit2".
-    iApply ("Hcont90" $! M90 kf qf sf inumf dnf bmf gilf gislf gyf n2 ef intact
-              with "[%] [%] Hpc Hcg2 Hcnt2 Hextc2 Hclmc2 Hslk Hslked Hdep Hidev
+    iApply ("Hcont90" $! M90 kf qf sf inumf dnf bmf gilf gislf gyf loyf tlyf n2 ef intact
+              with "[%] [%] Hpc Hcg2 Hcnt2 Hextc2 Hclmc2 Hslk Hslked [//] Hfl90 Hclaims90 Hdep Hidev
                     Hiinum Hival Hloaded Hity Hfrz Hiref Hru Hlog2 Hirs2 Hbm2
                     Hins2 Hbits2 Hbs2 Hka2 Hpriv2 Hpath2 Hargv2 Hargs2
                     [] Hframe Hexit2");

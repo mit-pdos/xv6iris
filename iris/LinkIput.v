@@ -18,5 +18,5 @@ Require Import LinkAcquire LinkRelease LinkAcquiresleep LinkReleasesleep
    All three are real proofs; the assumption count is still ZERO. *)
 Require Import LinkBread LinkLogWrite LinkBrelse.
 
-Module Iput := IputProof Acquire Release Acquiresleep Releasesleep Itrunc Iupdate
+Module Iput := IputProof Acquire Release ReleaseIn Acquiresleep Releasesleep Itrunc Iupdate
                          Bread LogWrite Brelse.

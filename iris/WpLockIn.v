@@ -70,6 +70,28 @@ Section LockIn.
     iApply lock_finisher_close_body.
   Qed.
 
+  (* A6.144, CLOSED: the FLOOR-FOLDING closing finisher.  The caller hands
+     the payload UNFLOORED plus a loglen receipt covering its stamps; the
+     park deposits it and [WpLock.lock_pay_intro_llb] raises the parked
+     context's bound to the receipt, minting the floors AT THE PARKED ξ --
+     which is where the next acquirer's exact-read credentials transport
+     from.  The lock stays stated at the floored [R]. *)
+  Lemma lock_finisher_close_in_llb `{CID : CpuId} γ lk s
+      (R Rdep : CtxId → iProp Σ) `{!CtxMorph Rdep} (D : iProp Σ)
+      (E : coPset) (tl : nat) :
+    (forall ξ : TsoCtx.CtxId, Rdep ξ ∗ TsoCtx.ctx_floor ξ tl ⊢ R ξ) ->
+    TsoGhost.llb loglen_name tl -∗
+    Rdep cur_ctx -∗
+    lock_finisher_in γ lk s R D emp E.
+  Proof.
+    intros Hfold.
+    iIntros "#Hllb HR". iExists (lock_pay R).
+    iSplitL "HR".
+    { iIntros "Hrun".
+      iApply (lock_pay_intro_llb Rdep R tl Hfold with "Hllb Hrun HR"). }
+    iApply lock_finisher_close_body.
+  Qed.
+
   (* ...and the plainest form: the record in hand, no token consulted *)
   Lemma lock_finisher_close_pay `{CID : CpuId} γ lk s R D E :
     lock_pay R -∗ lock_finisher_in γ lk s R D emp E.

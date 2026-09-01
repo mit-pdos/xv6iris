@@ -209,7 +209,7 @@ Definition wp_ilock_sconf_body
     (cn : ic_names)                                    (* the icache's names  *)
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-    (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (lo tl : nat) (o : ilkc) (dev inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -275,7 +275,10 @@ Definition wp_ilock_sconf_body
      what lets this contract EXPOSE that generation's type witness below.
      Mechanical for every existing caller: [IcacheRef.inode_shr_gen_intro]
      is the existential its [inode_shr] already carries. *)
-  inode_shr_gen k s dev inum g -∗
+  ⌜(lo <= tl)%nat⌝ -∗
+  IcacheRef.cred_floor lo tl -∗
+  IcacheInv.iref_claims -∗
+  IcacheRef.inode_shr_genlo k s dev inum g lo -∗
   (* ---- THE FILL's LICENCE, INDEXED (iclaim-ledger.md §5''''', RULING C')
 
      §16.4's fill has a sub-arm -- the CLAIM BOX -- that no caller can be
@@ -349,7 +352,7 @@ Definition wp_ilock_sconf_body
          identity halves, the valid cell, and the loaded content at a
          record the region agrees with.  Exactly [ic_swap_park]'s input,
          i.e. exactly SpecIunlock v3's precondition. *)
-      ic_deposit cn k (DepShr s dev inum g) -∗
+      ic_deposit cn k (DepShr s dev inum g lo) -∗
       i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
@@ -418,11 +421,11 @@ Module Type ILOCK.
       (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-      (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (lo tl : nat) (o : ilkc) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
-                          cov logstart inodestart nib k s g o dev inum
+                          cov logstart inodestart nib k s g lo tl o dev inum
                           pidv dq dqs m K eb b lks Vpr.
 End ILOCK.

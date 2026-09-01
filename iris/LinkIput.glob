@@ -1,4 +1,4 @@
-DIGEST c27c21030ff071718835fd428aa26972
+DIGEST 78c627e51c68b32724b64c62107ba63a
 Fxv6iris.LinkIput
 R702:712 xv6iris.LinkAcquire <> <> lib
 R714:724 xv6iris.LinkRelease <> <> lib
@@ -13,11 +13,12 @@ R1147:1156 xv6iris.LinkBrelse <> <> lib
 R1175:1183 xv6iris.ProofIput IputProof <> modtype
 R1185:1191 xv6iris.LinkAcquire Acquire <> modtype
 R1193:1199 xv6iris.LinkRelease Release <> modtype
-R1201:1212 xv6iris.LinkAcquiresleep Acquiresleep <> modtype
-R1214:1225 xv6iris.LinkReleasesleep Releasesleep <> modtype
-R1227:1232 xv6iris.LinkItrunc Itrunc <> modtype
-R1234:1240 xv6iris.LinkIupdate Iupdate <> modtype
-R1267:1271 xv6iris.LinkBread Bread <> modtype
-R1273:1280 xv6iris.LinkLogWrite LogWrite <> modtype
-R1282:1287 xv6iris.LinkBrelse Brelse <> modtype
+R1201:1209 xv6iris.LinkRelease ReleaseIn <> modtype
+R1211:1222 xv6iris.LinkAcquiresleep Acquiresleep <> modtype
+R1224:1235 xv6iris.LinkReleasesleep Releasesleep <> modtype
+R1237:1242 xv6iris.LinkItrunc Itrunc <> modtype
+R1244:1250 xv6iris.LinkIupdate Iupdate <> modtype
+R1277:1281 xv6iris.LinkBread Bread <> modtype
+R1283:1290 xv6iris.LinkLogWrite LogWrite <> modtype
+R1292:1297 xv6iris.LinkBrelse Brelse <> modtype
 mod 1167:1170 <> Iput

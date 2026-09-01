@@ -575,10 +575,17 @@ Definition fviewUR : ucmra :=
    entry's escrow arm is holding for the thread inside.  The fraction is a
    FIELD because an existentially-quantified one in the arm cannot be
    pinned by any resource. *)
+(* A6.145: the checked-out descriptors record the generation's ARM POINT
+   [lo] beside its gname -- the pair the liveness camera agrees on.  The
+   escrow arm's slice then sits at [live_genlo _ _ g lo] (floor-free, so
+   the plain-invariant discipline holds) and the racy guard read's
+   credential ties through the deposit: the holder's floor is at >= lo. *)
 Inductive ic_dep : Type :=
   | DepNone
   | DepRef (q : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
+      (lo : nat)
   | DepShr (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
+      (lo : nat)
   | DepFrz (q : Qp) (dev inum : SailStdpp.Values.mword 32).
 
 (* The link ledger, the count coupling, the freeze receipt and the freeze

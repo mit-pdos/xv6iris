@@ -470,7 +470,9 @@ Section CreateSpec.
     (∃ γil γisl : gname,
        is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) ∗
        sleeplocked_q γisl s (i_lock (ientry k)) pidv ∗
-       ic_deposit cn k (DepShr s dev inum g) ∗
+       (∃ loc tlc : nat,
+          ⌜(loc <= tlc)%nat⌝ ∗ IcacheRef.cred_floor loc tlc ∗
+          ic_deposit cn k (DepShr s dev inum g loc)) ∗
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
        i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
        i_valid (ientry k) ↦₄ valid_word true ∗
@@ -486,7 +488,7 @@ Section CreateSpec.
        (* A6.145: the retained parent travels FLOORED (genlo + the carrier's
           floor receipt), so the eventual forget can rebuild the credential *)
        (∃ lo tl : nat,
-          ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+          ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
           inode_ref_short_genlo k (qi + s)%Qp qi dev inum g lo) ∗
        (* ...AND ITS PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md §5''.3).
           This bundle IS [SpecIunlockput]'s precondition, and since item
@@ -506,7 +508,9 @@ Section CreateSpec.
       γil γisl :
     is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
     sleeplocked_q γisl s (i_lock (ientry k)) pidv -∗
-    ic_deposit cn k (DepShr s dev inum g) -∗
+    (∃ loc tlc : nat,
+       ⌜(loc <= tlc)%nat⌝ ∗ IcacheRef.cred_floor loc tlc ∗
+       ic_deposit cn k (DepShr s dev inum g loc)) -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word true -∗
@@ -514,7 +518,7 @@ Section CreateSpec.
     ity_shot g (di_type dn) -∗
     ifreeze_off (bv_unsigned inum) -∗
     (∃ lo tl : nat,
-       ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+       ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
        inode_ref_short_genlo k (qi + s)%Qp qi dev inum g lo) -∗
     runit_any (bv_unsigned inum) -∗
     create_locked cn γfs γi cov logstart dev pidv k qi s g inum dn bm.

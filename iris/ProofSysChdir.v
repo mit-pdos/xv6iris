@@ -1507,8 +1507,8 @@ Section ProofSysChdirBody.
         iDestruct "Hrefip" as "[Hkeep Hshr]".
         iEval (rewrite inode_shr_gen_intro) in "Hshr".
         iDestruct "Hshr" as (gsh losh tlsh) "(%Hlesh & #Hflsh & Hshr)".
-        iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
-        iDestruct (sc_esc_acc cn gfs gi cov logstart kk Hkk with "Hescrows")
+        iDestruct (is_itable2_claims with "Hitab") as "#Hclaimsch".
+            iDestruct (sc_esc_acc cn gfs gi cov logstart kk Hkk with "Hescrows")
           as "#Hesck".
         iDestruct (sc_slk_acc cn kk Hkk with "Hslks") as (gil gisl) "#Hslkk".
         iDestruct (sc_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
@@ -1545,13 +1545,14 @@ Section ProofSysChdirBody.
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Ilock.wp_ilock_sconf (CID := CID23) gs j gl gu gd gk pd pav pu
                   bn gfs gi cn gil gisl cov logstart inodestart nib
-                  kk (qq/2)%Qp gsh PlainK dev inum pid (DfracOwn (1/4)) dqs
+                  kk (qq/2)%Qp gsh losh tlsh PlainK dev inum pid (DfracOwn (1/4)) dqs
                   P0 (K - 20)%nat eb b lks
                   (upd_upt V P') ltac:(lia) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HP0a0
                   (Hlb "bcache"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck
-                        Hireg Hslkk Hshr Hruip Hsbi Hpbare Hprocs Hdev Hgeo Hdlk
+                        Hireg Hslkk [%] Hflsh Hclaimsch Hshr Hruip Hsbi Hpbare Hprocs Hdev Hgeo Hdlk
                         Hbs1").
+        all: try (exact Hlesh).
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CID24 Hq24 mil dn bm fl)
@@ -1722,13 +1723,14 @@ Section ProofSysChdirBody.
           iDestruct (cpu_own_transport CID24 CID29 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iApply (Iunlock.wp_iunlock_sconf (CID := CID29) gs gfs gi cn gil gisl
-                    cov logstart kk (qq/2)%Qp gsh dev inum dn bm
+                    cov logstart kk (qq/2)%Qp gsh losh tlsh dev inum dn bm
                     pid (DfracOwn (1/4)) P4 (K - 20)%nat eb pj b lks
                     (upd_upt V P') ltac:(lia) Hkk HP4a0 (Hlb "sleep lock"%string)
                     with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk Hslkd
-                          Hpbare Hprocs Hdep Hidev Hiinum Hivalid Hload
+                          Hpbare Hprocs [//] Hflsh Hclaimsch Hdep Hidev Hiinum Hivalid Hload
                           Hshot Hfrz").
           iIntros (CID30 Hq30 miu) "%Hcsiu Hcg Hown Hpc Hpbare Hshr".
+          iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
           iEval (rewrite inode_ref_short_gen_intro) in "Hkeep".
           iDestruct "Hkeep" as (gkp lokp tlkp) "(%Hlekp & #Hflkp & Hkeep)".
           iDestruct (inode_shr_gen_forget_on_keep _ _ _ _ _ _ _ _ _ _ _ _
@@ -2100,13 +2102,13 @@ Section ProofSysChdirBody.
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iApply (Iunlockput.wp_iunlockput_sconf (CID := CID29) gs j gl gu gd gk
                     pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
-                    inodestart nib size dev kk (qq/2)%Qp (qq/2)%Qp gsh inum
+                    inodestart nib size dev kk (qq/2)%Qp (qq/2)%Qp gsh losh tlsh inum
                     dn bm n1 pid (DfracOwn (1/4)) dqb dqs
                     Q1 (K - 20)%nat eb b lks
                     (upd_upt V P') ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl HQ1a0 (Hlb "log"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                          Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum
+                          Hesck Hireg Hropen Hslkk Hslkd [//] Hflsh Hclaimsch Hdep Hidev Hiinum
                           Hivalid Hload Hshot Hfrz [$Hkeep $Hruip] Hsbb Hsbi Hbmres Hpbare
                           Hprocs Hdev Hgeo Hdlk Hbsl [HopS]").
           { rewrite Heb /trap_csrs_ext. done. }

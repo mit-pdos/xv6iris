@@ -1270,6 +1270,8 @@ Section ProofSysMkdirBody.
            erased reference, so weaken it back here.  One line, and the
            name is what sys_open's O_CREATE arm needs kept. *)
         iDestruct "Href" as (lo tl) "(%Hle & #Hfl & Href)".
+        iDestruct "Hdep" as (loc tlc) "(%Hlec & #Hflc & Hdep)".
+        iDestruct (is_itable2_claims with "Hitab") as "#Hclaimsmd".
         iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hle
                      with "Hfl Href") as "Href".
         iDestruct (md_esc_acc cn gfs gi cov logstart kk ltac:(lia)
@@ -1281,14 +1283,14 @@ Section ProofSysMkdirBody.
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Iunlockput.wp_iunlockput_sconf (CID := CID20) gs j gl gu gd gk
                   pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
-                  inodestart nib size dev kk qi ss gy inum dn bm un1
+                  inodestart nib size dev kk qi ss gy loc tlc inum dn bm un1
                   pid (DfracOwn (1/4)) dqb dqs P0 (K - 18)%nat eb b lks
                   (upd_upt V P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                   Hibcov Hiblog ltac:(lia) Hcovb
                   ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
                   (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                        Hesc Hireg [] Hslk Hslkd Hdep Hidev Hiinum Hivalid
+                        Hesc Hireg [] Hslk Hslkd [//] Hflc Hclaimsmd Hdep Hidev Hiinum Hivalid
                         Hload Hshot Hfrz [$Href $Hru] Hsbb Hsbi Hbmres Hpbare Hprocs Hdev
                         Hgeo Hdlk Hbsl [HopS]").
         { rewrite Heb /trap_csrs_ext. done. }

@@ -264,6 +264,7 @@ Section SpecFilestat.
      (* the three persistent invariants SpecIlock v3 / SpecIunlock v3 take,
         at the FAMILY where they were per-slot *)
      itable_inv ∗
+     IcacheInv.iref_claims ∗
      ic_escrows (fsn_ic fn) (fsn_fs fn) (fsn_ireg fn) (fsn_cov fn)
                 (fsn_logstart fn) ∗
      ireg_inv (fsn_ireg fn) (fsn_fs fn) (fsn_inodestart fn) icfg_nib ∗
@@ -303,7 +304,7 @@ Section SpecFilestat.
     filestat_fs_env fn -∗ filestat_fs_out fn.
   Proof.
     rewrite /filestat_fs_env /filestat_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
     iFrame "Hsb Hbs".
   Qed.
 
@@ -411,7 +412,7 @@ Section SpecFilestat.
       (lo tl : nat),
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
-      ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+      ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
       IcacheRef.ity_shot g ty ∗
       IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo ∗
       (IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo -∗

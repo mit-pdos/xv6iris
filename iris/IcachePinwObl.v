@@ -41,12 +41,35 @@ Section IcachePinwObl.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
 
+  (* A6.146: the credential's cash-in -- either arm of [cred_floor] buys
+     the two-armed read licence at [lo]. *)
+  Lemma cred_floor_vis `{CIDw : CpuId} (lo tl : nat) :
+    (lo <= tl)%nat ->
+    TsoCtx.own_context TsoCtx.cur_ctx -∗ IcacheRef.cred_floor lo tl -∗
+    TsoCtx.own_context TsoCtx.cur_ctx ∗
+    ∃ K : nat,
+      view_lb view_name loglen_name (hart_agent cpu_id) K ∗
+      TsoCtx.ledger_vis (hart_agent cpu_id) K lo.
+  Proof.
+    iIntros (Hlotl) "Hctx #Hfl".
+    iDestruct "Hfl" as "[Hflc | (%a & Hw)]".
+    - iDestruct (TsoCtx.own_context_floor_view TsoCtx.cur_ctx tl
+                   with "Hctx Hflc") as "[Hctx Hview]".
+      iDestruct "Hview" as (K) "[#HvK %HtlK]".
+      iFrame "Hctx". iExists K. iFrame "HvK".
+      iApply TsoCtx.ledger_vis_below. lia.
+    - iDestruct (TsoCtx.own_context_wrote_vis TsoCtx.cur_ctx lo a
+                   with "Hctx Hw") as "[Hctx Hview]".
+      iDestruct "Hview" as (K) "[#HvK #Hvis]".
+      iFrame "Hctx". iExists K. iFrame "HvK Hvis".
+  Qed.
+
   Lemma iref_read_obl `{CIDw : CpuId} (g : gstate) (k : nat)
       (w : mword 32) (lo tst tl : nat) :
     (lo <= tl)%nat ->
     tso_interp_at riscv_eraGS g -∗
     TsoCtx.own_context TsoCtx.cur_ctx -∗
-    TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗
+    IcacheRef.cred_floor lo tl -∗
     iref_pin_rows k w lo tst -∗
     ⌜forall tvr : nat, (g.(gtv) cpu_id <= tvr)%nat ->
        (exists v : mword 32,
@@ -58,11 +81,9 @@ Section IcachePinwObl.
              (0 < bv_unsigned v < 2 ^ 31)%Z)⌝.
   Proof.
     iIntros (Hlotl) "Hint Hctx #Hfl Hrows".
-    iDestruct (TsoCtx.own_context_floor_view TsoCtx.cur_ctx tl with "Hctx Hfl")
+    iDestruct (cred_floor_vis lo tl Hlotl with "Hctx Hfl")
       as "[Hctx Hview]".
-    iDestruct "Hview" as (K) "[#HvK %HtlK]".
-    iDestruct (view_lb_le view_name loglen_name (hart_agent cpu_id) K lo
-                 ltac:(lia) with "HvK") as "#Hvlo".
+    iDestruct "Hview" as (K) "[#HvK #Hvis]".
     iAssert ([∗ list] j ∈ seq 0 4, ∃ t : nat,
         TsoCtx.phys_ledger_pinw (pa_add (i_ref (ientry k)) j) (DfracOwn 1)
           (nth_byte w j) t
@@ -70,9 +91,9 @@ Section IcachePinwObl.
       with "[Hrows]" as "Hrows".
     { iApply (big_sepL_mono with "Hrows"). iIntros (i j Hij) "H".
       iDestruct "H" as (t) "[_ H]". iExists t. iFrame "H". }
-    iDestruct (TsoCtx.ledger_read_pinw_ok g (i_ref (ientry k)) 4 lo iref_set
-                 (DfracOwn 1) (nth_byte w) ltac:(lia)
-                 with "Hint Hvlo Hrows") as %Hrd.
+    iDestruct (TsoCtx.ledger_read_pinw_vis g (i_ref (ientry k)) 4 lo K
+                 iref_set (DfracOwn 1) (nth_byte w) ltac:(lia)
+                 with "Hint HvK Hvis Hrows") as %Hrd.
     iPureIntro. intros tvr Htvr.
     destruct (Hrd tvr Htvr) as (fw & Hmem & Hbytes).
     pose proof Hmem as (z & Hz & Hfz).
@@ -125,6 +146,38 @@ Section IcachePinwObl.
     iPureIntro. intros tvr Htvr j HjN.
     assert (Hj4 : (j < 4)%nat) by lia.
     exact (Hrd tvr Htvr j Hj4).
+  Qed.
+
+  (* the LEAF-SHAPED exact read: existence + uniqueness in the two-part
+     form [WpAu4.wp_lw_au_rel_s_sconf]'s obligation wants, uniqueness by
+     byte extensionality off [tso_read]'s functionality. *)
+  Lemma iref_read_locked_all `{CIDw : CpuId} (g : gstate)
+      (k : nat) (w : mword 32) (lo tst tl : nat) :
+    (tst <= tl)%nat ->
+    tso_interp_at riscv_eraGS g -∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
+    TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗
+    iref_pin_rows k w lo tst -∗
+    ⌜forall tvr : nat, (g.(gtv) cpu_id <= tvr)%nat ->
+       (exists v : mword 32,
+          tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tvr
+            (i_ref (ientry k)) (Z.to_N 4) v)
+       /\ (forall v : mword 32,
+             tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tvr
+               (i_ref (ientry k)) (Z.to_N 4) v -> v = w)⌝.
+  Proof.
+    iIntros (Htsttl) "Hint Hgh Hctx #Hfl Hrows".
+    iDestruct (iref_read_locked_obl g k w lo tst tl Htsttl
+                 with "Hint Hgh Hctx Hfl Hrows") as %HH.
+    iPureIntro. intros tvr Htvr.
+    specialize (HH tvr Htvr).
+    split.
+    - exists w. exact HH.
+    - intros v Hv. apply (bv_eq_of_bytes (n := 4%N)).
+      intros j Hj.
+      specialize (Hv j Hj). specialize (HH j Hj).
+      rewrite Hv in HH. injection HH as HB. apply bv_eq. exact HB.
   Qed.
 
 End IcachePinwObl.

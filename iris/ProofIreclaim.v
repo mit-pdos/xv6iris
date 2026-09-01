@@ -1684,9 +1684,10 @@ Section IreclaimOrphan.
     (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)) *)
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
     iDestruct "Hshr" as (gsh losh tlsh) "(%Hlesh & #Hflsh & Hshr)".
-    iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
+    iDestruct (is_itable2_claims with "Hitb2") as "#Hclaims2".
     iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gil gisl
-              cov logstart inodestart nib kslot (q/2)%Qp gsh PlainK dev inum
+              cov logstart inodestart nib kslot (q/2)%Qp gsh losh tlsh PlainK dev
+              inum
               pidv dq dqs OC (K - 8)%nat eb b lks Vpr
               ltac:(lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
               HOCa0
@@ -1694,8 +1695,9 @@ Section IreclaimOrphan.
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hitbl Hescrow Hireg Hslk
-                    Hshr Hru Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
+                    [%] Hflsh Hclaims2 Hshr Hru Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
+    all: try (exact Hlesh).
     iIntros (CID18 Hq18 mL dnl bml fl_)
       "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbi Hsl1 Hslkd Hdep Hidev Hiinum
        Hvalid Hloaded #Hshot Hfrz %Hfr_ Hru %Hilkp".
@@ -1798,21 +1800,25 @@ Section IreclaimOrphan.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
+    iDestruct (is_itable2_claims with "Hitb2") as "#Hclaims".
     iApply (IU.wp_iunlock_sconf γs γfs γi cn gil gisl cov logstart kslot
-              (q/2)%Qp gsh dev inum dnl bml pidv dq OE (K - 8)%nat eb
+              (q/2)%Qp gsh losh tlsh dev inum dnl bml pidv dq OE (K - 8)%nat eb
               (proc_addr j) b lks Vpr
               ltac:(lia) Hkslot HOEa0
               (* iunlock's bound is "sleep lock"(6); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hitbl Hescrow Hslk Hslkd
-                    Hppid Hprocs Hdep Hidev Hiinum Hvalid Hloaded Hshot Hfrz").
+                    Hppid Hprocs [%] Hflsh Hclaims Hdep Hidev Hiinum Hvalid
+                    Hloaded Hshot Hfrz").
     all: try lkbelow.
+    { exact Hlesh. }
     iIntros (CID21 Hq21 mU) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
-    iApply fupd_wp.
-    iMod (inode_shr_gen_pin0 ⊤ kslot (q/2)%Qp dev inum gsh
-            ltac:(solve_ndisj) Hkslot with "Hitbl Hshr") as "Hshr".
-    iModIntro.
+    (* the returned genlo slice rejoins its retained credential (A6.145) *)
+    iAssert (inode_shr kslot (q/2)%Qp dev inum) with "[Hshr]" as "Hshr".
+    { rewrite IcacheRef.inode_shr_gen_intro.
+      iExists gsh, losh, tlsh. iSplitR; [by iPureIntro|].
+      iFrame "Hflsh Hshr". }
     assert (Hpc64 : ret_pc (OE !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x64))
       by (rewrite HOEra; pcw).

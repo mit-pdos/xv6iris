@@ -472,6 +472,7 @@ Section SpecFileread.
         [ref] words, the entries' content escrows, the inode region -- the
         escrow at the FAMILY where it was per-slot. *)
      itable_inv ∗
+     IcacheInv.iref_claims ∗
      ic_escrows (frn_ic fn) (frn_fs fn) (frn_ireg fn) (frn_cov fn)
                 (frn_logstart fn) ∗
      ireg_inv (frn_ireg fn) (frn_fs fn) (frn_inodestart fn) icfg_nib ∗
@@ -519,7 +520,7 @@ Section SpecFileread.
     fileread_fs_env γf fn -∗ fileread_fs_out fn.
   Proof.
     rewrite /fileread_fs_env /fileread_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
     iFrame "Hsb Hbs".
   Qed.
 
@@ -641,7 +642,7 @@ Section SpecFileread.
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
       ⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
-      ⌜(lo <= tl)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tl ∗
+      ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
       IcacheRef.ity_shot g ty ∗
       IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo ∗
       off_hold γf k γx true q ∗

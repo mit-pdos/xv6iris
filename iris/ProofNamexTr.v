@@ -2636,16 +2636,17 @@ Section ProofNamexTrMain.
                    iEval (rewrite inode_ref_short_gen_intro) in "Hkeep".
                    iDestruct "Hkeep" as (gkp lokp tlkp)
                      "(%Hlekp & #Hflkp & Hkeep)".
-                   iDestruct (inode_ref_short_genlo_shr_gen_agree
-                                with "Hkeep Hshr") as %->.
+                   iDestruct (IcacheRef.inode_shr_gen_pin_on_keep_short
+                                with "Hkeep Hshr") as "[Hkeep Hshr]".
+                   iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimsnx".
                    iApply (IL.wp_ilock_sconf gs j gl gu gd gk pd pav pu bn
                              gfs gi cn gilk gislk cov logstart inodestart nib
-                             ik (iq/2)%Qp gsh PlainK dev iinum pidv dq dqs
+                             ik (iq/2)%Qp gkp lokp tlkp PlainK dev iinum pidv dq dqs
                              V2 (K - 12)%nat eb b lks Vpr
                              Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0
                              ltac:(lkbelow)
                              with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hitbl Hesck
-                                   Hireg Hslkk Hshr Hru Hinos Hppid Hprocs Hdev
+                                   Hireg Hslkk [//] Hflkp Hclaimsnx Hshr Hru Hinos Hppid Hprocs Hdev
                                    Hgeom Hdlk Hbs1").
                    all: try lkbelow.
                    iIntros (CIDil Hqil mil dnl bml fl_)
@@ -2863,7 +2864,7 @@ Section ProofNamexTrMain.
                      iApply (IUP.wp_iunlockput_gen gs j gl gu gd gk pd pav pu
                                bn g gfs gi cn gtl gilk gislk cov logstart
                                bmapstart inodestart nib size dev
-                               ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
+                               ik (iq/2)%Qp (iq/2)%Qp gkp lokp tlkp iinum dnl bml ncur
                                Scur wc false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Vpr
                                Kiup Hik HbW ltac:(discriminate)
@@ -2872,10 +2873,11 @@ Section ProofNamexTrMain.
                                HND2a0 Hbelow
                                with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
-                                     Hdep Hidev Hiinum Hivalid Hload
+                                     [%] Hflkp Hclaimsnx Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hfrz [$Hkeep2 $Hru] Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
+                     all: try (exact Hlekp).
                      (* RULING G: a runtime caller lends the SEALED arm. *)
                      { iExact "Hropen". }
                      { iEval (cbn beta iota). iEmpIntro. }
@@ -3476,7 +3478,7 @@ Section ProofNamexTrMain.
                            iApply (IUP.wp_iunlockput_gen gs j gl gu gd gk
                                      pd pav pu bn g gfs gi cn gtl gilk gislk
                                      cov logstart bmapstart inodestart nib
-                                     size dev ik (iq/2)%Qp (iq/2)%Qp gsh
+                                     size dev ik (iq/2)%Qp (iq/2)%Qp gkp lokp tlkp
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
                                      GB3 (K - 12)%nat eb b lks Vpr
@@ -3486,11 +3488,12 @@ Section ProofNamexTrMain.
                                      Hiu Hj Hgs HGB3a0 Hbelow
                                      with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg []
-                                           Hslkk Hslkd Hdep Hidev
+                                           Hslkk Hslkd [%] Hflkp Hclaimsnx Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hfrz [$Hkeep2 $Hru] Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
                            all: try lkbelow.
+                           all: try (exact Hlekp).
                            (* RULING G: a runtime caller lends the SEALED arm of
                               the borrowed regime and discards what comes back --
                               its own copy is persistent. *)
@@ -3735,7 +3738,7 @@ Section ProofNamexTrMain.
                            iApply (IUP.wp_iunlockput_gen gs j gl gu gd gk
                                      pd pav pu bn g gfs gi cn gtl gilk gislk
                                      cov logstart bmapstart inodestart nib
-                                     size dev ik (iq/2)%Qp (iq/2)%Qp gsh
+                                     size dev ik (iq/2)%Qp (iq/2)%Qp gkp lokp tlkp
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
                                      GC3 (K - 12)%nat eb b lks Vpr
@@ -3745,11 +3748,12 @@ Section ProofNamexTrMain.
                                      Hiu Hj Hgs HGC3a0 Hbelow
                                      with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg []
-                                           Hslkk Hslkd Hdep Hidev
+                                           Hslkk Hslkd [%] Hflkp Hclaimsnx Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hfrz [$Hkeep2 $Hru] Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
                            all: try lkbelow.
+                           all: try (exact Hlekp).
                            (* RULING G: a runtime caller lends the SEALED arm of
                               the borrowed regime and discards what comes back --
                               its own copy is persistent. *)
@@ -3980,7 +3984,7 @@ Section ProofNamexTrMain.
                      iApply (IUP.wp_iunlockput_gen gs j gl gu gd gk pd pav pu
                                bn g gfs gi cn gtl gilk gislk cov logstart
                                bmapstart inodestart nib size dev
-                               ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
+                               ik (iq/2)%Qp (iq/2)%Qp gkp lokp tlkp iinum dnl bml ncur
                                Scur wc false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Vpr
                                Kiup Hik HbW ltac:(discriminate)
@@ -3989,10 +3993,11 @@ Section ProofNamexTrMain.
                                HND2a0 Hbelow
                                with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
-                                     Hdep Hidev Hiinum Hivalid Hload
+                                     [%] Hflkp Hclaimsnx Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hfrz [$Hkeep2 $Hru] Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
+                     all: try (exact Hlekp).
                      (* RULING G: a runtime caller lends the SEALED arm. *)
                      { iExact "Hropen". }
                      { iEval (cbn beta iota). iEmpIntro. }

@@ -476,6 +476,7 @@ Section SpecFilewrite.
      (* THE THREE PERSISTENT ICACHE INVARIANTS SpecIlock / SpecIunlock take,
         the escrow at the FAMILY where it was per-slot *)
      itable_inv ∗
+     IcacheInv.iref_claims ∗
      ic_escrows (fwn_ic fn) (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
                 (fwn_logstart fn) ∗
      ireg_inv (fwn_ireg fn) (fwn_fs fn) (fwn_inodestart fn) icfg_nib ∗
@@ -546,7 +547,7 @@ Section SpecFilewrite.
     filewrite_fs_env γf fn -∗ filewrite_fs_out fn.
   Proof.
     rewrite /filewrite_fs_env /filewrite_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
               Hsbi & Hsbs & Hsbb & _ & _ & _ & _ & Hbsl)".
     iFrame "Hsbi Hsbs Hsbb Hbsl".
   Qed.

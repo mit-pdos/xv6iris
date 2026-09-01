@@ -100,7 +100,7 @@ Section ProofIunlockputMain.
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -108,7 +108,7 @@ Section ProofIunlockputMain.
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
-                             size dev k qi s gy inum dn' bm' n Sb crb cru
+                             size dev k qi s gy loy tly inum dn' bm' n Sb crb cru
                              crz e0 pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlockput_gen_body].
@@ -117,7 +117,8 @@ Section ProofIunlockputMain.
     pose proof HK as HK'. 
     assert (Hipe : ip = ientry k) by reflexivity.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
-              Hropen #Hslk Hstok Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hparp
+              Hropen #Hslk Hstok %Hley #Hfly #Hclaims Hdep Hidev Hinumc Hvalid
+              Hlk #Hshot Hfrz Hparp
               Hbms Hins #Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hnlz Hlogop
               Hcont".
     (* SIMP-2: the short parent arrives PACKAGED with its provenance unit
@@ -269,18 +270,24 @@ Section ProofIunlockputMain.
     (* "sleep lock" outranks "itable": weaken [Hfresh]'s bound. *)
     assert (Hfresh_sl : locks_below lks "sleep lock")
       by lkbelow.
-    iApply (IU.wp_iunlock_sconf gs gfs gi cn gil gisl cov logstart k s gy dev inum
+    iApply (IU.wp_iunlock_sconf gs gfs gi cn gil gisl cov logstart k s gy
+              loy tly dev inum
               dn' bm' pidv dq R4 (K - 4)%nat eb pj b lks Vpr
               ltac:(lia) Hk ltac:(rewrite HR4a0; exact Hipe)
               Hfresh_sl
               with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk Hstok Hppid
-                    Hprocs Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz").
+                    Hprocs [%] Hfly Hclaims Hdep Hidev Hinumc Hvalid Hlk
+                    Hshot Hfrz").
     all: try lkbelow.
+    { exact Hley. }
     iIntros (CID8 Hq8 mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr".
-    iApply fupd_wp.
-    iMod (inode_shr_gen_pin0 ⊤ k s dev inum gy ltac:(solve_ndisj) Hk
-            with "Hitbl Hshr") as "Hshr".
-    iModIntro.
+    (* the returned genlo slice rejoins its RETAINED credential (the floor
+       pieces the caller kept from its shed) -- the erased floored form
+       rebuilds with no pin (A6.145). *)
+    iAssert (inode_shr k s dev inum) with "[Hshr]" as "Hshr".
+    { rewrite IcacheRef.inode_shr_gen_intro.
+      iExists gy, loy, tly. iSplitR; [by iPureIntro|].
+      iFrame "Hfly Hshr". }
     assert (Hpc10 : ret_pc (R4 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlockput + 0x10))
       by (rewrite HR4ra; pcw).
@@ -590,7 +597,7 @@ Section ProofIunlockputMain.
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -598,31 +605,34 @@ Section ProofIunlockputMain.
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
-                               size dev k qi s gy inum dn' bm' n
+                               size dev k qi s gy loy tly inum dn' bm' n
                                pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlockput_sconf_body].
     intros pcE ip pj ret_tgt HK Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
            Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
-              Hropen #Hslk Hstok Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hparp
+              Hropen #Hslk Hstok %Hley #Hfly #Hclaims Hdep Hidev Hinumc Hvalid
+              Hlk #Hshot Hfrz Hparp
               Hbms Hins #Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
               Hcont".
     iDestruct "Hlogop" as (Sb0) "Hlogop".
     iDestruct (log_opS_named with "Hlogop") as (e00) "Hlogop".
     iApply (wp_iunlockput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev
-              k qi s gy inum dn' bm' n Sb0 false false false e00
+              k qi s gy loy tly inum dn' bm' n Sb0 false false false e00
               pidv dq dqb dqs m K eb b lks Vpr
               HK Hk ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
-                    Hropen Hslk Hstok Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz
+                    Hropen Hslk Hstok [%] Hfly Hclaims Hdep Hidev Hinumc
+                    Hvalid Hlk Hshot Hfrz
                     Hparp
                     Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk Hbslots []
                     Hlogop [Hcont]").
     all: try lkbelow.
+    { exact Hley. }
     { iEval (cbn beta iota). iEmpIntro. }
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".

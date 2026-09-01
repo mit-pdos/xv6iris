@@ -219,7 +219,7 @@ Section KexecBBody.
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -275,7 +275,7 @@ Section KexecBBody.
     cpu_own 0 eb (proc_addr jp) b lks -∗
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jp) -∗
-    kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+    kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf loyf tlyf inumf dnf bmf
               gilf gislf -∗
     log_op g n2 -∗
     iref_slots 1 -∗
@@ -316,7 +316,7 @@ Section KexecBBody.
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (P : uptd) (w13 w67 : mword 64),
         kxc_at_1a2 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
-                   nib size dev kf qf sf gyf inumf dnf bmf
+                   nib size dev kf qf sf gyf loyf tlyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
@@ -353,7 +353,7 @@ Section KexecBBody.
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (P : uptd),
         kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
-                   nib size dev kf qf sf gyf inumf dnf bmf
+                   nib size dev kf qf sf gyf loyf tlyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
@@ -1277,7 +1277,8 @@ Section KexecBBody.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID3 CID8 eb (proc_addr jp)
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-      iDestruct "Hopen" as "(#Hslkk & Hslkd & Hdep & Hidev & Hiinum &
+      iDestruct "Hopen" as "(#Hslkk & Hslkd & %Hley & #Hfly & #Hclaimsy &
+                             Hdep & Hidev & Hiinum &
                              Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
       (* [kxc_bad64] is applied AT [CID8] (its [sie_cap_gpr] premise pins its
          own [CID0] from "Hcg"), so kexec's exit -- still anchored at the
@@ -1289,12 +1290,12 @@ Section KexecBBody.
                    with "Hcont") as "Hcont".
       iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gilf gislf ga gf cov logstart bmapstart inodestart nib size
-                dev kf qf sf gyf inumf dnf bmf n2
+                dev kf qf sf gyf loyf tlyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                 m B1 K eb lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
                 Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HB1sp HB1s4 HB1thr
-                with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hslkk Hslkd Hdep
+                with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hslkk Hslkd [//] Hfly Hclaimsy Hdep
                       Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits
                       Hka Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont]
                       Hcont").

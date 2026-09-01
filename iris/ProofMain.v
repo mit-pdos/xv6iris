@@ -1504,7 +1504,7 @@ Section ProofMain.
        return (the FIRST of the two ghost interludes below) and the rest at
        +0x92's, so one open serves both. *)
     iDestruct (fs_kit_icache_rest_open with "Hkit1") as
-      "(Hiref & Hlivef & Hislg & Hipool & Hitfree & Hictok & Hicmid & Hicid &
+      "(Hiref & Hlivef & Histmp & Hislg & Hipool & Hitfree & Hictok & Hicmid & Hicid &
         Hbiotok & Hblkpool & Hdllk)".
     (* the two allocator-budget facts, in the closed form the callees ask for *)
     assert (Hnb3 : exists nb, avail_sub (Some (length ps)) K_kvmmake = Some nb
@@ -1631,7 +1631,7 @@ Section ProofMain.
     iMod (icache_boot_at ⊤ fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov
             fsc_logst icfg_nib icfg_dev
             with "Hiref Hlivef Hislg Hitw Hitnm Hitcpu Hslf Hient Hirauth
-                  Hipool Hitfree Hictok Hicmid Hicid Hrun")
+                  Histmp Hipool Hitfree Hictok Hicmid Hicid Hrun")
       as "(Hrun & #Hitl & #Hitinv & #Hesc & Hicsl)".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.

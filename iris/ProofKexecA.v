@@ -975,6 +975,7 @@ Section KexecABody.
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
+        (loyf tlyf : nat)
         (n2 : nat) (ef : nat -> bv 8),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
@@ -995,7 +996,10 @@ Section KexecABody.
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
                      (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
         sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-        ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
+        ⌜(loyf <= tlyf)%nat⌝ -∗
+        IcacheRef.cred_floor loyf tlyf -∗
+        IcacheInv.iref_claims -∗
+        ic_deposit cn kf (DepShr sf dev inumf gyf loyf) -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
@@ -1058,7 +1062,7 @@ Section KexecABody.
        caller does ([inode_shr_gen_intro] -- SpecIlock's own porting note). *)
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
     iDestruct "Hshr" as (gy loy tly) "(%Hley & #Hfly & Hshr)".
-    iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
+    iDestruct (is_itable2_claims with "Hitab") as "#Hclaimskx".
     assert (Hib' : bv_unsigned inum < 16 * Z.of_nat nib)
       by (rewrite Hnib; exact Hib).
     destruct (Hiregb inum Hib') as [Hibc Hibl].
@@ -1151,13 +1155,14 @@ Section KexecABody.
     iDestruct (cpu_claim_ext_transport CID0 CID3 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iApply (Ilock.wp_ilock_sconf gs jp gl gu gd gk pd pav pu bn gfs gi cn
-              gilk gislk cov logstart inodestart nib k (q/2)%Qp gy PlainK
+              gilk gislk cov logstart inodestart nib k (q/2)%Qp gy loy tly PlainK
               dev inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat eb eb lks
               V ltac:(lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hitinv Hesck Hireg Hslkk
-                    Hshr Hru Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1").
+                    [%] Hfly Hclaimskx Hshr Hru Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1").
     all: try lkbelow.
+    all: try (exact Hley).
     iIntros (CIDil Hsil M1 dnl bml fl_) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hins Hbs1
              Hslkd Hdep Hidev Hiinum Hivalid Hload Hity Hfrz %Hfr_
              Hru %Hilkp".
@@ -1595,7 +1600,7 @@ Section KexecABody.
           destruct (decide (j < tot)%nat) as [_ | Hno]; [| lia].
           by rewrite Nat.add_0_l. }
         iApply ("Hcont90" $! Q12 k (q/2)%Qp (q/2)%Qp inum dnl bml gilk gislk gy
-                  n1 gb with "[%] [%] Hpc Hcg Hcnt Hextc Hclmc Hslkk Hslkd Hdep
+                  loy tly n1 gb with "[%] [%] Hpc Hcg Hcnt Hextc Hclmc Hslkk Hslkd [//] Hfly Hclaimskx Hdep
                   Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hlog Hirs Hbm Hins Hbits
                   Hbs Hka Hpriv Hpath Hargv Hargs [] [-Hcont] Hcont").
         * split_and!; [exact HQ12sp | exact HQ12s0 | exact HQ12s1 | exact HQ12s2
@@ -1680,12 +1685,12 @@ Section KexecABody.
         iDestruct (kxc_exit_open with "Hkw Hcont") as "Hcont".
       iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                   gilk gislk ga gf cov logstart bmapstart inodestart nib size
-                  dev k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
+                  dev k (q/2)%Qp (q/2)%Qp gy loy tly inum dnl bml n1
                   plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                   m Q12 K eb lks sp0 ra0 s00 s10 s20 pv av
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                   Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HQ12sp HQ12s4 HQ12thr
-                  with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd Hdep
+                  with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd [//] Hfly Hclaimskx Hdep
                         Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
         { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
@@ -1762,12 +1767,12 @@ Section KexecABody.
       iDestruct (kxc_exit_open with "Hkw Hcont") as "Hcont".
       iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gilk gislk ga gf cov logstart bmapstart inodestart nib size
-                dev k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
+                dev k (q/2)%Qp (q/2)%Qp gy loy tly inum dnl bml n1
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                 m Q9 K eb lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                 Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HQ9sp HQ9s4 HQ9thr
-                with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd Hdep
+                with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd [//] Hfly Hclaimskx Hdep
                       Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
       { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
@@ -1952,6 +1957,7 @@ Section KexecAMain.
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
+        (loyf tlyf : nat)
         (n2 : nat) (ef : nat -> bv 8),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
@@ -1972,7 +1978,10 @@ Section KexecAMain.
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
                      (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
         sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-        ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
+        ⌜(loyf <= tlyf)%nat⌝ -∗
+        IcacheRef.cred_floor loyf tlyf -∗
+        IcacheInv.iref_claims -∗
+        ic_deposit cn kf (DepShr sf dev inumf gyf loyf) -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗

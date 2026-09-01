@@ -1442,7 +1442,7 @@ Section KexecABad.
       (* [gy]: the GENERATION the caller's share names (SpecIlock v5 /
          fs-icache 17.6 (5)).  It rides through the deposit and pins the
          [ity_shot] SpecIunlockput now demands. *)
-      (k : nat) (qi sq : Qp) (gy : gname) (inum : mword 32)
+      (k : nat) (qi sq : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -1486,7 +1486,10 @@ Section KexecABad.
     is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
     (* ---- the open inode: exactly SpecIunlockput's input ---- *)
     sleeplocked_q gisl sq (i_lock (ientry k)) pidv -∗
-    ic_deposit cn k (DepShr sq dev inum gy) -∗
+    ⌜(loy <= tly)%nat⌝ -∗
+    IcacheRef.cred_floor loy tly -∗
+    IcacheInv.iref_claims -∗
+    ic_deposit cn k (DepShr sq dev inum gy loy) -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word true -∗
@@ -1541,7 +1544,7 @@ Section KexecABad.
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
            Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts4 Hthr.
     
-    iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab #Hslkk Hslkd Hdep Hidev
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev
              Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins #Hbits #Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs Hlog Hframe Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
@@ -1599,12 +1602,12 @@ Section KexecABad.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iApply (Iunlockput.wp_iunlockput_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               gi cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
+              k qi sq gy loy tly inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
               B2 (K - 68)%nat eb eb lks V
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
-                    Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload
+                    Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid Hload
                     Hity Hfrz [$Hkeep $Hru] Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
                     Hlog").
     all: try lkbelow.

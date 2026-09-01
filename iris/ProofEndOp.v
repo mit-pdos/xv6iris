@@ -1732,11 +1732,14 @@ Section EndOpBlocks.
       assert (Hpe : op_pending om = ∅)
         by (rewrite Hommt; exact op_pending_empty).
       rewrite Hpe. iExact "Hbatch". }
+    assert (Hrl_G2 : add_vec (G2 !!! Regidx (mword_of_int 10 : mword 5))
+                       (sign_extend' 64 (mword_of_int 0 : mword 12)) = log_addr)
+      by (rewrite HG2a0; apply addv_sext0).
+    assert (Hav_G2 : (10 <= K - 8)%nat) by (pose proof (eo_Klk K HK); lia).
     iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string <{ log_res Psi γ bn γfs cov logstart }> G2 0%nat eb (proc_addr j)
               (K - 8)%nat
               ({["log"]} ∪ lks)
-              ltac:(rewrite HG2a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
-              ltac:(pose proof (eo_Klk K HK); lia)
+              Hrl_G2 Hav_G2
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDc1 Hsc1 mr) "Hcg Hpc %Hrel Hcnt".
@@ -4127,11 +4130,14 @@ Section EndOpBlocks.
               G3 !!! Regidx c = (m !!! Regidx c : mword 64)).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /G3 upd_ne; [| regne]. exact (HG2thr c Hcs N2 N8 N9 N18). }
+    assert (Hrl_G3 : add_vec (G3 !!! Regidx (mword_of_int 10 : mword 5))
+                       (sign_extend' 64 (mword_of_int 0 : mword 12)) = log_addr)
+      by (rewrite HG3a0; apply addv_sext0).
+    assert (Hav_G3 : (10 <= K - 8)%nat) by (pose proof (eo_Klk K HK); lia).
     iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string <{ log_res Psi γ bn γfs cov logstart }> G3 0%nat eb (proc_addr j)
               (K - 8)%nat
               ({["log"]} ∪ lks)
-              ltac:(rewrite HG3a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
-              ltac:(pose proof (eo_Klk K HK); lia)
+              Hrl_G3 Hav_G3
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDc1 Hsc1 mr) "Hcg Hpc %Hrel Hcnt".
@@ -4842,10 +4848,13 @@ Section ProofEndOp.
                 U5 !!! Regidx c = (m !!! Regidx c : mword 64)).
       { intros c Hcs N2 N8 N9 N18.
         rewrite /U5 upd_ne; [| regne]. exact (HU4thr c Hcs N2 N8 N9 N18). }
+      assert (Hrl_U5 : add_vec (U5 !!! Regidx (mword_of_int 10 : mword 5))
+                         (sign_extend' 64 (mword_of_int 0 : mword 12)) = log_addr)
+        by (rewrite HU5a0; apply addv_sext0).
+      assert (Hav_U5 : (10 <= K - 8)%nat) by (pose proof (eo_Klk K HK); lia).
       iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string <{ log_res Psi γ bn γfs cov logstart }> U5 0%nat eb (proc_addr j) (K - 8)%nat
                 ({["log"]} ∪ lks)
-                ltac:(rewrite HU5a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
-                ltac:(pose proof (eo_Klk K HK); lia)
+                Hrl_U5 Hav_U5
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
       { iExact "Hlock". }
       iIntros (CIDr Hsr mr) "Hcg Hpc %Hrel Hcnt".

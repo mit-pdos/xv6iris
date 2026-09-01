@@ -689,7 +689,7 @@ Section ProofSysOpenPublish.
     off_wf voff ->
     (lo <= tl)%nat ->
     (* the parent the walk kept, short by the share it lent ilock ... *)
-    TsoCtx.ctx_floor TsoCtx.cur_ctx tl -∗
+    IcacheRef.cred_floor lo tl -∗
     IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi icfg_dev inum gy lo -∗
     (* ... its PROVENANCE UNIT, which travels with the parent into the fd
        slot's [cinv] and comes back out at fileclose's withdraw (item

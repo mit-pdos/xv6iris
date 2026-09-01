@@ -571,7 +571,7 @@ Section sweep_agree.
   Proof.
     intros HW3.
     destruct (fs_sb_ok_geom sb Hok) as (_ & _ & _ & Hn1 & Hn16 & _).
-    unfold fs_ent_blocks. f_equal. apply list_fmap_ext.
+    unfold fs_ent_blocks. apply (f_equal mjoin). apply list_fmap_ext.
     intros idx x Hx. apply lookup_seq in Hx as [-> Hx]. cbv beta zeta.
     rewrite (fs_dinode_agree P P' sb (Z.of_nat (0 + idx)) Hok Hag
                ltac:(lia)).

@@ -1044,7 +1044,7 @@ Section UsertrapRes.
     iDestruct (proc_priv_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
-    iExists kroot, (pv_tf V). iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |].
+    iExists kroot, (pv_tf V). iSplitR; [iExact "Hkpt" |]. iSplitR; [iPureIntro; exact Htfk |].
     iFrame "Htf Hctx".
     iIntros (ws') "%Htfk' Htf' Hctx".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
@@ -1361,7 +1361,7 @@ Section UsertrapRes.
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
-    iExists kroot, (pv_tf V). iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |].
+    iExists kroot, (pv_tf V). iSplitR; [iExact "Hkpt" |]. iSplitR; [iPureIntro; exact Htfk |].
     iFrame "Htf Hctx".
     iIntros (ws') "%Htfk' Htf' Hctx".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
@@ -1450,7 +1450,7 @@ Section UsertrapRes.
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
-    iExists kroot, (pv_tf V). iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |].
+    iExists kroot, (pv_tf V). iSplitR; [iExact "Hkpt" |]. iSplitR; [iPureIntro; exact Htfk |].
     iFrame "Htf Hcsrs Hctx".
     iIntros (ws') "%Htfk' Htf' Hcsrs' Hctx".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".

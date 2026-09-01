@@ -37,7 +37,8 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvLang RiscvPtsto RiscvExec.
+Require Import IcachePinwObl.
 Require Import SleepLock.
 Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
@@ -120,7 +121,8 @@ Section ProofIunlockMain.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
   Definition iul_cont `{CID0 : CpuId} 
-      (cn : ic_names) (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+      (cn : ic_names) (k : nat) (s : Qp) (g : gname) (lo : nat)
+      (dev inum : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
@@ -131,7 +133,7 @@ Section ProofIunlockMain.
         cpu_own 0 eb p b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv_bare p pidv Vpr -∗
-        inode_shr_gen k s dev inum g -∗
+        IcacheRef.inode_shr_genlo k s dev inum g lo -∗
         WP (Loop : expr riscv_lang))%I.
 
   Lemma wp_iunlock_sconf 
@@ -140,13 +142,13 @@ Section ProofIunlockMain.
       (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z)
-      (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (lo tl : nat) (dev inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
-                            dn' bm' pidv dq m K eb p b lks Vpr.
+    : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g lo tl
+                            dev inum dn' bm' pidv dq m K eb p b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlock_sconf_body].
     intros pcE ip ret_tgt HK Hk Ha0 Hfresh.
@@ -155,11 +157,13 @@ Section ProofIunlockMain.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (iul_entry_nonzero k Hk)).
     iIntros "Hcg Hcnt #Htext Hpc #Hitbl #Hesc #Hslk Hstok Hppid
-              #Hprocs Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hcont".
+              #Hprocs %Hle #Hfl #Hclaims Hdep Hidev Hinumc Hvalid Hlk
+              #Hshot Hfrz Hcont".
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
     iEval (rewrite Hipe) in "Hvalid".
-    iAssert (iul_cont (CID0 := CID)  cn k s g dev inum pidv dq m K eb p b lks Vpr)%I
+    iAssert (iul_cont (CID0 := CID)  cn k s g lo dev inum pidv dq m K eb p b
+                lks Vpr)%I
       with "[Hcont]" as "Hcont"; [rewrite /iul_cont; iExact "Hcont" |].
     (* ===== +0x00 c.addi sp,sp,-32 ===== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1 : mword 64)
@@ -432,48 +436,66 @@ Section ProofIunlockMain.
        hands out the ref word's own points-to; [wordw_claim_of] reads the
        claim off it and the peek closes with everything put back.  The claim
        is persistent, so it survives the close. *)
-    iApply fupd_wp.
-    iInv "Hesc" as ">Hbodyp" "Hclosep".
-    iDestruct (ic_open_out cn gfs gi cov logstart k (DepShr s dev inum g) g true
-                 eq_refl with "Hbodyp Hvalid Hdep")
-      as "(Hvalid & Hdep & Hborp)".
-    iDestruct "Hborp" as (sbp) "[Hlvp Hbbackp]".
-    iMod (iref_live_load_au (⊤ ∖ ↑icEscN) k sbp
-            ltac:(solve_ndisj) Hk with "Hitbl Hlvp") as (vp) "[Hcellp Hclp]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k)) (DfracOwn 1) vp
-                 ltac:(lia) with "Hcellp") as "#Hclaim0".
-    iMod ("Hclp" with "Hcellp") as "[%Hbp Hlvp]".
-    iMod ("Hclosep" with "[Hbbackp Hlvp]") as "_".
-    { iNext. iApply ("Hbbackp" with "Hlvp"). }
-    iModIntro.
-    iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iunlock + 0x1c)) Ra5 Rs1
-              (mword_of_int 8 : mword 12) mH (K - 4)%nat
-              (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
-                         i_valid (ientry k) ↦₄ valid_word true ∗
-                         ic_deposit cn k (DepShr s dev inum g))%I)
+    (* the claim, off the icache's persistent set (A6.145) *)
+    iDestruct (IcacheInv.iref_claims_at k Hk with "Hclaims") as "#Hclaim0".
+    (* THE PINW GUARD READ: the window crosses the racy load leaf as [Res]
+       (WITH its closer packed inside), the obligation reads the member
+       set off the pin, and the continuation learns the panic-killing
+       bounds at a view receipt. *)
+    unshelve iApply (wp_lw_au_rel_s_sconf true
+              (mword_of_int (KernelSyms.iunlock + 0x1c))
+              Ra5 Rs1 (mword_of_int 8 : mword 12) mH (K - 4)%nat
+              (fun v _ => (0 < bv_unsigned v < 2 ^ 31)%Z)
+              ((IcacheRef.cred_floor lo tl ∗
+                ∃ (w : mword 32) (tst : nat),
+                  IcacheInv.iref_pin_rows k w lo tst ∗
+                  (IcacheInv.iref_pin_rows k w lo tst
+                     ={⊤ ∖ ↑minstretN ∖ ↑icEscN ∖ ↑icacheN,
+                       ⊤ ∖ ↑minstretN ∖ ↑icEscN}=∗
+                   IcacheRef.live_genlo k (1/2) g lo))%I)
+              (i_valid (ientry k) ↦₄ valid_word true ∗
+               ic_deposit cn k (DepShr s dev inum g lo))%I
               (⊤ ∖ ↑minstretN ∖ ↑icEscN ∖ ↑icacheN) b
-              ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
+              ltac:(nz) ltac:(rdok) ltac:(solve_ndisj) _
               with "Hcg Hpc [] [] [Hvalid Hdep]").
+    { (* the read obligation *)
+      intros CIDw img sigma log V ppn Hcan Hoff Hpin Hmig.
+      rewrite Hrefadr Hipe in Hpin |- *.
+      iIntros "Hkm Hm Htso Hctx [#Hfl HRes]".
+      iDestruct "HRes" as (w tst) "[Hrows _]".
+      iDestruct (tso_interp_of_pin with "Htso") as %Hpin2.
+      rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+                 sigma.(sregs) sigma.(mdev) Hpin2).
+      rewrite (ktier_pin_id ppn _ Hpin).
+      iDestruct (IcachePinwObl.iref_read_obl (CIDw := CIDw)
+                   (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
+                   k w lo tst tl Hle
+                   with "Htso Hctx Hfl Hrows") as %HH.
+      iPureIntro. intros tvr Htvr.
+      destruct (HH tvr Htvr) as [Hex Hall].
+      split; [exact Hex |].
+      intros v Hv. exact (Hall v Hv). }
     { iApply (iui2_1c with "Htext"). }
     { rewrite Hrefadr Hipe. iExact "Hclaim0". }
-    { rewrite Hrefadr Hipe.
+    { (* the AU: borrow the arm's half, borrow the window, pack the closer *)
       iInv "Hesc" as ">Hbody" "Hclose".
-      (* IVd: the borrow names this holder's OWN descriptor half, which is
-         what rules out [ic_out]'s frozen alternative -- the free path's
-         window, which parks its live mass in [islot2] and deposits
-         a [DepFrz], so there would be no slice to borrow. *)
-      iDestruct (ic_open_out cn gfs gi cov logstart k (DepShr s dev inum g) g true
-                   eq_refl with "Hbody Hvalid Hdep")
-        as "(Hvalid & Hdep & Hbor)".
-      iDestruct "Hbor" as (sb) "[Hlv Hbback]".
-      iMod (iref_live_load_au (⊤ ∖ ↑minstretN ∖ ↑icEscN) k sb
-              ltac:(solve_ndisj) Hk with "Hitbl Hlv") as (v) "[Hcell Hcl]".
-      iModIntro. iExists v. iFrame "Hcell". iIntros "Hcell".
-      iMod ("Hcl" with "Hcell") as "[%Hb Hlv]".
+      iDestruct (ic_open_out_genlo cn gfs gi cov logstart k
+                   (DepShr s dev inum g lo) g lo true eq_refl eq_refl
+                   with "Hbody Hvalid Hdep")
+        as "(Hvalid & Hdep & (Hlv & Hbback))".
+      iMod (IcacheInv.iref_load_pinw_au (⊤ ∖ ↑minstretN ∖ ↑icEscN) k
+              (1/2)%Qp g lo ltac:(solve_ndisj) Hk with "Hitbl Hlv")
+        as (w tst) "[Hrows Hcl]".
+      iModIntro.
+      iSplitL "Hrows Hcl".
+      { iFrame "Hfl". iExists w, tst. iFrame "Hrows Hcl". }
+      iIntros "[_ HRes]". iDestruct "HRes" as (w2 tst2) "[Hrows Hcl]".
+      iMod ("Hcl" with "Hrows") as "Hlv".
       iMod ("Hclose" with "[Hbback Hlv]") as "_".
       { iNext. iApply ("Hbback" with "Hlv"). }
-      iModIntro. iFrame "Hvalid Hdep". iPureIntro. exact Hb. }
-    iIntros (refv CID14 Hq14) "Hcg Hpc (%Href & Hvalid & Hdep)".
+      iModIntro. iFrame "Hvalid Hdep". }
+    iIntros (refv CID14 Hq14) "Hcg Hpc Hqv (Hvalid & Hdep)".
+    iDestruct "Hqv" as (V0) "[_ %Href]".
     set (R7 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 refv)]> mH).
     assert (HR7a5 : R7 !!! Regidx Ra5 = (sign_extend' 64 refv : mword 64))
       by (rewrite /R7; apply upd_eq).
@@ -556,7 +578,7 @@ Section ProofIunlockMain.
       rewrite /ic_payload_np. iExists dn', bm'.
       iSplitL "Hlk"; [iExact "Hlk" | iExact "Hshot"]. }
     iInv "Hesc" as ">Hbody" "Hclose".
-    iMod (ic_swap_park cn gfs gi cov logstart k (DepShr s dev inum g) g
+    iMod (ic_swap_park cn gfs gi cov logstart k (DepShr s dev inum g lo) g
                  true dev inum eq_refl with "Hbody Hdep Hidev Hinumc Hvalid Hpay")
       as "(Hbody & Htok & Hrefout)".
     iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
@@ -576,8 +598,10 @@ Section ProofIunlockMain.
     iIntros (CID18 Hq18 mR) "%Hcs2 Hcg Hcnt Hpc Hslh".
     (* the generation is NOT forgotten here any more -- see [SpecIunlock]'s
        post.  What the arm handed back is already at [g]. *)
-    iAssert (inode_shr_gen k s dev inum g) with "[Href Hslh]" as "Href".
-    { rewrite inode_shr_gen_bare_split. iFrame. }
+    iAssert (IcacheRef.inode_shr_genlo k s dev inum g lo)
+      with "[Href Hslh]" as "Href".
+    { rewrite /IcacheRef.inode_shr_genlo /inode_shr_genlo_bare.
+      iDestruct "Href" as "[Hid Hlv]". iFrame. }
     assert (Hpc28 : ret_pc (R9 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlock + 0x28)) by (rewrite HR9ra; pcw).
     iEval (rewrite Hpc28) in "Hpc".

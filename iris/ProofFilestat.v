@@ -517,7 +517,7 @@ Section ProofFilestat.
       iDestruct (fst_env_in fn Cf Hin with "Henv") as "Henv".
       iEval (rewrite /filestat_fs_env) in "Henv".
       iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
-                            #Hbio & #Hitbl & #Hescs & #Hireg & #Hslks &
+                            #Hbio & #Hitbl & #Hclaimsfs & #Hescs & #Hireg & #Hslks &
                             Hsb & #Hdevi & #Hdgeom & #Hdlock & Hbslot)".
       (* ---- THE CARVE (fs-sysfile S4', blocker 2's ratified alternative).
          The slot, the inum, the device, the region bound and the SHARE are
@@ -671,13 +671,12 @@ Section ProofFilestat.
          payload's slice already does, so nothing has to be introduced here.
          A6.145: the lent half weakens genlo -> gen at the call; the KEPT
          half stays lo-exposed and re-pins the return. *)
-      iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
       iApply (Ilock.wp_ilock_sconf γs j γlp (fsn_uart fn) (fsn_disk fn)
                 (fsn_dlock fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)
                 (fsn_bio fn) (fsn_fs fn) (fsn_ireg fn) (fsn_ic fn)
                 gil gisl
                 (fsn_cov fn) (fsn_logstart fn) (fsn_inodestart fn)
-                icfg_nib ikk (ssh/2)%Qp gsh (ShotK tysh)
+                icfg_nib ikk (ssh/2)%Qp gsh losh tlsh (ShotK tysh)
                 icfg_dev inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb b
@@ -685,8 +684,9 @@ Section ProofFilestat.
                 ltac:(rewrite HQ3a0; exact Hipk)
                 Hbelow
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
-                      Hslk Hshr Hshot0 Hsb Hppid Hprocs
+                      Hslk [%] Hflsh Hclaimsfs Hshr Hshot0 Hsb Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hbslot").
+      all: try (exact Hlesh).
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
@@ -959,7 +959,7 @@ Section ProofFilestat.
       iApply (Iunlock.wp_iunlock_sconf γs (fsn_fs fn) (fsn_ireg fn)
                 (fsn_ic fn) gil gisl
                 (fsn_cov fn) (fsn_logstart fn)
-                ikk (ssh/2)%Qp gsh icfg_dev inm
+                ikk (ssh/2)%Qp gsh losh tlsh icfg_dev inm
                 dnl bml
                 pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj b lks
                 V (fst_av_iunlock K HK) Hik
@@ -969,15 +969,13 @@ Section ProofFilestat.
                 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                       Hheld Hppid Hprocs
-                      Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
+                      [//] Hflsh Hclaimsfs Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
       all: try lkbelow.
       iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
       iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
       (* THE GATHER (A6.145): the kept half PINS the returned half's
          (g, lo) by agreement, and the two genlo halves rejoin. *)
-      iDestruct (IcacheRef.inode_shr_gen_pin_on_keep
-                   with "Hkeep Hshr") as "[Hkeep Hshr]".
-      iAssert (IcacheRef.inode_shr_genlo ikk ssh icfg_dev inm gsh losh)
+            iAssert (IcacheRef.inode_shr_genlo ikk ssh icfg_dev inm gsh losh)
         with "[Hkeep Hshr]" as "Hshr".
       { rewrite (IcacheRef.inode_shr_genlo_halve ikk ssh). iFrame. }
       iDestruct ("Hpayback" with "Hshr") as "Hrpay".

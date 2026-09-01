@@ -251,7 +251,7 @@ Section ProofSysOpenBody.
       (cn : ic_names) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z) (dev : mword 32)
-      (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (kk : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (kf fd : nat) (l : list nat) (C : fcontent) (pn : fpnames)
       (om voff : mword 32) (nsj : nat)
@@ -295,7 +295,10 @@ Section ProofSysOpenBody.
     ic_escrow cn gfs gi cov logstart kk -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_deposit cn kk (DepShr s dev inum gy) -∗
+    ⌜(loy <= tly)%nat⌝ -∗
+    IcacheRef.cred_floor loy tly -∗
+    IcacheInv.iref_claims -∗
+    ic_deposit cn kk (DepShr s dev inum gy loy) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -304,7 +307,9 @@ Section ProofSysOpenBody.
     (* the payload's freeze token (§3.9, RULING A-prime), relayed to
        [so_tail_s]'s iunlock *)
     ifreeze_off (bv_unsigned inum) -∗
-    inode_ref_short_gen kk (qi + s)%Qp qi dev inum gy -∗
+    (∃ loK tlK : nat,
+       ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
+       IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi dev inum gy loK) -∗
     (* its PROVENANCE UNIT (item 7a-wire): the parent parks in the fd slot's
        [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
@@ -355,19 +360,19 @@ Section ProofSysOpenBody.
            HMs3 Hal.
     subst dev.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitinv #Hesck #Hslkk Hslkd Hdep Hidev Hiinum Hivalid
+              #Hitinv #Hesck #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev Hiinum Hivalid
               Hload #Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip Hfoff
               Hiru Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl
               Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24 Hcont".
     iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
     iApply (Tails.so_tail_s (CID0 := CID0) gs jx gl gu gd gk pd pav pu bn g gfs
-              gi cn gil gisl cov logstart icfg_dev kk s gy inum dn bm
+              gi cn gil gisl cov logstart icfg_dev kk s gy loy tly inum dn bm
               (mword_of_int (Z.of_nat fd) : mword 64) u pidv (DfracOwn (1/4))
               m M sp0 K eb b lks w6 w23 w24 bp V
               HKiu HKeo HK24 Kpop Hkk Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr
               HMs1 HMs3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
+                    Hitinv Hesck Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3
                     Hf4
                     Hf5 Hf6 HbP H23 H24
@@ -379,22 +384,15 @@ Section ProofSysOpenBody.
     iDestruct ("Hcback" with "Hpbare") as "Hcore".
     (* ---- THE PUBLICATION: one ghost step ---- *)
     iApply fupd_wp.
-    (* A6.145 interim: pin both the retained parent's slice and the returned
-       share to the zero epoch; the floors are then free. *)
-    iDestruct "Hkeep" as "(Hkf & Hklv & Hkid & Hksl)".
-    iDestruct "Hklv" as (loK) "Hklv".
-    iMod (iref_share_pin0 ⊤ kk qi gy loK ltac:(solve_ndisj) Hkk
-            with "Hitinv Hklv") as "[%HloK0 Hklv]".
-    subst loK.
+    (* A6.146: the retained parent arrives GENLO with its credential. *)
+    iDestruct "Hkeep" as (loK tlK) "(%HleK & #HflK & Hkeep)".
     iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn om voff
-            0%nat 0%nat
+            loK tlK
             ltac:(solve_ndisj) ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb Hdir
-            Hwf (Nat.le_refl 0)
-            with "[] [Hkf Hklv Hkid Hksl] Hru Hshr Hshot Hfref Hflive Hflds
+            Hwf HleK
+            with "HflK Hkeep Hru Hshr Hshot Hfref Hflive Hflds
                   Hfpn Hfip Hfoff")
       as "Href".
-    { iApply TsoCtx.ctx_floor_0. }
-    { rewrite /IcacheRef.inode_ref_short_genlo. iFrame. }
     iModIntro.
     iDestruct (proc_priv_settle gf (proc_addr jx) pidv V fd kf 1 C Hfdlt Hlen
                  Hkf with "Hcore Howe Href") as "Hpriv".
@@ -476,7 +474,7 @@ Section ProofSysOpenBody.
       (cn : ic_names) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (kk : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (kf fd : nat) (l : list nat) (pn : fpnames)
       (tyw : mword 32) (rd0 wr0 : bv 8) (pip ipold : mword 64) (maj : bv 16)
@@ -533,7 +531,10 @@ Section ProofSysOpenBody.
     ireg_inv gi gfs inodestart nib -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_deposit cn kk (DepShr s dev inum gy) -∗
+    ⌜(loy <= tly)%nat⌝ -∗
+    IcacheRef.cred_floor loy tly -∗
+    IcacheInv.iref_claims -∗
+    ic_deposit cn kk (DepShr s dev inum gy loy) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -542,7 +543,9 @@ Section ProofSysOpenBody.
     (* the payload's freeze token (§3.9, RULING A-prime), relayed to
        [so_tail_s]'s iunlock *)
     ifreeze_off (bv_unsigned inum) -∗
-    inode_ref_short_gen kk (qi + s)%Qp qi dev inum gy -∗
+    (∃ loK tlK : nat,
+       ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
+       IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi dev inum gy loK) -∗
     (* its PROVENANCE UNIT (item 7a-wire): the parent parks in the fd slot's
        [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
@@ -600,7 +603,7 @@ Section ProofSysOpenBody.
        lets the [log_op] hypothesis meet it without a rewrite. *)
     destruct u as [| [| u2]]; [ exfalso; lia | exfalso; lia | ].
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitinv #Hesck #Hireg #Hslkk Hslkd Hdep Hidev Hiinum
+              #Hitinv #Hesck #Hireg #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev Hiinum
               Hivalid Hload #Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd Hfwr
               Hfpip Hfmaj Hfip Hfoff Hiru Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop
               Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP
@@ -814,14 +817,14 @@ Section ProofSysOpenBody.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (so_tail_pub (CID0 := CID10) gf gs jx gl gu gd gk pd pav pu bn g
                 gfs gi cn gil gisl cov logstart bmapstart inodestart size
-                icfg_dev kk qi s gy inum dn bm kf fd l C pn om voff nsj
+                icfg_dev kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs V m N6 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp
                 HKiu HKeo HK24 Kpop Hkk eq_refl Hinb Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl Hdir Hwf
                 Hsp0 HN6sp HN6thr HN6s1 HN6s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                      Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
+                      Hitinv Hesck Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid
                       Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip2 Hfoff
                       Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                       Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
@@ -912,14 +915,14 @@ Section ProofSysOpenBody.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (so_tail_pub (CID0 := CID13) gf gs jx gl gu gd gk pd pav pu bn g
                 gfs gi cn gil gisl cov logstart bmapstart inodestart size
-                icfg_dev kk qi s gy inum dn bm kf fd l C pn om voff nsj
+                icfg_dev kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs V m N8 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp
                 HKiu HKeo HK24 Kpop Hkk eq_refl Hinb Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl Hdir Hwf
                 Hsp0 HN8sp HN8thr HN8s1 HN8s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                      Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
+                      Hitinv Hesck Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid
                       Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip2 Hfoff
                       Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                       Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
@@ -1083,14 +1086,14 @@ Section ProofSysOpenBody.
        function context. *)
     iApply (so_tail_pub (CID0 := CID17) gf gs jx gl gu gd gk pd pav pu bn g
               gfs gi cn gil gisl cov logstart bmapstart inodestart size
-              icfg_dev kk qi s gy inum (di_trunc dn) bm_empty kf fd l C pn
+              icfg_dev kk qi s gy loy tly inum (di_trunc dn) bm_empty kf fd l C pn
               om voff nsj u3 pidv dqb dqs V m mit sp0 K
               eb b lks w6 (word_of_words lo om) w24 bp
               HKiu HKeo HK24 Kpop Hkk eq_refl Hinb Hgeom Hj Hgl Hlkempty Hkf
               Hfdlt Hlen Hfrees eq_refl Htyor eq_refl Hdir Hwf
               Hsp0 Hitsp Hitthr Hits1 Hits3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
+                    Hitinv Hesck Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip2 Hfoff
                     Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                     Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
@@ -1123,7 +1126,7 @@ Section ProofSysOpenBody.
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (kk : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (om lo : mword 32) (nsj : nat)
       (u : nat) (pidv : mword 32) (dqb dqs : dfrac)
@@ -1177,7 +1180,10 @@ Section ProofSysOpenBody.
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_deposit cn kk (DepShr s dev inum gy) -∗
+    ⌜(loy <= tly)%nat⌝ -∗
+    IcacheRef.cred_floor loy tly -∗
+    IcacheInv.iref_claims -∗
+    ic_deposit cn kk (DepShr s dev inum gy loy) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1186,7 +1192,9 @@ Section ProofSysOpenBody.
     (* the payload's freeze token (§3.9, RULING A-prime), relayed to
        [so_tail_s]'s iunlock *)
     ifreeze_off (bv_unsigned inum) -∗
-    inode_ref_short_gen kk (qi + s)%Qp qi dev inum gy -∗
+    (∃ loK tlK : nat,
+       ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
+       IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi dev inum gy loK) -∗
     (* its PROVENANCE UNIT (item 7a-wire): the parent parks in the fd slot's
        [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
@@ -1235,7 +1243,7 @@ Section ProofSysOpenBody.
     assert (Hu2 : (2 <= u)%nat) by (revert Hiu; unfold iput_units; lia).
     subst dev. subst nib.
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpe #Hftab #Hbio #Hlog
-              Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep
+              Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep
               Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hpriv #Hprocs #Hdev #Hgeo
               #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
               HbP H23lo H23hi H24 Hcont".
@@ -1363,10 +1371,9 @@ Section ProofSysOpenBody.
       iEval (rewrite Htg66) in "Hpc".
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
       iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback]".
-      iApply fupd_wp.
-      iMod (inode_ref_short_gen_pin0 ⊤ kk (qi + s)%Qp qi _ inum gy
-              ltac:(solve_ndisj) Hkk with "Hitinv Hkeep") as "Hkeep".
-      iModIntro.
+      iDestruct "Hkeep" as (loK tlK) "(%HleK & #HflK & Hkeep)".
+      iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ HleK
+                   with "HflK Hkeep") as "Hkeep".
       iDestruct (cpu_own_transport CID3 CID5 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iDestruct (trap_csrs_ext_transport CID3 CID5 eb (proc_addr jx)
@@ -1375,14 +1382,14 @@ Section ProofSysOpenBody.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
       iApply (Tails.so_tail_e (CID0 := CID5) gs jx gl gu gd gk pd pav pu bn g
                 gfs gi cn gtl gil gisl cov logstart bmapstart inodestart
-                icfg_nib size icfg_dev kk qi s gy inum dn bm u pidv
+                icfg_nib size icfg_dev kk qi s gy loy tly inum dn bm u pidv
                 (DfracOwn (1/4)) dqb dqs m M2 sp0 K eb b lks w5 w6
                 (word_of_words lo om) w24 bp V
                 HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                 Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM2sp HM2thr
                 HM2s1 HM2s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                      Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
+                      Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev
                       Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
                       Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hpback Hfds Hisl Hires Hcont]").
@@ -1540,10 +1547,9 @@ Section ProofSysOpenBody.
       iEval (rewrite Htg70) in "Hpc".
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
       iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
-      iApply fupd_wp.
-      iMod (inode_ref_short_gen_pin0 ⊤ kk (qi + s)%Qp qi _ inum gy
-              ltac:(solve_ndisj) Hkk with "Hitinv Hkeep") as "Hkeep".
-      iModIntro.
+      iDestruct "Hkeep" as (loK tlK) "(%HleK & #HflK & Hkeep)".
+      iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ HleK
+                   with "HflK Hkeep") as "Hkeep".
       iDestruct (cpu_own_transport CID8 CID10 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iDestruct (trap_csrs_ext_transport CID8 CID10 eb (proc_addr jx)
@@ -1552,7 +1558,7 @@ Section ProofSysOpenBody.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
       iApply (Tails.so_tail_f (CID0 := CID10) gfl gf gs jx gl gu gd gk pd pav
                 pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
-                inodestart icfg_nib size icfg_dev kk qi s gy inum dn bm
+                inodestart icfg_nib size icfg_dev kk qi s gy loy tly inum dn bm
                 kf 1%Qp Cf inhabitant None u pidv
                 (DfracOwn (1/4)) dqb dqs m M4 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp V
@@ -1561,7 +1567,7 @@ Section ProofSysOpenBody.
                 HM4thr HM4s1 HM4s2 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Href
                       [] Hbio Hlog Hseam Hgen
-                      Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
+                      Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev
                       Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
                       Hprocs Hdev Hgeo Hdlk Hbsl Hires Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hcback Howe Hisl Hcont]").
@@ -1776,7 +1782,7 @@ Section ProofSysOpenBody.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (so_stores (CID0 := CID17) gf gs jx gl gu gd gk pd pav pu bn g
                 gfs gi cn gil gisl cov logstart bmapstart inodestart icfg_nib
-                size icfg_dev kk qi s gy inum dn bm kf fd ll pn FD_DEVICE
+                size icfg_dev kk qi s gy loy tly inum dn bm kf fd ll pn FD_DEVICE
                 (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
                 (di_major dn) om voff lo nsj u pidv dqb dqs V m M7 sp0 K eb b
                 lks w6 w24 bp
@@ -1785,7 +1791,7 @@ Section ProofSysOpenBody.
                 Hlkempty Hkf Hfdlt Hlen Hfrees (or_intror eq_refl) Hdir Hwf
                 Hal23 Hsp0 HM7sp HM7thr HM7s0 HM7s1 HM7s2 HM7s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                      Hitinv Hesck Hireg Hslkk Hslkd Hdep Hidev Hiinum
+                      Hitinv Hesck Hireg Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum
                       Hivalid Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd
                       Hfwr Hfpip Hfmaj Hfip Hfoff Hiru Hcore Howe Hprocs Hdev Hgeo
                       Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4
@@ -1873,7 +1879,7 @@ Section ProofSysOpenBody.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (so_stores (CID0 := CID16) gf gs jx gl gu gd gk pd pav pu bn g
               gfs gi cn gil gisl cov logstart bmapstart inodestart icfg_nib
-              size icfg_dev kk qi s gy inum dn bm kf fd ll pn FD_INODE
+              size icfg_dev kk qi s gy loy tly inum dn bm kf fd ll pn FD_INODE
               (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
               (fc_major Cf) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb
               dqs V m M8 sp0 K eb b lks w6 w24 bp
@@ -1882,7 +1888,7 @@ Section ProofSysOpenBody.
               Hkf Hfdlt Hlen Hfrees (or_introl eq_refl) Hdir off_wf_zero
               Hal23 Hsp0 HM8sp HM8thr HM8s0 HM8s1 HM8s2 HM8s3 Hal
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                    Hitinv Hesck Hireg Hslkk Hslkd Hdep Hidev Hiinum
+                    Hitinv Hesck Hireg Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum
                     Hivalid Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd
                     Hfwr Hfpip Hfmaj Hfip Hfoff Hiru Hcore Howe Hprocs Hdev Hgeo
                     Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4
@@ -1914,7 +1920,7 @@ Section ProofSysOpenBody.
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (kk : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (om lo : mword 32) (nsj : nat)
       (u : nat) (pidv : mword 32) (dqb dqs : dfrac)
@@ -1968,7 +1974,10 @@ Section ProofSysOpenBody.
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_deposit cn kk (DepShr s dev inum gy) -∗
+    ⌜(loy <= tly)%nat⌝ -∗
+    IcacheRef.cred_floor loy tly -∗
+    IcacheInv.iref_claims -∗
+    ic_deposit cn kk (DepShr s dev inum gy loy) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1977,7 +1986,9 @@ Section ProofSysOpenBody.
     (* the payload's freeze token (§3.9, RULING A-prime), relayed to
        [so_tail_s]'s iunlock *)
     ifreeze_off (bv_unsigned inum) -∗
-    inode_ref_short_gen kk (qi + s)%Qp qi dev inum gy -∗
+    (∃ loK tlK : nat,
+       ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
+       IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi dev inum gy loK) -∗
     (* its PROVENANCE UNIT (item 7a-wire): the parent parks in the fd slot's
        [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
@@ -2021,7 +2032,7 @@ Section ProofSysOpenBody.
                               HK10 & HK24 & Kpop).
     subst dev. subst nib.
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpe #Hftab #Hbio #Hlog
-              Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep
+              Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep
               Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hpriv #Hprocs #Hdev #Hgeo
               #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
               HbP H23lo H23hi H24 Hcont".
@@ -2107,14 +2118,14 @@ Section ProofSysOpenBody.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (so_alloc (CID0 := CID3) gfl gf gs jx gl gu gd gk pd pav pu bn g
                 gfs gi cn gtl gil gisl cov logstart bmapstart inodestart
-                icfg_nib size icfg_dev kk qi s gy inum dn bm om lo nsj u
+                icfg_nib size icfg_dev kk qi s gy loy tly inum dn bm om lo nsj u
                 pidv dqb dqs V m M2 sp0 K eb b lks w4 w5 w6 w24 bp
                 HKfull Hkk eq_refl eq_refl Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hal23 Hsp0
                 HM2sp HM2thr HM2s0 HM2s1 HM2s2 HM2s3 Hal Hnspos
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
-                      Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
+                      [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
                       Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcont"). }
     (* ---- T_DEVICE: the [major] bounds test ---- *)
@@ -2202,10 +2213,9 @@ Section ProofSysOpenBody.
       iEval (rewrite Htg5a) in "Hpc".
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
       iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback]".
-      iApply fupd_wp.
-      iMod (inode_ref_short_gen_pin0 ⊤ kk (qi + s)%Qp qi _ inum gy
-              ltac:(solve_ndisj) Hkk with "Hitinv Hkeep") as "Hkeep".
-      iModIntro.
+      iDestruct "Hkeep" as (loK tlK) "(%HleK & #HflK & Hkeep)".
+      iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ HleK
+                   with "HflK Hkeep") as "Hkeep".
       iDestruct (cpu_own_transport CID0 CID6 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iDestruct (trap_csrs_ext_transport CID0 CID6 eb (proc_addr jx)
@@ -2214,14 +2224,14 @@ Section ProofSysOpenBody.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
       iApply (Tails.so_tail_d (CID0 := CID6) gs jx gl gu gd gk pd pav pu bn g
                 gfs gi cn gtl gil gisl cov logstart bmapstart inodestart
-                icfg_nib size icfg_dev kk qi s gy inum dn bm u pidv
+                icfg_nib size icfg_dev kk qi s gy loy tly inum dn bm u pidv
                 (DfracOwn (1/4)) dqb dqs m M4 sp0 K eb b lks w4 w5 w6
                 (word_of_words lo om) w24 bp V
                 HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                 Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM4sp HM4thr
                 HM4s1 HM4s2 HM4s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                      Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
+                      Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev
                       Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
                       Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hpback Hfds Hisl Hcont]").
@@ -2263,14 +2273,14 @@ Section ProofSysOpenBody.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (so_alloc (CID0 := CID6) gfl gf gs jx gl gu gd gk pd pav pu bn g
               gfs gi cn gtl gil gisl cov logstart bmapstart inodestart
-              icfg_nib size icfg_dev kk qi s gy inum dn bm om lo nsj u
+              icfg_nib size icfg_dev kk qi s gy loy tly inum dn bm om lo nsj u
               pidv dqb dqs V m M4 sp0 K eb b lks w4 w5 w6 w24 bp
               HKfull Hkk eq_refl eq_refl Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hal23 Hsp0
               HM4sp HM4thr HM4s0 HM4s1 HM4s2 HM4s3 Hal Hnspos
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Hbio Hlog
                     Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
-                    Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
+                    [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
                     Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
                     Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcont").
   Qed.
@@ -2749,8 +2759,8 @@ Section ProofSysOpenBody.
     iDestruct "Hlocked" as (gil gisl)
       "(Hslk & Hslkd & Hdep & Hidev & Hiinum & Hivalid & Hload &
         Hshot & Hfrz & Href & Hru)".
-    iDestruct "Href" as (lo0 tl0) "(%Hle0 & #Hfl0 & Href)".
-    iDestruct (IcacheRef.inode_ref_short_genlo_gen with "Href") as "Href".
+    iDestruct "Hdep" as (loy tly) "(%Hley & #Hfly & Hdep)".
+    iDestruct (is_itable2_claims with "Hitab") as "#Hclaimsy".
     iApply (wp_cbeqz_fall_s_sconf (CID := CID7) (mword_of_int (SO + 0x48))
               (mword_of_int 69 : mword 8) (Cregidx (mword_of_int 2)) Ra0
               P1 (K - 24)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
@@ -2785,14 +2795,14 @@ Section ProofSysOpenBody.
         unfold sys_open_slots, create_slots in *. lia. } }
     iApply (so_join (CID0 := CID8) gfl gf gs jx gl gu gd gk pd pav pu bn g
               gfs gi cn gtl gil gisl cov logstart bmapstart inodestart nib
-              size dev kk qi ss gy inum dn bm om lo ns1 u1 pidv dqb dqs
+              size dev kk qi ss gy loy tly inum dn bm om lo ns1 u1 pidv dqb dqs
               V m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
               HKfull Hkk Hdevc Hnibc ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hibcov Hiblog Hcovb
               ltac:(exact (proj2 (proj2 Hu1) eq_refl)) Hj Hgl Hlkempty Hdirw
               Hal23 Hsp0 HP1sp HP1thr HP1s0 HP1s1i HP1s2 HP1s3 Hal ltac:(cbn in Hns1; unfold sys_open_slots, create_slots in *; lia)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
-                    Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hslk Hslkd Hdep
+                    Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hslk Hslkd [//] Hfly Hclaimsy Hdep
                     Hidev Hiinum Hivalid Hload Hshot Hfrz Href Hru Hpriv Hprocs
                     Hdev
                     Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3
@@ -3157,10 +3167,15 @@ Section ProofSysOpenBody.
     iDestruct "Hrefip" as "[Hkeep Hshr]".
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
     iDestruct "Hshr" as (gy loy tly) "(%Hley & #Hfly & Hshr)".
-    iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr") as "Hshr".
     iEval (rewrite inode_ref_short_gen_intro) in "Hkeep".
     iDestruct "Hkeep" as (gp lop tlp) "(%Hlep & #Hflp & Hkeep)".
-    iDestruct (inode_ref_short_genlo_shr_gen_agree with "Hkeep Hshr") as %->.
+    iDestruct (inode_ref_short_shr_genlo_agree with "Hkeep Hshr") as %[-> ->].
+    iDestruct (is_itable2_claims with "Hitab") as "#Hclaimsy".
+    iAssert ((∃ loK tlK : nat,
+       ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
+       IcacheRef.inode_ref_short_genlo kk (qq/2 + qq/2)%Qp (qq/2)%Qp dev inum
+         gy loK))%I with "[Hkeep]" as "Hkeep".
+    { iExists loy, tlp. iSplitR; [by iPureIntro|]. iFrame "Hflp Hkeep". }
     iDestruct (so_esc_acc cn gfs gi cov logstart kk Hkk with "Hescrows")
       as "#Hesck".
     iDestruct (so_slk_acc cn kk Hkk with "Hslks") as (gil gisl) "#Hslkk".
@@ -3208,12 +3223,12 @@ Section ProofSysOpenBody.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Ilock.wp_ilock_sconf (CID := CID6) gs jx gl gu gd gk pd pav pu bn
               gfs gi cn gil gisl cov logstart inodestart nib
-              kk (qq/2)%Qp gy PlainK dev inum pidv (DfracOwn (1/4)) dqs
+              kk (qq/2)%Qp gy loy tly PlainK dev inum pidv (DfracOwn (1/4)) dqs
               P2 (K - 24)%nat eb b lks V
               HKil Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HP2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck Hireg
-                    Hslkk Hshr Hru Hsbi Hpbare Hprocs Hdev Hgeo Hdlk Hbs1").
+                    Hslkk [//] Hfly Hclaimsy Hshr Hru Hsbi Hpbare Hprocs Hdev Hgeo Hdlk Hbs1").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CID7 Hq7 mil dn bm fl)
@@ -3341,10 +3356,9 @@ Section ProofSysOpenBody.
                   Hsbn Hsbi Hsbs Hsbb Hbsl Hisl Hpost").
         { exact Hcsf. }
         { unfold sys_open_slots, create_slots in *. lia. } }
-      iDestruct (IcacheRef.inode_ref_short_genlo_gen with "Hkeep") as "Hkeep".
       iApply (so_join (CID0 := CID10) gfl gf gs jx gl gu gd gk pd pav pu bn g
                 gfs gi cn gtl gil gisl cov logstart bmapstart inodestart nib
-                size dev kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm om lo
+                size dev kk (qq/2)%Qp (qq/2)%Qp gy loy tly inum dn bm om lo
                 (ns - 1)%nat n1 pidv dqb dqs V m Q2 sp0 K eb b lks w4 w5 w6 w24
                 bp1
                 HKfull Hkk Hdevc Hnibc Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -3352,7 +3366,7 @@ Section ProofSysOpenBody.
                 Hal23 Hsp0 HQ2sp HQ2thr HQ2s0 HQ2s1 HQ2s2 HQ2s3 Hal ltac:(unfold sys_open_slots, create_slots in *; lia)
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
-                      Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
+                      [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
                       Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcontj").
       { rewrite Heb /trap_csrs_ext. done. }
@@ -3429,10 +3443,9 @@ Section ProofSysOpenBody.
                   Hsbn Hsbi Hsbs Hsbb Hbsl Hisl Hpost").
         { exact Hcsf. }
         { unfold sys_open_slots, create_slots in *. lia. } }
-      iDestruct (IcacheRef.inode_ref_short_genlo_gen with "Hkeep") as "Hkeep".
       iApply (so_alloc (CID0 := CID12) gfl gf gs jx gl gu gd gk pd pav pu bn g
                 gfs gi cn gtl gil gisl cov logstart bmapstart inodestart nib
-                size dev kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm om lo
+                size dev kk (qq/2)%Qp (qq/2)%Qp gy loy tly inum dn bm om lo
                 (ns - 1)%nat n1 pidv dqb dqs V m Q3 sp0 K eb b lks w4 w5 w6 w24
                 bp1
                 HKfull Hkk Hdevc Hnibc Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -3441,7 +3454,7 @@ Section ProofSysOpenBody.
                 Hal23 Hsp0 HQ3sp HQ3thr HQ3s0 HQ3s1 HQ3s2 HQ3s3 Hal ltac:(unfold sys_open_slots, create_slots in *; lia)
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
-                      Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
+                      [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
                       Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcontj").
       { rewrite Heb /trap_csrs_ext. done. }
@@ -3460,8 +3473,9 @@ Section ProofSysOpenBody.
     assert (Hppfa : add_vec_int (mword_of_int (SO + 0xfa) : mword 64) 2
                     = mword_of_int (SO + 0xfc)) by pcw.
     iEval (rewrite Hppfa) in "Hpc".
-    iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hlep
-                 with "Hflp Hkeep") as "Hkeepe".
+    iDestruct "Hkeep" as (loK2 tlK2) "(%HleK2 & #HflK2 & Hkeep)".
+    iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ HleK2
+                 with "HflK2 Hkeep") as "Hkeepe".
     iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback2]".
     iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
     iDestruct (log_opS_op with "HopS") as "Hop".
@@ -3469,14 +3483,14 @@ Section ProofSysOpenBody.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Tails.so_tail_c (CID0 := CID12) gs jx gl gu gd gk pd pav pu bn g
               gfs gi cn gtl gil gisl cov logstart bmapstart inodestart nib
-              size dev kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm n1 pidv
+              size dev kk (qq/2)%Qp (qq/2)%Qp gy loy tly inum dn bm n1 pidv
               (DfracOwn (1/4)) dqb dqs m Q3 sp0 K eb b lks w4 w5 w6
               (word_of_words lo om) w24 bp1 V
               HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HQ3sp HQ3thr
               HQ3s1 HQ3s2 HQ3s3 Hal
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab
-                    Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum
+                    Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum
                     Hivalid Hload Hshot Hfrz Hkeepe Hru Hsbb Hsbi Hbmres Hpbare Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23
                     H24 [Hpback2 Hfds Hisl Hsbn Hsbs Hcont]").

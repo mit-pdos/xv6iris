@@ -1872,7 +1872,7 @@ Section ProofFileread.
              iDestruct (fr_env_fs γf fn Cf Htyi with "Henv") as "Henv".
              rewrite /fileread_fs_env.
              iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
-                                   #Hbio & #Hitbl & #Hescs &
+                                   #Hbio & #Hitbl & #Hclaimsfr & #Hescs &
                                    #Hireg & #Hslks & Hsb &
                                    #Hdevi & #Hdgeom & #Hdlock & Hbslot)".
              (* ---- THE CARVE (fs-sysfile S4', blocker 2's ratified
@@ -2012,22 +2012,22 @@ Section ProofFileread.
                 the payload's slice already does, so nothing has to be
                 introduced here -- the [inode_shr_gen_intro] this call used
                 to open with is gone with the caller-supplied [inode_shr]. *)
-             iDestruct (IcacheRef.inode_shr_genlo_gen with "Href") as "Href".
              iApply (Ilock.wp_ilock_sconf γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) (frn_ireg fn) (frn_ic fn)
                        gil gisl
                        (frn_cov fn) (frn_logstart fn) (frn_inodestart fn)
-                       icfg_nib ikk (ssh/2)%Qp gsh (ShotK ty0)
+                       icfg_nib ikk (ssh/2)%Qp gsh losh tlsh (ShotK ty0)
                        icfg_dev inm
                        pidv (DfracOwn (1/4)) (frn_dqs fn)
                        I2 (K - 6)%nat eb b
                        _ V (fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
                        ltac:(rewrite HI2a0; exact Hipk) Hbelow
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
-                             Hslk Href Hshot0 Hsb Hppid Hprocs
+                             Hslk [%] Hflsh Hclaimsfr Href Hshot0 Hsb Hppid Hprocs
                              Hdevi Hdgeom Hdlock Hbslot").
              all: try lkbelow.
+             all: try (exact Hlesh).
              { rewrite Heb /trap_csrs_ext. done. }
              { rewrite Heb /cpu_claim_ext. done. }
              (* v3: ilock also hands back the checkout descriptor's other
@@ -2442,7 +2442,7 @@ Section ProofFileread.
                 iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ireg fn)
                           (frn_ic fn) gil gisl
                           (frn_cov fn) (frn_logstart fn)
-                          ikk (ssh/2)%Qp gsh icfg_dev inm
+                          ikk (ssh/2)%Qp gsh losh tlsh icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj b
                           lks (upd_upt V P') (fr_av_iunlock K HK) Hik
@@ -2450,15 +2450,13 @@ Section ProofFileread.
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                                 Hheld Hppid Hprocs
-                                Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
+                                [//] Hflsh Hclaimsfr Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
                 all: try lkbelow.
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 (* THE GATHER (A6.145): the kept half PINS the returned
                    half's (g, lo) by agreement; the genlo halves rejoin. *)
-                iDestruct (IcacheRef.inode_shr_gen_pin_on_keep
-                             with "Hkeep Hrefout") as "[Hkeep Hrefout]".
-                iAssert (IcacheRef.inode_shr_genlo ikk ssh icfg_dev inm
+                                iAssert (IcacheRef.inode_shr_genlo ikk ssh icfg_dev inm
                            gsh losh)
                   with "[Hkeep Hrefout]" as "Hshr".
                 { rewrite (IcacheRef.inode_shr_genlo_halve ikk ssh). iFrame. }
@@ -2724,7 +2722,7 @@ Section ProofFileread.
                 iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ireg fn)
                           (frn_ic fn) gil gisl
                           (frn_cov fn) (frn_logstart fn)
-                          ikk (ssh/2)%Qp gsh icfg_dev inm
+                          ikk (ssh/2)%Qp gsh losh tlsh icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj b
                           lks (upd_upt V P') (fr_av_iunlock K HK) Hik
@@ -2732,15 +2730,13 @@ Section ProofFileread.
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                                 Hheld Hppid Hprocs
-                                Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
+                                [//] Hflsh Hclaimsfr Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
                 all: try lkbelow.
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 (* THE GATHER (A6.145): the kept half PINS the returned
                    half's (g, lo) by agreement; the genlo halves rejoin. *)
-                iDestruct (IcacheRef.inode_shr_gen_pin_on_keep
-                             with "Hkeep Hrefout") as "[Hkeep Hrefout]".
-                iAssert (IcacheRef.inode_shr_genlo ikk ssh icfg_dev inm
+                                iAssert (IcacheRef.inode_shr_genlo ikk ssh icfg_dev inm
                            gsh losh)
                   with "[Hkeep Hrefout]" as "Hshr".
                 { rewrite (IcacheRef.inode_shr_genlo_halve ikk ssh). iFrame. }

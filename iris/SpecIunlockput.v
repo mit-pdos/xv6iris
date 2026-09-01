@@ -125,7 +125,7 @@ Definition wp_iunlockput_sconf_body
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+    (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -186,7 +186,10 @@ Definition wp_iunlockput_sconf_body
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
-  ic_deposit cn k (DepShr s dev inum gy) -∗
+  ⌜(loy <= tly)%nat⌝ -∗
+  IcacheRef.cred_floor loy tly -∗
+  IcacheInv.iref_claims -∗
+  ic_deposit cn k (DepShr s dev inum gy loy) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -265,7 +268,7 @@ Definition wp_iunlockput_gen_body
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+    (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -329,7 +332,10 @@ Definition wp_iunlockput_gen_body
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
-  ic_deposit cn k (DepShr s dev inum gy) -∗
+  ⌜(loy <= tly)%nat⌝ -∗
+  IcacheRef.cred_floor loy tly -∗
+  IcacheInv.iref_claims -∗
+  ic_deposit cn k (DepShr s dev inum gy loy) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -413,7 +419,7 @@ Module Type IUNLOCKPUT.
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -421,7 +427,7 @@ Module Type IUNLOCKPUT.
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
-                               size dev k qi s gy inum dn' bm' n
+                               size dev k qi s gy loy tly inum dn' bm' n
                                pidv dq dqb dqs m K eb b lks Vpr.
   (* the credited set-form contract; [wp_iunlockput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
@@ -436,7 +442,7 @@ Module Type IUNLOCKPUT.
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -444,6 +450,6 @@ Module Type IUNLOCKPUT.
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
-                             size dev k qi s gy inum dn' bm' n Sb crb cru
+                             size dev k qi s gy loy tly inum dn' bm' n Sb crb cru
                              crz e0 pidv dq dqb dqs m K eb b lks Vpr.
 End IUNLOCKPUT.

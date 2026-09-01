@@ -93,6 +93,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvPtsto RiscvModelBytes.
 Require Import ArrCursor.
 Require Import WpLock.
+Require Import WpSconfMem.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import WpLockAt.   (* [lock_free_tok] / [newlock_at]: the pre-minted
                               lock gname, for [icache_boot_at] below *)
@@ -1587,6 +1588,25 @@ Section IcacheBootTable.
     rewrite big_sepL_sep. done.
   Qed.
 
+  (* A6.145: the fifty FREE pinw slots -- the first NINODE liveness units
+     park whole, the shadow batch mints the selectors (verbatim
+     [IcacheInv.live_pool_empty]'s split). *)
+  Local Lemma pinw_slots_boot :
+    ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ==∗
+    ([∗ list] k ∈ seq 0 NINODE, IcacheInv.pinw_slot ∅ k).
+  Proof.
+    iIntros "H".
+    rewrite seq_app big_sepL_app. iDestruct "H" as "[Hl Hr]".
+    rewrite -(fmap_add_seq NINODE 0 NINODE) big_sepL_fmap.
+    iDestruct (big_sepL_sep_2 with "Hl Hr") as "H".
+    iApply big_sepL_bupd.
+    iApply (big_sepL_mono with "H"). intros idx k _.
+    iIntros "[Hone Hr]".
+    iMod (frzsel_boot0 k with "Hr") as "Hs".
+    iModIntro. rewrite /IcacheInv.pinw_slot lookup_empty.
+    iDestruct "Hone" as (g) "Hone". iExists g, 0%nat. iFrame "Hone Hs".
+  Qed.
+
   Local Lemma iref_cells_boot :
     ([∗ list] k ∈ seq 0 NINODE,
        i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32))
@@ -1708,6 +1728,9 @@ Section IcacheBootTable.
     ([∗ list] k ∈ seq 0 NINODE, sl_fresh (i_lock (ientry k)) "inode"%string) -∗
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     iref_slots_auth -∗
+    (* A6.145: the fifty per-slot STAMP authorities, at 0 -- straight out
+       of [IcacheRef.icfg_alloc]'s post *)
+    ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) -∗
     ipool γfs γi cov logstart (region_inums nib) -∗
     (* THE ITABLE LOCK'S GHOST, unbuilt: the two [excl_auth] halves at
        [None], as [WpLockAt.lock_ghost_alloc] mints them.  A PREMISE for the
@@ -1733,7 +1756,7 @@ Section IcacheBootTable.
            is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
-    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool".
+    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hstamps Hpool".
     iIntros "Hfree Htok Hmid Hgid Hrun".
     (* only the ZEROS are used: they are what [itable_body] parks for a free
        slot.  The [sl_free_tok]s beside them belong to whoever wants to build
@@ -1755,13 +1778,25 @@ Section IcacheBootTable.
                  NINODE 0 with "Hid") as (dvs) "Hid".
     (* ---- the count authority's two halves ---- *)
     iDestruct (itable_half_split with "Hauth") as "[HhalfI HhalfL]".
-    (* ---- the [ref]-word invariant ---- *)
-    iMod (live_pool_empty with "Hlive") as "Hpool0".
+    (* ---- the [ref]-word invariant: fifty FREE pinw slots (A6.145) ---- *)
+    iMod (pinw_slots_boot with "Hlive") as "Hslots0".
     iMod (inv_alloc icacheN E itable_body
-            with "[HhalfI Href Hpool0]") as "#Hitinv".
-    { iNext. iExists ∅. iFrame "HhalfI". iSplitR; [iPureIntro; exact icM_wf_empty |].
-      iSplitL "Href"; [iApply iref_cells_boot; iExact "Href" |].
-      iExact "Hpool0". }
+            with "[HhalfI Hslots0]") as "#Hitinv".
+    { iNext. iExists ∅. iFrame "HhalfI".
+      iSplitR; [iPureIntro; exact icM_wf_empty |]. iExact "Hslots0". }
+    (* THE ADDRESS CLAIMS, read once off the boot cells (persistent) *)
+    iAssert ([∗ list] k ∈ seq 0 NINODE,
+               WpSconfMem.wordw_claim (KTR := KT0) 4 (i_ref (ientry k)) ∗
+               i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32))%I
+      with "[Href]" as "Hrefc".
+    { iApply (big_sepL_mono with "Href"). intros idx k _.
+      iIntros "Hc".
+      iDestruct (WpSconfMem.wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+                   (DfracOwn 1) (mword_of_int 0 : mword 32) ltac:(lia)
+                   with "Hc") as "#Hk".
+      iFrame "Hk Hc". }
+    iEval (rewrite big_sepL_sep) in "Hrefc".
+    iDestruct "Hrefc" as "[#Hclaims Href]".
     (* ---- the fifty escrows, at the EMPTY arm, and the table's shares ---- *)
     iDestruct (big_sepL_sep_2 with "Hid Hvalid") as "H1".
     iDestruct (big_sepL_sep_2 with "H1 Hmirror") as "H2".
@@ -1789,9 +1824,15 @@ Section IcacheBootTable.
     iEval (rewrite big_sepL_sep) in "Hesc".
     iDestruct "Hesc" as "[#Hescrows Hslots]".
     (* ---- the itable lock's resource, and the lock ---- *)
-    iAssert (itable_res2 cn γfs γi cov logstart nib dv)%I
-      with "[HhalfL Hsupply Hslots Hpool Hislauth]" as "Hres".
+    iAssert (itable_res2 TsoCtx.cur_ctx cn γfs γi cov logstart nib dv)%I
+      with "[HhalfL Hsupply Hslots Hpool Hislauth Href Hstamps]" as "Hres".
     { iExists ∅, ∅. iFrame "HhalfL".
+      iSplitL "Href Hstamps".
+      { (* the fifty FREE payload rows: cell 0 + full stamp auth + llb 0 *)
+        iDestruct (big_sepL_sep_2 with "Href Hstamps") as "H".
+        iApply (big_sepL_mono with "H"). intros idx k _.
+        iIntros "[Hc Hst]". rewrite /itable_slot_res lookup_empty.
+        iExists 0%nat. iFrame "Hc Hst". iApply TsoGhost.llb_0. }
       iSplitR; [iPureIntro; exact icM_wf_empty |].
       iSplitR; [iPureIntro; exact (ic_ci_wf_empty nib dv) |].
       iFrame "Hsupply".
@@ -1800,7 +1841,7 @@ Section IcacheBootTable.
       { iApply (big_sepL_mono with "Hslots"). intros idx k _.
         rewrite /islot2 !lookup_empty. done. }
       rewrite ci_inums_empty difference_empty_L. iExact "Hpool". }
-    iMod (newlock_at E γl itable_lock "itable"%string <{ itable_res2 cn γfs γi cov logstart nib dv }>
+    iMod (newlock_at E γl itable_lock "itable"%string (fun ξ => itable_res2 ξ cn γfs γi cov logstart nib dv)
             with "Hfree Hnm Hrun Hlkw Hcpu Hres") as "[Hrun #Hlock]".
     (* ---- the fifty inode sleeplocks, sealed over the checkout tokens ---- *)
     iDestruct (big_sepL_sep_2 with "Hsl Htok") as "Hsl".
@@ -1834,7 +1875,7 @@ Section IcacheBootTable.
        named [iFrame] searches that once per name -- 98 s in this one
        sentence (optimization.md's BioInv rule). *)
     rewrite /is_itable2.
-    iSplitR; [iExact "Hlock" |].
+    iSplitR; [iSplitR; [iExact "Hlock" | iExact "Hclaims"] |].
     iSplitR; [iExact "Hitinv" |].
     iSplitR; [iExact "Hescrows" |].
     iExact "Hsl".
@@ -1860,6 +1901,7 @@ Section IcacheBootTable.
     ([∗ list] k ∈ seq 0 NINODE, sl_fresh (i_lock (ientry k)) "inode"%string) -∗
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     iref_slots_auth -∗
+    ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) -∗
     ipool γfs γi cov logstart (region_inums nib) -∗
     own_context cur_ctx
     ={E}=∗ own_context cur_ctx ∗ ∃ (γl : gname) (cn : ic_names),
@@ -1871,11 +1913,11 @@ Section IcacheBootTable.
            is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
-    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool Hrun".
+    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hstamps Hpool Hrun".
     iMod lock_ghost_alloc as (γl) "Hfree".
     iMod (ic_names_alloc ic_dv_dummy) as (cn) "(Htok & Hmid & Hgid)".
     iDestruct (ic_id_forget cn false ic_dv_dummy with "Hgid") as "Hgid".
-    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hpool Hfree Htok Hmid Hgid Hrun") as "[Hrun H]".
+    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hstamps Hpool Hfree Htok Hmid Hgid Hrun") as "[Hrun H]".
     iModIntro. iFrame "Hrun". iExists γl, cn. iExact "H".
   Qed.
 

@@ -216,6 +216,17 @@ Section IrefSlots.
      has no zero).  The kfork line's [natR] retype of this statement is
      deferred with the rest of the count-0-share vocabulary -- see
      projects/reconcile-fork-icache.md, T5. *)
+  (* the SUPPLY bound itself, for [icM_wf]'s A6.145 count clause and the
+     store twins' [iref_set] membership *)
+  Lemma iref_slots_supply (n : positive) :
+    iref_slots_auth -∗ iref_slots (Pos.to_nat n) -∗
+    ⌜(Z.pos n <= Z.of_nat IREFSLOTS)%Z⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (iref_slots_bound with "Ha Hf") as %Hle.
+    iPureIntro. rewrite -positive_nat_Z. lia.
+  Qed.
+
   Lemma iref_slots_no_overflow (n : positive) :
     iref_slots_auth -∗ iref_slots (Pos.to_nat n) -∗
     ⌜(Z.pos n < 2 ^ 31)%Z /\ (Z.pos (Pos.succ n) < 2 ^ 31)%Z⌝.

@@ -889,9 +889,14 @@ Proof.
     change (N.to_nat 4) with 4%nat. change (N.to_nat 2) with 2%nat.
     rewrite (pa_range_split8 (used_elem_pa c p)). set_solver. }
   destruct (vs_is_out sl) eqn:Hout.
-  - rewrite Hws. unfold slot_done_dom, slot_wr. rewrite Hout. set_solver.
+  - rewrite Hws. unfold slot_done_dom, slot_wr. rewrite Hout. cbn match.
+    set (E := elem_dom c p). set (U := used_idx_dom c). clearbody E U.
+    set_solver.
   - rewrite write_byte_list_dom disk_read_length Hws.
-    unfold slot_done_dom, slot_wr. rewrite Hout. set_solver.
+    unfold slot_done_dom, slot_wr. rewrite Hout. cbn match.
+    set (E := elem_dom c p). set (U := used_idx_dom c).
+    set (B := pa_range (vr_buf (vs_req sl)) (vs_len sl)). clearbody E U B.
+    set_solver.
 Qed.
 
 (* the two per-byte floor stamps of the index word, as a function *)
@@ -954,6 +959,13 @@ Definition used_page_rest (c : virtio_cfg) : gmap Arch.pa (bv 8) :=
   filter (fun p : Arch.pa * bv 8 => p.1 ∉ used_idx_dom c)
     (range_map (vc_used c) 4096 (fun _ : nat => byte_zero)).
 
+(* Membership in a [pa_range] is decidable -- stated with the LENGTH
+   ABSTRACT so the instance search never meets [seq 0 4096].  Inline
+   [decide (a in pa_range b 4096)] pays that search at every call site. *)
+Lemma pa_range_decide (b : Arch.pa) (n : nat) (a : Arch.pa) :
+  Decision (a ∈ pa_range b n).
+Proof. unfold pa_range. apply _. Qed.
+
 (* the used page minus the index word, as the two windows the boot's
    carve-out produces (DiskAvail.used_split_init) *)
 Lemma used_page_rest_split (c : virtio_cfg) :
@@ -971,7 +983,7 @@ Proof.
     - intros (k & Hk & ->). rewrite -Hidx. apply pa_range_intro. exact Hk. }
   assert (H4096 : Z.of_nat 4096 < 18446744073709551616) by lia.
   unfold used_page_rest. apply map_eq. intro a.
-  destruct (decide (a ∈ pa_range (vc_used c) 4096)) as [Hin | Hnin].
+  destruct (pa_range_decide (vc_used c) 4096 a) as [Hin | Hnin].
   - apply pa_range_elim in Hin as (j & Hj & ->).
     assert (Hval : range_map (vc_used c) 4096 (fun _ : nat => byte_zero)
                      !! pa_add (vc_used c) j = Some byte_zero)
@@ -4993,6 +5005,7 @@ Section VirtioProto.
       pose proof (proj1 (elem_of_disjoint _ _) HctlD' x) as H1.
       pose proof (proj1 (elem_of_disjoint _ _) Hidx x) as H2.
       pose proof (proj1 (elem_of_disjoint _ _) Hdone' x) as H3.
+      clear - H1 H2 H3.
       rewrite !elem_of_union in H1 H2 H3.
       rewrite !elem_of_difference !elem_of_union. tauto. }
     rewrite HholeD.
