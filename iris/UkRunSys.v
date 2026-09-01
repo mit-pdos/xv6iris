@@ -309,26 +309,31 @@ Section UkRunSys.
     destruct (decide (n = USYS_close)) as [Hc | _]; [ contradiction (Hnc Hc) | ].
     destruct (decide (n = USYS_dup)) as [_ | _].
     { destruct Hrow as [(fd1 & _ & Hcl & ->) | [_ ->]]; [| by iModIntro].
-      iMod (ufd_dup_untracked γfd fdv _ fd1 Hcl with "Hufd") as "$".
+      (* the row says the slot was the LOWEST free one; the authority only
+         needs it FREE, so the extra strength is dropped here *)
+      iMod (ufd_dup_untracked γfd fdv _ fd1 (fd_least_closed_free _ _ Hcl)
+              with "Hufd") as "$".
       by iModIntro. }
     destruct (decide (n = USYS_open)) as [_ | _].
     { destruct Hrow as [(fd & rd & wr & t & _ & Hcl & ->) | [_ ->]];
         [| by iModIntro].
-      iMod (ufd_open γfd fdv fd (FdOpen rd wr t) Hcl ltac:(discriminate)
+      iMod (ufd_open γfd fdv fd (FdOpen rd wr t)
+              (fd_least_closed_free _ _ Hcl) ltac:(discriminate)
               with "Hufd") as "[$ _]".
       by iModIntro. }
     destruct (decide (n = USYS_pipe)) as [_ | _].
     { destruct (decide (uint r = 0)) as [_ | _]; [| subst fdv'; by iModIntro].
       destruct Hrow as (a & b & Hne & Hca & Hcb & ->).
-      iMod (ufd_open γfd fdv b (FdOpen false true FdPipe) Hcb
+      (* THE TWO OPENS RUN IN THE ROW'S OWN ORDER now: read end first, write
+         end against the table the first left.  That is the order sys_pipe
+         allocates in, and stating it that way is what lets the second
+         scan's least-closed fact be read at the table it is actually
+         about -- no commuting needed here at all. *)
+      iMod (ufd_open γfd fdv a (FdOpen true false FdPipe)
+              (fd_least_closed_free _ _ Hca)
               ltac:(discriminate) with "Hufd") as "[Hufd _]".
-      (* [a] is still free after [b]'s end is installed: the two are
-         distinct, which is what pipe's row promises *)
-      assert (Hca' : <[b := FdOpen false true FdPipe]> fdv !! a
-                     = Some FdClosed)
-        by (rewrite list_lookup_insert_ne; [exact Hca | exact (not_eq_sym Hne)]).
-      iMod (ufd_open γfd (<[b := FdOpen false true FdPipe]> fdv) a
-              (FdOpen true false FdPipe) Hca'
+      iMod (ufd_open γfd (<[a := FdOpen true false FdPipe]> fdv) b
+              (FdOpen false true FdPipe) (fd_least_closed_free _ _ Hcb)
               ltac:(discriminate) with "Hufd") as "[$ _]".
       by iModIntro. }
     subst fdv'. by iModIntro.
@@ -487,11 +492,13 @@ Section UkRunSys.
     iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
     iApply uslot_bupd.
     destruct Hfdok as [(fd & rd & wr & t & Hr & Hcl & ->) | [Hrm ->]].
-    - (* A DESCRIPTOR CAME BACK.  The slot was FREE -- that is the promise
-         [sys_open_post] now makes and the row carries -- so minting its
-         handle is an insert, and the authority lands at exactly the view
-         the process resumes at. *)
-      iMod (ufd_open γfd fdv fd (FdOpen rd wr t) Hcl ltac:(discriminate)
+    - (* A DESCRIPTOR CAME BACK.  The slot was the LOWEST free one -- that
+         is the promise [sys_open_post] now makes and the row carries -- so
+         minting its handle is an insert, and the authority lands at exactly
+         the view the process resumes at.  The mint needs only that the slot
+         was FREE; the rest of the promise is passed out to the caller. *)
+      iMod (ufd_open γfd fdv fd (FdOpen rd wr t)
+              (fd_least_closed_free _ _ Hcl) ltac:(discriminate)
               with "Hufd") as "[Hufd Hh]".
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
@@ -504,7 +511,7 @@ Section UkRunSys.
       iLeft. iExists fd, rd, wr, t. iFrame "Hh". iPureIntro.
       split; [ exact Hr | ].
       (* the slot the kernel chose is a slot of the table *)
-      rewrite <- Hfdlen. exact (lookup_lt_Some _ _ _ Hcl).
+      rewrite <- Hfdlen. exact (fd_least_closed_lt _ _ Hcl).
     - (* the call failed: nothing moved, and there is no handle to give *)
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv r Hx0 Hal4).
@@ -588,8 +595,8 @@ Section UkRunSys.
          own [st] ([Hsrc], off the handle), and the destination slot was
          free, so the new handle is an insert. *)
       rewrite Hai (list_lookup_total_correct fdv fd0 st Hsrc).
-      iMod (ufd_dup γfd fdv fd0 fd1 st Hcl with "Hufd Hh0")
-        as "(Hufd & Hh0 & Hh1)".
+      iMod (ufd_dup γfd fdv fd0 fd1 st (fd_least_closed_free _ _ Hcl)
+              with "Hufd Hh0") as "(Hufd & Hh0 & Hh1)".
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
                  (<[fd1 := st]> fdv) r Hx0 Hal4).
@@ -666,7 +673,8 @@ Section UkRunSys.
     iApply uslot_bupd.
     destruct Hfdok as [(fd1 & Hr & Hcl & ->) | [Hrm ->]].
     - iMod (ufd_dup_untracked γfd fdv
-              (Z.to_nat (usys_argfd (tf_of m pc))) fd1 Hcl with "Hufd")
+              (Z.to_nat (usys_argfd (tf_of m pc))) fd1
+              (fd_least_closed_free _ _ Hcl) with "Hufd")
         as "Hufd".
       iModIntro.
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
@@ -1278,8 +1286,8 @@ Section UkRunSys.
                  exists a b : nat,
                    a <> b /\
                    fdv !! a = Some FdClosed /\ fdv !! b = Some FdClosed /\
-                   fdv' = <[a := FdOpen true false FdPipe]>
-                            (<[b := FdOpen false true FdPipe]> fdv) /\
+                   fdv' = <[b := FdOpen false true FdPipe]>
+                            (<[a := FdOpen true false FdPipe]> fdv) /\
                    (forall i : nat, (i < 8)%nat ->
                       gg i = if (i <? 4)%nat
                              then nth_byte
@@ -1302,7 +1310,17 @@ Section UkRunSys.
           | rewrite HM2 Ha0; reflexivity
           | intros j Hj; exfalso; lia
           | intros _; exists a, b; split_and!;
-              [ exact Hne | exact Hca | exact Hcb | exact Hfdv' | exact Hbytes ]
+              [ exact Hne | exact (fd_least_closed_free _ _ Hca)
+              (* the row states the WRITE end's scan against the table the
+                 READ end's install left -- that is the order sys_pipe
+                 allocates in -- and this leaf's own summary wants both
+                 read at the incoming table, which the two being distinct
+                 gives back *)
+              | exact (eq_trans
+                         (eq_sym (list_lookup_insert_ne fdv a b
+                                    (FdOpen true false FdPipe) Hne))
+                         (fd_least_closed_free _ _ Hcb))
+              | exact Hfdv' | exact Hbytes ]
           | intros Hc; exfalso; exact (Hc Hr0) ].
       - (* FAILURE: nothing is claimed about the descriptors beyond "they
            did not move", which is the fd row's own else-branch, and the
@@ -1370,15 +1388,16 @@ Section UkRunSys.
                ∨ ⌜ uint r <> 0 ⌝))%I with "[Hufd]" as ">[Hufd Hhs]".
     { destruct (decide (uint r = 0)) as [Hr0 | Hr0].
       - destruct (Hsucc Hr0) as (a & b & Hne & Hca & Hcb & Hfdv' & Hbytes).
-        iMod (ufd_open γfd fdv b (FdOpen false true FdPipe) Hcb
-                ltac:(discriminate) with "Hufd") as "[Hufd Hhb]".
-        assert (Hca' : <[b := FdOpen false true FdPipe]> fdv !! a
+        (* minted in the ALLOCATION order the row is now stated in: read end
+           first, write end against the table that left *)
+        iMod (ufd_open γfd fdv a (FdOpen true false FdPipe) Hca
+                ltac:(discriminate) with "Hufd") as "[Hufd Hha]".
+        assert (Hcb' : <[a := FdOpen true false FdPipe]> fdv !! b
                        = Some FdClosed)
-          by (rewrite list_lookup_insert_ne;
-              [ exact Hca | exact (not_eq_sym Hne) ]).
-        iMod (ufd_open γfd (<[b := FdOpen false true FdPipe]> fdv) a
-                (FdOpen true false FdPipe) Hca' ltac:(discriminate)
-                with "Hufd") as "[Hufd Hha]".
+          by (rewrite list_lookup_insert_ne; [ exact Hcb | exact Hne ]).
+        iMod (ufd_open γfd (<[a := FdOpen true false FdPipe]> fdv) b
+                (FdOpen false true FdPipe) Hcb' ltac:(discriminate)
+                with "Hufd") as "[Hufd Hhb]".
         rewrite <- Hfdv'. iModIntro. iFrame "Hufd".
         iLeft. iExists a, b. iFrame "Hha Hhb". iPureIntro.
         split_and!;

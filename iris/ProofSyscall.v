@@ -3434,6 +3434,22 @@ Section SyscallArms.
       destruct (arg_fd_lookup v (pv_ofile (us_V U)) fd0 fv Ha)
         as (Hfd0N & _ & _ & _).
       pose proof (fd_frees_head_lt (pv_ofile (us_V U)) fd1 l Hfl) as Hfd1lt.
+      (* FDALLOC'S SCAN, CONVERTED.  The post's [fd_frees] head says no
+         SMALLER descriptor was free ([SpecFdalloc.fd_frees_below], on
+         p->ofile's pointers), and the block and bundle it hands back still
+         describe those slots -- the install touched only [fd1] -- so
+         [ProcInv.proc_priv_frags_least] reads the scan at the STATES with
+         nothing re-opened.  The conclusion is pure, so the two resources
+         survive for the frame below. *)
+      iDestruct (proc_priv_frags_least γf p pid
+                   (MkUstate (upd_ofile (us_V U) fd1 fv) (us_M U))
+                   sts (<[fd1 := sts !!! fd0]> sts) (pv_ofile (us_V U)) fd1
+                   ltac:(rewrite <- Hoflen; exact Hfd1lt) Hcl
+                   (fd_frees_below (pv_ofile (us_V U)) fd1 l Hfl)
+                   ltac:(intros jj Hjj; cbn [us_V pv_ofile upd_ofile];
+                         apply list_lookup_insert_ne; lia)
+                   ltac:(intros jj Hjj; apply list_lookup_insert_ne; lia)
+                   with "Hp Hfr") as %Hleast.
       iExists (upd_ofile (us_V U) fd1 fv), (<[fd1 := sts !!! fd0]> sts).
       iFrame "Hp Hfr". iPureIntro.
       split_and!; [reflexivity | reflexivity | reflexivity
@@ -3444,7 +3460,7 @@ Section SyscallArms.
          is one of sixteen values, so reading it back is the identity -- and
          [usys_argfd] IS how [argfd] computed its index
          ([SpecArgfd.arg_fd_index]). *)
-      left. exists fd1. split_and!; [exact Hr | exact Hcl |].
+      left. exists fd1. split_and!; [exact Hr | exact Hleast |].
       unfold usys_argfd. rewrite Harg (arg_fd_index v _ fd0 fv Ha) Nat2Z.id.
       reflexivity.
   Qed.
@@ -4765,6 +4781,8 @@ Section SyscallArms.
     (* syscall argument 0 -- the user address of the two-int array -- out of
        the trapframe page the block carries.  Nothing is assumed about it;
        copyout is the check. *)
+    (* the array's length, which bounds the two descriptors pipe returns *)
+    iDestruct (proc_priv_ofile_len with "Hpriv") as %Hoflen.
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpvback)".
     iDestruct (tf_page_length with "Htfp") as "%Htflen".
     iDestruct ("Hpvback" with "Htfc Htfp") as "Hpriv".
@@ -4850,7 +4868,84 @@ Section SyscallArms.
         (* a failed pipe returned -1, so the joined row's [uint r = 0]
            premise is refuted and it owes nothing *)
         intros _ Hz. exfalso. rewrite Hr in Hz. vm_compute in Hz. discriminate.
-      - iExists (upd_ofile (upd_ofile (upd_upt (us_V U) P') fd0 (fnode k0)) fd1 (fnode k1)),
+      - (* FDALLOC'S TWO SCANS, CONVERTED.  The post carries the free list's
+           first TWO entries, so the first descriptor's scan is
+           [fd_frees_below] at the head and the SECOND's is the same lemma
+           after [fd_frees_insert] pops that head -- which is exactly what
+           sys_pipe does, allocating the write end against the array the
+           read end's install left.  [fd_frees_snd] is what says the two
+           came in that order, and it is what makes the first scan's slots
+           untouched by BOTH installs. *)
+        pose proof (fd_frees_head_lt (pv_ofile (us_V U)) fd0 (fd1 :: l) Hfl)
+          as Hfd0lt.
+        pose proof (fd_frees_snd (pv_ofile (us_V U)) fd0 fd1 l Hfl) as Hlt01.
+        (* [fnode k0] is not null, which is what lets [fd_frees_insert] pop
+           the head.  The post does not say [k0 < NFILE] and does not need
+           to: slot [fd0] of the block it hands back holds [fnode k0] and
+           its state is the READ END, and the array/state agreement says a
+           null cell is a closed state. *)
+        iDestruct (proc_priv_states_agree γf (proc_addr j) pid
+                     (upd_usV (upd_usM (us_upt U P') M')
+                        (upd_ofile (upd_ofile
+                           (us_V (upd_usM (us_upt U P') M')) fd0 (fnode k0))
+                           fd1 (fnode k1)))
+                     (<[fd1 := FdOpen false true FdPipe]>
+                        (<[fd0 := FdOpen true false FdPipe]> sts))
+                     with "Hpv Hb") as %Hag0.
+        cbn [us_V pv_ofile upd_ofile upd_upt upd_usV upd_usM us_upt] in Hag0.
+        assert (Hk0nz : fnode k0 <> (zero_reg : mword 64)).
+        { intros Hz.
+          pose proof (proj1 (Hag0 fd0 (fnode k0) (FdOpen true false FdPipe)
+                               ltac:(rewrite list_lookup_insert_ne; [| lia];
+                                     apply list_lookup_insert; exact Hfd0lt)
+                               ltac:(rewrite list_lookup_insert_ne; [| lia];
+                                     apply list_lookup_insert;
+                                     exact (lookup_lt_Some _ _ _ Hcl0))) Hz)
+            as Hbad.
+          discriminate Hbad. }
+        pose proof (fd_frees_insert (pv_ofile (us_V U)) fd0 (fd1 :: l)
+                      (fnode k0) Hk0nz Hfl) as Hfl1.
+        pose proof (fd_frees_head_lt _ fd1 l Hfl1) as Hfd1lt'.
+        rewrite length_insert in Hfd1lt'.
+        iDestruct (proc_priv_frags_least γf (proc_addr j) pid
+                     (upd_usV (upd_usM (us_upt U P') M')
+                        (upd_ofile (upd_ofile
+                           (us_V (upd_usM (us_upt U P') M')) fd0 (fnode k0))
+                           fd1 (fnode k1)))
+                     sts
+                     (<[fd1 := FdOpen false true FdPipe]>
+                        (<[fd0 := FdOpen true false FdPipe]> sts))
+                     (pv_ofile (us_V U)) fd0
+                     ltac:(rewrite <- Hoflen; exact Hfd0lt) Hcl0
+                     (fd_frees_below (pv_ofile (us_V U)) fd0 (fd1 :: l) Hfl)
+                     ltac:(intros jj Hjj;
+                           cbn [us_V pv_ofile upd_ofile upd_upt upd_usV
+                                upd_usM us_upt upd_usV us_V];
+                           rewrite list_lookup_insert_ne; [| lia];
+                           apply list_lookup_insert_ne; lia)
+                     ltac:(intros jj Hjj;
+                           rewrite list_lookup_insert_ne; [| lia];
+                           apply list_lookup_insert_ne; lia)
+                     with "Hpv Hb") as %Hleast0.
+        iDestruct (proc_priv_frags_least γf (proc_addr j) pid
+                     (upd_usV (upd_usM (us_upt U P') M')
+                        (upd_ofile (upd_ofile
+                           (us_V (upd_usM (us_upt U P') M')) fd0 (fnode k0))
+                           fd1 (fnode k1)))
+                     (<[fd0 := FdOpen true false FdPipe]> sts)
+                     (<[fd1 := FdOpen false true FdPipe]>
+                        (<[fd0 := FdOpen true false FdPipe]> sts))
+                     (<[fd0 := fnode k0]> (pv_ofile (us_V U))) fd1
+                     ltac:(rewrite <- Hoflen; exact Hfd1lt')
+                     ltac:(rewrite list_lookup_insert_ne; [exact Hcl1 | lia])
+                     (fd_frees_below _ fd1 l Hfl1)
+                     ltac:(intros jj Hjj;
+                           cbn [us_V pv_ofile upd_ofile upd_upt upd_usV
+                                upd_usM us_upt upd_usV us_V];
+                           apply list_lookup_insert_ne; lia)
+                     ltac:(intros jj Hjj; apply list_lookup_insert_ne; lia)
+                     with "Hpv Hb") as %Hleast1.
+        iExists (upd_ofile (upd_ofile (upd_upt (us_V U) P') fd0 (fnode k0)) fd1 (fnode k1)),
                 (<[fd1 := FdOpen false true FdPipe]>
                    (<[fd0 := FdOpen true false FdPipe]> sts)).
         iFrame "Hpv Hb". iPureIntro.
@@ -4860,10 +4955,10 @@ Section SyscallArms.
            vocabulary they are reported by being WRITTEN -- and the post
            names them, so the arm simply exhibits them.  The two inserts
            commute because the descriptors are distinct. *)
-        exists fd0, fd1. split_and!; [exact Hne | exact Hcl0 | exact Hcl1 |].
-        symmetry.
-        apply (list_insert_commute sts fd0 fd1
-                 (FdOpen true false FdPipe) (FdOpen false true FdPipe) Hne). }
+        (* the row's inserts now run in the ALLOCATION order, which is the
+           order this arm exhibits them in, so there is nothing to commute *)
+        exists fd0, fd1.
+        split_and!; [exact Hne | exact Hleast0 | exact Hleast1 | reflexivity]. }
         (* ...AND THE JOINED ROW: the same two descriptors, and the bytes
            pipe copied out are theirs ([Hbytes], off the entry's own
            post).  This is the conjunct that lets a caller close what
@@ -4873,13 +4968,11 @@ Section SyscallArms.
           by (apply list_lookup_total_correct, Hv0).
         split_and!;
           [ exact Hne
-          | exact Hcl0
-          | exact Hcl1
+          | exact Hleast0
+          | exact Hleast1
           | rewrite Hv0t /M' Hd8; reflexivity
           | exact Hbytes
-          | symmetry;
-            apply (list_insert_commute sts fd0 fd1
-                     (FdOpen true false FdPipe) (FdOpen false true FdPipe) Hne) ]. }
+          | reflexivity ]. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
@@ -5280,18 +5373,40 @@ Section SyscallArms.
         split_and!; [exact Htfpe | reflexivity | reflexivity | exact Hextz | reflexivity |].
         (* the failure arm installs nothing: the row's right disjunct *)
         by right.
-      - iExists (upd_ofile (upd_upt (us_V U) P') fd (fnode kf)),
+      - destruct Hpu as (Hr & Hfrees & Hcl).
+        (* FDALLOC'S SCAN, CONVERTED -- the same three lines as dup's arm.
+           [sys_open_post] carries the free list's head, so
+           [SpecFdalloc.fd_frees_below] says no smaller descriptor was free,
+           and the block and bundle it hands back still describe those slots
+           (the install touched only [fd]).  The conclusion is pure, so both
+           resources survive for the frame below. *)
+        pose proof (fd_frees_head_lt (pv_ofile (us_V U)) fd ll Hfrees)
+          as Hfdlt.
+        iDestruct (proc_priv_frags_least γf (proc_addr j) pid
+                     (MkUstate (upd_ofile (upd_upt (us_V U) P') fd (fnode kf))
+                               (us_M U))
+                     sts
+                     (<[fd := FdOpen (so_rd_of (trunc32 v1))
+                                     (so_wr_of (trunc32 v1)) tp]> sts)
+                     (pv_ofile (us_V U)) fd
+                     ltac:(rewrite <- Hoflen; exact Hfdlt) Hcl
+                     (fd_frees_below (pv_ofile (us_V U)) fd ll Hfrees)
+                     ltac:(intros jj Hjj;
+                           cbn [us_V pv_ofile upd_ofile upd_upt];
+                           apply list_lookup_insert_ne; lia)
+                     ltac:(intros jj Hjj; apply list_lookup_insert_ne; lia)
+                     with "Hpv Hb") as %Hleast.
+        iExists (upd_ofile (upd_upt (us_V U) P') fd (fnode kf)),
                 (<[fd := FdOpen (so_rd_of (trunc32 v1)) (so_wr_of (trunc32 v1)) tp]> sts).
         iFrame "Hpv Hb". iPureIntro.
         split_and!; [exact Htfpe | reflexivity | reflexivity | exact Hextz | reflexivity |].
-        destruct Hpu as (Hr & _ & Hcl).
         (* the table's open row binds the descriptor, the mode bits and the
            type existentially; the post names all four, so the arm exhibits
            them.  The mode bits are not existential HERE -- they are the
            flags word [v1]'s bits, which is what the strengthened
            [sys_open_post] proves. *)
         left. exists fd, (so_rd_of (trunc32 v1)), (so_wr_of (trunc32 v1)), tp.
-        split_and!; [exact Hr | exact Hcl | reflexivity]. }
+        split_and!; [exact Hr | exact Hleast | reflexivity]. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).

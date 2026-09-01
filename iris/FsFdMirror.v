@@ -134,42 +134,11 @@ Record umirror := MkUmirror {
 (* [fdt0] and [fdt0_length] now live in [FdSlots], beside the mint that
    produces them. *)
 
-(* fdalloc's scan: the first closed row.  [fd_frees]'s head, read at the
-   mirror. *)
-Fixpoint fd_lowest_closed (l : list fdstate) : option nat :=
-  match l with
-  | [] => None
-  | FdClosed :: _ => Some 0%nat
-  | _ :: l' => S <$> fd_lowest_closed l'
-  end.
-
-Lemma fd_lowest_closed_fdt0 : fd_lowest_closed fdt0 = Some 0%nat.
-Proof. reflexivity. Qed.
-
-(* ...and the slot it names really is closed.  What wants this is the
-   agreement below: upstream's open and dup rows now PROMISE that the
-   descriptor they installed was free beforehand (see
-   [UsysMemOk.usys_fd_ok]), and the mirror's own rows pick their descriptor
-   with this scan, so the promise is one induction away. *)
-Lemma fd_lowest_closed_is_closed (l : list fdstate) (fd : nat) :
-  fd_lowest_closed l = Some fd -> l !! fd = Some FdClosed.
-Proof.
-  revert fd. induction l as [| st l IH]; intros fd H; [discriminate H |].
-  cbn in H. destruct st.
-  - injection H as <-. reflexivity.
-  - destruct (fd_lowest_closed l) as [k |] eqn:Hk; [| discriminate H].
-    cbn in H. injection H as <-. cbn. exact (IH k eq_refl).
-Qed.
-
-Lemma fd_lowest_closed_bound (l : list fdstate) (fd : nat) :
-  fd_lowest_closed l = Some fd -> (fd < length l)%nat.
-Proof.
-  revert fd. induction l as [| st l IH]; intros fd H; [discriminate H |].
-  cbn in H. destruct st.
-  - injection H as <-. cbn. lia.
-  - destruct (fd_lowest_closed l) as [k |] eqn:Hk; [| discriminate H].
-    cbn in H. injection H as <-. cbn. specialize (IH k eq_refl). lia.
-Qed.
+(* fdalloc's scan -- [fd_lowest_closed], with [_is_closed] and [_bound] --
+   now lives in [FdSlots.v], beside [fd_least_closed], which is the same
+   scan as a RELATION and is what [UsysMemOk]'s open/dup/pipe rows are
+   stated against.  It moved down because the rows below this file need it;
+   nothing here changed but the address. *)
 
 (* ===================================================================== *)
 (*  3.  THE PATH STRING, READ OFF THE IMAGE                               *)
@@ -691,10 +660,13 @@ Section Steps.
            word, not a decode of it, so exhibiting [fd] closes the goal with
            no bitvector arithmetic at all. *)
         left. exists fd.
-        (* the slot was FREE: the mirror picks it with [fd_lowest_closed],
-           which is the same scan fdalloc runs, so upstream's new promise is
-           our own row's [Hfd] read through [fd_lowest_closed_is_closed]. *)
-        pose proof (fd_lowest_closed_is_closed (um_fdt u) fd Hfd) as Hcl.
+        (* the slot was the LOWEST free one, and upstream's row now says so
+           in the mirror's OWN words: [FdSlots.fd_least_closed] IS
+           [fd_lowest_closed _ = Some _], the scan this row already picks
+           its descriptor with, so [Hfd] goes in verbatim.  It used to be
+           weakened through [fd_lowest_closed_is_closed] because the row
+           asked only that the slot be free. *)
+        pose proof Hfd as Hcl.
         destruct Harm as [(ma & mi & nl & _ & _ & ->)
                          | [(bs & nl & _ & ->) | (e & nl & _ & _ & ->)]].
         + exists (om_readable (ufs_arg tf 1)), (om_writable (ufs_arg tf 1)),
@@ -742,7 +714,10 @@ Section Steps.
            the range where the two agree. *)
         left. exists nfd. split_and!;
           [ reflexivity
-          | exact (fd_lowest_closed_is_closed (um_fdt u) nfd Hfd) | ].
+          (* the row asks for the LOWEST free slot now, which is this
+             mirror's own scan verbatim -- it used to be weakened to "free"
+             through [fd_lowest_closed_is_closed] *)
+          | exact Hfd | ].
         pose proof (lookup_lt_Some _ _ _ Hlk) as Hlt.
         rewrite Hlen HN in Hlt.
         apply (proj1 (Nat2Z.inj_lt _ _)) in Hlt.
