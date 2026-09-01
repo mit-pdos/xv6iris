@@ -72,9 +72,20 @@ absorb/withdraw (T2→T1, pay a floor); pin mint/forget (T1↔T3).
 
 THE LAW for invariant and cinv bodies: only (a) ξ-free ghosts, (b) T2
 custody with ξb ∃-packed inside, (c) T3 pins.  Lock payloads are
-context-λs (CtxMorph).  Credentials appear in exactly one form:
-`cred_floor lo tl := ctx_floor cur_ctx tl ∨ ctx_wrote cur_ctx lo _`
-(A6.146), and floors are DELIVERED only by:
+context-λs (CtxMorph).  TWO floor-shaped objects, each with ONE job
+(clarified 2026-09-01, answering R1-pre note (iv)):
+  - `ctx_floor ξ K` — the RAW floor.  It is what R1/R2 below deliver at
+    the winner's context, and it is what T2 BOX WITHDRAWS consume
+    (`aguard_intro` → `anchor_withdraw`; CtxAnchor's guard is
+    deliberately on ctx_floor alone — a wrote-arm holder can cash only
+    ledger_vis and cannot borrow other harts' cells).  Acquire posts and
+    payload floor rows are stated as ctx_floor, NEVER weakened to
+    cred_floor.
+  - `cred_floor lo tl := ctx_floor cur_ctx tl ∨ ctx_wrote cur_ctx lo _`
+    (A6.146) — the HOLDER-side credential for T3 RACY READS only (the
+    author rides its own fresh store).  ctx_floor ⊢ cred_floor
+    (`cred_floor_of_ctx`); never the other way.
+Floors are DELIVERED only by:
 
   R1  the llb-tier acquire posts (SpecAcquire/SpecAcquiresleep,
       LANDED): present `llb Tl` before the acquire, receive
@@ -392,6 +403,14 @@ R1-pre (PREREQUISITE, measured 2026-09-01 by the build agent): THE
          HOLDER-side credential bundle, not the raw R1/R2 outputs.
          Flagging for the reviewer in case the post should be stated
          as [cred_floor] instead.
+         ANSWER (vetting, 2026-09-01): keep [ctx_floor] — REQUIRED, not
+         merely allowed.  The box withdraw needs the left arm (see §1's
+         two-object rule); weakening the post to cred_floor would
+         discard exactly the information the checkout's rp-case cover
+         consumes.  Notes (i)–(iii) accepted as written; (i)'s derived
+         const tier's CtxMorph goal is ctx_morph_const and holds even
+         for a cell-bearing R — harmless for newlock, but the reason the
+         const tier fixes CtxMove only for ξ-free R.
 
 R1 (design retrofit, small):
   - Enrich bn_pres's cmra ((n_b,T_b) agree × positive); move ● into
@@ -591,3 +610,11 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   anchor-before-sleeplock build order already holds: BioInitAt mints
   the anchors in bio_names_ghost_alloc (the free-tok row), and
   BioInv.bio_init mints them before its sleeplock loop.
+- 2026-09-01 (design vetting of the R1-pre implementation notes): (i)–(iii)
+  accepted (RELEASE_IN wiring verified at SpecRelease.v:317 /
+  LinkRelease.v:12; the close_in_llb fold closes with tl' := tl).  (iv)
+  answered: the acquire post and payload rows stay ctx_floor — required
+  by the box withdraw (aguard on ctx_floor alone).  §1 reworded from
+  "one credential form" to the two-object rule (ctx_floor for T2
+  withdraws; cred_floor for T3 racy reads only).  §4.4b corroboration
+  accepted; the anchor-before-sleeplock order already holds.
