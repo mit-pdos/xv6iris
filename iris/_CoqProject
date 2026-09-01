@@ -1818,7 +1818,11 @@ LinkSysUnlinkAU.v
 # rest of the tree nothing.  Un-parking is the follow-on to the
 # every-slot-a-fragment change.
 # ---------------------------------------------------------------------
-# PARKED: UCodeShK.v
+# UCodeShK.v is NOT parked: UkSh.v (on-build, line 86) Requires it, so
+# parking it leaves UkSh building against a stale UCodeShK.vo -- caught
+# 2026-09-01 as "inconsistent assumptions over UserHeap" on a fresh
+# rebuild (a make -n check on prebuilt .vos does not see it).
+UCodeShK.v
 UkRunBr.v
 UkSh.v
 # PARKED: UkShRun.v
