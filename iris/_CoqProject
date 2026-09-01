@@ -1814,14 +1814,17 @@ LinkSysUnlinkAU.v
 # only by [ush_w32 g (t + 36) fd]), so "0 or 1" has to be said by the
 # parser, not assumed here.
 # ---------------------------------------------------------------------
-# Nothing outside these six files refers to them, so parking them costs the
-# rest of the tree nothing.  Un-parking is the follow-on to the
-# every-slot-a-fragment change.
+# UCodeShK.v IS NOT PARKED AND MUST NOT BE: it is the [uis_shk_*] catalog
+# UkSh.v READS, so parking it while listing UkSh.v leaves a dangling
+# dependency -- a local tree with a stale UCodeShK.vo still builds and a
+# fresh checkout does not ("No rule to make target 'UCodeShK.vo', needed by
+# 'UkSh.vo'").  It costs 10.6 s (see the catalog note above), so there was
+# never a build-time reason to shelve it either.
+#
+# Of the four files that ARE parked, nothing outside them refers to them,
+# so parking those costs the rest of the tree nothing.  Un-parking is the
+# follow-on to closing (c) above.
 # ---------------------------------------------------------------------
-# UCodeShK.v is NOT parked: UkSh.v (on-build, line 86) Requires it, so
-# parking it leaves UkSh building against a stale UCodeShK.vo -- caught
-# 2026-09-01 as "inconsistent assumptions over UserHeap" on a fresh
-# rebuild (a make -n check on prebuilt .vos does not see it).
 UCodeShK.v
 UkRunBr.v
 UkSh.v
