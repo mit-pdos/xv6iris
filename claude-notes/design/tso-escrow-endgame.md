@@ -207,13 +207,15 @@ the holder's hand, and the handle is frozen — that was the IDLE arm
 (A6.155 → A6.157), and it is why v2 has none.
 
 BUILD-AGENT FINDINGS ON v2 (2026-09-01, after A6.153–A6.157 landed and
-the R2 twins were half-written).  VETTED 2026-09-01: F1 ACCEPTED (gap
-real; the slot_d window token is the fix) with two corrections folded
-into the refutation table above — (b)'s OUT_L2 refutation is the COUNT
-AUTH, not "the cnt half" (Σ cannot do it at c = 1 with the unit in
-hdr_out), and (c)/(d) are NOT arm-agnostic (they refute OUT_L1 by
-slot_d).  F2 ACCEPTED (+ one regrouping lemma).  F3 ACCEPTED with the
-Q-valued sum.  F4/F5 ACCEPTED.  R1' may start on this shape.
+the R2 twins were half-written).  VETTED 2026-09-01: F1's DIAGNOSIS
+ACCEPTED; its fix went through two rounds — "slot_d's half rides
+hdr_out" (first vetting; needed a count-auth refutation for (b)'s
+OUT_L2 branch, which is bcache-specific and does not exist for an
+icache share checkout — the first vetting's error) — and was REPLACED
+by the WINDOW FLAG above (proposer's re-cut, accepted): arm shape by
+agreement, no count-auth appeal, (c)/(d) arm-agnostic.  F2 ACCEPTED
+(+ one regrouping lemma).  F3 ACCEPTED with the Q-valued sum.  F4/F5
+ACCEPTED.  R1' may start on the flag shape.
   F1  (a) has no refutation of OUT_L1.  hdr_out = ◯ m' with Σ m' = Σ m
       is the UNIT of the cmra at c = 0, and the withdrawer holds only
       cnt ½ 0 and L1's floor row: a second withdraw_L1 opened on
@@ -224,8 +226,9 @@ Q-valued sum.  F4/F5 ACCEPTED.  R1' may start on this shape.
       half into hdr_out (the window token) and (b) returns it at
       Td := T' — hdr_out := slot_d ½ Td ∗ ∃ m', ⌜Σ m' = Σ m⌝ ∗ ◯ m'.
       A second (a) then presents a third half of slot_d (½+½+½ > 1,
-      ghost_var validity).  [Vetting correction: (b) refutes OUT_L2 by
-      the COUNT AUTH (see the table); (c)/(d) refute OUT_L1 by slot_d.]
+      ghost_var validity).  [SUPERSEDED by the window flag (§2 above):
+      the half-moving fix left (b) without a generic OUT_L2 refutation;
+      the flag selects the arm shape by agreement instead.]
   F2  bcache's P_hdr must include buf_pay: the recycler rewrites the
       block IDENTITY (dev/blockno) and performs the pool exchange, both
       under L1, and pay is indexed by that identity.  So P_hdr :=
@@ -643,7 +646,13 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
      Σ m = c make agreement unnecessary; if it seems needed, a row is
      being maintained wrongly;
    - anything ξ-indexed proposed for Q or for a reference;
-   - an arm without a cell that the park can meet (the IDLE lesson).
+   - an arm without a cell that the park can meet (the IDLE lesson);
+   - a box lemma that appeals to a CLIENT ghost beyond the declared P,
+     Q and L2 token (count auths, identity ghosts, client tokens) — the
+     rule the count-auth fix broke; it is what keeps CtxBox.v generic.
+   BONUS RULE (from the flag): L1's payload row states slot_d ½ (Td,
+   false), so L1 cannot be released with a window open — the (a)…(b)
+   pair is forced into one critical section by the payload's shape.
 
 ## 6. Post-endgame cleanup (do NOT do before SystemAdequacy is green)
 
@@ -834,3 +843,11 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   count-auth appeal anywhere.  Also: icache P_hdr gains the
   identity-keyed payload arm (F2's twin).  §2 body/table, §3.2, §3.5
   (a)–(d), §4.2 amended in place.
+- 2026-09-01 (design vetting of the F1 re-cut): the WINDOW FLAG is
+  ACCEPTED as strictly better; the first vetting's count-auth fix was
+  bcache-specific (an icache share checkout puts no count fragment in
+  Q) and made a CtxBox lemma depend on a client cmra — withdrawn.  Stale
+  vetting text at the findings header and F1 rewritten; §5 gains the
+  "no client ghost in a box lemma" tripwire and the payload-row bonus
+  rule.  The icache identity-keyed payload arm in P_hdr is plausible;
+  confirm at R3's site map as the proposer says.
