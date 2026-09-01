@@ -17974,3 +17974,30 @@ CLEAN (ghost/register-tier only, verified): ireg_reg_inv, fs_bytes_inv,
 ftop_inv, escA (EscrowInode), perm_inv, wire_inv, uart/plic/disk_inv,
 stimecmp_free (a ↦ᵣ CSR cell -- registers are hart state, no ctx axis),
 kpt_inv (already ctx_values), crash_inv, pipes (lock-payload tier).
+
+## A6.147: PHASE 5 MEASUREMENT -- the bcache escrow choreography, mapped
+## before the anchor cutover (r74 baseline)
+
+Every real [iInv bioN] site in the tree, measured (six, plus a helper):
+ProofBread :1387 (sw b->dev, recycle, UNDER bcache.lock, escrow_recyc_dev),
+:1416 (sw b->blockno, UNDER bcache.lock, escrow_recyc_bno via Parts: pool
+evict + withdraw, closes as buf_mid), :1441 (claim peek, open/close_mid),
+:1460 (sw b->valid=0, UNDER bcache.lock, escrow_recyc_valid -> parked
+invalid); ProofBread :688 (lw b->valid checkout, UNDER b->lock,
+escrow_swap_checkout); ProofBrelse :677 (park store before releasesleep,
+UNDER b->lock, escrow_swap_park_now).  THE ESCROW IS NEVER OPENED IN THE
+LOCK-FREE WINDOWS: it is storage ACROSS them; every transition is inside
+a critical section.  Cutover consequences: (1) sites 1-4 dissolve into
+bcache.lock-payload cell ops (buf_mid + the three escrow_recyc_* lemmas
+die); (2) sites 5/6 become anchor withdraw/deposit at the SAME leaves;
+(3) brelse's refcnt-- at 0 folds the box back into the payload's
+refcnt-0 arm under bcache.lock.
+
+GUARD ROUTE, MEASURED AT THE REAL SITES (the A6.142 open question):
+every withdraw sits immediately after an acquire AMO -- acquiresleep for
+the checkout (its AMO-read of the parker's post-fence(rw,w) release
+store is the standard release-acquire transfer the sleeplock's R payload
+already uses), bcache.lock's acquire for the fold-back (deposit and
+withdraw under the same lock).  So aguard_receipt AT THE WITHDRAWER'S
+OWN ACQUIRE LEAF covers every case; the lock_pay_won route (and its
+WpLock stamp-ordering export) is NOT needed; gen-0 is boot-only.
