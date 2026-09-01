@@ -281,6 +281,81 @@ Section UserFd.
   Lemma ufd_alloc_fdt0 : ⊢ |==> ∃ γf : gname, ufd_auth γf fdt0.
   Proof. iApply (ufd_alloc fdt0 fdt0_length). Qed.
 
+  (* ...AND THE SAME MINT KEEPING THE FRAGMENTS.  [ufd_alloc] drops them on
+     the floor, and for a FRESH process that is exactly right -- its table
+     is all closed, so [ufd_map_fdt0] says the map is empty and there was
+     nothing to keep.  A FORKED CHILD is the other case: its table is its
+     parent's, so the map is whatever the parent had open, and those
+     fragments are precisely the handles that let the child close what it
+     inherited.  Dropping them is what made a forked child unable to close
+     fd 0, and [FdSlots.v]'s own retirement note calls this habit out by
+     name ("the weakening DISCARDS a value the producer had in hand").
+     Every key of the map is open by construction of the filter, so the
+     big-op is a family of real handles and not of [fd ↪ st] alone. *)
+  Lemma ufd_alloc_open (fdv : list fdstate) :
+    length fdv = NOFILE ->
+    ⊢ |==> ∃ γf : gname,
+        ufd_auth γf fdv ∗ ([∗ map] fd ↦ st ∈ ufd_map fdv, ufd γf fd st).
+  Proof.
+    intros Hlen. iMod (ghost_map_alloc (ufd_map fdv)) as (γf) "[Ha Hfr]".
+    iModIntro. iExists γf. iSplitL "Ha".
+    { iFrame "Ha". iPureIntro. exact Hlen. }
+    iApply (big_sepM_mono with "Hfr").
+    intros fd st Hst. cbn beta.
+    iIntros "Hf". iFrame "Hf". iPureIntro.
+    exact (proj2 (proj1 (ufd_map_lookup fdv fd st) Hst)).
+  Qed.
+
+  (* WHAT A SET OF HANDLES SAYS ABOUT THE TABLE: the states they name are
+     the table's, at the slots they name.  Stated as a map inclusion so it
+     composes with [big_sepM_subseteq] -- which is how a forked child gets
+     handles for exactly what its parent held, without either side ever
+     naming the whole table. *)
+  Lemma ufd_sub (γf : gname) (fdv : list fdstate) (D : gmap nat fdstate) :
+    ufd_auth γf fdv -∗
+    ([∗ map] fd ↦ st ∈ D, ufd γf fd st) -∗
+    ⌜D ⊆ ufd_map fdv⌝.
+  Proof.
+    iIntros "[Ha _] HD".
+    iDestruct (big_sepM_mono (fun fd st => ufd γf fd st)
+                 (fun fd st => (fd ↪[γf] st)%I) with "HD") as "HD";
+      [ by iIntros (k v _) "[$ _]" | ].
+    iApply (ghost_map_lookup_big with "Ha HD").
+  Qed.
+
+  (* ...and the mint a fork needs: a FRESH authority at the same table,
+     handing back handles for a chosen sub-map of it.  The caller passes
+     the sub-map its own handles cover ([ufd_sub] is what proves the side
+     condition), so neither the statement nor its user has to name the
+     whole table -- which matters, because the table lives inside
+     [UkRun.urun]'s existential and no caller can see it. *)
+  Lemma ufd_alloc_sub (fdv : list fdstate) (D : gmap nat fdstate) :
+    length fdv = NOFILE -> D ⊆ ufd_map fdv ->
+    ⊢ |==> ∃ γf : gname,
+        ufd_auth γf fdv ∗ ([∗ map] fd ↦ st ∈ D, ufd γf fd st).
+  Proof.
+    intros Hlen Hsub.
+    iMod (ufd_alloc_open fdv Hlen) as (γf) "[Ha Hfr]".
+    iModIntro. iExists γf. iFrame "Ha".
+    iApply (big_sepM_subseteq _ _ _ Hsub with "Hfr").
+  Qed.
+
+  (* pulling ONE inherited handle out of that family, at a slot the caller
+     can point to in the table.  The rest comes back, so a child that
+     inherited three descriptors spends this three times. *)
+  Lemma ufd_alloc_open_at (γf : gname) (fdv : list fdstate)
+      (fd : nat) (st : fdstate) :
+    fdv !! fd = Some st -> st <> FdClosed ->
+    ([∗ map] k ↦ v ∈ ufd_map fdv, ufd γf k v) -∗
+    ufd γf fd st ∗ ([∗ map] k ↦ v ∈ delete fd (ufd_map fdv), ufd γf k v).
+  Proof.
+    intros Hl Hne.
+    assert (Hm : ufd_map fdv !! fd = Some st)
+      by (apply ufd_map_lookup; split; [exact Hl | exact Hne]).
+    iIntros "Hfr".
+    iDestruct (big_sepM_delete _ _ fd st Hm with "Hfr") as "[$ $]".
+  Qed.
+
   (* A HANDLE NAMES A DESCRIPTOR A C [int] CAN HOLD.  This is the fact an
      argument-register premise is proved from. *)
   Lemma ufd_bound (γf : gname) (fdv : list fdstate) (fd : nat) (st : fdstate) :

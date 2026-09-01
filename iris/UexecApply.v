@@ -670,7 +670,22 @@ Section LoopApply.
           as [Hx | _]; [ contradiction (Hnex Hx) | ].
         destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_fork))
           as [_ | _].
-        * (* fork: nothing says [r <> 0] (K2) -- MINT *)
+        * (* THE FORK ROW, AND WHAT THE KERNEL STILL OWES.  Both of
+             fork's arms are discharged by MINTING a slot out of the
+             [∀ W'', uslot W''] family rather than by instantiating the
+             program's own arm: nothing here says [r <> 0], so the round
+             cannot tell parent from child, and the mint serves either.
+             That is why strengthening the child arm's guard to
+             [fdv' = uvis_fd W] ([UexecRet.uexec_ret_F]) costs this proof
+             nothing -- it never supplies the premise at all.
+             IT IS ALSO WHY THE FACT IS NOT YET EARNED.  The child's table
+             really is a copy ([ProofKforkParts.kfk_childV_full] proves the
+             POINTER array is), but the fdstate view reaches the child
+             through the park, where [ProofForkretPark]'s closure mints
+             [uslot (uvis_of U' sts)] at an EXISTENTIAL [sts] --
+             [FdSlots.v]'s own retirement note names [fd_frags_any] as
+             where the value is dropped.  Closing that is what turns this
+             mint into an instantiation. *)
           iApply "Hmk".
         * (* the returning arms: the row is the round's own conjunct *)
           (* the bump's two readers, hoisted out of argument position
