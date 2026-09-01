@@ -18392,3 +18392,28 @@ Code consequences (all inside the R2 file set): BioDefs.bioUR + the tok
 kit (first_ref/incr/decr/lookup/two), bio_slot_res2's Some-arm tie by
 match on the option share, bchain, the two swap lemmas' signatures,
 bcache_scan2_incr/recycle mint bchain (no fraction split for the chain).
+
+### A6.156: R2 progress -- the review-independent half landed (bpin, bwrite, log_write, the scan loops)
+
+While the A6.155 refinement is out for vetting, everything that does not
+depend on the chain-reference spelling landed and compiles:
+- BioInv: the v2 slot accessors (bcache_res2_to_scan, bio_slots_acc2,
+  bio_slot_devbno_acc2, bio_slot_refcnt_acc2) at the ambient context.
+- ProofBreadParts: bcache_scan2_incr (refs++: bump at 0 through the box
+  with the resting content assembled from the None arm; another fragment
+  at >= 1) and bcache_scan2_recycle (the recycler's stores are plain cell
+  writes on the None arm; the pool exchange and the bump happen in the
+  closing wand) -- both hand out a fractioned bref; the v1 twins deleted.
+- ProofBpin: the inline refcnt++ block IS bcache_scan2_incr (100 lines
+  -> one call); the bcache lock at the λ payload; the closing wand runs
+  at the running token (SieCapCtx.sie_cap_gpr_own_ctx_acc, fupd_wp).
+- Holdingsleep gained the genl tier (SpecHoldingsleep/ProofHoldingsleep,
+  const derived at (fun _ => R)); ProofBwrite calls it at bslp.
+- ProofLogWrite: the two structural bref destructs carry the fragment.
+- ProofBread: the five scan-loop lemmas and the main lemma carry
+  bcache_scan2 + the floor slot; hit/recyc bodies and bread_tail still
+  v1 (WIP -- they are the review-dependent sites 1-5).
+Pending the review: bioUR's option share + the tok kit, bchain, the OUT
+residue and the two swap signatures, then ProofBread sites 1-5,
+ProofBrelse (park, releasesleep _in, refs--), ProofBunpin (the decr twin),
+deletion of the v1 escrow, the -B round.

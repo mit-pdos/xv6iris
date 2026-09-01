@@ -2263,6 +2263,104 @@ Section BioBox.
   (*  The v2 context and its boot (bio_init's clone with the box).        *)
   (* ================================================================== *)
 
+  (* ================================================================== *)
+  (*  R2 (A): the v1 slot accessors restated over the v2 payload, at the  *)
+  (*  ambient context (the payload has been morphed to cur_ctx by the     *)
+  (*  acquire; every [↦₄] below is [ctx_word4_pointsto cur_ctx]).          *)
+  (* ================================================================== *)
+
+  Section BioSlots2.
+  Context `{XI : CurCtx}.
+
+  Lemma bcache_res2_to_scan (bn : bio_names) (V : bio_view Σ) :
+    bcache_res2 bn V cur_ctx -∗
+    ∃ M ord devs bnos tl,
+      TsoCtx.ctx_floor cur_ctx tl ∗ bcache_scan2 bn V M ord devs bnos tl cur_ctx.
+  Proof. rewrite /bcache_res2. iIntros "H". iExact "H". Qed.
+
+  Lemma bio_slots_acc2 (bn : bio_names) (V : bio_view Σ)
+      (M : gmap nat (Qp * positive)) (devs bnos : nat -> mword 32)
+      (tl i : nat) :
+    (i < NBUF)%nat ->
+    ([∗ list] k ∈ seq 0 NBUF, bio_slot_res2 bn V M k (devs k) (bnos k) tl cur_ctx) -∗
+    bio_slot_res2 bn V M i (devs i) (bnos i) tl cur_ctx ∗
+    (∀ (M' : gmap nat (Qp * positive)) (devs' bnos' : nat -> mword 32),
+       ⌜∀ k, k ≠ i -> M' !! k = M !! k /\ devs' k = devs k /\
+             bnos' k = bnos k⌝ -∗
+       bio_slot_res2 bn V M' i (devs' i) (bnos' i) tl cur_ctx -∗
+       [∗ list] k ∈ seq 0 NBUF, bio_slot_res2 bn V M' k (devs' k) (bnos' k) tl cur_ctx).
+  Proof.
+    iIntros (Hi) "H".
+    assert (Hlk : seq 0 NBUF !! i = Some i) by (apply lookup_seq; lia).
+    rewrite (big_sepL_delete
+               (fun _ k => bio_slot_res2 bn V M k (devs k) (bnos k) tl cur_ctx)
+               (seq 0 NBUF) i i Hlk).
+    iDestruct "H" as "[$ Hrest]".
+    iIntros (M' devs' bnos' HM') "Hi".
+    rewrite (big_sepL_delete
+               (fun _ k => bio_slot_res2 bn V M' k (devs' k) (bnos' k) tl cur_ctx)
+               (seq 0 NBUF) i i Hlk).
+    iFrame "Hi".
+    iApply (big_sepL_mono with "Hrest").
+    intros idx y Hy. destruct (decide (idx = i)) as [->|Hne]; [done|].
+    apply lookup_seq in Hy as [-> _].
+    destruct (HM' _ Hne) as (HMk & Hdk & Hbk).
+    unfold bio_slot_res2. rewrite HMk Hdk Hbk. done.
+  Qed.
+
+  (* the LRU scan's borrow of dev/blockno: SOME fraction of both cells *)
+  Lemma bio_slot_devbno_acc2 (bn : bio_names) (V : bio_view Σ)
+      (M : gmap nat (Qp * positive)) (k : nat) (dev bno : mword 32) (tl : nat) :
+    bio_slot_res2 bn V M k dev bno tl cur_ctx -∗
+    ∃ q : Qp,
+      b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
+      b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗
+      (b_dev (bpa k) ↦₄{DfracOwn q} dev -∗
+       b_blockno (bpa k) ↦₄{DfracOwn q} bno -∗
+       bio_slot_res2 bn V M k dev bno tl cur_ctx).
+  Proof.
+    iIntros "[Hregs Hslot]". rewrite /bio_slot_res2.
+    destruct (M !! k) as [[qt n]|] eqn:HMk.
+    - iDestruct "Hslot" as "(%Hn & Hcell & Hsl & Hc & Hqr)".
+      iDestruct "Hqr" as (qr) "(%Htie & Hdev & Hbno)".
+      iExists qr. iFrame "Hdev Hbno". iIntros "Hdev Hbno".
+      iFrame "Hregs". iSplitR; [by iPureIntro|]. iFrame "Hcell Hsl Hc".
+      iExists qr. iSplitR; [by iPureIntro|]. iFrame "Hdev Hbno".
+    - iDestruct "Hslot" as "(Hcell & Hc & Hcont)".
+      iDestruct "Hcont" as (v bs) "(Hvld & Hdev & Hbuf & Hbno & Hpay)".
+      iDestruct (ctx_word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
+      iExists (1/2)%Qp. iFrame "Hdev1 Hbno". iIntros "Hdev1 Hbno".
+      iDestruct (ctx_word4_pointsto_half_join with "Hdev1 Hdev2") as "Hdev".
+      iFrame "Hregs Hcell Hc". iExists v, bs. iFrame "Hvld Hdev Hbuf Hbno Hpay".
+  Qed.
+
+  (* the backward scan's borrow of the refcnt word, with the [beqz] tie *)
+  Lemma bio_slot_refcnt_acc2 (bn : bio_names) (V : bio_view Σ)
+      (M : gmap nat (Qp * positive)) (k : nat) (dev bno : mword 32) (tl : nat) :
+    bio_slot_res2 bn V M k dev bno tl cur_ctx -∗
+    ∃ cw : mword 32,
+      brefcnt k ↦₄ cw ∗
+      ⌜(eq_vec (sign_extend' 64 cw) (zero_reg : mword 64) = true /\ M !! k = None)
+       \/ (eq_vec (sign_extend' 64 cw) (zero_reg : mword 64) = false
+           /\ is_Some (M !! k))⌝ ∗
+      (brefcnt k ↦₄ cw -∗ bio_slot_res2 bn V M k dev bno tl cur_ctx).
+  Proof.
+    iIntros "[Hregs Hslot]". rewrite /bio_slot_res2.
+    destruct (M !! k) as [[qt n]|] eqn:HMk.
+    - iDestruct "Hslot" as "(%Hn & Hcell & Hsl & Hc & Hqr)".
+      iExists (mword_of_int (Z.pos n) : mword 32). iFrame "Hcell".
+      iSplitR.
+      { iPureIntro. right. split; [exact (brc_word_nonzero_eqv n Hn) | by eexists]. }
+      iIntros "Hcell". iFrame "Hregs". iSplitR; [by iPureIntro|]. iFrame "Hcell Hsl Hc Hqr".
+    - iDestruct "Hslot" as "(Hcell & Hc & Hcont)".
+      iExists (mword_of_int 0 : mword 32). iFrame "Hcell".
+      iSplitR.
+      { iPureIntro. left. split; [exact brc_word_zero_eqv | reflexivity]. }
+      iIntros "Hcell". iFrame "Hregs Hcell Hc Hcont".
+  Qed.
+
+  End BioSlots2.
+
   Section BioBoot2.
   Context `{XI : CurCtx}.
 

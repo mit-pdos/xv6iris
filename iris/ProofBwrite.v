@@ -330,8 +330,11 @@ Section ProofBwrite.
                  with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CID8 eb pj ltac:(rewrite Hbm; wp_next_chain)
                  with "Hextm") as "Hextm".
-    iApply (HSL.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb b _ Vpr HKhsl Hbelow
+    (* ENDGAME R1-pre: the buffer sleeplock is the λ instance at [bslp];
+       holdingsleep's genl tier takes the token at its share. *)
+    iDestruct "Hstok" as (qsl) "Hstok".
+    iApply (HSL.wp_holdingsleep_genl_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
+              "buffer"%string (bslp bn k) SleepLock.sl_untracked qsl mA pj pidv (K - 4)%nat eb b _ Vpr HKhsl Hbelow
               with "Hcg Hcnt Htext Hpc [] [Hstok] Hppid").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }
@@ -339,6 +342,8 @@ Section ProofBwrite.
     iIntros (CID9 Hs9 mH) "%Hhs Hcg Hcnt Hpc Hstok Hppid".
     destruct Hhs as [Hcs1 Hha0].
     iEval (rewrite HmAa0) in "Hstok".
+    iAssert (SleepLock.sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv) with "[Hstok]" as "Hstok".
+    { iExists qsl. iExact "Hstok". }
     assert (Hpc12 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.bwrite + 0x12)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc12) in "Hpc".

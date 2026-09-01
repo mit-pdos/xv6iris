@@ -69,12 +69,13 @@ Section ProofHoldingsleep.
       | rewrite upd_ne; [| vm_compute; discriminate]
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
 
-  Lemma wp_holdingsleep_gen_sconf
-      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
+  Lemma wp_holdingsleep_genl_sconf
+      (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R}
+      (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_holdingsleep_gen_sconf_body γl γsl s R H q m p pidv av eb b lks Vpr.
+    : wp_holdingsleep_genl_sconf_body γl γsl s R H q m p pidv av eb b lks Vpr.
   Proof.
-    cbv beta delta [wp_holdingsleep_gen_sconf_body].
+    cbv beta delta [wp_holdingsleep_genl_sconf_body].
     intros pcE slk ret_tgt Hav Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
@@ -94,7 +95,7 @@ Section ProofHoldingsleep.
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hb5 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 5).
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iDestruct (is_sleeplock_gen_lock with "Hsleeplock") as "#Hlk".
+    iDestruct (is_sleeplock_genl_lock with "Hsleeplock") as "#Hlk".
     (* ===================== PROLOGUE ===================== *)
     assert (Hpush : add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) = pa_stk sp0 6) by exact Hspr6.
     iApply (wp_caddi16sp_push_s_sconf pcE (mword_of_int 61 : mword 6) m av 6 b ltac:(lia) Hpush
@@ -236,7 +237,7 @@ Section ProofHoldingsleep.
     iDestruct (cpu_own_transport CID CID10 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* acquire(&slk->lk): intr_count 0 -> 1; is_lock from the sleeplock. *)
-    iApply (Acquire.wp_acquire_sconf KT1 γl "sleep lock"%string (sl_pay γsl slk (fun _ => R) H) M5
+    iApply (Acquire.wp_acquire_sconf KT1 γl "sleep lock"%string (sl_pay γsl slk R H) M5
               0%nat b p (av - 6)%nat b lks
               ltac:(lia)
               ltac:(lia)
@@ -250,7 +251,7 @@ Section ProofHoldingsleep.
       by (rewrite HM5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc18) in "Hpc".
     (* open sl_res with the caller's token: refute the free arm. *)
-    iDestruct (sl_res_open_held_q γsl slk R H q with "HR Hsl")
+    iDestruct (sl_res_open_held_q γsl slk (R TsoCtx.cur_ctx) H q with "HR Hsl")
       as "(Hsl & Hha & HHq & Hcellex)".
     (* the lock's pid field rides inside the holder token now (SleepLock.v's
        [sleeplocked_q]); holdingsleep only READS it, so it comes out and goes
@@ -496,10 +497,10 @@ Section ProofHoldingsleep.
       rewrite /D1e upd_ne; [| vm_compute; discriminate].
       rewrite /C46 upd_ne; [| vm_compute; discriminate]. exact HC42csp. }
     (* close sl_res again (held), for release's R argument. *)
-    iDestruct (sl_res_close_held γsl slk R H v Hvnz with "Hslk Hdep") as "HR20".
-    iDestruct (sl_pay_of_res γsl slk (fun _ => R) H with "HR20") as "HR2".
+    iDestruct (sl_res_close_held γsl slk (R TsoCtx.cur_ctx) H v Hvnz with "Hslk Hdep") as "HR20".
+    iDestruct (sl_pay_of_res γsl slk R H with "HR20") as "HR2".
     (* release(&slk->lk): intr_count 1 -> 0. *)
-    iApply (Release.wp_release_sconf KT1 γl (sl_lk slk) "sleep lock"%string (sl_pay γsl slk (fun _ => R) H) D20
+    iApply (Release.wp_release_sconf KT1 γl (sl_lk slk) "sleep lock"%string (sl_pay γsl slk R H) D20
               0%nat b p (av - 6)%nat ({["sleep lock"]} ∪ lks)
               ltac:(rewrite HD20a0; apply addv_sext0)
               ltac:(lia)
@@ -726,6 +727,20 @@ Section ProofHoldingsleep.
         split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
         apply Hthr; vm_compute; first [reflexivity | discriminate].
       - exact HE2e_a0. }
+  Qed.
+
+  (* the const instance, at [(fun _ => R)] *)
+  Lemma wp_holdingsleep_gen_sconf
+      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
+    : wp_holdingsleep_gen_sconf_body γl γsl s R H q m p pidv av eb b lks Vpr.
+  Proof.
+    pose proof (wp_holdingsleep_genl_sconf γl γsl s (fun _ => R) H q m p pidv av eb b lks Vpr) as HK.
+    cbv beta zeta delta [wp_holdingsleep_genl_sconf_body] in HK.
+    cbv beta zeta delta [wp_holdingsleep_gen_sconf_body].
+    intros Hav Hbelow. specialize (HK Hav Hbelow).
+    iIntros "Hcg Hcnt #Htext Hpc #Hslk Hsl Hpid Hcont".
+    iApply (HK with "Hcg Hcnt Htext Hpc Hslk Hsl Hpid Hcont").
   Qed.
 
   (* the untracked instance, which is what every existing caller takes *)

@@ -45,6 +45,36 @@ Import Defs.
    deposit straight back and re-closes, so [H] appears nowhere but in the
    lock predicate -- and [wp_holdingsleep_sconf_body] below is literally this
    at the untracked instance. *)
+(* ENDGAME R1-pre: the context-λ payload tier, the base every const tier
+   derives from (the sleeplock's payload is a WpLock payload).  holdingsleep
+   never touches R, so the body is the gen body with [is_sleeplock_genl]. *)
+Definition wp_holdingsleep_genl_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
+    (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.holdingsleep in
+  let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
+                   in
+  (16 <= av)%nat ->
+  locks_below lks "sleep lock" ->
+  sie_cap_gpr KT1 m av b p -∗
+  cpu_own 0 eb p b lks -∗
+  kernel_text -∗ pc_is pcE -∗
+  is_sleeplock_genl γl γsl slk s R H -∗
+  sleeplocked_q γsl q slk pidv -∗
+  proc_priv_bare p pidv Vpr -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ mf : regfile,
+      ⌜ callee_saved m mf /\
+        mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ⌝ -∗
+      sie_cap_gpr KT1 mf av b p -∗
+      cpu_own 0 eb p b lks -∗
+      pc_is ret_tgt -∗
+      sleeplocked_q γsl q slk pidv -∗
+      proc_priv_bare p pidv Vpr -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Definition wp_holdingsleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
     (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -108,6 +138,10 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{
   WP (Loop : expr riscv_lang).
 
 Module Type HOLDINGSLEEP.
+  Parameter wp_holdingsleep_genl_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} (H : Qp -> iProp Σ) (q : Qp)
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate),
+      wp_holdingsleep_genl_sconf_body γl γsl s R H q m p pidv av eb b lks Vpr.
   Parameter wp_holdingsleep_gen_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate),
