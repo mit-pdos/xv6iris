@@ -483,3 +483,39 @@ floor row into IcacheEscrow.itable_res2; is_itable2 λ-flip.  (3) the
 swap + the 11 cell-faced AU rewrites + icM_wf n <= IREFSLOTS +
 IcacheBoot + the consumer wave (the r64 interim pin0 seams get replaced
 by real floors from lock rows -- un-parkers re-mint under the lock).
+
+## r66 BANKED (snapshot 63d92f9b612): 4b-iii store-twin leg
+
+Additive, world 1304/1305.  CtxPinw's two store faces
+(ledger_store_pinw_ok / pinw_write_c) now EXPOSE the re-mint bound: the
+returned window rows carry ⌜t <= length g'.(glog)⌝ / ⌜t <= S (length
+log)⌝, which is what lets an AU reclose [iref_pin_rows] at a bumped
+stamp.  FOUR pinw store AU twins are certified in IcacheInv's Reg
+section, all against [itable_inv_pinw]:
+- iref_incr_store_pinw_au (licenced up-count; the model),
+- iref_close_store_pinw_au (survivor down-count),
+- iref_dup_store_pinw_au (self-split, no arm motion),
+- iref_upgrade_mir_store_pinw_au (licence-free up-count; the caller's
+  own slice refutes frozen, mirror rides for the region only).
+The SHARED choreography: open icacheN; pinw_slot_acc_upd; slot
+destructures to (g, lo, tst) with ⌜lo<=tst⌝; the caller's genlo
+slice/token AGREES (g, lo) by pair-agree and REFUTES the frozen arm
+(full unit + slice > 1); the two istmp halves (inv + A6.144 payload)
+agree, yield rows at tstp; on take-back ([pinw_store_post] = ∃tst',
+llb tst' ∗ rows(w')), max-bump the joined stamp auth, rebound rows,
+reclose; posts return the payload half at (max tstp tst') + llb(max)
+via llb_max, with ⌜lo <= tstn⌝ for the caller's later floor mint.
+Ghost movers: pinw_arm_split/pinw_arm_join (residual Qp algebra),
+iref_close_step_noarm, iref_dup_step_genlo, pinw_slot_acc_upd.
+NOTE: iref_upgrade_store_au needs NO twin (rider stays outside).
+
+NEXT: the ARM/RETIRE conversion faces in CtxPinw (all instruments
+verified present): retire = ledger_pinw_drop_run -> ledger_store_win_at_ok
+-> hart_view_lb_get (my view = S len after my own store) ->
+TsoCtx.ctx_bound_raise (own_context + hart_view_lb ==> ctx_floor) ->
+ctx_floor_le -> ctx_phys_pointsto_of_at_floor per byte; arm =
+ctx_phys_pointsto_ledger per byte -> at-store -> pinw mint
+(pinw_ok1_mint at lo := S len, member = the count-1 word) +
+live_genlo_bump (fresh g', lo' := S len) in the AU.  Then close_last/
+alloc AU twins, the locked exact read, itable_res2 extension, swap,
+consumers.
