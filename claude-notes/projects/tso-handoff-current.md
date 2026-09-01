@@ -1,4 +1,4 @@
-# TSO port: LIVE HANDOFF CHECKPOINT (2026-08-31, r67 CERTIFIED)
+# TSO port: LIVE HANDOFF CHECKPOINT (2026-09-01, r74 CERTIFIED)
 
 This file is the resumption point for a FRESH agent taking over the TSO
 port.  It is updated at green boundaries; trust the newest git commit of
@@ -755,3 +755,97 @@ iref_close_last_store_pinw_au + the ordinary ctx sw for the zeroing...
 NOTE the retire choreography revision: the conversion happens at the
 STORE leaf obligation with the A6.144 floor), ProofIdup, IcacheBoot,
 relink, sweep, bank.
+
+## A6.146: THE FRESH-REF CREDENTIAL (received-or-wrote at the bundle tier)
+
+DISCOVERY (r70 arc): iget's FRESH path cannot mint the bundle floor.
+The arm store is the holder's own buffered store; a [ctx_floor cur_ctx]
+at/above it is semantically false until a drain, and iget contains NO
+drain point (release is fence rw,w + plain sw -- fence_drains = false;
+Ztso needs no drain there).  The old live_frac0_fracc build at the arm
+exit was the pre-cutover lo=0 placeholder.
+
+THE DESIGN (all existing vocabulary; §0.38' received-or-wrote, the
+[WpLock.lk_floor]/[CtxValues] pattern one tier up):
+- IcacheRef.cred_floor lo tl := ctx_floor cur_ctx tl ∨ ∃a, ctx_wrote
+  cur_ctx lo a.  live_fracc's third conjunct IS now cred_floor (same
+  (g lo tl) binder shape, so the r64-wave destructures survive).
+  Builders: cred_floor_of_ctx / of_wrote / cred_floor_0.
+- The arm-store OBLIGATION registers its own message
+  ([TsoCtx.ctx_wrote_register] at W exposed BEFORE the append,
+  choreography copied from WpSconfMem:4140) and the wrote witness rides
+  Post/Ψ out to the TAILC, which builds live_fracc on the wrote arm.
+- Cash-in: IcachePinwObl.cred_floor_vis (either arm -> ∃K, view_lb K ∗
+  ledger_vis hart K lo); TsoCtx.ledger_read_pinw_vis (the _ok twin at
+  the two-armed licence -- visibleb's own-message arm IS store
+  forwarding, so the author reads its fresh slot at EVERY view).
+- iref_read_obl now takes cred_floor (route through the two above);
+  SpecIlock/SpecIunlock/SpecIunlockput floor rows are cred_floor rows;
+  ProofIlock/ProofIunlock Res changed textually only.
+Recycled-slot builds (iget hit path, idup, ...) use cred_floor_of_ctx at
+the payload row's floor (#Hflj) with the twin's ⌜lo<=tstj⌝.
+
+
+## r74 BANKED (snapshot 6ef6560415e): THE A6.145/A6.146 RELINK WAVE IS
+## COMPLETE -- GREEN=1284/1292, single error root ProofForkretPark:345
+
+The swap-wave and its entire consumer cone are green and certified by
+four full rounds (r71..r74).  RED = exactly the ForkretPark 8-file cone.
+World denominator moved 1309 -> 1292 (see island deletion below).
+
+What landed since the last banked entry:
+- **Relink shell 2 end to end**: SysMkdir/SysMknod (create ∃-pack
+  deposit destructured at the IUP), SysLink (+6 sl_tail_* sites, the
+  bad-arm re-ilock at kd, one deliberately re-erased forget arm),
+  SysUnlink (FULL sweep: su_w2_bad/su_w2/su_w3/su_w5_file/su_w5_dir
+  statements gained (loyd tlyd)/(loyi tlyi) binders + pure/cred/claims
+  trios before every deposit; both seam continuations; sconf threading),
+  Create (8 parent wp_iunlockput_gen sites at cr_*_half scope with
+  per-site ∃-pack destructures, 2 child IUPs, the Hfbad box, the
+  ctx_floor->cred_floor vocabulary sweep x13, create_locked_mk pack
+  braces in goal-order), CreateFreshTy (post keep row is now the
+  ∃-packed genlo+cred -- A6.146-native; the weaken deleted), KexecA,
+  NamexTr (pin_on_keep_short + 4 IUP sites), Filestat/Fileread (iunlock
+  returns GENLO now: pin_on_keep gathers deleted), SysOpen+Parts+Tails
+  (so_publish takes cred_floor; so_tail_s forgets via
+  inode_shr_gen_forget; the four bundle lemmas carry ∃-pack keeps).
+- **THE INTERIM PIN INSTRUMENTS ARE RETIRED**: iref_share_pin0,
+  inode_shr_gen_pin0, inode_ref_short_gen_pin0 have ZERO call sites.
+  Fresh-child credentials flow from create_fresh_ty's post (A6.146);
+  zero-epoch pinning is gone from the tree.
+- **Kexec chain**: SpecKexecB2/B3 + ProofKexecB/B2/B3 + PinnedA +
+  ProofKexec/ProofKexecPinned all threaded (kxc_open/kxc_res/kxc_at_12c
+  carry (loyf tlyf) + the trio; kxc_open_intro reseals with it).
+  GOTCHA that cost a day: ProofKexec/ProofKexecPinned sat behind STALE
+  .vo through four rounds (rounds without -B do not recheck a file whose
+  deps' interfaces changed only transitively) -- the forced -B profiling
+  build surfaced them.  A -B round is the only honest full certification
+  after an interface wave.
+- **FsEff*/FsOp* DEAD ISLAND DELETED** (owner ruling): 17 files
+  (FsOp{Filewrite,IputFree,Ireclaim,Link,Mkdir,Mknod,Open,Unlink},
+  FsEff{Base,Trunc,AllocIndBlock,AllocBlock,CreateEntry,FreeInode,
+  LinkEntry,UnlinkEntry,WriteData}) removed from tree + _CoqProject.
+  FsWf and FsCrash are LIVE and kept.  Only outside ref was a comment in
+  FsStateInode.v:386.
+- **OPTIMIZATION ROUND** (opus subagent, full TIMING=1 -B profile then
+  isolated A/B per optimization.md): FsWf 34.5->2.3s (f_equal ->
+  apply (f_equal mjoin)), VirtioProto 123.5->76.8s (set_solver atom
+  clearbody, clear before tauto, abstract-length pa_range_decide),
+  ProofEndOp 65->59.3s (inline ltac: args hoisted to named asserts at
+  the three release sites), UsertrapRes 23.5->12.6s (iFrame "Hkpt" ->
+  iSplitR;[iExact..]), FileInv 12.5->8.1s (big_sepL_sep rewrite -> the
+  wand form).  -38.5% serial over touched files.  MEASUREMENT FACT: the
+  -j180 per-SENTENCE numbers are NOT inflated (only whole-file wall is);
+  a parallel TIMING=1 profile's tactic ranking is trustworthy as-is.
+  Owner rulings on the residue: goodb_stepi / mc_rs_lk / mm_rs_lk /
+  solve_contractive are not worth fixing; VirtioProto's tauto residual
+  (11.9s) has a recorded next step (abstract the ∈-atoms) if wanted.
+- Profiling harness: ZZtiming.sh at the tree root (forced -B TIMING=1
+  round + /tmp/timing-report.txt aggregation; sentence excerpts must be
+  sliced at BYTE offsets -- the .v files are unicode-heavy).
+
+NEXT: Phase 5 (bcache anchor refactor per the ratified three-way split;
+measure ProofBget/ProofBrelse choreography + the guard-mint route at
+the real sites first), then Phase 4.5 (ic_escrow, the same design
+verbatim), then the main-side off/inode_pay rebase, the is_ftable
+λ-flip re-land, and ForkretPark's last bullet.
