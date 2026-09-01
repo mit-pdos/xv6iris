@@ -1783,36 +1783,53 @@ LinkSysUnlinkAU.v
 #       fd 0 and fd 1, threaded from [wp_ksh_start] out through [ush_rest]
 #       to exactly this file's front door.
 #
-#   (c) OPEN, and it is the real one: FORK'S CHILD ARM DOES NOT SAY THE
-#       CHILD'S DESCRIPTOR TABLE IS A COPY OF THE PARENT'S.
-#       [UexecRet.uexec_ret_F]'s fork arm gives the parent
-#       [fdv' = uvis_fd W] and gives the child only
-#       [length fdv' = NOFILE] -- a table of the right shape and nothing
-#       else.  xv6's fork() does [np->ofile[i] = filedup(p->ofile[i])], so
-#       the fact is TRUE and the kernel side has it; the u-tier drops it,
-#       because that arm MINTS rather than instantiating.
+#   (c) HALF CLOSED.  The u-tier now CARRIES the fork fact:
+#       [UexecRet.uexec_ret_F]'s child arm reads [fdv' = uvis_fd W], like
+#       the parent's, and [UkFork.wp_uk_ecall_fork] takes a handle set and
+#       hands it back to BOTH processes at their own ghost names.
+#       [UkShRun]'s [wp_kshr_fork]/[wp_kshr_fork1] thread it, and
+#       [wp_kshr_rcall] (new, §4') is the call shape close needs -- a stub
+#       with an [R] going in and an [S r] coming back, stated at the ONE
+#       register file it is applied to because close's precondition reads
+#       a0 and no fact about a0 holds for an arbitrary frame.
 #
-#       That is what PIPE and REDIR actually need.  Four of PIPE's six
-#       closes and all of REDIR's run IN THE CHILD after fork1, and a child
-#       whose table is only known to be NOFILE-long holds no handle for
-#       anything -- not the pipe ends its parent just made, not the
-#       standard streams it inherited.  Closing (c) means carrying the copy
-#       row up from sys_fork the way the pipe join was just carried up, and
-#       giving [wp_uk_ecall_fork]'s child arm an authority minted AT THE
-#       PARENT'S TABLE together with the handles matching what the parent
-#       held.
+#       WHAT IS NOT EARNED: the kernel never supplies the new premise.
+#       [UexecApply.uexec_ret_round_slot]'s fork case MINTS a slot from the
+#       ∀-key family instead of instantiating the program's arm, and the
+#       child's real fdstate view arrives through the park, where
+#       [ProofForkretPark]'s closure mints [uslot (uvis_of U' sts)] at an
+#       EXISTENTIAL [sts].  [ProofKforkParts.kfk_childV_full] proves the
+#       POINTER array is a copy; the fdstate list is dropped by
+#       [fd_frags_any], which [FdSlots.v]'s own retirement note names as
+#       "why nothing can say a forked child's descriptors are anything in
+#       particular".  Threading [fd_frags] at an explicit state list through
+#       kfork's filedup scan and the park is what earns it.
 #
-#       A second, smaller thing rides with it: [wp_kshr_qcall]'s [Hstub]
-#       argument has a FIXED type that takes and returns no resource, so
-#       [wp_ksh_close] -- which now takes a handle -- cannot be passed
-#       through it.  It needs a resource parameter.  And [UkFork.Forkable]
-#       is a THREE-gname footprint class; the child's [γfd] makes it four,
-#       and descriptor handles are not of its byte-footprint shape anyway.
+#   (d) OPEN, and it is REDIR's: two facts, both about the AST or the
+#       syscall row rather than about plumbing.
 #
-# sh's REDIR also still needs the well-formedness fact that a redirect's fd
-# is 0 or 1: it is DATA in the AST ([URedir c1 file mode fd], constrained
-# only by [ush_w32 g (t + 36) fd]), so "0 or 1" has to be said by the
-# parser, not assumed here.
+#       FIRST, a redirect's fd is 0 or 1, and nothing says so.  It is DATA
+#       in the AST ([URedir c1 file mode fd], constrained only by
+#       [ush_w32 g (t + 36) fd]), so it has to be SAID -- as a conjunct of
+#       [ush_cmd]'s URedir case, discharged by the parser, which only ever
+#       builds 0 (for '<') or 1 (for '>' and '>>').  Without it runcmd has
+#       no handle to spend on the close, since the entry precondition
+#       ([UkSh.ush_std]) covers exactly those two.
+#
+#       SECOND, AND THIS ONE IS A SPEC GAP, NOT A MISSING PREMISE: xv6's
+#       redirection works because [close(fd); open(...)] REOPENS THAT fd --
+#       fdalloc returns the LOWEST free descriptor.  [UsysMemOk]'s open row
+#       says only that the slot it returned was free, so the proof can
+#       carry a handle for WHATEVER fd open gave back but cannot show it is
+#       the one just closed.  That is enough for the safety statement this
+#       file makes (the child closes what it holds and holds what it
+#       closes) and NOT enough to say a REDIR redirects.  The enriched fs
+#       row has the fact -- design/fd-row-pilot.md pins open's fd to "the
+#       LEAST CLOSED row, fdalloc's own scan order" -- so widening runcmd
+#       to the enriched channel, or strengthening the plain row, is what
+#       would buy the stronger reading.  Whoever picks this up should
+#       decide WHICH statement sh's REDIR is meant to make before wiring
+#       the handles.
 # ---------------------------------------------------------------------
 # UCodeShK.v IS NOT PARKED AND MUST NOT BE: it is the [uis_shk_*] catalog
 # UkSh.v READS, so parking it while listing UkSh.v leaves a dangling
