@@ -5,12 +5,35 @@ name claude-notes/ at all.
 
 WHY IT IS HERE.  Every lemma under it -- wp_kshp_peek_scan,
 wp_kshp_peek_enter, wp_kshp_peek_epi, ushp_peek_res, and the §4b frame runs
-it is built on -- IS in the tree and green.  This body is the glue, and one
-tactic in it does not terminate: see the SH lane's stage-4 ROUND 2 record in
-claude-notes/projects/fs-syscall-specs.md for the measurement (15.2 GB of RSS
-in 268 s at the first tactic after the spill run's continuation), for the
-FOUR explanations that were tested and refuted, and for the cheapest next
-probe (an explicit end-pc parameter on wp_kshp_spill / wp_kshp_restore).
+it is built on -- IS in the tree and green.  This body is the glue, and ONE
+TACTIC in it does not terminate: see the SH lane's stage-4 ROUND 2 record in
+claude-notes/projects/fs-syscall-specs.md for the measurements and for the
+FIVE explanations that have been tested and refuted.
+
+WHICH TACTIC, MEASURED (lane 1, 2026-09-01 -- this SUPERSEDES round 2's
+"the tactic after the spill run's continuation", which was off by one):
+the tactic is the
+
+    iApply (wp_kshp_spill spn (2 + nn) [seven entries] ... )
+
+below.  Cutting the proof with Admitted immediately BEFORE it is green in
+13.8 s at 1.1 GB; cutting immediately AFTER it -- with neither its "{ }"
+instruction bullet nor the iIntros that follows -- runs to 17.5 GB and is
+still climbing when killed at 300 s.  The "{ }" bullet, the iIntros and the
+cbn [length] are all innocent; they were only ever measured downstream of a
+tactic that had already exploded.
+
+REFUTED, so nobody pays for them twice: the END-PC PARAMETER probe (pend on
+wp_kshp_spill / wp_kshp_restore, literal at every call site) -- identical
+17 GB; HOISTING the two ltac: premises into asserts, which is exactly what
+execcmd and wp_kshp_peek_epi do and this body does not -- identical;
+clearbody on every set (sp0 spn spl m1 vals kk) -- identical; iClear of
+every spatial hypothesis and clear of every pure one -- identical.  And
+"seven spills vs execcmd's three" is not the discriminator: wp_kshp_peek_epi
+applies wp_kshp_restore to the SAME seven-entry list in milliseconds.  What
+is left is spill's frame premise carrying an EXISTENTIAL UNDER THE BIG-OP
+where restore's does not; the worklist's stage-4 section spells out the next
+probe.
 
 TO RESUME: paste this back into iris/UkShParse.v immediately before the
 "§7 execcmd" section header -- that is where it was written and where its

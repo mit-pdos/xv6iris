@@ -2278,15 +2278,67 @@ things, and the answer differs:
       them costs nothing, since the directive stops INSTANCE search only
       and every `rewrite /ustack` still sees through.  It is simply not
       the cause of THIS.)
-      **WHERE THE NEXT LOOK SHOULD START.**  execcmd's IDENTICAL `iApply`
-      at the same instruction, in the same file, costs milliseconds — and
-      the difference is that its spill list has THREE entries and peek's
-      has SEVEN.  So the suspect is the term `wp_kshp_spill` hands its
-      continuation, and the cheapest probe is to give both runs an explicit
-      END-PC PARAMETER (`pend`, with the premise `pend = pcs (length rs)`)
-      so the continuation's pc is a LITERAL rather than `pcs (length rs)`
-      awaiting a `cbn` — the `cbn [length]` that resolves it today
-      normalises the WHOLE `envs_entails`, context included.
+      (e) **NOT the end-pc.  The END-PC PARAMETER PROBE IS REFUTED**
+      (lane 1, 2026-09-01, all runs `/usr/bin/time -v`, `timeout 300`, the
+      mirror at e66817bce, peek's body pasted back into a scratch copy of
+      `iris/UkShParse.v` and cut with `Admitted`):
+
+      | cut | wall | peak RSS | exit |
+      | --- | ---- | -------- | ---- |
+      | BASELINE, `iIntros "Hsl" (h2) "Hrun".` after the spill run | 5:01.31 | 17.0 GB | killed |
+      | PROBE: `pend` on `wp_kshp_spill`/`_restore`, same cut | 5:01.30 | 17.1 GB | killed |
+      | + `cbn [length]` as well (baseline, unmodified) | 5:01 | 17.0 GB | killed |
+      | just BEFORE the spill `iApply` (`set (vals := …)` last) | **0:13.81** | **1.1 GB** | **0** |
+      | the spill `iApply` ALONE, no `{ }` bullet, no `iIntros` | 5:01.30 | 17.5 GB | killed |
+      | + the `{ }` instruction bullet, still no `iIntros` | 5:01.26 | 17.6 GB | killed |
+      | probe + premises HOISTED into `assert`s (execcmd's shape) | 5:01.26 | 17.3 GB | killed |
+      | + `clearbody kk vals m1 spl spn sp0` | 5:01.28 | 17.5 GB | killed |
+      | + `iClear` of every spatial hyp and `clear` of every pure one | 5:01.36 | 17.7 GB | killed |
+
+      Giving both runs `(pend : Z)` with the premise `pcs (length rs) =
+      pend`, supplied by the caller as a literal (`0x458`, `0x1da`,
+      `0x1fc`, `0x49c`) under `ltac:(reflexivity)`, changes NOTHING: same
+      wall clock to the kill, same 17 GB.  The signature change was
+      therefore reverted; `iris/UkShParse.v` is byte-identical to what it
+      was.
+
+      **AND THE ROUND-2 BISECT WAS OFF BY ONE TACTIC.**  The obstacle is
+      NOT "the tactic after the spill run's continuation": row 4 above is
+      the cut immediately BEFORE the `iApply (wp_kshp_spill …)` and it is
+      green in 13.8 s and 1.1 GB, and row 5 is the SAME cut plus the
+      `iApply` alone — 17.5 GB.  **The blowup is inside the `iApply`
+      itself.**  Everything after it (the `{ }` bullet, the `iIntros`, the
+      `cbn [length]`) is innocent: they were only ever measured downstream
+      of a tactic that had already exploded.
+
+      **AND "THREE vs SEVEN" IS NOT THE DISCRIMINATOR EITHER.**
+      `wp_kshp_peek_epi` — landed, green, in the same file — applies
+      `wp_kshp_restore` to the SAME SEVEN-ENTRY LIST and costs
+      milliseconds.  Nor is it the surrounding proof: hoisting the two
+      `ltac:` premises into `assert`s (which is exactly what execcmd and
+      `_epi` do and peek alone did not), stripping the `set` bodies with
+      `clearbody`, and clearing the entire spatial AND pure context all
+      leave the 17 GB untouched.
+
+      **WHERE THE NEXT LOOK SHOULD START.**  What is left, after all of
+      the above, is a two-fact table: `wp_kshp_spill` @7 explodes,
+      `wp_kshp_spill` @3 (execcmd) is milliseconds, `wp_kshp_restore` @7
+      (`_epi`) is milliseconds.  The ONE structural difference between the
+      two runs' consumed premises is that spill's frame premise carries an
+      EXISTENTIAL UNDER THE BIG-OP —
+      `[∗ list] i ↦ _ ∈ rs, ∃ w : mword 64, uword γd (ad i) w`, the shape
+      `ushp_frame_split` hands out — where restore's is the ∃-free
+      `[∗ list] i ↦ _ ∈ rs, uword γd (ad i) (vals i)`.  So the next probe
+      is (i) measure the growth: apply `wp_kshp_spill` at k = 3,4,5,6,7 in
+      a STANDALONE lemma with a two-line context and see whether the curve
+      is exponential in k — if it is, the cause is `iSpecialize`'s
+      treatment of that ∃ and nothing about peek; and (ii) if so, give
+      `wp_kshp_spill` restore's ∃-free premise (a `pre : nat -> mword 64`
+      parameter) and have the CALLER open the seven existentials once, with
+      a helper lemma beside `ushp_frame_split` that turns
+      `[∗ list] i ↦ _ ∈ rs, ∃ w, uword γd (ad i) w` into
+      `∃ pre, [∗ list] i ↦ _ ∈ rs, uword γd (ad i) (pre i)` — which is
+      provable by the same `ushp_sepL_seq` induction already in the file.
 
     * **WHAT IS STILL OWED, HONESTLY SIZED.**  Of the 564 catalogued
       instructions, strchr (17), strlen (18) and execcmd (19) are walked
