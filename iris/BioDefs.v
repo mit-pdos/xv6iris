@@ -44,6 +44,10 @@ Record bio_names := MkBioNames {
   bn_mid  : nat -> gname;         (* buffer k's recycle token            *)
   bn_anc  : nat -> gname;         (* buffer k's transit anchor (Phase 5)  *)
   bn_pres : nat -> gname;         (* buffer k's presence auth (A6.148)    *)
+  bn_regp : nat -> gname;         (* reg_park   (endgame §3.2)            *)
+  bn_regd : nat -> gname;         (* reg_drop   (endgame §3.2)            *)
+  bn_pile : nat -> gname;         (* park-tag multiset ● S (endgame §3.2) *)
+  bn_regc : nat -> gname;         (* count sync (endgame changelog)       *)
 }.
 
 (* ---------------------------------------------------------------------- *)

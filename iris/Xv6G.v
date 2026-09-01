@@ -99,6 +99,10 @@ Class xv6G (Σ : gFunctors) := Xv6G {
   xv6_pipe       :: pipeG Σ;
   xv6_cinv       :: cinvG Σ;
   xv6_uio        :: uioG Σ;
+  (* ---- the BUFFER-CACHE TRANSIT BOX (endgame §3.2), a member since the
+     TSO port's R1: [bio_ctx]/[bio_init] are stated by ~100 files; see the
+     note at [Xv6Cameras.bioboxG]. *)
+  xv6_biobox     :: bioboxG Σ;
 }.
 
 (* THE FUNCTOR LIST, and the [subG] instance adequacy resolves the bundle
@@ -109,7 +113,8 @@ Class xv6G (Σ : gFunctors) := Xv6G {
    [xv6G xv6Σ]" even when every constituent is present. *)
 Definition xv6GΣ : gFunctors :=
   #[ sieΣ; lockΣ; kallocΣ; bioΣ; diskGhostΣ; uartGhostΣ; fsLogΣ; logΣ;
-     fsCrashΣ; iregΣ; fsTopΣ; fsLinkΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ ].
+     fsCrashΣ; iregΣ; fsTopΣ; fsLinkΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ;
+     bioboxΣ ].
 
 Global Instance subG_xv6GΣ {Σ} : subG xv6GΣ Σ -> xv6G Σ.
 Proof. solve_inG. Qed.

@@ -59,6 +59,7 @@ Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoMemPa TsoGhost.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -67,25 +68,27 @@ Local Open Scope Z_scope.
 (* ===================================================================== *)
 
 
-Module ReleasesleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Wakeup : WAKEUP) : RELEASESLEEP.
+Module ReleasesleepProof (Acquire : ACQUIRE) (Release : RELEASE) (ReleaseIn : RELEASE_IN) (Wakeup : WAKEUP) : RELEASESLEEP.
 
 Section ProofReleasesleep.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
-  Lemma wp_releasesleep_gen_sconf
+  Lemma wp_releasesleep_genin_sconf
       (γs : list gname)
-      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
+      (γl γsl : gname) (s : string) (R Rdep : TsoCtx.CtxId -> iProp Σ)
+      `{HmR : !TsoCtx.CtxMorph R} `{HmRd : !TsoCtx.CtxMorph Rdep} (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_releasesleep_gen_sconf_body γs γl γsl s R H q m pd pme av eb b lks.
+      (tl : nat)
+    : wp_releasesleep_genin_sconf_body γs γl γsl s R Rdep H q m pd pme av eb b lks tl.
   Proof.
-    cbv beta delta [wp_releasesleep_gen_sconf_body].
-    intros pcE slk ret_tgt Hav Hno.
+    cbv beta delta [wp_releasesleep_genin_sconf_body].
+    intros pcE slk ret_tgt Hav Hno Hfold.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     assert (Hcpune : forall i : CPU, eq_vec (zero_reg : mword 64) (mycpu_ret (cid_word_of i)) = false)
       by (intro i; apply mycpu_ret_nonzero; apply tp_ok_cid_of).
-    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk HRcaller #Hpinv Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk #Hllb HRdep #Hpinv Hcont".
     (* [b] and [eb] coincide here: the entry level is 0, so the ghost
        agreement pins the ambient SIE index to the saved base enable -- which
        is also release's own exit index.  Collapsing the two names is what
@@ -93,7 +96,7 @@ Section ProofReleasesleep.
        [wp_next (match 0 with O => eb | S _ => false end)]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbmatch. symmetry in Hbmatch.
     assert (Hbeb : eb = b) by (symmetry; exact Hbmatch). subst eb.
-    iDestruct (is_sleeplock_gen_lock with "Hslp") as "#Hlockinv".
+    iDestruct (is_sleeplock_genl_lock with "Hslp") as "#Hlockinv".
     iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
     { iDestruct "Hpinv" as "[%Hl _]". iPureIntro. exact Hl. }
     (* ===== PROLOGUE: 4-slot frame push + saves ra/s0/s1/s2 ===== *)
@@ -237,7 +240,7 @@ Section ProofReleasesleep.
        moved to a fresh one, so acquire wants it at CID10. *)
     iDestruct (cpu_own_transport CID CID10 0%nat b pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "sleep lock"%string <{ sl_res_gen γsl slk R H }> Kacq
+    iApply (Acquire.wp_acquire_sconf KT1 γl "sleep lock"%string (sl_pay γsl slk R H) Kacq
               0%nat b pme (av - 4)%nat b lks
               ltac:(lia)
               ltac:(lia)
@@ -246,6 +249,7 @@ Section ProofReleasesleep.
     all: try lkbelow.
     { iEval (rewrite HKacqa0). iExact "Hlockinv". }
     iIntros (CIDacq Hsacq ms Macq) "%Hms Hcg Hpc %Hpins HtokL HRsl _ Hown Hpay".
+    iDestruct (sl_pay_open with "HRsl") as "HRsl".
     assert (Hpc18 : ret_pc (Kacq !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.releasesleep + 0x18)).
     { rewrite HKacqra. apply bv_eq; vm_compute; reflexivity. }
@@ -263,7 +267,7 @@ Section ProofReleasesleep.
                          (sign_extend' 64 (mword_of_int 0x28 : mword 12)) = sl_pid slk).
     { rgne. rewrite HMacqs1. reflexivity. }
     (* open sl_res as the holder: the token refutes the free arm. *)
-    iDestruct (sl_res_open_held_q γsl slk R H q with "HRsl Hslk") as "(Hslk & Hha & HHdep & Hcell)".
+    iDestruct (sl_res_open_held_q γsl slk (R TsoCtx.cur_ctx) H q with "HRsl Hslk") as "(Hslk & Hha & HHdep & Hcell)".
     (* the pid field now rides INSIDE the holder token (SleepLock.v's
        [sleeplocked_q]); open it for the [sw zero,40(s1)] below and close it
        back at 0, which is exactly the free arm's shape. *)
@@ -380,15 +384,23 @@ Section ProofReleasesleep.
       rewrite /R2 upd_ne; [| vm_compute; discriminate].
       rewrite /R1 upd_eq. reflexivity. }
     (* rebuild the FREE sl_res: zeroed word + token + zeroed pid + R. *)
-    iDestruct (sl_res_close_free γsl slk R H q with "Hslkw Hslk Hha HRcaller") as "HRsl".
-    (* release(&slk->lk): intr_count 1 -> 0. *)
-    iApply (Release.wp_release_sconf KT1 γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γsl slk R H }> Krel
+    iDestruct (sl_res_close_free γsl slk (Rdep TsoCtx.cur_ctx) H q with "Hslkw Hslk Hha HRdep") as "HRsl".
+    (* release(&slk->lk): intr_count 1 -> 0.  ENDGAME R1-pre / R2: the
+       free arm goes back PRE-PARKED through [lock_pay_intro_llb], which
+       raises the parked record to the presented [llb tl] and mints the
+       floor at [tl] inside the payload -- what the next winner's absorb
+       hands over as [R cur_ctx] (the floor inside R, per the client). *)
+    iApply (ReleaseIn.wp_release_in_sconf KT1 γl (sl_lk slk) "sleep lock"%string (sl_pay γsl slk R H) Krel
               0%nat b pme (av - 4)%nat
               ({["sleep lock"%string]} ∪ lks)
               ltac:(rewrite HKrela0; apply addv_sext0)
               ltac:(lia)
-              with "Hcg Htext Hpc [] HtokL HRsl Hown Hpay").
+              with "Hcg Htext Hpc [] HtokL [HRsl] Hown Hpay").
     { iExact "Hlockinv". }
+    { iIntros "Hrun".
+      iApply (lock_pay_intro_llb (sl_pay γsl slk Rdep H) (sl_pay γsl slk R H) tl
+                (sl_body_fold γsl slk R Rdep H tl Hfold) with "Hllb Hrun [HRsl]").
+      iApply (sl_pay_of_res with "HRsl"). }
     (* release's own exit index is [match 0 with O => eb | S _ => false end]
        -- the term [Hbmatch] equates with [b] -- so the hart it hands back is
        at [wp_next b], matching releasesleep's own top-level index. *)
@@ -555,6 +567,40 @@ Section ProofReleasesleep.
   (* THE UNTRACKED INSTANCE, which is what every existing caller takes: the
      deposit is [emp], so the holder's fraction is irrelevant and its token
      is the fraction-free [sleeplocked]. *)
+  (* the plain λ relay: the _in relay at [tl := 0], [Rdep := R]. *)
+  Lemma wp_releasesleep_genl_sconf
+      (γs : list gname)
+      (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ)
+      `{HmR : !TsoCtx.CtxMorph R} (H : Qp -> iProp Σ) (q : Qp)
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string)
+    : wp_releasesleep_genl_sconf_body γs γl γsl s R H q m pd pme av eb b lks.
+  Proof.
+    pose proof (wp_releasesleep_genin_sconf γs γl γsl s R R H q m pd pme av eb b lks 0%nat) as HK.
+    cbv beta zeta delta [wp_releasesleep_genin_sconf_body] in HK.
+    cbv beta zeta delta [wp_releasesleep_genl_sconf_body].
+    intros Hav Hno.
+    specialize (HK Hav Hno ltac:(intros ξ; iIntros "[$ _]")).
+    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk HR #Hpinv Hcont".
+    iApply (HK with "Hcg Hown Htext Hpc Hslp Hslk [] HR Hpinv Hcont").
+    iApply TsoGhost.llb_0.
+  Qed.
+
+  (* the const tier: the plain λ relay at [R := λ _, R0]. *)
+  Lemma wp_releasesleep_gen_sconf
+      (γs : list gname)
+      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string)
+    : wp_releasesleep_gen_sconf_body γs γl γsl s R H q m pd pme av eb b lks.
+  Proof.
+    pose proof (wp_releasesleep_genl_sconf γs γl γsl s (fun _ => R) H q m pd pme av eb b lks) as HK.
+    cbv beta zeta delta [wp_releasesleep_genl_sconf_body] in HK.
+    cbv beta zeta delta [wp_releasesleep_gen_sconf_body].
+    intros Hav Hno.
+    specialize (HK Hav Hno).
+    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk HR #Hpinv Hcont".
+    iApply (HK with "Hcg Hown Htext Hpc Hslp Hslk HR Hpinv Hcont").
+  Qed.
+
   Lemma wp_releasesleep_sconf
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)

@@ -236,7 +236,7 @@ Section ProofHoldingsleep.
     iDestruct (cpu_own_transport CID CID10 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* acquire(&slk->lk): intr_count 0 -> 1; is_lock from the sleeplock. *)
-    iApply (Acquire.wp_acquire_sconf KT1 γl "sleep lock"%string <{ sl_res_gen γsl slk R H }> M5
+    iApply (Acquire.wp_acquire_sconf KT1 γl "sleep lock"%string (sl_pay γsl slk (fun _ => R) H) M5
               0%nat b p (av - 6)%nat b lks
               ltac:(lia)
               ltac:(lia)
@@ -245,6 +245,7 @@ Section ProofHoldingsleep.
     all: try lkbelow.
     { iEval (rewrite HM5a0). iExact "Hlk". }
     iIntros (CIDacq Hsacq ms A) "%Hms Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
+    iDestruct (sl_pay_open with "HR") as "HR".
     assert (Hpc18 : ret_pc (M5 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.holdingsleep + 0x18))
       by (rewrite HM5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc18) in "Hpc".
@@ -495,9 +496,10 @@ Section ProofHoldingsleep.
       rewrite /D1e upd_ne; [| vm_compute; discriminate].
       rewrite /C46 upd_ne; [| vm_compute; discriminate]. exact HC42csp. }
     (* close sl_res again (held), for release's R argument. *)
-    iDestruct (sl_res_close_held γsl slk R H v Hvnz with "Hslk Hdep") as "HR2".
+    iDestruct (sl_res_close_held γsl slk R H v Hvnz with "Hslk Hdep") as "HR20".
+    iDestruct (sl_pay_of_res γsl slk (fun _ => R) H with "HR20") as "HR2".
     (* release(&slk->lk): intr_count 1 -> 0. *)
-    iApply (Release.wp_release_sconf KT1 γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γsl slk R H }> D20
+    iApply (Release.wp_release_sconf KT1 γl (sl_lk slk) "sleep lock"%string (sl_pay γsl slk (fun _ => R) H) D20
               0%nat b p (av - 6)%nat ({["sleep lock"]} ∪ lks)
               ltac:(rewrite HD20a0; apply addv_sext0)
               ltac:(lia)

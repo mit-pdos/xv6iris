@@ -627,3 +627,15 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   `sl_res_gen` through `sl_body_eq : sl_body … R H cur_ctx =
   sl_res_gen … (R cur_ctx) H` (reflexivity), so no open/close lemma
   changed.
+- 2026-09-01 (build agent, R1-pre + R1 LANDED, gate green): §4.1 R1-pre
+  and R1 are in the tree (A6.153 lists the pieces).  Two encoding notes,
+  no design change: (a) §3.3's two cover lemmas are folded into the
+  transition lemmas (box_swap_checkout takes the two floors and the tie
+  picks inside; box_swap_drop_hand takes (Kb, Kd); box_swap_drop_pile
+  takes (Km ≥ T_mine, Kd) + the claim + the parker's astamp) -- one
+  lemma per site, the same total case split; (b) the four new camera
+  classes are bundled as Xv6Cameras.bioboxG inside Xv6G.xv6G so that no
+  bio_ctx/bio_init consumer gains a binder.  The sleeplock payload is
+  bslp := bown ∗ ∃ rp, reg_park rp ∗ astamp rp ∗ llb rp.2 ∗ ctx_floor ξ
+  rp.2, exactly §4.1's instantiation; bslp_dep/bslp_fold are the _in
+  release's Rdep and entailment.

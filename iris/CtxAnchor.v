@@ -70,16 +70,14 @@ Require Import RiscvLang RiscvPtsto.
 Require Import TsoMemPa TsoGhost.
 Require Import TsoCtx.
 Require Import TsoCtxAbsorbLb.
+Require Import Xv6Cameras.
 
 (* ---- the anchor's own ghost: an append-only generation ledger -------- *)
 (* [auth] of a [gmap nat (agree nat)]: the custody token holds the
    authority; each deposit allocates the next key; fragments are core-id,
    hence persistent -- the generation witness. *)
-Definition anchorR : cmra := authR (gmapUR nat (agreeR natO)).
-Class anchorG (Σ : gFunctors) := AnchorG { anchor_inG :: inG Σ anchorR }.
-Definition anchorΣ : gFunctors := #[GFunctor anchorR].
-Global Instance subG_anchorG {Σ} : subG anchorΣ Σ → anchorG Σ.
-Proof. solve_inG. Qed.
+(* [anchorR]/[anchorG] live in [Xv6Cameras] (section 15), bundled into
+   [xv6G] through [bioboxG]. *)
 
 Section Anchor.
   Context `{!riscvGS Σ} `{!anchorG Σ}.
@@ -164,6 +162,20 @@ Section Anchor.
   Qed.
 
   (* ---- agreement ---------------------------------------------------- *)
+
+  (* ENDGAME §3.2: a witness's generation never exceeds the anchor's --
+     the map's dom bound, read through the fragment. *)
+  Lemma astamp_le γ n XI T n' T' :
+    anchor γ n XI T -∗ astamp γ n' T' -∗ ⌜(n' ≤ n)%nat⌝.
+  Proof.
+    iIntros "(%m & Hauth & %Hlook & %Hdom & _) Hst".
+    iDestruct (own_valid_2 with "Hauth Hst") as %[Hincl _]%auth_both_valid_discrete.
+    iPureIntro.
+    apply singleton_included_l in Hincl as [y [Hy _]].
+    apply Hdom. apply elem_of_dom.
+    rewrite /anchor_map lookup_fmap in Hy.
+    destruct (m !! n') eqn:Hm; [by eexists | by inversion Hy].
+  Qed.
 
   Lemma astamp_agree γ n XI T T' :
     anchor γ n XI T -∗ astamp γ n T' -∗ ⌜T' = T⌝.

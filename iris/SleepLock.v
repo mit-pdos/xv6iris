@@ -93,6 +93,7 @@ Require Import Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Import WpLock.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
+Require Import CtxMorphTac.   (* ctx_morph_or for the payload λ *)
 Local Open Scope Z_scope.
 
 Section SleepLock.
@@ -182,6 +183,17 @@ Section SleepLock.
   Definition sleeplocked_q (γ : gname) (q : Qp) (slk : mword 64)
       (pid : mword 32) : iProp Σ :=
     (sl_htok γ q ∗ sl_pid slk ↦₄ pid)%I.
+
+  (* ENDGAME R1-pre: the same row at an EXPLICIT context -- what the inner
+     spinlock's payload λ carries; at [cur_ctx] it is [sleeplocked_q]
+     letter for letter (the ↦₄ notation is [ctx_word4_pointsto cur_ctx]). *)
+  Definition sleeplocked_q_at (ξ : TsoCtx.CtxId) (γ : gname) (q : Qp)
+      (slk : mword 64) (pid : mword 32) : iProp Σ :=
+    (sl_htok γ q ∗ TsoCtx.ctx_word4_pointsto ξ (sl_pid slk) (DfracOwn 1) pid)%I.
+
+  Lemma sleeplocked_q_at_cur γ q slk pid :
+    sleeplocked_q_at cur_ctx γ q slk pid = sleeplocked_q γ q slk pid.
+  Proof. reflexivity. Qed.
 
   (* the holder token with the fraction forgotten: what [sl_res]'s clients
      that do not track holders (every untracked sleeplock) carry. *)
@@ -430,13 +442,91 @@ Section SleepLock.
   Definition sl_res (γ : gname) (slk : mword 64) (R : iProp Σ) : iProp Σ :=
     sl_res_gen γ slk R sl_untracked.
 
+  (* ================================================================== *)
+  (*  ENDGAME R1-pre: THE PAYLOAD AS A CONTEXT-λ WITH A FLOOR SLOT.        *)
+  (*  The inner spinlock's payload used to be the CONST [<{ sl_res_gen }>] *)
+  (*  -- ambient-XI cells under a constant, the is_ftable class, and no    *)
+  (*  slot for the floor R2 folds at release.  Now: [sl_body] states the   *)
+  (*  word and the pid field at an explicit ξ over a BOUND-INDEXED client  *)
+  (*  payload [Rb : nat → iProp] (ξ-FREE by the sleeplock-payload rule),   *)
+  (*  and [sl_pay] packs it under [∃ tl, ctx_floor ξ tl].  The releaser    *)
+  (*  presents [llb tl] and [Rb tl]; the fold ([lock_pay_intro_llb]) mints  *)
+  (*  the floor at the parked context; the winner's absorb hands it back   *)
+  (*  at its own.  The const tier is the instance [Rb := λ _, R].          *)
+  (* ================================================================== *)
+
+  Definition sl_free_hold_at (ξ : TsoCtx.CtxId) (γ : gname) (slk : mword 64) : iProp Σ :=
+    (∃ q : Qp, sleeplocked_q_at ξ γ q slk (mword_of_int 0 : mword 32) ∗ sl_hauth γ q)%I.
+
+  Definition sl_body (γ : gname) (slk : mword 64) (R : TsoCtx.CtxId -> iProp Σ)
+      (H : Qp -> iProp Σ) (ξ : TsoCtx.CtxId) : iProp Σ :=
+    (∃ v : mword 32,
+       TsoCtx.ctx_word4_pointsto ξ slk (DfracOwn 1) v ∗
+       (⌜v = (mword_of_int 0 : mword 32)⌝ ∗ sl_free_hold_at ξ γ slk ∗ R ξ
+        ∨ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝ ∗ sl_dep γ H))%I.
+
+  (* the inner spinlock's payload λ IS the body; a floor a client wants
+     delivered rides inside its own R (an instance row), and R2's fold at
+     releasesleep lifts through [sl_body_fold] *)
+  Definition sl_pay (γ : gname) (slk : mword 64) (R : TsoCtx.CtxId -> iProp Σ)
+      (H : Qp -> iProp Σ) : TsoCtx.CtxId -> iProp Σ :=
+    sl_body γ slk R H.
+
+  Lemma sl_body_eq γ slk (R : TsoCtx.CtxId -> iProp Σ) H :
+    sl_body γ slk R H cur_ctx = sl_res_gen γ slk (R cur_ctx) H.
+  Proof. reflexivity. Qed.
+
+  Global Instance sl_body_morph γ slk (R : TsoCtx.CtxId -> iProp Σ) H
+      `{HmR : !TsoCtx.CtxMorph R} : TsoCtx.CtxMorph (sl_body γ slk R H).
+  Proof.
+    rewrite /sl_body. apply TsoCtx.ctx_morph_exist => v.
+    apply TsoCtx.ctx_morph_sep; [apply TsoCtx.ctx_morph_word4 |].
+    apply ctx_morph_or.
+    - apply TsoCtx.ctx_morph_sep; [apply TsoCtx.ctx_morph_const |].
+      apply TsoCtx.ctx_morph_sep; [| exact _].
+      rewrite /sl_free_hold_at. apply TsoCtx.ctx_morph_exist => q.
+      apply TsoCtx.ctx_morph_sep; [| apply TsoCtx.ctx_morph_const].
+      rewrite /sleeplocked_q_at.
+      apply TsoCtx.ctx_morph_sep; [apply TsoCtx.ctx_morph_const | apply TsoCtx.ctx_morph_word4].
+    - apply TsoCtx.ctx_morph_const.
+  Qed.
+  Global Instance sl_pay_morph γ slk (R : TsoCtx.CtxId -> iProp Σ) H
+      `{HmR : !TsoCtx.CtxMorph R} : TsoCtx.CtxMorph (sl_pay γ slk R H).
+  Proof. rewrite /sl_pay. apply _. Qed.
+
+  Lemma sl_pay_open γ slk (R : TsoCtx.CtxId -> iProp Σ) H :
+    sl_pay γ slk R H cur_ctx -∗ sl_res_gen γ slk (R cur_ctx) H.
+  Proof. rewrite /sl_pay sl_body_eq. iIntros "$". Qed.
+
+  Lemma sl_pay_of_res γ slk (R : TsoCtx.CtxId -> iProp Σ) H :
+    sl_res_gen γ slk (R cur_ctx) H -∗ sl_pay γ slk R H cur_ctx.
+  Proof. rewrite /sl_pay sl_body_eq. iIntros "$". Qed.
+
+  (* the releaser's side of the R2 fold, lifted from the client's row to the
+     whole body: the free arm takes the floor, the held arm carries no R *)
+  Lemma sl_body_fold γ slk (R Rdep : TsoCtx.CtxId -> iProp Σ) H (tl : nat) :
+    (forall ξ : TsoCtx.CtxId, Rdep ξ ∗ TsoCtx.ctx_floor ξ tl ⊢ R ξ) ->
+    forall ξ : TsoCtx.CtxId,
+      sl_pay γ slk Rdep H ξ ∗ TsoCtx.ctx_floor ξ tl ⊢ sl_pay γ slk R H ξ.
+  Proof.
+    intros Hfold ξ. rewrite /sl_pay /sl_body.
+    iIntros "[Hb #Hfl]". iDestruct "Hb" as (v) "[Hw [(Hv & Hhold & HR) | Hheld]]".
+    - iExists v. iFrame "Hw". iLeft. iFrame "Hv Hhold".
+      iApply Hfold. iFrame "HR Hfl".
+    - iExists v. iFrame "Hw". iRight. iExact "Hheld".
+  Qed.
+
   (* the whole sleeplock: its name plus the inner spinlock -- named
      "sleep lock", the literal initsleeplock passes to initlock -- over
      [sl_res_gen].  Persistent: every user shares it. *)
+  Definition is_sleeplock_genl (γl γ : gname) (slk : mword 64) (s : string)
+      (R : TsoCtx.CtxId -> iProp Σ) (H : Qp -> iProp Σ) : iProp Σ :=
+    (sl_name slk s ∗
+     is_lock γl (sl_lk slk) "sleep lock"%string (sl_pay γ slk R H))%I.
+
   Definition is_sleeplock_gen (γl γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) (H : Qp -> iProp Σ) : iProp Σ :=
-    (sl_name slk s ∗
-     is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }>)%I.
+    is_sleeplock_genl γl γ slk s (fun _ => R) H.
 
   Definition is_sleeplock (γl γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) : iProp Σ :=
@@ -449,6 +539,9 @@ Section SleepLock.
       (R : iProp Σ) : iProp Σ :=
     is_sleeplock_gen γl γ slk s R (slh_tok γ).
 
+  Global Instance is_sleeplock_genl_persistent γl γ slk s R H :
+    Persistent (is_sleeplock_genl γl γ slk s R H).
+  Proof. apply _. Qed.
   Global Instance is_sleeplock_gen_persistent γl γ slk s R H :
     Persistent (is_sleeplock_gen γl γ slk s R H).
   Proof. apply _. Qed.
@@ -459,29 +552,42 @@ Section SleepLock.
     Persistent (is_sleeplock_tok γl γ slk s R).
   Proof. apply _. Qed.
 
+  Lemma is_sleeplock_genl_name γl γ slk s R H :
+    is_sleeplock_genl γl γ slk s R H -∗ sl_name slk s.
+  Proof. iIntros "[$ _]". Qed.
+  Lemma is_sleeplock_genl_lock γl γ slk s R H :
+    is_sleeplock_genl γl γ slk s R H -∗
+    is_lock γl (sl_lk slk) "sleep lock"%string (sl_pay γ slk R H).
+  Proof. iIntros "[_ $]". Qed.
+  Lemma is_sleeplock_genl_intro γl γ slk s R H :
+    sl_name slk s -∗
+    is_lock γl (sl_lk slk) "sleep lock"%string (sl_pay γ slk R H) -∗
+    is_sleeplock_genl γl γ slk s R H.
+  Proof. iIntros "#Hn #Hl". by iFrame "Hn Hl". Qed.
+
   Lemma is_sleeplock_gen_name γl γ slk s R H :
     is_sleeplock_gen γl γ slk s R H -∗ sl_name slk s.
-  Proof. iIntros "[$ _]". Qed.
+  Proof. apply is_sleeplock_genl_name. Qed.
   Lemma is_sleeplock_gen_lock γl γ slk s R H :
     is_sleeplock_gen γl γ slk s R H -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }>.
-  Proof. iIntros "[_ $]". Qed.
+    is_lock γl (sl_lk slk) "sleep lock"%string (sl_pay γ slk (fun _ => R) H).
+  Proof. apply is_sleeplock_genl_lock. Qed.
   Lemma is_sleeplock_gen_intro γl γ slk s R H :
     sl_name slk s -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }> -∗
+    is_lock γl (sl_lk slk) "sleep lock"%string (sl_pay γ slk (fun _ => R) H) -∗
     is_sleeplock_gen γl γ slk s R H.
-  Proof. iIntros "#Hn #Hl". by iFrame "Hn Hl". Qed.
+  Proof. apply is_sleeplock_genl_intro. Qed.
 
   Lemma is_sleeplock_name γl γ slk s R :
     is_sleeplock γl γ slk s R -∗ sl_name slk s.
   Proof. apply is_sleeplock_gen_name. Qed.
   Lemma is_sleeplock_lock γl γ slk s R :
     is_sleeplock γl γ slk s R -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res γ slk R }>.
+    is_lock γl (sl_lk slk) "sleep lock"%string (sl_pay γ slk (fun _ => R) sl_untracked).
   Proof. apply is_sleeplock_gen_lock. Qed.
   Lemma is_sleeplock_intro γl γ slk s R :
     sl_name slk s -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res γ slk R }> -∗
+    is_lock γl (sl_lk slk) "sleep lock"%string (sl_pay γ slk (fun _ => R) sl_untracked) -∗
     is_sleeplock γl γ slk s R.
   Proof. apply is_sleeplock_gen_intro. Qed.
 
@@ -611,9 +717,10 @@ Section SleepLock.
   Proof.
     iIntros "Hfree #Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
     iDestruct (sl_free_hold_intro with "Hfree Hpid") as (q0) "[Htok Hha]".
-    iMod (newlock E (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }>
+    iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_pay γ slk (fun _ => R) H)
             with "Hlnm Hrun Hlkw Hcpu [Hw Htok Hha HR]") as "[Hrun Hlk]".
-    { iApply (sl_res_close_free with "Hw Htok Hha HR"). }
+    { iApply (sl_pay_of_res γ slk (fun _ => R) H).
+      iApply (sl_res_close_free with "Hw Htok Hha HR"). }
     iDestruct "Hlk" as (γl) "#Hlk".
     iModIntro. iFrame "Hrun". iExists γl.
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
@@ -639,13 +746,45 @@ Section SleepLock.
     { rewrite -!pair_op !left_id !right_id. apply pair_valid.
       split; [ by apply excl_auth_valid | by apply auth_auth_valid ]. }
     iDestruct "Hg" as "[[Hha Htok] Hauth]".
-    iMod (newlock E (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R (H γ) }>
+    iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_pay γ slk (fun _ => R) (H γ))
             with "Hlnm Hrun Hlkw Hcpu [Hw Htok Hha Hpid HR]") as "[Hrun Hlk]".
-    { iApply (sl_res_close_free with "Hw [Htok Hpid] Hha HR").
+    { iApply (sl_pay_of_res γ slk (fun _ => R) (H γ)).
+      iApply (sl_res_close_free with "Hw [Htok Hpid] Hha HR").
       iFrame "Htok Hpid". }
     iDestruct "Hlk" as (γl) "#Hlk".
     iModIntro. iFrame "Hrun". iExists γl, γ. iFrame "Hauth".
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
+  Qed.
+
+  (* ENDGAME R1-pre: the bound-indexed minting builder -- the client payload
+     at bound 0 seals the free arm under the free floor. *)
+  Lemma new_sleeplock_genl `{CID : RiscvLang.CpuId} E (slk : mword 64) (s : string)
+      (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} (H : gname -> Qp -> iProp Σ) :
+    lock_name (sl_lk slk) "sleep lock"%string -∗
+    sl_name slk s -∗
+    sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    WpLock.lk_cpu_ready (sl_lk slk) -∗
+    slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    own_context cur_ctx -∗
+    R cur_ctx ={E}=∗ own_context cur_ctx ∗
+    ∃ γl γ : gname, is_sleeplock_genl γl γ slk s R (H γ) ∗ slh_auth γ None.
+  Proof.
+    iIntros "#Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
+    iMod (own_alloc (((●E (1%Qp : leibnizO Qp), ε) : slhUR)
+                     ⋅ ((◯E (1%Qp : leibnizO Qp), ε) : slhUR)
+                     ⋅ ((ε, ● (None : optionUR ufracR)) : slhUR))) as (γ) "Hg".
+    { rewrite -!pair_op !left_id !right_id. apply pair_valid.
+      split; [ by apply excl_auth_valid | by apply auth_auth_valid ]. }
+    iDestruct "Hg" as "[[Hha Htok] Hauth]".
+    iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_pay γ slk R (H γ))
+            with "Hlnm Hrun Hlkw Hcpu [Hw Htok Hha Hpid HR]") as "[Hrun Hlk]".
+    { iApply (sl_pay_of_res γ slk R (H γ)).
+      iApply (sl_res_close_free with "Hw [Htok Hpid] Hha HR").
+      iFrame "Htok Hpid". }
+    iDestruct "Hlk" as (γl) "#Hlk".
+    iModIntro. iFrame "Hrun". iExists γl, γ. iFrame "Hauth".
+    iApply (is_sleeplock_genl_intro with "Hsnm Hlk").
   Qed.
 
   (* A6.67: the honest creator deposit (A6.66) takes the running token and
@@ -717,6 +856,16 @@ Section SleepLock.
     iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hrun HR".
     iApply (new_sleeplock E slk s R with "Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
   Qed.
+
+  Lemma sl_fresh_new_genl `{CID : RiscvLang.CpuId} E (slk : mword 64) (s : string)
+      (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} (H : gname -> Qp -> iProp Σ) :
+    sl_fresh slk s -∗ own_context cur_ctx -∗ R cur_ctx ={E}=∗ own_context cur_ctx ∗
+    ∃ γl γ : gname, is_sleeplock_genl γl γ slk s R (H γ) ∗ slh_auth γ None.
+  Proof.
+    iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hrun HR".
+    iApply (new_sleeplock_genl E slk s R H with "Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
+  Qed.
+
 
   (* [sl_fresh_new_gen] at a PRE-ALLOCATED gname -- what an array
      initializer (iinit over itable.inode[]) uses when the gnames had to be

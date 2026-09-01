@@ -65,7 +65,7 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import excl auth agree csum frac ufrac dfrac gmap
-     gset numbers updates local_updates.
+     gset gmultiset numbers updates local_updates.
 From iris.algebra.lib Require Import excl_auth dfrac_agree mono_list.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own ghost_var ghost_map saved_prop
@@ -651,4 +651,51 @@ Class uioG (Σ : gFunctors) := {
 }.
 Definition uioΣ : gFunctors := #[ ghost_varΣ (list (bv 8)); ghost_varΣ Z ].
 Global Instance subG_uioΣ {Σ} : subG uioΣ Σ -> uioG Σ.
+Proof. solve_inG. Qed.
+
+(* ===================================================================== *)
+(*  15.  THE BUFFER-CACHE TRANSIT BOX  (theory: BioInv.v, CtxAnchor.v)   *)
+(* ===================================================================== *)
+
+(* ENDGAME §3.2 (claude-notes/design/tso-escrow-endgame.md): the box's
+   cameras.  [presR]: the presence authority -- [● None] in the IDLE arm,
+   [● Some ((n_b, T_b), c)] at refs >= 1, every reference carrying
+   [◯ Some (_, 1)] beside its [bref_tok].  [btagR]: the park-tag multiset,
+   [● S] in the box and one claim [◯ {[+ n_P +]}] per un-decremented
+   parker.  [anchorR]: the context anchor's append-only generation ledger
+   ([auth] of a [gmap nat (agree nat)]; fragments are core-id, hence
+   persistent).  The two pair registers ([reg_park]/[reg_drop]) are
+   [ghost_var]s over [nat * nat]; the count-sync register is a
+   [ghost_var nat], already a member through [kallocG].  ONE bundle so the
+   ~100 files stating [bio_ctx]/[bio_init] keep [!xv6G Σ] as their only
+   binder (the rule at the head of this file). *)
+Definition presPair : ofe := prodO natO natO.
+Definition presR : cmra :=
+  authR (optionUR (prodR (agreeR presPair) positiveR)).
+Class presG (Σ : gFunctors) := PresG { pres_inG :: inG Σ presR }.
+Definition presΣ : gFunctors := #[GFunctor presR].
+Global Instance subG_presG {Σ} : subG presΣ Σ -> presG Σ.
+Proof. solve_inG. Qed.
+
+Definition btagR : cmra := authR (gmultisetUR natO).
+Class btagG (Σ : gFunctors) := BtagG { btag_inG :: inG Σ btagR }.
+Definition btagΣ : gFunctors := #[GFunctor btagR].
+Global Instance subG_btagG {Σ} : subG btagΣ Σ -> btagG Σ.
+Proof. solve_inG. Qed.
+
+Definition anchorR : cmra := authR (gmapUR nat (agreeR natO)).
+Class anchorG (Σ : gFunctors) := AnchorG { anchor_inG :: inG Σ anchorR }.
+Definition anchorΣ : gFunctors := #[GFunctor anchorR].
+Global Instance subG_anchorG {Σ} : subG anchorΣ Σ -> anchorG Σ.
+Proof. solve_inG. Qed.
+
+Class bioboxG (Σ : gFunctors) := BioboxG {
+  biobox_presG   :: presG Σ;
+  biobox_tagG    :: btagG Σ;
+  biobox_anchorG :: anchorG Σ;
+  biobox_regG    :: ghost_varG Σ (nat * nat);
+}.
+Definition bioboxΣ : gFunctors :=
+  #[ presΣ; btagΣ; anchorΣ; ghost_varΣ (nat * nat) ].
+Global Instance subG_bioboxΣ {Σ} : subG bioboxΣ Σ -> bioboxG Σ.
 Proof. solve_inG. Qed.

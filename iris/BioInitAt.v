@@ -24,8 +24,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import excl auth gmap frac numbers.
-From iris.base_logic.lib Require Import gen_heap invariants own.
+From iris.algebra Require Import excl auth gmap frac numbers agree gmultiset.
+From stdpp Require Import gmultiset.
+From iris.base_logic.lib Require Import gen_heap invariants own ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
@@ -37,6 +38,9 @@ Require Import WpLockAt.
 Require Import SleepLockAt.
 Require Import BufOwn.
 Require Import BcacheInv.
+Require Import TsoMemPa TsoGhost.
+Require Import TsoCtxPark.
+Require Import CtxAnchor.
 Require Export BioInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -63,7 +67,21 @@ Section BioInitAt.
      ([∗ list] k ∈ seq 0 NBUF,
         sl_free_pair (bn_slk bn k) ∗
         lock_tok_excl (bn_own bn k) ∗
-        lock_tok_excl (bn_mid bn k)))%I.
+        lock_tok_excl (bn_mid bn k)) ∗
+     ([∗ list] k ∈ seq 0 NBUF,
+        ((∃ ξ0 : CtxId, anchor (bn_anc bn k) 0 ξ0 0) ∗
+         astamp (bn_anc bn k) 0 0) ∗
+        own (bn_pres bn k) (● (None : optionUR (prodR (agreeR presPair) positiveR)))) ∗
+     (* ENDGAME §3.2: the three registers, both halves, and the empty tag
+        set -- generation 0 everywhere *)
+     ([∗ list] k ∈ seq 0 NBUF,
+        (ghost_var (bn_regp bn k) (1/2) ((0%nat, 0%nat) : nat * nat) ∗
+         ghost_var (bn_regp bn k) (1/2) ((0%nat, 0%nat) : nat * nat)) ∗
+        (ghost_var (bn_regd bn k) (1/2) ((0%nat, 0%nat) : nat * nat) ∗
+         ghost_var (bn_regd bn k) (1/2) ((0%nat, 0%nat) : nat * nat)) ∗
+        (ghost_var (bn_regc bn k) (1/2) (0%nat : nat) ∗
+         ghost_var (bn_regc bn k) (1/2) (0%nat : nat)) ∗
+        own (bn_pile bn k) (● (∅ : gmultiset nat))))%I.
 
   Local Lemma bio_at_seq_cons (j n : nat) : seq j (S n) = j :: seq (S j) n.
   Proof. reflexivity. Qed.
@@ -93,6 +111,70 @@ Section BioInitAt.
     case_decide as Hd; [exfalso; lia | done].
   Qed.
 
+  (* the three registers and the tag set, minted as four functions by the
+     same induction *)
+  Local Lemma bio_reg_ghost_alloc (n j : nat) :
+    ⊢ |==> ∃ fp fd fc ft : nat -> gname,
+        [∗ list] k ∈ seq j n,
+          (ghost_var (fp k) (1/2) ((0%nat, 0%nat) : nat * nat) ∗
+           ghost_var (fp k) (1/2) ((0%nat, 0%nat) : nat * nat)) ∗
+          (ghost_var (fd k) (1/2) ((0%nat, 0%nat) : nat * nat) ∗
+           ghost_var (fd k) (1/2) ((0%nat, 0%nat) : nat * nat)) ∗
+          (ghost_var (fc k) (1/2) (0%nat : nat) ∗ ghost_var (fc k) (1/2) (0%nat : nat)) ∗
+          own (ft k) (● (∅ : gmultiset nat)).
+  Proof.
+    iInduction n as [|n IH] forall (j).
+    { iModIntro. iExists (fun _ => inhabitant), (fun _ => inhabitant),
+        (fun _ => inhabitant), (fun _ => inhabitant). cbn [seq]. done. }
+    iMod (ghost_var_alloc ((0%nat, 0%nat) : nat * nat)) as (γp) "Hp".
+    iMod (ghost_var_alloc ((0%nat, 0%nat) : nat * nat)) as (γd) "Hd".
+    iMod (ghost_var_alloc (0%nat : nat)) as (γc) "Hc".
+    iMod (own_alloc (● (∅ : gmultiset nat))) as (γt) "Ht".
+    { by apply auth_auth_valid. }
+    iMod ("IH" $! (S j)) as (fp fd fc ft) "Hf".
+    iModIntro.
+    iExists (fun k => if decide (k = j) then γp else fp k),
+            (fun k => if decide (k = j) then γd else fd k),
+            (fun k => if decide (k = j) then γc else fc k),
+            (fun k => if decide (k = j) then γt else ft k).
+    rewrite bio_at_seq_cons. iSplitL "Hp Hd Hc Ht".
+    { case_decide as Hdd; [| congruence].
+      iEval (rewrite -{1}Qp.half_half) in "Hp". iDestruct "Hp" as "[Hp1 Hp2]".
+      iEval (rewrite -{1}Qp.half_half) in "Hd". iDestruct "Hd" as "[Hd1 Hd2]".
+      iEval (rewrite -{1}Qp.half_half) in "Hc". iDestruct "Hc" as "[Hc1 Hc2]".
+      iFrame "Hp1 Hp2 Hd1 Hd2 Hc1 Hc2 Ht". }
+    iApply (big_sepL_mono with "Hf"). intros i k Hk.
+    apply lookup_seq in Hk as [-> _].
+    case_decide as Hdd; [exfalso; lia | done].
+  Qed.
+
+  (* the per-buffer anchor (generation 0, stamp 0, some initial box context)
+     and presence authority (empty), minted as functions by the same
+     induction. *)
+  Local Lemma bio_anc_ghost_alloc (n j : nat) :
+    ⊢ |==> ∃ f g : nat -> gname,
+        [∗ list] k ∈ seq j n,
+          ((∃ ξ0 : CtxId, anchor (f k) 0 ξ0 0) ∗ astamp (f k) 0 0) ∗
+          own (g k) (● (None : optionUR (prodR (agreeR presPair) positiveR))).
+  Proof.
+    iInduction n as [|n IH] forall (j).
+    { iModIntro. iExists (fun _ => inhabitant), (fun _ => inhabitant).
+      cbn [seq]. done. }
+    iMod anchor_alloc as (γa ξ0) "[Ha Hs]".
+    iMod (own_alloc (● (None : optionUR (prodR (agreeR presPair) positiveR)))) as (γp) "Hp".
+    { by apply auth_auth_valid. }
+    iMod ("IH" $! (S j)) as (f g) "Hf".
+    iModIntro.
+    iExists (fun k => if decide (k = j) then γa else f k),
+            (fun k => if decide (k = j) then γp else g k).
+    rewrite bio_at_seq_cons. iSplitL "Ha Hs Hp".
+    { case_decide as Hd; [| congruence].
+      iFrame "Hs Hp". iExists ξ0. iFrame "Ha". }
+    iApply (big_sepL_mono with "Hf"). intros i k Hk.
+    apply lookup_seq in Hk as [-> _].
+    case_decide as Hd; [exfalso; lia | done].
+  Qed.
+
   (* THE SLOT SUPPLY IS THREADED IN, not minted here: its ghost name is
      canonical ([Xv6Cameras.bioslot_name]) and therefore fixed before this
      record is picked, so [BioDefs.bslots_alloc] mints authority and
@@ -105,12 +187,14 @@ Section BioInitAt.
     iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : bioUR)) as (γb) "Hauth".
     { apply auth_auth_valid. intros i. rewrite lookup_empty. done. }
     iMod (bio_buf_ghost_alloc NBUF 0) as (f) "Hbufs".
+    iMod (bio_anc_ghost_alloc NBUF 0) as (fanc fpres) "Hap".
+    iMod (bio_reg_ghost_alloc NBUF 0) as (fregp fregd fregc fpile) "Hregs".
     iModIntro.
     iExists (MkBioNames γlk γb (fun k => (f k).1.1) (fun k => (f k).1.2)
-                        (fun k => (f k).2) (fun k => (f k).2) (fun k => (f k).2)).
+                        (fun k => (f k).2) fanc fpres fregp fregd fpile fregc).
     rewrite /bio_free_tok /bslots_auth /bslots.
-    cbn [bn_lk bn_auth bn_slk bn_own bn_mid].
-    iFrame "Hlk Hauth Hsa Hsf Hbufs".
+    cbn [bn_lk bn_auth bn_slk bn_own bn_mid bn_anc bn_pres bn_regp bn_regd bn_regc bn_pile].
+    iFrame "Hlk Hauth Hsa Hsf Hbufs Hap Hregs".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -166,62 +250,91 @@ Section BioInitAt.
     ([∗ set] b ∈ bv_cov V, pool_blk V b) ={E}=∗
     own_context cur_ctx ∗ bio_ctx bn V ∗ bslots BSLOTS_FS.
   Proof.
-    iIntros (Hnc0) "Hrun (Hlkg & Hauth & Hsa & Hsf & Hbg) Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool".
+    iIntros (Hnc0) "Hrun (Hlkg & Hauth & Hsa & Hsf & Hbg & Hap & Hregs) Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool".
     assert (Hu0 : uint (mword_of_int 0 : mword 32) = 0)
       by (vm_compute; reflexivity).
-    (* every buffer's sleeplock, at its published gname pair, sealing exactly
-       its checkout token; the recycle tokens come back out. *)
+    (* the anchors' generation-0 witnesses, copied out (persistent) *)
+    iEval (rewrite big_sepL_sep) in "Hap".
+    iDestruct "Hap" as "[Hancs Hpres]".
+    iEval (rewrite big_sepL_sep) in "Hancs".
+    iDestruct "Hancs" as "[Hancs #Hsts]".
+    (* the registers: split the halves into the box side and the payload
+       side *)
+    iEval (rewrite !big_sepL_sep) in "Hregs".
+    iDestruct "Hregs" as "[[Hregp1 Hregp2] [[Hregd1 Hregd2] [[Hregc1 Hregc2] Hpile]]]".
+    (* every buffer's sleeplock, at its published gname pair, sealing the
+       bound-indexed client payload at bound 0 (ENDGAME R1-pre): the checkout
+       token and the park register's payload half at generation 0.  The dead
+       recycle-window tokens are dropped. *)
     iDestruct (big_sepL_sep_2 with "Hfresh Hbg") as "Hsl".
+    iDestruct (big_sepL_sep_2 with "Hsl Hregp1") as "Hsl".
     (* A6.68: SEQUENTIAL, not NBUF independent fupds. *)
     iAssert ([∗ list] idx↦k ∈ seq 0 NBUF,
                own_context cur_ctx -∗
-               (sl_fresh (buf_lock (bnode k)) "buffer"%string ∗
-                (sl_free_pair (bn_slk bn k) ∗ lock_tok_excl (bn_own bn k) ∗
-                 lock_tok_excl (bn_mid bn k)))
+               ((sl_fresh (buf_lock (bnode k)) "buffer"%string ∗
+                 (sl_free_pair (bn_slk bn k) ∗ lock_tok_excl (bn_own bn k) ∗
+                  lock_tok_excl (bn_mid bn k))) ∗
+                ghost_var (bn_regp bn k) (1/2) ((0%nat, 0%nat) : nat * nat))
                ={E}=∗ own_context cur_ctx ∗
-               (is_sleeplock (fst (bn_slk bn k)) (snd (bn_slk bn k))
-                  (buf_lock (bnode k)) "buffer"%string (bown bn k) ∗
-                bmid bn k))%I
+               is_sleeplock_genl (fst (bn_slk bn k)) (snd (bn_slk bn k))
+                 (buf_lock (bnode k)) "buffer"%string (bslp bn k) sl_untracked)%I
       as "Hstep".
-    { iApply big_sepL_intro. iIntros "!>" (idx k _) "Hrun [Hf (Hp & Ho & Hm)]".
-      iMod (sl_fresh_new_at2 E (bn_slk bn k) (buf_lock (bnode k))
-              "buffer"%string (bown bn k) with "Hp Hf Hrun Ho") as "[Hrun Hlk]".
-      iModIntro. iFrame "Hrun Hlk Hm". }
+    { iApply big_sepL_intro. iIntros "!>" (idx k Hk) "Hrun [[Hf (Hp & Ho & _)] Hrp]".
+      iDestruct (big_sepL_lookup _ _ idx k Hk with "Hsts") as "#Hst0".
+      iMod (sl_fresh_new_genl_at2 E (bn_slk bn k) (buf_lock (bnode k))
+              "buffer"%string (bslp bn k) sl_untracked with "Hp Hf Hrun [Ho Hrp]") as "[Hrun Hlk]".
+      { rewrite /bslp /bslp_raw. iFrame "Ho". iExists (0%nat, 0%nat). iFrame "Hrp".
+        iSplit; [iExact "Hst0"|]. iSplit; [iApply TsoGhost.llb_0 | iApply TsoCtx.ctx_floor_0]. }
+      iModIntro. iFrame "Hrun Hlk". }
     iMod (big_sepL_fupd_thread E (own_context cur_ctx)
-            with "Hrun Hstep Hsl") as "[Hrun Hsl]".
-    iEval (rewrite big_sepL_sep) in "Hsl".
-    iDestruct "Hsl" as "[#Hsls Hmids]".
+            with "Hrun Hstep Hsl") as "[Hrun #Hsls]".
     (* every initial payload is empty: blockno 0 is uncovered *)
     assert (Hpay0 : forall k bs,
-        buf_pay bn V k false (mword_of_int 0 : mword 32)
+        buf_pay (XI := cur_ctx) bn V k false (mword_of_int 0 : mword 32)
           (mword_of_int 0 : mword 32) bs = emp%I).
     { intros k bs. rewrite /buf_pay. case_decide as Hd; [|reflexivity].
       exfalso. apply Hnc0. rewrite -Hu0. exact Hd. }
-    (* park every buffer's content in a fresh escrow, keeping the bcache half
-       of dev/blockno and the refcnt cell for [bcache_res] *)
-    iDestruct (big_sepL_sep_2 with "Hbufs Hmids") as "Hbm".
-    iAssert (([∗ list] k ∈ seq 0 NBUF, |={E}=> buf_escrow bn V k) ∗
+    (* every buffer: the BOX starts IDLE at generation 0 (● None, the count
+       half at 0, no tags); the payload's None arm takes the whole resting
+       content plus the L1 register row at generation 0 *)
+    iDestruct (big_sepL_sep_2 with "Hancs Hpres") as "Hap".
+    iDestruct (big_sepL_sep_2 with "Hap Hregp2") as "Hap".
+    iDestruct (big_sepL_sep_2 with "Hap Hregd1") as "Hap".
+    iDestruct (big_sepL_sep_2 with "Hap Hregc1") as "Hap".
+    iDestruct (big_sepL_sep_2 with "Hap Hpile") as "Hap".
+    iDestruct (big_sepL_sep_2 with "Hregd2 Hregc2") as "Hslr".
+    iDestruct (big_sepL_sep_2 with "Hslr Hbufs") as "Hslr".
+    iDestruct (big_sepL_sep_2 with "Hap Hslr") as "Hall".
+    iAssert (([∗ list] k ∈ seq 0 NBUF, |={E}=> buf_box bn V k) ∗
              ([∗ list] k ∈ seq 0 NBUF,
-                bio_slot_res bn ∅ k (mword_of_int 0 : mword 32)
-                  (mword_of_int 0 : mword 32)))%I
-      with "[Hbm]" as "[Hesc Hslots]".
-    { rewrite -big_sepL_sep. iApply (big_sepL_mono with "Hbm").
-      intros i k Hk. rewrite /buf_raw.
-      iIntros "[(Hv & Hdk & Hdev & Hbno & Hrc & Hdata) Hmid]".
-      iDestruct (ctx_word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
+                bio_slot_res2 bn V ∅ k (mword_of_int 0 : mword 32)
+                  (mword_of_int 0 : mword 32) 0 cur_ctx))%I
+      with "[Hall]" as "[Hbox Hslots]".
+    { rewrite -big_sepL_sep. iApply (big_sepL_impl with "Hall").
+      iIntros "!>" (i k Hk). rewrite /buf_raw.
+      iDestruct (big_sepL_lookup _ _ i k Hk with "Hsts") as "#Hst0".
+      iIntros "[((((((%XI0 & Hanc) & Hpn) & Hrp) & Hrd) & Hc) & Hta) ((Hrd2 & Hc2) & (Hv & Hdk & Hdev & Hbno & Hrc & Hdata))]".
       iDestruct (ctx_word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
       iDestruct "Hdata" as (bs) "[%Hlen Hdata]".
-      iSplitR "Hrc Hdev2 Hbno2".
-      - rewrite /buf_escrow.
-        iApply (inv_alloc bioN E (buf_escrow_body bn V k)).
-        iNext. iLeft. rewrite /buf_parked.
-        iExists false, (mword_of_int 0 : mword 32),
-                (mword_of_int 0 : mword 32), bs.
+      iSplitL "Hanc Hpn Hrp Hrd Hc Hta".
+      - rewrite /buf_box.
+        iApply (inv_alloc bioxN E (buf_box_body bn V k)).
+        iNext. iExists 0%nat, 0%nat, XI0, (0%nat, 0%nat), (0%nat, 0%nat), ∅.
+        iFrame "Hanc Hrp Hrd Hta". iSplitR; [iExact "Hst0"|].
+        iSplitR; [iApply TsoGhost.llb_0|].
+        iSplitR; [iExact "Hst0"|].
+        iSplitR; [iApply TsoGhost.llb_0|].
+        iSplitR; [iPureIntro; intros Hne; done|].
+        iLeft. iFrame "Hpn Hc". done.
+      - rewrite /bio_slot_res2 lookup_empty.
+        iSplitL "Hrd2".
+        { iExists (0%nat, 0%nat). iFrame "Hrd2". iSplit; [iExact "Hst0"|].
+          iSplit; [iApply TsoGhost.llb_0 | done]. }
+        iFrame "Hrc Hc2". iExists false, bs.
         rewrite Hpay0. cbv iota.
-        iFrame "Hv Hdev1 Hmid". rewrite /buf_own.
-        iFrame "Hbno1 Hdk Hdata". done.
-      - rewrite /bio_slot_res lookup_empty. iFrame "Hrc Hdev2 Hbno2". }
-    iMod (big_sepL_fupd with "Hesc") as "#Hescs".
+        iFrame "Hv Hdev Hbno2". rewrite /buf_own.
+        iFrame "Hbno1 Hdk Hdata". done. }
+    iMod (big_sepL_fupd with "Hbox") as "#Hboxs".
     (* the initial pool covers the whole range: the zeroed slots claim only
        the uncovered 0 *)
     iAssert (bio_pool V (fun _ => (mword_of_int 0 : mword 32)))
@@ -237,14 +350,16 @@ Section BioInitAt.
           apply Hnc0. rewrite -Hu0. exact Hb. }
       rewrite Hc0. iExact "Hpool". }
     (* and seal the bcache lock, at its published gname, over the assembled
-       resource *)
-    iMod (newlock_at E (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }>
+       CONTEXT-INDEXED resource at floor slot 0 *)
+    iMod (newlock_at E (bn_lk bn) bcache_addr "bcache"%string
+            (fun ξ => bcache_res2 bn V ξ)
             with "Hlkg Hnm Hrun Hlkw Hcpu [Hauth Hsa Hslots Hlru Hpool]")
       as "[Hrun #Hlock]".
-    { rewrite /bcache_res /bcache_scan.
+    { rewrite /bcache_res2 /bcache_scan2.
       iExists ∅, (rev (seq 0 NBUF)),
         (fun _ => (mword_of_int 0 : mword 32)),
-        (fun _ => (mword_of_int 0 : mword 32)).
+        (fun _ => (mword_of_int 0 : mword 32)), 0%nat.
+      iSplitR; [iApply TsoCtx.ctx_floor_0|].
       iFrame "Hauth Hsa".
       iSplitR.
       { iPureIntro. intros k [x Hx]. rewrite lookup_empty in Hx. done. }
@@ -259,13 +374,11 @@ Section BioInitAt.
       assert (Hml : map bnode (rev (seq 0 NBUF)) = blist 0 NBUF)
         by (rewrite /blist map_rev //).
       rewrite Hml. iFrame "Hlru Hslots Hpool". }
-    (* Split STRUCTURALLY before framing: a bare [iFrame] here searches
-       [bio_ctx]'s big-op for each hypothesis (25 s of [BioInv]'s 46 s,
-       measured 2026-08-03). *)
+    (* Split STRUCTURALLY before framing (see the note in [BioInv]). *)
     iModIntro. iSplitL "Hrun"; [iExact "Hrun" |]. rewrite /bio_ctx.
     iSplitR "Hsf"; [| iExact "Hsf"].
     iSplitL "Hlock"; [iExact "Hlock" |].
-    rewrite big_sepL_sep. iSplitL "Hsls"; [iExact "Hsls" | iExact "Hescs"].
+    rewrite big_sepL_sep. iSplitL "Hsls"; [iExact "Hsls" | iExact "Hboxs"].
   Qed.
 
 End BioInitAt.

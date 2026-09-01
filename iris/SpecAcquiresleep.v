@@ -208,6 +208,80 @@ Definition wp_acquiresleep_gen_llb_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG
   WP (Loop : expr riscv_lang).
 
 
+(* ENDGAME R1-pre: THE CONTEXT-λ BASE TIER.  The sleeplock's client payload
+   is [R : CtxId → iProp] (CtxMorph, the same discipline as every spinlock
+   payload); the winner receives [R cur_ctx] through the inner lock's
+   standard payload morph.  Every const tier below is this at
+   [R := λ _, R0]. *)
+Definition wp_acquiresleep_genl_llb_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γs : list gname) (j : nat)
+    (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
+    (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Tl : nat) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
+  let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
+                   in
+  (j < NPROC)%nat ->
+  (26 <= av)%nat ->
+  locks_below lks "sleep lock" ->
+  sie_cap_gpr KT1 m av b pj -∗
+  cpu_own 0 eb pj b lks -∗
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb pj -∗
+  kernel_text -∗ pc_is pcE -∗
+  is_sleeplock_genl γl γsl slk s R H -∗
+  TsoGhost.llb loglen_name Tl -∗
+  (* THE DEPOSIT, spent into the lock and recovered by releasesleep *)
+  H q -∗
+  (* THE RUNNING THREAD'S OWN PROCESS BLOCK, TAKEN HERE AND HANDED STRAIGHT
+     BACK -- see the postcondition's matching row.  In and out, at the same
+     [Vpr]: acquiresleep reads ONE field of the process and writes nothing in
+     it, so nothing about the caller's block is retained by the lock, and a
+     caller reasons about it as borrowed for the length of the call.
+
+     IT USED TO BE A BARE FRACTION OF ONE FIELD, [p_pid pj ↦₄{dq} pidv] at a
+     universally quantified [dq], forwarded by every caller from the buffer
+     cache up to sys_unlink.  That was the WEAKER premise and the wrong one.
+     [p->pid]'s permission is split permanently in two -- one half in the
+     block, one half in [SchedCtx.proc_pub] behind [p->lock] -- so the only
+     source for the travelling fraction is the block itself, and the split is
+     a BORROW.  Every caller had to extract the quarter and splice it back;
+     worse, a contract asking for the block AND the quarter side by side was
+     asking for three quarters of a cell of which two are reachable, which is
+     unpayable and which no proof can refute (3/4 <= 1).  sys_close and
+     sys_pipe both shipped with exactly that defect, and ProofFilewrite.v hit
+     it and wrote it up ("there was no third fragment to find").
+
+     IT IS [ProcDefs.proc_priv_bare] AND NOT [ProcInv.proc_priv_core], and
+     that is not a detail: the one conjunct between them is [cwd_ref], an
+     INODE REFERENCE, and taking it would put [fileG]/[icfg] and the whole
+     file layer into the binder list of every contract from here up -- fifty
+     files that have no business knowing what a working directory is.
+     [ProcInv.proc_priv_core_bare] is the [⊣⊢] a caller splits with. *)
+  proc_priv_bare pj pidv Vpr -∗
+  procs_inv γs -∗
+  wp_next true pj (fun (CID : CpuId) =>
+    ∀ (mf : regfile),
+      ⌜ callee_saved m mf ⌝ -∗
+      sie_cap_gpr KT1 mf av b pj -∗
+      cpu_own 0 eb pj b lks -∗
+      trap_csrs_ext KT1 eb -∗
+      cpu_claim_ext eb pj -∗
+      pc_is ret_tgt -∗
+      (* the holder token, WITH the pid field inside it (SleepLock.v's
+         [sleeplocked_q]): acquiresleep's store into [lk->pid] lands through
+         [sleeplocked_q_pid], so what a holder walks away with is one row. *)
+      (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K) -∗
+      sleeplocked_q γsl q slk pidv -∗
+      (* ENDGAME R1-pre: the client's context-λ payload at the winner's own
+         context, through the inner lock's standard payload morph *)
+      R TsoCtx.cur_ctx -∗
+      proc_priv_bare pj pidv Vpr -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+
 Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     
     (γs : list gname) (j : nat)
@@ -366,6 +440,11 @@ Module Type ACQUIRESLEEP.
       (γs : list gname) (j : nat) (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Tl : nat),
       wp_acquiresleep_gen_llb_sconf_body γs j γl γsl s R H q m pidv Vpr av eb b lks Tl.
+  Parameter wp_acquiresleep_genl_llb_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (γs : list gname) (j : nat) (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} (H : Qp -> iProp Σ) (q : Qp)
+      (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Tl : nat),
+      wp_acquiresleep_genl_llb_sconf_body γs j γl γsl s R H q m pidv Vpr av eb b lks Tl.
   Parameter wp_acquiresleep_nb_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (j : nat)
