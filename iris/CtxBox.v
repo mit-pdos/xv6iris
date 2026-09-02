@@ -26,7 +26,12 @@
      P_rest   the rest of the bundle
      Q        the client's ξ-free ghost residue during an L2 checkout
      tok      the L2 exclusivity token (bcache: bown; icache: ic_tok)
-   with the two exclusivity laws the arms are refuted by.
+   with the two exclusivity laws the arms are refuted by.  tok and Q must
+   be GHOST (no cells): CtxMorph of a constant is trivial, so only
+   ξ-freedom keeps the box CtxMove-able across the fork (R-4).
+   THE L2 HOLDER'S HANDLE pins the parked fragment's keys AND mass when it
+   instantiates l2_hold (bcache: a unit singleton at ((dev,bno), t); icache:
+   the share singleton at mass s) -- never ∃ over the map (R-1).
 
    THE GHOSTS (one per box; §3.2):
      stamps   authR (gmapUR (id * nat) ufracR) -- the STAMPED SHARES.  Each
@@ -50,7 +55,8 @@
 
    THE ARMS: IN | OUT_L2 | OUT_L1, selected by the L1 register's flag:
      win = false:  (∃ x, P_hdr ident x ξb ∗ P_rest x ξb)  ∨  OUT_L2
-     win = true :  hdr_out ∗ ∃ x, P_rest x ξb
+     win = true :  hdr_out ∗ P_rest x ξb  at the x the register names
+                   (sr_x = Some x; (a) set it, (b) re-deposits at it)
    OUT_L2 := Q ∗ tok ∗ (the L2 payload's own row is NOT here: its slot_p
    half rides the holder's handle) ∗ the parked fragment named by [hold].
 

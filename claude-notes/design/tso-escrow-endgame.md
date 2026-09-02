@@ -508,7 +508,10 @@ ACCEPTED.  R1' may start on the flag shape.
       field of it (the new-box-ghost tripwire, applied).  No split, no
       half-fragment share, no mass arithmetic at (f).  The handle row:
         bstok bn k pidv dev bno := sleeplocked … pidv ∗ bref_tok0 ∗
-                                   l2_hold γ (dev,bno) mh   (∃ mh)
+                                   ∃ t, l2_hold γ (dev,bno) {[((dev,bno),t) := 1]}
+        (R-1: the handle pins the fragment's keys AND mass — only the
+        stamp is existential; an ∃ over the map would leave (d)'s unit
+        mass undischargeable)
       THE STATEMENTS ARE NOW CODE: iris/CtxBox.v (type-checked skeleton,
       proofs Admitted, case skeleton per lemma) — see §3.5.
       R1' MAY RESUME on CtxBox.v's statements.
