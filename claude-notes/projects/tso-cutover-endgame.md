@@ -1673,6 +1673,56 @@ IcachePinwObl, FsCfgKits, FsCfgSnap):
 - Measure follows in main-tso-readiness.md A12.9 (the ProofIget/Iput/Idup
   users of `frz_park_*` were roots already).
 
+## 6²⁰. SECOND REVIEWER ON §6¹⁹ / A12.9 (2026-09-02): both departures
+## confirmed; the landed statements match the bundle
+
+Checked against the tree at c8be36124 (statements read, not the notes).
+
+DEPARTURE 1 CONFIRMED: `ic_dep_id (DepFrz …) = Some (dev, inum)`.  The free
+    path's (g) deposits a DepFrz residue into `Q2`, whose pure tie requires
+    the descriptor's identity to be the slot's; with `None` the residue is
+    unbuildable.  Safe because nothing keyed on DepFrz being anonymous:
+    `ic_body` at DepFrz is still `False`, so `ic_deposit2` at DepFrz is
+    still `False`, and `ic_checkout`/`ic_park` remain uncallable for it --
+    the free path uses `ic_free_take` and `ic_park_hold`.  The viewer
+    refutes the DepFrz arm of `Q2` by its tx share as before.
+
+DEPARTURE 2 CONFIRMED: `ic_park` rejoins the descriptor halves inside the
+    wrapper.  The join wand is a plain entailment, so descriptor agreement
+    inside it selects the arm and hands both halves out as `Q'`; the update
+    to `DepNone` is a ghost step and must be a fupd, so the wrapper is the
+    right place.  The result, `ic_dep_neutral` beside the side share, is
+    what the sleeplock payload takes back.
+
+THE LANDED STATEMENTS MATCH THE RULED BUNDLE (§6¹³/§6¹⁴/§6¹⁷):
+    - `box_arm γ T ξb m c r s` carries `Q1 c` at OUT_L1 and `Q2` at OUT_L2;
+      (a) takes `Q1 c`; (b′) returns `Q1 c` and mints the unit at
+      `max 1 c`; (g) takes `Q2`, returns `Q1 1`; (f′) has `Qc'` in the wand
+      and as a premise, (f) its `emp` instance; `box_q_update` takes
+      `Q2 ={E∖↑N}=∗ Q2 ∗ R`, returns `l2_hold ∗ R`; `box_view` exposes the
+      arm with the count.
+    - `ic_q1 cn k 0 = ic_q_recycle` (F38's false quarter), `ic_q1 cn k (S _)
+      = ic_pin_tx`; `ic_q2` = descriptor half ∗ side share ∗ identity tie ∗
+      true quarter (F40); `ic_hdr_held` = the header minus the quarter at
+      an identified slot, with `ic_hdr_amb_split`/`_join`; `ic_checkout`
+      runs (e′) and returns the HELD bundle; `ic_free_take` returns the
+      pin; the (b) wrappers return the residue by count.
+    - F42/F42′: the resting pin is out of the header and out of `ic_pay`'s
+      ordinary arms (only the frozen alternative keeps `ic_pin_tx`, as
+      agreed); `islot_empty` carries `ic_pin_rest`; `frz_park`'s OFF arm
+      carries `hpn_full k None`, its ON arm nothing.
+    - CtxBox.v and IcacheEscrow.v: no Admitted (the two grep hits are the
+      "no [Admitted]" status comments).  OffBox.v unchanged apart from the
+      `λ _, emp` instantiation.
+
+NOTE FOR r20b (not a problem): `ic_hdr_held` at `None` is the whole dead
+    header, false quarter included.  Fine, since checkouts happen only at
+    an identified slot; a flip proof reaching for a held header at `None`
+    is a spelling error, not a missing lemma.
+
+Nothing here needs a ruling.  The design side is closed for r20, as §6¹⁸
+says.
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
