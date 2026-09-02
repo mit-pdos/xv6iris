@@ -1364,6 +1364,19 @@ context, mapped to CtxBox's lemmas:
   parents never check out (ilock takes a carved share, iput the merged
   unit), so ic_dep_mass (DepRef _) = 1 is the only reference mass at (e).
   R3 CODE MAY START once F21 is in the skeleton.
+  BUILD AGENT (2026-09-02, R3 plumbing, one deviation from F19 recorded
+  for the record): F23 THE BOX NAMES ARE A FIELD OF icfg, NOT ic_names.
+  inode_ref / inode_shr take no ic_names (they are stated at the
+  file-table altitude, IcacheRef.icfg's own reason for icfg_iref /
+  icfg_live), so a box-name parameter on them would be the 42-file sweep
+  §5 rule 2 forbids; the skeleton's `b : ic_boxes` parameter goes away
+  entirely.  `icfg_box : nat → box_names` is minted by icfg_alloc beside
+  icfg_istmp (one constructor site), ic_names is untouched, and
+  ic_deposit keeps its name and arity as F19 wanted.  The shape type ic_x
+  and the icache camera members live in Xv6Cameras §15 (icboxG is a
+  member of xv6G — one bundle); blkmap moved to BlkmapDefs.v (re-exported
+  by InodeInv) so the bundle can name the shape.
+
   BUILD AGENT'S REVIEW OF THE SKELETON (2026-09-02, against ProofIget /
   ProofIlock / ProofIunlock / ProofIput and the bcache instance as built).
   The design is sound as stated; walked: (C) after a share's park while
