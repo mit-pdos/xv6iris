@@ -675,10 +675,14 @@ disjunct.
     ref / share := ∃ m, stamps ◯ m ∗ llb loglen_name (max (snd <$> dom m))
                    with ⌜∀ p ∈ dom m, p.1 = id⌝ for the holder's known id
     (= CtxBox.reference γ id m)
-    THE L2 HOLDER'S HANDLE (R-1): pins the parked fragment's KEYS AND
-    MASS — bcache `{[((dev,bno), t) := 1]}`, icache `{[((dev,inum), t)
-    := s]}` — only the stamp t existential; never ∃ over the map (else
-    (d)/SpecIunlock cannot state the mass).
+    THE L2 HOLDER'S HANDLE (R-1, refined by F21): pins the parked
+    fragment's MASS by a pure row (what (d) / SpecIunlock need); the
+    KEYS may be ∃-bound in the handle because the L2 register records
+    the exact map and (f) recovers it by agreement.  bcache pins the unit
+    singleton `{[((dev,bno), t) := 1]}` (t existential); icache pins
+    `∃ m, ⌜qsum m = mass d⌝ ∗ l2_hold m` — a unit gathered from shares
+    that parked at different stamps has several keys and may be checked
+    out.  Never a handle whose mass is unstated.
 
 plus the client's token/cells: bcache `bref := bref_tok ∗ ref ∗ the
 dev/bno fractions` (bpin's / the log layer's), `bchain := bref_tok0 ∗
@@ -1204,6 +1208,192 @@ context, mapped to CtxBox's lemmas:
     serve the T3 racy read of ip->ref, not the box.  Only the sweep.
   - TABLE FIX taken: the icache's (c) runs at c ≥ 1 only; the ref-0 slot
     is the recycler's (a)…(b).
+  PROPOSER'S REVIEW OF THE MAP + VETTING (2026-09-01), AND THE SKELETON
+  (written against the vetting and the build agent's answers above):
+  iris/IcacheBox.v (type-checked on the VM against the current base;
+  proofs Admitted) is the icache instance's design of record, as
+  CtxBox.v is the box's.  Three corrections to the rulings above:
+  - M-1' THE DEAD SLOT IS AN IDENTITY, NOT A SHAPE.  The vetted M-1
+    discharge — "the recycler refutes non-Raw at c = 0 because the POOL
+    owns sr_ident's inum after eviction" — fails once the evicted inum
+    has been re-cached in ANOTHER slot k': k' 's box then owns the inum's
+    pool resource, the pool does not, and the recycler of k cannot see
+    either.  The build agent's named form has the same gap: "the
+    recycled slot's inum IS uncached" holds only if no other slot is
+    identified with it — the pool's domain is region ∖ ci_inums ci, and
+    a re-cached inum is in ci through k'.  Fix without a refutation: id := option (dev × inum), None =
+    never identified or evicted; P_hdr None x forces x = IcRaw (a fixed
+    raw header: valid/nlink/identity halves at any values, no payload
+    ghost); the recycler's (a) at c = 0 reads sr_ident = None off the
+    register and KNOWS the shape.  The L1 row's tie is ⌜sr_ident r =
+    ci !! k⌝ — the table's identification map itself — and ic_id
+    retires.  Eviction is (b) at c = 1 with identity None; boot is every
+    slot dead.  The unit (b) mints at None is dropped by the (d) that
+    follows.
+  - M-5 THE STAMPS MASS must be stated: a whole reference weighs 1, a
+    share of identity fraction s weighs s, a parent that has lent
+    (qt − qi) weighs 1 − (qt − qi) (the short-parent tie carries it).
+    "Mass q / s" as written would break (Σ): a whole reference holds
+    identity q ≤ 1/2 but must weigh 1 for Σ m = c.  IcacheBox.v:
+    ic_ref_stamps / inode_ref2 / inode_shr2 / inode_ref_lent2, with the
+    carve/gather statements.
+  - M-3 as vetted, with the regrouping stated: ic_payload_regroup —
+    the parked bundle (identity halves ∗ valid ∗ ic_payload_arm at
+    (inum, g, v)) ⊣⊢ ∃ x with gen g and polarity v, ic_hdr (Some
+    (dev,inum)) x ∗ ic_rest x.  P_rest's full cell is i_size; P_hdr's is
+    i_valid.  The frozen alternative rides inside ic_pay at the shape.
+  M-2, M-4 (ic_deposit2 at DepShr := l2_hold at the share singleton ∗
+  the share's cells ∗ its slice), M-6 (ic_slp := l2_row at ic_tok;
+  ic_slot_row) as vetted.  The skeleton states the eight site-shaped
+  lemmas (recycle a/b, hit c, decr d, ilock e, iunlock f, guard a/b,
+  evict b, boot) over CtxBox's; rule 0 applies to them as to CtxBox.v's.
+  VETTED 2026-09-01 (second reviewer — rule-0 audit of IcacheBox.v + the
+  full icache operations walk).  M-1' / M-5 mass / M-3 regrouping ALL
+  ACCEPTED (the re-cached-inum hole in the vetted M-1 discharge is real:
+  once the evicted inum sits in slot k', k' owns its ledger cells and k's
+  recycler can see neither the pool nor k').  Statements: PASS —
+  ic_recycle_withdraw (x0 = IcRaw by ic_hdr_dead_raw; the ∅ fragment is
+  own_unit), ic_hit_incr, ic_decr, ic_guard_withdraw (x0 ≠ IcRaw by
+  ic_pay _ IcRaw = False), ic_guard_deposit.  SEVEN ITEMS before R3 code:
+  F14 (GENERIC, CtxBox.v) (b) MUST ALLOW A SHAPE CHANGE.  box_deposit_L1
+      deposits P_hdr i' x0 at the register's x0 and closes in_arm at x0.
+      Two icache windows change shape: the recycler withdraws IcRaw and
+      deposits IcUnloaded g (ic_hdr (Some _) IcRaw is False — the stated
+      premise is unsatisfiable), and the eviction withdraws
+      Loaded/Unloaded and deposits IcRaw at None.  Neither
+      ic_recycle_deposit nor ic_evict_deposit is derivable from (b) as
+      stated.  FIX: (b) takes a target x1 and the client entailment
+      ∀ ξ, P_rest x0 ξ ⊢ P_rest x1 ξ; deposits P_hdr i' x1; closes at x1.
+      bcache: x1 = x0.  icache: reflexivity for Raw ↔ Unloaded (one term
+      in ic_rest_amb's `_` branch), weakening for Loaded → Raw.  F10's
+      "same x" was too strong.  Re-run rule 0 on (b) after the edit.
+  F15 slh_tok.  inode_shr_genlo INCLUDES slh_tok (icfg_isl k) s, which
+      the acquiresleep deposits into the tracked lock's held arm.  So
+      ic_ilock_checkout's premise is unsatisfiable at the site and
+      ic_iunlock_park cannot return it before releasesleep.  Both use the
+      share MINUS the token — inode_ident k s dev inum ∗ live_genlo k s g
+      lo (= ic_deposit2's cell-and-slice part); the client re-forms
+      inode_shr2 after releasesleep returns slh_tok.
+  F16 iput's OWN (e)/(f) ARE MISSING.  The free path checks out and parks
+      with the WHOLE unit (mass 1, identity fraction q, iref_frag), not a
+      share; ic_ilock_checkout is share-shaped and ic_deposit2 at DepShr
+      ties ic_hold … s to inode_ident k s with one s.  M-4 retired DepRef
+      one step early: state iput's hold row (ic_hold b k dev inum 1 ∗
+      inode_ident k q ∗ live slice ∗ iref_frag — iput-internal, any name)
+      and its (e)/(f) statements at mass 1.
+  F17 TABLE ROWS.  ic_slot_row has no cnt half — CtxBox puts it beside
+      L1's refcount, tied to M !! k's count (0 at None).  The dead
+      header holds inode_ident k ½ in the box, so the table's dead row
+      must hold the complementary halves for the recycler's stores —
+      that is today's islot_free_at: it STAYS (the map's deletion list
+      drops islot_free; under M-1' it is the dead row's complement).
+  F18 ic_decr's identity is (dev, inum); the eviction's (d) is at None.
+      Generalize to i : ic_bid.
+  F19 NAMES: put the four box gnames INTO ic_names.  Only 6 files
+      mention MkIcNames (not 21), so extending it is the smaller sweep,
+      and it is what lets ic_deposit cn k d keep its name and arity
+      (M-4's promise) — ic_deposit2 b k d does not, and a second record
+      parameter reaches every spec signature and call site.
+  F20 (cosmetic) ic_box_alloc's premise: ic_rest k IcRaw ξ (box_alloc
+      needs one binder across header and rest).
+  PROPOSER (2026-09-01): F14–F20 ALL ACCEPTED AND APPLIED; both files
+  re-type-check on the VM.
+  - F14 IS A GENUINE GENERIC GAP, not an icache convenience: the recycler
+    must deposit the pool bundle at (b) (Raw → Unloaded g'), and the
+    eviction must deposit the raw header (Loaded/Unloaded → Raw), and
+    neither can be avoided by re-shaping the icache's P_hdr/P_rest —
+    P_rest must stay at x (ic_loaded's tie between the meta cells and the
+    record is what readi consumes), and (a)…(b) is the only window in
+    which the identity-keyed payload can change hands under L1.  So
+    CtxBox.v gains box_deposit_L1_shape (target x1; premise ∀ ξb, P_rest
+    x0 ξb ⊢ P_rest x1 ξb; header at x1), stated and Admitted beside the
+    PROVEN box_deposit_L1, which is its x1 := x0 instance.  The proof is
+    (b)'s skeleton plus one application of the entailment to the arm's
+    P_rest before the close; the bcache wrappers keep calling (b).  This
+    is the one change to the proven file, and it is a strict
+    generalization of one statement.
+  - F15/F16: ic_body k d (the descriptor's cells + slice, + iref_frag at
+    DepRef), ic_dep_mass (a share its s, a reference 1), ic_dep_id;
+    ic_deposit2 b k d := ic_hold at (ic_dep_id d, ic_dep_mass d) ∗ ic_body
+    k d, both arms; ic_checkout / ic_park stated once over d (ilock and
+    iput's free path are the DepShr / DepRef instances).
+  - F17: ic_slot_row carries ic_cnt b k c; the dead row keeps
+    islot_free_at.  F18: ic_decr over i : ic_bid (ic_ref_stamps_at).
+    F19: recorded in the header — ic_boxes stands in for the ic_names
+    field icn_box; every b is cn at R3.  F20: applied.
+  - The two F14 entailments are stated: ic_rest_raw_unloaded (reflexivity,
+    proven) and ic_rest_to_raw (Admitted).
+  VETTED 2026-09-02 (second reviewer, rule-0 re-run on both files):
+  F14–F20 ALL CORRECTLY APPLIED.  box_deposit_L1_shape is a strict
+  generalization (same producers as (b) + the entailment applied to the
+  arm's P_rest before the close; build order: prove (b'), derive (b) as
+  x1 := x0).  ic_recycle_deposit (Raw → Unloaded g, reflexivity),
+  ic_evict_deposit (→ IcRaw at None, then ic_decr over ic_bid),
+  ic_checkout / ic_park over the descriptor (identity by (I) from the
+  key; q = ic_dep_mass d by Qp_to_Qc injectivity), ic_slot_row with cnt,
+  boot at IcRaw: all pass.  ONE NEW ITEM:
+  F21 THE FRAGMENT'S SHAPE BETWEEN SITES.  ic_checkout requires the
+      fragment as a SINGLETON {[(Some (dev,inum), t) := ic_dep_mass d]}
+      and ic_hold pins a singleton, but every producer that feeds it
+      hands out ic_ref_stamps … μ = ∃ m, qsum m = μ ∗ reference m —
+      ic_guard_deposit's post (iput's free path feeds its own checkout
+      from it), inode_ref2_carve's inode_shr2 (ilock's share),
+      ic_hit_incr, ic_recycle_deposit.  The box lemmas do produce
+      singletons; the site wrappers erase that, so the free path's
+      checkout is not dischargeable from the guard's post as stated.
+      FIX (recommended): generalize ic_checkout's fragment premise to any
+      m with ⌜qsum m = Qp_to_Qc (ic_dep_mass d)⌝ ∗ ⌜max_stamp m ≤ Kt⌝ ∗
+      reference … m, and ic_hold to pin THAT m.  R-1 still holds — the
+      register records the exact keys and the pure row pins the mass,
+      which is all (d) needs — and ic_park re-mints a singleton at T'
+      regardless.  It also covers the real multi-key case: a unit
+      gathered from shares that parked at different stamps has several
+      keys and may legitimately be checked out.  (The alternative —
+      every producer returns the named singleton — serves R1's Tl := t
+      but not the multi-key unit.)
+  BUILD NOTES (not design): ic_rest_to_raw needs length (bm_cells bm) =
+  13 — cite the lemma; with F19 the box names live in ic_names, so boot
+  mints them before MkIcNames — state ic_box_alloc over pre-minted names
+  (CtxBox.box_alloc_at, A6.159), as bio_init does.
+  CHECKED: iput's free path has (C) via the guard's re-mint at T' (Tl :=
+  T'); the +0x50 mint reaches iref_frag (ic_deposit2 is a plain
+  conjunction in iput's hand, not a frozen handle); the park sits at
+  IcUnloaded g on ic_pay's frozen alternative with live_gen k ½ g already
+  in the table's frz_park; the Loaded header ties i_nlink to di_nlink dn
+  so link/unlink via iupdate move the whole record consistently; lending
+  parents never check out (ilock takes a carved share, iput the merged
+  unit), so ic_dep_mass (DepRef _) = 1 is the only reference mass at (e).
+  R3 CODE MAY START once F21 is in the skeleton.
+  PROPOSER (2026-09-02): F21 REAL AND APPLIED, with one refinement to the
+  recommended fix: ic_hold pins the map ∃-BOUND with the mass as a pure
+  row (∃ m, ⌜qsum m = mass⌝ ∗ l2_hold m) rather than as a parameter — a
+  parameter would reach ic_deposit's arity (M-4/F19's promise), and the
+  keys are not needed in the handle: (f) reads the exact map off the L2
+  register by agreement.  R-1's rule is restated in §3.3 accordingly (the
+  mass pinned; keys recoverable).  ic_checkout's premise generalized to
+  any m with ⌜qsum m = mass d⌝ ∗ ⌜max_stamp m ≤ Kt⌝ (R1 at Tl :=
+  max_stamp m, which is what CtxBox.reference already carries).  Build
+  notes taken: ic_rest_to_raw cites the bm_cells length; boot restated
+  over pre-minted names (ic_box_alloc_at).  IcacheBox.v re-type-checks.
+  OPERATIONS WALK (what the instance must support; status after F14–F19):
+      iget hit (c) ✓ · iget recycle (a)/stores/pinw arm store/(b)→Unloaded
+      needs F14 · idup (c) ✓ · ilock: T3 racy read unchanged, genl_llb at
+      Tl := t, (e), load-from-disk under the lock (Unloaded→Loaded,
+      ity_pending→ity_shot), regroup — needs F15 · iunlock: T3 read, (f)
+      at the holder's shape, genin release — needs F15 · iput non-last
+      (d) ✓ · iput guard (a)/(b) at c = 1 ✓ · iput free path: own (e) at
+      mass 1, itrunc/iupdate/type:=0/valid:=0 on the bundle, (f) at
+      IcUnloaded g on the frozen alternative — needs F16 · iput last
+      close, free and non-free: (a) at c = 1, pool insert (icnt_half 0
+      from the table), (b)→None/IcRaw, (d) at None — needs F14, F18 ·
+      ialloc: pool only ✓ · itrunc/iupdate/readi/writei/stati/dirlink:
+      holder has the whole bundle, nlink is in P_hdr ✓ · fileclose:
+      inode_ref2_gather (keys may differ after a share's park) ✓ · boot
+      ✓ (F20) · frozen-path client ghosts (frz_park, ifreeze_pre, the
+      +0x50 mint) and ProofIdup's frozen refutation: table/holder-side,
+      unchanged.  Checked: the free path's (e) has its (C) cover through
+      the guard's re-minted unit (Tl := T'); the non-free last close runs
+      (a) then the evict (b) in one window — the register handles it.
 
 ### 4.3 inode_pay's cinv — round R4a
 
@@ -1661,3 +1851,40 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   pool's exclusive ledger cells for the uncached inum; M-3 X carries g;
   M-5 credential clause withdrawn; table fixed).  R3 code waits for
   reviewer 2.
+- 2026-09-01 (proposer, R3 map review + skeleton): iris/IcacheBox.v added
+  (type-checked, Admitted): id := option (dev × inum) with None = dead
+  (M-1' — the vetted pool-exclusivity discharge fails when the evicted
+  inum is re-cached elsewhere); X := IcRaw | IcUnloaded g | IcLoaded g dn
+  bm; ic_hdr/ic_rest with the payload ghost split from the cells and the
+  regrouping lemma stated; the stamps-mass rule for references and
+  shares (M-5 correction); ic_deposit2 as the handle row; ic_slp /
+  ic_slot_row; the site lemmas.  §4.2 amended in place.
+- 2026-09-01 (second reviewer: rule-0 audit of IcacheBox.v + operations
+  walk): M-1'/M-3/M-5 accepted.  Five site statements pass.  Seven items
+  before R3 code: F14 (b) must allow a shape change x0 → x1 under a
+  client P_rest entailment — GENERIC CtxBox.v change, bcache x1 = x0;
+  F15 the share minus slh_tok at (e)/(f); F16 iput's own (e)/(f) and hold
+  row at mass 1 (DepRef retired too early); F17 cnt half in ic_slot_row
+  and the dead row keeps islot_free_at; F18 ic_decr over ic_bid; F19 box
+  gnames into ic_names (6 MkIcNames files, not 21; keeps ic_deposit's
+  arity); F20 boot premise.  Operations table recorded.
+- 2026-09-01 (proposer, applying reviewer 1's IcacheBox audit): F14–F20
+  applied.  CtxBox.v: box_deposit_L1_shape (the shape-changing (b), F14 —
+  a strict generalization; the proven (b) is its x1 := x0 instance), the
+  one change to the proven file, Admitted for the build agent.
+  IcacheBox.v: ic_body / ic_dep_mass / ic_dep_id / ic_deposit2 over both
+  descriptors (F15/F16), ic_checkout / ic_park over d, ic_slot_row with
+  the cnt half (F17), ic_decr over ic_bid (F18), F19 note, boot premise
+  (F20), the two P_rest entailments.  Both files type-check on the VM.
+- 2026-09-02 (second reviewer, rule-0 re-run after F14–F20): all applied
+  correctly; box_deposit_L1_shape is a strict generalization of the
+  proven (b).  F21: ic_checkout's singleton fragment premise is not
+  producible from the site wrappers' ∃-m outputs — generalize the premise
+  and ic_hold to a pinned general m (R-1 preserved; covers multi-key
+  gathered units).  Two build notes (bm_cells length; boot over
+  box_alloc_at).  R3 code may start once F21 is in.
+- 2026-09-02 (proposer, F21 applied): ic_hold := ∃ m, ⌜qsum m = mass⌝ ∗
+  l2_hold m (mass pinned by the row; keys recovered at (f) from the
+  register); ic_checkout over any fragment of the descriptor's mass with
+  max_stamp ≤ Kt; R-1 restated in §3.3; boot over pre-minted names
+  (ic_box_alloc_at); bm_cells note.  IcacheBox.v type-checks.
