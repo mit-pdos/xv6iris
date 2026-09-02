@@ -85,6 +85,7 @@ Require Export FastSetSolver.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import CtxMorphTac.   (* [ctx_morph_solve] -- the log payload's transport driver *)
 
 (* ------------------------------------------------------------------ *)
 (*  Geometry (offsets confirmed against kernel-rocq/KernelInstrs.v):    *)
@@ -1330,6 +1331,66 @@ Section LogInv.
     iExact "Hrest".
   Qed.
 
+End LogInv.
+
+(* ====================================================================== *)
+(* THE LOG LOCK'S PAYLOAD, AS A λ OVER THE ACQUIRER'S CONTEXT             *)
+(* (tso-cutover-endgame section 6, L7 -- the const-payload class; the log  *)
+(* entry of that class, 2026-09-02).                                       *)
+(*                                                                        *)
+(* [log_res] is ξ-INDEXED and stays so -- it holds the three log cells     *)
+(* ([l_out], [l_cmt], [l_ncommit]) and, inside [log_state], the header's   *)
+(* run -- and a lock resource SHOULD be at a context: under the TSO        *)
+(* discipline an acquire is exactly where a payload changes context.  What *)
+(* must NOT be fixed to the ambient is the payload the HANDLE names, so    *)
+(* that a handle held at one context can be re-stated at another           *)
+(* (the handle morph moves a HANDLE but not a const payload) and the      *)
+(* acquirer re-indexes the payload along its [ctx_dom] via [CtxMorph].     *)
+(* So the payload is handed to [is_lock] as [log_res_at γ … : CtxId →      *)
+(* iProp Σ] rather than as the CONSTANT embedding [<{ log_res γ … }>];     *)
+(* [KallocInv.is_kmem] is the reference and [DiskInv.disk_res_at] the      *)
+(* named-payload twin.                                                     *)
+(*                                                                        *)
+(* THIS SECTION DECLARES NO [CurCtx], deliberately: it must spell          *)
+(* [log_res (XI := ξ)], which is not possible inside the section that      *)
+(* binds the ambient, and with none in scope a forgotten annotation is an  *)
+(* elaboration error instead of a silent capture.  [LogCtx] below reopens  *)
+(* the ambient for the rest of the file.                                   *)
+(* ====================================================================== *)
+Section LogResAt.
+  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !bioG Σ, !bioslotG Σ, !fsLogG Σ, !logG Σ,
+            !fsLinkG Σ, !fsTopG Σ, !fsCrashG Σ}.
+  Context `{GEN : GenId}.
+
+  (* the checked-out half transports on its own: the header cells and the
+     slot run are [↦₄]s, everything else in it is ghost state and pure
+     facts.  Proved STRUCTURALLY (head dispatch), and named so that the
+     payload's own instance below stops here rather than re-walking a body
+     this one already covers. *)
+  Global Instance log_state_morph (bn : bio_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) (n : nat) (LB pend : gset Z) :
+    CtxMorph (λ ξ : CtxId, log_state (XI := ξ) bn γfs cov logstart n LB pend).
+  Proof. rewrite /log_state. ctx_morph_solve. Qed.
+
+  Definition log_res_at (γ : log_names) (bn : bio_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) (ξ : CtxId) : iProp Σ :=
+    log_res (XI := ξ) γ bn γfs cov logstart.
+
+  Global Instance log_res_at_morph (γ : log_names) (bn : bio_names)
+      (γfs : fs_names) (cov : gset Z) (logstart : Z) :
+    CtxMorph (log_res_at γ bn γfs cov logstart).
+  Proof.
+    rewrite /log_res_at /log_res. ctx_morph_solve.
+    all: apply log_state_morph.
+  Qed.
+End LogResAt.
+
+Section LogCtx.
+  Context `{XI : CurCtx}.
+  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !bioG Σ, !bioslotG Σ, !fsLogG Σ, !logG Σ,
+            !fsLinkG Σ, !fsTopG Σ, !fsCrashG Σ}.
+  Context `{GEN : GenId}.
+
   (* the persistent bundle every log function shares: the sealed lock and
      the two cells initlog wrote once and froze.
 
@@ -1343,7 +1404,7 @@ Section LogInv.
       (cov : gset Z) (logstart : Z)
       (dev : SailStdpp.Values.mword 32) : iProp Σ :=
     (is_lock (ln_lk γ) log_addr "log"%string
-       <{ log_res γ bn γfs cov logstart }> ∗
+       (log_res_at γ bn γfs cov logstart) ∗
      l_dev ↦₄□ dev ∗
      l_start ↦₄□ (mword_of_int logstart : mword 32) ∗
      (* THE ERA'S SWAP RECEIPT (phase C2b/D1 stage 3).  [initlog]'s swap
@@ -1396,9 +1457,10 @@ Section LogInv.
     Persistent (log_ctx γ bn γfs cov logstart dev).
   Proof. apply _. Qed.
 
+
   Lemma log_ctx_lock γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗
-    is_lock (ln_lk γ) log_addr "log"%string <{ log_res γ bn γfs cov logstart }>.
+    is_lock (ln_lk γ) log_addr "log"%string (log_res_at γ bn γfs cov logstart).
   Proof. rewrite /log_ctx. iIntros "($ & _)". Qed.
 
   (* THE FROZEN CELLS ALONE -- log_ctx minus the lock.  The COMMITTER-ONLY
@@ -1869,4 +1931,33 @@ Section LogInv.
     iModIntro. iExists γ. iFrame.
   Qed.
 
-End LogInv.
+End LogCtx.
+
+(* ---------------------------------------------------------------------- *)
+(* THE BUNDLE AT ANOTHER CONTEXT (L7).  Below the ambient section for the   *)
+(* same reason [log_res_at] is: it has to spell [log_ctx (XI := ξ)].        *)
+(* ---------------------------------------------------------------------- *)
+Section LogCtxMorph.
+  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !bioG Σ, !bioslotG Σ, !fsLogG Σ, !logG Σ,
+            !fsLinkG Σ, !fsTopG Σ, !fsCrashG Σ}.
+  Context `{GEN : GenId}.
+
+  (* THE BUNDLE AT ANOTHER CONTEXT (L7).  Three of its rows are ξ-indexed:
+     the lock HANDLE, which moves by [WpLock.is_lock_handle_morph] alone
+     now that its payload is a λ, and the two frozen cells; the swap
+     receipt, the
+     byte-view row, block 1's park, the law and the seal are ξ-constant and
+     ride across as the same proposition. *)
+  Global Instance log_ctx_morph γ bn γfs cov logstart dev :
+    CtxMorph (λ ξ : CtxId, log_ctx (XI := ξ) γ bn γfs cov logstart dev).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /log_ctx.
+    iDestruct "H" as "(#Hlk & Hdev & Hst & Hrest)".
+    iMod (WpLock.is_lock_handle_morph (ln_lk γ) log_addr "log"%string
+            (log_res_at γ bn γfs cov logstart) ξ ξ' with "Hd Hlk")
+      as "[Hd #Hlk']".
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hst") as "[Hd Hst]".
+    iModIntro. iFrame "Hd Hlk' Hdev Hst". iExact "Hrest".
+  Qed.
+End LogCtxMorph.

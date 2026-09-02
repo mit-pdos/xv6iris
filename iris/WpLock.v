@@ -1960,6 +1960,27 @@ Section Lock.
 
 End Lock.
 
-
-
-
+(* ---------------------------------------------------------------------- *)
+(* THE LOCK HANDLE AT ANOTHER CONTEXT, ONCE (the environment-row sweep,     *)
+(* 2026-09-02).  A handle is [lock_name] (context-free) plus an [inv]       *)
+(* (context-free) plus the FLOOR, and the floor is exactly what             *)
+(* [lk_floor_morph] above transports -- so a handle crosses with no absorb  *)
+(* capability and, since the M3 λ-conversion, WITHOUT its payload having to *)
+(* move.  Three files had restated this locally ([ConsoleInv]'s copy stays, *)
+(* it is [Local] and older); [SchedCtx.is_lock_morph] is the same law       *)
+(* stated again for the scheduler's cone.                                   *)
+(*                                                                          *)
+(* BELOW THE SECTION, because it has to spell [is_lock (XI := ξ)]: inside   *)
+(* [Section Lock] the ambient [XI] is a section variable and the constant   *)
+(* has no argument to name yet.  (That is also why it is not literally      *)
+(* beside [lk_floor_morph].)                                                *)
+(* ---------------------------------------------------------------------- *)
+Global Instance is_lock_handle_morph `{!riscvGS Σ, !lockG Σ}
+    (γ : gname) (lk : mword 64) (s : string) (R : TsoCtx.CtxId → iProp Σ) :
+  TsoCtx.CtxMorph (λ ξ : TsoCtx.CtxId, is_lock (XI := ξ) γ lk s R).
+Proof.
+  iIntros (ξ ξ') "Hd H". rewrite /is_lock.
+  iDestruct "H" as (lo) "(#Hn & #Hi & Hf)".
+  iMod (lk_floor_morph lo ξ ξ' with "Hd Hf") as "[Hd #Hf']".
+  iModIntro. iFrame "Hd". iExists lo. by iFrame "Hn Hi Hf'".
+Qed.

@@ -504,7 +504,7 @@ Section SsBodies.
        index-generic. *)
     iDestruct (arm_pay_ext_split eb _ with "Htc Hclm") as "[Hpay Hext]".
     iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              <{ log_res γ bn γfs cov logstart }> X3 0%nat eb pj (K - 4)%nat
+              (log_res_at γ bn γfs cov logstart) X3 0%nat eb pj (K - 4)%nat
               ({["log"]} ∪ lks)
               Hrel_lka ltac:(pose proof (ss_K10 K HK); lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
@@ -790,7 +790,7 @@ Section SsBodies.
       by (rewrite HA3a0; apply addv_sext0).
     (* -------------------- release(&log.lock) -------------------- *)
     iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              <{ log_res γ bn γfs cov logstart }> A3 0%nat eb pj (K - 4)%nat
+              (log_res_at γ bn γfs cov logstart) A3 0%nat eb pj (K - 4)%nat
               ({["log"]} ∪ lks)
               Hrel_lka ltac:(pose proof (ss_K10 K HK); lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
@@ -874,7 +874,7 @@ Section SsBodies.
     (* -------------------- acquire(&log.lock) -------------------- *)
     iDestruct (cpu_own_transport CIDs CIDn 0 eb pj eb ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
-              <{ log_res γ bn γfs cov logstart }> A6 0%nat eb pj (K - 4)%nat eb lks
+              (log_res_at γ bn γfs cov logstart) A6 0%nat eb pj (K - 4)%nat eb lks
               ss_noff1 ltac:(pose proof (ss_K10 K HK); lia) Hbelow
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
@@ -1320,7 +1320,7 @@ Section ProofSysSync.
     (* ===================== acquire(&log.lock) ===================== *)
     iDestruct (cpu_own_transport CID CID7 0 eb pj eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string <{ log_res γ bn γfs cov logstart }> Maq
+    iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string (log_res_at γ bn γfs cov logstart) Maq
               0%nat eb pj (K - 4)%nat eb lks
               ss_noff1 ltac:(pose proof (ss_K10 K HK); lia) Hbelow
               with "Hcg Hown Htext Hpc []").

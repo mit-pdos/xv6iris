@@ -1561,7 +1561,7 @@ Section EndOpBlocks.
     iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa4)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (Acq.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
-              <{ log_res γ bn γfs cov logstart }> E4 0%nat eb (proc_addr j)
+              (log_res_at γ bn γfs cov logstart) E4 0%nat eb (proc_addr j)
               (K - 8)%nat eb lks eo_noff0 ltac:(pose proof (eo_Klk K HK); lia)
               Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -1878,7 +1878,7 @@ Section EndOpBlocks.
         by (rewrite Hommt; exact op_pending_empty).
       rewrite Hpe. iExact "Hbatch". }
     iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              <{ log_res γ bn γfs cov logstart }> G2 0%nat eb (proc_addr j)
+              (log_res_at γ bn γfs cov logstart) G2 0%nat eb (proc_addr j)
               (K - 8)%nat
               ({["log"]} ∪ lks)
               ltac:(rewrite HG2a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
@@ -4279,7 +4279,7 @@ Section EndOpBlocks.
     { intros c Hcs N2 N8 N9 N18.
       rewrite /G3 upd_ne; [| regne]. exact (HG2thr c Hcs N2 N8 N9 N18). }
     iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              <{ log_res γ bn γfs cov logstart }> G3 0%nat eb (proc_addr j)
+              (log_res_at γ bn γfs cov logstart) G3 0%nat eb (proc_addr j)
               (K - 8)%nat
               ({["log"]} ∪ lks)
               ltac:(rewrite HG3a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
@@ -4611,7 +4611,7 @@ Section ProofEndOp.
     iDestruct (eo_cont_shift (CIDa := CID) (CIDb := CID10)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (Acq.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
-              <{ log_res γ bn γfs cov logstart }> R6 0%nat eb (proc_addr j)
+              (log_res_at γ bn γfs cov logstart) R6 0%nat eb (proc_addr j)
               (K - 8)%nat eb lks eo_noff0 ltac:(pose proof (eo_Klk K HK); lia)
               Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -5031,7 +5031,7 @@ Section ProofEndOp.
       { intros c Hcs N2 N8 N9 N18.
         rewrite /U5 upd_ne; [| regne]. exact (HU4thr c Hcs N2 N8 N9 N18). }
       iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-                <{ log_res γ bn γfs cov logstart }> U5 0%nat eb (proc_addr j) (K - 8)%nat
+                (log_res_at γ bn γfs cov logstart) U5 0%nat eb (proc_addr j) (K - 8)%nat
                 ({["log"]} ∪ lks)
                 ltac:(rewrite HU5a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
                 ltac:(pose proof (eo_Klk K HK); lia)

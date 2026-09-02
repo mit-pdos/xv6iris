@@ -603,7 +603,7 @@ Section LogWriteBlocks.
        the acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              <{ log_res γ bn γfs cov logstart }> E3 n eb p (K - 4)%nat
+              (log_res_at γ bn γfs cov logstart) E3 n eb p (K - 4)%nat
               ({["log"]} ∪ lks)
               ltac:(rewrite HE3a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
@@ -1986,7 +1986,7 @@ Section ProofLogWrite.
     iDestruct (lw_cont_shift (CIDa := CID) (CIDb := CID9) bn γ γfs γd cov dev k pidv bno
                  bs bsd Φfsb Bud m K n eb p b lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
-              <{ log_res γ bn γfs cov logstart }> mA n eb p (K - 4)%nat b lks
+              (log_res_at γ bn γfs cov logstart) mA n eb p (K - 4)%nat b lks
               ltac:(lia) ltac:(lia) Hno
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.

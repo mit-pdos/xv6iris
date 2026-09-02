@@ -2742,7 +2742,7 @@ Section ProofInitlog.
        ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string
-            <{ log_res γ bn γfs cov logstart }>
+            (log_res_at γ bn γfs cov logstart)
             with "Hlkf Hlnm Hrun Hlock Hcpu Hres") as "[Hrun #Hislk]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* BLOCK 1'S PARK, ALLOCATED (durable-disk lane C-3a).  It is minted
