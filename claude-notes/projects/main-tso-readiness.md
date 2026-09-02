@@ -1726,3 +1726,66 @@ flip's `lo`/`lo tl`.
   /`ifreeze_excl` (no `frzown`); `Hitab` (is_itable2) is passed whole.
 - Measure: full `make -k -j24` running; counts to be appended below.
 
+
+## 12.14 L2/L3 r1 (second agent, `tso-cutover-l2`) — the shim sweep's first pass; the pipe page (2026-09-02)
+
+Lanes L2/L3/L4 of the endgame plan (§6/§7), run in parallel with the icache
+lane.  Method per file: `git log e1292b382..origin/main -- <file>` for main's
+non-TSO edits, `tools/merge3.sh` (base e1292b382) or a hand-applied flip hunk
+where main is ahead of flip (U tier, durable disk); flip's text for every
+physical-word matter.  Flip source = `origin/tso-flip` HEAD (a90cc05e8), NOT
+the stale `/shared/flip63` checkout (64 commits behind on 79 iris files).
+
+- **Dead `Require TsoCtxShim` dropped** (the tombstone compiles, so these were
+  never red, but they are the gate's grep): ProofSysPause, ProofSysKill,
+  ProofForkretParts, ProofAllocproc, ProofReparent, ProofScheduler,
+  ProofKforkB5, ProofKexit, ProofKwait, UkStep, ProofFilewriteParts.
+- **The ↦₄ split/join sandwich** (`ctx_word_to_mem` / `word_pointsto_split4` /
+  `ctx_word4_of_mem` ×2 and its join twin) replaced by flip's in-tier
+  `ctx_word_pointsto_split4` / `ctx_word_pointsto_join4` (ByteBuf, A6.58):
+  ProofSysRead, ProofSysWrite, ProofSysReadAU, ProofSysWriteAU,
+  ProofSysWriteConsAU (the three *AU* are main-only; same treatment as their
+  twins), ProofSysUnlinkParts.  ProofSysRead/Write gained flip's `Require
+  Import ByteBuf`.
+- **ProofCreateParts**: the forget/of_mem sandwich around `mem_ktier_mono`
+  is flip's `TsoCtx.ctx_pointsto_ktier_mono _ KT1` (A6.61), both windows.
+- **KexecOkQ at the ctx tier** (main-only file; DEPARTURE, no flip text):
+  `Require TsoCtx` (qualified, "no notation flip") became `Require Import
+  TsoCtx`, so `kexec_closer`'s `↦₄`/`↦₈`/`↦ₘ` cells are the ambient
+  thread's ctx cells like every phase lemma that hands them in or out.  That
+  raw spelling was the ONLY reason ProofKexecTail (10 sites: `kxc_exit_qgen`
+  and the epilogue) and ProofKexecD (5) crossed the shim; the conversions are
+  simply gone, as on flip.  ProofKexecTail is still red at 1185
+  (`kxa_esc_acc`: `ic_escrows` is no longer the big-op it unpacks -- the
+  icache lane's consumer sweep, r21), which keeps ProofKexecD blocked.
+- **L3 ProofPipealloc**: `page_own_pipe_raw` (gone with §0.26′) is flip's
+  `page_filled_pipe_raw _ _ Hpv` -- the kalloc post is the MEMSET page
+  (`KallocInv.kalloc_post`, A6.87) -- and `new_pipe`'s honest creator
+  deposit takes the running token, borrowed from `sie_cap_gpr` and put back
+  (`SieCapCtx.sie_cap_gpr_own_ctx_acc`, A6.68).  Main's fd-state shapes
+  (`FdClosed`, `file_pay_st`, `ustate`) untouched.  Green.
+- **Measure** (full `make -k`, `tools/cone.py`, VM tree seeded from the
+  primary's by a sound copy: identical source, `.vo` newer than source and
+  every dep's `.vo`): baseline at 8cb002042 = total 1508, roots 27, blocked
+  127, **green 1354**; after this round roots 23, blocked 121, **green
+  1364**.  Green: every file above except ProofKexecTail/ProofKexecD (icache
+  drift, above).  New root exposed behind ProofSysUnlinkParts:
+  ProofSysUnlinkTails:812 (`ic_tx_dep` arity -- icache lane).
+- **Remaining `TsoCtxShim.` mentions outside comments** (next passes):
+  BootCarveMain (67), BootShared (37), ProofUservec (2, `own_context_sc`),
+  ProofMainSecondary (1, `hart_view_lb_any`), BootBridge (1,
+  `ctx_pointsto_of_mem`), SystemAdequacy (1, `own_context_any`),
+  ProofForkretPark (1, `ctx_parked_any` -- L8, left), IcacheRef (a dead
+  `Require` -- the icache lane's file, not touched).
+- **Classification of the other baseline roots** (not this lane): the FS
+  cone's `iFrame (IAnon 1)` / `inode_shr_gen` / `carve_off_inode` / `ic_dep`
+  drifts (ProofNamex, ProofSysOpenParts, ProofCreateFreshTy, SpecFilestat,
+  ProofFileread/write, ProofSysChdir/Mkdir/Mknod/LinkTails, FsCollectAll,
+  ProofIput) = icache r21; SpecMain:525 (`started_inv P` vs flip's 3-arg
+  `started_inv γi ξd P` -- cutover's StartedInv.v is flip's, SpecMain /
+  ProofMain / SpecMainSecondary / BootShared are main's A6.129 shape) = L9's
+  boot chain, and it is what blocks BootCarveMain, BootBridge and
+  ProofMainSecondary; ProofUserretClosed:360 and UkRunFsLeaf:317 = r12's
+  deferred "concrete accessor discharge" (the `HRut` token accessor for
+  `Rut_at`, whose residue sits behind the `fd_frags` wand) -- taken up in
+  the next pass with ProofUservec.
