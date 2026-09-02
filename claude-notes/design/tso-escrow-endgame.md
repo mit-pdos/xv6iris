@@ -750,6 +750,18 @@ premises the table lists — if a proof wants more, the design is wrong
   asserted with no premise producing it — the file caught none of them
   by typing alone, which is why rule 0 is "premise for every equality",
   not "it compiles".
+  VETTED 2026-09-01 (second reviewer, rule-0 re-run on the applied
+  statements): ALL FOUR FIXES CORRECT, NO REGRESSIONS — STATEMENTS FINAL
+  for R1'.  (a) binds x0 across the register and P_hdr; (b)'s x0 agrees
+  with the arm by slot_d agreement + Some-injectivity and the close is
+  produced; (d)'s llb by llb_max from the row's and the reference's;
+  (e)'s out_l2 close has Q and keyed mh i from the reference; (f) derives
+  i = ident from keyed + (I) + validity.  m cannot change between (a)
+  and (b) (c/d select win = false, e/f refute win = true), so (b)'s full
+  dealloc stands.  Optional tidiness: a row ⌜sr_win r = false → sr_x r =
+  None⌝ (maintained by every transition; nothing reads sr_x when shut).
+  Cosmetic: the file header's arm summary omits the sr_x tie.
+
   Rows re-established at every close: (Σ) qsum m = c; (I) keys at
   ident; (C) (∀ stamps ≥ T) ∨ T ≤ tp; (D) T ≤ td ∨ T ∈ stamps.  The
   per-lemma derivations are the comments in CtxBox.v.
@@ -1360,3 +1372,7 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   rebuilt; §3.2 amended.  Lesson recorded in the file header: typing
   catches shape errors, not missing premises — rule 0's question must
   be asked per conclusion even on a compiled statement.
+- 2026-09-01 (second reviewer, rule-0 re-run): F10–F13 applied
+  correctly in CtxBox.v; no regressions; statements FINAL for R1'.  Two
+  optional notes (a win = false → sr_x = None tidiness row; the header
+  comment's arm summary).  R1' proceeds to proving the seven lemmas.
