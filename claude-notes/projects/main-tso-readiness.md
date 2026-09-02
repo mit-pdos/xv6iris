@@ -2033,4 +2033,7 @@ tie frag at the fd's cell fraction and the table's complement beside its L1
 row; `file_core_off`'s FD_INODE arm is `emp`; the duplicate `kallocG`
 binder removed.  +4 tagged Admitted (42 total).  Gate green again.
 Handed to reviewer 2.
+Measure after the fix round: total 1459 / roots 15 / blocked 100 / green
+1344; the 15 roots are exactly the pass-1 sites (item 20 lists them) plus
+ProofForkretPark (L8).
 

@@ -888,7 +888,18 @@ and law 10 (hooks).
       1, ProofSysOpenParts 3), all `SKELETON r25`, none survives the bank.
     - GATE re-run green: OffBox, FileInvDefs, FileInv, IcacheEscrow,
       IcacheBoot, FsReady, FirstTok, ProcInv, UsertrapRes, ProofSysOpenParts
-      compile.  Measure after the fix: next amendment.
+      compile.  MEASURE after the fix (full `make -k -j192`, `tools/cone.py`):
+      total 1459 / roots 15 / blocked 100 / green 1344 (was 1436 + the one
+      root).  THE 15 ROOTS ARE THE PASS-1 LIST, nothing else: SpecFileread:698
+      and SpecFilestat:431 (the `inode_pay` unfolds), ProofIput:963,
+      ProofIunlock:605, ProofIget:687, ProofIlock:2579, ProofIdup:369 (the
+      `ic_slp_dep` / `islot2` sites), ProofFileclose:326, ProofFilealloc:334,
+      ProofFiledup:281 (the ftable `<{ ftable_res }>` acquires -> `_in`
+      releases), ProofSysOpen:424 (so_publish at `qi = s`), ProofPipealloc:1609
+      (`file_core_noff_none`), ProofMain:1691 (the ftable `newlock` /
+      `ftable_res_boot`), FsCfgSnap:1271 (`icfg_alloc`'s two new rows), and
+      the pre-existing ProofForkretPark:238 (L8).  92 files fewer green by
+      design; the sweep closes them.
     Per reviewer 2's condition (item 17's process note), pass 1 waits for
     reviewer 2's audit of this state and reviewer 1's sign-off.
 
