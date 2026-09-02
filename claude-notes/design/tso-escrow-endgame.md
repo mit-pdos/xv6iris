@@ -1243,6 +1243,74 @@ context, mapped to CtxBox's lemmas:
   ic_slot_row) as vetted.  The skeleton states the eight site-shaped
   lemmas (recycle a/b, hit c, decr d, ilock e, iunlock f, guard a/b,
   evict b, boot) over CtxBox's; rule 0 applies to them as to CtxBox.v's.
+  VETTED 2026-09-01 (second reviewer — rule-0 audit of IcacheBox.v + the
+  full icache operations walk).  M-1' / M-5 mass / M-3 regrouping ALL
+  ACCEPTED (the re-cached-inum hole in the vetted M-1 discharge is real:
+  once the evicted inum sits in slot k', k' owns its ledger cells and k's
+  recycler can see neither the pool nor k').  Statements: PASS —
+  ic_recycle_withdraw (x0 = IcRaw by ic_hdr_dead_raw; the ∅ fragment is
+  own_unit), ic_hit_incr, ic_decr, ic_guard_withdraw (x0 ≠ IcRaw by
+  ic_pay _ IcRaw = False), ic_guard_deposit.  SEVEN ITEMS before R3 code:
+  F14 (GENERIC, CtxBox.v) (b) MUST ALLOW A SHAPE CHANGE.  box_deposit_L1
+      deposits P_hdr i' x0 at the register's x0 and closes in_arm at x0.
+      Two icache windows change shape: the recycler withdraws IcRaw and
+      deposits IcUnloaded g (ic_hdr (Some _) IcRaw is False — the stated
+      premise is unsatisfiable), and the eviction withdraws
+      Loaded/Unloaded and deposits IcRaw at None.  Neither
+      ic_recycle_deposit nor ic_evict_deposit is derivable from (b) as
+      stated.  FIX: (b) takes a target x1 and the client entailment
+      ∀ ξ, P_rest x0 ξ ⊢ P_rest x1 ξ; deposits P_hdr i' x1; closes at x1.
+      bcache: x1 = x0.  icache: reflexivity for Raw ↔ Unloaded (one term
+      in ic_rest_amb's `_` branch), weakening for Loaded → Raw.  F10's
+      "same x" was too strong.  Re-run rule 0 on (b) after the edit.
+  F15 slh_tok.  inode_shr_genlo INCLUDES slh_tok (icfg_isl k) s, which
+      the acquiresleep deposits into the tracked lock's held arm.  So
+      ic_ilock_checkout's premise is unsatisfiable at the site and
+      ic_iunlock_park cannot return it before releasesleep.  Both use the
+      share MINUS the token — inode_ident k s dev inum ∗ live_genlo k s g
+      lo (= ic_deposit2's cell-and-slice part); the client re-forms
+      inode_shr2 after releasesleep returns slh_tok.
+  F16 iput's OWN (e)/(f) ARE MISSING.  The free path checks out and parks
+      with the WHOLE unit (mass 1, identity fraction q, iref_frag), not a
+      share; ic_ilock_checkout is share-shaped and ic_deposit2 at DepShr
+      ties ic_hold … s to inode_ident k s with one s.  M-4 retired DepRef
+      one step early: state iput's hold row (ic_hold b k dev inum 1 ∗
+      inode_ident k q ∗ live slice ∗ iref_frag — iput-internal, any name)
+      and its (e)/(f) statements at mass 1.
+  F17 TABLE ROWS.  ic_slot_row has no cnt half — CtxBox puts it beside
+      L1's refcount, tied to M !! k's count (0 at None).  The dead
+      header holds inode_ident k ½ in the box, so the table's dead row
+      must hold the complementary halves for the recycler's stores —
+      that is today's islot_free_at: it STAYS (the map's deletion list
+      drops islot_free; under M-1' it is the dead row's complement).
+  F18 ic_decr's identity is (dev, inum); the eviction's (d) is at None.
+      Generalize to i : ic_bid.
+  F19 NAMES: put the four box gnames INTO ic_names.  Only 6 files
+      mention MkIcNames (not 21), so extending it is the smaller sweep,
+      and it is what lets ic_deposit cn k d keep its name and arity
+      (M-4's promise) — ic_deposit2 b k d does not, and a second record
+      parameter reaches every spec signature and call site.
+  F20 (cosmetic) ic_box_alloc's premise: ic_rest k IcRaw ξ (box_alloc
+      needs one binder across header and rest).
+  OPERATIONS WALK (what the instance must support; status after F14–F19):
+      iget hit (c) ✓ · iget recycle (a)/stores/pinw arm store/(b)→Unloaded
+      needs F14 · idup (c) ✓ · ilock: T3 racy read unchanged, genl_llb at
+      Tl := t, (e), load-from-disk under the lock (Unloaded→Loaded,
+      ity_pending→ity_shot), regroup — needs F15 · iunlock: T3 read, (f)
+      at the holder's shape, genin release — needs F15 · iput non-last
+      (d) ✓ · iput guard (a)/(b) at c = 1 ✓ · iput free path: own (e) at
+      mass 1, itrunc/iupdate/type:=0/valid:=0 on the bundle, (f) at
+      IcUnloaded g on the frozen alternative — needs F16 · iput last
+      close, free and non-free: (a) at c = 1, pool insert (icnt_half 0
+      from the table), (b)→None/IcRaw, (d) at None — needs F14, F18 ·
+      ialloc: pool only ✓ · itrunc/iupdate/readi/writei/stati/dirlink:
+      holder has the whole bundle, nlink is in P_hdr ✓ · fileclose:
+      inode_ref2_gather (keys may differ after a share's park) ✓ · boot
+      ✓ (F20) · frozen-path client ghosts (frz_park, ifreeze_pre, the
+      +0x50 mint) and ProofIdup's frozen refutation: table/holder-side,
+      unchanged.  Checked: the free path's (e) has its (C) cover through
+      the guard's re-minted unit (Tl := T'); the non-free last close runs
+      (a) then the evict (b) in one window — the register handles it.
 
 ### 4.3 inode_pay's cinv — round R4a
 
@@ -1708,3 +1776,12 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   regrouping lemma stated; the stamps-mass rule for references and
   shares (M-5 correction); ic_deposit2 as the handle row; ic_slp /
   ic_slot_row; the site lemmas.  §4.2 amended in place.
+- 2026-09-01 (second reviewer: rule-0 audit of IcacheBox.v + operations
+  walk): M-1'/M-3/M-5 accepted.  Five site statements pass.  Seven items
+  before R3 code: F14 (b) must allow a shape change x0 → x1 under a
+  client P_rest entailment — GENERIC CtxBox.v change, bcache x1 = x0;
+  F15 the share minus slh_tok at (e)/(f); F16 iput's own (e)/(f) and hold
+  row at mass 1 (DepRef retired too early); F17 cnt half in ic_slot_row
+  and the dead row keeps islot_free_at; F18 ic_decr over ic_bid; F19 box
+  gnames into ic_names (6 MkIcNames files, not 21; keeps ic_deposit's
+  arity); F20 boot premise.  Operations table recorded.
