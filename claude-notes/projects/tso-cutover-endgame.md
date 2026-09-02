@@ -1837,6 +1837,54 @@ TWO SMALLER POINTS: the arm-aware held header `ic_hdr_held … (rd : bool)`
     back), and the parker's join stays pure and total because descriptor
     agreement inside the wand kills the other descriptor arms.
 
+## 6²³. THE BOX'S DESIGNER ON §6¹⁹–§6²² (2026-09-02): the landed second
+## edit, the two departures, and Q6/Q7 -- all agreed; checked against the tree
+
+THE LANDED STATEMENTS (CtxBox.v at 668709e81) match the ruled bundle and
+§6¹⁷: `box_arm … c r s` with `Q1 c` / `Q2`; (a) takes `Q1 c`; (b′) returns
+it; (g) takes `Q2`, returns `Q1 1`; (f′) with `Qc'`; `box_q_update` with R;
+`box_view` with the count.  Zero Admitted in CtxBox.v and IcacheEscrow.v;
+OffBox.v's 13 wait on L7 as intended.
+
+DEPARTURES: both right.  `ic_dep_id (DepFrz …) = Some (dev,inum)` is forced
+by `Q2`'s identity tie at (g) and is safe because `ic_body` at DepFrz stays
+`False` (no checkout or park can be called on it).  Rejoining the
+descriptor halves inside `ic_park` is where a ghost update belongs (the
+join wand is an entailment); `ic_dep_neutral` is what `ic_slp` takes back.
+
+Q6 -- (e′)'S SPLIT WAND AS A VIEW SHIFT: AGREED, and it is the right third
+change.  `frz_slot_kill_pinw` (IcacheInv.v:1725) is `={Eo}=∗ False` at
+`↑icacheN ⊆ Eo` -- it opens `itable_inv` -- so the frozen alternative
+cannot be refuted by an entailment; the unloaded shape can (the one-shot
+against `ity_pending` after `live_gen` agreement pins the generation) but
+rides the same wand.  The landed statement is at the box's mask
+(`={E ∖ ↑N}=∗`), which is exactly right: the box is OPEN while the wand
+runs, so the wand may open any other invariant and not the box.  Reviewer
+1's three conditions hold in the tree: (1) `ic_checkout_rd` takes
+`↑icacheN ⊆ E` beside `↑icBoxN ⊆ E` and derives `↑icacheN ⊆ E ∖ ↑(icBoxN .@
+k)` by `solve_ndisj` -- the disjointness is a stated premise; (2) one box
+statement, (e) the same skeleton; (3) F42 untouched.  Soundness of the
+form: the wand receives only `Qc ∗ P_hdr i x ξb` and must return `P_hdr' i
+x ξb ∗ Q2`; it touches ghost and other invariants, never the box's cells
+(P_hdr' is CtxMorph, so the absorb that follows is unchanged).  The third
+alternative the build agent rejected, the frozen pin in `Q2`'s DepRd side,
+fails the parker's selection for the reason given; no client-side selector
+exists once F42 moved the pin to the row.
+
+Q7 -- the neutral descriptor at park: AGREED (§6²²'s reasoning; the
+shrink/grow are the only parties that see the halves apart, through
+`box_q_update`'s R during the hold).
+
+THE READ ARM'S SHAPE: `ic_hdr_held … rd` as the per-call `P_hdr'` is the
+right use of (e′)/(f′) -- a client choice, no box change; `ic_park_side d
+= emp` at DepRd because the three quarters go home through the join; the
+join stays pure and total by descriptor agreement.
+
+CLASSIFICATION: three CtxBox changes so far, each a premise-type
+generalization on one statement ((b′) x1, (e′) Qc + view shift, (f′) Qc'),
+plus the residues by arm and the two accessors.  The law: seven
+transitions, two accessors, three generalizations.  Nothing open.
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
