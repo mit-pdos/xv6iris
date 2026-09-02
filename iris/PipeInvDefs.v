@@ -691,3 +691,30 @@ Section PipeInv.
   Definition pipe_held (pi : mword 64) (w : bool) (q : Qp) : iProp Σ :=
     (∃ (γl : gname) (γp : pipe_names), is_pipe γl γp pi ∗ pipe_ref γp w q)%I.
 End PipeInv.
+
+(* ===================================================================== *)
+(*  THE PIPE HANDLE AT ANOTHER CONTEXT (the floors law; endgame section 9  *)
+(*  items 16/17, 2026-09-02).                                             *)
+(*                                                                        *)
+(*  [is_pipe] is a pure geometry fact, an [inv] over the lock's body-or-   *)
+(*  dead disjunction (both ξ-free: the payload is already the λ            *)
+(*  [pipe_res_at]) and, under the SAME existential the handle uses to hide *)
+(*  it, the lock FLOOR.  So the only row that moves is the floor, by       *)
+(*  [WpLock.lk_floor_morph] -- the same law the hoisted handle morph runs  *)
+(*  on.  Stated BELOW the section because it has to spell                  *)
+(*  [is_pipe (XI := ξ)].                                                   *)
+(* ===================================================================== *)
+Section PipeMorph.
+  Context `{!riscvGS Σ, !lockG Σ, !pipeG Σ}.
+
+  Global Instance is_pipe_morph (γl : gname) (γp : pipe_names)
+      (pi : mword 64) :
+    CtxMorph (λ ξ : CtxId, is_pipe (XI := ξ) γl γp pi).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /is_pipe.
+    iDestruct "H" as "(%Hv & %lo & #Hi & Hf)".
+    iMod (WpLock.lk_floor_morph lo ξ ξ' with "Hd Hf") as "[Hd #Hf']".
+    iModIntro. iFrame "Hd". iSplitR; [done|].
+    iExists lo. by iFrame "Hi Hf'".
+  Qed.
+End PipeMorph.

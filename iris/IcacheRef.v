@@ -3716,12 +3716,147 @@ Section IcacheHeldAny.
     iModIntro. iFrame.
   Qed.
 
-  (* NO transports for the FLOORED bundles ([inode_ref] through [live_fracc],
-     [inode_shr_held_gen], [inode_refp], [inode_held]): a [cred_floor] is a
-     fact about the holder's OWN context ([ctx_floor cur_ctx] or [ctx_wrote
-     cur_ctx]) and does not re-index along [ctx_dom]; tso-flip states none
-     either.  The cinv that used to park them ([FileInvDefs]'s payload chain)
-     is flip's R4a item: a parked share travels floor-free
-     ([inode_shr_genlo_bare]) and re-mints its floor under the lock. *)
+  (* ---- THE FLOORS LAW (endgame section 9, items 16/17; 2026-09-02) -----
+
+     THE FLOORED BUNDLES DO TRANSPORT, and the note that used to stand here
+     -- "a [cred_floor] is a fact about the holder's own context and does
+     not re-index" -- was reading the credential one binder too narrowly.
+     [cred_floor lo tl] is a DISJUNCTION and its UPPER index [tl] is
+     ∃-BOUND by every bundle that carries it ([live_fracc],
+     [inode_shr_held_gen], [inode_ref_short_gen]'s ∃-form): so a receiver
+     may RE-CHOOSE it.  Both arms land on the receiver's LEFT arm --
+     [TsoCtx.ctx_floor_dom] keeps [tl], and [TsoCtx.ctx_dom_wrote_floor]
+     turns the author's own message into [ctx_floor ξ' lo], for which
+     [tl := lo] is a legal choice ([lo <= lo]) -- which is exactly
+     [WpLock.lk_floor_morph]'s argument, one existential lower down.
+
+     Nothing else in these bundles moves: [live_genlo], [iref_frag],
+     [slh_tok] and the stamps are ghost state, and the only cells are
+     [inode_ident]'s two [↦₄]s ([inode_ident_morph] above). *)
+
+  Global Instance live_fracc_morph (k : nat) (s : Qp) :
+    CtxMorph (λ ξ, live_fracc (XI := ξ) k s).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /live_fracc /cred_floor.
+    iDestruct "H" as (g lo tl) "(Hlv & %Hle & [#Hfl | (%a & #Hw)])".
+    - iDestruct (TsoCtx.ctx_floor_dom with "Hd Hfl") as "[Hd #Hfl']".
+      iModIntro. iFrame "Hd". iExists g, lo, tl. iFrame "Hlv".
+      iSplitR; [done|]. by iLeft.
+    - iDestruct (TsoCtx.ctx_dom_wrote_floor with "Hd Hw") as "[Hd #Hfl']".
+      iModIntro. iFrame "Hd". iExists g, lo, lo. iFrame "Hlv".
+      iSplitR; [iPureIntro; lia|]. by iLeft.
+  Qed.
+
+  Global Instance inode_shr_genlo_morph (k : nat) (s : Qp)
+      (dev inum : mword 32) (g : gname) (lo : nat) :
+    CtxMorph (λ ξ, inode_shr_genlo (XI := ξ) k s dev inum g lo).
+  Proof.
+    iIntros (ξ ξ') "Hd (Hid & Hlv & Hsl & Hst)".
+    iMod (inode_ident_morph k (DfracOwn s) dev inum ξ ξ'
+                 with "Hd Hid") as "[Hd Hid]".
+    iModIntro. iFrame.
+  Qed.
+
+  Global Instance inode_shr_held_gen_morph (v : mword 64) (s : Qp)
+      (g : gname) (inum : mword 32) :
+    CtxMorph (λ ξ, inode_shr_held_gen (XI := ξ) v s g inum).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /inode_shr_held_gen /cred_floor.
+    iDestruct "H" as (k lo tl)
+      "(%Hv & %Hk & %Hb & %Hle & [#Hfl | (%a & #Hw)] & Hs)".
+    - iDestruct (TsoCtx.ctx_floor_dom with "Hd Hfl") as "[Hd #Hfl']".
+      iMod (inode_shr_genlo_morph k s icfg_dev inum g lo ξ ξ'
+                   with "Hd Hs") as "[Hd Hs]".
+      iModIntro. iFrame "Hd". iExists k, lo, tl.
+      iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+      iSplitR; [done|]. iSplitR; [by iLeft|]. iExact "Hs".
+    - iDestruct (TsoCtx.ctx_dom_wrote_floor with "Hd Hw") as "[Hd #Hfl']".
+      iMod (inode_shr_genlo_morph k s icfg_dev inum g lo ξ ξ'
+                   with "Hd Hs") as "[Hd Hs]".
+      iModIntro. iFrame "Hd". iExists k, lo, lo.
+      iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+      iSplitR; [iPureIntro; lia|]. iSplitR; [by iLeft|]. iExact "Hs".
+  Qed.
+
+  Global Instance inode_shr_morph (k : nat) (s : Qp) (dev inum : mword 32) :
+    CtxMorph (λ ξ, inode_shr (XI := ξ) k s dev inum).
+  Proof.
+    iIntros (ξ ξ') "Hd (Hid & Hlv & Hsl & Hst)".
+    iMod (inode_ident_morph k (DfracOwn s) dev inum ξ ξ'
+                 with "Hd Hid") as "[Hd Hid]".
+    iMod (live_fracc_morph k s ξ ξ' with "Hd Hlv") as "[Hd Hlv]".
+    iModIntro. iFrame.
+  Qed.
+
+  Global Instance inode_ref_morph (k : nat) (q : Qp) (dev inum : mword 32) :
+    CtxMorph (λ ξ, inode_ref (XI := ξ) k q dev inum).
+  Proof.
+    iIntros (ξ ξ') "Hd (Hfr & Hlv & Hsl & Hid & Hst)".
+    iMod (live_fracc_morph k q ξ ξ' with "Hd Hlv") as "[Hd Hlv]".
+    iMod (inode_ident_morph k (DfracOwn q) dev inum ξ ξ'
+                 with "Hd Hid") as "[Hd Hid]".
+    iModIntro. iFrame.
+  Qed.
+
+  Global Instance inode_ref_short_morph (k : nat) (qt qi : Qp)
+      (dev inum : mword 32) :
+    CtxMorph (λ ξ, inode_ref_short (XI := ξ) k qt qi dev inum).
+  Proof.
+    iIntros (ξ ξ') "Hd (Hfr & Hlv & Hid & Hsl & Hst)".
+    iMod (live_fracc_morph k qi ξ ξ' with "Hd Hlv") as "[Hd Hlv]".
+    iMod (inode_ident_morph k (DfracOwn qi) dev inum ξ ξ'
+                 with "Hd Hid") as "[Hd Hid]".
+    iModIntro. iFrame.
+  Qed.
+
+  Global Instance inode_refp_morph (k : nat) (q : Qp) (dev inum : mword 32) :
+    CtxMorph (λ ξ, inode_refp (XI := ξ) k q dev inum).
+  Proof.
+    iIntros (ξ ξ') "Hd [Hr Hu]".
+    iMod (inode_ref_morph k q dev inum ξ ξ' with "Hd Hr") as "[Hd Hr]".
+    iModIntro. iFrame.
+  Qed.
+
+  Global Instance inode_refp_short_morph (k : nat) (qt qi : Qp)
+      (dev inum : mword 32) :
+    CtxMorph (λ ξ, inode_refp_short (XI := ξ) k qt qi dev inum).
+  Proof.
+    iIntros (ξ ξ') "Hd [Hr Hu]".
+    iMod (inode_ref_short_morph k qt qi dev inum ξ ξ' with "Hd Hr")
+      as "[Hd Hr]".
+    iModIntro. iFrame.
+  Qed.
+
+  Global Instance inode_shr_held_morph (v : mword 64) (s : Qp) :
+    CtxMorph (λ ξ, inode_shr_held (XI := ξ) v s).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /inode_shr_held.
+    iDestruct "H" as (k inum) "(%Hv & %Hk & %Hb & Hs)".
+    iMod (inode_shr_morph k s icfg_dev inum ξ ξ' with "Hd Hs") as "[Hd Hs]".
+    iModIntro. iFrame "Hd". iExists k, inum.
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "Hs".
+  Qed.
+
+  Global Instance inode_held_short_morph (v : mword 64) (s : Qp) :
+    CtxMorph (λ ξ, inode_held_short (XI := ξ) v s).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /inode_held_short.
+    iDestruct "H" as (k qt qi inum) "(%Hv & %Hk & %Hb & %Hq & Hs)".
+    iMod (inode_refp_short_morph k qt qi icfg_dev inum ξ ξ'
+                 with "Hd Hs") as "[Hd Hs]".
+    iModIntro. iFrame "Hd". iExists k, qt, qi, inum.
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|]. iExact "Hs".
+  Qed.
+
+  Global Instance inode_held_morph (v : mword 64) :
+    CtxMorph (λ ξ, inode_held (XI := ξ) v).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /inode_held.
+    iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hb & Hs)".
+    iMod (inode_refp_morph k q icfg_dev inum ξ ξ' with "Hd Hs") as "[Hd Hs]".
+    iModIntro. iFrame "Hd". iExists k, q, inum.
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "Hs".
+  Qed.
 
 End IcacheHeldAny.
