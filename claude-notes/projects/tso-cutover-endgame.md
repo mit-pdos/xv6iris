@@ -552,6 +552,105 @@ root.  (v)–(vii): agree.
 
 ---------------------------------------------------------------------------
 
+## 6″. THIRD REVIEW (the box's designer, 2026-09-02; checked against main's
+## IcacheEscrow/FileInvDefs/TxPin/FsCollectAll and flip's IcacheEscrow)
+
+Agree with §6′ on all four heads: F31 needs (e′), F32 is real, L6/R4b is a
+mandatory third box, L1's root goes first.  Refinements and additions:
+
+F32 — REUSE Q, DO NOT ADD Q1.  The residue the collection must see during
+     OUT_L1 is the same kind of thing Q already is ("the client's ξ-free
+     ghost during a checkout").  Make Q the residue of BOTH out arms:
+       win = true : hdr_out ∗ P_rest x ξb ∗ Q
+       OUT_L2     : Q ∗ tok ∗ the parked fragment
+     (a) takes Q (the guard deposits ic_pin_tx's share), (b)/(b′) return
+     it, (g) EXCHANGES it (in: the guard's pin; out: DepFrz's content) —
+     `Q -∗ … ∗ Q`.  bcache: Q = emp, nothing changes.  The client's Q is a
+     disjunction over descriptors as §3.4.1b already has it, with one more
+     arm for the guard window.  Still a CtxBox statement change (law 5 ⇒
+     ruling), but no new parameter and the tripwire "protocol substates go
+     inside Q" is honoured literally.  F31's (e′) split wand then produces
+     Q's content from the arm exactly as (b′)'s entailment consumes it —
+     the two generalizations are of one kind.
+
+P1 — PER-SLOT NAMESPACES, OR THE COLLECTION CANNOT OPEN TWO BOXES.  Flip's
+     IcacheEscrow instantiates every slot at the single `icBoxN`
+     (IcacheEscrow.v.flip:1988); main's `icEscN .@ k` exists precisely so
+     the commit can hold all fifty escrows open in one ghost step.  r19
+     must instantiate at `icBoxN .@ k` (a parameter of `is_box`; nothing
+     else moves).  Not in the site map; it would surface only at
+     FsCollectAll.
+
+P2 — THE COLLECTION'S LEND IS A GHOST CHANGE INSIDE THE IN ARM.  Main's
+     cover is `ic_lend Q := Q ∗ ∃ R, R ∗ (Q -∗ R -∗ body)`: the leg leaves
+     at 3/4 and the body is rebuilt by the wand.  Over the box the lend
+     reaches into `P_hdr i x ξb`'s GHOST side (no floor needed for ghost;
+     the cells stay at ξb untouched).  Decide before r19 whether the
+     quarter LEAVES across the commit or the read is atomic: if it leaves,
+     `ic_pay`'s Loaded arm must be shaped for the lent fraction (an
+     `∃ dq ∈ {1, 1/4}` or a lent-marker in X), and (e) must hand a writer the
+     whole leg — writers are excluded during a commit by the tx argument
+     (a DepTx needs an open transaction), readers take 1/4 regardless, so
+     the shape is consistent; but it is a definition to make now, not at
+     FsCollectAll.  The lend's closing wand rebuilds `box_body`, i.e. the
+     cover is stated over the box body — client-side, no box change.
+
+P3 — ONE IDENTITY TRUTH, AND IT MUST BE IN THE BOX.  §6′ says state the
+     `ic_id ↔ sr_ident` tie in itable_res2's row; the collection holds no
+     itable.lock and reads the pool's `ic_id ¼` against the ESCROW's half
+     today (`ic_slot_cover_side`).  Put the quarter INTO P_hdr's ghost
+     side: `ic_hdr (Some (dev,inum)) x` carries `ic_id cn k ¼ true dev inum`
+     and the dead header `ic_hdr None IcRaw` carries `ic_id cn k ¼ false _ _`.
+     Then `sr_ident` agrees with `ic_id` by P_hdr's DEFINITION (one place),
+     the collection agrees exactly where main did, and no row is added
+     anywhere.  The mid-arm placement of `ic_id ½ true` "in the L1 row"
+     (§3.4.2) would be invisible to the collection — drop it.
+
+P4 — L6's DESIGN HAS FOUR SUB-DECISIONS; SKELETON THEM FIRST (rule 0).
+     (i)  PER-PUBLISH BOX.  The reclaim runs under ftable.lock only, so it
+          can never remove the off box's L2 register half from the inode's
+          sleeplock payload.  Hence the off box is allocated at PUBLISH
+          (fresh names, `box_alloc_at` inside sys_open under ip->lock) and
+          abandoned at RECLAIM; the ftable row's FD_INODE arm holds
+          `∃ γ, is_box γ ∗ slotd_half γ r`.  Stale L2 rows left in the inode
+          payload reference dead names — harmless garbage.
+     (ii) THE INODE PAYLOAD CARRIES A SET OF OFF-BOX L2 ROWS: `ic_slp` gains
+          `∃ S, [∗ k ∈ dom S] ∃ γ s, l2_row_off γ s ξ` keyed by main's
+          per-inode map of referring files; each row carries `llb (lr_tp s)`
+          so the `_in` releasesleep folds ALL rows at tl := the max
+          (llb_max, llb_le) — the fold entailment becomes a big-op.  Only
+          the publisher (under ip->lock) inserts; nobody removes.
+     (iii) THE L1 REGISTER HALF TRAVELS with the exclusive slot ownership
+          from filealloc to the publish (§6′'s wrinkle): the ftable row's
+          allocated-unpublished arm states the half is OUT; the bonus rule
+          ("L1 not releasable mid-window") is carried there by exclusivity
+          of the traveling half, not by the row.  State it as such.
+     (iv) A TOKEN PER OFF BOX (a `lock_tok_excl` minted at publish, riding
+          the inode payload's row for k): `tok` cannot be `ic_tok` — one
+          token cannot sit in two boxes' OUT_L2 arms.
+     The identity of the off box is the inode (dev, inum); the count is
+     f->ref; the references are the struct file's shares (mass by F21), so
+     fileclose's last-ref reclaim is (a) at c = 1 with the gathered unit —
+     the same shape as iput's guard.
+
+P5 — Note for the M-5 sweep: `inode_pay`'s PARKED shares (FileInvDefs) now
+     carry `∃ m, ◯ m ∗ llb …`, and a share's tag changes at every fileread
+     park while the share is out and back; the F21 form (∃-bound map, mass
+     pinned) is exactly what makes that legal.  State the parked share in
+     that form from the start (one sweep).
+
+ON ORDER: agree L1's root before the icache rounds.  The three rulings
+(F31's (e′), F32 as Q-reuse, L6's third box) all change or add CtxBox
+statements — take them together, as one edit of CtxBox.v with the F30
+precedent (state, type-check, then prove), before r19 writes IcacheEscrow.
+P1–P3 are r19 decisions and cost nothing if made now.
+
+ON §6: (i) F32 as above; (ii) DepFrz — agree, and with Q shared it is one
+descriptor arm among the others; (iii) the box, per publish (P4);
+(iv)–(vii) agree.
+
+---------------------------------------------------------------------------
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
