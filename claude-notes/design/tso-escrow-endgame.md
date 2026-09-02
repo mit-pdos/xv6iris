@@ -540,6 +540,74 @@ ACCEPTED.  R1' may start on the flag shape.
       ic_id) is unaffected: a parked copy needs no share-to-share
       agreement, only the cinv-open tie.
 
+  F10–F13 (second reviewer, 2026-09-01: the RULE-0 AUDIT of CtxBox.v's
+      seven statements — for every equality in a conclusion, which
+      premise produces it.  Audit by reading; the file was not compiled
+      here.  (a), (c), boot PASS; (b), (d), (e), (f) each have ONE
+      conclusion without a producing premise.)
+      Pass records, for the checklist:
+        (a) register by agree+update; P_hdr at sr_ident r because the
+            arm IS in_arm (sr_ident r_box) and r_box = r; cover: c = 0 ⇒
+            mD = m = ∅ ⇒ (D) T ≤ td ≤ Kd; c > 0 ⇒ ◯ mD ≼ ● m + equal
+            sums ⇒ m = mD ⇒ (D)'s witness ≤ max_stamp mD ≤ Kt; OUT_L2:
+            qsum mD + qsum m0 ≤ qsum m = qsum mD with m0 ≠ ∅.
+        (c) ident by agree; T and llb T are the body's own; (C)-left
+            keeps T ≤ T.
+        (e)'s identity (the F6 tie) IS produced: (I) on m, dom mh ⊆ dom
+            m by validity, keyed mh i + mh ≠ ∅ from `reference` ⇒ i =
+            sr_ident r.
+        boot: rows at m = ∅ (Σ trivial, I/C vacuous, D by td = T_boot).
+      F10  (b) deposit_L1: the premise `∀ x, P_hdr i' x ξ` is
+           dischargeable only when the deposited header is
+           x-INDEPENDENT.  True for the bcache recycle (v = false: buf_pay
+           ignores bs).  FALSE for iput's re-deposit of a VALID inode if
+           its payload arm is keyed by the dinode field values (§4.2):
+           the caller holds P_hdr i x0 at the specific x0 it withdrew,
+           and the lemma cannot know the arm's ∃x is that x0.  FIX (a
+           register FIELD, per the tripwire): slot_reg id X gains
+           `sr_x : option X`; (a) sets Some x0 and returns the NAMED
+           `P_hdr ident x0 ξ`; the OUT_L1 arm is `hdr_out ∗ P_rest x ξb`
+           at the register's x; (b) takes the specific `P_hdr i' x0 ξ`
+           and agrees x0 with the arm, then clears the field.  The
+           bcache instance discharges it trivially (its header ignores
+           x); the icache instance discharges it exactly.
+      F11  (d) ref_decr: the conclusion `llb (max td (max_stamp mD))`
+           needs `llb td` and `llb (max_stamp mD)`; the reference gives
+           the second, NOTHING gives the first (the body's `llb T` would
+           do only with a row td ≤ T, which is not stated).  FIX: add the
+           premise `llb loglen_name (sr_td r)` — the caller holds it in
+           l1_row.  No new row.
+      F12  (e) checkout: the close constructs `out_l2 = Q ∗ tok ∗ …` and
+           Q has NO producing premise.  Invisible for bcache (Q := emp),
+           fatal for any client with a residue.  FIX: (e) gains the
+           premise `Q -∗`; (f) already returns it.
+      F13  (f) park: the close is `in_arm (sr_ident r)` but the caller
+           deposits `P_hdr i x`, so the proof needs i = sr_ident r.  (I)
+           gives ∀ p ∈ dom mh, p.1 = sr_ident r; nothing says those keys
+           are at i — `keyed mh i` was a fact of the reference at (e)
+           and was NOT stored.  FIX: `out_l2` carries `⌜keyed m i⌝`
+           beside `⌜m ≠ ∅⌝` (available at (e)'s close from the
+           reference); (f) derives i = sr_ident r from it + (I) +
+           validity.
+      Also checked and fine: P_hdr_excl / P_rest_excl are stated fully
+      general (any identities, any x, any contexts) — strong, but exactly
+      what a FULL cell in each part gives, and both clients have one
+      (b_valid / b_disk; valid / the dinode fields).  (a) at c = 0 with
+      mD = ∅ hands `◯ ∅` = ε into hdr_out (own_unit).  (c) at OUT_L2 is
+      legal (arm framed).  The hold field's agreement at (f) is
+      injectivity on `Some (i, mh)`; gmap is Leibniz.
+      STATEMENT EDITS FOR THE BUILD AGENT (CtxBox.v, then re-type-check):
+        slot_reg id X := {| sr_td; sr_win; sr_ident; sr_x : option X |}
+        (a) conclusion: slotd_half (SlotReg td true ident (Some x0)) ∗
+            P_hdr (sr_ident r) x0 ξ   (x0 the arm's, now named)
+        body, win = true: hdr_out γ m ∗ P_rest x ξb with ⌜sr_x r = Some x⌝
+        (b) premises: sr_x r = Some x0; P_hdr i' x0 ξ (no ∀);
+            conclusion register: SlotReg T' false i' None
+        (d) premise: llb loglen_name (sr_td r)
+        (e) premise: Q
+        out_l2: … ∗ ⌜keyed m i⌝ ∗ ⌜m ≠ ∅⌝ ∗ stamps_frag γ m
+      Then rebuild the §3.5 table (rule 0).
+
 HARD RULES: exactly these three arm shapes and six lemmas.  Protocol
 substates go inside Q (ξ-free ghost).  A seventh lemma, a fourth arm
 shape, or a second reference form is a design error — stop (§5).
@@ -662,6 +730,11 @@ premises the table lists — if a proof wants more, the design is wrong
                                                              {|T_boot; false; id0|}, slot_p =
                                                              {|0; None|}; L1's row folds T_boot
                                                              via the newlock llb twin.
+
+  RULE-0 AUDIT AMENDMENTS (F10–F13, pending the statement edits):
+  (a) returns the NAMED x0 and records it in the register (sr_x);
+  (b) takes P_hdr i' x0 at that x0, not ∀ x;  (d) takes llb td;
+  (e) takes Q;  out_l2 carries ⌜keyed m i⌝ so (f) derives i = ident.
 
   Rows re-established at every close: (Σ) qsum m = c; (I) keys at
   ident; (C) (∀ stamps ≥ T) ∨ T ≤ tp; (D) T ≤ td ∨ T ∈ stamps.  The
@@ -1256,3 +1329,12 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   §3.2, §3.3, §4.1 R1' amended.  Two facts the table makes explicit
   that the prose hid: (b) is deposit AND bump (cnt 0 → 1 at c = 0), and
   (c) is legal at c = 0 (bget's hit on a cached refcnt-0 buffer).
+- 2026-09-01 (second reviewer: rule-0 audit of CtxBox.v): the hold-field
+  re-cut of F7 ACCEPTED (the split's rejoined mass was ∃-bound — a real
+  hole); rule 0 ACCEPTED.  Audit: (a), (c), boot pass; (e)'s F6 tie is
+  produced.  Four conclusions lack a producing premise — F10 (b)'s
+  ∀ x is undischargeable for iput's valid re-deposit: record the
+  withdrawn x in the L1 register (sr_x : option X) and take a specific
+  x0; F11 (d) needs llb td as a premise; F12 (e) needs Q as a premise;
+  F13 out_l2 must carry keyed m i so (f) can derive i = ident.
+  Statement edits listed for the build agent; §3.5 amended.
