@@ -2754,3 +2754,14 @@ culprit.  Build law: every GCP make runs under `timeout` now.
   names for the inner intros.
 - brelse: destruct the handle's `bstok` row BEFORE the park (the park needs
   the `l2_hold` half); the sleeplock token part is what holdingsleep takes.
+- PROFILE A SLOW FILE with `rocq compile -time <flags> File.v` on the VM
+  (`grep ^Chars | sort -rn` on the last field): per-command seconds.  The
+  icache instance's `Timeless` instances written as `apply _` over the
+  payload's ∃/∗/∨ tower did not finish in 5 minutes; the structural peeler
+  (`tl_struct`, one connective per step, leaf instances by `apply _`) takes
+  1.5 s.  Same lesson as BioInv's [tl_struct] note -- apply it to every new
+  big instance BEFORE the first build.
+- `run-on-gcp` syncs and cds to the CURRENT directory: run it from
+  /shared/xv6iris-3-fliptree (or the file is "not found" on the VM).
+- `pkill -f "Foo.v"` on the VM also kills the wrapper shell whose command
+  line mentions Foo.v: match the compiler process (`rocq compile.*Foo`).

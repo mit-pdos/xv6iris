@@ -627,7 +627,7 @@ Section ProofSysOpenTails.
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗
     IcacheRef.cred_floor loy tly -∗
@@ -975,7 +975,7 @@ Section ProofSysOpenTails.
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗
     IcacheRef.cred_floor loy tly -∗
@@ -1322,7 +1322,7 @@ Section ProofSysOpenTails.
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗
     IcacheRef.cred_floor loy tly -∗
@@ -1724,7 +1724,7 @@ Section ProofSysOpenTails.
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗
     IcacheRef.cred_floor loy tly -∗
@@ -1991,7 +1991,7 @@ Section ProofSysOpenTails.
     gen_cert -∗
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart kk -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗
     IcacheRef.cred_floor loy tly -∗

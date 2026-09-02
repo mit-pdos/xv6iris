@@ -2,4 +2,4 @@
    Sealed, so this is the only place the three ever meet. *)
 Require Import LinkAcquire LinkRelease ProofBunpin.
 
-Module Bunpin := BunpinProof Acquire Release.
+Module Bunpin := BunpinProof Acquire Release ReleaseIn.

@@ -428,6 +428,51 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* R3 / F22: THE NON-BLOCKING CONTRACT AT THE llb TIER over a λ payload --
+   the NB core with the inner acquire at the llb tier: the caller's [llb Tl]
+   goes in, a floor covering it comes out with the payload at the running
+   context (R1 on the NB proof; the inner AMO is the only drain between
+   iput's guard re-deposit and its checkout). *)
+Definition wp_acquiresleep_nb_genl_llb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (j : nat)
+    (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ)
+    (* THE DEPOSIT'S OWN GNAME, separate from the lock's.  A client keys the
+       "may hold" right by the OBJECT rather than by the lock -- the icache
+       keys it by the inode SLOT ([IcacheRef.icfg_isl k]) so that a reference
+       can carry it -- and the refutation only ever looks at this one. *)
+    (γt : gname) (q : Qp)
+    (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool)
+    (n : nat) (lks : gset string) (Tl : nat) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
+  let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (26 <= av)%nat ->
+  (Z.of_nat n + 4 < 2 ^ 31)%Z ->
+  (* NOT a rank bound: only what the held-set insert needs. *)
+  "sleep lock" ∉ lks ->
+  sie_cap_gpr KT1 m av false pj -∗
+  cpu_own (S n) eb pj false lks -∗
+  kernel_text -∗ pc_is pcE -∗
+  is_sleeplock_genl γl γsl slk s R (slh_tok γt) -∗
+  TsoGhost.llb loglen_name Tl -∗
+  (* THE EVIDENCE THAT THE LOCK IS FREE *)
+  slh_auth γt None -∗
+  proc_priv_bare pj pidv Vpr -∗
+  wp_next false pj (fun (CID : CpuId) =>
+    ∀ (mf : regfile),
+      ⌜ callee_saved m mf ⌝ -∗
+      sie_cap_gpr KT1 mf av false pj -∗
+      cpu_own (S n) eb pj false lks -∗
+      pc_is ret_tgt -∗
+      sleeplocked_q γsl q slk pidv -∗
+      slh_auth γt (Some q) -∗
+      (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K) -∗
+      R TsoCtx.cur_ctx -∗
+      proc_priv_bare pj pidv Vpr -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type ACQUIRESLEEP.
   Parameter wp_acquiresleep_gen_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
@@ -452,6 +497,13 @@ Module Type ACQUIRESLEEP.
       (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool)
       (n : nat) (lks : gset string),
       wp_acquiresleep_nb_body j γl γsl s R γt q m pidv Vpr av eb n lks.
+  Parameter wp_acquiresleep_nb_genl_llb_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (j : nat)
+      (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} (γt : gname) (q : Qp)
+      (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool)
+      (n : nat) (lks : gset string) (Tl : nat),
+      wp_acquiresleep_nb_genl_llb_body j γl γsl s R γt q m pidv Vpr av eb n lks Tl.
   Parameter wp_acquiresleep_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
 

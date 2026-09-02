@@ -1,12 +1,14 @@
 (* CtxBox.v -- THE TRANSIT BOX, v2 (claude-notes/design/tso-escrow-endgame.md
-   §2/§3), AS A TYPE-CHECKED SKELETON.
+   §2/§3).
 
-   STATUS: statements only.  Every proof is [Admitted]; each carries the
-   case skeleton the proof must follow (destruct the window flag, destruct
-   the arm, name the refutation or the transition, list the rows the close
-   re-establishes).  This file is the design of record for the box's
-   LEMMAS: the endgame doc points here for premises and conclusions, and a
-   change to a lemma's shape is a change to this file first.
+   STATUS: PROVEN (R2; no [Admitted]).  The six lemmas (a)-(f), the
+   allocator [box_alloc_at], the shape-changing deposit [box_deposit_L1_shape]
+   and the reference kit are closed; each proof still follows the case
+   skeleton its statement was written with (destruct the window flag,
+   destruct the arm, name the refutation or the transition, list the rows
+   the close re-establishes).  This file is the design of record for the
+   box's LEMMAS: the endgame doc points here for premises and conclusions,
+   and a change to a lemma's shape is a change to this file first.
 
    WHY A SKELETON.  Five design leaks in one day (F1, F6, F7, F8, F9) were
    all of the kind a statement catches and prose does not: a missing arm
@@ -217,6 +219,12 @@ Section helpers.
     rewrite (qsum_insert _ _ _ Hp) (qsum_delete _ _ _ Hb).
     apply Qcplus_le_compat; [exact Hqle | exact (IH _ Hrest)].
   Qed.
+  Lemma qsum_singleton (p : id * nat) (q : ufrac) : qsum {[p := q]} = Qp_to_Qc q.
+  Proof.
+    rewrite -(insert_empty p q) qsum_insert; [| apply lookup_empty].
+    rewrite qsum_empty. apply Qcplus_0_r.
+  Qed.
+
   Lemma qsum_singleton_op m (p : id * nat) (q : ufrac) :
     qsum ({[p := q]} ⋅ m) = (Qp_to_Qc q + qsum m)%Qc.
   Proof.
@@ -525,6 +533,24 @@ Section box.
 
   Definition is_box (N : namespace) γ : iProp Σ := inv N (box_body γ).
 
+  (* the boot fold: fifty deposit stamps under one llb bound (from BioInv) *)
+  (* the L1 floor slot at boot: the maximum of the per-buffer boot stamps *)
+  Lemma big_sepL_llb_max (l : list nat) (P : nat -> nat -> iProp Σ) :
+    ([∗ list] k ∈ l, ∃ Td : nat, llb loglen_name Td ∗ P k Td) -∗
+    ∃ tl : nat, llb loglen_name tl ∗
+      [∗ list] k ∈ l, ∃ Td : nat, ⌜(Td <= tl)%nat⌝ ∗ llb loglen_name Td ∗ P k Td.
+  Proof.
+    iInduction l as [|k l] "IH".
+    { iIntros "_". iExists 0%nat. iSplitR; [iApply TsoGhost.llb_0|]. done. }
+    iIntros "[Hk Hl]". iDestruct "Hk" as (Td) "[#Hllb HP]".
+    iDestruct ("IH" with "Hl") as (tl) "[#Hllbtl Hl]".
+    iExists (Nat.max tl Td). iSplitR.
+    { destruct (Nat.max_spec tl Td) as [[_ ->] | [_ ->]]; [iExact "Hllb" | iExact "Hllbtl"]. }
+    iSplitL "HP". { iExists Td. iSplitR; [iPureIntro; lia|]. iFrame "Hllb HP". }
+    iApply (big_sepL_mono with "Hl"). intros i k' _. iIntros "(%Td' & %Hb & #Hl' & HP')".
+    iExists Td'. iSplitR; [iPureIntro; lia|]. iFrame "Hl' HP'".
+  Qed.
+
   (* ---- instances and the ghost-level kit ------------------------------ *)
   Global Instance in_arm_morph i : CtxMorph (in_arm i).
   Proof. rewrite /in_arm. apply ctx_morph_exist. intros x. apply ctx_morph_sep; apply _. Qed.
@@ -620,6 +646,9 @@ Section box.
       + intros Hc. apply Hne. by apply (mscale_empty_iff s').
       + intros p Hp. rewrite dom_mscale in Hp. by apply Hk.
   Qed.
+  Lemma reference_llb γ (i : id) m : reference γ i m -∗ llb loglen_name (max_stamp m).
+  Proof. iIntros "(_ & _ & _ & #H)". iExact "H". Qed.
+
   Lemma reference_join γ (i : id) (m1 m2 : gmap (id * nat) ufrac) :
     reference γ i m1 -∗ reference γ i m2 -∗ reference γ i (m1 ⋅ m2).
   Proof.

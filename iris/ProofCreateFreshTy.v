@@ -263,8 +263,8 @@ Definition create_fresh_ty_body
              NOT assumed -- see the header. *)
           /\ fresh_shape dn⌝ ∗
          pc_is (mword_of_int (KernelSyms.create + 0xb4) : mword 64) ∗
-         is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
-                          (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) ∗
+         is_sleeplock_genl gil gisl (i_lock (ientry kslot)) "inode"%string
+                          (ic_slp cn kslot) (slh_tok (icfg_isl kslot)) ∗
          sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv ∗
          (∃ loc tlc : nat,
             ⌜(loc <= tlc)%nat⌝ ∗ IcacheRef.cred_floor loc tlc ∗
@@ -349,7 +349,7 @@ Section CftHelpers.
     (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
+    iIntros (Hk) "H". rewrite /ic_escrows /ic_boxes_all /ic_escrow.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.

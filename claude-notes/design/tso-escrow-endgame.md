@@ -1391,6 +1391,93 @@ context, mapped to CtxBox's lemmas:
   _` over ∃/∗/∨ towers and hung the file (the "degenerate" build); they
   are now structural (tl_struct), and IcacheBox.v compiles in 7.8 s of
   tactic time, worst command 1.6 s.
+  BUILD AGENT (2026-09-02, R3.3 merge): F25 THE L1 ROW'S FLOOR IS ITS
+  OWN.  The skeleton's ic_slot_row bounds the drop stamp by a [tl] "the
+  payload's floor slot"; in the itable that slot is the per-slot exact-read
+  stamp tst (A6.144), whose auth is HALF in the lock and half in icacheN,
+  so tying sr_td ≤ tst would make every (b)/(d) open the invariant to
+  bump tst.  Instead the ξ-row carries `∃ tb, ic_slot_row k (ci !! k)
+  (icM_count M k) tb ∗ llb tb ∗ ctx_floor ξ tb` (ic_slot_row_fl; _llb and
+  _bare twins for the release fold), re-floored per release by the same
+  ctx_parked_raise the exact-read stamps use.  ic_slot_row's statement is
+  unchanged; islot2 keeps its lock-held rows minus ic_id; the dead row is
+  islot_free_at (F17).  ic_names keeps icn_mid / icn_id as DEAD fields
+  (still minted; §6 cleanup removes them with the six MkIcNames sites).
+  F26 THE ITABLE HANDLE CARRIES THE ESCROW FAMILY: is_itable2 gains
+  `∗ ic_escrows cn γfs γi cov logstart` (persistent, same arity).  Under
+  the box every [ref++] under itable.lock is (c) -- iget's hit and idup's
+  -- and SpecIdup never took the escrows (its two callers, kfork and
+  namex, would each have needed a new row); the handle every itable user
+  already holds is where the family belongs.  Accessors is_itable2_escrows
+  / ic_escrows_lookup.  M-5 LANDED IN IcacheRef: ic_stamps k i (μ : Qc)
+  is the base row (mass in Qc so the canonical short parent qt = qi
+  weighs 1), ic_ref_stamps (Qp mass) and ic_lent_stamps k qt qi (mass
+  1 + qi − qt) the two spellings; inode_ref / _gen / _genlo carry mass 1,
+  inode_shr / _gen / _genlo mass s, inode_ref_short / _gen / _genlo the
+  lent mass, the BARE forms none (the holder deposited them into the box
+  with slh_tok into the lock -- F15).  The carve needs q + s ≤ 1, which
+  the liveness slice's validity supplies (live_fracc_le1).
+  F28 IPUT'S GUARD KEEPS ITS WINDOW OPEN INTO THE LAST CLOSE.  The site
+  map's "(a) at c = 1 … (b) at c = 1 (NO bump), then release itable _in"
+  is the FREE path's guard (the (b) re-mints the unit at T', the NB
+  acquire's inner AMO floors it -- F22).  On EXIT A (valid == 0 or
+  nlink != 0: no release, straight to ref--) a (b) at T' followed by the
+  last close's (a) would need a floor ≥ T' under the SAME itable hold,
+  which no running context can mint for its own deposit stamp (the R1
+  asymmetry).  So the guard's (a) is the last close's (a): the window
+  stays open from +0x3a through the +0x22 store, the eviction re-deposits
+  RAW at None ((b')) and (d) drops the unit -- one (a), one (b'), one (d)
+  per last close, exactly the tabulated transitions, with the header in
+  hand across the reads (the row "+0x3c/+0x44 re-reads: inside the
+  (a)…(b) window").  Proof shape: ip_free_entry's Exit A hands ip_tail
+  the OPEN window (register + header + cnt half + the slot's stamp row +
+  the rows' back-wand) instead of whole rows; ip_tail's premise is that
+  bundle when cnt = 1 and the whole rows otherwise.  Two plumbing rows
+  with it: iput's itable acquire is the llb tier at Tl := max_stamp of
+  the closer's unit (IcacheRef.inode_ref_at names the fragment so the
+  floor can be stated over it), and the post-free re-acquire at Tl := the
+  park stamp.
+  F30 OPEN -- NEEDS A RULING (2026-09-02, found writing ProofIput's free
+  path): THE FREE PATH'S (b) THEN (e) LOSES THE SHAPE.  The vetted plan
+  for iput's free path is the guard's (a) at c = 1, then (b) at T', then
+  the NB acquiresleep (F22's twin floors T'), then (e).  But (b) sets the
+  register's sr_x := None and (e) returns ∃ x, P_hdr x ∗ P_rest x -- the
+  box does not remember what was deposited, by design (the freshness
+  design keys content by the CLIENT's identity-keyed payload ghost, F2).
+  For the icache that ghost is ic_pay, and on the FROZEN alternative it is
+  "the receipt and nothing else" (M-3/IVd) -- so after the +0x50 mint
+  (which spends ifreeze_off, so the header can only go back frozen) the
+  header comes out of (e) at an UNKNOWN shape: IcUnloaded g' (frozen) is
+  not refutable, and for IcLoaded g' dn' bm' nothing ties dn' to the dn
+  the guard read nlink = 0 off (the cells are linear; the region's record
+  witness dinode_at is inside the box's ghost; no persistent witness of
+  the record exists that survives the later type := 0 write).  itrunc and
+  the region free need the cells and the record AT dn.  Moving the mint
+  after (e) (round trip on the ordinary alternative) pins the generation
+  (live_gen ½ g' vs the closer's own slice) but still not dn.
+  The bcache never hits this: buf_pay keys the data to the fs view, a
+  duplicable global.  The icache's analogue would be a shape witness the
+  holder keeps a half of across (b)…(e).
+  OPTIONS.  (B) the seventh transition the proposer named and rejected at
+      F22 -- OUT_L1 → OUT_L2 under both locks: the free path never
+      re-deposits the header; P_rest is taken out with the (a)-time floor
+      over the closer's unit (the guard's acquire floor Kt), the L1
+      register closes (win := false, sr_x := None), L2 holds the unit's
+      fragment.  One more CtxBox lemma ((b)'s and (e)'s skeletons fused,
+      no fresh stamp, rule 0 obvious); the NB twin (F22) becomes
+      unnecessary for this site.  Today's proof structure is exactly this
+      (the freer keeps its bundle in hand across the span).
+  (C) keep (b)/(e) and add a client-side SHAPE AGREEMENT to ic_pay on every
+      alternative (a per-slot fractional agreement on ic_x; the holder
+      keeps a half across (b)…(e)) -- a new client ghost family in the
+      instance, not in the box; ~13 sites regroup.
+  RECOMMENDATION: (B).  It is the smaller change (one lemma, one site), it
+  matches the vetted "+0x3c/+0x44 re-reads inside the (a)…(b) window"
+  reading, and the shape-blindness of (e) after (b) is a property of the
+  box (correct for every other site: their shapes are re-derived from the
+  identity-keyed ghost on the ordinary alternative).  The rest of R3
+  (recycle, hit, ilock, iunlock, idup, iput's Exit A and last closes) is
+  unaffected and proceeds; the free path waits for the ruling.
 
   BUILD AGENT'S REVIEW OF THE SKELETON (2026-09-02, against ProofIget /
   ProofIlock / ProofIunlock / ProofIput and the bcache instance as built).
@@ -2009,3 +2096,23 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   the 13-cell length; regroup lemmas are per shape; the lent parent is
   inode_ref_short; Timeless instances made structural (the slow build).
   Instance file compiles; R3.3 (IcacheEscrow merge + sweep) next.
+- 2026-09-02 (build agent, R3.3 merge): F25 — the box's L1 row rides the
+  itable ξ-row with its OWN floor (not tied to the exact-read stamp);
+  ic_escrow := the box, ic_deposit := the handle row, ic_sleeplocks over
+  ic_slp; arms, ic_id, ic_mid, 13 lemmas deleted; sleeplock tier swept.
+- 2026-09-02 (build agent, R3.3 cont.): F26 — is_itable2 carries
+  ic_escrows (idup's (c) without a spec sweep); M-5 landed in IcacheRef
+  (ic_stamps with a Qc mass; every reference form carries its stamps,
+  the bare forms none).
+- 2026-09-02 (build agent, R3.3 cont.): F27 — the payload's liveness half
+  rides ic_deposit beside ic_deposit2 across a share's hold (no spec row
+  names it); F28 — iput's guard window stays open into the last close on
+  Exit A (no floor for the guard's own re-mint under the same hold);
+  inode_ref_at (named fragment) for iput's llb-tier itable acquire.
+  ProofIdup green; ProofIget/Ilock/Iunlock rewritten (compiling);
+  ProofIput in progress; the NB twin (F22) not yet written.
+- 2026-09-02 (build agent, R3.3): F30 OPEN — iput's free path: (b) then
+  (e) loses the shape (the frozen alternative keys nothing, the box
+  forgets x at (b)); recommend the OUT_L1 → OUT_L2 transition (B) over a
+  client shape-agreement ghost (C).  Needs a ruling; everything else in
+  R3 proceeds.

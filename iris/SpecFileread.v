@@ -571,11 +571,7 @@ Section SpecFileread.
     IcacheRef.inode_shr_gen ik (s1 + s2)%Qp dev inum g ⊣⊢
     IcacheRef.inode_shr_gen ik s1 dev inum g ∗
     IcacheRef.inode_shr_gen ik s2 dev inum g.
-  Proof.
-    rewrite /IcacheRef.inode_shr_gen IcacheRef.inode_ident_split
-            IcacheRef.live_gen_split SleepLock.slh_tok_split.
-    iSplit; [iIntros "[[$ $] [[$ $] [$ $]]]" | iIntros "[($ & $ & $) ($ & $ & $)]"].
-  Qed.
+  Proof. apply IcacheRef.inode_shr_gen_split. Qed.
 
   (* halving, as its OWN lemma -- durable-notes' [rewrite -(Qp.div_2 q)]
      trap: written at a call site inside the proofmode the split's evar lands
@@ -617,7 +613,7 @@ Section SpecFileread.
     (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart ik
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
+    iIntros (Hk) "H". rewrite /ic_escrows /ic_boxes_all /ic_escrow.
     assert (Hl : seq 0 NINODE !! ik = Some ik) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ ik ik Hl with "H") as "$".
   Qed.

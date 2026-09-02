@@ -4048,7 +4048,7 @@ Section InodeRegion.
      (The extra [lockG] binder is [IcacheRef.inode_ref]'s, not this
      lemma's: the reference's liveness slice is stated over the icache
      lock's ghost theory, and this section does not carry it.) *)
-  Lemma inode_claimed_to_ClaimK `{!lockG Σ} ty k q dev inum g :
+  Lemma inode_claimed_to_ClaimK `{!lockG Σ} `{!icboxG Σ, !kallocG Σ} ty k q dev inum g :
     IcacheRef.inode_claimed ty k q dev inum ⊢
     IcacheRef.inode_ref k q dev inum ∗
     ireg_wd_lic (ClaimK ty) g (bv_unsigned inum).

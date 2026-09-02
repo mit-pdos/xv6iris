@@ -1210,7 +1210,7 @@ Section KexecAExit.
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
+    iIntros (Hk) "H". rewrite /ic_escrows /ic_boxes_all /ic_escrow.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
@@ -1483,7 +1483,7 @@ Section KexecABad.
     pc_is (mword_of_int (KXA + 0x064) : mword 64) -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry k)) "inode"%string (ic_slp cn k) (slh_tok (icfg_isl k)) -∗
     (* ---- the open inode: exactly SpecIunlockput's input ---- *)
     sleeplocked_q gisl sq (i_lock (ientry k)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗

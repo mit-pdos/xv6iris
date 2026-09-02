@@ -887,7 +887,7 @@ Section ProofSysChdirBody.
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
+    iIntros (Hk) "H". rewrite /ic_escrows /ic_boxes_all /ic_escrow.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
@@ -896,7 +896,7 @@ Section ProofSysChdirBody.
     (k < NINODE)%nat ->
     (ic_sleeplocks cn -∗
      ∃ gil gisl : gname,
-       is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k))
+       is_sleeplock_genl gil gisl (i_lock (ientry k)) "inode"%string (ic_slp cn k) (slh_tok (icfg_isl k))
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_sleeplocks.

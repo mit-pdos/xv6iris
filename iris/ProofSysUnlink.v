@@ -510,7 +510,7 @@ Section ProofSysUnlinkBody.
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
+    iIntros (Hk) "H". rewrite /ic_escrows /ic_boxes_all /ic_escrow.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
@@ -519,8 +519,8 @@ Section ProofSysUnlinkBody.
     (k < NINODE)%nat ->
     (ic_sleeplocks cn -∗
      ∃ gil gisl : gname,
-       is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string
-                        (ic_tok cn k) (slh_tok (icfg_isl k))
+       is_sleeplock_genl gil gisl (i_lock (ientry k)) "inode"%string
+                        (ic_slp cn k) (slh_tok (icfg_isl k))
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_sleeplocks.
@@ -542,13 +542,7 @@ Section ProofSysUnlinkBody.
   Lemma su_carve_gen `{XI : CurCtx} (k : nat) (q s : Qp) (dv inum : mword 32) (gy : gname) :
     inode_ref_gen k (q + s)%Qp dv inum gy ⊣⊢
     inode_ref_short_gen k (q + s)%Qp q dv inum gy ∗ inode_shr_gen k s dv inum gy.
-  Proof.
-    rewrite /inode_ref_gen /inode_ref_short_gen /inode_shr_gen
-            live_gen_split inode_ident_split SleepLock.slh_tok_split.
-    iSplit.
-    - iIntros "($ & [$ Hl2] & [$ Hi2] & [$ Hs2])". iFrame.
-    - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
-  Qed.
+  Proof. apply inode_ref_carve_gen. Qed.
 
   Lemma su_shed_gen `{XI : CurCtx} (k : nat) (q : Qp) (dv inum : mword 32) (gy : gname) :
     inode_ref_gen k q dv inum gy ⊣⊢
@@ -1476,8 +1470,8 @@ Section ProofSysUnlinkBody.
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string
-                     (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string
+                     (ic_slp cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗
     IcacheRef.cred_floor loy tly -∗
@@ -1731,8 +1725,8 @@ Section ProofSysUnlinkBody.
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
        proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
        (* ---- [dp], LOCKED and OPEN ---- *)
-       is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                        (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+       is_sleeplock_genl gild gisld (i_lock (ientry kd)) "inode"%string
+                        (ic_slp cn kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
        ⌜(loyd <= tlyd)%nat⌝ -∗
        IcacheRef.cred_floor loyd tlyd -∗
@@ -3542,8 +3536,8 @@ Section ProofSysUnlinkBody.
     procs_inv gs -∗
     proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
     (* ---- [dp], LOCKED and OPEN (the +0x72 seam's bundle) ---- *)
-    is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+    is_sleeplock_genl gild gisld (i_lock (ientry kd)) "inode"%string
+                     (ic_slp cn kd) (slh_tok (icfg_isl kd)) -∗
     sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
     ⌜(loyd <= tlyd)%nat⌝ -∗
     IcacheRef.cred_floor loyd tlyd -∗
@@ -3632,8 +3626,8 @@ Section ProofSysUnlinkBody.
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
        proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
        (* ---- [dp], unchanged ---- *)
-       is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                        (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+       is_sleeplock_genl gild gisld (i_lock (ientry kd)) "inode"%string
+                        (ic_slp cn kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
        ic_deposit cn kd (DepShr sd dev dinum gyd loyd) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
@@ -3658,8 +3652,8 @@ Section ProofSysUnlinkBody.
        (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
        runit_any (bv_unsigned dinum) -∗
        (* ---- [ip], LOCKED and OPEN ---- *)
-       is_sleeplock_gen gili gisli (i_lock (ientry ks)) "inode"%string
-                        (ic_tok cn ks) (slh_tok (icfg_isl ks)) -∗
+       is_sleeplock_genl gili gisli (i_lock (ientry ks)) "inode"%string
+                        (ic_slp cn ks) (slh_tok (icfg_isl ks)) -∗
        sleeplocked_q gisli si (i_lock (ientry ks)) pid -∗
        ⌜(loyi <= tlyi)%nat⌝ -∗
        IcacheRef.cred_floor loyi tlyi -∗
@@ -4320,8 +4314,8 @@ Section ProofSysUnlinkBody.
     procs_inv gs -∗
     proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
     (* ---- [dp], LOCKED and OPEN ---- *)
-    is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+    is_sleeplock_genl gild gisld (i_lock (ientry kd)) "inode"%string
+                     (ic_slp cn kd) (slh_tok (icfg_isl kd)) -∗
     sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
     ⌜(loyd <= tlyd)%nat⌝ -∗
     IcacheRef.cred_floor loyd tlyd -∗
@@ -4348,8 +4342,8 @@ Section ProofSysUnlinkBody.
     (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
     runit_any (bv_unsigned dinum) -∗
     (* ---- [ip], LOCKED and OPEN ---- *)
-    is_sleeplock_gen gili gisli (i_lock (ientry ks)) "inode"%string
-                     (ic_tok cn ks) (slh_tok (icfg_isl ks)) -∗
+    is_sleeplock_genl gili gisli (i_lock (ientry ks)) "inode"%string
+                     (ic_slp cn ks) (slh_tok (icfg_isl ks)) -∗
     sleeplocked_q gisli si (i_lock (ientry ks)) pid -∗
     ⌜(loyi <= tlyi)%nat⌝ -∗
     IcacheRef.cred_floor loyi tlyi -∗
@@ -5876,8 +5870,8 @@ Section ProofSysUnlinkBody.
     procs_inv gs -∗
     proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
     (* ---- [dp], LOCKED and OPEN ---- *)
-    is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+    is_sleeplock_genl gild gisld (i_lock (ientry kd)) "inode"%string
+                     (ic_slp cn kd) (slh_tok (icfg_isl kd)) -∗
     sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
     ⌜(loyd <= tlyd)%nat⌝ -∗
     IcacheRef.cred_floor loyd tlyd -∗
@@ -5904,8 +5898,8 @@ Section ProofSysUnlinkBody.
     (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
     runit_any (bv_unsigned dinum) -∗
     (* ---- [ip], LOCKED and OPEN ---- *)
-    is_sleeplock_gen gili gisli (i_lock (ientry ks)) "inode"%string
-                     (ic_tok cn ks) (slh_tok (icfg_isl ks)) -∗
+    is_sleeplock_genl gili gisli (i_lock (ientry ks)) "inode"%string
+                     (ic_slp cn ks) (slh_tok (icfg_isl ks)) -∗
     sleeplocked_q gisli si (i_lock (ientry ks)) pid -∗
     ⌜(loyi <= tlyi)%nat⌝ -∗
     IcacheRef.cred_floor loyi tlyi -∗

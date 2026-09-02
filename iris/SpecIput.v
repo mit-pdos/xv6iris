@@ -225,7 +225,7 @@ Definition wp_iput_sconf_body
      the slot, keyed by the slot rather than by the lock -- which is what
      lets iput, at [ip->ref == 1], prove the lock free instead of blocking
      on it (claude-notes/projects/iput-acquiresleep.md). *)
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp cn k)
                    (slh_tok (icfg_isl k)) -∗
   (* ---- THE REFERENCE BEING DESTROYED, WITH ITS PROVENANCE UNIT ----
      ONE ROW (SIMP-2): [inode_refp] IS this pair -- the reference and the
@@ -417,7 +417,7 @@ Definition wp_iput_gen_body
      the slot, keyed by the slot rather than by the lock -- which is what
      lets iput, at [ip->ref == 1], prove the lock free instead of blocking
      on it (claude-notes/projects/iput-acquiresleep.md). *)
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp cn k)
                    (slh_tok (icfg_isl k)) -∗
   (* the reference being destroyed, WITH its provenance unit: ONE ROW
      (SIMP-2), exactly as in the [_sconf] body above. *)

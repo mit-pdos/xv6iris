@@ -468,7 +468,7 @@ Section CreateSpec.
       (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
     (∃ γil γisl : gname,
-       is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) ∗
+       is_sleeplock_genl γil γisl (i_lock (ientry k)) "inode"%string (ic_slp cn k) (slh_tok (icfg_isl k)) ∗
        sleeplocked_q γisl s (i_lock (ientry k)) pidv ∗
        (∃ loc tlc : nat,
           ⌜(loc <= tlc)%nat⌝ ∗ IcacheRef.cred_floor loc tlc ∗
@@ -506,7 +506,7 @@ Section CreateSpec.
      "Framing"). *)
   Lemma create_locked_mk `{XI : CurCtx} cn γfs γi cov logstart dev pidv k qi s g inum dn bm
       γil γisl :
-    is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
+    is_sleeplock_genl γil γisl (i_lock (ientry k)) "inode"%string (ic_slp cn k) (slh_tok (icfg_isl k)) -∗
     sleeplocked_q γisl s (i_lock (ientry k)) pidv -∗
     (∃ loc tlc : nat,
        ⌜(loc <= tlc)%nat⌝ ∗ IcacheRef.cred_floor loc tlc ∗

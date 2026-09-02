@@ -267,7 +267,7 @@ Definition wp_ilock_sconf_body
      (claude-notes/projects/iput-acquiresleep.md).  The deposit ilock leaves
      is the [slh_tok] slice of the very share it consumes below, so no
      caller pays anything new. *)
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp cn k)
                    (slh_tok (icfg_isl k)) -∗
   (* THE CALLER'S SHARE (v3) -- consumed; deposited whole at the checkout.
      GENERATION-NAMED (design 17.3, ratified 17.4): the share's liveness

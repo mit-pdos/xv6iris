@@ -1422,13 +1422,7 @@ Section ProofCreateMain.
   Lemma cr_carve_gen (k : nat) (q s : Qp) (dev inum : mword 32) (g : gname) :
     inode_ref_gen k (q + s)%Qp dev inum g ⊣⊢
     inode_ref_short_gen k (q + s)%Qp q dev inum g ∗ inode_shr_gen k s dev inum g.
-  Proof.
-    rewrite /inode_ref_gen /inode_ref_short_gen /inode_shr_gen
-            live_gen_split inode_ident_split SleepLock.slh_tok_split.
-    iSplit.
-    - iIntros "($ & [$ Hl2] & [$ Hi2] & [$ Hs2])". iFrame.
-    - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
-  Qed.
+  Proof. apply inode_ref_carve_gen. Qed.
 
   Lemma cr_shed_gen (k : nat) (q : Qp) (dev inum : mword 32) (g : gname) :
     inode_ref_gen k q dev inum g ⊣⊢
@@ -1521,7 +1515,7 @@ Section ProofCreateMain.
     (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
+    iIntros (Hk) "H". rewrite /ic_escrows /ic_boxes_all /ic_escrow.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
@@ -2026,8 +2020,8 @@ Section ProofCreateMain.
        ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf jj) -∗
        ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nsl jj) -∗
        (* THE LOCKED PARENT, in pieces *)
-       is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
-                    (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+       is_sleeplock_genl γil γisl (i_lock (ientry kd)) "inode"%string
+                    (ic_slp cn kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q γisl (qd/2)%Qp (i_lock (ientry kd)) pidv -∗
        (∃ lodc tldc : nat,
           ⌜(lodc <= tldc)%nat⌝ ∗ IcacheRef.cred_floor lodc tldc ∗
@@ -2203,8 +2197,8 @@ Section ProofCreateMain.
        ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf jj) -∗
        ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nsl jj) -∗
        (* THE LOCKED PARENT, in pieces *)
-       is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
-                    (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+       is_sleeplock_genl γil γisl (i_lock (ientry kd)) "inode"%string
+                    (ic_slp cn kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q γisl (qd/2)%Qp (i_lock (ientry kd)) pidv -∗
        (∃ lodc tldc : nat,
           ⌜(lodc <= tldc)%nat⌝ ∗ IcacheRef.cred_floor lodc tldc ∗
@@ -2238,8 +2232,8 @@ Section ProofCreateMain.
           closes it spends the unit that rode with the reference. *)
        runit_any (bv_unsigned dind) -∗
        (* THE LOCKED CHILD, in pieces, at the FLUSHED record *)
-       is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
-                    (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) -∗
+       is_sleeplock_genl gil gisl (i_lock (ientry kslot)) "inode"%string
+                    (ic_slp cn kslot) (slh_tok (icfg_isl kslot)) -∗
        sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv -∗
        (∃ locc tlcc : nat,
           ⌜(locc <= tlcc)%nat⌝ ∗ IcacheRef.cred_floor locc tlcc ∗
@@ -2418,8 +2412,8 @@ Section ProofCreateMain.
        ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nsl jj) -∗
        (* THE LOCKED PARENT, in pieces, at the POST-dirlink indices --
           with [dir_links] still at the ENTRY ones and the ticket in hand *)
-       is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
-                    (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+       is_sleeplock_genl γil γisl (i_lock (ientry kd)) "inode"%string
+                    (ic_slp cn kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q γisl (qd/2)%Qp (i_lock (ientry kd)) pidv -∗
        (∃ lodc tldc : nat,
           ⌜(lodc <= tldc)%nat⌝ ∗ IcacheRef.cred_floor lodc tldc ∗
@@ -2451,8 +2445,8 @@ Section ProofCreateMain.
           closes it spends the unit that rode with the reference. *)
        runit_any (bv_unsigned dind) -∗
        (* THE LOCKED CHILD, at the flushed record *)
-       is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
-                    (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) -∗
+       is_sleeplock_genl gil gisl (i_lock (ientry kslot)) "inode"%string
+                    (ic_slp cn kslot) (slh_tok (icfg_isl kslot)) -∗
        sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv -∗
        (∃ locc tlcc : nat,
           ⌜(locc <= tlcc)%nat⌝ ∗ IcacheRef.cred_floor locc tlcc ∗
@@ -7142,8 +7136,8 @@ Section ProofCreateMain.
        ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf jj) -∗
        ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nsl jj) -∗
        (* THE LOCKED PARENT *)
-       is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
-                    (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+       is_sleeplock_genl γil γisl (i_lock (ientry kd)) "inode"%string
+                    (ic_slp cn kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q γisl (qd/2)%Qp (i_lock (ientry kd)) pidv -∗
        (∃ lodc tldc : nat,
           ⌜(lodc <= tldc)%nat⌝ ∗ IcacheRef.cred_floor lodc tldc ∗
@@ -7175,8 +7169,8 @@ Section ProofCreateMain.
           closes it spends the unit that rode with the reference. *)
        runit_any (bv_unsigned dind) -∗
        (* THE LOCKED CHILD -- WITHOUT its [dir_links] (see the header) *)
-       is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
-                    (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) -∗
+       is_sleeplock_genl gil gisl (i_lock (ientry kslot)) "inode"%string
+                    (ic_slp cn kslot) (slh_tok (icfg_isl kslot)) -∗
        sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv -∗
        (∃ locc tlcc : nat,
           ⌜(locc <= tlcc)%nat⌝ ∗ IcacheRef.cred_floor locc tlcc ∗

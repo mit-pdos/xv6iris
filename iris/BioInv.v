@@ -1528,22 +1528,7 @@ Section BioBox.
     iDestruct (big_sepL_lookup with "Hbufs") as "[$ $]"; [exact Hlk].
   Qed.
 
-  (* the L1 floor slot at boot: the maximum of the per-buffer boot stamps *)
-  Lemma big_sepL_llb_max (l : list nat) (P : nat -> nat -> iProp Σ) :
-    ([∗ list] k ∈ l, ∃ Td : nat, llb loglen_name Td ∗ P k Td) -∗
-    ∃ tl : nat, llb loglen_name tl ∗
-      [∗ list] k ∈ l, ∃ Td : nat, ⌜(Td <= tl)%nat⌝ ∗ llb loglen_name Td ∗ P k Td.
-  Proof.
-    iInduction l as [|k l] "IH".
-    { iIntros "_". iExists 0%nat. iSplitR; [iApply TsoGhost.llb_0|]. done. }
-    iIntros "[Hk Hl]". iDestruct "Hk" as (Td) "[#Hllb HP]".
-    iDestruct ("IH" with "Hl") as (tl) "[#Hllbtl Hl]".
-    iExists (Nat.max tl Td). iSplitR.
-    { destruct (Nat.max_spec tl Td) as [[_ ->] | [_ ->]]; [iExact "Hllb" | iExact "Hllbtl"]. }
-    iSplitL "HP". { iExists Td. iSplitR; [iPureIntro; lia|]. iFrame "Hllb HP". }
-    iApply (big_sepL_mono with "Hl"). intros i k' _. iIntros "(%Td' & %Hb & #Hl' & HP')".
-    iExists Td'. iSplitR; [iPureIntro; lia|]. iFrame "Hl' HP'".
-  Qed.
+  (* [big_sepL_llb_max] moved to CtxBox.v (R3.3: the icache boot folds the same way) *)
 
   (* BOX CONSTRUCTION (box v2, endgame §3.6): the boot content is DEPOSITED
      into a fresh parked context (stamp T_boot); IN, m = ∅, slot_p =

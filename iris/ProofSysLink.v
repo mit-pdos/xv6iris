@@ -701,7 +701,7 @@ Section ProofSysLinkBody.
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
+    iIntros (Hk) "H". rewrite /ic_escrows /ic_boxes_all /ic_escrow.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
@@ -726,13 +726,7 @@ Section ProofSysLinkBody.
   Lemma sl_carve_gen `{XI : CurCtx} (k : nat) (q s : Qp) (dev inum : mword 32) (g : gname) :
     inode_ref_gen k (q + s)%Qp dev inum g ⊣⊢
     inode_ref_short_gen k (q + s)%Qp q dev inum g ∗ inode_shr_gen k s dev inum g.
-  Proof.
-    rewrite /inode_ref_gen /inode_ref_short_gen /inode_shr_gen
-            live_gen_split inode_ident_split SleepLock.slh_tok_split.
-    iSplit.
-    - iIntros "($ & [$ Hl2] & [$ Hi2] & [$ Hs2])". iFrame.
-    - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
-  Qed.
+  Proof. apply inode_ref_carve_gen. Qed.
 
   Lemma sl_shed_gen `{XI : CurCtx} (k : nat) (q : Qp) (dev inum : mword 32) (g : gname) :
     inode_ref_gen k q dev inum g ⊣⊢

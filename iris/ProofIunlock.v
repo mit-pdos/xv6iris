@@ -70,6 +70,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import SieCapCtx.   (* R3: [own_context] off the cap, for the box steps *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -375,8 +376,8 @@ Section ProofIunlockMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (HS.wp_holdingsleep_gen_sconf gil gisl "inode"%string
-              (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 p pidv (K - 4)%nat eb b lks
+    iApply (HS.wp_holdingsleep_genl_sconf gil gisl "inode"%string
+              (ic_slp cn k) (slh_tok (icfg_isl k)) s R6 p pidv (K - 4)%nat eb b lks
  Vpr ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [] [Hstok] Hppid").
@@ -450,12 +451,12 @@ Section ProofIunlockMain.
                 ∃ (w : mword 32) (tst : nat),
                   IcacheInv.iref_pin_rows k w lo tst ∗
                   (IcacheInv.iref_pin_rows k w lo tst
-                     ={⊤ ∖ ↑minstretN ∖ ↑icEscN ∖ ↑icacheN,
-                       ⊤ ∖ ↑minstretN ∖ ↑icEscN}=∗
+                     ={⊤ ∖ ↑minstretN ∖ ↑icacheN,
+                       ⊤ ∖ ↑minstretN}=∗
                    IcacheRef.live_genlo k (1/2) g lo))%I)
               (i_valid (ientry k) ↦₄ valid_word true ∗
                ic_deposit cn k (DepShr s dev inum g lo))%I
-              (⊤ ∖ ↑minstretN ∖ ↑icEscN ∖ ↑icacheN) b
+              (⊤ ∖ ↑minstretN ∖ ↑icacheN) b
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj) _
               with "Hcg Hpc [] [] [Hvalid Hdep]").
     { (* the read obligation *)
@@ -477,13 +478,12 @@ Section ProofIunlockMain.
       intros v Hv. exact (Hall v Hv). }
     { iApply (iui2_1c with "Htext"). }
     { rewrite Hrefadr Hipe. iExact "Hclaim0". }
-    { (* the AU: borrow the arm's half, borrow the window, pack the closer *)
-      iInv "Hesc" as ">Hbody" "Hclose".
-      iDestruct (ic_open_out_genlo cn gfs gi cov logstart k
-                   (DepShr s dev inum g lo) g lo true eq_refl eq_refl
-                   with "Hbody Hvalid Hdep")
-        as "(Hvalid & Hdep & (Hlv & Hbback))".
-      iMod (IcacheInv.iref_load_pinw_au (⊤ ∖ ↑minstretN ∖ ↑icEscN) k
+    { (* the AU: the payload's liveness half is in the HOLDER's hand
+         (R3/F27: it rides the handle row) -- borrow the window only *)
+      rewrite /ic_deposit /ic_deposit2 /ic_pay_live. cbn [ic_dep_id].
+      iDestruct "Hdep" as "[[Hhold [Hbid Hblv]] (%lo2 & Hlv)]".
+      iDestruct (IcacheRef.live_genlo_agree with "Hlv Hblv") as %[_ ->].
+      iMod (IcacheInv.iref_load_pinw_au (⊤ ∖ ↑minstretN) k
               (1/2)%Qp g lo ltac:(solve_ndisj) Hk with "Hitbl Hlv")
         as (w tst) "[Hrows Hcl]".
       iModIntro.
@@ -491,9 +491,7 @@ Section ProofIunlockMain.
       { iFrame "Hfl". iExists w, tst. iFrame "Hrows Hcl". }
       iIntros "[_ HRes]". iDestruct "HRes" as (w2 tst2) "[Hrows Hcl]".
       iMod ("Hcl" with "Hrows") as "Hlv".
-      iMod ("Hclose" with "[Hbback Hlv]") as "_".
-      { iNext. iApply ("Hbback" with "Hlv"). }
-      iModIntro. iFrame "Hvalid Hdep". }
+      iModIntro. iFrame "Hvalid Hhold Hbid Hblv". iExists lo. iExact "Hlv". }
     iIntros (refv CID14 Hq14) "Hcg Hpc Hqv (Hvalid & Hdep)".
     iDestruct "Hqv" as (V0) "[_ %Href]".
     set (R7 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 refv)]> mH).
@@ -567,41 +565,48 @@ Section ProofIunlockMain.
        checked-out bundle back and takes the CHECKOUT TOKEN -- which is all
        the sleeplock protects now -- and the caller's reference out. *)
     iApply fupd_wp.
-    (* THE PARKED PAYLOAD, AND ITS TOKEN (iclaim-ledger.md §3.9).
-       [IcacheEscrow.ic_payload] is the [_np] bundle plus the inum's
-       [ifreeze_off]; the token is the one [SpecIlock]'s post handed this
-       holder, threaded through its critical section untouched, and putting
-       it back is what re-establishes the parked arm's A-custody conjunct. *)
-    iAssert (ic_payload gfs gi cov logstart k inum g true)%I
-      with "[Hlk Hfrz]" as "Hpay".
-    { iApply (ic_payload_join with "[Hlk] Hfrz").
-      rewrite /ic_payload_np. iExists dn', bm'.
-      iSplitL "Hlk"; [iExact "Hlk" | iExact "Hshot"]. }
-    iInv "Hesc" as ">Hbody" "Hclose".
-    iMod (ic_swap_park cn gfs gi cov logstart k (DepShr s dev inum g lo) g
-                 true dev inum eq_refl with "Hbody Hdep Hidev Hinumc Hvalid Hpay")
-      as "(Hbody & Htok & Hrefout)".
-    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+    (* THE PARK (R3, endgame §4.2 (f)): the checked-out bundle re-forms as
+       the box's header + rest at IcLoaded -- the cells, [ic_loaded], the
+       shot one-shot, the freeze token and the liveness half the handle row
+       carried (F27) -- and goes back through [ic_park]; the handle's body
+       (the share's cells and slice) comes out, with the parked fragment's
+       stamps at the park stamp [T']. *)
+    iDestruct (ic_loaded_bm_len with "Hlk") as %Hlen.
+    iEval (rewrite /ic_deposit /ic_pay_live) in "Hdep".
+    iDestruct "Hdep" as "[Hdep2 Hlg]".
+    iDestruct (ic_bundle_loaded_intro gfs gi cov logstart k dev inum g dn' bm' Hlen
+                 with "[Hidev Hinumc] Hvalid Hlk Hshot Hfrz Hlg") as "[Hhdr Hrest]".
+    { rewrite /inode_ident. iFrame "Hidev Hinumc". }
+    iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (ic_park cn gfs gi cov logstart k TsoCtx.cur_ctx (DepShr s dev inum g lo)
+            dev inum ⊤ ltac:(solve_ndisj) eq_refl
+            with "Hesc Hrun [Hhdr Hrest] Hdep2")
+      as "(Hrun & Htok & Hbody & %Tp & Hrp & Href & #HllbT)".
+    { iExists (IcLoaded g dn' bm'). iFrame "Hhdr Hrest". }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
-    (* the descriptor pins the fraction and the identity: the share comes back
-       at exactly [s], with no existential (§14.8) *)
-    iDestruct "Hrefout" as "[_ Href]".
-    iApply (RS.wp_releasesleep_gen_sconf gs gil gisl "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks
+    (* the _in release: the L2 row goes back UNFLOORED at the park stamp and
+       the callee re-floors it at the parked context (M-6, R2) *)
+    iApply (RS.wp_releasesleep_genin_sconf gs gil gisl "inode"%string (ic_slp cn k)
+              (fun _ => ic_slp_dep cn k Tp) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks Tp
               ltac:(lia)
               Hfresh
-              with "Hcg Hcnt Htext Hpc [] [Hstok] Htok Hprocs").
+              (ic_slp_fold cn k Tp)
+              with "Hcg Hcnt Htext Hpc [] [Hstok] HllbT [Htok Hrp] Hprocs").
     all: try lkbelow.
     { iEval (rewrite HR9a0). iExact "Hslk". }
     { iEval (rewrite HR9a0). iExact "Hstok". }
+    { rewrite /ic_slp_dep. iFrame "Htok Hrp". }
     (* the lock hands the deposit back at the holder's OWN fraction, which is
-       what rebuilds the caller's share: the arm kept the other two slices. *)
+       what rebuilds the caller's share: the handle's body kept the other two
+       slices, and the park stamped its fragment at [Tp] (mass [s]). *)
     iIntros (CID18 Hq18 mR) "%Hcs2 Hcg Hcnt Hpc Hslh".
-    (* the generation is NOT forgotten here any more -- see [SpecIunlock]'s
-       post.  What the arm handed back is already at [g]. *)
     iAssert (IcacheRef.inode_shr_genlo k s dev inum g lo)
-      with "[Href Hslh]" as "Href".
-    { rewrite /IcacheRef.inode_shr_genlo /inode_shr_genlo_bare.
-      iDestruct "Href" as "[Hid Hlv]". iFrame. }
+      with "[Hbody Href Hslh]" as "Href".
+    { rewrite /IcacheRef.inode_shr_genlo /ic_body.
+      iDestruct "Hbody" as "[Hid Hlv]". iFrame "Hid Hlv Hslh".
+      rewrite /IcacheRef.ic_ref_stamps /IcacheRef.ic_ref_stamps_at /IcacheRef.ic_stamps.
+      iExists _. iFrame "Href". iPureIntro. cbn. apply CtxBox.qsum_singleton. }
     assert (Hpc28 : ret_pc (R9 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlock + 0x28)) by (rewrite HR9ra; pcw).
     iEval (rewrite Hpc28) in "Hpc".

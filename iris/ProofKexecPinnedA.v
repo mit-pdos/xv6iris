@@ -1112,8 +1112,8 @@ Section KexecPinnedAMain.
         cpu_own 0 eb (proc_addr jp) b lks -∗
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jp) -∗
-        is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
-                     (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
+        is_sleeplock_genl gilf gislf (i_lock (ientry kf)) "inode"%string
+                     (ic_slp cn kf) (slh_tok (icfg_isl kf)) -∗
         sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
         ⌜(loyf <= tlyf)%nat⌝ -∗
         IcacheRef.cred_floor loyf tlyf -∗

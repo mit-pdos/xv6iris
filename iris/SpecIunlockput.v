@@ -183,7 +183,7 @@ Definition wp_iunlockput_sconf_body
      [rg := false] consumer on either of this file's two contracts.  The
      premise is persistent, so nothing comes back. *)
   ireg_open -∗
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
   ⌜(loy <= tly)%nat⌝ -∗
@@ -329,7 +329,7 @@ Definition wp_iunlockput_gen_body
      [rg := false] consumer on either of this file's two contracts.  The
      premise is persistent, so nothing comes back. *)
   ireg_open -∗
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
   ⌜(loy <= tly)%nat⌝ -∗

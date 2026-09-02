@@ -556,7 +556,7 @@ Section FileInv.
      [fileG], since they left that class (see its note).  This file is
      BELOW [Xv6G.v] -- it is one of the files the bundle is built out of --
      so it names them individually; everything above takes [xv6G]. *)
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !icboxG Σ, !kallocG Σ,
             !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ}.
   Context `{XI : CurCtx}.
 

@@ -146,6 +146,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import SieCapCtx.   (* R3: [own_context] off the cap, for the box steps *)
 Require Import RiscvExec.
 Require Import IcachePinwObl.
 Local Open Scope Z_scope.
@@ -2332,7 +2333,7 @@ Section ProofIlockMain.
        goes through its LIVENESS slice ([iref_live_load_au]) -- whose delivered
        bounds are the same ones, and whose [k < NINODE] premise this proof has
        had since its first line (§14.6/§14.8). *)
-    iDestruct "Href" as "(Hrid & Hrt & Hrs)".
+    iDestruct "Href" as "(Hrid & Hrt & Hrs & Hrst)".
     (* the share's SLEEPLOCK slice is what the lock will hold while ilock has
        the entry checked out; the arm keeps the other two slices. *)
     (* the address claim, off the ref word's OWN points-to: one peek-open of
@@ -2464,17 +2465,24 @@ Section ProofIlockMain.
     (* acquiresleep is index-generic now and takes the trap-CSR complement
        as a genuine pass-through: ilock's own (untouched since entry) is
        exactly what its wait loop's interior [sleep] needs. *)
-    iApply (ASL.wp_acquiresleep_gen_sconf gs j gil gisl "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 pidv Vpr (K - 4)%nat eb b lks
+    (* R3 (endgame §4.2, ilock): the llb tier of acquiresleep at Tl := the
+       SHARE's stamps -- the fragment's [llb (max_stamp m)] is the receipt,
+       and the acquire returns a floor covering it (R1); the lock's payload
+       is the box's L2 row [ic_slp]. *)
+    iDestruct "Hrst" as (mst) "(%Hmst & Hrefm)".
+    iDestruct (CtxBox.reference_llb with "Hrefm") as "#Hllbm".
+    iApply (ASL.wp_acquiresleep_genl_llb_sconf gs j gil gisl "inode"%string (ic_slp cn k)
+              (slh_tok (icfg_isl k)) s R6 pidv Vpr (K - 4)%nat eb b lks (CtxBox.max_stamp mst)
               Hj ltac:(lia)
               (* acquiresleep's bound is "sleep lock"(6); ilock's own is
                  "bcache"(4), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hrs Hppid Hprocs").
+              with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hllbm Hrs Hppid Hprocs").
     all: try lkbelow.
     { iEval (rewrite HR6a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDa], handing the complement
-       back too. *)
-    iIntros (CIDa Hqa mf) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hstok Htok Hppid".
+       back too -- and the floor at the fragment's stamps, and the L2 row. *)
+    iIntros (CIDa Hqa mf) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hflk Hstok Hslp Hppid".
     iEval (rewrite HR6a0) in "Hstok".
     assert (Hpc1a : ret_pc (R6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ilock + 0x1a)) by (rewrite HR6ra; pcw).
@@ -2499,35 +2507,26 @@ Section ProofIlockMain.
        DEPOSITED (§13.1d) -- from here on ilock owns no reference, which is
        exactly why the dev half had to come out with the payload. ---- *)
     iApply fupd_wp.
-    iInv "Hesc" as ">Hbody" "Hclose".
-    iMod (ic_swap_checkout cn gfs gi cov logstart k (DepShr s dev inum g lo) g
-            dev inum eq_refl with "Hbody Htok [Href]") as "[Hok | Hfrz]".
-    { rewrite /ic_dep_own. iSplitR; [iPureIntro; done |]. iExact "Href". }
-    2:{ (* ============ DEVIATION 1's OWED OBLIGATION, PAID BY RULING R-e
-           (iclaim-ledger.md §5⁗⁗).  The checkout may find the free path's
-           FROZEN PARK, and ilock holds no licence that decides it -- RULING
-           C' took that content away (§5⁗″.2), and neither PlainK nor ShotK
-           can get it back.
-
-           R-e pays it from the INVARIANT.  The frozen tail carries a quarter
-           of the slot's freeze SELECTOR, whose other half sits in
-           [IcacheInv.live_slot]'s frozen alternative BESIDE THE SLOT'S WHOLE
-           LIVENESS UNIT; and the deposit the checkout hands straight back
-           carries this caller's own positive slice.  A whole unit and a
-           positive slice cannot coexist, so the branch is dead -- with NO
-           lock, NO licence, NO region open, and NOTHING read off the index,
-           which is why the same line serves ClaimK, PlainK and ShotK. ==== *)
-        iDestruct "Hfrz" as "(Htok & Hown & Hrcpt & Hsel & Hwand)".
-        iDestruct (ic_dep_own_live with "Hown")
-          as (s0 g0 lo0) "(%Hg0 & %Hlo0 & Hlv & _)".
-        iMod (frz_slot_kill_pinw (⊤ ∖ ↑icEscN) k ((1/2)/2)%Qp s0 g0 lo0
-                ltac:(solve_ndisj) Hk with "Hitbl Hsel Hlv") as "[]". }
-    iDestruct "Hok" as "(Hbody & Hdep & Hout)".
-    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+    (* ---- THE CHECKOUT (R3, endgame §4.2 (e)): the acquire's floor covers
+       the share's stamps, the L2 row's floor its park stamp; the share's
+       cells and slice go behind the handle ([ic_body]), the fragment into
+       the box's hold; what comes out is the header and the rest at SOME
+       shape [x] -- Raw is impossible for an identified slot, and the
+       polarity the +0x1a read sees is [x]'s. ---- *)
+    iDestruct "Hflk" as (Kt) "[%HTlK #Hflt]".
+    iDestruct "Hslp" as (s0) "(Htok & Hrp & %Hs0 & #Hflp)".
+    iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (ic_checkout cn gfs gi cov logstart k TsoCtx.cur_ctx (DepShr s dev inum g lo)
+            dev inum s0 Kt (lr_tp s0) ⊤ ltac:(solve_ndisj) eq_refl Hs0 (Nat.le_refl _)
+            with "Hesc Hrun Hflt Hflp [Href] [Hrefm] Htok Hrp") as "(Hrun & Hbun & Hdep2)".
+    { rewrite /ic_body. iExact "Href". }
+    { iExists mst. iFrame "Hrefm". iPureIntro. split; [exact Hmst | exact HTlK]. }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
-    iDestruct "Hout" as (vv) "(Hidev & Hinumc & Hvalid & Hpay)".
-    iEval (rewrite -Hipe) in "Hidev".
-    iEval (rewrite -Hipe) in "Hinumc".
+    iDestruct "Hbun" as (x) "[Hhdr Hrest]".
+    rewrite /ic_hdr /ic_rest.
+    iDestruct (ic_hdr_valid_acc with "Hhdr") as "[Hvalid Hhdrback]".
+    set (vv := ic_x_loaded x).
     iEval (rewrite -Hipe) in "Hvalid".
     (* ===== +0x1a c.lw a5,64(s1) : a5 := ip->valid ===== *)
     assert (Hvaladr : add_vec (rget mf Rs1) (sign_extend' 64 (mword_of_int 64 : mword 12))
@@ -2555,7 +2554,13 @@ Section ProofIlockMain.
     iEval (rewrite Hpp1c) in "Hpc".
     (* ===== +0x1c c.beqz a5 : the CACHED / UNCACHED split, decided by the
        shadow's [vv] rather than by any runtime case analysis ===== *)
-    destruct vv.
+    iEval (rewrite Hipe) in "Hvalid".
+    iDestruct ("Hhdrback" with "Hvalid") as "Hhdr".
+    destruct x as [| gx | gx dnp bmp].
+    { (* an IDENTIFIED slot is never raw (M-1') *)
+      rewrite /ic_hdr_amb /ic_pay. iDestruct "Hhdr" as "(_ & _ & _ & [])". }
+    (* the two live shapes, CACHED first as before *)
+    all: swap 1 2.
     - (* ---- CACHED: valid = 1, fall through to the epilogue ---- *)
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.ilock + 0x1c))
                 (mword_of_int 13 : mword 8) (Cregidx (mword_of_int 7)) Ra5
@@ -2568,16 +2573,27 @@ Section ProofIlockMain.
                       = mword_of_int (KernelSyms.ilock + 0x1e)) by pcw.
       iEval (rewrite Hpp1e) in "Hpc".
       (* the CACHED arm's witness is the one the FILL that loaded this entry
-         minted, riding on the payload's TRUE polarity (design §17.6 (1)) --
-         so this arm proves the post's new conjunct with no work at all. *)
-      (* A-PRIME's TOKEN comes off the payload here, exactly as it does on
-         the uncached arm below (iclaim-ledger.md §3.9). *)
-      iDestruct (ic_payload_split with "Hpay") as "[Hpay Hfoff]".
-      iAssert (∃ (dn0 : dinode) (bm0 : blkmap),
-                 ic_loaded gfs gi cov logstart k inum dn0 bm0 ∗
-                 ity_shot g (di_type dn0))%I
-        with "[Hpay]" as "Hpay2"; [iExact "Hpay" |].
-      iDestruct "Hpay2" as (dnp bmp) "[Hlk #Hshot]".
+         minted, riding on the payload's TRUE polarity (design §17.6 (1)).
+         R3: the bundle regroups (F14) into the cells, [ic_loaded], the shot
+         one-shot, the freeze token and the payload's liveness half; the
+         frozen alternative is refuted by R-e exactly as before. *)
+      iApply fupd_wp.
+      iDestruct (ic_bundle_loaded_elim with "Hhdr Hrest")
+        as "(Hid & Hvalid & [(Hlk & #Hshot & Hfoff & Hlgh) | (Hfo & Hsel & _ & _)])".
+      2:{ rewrite /ic_deposit2. cbn [ic_dep_id]. iDestruct "Hdep2" as "[_ [_ Hblv]]".
+          iMod (frz_slot_kill_pinw ⊤ k ((1/2)/2)%Qp s g lo
+                  ltac:(solve_ndisj) Hk with "Hitbl Hsel Hblv") as "[]". }
+      (* the payload's generation IS the share's ([live_genlo_agree]) *)
+      iDestruct "Hlgh" as (lox) "Hlgx".
+      iAssert (⌜gx = g⌝)%I as %->.
+      { rewrite /ic_deposit2. cbn [ic_dep_id]. iDestruct "Hdep2" as "[_ [_ Hblv]]".
+        iDestruct (IcacheRef.live_genlo_agree with "Hlgx Hblv") as %[-> _]. done. }
+      iAssert (ic_deposit cn k (DepShr s dev inum g lo)) with "[Hdep2 Hlgx]" as "Hdep".
+      { rewrite /ic_deposit /ic_pay_live. iFrame "Hdep2". iExists lox. iExact "Hlgx". }
+      iModIntro.
+      rewrite /inode_ident. iDestruct "Hid" as "[Hidev Hinumc]".
+      iEval (rewrite -Hipe) in "Hidev". iEval (rewrite -Hipe) in "Hinumc".
+      iEval (rewrite -Hipe) in "Hvalid".
       (* THE CACHED ARM REFUTES [ClaimK] (RULING C', iclaim-ledger.md
          §5''''').  This entry was loaded by an earlier fill, so its
          [ic_loaded] carries the inum's [dinode_at] -- the record is OUT of
@@ -2633,22 +2649,28 @@ Section ProofIlockMain.
       iApply bi.later_intro.
       iIntros (CID13 Hq13) "Hcg Hpc".
       iEval (rewrite Htk) in "Hpc".
+      (* R3: the UNLOADED bundle regroups into the cells, the raw rest
+         (re-formed as [inode_raw] for the fill), the pool bundle, the
+         pending one-shot, the freeze token and the liveness half; the
+         frozen alternative is refuted by R-e. *)
+      iApply fupd_wp.
+      iDestruct (ic_bundle_unloaded_elim with "Hhdr Hrest")
+        as "(Hid & Hvalid & Hnl & Hm & Ha & [(Hpool & Hpend & Hfoff & Hlgh) | (Hfo & Hsel)])".
+      2:{ rewrite /ic_deposit2. cbn [ic_dep_id]. iDestruct "Hdep2" as "[_ [_ Hblv]]".
+          iMod (frz_slot_kill_pinw ⊤ k ((1/2)/2)%Qp s g lo
+                  ltac:(solve_ndisj) Hk with "Hitbl Hsel Hblv") as "[]". }
+      iDestruct "Hlgh" as (lox) "Hlgx".
+      iAssert (⌜gx = g⌝)%I as %->.
+      { rewrite /ic_deposit2. cbn [ic_dep_id]. iDestruct "Hdep2" as "[_ [_ Hblv]]".
+        iDestruct (IcacheRef.live_genlo_agree with "Hlgx Hblv") as %[-> _]. done. }
+      iAssert (ic_deposit cn k (DepShr s dev inum g lo)) with "[Hdep2 Hlgx]" as "Hdep".
+      { rewrite /ic_deposit /ic_pay_live. iFrame "Hdep2". iExists lox. iExact "Hlgx". }
+      iModIntro.
+      iDestruct (ic_raw_of_rest with "Hnl Hm Ha") as "Hraw".
+      rewrite /inode_ident. iDestruct "Hid" as "[Hidev Hinumc]".
+      iEval (rewrite -Hipe) in "Hidev". iEval (rewrite -Hipe) in "Hinumc".
+      iEval (rewrite -Hipe) in "Hvalid".
       iEval (change (valid_word false) with (mword_of_int 0 : mword 32)) in "Hvalid".
-      (* FOUR pieces since RULING A-prime (iclaim-ledger.md §3.10): the
-         payload is [ic_payload_np ∗ ifreeze_off], and at [v = false] the
-         [_np] half is [(inode_raw ∗ ipool_shape_np) ∗ ity_pending].  The
-         token is the holder's from here on -- that is what [SpecIlock]'s
-         post hands out and what create's fresh child and sys_link's
-         [ip->nlink++] pay [wp_iupdate_link]'s pin with.  Routing it through
-         [il_cont] to that post is the SAME un-landed item as the [iclaim]
-         goal this file still carries (see [ireg_withdraw] in [il_load]). *)
-      iAssert (inode_raw (ientry k) ∗
-               ipool_shape_np gfs gi cov logstart inum ∗
-               ity_pending g ∗
-               ifreeze_off (bv_unsigned inum))%I
-        with "[Hpay]" as "(Hraw & Hpool & Hpend & Hfoff)";
-        [rewrite /ic_payload /ic_payload_np /ic_unloaded;
-         iDestruct "Hpay" as "[[[$ $] $] $]" |].
       iEval (rewrite -Hipe) in "Hraw".
       (* THE UNCACHED ARM REFUTES [ShotK] (RULING C').  This arm's payload
          carries the generation's PENDING one-shot -- the fill has not run

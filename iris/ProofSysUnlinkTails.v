@@ -813,7 +813,7 @@ Section ProofSysUnlinkTails.
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗
     IcacheRef.cred_floor loy tly -∗
@@ -1149,7 +1149,7 @@ Section ProofSysUnlinkTails.
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗
     IcacheRef.cred_floor loy tly -∗
@@ -1343,7 +1343,7 @@ Section ProofSysUnlinkTails.
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     (* ---- dp, still locked: released in [bad:] ---- *)
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗
     IcacheRef.cred_floor loy tly -∗
@@ -1362,7 +1362,7 @@ Section ProofSysUnlinkTails.
     (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
     runit_any (bv_unsigned inum) -∗
     (* ---- ip, released HERE ---- *)
-    is_sleeplock_gen gili gisli (i_lock (ientry ki)) "inode"%string (ic_tok cn ki) (slh_tok (icfg_isl ki)) -∗
+    is_sleeplock_genl gili gisli (i_lock (ientry ki)) "inode"%string (ic_slp cn ki) (slh_tok (icfg_isl ki)) -∗
     sleeplocked_q gisli si (i_lock (ientry ki)) pidv -∗
     ⌜(loyi <= tlyi)%nat⌝ -∗
     IcacheRef.cred_floor loyi tlyi -∗

@@ -293,7 +293,7 @@ Section ProofSysOpenBody.
     gen_cert -∗
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart kk -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗
     IcacheRef.cred_floor loy tly -∗
@@ -529,7 +529,7 @@ Section ProofSysOpenBody.
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗
     IcacheRef.cred_floor loy tly -∗
@@ -1178,7 +1178,7 @@ Section ProofSysOpenBody.
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗
     IcacheRef.cred_floor loy tly -∗
@@ -1972,7 +1972,7 @@ Section ProofSysOpenBody.
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ⌜(loy <= tly)%nat⌝ -∗
     IcacheRef.cred_floor loy tly -∗
@@ -2293,7 +2293,7 @@ Section ProofSysOpenBody.
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
+    iIntros (Hk) "H". rewrite /ic_escrows /ic_boxes_all /ic_escrow.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
@@ -2306,8 +2306,8 @@ Section ProofSysOpenBody.
     (k < NINODE)%nat ->
     (ic_sleeplocks cn -∗
      ∃ gil gisl : gname,
-       is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string
-                        (ic_tok cn k) (slh_tok (icfg_isl k))
+       is_sleeplock_genl gil gisl (i_lock (ientry k)) "inode"%string
+                        (ic_slp cn k) (slh_tok (icfg_isl k))
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_sleeplocks.

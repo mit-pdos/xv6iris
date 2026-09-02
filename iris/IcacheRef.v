@@ -89,6 +89,8 @@ Require Import LogDefs.
 (* [WpLock] for [lockG] itself -- [Import] is not transitive, and without it
    the [!lockG Σ] binders below auto-generalize into a fresh variable. *)
 Require Import SleepLock.
+Require Import CtxBox.   (* R3 (M-5): the box's stamps fragment rides every reference form *)
+From Stdlib Require Import QArith Qcanon.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 (* M1 STAGE 2: [inode_ident]'s two cells are the slot's identity, written
@@ -2793,7 +2795,7 @@ End IcacheRefGhost.
 (* ===================================================================== *)
 
 Section IcacheRef.
-  Context `{!riscvGS Σ, !icacheG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !icacheG Σ, !lockG Σ, !icboxG Σ, !kallocG Σ}.  (* R3: the box's cameras, for the stamps rows *)
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
   Context `{XI : CurCtx}.
@@ -2930,15 +2932,162 @@ Section IcacheRef.
   (* A6.145: stated FLAT (not via [iref_tok]) so the liveness slice is the
      FLOORED one -- the reference carries its racy-read credential.
      [inode_ref_tok] below recovers the old reading, dropping the floor. *)
+  (* ================================================================== *)
+  (*  THE STAMPS FRAGMENT (endgame §3.3, M-5): every reference form      *)
+  (*  carries its share of the slot's box stamps                          *)
+  (* ================================================================== *)
+  (* [ic_stamps k i μ]: a fragment of the box's stamps at identity [i] of
+     mass [μ] (Qc: a whole reference weighs 1, a share of identity
+     fraction [s] weighs [s], a parent that has lent [qt − qi] weighs
+     [1 − (qt − qi)] -- in Qc so the canonical parent [qt = qi] is mass 1).
+     The keys are recorded by the box register; only the mass is pinned
+     here (R-1). *)
+  Definition ic_stamps (k : nat) (i : ic_bid) (μ : Qc) : iProp Σ :=
+    (∃ m : gmap (ic_bid * nat) ufrac,
+       ⌜qsum m = μ⌝ ∗ CtxBox.reference (X := ic_x) (icfg_box k) i m)%I.
+  Definition ic_ref_stamps_at (k : nat) (i : ic_bid) (μ : Qp) : iProp Σ :=
+    ic_stamps k i (Qp_to_Qc μ).
+  Definition ic_ref_stamps (k : nat) (dev inum : mword 32) (μ : Qp) : iProp Σ :=
+    ic_ref_stamps_at k (Some (dev, inum)) μ.
+  Definition ic_lent_stamps (k : nat) (qt qi : Qp) (dev inum : mword 32) : iProp Σ :=
+    ic_stamps k (Some (dev, inum)) (1 + Qp_to_Qc qi - Qp_to_Qc qt)%Qc.
+
+  Global Instance ic_stamps_timeless k i μ : Timeless (ic_stamps k i μ).
+  Proof.
+    rewrite /ic_stamps. apply bi.exist_timeless => m.
+    rewrite /CtxBox.reference /CtxBox.stamps_frag. apply _.
+  Qed.
+  Global Instance ic_ref_stamps_at_timeless k i μ : Timeless (ic_ref_stamps_at k i μ).
+  Proof. rewrite /ic_ref_stamps_at. apply _. Qed.
+  Global Instance ic_ref_stamps_timeless k dev inum μ : Timeless (ic_ref_stamps k dev inum μ).
+  Proof. rewrite /ic_ref_stamps. apply _. Qed.
+  Global Instance ic_lent_stamps_timeless k qt qi dev inum : Timeless (ic_lent_stamps k qt qi dev inum).
+  Proof. rewrite /ic_lent_stamps. apply _. Qed.
+
+  Lemma ic_stamps_join k i μ1 μ2 :
+    ic_stamps k i μ1 -∗ ic_stamps k i μ2 -∗ ic_stamps k i (μ1 + μ2)%Qc.
+  Proof.
+    iIntros "(%m1 & %H1 & Hr1) (%m2 & %H2 & Hr2)".
+    iExists (m1 ⋅ m2). iSplitR; [iPureIntro; rewrite qsum_op H1 H2; reflexivity |].
+    iApply (reference_join with "Hr1 Hr2").
+  Qed.
+  Lemma ic_stamps_split k i μ (s s' : Qp) :
+    (s + s')%Qp = 1%Qp ->
+    ic_stamps k i μ -∗
+    ic_stamps k i (μ * Qp_to_Qc s)%Qc ∗ ic_stamps k i (μ * Qp_to_Qc s')%Qc.
+  Proof.
+    iIntros (Hss) "(%m & %Hm & Hr)".
+    iDestruct (reference_split _ _ m s s' Hss with "Hr") as "[Hr1 Hr2]".
+    iSplitL "Hr1".
+    - iExists (mscale s m). iFrame "Hr1". iPureIntro. rewrite qsum_mscale Hm. reflexivity.
+    - iExists (mscale s' m). iFrame "Hr2". iPureIntro. rewrite qsum_mscale Hm. reflexivity.
+  Qed.
+  Lemma ic_stamps_mass_eq k i μ μ' :
+    μ = μ' -> ic_stamps k i μ ⊣⊢ ic_stamps k i μ'.
+  Proof. intros ->. reflexivity. Qed.
+
+  (* a share's stamps split with its identity fraction *)
+  Lemma ic_ref_stamps_split k dev inum (μ1 μ2 : Qp) :
+    ic_ref_stamps k dev inum (μ1 + μ2)%Qp ⊣⊢
+    ic_ref_stamps k dev inum μ1 ∗ ic_ref_stamps k dev inum μ2.
+  Proof.
+    rewrite /ic_ref_stamps /ic_ref_stamps_at. iSplit.
+    - iIntros "H".
+      iDestruct (ic_stamps_split _ _ _ (μ1 / (μ1 + μ2))%Qp (μ2 / (μ1 + μ2))%Qp
+                   with "H") as "[H1 H2]".
+      { rewrite -Qp.div_add_distr Qp.div_diag. reflexivity. }
+      iSplitL "H1".
+      + iApply (ic_stamps_mass_eq with "H1").
+        rewrite -Qp.to_Qc_inj_mul Qp.mul_div_r. reflexivity.
+      + iApply (ic_stamps_mass_eq with "H2").
+        rewrite -Qp.to_Qc_inj_mul Qp.mul_div_r. reflexivity.
+    - iIntros "[H1 H2]". iDestruct (ic_stamps_join with "H1 H2") as "H".
+      iApply (ic_stamps_mass_eq with "H"). rewrite Qp.to_Qc_inj_add. reflexivity.
+  Qed.
+  (* a reference lends a share: the parent keeps mass [1 − s] *)
+  Lemma ic_ref_stamps_carve k (q s : Qp) dev inum :
+    (q + s ≤ 1)%Qp ->
+    ic_ref_stamps k dev inum 1%Qp ⊣⊢
+    ic_lent_stamps k (q + s)%Qp q dev inum ∗ ic_ref_stamps k dev inum s.
+  Proof.
+    intros Hle. rewrite /ic_ref_stamps /ic_ref_stamps_at /ic_lent_stamps.
+    assert (Hs1 : (s < 1)%Qp).
+    { eapply Qp.lt_le_trans; [| exact Hle]. apply Qp.lt_add_r. }
+    apply Qp.lt_sum in Hs1 as [s' Hs'].
+    iSplit.
+    - iIntros "H".
+      iDestruct (ic_stamps_split _ _ _ s' s with "H") as "[H1 H2]".
+      { rewrite Qp.add_comm. symmetry. exact Hs'. }
+      iSplitL "H1".
+      + iApply (ic_stamps_mass_eq with "H1").
+        rewrite Qp_to_Qc_1 Qcmult_1_l Qp.to_Qc_inj_add.
+        assert (Hq : (Qp_to_Qc s + Qp_to_Qc s')%Qc = 1%Qc).
+        { rewrite -Qp.to_Qc_inj_add -Hs'. apply Qp_to_Qc_1. }
+        rewrite -Hq. ring.
+      + iApply (ic_stamps_mass_eq with "H2").
+        rewrite Qp_to_Qc_1 Qcmult_1_l. reflexivity.
+    - iIntros "[H1 H2]". iDestruct (ic_stamps_join with "H1 H2") as "H".
+      iApply (ic_stamps_mass_eq with "H").
+      rewrite Qp.to_Qc_inj_add Qp_to_Qc_1. ring.
+  Qed.
+  Lemma ic_lent_stamps_canon k q dev inum :
+    ic_lent_stamps k q q dev inum ⊣⊢ ic_ref_stamps k dev inum 1%Qp.
+  Proof.
+    rewrite /ic_lent_stamps /ic_ref_stamps /ic_ref_stamps_at Qp_to_Qc_1.
+    apply ic_stamps_mass_eq. ring.
+  Qed.
+  (* the identity fraction is at most one: the liveness slice says so *)
+  Lemma live_genlo_le1 k (s : Qp) g lo : live_genlo k s g lo -∗ ⌜(s ≤ 1)%Qp⌝.
+  Proof.
+    iIntros "H". iDestruct (own_valid with "H") as %Hv. iPureIntro.
+    specialize (Hv k). rewrite lookup_singleton in Hv.
+    apply Some_valid, pair_valid in Hv as [Hs _]. exact Hs.
+  Qed.
+  Lemma live_fracc_le1 k (s : Qp) : live_fracc k s -∗ ⌜(s ≤ 1)%Qp⌝.
+  Proof.
+    rewrite /live_fracc. iIntros "(%g & %lo & %tl & H & _ & _)".
+    iApply (live_genlo_le1 with "H").
+  Qed.
+
+  (* A6.145: stated FLAT (not via [iref_tok]) so the liveness slice is the
+     FLOORED one -- the reference carries its racy-read credential.
+     [inode_ref_tok] below recovers the old reading, dropping the floor.
+     R3 (M-5): and the box's stamps at mass 1. *)
   Definition inode_ref (k : nat) (q : Qp)
       (dev inum : mword 32) : iProp Σ :=
     (iref_frag k q ∗ live_fracc k q ∗ slh_tok (icfg_isl k) q ∗
-     inode_ident k (DfracOwn q) dev inum)%I.
+     inode_ident k (DfracOwn q) dev inum ∗ ic_ref_stamps k dev inum 1%Qp)%I.
+
+  (* THE NAMED-FRAGMENT REFERENCE (R3): [inode_ref] with its stamps
+     fragment [m] exposed -- what a holder that must speak of the fragment's
+     stamps (iput's guard: the itable acquire floors [max_stamp m]) carries
+     between the acquire and the box step.  [inode_ref] is its ∃-form. *)
+  Definition inode_ref_at (k : nat) (q : Qp) (dev inum : mword 32)
+      (m : gmap (ic_bid * nat) ufrac) : iProp Σ :=
+    (iref_frag k q ∗ live_fracc k q ∗ slh_tok (icfg_isl k) q ∗
+     inode_ident k (DfracOwn q) dev inum ∗
+     ⌜qsum m = Qp_to_Qc 1⌝ ∗ CtxBox.reference (X := ic_x) (icfg_box k) (Some (dev, inum)) m)%I.
+  Lemma inode_ref_at_elim k q dev inum :
+    inode_ref k q dev inum -∗ ∃ m, inode_ref_at k q dev inum m.
+  Proof.
+    iIntros "(Hf & Hlv & Hs & Hid & Hst)".
+    rewrite /ic_ref_stamps /ic_ref_stamps_at /ic_stamps.
+    iDestruct "Hst" as (m) "[%Hm Hr]". iExists m. iFrame "Hf Hlv Hs Hid Hr". done.
+  Qed.
+  Lemma inode_ref_at_intro k q dev inum m :
+    inode_ref_at k q dev inum m -∗ inode_ref k q dev inum.
+  Proof.
+    iIntros "(Hf & Hlv & Hs & Hid & %Hm & Hr)". iFrame "Hf Hlv Hs Hid".
+    rewrite /ic_ref_stamps /ic_ref_stamps_at /ic_stamps. iExists m. iFrame "Hr". done.
+  Qed.
+  Lemma inode_ref_at_llb k q dev inum m :
+    inode_ref_at k q dev inum m -∗ TsoGhost.llb loglen_name (max_stamp m).
+  Proof. iIntros "(_ & _ & _ & _ & _ & Hr)". iApply (CtxBox.reference_llb with "Hr"). Qed.
 
   Lemma inode_ref_tok k q dev inum :
     inode_ref k q dev inum -∗ iref_tok k q ∗ inode_ident k (DfracOwn q) dev inum.
   Proof.
-    iIntros "(Hf & Hlv & Hs & Hi)". iFrame "Hi Hf Hs".
+    iIntros "(Hf & Hlv & Hs & Hi & _)". iFrame "Hi Hf Hs".
     by iApply live_fracc_frac.
   Qed.
 
@@ -2947,7 +3096,7 @@ Section IcacheRef.
   Lemma inode_ref_agree k q1 d1 n1 q2 d2 n2 :
     inode_ref k q1 d1 n1 -∗ inode_ref k q2 d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
   Proof.
-    iIntros "(_ & _ & _ & H1) (_ & _ & _ & H2)".
+    iIntros "(_ & _ & _ & H1 & _) (_ & _ & _ & H2 & _)".
     iApply (inode_ident_agree with "H1 H2").
   Qed.
 
@@ -2955,98 +3104,72 @@ Section IcacheRef.
   (*  SHARES: what a reference can lend out, and what it costs it        *)
   (* ================================================================== *)
 
-  (* A SHARE of slot [k]: [s] of the identity cells, and [s] of the slot's
-     liveness unit.  NO count fragment -- [positiveR] has no zero (design
-     §14.5), which is the whole reason the liveness pool exists: the share
-     still has to prove the slot is live, and [live_frac] is how.
+  (* A SHARE of slot [k]: [s] of the identity cells, [s] of the slot's
+     liveness unit, and (R3) stamps of mass [s].  NO count fragment --
+     [positiveR] has no zero (design §14.5), which is the whole reason the
+     liveness pool exists: the share still has to prove the slot is live,
+     and [live_frac] is how.
 
      A share is deliberately NOT self-sufficient: it can be READ through and
      it refutes ilock's [ref < 1] panic, but it can never be spent as a
      reference, because no amount of it produces the count fragment. *)
   Definition inode_shr (k : nat) (s : Qp) (dev inum : mword 32) : iProp Σ :=
     (inode_ident k (DfracOwn s) dev inum ∗ live_fracc k s ∗
-     slh_tok (icfg_isl k) s)%I.
+     slh_tok (icfg_isl k) s ∗ ic_ref_stamps k dev inum s)%I.
 
   (* ---- THE GENERATION-NAMED FORMS (design §17.3, ratified §17.4) ------
-
-     A share and a reference each carry a liveness slice, and under §17' that
-     slice names a GENERATION.  [inode_shr] / [inode_ref] leave it ∃-bound,
-     which is what kept every Spec's arity when §17' piece 1 landed -- but
-     two consumers must NAME it:
-
-       [SpecIlock], whose postcondition exposes the fill's type witness at
-       the generation the CALLER's share belongs to, and
-
-       [IcacheEscrow.ic_dep_res], whose checkout must pin the arm's ½ to the
-       depositor's own generation ([live_gen_agree] is the only mechanism,
-       and it needs both sides named).
-
      They are the ∃-forms with the binder pulled out, so a caller moves
      between them by [iExists] / [iDestruct "H" as (g) "H"] and nothing
      else. *)
   Definition inode_shr_gen (k : nat) (s : Qp) (dev inum : mword 32)
       (g : gname) : iProp Σ :=
     (inode_ident k (DfracOwn s) dev inum ∗ live_gen k s g ∗
-     slh_tok (icfg_isl k) s)%I.
-
+     slh_tok (icfg_isl k) s ∗ ic_ref_stamps k dev inum s)%I.
   Definition inode_ref_gen (k : nat) (q : Qp) (dev inum : mword 32)
       (g : gname) : iProp Σ :=
     (iref_frag k q ∗ live_gen k q g ∗ inode_ident k (DfracOwn q) dev inum ∗
-     slh_tok (icfg_isl k) q)%I.
+     slh_tok (icfg_isl k) q ∗ ic_ref_stamps k dev inum 1%Qp)%I.
 
-  (* ---- THE SHARE WITHOUT ITS SLEEPLOCK SLICE.
-
-     The escrow's checked-out arm and the entry's SLEEPLOCK both want a piece
-     of the depositor's share, and there is only one [s].  Splitting the
-     fraction is the wrong fix: [s] is what [ic_deposit] records, what ilock
-     returns and what iunlock consumes, so moving it would ripple into every
-     caller.  So the share DECOMPOSES instead -- the arm keeps the liveness
-     and identity slices at [s], the lock keeps the [slh_tok] slice at the
-     same [s] -- and these are the arm's halves.  See
-     claude-notes/projects/iput-acquiresleep.md. *)
+  (* ---- THE SHARE WITHOUT ITS SLEEPLOCK SLICE (and, R3, without its
+     stamps: the holder deposits the [slh_tok] slice into the tracked lock
+     and the stamps into the box at the checkout -- F15/M-4).  The BARE
+     forms are the cells and the liveness slice, what the holder has in
+     hand across its hold ([IcacheEscrow.ic_body]). *)
   Definition inode_shr_gen_bare (k : nat) (s : Qp) (dev inum : mword 32)
       (g : gname) : iProp Σ :=
     (inode_ident k (DfracOwn s) dev inum ∗ live_gen k s g)%I.
-
-  (* A6.145: the genlo-named bare forms -- what the escrow's checked-out
-     arms hold now that the descriptor records (g, lo). *)
   Definition inode_shr_genlo_bare (k : nat) (s : Qp) (dev inum : mword 32)
       (g : gname) (lo : nat) : iProp Σ :=
     (inode_ident k (DfracOwn s) dev inum ∗ live_genlo k s g lo)%I.
-
   Lemma inode_shr_genlo_bare_gen k s dev inum g lo :
     inode_shr_genlo_bare k s dev inum g lo -∗ inode_shr_gen_bare k s dev inum g.
   Proof. iIntros "[$ H]". by iExists lo. Qed.
-
   Definition inode_ref_gen_bare (k : nat) (q : Qp) (dev inum : mword 32)
       (g : gname) : iProp Σ :=
     (iref_frag k q ∗ live_gen k q g ∗ inode_ident k (DfracOwn q) dev inum)%I.
-
   Definition inode_ref_genlo_bare (k : nat) (q : Qp) (dev inum : mword 32)
       (g : gname) (lo : nat) : iProp Σ :=
     (iref_frag k q ∗ live_genlo k q g lo ∗
      inode_ident k (DfracOwn q) dev inum)%I.
-
   Lemma inode_ref_genlo_bare_gen k q dev inum g lo :
     inode_ref_genlo_bare k q dev inum g lo -∗ inode_ref_gen_bare k q dev inum g.
   Proof. iIntros "($ & H & $)". by iExists lo. Qed.
-
   Lemma inode_shr_gen_bare_split k s dev inum g :
     inode_shr_gen k s dev inum g ⊣⊢
-    inode_shr_gen_bare k s dev inum g ∗ slh_tok (icfg_isl k) s.
+    inode_shr_gen_bare k s dev inum g ∗ slh_tok (icfg_isl k) s ∗
+    ic_ref_stamps k dev inum s.
   Proof.
     rewrite /inode_shr_gen /inode_shr_gen_bare.
-    iSplit; [iIntros "($ & $ & $)" | iIntros "[[$ $] $]"].
+    iSplit; [iIntros "($ & $ & $ & $)" | iIntros "[[$ $] [$ $]]"].
   Qed.
-
   Lemma inode_ref_gen_bare_split k q dev inum g :
     inode_ref_gen k q dev inum g ⊣⊢
-    inode_ref_gen_bare k q dev inum g ∗ slh_tok (icfg_isl k) q.
+    inode_ref_gen_bare k q dev inum g ∗ slh_tok (icfg_isl k) q ∗
+    ic_ref_stamps k dev inum 1%Qp.
   Proof.
     rewrite /inode_ref_gen /inode_ref_gen_bare.
-    iSplit; [iIntros "($ & $ & $ & $)" | iIntros "[($ & $ & $) $]"].
+    iSplit; [iIntros "($ & $ & $ & $ & $)" | iIntros "[($ & $ & $) [$ $]]"].
   Qed.
-
   Global Instance inode_shr_gen_bare_timeless k s dev inum g :
     Timeless (inode_shr_gen_bare k s dev inum g).
   Proof. apply _. Qed.
@@ -3060,23 +3183,39 @@ Section IcacheRef.
   Definition inode_shr_genlo (k : nat) (s : Qp) (dev inum : mword 32)
       (g : gname) (lo : nat) : iProp Σ :=
     (inode_ident k (DfracOwn s) dev inum ∗ live_genlo k s g lo ∗
-     slh_tok (icfg_isl k) s)%I.
-
+     slh_tok (icfg_isl k) s ∗ ic_ref_stamps k dev inum s)%I.
   Definition inode_ref_genlo (k : nat) (q : Qp) (dev inum : mword 32)
       (g : gname) (lo : nat) : iProp Σ :=
     (iref_frag k q ∗ live_genlo k q g lo ∗
-     inode_ident k (DfracOwn q) dev inum ∗ slh_tok (icfg_isl k) q)%I.
-
+     inode_ident k (DfracOwn q) dev inum ∗ slh_tok (icfg_isl k) q ∗
+     ic_ref_stamps k dev inum 1%Qp)%I.
   Lemma inode_shr_genlo_gen k s dev inum g lo :
     inode_shr_genlo k s dev inum g lo -∗ inode_shr_gen k s dev inum g.
   Proof.
-    iIntros "(Hid & Hg & Hs)". iFrame "Hid Hs". by iExists lo.
+    iIntros "(Hid & Hg & Hs & Hst)". iFrame "Hid Hs Hst". by iExists lo.
   Qed.
-
   Lemma inode_ref_genlo_gen k q dev inum g lo :
     inode_ref_genlo k q dev inum g lo -∗ inode_ref_gen k q dev inum g.
   Proof.
-    iIntros "(Hf & Hg & Hid & Hs)". iFrame "Hf Hid Hs". by iExists lo.
+    iIntros "(Hf & Hg & Hid & Hs & Hst)". iFrame "Hf Hid Hs Hst". by iExists lo.
+  Qed.
+  (* the bare genlo share plus its two deposits IS the genlo share
+     (F15's re-formation after releasesleep returns [slh_tok]) *)
+  Lemma inode_shr_genlo_bare_split k s dev inum g lo :
+    inode_shr_genlo k s dev inum g lo ⊣⊢
+    inode_shr_genlo_bare k s dev inum g lo ∗ slh_tok (icfg_isl k) s ∗
+    ic_ref_stamps k dev inum s.
+  Proof.
+    rewrite /inode_shr_genlo /inode_shr_genlo_bare.
+    iSplit; [iIntros "($ & $ & $ & $)" | iIntros "[[$ $] [$ $]]"].
+  Qed.
+  Lemma inode_ref_genlo_bare_split k q dev inum g lo :
+    inode_ref_genlo k q dev inum g lo ⊣⊢
+    inode_ref_genlo_bare k q dev inum g lo ∗ slh_tok (icfg_isl k) q ∗
+    ic_ref_stamps k dev inum 1%Qp.
+  Proof.
+    rewrite /inode_ref_genlo /inode_ref_genlo_bare.
+    iSplit; [iIntros "($ & $ & $ & $ & $)" | iIntros "[($ & $ & $) [$ $]]"].
   Qed.
 
   (* the intro equivalences, floored: the binder is at the TOP so the
@@ -3089,12 +3228,11 @@ Section IcacheRef.
   Proof.
     rewrite /inode_shr /inode_shr_genlo /live_fracc.
     iSplit.
-    - iIntros "[Hid [(%g & %lo & %tl & Hg & %Hle & #Hfl) Hs]]".
-      iExists g, lo, tl. iFrame "Hg Hid Hs Hfl". by iPureIntro.
-    - iIntros "(%g & %lo & %tl & %Hle & #Hfl & (Hid & Hg & Hs))".
-      iFrame "Hid Hs". iExists g, lo, tl. iFrame "Hg Hfl". by iPureIntro.
+    - iIntros "[Hid [(%g & %lo & %tl & Hg & %Hle & #Hfl) [Hs Hst]]]".
+      iExists g, lo, tl. iFrame "Hg Hid Hs Hst Hfl". by iPureIntro.
+    - iIntros "(%g & %lo & %tl & %Hle & #Hfl & (Hid & Hg & Hs & Hst))".
+      iFrame "Hid Hs Hst". iExists g, lo, tl. iFrame "Hg Hfl". by iPureIntro.
   Qed.
-
   Lemma inode_ref_gen_intro k q dev inum :
     inode_ref k q dev inum ⊣⊢
     ∃ (g : gname) (lo tl : nat),
@@ -3103,12 +3241,11 @@ Section IcacheRef.
   Proof.
     rewrite /inode_ref /inode_ref_genlo /live_fracc.
     iSplit.
-    - iIntros "(Hf & (%g & %lo & %tl & Hg & %Hle & #Hfl) & Hs & Hid)".
-      iExists g, lo, tl. iFrame "Hf Hg Hid Hs Hfl". by iPureIntro.
-    - iIntros "(%g & %lo & %tl & %Hle & #Hfl & (Hf & Hg & Hid & Hs))".
-      iFrame "Hf Hid Hs". iExists g, lo, tl. iFrame "Hg Hfl". by iPureIntro.
+    - iIntros "(Hf & (%g & %lo & %tl & Hg & %Hle & #Hfl) & Hs & Hid & Hst)".
+      iExists g, lo, tl. iFrame "Hf Hg Hid Hs Hst Hfl". by iPureIntro.
+    - iIntros "(%g & %lo & %tl & %Hle & #Hfl & (Hf & Hg & Hid & Hs & Hst))".
+      iFrame "Hf Hid Hs Hst". iExists g, lo, tl. iFrame "Hg Hfl". by iPureIntro.
   Qed.
-
   Global Instance inode_shr_gen_timeless k s dev inum g :
     Timeless (inode_shr_gen k s dev inum g).
   Proof. apply _. Qed.
@@ -3119,37 +3256,27 @@ Section IcacheRef.
   (* A reference WITH A SHARE OUTSTANDING: the count fragment is still whole
      at [qtok] -- carving does not move the authority, and MUST not, since
      the table's retained identity share is stated against it -- while the
-     liveness and identity slices have dropped to [qid].  This is the shape
-     the design calls NON-CANONICAL, and it is the point: no contract in the
-     tree states it, so a parent cannot spend its reference until
-     [inode_ref_gather] restores the pairing. *)
+     liveness and identity slices have dropped to [qid], and (R3) the
+     stamps to mass [1 − (qtok − qid)].  This is the shape the design calls
+     NON-CANONICAL, and it is the point: no contract in the tree states it,
+     so a parent cannot spend its reference until [inode_ref_gather]
+     restores the pairing. *)
   Definition inode_ref_short (k : nat) (qtok qid : Qp)
       (dev inum : mword 32) : iProp Σ :=
     (iref_frag k qtok ∗ live_fracc k qid ∗
-     inode_ident k (DfracOwn qid) dev inum ∗ slh_tok (icfg_isl k) qid)%I.
-
+     inode_ident k (DfracOwn qid) dev inum ∗ slh_tok (icfg_isl k) qid ∗
+     ic_lent_stamps k qtok qid dev inum)%I.
   Definition inode_ref_short_genlo (k : nat) (qtok qid : Qp)
       (dev inum : mword 32) (g : gname) (lo : nat) : iProp Σ :=
     (iref_frag k qtok ∗ live_genlo k qid g lo ∗
-     inode_ident k (DfracOwn qid) dev inum ∗ slh_tok (icfg_isl k) qid)%I.
-
-  (* THE SHORT PARENT, GENERATION-NAMED (fs-log.md §G.24, G-4d).  Same
-     three pieces as [inode_ref_short], with the liveness slice at a NAMED
-     generation instead of the arity-preserving [live_frac] wrapper.  A
-     walker needs it for exactly one reason: it hands ilock a share at a
-     named generation, gets a one-shot back at THAT generation, and must
-     re-form a reference the consumer can read the one-shot against --
-     and [inode_ref_gather] alone loses the name, because both of its
-     inputs come back generation-erased.
-
-     Nothing is proven about stability here and nothing needs to be: the
-     generation is an [agree] ([live_gen_agree]), and a regen must consume
-     the WHOLE unit ([live_frac_bump]), which a held slice makes
-     unownable.  Holding the reference IS the stability. *)
+     inode_ident k (DfracOwn qid) dev inum ∗ slh_tok (icfg_isl k) qid ∗
+     ic_lent_stamps k qtok qid dev inum)%I.
+  (* THE SHORT PARENT, GENERATION-NAMED (fs-log.md §G.24, G-4d). *)
   Definition inode_ref_short_gen (k : nat) (qtok qid : Qp)
       (dev inum : mword 32) (g : gname) : iProp Σ :=
     (iref_frag k qtok ∗ live_gen k qid g ∗
-     inode_ident k (DfracOwn qid) dev inum ∗ slh_tok (icfg_isl k) qid)%I.
+     inode_ident k (DfracOwn qid) dev inum ∗ slh_tok (icfg_isl k) qid ∗
+     ic_lent_stamps k qtok qid dev inum)%I.
 
   Lemma inode_ref_short_gen_intro k qt qi dev inum :
     inode_ref_short k qt qi dev inum ⊣⊢
@@ -3159,28 +3286,20 @@ Section IcacheRef.
   Proof.
     rewrite /inode_ref_short /inode_ref_short_genlo /live_fracc.
     iSplit.
-    - iIntros "(Hf & (%g & %lo & %tl & Hg & %Hle & #Hfl) & Hid & Hs)".
-      iExists g, lo, tl. iFrame "Hf Hg Hid Hs Hfl". by iPureIntro.
-    - iIntros "(%g & %lo & %tl & %Hle & #Hfl & (Hf & Hg & Hid & Hs))".
-      iFrame "Hf Hid Hs". iExists g, lo, tl. iFrame "Hg Hfl". by iPureIntro.
+    - iIntros "(Hf & (%g & %lo & %tl & Hg & %Hle & #Hfl) & Hid & Hs & Hst)".
+      iExists g, lo, tl. iFrame "Hf Hg Hid Hs Hst Hfl". by iPureIntro.
+    - iIntros "(%g & %lo & %tl & %Hle & #Hfl & (Hf & Hg & Hid & Hs & Hst))".
+      iFrame "Hf Hid Hs Hst". iExists g, lo, tl. iFrame "Hg Hfl". by iPureIntro.
   Qed.
-
   Lemma inode_ref_short_genlo_gen k qt qi dev inum g lo :
     inode_ref_short_genlo k qt qi dev inum g lo -∗
     inode_ref_short_gen k qt qi dev inum g.
   Proof.
-    iIntros "(Hf & Hg & Hid & Hs)". iFrame "Hf Hid Hs". by iExists lo.
+    iIntros "(Hf & Hg & Hid & Hs & Hst)". iFrame "Hf Hid Hs Hst". by iExists lo.
   Qed.
 
-  (* THE FORGET, and it is now a CHOICE rather than a boundary.  [iunlock]
-     hands its caller the generation it was handed ([SpecIunlock]'s post),
-     because the caller's own share is what forbids the recycler's
-     [live_gen_bump] (it wants the slot's WHOLE unit) -- so the generation
-     under a held reference cannot move, and erasing it at the return threw
-     away a witness the model was holding.  A consumer that does not want
-     the name applies this at its own call site. *)
-  (* A6.145: the forgets now carry the FLOOR back in -- the caller kept it
-     aside (it is persistent) from the intro that gave it the gen form. *)
+  (* THE FORGET: a consumer that does not want the name applies this at
+     its own call site; A6.145: the forgets carry the FLOOR back in. *)
   Lemma inode_shr_gen_forget k s dev inum g lo tl :
     (lo <= tl)%nat ->
     cred_floor lo tl -∗
@@ -3189,7 +3308,6 @@ Section IcacheRef.
     iIntros (Hle) "#Hfl H". rewrite inode_shr_gen_intro.
     iExists g, lo, tl. iFrame "H Hfl". by iPureIntro.
   Qed.
-
   Lemma inode_ref_short_gen_forget k qt qi dev inum g lo tl :
     (lo <= tl)%nat ->
     cred_floor lo tl -∗
@@ -3200,20 +3318,15 @@ Section IcacheRef.
     iExists g, lo, tl. iFrame "H Hfl". by iPureIntro.
   Qed.
 
-  (* the two slices of one slot name one generation -- [live_gen_agree] at
-     the pointer-free altitude, which is what lets a walker learn that the
-     share it lent ilock and the parent it kept are the same generation *)
+  (* the two slices of one slot name one generation *)
   Lemma inode_ref_short_shr_gen_agree k qt qi s dev inum d2 n2 g1 g2 :
     inode_ref_short_gen k qt qi dev inum g1 -∗ inode_shr_gen k s d2 n2 g2 -∗
     ⌜g1 = g2⌝.
   Proof.
-    iIntros "(_ & H1 & _ & _) (_ & H2 & _)". iApply (live_gen_agree with "H1 H2").
+    iIntros "(_ & H1 & _) (_ & H2 & _)". iApply (live_gen_agree with "H1 H2").
   Qed.
 
-  (* THE POST-RETURN MOVE (A6.145): a generation-erased share coming back
-     from ilock/iunlock re-pins its epoch by agreement with the RETAINED
-     parent's named slice, and forgets to the floored [inode_shr] using
-     the floor the shed kept aside. *)
+  (* THE POST-RETURN MOVE (A6.145) *)
   Lemma inode_shr_gen_forget_on_keep k s qt qi dev inum d2 n2 g gk lo tl :
     (lo <= tl)%nat ->
     cred_floor lo tl -∗
@@ -3221,29 +3334,27 @@ Section IcacheRef.
     inode_shr_gen k s dev inum g -∗
     inode_ref_short_genlo k qt qi d2 n2 gk lo ∗ inode_shr k s dev inum.
   Proof.
-    iIntros (Hle) "#Hfl (Hkf & Hklv & Hkid & Hksl) (Hid & [%lo2 Hlv] & Hsl)".
+    iIntros (Hle) "#Hfl (Hkf & Hklv & Hkid & Hksl & Hkst) (Hid & [%lo2 Hlv] & Hsl & Hst)".
     iDestruct (live_genlo_agree with "Hlv Hklv") as %[<- <-].
-    iSplitL "Hkf Hklv Hkid Hksl"; [by iFrame|].
-    rewrite /inode_shr /live_fracc. iFrame "Hid Hsl".
+    iSplitL "Hkf Hklv Hkid Hksl Hkst"; [by iFrame|].
+    rewrite /inode_shr /live_fracc. iFrame "Hid Hsl Hst".
     iExists g, lo2, tl. iFrame "Hlv Hfl". by iPureIntro.
   Qed.
-
   Lemma inode_ref_short_genlo_shr_gen_agree k qt qi s dev inum d2 n2
       g1 lo1 g2 :
     inode_ref_short_genlo k qt qi dev inum g1 lo1 -∗
     inode_shr_gen k s d2 n2 g2 -∗ ⌜g1 = g2⌝.
   Proof.
-    iIntros "(_ & H1 & _ & _) (_ & [%lo2 H2] & _)".
+    iIntros "(_ & H1 & _) (_ & [%lo2 H2] & _)".
     iDestruct (live_genlo_agree with "H1 H2") as %[<- _]. done.
   Qed.
-
   Lemma inode_ref_short_shr_genlo_agree k qt qi s dev inum d2 n2
       g1 lo1 g2 lo2 :
     inode_ref_short_genlo k qt qi dev inum g1 lo1 -∗
     inode_shr_genlo k s d2 n2 g2 lo2 -∗
     ⌜g1 = g2 /\ lo1 = lo2⌝.
   Proof.
-    iIntros "(_ & H1 & _ & _) (_ & H2 & _)".
+    iIntros "(_ & H1 & _) (_ & H2 & _)".
     iApply (live_genlo_agree with "H1 H2").
   Qed.
 
@@ -3251,19 +3362,18 @@ Section IcacheRef.
     inode_shr_genlo k (s1 + s2)%Qp dev inum g lo ⊣⊢
     inode_shr_genlo k s1 dev inum g lo ∗ inode_shr_genlo k s2 dev inum g lo.
   Proof.
-    rewrite /inode_shr_genlo inode_ident_split live_genlo_split slh_tok_split.
-    iSplit; [iIntros "([$ $] & [$ $] & [$ $])"
-            | iIntros "[($ & $ & $) ($ & $ & $)]"].
+    rewrite /inode_shr_genlo inode_ident_split live_genlo_split slh_tok_split
+            ic_ref_stamps_split.
+    iSplit; [iIntros "([$ $] & [$ $] & [$ $] & [$ $])"
+            | iIntros "[($ & $ & $ & $) ($ & $ & $ & $)]"].
   Qed.
-
   Lemma inode_shr_genlo_halve k s dev inum g lo :
     inode_shr_genlo k s dev inum g lo ⊣⊢
     inode_shr_genlo k (s/2)%Qp dev inum g lo ∗
     inode_shr_genlo k (s/2)%Qp dev inum g lo.
   Proof. rewrite -inode_shr_genlo_split Qp.div_2. reflexivity. Qed.
 
-  (* THE LO-EXPOSED SHED (A6.145): the per-proof [*_shed_gen] clones'
-     genlo form, once. *)
+  (* THE LO-EXPOSED SHED (A6.145) *)
   Lemma inode_ref_genlo_shed k q dev inum g lo :
     inode_ref_genlo k q dev inum g lo ⊣⊢
     inode_ref_short_genlo k (q/2 + q/2)%Qp (q/2)%Qp dev inum g lo ∗
@@ -3271,15 +3381,21 @@ Section IcacheRef.
   Proof.
     rewrite /inode_ref_genlo /inode_ref_short_genlo /inode_shr_genlo.
     iSplit.
-    - iIntros "(Hf & Hl & Hid & Hs)".
+    - iIntros "(Hf & Hl & Hid & Hs & Hst)".
+      iDestruct (live_genlo_le1 with "Hl") as %Hq1.
       iDestruct (live_genlo_halve with "Hl") as "[Hl1 Hl2]".
       iDestruct (inode_ident_halve with "Hid") as "[Hid1 Hid2]".
       iDestruct (slh_tok_halve_i with "Hs") as "[Hs1 Hs2]".
+      iDestruct (ic_ref_stamps_carve k (q/2)%Qp (q/2)%Qp with "Hst") as "[Hst1 Hst2]".
+      { rewrite Qp.div_2. exact Hq1. }
       rewrite (Qp.div_2 q). iFrame.
-    - iIntros "[(Hf & Hl1 & Hid1 & Hs1) (Hid2 & Hl2 & Hs2)]".
-      rewrite (Qp.div_2 q). iFrame "Hf".
+    - iIntros "[(Hf & Hl1 & Hid1 & Hs1 & Hst1) (Hid2 & Hl2 & Hs2 & Hst2)]".
       iDestruct (live_genlo_join with "Hl1 Hl2") as "Hl".
-      iEval (rewrite Qp.div_2) in "Hl". iFrame "Hl".
+      iDestruct (live_genlo_le1 with "Hl") as %Hq1.
+      iAssert (ic_ref_stamps k dev inum 1%Qp) with "[Hst1 Hst2]" as "Hst".
+      { rewrite (ic_ref_stamps_carve k (q/2)%Qp (q/2)%Qp dev inum Hq1).
+        iFrame "Hst1 Hst2". }
+      rewrite (Qp.div_2 q). iFrame "Hf Hl Hst".
       iDestruct "Hid1" as "[Hd1 Hn1]". iDestruct "Hid2" as "[Hd2 Hn2]".
       iDestruct (word4_frac_join with "Hd1 Hd2") as "Hd".
       iDestruct (word4_frac_join with "Hn1 Hn2") as "Hn".
@@ -3289,28 +3405,26 @@ Section IcacheRef.
       iEval (rewrite Qp.div_2) in "Hs". iFrame "Hs".
   Qed.
 
-  (* the SHARE-keep pin: a generation-erased return re-pins on a kept
-     share slice (A6.145) *)
+  (* the SHARE-keep pins (A6.145) *)
   Lemma inode_shr_gen_pin_on_keep_short k qt qi s dev inum d2 n2 g gk lo :
     inode_ref_short_genlo k qt qi d2 n2 gk lo -∗
     inode_shr_gen k s dev inum g -∗
     inode_ref_short_genlo k qt qi d2 n2 gk lo ∗
     inode_shr_genlo k s dev inum gk lo.
   Proof.
-    iIntros "(Hf1 & Hl1 & Hid1 & Hs1) (Hid2 & [%lo2 Hl2] & Hs2)".
+    iIntros "(Hf1 & Hl1 & Hid1 & Hs1 & Hst1) (Hid2 & [%lo2 Hl2] & Hs2 & Hst2)".
     iDestruct (live_genlo_agree with "Hl2 Hl1") as %[-> ->].
-    iFrame "Hf1 Hl1 Hid1 Hs1 Hid2 Hl2 Hs2".
+    iFrame "Hf1 Hl1 Hid1 Hs1 Hst1 Hid2 Hl2 Hs2 Hst2".
   Qed.
-
   Lemma inode_shr_gen_pin_on_keep k s1 s2 dev inum d2 n2 g gk lo :
     inode_shr_genlo k s1 d2 n2 gk lo -∗
     inode_shr_gen k s2 dev inum g -∗
     inode_shr_genlo k s1 d2 n2 gk lo ∗
     inode_shr_genlo k s2 dev inum gk lo.
   Proof.
-    iIntros "(Hid1 & Hl1 & Hs1) (Hid2 & [%lo2 Hl2] & Hs2)".
+    iIntros "(Hid1 & Hl1 & Hs1 & Hst1) (Hid2 & [%lo2 Hl2] & Hs2 & Hst2)".
     iDestruct (live_genlo_agree with "Hl2 Hl1") as %[-> ->].
-    iFrame "Hid1 Hl1 Hs1 Hid2 Hl2 Hs2".
+    iFrame "Hid1 Hl1 Hs1 Hst1 Hid2 Hl2 Hs2 Hst2".
   Qed.
 
   (* THE LO-EXPOSED GATHER (A6.145): both slices at ONE (g, lo). *)
@@ -3319,52 +3433,100 @@ Section IcacheRef.
     inode_shr_genlo k s dev inum g lo -∗
     inode_ref_genlo k (qi + s)%Qp dev inum g lo.
   Proof.
-    iIntros "(Hf & Hl1 & Hid1 & Hs1) (Hid2 & Hl2 & Hs2)".
+    iIntros "(Hf & Hl1 & Hid1 & Hs1 & Hst1) (Hid2 & Hl2 & Hs2 & Hst2)".
     rewrite /inode_ref_genlo. iFrame "Hf".
-    iSplitL "Hl1 Hl2"; [iApply (live_genlo_join with "Hl1 Hl2") |].
+    iDestruct (live_genlo_join with "Hl1 Hl2") as "Hl".
+    iDestruct (live_genlo_le1 with "Hl") as %Hle. iFrame "Hl".
     rewrite inode_ident_split. iFrame "Hid1 Hid2".
-    iApply (slh_tok_join with "Hs1 Hs2").
+    iSplitL "Hs1 Hs2"; [iApply (slh_tok_join with "Hs1 Hs2") |].
+    iApply (ic_ref_stamps_carve k qi s dev inum Hle). iFrame "Hst1 Hst2".
   Qed.
-
   (* THE NAMED GATHER: [inode_ref_gather] with the generation surviving *)
   Lemma inode_ref_gather_gen k qi s dev inum g :
     inode_ref_short_gen k (qi + s)%Qp qi dev inum g -∗
     inode_shr_gen k s dev inum g -∗
     inode_ref_gen k (qi + s)%Qp dev inum g.
   Proof.
-    iIntros "(Hf & Hl1 & Hid1 & Hs1) (Hid2 & Hl2 & Hs2)".
+    iIntros "(Hf & Hl1 & Hid1 & Hs1 & Hst1) (Hid2 & Hl2 & Hs2 & Hst2)".
     rewrite /inode_ref_gen. iFrame "Hf".
-    iSplitL "Hl1 Hl2"; [iApply (live_gen_join with "Hl1 Hl2") |].
+    iDestruct (live_gen_join with "Hl1 Hl2") as "Hl".
+    iDestruct "Hl" as "[%lo Hl]".
+    iDestruct (live_genlo_le1 with "Hl") as %Hle.
+    iSplitL "Hl"; [by iExists lo |].
     rewrite inode_ident_split. iFrame "Hid1 Hid2".
-    iApply (slh_tok_join with "Hs1 Hs2").
+    iSplitL "Hs1 Hs2"; [iApply (slh_tok_join with "Hs1 Hs2") |].
+    iApply (ic_ref_stamps_carve k qi s dev inum Hle). iFrame "Hst1 Hst2".
   Qed.
-
   Global Instance inode_ref_short_gen_timeless k qt qi dev inum g :
     Timeless (inode_ref_short_gen k qt qi dev inum g).
   Proof. apply _. Qed.
 
+  Lemma live_gen_le1 k (s : Qp) g : live_gen k s g -∗ ⌜(s ≤ 1)%Qp⌝.
+  Proof. iIntros "(%lo & H)". iApply (live_genlo_le1 with "H"). Qed.
+
+  (* THE GENERATION-NAMED CARVE and SHARE SPLIT -- the homes of the per-proof
+     copies (cr_/su_/sl_carve_gen, the *_split2 twins), which now delegate. *)
+  Lemma inode_shr_gen_split k s1 s2 dev inum g :
+    inode_shr_gen k (s1 + s2)%Qp dev inum g ⊣⊢
+    inode_shr_gen k s1 dev inum g ∗ inode_shr_gen k s2 dev inum g.
+  Proof.
+    rewrite /inode_shr_gen inode_ident_split live_gen_split slh_tok_split
+            ic_ref_stamps_split.
+    iSplit; [iIntros "[[$ $] [[$ $] [[$ $] [$ $]]]]"
+            | iIntros "[($ & $ & $ & $) ($ & $ & $ & $)]"].
+  Qed.
+  Lemma inode_ref_carve_gen k q s dev inum g :
+    inode_ref_gen k (q + s)%Qp dev inum g ⊣⊢
+    inode_ref_short_gen k (q + s)%Qp q dev inum g ∗ inode_shr_gen k s dev inum g.
+  Proof.
+    rewrite /inode_ref_gen /inode_ref_short_gen /inode_shr_gen.
+    iSplit.
+    - iIntros "(Hf & Hl & Hid & Hs & Hst)".
+      iDestruct (live_gen_le1 with "Hl") as %Hle.
+      rewrite live_gen_split inode_ident_split slh_tok_split
+              (ic_ref_stamps_carve k q s dev inum Hle).
+      iDestruct "Hl" as "[$ $]". iDestruct "Hid" as "[$ $]".
+      iDestruct "Hs" as "[$ $]". iDestruct "Hst" as "[$ $]". iFrame "Hf".
+    - iIntros "[(Hf & Hl1 & Hid1 & Hs1 & Hst1) (Hid2 & Hl2 & Hs2 & Hst2)]".
+      iFrame "Hf".
+      iDestruct (live_gen_join with "Hl1 Hl2") as "Hl".
+      iDestruct (live_gen_le1 with "Hl") as %Hle. iFrame "Hl".
+      rewrite inode_ident_split slh_tok_split
+              (ic_ref_stamps_carve k q s dev inum Hle).
+      iFrame "Hid1 Hid2 Hs1 Hs2 Hst1 Hst2".
+  Qed.
+
   Lemma inode_ref_canon k q dev inum :
     inode_ref k q dev inum ⊣⊢ inode_ref_short k q q dev inum.
   Proof.
-    rewrite /inode_ref /inode_ref_short.
-    iSplit; [iIntros "($ & $ & $ & $)" | iIntros "($ & $ & $ & $)"].
+    rewrite /inode_ref /inode_ref_short ic_lent_stamps_canon.
+    iSplit; [iIntros "($ & $ & $ & $ & $)" | iIntros "($ & $ & $ & $ & $)"].
   Qed.
 
-  (* THE CARVE, and its inverse.  Both are pure resource algebra: the
-     liveness slice and the identity slice split together, and the count
-     fragment does not move.  There is no ghost update and no invariant
-     opening, which §14.6 makes sound -- see [iliveUR]'s comment. *)
+  (* THE CARVE, and its inverse.  Pure resource algebra: the liveness slice,
+     the identity slice and (R3) the stamps mass split together, and the
+     count fragment does not move.  The stamps' split needs [q + s ≤ 1],
+     which the liveness slice supplies. *)
   Lemma inode_ref_carve k q s dev inum :
     inode_ref k (q + s)%Qp dev inum ⊣⊢
     inode_ref_short k (q + s)%Qp q dev inum ∗ inode_shr k s dev inum.
   Proof.
-    rewrite /inode_ref /inode_ref_short /inode_shr
-            live_fracc_split inode_ident_split slh_tok_split.
+    rewrite /inode_ref /inode_ref_short /inode_shr.
     iSplit.
-    - iIntros "($ & [$ $] & [$ $] & [$ $])".
-    - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
+    - iIntros "(Hf & Hlv & Hs & Hid & Hst)".
+      iDestruct (live_fracc_le1 with "Hlv") as %Hle.
+      rewrite live_fracc_split inode_ident_split slh_tok_split
+              (ic_ref_stamps_carve k q s dev inum Hle).
+      iDestruct "Hlv" as "[$ $]". iDestruct "Hs" as "[$ $]".
+      iDestruct "Hid" as "[$ $]". iDestruct "Hst" as "[$ $]". iFrame "Hf".
+    - iIntros "[(Hf & Hlv1 & Hid1 & Hs1 & Hst1) (Hid2 & Hlv2 & Hs2 & Hst2)]".
+      iFrame "Hf".
+      iDestruct (live_fracc_split with "[$Hlv1 $Hlv2]") as "Hlv".
+      iDestruct (live_fracc_le1 with "Hlv") as %Hle. iFrame "Hlv".
+      rewrite inode_ident_split slh_tok_split
+              (ic_ref_stamps_carve k q s dev inum Hle).
+      iFrame "Hid1 Hid2 Hs1 Hs2 Hst1 Hst2".
   Qed.
-
   Lemma inode_ref_gather k q s dev inum :
     inode_ref_short k (q + s)%Qp q dev inum -∗ inode_shr k s dev inum -∗
     inode_ref k (q + s)%Qp dev inum.
@@ -3378,18 +3540,12 @@ Section IcacheRef.
   Proof.
     iIntros "[H1 _] [H2 _]". iApply (inode_ident_agree with "H1 H2").
   Qed.
-
   Lemma inode_ref_shr_agree k q s d1 n1 d2 n2 :
     inode_ref k q d1 n1 -∗ inode_shr k s d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
   Proof.
-    iIntros "(_ & _ & _ & H1) [H2 _]".
+    iIntros "(_ & _ & _ & H1 & _) [H2 _]".
     iApply (inode_ident_agree with "H1 H2").
   Qed.
-
-  (* ...and the same for a SHORT parent, which is what the gather at a
-     [FileInv.inode_pay] cancel has in hand: the cinv gives back the parked
-     parent and the closer brings the travelling share, and the two have to
-     be shown to name one entry before [inode_ref_gather] applies. *)
   Lemma inode_ref_short_shr_agree k qt qi s d1 n1 d2 n2 :
     inode_ref_short k qt qi d1 n1 -∗ inode_shr k s d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
   Proof.
@@ -3402,17 +3558,15 @@ Section IcacheRef.
     inode_shr k (s1 + s2)%Qp dev inum ⊣⊢
     inode_shr k s1 dev inum ∗ inode_shr k s2 dev inum.
   Proof.
-    rewrite /inode_shr inode_ident_split live_fracc_split slh_tok_split.
-    iSplit; [iIntros "[[$ $] [[$ $] [$ $]]]" | iIntros "[($ & $ & $) ($ & $ & $)]"].
+    rewrite /inode_shr inode_ident_split live_fracc_split slh_tok_split
+            ic_ref_stamps_split.
+    iSplit; [iIntros "[[$ $] [[$ $] [[$ $] [$ $]]]]"
+            | iIntros "[($ & $ & $ & $) ($ & $ & $ & $)]"].
   Qed.
 
   (* SHEDDING A HALF-SHARE -- the form every caller that has no fraction in
-     mind actually wants, and A LEMMA RATHER THAN A [rewrite -(Qp.div_2 q)]
-     at the call site: inside the proofmode that rewrite puts the split's evar
-     out of [q]'s scope and fails with "cannot instantiate ?b" (durable-notes).
-     Stated with the sum UNREDUCED on the left so that a consumer whose target
-     is [inode_ref_short k (qi + s) qi] -- the shape [inode_ref_gather] and the
-     pointer-keyed [inode_held_short] below both want -- needs no arithmetic. *)
+     mind actually wants (durable-notes: a lemma, not a [rewrite -(Qp.div_2 q)]
+     at the call site). *)
   Lemma inode_ref_shed k q dev inum :
     inode_ref k q dev inum ⊣⊢
     inode_ref_short k (q/2 + q/2)%Qp (q/2)%Qp dev inum ∗
@@ -3576,7 +3730,7 @@ End IcacheRef.
 (* ===================================================================== *)
 
 Section IcacheHeld.
-  Context `{!riscvGS Σ, !icacheG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !icacheG Σ, !icboxG Σ, !kallocG Σ, !lockG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
   Context `{XI : CurCtx}.
@@ -3645,13 +3799,13 @@ Section IcacheHeld.
   Proof.
     iIntros "(%k & %q & %inum & %g & %lo & %tl &
               %Hv & %Hk & %Hb & %Hle & #Hfl & Href & _ & Hru)".
-    iDestruct "Href" as "(Hf & Hg & Hid & Hs)".
+    iDestruct "Href" as "(Hf & Hg & Hid & Hs & Hst)".
     iAssert (live_fracc k q) with "[Hg]" as "Hlv".
     { rewrite /live_fracc. iExists g, lo, tl. iFrame "Hg Hfl". by iPureIntro. }
     iExists k, q, inum.
     iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iSplitR; [by iPureIntro|].
-    rewrite /inode_refp /inode_ref. by iFrame "Hru Hf Hs Hid Hlv".
+    rewrite /inode_refp /inode_ref. by iFrame "Hru Hf Hs Hid Hlv Hst".
   Qed.
 
   Global Instance inode_held_ty_timeless v ty : Timeless (inode_held_ty v ty).
@@ -3733,16 +3887,16 @@ Section IcacheHeld.
   Proof.
     rewrite /inode_shr_held_gen /inode_shr_genlo. iSplit.
     - iIntros "(%k & %inum & %lo & %tl &
-                %Hv & %Hk & %Hb & %Hle & #Hfl & (Hid & Hlv & Hs))".
-      rewrite inode_ident_split live_genlo_split slh_tok_split.
+                %Hv & %Hk & %Hb & %Hle & #Hfl & (Hid & Hlv & Hs & Hst))".
+      rewrite inode_ident_split live_genlo_split slh_tok_split ic_ref_stamps_split.
       iDestruct "Hid" as "[Hid1 Hid2]". iDestruct "Hlv" as "[Hl1 Hl2]".
-      iDestruct "Hs" as "[Hs1 Hs2]".
-      iSplitL "Hid1 Hl1 Hs1"; iExists k, inum, lo, tl;
+      iDestruct "Hs" as "[Hs1 Hs2]". iDestruct "Hst" as "[Hst1 Hst2]".
+      iSplitL "Hid1 Hl1 Hs1 Hst1"; iExists k, inum, lo, tl;
         iFrame "∗ Hfl"; by iPureIntro.
     - iIntros "[(%k1 & %n1 & %lo1 & %tl1 &
-                 %Hv1 & %Hk1 & %Hb1 & %Hle1 & #Hfl1 & (Hid1 & Hl1 & Hs1))
+                 %Hv1 & %Hk1 & %Hb1 & %Hle1 & #Hfl1 & (Hid1 & Hl1 & Hs1 & Hst1))
                 (%k2 & %n2 & %lo2 & %tl2 &
-                 %Hv2 & %Hk2 & %Hb2 & %Hle2 & #Hfl2 & (Hid2 & Hl2 & Hs2))]".
+                 %Hv2 & %Hk2 & %Hb2 & %Hle2 & #Hfl2 & (Hid2 & Hl2 & Hs2 & Hst2))]".
       assert (Hkk : k1 = k2).
       { apply ientry_inj; [lia | lia |]. rewrite -Hv1 -Hv2. reflexivity. }
       subst k2.
@@ -3752,7 +3906,7 @@ Section IcacheHeld.
       iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
       iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
       iFrame "Hfl1".
-      rewrite inode_ident_split live_genlo_split slh_tok_split. iFrame.
+      rewrite inode_ident_split live_genlo_split slh_tok_split ic_ref_stamps_split. iFrame.
   Qed.
 
   Global Instance inode_shr_held_gen_timeless v s g :

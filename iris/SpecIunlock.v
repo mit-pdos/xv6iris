@@ -132,7 +132,7 @@ Definition wp_iunlock_sconf_body
   (* the [ref] words, and the entry's content escrow *)
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp cn k)
                    (slh_tok (icfg_isl k)) -∗
   (* THE HOLDER'S BUNDLE -- the third dead panic test is exactly this *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗

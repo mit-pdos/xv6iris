@@ -200,6 +200,9 @@ Section ProofIdup.
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hrinv Hislot Href Hru Hcont".
     iDestruct (is_itable2_lock with "Hlock") as "#Hlk2".
     iDestruct (is_itable2_claims with "Hlock") as "#Hclaims".
+    (* R3: the slot's BOX, off the itable handle's escrow family (F26) *)
+    iDestruct (is_itable2_escrows with "Hlock") as "#Hescs".
+    iDestruct (ic_escrows_lookup cn γfs γi cov logstart k Hk with "Hescs") as "#Hbox".
     (* the caller's unit.  UNDER RULING C' there is only one flavour a rest
        home can hold ([runit_any] IS [runit_plain]), so the flavour index
        the mover still takes is pinned at [false] here rather than
@@ -386,7 +389,7 @@ Section ProofIdup.
        live slot ([IcacheInv.iref_share_lookup_au], design §14.7(2)).  That
        one opens [itable_inv] and closes it again with nothing moved, so it is
        a fupd where [iref_lookup] was a pure wand -- hence the [fupd_wp]. *)
-    iDestruct "Href" as "(Hrident & Hrlive & Hrslh)".
+    iDestruct "Href" as "(Hrident & Hrlive & Hrslh & Hrst)".
     iDestruct "Hrlive" as (gsh losh tlsh) "(Hrlive & %Hlosh & #Hflsh)".
     iApply fupd_wp.
     iMod (IcacheInv.iref_share_lookup_pinw_au ⊤ M k s gsh losh
@@ -410,7 +413,7 @@ Section ProofIdup.
        and -- the two this proof now needs -- the ledger's [icnt] half and
        the FREEZE MIRROR's lock half, which inside iput's free window is the
        frozen PARK. *)
-    iDestruct "Hslot" as "(Hrest & Hiu & Hgid & Hicnt & Hpark)".
+    iDestruct "Hslot" as "(Hrest & Hiu & Hicnt & Hpark)".
     (* THE NEW REFERENCE'S IDENTITY SLICE COMES OUT OF THE TABLE'S RETAINED
        SHARE, exactly as iget's cache-hit arm mints one -- the caller brought
        a share, and a share's own fraction is the hole in its PARENT's slice,
@@ -464,10 +467,24 @@ Section ProofIdup.
        read at the payload row's stamp (A6.144: the acquire floor covers it,
        the store below forfeits it -- the row closes LLB-bare). *)
     iDestruct (IcacheInv.iref_claims_at k Hk with "Hclaims") as "#Hclaim0".
-    iDestruct (itable_slot_res_acc_upd_llb TsoCtx.cur_ctx M k Hk
+    iDestruct (itable_slot_res_acc_upd_llb TsoCtx.cur_ctx M ci k Hk
                  with "Hstamps") as "[Hsrow Hstampsback]".
     iEval (rewrite {1}/itable_slot_res HMk) in "Hsrow".
+    iDestruct "Hsrow" as "[Hbrow Hsrow]".
     iDestruct "Hsrow" as (tstk) "(Hstk & #Hllbk & #Hflk)".
+    (* R3 (endgame §4.2, the table's (c)): [ref++] on a live slot is the
+       box's ref_incr at the register's identity -- ghost-only, no window;
+       it mints the NEW reference's stamps (mass 1) and bumps the cnt half. *)
+    iDestruct "Hbrow" as (tb) "(Hrow & #Hllbb & #Hflb)".
+    iDestruct "Hrow" as (r) "(Hrd & %Hrw & %Hrx & %Hrid & #Hllbr & %Hrle & Hc)".
+    iEval (rewrite /icM_count HMk) in "Hc".
+    destruct (Pos2Nat.is_succ cnt) as [c0 Hc0].
+    iEval (rewrite Hc0) in "Hc".
+    iApply fupd_wp.
+    iMod (ic_hit_incr cn γfs γi cov logstart k r c0 dev inum ⊤
+            ltac:(solve_ndisj) Hrw ltac:(rewrite Hrid; exact Hcik)
+            with "Hbox Hrd Hc") as "(Hrd & Hc & Hstnew)".
+    iModIntro.
     unshelve iApply (wp_lw_au_rel_s_sconf true
               (mword_of_int (KernelSyms.idup + 0x18)) Ra5 Rs1
               (mword_of_int 8 : mword 12) macq (trap_res b + (K - 4))%nat
@@ -651,11 +668,17 @@ Section ProofIdup.
     iIntros "Hcg Hpc (Hhalf & Hisl & Ht1 & Hrlive & Hmir & Hicnt & Hru &
                       Hru2 & Hstrow)".
     (* the slot's payload row, LLB-BARE, back into the section's rows *)
-    iDestruct ("Hstampsback" $! (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M)
-                 with "[%] [Hstrow]") as "Hstampsllb".
+    iDestruct ("Hstampsback" $! (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ci
+                 with "[%] [%] [Hstrow Hrd Hc]") as "Hstampsllb".
     { intros j Hj. rewrite lookup_insert_ne;
         [reflexivity | by apply not_eq_sym]. }
-    { rewrite /itable_slot_res_llb lookup_insert.
+    { intros j Hj. reflexivity. }
+    { rewrite /itable_slot_res_llb /ic_slot_row_llb /icM_count !lookup_insert.
+      iSplitL "Hrd Hc".
+      { rewrite /ic_slot_row.
+        iExists tb. iSplitL; [| iExact "Hllbb"].
+        iExists r. rewrite Pos2Nat.inj_succ Hc0. iFrame "Hrd Hc Hllbr".
+        iPureIntro. split_and!; [exact Hrw | exact Hrx | exact Hrid | exact Hrle]. }
       iDestruct "Hstrow" as (tstn) "(_ & Hst & Hllbn)".
       iExists tstn. iFrame "Hst Hllbn". }
     (* the slot's share authority goes back into the lock's resource at the
@@ -671,13 +694,13 @@ Section ProofIdup.
     iEval (rewrite Qp.div_2) in "Hsplit".
     iDestruct ("Hsplit" with "Hrest") as "[Hid1 Hid2]".
     iDestruct ("Hback" $! (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ci
-                 with "[%] [%] [Hid1 Hiu Hgid Hicnt Hmir Hsel]") as "Hslots".
+                 with "[%] [%] [Hid1 Hiu Hicnt Hmir Hsel]") as "Hslots".
     { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
     { intros j Hj. reflexivity. }
     (* the ledger's [icnt] half goes back at the GROWN count, and the mirror
        half goes back into [frz_park]'s OFF arm -- which is where this proof
        found it, since the ON arm was refuted before the store. *)
-    { rewrite /islot2 lookup_insert Hcik. iFrame "Hiu Hgid Hicnt".
+    { rewrite /islot2 lookup_insert Hcik. iFrame "Hiu Hicnt".
       iSplitR "Hmir Hsel"; [| iApply (frz_park_intro_off with "Hmir Hsel") ].
       rewrite /islot_rest_at (id_frac_rest qt qr Hhalfsum). iFrame. }
     iAssert (itable_res2_llb TsoCtx.cur_ctx cn γfs γi cov logstart nib dev) with "[Hhalf Hstampsllb Hiauth Hipool Hslots Hpool]" as "HRres".
@@ -910,7 +933,7 @@ Section ProofIdup.
     iAssert (IcacheRef.live_fracc k s) with "[Hrlive]" as "Hrlive".
     { iExists gsh, losh, tlsh. iFrame "Hrlive".
       iSplitR; [iPureIntro; exact Hlosh | iExact "Hflsh"]. }
-    iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] [Hrident Hrlive Hrslh] [Ht1 Hid2]
+    iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] [Hrident Hrlive Hrslh Hrst] [Ht1 Hid2 Hstnew]
                                  [Hru] [Hru2]").
     5:{ iApply (runit_any_intro with "Hru2"). }
     4:{ iApply (runit_any_intro with "Hru"). }
@@ -919,8 +942,8 @@ Section ProofIdup.
         iAssert (IcacheRef.live_fracc k (qr/2)%Qp) with "[Hl1]" as "Hl1".
         { iExists gsh, losh, tlsh. iFrame "Hl1".
           iSplitR; [iPureIntro; exact Hlosh | iExact "Hflsh"]. }
-        iFrame "Hf1 Hl1 Hs1 Hid2". }
-    2:{ rewrite /IcacheRef.inode_shr. iFrame "Hrident Hrlive Hrslh". }
+        iFrame "Hf1 Hl1 Hs1 Hid2 Hstnew". }
+    2:{ rewrite /IcacheRef.inode_shr. iFrame "Hrident Hrlive Hrslh Hrst". }
     (* callee_saved m P5, and a0 = ip *)
     split; [| exact HP5a0].
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

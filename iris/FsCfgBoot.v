@@ -35,7 +35,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap frac excl.
+From iris.algebra Require Import ufrac auth gmap frac excl.
 From iris.base_logic.lib Require Import invariants own ghost_map ghost_var mono_nat.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -1379,13 +1379,14 @@ Section FsCfgBootEra.
      ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
      lock_free_tok fsc_itlock ∗
      ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
-     ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
-     (* the identification family at DUMMY recorded values: [ic_id] is a
-        plain [ghost_var] and [icache_boot_at] re-tags every slot to the
-        dev/inum words the entry cells actually hold ([ic_id_set]), so the
-        era owes no image premise for it (scout verdict 3). *)
+     (* R3: THE BOX GHOSTS of the fifty slots, as [icfg_alloc] hands them
+        (the recycle token and the identification family retired with the
+        escrow's arms) *)
      ([∗ list] k ∈ seq 0 NINODE,
-        ∃ (v : bool) (d n : mword 32), ic_id fsc_ic k 1 v d n) ∗
+        own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
+        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
+        ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+        ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)) ∗
      (* --- [bio_init_at]'s ghost premises --- *)
      bio_free_tok fsc_bio ∗
      ([∗ set] b ∈ fsc_cov,
@@ -1408,9 +1409,11 @@ Section FsCfgBootEra.
       ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
       lock_free_tok fsc_itlock ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
-      ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
       ([∗ list] k ∈ seq 0 NINODE,
-         ∃ (v : bool) (d n : mword 32), ic_id fsc_ic k 1 v d n) ∗
+         own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
+         ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
+         ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+         ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)) ∗
       bio_free_tok fsc_bio ∗
       ([∗ set] b ∈ fsc_cov,
          pool_blk (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) b) ∗
@@ -1558,9 +1561,14 @@ Section FsCfgBootEra.
      ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
      lock_free_tok fsc_itlock ∗
      ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
-     ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
+     (* R3: THE BOX GHOSTS of the fifty slots, as [icfg_alloc] hands them
+        (the recycle token and the identification family retired with the
+        escrow's arms) *)
      ([∗ list] k ∈ seq 0 NINODE,
-        ∃ (v : bool) (d n : mword 32), ic_id fsc_ic k 1 v d n) ∗
+        own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
+        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
+        ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+        ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)) ∗
      bio_free_tok fsc_bio ∗
      ([∗ set] b ∈ fsc_cov,
         pool_blk (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) b) ∗
@@ -1573,11 +1581,11 @@ Section FsCfgBootEra.
   Proof.
     iIntros "H".
     iDestruct (fs_kit_icache_open with "H")
-      as "(Hiref & Hlive & Histmp & Hislg & Hipool & Hitlk & Htok & Hmid & Hgid &
+      as "(Hiref & Hlive & Histmp & Hislg & Hipool & Hitlk & Htok & Hbox &
            Hbio & Hpool & Hkmlk & Hdllk & Hprlk & Hkav & Hkauth)".
     rewrite /fs_kit_printk /fs_kit_kalloc /fs_kit_icache_rest.
     iFrame "Hprlk Hkmlk Hkav Hkauth Hiref Hlive Histmp Hislg Hipool Hitlk Htok
-            Hmid Hgid Hbio Hpool Hdllk".
+            Hbox Hbio Hpool Hdllk".
   Qed.
 
   Lemma fs_kit_kalloc_open (ICFG : icfg) (FSC : fscfg) :
@@ -1597,9 +1605,11 @@ Section FsCfgBootEra.
       ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
       lock_free_tok fsc_itlock ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
-      ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
       ([∗ list] k ∈ seq 0 NINODE,
-         ∃ (v : bool) (d n : mword 32), ic_id fsc_ic k 1 v d n) ∗
+         own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
+         ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
+         ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+         ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)) ∗
       bio_free_tok fsc_bio ∗
       ([∗ set] b ∈ fsc_cov,
          pool_blk (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) b) ∗
@@ -2292,13 +2302,7 @@ Section FsCfgBootEra.
     iMod (kalloc_avail_alloc 0%nat) as (gkp) "[Hkav Hkauth]".
     iMod (ic_names_alloc (fun _ : nat => ((mword_of_int 0 : mword 32),
                                           (mword_of_int 0 : mword 32))))
-      as (cn) "(Htok & Hmid & Hgid)".
-    iAssert ([∗ list] k ∈ seq 0 NINODE,
-               ∃ (v : bool) (d n : mword 32), ic_id cn k 1 v d n)%I
-      with "[Hgid]" as "Hgid".
-    { iApply (big_sepL_mono with "Hgid"). intros idx k _. iIntros "H".
-      iExists false, (mword_of_int 0 : mword 32),
-              (mword_of_int 0 : mword 32). iExact "H". }
+      as (cn) "Htok".
     iModIntro.
     iExists ICFG,
       (MkFscfg gpr gkm gkp γd γv gdl bn γfs γi cn git
@@ -2347,7 +2351,7 @@ Section FsCfgBootEra.
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     (* ---- kit 1 ---- *)
-    iSplitL "Hiref Hlive Hstmp Hisl Hipool Hitlk Htok Hmid Hgid Hbio Hpool
+    iSplitL "Hiref Hlive Hstmp Hisl Hipool Hitlk Htok Hbox Hbio Hpool
              Hkmlk Hdllk Hprlk Hkav Hkauth".
     { iSplitL "Hiref"; [iExact "Hiref" |].
       iSplitL "Hlive"; [iExact "Hlive" |].
@@ -2356,8 +2360,7 @@ Section FsCfgBootEra.
       iSplitL "Hipool"; [iExact "Hipool" |].
       iSplitL "Hitlk"; [iExact "Hitlk" |].
       iSplitL "Htok"; [iExact "Htok" |].
-      iSplitL "Hmid"; [iExact "Hmid" |].
-      iSplitL "Hgid"; [iExact "Hgid" |].
+      iSplitL "Hbox"; [iExact "Hbox" |].
       iSplitL "Hbio"; [iExact "Hbio" |].
       iSplitL "Hpool"; [iExact "Hpool" |].
       iSplitL "Hkmlk"; [iExact "Hkmlk" |].
