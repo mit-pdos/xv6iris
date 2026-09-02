@@ -457,7 +457,7 @@ L10. **Loose ends from flip** (A6.163): `IcacheBox.v` stub — not carried;
 | r20c | THE HOOK CONSOLIDATION (law 10): hooked forms become the statements for (a), (b), (e), (f), (g); plain forms as corollaries; the six wrapper files retargeted | CtxBox/BioInv/IcacheEscrow/OffBox green, 0 Admitted in CtxBox |
 | r21 | the FS-cone consumer sweep incl. FsCollect/FsCollectAll (the acceptance test); `ic_slp`'s final shape; merge `main` | THE ICACHE BANK: honest green ≥ 1336 + the icache cone; zero new admits |
 | PARALLEL, starting now (a second agent) | L2 shim sweep, L3 pipe, L4 RiscvAdequacy | no `TsoCtxShim.` outside comments; RiscvAdequacy green; measure re-run after each sweep, green never drops |
-| r25 | the file layer as ONE sweep: L5 + L7 (the `is_ftable` λ-flip with the floor slot FIRST) + L6 (OffBox's 14 proofs) | no ξ-bodied cinv left; OffBox 0 Admitted |
+| r25 | the file layer as ONE sweep: L5 + L7 (the `is_ftable` λ-flip with the floor slot FIRST) + L6 (OffBox's 14 proofs) | no ξ-bodied cinv left; OffBox 0 Admitted; 0 Admitted in `EnvMorph` (the day-one instance skeletons closed before the bank) |
 | r26 | L8 | ProofForkretPark green |
 | r27 | L9 | SystemAdequacy green |
 | r28 | forced `-B` certification, `make audit`, admit inventory, delete `ctx_word4_claim` / the TsoCtxShim tombstone / dead `itable_res`; final `main` merge-in | zero red, audit at baseline |
@@ -507,7 +507,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | §3.2b | the consolidated box BUILT side-by-side (`iris/CtxBoxHooked.v`): hooks on (a)/(b)/(e)/(f)/(g), `box_q1_update`, eight verbatim-typed corollaries; green on the VM, assumptions closed | landed side-by-side (commit ded0fa1de); slot-in = r20c |
 | Q10 | the last close's (a) must not consume iput's pin name-half: the hooked (a) moves the frozen alternative's own pin into `Q1 1` (option B); no ghost change; `ic_hdr_frz` carries `ifreeze_pre` out and needs a `CtxMorph` instance | RULED B by reviewer 1, confirmed by the box's designer (item 9); to land in ProofIput |
 | §6²⁷ | run L2/L3/L4 in parallel now; sweep the file layer once; two tripwires before r21 | RECOMMENDED to the owner |
-| item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RECOMMENDED by the box's designer |
+| item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RULED -- reviewer 1 agrees (item 17), with `file_core_off`'s FD_INODE arm named as the FIFTH final shape and "0 Admitted in `EnvMorph`" added to r25's gate |
 | R4a Q1 | `inode_pay`: the cinv parks KEYED GHOST ONLY (`iref_frag`, `ic_lent_stamps`, `runit_any`); the reference's cells, `live_genlo`, `slh_tok` ride the fractional payload as `inode_ref_side` at the parked fraction; pin that fraction to `Q` by lending HALF at sys_open (no arity change), fallback `fp_iqi` | RULED by reviewer 1 (item 15) |
 | R4a Q2 | NO re-mint, NO llb, NO `own_context` at cancel: the share's `cred_floor` is in the canceller's hand (morphed with the payload) and `live_genlo_agree` pins the parked `lo`; `inode_pay_cancel`'s statement unchanged | RULED by reviewer 1 (item 15) |
 | R4a Q3/Q5 | ONE file-layer sweep with all three shapes final (`inode_pay`, `ftable_res_at` WITH the floor row + `_in` releases, `ic_slp ∗ off_rows`); L5 + full `ftable_res_at` first, then L8/L9 and the OffBox consumers as the two lanes INSIDE r25 | RULED by reviewer 1 (item 15); the two-sweep order reviewer 1 gave earlier is WITHDRAWN (L6 is on L8's path) |
@@ -853,6 +853,46 @@ branch and recorded in §3.2 and §8 here.
       checkout/park; (iii) OffBox's 14 proofs, the log λ-flip, the
       sleep-lock handle instance.  Measure per lane (pitfall 5).  Nothing
       in a lane changes a shape.
+
+17. **REVIEWER 1 ON ITEM 16 (2026-09-02): the three corrections and the
+    four tripwires are taken; two additions.**
+    - **Correction 1 taken** -- four final shapes on day one.  The floor
+      row's obligation ranges over `off_l1_row`'s stamp INSIDE `fslot`'s
+      allocated arm, so `fslot` at today's shape would force a second edit;
+      with OffBox now at 0 Admitted, even "statements suffice" is moot.
+      ADDITION: name a FIFTH shape explicitly -- `file_core_off`'s FD_INODE
+      arm, where the ledger fragment `ioff_ref` becomes the off fd row
+      (`off_fd_row on i k μ`).  It sits inside `file_pay`, so it reaches
+      both `fslot` arms AND the fd side's `file_ref`, and it is what
+      fileread's checkout consumes in lane (ii).  Implied by "fslot with the
+      off rows", but T1 must list it by name so nobody edits it twice.
+    - **Correction 2 taken.**  The seven inode proofs destruct `ic_slp` at
+      acquire and frame `ic_slp_dep` at the two `_in` releases; each gains
+      one conjunct.  The fold takes one floor at any `T ≥ max (lr_tp, off
+      max)` and weakens per row -- the monotonicity lemma EXISTS
+      (`TsoCtx.ctx_floor_le`); name it in the lane so it is not re-proven.
+    - **Correction 3 taken; T2 is the right tripwire.**  The λ-flip changes
+      nothing an acquire hands out; the twenty log sites move through the
+      handle's definition and one structural instance.  The floor row
+      exists for `off_reclaim` and for nothing else.
+    - **sys_open is ONE edit.**  Pass 1 has its `inode_pay_alloc` change and
+      lane (ii) has its publish under `ip->lock` with the `ic_slp` append at
+      its releasesleep.  Assign the whole proof to one place, which means
+      `ic_slp_dep_llb` and the off publish wrappers exist BEFORE sys_open is
+      opened; otherwise the six-proofs-once goal is missed on the first
+      proof.
+    - **The day-one instance skeletons** (`park_globals`, `proc_priv` as
+      `Global Instance` with row instances Admitted where a row is not yet
+      final) are the right type-check device and the right use of rule 0.
+      They must not survive the bank: "0 Admitted in `EnvMorph`" is added to
+      r25's gate (§7) and they are listed in the inventory while they
+      exist, so the inventory closed in item 8 does not silently reopen.
+    - **OffBox's three statement corrections are sound** as described: the
+      birth deposits the cell at the caller's context, the mask premise is
+      what `box_ref_incr` needs, `sr_ident r = k` is what `off_l1_row`
+      carries.  No ruling.
+    - With item 16 and this, the R4a rulings have two reviewers in
+      agreement; the rulings row moves from RECOMMENDED to RULED.
 
 10. **The AU proofs are PARKED (owner, 2026-09-02).**  Every `Proof*AU*` /
     `Link*AU*` row of `iris/_CoqProject` is commented out for the cutover;
