@@ -1254,6 +1254,91 @@ MERGE HAZARD (`ic_deposit` vs `ic_handle`): agreed; rename in flip's files
 MINOR: agreed that the `ic_id ↔ sr_ident` tie falls out of `ic_hdr_amb`;
     the two boot faces are fine.
 
+## 6¹². SECOND REVIEWER ON §6¹¹ (2026-09-02): F40 confirmed; its fix
+## chased through every party that touches Q -- F41/F42/F43
+
+F40 CONFIRMED.  `ic_q_side`'s DepRd arm is `ic_rd_arm … inum` with `inum`
+the descriptor's own; nothing in the box relates it to the slot's identity
+for a viewer.  The quarter-into-Q content with the pure tie on `ic_dep_id`
+is right, and it is F38's mechanism again.  Two consequences: every icache
+checkout goes through (e′), not (e) (DepTx checkouts must split the quarter
+out of the header too); and P3 reads "the quarter rides the header while IN
+and while OUT_L1, and rides Q while OUT_L2".
+
+F42 (BLOCKING): THE GUARD WINDOW'S Q HAS NO PRODUCER.  The guard wrapper
+    takes `ic_pin_tx k` as a premise -- one half of the `hpn` register at
+    `Some (t, q)`.  The register's whole at rest, `ic_pin_rest k =
+    hpn_full k None`, rides the LIVE header's `ic_pay` arms (and the dead
+    header explicitly), i.e. inside the box until (a) withdraws the header.
+    iput cannot update a register it does not hold, and (a) is one fupd
+    that takes Q before the header comes out.  F31's shape.
+    FIX: the resting pin rides the TABLE ROW (dead and live), not the
+    header.  iput and the recycler both hold the table row at their (a)
+    (they hold itable.lock; that is where their `ic_regd`/`ic_cnt` premises
+    come from).  iput updates the pin to `Some (t, q)` before (a), keeps a
+    half, deposits the other with the tx share.  `ic_pay`'s arms lose the
+    pin.
+
+F41 (BLOCKING, COUPLED TO F42): Q-REUSE LEAVES PARKERS UNABLE TO SELECT
+    THEIR ARM.  Every party that gets Q back ((b), (b′), (f), (g)) or must
+    discharge (f′)'s join wand faces the WHOLE disjunction and must refute
+    the arms it did not deposit.  The join wand is a closed entailment over
+    `P_hdr' ∗ Q`, so the refutations must come from what the parker holds.
+    Against the pin arm the parker's only possible selector is the resting
+    pin, and it holds it only if the pin rides the header.  So the pin's two
+    homes are in tension:
+    - pin in the header: parkers can refute the pin arm (hpn_agree: full
+      None vs h Some), but F42 -- the guard can never deposit it;
+    - pin in the table row: the guard works, but a parker holds no table
+      row and nothing else it holds (sleeplock payload, its descriptor half,
+      its header, its L2 hold) contradicts `hpn_h k (Some _) ∗ tx_pin`.
+    The recycle arm has the same problem: the parker can refute `ic_id ¼
+    false` only if it KEEPS a fraction of the true quarter in its header,
+    which §6¹¹'s fix moves wholesale into Q.
+    RESOLUTION: stop asking parkers to refute arms that exist only at
+    OUT_L1.  Split Q into Q1 (the OUT_L1 residue) and Q2 (the OUT_L2
+    residue):
+      Q1 := ic_pin_tx k ∨ (∃ dev inum, ic_id cn k ¼ false dev inum)
+        -- the guard selects with its pin half; the recycler selects
+        because the table row's `hpn_full None` contradicts the pin arm;
+        the collection refutes the pin arm by the tx share and reads the
+        recycle arm as dead (agreement with the pool's quarter);
+      Q2 := ∃ d dev inum, ⌜ic_dep_id d = Some (dev, inum)⌝ ∗
+              ic_deposit cn k ½ d ∗ ic_q_side d ∗ ic_id cn k ¼ true dev inum
+        -- parkers select by descriptor agreement; the collection refutes
+        DepTx/DepFrz by their shares and reads DepRd with the identity
+        tied.
+    §6¹¹'s alternative `Q : id → iProp` does NOT address this: indexing by
+    identity does not separate the pin arm from the descriptor arms at a
+    live slot.  Indexing by ARM does, and that is the Q1/Q2 split.
+
+F43 (THE MIRROR OF F33): (f′)'s JOIN WAND HAS NO CALLER RESIDUE.  A DepRd
+    parker facing a DepTx arm inside the wand can neither rebuild the header
+    (the leg is not there) nor refute (its descriptor half is in its handle,
+    OUTSIDE the wand).  (e′) got `Qc` for exactly this reason; (f′) needs
+    the mirror:
+      (∀ x ξ', Qc' ∗ P_hdr' i x ξ' ∗ Q2 ⊢ P_hdr i x ξ' ∗ Q') → … Qc' -∗ …
+    The alternative -- route the descriptor half into `P_hdr'` at (e′) --
+    needs no box change but shrinks `ic_handle`, which r20a just stitched
+    into seven spec files.  `Qc'` is the smaller change.
+
+RECOMMENDATION: ONE second CtxBox edit bundling F41 and F43 -- a `Q1`
+    parameter beside `Q` in `box_arm`'s OUT_L1 arm; (a)/(b)/(b′) over `Q1`;
+    (g) takes `Q`, returns `Q1`; `box_q_update`/(e)/(e′)/(f) over `Q`;
+    (f′) gains `Qc'`; `box_view` unchanged.  Both changes are mechanical
+    against the proven file.  bcache and off instantiate `Q1 := emp`.  The
+    icache changes are F38, F40, F42 and the Q1/Q2 definitions above.  This
+    reopens the "one edit" ruling with a specific cause: as designed, NO
+    placement of the resting pin lets both the guard deposit and the
+    parker select.
+
+TRIPWIRE (generalizing §6¹¹'s, for §5): every arm of a Q must be
+    SELECTABLE by every party that receives that Q back or discharges a
+    wand over it, from what that party holds alone; and READABLE with its
+    identity tied to the slot's, or REFUTABLE, by a viewer that holds no
+    register.  F38/F40 are the viewer half; F41 is the party half, and it
+    is what forces the split.
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
