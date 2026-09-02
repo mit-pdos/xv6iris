@@ -893,3 +893,38 @@ Section SleepLock.
   Qed.
 
 End SleepLock.
+
+(* ====================================================================== *)
+(* THE SLEEPLOCK HANDLE AT ANOTHER CONTEXT (the environment-row sweep,     *)
+(* 2026-09-02).  [is_sleeplock_genl] is one row of the parked kernel        *)
+(* environment ([BioInv.bio_ctx]'s per-buffer locks,                        *)
+(* [IcacheEscrow.ic_sleeplocks]), so it owes [CtxMorph] like every other    *)
+(* row.  Only ONE of its two conjuncts moves: [sl_name] is context-free by  *)
+(* construction (a [word_pointsto] and a [ctx_string_all]; see its header), *)
+(* and the inner spinlock's HANDLE moves by [WpLock.is_lock_handle_morph].  *)
+(* The payload does NOT have to move -- it is already the λ [sl_pay], whose *)
+(* own obligation is [sl_pay_morph] -- which is exactly what the λ-flip     *)
+(* bought.                                                                 *)
+(*                                                                        *)
+(* THIS SECTION DECLARES NO [CurCtx], deliberately: it must spell           *)
+(* [is_sleeplock_genl (XI := ξ)], which is not possible inside the section  *)
+(* that binds the ambient.                                                  *)
+(* ====================================================================== *)
+Section SleepLockMorph.
+  Context `{!riscvGS Σ, !lockG Σ}.
+
+  Global Instance is_sleeplock_genl_morph (γl γ : gname) (slk : mword 64)
+      (s : string) (R : TsoCtx.CtxId → iProp Σ) (H : Qp → iProp Σ)
+      `{HmR : !TsoCtx.CtxMorph R} :
+    TsoCtx.CtxMorph (λ ξ : TsoCtx.CtxId, is_sleeplock_genl (XI := ξ) γl γ slk s R H).
+  Proof.
+    rewrite /is_sleeplock_genl.
+    apply (TsoCtx.ctx_morph_sep
+             (λ _ : TsoCtx.CtxId, sl_name slk s)
+             (λ ξ : TsoCtx.CtxId,
+                is_lock (XI := ξ) γl (sl_lk slk) "sleep lock"%string
+                  (sl_pay γ slk R H))).
+    - apply TsoCtx.ctx_morph_const.
+    - apply WpLock.is_lock_handle_morph.
+  Qed.
+End SleepLockMorph.
