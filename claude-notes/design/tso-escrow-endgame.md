@@ -261,6 +261,31 @@ ACCEPTED.  R1' may start on the flag shape.
       the eight lemmas, CtxAnchor's use, A6.157's half cell, the boot
       deposit loop).
 
+  F6  (found at R1' while re-targeting bread's checkout; TO VET) THE
+      CHAIN'S IDENTITY.  bread's post promises bio_locked at the REQUESTED
+      (dev, bno); at the checkout the withdrawn bundle's (dev', bno') is
+      an existential of the box, and a ghost-only bchain (F2: "the chain
+      reads dev/bno off the withdrawn cells") carries nothing that ties
+      it to the request -- the register design had the bref's dev/bno
+      fractions in hand for exactly this agreement, and A6.155 took them
+      away.  The box cannot see L1's map, so the tie must ride the
+      reference as a PERSISTENT ghost, and it must be droppable when the
+      recycler re-identifies the slot (agree fragments never are) --
+      hence an IDENTITY EPOCH LEDGER per box: `bid : authR (gmapUR nat
+      (agreeR idO))` keyed by an epoch counter e that (b) advances
+      (append-only, so no fragment ever conflicts); the box row
+      ⌜I !! e = Some id⌝ with the IN bundle at id; the stamps map keyed
+      by (epoch, stamp) with the row ⌜∀ p ∈ dom m, p.1 = e⌝ (every live
+      unit is of the current epoch); a reference = ∃ e t, ◯{[(e,t) := 1]}
+      ∗ llb t ∗ bid ◯{[e := ag (dev,bno)]}; L1's slot row carries the
+      epoch's witness bid ◯{[e := ag (devs k, bnos k)]} (set by (b) from
+      the header it deposited), which is how (c) hands a new reference
+      its identity without seeing the bundle (OUT_L2 has none to agree
+      with).  Checkout: my (e_r,t) ∈ dom m ⇒ e_r = e ⇒ my witness agrees
+      with the box's ⇒ the bundle is at (dev, bno).  No new lemma, no
+      new arm; one ghost; (C)/(D) read stamps off p.2.  bpin's bref keeps
+      its fractions (the log layer's pinning) and gains the same witness.
+
 HARD RULES: exactly these three arm shapes and six lemmas.  Protocol
 substates go inside Q (ξ-free ghost).  A seventh lemma, a fourth arm
 shape, or a second reference form is a design error — stop (§5).
@@ -851,3 +876,7 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   "no client ghost in a box lemma" tripwire and the payload-row bonus
   rule.  The icache identity-keyed payload arm in P_hdr is plausible;
   confirm at R3's site map as the proposer says.
+- 2026-09-01 (build agent, R1' in progress): F6 -- the chain's identity
+  tie at the checkout needs a per-box IDENTITY EPOCH LEDGER (persistent
+  agree witnesses keyed by an epoch (b) advances; stamps keyed by
+  (epoch, stamp)); recorded in §2 for vetting; R1' proceeds on it.
