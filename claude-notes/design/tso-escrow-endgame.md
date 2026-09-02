@@ -285,6 +285,22 @@ ACCEPTED.  R1' may start on the flag shape.
       with the box's ⇒ the bundle is at (dev, bno).  No new lemma, no
       new arm; one ghost; (C)/(D) read stamps off p.2.  bpin's bref keeps
       its fractions (the log layer's pinning) and gains the same witness.
+      ALTERNATIVES CONSIDERED, for the vetting: (i) keep dev/bno
+      fractions on the chain reference and DEPOSIT them into the box at
+      the checkout (they would accumulate beside the bundle and come out
+      at the next (a)) -- needs a parked-shares register to keep the
+      slot tie exact and puts ξ-indexed rows in Q, both tripwires; (ii)
+      an agree component in the COUNT auth (bioUR) per slot -- the box
+      cannot see L1's map, so the tie never reaches the L2-only checkout;
+      (iii) an agree component in the STAMPS map value -- works, but
+      every stamps-kit lemma (Σ, the two local updates) is then over
+      pairs, and (d)/(f) need agree-aware cancellation; (iv) dfrac_agree
+      shares handed out at (c) -- (b)'s re-identification needs the full
+      fraction back, which the box cannot account for.  The epoch ledger
+      is the smallest: one append-only ghost, keys never reused, no
+      change to the six lemmas' shapes.  R1' IS PAUSED at this point
+      (the kit, the six lemmas and boot v5 are written against the
+      pre-F6 body) until F6 is vetted.
 
 HARD RULES: exactly these three arm shapes and six lemmas.  Protocol
 substates go inside Q (ξ-free ghost).  A seventh lemma, a fourth arm
@@ -879,4 +895,5 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
 - 2026-09-01 (build agent, R1' in progress): F6 -- the chain's identity
   tie at the checkout needs a per-box IDENTITY EPOCH LEDGER (persistent
   agree witnesses keyed by an epoch (b) advances; stamps keyed by
-  (epoch, stamp)); recorded in §2 for vetting; R1' proceeds on it.
+  (epoch, stamp)); recorded in §2 with the alternatives considered;
+  R1' is PAUSED at the identity tie until vetted.
