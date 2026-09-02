@@ -762,6 +762,41 @@ premises the table lists — if a proof wants more, the design is wrong
   None⌝ (maintained by every transition; nothing reads sr_x when shut).
   Cosmetic: the file header's arm summary omits the sr_x tie.
 
+  BUILD-AGENT REVIEW OF THE FINAL STATEMENTS (2026-09-01, against the
+  bcache sites; CtxBox.v re-type-checked on the VM, EXIT 0).  Walked
+  every row at every close and every site's premises: (a)–(f) and boot
+  are sound and complete for bcache.  Checked in particular: (C) after
+  a park while older references exist (left fails, right holds via
+  tp = T', and the winner's Kp is exactly the _in-folded tp); (D) after
+  the parker's (d) (td := max td T', so the recycler's (a) at c = 0 is
+  covered by L1's row alone); (a)'s OUT_L2 refutation at c = 1 (iput:
+  its unit + the parked fragment's mass exceed Σ = 1); (b)'s P_rest at
+  the older stamp T ≤ T' (older deposits need smaller floors); (e)
+  after (b) (the chain's key is at T', R1 at Tl := T'); (c) while
+  OUT_L2 (bpin under log_write: arm-agnostic).  Findings, all at the
+  CLIENT boundary, none in the statements:
+  R-1 (rule 0 at the handle row) the F7 line above writes the bcache
+      row as `l2_hold γ (dev,bno) mh (∃ mh)`; with mh ∃-bound, brelse's
+      (d) cannot discharge `qsum mD = nat_Qc 1` -- the split's hole
+      reappearing one level up.  The bcache row must pin the unit:
+        bstok bn k pidv dev bno := sleeplocked … pidv ∗ bref_tok0 bn k ∗
+                                   ∃ t, l2_hold γ (dev,bno) {[((dev,bno),t) := 1%Qp]}
+      and (f)'s ⌜Qp_to_Qc q = qsum mh⌝ then gives q = 1 for (d).
+  R-2 bcache's X is not "the data bytes" alone: bio_held carries the
+      buffer data bsl, the disk copy bsd and the dirty bit d, and
+      buf_pay reads all three -- X := (bsl, bsd, d) (or a record); P_hdr
+      i x := ∃ v, valid ↦ v ∗ dev ↦ i.1 ∗ blockno ↦ i.2 ∗ buf_pay v i x,
+      which at v = false ignores x, so the recycler's (b) at the
+      register's x0 is trivial (F10 as stated).
+  R-3 (build note, not design) qsum's fold body `(Qp_to_Qc q + acc)%Qc`
+      resolves through the Qc→Q coercion during `rewrite
+      map_fold_insert_L`; the kit lemmas need the step named (a
+      Definition over Qcplus) and passed explicitly -- hit in BioInv's
+      copy of the kit, which now moves into CtxBox.v.
+  R-4 l2_row_morph needs tok context-free (bown, ic_tok: yes) -- record
+      it in the client obligations list.
+  Nothing else; R1' resumes on CtxBox.v's statements with R-1's row.
+
   Rows re-established at every close: (Σ) qsum m = c; (I) keys at
   ident; (C) (∀ stamps ≥ T) ∨ T ≤ tp; (D) T ≤ td ∨ T ∈ stamps.  The
   per-lemma derivations are the comments in CtxBox.v.
@@ -1376,3 +1411,9 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   correctly in CtxBox.v; no regressions; statements FINAL for R1'.  Two
   optional notes (a win = false → sr_x = None tidiness row; the header
   comment's arm summary).  R1' proceeds to proving the seven lemmas.
+- 2026-09-01 (build agent, review of the final statements): sound and
+  complete for bcache; CtxBox.v type-checks on the VM.  R-1: the bcache
+  handle row must pin the parked fragment to a unit singleton (the F7
+  line's ∃ mh would leave (d)'s mass undischargeable); R-2: X for
+  bcache is (bsl, bsd, d); R-3 qsum fold gotcha; R-4 tok context-free.
+  R1' resumes.
