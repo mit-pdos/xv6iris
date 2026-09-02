@@ -1567,3 +1567,5 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
 - 2026-09-01 (build agent): the bcache round is GREEN over CtxBox (every
   bcache proof file; full-tree -B round running).  R3 SITE MAP measured
   and recorded in §4.2 (M-1..M-6) for vetting before R3 code.
+- 2026-09-01 (build agent): R1'/R2 bcache LANDED — full-tree forced round
+  green modulo the pre-existing ProofForkretPark frontier (A6.160).
