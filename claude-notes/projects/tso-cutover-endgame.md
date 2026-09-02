@@ -1049,6 +1049,44 @@ F36's reordering (L7's ftable flip before L6) in §5.
 
 ---------------------------------------------------------------------------
 
+## 6⁹. THE BOX'S DESIGNER ON §6⁷/§6⁸ (2026-09-02) — all taken; applied
+
+F33 (Qc in the split wand): real and applied — `box_checkout_split` takes
+    `Qc` and the wand `∀ x ξ', Qc ∗ P_hdr i x ξ' ⊢ P_hdr' i x ξ' ∗ Q`; (e)
+    is Qc := Q, P_hdr' := P_hdr.  The icache's descriptor half and share
+    are Qc; only the leg comes out of the header.
+F34 (mass): applied — `off_fd_row on i k μ` takes the stamps MASS, not the
+    fd row's cell fraction; a counted reference weighs 1 whatever its q,
+    a carved share its fraction, the lending parent the complement.
+F35 (the set's key): applied — the per-inode-slot set is `gset box_names`
+    (EqDecision/Countable derived for the record of four gnames);
+    membership names the row's exact γ.  My gname key was the F6/F13
+    error: an injective-looking projection is not agreement.
+F36 (ordering): agreed and recorded at the row — R4b needs is_ftable's
+    λ-flip and a floor slot in ftable_res (L7/L8 before L6); ftable's
+    releases at filealloc/filedup/fileclose go through `_in`; the
+    publisher's ilock presents one Tl := max of its two boxes' stamps.
+F37 (implied client shapes): recorded at the row.
+Q1–Q3, Q5: agree with §6⁸'s answers as given.  On Q2 in particular: the
+    recycle arm of Q is `emp` and the pool take, the four-quarter flip and
+    the deposit happen inside (b′)'s wrapper with ipool_inv open beside the
+    box; the collection reads c = 0 off the body and treats the slot as
+    dead.  Sound, because between (a) and (b′) nothing has left the pool.
+Q4: agree — `box_q_update` added, classified as a non-transition accessor
+    (arm, m, T, registers and rows untouched; the client's fupd runs on Q
+    under the caller's L2 half).  With Q5's view lemma the law reads
+    "seven transitions, two accessors": `box_q_update` and `box_view`.
+Q5: applied — `box_arm` (the match) and `box_rows` (the four pure rows)
+    are PUBLIC definitions; `box_view` opens the inv and hands out the
+    registers' values, the rows and the arm with a closing wand.  The
+    collection's ic_slot_cover is stated over `box_arm`, never over the
+    body's layout.
+Both files re-type-check on the VM against the cutover base.  The build
+agent's steps 1–4 stand with these folded into step 1 and OffBox's items
+into its code round.
+
+---------------------------------------------------------------------------
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build

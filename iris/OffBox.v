@@ -61,19 +61,35 @@ Require Import CtxBox.
 Require Import CtxBoxNext.
 Require Import FileInvDefs.
 
+(* F35: the per-inode-slot set is keyed by the WHOLE names record, so a
+   member's fragment names exactly the box whose row it selects (keying by
+   one gname would give bx_stamps γ' = bx_stamps γ and not γ' = γ -- the
+   F6/F13 class).  A record of four gnames is countable. *)
+Global Instance box_names_eq_dec : EqDecision box_names.
+Proof. solve_decision. Defined.
+Global Instance box_names_countable : Countable box_names.
+Proof.
+  apply (inj_countable'
+           (λ b, (bx_stamps b, bx_cnt b, bx_slotd b, bx_slotp b))
+           (λ t, BoxNames t.1.1.1 t.1.1.2 t.1.2 t.2)).
+  by intros [].
+Qed.
+
 (* ---- cameras (to Xv6Cameras §15 at R4b) ----------------------------- *)
 Class offboxG (Σ : gFunctors) := OffboxG {
   offbox_stampsG :: inG Σ (stampsR nat);
   offbox_slotdG  :: ghost_varG Σ (slot_reg nat unit);
   offbox_slotpG  :: ghost_varG Σ (l2_reg nat);
   (* the per-inode append-only set of published off boxes *)
-  offbox_setG    :: inG Σ (authR (gsetUR gname));
+  offbox_setG    :: inG Σ (authR (gsetUR box_names));
 }.
 Global Instance offbox_boxG {Σ} `{!offboxG Σ} `{!kallocG Σ} : boxG nat unit Σ :=
   {| box_stampsG := offbox_stampsG; box_cntG := kalloc_count_inG;
      box_slotdG := offbox_slotdG; box_slotpG := offbox_slotpG |}.
 
-(* the per-inode set gnames (a fscfg field at R4b; a parameter here) *)
+(* the per-inode-SLOT set gnames (a fscfg field at R4b; a parameter here).
+   Per slot, not per inode: rows outlive a recycle of the slot (dead γ,
+   harmless -- F37). *)
 Record off_names := MkOffNames { on_set : nat -> gname }.
 
 Definition offBoxN : namespace := nroot .@ "xv6offbox".
@@ -116,6 +132,12 @@ Section OffBox.
        ⌜qsum m = Qp_to_Qc μ⌝ ∗ CtxBox.reference (X := unit) γ k m)%I.
 
   (* ---- the L1 row: ftable's payload for a slot that has a box ---------- *)
+  (* F36/F37: this row lives in fslot's ALLOCATED arm beside a floor row
+     `ctx_floor ξ tl` that every ftable.lock release re-folds through `_in`
+     (R2) -- which requires is_ftable's λ-flip and a floor slot in
+     ftable_res FIRST (L7/L8 move ahead of L6).  fslot's FREE arm keeps the
+     cell and has no box.  The publisher's ilock presents ONE Tl := max
+     (the inode share's stamp, this box's unit stamp) for its two boxes. *)
   (* the register half, shut and empty, identity = k, its llb; the count is
      f->ref (M !! k's count), beside which the cnt half sits in fslot's arm *)
   Definition off_l1_row γ k (c tl : nat) : iProp Σ :=
@@ -125,9 +147,8 @@ Section OffBox.
        off_cnt γ c)%I.
 
   (* ---- the L2 side: the inode payload's APPEND-ONLY set of rows --------- *)
-  (* the set is keyed by the box's stamps gname (fresh per box) *)
-  Definition off_set_auth on i (L : gset gname) : iProp Σ := own (on_set on i) (● L).
-  Definition off_member on i γ : iProp Σ := own (on_set on i) (◯ {[ bx_stamps γ ]}).
+  Definition off_set_auth on i (L : gset box_names) : iProp Σ := own (on_set on i) (● L).
+  Definition off_member on i γ : iProp Σ := own (on_set on i) (◯ {[ γ ]}).
   Global Instance off_member_persistent on i γ : Persistent (off_member on i γ).
   Proof. rewrite /off_member. apply _. Qed.
 
@@ -139,10 +160,9 @@ Section OffBox.
   (* what rides in inode slot i's sleeplock payload (a conjunct of ic_slp):
      the set authority and every member box's row *)
   Definition off_rows on i (ξ : CtxId) : iProp Σ :=
-    (∃ L : gset gname,
+    (∃ L : gset box_names,
        off_set_auth on i L ∗
-       [∗ set] g ∈ L, ∃ (γ : box_names) (s : l2_reg nat),
-         ⌜bx_stamps γ = g⌝ ∗ off_l2_row γ s ξ)%I.
+       [∗ set] γ ∈ L, ∃ s : l2_reg nat, off_l2_row γ s ξ)%I.
   Global Instance off_rows_morph on i : CtxMorph (off_rows on i).
   Proof. Admitted.
 
@@ -159,11 +179,14 @@ Section OffBox.
 
   (* ---- what the fd row's FD_INODE arm carries for the off cell ----------- *)
   (* replaces main's [ioff_ref (fc_ip C) k q]: the box, membership in the
-     inode's set, and this fd row's stamps mass (the row's fraction of the
-     file's unit; F21 form) *)
-  Definition off_fd_row on (i k : nat) (q : Qp) : iProp Σ :=
+     inode slot's set, and this row's STAMPS MASS μ.  F34 (M-5): μ is NOT
+     the fd row's cell fraction q -- a counted reference (one of M !! k's n)
+     weighs 1 whatever its q; a share carved from it (fileread's
+     `fileread_pay_carve`) weighs its share fraction and the lending parent
+     1 − that (inode_ref_short's tie).  Σ over the slot's rows = f->ref. *)
+  Definition off_fd_row on (i k : nat) (μ : Qp) : iProp Σ :=
     (∃ γ : box_names,
-       off_box k γ ∗ off_member on i γ ∗ off_ref_stamps γ k q)%I.
+       off_box k γ ∗ off_member on i γ ∗ off_ref_stamps γ k μ)%I.
 
   (* ================================================================== *)
   (*  THE SITES                                                            *)

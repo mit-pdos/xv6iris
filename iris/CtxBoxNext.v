@@ -93,23 +93,33 @@ Section box.
   Definition in_arm (i : id) (ξb : CtxId) : iProp Σ :=
     (∃ x, P_hdr i x ξb ∗ P_rest x ξb)%I.
 
-  (* THE BODY: arms selected by (lr_hold s, sr_win r). *)
+  (* THE ARM, selected by (lr_hold s, sr_win r).  A PUBLIC definition: the
+     collection's view lemma (box_view, Q5) exposes it, so a non-owner
+     matches on this and never on the body's layout. *)
+  Definition box_arm γ (T : nat) (ξb : CtxId) m (r : slot_reg id X) (s : l2_reg id) : iProp Σ :=
+    (match lr_hold s with
+     | Some (i, mh) =>                                          (* OUT_L2 *)
+         ⌜sr_win r = false⌝ ∗ ⌜mh ≠ ∅⌝ ∗ ⌜keyed mh i⌝ ∗ stamps_frag γ mh ∗ Q
+     | None =>
+         if sr_win r
+         then hdr_out γ m ∗ (∃ x, ⌜sr_x r = Some (x, T)⌝ ∗ P_rest x ξb) ∗ Q   (* OUT_L1 *)
+         else in_arm (sr_ident r) ξb                                          (* IN *)
+     end)%I.
+
+  (* the four pure rows, named for the view *)
+  Definition box_rows (T : nat) m (c : nat) (r : slot_reg id X) (s : l2_reg id) : Prop :=
+    qsum m = nat_Qc c ∧                                        (* Σ *)
+    keyed m (sr_ident r) ∧                                     (* I *)
+    ((∀ p, p ∈ dom m → (T ≤ p.2)%nat) ∨ (T ≤ lr_tp s)%nat) ∧  (* C *)
+    ((T ≤ sr_td r)%nat ∨ ∃ p, p ∈ dom m ∧ p.2 = T).            (* D *)
+
+  (* THE BODY *)
   Definition box_body γ : iProp Σ :=
     (∃ (T : nat) (ξb : CtxId) m (c : nat) (r : slot_reg id X) (s : l2_reg id),
        ctx_parked ξb T ∗ llb loglen_name T ∗
        stamps_auth γ m ∗ cnt_half γ c ∗ slotd_half γ r ∗ slotp_half γ s ∗
-       ⌜qsum m = nat_Qc c⌝ ∗                                        (* Σ *)
-       ⌜keyed m (sr_ident r)⌝ ∗                                     (* I *)
-       ⌜(∀ p, p ∈ dom m → (T ≤ p.2)%nat) ∨ (T ≤ lr_tp s)%nat⌝ ∗     (* C *)
-       ⌜(T ≤ sr_td r)%nat ∨ ∃ p, p ∈ dom m ∧ p.2 = T⌝ ∗            (* D *)
-       match lr_hold s with
-       | Some (i, mh) =>                                          (* OUT_L2 *)
-           ⌜sr_win r = false⌝ ∗ ⌜mh ≠ ∅⌝ ∗ ⌜keyed mh i⌝ ∗ stamps_frag γ mh ∗ Q
-       | None =>
-           if sr_win r
-           then hdr_out γ m ∗ (∃ x, ⌜sr_x r = Some (x, T)⌝ ∗ P_rest x ξb) ∗ Q   (* OUT_L1 *)
-           else in_arm (sr_ident r) ξb                                          (* IN *)
-       end)%I.
+       ⌜box_rows T m c r s⌝ ∗
+       box_arm γ T ξb m r s)%I.
 
   Definition is_box (N : namespace) γ : iProp Σ := inv N (box_body γ).
 
@@ -226,19 +236,25 @@ Section box.
                close OUT_L2 with Q, the caller's whole fragment (keyed, ≠ ∅)
                and slot_p := {| tp; Some (i, mh) |} (both halves in hand).
      rows unchanged (m, T, r, s.tp). *)
+  (* F33: the split wand takes the CALLER's residue Qc beside the header --
+     the icache's Q is the descriptor half the caller mints ∗ the share in
+     its hand ∗ the 3/4 leg from the header; only the leg comes out of
+     P_hdr.  (e) is the instance Qc := Q, P_hdr' := P_hdr. *)
   Lemma box_checkout_split `{CID : CpuId} (N : namespace) γ (ξ : CtxId) (i : id)
       (P_hdr' : id → X → CtxId → iProp Σ) `{!∀ i x, CtxMorph (P_hdr' i x)}
+      (Qc : iProp Σ)
       (mh : gmap (id * nat) ufrac) (s0 : l2_reg id) (Kt Kp : nat) (E : coPset) :
     ↑N ⊆ E →
     lr_hold s0 = None →
     (max_stamp mh ≤ Kt)%nat →
     (lr_tp s0 ≤ Kp)%nat →
-    (∀ (x : X) (ξ' : CtxId), P_hdr i x ξ' ⊢ P_hdr' i x ξ' ∗ Q) →
+    (∀ (x : X) (ξ' : CtxId), Qc ∗ P_hdr i x ξ' ⊢ P_hdr' i x ξ' ∗ Q) →
     is_box N γ -∗
     own_context ξ -∗
     ctx_floor ξ Kt -∗
     ctx_floor ξ Kp -∗
     reference γ i mh -∗
+    Qc -∗
     slotp_half γ s0 ={E}=∗
     own_context ξ ∗
     (∃ x, P_hdr' i x ξ ∗ P_rest x ξ) ∗
@@ -355,6 +371,39 @@ Section box.
       slotd_half γ (SlotReg T_boot false i0 None) ∗ llb loglen_name T_boot ∗
       cnt_half γ 0 ∗
       slotp_half γ (L2Reg 0 None).
+  Proof. Admitted.
+
+  (* ================================================================== *)
+  (*  THE TWO NON-TRANSITION ACCESSORS (§6⁸ Q4/Q5).  Neither moves an arm,  *)
+  (*  a stamp, a register or a row; the law stays "seven transitions".     *)
+  (* ================================================================== *)
+
+  (* box_q_update: the L2 holder rewrites its residue in place (main's
+     ic_shrink_tx / ic_grow_tx: the descriptor half and the parked ln_tx
+     share change together under two write locks).  Selects OUT_L2 by the
+     caller's L2 half; runs the client's fupd on Q; puts it back. *)
+  Lemma box_q_update (N : namespace) γ (i : id) (mh : gmap (id * nat) ufrac) (E : coPset) :
+    ↑N ⊆ E →
+    is_box N γ -∗
+    l2_hold γ i mh -∗
+    (Q ={E ∖ ↑N}=∗ Q) ={E}=∗
+    l2_hold γ i mh.
+  Proof. Admitted.
+
+  (* box_view: a read-only three-way view for a NON-OWNER (the commit's
+     collection, which holds no lock of the box's).  Opens the inv, hands
+     out the registers' values with the four rows and the ARM (a public
+     definition -- the caller matches on lr_hold / sr_win and reads the
+     client content inside: IN's header and rest at ξb, OUT_L1's window
+     pair and Q, OUT_L2's parked fragment and Q), and closes with what it
+     opened.  The collection's ic_slot_cover is stated over box_arm. *)
+  Lemma box_view (N : namespace) γ (E : coPset) :
+    ↑N ⊆ E →
+    is_box N γ ={E, E ∖ ↑N}=∗
+    ∃ (T : nat) (ξb : CtxId) m (c : nat) (r : slot_reg id X) (s : l2_reg id),
+      ⌜box_rows T m c r s⌝ ∗
+      box_arm γ T ξb m r s ∗
+      (box_arm γ T ξb m r s ={E ∖ ↑N, E}=∗ True).
   Proof. Admitted.
 
   Lemma l1_row_fold γ (r : slot_reg id X) (ξ : CtxId) :
