@@ -466,6 +466,7 @@ Section SpecFileread.
         [ref] words, the entries' content escrows, the inode region -- the
         escrow at the FAMILY where it was per-slot. *)
      itable_inv ∗
+     IcacheInv.iref_claims ∗
      ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov
                 fsc_logst ∗
      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
@@ -528,7 +529,7 @@ Section SpecFileread.
     fileread_fs_env γf fn -∗ fileread_fs_out fn.
   Proof.
     rewrite /fileread_fs_env /fileread_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
     iFrame "Hsb Hbs".
   Qed.
 

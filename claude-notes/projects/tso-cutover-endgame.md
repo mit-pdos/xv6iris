@@ -515,22 +515,21 @@ and law 10 (hooks).
 
 ## 9. Open items (append new rounds here)
 
-1. **Land the recycle over (b″) + `box_q1_update` + the two-armed `Q1 0`**
-   (Q8/Q9, ruled): both box statements are BUILT and green in
+1. **DONE (r20b-6/7, A12.12/A12.13) — Land the recycle over (b″) + `box_q1_update` + the two-armed `Q1 0`**
+   (Q8/Q9, ruled): the wrappers call `CtxBoxHooked` (the build agent's own CtxBox.v draft was withdrawn).  Original text: both box statements are BUILT and green in
    `CtxBoxHooked.v` (§3.2b: `box_deposit_L1_hook`, `box_q1_update`); the
    build agent may call them from there (same `is_box`) or land its own
    draft in CtxBox.v -- one or the other, not both.  `ic_recycle_deposit`
    becomes the hooked form; the recycle wrapper states the pool's mask
    premises (`ipoolN`, `iregN`, `escAN inum`).  Then ProofIget's recycle
    arm.
-2. **State `ic_slot_cover` over `box_arm`** before ProofIget/ProofIput
-   finish (the r21 acceptance test, rule 0 for the viewer clause).
+2. **DONE (A12.13/A12.16) — State `ic_slot_cover` over `box_arm`**: `IcacheCover.v` -- the arm-level `ic_arm_cover` + viewer clause, and main's surface (`ic_escrow_body := box_body`, `ic_lend`, the three-alternative `ic_slot_cover` at the header quarter, `ic_escrow_body_cover`) so FsCollectAll compiles with one import.
 3. **The hook consolidation** (r20c) — BUILT side-by-side in
    `CtxBoxHooked.v` (§3.2b); what remains is the slot-in edit to CtxBox.v
    at the first quiet point after r20b, one commit, no client change.
-4. **A second agent for L2/L3/L4** — awaiting the owner.
-5. **`ic_slp`'s final shape** (the off-row conjunct + one fold lemma)
-   before r21's consumer sweep; `off_rows_morph` and the llb-max lemma
+4. **A second agent for L2/L3/L4** — RUNNING (owner approved 2026-09-02; worktree /shared/xv6iris-2-l2, branch tso-cutover-l2, fast-forwards into tso-cutover).
+5. **`ic_slp`'s final shape** (the off-row conjunct + one fold lemma) --
+   r21's consumers are fused against the CURRENT shape (`is_sleeplock_genl … (ic_slp fsc_ic k)`), so any later change is a wrapper-internal edit; was: before r21's consumer sweep; `off_rows_morph` and the llb-max lemma
    provable now.
 6. (v) **SC-only readers still live**: `ctx_word4_claim` (WpSconfMem, 8
    users) and the r12 UkStepGen threading; fate: replaced by
@@ -540,8 +539,8 @@ and law 10 (hooks).
    confirmed.
 8. **The port's Admitted inventory** must list OffBox's 14 until r25
    clears them.
-9. **Q10 (build agent, 2026-09-02, found while fusing ProofIput) — THE
-   WINDOW PIN'S NAME-HALF IS CONSUMED BY THE LAST CLOSE'S (a).**  Needs a
+9. **Q10 — RULED option B (both reviewers, 2026-09-02), IMPLEMENTED in r20b-7 (`ic_evict_withdraw_frz`, `ic_park_frz`; A12.13).  Original text follows.**  (build agent, 2026-09-02, found while fusing ProofIput) — THE
+   WINDOW PIN'S NAME-HALF IS CONSUMED BY THE LAST CLOSE'S (a).  Needs a
    ruling; two options below, the second recommended.
    - THE FACT.  `ic_pin_tx k := ∃ t q, hpn_h k (Some (t,q)) ∗ tx_pin t q`
      (`hpn_h` = ½).  Main's movers recover the returning share's `(t,q)`
@@ -739,3 +738,16 @@ history and is not edited.  Each round adds an Amendment to
 counts, deferred).  Design law is read from `origin/tso-flip`'s
 `tso-escrow-endgame.md`; a change to a `CtxBox.v` statement is made on this
 branch and recorded in §3.2 and §8 here.
+
+10. **The AU proofs are PARKED (owner, 2026-09-02).**  Every `Proof*AU*` /
+    `Link*AU*` row of `iris/_CoqProject` is commented out for the cutover;
+    the `Spec*AU` rows stay (live dependents).  Un-parking is a future round
+    with its own d3 pass (ProofSysMknodAU, ProofSysOpenAU*, ProofFilewriteAU,
+    ProofSysUnlinkAU*, ProofCreateAU*, ProofSysDupAU*, ProofSys{Read,Write}AU*).
+11. **r21 rule for the file layer (A12.16):** the fs env records
+    (SpecFileread / SpecFilewrite / SpecFilestat) carry `IcacheInv.iref_claims`
+    after `itable_inv`, flip's row; every syscall shell supplies it from
+    `is_itable2_claims`.  Consumers of the inode contracts keep main's
+    `_tx_sconf`/`_dep_sconf` spellings and take flip's `lo tl` epoch indices,
+    `cred_floor`, `iref_claims` premises and the floored forgets -- the
+    "main's names, flip's shapes" blend, recipe in A12.16.

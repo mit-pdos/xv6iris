@@ -231,7 +231,7 @@ Section ProofSysUnlinkTails.
   (*  Its crossing index is [b], not [true]: two plain instructions and  *)
   (*  the epilogue, and no callee in between.                            *)
   (* ================================================================== *)
-  Lemma su_tail_a `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_tail_a `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m M : regfile) (sp0 : mword 64) (K : nat) (b : bool) (pj : mword 64)
       (w3 w4 w5 w6 w27 w30 : mword 64) (bd bn bp be : nat -> bv 8) :
     (30 <= K)%nat -> ((K - 30) + 30 = K)%nat ->
@@ -332,7 +332,7 @@ Section ProofSysUnlinkTails.
   (*  the [addi] displacement differs too (1488 / 1446 / 1458, the three  *)
   (*  message strings).                                                   *)
   (* ================================================================== *)
-  Lemma su_panic_nlink `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_panic_nlink `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (M : regfile) (K : nat) (n : nat) (eb b : bool) (pj : mword 64)
       (lks : gset string) :
     (panic_stack <= K)%nat ->
@@ -396,7 +396,7 @@ Section ProofSysUnlinkTails.
       iSplit; [iPureIntro; exact su_nlink_nz|]. iExact "Hstr". }
   Qed.
 
-  Lemma su_panic_readi `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_panic_readi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (M : regfile) (K : nat) (n : nat) (eb b : bool) (pj : mword 64)
       (lks : gset string) :
     (panic_stack <= K)%nat ->
@@ -460,7 +460,7 @@ Section ProofSysUnlinkTails.
       iSplit; [iPureIntro; exact su_readi_nz|]. iExact "Hstr". }
   Qed.
 
-  Lemma su_panic_writei `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_panic_writei `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (M : regfile) (K : nat) (n : nat) (eb b : bool) (pj : mword 64)
       (lks : gset string) :
     (panic_stack <= K)%nat ->
@@ -534,7 +534,7 @@ Section ProofSysUnlinkTails.
   (*  inode-shaped.  s2 and s3 are untouched -- both spills are below    *)
   (*  the branch at +0x2e -- so slots 4 and 5 ride through as junk.      *)
   (* ================================================================== *)
-  Lemma su_tail_b `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_tail_b `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (u : nat) (pidv : mword 32) (dq : dfrac)
@@ -760,11 +760,11 @@ Section ProofSysUnlinkTails.
   (*  by the time this block runs, which is why they are PREMISES and     *)
   (*  their slots ride through at existential words.                      *)
   (* ================================================================== *)
-  Lemma su_tail_bad `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_tail_bad `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (kk : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
@@ -807,9 +807,12 @@ Section ProofSysUnlinkTails.
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep fsc_ic kk s icfg_dev inum gy -∗
+    ⌜(loy <= tly)%nat⌝ -∗
+    IcacheRef.cred_floor loy tly -∗
+    IcacheInv.iref_claims -∗
+    ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -865,7 +868,7 @@ Section ProofSysUnlinkTails.
            Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs2
            HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP
               H27 HbE H30 Hcont".
@@ -930,13 +933,13 @@ Section ProofSysUnlinkTails.
        element home in the ghost step that parks the payload. *)
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl
               pd pav pu gil gisl
- kk qi s gy inum dn bm u pidv dq
+ kk qi s gy loy tly inum dn bm u pidv dq
               dqb dqs M2 (K - 30)%nat eb b lks
               Upr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2)
@@ -1093,11 +1096,11 @@ Section ProofSysUnlinkTails.
   (*  of the caller's s2 out of the slot the [c.sdsp] at +0x5c filled.    *)
   (*  s3 is untouched: its spill is at +0x72, BELOW this branch.          *)
   (* ================================================================== *)
-  Lemma su_tail_d `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_tail_d `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (kk : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
@@ -1139,9 +1142,12 @@ Section ProofSysUnlinkTails.
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep fsc_ic kk s icfg_dev inum gy -∗
+    ⌜(loy <= tly)%nat⌝ -∗
+    IcacheRef.cred_floor loy tly -∗
+    IcacheInv.iref_claims -∗
+    ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1196,7 +1202,7 @@ Section ProofSysUnlinkTails.
     intros HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
            Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP
               H27 HbE H30 Hcont".
@@ -1239,13 +1245,13 @@ Section ProofSysUnlinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (su_tail_bad (CID0 := CID1) gs jx gl pd pav pu
               gil gisl
-              kk qi s gy inum dn bm u pidv dq dqb dqs m M1 sp0 K eb b lks
+              kk qi s gy loy tly inum dn bm u pidv dq dqb dqs m M1 sp0 K eb b lks
               (m !!! Regidx Rs2 : mword 64) w5 w6 w27 w30 bd bnm bp be
               Upr HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM1sp HM1thr
               HM1s1 HM1s2 HM1s3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
+                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev
                     Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                     HbD HbN HbP H27 HbE H30 Hcont").
@@ -1272,13 +1278,13 @@ Section ProofSysUnlinkTails.
   (*  its s2/s3 equations as premises: +0x5c and +0x72 are both above     *)
   (*  the [c.bnez] at +0x120 that reaches this block.                     *)
   (* ================================================================== *)
-  Lemma su_tail_e `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_tail_e `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname) (gili gisli : gname)
-      (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (kk : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
-      (ki : nat) (qip si : Qp) (gyi : gname) (inumi : mword 32)
+      (ki : nat) (qip si : Qp) (gyi : gname) (loyi tlyi : nat) (inumi : mword 32)
       (dni : dinode) (bmi : blkmap)
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
@@ -1325,9 +1331,12 @@ Section ProofSysUnlinkTails.
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     ireg_open -∗
     (* ---- dp, still locked: released in [bad:] ---- *)
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep_at fsc_ic kk s icfg_dev inum gy t (1/4) -∗
+    ⌜(loy <= tly)%nat⌝ -∗
+    IcacheRef.cred_floor loy tly -∗
+    IcacheInv.iref_claims -∗
+    ic_tx_dep_at fsc_ic kk s icfg_dev inum gy loy t (1/4) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1341,9 +1350,12 @@ Section ProofSysUnlinkTails.
     (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
     runit_any (bv_unsigned inum) -∗
     (* ---- ip, released HERE ---- *)
-    is_sleeplock_gen gili gisli (i_lock (ientry ki)) "inode"%string (ic_tok fsc_ic ki) (slh_tok (icfg_isl ki)) -∗
+    is_sleeplock_genl gili gisli (i_lock (ientry ki)) "inode"%string (ic_slp fsc_ic ki) (slh_tok (icfg_isl ki)) -∗
     sleeplocked_q gisli si (i_lock (ientry ki)) pidv -∗
-    ic_tx_dep_at fsc_ic ki si icfg_dev inumi gyi t (1/4) -∗
+    ⌜(loyi <= tlyi)%nat⌝ -∗
+    IcacheRef.cred_floor loyi tlyi -∗
+    IcacheInv.iref_claims -∗
+    ic_tx_dep_at fsc_ic ki si icfg_dev inumi gyi loyi t (1/4) -∗
     i_dev (ientry ki) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry ki) ↦₄{DfracOwn (1/2)} inumi -∗
     i_valid (ientry ki) ↦₄ valid_word true -∗
@@ -1400,8 +1412,8 @@ Section ProofSysUnlinkTails.
            Hsp0 HMsp HMthr HMs1 HMs2 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hescki #Hireg #Hropen
-              #Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru
-              #Hslkki Hslkdi Hdepi Hidevi Hiinumi Hivalidi Hloadi
+              #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru
+              #Hslkki Hslkdi %Hleyi #Hflyi #Hclaimsyi Hdepi Hidevi Hiinumi Hivalidi Hloadi
               #Hshoti Hfrzi Hkeepi Hrui
               Hsbb Hsbi #Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop
               Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP H27 HbE H30 Hcont".
@@ -1471,8 +1483,8 @@ Section ProofSysUnlinkTails.
        bundleless out-state stands across the call. *)
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := CID2) gs jx gl
               pd pav pu gili gisli
- ki qip si gyi
-              (DepTx si icfg_dev inumi gyi t (1/4)%Qp) inumi dni bmi u SbE
+ ki qip si gyi loyi tlyi
+              (DepTx si icfg_dev inumi gyi loyi t (1/4)%Qp) inumi dni bmi u SbE
               false false false eE _ _ pidv
               dq dqb dqs M2 (K - 30)%nat eb b lks
               Upr HKup eq_refl Hki ltac:(discriminate) ltac:(discriminate)
@@ -1480,7 +1492,7 @@ Section ProofSysUnlinkTails.
               Hinbi Hcovb ltac:(unfold iput_units in *; lia) Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty) eq_refl
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hescki Hireg Hropen Hslkki Hslkdi Hdepi Hidevi Hiinumi
+                    Hescki Hireg Hropen Hslkki Hslkdi [//] Hflyi Hclaimsyi Hdepi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti Hfrzi [$Hkeepi $Hrui] Hsbb Hsbi Hbmres Hpid Hprocs
                     Hdev Hgeo Hdlk Hbsl [] Hop").
     { iEval (cbn beta iota). iEmpIntro. }
@@ -1589,14 +1601,14 @@ Section ProofSysUnlinkTails.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (su_tail_bad (CID0 := CID6) gs jx gl pd pav pu
               gil gisl
-              kk qi s gy inum dn bm n2 pidv dq dqb dqs m P2 sp0 K eb b
+              kk qi s gy loy tly inum dn bm n2 pidv dq dqb dqs m P2 sp0 K eb b
               lks (m !!! Regidx Rs2 : mword 64) (m !!! Regidx Rs3 : mword 64)
               w6 w27 w30 bd bnm bp be
               Upr HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb ltac:(unfold iput_units, ip_spend_w, ip_bm in *; destruct wgE; cbn in *; lia)
               Hj Hgl Hlkempty Hsp0 HP2sp HP2thr HP2s1 HP2s2 HP2s3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
+                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev
                     Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                     HbD HbN HbP H27 HbE H30 [Hislot Hcont]").

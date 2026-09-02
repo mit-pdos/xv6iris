@@ -11,7 +11,7 @@
    inum, or REFUTED, from what the collection holds alone: the pool's quarter
    of the slot's identification ghost (which says the slot is LIVE at this
    inum) and the empty transaction authority (quiescence: no window and no
-   freeze is open).  [ic_slot_cover_side] is that clause, discharged state by
+   freeze is open).  [ic_arm_cover_side] is that clause, discharged state by
    state: the viewer argument of log §6¹⁰-§6¹⁸, F38/F44, Q9's live arm and
    OUT_L2's DepRd read, as one type-checked lemma.  [FsCollectAll] (r21)
    consumes it: [ic_cover_read] IS [FsCollect.col_side]'s body. *)
@@ -80,7 +80,7 @@ Section IcacheCover.
 
   (* THE COVER: rows, arm, and the closing wand at the mask the collection
      opened this box at (the fifty are opened nested, so [E] is the caller's) *)
-  Definition ic_slot_cover (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z)
+  Definition ic_arm_cover (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z)
       (E : coPset) (k : nat) : iProp Σ :=
     (∃ (T : nat) (ξb : CtxId) (m : gmap (ic_bid * nat) ufrac) (c : nat)
        (r : slot_reg ic_bid ic_x) (s : l2_reg ic_bid),
@@ -88,10 +88,10 @@ Section IcacheCover.
        ic_arm cn γfs γi cov logstart k T ξb m c r s ∗
        (ic_arm cn γfs γi cov logstart k T ξb m c r s ={E ∖ ↑(icBoxN .@ k), E}=∗ True))%I.
 
-  Lemma ic_slot_cover_view (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z) (E : coPset) (k : nat) :
+  Lemma ic_arm_cover_view (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z) (E : coPset) (k : nat) :
     ↑(icBoxN .@ k) ⊆ E ->
     ic_box cn γfs γi cov logstart k ={E, E ∖ ↑(icBoxN .@ k)}=∗
-    ic_slot_cover cn γfs γi cov logstart E k.
+    ic_arm_cover cn γfs γi cov logstart E k.
   Proof.
     iIntros (HE) "#Hbox".
     iMod (CtxBox.box_view (ic_hdr cn γfs γi cov logstart k) (ic_rest k)
@@ -101,8 +101,8 @@ Section IcacheCover.
     iModIntro. iExists T, ξb, m, c, r, s. iFrame "Harm Hcl". by iPureIntro.
   Qed.
 
-  Lemma ic_slot_cover_close (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z) (E : coPset) (k : nat) :
-    ic_slot_cover cn γfs γi cov logstart E k ={E ∖ ↑(icBoxN .@ k), E}=∗ True.
+  Lemma ic_arm_cover_close (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z) (E : coPset) (k : nat) :
+    ic_arm_cover cn γfs γi cov logstart E k ={E ∖ ↑(icBoxN .@ k), E}=∗ True.
   Proof.
     iIntros "Hc". iDestruct "Hc" as (T ξb m c r s) "(_ & Harm & Hcl)".
     iApply ("Hcl" with "Harm").
@@ -144,10 +144,10 @@ Section IcacheCover.
   Qed.
 
   (* THE VIEWER CLAUSE (law 9), over every state the rows admit *)
-  Lemma ic_slot_cover_side (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z) (E : coPset) (k : nat) (dev inum : mword 32) :
+  Lemma ic_arm_cover_side (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z) (E : coPset) (k : nat) (dev inum : mword 32) :
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ic_id cn k (1/4) true dev inum -∗
-    ic_slot_cover cn γfs γi cov logstart E k -∗
+    ic_arm_cover cn γfs γi cov logstart E k -∗
     ic_cover_read γfs γi inum.
   Proof.
     iIntros "Hauth Hq Hc".
@@ -200,5 +200,164 @@ Section IcacheCover.
             [| iDestruct (ic_pin_tx_quiet with "Hauth Hpin") as %[]].
           iDestruct (ic_loaded_ghost_shed with "Hlg") as "[Hrd _]".
           iApply (ic_rd_arm_read with "Hrd").
+  Qed.
+  (* ================================================================== *)
+  (*  MAIN'S ESCROW SURFACE, OVER THE BOX (r21, [FsCollectAll]).         *)
+  (*  The collection was written against main's [ic_escrow = inv (icEscN *)
+  (*  .@ k) ic_escrow_body] with a lend-shaped three-alternative cover;   *)
+  (*  every name below has main's statement, the body being the box's    *)
+  (*  own ([CtxBox.box_body]) and the cover's identification share the   *)
+  (*  header's QUARTER (main lent its half).  [ic_escrow_body_cover] is   *)
+  (*  [ic_arm_cover_side] above in the non-destructive direction: each    *)
+  (*  arm the rows admit is read as a lend that rebuilds the body, or     *)
+  (*  refuted at quiescence.                                              *)
+  (* ================================================================== *)
+  Definition icEscN : namespace := icBoxN.
+  Lemma ic_escrow_ns_sub (k : nat) : ↑(icEscN .@ k) ⊆ (↑icEscN : coPset).
+  Proof. apply nclose_subseteq. Qed.
+
+  Definition ic_escrow_body (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z)
+      (k : nat) : iProp Σ :=
+    CtxBox.box_body (ic_hdr cn γfs γi cov logstart k) (ic_rest k)
+      (ic_q1 cn γfs γi cov logstart k) (ic_q2 cn γfs γi cov logstart k) (icfg_box k).
+
+  Lemma ic_escrow_is_inv (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z) (k : nat) :
+    ic_escrow cn γfs γi cov logstart k = inv (icEscN .@ k) (ic_escrow_body cn γfs γi cov logstart k).
+  Proof. reflexivity. Qed.
+
+  Global Instance ic_escrow_body_timeless cn γfs γi cov logstart k :
+    Timeless (ic_escrow_body cn γfs γi cov logstart k).
+  Proof.
+    rewrite /ic_escrow_body /CtxBox.box_body.
+    repeat (apply bi.exist_timeless; intro). apply _.
+  Qed.
+
+  Definition ic_lend (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z)
+      (k : nat) (Q : iProp Σ) : iProp Σ :=
+    (Q ∗ ∃ R : iProp Σ, R ∗ (Q -∗ R -∗ ic_escrow_body cn γfs γi cov logstart k))%I.
+
+  Definition ic_slot_cover (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z)
+      (k : nat) : iProp Σ :=
+    (∃ (dev inum : mword 32),
+       ic_lend cn γfs γi cov logstart k (ic_id cn k (1/4) false dev inum)
+       ∨ ic_lend cn γfs γi cov logstart k
+           (ic_id cn k (1/4) true dev inum ∗ ipool_shape_np γfs γi cov logstart inum)
+       ∨ (∃ n : fs_node,
+            ⌜FsStateInode.node_dir_local (bv_unsigned inum) icfg_nib n⌝ ∗
+            ic_lend cn γfs γi cov logstart k
+              (ic_id cn k (1/4) true dev inum
+               ∗ ic_inode_leg γfs (DfracOwn (3/4)) γi inum n)))%I.
+
+  (* THE COVERAGE LEMMA (main's statement): it moves no resource *)
+  Lemma ic_escrow_body_cover cn γfs γi cov logstart k :
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ic_escrow_body cn γfs γi cov logstart k -∗
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+    ∗ ic_slot_cover cn γfs γi cov logstart k.
+  Proof.
+    iIntros "Hauth Hbody".
+    rewrite /ic_escrow_body /CtxBox.box_body.
+    iDestruct "Hbody" as (T ξb m c r s) "(Hpk & #Hllb & Hst & Hc & Hrd & Hrp & %Hrows & Harm)".
+    rewrite /CtxBox.box_arm.
+    destruct (lr_hold s) as [[i mh]|] eqn:Hh.
+    - (* OUT_L2: by the descriptor *)
+      iDestruct "Harm" as "(%Hw & %Hne & %Hkey & Hfrag & HQ)". rewrite /ic_q2.
+      iDestruct "HQ" as (d dev inum) "(%Hid & Hd & Hs & Hq)".
+      destruct d as [| qf dv nu t qt | s' dv nu g' lo' t q | s' dv nu g' lo'];
+        cbn [ic_dep_id] in Hid; [discriminate | | |].
+      + iEval (rewrite /ic_q_side; cbn) in "Hs". iDestruct "Hs" as "(_ & _ & Htx)".
+        iDestruct (TxPin.tx_pin_no_ops with "Hauth Htx") as %[].
+      + iEval (rewrite /ic_q_side; cbn) in "Hs".
+        iDestruct (TxPin.tx_pin_no_ops with "Hauth Hs") as %[].
+      + injection Hid as -> ->. iEval (rewrite /ic_q_side; cbn) in "Hs".
+        rewrite /ic_rd_arm.
+        iDestruct "Hs" as (dn bm data) "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg)".
+        iFrame "Hauth". iExists dev, inum. iRight; iRight. iExists (era_node dn bm data).
+        iSplitR.
+        { iPureIntro.
+          exact (FsStateEra.node_dir_local_of_ok (bv_unsigned inum) cov logstart icfg_nib
+                   dn bm data Hok Hdok Hddix Hdoc). }
+        rewrite /ic_lend. iSplitL "Hq Hleg"; [iFrame "Hq Hleg" |].
+        iExists _. iSplitL "Hpk Hst Hc Hrd Hrp Hfrag Hd"; [iAccu |].
+        iIntros "[Hq Hleg] (Hpk & Hst & Hc & Hrd & Hrp & Hfrag & Hd)".
+        iExists T, ξb, m, c, r, s. iFrame "Hpk Hllb Hst Hc Hrd Hrp".
+        iSplitR; [iPureIntro; exact Hrows |].
+        rewrite /CtxBox.box_arm Hh. iFrame "Hfrag".
+        iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+        rewrite /ic_q2. iExists (DepRd s' dev inum g' lo'), dev, inum. iFrame "Hd Hq".
+        iSplitR; [done |]. rewrite /ic_q_side; cbn. rewrite /ic_rd_arm.
+        iExists dn, bm, data. iFrame "Hleg". iPureIntro. split_and!; assumption.
+    - destruct (sr_win r) eqn:Hw.
+      + (* OUT_L1: by the count *)
+        iDestruct "Harm" as "(Hout & Hrest & HQ)".
+        destruct c as [| c'].
+        * rewrite ic_q1_0 /ic_q_recycle.
+          iDestruct "HQ" as "[(%d0 & %n0 & Hq) | (%d0 & %n0 & Hq & Hnp)]".
+          { iFrame "Hauth". iExists d0, n0. iLeft. rewrite /ic_lend.
+            iSplitL "Hq"; [iExact "Hq" |].
+            iExists _. iSplitL "Hpk Hst Hc Hrd Hrp Hout Hrest"; [iAccu |].
+            iIntros "Hq (Hpk & Hst & Hc & Hrd & Hrp & Hout & Hrest)".
+            iExists T, ξb, m, O, r, s. iFrame "Hpk Hllb Hst Hc Hrd Hrp".
+            iSplitR; [iPureIntro; exact Hrows |].
+            rewrite /CtxBox.box_arm Hh Hw. iFrame "Hout Hrest".
+            rewrite ic_q1_0 /ic_q_recycle. iLeft. iExists d0, n0. iExact "Hq". }
+          iFrame "Hauth". iExists d0, n0. iRight; iLeft. rewrite /ic_lend.
+          iSplitL "Hq Hnp"; [iFrame "Hq Hnp" |].
+          iExists _. iSplitL "Hpk Hst Hc Hrd Hrp Hout Hrest"; [iAccu |].
+          iIntros "[Hq Hnp] (Hpk & Hst & Hc & Hrd & Hrp & Hout & Hrest)".
+          iExists T, ξb, m, O, r, s. iFrame "Hpk Hllb Hst Hc Hrd Hrp".
+          iSplitR; [iPureIntro; exact Hrows |].
+          rewrite /CtxBox.box_arm Hh Hw. iFrame "Hout Hrest".
+          rewrite ic_q1_0 /ic_q_recycle. iRight. iExists d0, n0. iFrame "Hq Hnp".
+        * rewrite ic_q1_S. iDestruct (ic_pin_tx_quiet with "Hauth HQ") as %[].
+      + (* IN: by the identity and the shape *)
+        rewrite /CtxBox.in_arm. iDestruct "Harm" as (x) "[Hhdr Hrest]".
+        rewrite /ic_hdr /ic_hdr_amb.
+        destruct (sr_ident r) as [[dv nu]|] eqn:Hi.
+        2:{ iDestruct "Hhdr" as "(%Hx & Hvld & Hident & Hnl & (%d0 & %n0 & Hq))".
+            iFrame "Hauth". iExists d0, n0. iLeft. rewrite /ic_lend.
+            iSplitL "Hq"; [iExact "Hq" |].
+            iExists _. iSplitL "Hpk Hst Hc Hrd Hrp Hvld Hident Hnl Hrest"; [iAccu |].
+            iIntros "Hq (Hpk & Hst & Hc & Hrd & Hrp & Hvld & Hident & Hnl & Hrest)".
+            iExists T, ξb, m, c, r, s. iFrame "Hpk Hllb Hst Hc Hrd Hrp".
+            iSplitR; [iPureIntro; exact Hrows |].
+            rewrite /CtxBox.box_arm Hh Hw /CtxBox.in_arm Hi. iExists x. iFrame "Hrest".
+            rewrite /ic_hdr /ic_hdr_amb. iFrame "Hvld Hident Hnl".
+            iSplitR; [iPureIntro; exact Hx |]. iExists d0, n0. iExact "Hq". }
+        iDestruct "Hhdr" as "(Hvld & Hident & Hnl & Hpay & Hq)".
+        rewrite /ic_pay. destruct x as [| g | g dn bm].
+        * iDestruct "Hpay" as %[].
+        * iDestruct "Hpay" as "[(Hnp & Hpend & Hoff & Hlv) | [_ Hpin]]";
+            [| iDestruct (ic_pin_tx_quiet with "Hauth Hpin") as %[]].
+          iFrame "Hauth". iExists dv, nu. iRight; iLeft. rewrite /ic_lend.
+          iSplitL "Hq Hnp"; [iFrame "Hq Hnp" |].
+          iExists _. iSplitL "Hpk Hst Hc Hrd Hrp Hvld Hident Hnl Hpend Hoff Hlv Hrest"; [iAccu |].
+          iIntros "[Hq Hnp] (Hpk & Hst & Hc & Hrd & Hrp & Hvld & Hident & Hnl & Hpend & Hoff & Hlv & Hrest)".
+          iExists T, ξb, m, c, r, s. iFrame "Hpk Hllb Hst Hc Hrd Hrp".
+          iSplitR; [iPureIntro; exact Hrows |].
+          rewrite /CtxBox.box_arm Hh Hw /CtxBox.in_arm Hi. iExists (IcUnloaded g). iFrame "Hrest".
+          rewrite /ic_hdr /ic_hdr_amb. iFrame "Hvld Hident Hnl Hq".
+          rewrite /ic_pay. iLeft. iFrame "Hnp Hpend Hoff Hlv".
+        * iDestruct "Hpay" as "[(Hlg & #Hshot & Hoff & Hlv) | [_ Hpin]]";
+            [| iDestruct (ic_pin_tx_quiet with "Hauth Hpin") as %[]].
+          rewrite /ic_loaded_ghost.
+          iDestruct "Hlg" as (data) "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg)".
+          iDestruct (ic_inode_leg_shed_to with "Hleg") as "[Hleg Hn14]".
+          iFrame "Hauth". iExists dv, nu. iRight; iRight. iExists (era_node dn bm data).
+          iSplitR.
+          { iPureIntro.
+            exact (FsStateEra.node_dir_local_of_ok (bv_unsigned nu) cov logstart icfg_nib
+                     dn bm data Hok Hdok Hddix Hdoc). }
+          rewrite /ic_lend. iSplitL "Hq Hleg"; [iFrame "Hq Hleg" |].
+          iExists _. iSplitL "Hpk Hst Hc Hrd Hrp Hvld Hident Hnl Hoff Hlv Hn14 Hrest"; [iAccu |].
+          iIntros "[Hq Hleg] (Hpk & Hst & Hc & Hrd & Hrp & Hvld & Hident & Hnl & Hoff & Hlv & Hn14 & Hrest)".
+          iDestruct (ic_inode_leg_shed_of with "Hleg Hn14") as "Hleg".
+          iExists T, ξb, m, c, r, s. iFrame "Hpk Hllb Hst Hc Hrd Hrp".
+          iSplitR; [iPureIntro; exact Hrows |].
+          rewrite /CtxBox.box_arm Hh Hw /CtxBox.in_arm Hi. iExists (IcLoaded g dn bm). iFrame "Hrest".
+          rewrite /ic_hdr /ic_hdr_amb. iFrame "Hvld Hident Hnl Hq".
+          rewrite /ic_pay. iLeft. iFrame "Hshot Hoff Hlv".
+          rewrite /ic_loaded_ghost. iExists data. iFrame "Hleg".
+          iPureIntro. split_and!; assumption.
   Qed.
 End IcacheCover.

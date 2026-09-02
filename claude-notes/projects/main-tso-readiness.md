@@ -1724,7 +1724,7 @@ flip's `lo`/`lo tl`.
   meets F42); the identity agreement runs before `ip_rest_sum` (ours is
   device-fixed); the frozen alternative refutations use `frz_slot_kill_pinw`
   /`ifreeze_excl` (no `frzown`); `Hitab` (is_itable2) is passed whole.
-- Measure: full `make -k -j24` running; counts to be appended below.
+- Measure (full `make -k -j24`, 2026-09-02): total 1509, roots 26, blocked 119, green 1364.  No inode proof is a root any more (r20b gate met).  FS-cone roots: FsCollectAll (needs IcacheCover), SpecFilestat, SpecMain, ProofNamex, ProofSysChdir/Mkdir/Mknod/MknodAU/OpenAUParts (the `ic_escrows_lookup` twin; fixed locally, then the same files hit the r21 shape gaps), ProofSysOpenParts (genlo), ProofCreateFreshTy, ProofFileread/Filewrite (`carve_off_inode`), ProofFilewriteAU, ProofSysLinkTails, UkRunFsLeaf.  Shim-cone roots (parallel agent, L2/L3/L4/L8): ProofCreateParts, ProofKexecTail, ProofSysUnlinkParts, ProofSysRead/Write, ProofUservec, ProofUserretClosed, ProofForkretPark, ProofPipealloc, RiscvAdequacy.
 
 
 ## 12.14 L2/L3 r1 (second agent, `tso-cutover-l2`) — the shim sweep's first pass; the pipe page (2026-09-02)
@@ -1850,3 +1850,50 @@ the stale `/shared/flip63` checkout (64 commits behind on 79 iris files).
   now carry `IcacheInv.iref_claims` in their env records; ProofSysRead/Write
   pass the env through opaquely (`fileread_fs_env_out`) and need no change
   -- to be confirmed at the next full build after their push.
+
+### A12.16 — r21, the FS-cone consumer sweep, round 1 (2026-09-02; numbered after the L-lane's A12.14/A12.15)
+
+- METHOD (per file, mechanical): `git merge-file -p --diff3 -L cutover -L base
+  -L flip <HEAD> <merge-base(origin/main, origin/tso-flip)> <origin/tso-flip>`,
+  then every conflict hunk resolved ONE of three ways -- cutover text
+  (plumbing: ambient `FsCfg`, `fsc_*`, `icfg_*`, `ufdG`, the off ledgers),
+  flip text (physical shape), or a hand blend "main's NAMES, flip's SHAPES":
+  the `wp_*_tx_sconf` / `wp_*_dep_sconf` spellings and their `Htx`/`[]`
+  premises stay, and flip's `lo tl` epoch indices, `⌜lo <= tl⌝ ∗ cred_floor
+  lo tl ∗ iref_claims` premises, `inode_shr_genlo`/`inode_ref_short_genlo`,
+  the forgets with the floor (`inode_shr_gen_forget _ _ _ _ _ _ _ Hle with
+  "Hfl Hshr"`), `is_sleeplock_genl … (ic_slp fsc_ic k)`, `DepRd s dev inum g
+  lo` / `DepTx s dev inum g lo t q`, and `ic_handle` (the dep-form post) come
+  in.  The non-conflict flip changes ride the merge unseen; the build finds
+  the two or three per file that do not fit (an env pattern one `_` short, a
+  duplicated `XI` binder, main's extra args on a call) and they are fixed by
+  hand.  Resolver: `scratchpad/r21_resolve.py <d3> <out> <spec.json>`.
+- FUSED AND GREEN: ProofSysChdir, ProofSysMkdir, ProofSysMknod, ProofNamex,
+  SpecFilestat, ProofSysOpenParts
+  (`so_publish` takes `lo tl`, the floor and `⌜lo <= tl⌝`), ProofFilestat,
+  ProofFileread, ProofFilewrite, ProofCreateFreshTy (its span states the
+  create post's `∃ loc tlc, … ic_handle (DepTx … loc t qt)` and `∃ lo tl, …
+  inode_ref_short_genlo`), ProofSysLinkTails (main REMOVED flip's `Hilink`
+  at base; kept removed).  SpecMain, SpecMainSecondary, ProofMainSecondary and
+  UkRunFsLeaf went to the L-lane agent's round 2 (my drafts of SpecMain and
+  UkRunFsLeaf were dropped in its favour); ProofMain (L9) is mine after it.
+- THE FILE ENVS CARRY `IcacheInv.iref_claims` (flip's row, after
+  `itable_inv`) in SpecFileread / SpecFilewrite / SpecFilestat; their
+  syscall shells (ProofSysRead/Write -- the L-lane agent, notified -- and
+  ProofSysFstat) supply it from `is_itable2_claims`.
+- FsCollectAll OVER THE BOX WITH ONE IMPORT.  `IcacheCover.v` now exports
+  main's escrow surface with main's statements: `icEscN := icBoxN`,
+  `ic_escrow_body := CtxBox.box_body …` (timeless; `ic_escrow` IS `inv
+  (icEscN .@ k) ic_escrow_body` by `reflexivity`), `ic_lend`, the
+  three-alternative `ic_slot_cover` at the header's QUARTER of `ic_id`
+  (main lent its half), and `ic_escrow_body_cover` (the ln_tx authority in
+  and out, every arm the rows admit read as a lend that rebuilds the body or
+  refuted at quiescence -- `ic_arm_cover_side` in the non-destructive
+  direction, `iAccu` naming each lend's frame).  The arm-level cover of
+  A12.13 is renamed `ic_arm_cover`/`_view`/`_close`/`_side`.  FsCollectAll
+  compiled unchanged but for `Require Import IcacheCover`.
+- PARKED (owner, 2026-09-02): every `Proof*AU*` / `Link*AU*` row of
+  `_CoqProject` is commented out (`# [tso-cutover r21: AU proofs parked …]`);
+  the `Spec*AU` rows stay (FsAbs*Fire, FsFdMirror, FdRow*, UkInitFs,
+  SpecFilewriteCons depend on them).
+- Measure (full `make -k -j24`, 2026-09-02, AU rows parked): total 1464, roots 20, blocked 60, green 1384 (was 1509/26/119/1364).  My-lane roots left: ProofFilewrite (a binder), ProofSysOpenTails, ProofSysLink, ProofSyscall, SpecMainSecondary, ProofMain, ProofNamexEra, ProofNparEra; the other twelve are the L-lane agent's (TsoCtxShim, page_own_pipe_raw, boot).

@@ -887,16 +887,15 @@ Section ProofSysChdirBody.
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
-    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
-    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
+    iIntros (Hk) "H".
+    iApply (ic_escrows_lookup fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k Hk with "H").
   Qed.
 
   Lemma sc_slk_acc `{XI : CurCtx} (k : nat) :
     (k < NINODE)%nat ->
     (ic_sleeplocks fsc_ic -∗
      ∃ gil gisl : gname,
-       is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k))
+       is_sleeplock_genl gil gisl (i_lock (ientry k)) "inode"%string (ic_slp fsc_ic k) (slh_tok (icfg_isl k))
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_sleeplocks.
@@ -1500,7 +1499,8 @@ Section ProofSysChdirBody.
         iEval (rewrite inode_ref_shed) in "Hrefip".
         iDestruct "Hrefip" as "[Hkeep Hshr]".
         iEval (rewrite inode_shr_gen_intro) in "Hshr".
-        iDestruct "Hshr" as (gsh) "Hshr".
+        iDestruct "Hshr" as (gsh losh tlsh) "(%Hlesh & #Hflsh & Hshr)".
+        iDestruct (is_itable2_claims with "Hitab") as "#Hclaims".
         iDestruct (sc_esc_acc kk Hkk with "Hescrows")
           as "#Hesck".
         iDestruct (sc_slk_acc kk Hkk with "Hslks") as (gil gisl) "#Hslkk".
@@ -1549,13 +1549,14 @@ Section ProofSysChdirBody.
 
         iApply (Ilock.wp_ilock_tx_sconf (CID := CID23) gs j gl pd pav pu
  gil gisl
-                  kk (qq/2)%Qp gsh PlainK inum pid (DfracOwn (1/4)) dqs
+                  kk (qq/2)%Qp gsh losh tlsh PlainK inum pid (DfracOwn (1/4)) dqs
                   P0 (K - 20)%nat eb b lks
                   (us_upt U P') ltac:(lia) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HP0a0
                   (Hlb "bcache"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck
-                        Hireg Hslkk Hshr Hruip Hsbi Hpbare Hprocs Hdev Hgeo Hdlk
+                        Hireg Hslkk [%] Hflsh Hclaims Hshr Hruip Hsbi Hpbare Hprocs Hdev Hgeo Hdlk
                         Hbs1 Htx").
+        all: try (exact Hlesh).
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CID24 Hq24 mil dn bm fl)
@@ -1728,15 +1729,16 @@ Section ProofSysChdirBody.
           iDestruct (cpu_own_transport CID24 CID29 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iApply (Iunlock.wp_iunlock_tx_sconf (CID := CID29) gs gil gisl
-                    kk (qq/2)%Qp gsh icfg_dev inum dn bm
+                    kk (qq/2)%Qp gsh losh tlsh icfg_dev inum dn bm
                     pid (DfracOwn (1/4)) P4 (K - 20)%nat eb pj b lks
                     (us_upt U P') ltac:(lia) Hkk HP4a0 (Hlb "sleep lock"%string)
                     with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk Hslkd
-                          Hpbare Hprocs Hdep Hidev Hiinum Hivalid Hload
+                          Hpbare Hprocs [%] Hflsh Hclaims Hdep Hidev Hiinum Hivalid Hload
                           Hshot Hfrz").
+          all: try (exact Hlesh).
           iIntros (CID30 Hq30 miu) "%Hcsiu Hcg Hown Hpc Hpbare Hshr Htx".
 
-          iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
+          iDestruct (inode_shr_gen_forget _ _ _ _ _ _ _ Hlesh with "Hflsh Hshr") as "Hshr".
           assert (Hpc48 : ret_pc (P4 !!! Regidx Rra : mword 64)
                           = mword_of_int (SC + 0x48)) by (rewrite HP4ra; pcw).
           iEval (rewrite Hpc48) in "Hpc".
@@ -2106,16 +2108,17 @@ iExact "Hrefnew". }
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID29) gs j gl
                     pd pav pu gil gisl
- kk (qq/2)%Qp (qq/2)%Qp gsh inum
+ kk (qq/2)%Qp (qq/2)%Qp gsh losh tlsh inum
                     dn bm n1 pid (DfracOwn (1/4)) dqb dqs
                     Q1 (K - 20)%nat eb b lks
                     (us_upt U P') ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl HQ1a0 (Hlb "log"%string)
 
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                          Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum
+                          Hesck Hireg Hropen Hslkk Hslkd [%] Hflsh Hclaims Hdep Hidev Hiinum
                           Hivalid Hload Hshot Hfrz [$Hkeep $Hruip] Hsbb Hsbi Hbmres Hpbare
                           Hprocs Hdev Hgeo Hdlk Hbsl [HopS]").
+          all: try (exact Hlesh).
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           { iApply (log_opS_opb with "HopS"). }

@@ -535,7 +535,7 @@ Section ProofFilestat.
       iDestruct (fst_env_in fn st Hin' with "Henv") as "Henv".
       iEval (rewrite /filestat_fs_env) in "Henv".
       iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
-                            #Hbio & #Hitbl & #Hescs & #Hireg & #Hslks &
+                            #Hbio & #Hitbl & #Hclaimsfs & #Hescs & #Hireg & #Hslks &
                             Hsb & #Hdevi & #Hdgeom & #Hdlock & Hbslot)".
       (* ---- THE CARVE (fs-sysfile S4', blocker 2's ratified alternative).
          The slot, the inum, the device, the region bound and the SHARE are
@@ -544,8 +544,9 @@ Section ProofFilestat.
          inode.  The per-slot escrow and sleeplock then come out of the two
          families by the slot the payload named. ---- *)
       iDestruct (filestat_pay_carve γf k q Cf _ Hin with "Hrpay")
-        as (ikk inm ssh gsh tysh)
-           "(%Hipk & %Hik & %Hinlt & #Hshot0 & Hshr0 & Hpayback)".
+        as (ikk inm ssh gsh tysh losh tlsh)
+           "(%Hipk & %Hik & %Hinlt & %Hlesh & #Hflsh & #Hshot0 & Hshr0 &
+             Hpayback)".
       assert (Hibcov : IBLOCK inm icfg_ist ∈ fsc_cov)
         by (apply Hgeo; exact Hinlt).
       iDestruct (ic_escrows_acc2
@@ -557,7 +558,7 @@ Section ProofFilestat.
          [inode_shr], so the generation the payload names has to be pinned on
          the way back, and the kept half is what pins it
          ([inode_shr_regen2]).  filewrite already does exactly this. *)
-      iEval (rewrite inode_shr_gen_halve2) in "Hshr0".
+      iEval (rewrite IcacheRef.inode_shr_genlo_halve) in "Hshr0".
       iDestruct "Hshr0" as "[Hshr Hkeep]".
       (* +0x1e c.sdsp s2,48(sp) *)
       assert (Hf4 : add_vec (P3 !!! Regidx csp_rs1)
@@ -691,8 +692,8 @@ Section ProofFilestat.
 
                 gil gisl
 
- ikk (ssh/2)%Qp gsh
-                (DepRd (ssh/2)%Qp icfg_dev inm gsh) (ShotK tysh)
+ ikk (ssh/2)%Qp gsh losh tlsh
+                (DepRd (ssh/2)%Qp icfg_dev inm gsh losh) (ShotK tysh)
  inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb b
@@ -702,8 +703,9 @@ Section ProofFilestat.
                 ltac:(rewrite HQ3a0; exact Hipk)
                 Hbelow
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
-                      Hslk Hshr [] Hshot0 Hsb Hppid Hprocs
+                      Hslk [%] Hflsh Hclaimsfs Hshr [] Hshot0 Hsb Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hbslot").
+      all: try (exact Hlesh).
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
@@ -927,7 +929,7 @@ Section ProofFilestat.
       iEval (rewrite Hipk) in "Hidev".
       iEval (rewrite Hipk) in "Hinum".
       iAssert (ic_dep_held fsc_fs fsc_ireg fsc_cov
-                 fsc_logst (DepRd (ssh/2)%Qp icfg_dev inm gsh)
+                 fsc_logst (DepRd (ssh/2)%Qp icfg_dev inm gsh losh)
                  ikk inm dnl bml)%I
         with "[Hmeta Haddrs Hquarter]" as "Hlk".
       { rewrite /ic_dep_held /=. iExists data. iFrame "Hmeta Haddrs Hquarter".
@@ -995,7 +997,7 @@ Section ProofFilestat.
                    with "Hcnt") as "Hcnt".
       iApply (Iunlock.wp_iunlock_dep_sconf γs
                 gil gisl
-                ikk (ssh/2)%Qp gsh (DepRd (ssh/2)%Qp icfg_dev inm gsh)
+                ikk (ssh/2)%Qp gsh losh tlsh (DepRd (ssh/2)%Qp icfg_dev inm gsh losh)
                 icfg_dev inm
                 dnl bml
                 pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj b lks
@@ -1006,17 +1008,15 @@ Section ProofFilestat.
                 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                       Hheld Hppid Hprocs
-                      Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
+                      [//] Hflsh Hclaimsfs Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
       all: try lkbelow.
       iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr _".
-      iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
       iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
-      (* THE GATHER: iunlock gives the half back WITHOUT its generation; the
-         half that never left pins it, and the payload takes the whole slice
-         back.  From here the reference is intact again. *)
-      iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp inm gsh
-                   with "Hkeep Hshr") as "Hshr".
-      iEval (rewrite Qp.div_2) in "Hshr".
+      (* THE GATHER (A6.145): the kept half PINS the returned half's
+         (g, lo) by agreement, and the two genlo halves rejoin. *)
+            iAssert (IcacheRef.inode_shr_genlo ikk ssh icfg_dev inm gsh losh)
+        with "[Hkeep Hshr]" as "Hshr".
+      { rewrite (IcacheRef.inode_shr_genlo_halve ikk ssh). iFrame. }
       iDestruct ("Hpayback" with "Hshr") as "Hrpay".
       assert (Hpc3c : ret_pc (J2 !!! Regidx Rra) = mword_of_int (FST + 0x3c)).
       { rewrite HJ2ra. apply bv_eq; vm_compute; reflexivity. }

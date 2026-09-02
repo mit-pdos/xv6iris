@@ -233,7 +233,7 @@ Section ProofNamexTrMain.
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
+    iIntros (Hk) "H". rewrite /ic_escrows /ic_boxes_all /ic_escrow.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
@@ -2633,7 +2633,10 @@ Section ProofNamexTrMain.
                    iDestruct (cpu_claim_ext_transport CIDt CIDV2 eb (proc_addr j)
                                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                    iEval (rewrite inode_shr_gen_intro) in "Hshr".
-                   iDestruct "Hshr" as (gsh) "Hshr".
+                   iDestruct "Hshr" as (gsh losh tlsh)
+                     "(%Hlesh & #Hflsh & Hshr)".
+                   iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr")
+                     as "Hshr".
                    (* NAME THE RETAINED PARENT'S GENERATION TOO (fs-log.md
                       §G.24).  The share and the short parent are two slices
                       of one slot, so [live_gen_agree] pins them to ONE
@@ -2641,9 +2644,11 @@ Section ProofNamexTrMain.
                       ilock's one-shot against the reference it re-forms,
                       since iunlock hands the share back generation-ERASED. *)
                    iEval (rewrite inode_ref_short_gen_intro) in "Hkeep".
-                   iDestruct "Hkeep" as (gkp) "Hkeep".
-                   iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr")
-                     as %->.
+                   iDestruct "Hkeep" as (gkp lokp tlkp)
+                     "(%Hlekp & #Hflkp & Hkeep)".
+                   iDestruct (IcacheRef.inode_shr_gen_pin_on_keep_short
+                                with "Hkeep Hshr") as "[Hkeep Hshr]".
+                   iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimsnx".
                    (* ---- THE WRITE ARM (durable-fs-plan.md section 3,
                       [ilock]; durable-disk B''-tx): half the transaction's
                       element sits in the escrow's checked-out arm for the
@@ -2652,12 +2657,12 @@ Section ProofNamexTrMain.
 
                    iApply (IL.wp_ilock_tx_sconf gs j gl pd pav pu
                              gilk gislk
-                             ik (iq/2)%Qp gsh PlainK iinum pidv dq dqs
+                             ik (iq/2)%Qp gkp lokp tlkp PlainK iinum pidv dq dqs
                              V2 (K - 12)%nat eb b lks Upr
                              Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0
                              ltac:(lkbelow)
                              with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hitbl Hesck
-                                   Hireg Hslkk Hshr Hru Hinos Hppid Hprocs Hdev
+                                   Hireg Hslkk [//] Hflkp Hclaimsnx Hshr Hru Hinos Hppid Hprocs Hdev
                                    Hgeom Hdlk Hbs1 Htx").
                    all: try lkbelow.
                    iIntros (CIDil Hqil mil dnl bml fl_)
@@ -2870,12 +2875,12 @@ Section ProofNamexTrMain.
                      iDestruct (cpu_claim_ext_transport CIDil CIDN2 eb (proc_addr j)
                                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                      iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
-                     iDestruct (inode_ref_short_gen_forget with "Hkeep")
-                       as "Hkeep2".
+                     iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _
+                                  Hlekp with "Hflkp Hkeep") as "Hkeep2".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl pd pav pu
  gilk gislk
 
-                               ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
+                               ik (iq/2)%Qp (iq/2)%Qp gkp lokp tlkp iinum dnl bml ncur
                                Scur wc false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Upr
                                Kiup Hik HbW ltac:(discriminate)
@@ -2884,10 +2889,11 @@ Section ProofNamexTrMain.
                                HND2a0 Hbelow
                                with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
-                                     Hdep Hidev Hiinum Hivalid Hload
+                                     [%] Hflkp Hclaimsnx Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hfrz [$Hkeep2 $Hru] Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
+                     all: try (exact Hlekp).
                      (* RULING G: a runtime caller lends the SEALED arm. *)
                      { iExact "Hropen". }
                      { iEval (cbn beta iota). iEmpIntro. }
@@ -3480,12 +3486,13 @@ Section ProofNamexTrMain.
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
                            iDestruct (cpu_claim_ext_transport CIDdl CIDG8 eb (proc_addr j)
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-                           iDestruct (inode_ref_short_gen_forget with "Hkeep")
+                           iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _
+                                        _ _ Hlekp with "Hflkp Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl
                                      pd pav pu gilk gislk
 
- ik (iq/2)%Qp (iq/2)%Qp gsh
+ ik (iq/2)%Qp (iq/2)%Qp gkp lokp tlkp
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
                                      GB3 (K - 12)%nat eb b lks Upr
@@ -3495,11 +3502,12 @@ Section ProofNamexTrMain.
                                      Hiu Hj Hgs HGB3a0 Hbelow
                                      with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg []
-                                           Hslkk Hslkd Hdep Hidev
+                                           Hslkk Hslkd [%] Hflkp Hclaimsnx Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hfrz [$Hkeep2 $Hru] Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
                            all: try lkbelow.
+                           all: try (exact Hlekp).
                            (* RULING G: a runtime caller lends the SEALED arm of
                               the borrowed regime and discards what comes back --
                               its own copy is persistent. *)
@@ -3738,12 +3746,13 @@ Section ProofNamexTrMain.
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
                            iDestruct (cpu_claim_ext_transport CIDdl CIDG8 eb (proc_addr j)
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-                           iDestruct (inode_ref_short_gen_forget with "Hkeep")
+                           iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _
+                                        _ _ Hlekp with "Hflkp Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl
                                      pd pav pu gilk gislk
 
- ik (iq/2)%Qp (iq/2)%Qp gsh
+ ik (iq/2)%Qp (iq/2)%Qp gkp lokp tlkp
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
                                      GC3 (K - 12)%nat eb b lks Upr
@@ -3753,11 +3762,12 @@ Section ProofNamexTrMain.
                                      Hiu Hj Hgs HGC3a0 Hbelow
                                      with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg []
-                                           Hslkk Hslkd Hdep Hidev
+                                           Hslkk Hslkd [%] Hflkp Hclaimsnx Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hfrz [$Hkeep2 $Hru] Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
                            all: try lkbelow.
+                           all: try (exact Hlekp).
                            (* RULING G: a runtime caller lends the SEALED arm of
                               the borrowed regime and discards what comes back --
                               its own copy is persistent. *)
@@ -3983,12 +3993,12 @@ Section ProofNamexTrMain.
                      iDestruct (cpu_claim_ext_transport CIDil CIDN2 eb (proc_addr j)
                                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                      iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
-                     iDestruct (inode_ref_short_gen_forget with "Hkeep")
-                       as "Hkeep2".
+                     iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _
+                                  Hlekp with "Hflkp Hkeep") as "Hkeep2".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl pd pav pu
  gilk gislk
 
-                               ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
+                               ik (iq/2)%Qp (iq/2)%Qp gkp lokp tlkp iinum dnl bml ncur
                                Scur wc false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Upr
                                Kiup Hik HbW ltac:(discriminate)
@@ -3997,10 +4007,11 @@ Section ProofNamexTrMain.
                                HND2a0 Hbelow
                                with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
-                                     Hdep Hidev Hiinum Hivalid Hload
+                                     [%] Hflkp Hclaimsnx Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hfrz [$Hkeep2 $Hru] Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
+                     all: try (exact Hlekp).
                      (* RULING G: a runtime caller lends the SEALED arm. *)
                      { iExact "Hropen". }
                      { iEval (cbn beta iota). iEmpIntro. }

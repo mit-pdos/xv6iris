@@ -74,6 +74,7 @@ Require Import BitmapInv.
 Require Import SbPark.
 Require Import IcacheRef.
 Require Import IcacheEscrow.
+Require Import IcacheCover.     (* r21: main's escrow surface over the box *)
 Require Import FsDurXfer.       (* the run vocabulary: [xr_fs], [xf_shape] *)
 Require Import FsDurSnap.
 Require Import FsCollect.

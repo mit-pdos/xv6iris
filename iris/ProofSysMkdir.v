@@ -742,9 +742,8 @@ Section ProofSysMkdirBody.
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
-    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
-    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
+    iIntros (Hk) "H".
+    iApply (ic_escrows_lookup fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k Hk with "H").
   Qed.
 
   Lemma wp_sys_mkdir_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
@@ -1260,7 +1259,10 @@ Section ProofSysMkdirBody.
         (* create's payout is GENERATION-NAMED now; iunlockput takes the
            erased reference, so weaken it back here.  One line, and the
            name is what sys_open's O_CREATE arm needs kept. *)
-        iDestruct (inode_ref_short_gen_forget with "Href") as "Href".
+        iDestruct "Href" as (lo tl) "(%Hle & #Hfl & Href)".
+        iDestruct "Hdep" as (loc tlc) "(%Hlec & #Hflc & Hdep)".
+        iDestruct (is_itable2_claims with "Hitab") as "#Hclaims".
+        iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hle with "Hfl Href") as "Href".
         iDestruct (md_esc_acc kk ltac:(lia)
                      with "Hescrows") as "#Hesc".
         (* CREATE'S PAYOUT IS THE ARMED DESCRIPTOR (durable-disk B''-tx2):
@@ -1276,16 +1278,17 @@ Section ProofSysMkdirBody.
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID20) gs j gl
                   pd pav pu gil gisl
- kk qi ss gy inum dn bm un1
+ kk qi ss gy loc tlc inum dn bm un1
                   pid (DfracOwn (1/4)) dqb dqs P0 (K - 18)%nat eb b lks
                   (us_upt U P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                   Hibcov Hiblog ltac:(lia) Hcovb
                   ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
                   (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                        Hesc Hireg [] Hslk Hslkd Hdep Hidev Hiinum Hivalid
+                        Hesc Hireg [] Hslk Hslkd [%] Hflc Hclaims Hdep Hidev Hiinum Hivalid
                         Hload Hshot Hfrz [$Href $Hru] Hsbb Hsbi Hbmres Hpbare Hprocs Hdev
                         Hgeo Hdlk Hbsl [HopS]").
+        all: try (exact Hlec).
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         (* RULING G: a runtime caller lends iunlockput the SEALED arm of the

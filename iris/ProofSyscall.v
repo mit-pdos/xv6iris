@@ -2217,6 +2217,7 @@ Section SyscallVocab.
     iDestruct (sysc_ic_env_of_ready with "Hfs") as
       "( _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2 )".
+    iDestruct (is_itable2_claims with "Hit") as "#Hclaims".
     iDestruct (sysc_bm_cells with "Hfs") as "(_ & #Hisp & _)".
     iAssert FsReady.fs_ready as "#Hrdy".
     { iDestruct "Hfs" as "(_ & _ & _ & _ & $)". }
@@ -2233,6 +2234,7 @@ Section SyscallVocab.
       { iPureIntro. intros inum Hi. exact (proj1 (Hib inum Hi)). }
       iSplitR; [ iExact "Hbio"   |].
       iSplitR; [ iExact "Hitinv" |].
+      iSplitR; [ iExact "Hclaims" |].
       iSplitR; [ iExact "Hesc"   |].
       iSplitR; [ iExact "Hireg"  |].
       iSplitR; [ iExact "Hsl2"   |].
@@ -2260,6 +2262,7 @@ Section SyscallVocab.
     iDestruct (sysc_ic_env_of_ready with "Hfs") as
       "( _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2 )".
+    iDestruct (is_itable2_claims with "Hit") as "#Hclaims".
     iDestruct (sysc_bm_cells with "Hfs") as "(_ & #Hisp & _)".
     iSplitL "Hsl".
     { rewrite /SpecFilestat.filestat_fs_env /sysc_fstat_names; cbn.
@@ -2274,6 +2277,7 @@ Section SyscallVocab.
       { iPureIntro. intros inum Hi. exact (proj1 (Hib inum Hi)). }
       iSplitR; [ iExact "Hbio"   |].
       iSplitR; [ iExact "Hitinv" |].
+      iSplitR; [ iExact "Hclaims" |].
       iSplitR; [ iExact "Hesc"   |].
       iSplitR; [ iExact "Hireg"  |].
       iSplitR; [ iExact "Hsl2"   |].
@@ -2398,6 +2402,7 @@ Section SyscallVocab.
     iDestruct (sysc_ic_env_of_ready with "Hfs") as
       "( _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2 )".
+    iDestruct (is_itable2_claims with "Hit") as "#Hclaims".
     iDestruct (sysc_bm_cells with "Hfs") as "(#Hbmst & #Hisp & #Hbmr)".
     iAssert FsReady.fs_ready as "#Hrdy2".
     { iDestruct "Hfs" as "(_ & _ & _ & _ & $)". }
@@ -2421,7 +2426,8 @@ Section SyscallVocab.
     iSplitR; [ iExact "Hkd"    |].
     iSplitR; [ iExact "Hpe"    |].
     iSplitR; [ iExact "Hitinv" |].
-    iSplitR; [ iExact "Hesc"   |].
+    iSplitR; [ iExact "Hclaims" |].
+      iSplitR; [ iExact "Hesc"   |].
     iSplitR; [ iExact "Hireg"  |].
     iSplitR; [ iExact "Hsl2"   |].
     iSplitR; [ iExact "Hioffs" |].

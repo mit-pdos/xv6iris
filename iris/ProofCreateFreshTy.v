@@ -204,14 +204,14 @@ Definition create_fresh_ty_body
      (γs' : list gname) (j' : nat) (γl' : gname)
      (pd' pav' pu' : mword 64)
      (gil' gisl' : gname)
-     (k' : nat) (s' : Qp) (g' : gname) (d' : ic_dep) (o' : ilkc)
+     (k' : nat) (s' : Qp) (g' : gname) (lo' tl' : nat) (d' : ic_dep) (o' : ilkc)
      (inum' : mword 32)
      (pidv' : mword 32) (dq' dqs' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string) (Upr' : ustate),
      wp_ilock_dep_sconf_body (CID := CIDl) γs' j' γl' pd' pav' pu'
                              gil' gisl'
-                             k' s' g' d' o' inum' pidv' dq' dqs'
+                             k' s' g' lo' tl' d' o' inum' pidv' dq' dqs'
                              m' K' eb' b' lks' Upr') ->
   (* ================= THE SPAN ================= *)
   sie_cap_gpr KT1 Ma K b pj -∗
@@ -276,10 +276,12 @@ Definition create_fresh_ty_body
              NOT assumed -- see the header. *)
           /\ fresh_shape dn⌝ ∗
          pc_is (mword_of_int (KernelSyms.create + 0xb4) : mword 64) ∗
-         is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
-                          (ic_tok fsc_ic kslot) (slh_tok (icfg_isl kslot)) ∗
+         is_sleeplock_genl gil gisl (i_lock (ientry kslot)) "inode"%string
+                          (ic_slp fsc_ic kslot) (slh_tok (icfg_isl kslot)) ∗
          sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv ∗
-         ic_deposit fsc_ic kslot (DepTx (q/2)%Qp icfg_dev inum g t qt) ∗
+         (∃ loc tlc : nat,
+            ⌜(loc <= tlc)%nat⌝ ∗ IcacheRef.cred_floor loc tlc ∗
+            ic_handle fsc_ic kslot (DepTx (q/2)%Qp icfg_dev inum g loc t qt)) ∗
          i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} icfg_dev ∗
          i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} inum ∗
          i_valid (ientry kslot) ↦₄ valid_word true ∗
@@ -299,7 +301,9 @@ Definition create_fresh_ty_body
             comes straight back, and create returns it at the child's
             iunlock. *)
          ifreeze_off (bv_unsigned inum) ∗
-         inode_ref_short_gen kslot (q/2 + q/2)%Qp (q/2)%Qp icfg_dev inum g ∗
+         (∃ lo tl : nat,
+            ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
+            inode_ref_short_genlo kslot (q/2 + q/2)%Qp (q/2)%Qp icfg_dev inum g lo) ∗
          (* ...AND ITS PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md
             §5''.3): ialloc's [ClaimL] iget minted it, and the iunlockput
             that closes the child spends it. *)
@@ -367,7 +371,7 @@ Section CftHelpers.
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
+    iIntros (Hk) "H". rewrite /ic_escrows /ic_boxes_all /ic_escrow.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
@@ -587,21 +591,23 @@ Proof.
     iEval (rewrite inode_ref_shed) in "Href".
     iDestruct "Href" as "[Hkeep Hshr]".
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
-    iDestruct "Hshr" as (gsh) "Hshr".
+    iDestruct "Hshr" as (gsh losh tlsh) "(%Hlesh & #Hflsh & Hshr)".
+    iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimsf".
     iEval (rewrite inode_ref_short_gen_intro) in "Hkeep".
-    iDestruct "Hkeep" as (gkp) "Hkeep".
-    iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr") as %->.
+    iDestruct "Hkeep" as (gkp lokp tlkp) "(%Hlekp & #Hflkp & Hkeep)".
+    iDestruct (inode_ref_short_shr_genlo_agree with "Hkeep Hshr") as %[-> ->].
     iDestruct (cpu_own_transport CID4 CID7 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Hil CID7 XI γs j γl pd pav pu gilc gislc
-              kslot (q/2)%Qp gsh
-              (DepTx (q/2)%Qp icfg_dev inum gsh t qt) (ClaimK ty t qc) inum pidv dq dqs
+              kslot (q/2)%Qp gsh losh tlsh
+              (DepTx (q/2)%Qp icfg_dev inum gsh losh t qt) (ClaimK ty t qc) inum pidv dq dqs
               B1 K eb b lks Upr
               HKil eq_refl ltac:(discriminate)
               Hkslt Hlg Hist Hcblk Hinb Hj Hgs HB1a0 ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescc Hireg
-                    Hslkc Hshr [Htx] Hlic Hsbi Hppid Hprocs Hdevi Hdgeom
+                    Hslkc [%] Hflsh Hclaimsf Hshr [Htx] Hlic Hsbi Hppid Hprocs Hdevi Hdgeom
                     Hdlk Hbs1").
+    all: try (exact Hlesh).
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htx". }
@@ -639,14 +645,18 @@ Proof.
     iSplitR; [iExact "Hslkc" |].
     iSplitL "Hslq"; [iExact "Hslq" |].
 
-    iSplitL "Hdep"; [iExact "Hdep" |].
+    iSplitL "Hdep".
+    { iExists losh, tlsh. iSplitR; [iPureIntro; exact Hlesh |].
+      iSplitR; [iExact "Hflsh" | iExact "Hdep"]. }
     iSplitL "Hcidev"; [iExact "Hcidev" |].
     iSplitL "Hciinum"; [iExact "Hciinum" |].
     iSplitL "Hcivalid"; [iExact "Hcivalid" |].
     iSplitL "Hcload"; [iExact "Hcload" |].
     iSplitR; [iExact "Hcshot" |].
     iSplitL "Hcfrz"; [iExact "Hcfrz" |].
-    iSplitL "Hkeep"; [iExact "Hkeep" |].
+    iSplitL "Hkeep".
+    { iExists losh, tlkp. iSplitR; [iPureIntro; exact Hlekp |].
+      iSplitR; [iExact "Hflkp" | iExact "Hkeep"]. }
     iSplitL "Hwb"; [iExact "Hwb" |].
     iSplitL "Hws"; [iExact "Hws" | iExact "Hop"].
   - (* ============================================================== *)

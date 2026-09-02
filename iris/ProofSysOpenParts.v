@@ -890,7 +890,7 @@ Section ProofSysOpenPublish.
 
   Lemma so_publish `{XI : CurCtx} (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)
       (gy : gname) (inum : mword 32) (ty : bv 16) (C : fcontent)
-      (pn : fpnames) (om : mword 32) (rb wb : bool) :
+      (pn : fpnames) (om : mword 32) (rb wb : bool) (lo tl : nat) :
     ↑fileipN ⊆ E ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
@@ -912,9 +912,10 @@ Section ProofSysOpenPublish.
        free at the one site that installs the payload.  [so_tdev_zne] on the
        inode arm, [so_dev_vac] on the device arm. *)
     (fc_type C = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z) ->
-
+    (lo <= tl)%nat ->
     (* the parent the walk kept, short by the share it lent ilock ... *)
-    inode_ref_short_gen kk (qi + s)%Qp qi icfg_dev inum gy -∗
+    IcacheRef.cred_floor lo tl -∗
+    IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi icfg_dev inum gy lo -∗
     (* ... its PROVENANCE UNIT, which travels with the parent into the fd
        slot's [cinv] and comes back out at fileclose's withdraw (item
        7a-wire, iclaim-ledger.md §5''.3's step 6: the fd slot is one of the
@@ -941,11 +942,13 @@ Section ProofSysOpenPublish.
        projection because [fdstate_ok] is a relation -- see its note. *)
     |={E}=> ∃ st : fdstate, ⌜fdstate_ok inum C st⌝ ∗ file_ref gf kf 1 st.
   Proof.
-    intros HEi Hkk Hinb Hip Hty Hwrb Hrdb Hwdb Hdir Hdvw.
-    iIntros "Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hcoff".
+    intros HEi Hkk Hinb Hip Hty Hwrb Hrdb Hwdb Hdir Hdvw Hle.
+    iIntros "#Hfl Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hcoff".
     (* ---- the generation: name the returned share and pin it ---- *)
-    rewrite inode_shr_gen_intro. iDestruct "Hshr" as (g2) "Hshr".
-    iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr") as %<-.
+    rewrite inode_shr_gen_intro.
+    iDestruct "Hshr" as (g2 lo2 tl2) "(%Hle2 & #Hfl2 & Hshr)".
+    iDestruct (IcacheRef.inode_ref_short_shr_genlo_agree with "Hkeep Hshr")
+      as %[<- <-].
     (* ---- the parked reference: the parent, short by exactly [s] ---- *)
     iAssert (inode_held_short (ientry kk) s) with "[Hkeep Hru]" as "Hsh".
     { iExists kk, (qi + s)%Qp, qi, inum.
@@ -953,12 +956,15 @@ Section ProofSysOpenPublish.
       iSplitR; [iPureIntro; exact Hkk|].
       iSplitR; [iPureIntro; exact Hinb|].
       iSplitR; [iPureIntro; reflexivity|]. iFrame "Hru".
-      iApply (inode_ref_short_gen_forget with "Hkeep"). }
+      iApply (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hle
+                with "Hfl Hkeep"). }
     iAssert (inode_shr_held_gen (ientry kk) s gy inum) with "[Hshr]" as "Hs".
-    { iExists kk.
+    { iExists kk, lo, tl2.
       iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; exact Hkk|].
-      iSplitR; [iPureIntro; exact Hinb|]. iExact "Hshr". }
+      iSplitR; [iPureIntro; exact Hinb|].
+      iSplitR; [iPureIntro; exact Hle2|].
+      iFrame "Hfl2". iExact "Hshr". }
     (* ---- the two FD-type witnesses: [so_pay_witness] and the owner's
        ruling, both discharged by the caller and spent in one [iMod] ---- *)
     iMod (inode_pay_alloc E (ientry kk) s gy inum (fc_type C) (fc_wbool C) ty
@@ -1215,13 +1221,20 @@ Section ProofSysOpenFrame.
   Lemma so_omode_split `{XI : CurCtx} (sp0 : mword 64) (w : mword 64) :
     (pa_stk sp0 23) ↦₈[KT1] w ⊢
     (pa_stk sp0 23) ↦₄[KT1] word_lo w ∗ (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] word_hi w.
-  Proof. apply ctx_word_pointsto_split4. Qed.
+  Proof.
+    (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
+    iIntros "H".    iDestruct (ctx_word_pointsto_split4 with "H") as "[Hlo Hhi]".
+    iFrame "Hlo Hhi".
+  Qed.
 
   Lemma so_omode_join `{XI : CurCtx} (sp0 : mword 64) (lo hi : bv 32) :
     is_aligned_paddr (Physaddr (pa_stk sp0 23)) 8 = true ->
     (pa_stk sp0 23) ↦₄[KT1] lo -∗ (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] hi -∗
     (pa_stk sp0 23) ↦₈[KT1] word_of_words lo hi.
-  Proof. intro Hal. apply ctx_word_pointsto_join4. exact Hal. Qed.
+  Proof.
+    intro Hal. iIntros "Hlo Hhi".
+    iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal with "Hlo Hhi").
+  Qed.
 
   (* the buffer, named as bytes and back: argstr / namei / create all speak
      the [seq]-indexed byte window, not [bytes_own]. *)

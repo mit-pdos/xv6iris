@@ -755,6 +755,7 @@ End FwSlots.
    of a hand-reduced paraphrase of it: if SpecWritei's bracket ever changes
    shape again, this stops compiling.  ------------------------------------- *)
 Section FwWriteiSrc.
+  Context `{XI : CurCtx}.
   (* exactly [ProcInv]'s own context for [proc_priv].  [lockG] IS QUALIFIED
      ON PURPOSE: this file does not [Require Import WpLock], so the plain
      spelling does not fail -- Rocq's backtick binders generalize, and it
@@ -777,7 +778,7 @@ Section FwWriteiSrc.
      it GETS BACK at +0xa4 (instantiate [V := upd_upt V P']), which is what
      lets the loop re-park [proc_priv] and carry it into the next iteration
      without ever holding [p_pid] itself. *)
-  Lemma fw_writei_src `{XI : CurCtx} (γf : gname) (j : nat) (pidv : mword 32) (U : ustate)
+  Lemma fw_writei_src (γf : gname) (j : nat) (pidv : mword 32) (U : ustate)
       (dq : dfrac) (src : mword 64) (n : nat) (src_bytes : nat -> bv 8) :
     (if true
      then proc_priv_core (proc_addr j) pidv U
@@ -1533,6 +1534,7 @@ Section ProofFilewrite.
     KernelDataInv.kernel_data -∗
     SpecPrintk.printk_env (fsc_printk) (fsc_uart) (fsc_disk) -∗
     IcacheInv.itable_inv -∗
+    IcacheInv.iref_claims -∗
     (* the FAMILIES, since the slot is the carve's output and not the
        caller's to name *)
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov
@@ -1588,7 +1590,7 @@ Section ProofFilewrite.
     iIntros "Hcg Hcnt #Htext Hpc #Hprocs
              Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
              Href Hpriv #Hkenv
-             #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hescs #Hireg
+             #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hclaimsfw #Hescs #Hireg
              #Hslks #Hoffs #Hdev #Hgeo #Hdlk #Hbm Hout Hcont".
     (* ---- THE REFERENCE, OPENED, AND THE TWO FIELD FACTS OFF THE STATE ----
        The loop reads [f->type] and [f->writable] off the field cells, so it
@@ -1749,8 +1751,9 @@ Section ProofFilewrite.
        names below are local to the iteration and everything derived from
        them is re-derived on the next one. ---- *)
     iDestruct (fileread_pay_carve gf kx qx Cf _ (or_introl Htyi) with "Hrpay")
-      as (ik inum sh g ty)
-         "(%P8 & %P9 & %P5 & %P10 & %P10d & #Hty & Hshr & Hoh & Hpayback)".
+      as (ik inum sh g ty lox tlx)
+         "(%P8 & %P9 & %P5 & %P10 & %P10d & %Hlex & #Hflx & #Hty & Hshr & Hoh &
+           Hpayback)".
     (* the off output IS the ledger fragment on this arm *)
     iEval (rewrite (carve_off_inode _ _ _ _ Htyi)) in "Hoh".
     iDestruct (ioff_escrows_acc ik P9 with "Hoffs") as "#Hoesc".
@@ -1864,7 +1867,7 @@ Section ProofFilewrite.
     (* THE SHARE, HALVED (fs-icache 17.3): ilock is lent [s/2] and the
        retained half's [live_gen] is what pins the generation of the share
        iunlock hands back ([fw_shr_regen] on the way out). *)
-    iEval (rewrite fw_shr_gen_halve) in "Hshr".
+    iEval (rewrite (IcacheRef.inode_shr_genlo_halve ik sh)) in "Hshr".
     iDestruct "Hshr" as "[Hshrk Hshrl]".
     iEval (rewrite fw_bslots3) in "Hbsl".
     iDestruct "Hbsl" as "[Hbsl1 Hbsl2]".
@@ -1877,7 +1880,7 @@ Section ProofFilewrite.
 
               gil gisl
 
- ik (sh / 2)%Qp g (ShotK ty)
+ ik (sh / 2)%Qp g lox tlx (ShotK ty)
  inum
               pidv (DfracOwn (1/4)) (fwn_dqs fn)
               D3 (K - 12)%nat eb b lks (us_upt U PI)
@@ -1887,9 +1890,10 @@ Section ProofFilewrite.
                  and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hit Hesc Hireg
-                    Hslk2 Hshrl Hty Hsbi Hppid Hprocs
+                    Hslk2 [%] Hflx Hclaimsfw Hshrl Hty Hsbi Hppid Hprocs
                     Hdev Hgeo Hdlk Hbsl1 Htx").
     all: try lkbelow.
+    all: try (exact Hlex).
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDil Hsil mil dnl bml fl_)
@@ -2361,7 +2365,7 @@ Section ProofFilewrite.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Iunlock.wp_iunlock_tx_sconf gs
               gil gisl
-              ik (sh / 2)%Qp g icfg_dev
+              ik (sh / 2)%Qp g lox tlx icfg_dev
               inum dn' bm'
               pidv (DfracOwn (1/4)) X2 (K - 12)%nat eb (proc_addr jx) b lks
               (upd_usV U (upd_upt (upd_upt (us_V U) PI) P')) (fw_av_iunlock K HK) P9 ltac:(rewrite HX2a0; exact P8)
@@ -2370,8 +2374,9 @@ Section ProofFilewrite.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hit Hesc Hslk2
                     Hheld Hppid Hprocs
-                    Hdep Hidev Hinum Hvalid Hlk [Hshot] Hfrz").
+                    [%] Hflx Hclaimsfw Hdep Hidev Hinum Hvalid Hlk [Hshot] Hfrz").
     all: try lkbelow.
+    all: try (exact Hlex).
     { rewrite Htyq. iExact "Hshot". }
     iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshrb Htx".
     (* ...AND THE WRITE ARM COMES HOME inside [iunlock] (B''-tx): the
@@ -2379,7 +2384,6 @@ Section ProofFilewrite.
        gets its [log_op] back. *)
 
     iDestruct (log_opS_op with "HlogS Htx") as "Hlogop".
-    iDestruct (inode_shr_gen_forget with "Hshrb") as "Hshrb".
     iDestruct ("Hpbk3" with "Hppid") as "Hpriv".
     assert (Hpcbc : ret_pc (X2 !!! Regidx Rra) = mword_of_int (FW + 0xc4)).
     { rewrite HX2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2393,9 +2397,9 @@ Section ProofFilewrite.
     { rewrite (callee_saved_lookup Hcsiu_cs Rs1 ltac:(vm_compute; reflexivity)).
       exact HX2s1. }
     (* THE SHARE, WHOLE AGAIN, at the generation the retained half names *)
-    iDestruct (fw_shr_regen ik (sh / 2)%Qp (sh / 2)%Qp
-                 icfg_dev inum g with "Hshrk Hshrb") as "Hshr".
-    iEval (rewrite fw_qp_halves) in "Hshr".
+    iAssert (IcacheRef.inode_shr_genlo ik sh icfg_dev inum g lox)
+      with "[Hshrk Hshrb]" as "Hshr".
+    { rewrite (IcacheRef.inode_shr_genlo_halve ik sh). iFrame. }
     (* ...and back into the payload it came from.  From here the reference is
        intact again and the postcondition carries no share at all. *)
     iEval (rewrite -(carve_off_inode _ _ _ _ Htyi)) in "Hoh".
@@ -2642,7 +2646,7 @@ Section ProofFilewrite.
                   with "Hcg Hcnt Htext Hpc Hprocs
                         Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                         Href Hpriv Hkenv
-                        Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hescs Hireg
+                        Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hclaimsfw Hescs Hireg
                         Hslks Hoffs Hdev Hgeo Hdlk Hbm Hout Hcont").
     - (* ====== THE SHORT WRITE (and writei's -1): straight to +0xe2 ======
          Before 31f115a this arm ran its own five restores at +0xea first;
@@ -4294,7 +4298,7 @@ Section ProofFilewrite.
                     environment (the cinv is minted per publication, so no
                     fixed persistent family can exist); the names below keep
                     their meanings and the seventh slot is simply gone. *)
-                 iDestruct "Henv" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & #E8 & #E9 & #E10 & #E11 & #E12 & #E13 & #E14 & #E15 & #E16 & #E17 & #EOFF & E18 & E19 & E20 & #E21 & #E22 & #E23 & #E24 & E25)".
+                 iDestruct "Henv" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & #E8 & #E9 & #E10 & #E11 & #E12 & #E13 & #E14 & #E26 & #E15 & #E16 & #E17 & #EOFF & E18 & E19 & E20 & #E21 & #E22 & #E23 & #E24 & E25)".
                  (* the loop still takes the ONE slot's off-borrow invariant;
                     the environment now carries the family, so it is selected
                     here rather than by the caller. *)
@@ -4335,7 +4339,7 @@ Section ProofFilewrite.
                                  Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] Hkenv
-                                 E8 E9 E10 E11 E12 E13 E14 E15 E16 E17
+                                 E8 E9 E10 E11 E12 E13 E14 E26 E15 E16 E17
                                  EOFF E22 E23 E24 E21 [E18 E19 E20 E25]").
                  { rewrite /file_ref /file_fields. iExists Cf.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }

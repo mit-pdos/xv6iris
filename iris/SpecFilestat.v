@@ -253,6 +253,7 @@ Section SpecFilestat.
      (* the three persistent invariants SpecIlock v3 / SpecIunlock v3 take,
         at the FAMILY where they were per-slot *)
      itable_inv ∗
+     IcacheInv.iref_claims ∗
      ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov
                 fsc_logst ∗
      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
@@ -302,7 +303,7 @@ Section SpecFilestat.
     filestat_fs_env fn -∗ filestat_fs_out fn.
   Proof.
     rewrite /filestat_fs_env /filestat_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
     iFrame "Hsb Hbs".
   Qed.
 
@@ -332,11 +333,7 @@ Section SpecFilestat.
     IcacheRef.inode_shr_gen ik (s1 + s2)%Qp icfg_dev inum g ⊣⊢
     IcacheRef.inode_shr_gen ik s1 icfg_dev inum g ∗
     IcacheRef.inode_shr_gen ik s2 icfg_dev inum g.
-  Proof.
-    rewrite /IcacheRef.inode_shr_gen IcacheRef.inode_ident_split
-            IcacheRef.live_gen_split SleepLock.slh_tok_split.
-    iSplit; [iIntros "[[$ $] [[$ $] [$ $]]]" | iIntros "[($ & $ & $) ($ & $ & $)]"].
-  Qed.
+  Proof. apply IcacheRef.inode_shr_gen_split. Qed.
 
   (* halving, as its OWN lemma -- durable-notes' [rewrite -(Qp.div_2 q)]
      trap: written at a call site inside the proofmode the split's evar lands
@@ -363,8 +360,11 @@ Section SpecFilestat.
   Proof.
     iIntros "H1 H2".
     iEval (rewrite IcacheRef.inode_shr_gen_intro) in "H2".
-    iDestruct "H2" as (g2) "H2".
-    iDestruct "H1" as "(Hid1 & Hlv1 & Hs1)". iDestruct "H2" as "(Hid2 & Hlv2 & Hs2)".
+    iDestruct "H2" as (g2 lo2 tl2) "(%Hle2 & #Hfl2 & H2)".
+    iDestruct "H1" as "(Hid1 & Hlv1 & Hs1)".
+    iDestruct "H2" as "(Hid2 & Hlv2 & Hs2)".
+    iAssert (IcacheRef.live_gen ik s2 g2) with "[Hlv2]" as "Hlv2";
+      [by iExists lo2|].
     iDestruct (IcacheRef.live_gen_agree with "Hlv1 Hlv2") as %<-.
     rewrite inode_shr_gen_split2. iFrame.
   Qed.
@@ -378,7 +378,7 @@ Section SpecFilestat.
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ik
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
+    iIntros (Hk) "H". rewrite /ic_escrows /ic_boxes_all /ic_escrow.
     assert (Hl : seq 0 NINODE !! ik = Some ik) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ ik ik Hl with "H") as "$".
   Qed.
@@ -404,12 +404,15 @@ Section SpecFilestat.
       (st : fdstate) :
     fstat_has_inode Cf ->
     file_pay_st γf k q Cf st -∗
-    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16),
+    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16)
+      (lo tl : nat),
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+      ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
       IcacheRef.ity_shot g ty ∗
-      IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
-      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ file_pay_st γf k q Cf st).
+      IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo ∗
+      (IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo -∗
+         file_pay_st γf k q Cf st).
   Proof.
     intros Hty. iIntros "(%pn & %Hst & Hpn & Hpl)".
     assert (Hnp : bool_decide (fc_type Cf = FD_PIPE) = false).
@@ -426,14 +429,16 @@ Section SpecFilestat.
        never touches [f->off], so it is simply carried across and put
        back -- one slot in the pattern and one [iExact]. *)
     iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
-    iDestruct "Hs" as (ik) "(%Hipk & %Hik & %Hinb & Hshr)".
+    iDestruct "Hs" as (ik lo tl)
+      "(%Hipk & %Hik & %Hinb & %Hle & #Hfl & Hshr)".
     (* THREE conjuncts under the [∃ ty] now, not two: the owner's FD_INODE
        "not a device" rides beside the writable-fd "not a directory"
        ([FileInvDefs.inode_pay]'s fifth).  filestat needs neither -- it
        carries both across and puts them back. *)
     iDestruct "Hwt" as (ty) "(#Hshot & %Hnd & %Hdv)".
-    iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty.
+    iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty, lo, tl.
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|]. iSplitR; [iExact "Hfl"|].
     iSplitR; [iExact "Hshot"|].
     (* [iExact], not [iFrame]: both sides are the same FOLDED
        [IcacheRef.inode_shr_gen] and conversion closes it, while the [Frame]
@@ -443,7 +448,7 @@ Section SpecFilestat.
     rewrite /file_core /file_core_noff Hnp Hyes /inode_pay.
     iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
-    iSplitL "Hshr"; [iExists ik; iFrame "%"; iExact "Hshr"|].
+    iSplitL "Hshr"; [iExists ik, lo, tl; iFrame "% Hfl"; iExact "Hshr"|].
     iExists ty. iSplitR; [iExact "Hshot"|].
     iSplit; iPureIntro; [exact Hnd | exact Hdv].
   Qed.
