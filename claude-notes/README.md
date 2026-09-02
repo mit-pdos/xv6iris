@@ -206,6 +206,16 @@ Audited against the tree 2026-08-28, when six moved to
 (finished) and `sp-migration.md` (archived by the owner with work still
 outstanding; see the `completed/` section below).
 
+- **[`tso-cutover-endgame.md`](projects/tso-cutover-endgame.md)** — THE PLAN
+  OF RECORD for branch `tso-cutover` (worktree `/shared/xv6iris-2-main`),
+  the vehicle that lands the real-TSO proofs on `main`: the measured
+  frontier (red roots, blocked cone, honest green), the law it works under
+  (the owner's stitch rule: tso-flip for the physical words, main for the
+  durable-disk ghost), the icache stitch in detail (per-slot IcacheInv
+  fusion, the box instance with main's ghost placed in Q / the payload arm /
+  the L1 row / ipool_inv, the R3′ site map), the remaining lanes (ProcInv
+  keystone, shim sweep, R4–R6) with rounds and gates, and the items that may
+  need an owner ruling.  Read it before touching anything on that branch.
 - **[`main-tso-readiness.md`](projects/main-tso-readiness.md)** — getting
   `main` ready for the eventual TSO cutover, in SLICES that each leave main
   FULLY GREEN.  The goal is "TSO-ready SC": a tree whose STATEMENTS (specs,
