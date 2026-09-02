@@ -79,8 +79,14 @@ Require UserTotalU.
 Require Import UserPtTree UserExec.
 Require Import WpUmodeStep WpUmodeBranch.
 Require Import UmodeArith UmodeAbi.
+Require Import AlignBits.
+Require Import InstrBytes.
+Require Import ProcGeom.
+Require Import SpecUserret.
 Require Import UexecSlot.
+Require Import TfUser.
 Require Import UsysMemOk.
+Require Import UmodeRegs.
 Require Import UserPerm UexecWp UexecRet UkStep.
 Require Import UserHeap.
 Require Import UkRun.

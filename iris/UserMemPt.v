@@ -29,8 +29,11 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import SmodePte.
+Require Import CommonWalk.
 Require Import SmodeCore.
+Require Import UptTree.
 Require Import UserPtTree.
+Require Import UserBits.
 Require Import WpMmodeLeafBase.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import MemAccessGen.
