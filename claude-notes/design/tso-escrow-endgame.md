@@ -2353,3 +2353,11 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   producer; (g) checked producer by producer; the pre-ruling Kp-covered
   sketch marked SUPERSEDED (unsound after a recycle's (b)).  R3 complete;
   R4/R5/R6 next.
+- 2026-09-02 (proposer, R3.4 landing audited against CtxBox.v's
+  statements): matches the ruling; rule 0 re-run on the landed (g) and
+  (a) -- every conclusion produced.  hdr_out's fragment llb is the right
+  producer for l2_hold's llb (the "every key ≤ T" row would have served
+  via llb_le but touches every close); (g) at c = 1 is the free path's
+  only instance; the Kp-covered sketch is absent from the code.  Zero
+  Admitted in CtxBox/IcacheEscrow/ProofIput (the word survives only in
+  their status comments).  R3 complete; nothing outstanding on the box.
