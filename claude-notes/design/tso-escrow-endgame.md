@@ -1388,6 +1388,30 @@ context, mapped to CtxBox's lemmas:
       out — the same relay pattern as genl_llb, on the nb proof.  Without
       it the free path's checkout has no cover.  (The itable side is
       already fine: the guard's acquire is the existing llb tier.)
+      VETTED 2026-09-02 (second reviewer): F22 REAL, correctly scoped and
+      placed.  ProofIput:2589 is the only proof-side user of the NB tier;
+      no alternative cover exists — (C)'s left disjunct needs a floor at
+      T' that the depositor cannot mint (its bound is below its buffered
+      stores), and the right disjunct fails because Tp is the last park
+      stamp, older than T'.  The NB acquire's inner AMO is the only drain
+      between the guard's (b) and the checkout, so the twin
+      wp_acquiresleep_nb_genl_llb_sconf (λ payload ic_slp, llb Tl in,
+      ∃ K, Tl ≤ K ∗ ctx_floor cur_ctx K out) is necessary and sufficient
+      — the genl_llb relay pattern on the NB proof; a lock-relay item,
+      not a box change.  The NB tier's free-lock evidence (slh_auth γt
+      None) and the isl-pool return are untouched; only the payload form
+      and the llb row change.  Add to the R3 list.
+  VETTED 2026-09-02 (second reviewer, F21 as applied + the build agent's
+  walk): F21's refinement ACCEPTED — the map ∃-bound in ic_hold with the
+  mass as a pure row is right (a parameter would reach ic_deposit's
+  arity; (f) recovers the keys from the register by agreement); rule 0
+  re-checked at (f) and the following (d)/SpecIunlock (a singleton of
+  known mass).  ic_box_alloc_at matches box_alloc_at's premise shape.
+  The walk's items all check out ((C) after a share's park with older
+  live keys; (I) across evict → recycle; the guard's OUT_L2 refutation by
+  mass; the two-window non-free last close; the frozen alternative
+  through (e)/(f); the generation pinned by live_gen_agree).  No new
+  issues.  R3 CODE MAY START, with F22's twin on the list.
   Build notes (mine to pay, no ruling needed): box_deposit_L1_shape is
   (b)'s proof plus the entailment before the close, then (b) := x1 = x0;
   ic_hdr's CtxMorph is the cells' word/half morphs plus ctx_morph_const
@@ -1924,3 +1948,7 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   acquiresleep tier, which has no llb twin — R3 needs
   wp_acquiresleep_nb_genl_llb_sconf (relay item) for the free path's (e)
   cover.  R3 code otherwise ready to start.
+- 2026-09-02 (second reviewer): F21 application and the build agent's
+  walk vetted — no new issues; F22 accepted as a lock-relay item (the
+  NB acquiresleep tier needs its genl_llb twin; no alternative cover for
+  the free path's (e)).  R3 code may start.
