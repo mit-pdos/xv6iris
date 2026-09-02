@@ -135,30 +135,41 @@ instance is declared by:
 
 Body:
 
-  box_body := ∃ T ξb m Tp Td (w : bool),
+  box_body := ∃ T ξb m Tp (r : slot_reg),      (* r = {| td; win; ident |} *)
      ctx_parked ξb T ∗ llb loglen_name T ∗
-     stamps ● m ∗ cnt ½ (Σ m) ∗ slot_p ½ Tp ∗ slot_d ½ (Td, w) ∗
-     ⌜(∀ t ∈ dom m, T ≤ t) ∨ T ≤ Tp⌝ ∗        (C: the L2-side cover)
-     ⌜T ≤ Td ∨ T ∈ dom m⌝ ∗                     (D: the L1-side cover)
-     if w then hdr_out ∗ P_rest ξb              (* OUT_L1: header out, L1  *)
-     else ( P_hdr ξb ∗ P_rest ξb                (* IN                      *)
-          ∨ Q )                                 (* OUT_L2: out under L2    *)
+     stamps ● m ∗ cnt ½ (Σ m) ∗ slot_p ½ Tp ∗ slot_d ½ r ∗
+     ⌜∀ p ∈ dom m, p.1 = r.ident⌝ ∗              (I: every live unit names
+                                                  the box's identity)
+     ⌜(∀ p ∈ dom m, T ≤ p.2) ∨ T ≤ Tp⌝ ∗        (C: the L2-side cover)
+     ⌜T ≤ r.td ∨ T ∈ snd <$> dom m⌝ ∗            (D: the L1-side cover)
+     if r.win then hdr_out ∗ P_rest ξb           (* OUT_L1: header out, L1  *)
+     else ( P_hdr r.ident ξb ∗ P_rest ξb         (* IN, at the identity     *)
+          ∨ Q )                                  (* OUT_L2: out under L2    *)
+
+  THE L1 SLOT REGISTER `slot_d : ghost_var slot_reg`, one record
+  {| td : nat; win : bool; ident : id |} shared half/half between the
+  box and L1's payload row — the ONLY state the L1 side and the box
+  share.  L1's row states `win = false` and `ident = (devs k, bnos k)`
+  (the row's own cells), which is how (c) learns the identity it mints
+  at without seeing the bundle (OUT_L2 has none).  Anything the L1 side
+  must tell the box goes in this record; never a second register.
 
   hdr_out := ∃ m', ⌜Σ m' = Σ m⌝ ∗ stamps ◯ m'
              (the withdrawer's unit at c = 1, ∅ at c = 0 — one shape).
 
   THE WINDOW FLAG (F1, re-cut 2026-09-01 by the proposer; supersedes the
   "slot_d half rides hdr_out" fix): slot_d's VALUE carries the window
-  bit, `slot_d : ghost_var (nat * bool)`, at rest (Td, false) in both
-  halves.  L1's payload row states `slot_d ½ (Td, false)` — so L1 cannot
-  be released mid-window — and every L1-side lemma SELECTS its arm shape
-  by agreement on w instead of refuting the other shape:
-    (a) takes (Td, false) ⇒ the body is IN ∨ OUT_L2; sets (Td, true) and
-        KEEPS its half (the unit ◯ m_D goes into hdr_out, as before);
-    (b) takes (Td, true)  ⇒ the body IS hdr_out ∗ P_rest — no case split,
-        for ANY client; sets (T', false) and returns the half to the row;
-    (c),(d) take (Td, false) ⇒ IN ∨ OUT_L2, and they touch neither arm —
-        arm-agnostic again.
+  bit `r.win`, at rest false in both halves.  L1's payload row states
+  `slot_d ½ r` with `r.win = false` — so L1 cannot be released
+  mid-window — and every L1-side lemma SELECTS its arm shape by
+  agreement on `r.win` instead of refuting the other shape:
+    (a) takes r.win = false ⇒ the body is IN ∨ OUT_L2; sets r.win := true
+        and KEEPS its half (the unit ◯ m_D goes into hdr_out, as before);
+    (b) takes r.win = true  ⇒ the body IS hdr_out ∗ P_rest — no case
+        split, for ANY client; sets r := {| td := T'; win := false;
+        ident := id' |} and returns the half to the row;
+    (c),(d) take r.win = false ⇒ IN ∨ OUT_L2, and they touch neither arm
+        — arm-agnostic again.
   WHY NOT THE VETTED FIX: moving the payload's half into hdr_out left
   (b) with nothing in hand for the OUT_L2 branch; the count-auth
   refutation chosen for it works for bcache (bchain carries bref_tok0)
@@ -301,6 +312,101 @@ ACCEPTED.  R1' may start on the flag shape.
       change to the six lemmas' shapes.  R1' IS PAUSED at this point
       (the kit, the six lemmas and boot v5 are written against the
       pre-F6 body) until F6 is vetted.
+      VETTED 2026-09-01 — F6 REAL; EPOCH LEDGER ACCEPTED with the
+      (Td, w, e) refinement — THEN SUPERSEDED the same day (proposer's
+      review, below) by IDENTITY-KEYED STAMPS: no ledger, no epoch.
+      The first vetting's text is kept for the record:
+      - Premise confirmed: SpecBread's post is bio_locked at the
+        REQUESTED (dev, bno) (SpecBread.v:156); the register design's
+        tie was points-to agreement on the bref's cell fractions, which
+        A6.155 rightly removed from the chain (Q must be ξ-free).
+      - Alternatives (i)–(iv) rightly rejected; (iv) is workable only
+        through L1's payload tie on M (the count auth) — client-specific,
+        so rejected for genericity.  A STAMP-keyed ledger (no epoch) is
+        also rejected: (b) after a recycle may deposit at T' = T
+        (ctx_deposit raises only past K⊔W) and would rewrite an existing
+        agree key.  The explicit epoch, advanced by (b), is append-only
+        by construction.
+      - REFINEMENT (required): L1's slot-row witness is not
+        self-evidently CURRENT (agreement with ● I gives I !! e_row =
+        id, not e_row = e_box), so (c) cannot show the reference it
+        mints is of the current epoch.  Put the epoch INTO slot_d's
+        value: `slot_d : ghost_var (nat * bool * nat)` = (Td, w, e).
+        (c) agrees on e with the box and mints the new reference's
+        witness from the box's ● I (a core-id fragment of an existing
+        key); L1's row then carries NO witness of its own.  (b) already
+        updates slot_d and advances e in one step, so the sync is free.
+      - Checked: the checkout derivation ((e_r,t) ∈ dom m ⇒ e_r = e ⇒
+        id_r = id ⇒ bundle at (dev,bno)) is total; (f) re-establishes
+        "IN at id" from bio_locked's identity + its witness (only the
+        recycler changes dev/bno, at c = 0); pair-keyed stamps cost a
+        `snd` projection in (C)/(D), no new lemma; one reference
+        spelling, six lemmas, three arm shapes; CtxBox.v gains an idO
+        parameter — the ledger is box-owned and generic.
+      - R3 FLAG (not blocking): icache shares carry inode_ident CELL
+        fractions, which cannot ride Q.  R3's site map decides whether
+        the share stays in the holder's hand across ilock→iunlock (cells
+        give the tie; ledger bcache-only) or the icache goes
+        ghost-identity through the same ledger.
+      PROPOSER'S REVIEW (2026-09-01) — the ledger's premise is wrong.
+      "The tie must ride the reference as a PERSISTENT ghost, droppable
+      at re-identification" is a false constraint: the witness need not
+      be persistent, it must be HELD by every live reference and
+      DROPPABLE at (b) — and the reference already carries a resource
+      with exactly that lifecycle, its stamps fragment ((c) mints, (f)
+      moves, (d) removes, (b) re-mints).  So the identity goes into the
+      KEY of the stamps map, not into a new ledger:
+        stamps : authR (gmapUR (id * nat) ufracR)      keyed (ident, stamp)
+        reference := ∃ id t, ◯{[(id, t) := 1]} ∗ llb t
+        slot_d's record carries `ident` in place of the epoch
+        one row (I): ∀ p ∈ dom m, p.1 = r.ident;  IN bundle at r.ident.
+      Checkout: (id_r, t) ∈ dom m ⇒ id_r = r.ident ⇒ the bundle is at
+      the request.  (c) agrees on slot_d and mints at r.ident =
+      (devs k, bnos k), the matched request.  (b) resets m to
+      {[(id', T') := 1]} (mint at c = 0, move the hdr_out unit at c = 1)
+      and sets r := {| td := T'; win := false; ident := id' |}, id' being
+      the header it just stored.  (f) moves (id_r, t) to (id_r, T');
+      id_r = r.ident by (I).  (d) removes a unit; (I) is monotone under
+      removal.  The stamp-reuse objection to a stamp-keyed LEDGER does
+      not apply: keys carry ufrac mass, not agree, and (b) resets m, so
+      no stale key survives to collide.  Alternative (iii) was rejected
+      for making the kit pair-VALUED; keying rather than valuing leaves
+      Σ and both local updates untouched — (C)/(D) project the stamp
+      with `snd`, the cost F6 already accepted for (e, t) keys.
+      Deleted relative to the ledger: `bid`, the epoch, rows
+      ⌜I !! e = Some id⌝ and ⌜p.1 = e⌝, the second fragment on every
+      reference.  CtxBox.v takes `id : Type` (EqDecision, Countable) as
+      its identity parameter and nothing else new.
+      R3 CONSEQUENCE: a stamps fragment IS ghost identity, so the icache
+      share's inode_ident CELL fractions need not enter the box story
+      at all; the R3 flag resolves toward ghost identity through the
+      key (confirm at the site map, as before).
+      R1' MAY RESUME on identity-keyed stamps with the slot_reg record.
+      VETTED 2026-09-01 (second reviewer, on the re-cut): ACCEPTED —
+      strictly simpler than the ledger, whose "persistent witness"
+      premise was a false constraint the first vetting accepted too
+      quickly.  Checked: (I) is maintained at all six (a: m and ident
+      untouched, the unit stays in ● m; b: singleton at id' + r.ident :=
+      id' in one step; c: mint at r.ident; d: removal; e: untouched; f:
+      move within id_r = r.ident; boot vacuous); the stamp-reuse
+      objection was specific to an AGREE ledger and does not apply to
+      ufrac mass; (c)'s currency is ghost_var agreement on the record
+      (the flag's own mechanism), and L1's row ties ident to its cells,
+      which (b) rewrites with its stores — so bread's requested
+      (dev, bno) reaches the checkout through the key; all live
+      fragments share one identity because only (b) changes it and (b)
+      empties m; (mword 32 × mword 32) has EqDecision/Countable, and
+      CtxBox.v's `id : Type` is the only new parameter.  The
+      new-box-ghost tripwire is exactly the lesson of F1's second fix
+      and F6's ledger.  R3 NUANCE: "the share's inode_ident cells need
+      not enter the box story" is right for the BOX, but those ξ-cells
+      still need a home during ilock→iunlock and it cannot be Q; the
+      options are the icache holder handle (if not frozen) or the
+      existing ghost ic_id — NOT a deposit at ξb (the parker has no
+      acquire between checkout and park to cash a cover).  Site-map
+      question for R3, not a box question.  Notation swept to the
+      record form (r.win / r.td / snd <$> dom m) in the flag paragraph,
+      §3.5 (a)/(d) and the bonus rule.
 
 HARD RULES: exactly these three arm shapes and six lemmas.  Protocol
 substates go inside Q (ξ-free ghost).  A seventh lemma, a fourth arm
@@ -329,28 +435,35 @@ disjunct.
 
 ### 3.2 The ghosts (per box)
 
-  - `stamps : authR (gmapUR nat ufracR)` — THE STAMPED SHARES.  A map
-    stamp ↦ fraction; `● m` in the box.  Each COUNTED reference owns ONE
-    UNIT (fractions summing to 1); a share owns part of its parent's
-    unit at the share's own fraction s (split/merge = the gmap op).  The
-    row `Σ m = c` ties the total to the refcount.  A holder's stamp is
-    the stamp of the LAST deposit it witnessed: ref_incr mints
-    `◯{[T := 1]}` at the box's current T; a park MOVES the parker's
-    fraction from its old stamp to the park stamp (dealloc + alloc; Qp
-    addition is cancelable).  ufrac, not frac: several units may sit at
-    one stamp.
-  - `slot_p : ghost_var nat`, `slot_d : ghost_var (nat * bool)` — half
-    in the box, half in the L2 / L1 payload beside that payload's floor
-    row `ctx_floor ξ Tp` / `ctx_floor ξ Td`.  slot_d's bool is the
-    window flag (§2); the L1 row states it false, and also carries
-    `llb loglen_name Td`, so a release that leaves Td unchanged can
-    re-fold it (§3.4).
+  - `stamps : authR (gmapUR (id * nat) ufracR)` — THE STAMPED SHARES,
+    keyed by (IDENTITY, STAMP).  `● m` in the box.  Each COUNTED
+    reference owns ONE UNIT (fractions summing to 1); a share owns part
+    of its parent's unit at the share's own fraction s (split/merge =
+    the gmap op).  The row `Σ m = c` ties the total to the refcount; the
+    row (I) `∀ p ∈ dom m, p.1 = r.ident` ties every live unit to the
+    box's identity (F6 — the checkout's tie to the requested (dev,bno),
+    and R3's ghost identity for shares).  A holder's stamp is the stamp
+    of the LAST deposit it witnessed: ref_incr mints `◯{[(r.ident, T)
+    := 1]}` at the box's current T; a park MOVES the parker's fraction
+    from (id, t) to (id, T') (dealloc + alloc; Qp addition is
+    cancelable); (b) re-mints the unit at the new identity.  ufrac, not
+    frac: several units may sit at one key.
+  - `slot_p : ghost_var nat`, `slot_d : ghost_var slot_reg` with
+    `slot_reg := {| td : nat; win : bool; ident : id |}` — half in the
+    box, half in the L2 / L1 payload beside that payload's floor row
+    `ctx_floor ξ Tp` / `ctx_floor ξ r.td`.  `win` is the window flag
+    (§2); `ident` the box's current identity (F6).  The L1 row states
+    win = false and ident = (devs k, bnos k), and also carries
+    `llb loglen_name r.td`, so a release that leaves td unchanged can
+    re-fold it (§3.4).  ONE record, not a tuple that grows: any further
+    L1↔box fact is a field of it.
   - `cnt : ghost_var nat` — half in the box, half in L1's payload beside
     the refcount word; the row ⌜Σ m = c⌝ with Σ taken in Q (F3).
 
 ### 3.3 The reference: ONE spelling, ghost-only
 
-    ref / share := ∃ m, stamps ◯ m ∗ llb loglen_name (max (dom m))
+    ref / share := ∃ m, stamps ◯ m ∗ llb loglen_name (max (snd <$> dom m))
+                   with ⌜∀ p ∈ dom m, p.1 = id⌝ for the holder's known id
 
 plus the client's token/cells: bcache `bref := bref_tok ∗ ref ∗ the
 dev/bno fractions` (bpin's / the log layer's), `bchain := bref_tok0 ∗
@@ -362,57 +475,68 @@ where it is needed.
 
 ### 3.4 The floor rule (routes unchanged)
 
-  - R1 at EVERY acquire by a reference holder: `Tl := max (dom m)`.
-  - R2 at every L1 release (ALL through `_in`): fold `max Td (paid)`
-    — the llb is the payload row's `llb Td` joined with the decrement's
-    `llb (max (dom m_D))` (llb_max); a release that leaves Td unchanged
-    ((c), the hit path) folds the row's own `llb Td`.  At every L2
-    release (always `_in`): fold the park stamp.  Tp / Td ARE what
+  - R1 at EVERY acquire by a reference holder: `Tl := max (snd <$> dom m)`.
+  - R2 at every L1 release (ALL through `_in`): fold `max r.td (paid)`
+    — the llb is the payload row's `llb r.td` joined with the decrement's
+    `llb (max (snd <$> dom m_D))` (llb_max); a release that leaves r.td
+    unchanged ((c), the hit path) folds the row's own `llb r.td`.  At
+    every L2 release (always `_in`): fold the park stamp.  Tp / r.td ARE
+    what
     those payloads' floor rows say.
 
 ### 3.5 The six lemmas (each re-establishes (C), (D), Σ m = c)
 
   (a) withdraw_L1 (under L1; IN → OUT_L1).  Premises: `ctx_floor ξ Kd`,
-      `Td ≤ Kd` (L1's row); the cnt half at c; if c ≠ 0 the caller's
+      `r.td ≤ Kd` (L1's row); the cnt half at c; if c ≠ 0 the caller's
       WHOLE unit `◯ m_D` (Σ m_D = c) with `ctx_floor ξ Kt`,
-      `max (dom m_D) ≤ Kt` (R1).  Cover: c = 0 ⇒ m = ∅ (Σ) ⇒ (D) gives
-      T ≤ Td; c = Σ m_D ⇒ m = m_D (pointwise ≤ and equal sums) ⇒ (D)
-      gives T ≤ Td ∨ T ∈ dom m_D.  Premise `slot_d ½ (Td, false)` ⇒
-      the body is IN ∨ OUT_L2; OUT_L2 refuted: Q's fraction breaks Σ
-      (c = 0) / overflows against the unit in hand (c = 1).  P_hdr comes
-      out at ξ; the unit goes into hdr_out; both slot_d halves flip to
-      (Td, true) and the caller KEEPS its half (L1's row is re-formed
+      `max (snd <$> dom m_D) ≤ Kt` (R1).  Cover: c = 0 ⇒ m = ∅ (Σ) ⇒ (D)
+      gives T ≤ r.td; c = Σ m_D ⇒ m = m_D (pointwise ≤ and equal sums) ⇒
+      (D) gives T ≤ r.td ∨ T ∈ snd <$> dom m_D.  Premise `slot_d ½ r`
+      with r.win = false ⇒ the body is IN ∨ OUT_L2; OUT_L2 refuted: Q's
+      fraction breaks Σ (c = 0) / overflows against the unit in hand
+      (c = 1).  P_hdr comes out at ξ (at r.ident); the unit goes into
+      hdr_out; both slot_d halves set r.win := true (td, ident
+      unchanged) and the caller KEEPS its half (L1's row is re-formed
       only by (b)).
       Sites: bget recycle (c = 0), iput's ref == 1 valid read (c = 1).
-  (b) deposit_L1 (under L1; OUT_L1 → IN).  Deposit P_hdr at the new
-      stamp T'; m := {[T' := 1]} (mint if c = 0, move if c = 1 — the
-      unit is in hdr_out, inside the box); both slot_d halves := (T',
-      false) (the caller's + the prefix's); hand out `◯{[T' := 1]} ∗
-      llb T' ∗ slot_d ½ (T', false)` for L1's row.  (C) left holds (m
-      is a singleton at T'); (D) via Td.  Premise `slot_d ½ (Td, true)`
-      ⇒ the body IS the OUT_L1 shape: nothing to refute.  Sites: the
-      recycle's re-park, iput's re-deposit before its acquiresleep.
-  (c) ref_incr (under L1).  m ⊎= {[T := 1]}; cnt += 1; the new ref gets
-      the box's own `llb T`.  (C)/(D) untouched.  Premise `slot_d ½
-      (Td, false)` ⇒ IN ∨ OUT_L2, both untouched (arm-agnostic).
+  (b) deposit_L1 (under L1; OUT_L1 → IN).  Deposit P_hdr at identity
+      id' (the header the caller just stored) at the new stamp T';
+      m := {[(id', T') := 1]} (mint if c = 0, move if c = 1 — the unit
+      is in hdr_out, inside the box); both slot_d halves := {| td := T';
+      win := false; ident := id' |} (the caller's + the prefix's); hand
+      out `◯{[(id', T') := 1]} ∗ llb T' ∗ slot_d ½ r'` for L1's row,
+      whose ident tie the caller's fresh dev/blockno cells discharge.
+      (I) holds (m is a singleton at id'); (C) left holds; (D) via td.
+      Premise `r.win = true` ⇒ the body IS the OUT_L1 shape: nothing to
+      refute.  Sites: the recycle's re-park, iput's re-deposit before
+      its acquiresleep.
+  (c) ref_incr (under L1).  Agree on slot_d: r.ident = (devs k, bnos k),
+      the identity the hit scan matched.  m ⊎= {[(r.ident, T) := 1]};
+      cnt += 1; the new ref gets the box's own `llb T`.  (I)/(C)/(D)
+      untouched.  Premise `r.win = false` ⇒ IN ∨ OUT_L2, both untouched
+      (arm-agnostic) — the identity comes from the register, never from
+      the bundle.
   (d) ref_decr (under L1).  Present `◯ m_D` (Σ = 1); m -= m_D;
-      Td := max Td (max (dom m_D)); cnt -= 1.  (D) preserved (a removed
-      witness is now ≤ Td); the release folds Td by R2.  refs 1 → 0 IS
-      (d) — the content stays in the box.  Premise `slot_d ½ (Td,
-      false)` ⇒ IN ∨ OUT_L2, both untouched (arm-agnostic).
+      r.td := max r.td (max (snd <$> dom m_D)); cnt -= 1.  (D) preserved
+      (a removed witness is now ≤ r.td); (I) monotone under removal; the
+      release folds r.td by R2.  refs 1 → 0 IS (d) — the content stays in
+      the box.  Premise `slot_d ½ r` with r.win = false ⇒ IN ∨ OUT_L2,
+      both untouched (arm-agnostic).
   (e) checkout (under L2; IN → OUT_L2).  Premises: my `◯ m_h` with
-      `ctx_floor ξ Kt`, `max (dom m_h) ≤ Kt` (R1 at the acquiresleep);
+      `ctx_floor ξ Kt`, `max (snd <$> dom m_h) ≤ Kt` (R1 at the acquiresleep);
       the payload's `slot_p ½ Tp` with `ctx_floor ξ Kp`, `Tp ≤ Kp` (R2);
       the L2 token.  (C) gives T ≤ Kt ∨ T ≤ Kp.  OUT_L2 refuted by the
       token; OUT_L1 refuted by Σ (my fraction vs c = 0, or vs the whole
       unit in hdr_out).  Whole bundle out at ξ; Q := token ∗ ref ∗ the
       slot_p half (A6.155).
   (f) park (under L2; OUT_L2 → IN).  Q out; deposit P at T'; my fraction
-      moves to T'; Tp := T'; hand back the token, the ref at T',
-      `llb T'`, `slot_p ½ T'` for the `_in` releasesleep.  IN refuted by
-      the full valid cell; OUT_L1 refuted by P_rest's cell
-      (ctx_word4_excl_x).  The parker holds ONLY bio_locked and the
-      bundle, and that suffices (the park principle, §2).
+      moves from (id_r, t) to (id_r, T'), and id_r = r.ident by (I), so
+      "IN at r.ident" is re-formed from bio_locked's own (dev, bno);
+      Tp := T'; hand back the token, the ref at (id_r, T'), `llb T'`,
+      `slot_p ½ T'` for the `_in` releasesleep.  IN refuted by the full
+      valid cell; OUT_L1 refuted by P_rest's cell (ctx_word4_excl_x).
+      The parker holds ONLY bio_locked and the bundle, and that
+      suffices (the park principle, §2).
 
 ### 3.6 Cases the register design needed agreement for — now by rows
 
@@ -429,8 +553,8 @@ where it is needed.
     via T' ∈ dom m; the stamp travels inside the share and merges into
     the unit at fileclose.  (The register design had no unit for a
     share to deposit — the R3 wall v2 removes.)
-  - "D never parked" vs "D parked": one lemma, (a); only max (dom m_D)
-    differs.
+  - "D never parked" vs "D parked": one lemma, (a); only
+    max (snd <$> dom m_D) differs.
   Boot: bio_init deposits the content (IN, m = ∅, stamp T_boot = the
   boot hart's K⊔W); (C) is vacuous; (D) needs Td = T_boot, and the boot
   hart cannot floor its own deposit, so L1 is minted WITH the fold: a
@@ -536,13 +660,14 @@ R1-pre (PREREQUISITE; measured 2026-09-01 by the build agent, design
 R1' (the v2 box; replaces R1 as landed in A6.153 — same BioInv slice):
   BioInv's box section rewritten to §2/§3 (three arm shapes, rows
   (C)/(D), Σ m = c, the six lemmas, boot v5: IN at T_boot); bref/bchain
-  to §3.3; bslp minus astamp; the ufrac/gmap kit (~40 lines: frag_sum,
+  to §3.3; bslp minus astamp; the ufrac/gmap kit over (id * nat) keys
+  (~40 lines: frag_sum,
   whole-unit agreement `◯ m_D ≼ ● m ∧ Σ m_D = Σ m → m = m_D`, split/
   merge, the move-stamp local update); the `newlock` twin over
   lock_pay_intro_llb.  Gate: BioInv/BioInitAt/SleepLock cone green.
 R2 (the cutover): the A6.154 site map as written, with (a)–(f) in place
   of the eight lemmas: sites 1–4 (the recycler) = (a) + three stores +
-  (b); site 5 = (e) at the genl_llb acquiresleep with Tl := max (dom m);
+  (b); site 5 = (e) at the genl_llb acquiresleep with Tl := max (snd <$> dom m);
   site 6 = (f) + the genin releasesleep; brelse's refs-- = (d) (no
   withdraw at 0); bpin = (c); bunpin = (d).  bio_ctx's
   `<{ bcache_res bn V }>` takes the λ-flip (bcache_res2).  DELETE the v1
@@ -579,7 +704,7 @@ blockno; confirm the exact rows at R3's site map);
 P_rest := the remaining in-memory dinode fields (type/major/minor/size/
 addrs — non-empty, so the park principle holds).  Extract
 `CtxBox.v` NOW (rule of two) and re-express the bcache over it.  The
-reference spelling gains `∃ m, ◯ m ∗ llb (max (dom m))` beside
+reference spelling gains `∃ m, ◯ m ∗ llb (max (snd <$> dom m))` beside
 live_fracc — ONE sweep of the inode_ref/inode_shr destructures to the
 final form (§5 rule 2); no other new inode_* spelling.
 Gate: -B green; ic_escrow's five-arm body and its ~13 open/swap lemmas
@@ -681,7 +806,7 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
 7. TRIPWIRES (stop and come here if any fires):
    - a seventh lemma on the box, a fourth arm shape, or a second
      reference form;
-   - any per-site floor that is not "R1 at Tl := max (dom m)" or a
+   - any per-site floor that is not "R1 at Tl := max (snd <$> dom m)" or a
      payload floor row;
    - any need to AGREE a stamp between two holders — (C)/(D) with
      Σ m = c make agreement unnecessary; if it seems needed, a row is
@@ -690,10 +815,17 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
    - an arm without a cell that the park can meet (the IDLE lesson);
    - a box lemma that appeals to a CLIENT ghost beyond the declared P,
      Q and L2 token (count auths, identity ghosts, client tokens) — the
-     rule the count-auth fix broke; it is what keeps CtxBox.v generic.
-   BONUS RULE (from the flag): L1's payload row states slot_d ½ (Td,
-   false), so L1 cannot be released with a window open — the (a)…(b)
-   pair is forced into one critical section by the payload's shape.
+     rule the count-auth fix broke; it is what keeps CtxBox.v generic;
+   - a NEW BOX GHOST.  It is admitted only after showing the fact
+     cannot be a KEY of the stamps map, a VALUE of it, or a FIELD of the
+     slot register — F1's second fix and F6's ledger were both
+     expressible that way (the flag as a slot_reg field; the identity as
+     the stamps key), and each was first proposed as a new ghost.  The
+     box owns exactly: the parked context, stamps, cnt, slot_p, slot_d.
+   BONUS RULE (from the flag): L1's payload row states slot_d ½ r with
+   r.win = false, so L1 cannot be released with a window open — the
+   (a)…(b) pair is forced into one critical section by the payload's
+   shape.
 
 ## 6. Post-endgame cleanup (do NOT do before SystemAdequacy is green)
 
@@ -897,3 +1029,36 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   agree witnesses keyed by an epoch (b) advances; stamps keyed by
   (epoch, stamp)); recorded in §2 with the alternatives considered;
   R1' is PAUSED at the identity tie until vetted.
+- 2026-09-01 (design vetting of F6): REAL (SpecBread's post is at the
+  requested identity; A6.155 removed the points-to tie).  EPOCH LEDGER
+  ACCEPTED as the minimal generic fix (alternatives i–iv and a
+  stamp-keyed ledger rejected, reasons recorded).  Refinement REQUIRED:
+  the epoch rides slot_d's value (Td, w, e) so (c) mints a current
+  witness from the box's ● I; L1's row carries no witness.  §3.2 gains
+  bid + the pair-keyed stamps row.  R3 flag: icache shares' ident cells
+  vs Q.  R1' may resume.
+- 2026-09-01 (proposer's review of F6): REAL, but the epoch ledger is
+  SUPERSEDED — its premise (a persistent witness) was a false
+  constraint; the stamps fragment already has the needed lifecycle.
+  IDENTITY-KEYED STAMPS: `gmapUR (id * nat) ufracR`, row (I)
+  `∀ p ∈ dom m, p.1 = r.ident`, IN at r.ident; the identity rides the
+  L1 slot register in place of the epoch, and slot_d's value is now the
+  record slot_reg {| td; win; ident |}.  Deleted: bid, the epoch, two
+  rows, the second fragment per reference.  §2 body/register, §3.2,
+  §3.3, §3.5 (b)/(c)/(f) amended; §5 gains the new-box-ghost tripwire
+  (key / value / register field first).  R3: the stamps key is ghost
+  identity for shares.  R1' resumes on this shape.
+- 2026-09-01 (design vetting of the F6 re-cut): identity-keyed stamps
+  ACCEPTED over the epoch ledger (the persistent-witness premise was
+  false; the stamps fragment has the needed lifecycle).  (I) checked at
+  all six lemmas; the T' = T objection applies only to an agree ledger;
+  (c)'s currency = record agreement; CtxBox.v gains only `id : Type`.
+  R3 nuance: the share's ident cells still need a non-Q home (holder
+  handle or ic_id), never a ξb deposit.  Tuple notation swept to the
+  slot_reg record in §2 and §3.5.  R1' resumes on this shape.
+- 2026-09-01 (proposer, pass after the F6 vetting): agreed with the
+  vetting including the R3 nuance (the share's ident cells need a
+  non-Q, non-ξb home: the locked handle or ic_id — a site-map item).
+  Remaining pre-F6 notation swept: `max (dom m)` → `max (snd <$> dom
+  m)` and Td → r.td in §3.4, §3.5 (e), §3.6, §4.1 R2, §4.2, §5; the R1'
+  kit named over (id * nat) keys.  No design change.
