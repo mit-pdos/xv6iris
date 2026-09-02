@@ -507,6 +507,13 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | §3.2b | the consolidated box BUILT side-by-side (`iris/CtxBoxHooked.v`): hooks on (a)/(b)/(e)/(f)/(g), `box_q1_update`, eight verbatim-typed corollaries; green on the VM, assumptions closed | landed side-by-side (commit ded0fa1de); slot-in = r20c |
 | Q10 | the last close's (a) must not consume iput's pin name-half: the hooked (a) moves the frozen alternative's own pin into `Q1 1` (option B); no ghost change; `ic_hdr_frz` carries `ifreeze_pre` out and needs a `CtxMorph` instance | RULED B by reviewer 1, confirmed by the box's designer (item 9); to land in ProofIput |
 | §6²⁷ | run L2/L3/L4 in parallel now; sweep the file layer once; two tripwires before r21 | RECOMMENDED to the owner |
+| R4a Q1 | `inode_pay`: the cinv parks KEYED GHOST ONLY (`iref_frag`, `ic_lent_stamps`, `runit_any`); the reference's cells, `live_genlo`, `slh_tok` ride the fractional payload as `inode_ref_side` at the parked fraction; pin that fraction to `Q` by lending HALF at sys_open (no arity change), fallback `fp_iqi` | RULED by reviewer 1 (item 15) |
+| R4a Q2 | NO re-mint, NO llb, NO `own_context` at cancel: the share's `cred_floor` is in the canceller's hand (morphed with the payload) and `live_genlo_agree` pins the parked `lo`; `inode_pay_cancel`'s statement unchanged | RULED by reviewer 1 (item 15) |
+| R4a Q3/Q5 | ONE file-layer sweep with all three shapes final (`inode_pay`, `ftable_res_at` WITH the floor row + `_in` releases, `ic_slp ∗ off_rows`); L5 + full `ftable_res_at` first, then L8/L9 and the OffBox consumers as the two lanes INSIDE r25 | RULED by reviewer 1 (item 15); the two-sweep order reviewer 1 gave earlier is WITHDRAWN (L6 is on L8's path) |
+| R4a Q4 | raise the twin's parked floor AFTER the last deposit (`ctx_parked_raise` takes only `llb T'`) | no objection (item 15) |
+| R4a Q6 | `cwd_ref` (class D) needs NO ruling and NO floor-free form: `live_fracc` morphs by re-choosing `tl := lo` in the wrote case (the `lk_floor_morph` proof) -- so `inode_held` morphs structurally; class D is class A | RULED by reviewer 1 (item 15) |
+| R4a Q7 | `first_fsinit`: classify by `About`; indexed cells morph structurally, raw cells need no crossing; do not restructure userinit/forkret for it | reviewer 1 (item 15) |
+| FLOORS | a floored bundle that ∃-binds its `tl` MORPHS (floor case: `ctx_floor_dom` keeps `tl`; wrote case: `ctx_dom_wrote_floor` gives `ctx_floor ξ' lo`, re-choose `tl := lo`); the F21 llb form is for shares whose OWNER IS GONE (parked in the box), not for a credential whose owner crosses with it | law note (item 15) |
 
 Tripwires added by this lane, beyond flip endgame §5.7: law 9 (residues)
 and law 10 (hooks).
@@ -729,6 +736,112 @@ and law 10 (hooks).
     row; `fs_ready` rides in `first_tok` inside `proc_priv`, which the park
     deposits).  The honest order is the plan's: r25 then r26; parallelism
     is inside r25.
+15. **REVIEWER 1 ON ITEM 14 AND `inode-pay-r4a.md` §1–§8 (2026-09-02).**  Read
+    against the code: `inode_pay`, `inode_held_short`, `inode_ref_short`,
+    `live_fracc`, `cred_floor`, `inode_shr_held_gen`, `lk_floor` and its
+    morph, `live_genlo` (frac-agree on `(g, lo)`), `ctx_floor_dom`,
+    `ctx_dom_wrote_floor`, `ctx_parked_raise`, `fslot`/`file_rest`/`file_pay`/
+    `file_core_noff`/`file_core_off`/`file_ref`, `is_pipe`, `ftable_res`, the
+    eleven `<{ ftable_res γ }>` sites, `so_publish`.
+    - **THE DIAGNOSIS IS RIGHT; THE PROBLEM IS SMALLER THAN THE NOTE MAKES IT.**
+      Every conjunct of `ftable_res` morphs structurally except three:
+      the cinv (its body names the ambient context), `inode_shr_held_gen`
+      (carries `cred_floor`) and `is_pipe` (carries `lk_floor`).  The last
+      two are not blockers: `lk_floor ξ lo := ctx_floor ξ lo ∨ ∃ a, ctx_wrote
+      ξ lo a` already has `lk_floor_morph` (from `ctx_floor_dom` and
+      `ctx_dom_wrote_floor`), and `cred_floor lo tl` is the same shape with
+      two epochs.  The same proof carries it, re-choosing `tl := lo` in the
+      wrote case; `inode_shr_held_gen` and `live_fracc` both ∃-bind `tl`, so
+      each gets a five-line hand instance.  `is_pipe` is `∃ lo, inv(const) ∗
+      lk_floor`, one structural line.  The ONLY genuine defect is that the
+      cinv parks cell fractions and a credential inside an invariant.
+    - **THE PARKED EPOCH IS PINNED BY AGREEMENT.**  `live_genlo` is fractional
+      agreement on `(g, lo)`; the file's parked reference and its fd share
+      come from one reference, so at cancel their `lo` is provably equal
+      and the share's credential serves the reference.  D1(c)'s `∃ lo,
+      live_genlo ∗ llb lo` and the re-mint are unnecessary.
+    - **THE SHAPE (D1 revised):**
+        inode_pay γx Q g inum v fdty wr q :=
+          cinv fileipN γx (inode_core v Q inum) ∗ cinv_own γx q ∗
+          inode_ref_side v (q*Q) g inum ∗ inode_shr_held_gen v (q*Q) g inum ∗
+          ∃ ty, ity_shot g ty ∗ ⌜…⌝
+        inode_core v Q inum := ∃ k, ⌜v = ientry k⌝ ∗ bounds ∗
+          iref_frag k (Q+Q) ∗ ic_lent_stamps k (Q+Q) Q icfg_dev inum ∗ runit_any inum   (ghost only)
+        inode_ref_side v s g inum := ∃ k lo, ⌜v = ientry k⌝ ∗
+          inode_ident k (DfracOwn s) icfg_dev inum ∗ live_genlo k s g lo ∗ slh_tok (icfg_isl k) s
+      Split law: everything fractional or persistent.  Morph: cells + ghost
+      + the one hand instance.  Cancel: `cinv_cancel` + join the side (Q)
+      with the share (Q) → `inode_ref k (Q+Q)` with `live_fracc` from the
+      share's `cred_floor`; `inode_pay_cancel`'s statement UNCHANGED, so
+      ProofFileclose does not move.  Arity UNCHANGED, so fourteen of the
+      eighteen files that mention `inode_pay` do not move; the unfolding
+      sites (SpecFileread/Filestat/Filewrite, sys_open's alloc, fileclose's
+      cancel) frame one conjunct.
+    - **R4a Q1:** cells outside the cinv in the fractional payload (the slot
+      row IS the payload's remainder).  Pin the parked fraction to `Q` by
+      construction: sys_open lends exactly HALF of the incoming reference's
+      share fraction (`so_publish` takes `qi` and `s` as parameters, so the
+      halving is one site upstream in ProofSysOpen).  Fallback if that
+      fraction is spec-fixed: `fp_iqi` in `fpnames` (6 `MkFPNames` sites,
+      mechanical insertions at the 18 files).
+    - **R4a Q2:** neither option -- no `own_context` premise, no llb; see the
+      agreement point.  The canceller's `inode_pay … 1` is at its own
+      context (its fd's fraction is private; the table's came in under
+      ftable.lock), so the share's `cred_floor` is already where it is
+      needed.
+    - **R4a Q3 and Q5, together, with a CORRECTION of my own:** earlier
+      today I recommended two sweeps (L5 + λ-only L7 first to unblock L8).
+      §8's audit is right that `ioff_escrows` is a row of `fs_ready`,
+      which rides in `first_tok` inside `proc_priv`, which the park
+      deposits -- so L6 IS on L8's path and the two-sweep order is
+      WITHDRAWN.  Q5: yes -- fix all three shapes now and sweep the file
+      layer ONCE (r25): `inode_pay` as above; `ftable_res_at γ ξ` WITH the
+      floor row (`∃ Kd, ctx_floor ξ Kd`, every allocated slot's `tl ≤ Kd`)
+      and the eight `_in` releases; `ic_slp cn k ξ := … ∗ off_rows on k ξ`
+      with the fold's llb maximum.  Order inside r25: L5 + the full
+      `ftable_res_at` first (one pass over the lock sites), then two lanes:
+      L8/L9 (the saved patch) on one, `ic_slp ∗ off_rows` + the OffBox
+      consumers on the other.  Nothing in the first pass is removed by the
+      second: `ftable_res_at` is the final name, the floor row is final,
+      `inode_pay` is final (L6 does not touch it).
+    - **R4a Q4:** no objection.  `ctx_parked_raise` takes only `llb T'` and
+      yields the twin's floor at `T'`; raise AFTER the last deposit (a raise
+      before one is overtaken).
+    - **R4a Q6 (class D, `cwd_ref`):** needs no ruling.  `inode_held v` =
+      `inode_refp` = `inode_ref` ∗ `runit`; `inode_ref` = `iref_frag` ∗
+      `live_fracc` ∗ `slh_tok` ∗ `inode_ident` ∗ `ic_ref_stamps` -- ghost,
+      cells, and `live_fracc`, which morphs by the `tl := lo` re-choice.
+      So `inode_held_morph` is structural + that one instance; class D IS
+      class A.  Neither (i) (floor-free park form + re-mint) nor (ii) (drop
+      the credential) -- both would re-spell every cwd consumer for a
+      problem the morph instance solves in five lines.
+    - **R4a Q7 (`first_fsinit`):** classify by `About` as §8 did the rest;
+      indexed cells morph structurally, raw cells need no crossing; do not
+      restructure userinit/forkret for it.
+    - **THE OFF CELL (the owner's question): the invariant is NOT too
+      strong.**  The dead phase is already the weak form (`foff_dead k q`, a
+      plain cell in ftable's payload).  The live phase forces custody:
+      `f->off` is written under `ip->lock` by any holder of the file, on a
+      cell that belongs to a file slot, and the last closer must recover it
+      holding only ftable.lock while excluding a mid-checkout reader --
+      only a COUNTED custody proves that, and a raw pointsto would need the
+      same deposit stamps to be absorbed by the next writer at another
+      context.  The box, at `Q1 := λ _, emp`, `Q2 := emp`, is the minimal
+      such mechanism; L6 stands as ruled.
+    - **PITFALLS, written down before r25 starts:** (1) do NOT import the F21
+      llb machinery into `inode_pay` or `cwd_ref` -- it is for shares whose
+      owner is gone (parked in the box); here the owner crosses with the
+      credential; (2) the cinv body must not mention the ambient context
+      syntactically -- define `inode_core` where no `CurCtx` is in scope or
+      check with `Print` that it took no `XI`, else `ctx_morph_const` will
+      not unify; (3) keep `inode_pay`'s arity -- every unfolding site is a
+      re-spiral risk, opaque sites are free; (4) the sleep-lock HANDLE morph
+      (§8 class A) is the same shape as `is_lock`'s: `∃ lo, inv(const) ∗
+      lk_floor` -- one instance, not a design; (5) measure after L5 +
+      `ftable_res_at`, after L8, and after the OffBox consumers separately,
+      so a regression names its cause; (6) `ftable_res_morph` must be a
+      Global Instance so `SpecAcquire`/`SpecRelease`'s `CtxMorph R` resolve
+      at the eleven sites and ProofMain's `newlock`.
 
 ## 10. Process and tooling (measured facts)
 

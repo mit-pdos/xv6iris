@@ -265,3 +265,21 @@ Q7. `first_fsinit` (the boot arm's raw-image resource, only the first
     parks the first process; its forkret runs fsinit at the child's
     context, so the arm could be minted there)?  Needs one reading of its
     rows; not started.
+
+## 9. Reviewer 1's answers (2026-09-02) — recorded in the plan of record
+
+The rulings are in `tso-cutover-endgame.md` §8 (rows "R4a Q1"–"R4a Q7",
+"FLOORS") and §9 item 15.  In one paragraph: the cinv parks keyed ghost
+only (`iref_frag`, `ic_lent_stamps`, `runit_any`); the reference's cells,
+`live_genlo` and `slh_tok` ride the fractional payload at the parked
+fraction, pinned to `Q` by lending half at sys_open (fallback `fp_iqi`);
+no re-mint and no llb at cancel -- the share's `cred_floor` is in the
+canceller's hand and `live_genlo_agree` pins `lo`; `inode_pay_cancel`'s
+statement and `inode_pay`'s arity do not change.  Floored bundles that
+∃-bind their `tl` MORPH (the `lk_floor_morph` proof, re-choosing `tl := lo`
+in the wrote case), which gives `inode_shr_held_gen_morph`, `live_fracc_morph`
+and hence `inode_held_morph`: class D is class A and Q6 needs no ruling.
+Q5: yes, all three shapes final, one sweep (r25), L5 + the full
+`ftable_res_at` (floor row + `_in` releases) first, then L8/L9 and the
+OffBox consumers as the two lanes inside r25.  Q4: no objection.  Q7:
+classify by `About`, morph or nothing, no restructuring.
