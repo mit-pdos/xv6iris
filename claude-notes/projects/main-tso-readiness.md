@@ -1308,16 +1308,24 @@ green with ip_free_locked Admitted behind F30)").
   out of `InodeInv`, which now `Require Export`s it) so the camera file can
   name the shape.
 
+- **IcacheBoot green**: `icache_boot_at`/`icache_boot` take the running
+  token (A6.68's shape, as on flip): `own_context cur_ctx` in and out, the
+  itable `newlock_at` and the fifty inode `sl_fresh_new_gen`s borrow it
+  sequentially (`SepThread.big_sepL_fupd_thread`), and the lock's ready arm
+  ARRIVES BUILT (`WpLock.lk_cpu_ready itable_lock`, M4) instead of being
+  minted from the raw owner cell (`lk_cpu_ready_intro` does not exist on
+  cutover).  The one real caller, `ProofMain:1582`, still passes the old
+  rows -- it is behind the shim wall and belongs to the boot-chain lane.
+
 Gate (full `make -k` after each step): the buildable cone grew from 154
-files (r13) to **~940** -- `IcacheRef`, `IcacheInv`, `IcacheEscrow`,
+files (r13) to **~950** -- `IcacheRef`, `IcacheInv`, `IcacheEscrow`,
 `InodeInv`, `InodeLock`, `ProofIdup`, `ProofIget`, `ProofIlock`,
 `ProofIput`, `ProofIunlock`, `ProofAcquiresleep` and their cones compile.
-Reds: `IcacheBoot:1492` (main's boot passes no running token to
-`newlock_at` -- the icache port's own stage, see 12.2), `ProcInv:1013`
+Reds: `ProcInv:1013`
 (`TsoCtxShim.ctx_phys_word_shim`, the shim wall of 12.3), `ProofPipealloc`
 (`page_own_pipe_raw`, an M1 debt), `ProofSysKill` (shim), `RiscvAdequacy`
-(machine lane).  337 files still pending, behind `IcacheBoot` (the FS boot
-chain) and `ProcInv` (everything over procs).
+(machine lane).  332 files still pending, essentially all behind `ProcInv`
+(everything over procs, the FS boot chain included).
 
 ## 12.2 The analysis: what the real port is (NOT yet done)
 
