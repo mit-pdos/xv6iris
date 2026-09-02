@@ -182,6 +182,7 @@ From Kernel Require KernelSyms.
 Require Import WaitInv.   (* [wait_res] -- what wait_lock is over *)
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* main's stack budget: its own 16-byte / 2-slot frame over its deepest
@@ -201,7 +202,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    ([BootBridge.boot_stack_slots]), i.e. 180 slots = 1440 bytes of the
    4096-byte per-hart stack, so nothing upstream has to change. *)
 Require Import TsoCtx.
-Require Import CtxRecord.   (* [ctx_parked_inv] -- the boot deposit's record *)
 
 Notation K_main := (122%nat) (only parsing).
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
@@ -460,11 +460,8 @@ Section SpecMain.
          [FsCfgBoot.fs_boot_snap_wf] says. *)
       (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (* THE BOOT DEPOSIT'S NAMED CONTEXT (tso-port M2): the record eight harts
-         read the deposit from is at [xid]; main deposits its rows there
-         ([TsoCtx.ctx_deposit], in [ProofMain.mn_grp_started]). *)
-      (xid : CtxId)
-      (P : iProp Σ) `{!Persistent P} :=
+      (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
+      `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)} :=
     let pcE : mword 64 := mword_of_int KernelSyms.main in
     (* the arm is decided by the ambient hart: [beqz a0] at main+0x14 takes
        the boot path exactly when cpuid() returns 0. *)
@@ -522,22 +519,24 @@ Section SpecMain.
     (* the handover channel, and the RECIPE for the deposit it will carry:
        main applies this wand at the [started = 1] store, to the [pr] lock, the
        64 proc locks and the vdisk_lock it has just allocated. *)
-    started_inv P -∗
-    ctx_parked_inv xid -∗
-    □ (∀ (γpr : gname) (γs : list gname) (γk : gname) (pd pav pu : mword 64)
+    started_inv γi ξd P -∗ started_prim γi -∗
+    □ (∀ (pos : nat)
+         (γpr : gname) (γs : list gname) (γk : gname) (pd pav pu : mword 64)
          (root : mword 44) (pas : nat -> mword 44),
          printk_env γpr γd γv -∗
          procs_inv γs -∗
          console_caps γd -∗
          is_lock γk d_lock "virtio_disk"%string (disk_res_at γv pd pav pu) -∗
-         disk_geom (XI := xid) γv pd pav pu -∗
+         disk_geom γv pd pav pu -∗
          kpt_inv root -∗
-         ctx_word_pointsto xid
-           (mword_of_int KernelSyms.kernel_pagetable : mword 64) DfracDiscarded
+         (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
            (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
          kmap_at tramp_vpn tramp_ppn KP_rx -∗
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
-         P) -∗
+         (* A6.138: the deposit learns the flag position and the tie that
+            the kernel table's bound is BELOW it *)
+         (∃ B : nat, KptGhost.kpt_bound B ∗ ⌜(B <= pos)%nat⌝) -∗
+         P pos cur_ctx) -∗
     (* the boot supply *)
     main_locks_raw -∗
     main_globals_raw -∗
@@ -666,6 +665,9 @@ Section SpecMain.
        the root cell.)  It is GLOBAL, not per-hart, so it travels beside the
        boot bridge rather than through it. *)
     kpt_unset -∗
+    (* A6.71: ...and the pin bound's one-shot beside it -- [kpt_inv_alloc]
+       takes both, and both are minted once at adequacy (A6.70 finding 1). *)
+    kptb_unset -∗
     (* the kernel-mapping auth, likewise a GLOBAL boot token minted at
        adequacy and spent in that same publication assembly in main's boot
        arm (it retires into [kpt_inv] with the tree, after minting the 65
@@ -694,8 +696,8 @@ Module Type MAIN.
       (ndisk : nat)
       (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (xid : CtxId)
-      (P : iProp Σ) `{!Persistent P},
+      (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
+      `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)},
       wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 xid P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
 End MAIN.

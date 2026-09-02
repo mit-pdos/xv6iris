@@ -47,12 +47,15 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang ObsTrace RiscvPtsto.
 Require Import KptPt.   (* kmap_M0, for the kmap ghost (rwx-kmap) *)
+Require Import KptGhost.   (* kpt_unset / kpt_ghost_alloc / kptb_ghost_alloc: the shared kernel table\'s one-shots *)
 Require Import BootCarve.  (* the boot-image carving library: the claims-bundle
                               persist and the rwx three-way split at [text_end],
                               lifted out of this proof so there is ONE copy *)
 Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the SIE/SPP/SPIE ghosts *)
 Require Import WpUart.
 Require Import PowerBoot.   (* the canonical reset machine + [boot_shape_boot_gstate] *)
+Require Import TsoMemPa TsoGhost.  (* the era's TSO ghosts: [ts_elem]/[ts_ok],
+                                      [view_auth_alloc], [llb] (A6.58) *)
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)
 (* and the nightly dead-import sweep skips [Require Export] lines.         *)
@@ -95,6 +98,15 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
      boot client spends it in main's kvm assembly, where the tree kvminit
      actually built is known. *)
   riscv_pre_kptGS :: inG Σ kptR;
+  (* A6.63' THE FLIP'S TWO MISSING PRE-CLASSES.  [riscvFixedGS] gained
+     [riscvF_kptbGS] (A6.53's pin bound) and [riscvF_tsomemGS] (the TSO
+     ghosts), and the era record below fills BOTH from this class by
+     positional [_] -- so without these two fields those underscores have
+     nothing to resolve against.  That is the "Could not find an instance
+     for ?riscvF_kptbGS / ?riscvF_tsomemGS" the adequacy file has been
+     carrying since the flip; it is a MISSING CAPACITY, not a miscount. *)
+  riscv_pre_kptbGS :: inG Σ kptbR;
+  riscv_pre_tsomemGS :: tsoMemG Σ;
   (* the PER-PROC HART TAG (ProcGeom.hart_own): capacity only -- the theorem
      below mints one [ghost_var CPU] per proc slot, at hart 0, and hands all
      of them to the boot client, which spends them in
@@ -138,6 +150,8 @@ Definition riscvΣ : gFunctors :=
      @ghost_mapΣ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
        (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
      GFunctor kptR;
+     GFunctor kptbR;
+     tsoMemΣ;
      ghost_varΣ CPU;
      ghost_varΣ (SailStdpp.Values.mword 32);
      ghost_varΣ log_mirror;
@@ -468,6 +482,9 @@ Section power.
           (@SailStdpp.Instances.Countable_mword 27) _
           (era_kmap_name HE) vpn (DfracOwn 1) pc) ∗
      own (era_kpt_name HE) (Cinl (Excl ()) : kptR) ∗
+     (* A6.71: the pin bound's one-shot, beside the table's own (same
+        reason, same moment -- see the system bundle above) *)
+     own (era_kptb_name HE) (Cinl (Excl ()) : kptbR) ∗
      ([∗ list] c ∈ enum CPU,
         strans_pending_at (era_strans_name HE c) ∗
         strans_pending_at (era_strans_name HE c)) ∗
@@ -528,8 +545,28 @@ Section power.
         SAME one -- which is the whole point (the durability property is what
         survives the power cycle).  The boot client threads it to
         [wp_disk_loop]. *)
+     (* THE ERA'S ELEMENT SUPPLY (tso-machine-flip.md A6.81): one LEDGER
+        ELEMENT per byte of [gmem], at timestamp 0 with no canon pin -- the
+        image is what was last written and nothing is pinned yet.  It is
+        the row the memory row above is only HALF of: a registered
+        (context-tier) byte is a raw byte PLUS its element, so a boot client
+        that carves ctx cells needs both, byte for byte, and this
+        [ghost_map_alloc] is the system's one and only supplier (A6.9).
+        The single-generation theorem hands the same supply in the CLIENT's
+        range vocabulary ([BootCarve.boot_led_ran], already split at
+        [text_end]); the power arm hands the whole map, exactly as it hands
+        the whole raw one, and the client cuts both with the same lemma
+        pair.  It sits HERE rather than last so that the fixed-layer tail
+        ([crash_inv] and the generation certificate) stays one bundle at
+        every unpack. *)
+     ([∗ map] a ↦ _ ∈ g'.(gmem),
+        ghost_map_elem (era_ts_name HE) a (DfracOwn 1)
+          ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem)) ∗
      crash_inv ∗
-     gen_born gen ∗ gen_started gen ∗ era_registered gen HE)%I.
+     gen_born gen ∗ gen_started gen ∗ era_registered gen HE ∗
+     (* A6.131: the era's image, as the boot client's pure fact -- what a
+        racy reader of a once-written .bss word ([StartedInv]) needs *)
+     ⌜era_img HE = g'.(gimg)⌝)%I.
 
   (* THE LENT RESOURCE COMES BACK OUT (durable-disk BT-3).  [Rb]'s conjunct
      is the client's, so the client must be able to SPEND it before it hands
@@ -552,8 +589,8 @@ Section power.
   Proof.
     rewrite /power_boot_res.
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12 &
-              H13 & H14 & H15 & H16 & H17 & H18 & H19 & HRb & H21 & H22 &
-              H23 & H24)".
+              H13 & H14 & H15 & H16 & H17 & H18 & H19 & H20 & HRb & H22 & H23 &
+              H24 & H25 & H26 & %H27)".
     iSplitL "HRb"; [ iExact "HRb" | ].
     iSplitL "H1"; [ iExact "H1" | ].
     iSplitL "H2"; [ iExact "H2" | ].
@@ -574,11 +611,14 @@ Section power.
     iSplitL "H17"; [ iExact "H17" | ].
     iSplitL "H18"; [ iExact "H18" | ].
     iSplitL "H19"; [ iExact "H19" | ].
+    iSplitL "H20"; [ iExact "H20" | ].
     iSplitR; [ done | ].
-    iSplitL "H21"; [ iExact "H21" | ].
     iSplitL "H22"; [ iExact "H22" | ].
     iSplitL "H23"; [ iExact "H23" | ].
-    iExact "H24".
+    iSplitL "H24"; [ iExact "H24" | ].
+    iSplitL "H25"; [ iExact "H25" | ].
+    iSplitL "H26"; [ iExact "H26" | ].
+    iPureIntro. exact H27.
   Qed.
 
   Lemma wp_power_loop (D : CPU -> gset register) (nproc ndisk : nat)
@@ -843,7 +883,21 @@ Section power.
         as (γmir) "Hmir".
       iMod (own_alloc_lockset_cpus (enum CPU) (NoDup_enum CPU)) as (γlks) "Hlks".
       iMod (ghost_map_alloc (resv_map g2.(gresv))) as (γresv) "[Hresvauth Hresvfrags]".
-      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv).
+      (* A6.63' / carve Q4: THE POWER ARM'S FIVE FLIP GNAMES.  A6.59 landed
+         these in the system theorem and the power path never got them, so
+         its era record was short by five and this arm could not build one.
+         Same five, same order, at the NEW era's state [g2] -- a fresh era
+         starts at timestamp 0 with an empty log, exactly as the boot one
+         does, and [boot_shape] gives [g2]'s memory as its own image. *)
+      iMod kptb_ghost_alloc as (γkptb) "Hkptb2".
+      iMod (ghost_map_alloc
+              ((fun _ : bv 8 => ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem)) <$> g2.(gmem)))
+        as (γts) "[Htsauth2 Htsfrags2]".
+      iMod (ghost_map_alloc_empty (K := nat) (V := TsoMemPa.pwmsg))
+        as (γlogm) "Hlogmauth2".
+      iMod (mono_nat_own_alloc 0%nat) as (γloglen) "[Hloglenauth2 _]".
+      iMod (view_auth_alloc (avf g2)) as (γview) "Hviewauth2".
+      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γkptb γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv γts γlogm γloglen γview g2.(gimg)).
       (* the started counter ticks (PowerOff had already bumped [ggen], so
          the count moves from [ggen + 0] to [ggen + 1]) *)
       iMod (mono_nat_own_update (n := start_count g) (g.(ggen) + 1)%nat
@@ -873,30 +927,38 @@ Section power.
               with "HRelem Hgst Hsauth Htie Hmir HPsw")
         as ">(Hsauth & Htie & HPsw & Hmir & #Hswlb & HRb)".
       iMod ("Hclosesw" with "HPsw") as "_".
+      iEval (rewrite big_sepM_fmap) in "Htsfrags2".
       iMod (Hboot HE g.(ggen) g2 Hbf Hpure with
-              "Hoinv [Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF
-                Hdfrags Hmir Hresvfrags HRb]")
+              "Hoinv [Helems Hbytes Hkauth Hkfrags Hkpt Hkptb2 Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF
+                Hdfrags Hmir Hresvfrags HRb Htsfrags2]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
       { rewrite /power_boot_res.
-        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF Hdfrags Hmir Hswlb".
+        iFrame "Hbytes Hkauth Hkfrags Hkpt Hkptb2 Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF Hdfrags Hmir Hswlb".
         iFrame "Helems".
         iSplitL "Hresvfrags".
         { destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & Hnone).
-          rewrite (resv_map_none _ Hnone) big_sepM_gset_to_gmap.
+          (* A6.71: [boot_facts]' last conjunct is the flip's FOUR-way
+             machine-reset fact (reservations, log, image, views), not the
+             reservation clause alone -- take its first arm. *)
+          rewrite (resv_map_none _ (proj1 Hnone)) big_sepM_gset_to_gmap.
           iExact "Hresvfrags". }
         (* the client's lent resource, at the RESET machine's disk --
            which is the disk [Hswap] just ran at ([Hdk2]) *)
         iSplitL "HRb"; [iExact "HRb"|].
+        (* the element half of the era's image (A6.81), beside it *)
+        iSplitL "Htsfrags2"; [iExact "Htsfrags2" |].
         iSplitR; [iExact "Hcinv"|].
         iSplitR; [iExact "Hbornlb"|].
-        iSplitR; [|iExact "HRelem"].
+        iSplitR; [|iSplitR; [iExact "HRelem" | iPureIntro; reflexivity]].
         iExact "Hgst". }
       iModIntro.
       rewrite /start_count Hpw /= Nat.add_0_r in Hdom.
-      iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth Hoauth".
+      iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth
+               Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2 Hoauth".
       { rewrite /state_interp /=.
         (* the trace conjunct, at the extended history *)
-        iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth";
+        iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth
+                 Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2";
           last first.
         { iDestruct (obs_interp_close _ _ _ _ _ _ h κs Hstep0 Hwf Htot
                        with "Hoauth") as "Hobs". iExact "Hobs". }
@@ -925,11 +987,56 @@ Section power.
           iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
         (* the fresh era's image auth, at the reset machine's own disk *)
         iSplitL "Hdauth"; [iExact "Hdauth"|].
+        (* ============================================================ *)
+        (* A6.71 THE POWER ARM'S TSO INTERP.  A6.59 landed this conjunct  *)
+        (* in the SYSTEM theorem and the power path never got it -- the   *)
+        (* four allocations were already here (A6.63' / carve Q4), only   *)
+        (* the interp they feed was missing.  It is the boot construction *)
+        (* verbatim at [g2]: a fresh era starts with an empty log, so all *)
+        (* four conjuncts are the same fact read four ways, and           *)
+        (* [boot_shape]'s own reset clause supplies every one of them.    *)
+        (* ============================================================ *)
+        destruct Hbf as (_ & _ & Hramtot2 & _ & _ & _ & _ & Hreset).
+        destruct Hreset as (Hresv0 & Hlog0 & Himg0 & Htv0).
+        iSplitL "Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2".
+        { rewrite /tso_interp_at.
+          iExists ((fun _ : bv 8 => ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem))
+                     <$> g2.(gmem)), ∅.
+          iFrame "Htsauth2".
+          iSplitR; [iPureIntro; apply dom_fmap_L |].
+          iSplitR.
+          { iPureIntro. intros a e Ha.
+            rewrite lookup_fmap in Ha.
+            destruct (g2.(gmem) !! a) as [v|] eqn:Hv; [|discriminate].
+            cbn in Ha. injection Ha as <-.
+            split_and!.
+            - exists v. split; [exact Hv |].
+              rewrite /TsoMemPa.latest /TsoMemPa.log_byte Hlog0 Himg0 /=.
+              split; [exact Hv |].
+              intros t' Ht'. destruct t' as [|i]; [lia | reflexivity].
+            - intros Sv B Hc. discriminate Hc.
+            - intros W Hc. discriminate Hc.
+            - intros R0 Hc0. discriminate Hc0.
+            - intros Wp Hcp. discriminate Hcp. }
+          iFrame "Hlogmauth2".
+          iSplitR.
+          { iPureIntro. intros i. rewrite lookup_empty Hlog0 //. }
+          rewrite Hlog0 /=. iFrame "Hloglenauth2 Hviewauth2".
+          iPureIntro. split; [| reflexivity].
+          rewrite /mm_ok Hlog0 Himg0 /TsoMemPa.flat /=.
+          split_and!; [reflexivity | intros c; rewrite Htv0; lia |].
+          (* [boot_facts]' RAM totality: the era image is created HERE and
+             this is the one arm that has to establish the conjunct. *)
+          intros a Ha.
+          rewrite -(RiscvLang.mm_moi_uint a).
+          exists (boot_byte (SailStdpp.Operators_mwords.uint a)).
+          apply Hramtot2.
+          move: Ha. rewrite /addr_is_ram /ram_base /ram_size /ram_lo /ram_hi.
+          lia. }
         (* the reservation mirror: minted at the reset machine's all-[None]
            map, and the snapshot invariant is vacuous there *)
         iFrame "Hresvauth". iPureIntro.
-        destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & Hnone).
-        intros c r Hc. rewrite Hnone in Hc. discriminate. }
+        intros c r Hc. rewrite Hresv0 in Hc. discriminate. }
       iSplitR; [iApply "IH"|].
       (* the fork obligations: the new generation's whole complement *)
       rewrite /power_fork big_sepL_app big_sepL_fmap /=.
@@ -961,8 +1068,14 @@ Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
        whole trace, and the client's trace predicate *)
     (γobs : gname) (T : list mobs) (Ptp : iProp Σ)
   : riscvFixedGS Σ :=
-  RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
-    _ _ γdisk ndisk Pcp γswap _ γobs T Ptp.
+  (* A6.71: TWO MORE ANONYMOUS SLOTS than main had.  [riscvFixedGS] gained
+     [riscvF_kptbGS] (A6.53's pin bound, between [riscvF_kptGS] and
+     [riscvF_lockSetGS]) and [riscvF_tsomemGS] (the TSO machine's classes,
+     between [riscvF_resvGS] and [riscvF_diskGS]), so the two positional
+     runs of underscores are one longer each; the trace fields at the end
+     are main's.  All resolve from [riscvGpreS]. *)
+  RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
+    _ _ _ γdisk ndisk Pcp γswap _ γobs T Ptp.
 
 (* ---------------------------------------------------------------------- *)
 (* THE TRACE HOOK'S HELPERS -- ONE PER CONJUNCT OF [state_interp].          *)
@@ -1084,7 +1197,10 @@ Lemma power_interp_resv_ok {Σ : gFunctors} `{!riscvFixedGS Σ} (g : gstate) :
 Proof.
   iIntros "(_ & _ & _ & HR)". iDestruct "HR" as (R) "(_ & _ & Hera)".
   destruct (g.(gpow)) eqn:Hpw; last (iPureIntro; discriminate).
-  iDestruct "Hera" as (E) "(_ & _ & _ & _ & _ & _ & %Hok)".
+  (* A6.71: one more conjunct -- [tso_interp_at] sits between the durable
+     disk's and the reservation mirror's, so the positional walk is one
+     underscore longer. *)
+  iDestruct "Hera" as (E) "(_ & _ & _ & _ & _ & _ & _ & %Hok)".
   iPureIntro. intros _. exact Hok.
 Qed.
 

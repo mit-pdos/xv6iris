@@ -332,6 +332,11 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
        such treatment: it is all-harts (WireInv.v) and rides for free. *)
     hw_config -∗
     minstret_inv -∗
+    (* the resuming hart's walk credential (persistent, per-hart -- same
+       reason as the two bundles above): the next round's exit switch needs
+       it, and this round's proof holds it off the kernel residue it just
+       released ([tlb_res_pt]'s own conjunct). *)
+    KptShare.kpt_creds -∗
     WP (Loop : expr riscv_lang)).
 Global Typeclasses Opaque uservec_post.
 
@@ -409,6 +414,9 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
      caller holds it from kvminithart's postcondition -- same premise
      [wp_userret_pt] takes) *)
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
+  (* A6.135's per-hart walk credential, for the exit switch's shared-kernel
+     window fetches (the kcur window can WALK the shared table on a miss) *)
+  KptShare.kpt_creds -∗
   (* the machine, exactly as the trap delivers it -- at NAMED data, image
      included *)
   user_trap_frame_atm C pt Rut (uint (pv_sz (us_V U))) M

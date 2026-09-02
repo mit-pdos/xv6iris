@@ -294,6 +294,12 @@ Section UkLeafFs.
           (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate).
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
+  (* the residue's TOKEN ACCESSOR (A6.140 / r12's [uk_ih] shape): every leaf
+     borrows the running token out of [Rut] for its step and puts it back,
+     and the callers below already pass it in this position *)
+  Hypothesis (HRut : forall pt' : uptd,
+                ⊢ Rut pt' -∗ TsoCtx.own_context TsoCtx.cur_ctx ∗
+                             (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt')).
 
   (* the later-FREE funnel, off the sealed one -- [wp_uk_retire]'s own
      derivation from [wp_uk_retire_later] *)

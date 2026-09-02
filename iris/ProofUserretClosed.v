@@ -154,14 +154,39 @@ Section UserretClosed.
      hypothesis has to carry [fd_frags γfd (uvis_fd W)] beside the machine,
      and nothing would otherwise say that those fragments belong to THIS
      process.  The pin says it, so the closer accepts them. *)
+  (* [tlb_res_pt]'s creds conjunct, read off without consuming the residue
+     (A6.91's ninth, persistent, member). *)
+  Lemma urc_tlb_res_creds `{CID : CpuId} (r : mword 44) :
+    KptShare.tlb_res_pt r -∗ KptShare.kpt_creds ∗ KptShare.tlb_res_pt r.
+  Proof.
+    iIntros "H".
+    iDestruct "H" as (s0 tv) "(Hsatp & %A & %B & %C & Htlb & Hsnap & Hpmp & #Hk & #Hcr)".
+    iSplitR; [ iExact "Hcr" | ].
+    iExists s0, tv.
+    iSplitL "Hsatp"; [ iExact "Hsatp" | ].
+    iSplitR; [iPureIntro; exact A |].
+    iSplitR; [iPureIntro; exact B |].
+    iSplitR; [iPureIntro; exact C |].
+    iSplitL "Htlb"; [ iExact "Htlb" | ].
+    iSplitL "Hsnap"; [ iExact "Hsnap" | ].
+    iSplitL "Hpmp"; [ iExact "Hpmp" | ].
+    iSplitR; [ iExact "Hk" | iExact "Hcr" ].
+  Qed.
+
   Definition Rut_at (h : CpuId) (sz : Z) (γfd : gname) : uptd -> iProp Σ :=
     fun p => (∃ (ksp : mword 64) (U : ustate),
                 (* the closer LEADS: at the entry the record it produces is
                    only known once the trapframe words are back, so a
                    [⌜⌝] stated ahead of it would pin the existential before
                    there is anything to pin it to *)
+                (* THE RUNNING TOKEN, BESIDE THE CLOSER (A6.140 / r12's
+                   accessor shape): user execution borrows it out of [Rut]
+                   per step ([Rut_at_acc] below is the [HRut] every loop
+                   lemma takes) and the trap folds it back into the residue
+                   through the closer, which is why the closer takes it. *)
+                TsoCtx.own_context TsoCtx.cur_ctx ∗
                 (∀ sts' : list fdstate,
-                   FdSlots.fd_frags γfd sts' -∗
+                   FdSlots.fd_frags γfd sts' -∗ TsoCtx.own_context TsoCtx.cur_ctx -∗
                    UV.usertrap_res_bare (CID := h) p ksp U sts') ∗
                 ⌜uint (pv_sz (us_V U)) = sz⌝ ∗
                 ⌜pv_fdg (us_V U) = γfd⌝)%I.
@@ -170,12 +195,27 @@ Section UserretClosed.
       (ksp : mword 64) (U : ustate) :
     uint (pv_sz (us_V U)) = sz ->
     pv_fdg (us_V U) = γfd ->
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     (∀ sts' : list fdstate,
-       FdSlots.fd_frags γfd sts' -∗ UV.usertrap_res_bare (CID := h) p ksp U sts') -∗
+       FdSlots.fd_frags γfd sts' -∗ TsoCtx.own_context TsoCtx.cur_ctx -∗
+       UV.usertrap_res_bare (CID := h) p ksp U sts') -∗
     Rut_at h sz γfd p.
   Proof.
-    intros Hsz Hg. iIntros "H". rewrite /Rut_at. iExists ksp, U.
+    intros Hsz Hg. iIntros "Hctx H". rewrite /Rut_at. iExists ksp, U.
+    iSplitL "Hctx"; [ iExact "Hctx" |].
     iSplitL; [ iExact "H" |].
+    iSplitR; [ iPureIntro; exact Hsz | iPureIntro; exact Hg ].
+  Qed.
+
+  (* the accessor every U-mode loop lemma takes as [HRut]: the token is a
+     conjunct, so borrowing it is a split and a re-pack *)
+  Lemma Rut_at_acc (h : CpuId) (sz : Z) (γfd : gname) (p : uptd) :
+    ⊢ Rut_at h sz γfd p -∗
+      TsoCtx.own_context TsoCtx.cur_ctx ∗
+      (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut_at h sz γfd p).
+  Proof.
+    iIntros "H". iDestruct "H" as (ksp U) "(Hctx & Hclose & %Hsz & %Hg)".
+    iFrame "Hctx". iIntros "Hctx". iExists ksp, U. iFrame "Hctx Hclose".
     iSplitR; [ iPureIntro; exact Hsz | iPureIntro; exact Hg ].
   Qed.
 
@@ -200,6 +240,7 @@ Section UserretClosed.
          hw_config (CID := h) -∗
          (* [minstret_inv] is [emp] post-port: no hart index left *)
          minstret_inv -∗
+         KptShare.kpt_creds (CID := h) -∗
          (* THE DESCRIPTOR VIEW COMES BACK WITH THE MACHINE.  [ukb_F]'s body
             hands the kernel [Rfd (uvis_fd W')] at the trap, and at this
             loop's instantiation [Rfd] IS [fd_frags γfd] -- so the round's
@@ -224,7 +265,7 @@ Section UserretClosed.
       iApply (UexecCond.cond_entry_slot W with "Hgen"). }
     iLöb as "IH".
     iIntros "!>" (h C pt sz γfd W sc stv)
-      "%Hok %Hperm %Hszw #Hhw #Hmin (Hframe & Hfrag & Hret)".
+      "%Hok %Hperm %Hszw #Hhw #Hmin #Hcreds (Hframe & Hfrag & Hret)".
     destruct Hok as (Hstv & Hdqc & Hmie & Hmedl & Hnorm & Hptwf).
     (* ---- open the trapped machine.  [user_cfg] stays BUNDLED: the frame
            uservec takes is the same predicate at [Rut := emp], so nothing
@@ -237,8 +278,8 @@ Section UserretClosed.
        feeding it the view the bundle just handed back rebuilds the residue
        AT THAT VIEW.  This is the step that makes [uvis_fd W] the process's
        real descriptor state rather than a value the key merely names. *)
-    iDestruct "Hrut" as (ksp U0) "(Hclose & %Hsz & %Hgam)".
-    iDestruct ("Hclose" $! (uvis_fd W) with "Hfrag") as "Hures".
+    iDestruct "Hrut" as (ksp U0) "(Hctx & Hclose & %Hsz & %Hgam)".
+    iDestruct ("Hclose" $! (uvis_fd W) with "Hfrag Hctx") as "Hures".
     (* put [Hszw] in terms of the residue's size FIRST: otherwise [subst sz]
        has two equations to choose from and takes the wrong one. *)
     rewrite <- Hsz in Hszw.
@@ -263,14 +304,14 @@ Section UserretClosed.
               (us_upt U0 pt) (uvis_fd W) (uvis_M W) (tf_resume_gpr0 (uvis_tf W))
               ms_v sc stv (tf_w (uvis_tf W) tf_epc_idx)
               Hstv Hdqc Hmie Hj Hnorm Hptwf
-              with "Hkt Hhw Hmin Hclaim Hframe Hures [-]").
+              with "Hkt Hhw Hmin Hclaim Hcreds Hframe Hures [-]").
     iApply wp_next_intro. iIntros (CID').
     rewrite /uservec_post.
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2)
       "%Huptpt' %Hround' %Hfdkept %Hfdecall %Hpipecall %Hpcret' %Hgprtie'
        %Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
-       Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin'".
+       Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin' #Hcreds'".
     (* the three frozen CSRs, duplicated out of the residue for [user_cfg] *)
     iDestruct (UV.usertrap_res_csrs_open (CID := CID') pt' ksp U2 with "Hures'")
       as "[Hcsrs Hcback]".
@@ -308,9 +349,9 @@ Section UserretClosed.
        left the descriptor states, so this is the view the process resumes
        at, not the one it trapped at. *)
     iDestruct (UV.usertrap_res_bare_fd_open pt' ksp U2 sts2 with "Hures'")
-      as "[Hfrag2 Hclose2]".
+      as "(Hfrag2 & Hctx2 & Hclose2)".
     iDestruct (Rut_at_intro CID' (uint (pv_sz (us_V U2))) (pv_fdg (us_V U2))
-                 pt' ksp U2 eq_refl eq_refl with "Hclose2") as "Hrut'".
+                 pt' ksp U2 eq_refl eq_refl with "Hctx2 Hclose2") as "Hrut'".
     (* ---- STEPS A/B: the returned [uexec_ret], re-keyed onto the record
            the round left ([UexecApply]).  The round is stated at the RUN
            projection of the trapped key, and its entry permission map is
@@ -357,6 +398,7 @@ Section UserretClosed.
     iApply (uslot_apply_loop (CID := CID') (loop_ucfg mdv0 Hmm) pt'
               (FdSlots.fd_frags (pv_fdg (us_V U2)))
               (Rut_at CID' (uint (pv_sz (us_V U2))) (pv_fdg (us_V U2)))
+              (Rut_at_acc CID' (uint (pv_sz (us_V U2))) (pv_fdg (us_V U2)))
               (uint (pv_sz (us_V U2)))
               sts2
               (uvis_of U2 sts2) (us_M U2) mf
@@ -380,7 +422,7 @@ Section UserretClosed.
     iIntros (W2 sc2 stv2) "%Hp2 %Hs2 %Hf2 (Hframe2 & Hfrag2' & Hret2)".
     iApply ("IH" $! CID' (loop_ucfg mdv0 Hmm) pt' (uint (pv_sz (us_V U2)))
               (pv_fdg (us_V U2)) W2 sc2 stv2
-              with "[%] [%] [%] Hhw' Hmin' [$Hframe2 $Hfrag2' $Hret2]").
+              with "[%] [%] [%] Hhw' Hmin' Hcreds' [$Hframe2 $Hfrag2' $Hret2]").
     - exact (loop_ok_loop_ucfg mdv0 Hmm pt' Hnorm' Hptwf').
     - exact Hp2.
     - exact Hs2.
@@ -492,7 +534,9 @@ End Res.
        other -- see [UsertrapRes.ut_res_bare_fd_tf_open]. *)
     iDestruct (usertrap_res_bare_fd_tf_open pt ksp U fdv with "Hures")
       as "[Hfrag Hopen]".
-    iDestruct "Hopen" as (kroot') "(#Hkpt' & %Hokws & Htfp & Hclose)".
+    iDestruct "Hopen" as (kroot') "(#Hkpt' & %Hokws & Htfp & Hctx & Hclose)".
+    (* the walk credential, read off the kernel residue's tlb bundle (A6.91) *)
+    iDestruct (LP.urc_tlb_res_creds kroot with "Hktlb") as "[#Hcreds Hktlb]".
     (* the borrowed words ARE the residue index's -- named so the open below
        substitutes a variable, exactly as it did before the re-key *)
     remember (pv_tf (us_V U)) as ws eqn:Hws.
@@ -509,6 +553,7 @@ End Res.
     iApply (RU.wp_userret_user C pt (uint (pv_sz (us_V U))) fdv (us_M U)
               (FdSlots.fd_frags (pv_fdg (us_V U)))
               (LP.Rut_at CID (uint (pv_sz (us_V U))) (pv_fdg (us_V U)))
+              (LP.Rut_at_acc CID (uint (pv_sz (us_V U))) (pv_fdg (us_V U)))
               kroot m usatp
               mstatus0 sepc0 sc_v stval_v
               u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280 u112 (DfracOwn 1)
@@ -520,12 +565,12 @@ End Res.
                     Hsepc Hclaim Hktlb Hufr Hpc Hfile
                     Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272 Htf280 Htf112
                     Hsc Hstval Hstvec Hmedlc Hmsec Hssec Hmcen Hscen Hhpm Hdata
-                    Hfrag [Hclose Hu0 Hu8 Hu16 Hu24 Hu32 Htail] Hkc [-]").
+                    Hfrag Hcreds Hctx [Hclose Hu0 Hu8 Hu16 Hu24 Hu32 Htail] Hkc [-]").
     - (* [Rut] at this hart, as a CLOSER: the residue minus the save slots,
          completed by the words userret gives back -- and WHOLE, since the
          slot never came out of it (R-a).  The size row is [reflexivity]:
          restoring the trapframe words does not move [p->sz]. *)
-      iIntros "K40 K48 K56 K64 K72 K80 K88 K96 K104 K120 K128 K136 K144 K152 K160 K168 K176 K184 K192 K200 K208 K216 K224 K232 K240 K248 K256 K264 K272 K280 K112".
+      iIntros "K40 K48 K56 K64 K72 K80 K88 K96 K104 K120 K128 K136 K144 K152 K160 K168 K176 K184 K192 K200 K208 K216 K224 K232 K240 K248 K256 K264 K272 K280 K112 Ktok".
       iDestruct (tf_page_close36 (ud_tfp pt) u0 u1 u2 u3 u4 u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280
                 with "Hu0 Hu8 Hu16 Hu24 Hu32 K40 K48 K56 K64 K72 K80 K88 K96 K104 K112 K120 K128 K136 K144 K152 K160 K168 K176 K184 K192 K200 K208 K216 K224 K232 K240 K248 K256 K264 K272 K280 Htail") as "Htfp'".
       (* [Rut_at] holds the residue MINUS the descriptor fragments -- which
@@ -533,9 +578,12 @@ End Res.
          words and still waiting on the view.  The bundle gives that view
          back at the trap and the loop feeds it in. *)
       rewrite /LP.Rut_at. iExists ksp, _.
+      (* the token userret hands back goes BESIDE the closer: the resumed
+         loop's accessor ([Rut_at_acc]) is what borrows it next (A6.140) *)
+      iSplitL "Ktok"; [ iExact "Ktok" |].
       iSplitL.
-      + iIntros (sts') "Hfr".
-        iApply ("Hclose" with "[%] Htfp' Hfr").
+      + iIntros (sts') "Hfr Hctx".
+        iApply ("Hclose" with "[%] Htfp' Hfr Hctx").
         refine (tf_kernel_words_ok_tail _ _ _ _ _ _ _ _ _ Hokws).
       + iSplitR; iPureIntro; reflexivity.
     - (* the trap seam, at the kernel obligation's own shape: the loop is
@@ -548,7 +596,7 @@ End Res.
       iIntros (W sc stv) "%Hp %Hs %Hf (Hframe & Hfrag' & Hret)".
       iApply ("Hloop" $! CID C pt (uint (pv_sz (us_V U))) (pv_fdg (us_V U))
                 W sc stv
-                with "[%] [%] [%] Hhw Hmin [$Hframe $Hfrag' $Hret]").
+                with "[%] [%] [%] Hhw Hmin Hcreds [$Hframe $Hfrag' $Hret]").
       + rewrite /loop_ok.
         split; [exact Hstv | split; [exact Hdqc | split; [exact Hmie |
           split; [exact Hmedl | split; [exact Hnorm | exact Hptwf]]]]].

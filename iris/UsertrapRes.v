@@ -1453,26 +1453,41 @@ Section UsertrapRes.
       (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
     ut_res_bare Rsys pt ksp U sts -∗
     fd_frags (pv_fdg (us_V U)) sts ∗
+    (* ...AND THE RUNNING TOKEN (A6.140 / r12): what parks across user
+       execution is the residue MINUS the view and MINUS the token -- the
+       token is the walk's, borrowed per step through the [HRut] accessor
+       and folded back at the trap -- so the closer takes both back. *)
+    own_context cur_ctx ∗
     (∀ sts' : list fdstate,
-       fd_frags (pv_fdg (us_V U)) sts' -∗ ut_res_bare Rsys pt ksp U sts').
+       fd_frags (pv_fdg (us_V U)) sts' -∗ own_context cur_ctx -∗
+       ut_res_bare Rsys pt ksp U sts').
   Proof.
     iIntros "H".
     iDestruct "H" as (N av)
       "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    iDestruct "Htrap" as "(Hstk & Harm & Hctx & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
     iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hfr & Hsy & Hownback)".
-    iFrame "Hfr".
-    iIntros (sts') "Hfr".
+    iFrame "Hfr Hctx".
+    iIntros (sts') "Hfr Hctx".
     iDestruct ("Hownback" $! (us_V U) sts' with "Hpv Hfr Hsy") as "Hown'".
     iExists N, av.
     (* row by row, not framed -- see [ut_res_tlb_close] *)
-    rewrite /ut_env_nopt.
+    rewrite /ut_env_nopt /ut_trap_parked.
     iSplitR; [iPureIntro; exact Hupt |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
     iSplitR; [iPureIntro; exact Hav |].
     iSplitR; [iExact "Htfk" |].
     iSplitR; [iExact "Htc" |].
-    iFrame "Htrap Hcaps Hown'".
+    iSplitR "Hcaps Hown'";
+      [| iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown'"]].
+    iSplitL "Hstk"; [iExact "Hstk" |].
+    iSplitL "Harm"; [iExact "Harm" |].
+    iSplitL "Hctx"; [iExact "Hctx" |].
+    iSplitL "Hb1"; [iExact "Hb1" |].
+    iSplitL "Hb2"; [iExact "Hb2" |].
+    iSplitL "Hgh"; [iExact "Hgh" |].
+    iSplitL "Hcpu"; [iExact "Hcpu" | iExact "Hclm"].
   Qed.
 
   (* BOTH BORROWS AT ONCE, and the entry point is why it has to be one
@@ -1490,34 +1505,44 @@ Section UsertrapRes.
     ∃ kroot : mword 44,
       kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
       tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
+      (* ...and the running token, as in [ut_res_bare_fd_open] *)
+      own_context cur_ctx ∗
       (∀ (ws' : list (mword 64)) (sts' : list fdstate),
          ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
-         fd_frags (pv_fdg (us_V U)) sts' -∗
+         fd_frags (pv_fdg (us_V U)) sts' -∗ own_context cur_ctx -∗
          ut_res_bare Rsys pt ksp (us_tf U ws') sts').
   Proof.
     iIntros "H".
     iDestruct "H" as (N av)
       "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    iDestruct "Htrap" as "(Hstk & Harm & Hctx & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
     iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hfr & Hsy & Hownback)".
     iFrame "Hfr".
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
-    iExists kroot. iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf".
-    iIntros (ws' sts') "%Htfk' Htf' Hfr".
+    iExists kroot. iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf Hctx".
+    iIntros (ws' sts') "%Htfk' Htf' Hfr Hctx".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
     iDestruct ("Hownback" $! (upd_tf (us_V U) ws') sts' with "Hpv' Hfr Hsy") as "Hown'".
     iExists N, av.
     iDestruct (ut_tfk_intro ksp (upd_tf (us_V U) ws') kroot Htfk' with "Hkpt") as "#Htfk'".
-    rewrite /ut_env_nopt.
+    rewrite /ut_env_nopt /ut_trap_parked.
     iSplitR; [iPureIntro; rewrite /us_tf /upd_usV /upd_tf; exact Hupt |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
     iSplitR; [iPureIntro; exact Hav |].
     iSplitR; [iExact "Htfk'" |].
     iSplitR; [iExact "Htc" |].
-    iSplitL "Htrap"; [iExact "Htrap" |].
-    iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown'"].
+    iSplitR "Hcaps Hown'";
+      [| iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown'"]].
+    iSplitL "Hstk"; [iExact "Hstk" |].
+    iSplitL "Harm"; [iExact "Harm" |].
+    iSplitL "Hctx"; [iExact "Hctx" |].
+    iSplitL "Hb1"; [iExact "Hb1" |].
+    iSplitL "Hb2"; [iExact "Hb2" |].
+    iSplitL "Hgh"; [iExact "Hgh" |].
+    iSplitL "Hcpu"; [iExact "Hcpu" | iExact "Hclm"].
   Qed.
 
   Lemma ut_res_bare_tf_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
@@ -1526,32 +1551,44 @@ Section UsertrapRes.
     ∃ kroot : mword 44,
       kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
       tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
+        own_context cur_ctx ∗
       (∀ ws' : list (mword 64),
          ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
+         own_context cur_ctx -∗
          ut_res_bare Rsys pt ksp (us_tf U ws') sts).
   Proof.
     iIntros "H".
     iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    (* the running token, out of the parked trap bundle (A6.140: the walk
+       borrows it from the residue instead of minting one) *)
+    iDestruct "Htrap" as "(Hstk & Harm & Hctx & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
     iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hfr & Hsy & Hownback)".
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
-    iExists kroot. iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf".
-    iIntros (ws') "%Htfk' Htf'".
+    iExists kroot. iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf Hctx".
+    iIntros (ws') "%Htfk' Htf' Hctx".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
     iDestruct ("Hownback" $! (upd_tf (us_V U) ws') with "Hpv' Hfr Hsy") as "Hown'".
     iExists N, av.
     iDestruct (ut_tfk_intro ksp (upd_tf (us_V U) ws') kroot Htfk' with "Hkpt") as "#Htfk'".
     (* row by row, not framed -- see [ut_res_tlb_close] *)
-    rewrite /ut_env_nopt.
+    rewrite /ut_env_nopt /ut_trap_parked.
     iSplitR; [iPureIntro; rewrite /us_tf /upd_usV /upd_tf; exact Hupt |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
     iSplitR; [iPureIntro; exact Hav |].
     iSplitR; [iExact "Htfk'" |].
     iSplitR; [iExact "Htc" |].
-    iSplitL "Htrap"; [iExact "Htrap" |].
-    iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown'"].
+    iSplitR "Hcaps Hown'";
+      [| iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown'"]].
+    iSplitL "Hstk"; [iExact "Hstk" |].
+    iSplitL "Harm"; [iExact "Harm" |].
+    iSplitL "Hctx"; [iExact "Hctx" |].
+    iSplitL "Hb1"; [iExact "Hb1" |].
+    iSplitL "Hb2"; [iExact "Hb2" |].
+    iSplitL "Hgh"; [iExact "Hgh" |].
+    iSplitL "Hcpu"; [iExact "Hcpu" | iExact "Hclm"].
   Qed.
 
   (* THE PER-HART CSRs.  [hart_csrs] rides in [cpu_priv], hence in the
@@ -1602,9 +1639,9 @@ Section UsertrapRes.
     ut_res_bare Rsys pt ksp U sts -∗
     ∃ kroot : mword 44,
       kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
-      tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗ hart_csrs ∗
+      tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗ hart_csrs ∗ own_context cur_ctx ∗
       (∀ ws' : list (mword 64),
-         ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗
+         ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ own_context cur_ctx -∗
          ut_res_bare Rsys pt ksp (us_tf U ws') sts).
   Proof.
     iIntros "H".
@@ -1618,8 +1655,8 @@ Section UsertrapRes.
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
     iExists kroot. iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |].
-    iFrame "Htf Hcsrs".
-    iIntros (ws') "%Htfk' Htf' Hcsrs'".
+    iFrame "Htf Hcsrs Hctx".
+    iIntros (ws') "%Htfk' Htf' Hcsrs' Hctx".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
     iDestruct ("Hownback" $! (upd_tf (us_V U) ws') with "Hpv' Hfr Hsy") as "Hown'".
     iDestruct ("Hcback" with "Hcsrs'") as "Hcpu".

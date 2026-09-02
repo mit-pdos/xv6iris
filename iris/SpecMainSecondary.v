@@ -81,8 +81,8 @@ Require Import TimerCap.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx.
-Require Import CtxRecord.   (* [ctx_parked_inv]: the deposit's own token *)
+Require Import TsoCtx CtxMorphTac UartTxInv ConsoleInv.
+Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 
 (* the secondary arm's stack budget: see the header.  Like [SpecMain.K_main]
    this is set by the SCHEDULER's trap reserve rather than by the arm's own
@@ -93,100 +93,86 @@ Require Import CtxRecord.   (* [ctx_parked_inv]: the deposit's own token *)
    spilled one more callee-saved for the c->intena reset, so its own prologue
    costs two slots more.) *)
 Notation K_main_secondary := (114%nat) (only parsing).
-Require Import TsoCtx.
-Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
-Section MainDeposit.
+Section SpecMainSecondary.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
-  (* THE ROWS: exactly the nine facts the boot arm's □-wand takes as       *)
-  (* arguments, packaged with their ghost names / pages / root / pas       *)
-  (* existential, AT THE RECORD'S CONTEXT [ξd].  Every conjunct is          *)
-  (* persistent, which is what lets the whole package ride the one-shot    *)
-  (* [started] escrow to up to NCPU-1 readers.                             *)
-  (*                                                                       *)
-  (* THREE OF THE NINE ARE ξ-INDEXED, and they are precisely the ones §0.4  *)
-  (* item 6 forbids handing out uniformly: [procs_inv]'s per-slot           *)
-  (* [is_kstack] and [disk_geom]'s three ring-page pointers are DISCARDED   *)
-  (* cells written at WP time, and so is the [kernel_pagetable] word.  They *)
-  (* are handed out against VIEW EVIDENCE instead ([TsoCtx.ctx_absorb]),    *)
-  (* which is §0.15′'s own rule -- give the resource the TRANSPORT, not the  *)
-  (* uniformity -- applied at the fact level.                              *)
+  (* THE DEPOSIT: the canonical instantiation of SpecMain's payload [P].  *)
+  (* Exactly the nine facts the boot arm's □-wand takes as arguments,      *)
+  (* packaged with their ghost names / pages / root / pas existential.     *)
+  (* Every conjunct is persistent, which is what lets the whole package    *)
+  (* ride the one-shot [started] escrow to up to NCPU-1 readers.           *)
   (* ------------------------------------------------------------------- *)
-  Definition main_deposit_rows (xid : CtxId) (γd : uart_names) (γv : disk_names)
+  Definition main_deposit (γd : uart_names) (γv : disk_names)
        : iProp Σ :=
     (∃ (γpr γk : gname) (γs : list gname) (pd pav pu : mword 64)
        (root : mword 44) (pas : nat -> mword 44),
        printk_env γpr γd γv ∗
-       (* [procs_inv] STAYS AT THE AMBIENT CONTEXT (main's M2 port, SC-stub
-          corner): on main's const-payload spelling the per-proc lock rows
-          reach [valid_context] -> [p_sched] -> [trap_csrs] -> the ambient
-          handler contract, which has no transport without the M-leg's caps
-          channel.  The row rides the record as a [ctx_morph_const] conjunct
-          instead -- see claude-notes/projects/main-tso-readiness.md. *)
        procs_inv γs ∗
        (* consoleintr's credential, which the kernelvec handler contract
           closes over ([SpecDevintr.devintr_caps]) and which no hart can make
           for itself: both halves are locks over static globals. *)
        console_caps γd ∗
        is_lock γk d_lock "virtio_disk"%string (disk_res_at γv pd pav pu) ∗
-       disk_geom (XI := xid) γv pd pav pu ∗
+       disk_geom γv pd pav pu ∗
        kpt_inv root ∗
-       ctx_word_pointsto xid
-         (mword_of_int KernelSyms.kernel_pagetable : mword 64) DfracDiscarded
+       (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
          (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) ∗
        kmap_at tramp_vpn tramp_ppn KP_rx ∗
        ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw))%I.
 
-  Global Instance main_deposit_rows_persistent xid γd γv :
-    Persistent (main_deposit_rows xid γd γv).
-  Proof. rewrite /main_deposit_rows. apply _. Qed.
-
-  (* THE TRANSPORT OBLIGATION.  Applied AS TERMS at the ∃ and at the three
-     ξ-indexed rows; the other seven ([procs_inv] included, see its note)
-     are [ctx_morph_const] and frame. *)
-  Global Instance main_deposit_rows_morph (γd : uart_names) (γv : disk_names) :
-    CtxMorph (λ ξ : CtxId, main_deposit_rows ξ γd γv).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /main_deposit_rows.
-    iDestruct "H" as (γpr γk γs pd pav pu root pas)
-      "(H1 & Hpi & H3 & H4 & Hgeom & H6 & Hkpt & H8 & H9)".
-    iMod (disk_geom_morph γv pd pav pu ξ ξ' with "Hd Hgeom") as "[Hd Hgeom]".
-    iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hkpt") as "[Hd Hkpt]".
-    iModIntro. iFrame "Hd". iExists γpr, γk, γs, pd, pav, pu, root, pas. iFrame.
-  Qed.
-
-  (* THE DEPOSIT.  The rows at [ξd], plus the one-line invariant that holds
-     [ξd]'s own parked token ([CtxRecord.ctx_parked_inv]) -- which is what a
-     reader opens to get the [ctx_parked ξd T] that [ctx_absorb] consumes and
-     hands straight back.  BOTH conjuncts are persistent, so the whole
-     package still rides the one-shot [started] escrow. *)
-  Definition main_deposit (xid : CtxId) (γd : uart_names) (γv : disk_names)
-       : iProp Σ :=
-    (ctx_parked_inv xid ∗ main_deposit_rows xid γd γv)%I.
-
-  Global Instance main_deposit_persistent xid γd γv :
-    Persistent (main_deposit xid γd γv).
+  Global Instance main_deposit_persistent γd γv :
+    Persistent (main_deposit γd γv).
   Proof. rewrite /main_deposit. apply _. Qed.
-
-End MainDeposit.
-
-Section SpecMainSecondary.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
   (* main(), entered on a SECONDARY hart.                                 *)
   (* ------------------------------------------------------------------- *)
+End SpecMainSecondary.
+
+(* A6.132: THE DEPOSIT AS A FUNCTION OF THE CONTEXT, with its transport --
+   what the barrier record carries at [ξd] and each secondary absorbs into
+   its own context.  One [CtxMorph] instance per named row, as elsewhere. *)
+Section MainDepositMorph.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId}.
+
+  Global Instance is_txlock_morph γl γu : CtxMorph (λ ξ, is_txlock (XI := ξ) γl γu).
+  Proof. rewrite /is_txlock. ctx_morph_solve. Qed.
+  Global Instance is_conslock_morph γ : CtxMorph (λ ξ, is_conslock (XI := ξ) γ).
+  Proof. rewrite /is_conslock. ctx_morph_solve. Qed.
+  Global Instance console_caps_morph γu : CtxMorph (λ ξ, console_caps (XI := ξ) γu).
+  Proof. rewrite /console_caps. ctx_morph_solve. Qed.
+  Global Instance printk_env_morph γpr γd γv : CtxMorph (λ ξ, printk_env (XI := ξ) γpr γd γv).
+  Proof. rewrite /printk_env. ctx_morph_solve. Qed.
+  Global Instance disk_geom_morph γ pd pav pu : CtxMorph (λ ξ, disk_geom (XI := ξ) γ pd pav pu).
+  Proof. rewrite /disk_geom. ctx_morph_solve. Qed.
+
+  (* A6.138: the deposit is POSITION-INDEXED -- it learns the flag store's
+     log position, and records that the kernel table's publication bound is
+     BELOW it.  That pure tie is what turns a secondary's read receipt
+     ([view_lb] at the flag's position) into the pin credentials
+     ([KptShare.kpt_creds]) its kvminithart call needs. *)
+  Definition main_dep (γd : uart_names) (γv : disk_names)
+      : nat -> CtxId -> iProp Σ :=
+    λ pos ξ, (main_deposit (XI := ξ) γd γv ∗
+              ∃ B : nat, KptGhost.kpt_bound B ∗ ⌜(B <= pos)%nat⌝)%I.
+  Global Instance main_dep_persistent γd γv pos ξ :
+    Persistent (main_dep γd γv pos ξ).
+  Proof. rewrite /main_dep. apply _. Qed.
+  Global Instance main_dep_morph γd γv pos : CtxMorph (main_dep γd γv pos).
+  Proof. rewrite /main_dep /main_deposit. ctx_morph_solve. Qed.
+End MainDepositMorph.
+
+Section SpecMainSecondaryBody.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+
   Definition wp_main_secondary_sconf_body
       (m : regfile) (K : nat)
       (p0 : mword 64)
-      (* THE DEPOSIT'S CONTEXT, NAMED.  Minted once at
-         [BootShared.boot_shared_alloc] and shared by all eight harts; this
-         arm ABSORBS the deposit's three ξ-indexed rows into its own context
-         after the acquire fence at main+0x18. *)
-      (xid : CtxId)
+      (γi : gname) (ξd : CtxId)
       (γd : uart_names) (γv : disk_names)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :=
     let pcE : mword 64 := mword_of_int KernelSyms.main in
@@ -214,7 +200,7 @@ Section SpecMainSecondary.
     (* HART-GENERIC, as on the boot arm: this arm reaches scheduler(), whose
        acquire wants them hart-generically. *)
     (* the handover channel, at the CONCRETE deposit *)
-    started_inv (main_deposit xid γd γv) -∗
+    started_inv γi ξd (main_dep γd γv) -∗
     (* this hart's own translation and trap resources *)
     (* THE TIMER CAPABILITY, this hart's.  [timer_cap] is the sstc pin plus the
        stimecmp invariant (TimerCap.v), allocated in the boot chain out of the
@@ -222,19 +208,25 @@ Section SpecMainSecondary.
        it because it is a member of [SpecDevintr.devintr_caps], which the
        handler contract closes over -- clockintr is on kerneltrap's cone. *)
     timer_cap -∗
+    (* A6.138: [KptShare.kpt_creds] is NO LONGER A PREMISE -- a secondary's
+       honest source is its own acquire of [started], and that is now
+       exactly where it is DERIVED: the deposit carries
+       [∃B, kpt_bound B ∗ ⌜B ≤ pos⌝] at the flag's position, the armed
+       read hands a [view_lb] receipt at that position, and
+       [view_lb_le] + [cv_boot_cred_view] + [kpt_creds_intro] mint the
+       credentials inside the spin's continuation. *)
     main_hart_raw tlbvec0 -∗
     WP (Loop : expr riscv_lang).
 
-End SpecMainSecondary.
+End SpecMainSecondaryBody.
 
 Module Type MAIN_SECONDARY.
   Parameter wp_main_secondary_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       
       (m : regfile) (K : nat)
-      (p0 : mword 64)
-      (xid : CtxId)
+      (p0 : mword 64) (γi : gname) (ξd : CtxId)
       (γd : uart_names) (γv : disk_names)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)),
-      wp_main_secondary_sconf_body m K p0 xid γd γv tlbvec0.
+      wp_main_secondary_sconf_body m K p0 γi ξd γd γv tlbvec0.
 End MAIN_SECONDARY.

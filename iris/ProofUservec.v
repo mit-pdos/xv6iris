@@ -66,6 +66,28 @@ Import Defs.
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module UservecProof (UT : UtResFits.USERTRAP_PARK) (UR : SpecUserret.USERRET) : USERVEC.
 
+(* [tlb_res_pt]'s creds conjunct, read off without consuming the residue
+   (A6.91 made it the bundle's ninth, persistent, member).  OUTSIDE the
+   section: the resuming hart is not the section's [CID], so the projection
+   must keep its hart implicit instantiable. *)
+Lemma uv_tlb_res_creds `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (r : mword 44) :
+  KptShare.tlb_res_pt r -∗ KptShare.kpt_creds ∗ KptShare.tlb_res_pt r.
+Proof.
+  iIntros "H".
+  iDestruct "H" as (s0 tv) "(Hsatp & %A & %B & %C & Htlb & Hsnap & Hpmp & #Hk & #Hcr)".
+  iSplitR; [ iExact "Hcr" | ].
+  iExists s0, tv.
+  iSplitL "Hsatp"; [ iExact "Hsatp" | ].
+  iSplitR; [iPureIntro; exact A |].
+  iSplitR; [iPureIntro; exact B |].
+  iSplitR; [iPureIntro; exact C |].
+  iSplitL "Htlb"; [ iExact "Htlb" | ].
+  iSplitL "Hsnap"; [ iExact "Hsnap" | ].
+  iSplitL "Hpmp"; [ iExact "Hpmp" | ].
+  iSplitR; [ iExact "Hk" | iExact "Hcr" ].
+Qed.
+
 Section UservecAllPt.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!ufdG Σ}.
@@ -131,10 +153,7 @@ Section UservecAllPt.
        unify through the definition. See claude-notes/optimization.md. *)
     unfold uservec_gpr.
     intros Hstvec Hdqc Hmie Hjlt Hnorm Hptwf.
-    iIntros "#Hkt #Hhw #Hinv #Hclaim Hframe Hures Hcont".
-    (* the walk's running token: SC-minted here (TsoCtxShim seam); the
-       T-leg borrows it from the residue's [ut_trap_parked] conjunct *)
-    iPoseProof (TsoCtxShim.own_context_sc XI) as "HctxSC".
+    iIntros "#Hkt #Hhw #Hinv #Hclaim #Hcreds Hframe Hures Hcont".
     (* ============ open the trapped machine ============ *)
     (* AT NAMED DATA (milestone J1a).  [user_trap_frame] is definitionally the
        ∃ over [user_trap_frame_at], so this is the same premise with its five
@@ -185,7 +204,10 @@ Section UservecAllPt.
     (* ... and with them the KERNEL ROOT the residue's kernel_satp names,
        with its [kpt_inv]: this is the [kroot] the exit switch installs. *)
     iDestruct (usertrap_res_tf_csrs_open pt vksp U with "Hures") as (kroot)
-      "(#Hkfr & %Hok0 & Htf0 & Hcsrs0 & Hclose0)".
+      "(#Hkfr & %Hok0 & Htf0 & Hcsrs0 & Hctx & Hclose0)".
+    (* the walk's running token comes OUT OF THE RESIDUE (A6.140: its
+       [ut_trap_parked] conjunct), rides every leaf, and goes back in at the
+       reseal below -- no SC mint. *)
     (* the borrowed words ARE the residue's index's, named so the open below
        substitutes a variable exactly as it did before the re-key *)
     remember (pv_tf (us_V U)) as ws0 eqn:Hws0.
@@ -224,9 +246,8 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(intros _; vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb HctxSC
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hctx
                     Hpc Hfile Hi_csrw_ss").
-    iClear "HctxSC".
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hctx Hpc Hfile".
     iClear "Hi_csrw_ss".
     assert (Hpcx_0x00 : add_vec_int (uva 0x00) (if false then 2 else 4) = uva 0x04)
@@ -1535,8 +1556,8 @@ Section UservecAllPt.
               (vksat : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
               HSIE HMPRV HSXL HTVM Hmm HPBMTE Hmenvval0 Hwfu Ht1v HkMode Hkasid Hkppn
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hclaim Hutlb Hkfr Hctx
-                    Hpc Hfile Hi_sf1 Hi_csrw_satp Hi_sf2 Hi_cjalr").
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hclaim Hutlb Hkfr
+                    Hcreds Hctx Hpc Hfile Hi_sf1 Hi_csrw_satp Hi_sf2 Hi_cjalr").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hufr Hkres Hctx Hpc Hfile".
     iClear "Hi_sf1".
     iClear "Hi_csrw_satp".
@@ -1576,7 +1597,7 @@ Section UservecAllPt.
     (* hand the page and the CSRs back before the residue goes to usertrap *)
     iAssert hart_csrs with "[Hsscr Hmdlc Hmsec Hssec]" as "Hcsrs0'".
     { iFrame "Hmdlc Hmsec Hssec". iExists _. iExact "Hsscr". }
-    iDestruct ("Hclose0" with "[%] Htf0' Hcsrs0'") as "Hures'".
+    iDestruct ("Hclose0" with "[%] Htf0' Hcsrs0' Hctx") as "Hures'".
     { refine (tf_kernel_words_ok_tail _ _ _ _ _ _ _ _ _ Hok0k). }
     (* ---- THE ADDRESS SPACE CHANGES VIEW, then the two borrows close ----
        The exit switch just did the one thing that converts the views: it
@@ -1636,12 +1657,13 @@ Section UservecAllPt.
        uservec framing it. *)
     iDestruct (UT.usertrap_res_tlb_open (CID:=CID2) pt' vksp U2 with "Hures2")
       as (kroot2) "[Hkres2 Hures2]".
+    iDestruct (uv_tlb_res_creds (CID:=CID2) kroot2 with "Hkres2") as "[#Hcreds2 Hkres2]".
     iDestruct (UT.usertrap_res_ptm_open (CID:=CID2) pt' vksp U2 with "Hures2")
       as "[Hpt' Hures2]".
     iEval (rewrite /proc_ptm) in "Hpt'".
     iDestruct "Hpt'" as "(%Hptwf' & Hufr' & Hdata')".
     iDestruct (UT.usertrap_res_tf_open (CID:=CID2) pt' vksp U2 with "Hures2") as (kroot1)
-      "(#Hinv1 & %Hok1 & Htf1 & Hclose1)".
+      "(#Hinv1 & %Hok1 & Htf1 & Hctx2 & Hclose1)".
     remember (pv_tf (us_V U2)) as ws1 eqn:Hws1.
     iDestruct (tf_page_length with "Htf1") as %Hlen1.
     iDestruct (tf_page_open36 (ud_tfp pt') ws1 Hlen1 with "Htf1") as
@@ -1693,14 +1715,14 @@ Section UservecAllPt.
        name the ENTRY hart's resources and are a different (if
        identically-printed) proposition whenever usertrap crossed harts.
        See [SpecUsertrap.usertrap_post]'s comment. *)
-    (* the resuming hart's running token: SC-minted (TsoCtxShim seam) *)
-    iPoseProof (TsoCtxShim.own_context_sc (CID := CID2) TsoCtx.cur_ctx) as "Hctx2".
-    iApply ("Hwup" with "Hkt Hhw2 Hmin2 Hhs2 Hpriv2 Hms2 Hmie3 Hmdl3 Hmenv3 Hsenv2 Hsepc2 Hclaim Hkres2 Hufr' Hctx2 Hpc2 Hfile2
+    (* the resuming hart's running token: out of ITS residue (the opener
+       above), handed to userret and back through the closer below *)
+    iApply ("Hwup" with "Hkt Hhw2 Hmin2 Hhs2 Hpriv2 Hms2 Hmie3 Hmdl3 Hmenv3 Hsenv2 Hsepc2 Hclaim Hcreds2 Hkres2 Hufr' Hctx2 Hpc2 Hfile2
                     Hutf40 Hutf48 Hutf56 Hutf64 Hutf72 Hutf80 Hutf88 Hutf96 Hutf104
                     Hutf120 Hutf128 Hutf136 Hutf144 Hutf152 Hutf160 Hutf168 Hutf176 Hutf184
                     Hutf192 Hutf200 Hutf208 Hutf216 Hutf224 Hutf232 Hutf240 Hutf248 Hutf256
                     Hutf264 Hutf272 Hutf280 Hutf112").
-    iIntros "Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hsenv3 Hsepc3 Hutlb3 _ Hpc3 Hfile3
+    iIntros "Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hsenv3 Hsepc3 Hutlb3 Hctx3 Hpc3 Hfile3
              Hutf40' Hutf48' Hutf56' Hutf64' Hutf72' Hutf80' Hutf88' Hutf96' Hutf104'
              Hutf120' Hutf128' Hutf136' Hutf144' Hutf152' Hutf160' Hutf168' Hutf176' Hutf184'
              Hutf192' Hutf200' Hutf208' Hutf216' Hutf224' Hutf232' Hutf240' Hutf248' Hutf256'
@@ -1714,7 +1736,7 @@ Section UservecAllPt.
                        Hutf120' Hutf128' Hutf136' Hutf144' Hutf152' Hutf160' Hutf168' Hutf176' Hutf184'
                        Hutf192' Hutf200' Hutf208' Hutf216' Hutf224' Hutf232' Hutf240' Hutf248' Hutf256'
                        Hutf264' Hutf272' Hutf280' Htail1") as "Htf1'".
-    iDestruct ("Hclose1" with "[%] Htf1'") as "Hures3".
+    iDestruct ("Hclose1" with "[%] Htf1' Hctx3") as "Hures3".
     { refine (tf_kernel_words_ok_tail _ _ _ _ _ _ _ _ _ Hok1). }
     (* ---- THE ADDRESS SPACE CHANGES VIEW BACK -------------------------
        userret's entry switch installed the user root, so [Hutlb3] is the
@@ -1755,7 +1777,7 @@ Section UservecAllPt.
                 deferred to a goal, [?U'] is already resolved by the time the
                 (purely iota) conversion is checked. *)
              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
-                    [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2").
+                    [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2 Hcreds2").
     - (* the descriptor the residue is keyed at IS the one handed over *)
       reflexivity.
     - (* THE ROUND, read at the machine that trapped.  usertrap's [tf0] is
