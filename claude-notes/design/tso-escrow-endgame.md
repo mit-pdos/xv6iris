@@ -126,9 +126,10 @@ instance is declared by:
                 under itable.lock before its acquiresleep);
         P_rest = everything else (bcache: data, disk, pay; icache: the
                 in-memory dinode fields).
-  - residue Q : iProp   (ξ-FREE ghost — the chain's reference, the L2
-                         exclusivity token, the L2 payload's slot_p
-                         half: A6.155's shape)
+  - residue Q : iProp   (ξ-FREE ghost — the L2 exclusivity token, the
+                         L2 payload's slot_p half, and ONE HALF of the
+                         chain's stamps fragment (F7 split); the other
+                         half rides the holder's handle row)
   - guard locks L1, L2  (bcache: bcache.lock / b->sleeplock;
                          icache: itable.lock / ip->sleeplock)
   - the stamped-shares ghost (§3.2)
@@ -442,6 +443,72 @@ ACCEPTED.  R1' may start on the flag shape.
       ghost in Q" was right about ghost, wrong about Q: the handle can
       carry a ghost conjunct behind an existing row.  No new lemma, no
       new arm, no new ghost; three files touch the row.
+      VETTED 2026-09-01 — F7 REAL (missed by BOTH F6 vettings, which
+      wrote "re-formed from bio_locked's identity + its witness" while
+      the witness sat in Q); FIX DIRECTION ACCEPTED, Q-SHRINK CORRECTED:
+      - "Frozen in SHAPE, not in the DEFINITION of its conjuncts" is a
+        legitimate tool (the sleeplock relay used it: is_sleeplock kept
+        name and arity while its definition became the λ instance).  It
+        holds only if every user of the conjunct AS A TOKEN is in the
+        round's file set; that is a "textually unchanged" claim of the
+        kind stale .vo hid at r76, so R1's gate is a forced -B round.
+      - The proposed Q := bown ∗ park half BREAKS (a): its OUT_L2
+        refutation is "Q's fraction breaks Σ" (c = 0) / "overflows
+        against the whole unit in hand" (c = 1); with no fragment in Q
+        neither works — the chain's fragment is in the holder's hand,
+        invisible to the L1 opener, and bown / the slot_p half clash
+        with nothing an L1 caller holds.  The flag cannot help: (e)/(f)
+        hold no slot_d and cannot mark "out under L2".
+      - FIX: SPLIT the chain's unit at (e).  ◯{[(id,t) := 1]} splits
+        (ufrac, same key) into a Q-half — kept in Q for (a)'s Σ
+        refutation — and a handle-half that rides bstok with bref_tok0
+        and llb t, for (f)'s identity and brelse's refs--.  (f) rejoins
+        Q's half with its own and moves the WHOLE to (id, T').  Checks:
+        (a) at c = 0: Q's half vs Σ m = 0; at c = 1: Q's half + the
+        caller's unit > Σ m = 1 — both refuted as before.  (f): the
+        handle half gives (dev,bno) = r.ident by (I); Q's half is
+        ∃-bound but (I) pins its identity too; the move-stamp update is
+        over the parker's whole fragment map, so NO agreement between
+        the halves is needed (the no-agreement tripwire holds).  A
+        half-fragment is a SHARE — the reference form the design already
+        has — so no new spelling.  bref_tok0 (client count ghost) never
+        enters the box: the client composes bstok outside the lemmas,
+        so CtxBox stays generic.
+        Q := bown ∗ ∃ Tp, slot_p ½ Tp ∗ ∃ p, ◯{[p := ½]}
+        bstok bn k pidv dev bno := sleeplocked … pidv ∗ bref_tok0 ∗
+                                   ∃ t, ◯{[((dev,bno), t) := ½]} ∗ llb t
+      - R3: the same handle-row trick is the likely non-Q home for the
+        icache share during ilock→iunlock (the locked handle is at the
+        holder's ξ, so its ξ-cells may ride there), once R3's site map
+        confirms which files use that row as a token.
+      R1' MAY RESUME on F7 with the split.
+
+  F8  (second reviewer, 2026-09-01, on re-walking the design) P_hdr AND
+      P_rest SHARE BINDERS.  bcache's buf_pay v dev bno bs depends on
+      the data bs (P_rest) when v = true, and the icache's dinode
+      payload is keyed by the field values in P_rest.  So the IN arm is
+      ∃ x, P_hdr id x ξb ∗ P_rest x ξb with ONE binder over both, and
+      OUT_L1 is hdr_out ∗ ∃ x, P_rest x ξb.  CtxBox.v's signature must
+      take the split as `P_hdr : id → X → CtxId → iProp`, `P_rest : X →
+      CtxId → iProp` (X the client's shared witness type), not as two
+      independent λs — get this right the first time.  (a)'s output at
+      c = 0 is P_hdr at an ∃-bound x it cannot inspect; the recycler
+      only needs to return the old identity's payload to the pool and
+      re-deposit at v = false (F2), where the dependence vanishes.
+
+  F9  (second reviewer, 2026-09-01) THE STAMPS KEY IS NOT SHARE-TO-SHARE
+      IDENTITY AGREEMENT.  Two fragments at different keys of the same
+      box are jointly valid; only row (I) ties a fragment to r.ident,
+      and only at a box open.  inode_ident's CELL fractions give
+      agreement between two shares anywhere, with no box open, and the
+      fs layer uses that.  So R3 must NOT "simplify" icache shares to
+      ghost-only identity via the key: the ident cells stay on shares;
+      the key serves the CHECKOUT tie (F6) and nothing else.  The R3
+      nuance (a non-Q home for the share's cells during the hold) is
+      answered by F7's handle-row trick, not by removing the cells.
+      §4.3's inode_pay fix (ghost identity for the PARKED copy via
+      ic_id) is unaffected: a parked copy needs no share-to-share
+      agreement, only the cinv-open tie.
 
 HARD RULES: exactly these three arm shapes and six lemmas.  Protocol
 substates go inside Q (ξ-free ghost).  A seventh lemma, a fourth arm
@@ -562,11 +629,15 @@ where it is needed.
       the payload's `slot_p ½ Tp` with `ctx_floor ξ Kp`, `Tp ≤ Kp` (R2);
       the L2 token.  (C) gives T ≤ Kt ∨ T ≤ Kp.  OUT_L2 refuted by the
       token; OUT_L1 refuted by Σ (my fraction vs c = 0, or vs the whole
-      unit in hdr_out).  Whole bundle out at ξ; Q := token ∗ ref ∗ the
-      slot_p half (A6.155).
-  (f) park (under L2; OUT_L2 → IN).  Q out; deposit P at T'; my fraction
-      moves from (id_r, t) to (id_r, T'), and id_r = r.ident by (I), so
-      "IN at r.ident" is re-formed from bio_locked's own (dev, bno);
+      unit in hdr_out).  Whole bundle out at ξ; the winner's unit
+      SPLITS (F7): Q := token ∗ the slot_p half ∗ ◯{[(id,t) := ½]}; the
+      other half + bref_tok0 + llb t go into the handle's token row
+      (bstok).
+  (f) park (under L2; OUT_L2 → IN).  Q out; deposit P at T'; my
+      handle-half ◯{[((dev,bno), t) := ½]} rejoins Q's half (no
+      agreement needed — both keys satisfy (I)) and the WHOLE moves to
+      ((dev,bno), T'); (dev,bno) = r.ident by (I) on the handle half, so
+      "IN at r.ident" is re-formed SOUNDLY (F7);
       Tp := T'; hand back the token, the ref at (id_r, T'), `llb T'`,
       `slot_p ½ T'` for the `_in` releasesleep.  IN refuted by the full
       valid cell; OUT_L1 refuted by P_rest's cell (ctx_word4_excl_x).
@@ -857,6 +928,10 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
      expressible that way (the flag as a slot_reg field; the identity as
      the stamps key), and each was first proposed as a new ghost.  The
      box owns exactly: the parked context, stamps, cnt, slot_p, slot_d.
+   TOOL (from F7): a frozen handle may gain GHOST content by
+   redefining an existing conjunct (shape unchanged), provided every
+   user of that conjunct as a token is inside the round's file set —
+   verified by a forced -B round, never by grep alone.
    BONUS RULE (from the flag): L1's payload row states slot_d ½ r with
    r.win = false, so L1 cannot be released with a window open — the
    (a)…(b) pair is forced into one critical section by the payload's
@@ -864,6 +939,10 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
 
 ## 6. Post-endgame cleanup (do NOT do before SystemAdequacy is green)
 
+- Consider dropping bpin's bref dev/bno CELL fractions (the stamps key
+  pins the identity for the log layer's bufs, which it holds locked);
+  if so the option-share component of bioUR collapses.  Evaluate only
+  after ProofLogWrite is green on the key.
 - Collapse the IcacheRef flavor zoo to the two-spellings rule
   (retire _bare/_gen intermediates with one final sweep).
 - Delete CtxAnchor.v and the dead presG/btagG/anchorG cameras (R-d).
@@ -1103,3 +1182,13 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   reference rides the handle's sleeplock-token row behind a wrapper
   Definition (shape unchanged; bread/bwrite/brelse only), Q := bown ∗
   park half.  Recorded in §2 for vetting; R1' PAUSED.
+- 2026-09-01 (design vetting of F7 + re-walk): F7 REAL, missed by both
+  F6 vettings.  Handle-row redefinition ACCEPTED as a tool (with the -B
+  gate); the proposed Q shrink REJECTED — it removes (a)'s OUT_L2
+  refutation at both c = 0 and c = 1; FIX: split the chain's unit at
+  (e), Q-half for Σ, handle-half (+ bref_tok0, llb) for (f)/(d), rejoin
+  and move at (f).  NEW: F8 (P_hdr/P_rest share binders — fix CtxBox's
+  signature up front), F9 (the stamps key is not share-to-share
+  identity agreement; icache shares keep inode_ident cells; the R3 home
+  is the handle-row trick).  §2 Q line, §3.5 (e)/(f), §5 tool, §6
+  optional bref simplification.  R1' resumes on F7 with the split.
