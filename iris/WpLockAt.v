@@ -26,6 +26,7 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Export WpLock.
+Require Import TsoGhost.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Local Open Scope Z_scope.
 
@@ -91,6 +92,42 @@ Section LockAt.
     { iNext. rewrite /lock_inv. iFrame "Hc4 Hc8".
       (* A6.119: the pre-allocated token's position is whatever it was
          allocated at; a FREE lock's word arm does not mention it. *)
+      iDestruct "Ha" as (B0) "Ha".
+      iExists (mword_of_int 0 : mword 32), None, B0.
+      iDestruct (lock_word_intro with "Hword") as "Hword".
+      rewrite lk_cpu_res_free. iFrame "Hword Ha".
+      iSplitL "Hcell"; [ iExact "Hcell" | ].
+      iLeft. iSplitR; [done|]. iSplitR; [done|].
+      iSplitL "Hf"; [ iExact "Hf" | iExact "HR" ]. }
+    iModIntro. iApply (is_lock_intro with "Hnm Hinv Hfl").
+  Qed.
+
+  (* ENDGAME R1-pre (tso-flip cb3699cd9's caller; the lemma itself was not in
+     the pushed tree): [newlock_at] WITH THE FOLD AT THE BOOT FLOOR SLOT --
+     the creator deposits the unfloored [Rd] beside a loglen receipt at [tl];
+     the lock is minted over the floored [R] ([WpLock.lock_pay_intro_llb]). *)
+  Lemma newlock_at_llb `{CID : RiscvLang.CpuId} E (γ : gname) (lk : mword 64) (s : string)
+      (R Rd : CtxId → iProp Σ) `{!CtxMorph Rd} (tl : nat)
+      (Hfold : forall ξ : CtxId, Rd ξ ∗ TsoCtx.ctx_floor ξ tl ⊢ R ξ) :
+    lock_free_tok γ -∗
+    lock_name lk s -∗
+    own_context cur_ctx -∗
+    lk ↦₄ (mword_of_int 0 : mword 32) -∗
+    WpLock.lk_cpu_ready lk -∗
+    TsoGhost.llb loglen_name tl -∗
+    Rd cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock γ lk s R.
+  Proof.
+    iIntros "[Ha Hf] #Hnm Hrun Hword Hready #Hllb HR".
+    rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
+    iDestruct "Hready" as (lo) "[Hcpu #Hfl]".
+    iMod (lock_pay_intro_llb Rd R tl Hfold with "Hllb Hrun HR") as "[Hrun HR]".
+    iFrame "Hrun".
+    iDestruct (WpLock.lk_addr_claim_of4 lk (DfracOwn 1) (mword_of_int 0 : mword 32)
+                 with "Hword") as "#Hc4".
+    iDestruct "Hcpu" as "[#Hc8 Hcell]".
+    iMod (inv_alloc lockN E (lock_inv γ lk s R lo)
+            with "[Hword Hcell Ha Hf HR]") as "#Hinv".
+    { iNext. rewrite /lock_inv. iFrame "Hc4 Hc8".
       iDestruct "Ha" as (B0) "Ha".
       iExists (mword_of_int 0 : mword 32), None, B0.
       iDestruct (lock_word_intro with "Hword") as "Hword".

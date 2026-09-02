@@ -101,7 +101,7 @@ Section ProofAcquire.
      guide's "consumer side" recipe. *)
   Lemma wp_acquire_lock_loop_sconf `{CID0 : CpuId}
       (γl : gname) (s : string) (R : CtxId → iProp Σ) (Tc Dc : iProp Σ)
-      (M0 : regfile) (n : nat) (a5v lk : mword 64) (p : mword 64) :
+      (M0 : regfile) (n : nat) (a5v lk : mword 64) (p : mword 64) (Tl : nat) :
     let a4one : mword 64 := add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) in
     M0 !!! Regidx (mword_of_int 14 : mword 5) = a4one ->
     M0 !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg lk ->
@@ -109,12 +109,14 @@ Section ProofAcquire.
     sie_cap_gpr kt (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg a5v]> M0) n false p -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.acquire + 0x1a)) -∗
     lock_openable γl lk s R Dc -∗
+    TsoGhost.llb loglen_name Tl -∗
     Tc -∗
     ( Tc -∗
       sie_cap_gpr kt (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) n false p -∗
       pc_is (mword_of_int (KernelSyms.acquire + 0x24)) -∗
       (* A6.119/A6.120: the WHOLE parked record, with the acquirer's floor
          at its stamp -- what the absorb below consumes. *)
+      (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K) -∗
       locked_pre γl cpu_id -∗ lock_pay_won R -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -137,7 +139,7 @@ Section ProofAcquire.
     assert (Htgt : add_vec (mword_of_int (KernelSyms.acquire + 0x22) : mword 64)
               (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0"))))
             = mword_of_int (KernelSyms.acquire + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
-    iIntros "Hcg #Htext Hpc #Hlock HTc Hcont".
+    iIntros "Hcg #Htext Hpc #Hlock #Hllb HTc Hcont".
     iRevert "Hcg Hpc HTc Hcont".
     iLöb as "IH" forall (a5v).
     iIntros "Hcg Hpc HTc Hcont".
@@ -170,13 +172,13 @@ Section ProofAcquire.
     { intros hh. rgne. rewrite upd_eq. unfold regval_into_reg, v1, a4one.
       apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_amoswap_lockopen_s_sconf γl lk s R Tc Dc (mword_of_int (KernelSyms.acquire + 0x1c)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 9)
-              (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0) n false
+              (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0) n false Tl
               HPAlk (Hrs2one _) HSTZ
               ltac:(vm_compute; discriminate) ltac:(rdok) Href
-              with "Hcg Hpc [] Hlock HTc").
+              with "Hcg Hpc [] Hlock Hllb HTc").
     { iApply (aqi_1c with "Htext"). }
     iIntros (w). iApply wp_next_off_intro.
-    iIntros "HTc Hcg Hpc Hpay".
+    iIntros "HTc Hcg Hpc #Hpaira Hpay".
     iEval (rewrite upd_upd) in "Hcg".
     assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.acquire + 0x1c) : mword 64) 4 = mword_of_int (KernelSyms.acquire + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp20) in "Hpc".
@@ -209,7 +211,7 @@ Section ProofAcquire.
       iIntros "Hcg Hpc".
       assert (Hpp24 : add_vec_int (mword_of_int (KernelSyms.acquire + 0x22) : mword 64) 2 = mword_of_int (KernelSyms.acquire + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp24) in "Hpc".
-      iApply ("Hcont" with "HTc Hcg Hpc Htokp HRes").
+      iApply ("Hcont" with "HTc Hcg Hpc Hpaira Htokp HRes").
     - (* ---- w <> 0: c.bnez TAKEN back; Löb ---- *)
       iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.acquire + 0x22)) (mword_of_int 252 : mword 8) (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5)
                 (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 w)]> M0) n false
@@ -233,16 +235,17 @@ Section ProofAcquire.
      obligation.  [Hfresh] now does DOUBLE DUTY: it also decides the
      [if(holding(lk)) panic] check, so neither tier carries a panic
      credential any more. *)
-  Lemma wp_acquire_gen_fresh_sconf
+  Lemma wp_acquire_gen_llb_fresh_sconf
       (γl : gname) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (Tc Dc : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string)
-    : wp_acquire_gen_fresh_sconf_body kt γl s R Tc Dc m n eb p av b lks.
+      (Tl : nat)
+    : wp_acquire_gen_llb_pre_body kt γl s R Tc Dc m n eb p av b lks Tl (s ∉ lks).
   Proof.
-    cbv beta delta [wp_acquire_gen_fresh_sconf_body wp_acquire_gen_pre_body].
+    cbv beta delta [wp_acquire_gen_llb_pre_body].
     intros pcE lk0 ret_tgt Hpos Hav Hfresh Href Hrefpre.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hown #Htext Hpc #Hlock HTc Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hlock #Hllb HTc Hcont".
     (* THE ENTRY BOUND, taken before push_off raises the level: after the push
        the bundle offers only [size lks <= S n], one too weak to add a rank.
        It is pure, so it survives the push in the Coq context. *)
@@ -494,11 +497,11 @@ Section ProofAcquire.
     { intros f k. apply functional_extensionality; intro j.
       unfold insert, regfile_insert, rf_upd, regval_into_reg, lookup_total, regfile_lookup_total.
       case_bool_decide as Heq; [subst; reflexivity | reflexivity]. }
-    iApply (wp_acquire_lock_loop_sconf γl s R Tc Dc B3 (trap_res b + (av - 4))%nat (B3 !!! Regidx (mword_of_int 15 : mword 5)) lk0 p
+    iApply (wp_acquire_lock_loop_sconf γl s R Tc Dc B3 (trap_res b + (av - 4))%nat (B3 !!! Regidx (mword_of_int 15 : mword 5)) lk0 p Tl
               HB3a4 HB3s1 Href
-              with "[Hcg] Htext Hpc Hlock HTc").
+              with "[Hcg] Htext Hpc Hlock Hllb HTc").
     { rewrite (Hupd_id B3 (Regidx (mword_of_int 15 : mword 5))). iExact "Hcg". }
-    iIntros "HTc Hcg Hpc Htokp HRes".
+    iIntros "HTc Hcg Hpc #Hpaira Htokp HRes".
     set (B8 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> B3).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> B3) with B8.
     (* ---- 0x24: jal ra,mycpu ---- *)
@@ -685,10 +688,10 @@ Section ProofAcquire.
     iMod (ctx_absorb_lb (CID := CIDpo) R ξ0 cur_ctx T0 K0 HT0K
             with "Hrun HK0s Hpk0 HRes") as "(Hrun & _ & HRes)".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iSpecialize ("Hcont" $! CIDpo with "[%]"); [wp_next_chain|].
     iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb".
     { iExists K0. iExact "HK0s". }
-    iSpecialize ("Hcont" $! CIDpo with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! ms E4 with "[%] HTc Hcg Hpc [%] Htok HRes Hlb Hown Hpay").
+    iApply ("Hcont" $! ms E4 with "[%] HTc Hcg Hpc [%] Htok HRes Hpaira Hlb Hown Hpay").
     { exact Hmsf. }
     (* [s0]/[s1] never surface as separate goals below: each is restored by
        an epilogue [ldsp] as the LITERAL value [m !!! reg] (the leaf's own
@@ -823,6 +826,41 @@ Section ProofAcquire.
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
   Qed.
 
+  (* A6.149: the plain fresh tier is the llb tier at [Tl := 0], with the
+     receipt row's pure half dropped. *)
+  Lemma wp_acquire_gen_fresh_sconf
+      (γl : gname) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (Tc Dc : iProp Σ)
+      (m : regfile)
+      (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string)
+    : wp_acquire_gen_fresh_sconf_body kt γl s R Tc Dc m n eb p av b lks.
+  Proof.
+    cbv beta delta [wp_acquire_gen_fresh_sconf_body wp_acquire_gen_pre_body].
+    intros pcE lk0 ret_tgt Hpos Hav Hfresh Href Hrefpre.
+    iIntros "Hcg Hown #Htext Hpc #Hlock HTc Hcont".
+    iApply (wp_acquire_gen_llb_fresh_sconf γl s R Tc Dc m n eb p av b lks 0
+              Hpos Hav Hfresh Href Hrefpre
+              with "Hcg Hown Htext Hpc Hlock [] HTc [Hcont]").
+    { iApply TsoGhost.llb_0. }
+    iIntros (CID2) "%Hs2".
+    iSpecialize ("Hcont" $! CID2 with "[%]"); [exact Hs2|].
+    iIntros (ms mfin) "%Hms HTc Hcg Hpc %Hcs Htok HRes _ Hlb Hown Hpay".
+    iApply ("Hcont" $! ms mfin with "[%] HTc Hcg Hpc [%] Htok HRes Hlb Hown Hpay");
+      [exact Hms | exact Hcs].
+  Qed.
+
+  (* A6.149: the llb BELOW tier, for the transit-box withdraw sites. *)
+  Lemma wp_acquire_gen_llb_sconf
+      (γl : gname) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (Tc Dc : iProp Σ)
+      (m : regfile)
+      (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string)
+      (Tl : nat)
+    : wp_acquire_gen_llb_sconf_body kt γl s R Tc Dc m n eb p av b lks Tl.
+  Proof.
+    exact (wp_acquire_gen_llb_pre_weaken γl s R Tc Dc m n eb p av b lks Tl
+             (s ∉ lks) (locks_below lks s) (locks_below_not_elem lks s)
+             (wp_acquire_gen_llb_fresh_sconf γl s R Tc Dc m n eb p av b lks Tl)).
+  Qed.
+
   (* THE BELOW TIER, as a corollary: the contract is antitone in its held-set
      precondition and [locks_below lks s] implies [s ∉ lks]. *)
   Lemma wp_acquire_gen_sconf
@@ -871,6 +909,39 @@ Section OfGen.
     iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hlb Hown Hpay".
     iSpecialize ("Hcont" $! CIDg with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hlb Hown Hpay").
+  Qed.
+
+  (* A6.149: the static llb tiers, for the transit-box withdraw sites. *)
+  Lemma wp_acquire_llb_fresh_sconf
+      (γl : gname) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R}
+      (m : regfile)
+      (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool)
+      (lks : gset string) (Tl : nat)
+    : wp_acquire_llb_fresh_sconf_body kt γl s R m n eb p av b lks Tl.
+  Proof.
+    cbv beta delta [wp_acquire_llb_fresh_sconf_body wp_acquire_llb_pre_body].
+    intros pcE lk0 ret_tgt Hpos Hav Hfresh.
+    iIntros "Hcg Hown #Htext Hpc #Hlock #Hllb Hcont".
+    iApply (G.wp_acquire_gen_llb_fresh_sconf kt γl s R emp%I False%I m n eb p av b lks Tl
+              Hpos Hav Hfresh (lock_refute_False _) (fun i => lock_refute_False _)
+              with "Hcg Hown Htext Hpc [] Hllb []").
+    { iApply (is_lock_openable with "Hlock"). }
+    { done. }
+    iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hfl Hlb Hown Hpay".
+    iSpecialize ("Hcont" $! CIDg with "[%]"); [wp_next_chain|].
+    iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hfl Hlb Hown Hpay").
+  Qed.
+
+  Lemma wp_acquire_llb_sconf
+      (γl : gname) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R}
+      (m : regfile)
+      (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool)
+      (lks : gset string) (Tl : nat)
+    : wp_acquire_llb_sconf_body kt γl s R m n eb p av b lks Tl.
+  Proof.
+    exact (wp_acquire_llb_pre_weaken γl s R m n eb p av b lks Tl
+             (s ∉ lks) (locks_below lks s) (locks_below_not_elem lks s)
+             (wp_acquire_llb_fresh_sconf γl s R m n eb p av b lks Tl)).
   Qed.
 
   Lemma wp_acquire_sconf

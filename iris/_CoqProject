@@ -66,6 +66,7 @@ TsoCtxShim.v
 TsoCtxAbsorbLb.v
 CtxMorphTac.v
 TsoCtxPark.v
+CtxBox.v
 TsoCtxMove.v
 CtxValues.v
 CtxPinw.v
@@ -691,6 +692,7 @@ SpecBinit.v
 ProofBinit.v
 LinkBinit.v
 BioInv.v
+BioBox.v
 BioFs.v
 BioInitAt.v
 FsBlocks.v

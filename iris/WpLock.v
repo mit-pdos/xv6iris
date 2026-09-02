@@ -228,6 +228,7 @@ Section Lock.
     destruct (proj1 (excl_auth_frag_op_valid _ _) Hv1).
   Qed.
 
+
   Lemma lock_frag_at_exclusive γ st st' B B' :
     lock_frag_at γ st B -∗ lock_frag_at γ st' B' -∗ False.
   Proof.
@@ -1911,6 +1912,45 @@ Section Lock.
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ. iIntros (R) "%HmR Hrun HR".
     iMod (lock_pay_intro (CtxMorph0 := HmR) R with "Hrun HR") as "[Hrun HR]".
+    iFrame "Hrun".
+    iMod (inv_alloc lockN E (lock_inv γ lk s R lo) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
+    { iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None, 0%nat.
+      iDestruct (lock_word_intro with "Hword") as "Hword".
+    rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
+      iLeft. iSplitR; [done|]. iSplitR; [done|].
+      iSplitL "Hf"; [ by iExists 0%nat | iExact "HR" ]. }
+    iModIntro. iApply (is_lock_intro with "Hnm Hinv Hfl").
+  Qed.
+
+  (* ENDGAME R1-pre (tso-flip cb3699cd9's caller; the lemma itself was not in
+     the pushed tree): [newlock_delayed] WITH THE FOLD AT THE BOOT FLOOR SLOT
+     -- the creator deposits the UNFLOORED payload [Rd] beside a loglen
+     receipt at [tl], and the lock is minted over the floored [R] through
+     [lock_pay_intro_llb].  Same proof as [newlock_delayed], one call moved. *)
+  Lemma newlock_delayed_llb `{CID : CpuId} E (lk : mword 64) (s : string) :
+    lock_name lk s -∗
+    lk ↦₄ (mword_of_int 0 : mword 32) -∗
+    lk_cpu_ready lk ==∗
+    ∃ γ : gname, ∀ (R Rd : CtxId → iProp Σ) (tl : nat),
+      ⌜CtxMorph Rd⌝ -∗
+      ⌜forall ξ : CtxId, Rd ξ ∗ TsoCtx.ctx_floor ξ tl ⊢ R ξ⌝ -∗
+      TsoGhost.llb loglen_name tl -∗
+      own_context cur_ctx -∗
+      Rd cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock γ lk s R.
+  Proof.
+    iIntros "#Hnm Hword Hready".
+    rewrite /lk_cpu_ready /lk_cpu_ready_at.
+    iDestruct "Hready" as (lo) "[[#Hc8 Hcpu] #Hfl]".
+    iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
+    iMod (own_alloc ((((●E (None : leibnizO lock_state)),
+                       (●E (0%nat : leibnizO nat)))
+                      ⋅ ((◯E (None : leibnizO lock_state)),
+                         (◯E (0%nat : leibnizO nat)))) : lockUR)) as (γ) "H";
+      [ split; apply excl_auth_valid | ].
+    iDestruct (own_op with "H") as "[Ha Hf]".
+    iModIntro. iExists γ. iIntros (R Rd tl) "%HmR %Hfold #Hllb Hrun HR".
+    iMod (lock_pay_intro_llb (CtxMorph0 := HmR) Rd R tl Hfold with "Hllb Hrun HR")
+      as "[Hrun HR]".
     iFrame "Hrun".
     iMod (inv_alloc lockN E (lock_inv γ lk s R lo) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
     { iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None, 0%nat.

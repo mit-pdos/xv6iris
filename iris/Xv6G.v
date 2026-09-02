@@ -102,6 +102,10 @@ Class xv6G (Σ : gFunctors) := Xv6G {
   (* the off-borrow liveness counter's camera (off-ledger ruling); its
      gname is [FsCfg.fsc_fol].  See [Xv6Cameras.flivG]. *)
   xv6_fliv       :: flivG Σ;
+  (* ---- the BUFFER-CACHE TRANSIT BOX (endgame §3.2), a member since the
+     TSO port's R1: [bio_ctx]/[bio_init] are stated by ~100 files; see the
+     note at [Xv6Cameras.bioboxG]. *)
+  xv6_biobox     :: bioboxG Σ;
 }.
 
 (* THE OFF LEDGER ([FileInvDefs.ioff_body]) DELIBERATELY HAS NO FIELD HERE.
@@ -125,7 +129,7 @@ Class xv6G (Σ : gFunctors) := Xv6G {
 Definition xv6GΣ : gFunctors :=
   #[ sieΣ; lockΣ; kallocΣ; bioΣ; diskGhostΣ; uartGhostΣ; fsLogΣ; logΣ;
      fsCrashΣ; iregΣ; fsTopΣ; fsLinkΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ;
-     flivΣ ].
+     flivΣ; bioboxΣ ].
 
 Global Instance subG_xv6GΣ {Σ} : subG xv6GΣ Σ -> xv6G Σ.
 Proof. solve_inG. Qed.

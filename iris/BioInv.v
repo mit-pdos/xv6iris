@@ -63,18 +63,23 @@
    caller of every increment supplies one unit, the resource stores n units
    per busy buffer, every decrement returns one -- that is what makes the
    unchecked refcnt++ provable and keeps the cell a faithful int. *)
-From Stdlib Require Import ZArith Lia List.
+From Stdlib Require Import ZArith Lia List QArith Qcanon.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import excl auth gmap frac numbers.
+From iris.algebra Require Import excl auth gmap frac numbers agree gmultiset ufrac.
+From stdpp Require Import gmultiset.
+From iris.base_logic.lib Require Import ghost_var.
 From iris.base_logic.lib Require Import gen_heap invariants own.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
 Require Import WpLock.
-Require Import TsoCtx TsoCtxAbsorbLb.
-Require Import SepThread.   (* A6.68: the token threaded through the NBUF *)   (* the lock payload's context axis; [<{ }>] *)
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
+Require Import TsoMemPa TsoGhost.
+Require Import TsoCtxPark.
+Require Import TsoCtxAbsorbLb.
+Require Import CtxBox.   (* the generic transit box; bcache instantiates it below *)
 Require Import SleepLock.
 Require Import BufOwn.
 Require Import DiskPtsto.
@@ -82,9 +87,9 @@ Require Import BcacheInv.
 Require Export BioDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SepThread.   (* A6.68: the token threaded through the NBUF *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
-Require Import TsoCtx.
 
 (* ------------------------------------------------------------------ *)
 (*  Geometry: the pa-tier node base and the refcnt cell                 *)
@@ -117,106 +122,111 @@ Proof. reflexivity. Qed.
    back (it looks exactly like a hang -- durable-notes' "a failing/searching
    tactic looks like a hang"). *)
 
-(* refcnt==0 -> refcnt:=1: allocate the entry, minting the first reference
-   at fraction qn (split off the resource's retained share). *)
-Local Lemma bio_first_upd (M : gmap nat (Qp * positive)) (k : nat) (qn : Qp) :
+(* ENDGAME A6.155 (vetted): the share component is [option Qp].  A
+   fractioned reference (bpin's / the log layer's) carries [Some q] and the
+   dev/bno fractions {q}; the chain's reference carries [None] and no
+   fraction.  [None] is the unit of [optionUR fracR], so (None,1) ⋅ (Some q,1)
+   = (Some q,2): the count component counts BOTH kinds.  The kit is written
+   ONCE over the option share. *)
+Local Lemma bio_first_upd (M : gmap nat (option Qp * positive)) (k : nat) (o : option Qp) :
   M !! k = None ->
-  ✓ qn ->
-  (● M : bioUR) ~~> ● (<[k := (qn, 1%positive)]> M) ⋅ ◯ {[ k := (qn, 1%positive) ]}.
+  ✓ o ->
+  (● M : bioUR) ~~> ● (<[k := (o, 1%positive)]> M) ⋅ ◯ {[ k := (o, 1%positive) ]}.
 Proof.
-  intros HM Hq. apply auth_update_alloc.
-  apply (alloc_singleton_local_update _ k (qn, 1%positive)); [done|].
-  split; [exact Hq | done].
+  intros HM Ho. apply auth_update_alloc.
+  apply (alloc_singleton_local_update _ k (o, 1%positive)); [done|].
+  split; [exact Ho | done].
 Qed.
 
-(* refcnt++ on a busy buffer.  Unlike filedup nothing comes from a caller's
-   fragment: the entry GROWS by exactly the minted [(qn,1)], so the update is
-   an allocation keyed pointwise rather than a [singleton_local_update]. *)
-Local Lemma bio_incr_lu (M : gmap nat (Qp * positive)) (k : nat)
-    (qt qn : Qp) (n : positive) :
-  M !! k = Some (qt, n) ->
-  ✓ (qt + qn)%Qp ->
-  @local_update _ (gmapUR nat (prodR fracR positiveR))
-    (M, ∅) (<[k := ((qt + qn)%Qp, Pos.succ n)]> M, {[ k := (qn, 1%positive) ]}).
+Local Lemma bio_incr_lu (M : gmap nat (option Qp * positive)) (k : nat)
+    (ot on : option Qp) (n : positive) :
+  M !! k = Some (ot, n) ->
+  ✓ (ot ⋅ on) ->
+  @local_update _ (gmapUR nat (prodR (optionUR fracR) positiveR))
+    (M, ∅) (<[k := (ot ⋅ on, Pos.succ n)]> M, {[ k := (on, 1%positive) ]}).
 Proof.
-  intros HM Hq.
+  intros HM Hv.
   apply gmap_local_update. intros i.
   destruct (decide (i = k)) as [->|Hne]; last first.
   { rewrite lookup_insert_ne // lookup_singleton_ne //. }
   rewrite lookup_insert lookup_singleton lookup_empty HM.
-  apply local_update_unital_discrete. intros z Hv Hz.
+  apply local_update_unital_discrete. intros z _ Hz.
   rewrite left_id in Hz. rewrite -Hz.
   split.
-  { apply Some_valid. split; cbn; [exact Hq | done]. }
-  rewrite -Some_op -pair_op frac_op pos_op_add.
-  by rewrite (Qp.add_comm qn qt) Pos.add_1_l.
+  { apply Some_valid. split; cbn; [exact Hv | done]. }
+  rewrite -Some_op -pair_op pos_op_add.
+  by rewrite (comm op on ot) Pos.add_1_l.
 Qed.
 
-Local Lemma bio_incr_upd (M : gmap nat (Qp * positive)) (k : nat)
-    (qt qn : Qp) (n : positive) :
-  M !! k = Some (qt, n) ->
-  ✓ (qt + qn)%Qp ->
+Local Lemma bio_incr_upd (M : gmap nat (option Qp * positive)) (k : nat)
+    (ot on : option Qp) (n : positive) :
+  M !! k = Some (ot, n) ->
+  ✓ (ot ⋅ on) ->
   (● M : bioUR) ~~>
-  ● (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) ⋅ ◯ {[ k := (qn, 1%positive) ]}.
-Proof. intros HM Hq. apply auth_update_alloc. by apply bio_incr_lu. Qed.
+  ● (<[k := (ot ⋅ on, Pos.succ n)]> M) ⋅ ◯ {[ k := (on, 1%positive) ]}.
+Proof. intros HM Hv. apply auth_update_alloc. by apply bio_incr_lu. Qed.
 
-(* refcnt-- with survivors: the departing reference's fraction returns to the
-   outstanding total (FileInv.file_close_step's algebra, verbatim). *)
-Local Lemma bio_decr_upd (M : gmap nat (Qp * positive)) (k : nat)
-    (q qt qr : Qp) (n : positive) :
-  M !! k = Some (qt, Pos.succ n) ->
-  (qt - q)%Qp = Some qr ->
-  (● M : bioUR) ⋅ ◯ {[ k := (q, 1%positive) ]} ~~> ● (<[k := (qr, n)]> M).
+(* refcnt-- with survivors: the departing reference's share leaves the
+   entry ([o] is cancelable: [optionUR fracR] over an id-free, cancelable
+   carrier). *)
+Local Lemma bio_decr_upd (M : gmap nat (option Qp * positive)) (k : nat)
+    (o ot orem : option Qp) (n : positive) :
+  M !! k = Some (ot, Pos.succ n) ->
+  ot = o ⋅ orem ->
+  (● M : bioUR) ⋅ ◯ {[ k := (o, 1%positive) ]} ~~> ● (<[k := (orem, n)]> M).
 Proof.
   intros HM Hsub.
-  apply Qp.sub_Some in Hsub.       (* qt = q + qr *)
   apply auth_update_dealloc, gmap_local_update. intros i.
   destruct (decide (i = k)) as [->|Hne]; last first.
-  { (* untouched slot: the fragment is absent on both sides *)
-    assert (Hki : k <> i) by auto.
-    pose proof (lookup_singleton_ne (M:=gmap nat) k i (q, 1%positive) Hki) as Hs.
-    pose proof (lookup_insert_ne M k i (qr, n) Hki) as Hm.
+  { assert (Hki : k <> i) by auto.
+    pose proof (lookup_singleton_ne (M:=gmap nat) k i (o, 1%positive) Hki) as Hs.
+    pose proof (lookup_insert_ne M k i (orem, n) Hki) as Hm.
     apply local_update_discrete. intros mz Hv Hz.
     rewrite Hs in Hz. rewrite Hm. split; [exact Hv | exact Hz]. }
-  pose proof (lookup_singleton (M:=gmap nat) k (q, 1%positive)) as Hs.
-  pose proof (lookup_insert M k (qr, n)) as Hm.
+  pose proof (lookup_singleton (M:=gmap nat) k (o, 1%positive)) as Hs.
+  pose proof (lookup_insert M k (orem, n)) as Hm.
   apply local_update_discrete. intros mz Hv Hz.
   rewrite HM in Hz, Hv. rewrite Hs in Hz. rewrite Hm.
-  (* the frame is an [option] of the ENTRY, so three shapes *)
   destruct mz as [[[qf nf]|]|]; simpl in Hz.
-  - (* a real frame -- it is exactly what the entry shrinks to *)
-    apply Some_equiv_inj in Hz. destruct Hz as [Hq Hn]; simpl in Hq, Hn.
+  - apply (inj Some) in Hz. destruct Hz as [Hq Hn]; simpl in Hq, Hn.
     rewrite pos_op_add in Hn.
     assert (Hn' : Pos.succ n = (1 + nf)%positive) by exact Hn.
     assert (Hnf : nf = n) by lia.
-    rewrite frac_op in Hq.
-    assert (Hqf : qf = qr).
-    { apply (inj (Qp.add q)). by rewrite -Hq -Hsub. }
-    subst nf qf. split; last first.
+    destruct Hv as [Hvq _]; simpl in Hvq.
+    assert (Hqf : qf ≡ orem).
+    { apply (cancelable o); [by rewrite -Hq |]. by rewrite -Hq -Hsub. }
+    apply leibniz_equiv in Hqf. subst nf qf. split; last first.
     { by constructor. }
-    destruct Hv as [Hvq _]; simpl in Hvq. apply frac_valid in Hvq.
     split; simpl; [|done].
-    apply frac_valid. etrans; [|exact Hvq]. rewrite Hsub. apply Qp.le_add_r.
-  - (* empty frame: the entry would have to BE (q,1), i.e. Pos.succ n = 1 *)
-    exfalso. rewrite right_id in Hz. apply Some_equiv_inj in Hz.
+    rewrite Hsub in Hvq. exact (cmra_valid_op_r _ _ Hvq).
+  - exfalso. rewrite right_id in Hz. apply (inj Some) in Hz.
     destruct Hz as [_ Hn]; simpl in Hn.
     assert (Hn' : Pos.succ n = 1%positive) by exact Hn. lia.
-  - (* no frame: same contradiction *)
-    exfalso. apply Some_equiv_inj in Hz.
+  - exfalso. apply (inj Some) in Hz.
     destruct Hz as [_ Hn]; simpl in Hn.
     assert (Hn' : Pos.succ n = 1%positive) by exact Hn. lia.
 Qed.
 
-(* the last refcnt--: [(q,1)] is not EXCLUSIVE (q may be a share), but it is
-   cancelable and the entry is exactly the fragment -- a frame would push the
-   COUNT past 1 -- so the whole entry goes away. *)
-Local Lemma bio_last_upd (M : gmap nat (Qp * positive)) (k : nat) (q : Qp) :
-  M !! k = Some (q, 1%positive) ->
-  (● M : bioUR) ⋅ ◯ {[ k := (q, 1%positive) ]} ~~> ● (delete k M).
+(* the last refcnt--: [(o,1)] is cancelable and the entry is exactly the
+   fragment -- a frame would push the COUNT past 1 -- so the entry goes. *)
+Local Lemma bio_last_upd (M : gmap nat (option Qp * positive)) (k : nat) (o : option Qp) :
+  M !! k = Some (o, 1%positive) ->
+  (● M : bioUR) ⋅ ◯ {[ k := (o, 1%positive) ]} ~~> ● (delete k M).
 Proof.
   intros HM. apply auth_update_dealloc.
   apply delete_singleton_local_update_cancelable; [apply _ | by rewrite HM].
 Qed.
+
+(* A6.148: the per-slot PRESENCE authority.  [● None] sits in the box's
+   IDLE arm at refs = 0; [● Some n] in bcache.lock's payload at refs >= 1;
+   every buffer reference carries a [◯ Some 1] fragment beside [bref_tok].
+   The checkout's fragment against [● None] is the IDLE refutation that no
+   count fragment could provide (fragments compose; authorities clash). *)
+(* ENDGAME §3.2: the presence element carries the LAST BUMP's
+   (generation, stamp) pair as an agree beside the count, so a reference's
+   fragment IS its freshness witness for the bump case. *)
+(* [presR]/[presG] and [btagR]/[btagG] live in [Xv6Cameras] (section 15),
+   bundled into [xv6G] through [bioboxG]. *)
 
 Section BioInv.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
@@ -228,6 +238,7 @@ Section BioInv.
     a ↦₄ w1 -∗ a ↦₄{dq} w2 -∗ False.
   Proof.
     iIntros "H1 H2".
+    (* M1 stage 2: [↦₄] is the ctx tower, so the laws gain a leading ξ *)
     iDestruct (ctx_word4_pointsto_bytes with "H1") as "H1".
     iDestruct (ctx_word4_pointsto_bytes with "H2") as "H2".
     cbn [seq].
@@ -247,41 +258,66 @@ Section BioInv.
      fraction of the dev/blockno cells, so holders agree on the key with no
      extra ghost (FileInv's file_ref shape).  bpin's clients hold one; a
      bread..brelse chain's reference rides inside the escrow instead. *)
+  (* one reference's count fragment at share [o] (A6.155) *)
+  Definition btok (bn : bio_names) (k : nat) (o : option Qp) : iProp Σ :=
+    own (bn_auth bn) (◯ {[ k := (o, 1%positive) ]}).
+  (* a FRACTIONED reference's fragment (bpin / the log layer) *)
   Definition bref_tok (bn : bio_names) (k : nat) (q : Qp) : iProp Σ :=
-    own (bn_auth bn) (◯ {[ k := (q, 1%positive) ]}).
+    btok bn k (Some q).
+  (* the CHAIN's fragment (bread's reference): no share, no fraction *)
+  Definition bref_tok0 (bn : bio_names) (k : nat) : iProp Σ :=
+    btok bn k None.
 
+  (* ================================================================== *)
+  (*  THE STAMPED SHARES (box v2, endgame §3.2): stamp ↦ fraction.  [● m]  *)
+  (*  sits in the box; a COUNTED reference owns ONE UNIT {[t := 1]} at    *)
+  (*  the stamp of the last deposit it witnessed; Σ m (in Qc) is the      *)
+  (*  count.  The kit: the sum, its steps, the two local updates.         *)
+  (* ================================================================== *)
+  (* THE BOX NAMES (CtxBox.v, endgame §3.2): stamps / cnt / slot_d / slot_p
+     per buffer, drawn from the names record's fields *)
+  Definition bn_box (bn : bio_names) (k : nat) : box_names :=
+    BoxNames (bn_pres bn k) (bn_regc bn k) (bn_regd bn k) (bn_regp bn k).
+  (* the count register's half at a RAW gname, at the box's own instance
+     ([ghost_varG Σ nat] has several members in the bundle; the box's is
+     kalloc's) -- what the boot mints before the names record exists *)
+  Definition bcnt_var (γ : gname) (c : nat) : iProp Σ :=
+    ghost_var (ghost_varG0 := kalloc_count_inG) γ (1/2) c.
+
+  (* a COUNTED reference's stamps: one unit at the stamp of the last deposit
+     it witnessed, with that stamp's llb (the R1 presentation at every
+     acquire: [Tl := t]) *)
+  Definition bref_ghost (bn : bio_names) (k : nat) (dev bno : mword 32) : iProp Σ :=
+    (∃ t : nat, CtxBox.reference (X := bio_x) (bn_box bn k) (dev, bno) {[((dev, bno), t) := 1%Qp]})%I.
+
+  (* a FRACTIONED reference (bpin's / the log layer's): the count fragment,
+     the stamps unit at its identity, and the dev/bno fractions *)
   Definition bref (bn : bio_names) (k : nat) (q : Qp)
       (dev bno : mword 32) : iProp Σ :=
     (bref_tok bn k q ∗
+     bref_ghost bn k dev bno ∗
      b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
      b_blockno (bpa k) ↦₄{DfracOwn q} bno)%I.
+  (* the CHAIN's reference (bread's), ghost-only: share None, no fraction;
+     the identity rides the stamps key (F6) *)
+  Definition bchain (bn : bio_names) (k : nat) (dev bno : mword 32) : iProp Σ :=
+    (bref_tok0 bn k ∗ bref_ghost bn k dev bno)%I.
 
-  (* ---- the checkout token: the buffer sleeplock's WHOLE resource ---- *)
   Definition bown (bn : bio_names) (k : nat) : iProp Σ :=
     lock_tok_excl (bn_own bn k).
 
   Lemma bown_exclusive bn k : bown bn k -∗ bown bn k -∗ False.
   Proof. apply lock_tok_excl_exclusive. Qed.
+  Global Instance bown_timeless bn k : Timeless (bown bn k).
+  Proof. rewrite /bown. apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
-  (*  The escrow                                                          *)
+  (*  The uncached pool bundle and the payloads                           *)
   (* ------------------------------------------------------------------ *)
-
-  Definition bioN : namespace := nroot .@ "xv6bio".
-
-  (* the recycle token: parked in A1/A2, in the recycler's hand during the
-     A3 window (which is what lets the recycler refute A1/A2 when it closes
-     the window -- see the header). *)
-  Definition bmid (bn : bio_names) (k : nat) : iProp Σ :=
-    lock_tok_excl (bn_mid bn k).
-
-  Lemma bmid_exclusive bn k : bmid bn k -∗ bmid bn k -∗ False.
-  Proof. apply lock_tok_excl_exclusive. Qed.
 
   (* one uncached covered block's pool bundle: its disk cell and its clean
-     payload at the SAME content -- uncached implies clean, because the
-     dirty arm parks a real [bref] and a referenced buffer is never
-     evicted. *)
+     payload at the SAME content (uncached implies clean: the dirty arm
+     parks a real [bref] and a referenced buffer is never evicted). *)
   Definition pool_blk (V : bio_view Σ) (b : Z) : iProp Σ :=
     (∃ bs : list (bv 8), disk_block (bv_gd V) b bs ∗ bv_clean V b bs)%I.
 
@@ -315,55 +351,6 @@ Section BioInv.
      rw flips it, and always back before returning.  The valid cell is
      keyed by the bool [v], which is what couples it to the payload's
      form. *)
-  Definition buf_parked (bn : bio_names) (V : bio_view Σ) (k : nat) : iProp Σ :=
-    (∃ (v : bool) (dev bno : mword 32) (bs : list (bv 8)),
-       b_valid (bpa k) ↦₄
-         (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)) ∗
-       b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
-       buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
-       buf_pay bn V k v dev bno bs ∗
-       bmid bn k)%I.
-
-  (* A2: checked out by a sleeplock chain; the chain's own reference, the
-     checkout token and the recycle token wait here until brelse brings
-     the content back. *)
-  Definition buf_chain (bn : bio_names) (k : nat) : iProp Σ :=
-    (∃ (q : Qp) (dev bno : mword 32),
-       bref_tok bn k q ∗
-       b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
-       b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗
-       bown bn k ∗
-       bmid bn k)%I.
-
-  (* A3: the recycler's window between its blockno store and its valid
-     store, where the blockno cell already names the NEW block but the
-     valid cell is stale: cells only, decoupled from any payload.  The dev
-     cell is FULL (the recycler joins the bcache-retained half in), which
-     is what every OTHER opener refutes this arm by; the recycle token is
-     out, in the recycler's hand.  The dev cell's VALUE is pinned to the
-     view's device: the only creator is the recycler, right after its dev
-     store, and the recycler itself holds no fraction across the window,
-     so an existential value here would be unrecoverable at the valid
-     store (and the re-parked arm's dev pin unprovable). *)
-  Definition buf_mid (V : bio_view Σ) (k : nat) : iProp Σ :=
-    (∃ (vld bno : mword 32) (bs : list (bv 8)),
-       ⌜vld = (mword_of_int 0 : mword 32) \/ vld = (mword_of_int 1 : mword 32)⌝ ∗
-       b_valid (bpa k) ↦₄ vld ∗
-       b_dev (bpa k) ↦₄ (bv_dev V) ∗
-       buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs)%I.
-
-  Definition buf_escrow_body (bn : bio_names) (V : bio_view Σ) (k : nat) : iProp Σ :=
-    (buf_parked bn V k ∨ buf_chain bn k ∨ buf_mid V k)%I.
-
-  (* [buf_escrow] ITSELF IS NOT HERE.  It is an [inv] over this ξ-INDEXED
-     body, and an [inv] body is not updatable, so no [CtxMorph] transport
-     across it exists or can be written (tso-port.md §0.12′).  The escrow is
-     therefore a PARKED RECORD -- the body at its own ∃-bound context,
-     carrying that context's own parked token -- and it is defined BELOW
-     [End BioInv], in a section that binds no ambient [CurCtx] at all, so
-     that a forgotten [(XI := ...)] is an elaboration error rather than a
-     silent capture (§0.8′ rule 3).  See [Section BioEscrow]. *)
-
   (* the whole body is TIMELESS (the view's payload fields carry their own
      Timeless proofs), so every opener strips the ▷ up front with the usual
      [iInv … as ">Hbody"] -- exactly as the physical layer did. *)
@@ -395,32 +382,21 @@ Section BioInv.
     Timeless (buf_pay bn V k v dev bno bs).
   Proof. rewrite /buf_pay. case_decide; [destruct v|]; tl_struct. Qed.
 
-  Global Instance buf_parked_timeless bn V k : Timeless (buf_parked bn V k).
-  Proof. rewrite /buf_parked. tl_struct. Qed.
-
-  Global Instance buf_chain_timeless bn k : Timeless (buf_chain bn k).
-  Proof. rewrite /buf_chain. tl_struct. Qed.
-
-  Global Instance buf_mid_timeless V k : Timeless (buf_mid V k).
-  Proof. rewrite /buf_mid. tl_struct. Qed.
-
-  Global Instance buf_escrow_body_timeless bn V k :
-    Timeless (buf_escrow_body bn V k).
-  Proof. rewrite /buf_escrow_body. tl_struct. Qed.
-
-  (* a reference fragment against an authority showing NO references: the
-     refutation the free-open and the eviction reading both turn on. *)
-  Lemma bref_tok_free_absurd bn (M : gmap nat (Qp * positive)) k q :
+  Lemma btok_free_absurd bn (M : gmap nat (option Qp * positive)) k (o : option Qp) :
     M !! k = None ->
-    own (bn_auth bn) (● M) -∗ bref_tok bn k q -∗ False.
+    own (bn_auth bn) (● M) -∗ btok bn k o -∗ False.
   Proof.
-    iIntros (HM) "Ha Htok". rewrite /bref_tok.
+    iIntros (HM) "Ha Htok". rewrite /btok.
     iDestruct (own_valid_2 with "Ha Htok")
       as %[Hincl _]%auth_both_valid_discrete.
     iPureIntro.
     apply singleton_included_l in Hincl as [y [Hy _]].
     rewrite HM in Hy. inversion Hy.
   Qed.
+  Lemma bref_tok_free_absurd bn (M : gmap nat (option Qp * positive)) k q :
+    M !! k = None ->
+    own (bn_auth bn) (● M) -∗ bref_tok bn k q -∗ False.
+  Proof. apply btok_free_absurd. Qed.
 
   (* ---- the swaps (used inside an [iInv] open of [buf_escrow]) ---- *)
 
@@ -429,165 +405,7 @@ Section BioInv.
      reference's cell fractions AGREE with the parked bundle's, pinning the
      withdrawn dev/bno to the requested key.  The deposited A2 absorbs the
      parked arm's recycle token, so the handle needn't carry it. *)
-  Lemma escrow_swap_checkout bn V k q (dev bno : mword 32) :
-    buf_escrow_body bn V k -∗
-    bown bn k -∗
-    bref_tok bn k q -∗
-    b_dev (bpa k) ↦₄{DfracOwn q} dev -∗
-    b_blockno (bpa k) ↦₄{DfracOwn q} bno -∗
-    buf_escrow_body bn V k ∗
-    (∃ (v : bool) (bs : list (bv 8)),
-       b_valid (bpa k) ↦₄
-         (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)) ∗
-       b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
-       buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
-       buf_pay bn V k v dev bno bs).
-  Proof.
-    iIntros "Hbody Hown Htok Hdev Hbno".
-    iDestruct "Hbody" as "[Hparked | [Hchain | Hmid]]".
-    - iDestruct "Hparked" as (v dev' bno' bs) "(Hvld & Hdev' & Hbuf & Hpay & Hbmid)".
-      iDestruct (ctx_word4_pointsto_agree with "Hdev Hdev'") as %Heqd. subst dev'.
-      rewrite /buf_own.
-      iDestruct "Hbuf" as "(Hbno' & Hdisk & %Hlen & Hdata)".
-      iDestruct (ctx_word4_pointsto_agree with "Hbno Hbno'") as %Heqb. subst bno'.
-      iSplitL "Htok Hdev Hbno Hown Hbmid".
-      { iRight; iLeft. rewrite /buf_chain. iExists q, dev, bno. iFrame. }
-      iExists v, bs. iFrame "Hvld Hdev' Hpay".
-      rewrite /buf_own. iFrame "Hbno' Hdisk Hdata". done.
-    - iDestruct "Hchain" as (q' dev' bno') "(_ & _ & _ & Hown' & _)".
-      iExFalso. iApply (bown_exclusive with "Hown Hown'").
-    - iDestruct "Hmid" as (vld bno' bs) "(_ & _ & Hdev' & _)".
-      iExFalso. iApply (word4_pointsto_excl with "Hdev' Hdev").
-  Qed.
-
-  (* (b) park, brelse's first instruction: the opener's full valid cell
-     refutes A1 AND A3 (both hold the cell full); the chain's reference and
-     bown come back out, and the deposited A1 re-absorbs the recycle token
-     the chain arm was keeping.  The withdrawn fractions agree with the
-     deposited bundle's, so the recovered reference is at the SAME key. *)
-  Lemma escrow_swap_park bn V k (v : bool) (dev bno : mword 32) (bs : list (bv 8)) :
-    buf_escrow_body bn V k -∗
-    b_valid (bpa k) ↦₄
-      (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)) -∗
-    b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev -∗
-    buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs -∗
-    buf_pay bn V k v dev bno bs -∗
-    buf_escrow_body bn V k ∗
-    (∃ q : Qp,
-       bref_tok bn k q ∗
-       b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
-       b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗
-       bown bn k).
-  Proof.
-    iIntros "Hbody Hvld Hdev Hbuf Hpay".
-    iDestruct "Hbody" as "[Hparked | [Hchain | Hmid]]".
-    - iDestruct "Hparked" as (v' dev' bno' bs') "(Hvld' & _)".
-      iExFalso. iApply (word4_pointsto_excl with "Hvld Hvld'").
-    - iDestruct "Hchain" as (q dev' bno') "(Htok & Hdev' & Hbno' & Hown & Hbmid)".
-      iDestruct (ctx_word4_pointsto_agree with "Hdev Hdev'") as %Heqd. subst dev'.
-      rewrite /buf_own.
-      iDestruct "Hbuf" as "(Hbno & Hdisk & %Hlen & Hdata)".
-      iDestruct (ctx_word4_pointsto_agree with "Hbno' Hbno") as %Heqb. subst bno'.
-      iSplitR "Htok Hdev' Hbno' Hown".
-      { iLeft. rewrite /buf_parked. iExists v, dev, bno, bs.
-        iFrame "Hvld Hdev Hpay Hbmid".
-        rewrite /buf_own. iFrame "Hbno Hdisk Hdata". done. }
-      iExists q. iFrame.
-    - iDestruct "Hmid" as (vld bno' bs') "(_ & Hvld' & _)".
-      iExFalso. iApply (word4_pointsto_excl with "Hvld' Hvld").
-  Qed.
-
-  (* THE SAME SWAP, with the withdrawn bundle already OUT from under the
-     [▷] that [iInv] hands back.  brelse's park runs inside the +0x02
-     store's atomic update and needs the reference NOW, so it must strip
-     that later -- and the cost of doing so is proportional to the Iris
-     CONTEXT it is done in, not to the bundle: the [iMod "Hpark"] at
-     brelse's store measured 34 s, while the identical [Timeless] search on
-     the identical bundle costs 0.4 s here, where the context is five
-     hypotheses wide.  So the later comes off HERE and the caller writes one
-     [iMod].  (Same family as optimization.md's [iNext] rule: never pay a
-     context-proportional modality step inside a whole-function proof when a
-     lemma can pay it once.) *)
-  Lemma escrow_swap_park_now (E : coPset) bn V k (v : bool)
-      (dev bno : mword 32) (bs : list (bv 8)) :
-    ▷ buf_escrow_body bn V k -∗
-    b_valid (bpa k) ↦₄
-      (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)) -∗
-    b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev -∗
-    buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs -∗
-    buf_pay bn V k v dev bno bs -∗
-    |={E}=> ▷ buf_escrow_body bn V k ∗
-            (∃ q : Qp,
-               bref_tok bn k q ∗
-               b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
-               b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗
-               bown bn k).
-  Proof.
-    iIntros "Hbody Hvld Hdev Hbuf Hpay".
-    iAssert (▷ (buf_escrow_body bn V k ∗
-                (∃ q : Qp,
-                   bref_tok bn k q ∗
-                   b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
-                   b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗
-                   bown bn k)))%I
-      with "[Hbody Hvld Hdev Hbuf Hpay]" as "Hsw".
-    { iNext. iApply (escrow_swap_park bn V k v dev bno bs
-                       with "Hbody Hvld Hdev Hbuf Hpay"). }
-    iDestruct "Hsw" as "[Hbody Hpark]". iMod "Hpark".
-    iModIntro. iSplitL "Hbody"; [iExact "Hbody" | iExact "Hpark"].
-  Qed.
-
-  (* (c) the miss path's view: with the authority showing no references, A2
-     is impossible, and the bcache-retained dev half refutes A3 (whose dev
-     cell is full), so the body IS the parked bundle. *)
-  Lemma escrow_open_free bn V k (M : gmap nat (Qp * positive)) (devr : mword 32) :
-    M !! k = None ->
-    own (bn_auth bn) (● M) -∗
-    b_dev (bpa k) ↦₄{DfracOwn (1/2)} devr -∗
-    buf_escrow_body bn V k -∗
-    own (bn_auth bn) (● M) ∗
-    b_dev (bpa k) ↦₄{DfracOwn (1/2)} devr ∗
-    buf_parked bn V k ∗
-    (buf_parked bn V k -∗ buf_escrow_body bn V k).
-  Proof.
-    iIntros (HM) "Ha Hdevr Hbody".
-    iDestruct "Hbody" as "[Hparked | [Hchain | Hmid]]".
-    - iFrame "Ha Hdevr Hparked". iIntros "Hp". by iLeft.
-    - iDestruct "Hchain" as (q dev bno) "(Htok & _)".
-      iExFalso. iApply (bref_tok_free_absurd bn M k q HM with "Ha Htok").
-    - iDestruct "Hmid" as (vld bno bs) "(_ & _ & Hdev & _)".
-      iExFalso. iApply (word4_pointsto_excl with "Hdev Hdevr").
-  Qed.
-
-  (* (d) the recycler's re-open at its valid store: its recycle token
-     refutes BOTH normal arms, so the body is the mid window it parked; the
-     reclose is at a normal parked arm, which re-absorbs the token. *)
-  Lemma escrow_open_mid bn V k :
-    bmid bn k -∗
-    buf_escrow_body bn V k -∗
-    bmid bn k ∗ buf_mid V k ∗
-    (buf_parked bn V k -∗ buf_escrow_body bn V k).
-  Proof.
-    iIntros "Hbmid Hbody".
-    iDestruct "Hbody" as "[Hparked | [Hchain | Hmid]]".
-    - iDestruct "Hparked" as (v dev bno bs) "(_ & _ & _ & _ & Hbmid')".
-      iExFalso. iApply (bmid_exclusive with "Hbmid Hbmid'").
-    - iDestruct "Hchain" as (q dev bno) "(_ & _ & _ & _ & Hbmid')".
-      iExFalso. iApply (bmid_exclusive with "Hbmid Hbmid'").
-    - iFrame "Hbmid Hmid". iIntros "Hp". by iLeft.
-  Qed.
-
-  (* closing the window OPEN (at the blockno store): any mid bundle is a
-     legal body. *)
-  Lemma escrow_close_mid bn V k :
-    buf_mid V k -∗ buf_escrow_body bn V k.
-  Proof. iIntros "H". iRight; iRight. iExact "H". Qed.
-
-  (* the eviction reading of a parked payload: with the authority showing
-     no references the dirty arm (which parks a real bref) is impossible,
-     so a covered payload yields exactly the block's pool bundle.  This is
-     the "only clean content ever leaves the cache" fact. *)
-  Lemma buf_pay_evict bn V k (M : gmap nat (Qp * positive))
+  Lemma buf_pay_evict bn V k (M : gmap nat (option Qp * positive))
       (v : bool) (dev bno : mword 32) (bs : list (bv 8)) :
     M !! k = None ->
     own (bn_auth bn) (● M) -∗
@@ -620,87 +438,81 @@ Section BioInv.
      further -- the STRICT order at a surviving entry, which is what
      [bio_decr_step]'s [(qt - q) = Some qr] premise needs (brelse and bunpin
      both take it on their non-last decrement). *)
-  Lemma bref_tok_lookup bn M k q :
-    own (bn_auth bn) (● M) -∗ bref_tok bn k q -∗
-    ⌜∃ qt n, M !! k = Some (qt, n) /\
-       (n = 1%positive -> q = qt) /\ (q = qt -> n = 1%positive) /\
-       (n ≠ 1%positive -> (q < qt)%Qp)⌝.
+  (* what a fragment says about the authority: the entry exists, the
+     fragment's share is included, and a count of ONE means the entry IS
+     the fragment. *)
+  Lemma btok_lookup bn M k (o : option Qp) :
+    own (bn_auth bn) (● M) -∗ btok bn k o -∗
+    ⌜∃ ot n, M !! k = Some (ot, n) /\ o ≼ ot /\ (n = 1%positive -> ot = o)⌝.
   Proof.
-    rewrite /bref_tok. iIntros "Ha Hf".
+    rewrite /btok. iIntros "Ha Hf".
     iDestruct (own_valid_2 with "Ha Hf") as %[Hincl _]%auth_both_valid_discrete.
     iPureIntro.
     apply singleton_included_l in Hincl as [y [Hy Hle]].
-    apply leibniz_equiv in Hy. destruct y as [qt n]. exists qt, n.
+    apply leibniz_equiv in Hy. destruct y as [ot n]. exists ot, n.
     split; [exact Hy|].
     apply Some_included in Hle as [Heq | Hlt].
-    - destruct Heq as [Hq Hn]; cbn in Hq, Hn.
-      split_and!.
-      + intros _. exact Hq.
-      + intros _. by rewrite -Hn.
-      + intros Hne. exfalso. apply Hne. by rewrite -Hn.
-    - apply pair_included in Hlt as [Hq Hn]; cbn in Hq, Hn.
-      apply frac_included in Hq. apply pos_included in Hn.
-      split_and!.
-      + intros Hc. exfalso. rewrite Hc in Hn. lia.
-      + intros Hc. exfalso. rewrite Hc in Hq. by apply (irreflexivity Qp.lt qt).
-      + intros _. exact Hq.
+    - destruct Heq as [Ho Hn]; cbn in Ho, Hn. apply leibniz_equiv in Ho.
+      split.
+      + exists None. by rewrite right_id Ho.
+      + intros _. by rewrite Ho.
+    - apply pair_included in Hlt as [Ho Hn]; cbn in Ho, Hn.
+      apply pos_included in Hn.
+      split; [exact Ho|]. intros Hc. exfalso. rewrite Hc in Hn. lia.
   Qed.
 
-  (* refcnt==0 -> refcnt:=1: allocate the entry, minting the first reference
-     with fraction qn split off the resource's retained share (the caller
-     performs the physical cell split alongside). *)
-  Lemma bio_first_ref_step bn M k (qn : Qp) :
+  (* an entry's share is valid (the authority is) *)
+  Lemma bio_auth_entry_valid bn M k (ot : option Qp) (n : positive) :
+    M !! k = Some (ot, n) ->
+    own (bn_auth bn) (● M) -∗ ⌜✓ ot⌝.
+  Proof.
+    iIntros (HM) "Ha". iDestruct (own_valid with "Ha") as %Hv.
+    apply (proj1 (auth_auth_valid _)) in Hv.
+    iPureIntro. specialize (Hv k). rewrite HM Some_valid in Hv.
+    destruct Hv as [Hvo _]. exact Hvo.
+  Qed.
+
+  Lemma bio_first_ref_step bn M k (o : option Qp) :
     M !! k = None ->
-    ✓ qn ->
+    ✓ o ->
     own (bn_auth bn) (● M) ==∗
-    own (bn_auth bn) (● (<[k := (qn, 1%positive)]> M)) ∗ bref_tok bn k qn.
+    own (bn_auth bn) (● (<[k := (o, 1%positive)]> M)) ∗ btok bn k o.
   Proof.
-    iIntros (HM Hqn) "Ha". rewrite /bref_tok.
-    iMod (own_update _ _ _ (bio_first_upd M k qn HM Hqn) with "Ha") as "[$ $]".
+    iIntros (HM Ho) "Ha". rewrite /btok.
+    iMod (own_update _ _ _ (bio_first_upd M k o HM Ho) with "Ha") as "[$ $]".
     done.
   Qed.
 
-  (* refcnt++ on a busy buffer: mint a fresh reference at fraction qn taken
-     from the RETAINED share (the incrementer -- bpin, or bget's hit path --
-     may hold no reference of its own, so unlike filedup nothing comes from
-     a caller's fragment: the entry grows by exactly the minted amount). *)
-  Lemma bio_incr_step bn M k qt (n : positive) (qn : Qp) :
-    M !! k = Some (qt, n) ->
-    ✓ (qt + qn)%Qp ->
+  Lemma bio_incr_step bn M k (ot : option Qp) (n : positive) (on : option Qp) :
+    M !! k = Some (ot, n) ->
+    ✓ (ot ⋅ on) ->
     own (bn_auth bn) (● M) ==∗
-    own (bn_auth bn) (● (<[k := ((qt + qn)%Qp, Pos.succ n)]> M)) ∗
-    bref_tok bn k qn.
+    own (bn_auth bn) (● (<[k := (ot ⋅ on, Pos.succ n)]> M)) ∗ btok bn k on.
   Proof.
-    iIntros (HM Hq) "Ha". rewrite /bref_tok.
-    iMod (own_update _ _ _ (bio_incr_upd M k qt qn n HM Hq) with "Ha")
-      as "[$ $]".
+    iIntros (HM Hv) "Ha". rewrite /btok.
+    iMod (own_update _ _ _ (bio_incr_upd M k ot on n HM Hv) with "Ha") as "[$ $]".
     done.
   Qed.
 
-  (* refcnt-- with survivors: the departing reference's fraction returns to
-     the outstanding total (file_close_step's mirror). *)
-  Lemma bio_decr_step bn M k q qt (n : positive) (qr : Qp) :
-    M !! k = Some (qt, Pos.succ n) ->
-    (qt - q)%Qp = Some qr ->
-    own (bn_auth bn) (● M) -∗ bref_tok bn k q ==∗
-    own (bn_auth bn) (● (<[k := (qr, n)]> M)).
+  Lemma bio_decr_step bn M k (o ot orem : option Qp) (n : positive) :
+    M !! k = Some (ot, Pos.succ n) ->
+    ot = o ⋅ orem ->
+    own (bn_auth bn) (● M) -∗ btok bn k o ==∗
+    own (bn_auth bn) (● (<[k := (orem, n)]> M)).
   Proof.
-    iIntros (HM Hsub) "Ha Hf". rewrite /bref_tok.
-    iMod (own_update_2 _ _ _ _ (bio_decr_upd M k q qt qr n HM Hsub)
+    iIntros (HM Hsub) "Ha Hf". rewrite /btok.
+    iMod (own_update_2 _ _ _ _ (bio_decr_upd M k o ot orem n HM Hsub)
            with "Ha Hf") as "$".
     done.
   Qed.
 
-  (* the last refcnt--: the entry disappears; the sole reference held the
-     whole fraction (bref_tok_lookup), so the resource's retained share is
-     whole again (file_close_last_step's mirror). *)
-  Lemma bio_last_ref_step bn M k q :
-    M !! k = Some (q, 1%positive) ->
-    own (bn_auth bn) (● M) -∗ bref_tok bn k q ==∗
+  Lemma bio_last_ref_step bn M k (o : option Qp) :
+    M !! k = Some (o, 1%positive) ->
+    own (bn_auth bn) (● M) -∗ btok bn k o ==∗
     own (bn_auth bn) (● (delete k M)).
   Proof.
-    iIntros (HM) "Ha Hf". rewrite /bref_tok.
-    iMod (own_update_2 _ _ _ _ (bio_last_upd M k q HM) with "Ha Hf") as "$".
+    iIntros (HM) "Ha Hf". rewrite /btok.
+    iMod (own_update_2 _ _ _ _ (bio_last_upd M k o HM) with "Ha Hf") as "$".
     done.
   Qed.
 
@@ -709,7 +521,7 @@ Section BioInv.
   (* ------------------------------------------------------------------ *)
 
   (* the refcnt word each state stores (0 on a free slot, the count else) *)
-  Definition brc_word (o : option (Qp * positive)) : mword 32 :=
+  Definition brc_word (o : option (option Qp * positive)) : mword 32 :=
     match o with
     | None => (mword_of_int 0 : mword 32)
     | Some (_, n) => (mword_of_int (Z.pos n) : mword 32)
@@ -774,29 +586,6 @@ Section BioInv.
      half (1/2) when free, the retainder qr (with q + qr = 1/2) when busy,
      plus one absorbed [bslot] per outstanding reference and the faithful-int
      bound the word ties need. *)
-  Definition bio_slot_res (bn : bio_names) (M : gmap nat (Qp * positive))
-      (k : nat) (dev bno : mword 32) : iProp Σ :=
-    match M !! k with
-    | None =>
-        (brefcnt k ↦₄ (mword_of_int 0 : mword 32) ∗
-         b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
-         b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno)%I
-    | Some (q, n) =>
-        (⌜(Z.pos n < 2 ^ 31)%Z⌝ ∗
-         brefcnt k ↦₄ (mword_of_int (Z.pos n) : mword 32) ∗
-         bslots (Pos.to_nat n) ∗
-         ∃ qr : Qp, ⌜(q + qr)%Qp = (1/2)%Qp⌝ ∗
-           b_dev (bpa k) ↦₄{DfracOwn qr} dev ∗
-           b_blockno (bpa k) ↦₄{DfracOwn qr} bno)%I
-    end.
-
-  (* ------------------------------------------------------------------ *)
-  (*  The uncached pool                                                    *)
-  (* ------------------------------------------------------------------ *)
-
-  (* the blocknos currently claimed by SOME buffer slot, valid or not (an
-     invalid slot's blockno still names the block whose fill is in flight;
-     binit's slots all claim 0, which [bv_cov] excludes). *)
   Definition bcache_cached (bnos : nat -> mword 32) : gset Z :=
     list_to_set ((fun k => uint (bnos k)) <$> seq 0 NBUF).
 
@@ -925,97 +714,14 @@ Section BioInv.
      never claim the same covered block -- what makes the pool's set
      subtraction and the eviction deposit sound; the miss scan's exit ties
      re-establish it at the recycle) and the pool itself. *)
-  Definition bcache_scan (bn : bio_names) (V : bio_view Σ)
-      (M : gmap nat (Qp * positive))
-      (ord : list nat) (devs bnos : nat -> mword 32) : iProp Σ :=
-    (own (bn_auth bn) (● M) ∗
-     bslots_auth ∗
-     ⌜∀ k, is_Some (M !! k) -> (k < NBUF)%nat⌝ ∗
-     ⌜ord ≡ₚ seq 0 NBUF⌝ ∗
-     ⌜∀ k1 k2, (k1 < NBUF)%nat -> (k2 < NBUF)%nat ->
-        uint (bnos k1) ∈ bv_cov V ->
-        uint (bnos k1) = uint (bnos k2) -> k1 = k2⌝ ∗
-     (* the DEV PIN: a slot claiming a covered blockno is on the view's
-        device.  This is what upgrades the forward scan's per-slot exit tie
-        (dev ≠ OR bno ≠, the negation of the code's && ) to the miss fact
-        the pool exchange needs (∀ j, bnos j ≠ B): the payload's own dev
-        pin is unreachable mid-scan (a checked-out arm carries no payload),
-        so the fact must be RECORDED here -- the vs_data rule again. *)
-     ⌜∀ k, (k < NBUF)%nat -> uint (bnos k) ∈ bv_cov V ->
-        devs k = bv_dev V⌝ ∗
-     bcache_lru bhead (map bnode ord) ∗
-     bio_pool V bnos ∗
-     [∗ list] k ∈ seq 0 NBUF, bio_slot_res bn M k (devs k) (bnos k))%I.
+  (* F7 (vetted): the holder's token row -- the sleeplock token, the chain's
+     count fragment, and the L2 register half naming the parked unit
+     (keys AND mass: only the stamp is existential, R-1) *)
+  Definition bstok (bn : bio_names) (k : nat) (pidv dev bno : mword 32) : iProp Σ :=
+    (sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv ∗
+     bref_tok0 bn k ∗
+     ∃ t : nat, CtxBox.l2_hold (X := bio_x) (bn_box bn k) (dev, bno) {[((dev, bno), t) := 1%Qp]})%I.
 
-  (* ...and the CLOSED form the bcache spinlock is sealed over: its closure. *)
-  Definition bcache_res (bn : bio_names) (V : bio_view Σ) : iProp Σ :=
-    (∃ (M : gmap nat (Qp * positive)) (ord : list nat)
-       (devs bnos : nat -> mword 32),
-       bcache_scan bn V M ord devs bnos)%I.
-
-  Lemma bcache_res_to_scan (bn : bio_names) (V : bio_view Σ) :
-    bcache_res bn V -∗ ∃ M ord devs bnos, bcache_scan bn V M ord devs bnos.
-  Proof. rewrite /bcache_res. iIntros "H". iExact "H". Qed.
-
-  Lemma bcache_scan_to_res (bn : bio_names) (V : bio_view Σ) M ord devs bnos :
-    bcache_scan bn V M ord devs bnos -∗ bcache_res bn V.
-  Proof.
-    rewrite /bcache_res. iIntros "H". iExists M, ord, devs, bnos. iExact "H".
-  Qed.
-
-  (* borrow one buffer's slot out of the big-sep and put it back, possibly
-     under a different authority map (ftable_slots_acc's mirror). *)
-  Lemma bio_slots_acc (bn : bio_names) (M : gmap nat (Qp * positive))
-      (devs bnos : nat -> mword 32) (i : nat) :
-    (i < NBUF)%nat ->
-    ([∗ list] k ∈ seq 0 NBUF, bio_slot_res bn M k (devs k) (bnos k)) -∗
-    bio_slot_res bn M i (devs i) (bnos i) ∗
-    (∀ (M' : gmap nat (Qp * positive)) (devs' bnos' : nat -> mword 32),
-       ⌜∀ k, k ≠ i -> M' !! k = M !! k /\ devs' k = devs k /\
-             bnos' k = bnos k⌝ -∗
-       bio_slot_res bn M' i (devs' i) (bnos' i) -∗
-       [∗ list] k ∈ seq 0 NBUF, bio_slot_res bn M' k (devs' k) (bnos' k)).
-  Proof.
-    iIntros (Hi) "H".
-    assert (Hlk : seq 0 NBUF !! i = Some i) by (apply lookup_seq; lia).
-    rewrite (big_sepL_delete
-               (fun _ k => bio_slot_res bn M k (devs k) (bnos k))
-               (seq 0 NBUF) i i Hlk).
-    iDestruct "H" as "[$ Hrest]".
-    iIntros (M' devs' bnos' HM') "Hi".
-    rewrite (big_sepL_delete
-               (fun _ k => bio_slot_res bn M' k (devs' k) (bnos' k))
-               (seq 0 NBUF) i i Hlk).
-    iFrame "Hi".
-    iApply (big_sepL_mono with "Hrest").
-    intros idx y Hy. destruct (decide (idx = i)) as [->|Hne]; [done|].
-    apply lookup_seq in Hy as [-> _].
-    destruct (HM' _ Hne) as (HMk & Hdk & Hbk).
-    unfold bio_slot_res. rewrite HMk Hdk Hbk. done.
-  Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (*  The persistent context and the caller-facing handle                 *)
-  (*                                                                      *)
-  (*  [bio_ctx] is BELOW [End BioInv] with [buf_escrow]: it carries the    *)
-  (*  escrow handle, and the escrow is a CLOSED TERM now, so [bio_ctx] is  *)
-  (*  one too -- which is what makes [fs_ready] / [first_tok] /            *)
-  (*  [proc_priv] context-free all the way up to the park.                 *)
-  (* ------------------------------------------------------------------ *)
-
-
-  (* the held-buffer handle bread returns and bwrite/brelse (and the log
-     layer's log_write) consume: the sleeplock holder's bundle, the
-     traveling content at [bs], the block's disk cell at [bsd], and the
-     payload at logical content [bsl] with dirty flag [d].  The chain's
-     reference is NOT here (it rides in the escrow); the DIRTY payload's
-     pinning reference is.
-
-     [bio_held] leaves [bs] and [bsl] independent -- a holder who has
-     edited the bytes has bs ≠ bsl until log_write re-indexes the payload
-     -- and [bio_locked] (what bread returns and bwrite/brelse demand)
-     ties them.  That tie IS the brelse obligation: modified bytes cannot
-     be parked until the payload says they are the logical content. *)
   Definition bio_held (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (bs bsl bsd : list (bv 8)) (d : bool) : iProp Σ :=
     (⌜(k < NBUF)%nat⌝ ∗
@@ -1024,7 +730,7 @@ Section BioInv.
      (* the buffer's sleeplock, held -- its [pid] field is INSIDE the token
         now (SleepLock.v's [sleeplocked_q]), so [pidv] indexes the token
         rather than a row of its own. *)
-     sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv ∗
+     bstok bn k pidv dev bno ∗
      b_valid (bpa k) ↦₄ (mword_of_int 1 : mword 32) ∗
      b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
      buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
@@ -1049,7 +755,7 @@ Section BioInv.
      (* the buffer's sleeplock, held -- its [pid] field is INSIDE the token
         now (SleepLock.v's [sleeplocked_q]), so [pidv] indexes the token
         rather than a row of its own. *)
-     sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv ∗
+     bstok bn k pidv dev bno ∗
      b_valid (bpa k) ↦₄ (mword_of_int 1 : mword 32) ∗
      b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
      buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
@@ -1084,7 +790,7 @@ Section BioInv.
      into a second function; [bn] is assembled from the two functions at the
      end, and [bown bn k] is [lock_tok_excl (f k)] by construction.
      These two lemmas are the collectors. *)
-  Local Lemma tok_fun_alloc (n j : nat) :
+  Lemma tok_fun_alloc (n j : nat) :
     ⊢ |==> ∃ f : nat -> gname, [∗ list] k ∈ seq j n, lock_tok_excl (f k).
   Proof.
     iInduction n as [|n IH] forall (j).
@@ -1099,7 +805,7 @@ Section BioInv.
     case_decide as Hd; [exfalso; lia | done].
   Qed.
 
-  Local Lemma seq_fun_alloc {A : Type} `{Inhabited A} (E : coPset)
+  Lemma seq_fun_alloc {A : Type} `{Inhabited A} (E : coPset)
       (Q : nat -> A -> iProp Σ) (n j : nat) :
     ([∗ list] k ∈ seq j n, |={E}=> ∃ x : A, Q k x) ={E}=∗
     ∃ f : nat -> A, [∗ list] k ∈ seq j n, Q k (f k).
@@ -1116,282 +822,6 @@ Section BioInv.
     case_decide as Hd; [exfalso; lia | done].
   Qed.
 
-End BioInv.
-
-(* ==================================================================== *)
-(*  THE ESCROW AS A PARKED RECORD                                        *)
-(*                                                                       *)
-(*  This section BINDS NO [CurCtx].  Every row below spells its context   *)
-(*  explicitly, so a forgotten annotation is an elaboration error rather  *)
-(*  than a silent capture of an ambient (§0.8′ rule 3, and the fifth      *)
-(*  occurrence of this move: [is_kmem], [is_conslock], [is_ftable],       *)
-(*  [valid_context_pre]).                                                 *)
-(*                                                                       *)
-(*  WHY THE BODY CARRIES A PARKED TOKEN.  The escrow bridges TWO lock     *)
-(*  disciplines -- four of its six opens hold only the bcache spinlock,   *)
-(*  two hold the buffer's sleeplock -- so neither lock's payload can host *)
-(*  it and no opener is entitled to a [ctx_dom] from the escrow's         *)
-(*  context.  What every opener DOES have is its own [own_context] and    *)
-(*  its hart's [hart_view_lb]; [TsoCtx.ctx_absorb] turns that pair plus   *)
-(*  the record's own [ctx_parked ξ T] into the payload at the OPENER's    *)
-(*  context, and hands the token straight back at the same stamp so the   *)
-(*  next open can do it again.  Closing is the dual, [TsoCtx.ctx_deposit] *)
-(*  back into the same ∃-bound ξ, which raises the stamp.                 *)
-(*  (tso-absorb-memo.md §3; twin image [ZZAbsorbProbe.twin_absorb].)      *)
-(* ==================================================================== *)
-Section BioEscrow.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-
-  (* ---- the transport obligations, applied AS TERMS where the structural
-     instances cannot be reached by search (§0.15′: [↦ₘ]/[↦₈] put the index
-     under the [cur_ctx] projection and instance search will not take that
-     delta step).  Proved row by row instead, which is the same thing and
-     reads better. ---- *)
-
-  Global Instance buf_own_morph (b : Arch.pa) (bno dsk : mword 32)
-      (bs : list (bv 8)) :
-    CtxMorph (λ ξ, buf_own (XI := ξ) b bno dsk bs).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /buf_own.
-    iDestruct "H" as "(Hbno & Hdisk & %Hlen & Hdata)".
-    iMod (ctx_morph_big_sepL bs
-                 (λ j byte ξ0, ctx_pointsto ξ0 (pa_add (b_data b) j)
-                                 (DfracOwn 1) byte)
-                 (λ i x, ctx_morph_pointsto _ _ _ _) ξ ξ' with "Hd Hdata")
-      as "[Hd Hdata]".
-    (* the blockno half and the disk flag became [↦₄] ctx cells at stage 2 *)
-    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
-    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdisk") as "[Hd Hdisk]".
-    iModIntro. iFrame "Hd Hbno Hdisk Hdata". done.
-  Qed.
-
-  (* [bref]'s two fractional identity cells are [↦₄], so the whole payload
-     chain [bref] -> [bio_pay] -> [buf_pay] stopped being ξ-constant at M1
-     stage 2.  Each arm is proved by cases, the branch condition split
-     BEFORE the [iIntros] so the hypothesis arrives already reduced. *)
-  Global Instance bref_morph (bn : bio_names) (k : nat) (q : Qp)
-      (dev bno : mword 32) :
-    CtxMorph (λ ξ, bref (XI := ξ) bn k q dev bno).
-  Proof.
-    iIntros (ξ ξ') "Hd (Htok & Hdev & Hbno)".
-    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
-    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
-    by iFrame.
-  Qed.
-
-  Global Instance bio_pay_morph (bn : bio_names) (V : bio_view Σ) (k : nat)
-      (dev bno : mword 32) (bsl bsd : list (bv 8)) (d : bool) :
-    CtxMorph (λ ξ, bio_pay (XI := ξ) bn V k dev bno bsl bsd d).
-  Proof.
-    rewrite /bio_pay. destruct d.
-    - iIntros (ξ ξ') "Hd [Hdy [%q Hb]]".
-      iMod (bref_morph bn k q dev bno ξ ξ' with "Hd Hb") as "[Hd Hb]".
-      iModIntro. iFrame "Hd Hdy". iExists q. iExact "Hb".
-    - iIntros (ξ ξ') "Hd H". by iFrame.
-  Qed.
-
-  Global Instance buf_pay_morph (bn : bio_names) (V : bio_view Σ) (k : nat)
-      (v : bool) (dev bno : mword 32) (bs : list (bv 8)) :
-    CtxMorph (λ ξ, buf_pay (XI := ξ) bn V k v dev bno bs).
-  Proof.
-    rewrite /buf_pay. destruct (decide (uint bno ∈ bv_cov V));
-      [| iIntros (ξ ξ') "Hd H"; by iFrame ].
-    destruct v; [| iIntros (ξ ξ') "Hd H"; by iFrame ].
-    iIntros (ξ ξ') "Hd [%Heq H]". iDestruct "H" as (bsd dd) "[Hdb Hp]".
-    iMod (bio_pay_morph bn V k dev bno bs bsd dd ξ ξ' with "Hd Hp")
-      as "[Hd Hp]".
-    iModIntro. iFrame "Hd". iSplit; [done|]. iExists bsd, dd. iFrame.
-  Qed.
-
-  Global Instance buf_parked_morph (bn : bio_names) (V : bio_view Σ) (k : nat) :
-    CtxMorph (λ ξ, buf_parked (XI := ξ) bn V k).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /buf_parked.
-    iDestruct "H" as (v dev bno bs) "(Hvld & Hdev & Hown & Hpay & Hmid)".
-    iMod (buf_own_morph (bpa k) bno (mword_of_int 0 : mword 32) bs ξ ξ'
-                 with "Hd Hown") as "[Hd Hown]".
-    (* the valid and dev cells became [↦₄] ctx cells at M1 stage 2 *)
-    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hvld") as "[Hd Hvld]".
-    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
-    iMod (buf_pay_morph bn V k v dev bno bs ξ ξ' with "Hd Hpay")
-      as "[Hd Hpay]".
-    iModIntro. iFrame "Hd". iExists v, dev, bno, bs. iFrame.
-  Qed.
-
-  (* A2's two fractional identity cells are [↦₄] too, so this arm is no
-     longer ξ-constant (it was [ctx_morph_const] before M1 stage 2). *)
-  Global Instance buf_chain_morph (bn : bio_names) (k : nat) :
-    CtxMorph (λ ξ, buf_chain (XI := ξ) bn k).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /buf_chain.
-    iDestruct "H" as (q dev bno) "(Href & Hdev & Hbno & Hown & Hmid)".
-    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
-    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hbno") as "[Hd Hbno]".
-    iModIntro. iFrame "Hd". iExists q, dev, bno. iFrame.
-  Qed.
-
-  Global Instance buf_mid_morph (V : bio_view Σ) (k : nat) :
-    CtxMorph (λ ξ, buf_mid (XI := ξ) V k).
-  Proof.
-    iIntros (ξ ξ') "Hd H". rewrite /buf_mid.
-    iDestruct "H" as (vld bno bs) "(%Hv & Hvld & Hdev & Hown)".
-    iMod (buf_own_morph (bpa k) bno (mword_of_int 0 : mword 32) bs ξ ξ'
-                 with "Hd Hown") as "[Hd Hown]".
-    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hvld") as "[Hd Hvld]".
-    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdev") as "[Hd Hdev]".
-    iModIntro. iFrame "Hd". iExists vld, bno, bs. iFrame. done.
-  Qed.
-
-  (* the three arms, AS A TERM.  [ctx_morph_or] is the instance this
-     tranche adds to the sealed surface (tso-absorb-memo.md §1.3): the kit
-     had [const], [pointsto], [word], [sep], [exist], [big_sepL],
-     [big_sepM], [if_then], [if_else] -- and no DISJUNCTION, which is what
-     an escrow body, a first-token and an fd slot all are. *)
-  Global Instance buf_escrow_body_morph (bn : bio_names) (V : bio_view Σ)
-      (k : nat) :
-    CtxMorph (λ ξ, buf_escrow_body (XI := ξ) bn V k).
-  Proof.
-    apply (ctx_morph_or _ _ (buf_parked_morph bn V k)
-             (ctx_morph_or _ _ (buf_chain_morph bn k)
-                (buf_mid_morph V k))).
-  Qed.
-
-  (* THE PARKED RECORD: the body at its OWN context, carrying that
-     context's parked token.  NOT [Typeclasses Opaque] -- [IntoExist] is a
-     typeclass and sealing an ∃-shaped definition breaks every
-     [iDestruct "H" as (ξ T) "..."] at the openers (§0.16′'s measured
-     gotcha: seal a big-op SEAM, not an ∃). *)
-  Definition buf_escrow_rec (bn : bio_names) (V : bio_view Σ) (k : nat) : iProp Σ :=
-    (∃ (ξ : CtxId) (T : nat),
-       ctx_parked ξ T ∗ buf_escrow_body (XI := ξ) bn V k)%I.
-
-  (* THE ESCROW.  A CLOSED TERM: no [CurCtx] in its type. *)
-  Definition buf_escrow (bn : bio_names) (V : bio_view Σ) (k : nat) : iProp Σ :=
-    inv bioN (buf_escrow_rec bn V k).
-
-  Global Instance buf_escrow_persistent bn V k : Persistent (buf_escrow bn V k).
-  Proof. apply _. Qed.
-
-  (* the record under the [▷] [iInv] hands back: [ctx_parked] is timeless
-     ([TsoCtx.ctx_parked_timeless]) and so is the body, and [CtxId] is
-     [Inhabited] ([TsoCtx.ctx_id_inhabited], whose header already says this
-     is what it is for), so the whole ∃ strips with one [">Hrec"]. *)
-  Global Instance buf_escrow_rec_timeless bn V k :
-    Timeless (buf_escrow_rec bn V k).
-  Proof. rewrite /buf_escrow_rec. apply _. Qed.
-
-  (* the record, opened and re-closed.  Stated so the six open sites read
-     the same way whatever lock they hold. *)
-  Lemma buf_escrow_rec_intro (bn : bio_names) (V : bio_view Σ) (k : nat)
-      (ξ : CtxId) (T : nat) :
-    ctx_parked ξ T -∗ buf_escrow_body (XI := ξ) bn V k -∗ buf_escrow_rec bn V k.
-  Proof. iIntros "Hpk Hb". iExists ξ, T. iFrame. Qed.
-
-  (* ---- OPEN and CLOSE, the two halves every opener runs ---- *)
-
-  (* ABSORB: the record's payload at the OPENER's context, the token back at
-     the same stamp.  [K] is the opener's hart view; at SC it comes from
-     [TsoCtxShim.hart_view_lb_any T] at [K := T] (M2 debt, quarantined
-     exactly where the scheduler's resume already owes it). *)
-  Lemma escrow_absorb `{CID : RiscvLang.CpuId} `{XI : CurCtx}
-      (bn : bio_names) (V : bio_view Σ) (k : nat) (ξ : CtxId) (T K : nat) :
-    (T ≤ K)%nat →
-    own_context cur_ctx -∗ hart_view_lb K -∗
-    ctx_parked ξ T -∗ buf_escrow_body (XI := ξ) bn V k ==∗
-    own_context cur_ctx ∗ ctx_parked ξ T ∗ buf_escrow_body (XI := XI) bn V k.
-  Proof.
-    iIntros (HTK) "Hrun HK Hpk Hbody".
-    iApply (TsoCtxAbsorbLb.ctx_absorb_lb (λ ξ0, buf_escrow_body (XI := ξ0) bn V k)
-              ξ cur_ctx T K HTK with "Hrun HK Hpk Hbody").
-  Qed.
-
-  (* DEPOSIT: the worked-on body back into the SAME record context, the
-     stamp raised to cover what was written. *)
-  Lemma escrow_deposit `{CID : RiscvLang.CpuId} `{XI : CurCtx}
-      (bn : bio_names) (V : bio_view Σ) (k : nat) (ξ : CtxId) (T : nat) :
-    own_context cur_ctx -∗ ctx_parked ξ T -∗
-    buf_escrow_body (XI := XI) bn V k ==∗
-    own_context cur_ctx ∗
-    ∃ T' : nat, ctx_parked ξ T' ∗ buf_escrow_body (XI := ξ) bn V k.
-  Proof.
-    iIntros "Hrun Hpk Hbody".
-    iMod (ctx_deposit (λ ξ0, buf_escrow_body (XI := ξ0) bn V k)
-            cur_ctx ξ T with "Hrun Hpk Hbody") as "[Hrun Hres]".
-    iDestruct "Hres" as (T') "(_ & Hpk & Hbody)".
-    iModIntro. iFrame "Hrun". iExists T'. iFrame.
-  Qed.
-
-  (* the bcache payload stays the CONSTANT embedding [<{ bcache_res bn V }>]
-     (flip's shape): its lru links are ctx cells now (BcacheInv A6.61), so a
-     λ-payload would need a [bseg] transport nothing consumes -- the morph
-     pile main built here died with the re-tier. *)
-
-
-  (* ---- the caller-facing handle ---- *)
-
-  Definition bio_ctx `{XI : CurCtx} (bn : bio_names) (V : bio_view Σ) : iProp Σ :=
-    (is_lock (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }> ∗
-     [∗ list] k ∈ seq 0 NBUF,
-       (is_sleeplock (fst (bn_slk bn k)) (snd (bn_slk bn k))
-          (buf_lock (bnode k)) "buffer"%string (bown bn k) ∗
-        buf_escrow bn V k))%I.
-
-  Global Instance bio_ctx_persistent `{XI : CurCtx} bn V : Persistent (bio_ctx bn V).
-  Proof. apply _. Qed.
-
-  Lemma bio_ctx_lock `{XI : CurCtx} bn V :
-    bio_ctx bn V -∗
-    is_lock (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }>.
-  Proof. iIntros "[$ _]". Qed.
-
-  Lemma bio_ctx_buf `{XI : CurCtx} bn V k :
-    (k < NBUF)%nat ->
-    bio_ctx bn V -∗
-    is_sleeplock (fst (bn_slk bn k)) (snd (bn_slk bn k))
-      (buf_lock (bnode k)) "buffer"%string (bown bn k) ∗
-    buf_escrow bn V k.
-  Proof.
-    iIntros (Hk) "[_ Hbufs]".
-    assert (Hlk : seq 0 NBUF !! k = Some k) by (apply lookup_seq; lia).
-    iDestruct (big_sepL_lookup with "Hbufs") as "[$ $]"; [exact Hlk].
-  Qed.
-
-  (* sealed HERE, not at the file end: after the two accessors above -- [bio_init]'s [iModIntro] below
-     otherwise searches the NBUF big-op (measured: a non-terminating
-     instance search once the escrow became a parked record). *)
-  Global Typeclasses Opaque bio_ctx.
-
-End BioEscrow.
-
-Section BioInit.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{XI : CurCtx}.
-
-  (* ALLOCATE the escrows, threading the allocator's [own_context].  A
-     [big_sepL_mono] cannot do this -- the running token is EXCLUSIVE and
-     has to be handed from one buffer to the next -- so the fold is an
-     explicit induction, and it is shared by [bio_init] and
-     [BioInitAt.bio_init_at]. *)
-  Lemma escrow_alloc_seq `{CID : RiscvLang.CpuId} (bn : bio_names) (V : bio_view Σ)
-      (E : coPset) (n j : nat) :
-    own_context cur_ctx -∗
-    ([∗ list] k ∈ seq j n, buf_parked (XI := XI) bn V k) ={E}=∗
-    own_context cur_ctx ∗ [∗ list] k ∈ seq j n, buf_escrow bn V k.
-  Proof.
-    iInduction n as [|n IH] forall (j).
-    { iIntros "Hrun _". iModIntro. cbn [seq]. iFrame "Hrun". done. }
-    rewrite !bio_seq_cons. iIntros "Hrun [Hh Ht]".
-    iMod (ctx_parked_alloc) as (ξ) "Hpk".
-    iMod (ctx_deposit (λ ξ0, buf_parked (XI := ξ0) bn V j)
-            cur_ctx ξ 0 with "Hrun Hpk Hh") as "[Hrun Hres]".
-    iDestruct "Hres" as (T') "(_ & Hpk & Hh)".
-    iMod (inv_alloc bioN E (buf_escrow_rec bn V j) with "[Hpk Hh]") as "#Hinv".
-    { iNext. rewrite /buf_escrow_rec. iExists ξ, T'. iFrame "Hpk".
-      iLeft. iExact "Hh". }
-    iMod ("IH" with "Hrun Ht") as "[Hrun Ht]".
-    iModIntro. iFrame "Hrun Ht". rewrite /buf_escrow. iExact "Hinv".
-  Qed.
-
   (* The caller-side ghost step over binit's postcondition (SpecBinit.v) plus
      the .bss-zeroed [struct buf] cells: seal the bcache spinlock over
      [bcache_res], seal every buffer's sleeplock over its checkout token,
@@ -1403,19 +833,775 @@ Section BioInit.
      range's pool bundles (its [disk_block]s paired with clean payloads --
      for the log layer, the mkfs image's content against the logged-view
      ghost), and 0 must be outside the covered range because every zeroed
-     blockno cell claims it.
+     blockno cell claims it. *)
+  (* A6.68: the honest creator deposit (A6.66) wants the running token, and
+     this boot step builds NBUF+1 locks.  Borrowed once and handed straight
+     back; the per-buffer loop threads it with
+     [SepThread.big_sepL_fupd_thread], because [own_context] is EXCLUSIVE and
+     the NBUF steps cannot run as independent fupds. *)
+End BioInv.
 
-     THE RUNNING TOKEN IS BORROWED, not consumed: every escrow is a PARKED
-     RECORD now, so its initial content has to be [ctx_deposit]ed into the
-     freshly minted context that record carries, and a deposit runs at the
-     depositor's own authority.  It is handed straight back. *)
+Section BioBox.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+
+  (* ================================================================== *)
+  (*  THE BUNDLE, split P_hdr ∗ P_rest (endgame §2, F2): the header is   *)
+  (*  what the L1-side code reads or writes (valid / dev / blockno and   *)
+  (*  the identity-keyed payload); the rest is the disk cell + data.     *)
+  (* ================================================================== *)
+  Definition buf_hdr (bn : bio_names) (V : bio_view Σ) (k : nat) (ξ : CtxId)
+      (v : bool) (dev bno : mword 32) (bs : list (bv 8)) : iProp Σ :=
+    (ctx_word4_pointsto ξ (b_valid (bpa k)) (DfracOwn 1)
+       (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)) ∗
+     ctx_word4_pointsto ξ (b_dev (bpa k)) (DfracOwn (1/2)) dev ∗
+     ctx_word4_pointsto ξ (b_blockno (bpa k)) (DfracOwn (1/2)) bno ∗
+     buf_pay (XI := ξ) bn V k v dev bno bs)%I.
+  Definition buf_rest (k : nat) (ξ : CtxId) (bs : list (bv 8)) : iProp Σ :=
+    (ctx_word4_pointsto ξ (b_disk (bpa k)) (DfracOwn 1) (mword_of_int 0 : mword 32) ∗
+     ⌜length bs = 1024%nat⌝ ∗
+     [∗ list] j ↦ byte ∈ bs, ctx_pointsto ξ (pa_add (b_data (bpa k)) j) (DfracOwn 1) byte)%I.
+  Definition buf_bundle (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (ξ : CtxId) : iProp Σ :=
+    (∃ (v : bool) (dev bno : mword 32) (bs : list (bv 8)),
+       buf_hdr bn V k ξ v dev bno bs ∗ buf_rest k ξ bs)%I.
+
+  (* the regrouping (F2): the handle's [buf_own] spelling of the bundle *)
+  Lemma buf_bundle_own bn V k ξ :
+    buf_bundle bn V k ξ ⊣⊢
+    (∃ (v : bool) (dev bno : mword 32) (bs : list (bv 8)),
+       ctx_word4_pointsto ξ (b_valid (bpa k)) (DfracOwn 1)
+         (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)) ∗
+       ctx_word4_pointsto ξ (b_dev (bpa k)) (DfracOwn (1/2)) dev ∗
+       buf_own (XI := ξ) (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
+       buf_pay (XI := ξ) bn V k v dev bno bs)%I.
+  Proof.
+    rewrite /buf_bundle /buf_hdr /buf_rest /buf_own. iSplit.
+    - iIntros "(%v & %dev & %bno & %bs & (Hv & Hd & Hb & Hp) & (Hdk & %Hl & Hdata))".
+      iExists v, dev, bno, bs. iFrame "Hv Hd Hp Hb Hdk Hdata". done.
+    - iIntros "(%v & %dev & %bno & %bs & Hv & Hd & (Hb & Hdk & %Hl & Hdata) & Hp)".
+      iExists v, dev, bno, bs. iFrame "Hv Hd Hb Hp Hdk Hdata". done.
+  Qed.
+  (* the invalid header does not mention the data *)
+  Lemma buf_hdr_false_bs bn V k ξ dev bno bs bs' :
+    buf_hdr bn V k ξ false dev bno bs -∗ buf_hdr bn V k ξ false dev bno bs'.
+  Proof.
+    rewrite /buf_hdr. iIntros "(Hv & Hd & Hb & Hp)". iFrame "Hv Hd Hb".
+    rewrite /buf_pay. case_decide; [iExact "Hp" | iExact "Hp"].
+  Qed.
+
+  Global Instance buf_hdr_timeless bn V k ξ v dev bno bs : Timeless (buf_hdr bn V k ξ v dev bno bs).
+  Proof.
+    rewrite /buf_hdr. apply bi.sep_timeless; [apply _|]. apply bi.sep_timeless; [apply _|].
+    apply bi.sep_timeless; apply _.
+  Qed.
+  Global Instance buf_rest_timeless k ξ bs : Timeless (buf_rest k ξ bs).
+  Proof. rewrite /buf_rest. apply bi.sep_timeless; [apply _|]. apply bi.sep_timeless; apply _. Qed.
+  Global Instance buf_bundle_timeless bn V k ξ : Timeless (buf_bundle bn V k ξ).
+  Proof.
+    rewrite /buf_bundle.
+    apply bi.exist_timeless; intro v. apply bi.exist_timeless; intro dev.
+    apply bi.exist_timeless; intro bno. apply bi.exist_timeless; intro bs.
+    apply bi.sep_timeless; apply _.
+  Qed.
+
+  Local Instance buf_pay_morph' bn V k v dev bno bs :
+    CtxMorph (fun ξ => buf_pay (XI := ξ) bn V k v dev bno bs).
+  Proof.
+    rewrite /buf_pay.
+    case_decide; [|apply ctx_morph_const].
+    apply ctx_morph_sep; [apply ctx_morph_const|].
+    destruct v.
+    - apply ctx_morph_exist => bsd. apply ctx_morph_exist => d.
+      apply ctx_morph_sep; [apply ctx_morph_const|].
+      rewrite /bio_pay. destruct d.
+      + apply ctx_morph_sep; [apply ctx_morph_const|].
+        apply ctx_morph_exist => q.
+        rewrite /bref.
+        apply ctx_morph_sep; [apply ctx_morph_const|].
+        apply ctx_morph_sep; [apply ctx_morph_const|].
+        apply ctx_morph_sep; apply ctx_morph_word4.
+      + apply ctx_morph_const.
+    - apply ctx_morph_const.
+  Qed.
+  Global Instance buf_hdr_morph bn V k v dev bno bs :
+    CtxMorph (fun ξ => buf_hdr bn V k ξ v dev bno bs).
+  Proof.
+    rewrite /buf_hdr.
+    apply ctx_morph_sep; [apply ctx_morph_word4|].
+    apply ctx_morph_sep; [apply ctx_morph_word4|].
+    apply ctx_morph_sep; [apply ctx_morph_word4|].
+    apply buf_pay_morph'.
+  Qed.
+  Global Instance buf_rest_morph k bs : CtxMorph (fun ξ => buf_rest k ξ bs).
+  Proof.
+    rewrite /buf_rest.
+    apply ctx_morph_sep; [apply ctx_morph_word4|].
+    apply ctx_morph_sep; [apply ctx_morph_const|].
+    apply ctx_morph_big_sepL. intros i x. apply ctx_morph_pointsto.
+  Qed.
+  Global Instance buf_bundle_morph bn V k : CtxMorph (buf_bundle bn V k).
+  Proof.
+    rewrite /buf_bundle. apply ctx_morph_exist => v.
+    apply ctx_morph_exist => dev. apply ctx_morph_exist => bno.
+    apply ctx_morph_exist => bs.
+    apply ctx_morph_sep; [apply buf_hdr_morph | apply buf_rest_morph].
+  Qed.
+
+  (* two full ownerships of one cell, at any two contexts, clash *)
+  Lemma ctx_word4_excl_x (ξ1 ξ2 : CtxId) (a : Arch.pa) (dq : dfrac)
+      (w1 w2 : bv 32) :
+    ctx_word4_pointsto ξ1 a (DfracOwn 1) w1 -∗
+    ctx_word4_pointsto ξ2 a dq w2 -∗ False.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (ctx_word4_pointsto_bytes with "H1") as "H1".
+    iDestruct (ctx_word4_pointsto_bytes with "H2") as "H2".
+    iEval (cbn [seq]; rewrite big_sepL_cons) in "H1". iDestruct "H1" as "[H1 _]".
+    iEval (cbn [seq]; rewrite big_sepL_cons) in "H2". iDestruct "H2" as "[H2 _]".
+    iDestruct (ctx_pointsto_ne with "H1 H2") as %Hne. exfalso. by apply Hne.
+  Qed.
+
+  (* ================================================================== *)
+  (*  THE INSTANTIATION of CtxBox at bcache (endgame §4.1): id = dev ×     *)
+  (*  blockno, X = the data bytes, P_hdr = the header at an identity (F2),  *)
+  (*  P_rest = disk cell + data, tok = bown, Q = emp.                       *)
+  (* ================================================================== *)
+  Definition bhdr (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (i : bio_id) (x : bio_x) (ξ : CtxId) : iProp Σ :=
+    (∃ v : bool, buf_hdr bn V k ξ v i.1 i.2 x)%I.
+  Definition brest (k : nat) (x : bio_x) (ξ : CtxId) : iProp Σ := buf_rest k ξ x.
+
+  Global Instance bhdr_morph bn V k i x : CtxMorph (bhdr bn V k i x).
+  Proof. rewrite /bhdr. apply ctx_morph_exist => v. apply buf_hdr_morph. Qed.
+  Global Instance brest_morph k x : CtxMorph (brest k x).
+  Proof. rewrite /brest. apply buf_rest_morph. Qed.
+  Global Instance bhdr_timeless bn V k i x ξ : Timeless (bhdr bn V k i x ξ).
+  Proof. rewrite /bhdr. apply bi.exist_timeless; intro v. apply _. Qed.
+  Global Instance brest_timeless k x ξ : Timeless (brest k x ξ).
+  Proof. rewrite /brest. apply _. Qed.
+
+  (* the client obligations: a FULL cell in each part (valid / disk) *)
+  Lemma bhdr_excl bn V k : forall (i i' : bio_id) (x x' : bio_x) (ξ ξ' : CtxId),
+    bhdr bn V k i x ξ -∗ bhdr bn V k i' x' ξ' -∗ False.
+  Proof.
+    iIntros (i i' x x' ξ ξ') "H1 H2".
+    iDestruct "H1" as (v1) "(Hv1 & _)". iDestruct "H2" as (v2) "(Hv2 & _)".
+    iDestruct (ctx_word4_excl_x ξ ξ' (b_valid (bpa k)) (DfracOwn 1) with "Hv1 Hv2") as %[].
+  Qed.
+  Lemma brest_excl k : forall (x x' : bio_x) (ξ ξ' : CtxId),
+    brest k x ξ -∗ brest k x' ξ' -∗ False.
+  Proof.
+    iIntros (x x' ξ ξ') "(Hd1 & _) (Hd2 & _)".
+    iDestruct (ctx_word4_excl_x ξ ξ' (b_disk (bpa k)) (DfracOwn 1) with "Hd1 Hd2") as %[].
+  Qed.
+  Lemma bown_excl bn k : bown bn k -∗ bown bn k -∗ False.
+  Proof. apply bown_exclusive. Qed.
+
+  (* the bundle at an identity: CtxBox's in_arm shape, and its [buf_own]
+     regrouping (F2) for the handle *)
+  Definition buf_bundle_at (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (ξ : CtxId) (dev bno : mword 32) : iProp Σ :=
+    (∃ x : bio_x, bhdr bn V k (dev, bno) x ξ ∗ brest k x ξ)%I.
+  Lemma buf_bundle_at_own bn V k ξ dev bno :
+    buf_bundle_at bn V k ξ dev bno ⊣⊢
+    (∃ (v : bool) (bs : list (bv 8)),
+       ctx_word4_pointsto ξ (b_valid (bpa k)) (DfracOwn 1)
+         (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)) ∗
+       ctx_word4_pointsto ξ (b_dev (bpa k)) (DfracOwn (1/2)) dev ∗
+       buf_own (XI := ξ) (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
+       buf_pay (XI := ξ) bn V k v dev bno bs)%I.
+  Proof.
+    rewrite /buf_bundle_at /bhdr /brest /buf_hdr /buf_rest /buf_own. iSplit.
+    - iIntros "(%bs & (%v & (Hv & Hd & Hb & Hp)) & (Hdk & %Hl & Hdata))".
+      iExists v, bs. cbn [fst snd]. iFrame "Hv Hd Hp Hb Hdk Hdata". done.
+    - iIntros "(%v & %bs & Hv & Hd & (Hb & Hdk & %Hl & Hdata) & Hp)".
+      iExists bs. iSplitL "Hv Hd Hb Hp".
+      { iExists v. cbn [fst snd]. iFrame "Hv Hd Hb Hp". }
+      iFrame "Hdk Hdata". done.
+  Qed.
+  Global Instance buf_bundle_at_timeless bn V k ξ dev bno : Timeless (buf_bundle_at bn V k ξ dev bno).
+  Proof. rewrite /buf_bundle_at. apply bi.exist_timeless; intro x. apply _. Qed.
+
+  (* ---- the registers, named per buffer ---- *)
+  Definition reg_cnt (bn : bio_names) (k : nat) (c : nat) : iProp Σ :=
+    cnt_half (X := bio_x) (bn_box bn k) c.
+  Definition reg_drop (bn : bio_names) (k : nat) (r : slot_reg bio_id bio_x) : iProp Σ :=
+    slotd_half (bn_box bn k) r.
+  Definition reg_park (bn : bio_names) (k : nat) (s : l2_reg bio_id) : iProp Σ :=
+    slotp_half (X := bio_x) (bn_box bn k) s.
+  Definition bstm_frag (bn : bio_names) (k : nat) (m : gmap (bio_id * nat) ufrac) : iProp Σ :=
+    stamps_frag (X := bio_x) (bn_box bn k) m.
+  Definition bstm_auth (bn : bio_names) (k : nat) (m : gmap (bio_id * nat) ufrac) : iProp Σ :=
+    stamps_auth (X := bio_x) (bn_box bn k) m.
+
+  Definition bioxN : namespace := nroot .@ "xv6biox".
+
+  (* THE BOX *)
+  Definition buf_box (bn : bio_names) (V : bio_view Σ) (k : nat) : iProp Σ :=
+    is_box (bhdr bn V k) (brest k) emp (bown bn k) bioxN (bn_box bn k).
+  Global Instance buf_box_persistent bn V k : Persistent (buf_box bn V k).
+  Proof. rewrite /buf_box /is_box. apply _. Qed.
+
+  (* ================================================================== *)
+  (*  THE SIX LEMMAS at bcache (thin wrappers over CtxBox's; endgame      *)
+  (*  §3.5).  The chain and the fractioned reference both carry ONE unit,  *)
+  (*  so every fragment here is a unit singleton at the identity.         *)
+  (* ================================================================== *)
+
+  (* (a) at c = 0 (the recycle): the caller presents no units *)
+  Lemma bbox_withdraw_L1 `{CID : RiscvLang.CpuId} (bn : bio_names) (V : bio_view Σ)
+      (k : nat) (ξ : CtxId) (r : slot_reg bio_id bio_x) (Kd : nat) (E : coPset) :
+    ↑bioxN ⊆ E ->
+    sr_win r = false ->
+    (sr_td r <= Kd)%nat ->
+    buf_box bn V k -∗
+    TsoCtx.own_context ξ -∗
+    TsoCtx.ctx_floor ξ Kd -∗
+    reg_drop bn k r -∗
+    reg_cnt bn k 0 ={E}=∗
+    TsoCtx.own_context ξ ∗ reg_cnt bn k 0 ∗
+    ∃ x0 : bio_x, reg_drop bn k (SlotReg (sr_td r) true (sr_ident r) (Some x0)) ∗
+                  bhdr bn V k (sr_ident r) x0 ξ.
+  Proof.
+    iIntros (HE Hw HKd) "#Hbox Hrun #Hfl Hrd Hc".
+    iMod (own_unit (authUR (gmapUR (bio_id * nat) ufracR)) (bx_stamps (bn_box bn k))) as "Hf0".
+    assert (Hq0 : qsum (∅ : gmap (bio_id * nat) ufrac) = nat_Qc 0).
+    { rewrite /qsum map_fold_empty /nat_Qc /=. symmetry. apply Z2Qc_inj_0. }
+    assert (Hm0 : (max_stamp (∅ : gmap (bio_id * nat) ufrac) <= 0)%nat).
+    { rewrite /max_stamp map_fold_empty. lia. }
+    iMod (CtxBox.box_withdraw_L1 (bhdr bn V k) (brest k) emp%I (bown bn k)
+            bioxN (bn_box bn k) ξ r 0 ∅ Kd 0 E HE Hw Hq0 HKd Hm0
+            with "Hbox Hrun Hfl [] Hrd Hc [Hf0]") as "(Hrun & Hc & Hout)".
+    { iApply TsoCtx.ctx_floor_0. }
+    { rewrite /stamps_frag. iExact "Hf0". }
+    iModIntro. iFrame "Hrun Hc". iExact "Hout".
+  Qed.
+
+  (* (b) at c = 0: the header comes back at the NEW identity; the chain's
+     reference is minted at the deposit stamp *)
+  Lemma bbox_deposit_L1 `{CID : RiscvLang.CpuId} (bn : bio_names) (V : bio_view Σ)
+      (k : nat) (ξ : CtxId) (Td : nat) (i0 : bio_id) (x0 : bio_x)
+      (dev bno : mword 32) (E : coPset) :
+    ↑bioxN ⊆ E ->
+    buf_box bn V k -∗
+    TsoCtx.own_context ξ -∗
+    reg_drop bn k (SlotReg Td true i0 (Some x0)) -∗
+    reg_cnt bn k 0 -∗
+    bhdr bn V k (dev, bno) x0 ξ ={E}=∗
+    TsoCtx.own_context ξ ∗
+    ∃ T' : nat, reg_drop bn k (SlotReg T' false (dev, bno) None) ∗ reg_cnt bn k 1 ∗
+                bref_ghost bn k dev bno ∗ llb loglen_name T'.
+  Proof.
+    iIntros (HE) "#Hbox Hrun Hrd Hc Hhdr".
+    iMod (CtxBox.box_deposit_L1 (bhdr bn V k) (brest k) emp%I (bown bn k)
+            bioxN (bn_box bn k) ξ
+            (SlotReg Td true i0 (Some x0)) 0 (dev, bno) x0 E HE eq_refl eq_refl
+            with "Hbox Hrun Hrd Hc Hhdr") as "(Hrun & %T' & Hrd & Hc & Href & #Hllb)".
+    iModIntro. iFrame "Hrun". iExists T'. iFrame "Hrd Hllb".
+    iSplitL "Hc"; [iExact "Hc"|].
+    rewrite /bref_ghost. iExists T'.
+    assert (unit_mass 0 = 1%Qp) as -> by reflexivity. iExact "Href".
+  Qed.
+
+  (* (c) refs++: the identity from the L1 row's register tie *)
+  Lemma bbox_ref_incr (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (r : slot_reg bio_id bio_x) (c : nat) (dev bno : mword 32) (E : coPset) :
+    ↑bioxN ⊆ E ->
+    sr_win r = false ->
+    sr_ident r = (dev, bno) ->
+    buf_box bn V k -∗
+    reg_drop bn k r -∗
+    reg_cnt bn k c ={E}=∗
+    reg_drop bn k r ∗ reg_cnt bn k (S c) ∗ bref_ghost bn k dev bno.
+  Proof.
+    iIntros (HE Hw Hid) "#Hbox Hrd Hc".
+    iMod (CtxBox.box_ref_incr (bhdr bn V k) (brest k) emp%I (bown bn k)
+            bioxN (bn_box bn k) r c E HE Hw
+            with "Hbox Hrd Hc") as "(Hrd & Hc & %T & Href)".
+    iModIntro. iFrame "Hrd Hc". rewrite /bref_ghost. iExists T. rewrite Hid. iExact "Href".
+  Qed.
+
+  (* (d) refs--: the unit leaves; td := max td t; the row's llb joins the
+     reference's *)
+  Lemma bbox_ref_decr (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (r : slot_reg bio_id bio_x) (c : nat) (dev bno : mword 32) (E : coPset) :
+    ↑bioxN ⊆ E ->
+    sr_win r = false ->
+    buf_box bn V k -∗
+    reg_drop bn k r -∗
+    llb loglen_name (sr_td r) -∗
+    reg_cnt bn k (S c) -∗
+    bref_ghost bn k dev bno ={E}=∗
+    ∃ td' : nat, ⌜(sr_td r <= td')%nat⌝ ∗
+      reg_drop bn k (SlotReg td' false (sr_ident r) (sr_x r)) ∗ reg_cnt bn k c ∗
+      llb loglen_name td'.
+  Proof.
+    iIntros (HE Hw) "#Hbox Hrd #Hllb Hc Href". iDestruct "Href" as (t) "Href".
+    assert (Hq1 : qsum ({[((dev, bno), t) := 1%Qp]} : gmap (bio_id * nat) ufrac) = nat_Qc 1).
+    { rewrite /qsum map_fold_singleton /qsum_step Qcplus_0_r Qp_to_Qc_1 /nat_Qc /=. symmetry. apply Z2Qc_inj_1. }
+    iMod (CtxBox.box_ref_decr (bhdr bn V k) (brest k) emp%I (bown bn k)
+            bioxN (bn_box bn k) r c (dev, bno)
+            {[((dev, bno), t) := 1%Qp]} E HE Hw Hq1
+            with "Hbox Hrd Hllb Hc Href") as "(Hrd & Hc & #Hllb')".
+    iModIntro. iExists (Nat.max (sr_td r) (max_stamp {[((dev, bno), t) := 1%Qp]})).
+    iSplitR; [iPureIntro; lia|]. iFrame "Hrd Hc Hllb'".
+  Qed.
+
+  (* (e) the checkout: the winner's unit at stamp t (R1 at Tl := t), the
+     payload row's pieces (tok, the register half at rest, its floor) *)
+  Lemma bbox_checkout `{CID : RiscvLang.CpuId} (bn : bio_names) (V : bio_view Σ)
+      (k : nat) (ξ : CtxId) (dev bno : mword 32) (t : nat) (s0 : l2_reg bio_id)
+      (Kt Kp : nat) (E : coPset) :
+    ↑bioxN ⊆ E ->
+    lr_hold s0 = None ->
+    (t <= Kt)%nat ->
+    (lr_tp s0 <= Kp)%nat ->
+    buf_box bn V k -∗
+    TsoCtx.own_context ξ -∗
+    TsoCtx.ctx_floor ξ Kt -∗
+    TsoCtx.ctx_floor ξ Kp -∗
+    CtxBox.reference (X := bio_x) (bn_box bn k) (dev, bno) {[((dev, bno), t) := 1%Qp]} -∗
+    bown bn k -∗
+    reg_park bn k s0 ={E}=∗
+    TsoCtx.own_context ξ ∗ buf_bundle_at bn V k ξ dev bno ∗
+    CtxBox.l2_hold (X := bio_x) (bn_box bn k) (dev, bno) {[((dev, bno), t) := 1%Qp]}.
+  Proof.
+    iIntros (HE Hs0 HKt HKp) "#Hbox Hrun #Hflt #Hflp Href Htok Hrp".
+    assert (Hmt : (max_stamp ({[((dev, bno), t) := 1%Qp]} : gmap (bio_id * nat) ufrac) <= Kt)%nat).
+    { rewrite /max_stamp map_fold_singleton /max_step /=. lia. }
+    iMod (CtxBox.box_checkout (bhdr bn V k) (brest k) emp%I (bown bn k)
+            (bown_excl bn k) bioxN (bn_box bn k) ξ (dev, bno)
+            {[((dev, bno), t) := 1%Qp]} s0 Kt Kp E HE Hs0 Hmt HKp
+            with "Hbox Hrun Hflt Hflp Href [] Htok Hrp") as "(Hrun & Hbun & Hhold)".
+    { done. }
+    iModIntro. iFrame "Hrun Hhold". iExact "Hbun".
+  Qed.
+
+  (* (f) the park: the bundle at the handle's identity and the handle's
+     register half naming the parked unit; the unit moves to the park stamp *)
+  Lemma bbox_park `{CID : RiscvLang.CpuId} (bn : bio_names) (V : bio_view Σ)
+      (k : nat) (ξ : CtxId) (dev bno : mword 32) (t : nat) (E : coPset) :
+    ↑bioxN ⊆ E ->
+    buf_box bn V k -∗
+    TsoCtx.own_context ξ -∗
+    buf_bundle_at bn V k ξ dev bno -∗
+    CtxBox.l2_hold (X := bio_x) (bn_box bn k) (dev, bno) {[((dev, bno), t) := 1%Qp]} ={E}=∗
+    TsoCtx.own_context ξ ∗ bown bn k ∗
+    ∃ T' : nat, reg_park bn k (L2Reg T' None) ∗ bref_ghost bn k dev bno ∗ llb loglen_name T'.
+  Proof.
+    iIntros (HE) "#Hbox Hrun Hbun Hhold".
+    iMod (CtxBox.box_park (bhdr bn V k) (brest k) emp%I (bown bn k)
+            (bhdr_excl bn V k) (brest_excl k) bioxN (bn_box bn k) ξ (dev, bno)
+            {[((dev, bno), t) := 1%Qp]} E HE
+            with "Hbox Hrun Hbun Hhold") as "(Hrun & _ & Htok & %T' & %q & %Hq & Hrp & Href & #Hllb)".
+    assert (q = 1%Qp) as ->.
+    { apply Qp.to_Qc_inj_iff. rewrite Hq /qsum map_fold_singleton /qsum_step. by rewrite Qcplus_0_r. }
+    iModIntro. iFrame "Hrun Htok". iExists T'. iFrame "Hrp Hllb".
+    rewrite /bref_ghost. iExists T'. iExact "Href".
+  Qed.
+
+  (* ================================================================== *)
+  (*  The payload side (v2, A6.142): refs-0 custody in bcache.lock.       *)
+  (*  Stated as context-λs -- the lock payload re-indexes at each acquire. *)
+  (* ================================================================== *)
+
+  (* the L1 row of endgame §3.2: the drop register's payload half with its
+     stamp witnesses, bounded by the payload-level floor slot [tl] *)
+  Definition bslot_regs (bn : bio_names) (k : nat) (tl : nat) (dev bno : mword 32) : iProp Σ :=
+    (∃ r : slot_reg bio_id bio_x,
+       reg_drop bn k r ∗ ⌜sr_win r = false⌝ ∗ ⌜sr_x r = None⌝ ∗ ⌜sr_ident r = (dev, bno)⌝ ∗
+       llb loglen_name (sr_td r) ∗ ⌜(sr_td r ≤ tl)%nat⌝)%I.
+
+  (* the L1 slot's tie on the bcache half (A6.155): [None] -- no fractioned
+     reference outstanding, the slot keeps the whole half (the other half
+     rides the bundle); [Some q] -- the fractioned references hold q of it. *)
+  Definition btie (oq : option Qp) (qr : Qp) : Prop :=
+    match oq with
+    | None => qr = (1/2)%Qp
+    | Some q => (q + qr)%Qp = (1/2)%Qp
+    end.
+
+  Definition bio_slot_res2 (bn : bio_names) (V : bio_view Σ)
+      (M : gmap nat (option Qp * positive)) (k : nat) (dev bno : mword 32)
+      (tl : nat) (ξ : CtxId) : iProp Σ :=
+    bslot_regs bn k tl dev bno ∗
+    match M !! k with
+    | None =>
+        (ctx_word4_pointsto ξ (brefcnt k) (DfracOwn 1) (mword_of_int 0 : mword 32) ∗
+         reg_cnt bn k 0 ∗
+         ctx_word4_pointsto ξ (b_dev (bpa k)) (DfracOwn (1/2)) dev ∗
+         ctx_word4_pointsto ξ (b_blockno (bpa k)) (DfracOwn (1/2)) bno)%I
+    | Some (oq, n) =>
+        (⌜(Z.pos n < 2 ^ 31)%Z⌝ ∗
+         ctx_word4_pointsto ξ (brefcnt k) (DfracOwn 1)
+           (mword_of_int (Z.pos n) : mword 32) ∗
+         bslots (Pos.to_nat n) ∗
+         reg_cnt bn k (Pos.to_nat n) ∗
+         ∃ qr : Qp, ⌜btie oq qr⌝ ∗
+           ctx_word4_pointsto ξ (b_dev (bpa k)) (DfracOwn qr) dev ∗
+           ctx_word4_pointsto ξ (b_blockno (bpa k)) (DfracOwn qr) bno)%I
+    end.
+
+  Definition bcache_scan2 (bn : bio_names) (V : bio_view Σ)
+      (M : gmap nat (option Qp * positive)) (ord : list nat)
+      (devs bnos : nat -> mword 32) (tl : nat) (ξ : CtxId) : iProp Σ :=
+    (own (bn_auth bn) (● M) ∗
+     bslots_auth ∗
+     ⌜∀ k, is_Some (M !! k) -> (k < NBUF)%nat⌝ ∗
+     ⌜ord ≡ₚ seq 0 NBUF⌝ ∗
+     ⌜∀ k1 k2, (k1 < NBUF)%nat -> (k2 < NBUF)%nat ->
+        uint (bnos k1) ∈ bv_cov V ->
+        uint (bnos k1) = uint (bnos k2) -> k1 = k2⌝ ∗
+     ⌜∀ k, (k < NBUF)%nat -> uint (bnos k) ∈ bv_cov V ->
+        devs k = bv_dev V⌝ ∗
+     bcache_lru (XI := ξ) bhead (map bnode ord) ∗
+     bio_pool V bnos ∗
+     [∗ list] k ∈ seq 0 NBUF, bio_slot_res2 bn V M k (devs k) (bnos k) tl ξ)%I.
+
+  (* the payload, with its floor slot: R2 folds the releaser's llb here
+     ([lock_pay_intro_llb] with [bcache_scan2] as the unfloored body) *)
+  Definition bcache_res2 (bn : bio_names) (V : bio_view Σ) (ξ : CtxId) : iProp Σ :=
+    (∃ (M : gmap nat (option Qp * positive)) (ord : list nat)
+       (devs bnos : nat -> mword 32) (tl : nat),
+       TsoCtx.ctx_floor ξ tl ∗ llb loglen_name tl ∗
+       bcache_scan2 bn V M ord devs bnos tl ξ)%I.
+
+  Lemma bcache_res2_fold bn V M ord devs bnos tl (ξ : CtxId) :
+    bcache_scan2 bn V M ord devs bnos tl ξ ∗ TsoCtx.ctx_floor ξ tl ∗ llb loglen_name tl
+    ⊢ bcache_res2 bn V ξ.
+  Proof. iIntros "(Hb & #Hfl & #Hllb)". iExists M, ord, devs, bnos, tl. iFrame "Hfl Hllb Hb". Qed.
+
+  (* the _in release's fold: the releaser presents [llb tl] (R2's
+     [lock_pay_intro_llb] mints the floor) *)
+  Lemma bcache_res2_fold_in bn V M ord devs bnos tl :
+    forall ξ : CtxId,
+      (llb loglen_name tl ∗ bcache_scan2 bn V M ord devs bnos tl ξ) ∗ TsoCtx.ctx_floor ξ tl
+      ⊢ bcache_res2 bn V ξ.
+  Proof.
+    intros ξ. iIntros "[[#Hl Hs] #Hf]". iApply bcache_res2_fold. iFrame "Hs Hf Hl".
+  Qed.
+
+  (* the floor slot is a BOUND: every L1 row's stamp sits below it, so a
+     larger slot (a decrement's synced stamp beyond the current slot) keeps
+     every row.  The releaser re-floors at the larger slot through the _in
+     release (llb of the max is one of the two llbs). *)
+  Lemma bcache_scan2_floor_mono bn V M ord devs bnos tl tl' (ξ : CtxId) :
+    (tl <= tl')%nat ->
+    bcache_scan2 bn V M ord devs bnos tl ξ -∗ bcache_scan2 bn V M ord devs bnos tl' ξ.
+  Proof.
+    iIntros (Hle) "(Hauth & Hsauth & %Hdom & %Hord & %Hinj & %Hdev & Hlru & Hpool & Hslots)".
+    rewrite /bcache_scan2. iFrame "Hauth Hsauth Hlru Hpool".
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iApply (big_sepL_mono with "Hslots"). intros i k Hk.
+    rewrite /bio_slot_res2. iIntros "[Hregs Hslot]". iFrame "Hslot".
+    iDestruct "Hregs" as (r) "(Hrd & %Hw & %Hx & %Hid & #Hllb & %Hb)".
+    iExists r. iFrame "Hrd Hllb". iPureIntro. split_and!; [done | done | done | lia].
+  Qed.
+
+  (* ---- morphability ------------------------------------------------- *)
+
+  Lemma bseg_morph (h : mword 64) :
+    forall (l : list (mword 64)) (prev : mword 64),
+      CtxMorph (fun ξ => bseg (XI := ξ) h prev l).
+  Proof.
+    induction l as [|a l' IH]; intros prev; cbn [bseg].
+    - apply ctx_morph_const.
+    - apply ctx_morph_sep; [apply ctx_morph_word|].
+      apply ctx_morph_sep; [apply ctx_morph_word|].
+      apply IH.
+  Qed.
+
+  Global Instance bcache_lru_morph h l :
+    CtxMorph (fun ξ => bcache_lru (XI := ξ) h l).
+  Proof.
+    rewrite /bcache_lru.
+    apply ctx_morph_sep; [apply ctx_morph_word|].
+    apply ctx_morph_sep; [apply ctx_morph_word|].
+    apply bseg_morph.
+  Qed.
+
+
+
+
+  Global Instance bio_slot_res2_morph bn V M k dev bno tl :
+    CtxMorph (bio_slot_res2 bn V M k dev bno tl).
+  Proof.
+    rewrite /bio_slot_res2.
+    apply ctx_morph_sep; [apply ctx_morph_const|].
+    destruct (M !! k) as [[q n]|].
+    - apply ctx_morph_sep; [apply ctx_morph_const|].
+      apply ctx_morph_sep; [apply ctx_morph_word4|].
+      apply ctx_morph_sep; [apply ctx_morph_const|].
+      apply ctx_morph_sep; [apply ctx_morph_const|].
+      apply ctx_morph_exist => qr.
+      apply ctx_morph_sep; [apply ctx_morph_const|].
+      apply ctx_morph_sep; apply ctx_morph_word4.
+    - apply ctx_morph_sep; [apply ctx_morph_word4|].
+      apply ctx_morph_sep; [apply ctx_morph_const|].
+      apply ctx_morph_sep; apply ctx_morph_word4.
+  Qed.
+
+  Global Instance bcache_scan2_morph bn V M ord devs bnos tl :
+    CtxMorph (bcache_scan2 bn V M ord devs bnos tl).
+  Proof.
+    rewrite /bcache_scan2.
+    apply ctx_morph_sep; [apply ctx_morph_const|].
+    apply ctx_morph_sep; [apply ctx_morph_const|].
+    apply ctx_morph_sep; [apply ctx_morph_const|].
+    apply ctx_morph_sep; [apply ctx_morph_const|].
+    apply ctx_morph_sep; [apply ctx_morph_const|].
+    apply ctx_morph_sep; [apply ctx_morph_const|].
+    apply ctx_morph_sep; [apply bcache_lru_morph|].
+    apply ctx_morph_sep; [apply ctx_morph_const|].
+    apply ctx_morph_big_sepL. intros i x. apply bio_slot_res2_morph.
+  Qed.
+
+  Global Instance bcache_res2_morph bn V : CtxMorph (bcache_res2 bn V).
+  Proof.
+    rewrite /bcache_res2.
+    apply ctx_morph_exist => M. apply ctx_morph_exist => ord.
+    apply ctx_morph_exist => devs. apply ctx_morph_exist => bnos.
+    apply ctx_morph_exist => tl.
+    apply ctx_morph_sep; [apply _ |].
+    apply ctx_morph_sep; [apply ctx_morph_const | apply bcache_scan2_morph].
+  Qed.
+  Global Instance bcache_scan2_llb_morph bn V M ord devs bnos tl :
+    CtxMorph (fun ξ => llb loglen_name tl ∗ bcache_scan2 bn V M ord devs bnos tl ξ)%I.
+  Proof. apply ctx_morph_sep; [apply ctx_morph_const | apply bcache_scan2_morph]. Qed.
+
+  (* ---- the sleeplock's client payload (endgame §3.2 / R1-pre): ξ-free,
+     bound-indexed -- the checkout token plus the park register's payload
+     half with its witnesses, bounded by the sleeplock's floor slot. ---- *)
+  Definition bslp_raw (γo γp : gname) (ξ : CtxId) : iProp Σ :=
+    (lock_tok_excl γo ∗
+     ∃ s : l2_reg bio_id, ghost_var γp (1/2) s ∗ ⌜lr_hold s = None⌝ ∗
+       TsoCtx.ctx_floor ξ (lr_tp s))%I.
+  Definition bslp (bn : bio_names) (k : nat) : CtxId -> iProp Σ :=
+    bslp_raw (bn_own bn k) (bn_regp bn k).
+  (* the releaser's unfloored row (R2's [Rdep]), at a KNOWN park stamp *)
+  Definition bslp_dep (bn : bio_names) (k : nat) (T' : nat) : CtxId -> iProp Σ :=
+    fun _ => (bown bn k ∗ reg_park bn k (L2Reg T' None))%I.
+  Lemma bslp_fold bn k T' :
+    forall ξ : CtxId, bslp_dep bn k T' ξ ∗ TsoCtx.ctx_floor ξ T' ⊢ bslp bn k ξ.
+  Proof.
+    intros ξ. iIntros "[(Ho & Hrp) #Hfl]". rewrite /bslp /bslp_raw /bown.
+    iFrame "Ho". iExists (L2Reg T' None). rewrite /reg_park /slotp_half /bn_box /=.
+    iFrame "Hrp". iSplitR; [done|]. iExact "Hfl".
+  Qed.
+  (* the checkout's pieces of the payload row *)
+  Lemma bslp_unfold bn k (ξ : CtxId) :
+    bslp bn k ξ ⊢ bown bn k ∗ ∃ s : l2_reg bio_id, reg_park bn k s ∗ ⌜lr_hold s = None⌝ ∗
+                                                  TsoCtx.ctx_floor ξ (lr_tp s).
+  Proof.
+    iIntros "[Ho Hs]". rewrite /bown. iFrame "Ho". iDestruct "Hs" as (s) "(Hrp & %Hh & #Hfl)".
+    iExists s. rewrite /reg_park /slotp_half /bn_box /=. iFrame "Hrp Hfl". done.
+  Qed.
+  Global Instance bslp_raw_morph γo γp : CtxMorph (bslp_raw γo γp).
+  Proof.
+    rewrite /bslp_raw. apply ctx_morph_sep; [apply ctx_morph_const|].
+    apply ctx_morph_exist => s.
+    apply ctx_morph_sep; [apply ctx_morph_const|].
+    apply ctx_morph_sep; [apply ctx_morph_const| apply _].
+  Qed.
+  Global Instance bslp_morph bn k : CtxMorph (bslp bn k).
+  Proof. rewrite /bslp. apply _. Qed.
+
+  Section BioSlots2.
+  Context `{XI : CurCtx}.
+
+  Lemma bcache_res2_to_scan (bn : bio_names) (V : bio_view Σ) :
+    bcache_res2 bn V cur_ctx -∗
+    ∃ M ord devs bnos tl,
+      TsoCtx.ctx_floor cur_ctx tl ∗ llb loglen_name tl ∗
+      bcache_scan2 bn V M ord devs bnos tl cur_ctx.
+  Proof. rewrite /bcache_res2. iIntros "H". iExact "H". Qed.
+
+  (* a slot's row is a BOUND on its stamp: it survives a larger floor slot *)
+  Lemma bio_slot_res2_floor_mono bn V M k dev bno tl tl' (ξ : CtxId) :
+    (tl <= tl')%nat ->
+    bio_slot_res2 bn V M k dev bno tl ξ -∗ bio_slot_res2 bn V M k dev bno tl' ξ.
+  Proof.
+    iIntros (Hle) "[Hregs Hslot]". rewrite /bio_slot_res2. iFrame "Hslot".
+    iDestruct "Hregs" as (r) "(Hrd & %Hw & %Hx & %Hid & #Hllb & %Hb)".
+    iExists r. iFrame "Hrd Hllb". iPureIntro. split_and!; [done | done | done | lia].
+  Qed.
+
+  Lemma bio_slots_acc2 (bn : bio_names) (V : bio_view Σ)
+      (M : gmap nat (option Qp * positive)) (devs bnos : nat -> mword 32)
+      (tl i : nat) :
+    (i < NBUF)%nat ->
+    ([∗ list] k ∈ seq 0 NBUF, bio_slot_res2 bn V M k (devs k) (bnos k) tl cur_ctx) -∗
+    bio_slot_res2 bn V M i (devs i) (bnos i) tl cur_ctx ∗
+    (∀ (M' : gmap nat (option Qp * positive)) (devs' bnos' : nat -> mword 32) (tl' : nat),
+       ⌜∀ k, k ≠ i -> M' !! k = M !! k /\ devs' k = devs k /\
+             bnos' k = bnos k⌝ -∗
+       ⌜(tl <= tl')%nat⌝ -∗
+       bio_slot_res2 bn V M' i (devs' i) (bnos' i) tl' cur_ctx -∗
+       [∗ list] k ∈ seq 0 NBUF, bio_slot_res2 bn V M' k (devs' k) (bnos' k) tl' cur_ctx).
+  Proof.
+    iIntros (Hi) "H".
+    assert (Hlk : seq 0 NBUF !! i = Some i) by (apply lookup_seq; lia).
+    rewrite (big_sepL_delete
+               (fun _ k => bio_slot_res2 bn V M k (devs k) (bnos k) tl cur_ctx)
+               (seq 0 NBUF) i i Hlk).
+    iDestruct "H" as "[$ Hrest]".
+    iIntros (M' devs' bnos' tl' HM' Htl) "Hi".
+    rewrite (big_sepL_delete
+               (fun _ k => bio_slot_res2 bn V M' k (devs' k) (bnos' k) tl' cur_ctx)
+               (seq 0 NBUF) i i Hlk).
+    iFrame "Hi".
+    iApply (big_sepL_impl with "Hrest").
+    iIntros "!>" (idx y Hy) "Hs". destruct (decide (idx = i)) as [->|Hne]; [done|].
+    apply lookup_seq in Hy as [-> _].
+    destruct (HM' _ Hne) as (HMk & Hdk & Hbk).
+    iApply (bio_slot_res2_floor_mono with "[Hs]"); [exact Htl|].
+    unfold bio_slot_res2. rewrite HMk Hdk Hbk. iExact "Hs".
+  Qed.
+
+  (* the LRU scan's borrow of dev/blockno: SOME fraction of both cells *)
+  Lemma bio_slot_devbno_acc2 (bn : bio_names) (V : bio_view Σ)
+      (M : gmap nat (option Qp * positive)) (k : nat) (dev bno : mword 32) (tl : nat) :
+    bio_slot_res2 bn V M k dev bno tl cur_ctx -∗
+    ∃ q : Qp,
+      b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
+      b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗
+      (b_dev (bpa k) ↦₄{DfracOwn q} dev -∗
+       b_blockno (bpa k) ↦₄{DfracOwn q} bno -∗
+       bio_slot_res2 bn V M k dev bno tl cur_ctx).
+  Proof.
+    iIntros "[Hregs Hslot]". rewrite /bio_slot_res2.
+    destruct (M !! k) as [[qt n]|] eqn:HMk.
+    - iDestruct "Hslot" as "(%Hn & Hcell & Hsl & Hc & Hqr)".
+      iDestruct "Hqr" as (qr) "(%Htie & Hdev & Hbno)".
+      iExists qr. iFrame "Hdev Hbno". iIntros "Hdev Hbno".
+      iFrame "Hregs". iSplitR; [by iPureIntro|]. iFrame "Hcell Hsl Hc".
+      iExists qr. iSplitR; [by iPureIntro|]. iFrame "Hdev Hbno".
+    - iDestruct "Hslot" as "(Hcell & Hc & Hdev & Hbno)".
+      iExists (1/2)%Qp. iFrame "Hdev Hbno". iIntros "Hdev Hbno".
+      iFrame "Hregs Hcell Hc Hdev Hbno".
+  Qed.
+
+  (* the backward scan's borrow of the refcnt word, with the [beqz] tie *)
+  Lemma bio_slot_refcnt_acc2 (bn : bio_names) (V : bio_view Σ)
+      (M : gmap nat (option Qp * positive)) (k : nat) (dev bno : mword 32) (tl : nat) :
+    bio_slot_res2 bn V M k dev bno tl cur_ctx -∗
+    ∃ cw : mword 32,
+      brefcnt k ↦₄ cw ∗
+      ⌜(eq_vec (sign_extend' 64 cw) (zero_reg : mword 64) = true /\ M !! k = None)
+       \/ (eq_vec (sign_extend' 64 cw) (zero_reg : mword 64) = false
+           /\ is_Some (M !! k))⌝ ∗
+      (brefcnt k ↦₄ cw -∗ bio_slot_res2 bn V M k dev bno tl cur_ctx).
+  Proof.
+    iIntros "[Hregs Hslot]". rewrite /bio_slot_res2.
+    destruct (M !! k) as [[qt n]|] eqn:HMk.
+    - iDestruct "Hslot" as "(%Hn & Hcell & Hsl & Hc & Hqr)".
+      iExists (mword_of_int (Z.pos n) : mword 32). iFrame "Hcell".
+      iSplitR.
+      { iPureIntro. right. split; [exact (brc_word_nonzero_eqv n Hn) | by eexists]. }
+      iIntros "Hcell". iFrame "Hregs". iSplitR; [by iPureIntro|]. iFrame "Hcell Hsl Hc Hqr".
+    - iDestruct "Hslot" as "(Hcell & Hc & Hdev & Hbno)".
+      iExists (mword_of_int 0 : mword 32). iFrame "Hcell".
+      iSplitR.
+      { iPureIntro. left. split; [exact brc_word_zero_eqv | reflexivity]. }
+      iIntros "Hcell". iFrame "Hregs Hcell Hc Hdev Hbno".
+  Qed.
+
+  End BioSlots2.
+
+  Section BioBoot2.
+  Context `{XI : CurCtx}.
+
+  Definition bio_ctx (bn : bio_names) (V : bio_view Σ) : iProp Σ :=
+    (WpLock.is_lock (bn_lk bn) bcache_addr "bcache"%string
+       (fun ξ => bcache_res2 bn V ξ) ∗
+     [∗ list] k ∈ seq 0 NBUF,
+       (is_sleeplock_genl (fst (bn_slk bn k)) (snd (bn_slk bn k))
+          (buf_lock (bnode k)) "buffer"%string (bslp bn k) sl_untracked ∗
+        buf_box bn V k))%I.
+
+  Global Instance bio_ctx_persistent bn V : Persistent (bio_ctx bn V).
+  Proof. apply _. Qed.
+
+  Lemma bio_ctx_lock bn V :
+    bio_ctx bn V -∗
+    WpLock.is_lock (bn_lk bn) bcache_addr "bcache"%string
+      (fun ξ => bcache_res2 bn V ξ).
+  Proof. iIntros "[$ _]". Qed.
+
+  Lemma bio_ctx_buf bn V k :
+    (k < NBUF)%nat ->
+    bio_ctx bn V -∗
+    is_sleeplock_genl (fst (bn_slk bn k)) (snd (bn_slk bn k))
+      (buf_lock (bnode k)) "buffer"%string (bslp bn k) sl_untracked ∗
+    buf_box bn V k.
+  Proof.
+    iIntros (Hk) "[_ Hbufs]".
+    assert (Hlk : seq 0 NBUF !! k = Some k) by (apply lookup_seq; lia).
+    iDestruct (big_sepL_lookup with "Hbufs") as "[$ $]"; [exact Hlk].
+  Qed.
+
+  (* the L1 floor slot at boot: the maximum of the per-buffer boot stamps *)
+  Lemma big_sepL_llb_max (l : list nat) (P : nat -> nat -> iProp Σ) :
+    ([∗ list] k ∈ l, ∃ Td : nat, llb loglen_name Td ∗ P k Td) -∗
+    ∃ tl : nat, llb loglen_name tl ∗
+      [∗ list] k ∈ l, ∃ Td : nat, ⌜(Td <= tl)%nat⌝ ∗ llb loglen_name Td ∗ P k Td.
+  Proof.
+    iInduction l as [|k l] "IH".
+    { iIntros "_". iExists 0%nat. iSplitR; [iApply TsoGhost.llb_0|]. done. }
+    iIntros "[Hk Hl]". iDestruct "Hk" as (Td) "[#Hllb HP]".
+    iDestruct ("IH" with "Hl") as (tl) "[#Hllbtl Hl]".
+    iExists (Nat.max tl Td). iSplitR.
+    { destruct (Nat.max_spec tl Td) as [[_ ->] | [_ ->]]; [iExact "Hllb" | iExact "Hllbtl"]. }
+    iSplitL "HP". { iExists Td. iSplitR; [iPureIntro; lia|]. iFrame "Hllb HP". }
+    iApply (big_sepL_mono with "Hl"). intros i k' _. iIntros "(%Td' & %Hb & #Hl' & HP')".
+    iExists Td'. iSplitR; [iPureIntro; lia|]. iFrame "Hl' HP'".
+  Qed.
+
+  (* BOX CONSTRUCTION (box v2, endgame §3.6): the boot content is DEPOSITED
+     into a fresh parked context (stamp T_boot); IN, m = ∅, slot_p =
+     {| 0; None |}, slot_d = {| T_boot; false; (0,0); None |}.  The caller
+     floors L1 at the maximum of the boot stamps through the lock's llb
+     mint. *)
+  Lemma buf_box_alloc `{CID : RiscvLang.CpuId} (E : coPset) (bn : bio_names)
+      (V : bio_view Σ) (k : nat) :
+    own_context cur_ctx -∗
+    bstm_auth bn k ∅ -∗
+    reg_cnt bn k 0 -∗
+    reg_park bn k (L2Reg 0 None) -∗
+    (∃ r0 : slot_reg bio_id bio_x, ghost_var (bn_regd bn k) 1 r0) -∗
+    b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) -∗
+    b_dev (bpa k) ↦₄{DfracOwn (1/2)} (mword_of_int 0 : mword 32) -∗
+    b_blockno (bpa k) ↦₄{DfracOwn (1/2)} (mword_of_int 0 : mword 32) -∗
+    b_disk (bpa k) ↦₄ (mword_of_int 0 : mword 32) -∗
+    (∃ bs : list (bv 8), ⌜length bs = 1024%nat⌝ ∗
+       ([∗ list] j ↦ byte ∈ bs, pa_add (b_data (bpa k)) j ↦ₘ byte) ∗
+       buf_pay bn V k false (mword_of_int 0 : mword 32) (mword_of_int 0 : mword 32) bs) ={E}=∗
+    own_context cur_ctx ∗ buf_box bn V k ∗
+    ∃ Td : nat,
+      reg_drop bn k (SlotReg Td false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None) ∗
+      llb loglen_name Td.
+  Proof.
+    iIntros "Hrun Hst Hc Hrp Hrd Hv Hdev Hbno Hdk Hdata".
+    iDestruct "Hdata" as (bs) "(%Hlen & Hdata & Hpay)".
+    iAssert (buf_bundle_at bn V k cur_ctx (mword_of_int 0 : mword 32) (mword_of_int 0 : mword 32))
+      with "[Hv Hdev Hbno Hpay Hdk Hdata]" as "Hbun".
+    { rewrite /buf_bundle_at /bhdr /brest /buf_hdr /buf_rest.
+      iExists bs. iSplitL "Hv Hdev Hbno Hpay".
+      { iExists false. cbn [fst snd]. cbv iota. iFrame "Hv Hdev Hbno Hpay". }
+      iFrame "Hdk Hdata". done. }
+    iMod (CtxBox.box_alloc_at (bhdr bn V k) (brest k) emp%I (bown bn k)
+            bioxN (bn_box bn k) cur_ctx
+            (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) E
+            with "Hrun Hst Hc [Hrd] Hrp Hbun") as "(Hrun & %Tb & #Hbx & Hrd & #Hllb)".
+    { rewrite /bn_box /=. iExact "Hrd". }
+    iModIntro. iFrame "Hrun". iSplitR; [iExact "Hbx"|]. iExists Tb. iFrame "Hrd Hllb".
+  Qed.
+
   Lemma bio_init `{CID : RiscvLang.CpuId} (V : bio_view Σ) E :
     (0 ∉ bv_cov V) ->
     own_context cur_ctx -∗
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name bcache_addr "bcache"%string -∗
-    (* M4: the owner cell is a LEDGER cell; the ready arm arrives built
-       (the boot chain's carve mints it), not minted from a raw word *)
     WpLock.lk_cpu_ready bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_fresh (buf_lock (bnode k)) "buffer"%string) -∗
     ([∗ list] k ∈ seq 0 NBUF,
@@ -1428,11 +1614,6 @@ Section BioInit.
           [∗ list] j ↦ byte ∈ bs, pa_add (b_data (bpa k)) j ↦ₘ byte)) -∗
     bcache_lru bhead (blist 0 NBUF) -∗
     ([∗ set] b ∈ bv_cov V, pool_blk V b) -∗
-    (* THE SLOT SUPPLY IS NO LONGER MINTED HERE.  Its ghost name is
-       canonical ([Xv6Cameras.bioslot_name]) and therefore fixed before this
-       invariant exists, so [BioDefs.bslots_alloc] mints it at boot and this
-       function takes the authority in and hands the fragments straight back
-       out -- the same total, one step earlier. *)
     bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
     own_context cur_ctx ∗
     ∃ bn : bio_names, bio_ctx bn V ∗ bslots BSLOTS_FS.
@@ -1440,79 +1621,153 @@ Section BioInit.
     iIntros (Hnc0) "Hrun Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf".
     assert (Hu0 : uint (mword_of_int 0 : mword 32) = 0)
       by (vm_compute; reflexivity).
-    (* the NBUF checkout tokens and the NBUF recycle tokens, as functions *)
     iMod (tok_fun_alloc NBUF 0) as (fown) "Htoks".
     iMod (tok_fun_alloc NBUF 0) as (fmid) "Hmids".
-    (* the count authority (no buffer has a reference) and the slot supply *)
-    iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : bioUR)) as (γb) "Hauth".
+    (* the stamped-shares authorities, the two registers' halves, the count *)
+    iAssert ([∗ list] k ∈ seq 0 NBUF, |={E}=> ∃ γ : gname,
+               own γ (● (∅ : gmapUR (bio_id * nat) ufracR)))%I as "Hstm".
+    { iApply big_sepL_intro. iIntros "!>" (i k _).
+      iMod (own_alloc (● (∅ : gmapUR (bio_id * nat) ufracR))) as (γ) "H"; [by apply auth_auth_valid|].
+      iModIntro. iExists γ. iExact "H". }
+    iMod (seq_fun_alloc E (fun _ γ => own γ (● (∅ : gmapUR (bio_id * nat) ufracR))) NBUF 0 with "Hstm")
+      as (fstm) "Hstm2".
+    iAssert ([∗ list] k ∈ seq 0 NBUF, |={E}=> ∃ γ : gname,
+               ghost_var γ (1/2) (L2Reg 0 None : l2_reg bio_id) ∗
+               ghost_var γ (1/2) (L2Reg 0 None : l2_reg bio_id))%I as "Hgp".
+    { iApply big_sepL_intro. iIntros "!>" (i k _).
+      iMod (ghost_var_alloc (L2Reg 0 None : l2_reg bio_id)) as (γ) "H".
+      iModIntro. iExists γ. iEval (rewrite -{1}Qp.half_half) in "H". iDestruct "H" as "[$ $]". }
+    iMod (seq_fun_alloc E (fun _ γ => ghost_var γ (1/2) (L2Reg 0 None : l2_reg bio_id) ∗
+                                      ghost_var γ (1/2) (L2Reg 0 None : l2_reg bio_id))%I
+            NBUF 0 with "Hgp") as (fregp) "Hregp".
+    iAssert ([∗ list] k ∈ seq 0 NBUF, |={E}=> ∃ γ : gname,
+               ghost_var γ 1 (SlotReg 0 false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None
+                                : slot_reg bio_id bio_x))%I as "Hgd".
+    { iApply big_sepL_intro. iIntros "!>" (i k _).
+      iMod (ghost_var_alloc (SlotReg 0 false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None
+                               : slot_reg bio_id bio_x)) as (γ) "H".
+      iModIntro. iExists γ. iExact "H". }
+    iMod (seq_fun_alloc E
+            (fun _ γ => ghost_var γ 1 (SlotReg 0 false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None
+                                          : slot_reg bio_id bio_x)) NBUF 0 with "Hgd")
+      as (fregd) "Hregd".
+    iAssert ([∗ list] k ∈ seq 0 NBUF, |={E}=> ∃ γ : gname,
+               bcnt_var γ 0 ∗ bcnt_var γ 0)%I as "Hgc".
+    { iApply big_sepL_intro. iIntros "!>" (i k _).
+      iMod (ghost_var_alloc (ghost_varG0 := kalloc_count_inG) 0%nat) as (γ) "H".
+      iModIntro. iExists γ. rewrite /bcnt_var. iEval (rewrite -{1}Qp.half_half) in "H".
+      iDestruct "H" as "[$ $]". }
+    iMod (seq_fun_alloc E (fun _ γ => bcnt_var γ 0 ∗ bcnt_var γ 0)%I
+            NBUF 0 with "Hgc") as (fregc) "Hregc".
+    iMod (own_alloc (● (∅ : gmap nat (option Qp * positive)) : bioUR)) as (γb) "Hauth".
     { apply auth_auth_valid. intros i. rewrite lookup_empty. done. }
-    (* the bcache spinlock's gname, BEFORE its resource can be stated *)
-    iMod (newlock_delayed E bcache_addr "bcache"%string with "Hnm Hlkw Hcpu")
+    iMod (newlock_delayed_llb E bcache_addr "bcache"%string with "Hnm Hlkw Hcpu")
       as (γlk) "Hmk".
-    (* every buffer's sleeplock, sealing exactly its checkout token *)
+    (* the sleeplocks, sealed over the λ payload at the park stamp 0 *)
+    iEval (rewrite big_sepL_sep) in "Hregp".
+    iDestruct "Hregp" as "[Hregp1 Hregp2]".
     iDestruct (big_sepL_sep_2 with "Hfresh Htoks") as "Hsl".
-    (* A6.68: SEQUENTIAL, not NBUF independent fupds -- each
-       [sl_fresh_new] borrows the running token and returns it. *)
+    iDestruct (big_sepL_sep_2 with "Hsl Hregp1") as "Hsl".
     iAssert ([∗ list] idx↦k ∈ seq 0 NBUF,
                own_context cur_ctx -∗
-               (sl_fresh (buf_lock (bnode k)) "buffer"%string ∗
-                lock_tok_excl (fown k))
+               ((sl_fresh (buf_lock (bnode k)) "buffer"%string ∗
+                 lock_tok_excl (fown k)) ∗
+                ghost_var (fregp k) (1/2) (L2Reg 0 None : l2_reg bio_id))
                ={E}=∗ own_context cur_ctx ∗
                (∃ p : gname * gname,
-                  is_sleeplock (fst p) (snd p) (buf_lock (bnode k))
-                    "buffer"%string (lock_tok_excl (fown k))))%I
+                  is_sleeplock_genl (fst p) (snd p) (buf_lock (bnode k))
+                    "buffer"%string
+                    (bslp_raw (fown k) (fregp k))
+                    sl_untracked))%I
       as "Hstep".
-    { iApply big_sepL_intro. iIntros "!>" (idx k _) "Hrun [Hf Ht]".
-      iMod (sl_fresh_new E (buf_lock (bnode k)) "buffer"%string
-              (lock_tok_excl (fown k)) with "Hf Hrun Ht") as "[Hrun Hlk]".
-      iDestruct "Hlk" as (γl γsl) "Hlk".
+    { iApply big_sepL_intro. iIntros "!>" (idx k Hk) "Hrun [[Hf Ht] Hrp]".
+      iMod (sl_fresh_new_genl E (buf_lock (bnode k)) "buffer"%string
+              (bslp_raw (fown k) (fregp k))
+              (fun _ => sl_untracked) with "Hf Hrun [Ht Hrp]") as "[Hrun Hlk]".
+      { rewrite /bslp_raw. iFrame "Ht". iExists (L2Reg 0 None). iFrame "Hrp".
+        iSplitR; [done|]. simpl. iApply TsoCtx.ctx_floor_0. }
+      iDestruct "Hlk" as (γl γsl) "[Hlk _]".
       iModIntro. iFrame "Hrun". iExists (γl, γsl). iExact "Hlk". }
     iMod (big_sepL_fupd_thread E (own_context cur_ctx)
             with "Hrun Hstep Hsl") as "[Hrun Hsl]".
     iAssert ([∗ list] k ∈ seq 0 NBUF, |={E}=> ∃ p : gname * gname,
-               is_sleeplock (fst p) (snd p) (buf_lock (bnode k))
-                 "buffer"%string (lock_tok_excl (fown k)))%I
+               is_sleeplock_genl (fst p) (snd p) (buf_lock (bnode k))
+                 "buffer"%string
+                 (bslp_raw (fown k) (fregp k))
+                 sl_untracked)%I
       with "[Hsl]" as "Hsl".
     { iApply (big_sepL_mono with "Hsl"). intros i k Hk.
       iIntros "H". by iModIntro. }
     iMod (seq_fun_alloc E
-            (fun k p => is_sleeplock (fst p) (snd p) (buf_lock (bnode k))
-                          "buffer"%string (lock_tok_excl (fown k)))
+            (fun k p => is_sleeplock_genl (fst p) (snd p) (buf_lock (bnode k))
+                          "buffer"%string
+                          (bslp_raw (fown k) (fregp k))
+                          sl_untracked)
             NBUF 0 with "Hsl") as (fslk) "#Hsls".
-    set (bn := MkBioNames γlk γb fslk fown fmid).
-    (* every initial payload is empty: blockno 0 is uncovered *)
+    (* the anchor / pile gname families are DEAD in box v2: any gname does *)
+    set (bn := MkBioNames γlk γb fslk fown fmid fown fstm fregp fregd fown fregc).
     assert (Hpay0 : forall k bs,
-        buf_pay bn V k false (mword_of_int 0 : mword 32)
+        buf_pay (XI := cur_ctx) bn V k false (mword_of_int 0 : mword 32)
           (mword_of_int 0 : mword 32) bs = emp%I).
     { intros k bs. rewrite /buf_pay. case_decide as Hd; [|reflexivity].
       exfalso. apply Hnc0. rewrite -Hu0. exact Hd. }
-    (* park every buffer's content in a fresh escrow, keeping the bcache half
-       of dev/blockno and the refcnt cell for [bcache_res] *)
-    iDestruct (big_sepL_sep_2 with "Hbufs Hmids") as "Hbm".
-    iAssert (([∗ list] k ∈ seq 0 NBUF, buf_parked (XI := XI) bn V k) ∗
-             ([∗ list] k ∈ seq 0 NBUF,
-                bio_slot_res bn ∅ k (mword_of_int 0 : mword 32)
-                  (mword_of_int 0 : mword 32)))%I
-      with "[Hbm]" as "[Hesc Hslots]".
-    { rewrite -big_sepL_sep. iApply (big_sepL_mono with "Hbm").
-      intros i k Hk. iIntros "[(Hv & Hdk & Hdev & Hbno & Hrc & Hdata) Hmid]".
-      (* the split every buffer's dev/blockno cell undergoes exactly once:
-         one half into the escrow's parked bundle, one half into the bcache
-         resource, forever. *)
+    (* every buffer: the content is DEPOSITED into its box (IN at the boot
+       stamp); the slot keeps the bcache half of dev/blockno and the count *)
+    iEval (rewrite big_sepL_sep) in "Hregc".
+    iDestruct "Hregc" as "[Hregc1 Hregc2]".
+    iDestruct (big_sepL_sep_2 with "Hstm2 Hregp2") as "Hap".
+    iDestruct (big_sepL_sep_2 with "Hap Hregd") as "Hap".
+    iDestruct (big_sepL_sep_2 with "Hap Hregc1") as "Hap".
+    iDestruct (big_sepL_sep_2 with "Hregc2 Hbufs") as "Hslr".
+    iDestruct (big_sepL_sep_2 with "Hap Hslr") as "Hall".
+    iAssert ([∗ list] i↦k ∈ seq 0 NBUF,
+               own_context cur_ctx -∗ emp ={E}=∗
+               own_context cur_ctx ∗
+               (buf_box bn V k ∗
+                ∃ Td : nat, llb loglen_name Td ∗
+                  (reg_drop bn k (SlotReg Td false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None) ∗
+                   (brefcnt k ↦₄ (mword_of_int 0 : mword 32) ∗
+                    reg_cnt bn k 0 ∗
+                    b_dev (bpa k) ↦₄{DfracOwn (1/2)} (mword_of_int 0 : mword 32) ∗
+                    b_blockno (bpa k) ↦₄{DfracOwn (1/2)} (mword_of_int 0 : mword 32)))))%I
+      with "[Hall]" as "Hstep2".
+    { iApply (big_sepL_impl with "Hall").
+      iIntros "!>" (i k Hk).
+      iIntros "[(((Hst & Hrp) & Hrd) & Hc) [Hc2 (Hv & Hdk & Hdev & Hbno & Hrc & Hdata)]] Hrun _".
       iDestruct (ctx_word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
       iDestruct (ctx_word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
-      iDestruct "Hdata" as (bs) "[%Hlen Hdata]".
-      iSplitR "Hrc Hdev2 Hbno2".
-      - rewrite /buf_parked.
-        iExists false, (mword_of_int 0 : mword 32),
-                (mword_of_int 0 : mword 32), bs.
-        rewrite Hpay0. cbv iota.
-        iFrame "Hv Hdev1 Hmid". rewrite /buf_own.
-        iFrame "Hbno1 Hdk Hdata". done.
-      - rewrite /bio_slot_res lookup_empty. iFrame "Hrc Hdev2 Hbno2". }
-    iMod (escrow_alloc_seq bn V E NBUF 0 with "Hrun Hesc") as "[Hrun #Hescs]".
-    (* the initial pool covers the whole range: the zeroed slots claim only
-       the uncovered 0 *)
+      iMod (buf_box_alloc E bn V k with "Hrun Hst Hc Hrp [Hrd] Hv Hdev1 Hbno1 Hdk [Hdata]")
+        as "(Hrun & #Hbx & Hreg)".
+      { iExists _. iExact "Hrd". }
+      { iDestruct "Hdata" as (bs) "[%Hlen Hdata]". iExists bs. iFrame "Hdata".
+        iSplitR; [done|]. rewrite Hpay0. done. }
+      iModIntro. iFrame "Hrun". iSplitR; [iExact "Hbx"|].
+      iDestruct "Hreg" as (Td) "[Hrd0 #Hllb]". iExists Td. iFrame "Hllb Hrd0".
+      iFrame "Hrc Hc2 Hdev2 Hbno2". }
+    iAssert ([∗ list] i↦k ∈ seq 0 NBUF, emp)%I as "Hemp".
+    { rewrite big_sepL_emp. iEmpIntro. }
+    iMod (big_sepL_fupd_thread E (own_context cur_ctx) (fun _ _ => emp%I)
+            with "Hrun Hstep2 Hemp") as "[Hrun Hboth]".
+    iEval (rewrite big_sepL_sep) in "Hboth".
+    iDestruct "Hboth" as "[#Hboxs Hslots0]".
+    iDestruct (big_sepL_llb_max (seq 0 NBUF)
+                 (fun k Td => reg_drop bn k (SlotReg Td false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None) ∗
+                              (brefcnt k ↦₄ (mword_of_int 0 : mword 32) ∗
+                               reg_cnt bn k 0 ∗
+                               b_dev (bpa k) ↦₄{DfracOwn (1/2)} (mword_of_int 0 : mword 32) ∗
+                               b_blockno (bpa k) ↦₄{DfracOwn (1/2)} (mword_of_int 0 : mword 32)))%I
+                 with "Hslots0") as (tl) "[#Hllbtl Hslots0]".
+    iAssert ([∗ list] k ∈ seq 0 NBUF,
+               bio_slot_res2 bn V ∅ k (mword_of_int 0 : mword 32)
+                 (mword_of_int 0 : mword 32) tl cur_ctx)%I
+      with "[Hslots0]" as "Hslots".
+    { iApply (big_sepL_mono with "Hslots0"). intros i k _.
+      iIntros "(%Td & %Hb & #Hl & Hrd & Hslot)".
+      rewrite /bio_slot_res2 lookup_empty.
+      iSplitL "Hrd".
+      { iExists (SlotReg Td false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None).
+        iFrame "Hrd Hl". iPureIntro. cbn. split_and!; [done | done | done | exact Hb]. }
+      iExact "Hslot". }
     iAssert (bio_pool V (fun _ => (mword_of_int 0 : mword 32)))
       with "[Hpool]" as "Hpool".
     { rewrite /bio_pool.
@@ -1525,16 +1780,17 @@ Section BioInit.
           apply bcache_cached_spec in Hc as (j & Hj & ->).
           apply Hnc0. rewrite -Hu0. exact Hb. }
       rewrite Hc0. iExact "Hpool". }
-    (* and seal the bcache lock over the assembled resource *)
-    (* [newlock_delayed]'s continuation is now lambda-payloaded and asks for
-       the payload's [CtxMorph] -- discharged by the const embedding's own
-       instance ([TsoCtx.ctx_morph_const_pay]). *)
-    iMod ("Hmk" $! (<{ bcache_res bn V }>) with "[%] Hrun [Hauth Hsa Hslots Hlru Hpool]")
-      as "[Hrun #Hlock]"; [ apply ctx_morph_const_pay | | ].
-    { rewrite /bcache_res /bcache_scan.
-      iExists ∅, (rev (seq 0 NBUF)),
-        (fun _ => (mword_of_int 0 : mword 32)),
-        (fun _ => (mword_of_int 0 : mword 32)).
+    (* L1, minted WITH the fold at the boot floor slot *)
+    iMod ("Hmk" $! (fun ξ => bcache_res2 bn V ξ)
+            (fun ξ => llb loglen_name tl ∗
+                      bcache_scan2 bn V ∅ (rev (seq 0 NBUF))
+                        (fun _ => (mword_of_int 0 : mword 32))
+                        (fun _ => (mword_of_int 0 : mword 32)) tl ξ)%I tl
+            with "[%] [%] Hllbtl Hrun [Hauth Hsa Hslots Hlru Hpool]")
+      as "[Hrun #Hlock]".
+    { apply _. }
+    { apply bcache_res2_fold_in. }
+    { iFrame "Hllbtl". rewrite /bcache_scan2.
       iFrame "Hauth Hsa".
       iSplitR.
       { iPureIntro. intros k [x Hx]. rewrite lookup_empty in Hx. done. }
@@ -1549,19 +1805,14 @@ Section BioInit.
       assert (Hml : map bnode (rev (seq 0 NBUF)) = blist 0 NBUF)
         by (rewrite /blist map_rev //).
       rewrite Hml. iFrame "Hlru Hslots Hpool". }
-    (* Split STRUCTURALLY before framing.  A bare [iFrame "H"] against this
-       goal has to search [bio_ctx]'s big-op (NBUF sleeplocks + escrows) for
-       each named hypothesis: the two frames here were 25 s of the file's
-       46 s (measured 2026-08-03).  [iSplitR]/[iExact] name both sides, so
-       nothing is searched. *)
-    iModIntro. iSplitL "Hrun"; [iExact "Hrun" |].
-    iExists bn. rewrite /bio_ctx.
+    iModIntro. iSplitL "Hrun"; [iExact "Hrun" |]. iExists bn. rewrite /bio_ctx.
     iSplitR "Hsf"; [| iExact "Hsf"].
     iSplitL "Hlock"; [iExact "Hlock" |].
-    rewrite big_sepL_sep. iSplitL "Hsls"; [iExact "Hsls" | iExact "Hescs"].
+    rewrite big_sepL_sep. iSplitL "Hsls"; [iExact "Hsls" | iExact "Hboxs"].
   Qed.
 
-End BioInit.
+  End BioBoot2.
+End BioBox.
 
 (* A BIG-OP UNDER A TRANSPARENT NAME IS AN [iFrame] BOMB (optimization.md).
    This is [is_lock] plus a [big_sepL] over NBUF, and it is a conjunct of
@@ -1570,6 +1821,6 @@ End BioInit.
    2026-08-27 by sealing it and nothing else: [ProofWritei] 84.3 s ->
    75.0 s.  ([disk_res], sealed the same way, is worth only 1.0 s there --
    size of the body is not what predicts this, being a big-op is.) *)
-(* AT THE END OF THE FILE: this file's own lemmas take [bio_ctx] apart
-   ([iAndDestructChoice] at :1014), and they are the accessors every consumer
-   should use instead of unfolding it. *)
+Global Typeclasses Opaque bio_ctx.
+(* AT THE END OF THE FILE: this file's own lemmas take [bio_ctx] apart, and
+   they are the accessors every consumer should use instead of unfolding it. *)

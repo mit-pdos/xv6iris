@@ -43,6 +43,31 @@ Section SleepLockAt.
   (* A6.68: the honest creator deposit (A6.66) takes the running token and
      hands it straight back -- [WpLockAt.newlock_at]'s price, threaded down
      this file's three wrappers. *)
+  (* ENDGAME R1-pre: the bound-indexed base builder -- the client payload
+     at bound 0 seals the free arm under the free floor. *)
+  Lemma new_sleeplock_genl_at2 `{XI : CurCtx} `{CID : RiscvLang.CpuId}
+      E (p : gname * gname) (slk : mword 64)
+      (s : string) (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} (H : Qp -> iProp Σ) :
+    sl_free_pair p -∗
+    lock_name (sl_lk slk) "sleep lock"%string -∗
+    sl_name slk s -∗
+    sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    WpLock.lk_cpu_ready (sl_lk slk) -∗
+    slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    own_context cur_ctx -∗
+    R cur_ctx ={E}=∗ own_context cur_ctx ∗ is_sleeplock_genl p.1 p.2 slk s R H.
+  Proof.
+    iIntros "[Hlfree Hfree] #Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
+    iDestruct (sl_free_hold_intro with "Hfree Hpid") as (q0) "[Htok Hha]".
+    iMod (newlock_at E p.1 (sl_lk slk) "sleep lock"%string (sl_pay p.2 slk R H)
+            with "Hlfree Hlnm Hrun Hlkw Hcpu [Hw Htok Hha HR]") as "[Hrun #Hlk]".
+    { iApply (sl_pay_of_res p.2 slk R H).
+      iApply (sl_res_close_free with "Hw Htok Hha HR"). }
+    iModIntro. iFrame "Hrun".
+    iApply (is_sleeplock_genl_intro with "Hsnm Hlk").
+  Qed.
+
   Lemma new_sleeplock_gen_at2 `{XI : CurCtx} `{CID : RiscvLang.CpuId}
       E (p : gname * gname) (slk : mword 64)
       (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) :
@@ -56,13 +81,20 @@ Section SleepLockAt.
     own_context cur_ctx -∗
     R ={E}=∗ own_context cur_ctx ∗ is_sleeplock_gen p.1 p.2 slk s R H.
   Proof.
-    iIntros "[Hlfree Hfree] #Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
-    iDestruct (sl_free_hold_intro with "Hfree Hpid") as (q0) "[Htok Hha]".
-    iMod (newlock_at E p.1 (sl_lk slk) "sleep lock"%string <{ sl_res_gen p.2 slk R H }>
-            with "Hlfree Hlnm Hrun Hlkw Hcpu [Hw Htok Hha HR]") as "[Hrun #Hlk]".
-    { iApply (sl_res_close_free with "Hw Htok Hha HR"). }
-    iModIntro. iFrame "Hrun".
-    iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
+    iIntros "Hp #Hlnm #Hsnm Hlkw Hcpu Hw Hpid Hrun HR".
+    iApply (new_sleeplock_genl_at2 E p slk s (fun _ => R) H
+              with "Hp Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
+  Qed.
+
+  Lemma sl_fresh_new_genl_at2 `{XI : CurCtx} `{CID : RiscvLang.CpuId}
+      E (p : gname * gname) (slk : mword 64)
+      (s : string) (R : TsoCtx.CtxId -> iProp Σ) `{HmR : !TsoCtx.CtxMorph R} (H : Qp -> iProp Σ) :
+    sl_free_pair p -∗ sl_fresh slk s -∗ own_context cur_ctx -∗ R cur_ctx ={E}=∗
+    own_context cur_ctx ∗ is_sleeplock_genl p.1 p.2 slk s R H.
+  Proof.
+    iIntros "Hp (Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) Hrun HR".
+    iApply (new_sleeplock_genl_at2 E p slk s R H
+              with "Hp Hlnm Hsnm Hlkw Hcpu Hw Hpid Hrun HR").
   Qed.
 
   (* the two forms an array initializer uses: initsleeplock's packaged output

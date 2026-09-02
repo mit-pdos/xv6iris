@@ -81,7 +81,7 @@ From Kernel Require KernelSyms.
 Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
+Require Import ProcDefs.  (* [ustate], [proc_priv_bare] *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 
@@ -330,8 +330,14 @@ Section ProofBwrite.
                  with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CID8 eb pj ltac:(rewrite Hbm; wp_next_chain)
                  with "Hextm") as "Hextm".
-    iApply (HSL.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb b _ Upr HKhsl Hbelow
+    (* ENDGAME R1-pre: the buffer sleeplock is the λ instance at [bslp];
+       holdingsleep's genl tier takes the token at its share. *)
+    (* F7: the handle's token row also carries the chain's count fragment
+       and the register half naming the parked unit; they ride along *)
+    iDestruct "Hstok" as "(Hstok & Hbr0 & Hhold)".
+    iDestruct "Hstok" as (qsl) "Hstok".
+    iApply (HSL.wp_holdingsleep_genl_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
+              "buffer"%string (bslp bn k) SleepLock.sl_untracked qsl mA pj pidv (K - 4)%nat eb b _ Upr HKhsl Hbelow
               with "Hcg Hcnt Htext Hpc [] [Hstok] Hppid").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }
@@ -339,6 +345,10 @@ Section ProofBwrite.
     iIntros (CID9 Hs9 mH) "%Hhs Hcg Hcnt Hpc Hstok Hppid".
     destruct Hhs as [Hcs1 Hha0].
     iEval (rewrite HmAa0) in "Hstok".
+    iAssert (SleepLock.sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv) with "[Hstok]" as "Hstok".
+    { iExists qsl. iExact "Hstok". }
+    iAssert (bstok bn k pidv dev bno) with "[Hstok Hbr0 Hhold]" as "Hstok".
+    { rewrite /bstok. iFrame "Hstok Hbr0 Hhold". }
     assert (Hpc12 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.bwrite + 0x12)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc12) in "Hpc".

@@ -6,4 +6,4 @@
 Require Import LinkAcquire LinkRelease LinkAcquiresleep LinkVirtioDiskRw LinkPanic
                 ProofBread.
 
-Module Bread := BreadProof Acquire Release Acquiresleep VirtioDiskRw Panic.
+Module Bread := BreadProof Acquire Release ReleaseIn Acquiresleep VirtioDiskRw Panic.

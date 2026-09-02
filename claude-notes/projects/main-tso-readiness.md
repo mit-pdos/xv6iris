@@ -1195,3 +1195,73 @@ The fork child's own context and the deposits that go with it (6.3 / §0.27′ �
 `ProofForkretPark`'s frontier on r53); `cpu_ctx_free`'s parked record (6.5);
 the U-tier page-table tree (main's `PtTree` is not context-indexed: when the
 physical tier gets its context axis, `PtTreeMove.v` is the file to take).
+
+# AMENDMENT 11 (2026-09-02, on `tso-cutover`) — THE BCACHE SET OVER CtxBox: tso-flip's R1-pre/R1'/R2 bread/brelse proofs landed
+
+Executes the owner's ask ("tso-flip has proven the bcache (bread, brelse);
+merge over the proofs from tso-flip for that category; it's based around
+CtxBox").  Source snapshot: `origin/tso-flip` `4bc0c0e4d` (the bcache
+commits `8b796b843` A6.153 R1-pre, `326e9e629` A6.156 R2, `c6f0a77f0`/
+`cb3699cd9` R1' CtxBox, `a36de2856` "the whole bcache set green over
+CtxBox").  Rule: [[tso-port-copy-tso-flip-no-inventions]] -- flip's text,
+with main's measured departures re-applied on top.  Gate: full `make -k` on `tso-cutover` after the merge of main -- every
+buildable file green (the two reds are the pre-existing `IcacheRef` shim
+tombstone and `RiscvAdequacy`'s boot-arm ghost record; `ProofBread` and
+`ProofBrelse` LEAVE the red list), 434 files still pending behind `IcacheRef`
+(the FS/syscall cone).
+
+## 11.1 What landed (flip's files, taken WHOLE unless noted)
+
+| flip item | on tso-cutover |
+|---|---|
+| `CtxBox.v` (new) | verbatim; `_CoqProject` after `TsoCtxPark.v` (flip has `CtxAnchor.v` between; not ported). |
+| `BioBox.v` (new) | verbatim; `_CoqProject` after `BioInv.v`. |
+| `Xv6Cameras.v` | flip's §15 (box registers `slot_reg`/`l2_reg`, `stampsR`, `boxG`, `bio_id`/`bio_x`, `bioboxG`/`bioboxΣ`, `biobox_boxG`), `presR`/`btagR`/`anchorR` cameras, `bioUR` at `optionUR fracR`; 3-way merged -- main's virtio pop cameras, icache escrow arms and `iliveUR` (`leibnizO gname`, NOT flip's `gname * nat`) kept. |
+| `Xv6G.v` | `xv6_biobox :: bioboxG Σ`, `bioboxΣ` in the bundle (beside main's `flivG`). |
+| `SleepLock.v` | whole: `sl_body`/`sl_pay` (the inner spinlock's payload as a context-λ with the floor slot), `is_sleeplock_genl`, `new_sleeplock_genl`, `sl_body_fold`. |
+| `SleepLockAt.v` | 3-way (all flip): `new_sleeplock_genl_at2`, `sl_fresh_new_genl_at2`. |
+| `SpecAcquire`/`ProofAcquire`/`WpSconfLock` | 3-way (all flip): A6.149 -- `wp_acquire_llb_pre_body`, the `gen_llb`/`llb` tiers, the drained-point receipt `(∃ K, ⌜Tl ≤ K⌝ ∗ ctx_floor cur_ctx K)` (the PLAIN tier's post is unchanged: 47 callers untouched). |
+| `SpecAcquiresleep`/`ProofAcquiresleep`, `SpecHoldingsleep`/`ProofHoldingsleep`, `SpecReleasesleep`/`ProofReleasesleep`, `LinkReleasesleep` | 3-way (all flip): the `genl`/`genl_llb`/`genin` tiers; `RELEASE_IN` functor arg on the releasesleep proof. |
+| `WpLock.v`, `WpLockAt.v` | 3-way; PLUS `newlock_delayed_llb` / `newlock_at_llb` (see 11.2). |
+| `WpAu4.v` | 3-way (flip's additions, no conflict). |
+| `BioDefs`, `BcacheInv`, `Spec{Bread,Brelse,Bwrite,Bpin,Bunpin,Binit}`, `ProofBinit`, `LinkBread`, `LinkBrelse` | 3-way, no conflicts. |
+| `BioInv.v` (v6), `BioInitAt.v`, `BreadLru.v`, `ProofBreadParts.v`, `ProofBread.v`, `ProofBrelse.v`, `ProofBpin.v`, `ProofBunpin.v`, `ProofBwrite.v` | WHOLE from flip (the 3-way kept cutover's deleted v1 sections beside flip's v6 -- a deletion the merge cannot see). |
+| `ProofLogWrite.v`, `ProofWriteHead.v` | cutover's text; only the bcache rows moved: `bref` gains `Hfr` (`bref_ghost`), `wh_hold` carries `bstok bn k pidv dev bno` in place of the bare `sleeplocked` row (flip's HEAD has NOT yet adapted these consumers -- "full-tree round next"). |
+
+## 11.2 Departures from flip's text, complete
+
+- **`Vpr : pprivate` → `Upr : ustate`** (main's `f88d3bfd4`, "proc_priv speaks
+  ustate") in every ported file (`sed` on the whole-word names).
+- **`Global Typeclasses Opaque bio_ctx`** re-appended to `BioInv.v` (main's
+  `0f4c2afc9` seal; flip is unsealed).
+- **`WpLock.newlock_delayed_llb` and `WpLockAt.newlock_at_llb` are
+  RECONSTRUCTED**: `BioInv.v`'s boot and `BioInitAt.v` on flip call them,
+  but no commit on `origin/tso-flip` defines them (they were in flip's
+  unpushed workspace; `git log -S` finds only the callers, `cb3699cd9`).
+  Written as the llb-fold twins of `newlock_delayed`/`newlock_at`: same
+  statement with `(R Rd : CtxId → iProp) (tl)`, `CtxMorph Rd`, the fold
+  `∀ ξ, Rd ξ ∗ ctx_floor ξ tl ⊢ R ξ`, `llb loglen_name tl` and `Rd cur_ctx`
+  in, `is_lock γ lk s R` out; same proof with `lock_pay_intro_llb` in place
+  of `lock_pay_intro`.  Replace with flip's text when it is pushed.
+- `lock_frag_at_exclusive` (flip's addition) already existed on cutover:
+  the duplicate was dropped.
+- `ProofInstallTrans`/`ProofEndOp`: NOT merged (their flip deltas are the
+  `Psi` log parameter main removed); they are in the blind FS cone anyway.
+
+## 11.3 Measured
+
+- Tier order that worked: cameras + CtxBox + lock lane first (green on the
+  first build after taking `SleepLock.v` whole), then the bcache layer
+  (three rounds: the missing llb builders, the duplicate lemma, the stale v1
+  sections), then the consumers.
+- The 3-way merge (base = `merge-base main tso-flip` = `e1292b382`) is the
+  right tool for files where flip only ADDED; it is the wrong tool where flip
+  DELETED whole sections (`BioInv`): take the file.
+
+## 11.4 Deferred
+
+- flip's icache lane (`IcacheRef`/`IcacheInv`/`IcacheEscrow`/`IcacheBoot`,
+  R3 in the endgame doc) -- untouched; `IcacheRef` stays at its shim red.
+- flip's `CtxAnchor.v` (the anchor ledger; `anchorR` camera landed with §15).
+- The blind FS-cone consumers of the sleeplock `genl` tiers keep the
+  const-tier calls (still provided).

@@ -2575,7 +2575,7 @@ Section ProofLogWrite.
         iMod (fs_dirty_flip γfs D (uint bno) false false true with "HDauth HpD Hcovb")
           as "((%Hdd & %HDlk) & HDauth & HpD & Hcovb)".
         iDestruct "Href" as (q dv bv) "Href".
-        rewrite /bref. iDestruct "Href" as "(Hrt & Hrdev & Hrbno)".
+        rewrite /bref. iDestruct "Href" as "(Hrt & Hfr & Hrdev & Hrbno)".
         iDestruct (ctx_word4_pointsto_agree with "Hdevh Hrdev") as %Hdveq.
         iDestruct (ctx_word4_pointsto_agree with "Hbnoc Hrbno") as %Hbveq.
         subst dv bv.
@@ -2587,7 +2587,7 @@ Section ProofLogWrite.
         assert (HbdT : bool_decide (uint bno ∈ map uint (W ++ [bno])) = true)
           by (apply bool_decide_eq_true_2; apply lw_mem_snoc).
         iModIntro.
-        iSplitR "HpL HpD Hrt Hrdev Hrbno Hslk Hvalid Hdevh Hbnoc Hbdisk Hbytes
+        iSplitR "HpL HpD Hrt Hfr Hrdev Hrbno Hslk Hvalid Hdevh Hbnoc Hbdisk Hbytes
                  Hdisk HPhifsb Hop Hslot".
         + rewrite /log_res.
           iExists out, false, nc, om', Ep, (Xr ∪ {[(Ep, uint bno)]}), Tx.
@@ -2681,8 +2681,8 @@ Section ProofLogWrite.
             iSplitL "Hbdisk"; [iExact "Hbdisk"|].
             iSplitR; [iPureIntro; exact Hlenbs|]. iExact "Hbytes". }
           iSplitL "Hdisk"; [iExact "Hdisk"|].
-          iApply (lw_pay_mk with "HpL HpD [Hrt Hrdev Hrbno]").
-          iExists q. rewrite /bref. iFrame "Hrt Hrdev Hrbno". }
+          iApply (lw_pay_mk with "HpL HpD [Hrt Hfr Hrdev Hrbno]").
+          iExists q. rewrite /bref. iFrame "Hrt Hfr Hrdev Hrbno". }
     (* ===== +0x34 blez a2 : the n == 0 entry goes straight to the store ===== *)
     assert (Hpp34 : add_vec_int (mword_of_int (KernelSyms.log_write + 0x32) : mword 64) 2
                     = mword_of_int (KernelSyms.log_write + 0x34))

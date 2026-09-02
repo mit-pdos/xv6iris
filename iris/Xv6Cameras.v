@@ -99,11 +99,14 @@ Local Open Scope Z_scope.
    and the fragment cannot be forged. *)
 Definition lock_state : Type := option (CPU * bool).
 
-(* A6.119 (tso-flip Xv6Cameras.v:109): the lock's ghost carries, beside the
-   state, the POSITION the invariant minted at the winning AMO -- what the
-   holder token's floor is at ([WpLock.locked]).  Both halves hide it
-   existentially at the [lock_auth]/[lock_frag] level; the [_at] forms in
-   WpLock expose it to the two places that need it. *)
+(* >>> A6.119 (1'): THE LOCK'S GHOST CARRIES A SECOND, AGREED COMPONENT --
+   the ACQUIRE POSITION, which the holder and the invariant must agree on so
+   that the word's value-set pin can be read (§0.35'(iv) case 2).  A PRODUCT
+   rather than a wider [lock_state]: the position is a fact two parties agree
+   on, not a component every consumer of the state must see, and this way no
+   arity moves and every existing ghost step keeps its shape.  Both halves
+   hide it existentially at the [lock_auth] / [lock_frag] level; the [_at]
+   forms below expose it to the two places that need it. <<< *)
 Definition lockUR : ucmra :=
   prodUR (excl_authUR (leibnizO lock_state)) (excl_authUR (leibnizO nat)).
 
@@ -156,7 +159,10 @@ Proof. solve_inG. Qed.
 (* The reference-count authority and the finite slot supply used to bound
    every buffer reference count.  These functors and names are shared with
    the log layer because [log_state] stores the unused slot fragments. *)
-Definition bioUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
+(* ENDGAME A6.155: the share is [option frac] -- [None] for the buffer
+   cache's chain reference (no fraction), [Some q] for a fractioned one;
+   the positive counts both.  See [BioInv.btok]. *)
+Definition bioUR : ucmra := authUR (gmapUR nat (prodR (optionUR fracR) positiveR)).
 Definition bioslotUR : ucmra := authUR natUR.
 
 Class bioG (Σ : gFunctors) := BioG {
@@ -590,6 +596,11 @@ Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    an agreed GENERATION gname.  Two slices of one slot AGREE on the
    generation ([IcacheRef.live_gen_agree]), which is the mechanism the
    whole §17' design runs on. *)
+(* A6.145: the generation agree carries the generation's gname AND its
+   EPOCH FLOOR (the arm store's log position, the word-set pin's [pw_lo]).
+   Two slices of one slot agreeing on the pair is what hands a racy
+   [ip->ref] reader the CURRENT epoch's floor with no extra ghost: a
+   stale (g, lo) is unownable exactly as a stale g was. *)
 Definition iliveUR : ucmra :=
   gmapUR nat (prodR fracR (agreeR (leibnizO gname))).
 
@@ -719,6 +730,11 @@ Definition hpnUR : ucmra :=
    entry's escrow arm is holding for the thread inside.  The fraction is a
    FIELD because an existentially-quantified one in the arm cannot be
    pinned by any resource. *)
+(* A6.145: the checked-out descriptors record the generation's ARM POINT
+   [lo] beside its gname -- the pair the liveness camera agrees on.  The
+   escrow arm's slice then sits at [live_genlo _ _ g lo] (floor-free, so
+   the plain-invariant discipline holds) and the racy guard read's
+   credential ties through the deposit: the holder's floor is at >= lo. *)
 Inductive ic_dep : Type :=
   | DepNone
   (* THERE IS NO BUNDLELESS LOCK DESCRIPTOR (durable-disk B''-tx3/-tx4), and
@@ -909,3 +925,116 @@ Class uioG (Σ : gFunctors) := {
 Definition uioΣ : gFunctors := #[ ghost_varΣ (list (bv 8)); ghost_varΣ Z ].
 Global Instance subG_uioΣ {Σ} : subG uioΣ Σ -> uioG Σ.
 Proof. solve_inG. Qed.
+
+(* ===================================================================== *)
+(*  15.  THE BUFFER-CACHE TRANSIT BOX  (theory: BioInv.v, CtxAnchor.v)   *)
+(* ===================================================================== *)
+
+(* ENDGAME §3.2 (claude-notes/design/tso-escrow-endgame.md): the box's
+   cameras.  [presR]: the presence authority -- [● None] in the IDLE arm,
+   [● Some ((n_b, T_b), c)] at refs >= 1, every reference carrying
+   [◯ Some (_, 1)] beside its [bref_tok].  [btagR]: the park-tag multiset,
+   [● S] in the box and one claim [◯ {[+ n_P +]}] per un-decremented
+   parker.  [anchorR]: the context anchor's append-only generation ledger
+   ([auth] of a [gmap nat (agree nat)]; fragments are core-id, hence
+   persistent).  The two pair registers ([reg_park]/[reg_drop]) are
+   [ghost_var]s over [nat * nat]; the count-sync register is a
+   [ghost_var nat], already a member through [kallocG].  ONE bundle so the
+   ~100 files stating [bio_ctx]/[bio_init] keep [!xv6G Σ] as their only
+   binder (the rule at the head of this file). *)
+Definition presPair : ofe := prodO natO natO.
+Definition presR : cmra :=
+  authR (optionUR (prodR (agreeR presPair) positiveR)).
+Class presG (Σ : gFunctors) := PresG { pres_inG :: inG Σ presR }.
+Definition presΣ : gFunctors := #[GFunctor presR].
+Global Instance subG_presG {Σ} : subG presΣ Σ -> presG Σ.
+Proof. solve_inG. Qed.
+
+Definition btagR : cmra := authR (gmultisetUR natO).
+Class btagG (Σ : gFunctors) := BtagG { btag_inG :: inG Σ btagR }.
+Definition btagΣ : gFunctors := #[GFunctor btagR].
+Global Instance subG_btagG {Σ} : subG btagΣ Σ -> btagG Σ.
+Proof. solve_inG. Qed.
+
+Definition anchorR : cmra := authR (gmapUR nat (agreeR natO)).
+Class anchorG (Σ : gFunctors) := AnchorG { anchor_inG :: inG Σ anchorR }.
+Definition anchorΣ : gFunctors := #[GFunctor anchorR].
+Global Instance subG_anchorG {Σ} : subG anchorΣ Σ -> anchorG Σ.
+Proof. solve_inG. Qed.
+
+(* BOX v2 (endgame §2/§3, F6/F7 as vetted 2026-09-01): THE GENERIC TRANSIT
+   BOX is iris/CtxBox.v; its register value types, stamps camera, class and
+   names record live HERE so CtxBox.v can import this file (the rule at the
+   head: one bundle).  bcache instantiates it at identity dev × blockno and
+   witness type = the data bytes.  The presence / tag / anchor cameras above
+   are dead (kept until §6 cleanup). *)
+
+(* ---- the registers' value types (CtxBox.v) ---- *)
+Record slot_reg (id X : Type) := SlotReg {
+  sr_td    : nat;      (* the stamp L1's payload floor row covers *)
+  sr_win   : bool;     (* the L1 out-window is open *)
+  sr_ident : id;       (* the box's current identity *)
+  sr_x     : option X; (* F10: the witness the open window's P_rest is at *)
+}.
+Arguments SlotReg {id X} _ _ _ _.
+Arguments sr_td {id X} _.
+Arguments sr_win {id X} _.
+Arguments sr_ident {id X} _.
+Arguments sr_x {id X} _.
+
+Record l2_reg (id : Type) `{Countable id} := L2Reg {
+  lr_tp   : nat;                                 (* the stamp L2's floor row covers *)
+  lr_hold : option (id * gmap (id * nat) ufrac); (* the fragment parked in OUT_L2 *)
+}.
+Arguments L2Reg {id _ _} _ _.
+Arguments lr_tp {id _ _} _.
+Arguments lr_hold {id _ _} _.
+
+(* the registers sit under the box's later: destructing their ∃ needs an
+   inhabitant (bcache: dev × blockno; icache: dev × inum) *)
+Global Instance slot_reg_inhabited (id X : Type) `{Inhabited id} : Inhabited (slot_reg id X) :=
+  populate (SlotReg 0 false inhabitant None).
+Global Instance l2_reg_inhabited (id : Type) `{Countable id} : Inhabited (l2_reg id) :=
+  populate (L2Reg 0 None).
+
+(* ---- the box's cameras, generic in the identity ---- *)
+Definition stampsR (id : Type) `{Countable id} : cmra :=
+  authR (gmapUR (id * nat) ufracR).
+Class boxG (id : Type) `{Countable id} (X : Type) (Σ : gFunctors) := BoxG {
+  box_stampsG :: inG Σ (stampsR id);
+  box_cntG    :: ghost_varG Σ nat;
+  box_slotdG  :: ghost_varG Σ (slot_reg id X);
+  box_slotpG  :: ghost_varG Σ (l2_reg id);
+}.
+Record box_names := BoxNames {
+  bx_stamps : gname;
+  bx_cnt    : gname;
+  bx_slotd  : gname;
+  bx_slotp  : gname;
+}.
+
+(* ---- the bcache instance's members: stamps at dev × blockno, the two
+   register ghost_vars (the count's [ghost_varG Σ nat] is a member through
+   [kallocG]) ---- *)
+Notation bio_id := (SailStdpp.Values.mword 32 * SailStdpp.Values.mword 32)%type.
+Notation bio_x := (list (bv 8)).
+(* ONE decidable-equality / countability witness for the identity, at top
+   priority: files that also see Sail's instances for [mword] would
+   otherwise elaborate a different (non-convertible) instance term into
+   [l2_reg bio_id] / the stamps map, and the [boxG] instance would not
+   match ("no type class instance found" at a register definition). *)
+Global Instance bio_id_eq_dec : EqDecision bio_id | 0 := _.
+Global Instance bio_id_countable : Countable bio_id | 0 := _.
+Class bioboxG (Σ : gFunctors) := BioboxG {
+  biobox_stampsG :: inG Σ (stampsR bio_id);
+  biobox_slotdG  :: ghost_varG Σ (slot_reg bio_id bio_x);
+  biobox_slotpG  :: ghost_varG Σ (l2_reg bio_id);
+}.
+Definition bioboxΣ : gFunctors :=
+  #[ GFunctor (stampsR bio_id); ghost_varΣ (slot_reg bio_id bio_x); ghost_varΣ (l2_reg bio_id) ].
+Global Instance subG_bioboxΣ {Σ} : subG bioboxΣ Σ -> bioboxG Σ.
+Proof. solve_inG. Qed.
+(* the generic class, assembled for bcache: the count member is kalloc's *)
+Global Instance biobox_boxG {Σ} `{!bioboxG Σ} `{!kallocG Σ} : boxG bio_id bio_x Σ :=
+  {| box_stampsG := biobox_stampsG; box_cntG := kalloc_count_inG;
+     box_slotdG := biobox_slotdG; box_slotpG := biobox_slotpG |}.

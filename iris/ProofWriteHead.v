@@ -391,7 +391,7 @@ Section WriteHeadDefs.
     (⌜(k < NBUF)%nat⌝ ∗
      ⌜uint bno ∈ bv_cov V⌝ ∗
      ⌜dev = bv_dev V⌝ ∗
-     sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv ∗
+     bstok bn k pidv dev bno ∗
      b_valid (bnode k) ↦₄ (mword_of_int 1 : mword 32) ∗
      b_dev (bnode k) ↦₄{DfracOwn (1/2)} dev ∗
      b_blockno (bnode k) ↦₄{DfracOwn (1/2)} bno ∗

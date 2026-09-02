@@ -3,4 +3,4 @@
    only place the five ever meet. *)
 Require Import LinkHoldingsleep LinkReleasesleep LinkAcquire LinkRelease ProofBrelse.
 
-Module Brelse := BrelseProof Holdingsleep Releasesleep Acquire Release.
+Module Brelse := BrelseProof Holdingsleep Releasesleep Acquire Release ReleaseIn.
