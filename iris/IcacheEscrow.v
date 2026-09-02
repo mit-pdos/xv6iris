@@ -4553,11 +4553,16 @@ Section IcacheTable.
      ([ic_slot_row] below, in the ξ-row). *)
   Definition islot_empty (cn : ic_names) (k : nat) : iProp Σ :=
     (∃ dev inum : mword 32,
-       i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
-       (* A QUARTER since durable-disk C-3b: the pool invariant keeps the
-          other quarter of the table's share, which is what lets it state
-          the partition the commit's collection reads (section 5c). *)
-       ic_id cn k (1/4) false dev inum)%I.
+       (* THE CELLS follow the box (tso-flip M-1'/F17): the table's share of
+          a DEAD slot is the identity halves complementary to the dead
+          header's ([islot_free_at]). *)
+       islot_free_at k dev inum ∗
+       (* THE GHOST follows main (durable-disk C-3b), re-homed by the stitch
+          (endgame plan §6′): the identity IS the register's [sr_ident]
+          (= [ci !! k]), so both halves of the table's side of the
+          identification ghost live HERE, under itable.lock, beside the pool
+          invariant's quarter: 3/4 in the slot, 1/4 in the pool. *)
+       ic_id cn k (3/4) false dev inum)%I.
 
   (* THE COUNT COUPLING's SLOT HALF (iclaim-ledger.md §2.2) rides on the LIVE
      arm, at this slot's own count: [icnt_half (bv_unsigned inum)
@@ -4586,7 +4591,7 @@ Section IcacheTable.
     | Some (q, n), Some (dev, inum) =>
         (islot_rest_at k q dev inum ∗ iref_slots (Pos.to_nat n) ∗
          (* A QUARTER since durable-disk C-3b: see [islot_empty]. *)
-         ic_id cn k (1/4) true dev inum ∗
+         ic_id cn k (3/4) true dev inum ∗
          icnt_half (bv_unsigned inum) (Pos.to_nat n) ∗
          (* THE FREEZE MIRROR's LOCK HALF, AND THE FROZEN PARK
             (iclaim-ledger.md §3.16, RULING A⁗).  Ordinarily the bare
