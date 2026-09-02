@@ -508,7 +508,10 @@ ACCEPTED.  R1' may start on the flag shape.
       field of it (the new-box-ghost tripwire, applied).  No split, no
       half-fragment share, no mass arithmetic at (f).  The handle row:
         bstok bn k pidv dev bno := sleeplocked … pidv ∗ bref_tok0 ∗
-                                   l2_hold γ (dev,bno) mh   (∃ mh)
+                                   ∃ t, l2_hold γ (dev,bno) {[((dev,bno),t) := 1]}
+        (R-1: the handle pins the fragment's keys AND mass — only the
+        stamp is existential; an ∃ over the map would leave (d)'s unit
+        mass undischargeable)
       THE STATEMENTS ARE NOW CODE: iris/CtxBox.v (type-checked skeleton,
       proofs Admitted, case skeleton per lemma) — see §3.5.
       R1' MAY RESUME on CtxBox.v's statements.
@@ -672,6 +675,10 @@ disjunct.
     ref / share := ∃ m, stamps ◯ m ∗ llb loglen_name (max (snd <$> dom m))
                    with ⌜∀ p ∈ dom m, p.1 = id⌝ for the holder's known id
     (= CtxBox.reference γ id m)
+    THE L2 HOLDER'S HANDLE (R-1): pins the parked fragment's KEYS AND
+    MASS — bcache `{[((dev,bno), t) := 1]}`, icache `{[((dev,inum), t)
+    := s]}` — only the stamp t existential; never ∃ over the map (else
+    (d)/SpecIunlock cannot state the mass).
 
 plus the client's token/cells: bcache `bref := bref_tok ∗ ref ∗ the
 dev/bno fractions` (bpin's / the log layer's), `bchain := bref_tok0 ∗
@@ -796,6 +803,35 @@ premises the table lists — if a proof wants more, the design is wrong
   R-4 l2_row_morph needs tok context-free (bown, ic_tok: yes) -- record
       it in the client obligations list.
   Nothing else; R1' resumes on CtxBox.v's statements with R-1's row.
+  VETTED 2026-09-01 (second reviewer): R-1..R-4 ALL ACCEPTED; no
+  statement changes.
+  - R-1 is a genuine catch (my split's hole, one level up): the handle
+    row pins the parked fragment's KEYS AND MASS, only the stamp
+    existential.  Consistent with what bcache checks out — (c) and (b)
+    mint unit singletons and (f) re-mints one, so bread's reference at
+    (e) is always a unit singleton.  ICACHE MIRROR: the ilock holder's
+    handle row pins `{[((dev,inum), t) := s]}` — the share's exact map —
+    so iunlock's (f) returns a share of known mass s for SpecIunlock.
+    Shares checked out at ilock are always singletons (a carve is one
+    key; a park re-mints one key), so the pin is a singleton in both
+    clients.  RULE (§3.3): the L2 holder's handle pins the parked
+    fragment's keys and mass; never ∃ over the map.
+  - R-2: acceptable either way (buf_pay ∃-binds bsd/d internally, so
+    X := bs would also type); exposing (bsl, bsd, d) lets the checkout
+    re-form bio_locked without destructuring.  Client-side only.  Nit:
+    the bundle's dev/blockno cells are the HALVES (F2); the full valid
+    cell carries P_hdr_excl.
+  - R-3: build note; the named-step Definition over Qcplus is the
+    standard fix for map_fold_insert_L through a coercion.
+  - R-4: agree, and be precise about WHY: ctx_morph_const holds for any
+    constant iProp, so l2_row_morph compiles regardless; the real
+    obligation is ξ-FREEDOM for CtxMove (the is_ftable lesson — a
+    constant mentioning ambient-XI cells compiles and still blocks the
+    fork crossing).  Record as "tok is GHOST (no cells)", not merely
+    CtxMorph.  bown / ic_tok satisfy it.
+  Re-verified the primitive-dependent site check: (b)'s P_rest stays
+  valid at the raised stamp because ctx_deposit only raises the parked
+  context's bound, under which existing clean facts remain clean.
 
   Rows re-established at every close: (Σ) qsum m = c; (I) keys at
   ident; (C) (∀ stamps ≥ T) ∨ T ≤ tp; (D) T ≤ td ∨ T ∈ stamps.  The
@@ -804,7 +840,9 @@ premises the table lists — if a proof wants more, the design is wrong
   Client obligations (CtxBox's section Context): CtxMorph for P_hdr i x
   and P_rest x; Timeless for P_hdr/P_rest/Q/tok; `P_hdr_excl`,
   `P_rest_excl` (a FULL cell in each part clashes across contexts —
-  bcache: ctx_word4_excl_x on b_valid / b_disk); `tok_excl`.  Nothing
+  bcache: ctx_word4_excl_x on b_valid / b_disk); `tok_excl`; tok and Q
+  are GHOST (no cells — ξ-freedom for CtxMove, R-4; CtxMorph alone
+  would not catch a cell-bearing constant).  Nothing
   else: no count auth, no identity ghost, no client token enters a box
   lemma (§5 rule 7).
 
@@ -1417,3 +1455,10 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   line's ∃ mh would leave (d)'s mass undischargeable); R-2: X for
   bcache is (bsl, bsd, d); R-3 qsum fold gotcha; R-4 tok context-free.
   R1' resumes.
+- 2026-09-01 (second reviewer, vetting R-1..R-4): all accepted, no
+  statement changes.  R-1 generalized to the rule "the L2 holder's
+  handle pins the parked fragment's keys and mass" with the icache
+  mirror (a share singleton at mass s); R-2 client-side either way (dev/
+  blockno halves nit); R-3 build note; R-4 sharpened to ξ-freedom of
+  tok/Q (ghost), recorded in the client obligations.  §3.3 and §3.5
+  amended.  R1' proceeds.
