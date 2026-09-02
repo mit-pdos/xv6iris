@@ -18505,4 +18505,14 @@ NEXT: R1' per §4.1 once F1 is vetted (or as F1 says, absent objection).
   box's L1 row rides the itable ξ-row FLOORED (its own stamp, re-floored
   at each release) rather than tied to the exact-read stamp tst (F25);
   the inode sleeplock tier swept to genl (59 sites, 20 files).
+- R3.3 status (later on 2026-09-02): IcacheEscrow/IcacheRef/boot/FsCfgBoot/
+  ProofMain green; ProofIdup, ProofIget, ProofIlock, ProofIunlock green
+  over the box (F26 is_itable2 carries ic_escrows; F27 the liveness half
+  rides the handle row; the M-5 sweep landed in IcacheRef with a Qc mass).
+  ProofIput: the tail (Exit A keeps the guard's window open, F28), the
+  hit/non-last (d), the guard's (a) and both Exit A arms are written;
+  the FREE PATH IS PARKED (ip_free_locked Admitted) behind F30 -- (b) then
+  (e) loses the shape; the OUT_L1 -> OUT_L2 transition is recommended.
+  The NB acquiresleep twin (F22) is written (asl_nested_core_llb /
+  wp_acquiresleep_nb_genl_llb_sconf) and becomes unnecessary if (B) rules.
 
