@@ -1556,6 +1556,53 @@ F42′ AGREED, WITH THE ALTERNATIVE NAMED.  On the free path the pin's two
 
 §6¹⁵'s note on A12.8: agreed, moot under the split.
 
+## 6¹⁷. SECOND REVIEWER ON §6¹⁶ (2026-09-02): the eviction's count
+## conceded; F44 restated on the viewer's obligation -- `Q1 0 := emp` is
+## still unsound; the count index taken
+
+CONCEDED: THE EVICTION IS AT COUNT ONE.  `ic_evict_deposit` takes `ic_cnt
+k 1` and deposits to `None` from the guard's window; (b′)'s statement
+REPLACES the stamp map with one unit re-minted at `(i', T')`, so row I is
+re-established at `None` with iput's reference moved, and (d) runs after
+the window has closed.  §6¹⁵'s "it cannot do this at c = 1" was wrong: I
+read main's ordering notes as the box's steps, and they describe main's.
+No landed wrapper opens a count-zero window with a live identity.  (Noted
+in passing: (b′) at c = 0 returns `cnt_half (max 1 c)` and mints the unit,
+so the recycler's `ref = 1` is inside (b′) and never needs (c) during its
+window.)
+
+F44 RESTATED (BLOCKING): THE VIEWER'S OBLIGATION IS OVER INVARIANT-
+    ADMITTED STATES, NOT WRAPPER-REACHABLE ONES.  The collection proves
+    `ic_slot_cover` from what `box_view` returns plus the pool's quarter.
+    The rows admit OUT_L1 at c = 0 with ANY register identity (`keyed ∅ i`
+    holds for every i), and nothing in the body ties the count to a dead
+    pool entry.  So the collection must discharge the state {OUT_L1, c = 0,
+    pool entry TRUE}.  There the header and its quarter are out, `P_rest`
+    holds only the meta cells, and `Q1 0` is all the ghost the box offers.
+    With `emp` the collection can neither produce the leg nor refute.  With
+    the landed F38 quarter, `ic_id ¼ false` agrees with the pool's quarter,
+    the entry is false, and the case is dead.  That no wrapper creates the
+    live-entry variant is irrelevant: the collection never sees a wrapper's
+    precondition.  Hence
+      Q1 0     := ic_q_recycle cn k    (F38 as landed: ∃ dev inum, ic_id cn k ¼ false dev inum)
+      Q1 (S _) := ic_pin_tx k
+    The quarter's role as a RETURNER's selector is moot (§6¹⁶); its role
+    for the VIEWER is not.  Nothing changes in the tree -- F38 landed in
+    this shape; ruling (i) should simply not remove it.
+
+THE COUNT INDEX: TAKEN.  §6¹⁵'s preference for the constant two-arm Q1 is
+    withdrawn -- with the eviction at count one the index removes every
+    selector lemma, and the constant form would need two.
+
+F42′: AGREED EITHER WAY.  The clause as stated (the row's pin slot tied to
+    the freeze bit) follows the stitch rule; the share-only frozen
+    alternative is a one-line variant if r20 prefers it.
+
+TRIPWIRE SHARPENED (§5, the viewer clause): refutable, or readable with
+    the identity tied, on EVERY state the box's rows admit, from what the
+    viewer holds.  A state no wrapper reaches still needs a refutation, and
+    only the residue can carry it.  F44 is the instance.
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
