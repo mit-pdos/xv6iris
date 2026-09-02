@@ -52,52 +52,38 @@ From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap gmultiset.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gmap ufrac gset.
-From iris.base_logic.lib Require Import own ghost_var invariants.
+From iris.base_logic.lib Require Import own ghost_var invariants ghost_map.
 Require Import SailStdpp.Values.
 Require Import RiscvLang RiscvPtsto.
 Require Import TsoMemPa TsoGhost.
 Require Import TsoCtx.
 Require Import CtxMorphTac.
-Require Import SleepLock.
 Require Import Xv6Cameras Xv6G.
 Require Import CtxBox.
-Require Import FileInvDefs.
+Require Import IcacheRef.   (* [icfg] -- the two names ride in it (r25 shapes) *)
+Require Import FileOffCell.   (* [off_resident] -- the boxed cell; this file builds BEFORE FileInvDefs (r25 shapes) *)
 
 (* F35: the per-inode-slot set is keyed by the WHOLE names record, so a
    member's fragment names exactly the box whose row it selects (keying by
    one gname would give bx_stamps γ' = bx_stamps γ and not γ' = γ -- the
    F6/F13 class).  A record of four gnames is countable. *)
-Global Instance box_names_eq_dec : EqDecision box_names.
-Proof. solve_decision. Defined.
-Global Instance box_names_countable : Countable box_names.
-Proof.
-  apply (inj_countable'
-           (λ b, (bx_stamps b, bx_cnt b, bx_slotd b, bx_slotp b))
-           (λ t, BoxNames t.1.1.1 t.1.1.2 t.1.2 t.2)).
-  by intros [].
-Qed.
+(* [box_names]'s countability, [offboxG] and [offbox_boxG] MOVED to
+   Xv6Cameras.v (r25 shapes): [xv6G] bundles the class. *)
 
-(* ---- cameras (to Xv6Cameras §15 at R4b) ----------------------------- *)
-Class offboxG (Σ : gFunctors) := OffboxG {
-  offbox_stampsG :: inG Σ (stampsR nat);
-  offbox_slotdG  :: ghost_varG Σ (slot_reg nat unit);
-  offbox_slotpG  :: ghost_varG Σ (l2_reg nat);
-  (* the per-inode append-only set of published off boxes *)
-  offbox_setG    :: inG Σ (authR (gsetUR box_names));
-}.
-Global Instance offbox_boxG {Σ} `{!offboxG Σ} `{!kallocG Σ} : boxG nat unit Σ :=
-  {| box_stampsG := offbox_stampsG; box_cntG := kalloc_count_inG;
-     box_slotdG := offbox_slotdG; box_slotpG := offbox_slotpG |}.
+(* THE NAMES.  Per inode SLOT the set of published boxes (rows outlive a
+   recycle of the slot: dead γ, harmless -- F37), and the file table's
+   slot -> box-names agreement map.  Both are [icfg] fields ([icfg_off],
+   [icfg_obox]); [off_cfg] is the record every consumer spells. *)
+Record off_names := MkOffNames { on_set : nat -> gname; on_obox : gname }.
+Definition off_cfg `{ICFG : icfg} : off_names := MkOffNames icfg_off icfg_obox.
 
-(* the per-inode-SLOT set gnames (a fscfg field at R4b; a parameter here).
-   Per slot, not per inode: rows outlive a recycle of the slot (dead γ,
-   harmless -- F37). *)
-Record off_names := MkOffNames { on_set : nat -> gname }.
 
 Definition offBoxN : namespace := nroot .@ "xv6offbox".
 
 Section OffBox.
-  Context `{!riscvGS Σ, !xv6G Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !offboxG Σ}.
+  (* the box's own cameras, not the [xv6G] bundle: FileInvDefs binds classes
+     one by one and must be able to name these rows (r25 shapes) *)
+  Context `{!riscvGS Σ, !kallocG Σ, !lockG Σ, !offboxG Σ}.
   (* FileInvDefs' rows are ambient; the box λs take an explicit ξ *)
   Context `{XI : CurCtx}.
 
@@ -256,9 +242,42 @@ Section OffBox.
      weighs 1 whatever its q; a share carved from it (fileread's
      `fileread_pay_carve`) weighs its share fraction and the lending parent
      1 − that (inode_ref_short's tie).  Σ over the slot's rows = f->ref. *)
+  (* THE SLOT -> BOX TIE (r25 shapes, STATEMENT CHANGE to the skeleton's
+     [off_fd_row]): a file slot's fd rows and its table row ([fslot]'s
+     allocated arm, [off_l1_row]) must name ONE box, and nothing in the box
+     itself relates two names at the same slot.  So the fd side carries a
+     fraction of a ghost-map pointsto [k ↦ γ] beside its stamps, the table
+     holds the map's authority ([ftable_res]), and the free slot row holds
+     the whole pointsto (stale names) so filealloc can update it under
+     ftable.lock when it births the next box. *)
+  Definition obox_frag on (k : nat) (q : Qp) γ : iProp Σ :=
+    (k ↪[on_obox on]{#q} γ)%I.
+  Definition obox_full on (k : nat) γ : iProp Σ := (k ↪[on_obox on] γ)%I.
+  Definition obox_auth on (B : gmap nat box_names) : iProp Σ :=
+    ghost_map_auth (on_obox on) 1 B.
   Definition off_fd_row on (i k : nat) (μ : Qp) : iProp Σ :=
     (∃ γ : box_names,
-       off_box k γ ∗ off_member on i γ ∗ off_ref_stamps γ k μ)%I.
+       off_box k γ ∗ obox_frag on k μ γ ∗ off_member on i γ ∗ off_ref_stamps γ k μ)%I.
+
+  (* THE ROWS' CONTEXT-FREE FORM (r25 shapes; SKELETON statements, proofs in
+     lane (ii)).  What an [_in] release of ip->lock holds: every row's L2
+     register half with its park stamp bounded by [T], and [llb T] so the
+     release can present one lower bound for the combined maximum
+     (reviewer 2's correction 2: the register's [lr_tp] cannot be raised,
+     so the fold takes one floor at [T ≥ max] and weakens per row by
+     [TsoCtx.ctx_floor_le]). *)
+  Definition off_rows_dep on i (T : nat) : iProp Σ :=
+    (∃ L : gset box_names,
+       off_set_auth on i L ∗ llb loglen_name T ∗
+       [∗ set] γ ∈ L, ∃ s : l2_reg nat,
+         off_regp γ s ∗ ⌜lr_hold s = None⌝ ∗ llb loglen_name (lr_tp s) ∗
+         ⌜(lr_tp s ≤ T)%nat⌝)%I.
+  Lemma off_rows_fold on i (T : nat) (ξ : CtxId) :
+    off_rows_dep on i T ∗ ctx_floor ξ T ⊢ off_rows on i ξ.
+  Proof. (* SKELETON r25 (lane ii): per row, [ctx_floor_le] from T down to lr_tp *) Admitted.
+  Lemma off_rows_to_dep on i (ξ : CtxId) :
+    off_rows on i ξ -∗ ∃ T : nat, off_rows_dep on i T.
+  Proof. (* SKELETON r25 (lane ii): T := the rows' maximum, llb by the maximum lemma *) Admitted.
 
   (* ================================================================== *)
   (*  THE SITES                                                            *)

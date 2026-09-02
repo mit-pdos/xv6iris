@@ -1040,7 +1040,7 @@ Section ProofIget.
       ([∗ list] i0 ∈ seq 0 NINODE, itable_slot_res TsoCtx.cur_ctx M ci i0) -∗
       iref_slots_auth -∗
       isl_pool M -∗
-      ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic M ci i0) -∗
+      ([∗ list] i0 ∈ seq 0 NINODE, islot2 cur_ctx fsc_ic M ci i0) -∗
       ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib ∖ ci_inums ci) ∅ -∗
       iref_slot -∗
       (* THE LICENCE rides the scan (increment IIIe): it is spent at whichever
@@ -1080,7 +1080,7 @@ Section ProofIget.
         ([∗ list] i0 ∈ seq 0 NINODE, itable_slot_res TsoCtx.cur_ctx M ci i0) -∗
         iref_slots_auth -∗
         isl_pool M -∗
-        ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic M ci i0) -∗
+        ([∗ list] i0 ∈ seq 0 NINODE, islot2 cur_ctx fsc_ic M ci i0) -∗
         ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib ∖ ci_inums ci) ∅ -∗
         iref_slot -∗
         iname fsc_ireg fsc_fs icfg_ist inum l -∗

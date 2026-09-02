@@ -524,8 +524,9 @@ FdSlots.v
 UserFd.v
 IcacheRef.v
 EscrowDefs.v
-FileInvDefs.v
+FileOffCell.v
 OffBox.v
+FileInvDefs.v
 FileInv.v
 FileOff.v
 KallocInv.v

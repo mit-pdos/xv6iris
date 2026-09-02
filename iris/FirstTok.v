@@ -930,6 +930,26 @@ Global Instance first_fsinit_morph
   CtxMorph (λ ξ : CtxId, first_fsinit (XI := ξ)).
 Proof. rewrite /first_fsinit. ctx_morph_solve. Qed.
 
+(* DAY-ONE INSTANCE SKELETONS (r25 shapes; rule 0): the token's two arms.
+   The boot arm's exclusive half is [first_fsinit_morph] above; its
+   persistent half and the steady arm both end in [ioff_escrows] and carry
+   the two λ-flipped handles, so they close with L6/L7 (lane i). *)
+Global Instance first_boot_persist_morph
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    `{GEN : GenId} `{ICFG : icfg} :
+  CtxMorph (λ ξ : CtxId, first_boot_persist (XI := ξ)).
+Proof. (* SKELETON r25 (lane i) *) Admitted.
+Global Instance first_done_morph
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    `{GEN : GenId} `{ICFG : icfg} :
+  CtxMorph (λ ξ : CtxId, first_done (XI := ξ)).
+Proof. (* SKELETON r25 (lane i) *) Admitted.
+Global Instance first_tok_morph
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    `{GEN : GenId} `{ICFG : icfg} :
+  CtxMorph (λ ξ : CtxId, first_tok (XI := ξ)).
+Proof. (* SKELETON r25 (lane i): ctx_morph_or over the two arms *) Admitted.
+
 (* ...AND THE SAME SEAL AT TOP LEVEL, for [FsReady.v]'s reason: a
    [Typeclasses Opaque] inside a Section does not survive it.
 

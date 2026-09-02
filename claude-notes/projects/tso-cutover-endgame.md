@@ -700,6 +700,92 @@ and law 10 (hooks).
       Global Instance so `SpecAcquire`/`SpecRelease`'s `CtxMorph R` resolve
       at the eleven sites and ProofMain's `newlock`.
 
+18. **r25 DAY ONE -- THE SHAPES COMMIT (2026-09-02; reviewer 2's rule 0, items
+    16/17): definitions and instance headers only, zero proof work; the
+    reviewers audit this commit before pass 1 starts.**  SIX final shapes
+    (the reviewers named five; the sixth was found by the gate itself):
+    - `inode_pay` (D1 revised): `cinv fileipN γx (inode_core v Q inum)` --
+      `inode_core` is ghost only (`iref_frag k (Q+Q)`, `ic_lent_stamps k
+      (Q+Q) Q`, `runit_any`), defined in a section WITHOUT `CurCtx`
+      (`About inode_core` takes no context: pitfall 2 checked) -- beside
+      `inode_ref_side v (q*Q) g inum` (the two ident cells, `live_genlo`,
+      `slh_tok`) and the travelling share; arity unchanged.
+      `inode_pay_alloc` now takes `inode_ref_short_genlo k (Q+Q) Q … g lo ∗
+      runit_any ∗ inode_shr_held_gen (ientry k) Q g inum ∗ ity_shot`;
+      `inode_pay_cancel`'s statement unchanged; `so_publish` gains `qi = s`.
+    - `file_core_off`'s FD_INODE arm: `∃ i, ⌜fc_ip C = ientry i⌝ ∗ ⌜i <
+      NINODE⌝ ∗ off_fd_row off_cfg i k q` (the fifth shape); the ledger's
+      `ioff_ref` is dead there (retired with the ledger in lane (ii)).
+    - `fslot γ M B Kd k`: the allocated arm carries `off_box k γb ∗
+      off_l1_row γb k (Pos.to_nat n) Kd` for the `γb` the slot->box map `B`
+      names; the free arm holds the map's pointsto whole (`obox_full`).
+    - `ftable_res γ Kd` carries `obox_auth off_cfg B` and the slot rows at
+      `Kd`; `ftable_res_at γ ξ := ∃ Kd, ctx_floor ξ Kd ∗ ftable_res (XI := ξ)
+      γ Kd` (FINAL name, T1) is `is_ftable`'s λ payload; `ftable_res_boot`
+      takes `obox_auth off_cfg ∅` and yields `ftable_res_at γ cur_ctx`.
+    - `ic_slp cn k ξ := … ∗ off_rows off_cfg k ξ`; `ic_slp_dep cn k T := ∃
+      Tp, ⌜Tp ≤ T⌝ ∗ llb T ∗ ic_tok ∗ ic_regp (L2Reg Tp None) ∗
+      ic_dep_neutral ∗ off_rows_dep off_cfg k T` (correction 2: one bound
+      for the combined maximum; `ic_slp_fold`'s statement unchanged;
+      `ic_slp_dep_llb` proved).
+    - THE SIXTH: itable.lock's payload `itable_res2 ξ …` took the DEFINER's
+      ambient context beside its own through `islot2`/`islot_empty` (found
+      when the L7 agent's `is_itable2_morph` failed: `About itable_res2`
+      listed `CurCtx`).  `islot2 ξ cn M ci k` and `islot_empty ξ cn k` now
+      take the payload's context (`islot_rest_at (XI := ξ)`, `islot_free_at
+      (XI := ξ)`; `frz_park` is context-free); every consumer spells
+      `islot2 cur_ctx cn …` (16 tokens in IcacheEscrow/IcacheBoot/ProofIget/
+      ProofIput), δ-equal at the acquirer's context.  `About itable_res2`
+      now takes no context.
+    THE TIE (a design point for the audit): a slot's fd rows and its table
+    row must name ONE box, and nothing in the box relates two names at one
+    slot.  `off_fd_row` gains `obox_frag off_cfg k μ γ` (a fraction of a
+    ghost-map pointsto `k ↦ γ`, camera in `offboxG`), the table's
+    `ftable_res` holds `obox_auth`, the free slot row the whole pointsto;
+    filealloc updates it under ftable.lock.  STATEMENT CHANGE to OffBox's
+    skeleton `off_fd_row`, flagged in the file.
+    PLUMBING: `FileOffCell.v` (new: the entry addresses, `off_wf`,
+    `off_resident`; `Require Export`ed by FileInvDefs) so OffBox builds
+    BEFORE FileInvDefs; OffBox drops `fileG`/`fdslotG`/`SleepLock`/`xv6G`
+    for `kallocG ∗ offboxG`; `offboxG` (+ `ghost_mapG Σ nat box_names`) and
+    `box_names`' countability move to Xv6Cameras, `xv6G` bundles it
+    (`offboxΣ` in `xv6GΣ`); `icfg` gains `icfg_off : nat -> gname` and
+    `icfg_obox : gname`, minted by `icfg_alloc` (two new rows in its ∃;
+    its callers reopen in pass 1); `off_cfg := MkOffNames icfg_off
+    icfg_obox`; `off_rows_dep`/`off_rows_fold`/`off_rows_to_dep` in OffBox;
+    Section FileInv binds `kallocG ∗ offboxG` (single path: consumers reach
+    them through `xv6G`).
+    DAY-ONE INSTANCE SKELETONS (Admitted, tagged `SKELETON r25`): the file
+    rows (`file_fields/inode_ref_side/inode_pay/file_core_noff/
+    file_core_off/file_core/file_pay/file_pay_st/file_ref/file_rest/fslot
+    _morph`), `ftable_res_at_morph`, `ofile_slot/proc_ofiles/proc_priv_core/
+    proc_priv/proc_priv_nopt _morph`, `first_boot_persist/first_done/
+    first_tok _morph`, `fs_ready_morph`, `park_globals_morph` (at flip's
+    arity `ξ γs γw γft γf γtl`, the L8 definition landed), `itable_res2
+    _morph` ×3 (their old structural proofs no longer close over `islot2 ξ`).
+    ADMITTED INVENTORY of this commit (38; every one closes in pass 1 or a
+    lane, none survives the bank): FileInvDefs 16 (the 5 reopened proofs
+    `inode_pay_split/_cancel/_alloc/_not_dev`, `file_core_off_split` + 11
+    skeletons), FileInv 3 (`file_off_reclaim`, `ftable_res_boot`,
+    `ftable_res_at_morph`), IcacheEscrow 4 (`ic_slp_fold`, 3 itable
+    morphs), OffBox 2, ProcInv 5, FirstTok 3, FsReady 1, UsertrapRes 1,
+    IcacheBoot 1 (`icache_boot_at`: the `ic_slp` mint), ProofSysOpenParts 2
+    (`so_deposit`, `so_publish`).  GATE: the shape files and every
+    skeleton file compile (`make` of FileInv, IcacheEscrow, IcacheBoot,
+    FsReady, FirstTok, ProcInv, UsertrapRes, ProofSysOpenParts green);
+    the consumers (filealloc/filedup/fileclose, sys_open, the three fs
+    specs, the inode proofs' `ic_slp_dep` sites, `fs_ready`'s ledger row,
+    `icfg_alloc`'s callers) are pass-1 content and red by design.
+    QUESTIONS FOR THE AUDIT: (a) the obox tie as designed, or a box-side
+    tie the reviewers prefer; (b) `ic_slp_dep`'s `llb T` and `off_rows_dep`'s
+    `lr_hold s = None`; (c) `inode_pay_alloc`'s premise shape (the pieces,
+    not `inode_held_short`); (d) the `kallocG ∗ offboxG` binder in Section
+    FileInv.  ALSO LANDED beside it: the L7 agent's three commits (the log
+    λ-flip with `log_res_at`/`log_ctx_morph` and `WpLock.is_lock_handle_morph`;
+    `EnvMorph.v` with the class-A wrapper instances and the sleep-lock handle
+    morph; the floors-law instances in IcacheRef/PipeInvDefs), each green on
+    its own base at 1436 (the one pre-existing root).
+
 ## 10. Process and tooling (measured facts)
 
 ### 10.1 Build

@@ -80,6 +80,8 @@ Require Export FdSlots.
 Require Import PipeInvDefs.
 Require Import IcacheRef.
 Require Import FsCfg.   (* [fscfg] -- see the note on [fileG] below *)
+Require Export FileOffCell.   (* the entry addresses, [off_wf], [off_resident] (r25 shapes) *)
+Require Import OffBox.        (* the off box's rows: [fslot]'s L1 row, [file_core_off]'s fd row (r25 shapes) *)
 (* for [T_DIR_z] alone -- [inode_pay]'s witness says "not a directory", and
    the number is stated once, where [IcacheEscrow.ic_loaded]'s [dir_ok]
    states it (design fs-icache.md §17.6 (5)). *)
@@ -109,28 +111,9 @@ Definition ftable_addr : mword 64 := mword_of_int KernelSyms.ftable.
 (* [NFILE] moved to [FdSlots.v] to break the IrefSlots -> FileInv cycle;
    it is still in scope here through this file's own [Require Import
    FdSlots], and [Require Export] keeps it visible to FileInv's importers. *)
-Definition file_stride : Z := 40.               (* the loop's [addi s1,s1,40] *)
-Definition file_base : Z := KernelSyms.ftable + 24.
-
-(* the [k]th entry, &ftable.file[k].  [fnode NFILE] is one past the last entry
-   -- which is where the next global (<disk>) starts, and is the literal end
-   pointer filealloc's scan compares its cursor against. *)
-Definition fnode (k : nat) : mword 64 := acur file_base file_stride k.
-
-(* the field addresses, in the EXACT [add_vec base (sign_extend' 64 imm)] form
-   the instructions compute, so a load/store address unifies with the cell
-   without rewriting. *)
-Definition foff_of (a : mword 64) (i : Z) : mword 64 :=
-  add_vec a (sign_extend' 64 (mword_of_int i : mword 12)).
-
-Definition a_ftype     (k : nat) : mword 64 := fnode k.
-Definition a_fref      (k : nat) : mword 64 := foff_of (fnode k) 4.
-Definition a_freadable (k : nat) : mword 64 := foff_of (fnode k) 8.
-Definition a_fwritable (k : nat) : mword 64 := foff_of (fnode k) 9.
-Definition a_fpipe     (k : nat) : mword 64 := foff_of (fnode k) 16.
-Definition a_fip       (k : nat) : mword 64 := foff_of (fnode k) 24.
-Definition a_foff      (k : nat) : mword 64 := foff_of (fnode k) 32.
-Definition a_fmajor    (k : nat) : mword 64 := foff_of (fnode k) 36.
+(* [file_stride] … [a_fmajor] MOVED to FileOffCell.v (r25 shapes, 2026-09-02):
+   the off box needs the cell's address and must build BEFORE this file.
+   Re-exported from here, so no importer changes. *)
 
 (* the side conditions [ArrCursor]'s cursor lemmas take, discharged once. *)
 Lemma file_base_nonneg : 0 <= file_base.
@@ -781,25 +764,7 @@ Definition offN : namespace := nroot .@ "fileoff".
    sys_open writes 0, and every advance is [off + r] with [r] clamped by
    readi/writei to the file's size, which is itself bounded by MAXFILE*BSIZE.
    A pipe or device file never writes the cell. *)
-Definition off_wf (v : mword 32) : Prop :=
-  bv_unsigned v <= Z.of_nat MAXFILE * Z.of_nat BSIZE.
-
-Lemma off_wf_zero : off_wf (mword_of_int 0 : mword 32).
-Proof.
-  rewrite /off_wf.
-  assert (Hz : bv_unsigned (mword_of_int 0 : mword 32) = 0) by reflexivity.
-  rewrite Hz. unfold MAXFILE, BSIZE. lia.
-Qed.
-
-(* an offset in range is BELOW int range, which is what makes the [lw] that
-   loads it read the literal (and readi's [off + n < 2^31] premise
-   dischargeable from a bound on [n] alone). *)
-Lemma off_wf_lt31 (v : mword 32) : off_wf v -> bv_unsigned v < 2 ^ 31.
-Proof.
-  rewrite /off_wf. unfold MAXFILE, BSIZE. intro H.
-  assert (E : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
-  rewrite E. lia.
-Qed.
+(* [off_wf], [off_wf_zero], [off_wf_lt31] MOVED to FileOffCell.v (r25 shapes). *)
 
 (* Timelessness of the word points-to the off invariant puts in its body --
    typeclass search does not unfold a [Definition] on its own, exactly as
@@ -812,13 +777,40 @@ Global Instance word_pointsto_timeless'' `{!riscvGS Σ} (ktr : ktier) (a : Arch.
     (w : bv 64) : Timeless (word_pointsto (KTR := ktr) a dq w).
 Proof. exact (word_pointsto_timeless' ktr a dq w). Qed.
 
+(* ==================================================================== *)
+(*  THE PARKED SHARE'S GHOST CORE -- NO [CurCtx] IN SCOPE (r25 shapes;     *)
+(*  plan §9 items 15-17, R4a).  What [inode_pay]'s cancellable invariant   *)
+(*  parks is keyed ghost ONLY: the count fragment at the reference's whole  *)
+(*  fraction [Q + Q], its lent stamps, the reader unit.  The cells, the     *)
+(*  liveness slice and the sleep-lock share ride the fractional payload    *)
+(*  OUTSIDE the invariant ([inode_ref_side] below), so the payload         *)
+(*  morphs structurally and the invariant's body names no context.  This  *)
+(*  section binds no [CurCtx] on purpose (reviewer 2's pitfall 2): a       *)
+(*  forgotten annotation is an elaboration error, not a silent capture.    *)
+(* ==================================================================== *)
+Section InodeCore.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !offboxG Σ,
+            !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ,
+            !ghost_mapG Σ nat unit, !flivG Σ,
+            (* A12: the inode share carries the box's stamps (tso-flip M-5) *)
+            !icboxG Σ, !kallocG Σ}.
+
+  Definition inode_core (v : mword 64) (Q : Qp) (inum : mword 32) : iProp Σ :=
+    (∃ k : nat,
+       ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
+       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+       iref_frag k (Q + Q)%Qp ∗
+       ic_lent_stamps k (Q + Q)%Qp Q icfg_dev inum ∗
+       runit_any (bv_unsigned inum))%I.
+End InodeCore.
+
 Section FileInv.
   Context `{XI : TsoCtx.CurCtx}.
   (* [icacheG]/[pipeG]/[cinvG] are bound HERE rather than reached through
      [fileG], since they left that class (see its note).  This file is
      BELOW [Xv6G.v] -- it is one of the files the bundle is built out of --
      so it names them individually; everything above takes [xv6G]. *)
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !offboxG Σ,
             !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ,
             !ghost_mapG Σ nat unit, !flivG Σ,
             (* A12: the inode share carries the box's stamps (tso-flip M-5) *)
@@ -1091,9 +1083,24 @@ Section FileInv.
      inum through [inode_ident], it was simply ∃-bound.  Naming it costs the
      consumers that do not care nothing -- an [∃ inum] in front of the
      payload is exactly what they used to have. *)
+  (* THE REFERENCE'S SIDE, at fraction [s] of the fd's payload: the two
+     identity cells, the liveness slice at the parked epoch, the sleep-lock
+     share.  Context-indexed (cells) and structural; the epoch [lo] is pinned
+     by agreement with the travelling share's ([live_genlo_agree]). *)
+  Definition inode_ref_side (v : mword 64) (s : Qp) (g : gname) (inum : mword 32) : iProp Σ :=
+    (∃ (k : nat) (lo : nat),
+       ⌜v = ientry k⌝ ∗
+       inode_ident k (DfracOwn s) icfg_dev inum ∗
+       live_genlo k s g lo ∗
+       SleepLock.slh_tok (icfg_isl k) s)%I.
+
+  (* D1 REVISED (plan §9 item 15, confirmed item 16): the cinv parks
+     [inode_core] (ghost only); the side and the travelling share ride the
+     fractional payload at [q * Q]; arity unchanged. *)
   Definition inode_pay (γx : gname) (Q : Qp) (g : gname) (inum : mword 32)
       (v : mword 64) (fdty : mword 32) (wr : bool) (q : Qp) : iProp Σ :=
-    (cinv fileipN γx (inode_held_short v Q) ∗ cinv_own γx q ∗
+    (cinv fileipN γx (inode_core v Q inum) ∗ cinv_own γx q ∗
+     inode_ref_side v (q * Q)%Qp g inum ∗
      inode_shr_held_gen v (q * Q)%Qp g inum ∗
      ∃ ty : bv 16, ity_shot g ty ∗ ⌜wr = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
                    ⌜fdty = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝)%I.
@@ -1101,14 +1108,7 @@ Section FileInv.
   Lemma inode_pay_split γx Q g inum v fdty wr q1 q2 :
     inode_pay γx Q g inum v fdty wr (q1 + q2) ⊣⊢
     inode_pay γx Q g inum v fdty wr q1 ∗ inode_pay γx Q g inum v fdty wr q2.
-  Proof.
-    rewrite /inode_pay cinv_own_fractional Qp.mul_add_distr_r
-            inode_shr_held_gen_split.
-    iSplit.
-    - iIntros "(#Hi & [H1 H2] & [S1 S2] & #Hw)". iFrame "Hi H1 H2 S1 S2 Hw".
-    - iIntros "[(#Hi & H1 & S1 & #Hw) (_ & H2 & S2 & _)]".
-      iFrame "Hi H1 H2 S1 S2 Hw".
-  Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   (* THE LAST CLOSER'S MOVE, packaged: fraction one is the whole reference.
      A fupd, and the only one the file layer performs.  The gather is what
@@ -1117,13 +1117,7 @@ Section FileInv.
   Lemma inode_pay_cancel (E : coPset) (γx : gname) (Q : Qp) (g : gname)
       (inum : mword 32) (v : mword 64) (fdty : mword 32) (wr : bool) :
     ↑fileipN ⊆ E -> inode_pay γx Q g inum v fdty wr 1 ={E}=∗ inode_held v.
-  Proof.
-    iIntros (HE) "(#Hi & Hown & Hs & _)".
-    iMod (cinv_cancel with "Hi Hown") as "H"; [exact HE|].
-    iMod "H". iModIntro. rewrite Qp.mul_1_l.
-    iDestruct (inode_shr_held_gen_forget with "Hs") as "Hs".
-    iApply (inode_held_gather with "H Hs").
-  Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   (* the travelling share names SOME generation -- the one every slice of
      this slot names, since [iliveUR]'s agree is per-KEY ([IcacheRef.
@@ -1167,21 +1161,21 @@ Section FileInv.
      FD_DEVICE the implication is vacuous.  [ProofSysOpenParts.so_tdev_zne]
      and [ProofSysOpenParts.so_dev_vac] state the two arms in exactly this
      shape. *)
-  Lemma inode_pay_alloc (E : coPset) (v : mword 64) (Q : Qp) (g : gname)
+  (* AT [qt = Q + Q]: sys_open lends exactly HALF of the incoming
+     reference's share fraction ([so_publish] at [qi = s]; items 15/16), so
+     the parked reference is the short form at [(Q + Q, Q)] with its epoch
+     named, beside the travelling share at [Q]. *)
+  Lemma inode_pay_alloc (E : coPset) (k : nat) (Q : Qp) (g : gname) (lo : nat)
       (inum : mword 32) (fdty : mword 32) (wr : bool) (ty : bv 16) :
+    (k < NINODE)%nat ->
+    bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
     (wr = true -> bv_unsigned ty <> T_DIR_z) ->
     (fdty = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z) ->
-    inode_held_short v Q -∗ inode_shr_held_gen v Q g inum -∗ ity_shot g ty
-    ={E}=∗ ∃ γx : gname, inode_pay γx Q g inum v fdty wr 1.
-  Proof.
-    iIntros (Hwr Hdv) "Hsh Hs #Hty".
-    iMod (cinv_alloc E fileipN (inode_held_short v Q) with "[Hsh]")
-      as (γx) "[#Hi Hown]".
-    { by iApply bi.later_intro. }
-    iModIntro. iExists γx. rewrite /inode_pay Qp.mul_1_l.
-    iFrame "Hi Hown Hs". iExists ty. iFrame "Hty".
-    iSplit; iPureIntro; [exact Hwr | exact Hdv].
-  Qed.
+    inode_ref_short_genlo k (Q + Q)%Qp Q icfg_dev inum g lo -∗
+    runit_any (bv_unsigned inum) -∗
+    inode_shr_held_gen (ientry k) Q g inum -∗ ity_shot g ty
+    ={E}=∗ ∃ γx : gname, inode_pay γx Q g inum (ientry k) fdty wr 1.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   (* ---- THE READING THE FD_INODE ARM'S CONSUMERS ASK FOR ----
 
@@ -1203,12 +1197,7 @@ Section FileInv.
       (v : mword 64) (wr : bool) (q : Qp) (ty : bv 16) :
     inode_pay γx Q g inum v FD_INODE wr q -∗ ity_shot g ty -∗
     ⌜bv_unsigned ty <> FsImg.T_DEVICE_z⌝.
-  Proof.
-    iIntros "(_ & _ & _ & Hwt) #Hshot".
-    iDestruct "Hwt" as (ty') "(#Hs & _ & %Hdv)".
-    iDestruct (ity_shot_agree with "Hs Hshot") as %<-.
-    iPureIntro. exact (Hdv eq_refl).
-  Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   (* the per-slot payload-names ghost: fractional, agreeing, and updatable
      by whoever holds the whole of it.  See the header above [fpnames]. *)
@@ -1268,8 +1257,8 @@ Section FileInv.
     iPureIntro. exact (Hne eq_refl).
   Qed.
 
-  Definition off_resident (k : nat) : iProp Σ :=
-    (∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝)%I.
+  (* [off_resident] MOVED to FileOffCell.v (r25 shapes): the box's header
+     cell, shared with OffBox.v which now builds before this file. *)
 
   (* the borrower's marker: the inode's [valid] flag, which ilock hands out
      at 1 and which no fs.c callee below ilock touches.  It is EXCLUSIVE, it
@@ -1502,9 +1491,15 @@ Section FileInv.
      carries the ledger fragment (the cell itself is deposited in the
      inode's ledger), every other arm carries the dead cell at the arm's
      own fraction. *)
+  (* THE FIFTH FINAL SHAPE (item 17): an FD_INODE file's [f->off] is the off
+     box's fd row -- the box handle, the slot->box tie, membership in the
+     inode's published set, the fd's stamp share -- not the retired ledger's
+     fragment.  Everything else keeps the cell as before. *)
   Definition file_core_off (k : nat) (q : Qp) (C : fcontent) : iProp Σ :=
     (if bool_decide (fc_type C = FD_INODE)
-     then ioff_ref (fc_ip C) k q else foff_dead k q)%I.
+     then ∃ i : nat, ⌜fc_ip C = ientry i⌝ ∗ ⌜(i < NINODE)%nat⌝ ∗
+                     off_fd_row off_cfg i k q
+     else foff_dead k q)%I.
 
   Definition file_core (k : nat) (q : Qp) (pn : fpnames) (C : fcontent) : iProp Σ :=
     (file_core_noff q pn C ∗ file_core_off k q C)%I.
@@ -1559,10 +1554,7 @@ Section FileInv.
   Lemma file_core_off_split k q1 q2 C :
     file_core_off k (q1 + q2) C ⊣⊢
     file_core_off k q1 C ∗ file_core_off k q2 C.
-  Proof.
-    rewrite /file_core_off.
-    case_bool_decide; [apply ioff_ref_split | apply foff_dead_split].
-  Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   Lemma file_core_split k q1 q2 pn C :
     file_core k (q1 + q2) pn C ⊣⊢ file_core k q1 pn C ∗ file_core k q2 pn C.
@@ -1759,19 +1751,79 @@ Section FileInv.
      authority at every slot would infect every consumer.  It is not an
      independent assumption: every operation that changes a count re-derives
      it from [fd_slots_no_overflow]. *)
-  Definition fslot (γ : gname) (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
+  (* THE FOURTH FINAL SHAPE (item 16, F37): the allocated arm carries the off
+     box's L1 half at the count [n] (F34: mass = one per counted reference)
+     and at the table's floor [Kd] ([ftable_res_at]'s floor row bounds every
+     slot's stamp); the box is the one the slot->box map [B] names, so the
+     fd rows' tie ([obox_frag]) meets it.  The free arm keeps the cell (the
+     FD_NONE payload's [foff_dead]) and holds the map's pointsto whole, so
+     filealloc can point it at the box it births. *)
+  Definition fslot (γ : gname) (M : gmap nat (Qp * positive))
+      (B : gmap nat box_names) (Kd : nat) (k : nat) : iProp Σ :=
     match M !! k with
     | None =>
         (a_fref k ↦₄ (mword_of_int 0 : mword 32) ∗
+         (∃ γ0 : box_names, obox_full off_cfg k γ0) ∗
          ∃ C, ⌜fc_type C = FD_NONE⌝ ∗ file_fields k 1 C ∗
               file_pay γ k 1 C)%I
     | Some (q, n) =>
         (⌜Z.pos n < 2 ^ 31⌝ ∗
          a_fref k ↦₄ (mword_of_int (Z.pos n) : mword 32) ∗
          file_rest γ k q ∗
-         fd_slots (Pos.to_nat n))%I
+         fd_slots (Pos.to_nat n) ∗
+         ∃ γb : box_names, ⌜B !! k = Some γb⌝ ∗
+           off_box k γb ∗ off_l1_row γb k (Pos.to_nat n) Kd)%I
     end.
 End FileInv.
+
+(* ==================================================================== *)
+(*  DAY-ONE INSTANCE SKELETONS (r25 shapes; reviewer 2's rule 0, item 16): *)
+(*  every context-indexed row of the file payload, stated with the         *)
+(*  context as an argument so a row that cannot cross is a type error       *)
+(*  before any proof reopens.  Proofs are lane work; listed in the plan's   *)
+(*  Admitted inventory (§9 item 18) and closed before the r25 bank.         *)
+(* ==================================================================== *)
+Section FilePayloadMorph.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !offboxG Σ,
+            !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ,
+            !ghost_mapG Σ nat unit, !flivG Σ,
+            (* A12: the inode share carries the box's stamps (tso-flip M-5) *)
+            !icboxG Σ, !kallocG Σ}.
+
+  Global Instance file_fields_morph k q C :
+    CtxMorph (λ ξ : CtxId, file_fields (XI := ξ) k q C).
+  Proof. (* SKELETON r25 *) Admitted.
+  Global Instance inode_ref_side_morph v s g inum :
+    CtxMorph (λ ξ : CtxId, inode_ref_side (XI := ξ) v s g inum).
+  Proof. (* SKELETON r25 *) Admitted.
+  Global Instance inode_pay_morph γx Q g inum v fdty wr q :
+    CtxMorph (λ ξ : CtxId, inode_pay (XI := ξ) γx Q g inum v fdty wr q).
+  Proof. (* SKELETON r25: cinv/cinv_own const, side structural, share by inode_shr_held_gen_morph *) Admitted.
+  Global Instance file_core_noff_morph q pn C :
+    CtxMorph (λ ξ : CtxId, file_core_noff (XI := ξ) q pn C).
+  Proof. (* SKELETON r25: the if-body; is_pipe_morph, inode_pay_morph, const *) Admitted.
+  Global Instance file_core_off_morph k q C :
+    CtxMorph (λ ξ : CtxId, file_core_off (XI := ξ) k q C).
+  Proof. (* SKELETON r25: the if-body; off_fd_row is context-free (box handle, ghosts), foff_dead a cell *) Admitted.
+  Global Instance file_core_morph k q pn C :
+    CtxMorph (λ ξ : CtxId, file_core (XI := ξ) k q pn C).
+  Proof. (* SKELETON r25 *) Admitted.
+  Global Instance file_pay_morph γ k q C :
+    CtxMorph (λ ξ : CtxId, file_pay (XI := ξ) γ k q C).
+  Proof. (* SKELETON r25 *) Admitted.
+  Global Instance file_pay_st_morph γ k q C st :
+    CtxMorph (λ ξ : CtxId, file_pay_st (XI := ξ) γ k q C st).
+  Proof. (* SKELETON r25 *) Admitted.
+  Global Instance file_ref_morph γ k q st :
+    CtxMorph (λ ξ : CtxId, file_ref (XI := ξ) γ k q st).
+  Proof. (* SKELETON r25 *) Admitted.
+  Global Instance file_rest_morph γ k q :
+    CtxMorph (λ ξ : CtxId, file_rest (XI := ξ) γ k q).
+  Proof. (* SKELETON r25: the match-body *) Admitted.
+  Global Instance fslot_morph γ M B Kd k :
+    CtxMorph (λ ξ : CtxId, fslot (XI := ξ) γ M B Kd k).
+  Proof. (* SKELETON r25: the match-body; off_l1_row is context-free *) Admitted.
+End FilePayloadMorph.
 
 (* ====================================================================
    THE LEDGER'S BOOT FACE (fs-cfg-boot.md's [_at] constructor discipline)
@@ -1873,7 +1925,7 @@ Typeclasses Opaque ioff_escrows_at.
 
 Section FileOffLedgerEq.
   Context `{XI : TsoCtx.CurCtx}.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !offboxG Σ,
             !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ,
             !ghost_mapG Σ nat unit, !flivG Σ,
             (* A12: the inode share carries the box's stamps (tso-flip M-5) *)

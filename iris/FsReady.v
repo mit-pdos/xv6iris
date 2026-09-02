@@ -663,6 +663,20 @@ Section FsReady.
 
 End FsReady.
 
+(* DAY-ONE INSTANCE SKELETON (r25 shapes; rule 0): every process's
+   environment carries [fs_ready], and a fork child receives it from its
+   parent's [first_tok] across the park.  Its rows: the λ-payload handles
+   (structural once the file table's and the log's payloads are λ, L7),
+   [ioff_escrows] (retired by L6 -- the off box replaces the ledger), the
+   rest context-free or already instanced. *)
+Section FsReadyMorph.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId} `{ICFG : icfg}.
+
+  Global Instance fs_ready_morph : CtxMorph (λ ξ : CtxId, fs_ready (XI := ξ)).
+  Proof. (* SKELETON r25 (lane i, after L7 + the ledger's retirement) *) Admitted.
+End FsReadyMorph.
+
 (* AND THE SAME TWO SEALS AT TOP LEVEL.  [Typeclasses Opaque] inside a
    Section names the SECTION-LOCAL constant; after discharge the redeclared
    constant is a different one, and the setting does not travel.  Re-stating

@@ -2010,3 +2010,20 @@ the stale `/shared/flip63` checkout (64 commits behind on 79 iris files).
 - CtxBox.v green under `rocq-warm` (cold, 1587 sentences, 9 s).  Full
   `make -k -j192`: total 1457, roots 1, blocked 21, green 1435 -- the same
   tree as A12.17's measure with one file fewer; nothing downstream moved.
+
+### A12.19 -- r25 day one: the shapes commit (2026-09-02)
+
+Plan §9 item 18 is the record.  One commit, definitions and instance
+headers only, six final shapes (`inode_pay`, `file_core_off`'s FD_INODE
+arm, `fslot`, `ftable_res_at`, `ic_slp ∗ off_rows`, and the itable payload
+closed in its own context -- the sixth, found by the gate), the slot->box
+tie, the off box's cameras and names, and 38 tagged Admitted (16 FileInvDefs,
+3 FileInv, 4 IcacheEscrow, 2 OffBox, 5 ProcInv, 3 FirstTok, 1 FsReady,
+1 UsertrapRes, 1 IcacheBoot, 2 ProofSysOpenParts).  Gate: the shape and
+skeleton files compile; consumers are red by design until pass 1.  Same
+day, earlier: `first_fsinit_morph` (Q7), OffBox's 14 proofs, the L7 agent's
+log λ-flip + EnvMorph + floors-law instances (1436 green on their base).
+L8's honest park is written and saved (`/shared/xv6iris-2-l8-park.patch`),
+re-applied in lane (i) after pass 1.  Measure after the merge: recorded in
+the next amendment.
+

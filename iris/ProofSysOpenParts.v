@@ -872,25 +872,15 @@ Section ProofSysOpenPublish.
     i_valid (ientry kk) ↦₄ valid_word true -∗
     a_foff kf ↦₄ voff ={E}=∗
     i_valid (ientry kk) ↦₄ valid_word true ∗ file_core_off kf 1 C.
-  Proof.
-    intros HE Hkk Hip Hwf.
-    iIntros "#Hfam Hvalid Hoff".
-    rewrite /file_core_off. case_bool_decide as Hin; last first.
-    { iModIntro. iFrame "Hvalid". rewrite /foff_dead. iExists voff.
-      iExact "Hoff". }
-    iDestruct (ioff_escrows_acc kk Hkk with "Hfam") as "#Hesc".
-    iMod (ioff_publish E kk kf voff HE (Hwf Hin) with "Hesc [Hvalid] Hoff")
-      as "[Hmk Hfrag]".
-    { rewrite /off_mark. iExact "Hvalid". }
-    iModIntro. iSplitL "Hmk"; [iExact "Hmk"|].
-    iExists kk. rewrite Hip.
-    iSplitR; [iPureIntro; reflexivity|].
-    iSplitR; [iPureIntro; exact Hkk|]. iExact "Hfrag".
-  Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   Lemma so_publish `{XI : CurCtx} (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)
       (gy : gname) (inum : mword 32) (ty : bv 16) (C : fcontent)
       (pn : fpnames) (om : mword 32) (rb wb : bool) (lo tl : nat) :
+    (* r25 shapes (items 15/16): the parked ident fraction is PINNED to the
+       travelling share's -- sys_open lends exactly half of the incoming
+       reference's share fraction, so [inode_pay_alloc] parks at [Q + Q]. *)
+    qi = s ->
     ↑fileipN ⊆ E ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
@@ -941,69 +931,7 @@ Section ProofSysOpenPublish.
        by [C] and [inum] ([fdstate_ok_inj]); it is a parameter rather than a
        projection because [fdstate_ok] is a relation -- see its note. *)
     |={E}=> ∃ st : fdstate, ⌜fdstate_ok inum C st⌝ ∗ file_ref gf kf 1 st.
-  Proof.
-    intros HEi Hkk Hinb Hip Hty Hwrb Hrdb Hwdb Hdir Hdvw Hle.
-    iIntros "#Hfl Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hcoff".
-    (* ---- the generation: name the returned share and pin it ---- *)
-    rewrite inode_shr_gen_intro.
-    iDestruct "Hshr" as (g2 lo2 tl2) "(%Hle2 & #Hfl2 & Hshr)".
-    iDestruct (IcacheRef.inode_ref_short_shr_genlo_agree with "Hkeep Hshr")
-      as %[<- <-].
-    (* ---- the parked reference: the parent, short by exactly [s] ---- *)
-    iAssert (inode_held_short (ientry kk) s) with "[Hkeep Hru]" as "Hsh".
-    { iExists kk, (qi + s)%Qp, qi, inum.
-      iSplitR; [iPureIntro; reflexivity|].
-      iSplitR; [iPureIntro; exact Hkk|].
-      iSplitR; [iPureIntro; exact Hinb|].
-      iSplitR; [iPureIntro; reflexivity|]. iFrame "Hru".
-      iApply (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hle
-                with "Hfl Hkeep"). }
-    iAssert (inode_shr_held_gen (ientry kk) s gy inum) with "[Hshr]" as "Hs".
-    { iExists kk, lo, tl2.
-      iSplitR; [iPureIntro; reflexivity|].
-      iSplitR; [iPureIntro; exact Hkk|].
-      iSplitR; [iPureIntro; exact Hinb|].
-      iSplitR; [iPureIntro; exact Hle2|].
-      iFrame "Hfl2". iExact "Hshr". }
-    (* ---- the two FD-type witnesses: [so_pay_witness] and the owner's
-       ruling, both discharged by the caller and spent in one [iMod] ---- *)
-    iMod (inode_pay_alloc E (ientry kk) s gy inum (fc_type C) (fc_wbool C) ty
-            (so_pay_witness om ty C Hwrb Hdir) Hdvw with "Hsh Hs Hshot")
-      as (gx) "Hpay".
-    (* ---- ONE names update installs the payload's ---- *)
-    iMod (fpay_tok_update gf kf pn
-            (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy inum) with "Hnames")
-      as "Hnames".
-    iModIntro.
-    assert (Hnp : bool_decide (fc_type C = FD_PIPE) = false).
-    { apply bool_decide_false. destruct Hty as [Ht | Ht]; rewrite Ht;
-        intro Hc; by vm_compute in Hc. }
-    assert (Hor : (bool_decide (fc_type C = FD_INODE)
-                   || bool_decide (fc_type C = FD_DEVICE))%bool = true).
-    { destruct Hty as [Ht | Ht]; rewrite Ht.
-      - rewrite bool_decide_true; [reflexivity | reflexivity].
-      - rewrite orb_true_r. reflexivity. }
-    (* the state the file now gives: its type, and -- on the FD_INODE arm --
-       the inum of the reference it just parked *)
-    set (stpub := if bool_decide (fc_type C = FD_INODE)
-                  then FdOpen rb wb (FdInode (bv_unsigned inum))
-                  else FdOpen rb wb (FdDevice (bv_unsigned (fc_major C)))).
-    assert (Hokpub : fdstate_ok inum C stpub).
-    { rewrite /stpub. destruct Hty as [Ht | Ht].
-      - rewrite (bool_decide_true _ Ht). cbn. by repeat split.
-      - rewrite bool_decide_false.
-        2:{ rewrite Ht. unfold FD_DEVICE, FD_INODE. intro Hc.
-            apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc. }
-        cbn. by repeat split. }
-    iExists stpub. iSplitR; [iPureIntro; exact Hokpub|].
-    rewrite /file_ref /file_pay_st /file_core /file_core_noff.
-    iExists C. iFrame "Href Hflds Hlive".
-    iExists (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy inum).
-    cbn [fp_inum]. iSplitR; [iPureIntro; exact Hokpub|].
-    iFrame "Hnames". rewrite Hnp Hor.
-    cbn [fp_icv fp_iq fp_ig].
-    rewrite Hip. iFrame "Hpay Hcoff".
-  Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   (* ==== THE O_TRUNC BRIDGE ============================================
      sys_open is the FIRST caller that has to REBUILD [ic_loaded] after

@@ -75,7 +75,7 @@
    neither of which a lock-free reader may open. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
-From iris.algebra Require Import ufrac auth gmap frac numbers agree csum excl updates local_updates.
+From iris.algebra Require Import ufrac auth gmap frac numbers agree csum excl updates local_updates gset.
 From iris.algebra.lib Require Import dfrac_agree.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants own ghost_var mono_nat ghost_map.
@@ -811,6 +811,13 @@ Class icfg := MkIcfg {
      same reason icfg_isl is: inode_ref / inode_shr carry the box's stamps at
      the file-table altitude. *)
   icfg_box  : nat -> box_names;
+  (* THE OFF BOX'S TWO NAMES (R4b; r25 shapes, 2026-09-02).  Per inode SLOT,
+     the auth of the append-only set of published off boxes ([ic_slp]'s
+     [off_rows] conjunct); and the one slot->box-names agreement map the
+     file table keys its rows by.  Here rather than in [fscfg] because
+     [ic_slp] is stated under [icfg] alone. *)
+  icfg_off  : nat -> gname;
+  icfg_obox : gname;
 }.
 
 (* ---------------------------------------------------------------------- *)
@@ -1013,6 +1020,24 @@ Proof.
 Qed.
 
 (* the per-slot box names, minted as one family (bio_init's pattern; tso-flip R3) *)
+(* the off set family: one empty auth per inode slot (r25 shapes) *)
+Local Lemma icfg_off_fun_alloc {Σ} `{!offboxG Σ} (n j : nat) :
+  ⊢ |==> ∃ f : nat -> gname,
+      [∗ list] k ∈ seq j n, own (f k) (● (∅ : gsetUR box_names)).
+Proof.
+  iInduction n as [|n IH] forall (j).
+  { iModIntro. iExists (fun _ => inhabitant). cbn [seq]. done. }
+  iMod (own_alloc (● (∅ : gsetUR box_names))) as (γs) "Hs"; [by apply auth_auth_valid|].
+  iMod ("IH" $! (S j)) as (f) "Hf".
+  iModIntro. iExists (fun k => if decide (k = j) then γs else f k).
+  change (seq j (S n)) with (j :: seq (S j) n). rewrite big_sepL_cons.
+  iSplitL "Hs".
+  { case_decide as Hdd; [| congruence]. iExact "Hs". }
+  iApply (big_sepL_mono with "Hf"). intros i k Hk.
+  apply lookup_seq in Hk as [-> _].
+  case_decide as Hdd; [exfalso; lia | done].
+Qed.
+
 Local Lemma icfg_box_fun_alloc {Σ} `{!icboxG Σ, !kallocG Σ} (n j : nat) :
   ⊢ |==> ∃ f : nat -> box_names,
       [∗ list] k ∈ seq j n,
@@ -1038,7 +1063,7 @@ Proof.
   case_decide as Hdd; [exfalso; lia | done].
 Qed.
 
-Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ, !icboxG Σ, !kallocG Σ} (dv : mword 32) (nib : nat)
+Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ, !icboxG Σ, !offboxG Σ, !kallocG Σ} (dv : mword 32) (nib : nat)
     (LM : linkUR) (CM : icntUR) (BM : frzmUR)
     (γlog : log_names) (ist : Z) :
   ✓ LM -> ✓ CM -> ✓ BM ->
@@ -1110,7 +1135,11 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ, !icboxG Σ, !kalloc
          walk exists yet, so no inum's deposit is outstanding.  The image has
          no corpses either -- [IcacheBoot.icache_boot_at] hands this straight
          to [IcacheEscrow.ipool_alloc_inv], whose [X] is [∅]. *)
-      ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse).
+      ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
+      (* the off box's names, empty (r25 shapes): the set auths go into
+         [ic_slp] at IcacheBoot, the map auth into [ftable_res] at its boot *)
+      ([∗ list] k ∈ seq 0 NINODE, own (icfg_off k) (● (∅ : gsetUR box_names))) ∗
+      ghost_map_auth icfg_obox 1 (∅ : gmap nat box_names).
 Proof.
   intros HLM HCM HBM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
@@ -1147,12 +1176,14 @@ Proof.
   (* the corpse ledger, whole and empty (durable-disk C-7) *)
   iMod (ghost_map_alloc (∅ : gmap Z icorpse)) as (γpcrp) "[Hpcrp _]".
   iMod (icfg_box_fun_alloc NINODE 0) as (fbox) "Hbox".
+  iMod (icfg_off_fun_alloc NINODE 0) as (foff) "Hoff".
+  iMod (ghost_map_alloc_empty (K:=nat) (V:=box_names)) as (γob) "Hob".
   iModIntro.
   iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γpext γcnt γfrzm γhpn γptrn γpcrp
-             feplo fstmp fbox), g0.
+             feplo fstmp fbox foff γob), g0.
   cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_pool icfg_pext icfg_icnt
-       icfg_frzm icfg_hpn icfg_ptrn icfg_pcrp icfg_ieplo icfg_istmp icfg_box].
-  by iFrame "Ha Hl Hlk Hcnt Hfrzm Hep Hisl Heplo Hstmp Hboot Hreg Hlkr Hpool Hpext Hhpn Hptrn Hpcrp Hbox".
+       icfg_frzm icfg_hpn icfg_ptrn icfg_pcrp icfg_ieplo icfg_istmp icfg_box icfg_off icfg_obox].
+  by iFrame "Ha Hl Hlk Hcnt Hfrzm Hep Hisl Heplo Hstmp Hboot Hreg Hlkr Hpool Hpext Hhpn Hptrn Hpcrp Hbox Hoff Hob".
 Qed.
 
 (* ===================================================================== *)

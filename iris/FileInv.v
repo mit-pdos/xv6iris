@@ -32,6 +32,7 @@ Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export FileInvDefs.
+Require Import OffBox.   (* [obox_auth] -- the slot->box map authority rides the table (r25 shapes) *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import IrefSlots.  (* [iref_frac] -- see FileInvDefs.file_core *)
 Local Open Scope Z_scope.
@@ -41,14 +42,23 @@ Section FileInv.
   Context `{XI : CurCtx}.
 
 
-  Definition ftable_res (γ : gname) : iProp Σ :=
-    (∃ M : gmap nat (Qp * positive),
+  (* THE TABLE'S PAYLOAD AT A FLOOR [Kd] (r25 shapes; items 15-17).  [Kd]
+     is the one floor the [ftable_res_at] row below carries at the
+     acquirer's context; every allocated slot's off L1 row is stamped at or
+     below it, which is what [OffBox.off_reclaim] needs from the last
+     closer (tripwire T2: this floor row exists for that and for nothing
+     else).  [B] is the slot->box-names map; its authority lives here so
+     filealloc updates it under this lock. *)
+  Definition ftable_res (γ : gname) (Kd : nat) : iProp Σ :=
+    (∃ (M : gmap nat (Qp * positive)) (B : gmap nat box_names),
        ftable_auth γ M ∗
+       obox_auth off_cfg B ∗
+       ⌜∀ k, (k < NFILE)%nat -> is_Some (B !! k)⌝ ∗
        (* the fd-slot supply: the table is where the conservation law is
           checked, because the table is what holds one unit per reference. *)
        fd_slots_auth ∗
        ⌜∀ k, is_Some (M !! k) -> (k < NFILE)%nat⌝ ∗
-       [∗ list] k ∈ seq 0 NFILE, fslot γ M k)%I.
+       [∗ list] k ∈ seq 0 NFILE, fslot γ M B Kd k)%I.
 
   (* the whole table: the spinlock named "ftable" over that resource.  ITS
      HANDLE IS A CLOSED TERM and its definition therefore lives BELOW this
@@ -125,25 +135,25 @@ Section FileInv.
      scan borrows slot after slot unchanged (M' := M), and the slot it takes
      is given back at [<[i := (1,1)]> M].  Since [fslot γ M k] reads only
      [M !! k], every other slot is untouched by the update. *)
-  Lemma ftable_slots_acc (γ : gname) (M : gmap nat (Qp * positive)) (i : nat) :
+  Lemma ftable_slots_acc (γ : gname) (M : gmap nat (Qp * positive))
+      (B : gmap nat box_names) (Kd : nat) (i : nat) :
     (i < NFILE)%nat ->
-    ([∗ list] k ∈ seq 0 NFILE, fslot γ M k) -∗
-    fslot γ M i ∗
+    ([∗ list] k ∈ seq 0 NFILE, fslot γ M B Kd k) -∗
+    fslot γ M B Kd i ∗
     (∀ M' : gmap nat (Qp * positive),
-       ⌜∀ k, k ≠ i -> M' !! k = M !! k⌝ -∗ fslot γ M' i -∗
-       [∗ list] k ∈ seq 0 NFILE, fslot γ M' k).
+       ⌜∀ k, k ≠ i -> M' !! k = M !! k⌝ -∗ fslot γ M' B Kd i -∗
+       [∗ list] k ∈ seq 0 NFILE, fslot γ M' B Kd k).
   Proof.
     iIntros (Hi) "H".
     assert (Hlk : seq 0 NFILE !! i = Some i).
     { apply lookup_seq. lia. }
-    rewrite (big_sepL_delete (fun _ k => fslot γ M k) (seq 0 NFILE) i i Hlk).
+    rewrite (big_sepL_delete (fun _ k => fslot γ M B Kd k) (seq 0 NFILE) i i Hlk).
     iDestruct "H" as "[$ Hrest]".
     iIntros (M' HM') "Hi".
-    rewrite (big_sepL_delete (fun _ k => fslot γ M' k) (seq 0 NFILE) i i Hlk).
+    rewrite (big_sepL_delete (fun _ k => fslot γ M' B Kd k) (seq 0 NFILE) i i Hlk).
     iFrame "Hi".
     iApply (big_sepL_mono with "Hrest").
     intros idx y Hy. destruct (decide (idx = i)) as [->|Hne]; [done|].
-    (* in [seq 0 NFILE] the element IS the index, so [y <> i] *)
     apply lookup_seq in Hy as [-> _].
     unfold fslot. rewrite (HM' _ Hne). done.
   Qed.
@@ -368,21 +378,7 @@ Section FileInv.
     file_core_off k 1 C -∗ ftable_auth γ M -∗ flive_tok k
     ={E}=∗
     ftable_auth γ M ∗ flive_tok k ∗ foff_dead k 1.
-  Proof.
-    iIntros (HE HM) "Hfam Hoff Ha Hlv".
-    rewrite /file_core_off.
-    case_bool_decide as Hin; last first.
-    { iModIntro. iFrame. }
-    iDestruct "Hoff" as (i) "(%Hv & %Hi & Hfrag)".
-    assert (HEi : ↑(offN .@ i) ⊆ E)
-      by (etrans; [apply nclose_subseteq | exact HE]).
-    iDestruct (ioff_escrows_acc i Hi with "Hfam") as "#Hinv".
-    iMod (ioff_reclaim E γ i k M qt HEi HM with "Hinv Hfrag Ha Hlv")
-      as "(Hauth & Hlv & Hcell)".
-    iModIntro. iFrame "Hauth Hlv".
-    iDestruct "Hcell" as (v) "[Hc _]". rewrite /foff_dead. iExists v.
-    iExact "Hc".
-  Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   (* ------------------------------------------------------------------ *)
   (*  The three ghost steps, all performed under ftable.lock              *)
@@ -665,6 +661,23 @@ End FileInv.
    removed even the cinv token from the slot: a slot's ξ-dependence is now
    [file_fields] plus the plain cells/own-ghosts of [file_core], and the
    instance is the structural ones applied AS TERMS. *)
+(* THE λ PAYLOAD WITH ITS FLOOR ROW (L7, items 15-17; FINAL name, tripwire
+   T1).  Stated below the section so [(XI := ξ)] is an argument: the
+   acquirer re-indexes it along its [ctx_dom] via the instance below, and
+   the eight releases are [_in] releases that re-floor it at the releaser's
+   context ([SpecRelease.wp_release_in_sconf], the fold like
+   [IcacheEscrow.ic_slp_fold]). *)
+Definition ftable_res_at `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}
+    (γ : gname) (ξ : CtxId) : iProp Σ :=
+  (∃ Kd : nat, ctx_floor ξ Kd ∗ ftable_res (XI := ξ) γ Kd)%I.
+
+(* DAY-ONE SKELETON (rule 0): the payload's morph, which [SpecAcquire] /
+   [SpecRelease] resolve at the eleven sites and ProofMain's [newlock]
+   (reviewer 1's pitfall 6: it must be a Global Instance). *)
+Global Instance ftable_res_at_morph `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}
+    (γ : gname) : CtxMorph (ftable_res_at γ).
+Proof. (* SKELETON r25: ctx_morph_exist; ctx_floor_dom for the floor; ftable_res structural via fslot_morph *) Admitted.
+
 Section FileLock.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{XI : CurCtx}.
@@ -672,7 +685,7 @@ Section FileLock.
 
   (* Persistent, so every core shares it. *)
   Definition is_ftable (γl γ : gname) : iProp Σ :=
-    is_lock γl ftable_addr "ftable"%string <{ ftable_res γ }>.
+    is_lock γl ftable_addr "ftable"%string (ftable_res_at γ).
 
   Global Instance is_ftable_persistent γl γ : Persistent (is_ftable γl γ).
   Proof. apply _. Qed.
@@ -805,56 +818,11 @@ Section FileGhostAlloc.
   (* ================================================================== *)
   Lemma ftable_res_boot (E : coPset) :
     flive_own (● (∅ : gmap nat positive)) -∗
+    obox_auth off_cfg ∅ -∗
     ([∗ list] k ∈ seq 0 NFILE, fentry_raw k) -∗
     fd_slots_auth -∗
     iref_slots NFILE ={E}=∗
-    ∃ γ : gname, ftable_res γ.
-  Proof.
-    iIntros "Hfol Hraw Hfda Hir".
-    iMod (ftable_ghosts_alloc with "Hfol") as (γ) "[Hauth Htoks]".
-    iDestruct (iref_slots_to_any (seq 0 NFILE) with "[Hir]") as "Hunits".
-    { rewrite length_seq. iExact "Hir". }
-    (* the three families, zipped into one so the per-slot work is a single
-       [big_sepL_mono] under [big_sepL_fupd] rather than three walks. *)
-    iAssert ([∗ list] k ∈ seq 0 NFILE,
-               (fentry_raw k ∗ (∃ pn, fpay_tok γ k 1 pn) ∗ iref_slot))%I
-      with "[Hraw Htoks Hunits]" as "Hall".
-    (* the WAND form, not [rewrite !big_sepL_sep]: an [⊣⊢] big-op law under
-       [rewrite] is a setoid rewrite whose cost is the [Proper] proofs over
-       the PREDICATES, and the trailing failing pass re-traverses the whole
-       goal for nothing.  [big_sepL_sep_2] matches by head.  Measured
-       2026-08-29: the sentence 4.25 s -> 0.1 s.  Same edit and same reason
-       as [BootShared.v]'s eight-way chain. *)
-    { iApply (big_sepL_sep_2 with "Hraw [Htoks Hunits]").
-      iApply (big_sepL_sep_2 with "Htoks Hunits"). }
-    iAssert ([∗ list] k ∈ seq 0 NFILE, fslot γ ∅ k)%I
-      with "[Hall]" as "Hslots".
-    { iApply (big_sepL_mono with "Hall").
-      intros i k _. iIntros "(Hraw & (%pn & Htok) & Hu)".
-      rewrite /fentry_raw.
-      iDestruct "Hraw" as "(Hty & Href & (%r & Hrd) & (%w & Hwr) &
-                            (%pp & Hpp) & (%ip & Hip) & Hoff & (%mj & Hmj))".
-      rewrite /fslot lookup_empty.
-      iSplitL "Href"; [iExact "Href"|].
-      iExists (MkFContent FD_NONE r w pp ip mj).
-      iSplitR; [iPureIntro; reflexivity|].
-      iSplitL "Hty Hrd Hwr Hpp Hip Hmj".
-      { rewrite /file_fields.
-        cbn [fc_type fc_readable fc_writable fc_pipe fc_ip fc_major].
-        iFrame "Hty Hrd Hwr Hpp Hmj". iExact "Hip". }
-      rewrite /file_pay.
-      iExists pn.
-      iSplitL "Htok"; [iExact "Htok"|].
-      rewrite (file_core_none k 1 pn (MkFContent FD_NONE r w pp ip mj) eq_refl).
-      iSplitL "Hu".
-      { rewrite -iref_slot_frac. iExact "Hu". }
-      rewrite /foff_dead. iExists (mword_of_int 0 : mword 32). iExact "Hoff". }
-    iModIntro. iExists γ. rewrite /ftable_res.
-    iExists ∅. iFrame "Hauth Hfda".
-    iSplitR.
-    { iPureIntro. intros k Hk. rewrite lookup_empty in Hk.
-      by destruct Hk as [? ?]. }
-    iExact "Hslots".
-  Qed.
+    ∃ γ : gname, ftable_res_at γ cur_ctx.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
 End FileGhostAlloc.

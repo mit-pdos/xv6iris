@@ -568,8 +568,8 @@ Section IputTail.
     ((∀ (M' : gmap nat (Qp * positive)) (ci' : gmap nat (mword 32 * mword 32)),
         ⌜forall j, j <> k -> M' !! j = Mt !! j⌝ -∗
         ⌜forall j, j <> k -> ci' !! j = ci !! j⌝ -∗
-        islot2 cn M' ci' k -∗
-        [∗ list] j ∈ seq 0 NINODE, islot2 cn M' ci' j) ∗
+        islot2 cur_ctx cn M' ci' k -∗
+        [∗ list] j ∈ seq 0 NINODE, islot2 cur_ctx cn M' ci' j) ∗
      ⌜ci !! k = Some (dev, inum)⌝ ∗
      islot_rest_at k q dev inum ∗ iref_slots (Pos.to_nat 1) ∗
      ic_id cn k (1/2) true dev inum ∗ icnt_half (bv_unsigned inum) (Pos.to_nat 1) ∗
@@ -600,11 +600,11 @@ Section IputTail.
               ip_row_open cn k Mt ci q dev inum ∗ ip_pin k tid qtx
          else ([∗ list] i0 ∈ seq 0 NINODE, itable_slot_res TsoCtx.cur_ctx Mt ci i0) ∗
               IcacheRef.ic_ref_stamps k dev inum 1%Qp ∗
-              ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) ∗
+              ([∗ list] i0 ∈ seq 0 NINODE, islot2 cur_ctx cn Mt ci i0) ∗
               tid ↪[ln_tx icfg_log]{#qtx} ()
      | None => ([∗ list] i0 ∈ seq 0 NINODE, itable_slot_res TsoCtx.cur_ctx Mt ci i0) ∗
                IcacheRef.ic_ref_stamps k dev inum 1%Qp ∗
-               ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) ∗
+               ([∗ list] i0 ∈ seq 0 NINODE, islot2 cur_ctx cn Mt ci i0) ∗
                tid ↪[ln_tx icfg_log]{#qtx} ()
      end)%I.
 
@@ -623,7 +623,7 @@ Section IputTail.
      inode_ident k (DfracOwn q) dev inum) ∗
     (([∗ list] i0 ∈ seq 0 NINODE, itable_slot_res TsoCtx.cur_ctx Mt ci i0) ∗
      IcacheRef.ic_ref_stamps k dev inum 1%Qp ∗
-     ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) ∗
+     ([∗ list] i0 ∈ seq 0 NINODE, islot2 cur_ctx cn Mt ci i0) ∗
      tid ↪[ln_tx icfg_log]{#qtx} ()).
   Proof. intros H Hne. rewrite /ip_rows H. case_decide; [congruence | reflexivity]. Qed.
 
@@ -2560,7 +2560,7 @@ Section IputFreePath.
      IputFreeEntryDev.v:428-467), in the same order and with the same
      arguments.  ip_free_entry's Exit-B continuation therefore discharges
      this entry by [iApply] with nothing re-derived on either side; the
-     islot2 big-op and [IcacheRef.inode_ref] that used to sit here are
+     islot2 cur_ctx big-op and [IcacheRef.inode_ref] that used to sit here are
      UNSATISFIABLE at 0x5a and no longer appear (see the i_inum-split note at
      the premise site, and the 586 site in the body where the surplus half is
      now fed to the wand instead of dropped).
@@ -2671,7 +2671,7 @@ Section IputFreePath.
        sits on its HELD arm, and [IcacheEscrow.ic_held] owns [i_inum] AT
        DFRAC 1 by design (the arm's own 1/2 PLUS the closer's [q] PLUS the
        table's [1/2 - q]) -- i.e. exactly the two [i_inum] shares that live
-       inside [IcacheRef.inode_ref] and inside [islot2 fsc_ic Mt ci k]'s
+       inside [IcacheRef.inode_ref] and inside [islot2 cur_ctx fsc_ic Mt ci k]'s
        [islot_rest_at].  Neither of those two resources exists at this pc.
        The fingerprint of the over-count was in this file's own body: the
        0x76 [ic_open_held] returns [i_inum] WHOLE and the surplus half was
@@ -2679,7 +2679,7 @@ Section IputFreePath.
 
        What is taken instead is the pieces that DO exist plus a RE-ASSEMBLY
        WAND: fed the surplus half (now no longer dropped) and the borrowed
-       [ic_id], it rebuilds the islot2 list and the reference's identity
+       [ic_id], it rebuilds the islot2 cur_ctx list and the reference's identity
        exactly.  This block is a VERBATIM copy of
        [IputFreeEntryDev.ip_free_entry]'s EXIT B (IputFreeEntryDev.v:461-467
        at cdcd2c86f5), so the Exit-B -> entry hand-off is SHAPE-IDENTICAL:
@@ -2688,7 +2688,7 @@ Section IputFreePath.
        ================================================================ *)
     ⌜ci !! k = Some (icfg_dev, inum)⌝ -∗
     (* R3: the table's slot rows go whole (the frozen park inside) *)
-    ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic Mt ci i0) -∗
+    ([∗ list] i0 ∈ seq 0 NINODE, islot2 cur_ctx fsc_ic Mt ci i0) -∗
     (* the REDUCED reference (its live slice froze into the table); no fresh
        fragment -- with (g) the unit's stays in the box's window (F30) *)
     (iref_frag k q ∗ slh_tok (icfg_isl k) q ∗
@@ -2707,7 +2707,7 @@ Section IputFreePath.
        releasesleep at 0x76 needs runs [ic_open_held], which CONSUMES exactly
        these two (plus iref_frag/live_frac out of the [iref_tok] above and
        the [ic_id] the entry now takes directly, the two pieces that used to
-       be popped from [inode_ref] and from the islot2 big-op before the
+       be popped from [inode_ref] and from the islot2 cur_ctx big-op before the
        i_inum-split note above retired both); the clean subset cannot
        rebuild [ic_payload_at] (it lacks
        the dir-link ledger, the disk-data cells and the well-formedness).
@@ -4084,7 +4084,7 @@ Section IputFreePath.
        isl_pool Mt -∗
        ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib ∖ ci_inums ci) ∅ -∗
        ⌜ci !! k = Some (icfg_dev, inum)⌝ -∗
-       ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic Mt ci i0) -∗
+       ([∗ list] i0 ∈ seq 0 NINODE, islot2 cur_ctx fsc_ic Mt ci i0) -∗
        (iref_frag k q ∗ slh_tok (icfg_isl k) q ∗
         IcacheRef.inode_ident k (DfracOwn q) icfg_dev inum) -∗
        ic_id fsc_ic k (1/4) true icfg_dev inum -∗
@@ -4219,7 +4219,7 @@ Section IputFreePath.
     ([∗ list] i0 ∈ seq 0 NINODE, itable_slot_res TsoCtx.cur_ctx Mt ci i0) -∗
     iref_slots_auth -∗
     isl_pool Mt -∗
-    ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic Mt ci i0) -∗
+    ([∗ list] i0 ∈ seq 0 NINODE, islot2 cur_ctx fsc_ic Mt ci i0) -∗
     ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib ∖ ci_inums ci) ∅ -∗
     (* R3: the closer's unit with its stamps fragment NAMED, and the itable
        acquire's floor over it -- the guard's (a) presents both *)

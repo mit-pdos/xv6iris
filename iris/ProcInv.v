@@ -2777,6 +2777,37 @@ Section ProcInv.
   (* =================================================================== *)
 End ProcInv.
 
+(* ==================================================================== *)
+(*  DAY-ONE INSTANCE SKELETONS (r25 shapes; rule 0, plan §9 items 16/17). *)
+(*  L8's second deposit moves the child's private block into its twin     *)
+(*  context; every context-indexed row of it is stated here with the      *)
+(*  context as an argument so a row that cannot cross is a type error.    *)
+(*  [cwd_ref] is [inode_held], whose instance the floors law gives         *)
+(*  (IcacheRef); [first_tok]'s is FirstTok's; the file rows' are           *)
+(*  FileInvDefs's.  Proofs are lane work, listed in the Admitted inventory. *)
+(* ==================================================================== *)
+Section ProcPrivMorph.
+  Context `{!riscvGS Σ}.
+  Context `{ !fileG Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{GEN : GenId}.
+
+  Global Instance ofile_slot_morph γf γd pa fd v :
+    CtxMorph (λ ξ : CtxId, ofile_slot (XI := ξ) γf γd pa fd v).
+  Proof. (* SKELETON r25 *) Admitted.
+  Global Instance proc_ofiles_morph γf γd pa fs :
+    CtxMorph (λ ξ : CtxId, proc_ofiles (XI := ξ) γf γd pa fs).
+  Proof. (* SKELETON r25 *) Admitted.
+  Global Instance proc_priv_core_morph pa pid U :
+    CtxMorph (λ ξ : CtxId, proc_priv_core (XI := ξ) pa pid U).
+  Proof. (* SKELETON r25 *) Admitted.
+  Global Instance proc_priv_morph γf pa pid U :
+    CtxMorph (λ ξ : CtxId, proc_priv (XI := ξ) γf pa pid U).
+  Proof. (* SKELETON r25 *) Admitted.
+  Global Instance proc_priv_nopt_morph γf pa pid V :
+    CtxMorph (λ ξ : CtxId, proc_priv_nopt (XI := ξ) γf pa pid V).
+  Proof. (* SKELETON r25 *) Admitted.
+End ProcPrivMorph.
+
 (* ====================================================================== *)
 (* THE PRIVATE BLOCK'S TRANSPORT OBLIGATION (tso-port M3 / absorb).        *)
 (*                                                                         *)

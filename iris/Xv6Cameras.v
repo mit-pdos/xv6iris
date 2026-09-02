@@ -64,7 +64,7 @@
     [subG_xv6GΣ] with "Cannot infer this placeholder".  *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
-From iris.algebra Require Import excl auth agree csum frac ufrac dfrac gmap
+From iris.algebra Require Import excl auth agree csum frac ufrac dfrac gmap gset
      gset gmultiset numbers updates local_updates.
 From iris.algebra.lib Require Import excl_auth dfrac_agree mono_list.
 From iris.proofmode Require Import proofmode.
@@ -1076,3 +1076,37 @@ Proof. solve_inG. Qed.
 Global Instance icbox_boxG {Σ} `{!icboxG Σ} `{!kallocG Σ} : boxG ic_bid ic_x Σ :=
   {| box_stampsG := icbox_stampsG; box_cntG := kalloc_count_inG;
      box_slotdG := icbox_slotdG; box_slotpG := icbox_slotpG |}.
+
+(* ---- THE OFF BOX'S CAMERAS (R4b; tso-cutover r25 shapes, 2026-09-02) ----
+   The third instance of the box (OffBox.v): X := unit, id := the file slot.
+   Moved here from OffBox.v so that [xv6G] can bundle the class and no
+   consumer section names it (the same reason [icboxG] lives here).  Two
+   cameras beyond the box's own: the per-inode-slot APPEND-ONLY SET of
+   published boxes ([off_rows], an auth over a gset of box names) and the
+   SLOT -> BOX-NAMES agreement map ([obox_frag]: a file slot's fd rows and
+   its table row name the same box, fractional pointsto, updated under
+   ftable.lock at filealloc).  [box_names] is countable for the set. *)
+Global Instance box_names_eq_dec : EqDecision box_names.
+Proof. solve_decision. Defined.
+Global Instance box_names_countable : Countable box_names.
+Proof.
+  apply (inj_countable'
+           (λ b, (bx_stamps b, bx_cnt b, bx_slotd b, bx_slotp b))
+           (λ t, BoxNames t.1.1.1 t.1.1.2 t.1.2 t.2)).
+  by intros [].
+Qed.
+Class offboxG (Σ : gFunctors) := OffboxG {
+  offbox_stampsG :: inG Σ (stampsR nat);
+  offbox_slotdG  :: ghost_varG Σ (slot_reg nat unit);
+  offbox_slotpG  :: ghost_varG Σ (l2_reg nat);
+  offbox_setG    :: inG Σ (authR (gsetUR box_names));
+  offbox_oboxG   :: ghost_mapG Σ nat box_names;
+}.
+Definition offboxΣ : gFunctors :=
+  #[ GFunctor (stampsR nat); ghost_varΣ (slot_reg nat unit); ghost_varΣ (l2_reg nat);
+     GFunctor (authR (gsetUR box_names)); ghost_mapΣ nat box_names ].
+Global Instance subG_offboxΣ {Σ} : subG offboxΣ Σ -> offboxG Σ.
+Proof. solve_inG. Qed.
+Global Instance offbox_boxG {Σ} `{!offboxG Σ} `{!kallocG Σ} : boxG nat unit Σ :=
+  {| box_stampsG := offbox_stampsG; box_cntG := kalloc_count_inG;
+     box_slotdG := offbox_slotdG; box_slotpG := offbox_slotpG |}.

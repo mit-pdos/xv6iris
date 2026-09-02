@@ -106,6 +106,8 @@ Class xv6G (Σ : gFunctors) := Xv6G {
      TSO port's R1: [bio_ctx]/[bio_init] are stated by ~100 files; see the
      note at [Xv6Cameras.bioboxG]. *)
   xv6_biobox     :: bioboxG Σ;
+  (* the off box's cameras (R4b, r25 shapes): the set and the slot->box map *)
+  xv6_offbox     :: offboxG Σ;
   xv6_icbox      :: icboxG Σ;    (* the icache instance of the box (R3) *)
 }.
 
@@ -130,7 +132,8 @@ Class xv6G (Σ : gFunctors) := Xv6G {
 Definition xv6GΣ : gFunctors :=
   #[ sieΣ; lockΣ; kallocΣ; bioΣ; diskGhostΣ; uartGhostΣ; fsLogΣ; logΣ;
      fsCrashΣ; iregΣ; fsTopΣ; fsLinkΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ;
-     flivΣ; bioboxΣ; icboxΣ ].
+     flivΣ; bioboxΣ; icboxΣ;
+     offboxΣ ].
 
 Global Instance subG_xv6GΣ {Σ} : subG xv6GΣ Σ -> xv6G Σ.
 Proof. solve_inG. Qed.

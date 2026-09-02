@@ -1931,65 +1931,39 @@ End UsertrapRes.
    The names are ARGUMENTS rather than read off a record so that the
    resumer can supply the bundle before it has seen one. *)
 Definition park_globals `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-    !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
-    (ξ : CtxId) (γs : list gname) (γft γf : gname) : iProp Σ :=
-  (* [procs_inv] at the AMBIENT context, not [ξ] (main's M2 port, SC-stub
-     corner): its lock rows reach the ambient handler contract through
-     [valid_context] / [p_sched] / [trap_csrs], which has no transport without
-     the M-leg's caps channel; the row rides as a [ctx_morph_const] conjunct. *)
-  (procs_inv γs ∗
-   (* [is_ftable] is a CLOSED TERM since the M3 λ-conversion of
-      [ftable_res] (FileInv.v's [FileLock] section), so it names no ξ. *)
-   is_ftable γft γf ∗
-   console_caps fsc_uart ∗
+    !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    (ξ : CtxId) (γs : list gname) (γw γft γf γtl : gname) : iProp Σ :=
+  (procs_inv (XI := ξ) γs ∗
+   is_lock (XI := ξ) γw wait_lock_addr "wait_lock"%string wait_res_at ∗
+   is_ftable (XI := ξ) γft γf ∗
+   console_caps (XI := ξ) fsc_uart ∗
    console_ready (XI := ξ) ∗
+   is_tickslock (XI := ξ) γtl ∗
+   (∃ γp : gname,
+      is_lock (XI := ξ) γp SpecAllocpid.alp_pid_lock "nextpid"%string SpecAllocpid.nextpid_res_at) ∗
    (∃ ip : mword 64,
       ctx_word_pointsto ξ (mword_of_int KernelSyms.initproc : mword 64)
         DfracDiscarded ip))%I.
 
 Global Instance park_globals_persistent `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-    !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx} ξ γs γft γf :
-  Persistent (park_globals ξ γs γft γf).
+    !irefslotG Σ, !pavG Σ} `{GEN : GenId} ξ γs γw γft γf γtl :
+  Persistent (park_globals ξ γs γw γft γf γtl).
 Proof. rewrite /park_globals. apply _. Qed.
 
-(* ...AND IT TRANSPORTS (tso-port.md §0.16′).  The park has to hand this
-   bundle to a freshly minted child context, and what a [TsoCtx.ctx_deposit]
-   wants is not context-FREEDOM but TRANSPORTABILITY (§0.15′'s rule).  Every
-   row goes through: [procs_inv] and [console_ready] by their own instances,
-   [is_ftable] and [console_caps] because they are CLOSED TERMS (the M3
-   λ-conversions -- [ftable_res]'s landed at §0.16′), and the [initproc] cell
-   by [ctx_morph_word] applied AS A TERM (instance search does not do the ∃
-   unification -- MEASURED).
-
-   THIS INSTANCE IS THE RECORD OF WHAT IS PAYABLE.  ALL SIX rows
-   [ProofForkretPark.forkret_park_paid] deposits into the child's context
-   are: this one, [SchedCtx.procs_inv], [ProcDefs.is_kstack],
-   [SwtchCtx.ctx_cells], [StackOwn.stack_own] -- and, since the bcache
-   escrow became a PARKED RECORD (tso-port.md §0.17′), [ProcInv.proc_priv]
-   too ([ProcInv.proc_priv_morph]).  The park is [Qed]. *)
+(* THE RESUMER'S GLOBALS, AT FLIP'S ARITY (L8 / A12.19; r25 shapes, day
+   one).  The eight rows a process's forkret needs at ITS context, handed
+   to the parked twin by [ProofForkretPark]'s deposit.  Every row is a
+   λ-payload lock handle, an instanced invariant, or a persistent cell,
+   except [is_ftable], whose handle morphs once its payload is the λ
+   [FileInv.ftable_res_at] (this commit).  DAY-ONE SKELETON (rule 0): the
+   deposit's instance, stated now; the proof (hand instances for the two
+   handles without a global one, the console caps' two locks) lands with
+   the L8 patch. *)
 Global Instance park_globals_morph `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-    !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx} (γs : list gname) (γft γf : gname) :
-  CtxMorph (λ ξ0 : CtxId, park_globals ξ0 γs γft γf).
-Proof.
-  iIntros (ξ ξ') "Hd H". rewrite /park_globals.
-  iDestruct "H" as "(Hp & #Hft & #Hcc & Hcr & Hip)".
-  iMod (ctx_morph (R := λ ξ0 : CtxId, ConsoleInv.console_ready (XI := ξ0))
-               ξ ξ' with "Hd Hcr") as "[Hd Hcr]".
-  iDestruct "Hip" as (ip) "Hip".
-  iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hip") as "[Hd Hip]".
-  iModIntro. iFrame "Hd Hp Hft Hcc Hcr". iExists ip. iExact "Hip".
-Qed.
+    !irefslotG Σ, !pavG Σ} `{GEN : GenId} (γs : list gname) (γw γft γf γtl : gname) :
+  CtxMorph (λ ξ0 : CtxId, park_globals ξ0 γs γw γft γf γtl).
+Proof. (* SKELETON r25 (lane i, the L8 patch) *) Admitted.
 
-(* ------------------------------------------------------------------- *)
-(* THE TWO CROSS-CONTEXT AGREEMENTS THE PINS ARE READ WITH.              *)
-(* ------------------------------------------------------------------- *)
-(* [TsoCtx.ctx_word_pointsto_agree] is stated over two FREE contexts and
-   needs no [ctx_dom] -- two registered facts about one byte name one
-   lattice cell.  It is the only law in the sealed surface that relates two
-   contexts for nothing, and these two are its only park-side uses.  They
-   belong in [DiskInv.v] and [ProcDefs.v] beside their single-context
-   twins; they are here so that this fix does not rebuild the whole tree
-   for two four-line lemmas.  MOVE THEM WHEN THAT IS CHEAP. *)
 Lemma disk_geom_agree_x `{!riscvGS Σ, !xv6G Σ} `{!ufdG Σ} (ξ1 ξ2 : CtxId) (γ : disk_names)
     (pd pav pu pd' pav' pu' : mword 64) :
   disk_geom (XI := ξ1) γ pd pav pu -∗ disk_geom (XI := ξ2) γ pd' pav' pu' -∗

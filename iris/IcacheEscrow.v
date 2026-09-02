@@ -208,6 +208,7 @@ From Stdlib Require Import QArith Qcanon.
 From iris.algebra Require Import ufrac.
 Require Import TsoMemPa TsoGhost.
 Require Import CtxBox.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] -- ip->lock's payload carries the off rows (r25 shapes) *)
 Require Import SepThread.   (* the boot threads own_context through the slots *)
 
 Local Open Scope Z_scope.
@@ -4609,27 +4610,39 @@ Section IcacheBox.
     by iPureIntro.
   Qed.
 
+  (* THE THIRD FINAL SHAPE (r25; items 16/17): ip->lock's payload also holds
+     the inode's published off rows (OffBox.off_rows) -- the L2 rows of the
+     off boxes whose files point at this inode, keyed by the per-slot set. *)
   Definition ic_slp cn k : CtxId -> iProp Σ :=
     fun ξ => (∃ s : l2_reg ic_bid,
       CtxBox.l2_row (X := ic_x) (icfg_box k) s ξ ∗
-      ic_tok cn k ∗ ic_dep_neutral cn k)%I.
+      ic_tok cn k ∗ ic_dep_neutral cn k ∗
+      off_rows off_cfg k ξ)%I.
   Global Instance ic_slp_morph cn k : CtxMorph (ic_slp cn k).
   Proof.
     rewrite /ic_slp. apply ctx_morph_exist => s.
     apply ctx_morph_sep; [apply _ |].
-    apply ctx_morph_sep; apply ctx_morph_const.
+    apply ctx_morph_sep; [apply ctx_morph_const |].
+    apply ctx_morph_sep; [apply ctx_morph_const | apply off_rows_morph].
   Qed.
   (* the releaser's UNFLOORED row at a known park stamp (R2's Rdep, the
      bcache's bslp_dep): what (f) leaves in hand; the _in release re-floors
      it at the parked context through the fold *)
-  Definition ic_slp_dep cn k (T' : nat) : iProp Σ :=
-    (ic_tok cn k ∗ ic_regp k (L2Reg T' None) ∗ ic_dep_neutral cn k)%I.
-  Lemma ic_slp_fold cn k T' (ξ : CtxId) :
-    ic_slp_dep cn k T' ∗ ctx_floor ξ T' ⊢ ic_slp cn k ξ.
-  Proof.
-    iIntros "[(Ht & Hrp & Hn) #Hfl]". rewrite /ic_slp. iExists (L2Reg T' None).
-    rewrite /CtxBox.l2_row /ic_regp. iFrame "Ht Hrp Hn". iSplitR; [done |]. iExact "Hfl".
-  Qed.
+  (* the releaser's context-free form, at ONE bound [T] for the combined
+     maximum (reviewer 2's correction 2): the register's own park stamp
+     [Tp ≤ T] (it cannot be raised at release), the off rows bounded by [T]
+     (OffBox.off_rows_dep), and [llb T] so the [_in] release presents one
+     lower bound.  [ic_slp_fold]'s statement is unchanged; per row the fold
+     weakens the floor by [TsoCtx.ctx_floor_le]. *)
+  Definition ic_slp_dep cn k (T : nat) : iProp Σ :=
+    (∃ Tp : nat, ⌜(Tp ≤ T)%nat⌝ ∗ llb loglen_name T ∗
+       ic_tok cn k ∗ ic_regp k (L2Reg Tp None) ∗ ic_dep_neutral cn k ∗
+       off_rows_dep off_cfg k T)%I.
+  Lemma ic_slp_dep_llb cn k T : ic_slp_dep cn k T -∗ llb loglen_name T.
+  Proof. iIntros "(% & _ & #H & _)". iExact "H". Qed.
+  Lemma ic_slp_fold cn k T (ξ : CtxId) :
+    ic_slp_dep cn k T ∗ ctx_floor ξ T ⊢ ic_slp cn k ξ.
+  Proof. (* SKELETON r25 (lane ii): ctx_floor_le T -> Tp for the register row; off_rows_fold *) Admitted.
   Global Instance ic_slp_dep_morph cn k T' : CtxMorph (fun _ => ic_slp_dep cn k T').
   Proof. apply ctx_morph_const. Qed.
   (* L1: the slot's row in itable_res2 -- the register half, shut and
@@ -5434,12 +5447,19 @@ Section IcacheTable.
      complementary to the dead header's ([islot_free_at]); the LIVE/EMPTY
      agreement [ic_id] retired -- the box register's identity IS [ci !! k]
      ([ic_slot_row] below, in the ξ-row). *)
-  Definition islot_empty (cn : ic_names) (k : nat) : iProp Σ :=
+  (* THE SIXTH FINAL SHAPE (r25 shapes; found by the day-one type-check
+     gate, reviewer 2's rule 0): itable.lock's payload took the DEFINER's
+     ambient context beside its own [ξ] -- through this row's cells and
+     [islot2]'s -- so the handle at one context named a different payload
+     from the handle at another and could not morph.  The rows now take the
+     payload's [ξ] explicitly; at the acquirer's context they unfold to what
+     they were, so consumers change one token. *)
+  Definition islot_empty (ξ : TsoCtx.CtxId) (cn : ic_names) (k : nat) : iProp Σ :=
     (∃ dev inum : mword 32,
        (* THE CELLS follow the box (tso-flip M-1'/F17): the table's share of
           a DEAD slot is the identity halves complementary to the dead
           header's ([islot_free_at]). *)
-       islot_free_at k dev inum ∗
+       islot_free_at (XI := ξ) k dev inum ∗
        (* THE GHOST follows main (durable-disk C-3b), re-homed by the stitch
           (endgame plan §6′): the identity IS the register's [sr_ident]
           (= [ci !! k]), so both halves of the table's side of the
@@ -5472,12 +5492,12 @@ Section IcacheTable.
      arms' inums, so pool ⊎ live = every region inum, one half each); wiring
      it is the recycle/eviction increment's, together with the boot premise
      that supplies them. *)
-  Definition islot2 (cn : ic_names) (M : gmap nat (Qp * positive))
+  Definition islot2 (ξ : TsoCtx.CtxId) (cn : ic_names) (M : gmap nat (Qp * positive))
       (ci : gmap nat (mword 32 * mword 32)) (k : nat) : iProp Σ :=
     match M !! k, ci !! k with
-    | None, None => islot_empty cn k
+    | None, None => islot_empty ξ cn k
     | Some (q, n), Some (dev, inum) =>
-        (islot_rest_at k q dev inum ∗ iref_slots (Pos.to_nat n) ∗
+        (islot_rest_at (XI := ξ) k q dev inum ∗ iref_slots (Pos.to_nat n) ∗
          (* A QUARTER since durable-disk C-3b: see [islot_empty]. *)
          ic_id cn k (1/2) true dev inum ∗
          icnt_half (bv_unsigned inum) (Pos.to_nat n) ∗
@@ -5725,7 +5745,7 @@ Section IcacheTable.
           invariant could survive
           (claude-notes/projects/iput-acquiresleep.md). *)
        isl_pool M ∗
-       ([∗ list] k ∈ seq 0 NINODE, islot2 cn M ci k) ∗
+       ([∗ list] k ∈ seq 0 NINODE, islot2 ξ cn M ci k) ∗
        ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅)%I.
 
   Definition itable_res2_llb (ξ : TsoCtx.CtxId)
@@ -5737,14 +5757,14 @@ Section IcacheTable.
        ⌜icM_wf M⌝ ∗ ⌜ic_ci_wf M ci nib dv⌝ ∗
        iref_slots_auth ∗
        isl_pool M ∗
-       ([∗ list] k ∈ seq 0 NINODE, islot2 cn M ci k) ∗
+       ([∗ list] k ∈ seq 0 NINODE, islot2 ξ cn M ci k) ∗
        ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅)%I.
 
   Global Instance itable_res2_llb_morph (cn : ic_names) (γfs : fs_names)
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
       (dv : mword 32) :
     CtxMorph (fun ξ => itable_res2_llb ξ cn γfs γi cov logstart nib dv).
-  Proof. rewrite /itable_res2_llb. apply _. Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   (* THE BARE TABLE: every row's floor stripped and bounded by ONE [tl] --
      what the boot deposits through [newlock_at_llb] (the fifty boot stamps
@@ -5773,13 +5793,13 @@ Section IcacheTable.
        ⌜icM_wf M⌝ ∗ ⌜ic_ci_wf M ci nib dv⌝ ∗
        iref_slots_auth ∗
        isl_pool M ∗
-       ([∗ list] k ∈ seq 0 NINODE, islot2 cn M ci k) ∗
+       ([∗ list] k ∈ seq 0 NINODE, islot2 ξ cn M ci k) ∗
        ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅)%I.
 
   Global Instance itable_res2_bare_morph (tl : nat) (cn : ic_names) (γfs : fs_names)
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
     CtxMorph (fun ξ => itable_res2_bare ξ tl cn γfs γi cov logstart nib dv).
-  Proof. rewrite /itable_res2_bare. apply _. Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   Lemma itable_res2_of_bare (ξ : TsoCtx.CtxId) (tl : nat)
       (cn : ic_names) (γfs : fs_names) (γi : gname)
@@ -5868,7 +5888,7 @@ Section IcacheTable.
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
       (dv : mword 32) :
     CtxMorph (fun ξ => itable_res2 ξ cn γfs γi cov logstart nib dv).
-  Proof. rewrite /itable_res2. apply _. Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
     Definition is_itable2 (γl : gname) (cn : ic_names) (γfs : fs_names)
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
@@ -5936,13 +5956,13 @@ Section IcacheTable.
   Lemma islots2_acc_upd (cn : ic_names) (M : gmap nat (Qp * positive))
       (ci : gmap nat (mword 32 * mword 32)) (k : nat) :
     (k < NINODE)%nat ->
-    ([∗ list] j ∈ seq 0 NINODE, islot2 cn M ci j) -∗
-      islot2 cn M ci k ∗
+    ([∗ list] j ∈ seq 0 NINODE, islot2 cur_ctx cn M ci j) -∗
+      islot2 cur_ctx cn M ci k ∗
       (∀ (M' : gmap nat (Qp * positive)) (ci' : gmap nat (mword 32 * mword 32)),
          ⌜forall j, j <> k -> M' !! j = M !! j⌝ -∗
          ⌜forall j, j <> k -> ci' !! j = ci !! j⌝ -∗
-         islot2 cn M' ci' k -∗
-         [∗ list] j ∈ seq 0 NINODE, islot2 cn M' ci' j).
+         islot2 cur_ctx cn M' ci' k -∗
+         [∗ list] j ∈ seq 0 NINODE, islot2 cur_ctx cn M' ci' j).
   Proof.
     intros Hk. iIntros "Hs".
     iDestruct (big_sepL_delete _ (seq 0 NINODE) k k
