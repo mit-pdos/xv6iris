@@ -82,50 +82,9 @@ Require Import TsoCtx.
 Require Import TsoCtxPark.
 Require Import TsoCtxAbsorbLb.
 
-(* ---- the registers' value types ------------------------------------- *)
-Record slot_reg (id X : Type) := SlotReg {
-  sr_td    : nat;      (* the stamp L1's payload floor row covers *)
-  sr_win   : bool;     (* the L1 out-window is open *)
-  sr_ident : id;       (* the box's current identity *)
-  sr_x     : option X; (* F10: the witness the open window's P_rest is at *)
-}.
-Arguments SlotReg {id X} _ _ _ _.
-Arguments sr_td {id X} _.
-Arguments sr_win {id X} _.
-Arguments sr_ident {id X} _.
-Arguments sr_x {id X} _.
-
-Record l2_reg (id : Type) `{Countable id} := L2Reg {
-  lr_tp   : nat;                                 (* the stamp L2's floor row covers *)
-  lr_hold : option (id * gmap (id * nat) ufrac); (* the fragment parked in OUT_L2 *)
-}.
-Arguments L2Reg {id _ _} _ _.
-Arguments lr_tp {id _ _} _.
-Arguments lr_hold {id _ _} _.
-
-(* the registers sit under the box's later: destructing their ∃ needs an
-   inhabitant (bcache: dev × blockno; icache: dev × inum) *)
-Global Instance slot_reg_inhabited (id X : Type) `{Inhabited id} : Inhabited (slot_reg id X) :=
-  populate (SlotReg 0 false inhabitant None).
-Global Instance l2_reg_inhabited (id : Type) `{Countable id} : Inhabited (l2_reg id) :=
-  populate (L2Reg 0 None).
-
-(* ---- cameras (to Xv6Cameras §15 at R1') ---------------------------- *)
-Definition stampsR (id : Type) `{Countable id} : cmra :=
-  authR (gmapUR (id * nat) ufracR).
-Class boxG (id : Type) `{Countable id} (X : Type) (Σ : gFunctors) := BoxG {
-  box_stampsG :: inG Σ (stampsR id);
-  box_cntG    :: ghost_varG Σ nat;
-  box_slotdG  :: ghost_varG Σ (slot_reg id X);
-  box_slotpG  :: ghost_varG Σ (l2_reg id);
-}.
-
-Record box_names := BoxNames {
-  bx_stamps : gname;
-  bx_cnt    : gname;
-  bx_slotd  : gname;
-  bx_slotp  : gname;
-}.
+(* the registers' value types, the stamps camera, the class [boxG] and the
+   names record [box_names] live in Xv6Cameras §15 (one camera bundle). *)
+Require Import Xv6Cameras.
 
 (* ---- pure helpers over the stamps map ------------------------------- *)
 Section helpers.
@@ -1046,6 +1005,44 @@ Section box.
       iSplitR; [iPureIntro; left; lia|].
       iLeft. iExact "Hbun". }
     iModIntro. iFrame "Hrun". iExists γ, Tb. iFrame "Hinv Hd2 Hllb Hc2 Hp2".
+  Qed.
+
+  (* ================================================================== *)
+  (*  boot at PRE-MINTED names (bio_init / bio_init_at: the names record   *)
+  (*  is minted first; the boxes are built into it).  The L2 register half *)
+  (*  and the cnt half arrive already split (the other halves seed the    *)
+  (*  sleeplock payload and the L1 slot row); slot_d arrives whole.       *)
+  (* ================================================================== *)
+  Lemma box_alloc_at `{CID : CpuId} (N : namespace) γ (ξ : CtxId) (i0 : id) (E : coPset) :
+    own_context ξ -∗
+    stamps_auth γ ∅ -∗
+    cnt_half γ 0 -∗
+    (∃ r0 : slot_reg id X, ghost_var (bx_slotd γ) 1 r0) -∗
+    slotp_half γ (L2Reg 0 None) -∗
+    (∃ x, P_hdr i0 x ξ ∗ P_rest x ξ) ={E}=∗
+    own_context ξ ∗
+    ∃ T_boot : nat,
+      is_box N γ ∗
+      slotd_half γ (SlotReg T_boot false i0 None) ∗ llb loglen_name T_boot.
+  Proof.
+    iIntros "Hrun Hst Hc Hd Hp Hbun". iDestruct "Hd" as (r0) "Hd".
+    iMod ctx_parked_alloc as (ξb) "Hpk".
+    iMod (ctx_deposit (in_arm i0) ξ ξb 0 with "Hrun Hpk [Hbun]")
+      as "(Hrun & %Tb & _ & Hpk & Hbun)".
+    { rewrite /in_arm. iExact "Hbun". }
+    iDestruct (ctx_parked_llb with "Hpk") as "[Hpk #Hllb]".
+    iMod (ghost_var_update (SlotReg Tb false i0 None) with "Hd") as "Hd".
+    iEval (rewrite -Qp.half_half) in "Hd". iDestruct (ghost_var_split with "Hd") as "[Hd1 Hd2]".
+    iMod (inv_alloc N _ (box_body γ) with "[Hpk Hst Hc Hd1 Hp Hbun]") as "#Hinv".
+    { iNext. rewrite /box_body.
+      iExists Tb, ξb, ∅, 0%nat, (SlotReg Tb false i0 None), (L2Reg 0 None).
+      iFrame "Hpk Hllb Hst Hc Hd1 Hp". simpl.
+      iSplitR; [iPureIntro; by rewrite qsum_empty nat_Qc_0|].
+      iSplitR. { iPureIntro. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp. }
+      iSplitR. { iPureIntro. left. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp. }
+      iSplitR; [iPureIntro; left; lia|].
+      iLeft. iExact "Hbun". }
+    iModIntro. iFrame "Hrun". iExists Tb. iFrame "Hinv Hd2 Hllb".
   Qed.
 
   (* ---- the derived facts the client rows need ------------------------ *)

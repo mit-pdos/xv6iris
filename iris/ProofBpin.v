@@ -302,9 +302,9 @@ Section ProofBpin.
        the box at refs >= 1, the bump at refs 0 -- over the v2 payload at the
        ambient context; the closing wand runs at the running token. *)
     iDestruct (bio_ctx_buf bn V k Hk with "Hctx") as "[_ #Hbox]".
-    iDestruct (bcache_res2_to_scan bn V with "HRres") as (Mg ord devs bnos tl) "[#Hfl Hscan]".
+    iDestruct (bcache_res2_to_scan bn V with "HRres") as (Mg ord devs bnos tl) "(#Hfl & #Hllbtl & Hscan)".
     iDestruct (bcache_scan2_incr bn V Mg ord devs bnos tl k ⊤ ltac:(solve_ndisj) Hk
-                 with "Hbox Hfl Hscan Hbslot") as (cw) "[Hcell Hclose]".
+                 with "Hbox Hfl Hllbtl Hscan Hbslot") as (cw) "[Hcell Hclose]".
     (* +0x18 c.lw a5,64(s1) *)
     assert (Hpa : add_vec (rget macq Rs1) (sign_extend' 64 (mword_of_int 64 : mword 12))
                   = brefcnt k).
@@ -358,10 +358,8 @@ Section ProofBpin.
     assert (Hstv : trunc32 (D2 !!! Regidx Ra5) = incr32 (cw : mword 32)).
     { rewrite /D2 upd_eq. unfold regval_into_reg. rewrite HD1a5. reflexivity. }
     iEval (rewrite Hstv) in "Hcell".
-    iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iApply fupd_wp.
-    iMod ("Hclose" with "Hrun Hcell") as "(Hrun & HRres & Href)".
-    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iMod ("Hclose" with "Hcell") as "[HRres Href]".
     iDestruct "Href" as (qh) "Href".
     iAssert (∃ (q : Qp) (dev bno : mword 32), bref bn k q dev bno)%I with "[Href]" as "Href".
     { iExists qh, (devs k), (bnos k). iExact "Href". }

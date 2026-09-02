@@ -18448,3 +18448,30 @@ v2 box section).  The R2 twins written against pass 2
 (bcache_scan2_incr/incr0/recycle/decr/decr0) keep their call shapes
 under (c)/(a)+(b)/(d); ProofBunpin's conversion stands.
 NEXT: R1' per §4.1 once F1 is vetted (or as F1 says, absent objection).
+
+### A6.159 — R1' stage 1 landed: CtxBox.v PROVEN; bcache instantiated over it (2026-09-01)
+
+- `iris/CtxBox.v` (the reviewers' type-checked skeleton, statements FINAL per
+  the F10–F13 rule-0 audit) is fully proven: the seven lemmas, `box_alloc`,
+  plus a `box_alloc_at` twin (boot at pre-minted names — bio_init/bio_init_at
+  mint the names record first).  The share kit is generic over `(id * nat)`
+  keys with a general fragment dealloc by induction (`stamps_dealloc`), the
+  identity/cover helpers (`keyed_agree`, `qsum_eq_dom`, `max_stamp_ge`).
+- The register value types, `stampsR`, the class `boxG`, `box_names` moved to
+  Xv6Cameras §15 (CtxBox imports Xv6Cameras); `bioboxG` holds the bcache
+  members; `biobox_boxG : boxG bio_id bio_x Σ` assembles the generic class
+  (the count member is kalloc's `ghost_varG Σ nat`).
+- BioInv v6: `bn_box`, `bref_ghost bn k dev bno` (a unit singleton at the
+  identity), `bchain bn k dev bno`, `bstok` (F7: the handle's token row =
+  sleeplocked ∗ bref_tok0 ∗ ∃ t, l2_hold at the unit), `bhdr/brest/buf_bundle_at`
+  (+ `buf_bundle_at_own`), registers as `slotd_half`/`slotp_half`/`cnt_half`
+  wrappers, `buf_box := is_box …`, the six `bbox_*` wrappers, `bslp` over
+  `l2_reg`, `bslp_unfold`, `bslot_regs` with the record (win/x/ident rows),
+  BioSlots2 accessors restored (`bio_slots_acc2` now takes `tl'`), boot v6.
+- Re-targeted: ProofBreadParts twins (bbox_* + `bd_ref_llb`), ProofBread's
+  hit/recyc/tail (checkout via `bbox_checkout` at Tl := t; recycle's three
+  stores are PLAIN stores between (a) and (b); `_in` release; `RIn` functor
+  arg), ProofBrelse (park via `bbox_park` with the handle's `l2_hold`),
+  ProofBpin/ProofBunpin, BioInitAt v6, BreadLru v1 section removed.
+- Doc: F6 (identity keyed stamps), F7 (handle-row tool; hold field), F8–F13
+  rulings mirrored; my review notes R-1..R-4 accepted.

@@ -332,6 +332,9 @@ Section ProofBwrite.
                  with "Hextm") as "Hextm".
     (* ENDGAME R1-pre: the buffer sleeplock is the λ instance at [bslp];
        holdingsleep's genl tier takes the token at its share. *)
+    (* F7: the handle's token row also carries the chain's count fragment
+       and the register half naming the parked unit; they ride along *)
+    iDestruct "Hstok" as "(Hstok & Hbr0 & Hhold)".
     iDestruct "Hstok" as (qsl) "Hstok".
     iApply (HSL.wp_holdingsleep_genl_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bslp bn k) SleepLock.sl_untracked qsl mA pj pidv (K - 4)%nat eb b _ Vpr HKhsl Hbelow
@@ -344,6 +347,8 @@ Section ProofBwrite.
     iEval (rewrite HmAa0) in "Hstok".
     iAssert (SleepLock.sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv) with "[Hstok]" as "Hstok".
     { iExists qsl. iExact "Hstok". }
+    iAssert (bstok bn k pidv dev bno) with "[Hstok Hbr0 Hhold]" as "Hstok".
+    { rewrite /bstok. iFrame "Hstok Hbr0 Hhold". }
     assert (Hpc12 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.bwrite + 0x12)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc12) in "Hpc".

@@ -35,6 +35,8 @@ Require Import BufOwn BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoMemPa TsoGhost.   (* [llb] *)
+Require Import CtxBox.              (* [reference], [max_stamp] *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -44,16 +46,7 @@ Set Printing Depth 40.
 (*      (The mask-carrying width-4 load/store are [WpAu4.v]'s now.)       *)
 (* ===================================================================== *)
 
-Section BreadEscrowLeaves.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-
-  (* the escrow, in the raw [inv] shape [iInv] recognizes *)
-  Lemma buf_escrow_inv (bn : bio_names) (V : bio_view Σ) (k : nat) :
-    buf_escrow bn V k -∗ inv bioN (buf_escrow_body bn V k).
-  Proof. iIntros "H". iExact "H". Qed.
-
-End BreadEscrowLeaves.
+(* the v1 escrow leaves are gone: the box is CtxBox.v (endgame §3.5) *)
 
 (* ===================================================================== *)
 (*  (2) Fraction arithmetic, over Qp VARIABLES.                           *)
@@ -277,140 +270,6 @@ Section BreadScan.
   Qed.
 
   (* dev: escrow half + slot half -> full; re-park at the stored value *)
-  Lemma escrow_recyc_dev (bn : bio_names) (V : bio_view Σ) (k : nat)
-      (M : gmap nat (Qp * positive)) (devr dnew : mword 32) :
-    M !! k = None ->
-    dnew = bv_dev V ->
-    own (bn_auth bn) (● M) -∗
-    buf_escrow_body bn V k -∗
-    b_dev (bpa k) ↦₄{DfracOwn (1/2)} devr -∗
-    own (bn_auth bn) (● M) ∗
-    b_dev (bpa k) ↦₄ devr ∗
-    (b_dev (bpa k) ↦₄ dnew -∗
-       buf_escrow_body bn V k ∗ b_dev (bpa k) ↦₄{DfracOwn (1/2)} dnew).
-  Proof.
-    iIntros (HMk Hdnew) "Hauth Hbody Hslot".
-    iDestruct (escrow_open_free bn V k M devr HMk with "Hauth Hslot Hbody")
-      as "(Hauth & Hslot & Hpark & Hclose)".
-    iDestruct "Hpark" as (v de bno bs) "(Hvld & Hdev & Hbuf & Hpay & Hbmid)".
-    iDestruct (ctx_word4_pointsto_agree with "Hslot Hdev") as %Heq. subst de.
-    iFrame "Hauth".
-    iSplitL "Hslot Hdev".
-    { iApply (ctx_word4_pointsto_half_join with "Hslot Hdev"). }
-    iIntros "Hfull".
-    iDestruct (ctx_word4_pointsto_half_split with "Hfull") as "[Hd1 Hd2]".
-    iSplitR "Hd2"; [| iExact "Hd2"].
-    iApply "Hclose". rewrite /buf_parked.
-    iExists v, dnew, bno, bs.
-    iDestruct (bd_pay_retarget bn V k v devr dnew bno bs Hdnew with "Hpay") as "Hpay".
-    iFrame "Hvld Hd1 Hbuf Hpay Hbmid".
-  Qed.
-
-  (* blockno: the escrow's half lives inside [buf_own]; joining it with the
-     slot's makes the cell storable.  This is where the CACHE MEMBERSHIP
-     moves, so it is also where the pool exchange happens -- the evicted
-     block's payload is read out with [buf_pay_evict] (the authority kills
-     the dirty arm: only clean, disk-agreeing content ever leaves the
-     cache) and deposited, and the requested block's bundle is withdrawn.
-     The escrow re-closes as the MID window: cells only, the dev cell FULL
-     (the bcache-retained half joined in), the recycle token OUT. *)
-  Lemma escrow_recyc_bno (bn : bio_names) (V : bio_view Σ) (k : nat)
-      (M : gmap nat (Qp * positive)) (bnos : nat -> mword 32)
-      (devr B : mword 32) :
-    M !! k = None ->
-    (k < NBUF)%nat ->
-    uint B ∈ bv_cov V ->
-    (forall j, (j < NBUF)%nat -> uint (bnos j) ≠ uint B) ->
-    (uint (bnos k) ∈ bv_cov V ->
-       forall j, (j < NBUF)%nat -> j ≠ k -> uint (bnos j) ≠ uint (bnos k)) ->
-    devr = bv_dev V ->
-    own (bn_auth bn) (● M) -∗
-    buf_escrow_body bn V k -∗
-    b_dev (bpa k) ↦₄{DfracOwn (1/2)} devr -∗
-    b_blockno (bpa k) ↦₄{DfracOwn (1/2)} (bnos k) -∗
-    bio_pool V bnos -∗
-    own (bn_auth bn) (● M) ∗
-    b_blockno (bpa k) ↦₄ (bnos k) ∗
-    (b_blockno (bpa k) ↦₄ B -∗
-       buf_escrow_body bn V k ∗ bmid bn k ∗ pool_blk V (uint B) ∗
-       b_blockno (bpa k) ↦₄{DfracOwn (1/2)} B ∗
-       bio_pool V (bfun_upd bnos k B)).
-  Proof.
-    iIntros (HMk Hk HcovB Hmiss Huniq Hdevr) "Hauth Hbody Hdevr Hbno Hpool".
-    iDestruct (escrow_open_free bn V k M devr HMk with "Hauth Hdevr Hbody")
-      as "(Hauth & Hdevr & Hpark & _)".
-    iDestruct "Hpark" as (v de bno bs) "(Hvld & Hdev & Hbuf & Hpay & Hbmid)".
-    iDestruct (ctx_word4_pointsto_agree with "Hdevr Hdev") as %Heqd. subst de.
-    rewrite /buf_own.
-    iDestruct "Hbuf" as "(Hbno0 & Hdisk & %Hlen & Hdata)".
-    iDestruct (ctx_word4_pointsto_agree with "Hbno Hbno0") as %Heqb. subst bno.
-    iDestruct (buf_pay_evict bn V k M v devr (bnos k) bs HMk with "Hauth Hpay")
-      as "[Hauth Hold]".
-    iFrame "Hauth".
-    iSplitL "Hbno Hbno0".
-    { iApply (ctx_word4_pointsto_half_join with "Hbno Hbno0"). }
-    iIntros "Hfull".
-    iDestruct (ctx_word4_pointsto_half_split with "Hfull") as "[Hb1 Hb2]".
-    (* the pool exchange, at the one instant [bnos] changes *)
-    iDestruct (bio_pool_recycle V bnos (bfun_upd bnos k B) k (bnos k) B
-                 Hk eq_refl (bfun_upd_eq bnos k B)
-                 (fun j Hj => bfun_upd_ne bnos k B j Hj)
-                 HcovB Hmiss Huniq with "Hpool") as "[HpoolB Hpoolback]".
-    iDestruct ("Hpoolback" with "[Hold]") as "Hpool".
-    { case_decide as Hc; [iDestruct "Hold" as "[_ $]" | done]. }
-    (* and re-close as the mid-recycle window *)
-    iDestruct (ctx_word4_pointsto_half_join with "Hdevr Hdev") as "Hdevfull".
-    iSplitL "Hvld Hdevfull Hb1 Hdisk Hdata".
-    { iApply (escrow_close_mid bn V k). rewrite /buf_mid.
-      iExists (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)),
-              B, bs.
-      iSplitR. { iPureIntro. destruct v; [by right | by left]. }
-      rewrite -Hdevr.
-      iFrame "Hvld Hdevfull". rewrite /buf_own. iFrame "Hb1 Hdisk Hdata". done. }
-    iFrame "Hbmid HpoolB Hb2 Hpool".
-  Qed.
-
-  (* valid: the recycle token refutes BOTH normal arms, so what comes out is
-     the window this recycler itself parked -- with the dev cell FULL at the
-     view's device, which is what lets the re-parked payload's dev pin (and
-     the handle's dev half) be identified at all.  The stored 0 is what makes
-     the arm INVALID, i.e. what hands the block's pool bundle -- withdrawn at
-     the blockno store -- to WHOEVER wins the sleeplock race and does the
-     fill.  The retained blockno half pins the window's block to [B]. *)
-  Lemma escrow_recyc_valid (bn : bio_names) (V : bio_view Σ) (k : nat)
-      (B : mword 32) :
-    uint B ∈ bv_cov V ->
-    bmid bn k -∗
-    buf_escrow_body bn V k -∗
-    b_blockno (bpa k) ↦₄{DfracOwn (1/2)} B -∗
-    pool_blk V (uint B) -∗
-    (∃ vld : mword 32, b_valid (bpa k) ↦₄ vld) ∗
-    b_blockno (bpa k) ↦₄{DfracOwn (1/2)} B ∗
-    (b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) -∗
-       buf_escrow_body bn V k ∗
-       b_dev (bpa k) ↦₄{DfracOwn (1/2)} (bv_dev V)).
-  Proof.
-    iIntros (HcovB) "Hbmid Hbody Hbno Hpool".
-    iDestruct (escrow_open_mid bn V k with "Hbmid Hbody")
-      as "(Hbmid & Hmid & Hclose)".
-    iDestruct "Hmid" as (vld bno bs) "(%Hpin & Hvld & Hdevfull & Hbuf)".
-    rewrite /buf_own.
-    iDestruct "Hbuf" as "(Hbno0 & Hdisk & %Hlen & Hdata)".
-    iDestruct (ctx_word4_pointsto_agree with "Hbno Hbno0") as %Heqb. subst bno.
-    iSplitL "Hvld"; [by iExists vld|].
-    iFrame "Hbno".
-    iIntros "Hvld".
-    iDestruct (ctx_word4_pointsto_half_split with "Hdevfull") as "[Hd1 Hd2]".
-    iSplitR "Hd2"; [| iExact "Hd2"].
-    iAssert (buf_pay bn V k false (bv_dev V) B bs) with "[Hpool]" as "Hpay".
-    { rewrite /buf_pay. case_decide as Hc; [| exfalso; exact (Hc HcovB)].
-      iSplitR; [done|]. iExact "Hpool". }
-    iApply "Hclose". rewrite /buf_parked.
-    iExists false, (bv_dev V), B, bs. cbv iota.
-    iFrame "Hvld Hd1 Hpay Hbmid".
-    rewrite /buf_own. iFrame "Hbno0 Hdisk Hdata". done.
-  Qed.
-
 End BreadScan.
 
 (* ====================================================================== *)
@@ -428,44 +287,139 @@ Section BreadScan2.
   Local Lemma bd_pos1_lt : (Z.pos 1 < 2 ^ 31)%Z.
   Proof. vm_compute. reflexivity. Qed.
 
-  (* the hit path's refcnt++ : the FIRST reference bumps the box (the
-     resting content leaves the payload's None arm for the box's IN arm),
-     a later one takes another fragment out of the box. *)
+  (* the slot tie's steps (A6.155): a fractioned refs++ halves the retained
+     share; a chain refs++ leaves it alone; a fractioned refs-- returns it. *)
+  Local Lemma bd_btie_incr (ot : option Qp) (qr : Qp) :
+    btie ot qr -> btie (ot ⋅ Some (qr/2)%Qp) (qr/2)%Qp.
+  Proof.
+    destruct ot as [q|]; intros Htie; cbn in Htie.
+    - rewrite -Some_op frac_op. cbn. rewrite -Qp.add_assoc Qp.div_2. exact Htie.
+    - rewrite left_id_L. cbn. rewrite Htie. apply Qp.div_2.
+  Qed.
+  Local Lemma bd_btie_incr_valid (ot : option Qp) (qr : Qp) :
+    btie ot qr -> ✓ (ot ⋅ Some (qr/2)%Qp).
+  Proof.
+    destruct ot as [q|]; intros Htie; cbn in Htie.
+    - rewrite -Some_op frac_op. apply Some_valid, frac_valid.
+      etrans; [| exact bd_half_le_one].
+      rewrite -Htie. apply Qp.add_le_mono; [reflexivity | apply bd_div2_le].
+    - rewrite left_id_L. apply Some_valid, frac_valid. rewrite Htie.
+      etrans; [apply bd_div2_le | exact bd_half_le_one].
+  Qed.
+  Local Lemma bd_btie_incr0 (ot : option Qp) (qr : Qp) :
+    btie ot qr -> btie (ot ⋅ None) qr.
+  Proof. intros Htie. by rewrite right_id_L. Qed.
+  Local Lemma bd_btie_decr (q : Qp) (orem : option Qp) (qr : Qp) :
+    btie (Some q ⋅ orem) qr -> btie orem (qr + q)%Qp.
+  Proof.
+    destruct orem as [r|]; intros Htie.
+    - rewrite -Some_op frac_op in Htie. cbn in Htie. cbn.
+      rewrite (Qp.add_comm qr q) Qp.add_assoc (Qp.add_comm r q). exact Htie.
+    - rewrite right_id_L in Htie. cbn in Htie. cbn. rewrite Qp.add_comm. exact Htie.
+  Qed.
+
+  (* the payload's re-formed pieces after a count edge: the floor slot may
+     have moved to [tl'] (with its llb); the scan at [tl'].  The caller
+     re-floors through the _in release (R2: every L1 release). *)
+  Definition bd_scan2_after (bn : bio_names) (V : bio_view Σ) (tl : nat) : iProp Σ :=
+    (∃ (M : gmap nat (option Qp * positive)) (ord : list nat)
+       (devs bnos : nat -> mword 32) (tl' : nat),
+       ⌜(tl <= tl')%nat⌝ ∗ llb loglen_name tl' ∗
+       bcache_scan2 bn V M ord devs bnos tl' cur_ctx)%I.
+
+  Local Lemma bd_llb_max (tl T : nat) :
+    llb loglen_name tl -∗ llb loglen_name T -∗ llb loglen_name (Nat.max tl T).
+  Proof.
+    iIntros "#H1 #H2". destruct (Nat.max_spec tl T) as [[_ ->] | [_ ->]]; [iExact "H2" | iExact "H1"].
+  Qed.
+
+  (* the common tail: the slot re-formed at the new entry, the scan re-formed
+     at the same floor slot *)
+  Local Lemma bd_scan2_close (bn : bio_names) (V : bio_view Σ) M ord devs bnos (tl k : nat)
+      (e : option Qp * positive) :
+    (k < NBUF)%nat ->
+    ⌜∀ k0, is_Some (M !! k0) -> (k0 < NBUF)%nat⌝ -∗
+    ⌜ord ≡ₚ seq 0 NBUF⌝ -∗
+    ⌜∀ k1 k2, (k1 < NBUF)%nat -> (k2 < NBUF)%nat ->
+        uint (bnos k1) ∈ bv_cov V -> uint (bnos k1) = uint (bnos k2) -> k1 = k2⌝ -∗
+    ⌜∀ k0, (k0 < NBUF)%nat -> uint (bnos k0) ∈ bv_cov V -> devs k0 = bv_dev V⌝ -∗
+    TsoCtx.ctx_floor cur_ctx tl -∗ llb loglen_name tl -∗
+    own (bn_auth bn) (● (<[k := e]> M)) -∗ bslots_auth -∗
+    bcache_lru bhead (map bnode ord) -∗ bio_pool V bnos -∗
+    ([∗ list] k0 ∈ seq 0 NBUF, bio_slot_res2 bn V (<[k := e]> M) k0 (devs k0) (bnos k0) tl cur_ctx) -∗
+    bcache_res2 bn V cur_ctx.
+  Proof.
+    iIntros (Hk Hdom Hord Hinj Hdevpin) "#Hfl #Hllbtl Hauth Hsauth Hlru Hpool Hslots".
+    iApply (bcache_res2_fold bn V (<[k := e]> M) ord devs bnos tl).
+    iFrame "Hfl Hllbtl". rewrite /bcache_scan2. iFrame "Hauth Hsauth".
+    iSplitR.
+    { iPureIntro. intros j Hj.
+      destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
+      apply Hdom. by rewrite lookup_insert_ne in Hj. }
+    iSplitR; [iPureIntro; exact Hord|].
+    iSplitR; [iPureIntro; exact Hinj|].
+    iSplitR; [iPureIntro; exact Hdevpin|].
+    iFrame "Hlru Hpool Hslots".
+  Qed.
+
+  (* the reference's own llb, at its stamp (R1's presentation at an acquire) *)
+  Lemma bd_ref_llb (bn : bio_names) (k : nat) (dev bno : mword 32) (t : nat) :
+    CtxBox.reference (X := bio_x) (bn_box bn k) (dev, bno) {[((dev, bno), t) := 1%Qp]} -∗
+    CtxBox.reference (X := bio_x) (bn_box bn k) (dev, bno) {[((dev, bno), t) := 1%Qp]} ∗
+    llb loglen_name t.
+  Proof.
+    iIntros "H". iDestruct "H" as "(%H1 & %H2 & Hf & #Hllb)".
+    iSplitL "Hf".
+    { iSplitR; [iPureIntro; exact H1|]. iSplitR; [iPureIntro; exact H2|]. iFrame "Hf Hllb". }
+    iEval (rewrite /max_stamp map_fold_singleton /max_step /= Nat.max_0_r) in "Hllb". iExact "Hllb".
+  Qed.
+
+  (* the L1 row, re-formed at an unchanged stamp *)
+  Local Lemma bd_regs_same (bn : bio_names) (k tl : nat) (r : slot_reg bio_id bio_x)
+      (dev bno : mword 32) :
+    sr_win r = false -> sr_x r = None -> sr_ident r = (dev, bno) -> (sr_td r <= tl)%nat ->
+    reg_drop bn k r -∗ llb loglen_name (sr_td r) -∗ bslot_regs bn k tl dev bno.
+  Proof.
+    iIntros (Hw Hx Hid Hb) "Hrd #Hllb". iExists r. iFrame "Hrd Hllb". iPureIntro. split_and!; done.
+  Qed.
+
+  (* ---- refs++ (box lemma (c)) for a FRACTIONED reference (bpin) ---- *)
   Lemma bcache_scan2_incr (bn : bio_names) (V : bio_view Σ) M ord devs bnos
       (tl k : nat) (E : coPset) :
     ↑bioxN ⊆ E ->
     (k < NBUF)%nat ->
     buf_box bn V k -∗
     TsoCtx.ctx_floor cur_ctx tl -∗
+    llb loglen_name tl -∗
     bcache_scan2 bn V M ord devs bnos tl cur_ctx -∗ bslot -∗
     ∃ cw : mword 32,
       brefcnt k ↦₄ cw ∗
-      (own_context cur_ctx -∗ brefcnt k ↦₄ (incr32 cw) ={E}=∗
-         own_context cur_ctx ∗ bcache_res2 bn V cur_ctx ∗
-         ∃ q : Qp, bref bn k q (devs k) (bnos k)).
+      (brefcnt k ↦₄ (incr32 cw) ={E}=∗
+         bcache_res2 bn V cur_ctx ∗ ∃ q : Qp, bref bn k q (devs k) (bnos k)).
   Proof.
-    iIntros (HE Hk) "#Hbox #Hfl Hscan Hbslot".
+    iIntros (HE Hk) "#Hbox #Hfl #Hllbtl Hscan Hbslot".
     rewrite /bcache_scan2.
     iDestruct "Hscan" as
       "(Hauth & Hsauth & %Hdom & %Hord & %Hinj & %Hdevpin & Hlru & Hpool & Hslots)".
     iDestruct (bio_slots_acc2 bn V M devs bnos tl k Hk with "Hslots") as "[Hslot Hback]".
-    destruct (M !! k) as [[qt cnt]|] eqn:HMk.
-    - (* ---- busy buffer: halve the retained share; another fragment ---- *)
+    destruct (M !! k) as [[ot cnt]|] eqn:HMk.
+    - (* ---- busy buffer: halve the retained share ---- *)
       iEval (rewrite /bio_slot_res2 HMk) in "Hslot".
       iDestruct "Hslot" as "[Hregs (%Hcnt & Hcell & Hfd & Hc & Hqr)]".
+      iDestruct "Hregs" as (r) "(Hrd & %Hw & %Hxn & %Hid & #Hllbd & %Hb)".
       iDestruct "Hqr" as (qr) "(%Htie & Hdev & Hbno)".
       iDestruct (bslots_no_overflow with "Hsauth Hfd") as %[Hn1 Hn2].
       iExists (mword_of_int (Z.pos cnt) : mword 32). iFrame "Hcell".
-      iIntros "Hrun Hcell".
+      iIntros "Hcell".
       assert (Hinc : incr32 (mword_of_int (Z.pos cnt) : mword 32)
                      = (mword_of_int (Z.pos (Pos.succ cnt)) : mword 32)).
       { rewrite (incr32_pos (Z.pos cnt) ltac:(lia)
                    ltac:(pose proof Hn2 as Hx; rewrite Pos2Z.inj_succ in Hx; lia)).
         f_equal. rewrite Pos2Z.inj_succ. lia. }
       iEval (rewrite Hinc) in "Hcell".
-      iMod (bio_incr_step bn M k qt cnt (qr/2)%Qp HMk (bd_incr_valid qt qr Htie)
+      iMod (bio_incr_step bn M k ot cnt (Some (qr/2)%Qp) HMk (bd_btie_incr_valid ot qr Htie)
               with "Hauth") as "[Hauth Htok]".
-      iMod (box_ref_another bn V k cnt E HE with "Hbox Hc") as "[Hc Hfr]".
+      iMod (bbox_ref_incr bn V k r (Pos.to_nat cnt) (devs k) (bnos k) E HE Hw Hid with "Hbox Hrd Hc") as "(Hrd & Hc & Hgh)".
       iAssert (b_dev (bpa k) ↦₄{DfracOwn (qr/2)} (devs k) ∗
                b_dev (bpa k) ↦₄{DfracOwn (qr/2)} (devs k))%I
         with "[Hdev]" as "[Hdev1 Hdev2]".
@@ -477,96 +431,171 @@ Section BreadScan2.
       assert (Hsucc : Pos.to_nat (Pos.succ cnt) = (Pos.to_nat cnt + 1)%nat)
         by (rewrite Pos2Nat.inj_succ; lia).
       iEval (rewrite /bslot) in "Hbslot".
-      iAssert (bio_slot_res2 bn V (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) k
+      iAssert (bio_slot_res2 bn V (<[k := (ot ⋅ Some (qr/2)%Qp, Pos.succ cnt)]> M) k
                  (devs k) (bnos k) tl cur_ctx)
-        with "[Hregs Hcell Hfd Hbslot Hc Hdev1 Hbno1]" as "Hslot".
-      { rewrite /bio_slot_res2 lookup_insert. iFrame "Hregs".
+        with "[Hrd Hcell Hfd Hbslot Hc Hdev1 Hbno1]" as "Hslot".
+      { rewrite /bio_slot_res2 lookup_insert.
+        iSplitL "Hrd". { iApply (bd_regs_same _ _ _ _ _ _ Hw Hxn Hid Hb with "Hrd Hllbd"). }
         iSplitR. { iPureIntro. rewrite Pos2Z.inj_succ. rewrite Pos2Z.inj_succ in Hn2. lia. }
         iFrame "Hcell".
         iSplitL "Hfd Hbslot".
         { rewrite Hsucc bslots_op. iFrame "Hfd Hbslot". }
-        iSplitL "Hc". { rewrite -Pos.add_1_r. iExact "Hc". }
+        iSplitL "Hc".
+        { assert (Hsucc' : Pos.to_nat (Pos.succ cnt) = S (Pos.to_nat cnt)) by lia.
+          rewrite Hsucc'. iExact "Hc". }
         iExists (qr/2)%Qp. iSplitR.
-        { iPureIntro. exact (bd_incr_tie qt qr Htie). }
+        { iPureIntro. exact (bd_btie_incr ot qr Htie). }
         iFrame "Hdev1 Hbno1". }
-      iDestruct ("Hback" $! (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) devs bnos
-                   with "[%] Hslot") as "Hslots".
+      iDestruct ("Hback" $! (<[k := (ot ⋅ Some (qr/2)%Qp, Pos.succ cnt)]> M) devs bnos tl
+                   with "[%] [%] Hslot") as "Hslots"; [| lia |].
       { intros j Hj. split_and!;
           [ rewrite lookup_insert_ne; [reflexivity | congruence] | reflexivity | reflexivity ]. }
-      iModIntro. iFrame "Hrun". iSplitR "Htok Hfr Hdev2 Hbno2".
-      + iApply (bcache_res2_fold bn V (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ord devs bnos tl).
-        iFrame "Hfl". rewrite /bcache_scan2. iFrame "Hauth Hsauth".
-        iSplitR.
-        { iPureIntro. intros j Hj.
-          destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
-          apply Hdom. by rewrite lookup_insert_ne in Hj. }
-        iSplitR; [iPureIntro; exact Hord|].
-        iSplitR; [iPureIntro; exact Hinj|].
-        iSplitR; [iPureIntro; exact Hdevpin|].
-        iFrame "Hlru Hpool Hslots".
-      + iExists (qr/2)%Qp. rewrite /bref. iFrame "Htok Hdev2 Hbno2".
-        iDestruct "Hfr" as (rb) "(Hfr & _ & #Hllb)". iExists rb. iFrame "Hfr Hllb".
-    - (* ---- idle buffer with a matching key: the FIRST reference BUMPS ---- *)
+      iModIntro. iSplitR "Htok Hgh Hdev2 Hbno2".
+      + iApply (bd_scan2_close bn V M ord devs bnos tl k _ Hk
+                  with "[%] [%] [%] [%] Hfl Hllbtl Hauth Hsauth Hlru Hpool Hslots"); done.
+      + iExists (qr/2)%Qp. rewrite /bref /bref_tok. iFrame "Htok Hgh Hdev2 Hbno2".
+    - (* ---- idle buffer: the FIRST reference; the content stays in the box ---- *)
       iEval (rewrite /bio_slot_res2 HMk) in "Hslot".
-      iDestruct "Hslot" as "[Hregs (Hcell & Hc & Hcont)]".
-      iDestruct "Hcont" as (v bs) "(Hvld & Hdev & Hbuf & Hbno & Hpay)".
+      iDestruct "Hslot" as "[Hregs (Hcell & Hc & Hdev & Hbno)]".
+      iDestruct "Hregs" as (r) "(Hrd & %Hw & %Hxn & %Hid & #Hllbd & %Hb)".
       iExists (mword_of_int 0 : mword 32). iFrame "Hcell".
-      iIntros "Hrun Hcell".
+      iIntros "Hcell".
       assert (Hinc : incr32 (mword_of_int 0 : mword 32) = (mword_of_int 1 : mword 32)).
       { rewrite (incr32_pos 0 ltac:(lia) ltac:(vm_compute; reflexivity)). reflexivity. }
       iEval (rewrite Hinc) in "Hcell".
-      iMod (bio_first_ref_step bn M k (1/4)%Qp HMk bd_quarter_valid
+      iMod (bio_first_ref_step bn M k (Some (1/4)%Qp) HMk bd_quarter_valid
               with "Hauth") as "[Hauth Htok]".
-      (* the dev cell: the bundle's half, then the bcache half in quarters *)
-      iDestruct (ctx_word4_pointsto_half_split with "Hdev") as "[Hdevb Hdevs]".
+      iMod (bbox_ref_incr bn V k r 0 (devs k) (bnos k) E HE Hw Hid with "Hbox Hrd Hc") as "(Hrd & Hc & Hgh)".
       iAssert (b_dev (bpa k) ↦₄{DfracOwn (1/4)} (devs k) ∗
                b_dev (bpa k) ↦₄{DfracOwn (1/4)} (devs k))%I
-        with "[Hdevs]" as "[Hdev1 Hdev2]".
-      { rewrite -ctx_word4_pointsto_frac_split bd_quarter_half. iExact "Hdevs". }
+        with "[Hdev]" as "[Hdev1 Hdev2]".
+      { rewrite -ctx_word4_pointsto_frac_split bd_quarter_half. iExact "Hdev". }
       iAssert (b_blockno (bpa k) ↦₄{DfracOwn (1/4)} (bnos k) ∗
                b_blockno (bpa k) ↦₄{DfracOwn (1/4)} (bnos k))%I
         with "[Hbno]" as "[Hbno1 Hbno2]".
       { rewrite -ctx_word4_pointsto_frac_split bd_quarter_half. iExact "Hbno". }
-      (* the bundle leaves the payload for the box *)
-      iMod (box_swap_bump bn V k cur_ctx E HE with "Hbox Hrun Hc [Hvld Hdevb Hbuf Hpay]")
-        as "(Hrun & Hc & Hfr)".
-      { rewrite /buf_bundle. iExists v, (devs k), (bnos k), bs. iFrame "Hvld Hdevb Hbuf Hpay". }
       iEval (rewrite /bslot) in "Hbslot".
-      iAssert (bio_slot_res2 bn V (<[k := ((1/4)%Qp, 1%positive)]> M) k (devs k) (bnos k) tl cur_ctx)
-        with "[Hregs Hcell Hbslot Hc Hdev1 Hbno1]" as "Hslot".
-      { rewrite /bio_slot_res2 lookup_insert. iFrame "Hregs".
+      iAssert (bio_slot_res2 bn V (<[k := (Some (1/4)%Qp, 1%positive)]> M) k (devs k) (bnos k) tl cur_ctx)
+        with "[Hrd Hcell Hbslot Hc Hdev1 Hbno1]" as "Hslot".
+      { rewrite /bio_slot_res2 lookup_insert.
+        iSplitL "Hrd". { iApply (bd_regs_same _ _ _ _ _ _ Hw Hxn Hid Hb with "Hrd Hllbd"). }
         iSplitR. { iPureIntro. exact bd_pos1_lt. }
         iFrame "Hcell".
         iSplitL "Hbslot". { change (Pos.to_nat 1) with 1%nat. iFrame "Hbslot". }
         iSplitL "Hc". { change (Pos.to_nat 1) with 1%nat. iExact "Hc". }
-        iExists (1/4)%Qp. iSplitR; [iPureIntro; exact bd_quarter_half|].
+        iExists (1/4)%Qp. iSplitR; [iPureIntro; cbn; exact bd_quarter_half|].
         iFrame "Hdev1 Hbno1". }
-      iDestruct ("Hback" $! (<[k := ((1/4)%Qp, 1%positive)]> M) devs bnos
-                   with "[%] Hslot") as "Hslots".
+      iDestruct ("Hback" $! (<[k := (Some (1/4)%Qp, 1%positive)]> M) devs bnos tl
+                   with "[%] [%] Hslot") as "Hslots"; [| lia |].
       { intros j Hj. split_and!;
           [ rewrite lookup_insert_ne; [reflexivity | congruence] | reflexivity | reflexivity ]. }
-      iModIntro. iFrame "Hrun". iSplitR "Htok Hfr Hdev2 Hbno2".
-      + iApply (bcache_res2_fold bn V (<[k := ((1/4)%Qp, 1%positive)]> M) ord devs bnos tl).
-        iFrame "Hfl". rewrite /bcache_scan2. iFrame "Hauth Hsauth".
-        iSplitR.
-        { iPureIntro. intros j Hj.
-          destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
-          apply Hdom. by rewrite lookup_insert_ne in Hj. }
-        iSplitR; [iPureIntro; exact Hord|].
-        iSplitR; [iPureIntro; exact Hinj|].
-        iSplitR; [iPureIntro; exact Hdevpin|].
-        iFrame "Hlru Hpool Hslots".
-      + iExists (1/4)%Qp. rewrite /bref. iFrame "Htok Hdev2 Hbno2".
-        iDestruct "Hfr" as (rb) "(Hfr & _ & #Hllb)". iExists rb. iFrame "Hfr Hllb".
+      iModIntro. iSplitR "Htok Hgh Hdev2 Hbno2".
+      + iApply (bd_scan2_close bn V M ord devs bnos tl k _ Hk
+                  with "[%] [%] [%] [%] Hfl Hllbtl Hauth Hsauth Hlru Hpool Hslots"); done.
+      + iExists (1/4)%Qp. rewrite /bref /bref_tok. iFrame "Htok Hgh Hdev2 Hbno2".
   Qed.
 
-  (* the RECYCLE path: the idle slot's content cells come out FULL (the
-     bcache half joined with the bundle's), the closing wand takes them
-     back at the recycler's values, evicts the old payload into the pool,
-     withdraws the new block's bundle, and BUMPS the box with the (invalid)
-     bundle at [refcnt = 1]. *)
+  (* ---- refs++ (box lemma (c)) for THE CHAIN (bread's hit path) ---- *)
+  Lemma bcache_scan2_incr0 (bn : bio_names) (V : bio_view Σ) M ord devs bnos
+      (tl k : nat) (E : coPset) :
+    ↑bioxN ⊆ E ->
+    (k < NBUF)%nat ->
+    buf_box bn V k -∗
+    TsoCtx.ctx_floor cur_ctx tl -∗
+    llb loglen_name tl -∗
+    bcache_scan2 bn V M ord devs bnos tl cur_ctx -∗ bslot -∗
+    ∃ cw : mword 32,
+      brefcnt k ↦₄ cw ∗
+      (brefcnt k ↦₄ (incr32 cw) ={E}=∗ bcache_res2 bn V cur_ctx ∗ bchain bn k (devs k) (bnos k)).
+  Proof.
+    iIntros (HE Hk) "#Hbox #Hfl #Hllbtl Hscan Hbslot".
+    rewrite /bcache_scan2.
+    iDestruct "Hscan" as
+      "(Hauth & Hsauth & %Hdom & %Hord & %Hinj & %Hdevpin & Hlru & Hpool & Hslots)".
+    iDestruct (bio_slots_acc2 bn V M devs bnos tl k Hk with "Hslots") as "[Hslot Hback]".
+    destruct (M !! k) as [[ot cnt]|] eqn:HMk.
+    - iEval (rewrite /bio_slot_res2 HMk) in "Hslot".
+      iDestruct "Hslot" as "[Hregs (%Hcnt & Hcell & Hfd & Hc & Hqr)]".
+      iDestruct "Hregs" as (r) "(Hrd & %Hw & %Hxn & %Hid & #Hllbd & %Hb)".
+      iDestruct "Hqr" as (qr) "(%Htie & Hdev & Hbno)".
+      iDestruct (bslots_no_overflow with "Hsauth Hfd") as %[Hn1 Hn2].
+      iDestruct (bio_auth_entry_valid bn M k ot cnt HMk with "Hauth") as %Hvot.
+      iExists (mword_of_int (Z.pos cnt) : mword 32). iFrame "Hcell".
+      iIntros "Hcell".
+      assert (Hinc : incr32 (mword_of_int (Z.pos cnt) : mword 32)
+                     = (mword_of_int (Z.pos (Pos.succ cnt)) : mword 32)).
+      { rewrite (incr32_pos (Z.pos cnt) ltac:(lia)
+                   ltac:(pose proof Hn2 as Hx; rewrite Pos2Z.inj_succ in Hx; lia)).
+        f_equal. rewrite Pos2Z.inj_succ. lia. }
+      iEval (rewrite Hinc) in "Hcell".
+      assert (Hv0 : ✓ (ot ⋅ None)) by (rewrite right_id; exact Hvot).
+      iMod (bio_incr_step bn M k ot cnt None HMk Hv0 with "Hauth") as "[Hauth Htok]".
+      iMod (bbox_ref_incr bn V k r (Pos.to_nat cnt) (devs k) (bnos k) E HE Hw Hid with "Hbox Hrd Hc") as "(Hrd & Hc & Hgh)".
+      assert (Hsucc : Pos.to_nat (Pos.succ cnt) = (Pos.to_nat cnt + 1)%nat)
+        by (rewrite Pos2Nat.inj_succ; lia).
+      iEval (rewrite /bslot) in "Hbslot".
+      iAssert (bio_slot_res2 bn V (<[k := (ot ⋅ None, Pos.succ cnt)]> M) k
+                 (devs k) (bnos k) tl cur_ctx)
+        with "[Hrd Hcell Hfd Hbslot Hc Hdev Hbno]" as "Hslot".
+      { rewrite /bio_slot_res2 lookup_insert.
+        iSplitL "Hrd". { iApply (bd_regs_same _ _ _ _ _ _ Hw Hxn Hid Hb with "Hrd Hllbd"). }
+        iSplitR. { iPureIntro. rewrite Pos2Z.inj_succ. rewrite Pos2Z.inj_succ in Hn2. lia. }
+        iFrame "Hcell".
+        iSplitL "Hfd Hbslot".
+        { rewrite Hsucc bslots_op. iFrame "Hfd Hbslot". }
+        iSplitL "Hc".
+        { assert (Hsucc' : Pos.to_nat (Pos.succ cnt) = S (Pos.to_nat cnt)) by lia.
+          rewrite Hsucc'. iExact "Hc". }
+        iExists qr. iSplitR.
+        { iPureIntro. exact (bd_btie_incr0 ot qr Htie). }
+        iFrame "Hdev Hbno". }
+      iDestruct ("Hback" $! (<[k := (ot ⋅ None, Pos.succ cnt)]> M) devs bnos tl
+                   with "[%] [%] Hslot") as "Hslots"; [| lia |].
+      { intros j Hj. split_and!;
+          [ rewrite lookup_insert_ne; [reflexivity | congruence] | reflexivity | reflexivity ]. }
+      iModIntro. iSplitR "Htok Hgh".
+      + iApply (bd_scan2_close bn V M ord devs bnos tl k _ Hk
+                  with "[%] [%] [%] [%] Hfl Hllbtl Hauth Hsauth Hlru Hpool Hslots"); done.
+      + rewrite /bchain /bref_tok0. iFrame "Htok Hgh".
+    - iEval (rewrite /bio_slot_res2 HMk) in "Hslot".
+      iDestruct "Hslot" as "[Hregs (Hcell & Hc & Hdev & Hbno)]".
+      iDestruct "Hregs" as (r) "(Hrd & %Hw & %Hxn & %Hid & #Hllbd & %Hb)".
+      iExists (mword_of_int 0 : mword 32). iFrame "Hcell".
+      iIntros "Hcell".
+      assert (Hinc : incr32 (mword_of_int 0 : mword 32) = (mword_of_int 1 : mword 32)).
+      { rewrite (incr32_pos 0 ltac:(lia) ltac:(vm_compute; reflexivity)). reflexivity. }
+      iEval (rewrite Hinc) in "Hcell".
+      iMod (bio_first_ref_step bn M k None HMk I with "Hauth") as "[Hauth Htok]".
+      iMod (bbox_ref_incr bn V k r 0 (devs k) (bnos k) E HE Hw Hid with "Hbox Hrd Hc") as "(Hrd & Hc & Hgh)".
+      iEval (rewrite /bslot) in "Hbslot".
+      iAssert (bio_slot_res2 bn V (<[k := (None, 1%positive)]> M) k (devs k) (bnos k) tl cur_ctx)
+        with "[Hrd Hcell Hbslot Hc Hdev Hbno]" as "Hslot".
+      { rewrite /bio_slot_res2 lookup_insert.
+        iSplitL "Hrd". { iApply (bd_regs_same _ _ _ _ _ _ Hw Hxn Hid Hb with "Hrd Hllbd"). }
+        iSplitR. { iPureIntro. exact bd_pos1_lt. }
+        iFrame "Hcell".
+        iSplitL "Hbslot". { change (Pos.to_nat 1) with 1%nat. iFrame "Hbslot". }
+        iSplitL "Hc". { change (Pos.to_nat 1) with 1%nat. iExact "Hc". }
+        iExists (1/2)%Qp. iSplitR; [iPureIntro; done|].
+        iFrame "Hdev Hbno". }
+      iDestruct ("Hback" $! (<[k := (None, 1%positive)]> M) devs bnos tl
+                   with "[%] [%] Hslot") as "Hslots"; [| lia |].
+      { intros j Hj. split_and!;
+          [ rewrite lookup_insert_ne; [reflexivity | congruence] | reflexivity | reflexivity ]. }
+      iModIntro. iSplitR "Htok Hgh".
+      + iApply (bd_scan2_close bn V M ord devs bnos tl k _ Hk
+                  with "[%] [%] [%] [%] Hfl Hllbtl Hauth Hsauth Hlru Hpool Hslots"); done.
+      + rewrite /bchain /bref_tok0. iFrame "Htok Hgh".
+  Qed.
+
+  (* ---- the RECYCLE (box lemmas (a) + three stores + (b)): the idle slot's
+     header comes out of the box FULL (the bundle's halves joined with the
+     bcache halves); the closing wand takes the cells back at the recycler's
+     values, evicts the old payload into the pool, withdraws the new block's
+     bundle, deposits the (invalid) header at the new stamp, and mints the
+     chain's reference there.  The floor slot grows to the new stamp. ---- *)
   Lemma bcache_scan2_recycle (bn : bio_names) (V : bio_view Σ)
-      (M : gmap nat (Qp * positive)) (ord : list nat)
+      (M : gmap nat (option Qp * positive)) (ord : list nat)
       (devs bnos : nat -> mword 32) (tl k : nat) (D B : mword 32) (E : coPset) :
     ↑bioxN ⊆ E ->
     (k < NBUF)%nat ->
@@ -575,20 +604,23 @@ Section BreadScan2.
     uint B ∈ bv_cov V ->
     (forall i, (i < NBUF)%nat -> ¬ (devs i = D /\ bnos i = B)) ->
     buf_box bn V k -∗
+    TsoCtx.own_context cur_ctx -∗
     TsoCtx.ctx_floor cur_ctx tl -∗
-    bcache_scan2 bn V M ord devs bnos tl cur_ctx -∗ bslot -∗
+    llb loglen_name tl -∗
+    bcache_scan2 bn V M ord devs bnos tl cur_ctx -∗ bslot ={E}=∗
+    TsoCtx.own_context cur_ctx ∗
     brefcnt k ↦₄ (mword_of_int 0 : mword 32) ∗
     (∃ vld : mword 32, b_valid (bpa k) ↦₄ vld) ∗
     b_dev (bpa k) ↦₄ (devs k) ∗
     b_blockno (bpa k) ↦₄ (bnos k) ∗
-    (own_context cur_ctx -∗
+    (TsoCtx.own_context cur_ctx -∗
      brefcnt k ↦₄ (mword_of_int 1 : mword 32) -∗
      b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) -∗
      b_dev (bpa k) ↦₄ D -∗
      b_blockno (bpa k) ↦₄ B ={E}=∗
-     own_context cur_ctx ∗ bcache_res2 bn V cur_ctx ∗ bref bn k (1/4)%Qp D B).
+     TsoCtx.own_context cur_ctx ∗ bd_scan2_after bn V tl ∗ bchain bn k D B).
   Proof.
-    iIntros (HE Hk HMk HD HcovB Htie) "#Hbox #Hfl Hscan Hbslot".
+    iIntros (HE Hk HMk HD HcovB Htie) "#Hbox Hrun #Hfl #Hllbtl Hscan Hbslot".
     rewrite /bcache_scan2.
     iDestruct "Hscan" as
       "(Hauth & Hsauth & %Hdom & %Hord & %Hinj & %Hdevpin & Hlru & Hpool & Hslots)".
@@ -599,12 +631,17 @@ Section BreadScan2.
       exact (Hinj k j Hk Hj Hcov (eq_sym Heq)). }
     iDestruct (bio_slots_acc2 bn V M devs bnos tl k Hk with "Hslots") as "[Hslot Hback]".
     iEval (rewrite /bio_slot_res2 HMk) in "Hslot".
-    iDestruct "Hslot" as "[Hregs (Hcell & Hc & Hcont)]".
-    iDestruct "Hcont" as (v bs) "(Hvld & Hdev & Hbuf & Hbno & Hpay)".
-    rewrite /buf_own.
-    iDestruct "Hbuf" as "(Hbno0 & Hdisk & %Hlen & Hdata)".
-    iDestruct (ctx_word4_pointsto_half_join with "Hbno Hbno0") as "Hbnofull".
-    iFrame "Hcell Hdev Hbnofull".
+    iDestruct "Hslot" as "[Hregs (Hcell & Hc & Hdev & Hbno)]".
+    iDestruct "Hregs" as (r) "(Hrd & %Hw & %Hxn & %Hid & #Hllbd & %Hb)".
+    (* (a): the header out of the box at the slot's identity; the window opens *)
+    iMod (bbox_withdraw_L1 bn V k cur_ctx r tl E HE Hw Hb with "Hbox Hrun Hfl Hrd Hc")
+      as "(Hrun & Hc & Hout)".
+    iDestruct "Hout" as (bs) "[Hrd Hhdr]".
+    iEval (rewrite /bhdr Hid; cbn [fst snd]) in "Hhdr".
+    iDestruct "Hhdr" as (v) "(Hvld & Hdevb & Hbnob & Hpay)".
+    iDestruct (ctx_word4_pointsto_half_join with "Hdevb Hdev") as "Hdev".
+    iDestruct (ctx_word4_pointsto_half_join with "Hbnob Hbno") as "Hbno".
+    iModIntro. iFrame "Hrun Hcell Hdev Hbno".
     iSplitL "Hvld". { by iExists _. }
     iIntros "Hrun Hcell Hvld Hdev Hbno".
     (* the old payload leaves for the pool; the new block's bundle comes out *)
@@ -616,48 +653,46 @@ Section BreadScan2.
                  HcovB Hmiss Huniq with "Hpool") as "[HpoolB Hpoolback]".
     iDestruct ("Hpoolback" with "[Hold]") as "Hpool".
     { case_decide as Hc; [iDestruct "Hold" as "[_ $]" | done]. }
-    iMod (bio_first_ref_step bn M k (1/4)%Qp HMk bd_quarter_valid
-            with "Hauth") as "[Hauth Htok]".
-    (* the cells at the new values: the bundle's shares and the bcache quarters *)
-    iDestruct (ctx_word4_pointsto_half_split with "Hdev") as "[Hdevb Hdevs]".
-    iAssert (b_dev (bpa k) ↦₄{DfracOwn (1/4)} D ∗ b_dev (bpa k) ↦₄{DfracOwn (1/4)} D)%I
-      with "[Hdevs]" as "[Hdev1 Hdev2]".
-    { rewrite -ctx_word4_pointsto_frac_split bd_quarter_half. iExact "Hdevs". }
-    iDestruct (ctx_word4_pointsto_half_split with "Hbno") as "[Hbnob Hbnos]".
-    iAssert (b_blockno (bpa k) ↦₄{DfracOwn (1/4)} B ∗ b_blockno (bpa k) ↦₄{DfracOwn (1/4)} B)%I
-      with "[Hbnos]" as "[Hbno1 Hbno2]".
-    { rewrite -ctx_word4_pointsto_frac_split bd_quarter_half. iExact "Hbnos". }
     iAssert (buf_pay bn V k false D B bs) with "[HpoolB]" as "Hpay".
     { rewrite /buf_pay. case_decide as Hc; [| exfalso; exact (Hc HcovB)].
       iSplitR; [by iPureIntro|]. iExact "HpoolB". }
-    (* the (invalid) bundle enters the box *)
-    iMod (box_swap_bump bn V k cur_ctx E HE
-            with "Hbox Hrun Hc [Hvld Hdevb Hbnob Hdisk Hdata Hpay]")
-      as "(Hrun & Hc & Hfr)".
-    { rewrite /buf_bundle. iExists false, D, B, bs. cbv iota.
-      iFrame "Hvld Hdevb Hpay". rewrite /buf_own. iFrame "Hbnob Hdisk Hdata". done. }
+    (* the cells at the new values: the bundle's halves and the bcache halves *)
+    iDestruct (ctx_word4_pointsto_half_split with "Hdev") as "[Hdevb Hdevs]".
+    iDestruct (ctx_word4_pointsto_half_split with "Hbno") as "[Hbnob Hbnos]".
+    (* (b): the (invalid) header enters the box at the new stamp; the chain's
+       unit is minted there *)
+    iMod (bbox_deposit_L1 bn V k cur_ctx (sr_td r) (sr_ident r) bs D B E HE
+            with "Hbox Hrun Hrd Hc [Hvld Hdevb Hbnob Hpay]")
+      as "(Hrun & %T' & Hrd & Hc & Hgh & #Hllb')".
+    { rewrite /bhdr. iExists false. cbn [fst snd]. rewrite /buf_hdr. cbv iota.
+      iFrame "Hvld Hdevb Hbnob Hpay". }
+    iMod (bio_first_ref_step bn M k None HMk I with "Hauth") as "[Hauth Htok]".
     iEval (rewrite /bslot) in "Hbslot".
-    iAssert (bio_slot_res2 bn V (<[k := ((1/4)%Qp, 1%positive)]> M) k D B tl cur_ctx)
-      with "[Hregs Hcell Hbslot Hc Hdev1 Hbno1]" as "Hslot".
-    { rewrite /bio_slot_res2 lookup_insert. iFrame "Hregs".
+    iAssert (bio_slot_res2 bn V (<[k := (None, 1%positive)]> M) k D B (Nat.max tl T') cur_ctx)
+      with "[Hrd Hcell Hbslot Hc Hdevs Hbnos]" as "Hslot".
+    { rewrite /bio_slot_res2 lookup_insert.
+      iSplitL "Hrd".
+      { iExists (SlotReg T' false (D, B) None). iFrame "Hrd Hllb'". iPureIntro. cbn.
+        split_and!; [done | done | done | lia]. }
       iSplitR. { iPureIntro. exact bd_pos1_lt. }
       iFrame "Hcell".
       iSplitL "Hbslot". { change (Pos.to_nat 1) with 1%nat. iFrame "Hbslot". }
-      iSplitL "Hc". { change (Pos.to_nat 1) with 1%nat. iExact "Hc". }
-      iExists (1/4)%Qp. iSplitR; [iPureIntro; exact bd_quarter_half|].
-      iFrame "Hdev1 Hbno1". }
-    iDestruct ("Hback" $! (<[k := ((1/4)%Qp, 1%positive)]> M)
-                 (bfun_upd devs k D) (bfun_upd bnos k B)
-                 with "[%] [Hslot]") as "Hslots".
+      iFrame "Hc".
+      iExists (1/2)%Qp. iSplitR; [iPureIntro; done|].
+      iFrame "Hdevs Hbnos". }
+    iDestruct ("Hback" $! (<[k := (None, 1%positive)]> M)
+                 (bfun_upd devs k D) (bfun_upd bnos k B) (Nat.max tl T')
+                 with "[%] [%] [Hslot]") as "Hslots"; [| lia |].
     { intros j Hj. split_and!;
         [ rewrite lookup_insert_ne; [reflexivity | congruence]
         | exact (bfun_upd_ne devs k D j Hj)
         | exact (bfun_upd_ne bnos k B j Hj) ]. }
     { rewrite (bfun_upd_eq devs k D) (bfun_upd_eq bnos k B). iExact "Hslot". }
-    iModIntro. iFrame "Hrun". iSplitR "Htok Hfr Hdev2 Hbno2".
-    - iApply (bcache_res2_fold bn V (<[k := ((1/4)%Qp, 1%positive)]> M) ord
-                (bfun_upd devs k D) (bfun_upd bnos k B) tl).
-      iFrame "Hfl". rewrite /bcache_scan2. iFrame "Hauth Hsauth".
+    iModIntro. iFrame "Hrun". iSplitR "Htok Hgh".
+    - iExists (<[k := (None, 1%positive)]> M), ord, (bfun_upd devs k D), (bfun_upd bnos k B), (Nat.max tl T').
+      iSplitR; [iPureIntro; lia|].
+      iSplitR; [iApply (bd_llb_max with "Hllbtl Hllb'")|].
+      rewrite /bcache_scan2. iFrame "Hauth Hsauth".
       iSplitR.
       { iPureIntro. intros j Hj.
         destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
@@ -668,8 +703,240 @@ Section BreadScan2.
       iSplitR.
       { iPureIntro. exact (bd_devpin_upd V devs bnos k D B HD Hdevpin). }
       iFrame "Hlru Hpool Hslots".
-    - rewrite /bref. iFrame "Htok Hdev2 Hbno2".
-      iDestruct "Hfr" as (rb) "(Hfr & _ & #Hllb)". iExists rb. iFrame "Hfr Hllb".
+    - rewrite /bchain /bref_tok0. iFrame "Htok Hgh".
+  Qed.
+
+  (* ---- refs-- (box lemma (d)) for a FRACTIONED reference in hand (bunpin);
+     refs 1 -> 0 IS (d): the content stays in the box. ---- *)
+  Lemma bcache_scan2_decr (bn : bio_names) (V : bio_view Σ) M ord devs bnos
+      (tl k : nat) (q : Qp) (dev bno : mword 32) (E : coPset) :
+    ↑bioxN ⊆ E ->
+    (k < NBUF)%nat ->
+    buf_box bn V k -∗
+    TsoCtx.ctx_floor cur_ctx tl -∗
+    llb loglen_name tl -∗
+    bcache_scan2 bn V M ord devs bnos tl cur_ctx -∗
+    bref bn k q dev bno -∗
+    ∃ cnt : positive,
+      ⌜(Z.pos cnt < 2 ^ 31)%Z⌝ ∗
+      brefcnt k ↦₄ (mword_of_int (Z.pos cnt) : mword 32) ∗
+      (brefcnt k ↦₄ (mword_of_int (Z.pos cnt - 1) : mword 32) ={E}=∗
+         bd_scan2_after bn V tl ∗ bslot).
+  Proof.
+    iIntros (HE Hk) "#Hbox #Hfl #Hllbtl Hscan Href".
+    iDestruct "Href" as "(Hrtok & Hgh & Hrdev & Hrbno)".
+    rewrite /bcache_scan2.
+    iDestruct "Hscan" as
+      "(Hauth & Hsauth & %Hdom & %Hord & %Hinj & %Hdevpin & Hlru & Hpool & Hslots)".
+    iDestruct (btok_lookup with "Hauth Hrtok") as %(ot & cnt & HMk & Hincl & Hsole).
+    iDestruct (bio_slots_acc2 bn V M devs bnos tl k Hk with "Hslots") as "[Hslot Hback]".
+    iEval (rewrite /bio_slot_res2 HMk) in "Hslot".
+    iDestruct "Hslot" as "[Hregs (%Hcnt & Hcell & Hfd & Hc & Hqr)]".
+    iDestruct "Hregs" as (r) "(Hrd & %Hw & %Hxn & %Hid & #Hllbd & %Hb)".
+    iDestruct "Hqr" as (qr) "(%Htie & Hdev & Hbno)".
+    iDestruct (ctx_word4_pointsto_agree with "Hrdev Hdev") as %->.
+    iDestruct (ctx_word4_pointsto_agree with "Hrbno Hbno") as %->.
+    iExists cnt. iSplitR; [iPureIntro; exact Hcnt|]. iFrame "Hcell".
+    iIntros "Hcell".
+    assert (Hex : exists c', Pos.to_nat cnt = S c').
+    { exists (Pos.to_nat cnt - 1)%nat. pose proof (Pos2Nat.is_pos cnt). lia. }
+    destruct Hex as [c' Hc'].
+    iEval (rewrite Hc') in "Hc".
+    iMod (bbox_ref_decr bn V k r c' _ _ E HE Hw with "Hbox Hrd Hllbd Hc Hgh")
+      as "(%td' & %Htd' & Hrd & Hc & #Hllbd')".
+    iAssert (bslot_regs bn k (Nat.max tl td') (devs k) (bnos k)) with "[Hrd]" as "Hregs".
+    { iExists (SlotReg td' false (sr_ident r) (sr_x r)). iFrame "Hrd Hllbd'". iPureIntro. cbn.
+      split_and!; [done | exact Hxn | exact Hid | lia]. }
+    destruct (decide (cnt = 1%positive)) as [->|Hne].
+    - (* the last reference: the entry disappears; the bcache half re-forms *)
+      assert (Hot : ot = Some q) by (apply Hsole; reflexivity). subst ot.
+      iMod (bio_last_ref_step bn M k (Some q) HMk with "Hauth Hrtok") as "Hauth".
+      assert (Hz0 : (Z.pos 1 - 1)%Z = 0%Z) by reflexivity.
+      iEval (rewrite Hz0) in "Hcell".
+      assert (Hc'0 : c' = 0%nat) by (change (Pos.to_nat 1) with 1%nat in Hc'; lia). subst c'.
+      iAssert (b_dev (bpa k) ↦₄{DfracOwn (1/2)} (devs k))%I with "[Hrdev Hdev]" as "Hdev".
+      { cbn in Htie. rewrite -(Qp.add_comm qr q) in Htie. rewrite -Htie ctx_word4_pointsto_frac_split.
+        iFrame "Hdev Hrdev". }
+      iAssert (b_blockno (bpa k) ↦₄{DfracOwn (1/2)} (bnos k))%I with "[Hrbno Hbno]" as "Hbno".
+      { cbn in Htie. rewrite -(Qp.add_comm qr q) in Htie. rewrite -Htie ctx_word4_pointsto_frac_split.
+        iFrame "Hbno Hrbno". }
+      assert (Hdel : delete k M !! k = None) by apply lookup_delete.
+      iAssert (bio_slot_res2 bn V (delete k M) k (devs k) (bnos k) (Nat.max tl td') cur_ctx)
+        with "[Hregs Hcell Hc Hdev Hbno]" as "Hslot".
+      { rewrite /bio_slot_res2 Hdel. iFrame "Hregs Hcell Hc Hdev Hbno". }
+      iDestruct ("Hback" $! (delete k M) devs bnos (Nat.max tl td') with "[%] [%] Hslot") as "Hslots";
+        [| lia |].
+      { intros j Hj. split_and!;
+          [ rewrite lookup_delete_ne; [reflexivity | congruence] | reflexivity | reflexivity ]. }
+      iModIntro. iSplitR "Hfd".
+      + iExists (delete k M), ord, devs, bnos, (Nat.max tl td').
+        iSplitR; [iPureIntro; lia|].
+        iSplitR; [iApply (bd_llb_max with "Hllbtl Hllbd'")|].
+        rewrite /bcache_scan2. iFrame "Hauth Hsauth".
+        iSplitR.
+        { iPureIntro. intros j Hj. apply Hdom.
+          destruct (decide (j = k)) as [->|Hnk].
+          - rewrite Hdel in Hj. by destruct Hj as [x Hx].
+          - rewrite lookup_delete_ne in Hj; [exact Hj | congruence]. }
+        iSplitR; [iPureIntro; exact Hord|].
+        iSplitR; [iPureIntro; exact Hinj|].
+        iSplitR; [iPureIntro; exact Hdevpin|].
+        iFrame "Hlru Hpool Hslots".
+      + rewrite /bslot. change (Pos.to_nat 1) with 1%nat. iExact "Hfd".
+    - (* survivors: the share returns to the slot *)
+      assert (Hex2 : exists cp, cnt = Pos.succ cp).
+      { exists (Pos.pred cnt). symmetry. by apply Pos.succ_pred. }
+      destruct Hex2 as [cp Hcp]. subst cnt.
+      destruct Hincl as [orem Horem]. apply leibniz_equiv in Horem.
+      iMod (bio_decr_step bn M k (Some q) ot orem cp HMk Horem with "Hauth Hrtok") as "Hauth".
+      assert (Hzp : (Z.pos (Pos.succ cp) - 1)%Z = Z.pos cp)
+        by (rewrite Pos2Z.inj_succ; lia).
+      iEval (rewrite Hzp) in "Hcell".
+      iAssert (b_dev (bpa k) ↦₄{DfracOwn (qr + q)} (devs k))%I
+        with "[Hrdev Hdev]" as "Hdev".
+      { rewrite ctx_word4_pointsto_frac_split. iFrame "Hdev Hrdev". }
+      iAssert (b_blockno (bpa k) ↦₄{DfracOwn (qr + q)} (bnos k))%I
+        with "[Hrbno Hbno]" as "Hbno".
+      { rewrite ctx_word4_pointsto_frac_split. iFrame "Hbno Hrbno". }
+      assert (Hsucc : Pos.to_nat (Pos.succ cp) = (Pos.to_nat cp + 1)%nat)
+        by (rewrite Pos2Nat.inj_succ; lia).
+      assert (Hcp' : c' = Pos.to_nat cp) by lia. subst c'.
+      iEval (rewrite Hsucc bslots_op) in "Hfd".
+      iDestruct "Hfd" as "[Hfd Hout]".
+      iAssert (bio_slot_res2 bn V (<[k := (orem, cp)]> M) k (devs k) (bnos k) (Nat.max tl td') cur_ctx)
+        with "[Hregs Hcell Hfd Hc Hdev Hbno]" as "Hslot".
+      { rewrite /bio_slot_res2 lookup_insert. iFrame "Hregs".
+        iSplitR. { iPureIntro. rewrite Pos2Z.inj_succ in Hcnt. lia. }
+        iFrame "Hcell Hfd Hc".
+        iExists (qr + q)%Qp. iSplitR.
+        { iPureIntro. apply bd_btie_decr. rewrite -Horem. exact Htie. }
+        iFrame "Hdev Hbno". }
+      iDestruct ("Hback" $! (<[k := (orem, cp)]> M) devs bnos (Nat.max tl td') with "[%] [%] Hslot") as "Hslots";
+        [| lia |].
+      { intros j Hj. split_and!;
+          [ rewrite lookup_insert_ne; [reflexivity | congruence] | reflexivity | reflexivity ]. }
+      iModIntro. iSplitR "Hout".
+      + iExists (<[k := (orem, cp)]> M), ord, devs, bnos, (Nat.max tl td').
+        iSplitR; [iPureIntro; lia|].
+        iSplitR; [iApply (bd_llb_max with "Hllbtl Hllbd'")|].
+        rewrite /bcache_scan2. iFrame "Hauth Hsauth".
+        iSplitR.
+        { iPureIntro. intros j Hj.
+          destruct (decide (j = k)) as [->|Hnk]; [exact Hk|].
+          apply Hdom. by rewrite lookup_insert_ne in Hj. }
+        iSplitR; [iPureIntro; exact Hord|].
+        iSplitR; [iPureIntro; exact Hinj|].
+        iSplitR; [iPureIntro; exact Hdevpin|].
+        iFrame "Hlru Hpool Hslots".
+      + rewrite /bslot. iExact "Hout".
+  Qed.
+
+  (* ---- refs-- (box lemma (d)) for THE CHAIN after its park (brelse) ---- *)
+  Lemma bcache_scan2_decr0 (bn : bio_names) (V : bio_view Σ) M ord devs bnos
+      (tl k : nat) (dev bno : mword 32) (E : coPset) :
+    ↑bioxN ⊆ E ->
+    (k < NBUF)%nat ->
+    buf_box bn V k -∗
+    TsoCtx.ctx_floor cur_ctx tl -∗
+    llb loglen_name tl -∗
+    bcache_scan2 bn V M ord devs bnos tl cur_ctx -∗
+    bchain bn k dev bno -∗
+    ∃ cnt : positive,
+      ⌜(Z.pos cnt < 2 ^ 31)%Z⌝ ∗
+      brefcnt k ↦₄ (mword_of_int (Z.pos cnt) : mword 32) ∗
+      (brefcnt k ↦₄ (mword_of_int (Z.pos cnt - 1) : mword 32) ={E}=∗
+         bd_scan2_after bn V tl ∗ bslot).
+  Proof.
+    iIntros (HE Hk) "#Hbox #Hfl #Hllbtl Hscan Hch".
+    iDestruct "Hch" as "[Hrtok Hgh]".
+    rewrite /bcache_scan2.
+    iDestruct "Hscan" as
+      "(Hauth & Hsauth & %Hdom & %Hord & %Hinj & %Hdevpin & Hlru & Hpool & Hslots)".
+    iDestruct (btok_lookup with "Hauth Hrtok") as %(ot & cnt & HMk & _ & Hsole).
+    iDestruct (bio_slots_acc2 bn V M devs bnos tl k Hk with "Hslots") as "[Hslot Hback]".
+    iEval (rewrite /bio_slot_res2 HMk) in "Hslot".
+    iDestruct "Hslot" as "[Hregs (%Hcnt & Hcell & Hfd & Hc & Hqr)]".
+    iDestruct "Hregs" as (r) "(Hrd & %Hw & %Hxn & %Hid & #Hllbd & %Hb)".
+    iDestruct "Hqr" as (qr) "(%Htie & Hdev & Hbno)".
+    iExists cnt. iSplitR; [iPureIntro; exact Hcnt|]. iFrame "Hcell".
+    iIntros "Hcell".
+    assert (Hex : exists c', Pos.to_nat cnt = S c').
+    { exists (Pos.to_nat cnt - 1)%nat. pose proof (Pos2Nat.is_pos cnt). lia. }
+    destruct Hex as [c' Hc'].
+    iEval (rewrite Hc') in "Hc".
+    iMod (bbox_ref_decr bn V k r c' _ _ E HE Hw with "Hbox Hrd Hllbd Hc Hgh")
+      as "(%td' & %Htd' & Hrd & Hc & #Hllbd')".
+    iAssert (bslot_regs bn k (Nat.max tl td') (devs k) (bnos k)) with "[Hrd]" as "Hregs".
+    { iExists (SlotReg td' false (sr_ident r) (sr_x r)). iFrame "Hrd Hllbd'". iPureIntro. cbn.
+      split_and!; [done | exact Hxn | exact Hid | lia]. }
+    destruct (decide (cnt = 1%positive)) as [->|Hne].
+    - assert (Hot : ot = None) by (apply Hsole; reflexivity). subst ot.
+      cbn in Htie. subst qr.
+      iMod (bio_last_ref_step bn M k None HMk with "Hauth Hrtok") as "Hauth".
+      assert (Hz0 : (Z.pos 1 - 1)%Z = 0%Z) by reflexivity.
+      iEval (rewrite Hz0) in "Hcell".
+      assert (Hc'0 : c' = 0%nat) by (change (Pos.to_nat 1) with 1%nat in Hc'; lia). subst c'.
+      assert (Hdel : delete k M !! k = None) by apply lookup_delete.
+      iAssert (bio_slot_res2 bn V (delete k M) k (devs k) (bnos k) (Nat.max tl td') cur_ctx)
+        with "[Hregs Hcell Hc Hdev Hbno]" as "Hslot".
+      { rewrite /bio_slot_res2 Hdel. iFrame "Hregs Hcell Hc Hdev Hbno". }
+      iDestruct ("Hback" $! (delete k M) devs bnos (Nat.max tl td') with "[%] [%] Hslot") as "Hslots";
+        [| lia |].
+      { intros j Hj. split_and!;
+          [ rewrite lookup_delete_ne; [reflexivity | congruence] | reflexivity | reflexivity ]. }
+      iModIntro. iSplitR "Hfd".
+      + iExists (delete k M), ord, devs, bnos, (Nat.max tl td').
+        iSplitR; [iPureIntro; lia|].
+        iSplitR; [iApply (bd_llb_max with "Hllbtl Hllbd'")|].
+        rewrite /bcache_scan2. iFrame "Hauth Hsauth".
+        iSplitR.
+        { iPureIntro. intros j Hj. apply Hdom.
+          destruct (decide (j = k)) as [->|Hnk].
+          - rewrite Hdel in Hj. by destruct Hj as [x Hx].
+          - rewrite lookup_delete_ne in Hj; [exact Hj | congruence]. }
+        iSplitR; [iPureIntro; exact Hord|].
+        iSplitR; [iPureIntro; exact Hinj|].
+        iSplitR; [iPureIntro; exact Hdevpin|].
+        iFrame "Hlru Hpool Hslots".
+      + rewrite /bslot. change (Pos.to_nat 1) with 1%nat. iExact "Hfd".
+    - assert (Hex2 : exists cp, cnt = Pos.succ cp).
+      { exists (Pos.pred cnt). symmetry. by apply Pos.succ_pred. }
+      destruct Hex2 as [cp Hcp]. subst cnt.
+      assert (Hsub : ot = None ⋅ ot) by (by rewrite left_id).
+      iMod (bio_decr_step bn M k None ot ot cp HMk Hsub with "Hauth Hrtok") as "Hauth".
+      assert (Hzp : (Z.pos (Pos.succ cp) - 1)%Z = Z.pos cp)
+        by (rewrite Pos2Z.inj_succ; lia).
+      iEval (rewrite Hzp) in "Hcell".
+      assert (Hsucc : Pos.to_nat (Pos.succ cp) = (Pos.to_nat cp + 1)%nat)
+        by (rewrite Pos2Nat.inj_succ; lia).
+      assert (Hcp' : c' = Pos.to_nat cp) by lia. subst c'.
+      iEval (rewrite Hsucc bslots_op) in "Hfd".
+      iDestruct "Hfd" as "[Hfd Hout]".
+      iAssert (bio_slot_res2 bn V (<[k := (ot, cp)]> M) k (devs k) (bnos k) (Nat.max tl td') cur_ctx)
+        with "[Hregs Hcell Hfd Hc Hdev Hbno]" as "Hslot".
+      { rewrite /bio_slot_res2 lookup_insert. iFrame "Hregs".
+        iSplitR. { iPureIntro. rewrite Pos2Z.inj_succ in Hcnt. lia. }
+        iFrame "Hcell Hfd Hc".
+        iExists qr. iSplitR; [iPureIntro; exact Htie|].
+        iFrame "Hdev Hbno". }
+      iDestruct ("Hback" $! (<[k := (ot, cp)]> M) devs bnos (Nat.max tl td') with "[%] [%] Hslot") as "Hslots";
+        [| lia |].
+      { intros j Hj. split_and!;
+          [ rewrite lookup_insert_ne; [reflexivity | congruence] | reflexivity | reflexivity ]. }
+      iModIntro. iSplitR "Hout".
+      + iExists (<[k := (ot, cp)]> M), ord, devs, bnos, (Nat.max tl td').
+        iSplitR; [iPureIntro; lia|].
+        iSplitR; [iApply (bd_llb_max with "Hllbtl Hllbd'")|].
+        rewrite /bcache_scan2. iFrame "Hauth Hsauth".
+        iSplitR.
+        { iPureIntro. intros j Hj.
+          destruct (decide (j = k)) as [->|Hnk]; [exact Hk|].
+          apply Hdom. by rewrite lookup_insert_ne in Hj. }
+        iSplitR; [iPureIntro; exact Hord|].
+        iSplitR; [iPureIntro; exact Hinj|].
+        iSplitR; [iPureIntro; exact Hdevpin|].
+        iFrame "Hlru Hpool Hslots".
+      + rewrite /bslot. iExact "Hout".
   Qed.
 
 End BreadScan2.

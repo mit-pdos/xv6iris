@@ -2712,3 +2712,34 @@ culprit.  Build law: every GCP make runs under `timeout` now.
 - **Z_scope pairs**: `((0, 0) : nat * nat)` still elaborates the literals in
   `Z`; write `(0%nat, 0%nat)`.  A multiset binder named `S` shadows the
   successor (`S n` becomes an application of the multiset) -- name it `Sm`.
+- **A `={E}=∗` closing wand inside `WP (Loop …)` needs `iApply fupd_wp` first**
+  (then `iMod …`, and `iModIntro` once the resources are back in hand);
+  `iMod` alone reports "cannot eliminate modality … in (WP Loop)".  The v1
+  `==∗` wands never needed it; the v2 box-opening wands (`bcache_scan2_incr`
+  etc.) do.
+
+### R1' (CtxBox) build gotchas (2026-09-01)
+- `apply lookup_included in H` (and `singleton_included_l`, `option_included`,
+  `Some_included`, `gmap_local_update`, `local_update_unital_discrete`) fail
+  with "Unable to apply lemma … gmap ?K ?A" when the cmra is left implicit:
+  unification cannot invert the carrier coercion under evars.  Pin it:
+  `(K := …) (A := ufracR)` / `(A := optionUR ufracR)`, or wrap once
+  (CtxBox's `gincl_*`).
+- Destructing `▷ ∃ (r : slot_reg …), …` needs `Inhabited` for the binder's
+  type — the section carries `Inhabited id`; Xv6Cameras has the instances.
+- Section variables only abstract into a lemma when USED: CtxBox's excl
+  obligations appear as explicit args only in (e) (`tok_excl`) and (f)
+  (`P_hdr_excl P_rest_excl`) — pass by position accordingly.
+- `Countable (mword 32 * mword 32)` resolves to DIFFERENT terms in files
+  that see Sail's instances; `bio_id_eq_dec`/`bio_id_countable` (priority 0,
+  Xv6Cameras) pin one — without them the `boxG` instance is "not found" at
+  the first `l2_reg bio_id`-typed register.
+- `ghost_varG Σ nat` has several members in xv6G: mint the count halves with
+  `(ghost_varG0 := kalloc_count_inG)` (`bcnt_var`) or the box's instance
+  won't match.
+- `qsum`'s fold step must be a named Definition over `Qcplus` (an anonymous
+  `(_ + _)%Qc` body elaborates through the Qc→Q coercion); `nat_Qc` over
+  `Qc_of_Z` gives `Z2Qc_inj_*` for free.
+- `rewrite Hw` (a Coq rewrite) rewrites the WHOLE Iris goal incl. the
+  context; a following `iEval (rewrite Hw) in "H"` then finds nothing.
+- `own_update_2 _ _ _ _ (upd)`: FOUR underscores (γ a1 a2 a').
