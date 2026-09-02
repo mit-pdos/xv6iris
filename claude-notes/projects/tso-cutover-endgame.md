@@ -1722,6 +1722,71 @@ NOTE FOR r20b (not a problem): `ic_hdr_held` at `None` is the whole dead
 
 Nothing here needs a ruling.  The design side is closed for r20, as §6¹⁸
 says.
+## 6²¹. BUILD AGENT (2026-09-02): r20b's first design point — the READ ARM
+## under (e′)/(f′), and (e′)'s split wand as a VIEW SHIFT (a third CtxBox change)
+
+FOR THE REVIEWERS.  Starting ProofIunlock (whose spec covers the write arm
+AND the read arm through `d`) surfaced what F40 leaves open for `DepRd`:
+
+- Main's read arm SPLITS THE LEG: the escrow kept three quarters
+  (`ic_rd_arm`, which the commit's collection reads) and the holder took a
+  quarter (`ic_rd_held`).  Under F40 the three quarters must be in Q2 from
+  the instant of checkout (a reader holds no transaction, so the collection
+  cannot refute a reader's window; it must READ the leg), so they move
+  through (e′)'s split wand and come home through (f′)'s join wand.  Hence
+  THE HELD HEADER IS ARM-AWARE: `ic_hdr_held cn … k (rd : bool) i x ξ`; at
+  `rd = true` the payload is `ic_rd_held_ghost` (the quarter) ∗ the type
+  one-shot ∗ the freeze token ∗ the liveness half, LOADED and ORDINARY only.
+- (e′)'S SPLIT WAND MUST BE TOTAL OVER THE HEADER'S SHAPES, and at the read
+  arm two of them cannot yield `ic_rd_arm`: the UNLOADED payload (no leg to
+  shed — its `ipool_shape_np` right arm is the marker) and the FROZEN
+  alternative (`frzsel ¼ true ∗ ic_pin_tx`, no payload).  Main refuted both
+  INSIDE the checkout's own ghost step (`ic_swap_checkout_rd`: the reader's
+  `ShotK` one-shot kills `ity_pending`; the FROZEN outcome was handed to the
+  caller, who killed it with `frz_slot_kill` and its live slice).  A PURE
+  wand can do the first (ghost agreement is an entailment) but not the
+  second (the kill opens `itable_inv`).  Alternatives weighed:
+    (a) `Q2`'s `DepRd` side as `ic_rd_arm ∨ ic_pin_tx` (the frozen pin moves
+        to Q2 instead): the viewer refutes the pin by the tx share, but the
+        ORDINARY parker's join cannot select — after F42 it holds no pin
+        piece, and nothing else it holds contradicts `hpn_h (Some _)`;
+    (b) keep main's FROZEN outcome as a checkout RESULT: impossible under
+        the box, the (e′) transition has already closed OUT_L2 with Q2
+        when the shape is learned;
+    (c) MAKE (e′)'S SPLIT WAND A VIEW SHIFT at the box's mask,
+        `∀ x ξ', Qc ∗ P_hdr i x ξ' ={E ∖ ↑N}=∗ P_hdr' i x ξ' ∗ Q2`.
+        The read arm's split then refutes the frozen alternative with
+        `frz_slot_kill_pinw` (the reader's slice rides Qc in, and the held
+        bundle out, via `ic_hdr_held_rd_sl := ic_hdr_held … true ∗
+        live_genlo`), the unloaded shape by the one-shot, and sheds the leg
+        at the loaded ordinary payload.  `Q2`'s `DepRd` side stays
+        `ic_rd_arm` alone; the parker's join stays PURE and total
+        (`ic_hdr_amb_join_rd`).  In CtxBox the change is one line of proof
+        (`iDestruct` → `iMod` at ξb); (e) is unaffected.
+  TAKEN: (c).  It is §6¹³'s "(a′) view-shift split wand" generalization,
+  now with a client that needs it; it does not reopen F42 (the guard's pin
+  is still produced from the row before (a)).
+- The park's return is by arm kind: `ic_park_side d` is `emp` at `DepRd`
+  (the three quarters went home) and `ic_q_side d` otherwise; `ic_park` /
+  `ic_park_hold` take the held header at `ic_dep_rd d`, the parker's
+  descriptor half as Qc′, and return `ic_dep_neutral cn k` (the halves
+  rejoin inside).  Two checkout wrappers: `ic_checkout` (write arm and any
+  non-read descriptor, pure split, premise `ic_dep_rd d = false`) and
+  `ic_checkout_rd` (premises `itable_inv`, `ity_shot g ty`, `↑icacheN ⊆ E`,
+  `k < NINODE`).
+- Also from §6¹⁹, restated for review: `ic_dep_id (DepFrz _ dev inum _ _) =
+  Some (dev, inum)` (was `None`), because `ic_q2`'s pure tie would exclude
+  the free path's residue at (g) otherwise.
+
+STATUS: F38/F39/F40/F42/F42′ and the second edit are landed (§6¹⁹, commit
+c8be36124, measure 33/138/1336 with the root set unchanged).  The read-arm
+machinery above is in the tree and compiling as this is written; r20b
+(ProofIunlock first, then ProofIlock, ProofIput, ProofIget, ProofIdup,
+ProofIunlockput, ProofIreclaim) follows.  Questions for the reviewers:
+(Q6) is (c) acceptable as the third CtxBox change, or is there a
+client-side selector I missed for (a)?  (Q7) `ic_park`'s return of the
+NEUTRAL descriptor (the wrapper runs `ic_dep_park`) rather than the two
+halves — any consumer that wanted the halves apart?
 
 ## 7. Process and tooling (measured facts, not preferences)
 
