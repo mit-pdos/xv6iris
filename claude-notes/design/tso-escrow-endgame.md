@@ -408,6 +408,41 @@ ACCEPTED.  R1' may start on the flag shape.
       record form (r.win / r.td / snd <$> dom m) in the flag paragraph,
       §3.5 (a)/(d) and the bonus rule.
 
+  F7  (found at R1' on the vetted F6 re-cut; TO VET; R1' PAUSED) THE
+      PARK HAS NO IDENTITY WITNESS IN HAND.  (f)'s text re-forms "IN at
+      r.ident" from "bio_locked's own (dev, bno)" -- but bio_locked's
+      dev/bno are SPEC PARAMETERS of brelse with no ghost tie: the chain
+      reference (the only resource keyed by the identity) went into Q at
+      the checkout (A6.155), and under L2 alone the box holds no cell to
+      agree the parker's bundle against (OUT_L2 = Q, ghost only).  So a
+      parker could, in-logic, park a bundle of any identity, and the
+      next checkout's tie (my key = r.ident = the IN bundle) is unsound.
+      The same gap exists for the ledger version ("+ its witness": the
+      witness was on the reference, in Q, not in the parker's hand).
+      Nothing the parker holds outside the handle can carry it; a cell
+      fraction left in Q cannot be merged back later (contexts); the
+      sleeplock token certifies the hold episode, not the identity.
+      FIX (measured): the handle is frozen in SHAPE, not in the
+      DEFINITION of its conjuncts.  bio_held's row `sleeplocked (snd
+      (bn_slk bn k)) (buf_lock (bnode k)) pidv` is destructed by ~25 fs
+      files as one opaque conjunct and USED as a token only by bread,
+      bwrite and brelse (grep: wp_holdingsleep/wp_releasesleep/Hstok on
+      bcache tokens); the icache's sleeplocked rows are a different
+      lock.  So replace that ONE conjunct by
+        bstok bn k pidv dev bno := sleeplocked … pidv ∗ bchain bn k dev bno
+      (same shape, one Definition; bread constructs it at the checkout,
+      bwrite/brelse open it).  Then the chain reference is IN THE
+      PARKER'S HAND: (f) takes the bundle at (dev, bno) and the unit
+      ◯{[((dev,bno), t) := 1]}, row (I) gives (dev, bno) = r.ident, and
+      "IN at r.ident" is re-formed soundly; Q shrinks to
+        Q := bown ∗ ∃ Tp, reg_park Tp
+      (bown stays: it is what refutes OUT_L2 at the checkout); (e) hands
+      the chain reference back out instead of parking it in Q; brelse's
+      refs-- has the count fragment in hand.  A6.155's "residue must be
+      ghost in Q" was right about ghost, wrong about Q: the handle can
+      carry a ghost conjunct behind an existing row.  No new lemma, no
+      new arm, no new ghost; three files touch the row.
+
 HARD RULES: exactly these three arm shapes and six lemmas.  Protocol
 substates go inside Q (ξ-free ghost).  A seventh lemma, a fourth arm
 shape, or a second reference form is a design error — stop (§5).
@@ -1062,3 +1097,9 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   Remaining pre-F6 notation swept: `max (dom m)` → `max (snd <$> dom
   m)` and Td → r.td in §3.4, §3.5 (e), §3.6, §4.1 R2, §4.2, §5; the R1'
   kit named over (id * nat) keys.  No design change.
+- 2026-09-01 (build agent, R1' on the F6 re-cut): F7 -- (f) has no
+  parker-held identity witness (bio_locked's dev/bno are spec
+  parameters; the reference is in Q).  Proposed fix: the chain
+  reference rides the handle's sleeplock-token row behind a wrapper
+  Definition (shape unchanged; bread/bwrite/brelse only), Q := bown ∗
+  park half.  Recorded in §2 for vetting; R1' PAUSED.
