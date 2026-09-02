@@ -8,4 +8,4 @@
    visible effect of this change on [tools/proof_coverage.py]. *)
 Require Import LinkAcquire LinkRelease ProofIdup.
 
-Module Idup := IdupProof Acquire Release.
+Module Idup := IdupProof Acquire Release ReleaseIn.
