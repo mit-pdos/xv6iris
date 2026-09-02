@@ -507,6 +507,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | §3.2b | the consolidated box BUILT side-by-side (`iris/CtxBoxHooked.v`): hooks on (a)/(b)/(e)/(f)/(g), `box_q1_update`, eight verbatim-typed corollaries; green on the VM, assumptions closed | landed side-by-side (commit ded0fa1de); slot-in = r20c |
 | Q10 | the last close's (a) must not consume iput's pin name-half: the hooked (a) moves the frozen alternative's own pin into `Q1 1` (option B); no ghost change; `ic_hdr_frz` carries `ifreeze_pre` out and needs a `CtxMorph` instance | RULED B by reviewer 1, confirmed by the box's designer (item 9); to land in ProofIput |
 | §6²⁷ | run L2/L3/L4 in parallel now; sweep the file layer once; two tripwires before r21 | RECOMMENDED to the owner |
+| item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RECOMMENDED by the box's designer |
 | R4a Q1 | `inode_pay`: the cinv parks KEYED GHOST ONLY (`iref_frag`, `ic_lent_stamps`, `runit_any`); the reference's cells, `live_genlo`, `slh_tok` ride the fractional payload as `inode_ref_side` at the parked fraction; pin that fraction to `Q` by lending HALF at sys_open (no arity change), fallback `fp_iqi` | RULED by reviewer 1 (item 15) |
 | R4a Q2 | NO re-mint, NO llb, NO `own_context` at cancel: the share's `cred_floor` is in the canceller's hand (morphed with the payload) and `live_genlo_agree` pins the parked `lo`; `inode_pay_cancel`'s statement unchanged | RULED by reviewer 1 (item 15) |
 | R4a Q3/Q5 | ONE file-layer sweep with all three shapes final (`inode_pay`, `ftable_res_at` WITH the floor row + `_in` releases, `ic_slp ∗ off_rows`); L5 + full `ftable_res_at` first, then L8/L9 and the OffBox consumers as the two lanes INSIDE r25 | RULED by reviewer 1 (item 15); the two-sweep order reviewer 1 gave earlier is WITHDRAWN (L6 is on L8's path) |
@@ -739,6 +740,119 @@ history and is not edited.  Each round adds an Amendment to
 counts, deferred).  Design law is read from `origin/tso-flip`'s
 `tso-escrow-endgame.md`; a change to a `CtxBox.v` statement is made on this
 branch and recorded in §3.2 and §8 here.
+
+16. **THE BOX'S DESIGNER ON ITEMS 14/15 AND `inode-pay-r4a.md` (2026-09-02):
+    the rulings hold against the code; the sweep is safe ONLY if "shapes
+    final" includes `fslot` and `ic_slp`; three corrections, four tripwires.**
+    Read: `inode_pay`/`_split`/`_cancel`/`_alloc` (FileInvDefs.v:1094-1184),
+    `inode_ref`/`_short`/`_refp`/`inode_held`/`_held_short`/`inode_shr_held_gen`
+    (IcacheRef.v), `live_fracc`/`cred_floor`/`live_genlo_agree`, `lk_floor_morph`
+    (WpLock.v:1095) and its two TsoCtx lemmas, `ctx_parked_raise`, `ftable_res`,
+    `fslot`, `file_core_noff`, `is_pipe`, `so_publish` (ProofSysOpenParts.v:891),
+    `ic_slp`/`ic_slp_dep`/`ic_slp_fold` (IcacheEscrow.v:4612-4633) and their
+    consumers, `off_rows`/`off_l1_row`/`off_reclaim` (OffBox.v), `is_sleeplock_genl`,
+    `proc_priv_core` (ProcInv.v:1199), the `<{ log_res }>` sites (20 in 6 files),
+    the `<{ ftable_res }>` sites (11 in 5 files).
+    - **D1 REVISED IS RIGHT, AND THE ARITHMETIC CLOSES.**  The published
+      reference is `inode_refp k qt` with `qt = qi + Q`; pinning `qi := Q`
+      makes `qt = Q + Q` and the cinv parks `iref_frag k (Q+Q) ∗
+      ic_lent_stamps k (Q+Q) Q ∗ runit_any`, all context-free
+      (`ic_lent_stamps` is `CtxBox.reference`: `own ∗ llb`).  Outside, at
+      `q*Q`: the side (`inode_ident`, `live_genlo`, `slh_tok`) and the
+      travelling share.  At `q = 1` the cancel joins side + share:
+      `inode_ident 2Q`, `live_genlo 2Q g lo` (`live_genlo_agree` forces one
+      `lo`), `slh_tok 2Q`, `ic_ref_stamps 1` from `ic_lent_stamps` + the
+      share's stamps, and `live_fracc 2Q` from the share's `cred_floor` --
+      which IS at the canceller's context: the table's fraction arrived
+      through the acquire's morph, the fd's fraction is the process's own
+      (morphed at a park by the instance below).  `inode_pay_cancel`'s
+      statement unchanged, as reviewer 1 says.  `so_publish` takes `qi` and
+      `s` as parameters (:891), so the halving is one site; `fp_iqi` is not
+      needed.
+    - **THE FLOORS LAW IS RIGHT, and it is the load-bearing observation of
+      this round.**  In `live_fracc` and `inode_shr_held_gen` the epoch `tl`
+      occurs ONLY in `⌜lo ≤ tl⌝ ∗ cred_floor lo tl`; `lk_floor_morph`'s
+      proof (floor arm: `ctx_floor_dom` keeps `tl`; wrote arm:
+      `ctx_dom_wrote_floor` yields `ctx_floor ξ' lo`, choose `tl := lo`)
+      carries over verbatim, and every consumer cashes the credential at
+      `lo` (`cred_floor_vis`), so the minimal `tl` loses nothing.  Hence
+      `inode_held` morphs structurally and `cwd_ref` (class D) needs no
+      design.  Nothing here requires an absorb capability or `own_context`.
+    - **CORRECTION 1 -- "shapes final" must include `fslot` and `ic_slp`,
+      or the sweep is two sweeps.**  The floor row's obligation ("every
+      allocated slot's `tl ≤ Kd`") quantifies over `off_l1_row γ k c tl` IN
+      `fslot`'s allocated arm; it cannot be stated finally with `fslot` at
+      today's shape.  So pass 1 of r25 lands FOUR final shapes, not three:
+      `inode_pay` (D1), `fslot` (F37: `off_l1_row` + `off_fd_row` in the
+      allocated arm, the cell alone in the free arm), `ftable_res_at γ ξ`
+      (the floor row), `ic_slp cn k ξ := … ∗ off_rows on k ξ`.  This needs
+      only OffBox's STATEMENTS (its 14 Admitted are being proved in
+      parallel; rule 0 says statements suffice for a sweep).  Then
+      filealloc's mint, filedup's (c), fileclose's (d)/`off_reclaim` are
+      pass-1 content too (F34: mass = one per counted reference, and
+      fileclose's arm must produce the floor for `off_reclaim` from the row
+      it just designed); what remains for the OffBox lane is the publish
+      side only (fileread/filewrite's checkout/park under `ip->lock`).
+      Anything else re-touches the six file proofs.
+    - **CORRECTION 2 -- item 5 overstates `ic_slp`'s wrapper-internality.**
+      The seven inode proofs consume `ic_slp` at both ends: the acquire's
+      output is destructed into the row, the token and the neutral
+      descriptor, and the two `_in` releases `rewrite /ic_slp_dep` and frame
+      its three conjuncts (ProofIunlock.v:605, ProofIput.v:3232) after
+      presenting `llb Tp` with `Tp = lr_tp`.  With `off_rows` added, each
+      site gains ONE conjunct to thread, and the llb presented must be the
+      COMBINED maximum (the L2 register's `lr_tp` cannot be raised at
+      release -- the box holds its other half -- so the fold takes
+      `ctx_floor ξ T` for any `T ≥ max (lr_tp, off max)` and weakens by
+      floor monotonicity).  Give `ic_slp_dep cn k T` the off rows and
+      `⌜stamps ≤ T⌝`, one lemma `ic_slp_dep_llb`, and `ic_slp_fold`'s
+      statement stays.  Seven proofs, a few lines each, mechanical -- but
+      list them in the lane, do not discover them.
+    - **CORRECTION 3 -- the λ-flip is cheap; the floor row is the cost;
+      the log gets no floor row.**  `<{ R }>` → `(λ ξ, R (XI := ξ))` changes
+      nothing an acquire hands out at `cur_ctx`, so the 20 log-lock sites
+      change only through the handle's definition and one structural
+      instance (`log_res` = cells + ghost maps).  The eleven ftable sites
+      change because of the floor row and the eight `_in` releases, and
+      ONLY because `off_reclaim` needs `ctx_floor ξ Kd` under ftable.lock.
+      No consumer reads a log field racily; a floor row there would be
+      symmetry, not need.  Write that down so nobody adds one.
+    - **Q4, Q7 agreed.**  `ctx_parked_raise` takes `llb T'` alone and yields
+      the twin's floor; after the last deposit.  `first_fsinit`: `About`,
+      then morph or nothing.
+    - **THE SPIRAL RISK, NAMED.**  It is not any one shape; it is
+      discovering a missing `CtxMorph` instance AFTER the file proofs are
+      reopened.  L8's two deposits need exactly two instances,
+      `park_globals` and `proc_priv`, assembled from the rows.  Rule 0
+      applies: state BOTH as `Global Instance` skeletons on day one of r25
+      (row instances Admitted where the row is not yet final), so that a
+      row that cannot cross is a type error before any proof moves.  The
+      hand instances are the `match`/`if` bodies: `fslot`, `file_core_noff`,
+      `file_pay_st`; `cinv … inode_core` and `cinv_own` are constants;
+      `is_pipe` and the sleep-lock handle are `∃ lo, inv(const) ∗ lk_floor`
+      (`is_sleeplock_genl` is `sl_name ∗ is_lock … (sl_pay γ slk R H)`, so
+      its instance is `is_lock`'s at a λ payload).
+    - **TRIPWIRES for r25** (added to §8's list):
+      (T1) no shape lands twice -- a second edit to `inode_pay`, `fslot`,
+           `ftable_res_at` or `ic_slp` inside r25 stops the lane and comes
+           back here;
+      (T2) no floor row without a named consumer that needs it (ftable:
+           `off_reclaim`; `ic_slp`: the off L2 rows; log: none);
+      (T3) no `llb`/F21 form on a credential whose owner crosses with it
+           (reviewer 1's pitfall 1) -- `cred_floor` morphs, it is not
+           re-minted;
+      (T4) a `CtxMorph` instance is a statement before any proof that
+           depends on it is reopened; `About` (not reading) decides whether
+           a body takes `XI`.
+    - **ORDER, as I would run it:** day one: the four shapes + the two
+      instance skeletons + `inode_pay_alloc`/`so_publish` at `qt = Q+Q`.
+      Pass 1: the eleven ftable sites (`_in` releases), filealloc/filedup/
+      fileclose's box steps, sys_open's alloc, the three spec unfolds;
+      measure.  Then three lanes: (i) L8/L9 from the saved patch; (ii) the
+      seven inode proofs' one conjunct + fileread/filewrite's off
+      checkout/park; (iii) OffBox's 14 proofs, the log λ-flip, the
+      sleep-lock handle instance.  Measure per lane (pitfall 5).  Nothing
+      in a lane changes a shape.
 
 10. **The AU proofs are PARKED (owner, 2026-09-02).**  Every `Proof*AU*` /
     `Link*AU*` row of `iris/_CoqProject` is commented out for the cutover;
