@@ -39,7 +39,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list sets bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap frac excl.
+From iris.algebra Require Import ufrac auth gmap frac excl.
 From iris.base_logic.lib Require Import invariants own ghost_map ghost_var mono_nat.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -901,7 +901,7 @@ Section SnapMint.
             (frzm_boot_map_valid _))
       as (ICFG g0) "(%Hdev & %Hnibq & %Hlogq & %Histq & Hiref & Hlive &
                      Hlk & Hcnt & Hfrzm & Hboot & Hep &
-                     Hisl & Hrauth & Hlkauth & Hpkey & Hxkey & Hhpn & Htkey &
+                     Hisl & Heplo & Hstmp & Hbox & Hrauth & Hlkauth & Hpkey & Hxkey & Hhpn & Htkey &
                      Hckey)".
     iDestruct (hpn_boot_split with "Hhpn") as "Hhpn".
     symmetry in Hnibq. subst nib.
@@ -1204,7 +1204,7 @@ Section SnapMint.
     iMod (kalloc_avail_alloc 0%nat) as (gkp) "[Hkav Hkauth]".
     iMod (ic_names_alloc (fun _ : nat => ((mword_of_int 0 : mword 32),
                                           (mword_of_int 0 : mword 32))))
-      as (cn) "(Htok & Hmid & Hgid)".
+      as (cn) "(Htok & Hdep & Hgid)".
     iAssert ([∗ list] k ∈ seq 0 NINODE,
                ∃ (v : bool) (d n : mword 32), ic_id cn k 1 v d n)%I
       with "[Hgid]" as "Hgid".
@@ -1246,17 +1246,18 @@ Section SnapMint.
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
-    iSplitL "Hiref Hlive Hisl Hipool Hpkey Hxkey Hitlk Htok Hmid Hgid Hbio Hpool
-             Hkmlk Hdllk Hprlk Hkav Hkauth Hhpn Htkey Hckey".
+    iSplitL "Hiref Hlive Hisl Hstmp Hipool Hpkey Hxkey Hitlk Htok Hdep Hgid Hbio Hpool
+             Hkmlk Hdllk Hprlk Hkav Hkauth Hhpn Htkey Hckey Hbox".
     { iSplitL "Hiref"; [iExact "Hiref" |].
       iSplitL "Hlive"; [iExact "Hlive" |].
+      iSplitL "Hstmp"; [iExact "Hstmp" |].
       iSplitL "Hisl"; [iExact "Hisl" |].
       iSplitL "Hipool"; [iExact "Hipool" |].
       iSplitL "Hpkey"; [iExact "Hpkey" |].
       iSplitL "Hxkey"; [iExact "Hxkey" |].
       iSplitL "Hitlk"; [iExact "Hitlk" |].
       iSplitL "Htok"; [iExact "Htok" |].
-      iSplitL "Hmid"; [iExact "Hmid" |].
+      iSplitL "Hdep"; [iExact "Hdep" |].
       iSplitL "Hgid"; [iExact "Hgid" |].
       iSplitL "Hbio"; [iExact "Hbio" |].
       iSplitL "Hpool"; [iExact "Hpool" |].
@@ -1266,7 +1267,8 @@ Section SnapMint.
       iSplitL "Hkav"; [iExact "Hkav" |].
       iSplitL "Hkauth"; [iExact "Hkauth" |].
       iSplitL "Hhpn"; [iExact "Hhpn" |].
-      iSplitL "Htkey"; [iExact "Htkey" | iExact "Hckey"]. }
+      iSplitL "Htkey"; [iExact "Htkey" |].
+      iSplitL "Hckey"; [iExact "Hckey" | iExact "Hbox"]. }
     (* kit 2 is a GROUP now (the ledger rows follow it), so its body's
        splits go under one [iSplitL] bracket *)
     iSplitL "Hlogtok Hboot Hb1 HaL HaD Hdty Hhdr Hslots Hbmres Hrem Hxo".

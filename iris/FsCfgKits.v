@@ -33,7 +33,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap frac excl.
+From iris.algebra Require Import ufrac auth gmap frac excl.
 From iris.base_logic.lib Require Import invariants own ghost_map ghost_var mono_nat.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -120,7 +120,8 @@ Section FsCfgKits.
   Definition fs_kit_icache (ICFG : icfg) (FSC : fscfg) : iProp Σ :=
     ((* --- [icache_boot_at]'s ghost premises, in its own order --- *)
      own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
-     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) ∗
+     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
+     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
      ([∗ list] k ∈ seq 0 NINODE,
         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
      (* THE STOCKED POOL (R5): image-accurate before [userinit] runs, so
@@ -163,12 +164,20 @@ Section FsCfgKits.
      ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
      (* ...AND THE POOL'S CORPSE LEDGER (durable-disk C-7), whole and empty:
         the image has no corpses.  LAST, for the transit ledger's reason. *)
-     ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse))%I.
+     ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
+     (* the fifty boxes' fresh ghosts (tso-flip F19/F23), for
+        [IcacheBoot.icache_boot_at]'s [CtxBox.box_alloc_at] *)
+     ([∗ list] k ∈ seq 0 NINODE,
+        own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
+        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
+        ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+        ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)))%I.
 
   Lemma fs_kit_icache_open (ICFG : icfg) (FSC : fscfg) :
     fs_kit_icache ICFG FSC -∗
       own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
-      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) ∗
+      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
+     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
       ([∗ list] k ∈ seq 0 NINODE,
          sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
       ipool_rows fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
@@ -189,7 +198,12 @@ Section FsCfgKits.
       kmem_avail_auth fsc_kpages 0%nat ∗
       ([∗ list] k ∈ seq 0 NINODE, hpn_full k None) ∗
       ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
-      ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse).
+      ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
+      ([∗ list] k ∈ seq 0 NINODE,
+        own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
+        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
+        ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+        ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)).
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
@@ -342,7 +356,8 @@ Section FsCfgKits.
       the vdisk [newlock_at] take between main+0x8e and +0xa2.             *)
   Definition fs_kit_icache_rest (ICFG : icfg) (FSC : fscfg) : iProp Σ :=
     (own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
-     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) ∗
+     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
+     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
      ([∗ list] k ∈ seq 0 NINODE,
         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
      ipool_rows fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
@@ -368,7 +383,14 @@ Section FsCfgKits.
      ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
      (* ...AND THE POOL'S CORPSE LEDGER (durable-disk C-7), whole and empty:
         the image has no corpses.  LAST, for the transit ledger's reason. *)
-     ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse))%I.
+     ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
+     (* the fifty boxes' fresh ghosts (tso-flip F19/F23), for
+        [IcacheBoot.icache_boot_at]'s [CtxBox.box_alloc_at] *)
+     ([∗ list] k ∈ seq 0 NINODE,
+        own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
+        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
+        ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+        ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)))%I.
 
   Lemma fs_kit_icache_split (ICFG : icfg) (FSC : fscfg) :
     fs_kit_icache ICFG FSC -∗
@@ -377,11 +399,11 @@ Section FsCfgKits.
   Proof.
     iIntros "H".
     iDestruct (fs_kit_icache_open with "H")
-      as "(Hiref & Hlive & Hislg & Hipool & Hpkey & Hxkey & Hitlk & Htok & Hmid & Hgid &
-           Hbio & Hpool & Hkmlk & Hdllk & Hprlk & Hkav & Hkauth & Hhpn & Htkey & Hckey)".
+      as "(Hiref & Hlive & Hislg & Hstmp & Hipool & Hpkey & Hxkey & Hitlk & Htok & Hdep & Hgid &
+           Hbio & Hpool & Hkmlk & Hdllk & Hprlk & Hkav & Hkauth & Hhpn & Htkey & Hckey & Hbox)".
     rewrite /fs_kit_printk /fs_kit_kalloc /fs_kit_icache_rest.
-    iFrame "Hprlk Hkmlk Hkav Hkauth Hiref Hlive Hislg Hipool Hpkey Hxkey Hitlk Htok
-            Hmid Hgid Hbio Hpool Hdllk Hhpn Htkey Hckey".
+    iFrame "Hprlk Hkmlk Hkav Hkauth Hiref Hlive Hislg Hstmp Hipool Hpkey Hxkey Hitlk Htok
+            Hdep Hgid Hbio Hpool Hdllk Hhpn Htkey Hckey Hbox".
   Qed.
 
   Lemma fs_kit_kalloc_open (ICFG : icfg) (FSC : fscfg) :
@@ -394,7 +416,8 @@ Section FsCfgKits.
   Lemma fs_kit_icache_rest_open (ICFG : icfg) (FSC : fscfg) :
     fs_kit_icache_rest ICFG FSC -∗
       own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
-      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) ∗
+      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
+     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
       ([∗ list] k ∈ seq 0 NINODE,
          sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
       ipool_rows fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
@@ -411,7 +434,12 @@ Section FsCfgKits.
       lock_free_tok fsc_dlock ∗
       ([∗ list] k ∈ seq 0 NINODE, hpn_full k None) ∗
       ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
-      ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse).
+      ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
+      ([∗ list] k ∈ seq 0 NINODE,
+        own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
+        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
+        ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+        ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)).
   Proof. iIntros "H". iExact "H". Qed.
 
   (*  THE ONE ROW OF KIT 2 THAT main ITSELF NEEDS, peeled without spending

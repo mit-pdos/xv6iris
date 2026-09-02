@@ -1475,3 +1475,69 @@ Two flip lemmas the cutover ctx tier lacked came over verbatim:
 box's (f) uses).  Green: IcacheInv, IcachePinwObl, InodeRegion, WpLockIn.
 Expected fallout: IcacheEscrow/IcacheBoot/the inode proofs (already red) now
 also read `itable_body`'s old shape — r19/r20's files.
+
+## 12.6 r19 — IcacheEscrow and IcacheBoot stitched (2026-09-02; r19a c3e733d0e, r19b 3cb7ff853, r19c this commit)
+
+The escrow IS tso-flip's box (`ic_box := is_box ic_hdr ic_rest Q ic_tok`);
+main's durable-disk ghost rides beside it, exactly per the endgame plan §3.4:
+- `Q := ic_q cn … k := ∃ d, ic_deposit cn k d ∗ ic_q_side k d` — main's
+  descriptor HALF and, per descriptor, the parked `ln_tx` share (`DepTx`),
+  the reader's 3/4 leg `ic_rd_arm` (`DepRd`), or the freeze window's count
+  fragment + selector quarter + `(t, qt)` share (`DepFrz`).  Reviewer
+  findings F31 (the read checkout cannot supply the 3/4 leg at (e)) and F32
+  (the collection cannot see the pin during OUT_L1) are NOT coded around:
+  the definitions stand, the two site rows wait for the (e′) variant and
+  the Q1 ruling.
+- THE DESCRIPTOR VARIABLE moves to its own gname: `ic_names`' dead
+  recycle-token field is now `icn_dep`; `ic_deposit cn k d` (main's name,
+  arity and lemmas) is `ghost_var (icn_dep cn k) ½ d`; its neutral whole
+  `ic_dep_neutral` rides the L2 payload λ `ic_slp` beside the box's
+  `l2_row`, so the acquiresleep winner holds it as main's winner held
+  `ic_tok`.  The box's token `ic_tok = ghost_var (icn_esc cn k) 1 DepNone`
+  is unchanged and whole inside the box during OUT_L2.
+- THE HOLDER'S HANDLE is `ic_handle cn k d := ic_deposit2 k d ∗ ic_pay_live
+  k d ∗ ic_deposit cn k d` (flip spelled it `ic_deposit`; the rename is
+  mechanical in the files taken from flip at r20).
+- `ic_dep` (Xv6Cameras) gains tso-flip's epoch field `lo` on `DepTx`/`DepRd`
+  and the whole-reference constructor `DepRef`; `DepFrz` stays (its
+  `(t, qt)` share is durable-disk ghost).  `ic_dep_lo`, `ic_dep_shr` (now
+  with `lo`), `ic_tx_dep`/`ic_tx_dep_at` (now with `lo`) follow; every
+  `DepTx`/`DepRd` pattern site in the FS cone is r20/r21's arity sweep.
+- THE PAYLOAD GHOST is main's: `ic_loaded_ghost` = main's `ic_loaded` minus
+  its two cell conjuncts (the five pure rows + `ic_inode_leg` at 1; no
+  `dv_ride`/`fv_ride`), the frozen alternative of `ic_pay` carries main's
+  `frzsel` quarter + `ic_pin_tx` and the ordinary one `ic_pin_rest`.
+- THE IDENTIFICATION GHOST `ic_id` (main's `ipool_body` reads it) has no arm
+  to ride in the box; the identity is the register's `sr_ident`.  Both
+  halves of the table's side live under itable.lock: `islot_empty` /
+  `islot2` carry 3/4, the pool invariant its quarter (`ic_id_split_34`).
+  The tie `ic_id ½ true ↔ sr_ident = Some …` the reviewer asked for is not
+  yet stated (r20, in `itable_slot_res`).  `islot_empty`'s CELLS follow
+  flip (both identity halves complementary to the dead header's).
+- `is_itable2 := is_lock (λ ξ, itable_res2 ξ …) ∗ iref_claims ∗ ic_escrows ∗
+  ipool_inv`, with `is_itable2_pool` beside flip's three projections;
+  `itable_res2`'s pool conjunct is main's two-argument `ipool … ∅`.
+- DELETED with the arms: main's `ic_parked/out/mid_arm/empty_arm/held`,
+  `ic_escrow_body`, `icEscN`, `ic_mid`, the ~30 `ic_swap_*/ic_open_*/
+  ic_close_*` lemmas, `ic_lend`, `ic_slot_cover`, `ic_escrow_body_cover`,
+  `ic_open_held`, `ic_shrink_tx`/`ic_grow_tx`, `ic_escrow_body_ident`.
+  Their ghost steps are re-expressed at the sites in r20; `ic_slot_cover`
+  and the collection's cover are re-stated over the box at r21 (F32
+  permitting); shrink/grow need a Q accessor (ruling: an eighth box lemma
+  or a client-side opening of `box_body`).
+- IcacheBoot: flip's box boot (`pinw_slots_boot`, the read claims,
+  `box_alloc_at`, the llb-folded L1 rows, `newlock_at_llb` over the bare
+  table, the sleeplocks over `ic_slp`) with main's ghost boot (the `ic_id`
+  re-tag at 3/4 + 1/4, `ipool_alloc_inv`, the pin/transit/corpse premises).
+  `icache_boot_at`'s premise list = main's + flip's (stamps, box ghosts,
+  `live_frac0`); `fs_kit_icache`/`fs_kit_icache_rest` and FsCfgSnap follow.
+- ProcInv's root (`tf_word_phys_to_mem`/`_mem_to_phys`) takes flip's
+  shim-free proofs (A6.58/A6.69), per the reviewer: the keystone is closed.
+- Measured after r19a (`tools/cone.py` on a full `make -k`): 29 roots, 272
+  blocked, 1205 green of 1506 (from 13/361/1132).  The new roots are the
+  ProcInv cone's honest fallout: the spec files that spell descriptors
+  (r20), shim bridges in ProofArgfd/SysPause/SysKill/ForkretParts (L2),
+  name drifts vs flip (SpecProcinit `lk_cpu_ready_intro`, ProofSysSbrk,
+  ProofSysExec), the pipe proofs, FsCollectAll (`ic_slot_cover`),
+  RiscvAdequacy.  Green: IcacheRef, IcacheInv, IcacheEscrow, IcacheBoot,
+  IcachePinwObl, FsCfgKits, FsCfgSnap, ProcInv.
