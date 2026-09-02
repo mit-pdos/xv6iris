@@ -66,6 +66,7 @@ TsoCtxShim.v
 TsoCtxAbsorbLb.v
 CtxMorphTac.v
 TsoCtxPark.v
+CtxAnchor.v
 CtxBox.v
 TsoCtxMove.v
 CtxValues.v
@@ -1135,6 +1136,7 @@ ProofWritei.v
 SpecReadi.v
 IrefSlots.v
 IcacheInv.v
+IcachePinwObl.v
 InodeRef.v
 InodeLock.v
 FsImgBridge.v

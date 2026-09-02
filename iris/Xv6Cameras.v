@@ -603,7 +603,7 @@ Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    [ip->ref] reader the CURRENT epoch's floor with no extra ghost: a
    stale (g, lo) is unownable exactly as a stale g was. *)
 Definition iliveUR : ucmra :=
-  gmapUR nat (prodR fracR (agreeR (leibnizO gname))).
+  gmapUR nat (prodR fracR (agreeR (leibnizO (gname * nat)))).
 
 (* THE PER-GENERATION TYPE ONE-SHOT (design §17.2 piece 2).  The generation's
    [agree] carries a fresh GNAME rather than a type, and the type attaches
@@ -975,7 +975,8 @@ Record slot_reg (id X : Type) := SlotReg {
   sr_td    : nat;      (* the stamp L1's payload floor row covers *)
   sr_win   : bool;     (* the L1 out-window is open *)
   sr_ident : id;       (* the box's current identity *)
-  sr_x     : option X; (* F10: the witness the open window's P_rest is at *)
+  sr_x     : option (X * nat); (* F10/F30: the witness the open window's P_rest is at,
+                                  and the box stamp the window opened at *)
 }.
 Arguments SlotReg {id X} _ _ _ _.
 Arguments sr_td {id X} _.

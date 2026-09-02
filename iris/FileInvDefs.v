@@ -820,7 +820,9 @@ Section FileInv.
      so it names them individually; everything above takes [xv6G]. *)
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ,
             !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ,
-            !ghost_mapG Σ nat unit, !flivG Σ}.
+            !ghost_mapG Σ nat unit, !flivG Σ,
+            (* A12: the inode share carries the box's stamps (tso-flip M-5) *)
+            !icboxG Σ, !kallocG Σ}.
 
   (* ---- the content cells, at an arbitrary fraction ----
 
@@ -1135,8 +1137,12 @@ Section FileInv.
   Proof.
     rewrite /inode_shr_held /inode_shr_held_gen.
     iIntros "(%k & %inum & %Hv & %Hk & %Hb & Hs)".
-    rewrite inode_shr_gen_intro. iDestruct "Hs" as (g) "Hs".
-    iExists g, inum, k. by iFrame.
+    rewrite inode_shr_gen_intro.
+    iDestruct "Hs" as (g lo tl) "(%Hle & #Hfl & Hs)".
+    iExists g, inum, k, lo, tl.
+    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+    iFrame "Hfl Hs".
   Qed.
 
   (* the shed hands back the INUM as well, and this is where sys_open learns
@@ -1869,7 +1875,9 @@ Section FileOffLedgerEq.
   Context `{XI : TsoCtx.CurCtx}.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ,
             !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ,
-            !ghost_mapG Σ nat unit, !flivG Σ}.
+            !ghost_mapG Σ nat unit, !flivG Σ,
+            (* A12: the inode share carries the box's stamps (tso-flip M-5) *)
+            !icboxG Σ, !kallocG Σ}.
 
   (* the boot face IS the classy family, by conversion: the class-side
      definitions unfold to the [_at] ones at the two [fscfg] fields. *)

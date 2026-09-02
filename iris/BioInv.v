@@ -1048,8 +1048,10 @@ Section BioBox.
     reg_drop bn k r -∗
     reg_cnt bn k 0 ={E}=∗
     TsoCtx.own_context ξ ∗ reg_cnt bn k 0 ∗
-    ∃ x0 : bio_x, reg_drop bn k (SlotReg (sr_td r) true (sr_ident r) (Some x0)) ∗
-                  bhdr bn V k (sr_ident r) x0 ξ.
+    ∃ (x0 : bio_x) (T0 : nat),
+      ⌜(T0 <= Kd)%nat⌝ ∗
+      reg_drop bn k (SlotReg (sr_td r) true (sr_ident r) (Some (x0, T0))) ∗
+      bhdr bn V k (sr_ident r) x0 ξ.
   Proof.
     iIntros (HE Hw HKd) "#Hbox Hrun #Hfl Hrd Hc".
     iMod (own_unit (authUR (gmapUR (bio_id * nat) ufracR)) (bx_stamps (bn_box bn k))) as "Hf0".
@@ -1059,21 +1061,23 @@ Section BioBox.
     { rewrite /max_stamp map_fold_empty. lia. }
     iMod (CtxBox.box_withdraw_L1 (bhdr bn V k) (brest k) emp%I (bown bn k)
             bioxN (bn_box bn k) ξ r 0 ∅ Kd 0 E HE Hw Hq0 HKd Hm0
-            with "Hbox Hrun Hfl [] Hrd Hc [Hf0]") as "(Hrun & Hc & Hout)".
+            with "Hbox Hrun Hfl [] [] Hrd Hc [Hf0]") as "(Hrun & Hc & Hout)".
     { iApply TsoCtx.ctx_floor_0. }
+    { rewrite /max_stamp map_fold_empty. iApply TsoGhost.llb_0. }
     { rewrite /stamps_frag. iExact "Hf0". }
-    iModIntro. iFrame "Hrun Hc". iExact "Hout".
+    iDestruct "Hout" as (x0 T0) "(%HT0 & Hrd & Hhdr)".
+    iModIntro. iFrame "Hrun Hc". iExists x0, T0. iFrame "Hrd Hhdr". iPureIntro. lia.
   Qed.
 
   (* (b) at c = 0: the header comes back at the NEW identity; the chain's
      reference is minted at the deposit stamp *)
   Lemma bbox_deposit_L1 `{CID : RiscvLang.CpuId} (bn : bio_names) (V : bio_view Σ)
-      (k : nat) (ξ : CtxId) (Td : nat) (i0 : bio_id) (x0 : bio_x)
+      (k : nat) (ξ : CtxId) (Td : nat) (i0 : bio_id) (x0 : bio_x) (T0 : nat)
       (dev bno : mword 32) (E : coPset) :
     ↑bioxN ⊆ E ->
     buf_box bn V k -∗
     TsoCtx.own_context ξ -∗
-    reg_drop bn k (SlotReg Td true i0 (Some x0)) -∗
+    reg_drop bn k (SlotReg Td true i0 (Some (x0, T0))) -∗
     reg_cnt bn k 0 -∗
     bhdr bn V k (dev, bno) x0 ξ ={E}=∗
     TsoCtx.own_context ξ ∗
@@ -1083,7 +1087,7 @@ Section BioBox.
     iIntros (HE) "#Hbox Hrun Hrd Hc Hhdr".
     iMod (CtxBox.box_deposit_L1 (bhdr bn V k) (brest k) emp%I (bown bn k)
             bioxN (bn_box bn k) ξ
-            (SlotReg Td true i0 (Some x0)) 0 (dev, bno) x0 E HE eq_refl eq_refl
+            (SlotReg Td true i0 (Some (x0, T0))) 0 (dev, bno) x0 T0 E HE eq_refl eq_refl
             with "Hbox Hrun Hrd Hc Hhdr") as "(Hrun & %T' & Hrd & Hc & Href & #Hllb)".
     iModIntro. iFrame "Hrun". iExists T'. iFrame "Hrd Hllb".
     iSplitL "Hc"; [iExact "Hc"|].

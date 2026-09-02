@@ -1378,3 +1378,83 @@ thirty files still call the retired shim's raw↔ctx bridges
 `ProofUservec`, `SystemAdequacy` -- and `ctx_word4_claim` (7 files) has no
 definition anywhere.  Each of those is a file flip has a TSO-proper version
 of; they are the remaining convergence work, lane by lane.
+
+## 12.4 THE STITCH RULE (owner, 2026-09-02) and stage 2 as started on `tso-cutover-icache-wip`
+
+The owner's rule for the two-design merge: **tso-flip's approach for the
+PHYSICAL WORDS of memory** (ownership, bounds, contexts, floors, stamps, the
+box for the cells -- the tricky bits being icache and bcache) and **main's
+approach for the GHOST state of the durable disk** (the descriptors and the
+`ln_tx` shares they park, the arm-keyed registry, the corpse/transit
+ledgers, the pool partition -- all ghost, untouched by TSO), stitched at
+the boundary.  CtxBox's parameters are that boundary: `P_hdr`/`P_rest` are
+flip's cells, `tok := ic_tok`, and `Q` -- "the client's ξ-free ghost residue
+during an L2 checkout" -- is where main's checkout-time ghost rows live
+(`∃ d, ic_deposit½ d ∗ ic_dep_side d`, i.e. the descriptor half and the
+parked share); the rest of main's ghost (pool ledgers, `ic_id`'s quarters,
+the registry) stays beside the box in `itable_res2`/the pool invariant.
+
+Stage 2 so far (WIP branch `tso-cutover-icache-wip`, off r16; NOT on
+tso-cutover, because the camera change below leaves IcacheInv/IcacheEscrow/
+IcacheBoot red until they are stitched):
+- `Xv6Cameras.iliveUR` payload → `leibnizO (gname * nat)` (A6.145: the
+  liveness slice carries its epoch floor).  `ic_dep` still main's
+  (`DepTx`/`DepRd`/`DepFrz`); flip's `lo` field joins when IcacheEscrow's
+  `ic_body`/`ic_dep_lo` come over.
+- `IcacheRef.v` MERGED: flip's floored/stamped reference tier (`live_genlo`,
+  `live_fracc`, `cred_floor`, `ic_stamps`/`ic_ref_stamps` over the box,
+  `inode_ref := iref_frag ∗ live_fracc ∗ slh_tok ∗ inode_ident ∗
+  ic_ref_stamps`, `inode_*_genlo(_bare)`, `icfg_ieplo/istmp/box` with their
+  allocators) beside main's ghost (`icfg_lk/pool/pext/hpn/ptrn/pcrp`, the
+  descriptors, `live_gen_bound`).  `inode_shr_held_gen` = main's NAMED inum
+  + flip's floors.  The floored bundles have NO `CtxMorph` (a `cred_floor`
+  is about the holder's own context) -- flip states none; `FileInvDefs`'s
+  parked shares are flip's R4a (park floor-free, re-mint under the lock).
+  Compiles.
+- `CtxPinw.v` at flip HEAD, `CtxAnchor.v` and `IcachePinwObl.v` new
+  (registered), flip R3.4 refresh of `CtxBox`/`BioInv`/`ProofBreadParts`/
+  the `slot_reg.sr_x : option (X * nat)` register.
+
+Next, in order, each a fusion of flip's physical machinery with main's
+ghost steps (the 3-way merge lays them side by side; the lemma bodies are
+written by hand):
+Stage-2 checkpoint (branch `tso-cutover-icache-wip`, 2026-09-02): IcacheRef
+is merged (flip's `live_genlo`/`cred_floor`/`ic_ref_stamps` tier + main's
+icfg ghost fields and the `inum`-carrying `inode_shr_held_gen`), CtxPinw/
+CtxAnchor/IcachePinwObl and the CtxBox R3.4 delta are in, FileInvDefs and
+ProofFilewriteParts follow flip's reference shapes.  Red, all expected until
+the items below land: the seven inode proofs (Idup/Iget/Ilock/Iput/Ireclaim/
+Iunlock/Iunlockput -- they read the old `inode_shr_gen` triple), IcachePinwObl
+(needs flip's `iref_pin_rows` from IcacheInv), IcacheBoot, plus the shim-wall
+reds (12.3).  tso-flip's own merge map is its worklist entry A6.163
+(tso-machine-flip.md, a90cc05e8) -- read its MERGE HAZARDS list before each
+file (IcacheBox.v stub, SpecAcquire `wp_acquire_llb_fresh_sconf`,
+SpecAcquiresleep's NB λ twin, the tracked `*.aux`/`ZZ*` strays never come over).
+
+1. `IcacheInv` (17 conflicts).  The fusion is per SLOT: flip's `itable_body`
+   is `itable_half M ∗ ⌜icM_wf M⌝ ∗ [∗ list] k, pinw_slot M k`, where
+   `pinw_slot M k` FOLDS cutover's `iref_cells M` (the count word, now as
+   four `phys_ledger_pinw` bytes under `TsPinw … iref_set`, stamped at
+   `tst` with half the `icfg_istmp k` auth beside them) and `live_pool M`'s
+   arm for slot k (genlo-ized at the slot's `(g, lo)`; free slots keep the
+   liveness unit only, their count cells ride itable.lock's payload).  So:
+   flip's `pinw_slot`/`iref_set`/`iref_pin_rows` verbatim, cutover's
+   `live_pool` arm shapes (main's `frzidx` freeze selector, `runit`,
+   `ireg_reg`) inside the per-slot arm.  `itable_inv_pinw` (flip: `pinw_slot` rows,
+   `iref_set`, the stamp halves) is the invariant; main's ghost rows
+   (`ireg_reg`, the `frzidx`-indexed freeze receipts, `frz_mir`, `runit`)
+   ride beside.  The accessor family (`iref_incr_store_au`,
+   `iref_close_last_*`, `iref_dup_*`, `iref_upgrade_*`, the racy `iref_load`)
+   = flip's window opening (`pinw_slot_acc_upd`, the `(g,lo)` agreement,
+   the stamp bump) + main's region step (`ireg_icnt_frz_acc` at
+   `frz_close ph`, `frz_mir`, `runit`) at the same instruction.
+2. `IcacheEscrow` (11 conflicts + the deleted arms): start from flip's box
+   file; re-add main's ghost definitions (`ic_deposit`/`ic_dep_*`, the
+   `ic_pin_*` shares, `ipool_*` ledgers, `ic_id` quarters, `ic_slot_cover`,
+   `ic_lend`) with `Q` as above; re-express main's ~13 arm lemmas
+   (`ic_swap_*`, `ic_open_*`, `ic_close_*`) as CtxBox (a)…(g) + the ghost
+   step, per flip's R3 site map (`tso-escrow-endgame.md` §4.2).
+3. `IcacheBoot` (16), then `ProofIget/Ilock/Iunlock/Iput/Idup/Iunlockput`
+   and their specs (flip's proofs over the box + main's ghost rows in the
+   spec posts), then the FS-cone consumers of `inode_ref`'s new spelling
+   (M-5: 42 files mention it, 4 unfold it).
