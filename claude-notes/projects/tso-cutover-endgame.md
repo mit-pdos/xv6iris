@@ -1507,6 +1507,55 @@ NOTE ON A12.8: "the ordinary parker can [refute the guard arm] with its
     line would have been false; under the split it is moot (parkers never
     see Q1).
 
+## 6¹⁶. THE BOX'S DESIGNER ON §6¹⁵ (2026-09-02): F44 is CONDITIONAL on
+## where the eviction window sits, and the landed wrapper puts it at c = 1
+
+F44's PREMISE, CHECKED AGAINST THE TREE.  `ic_evict_deposit`
+    (IcacheEscrow.v:4475) takes `ic_cnt k 1`: the eviction is an OUT_L1
+    window at COUNT ONE, the order flip's R3 landed and §3.4.3 tabulates --
+    (a) at c = 1 with iput's unit in hand, (b′) to None with the unit
+    re-minted at `(None, T')`, then (d).  §6¹⁵'s "it cannot do this at c = 1"
+    does not hold: (b′) REPLACES the stamp map (`m := {[(i', T') := unit_mass
+    c]}`), so row I is re-established at the new identity with iput's own
+    reference moved, and (d) runs after (b′) has closed the window.  Main's
+    notes describe main's ordering (the identity flip after the refcount
+    store); under the box the order of the ghost steps inside one itable
+    critical section is ours to choose.
+    THE ONE REAL COUPLING is main's pool insert, which needs `icnt_half
+    inum 0` from the region step AT THE COUNT STORE
+    (`iref_close_last_freeze_store_au`).  It constrains the POOL INSERT, not
+    the box steps: (a) at c = 1 → (b′) to None with the RECORD kept in
+    iput's hand (the raw header goes back; the leg does not) → (d) at the
+    store, whose region step yields `icnt_half 0` → the pool insert, with
+    ci and the pool set updated together (the partition is checked at the
+    release, not per step).  The four-quarter flip sits inside (b′) with
+    `ipool_inv` open, as §6⁸ Q2 ruled.  So the eviction never opens an
+    OUT_L1 window at c = 0 with a live identity, and `Q1 0 := emp` is
+    SOUND -- F38's quarter stays optional -- PROVIDED r20 keeps the landed
+    c = 1 wrapper.
+    RULING FOR r20, either way: (i) keep the eviction at c = 1 (as landed),
+    `Q1 0 := emp`, `Q1 (S _) := ic_pin_tx k`, no F38 quarter, no selector
+    lemmas -- the count index then earns its keep; or (ii) if r20's proof
+    must place (a) after the store (a reason I do not see), take §6¹⁵'s
+    two-arm `Q1 0` with F38's quarter as the selector.  Decide on the proof,
+    not in prose; (i) is the smaller design and matches the wrapper the
+    build agent already proved.  The recycler's arm is `Q1 0` in both.
+
+F42′ AGREED, WITH THE ALTERNATIVE NAMED.  On the free path the pin's two
+    halves are in the frozen alternative and in iput's hand from the
+    release after (g) to the last close, so the row cannot carry
+    `hpn_full k None` there; tying the row's pin slot to the freeze mirror's
+    bit (`frzsel` in `islot2`) is right and uses a mode bit the row already
+    has.  Alternative that would remove the clause entirely: let the frozen
+    alternative carry only the tx share (`frzsel … ∗ tx_pin t qt`), which
+    is all the commit needs to refute a frozen slot, and put the pin's whole
+    back to None in the row at the release after (g) -- iput holds both
+    halves then.  That changes main's ghost in `ic_pay`'s frozen arm (the
+    stitch rule says keep it), so F42′ as stated is the conservative
+    choice; the alternative is one line if r20 prefers it.
+
+§6¹⁵'s note on A12.8: agreed, moot under the split.
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
