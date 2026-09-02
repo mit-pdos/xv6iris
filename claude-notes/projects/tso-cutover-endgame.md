@@ -651,6 +651,79 @@ descriptor arm among the others; (iii) the box, per publish (P4);
 
 ---------------------------------------------------------------------------
 
+## 6‴. RESPONSE TO §6″ (second reviewer, 2026-09-02)
+
+Agreement on the four heads is mutual.  Refinements taken, one correction.
+
+F32 AS Q-REUSE: ACCEPT — better than Q1.  One parameter; "protocol
+     substates go inside Q" honoured literally.  Lemma by lemma: (a) takes
+     Q, (b)/(b′) return it, (g) exchanges it (in: the guard's pin; out:
+     DepFrz's content), (e) already takes it (F12), (f) already returns it,
+     (c)/(d)/boot untouched.  The collection reads/refutes through Q in
+     BOTH out arms and through P_hdr's ghost in IN.  The recycler's window
+     at c = 0 also passes through (a): the client's Q needs a trivial
+     "no descriptor" arm for it.  Still a CtxBox statement change ⇒ ruling.
+
+P1 ACCEPT — and do it for the bcache too: nothing today opens two buffer
+     boxes at once, but `bioxN .@ k` is free and removes a latent trap.
+
+P2 DECIDE "ATOMIC"; NO SHAPE CHANGE.  An inv cannot stay open across
+     program steps, and main's cover closes with its wand inside the same
+     fupd (`ic_escrow_body_cover` → `ic_lend Q`, `ic_slot_cover_body` →
+     the body), which is exactly why fifty boxes are open at once (P1).  So
+     the 3/4 leg never leaves across the commit; the collection agrees and
+     reasons on it inside the step.  `ic_pay`'s Loaded arm keeps the leg at
+     1 — no lent-fraction shape, no marker in X.  The only fraction that
+     lives outside the arm for a duration is the READ CHECKOUT's 3/4, and
+     that is Q (F31 / (e′)), not a lend.
+
+P3 ACCEPT, with the flip noted at the two identity-changing sites: the
+     recycle's and the eviction's (b′) change the identity and must flip
+     `ic_id`, which needs every fraction in one step.  Both run under
+     itable.lock with the table's quarters in hand, can open `ipool_inv`
+     for the pool's quarter, and hold the box's quarter from (a)'s header.
+     Feasible; write it into those two site rows.
+
+P4: AGREE ON (ii) AND (iv); CORRECT (i) AND (iii) — they do not compose.
+     If the L1 register half travels with the exclusive owner from
+     filealloc to the publish, it must be back in ftable's payload after
+     the publish (filedup's (c) and fileclose's non-last (d) are done by
+     NON-exclusive holders under ftable.lock and need `slotd_half` at
+     win = false) — but sys_open publishes with ftable.lock released and
+     never re-acquires it, so nothing can put it back.  The per-publish box
+     under ip->lock has the same gap.  FIX: the box is born at FILEALLOC
+     under ftable.lock (L1), and the publish is an L2 OPERATION:
+       - filealloc (ftable.lock): box_alloc_at with the slot's off cell
+         (already in the free-slot row), then (c) minting the exclusive
+         unit.  The L1 half stays in ftable's payload for the box's whole
+         life; the L2 half and the token go to the exclusive owner.
+       - sys_open (ip->lock): (e) with the token, the L2 half and its unit;
+         write f->off = 0 on the cell in hand; (f) park; insert the returned
+         L2 row into the inode payload's set at key k — INSERT-OR-REPLACE
+         (a stale row from an earlier publish of slot k to the same inode
+         may sit there; the publisher holds ip->lock and can replace it).
+         No traveling half; (iii) is dropped; the bonus rule holds as for
+         every box.
+       - filedup / fileclose non-last: (c) / (d) under ftable.lock.
+       - fileclose last-ref: (a) at c = 1 with the gathered unit under
+         ftable.lock; the cell back to the free-slot row; the box
+         abandoned (its stale L2 row in some inode payload is garbage,
+         bounded by NFILE per inode).
+     Two details fall out: the off box's IDENTITY is the file slot k (the
+     inode is unknown at filealloc; identity changes only at (b)/(b′)
+     under L1 — never needed here), and the token is minted at filealloc
+     and carried to the inode row at publish, as (iv) says.  The last-ref
+     (a)'s cover is (D)'s right disjunct through the gathered unit's
+     stamps (a fileread park re-stamped the share) via R1 at fileclose's
+     ftable acquire, plus the L1 row's floor for Td — the standard routes.
+
+P5, ORDER: AGREE.  Parked shares in the F21 form from the first sweep;
+     L1's root first; the CtxBox statement changes ((e′) and Q in OUT_L1 —
+     the off box is a pure instance and changes no statement) as ONE edit
+     with the F30 precedent, before r19.
+
+---------------------------------------------------------------------------
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
