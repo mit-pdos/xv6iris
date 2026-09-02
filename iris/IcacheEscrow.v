@@ -208,7 +208,6 @@ From Stdlib Require Import QArith Qcanon.
 From iris.algebra Require Import ufrac.
 Require Import TsoMemPa TsoGhost.
 Require Import CtxBox.
-Require Import CtxBoxHooked.   (* the hooked forms (§3.2b): (b) with the join, the OUT_L1 residue accessor *)
 Require Import SepThread.   (* the boot threads own_context through the slots *)
 
 Local Open Scope Z_scope.
@@ -4728,7 +4727,7 @@ Section IcacheBox.
     ic_id cn k (1/2) true dev inum.
   Proof.
     iIntros (HE HEp HEe HEr HEr2 Hw Hk Hin Hnib) "#Hbox #Hrinv #Hpinv Hrd Hc Hpool HgidT HgidB Hlic".
-    iMod (CtxBoxHooked.box_q1_update (ic_hdr cn γfs γi cov logstart k) (ic_rest k)
+    iMod (CtxBox.box_q1_update (ic_hdr cn γfs γi cov logstart k) (ic_rest k)
             (ic_q1 cn γfs γi cov logstart k) (ic_q2 cn γfs γi cov logstart k)
             (icBoxN .@ k) (icfg_box k) r 0
             (iname γi γfs inodestart inum l ∗ icnt_half (bv_unsigned inum) 0%nat ∗
@@ -4807,7 +4806,7 @@ Section IcacheBox.
       rewrite /ic_hdr /ic_hdr_amb /ic_hdr_bare /ic_hdr_bare_amb /ic_pay.
       iDestruct "Hbare" as "(_ & Hvld & Hid & Hnl)".
       iFrame "Hvld Hid Hnl Hq". iLeft. iFrame "Hnp Hpend Hfoff Hlvh". }
-    iMod (CtxBoxHooked.box_deposit_L1_hook (ic_hdr cn γfs γi cov logstart k) (ic_rest k)
+    iMod (CtxBox.box_deposit_L1_hook (ic_hdr cn γfs γi cov logstart k) (ic_rest k)
             (ic_q1 cn γfs γi cov logstart k) (ic_q2 cn γfs γi cov logstart k)
             (icBoxN .@ k) (icfg_box k) ξ r 0 (Some (dev, inum)) IcRaw (IcUnloaded g) T0
             (ic_hdr_bare k)
@@ -5120,7 +5119,7 @@ Section IcacheBox.
   Qed.
 
   (* iput's LAST CLOSE on the FREE PATH -- the HOOKED (a) at c = 1 (Q10,
-     option B; CtxBoxHooked's [box_withdraw_L1_hook]).  The header comes out
+     option B; CtxBox's [box_withdraw_L1_hook], r20c).  The header comes out
      FROZEN (the ordinary alternative dies on [ifreeze_excl] against the
      walk's [ifreeze_pre], inside the hook), and the hook moves the frozen
      alternative's own pin into the OUT_L1 residue [Q1 1] -- so the walk's
@@ -5165,7 +5164,7 @@ Section IcacheBox.
           iDestruct (IcacheRef.ifreeze_excl with "Hpre Hoff") as %[]. }
         iModIntro. iFrame "Hpin Hvld Hidc Hsel Hq Hpre".
         iSplitR; [iPureIntro; discriminate |]. iExists (di_nlink dn). iExact "Hnl". }
-    iMod (CtxBoxHooked.box_withdraw_L1_hook (ic_hdr cn γfs γi cov logstart k) (ic_rest k)
+    iMod (CtxBox.box_withdraw_L1_hook (ic_hdr cn γfs γi cov logstart k) (ic_rest k)
             (ic_q1 cn γfs γi cov logstart k) (ic_q2 cn γfs γi cov logstart k)
             (icBoxN .@ k) (icfg_box k) ξ r 1 m Kd Kt (ic_hdr_frz cn rg k)
             (ifreeze_pre rg (bv_unsigned inum)) E HEk Hw Hq HKd Hmt Hhook

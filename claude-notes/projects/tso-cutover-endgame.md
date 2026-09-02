@@ -174,7 +174,7 @@ unchanged.  Blast radius: the direct callers of `CtxBox.box_*` are
 no inode proof calls a box lemma.  bcache and off instantiate every hook
 with the identity.
 
-### 3.2b The consolidated box, BUILT side-by-side (`iris/CtxBoxHooked.v`, 2026-09-02)
+### 3.2b The consolidated box, BUILT side-by-side (`iris/CtxBoxHooked.v`, 2026-09-02) — SLOTTED INTO CtxBox.v at r20c (A12.18); the side file is gone, the names below live in CtxBox
 
 At the owner's instruction the consolidation is built now, beside
 `CtxBox.v` and not in its place, so it is ready the moment a wrapper needs
@@ -524,7 +524,7 @@ and law 10 (hooks).
    premises (`ipoolN`, `iregN`, `escAN inum`).  Then ProofIget's recycle
    arm.
 2. **DONE (A12.13/A12.16) — State `ic_slot_cover` over `box_arm`**: `IcacheCover.v` -- the arm-level `ic_arm_cover` + viewer clause, and main's surface (`ic_escrow_body := box_body`, `ic_lend`, the three-alternative `ic_slot_cover` at the header quarter, `ic_escrow_body_cover`) so FsCollectAll compiles with one import.
-3. **The hook consolidation** (r20c) — BUILT side-by-side in
+3. **DONE (A12.18, owner's go-ahead 2026-09-02) — The hook consolidation** (r20c): slotted into CtxBox.v as one edit, `CtxBoxHooked.v` deleted, no client change.  Was: BUILT side-by-side in
    `CtxBoxHooked.v` (§3.2b); what remains is the slot-in edit to CtxBox.v
    at the first quiet point after r20b, one commit, no client change.
 4. **A second agent for L2/L3/L4** — DONE (2026-09-02; three rounds on tso-cutover, A12.14–A12.16 of the readiness record): L2 closed but ProofForkretPark (L8) and IcacheRef's dead `Require TsoCtxShim`; L3, L4 closed; BootShared/BootChain/SystemAdequacy textual behind ProofMain (L9, mine).

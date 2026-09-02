@@ -50,7 +50,6 @@ From Stdlib Require Import QArith Qcanon.
 From iris.algebra Require Import ufrac.
 Require Import TsoMemPa TsoGhost.
 Require Import CtxBox.
-Require Import CtxBoxHooked.   (* the hooked forms (§3.2b): (b) with the join, the OUT_L1 residue accessor *)
 Require Import SepThread.   (* the boot threads own_context through the slots *)
 Require Import TsoCtx.
 Require Import CtxBox.

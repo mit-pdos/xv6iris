@@ -1987,3 +1987,26 @@ the stale `/shared/flip63` checkout (64 commits behind on 79 iris files).
   statements take `∃ lodc tldc, ⌜⌝ ∗ cred_floor ∗ ic_handle … (DepTx … lodc t
   q)` where main had the bare descriptor half, and the retained parents the
   `∃ lo tl` genlo form SpecCreate already states.
+
+### A12.18 — r20c, the hook consolidation slotted into CtxBox.v (2026-09-02)
+
+- Owner's go-ahead 2026-09-02 (reviewer 2's recommendation, log §6²⁶/§6²⁷;
+  reviewer 1's side-by-side build, plan §3.2b).  ONE EDIT, the F30
+  precedent: the five `_hook` lemmas (`box_withdraw_L1_hook`,
+  `box_deposit_L1_hook`, `box_checkout_hook`, `box_park_hook`,
+  `box_l1_to_l2_hook`) and `box_q1_update` moved verbatim from
+  `CtxBoxHooked.v` into CtxBox.v's `Section box`, each before the plain form
+  it generalizes (`box_q1_update` beside `box_q_update`); the plain forms
+  `box_withdraw_L1`, `box_deposit_L1_shape`, `box_deposit_L1`,
+  `box_checkout_split`, `box_checkout`, `box_park_join`, `box_park`,
+  `box_l1_to_l2` keep their statements and become the one-line corollaries at
+  the identity hook (the side file's proofs, with `CtxBox.` prefixes dropped
+  and its local `floor_view` = CtxBox's `box_floor_view`).  `CtxBoxHooked.v`
+  deleted with its `_CoqProject` row; the two callers (IcacheEscrow,
+  IcacheCover) say `CtxBox.<name>` -- no statement a client sees changed.
+- The law now reads as §3.2b states it: seven transitions, the header-moving
+  five each with one client hook, two residue accessors, one view; no
+  per-lemma variant can be added again (law 10, the tripwire).
+- CtxBox.v green under `rocq-warm` (cold, 1587 sentences, 9 s).  Full
+  `make -k -j192`: total 1457, roots 1, blocked 21, green 1435 -- the same
+  tree as A12.17's measure with one file fewer; nothing downstream moved.
