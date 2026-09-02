@@ -62,6 +62,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import SepThread.   (* A6.69: the running token threaded through the sixty-four proc locks *)
 Local Open Scope Z_scope.
 
 
@@ -127,7 +128,9 @@ Section SpecProcinit.
   Definition lk_fresh `{XI : CurCtx} (lk : mword 64) (s : string) : iProp Σ :=
     (lk ↦₄ (mword_of_int 0 : mword 32) ∗
      lock_name lk s ∗
-     lk_cpu lk ↦₈ (zero_reg : mword 64))%I.
+     (* the M4 kit's cpu cell at its ready shape (tso-flip): what
+        [newlock]/[newlock_delayed] take *)
+     WpLock.lk_cpu_ready lk)%I.
 
   (* ---- one process, before ---- *)
   (* [p_state] and [p_kstack] are the only two private cells procinit
@@ -243,7 +246,7 @@ Section ProcinitProcsInv.
   Lemma lk_fresh_pieces (lk : mword 64) (s : string) :
     lk_fresh lk s -∗
     lock_name lk s ∗ lk ↦₄ (mword_of_int 0 : mword 32) ∗
-    lock_cpu lk ↦₈ (zero_reg : mword 64).
+    WpLock.lk_cpu_ready lk.
   Proof. rewrite /lk_fresh /lk_cpu /lock_cpu. iIntros "($ & $ & $)". Qed.
 
   (* what is left of one process once its lock word and name have gone into
@@ -282,7 +285,8 @@ Section ProcinitProcsInv.
     ([∗ list] i ∈ seq 0 n, lk_fresh (addr i) nm ∗ Q i)
     ==∗ ∃ γl : list gname, ⌜length γl = n⌝ ∗
         ([∗ list] i ↦ g ∈ γl,
-           (∀ R : CtxId → iProp Σ, ⌜CtxMorph R⌝ -∗ R cur_ctx ={E}=∗ is_lock g (addr i) nm R) ∗ Q i).
+           (∀ R : CtxId → iProp Σ, ⌜CtxMorph R⌝ -∗ own_context cur_ctx -∗
+              R cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock g (addr i) nm R) ∗ Q i).
   Proof.
     induction n as [|n IH].
     { iIntros "_". iModIntro. iExists []. iSplit; [done|]. done. }
@@ -292,14 +296,15 @@ Section ProcinitProcsInv.
     iMod (IH with "Hpre") as (γl) "[%Hlen Hγl]".
     iDestruct "Hlast" as "[[Hfresh HQ] _]".
     iDestruct (lk_fresh_pieces with "Hfresh") as "(#Hnm & Hword & Hcpu)".
-    iMod (newlock_delayed E (addr n) nm with "Hnm Hword [Hcpu]") as (g) "Hmk".
-    { iApply (lk_cpu_ready_intro with "Hcpu"). }
+    iMod (newlock_delayed E (addr n) nm with "Hnm Hword Hcpu") as (g) "Hmk".
     iModIntro. iExists ((γl ++ [g])%list).
     iSplit.
     { iPureIntro. rewrite List.last_length. by rewrite Hlen. }
     rewrite (big_sepL_app
                (fun i g => ((∀ R : CtxId → iProp Σ, ⌜CtxMorph R⌝ -∗
-                               R cur_ctx ={E}=∗ is_lock g (addr i) nm R) ∗ Q i)%I)
+                               own_context cur_ctx -∗
+                               R cur_ctx ={E}=∗ own_context cur_ctx ∗
+                               is_lock g (addr i) nm R) ∗ Q i)%I)
                γl [g]).
     iSplitL "Hγl"; [iExact "Hγl"|].
     rewrite big_sepL_singleton Hlen Nat.add_0_r. iFrame "Hmk HQ".
@@ -321,10 +326,11 @@ Section ProcinitProcsInv.
        ((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
          proc_pub (proc_addr i)) ∗ hart_full i (0%fin : CPU)) ∗
        pstate_full i UNUSED) -∗
-    kstack_bank
-    ={E}=∗ ∃ γs : list gname, procs_inv γs.
+    kstack_bank -∗
+    own_context cur_ctx
+    ={E}=∗ own_context cur_ctx ∗ ∃ γs : list gname, procs_inv γs.
   Proof.
-    iIntros "Hin Hbank".
+    iIntros "Hin Hbank Hrun".
     iDestruct (kstack_bank_carve with "Hbank") as "Hstk".
     (* pair each slot's stack with its resources, so one [big_sepL_impl] can
        carry both through the two passes below *)
@@ -351,14 +357,21 @@ Section ProcinitProcsInv.
       as (γs) "[%Hlen Hmk]".
     (* 3. γs is now fixed, so each lock can be paid its resource -- and the
           [p_kstack] cell persisted into the (persistent) [is_kstack]. *)
-    iDestruct (big_sepL_impl
-                 (fun i g => ((∀ R : CtxId → iProp Σ, ⌜CtxMorph R⌝ -∗
-                                 R cur_ctx ={E}=∗ is_lock g (proc_addr i) "proc"%string R)
-                              ∗ proc_res i)%I)
-                 (fun i g => (|={E}=> is_lock g (proc_addr i) "proc"%string (proc_lock_pay γs g (proc_addr i)) ∗
-                                      ∃ ks : mword 64, is_kstack (proc_addr i) ks)%I)
-                 γs with "Hmk []") as "Hmk".
-    { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark & Hg & Hstk)]".
+    (* A6.69: SEQUENTIAL, not NPROC independent fupds -- the honest creator
+       deposit (A6.66) wants the running token and [own_context] is
+       EXCLUSIVE, so the sixty-four seals thread it one after another
+       ([SepThread.big_sepL_fupd_thread], [IcacheBoot]'s shape). *)
+    iAssert ([∗ list] i↦g ∈ γs,
+               own_context cur_ctx -∗
+               ((∀ R : CtxId → iProp Σ, ⌜CtxMorph R⌝ -∗ own_context cur_ctx -∗
+                   R cur_ctx ={E}=∗ own_context cur_ctx ∗
+                   is_lock g (proc_addr i) "proc"%string R) ∗ proc_res i)
+               ={E}=∗ own_context cur_ctx ∗
+               (is_lock g (proc_addr i) "proc"%string
+                  (proc_lock_pay γs g (proc_addr i)) ∗
+                ∃ ks : mword 64, is_kstack (proc_addr i) ks))%I as "Hstep".
+    { iApply big_sepL_intro.
+      iIntros "!>" (i g _) "Hrun [Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark & Hg & Hstk)]".
       iMod (ctx_word_pointsto_persist with "Hks") as "#Hksp".
       iDestruct "Hch" as (ch) "Hch".
       (* THE DEPOSIT: the persisted cell is [is_kstack], and with the words
@@ -367,20 +380,22 @@ Section ProcinitProcsInv.
       { iApply (kstack_free_intro (proc_addr i) (kstack_va i)
                   with "[] Hstk"). iExact "Hksp". }
       iMod ("Hmk" $! ((proc_lock_pay γs g (proc_addr i)))
-              with "[%] [Hst Hg Hch Hpub Hdorm Hpark Hkst]") as "#Hlk".
-      { (* the payload's transport obligation (§0.18') *) apply _. }
+              with "[%] Hrun [Hst Hg Hch Hpub Hdorm Hpark Hkst]") as "[Hrun #Hlk]".
+      { apply _. }
       { iApply (proc_lock_res_intro γs g (proc_addr i) UNUSED ch
                   with "Hst Hg Hch Hpub [Hdorm Hpark Hkst]").
         iApply (proc_slots_unused_intro with "[Hdorm Hkst] Hpark").
         iApply (proc_dormant_prestk_seal with "Hdorm Hkst"). }
-      iModIntro. iFrame "Hlk". iExists (kstack_va i). iExact "Hksp". }
-    iMod (big_sepL_fupd with "Hmk") as "Hmk".
+      iModIntro. iFrame "Hrun Hlk". iExists (kstack_va i). iExact "Hksp". }
+    iMod (big_sepL_fupd_thread E (own_context cur_ctx)
+            with "Hrun Hstep Hmk") as "[Hrun Hmk]".
     rewrite (big_sepL_sep (PROP:=iPropI Σ)).
     iDestruct "Hmk" as "[Hlocks Hks]".
-    iModIntro. iExists γs. rewrite /procs_inv.
+    iModIntro. iFrame "Hrun". iExists γs. rewrite /procs_inv.
     iSplitR; [iPureIntro; exact Hlen |].
     iFrame "Hlocks Hks".
   Qed.
+
 
 End ProcinitProcsInv.
 

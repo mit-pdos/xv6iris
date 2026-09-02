@@ -142,6 +142,7 @@ Require Import KernelRvcDecode.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving ([ctx_word_pointsto_split4]/[_join4]) *)
 Require TsoCtxShim.
 Import Defs.
 
@@ -1896,16 +1897,11 @@ Section ProofSysPause.
     iDestruct "S7" as (w7) "Hs7".
     (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses to the raw
        4-byte tower through the shim, and the join crosses back. *)
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs7") as "Hs7".
-    iDestruct (word_pointsto_aligned_p with "Hs7") as %Hal7.
-    iDestruct (word_pointsto_split4 with "Hs7") as "[Hs7lo Hs7hi]".
-    (* M1 stage 2: the HI half faces flipped 4-byte statements from here on *)
-    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hs7hi") as "Hs7hi".
+    iDestruct (ctx_word_pointsto_aligned_p with "Hs7") as %Hal7.
+    iDestruct (ctx_word_pointsto_split4 with "Hs7") as "[Hs7lo Hs7hi]".
     iAssert (sp_join7 sp0) with "[Hs7lo]" as "Hjoin7".
     { rewrite /sp_join7. iIntros (nv) "Hhi". iExists _.
-      iApply TsoCtxShim.ctx_word_of_mem.
-      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hhi") as "Hhi".
-      iApply (word_pointsto_join4 _ _ _ _ Hal7 with "Hs7lo Hhi"). }
+      iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal7 with "Hs7lo Hhi"). }
     (* +0x02 c.sdsp ra,56(sp) *)
     assert (Hb1 : add_vec (R1 !!! Regidx csp_rs1)
                     (zero_extend' 64 (concat_vec (mword_of_int 7 : mword 6) ('b"000"))) = pa_stk sp0 1)

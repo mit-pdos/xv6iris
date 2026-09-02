@@ -52,6 +52,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Require Import TsoCtx.
+Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving ([ctx_word_pointsto_split4]/[_join4]) *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -991,7 +992,7 @@ Section ProofSysSbrk.
         + right. split; [exact Hrv |]. left. split; [left; exact Heager | exact Hgok].
         + left. split; [exact Hrv | split; [exact Hp | split; [exact Hs | exact Hm']]].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
-        iApply (ctx_word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
+        iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ---- t <> SBRK_EAGER: look at the sign of n ---- *)
     assert (Hnoteager : ~ sbrk_eager v1).
     { unfold sbrk_eager. intro He.
@@ -1075,7 +1076,7 @@ Section ProofSysSbrk.
         + right. split; [exact Hrv |]. left. split; [right; exact Hnneg | exact Hgok].
         + left. split; [exact Hrv | split; [exact Hp | split; [exact Hs | exact Hm']]].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
-        iApply (ctx_word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
+        iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ================================================================= *)
     (*  THE LAZY PATH: n >= 0 and t <> SBRK_EAGER.                        *)
     (* ================================================================= *)
@@ -1231,7 +1232,7 @@ Section ProofSysSbrk.
         rewrite /Y1 upd_ne; [| congruence]. apply HthrL4; assumption.
       - left. repeat split; reflexivity.
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
-        iApply (ctx_word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
+        iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ---- it fits ---- *)
     assert (Hfits : (bv_unsigned (add_vec (pv_sz (us_V U)) (sbrk_arg v0)) <= 274877898752)%Z).
     { rewrite HL4a4 HL4a5 in Hbltu1. unfold zopz0zI_u in Hbltu1.
@@ -1456,7 +1457,7 @@ Section ProofSysSbrk.
       split; [reflexivity |].
       split; [exact Hszle | reflexivity].
     - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
-      iApply (ctx_word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi").
+      iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi").
   Qed.
 
 End ProofSysSbrk.

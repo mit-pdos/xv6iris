@@ -1254,7 +1254,7 @@ Section ProofSysPipe.
       iIntros (CIDE HsE mj P' d bs res) "(%Hjsp & %Hja5 & %Hjthr) %Hext %Hd8 Hcg Hcpu Hextc Hextm Hpc Hiru Hpenv Hfenv Hrest Hslot8 Hpost".
       iDestruct "Hrest" as (w5 w6 w7) "(Hb5 & Hb6 & Hb7)".
       iDestruct "Hslot8" as (lo hi) "[Hlo Hhi]".
-      iDestruct (ctx_word_pointsto_join4 _ _ _ _ Hal8 with "Hlo Hhi") as "Hb8".
+      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal8 with "Hlo Hhi") as "Hb8".
       iApply (sp_epi (CID0 := CIDE) m mj av res sp0 ra0 s00 s10 u4 w5 w6 w7
                 (word_of_words lo hi) p b
                 Hav8 eq_refl eq_refl eq_refl eq_refl Hjsp Hja5 Hjthr

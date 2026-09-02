@@ -671,7 +671,7 @@ Section DlBuf.
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
+    iIntros (Hk) "H". rewrite /ic_escrows /ic_boxes_all /ic_escrow.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.

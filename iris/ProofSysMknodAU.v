@@ -1587,7 +1587,7 @@ Section ProofSysMknodBody.
                    (aligned8_aligned4 _ Hal19) with "Hminlo Hminhi") as "Hmin".
       iDestruct (word4_pointsto_join2 (KTR := KT1) _ _ _ _
                    (aligned8_aligned4_hi _ Hal19) with "Hmajlo Hmajhi") as "Hmaj".
-      iDestruct (ctx_word_pointsto_join4 _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
+      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
       (* ============ +0x3a c.li a1,3 : T_DEVICE ============ *)
       iApply (wp_cli_s_sconf (CID := CID22) (mword_of_int (MN + 0x3a)) Ra1
                 (mword_of_int 3 : mword 6)
@@ -1978,7 +1978,7 @@ Section ProofSysMknodBody.
                         (sign_extend' 64 (mword_of_int 42 : mword 13))
                       = mword_of_int (MN + 0x58)) by pcw.
       iEval (rewrite Htg58) in "Hpc".
-      iDestruct (ctx_word_pointsto_join4 _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
+      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
       iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
         as "[Hpbare Hpback]".
       iDestruct (cpu_own_transport CID19 CID20 0 eb pj b
