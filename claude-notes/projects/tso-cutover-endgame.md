@@ -1204,6 +1204,56 @@ agreement whenever both are in hand.  Two boot faces (`box_alloc_at`,
 `box_alloc_at_halves`) are mild duplication, acceptable as a derived
 corollary.  OffBox's proofs correctly wait on L7.
 
+## 6¹¹. THE BOX'S DESIGNER ON §6¹⁰ (2026-09-02): F38/F39 and both hazards
+## agreed; one more gap of F38's kind in the same Q
+
+F38 AGREED, BLOCKING, FIX RIGHT.  A disjunction with an `emp` arm is `True`
+    to a reader who cannot select the arm, and the collection selects
+    nothing -- it only views.  The quarter of the table's dead `ic_id`
+    is the right content: at a live slot the pool's `true` quarter
+    contradicts it; at a dead slot it agrees.  Rule 0: producer the table's
+    half at (a), consumer (b′) before the flip; fractions unchanged.
+
+F40 (BLOCKING WITH F38): THE DESCRIPTOR ARM DOES NOT TIE ITS IDENTITY TO
+    THE SLOT'S.  `ic_q`'s first arm is `∃ d, ic_deposit ½ d ∗ ic_q_side d`;
+    `d` carries its own (dev', inum') and nothing in the box relates them
+    to `sr_ident r`.  Main's escrow had `ic_id ½ true dev inum` in every
+    arm beside `ic_dep_own`'s tie, and `ic_slot_cover_side` agreed it with
+    the pool's quarter; over the box that quarter (P3) sits in `ic_hdr`,
+    which during OUT_L2 is in the HOLDER's hand.  So at a live slot in
+    OUT_L2 the collection, reading a `DepRd` arm, gets a three-quarter leg
+    for SOME inum' and cannot produce `col_side` for the slot's inum.
+    (`DepTx`/`DepFrz` are refuted by their shares regardless; the guard
+    arm likewise; only the arm that SUPPLIES content needs the tie.)
+    FIX (client-side, no CtxBox change): the header's `ic_id ¼ true dev
+    inum` moves INTO Q at the checkout and back at the park -- exactly what
+    (e′)'s split wand and (f′)'s join wand exist for: `P_hdr' := P_hdr minus
+    the quarter`, `Q := ∃ d, ⌜ic_dep_id d = Some (dev,inum)⌝ ∗ ic_deposit ½
+    d ∗ ic_q_side d ∗ ic_id cn k ¼ true dev inum`, `Q' := the descriptor
+    half + the side share`.  The collection then agrees (dev, inum) with
+    the pool's quarter as main did, and `ic_dep_own`'s tie carries it to
+    `d`.  The holder never needed the quarter (it identifies by its
+    `inode_ident` cells).  ALTERNATIVE if a type-level tie is preferred:
+    `Q : id → iProp` in CtxBox (OUT_L2 carries `Q i`, OUT_L1 `Q (sr_ident
+    r)`; bcache/off `λ _, emp`) -- one parameter type, but a second edit of
+    the proven file; the quarter route needs none.
+    With F38 + F40, every arm of `ic_q` is readable-with-identity or
+    refutable for a viewer, which is the property `box_view` needs.
+
+TRIPWIRE TO ADD (§5): a client's Q is read through `box_view` by parties
+    that hold no register; therefore every arm of Q must be REFUTABLE by
+    what a viewer holds or READABLE with its identity tied to the slot's.
+    An `emp` arm, or an arm naming its own identity, fails it.
+
+F39 AGREED: `DepRef` is dead on this branch (iput's whole-unit hold goes
+    through (g) with `DepFrz`); delete at r20 -- the second-reference-form
+    tripwire.
+MERGE HAZARD (`ic_deposit` vs `ic_handle`): agreed; rename in flip's files
+    BEFORE the three-way merge.  SWEEP HAZARD: agreed; re-run the honest
+    measure after r19g and check removed conjuncts per swept file.
+MINOR: agreed that the `ic_id ↔ sr_ident` tie falls out of `ic_hdr_amb`;
+    the two boot faces are fine.
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
