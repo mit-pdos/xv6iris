@@ -18642,6 +18642,47 @@ LOOSE ENDS (recorded, none blocking the merge)
 - Scratch backups (`*.pre-r3`, `*.pre-g`, `free_body.v`) live only in the
   build agent's session scratchpad, not in the repo; nothing to merge.
 
+WHAT IS ON `tso` AND NOT ON `tso-flip` (checked 2026-09-02; the merge
+agent works on tso-flip, so this is the list of things tso-flip lacks)
+- THE M-LEG PROOF TREE.  `tso`'s `iris/` is the main-derived SC tree that
+  the M-leg lane worked on IN PARALLEL to the flip tree: after the two
+  branches' merge-base (9dd804dd9, 2026-08-26) `tso` has four iris
+  commits not in tso-flip's ancestry -- 39000ac56 (the lock kit's
+  parked-record idiom), 4535b31c1 (M1 stage 2, the word2/4 towers),
+  878729d40 (§0.20′ the cutover back-ports; own_context is CpuId-indexed),
+  4d73cc8b0 (§0.22′ M1 stage 3, the string tier).  The flip tree absorbed
+  §0.20′'s CpuId finding BY HAND (this worklist's "cross-lane CpuId
+  back-port" note), not by merge; nothing else of the four is in tso-flip
+  by ancestry.  Their route to main is governed by tso-port.md §0.23′
+  ("main moves ONCE, after leg C validates on tso") and §0.25′ (the
+  three-case gate that unlocks partial replay), and by
+  main-tso-cutover.md: the owner opened branch `tso-cutover` (off main,
+  worktree /shared/xv6iris-2-main) on 2026-08-31 as the vehicle that
+  lands the flip tree's real-TSO proofs on main in banked rounds (r14 at
+  the time of writing carries tso-flip's bread/brelse over CtxBox).
+  The merge agent should treat `tso-cutover` as the target, check what of
+  the M-leg it already carries, and use tso-flip-replay.md as the
+  fallback recipe (§0.23′ (ii)).
+- THE NOTES.  tso-flip mirrors only four files (the endgame doc, this
+  worklist, durable-notes, tso-escrow-box-v2).  `tso` has the whole
+  claude-notes tree: README, durable-notes, completed/, design/ for every
+  subsystem, and in projects/ the port's law and process --
+  tso-port.md (the owner rulings §0.x′), tso-handoff-current.md (the
+  fresh-agent resumption point, r74), main-tso-cutover.md, tso-flip-replay.md,
+  the lane memos (tso-m4-memo, tso-park-protocol-memo, tso-pin-memo,
+  tso-transport-memo, tso-absorb-memo, tso-intr/kpt/umode-lane), sp-migration,
+  fs-log, namei-pinned-lookup, durable-disk, device-conformance.  Read them
+  from `tso` (or main, where they exist).
+- THE SCAFFOLDING.  tso-flip has no README, Makefile, CLAUDE.md, .github,
+  .gitignore, vtest-rocq, gcp-rocq; it carries iris/, kernel-rocq/ (with
+  tracked build artifacts), the four docs, and stray ZZ* scratch files
+  (ZZFloorProbe.v, ZZM4Flip/, ZZ*.sh, ZZmorphtest.*, RiscvLang.v.tso, logs)
+  that must not go to main.  `tso` also has six non-iris commits main lacks
+  (the Sail ifetch/ttw tagging patch, the M1 stage-1 flip, lock_ctx_sweep.py,
+  TsoMem/TsoLitmus/TsoCtx's opening) -- see `git log origin/main..tso`.
+- main itself is ~900 commits ahead of tso (nightly sweeps and unrelated
+  work); the cutover branch is where those are reconciled.
+
 NEXT ROUNDS (per the reviewers, after the merge): R4a inode_pay §4.3,
 R4b off_hold §4.4 (coordinate with the main-side refactor; no bespoke
 third mechanism), R5 the recorded reverts + log_res λ-flip + ForkretPark,
