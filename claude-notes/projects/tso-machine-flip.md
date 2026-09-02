@@ -18524,6 +18524,39 @@ NEXT: R1' per §4.1 once F1 is vetted (or as F1 says, absent objection).
   one red, ProofForkretPark's bracketed park_globals frontier (A6.160);
   confirmed by a clean `make -B` round after the bank.  (B)'s statement
   (box_take_L2_in_window) is in the endgame doc's F30 for the ruling.
+
+### A6.162 — F30 RULED AND LANDED: (g) box_l1_to_l2, the register stamp, iput's free path PROVEN (2026-09-02)
+
+- THE RULING (tso-flip 09e5fd16e, both reviewers): (B) + the register
+  records the window's stamp -- `sr_x : option (X * nat)`; the body's
+  OUT_L1 arm ties `sr_x r = Some (x, T)`; (a) exports `T0 ≤ max Kd Kt`;
+  (b)/(b') take `Some (x0, T0)`; the seventh lemma (g) `box_l1_to_l2`
+  (OUT_L1 → OUT_L2 under both locks, no fresh stamp, rows untouched).
+  (E) rejected as unsound under (f); (C) rejected as a client family for
+  one site; F23–F29 accepted.
+- ONE PRODUCER THE RULING DID NOT NAME (recorded in the doc's F30 landing
+  note for the reviewers): l2_hold needs `llb (max_stamp m')` and nothing
+  in the box produces it at (g), so hdr_out keeps the fragment's llb (the
+  reference's, handed over at (a)); (g) stated at c = 1.
+- LANDED: `tso-flip` f59eb61b4 (R3.4a: the box + the sweep, cone green)
+  then R3.4 (this entry): `ip_free_locked` PROVEN over the box -- NB
+  acquiresleep over the λ payload (F22's twin at Tl := 0; the relay is
+  vacuous, (g) covers itself from the register's stamp), `ic_free_take`
+  ((g)), the rows re-form llb-bare and the _in release, itrunc on the
+  bundle in hand (P_rest's cells + the ghost), the +0x70 store on the
+  freer's own valid cell, `ic_park_hold` ((f) over the hold alone, at
+  IcUnloaded on the frozen alternative with itrunc's cells), the genin
+  releasesleep, the llb re-acquire at Tl := the park stamp, and the last
+  close as (a) [ifreeze_pre refutes the ordinary alternative via
+  ifreeze_excl] + the frozen retire AU + (b') at None + (d).  The entry's
+  Exit B and wp_iput_gen's Exit B hand the OPEN WINDOW over (the wand,
+  the stamp row, the register at (IcLoaded g1 dn bm, T0) with its bound
+  under a floor the entry picks by `Nat.max_spec`, the header's pieces).
+  ProofIput has ZERO Admitted.  The old escrow-arm body is gone.
+- Gotchas: `iEval (cbn [sr_td]) in "Hreg"` after ic_free_take (the
+  returned register is `SlotReg (sr_td r) …` with r a literal); the count
+  rewrite `Hcnt1 Hpos1` must also hit `Hiu`; the ic_guard_withdraw's
+  congruence on `x0 ≠ IcRaw` must run AFTER the frame resolves the evar.
   Compile-iteration gotchas worth keeping: ip_rows' `if decide` is best
   opened through the two equivalences `ip_rows_one` / `ip_rows_ne`
   (`case_decide` inside) rather than `rewrite decide_True` at sites (the
