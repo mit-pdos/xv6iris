@@ -169,12 +169,23 @@ Section Res.
     tlb_res_pt r -∗ kpt_inv r ∗ tlb_res_pt r.
   Proof.
     iIntros "H".
-    iDestruct "H" as (s0 tv) "(Hsatp & %A & %B & %C & Htlb & Hsnap & Hpmp & #Hk)".
-    iFrame "Hk". iExists s0, tv. iFrame "Hsatp".
+    (* A6.91: the residue grew a NINTH conjunct -- [KptShare.kpt_creds],
+       A6.70's canon-pin credential (the bound plus THIS hart's receipt that
+       its view has passed it).  It is persistent and this projection only
+       reads the invariant off, so it comes apart and goes straight back. *)
+    iDestruct "H" as (s0 tv) "(Hsatp & %A & %B & %C & Htlb & Hsnap & Hpmp & #Hk & #Hcr)".
+    (* spelled with explicit splits rather than [iFrame]: the residue's tail
+       is now three persistent conjuncts and framing by name reorders. *)
+    iSplitR; [ iExact "Hk" | ].
+    iExists s0, tv.
+    iSplitL "Hsatp"; [ iExact "Hsatp" | ].
     iSplitR; [iPureIntro; exact A |].
     iSplitR; [iPureIntro; exact B |].
     iSplitR; [iPureIntro; exact C |].
-    iFrame "Htlb Hsnap Hpmp Hk".
+    iSplitL "Htlb"; [ iExact "Htlb" | ].
+    iSplitL "Hsnap"; [ iExact "Hsnap" | ].
+    iSplitL "Hpmp"; [ iExact "Hpmp" | ].
+    iSplitR; [ iExact "Hk" | ]. iExact "Hcr".
   Qed.
 
 End Res.

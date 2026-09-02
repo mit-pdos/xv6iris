@@ -97,6 +97,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import TsoCtx.
+Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving *)
 Require Import RegFile.
 Require Import InstrBytes.
 Require Import WpMmodeLeafBase.
