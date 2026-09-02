@@ -211,3 +211,57 @@ Q5. Given §7, should the reviewers fix ALL THREE final shapes in this round
     L7+L6) is then: land L5 + the full `ftable_res_at` first (one pass over
     the eight lock sites), L8/L9 on one lane, `ic_slp ∗ off_rows` + the
     OffBox consumers on the other.
+
+## 8. THE AUDIT — every row a process's environment carries, classified (2026-09-02)
+
+Method: `About` on the VM for each row of `fs_ready`, `first_tok`,
+`proc_priv`, `ut_caps`, `park_globals`, `park_env`; a row is
+context-indexed iff its closed constant takes a `CurCtx` argument (Coq only
+abstracts a section's `XI` when the body uses it).  81 rows queried: 40
+context-free, 41 indexed.  The indexed ones, by what it takes to cross a
+context:
+
+| class | rows | status |
+|---|---|---|
+| A. instance exists, or structural (cells / `∀ ξ` / λ payload) | `procs_inv`, `is_kstack`, `disk_geom`, `is_tickslock`, `console_inv`, `console_ready`, `console_caps` (L8 patch), `is_txlock` (`<{ tx_res }>` is context-free), `printk_env` (`<{ pr_res }>` = `emp`), `fs_sb_cells` (four □ cells), `tf_page`, `proc_fields`, `proc_ptm_at` (two cells + `proc_pt`, ProcPtOwn's instances), `kmem_res` (λ), `is_itable2` (λ `itable_res2`, rest context-free), `bio_ctx` / `ic_sleeplocks` (λ payloads; NEEDS a sleep-lock HANDLE morph — none exists, mechanical), `sysc_park_extra`, `devintr_caps_any`, `park_world`, `park_globals` (wrappers) | work, no ruling |
+| B. constant payload over context cells (λ-flip) | `is_ftable`/`ftable_res` (L7, blocked by L5), `log_ctx`/`log_res` (L7: `l_out`/`l_cmt`/`l_ncommit` in `<{ log_res }>`; body = cells + ghost maps, structural once λ) | work, no ruling |
+| C. invariant over a context-indexed body | `ioff_escrows`/`ioff_body`/`off_resident` (L6, R4b: the off box); `inode_pay`'s cinv (L5, R4a) | RULED (box / §3), not yet built |
+| D. floored bundle (the holder's credential inside) | `cwd_ref v := inode_held v` — `inode_refp` → `inode_ref` → `live_fracc` → `cred_floor` **plus the two ident cells**; carried by `proc_priv_core`, so the child's `cwd` crosses at the park | **NEW — needs a ruling (Q6)** |
+| E. wrappers whose crossing is the conjunction of the above | `fs_ready` (B: ftable, log; C: `ioff_escrows` is its LAST row; A: the rest), `first_done`, `first_tok` (steady arm = `first_done`; boot arm = `first_boot_persist` (A/B) + `first_fsinit` (the raw image's cells — to classify, Q7)), `proc_priv_core` (A + D + `first_tok`), `ofile_slot`/`proc_ofiles` (`file_ref γf k q st` = a struct-file share, which reaches `inode_pay` (C) and, after L6, the off row), `proc_priv`, `ut_caps`, `park_env`/`ut_park_caps` | follow |
+
+Context-free (no crossing needed): `itable_inv`/`itable_body`/`pinw_slot`,
+`ireg_inv`/`ireg_body`/`ireg_blk`/`ireg_registry`, `ftop_inv`, `ireg_open`,
+`bitmap_inv`/`bitmap_body`, `fs_crash_seam`, `dev_inv` and the three device
+invariant bodies, `bcache_res2`/`buf_box`/`bslp`, `ic_escrows`/`ic_box`/
+`ic_hdr`/`ic_rest`/`ic_q1`/`ic_q2`/`ic_slp`, `iref_claims`, `kernel_text`,
+`kernel_data` (stated for every ξ), `ticks/wait/nextpid_res_at`,
+`kalloc_avail`, `procs_avail`, `pr_res`, `tx_res`, `cons_res_at`,
+`uart_sent_sub`.  The icache's box design already made the whole inode side
+lawful; the remaining unlawful shapes are exactly the three the plan names
+(L5, L6, L7) plus D.
+
+CORRECTION to §1 and to what was reported to the owner earlier today:
+L6 IS on L8's path.  `ioff_escrows` is a row of `fs_ready`, `fs_ready` is
+`first_done`'s second half, `first_tok` rides in `proc_priv_core`, and the
+park deposits `proc_priv` into the child's twin.  Only the very first
+process (whose forkret boot arm MINTS `fs_ready` at its own context) could
+be parked without it; every fork child receives `first_done` from its
+parent's `first_tok` and needs the morph.  So the honest order is the
+plan's: r25 (L5 + L7 + L6, one sweep) then r26 (L8), with D and the class-A
+instances added to r25's list.  The parallelism available is INSIDE r25
+(OffBox's proofs, the log lock's λ-flip, the sleep-lock handle morph, the
+class-A instances) — not L8 beside it.
+
+Q6. The child's `cwd` across the park (class D).  Options: (i) `proc_priv`'s
+    PARK form carries the cwd floor-free (`inode_held_genlo`-shaped:
+    `live_genlo ∗ llb`, cells outside any invariant) and the resumer
+    re-mints the credential at its own context from its running token —
+    the same move as §3 (c); (ii) the credential is dropped from
+    `inode_held` for cwd altogether and re-derived at each use.  (i) keeps
+    every cwd consumer's statement.
+Q7. `first_fsinit` (the boot arm's raw-image resource, only the first
+    process's) — morph it into the first child's twin, or hand the boot
+    arm to the first process at ITS context by construction (userinit
+    parks the first process; its forkret runs fsinit at the child's
+    context, so the arm could be minted there)?  Needs one reading of its
+    rows; not started.

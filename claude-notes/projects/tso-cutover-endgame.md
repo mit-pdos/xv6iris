@@ -722,7 +722,13 @@ and law 10 (hooks).
     taken); F36's floor slot is `∃ Kd, ctx_floor ξ Kd` in `ftable_res_at`
     with `_in` releases.  OffBox.v's 14 proofs STARTED in parallel (no
     consumer touched).  Q5 asks the reviewers to fix all three final shapes
-    in one round.
+    in one round.  AUDIT (note §8, same day): all 81 environment rows
+    classified by `About`; unlawful shapes are exactly L5, L6, L7 plus a
+    fourth, `cwd_ref` = a FLOORED inode reference inside `proc_priv` (Q6).
+    CORRECTION: L6 IS on L8's path (`ioff_escrows` is `fs_ready`'s last
+    row; `fs_ready` rides in `first_tok` inside `proc_priv`, which the park
+    deposits).  The honest order is the plan's: r25 then r26; parallelism
+    is inside r25.
 
 ## 10. Process and tooling (measured facts)
 
