@@ -510,6 +510,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RULED -- reviewer 1 agrees (item 17), with `file_core_off`'s FD_INODE arm named as the FIFTH final shape and "0 Admitted in `EnvMorph`" added to r25's gate |
 | item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; the two fixes LANDED (item 20) -- reviewer 2's audit next |
 | item 21 | reviewer 2's audit of d53e4a4e5: NOT signed off -- (1) the cell claimed twice and the unit unowned at non-FD_INODE arms (unit unconditional; `file_core_off := emp`; the free arm holds `off_resident`; the L2 half rides the FD_NONE unit); (2) `file_pay_st_split` false (one-sided over a unitless `file_pay_tie`); (3) the three ghost steps, the last-close pair, `so_deposit`, `so_open_slot` not at final shape; plus `ftable_res_at`'s fold/unfold pair | AUDITED by reviewer 2; fixes pending |
+| item 22 | reviewer 1 on item 21: blocking 1-3 and the fold pair RIGHT; BLOCKING 4 -- the publish checkout has no floor (the birth deposit stamps at the creator's view+dirty watermark; no acquire between birth and the `f->off = 0` store; a release mints no receipt); repair: `box_alloc_out_l2_at` -- the off box is born CHECKED OUT, the creator keeps the cell, the publish/retype is the (f) PARK as landed, `off_publish_checkout` deleted, the FD_NONE unit = `l2_hold ∗ off_resident`; checklist: name the acquire that pays every self-absorbed deposit | AUDITED by reviewer 1; for reviewer 2; sign-off pending the fixes |
 | R4a Q1 | `inode_pay`: the cinv parks KEYED GHOST ONLY (`iref_frag`, `ic_lent_stamps`, `runit_any`); the reference's cells, `live_genlo`, `slh_tok` ride the fractional payload as `inode_ref_side` at the parked fraction; pin that fraction to `Q` by lending HALF at sys_open (no arity change), fallback `fp_iqi` | RULED by reviewer 1 (item 15) |
 | R4a Q2 | NO re-mint, NO llb, NO `own_context` at cancel: the share's `cred_floor` is in the canceller's hand (morphed with the payload) and `live_genlo_agree` pins the parked `lo`; `inode_pay_cancel`'s statement unchanged | RULED by reviewer 1 (item 15) |
 | R4a Q3/Q5 | ONE file-layer sweep with all three shapes final (`inode_pay`, `ftable_res_at` WITH the floor row + `_in` releases, `ic_slp ∗ off_rows`); L5 + full `ftable_res_at` first, then L8/L9 and the OffBox consumers as the two lanes INSIDE r25 | RULED by reviewer 1 (item 15); the two-sweep order reviewer 1 gave earlier is WITHDRAWN (L6 is on L8's path) |
@@ -1163,6 +1164,88 @@ branch and recorded in §3.2 and §8 here.
     - **SIGN-OFF:** with blocking 1-3 and the fold pair landed as
       statements (no proofs), I sign off; reviewer 1 should re-read the
       unit and the free arm, since they move again.
+
+22. **REVIEWER 1 ON ITEM 21 AND THE FIX ROUND (d53e4a4e5; 2026-09-02).  NOT
+    SIGNED OFF: reviewer 2's blocking 1-3 and the fold pair are RIGHT; a
+    FOURTH blocking finding in the publish, which repair 1 as written would
+    inherit; the repair is a box born CHECKED OUT.**  Read: the fix round's
+    diff, `off_fd_unit`/`file_pay_st` and its three lemmas, `file_core_off`,
+    `fslot`, `ftable_res`/`_at`/`_boot`, the FileInv ghost steps and the
+    last-close pair, `so_open_slot`/`so_deposit`/`so_publish`, `off_filealloc`/
+    `off_publish_checkout`/`off_publish_park`/`off_dup`/`off_close`/
+    `off_reclaim`, `off_rows_*`, `ic_slp`/`_dep`/`_fold`, `box_alloc_at`,
+    `ctx_deposit`/`ctx_dom_to_parked` (the stamping rule), `own_context_def`/
+    `ctx_parked_def`/`ctx_floor`, `ctx_bound_raise`, SpecAcquire's R1 post,
+    `wp_fence_pub_s_sconf` and its users, ProofSysOpen's call order.
+    - **Blocking 1 -- RIGHT** (cell twice, unit nowhere at FD_NONE/PIPE/DEVICE);
+      the direction of the repair is right (unit unconditional,
+      `file_core_off := emp`, the free arm holds `off_resident`), but its
+      detail "the L2 half rides the FD_NONE unit AT REST, the cell in the box"
+      keeps the publish CHECKOUT, which finding 4 shows has no floor; the
+      FD_NONE arm's content changes (below).
+    - **Blocking 2 -- RIGHT** (`file_pay_st_split` false: two units vs one);
+      the one-sided pair over a unitless `file_pay_tie` is the statement,
+      `file_dup_step` is where the second unit enters.
+    - **Blocking 3 -- RIGHT** (T1 on the five statements).  Under finding 4
+      `so_open_slot` KEEPS yielding the cell, so ProofSysOpen's store proof
+      survives.
+    - **The `ftable_res_at` fold pair -- REQUIRED**, for the reason given
+      (`off_close` raises `td` past the acquired `Kd`); same form as
+      `ic_slp`'s.
+    - **BLOCKING 4 -- THE PUBLISH CHECKOUT HAS NO FLOOR.**
+      `off_publish_checkout` needs `ctx_floor ξ Kt` with the birth unit's
+      stamp `T_boot ≤ Kt`.  No producer exists:
+      (i) the birth deposit stamps the box at `T' = max K W` -- the
+          creator's view receipt and its DIRTY WATERMARK
+          (`ctx_dom_to_parked`); the creator has just stored `f->ref = 1`
+          under ftable.lock, so `W` exceeds any floor it holds; the lemma's
+          own comment says who pays: "the resumer's lock acquire pays the
+          raised stamp";
+      (ii) in sys_open the only acquires are `ilock` (inside `create`, or
+          after `namei`) and ftable.lock inside `filealloc` -- both BEFORE
+          the birth; between the birth and the `f->off = 0` store there is
+          `fdalloc` and nothing else (ProofSysOpen's call order checked);
+      (iii) a release mints no view receipt; the publishing fence leaf
+          (`wp_fence_pub_s_sconf`) is used only in main's boot arm; a
+          release-side receipt would be a THIRD floor route (the law has
+          two).
+      So plan §6 L6's "the ilock presents Tl := the off box's birth stamp"
+      is order-impossible, and any repair that keeps a checkout at the
+      publish inherits the gap.
+      THE REPAIR -- BORN CHECKED OUT; the creator never re-absorbs its own
+      deposit.  ONE new BOOT statement in CtxBox, `box_alloc_out_l2_at`: the
+      body starts in OUT_L2 with the unit parked in the arm at stamp 0 and
+      NOTHING deposited; the caller keeps the bundle at its own context and
+      receives `l2_hold γ k m`.  No floor anywhere (no deposit happened);
+      rows Σ/I trivially, C and D at `T = 0`.  Then:
+        - `off_filealloc` births the box WITHOUT depositing the cell; the
+          creator keeps `off_resident k` in hand;
+        - the FD_NONE unit IS the hold: `l2_hold γb k m ∗ off_resident k`,
+          beside the tie frag (cells morph; `file_pay_st` stays morphable);
+        - sys_open writes `f->off = 0` on the cell in hand; the publish is
+          `off_publish_park` EXACTLY AS LANDED ((f) with `own_context`, the
+          cell, `l2_hold`, `off_rows`; returns the reference at the fresh
+          stamp and inserts the row) -- deposits never need a floor;
+          `off_publish_checkout` is DELETED;
+        - the pipe and device retypes PARK too, at the retype, and drop the
+          L2 half; their fd unit is `off_ref_stamps γb k 1` alone (two parks
+          in ProofPipealloc, one in sys_open's device arm);
+        - fileclose at FD_NONE (the fdalloc-failed error path) puts the cell
+          it still holds into the free arm and ABANDONS the box in OUT_L2
+          (drops `l2_hold` and the L1 row); every other last close is
+          `off_reclaim` as landed, with `Kt` from R1 at the closer's ftable
+          acquire by presenting its own unit's llb (held BEFORE acquiring);
+        - fileread's (e) unchanged: `Kt` from the ilock acquire presenting
+          the fd unit's llb, `Kp` from the row's transported floor.
+      A boot variant, not a transition (beside `box_alloc_at_halves` under
+      the law); a CtxBox change, so it needs the ruling.
+    - **CHECKLIST ADDITION** (beside reviewer 2's per-arm producer line): for
+      every deposit whose content the SAME party later absorbs, name the
+      acquire between the two that pays the floor.  Finding 4 is exactly
+      what that line catches; the icache never hit it only because each of
+      its flows had an acquire between the two steps.
+    - **SIGN-OFF:** with blocking 1-3, the fold pair and finding 4's
+      born-checked-out repair landed as statements, reviewer 1 signs off.
 
 17. **REVIEWER 1 ON ITEM 16 (2026-09-02): the three corrections and the
     four tripwires are taken; two additions.**
