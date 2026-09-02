@@ -3,8 +3,8 @@
  * conc_sb (store buffering) separates TSO from SEQUENTIAL CONSISTENCY, and
  * it is what found finding 24: QEMU on an x86 host produces (0,0), which no
  * SC machine can, because the host is TSO and TSO permits a store to be
- * reordered past a later load.  That tells us the model is not SC-correct.
- * It tells us NOTHING about whether real RISC-V hardware is weaker still.
+ * reordered past a later load.  The model is Ztso now, and reproduces it.
+ * That tells us NOTHING about whether real RISC-V hardware is weaker still.
  *
  * RVWMO IS WEAKER THAN TSO.  TSO keeps store->store and load->load order and
  * relaxes only store->load; RVWMO relaxes all of them.  So the test that
@@ -24,7 +24,7 @@
  * why xv6's acquire/release carry __sync_synchronize().
  *
  * SO THE THREE MACHINES SHOULD DISAGREE THREE WAYS, and that is the point:
- *   - the MODEL is sequentially consistent, so (1,0) is impossible;
+ *   - the MODEL is Ztso (since the TSO cutover), so (1,0) is impossible;
  *   - QEMU on an x86 host is TSO, so (1,0) should be impossible THERE TOO
  *     -- which makes QEMU useless for finding this class of bug, and is why
  *     a board is worth the trouble;

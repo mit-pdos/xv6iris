@@ -17,7 +17,7 @@ From stdpp Require Import base list option gmap bitvector.definitions.
 Import ListNotations.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes RiscvExec VirtioModel DevModel.
+Require Import RiscvModelBytes RiscvExec VirtioModel DevModel TsoMemPa.
 Require Import VTest VConc.
 Local Open Scope Z_scope.
 
@@ -161,15 +161,53 @@ Proof.
   rewrite Hf. unfold virtio_blk_t_flush, virtio_blk_t_out. lia.
 Qed.
 
-(* ---- from the retired ConcSb.v ---- *)
+(* ---- from the retired ConcSb.v, restated for the Ztso machine ---- *)
 
 (* ---------------------------------------------------------------------- *)
+(* These two used to say the opposite -- that a hart reads THE one memory  *)
+(* and a store is global the instant it retires -- and were the model-side *)
+(* record of finding 24.  Since the machine flip they are false, and what  *)
+(* replaces them is the pair of arms that make store buffering a model     *)
+(* execution: a PLAIN STORE appends its message and leaves the author's    *)
+(* view where it was, and a PLAIN LOAD may read at the view the hart       *)
+(* already has, where another hart's later stores are not yet visible.     *)
+(* ConcSbSched.sb_00 is the run that uses exactly these two transitions.   *)
+(* ---------------------------------------------------------------------- *)
 
-Lemma model_hart_sees_the_one_memory : forall g c, mem (ghart g c) = gmem g.
-Proof. reflexivity. Qed.
+Lemma model_plain_store_buffers oth h img s log tv r n req k :
+  dev_addr (Interface.WriteReq.pa req) = false ->
+  ak_excl (Interface.WriteReq.access_kind req) = false ->
+  footprint (Interface.WriteReq.pa req) n ## oth ->
+  mnode_step oth h img s log tv r
+    (Interface.Next (Interface.MemWrite n req) k)
+    (k (inl None))
+    (MState (sregs s)
+       (write_bytes (mem s) (Interface.WriteReq.pa req) n
+                    (Interface.WriteReq.value req)) (mdev s))
+    (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
+                            (Interface.WriteReq.value req)) h])%list
+    tv None.
+Proof.
+  intros Hdev Hex Hfp. unfold mnode_step. rewrite Hdev, Hex. cbv beta iota.
+  right. split_and!; first [reflexivity | exact Hfp].
+Qed.
 
-Lemma model_store_is_immediately_global : forall g c s, gmem (gput g c s) = mem s.
-Proof. reflexivity. Qed.
+Lemma model_plain_load_may_read_stale oth h img s log tv r n req k
+    (w : bv (8 * n)) :
+  dev_addr (Interface.ReadReq.pa req) = false ->
+  ak_excl (Interface.ReadReq.access_kind req) = false ->
+  (tv <= length log)%nat ->
+  (forall j : nat, (N.of_nat j < n)%N ->
+     tso_read img log h tv (pa_add (Interface.ReadReq.pa req) j)
+     = Some (nth_byte w j)) ->
+  mnode_step oth h img s log tv r
+    (Interface.Next (Interface.MemRead n req) k)
+    (k (inl (w, None))) s log tv r.
+Proof.
+  intros Hdev Hex Htv Hrd. unfold mnode_step. rewrite Hdev. cbv beta iota.
+  left. split; [exact Hex|]. exists tv, w.
+  split_and!; first [reflexivity | exact Hrd | lia].
+Qed.
 
 (* ---- from the retired PtTlb.v ---- *)
 

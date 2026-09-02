@@ -371,7 +371,7 @@ would not give.
 
 ## Findings so far
 
-Fifteen of these have been FIXED rather than recorded -- the whole UART
+Sixteen of these have been FIXED rather than recorded -- the whole UART
 register file, its interrupt-status semantics and its bus decode; the PLIC's
 threshold, its M contexts and its source count; and the virtio disk's register
 decode, its queue sizes and its used-ring reporting.  They are in
@@ -395,7 +395,6 @@ does not exist).
 | 26 | **the model's TLB is DIRECT-MAPPED (64 entries, `tlb_hash` = the low 6 bits of the VPN)** | at a colliding VPN the entry is evicted by the very next fetch, so a PTE rewritten WITHOUT `sfence.vma` is re-walked and the NEW mapping is used | keeps the stale entry | unsound direction, but see below | `pt_tlb` |
 | 21 | `misa` advertises F and D but the model has NO F/D instructions | `fsd` takes an illegal-instruction trap (`mcause` 2, `mtval` = the encoding) | executes | incompleteness + internal inconsistency | `core_regs_fpr` |
 | 22 | CSRs the model implements that QEMU's default virt CPU REFUSES: `mseccfg`, `mstateen0`, `sstateen0`, `scountovf`, `mcyclecfg`, `minstretcfg`, `ssp` | implemented, read successfully | illegal instruction | **model is WIDER -- needs a ruling**, see below | `core_regs_mcsr` |
-| 24 | **THE MEMORY MODEL: the model is sequentially consistent** | one shared `gmem`, a store is global the instant it retires -- (0,0) unreachable | store-buffering gives **(0,0) in a few percent of runs**, which RVWMO permits | **UNSOUNDNESS** | `conc_sb` |
 | 25 | `sc.w` does not evaluate | `vm_compute` does not return (110 s+), so a test containing one cannot be COMPILED | executes | **out of scope: LR/SC is not supported** | `conc_amo` |
 
 ### Findings from REAL HARDWARE
@@ -523,6 +522,7 @@ them are one modelling shortcut seen from different sides.
 | 8 | UART THRE interrupt: LEVEL or LATCH | a level -- the second ISR read still `0xc2` | second read `0xc1`: the read cleared it.  The latch `u_thri` arms when the transmitter falls idle, when an FCR write clears the tx FIFO, or when IER bit 1 is written while it is already idle | incompleteness | `uart_regs`, `uart_irq_tx` |
 | 9 | UART access WIDTH | width 1 only -- a 4-byte read was STUCK | `0x00000008`: the bus NARROWS to the one byte register the address names (zero-extended out, low byte in), at 2, 4 and 8 bytes, and does NOT gather registers into a word | incompleteness | `uart_width` |
 | 23 | RHR read on an EMPTY receive FIFO | `0` | the LAST byte received: the holding register is cleared neither by a read nor by an FCR clear, only the DR FLAG is -- and with the FIFOs ENABLED the machine answers `0`, which is the FIFO's output stage | incompleteness | `uart_rx`, `uart_dlab` |
+| 24 | **THE MEMORY MODEL was sequentially consistent** | one shared `gmem`, a store global the instant it retired -- store buffering's (0,0) unreachable by any schedule | (0,0) in 4.6% of runs.  The machine is now **Ztso** (`RiscvLang.mnode_step`, `TsoMemPa`): a plain store appends to the era's write log without moving the author's view, a plain load reads latest-visible at a view of its choosing, and `VConc`'s `CCpuStale` exhibits (0,0) -- see [below](#finding-24-is-the-largest-one-the-suite-has-found) | **unsoundness** | `conc_sb` |
 | 10 | **PLIC claim ignores the context THRESHOLD** | the masked source's id, and its pending bit cleared | `0`, and the source STAYS pending.  The threshold now lives in `plic_cand`, which `plic_eip` and `plic_best` both read | **unsoundness** (and a defect) | `plic_thresh` |
 | 11 | PLIC M-context registers (enable 0x2000, threshold 0x200000, claim 0x200004) | not decoded -- STUCK at the first M access | all three serviced: the PLIC is indexed by CONTEXT (`plic_nctx`, `plic_mctx`/`plic_sctx`), both halves of every hart's pair, and each context drives its own pin | incompleteness | `plic_mctx` |
 | 12 | PLIC source 0's priority register, and `plic_nsrc` = 32 against the board's 96 | STUCK at both bounds | offset 0 is read-only zero (source 0 does not exist); 96 sources, so the enable and pending bitmaps are three words each | incompleteness | `plic_prio0` |
@@ -724,44 +724,45 @@ path writes the data buffer.  So on these paths QEMU is not spec-conforming
 either, and finding 4's fix must be stated against the SPEC (bytes actually
 written into the device-writable part of the chain), not against QEMU's value.
 
-### Finding 24 is the largest one the suite has found
+<a id="finding-24-is-the-largest-one-the-suite-has-found"></a>
+### Finding 24 is the largest one the suite has found -- and it is now fixed
 
 `conc_sb` is the store-buffering litmus test -- `hart 0: X=1; a=Y` alongside
 `hart 1: Y=1; b=X` -- and QEMU produces **(a,b) = (0,0)**, which no
 sequentially consistent machine can.  Measured 55 times in 1200 runs (4.6%)
 by the agent, and independently re-confirmed at 4 in 200.  It is not a
 truncated run: in the (0,0) captures **X and Y are both 1**, so both stores
-landed and both loads still returned 0 (`conc_sb_both_stores_happened`).
+landed and both loads still returned 0.
 
 QEMU is RIGHT.  RVWMO permits a store to be reordered past a later load, the
 litmus program has no fence between them, and QEMU on an x86 host exposes the
-host's TSO.  It is the MODEL that is wrong.
+host's TSO.  It was the MODEL that was wrong: `RiscvLang` stepped every hart
+over one byte map, so a store was global the instant it retired, and the
+old `VConc` recorded that off the model (`model_hart_sees_the_one_memory`,
+`model_store_is_immediately_global`) and enumerated all six interleavings of
+the two two-instruction sequences, none of which gives (0,0).
 
-And it is not a granularity gap that a finer schedule would close.  `VConc`
-has one `gmem`; `ghart` hands it to a hart and `gput` makes that hart's memory
-THE memory, so no store can wait anywhere -- `ConcSb.v` states this off the
-model (`model_hart_sees_the_one_memory`, `model_store_is_immediately_global`)
-and enumerates all six interleavings of the two two-instruction sequences,
-none of which gives (0,0).  Per-node interleaving would not help either.
+**FIXED BY THE TSO CUTOVER.**  The language is now a Ztso machine
+(`RiscvLang.mnode_step` over `TsoMemPa`): the era has a global append-only
+write log, every hart a monotone VIEW into it, a plain store appends without
+moving the author's view, and a plain load first advances the view to any
+index up to the top and then reads latest-visible there -- below the view, or
+the hart's own message (which is store forwarding).  A W->R fence drains.
+The harness follows: `VTso.texec` is `exec` with those arms, its read policy
+is a schedule choice, and `VConc.CCpuStale` runs a hart without moving its
+view.  `ConcSbSched.sb_00` -- `align ++ [CCpuStale hart0 2; CCpuStale hart1
+2]` -- is the (0,0) execution: each hart's view was last drained by the
+spin-load on the other's rendezvous flag, before either litmus store, so each
+load reads below the other hart's store.  The two arms it uses are stated off
+the model in `VModelFacts.model_plain_store_buffers` and
+`VModelFacts.model_plain_load_may_read_stale`.  With `sw; fence; lw` the
+same schedule reads at the top and (0,0) is gone, so xv6's
+`__sync_synchronize()` in `acquire`/`release` is now OBSERVABLE.
 
-**IT IS FIXED IN THE DEVICE MODEL, AND THE DRIVER PORT IS IN PROGRESS.**  A
-step now takes the available-ring position it answers as a parameter; the
-device state carries a watermark plus the set of positions served out of turn,
-and `v_taken` names the position whose payload is latched rather than being a
-flag.  `DiskOrder.v` proves both of QEMU's captures are model executions --
-same program, same start state, two schedules that differ only in which
-outstanding request the device picks up.  The Iris driver proof is being
-ported to the new protocol; `claude-notes/projects/device-conformance.md`
-records exactly what is green, what is in progress, and the two design pieces
-that remain.
-
-**This is live in xv6.**  `acquire`/`release` carry `__sync_synchronize()`
-precisely because the hardware reorders a store past a later load -- and under
-this model those fences are unobservable, so nothing in the development can
-tell a correct one from a missing one.
-
-The model reproduces the three SC outcomes, whole result region each, lined up
-with the capture order (`conc_sb_model_admits_every_sc_outcome`).
+The model reproduces all four observed outcomes, whole result region each
+(`ConcSbQemuPass`).  The draining policy (`CCpu`) is provably the old harness
+(`VTso.texec_fresh_exec`), so every other multi-hart run computes what it
+computed before.
 
 ### Finding 26 is a different shape from the other three
 

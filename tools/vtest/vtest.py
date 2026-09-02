@@ -400,7 +400,7 @@ End {m}Pass.
 # VModelFacts -- the universally quantified statements about the model that
 # no capture comparison can express, which is why they outlived the per-case
 # files they came from.
-HARNESS = ["VSched.v", "VExecStuck.v", "VTest.v", "VBoot.v", "VConc.v",
+HARNESS = ["VSched.v", "VExecStuck.v", "VTest.v", "VTso.v", "VBoot.v", "VConc.v",
            "VNode.v", "VRun.v", "VRunConc.v", "VModelFacts.v"]
 
 PROJECT_HEAD = """-R . VTest

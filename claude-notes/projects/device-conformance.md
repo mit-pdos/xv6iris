@@ -1,5 +1,48 @@
 # Project: device conformance — the semantics, differentially tested against QEMU (and now against real hardware)
 
+## STATUS ADDENDUM (2026-09-02): THE SUITE UNDER THE TSO CUTOVER, AND FINDING 24 CLOSED
+
+The `tso-cutover` branch flipped the machine (`RiscvLang.gstate` grew the
+era image, the write log and the per-hart views; `mnode_step` threads them;
+`disk_step` yields its WRITE SET rather than the post-state map).  The
+single-hart harness needed nothing: `RiscvExec.exec` is deliberately
+unchanged (the flip's RULING 3 — a hart alone in its era reads flat), and
+every single-hart run computes what it computed.  What broke was
+`VConc.g0_of_at`/`gput`, which spell `GState`'s constructor.  That was a
+one-line fix and the suite was green again.
+
+WHAT WAS THEN WRONG WAS THE HARNESS'S CLAIM, not its build.  `VConc`'s
+header said the memory model is SC and that this is unsound; finding 24 in
+tools/vtest/README.md pinned `conc_sb`'s (0,0) as unreachable; and
+`VModelFacts` recorded `model_store_is_immediately_global` off the harness.
+All of that is now false of the model, and durable-notes' rule for a pinned
+finding applies: when the model moves, the test file is revisited.
+
+**`VTso.v` is the multi-hart stepper under Ztso.**  `texec` is `exec` with
+`mnode_step`'s four memory-model arms (plain store: append, view stays;
+plain load: advance-then-read-latest-visible; exclusive read: drain to the
+top; W->R fence: `fence_post`), threading `h`/`img`/`log`/`tv` exactly as
+the relation does.  The ONE choice the arms leave open — how far a plain
+load advances the view — is a schedule parameter, `rpol`: `PFresh` drains
+to the top (reading there IS the flat read, so this is provably the old
+harness, `texec_fresh_exec`) and `PStale` stays put.  `VConc.citem` gains
+`CCpuStale`; `VNode` steps through the same arms one node at a time
+(`tnode`); the device settle now returns the DMA write sets
+(`VSched.sapply_w`/`settle_w`) and `VConc.gsettle` appends them to the log as
+`disk_agent` messages, so a stale hart cannot see a DMA it should not.
+
+**`ConcSbSched.sb_00` = `align ++ [CCpuStale hart0 2; CCpuStale hart1 2]`
+exhibits (0,0)**, and `ConcSbQemuPass` is in `_CoqProject`: the last red
+run on the QEMU side that was a genuine model unsoundness is green, and the
+finding moved to "Findings fixed".  The model facts are restated as
+`model_plain_store_buffers` and `model_plain_load_may_read_stale`, both
+direct instances of `mnode_step`'s arms.
+
+Standing caveat, unchanged: no soundness lemma ties `texec`/`tnode` to
+`mnode_step`; each arm is a transcription.  Not expressible yet: a view
+that stops STRICTLY between where it is and the top (add a policy when a
+test needs one).
+
 ## STATUS ADDENDUM (2026-08-30d): WHY EACH RED RUN IS RED, AND ONE THAT WASN'T
 
 Sixteen runs had no passing proof.  "No proof" only says the [TEST_PASSES]
@@ -442,11 +485,13 @@ finding 10, is fixed -- see below):
    makes `update_and_write_pte`'s `Ok false -> internal_error` arm unreachable
    by this harness.
 
-1. **The memory model is sequentially consistent and the architecture is not**
-   (finding 24, `conc_sb`).  Store buffering gives (0,0) on QEMU in a few
-   percent of runs, which RVWMO permits and no SC machine can.  Live in xv6:
-   `acquire`/`release` carry `__sync_synchronize()` for exactly this reason,
-   and under this model those fences are unobservable.
+1. **The memory model WAS sequentially consistent and the architecture is
+   not** (finding 24, `conc_sb`).  Store buffering gives (0,0) on QEMU in a
+   few percent of runs, which RVWMO permits and no SC machine can.  CLOSED
+   by the TSO cutover (addendum 2026-09-02): the machine is Ztso and
+   `ConcSbSched.sb_00` exhibits (0,0).  Live in xv6: `acquire`/`release`
+   carry `__sync_synchronize()` for exactly this reason, and those fences
+   are now observable in the model.
 2. **The virtqueue is served strictly in publication order** (finding 5,
    `disk_order`), where a real device completes in any order -- which is why
    `virtio_disk_intr` reads the used element's id at all.
@@ -659,15 +704,11 @@ stay in the findings table UNCLASSIFIED, and no test depends on the answer.
 
 ## 5. WHAT IS LEFT, in the order it is worth doing
 
-0. **THE MEMORY MODEL (finding 24) is now the largest open question in the
-   effort**, and it is not a device question at all.  `VConc` has one `gmem`
-   and a store is global the instant it retires; RVWMO permits store->load
-   reordering.  Nothing short of giving the language a real memory model
-   closes it, which is a research-scale change to `RiscvLang.prim_step`, not
-   a fix.  What is cheap and worth doing first is to WRITE DOWN the exposure:
-   which proofs would change if fences became observable, and whether the
-   whole-system theorem should state its SC assumption explicitly rather than
-   inheriting it silently from the language.
+0. ~~**THE MEMORY MODEL (finding 24)**~~ — DONE by the TSO cutover (the
+   research-scale change to `RiscvLang.prim_step` this item said it would
+   take); see the 2026-09-02 addendum.  What is left on the SUITE's side is
+   the soundness lemma `VTso.texec`/`tnode` -> `mnode_step`, the same one
+   `VConc`/`VNode` have always deferred.
 
 **DONE since this list was written** (2026-08-24): items 1-3 (`disk_ident`
 and its twelve stuck programs, `disk_err`, `disk_chain`), item 4 (`uart_*`,

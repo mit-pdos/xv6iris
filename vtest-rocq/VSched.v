@@ -144,58 +144,73 @@ Fixpoint cpu_steps (tick : bool) (n : nat) (s : mstate) : option mstate :=
 Definition writes_of (w : list (Z * Z)) : gmap Arch.pa (bv 8) :=
   list_to_map ((fun ab => (SailStdpp.Values.mword_of_int ab.1, Z_to_bv 8 ab.2)) <$> w).
 
-Definition sapply (i : sitem) (s : mstate) : option mstate :=
+(* [sapply_w] ALSO RETURNS THE WRITE SET the arm put on the bus, because the
+   disk is an AGENT of the era's write log ([RiscvLang.prim_step]'s disk
+   arm, tso-machine-flip.md A6.11): a DMA-writing step appends its bytes as
+   one message and a non-writing step appends nothing.  A single-hart test
+   never needs it -- the log is unobservable in a solo era -- but VConc's
+   multi-hart machine does, and the schedule is the only place that knows
+   which arm wrote what.  [sapply] is its projection, and every existing
+   caller is unchanged. *)
+Definition sapply_w (i : sitem) (s : mstate)
+    : option (mstate * gmap Arch.pa (bv 8)) :=
   let d := mdev s in
   match i with
-  | SCpu n => cpu_steps false n s
-  | SCpuTick n => cpu_steps true n s
+  | SCpu n =>
+      match cpu_steps false n s with Some s' => Some (s', ∅) | None => None end
+  | SCpuTick n =>
+      match cpu_steps true n s with Some s' => Some (s', ∅) | None => None end
   | SUartTx =>
       match uart_tx_pop (duart d) with
-      | Some (_, u') => Some (with_dev s (set_duart d u'))
+      | Some (_, u') => Some (with_dev s (set_duart d u'), ∅)
       | None => None
       end
   | SUartRx b =>
       match uart_rx_push (duart d) (Z_to_bv 8 b) with
-      | Some u' => Some (with_dev s (set_duart d u'))
+      | Some u' => Some (with_dev s (set_duart d u'), ∅)
       | None => None
       end
   | SDiskPop =>
       match virtio_pop_step (dvirtio d) (view_of (mem s)) with
-      | Some v' => Some (with_dev s (set_dvirtio d v'))
+      | Some v' => Some (with_dev s (set_dvirtio d v'), ∅)
       | None => None
       end
   | SDiskCapture h =>
       match virtio_capture_step (dvirtio d) (view_of (mem s)) (Z_to_bv 16 h) with
-      | Some v' => Some (with_dev s (set_dvirtio d v'))
+      | Some v' => Some (with_dev s (set_dvirtio d v'), ∅)
       | None => None
       end
   | SDiskDma h =>
       match virtio_req_step (dvirtio d) (view_of (mem s)) (Z_to_bv 16 h) with
-      | Some (v', w) => Some (MState (sregs s) (w ∪ mem s) (set_dvirtio d v'))
+      | Some (v', w) =>
+          Some (MState (sregs s) (w ∪ mem s) (set_dvirtio d v'), w)
       | None => None
       end
   | SDiskDrain sec =>
       match virtio_drain_step (dvirtio d) sec with
-      | Some v' => Some (with_dev s (set_dvirtio d v'))
+      | Some v' => Some (with_dev s (set_dvirtio d v'), ∅)
       | None => None
       end
   | SDiskWild w =>
       (* enabled ONLY when the queue really is malformed -- the model's own
          side condition, not a licence to scribble whenever convenient *)
       if virtio_stalled (dvirtio d) (view_of (mem s))
-      then Some (MState (sregs s) (writes_of w ∪ mem s) d)
+      then Some (MState (sregs s) (writes_of w ∪ mem s) d, writes_of w)
       else None
   | SLatch src =>
       if dev_irq_level d src then
         match plic_latch (dplic d) src with
-        | Some p' => Some (with_dev s (set_dplic d p'))
+        | Some p' => Some (with_dev s (set_dplic d p'), ∅)
         | None => None
         end
       else None
   | SWire h =>
       Some (MState (register_set sig_seip (bool_to_bit (dev_seip d h)) (sregs s))
-                   (mem s) d)
+                   (mem s) d, ∅)
   end.
+
+Definition sapply (i : sitem) (s : mstate) : option mstate :=
+  match sapply_w i s with Some (s', _) => Some s' | None => None end.
 
 Definition srun (sch : list sitem) (s : mstate) : option mstate :=
   foldl (fun o i => match o with Some s' => sapply i s' | None => None end)
@@ -223,11 +238,14 @@ Definition srun (sch : list sitem) (s : mstate) : option mstate :=
 Definition lowest_cached (v : virtio_state) : option Z :=
   head (elements (dom (v_cache v))).
 
-Definition drain_one (s : mstate) : option mstate :=
+Definition drain_one_w (s : mstate) : option (mstate * gmap Arch.pa (bv 8)) :=
   match lowest_cached (dvirtio (mdev s)) with
-  | Some sec => sapply (SDiskDrain sec) s
+  | Some sec => sapply_w (SDiskDrain sec) s
   | None => None
   end.
+
+Definition drain_one (s : mstate) : option mstate :=
+  match drain_one_w s with Some (s', _) => Some s' | None => None end.
 
 (* THE WIRE NEEDS A GUARD THAT THE OTHER ARMS DO NOT.  [plic_step] has no
    premise -- propagating the PLIC's EIP level onto a hart's pin is always a
@@ -239,8 +257,11 @@ Definition wire_needed (s : mstate) (h : nat) : bool :=
   negb (bv_unsigned (register_lookup sig_seip (sregs s))
         =? bv_unsigned (bool_to_bit (dev_seip (mdev s) h))).
 
+Definition settle_wire_w (s : mstate) : option (mstate * gmap Arch.pa (bv 8)) :=
+  if wire_needed s 0 then sapply_w (SWire 0) s else None.
+
 Definition settle_wire (s : mstate) : option mstate :=
-  if wire_needed s 0 then sapply (SWire 0) s else None.
+  match settle_wire_w s with Some (s', _) => Some s' | None => None end.
 
 (* WHICH IN-FLIGHT REQUEST THE EAGER SCHEDULE PICKS UP.  The device may
    complete any head it has popped and not yet completed, so an eager
@@ -270,12 +291,16 @@ Definition highest_head (v : virtio_state) : option Z :=
   | h :: hs => Some (foldl Z.max h hs)
   end.
 
-Definition pick_at (pick : virtio_state -> option Z)
-    (f : Z -> sitem) (s : mstate) : option mstate :=
+Definition pick_at_w (pick : virtio_state -> option Z)
+    (f : Z -> sitem) (s : mstate) : option (mstate * gmap Arch.pa (bv 8)) :=
   match pick (dvirtio (mdev s)) with
-  | Some h => sapply (f h) s
+  | Some h => sapply_w (f h) s
   | None => None
   end.
+
+Definition pick_at (pick : virtio_state -> option Z)
+    (f : Z -> sitem) (s : mstate) : option mstate :=
+  match pick_at_w pick f s with Some (s', _) => Some s' | None => None end.
 
 (* first enabled arm wins.  Nested rather than a list, so a later arm is not
    even evaluated once an earlier one fires -- [settle] runs after EVERY
@@ -299,37 +324,53 @@ Definition pick_at (pick : virtio_state -> option Z)
 
    EVERY EXISTING CALLER IS UNCHANGED: [settle1_at] and [settle] pass
    [true], which is the body this had before. *)
-Definition settle1_gated (pick : virtio_state -> option Z) (latch : bool)
-    (s : mstate) : option mstate :=
-  match sapply SUartTx s with Some s' => Some s' | None =>
-  match sapply SDiskPop s with Some s' => Some s' | None =>
-  match pick_at pick SDiskCapture s with Some s' => Some s' | None =>
-  match drain_one s with Some s' => Some s' | None =>
-  match pick_at pick SDiskDma s with Some s' => Some s' | None =>
+Definition settle1_gated_w (pick : virtio_state -> option Z) (latch : bool)
+    (s : mstate) : option (mstate * gmap Arch.pa (bv 8)) :=
+  match sapply_w SUartTx s with Some r => Some r | None =>
+  match sapply_w SDiskPop s with Some r => Some r | None =>
+  match pick_at_w pick SDiskCapture s with Some r => Some r | None =>
+  match drain_one_w s with Some r => Some r | None =>
+  match pick_at_w pick SDiskDma s with Some r => Some r | None =>
   (* the two interrupt gateways, then the wire.  [plic_latch] is itself
      guarded -- a level source is forwarded only when it is neither already
      pending nor claimed -- so these stop on their own. *)
-  match (if latch then sapply (SLatch virtio_irq_id) s else None) with
-  | Some s' => Some s' | None =>
-  match (if latch then sapply (SLatch uart_irq_id) s else None) with
-  | Some s' => Some s' | None =>
-  settle_wire s
+  match (if latch then sapply_w (SLatch virtio_irq_id) s else None) with
+  | Some r => Some r | None =>
+  match (if latch then sapply_w (SLatch uart_irq_id) s else None) with
+  | Some r => Some r | None =>
+  settle_wire_w s
   end end end end end end end.
+
+Definition settle1_gated (pick : virtio_state -> option Z) (latch : bool)
+    (s : mstate) : option mstate :=
+  match settle1_gated_w pick latch s with Some (s', _) => Some s' | None => None end.
 
 Definition settle1_at (pick : virtio_state -> option Z)
     (s : mstate) : option mstate := settle1_gated pick true s.
 
 Definition settle1 (s : mstate) : option mstate := settle1_at lowest_head s.
 
-Fixpoint settle_gated (pick : virtio_state -> option Z) (latch : bool)
-    (fuel : nat) (s : mstate) : mstate :=
+(* ...and the whole settle, keeping the NON-EMPTY write sets in the order
+   the rounds produced them: one future log message each (VTso.glog_dma). *)
+Fixpoint settle_gated_w (pick : virtio_state -> option Z) (latch : bool)
+    (fuel : nat) (s : mstate) : mstate * list (gmap Arch.pa (bv 8)) :=
   match fuel with
-  | 0%nat => s
-  | S f => match settle1_gated pick latch s with
-           | Some s' => settle_gated pick latch f s'
-           | None => s
+  | 0%nat => (s, [])
+  | S f => match settle1_gated_w pick latch s with
+           | Some (s', w) =>
+               let '(s'', ws) := settle_gated_w pick latch f s' in
+               (s'', if decide (w = ∅) then ws else w :: ws)
+           | None => (s, [])
            end
   end.
+
+Definition settle_gated (pick : virtio_state -> option Z) (latch : bool)
+    (fuel : nat) (s : mstate) : mstate :=
+  (settle_gated_w pick latch fuel s).1.
+
+Definition settle_w (fuel : nat) (s : mstate)
+    : mstate * list (gmap Arch.pa (bv 8)) :=
+  settle_gated_w lowest_head true fuel s.
 
 Definition settle_at (pick : virtio_state -> option Z) (fuel : nat)
     (s : mstate) : mstate := settle_gated pick true fuel s.

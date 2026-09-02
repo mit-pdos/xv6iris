@@ -40,14 +40,17 @@ Definition align : list citem :=
   [CCpu hart0 28; CCpu hart1 31; CCpu hart0 26; CCpu hart1 28; CCpu hart0 9].
 
 (* ---------------------------------------------------------------------- *)
-(* 2. ALL SIX interleavings of the two two-instruction sequences, and what  *)
-(*    each gives.  This is the exhaustive form of the SC argument: with     *)
-(*    [s] the store and [l] the load,                                       *)
+(* 2. ALL SIX interleavings of the two two-instruction sequences under the  *)
+(*    DRAINING policy ([CCpu]: every load reads at the top of the log),    *)
+(*    and what each gives.  This is the exhaustive form of the SC          *)
+(*    argument: with [s] the store and [l] the load,                       *)
 (*                                                                         *)
 (*      s0 l0 s1 l1  (0,1)     s0 s1 l0 l1  (1,1)     s0 s1 l1 l0  (1,1)    *)
 (*      s1 s0 l0 l1  (1,1)     s1 s0 l1 l0  (1,1)     s1 l1 s0 l0  (1,0)    *)
 (*                                                                         *)
-(*    -- and (0,0) is in none of them.                                     *)
+(*    -- and (0,0) is in none of them.  It was in none of the MODEL's      *)
+(*    executions either while the model was sequentially consistent, and   *)
+(*    that was finding 24.                                                 *)
 (* ---------------------------------------------------------------------- *)
 
 Definition sb_01 : list citem := align ++ [CCpu hart0 2; CCpu hart1 2].
@@ -62,20 +65,49 @@ Definition sb_10 : list citem := align ++ [CCpu hart1 2; CCpu hart0 2].
 Definition sb_all_interleavings : list (list citem) :=
   [sb_01; sb_11; sb_ss_lr; sb_ss_rl; sb_11'; sb_10].
 
-(* The WHY -- that a [gstate] has one [gmem], so the model is
-   sequentially consistent and QEMU is not -- is now
-   VModelFacts.model_hart_sees_the_one_memory and
-   VModelFacts.model_store_is_immediately_global. *)
+(* ---------------------------------------------------------------------- *)
+(* 3. THE FOURTH OUTCOME, now that the model is Ztso.                     *)
+(*                                                                         *)
+(*    Under [RiscvLang.mnode_step] a plain store appends to the era's      *)
+(*    write log WITHOUT moving the author's view, and a plain load reads   *)
+(*    latest-visible at a view of the hart's choosing between where it is  *)
+(*    and the top -- the hart's own messages always visible, the other     *)
+(*    hart's only below the view.  [CCpuStale] is the choice "stay put".  *)
+(*                                                                         *)
+(*    Each hart's view was last drained by the spin-load on the other      *)
+(*    hart's rendezvous flag (inside [align], under [CCpu]), i.e. BEFORE   *)
+(*    either litmus store.  So:                                            *)
+(*                                                                         *)
+(*      hart 0:  X := 1  appends at slot k, view stays;                    *)
+(*               a  := Y  reads at that view: hart 1 has not stored yet,   *)
+(*                        and Y has never been written -- 0.               *)
+(*      hart 1:  Y := 1  appends at slot k+1, view stays;                  *)
+(*               b  := X  reads at ITS view, which is below slot k, and    *)
+(*                        slot k is hart 0's -- invisible: 0.              *)
+(*                                                                         *)
+(*    Both stores are in the log (the capture shows X = Y = 1: both        *)
+(*    landed), both loads returned 0.  That is the execution QEMU's x86    *)
+(*    host produces in 4.6% of runs and the SC model could not; the        *)
+(*    ORDER of the two harts' stale stretches does not matter, since       *)
+(*    neither reads the other's message either way.                        *)
+(*                                                                         *)
+(*    What the FENCE would do: [VTso.texec] drains on a W->R fence         *)
+(*    ([fence_post]), so `sw; fence; lw` under [CCpuStale] reads at the    *)
+(*    top and (0,0) is gone -- the fence xv6's acquire/release carry is    *)
+(*    OBSERVABLE in this model, which is the whole point of the flip.      *)
+(* ---------------------------------------------------------------------- *)
+
+Definition sb_00 : list citem :=
+  align ++ [CCpuStale hart0 2; CCpuStale hart1 2].
 
 (* ---------------------------------------------------------------------- *)
-(* 4. THE TEST.  QEMU's capture has four outcomes; the model reproduces the *)
-(*    three SEQUENTIALLY CONSISTENT ones, whole 4 KB region each, in the    *)
-(*    order the capture lists them.  The capture is sorted by the raw       *)
-(*    bytes, i.e. by (a,b), so the non-SC (0,0) is entry 0 and [tail] is    *)
-(*    exactly the part the model can do.                                    *)
+(* 4. THE TEST.  QEMU's capture has four outcomes and the model now        *)
+(*    reproduces all four, whole 4 KB region each, in the order the        *)
+(*    capture lists them.  The capture is sorted by the raw bytes, i.e. by *)
+(*    (a,b), so the once-impossible (0,0) is entry 0.                      *)
 (* ---------------------------------------------------------------------- *)
 
-Definition sb_schedules : list (list citem) := [sb_01; sb_10; sb_11].
+Definition sb_schedules : list (list citem) := [sb_00; sb_01; sb_10; sb_11].
 
 (* the uniform name VRunConc's generated case refers to *)
 Definition schedules : list (list citem) := sb_schedules.

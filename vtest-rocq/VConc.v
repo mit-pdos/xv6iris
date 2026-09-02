@@ -5,9 +5,9 @@
 (* the device fabric.  A race needs two harts over ONE memory, which is     *)
 (* what [RiscvLang.gstate] already is -- [gregs : CPU -> regstate] beside a *)
 (* single [gmem] and [gdev].  So this layer does not invent a machine: it   *)
-(* projects a hart out of a [gstate], steps it with the same [exec] the     *)
-(* rest of the suite uses, and writes it back, which is exactly the shape   *)
-(* of [prim_step]'s hart arm.                                              *)
+(* projects a hart out of a [gstate], steps it with [VTso.texec] -- the     *)
+(* suite's [exec] with the memory-model state threaded through -- and       *)
+(* writes it back, which is exactly the shape of [prim_step]'s hart arm.    *)
 (*                                                                         *)
 (* THE SCHEDULE IS THE WITNESS, and here it is the WHOLE point.  A race has *)
 (* several outcomes on real hardware; the model must admit each one, and    *)
@@ -24,19 +24,22 @@
 (* sub-instruction interleaving to reproduce, it would show up as a test    *)
 (* that cannot be matched, not as one that wrongly passes.  For a race on   *)
 (* one word between plain loads and stores it makes no difference: each     *)
-(* access is a single instruction either way -- and the (0,0) outcome       *)
-(* above is NOT of that kind anyway, since no interleaving of whole         *)
-(* instructions OR of nodes produces it over a single shared memory.        *)
+(* access is a single instruction either way.  Granularity is not what     *)
+(* separates the memory models: the store-buffering (0,0) below needs no    *)
+(* sub-instruction interleaving, it needs a hart that reads at a stale     *)
+(* VIEW, which is the next paragraph.                                      *)
 (*                                                                         *)
-(* THE MEMORY MODEL IS SEQUENTIALLY CONSISTENT, AND THAT IS UNSOUND.       *)
-(* There is one [gmem]; [ghart] hands it to a hart and [gput] makes that    *)
-(* hart's memory THE memory, so a store is globally visible the instant it  *)
-(* retires and no interleaving can hide one.  Real RISC-V is RVWMO, which   *)
-(* permits a store to be reordered past a LATER LOAD, and QEMU on an x86    *)
-(* host exposes exactly that: [ConcSb.v] measures the store-buffering       *)
-(* litmus test producing (0,0) in a few percent of runs, an outcome no SC   *)
-(* machine has.  Read [ConcSb.v] before trusting any concurrency result     *)
-(* from this harness.                                                       *)
+(* THE MEMORY MODEL IS Ztso, AND THE SCHEDULE SAYS WHERE EACH HART READS. *)
+(* A [gstate] has one flat cache [gmem] -- memory at the top of the era's   *)
+(* write log -- but a hart does not read the cache: a plain load reads the *)
+(* log at the hart's own VIEW, which its stores do not advance             *)
+(* ([RiscvLang.mnode_step], VTso.v).  So a store CAN sit unseen by the      *)
+(* other hart while a later load of this one completes, and the store-     *)
+(* buffering litmus test's (0,0) -- which the SC harness this file used to *)
+(* be could not exhibit, finding 24 -- is a schedule here: [CCpuStale]     *)
+(* runs a hart WITHOUT draining its view on loads, [CCpu] drains at every  *)
+(* load.  Both are model executions; [CCpu] alone is the old harness       *)
+(* ([VTso.texec_fresh_exec]).  Read [ConcSbSched.v] for the worked case.   *)
 (*                                                                         *)
 (* ATOMICS, measured rather than assumed -- an earlier version of this      *)
 (* header said LR/SC/AMO were all stuck, and that was WRONG:                *)
@@ -50,8 +53,8 @@
 From stdpp Require Import gmap bitvector.definitions list.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
-Require Import RiscvModelBytes RiscvExec DevModel ColdBoot.
-Require Export VTest.
+Require Import RiscvModelBytes RiscvExec DevModel ColdBoot TsoMemPa.
+Require Export VTest VTso.
 Local Open Scope Z_scope.
 
 Definition hart0 : CPU := 0%fin.
@@ -82,10 +85,14 @@ Definition hart1 : CPU := 1%fin.
    [cfinish] or in the hand-written schedules, which go on naming hart0 and
    hart1 and mean "the first and second hart of this run". *)
 Definition g0_of_at (base : Z) (text : list Z) (rs : list region) : gstate :=
+  let m := mem_of text rs in
   GState (fun c => ColdBoot.cold_regs
                      (SailStdpp.Values.mword_of_int
                         (base + Z.of_nat (fin_to_nat c))))
-         (mem_of text rs) dev0_state 0%nat true (fun _ => None).
+         m dev0_state 0%nat true (fun _ => None)
+         (* the TSO axis at power-on ([RiscvLang.boot_facts]): the era image
+            IS the loaded memory, the write log is empty, every view is 0 *)
+         m [] (fun _ => 0%nat).
 
 Definition g0_of (text : list Z) (rs : list region) : gstate :=
   g0_of_at 0 text rs.
@@ -98,35 +105,48 @@ Definition ghart (g : gstate) (c : CPU) : mstate :=
 
 Definition gput (g : gstate) (c : CPU) (s : mstate) : gstate :=
   GState (<[c := sregs s]> (gregs g)) (mem s) (mdev s)
-         (ggen g) (gpow g) (gresv g).
+         (ggen g) (gpow g) (gresv g) (gimg g) (glog g) (gtv g).
 
 (* ---------------------------------------------------------------------- *)
 (* 2. The schedule.                                                        *)
 (* ---------------------------------------------------------------------- *)
 
-Fixpoint gcpu (c : CPU) (n : nat) (g : gstate) : option gstate :=
+(* [n] whole instructions of hart [c] under read policy [pol] (VTso.v):
+   [PFresh] drains the view at every plain load -- the old harness --
+   and [PStale] never moves it. *)
+Fixpoint gcpu_pol (pol : rpol) (c : CPU) (n : nat) (g : gstate) : option gstate :=
   match n with
   | 0%nat => Some g
-  | S n' => match exec (riscv_step false) (ghart g c) with
-            | Some (_, s') => gcpu c n' (gput g c s')
+  | S n' => match thart pol c g with
+            | Some g' => gcpu_pol pol c n' g'
             | None => None
             end
   end.
 
+Definition gcpu (c : CPU) (n : nat) (g : gstate) : option gstate :=
+  gcpu_pol PFresh c n g.
+
 (* The devices are SHARED (they live in [gdev]), so settling them through
    any hart's projection moves the same fabric.  Hart 0 is used because
    VSched.settle's last arm drives the external-interrupt PIN, which is
-   per-hart; a test that cares about hart 1's pin must say so itself. *)
+   per-hart; a test that cares about hart 1's pin must say so itself.
+   The disk's DMA write sets go onto the log afterwards, one message each
+   ([VTso.glog_dma]): the disk is an agent of the log like any hart. *)
 Definition gsettle (g : gstate) : gstate :=
-  gput g hart0 (settle dev_fuel (ghart g hart0)).
+  let '(s', ws) := settle_w dev_fuel (ghart g hart0) in
+  glog_dma (gput g hart0 s') ws.
 
 Inductive citem :=
-  | CCpu (c : CPU) (n : nat)   (* n whole instructions of hart c *)
-  | CDev.                      (* let the devices take every enabled step *)
+  | CCpu (c : CPU) (n : nat)        (* n whole instructions of hart c, draining
+                                       its view at every load *)
+  | CCpuStale (c : CPU) (n : nat)   (* the same, WITHOUT moving its view: the
+                                       other hart's stores stay invisible *)
+  | CDev.                           (* let the devices take every enabled step *)
 
 Definition capply (i : citem) (g : gstate) : option gstate :=
   match i with
-  | CCpu c n => gcpu c n g
+  | CCpu c n => gcpu_pol PFresh c n g
+  | CCpuStale c n => gcpu_pol PStale c n g
   | CDev => Some (gsettle g)
   end.
 

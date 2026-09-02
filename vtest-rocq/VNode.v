@@ -1,8 +1,8 @@
 (* ====================================================================== *)
 (* VNode.v -- STEPPING ONE SAIL EVENT AT A TIME.                           *)
 (*                                                                         *)
-(* [VConc] steps whole INSTRUCTIONS: [exec (riscv_step false)] runs a hart *)
-(* from one boundary to the next, so every memory access an instruction    *)
+(* [VConc] steps whole INSTRUCTIONS: [VTso.texec] runs a hart from one     *)
+(* boundary to the next, so every memory access an instruction            *)
 (* makes happens with no other hart in between.  For a plain load or store *)
 (* that is exactly right -- the access IS the instruction.  It stops being *)
 (* right the moment an instruction makes MORE THAN ONE access, and the     *)
@@ -21,78 +21,27 @@
 (* nothing interleaves inside a block.                                     *)
 (*                                                                         *)
 (* WHAT IS STILL MISSING, stated plainly: the soundness lemma              *)
-(*   enode s m = Some (m', s') -> mstep1 (m, s) (m', s')                   *)
+(*   tnode pol h img s log tv m = Some (m', s', log', tv') ->             *)
+(*     mnode_step oth h img s log tv r m m' s' log' tv' r'                *)
 (* which is the converse [HartBlock.v]'s header defers to "the language's  *)
 (* own functional interpreter (the reflective stepper)".  Every arm below  *)
 (* is a transcription of the corresponding [mnode_step] arm, so the proof  *)
 (* is a case analysis with no content -- but it is not written yet, and    *)
-(* until it is, a result here is a fact about [enode] and not yet about    *)
+(* until it is, a result here is a fact about [tnode] and not yet about    *)
 (* [prim_step].  Same standing caveat as the rest of the suite.            *)
 (* ====================================================================== *)
 From stdpp Require Import gmap bitvector.definitions list.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
-Require Import RiscvModelBytes RiscvExec DevModel.
+Require Import RiscvModelBytes RiscvExec DevModel TsoMemPa.
 Require Export VConc.
 Local Open Scope Z_scope.
 
 (* ---------------------------------------------------------------------- *)
-(* 1. One node.  A transcription of [RiscvExec.exec] with the recursion    *)
-(*    removed: where [exec] calls itself on the continuation, this returns *)
-(*    the continuation.  [None] is "no node to take here" -- either the    *)
-(*    cycle is over ([Ret]) or the model is stuck, and [node_kind] below   *)
-(*    tells the caller which.                                              *)
+(* 1. One node: [VTso.tnode], the transcription of [mnode_step]'s arms     *)
+(*    with the recursion removed, memory-model state and all.  The read    *)
+(*    policy is the schedule's, as in VConc.                              *)
 (* ---------------------------------------------------------------------- *)
-
-Definition enode (s : mstate) (m : M unit) : option (M unit * mstate) :=
-  match m with
-  | Interface.Ret _ => None
-  | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T
-             return (T -> M unit) -> option (M unit * mstate) with
-       | Interface.RegRead r _ => fun k =>
-           Some (k (register_lookup r s.(sregs)), s)
-       | Interface.RegWrite r _ v => fun k =>
-           Some (k tt, set_reg s r v)
-       | Interface.MemRead n req => fun k =>
-           if dev_addr (Interface.ReadReq.pa req) then
-             match dev_read s.(mdev) (Interface.ReadReq.pa req) n with
-             | Some (w, d') =>
-                 Some (k (inl (w, None)), MState s.(sregs) s.(mem) d')
-             | None => None
-             end
-           else
-             match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
-             | Some w => Some (k (inl (w, None)), s)
-             | None => None
-             end
-       | Interface.MemWrite n req => fun k =>
-           if dev_addr (Interface.WriteReq.pa req) then
-             match dev_write s.(mdev) (Interface.WriteReq.pa req) n
-                             (Interface.WriteReq.value req) with
-             | Some d' => Some (k (inl None), MState s.(sregs) s.(mem) d')
-             | None => None
-             end
-           else
-             Some (k (inl None),
-                   MState s.(sregs)
-                     (write_bytes s.(mem) (Interface.WriteReq.pa req) n
-                                  (Interface.WriteReq.value req)) s.(mdev))
-       | Interface.InstrAnnounce _    => fun k => Some (k tt, s)
-       | Interface.BranchAnnounce _ _ => fun k => Some (k tt, s)
-       | Interface.Barrier _          => fun k => Some (k tt, s)
-       | Interface.CacheOp _          => fun k => Some (k tt, s)
-       | Interface.TlbOp _            => fun k => Some (k tt, s)
-       | Interface.TakeException _    => fun k => Some (k tt, s)
-       | Interface.ReturnException _  => fun k => Some (k tt, s)
-       | Interface.TranslationStart _ => fun k => Some (k tt, s)
-       | Interface.TranslationEnd _   => fun k => Some (k tt, s)
-       | Interface.CycleCount         => fun k => Some (k tt, s)
-       | Interface.Message _          => fun k => Some (k tt, s)
-       | Interface.GetCycleCount      => fun k => Some (k 0%Z, s)
-       | _ => fun _ => None   (* Choose / GenericFail / Discard: stuck, as exec *)
-       end) k
-  end.
 
 (* ---------------------------------------------------------------------- *)
 (* 2. Seeing where a hart IS.  This is what makes a sub-instruction test   *)
@@ -147,22 +96,26 @@ Definition n0_of (text : list Z) (rs : list region) : nstate :=
   n0 (g0_of text rs).
 
 (* one node of hart [c]; at a cycle boundary, start the next cycle *)
-Definition nstep1 (c : CPU) (x : nstate) : option nstate :=
+Definition nstep1 (pol : rpol) (c : CPU) (x : nstate) : option nstate :=
   match ns_m x c with
   | Interface.Ret _ =>
       Some (NState (ns_g x) (<[c := riscv_step false]> (ns_m x)))
   | m =>
-      match enode (ghart (ns_g x) c) m with
-      | Some (m', s') =>
-          Some (NState (gput (ns_g x) c s') (<[c := m']> (ns_m x)))
+      match tnode pol (hart_agent c) (gimg (ns_g x)) (gfocus (ns_g x) c)
+                  (glog (ns_g x)) (gtv (ns_g x) c) m with
+      | Some (m', s', log', tv') =>
+          Some (NState (gwb (ns_g x) c s' log' tv') (<[c := m']> (ns_m x)))
       | None => None
       end
   end.
 
-Fixpoint nsteps (c : CPU) (n : nat) (x : nstate) : option nstate :=
+Fixpoint nsteps (pol : rpol) (c : CPU) (n : nat) (x : nstate) : option nstate :=
   match n with
   | 0%nat => Some x
-  | S n' => match nstep1 c x with Some x' => nsteps c n' x' | None => None end
+  | S n' => match nstep1 pol c x with
+            | Some x' => nsteps pol c n' x'
+            | None => None
+            end
   end.
 
 (* THE SURGICAL TOOL: run hart [c] until it is ABOUT to touch [addr] and
@@ -174,20 +127,22 @@ Fixpoint nrun_to_addr (fuel : nat) (c : CPU) (addr : Z) (x : nstate)
   if pending_addr (ns_m x c) =? addr then Some x else
   match fuel with
   | 0%nat => None
-  | S f => match nstep1 c x with
+  | S f => match nstep1 PFresh c x with
            | Some x' => nrun_to_addr f c addr x'
            | None => None
            end
   end.
 
 Inductive nitem :=
-  | NCpu (c : CPU) (n : nat)        (* n NODES of hart c *)
+  | NCpu (c : CPU) (n : nat)        (* n NODES of hart c, draining at loads *)
+  | NCpuStale (c : CPU) (n : nat)   (* n NODES of hart c at its current view *)
   | NUntil (c : CPU) (addr : Z)     (* hart c up to its access of addr *)
   | NDev.
 
 Definition napply (i : nitem) (x : nstate) : option nstate :=
   match i with
-  | NCpu c n => nsteps c n x
+  | NCpu c n => nsteps PFresh c n x
+  | NCpuStale c n => nsteps PStale c n x
   | NUntil c a => nrun_to_addr 20000 c a x
   | NDev => Some (NState (gsettle (ns_g x)) (ns_m x))
   end.
@@ -201,12 +156,12 @@ Fixpoint nfinish (n : nat) (x : nstate) : option nstate :=
   if gflag (ns_g x) then Some x else
   match n with
   | 0%nat => None
-  | S n' => match nstep1 hart0 x with
+  | S n' => match nstep1 PFresh hart0 x with
             | None => None
             (* NB: not x1/x2 -- those are CONSTRUCTORS of the Sail model's
                register enum (the GPR names), and shadowing one here is an
                elaboration error, not a warning. *)
-            | Some xa => match nstep1 hart1 xa with
+            | Some xa => match nstep1 PFresh hart1 xa with
                          | None => None
                          | Some xb => nfinish n' xb
                          end

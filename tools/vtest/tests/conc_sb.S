@@ -8,11 +8,14 @@
  * Under RVWMO -- and on any machine that lets a store sit in a buffer while
  * a later load to a different address completes -- (0,0) is allowed.
  *
- * OUR MODEL IS SC.  RiscvLang steps one hart at a time over one memory, so
- * no schedule of VConc can produce (0,0).  If QEMU ever does, that is an
- * UNSOUNDNESS -- a hardware behaviour with no model execution -- and by far
- * the most valuable thing this area could find.  So the test exists to look
- * for it, and its capture records how hard we looked.
+ * OUR MODEL USED TO BE SC -- RiscvLang stepped one hart at a time over one
+ * memory, so no schedule of VConc could produce (0,0) -- and QEMU DOES
+ * produce it, which was finding 24, the largest unsoundness this suite has
+ * found.  The model is now Ztso (RiscvLang.mnode_step over TsoMemPa: a
+ * write log, one view per hart, a store that does not move its author's
+ * view) and the (0,0) run is ConcSbSched.sb_00, exhibited with VConc's
+ * CCpuStale.  The test stays: it is what pins the model's store buffering
+ * against the hardware's, and its capture records how hard we looked.
  *
  * The two-pass warm-up is the same device as conc_lost.S and for the same
  * reason: a QEMU basic block costs thousands of guest instructions the first
@@ -26,10 +29,10 @@
  * MEASURED, 1200 runs at D0 = 2, D1 = 1:
  *     (0,1)  905     (1,0)  226     (1,1)   14     (0,0)   55
  * All four appear, so the capture is a set of four; (1,1) is the rarest at
- * 1.2%, which is why `repeat` is 700 and not 100.  (0,0) -- the one the
- * model cannot have -- is 4.6%.
+ * 1.2%, which is why `repeat` is 700 and not 100.  (0,0) -- the one the SC
+ * model could not have -- is 4.6%.
  *
- * RESULT layout (mirrored in vtest-rocq/ConcSb.v):
+ * RESULT layout (mirrored in vtest-rocq/ConcSbSched.v):
  *   +0x000  DONE          +0x100  X               +0x104  Y
  *   +0x004  status = 1    +0x108  BAR0A  +0x10c  BAR1A   pass-1 rendezvous
  *   +0x008  a = hart 0's load of Y    +0x110  BAR0B  +0x114  BAR1B  pass 2

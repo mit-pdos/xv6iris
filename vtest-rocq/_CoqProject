@@ -7,6 +7,7 @@
 VSched.v
 VExecStuck.v
 VTest.v
+VTso.v
 VBoot.v
 VConc.v
 VNode.v
@@ -217,6 +218,7 @@ ConcLostQemuPass.v
 ConcMpJh7110Pass.v
 ConcMpQemuPass.v
 ConcSbJh7110Pass.v
+ConcSbQemuPass.v
 ConcSmokeJh7110Pass.v
 ConcSmokeQemuPass.v
 CoreCsrprobeQemuPass.v
