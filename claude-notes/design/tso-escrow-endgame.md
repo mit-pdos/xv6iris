@@ -475,12 +475,13 @@ where it is needed.
 
 ### 3.4 The floor rule (routes unchanged)
 
-  - R1 at EVERY acquire by a reference holder: `Tl := max (dom m)`.
-  - R2 at every L1 release (ALL through `_in`): fold `max Td (paid)`
-    — the llb is the payload row's `llb Td` joined with the decrement's
-    `llb (max (dom m_D))` (llb_max); a release that leaves Td unchanged
-    ((c), the hit path) folds the row's own `llb Td`.  At every L2
-    release (always `_in`): fold the park stamp.  Tp / Td ARE what
+  - R1 at EVERY acquire by a reference holder: `Tl := max (snd <$> dom m)`.
+  - R2 at every L1 release (ALL through `_in`): fold `max r.td (paid)`
+    — the llb is the payload row's `llb r.td` joined with the decrement's
+    `llb (max (snd <$> dom m_D))` (llb_max); a release that leaves r.td
+    unchanged ((c), the hit path) folds the row's own `llb r.td`.  At
+    every L2 release (always `_in`): fold the park stamp.  Tp / r.td ARE
+    what
     those payloads' floor rows say.
 
 ### 3.5 The six lemmas (each re-establishes (C), (D), Σ m = c)
@@ -522,7 +523,7 @@ where it is needed.
       the box.  Premise `slot_d ½ r` with r.win = false ⇒ IN ∨ OUT_L2,
       both untouched (arm-agnostic).
   (e) checkout (under L2; IN → OUT_L2).  Premises: my `◯ m_h` with
-      `ctx_floor ξ Kt`, `max (dom m_h) ≤ Kt` (R1 at the acquiresleep);
+      `ctx_floor ξ Kt`, `max (snd <$> dom m_h) ≤ Kt` (R1 at the acquiresleep);
       the payload's `slot_p ½ Tp` with `ctx_floor ξ Kp`, `Tp ≤ Kp` (R2);
       the L2 token.  (C) gives T ≤ Kt ∨ T ≤ Kp.  OUT_L2 refuted by the
       token; OUT_L1 refuted by Σ (my fraction vs c = 0, or vs the whole
@@ -552,8 +553,8 @@ where it is needed.
     via T' ∈ dom m; the stamp travels inside the share and merges into
     the unit at fileclose.  (The register design had no unit for a
     share to deposit — the R3 wall v2 removes.)
-  - "D never parked" vs "D parked": one lemma, (a); only max (dom m_D)
-    differs.
+  - "D never parked" vs "D parked": one lemma, (a); only
+    max (snd <$> dom m_D) differs.
   Boot: bio_init deposits the content (IN, m = ∅, stamp T_boot = the
   boot hart's K⊔W); (C) is vacuous; (D) needs Td = T_boot, and the boot
   hart cannot floor its own deposit, so L1 is minted WITH the fold: a
@@ -659,13 +660,14 @@ R1-pre (PREREQUISITE; measured 2026-09-01 by the build agent, design
 R1' (the v2 box; replaces R1 as landed in A6.153 — same BioInv slice):
   BioInv's box section rewritten to §2/§3 (three arm shapes, rows
   (C)/(D), Σ m = c, the six lemmas, boot v5: IN at T_boot); bref/bchain
-  to §3.3; bslp minus astamp; the ufrac/gmap kit (~40 lines: frag_sum,
+  to §3.3; bslp minus astamp; the ufrac/gmap kit over (id * nat) keys
+  (~40 lines: frag_sum,
   whole-unit agreement `◯ m_D ≼ ● m ∧ Σ m_D = Σ m → m = m_D`, split/
   merge, the move-stamp local update); the `newlock` twin over
   lock_pay_intro_llb.  Gate: BioInv/BioInitAt/SleepLock cone green.
 R2 (the cutover): the A6.154 site map as written, with (a)–(f) in place
   of the eight lemmas: sites 1–4 (the recycler) = (a) + three stores +
-  (b); site 5 = (e) at the genl_llb acquiresleep with Tl := max (dom m);
+  (b); site 5 = (e) at the genl_llb acquiresleep with Tl := max (snd <$> dom m);
   site 6 = (f) + the genin releasesleep; brelse's refs-- = (d) (no
   withdraw at 0); bpin = (c); bunpin = (d).  bio_ctx's
   `<{ bcache_res bn V }>` takes the λ-flip (bcache_res2).  DELETE the v1
@@ -702,7 +704,7 @@ blockno; confirm the exact rows at R3's site map);
 P_rest := the remaining in-memory dinode fields (type/major/minor/size/
 addrs — non-empty, so the park principle holds).  Extract
 `CtxBox.v` NOW (rule of two) and re-express the bcache over it.  The
-reference spelling gains `∃ m, ◯ m ∗ llb (max (dom m))` beside
+reference spelling gains `∃ m, ◯ m ∗ llb (max (snd <$> dom m))` beside
 live_fracc — ONE sweep of the inode_ref/inode_shr destructures to the
 final form (§5 rule 2); no other new inode_* spelling.
 Gate: -B green; ic_escrow's five-arm body and its ~13 open/swap lemmas
@@ -804,7 +806,7 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
 7. TRIPWIRES (stop and come here if any fires):
    - a seventh lemma on the box, a fourth arm shape, or a second
      reference form;
-   - any per-site floor that is not "R1 at Tl := max (dom m)" or a
+   - any per-site floor that is not "R1 at Tl := max (snd <$> dom m)" or a
      payload floor row;
    - any need to AGREE a stamp between two holders — (C)/(D) with
      Σ m = c make agreement unnecessary; if it seems needed, a row is
@@ -1054,3 +1056,9 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   R3 nuance: the share's ident cells still need a non-Q home (holder
   handle or ic_id), never a ξb deposit.  Tuple notation swept to the
   slot_reg record in §2 and §3.5.  R1' resumes on this shape.
+- 2026-09-01 (proposer, pass after the F6 vetting): agreed with the
+  vetting including the R3 nuance (the share's ident cells need a
+  non-Q, non-ξb home: the locked handle or ic_id — a site-map item).
+  Remaining pre-F6 notation swept: `max (dom m)` → `max (snd <$> dom
+  m)` and Td → r.td in §3.4, §3.5 (e), §3.6, §4.1 R2, §4.2, §5; the R1'
+  kit named over (id * nat) keys.  No design change.
