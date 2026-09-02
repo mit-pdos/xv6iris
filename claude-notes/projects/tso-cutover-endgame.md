@@ -34,8 +34,9 @@ the three-case gate; §0.26′ visibility-free free pages).
   tier, IcacheInv per-slot fusion), r19a–r19i (IcacheEscrow/IcacheBoot
   over the box, the two CtxBox edits, the read arm), r20a (inode specs),
   r20b-1..5 (ProofIunlock, ProofIunlockput, ProofIdup, ProofIlock,
-  ProofIreclaim green over the box).  In flight: r20b (ProofIget,
-  ProofIput), which is where the pending (b″) ruling comes from (§9).
+  ProofIreclaim green over the box), r20b-6 (ProofIget, 8cb002042),
+  r20b-7 (ProofIput; `IcacheCover.v` = item 2).  In flight: the full
+  measure after r20b-7, then r20c (the hook slot-in) and r21.
 
 ---------------------------------------------------------------------------
 
@@ -260,9 +261,16 @@ icache boxes inside one fupd (log §6″ P1).
   leg).
 - **The resting pin `ic_pin_rest k = hpn_full k None`** rides the TABLE ROW
   (dead row `islot_empty`; live row's `frz_park` OFF arm), NOT the header
-  (F42: the guard must produce its `Q1 1` before (a) opens the box).  When
-  the freeze bit is UP the row carries no pin; the two halves are in the
-  frozen alternative (`frzsel … ∗ ic_pin_tx`) and iput's hand (F42′).
+  (F42: the guard must produce its `Q1 1` before (a) opens the box).  While
+  a window is open the row carries no pin (the guard's row rides the
+  window as `ProofIput.ip_row_open`; the frozen park's ON arm has none,
+  F42′): ONE half of the pin cell is in an invariant-visible place -- the
+  guard's `Q1 1`, then `Q2`'s `DepFrz` side, then the frozen alternative
+  (`frzsel … ∗ ic_pin_tx`), then the last close's `Q1 1` -- and the OTHER,
+  the NAME-half, never leaves iput's hand: the last close's (a) is the
+  HOOKED form (`ic_evict_withdraw_frz`), whose hook moves the frozen
+  alternative's own pin into `Q1 1`, never the hand's (Q10, §9 item 9;
+  condition (3) corrected here).
 - **Descriptor halves**: the holder's half rides the handle
   `ic_handle cn k d := ic_deposit2 k d ∗ ic_pay_live k d ∗ ic_deposit cn k d
   ∗ ic_tok cn k` (the sleeplock token rides the handle across the hold and
@@ -312,7 +320,8 @@ DepTx/DepFrz refuted by their shares, DepRd read with the identity tied.
 |---|---|---|
 | `ic_hit_incr` | (c) | iget scan hit, `ref++` |
 | `ic_recycle_withdraw` | (a) at c = 0, `sr_ident = None` | takes `ic_q_recycle`; returns the dead header |
-| `ic_recycle_deposit` | (b′) at c = 0 to `IcUnloaded g` | returns `ic_q_recycle`; TO BE REPLACED by the (b″) form (§9 item 1) |
+| `ic_recycle_flip` | `CtxBoxHooked.box_q1_update` at c = 0 | `ipool_take_lend` inside, the four-quarter flip, `Q1 0` back in its live arm (Q8/Q9) |
+| `ic_recycle_deposit` | `CtxBoxHooked.box_deposit_L1_hook` at c = 0 to `IcUnloaded g` | the join: `ic_hdr_bare` + the payload ghost + the residue's live arm; `Q'` = the table's ½ |
 | `ic_checkout` | (e′), pure split | write arm and any non-read descriptor (`ic_dep_rd d = false`); returns the HELD header |
 | `ic_checkout_rd` | (e′), view-shift split | premises `itable_inv`, `ity_shot g ty`, `↑icacheN ⊆ E`, `k < NINODE`; refutes the frozen alternative by `frz_slot_kill_pinw`, the unloaded shape by the one-shot, sheds the leg into `Q2` |
 | `ic_park_hold` / `ic_park` | (f′) with `Qc' := ic_deposit cn k d` | returns `ic_dep_neutral ∗ ic_park_side d` |
@@ -320,6 +329,8 @@ DepTx/DepFrz refuted by their shares, DepRd read with the identity tied.
 | `ic_guard_deposit` / `_gen` | (b) at c = 1, no bump | returns `ic_pin_tx k` |
 | `ic_evict_deposit` | (b′) at c = 1 to `None`/`IcRaw` | the identity flip (table ½ + header ¼ + the pool's lent ¼) happens BEFORE the call, `ipool_inv` open; the unit is re-minted at `(None, T')` |
 | `ic_free_take` | (g) | takes `ic_q2` (a `DepFrz` residue), returns `ic_pin_tx k` and the L2 hold |
+| `ic_park_frz` | (f′) at the frozen alternative, `P_hdr' := ic_hdr_bare` | the join builds the alternative from `Q2`'s selector quarter and the re-entered pin |
+| `ic_evict_withdraw_frz` | `CtxBoxHooked.box_withdraw_L1_hook` at c = 1 | Q10 option B: the hook decides the frozen arm (`ifreeze_excl`) and moves its pin into `Q1 1`; returns `ic_hdr_frz` (cells, `frzsel ¼`, quarter, `ifreeze_pre`) |
 | `ic_box_alloc_at` | boot | fifty boxes at `icBoxN .@ k`, stamps at 0 |
 | (r20/r21) shrink/grow | `box_q_update` | main's `ic_shrink_tx`/`ic_grow_tx` re-stated over the accessor |
 

@@ -1682,3 +1682,47 @@ flip's `lo`/`lo tl`.
   it at Raw is vacuous.
 - Measure: not re-run yet (ProofIput next; then the full `make -k`).
 
+## 12.13 r20b-7 — ProofIput fused; Q10 closed by the hooked (a); the cover stated (2026-09-02)
+
+- `ProofIput.v` fused from flip's text over the box (`scratchpad/iput_gen.py`
+  over `scratchpad/ic/ProofIput.d3`, 92 hunks) with main's ghost: the guard's
+  (a) takes `ic_pin_tx` produced from the row's resting pin (F42), so the
+  row cannot be re-formed while the window is open -- `ip_rows` at ref 1 now
+  carries `ip_window ∗ ip_row_open ∗ ip_pin` (the open row's pieces incl. the
+  table's `ic_id ½` and `⌜ci !! k = Some (dev, inum)⌝`, and the pin's
+  name-half with the kept share, `∃ qp qr, ⌜qp + qr = qtx⌝`); at ref > 1 the
+  slot big-op and the whole share ride beside the stamp rows.  The tail's
+  eviction: `ipool_evict_lend` (a quarter of the table's half, transit share
+  `(tid, qr)`), the four-quarter `ic_id_flip` to false, the dead header's
+  quarter to (b′) `ic_evict_deposit` (which returns `Q1 1`), `ic_pin_exit`
+  with the name-half, `ipool_put_ord`, the shares rejoined.
+- The free path: (g) `ic_free_take` over `ic_q2` at `DepFrz q dev inum tid
+  (qtx/2)` (the descriptor half from the L2 row's neutral, the reduced
+  fragment, the selector's escrow quarter, the kept share, the header's
+  quarter); the payload for itrunc via `ic_loaded_ghost_split` +
+  `ic_loaded_open` (main's flat body); (f′) `ic_park_frz` with the pin
+  re-entered from the guard's share; +0x8a the HOOKED (a)
+  `ic_evict_withdraw_frz` (Q10 option B, ruled): the frozen alternative's pin
+  goes into `Q1 1`, `ic_hdr_frz` carries the cells, `frzsel ¼`, the quarter
+  and `ifreeze_pre` out; lend/flip/(b′)/`ic_pin_exit`/`ipool_put_corpse
+  … (qtx/2)`; the corpse's share returns off-lock and rejoins.  Fraction plan
+  as plan §9 item 9 (checked by both reviewers).
+- `ip_entry_exit1/2` (RULE ONE folds) restated for the new seams; the mint
+  opens the era leg for the record (`ic_inode_leg_era_open`/`_intro`).
+- `SmodeCorePt.v` taken from flip whole (ours lacked only
+  `phys_word4_of_win`, the retire store's bytes-to-word step).
+- `LinkIput` takes `ReleaseIn`.
+- `iris/IcacheCover.v` (NEW; plan §9 item 2): `ic_slot_cover` over
+  `CtxBox.box_arm` (rows + arm + `box_view`'s closing wand at the caller's
+  mask), `ic_slot_cover_view`/`_close`, and THE VIEWER CLAUSE
+  `ic_slot_cover_side`: from the pool's true quarter and the empty `ln_tx`
+  authority, every state the rows admit is read (`ic_cover_read` =
+  `FsCollect.col_side`'s body) or refuted -- IN dead/live by shape, OUT_L1
+  c = 0 dead/live arm, c ≥ 1 pin, OUT_L2 by descriptor.  Compiles, no
+  Admitted.  FsCollectAll (r21) consumes it.
+- Departures from flip's text: `ip_rows` carries the row and the share (F28
+  meets F42); the identity agreement runs before `ip_rest_sum` (ours is
+  device-fixed); the frozen alternative refutations use `frz_slot_kill_pinw`
+  /`ifreeze_excl` (no `frzown`); `Hitab` (is_itable2) is passed whole.
+- Measure: full `make -k -j24` running; counts to be appended below.
+

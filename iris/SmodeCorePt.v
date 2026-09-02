@@ -452,6 +452,67 @@ Section SmodeCorePt.
       rewrite (pa_of_pa_add ppn a x Hcan Hx). iExact "Hb".
   Qed.
 
+  (* A6.145 RETIRE (the icache window): freed PHYS bytes re-enter the VA
+     ctx tier as the ONE word cell a lock payload's free arm holds.  The
+     word claim pays alignment; the KT0 pin identity pays the per-byte
+     side conditions ([KptPt]'s word-window arithmetic).  Lives here, off
+     the heavy proof files, so the plain [lia]s are not broken by the
+     [bitvector.tactics] zify hook. *)
+  Lemma phys_word4_of_win `{KTR2 : !CurKtier} (a : mword 64)
+      (ppn : mword 44) (w : mword 32) :
+    is_aligned_paddr (Physaddr a) 4 = true ->
+    (uint a < 274877906944)%Z ->
+    pa_of ppn a = a ->
+    kmap_at (svpn_of a) ppn KP_rw -∗
+    ([∗ list] j ∈ seq 0 4,
+       TsoCtx.ctx_phys_pointsto TsoCtx.cur_ctx (pa_add a j) (DfracOwn 1)
+         (nth_byte w j)) -∗
+    TsoCtx.ctx_word4_pointsto (KTR := KTR2) TsoCtx.cur_ctx a (DfracOwn 1) w.
+  Proof.
+    intros Halign Hcan Hid. iIntros "#Hk Hb".
+    pose proof (bv_unsigned_in_range _ a) as [Hnn Hup].
+    pose proof Hcan as Hcan'. rewrite uint_unsigned in Hcan'.
+    assert (Hlow : (bv_unsigned (subrange_vec_dec a 11 0) <= 4092)%Z).
+    { rewrite subrange64_unsigned_11_0. change (2 ^ 12)%Z with 4096%Z.
+      unfold is_aligned_paddr in Halign. apply Z.eqb_eq in Halign.
+      assert (Hrm : (Z.rem (uint a) 4 = uint a mod 4)%Z).
+      { apply Z.rem_mod_nonneg; unfold uint; lia. }
+      rewrite Hrm in Halign.
+      rewrite uint_unsigned in Halign.
+      assert (H4 : ((bv_unsigned a mod 4096) mod 4 = 0)%Z).
+      { rewrite <- Znumtheory.Zmod_div_mod;
+          [exact Halign | lia | lia | exists 1024%Z; reflexivity]. }
+      apply Z.mod_divide in H4; [| lia]. destruct H4 as [q Hq].
+      pose proof (Z.mod_pos_bound (bv_unsigned a) 4096 ltac:(lia)) as Hb1.
+      lia. }
+    iApply (TsoCtx.ctx_word4_pointsto_intro TsoCtx.cur_ctx a (DfracOwn 1) w
+              Halign).
+    iApply (big_sepL_impl with "Hb").
+    iIntros "!>" (x y Hjx) "H".
+    apply lookup_seq in Hjx as [-> Hx4].
+    assert (Hoffx : (bv_unsigned (subrange_vec_dec a 11 0)
+                     + Z.of_nat (0 + x)%nat < 4096)%Z) by lia.
+    assert (Hcx : (uint (pa_add a (0 + x)%nat) < 274877906944)%Z).
+    { unfold pa_add. rewrite uint_unsigned.
+      rewrite (pt_add_vec_int_small a (Z.of_nat (0 + x)%nat)
+                 ltac:(lia) ltac:(lia)).
+      rewrite subrange64_unsigned_11_0 in Hoffx.
+      change (2 ^ 12)%Z with 4096%Z in Hoffx.
+      pose proof (Z_div_mod_eq_full (bv_unsigned a) 4096) as Hdm.
+      pose proof (Z.mod_pos_bound (bv_unsigned a) 4096 ltac:(lia)) as Hmb.
+      lia. }
+    assert (Hpx : pa_of ppn (pa_add a (0 + x)%nat) = pa_add a (0 + x)%nat).
+    { rewrite (pa_of_pa_add ppn a (0 + x)%nat Hcan Hoffx) Hid. reflexivity. }
+    iEval (rewrite TsoCtx.ctx_pointsto_phys).
+    iExists ppn.
+    rewrite (svpn_of_pa_add a (0 + x)%nat Hcan Hoffx).
+    iFrame "Hk".
+    iSplitR; [by iPureIntro |].
+    iSplitR.
+    { iPureIntro. exact (ktier_pin_of_id _ ppn (pa_add a (0 + x)%nat) Hpx). }
+    rewrite Hpx. iExact "H".
+  Qed.
+
   (* ------------------------------------------------------------------- *)
   (* §0.26′ / A6.85: THE SAME TWO BRIDGES AT THE VISIBILITY-FREE TIER.     *)
   (* [TsoCtx.mem_free] is [ctx_pointsto]'s body with the justification     *)

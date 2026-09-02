@@ -1150,6 +1150,7 @@ FsRep.v
 IregLinkNz.v
 IgetLic.v
 IcacheEscrow.v
+IcacheCover.v
 IcacheBoot.v
 FsCfgKits.v
 FsCfgBoot.v
