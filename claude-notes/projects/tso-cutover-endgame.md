@@ -1885,6 +1885,104 @@ generalization on one statement ((b′) x1, (e′) Qc + view shift, (f′) Qc'),
 plus the residues by arm and the two accessors.  The law: seven
 transitions, two accessors, three generalizations.  Nothing open.
 
+## 6²⁴. BUILD AGENT (2026-09-02): r20b's second design point — iget's RECYCLE
+## needs the OUT_L1 residue INSIDE its deposit; two more CtxBox generalizations
+## proposed, FOR RULING before they land
+
+STATUS FIRST.  ProofIunlock, ProofIunlockput, ProofIdup and ProofIlock are
+green over the box (commits 79e6d36f1, 579da6637, 8942ccfa3, 4289740ac);
+ProofIget is next, and its RECYCLE arm does not fit the landed law.  The
+(b″) lemma below is drafted and compiles locally but is NOT committed;
+nothing here is landed until ruled.
+
+THE PROBLEM.  The recycle re-identifies a dead slot: at the end of its
+window the slot's identification ghost `ic_id cn k` must go from
+`(false, dev0, inum0)` to `(true, dev, inum)`, and that is a ghost_var
+update, so it needs ALL FOUR QUARTERS in one hand at one instant.  Where
+they are during the window (F38 as landed):
+  - the table's row half:  1/2 → 1/4 KEPT by the recycler, 1/4 deposited as
+    `Q1 0` at (a) (F38's quarter, the viewer's F44 refutation);
+  - the header's quarter:  in the recycler's hand (the dead header came out
+    at (a));
+  - the pool's quarter:    inside `ipool_inv`, LENDABLE for the duration of
+    one fupd (`ipool_take_lend`: the pool row comes out, inum leaves the
+    free index, the quarter is lent; its closing wand wants the HALF back
+    at the NEW identity — the take and the flip are one step because the
+    pool's partition row `region = O ∪ X ∪ dom T ∪ live ids` is false in
+    between);
+  - `Q1 0`'s quarter:      inside the box until (b′) returns it.
+So during the window the recycler can reach three quarters, never four; and
+(b′) demands the REBUILT header (with its quarter at `true`) BEFORE it hands
+`Q1 0` back.  Main had no such problem: the escrow's quarter was inside an
+invariant the recycler could OPEN at +0x72, so take + flip + park were one
+step there.  Under the box the header's quarter is out (fine) but the
+residue's is not.
+
+TWO MORE CONSTRAINTS that rule out the easy fixes:
+  (i) the pool TAKE must precede +0x78 (`sw a5,8(s3)`, `ip->ref = 1`):
+      that store's AU (`iref_alloc_pinw_install`) spends the row's ledger
+      pair (`icnt_half inum 0`, `frzm_h`, `ifreeze_off`), which only the take
+      produces.  So the take cannot simply move to (b′) at +0x7c.
+  (ii) parking the taken inum in the pool's TRANSIT ledger across
+      +0x72..+0x7c (`ipool_transit T := tx_pins T`) needs a positive
+      transaction share for it — every iget in xv6 IS inside a transaction,
+      but `SpecIget` is transaction-agnostic and every caller would change.
+      Not proposed.
+  (iii) the leg cannot be in two places: the viewer must READ the new
+      inum's payload once the pool says it is live (F40/F44's tripwire),
+      and the recycler must DEPOSIT that same payload at (b′) — so whatever
+      holds it across the window must be handed back INSIDE the deposit.
+
+THE PROPOSAL (two generalizations, both mechanical, same shape as F33/F43):
+  (b″) `box_deposit_L1_join`: (b′) with a caller residue and a VIEW-SHIFT
+      join, the L1 twin of (e′)/(f′):
+        (∀ ξ', Qc ∗ Q1 c ∗ P_hdr' i' x1 ξ' ={E ∖ ↑N}=∗ P_hdr i' x1 ξ' ∗ Q') →
+        … Qc -∗ P_hdr' i' x1 ξ ={E}=∗ own_context ξ ∗ Q' ∗ (rows as (b′)).
+      The client receives `Q1 c` inside the fupd, beside its own residue
+      and the header-minus-payload, rebuilds the whole header and keeps
+      `Q'`.  (b′) is the instance P_hdr' := P_hdr, Qc := emp, Q' := Q1 c.
+      Drafted; one screen of proof, the (b′) skeleton with `iMod (Hjoin ξ …)`
+      before `ctx_deposit`.
+  `box_q1_update`: the OUT_L1 twin of `box_q_update` — the window's holder
+      (its L1 register half at `win = true` selects the arm) rewrites
+      `Q1 c` in place through `Q1 c ={E ∖ ↑N}=∗ Q1 c ∗ R`, getting `R` back.
+      Non-transition accessor; nothing moves but Q1's content.
+  and in the icache, `Q1 0` becomes TWO-ARMED:
+        Q1 0 := (∃ dev inum, ic_id cn k ¼ false dev inum)                    (dead)
+              ∨ (∃ dev inum, ic_id cn k ¼ true dev inum ∗
+                             ipool_shape_np γfs γi cov logstart inum)        (recycling, identified)
+      The recycle: at +0x72, INSIDE `box_q1_update`'s fupd, `ipool_take_lend`
+      (pool open, lend), the four quarters join (table ¼ + header ¼ + Q1's
+      ¼ + the lent ¼), the flip, the lend closes with the half at the new
+      identity, and Q1 0 is put back in its LIVE arm with the taken row's
+      `ipool_shape_np` parked in it; the ledger pair comes out for +0x78.
+      At +0x7c, (b″): the join wand receives Q1 0, selects the live arm by
+      agreement with the recycler's table quarter (in Qc), takes the np
+      shape and the quarter, and rebuilds the header at `IcUnloaded g` (the
+      pending one-shot, the freeze token and the liveness half ride Qc);
+      Q' is the table's half at the new identity.
+  TRIPWIRE CHECK for the viewer (§6¹⁷'s sharpened clause), state by state
+  at OUT_L1 c = 0: dead arm — refuted or read dead by the pool's quarter
+  (F38/F44, unchanged); live arm — readable WITH the identity tied (the
+  quarter names the inum, the np shape is the payload the collection
+  already reads at an unloaded live slot).  Returners: (a) puts the dead
+  arm, `box_q1_update` sees the arm it rewrites, (b″) selects by the
+  table-quarter agreement inside the wand.  The eviction is unaffected
+  (`Q1 1 = ic_pin_tx`, and its flip at (a) time has all four quarters:
+  table ½ + header ¼ + the lent pool ¼).
+
+CLASSIFICATION if accepted: seven transitions, THREE accessors
+(`box_q_update`, `box_q1_update`, `box_view`), FOUR premise-type
+generalizations ((b′) x1, (e′) Qc + view shift, (f′) Qc', (b″) Qc + view
+shift).
+
+QUESTIONS.  (Q8) Accept (b″) and `box_q1_update`, or is there a
+client-side arrangement of the four quarters I missed?  (Q9) Is the
+two-armed `Q1 0` (with the np shape parked in the live arm) the right
+viewer-side content, or would the reviewers rather see the recycle's live
+phase carry something else the collection can read?  Until ruled, r20b
+continues with ProofIreclaim / ProofIput's non-recycle parts.
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
