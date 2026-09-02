@@ -1391,6 +1391,18 @@ context, mapped to CtxBox's lemmas:
   _` over ∃/∗/∨ towers and hung the file (the "degenerate" build); they
   are now structural (tl_struct), and IcacheBox.v compiles in 7.8 s of
   tactic time, worst command 1.6 s.
+  BUILD AGENT (2026-09-02, R3.3 merge): F25 THE L1 ROW'S FLOOR IS ITS
+  OWN.  The skeleton's ic_slot_row bounds the drop stamp by a [tl] "the
+  payload's floor slot"; in the itable that slot is the per-slot exact-read
+  stamp tst (A6.144), whose auth is HALF in the lock and half in icacheN,
+  so tying sr_td ≤ tst would make every (b)/(d) open the invariant to
+  bump tst.  Instead the ξ-row carries `∃ tb, ic_slot_row k (ci !! k)
+  (icM_count M k) tb ∗ llb tb ∗ ctx_floor ξ tb` (ic_slot_row_fl; _llb and
+  _bare twins for the release fold), re-floored per release by the same
+  ctx_parked_raise the exact-read stamps use.  ic_slot_row's statement is
+  unchanged; islot2 keeps its lock-held rows minus ic_id; the dead row is
+  islot_free_at (F17).  ic_names keeps icn_mid / icn_id as DEAD fields
+  (still minted; §6 cleanup removes them with the six MkIcNames sites).
 
   BUILD AGENT'S REVIEW OF THE SKELETON (2026-09-02, against ProofIget /
   ProofIlock / ProofIunlock / ProofIput and the bcache instance as built).
@@ -2009,3 +2021,7 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   the 13-cell length; regroup lemmas are per shape; the lent parent is
   inode_ref_short; Timeless instances made structural (the slow build).
   Instance file compiles; R3.3 (IcacheEscrow merge + sweep) next.
+- 2026-09-02 (build agent, R3.3 merge): F25 — the box's L1 row rides the
+  itable ξ-row with its OWN floor (not tied to the exact-read stamp);
+  ic_escrow := the box, ic_deposit := the handle row, ic_sleeplocks over
+  ic_slp; arms, ic_id, ic_mid, 13 lemmas deleted; sleeplock tier swept.

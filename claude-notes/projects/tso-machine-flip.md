@@ -18486,3 +18486,23 @@ NEXT: R1' per §4.1 once F1 is vetted (or as F1 says, absent objection).
   (its own copy of the handle's token row) → `bstok` (F7's row).
 - R3 (icache) site map recorded in the endgame doc §4.2 (M-1..M-6) for
   vetting; R3 code waits for the rulings.
+
+### A6.161 — R3.2 banked: IcacheBox.v PROVEN; the slow build was the Timeless `apply _` (2026-09-02)
+
+- `tso-flip` 2eae3aaa6: IcacheBox.v's eight site wrappers + boot are proven
+  over CtxBox (F14's (b') shape-change deposit, box_alloc_at, the share
+  arithmetic `reference_split`/`reference_join`); icache cameras/shape in
+  Xv6Cameras §15; `icfg_box` names minted by icfg_alloc (F23); blkmap in
+  BlkmapDefs.v.  Full tree green modulo ProofForkretPark (the A6.160
+  frontier).  FsCfgBoot's icfg_alloc destructure gained the box family.
+- THE "DEGENERATE" BUILD: the skeleton's Timeless instances were `apply _`
+  over ∃/∗/∨ towers (the IcacheBox rows), which hangs typeclass search;
+  now structural (`tl_struct`), and `rocq compile -time` shows the file at
+  7.8 s of tactic time, worst command 1.6 s (recorded in durable-notes).
+- R3.3 started: IcacheEscrow.v's five arms, ic_id, ic_mid and the ~13
+  swap/open/close lemmas deleted; the box instance moved in (ic_escrow :=
+  the box, ic_deposit := the handle row, ic_sleeplocks over ic_slp); the
+  box's L1 row rides the itable ξ-row FLOORED (its own stamp, re-floored
+  at each release) rather than tied to the exact-read stamp tst (F25);
+  the inode sleeplock tier swept to genl (59 sites, 20 files).
+
