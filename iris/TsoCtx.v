@@ -5935,6 +5935,54 @@ Section ctx.
     apply TsoMemPa.visibleb_below. lia.
   Qed.
 
+  (* A6.146: the same gate, at the TWO-ARMED licence ([ledger_vis]) -- the
+     window is readable below the receipt OR the reader authored the arm
+     store itself ([visibleb]'s own-message arm: store forwarding).  This
+     is what serves iget's FRESH slot: its ilock-time racy read runs before
+     any drain of the arm store, on the author's own receipt. *)
+  Lemma ledger_read_pinw_vis `{CID : CpuId} (g : gstate) (base : Arch.pa)
+      (nn lo K : nat) (Sw : (nat -> bv 8) -> Prop) (dq : dfrac)
+      (f : nat -> bv 8) :
+    (0 < nn)%nat ->
+    tso_interp_at riscv_eraGS g -∗
+    view_lb view_name loglen_name (hart_agent cpu_id) K -∗
+    ledger_vis (hart_agent cpu_id) K lo -∗
+    ([∗ list] j ∈ seq 0 nn, ∃ t : nat,
+       phys_ledger_pinw (pa_add base j) dq (f j) t (TsPinw base nn j lo Sw)) -∗
+    ⌜forall tv : nat, (g.(gtv) cpu_id <= tv)%nat ->
+       exists fw : nat -> bv 8,
+         Sw fw /\
+         forall j, (j < nn)%nat ->
+           tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv (pa_add base j)
+           = Some (fw j)⌝.
+  Proof.
+    iIntros (Hn) "Hint #HK #Hvis Hb".
+    iAssert (⌜forall j, (j < nn)%nat ->
+               pinw_ok1 g.(gimg) g.(glog) (pa_add base j)
+                 (TsPinw base nn j lo Sw)⌝)%I as %Hok.
+    { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
+      iDestruct (big_sepL_lookup _ (seq 0 nn) j j with "Hb") as (t) "Hbj".
+      { rewrite lookup_seq_lt; [reflexivity|lia]. }
+      iApply (ledger_pinw_ok g (pa_add base j) dq (f j) t _ with "Hint Hbj"). }
+    iDestruct "Hint"
+      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
+    iDestruct (view_auth_valid with "Hvw HK") as %HKtv.
+    rewrite avf_hart in HKtv.
+    iDestruct "Hvis" as "[%HloK | (%i & %m & %Hloi & #Hmsg & %Htid)]".
+    - iPureIntro. intros tv Htv.
+      apply (TsoMemPa.pinw_read g.(gimg) g.(glog) base nn lo Sw
+               (hart_agent cpu_id) tv Hn Hok).
+      apply TsoMemPa.visibleb_below. lia.
+    - iDestruct (ghost_map_lookup with "Hm Hmsg") as %HLi.
+      iPureIntro. intros tv Htv.
+      apply (TsoMemPa.pinw_read g.(gimg) g.(glog) base nn lo Sw
+               (hart_agent cpu_id) tv Hn Hok).
+      subst lo.
+      apply (TsoMemPa.visibleb_own (hart_agent cpu_id) tv g.(glog) i m);
+        [| exact Htid].
+      rewrite -HLM. exact HLi.
+  Qed.
+
   (* the hand-back: a stamped cell whose stamp the context's floor covers is
      a CLEAN ctx cell (A6.126 §6: the reclaimed slot's bytes return to the
      publisher through the lock payload's floor) *)

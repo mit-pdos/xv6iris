@@ -1458,3 +1458,20 @@ SpecAcquiresleep's NB λ twin, the tracked `*.aux`/`ZZ*` strays never come over)
    and their specs (flip's proofs over the box + main's ghost rows in the
    spec posts), then the FS-cone consumers of `inode_ref`'s new spelling
    (M-5: 42 files mention it, 4 unfold it).
+
+## 12.5 r18 — IcacheInv fused (2026-09-02)
+
+Method: flip's IcacheInv taken whole, then main's delta since the merge base
+(`diff base cutover`, 55 hunks) applied on top: 36 hunks clean, 19 by hand
+(the imports; the `*_store_au` accessor family, where flip's `_pinw` twins
+got main's edits — `ireg_reg` for the lemmas that call `ireg_icnt_lic_acc`,
+the retired freeze receipt `frz_rcpt`/`frzown` dropped from the two last-close
+twins, `rg : frzidx`; the `ctx_word4_pointsto_*` spellings).  Flip's dead
+`itable_res`/`is_itable`/`islots_acc_upd` section is KEPT for now (flip's
+IcacheEscrow text still names it; deleted with the const-payload class, L7).
+Two flip lemmas the cutover ctx tier lacked came over verbatim:
+`TsoCtx.ledger_read_pinw_vis` (A6.146; IcachePinwObl needs it) and
+`WpLockIn.lock_finisher_close_in_llb` (A6.144; the `_in` releasesleep the
+box's (f) uses).  Green: IcacheInv, IcachePinwObl, InodeRegion, WpLockIn.
+Expected fallout: IcacheEscrow/IcacheBoot/the inode proofs (already red) now
+also read `itable_body`'s old shape — r19/r20's files.

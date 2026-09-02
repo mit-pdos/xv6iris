@@ -38,6 +38,7 @@ visibility-free free pages).
 | r15–r16 | f8688d4e6, bc71760b0 | icache stage 1: IcacheRef shim removal, modal transports, IcacheBoot token threading (Amendment 12.1) |
 | r17 | 6f0c00faf | device-conformance vtests under Ztso (another agent; finding 24 closed) |
 | checkpoint | 0f3c7a5d0 | icache stage 2: IcacheRef merged under the stitch rule (Amendment 12.4) |
+| r18 | (this commit) | IcacheInv per-slot fusion (§3.3): flip's pinw body and `*_store_pinw_au` accessors with main's region steps (`ireg_reg`, `frzidx`, no freeze receipt); `TsoCtx.ledger_read_pinw_vis` and `WpLockIn.lock_finisher_close_in_llb` brought over verbatim from flip; IcacheInv/IcachePinwObl/InodeRegion/WpLockIn green |
 
 `main` is one commit ahead (cacbc4aa1, the nightly dead-import sweep); it
 merges in at the next bank.
@@ -180,7 +181,7 @@ comment.
   stitched inode proofs are expected to stop using it in favour of
   `CtxPinw.wordw_claim`, after which it is deleted.
 
-### 3.3 `IcacheInv` — the per-slot fusion (next round, r18)
+### 3.3 `IcacheInv` — the per-slot fusion (r18, LANDED)
 
 Flip's body (IcacheInv.v.flip:1588) is
 `∃ M, itable_half M ∗ ⌜icM_wf M⌝ ∗ [∗ list] k ∈ seq 0 NINODE, pinw_slot M k`,
@@ -230,6 +231,24 @@ Flip's `ic_deposit cn k d := ic_deposit2 k d ∗ ic_pay_live k d` (name and
 arity kept for ~70 opaque takers) becomes
 `ic_deposit2 k d ∗ ic_pay_live k d ∗ ic_dep_half cn k d` — the holder's
 half of main's descriptor rides the holder's handle.
+
+#### 3.4.1b The descriptor variable and the box token (decided at r18, for r19)
+The box's L2 token is `ic_tok cn k = ghost_var (icn_esc cn k) 1 DepNone`
+(flip and main agree on the definition), and the box holds it WHOLE during
+OUT_L2 — so main's descriptor halves (`ic_deposit cn k d`, the `ghost_var`
+at `d` split between the arm and the holder, whose agreement at the park is
+what hands back exactly the `(t, q)` share the checkout parked) cannot live
+in the same variable.  They move to their own client ghost: `ic_names` gains
+`icn_dep : nat -> gname`; `ic_deposit cn k d := ghost_var (icn_dep cn k) ½ d`
+keeps main's name, arity and every lemma (`ic_dep_checkout`, `ic_dep_park`,
+`ic_deposit_agree`); its neutral whole `ghost_var (icn_dep cn k) 1 DepNone`
+rides the L2 payload λ beside the box's `l2_row` (so the acquiresleep winner
+holds it, exactly as main's winner held `ic_tok`).  `icn_mid` (main's recycle
+token) is retired — the window flag `sr_win` is that token — and `icn_id`
+(main's live/identity agreement, which `ipool_body`'s `ic_ids` reads) stays.
+`Q := ∃ d, ic_deposit cn k d ∗ ic_q_side k d` with `ic_q_side` = the parked
+`ln_tx` share at `DepTx`, `ic_out_rd` at `DepRd`, the freeze window's share,
+selector quarter and count fragment at `DepFrz`, `False` at `DepNone`.
 
 #### 3.4.2 Where main's ghost lives, arm by arm (the placement rule)
 Main's five-arm body (`ic_parked ∨ ic_out ∨ ic_mid_arm ∨ ic_empty_arm ∨
