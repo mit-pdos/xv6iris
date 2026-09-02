@@ -2268,6 +2268,33 @@ Section IcacheBox.
     iModIntro. iFrame "Hrun Htok Hbody". iExists T'. iFrame "Hrp Href Hllb".
   Qed.
 
+  (* the free path's PARK -- (f) over the hold alone (F30): the freer's
+     descriptor-less hold [ic_hold] at mass μ (its own body never left its
+     hand), the bundle back at the identity; the L2 row's pieces and the
+     unit's fresh reference at the park stamp, as [ic_park]. *)
+  Lemma ic_park_hold `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (k : nat)
+      (ξ : CtxId) (dev inum : mword 32) (μ : Qp) (E : coPset) :
+    ↑icBoxN ⊆ E ->
+    ic_box cn γfs γi cov logstart k -∗
+    own_context ξ -∗
+    (∃ x : ic_x, ic_hdr γfs γi cov logstart k (Some (dev, inum)) x ξ ∗ ic_rest k x ξ) -∗
+    ic_hold k dev inum μ ={E}=∗
+    own_context ξ ∗ ic_tok cn k ∗
+    ∃ T' : nat,
+      ic_regp k (L2Reg T' None) ∗
+      CtxBox.reference (X := ic_x) (icfg_box k) (Some (dev, inum))
+        {[ (Some (dev, inum), T') := μ ]} ∗
+      llb loglen_name T'.
+  Proof.
+    iIntros (HE) "#Hbox Hrun Hbun Hhold".
+    iDestruct "Hhold" as (m) "[%Hm Hhold]".
+    iMod (CtxBox.box_park (ic_hdr γfs γi cov logstart k) (ic_rest k) emp%I (ic_tok cn k)
+            (ic_hdr_excl γfs γi cov logstart k) (ic_rest_excl k) icBoxN (icfg_box k) ξ (Some (dev, inum)) m E HE
+            with "Hbox Hrun Hbun Hhold") as "(Hrun & _ & Htok & %T' & %q & %Hq & Hrp & Href & #Hllb)".
+    assert (q = μ) as ->. { apply Qp.to_Qc_inj_iff. by rewrite Hq Hm. }
+    iModIntro. iFrame "Hrun Htok". iExists T'. iFrame "Hrp Href Hllb".
+  Qed.
+
   (* iput's ref == 1 GUARD -- (a) at c = 1 with the WHOLE unit (inode_refp,
      shares gathered): the header comes out at a NAMED shape, so the guard's
      valid and nlink reads are exact; (b) re-deposits at that shape with no

@@ -2305,6 +2305,13 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   Seven-lemma law; F22's twin unused; F29 moot; free-path sequence
   recorded; one site check on the count-store twin.  F23–F29 accepted.
   For reviewer 2's vetting, then the owner's ruling.
+- 2026-09-02 (build agent, R3.4): F30 LANDED as ruled -- sr_x : option
+  (X * nat), (a)'s export, (g) box_l1_to_l2 (at c = 1), hdr_out keeps the
+  fragment's llb (the one producer the ruling's list lacked; see the
+  landing note in §4.2), wrappers ic_free_take / ic_park_hold; iput's free
+  path PROVEN over the box, ProofIput with no Admitted (tso-flip R3.4).
+  F22's twin is used at Tl := 0 as the λ-payload NB tier (no separate
+  plain nb_genl tier exists); its relay is vacuous at this site.
 - 2026-09-02 (proposer, F30 audit): (B) + the register stamp ACCEPTED;
   (E) (keep the shape in the register at rest) rejected as unsound under
   (f); (C) rejected as a client family for one site.  (g)'s statement,
