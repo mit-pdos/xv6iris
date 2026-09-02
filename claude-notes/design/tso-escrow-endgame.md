@@ -301,6 +301,40 @@ ACCEPTED.  R1' may start on the flag shape.
       change to the six lemmas' shapes.  R1' IS PAUSED at this point
       (the kit, the six lemmas and boot v5 are written against the
       pre-F6 body) until F6 is vetted.
+      VETTED 2026-09-01 — F6 REAL, EPOCH LEDGER ACCEPTED, ONE REFINEMENT:
+      - Premise confirmed: SpecBread's post is bio_locked at the
+        REQUESTED (dev, bno) (SpecBread.v:156); the register design's
+        tie was points-to agreement on the bref's cell fractions, which
+        A6.155 rightly removed from the chain (Q must be ξ-free).
+      - Alternatives (i)–(iv) rightly rejected; (iv) is workable only
+        through L1's payload tie on M (the count auth) — client-specific,
+        so rejected for genericity.  A STAMP-keyed ledger (no epoch) is
+        also rejected: (b) after a recycle may deposit at T' = T
+        (ctx_deposit raises only past K⊔W) and would rewrite an existing
+        agree key.  The explicit epoch, advanced by (b), is append-only
+        by construction.
+      - REFINEMENT (required): L1's slot-row witness is not
+        self-evidently CURRENT (agreement with ● I gives I !! e_row =
+        id, not e_row = e_box), so (c) cannot show the reference it
+        mints is of the current epoch.  Put the epoch INTO slot_d's
+        value: `slot_d : ghost_var (nat * bool * nat)` = (Td, w, e).
+        (c) agrees on e with the box and mints the new reference's
+        witness from the box's ● I (a core-id fragment of an existing
+        key); L1's row then carries NO witness of its own.  (b) already
+        updates slot_d and advances e in one step, so the sync is free.
+      - Checked: the checkout derivation ((e_r,t) ∈ dom m ⇒ e_r = e ⇒
+        id_r = id ⇒ bundle at (dev,bno)) is total; (f) re-establishes
+        "IN at id" from bio_locked's identity + its witness (only the
+        recycler changes dev/bno, at c = 0); pair-keyed stamps cost a
+        `snd` projection in (C)/(D), no new lemma; one reference
+        spelling, six lemmas, three arm shapes; CtxBox.v gains an idO
+        parameter — the ledger is box-owned and generic.
+      - R3 FLAG (not blocking): icache shares carry inode_ident CELL
+        fractions, which cannot ride Q.  R3's site map decides whether
+        the share stays in the holder's hand across ilock→iunlock (cells
+        give the tie; ledger bcache-only) or the icache goes
+        ghost-identity through the same ledger.
+      R1' MAY RESUME on F6 with (Td, w, e).
 
 HARD RULES: exactly these three arm shapes and six lemmas.  Protocol
 substates go inside Q (ξ-free ghost).  A seventh lemma, a fourth arm
@@ -339,12 +373,18 @@ disjunct.
     fraction from its old stamp to the park stamp (dealloc + alloc; Qp
     addition is cancelable).  ufrac, not frac: several units may sit at
     one stamp.
-  - `slot_p : ghost_var nat`, `slot_d : ghost_var (nat * bool)` — half
-    in the box, half in the L2 / L1 payload beside that payload's floor
-    row `ctx_floor ξ Tp` / `ctx_floor ξ Td`.  slot_d's bool is the
-    window flag (§2); the L1 row states it false, and also carries
-    `llb loglen_name Td`, so a release that leaves Td unchanged can
-    re-fold it (§3.4).
+  - `slot_p : ghost_var nat`, `slot_d : ghost_var (nat * bool * nat)`
+    = (Td, w, e) — half in the box, half in the L2 / L1 payload beside
+    that payload's floor row `ctx_floor ξ Tp` / `ctx_floor ξ Td`.
+    slot_d's bool is the window flag (§2), its third component the
+    identity EPOCH (F6): the L1 row states w = false and agrees on e,
+    and also carries `llb loglen_name Td`, so a release that leaves Td
+    unchanged can re-fold it (§3.4).
+  - `bid : authR (gmapUR nat (agreeR idO))` — the IDENTITY EPOCH LEDGER
+    (F6): ● I in the box with row ⌜I !! e = Some id⌝ and the IN bundle
+    at id; (b) advances e and appends; every reference carries the
+    persistent witness ◯{[e := ag id]}, minted by (c)/(b) from ● I;
+    stamps are keyed by (epoch, stamp) with row ⌜∀ p ∈ dom m, p.1 = e⌝.
   - `cnt : ghost_var nat` — half in the box, half in L1's payload beside
     the refcount word; the row ⌜Σ m = c⌝ with Σ taken in Q (F3).
 
@@ -897,3 +937,11 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   agree witnesses keyed by an epoch (b) advances; stamps keyed by
   (epoch, stamp)); recorded in §2 with the alternatives considered;
   R1' is PAUSED at the identity tie until vetted.
+- 2026-09-01 (design vetting of F6): REAL (SpecBread's post is at the
+  requested identity; A6.155 removed the points-to tie).  EPOCH LEDGER
+  ACCEPTED as the minimal generic fix (alternatives i–iv and a
+  stamp-keyed ledger rejected, reasons recorded).  Refinement REQUIRED:
+  the epoch rides slot_d's value (Td, w, e) so (c) mints a current
+  witness from the box's ● I; L1's row carries no witness.  §3.2 gains
+  bid + the pair-keyed stamps row.  R3 flag: icache shares' ident cells
+  vs Q.  R1' may resume.
