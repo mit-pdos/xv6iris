@@ -1983,6 +1983,70 @@ viewer-side content, or would the reviewers rather see the recycle's live
 phase carry something else the collection can read?  Until ruled, r20b
 continues with ProofIreclaim / ProofIput's non-recycle parts.
 
+## 6²⁵. SECOND REVIEWER ON §6²⁴ (2026-09-02): Q8 accepted -- (b″) and
+## `box_q1_update`; Q9 accepted -- the two-armed `Q1 0` is main's MID arm
+## re-homed; one error of mine recorded
+
+THE PROBLEM IS REAL, AND PART OF IT IS MINE.  (b′) takes the header at the
+NEW identity as a premise, and the header at `Some` carries its quarter at
+`true`; so the flip must precede (b′), while F38's quarter sits in `Q1 0`
+until (b′) returns it.  §6¹⁰ said the recycler "gets it back from (b′)
+BEFORE the flip", and A12.8 repeated it; that was false -- (b′) cannot
+complete without the flipped header.  Found where it had to be found, at
+ProofIget.
+
+Q8 -- ACCEPT BOTH.  The client-side arrangements that would avoid them
+    each fail:
+    - flip before (a): the header's quarter is inside the box until (a) --
+      three quarters at most;
+    - drop the dead header's quarter (table ¾ + pool ¼, flip without the
+      header): breaks the viewer -- {header IN and dead, pool entry TRUE}
+      becomes admitted and unrefutable, and it is a REAL mid-recycle
+      state, not a hypothetical one;
+    - split the window at +0x72 and deposit the header early at the new
+      identity: an Exit-A eviction leaves the physical valid word at 1, so
+      a header at `Some` with `IcUnloaded` cannot be formed until the
+      +0x7c store; and the +0x78 ref store needs the ledger pair only the
+      pool take produces, so the take is mid-window regardless.
+    Hence mid-window access to the L1 residue is unavoidable
+    (`box_q1_update`, the L1 twin of `box_q_update`) and the header cannot
+    be rebuilt before the residue comes back ((b″), the L1 twin of (f′)
+    with F43's residue wand).  Both are premise-type generalizations of the
+    kind already landed.
+    RULE 0: `box_q1_update`'s premises are the L1 register half at
+    `win = true` and the count half, both returned, so the arm and the
+    count are fixed by agreement.  (b″)'s wand runs at the running context
+    before `ctx_deposit`; the `∀ ξ'` is harmless and `P_hdr'` need not be
+    CtxMorph.
+
+Q9 -- ACCEPT.  Main's `ic_slot_cover`'s second alternative is exactly
+    `ic_id ½ true dev inum ∗ ipool_shape_np … inum`; the proposed live arm
+    has the same content at a quarter, so the collection reads it as it
+    reads an unloaded live slot.  It is main's MID arm re-homed in the
+    residue.  Selection on both sides: inside `box_q1_update` the
+    recycler's table quarter at `false` refutes the live arm; inside (b″)
+    its quarter at `true` refutes the dead arm.  The eviction is
+    unaffected: at (b′) time it holds header ¼ + table ½ + the lent pool
+    ¼ and flips before depositing, no residue quarter involved.
+
+CONDITIONS:
+    (1) the live arm carries the np shape and the quarter, nothing more;
+        the pending one-shot, the freeze token and the liveness half ride
+        `Qc` into (b″), as proposed;
+    (2) the pool invariant's namespace disjoint from the box's, stated as
+        a premise of the recycle wrapper (as `ic_checkout_rd` does for
+        `icacheN`);
+    (3) note the pattern in §5 rather than refactor: every transition that
+        MOVES A HEADER now takes a residue wand ((b″), (e′), (f′)).  If (a)
+        or (g) ever needs one, that is the fifth of a kind and the right
+        move is ONE shared wand convention, not another per-lemma
+        addition.
+
+CLASSIFICATION as §6²⁴ states it: seven transitions, three accessors
+(`box_q_update`, `box_q1_update`, `box_view`), four premise-type
+generalizations ((b′) x1; (e′) Qc + view shift; (f′) Qc'; (b″) Qc + view
+shift).  Nothing else open.
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
