@@ -1408,6 +1408,42 @@ TRIPWIRE (§5, replacing §6¹¹'s): every arm of a residue must be SELECTABLE
     register.  Residues are indexed by ARM so that the first clause can be
     met at all.
 
+## 6¹⁴. ADDENDUM (the box's designer, 2026-09-02): the build agent's A12.8
+## proposal `Q1 : nat → iProp` is BETTER than the Q1 disjunction — take it
+
+The build agent reached F41 independently (A12.8: the guard's (b) cannot
+tell the guard arm from a checkout arm; the frozen park cannot tell the
+guard arm from its own DepFrz arm) and proposes indexing the OUT_L1
+residue by the COUNT: `Q1 : nat → iProp`, `Q2 : iProp`.  This is strictly
+better than §6¹²'s two-arm Q1:
+  - the OUT_L1 arm carries `Q1 c` with c the body's count; the recycler's
+    window is `Q1 0`, the guard's is `Q1 1` -- separated by TYPE, so no
+    returner refutes anything: the recycler receives `Q1 0`, the guard
+    `Q1 1`, and neither the `hpn_full None` contradiction nor F38's
+    identity quarter is needed for SELECTION;
+  - the viewer selects by the same c (it reads `box_rows`): at c = 0 it
+    treats the slot as dead by the pool's own quarter (the `ids` entry is
+    false there) and needs nothing from `Q1 0`, which can therefore be
+    `emp` -- F38's quarter becomes optional and I recommend dropping it
+    (less ghost moving at every recycle; F38's DIAGNOSIS stands, its
+    content is no longer needed once the residue is indexed);
+  - at c ≥ 1 the viewer sees `Q1 c = ic_pin_tx k` and refutes by the tx
+    share as before.
+The frozen park's ambiguity is resolved by the arm split itself (DepFrz
+is a Q2 arm, the guard's pin a Q1 arm) plus F43's Qc' for selection within
+Q2.  F42 (the resting pin on the table row) is still required: `Q1 1` must
+be PRODUCED by the guard at its (a), and the pin's whole must be in its
+hand for that.  F43 unchanged.
+
+So the second edit is: `Q1 : nat → iProp` beside `Q2 : iProp`; OUT_L1
+carries `Q1 c`; (a) takes `Q1 c`, (b)/(b′) return `Q1 c`, (g) takes Q2 and
+returns `Q1 1`; (f′) with Qc'; box_q_update with the output residue R;
+box_view unchanged.  bcache / off: `Q1 := λ _, emp`, `Q2 := emp`.  icache:
+`Q1 0 := emp`, `Q1 (S _) := ic_pin_tx k`, `Q2 := ∃ d dev inum, ⌜ic_dep_id d
+= Some (dev,inum)⌝ ∗ ic_deposit cn k ½ d ∗ ic_q_side d ∗ ic_id cn k ¼ true
+dev inum` (F40).  The tripwire's "indexed by ARM" reads "indexed by arm and,
+for OUT_L1, by count".
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
