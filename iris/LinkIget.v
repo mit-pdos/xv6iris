@@ -13,4 +13,4 @@
    [n + 3 < 2^31] and the rank table's "itable" < "pr" edge pay for. *)
 Require Import LinkAcquire LinkRelease LinkPanic ProofIget.
 
-Module Iget := IgetProof Acquire Release Panic.
+Module Iget := IgetProof Acquire Release ReleaseIn Panic.

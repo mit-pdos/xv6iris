@@ -1651,3 +1651,34 @@ post's `ic_dep_side d`.  `ic_handle` gains `ic_tok cn k` (the sleeplock's
 token rides the handle across the hold; main put it in the escrow arm).
 The d3 resolution: hunks 1/8/9/10/11/12 flip (adapted), 2–7 cutover with
 flip's `lo`/`lo tl`.
+
+## 12.12 r20b-6 — ProofIget fused; the recycle over the hooked box (2026-09-02)
+
+- `CtxBoxHooked.v` (the reviewers' side-by-side consolidation, ded0fa1de) is
+  what the recycle calls: `ic_recycle_flip` = `box_q1_update` with
+  `ipool_take_lend` inside its client fupd (all five mask premises stated),
+  the four-quarter identity flip, `Q1 0` put back in its LIVE arm with the
+  taken row's `ipool_shape_np`; `ic_recycle_deposit` = `box_deposit_L1_hook`
+  with the join (the header rebuilt from `ic_hdr_bare` + the pending one-shot,
+  freeze token, liveness half + the residue's live arm; `Q'` = the table's ½).
+  `ic_q_recycle`/`ic_q1` are TWO-ARMED and take `γfs γi cov logstart` (Q9);
+  `ic_recycle_withdraw` takes the dead quarter.  The CtxBox.v draft of (b″)
+  is withdrawn (plan §9 item 1: one or the other).
+- `ProofIget.v` fused from flip's text (`scratchpad/iget_gen.py` over the d3):
+  the dead row is `islot_free_at ∗ ic_id ½ ∗ ic_pin_rest` (3 conjuncts), the
+  live row 5, the pin rides `frz_park`'s OFF arm through `frz_park_lic_off`
+  (4 outputs) / `frz_park_intro_off` (3 inputs).  `LinkIget` instantiates
+  `IgetProof Acquire Release ReleaseIn Panic`.  Green on the VM together with
+  `IcacheEscrow`, `IcacheBoot`, `LinkIget`.
+- For ProofIput (in flight): `ic_evict_withdraw_frz` (the hooked (a) at
+  c = 1: the hook decides the frozen arm and moves the alternative's pin
+  into `Q1 1`; returns `ic_hdr_frz`) and `ic_park_frz` ((f′) at the frozen
+  alternative, `P_hdr' := ic_hdr_bare`) are in `IcacheEscrow.v` and compile
+  -- plan §9 item 9 (Q10), option B; unused until the ruling.
+- Departures from flip's text, recorded: `Hlk2` is our projected `Hlock`;
+  the +0x72 store is plain after `ic_recycle_flip` (flip had
+  `ipool_shape_to_np` before a plain store; main had the take inside the
+  store's AU); `ic_hdr_bare_amb` carries `⌜x ≠ IcRaw⌝` so (f′)'s join over
+  it at Raw is vacuous.
+- Measure: not re-run yet (ProofIput next; then the full `make -k`).
+
