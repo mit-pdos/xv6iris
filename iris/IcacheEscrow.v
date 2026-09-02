@@ -3961,6 +3961,61 @@ Section IcacheBoxAmb.
       + rewrite /ic_rest_amb /ic_meta_rest. iFrame "Hty2 Hmaj Hmin Hsz Haddr". done.
   Qed.
 
+  (* ---- ilock's readings of the HELD header ---- *)
+  (* the valid cell, borrowed and returned unchanged (the +0x1a read) *)
+  Lemma ic_hdr_held_valid_acc cn γfs γi cov logstart k rd dev inum x :
+    ic_hdr_held_amb cn γfs γi cov logstart k rd (Some (dev, inum)) x -∗
+    i_valid (ientry k) ↦₄ valid_word (ic_x_loaded x) ∗
+    (i_valid (ientry k) ↦₄ valid_word (ic_x_loaded x) -∗
+     ic_hdr_held_amb cn γfs γi cov logstart k rd (Some (dev, inum)) x).
+  Proof.
+    rewrite /ic_hdr_held_amb. iIntros "(Hv & Hid & Hnl & Hpay)". iFrame "Hv".
+    iIntros "Hv". iFrame "Hv Hid Hnl Hpay".
+  Qed.
+  (* the LOADED held bundle, by arm kind: the cells, and either the ordinary
+     payload as the arm's [ic_dep_held] (the whole [ic_loaded] at a
+     bundleless descriptor, the reader's quarter at DepRd) with the one-shot,
+     the freeze token and the liveness half, or the frozen alternative *)
+  Lemma ic_bundle_loaded_elim_held cn γfs γi cov logstart k d dev inum g dn bm :
+    ic_hdr_held_amb cn γfs γi cov logstart k (ic_dep_rd d) (Some (dev, inum)) (IcLoaded g dn bm) -∗
+    ic_rest_amb k (IcLoaded g dn bm) -∗
+    inode_ident k (DfracOwn (1/2)) dev inum ∗
+    i_valid (ientry k) ↦₄ valid_word true ∗
+    ((ic_dep_held γfs γi cov logstart d k inum dn bm ∗ ity_shot g (di_type dn) ∗
+      ifreeze_off (bv_unsigned inum) ∗ live_gen k (1/2) g)
+     ∨ (frzsel k ((1/2)/2)%Qp true ∗ ic_pin_tx k ∗
+        inode_meta (ientry k) dn ∗ inode_addrs (ientry k) (bm_cells bm))).
+  Proof.
+    rewrite /ic_hdr_held_amb /ic_pay_held /ic_rest_amb /ic_meta_rest /ic_dep_held.
+    iIntros "(Hv & Hid & Hnl & Hpay) (%Hlen & (Hty2 & Hmaj & Hmin & Hsz) & Haddr)".
+    iFrame "Hid Hv". destruct (ic_dep_rd d).
+    - iDestruct "Hpay" as "(Hheld & Hty & Hoff & Hlg)". iLeft. iFrame "Hty Hoff Hlg".
+      rewrite /ic_rd_held /ic_rd_held_ghost. iDestruct "Hheld" as (data) "(%Hok & %Hloc & Hn14)".
+      iExists data. rewrite /inode_meta. iFrame "Hn14 Haddr Hty2 Hmaj Hmin Hnl Hsz". done.
+    - rewrite /ic_pay. iDestruct "Hpay" as "[(Hg & Hty & Hoff & Hlg) | [Hfs Hpin]]".
+      + iLeft. iFrame "Hty Hoff Hlg". rewrite /ic_loaded /ic_loaded_ghost.
+        iDestruct "Hg" as (data) "(%H1 & %H2 & %H3 & %H4 & %H5 & Hleg)".
+        iExists data. rewrite /inode_meta. iFrame "Hleg Haddr Hty2 Hmaj Hmin Hnl Hsz". done.
+      + iRight. iFrame "Hfs Hpin Haddr". rewrite /inode_meta. iFrame "Hty2 Hmaj Hmin Hnl Hsz".
+  Qed.
+  (* the UNLOADED held bundle (a bundleless descriptor only: the read arm's
+     held payload is loaded by construction) *)
+  Lemma ic_bundle_unloaded_elim_held cn γfs γi cov logstart k dev inum g :
+    ic_hdr_held_amb cn γfs γi cov logstart k false (Some (dev, inum)) (IcUnloaded g) -∗
+    ic_rest_amb k (IcUnloaded g) -∗
+    inode_ident k (DfracOwn (1/2)) dev inum ∗
+    i_valid (ientry k) ↦₄ valid_word false ∗
+    (∃ n : bv 16, i_nlink (ientry k) ↦₂ n) ∗
+    (∃ dd : dinode, ic_meta_rest (ientry k) dd) ∗
+    (∃ l : list (bv 32), ⌜length l = 13%nat⌝ ∗ inode_addrs (ientry k) l) ∗
+    ((ipool_shape_np γfs γi cov logstart inum ∗ ity_pending g ∗
+      ifreeze_off (bv_unsigned inum) ∗ live_gen k (1/2) g)
+     ∨ (frzsel k ((1/2)/2)%Qp true ∗ ic_pin_tx k)).
+  Proof.
+    rewrite /ic_hdr_held_amb /ic_pay_held /ic_rest_amb.
+    iIntros "(Hv & Hid & Hnl & Hpay) (Hm & Ha)". iFrame "Hid Hv Hnl Hm Ha". iExact "Hpay".
+  Qed.
+
 End IcacheBoxAmb.
 
 (* ====================================================================== *)
@@ -4552,6 +4607,13 @@ Section IcacheBox.
     | _ => ic_q_side γfs γi cov logstart k d
     end.
 
+  Lemma ic_dep_side_q_side γfs γi cov logstart k d (s : Qp) (dev inum : mword 32) (g : gname) (lo : nat) :
+    ic_dep_shr d = Some (s, dev, inum, g, lo) -> ic_dep_rd d = false ->
+    ic_dep_side d -∗ ic_q_side γfs γi cov logstart k d.
+  Proof.
+    rewrite /ic_q_side /ic_dep_side /ic_dep_side_tx /tx_pin_o /ic_dep_shr /ic_dep_rd.
+    destruct d; try discriminate; intros _ _; iIntros "H"; iExact "H".
+  Qed.
   Lemma ic_park_side_dep_side γfs γi cov logstart k d (s : Qp) (dev inum : mword 32) (g : gname) (lo : nat) :
     ic_dep_shr d = Some (s, dev, inum, g, lo) ->
     ic_park_side γfs γi cov logstart k d -∗ ic_dep_side d.
