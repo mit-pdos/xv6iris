@@ -1444,6 +1444,69 @@ box_view unchanged.  bcache / off: `Q1 := λ _, emp`, `Q2 := emp`.  icache:
 dev inum` (F40).  The tripwire's "indexed by ARM" reads "indexed by arm and,
 for OUT_L1, by count".
 
+## 6¹⁵. SECOND REVIEWER ON §6¹³/§6¹⁴ (2026-09-02): §6¹³ agreed in full;
+## §6¹⁴'s `Q1 0 := emp` is unsound (F44); F42 needs one clause (F42′)
+
+§6¹³ AGREED.  The bundle is right; `box_q_update`'s output residue R is
+needed for the reason given (a shrink/grow hands its UPDATED half back
+out); (f) as the `Qc' := emp` instance of (f′) is the right spelling.
+
+§6¹⁴: THE COUNT INDEX IS WELL-DEFINED.  Checked: (c) `box_ref_incr` and
+(d) `box_ref_decr` both require `sr_win r = false`, so the count cannot
+change while an OUT_L1 window is open and `Q1 c` in the body is stable
+across the window.  Separating the guard (c = 1) from the count-zero
+windows by type is sound.
+
+F44 (BLOCKING): `Q1 0 := emp` IS UNSOUND -- COUNT ZERO HAS TWO
+    DEPOSITORS.  §6¹⁴ argues the viewer needs nothing at c = 0 because the
+    pool's entry is false there.  True for the RECYCLER, which arrives at a
+    dead slot (`ic_recycle_withdraw` requires `sr_ident r = None`).  False
+    for IPUT: IcacheEscrow.v's own notes (the `ic_id` comment, "iput's
+    LAST CLOSE flips it back, because a non-live slot's bundle goes home
+    to the pool"; "an eviction's identity flip and its deposit are two
+    ghost steps … after the refcount store has fired"; "iput's two
+    evictions") make the eviction a SECOND OUT_L1 window at c = 0: iput
+    withdraws the header at a slot whose register still says `Some` and
+    whose pool entry is still TRUE, sends the bundle home, and deposits
+    with the shape change to `None`, the flip inside (b′)'s fupd as ruled
+    (§6⁷ Q2).  It cannot do this at c = 1: row I keys the stamp map by
+    `sr_ident` and iput's own reference is still in the map, and (d) needs
+    the window closed.  So during the eviction window the collection sees
+    c = 0, a live register, a true pool entry and the payload OUT; it must
+    refute, and `emp` cannot be refuted.  Hence
+      Q1 0     := ic_pin_tx k ∨ (∃ dev inum, ic_id cn k (1/4) false dev inum)
+      Q1 (S _) := ic_pin_tx k
+    F38's quarter is therefore NOT optional: it is the recycler's arm, and
+    the SELECTOR on both sides at c = 0 -- the recycler refutes the pin arm
+    with the row's `hpn_full None` (F42); iput refutes the quarter arm with
+    the row's `ic_id ½ true` and selects the pin by `hpn_agree`.  The
+    viewer refutes the pin by the tx share and reads the quarter as dead.
+    Rule 0 for iput's deposit: the tx share is SpecIput's (it already feeds
+    the guard's pin), the pin's whole is the row's (F42), iput holds the
+    row under itable.lock at the eviction.
+    With this content the count index buys only the guard's type-level
+    selection; both shapes need the same disjunction at c = 0 and the same
+    selectors.  Either is sound.  Recommendation: the constant two-arm Q1
+    (one parameter fewer) unless the build agent has a proof-side reason to
+    keep the index.
+
+F42′ (IMPLEMENTATION CLAUSE F42 NEEDS): THE TABLE ROW MUST BE ALLOWED TO
+    BE WITHOUT THE PIN.  On Exit A the pin is back before iput releases
+    itable.lock -- nothing changes.  On the FREE path iput releases
+    itable.lock right after (g), and from then until the eviction window
+    one half sits in the header's frozen alternative (`ic_pay`'s
+    `frzsel … ∗ ic_pin_tx`, as now) and iput holds the other.  The row
+    already has a mode bit for exactly this interval: the freeze mirror's
+    lock half (`frzsel`) in `islot2`.  Tie the pin to it -- bit DOWN, the
+    row carries `hpn_full k None`; bit UP, the row carries nothing and the
+    two halves are where the free path put them.  Without this clause the
+    release after (g) is unprovable at r20.
+
+NOTE ON A12.8: "the ordinary parker can [refute the guard arm] with its
+    resting pin" -- after F42 the parker no longer holds that pin, so the
+    line would have been false; under the split it is moot (parkers never
+    see Q1).
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
