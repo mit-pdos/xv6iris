@@ -494,6 +494,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | Q9 | the two-armed `Q1 0` (main's MID arm re-homed) | ACCEPTED, not landed |
 | §6²⁶/§6²⁷ | the hook convention as law; consolidate before r21; hook (a)/(g) too | RECOMMENDED to the owner |
 | §3.2b | the consolidated box BUILT side-by-side (`iris/CtxBoxHooked.v`): hooks on (a)/(b)/(e)/(f)/(g), `box_q1_update`, eight verbatim-typed corollaries; green on the VM, assumptions closed | landed side-by-side (commit ded0fa1de); slot-in = r20c |
+| Q10 | the last close's (a) must not consume iput's pin name-half: the hooked (a) moves the frozen alternative's own pin into `Q1 1` (option B); no ghost change | RULED B by reviewer 1 (item 9); to land in ProofIput |
 | §6²⁷ | run L2/L3/L4 in parallel now; sweep the file layer once; two tripwires before r21 | RECOMMENDED to the owner |
 
 Tripwires added by this lane, beyond flip endgame §5.7: law 9 (residues)
@@ -594,6 +595,39 @@ and law 10 (hooks).
    `ic_recycle_deposit` = `box_deposit_L1_hook` with the join; `Q1 0`
    two-armed); `IcacheEscrow`/`IcacheBoot` green on the VM with them;
    ProofIget fused and building.  The CtxBox.v draft of (b″) is withdrawn.
+   - **REVIEWER 1 (2026-09-02): TAKE B.**  The fact is right: `ic_pin_exit`
+     recovers `(t, q)` only by agreement with the half the walk KEPT, so
+     the plain (a)'s `Q1 1` premise would spend it; F42′'s prose did not
+     account for (a) taking the hand's half.  Provability, not soundness.
+     B over A: (i) it is exactly what `box_withdraw_L1_hook` exists for --
+     the hook produces `Q1 1` FROM the header, so the alternative's own pin
+     moves into the residue and the name-half never leaves iput's hand;
+     the first client use of the (a) hook, the case §6¹³ reached for and
+     §6²⁷ widened to; (ii) it keeps main's ghost verbatim (stitch rule) --
+     A re-spells the pin's fraction and every mover for one site, though
+     `hpn_at` being fraction-generic would carry it; (iii) the refutation
+     the hook needs is PURE: `ifreeze_excl` is an `own_valid_2` exclusion,
+     so the ordinary alternative dies inside the hook with no invariant
+     open.  The fraction plan closes: at every point exactly one w/2 sits
+     in an invariant-visible place (the guard's pin, then `Q2`'s DepFrz
+     side, then the frozen alternative's pin, then `Q1 1` beside the
+     transit row) while iput holds the other, until (b′) and the corpse
+     return both (the phrase "the Q' half" for the transit-row share is
+     loose -- that w/2 is iput's kept one -- but the arithmetic is right).
+     THREE CONDITIONS: (1) the hook CONSUMES `Qc`; in the frozen case
+     `ifreeze_pre` is not spent, so if iput needs it afterwards it rides
+     back out in `P_hdr'` (`ic_hdr_frz`), a client choice -- state it, do
+     not discover it at the join; (2) the hook is quantified over every x:
+     `ic_pay … IcRaw = False`, the frozen alternative exists at
+     `IcUnloaded` and `IcLoaded` -- discharge all three explicitly rather
+     than lean on `sr_x`; (3) correct F42′'s prose: the alternative holds
+     one half, iput the NAME-half, and the last close's (a) takes the
+     alternative's half through the hook, never the hand's.
+     On item 1's status: the recycle wrappers on `CtxBoxHooked` are the
+     module's intended use and withdrawing CtxBox.v's (b″) draft is right;
+     not yet on the remote, so unchecked here.  Once landed the module is
+     load-bearing and r20c's slot-in is: move the hooks into CtxBox.v,
+     repoint the two wrappers.
 
 ---------------------------------------------------------------------------
 
