@@ -18566,6 +18566,86 @@ NEXT: R1' per §4.1 once F1 is vetted (or as F1 says, absent objection).
   NEXT per the reviewers: R4 (inode_pay §4.3, off_hold §4.4 with the
   main side), then R5 (the recorded reverts, log_res, ForkretPark's
   bullets), R6.
+
+### A6.163 — HANDOFF CHECKPOINT for the merge into main (2026-09-02)
+
+The escrow work (bcache Phase 5 + icache Phase 4.5, rounds R1-pre..R3.4)
+is complete and vetted; this entry is the state a MERGE AGENT needs.
+Nothing is unbanked: the fliptree working copy equals `tso-flip` HEAD
+on every tracked source and has no untracked sources.
+
+WHERE THINGS ARE
+- `tso-flip` (c48975a86 = code + the reviewers' vetting; the build agent's
+  last bank is 2109bd833, R3.4): THE CODE.  `iris/` is the whole proof
+  tree; `claude-notes/` on this branch is a MIRROR of the tso checkout's
+  docs (endgame doc, this worklist, durable-notes, tso-escrow-box-v2.md),
+  re-copied at each bank -- the reviewers wrote their rulings directly on
+  this branch's copy, and the build agent merged them back to `tso` by
+  `git apply --3way` of the doc diff.  For the merge, `tso-flip`'s copy of
+  the endgame doc is the complete one; `tso`'s worklist has the fuller
+  A6.16x log (identical content since the last mirror, 042fa374c).
+- `tso` (042fa374c): notes only (plus the pre-flip proof tree, stale).
+- The design law: claude-notes/design/tso-escrow-endgame.md (§2 the box,
+  §3 the freshness design, §3.5 "the statements are iris/CtxBox.v", §4.1
+  bcache, §4.2 icache with F1..F30 and the rulings, §4.3-§4.5 R4-R6, §5
+  process rules, §6 post-endgame cleanup, changelog).  Statements are
+  code: CtxBox.v's seven lemmas ((a)-(f) + (g), plus box_alloc_at and the
+  (b') shape-change deposit) are the law's text.
+
+BUILD
+- durable-notes.md has the recipe; in short: on the VM, `cd iris && eval
+  $(opam env --switch=/shared/xv6rocq) && make -f CoqMakefile -j64 -k`.
+  Full tree at R3.4: ONE red, ProofForkretPark.v:345 (the bracketed
+  park_globals frontier, tso-port §0.43′; R5's item).  Admitted: none in
+  CtxBox/IcacheEscrow/IcacheRef/the five inode proofs/the bcache set; the
+  rest of the tree's Admitted are the pre-existing kexec A/B/PinnedA,
+  kfork main, syscall (4), virtio RwF, U-mode shell ones.
+
+MERGE HAZARDS (things main will not have)
+- Xv6Cameras.v: `slot_reg`'s `sr_x : option (X * nat)` (F30) -- every
+  `SlotReg _ true _ (Some x)` on main must become `Some (x, T0)`; the box
+  cameras (`boxG`, `box_names`) live in Xv6Cameras §15 with the icache
+  shape `ic_x`; `icfg_box` names are minted by icfg_alloc (F23).
+- SpecAcquire.v gained `Parameter wp_acquire_llb_fresh_sconf`;
+  SpecAcquiresleep.v gained the NB λ-payload twin
+  `wp_acquiresleep_nb_genl_llb_sconf` (F22; used at Tl := 0 by iput's
+  free path -- the only λ-payload NB tier; keep it).
+- IcacheBox.v is a one-line stub (`Require Export IcacheEscrow.`) kept so
+  older `Require` lines resolve; it is still in `_CoqProject` (line 1117).
+  Delete both at the merge if nothing on main requires it.
+- IcacheEscrow.v REPLACES the old escrow (five arms, ic_id, ic_mid, the
+  swap/open/close lemmas are gone); `ic_deposit cn k d` keeps its name and
+  arity (F19/F23) but is `ic_deposit2 ∗ ic_pay_live`; `is_itable2` carries
+  `ic_escrows` (F26); `itable_slot_res` is the box's L1 row + the stamp
+  row; the sleeplock payload is the λ `ic_slp` (M-6); 59 sleeplock sites
+  in 20 files were swept to the genl tiers.
+- IcacheRef.v: M-5 stamps (`ic_stamps`, `ic_ref_stamps`, `ic_lent_stamps`,
+  `inode_ref_at`); every reference form carries stamps; contexts gained
+  `!icboxG Σ, !kallocG Σ`.
+- bcache: BioInv.v is the v6 instance over CtxBox (bbox_* wrappers with
+  the stamp), BioInitAt the boot, ProofBreadParts/Bread/Brelse/Bpin/
+  Bunpin over it; `bcache_res2` λ payload.
+- `tso-flip` tracks 1316 `iris/*.aux` build artifacts (an old accidental
+  `add`); do NOT carry them to main -- `git rm --cached` them or exclude
+  at the merge.
+- ProofForkretPark.v is red on purpose (the `iExact "Hglobp"` bracket);
+  main's version may differ -- take tso-flip's and leave it red until R5.
+
+LOOSE ENDS (recorded, none blocking the merge)
+- F22's twin is live at Tl := 0; a plain nb_genl tier would be a one-line
+  corollary if ever wanted.
+- The endgame doc's F30 section keeps the build agent's pre-ruling sketch
+  `box_take_L2_in_window`, marked SUPERSEDED/unsound by the reviewers;
+  never in code; trim at §6.
+- CtxBox.v / IcacheEscrow.v header comments say "STATUS: PROVEN"; the word
+  "Admitted" survives only in those comments (a grep hits them).
+- Scratch backups (`*.pre-r3`, `*.pre-g`, `free_body.v`) live only in the
+  build agent's session scratchpad, not in the repo; nothing to merge.
+
+NEXT ROUNDS (per the reviewers, after the merge): R4a inode_pay §4.3,
+R4b off_hold §4.4 (coordinate with the main-side refactor; no bespoke
+third mechanism), R5 the recorded reverts + log_res λ-flip + ForkretPark,
+R6 bucket C to SystemAdequacy, then §6 cleanup.
 - Gotchas: `iEval (cbn [sr_td]) in "Hreg"` after ic_free_take (the
   returned register is `SlotReg (sr_td r) …` with r a literal); the count
   rewrite `Hcnt1 Hpos1` must also hit `Hiu`; the ic_guard_withdraw's
