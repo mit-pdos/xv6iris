@@ -1584,7 +1584,9 @@ do not edit it until told).
   builds Q from it.  The recycler's fraction budget: table 1/2 → 1/4 into Q
   at (a) + 1/4 kept; header 1/4 (out, in hand); pool 1/4; (b′) returns Q's
   quarter BEFORE the flip, which then joins table 1/2 + header 1/4 + pool
-  1/4.
+  1/4.  Measure after F38/F39 (5beee236b, full `make -k`): 33 roots, 138
+  blocked, 1336 green of 1507 -- the root SET is unchanged from r20a's
+  (green did not drop, reviewer 1's tripwire).
 - §6¹⁰ F39 (DONE, this commit): `DepRef` deleted from `ic_dep`
   (Xv6Cameras), from `ic_dep_gname`/`ic_dep_lo` (IcacheRef) and from every
   arm/`destruct` in IcacheEscrow.  Reason recorded at the constructor: under
