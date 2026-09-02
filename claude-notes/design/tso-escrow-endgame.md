@@ -1478,6 +1478,146 @@ context, mapped to CtxBox's lemmas:
   identity-keyed ghost on the ordinary alternative).  The rest of R3
   (recycle, hit, ilock, iunlock, idup, iput's Exit A and last closes) is
   unaffected and proceeds; the free path waits for the ruling.
+  RULING RECOMMENDED (second reviewer, 2026-09-02; for reviewer 2's
+  vetting, then the owner): (B), WITH ONE ADDITION.
+  - Diagnosis confirmed: after the guard's (b) the register is cleared
+    and the IN arm is ∃ x; (e) returns that ∃.  Nothing in the logic
+    remembers x0 although no transition can have touched the arm (the
+    caller holds L1, so (a)–(d) are excluded; (e)/(f) need the
+    sleeplock it is about to take).  A (b)-then-(e) round trip by the
+    same holder is shape-blind by construction; bcache never sees it
+    (buf_pay is keyed by a duplicable global), ic_pay's frozen
+    alternative keys nothing.
+  - (B) is the smaller and more honest fix: the free path never
+    re-deposits the header.  ONE new CtxBox lemma (g) `box_l1_to_l2`,
+    under BOTH locks: takes P_rest out of OUT_L1, closes the L1 register
+    (win := false, sr_x := None), parks the unit's fragment in OUT_L2
+    with hold := Some (i, m), consumes tok into the arm.  Rows: m, T, tp,
+    td unchanged ⇒ (Σ)(I)(C)(D) preserved trivially (the fragment moves
+    from hdr_out to out_l2 inside the body).  Refutation: win agreement
+    selects OUT_L1; nothing else.  The unique both-locks site, which is
+    why a fused transition exists here and nowhere else.  (C) is a new
+    client ghost family at ~13 sites; a box-level shape witness would
+    touch every lemma's body.
+  - THE ADDITION — (g)'s cover.  P_rest is clean at the box stamp T and
+    the caller must show T ≤ K for a floor it holds; (a) derived that
+    from (D), but hdr_out's map is ∃-bound and T is box-internal, so (g)
+    cannot re-derive it from Kd/Kt alone.  Fix as a REGISTER FIELD (the
+    tripwire): the window witness records the stamp it opened at,
+    `sr_x : option (X * nat)`; the OUT_L1 arm ties ⌜sr_x r = Some (x, T)⌝
+    to the body's T; (a)'s post adds the pure ⌜T ≤ Nat.max Kd Kt⌝.  (g)
+    takes the caller's register half and a floor K ≥ T0 by agreement;
+    (b') reads Some (x0, _).  T is stable across the window (no deposit
+    can happen while win = true), so the recorded stamp is exact.
+  - RULE 0 on (g): P_rest x0 ξ ← the arm (win agreement gives x = x0) +
+    the cover (register T0, caller's floor); l2_hold i m ← the L2
+    register update with both halves (the caller holds L2's half from
+    the NB acquire's payload); the closed L1 register ← slot_d update;
+    Q/tok ← the caller's payload pieces into the arm.
+  - CONSEQUENCES: the law is SEVEN lemmas, (g) the only both-locks
+    transition (tripwire reworded to "an eighth"); F22's NB llb twin is
+    unused by this site — do not land it unless another site needs it
+    (else §6); F29's "guard re-deposit at a fresh generation" is moot on
+    the free path (the generation bump lives at the mint, client-side);
+    the free path is (a), (g), [L2 hold: mint, itrunc, iupdate, type :=
+    0, valid := 0], (f), releasesleep, itable re-acquire, last close (a),
+    evict (b'), (d).  The header stays at the caller's ξ across the NB
+    acquire (no sleep; the thread keeps its context regardless).
+  - ONE THING TO WATCH: with (B) + F28 the header is out of the box for
+    all of iput past the guard; the per-slot exact-read stamp row
+    (A6.144, tst) and the pinw count tier are unaffected only if iput's
+    ref-- store still goes through the existing count-store twin under
+    icacheN (it does today; (d) touches only the box's prefix).  One-line
+    check at the site.
+  PROPOSER'S AUDIT (2026-09-02): F30 REAL; (B) WITH THE REGISTER STAMP
+  ACCEPTED.  The diagnosis is the box's own design: (e) is shape-blind by
+  construction (the box keys nothing but identity), and a same-holder (b)
+  then (e) is a round trip the freshness design never had to serve --
+  bcache's payload is keyed by a duplicable global, ic_pay's frozen
+  alternative keys nothing.  Alternatives I checked and reject: (E)
+  leave sr_x = Some x1 at rest after (b) and let an (e) that also holds
+  the L1 register agree the shape -- UNSOUND in general, a park (f)
+  changes the shape without touching the register, and only the open
+  window (win = true, which (e)/(f) refute by a cell) guarantees that no
+  transition intervened; that guarantee is exactly what (g) uses.  (C)
+  a client shape-agreement ghost is a new family at ~13 sites for one
+  site's need.  (B) is the smallest sound mechanism and the one the
+  window already licenses.  Why T must be RECORDED: (a) derived its cover
+  from (D) with the unit in hand; at (g) the unit sits in hdr_out as an
+  ∃-bound m' and T is box-internal, so (g) can neither name T nor re-run
+  (D) -- the register is the one caller↔box channel, so the stamp goes
+  there (the new-box-ghost tripwire, applied) and (a) exports the pure
+  bound.  Rule 0 on (g), statement for CtxBox.v (the build agent lands
+  it with the (a)/(b)/body edits; sr_x : option (X * nat) reaches the
+  bcache wrappers' `Some x0` in a handful of places):
+    body, win = true:  hdr_out γ m ∗ ∃ x, ⌜sr_x r = Some (x, T)⌝ ∗ P_rest x ξb
+    (a) post:          ∃ x0 T0, ⌜T0 ≤ Nat.max Kd Kt⌝ ∗
+                       slotd_half γ (SlotReg td true ident (Some (x0, T0))) ∗
+                       P_hdr ident x0 ξ
+    (b)/(b') premise:  sr_x r = Some (x0, T0)   (T0 unused)
+    (g) box_l1_to_l2 `{CID} N γ ξ (r : slot_reg id X) (x0 : X) (T0 K : nat)
+        (s0 : l2_reg id) E :
+      ↑N ⊆ E → sr_win r = true → sr_x r = Some (x0, T0) → (T0 ≤ K)%nat →
+      lr_hold s0 = None →
+      is_box N γ -∗ own_context ξ -∗ ctx_floor ξ K -∗
+      slotd_half γ r -∗ Q -∗ tok -∗ slotp_half γ s0 ={E}=∗
+      own_context ξ ∗ P_rest x0 ξ ∗
+      slotd_half γ (SlotReg (sr_td r) false (sr_ident r) None) ∗
+      ∃ m, ⌜qsum m = qsum-of-the-arm⌝ ∗ l2_hold γ (sr_ident r) m.
+      (The mass row: state it as ⌜qsum m = nat_Qc c⌝ with the caller's
+      cnt half, or return the map with its reference-side facts; the
+      free path only needs mass 1 for (f)/(d).)
+    producers: P_rest x0 ← the arm (win agreement, x = x0) + the cover
+      (T = T0 by the tie, T0 ≤ K, own_context_floor_view, ctx_absorb_lb);
+      l2_hold ← both slot_p halves (the caller's from the NB acquire's
+      payload); m ← hdr_out's m' (= m by equal sums, keyed by (I), ≠ ∅
+      by Σ at c ≥ 1); the closed register ← both slot_d halves.
+    rows: m, T, td, tp unchanged ⇒ (Σ)(I)(C)(D) untouched.
+  Free path after (g), checked: mint / itrunc / iupdate / type := 0 /
+  valid := 0 on the bundle in hand at the freer's ξ; (f) at IcUnloaded g
+  on the frozen alternative (g unconstrained there -- fine, ∃ in the
+  shape); genin releasesleep folds T'; itable re-acquire at Tl := T';
+  last close (a) at c = 1 with cover (D) via the unit's key T' ≤ Kt;
+  pool insert; (b') at None; (d) at None.  F28's Exit A: (a), the ref--
+  store (the count-store twin under icacheN, not the box), (b') at None,
+  (d) -- (b') before (d) because (d) selects win = false.  F22's twin
+  is landed but unused by this site; keep it out of the free path and
+  list it for §6 unless another site needs it.  The law is SEVEN
+  lemmas; (g) is the unique both-locks transition because iput's free
+  path is the unique both-locks site (bget releases L1 before its
+  acquiresleep).  F23–F29: agreed as recorded; F23 keeps ic_deposit's
+  arity, which was F19's goal.
+  F23–F29 ACCEPTED as recorded (F23: a justified deviation from F19 —
+  inode_ref/inode_shr live at the icfg altitude, and ic_deposit's arity
+  is kept, which was F19's goal; F25: right, tying sr_td to tst would
+  open icacheN at every (b)/(d); F28: the same principle as (B) — once
+  the header is out, never re-deposit until the final (b')).
+  BUILD AGENT, LANDING (2026-09-02, R3.4): (B) + the register stamp landed
+  as ruled, with ONE producer the ruling's list did not name, recorded
+  here for the reviewers' check:
+  - l2_hold's second component is `llb loglen_name (max_stamp m)`, and
+    at (g) the window's fragment m' is ∃-bound inside hdr_out with no
+    llb beside it -- nothing in the box can produce that llb (the box
+    keeps llb T only, and no row bounds max_stamp m by T).  So hdr_out
+    now keeps the fragment's llb: `∃ m', ⌜qsum m' = qsum m⌝ ∗
+    stamps_frag γ m' ∗ llb loglen_name (max_stamp m')`, and (a) takes
+    `llb loglen_name (max_stamp mD)` from the caller -- the llb every
+    reference already carries (the c = 0 callers pass llb 0).  Not a
+    ghost, not a row: the window's fragment travels as a reference does.
+    (The alternative, a pure row "every key ≤ T", touches every lemma's
+    close for the same effect.)
+  - (g) `box_l1_to_l2` is stated at c = 1 (cnt_half γ 1 in and out, mass
+    `nat_Qc 1`), where the free path runs; the m' ≠ ∅ out_l2 needs comes
+    from the mass.  Premises exactly as ruled otherwise: win, sr_x =
+    Some (x0, T0), T0 ≤ K, lr_hold s0 = None; floor K; Q, tok, the L2 half.
+  - (a)'s post is `∃ x0 T0, ⌜T0 ≤ Nat.max Kd Kt⌝ ∗ slotd_half (SlotReg td
+    true ident (Some (x0, T0))) ∗ P_hdr ident x0 ξ`; (b)/(b') take
+    `sr_x r = Some (x0, T0)`; the body's OUT_L1 arm ties `sr_x r =
+    Some (x, T)`.  bcache: bbox_withdraw_L1 exports T0 ≤ Kd (Kt = 0);
+    bbox_deposit_L1 gains T0.  icache: ic_recycle_withdraw / ic_guard_
+    withdraw export the bound, the four deposit wrappers take T0, and
+    the new wrapper `ic_free_take` (the (g) site) returns `ic_hold k dev
+    inum 1` for the caller's ic_body.
 
   (B) AS A STATEMENT (build agent, 2026-09-02, so the ruling is on code;
   the R3.3 bank ec7d87efa has everything else green, ip_free_locked the
@@ -1729,8 +1869,9 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
 6. This file is edited in place; the A6 log records history, not
    current design.
 7. TRIPWIRES (stop and come here if any fires):
-   - a seventh lemma on the box, a fourth arm shape, or a second
-     reference form;
+   - an EIGHTH lemma on the box (seven after F30's (g), the only
+     both-locks transition), a fourth arm shape, or a second reference
+     form;
    - any per-site floor that is not "R1 at Tl := max (snd <$> dom m)" or a
      payload floor row;
    - any need to AGREE a stamp between two holders — (C)/(D) with
@@ -2157,3 +2298,15 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   forgets x at (b)); recommend the OUT_L1 → OUT_L2 transition (B) over a
   client shape-agreement ghost (C).  Needs a ruling; everything else in
   R3 proceeds.
+- 2026-09-02 (second reviewer, F30 ruling recommended): (B) — the
+  both-locks transition (g) OUT_L1 → OUT_L2, one CtxBox lemma with all
+  rows trivially preserved — PLUS the register field: sr_x records the
+  window's stamp (option (X * nat)) so (g) has its cover by agreement.
+  Seven-lemma law; F22's twin unused; F29 moot; free-path sequence
+  recorded; one site check on the count-store twin.  F23–F29 accepted.
+  For reviewer 2's vetting, then the owner's ruling.
+- 2026-09-02 (proposer, F30 audit): (B) + the register stamp ACCEPTED;
+  (E) (keep the shape in the register at rest) rejected as unsound under
+  (f); (C) rejected as a client family for one site.  (g)'s statement,
+  producers and row check recorded in §4.2 for the build agent; the law
+  is seven lemmas, (g) the unique both-locks transition.  F23–F29 agreed.
