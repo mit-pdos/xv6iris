@@ -412,7 +412,7 @@ L10. **Loose ends to carry or refuse from flip** (A6.163): `IcacheBox.v`
 | r21 | the FS-cone consumer sweep incl. FsCollect/FsCollectAll; merge `main` | THE ICACHE BANK: honest-green count ≥ 1132 + the icache cone; zero new admits |
 | r22 | L1 ProcInv keystone | ProcInv green; cone re-enumerated and recorded |
 | r23–r24 | L2 shim sweep, L3 pipe, L4 RiscvAdequacy | no `TsoCtxShim.` outside comments; RiscvAdequacy green |
-| r25 | L5 R4a, L7 const-payload class, L6 R4b (after checking main's fd-row state) | FileInvDefs/FileInv/LogInv λ-shaped; no ξ-bodied cinv left |
+| r25 | L5 R4a, L7 const-payload class (the `is_ftable` λ-flip with `ftable_res`'s floor slot FIRST — F36), then L6 R4b as the off box (§6⁴–§6⁸) | FileInvDefs/FileInv/LogInv λ-shaped; no ξ-bodied cinv left |
 | r26 | L8 R5 | ProofForkretPark green |
 | r27 | L9 bucket C | SystemAdequacy green |
 | r28 | forced `-B` certification, `make audit`, admit inventory, delete `ctx_word4_claim`/TsoCtxShim tombstone/dead `itable_res`; final `main` merge-in | zero red, audit at baseline |
@@ -1086,6 +1086,46 @@ agent's steps 1–4 stand with these folded into step 1 and OffBox's items
 into its code round.
 
 ---------------------------------------------------------------------------
+
+## 6⁹. LANDED (the build agent, 2026-09-02, r19d/r19e): the edit, the answers taken
+
+THE EDIT IS IN `iris/CtxBox.v` (r19d, 11a291dfe + 0922843b7), proven, no
+Admitted: the register-selected arms (`box_arm` public, `box_rows` the four
+pure rows, the body `∃ …, ghosts ∗ ⌜box_rows⌝ ∗ box_arm`), no
+`tok`/`P_hdr_excl`/`P_rest_excl`, Q in both out arms ((a) takes it, (b)/(b′)
+return it, (g) exchanges it), (e′) `box_checkout_split` with the caller
+residue `Qc` (F33) and (f′) `box_park_join`, with (e)/(f) their instances,
+and the two non-transition accessors `box_q_update` and `box_view`.  The
+proofs are CtxBox's with the case selection changed.  `box_alloc_at` takes
+the whole variables (the skeleton's shape); `box_alloc_at_halves` keeps the
+bcache boot's split-in shape.  `CtxBoxNext.v` is folded in and deleted;
+`OffBox.v` imports CtxBox (its statements type-check, Admitted as
+delivered; F34/F35 are the designer's).  THE LAW reads: seven transitions
+((a)–(g), with (b′)/(e′)/(f′) the shape generalizations) plus two
+non-transition accessors.
+
+THE INSTANCES (r19d/r19e):
+- bcache: `buf_box` at `bioxN .@ k`; `bown` rides the holder's handle
+  `bstok` (bread/bwrite/brelse thread it); no other change.
+- icache: `ic_box` at `icBoxN .@ k`; `ic_tok` rides `ic_slp` beside the L2
+  row; `ic_q := (∃ d, ic_deposit ½ d ∗ ic_q_side d) ∨ ic_pin_tx k ∨
+  ic_q_recycle k` with `ic_q_recycle := emp` (Q2 as ruled: the recycler's
+  (a) deposits emp, the pool take / identity flip / deposit happen inside
+  the (b′) wrapper's fupd with `ipool_inv` open beside the box — r20's
+  site); the guard's (a) deposits `ic_pin_tx`; the deposits return Q and
+  (g) exchanges it.
+- P3 / Q1 / Q3 as ruled: `ic_hdr cn …` carries the box's QUARTER of
+  `ic_id` (true at the identity; false with ∃-bound values when dead) and,
+  when dead, `ic_pin_rest k`; `islot_empty`/`islot2` keep a HALF; the pool
+  invariant its quarter.  Boot splits 1 → ½ + ¼ + ¼.  `sr_ident` and
+  `ic_id` agree by the header's definition.
+- Q4: `box_q_update` is in; main's `ic_shrink_tx`/`ic_grow_tx` return over
+  it at r20/r21.  Q5: `box_view` is in; `ic_slot_cover` is stated over
+  `box_arm` at r21.
+
+ORDER (§5) amended per F36: L7 (the `is_ftable` λ-flip with a floor slot in
+`ftable_res`, the `_in` releases at filealloc/filedup/fileclose) moves
+AHEAD of L6 (the off box); L6 waits for the OffBox skeleton's F34/F35 fixes.
 
 ## 7. Process and tooling (measured facts, not preferences)
 

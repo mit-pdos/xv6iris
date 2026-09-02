@@ -1541,3 +1541,19 @@ main's durable-disk ghost rides beside it, exactly per the endgame plan §3.4:
   ProofSysExec), the pipe proofs, FsCollectAll (`ic_slot_cover`),
   RiscvAdequacy.  Green: IcacheRef, IcacheInv, IcacheEscrow, IcacheBoot,
   IcachePinwObl, FsCfgKits, FsCfgSnap, ProcInv.
+
+## 12.7 r19d/r19e — the CtxBox edit landed and the icache re-instantiated (2026-09-02)
+
+See tso-cutover-endgame.md §6⁵–§6⁹.  In code: `CtxBox.v`'s Section box is
+the ruled edit (register-selected `box_arm`, `box_rows`, Q in both out arms,
+(e′)/(f′) with `Qc`, `box_q_update`, `box_view`, `box_alloc_at` whole-in and
+`box_alloc_at_halves` split-in), every proof adapted from CtxBox's; BioInv
+and the bread/brelse/bwrite proofs drop the token from the box (it rides
+`bstok`); IcacheEscrow's wrappers drop the token and the exclusivity
+arguments, take/return Q at (a)/(b′)/(g), sit at `icBoxN .@ k` (the
+`↑icBoxN ⊆ E` premise stays; the slot inclusion is derived inside);
+`ic_hdr cn …` carries the identification quarter and the resting pin;
+IcacheBoot splits the identity 1 → ½ + ¼ + ¼ and hands the pin to the dead
+header.  `CtxBoxNext.v` deleted; `OffBox.v` retargeted to CtxBox.  Green:
+CtxBox, BioInv, BioInitAt, ProofBreadParts/Bread/Brelse/Bwrite, IcacheEscrow,
+IcacheBoot, OffBox (Admitted as delivered).

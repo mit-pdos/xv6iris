@@ -1321,17 +1321,6 @@ Section IcacheBootTable.
          straight through.
      [icache_boot] below is this lemma plus the two mints, so there is one
      body and the old signature is a corollary. *)
-  (* THE STITCH: the table keeps 3/4 of the identification ghost (see
-     [IcacheEscrow.islot_empty]) and the pool invariant the remaining
-     quarter; one split at the boot re-tag. *)
-  Local Lemma ic_id_split_34 (cn : ic_names) (k : nat) (v : bool)
-      (d n : mword 32) :
-    ic_id cn k 1 v d n -∗ ic_id cn k (3/4) v d n ∗ ic_id cn k (1/4) v d n.
-  Proof.
-    iIntros "H".
-    assert (Hq : (1 : Qp) = (3/4 + 1/4)%Qp) by compute_done.
-    rewrite {1}Hq. iApply (ic_id_split_q cn k (3/4) (1/4) with "H").
-  Qed.
 
   (* A6.145 (tso-flip): the fifty FREE pinw slots -- the first NINODE
      liveness units park whole, the shadow batch mints the selectors
@@ -1474,34 +1463,40 @@ Section IcacheBootTable.
     iDestruct (big_sepL_sep_2 with "Hid Hvalid") as "H1".
     iDestruct (big_sepL_sep_2 with "H1 Hmirror") as "H2".
     iDestruct (big_sepL_sep_2 with "H2 Hgid") as "H3".
+    iDestruct (big_sepL_sep_2 with "H3 Hhpn") as "H3".
     iDestruct (big_sepL_sep_2 with "Hbox H3") as "Hall".
     iAssert ([∗ list] k ∈ seq 0 NINODE,
                |==> (CtxBox.stamps_auth (X := ic_x) (icfg_box k) ∅ ∗
                      ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
                      ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
                      ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid) ∗
-                     ic_hdr γfs γi cov logstart k None IcRaw cur_ctx ∗
+                     ic_hdr cn γfs γi cov logstart k None IcRaw cur_ctx ∗
                      ic_rest k IcRaw cur_ctx) ∗
                     (islot_empty cn k ∗
                      ic_id cn k (1/4) false (dvs k).1 (dvs k).2))%I
       with "[Hall]" as "Hall".
     { iApply (big_sepL_mono with "Hall"). intros idx k _.
-      iIntros "[(Hst & Hc & Hrd & Hrp) ((([Hd Hn] & (%w & Hv)) & Hmir) & Hgd)]".
-      (* the caller minted this variable blind; WRITE what the cells say. *)
+      iIntros "[(Hst & Hc & Hrd & Hrp) (((([Hd Hn] & (%w & Hv)) & Hmir) & Hgd) & Hpin)]".
+      (* the caller minted this variable blind; WRITE what the cells say.
+         Then the three shares: the table's half, the box header's quarter,
+         the pool invariant's quarter (§6⁸ Q1). *)
       iDestruct "Hgd" as (v0 d0 n0) "Hgd".
       iMod (ic_id_set _ _ _ _ _ false (dvs k).1 (dvs k).2 with "Hgd") as "Hgd".
-      iDestruct (ic_id_split_34 with "Hgd") as "[Hgd1 Hgd2]".
+      iDestruct (ic_id_split_half with "Hgd") as "[Hgd1 Hgd2]".
+      iDestruct (ic_id_quarters_split with "Hgd2") as "[Hgdh Hgd2]".
       iDestruct (ctx_word4_pointsto_half_split with "Hd") as "[Hd1 Hd2]".
       iDestruct (ctx_word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
       iDestruct "Hmir" as "[(%dn & Hmeta) Haddrs]".
       iDestruct "Hmeta" as "(Hty & Hmaj & Hmin & Hnl & Hsz)".
       iModIntro.
       iSplitR "Hd2 Hn2 Hgd1 Hgd2".
-      { iFrame "Hst Hc Hrd Hrp". iSplitL "Hv Hd1 Hn1 Hnl".
+      { iFrame "Hst Hc Hrd Hrp". iSplitL "Hv Hd1 Hn1 Hnl Hpin Hgdh".
         { rewrite /ic_hdr /ic_hdr_amb. iSplitR; [done |].
           iSplitL "Hv"; [iExists w; iExact "Hv" |].
           iSplitL "Hd1 Hn1"; [iExists (dvs k).1, (dvs k).2; rewrite /inode_ident; iFrame "Hd1 Hn1" |].
-          iExists (di_nlink dn). iExact "Hnl". }
+          iSplitL "Hnl"; [iExists (di_nlink dn); iExact "Hnl" |].
+          iSplitL "Hpin"; [rewrite /ic_pin_rest; iExact "Hpin" |].
+          iExists (dvs k).1, (dvs k).2. iExact "Hgdh". }
         rewrite /ic_rest /ic_rest_amb. iSplitL "Hty Hmaj Hmin Hsz".
         { iExists dn. rewrite /ic_meta_rest. iFrame "Hty Hmaj Hmin Hsz". }
         iExact "Haddrs". }
