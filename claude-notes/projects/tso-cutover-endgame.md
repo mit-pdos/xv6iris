@@ -715,7 +715,14 @@ and law 10 (hooks).
     complete up to `is_ftable_morph`) are saved as a patch outside the tree
     (`/shared/xv6iris-2-l8-park.patch`), the worktree is clean.  Owner's
     stated order once ruled: L5 + minimal L7 first, then L8/L9 in parallel
-    with the real L7 (floor slot, `_in` releases) + L6.
+    with the real L7 (floor slot, `_in` releases) + L6.  L6 CHECKED the
+    same day (note §7): main has not dissolved `f->off` (still in
+    `ioff_escrow` on main HEAD; fd-row-pilot rules no offset carrier), so
+    L6 is the box; `ic_slp` has no off-row set yet (mitigation (1) was not
+    taken); F36's floor slot is `∃ Kd, ctx_floor ξ Kd` in `ftable_res_at`
+    with `_in` releases.  OffBox.v's 14 proofs STARTED in parallel (no
+    consumer touched).  Q5 asks the reviewers to fix all three final shapes
+    in one round.
 
 ## 10. Process and tooling (measured facts)
 

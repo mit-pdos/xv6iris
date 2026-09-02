@@ -165,3 +165,49 @@ Q4. L8's second crossing as built: twin the parker's token, `ctx_move` the
     `ctx_parked_raise` to lift the box's floor to the twin's stamp.  Any
     objection to raising the box floor after the deposits rather than
     depositing before the park?
+
+## 7. L6 (the off box) — what it needs from the same ruling, checked 2026-09-02
+
+Verified against the code and against `origin/main`:
+
+- MAIN HAS NOT DISSOLVED `f->off`.  main is three commits past the merge
+  base (an upstream pointer, a dead-import sweep and its revert); on main
+  HEAD the FD_INODE cell is still `off_resident k` inside the per-inode
+  ledger invariant `ioff_escrow i` (`FileInvDefs.v`), and
+  `design/fd-row-pilot.md` rules "no offset carrier: `f->off` stays behind
+  `file_pay`".  So L6 is the box, not a merge (plan L6's "coordinate with
+  main" is settled).
+- `ic_slp` on the cutover carries NO off-row set yet (`IcacheEscrow.v:4612`:
+  `∃ s, l2_row s ξ ∗ ic_tok ∗ ic_dep_neutral`), so the log's mitigation (1)
+  was not taken before r21: L6 will reopen the seven inode proofs at their
+  iunlock folds.  `OffBox.off_rows on i ξ` IS the conjunct the plan
+  specifies (`own (on_set on i) (● L) ∗ [∗ set] γ ∈ L, ∃ s, off_l2_row γ s ξ`,
+  with `off_l2_row` = `l2_row ∗ llb (lr_tp s)`), so the change is
+  `ic_slp cn k ξ := … ∗ off_rows on k ξ` plus the fold (`ic_slp_fold` gains
+  the off rows' maximum through `llb`).
+- F36, made concrete: `OffBox.off_reclaim` (the last close) takes
+  `ctx_floor ξ Kd` with `sr_td r ≤ Kd`, and `off_l1_row γ k c tl` (the L1
+  half that rides ftable's payload for the box's life) carries
+  `llb (sr_td r) ∗ ⌜sr_td r ≤ tl⌝`.  The closer holds ftable.lock, so the
+  floor has to come out of ftable's PAYLOAD: `ftable_res_at γ ξ` gains one
+  floor row, `∃ Kd, ctx_floor ξ Kd`, every allocated slot's `tl ≤ Kd`, and
+  the eight releases become `SpecRelease.wp_release_in_sconf` releases that
+  re-floor the payload at the releaser's context through a fold of the
+  shape `IcacheEscrow.ic_slp_fold` (`ic_slp_dep ∗ ctx_floor ξ T' ⊢ ic_slp ξ`).
+  That is why the plan says L7 (with the floor slot) precedes L6.
+- `fslot`'s allocated arm carries `off_l1_row γ k c tl` (F37) and the fd row
+  `off_fd_row on i k μ` (`off_box ∗ off_member ∗ off_ref_stamps`); the free
+  arm keeps the cell (`foff`'s FD_NONE spelling) and no box.
+- STARTED IN PARALLEL (2026-09-02): the 14 `Admitted` of `OffBox.v` — pure
+  CtxBox-instance algebra, no consumer touched, no ruling needed — are
+  being proved by a background agent in the cutover worktree (OffBox.v
+  only, not committed until green).
+
+Q5. Given §7, should the reviewers fix ALL THREE final shapes in this round
+    — `inode_pay` (§3 D1), `ftable_res_at` WITH the floor row (the F36
+    slot, not the λ-only interim of Q3), and `ic_slp ∗ off_rows` — so the
+    six file proofs and the seven inode proofs are swept ONCE (the log's
+    mitigation (2))?  The owner's parallelism (L8/L9 beside the real
+    L7+L6) is then: land L5 + the full `ftable_res_at` first (one pass over
+    the eight lock sites), L8/L9 on one lane, `ic_slp ∗ off_rows` + the
+    OffBox consumers on the other.
