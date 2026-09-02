@@ -18521,7 +18521,9 @@ NEXT: R1' per §4.1 once F1 is vetted (or as F1 says, absent objection).
   the fresh generation) and wp_iput_gen's two exits -- with ip_free_locked
   the ONE Admitted in the icache files (F30).  The NB twin re-verified
   (SpecAcquire, SpecAcquiresleep, ProofAcquiresleep green).  Full tree:
-  one red, ProofForkretPark's bracketed park_globals frontier (A6.160).
+  one red, ProofForkretPark's bracketed park_globals frontier (A6.160);
+  confirmed by a clean `make -B` round after the bank.  (B)'s statement
+  (box_take_L2_in_window) is in the endgame doc's F30 for the ruling.
   Compile-iteration gotchas worth keeping: ip_rows' `if decide` is best
   opened through the two equivalences `ip_rows_one` / `ip_rows_ne`
   (`case_decide` inside) rather than `rewrite decide_True` at sites (the
