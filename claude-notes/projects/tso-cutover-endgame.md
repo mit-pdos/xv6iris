@@ -544,164 +544,16 @@ and law 10 (hooks).
 7. (vi) The pre-existing main Admitted set is outside the gate — confirmed
    by both reviewers; (vii) merge-main cadence every bank, one landing —
    confirmed.
-8. **The port's Admitted inventory** must list OffBox's 14 until r25
-   clears them.
-9. **Q10 — RULED option B (both reviewers, 2026-09-02), IMPLEMENTED in r20b-7 (`ic_evict_withdraw_frz`, `ic_park_frz`; A12.13).  Original text follows.**  (build agent, 2026-09-02, found while fusing ProofIput) — THE
-   WINDOW PIN'S NAME-HALF IS CONSUMED BY THE LAST CLOSE'S (a).  Needs a
-   ruling; two options below, the second recommended.
-   - THE FACT.  `ic_pin_tx k := ∃ t q, hpn_h k (Some (t,q)) ∗ tx_pin t q`
-     (`hpn_h` = ½).  Main's movers recover the returning share's `(t,q)`
-     from the residue's ∃ ONLY by agreement with the half the walk KEPT
-     (`ic_pin_exit k t q : hpn_h k (Some (t,q)) -∗ ic_pin_tx k ==∗ hpn_full
-     k None ∗ t ↪{q}`).  Under the box this works at the guard (Exit A's
-     (b′) and the free path's (g) return `Q1 1` while iput still holds its
-     half).  It BREAKS at the free path's last close: after (g) and the
-     frozen park (f′), F42′ puts one pin half in the header's frozen
-     alternative (`frzsel ¼ ∗ ic_pin_tx k`) and the other in iput's hand;
-     at +0x8a the box's (a) at c = 1 DEMANDS `Q1 1 = ic_pin_tx k` as a
-     premise, and the only half iput has is the name-half.  Depositing it,
-     iput gets the alternative's pin out (∃ t' q') and, after (b′), `Q1 1`
-     back (∃ t'' q''): two anonymous halves agree with each other and with
-     nothing iput knows, so the returning shares cannot be shown to be
-     `(tid, ·)` and the post `tid ↪[ln_tx]{#qtx} ()` (and the transit row's
-     `(t,q)`, and the join with the freeze index's half) is unprovable.
-     Provability, not soundness; F42′'s "the two halves are in the frozen
-     alternative and iput's hand" did not account for (a) taking the hand's
-     half.  Not reachable by any of the five green inode proofs (they see
-     `hpn_full` and `ic_pin_tx` opaquely); ProofIget does not enter a pin.
-   - REJECTED: parking an anonymous share alone in the alternative (the
-     share's identity is lost the same way); recording `(t,q)` in the
-     header (`ic_pay` at `IcUnloaded g` has no slot; changes `ic_x`); a
-     persistent snapshot of the pin (`hpn_at` is `frac_agree`, none).
-   - OPTION A — QUARTERS (ghost-only, icache-local): `ic_pin_tx k := ∃ t q,
-     hpn_at k ¼ (Some (t,q)) ∗ tx_pin t q`; a pin enter leaves the walk ¾;
-     at the last close it splits ¾ into a ¼-pin for `Q1 1` and a KNOWN ½;
-     both returning quarters agree with the kept ½ and the four rejoin to
-     the full cell → `None` → `ic_pin_rest` for the dead row.  Touches
-     `ic_pin_tx` and its movers in `IcacheEscrow.v` only (`hpn_at` is
-     already fraction-generic); no box change; nothing green reopens.
-   - OPTION B — THE HOOKED (a) (recommended; it is what §6²⁷/§3.2b's
-     `box_withdraw_L1_hook` was built for: "the guard's pin … could be
-     produced here"): at +0x8a iput calls `box_withdraw_L1_hook` with
-     `Qc := ifreeze_pre rg inum`, hook `Qc ∗ ic_hdr … x ξ' ={E∖↑N}=∗
-     ic_hdr_frz … x ξ' ∗ ic_pin_tx k` — the hook decides the header's arm
-     (the ordinary alternative dies on `ifreeze_excl` against `ifreeze_pre`,
-     exactly flip's decision, now inside the hook) and MOVES the frozen
-     alternative's own pin into `Q1 1`; `P_hdr'` is the header with the
-     alternative reduced to `frzsel ¼ true`.  iput's known half never
-     leaves its hand; (b′) returns the alternative's pin and `ic_pin_exit`
-     recovers `(tid, q)` as on main.  One new wrapper
-     (`ic_evict_withdraw_frz`, the hooked (a) at c = 1), no ghost change,
-     no CtxBox change (law 10: the need is met by the hook of the
-     transition it belongs to).  The fraction plan then closes with
-     halves: the window half `w = qtx/2`; `w/2` into the guard's pin at
-     +0x3a and `w/2` kept; (g) returns the pin (both halves in hand);
-     `w/2` into `Q2`'s `DepFrz` side at (g), back as `Q'` at (f′); the
-     frozen alternative's pin takes `w/2` at (f′); at +0x8a the alternative's
-     pin comes out through the hook, `ipool_evict_lend` parks the `Q'` half
-     `(tid, w/2)` in the transit row, (b′) returns the pin's `w/2`, the
-     off-lock deposit returns the corpse's `w/2`: `w` at
-     `ip_locked_exit1`, `qtx` after the join with the freeze index's half
-     in `wp_iput_gen` (main's C-6 plan, one level down).
-   - EITHER WAY the `ip_rows`/`ip_window` seam of the tail gains the pin
-     half and the kept share (Exit A keeps the window open into the
-     eviction, F28; the tail's (b′) returns `Q1 1` there), and F42′'s prose
-     is corrected to name which half is where.
-   STATUS OF ITEM 1: the recycle wrappers are on `CtxBoxHooked` (`ic_recycle_flip`
-   = `box_q1_update` with `ipool_take_lend` inside, all five mask premises;
-   `ic_recycle_deposit` = `box_deposit_L1_hook` with the join; `Q1 0`
-   two-armed); `IcacheEscrow`/`IcacheBoot` green on the VM with them;
-   ProofIget fused and building.  The CtxBox.v draft of (b″) is withdrawn.
-   - **REVIEWER 1 (2026-09-02): TAKE B.**  The fact is right: `ic_pin_exit`
-     recovers `(t, q)` only by agreement with the half the walk KEPT, so
-     the plain (a)'s `Q1 1` premise would spend it; F42′'s prose did not
-     account for (a) taking the hand's half.  Provability, not soundness.
-     B over A: (i) it is exactly what `box_withdraw_L1_hook` exists for --
-     the hook produces `Q1 1` FROM the header, so the alternative's own pin
-     moves into the residue and the name-half never leaves iput's hand;
-     the first client use of the (a) hook, the case §6¹³ reached for and
-     §6²⁷ widened to; (ii) it keeps main's ghost verbatim (stitch rule) --
-     A re-spells the pin's fraction and every mover for one site, though
-     `hpn_at` being fraction-generic would carry it; (iii) the refutation
-     the hook needs is PURE: `ifreeze_excl` is an `own_valid_2` exclusion,
-     so the ordinary alternative dies inside the hook with no invariant
-     open.  The fraction plan closes: at every point exactly one w/2 sits
-     in an invariant-visible place (the guard's pin, then `Q2`'s DepFrz
-     side, then the frozen alternative's pin, then `Q1 1` beside the
-     transit row) while iput holds the other, until (b′) and the corpse
-     return both (the phrase "the Q' half" for the transit-row share is
-     loose -- that w/2 is iput's kept one -- but the arithmetic is right).
-     THREE CONDITIONS: (1) the hook CONSUMES `Qc`; in the frozen case
-     `ifreeze_pre` is not spent, so if iput needs it afterwards it rides
-     back out in `P_hdr'` (`ic_hdr_frz`), a client choice -- state it, do
-     not discover it at the join; (2) the hook is quantified over every x:
-     `ic_pay … IcRaw = False`, the frozen alternative exists at
-     `IcUnloaded` and `IcLoaded` -- discharge all three explicitly rather
-     than lean on `sr_x`; (3) correct F42′'s prose: the alternative holds
-     one half, iput the NAME-half, and the last close's (a) takes the
-     alternative's half through the hook, never the hand's.
-     On item 1's status: the recycle wrappers on `CtxBoxHooked` are the
-     module's intended use and withdrawing CtxBox.v's (b″) draft is right;
-     not yet on the remote, so unchecked here.  Once landed the module is
-     load-bearing and r20c's slot-in is: move the hooks into CtxBox.v,
-     repoint the two wrappers.
-   - **THE BOX'S DESIGNER (2026-09-02): B, and it closes.**  Checked
-     against the tree, not the prose:
-     (i) THE FACT.  `ic_pin_exit` (IcacheEscrow.v:1440) recovers `(t, q)`
-         only by `hpn_agree` between the residue's half and the half in
-         hand; the plain (a) at c = 1 takes `Q1 1 = ic_pin_tx k` as a
-         premise, and at the last close the only half in hand is the
-         name-half.  Two anonymous halves after (b′).  Correct, and
-         provability only.
-     (ii) THE HOOK'S DISCHARGE IS TOTAL.  `box_withdraw_L1_hook`
-         (CtxBoxHooked.v:141) quantifies the hook over every `x` and `ξ'`
-         at `sr_ident r`, which iput's register half fixes at
-         `Some (dev, inum)`.  `ic_hdr_amb` at `Some` (IcacheEscrow.v:3513)
-         carries `ic_pay … inum x`: `IcRaw ↦ False`; `IcUnloaded`/
-         `IcLoaded ↦ ordinary ∨ frozen`, the ordinary alternative holding
-         `ifreeze_off inum`.  `ifreeze_excl` (IcacheRef.v:1530) is
-         `own_valid_2` on one exclusive cell -- no mask, no invariant --
-         and iput holds `ifreeze_pre` in hand to +0x8a (ProofIput.v:3171
-         decides the same alternative by it today).  So the hook's three
-         cases are False / False / take `ic_pin_tx` out, and `Q1 1` is
-         `ic_pin_tx k` by `ic_q1`'s S-clause.  Nothing is left to the
-         register's `sr_x`.
-     (iii) THE ONE PREMISE THE PLAN DOES NOT NAME: the (a) hook requires
-         `∀ i x, CtxMorph (P_hdr' i x)` -- the withdrawn header is absorbed
-         at ξ after the hook, unlike (b)'s `P_hdr'`, which is a premise at
-         ξ and needs no instance.  `ic_hdr_frz` therefore needs a
-         `CtxMorph` instance; it is `ic_hdr_morph`'s `Some` branch with the
-         payload conjunct replaced by `ctx_morph_const`, and the `None`
-         branch may be `ic_hdr None x` or `False`.  A deliverable, one
-         screen, name it.
-     (iv) CONDITION (1) DECIDED NOW, not at the join: `ifreeze_pre` is
-         needed after the hook (the +0x8a AU's FrzPre → FrzPost step,
-         ProofIput.v:2390), so `ic_hdr_frz` CARRIES IT OUT -- the hook
-         reads it for the refutation in the ordinary case and returns it
-         beside `frzsel k ¼ true` in the frozen case.  `ic_hdr_frz` gains
-         the freeze index as a parameter; it is ghost, so (iii)'s instance
-         is unchanged.
-     (v) THE FRACTION PLAN.  The alternative's pin was entered at (f′) by
-         `ic_pin_enter` from `hpn_full None`, so its half and iput's kept
-         half NAME THE SAME `(tid, w/2)`; `ic_pin_exit` after (b′) recovers
-         exactly that share.  Reviewer 1's accounting (one w/2 always
-         invariant-visible, one in hand) checks.  The viewer is untouched:
-         the window between the hooked (a) and (b′) is OUT_L1 c = 1 with
-         `Q1 1` the alternative's pin, positive share, refuted at
-         quiescence as before (law 9 unchanged; law 10 says hooks are
-         invisible to the viewer, and this one is).
-     (vi) A NOT B, for the record: A re-spells `hpn` to quarters and every
-         mover; it also LEAVES the plain (a) spending a half that has a
-         name, which is the shape that hid this bug -- B removes the shape.
-     WHAT REMAINS FOR THE CLOSE, in order: (1) item 1's landing (the
-     recycle wrappers on `CtxBoxHooked`, two-armed `Q1 0`), unchecked
-     here because not on the remote; (2) `ic_evict_withdraw_frz` +
-     `ic_hdr_frz` + its instance, ProofIput's +0x8a on it, F42′'s prose
-     corrected; (3) ITEM 2 BEFORE EITHER PROOF IS CALLED DONE:
-     `ic_slot_cover` stated over `box_arm` -- every viewer argument in this
-     file, F38/F44, Q9's live arm, OUT_L2's DepRd read, is prose until that
-     statement type-checks; the residues' final shapes are being landed
-     this round, so this is the moment.  Nothing else open on Q10.
+8. **The port's Admitted inventory** — CLOSED (2026-09-02): OffBox.v's 14
+    are proved (background agent, same day); `grep Admitted iris/*.v` finds
+    no code-line admit in the tree.  Three skeleton statements were
+    corrected to be provable, each flagged `STATEMENT CHANGE` in the file:
+    `off_filealloc` (the cell at ξ, not the ambient; the `↑(offBoxN.@k) ⊆ E`
+    mask for the birth unit's `box_ref_incr`; the count ghost pinned to
+    `kalloc_count_inG` as BioInv/IcacheEscrow do), `off_dup` and `off_close`
+    (`sr_ident r = k`, which `off_l1_row` already carries).  One helper
+    added (`off_rows_insert_row`, the park's form of the append).  Original
+    text: "must list OffBox's 14 until r25".
 
 ---------------------------------------------------------------------------
 
@@ -739,7 +591,8 @@ and law 10 (hooks).
     structural; `FirstTok.first_fsinit_morph` landed.  In flight: OffBox's
     14 proofs (main worktree) and ONE agent in an isolated worktree for
     the log lock λ-flip, the sleep-lock handle morph and the class-A
-    wrapper instances (`EnvMorph.v`).15. **REVIEWER 1 ON ITEM 14 AND `inode-pay-r4a.md` §1–§8 (2026-09-02).**  Read
+    wrapper instances (`EnvMorph.v`).  OffBox DONE (item 8).
+15. **REVIEWER 1 ON ITEM 14 AND `inode-pay-r4a.md` §1–§8 (2026-09-02).**  Read
     against the code: `inode_pay`, `inode_held_short`, `inode_ref_short`,
     `live_fracc`, `cred_floor`, `inode_shr_held_gen`, `lk_floor` and its
     morph, `live_genlo` (frac-agree on `(g, lo)`), `ctx_floor_dom`,
