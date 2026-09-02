@@ -126,10 +126,12 @@ instance is declared by:
                 under itable.lock before its acquiresleep);
         P_rest = everything else (bcache: data, disk, pay; icache: the
                 in-memory dinode fields).
-  - residue Q : iProp   (ξ-FREE ghost — the L2 exclusivity token, the
-                         L2 payload's slot_p half, and ONE HALF of the
-                         chain's stamps fragment (F7 split); the other
-                         half rides the holder's handle row)
+  - residue Q : iProp   (the client's ξ-FREE ghost; bcache: emp).  The
+                         OUT_L2 arm is Q ∗ tok ∗ the holder's WHOLE
+                         stamps fragment, named — keys and mass — by
+                         the L2 register's [hold] field (F7, final
+                         form: no split).  The L2 payload's register
+                         half rides the holder's handle row meanwhile.
   - guard locks L1, L2  (bcache: bcache.lock / b->sleeplock;
                          icache: itable.lock / ip->sleeplock)
   - the stamped-shares ghost (§3.2)
@@ -481,7 +483,35 @@ ACCEPTED.  R1' may start on the flag shape.
         icache share during ilock→iunlock (the locked handle is at the
         holder's ξ, so its ξ-cells may ride there), once R3's site map
         confirms which files use that row as a token.
-      R1' MAY RESUME on F7 with the split.
+      PROPOSER'S REVIEW (2026-09-01) — THE SPLIT HAS A MASS GAP, and the
+      fix is a field, not a split.  After (f) rejoins, the parker holds
+      "its half + Q's fragment", and Q's fragment is ∃-BOUND inside the
+      arm: nothing in hand says its mass is the other half.  So the
+      rejoined unit has unknown mass and brelse's (d), which must remove
+      exactly one unit to keep Σ m = c, cannot be called.  The register
+      that already sits between the L2 side and the box is the place to
+      record what was parked: `slot_p : ghost_var l2_reg`,
+      `l2_reg := {| tp : nat; hold : option (id * gmap (id*nat) ufrac) |}`.
+        (e) parks the holder's WHOLE fragment ◯ mh in OUT_L2 and sets
+            hold := Some (i, mh) on both halves (the payload's half is in
+            the winner's hand from bslp); the payload's half then rides
+            the holder's handle row (F7's tool) as `l2_hold`.
+        (f) agrees on slot_p ⇒ the arm's fragment IS (i, mh): known keys,
+            known mass; (I) on mh ⇒ i = r.ident; deposit; move mh to
+            {[(i, T') := mass mh]}; hold := None, tp := T' on both halves.
+        (a) refutes OUT_L2 by the parked fragment's mass (whole, not
+            half) against Σ — as before, stronger.
+        L2's row at rest states hold = None, so releasesleep mid-checkout
+        is impossible by the payload's shape (the L1 bonus rule's twin).
+      Symmetric design: EACH lock side has ONE register record shared
+      with the box, and everything that side must tell the box is a
+      field of it (the new-box-ghost tripwire, applied).  No split, no
+      half-fragment share, no mass arithmetic at (f).  The handle row:
+        bstok bn k pidv dev bno := sleeplocked … pidv ∗ bref_tok0 ∗
+                                   l2_hold γ (dev,bno) mh   (∃ mh)
+      THE STATEMENTS ARE NOW CODE: iris/CtxBox.v (type-checked skeleton,
+      proofs Admitted, case skeleton per lemma) — see §3.5.
+      R1' MAY RESUME on CtxBox.v's statements.
 
   F8  (second reviewer, 2026-09-01, on re-walking the design) P_hdr AND
       P_rest SHARE BINDERS.  bcache's buf_pay v dev bno bs depends on
@@ -550,10 +580,15 @@ disjunct.
     from (id, t) to (id, T') (dealloc + alloc; Qp addition is
     cancelable); (b) re-mints the unit at the new identity.  ufrac, not
     frac: several units may sit at one key.
-  - `slot_p : ghost_var nat`, `slot_d : ghost_var slot_reg` with
-    `slot_reg := {| td : nat; win : bool; ident : id |}` — half in the
-    box, half in the L2 / L1 payload beside that payload's floor row
-    `ctx_floor ξ Tp` / `ctx_floor ξ r.td`.  `win` is the window flag
+  - `slot_d : ghost_var slot_reg`, `slot_reg := {| td : nat; win : bool;
+    ident : id |}` — THE L1 SLOT REGISTER: half in the box, half in L1's
+    payload row beside `ctx_floor ξ r.td`.
+  - `slot_p : ghost_var l2_reg`, `l2_reg := {| tp : nat; hold : option
+    (id * gmap (id*nat) ufrac) |}` — THE L2 SLOT REGISTER: half in the
+    box, half in L2's payload row beside `ctx_floor ξ s.tp` at rest
+    (hold = None), or in the L2 holder's handle row during a checkout
+    (hold = Some (i, mh): exactly the fragment parked in OUT_L2, F7).
+    Continuing the previous item:  `win` is the window flag
     (§2); `ident` the box's current identity (F6).  The L1 row states
     win = false and ident = (devs k, bnos k), and also carries
     `llb loglen_name r.td`, so a release that leaves td unchanged can
@@ -566,6 +601,7 @@ disjunct.
 
     ref / share := ∃ m, stamps ◯ m ∗ llb loglen_name (max (snd <$> dom m))
                    with ⌜∀ p ∈ dom m, p.1 = id⌝ for the holder's known id
+    (= CtxBox.reference γ id m)
 
 plus the client's token/cells: bcache `bref := bref_tok ∗ ref ∗ the
 dev/bno fractions` (bpin's / the log layer's), `bchain := bref_tok0 ∗
@@ -586,63 +622,62 @@ where it is needed.
     what
     those payloads' floor rows say.
 
-### 3.5 The six lemmas (each re-establishes (C), (D), Σ m = c)
+### 3.5 The six lemmas — THE STATEMENTS ARE iris/CtxBox.v
 
-  (a) withdraw_L1 (under L1; IN → OUT_L1).  Premises: `ctx_floor ξ Kd`,
-      `r.td ≤ Kd` (L1's row); the cnt half at c; if c ≠ 0 the caller's
-      WHOLE unit `◯ m_D` (Σ m_D = c) with `ctx_floor ξ Kt`,
-      `max (snd <$> dom m_D) ≤ Kt` (R1).  Cover: c = 0 ⇒ m = ∅ (Σ) ⇒ (D)
-      gives T ≤ r.td; c = Σ m_D ⇒ m = m_D (pointwise ≤ and equal sums) ⇒
-      (D) gives T ≤ r.td ∨ T ∈ snd <$> dom m_D.  Premise `slot_d ½ r`
-      with r.win = false ⇒ the body is IN ∨ OUT_L2; OUT_L2 refuted: Q's
-      fraction breaks Σ (c = 0) / overflows against the unit in hand
-      (c = 1).  P_hdr comes out at ξ (at r.ident); the unit goes into
-      hdr_out; both slot_d halves set r.win := true (td, ident
-      unchanged) and the caller KEEPS its half (L1's row is re-formed
-      only by (b)).
-      Sites: bget recycle (c = 0), iput's ref == 1 valid read (c = 1).
-  (b) deposit_L1 (under L1; OUT_L1 → IN).  Deposit P_hdr at identity
-      id' (the header the caller just stored) at the new stamp T';
-      m := {[(id', T') := 1]} (mint if c = 0, move if c = 1 — the unit
-      is in hdr_out, inside the box); both slot_d halves := {| td := T';
-      win := false; ident := id' |} (the caller's + the prefix's); hand
-      out `◯{[(id', T') := 1]} ∗ llb T' ∗ slot_d ½ r'` for L1's row,
-      whose ident tie the caller's fresh dev/blockno cells discharge.
-      (I) holds (m is a singleton at id'); (C) left holds; (D) via td.
-      Premise `r.win = true` ⇒ the body IS the OUT_L1 shape: nothing to
-      refute.  Sites: the recycle's re-park, iput's re-deposit before
-      its acquiresleep.
-  (c) ref_incr (under L1).  Agree on slot_d: r.ident = (devs k, bnos k),
-      the identity the hit scan matched.  m ⊎= {[(r.ident, T) := 1]};
-      cnt += 1; the new ref gets the box's own `llb T`.  (I)/(C)/(D)
-      untouched.  Premise `r.win = false` ⇒ IN ∨ OUT_L2, both untouched
-      (arm-agnostic) — the identity comes from the register, never from
-      the bundle.
-  (d) ref_decr (under L1).  Present `◯ m_D` (Σ = 1); m -= m_D;
-      r.td := max r.td (max (snd <$> dom m_D)); cnt -= 1.  (D) preserved
-      (a removed witness is now ≤ r.td); (I) monotone under removal; the
-      release folds r.td by R2.  refs 1 → 0 IS (d) — the content stays in
-      the box.  Premise `slot_d ½ r` with r.win = false ⇒ IN ∨ OUT_L2,
-      both untouched (arm-agnostic).
-  (e) checkout (under L2; IN → OUT_L2).  Premises: my `◯ m_h` with
-      `ctx_floor ξ Kt`, `max (snd <$> dom m_h) ≤ Kt` (R1 at the acquiresleep);
-      the payload's `slot_p ½ Tp` with `ctx_floor ξ Kp`, `Tp ≤ Kp` (R2);
-      the L2 token.  (C) gives T ≤ Kt ∨ T ≤ Kp.  OUT_L2 refuted by the
-      token; OUT_L1 refuted by Σ (my fraction vs c = 0, or vs the whole
-      unit in hdr_out).  Whole bundle out at ξ; the winner's unit
-      SPLITS (F7): Q := token ∗ the slot_p half ∗ ◯{[(id,t) := ½]}; the
-      other half + bref_tok0 + llb t go into the handle's token row
-      (bstok).
-  (f) park (under L2; OUT_L2 → IN).  Q out; deposit P at T'; my
-      handle-half ◯{[((dev,bno), t) := ½]} rejoins Q's half (no
-      agreement needed — both keys satisfy (I)) and the WHOLE moves to
-      ((dev,bno), T'); (dev,bno) = r.ident by (I) on the handle half, so
-      "IN at r.ident" is re-formed SOUNDLY (F7);
-      Tp := T'; hand back the token, the ref at (id_r, T'), `llb T'`,
-      `slot_p ½ T'` for the `_in` releasesleep.  IN refuted by the full
-      valid cell; OUT_L1 refuted by P_rest's cell (ctx_word4_excl_x).
-      The parker holds ONLY bio_locked and the bundle, and that
-      suffices (the park principle, §2).
+The lemma shapes live in code, not here: `iris/CtxBox.v` is a
+type-checked skeleton (definitions, the seven statements, proofs
+`Admitted`, each with its case skeleton in a comment).  A change to a
+lemma's premises or conclusion is made THERE first; this table is the
+reading guide and the vetting checklist.  A box lemma has exactly the
+premises the table lists — if a proof wants more, the design is wrong
+(§5 rule 4).
+
+  lemma        arm select     other arms refuted by          cover / change
+  ------------ -------------- ------------------------------ ------------------------------
+  (a) withdraw slot_d agree   OUT_L2: parked fragment's      (D): c = 0 ⇒ m = ∅ ⇒ T ≤ td;
+      _L1      win = false    mass + caller's ALL c units    c > 0 ⇒ m = m_D ⇒ T ≤ td or
+      under L1 ⇒ IN∨OUT_L2    > Σ m = c                      T ∈ stamps m_D.  Floors Kd,Kt.
+                                                             win := true; hdr_out := ◯ m_D;
+                                                             P_hdr ident x out (x box-bound).
+  (b) deposit  slot_d agree   (none: the shape is unique)    deposit ∀x P_hdr id' x → T';
+      _L1      win = true                                    m := {[(id',T') := max 1 c]};
+      under L1 ⇒ OUT_L1                                      cnt := max 1 c (the bump);
+                                                             slot_d := {|T'; false; id'|}.
+  (c) ref_incr slot_d agree   (arm untouched)                m ⊎= {[(ident,T) := 1]};
+      under L1 win = false                                   cnt += 1; ref gets llb T.
+  (d) ref_decr slot_d agree   (arm untouched)                m −= m_D (one unit);
+      under L1 win = false                                   td := max td (max_stamp m_D);
+                                                             cnt −= 1; release via _in.
+  (e) checkout (no slot_d)    OUT_L1: hdr_out's Σ m' = Σ m + (I): mh's keys ⇒ i = ident.
+      under L2 destruct win   caller's mh > Σ m.             (C): T ≤ stamps mh ≤ Kt, or
+                              OUT_L2: tok vs tok.            T ≤ tp ≤ Kp.  Whole bundle out
+                                                             (one binder x).  Park ◯ mh in
+                                                             OUT_L2; slot_p.hold := Some(i,mh).
+  (f) park     (no slot_d)    OUT_L1: P_rest cell clash.     slot_p agree ⇒ arm's fragment
+      under L2 destruct win   IN: P_hdr cell clash.          = (i, mh); (I) ⇒ i = ident;
+                                                             deposit bundle → T'; move mh to
+                                                             {[(i,T') := mass mh]}; slot_p :=
+                                                             {|T'; None|}; export llb T'.
+  boot alloc   —              —                              IN at T_boot, m = ∅, slot_d =
+                                                             {|T_boot; false; id0|}, slot_p =
+                                                             {|0; None|}; L1's row folds T_boot
+                                                             via the newlock llb twin.
+
+  Rows re-established at every close: (Σ) qsum m = c; (I) keys at
+  ident; (C) (∀ stamps ≥ T) ∨ T ≤ tp; (D) T ≤ td ∨ T ∈ stamps.  The
+  per-lemma derivations are the comments in CtxBox.v.
+
+  Client obligations (CtxBox's section Context): CtxMorph for P_hdr i x
+  and P_rest x; Timeless for P_hdr/P_rest/Q/tok; `P_hdr_excl`,
+  `P_rest_excl` (a FULL cell in each part clashes across contexts —
+  bcache: ctx_word4_excl_x on b_valid / b_disk); `tok_excl`.  Nothing
+  else: no count auth, no identity ghost, no client token enters a box
+  lemma (§5 rule 7).
+
+  Sites: (a)/(b): bget recycle (c = 0), iput's ref == 1 read (c = 1);
+  (c): bget hit at ANY refcnt incl. 0, bpin; (d): brelse's and
+  bunpin's refs--, iput's ref--; (e): bread's acquiresleep, ilock, iput's
+  acquiresleep; (f): brelse, iunlock, iput before releasesleep.
 
 ### 3.6 Cases the register design needed agreement for — now by rows
 
@@ -763,7 +798,14 @@ R1-pre (PREREQUISITE; measured 2026-09-01 by the build agent, design
   Gate: SleepLock cone green (the four sleeplock proofs + SleepLockAt +
   IcacheBoot/BioInitAt builders); then a -B round (interface change).
 
-R1' (the v2 box; replaces R1 as landed in A6.153 — same BioInv slice):
+R1' (the v2 box; replaces R1 as landed in A6.153 — same BioInv slice).
+  STEP 0 IS DONE: iris/CtxBox.v holds the generic box (definitions +
+  statements, Admitted).  R1' = prove CtxBox.v's seven lemmas, then
+  instantiate for bcache (id := dev × blockno, X := the data bytes,
+  P_hdr/P_rest per F2, tok := bown, Q := emp) — the "rule of two" is
+  satisfied up front because the icache instance is a second
+  instantiation of the same file, not an extraction from BioInv.
+  Details:
   BioInv's box section rewritten to §2/§3 (three arm shapes, rows
   (C)/(D), Σ m = c, the six lemmas, boot v5: IN at T_boot); bref/bchain
   to §3.3; bslp minus astamp; the ufrac/gmap kit over (id * nat) keys
@@ -890,6 +932,15 @@ compile of text written while unbuildable; budget a fallout tail.
 Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
 
 ## 5. Anti-sprawl process rules (additions to the §4 process law)
+
+0. THE STATEMENTS ARE CODE.  A box lemma's shape is CtxBox.v's statement;
+   a design change edits the statement, re-type-checks the file, and
+   only then the prose.  Vetting a change means: for every equality or
+   identity in a conclusion, name the PREMISE and the agreement lemma
+   that produce it — a spec parameter is never a witness (F6, F7 were
+   both conclusions asserted from parameters).  After any change,
+   rebuild the whole §3.5 table (six lemmas × three arm shapes × four
+   rows); never accept a direction and add a refinement without it.
 
 1. The §1 allowed-forms law and the §2 arm/lemma law (three arm shapes,
    six lemmas) are LAW.  A need that doesn't fit is an owner-ruling
@@ -1192,3 +1243,16 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   identity agreement; icache shares keep inode_ident cells; the R3 home
   is the handle-row trick).  §2 Q line, §3.5 (e)/(f), §5 tool, §6
   optional bref simplification.  R1' resumes on F7 with the split.
+- 2026-09-01 (proposer, on F7–F9): F8/F9 ACCEPTED.  F7's SPLIT REPLACED:
+  the rejoined mass at (f) was ∃-bound (Q's half is inside the arm), so
+  (d) could not present a unit; the L2 register gains a `hold` field
+  naming the parked fragment (keys and mass) — `slot_p : ghost_var
+  l2_reg {| tp; hold |}`, symmetric to slot_d — and (e) parks the whole
+  fragment.  THE STATEMENTS ARE NOW CODE: iris/CtxBox.v, a type-checked
+  skeleton (7 statements, Admitted, case skeletons in comments), added
+  to _CoqProject after CtxAnchor.v.  §3.5 is now the reading table over
+  it; §5 gains rule 0 (statements are code; a spec parameter is never a
+  witness; rebuild the table after every change).  §2 Q line, F7 block,
+  §3.2, §3.3, §4.1 R1' amended.  Two facts the table makes explicit
+  that the prose hid: (b) is deposit AND bump (cnt 0 → 1 at c = 0), and
+  (c) is legal at c = 0 (bget's hit on a cached refcnt-0 buffer).
