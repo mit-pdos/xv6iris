@@ -791,6 +791,47 @@ is the designer's next step (`iris/CtxBoxNext.v`, `iris/OffBox.v`).
 
 ---------------------------------------------------------------------------
 
+## 6⁶. THE ONE CtxBox EDIT, AS DESIGNED (the box's designer, 2026-09-02;
+## statements in `iris/CtxBoxNext.v`, the off instance in `iris/OffBox.v`)
+
+Writing the ruled changes as statements exposed two more things; both are
+simplifications and both are in the skeleton.
+
+(A) THE ARM IS SELECTED BY THE TWO REGISTERS; THE CELL-CLASH OBLIGATIONS
+    AND THE TOKEN GO.  Once the L2 register records the hold (F7/F21), the
+    three states are determined by (sr_win r, lr_hold s): IN = (false,
+    None), OUT_L1 = (true, None), OUT_L2 = (false, Some (i, m)).  The body
+    becomes a match on lr_hold then on sr_win.  (f) selects OUT_L2 by
+    agreement on its L2 half instead of refuting IN and OUT_L1 by cell
+    clashes; (e) refutes OUT_L1 by Σ as today and needs no token to
+    refute OUT_L2 — its L2 half says hold = None.  So `P_hdr_excl`,
+    `P_rest_excl`, `tok` and `tok_excl` leave CtxBox's parameter list.  The
+    "park principle" was the workaround for a parker holding only cells;
+    F7 gave it the register half.  THIS IS WHAT MAKES THE OFF BOX POSSIBLE:
+    a one-cell client has no second cell for `P_rest_excl` and no natural
+    token.  `bown`/`ic_tok` stay in their lock payloads for the clients'
+    own reasons; the box does not see them.  Consequence for the L6 design
+    of §6‴/§6⁗: P4(iv) "a token per off box" is void.
+
+(B) (f′) box_park_join IS NEEDED BESIDE (e′).  §6′'s "(f) needs no twin —
+    the caller re-forms the full header from its quarter and the Q that
+    (f) returns" is circular: (f) takes the FULL header as its input, and
+    the holder cannot re-form it before the box returns Q.  So (f′) takes
+    the client's join wand  ∀ x ξ', P_hdr' i x ξ' ∗ Q ⊢ P_hdr i x ξ' ∗ Q'
+    and applies it at the holder's ξ with the arm's Q before the deposit,
+    handing back Q'.  (e)/(f) are the instances at P_hdr' := P_hdr with
+    the pass-through wands.  Transition count unchanged: (a)–(g), with
+    (b′)/(e′)/(f′) the shape generalizations.
+
+(C) Q in OUT_L1 as ruled: (a) takes Q, (b′) returns it, (g) exchanges it.
+
+The skeleton's rule-0 producers are in the file, per lemma.  For the
+build agent: the proofs are CtxBox's with the case selection changed as
+noted at each lemma; BioInv's and IcacheEscrow's wrappers lose their
+`tok`/`_excl` arguments and gain Q at (a)/(b′)/(g) (bcache: emp).
+
+---------------------------------------------------------------------------
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
