@@ -1403,6 +1403,20 @@ context, mapped to CtxBox's lemmas:
   unchanged; islot2 keeps its lock-held rows minus ic_id; the dead row is
   islot_free_at (F17).  ic_names keeps icn_mid / icn_id as DEAD fields
   (still minted; §6 cleanup removes them with the six MkIcNames sites).
+  F26 THE ITABLE HANDLE CARRIES THE ESCROW FAMILY: is_itable2 gains
+  `∗ ic_escrows cn γfs γi cov logstart` (persistent, same arity).  Under
+  the box every [ref++] under itable.lock is (c) -- iget's hit and idup's
+  -- and SpecIdup never took the escrows (its two callers, kfork and
+  namex, would each have needed a new row); the handle every itable user
+  already holds is where the family belongs.  Accessors is_itable2_escrows
+  / ic_escrows_lookup.  M-5 LANDED IN IcacheRef: ic_stamps k i (μ : Qc)
+  is the base row (mass in Qc so the canonical short parent qt = qi
+  weighs 1), ic_ref_stamps (Qp mass) and ic_lent_stamps k qt qi (mass
+  1 + qi − qt) the two spellings; inode_ref / _gen / _genlo carry mass 1,
+  inode_shr / _gen / _genlo mass s, inode_ref_short / _gen / _genlo the
+  lent mass, the BARE forms none (the holder deposited them into the box
+  with slh_tok into the lock -- F15).  The carve needs q + s ≤ 1, which
+  the liveness slice's validity supplies (live_fracc_le1).
 
   BUILD AGENT'S REVIEW OF THE SKELETON (2026-09-02, against ProofIget /
   ProofIlock / ProofIunlock / ProofIput and the bcache instance as built).
@@ -2025,3 +2039,7 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   itable ξ-row with its OWN floor (not tied to the exact-read stamp);
   ic_escrow := the box, ic_deposit := the handle row, ic_sleeplocks over
   ic_slp; arms, ic_id, ic_mid, 13 lemmas deleted; sleeplock tier swept.
+- 2026-09-02 (build agent, R3.3 cont.): F26 — is_itable2 carries
+  ic_escrows (idup's (c) without a spec sweep); M-5 landed in IcacheRef
+  (ic_stamps with a Qc mass; every reference form carries its stamps,
+  the bare forms none).
