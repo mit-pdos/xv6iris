@@ -1339,6 +1339,75 @@ TRIPWIRE (generalizing §6¹¹'s, for §5): every arm of a Q must be
     register.  F38/F40 are the viewer half; F41 is the party half, and it
     is what forces the split.
 
+## 6¹³. THE BOX'S DESIGNER ON §6¹² (2026-09-02): F41/F42/F43 agreed;
+## Q-reuse withdrawn; the second edit bundled, with one small addition
+
+F42 AGREED, BLOCKING.  The guard's (a) takes Q as a premise, and the pin
+    it must deposit is a half of a register whose whole rides the header
+    -- inside the box until (a) opens it.  Moving the resting pin to the
+    TABLE ROW (dead and live) is the right fix: both L1-side depositors
+    hold the row at their (a); no box change.  (The alternative -- an (a′)
+    with a view-shift split wand `Qc ∗ P_hdr ==∗ P_hdr' ∗ Q1` at ξb -- would
+    also let the guard update the pin inside the fupd, but it is a third
+    generalization for one client's placement choice; the row is simpler.)
+
+F41 AGREED, BLOCKING; MY Q-REUSE IS WITHDRAWN.  §6″'s reuse argued from the
+    VIEWER's side only: every arm refutable-or-readable by the collection.
+    It missed the RETURNERS: whoever receives Q back from (b)/(b′)/(g), or
+    discharges (f′)'s join over it, must select its own arm from what it
+    holds, and with one Q the guard cannot refute the descriptor arm (its
+    table half `ic_id ½ true` AGREES with the arm's quarter; it holds no
+    descriptor and no ic_tok) -- checked, the guard's Exit-A (b′) is stuck.
+    Splitting by ARM is the type-level tag the box cannot otherwise
+    attach: Q1 for OUT_L1, Q2 for OUT_L2.  Selection, party by party, on
+    the split:
+      recycler at (b′):  Q1 = pin ∨ recycle; the row's `hpn_full None`
+                         contradicts the pin arm ⇒ recycle.
+      guard at (b′)/(g): Q1; its pin half `hpn_h k (Some (t,q))` agrees
+                         with the pin arm; the recycle arm's `ic_id ¼
+                         false` contradicts the row's `½ true` ⇒ pin.
+      parkers at (f′), box_q_update's caller:  Q2 = ∃ d …; descriptor
+                         agreement on `ic_deposit ½ d` (with F43's Qc')
+                         selects d ⇒ the arm.
+      the collection (box_view): Q1's pin arm refuted by the tx share,
+                         its recycle arm read as dead by the pool's
+                         quarter; Q2's DepTx/DepFrz refuted by their
+                         shares, DepRd read with the identity tied (F40).
+    `Q : id → iProp` indeed does not help here; indexing by arm does.
+
+F43 AGREED.  (f′)'s join must see the parker's descriptor half to select
+    within Q2: `Qc'` beside `P_hdr'` in the wand, the mirror of F33.
+
+ONE SMALL ADDITION TO THE BUNDLE: `box_q_update` takes a closed fupd
+    `Q2 ={E∖↑N}=∗ Q2` and returns only `l2_hold`, so a shrink/grow that
+    must hand its UPDATED descriptor half back to the caller has nowhere to
+    put it.  Give it an output residue: `(Q2 ={E∖↑N}=∗ Q2 ∗ R) → … ={E}=∗
+    l2_hold γ i m ∗ R` (the caller's half rides in, the updated half rides
+    out as R).  Same classification (non-transition accessor).
+
+THE SECOND EDIT, AGREED AND BUNDLED (rule 0 per statement):
+    - `Q1 : iProp` beside `Q` (rename `Q` to `Q2` in the file for clarity);
+      `box_arm`'s OUT_L1 arm carries Q1, OUT_L2 carries Q2.
+    - (a) takes Q1; (b)/(b′) return Q1; (g) takes Q2 and returns Q1;
+      (e)/(e′) take Qc / produce Q2 as now; (f′) gains Qc' in the wand
+      `∀ x ξ', Qc' ∗ P_hdr' i x ξ' ∗ Q2 ⊢ P_hdr i x ξ' ∗ Q'` and the premise
+      `Qc'`; (f) is the instance Qc' := emp; box_q_update over Q2 with the
+      output residue R; box_view unchanged (the viewer sees the arm's Q1
+      or Q2 by arm).
+    - bcache / off: Q1 := emp, Q2 := emp.  icache: Q1 / Q2 as §6¹² writes
+      them; F38, F40, F42 in the client.
+    This reopens the ruling's "one edit" for the cause §6¹² names: no
+    placement of the resting pin lets both the guard deposit and the parker
+    select under one Q.  The edit is mechanical against the proven file
+    and lands before r20's inode proofs, which are its consumers.
+
+TRIPWIRE (§5, replacing §6¹¹'s): every arm of a residue must be SELECTABLE
+    by every party that receives that residue back or discharges a wand
+    over it, from what that party holds alone; and READABLE with its
+    identity tied to the slot's, or REFUTABLE, by a viewer that holds no
+    register.  Residues are indexed by ARM so that the first clause can be
+    met at all.
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
