@@ -1376,6 +1376,21 @@ context, mapped to CtxBox's lemmas:
   and the icache camera members live in Xv6Cameras §15 (icboxG is a
   member of xv6G — one bundle); blkmap moved to BlkmapDefs.v (re-exported
   by InodeInv) so the bundle can name the shape.
+  BUILD AGENT (2026-09-02, IcacheBox.v green; three build-time facts for
+  the record, none a design change): F24 (i) the Loaded branch of the rest
+  row carries ⌜length (bm_cells bm) = 13⌝ beside the addrs cells, because
+  the eviction deposit (b') must produce the Raw rest from the Loaded
+  rest and Raw's 13-cell wildcard needs the length; (ii) the F14 "regroup"
+  lemma is stated per shape (ic_bundle_loaded_intro/elim,
+  ic_bundle_unloaded_intro/elim, ic_hdr_dead_intro) — one lemma over all
+  three shapes has no useful statement; (iii) the lent parent of a share
+  (M-5) is inode_ref_short k qt qi: the parent's stamps fragment at mass
+  1−s plus its own half-ident, i.e. exactly the inode_ref row without the
+  slot's sleeplock-side pieces, so inode_ref_lent2 is a definition, not
+  a new row.  Build note: the skeleton's Timeless instances were `apply
+  _` over ∃/∗/∨ towers and hung the file (the "degenerate" build); they
+  are now structural (tl_struct), and IcacheBox.v compiles in 7.8 s of
+  tactic time, worst command 1.6 s.
 
   BUILD AGENT'S REVIEW OF THE SKELETON (2026-09-02, against ProofIget /
   ProofIlock / ProofIunlock / ProofIput and the bcache instance as built).
@@ -1990,3 +2005,7 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   between the guard's (b) and the free path's checkout, and the cover is
   (C)-left at the re-minted unit).  A seventh transition could also cover
   it and is rejected by the six-lemma law.  No skeleton change.
+- 2026-09-02 (build agent, IcacheBox.v green): F24 — Loaded rest carries
+  the 13-cell length; regroup lemmas are per shape; the lent parent is
+  inode_ref_short; Timeless instances made structural (the slow build).
+  Instance file compiles; R3.3 (IcacheEscrow merge + sweep) next.
