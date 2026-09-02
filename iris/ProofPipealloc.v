@@ -70,6 +70,7 @@ Require Import SpecPipealloc.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
 Require Import ProcAvail.
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the creator\'s borrow *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Require Import TsoCtx.
@@ -1376,7 +1377,9 @@ Section ProofPipealloc.
     { intros c Hcs N2 N8 N9 N20 N18 N19.
       rewrite /G2 upd_ne; [| regne]. apply HG1thr; assumption. }
     (* the page becomes a raw [struct pipe] *)
-    iDestruct (page_own_pipe_raw _ Hpv with "Hpage") as "Hraw".
+    (* A6.87: the pipe is carved out of the page KALLOC MEMSET, not out of
+       a visibility-free one -- the struct's fields are word cells. *)
+    iDestruct (page_filled_pipe_raw _ _ Hpv with "Hpage") as "Hraw".
     rewrite /pipe_raw.
     iDestruct "Hraw" as "(Hlkw & Hlkn & Hlkc & Hdat & Hnr & Hnw & Hro & Hwo & Hslack)".
     iDestruct "Hlkw" as (vlock) "Hlkw". iDestruct "Hlkn" as (vname) "Hlkn".
@@ -1534,8 +1537,15 @@ Section ProofPipealloc.
     (* the pipe is born.  The lock's name field goes INTO the pipe rather than
        being sealed away: it is 8 bytes of the page pipeclose has to free. *)
     iApply fupd_wp.
+    (* A6.68: the honest creator deposit (A6.66) wants the running token; this
+       proof holds the kernel bundle, so it borrows its own and puts it back
+       ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (new_pipe ⊤ pi _ bs Hpv Hbslen
-            with "Hlkn Hlkw Hlkc Hnr Hnw Hro Hwo Hdat Hslack") as (γpl γp) "(#Hpipe & Hrd & Hwr)".
+            with "Hlkn Hlkw Hlkc Hnr Hnw Hro Hwo Hdat Hslack Hrun")
+      as "[Hrun Hnew]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Hnew" as (γpl γp) "(#Hpipe & Hrd & Hwr)".
     iModIntro.
 
     (* ---- the eight unlocked stores into the two struct files ---- *)

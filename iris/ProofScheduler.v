@@ -48,7 +48,6 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SwtchCtx.
-Require Import TsoCtxShim.   (* [ctx_dom_sc]: the SC claim of the free cpu context *)
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import CodeScheduler.

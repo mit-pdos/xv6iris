@@ -89,8 +89,6 @@ Require Import ProofFilereadParts.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the devsw slot is still a RAW word here; the [c.ld]
-                         leaf takes the ctx one *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 

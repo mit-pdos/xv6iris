@@ -72,7 +72,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the raw [WpSconfMem] word towers cross the seam here *)
+Require Import ByteBuf.  (* A6.58: the CONTEXT tower\'s 8<->4 halving ([ctx_word_pointsto_split4]/[_join4]) *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -424,13 +424,9 @@ Section ProofSysRead.
       by (rewrite /M2 upd_ne; [exact HM1sp | reg_neq]).
     (* THE [int n] IS THE UPPER HALF OF SLOT 4: carve it now, take the
        8-alignment fact out FIRST (the halves no longer carry it). *)
-    (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses to the raw
-       4-byte tower through the shim, and each join crosses back. *)
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs4") as "Hs4".
-    iDestruct (word_pointsto_aligned_p with "Hs4") as %Hal4.
-    iDestruct (word_pointsto_split4 with "Hs4") as "[Hs4lo Hs4hi]".
-    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs4lo") as "Hs4lo".
-    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs4hi") as "Hs4hi".
+    (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
+    iDestruct (ctx_word_pointsto_aligned_p with "Hs4") as %Hal4.
+    iDestruct (ctx_word_pointsto_split4 with "Hs4") as "[Hs4lo Hs4hi]".
     (* ---- +0x08: addi a1,s0,-40 -- a1 := &p ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.sys_read + 0x08))
               Ra1 Rs0 (mword_of_int 0xfd8 : mword 12) M2 (av - 6)%nat b
@@ -785,10 +781,7 @@ Section ProofSysRead.
       iEval (rewrite Htgt40) in "Hpc".
       iEval (rewrite HN4a2) in "Hfcell".
       (* slot 4 goes back together: both halves are dead from here on *)
-      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs4lo") as "Hs4lo".
-      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs4hi") as "Hs4hi".
-      iDestruct (word_pointsto_join4 _ _ _ _ Hal4 with "Hs4lo Hs4hi") as "Hs4".
-      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs4") as "Hs4".
+      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal4 with "Hs4lo Hs4hi") as "Hs4".
       iApply (sr_tail (CID0 := CID20) m A3 av (mword_of_int (-1) : mword 64)
                 sp0 ra0 s00 _ _ _ _ b pj
                 ltac:(lia) eq_refl eq_refl eq_refl HA3sp HA3a0 HthrA
@@ -993,10 +986,7 @@ Section ProofSysRead.
         rewrite /S2 upd_ne; [| congruence].
         rewrite /S1 upd_ne; [| congruence].
         apply HthrA; assumption. }
-      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs4lo") as "Hs4lo".
-      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs4hi") as "Hs4hi".
-      iDestruct (word_pointsto_join4 _ _ _ _ Hal4 with "Hs4lo Hs4hi") as "Hs4".
-      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs4") as "Hs4".
+      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal4 with "Hs4lo Hs4hi") as "Hs4".
       iApply (sr_tail (CID0 := CID25) m mf av rv sp0 ra0 s00 _ _ _ _ b pj
                 ltac:(lia) eq_refl eq_refl eq_refl HMfsp Hrva HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4 Hs5 Hs6").

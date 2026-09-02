@@ -101,7 +101,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Require Import TsoCtx.
-Require Import TsoCtxShim.
+Require Import ByteBuf.  (* A6.58: the CONTEXT tower\'s 8<->4 halving ([ctx_word_pointsto_split4]/[_join4]) *)
 (* ---- the AU side ---- *)
 Require Import ProofSysWrite.      (* [sw_addr_p]/[sw_addr_n]/[sw_addr_f]/
                                       [sw_addr_f_base] are TOP-LEVEL there *)
@@ -445,11 +445,9 @@ Section ProofSysWriteConsAU.
       by (rewrite /M2 upd_ne; [exact HM1sp | reg_neq]).
     (* THE [int n] IS THE UPPER HALF OF SLOT 4: carve it now, take the
        8-alignment fact out FIRST (the halves no longer carry it). *)
-    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs4") as "Hs4".
-    iDestruct (word_pointsto_aligned_p with "Hs4") as %Hal4.
-    iDestruct (word_pointsto_split4 with "Hs4") as "[Hs4lo Hs4hi]".
-    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs4lo") as "Hs4lo".
-    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs4hi") as "Hs4hi".
+    (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
+    iDestruct (ctx_word_pointsto_aligned_p with "Hs4") as %Hal4.
+    iDestruct (ctx_word_pointsto_split4 with "Hs4") as "[Hs4lo Hs4hi]".
     (* ---- +0x08: addi a1,s0,-40 -- a1 := &p ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.sys_write + 0x08))
               Ra1 Rs0 (mword_of_int 0xfd8 : mword 12) M2 (av - 6)%nat b
@@ -986,10 +984,7 @@ Section ProofSysWriteConsAU.
         rewrite /S2 upd_ne; [| congruence].
         rewrite /S1 upd_ne; [| congruence].
         apply HthrA; assumption. }
-      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs4lo") as "Hs4lo".
-      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs4hi") as "Hs4hi".
-      iDestruct (word_pointsto_join4 _ _ _ _ Hal4 with "Hs4lo Hs4hi") as "Hs4".
-      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs4") as "Hs4".
+      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal4 with "Hs4lo Hs4hi") as "Hs4".
       iApply (swau_tail (CID0 := CID25) m mf av rv sp0 ra0 s00 _ _ _ _ b pj
                 ltac:(lia) eq_refl eq_refl eq_refl HMfsp Hrva HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4 Hs5 Hs6").

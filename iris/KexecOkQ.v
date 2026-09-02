@@ -70,7 +70,10 @@ Require Import KvmSpec.         (* [kalloc_env]                         *)
 Require Import Xv6G.            (* [xv6G]                               *)
 Require Import FdSlots.         (* [fdslotG]                            *)
 Require Import FileInvDefs.     (* [fileG]                              *)
-Require TsoCtx.   (* qualified: the class only, no notation flip *)
+Require Import TsoCtx.   (* the CONTEXT tier: [kexec_closer]'s cells are the
+   ambient thread's [ctx_*_pointsto], as every phase lemma that hands
+   them in or out states them (tso-cutover L2: the raw spelling here was
+   the one reason ProofKexecTail/ProofKexecD crossed the retired shim) *)
 
 Local Open Scope Z_scope.
 

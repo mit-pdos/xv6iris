@@ -93,7 +93,6 @@ From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import TsoCtx.
-Require TsoCtxShim.
 Local Open Scope Z_scope.
 
 (* durable-notes' rule: a goal over [proc_priv] carries [tf_page]'s
@@ -1834,11 +1833,6 @@ Section KexecDCommit.
                  (h <$> seq 0 PNAMELEN)) Mx)
               (Z_to_bv 64 (le_at ef 24 8) : mword 64)
               (mword_of_int (kxc_sp_final (uint sz1) alen c)) sz1).
-    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hbm") as "Hbm".
-    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hins") as "Hins".
-    iEval (setoid_rewrite (TsoCtxShim.ctx_pointsto_shim _ cur_ctx)) in "Hpath".
-    iEval (setoid_rewrite (TsoCtxShim.ctx_word_shim _ cur_ctx)) in "Hargv".
-    iEval (setoid_rewrite (TsoCtxShim.ctx_pointsto_shim _ cur_ctx)) in "Hargs".
     iApply ("Hcont" with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath
                     Hargv Hargs Hbs Hirs").
     - exact Hcs.

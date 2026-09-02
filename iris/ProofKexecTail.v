@@ -122,7 +122,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
-Require TsoCtxShim.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
    printing one takes tens of minutes, so a one-line mistake reads as a hang.
@@ -1117,11 +1116,6 @@ Section KexecExitQ.
     iIntros (mf U' entry spv szv')
             "%Hcs %Hok Hsie Hcnt Htc Hcl Hpc Hbm Hin Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs".
-    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hbm") as "Hbm".
-    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hin") as "Hin".
-    iEval (setoid_rewrite <-(TsoCtxShim.ctx_pointsto_shim _ cur_ctx)) in "Hpath".
-    iEval (setoid_rewrite <-(TsoCtxShim.ctx_word_shim _ cur_ctx)) in "Hargv".
-    iEval (setoid_rewrite <-(TsoCtxShim.ctx_pointsto_shim _ cur_ctx)) in "Hargs".
     iApply ("H" $! mf U' entry spv szv' with
              "[%] [%] Hsie Hcnt Htc Hcl Hpc Hbm Hin Hka Hpriv Hpath Hargv
               Hargs Hbs Hirs");
@@ -1278,11 +1272,6 @@ Section KexecAExit.
     iDestruct (cpu_claim_ext_transport CID0 CIDe eb pj
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iSpecialize ("Hcont" $! CIDe with "[%]"); [wp_next_chain |].
-    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hbm") as "Hbm".
-    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hins") as "Hins".
-    iEval (setoid_rewrite (TsoCtxShim.ctx_pointsto_shim _ cur_ctx)) in "Hpath".
-    iEval (setoid_rewrite (TsoCtxShim.ctx_word_shim _ cur_ctx)) in "Hargv".
-    iEval (setoid_rewrite (TsoCtxShim.ctx_pointsto_shim _ cur_ctx)) in "Hargs".
     iApply ("Hcont" $! mf U (mword_of_int 0 : mword 64)
               (mword_of_int 0 : mword 64) (mword_of_int 0 : mword 64)
               with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath

@@ -43,7 +43,6 @@ Require Import SpecPrepareReturn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import TsoCtx.
-Require TsoCtxShim.   (* tier weakening rides the raw law *)
 Local Open Scope Z_scope.
 
 Notation FR := KernelSyms.forkret.

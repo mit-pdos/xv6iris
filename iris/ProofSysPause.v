@@ -143,7 +143,6 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving ([ctx_word_pointsto_split4]/[_join4]) *)
-Require TsoCtxShim.
 Import Defs.
 
 Local Open Scope Z_scope.
