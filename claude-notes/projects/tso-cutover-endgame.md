@@ -1127,6 +1127,83 @@ ORDER (§5) amended per F36: L7 (the `is_ftable` λ-flip with a floor slot in
 `ftable_res`, the `_in` releases at filealloc/filedup/fileclose) moves
 AHEAD of L6 (the off box); L6 waits for the OffBox skeleton's F34/F35 fixes.
 
+## 6¹⁰. SECOND REVIEWER: PROGRESS REVIEW AFTER r19g (2026-09-02; checked
+## against `iris/IcacheEscrow.v` at 165159be1)
+
+The landing matches the ruled edit: CtxBox.v proven (0 Admitted),
+IcacheEscrow.v stitched and proven (0 Admitted), OffBox.v the expected
+13-Admitted skeleton with F34/F35 applied, the ProcInv root closed, r19f/r19g
+sweeping the cone's fallout behind the build gate, L7 ahead of L6 per F36.
+Four findings, one of them blocking for r21.
+
+**F38 (BLOCKING before r21): `ic_q_recycle := emp` makes Q vacuous for the
+collection.**  `ic_q` (IcacheEscrow.v:4001) is a three-way disjunction whose
+third arm is `emp` (line 4000).  A disjunction with an `emp` disjunct is, to
+a reader of the invariant, no stronger than `True`.  The collection only
+ever sees the box through `box_view`, so at every OUT arm it must consider
+the recycle case and cannot refute it.  Two windows the design relies on
+REFUTING are thereby unrefutable:
+
+- the guard window (OUT_L1, c = 1, `sr_ident = Some`): the wrapper at
+  line 4370 deposits `ic_pin_tx`, but the collection cannot know the pin
+  arm is the one standing.  The header is out, so the box holds no payload
+  ghost to read a leg from; refutation was the only route.  This is the
+  "body-level pin does not refute ic_held" pattern the file's own comment
+  (lines 1397–1401) warns against, reintroduced one level up;
+- every OUT_L2 checkout at a live slot: the collection needs the
+  descriptor arm (DepTx refuted by its tx share, DepRd read as the
+  three-quarter leg).  With `emp` admitted it gets neither.
+
+Consequence: `ic_slot_cover` over `box_view` (Q5, r21) cannot be stated
+soundly against the current Q.  The fix is small and needs no re-cut of P3.
+The recycler runs with the table's dead row in hand, which carries
+`ic_id ½ false`; split it and deposit a quarter:
+
+    Definition ic_q_recycle cn k : iProp Σ :=
+      ∃ dev inum, ic_id cn k (1/4) false dev inum.
+
+The recycler supplies it from the table's half at (a) and gets it back from
+(b′) BEFORE the flip (the flip needs the table's ½ + pool's ¼ + header's ¼
+= 1, all in hand at that point), so the fraction accounting at every slot
+state is unchanged and boot's split stays 1 → ½ + ¼ + ¼.  For the
+collection the recycle arm now says the slot is dead by agreement with the
+pool's quarter, and at a LIVE slot (pool's quarter `true`) the `false`
+quarter is a contradiction outright.  Q then has no arm the collection can
+neither read nor refute.  Rule-0 check: the recycle arm's producer is the
+table's half (the recycler holds itable.lock at (a)); its consumer is (b′)
+returning Q.  No new ghost, no new arm, no new transition.
+
+**F39 (cleanup at r20): `DepRef` is a dead descriptor with a `False`
+escrow form.**  `ic_dep_res` maps `DepRef` to `False` (line 1574) while
+`ic_body`/`ic_dep_half` still carry live arms for it and the F16 note
+(line 3527) says it stays for iput's whole-unit (e)/(f).  But §3 routes
+iput's free window through (g) with `DepFrz` carrying the `(t, qt)` share,
+so nothing deposits `DepRef`.  Harmless today (a deposit of it is
+unprovable), but it is the "second reference form" tripwire waiting to
+fire.  Delete it at r20, or record in §3 why iput needs both.
+
+**Merge hazard for r20: two things named `ic_deposit`.**  On this branch
+`ic_deposit cn k d` is main's ghost-variable half (line 345) and the
+holder's handle is `ic_handle` (line 4119).  Flip's ProofIget/ProofIput/
+ProofIlock texts use `ic_deposit` as the HANDLE, with the same argument
+list.  A three-way merge will type-check some of those uses by accident.
+Rename the handle occurrences in flip's files to `ic_handle` BEFORE
+merging, not after.
+
+**Sweep hazard for r19f/r19g.**  Taking flip's spellings wholesale in the
+ProcInv cone can drop main's post-fork edits silently: a spec that lost a
+main-only conjunct still builds when its consumers are Admitted or
+blocked, and the `-B` gate does not see it.  For each swept file skim
+`git diff main -- <file>` for REMOVED conjuncts, and re-run the honest
+measure after r19g (last recorded: 29 / 272 / 1205 after r19a) — the green
+count must not drop.
+
+Minor: the `ic_id ↔ sr_ident` tie deferred to r20 (`itable_slot_res`) is
+likely unnecessary — under P3 it falls out of `ic_hdr_amb` by fraction
+agreement whenever both are in hand.  Two boot faces (`box_alloc_at`,
+`box_alloc_at_halves`) are mild duplication, acceptable as a derived
+corollary.  OffBox's proofs correctly wait on L7.
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
