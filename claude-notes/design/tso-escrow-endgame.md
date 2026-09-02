@@ -648,9 +648,11 @@ disjunct.
     from (id, t) to (id, T') (dealloc + alloc; Qp addition is
     cancelable); (b) re-mints the unit at the new identity.  ufrac, not
     frac: several units may sit at one key.
-  - `slot_d : ghost_var slot_reg`, `slot_reg := {| td : nat; win : bool;
-    ident : id |}` — THE L1 SLOT REGISTER: half in the box, half in L1's
-    payload row beside `ctx_floor ξ r.td`.
+  - `slot_d : ghost_var slot_reg`, `slot_reg id X := {| td : nat; win :
+    bool; ident : id; x : option X |}` — THE L1 SLOT REGISTER: half in
+    the box, half in L1's payload row beside `ctx_floor ξ r.td` (at rest
+    win = false, x = None).  `x` names the witness the open window's
+    P_rest is at (F10), so (b) re-deposits at the same one.
   - `slot_p : ghost_var l2_reg`, `l2_reg := {| tp : nat; hold : option
     (id * gmap (id*nat) ufrac) |}` — THE L2 SLOT REGISTER: half in the
     box, half in L2's payload row beside `ctx_floor ξ s.tp` at rest
@@ -705,37 +707,49 @@ premises the table lists — if a proof wants more, the design is wrong
   (a) withdraw slot_d agree   OUT_L2: parked fragment's      (D): c = 0 ⇒ m = ∅ ⇒ T ≤ td;
       _L1      win = false    mass + caller's ALL c units    c > 0 ⇒ m = m_D ⇒ T ≤ td or
       under L1 ⇒ IN∨OUT_L2    > Σ m = c                      T ∈ stamps m_D.  Floors Kd,Kt.
-                                                             win := true; hdr_out := ◯ m_D;
-                                                             P_hdr ident x out (x box-bound).
-  (b) deposit  slot_d agree   (none: the shape is unique)    deposit ∀x P_hdr id' x → T';
-      _L1      win = true                                    m := {[(id',T') := max 1 c]};
-      under L1 ⇒ OUT_L1                                      cnt := max 1 c (the bump);
-                                                             slot_d := {|T'; false; id'|}.
+                                                             win := true, x := Some x0;
+                                                             hdr_out := ◯ m_D; P_hdr ident x0
+                                                             out, x0 NAMED (F10).
+  (b) deposit  slot_d agree   (none: the shape is unique)    deposit P_hdr id' x0 → T', x0 =
+      _L1      win = true,                                   the register's (F10);
+      under L1 x = Some x0                                   m := {[(id',T') := max 1 c]};
+               ⇒ OUT_L1 at x0                                cnt := max 1 c (the bump);
+                                                             slot_d := {|T'; false; id'; None|}.
   (c) ref_incr slot_d agree   (arm untouched)                m ⊎= {[(ident,T) := 1]};
       under L1 win = false                                   cnt += 1; ref gets llb T.
   (d) ref_decr slot_d agree   (arm untouched)                m −= m_D (one unit);
       under L1 win = false                                   td := max td (max_stamp m_D);
+                                                             llb td' from llb td (L1's row,
+                                                             F11) + the reference's;
                                                              cnt −= 1; release via _in.
   (e) checkout (no slot_d)    OUT_L1: hdr_out's Σ m' = Σ m + (I): mh's keys ⇒ i = ident.
       under L2 destruct win   caller's mh > Σ m.             (C): T ≤ stamps mh ≤ Kt, or
                               OUT_L2: tok vs tok.            T ≤ tp ≤ Kp.  Whole bundle out
-                                                             (one binder x).  Park ◯ mh in
+                                                             (one binder x).  Park ◯ mh +
+                                                             ⌜keyed mh i⌝ (F13) + Q (F12) in
                                                              OUT_L2; slot_p.hold := Some(i,mh).
   (f) park     (no slot_d)    OUT_L1: P_rest cell clash.     slot_p agree ⇒ arm's fragment
-      under L2 destruct win   IN: P_hdr cell clash.          = (i, mh); (I) ⇒ i = ident;
+      under L2 destruct win   IN: P_hdr cell clash.          = (i, mh); keyed mh i + (I) +
+                                                             validity ⇒ i = ident (F13);
                                                              deposit bundle → T'; move mh to
                                                              {[(i,T') := mass mh]}; slot_p :=
                                                              {|T'; None|}; export llb T'.
   boot alloc   —              —                              IN at T_boot, m = ∅, slot_d =
-                                                             {|T_boot; false; id0|}, slot_p =
+                                                             {|T_boot; false; id0; None|}, slot_p =
                                                              {|0; None|}; L1's row folds T_boot
                                                              via the newlock llb twin.
 
-  RULE-0 AUDIT AMENDMENTS (F10–F13, pending the statement edits):
-  (a) returns the NAMED x0 and records it in the register (sr_x);
-  (b) takes P_hdr i' x0 at that x0, not ∀ x;  (d) takes llb td;
-  (e) takes Q;  out_l2 carries ⌜keyed m i⌝ so (f) derives i = ident.
-
+  RULE-0 AUDIT AMENDMENTS (F10–F13) — APPLIED to CtxBox.v and
+  re-type-checked (proposer, 2026-09-01): slot_reg id X gains
+  `sr_x : option X`; (a) returns the NAMED x0 and records it (win = true,
+  sr_x = Some x0); the OUT_L1 arm is `hdr_out ∗ P_rest x ξb` with
+  ⌜sr_x r = Some x⌝; (b) takes `sr_x r = Some x0` and the specific
+  `P_hdr i' x0 ξ`, clears the field; (d) takes `llb td`; (e) takes Q;
+  out_l2 carries ⌜keyed m i⌝ beside ⌜m ≠ ∅⌝; L1's row at rest states
+  sr_x = None.  All four were real: each was a conclusion the statement
+  asserted with no premise producing it — the file caught none of them
+  by typing alone, which is why rule 0 is "premise for every equality",
+  not "it compiles".
   Rows re-established at every close: (Σ) qsum m = c; (I) keys at
   ident; (C) (∀ stamps ≥ T) ∨ T ≤ tp; (D) T ≤ td ∨ T ∈ stamps.  The
   per-lemma derivations are the comments in CtxBox.v.
@@ -1338,3 +1352,11 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   x0; F11 (d) needs llb td as a premise; F12 (e) needs Q as a premise;
   F13 out_l2 must carry keyed m i so (f) can derive i = ident.
   Statement edits listed for the build agent; §3.5 amended.
+- 2026-09-01 (proposer, applying the rule-0 audit): F10–F13 all real and
+  APPLIED to CtxBox.v (re-type-checked): slot_reg gains sr_x : option X
+  ((a) names the window's x, (b) takes the header at it — the icache's
+  valid re-deposit needs this, the bcache's header ignores it); (d)
+  takes llb td; (e) takes Q; out_l2 records keyed m i.  §3.5 table
+  rebuilt; §3.2 amended.  Lesson recorded in the file header: typing
+  catches shape errors, not missing premises — rule 0's question must
+  be asked per conclusion even on a compiled statement.
