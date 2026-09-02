@@ -494,7 +494,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | Q9 | the two-armed `Q1 0` (main's MID arm re-homed) | ACCEPTED, not landed |
 | §6²⁶/§6²⁷ | the hook convention as law; consolidate before r21; hook (a)/(g) too | RECOMMENDED to the owner |
 | §3.2b | the consolidated box BUILT side-by-side (`iris/CtxBoxHooked.v`): hooks on (a)/(b)/(e)/(f)/(g), `box_q1_update`, eight verbatim-typed corollaries; green on the VM, assumptions closed | landed side-by-side (commit ded0fa1de); slot-in = r20c |
-| Q10 | the last close's (a) must not consume iput's pin name-half: the hooked (a) moves the frozen alternative's own pin into `Q1 1` (option B); no ghost change | RULED B by reviewer 1 (item 9); to land in ProofIput |
+| Q10 | the last close's (a) must not consume iput's pin name-half: the hooked (a) moves the frozen alternative's own pin into `Q1 1` (option B); no ghost change; `ic_hdr_frz` carries `ifreeze_pre` out and needs a `CtxMorph` instance | RULED B by reviewer 1, confirmed by the box's designer (item 9); to land in ProofIput |
 | §6²⁷ | run L2/L3/L4 in parallel now; sweep the file layer once; two tripwires before r21 | RECOMMENDED to the owner |
 
 Tripwires added by this lane, beyond flip endgame §5.7: law 9 (residues)
@@ -628,6 +628,63 @@ and law 10 (hooks).
      not yet on the remote, so unchecked here.  Once landed the module is
      load-bearing and r20c's slot-in is: move the hooks into CtxBox.v,
      repoint the two wrappers.
+   - **THE BOX'S DESIGNER (2026-09-02): B, and it closes.**  Checked
+     against the tree, not the prose:
+     (i) THE FACT.  `ic_pin_exit` (IcacheEscrow.v:1440) recovers `(t, q)`
+         only by `hpn_agree` between the residue's half and the half in
+         hand; the plain (a) at c = 1 takes `Q1 1 = ic_pin_tx k` as a
+         premise, and at the last close the only half in hand is the
+         name-half.  Two anonymous halves after (b′).  Correct, and
+         provability only.
+     (ii) THE HOOK'S DISCHARGE IS TOTAL.  `box_withdraw_L1_hook`
+         (CtxBoxHooked.v:141) quantifies the hook over every `x` and `ξ'`
+         at `sr_ident r`, which iput's register half fixes at
+         `Some (dev, inum)`.  `ic_hdr_amb` at `Some` (IcacheEscrow.v:3513)
+         carries `ic_pay … inum x`: `IcRaw ↦ False`; `IcUnloaded`/
+         `IcLoaded ↦ ordinary ∨ frozen`, the ordinary alternative holding
+         `ifreeze_off inum`.  `ifreeze_excl` (IcacheRef.v:1530) is
+         `own_valid_2` on one exclusive cell -- no mask, no invariant --
+         and iput holds `ifreeze_pre` in hand to +0x8a (ProofIput.v:3171
+         decides the same alternative by it today).  So the hook's three
+         cases are False / False / take `ic_pin_tx` out, and `Q1 1` is
+         `ic_pin_tx k` by `ic_q1`'s S-clause.  Nothing is left to the
+         register's `sr_x`.
+     (iii) THE ONE PREMISE THE PLAN DOES NOT NAME: the (a) hook requires
+         `∀ i x, CtxMorph (P_hdr' i x)` -- the withdrawn header is absorbed
+         at ξ after the hook, unlike (b)'s `P_hdr'`, which is a premise at
+         ξ and needs no instance.  `ic_hdr_frz` therefore needs a
+         `CtxMorph` instance; it is `ic_hdr_morph`'s `Some` branch with the
+         payload conjunct replaced by `ctx_morph_const`, and the `None`
+         branch may be `ic_hdr None x` or `False`.  A deliverable, one
+         screen, name it.
+     (iv) CONDITION (1) DECIDED NOW, not at the join: `ifreeze_pre` is
+         needed after the hook (the +0x8a AU's FrzPre → FrzPost step,
+         ProofIput.v:2390), so `ic_hdr_frz` CARRIES IT OUT -- the hook
+         reads it for the refutation in the ordinary case and returns it
+         beside `frzsel k ¼ true` in the frozen case.  `ic_hdr_frz` gains
+         the freeze index as a parameter; it is ghost, so (iii)'s instance
+         is unchanged.
+     (v) THE FRACTION PLAN.  The alternative's pin was entered at (f′) by
+         `ic_pin_enter` from `hpn_full None`, so its half and iput's kept
+         half NAME THE SAME `(tid, w/2)`; `ic_pin_exit` after (b′) recovers
+         exactly that share.  Reviewer 1's accounting (one w/2 always
+         invariant-visible, one in hand) checks.  The viewer is untouched:
+         the window between the hooked (a) and (b′) is OUT_L1 c = 1 with
+         `Q1 1` the alternative's pin, positive share, refuted at
+         quiescence as before (law 9 unchanged; law 10 says hooks are
+         invisible to the viewer, and this one is).
+     (vi) A NOT B, for the record: A re-spells `hpn` to quarters and every
+         mover; it also LEAVES the plain (a) spending a half that has a
+         name, which is the shape that hid this bug -- B removes the shape.
+     WHAT REMAINS FOR THE CLOSE, in order: (1) item 1's landing (the
+     recycle wrappers on `CtxBoxHooked`, two-armed `Q1 0`), unchecked
+     here because not on the remote; (2) `ic_evict_withdraw_frz` +
+     `ic_hdr_frz` + its instance, ProofIput's +0x8a on it, F42′'s prose
+     corrected; (3) ITEM 2 BEFORE EITHER PROOF IS CALLED DONE:
+     `ic_slot_cover` stated over `box_arm` -- every viewer argument in this
+     file, F38/F44, Q9's live arm, OUT_L2's DepRd read, is prose until that
+     statement type-checks; the residues' final shapes are being landed
+     this round, so this is the moment.  Nothing else open on Q10.
 
 ---------------------------------------------------------------------------
 
