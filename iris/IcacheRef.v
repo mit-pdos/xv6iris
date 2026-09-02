@@ -75,7 +75,7 @@
    neither of which a lock-free reader may open. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
-From iris.algebra Require Import auth gmap frac numbers agree csum excl updates local_updates.
+From iris.algebra Require Import ufrac auth gmap frac numbers agree csum excl updates local_updates.
 From iris.algebra.lib Require Import dfrac_agree.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants own ghost_var mono_nat ghost_map.
@@ -873,6 +873,10 @@ Class icfg := MkIcfg {
      EXACT. *)
   icfg_ieplo : nat -> gname;
   icfg_istmp : nat -> gname;
+  (* R3: the slot's transit box names (CtxBox), canonical for the same
+     reason icfg_isl is: inode_ref / inode_shr carry the box's stamps at
+     the file-table altitude. *)
+  icfg_box  : nat -> box_names;
 }.
 
 (* the pool at BOOT: one whole unit at each of the fifty slots, as ONE map,
@@ -1004,7 +1008,33 @@ Proof.
   case_decide as Hd; [exfalso; lia | done].
 Qed.
 
-Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (nib : nat)
+(* the per-slot box names, minted as one family (bio_init's pattern) *)
+Local Lemma icfg_box_fun_alloc {Σ} `{!icboxG Σ, !kallocG Σ} (n j : nat) :
+  ⊢ |==> ∃ f : nat -> box_names,
+      [∗ list] k ∈ seq j n,
+        own (bx_stamps (f k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
+        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (f k)) 1 0%nat ∗
+        ghost_var (bx_slotd (f k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+        ghost_var (bx_slotp (f k)) 1 (inhabitant : l2_reg ic_bid).
+Proof.
+  iInduction n as [|n IH] forall (j).
+  { iModIntro. iExists (fun _ => inhabitant). cbn [seq]. done. }
+  iMod (own_alloc (● (∅ : gmapUR (ic_bid * nat) ufracR))) as (γs) "Hs"; [by apply auth_auth_valid|].
+  iMod (ghost_var_alloc (ghost_varG0 := kalloc_count_inG) 0%nat) as (γc) "Hc".
+  iMod (ghost_var_alloc (inhabitant : slot_reg ic_bid ic_x)) as (γd) "Hd".
+  iMod (ghost_var_alloc (inhabitant : l2_reg ic_bid)) as (γp) "Hp".
+  iMod ("IH" $! (S j)) as (f) "Hf".
+  iModIntro. iExists (fun k => if decide (k = j) then BoxNames γs γc γd γp else f k).
+  change (seq j (S n)) with (j :: seq (S j) n). rewrite big_sepL_cons.
+  iSplitL "Hs Hc Hd Hp".
+  { case_decide as Hdd; [| congruence]. cbn [bx_stamps bx_cnt bx_slotd bx_slotp].
+    iFrame "Hs Hc Hd Hp". }
+  iApply (big_sepL_mono with "Hf"). intros i k Hk.
+  apply lookup_seq in Hk as [-> _].
+  case_decide as Hdd; [exfalso; lia | done].
+Qed.
+
+Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ, !icboxG Σ, !kallocG Σ} (dv : mword 32) (nib : nat)
     (LM : linkUR) (CM : icntUR) (FM : frzoUR) (BM : frzmUR) (DM : dviewUR)
     (VM : fviewUR)
     (γlog : log_names) (ist : Z) :
@@ -1054,6 +1084,13 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
       (* A6.145: the epoch floors and cell stamps, at 0 (no slot armed) *)
       ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_ieplo k) 1 0) ∗
       ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
+      (* R3: the box ghosts, whole, at their boot values -- IcacheBoot builds
+         the boxes into them (CtxBox.box_alloc_at) *)
+      ([∗ list] k ∈ seq 0 NINODE,
+         own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
+         ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
+         ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+         ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)) ∗
       (* OPTION A (option 1, in-body registry): the escrow registry's auth,
          handed out EMPTY.  [ireg_alloc] populates it over every inum (dummy
          escrow gnames; the reordered-iput walk re-mints real ones at deposit)
@@ -1086,13 +1123,14 @@ Proof.
      boot fupd re-mints it registered over every inum and parks it in
      [ireg_body] (where [reg_full] refutes the pending arm). *)
   iMod (ghost_map_alloc (∅ : gmap Z (gname * gname))) as (γreg) "[Hreg _]".
+  iMod (icfg_box_fun_alloc NINODE 0) as (fbox) "Hbox".
   iModIntro.
   iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γcnt γfrzo γfrzm
-             γdv γfv feplo fstmp), g0.
+             γdv γfv feplo fstmp fbox), g0.
   cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_icnt icfg_frzo icfg_frzm
-       icfg_dview icfg_fview icfg_ieplo icfg_istmp].
+       icfg_dview icfg_fview icfg_ieplo icfg_istmp icfg_box].
   by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Heplo Hstmp Hboot
-             Hreg".
+             Hreg Hbox".
 Qed.
 
 (* ===================================================================== *)

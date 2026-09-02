@@ -947,19 +947,7 @@ Section BioBox.
     apply ctx_morph_sep; [apply buf_hdr_morph | apply buf_rest_morph].
   Qed.
 
-  (* two full ownerships of one cell, at any two contexts, clash *)
-  Lemma ctx_word4_excl_x (ξ1 ξ2 : CtxId) (a : Arch.pa) (dq : dfrac)
-      (w1 w2 : bv 32) :
-    ctx_word4_pointsto ξ1 a (DfracOwn 1) w1 -∗
-    ctx_word4_pointsto ξ2 a dq w2 -∗ False.
-  Proof.
-    iIntros "H1 H2".
-    iDestruct (ctx_word4_pointsto_bytes with "H1") as "H1".
-    iDestruct (ctx_word4_pointsto_bytes with "H2") as "H2".
-    iEval (cbn [seq]; rewrite big_sepL_cons) in "H1". iDestruct "H1" as "[H1 _]".
-    iEval (cbn [seq]; rewrite big_sepL_cons) in "H2". iDestruct "H2" as "[H2 _]".
-    iDestruct (ctx_pointsto_ne with "H1 H2") as %Hne. exfalso. by apply Hne.
-  Qed.
+  (* [ctx_word4_excl_x] is CtxBox's now (shared with the icache instance) *)
 
   (* ================================================================== *)
   (*  THE INSTANTIATION of CtxBox at bcache (endgame §4.1): id = dev ×     *)

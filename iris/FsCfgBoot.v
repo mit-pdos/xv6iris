@@ -1892,7 +1892,7 @@ Section FsCfgBootEra.
             (dview_boot_map_valid _) (fview_boot_map_valid _))
       as (ICFG g0) "(%Hdev & %Hnibq & %Hlogq & %Histq & Hiref & Hlive &
                      Hlk & Hcnt & Hfrzo & Hfrzm & Hdv & Hfv & Hboot & Hep &
-                     Hisl & Heplo & Hstmp & Hrauth)".
+                     Hisl & Heplo & Hstmp & Hbox & Hrauth)".
     (* every ambient form below is stated at [icfg_nib]; make the caller's
        [nib] BE it, so no lemma has to be re-instantiated *)
     symmetry in Hnibq. subst nib.

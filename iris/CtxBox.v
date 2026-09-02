@@ -384,6 +384,78 @@ Section helpers.
     apply elem_of_dom in Hi as [x Hx]. apply (elem_of_dom_2 _ i x).
     by rewrite (msub_key_lookup_ne _ _ _ _ Hne).
   Qed.
+
+  (* ---- shares (icache M-5): a fragment scaled by s, and joins ---- *)
+  Definition mscale (s : Qp) m : gmap (id * nat) ufrac := (fun q : ufrac => (q * s)%Qp) <$> m.
+  Lemma mscale_lookup (s : Qp) m (p : id * nat) :
+    mscale s m !! p = (fun q : ufrac => (q * s)%Qp) <$> (m !! p).
+  Proof. by rewrite /mscale lookup_fmap. Qed.
+  Lemma dom_mscale (s : Qp) m : dom (mscale s m) = dom m.
+  Proof. by rewrite /mscale dom_fmap_L. Qed.
+  Lemma mscale_empty_iff (s : Qp) m : mscale s m = ∅ <-> m = ∅.
+  Proof. by rewrite /mscale fmap_empty_iff. Qed.
+  (* m = mscale s m ⋅ mscale s' m when s + s' = 1 *)
+  Lemma mscale_split (s s' : Qp) m :
+    (s + s')%Qp = 1%Qp -> m = mscale s m ⋅ mscale s' m.
+  Proof.
+    intros Hss. apply map_eq. intros p. rewrite lookup_op !mscale_lookup.
+    destruct (m !! p) as [q|]; simpl; [| done].
+    change (Some (q * s)%Qp ⋅ Some (q * s')%Qp) with (Some ((q * s) + (q * s'))%Qp).
+    f_equal. rewrite -Qp.mul_add_distr_l Hss Qp.mul_1_r. reflexivity.
+  Qed.
+  Lemma qsum_mscale (s : Qp) m : qsum (mscale s m) = (qsum m * Qp_to_Qc s)%Qc.
+  Proof.
+    induction m as [|p q m Hp IH] using map_ind.
+    { rewrite /mscale fmap_empty !qsum_empty. by rewrite Qcmult_0_l. }
+    rewrite /mscale fmap_insert (qsum_insert _ _ _ Hp).
+    rewrite qsum_insert; [| by rewrite lookup_fmap Hp].
+    fold (mscale s m). rewrite IH Qp.to_Qc_inj_mul. by rewrite Qcmult_plus_distr_l.
+  Qed.
+  Lemma max_stamp_mscale (s : Qp) m : max_stamp (mscale s m) = max_stamp m.
+  Proof.
+    induction m as [|p q m Hp IH] using map_ind.
+    { by rewrite /mscale fmap_empty. }
+    rewrite /mscale fmap_insert (max_stamp_insert _ _ _ Hp).
+    rewrite max_stamp_insert; [| by rewrite lookup_fmap Hp]. by rewrite IH.
+  Qed.
+  Lemma max_stamp_singleton_op m (p : id * nat) (q : ufrac) :
+    max_stamp ({[p := q]} ⋅ m) = Nat.max p.2 (max_stamp m).
+  Proof.
+    destruct (m !! p) as [q0|] eqn:Hp.
+    - assert (Heq : {[p := q]} ⋅ m = <[p := (q ⋅ q0)]> (delete p m)).
+      { apply map_eq. intros i. rewrite lookup_op. destruct (decide (i = p)) as [->|Hne].
+        - rewrite lookup_singleton lookup_insert Hp. by rewrite -Some_op.
+        - rewrite lookup_singleton_ne; [|done]. rewrite lookup_insert_ne; [|done].
+          rewrite lookup_delete_ne; [|done]. by rewrite left_id_L. }
+      rewrite Heq max_stamp_insert; [| apply lookup_delete].
+      rewrite {2}/max_stamp (map_fold_delete_L max_step 0%nat p q0 m
+                (fun j1 j2 z1 z2 y _ _ _ => max_step_comm j1 j2 z1 z2 y) Hp).
+      unfold max_step at 1. fold (max_stamp (delete p m)). lia.
+    - rewrite -insert_singleton_op; [| exact Hp]. by apply max_stamp_insert.
+  Qed.
+  Lemma max_stamp_op (m1 m2 : gmap (id * nat) ufrac) :
+    max_stamp (m1 ⋅ m2) = Nat.max (max_stamp m1) (max_stamp m2).
+  Proof.
+    induction m1 as [|p q m1 Hp IH] using map_ind.
+    { rewrite left_id_L /max_stamp map_fold_empty. lia. }
+    rewrite (insert_singleton_op m1 p q Hp) -assoc_L max_stamp_singleton_op IH.
+    rewrite (max_stamp_singleton_op m1 p q). lia.
+  Qed.
+  Lemma keyed_op (m1 m2 : gmap (id * nat) ufrac) (i : id) :
+    keyed m1 i -> keyed m2 i -> keyed (m1 ⋅ m2) i.
+  Proof.
+    intros H1 H2 p Hp. rewrite dom_op in Hp.
+    apply elem_of_union in Hp as [Hp | Hp]; [by apply H1 | by apply H2].
+  Qed.
+  Lemma op_ne_empty_l (m1 m2 : gmap (id * nat) ufrac) : m1 ≠ ∅ -> m1 ⋅ m2 ≠ ∅.
+  Proof.
+    intros Hne Hc. apply Hne. apply map_eq. intros p.
+    apply (f_equal (lookup p)) in Hc. rewrite lookup_op lookup_empty in Hc.
+    rewrite lookup_empty. destruct (m1 !! p) as [q|] eqn:Hq; [| done].
+    exfalso. rewrite Hq in Hc. destruct (m2 !! p) as [q'|] eqn:Hq2; rewrite Hq2 in Hc.
+    - rewrite -Some_op in Hc. discriminate.
+    - rewrite right_id_L in Hc. discriminate.
+  Qed.
 End helpers.
 
 Section box.
@@ -516,6 +588,46 @@ Section box.
     iDestruct (own_context_floor_view with "Hrun Hfl") as "[Hrun (%K' & #HK & %HKK)]".
     iFrame "Hrun". iExists K'. iSplitR; [done|].
     rewrite hart_view_lb_unseal /hart_view_lb_def. iExact "HK".
+  Qed.
+
+  (* ---- two full ownerships of one word cell, at any two contexts, clash
+     (the clients' P_hdr_excl / P_rest_excl run on it) ------------------ *)
+  Lemma ctx_word4_excl_x (ξ1 ξ2 : CtxId) a (dq : dfrac) w1 w2 :
+    ctx_word4_pointsto ξ1 a (DfracOwn 1) w1 -∗
+    ctx_word4_pointsto ξ2 a dq w2 -∗ False.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (ctx_word4_pointsto_bytes with "H1") as "H1".
+    iDestruct (ctx_word4_pointsto_bytes with "H2") as "H2".
+    iEval (cbn [seq]; rewrite big_sepL_cons) in "H1". iDestruct "H1" as "[H1 _]".
+    iEval (cbn [seq]; rewrite big_sepL_cons) in "H2". iDestruct "H2" as "[H2 _]".
+    iDestruct (ctx_pointsto_ne with "H1 H2") as %Hne. exfalso. by apply Hne.
+  Qed.
+
+  (* ---- shares: a reference splits by mass and joins (M-5) ------------ *)
+  Lemma reference_split γ (i : id) m (s s' : Qp) :
+    (s + s')%Qp = 1%Qp ->
+    reference γ i m -∗ reference γ i (mscale s m) ∗ reference γ i (mscale s' m).
+  Proof.
+    iIntros (Hss) "(%Hne & %Hk & Hf & #Hllb)".
+    iAssert (stamps_frag γ (mscale s m) ∗ stamps_frag γ (mscale s' m))%I with "[Hf]" as "[Hf1 Hf2]".
+    { rewrite /stamps_frag -own_op -auth_frag_op -(mscale_split s s' m Hss). iExact "Hf". }
+    iSplitL "Hf1".
+    - iFrame "Hf1". rewrite max_stamp_mscale. iFrame "Hllb". iPureIntro. split.
+      + intros Hc. apply Hne. by apply (mscale_empty_iff s).
+      + intros p Hp. rewrite dom_mscale in Hp. by apply Hk.
+    - iFrame "Hf2". rewrite max_stamp_mscale. iFrame "Hllb". iPureIntro. split.
+      + intros Hc. apply Hne. by apply (mscale_empty_iff s').
+      + intros p Hp. rewrite dom_mscale in Hp. by apply Hk.
+  Qed.
+  Lemma reference_join γ (i : id) (m1 m2 : gmap (id * nat) ufrac) :
+    reference γ i m1 -∗ reference γ i m2 -∗ reference γ i (m1 ⋅ m2).
+  Proof.
+    iIntros "(%Hne1 & %Hk1 & Hf1 & #Hl1) (%Hne2 & %Hk2 & Hf2 & #Hl2)".
+    rewrite /reference /stamps_frag auth_frag_op own_op. iFrame "Hf1 Hf2".
+    iSplitR; [iPureIntro; by apply op_ne_empty_l|].
+    iSplitR; [iPureIntro; by apply keyed_op|].
+    rewrite max_stamp_op. iApply (llb_max with "Hl1 Hl2").
   Qed.
 
   (* ---- the two payload rows the locks carry (client-facing) --------- *)
@@ -716,7 +828,47 @@ Section box.
       reference γ i' {[ (i', T') := unit_mass c ]} ∗
       llb loglen_name T'.
   Proof.
-  Admitted.
+    iIntros (HE Hw Hx Hent) "#Hbox Hrun Hrd0 Hcnt Hhdr".
+    rewrite /is_box. box_open "Hbox" "Hcl".
+    iDestruct (ghost_var_agree with "Hrd Hrd0") as %->.
+    iDestruct (ghost_var_agree with "Hc Hcnt") as %->.
+    iEval (rewrite Hw) in "Harm".
+    iDestruct "Harm" as "[>Hho >Hrest]". iDestruct "Hrest" as (x) "[%Hx' Hrest]".
+    assert (x = x0) as -> by congruence.
+    (* F14: the arm's rest converts to the target shape *)
+    iDestruct (Hent ξb with "Hrest") as "Hrest".
+    iDestruct "Hho" as (m') "[%Hsum' Hf']".
+    iMod (stamps_dealloc with "Hst Hf'") as (m1) "(Hst & %Hq1 & _ & _)".
+    assert (m1 = ∅) as ->.
+    { apply qsum_zero_empty. rewrite Hsum' in Hq1.
+      apply (Qc_plus_cancel_l (qsum m)). by rewrite Hq1 Qcplus_0_r. }
+    iMod (ctx_deposit (P_hdr i' x1) ξ ξb T with "Hrun Hpk Hhdr")
+      as "(Hrun & %T' & %HTT' & Hpk & Hhdr)".
+    iDestruct (ctx_parked_llb with "Hpk") as "[Hpk #Hllb']".
+    iMod (own_update _ _ _ (stamps_alloc_upd ∅ (i', T') (unit_mass c)) with "Hst") as "[Hst Hfr]".
+    iEval (rewrite right_id) in "Hst".
+    iMod (ghost_var_update_2 (SlotReg T' false i' None) with "Hrd Hrd0")
+      as "[Hrd Hrd0]"; [by rewrite Qp.half_half|].
+    iMod (ghost_var_update_2 (Nat.max 1 c) with "Hc Hcnt") as "[Hc Hcnt]"; [by rewrite Qp.half_half|].
+    iMod ("Hcl" with "[Hpk Hst Hc Hrd Hrp Hhdr Hrest]") as "_".
+    { iNext. iExists T', ξb, {[(i', T') := unit_mass c]}, (Nat.max 1 c), (SlotReg T' false i' None), sb.
+      iFrame "Hpk Hllb' Hst Hc Hrd Hrp". simpl.
+      iSplitR.
+      { iPureIntro. rewrite -insert_empty (qsum_insert ∅ _ _ (lookup_empty _)) qsum_empty Qcplus_0_r.
+        apply unit_mass_Qc. }
+      iSplitR; [iPureIntro; apply keyed_singleton|].
+      iSplitR.
+      { iPureIntro. left. intros p Hp. rewrite dom_singleton_L in Hp.
+        apply elem_of_singleton in Hp. subst p. simpl. lia. }
+      iSplitR; [iPureIntro; left; lia|].
+      iLeft. iExists x1. iFrame "Hhdr Hrest". }
+    iModIntro. iFrame "Hrun". iExists T'. iFrame "Hrd0 Hcnt".
+    iSplitL "Hfr"; [| iExact "Hllb'"].
+    rewrite /reference. iFrame "Hfr".
+    iSplitR; [iPureIntro; apply singleton_ne_empty_map|].
+    iSplitR; [iPureIntro; apply keyed_singleton|].
+    rewrite max_stamp_singleton. iExact "Hllb'".
+  Qed.
 
   (* ================================================================== *)
   (*  (c) ref_incr, under L1 (legal at c = 0: bget's hit on a cached      *)

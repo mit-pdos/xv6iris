@@ -59,6 +59,7 @@ Require Import LogInv.
 Require Import BioDefs.   (* [BSIZE]: the block size [bm_covers] divides by *)
 Require Import BlockWords.
 Require Import DinodeEnc.
+Require Export BlkmapDefs.
 Require Export IcacheRef.   (* the in-core scalar fields + the reference *)
 Require Export InodeDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -231,11 +232,8 @@ Definition ireg_blocks_ok (inodestart : Z) (nib : nat)
 (*  The pure model: a file's block map                                    *)
 (* ===================================================================== *)
 
-Record blkmap := MkBlkmap {
-  bm_dir : list (bv 32);   (* the NDIRECT direct entries; 0 = unallocated *)
-  bm_ind : bv 32;          (* the indirect block itself;  0 = none        *)
-  bm_ent : list (bv 32);   (* the NINDIRECT entries of that block         *)
-}.
+(* [blkmap] lives in BlkmapDefs.v (re-exported below), so the camera bundle
+   can name the icache box's shape without this file. *)
 
 (* file index -> disk block.  Total: an out-of-range index reads the
    [Inhabited] default (all zeros), i.e. "unallocated", which is exactly

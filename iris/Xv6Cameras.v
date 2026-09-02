@@ -85,6 +85,7 @@ Require Import Riscv.rv64d_types.
 Require Import RiscvLang.     (* [CPU]                                        *)
 Require Import VirtioQueue.   (* [vslot]; brings [virtio_cfg] / [disk_wr]     *)
 Require Import DinodeEnc.     (* [dinode]                                     *)
+Require Import BlkmapDefs.    (* [blkmap] -- the icache box shape (§15)       *)
 Require Import FsNode.        (* [fs_node] -- the era top map's value type    *)
 
 Local Open Scope Z_scope.
@@ -742,6 +743,8 @@ Record box_names := BoxNames {
   bx_slotd  : gname;
   bx_slotp  : gname;
 }.
+Global Instance box_names_inhabited : Inhabited box_names :=
+  populate (BoxNames inhabitant inhabitant inhabitant inhabitant).
 
 (* ---- the bcache instance's members: stamps at dev × blockno, the two
    register ghost_vars (the count's [ghost_varG Σ nat] is a member through
@@ -768,3 +771,29 @@ Proof. solve_inG. Qed.
 Global Instance biobox_boxG {Σ} `{!bioboxG Σ} `{!kallocG Σ} : boxG bio_id bio_x Σ :=
   {| box_stampsG := biobox_stampsG; box_cntG := kalloc_count_inG;
      box_slotdG := biobox_slotdG; box_slotpG := biobox_slotpG |}.
+
+(* ---- the ICACHE instance's members (R3, IcacheBox.v): identity option
+   (dev × inum) with None = dead (M-1'), shape with the generation (M-3).
+   The per-slot box names are a field of [IcacheRef.icfg] (canonical, like
+   icfg_isl) so inode_ref / inode_shr keep their arity. ---- *)
+Notation ic_bid := (option bio_id).
+Inductive ic_x : Type :=
+  | IcRaw
+  | IcUnloaded (g : gname)
+  | IcLoaded (g : gname) (dn : dinode) (bm : blkmap).
+Global Instance ic_bid_eq_dec : EqDecision ic_bid | 0 := _.
+Global Instance ic_bid_countable : Countable ic_bid | 0 := _.
+Global Instance ic_bid_inhabited : Inhabited ic_bid := populate None.
+Global Instance ic_x_inhabited : Inhabited ic_x := populate IcRaw.
+Class icboxG (Σ : gFunctors) := IcboxG {
+  icbox_stampsG :: inG Σ (stampsR ic_bid);
+  icbox_slotdG  :: ghost_varG Σ (slot_reg ic_bid ic_x);
+  icbox_slotpG  :: ghost_varG Σ (l2_reg ic_bid);
+}.
+Definition icboxΣ : gFunctors :=
+  #[ GFunctor (stampsR ic_bid); ghost_varΣ (slot_reg ic_bid ic_x); ghost_varΣ (l2_reg ic_bid) ].
+Global Instance subG_icboxΣ {Σ} : subG icboxΣ Σ -> icboxG Σ.
+Proof. solve_inG. Qed.
+Global Instance icbox_boxG {Σ} `{!icboxG Σ} `{!kallocG Σ} : boxG ic_bid ic_x Σ :=
+  {| box_stampsG := icbox_stampsG; box_cntG := kalloc_count_inG;
+     box_slotdG := icbox_slotdG; box_slotpG := icbox_slotpG |}.
