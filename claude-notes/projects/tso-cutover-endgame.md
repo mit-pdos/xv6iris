@@ -528,6 +528,72 @@ and law 10 (hooks).
    confirmed.
 8. **The port's Admitted inventory** must list OffBox's 14 until r25
    clears them.
+9. **Q10 (build agent, 2026-09-02, found while fusing ProofIput) — THE
+   WINDOW PIN'S NAME-HALF IS CONSUMED BY THE LAST CLOSE'S (a).**  Needs a
+   ruling; two options below, the second recommended.
+   - THE FACT.  `ic_pin_tx k := ∃ t q, hpn_h k (Some (t,q)) ∗ tx_pin t q`
+     (`hpn_h` = ½).  Main's movers recover the returning share's `(t,q)`
+     from the residue's ∃ ONLY by agreement with the half the walk KEPT
+     (`ic_pin_exit k t q : hpn_h k (Some (t,q)) -∗ ic_pin_tx k ==∗ hpn_full
+     k None ∗ t ↪{q}`).  Under the box this works at the guard (Exit A's
+     (b′) and the free path's (g) return `Q1 1` while iput still holds its
+     half).  It BREAKS at the free path's last close: after (g) and the
+     frozen park (f′), F42′ puts one pin half in the header's frozen
+     alternative (`frzsel ¼ ∗ ic_pin_tx k`) and the other in iput's hand;
+     at +0x8a the box's (a) at c = 1 DEMANDS `Q1 1 = ic_pin_tx k` as a
+     premise, and the only half iput has is the name-half.  Depositing it,
+     iput gets the alternative's pin out (∃ t' q') and, after (b′), `Q1 1`
+     back (∃ t'' q''): two anonymous halves agree with each other and with
+     nothing iput knows, so the returning shares cannot be shown to be
+     `(tid, ·)` and the post `tid ↪[ln_tx]{#qtx} ()` (and the transit row's
+     `(t,q)`, and the join with the freeze index's half) is unprovable.
+     Provability, not soundness; F42′'s "the two halves are in the frozen
+     alternative and iput's hand" did not account for (a) taking the hand's
+     half.  Not reachable by any of the five green inode proofs (they see
+     `hpn_full` and `ic_pin_tx` opaquely); ProofIget does not enter a pin.
+   - REJECTED: parking an anonymous share alone in the alternative (the
+     share's identity is lost the same way); recording `(t,q)` in the
+     header (`ic_pay` at `IcUnloaded g` has no slot; changes `ic_x`); a
+     persistent snapshot of the pin (`hpn_at` is `frac_agree`, none).
+   - OPTION A — QUARTERS (ghost-only, icache-local): `ic_pin_tx k := ∃ t q,
+     hpn_at k ¼ (Some (t,q)) ∗ tx_pin t q`; a pin enter leaves the walk ¾;
+     at the last close it splits ¾ into a ¼-pin for `Q1 1` and a KNOWN ½;
+     both returning quarters agree with the kept ½ and the four rejoin to
+     the full cell → `None` → `ic_pin_rest` for the dead row.  Touches
+     `ic_pin_tx` and its movers in `IcacheEscrow.v` only (`hpn_at` is
+     already fraction-generic); no box change; nothing green reopens.
+   - OPTION B — THE HOOKED (a) (recommended; it is what §6²⁷/§3.2b's
+     `box_withdraw_L1_hook` was built for: "the guard's pin … could be
+     produced here"): at +0x8a iput calls `box_withdraw_L1_hook` with
+     `Qc := ifreeze_pre rg inum`, hook `Qc ∗ ic_hdr … x ξ' ={E∖↑N}=∗
+     ic_hdr_frz … x ξ' ∗ ic_pin_tx k` — the hook decides the header's arm
+     (the ordinary alternative dies on `ifreeze_excl` against `ifreeze_pre`,
+     exactly flip's decision, now inside the hook) and MOVES the frozen
+     alternative's own pin into `Q1 1`; `P_hdr'` is the header with the
+     alternative reduced to `frzsel ¼ true`.  iput's known half never
+     leaves its hand; (b′) returns the alternative's pin and `ic_pin_exit`
+     recovers `(tid, q)` as on main.  One new wrapper
+     (`ic_evict_withdraw_frz`, the hooked (a) at c = 1), no ghost change,
+     no CtxBox change (law 10: the need is met by the hook of the
+     transition it belongs to).  The fraction plan then closes with
+     halves: the window half `w = qtx/2`; `w/2` into the guard's pin at
+     +0x3a and `w/2` kept; (g) returns the pin (both halves in hand);
+     `w/2` into `Q2`'s `DepFrz` side at (g), back as `Q'` at (f′); the
+     frozen alternative's pin takes `w/2` at (f′); at +0x8a the alternative's
+     pin comes out through the hook, `ipool_evict_lend` parks the `Q'` half
+     `(tid, w/2)` in the transit row, (b′) returns the pin's `w/2`, the
+     off-lock deposit returns the corpse's `w/2`: `w` at
+     `ip_locked_exit1`, `qtx` after the join with the freeze index's half
+     in `wp_iput_gen` (main's C-6 plan, one level down).
+   - EITHER WAY the `ip_rows`/`ip_window` seam of the tail gains the pin
+     half and the kept share (Exit A keeps the window open into the
+     eviction, F28; the tail's (b′) returns `Q1 1` there), and F42′'s prose
+     is corrected to name which half is where.
+   STATUS OF ITEM 1: the recycle wrappers are on `CtxBoxHooked` (`ic_recycle_flip`
+   = `box_q1_update` with `ipool_take_lend` inside, all five mask premises;
+   `ic_recycle_deposit` = `box_deposit_L1_hook` with the join; `Q1 0`
+   two-armed); `IcacheEscrow`/`IcacheBoot` green on the VM with them;
+   ProofIget fused and building.  The CtxBox.v draft of (b″) is withdrawn.
 
 ---------------------------------------------------------------------------
 
