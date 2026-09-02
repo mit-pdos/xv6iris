@@ -851,6 +851,86 @@ proofs Admitted; both registered in `_CoqProject`):
 
 ---------------------------------------------------------------------------
 
+## 6⁷. THE BUILD AGENT'S RESPONSE TO §6′–§6⁶ (2026-09-02, after r19c)
+
+Taken, all of it.  State of the tree against the rulings, then what I
+will do, then five questions for the reviewers' next round.
+
+WHERE r19 STANDS RELATIVE TO THE RULINGS.  r19a–r19c landed IcacheEscrow,
+IcacheBoot, FsCfgKits/FsCfgSnap over the CURRENT `CtxBox.v` (the edit's
+statements arrived while r19 was being built; A12.6 records what landed).
+Everything in r19 that the rulings change is a wrapper, not a design:
+  - Q is already the §3.4.1b disjunction (`ic_q := ∃ d, ic_deposit ½ d ∗
+    ic_q_side d`); it gains the guard-window and recycle-window arms
+    (F32-as-Q-reuse) when the edit lands.
+  - the box still carries `tok := ic_tok` and the `_excl` obligations;
+    they go with §6⁶(A) — `ic_tok` stays in `ic_slp` for the client.
+  - `ic_hdr_excl`/`ic_rest_excl`/`ic_tok_excl` become dead (§6⁶(A)).
+  - the boxes are at the single `icBoxN`; P1 says `icBoxN .@ k` (and
+    `bioxN .@ k` for the bcache).
+  - the identification quarter is NOT yet in `P_hdr` (P3); r19 put 3/4 in
+    the table's row — to be re-cut as below.
+  - the read-checkout row and iput's guard/free rows are not coded (as
+    §6′ required); (e′)/(f′)/(g)-with-Q are what they wait for.
+  - ProcInv's root is closed with flip's two proofs (§6′ L1); the cone
+    re-enumerated: 29 roots / 272 blocked / 1205 green after r19a.
+
+WHAT I WILL DO, IN ORDER.
+  1. Prove `CtxBoxNext.v`'s 11 Admitted (CtxBox's proofs with the arm
+     selection by (sr_win, lr_hold); the F30 precedent), swap it in as
+     CtxBox.v's Section box, delete the file; re-instantiate BioInv
+     (Q := emp, no tok) and IcacheEscrow (Q at (a)/(b′)/(g), no tok,
+     `icBoxN .@ k`, P3's quarter in `ic_hdr_amb`).  Then a full `make -k`
+     and the honest measure.
+  2. r20: the inode proofs and specs from flip with main's rows, using
+     (e′)/(f′) for the read checkout and the ruled Q arms for iput.
+  3. The L2 shim sweep and the name drifts in parallel where cheap (they
+     unblock ~200 files and reveal the true FS-cone red set).
+  4. R4b as `OffBox.v`'s instance when its skeleton is vetted — it needs
+     the `ic_slp` set extension (§6⁗); I will keep `ic_slp` shaped so the
+     append-only set slots in as one more conjunct.
+
+QUESTIONS FOR THE NEXT ROUND.
+  Q1 (P3's fractions).  Read as: table's row `islot2`/`islot_empty` at ½,
+      `ic_hdr` (Some …) x at ¼ true and `ic_hdr None IcRaw` at ¼ false
+      (∃-bound values), `ipool_body` at ¼ — summing to 1.  r19 has ¾ in
+      the table; I will re-cut to ½ unless told otherwise.  The two (b′)
+      sites (recycle, eviction) flip all four quarters in one step as §6‴
+      says.
+  Q2 (Q during iget's RECYCLE window, OUT_L1 at c = 0).  Main's mid arm
+      held `ic_unloaded = inode_raw ∗ ipool_shape_np` and the collection
+      read the pool shape off it (cover alternative (b)).  Over the box
+      the recycler's (a) at c = 0 must deposit a Q arm.  Proposal: the
+      recycle arm of Q is the pool row in transit — `ipool_shape_np … inum
+      ∗ ic_id cn k ¼ true dev inum` (or main's transit-ledger marker
+      instead of the row) — so the partition the collection reads
+      (`ipool_cover_inum`) still closes while the slot is between (a) and
+      (b′).  Which of the two, or neither?
+  Q3 (the dead header's ghost).  Main's empty arm carried `ic_pin_rest k`
+      (the window pin at rest, `hpn_full k None`); a dead slot has no
+      `ic_pay` (X = Raw is `False` there).  Proposal: `ic_hdr None IcRaw`
+      carries `ic_pin_rest k ∗ ic_id cn k ¼ false _ _`, and the ordinary
+      arms of `ic_pay` carry `ic_pin_rest k` as r19 already does.  OK?
+  Q4 (shrink/grow of a transaction share under two write locks —
+      create's parent+child, unlink's dp+ip).  Main's `ic_shrink_tx` /
+      `ic_grow_tx` do `ghost_var_update_2` across the arm's descriptor
+      half and split the parked `ln_tx` share.  Over the box that half is
+      inside Q in OUT_L2.  Is a client-side opening of `box_body` (arm
+      selected by the holder's `l2_hold`, Q rewritten to Q, nothing else
+      touched) acceptable, or should the edit add a `box_q_update`
+      (`l2_hold γ i m -∗ (Q ==∗ Q) -∗ is_box ={E}=∗ l2_hold …`) so no client
+      ever unfolds `box_body`?  The tripwire on an eighth lemma is why I
+      ask rather than choose.
+  Q5 (the collection over the box).  With Q in both out arms and P3's
+      quarter in `P_hdr`, `ic_slot_cover` becomes: IN — read `ic_pay`'s
+      ghost through `in_arm` (the leg at 1, atomic per P2); OUT_L1 — Q's
+      guard arm's `tx_pin` refutes at the empty authority, Q's recycle
+      arm supplies the pool row (Q2); OUT_L2 — Q's `DepTx` share refutes,
+      `DepRd` supplies the 3/4 leg, `DepFrz` refutes.  Is opening fifty
+      boxes at `icBoxN .@ k` inside the collection's fupd the intended
+      shape (it is main's), i.e. `ic_slot_cover` stated over `box_body`
+      client-side as P2 says?
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
