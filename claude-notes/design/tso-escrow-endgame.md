@@ -1437,6 +1437,47 @@ context, mapped to CtxBox's lemmas:
   the closer's unit (IcacheRef.inode_ref_at names the fragment so the
   floor can be stated over it), and the post-free re-acquire at Tl := the
   park stamp.
+  F30 OPEN -- NEEDS A RULING (2026-09-02, found writing ProofIput's free
+  path): THE FREE PATH'S (b) THEN (e) LOSES THE SHAPE.  The vetted plan
+  for iput's free path is the guard's (a) at c = 1, then (b) at T', then
+  the NB acquiresleep (F22's twin floors T'), then (e).  But (b) sets the
+  register's sr_x := None and (e) returns ∃ x, P_hdr x ∗ P_rest x -- the
+  box does not remember what was deposited, by design (the freshness
+  design keys content by the CLIENT's identity-keyed payload ghost, F2).
+  For the icache that ghost is ic_pay, and on the FROZEN alternative it is
+  "the receipt and nothing else" (M-3/IVd) -- so after the +0x50 mint
+  (which spends ifreeze_off, so the header can only go back frozen) the
+  header comes out of (e) at an UNKNOWN shape: IcUnloaded g' (frozen) is
+  not refutable, and for IcLoaded g' dn' bm' nothing ties dn' to the dn
+  the guard read nlink = 0 off (the cells are linear; the region's record
+  witness dinode_at is inside the box's ghost; no persistent witness of
+  the record exists that survives the later type := 0 write).  itrunc and
+  the region free need the cells and the record AT dn.  Moving the mint
+  after (e) (round trip on the ordinary alternative) pins the generation
+  (live_gen ½ g' vs the closer's own slice) but still not dn.
+  The bcache never hits this: buf_pay keys the data to the fs view, a
+  duplicable global.  The icache's analogue would be a shape witness the
+  holder keeps a half of across (b)…(e).
+  OPTIONS.  (B) the seventh transition the proposer named and rejected at
+      F22 -- OUT_L1 → OUT_L2 under both locks: the free path never
+      re-deposits the header; P_rest is taken out with the (a)-time floor
+      over the closer's unit (the guard's acquire floor Kt), the L1
+      register closes (win := false, sr_x := None), L2 holds the unit's
+      fragment.  One more CtxBox lemma ((b)'s and (e)'s skeletons fused,
+      no fresh stamp, rule 0 obvious); the NB twin (F22) becomes
+      unnecessary for this site.  Today's proof structure is exactly this
+      (the freer keeps its bundle in hand across the span).
+  (C) keep (b)/(e) and add a client-side SHAPE AGREEMENT to ic_pay on every
+      alternative (a per-slot fractional agreement on ic_x; the holder
+      keeps a half across (b)…(e)) -- a new client ghost family in the
+      instance, not in the box; ~13 sites regroup.
+  RECOMMENDATION: (B).  It is the smaller change (one lemma, one site), it
+  matches the vetted "+0x3c/+0x44 re-reads inside the (a)…(b) window"
+  reading, and the shape-blindness of (e) after (b) is a property of the
+  box (correct for every other site: their shapes are re-derived from the
+  identity-keyed ghost on the ordinary alternative).  The rest of R3
+  (recycle, hit, ilock, iunlock, idup, iput's Exit A and last closes) is
+  unaffected and proceeds; the free path waits for the ruling.
 
   BUILD AGENT'S REVIEW OF THE SKELETON (2026-09-02, against ProofIget /
   ProofIlock / ProofIunlock / ProofIput and the bcache instance as built).
@@ -2070,3 +2111,8 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   inode_ref_at (named fragment) for iput's llb-tier itable acquire.
   ProofIdup green; ProofIget/Ilock/Iunlock rewritten (compiling);
   ProofIput in progress; the NB twin (F22) not yet written.
+- 2026-09-02 (build agent, R3.3): F30 OPEN — iput's free path: (b) then
+  (e) loses the shape (the frozen alternative keys nothing, the box
+  forgets x at (b)); recommend the OUT_L1 → OUT_L2 transition (B) over a
+  client shape-agreement ghost (C).  Needs a ruling; everything else in
+  R3 proceeds.
