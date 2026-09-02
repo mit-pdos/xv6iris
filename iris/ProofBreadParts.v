@@ -682,7 +682,7 @@ Section BreadScan2.
       iFrame "Hdevs Hbnos". }
     iDestruct ("Hback" $! (<[k := (None, 1%positive)]> M)
                  (bfun_upd devs k D) (bfun_upd bnos k B) (Nat.max tl T')
-                 with "[%] [%] [Hslot]") as "Hslots"; [| lia |].
+                 with "[%] [%] [Hslot]") as "Hslots"; [| lia | |].
     { intros j Hj. split_and!;
         [ rewrite lookup_insert_ne; [reflexivity | congruence]
         | exact (bfun_upd_ne devs k D j Hj)

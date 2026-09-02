@@ -1379,12 +1379,12 @@ Section BioBox.
   Definition bslp (bn : bio_names) (k : nat) : CtxId -> iProp Σ :=
     bslp_raw (bn_own bn k) (bn_regp bn k).
   (* the releaser's unfloored row (R2's [Rdep]), at a KNOWN park stamp *)
-  Definition bslp_dep (bn : bio_names) (k : nat) (T' : nat) : iProp Σ :=
-    (bown bn k ∗ reg_park bn k (L2Reg T' None))%I.
-  Lemma bslp_fold bn k T' (ξ : CtxId) :
-    bslp_dep bn k T' ∗ TsoCtx.ctx_floor ξ T' ⊢ bslp bn k ξ.
+  Definition bslp_dep (bn : bio_names) (k : nat) (T' : nat) : CtxId -> iProp Σ :=
+    fun _ => (bown bn k ∗ reg_park bn k (L2Reg T' None))%I.
+  Lemma bslp_fold bn k T' :
+    forall ξ : CtxId, bslp_dep bn k T' ξ ∗ TsoCtx.ctx_floor ξ T' ⊢ bslp bn k ξ.
   Proof.
-    iIntros "[(Ho & Hrp) #Hfl]". rewrite /bslp /bslp_raw /bown.
+    intros ξ. iIntros "[(Ho & Hrp) #Hfl]". rewrite /bslp /bslp_raw /bown.
     iFrame "Ho". iExists (L2Reg T' None). rewrite /reg_park /slotp_half /bn_box /=.
     iFrame "Hrp". iSplitR; [done|]. iExact "Hfl".
   Qed.

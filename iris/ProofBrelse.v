@@ -213,6 +213,43 @@ Section ProofBrelse.
   Qed.
 
 
+  (* ---------------------------------------------------------------- *)
+  (*  The [c.addiw a5,a5,-1] value, as a function of the loaded word    *)
+  (* ---------------------------------------------------------------- *)
+
+  Local Definition decr32 (cw : mword 32) : mword 32 :=
+    trunc32 (sign_extend' 64 (subrange_vec_dec
+      (add_vec (sign_extend' 64 cw)
+               (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)).
+
+  (* the 64-bit register value the branch reads is the sign extension of it *)
+  Local Lemma decr64_sext (cw : mword 32) :
+    sign_extend' 64 (subrange_vec_dec
+      (add_vec (sign_extend' 64 cw)
+               (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)
+    = sign_extend' 64 (decr32 cw).
+  Proof. rewrite /decr32 trunc32_sext. reflexivity. Qed.
+
+  (* on a POSITIVE count the borrow never happens: the stored word is the
+     literal predecessor (pop_off's [c->noff--] arithmetic, at a [positive]). *)
+  Local Lemma decr32_pos (cnt : positive) :
+    (Z.pos cnt < 2 ^ 31)%Z ->
+    decr32 (mword_of_int (Z.pos cnt) : mword 32) = (mword_of_int (Z.pos cnt - 1) : mword 32).
+  Proof.
+    intro Hb.
+    pose (j := (Pos.to_nat cnt - 1)%nat).
+    assert (Hj : Pos.to_nat cnt = S j)
+      by (unfold j; pose proof (Pos2Nat.is_pos cnt); lia).
+    assert (Hz : Z.pos cnt = Z.of_nat (S j))
+      by (rewrite -Hj positive_nat_Z; reflexivity).
+    assert (Hb' : (Z.of_nat (S j) < 2 ^ 31)%Z) by (rewrite -Hz; exact Hb).
+    assert (Hnv : (mword_of_int (Z.pos cnt) : mword 32) = noff_val (S j))
+      by (unfold noff_val; rewrite Hz; reflexivity).
+    rewrite /decr32 Hnv (pop_nv1_pred j Hb') trunc32_sext /noff_val.
+    assert (Heq : Z.of_nat j = (Z.pos cnt - 1)%Z) by lia.
+    rewrite Heq. reflexivity.
+  Qed.
+
   (* ================================================================== *)
   (*  THE TAIL: release(&bcache.lock) + the epilogue, reached from both  *)
   (*  arms of the [c.bnez].                                             *)
@@ -545,6 +582,9 @@ Section ProofBrelse.
     iDestruct (bio_ctx_buf bn V k Hk with "Hbio") as "[#Hslk #Hbox]".
     iDestruct "Hlocked"
       as "(_ & %Hcov & %Hdv & Hstok & Hvalid & Hbdev & Hbuf & Hdb & Hbpay)".
+    (* F7: the handle's token row carries the chain's count fragment and the
+       L2 register half naming the parked unit *)
+    iDestruct "Hstok" as "(Hstok & Hbr0 & Hhold)". iDestruct "Hhold" as (th) "Hhold".
     (* the payload the park deposits: the handle's disk cell and [bio_pay],
        re-packaged at the escrow's [buf_pay] shape.  The blockno is covered
        (bio_held's second conjunct), so the [decide] resolves LEFT and the
@@ -636,6 +676,7 @@ Section ProofBrelse.
               R1 (K - 4)%nat vr24 b with "Hcg Hpc [] Hr24").
     { iApply (bri_02 with "Htext"). }
     iIntros (CID2 Hs2) "Hcg Hpc Hr24".
+    iEval (rgpeel) in "Hr24".
     iEval (rewrite Hb1 HR1ra) in "Hr24".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.brelse + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.brelse + 0x04))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -770,9 +811,6 @@ Section ProofBrelse.
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID10 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    (* F7: the handle's token row carries the chain's count fragment and the
-       L2 register half naming the parked unit *)
-    iDestruct "Hstok" as "(Hstok & Hbr0 & Hhold)". iDestruct "Hhold" as (th) "Hhold".
     iDestruct "Hstok" as (qsl) "Hstok".
     iApply (Hsl.wp_holdingsleep_genl_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bslp bn k) SleepLock.sl_untracked qsl mA p pidv (K - 4)%nat b b lks
@@ -865,7 +903,7 @@ Section ProofBrelse.
     { iEval (rewrite HH2a0). iExact "Hslk". }
     { iEval (rewrite HH2a0). iExact "Hstok". }
     { rewrite /bslp_dep /bown. iFrame "Hbown Hrp". }
-    iIntros (CID15 Hs15 mR) "%Hcs2 Hcg Hcnt Hpc".
+    iIntros (CID15 Hs15 mR) "%Hcs2 Hcg Hcnt Hpc _".
     assert (Hpc20 : ret_pc (H2 !!! Regidx Rra) = mword_of_int (KernelSyms.brelse + 0x20)).
     { rewrite HH2ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc20) in "Hpc".
@@ -1038,7 +1076,9 @@ Section ProofBrelse.
       iApply fupd_wp.
       iMod ("Hclose" with "Hcell") as "[Hafter Hfd]".
       iModIntro.
-      iDestruct "Hafter" as (Mg ord devs bnos tl') "(%Htl' & #Hllbtl' & Hscan')".
+      iDestruct "Hafter" as (Mg' ord' devs' bnos' tl') "(%Htl' & #Hllbtl' & Hscan')".
+      clear Mg ord devs bnos.
+      rename Mg' into Mg; rename ord' into ord; rename devs' into devs; rename bnos' into bnos.
       iDestruct "Hscan'" as "(Hauth & Hsauth & %Hdom' & %Hord & %Hinj & %Hdev & Hlru & Hpool & Hslots)".
       (* ===== +0x32 c.bnez a5 : NOT taken, the splice runs ===== *)
       assert (Hbnez : neq_vec (D2 !!! Regidx Ra5) zero_reg = false)
