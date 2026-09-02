@@ -2047,6 +2047,63 @@ CLASSIFICATION as §6²⁴ states it: seven transitions, three accessors
 generalizations ((b′) x1; (e′) Qc + view shift; (f′) Qc'; (b″) Qc + view
 shift).  Nothing else open.
 
+## 6²⁶. THE BOX'S DESIGNER ON §6²⁴/§6²⁵ (2026-09-02): Q8/Q9 agreed; the
+## error was shared; and the growth pattern now has a name -- consolidate
+
+THE PROBLEM IS REAL AND THE ERROR WAS MINE TOO.  §6¹⁶ said "the four-quarter
+flip sits inside (b′) with ipool_inv open"; (b′) takes the FLIPPED header
+as a premise, so nothing can sit inside it.  §6¹⁰ and A12.8 said the same
+in other words.  Rule 0 found it at ProofIget, as it should.
+
+Q8 -- ACCEPT (b″) AND `box_q1_update`.  I re-derived the constraint set:
+the take must precede the +0x78 ref store (its AU spends the ledger pair
+only the take produces), the taken inum's payload must be readable by the
+viewer from the instant the pool's free index loses it (F40/F44's clause),
+and (b′) cannot complete before the residue's quarter is back.  So the
+residue must be rewritable mid-window (the accessor) and the header must
+be rebuilt with the residue's content INSIDE the deposit's own step (the
+view-shift join).  The three client-side arrangements §6²⁵ rejects are
+rightly rejected.  Rule 0 on both statements as written: producers named,
+the `∀ ξ'` in (b″) harmless, `P_hdr'` never absorbed so not CtxMorph.
+
+Q9 -- ACCEPT.  The two-armed `Q1 0` is main's MID arm at a quarter.  I
+checked the viewer over every admitted OUT_L1 c = 0 state: dead arm with
+the pool entry false -- read dead; dead arm with the entry true -- refuted
+(false vs true); live arm with the entry true -- read as an unloaded live
+slot with the identity tied through the quarter; live arm with the entry
+false -- refuted.  The register's identity is stale during the window
+(None until (b″)); the viewer's identity comes from the quarter, which is
+the tie the clause asks for.  Returners select by the table quarter in
+hand: false at `box_q1_update`, true at (b″).  Conditions (1)-(2) agreed.
+
+CONDITION (3) IS THE IMPORTANT ONE, AND I WOULD MAKE IT FIRMER.  The tally
+is now seven transitions, three accessors, four premise-type
+generalizations -- fourteen statements over one body, and the four
+generalizations are ONE pattern: every transition that moves a header
+takes a client hook `Qc ∗ <arm content> ={E∖↑N}=∗ <arm content'> ∗ Q'`
+run at the transition's own step ((e′) at ξb before the absorb, (f′)/(b″)
+at ξ before the deposit; (b′)'s x1 is the hook on P_rest).  The two
+residue accessors are the same hook at the identity transition.  This is
+exactly the growth the escrow endgame was written to stop: each need met
+by one more per-lemma variant, each individually justified.  RULING
+RECOMMENDED: adopt the hook as THE convention now, in prose and as a
+tripwire ("no per-lemma variant; a new need is met by the hook of the
+transition it belongs to"), and CONSOLIDATE the statements at the first
+quiet point -- after r20b's proofs are green and before the icache bank
+(r21), as one edit with the F30 precedent:
+    the hooked forms become the statements -- `box_deposit_L1` (with x1
+    and the join hook), `box_checkout` (with the split hook), `box_park`
+    (with the join hook); the plain forms are corollaries at the identity
+    hook; (a) and (g) stay unhooked until a client needs one, at which
+    point they take the SAME hook shape, not a variant; (c), (d), the two
+    residue accessors and `box_view` unchanged.
+The law then reads: seven transitions (the header-moving five each with a
+client hook), two residue accessors, one view -- and it can no longer grow
+by variants.  bcache and off instantiate every hook with the identity.  Not
+now, mid-proof; but scheduled, not "if a fifth appears".
+
+§6²⁵'s classification stands until that edit.  Nothing else open.
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
