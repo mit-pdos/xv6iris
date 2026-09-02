@@ -68,6 +68,7 @@ CtxMorphTac.v
 TsoCtxPark.v
 CtxAnchor.v
 CtxBox.v
+CtxBoxNext.v
 TsoCtxMove.v
 CtxValues.v
 CtxPinw.v
@@ -525,6 +526,7 @@ UserFd.v
 IcacheRef.v
 EscrowDefs.v
 FileInvDefs.v
+OffBox.v
 FileInv.v
 FileOff.v
 KallocInv.v

@@ -830,6 +830,25 @@ build agent: the proofs are CtxBox's with the case selection changed as
 noted at each lemma; BioInv's and IcacheEscrow's wrappers lose their
 `tok`/`_excl` arguments and gain Q at (a)/(b′)/(g) (bcache: emp).
 
+LANDED AS STATEMENTS (type-checked on the VM against the cutover base,
+proofs Admitted; both registered in `_CoqProject`):
+  - `iris/CtxBoxNext.v` — the Section box of the edit: the register-
+    selected body, (a) with Q, (b′) returning Q, (c)/(d) unchanged, (e′)
+    box_checkout_split + (e), (f′) box_park_join + (f), (g) exchanging Q,
+    box_alloc_at, the two row folds, no tok/excl.  Imports CtxBox for the
+    helper kit; replaces CtxBox.v's Section box at the edit and is then
+    deleted.
+  - `iris/OffBox.v` — the third instance: id := the file slot, X := unit,
+    P_hdr := off_resident at ξ, P_rest := emp, Q := emp; `off_box k γ` at
+    `offBoxN .@ k`; the L1 row for ftable's payload (`off_l1_row`), the
+    per-inode APPEND-ONLY set of published boxes keyed by the box's stamps
+    gname with the persistent membership fragment (`off_rows`,
+    `off_member`, `off_rows_take`, `off_rows_insert`); the fd row's arm
+    (`off_fd_row`); the site statements filealloc / publish (checkout,
+    park + insert) / read (checkout, park) / dup / close / reclaim.
+    The set's gnames are a parameter record (`off_names`) standing in for
+    an fscfg field at R4b; the cameras (`offboxG`) move to Xv6Cameras §15.
+
 ---------------------------------------------------------------------------
 
 ## 7. Process and tooling (measured facts, not preferences)
