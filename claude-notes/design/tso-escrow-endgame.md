@@ -1364,6 +1364,37 @@ context, mapped to CtxBox's lemmas:
   parents never check out (ilock takes a carved share, iput the merged
   unit), so ic_dep_mass (DepRef _) = 1 is the only reference mass at (e).
   R3 CODE MAY START once F21 is in the skeleton.
+  BUILD AGENT'S REVIEW OF THE SKELETON (2026-09-02, against ProofIget /
+  ProofIlock / ProofIunlock / ProofIput and the bcache instance as built).
+  The design is sound as stated; walked: (C) after a share's park while
+  the lending parent's older keys are live (left fails, right holds via
+  tp = T', and the gathered unit's later checkout presents Tl :=
+  max_stamp = T'); (I) across evict → recycle (the evictor's own unit is
+  re-minted at None and dropped by its (d) in the same window, so no
+  live key ever sits at a stale identity); the guard's OUT_L2 refutation
+  at c = 1 by mass; iput's non-free last close (guard (a)/(b), then the
+  evict (b')/(d) — two windows, one critical section); the frozen
+  alternative riding ic_pay through (e)/(f) untouched; the generation
+  pinned client-side after (e) by live_gen_agree between the holder's
+  slice and ic_pay's live_gen k ½ g.  ONE GAP, in the lock relay rather
+  than the box:
+  F22 iput's free path acquires the inode sleeplock through the NB tier
+      (wp_acquiresleep_nb_sconf: under itable.lock, with the isl-pool
+      return; ProofIput:2589), and the R1-pre relay minted llb twins only
+      for the gen / genl tiers (gen_llb, genl_llb).  The free path's (e)
+      needs Kt ≥ T' (R1 at Tl := the guard's re-minted stamp), so R3 needs
+      wp_acquiresleep_nb_genl_llb_sconf: the nb tier over the λ payload
+      ic_slp with `llb Tl -∗` in and `∃ K, Tl ≤ K ∗ ctx_floor cur_ctx K`
+      out — the same relay pattern as genl_llb, on the nb proof.  Without
+      it the free path's checkout has no cover.  (The itable side is
+      already fine: the guard's acquire is the existing llb tier.)
+  Build notes (mine to pay, no ruling needed): box_deposit_L1_shape is
+  (b)'s proof plus the entailment before the close, then (b) := x1 = x0;
+  ic_hdr's CtxMorph is the cells' word/half morphs plus ctx_morph_const
+  on the ghost payload; the ic_names extension (F19) reaches the six
+  MkIcNames sites and IcacheBoot's mint order (box ghosts before the
+  record, as bio_init).
+
   PROPOSER (2026-09-02): F21 REAL AND APPLIED, with one refinement to the
   recommended fix: ic_hold pins the map ∃-BOUND with the mass as a pure
   row (∃ m, ⌜qsum m = mass⌝ ∗ l2_hold m) rather than as a parameter — a
@@ -1888,3 +1919,8 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   register); ic_checkout over any fragment of the descriptor's mass with
   max_stamp ≤ Kt; R-1 restated in §3.3; boot over pre-minted names
   (ic_box_alloc_at); bm_cells note.  IcacheBox.v type-checks.
+- 2026-09-02 (build agent, reviewing the R3 skeleton after F14–F21):
+  sound; walk recorded in §4.2.  F22: iput's free path uses the NB
+  acquiresleep tier, which has no llb twin — R3 needs
+  wp_acquiresleep_nb_genl_llb_sconf (relay item) for the free path's (e)
+  cover.  R3 code otherwise ready to start.
