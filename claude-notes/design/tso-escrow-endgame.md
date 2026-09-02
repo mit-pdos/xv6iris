@@ -1030,6 +1030,102 @@ final form (§5 rule 2); no other new inode_* spelling.
 Gate: -B green; ic_escrow's five-arm body and its ~13 open/swap lemmas
 deleted.
 
+R3 SITE MAP (measured 2026-09-01 by the build agent, after the bcache
+round went green over CtxBox; TO VET before R3 code).  Every escrow site
+(grep of iInv icEscN / ic_swap_* / ic_open_* / ic_close_*) with its lock
+context, mapped to CtxBox's lemmas:
+
+  site (file:site)                         lock      today                         CtxBox
+  ---------------------------------------- --------- ----------------------------- ------------------
+  iget scan hit, ref++ (any ref, incl. 0)  itable    no escrow touch (count in M)  (c) at sr_ident
+  iget recycle: +0x6e dev, +0x72 inum,     itable    open_empty_dev/free, close_   (a) at c = 0, THREE
+     +0x7c valid := 0, then ref := 1                 mid, open_mid, close_mid_to_  PLAIN stores, (b)
+                                                     parked (four escrow opens)    with the bump
+  ilock: acquiresleep, checkout            inode L2  swap_checkout (DepShr s …),   genl_llb acquire at
+                                                     frozen alt. refuted by R-e    Tl := share stamp;
+                                                                                   (e) with the share's
+                                                                                   fragment (mass s)
+  iunlock: +the liveness read, the park    inode L2  open_out_genlo (a borrow),    borrow GONE (the
+                                                     swap_park, releasesleep_gen   holder's own slice
+                                                                                   rides its row); (f);
+                                                                                   _in releasesleep
+  iput non-last close (ref--)              itable    no escrow touch               (d)
+  iput ref == 1 guard (valid, nlink reads) itable    open_auth_ref (window),       (a) at c = 1 (its own
+                                                     close_held / close_parked     unit), reads off the
+                                                                                   header in hand, (b)
+                                                                                   at c = 1 (NO bump:
+                                                                                   cnt := max 1 c), then
+                                                                                   release itable _in
+  iput free path: acquiresleep, itrunc,    inode L2  acquiresleep_nb, open_held,   genl_llb acquire at
+     iupdate, type := 0, +0x70 valid := 0,           close_out_frz, swap_park_frz  Tl := T' of (b); (e);
+     park, releasesleep                                                            … ; (f) with the
+                                                                                   payload arm's frozen
+                                                                                   alternative (receipt)
+                                                                                   INSIDE P_hdr's payload
+                                                                                   (client-defined, as
+                                                                                   today); _in release
+  iput last close (ref 1 → 0) + eviction   itable    open_auth_frz, close_to_      (a) at c = 1, the pool
+                                                     empty_frz (pool insert with   insert (icnt_half 0,
+                                                     icnt_half 0, frzm_h,          frzm_h, ifreeze_off as
+                                                     ifreeze_off)                  today), (b) at c = 1
+                                                                                   with the RAW header
+                                                                                   (no bump), then (d)
+  iput +0x3c/+0x44 re-reads, itrunc's      itable /  open_held / close_held,       inside the (a)…(b)
+     re-entries (4183–4640)                inode L2  mk_parked_arm, mk_loaded      window (header in
+                                                                                   hand) or under the
+                                                                                   checkout (bundle in
+                                                                                   hand): no box touch
+
+  Consequences the map settles (each is a ruling to confirm):
+  M-1 NO EMPTY ARM.  A never-identified or evicted slot is IN at its last
+      identity with a RAW payload arm (cells at arbitrary values, no
+      dinode_at) — xv6's iget hits only ref > 0 slots, so a ref-0 slot is
+      never looked up by identity, and the recycler's (a) finds nothing to
+      return to the pool.  ic_id's identified bit becomes "M !! k ≠ None";
+      the L1 row's identity tie ⌜sr_ident r = (devs k, inums k)⌝ is stated
+      only for identified slots (the table's islot_rest half exists only
+      then).  The table's islot_free / the escrow's full-dev discriminator
+      go away with the empty arm.
+  M-2 THE BUMP.  (b) sets cnt := max 1 c, so iput's re-deposits at c = 1
+      (both the guard window and the eviction) are bump-free — exactly the
+      shape §3.5 tabulated; no third lemma.  The eviction's pool insert
+      needs icnt_half 0, which is why it sits at the LAST CLOSE under
+      itable and not at the +0x70 park: (a) at c = 1 hands the frozen tail
+      out, the client inserts, (b) re-deposits RAW, (d) drops the unit.
+  M-3 X := Raw | Unloaded | Loaded dn bm (the payload arm's three shapes;
+      the frozen alternative lives inside ic_payload_arm as today).
+      P_hdr i x := i_valid ↦ v ∗ i_dev½ i.1 ∗ i_inum½ i.2 ∗ the nlink cell
+      ∗ ipay v i.2 x (identity-keyed by inum: raw / ipool_shape_np /
+      the ic_loaded ghost side); P_rest x := the remaining meta cells and
+      addrs at x (inode_meta minus nlink — one regrouping lemma, F2's
+      twin).  tok := ic_tok (ghost — R-4).  Q := emp.
+  M-4 THE HANDLE ROW IS `ic_deposit cn k (DepShr s dev inum g lo)`.
+      SpecIlock's post has no handle predicate: it lists rows, and 21
+      files pass `ic_deposit cn k (DepShr …)` to iunlock opaquely (DepRef
+      is defined but used by no proof).  F7's tool: keep the NAME and the
+      descriptor's arity, redefine ic_deposit at DepShr as l2_hold at
+      {[((dev,inum), t) := s]} (t existential; keys and mass pinned, R-1)
+      ∗ inode_ident k s dev inum ∗ live_genlo k s g lo — the share's cells
+      and liveness slice ride the holder's row (F9 / the R3 nuance), Q
+      stays emp.  DepFrz / ic_out_frz disappear (the receipt is a
+      payload-arm alternative, parked by (f) like any x).
+  M-5 THE REFERENCE SWEEP.  inode_ref / inode_shr gain the stamps
+      fragment (`∃ m, ◯ m ∗ llb (max_stamp m)` keyed at (dev,inum) with
+      mass q / s) beside live_fracc; measured: 42 files mention them, 4
+      unfold them (§5 rule 2: one sweep to the final spelling).  The
+      `⌜lo ≤ tl⌝ ∗ cred_floor lo tl` credential rows of SpecIlock /
+      SpecIunlock are R1-pre residue: the llb-tier acquire at Tl := the
+      share's stamp replaces them (confirm against inode_pay's cinv, R4a).
+  M-6 LOCK TIERS.  The inode sleeplock becomes is_sleeplock_genl over
+      ic_slp := ∃ s, l2_row ic_tok (bx k) s (ilock: genl_llb acquire;
+      iunlock/iput: genin releasesleep folding the park stamp); itable
+      releases after (b)/(d) go through _in with the row's llb (R2), the
+      plain release stays for (c)-only critical sections.
+  Open for the reviewers: M-1 (raw-at-identity vs an explicit empty
+  identity), M-2 (the eviction's (a)/(b) at c = 1 vs a pool insert at the
+  park), M-5's credential rows.  Deletions on R3's green: ic_escrow's
+  five arms and ~13 lemmas, ic_mid, ic_id, DepFrz/ic_out_frz, islot_free.
+
 ### 4.3 inode_pay's cinv — round R4a
 
 No box.  The parked share is immutable-while-armed; its ξ-dependence
@@ -1468,3 +1564,6 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   types / stamps camera / boxG / box_names moved to Xv6Cameras §15; bcache
   instantiated (BioInv v6: bbox_* wrappers, bstok handle row per F7/R-1);
   the bcache consumers are being re-targeted (stage 2, A6.159).
+- 2026-09-01 (build agent): the bcache round is GREEN over CtxBox (every
+  bcache proof file; full-tree -B round running).  R3 SITE MAP measured
+  and recorded in §4.2 (M-1..M-6) for vetting before R3 code.
