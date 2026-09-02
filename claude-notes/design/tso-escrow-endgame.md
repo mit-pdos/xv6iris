@@ -1179,6 +1179,31 @@ context, mapped to CtxBox's lemmas:
     ref-0 case is the recycler's (a)…(b).  Harmless for soundness (the
     lemma allows c = 0) but the row must not contradict M-1.
   R3 code may start on the map with these amendments.
+  BUILD AGENT'S ANSWERS (2026-09-01, reviewer 1's rulings; reviewer 2
+  pending — R3 code waits for both):
+  - M-1 DISCHARGE, NAMED.  The recycler runs under itable.lock and holds
+    itable_res2, whose pool row owns `ipool_shape γfs γi cov logstart
+    inum` for every uncached inum — and the recycled slot's inum IS
+    uncached (M !! k = None ⇒ the slot is not in ci, the pool's domain is
+    the complement).  `ipool_shape inum` carries `ipool_shape_np inum`
+    (its two alternatives own the exclusive ledger cells `inode_owned_era
+    γfs γi inum _` / `imark γi inum`) and `icnt_half inum 0`.  An
+    Unloaded x0 would put a SECOND `ipool_shape_np inum` in the
+    recycler's hand (ic_unloaded := inode_raw ∗ ipool_shape_np); a Loaded
+    x0 would put `dinode_at γi inum dn` (inside ic_loaded) beside the
+    pool's `inode_owned_era`, which owns that record.  Both duplicate an
+    exclusive cell; the refutation is `ipool_shape_np` vs `ipool_shape_np`
+    on the marker/era ledger (the existing exclusivity lemmas of
+    InodeRegion/IcacheRef — to be cited by name at R3 code), so the
+    recycler handles ONE shape: Raw.
+  - M-3: accepted — X := (g, Raw | Unloaded | Loaded dn bm); the slot's
+    generation rides X, ic_payload_arm's own parameter.  P_rest's full
+    cell: the meta cells (type/major/minor/size) are full today in every
+    arm (inode_meta / inode_raw) — confirmed at R3 code.
+  - M-5: credential clause WITHDRAWN — the cred_floor rows stay; they
+    serve the T3 racy read of ip->ref, not the box.  Only the sweep.
+  - TABLE FIX taken: the icache's (c) runs at c ≥ 1 only; the ref-0 slot
+    is the recycler's (a)…(b).
 
 ### 4.3 inode_pay's cinv — round R4a
 
@@ -1630,3 +1655,9 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   of ip->ref before the acquire (ilock +0x0e) / with no acquire
   (iunlock), keep them; table fix: iget hits only ref > 0 (M-1's own
   premise).  Acquire notes for iput's two itable windows recorded.
+- 2026-09-01 (build agent): R1'/R2 bcache LANDED — full-tree forced round
+  green modulo the pre-existing ProofForkretPark frontier (A6.160).
+  Reviewer 1's R3 rulings answered in §4.2 (M-1 discharge named: the
+  pool's exclusive ledger cells for the uncached inum; M-3 X carries g;
+  M-5 credential clause withdrawn; table fixed).  R3 code waits for
+  reviewer 2.

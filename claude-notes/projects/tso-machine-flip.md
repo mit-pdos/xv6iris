@@ -18475,3 +18475,14 @@ NEXT: R1' per §4.1 once F1 is vetted (or as F1 says, absent objection).
   ProofBpin/ProofBunpin, BioInitAt v6, BreadLru v1 section removed.
 - Doc: F6 (identity keyed stamps), F7 (handle-row tool; hold field), F8–F13
   rulings mirrored; my review notes R-1..R-4 accepted.
+
+### A6.160 — R1'/R2 (bcache over CtxBox) GATED: full-tree forced round green modulo the known frontier (2026-09-01)
+
+- `make -B -j32 -k` on the whole tree (1260 + 29 files): every file green
+  except `ProofForkretPark.v:345` — the pre-existing intr-lane frontier
+  (parker-context handles across the fork crossing; "DEFERRED FOR OWNER
+  REVIEW … ProofForkretPark is red" above), untouched by this round.
+- The only out-of-set fix the round needed: ProofWriteHead's `wh_hold`
+  (its own copy of the handle's token row) → `bstok` (F7's row).
+- R3 (icache) site map recorded in the endgame doc §4.2 (M-1..M-6) for
+  vetting; R3 code waits for the rulings.
