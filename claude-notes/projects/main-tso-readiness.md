@@ -1926,3 +1926,43 @@ the stale `/shared/flip63` checkout (64 commits behind on 79 iris files).
 - **Open** (for the owner): none of the L2/L3/L4 work needed a design
   ruling; the two departures (KexecOkQ at the ctx tier, the U-tier openers
   exposing the token) are recorded in A12.14/A12.15.
+
+### A12.17 — r21 round 2: the syscall shells, kexec, ProofMain (2026-09-02)
+
+- Same recipe (A12.16).  FUSED: ProofSysOpenTails, ProofSysOpen (63 hunks; the
+  retained parent arrives genlo with its floor, `so_publish` takes `loK tlK`),
+  ProofSysLink (26), ProofSysUnlinkTails (21; the two-lock stages at
+  `ic_tx_dep_at … loy t (1/4)`), ProofNamexTr, ProofSyscall (the three fs-env
+  assemblies gain the `iref_claims` row from `IcacheEscrow.is_itable2_claims`),
+  ProofKexecTail (`kxa_esc_acc` over `ic_escrows_lookup`; the `kxc_bad64`
+  wrapper takes `loy tly` and the floor/claims premises), the kexec chain
+  (ProofKexecA by hand; SpecKexecB2/B3, ProofKexecB/B2/B3/C/D/Pin/PinA/Pinned/
+  PinnedA/Seam/Kexec by the regex blend `scratchpad/r21_auto.py`: `gyf inumf`
+  -> `gyf loyf tlyf inumf`, the sleeplock at `ic_slp`, the release premise
+  floored), ProofMain (30 hunks: flip's running-token `newlock`s and started
+  deposit (`started_inv γi ξd P`, `started_inv_claim`/`started_store_open`,
+  the position-generic builder off `Hcreds`), flip's `kstack_bank_intro` with
+  `kalloc_junk` and no `kpt_inv_alloc` here (A6.135: kvminithart's hook);
+  main's icache boot kit destruct (`Hpkey Hxkey … Hhpn Htkey Hckey` beside
+  flip's `Histmp Hicbox`), main's `disk_res_boot` (DiskBoot is main-shaped:
+  `Hrdat Hstg … Hcmauth … Hringh`), main's `S Pb Rspent`/`ufdG`, the
+  `ftable_res_boot` with `Hfolauth`).  ProofMain GREEN.
+- PARKED (owner): ProofNamexEra/LinkNamexEra/LinkNameiEra and
+  ProofNparEra/LinkNparEra/LinkNparWrapEra rows of `_CoqProject` (the era
+  walk); nothing outside the chain depended on them.
+- NEW IN `IcacheEscrow.v` (plan §9 item 12): `ic_grow_tx` / `ic_shrink_tx`
+  with main's statements + `lo`, over the holder's `ic_handle`, proved through
+  `CtxBox.box_q_update` -- no box change.  Users: ProofSysUnlinkTails (dp's
+  quarter grows back to the half before `su_tail_bad`), ProofCreate (6 + 4).
+- Measure after the grow/shrink lemmas (full `make -k -j24`, 2026-09-02):
+  total 1458, roots 6, blocked 34, green 1418 (was 1387 after the L-lane's
+  r2).  Roots: ProofCreate, ProofSysUnlink (both being fused, below),
+  ProofKexecB2/B3 (`kxc_open_intro` wants `[//] Hfly Hclaimsy` -- fixed),
+  ProofMain (one `xid` pagetable cell in the wand's statement -- `↦₈□`,
+  fixed), ProofForkretPark (L8: A6.129 `own_context_twin` / `park_globals`,
+  the plan's r26 lane -- NOT this round).
+- NEXT: ProofCreate (65 hunks) and ProofSysUnlink (68) -- flip's `Hdview /
+  Hfview / Hilink` rows are flip-only ghost and do not come; the stage
+  statements take `∃ lodc tldc, ⌜⌝ ∗ cred_floor ∗ ic_handle … (DepTx … lodc t
+  q)` where main had the bare descriptor half, and the retained parents the
+  `∃ lo tl` genlo form SpecCreate already states.

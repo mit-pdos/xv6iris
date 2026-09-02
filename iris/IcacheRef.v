@@ -114,8 +114,6 @@ Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
    NON-Local [Notation] escapes to importers and silently un-flips theirs.)
    The import must come LAST, after RiscvPtsto, for the notations to flip. *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the ∃-context wrapper's SC-only elimination; see the
-                         [IcacheHeldAny] section at the end of the file *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)

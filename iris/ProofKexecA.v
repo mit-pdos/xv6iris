@@ -827,6 +827,7 @@ Section KexecABody.
       (jp : nat) (gf : gname) (plen : nat) (pfun : nat -> bv 8) (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat) (afun : nat -> nat -> bv 8) (pidv : mword 32) (U : ustate) (dqb : dfrac) (dqs : dfrac) (dqa : dfrac) (dqpv : dfrac) (dqas : dfrac) (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s20 : mword 64) (pv : mword 64) (av : mword 64) (HD : option (nat -> bv 8)) (XCH : iProp Σ) (KEX : CpuId -> iProp Σ) (CID : CpuId) : iProp Σ :=
     (∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
+        (loyf tlyf : nat)
         (n2 : nat) (ef : nat -> bv 8),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
@@ -844,10 +845,13 @@ Section KexecABody.
         cpu_own 0 eb (proc_addr jp) b lks -∗
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jp) -∗
-        is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
-                     (ic_tok fsc_ic kf) (slh_tok (icfg_isl kf)) -∗
+        is_sleeplock_genl gilf gislf (i_lock (ientry kf)) "inode"%string
+                     (ic_slp fsc_ic kf) (slh_tok (icfg_isl kf)) -∗
         sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-        ic_tx_dep fsc_ic kf sf icfg_dev inumf gyf -∗
+        ⌜(loyf <= tlyf)%nat⌝ -∗
+        IcacheRef.cred_floor loyf tlyf -∗
+        IcacheInv.iref_claims -∗
+        ic_tx_dep fsc_ic kf sf icfg_dev inumf gyf loyf -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
@@ -1025,7 +1029,8 @@ Section KexecABody.
        ([IcacheRef.inode_shr_gen]); the conversion is the one every existing
        caller does ([inode_shr_gen_intro] -- SpecIlock's own porting note). *)
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
-    iDestruct "Hshr" as (gy) "Hshr".
+    iDestruct "Hshr" as (gy loy tly) "(%Hley & #Hfly & Hshr)".
+    iDestruct (is_itable2_claims with "Hitab") as "#Hclaimskx".
     assert (Hib' : bv_unsigned inum < 16 * Z.of_nat icfg_nib)
       by (exact Hib).
     destruct (Hiregb inum Hib') as [Hibc Hibl].
@@ -1125,13 +1130,15 @@ Section KexecABody.
     iDestruct (log_op_split with "Hlog") as "[Hlog Htx]".
 
     iApply (Ilock.wp_ilock_tx_sconf gs jp gl pd pav pu
-              gilk gislk k (q/2)%Qp gy PlainK
+              gilk gislk k (q/2)%Qp gy loy tly PlainK
  inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat eb eb lks
               U ltac:(lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hitinv Hesck Hireg Hslkk
-                    Hshr Hru Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1 Htx").
+                    [%] Hfly Hclaimskx Hshr Hru Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1 Htx").
+    all: try (exact Hley).
     all: try lkbelow.
+    all: try (exact Hley).
     iIntros (CIDil Hsil M1 dnl bml fl_) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hins Hbs1
              Hslkd Hdep Hidev Hiinum Hivalid Hload Hity Hfrz %Hfr_
              Hru %Hilkp".
@@ -1575,7 +1582,7 @@ Section KexecABody.
           destruct (decide (j < tot)%nat) as [_ | Hno]; [| lia].
           by rewrite Nat.add_0_l. }
         iApply ("Hcont90" $! Q12 k (q/2)%Qp (q/2)%Qp inum dnl bml gilk gislk gy
-                  n1 gb with "[%] [%] Hpc Hcg Hcnt Hextc Hclmc Hslkk Hslkd Hdep
+                  loy tly n1 gb with "[%] [%] Hpc Hcg Hcnt Hextc Hclmc Hslkk Hslkd [//] Hfly Hclaimskx Hdep
                   Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hlog Hirs Hbm Hins Hbits
                   Hbs Hka Hpriv Hpath Hargv Hargs [] [-Hcont] Hcont").
         * split_and!; [exact HQ12sp | exact HQ12s0 | exact HQ12s1 | exact HQ12s2
@@ -1659,12 +1666,12 @@ Section KexecABody.
         iDestruct (kxc_exit_open with "Hkw Hcont") as "Hcont".
       iApply (T.kxc_bad64 Q gs jp gl pd pav pu
                   gilk gislk gf
- k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
+ k (q/2)%Qp (q/2)%Qp gy loy tly inum dnl bml n1
                   plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
                   m Q12 K eb lks sp0 ra0 s00 s10 s20 pv av
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                   Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HQ12sp HQ12s4 HQ12thr
-                  with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd Hdep
+                  with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd [//] Hfly Hclaimskx Hdep
                         Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
         { iExact "Hfab". }
@@ -1739,12 +1746,12 @@ Section KexecABody.
       iDestruct (kxc_exit_open with "Hkw Hcont") as "Hcont".
       iApply (T.kxc_bad64 Q gs jp gl pd pav pu
                 gilk gislk gf
- k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
+ k (q/2)%Qp (q/2)%Qp gy loy tly inum dnl bml n1
                 plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
                 m Q9 K eb lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                 Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HQ9sp HQ9s4 HQ9thr
-                with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd Hdep
+                with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd [//] Hfly Hclaimskx Hdep
                       Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
       { iExact "Hfab". }
@@ -1903,6 +1910,7 @@ Section KexecAMain.
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
+        (loyf tlyf : nat)
         (n2 : nat) (ef : nat -> bv 8),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
@@ -1920,10 +1928,13 @@ Section KexecAMain.
         cpu_own 0 eb (proc_addr jp) b lks -∗
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jp) -∗
-        is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
-                     (ic_tok fsc_ic kf) (slh_tok (icfg_isl kf)) -∗
+        is_sleeplock_genl gilf gislf (i_lock (ientry kf)) "inode"%string
+                     (ic_slp fsc_ic kf) (slh_tok (icfg_isl kf)) -∗
         sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-        ic_tx_dep fsc_ic kf sf icfg_dev inumf gyf -∗
+        ⌜(loyf <= tlyf)%nat⌝ -∗
+        IcacheRef.cred_floor loyf tlyf -∗
+        IcacheInv.iref_claims -∗
+        ic_tx_dep fsc_ic kf sf icfg_dev inumf gyf loyf -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗

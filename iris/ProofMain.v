@@ -129,7 +129,9 @@ Require Import WaitInv.   (* [wait_res] -- what main finally brings wait_lock up
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import PtTreeShim.
+Require Import TsoGhost.
+Require Import KptPublish.   (* [dset_auth]: the started barrier's index authority (A6.132) *)
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the creators' borrow *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
 Import Defs.
@@ -550,10 +552,13 @@ Section ProofMain.
     iPoseProof (uart_sent_sub_nil γd l0 with "Hsent") as "#Hsub0".
     (* [newlock_at] at [fsc_printk], not [newlock] with a fresh γ *)
     rewrite /fs_kit_printk.
-    iMod (newlock_at ⊤ fsc_printk (mword_of_int KernelSyms.pr) "pr"%string
-            <{ pr_res γd }> with "Hkprintk Hprnm Hprw [Hprcpu] []") as "#Hprlk".
-    { iApply (lk_cpu_ready_intro with "Hprcpu"). }
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (newlock_at ⊤ fsc_printk (mword_of_int KernelSyms.pr) "pr"%string <{ pr_res γd }> with "Hkprintk Hprnm Hrun Hprw Hprcpu []") as "[Hrun #Hprlk]".
     { rewrite /pr_res. done. }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* ---- THE OTHER TWO [newlock]s, and this is the point of the group.
        consoleinit has just run [initlock] on cons.lock and, through uartinit,
        on tx_lock; both come back as [WpLock.newlock]'s raw material, and both
@@ -565,10 +570,15 @@ Section ProofMain.
        consoleintr takes both locks.  Nothing consumed it before consoleintr
        was proven, which is why the two steps sat here un-taken. ---- *)
     iDestruct "Hlkfresh" as "(Htxw & #Htxnm & Htxcpu)".
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock ⊤ UartTxInv.a_tx_lock "uart"%string <{ tx_res γd }>
-            with "Htxnm Htxw [Htxcpu] [Htx]") as (γtx) "#Htxinv".
-    { iApply (lk_cpu_ready_intro with "Htxcpu"). }
+            with "Htxnm Hrun Htxw Htxcpu [Htx]") as "[Hrun Htxi0]".
     { iApply (tx_res_intro γd l0 with "Htx"). }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Htxi0" as (γtx) "#Htxinv".
     (* [is_txlock]'s two halves are exactly [Htxinv]/[Hdoff] -- the same pair
        [console_caps] below folds inline -- so mint it once here and feed
        both consumers (LinkPrintk.v needs the witness to invoke the real
@@ -579,9 +589,14 @@ Section ProofMain.
       iSplitR; [iExact "Hdoff" |].
       iSplitR; [iExact "Hdev" |].
       iSplitR; [iExists γtx; iExact "Htxl" | iExact "Hsub0"]. }
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock ⊤ a_cons "cons"%string cons_res_at
-            with "Hclnm Hclw [Hclcpu] Hring") as (γcl) "#Hconslk".
-    { iApply (lk_cpu_ready_intro with "Hclcpu"). }
+            with "Hclnm Hrun Hclw Hclcpu Hring") as "[Hrun Hcl0]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Hcl0" as (γcl) "#Hconslk".
     iAssert (console_caps γd) as "#Hccaps".
     { rewrite /console_caps. iExists γtx, γcl.
       iSplitR; [iExact "Htxl" |].
@@ -804,6 +819,7 @@ Section ProofMain.
                         (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv ->
     prun phystop s1entry ps ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->
+    hart_agent cpu_id = 0%nat ->
     sie_cap_gpr KT0 m n false p0 -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.main + 0x6e) : mword 64) -∗
@@ -821,6 +837,10 @@ Section ProofMain.
     (∃ kpt0 : mword 64,
        (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ kpt0) -∗
     strans_pending -∗ tlb ↦ᵣ tlbvec0 -∗ kpt_unset -∗
+    (* A6.71 / A6.70 finding 1: the pin bound's one-shot, minted at
+       adequacy beside [kpt_unset] and spent in the SAME publication
+       assembly ([KptShare.kpt_inv_alloc] takes both). *)
+    kptb_unset -∗
     kmap_auth kmap_M0 -∗
     lk_raw pid_lock_addr -∗ lk_raw wait_lock_addr -∗
     (* ...AND WHAT wait_lock IS OVER, so that this group can bring it UP the
@@ -883,9 +903,12 @@ Section ProofMain.
         (* the KPT receipt kvminithart minted, on its way to [trap_csrs] *)
         kpt_on cpu_id -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
-        (* what kvminithart published about the kernel page table: all four
-           PERSISTENT, and exactly what the [started] deposit carries *)
+        (* what kvminithart published about the kernel page table: all
+           PERSISTENT, and exactly what the [started] deposit carries.
+           A6.138: the creds travel too -- mn_grp_started needs the BOUND
+           (and its llb) to tie the deposit to the flag's position. *)
         kpt_inv root -∗
+        KptShare.kpt_creds -∗
         (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
           (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
         kmap_at tramp_vpn tramp_ppn KP_rx -∗
@@ -893,10 +916,10 @@ Section ProofMain.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hphystop Hs1 Hprun Hlen.
+    intros Hn Hphystop Hs1 Hprun Hlen H0cid.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt".
-    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hfds Hirs Hbss Hparks Hpst Hcont".
+    iIntros "Hsbit Htlb Hunset Hbunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hfds Hirs Hbss Hparks Hpst Hcont".
     iDestruct "Hlkmem" as (vkl vkn vkc) "(Hkw & Hkn & Hkc)".
     iDestruct "Hkpt" as (kpt0) "Hkpt".
     (* ---- +0x6e jal kinit ---- *)
@@ -980,17 +1003,14 @@ Section ProofMain.
        page is carved to [KSTACK_AV] and deposited in its dormant block
        ([SpecProcinit.procs_inv_alloc]) -- so a process's kernel stack comes
        from HERE for the rest of the system's life. ---- *)
-    iDestruct (kstack_bank_intro pas Hpasok with "Hkstx Hkstacks") as "Hbank".
-    (* THE PUBLICATION SEAM: kvminit built the tree at the ambient tier;
-       the shared body is context-free ([KTier], A6.20/A6.21).  At SC the
-       move is the shim rewrite; the T-leg replaces it with the real
-       publication (pin mint + drain, tso-flip KptPublish). *)
-    iEval (rewrite (PtTreeShim.ptree_own_retier_sc
-                      (PtTree.UTier TsoCtx.cur_ctx) (PtTree.KTier 0%nat) 2))
-      in "Htree".
-    iMod (kpt_inv_alloc (pt_base t) 0%nat t (kvm_M pas) ⊤
-            (kvm_bridge pas t (pt_base t) Hpasok eq_refl Hrep)
-            with "Htree Hauth Hunset") as "[#Hkinv #Hlbt]".
+    iDestruct (kstack_bank_intro pas kalloc_junk Hpasok with "Hkstx Hkstacks") as "Hbank".
+    (* A6.135 §5: the invariant is NOT allocated here -- there is no interp
+       under a bare [fupd_wp].  The tree, the map auth and the two one-shots
+       ride into kvminithart's ESTABLISHMENT HOOK, which runs against the
+       live interp at the `csrw satp` write node and publishes every slot
+       byte at its own stamp ([KptPublish.kptree_publish_boot] -- no drain,
+       no log top), allocates [kpt_inv], and mints hart 0's boot
+       credentials ([kpt_creds_intro_boot] -- no view receipt). *)
     iModIntro.
     (* ---- +0x76 jal kvminithart ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x76)) (mword_of_int 1 : mword 5)
@@ -1008,14 +1028,35 @@ Section ProofMain.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtkh) in "Hpc".
     iApply (Kvminithart.wp_kvminithart_sconf V3 0%nat n (pt_base t) tlbvec0 p0
+              (PtTree.ptree_own_at (PtTree.UTier cur_ctx) 2 (DfracOwn 1) t ∗ kmap_auth (kvm_M pas) ∗
+               kpt_unset ∗ kptb_unset)%I
+              (kpt_inv (pt_base t) ∗ KptShare.kpt_creds)%I
               eq_refl ltac:(lia)
-              with "Hcg Hsbit Htext Hpc Htlb Hkptp Hkinv").
+              with "Hcg Hsbit Htext Hpc Htlb Hkptp []
+                    [Htree Hauth Hunset Hbunset]").
+    { (* THE ESTABLISHMENT *)
+      iIntros (g) "Hgh Hint Hctx (Htree & Hauth & Hunset & Hbunset)".
+      iMod (KptPublish.kptree_publish_boot g cur_ctx 2 t H0cid
+              with "Hgh Hint Hctx Htree")
+        as "(Hgh & Hint & Hctx & Ht & #Hllb)".
+      iMod (KptShare.kpt_inv_alloc (pt_base t) (length g.(glog)) t
+              (kvm_M pas) ⊤
+              (kvm_bridge pas t (pt_base t) Hpasok eq_refl Hrep)
+              with "Ht Hauth Hllb Hunset Hbunset")
+        as "(#Hkinv & #Hlbt & #Hbd)".
+      iDestruct (KptShare.kpt_creds_intro_boot _ H0cid with "Hbd Hllb")
+        as "#Hcreds".
+      iModIntro. iFrame "Hgh Hint Hctx".
+      iSplitR; [iExact "Hkinv" |]. iSplitR; [iExact "Hcreds" |].
+      iSplitR; [iExact "Hkinv" | iExact "Hcreds"]. }
+    { iFrame "Htree Hauth Hunset Hbunset". }
     (* kvminithart's KPT RECEIPT, kept rather than dropped: it is a member of
        [trap_csrs] now (IntrDefs §6b -- interrupts enabled implies the kernel
        table is installed), so the boot chain must carry it to the fold in
        [wp_main_boot_sconf].  Named [Hkptr] -- [Hkpt] in this lemma is the
        [kernel_pagetable] CELL, a different thing. *)
-    iIntros (mkh) "Hcg Hpc %Hcskh #Hkptr Hstvec".
+    iIntros (mkh) "Hcg Hpc %Hcskh #Hkptr Hstvec HQk".
+    iDestruct "HQk" as "(#Hkinv & #Hcreds)".
     (* ---- THE BOOT SEAM: kvminithart has installed the kernel table, so
        this hart's regime moves KT0 -> KT1.  [sie_cap_gpr_ktier_up] carries
        the capability across, weakening its (static, boot-stack) frame
@@ -1068,7 +1109,13 @@ Section ProofMain.
                                 proc_pub (proc_addr i))) ∗ hart_full i (0%fin : CPU))%I)
                  (fun _ i => pstate_full i UNUSED)
                  (seq 0 NPROC) with "Hin Hpst") as "Hin".
-    iMod (procs_inv_alloc ⊤ with "Hin Hbank") as (γs) "#Hpinv".
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (procs_inv_alloc ⊤ with "Hin Hbank Hrun") as "[Hrun Hpi0]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Hpi0" as (γs) "#Hpinv".
     (* ---- ASSEMBLY 2b: the nextpid LOCK.  procinit's [lk_fresh] plus the
            .data cell IS [WpLock.newlock]'s premise list at
            [SpecAllocpid.nextpid_res], and the result is what allocproc --
@@ -1077,23 +1124,33 @@ Section ProofMain.
            writable .data words; see [KernelDataInv]'s header. ---- *)
     iDestruct (lk_fresh_pieces pid_lock_addr "nextpid"%string with "Hlpidf")
       as "(#Hpnm & Hpw & Hpc0)".
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock ⊤ alp_pid_lock "nextpid"%string nextpid_res_at
-            with "Hpnm Hpw [Hpc0] [Hnpid]") as (γp) "#Hpidlock".
-    { iApply (lk_cpu_ready_intro with "Hpc0"). }
-    { rewrite /nextpid_res. iExact "Hnpid". }
+            with "Hpnm Hrun Hpw Hpc0 [Hnpid]") as "[Hrun Hpid0]".
+    { rewrite /nextpid_res /nextpid_res_at. iExact "Hnpid". }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Hpid0" as (γp) "#Hpidlock".
     (* ---- ASSEMBLY 2c: the wait_lock, and it is the SAME move.  procinit
            initialises the lock's three words exactly as it does pid_lock's;
            what was missing until [BootCarveMain] stopped dropping the
            [p_parent] cells was a resource for it to be over. ---- *)
     iDestruct (lk_fresh_pieces wait_lock_addr "wait_lock"%string with "Hlwaitf")
       as "(#Hwnm & Hww & Hwc0)".
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock ⊤ wait_lock_addr "wait_lock"%string wait_res_at
-            with "Hwnm Hww [Hwc0] Hwres") as (γw) "#Hwaitlock".
-    { iApply (lk_cpu_ready_intro with "Hwc0"). }
+            with "Hwnm Hrun Hww Hwc0 Hwres") as "[Hrun Hwl0]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Hwl0" as (γw) "#Hwaitlock".
     iModIntro.
     iApply ("Hcont" $! γp γw γs mpr (pt_base t) pas
               with "Hcg Hpc Hfree Hcpu Hkenv Hkmem Hpinv Hpidlock Hwaitlock
-                    Hkptr Hstvec Hkinv Hkptp Htramp Hkstx").
+                    Hkptr Hstvec Hkinv Hcreds Hkptp Htramp Hkstx").
   Qed.
 
   (* =================================================================== *)
@@ -1164,10 +1221,14 @@ Section ProofMain.
     (* a fupd in front of a [WP (Loop)] goal: the tree's idiom is to peel it
        with [fupd_wp] first (ProofIupdate.v records the same). *)
     iApply fupd_wp.
-    iMod (newlock ⊤ (mword_of_int KernelSyms.tickslock : mword 64) "time"%string
-            ticks_res_at with "Htn2 Htw2 [Htc2] [Hticks]") as (γtl) "#Htl".
-    { iApply (lk_cpu_ready_intro with "Htc2"). }
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (newlock ⊤ (mword_of_int KernelSyms.tickslock : mword 64) "time"%string ticks_res_at with "Htn2 Hrun Htw2 Htc2 [Hticks]") as "[Hrun Htl0]".
     { iApply (ticks_res_intro t0 with "Hticks"). }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Htl0" as (γtl) "#Htl".
     iModIntro.
     assert (Hretti : ret_pc (T1 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x82) : mword 64)).
@@ -1457,8 +1518,8 @@ Section ProofMain.
        return (the FIRST of the two ghost interludes below) and the rest at
        +0x92's, so one open serves both. *)
     iDestruct (fs_kit_icache_rest_open with "Hkit1") as
-      "(Hiref & Hlivef & Hislg & Hipool & Hpkey & Hxkey & Hitfree & Hictok & Hicmid & Hicid &
-        Hbiotok & Hblkpool & Hdllk & Hhpn & Htkey & Hckey)".
+      "(Hiref & Hlivef & Histmp & Hislg & Hipool & Hpkey & Hxkey & Hitfree & Hictok & Hicmid & Hicid &
+        Hbiotok & Hblkpool & Hdllk & Hhpn & Htkey & Hckey & Hicbox)".
     (* the two allocator-budget facts, in the closed form the callees ask for *)
     assert (Hnb3 : exists nb, avail_sub (Some (length ps)) K_kvmmake = Some nb
                               /\ (3 <= nb)%nat).
@@ -1513,12 +1574,15 @@ Section ProofMain.
     (* the depositor's own authority.  The token rides in [sie_cap]'s fourth *)
     (* conjunct ([SieCapCtx.sie_cap_gpr_own_ctx_acc]) and goes straight back.*)
     iApply fupd_wp.
-    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrunbio Hcgbio]".
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (bio_init_at fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) ⊤
             Hcov0
-            with "Hrunbio Hbiotok Hbclk Hbcnm Hbccpu Hbfresh Hbpay Hblru Hblkpool")
-      as "(Hrunbio & #Hbioctx & Hbslots)".
-    iDestruct ("Hcgbio" with "Hrunbio") as "Hcg".
+            with "Hrun Hbiotok Hbclk Hbcnm Hbccpu Hbfresh Hbpay Hblru Hblkpool")
+      as "(Hrun & #Hbioctx & Hbslots)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
     (* ---- +0x92 jal iinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x92)) (mword_of_int 1 : mword 5)
@@ -1579,12 +1643,17 @@ Section ProofMain.
          [acur] application. *)
       rewrite /inode_lock /inode_lock_base /inode_stride.
       rewrite inode_lock_is_ientry_lock. iIntros "H"; iExact "H". }
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (icache_boot_at ⊤ fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov
             fsc_logst icfg_nib icfg_dev
             with "Hiref Hlivef Hislg Hitw Hitnm Hitcpu Hslf Hient Hirauth
-                  Hipool Hpkey Hxkey Hitfree Hictok Hicmid Hicid Hhpn Htkey
-                  Hckey")
-      as "(#Hitl & #Hitinv & #Hesc & Hicsl)".
+                  Histmp Hipool Hpkey Hxkey Hitfree Hictok Hicmid Hicid Hhpn Htkey
+                  Hckey Hicbox Hrun")
+      as "(Hrun & #Hitl & #Hitinv & #Hesc & Hicsl)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
     (* ---- +0x96 jal fileinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x96)) (mword_of_int 1 : mword 5)
@@ -1620,9 +1689,13 @@ Section ProofMain.
     iIntros (mfi) "Hcg Hpc %Hcsfi Hftw Hftnm Hftc".
     iApply fupd_wp.
     iMod (ftable_res_boot ⊤ with "Hfolauth Hfents Hfdauth Hirfile") as (γf) "Hfres".
-    iMod (newlock ⊤ (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string
-            <{ ftable_res γf }> with "Hftnm Hftw [Hftc] Hfres") as (γft) "#Hftable".
-    { iApply (lk_cpu_ready_intro with "Hftc"). }
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (newlock ⊤ (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string <{ ftable_res γf }> with "Hftnm Hrun Hftw Hftc Hfres") as "[Hrun Hft0]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iDestruct "Hft0" as (γft) "#Hftable".
     iModIntro.
     (* [is_ftable γft γf] is [Hftable] at [ftable_addr]'s spelling *)
     iAssert (is_ftable γft γf) as "#Hftable'".
@@ -1708,12 +1781,11 @@ Section ProofMain.
        γ chosen here could never be shown equal to the field.  The free
        token [Hdllk] is kit 1's row; everything else is what the old
        [newlock] took, in the same order. *)
-    (* A6.68: the honest creator deposit wants the running token; borrow it
-       out of the kernel bundle and put it back
-       ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
+    (* A6.69: the honest creator deposit (A6.66) wants the running token;
+       this proof holds the kernel bundle, so it borrows its own and puts
+       it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (newlock_at ⊤ fsc_dlock d_lock "virtio_disk"%string
-            (disk_res_at γv pd pav pu)
+    iMod (newlock_at ⊤ fsc_dlock d_lock "virtio_disk"%string (disk_res_at γv pd pav pu)
             with "Hdllk Hdlnm Hrun Hdlkw Hdcpu HRdisk") as "[Hrun #Hdlock]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
@@ -1874,34 +1946,36 @@ Section ProofMain.
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) (pd pav pu : mword 64)
       (root : mword 44) (pas : nat -> mword 44)
-      (xid : CtxId)
-      (P : iProp Σ) `{!Persistent P} :
+      (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
+      `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)} :
     (* the scheduler this block tail-calls enables interrupts at its loop head
        and must fund [kv_frame_slots] there; see [SpecScheduler]. *)
     (kv_frame_slots + 22 <= n)%nat ->
     p0 = zero_reg ->
+    cid_word = zero_reg ->
     sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
     trap_csrs KT1 -∗
-    started_inv P -∗
-    ctx_parked_inv xid -∗
-    □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
+    started_inv γi ξd P -∗ started_prim γi -∗
+    □ (∀ (pos : nat)
+         (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
          (root' : mword 44) (pas' : nat -> mword 44),
          printk_env γpr' γd γv -∗
          procs_inv γs' -∗
          console_caps γd -∗
          is_lock γk' d_lock "virtio_disk"%string (disk_res_at γv pd' pav' pu') -∗
-         disk_geom (XI := xid) γv pd' pav' pu' -∗
+         disk_geom γv pd' pav' pu' -∗
          kpt_inv root' -∗
-         ctx_word_pointsto xid
-           (mword_of_int KernelSyms.kernel_pagetable : mword 64) DfracDiscarded
+         (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
            (zero_extend' 64 (concat_vec root' (zeros' 12 : mword 12))) -∗
          kmap_at tramp_vpn tramp_ppn KP_rx -∗
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas' i) KP_rw) -∗
-         P) -∗
+         (∃ B : nat, KptGhost.kpt_bound B ∗ ⌜(B <= pos)%nat⌝) -∗
+         P pos cur_ctx) -∗
+    KptShare.kpt_creds -∗
     printk_env γpr γd γv -∗
     procs_inv γs -∗
     console_caps γd -∗
@@ -1914,56 +1988,20 @@ Section ProofMain.
     ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hp0.
-    iIntros "Hcg #Htext Hpc Hfree Hcpu Htcsr #Hsinv #Hpkinv #Hwand".
+    intros Hn Hp0 Hcid.
+    iIntros "Hcg #Htext Hpc Hfree Hcpu Htcsr #Hsinv Hprim #Hwand #Hcreds".
     iIntros "#Hpenv #Hpinv #Hccaps #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
-    (* ================================================================== *)
-    (* THE DEPOSIT.  Everything main built is at THIS hart's context, and   *)
-    (* the record eight harts will read it from is at [xid] -- so the three *)
-    (* ξ-indexed rows ([procs_inv]'s per-slot [is_kstack], [disk_geom]'s    *)
-    (* three ring-page pointers, the [kernel_pagetable] word) are handed    *)
-    (* over with [TsoCtx.ctx_deposit], which raises the record's stamp to    *)
-    (* cover them.  The other six are ξ-free or closed handles and pass      *)
-    (* straight through the □-wand.                                          *)
-    (*                                                                       *)
-    (* IT HAPPENS HERE AND NOT IN THE WAND, and that is not a preference:    *)
-    (* [ctx_deposit] CONSUMES an [own_context], and nothing under a [□] can  *)
-    (* consume anything.  A deposit runs at the top level or not at all      *)
-    (* (§0.16′ step (ii)'s lesson, restated one layer up).  This is the last *)
-    (* point on main's boot arm that still holds its [sie_cap_gpr], hence     *)
-    (* its own thread-of-control token.                                      *)
-    (* ================================================================== *)
-    iApply fupd_wp.
-    iInv "Hpkinv" as ">Hpk" "Hclosepk".
-    iDestruct "Hpk" as (Td) "Hpk".
-    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    (* THE OBLIGATION IS APPLIED AS A TERM.  Instance search does not reach
-       through the [∗] to a payload whose rows are named at an explicit ξ
-       (§0.15′, measured: [Hint Extern] does not rescue it either), so the
-       three instances are composed by hand. *)
-    iMod (ctx_deposit
-            (λ ξ : CtxId,
-               procs_inv γs ∗
-               disk_geom (XI := ξ) γv pd pav pu ∗
-               ctx_word_pointsto ξ
-                 (mword_of_int KernelSyms.kernel_pagetable : mword 64)
-                 DfracDiscarded
-                 (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))))%I
-            (CtxMorph0 :=
-               ctx_morph_sep _ _ (ctx_morph_const _)
-                 (ctx_morph_sep _ _ (disk_geom_morph γv pd pav pu)
-                    (ctx_morph_word _ _ _ _)))
-            cur_ctx xid Td with "Hrun Hpk [Hpinv Hgeom Hkptp]")
-      as "[Hrun Hdres]".
-    { iFrame "Hpinv Hgeom Hkptp". }
-    iDestruct "Hdres" as (Td') "(_ & Hpk & #Hpinvd & #Hgeomd & #Hkptpd)".
-    iDestruct ("Hcgb" with "Hrun") as "Hcg".
-    iMod ("Hclosepk" with "[Hpk]") as "_". { iNext. iExists Td'. iExact "Hpk". }
-    iModIntro.
-    (* the deposit itself: everything main built, through the □-wand *)
-    iAssert P as "#HP".
-    { iApply ("Hwand" $! γpr γs γk pd pav pu root pas
-                with "Hpenv Hpinvd Hccaps Hdlock Hgeomd Hkinv Hkptpd Htramp Hkstx"). }
+    (* A6.138: the deposit is POSITION-GENERIC -- the builder fires at the
+       flag store's own position, where [B ≤ pos] is the bound-below-flag
+       tie the secondaries' credentials need. *)
+    iDestruct "Hcreds" as (Bk) "[#Hbd #Hbc]".
+    iDestruct (CtxValues.cv_boot_cred_llb with "Hbc") as "#HllbB".
+    iAssert (□ (∀ pos : nat, ⌜(Bk <= pos)%nat⌝ -∗ P pos cur_ctx))%I as "#HPmk".
+    { iIntros "!>" (pos) "%Hpos".
+      iApply ("Hwand" $! pos γpr γs γk pd pav pu root pas
+                with "Hpenv Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx
+                      [ ]").
+      iExists Bk. iFrame "Hbd". by iPureIntro. }
     (* The release sequence.  Note the shape: the address is materialized
        BEFORE the barrier and the store is the compressed [c.sw], so the
        fence separates the whole deposit from the store alone -- and it is
@@ -2036,37 +2074,34 @@ Section ProofMain.
        persistent and says nothing about the VALUE, so one peek-open of the
        started invariant delivers it and puts the body straight back. *)
     iApply fupd_wp.
-    iMod (inv_acc ⊤ startedN with "Hsinv") as "[Hbody Hclose]"; [ solve_ndisj | ].
-    iDestruct "Hbody" as (vpk) "[>Hword Hrest]".
-    (* M1 stage 2: the invariant body carries the ∃-CONTEXT cell
-       ([StartedInv.started_cell]) so that the body is a CLOSED term -- the
-       adequacy proof hands this one persistent handle to every hart at its
-       OWN identity.  Pay [started_cell_acc] to read the claim off it and put
-       it straight back. *)
-    iEval (rewrite started_cell_acc) in "Hword".
-    iDestruct (ctx_word4_claim (KTR2 := KT0) started_addr (DfracOwn 1) vpk
-                 ltac:(lia) with "Hword") as "#Hstcl".
-    iMod ("Hclose" with "[Hword Hrest]") as "_".
-    { iNext. iExists vpk. rewrite started_cell_acc. iFrame "Hword Hrest". }
+    iMod (started_inv_claim ⊤ γi ξd P ltac:(solve_ndisj) with "Hsinv") as "#Hstcl".
     iModIntro.
-    iApply (wp_store_s_sconf_au (kt := KT1) (ktd := KT0) 4 true (mword_of_int (KernelSyms.main + 0xb0))
+    (* THE RELEASE STORE (A6.132): the datum-form leaf, whose obligation
+       runs [started_store_obl] -- the plain window becomes the armed one
+       at the store's own index, the deposit context is stamped there and
+       the ownership rows go into the invariant's armed disjunct. *)
+    iApply (wp_store_s_sconf_au_dat (kt := KT1) (ktd := KT0) 4 true (mword_of_int (KernelSyms.main + 0xb0))
               (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
               (mword_of_int 0 : mword 12) S3 n
               (trunc32 (rget S3 (mword_of_int 14 : mword 5))) True%I
               ((⊤ ∖ ↑minstretN) ∖ ↑startedN) false
+              (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_parked ξd 0 ∗
+               started_prim γi ∗
+               (llb loglen_name Bk ∗
+                □ (∀ pos : nat, ⌜(Bk <= pos)%nat⌝ -∗ P pos cur_ctx)))%I
+              (started_right γi ξd P)
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_write_ram_plain_4
               (store_ext_4 (rget S3 (mword_of_int 14 : mword 5)))
-              ltac:(solve_ndisj) with "Hcg Hpc [] [] [HP]").
+              ltac:(solve_ndisj)
+              ltac:(cbv zeta; rewrite Hsa Hsvst;
+                    exact (started_store_obl γi ξd P Bk p0 Hcid))
+              with "Hcg Hpc [] [] [Hprim]").
     { iApply (mni_b0 with "Htext"). }
     { rewrite Hsa. iExact "Hstcl". }
-    { rewrite Hsa Hsvst.
-      iMod (started_inv_store_au (⊤ ∖ ↑minstretN) P ltac:(solve_ndisj)
-              with "Hsinv HP") as (vold) "[Hw Hclose]".
-      iModIntro. iExists vold.
-      iEval (rewrite -(wordw4_ctx (KTR2 := KT0))) in "Hw". iFrame "Hw".
-      iIntros "Hw". iEval (rewrite (wordw4_ctx (KTR2 := KT0))) in "Hw".
-      iApply ("Hclose" with "Hw"). }
+    { iApply (started_store_open (⊤ ∖ ↑minstretN) γi ξd P Bk ltac:(solve_ndisj)
+                with "Hsinv Hprim [ ]").
+      iFrame "HllbB HPmk". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc _".
     iEval (change (if true then 2%Z else 4%Z) with 2%Z) in "Hpc".
@@ -2117,10 +2152,10 @@ Section ProofMain.
       (ndisk : nat)
       (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (xid : CtxId)
-      (P : iProp Σ) `{!Persistent P}
+      (γi : gname) (ξd : CtxId) (P : nat -> CtxId -> iProp Σ)
+      `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)}
     : wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 xid P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
     intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hsnap Hp0.
@@ -2142,10 +2177,10 @@ Section ProofMain.
         by (apply Z.div_pos; lia).
       rewrite Hsbeq in Hinibeq. lia. }
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
-    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hpkinv #Hwand Hlocks Hglobals".
+    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv Hprim #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
     iIntros "Hparks Hpst Hpavail Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
-    iIntros "#Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim Hcmauth #Hdone #Htimc Hhart Hunset Hkauth Hpages".
+    iIntros "#Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim Hcmauth #Hdone #Htimc Hhart Hunset Hbunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
     (* THE [tx_busy] CELL IS GONE from the bundle: ae96fd0 deleted the flag, so
@@ -2254,12 +2289,13 @@ Section ProofMain.
     (* --- 0x6e .. 0x7a : kinit / kvminit / kvminithart / procinit --- *)
     iApply (mn_grp_kvm m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Hphystop Hs1 Hprun Hlen
+              (StartedInv.cid_zero_agent cpu_id Hcid)
               with "Hcg Htext Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt
-                    Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hfds Hirs
+                    Hsbit Htlb Hunset Hbunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hfds Hirs
                     Hbss Hparks Hpst").
     iIntros (γp γw γs m3 root pas)
       "Hcg Hpc Hfree Hcpu Hkenv #Hkmem #Hpinv #Hpidlock #Hwaitlock Hkpt Hstvec
-       #Hkinv #Hkptp #Htramp #Hkstx".
+       #Hkinv #Hcreds #Hkptp #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
     iApply (mn_grp_trap γd γv m3 (K - 2)%nat p0 Hn50 Hcid
               with "Hcg Htext Hkdata Hdev Hpc Hltick Hticks Hstvec Hq").
@@ -2309,8 +2345,9 @@ Section ProofMain.
     { iEval (rewrite /kernelvec_env). iModIntro. iExact "Hcaps". }
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started fsc_printk γk fsc_kalloc γs γd γv m5 (K - 2)%nat p0 pd pav pu
-              root pas xid P ltac:(lia) Hp0
-              with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hpkinv Hwand Hpenv
+              root pas γi ξd P ltac:(lia) Hp0 Hcid
+              with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hprim Hwand
+                    Hcreds Hpenv
                     Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
     (* fold the boot cells and the freshly built handler resource into the
        [trap_csrs] the scheduler consumes. *)

@@ -834,10 +834,13 @@ Section KexecPinAMain.
         cpu_own 0 eb (proc_addr jp) b lks -∗
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jp) -∗
-        is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
-                     (ic_tok fsc_ic kf) (slh_tok (icfg_isl kf)) -∗
+        is_sleeplock_genl gilf gislf (i_lock (ientry kf)) "inode"%string
+                     (ic_slp fsc_ic kf) (slh_tok (icfg_isl kf)) -∗
         sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-        ic_tx_dep fsc_ic kf sf icfg_dev inumf gyf -∗
+        ⌜(loyf <= tlyf)%nat⌝ -∗
+        IcacheRef.cred_floor loyf tlyf -∗
+        IcacheInv.iref_claims -∗
+        ic_tx_dep fsc_ic kf sf icfg_dev inumf gyf loyf -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗

@@ -567,7 +567,7 @@ Section KexecPinMain.
     destruct Hregs90 as (HM90sp & HM90s0 & HM90s1 & HM90s2 & HM90s4 & Hkf &
                          Hinumf & HM90thr).
     (* the nine resources phase B threads whole and never looks inside *)
-    iAssert (kxc_open pidv kf qf sf gyf inumf dnf
+    iAssert (kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf
                       bmf gilf gislf)
       with "[Hslk Hslked Hdep Hidev Hiinum Hival Hloaded Hity Hfrz
              Hiref Hru]"
@@ -587,7 +587,7 @@ Section KexecPinMain.
     (* ---- PHASE B1: +0x090 .. +0x0cc, plus the +0x31c tail ---- *)
     iApply (PB.kxc_b1 (CID0 := CIDa) (kxp_entry_ok pb) gs jp gl pd pav pu
  gf
-              kf qf sf gyf inumf dnf bmf gilf gislf n2
+              kf qf sf gyf loyf tlyf inumf dnf bmf gilf gislf n2
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m M90 K eb eb ∅
               (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
@@ -602,7 +602,7 @@ Section KexecPinMain.
       iIntros (CIDz) "%Hsz1". iIntros (Mz Pz w13z w67z) "Hst1a2 Hcont".
       iApply (PB3.kxc_b2z (CID0 := CIDz) gs jp gl pd pav pu
                 gilf gislf gf
- kf qf sf gyf inumf dnf bmf n2
+ kf qf sf gyf loyf tlyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                 m Mz K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
@@ -630,7 +630,7 @@ Section KexecPinMain.
       iIntros (CIDl) "%Hsl". iIntros (Ml Pl) "Hst12c Hcont".
       iApply (PB3.kxc_b2 (CID0 := CIDl) (kxp_entry_ok pb) gs jp gl pd pav pu
                 gilf gislf gf
- kf qf sf gyf inumf dnf bmf n2
+ kf qf sf gyf loyf tlyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                 m Ml K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)

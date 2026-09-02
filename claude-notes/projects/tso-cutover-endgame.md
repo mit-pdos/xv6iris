@@ -527,7 +527,7 @@ and law 10 (hooks).
 3. **The hook consolidation** (r20c) — BUILT side-by-side in
    `CtxBoxHooked.v` (§3.2b); what remains is the slot-in edit to CtxBox.v
    at the first quiet point after r20b, one commit, no client change.
-4. **A second agent for L2/L3/L4** — RUNNING (owner approved 2026-09-02; worktree /shared/xv6iris-2-l2, branch tso-cutover-l2, fast-forwards into tso-cutover).
+4. **A second agent for L2/L3/L4** — DONE (2026-09-02; three rounds on tso-cutover, A12.14–A12.16 of the readiness record): L2 closed but ProofForkretPark (L8) and IcacheRef's dead `Require TsoCtxShim`; L3, L4 closed; BootShared/BootChain/SystemAdequacy textual behind ProofMain (L9, mine).
 5. **`ic_slp`'s final shape** (the off-row conjunct + one fold lemma) --
    r21's consumers are fused against the CURRENT shape (`is_sleeplock_genl … (ic_slp fsc_ic k)`), so any later change is a wrapper-internal edit; was: before r21's consumer sweep; `off_rows_morph` and the llb-max lemma
    provable now.
@@ -751,3 +751,15 @@ branch and recorded in §3.2 and §8 here.
     `_tx_sconf`/`_dep_sconf` spellings and take flip's `lo tl` epoch indices,
     `cred_floor`, `iref_claims` premises and the floored forgets -- the
     "main's names, flip's shapes" blend, recipe in A12.16.
+
+12. **`ic_grow_tx` / `ic_shrink_tx` OVER THE BOX (r21 round 2, 2026-09-02).**
+    Main's two two-lock moves (the parked `ln_tx` share of a `DepTx`
+    descriptor grows / shrinks while the holder keeps the lock; sys_unlink's
+    `dp`, create's parent and child) are stated on the cutover with main's
+    arity plus the epoch `lo`, over the holder's `ic_handle`, and PROVED
+    THROUGH `CtxBox.box_q_update` (the L2 holder's Q2 rewrite, ruled §6⁸ Q4)
+    -- no CtxBox.v / CtxBoxHooked.v change: the descriptor variable's two
+    halves move together (`ghost_var_update_halves`), `ic_q_side` at DepTx
+    (= `tx_pin`) takes or gives exactly the crossing share, `ic_deposit2` /
+    `ic_pay_live` do not read `q`.  In `IcacheEscrow.v` beside `ic_slp`.
+    Reviewers: this is the note at CtxBox.v's `box_q_update` made concrete.

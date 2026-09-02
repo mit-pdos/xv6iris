@@ -545,12 +545,15 @@ Section KexecBSeam.
      spell them out. *)
   Definition kxc_open
  (pidv : mword 32)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) : iProp Σ :=
-    (is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok fsc_ic kf) (slh_tok (icfg_isl kf)) ∗
+    (is_sleeplock_genl gilf gislf (i_lock (ientry kf)) "inode"%string (ic_slp fsc_ic kf) (slh_tok (icfg_isl kf)) ∗
      sleeplocked_q gislf sf (i_lock (ientry kf)) pidv ∗
-     ic_tx_dep fsc_ic kf sf icfg_dev inumf gyf ∗
+     ⌜(loyf <= tlyf)%nat⌝ ∗
+     IcacheRef.cred_floor loyf tlyf ∗
+     IcacheInv.iref_claims ∗
+     ic_tx_dep fsc_ic kf sf icfg_dev inumf gyf loyf ∗
      i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev ∗
      i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf ∗
      i_valid (ientry kf) ↦₄ valid_word true ∗
@@ -578,7 +581,7 @@ Section KexecBSeam.
   Definition kxc_at_1a2
       (jp : nat)
       (gf : gname)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -611,7 +614,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open pidv kf qf sf gyf inumf dnf bmf
+     kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf
               gilf gislf ∗
      log_opb icfg_log n2 ∗
      iref_slots 1 ∗
@@ -657,7 +660,7 @@ Section KexecBSeam.
   Definition kxc_at_12c
       (jp : nat)
       (gf : gname)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -693,7 +696,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open pidv kf qf sf gyf inumf dnf bmf
+     kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf
               gilf gislf ∗
      log_opb icfg_log n2 ∗
      iref_slots 1 ∗
@@ -727,7 +730,7 @@ Section KexecBSeam.
   Definition kxc_at_1a4
       (jp : nat)
       (gf : gname)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -761,7 +764,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open pidv kf qf sf gyf inumf dnf bmf
+     kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf
               gilf gislf ∗
      log_opb icfg_log n2 ∗
      iref_slots 1 ∗

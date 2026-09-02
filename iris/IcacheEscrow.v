@@ -4522,6 +4522,94 @@ Section IcacheBox.
 
   (* ---- the two payload rows (M-6) ------------------------------------ *)
   (* L2: the inode sleeplock's λ payload -- CtxBox.l2_row at ic_tok *)
+  (* r21: BOTH MOVES OVER THE BOX, main's statements (ic_shrink_tx /
+     ic_grow_tx) with the epoch [lo] and the holder's HANDLE in place of
+     main's bare descriptor half.  Neither touches an arm, a stamp, a
+     register or a row: the L2 holder selects OUT_L2 by its own register half
+     ([ic_hold] inside [ic_deposit2]) and rewrites Q2 in place through
+     [CtxBox.box_q_update] -- the descriptor variable's two halves move
+     together ([ghost_var_update_halves]) and the parked [ln_tx] share
+     ([ic_q_side] at DepTx = [tx_pin]) grows or shrinks by exactly the share
+     that crosses.  [ic_deposit2]/[ic_pay_live] do not read [q], so the
+     handle's other conjuncts are the same term at both descriptors. *)
+  Lemma ic_grow_tx (E : coPset) cn (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z) (k : nat)
+      (s : Qp) (dev inum : mword 32) (g : gname) (lo : nat) (v : bool)
+      (t : nat) (q q1 q2 : Qp) :
+    q = (q1 + q2)%Qp ->
+    ↑(icBoxN .@ k) ⊆ E ->
+    ic_escrow cn γfs γi cov logstart k -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_handle cn k (DepTx s dev inum g lo t q1) -∗
+    t ↪[ln_tx icfg_log]{#q2} tt ={E}=∗
+      i_valid (ientry k) ↦₄ valid_word v ∗
+      ic_handle cn k (DepTx s dev inum g lo t q).
+  Proof.
+    iIntros (Hq HE) "#Hesc Hvld (Hd2 & Hpl & Hdep & Htok) Htx".
+    iFrame "Hvld".
+    rewrite /ic_deposit2. cbn [ic_dep_id ic_dep_mass].
+    iDestruct "Hd2" as "[Hhold Hbody]".
+    rewrite /ic_hold. iDestruct "Hhold" as (mh) "[%Hmass Hl2]".
+    iMod (CtxBox.box_q_update (ic_hdr cn γfs γi cov logstart k) (ic_rest k)
+            (ic_q1 cn γfs γi cov logstart k) (ic_q2 cn γfs γi cov logstart k)
+            (icBoxN .@ k) (icfg_box k) (Some (dev, inum))
+            (ic_deposit cn k (DepTx s dev inum g lo t q)) mh E HE
+            with "Hesc Hl2 [Hdep Htx]") as "[Hl2 Hdep]".
+    { iIntros "HQ". rewrite /ic_q2.
+      iDestruct "HQ" as (d dev' inum') "(%Hid & Hdep' & Hside & Hq)".
+      iDestruct (ic_deposit_agree with "Hdep Hdep'") as %<-.
+      iEval (rewrite /ic_q_side; cbn) in "Hside".
+      rewrite /ic_deposit.
+      iMod (ghost_var_update_halves (DepTx s dev inum g lo t q) with "Hdep Hdep'")
+        as "[Hdep Hdep']".
+      iModIntro. iSplitR "Hdep"; [| iExact "Hdep"].
+      iExists (DepTx s dev inum g lo t q), dev', inum'.
+      iFrame "Hdep' Hq". iSplitR; [iPureIntro; exact Hid |].
+      rewrite /ic_q_side; cbn. rewrite /TxPin.tx_pin.
+      iApply (ic_tx_share_join t q q1 q2 Hq with "Hside Htx"). }
+    iModIntro. rewrite /ic_handle /ic_deposit2. cbn [ic_dep_id ic_dep_mass].
+    iFrame "Hpl Hdep Htok Hbody". rewrite /ic_hold. iExists mh. iFrame "Hl2".
+    by iPureIntro.
+  Qed.
+
+  Lemma ic_shrink_tx (E : coPset) cn (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z) (k : nat)
+      (s : Qp) (dev inum : mword 32) (g : gname) (lo : nat) (v : bool)
+      (t : nat) (q q1 q2 : Qp) :
+    q = (q1 + q2)%Qp ->
+    ↑(icBoxN .@ k) ⊆ E ->
+    ic_escrow cn γfs γi cov logstart k -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_handle cn k (DepTx s dev inum g lo t q) ={E}=∗
+      i_valid (ientry k) ↦₄ valid_word v ∗
+      ic_handle cn k (DepTx s dev inum g lo t q1) ∗
+      t ↪[ln_tx icfg_log]{#q2} tt.
+  Proof.
+    iIntros (Hq HE) "#Hesc Hvld (Hd2 & Hpl & Hdep & Htok)".
+    iFrame "Hvld".
+    rewrite /ic_deposit2. cbn [ic_dep_id ic_dep_mass].
+    iDestruct "Hd2" as "[Hhold Hbody]".
+    rewrite /ic_hold. iDestruct "Hhold" as (mh) "[%Hmass Hl2]".
+    iMod (CtxBox.box_q_update (ic_hdr cn γfs γi cov logstart k) (ic_rest k)
+            (ic_q1 cn γfs γi cov logstart k) (ic_q2 cn γfs γi cov logstart k)
+            (icBoxN .@ k) (icfg_box k) (Some (dev, inum))
+            (ic_deposit cn k (DepTx s dev inum g lo t q1) ∗ t ↪[ln_tx icfg_log]{#q2} tt)%I
+            mh E HE with "Hesc Hl2 [Hdep]") as "[Hl2 [Hdep Htx]]".
+    { iIntros "HQ". rewrite /ic_q2.
+      iDestruct "HQ" as (d dev' inum') "(%Hid & Hdep' & Hside & Hq)".
+      iDestruct (ic_deposit_agree with "Hdep Hdep'") as %<-.
+      iEval (rewrite /ic_q_side; cbn) in "Hside". rewrite /TxPin.tx_pin.
+      iDestruct (ic_tx_share_split t q q1 q2 Hq with "Hside") as "[Hside Htx]".
+      rewrite /ic_deposit.
+      iMod (ghost_var_update_halves (DepTx s dev inum g lo t q1) with "Hdep Hdep'")
+        as "[Hdep Hdep']".
+      iModIntro. iSplitR "Hdep Htx"; [| iFrame "Hdep Htx"].
+      iExists (DepTx s dev inum g lo t q1), dev', inum'.
+      iFrame "Hdep' Hq". iSplitR; [iPureIntro; exact Hid |].
+      rewrite /ic_q_side; cbn. rewrite /TxPin.tx_pin. iExact "Hside". }
+    iModIntro. iFrame "Htx". rewrite /ic_handle /ic_deposit2. cbn [ic_dep_id ic_dep_mass].
+    iFrame "Hpl Hdep Htok Hbody". rewrite /ic_hold. iExists mh. iFrame "Hl2".
+    by iPureIntro.
+  Qed.
+
   Definition ic_slp cn k : CtxId -> iProp Σ :=
     fun ξ => (∃ s : l2_reg ic_bid,
       CtxBox.l2_row (X := ic_x) (icfg_box k) s ξ ∗

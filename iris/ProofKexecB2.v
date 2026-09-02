@@ -295,7 +295,7 @@ Section KexecB2Body.
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -306,7 +306,7 @@ Section KexecB2Body.
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string) :
     kxc_bad324_body Q gs jp gl pd pav pu gilf gislf
  gf
-      kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
+      kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P szf eb lks.
   Proof.
@@ -644,7 +644,8 @@ Section KexecB2Body.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID3 CID13 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iDestruct "Hopen" as "(#Hslkk & Hslkd & Hdep & Hidev & Hiinum &
+    iDestruct "Hopen" as "(#Hslkk & Hslkd & %Hley & #Hfly & #Hclaimsy &
+                           Hdep & Hidev & Hiinum &
                            Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
     (* [kxc_bad64] pins its own [CID0] from "Hcg", so kexec's exit -- still
        anchored at the section's [CID0] -- is re-anchored there, and the
@@ -655,12 +656,12 @@ Section KexecB2Body.
                  with "Hcont") as "Hcont".
     iApply (A.kxc_bad64 Q gs jp gl pd pav pu
               gilf gislf gf
- kf qf sf gyf inumf dnf bmf n2
+ kf qf sf gyf loyf tlyf inumf dnf bmf n2
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m U8 K eb lks sp0 ra0 s00 s10 s20 pv av
               HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
               Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HU8sp HU8s4 HU8thr
-              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hslkk Hslkd Hdep
+              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hslkk Hslkd [//] Hfly Hclaimsy Hdep
                     Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits
                     Hka Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont]
                     Hcont").
@@ -778,7 +779,7 @@ Section KexecB2Loops.
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -790,7 +791,7 @@ Section KexecB2Loops.
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string) :
     kxc_ls_body Q gs jp gl pd pav pu gilf gislf
  gf
-      kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
+      kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P ip va fz po eb lks.
   Proof.
@@ -1329,7 +1330,8 @@ Section KexecB2Loops.
         rewrite /D5 upd_ne; [| lregne]. rewrite /D4 upd_ne; [| lregne].
         exact (HD3get r Hr Hne). }
       (* ---- the resources readi asks for ---- *)
-      iDestruct "Hopen" as "(#Hslkk & Hslkd & Hdep & Hidev & Hiinum &
+      iDestruct "Hopen" as "(#Hslkk & Hslkd & %Hley & #Hfly & #Hclaimsy &
+                           Hdep & Hidev & Hiinum &
                              Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
       iDestruct (kxc_load_peel with "Hload") as
         (datl) "(%Hiok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta
@@ -1345,6 +1347,7 @@ Section KexecB2Loops.
           #Hkmapb & _)".
       iDestruct (proc_pt_page_acc P (svpn_of vai) w0 Hum0 with "Hkmapb Hpt")
         as "[Hpage Hgive]".
+      iEval (rewrite /ProcPtOwn.page_named) in "Hpage".
       iDestruct (kxc_page_take (page_base (pte_ppn w0)) nn ltac:(lia)
                    with "Hpage") as (fpg) "[Hdst Hrest]".
       iEval (rewrite -HD6a2) in "Hdst".
@@ -1388,9 +1391,9 @@ Section KexecB2Loops.
                    Hiok Hrl Hdok Hddix Hdoc Hduq
                    with "Hdlk Hdiat Hmeta Hmap Hblocks Htop") as "Hload".
       iDestruct (A.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
-      iDestruct (kxc_open_intro pidv kf qf sf gyf
+      iDestruct (kxc_open_intro pidv kf qf sf gyf loyf tlyf
                    inumf dnf bmf gilf gislf
-                   with "Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload
+                   with "Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid Hload
                          Hity Hfrz Hkeep Hru") as "Hopen".
       (* ---- the register facts on the far side of readi ---- *)
       assert (HM2s2 : M2 !!! Regidx Rs2
@@ -1641,7 +1644,7 @@ Section KexecB2Loops.
                      with "Hcont") as "Hcont".
         iApply (kxc_bad324 (CID0 := CIDb1) Q gs jp gl pd pav pu
                   gilf gislf gf
- kf qf sf gyf inumf dnf bmf n2 plen
+ kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen
                   pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas m M2 K
                   sp0 ra0 s00 s10 s20 pv av w63 w67 ef P w65 eb lks
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp

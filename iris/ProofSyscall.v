@@ -2217,7 +2217,7 @@ Section SyscallVocab.
     iDestruct (sysc_ic_env_of_ready with "Hfs") as
       "( _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2 )".
-    iDestruct (is_itable2_claims with "Hit") as "#Hclaims".
+    iDestruct (IcacheEscrow.is_itable2_claims with "Hit") as "#Hclaims".
     iDestruct (sysc_bm_cells with "Hfs") as "(_ & #Hisp & _)".
     iAssert FsReady.fs_ready as "#Hrdy".
     { iDestruct "Hfs" as "(_ & _ & _ & _ & $)". }
@@ -2262,7 +2262,7 @@ Section SyscallVocab.
     iDestruct (sysc_ic_env_of_ready with "Hfs") as
       "( _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2 )".
-    iDestruct (is_itable2_claims with "Hit") as "#Hclaims".
+    iDestruct (IcacheEscrow.is_itable2_claims with "Hit") as "#Hclaims".
     iDestruct (sysc_bm_cells with "Hfs") as "(_ & #Hisp & _)".
     iSplitL "Hsl".
     { rewrite /SpecFilestat.filestat_fs_env /sysc_fstat_names; cbn.
@@ -2402,7 +2402,7 @@ Section SyscallVocab.
     iDestruct (sysc_ic_env_of_ready with "Hfs") as
       "( _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2 )".
-    iDestruct (is_itable2_claims with "Hit") as "#Hclaims".
+    iDestruct (IcacheEscrow.is_itable2_claims with "Hit") as "#Hclaims".
     iDestruct (sysc_bm_cells with "Hfs") as "(#Hbmst & #Hisp & #Hbmr)".
     iAssert FsReady.fs_ready as "#Hrdy2".
     { iDestruct "Hfs" as "(_ & _ & _ & _ & $)". }

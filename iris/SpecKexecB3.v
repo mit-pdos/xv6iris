@@ -90,7 +90,7 @@ Definition kxc_b2_body
     (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
     (gilf gislf : gname) (gf : gname)
-    (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+    (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -120,7 +120,7 @@ Definition kxc_b2_body
   fs_fabric gs pd pav pu
  -∗
   kxc_at_12c jp gf
- kf qf sf gyf inumf dnf bmf gilf gislf n2
+ kf qf sf gyf loyf tlyf inumf dnf bmf gilf gislf n2
              plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -156,7 +156,7 @@ Definition kxc_b2z_body
     (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
     (gilf gislf : gname) (gf : gname)
-    (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+    (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -181,7 +181,7 @@ Definition kxc_b2z_body
   fs_fabric gs pd pav pu
  -∗
   kxc_at_1a2 jp gf
- kf qf sf gyf inumf dnf bmf gilf gislf n2
+ kf qf sf gyf loyf tlyf inumf dnf bmf gilf gislf n2
              plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -207,7 +207,7 @@ Module Type KEXECB3.
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -218,7 +218,7 @@ Module Type KEXECB3.
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64),
     kxc_b2_body Q gs jp gl pd pav pu gilf gislf
  gf
-      kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
+      kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
       ef P i szv.
 
@@ -227,7 +227,7 @@ Module Type KEXECB3.
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
-      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -238,6 +238,6 @@ Module Type KEXECB3.
       (ef : nat -> bv 8) (P : uptd),
     kxc_b2z_body gs jp gl pd pav pu gilf gislf
  gf
-      kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
+      kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w13 w67 ef P.
 End KEXECB3.
