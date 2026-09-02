@@ -1462,3 +1462,9 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   blockno halves nit); R-3 build note; R-4 sharpened to ξ-freedom of
   tok/Q (ghost), recorded in the client obligations.  §3.3 and §3.5
   amended.  R1' proceeds.
+- 2026-09-01 (build agent, R1' stage 1): iris/CtxBox.v is PROVEN as
+  stated (no Admitted); a `box_alloc_at` boot twin for pre-minted names
+  added beside `box_alloc` (statements otherwise untouched).  The register
+  types / stamps camera / boxG / box_names moved to Xv6Cameras §15; bcache
+  instantiated (BioInv v6: bbox_* wrappers, bstok handle row per F7/R-1);
+  the bcache consumers are being re-targeted (stage 2, A6.159).
