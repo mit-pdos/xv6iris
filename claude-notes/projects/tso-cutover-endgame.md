@@ -771,6 +771,26 @@ identity the file slot.  ONE REFINEMENT to P4's "insert-or-replace at k":
 
 ---------------------------------------------------------------------------
 
+## 6⁵. OWNER RULING (2026-09-02), recorded by the box's designer
+
+The owner ruled on the three items as recommended:
+  1. (e′) `box_checkout_split` — a shape-splitting checkout with a client
+     split wand; (e) is its trivial instance.  APPROVED.
+  2. Q is the residue of BOTH out arms (OUT_L1 := hdr_out ∗ P_rest ∗ Q);
+     (a) takes Q, (b)/(b′) return it, (g) exchanges it.  No Q1 parameter.
+     APPROVED.
+  3. R4b is a THIRD BOX INSTANCE (born at filealloc under ftable.lock,
+     publish = (e)/(f) under ip->lock, identity = the file slot, the
+     inode payload's append-only set of off-box rows with a membership
+     witness on the fd row, a token per box), skeletoned under rule 0
+     before code.  APPROVED.
+Riders accepted with the ruling: L1's root first; the CtxBox statement
+changes land as ONE edit (state, type-check, then prove — the F30
+precedent) before r19.  The skeleton for that edit and for the off box
+is the designer's next step (`iris/CtxBoxNext.v`, `iris/OffBox.v`).
+
+---------------------------------------------------------------------------
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
