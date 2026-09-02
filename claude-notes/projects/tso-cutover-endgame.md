@@ -508,6 +508,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | Q10 | the last close's (a) must not consume iput's pin name-half: the hooked (a) moves the frozen alternative's own pin into `Q1 1` (option B); no ghost change; `ic_hdr_frz` carries `ifreeze_pre` out and needs a `CtxMorph` instance | RULED B by reviewer 1, confirmed by the box's designer (item 9); to land in ProofIput |
 | §6²⁷ | run L2/L3/L4 in parallel now; sweep the file layer once; two tripwires before r21 | RECOMMENDED to the owner |
 | item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RULED -- reviewer 1 agrees (item 17), with `file_core_off`'s FD_INODE arm named as the FIFTH final shape and "0 Admitted in `EnvMorph`" added to r25's gate |
+| item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; sign-off pending the two fixes |
 | R4a Q1 | `inode_pay`: the cinv parks KEYED GHOST ONLY (`iref_frag`, `ic_lent_stamps`, `runit_any`); the reference's cells, `live_genlo`, `slh_tok` ride the fractional payload as `inode_ref_side` at the parked fraction; pin that fraction to `Q` by lending HALF at sys_open (no arity change), fallback `fp_iqi` | RULED by reviewer 1 (item 15) |
 | R4a Q2 | NO re-mint, NO llb, NO `own_context` at cancel: the share's `cred_floor` is in the canceller's hand (morphed with the payload) and `live_genlo_agree` pins the parked `lo`; `inode_pay_cancel`'s statement unchanged | RULED by reviewer 1 (item 15) |
 | R4a Q3/Q5 | ONE file-layer sweep with all three shapes final (`inode_pay`, `ftable_res_at` WITH the floor row + `_in` releases, `ic_slp ∗ off_rows`); L5 + full `ftable_res_at` first, then L8/L9 and the OffBox consumers as the two lanes INSIDE r25 | RULED by reviewer 1 (item 15); the two-sweep order reviewer 1 gave earlier is WITHDRAWN (L6 is on L8's path) |
@@ -785,6 +786,80 @@ and law 10 (hooks).
     `EnvMorph.v` with the class-A wrapper instances and the sleep-lock handle
     morph; the floors-law instances in IcacheRef/PipeInvDefs), each green on
     its own base at 1436 (the one pre-existing root).
+
+19. **REVIEWER 1'S AUDIT OF THE SHAPES COMMIT (2aba5506b, HEAD 15a5e6e97;
+    2026-09-02).  NOT SIGNED OFF YET: one inconsistency between two shapes
+    and one binder bug; everything else, and all four questions, approved.**
+    Read: `inode_core`/`inode_ref_side`/`inode_pay`/`_alloc`/`_cancel`/
+    `_split`, `file_core_off`, `file_pay_st`, `file_rest`, `fslot γ M B Kd k`,
+    `ftable_res γ Kd`, `ftable_res_at`, `ftable_res_boot`, `is_ftable`,
+    `off_fd_row`/`off_l1_row`/`off_ref_stamps`/`obox_*`/`off_rows`/
+    `off_rows_dep`/`off_l2_row`, `off_filealloc`/`off_dup`/`off_close`/
+    `off_reclaim`, `inode_ref_short_genlo`, the 38 `SKELETON r25` tags,
+    `EnvMorph.v`, `is_lock_handle_morph`, the Section FileInv contexts.
+    - **BLOCKING -- the fd row's stamps MASS and the table's COUNT
+      disagree.**  `file_core_off`'s FD_INODE arm is `off_fd_row off_cfg i k
+      q`, whose `off_ref_stamps γ k μ` sits at `μ := q`, the fd's CELL
+      fraction; but `fslot`'s allocated arm carries `off_l1_row γb k
+      (Pos.to_nat n) Kd` (count = the reference count n) and `off_dup`/
+      `off_close` mint/consume ONE unit per counted reference.  Σ demands
+      `qsum m = n`; the fd rows' masses sum to the out fraction and the
+      remainder's to the rest -- always 1.  Unsatisfiable at n ≥ 2; the
+      first filedup proof finds it.  F34 mis-stated in the shape: mass
+      belongs to counted references, not to cell fractions.
+      THE REPAIR (consistent with L6 as ruled and with the landed
+      `off_dup`/`off_close`/`off_reclaim`): the unit rides the FD-ONLY
+      predicate.  `file_pay_st` is used only inside `file_ref` (one per fd)
+      and is unfolded in three files (ProofFileread, ProofFilewrite,
+      FileInvDefs) -- exactly the sites that need the unit for (e)/(f).
+        file_pay_st γ k q C st := ∃ pn, ⌜fdstate_ok …⌝ ∗ fpay_tok γ k q pn ∗
+                                  file_core k q pn C ∗ off_fd_unit k q C
+        off_fd_unit k q C := if FD_INODE then ∃ i γb, ⌜fc_ip C = ientry i⌝ ∗
+              ⌜i < NINODE⌝ ∗ obox_frag off_cfg k q γb ∗ off_box k γb ∗
+              off_member off_cfg i γb ∗ off_ref_stamps γb k 1   else emp
+        file_core_off k q C := if FD_INODE then emp else foff_dead k q
+        fslot (allocated): … ∗ ∃ γb, ⌜B !! k = Some γb⌝ ∗ off_box k γb ∗
+              off_l1_row γb k (Pos.to_nat n) Kd ∗ (the complement frag
+              `obox_frag off_cfg k (1-q) γb` when `1 - q` exists)
+      The tie frag rides with the unit at the fd's cell fraction, so
+      `file_pay_split` still distributes it; the table holds the complement
+      beside its L1 row, so the frags sum to one WITHOUT `file_rest`
+      carrying any box ghost.  filedup builds the new fd's `file_pay_st`
+      from the split plus `off_dup`'s fresh unit.  The table never holds
+      stamps, so the floor row bounds `td` only, and the last closer's `Kt`
+      comes from R1 at its ftable acquire (present its own unit's llb);
+      `off_reclaim`'s `qsum m = 1` is then exactly the closer's unit.
+      REJECTED alternative (count constant 1, mass = cell fractions): drops
+      `off_dup`/`off_close`, contradicts the ruled L6, and stores stamps in
+      the remainder, which the payload floor row would then have to bound
+      -- a shape the current `file_pay` cannot express without a parameter.
+    - **SMALL FIX:** `FileInvDefs.v` binds `!kallocG Σ` TWICE in both
+      Section FileInv contexts (792/796 and 813/817).  Two instances of one
+      class in scope make `ghost_var` resolution ambiguous -- the
+      `kalloc_count_inG` pin in `off_filealloc` is working around it.
+      Remove the duplicate.
+    - **APPROVED AS LANDED:** `inode_core` ghost-only and context-free (pitfall
+      2 checked), `inode_ref_side`, `inode_pay` at unchanged arity,
+      `inode_pay_cancel` unchanged, `so_publish` at `qi = s` -- D1 revised
+      exactly; (c) the PIECES are the right alloc premise (`inode_held_short`
+      hides `qi`; the alloc must pin it).  (a) the ghost-map tie is right and
+      minimal -- an `fpnames` field fails when `file_rest` is empty (no
+      agreement token in the table); the tie moves with the unit but its
+      mechanism is unchanged.  (b) `off_rows_dep`'s `lr_hold s = None` holds
+      because a checked-out row is in the holder's hand while it holds
+      `ip->lock`, so every row is at rest at every release; `ic_slp_dep`'s
+      single `llb T` is what `lock_finisher_close_in_llb` takes.  (d) the
+      `kallocG ∗ offboxG` binder follows the file's rule (below `Xv6G`, names
+      classes individually) -- fine once the duplicate is gone.  The SIXTH
+      shape (`islot2`/`islot_empty` at the payload's context) is the standard
+      move, found the way rule 0 predicts.  `ftable_res_at` with the floor
+      row and `is_ftable` over it; `off_l1_row` with `llb td ∗ td ≤ Kd` and
+      no floor; `off_reclaim` taking both floors.  `ftable_res`'s `is_Some
+      (B !! k)` row is derivable from the big-op once boot inserts all keys
+      (harmless).  The 38 tagged skeletons, `EnvMorph.v`, the log λ-flip,
+      `is_lock_handle_morph`, the floors-law instances.
+    - **SIGN-OFF:** pass 1 waits for the two fixes above (both
+      statement-level, small); with them landed, reviewer 1 signs off.
 
 ## 10. Process and tooling (measured facts)
 
