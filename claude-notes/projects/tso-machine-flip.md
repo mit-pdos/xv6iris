@@ -18553,6 +18553,11 @@ NEXT: R1' per §4.1 once F1 is vetted (or as F1 says, absent objection).
   the stamp row, the register at (IcLoaded g1 dn bm, T0) with its bound
   under a floor the entry picks by `Nat.max_spec`, the header's pieces).
   ProofIput has ZERO Admitted.  The old escrow-arm body is gone.
+- BANKED `tso-flip` 2109bd833 (R3.4).  Full tree: ONE red, ProofForkretPark's
+  bracketed park_globals frontier (A6.160); the icache/bcache escrow work
+  ("finish the bcache and iescrow proofs") has no Admitted left -- the
+  remaining Admitted in the tree are the pre-existing kexec / kfork /
+  syscall / virtio-F / U-mode shell ones, outside this effort.
 - Gotchas: `iEval (cbn [sr_td]) in "Hreg"` after ic_free_take (the
   returned register is `SlotReg (sr_td r) …` with r a literal); the count
   rewrite `Hcnt1 Hpos1` must also hit `Hiu`; the ic_guard_withdraw's
