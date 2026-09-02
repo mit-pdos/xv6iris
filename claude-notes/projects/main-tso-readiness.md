@@ -1636,3 +1636,18 @@ wrappers `ic_checkout` (`ic_dep_rd d = false`), `ic_checkout_rd`
 rides `ic_hdr_held_rd_sl`), `ic_park`/`ic_park_hold` over `ic_dep_rd d`
 returning `ic_dep_neutral ∗ ic_park_side d`.  Green: CtxBox, BioInv,
 OffBox, IcacheEscrow, IcacheBoot, IcachePinwObl, FsCfgKits, FsCfgSnap.
+
+## 12.11 r20b-1 — ProofIunlock fused (2026-09-02)
+
+The first inode proof over the box + main's ghost: flip's text for the
+pinw guard read (`iref_claims_at`, `wp_lw_au_rel_s_sconf`,
+`iref_load_pinw_au`), the holdingsleep/releasesleep `genl`/`genin` forms
+over `ic_slp`, and the park through `ic_park` at the held header
+(`ic_dep_held_intro_held` builds it from `ic_dep_held` by arm kind); main's
+descriptor `d` throughout (`ic_dep_shr d = Some (s, dev, inum, g, lo)`),
+with the pure projections `ic_dep_id_of_shr`/`ic_dep_mass_of_shr`/
+`ic_pay_live_of_shr`/`ic_body_of_shr` and `ic_park_side_dep_side` for the
+post's `ic_dep_side d`.  `ic_handle` gains `ic_tok cn k` (the sleeplock's
+token rides the handle across the hold; main put it in the escrow arm).
+The d3 resolution: hunks 1/8/9/10/11/12 flip (adapted), 2–7 cutover with
+flip's `lo`/`lo tl`.

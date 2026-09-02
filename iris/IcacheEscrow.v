@@ -3921,6 +3921,46 @@ Section IcacheBoxAmb.
       + iMod (frz_slot_kill_pinw E k ((1/2)/2)%Qp s g lo HE Hk with "Hinvp Hfs Hlv") as "[]".
   Qed.
 
+  (* THE HELD BUNDLE FROM WHAT A HOLDER CARRIES (iunlock's park input): the
+     cells, [ic_dep_held] at the descriptor's arm, the one-shot, the freeze
+     token and the liveness half the handle carried -- by arm kind. *)
+  Lemma ic_dep_held_bm_len γfs γi cov logstart d k (inum : mword 32) dn bm :
+    ic_dep_held γfs γi cov logstart d k inum dn bm -∗ ⌜length (bm_cells bm) = 13%nat⌝.
+  Proof.
+    rewrite /ic_dep_held. destruct (ic_dep_rd d); [| apply ic_loaded_bm_len].
+    rewrite /ic_rd_held. iIntros "H". iDestruct "H" as (data) "(%Hok & _)".
+    iPureIntro. destruct Hok as (Hwf & _).
+    rewrite /bm_cells length_app (blkmap_wf_dir_len _ _ _ Hwf). reflexivity.
+  Qed.
+  Lemma ic_dep_held_intro_held cn γfs γi cov logstart k d (s : Qp) (dev inum : mword 32)
+      (g : gname) (lo : nat) dn bm :
+    ic_dep_shr d = Some (s, dev, inum, g, lo) ->
+    length (bm_cells bm) = 13%nat ->
+    inode_ident k (DfracOwn (1/2)) dev inum -∗
+    i_valid (ientry k) ↦₄ valid_word true -∗
+    ic_dep_held γfs γi cov logstart d k inum dn bm -∗
+    ity_shot g (di_type dn) -∗ ifreeze_off (bv_unsigned inum) -∗ live_gen k (1/2) g -∗
+    ic_hdr_held_amb cn γfs γi cov logstart k (ic_dep_rd d) (Some (dev, inum)) (IcLoaded g dn bm) ∗
+    ic_rest_amb k (IcLoaded g dn bm).
+  Proof.
+    iIntros (Hshr Hlen) "Hid Hv Hheld Hty Hoff Hlg".
+    rewrite /ic_dep_held /ic_hdr_held_amb /ic_pay_held. destruct (ic_dep_rd d).
+    - rewrite /ic_rd_held.
+      iDestruct "Hheld" as (data) "(%Hok & %Hloc & Hmeta & Haddr & Hn14)".
+      rewrite /inode_meta. iDestruct "Hmeta" as "(Hty2 & Hmaj & Hmin & Hnl & Hsz)".
+      iSplitR "Hty2 Hmaj Hmin Hsz Haddr".
+      + iFrame "Hv Hid Hnl Hty Hoff Hlg". rewrite /ic_rd_held_ghost. iExists data.
+        iFrame "Hn14". done.
+      + rewrite /ic_rest_amb /ic_meta_rest. iFrame "Hty2 Hmaj Hmin Hsz Haddr". done.
+    - rewrite /ic_loaded.
+      iDestruct "Hheld" as (data) "(%H1 & %H2 & %H3 & %H4 & %H5 & Hleg & Hmeta & Haddr)".
+      rewrite /inode_meta. iDestruct "Hmeta" as "(Hty2 & Hmaj & Hmin & Hnl & Hsz)".
+      iSplitR "Hty2 Hmaj Hmin Hsz Haddr".
+      + iFrame "Hv Hid Hnl". rewrite /ic_pay. iLeft. iFrame "Hty Hoff Hlg".
+        rewrite /ic_loaded_ghost. iExists data. iFrame "Hleg". done.
+      + rewrite /ic_rest_amb /ic_meta_rest. iFrame "Hty2 Hmaj Hmin Hsz Haddr". done.
+  Qed.
+
 End IcacheBoxAmb.
 
 (* ====================================================================== *)
@@ -4200,7 +4240,39 @@ Section IcacheBox.
      the checkout parked).  Flip's inode proofs spell the handle
      [ic_deposit cn k d]; on this branch that is [ic_handle]. *)
   Definition ic_handle (cn : ic_names) (k : nat) (d : ic_dep) : iProp Σ :=
-    (ic_deposit2 k d ∗ ic_pay_live k d ∗ ic_deposit cn k d)%I.
+    (ic_deposit2 k d ∗ ic_pay_live k d ∗ ic_deposit cn k d ∗
+     (* ...AND THE SLEEPLOCK'S TOKEN [ic_tok], which rides the L2 payload
+        [ic_slp] while the lock is free: the holder takes it at acquiresleep
+        and hands it back at releasesleep ([ic_slp_dep]); across the hold it
+        lives HERE (main put it into the escrow arm at the checkout; the box
+        has no token slot after the second edit). *)
+     ic_tok cn k)%I.
+  (* the descriptor's PURE projections at a share-bearing descriptor *)
+  Lemma ic_dep_id_of_shr d (s : Qp) (dev inum : mword 32) (g : gname) (lo : nat) :
+    ic_dep_shr d = Some (s, dev, inum, g, lo) -> ic_dep_id d = Some (dev, inum).
+  Proof.
+    rewrite /ic_dep_shr /ic_dep_id.
+    destruct d; try discriminate; intros H; injection H as _ <- <- _ _; reflexivity.
+  Qed.
+  Lemma ic_dep_mass_of_shr d (s : Qp) (dev inum : mword 32) (g : gname) (lo : nat) :
+    ic_dep_shr d = Some (s, dev, inum, g, lo) -> ic_dep_mass d = s.
+  Proof.
+    rewrite /ic_dep_shr /ic_dep_mass.
+    destruct d; try discriminate; intros H; injection H as <- _ _ _ _; reflexivity.
+  Qed.
+  Lemma ic_pay_live_of_shr k d (s : Qp) (dev inum : mword 32) (g : gname) (lo : nat) :
+    ic_dep_shr d = Some (s, dev, inum, g, lo) -> ic_pay_live k d = live_gen k (1/2) g.
+  Proof.
+    rewrite /ic_dep_shr /ic_pay_live.
+    destruct d; try discriminate; intros H; injection H as _ _ _ <- _; reflexivity.
+  Qed.
+  Lemma ic_body_of_shr k d (s : Qp) (dev inum : mword 32) (g : gname) (lo : nat) :
+    ic_dep_shr d = Some (s, dev, inum, g, lo) ->
+    ic_body k d = (inode_ident k (DfracOwn s) dev inum ∗ live_genlo k s g lo)%I.
+  Proof.
+    rewrite /ic_dep_shr /ic_body.
+    destruct d; try discriminate; intros H; injection H as <- <- <- <- <-; reflexivity.
+  Qed.
 
   (* ---- THE TRANSACTION-DEPOSIT BUNDLE (main's durable-disk B''-tx3), over
      the handle: moved here from the first section because it names
@@ -4479,6 +4551,14 @@ Section IcacheBox.
     | DepRd _ _ _ _ _ => emp%I
     | _ => ic_q_side γfs γi cov logstart k d
     end.
+
+  Lemma ic_park_side_dep_side γfs γi cov logstart k d (s : Qp) (dev inum : mword 32) (g : gname) (lo : nat) :
+    ic_dep_shr d = Some (s, dev, inum, g, lo) ->
+    ic_park_side γfs γi cov logstart k d -∗ ic_dep_side d.
+  Proof.
+    rewrite /ic_park_side /ic_q_side /ic_dep_side /ic_dep_side_tx /tx_pin_o.
+    destruct d; try discriminate; intros _; iIntros "H"; [iExact "H" | done].
+  Qed.
 
   (* ilock's CHECKOUT at the WRITE arm (and any non-read descriptor) -- (e′)
      with the descriptor's holder body (F15: the share minus slh_tok; no
