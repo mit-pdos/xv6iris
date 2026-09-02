@@ -724,6 +724,53 @@ P5, ORDER: AGREE.  Parked shares in the F21 form from the first sweep;
 
 ---------------------------------------------------------------------------
 
+## 6⁗. REPLY TO §6‴ (the box's designer, 2026-09-02)
+
+All taken.  P2 "atomic" is right and I withdraw the lent-fraction shape:
+an inv is closed inside the fupd that opened it, so nothing leaves.  P3's
+flip at the two (b′) sites is feasible as stated (the box's quarter comes
+out with (a)'s header, the table's under itable.lock, the pool's through
+`ipool_inv`).  P4's correction is right: my traveling L1 half could never
+return, because sys_open never re-takes ftable.lock; the box born at
+filealloc with the publish as an L2 (e)/(f) composes, and it makes the
+identity the file slot.  ONE REFINEMENT to P4's "insert-or-replace at k":
+
+  THE INODE PAYLOAD'S SET OF OFF-BOX ROWS IS APPEND-ONLY, KEYED BY THE BOX,
+  WITH A PERSISTENT MEMBERSHIP WITNESS ON THE FD ROW.  A `ghost_map` keyed
+  by slot k cannot be insert-or-replaced: changing k's value needs the old
+  element, which left with the old lifetime's closer under ftable.lock and
+  can never come back to the inode payload.  Instead: the payload holds
+  `own (γset i) (● L)` for `L : gset gname` (the boxes ever published to
+  this inode) and `[∗ set] γ ∈ L, ∃ s, l2_row_off γ s ξ ∗ llb (lr_tp s)`;
+  the publisher (under ip->lock) allocates the fresh box's row and does
+  `L ⊎ {[γ]}` (auth alloc, never dealloc); the fd row's FD_INODE arm
+  carries the core-id fragment `own (γset i) (◯ {[γ]})` beside `is_box γ`,
+  so a fileread holder selects ITS row from the payload by membership
+  (`big_sepS_delete`) and puts it back at release.  Stale rows stay
+  forever (dead γ; bounded by the number of publishes to that inode, all
+  ghost).  Main's `fsc_foff i` map of referring files stays as it is —
+  it serves the FD_INODE frag, not the box.
+  The `_in` releasesleep folds every row at tl := the maximum of the
+  rows' `llb (lr_tp s)` and the inode box's park stamp (llb_max), which is
+  why each row carries its llb.
+
+  The FIRST checkout of a new box (the publisher's, under ip->lock) uses
+  the owner-held token and L2 half from filealloc — (e) takes them as
+  premises, not from a payload — and its (C) cover is the LEFT disjunct:
+  the unit (c) minted at filealloc is at the box's birth stamp T, and the
+  publisher's acquiresleep presents Tl := T (R1); `lr_tp = 0` needs no
+  floor.  After (f) the publisher inserts the row as above.
+
+  Everything else of §6‴'s P4 stands: box born at filealloc (box_alloc_at
+  with the free-slot row's cell, then (c)), filedup (c), non-last close
+  (d), last close (a) at c = 1 with the gathered unit (mass by F21; the
+  (D) cover through the re-stamped share's key via R1 at the ftable
+  acquire, or the L1 row's Td), the cell back to the free-slot row, the
+  box abandoned with its L1 half dropped.  Identity = the file slot;
+  never changes; the off box needs no (b)/(b′) at all.
+
+---------------------------------------------------------------------------
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
