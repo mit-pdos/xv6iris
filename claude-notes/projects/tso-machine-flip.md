@@ -18558,6 +18558,14 @@ NEXT: R1' per §4.1 once F1 is vetted (or as F1 says, absent objection).
   ("finish the bcache and iescrow proofs") has no Admitted left -- the
   remaining Admitted in the tree are the pre-existing kexec / kfork /
   syscall / virtio-F / U-mode shell ones, outside this effort.
+- VETTED (tso-flip 5e0fa7c3a, c48975a86; both reviewers): the landing
+  matches the ruling, rule 0 re-run on the landed (g)/(a), no new issues;
+  hdr_out's fragment llb accepted as the missing producer; the pre-ruling
+  `box_take_L2_in_window` sketch (Kp cover) marked SUPERSEDED -- unsound
+  after a recycle's (b), never in code.  R3 COMPLETE for the icache.
+  NEXT per the reviewers: R4 (inode_pay §4.3, off_hold §4.4 with the
+  main side), then R5 (the recorded reverts, log_res, ForkretPark's
+  bullets), R6.
 - Gotchas: `iEval (cbn [sr_td]) in "Hreg"` after ic_free_take (the
   returned register is `SlotReg (sr_td r) …` with r a literal); the count
   rewrite `Hcnt1 Hpos1` must also hit `Hiu`; the ic_guard_withdraw's
