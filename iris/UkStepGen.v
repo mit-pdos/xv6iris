@@ -50,7 +50,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import WpGpr RegFile InstrBytes.
 Require Import WpIntrCore.
-Require Import RiscvExtras.
 Require Import WpDecodeBridge DecodeTotalU.
 Require Import PtreeType PtTree.
 Require Import UptTree.
@@ -61,9 +60,9 @@ Require Import UserBytes UserFrame UserClassifyAsm.
 Require Import UserExec UserStep UserTrap UserExecFacts.
 Require UserTotalU.
 Require Import UserActiveClass.
-Require Import UmodeMem UmodeCap UmodeFetch.
+Require Import UmodeMem UmodeFetch.
+Require Import UmodeRegs.
 Require Import WpUmodeStep.
-Require Import ProcPtOwn.    (* [proc_pt_wf] *)
 Require Import UserPerm.
 Require Import UsysMemOk.
 Require Import UexecWp UexecSlot UexecRet.

@@ -55,7 +55,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 (* the WaitInv parent table is still the RAW word fact; the named
    crossings below are its shim seams (stage-2 worklist). *)
-Require Import TsoCtxShim.
 Local Open Scope Z_scope.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]).  Written

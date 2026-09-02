@@ -31,31 +31,23 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import RegFile InstrBytes WpGpr.
-Require Import AlignBits.
-Require Import ProcGeom.
+Require Import RiscvLang RiscvPtsto.
+Require Import RegFile.
 Require Import UserPtTree.
 Require Import UserExec.
 Require Import HartMemRun.
 Require Import WpUmodeStep.   (* [uv_redirect]/[uv_wrok]/[uv_exp]/[uv_upd] *)
 Require Import UserExecFacts.
 Require Import UserFrame.
-Require Import SpecUserret.
 Require Import UexecWp.
 Require Import UexecSlot.
-Require Import TfUser.
 Require Import UsysMemOk.
-Require Import UmodeRegs.
 Require Import UserPerm.
 Local Open Scope Z_scope.
 Import Defs.
 (* ...UkRunSysFs.v's block above, VERBATIM; this file's own below. *)
 From iris.base_logic.lib Require Import ghost_var ghost_map.
 Require Import UexecRet.
-Require Import WpMmodeLeafBase.
-Require Import UserHeap.
-Require Import UkRun.
 Require Import TsoCtx.
 Require Import FdSlots.
 Require Import FsFdMirror.
