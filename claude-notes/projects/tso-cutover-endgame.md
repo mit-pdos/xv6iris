@@ -698,6 +698,25 @@ and law 10 (hooks).
 
 ---------------------------------------------------------------------------
 
+14. **L8 IS BLOCKED ON L5 + L7's λ PART — design out for review (2026-09-02).**
+    Building the honest forkret park showed the chain the ordering encodes:
+    the park's second crossing deposits `park_globals` into the child's
+    twin (`ctx_deposit`, `CtxMorph`); every row morphs except `is_ftable`,
+    whose `<{ ftable_res γ }>` payload is at the handle's context
+    (`Print is_ftable`: `<{ @ftable_res … XI γ }>`) — L7's λ-flip; the
+    λ-flip needs `CtxMorph (λ ξ, ftable_res (XI := ξ) γ)`, which
+    `inode_pay`'s `cinv fileipN γx (inode_held_short v Q)` blocks (its body
+    holds `cred_floor` via `live_fracc` and the two `inode_ident` cells) —
+    L5.  The L5 entry above is under-specified against the code (the
+    `inode_shr_genlo_bare` it says to park CONTAINS the cells; the cells'
+    destination and cancel's re-assembly of `inode_held` are unsaid; its
+    "§4.3" pointer has no target).  The design and four questions:
+    `claude-notes/projects/inode-pay-r4a.md`.  The L8 edits (ten files,
+    complete up to `is_ftable_morph`) are saved as a patch outside the tree
+    (`/shared/xv6iris-2-l8-park.patch`), the worktree is clean.  Owner's
+    stated order once ruled: L5 + minimal L7 first, then L8/L9 in parallel
+    with the real L7 (floor slot, `_in` releases) + L6.
+
 ## 10. Process and tooling (measured facts)
 
 ### 10.1 Build
