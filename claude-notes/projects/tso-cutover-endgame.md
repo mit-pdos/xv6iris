@@ -454,6 +454,104 @@ table otherwise, recording any deviation in place.
 
 ---------------------------------------------------------------------------
 
+## 6′. REVIEW OF THIS PLAN (second reviewer, 2026-09-02; checked against
+## the tree on `tso-cutover` and main's post-fork history)
+
+Frame RIGHT: honest measure by roots and cones, the stitch at CtxBox's
+parameter list, copy-flip-invent-nothing, site-map-first, main moves once.
+The r18 fusion table and most of §3.4.3 are sound.  Two site-map rows do
+not work as written, one lane is mis-stated on the facts, and one ordering
+choice would make the icache gate dishonest.  In order of weight:
+
+F31  THE READ CHECKOUT'S 3/4 LEG CANNOT LIVE IN Q AS (e) STANDS.  §3.4.3
+     puts DepRd's `ic_out_rd` (the `ic_inode_leg` at 3/4) into Q.  Lawful
+     (ξ-free ghost), but `box_checkout` takes Q as a PREMISE from the
+     caller, and at (e) the whole leg is still inside the bundle at ξb; the
+     caller cannot split 3/4 off before it has the bundle, and after (e) the
+     arm is OUT_L2 with Q fixed — no lemma adds to Q, and one would be an
+     eighth lemma.  FIX, mirroring (b′): an (e′) `box_checkout_split` with a
+     client split wand `∀ x ξ', P_hdr i x ξ' -∗ P_hdr_rd i x ξ' ∗ Q` (Q is
+     x-independent: `ic_rd_arm` ∃-binds dn bm data); (e) becomes its trivial
+     instance; (f) needs no twin — the caller re-forms the full header from
+     its quarter and the Q that (f) returns.  Alternative: house the 3/4
+     leg in `ipool_inv` (ghost, openable by anyone) instead of Q, at the
+     cost of moving main's placement.  r19 must NOT code the read-checkout
+     row from the table as written.
+
+F32  THE COLLECTION CANNOT SEE THE PIN WHERE §3.4.2 PUTS IT.  Today
+     `ic_escrow_body_cover` handles `ic_held` by REFUTATION: `ic_pin_tx k`
+     carries a `tx_pin` share and the collection's empty `ln_tx` authority
+     refutes it (iput always runs inside a transaction; at commit
+     quiescence no window is open).  §3.4.2 moves the pin into the L1
+     PAYLOAD ROW during OUT_L1; the collection holds no itable.lock and the
+     box's OUT_L1 arm (`hdr_out ∗ P_rest x ξb`) has no client ghost slot —
+     the collection meets OUT_L1 with nothing to refute it, and
+     `ic_slot_cover` over the box is unprovable there.  FIX: an OUT_L1
+     residue parameter `Q1`, symmetric to Q — deposited at (a), returned at
+     (b)/(b′), moved to Q at (g).  It changes CtxBox's declared parameter
+     list (law 5), hence a RULING item, not something r19 may improvise.
+     It also makes DepFrz uniform: the tx share is Q1 while the header is
+     out under L1 and Q after (g).  §6(i)'s premise is right; the ghost the
+     collection needs must be IN THE BOX'S ARM, not in a lock payload.
+
+L6 / R4b IS MIS-STATED ON THE FACTS.  Main's fd-row work did NOT dissolve
+     `f->off` into ip->lock's payload; main's off ledger (2026-08-31,
+     off-ledger.md) explicitly rules that out (fileclose reclaims `f->off`
+     holding no inode lock) and puts the cells in `ioff_escrow_at i :=
+     inv (offN .@ i) (∃ S, … [∗ set] k ∈ dom S, ioff_slot_res_at …)` with
+     `a_foff k ↦₄ v` at the AMBIENT context — a new ξ-BODIED invariant, the
+     exact class this port removes, and not in this plan's inventory.  Worse
+     for the stitch, its checkout marker `off_mark ip := i_valid ip ↦₄ 1`
+     parks the INODE'S valid cell, which under the box is `ic_hdr`'s full
+     cell (`P_hdr_excl` runs on it).  So R4b is MANDATORY and a redesign,
+     not "a tiny instance": a third box (bundle = the off cell; L1 =
+     ftable.lock at the last-ref reclaim; L2 = ip->lock) with the L2 hold
+     as the credential in place of the marker, and one wrinkle — sys_open
+     writes `f->off = 0` with ftable.lock released, so the L1 register
+     half travels with the exclusive slot ownership from filealloc to the
+     publish, with the floor from the filealloc acquire.  Main's per-inode
+     ghost map (which files refer to the inode) stays as is.
+
+L1: THE ROOT IS SMALL, THE CONE IS THE WORK — DO THE ROOT FIRST.
+     `ProcInv:1013` is `tf_word_phys_to_mem` through the dead shim.  Flip's
+     A6.58 proof of the SAME lemma is shim-free (~40 lines) and every lemma
+     it uses exists on cutover (`ctx_phys_word_pointsto_bytes`/`_intro`,
+     `ctx_word_pointsto_intro`, `ctx_pointsto_of_phys`, `ktier_pin_of_id`).
+     The plan schedules L1 at r22 as "take flip's proc_priv/trapframe
+     shapes … new work"; the root is neither.  The real L1 is the cone's
+     fallout against main's proc_priv (+839 lines since the fork: ustate,
+     fd rows).  Consequences: (1) fix the root BEFORE the icache rounds —
+     with ProcInv red, "everything over procs, the FS boot chain included"
+     is blocked, so the r21 gate ("the FS cone that does not sit behind
+     ProcInv") certifies little; unblocking first is measure-first and
+     reveals the true red set the icache sweep must hit; (2) expect the
+     cone's re-enumeration to expose main-only shapes (fd rows) with no
+     flip twin — that is where owner input may be needed (§6 iv), not at
+     the root.
+
+SMALLER PITFALLS.
+  - "Take the file whole" drops main's post-fork edits: main changed the
+    bcache files by +677 lines after the fork (dead-code passes, layer
+    moves, the bio_ctx seal); r14 re-appended the seal and the rest
+    happened to be the superseded SC stub.  Every future "take whole"
+    (IcacheEscrow at r19 especially) needs `git log base..main -- file`
+    checked for non-TSO edits first.
+  - TWO SOURCES OF IDENTITY TRUTH: the stitch keeps `ic_id` quarters
+    (main's `ipool_body` needs `ic_ids`) beside the register's `sr_ident`.
+    State the tie `ic_id ½ true dev inum ↔ sr_ident = Some (dev,inum)`
+    ONCE, in `itable_res2`'s slot row, where both live.
+  - r19's fallback ("proceeds under this file's table otherwise") is fine
+    for every row EXCEPT F31's and F32's.
+  - Check in `tools/cone.py` before r18's bank so the honest measure is
+    reproducible by the next agent.
+
+ON §6: (i) answered by F32 — the collection needs Q1.  (ii) DepFrz kept:
+agree; with Q1 its placement is uniform.  (iii) answered above: the box
+instance, mandatory.  (iv) likely at the cone re-enumeration, not the
+root.  (v)–(vii): agree.
+
+---------------------------------------------------------------------------
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
