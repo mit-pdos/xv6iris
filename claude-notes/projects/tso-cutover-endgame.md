@@ -2104,6 +2104,91 @@ now, mid-proof; but scheduled, not "if a fifth appears".
 
 §6²⁵'s classification stands until that edit.  Nothing else open.
 
+## 6²⁷. THIRD REVIEWER (2026-09-02, at 5721eb741 plus the uncommitted (b″)
+## draft): Q8/Q9 endorsed; the consolidation endorsed and widened; the tail
+## after r21 is the schedule risk; the document itself is now a cost
+
+Checked against the tree, not the notes: `CtxBox.v` (the box section's
+parameters, `box_arm`, `box_rows`, the fifteen statements), the (b″) draft
+in the sibling worktree, `IcacheEscrow.v` (`ic_q1`/`ic_q2`/`ic_q_recycle`,
+`ipool_take_lend`, the recycle/guard/evict/checkout/park wrappers, `ic_slp`),
+`OffBox.v`, the direct callers of the box lemmas, the `TsoCtxShim.` census,
+A12.6–A12.11 and the commit pace (r19a → r20b-5 and §6′–§6²⁶: 08:34 → 12:10).
+
+Q8/Q9 -- ENDORSED.  The constraint set re-derives from the code: the pool
+    take must precede the +0x78 ref store (its AU spends the row's ledger
+    pair), the flip is a `ghost_var` update and needs all four quarters,
+    and `box_deposit_L1_shape` takes the FLIPPED header as a premise, so no
+    client-side ordering closes the window.  Fraction accounting checked
+    against `ipool_take_lend` as stated: it takes ¼, returns ½ (the lent ¼
+    beside the caller's), and its closing wand consumes ½ at the new
+    identity and returns ¼.  After the flip the recycler holds ¾ at true:
+    ¼ into `Q1 0`'s live arm, ¼ kept for the table, ¼ for the header's
+    rebuild at (b″); (b″)'s `Q'` is the table's ½.  Closes.
+    NIT: (b″)'s wand needs no view shift for THIS client -- arm selection is
+    `ghost_var_agree` and the rebuild is pure; the fupd is spent by
+    `box_q1_update` at +0x72, where the pool is opened.  Keep the view shift
+    anyway (uniform hook shape).
+
+§6²⁶'s CONSOLIDATION -- ENDORSED, AND WIDENED: HOOK (a) AND (g) IN THE SAME
+    EDIT.  The direct callers of `CtxBox.box_*` are six files (`BioInv`,
+    `FsCfgKits`, `IcacheRef`, `IcacheBoot`, `IcacheEscrow`, `OffBox`); no
+    inode proof calls a box lemma, so the edit's blast radius is the
+    wrappers.  Leaving (a)/(g) unhooked "until a client needs one" books the
+    fifth ruling round in advance -- §6¹³ already reached for an (a′).  The
+    law after the edit: seven transitions, each header-moving one with the
+    hook `Qc ∗ <arm content> ={E∖↑N}=∗ <arm content'> ∗ Q'`, two residue
+    accessors, one view; plain forms are corollaries at the identity hook.
+    Timing as §6²⁶: after r20b's proofs are green, before r21.
+
+THE SCHEDULE RISK IS THE TAIL, NOT THE BOX.  Measure: 13/361/1132 →
+    29/272/1205 (r19a) → 33/138/1336 (5beee236b).  The ProcInv cone's
+    fallout is now IN the roots.  L2 (26 shim files -- `BootCarveMain`
+    67 mentions, `BootShared` 38, `ProofSysRead`/`Write` 10 each,
+    `ProofKexecTail` 11), L3 and L4 are mechanical, have flip twins, and do
+    not depend on the box; §5 runs them at r23–r24, AFTER the icache bank.
+    RECOMMEND: a second agent runs L2/L3/L4 now, in parallel.  It unblocks
+    most of the 138 and exposes the FS cone's true red set BEFORE r21,
+    which is what r21's gate claims to certify (§6′ L1's argument, applied
+    once more).
+
+THE FILE-LAYER LANES WILL REOPEN GREEN PROOFS.  L5 (`inode_pay`), L7
+    (`is_ftable` λ-flip + floor slot, `_in` releases) and L6 (the off box)
+    touch the SAME proofs (filealloc, filedup, fileclose, sys_open,
+    fileread, filewrite) and L6 changes `ic_slp` (the off-row set and its
+    release fold at every iunlock: 10 files, the seven inode proofs r20b
+    just made green among them).  Two mitigations:
+    (1) fix `ic_slp`'s FINAL shape before r21's consumer sweep -- the
+        off-row conjunct and its fold packaged in one lemma; the two
+        OffBox lemmas it needs (the big-op CtxMorph, the llb maximum) do
+        not depend on L7 and can be proven now;
+    (2) decide the three final shapes (`inode_pay`, `ftable_res`, `ic_slp`)
+        together and sweep the file layer ONCE.  Law 4 already forbids
+        interim wrappers; three passes over six proofs is that mistake in
+        another spelling.
+
+TWO TRIPWIRES TO SET BEFORE r21.
+    - State `ic_slot_cover` over `box_arm` NOW, type-checked, with the
+      viewer's case table (IN / OUT_L1 by count / OUT_L2 by descriptor) as
+      its proof skeleton.  The viewer clause was argued in prose across
+      §6¹⁰–§6¹⁸ and every miss reopened the residues; FsCollectAll is the
+      acceptance test and its statement costs nothing to write before
+      ProofIget/ProofIput finish.
+    - The recycle wrapper's mask premises: `ipool_take_lend` wants `ipoolN`,
+      `iregN` and `escAN inum` inside the box's mask -- state all three, as
+      `ic_checkout_rd` states `icacheN` (§6²⁵ condition 2, made concrete).
+
+THE DOCUMENT IS NOW A CONVERGENCE COST.  §3–§5 are stale against §6′–§6²⁶:
+    §3.4.3's read-checkout, guard and recycle rows are superseded, §5's
+    order carries F36 only as a note, §1's measure is three rounds old, and
+    a fresh agent (this file's stated audience) must replay 26 rounds to
+    learn the current law.  OffBox's 14 Admitted are also absent from the
+    port's Admitted inventory and count against r28.  RECOMMEND: at the
+    first quiet point, a consolidated plan of record (law as it stands,
+    the box's statements, the icache instance as landed, the site map from
+    the wrappers, a rulings table, the lanes and order) with this file kept
+    as the log.  (Done as the next commit, at the owner's instruction.)
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
