@@ -511,6 +511,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; the two fixes LANDED (item 20) -- reviewer 2's audit next |
 | item 21 | reviewer 2's audit of d53e4a4e5: NOT signed off -- (1) the cell claimed twice and the unit unowned at non-FD_INODE arms (unit unconditional; `file_core_off := emp`; the free arm holds `off_resident`; the L2 half rides the FD_NONE unit); (2) `file_pay_st_split` false (one-sided over a unitless `file_pay_tie`); (3) the three ghost steps, the last-close pair, `so_deposit`, `so_open_slot` not at final shape; plus `ftable_res_at`'s fold/unfold pair | AUDITED by reviewer 2; fixes pending |
 | item 22 | reviewer 1 on item 21: blocking 1-3 and the fold pair RIGHT; BLOCKING 4 -- the publish checkout has no floor (the birth deposit stamps at the creator's view+dirty watermark; no acquire between birth and the `f->off = 0` store; a release mints no receipt); repair: `box_alloc_out_l2_at` -- the off box is born CHECKED OUT, the creator keeps the cell, the publish/retype is the (f) PARK as landed, `off_publish_checkout` deleted, the FD_NONE unit = `l2_hold ∗ off_resident`; checklist: name the acquire that pays every self-absorbed deposit | AUDITED by reviewer 1; for reviewer 2; sign-off pending the fixes |
+| item 23 | reviewer 2 on item 22: finding 4 checked against `ctx_park`/`ctx_dom_to_parked`; born-checked-out RULED (third boot statement, provable from `ctx_parked_alloc` at stamp 0, no `own_context`, no ξ); `box_alloc_out_l2_at` statement given; `off_retype_park` and `off_abandon` named; `off_publish_checkout` deleted | RULED by the box's designer; sign-off on landing |
 | R4a Q1 | `inode_pay`: the cinv parks KEYED GHOST ONLY (`iref_frag`, `ic_lent_stamps`, `runit_any`); the reference's cells, `live_genlo`, `slh_tok` ride the fractional payload as `inode_ref_side` at the parked fraction; pin that fraction to `Q` by lending HALF at sys_open (no arity change), fallback `fp_iqi` | RULED by reviewer 1 (item 15) |
 | R4a Q2 | NO re-mint, NO llb, NO `own_context` at cancel: the share's `cred_floor` is in the canceller's hand (morphed with the payload) and `live_genlo_agree` pins the parked `lo`; `inode_pay_cancel`'s statement unchanged | RULED by reviewer 1 (item 15) |
 | R4a Q3/Q5 | ONE file-layer sweep with all three shapes final (`inode_pay`, `ftable_res_at` WITH the floor row + `_in` releases, `ic_slp ∗ off_rows`); L5 + full `ftable_res_at` first, then L8/L9 and the OffBox consumers as the two lanes INSIDE r25 | RULED by reviewer 1 (item 15); the two-sweep order reviewer 1 gave earlier is WITHDRAWN (L6 is on L8's path) |
@@ -1246,6 +1247,85 @@ branch and recorded in §3.2 and §8 here.
       its flows had an acquire between the two steps.
     - **SIGN-OFF:** with blocking 1-3, the fold pair and finding 4's
       born-checked-out repair landed as statements, reviewer 1 signs off.
+
+23. **THE BOX'S DESIGNER ON ITEM 22 (2026-09-02): finding 4 is right and
+    the born-checked-out repair is RULED; the boot statement is provable
+    from what CtxBox has; two wrapper statements named.**
+    - **FINDING 4 CHECKED AGAINST THE MODEL.**  `ctx_park` (TsoCtx.v:557) and
+      `ctx_dom_to_parked` stamp at `max K W`, `W` the depositor's dirty
+      watermark; `box_alloc_at` (CtxBox.v:1642) births through
+      `ctx_deposit`, so the birth stamp sits above every store the creator
+      has buffered, including `f->ref = 1`.  A floor ≥ that stamp reaches
+      the creator only through R1 or R2, and sys_open has no acquire
+      between filealloc and the `f->off = 0` store (ilock precedes
+      filealloc; fdalloc takes no lock; the release in filealloc mints
+      nothing under the law).  So `off_publish_checkout`'s `ctx_floor ξ Kt`
+      has no producer.  The icache never met this because each of its
+      deposit-then-absorb flows has an acquire between (iunlock … ilock;
+      the guard's (a) after itable's acquire).  Reviewer 1's checklist line
+      -- name the acquire that pays every self-absorbed deposit -- is the
+      right tripwire and is adopted.
+    - **THE REPAIR IS RIGHT, AND IT IS THE MINIMAL ONE.**  The alternatives:
+      a release-side receipt (a third floor route, touching every lock
+      spec) and a fence (no fence in the code path) are both larger.  Born
+      checked out keeps the law's two routes and changes one boot lemma.
+      RULED: accept.  Classification: a THIRD BOOT STATEMENT beside
+      `box_alloc_at` / `box_alloc_at_halves`; no transition, no arm, no
+      register field, no client ghost -- the tripwires are untouched.
+    - **PROVABILITY, from the file as it stands.**  `ctx_parked_alloc`
+      (TsoCtx.v:517) mints a parked context at stamp 0 with an empty dirty
+      set and NO deposit; the stamps authority is allocated at the
+      singleton unit `{[ (i0, 0) := 1%Qp ]}` with its fragment; the body
+      is stated at `T = 0`, `ξb` fresh, `m` the singleton, `c = 1`,
+      `r = SlotReg 0 false i0 None`, `sb = L2Reg 0 (Some (i0, m))`, arm
+      OUT_L2 = `Q2 ∗ ◯ m`.  Rows: Σ (`qsum m = 1 = c`), I (the key is at
+      `sr_ident`), C and D trivially at `T = 0`.  Nothing new.  THE
+      STATEMENT (rule 0; the impl agent lands it in CtxBox.v):
+        Lemma box_alloc_out_l2_at (N : namespace) γ (i0 : id) (E : coPset) :
+          stamps_auth γ ∅ -∗
+          ghost_var (bx_cnt γ) 1 0%nat -∗
+          ghost_var (bx_slotd γ) 1 (inhabitant : slot_reg id X) -∗
+          ghost_var (bx_slotp γ) 1 (inhabitant : l2_reg id) -∗
+          Q2 ={E}=∗
+          is_box N γ ∗ slotd_half γ (SlotReg 0 false i0 None) ∗ cnt_half γ 1 ∗
+          l2_hold γ i0 {[ (i0, 0%nat) := 1%Qp ]}.
+      Note what is ABSENT: `own_context` and `ξ` -- no deposit happened, so
+      the birth is context-free, and `P_hdr`/`P_rest` are not premises (the
+      creator keeps its bundle).  `l2_hold` already carries the L2 register
+      half naming the parked fragment, so no separate `slotp_half` is
+      returned.  If the impl agent finds the count row wants `c = 0` with
+      the unit minted by a following (c), that is `box_alloc_at`'s shape
+      and also fine; I prefer `c = 1` at birth so the unit is never
+      unowned even for an instant.
+    - **THE WRAPPERS (statements for the shapes commit):**
+      `off_filealloc` := the boot above at `Q2 := emp`, returning the L1
+      row's pieces at `td = 0`, `off_cnt γ 1`, and the FD_NONE unit
+      (`l2_hold γb k m` beside the tie frag and `off_ref_stamps γb k 1`
+      -- the stamps fragment IS the parked one, so check whether the unit
+      predicate at FD_NONE holds the fragment or the hold names it; one or
+      the other, not both);
+      `off_publish_park` as landed (FD_INODE: inserts the row into inode
+      i's set, returns membership);
+      `off_retype_park` NEW: (f) with no set insertion, for the pipe and
+      device arms; returns the L2 half, which the caller drops;
+      `off_abandon` NEW (the fdalloc-failed close at FD_NONE): consumes the
+      L1 row and the hold, returns nothing; the closer already holds the
+      cell for the free arm;
+      `off_publish_checkout` DELETED.
+      The FD_NONE unit is whole (`q = 1`) and is never split
+      (`file_pay_tie` keeps the hold and the cell on the unit side), so
+      `l2_hold`'s exclusivity is safe at any stated `q`.
+    - **ONE CAUTION for lane (ii), not a shape change:** after a park the
+      parker's own fragment is re-stamped at the fresh `T'` but every OTHER
+      fd's fragment keeps its old stamp; their checkouts pay `Kp` through
+      the L2 cover (`ctx_floor ξ (lr_tp s)` in `off_rows`, R2 from the
+      previous holder's `_in` release), never through their own llb.  This
+      is why `off_rows` rides `ic_slp` and why `ic_slp_fold`'s bound must
+      dominate the off rows -- already in the shapes.
+    - **SIGN-OFF:** with items 21 and 22 landed as statements (blocking 1-3,
+      the fold pair, `box_alloc_out_l2_at`, the two new wrappers, the
+      deletion), I sign off; the per-arm producer line and the
+      self-absorb line go into the day-one checklist together.
 
 17. **REVIEWER 1 ON ITEM 16 (2026-09-02): the three corrections and the
     four tripwires are taken; two additions.**
