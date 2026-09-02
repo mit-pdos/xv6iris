@@ -789,7 +789,7 @@ Proof. exact (word_pointsto_timeless' ktr a dq w). Qed.
 (*  forgotten annotation is an elaboration error, not a silent capture.    *)
 (* ==================================================================== *)
 Section InodeCore.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !offboxG Σ,
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !offboxG Σ,
             !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ,
             !ghost_mapG Σ nat unit, !flivG Σ,
             (* A12: the inode share carries the box's stamps (tso-flip M-5) *)
@@ -810,7 +810,7 @@ Section FileInv.
      [fileG], since they left that class (see its note).  This file is
      BELOW [Xv6G.v] -- it is one of the files the bundle is built out of --
      so it names them individually; everything above takes [xv6G]. *)
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !offboxG Σ,
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !offboxG Σ,
             !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ,
             !ghost_mapG Σ nat unit, !flivG Σ,
             (* A12: the inode share carries the box's stamps (tso-flip M-5) *)
@@ -1497,8 +1497,7 @@ Section FileInv.
      fragment.  Everything else keeps the cell as before. *)
   Definition file_core_off (k : nat) (q : Qp) (C : fcontent) : iProp Σ :=
     (if bool_decide (fc_type C = FD_INODE)
-     then ∃ i : nat, ⌜fc_ip C = ientry i⌝ ∗ ⌜(i < NINODE)%nat⌝ ∗
-                     off_fd_row off_cfg i k q
+     then emp
      else foff_dead k q)%I.
 
   Definition file_core (k : nat) (q : Qp) (pn : fpnames) (C : fcontent) : iProp Σ :=
@@ -1599,10 +1598,23 @@ Section FileInv.
      and FD_PIPE arms would carry a number that means nothing.  [st] is what
      the consumers actually want, and by [fdstate_ok] it is the same fact --
      in BOTH directions, which is what lets [file_ref] hide [C]. *)
+  (* THE OFF BOX'S UNIT ON THE FD SIDE (reviewer 1, plan §9 item 19; the
+     fifth shape as corrected): an FD_INODE fd holds ONE unit of its file's
+     off box (mass 1 per counted reference, [OffBox.off_fd_row]) and, beside
+     it, the slot->box tie frag at its CELL fraction [q] -- [file_pay_split]
+     distributes the frag, the unit is one per fd by construction
+     ([file_pay_st] is used only inside [file_ref]).  Other files: nothing. *)
+  Definition off_fd_unit (k : nat) (q : Qp) (C : fcontent) : iProp Σ :=
+    (if bool_decide (fc_type C = FD_INODE)
+     then ∃ (i : nat) (γb : box_names),
+            ⌜fc_ip C = ientry i⌝ ∗ ⌜(i < NINODE)%nat⌝ ∗
+            obox_frag off_cfg k q γb ∗ off_fd_row off_cfg i k γb
+     else emp)%I.
+
   Definition file_pay_st (γ : gname) (k : nat) (q : Qp) (C : fcontent)
       (st : fdstate) : iProp Σ :=
     (∃ pn, ⌜fdstate_ok (fp_inum pn) C st⌝ ∗ fpay_tok γ k q pn ∗
-           file_core k q pn C)%I.
+           file_core k q pn C ∗ off_fd_unit k q C)%I.
 
   (* the forgetful direction only.  There is no [file_pay -∗ ∃ st,
      file_pay_st]: a payload whose [f->type] is none of the four codes has NO
@@ -1611,7 +1623,7 @@ Section FileInv.
      [file_pay_st_none], which is filealloc's. *)
   Lemma file_pay_st_pay γ k q C st :
     file_pay_st γ k q C st -∗ file_pay γ k q C.
-  Proof. iIntros "(%pn & _ & Hn & Hp)". iExists pn. iFrame. Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
 
   (* an UNTYPED payload gives [FdClosed] and there is nothing to choose:
@@ -1619,10 +1631,7 @@ Section FileInv.
   Lemma file_pay_st_none γ k q C :
     fc_type C = FD_NONE ->
     file_pay γ k q C -∗ file_pay_st γ k q C FdClosed.
-  Proof.
-    iIntros (Hty) "(%pn & Hn & Hp)". iExists pn. iFrame.
-    iPureIntro. exact Hty.
-  Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   (* THE SPLIT, at ONE state: filedup's two shares describe one file.  It is
      the names ghost that makes this true rather than merely stated
@@ -1630,16 +1639,7 @@ Section FileInv.
   Lemma file_pay_st_split γ k q1 q2 C st :
     file_pay_st γ k (q1 + q2) C st ⊣⊢
     file_pay_st γ k q1 C st ∗ file_pay_st γ k q2 C st.
-  Proof.
-    rewrite /file_pay_st. iSplit.
-    - iIntros "(%pn & %Hi & Hn & Hp)".
-      rewrite fpay_tok_split file_core_split.
-      iDestruct "Hn" as "[Hn1 Hn2]". iDestruct "Hp" as "[Hp1 Hp2]".
-      iSplitL "Hn1 Hp1"; iExists pn; by iFrame.
-    - iIntros "[(%pn1 & %Hi1 & Hn1 & Hp1) (%pn2 & %Hi2 & Hn2 & Hp2)]".
-      iDestruct (fpay_tok_agree with "Hn1 Hn2") as %<-.
-      iExists pn1. rewrite fpay_tok_split file_core_split. by iFrame.
-  Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   (* THE TIE, READ WITHOUT SPENDING THE PAYLOAD.  An [∧] rather than a [∗]
      so that both sides see the whole resource: the pure fact is what a proof
@@ -1772,7 +1772,13 @@ Section FileInv.
          file_rest γ k q ∗
          fd_slots (Pos.to_nat n) ∗
          ∃ γb : box_names, ⌜B !! k = Some γb⌝ ∗
-           off_box k γb ∗ off_l1_row γb k (Pos.to_nat n) Kd)%I
+           off_box k γb ∗ off_l1_row γb k (Pos.to_nat n) Kd ∗
+           (* the tie's COMPLEMENT frag (item 19): the fd units carry [q] of
+              it between them, the table the rest, so the frags sum to one *)
+           (match (1 - q)%Qp with
+            | Some q' => obox_frag off_cfg k q' γb
+            | None => emp
+            end))%I
     end.
 End FileInv.
 
@@ -1784,7 +1790,7 @@ End FileInv.
 (*  Admitted inventory (§9 item 18) and closed before the r25 bank.         *)
 (* ==================================================================== *)
 Section FilePayloadMorph.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !offboxG Σ,
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !offboxG Σ,
             !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ,
             !ghost_mapG Σ nat unit, !flivG Σ,
             (* A12: the inode share carries the box's stamps (tso-flip M-5) *)
@@ -1925,7 +1931,7 @@ Typeclasses Opaque ioff_escrows_at.
 
 Section FileOffLedgerEq.
   Context `{XI : TsoCtx.CurCtx}.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !offboxG Σ,
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !offboxG Σ,
             !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ,
             !ghost_mapG Σ nat unit, !flivG Σ,
             (* A12: the inode share carries the box's stamps (tso-flip M-5) *)

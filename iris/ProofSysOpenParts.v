@@ -833,19 +833,7 @@ Section ProofSysOpenPublish.
       a_fmajor kf    ↦₂ fc_major Cf ∗
       a_fip kf       ↦₈ fc_ip Cf ∗
       a_foff kf      ↦₄ voff.
-  Proof.
-    iIntros "(%Cf & Href & Hflds & (%pn & %Hok & Hnames & Hcore) & Hlive)".
-    (* [fdstate_ok]'s [FdClosed] arm IS the type equation *)
-    cbn in Hok. set (Ht := Hok : fc_type Cf = FD_NONE).
-    iEval (rewrite (file_core_none kf 1 pn Cf Ht)) in "Hcore".
-    iDestruct "Hcore" as "[Hiru Hoffd]".
-    iDestruct "Hoffd" as (voff) "Hoffc".
-    iEval (rewrite -iref_slot_frac) in "Hiru".
-    iDestruct "Hflds" as "(Hty & Hrd & Hwr & Hpip & Hip & Hmaj)".
-    iModIntro. iExists Cf, pn, voff.
-    iSplitR; [iPureIntro; exact Ht |].
-    iFrame "Hiru Href Hlive Hnames Hty Hrd Hwr Hpip Hmaj Hip Hoffc".
-  Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   (* the DEVICE arm's vacuous bound: an FD_DEVICE store is not the inode
      arm, so the conditional [off_wf] premise costs it nothing *)

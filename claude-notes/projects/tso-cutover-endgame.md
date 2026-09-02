@@ -508,7 +508,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | Q10 | the last close's (a) must not consume iput's pin name-half: the hooked (a) moves the frozen alternative's own pin into `Q1 1` (option B); no ghost change; `ic_hdr_frz` carries `ifreeze_pre` out and needs a `CtxMorph` instance | RULED B by reviewer 1, confirmed by the box's designer (item 9); to land in ProofIput |
 | §6²⁷ | run L2/L3/L4 in parallel now; sweep the file layer once; two tripwires before r21 | RECOMMENDED to the owner |
 | item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RULED -- reviewer 1 agrees (item 17), with `file_core_off`'s FD_INODE arm named as the FIFTH final shape and "0 Admitted in `EnvMorph`" added to r25's gate |
-| item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; sign-off pending the two fixes |
+| item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; the two fixes LANDED (item 20) -- reviewer 2's audit next |
 | R4a Q1 | `inode_pay`: the cinv parks KEYED GHOST ONLY (`iref_frag`, `ic_lent_stamps`, `runit_any`); the reference's cells, `live_genlo`, `slh_tok` ride the fractional payload as `inode_ref_side` at the parked fraction; pin that fraction to `Q` by lending HALF at sys_open (no arity change), fallback `fp_iqi` | RULED by reviewer 1 (item 15) |
 | R4a Q2 | NO re-mint, NO llb, NO `own_context` at cancel: the share's `cred_floor` is in the canceller's hand (morphed with the payload) and `live_genlo_agree` pins the parked `lo`; `inode_pay_cancel`'s statement unchanged | RULED by reviewer 1 (item 15) |
 | R4a Q3/Q5 | ONE file-layer sweep with all three shapes final (`inode_pay`, `ftable_res_at` WITH the floor row + `_in` releases, `ic_slp ∗ off_rows`); L5 + full `ftable_res_at` first, then L8/L9 and the OffBox consumers as the two lanes INSIDE r25 | RULED by reviewer 1 (item 15); the two-sweep order reviewer 1 gave earlier is WITHDRAWN (L6 is on L8's path) |
@@ -860,6 +860,37 @@ and law 10 (hooks).
       `is_lock_handle_morph`, the floors-law instances.
     - **SIGN-OFF:** pass 1 waits for the two fixes above (both
       statement-level, small); with them landed, reviewer 1 signs off.
+
+20. **THE SHAPES COMMIT, FIXED PER REVIEWER 1 (item 19) -- FOR REVIEWER 2'S
+    AUDIT (2026-09-02).**  Both statement-level fixes landed, nothing else
+    moved:
+    - (1) THE UNIT RIDES THE FD-ONLY PREDICATE.  `OffBox.off_fd_row on i k γ
+      := off_box k γ ∗ off_member on i γ ∗ off_ref_stamps γ k 1` (mass 1,
+      γ explicit: ONE per counted reference, F34 as ruled); `FileInvDefs.
+      off_fd_unit k q C := if FD_INODE then ∃ i γb, ⌜fc_ip C = ientry i⌝ ∗
+      ⌜i < NINODE⌝ ∗ obox_frag off_cfg k q γb ∗ off_fd_row off_cfg i k γb
+      else emp`; `file_pay_st γ k q C st := ∃ pn, ⌜…⌝ ∗ fpay_tok ∗ file_core
+      ∗ off_fd_unit k q C`; `file_core_off`'s FD_INODE arm is `emp`;
+      `fslot`'s allocated arm carries, beside `off_box k γb ∗ off_l1_row γb k
+      (Pos.to_nat n) Kd`, the tie's COMPLEMENT `match (1-q)%Qp with Some q'
+      => obox_frag off_cfg k q' γb | None => emp end`.  The tie frag rides
+      with the unit at the fd's cell fraction (so `file_pay_split`
+      distributes it), the table holds the complement, the frags sum to one
+      and `file_rest` carries no box ghost.  The table never holds stamps;
+      the floor row bounds `td` only.
+    - (2) the duplicate `!kallocG Σ` binder is gone from all four Section
+      contexts (the original `Context` block already binds it).
+    - INVENTORY DELTA: +4 tagged Admitted -- `file_pay_st_pay`,
+      `file_pay_st_none`, `file_pay_st_split` (FileInvDefs; the predicate
+      gained a conjunct) and `so_open_slot` (ProofSysOpenParts; it destructs
+      `file_pay_st`).  Total now 42 (FileInvDefs 19, FileInv 3, IcacheEscrow 4,
+      OffBox 2, ProcInv 5, FirstTok 3, FsReady 1, UsertrapRes 1, IcacheBoot
+      1, ProofSysOpenParts 3), all `SKELETON r25`, none survives the bank.
+    - GATE re-run green: OffBox, FileInvDefs, FileInv, IcacheEscrow,
+      IcacheBoot, FsReady, FirstTok, ProcInv, UsertrapRes, ProofSysOpenParts
+      compile.  Measure after the fix: next amendment.
+    Per reviewer 2's condition (item 17's process note), pass 1 waits for
+    reviewer 2's audit of this state and reviewer 1's sign-off.
 
 ## 10. Process and tooling (measured facts)
 

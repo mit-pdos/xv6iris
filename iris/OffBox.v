@@ -255,9 +255,16 @@ Section OffBox.
   Definition obox_full on (k : nat) γ : iProp Σ := (k ↪[on_obox on] γ)%I.
   Definition obox_auth on (B : gmap nat box_names) : iProp Σ :=
     ghost_map_auth (on_obox on) 1 B.
-  Definition off_fd_row on (i k : nat) (μ : Qp) : iProp Σ :=
-    (∃ γ : box_names,
-       off_box k γ ∗ obox_frag on k μ γ ∗ off_member on i γ ∗ off_ref_stamps γ k μ)%I.
+  (* THE UNIT (reviewer 1, plan §9 item 19; F34): ONE per counted reference,
+     mass 1, riding the fd-only [FileInvDefs.file_pay_st] -- never a cell
+     fraction (Σ demands qsum = the count n).  The box handle, membership
+     in the inode's published set, and the reference's whole stamp share;
+     the slot->box tie frag rides BESIDE it at the fd's cell fraction
+     ([FileInvDefs.off_fd_unit]), the table holding the complement frag
+     next to its L1 row, so the frags sum to one without [file_rest]
+     carrying any box ghost. *)
+  Definition off_fd_row on (i k : nat) γ : iProp Σ :=
+    (off_box k γ ∗ off_member on i γ ∗ off_ref_stamps γ k 1%Qp)%I.
 
   (* THE ROWS' CONTEXT-FREE FORM (r25 shapes; SKELETON statements, proofs in
      lane (ii)).  What an [_in] release of ip->lock holds: every row's L2

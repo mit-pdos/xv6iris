@@ -2027,3 +2027,10 @@ L8's honest park is written and saved (`/shared/xv6iris-2-l8-park.patch`),
 re-applied in lane (i) after pass 1.  Measure after the merge: recorded in
 the next amendment.
 
+Fix round (same day, plan §9 items 19/20): reviewer 1's audit -- the off
+box's unit now rides `file_pay_st` at mass 1 per counted reference with the
+tie frag at the fd's cell fraction and the table's complement beside its L1
+row; `file_core_off`'s FD_INODE arm is `emp`; the duplicate `kallocG`
+binder removed.  +4 tagged Admitted (42 total).  Gate green again.
+Handed to reviewer 2.
+
