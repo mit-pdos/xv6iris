@@ -688,6 +688,37 @@ Section box.
   Qed.
 
   (* ================================================================== *)
+  (*  (b') deposit_L1 WITH A SHAPE CHANGE (F14, generic)                   *)
+  (* ================================================================== *)
+  (* The header comes back at a TARGET shape x1; the arm's P_rest at the
+     register's x0 converts to x1 by a client entailment.  bcache: x1 = x0
+     (reflexivity).  icache: Raw ↔ Unloaded share one P_rest term (the
+     recycle), Loaded → Raw is a weakening (the eviction).  [box_deposit_L1]
+     above is the x1 := x0 instance: prove this statement and derive that
+     one from it (F10's "same x" was too strong).  Same case skeleton as
+     (b); the only new step is the entailment applied to the arm's P_rest
+     before the close. *)
+  Lemma box_deposit_L1_shape `{CID : CpuId} (N : namespace) γ (ξ : CtxId) (r : slot_reg id X)
+      (c : nat) (i' : id) (x0 x1 : X) (E : coPset) :
+    ↑N ⊆ E →
+    sr_win r = true →
+    sr_x r = Some x0 →
+    (∀ ξb : CtxId, P_rest x0 ξb ⊢ P_rest x1 ξb) →
+    is_box N γ -∗
+    own_context ξ -∗
+    slotd_half γ r -∗
+    cnt_half γ c -∗
+    P_hdr i' x1 ξ ={E}=∗
+    own_context ξ ∗
+    ∃ T' : nat,
+      slotd_half γ (SlotReg T' false i' None) ∗
+      cnt_half γ (Nat.max 1 c) ∗
+      reference γ i' {[ (i', T') := unit_mass c ]} ∗
+      llb loglen_name T'.
+  Proof.
+  Admitted.
+
+  (* ================================================================== *)
   (*  (c) ref_incr, under L1 (legal at c = 0: bget's hit on a cached      *)
   (*      refcnt-0 buffer takes this path, not the recycler's)            *)
   (* ================================================================== *)

@@ -1292,6 +1292,33 @@ context, mapped to CtxBox's lemmas:
       parameter reaches every spec signature and call site.
   F20 (cosmetic) ic_box_alloc's premise: ic_rest k IcRaw ξ (box_alloc
       needs one binder across header and rest).
+  PROPOSER (2026-09-01): F14–F20 ALL ACCEPTED AND APPLIED; both files
+  re-type-check on the VM.
+  - F14 IS A GENUINE GENERIC GAP, not an icache convenience: the recycler
+    must deposit the pool bundle at (b) (Raw → Unloaded g'), and the
+    eviction must deposit the raw header (Loaded/Unloaded → Raw), and
+    neither can be avoided by re-shaping the icache's P_hdr/P_rest —
+    P_rest must stay at x (ic_loaded's tie between the meta cells and the
+    record is what readi consumes), and (a)…(b) is the only window in
+    which the identity-keyed payload can change hands under L1.  So
+    CtxBox.v gains box_deposit_L1_shape (target x1; premise ∀ ξb, P_rest
+    x0 ξb ⊢ P_rest x1 ξb; header at x1), stated and Admitted beside the
+    PROVEN box_deposit_L1, which is its x1 := x0 instance.  The proof is
+    (b)'s skeleton plus one application of the entailment to the arm's
+    P_rest before the close; the bcache wrappers keep calling (b).  This
+    is the one change to the proven file, and it is a strict
+    generalization of one statement.
+  - F15/F16: ic_body k d (the descriptor's cells + slice, + iref_frag at
+    DepRef), ic_dep_mass (a share its s, a reference 1), ic_dep_id;
+    ic_deposit2 b k d := ic_hold at (ic_dep_id d, ic_dep_mass d) ∗ ic_body
+    k d, both arms; ic_checkout / ic_park stated once over d (ilock and
+    iput's free path are the DepShr / DepRef instances).
+  - F17: ic_slot_row carries ic_cnt b k c; the dead row keeps
+    islot_free_at.  F18: ic_decr over i : ic_bid (ic_ref_stamps_at).
+    F19: recorded in the header — ic_boxes stands in for the ic_names
+    field icn_box; every b is cn at R3.  F20: applied.
+  - The two F14 entailments are stated: ic_rest_raw_unloaded (reflexivity,
+    proven) and ic_rest_to_raw (Admitted).
   OPERATIONS WALK (what the instance must support; status after F14–F19):
       iget hit (c) ✓ · iget recycle (a)/stores/pinw arm store/(b)→Unloaded
       needs F14 · idup (c) ✓ · ilock: T3 racy read unchanged, genl_llb at
@@ -1785,3 +1812,11 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   and the dead row keeps islot_free_at; F18 ic_decr over ic_bid; F19 box
   gnames into ic_names (6 MkIcNames files, not 21; keeps ic_deposit's
   arity); F20 boot premise.  Operations table recorded.
+- 2026-09-01 (proposer, applying reviewer 1's IcacheBox audit): F14–F20
+  applied.  CtxBox.v: box_deposit_L1_shape (the shape-changing (b), F14 —
+  a strict generalization; the proven (b) is its x1 := x0 instance), the
+  one change to the proven file, Admitted for the build agent.
+  IcacheBox.v: ic_body / ic_dep_mass / ic_dep_id / ic_deposit2 over both
+  descriptors (F15/F16), ic_checkout / ic_park over d, ic_slot_row with
+  the cnt half (F17), ic_decr over ic_bid (F18), F19 note, boot premise
+  (F20), the two P_rest entailments.  Both files type-check on the VM.

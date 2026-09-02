@@ -37,9 +37,28 @@
 
    M-6  L2 payload := CtxBox.l2_row at tok := ic_tok; L1 row := ic_slot_row.
 
-   Names: the four box gnames per slot come from a new record [ic_boxes]
-   beside [ic_names] (extending MkIcNames would sweep its 21 constructors'
-   sites; the record is passed alongside instead). *)
+   Names (F19): the four box gnames per slot become a FIELD of ic_names
+   (icn_box : nat → box_names; six MkIcNames sites, the smaller sweep, and
+   what lets [ic_deposit cn k d] keep its name and arity).  In this
+   skeleton the record [ic_boxes] stands in for that field so the file is
+   self-contained; every [b] below is [cn] at R3.
+
+   AFTER REVIEWER 1's RULE-0 AUDIT (F14–F20, applied here):
+   F14  the recycle and the eviction CHANGE the shape at (b): CtxBox gains
+        box_deposit_L1_shape (target x1, client entailment P_rest x0 ⊢
+        P_rest x1); ic_rest_raw_unloaded / ic_rest_to_raw are the icache's
+        two entailments.
+   F15  the holder has the share MINUS slh_tok (acquiresleep deposited it):
+        (e)/(f) take and return [ic_body k d], the descriptor's cells and
+        slice; the client re-forms inode_shr2 after releasesleep.
+   F16  iput's own (e)/(f) run at mass 1 with the WHOLE unit: DepRef stays
+        as the descriptor of that hold (its identity fraction q, its slice,
+        its count fragment, hold mass 1).  ic_deposit2 has both arms.
+   F17  ic_slot_row carries the cnt half (tied to M !! k's count, 0 at
+        None); the table's dead row keeps [islot_free_at] as the
+        complement of the dead header's identity halves.
+   F18  ic_decr over any identity (the eviction's (d) is at None).
+   F20  boot deposits ic_rest k IcRaw. *)
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -189,6 +208,14 @@ Section IcacheBoxAmb.
     ic_hdr_amb γfs γi cov logstart k None x -∗ ⌜x = IcRaw⌝.
   Proof. iIntros "(% & _)". by iPureIntro. Qed.
 
+  (* F14: the two P_rest entailments the shape-changing (b) needs *)
+  Lemma ic_rest_raw_unloaded k g :
+    ic_rest_amb k IcRaw ⊣⊢ ic_rest_amb k (IcUnloaded g).
+  Proof. reflexivity. Qed.
+  Lemma ic_rest_to_raw k x :
+    ic_rest_amb k x ⊢ ic_rest_amb k IcRaw.
+  Proof. Admitted.
+
   (* THE REGROUPING (F2's icache twin): today's parked bundle -- the two
      identity halves, the valid cell and [ic_payload_arm] at (inum, g, v) --
      IS the box bundle at Some (dev,inum) and a shape with generation g and
@@ -256,10 +283,12 @@ Section IcacheBox.
   (* ---- the reference rows (M-5) --------------------------------------- *)
   (* stamps of mass μ at the slot's identity: whole reference μ = 1, share
      μ = its identity fraction s, lending parent μ = 1 − lent *)
-  Definition ic_ref_stamps b k (dev inum : mword 32) (μ : Qp) : iProp Σ :=
+  Definition ic_ref_stamps_at b k (i : ic_bid) (μ : Qp) : iProp Σ :=
     (∃ m : gmap (ic_bid * nat) ufrac,
        ⌜qsum m = Qp_to_Qc μ⌝ ∗
-       CtxBox.reference (X := ic_x) (icb b k) (Some (dev, inum)) m)%I.
+       CtxBox.reference (X := ic_x) (icb b k) i m)%I.
+  Definition ic_ref_stamps b k (dev inum : mword 32) (μ : Qp) : iProp Σ :=
+    ic_ref_stamps_at b k (Some (dev, inum)) μ.
 
   Definition inode_ref2 b (k : nat) (q : Qp) (dev inum : mword 32) : iProp Σ :=
     (inode_ref k q dev inum ∗ ic_ref_stamps b k dev inum 1%Qp)%I.
@@ -288,17 +317,35 @@ Section IcacheBox.
     (∃ t : nat,
        CtxBox.l2_hold (X := ic_x) (icb b k) (Some (dev, inum))
          {[ (Some (dev, inum), t) := s ]})%I.
-  (* [ic_deposit cn k (DepShr s dev inum g lo)] REDEFINED (name and arity
-     kept for the 21 opaque sites; DepRef/DepFrz die): the parked-fragment
-     register half at the share singleton, the share's identity cells and
-     its liveness slice.  The sleeplock holder carries this and nothing else
-     of the box's between ilock and iunlock. *)
-  Definition ic_deposit2 b (k : nat) (d : ic_dep) : iProp Σ :=
+  (* what the holder has IN HAND of its share / reference once acquiresleep
+     has deposited slh_tok into the tracked lock (F15): the identity cells
+     and the liveness slice, plus the count fragment for a whole reference
+     (F16).  DepFrz dies (the receipt is a payload-arm alternative). *)
+  Definition ic_body (k : nat) (d : ic_dep) : iProp Σ :=
     match d with
     | DepShr s dev inum g lo =>
-        (ic_hold b k dev inum s ∗ inode_ident k (DfracOwn s) dev inum ∗
-         live_genlo k s g lo)%I
+        (inode_ident k (DfracOwn s) dev inum ∗ live_genlo k s g lo)%I
+    | DepRef q dev inum g lo =>
+        (inode_ident k (DfracOwn q) dev inum ∗ live_genlo k q g lo ∗ iref_frag k q)%I
     | _ => False%I
+    end.
+  (* the stamps mass the descriptor's holder parked: a share its fraction
+     (M-5), a whole reference 1 *)
+  Definition ic_dep_mass (d : ic_dep) : Qp :=
+    match d with DepShr s _ _ _ _ => s | _ => 1%Qp end.
+  Definition ic_dep_id (d : ic_dep) : ic_bid :=
+    match d with
+    | DepShr _ dev inum _ _ | DepRef _ dev inum _ _ => Some (dev, inum)
+    | _ => None
+    end.
+  (* [ic_deposit cn k d] REDEFINED (name and arity kept for its opaque
+     sites): the parked-fragment register half at the holder's singleton --
+     keys and mass pinned (R-1) -- and the holder's body.  The sleeplock
+     holder carries this and nothing else of the box's across its hold. *)
+  Definition ic_deposit2 b (k : nat) (d : ic_dep) : iProp Σ :=
+    match ic_dep_id d with
+    | Some (dev, inum) => (ic_hold b k dev inum (ic_dep_mass d) ∗ ic_body k d)%I
+    | None => False%I
     end.
 
   (* ---- the two payload rows (M-6) ------------------------------------ *)
@@ -309,10 +356,15 @@ Section IcacheBox.
   (* L1: the slot's row in itable_res2 -- the register half, shut and
      empty, IDENTITY = the table's ci !! k (None when unidentified: M-1'),
      bounded by the payload's floor slot [tl] *)
-  Definition ic_slot_row b k (oi : ic_bid) (tl : nat) : iProp Σ :=
+  Definition ic_slot_row b k (oi : ic_bid) (c : nat) (tl : nat) : iProp Σ :=
     (∃ r : slot_reg ic_bid ic_x,
        ic_regd b k r ∗ ⌜sr_win r = false⌝ ∗ ⌜sr_x r = None⌝ ∗ ⌜sr_ident r = oi⌝ ∗
-       llb loglen_name (sr_td r) ∗ ⌜(sr_td r ≤ tl)%nat⌝)%I.
+       llb loglen_name (sr_td r) ∗ ⌜(sr_td r ≤ tl)%nat⌝ ∗
+       ic_cnt b k c)%I.
+  (* F17: [c] is M !! k's count (0 at None).  The table's DEAD row keeps
+     today's [islot_free_at k dev inum] -- the identity halves complementary
+     to the dead header's, which the recycler joins for its stores; the
+     map's deletion of islot_free is withdrawn. *)
 
   (* ====================================================================== *)
   (*  THE SITES (R3's map), as statements over CtxBox's six lemmas            *)
@@ -332,7 +384,8 @@ Section IcacheBox.
     ic_hdr γfs γi cov logstart k None IcRaw ξ.
   Proof. Admitted.
 
-  (* iget's RECYCLE, part 2 -- (b) at c = 0 with the bump: the header
+  (* iget's RECYCLE, part 2 -- (b') at c = 0 with the bump (F14: x0 = IcRaw,
+     x1 = IcUnloaded g, entailment ic_rest_raw_unloaded): the header
      re-deposited at the NEW identity, UNLOADED at a fresh generation (the
      pool's bundle for inum taken under itable.lock, [live_slot_alloc]'s
      half and pending); the new reference is a unit at the deposit stamp. *)
@@ -364,54 +417,59 @@ Section IcacheBox.
 
   (* iput's ref-- -- (d): the unit's debt paid into the L1 register *)
   Lemma ic_decr cn b γfs γi cov logstart (k : nat) (r : slot_reg ic_bid ic_x)
-      (c : nat) (dev inum : mword 32) (E : coPset) :
+      (c : nat) (i : ic_bid) (E : coPset) :
     ↑icBoxN ⊆ E ->
     sr_win r = false ->
     ic_box cn b γfs γi cov logstart k -∗
     ic_regd b k r -∗ llb loglen_name (sr_td r) -∗ ic_cnt b k (S c) -∗
-    ic_ref_stamps b k dev inum 1%Qp ={E}=∗
+    ic_ref_stamps_at b k i 1%Qp ={E}=∗
     ∃ td' : nat, ⌜(sr_td r <= td')%nat⌝ ∗
       ic_regd b k (SlotReg td' false (sr_ident r) (sr_x r)) ∗ ic_cnt b k c ∗
       llb loglen_name td'.
   Proof. Admitted.
 
-  (* ilock -- (e) with a SHARE (SpecIlock: one share, consumed).  R1 at the
-     genl_llb acquiresleep presents the share's stamp; the L2 row's pieces
-     come from the payload.  Out: the bundle at the identity (one binder
-     over the shape), and the handle row the holder carries to iunlock. *)
-  Lemma ic_ilock_checkout `{CID : RiscvLang.CpuId} cn b γfs γi cov logstart (k : nat)
-      (ξ : CtxId) (s : Qp) (dev inum : mword 32) (g : gname) (lo : nat)
+  (* ilock's and iput's CHECKOUT -- (e) with the descriptor's holder body
+     (F15: the share minus slh_tok; F16: iput's whole unit at DepRef).  R1
+     at the genl_llb acquiresleep presents the fragment's stamp; the L2
+     row's pieces come from the payload.  Out: the bundle at the identity
+     (one binder over the shape), and the handle row [ic_deposit2 b k d]. *)
+  Lemma ic_checkout `{CID : RiscvLang.CpuId} cn b γfs γi cov logstart (k : nat)
+      (ξ : CtxId) (d : ic_dep) (dev inum : mword 32)
       (s0 : l2_reg ic_bid) (Kt Kp : nat) (E : coPset) :
     ↑icBoxN ⊆ E ->
+    ic_dep_id d = Some (dev, inum) ->
     lr_hold s0 = None -> (lr_tp s0 <= Kp)%nat ->
     ic_box cn b γfs γi cov logstart k -∗
     own_context ξ -∗
     ctx_floor ξ Kt -∗ ctx_floor ξ Kp -∗
-    (* the share, its stamp covered by Kt (the R1 post at Tl := its stamp) *)
-    inode_shr_genlo k s dev inum g lo -∗
+    ic_body k d -∗
     (∃ t : nat, ⌜(t <= Kt)%nat⌝ ∗
-       CtxBox.reference (X := ic_x) (icb b k) (Some (dev, inum)) {[ (Some (dev, inum), t) := s ]}) -∗
+       CtxBox.reference (X := ic_x) (icb b k) (Some (dev, inum))
+         {[ (Some (dev, inum), t) := ic_dep_mass d ]}) -∗
     ic_tok cn k -∗ ic_regp b k s0 ={E}=∗
     own_context ξ ∗
     (∃ x : ic_x, ic_hdr γfs γi cov logstart k (Some (dev, inum)) x ξ ∗ ic_rest k x ξ) ∗
-    ic_deposit2 b k (DepShr s dev inum g lo).
+    ic_deposit2 b k d.
   Proof. Admitted.
 
-  (* iunlock -- (f): the bundle back at the identity the handle names (the
-     register agrees, (I) ties it), the share re-minted at the park stamp,
-     the L2 row's pieces for the genin releasesleep *)
-  Lemma ic_iunlock_park `{CID : RiscvLang.CpuId} cn b γfs γi cov logstart (k : nat)
-      (ξ : CtxId) (s : Qp) (dev inum : mword 32) (g : gname) (lo : nat) (E : coPset) :
+  (* iunlock's and iput's PARK -- (f): the bundle back at the identity the
+     handle names (the register agrees, (I) ties it), the fragment re-minted
+     at the park stamp at the descriptor's mass, the holder's body back, the
+     L2 row's pieces for the genin releasesleep (the client re-forms
+     inode_shr2 / the reference once releasesleep returns slh_tok) *)
+  Lemma ic_park `{CID : RiscvLang.CpuId} cn b γfs γi cov logstart (k : nat)
+      (ξ : CtxId) (d : ic_dep) (dev inum : mword 32) (E : coPset) :
     ↑icBoxN ⊆ E ->
+    ic_dep_id d = Some (dev, inum) ->
     ic_box cn b γfs γi cov logstart k -∗
     own_context ξ -∗
     (∃ x : ic_x, ic_hdr γfs γi cov logstart k (Some (dev, inum)) x ξ ∗ ic_rest k x ξ) -∗
-    ic_deposit2 b k (DepShr s dev inum g lo) ={E}=∗
-    own_context ξ ∗ ic_tok cn k ∗
+    ic_deposit2 b k d ={E}=∗
+    own_context ξ ∗ ic_tok cn k ∗ ic_body k d ∗
     ∃ T' : nat,
       ic_regp b k (L2Reg T' None) ∗
-      inode_shr_genlo k s dev inum g lo ∗
-      CtxBox.reference (X := ic_x) (icb b k) (Some (dev, inum)) {[ (Some (dev, inum), T') := s ]} ∗
+      CtxBox.reference (X := ic_x) (icb b k) (Some (dev, inum))
+        {[ (Some (dev, inum), T') := ic_dep_mass d ]} ∗
       llb loglen_name T'.
   Proof. Admitted.
 
@@ -453,8 +511,9 @@ Section IcacheBox.
 
   (* iput's LAST CLOSE with eviction -- (a) at c = 1 as above, the client
      returns the payload to the pool (icnt_half 0 in hand under itable), then
-     (b) at c = 1 with the DEAD identity and the raw header: the slot is
-     dead from here (M-1'), and (d) drops the unit. *)
+     (b') at c = 1 with the DEAD identity and the raw header (F14: x0 the
+     withdrawn shape, x1 = IcRaw, entailment ic_rest_to_raw): the slot is
+     dead from here (M-1'), and (d) at None drops the unit (F18). *)
   Lemma ic_evict_deposit `{CID : RiscvLang.CpuId} cn b γfs γi cov logstart (k : nat)
       (ξ : CtxId) (r : slot_reg ic_bid ic_x) (x0 : ic_x) (E : coPset) :
     ↑icBoxN ⊆ E ->
@@ -476,7 +535,7 @@ Section IcacheBox.
   Lemma ic_box_alloc `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (ξ : CtxId) (E : coPset) :
     own_context ξ -∗
     ([∗ list] k ∈ seq 0 NINODE,
-       ic_hdr γfs γi cov logstart k None IcRaw ξ ∗ ∃ x, ic_rest k x ξ) ={E}=∗
+       ic_hdr γfs γi cov logstart k None IcRaw ξ ∗ ic_rest k IcRaw ξ) ={E}=∗
     own_context ξ ∗
     ∃ b : ic_boxes,
       ic_boxes_all cn b γfs γi cov logstart ∗
