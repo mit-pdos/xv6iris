@@ -509,6 +509,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | §6²⁷ | run L2/L3/L4 in parallel now; sweep the file layer once; two tripwires before r21 | RECOMMENDED to the owner |
 | item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RULED -- reviewer 1 agrees (item 17), with `file_core_off`'s FD_INODE arm named as the FIFTH final shape and "0 Admitted in `EnvMorph`" added to r25's gate |
 | item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; the two fixes LANDED (item 20) -- reviewer 2's audit next |
+| item 21 | reviewer 2's audit of d53e4a4e5: NOT signed off -- (1) the cell claimed twice and the unit unowned at non-FD_INODE arms (unit unconditional; `file_core_off := emp`; the free arm holds `off_resident`; the L2 half rides the FD_NONE unit); (2) `file_pay_st_split` false (one-sided over a unitless `file_pay_tie`); (3) the three ghost steps, the last-close pair, `so_deposit`, `so_open_slot` not at final shape; plus `ftable_res_at`'s fold/unfold pair | AUDITED by reviewer 2; fixes pending |
 | R4a Q1 | `inode_pay`: the cinv parks KEYED GHOST ONLY (`iref_frag`, `ic_lent_stamps`, `runit_any`); the reference's cells, `live_genlo`, `slh_tok` ride the fractional payload as `inode_ref_side` at the parked fraction; pin that fraction to `Q` by lending HALF at sys_open (no arity change), fallback `fp_iqi` | RULED by reviewer 1 (item 15) |
 | R4a Q2 | NO re-mint, NO llb, NO `own_context` at cancel: the share's `cred_floor` is in the canceller's hand (morphed with the payload) and `live_genlo_agree` pins the parked `lo`; `inode_pay_cancel`'s statement unchanged | RULED by reviewer 1 (item 15) |
 | R4a Q3/Q5 | ONE file-layer sweep with all three shapes final (`inode_pay`, `ftable_res_at` WITH the floor row + `_in` releases, `ic_slp ∗ off_rows`); L5 + full `ftable_res_at` first, then L8/L9 and the OffBox consumers as the two lanes INSIDE r25 | RULED by reviewer 1 (item 15); the two-sweep order reviewer 1 gave earlier is WITHDRAWN (L6 is on L8's path) |
@@ -1056,6 +1057,112 @@ branch and recorded in §3.2 and §8 here.
       checkout/park; (iii) OffBox's 14 proofs, the log λ-flip, the
       sleep-lock handle instance.  Measure per lane (pitfall 5).  Nothing
       in a lane changes a shape.
+
+21. **THE BOX'S DESIGNER'S AUDIT OF THE SHAPES COMMIT (d53e4a4e5; 2026-09-02).
+    NOT SIGNED OFF: the non-FD_INODE arms are inconsistent with the box's
+    birth, one Admitted is FALSE as stated, and five statements the gate
+    tagged as "reopened" are not at their final shape.  Everything else
+    checks.**  Read: `inode_core`/`inode_ref_side`/`inode_pay`/`_alloc`,
+    `off_fd_unit`, `file_pay_st` and its three lemmas, `file_core_off`,
+    `file_rest`, `fslot`, `ftable_res`/`_at`/`_boot`, `file_off_reclaim`, the
+    three ghost steps and the last-close pair (FileInv.v:395-592),
+    `off_filealloc`/`off_publish_*`/`off_dup`/`off_close`/`off_reclaim`,
+    `off_rows_dep`/`_fold`/`_to_dep`, `CtxBox.l2_row`, `ic_slp`/`ic_slp_dep`/
+    `ic_slp_fold`, `so_open_slot`/`so_deposit`/`so_publish`, `EnvMorph.v`,
+    `park_globals`, `FileOffCell.v`, `foff_dead`.
+    - **VERIFIED.**  D1 as landed is item 15's shape exactly; `inode_core`
+      is in a section with no `CurCtx`; `inode_pay_alloc` takes the pieces
+      at `Q + Q`.  `CtxBox.l2_row` pins `lr_hold s = None`, so
+      `off_rows_to_dep` is provable and `off_rows_dep`'s clause is honest.
+      `ic_slp_dep` at one bound with `off_rows_dep` is correction 2 as
+      meant; `ic_slp_fold`'s statement unchanged.  `EnvMorph` 0 Admitted.
+      `park_globals` at flip's arity over the λ `is_ftable`.  The tie by a
+      fractional ghost-map pointsto with the complement in the table row:
+      right and minimal.  `ftable_res_at` with the floor row; `is_ftable`
+      over it.
+    - **BLOCKING 1 -- THE CELL IS CLAIMED TWICE AND THE UNIT BY NOBODY at
+      FD_NONE / FD_PIPE / FD_DEVICE.**  `off_filealloc` (P4: born at
+      filealloc) deposits the cell INTO the box (`box_alloc_at` at
+      `off_resident`, arm IN, `win = false`), and `fslot`'s allocated arm
+      carries `off_box ∗ off_l1_row γb k n Kd` for EVERY allocated slot.
+      But `file_core_off k q C` at every non-FD_INODE type is still
+      `foff_dead k q` -- the same cell, fractional, inside `file_pay`
+      (`so_open_slot` hands it out as `a_foff kf ↦₄ voff`).  One cell, two
+      owners: the FD_NONE payload is unsatisfiable, so filealloc cannot
+      form `file_ref γ k 1 FdClosed`.  And `off_fd_unit` is `emp` at those
+      types while the L1 row's count is 1: the birth unit
+      (`off_ref_stamps γ k 1`, which `off_filealloc` returns) has no home,
+      so sys_open cannot obtain it for the publish, and a pipe's or
+      device's last close cannot meet `off_reclaim`'s `qsum m = 1`.  Third,
+      `off_filealloc`'s premise is `off_resident` (with `off_wf`), which
+      `foff_dead` does not give.
+      THE REPAIR (one consistent story, "the cell lives in the box for the
+      slot's allocated life, and is well-formed always"):
+        off_fd_unit k q C := ∃ γb, obox_frag off_cfg k q γb ∗ off_box k γb ∗
+             off_ref_stamps γb k 1 ∗
+             match fc_type C with
+             | FD_NONE  => off_regp γb (L2Reg 0 None)      (the owner's L2 half, rides to the publish)
+             | FD_INODE => ∃ i, ⌜fc_ip C = ientry i⌝ ∗ ⌜i < NINODE⌝ ∗ off_member off_cfg i γb
+             | _        => emp                             (pipe/device never touch f->off; the half is dropped at the retype)
+             end
+        file_core_off k q C := emp        (every arm; `foff_dead` retired)
+        fslot (free arm): a_fref ↦₄ 0 ∗ off_resident k ∗ (∃ γ0, obox_full off_cfg k γ0) ∗ ∃ C, FD_NONE ∗ file_fields ∗ file_pay
+      `off_wf` holds everywhere: boot zeros the table (`off_wf_zero`), the
+      box's header keeps it, `off_reclaim` returns `off_resident` to the
+      closer, who puts it in the free arm.  The unit is unconditional (F34:
+      one per counted reference, whatever the type); membership is minted
+      at the publish (`off_publish_park` inserts the row into inode i's
+      set), so it is conditional.  The L2 half rides the FD_NONE unit
+      because that is the only way it reaches sys_open's publish; a file is
+      never dup'd at FD_NONE (fdalloc precedes the type store within one
+      thread), so the half's exclusivity is never split.
+    - **BLOCKING 2 -- `file_pay_st_split` (FileInvDefs.v:1639) IS FALSE.**  As a
+      ⊣⊢ its right side carries two units at mass 1 and its left one; no
+      direction holds.  Its one user is `file_dup_step` (FileInv.v:454), which
+      is exactly where the second unit must come from `off_dup`.  Replace by
+      the one-sided pair over a UNITLESS half:
+        file_pay_tie γ k q C st := (file_pay_st minus off_fd_row: names, core, obox_frag k q γb)
+        file_pay_st γ k (q1+q2) C st ⊣⊢ file_pay_st γ k q1 C st ∗ file_pay_tie γ k q2 C st
+        file_pay_tie γ k q C st -∗ off_box k γb -∗ off_ref_stamps γb k 1 -∗ (membership at FD_INODE) -∗ file_pay_st γ k q C st
+      (the tie's γb and the unit's agree through `obox_auth` under
+      ftable.lock, which filedup holds).  `file_pay_st_none` must take the
+      unit: `file_pay γ k q C -∗ off_fd_unit k q C -∗ file_pay_st … FdClosed`.
+    - **BLOCKING 3 -- five statements tagged "reopened" are NOT final (T1).**
+      `file_alloc_step`, `file_dup_step`, `file_close_step` (FileInv.v:395/421/
+      467) are still `==∗` ghost steps with no box premise; each is now a fupd
+      at `↑(offBoxN .@ k) ⊆ E` taking the slot's `off_box ∗ off_l1_row` (alloc:
+      the birth through `off_filealloc` plus the `obox` update; dup:
+      `off_dup`'s unit into the new `file_pay_st`; close: `off_close` on the
+      departing unit, the frag back to the complement, td' out).
+      `file_close_last_step`/`file_off_reclaim` (533/373): `file_off_reclaim`
+      still takes `ioff_escrows` and `file_core_off k 1 C`; final form takes
+      the closer's unit (its reference's llb → `Kt` by R1 at the acquire),
+      `ctx_floor ξ Kd`, `ctx_floor ξ Kt`, `own_context ξ`, the L1 row at
+      count 1, and yields `off_resident k ∗ obox_full` for the free arm.
+      `so_deposit` (ProofSysOpenParts.v:853) still takes `ioff_escrows` and
+      yields `file_core_off`; final form is the publish pair around the
+      `f->off = 0` store (checkout before, park after) over the unit's
+      reference, the FD_NONE unit's L2 half and `ic_slp`'s off rows.
+      `so_open_slot` yields the unit, not `a_foff kf ↦₄ voff`.  Each of these
+      would otherwise be edited twice: once now, once when its proof opens.
+    - **REQUIRED ADDITION -- `ftable_res_at`'s fold/unfold pair, mirroring
+      `ic_slp`'s.**  `off_close` raises the L1 row's `td` past the acquired
+      `Kd`, so no release can re-fold `ftable_res γ Kd` at the Kd it
+      acquired; every `_in` release needs `ftable_res_dep γ T` (rows with
+      `llb td ∗ td ≤ T`, one `llb T`), `ftable_res_fold : ftable_res_dep γ T ∗
+      ctx_floor ξ T ⊢ ftable_res_at γ ξ`, `ftable_res_to_dep : ftable_res_at
+      γ ξ -∗ ∃ T, ftable_res_dep γ T`.  Statements now; all eleven sites use
+      them; without them each site hand-rolls a maximum over NFILE rows.
+    - **WHY THE GATE MISSED THESE.**  "Compiles" checks that a statement is
+      well-typed, not that it is satisfiable or final.  The three findings
+      are of the kind rule 0 catches only if the reviewer also asks, per
+      shape, "who produces each conjunct, at every arm of every `match`":
+      the FD_NONE arm was never walked.  Add to the day-one checklist: for
+      every `match`/`if` in a shape, one line per arm naming the producer
+      of each conjunct.
+    - **SIGN-OFF:** with blocking 1-3 and the fold pair landed as
+      statements (no proofs), I sign off; reviewer 1 should re-read the
+      unit and the free arm, since they move again.
 
 17. **REVIEWER 1 ON ITEM 16 (2026-09-02): the three corrections and the
     four tripwires are taken; two additions.**
