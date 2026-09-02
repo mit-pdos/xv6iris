@@ -152,7 +152,7 @@ The box owns exactly: the parked context, stamps, cnt, slot_d, slot_p.
 | (a) | `box_withdraw_L1` | takes `Q1 c` | landed |
 | (b′) | `box_deposit_L1_shape` | x0 → x1 entailment on `P_rest`; returns `Q1 c`; mints the unit at `max 1 c` | landed |
 | (b) | `box_deposit_L1` | instance x1 := x0 | landed |
-| (b″) | `box_deposit_L1_join` | `Qc`, `P_hdr'`, view-shift join `∀ ξ', Qc ∗ Q1 c ∗ P_hdr' i' x1 ξ' ={E∖↑N}=∗ P_hdr i' x1 ξ' ∗ Q'`; (b′) is its instance | DRAFTED, uncommitted in the sibling worktree; ruled ACCEPT (log §6²⁵/§6²⁶/§6²⁷) |
+| (b″) | `box_deposit_L1_join` | `Qc`, `P_hdr'`, view-shift join `∀ ξ', Qc ∗ Q1 c ∗ P_hdr' i' x1 ξ' ={E∖↑N}=∗ P_hdr i' x1 ξ' ∗ Q'`; (b′) is its instance | ruled ACCEPT (log §6²⁵/§6²⁶/§6²⁷); BUILT side-by-side as `CtxBoxHooked.box_deposit_L1_hook`, with F14's x0 → x1 folded into the same hook (§3.2b) |
 | (c) | `box_ref_incr` | needs win = false | landed |
 | (d) | `box_ref_decr` | needs win = false | landed |
 | (e′) | `box_checkout_split` | `Qc`, `P_hdr'`, view-shift split `∀ x ξ', Qc ∗ P_hdr i x ξ' ={E∖↑N}=∗ P_hdr' i x ξ' ∗ Q2` at ξb before the absorb | landed |
@@ -161,7 +161,7 @@ The box owns exactly: the parked context, stamps, cnt, slot_d, slot_p.
 | (f) | `box_park` | instance Qc' := emp | landed |
 | (g) | `box_l1_to_l2` | takes `Q2`, returns `Q1 1` | landed |
 | accessor | `box_q_update` | under the L2 half: `Q2 ={E∖↑N}=∗ Q2 ∗ R`, returns `l2_hold ∗ R` | landed |
-| accessor | `box_q1_update` | under the L1 half at win = true and the cnt half: `Q1 c ={E∖↑N}=∗ Q1 c ∗ R` | ruled ACCEPT, not yet written |
+| accessor | `box_q1_update` | under the L1 half at win = true and the cnt half: `Q1 c ={E∖↑N}=∗ Q1 c ∗ R` | ruled ACCEPT; BUILT side-by-side as `CtxBoxHooked.box_q1_update` (§3.2b) |
 | view | `box_view` | opens the inv for a non-owner: rows + `box_arm` + closing wand | landed |
 | boot | `box_alloc`, `box_alloc_at`, `box_alloc_at_halves` | born IN at T_boot | landed |
 
@@ -172,6 +172,50 @@ unchanged.  Blast radius: the direct callers of `CtxBox.box_*` are
 `BioInv`, `FsCfgKits`, `IcacheRef`, `IcacheBoot`, `IcacheEscrow`, `OffBox`;
 no inode proof calls a box lemma.  bcache and off instantiate every hook
 with the identity.
+
+### 3.2b The consolidated box, BUILT side-by-side (`iris/CtxBoxHooked.v`, 2026-09-02)
+
+At the owner's instruction the consolidation is built now, beside
+`CtxBox.v` and not in its place, so it is ready the moment a wrapper needs
+another extension or the cleanup pass (r20c) is scheduled.  The file is in
+`_CoqProject` after `CtxBox.v`; it imports CtxBox and REUSES its ghosts,
+arms, rows, body, `is_box` (the SAME predicate, so one box may be driven by
+both files' lemmas), the reference kit, (c)/(d), `box_q_update`, `box_view`
+and boot unchanged.  It adds:
+
+| lemma | hook (all at the box's mask `E ∖ ↑N`, the box open) |
+|---|---|
+| (a) `box_withdraw_L1_hook` | `∀ x ξ', Qc ∗ P_hdr i x ξ' ={E∖↑N}=∗ P_hdr' i x ξ' ∗ Q1 c` at ξb before the absorb (§6¹³'s "(a′)", now present) |
+| (b) `box_deposit_L1_hook` | `∀ ξb, Qc ∗ Q1 c ∗ P_hdr' i' x1 ξ ∗ P_rest x0 ξb ={E∖↑N}=∗ P_hdr i' x1 ξ ∗ P_rest x1 ξb ∗ Q'` before the deposit -- (b″) with F14's shape change inside the hook |
+| (e) `box_checkout_hook` | = `box_checkout_split` as landed |
+| (f) `box_park_hook` | `box_park_join`'s join as a view shift |
+| (g) `box_l1_to_l2_hook` | `Qc ∗ Q1 1 ={E∖↑N}=∗ Q2 ∗ Q'` at ξ, on the residues only |
+| accessor `box_q1_update` | under the L1 half at win = true and the cnt half: `Q1 c ={E∖↑N}=∗ Q1 c ∗ R` |
+| corollaries | `box_withdraw_L1`, `box_deposit_L1_shape`, `box_deposit_L1`, `box_checkout_split`, `box_checkout`, `box_park_join`, `box_park`, `box_l1_to_l2` -- CtxBox's names, CtxBox's statements |
+
+No hook sees a register, a stamp, the count or a row.  Each hooked proof
+is CtxBox's proof of the plain form with one `iMod (Hhook …)` where that
+proof read the client content; the corollaries are one-line identity
+instantiations.
+
+VERIFIED on the VM at 10de366d1: compiles by `coqc` and through
+`CoqMakefile` (5.8 s), no Admitted, `Print Assumptions` of the hooked
+deposit closed under the global context, and each of the eight corollaries
+type-checks AT CtxBox's exact type (`(@CtxBoxHooked.<name> : type of
+@CtxBox.<name>)`), so a client switches `CtxBox.<name>` →
+`CtxBoxHooked.<name>` with no other change.
+
+USE NOW: a wrapper that needs a hook calls `CtxBoxHooked.<name>_hook` with
+CtxBox's leading arguments (`P_hdr P_rest Q1 Q2 N γ …`); everything else
+stays on CtxBox.  Open item 1 (the recycle) can take `box_deposit_L1_hook`
+and `box_q1_update` from here instead of landing (b″) in CtxBox.v.
+
+SLOT-IN (r20c, one edit, F30 precedent): move the five `_hook` lemmas and
+`box_q1_update` into CtxBox.v's Section box; make CtxBox's
+`box_withdraw_L1`, `box_deposit_L1_shape`, `box_checkout`,
+`box_park_join`, `box_l1_to_l2` the one-line corollaries this file has (the
+other three already are); delete `CtxBoxHooked.v` and its `_CoqProject`
+line.  The six direct callers do not change.
 
 ### 3.3 Instances
 
@@ -449,6 +493,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | Q8 | (b″) `box_deposit_L1_join` + `box_q1_update` | ACCEPTED, not landed |
 | Q9 | the two-armed `Q1 0` (main's MID arm re-homed) | ACCEPTED, not landed |
 | §6²⁶/§6²⁷ | the hook convention as law; consolidate before r21; hook (a)/(g) too | RECOMMENDED to the owner |
+| §3.2b | the consolidated box BUILT side-by-side (`iris/CtxBoxHooked.v`): hooks on (a)/(b)/(e)/(f)/(g), `box_q1_update`, eight verbatim-typed corollaries; green on the VM, assumptions closed | landed side-by-side (commit ded0fa1de); slot-in = r20c |
 | §6²⁷ | run L2/L3/L4 in parallel now; sweep the file layer once; two tripwires before r21 | RECOMMENDED to the owner |
 
 Tripwires added by this lane, beyond flip endgame §5.7: law 9 (residues)
@@ -458,15 +503,19 @@ and law 10 (hooks).
 
 ## 9. Open items (append new rounds here)
 
-1. **Land (b″) + `box_q1_update` + the two-armed `Q1 0`** (Q8/Q9, ruled):
-   the (b″) proof is drafted in the sibling worktree; `box_q1_update` is
-   `box_q_update` with the L1 selector; `ic_recycle_deposit` becomes the
-   (b″) form; the recycle wrapper states the pool's mask premises.  Then
-   ProofIget's recycle arm.
+1. **Land the recycle over (b″) + `box_q1_update` + the two-armed `Q1 0`**
+   (Q8/Q9, ruled): both box statements are BUILT and green in
+   `CtxBoxHooked.v` (§3.2b: `box_deposit_L1_hook`, `box_q1_update`); the
+   build agent may call them from there (same `is_box`) or land its own
+   draft in CtxBox.v -- one or the other, not both.  `ic_recycle_deposit`
+   becomes the hooked form; the recycle wrapper states the pool's mask
+   premises (`ipoolN`, `iregN`, `escAN inum`).  Then ProofIget's recycle
+   arm.
 2. **State `ic_slot_cover` over `box_arm`** before ProofIget/ProofIput
    finish (the r21 acceptance test, rule 0 for the viewer clause).
-3. **The hook consolidation** (r20c) — awaiting the owner's word on law 10;
-   the recommendation is unanimous among the three reviewers.
+3. **The hook consolidation** (r20c) — BUILT side-by-side in
+   `CtxBoxHooked.v` (§3.2b); what remains is the slot-in edit to CtxBox.v
+   at the first quiet point after r20b, one commit, no client change.
 4. **A second agent for L2/L3/L4** — awaiting the owner.
 5. **`ic_slp`'s final shape** (the off-row conjunct + one fold lemma)
    before r21's consumer sweep; `off_rows_morph` and the llb-max lemma
