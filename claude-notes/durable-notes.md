@@ -2743,3 +2743,14 @@ culprit.  Build law: every GCP make runs under `timeout` now.
 - `rewrite Hw` (a Coq rewrite) rewrites the WHOLE Iris goal incl. the
   context; a following `iEval (rewrite Hw) in "H"` then finds nothing.
 - `own_update_2 _ _ _ _ (upd)`: FOUR underscores (γ a1 a2 a').
+- The genin releasesleep's `Rdep` is `CtxId → iProp` (constant for bcache:
+  `bslp_dep bn k T' := fun _ => …`); its fold premise is
+  `∀ ξ, Rdep ξ ∗ ctx_floor ξ tl ⊢ R ξ`.  Its post hands `H q` back — one
+  more intro (`_` for sl_untracked).
+- `iDestruct (... with "[%] [%] [H]") …; [| lia |]` counts goals: with a
+  `[H]` selector there are FOUR goals (`[| lia | |]`).
+- Inside an `iAssert … as "HADV"` proof the outer persistent names are
+  still in scope: re-introducing `#Hfl` fails ("not fresh") — use fresh
+  names for the inner intros.
+- brelse: destruct the handle's `bstok` row BEFORE the park (the park needs
+  the `l2_hold` half); the sleeplock token part is what holdingsleep takes.
