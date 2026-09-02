@@ -767,6 +767,7 @@ CodeIinit.v
 SpecIinit.v
 ProofIinit.v
 LinkIinit.v
+BlkmapDefs.v
 InodeInv.v
 DirView.v
 FsTree.v

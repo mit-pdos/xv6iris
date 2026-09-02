@@ -152,9 +152,9 @@ Section MainDeposit.
     iIntros (ξ ξ') "Hd H". rewrite /main_deposit_rows.
     iDestruct "H" as (γpr γk γs pd pav pu root pas)
       "(H1 & Hpi & H3 & H4 & Hgeom & H6 & Hkpt & H8 & H9)".
-    iDestruct (disk_geom_morph γv pd pav pu ξ ξ' with "Hd Hgeom") as "[Hd Hgeom]".
-    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hkpt") as "[Hd Hkpt]".
-    iFrame "Hd". iExists γpr, γk, γs, pd, pav, pu, root, pas. iFrame.
+    iMod (disk_geom_morph γv pd pav pu ξ ξ' with "Hd Hgeom") as "[Hd Hgeom]".
+    iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hkpt") as "[Hd Hkpt]".
+    iModIntro. iFrame "Hd". iExists γpr, γk, γs, pd, pav, pu, root, pas. iFrame.
   Qed.
 
   (* THE DEPOSIT.  The rows at [ξd], plus the one-line invariant that holds

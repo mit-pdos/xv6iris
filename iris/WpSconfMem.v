@@ -129,6 +129,26 @@ Section WpSconfMem.
     by change (Z.to_nat 8) with 8%nat.
   Qed.
 
+  (* main's siblings at 4 and 2 (main-tso-readiness A12): the windows at the
+     narrower widths ARE the ctx cells, by the same unfolding *)
+  Lemma wordw4_ctx `{KTR2 : !CurKtier} (a : Arch.pa)
+      (dq : dfrac) (v : mword 32) :
+    wordw_pointsto (KTR := KTR2) 4 a dq v
+    ⊣⊢ ctx_word4_pointsto (KTR := KTR2) cur_ctx a dq v.
+  Proof.
+    rewrite /wordw_pointsto /TsoCtx.ctx_word4_pointsto.
+    by change (Z.to_nat 4) with 4%nat.
+  Qed.
+
+  Lemma wordw2_ctx `{KTR2 : !CurKtier} (a : Arch.pa)
+      (dq : dfrac) (v : mword 16) :
+    wordw_pointsto (KTR := KTR2) 2 a dq v
+    ⊣⊢ ctx_word2_pointsto (KTR := KTR2) cur_ctx a dq v.
+  Proof.
+    rewrite /wordw_pointsto /TsoCtx.ctx_word2_pointsto.
+    by change (Z.to_nat 2) with 2%nat.
+  Qed.
+
   (* THE ADDRESS CLAIM, AND WHY THE ATOMIC-UPDATE FORMS TAKE IT.
      Per node, an access TRANSLATES before it reads, and the translation
      needs the window's claim -- its [ppn], canonicality, RAM-ness and tier
@@ -180,6 +200,41 @@ Section WpSconfMem.
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
     iSplitR; [done|]. iApply (mem_pointsto_claim with "Hb0").
+  Qed.
+
+  (* main's claim readers off a ctx cell (main-tso-readiness A12): the
+     address claim a leaf wants, from the window the caller holds *)
+  Lemma ctx_word4_claim `{KTR2 : !CurKtier} (a : Arch.pa)
+      (dq : dfrac) (w : mword 32) :
+    (0 < 4)%Z ->
+    ctx_word4_pointsto (KTR := KTR2) cur_ctx a dq w -∗
+    wordw_claim (KTR := KTR2) 4 a.
+  Proof.
+    intros _.
+    rewrite -(wordw4_ctx (KTR2 := KTR2)).
+    iApply (wordw_claim_of (KTR := KTR2) 4 a dq w ltac:(lia)).
+  Qed.
+
+  Lemma ctx_word2_claim `{KTR2 : !CurKtier} (a : Arch.pa)
+      (dq : dfrac) (w : mword 16) :
+    (0 < 2)%Z ->
+    ctx_word2_pointsto (KTR := KTR2) cur_ctx a dq w -∗
+    wordw_claim (KTR := KTR2) 2 a.
+  Proof.
+    intros _.
+    rewrite -(wordw2_ctx (KTR2 := KTR2)).
+    iApply (wordw_claim_of (KTR := KTR2) 2 a dq w ltac:(lia)).
+  Qed.
+
+  Lemma ctx_word_claim `{KTR2 : !CurKtier} (a : Arch.pa)
+      (dq : dfrac) (w : mword 64) :
+    (0 < 8)%Z ->
+    ctx_word_pointsto (KTR := KTR2) cur_ctx a dq w -∗
+    wordw_claim (KTR := KTR2) 8 a.
+  Proof.
+    intros _.
+    rewrite -(wordw8_ctx (KTR2 := KTR2)).
+    iApply (wordw_claim_of (KTR := KTR2) 8 a dq w ltac:(lia)).
   Qed.
 
   (* ------------------------------------------------------------------- *)

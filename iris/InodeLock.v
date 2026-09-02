@@ -162,9 +162,9 @@ Section InodeLockResMorph.
     TsoCtx.CtxMorph (λ ξ : TsoCtx.CtxId, inode_raw (XI := ξ) ip).
   Proof.
     iIntros (ξ ξ') "Hd [[%d Hm] (%l & %Hl & Ha)]". rewrite /inode_raw.
-    iDestruct (inode_meta_morph ip d ξ ξ' with "Hd Hm") as "[Hd Hm]".
-    iDestruct (inode_addrs_morph ip l ξ ξ' with "Hd Ha") as "[Hd Ha]".
-    iFrame "Hd". iSplitL "Hm"; [iExists d; iExact "Hm"|].
+    iMod (inode_meta_morph ip d ξ ξ' with "Hd Hm") as "[Hd Hm]".
+    iMod (inode_addrs_morph ip l ξ ξ' with "Hd Ha") as "[Hd Ha]".
+    iModIntro. iFrame "Hd". iSplitL "Hm"; [iExists d; iExact "Hm"|].
     iExists l. by iFrame.
   Qed.
 

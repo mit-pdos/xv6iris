@@ -2893,35 +2893,9 @@ Section IcacheHeldAny.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
 
-  Definition inode_held_short_any (v : mword 64) (s : Qp) : iProp Σ :=
-    (∃ ξ : CtxId, inode_held_short (XI := ξ) v s)%I.
-
-  Global Instance inode_held_short_any_timeless v s :
-    Timeless (inode_held_short_any v s).
-  Proof. rewrite /inode_held_short_any. apply _. Qed.
-
-  Lemma inode_held_short_any_intro `{XI : CurCtx} (v : mword 64) (s : Qp) :
-    inode_held_short v s -∗ inode_held_short_any v s.
-  Proof. iIntros "H". iExists cur_ctx. iExact "H". Qed.
-
-  (* THE ∃-ELIMINATION, and it is the SC-only half.  At TSO a ledger fact is
-     pinned to its context and the ∃ hides WHICH, so nothing can dominate it;
-     the honest form is the borrow window's [TsoCtx.ctx_absorb] against the
-     opener's own [own_context] and hart receipt, exactly as the bcache
-     escrow does (§0.17′).  Quarantined through the shim until that sweep. *)
-  Lemma inode_held_short_any_elim `{XI : CurCtx} (v : mword 64) (s : Qp) :
-    inode_held_short_any v s -∗ inode_held_short v s.
-  Proof.
-    iIntros "[%ξ H]". rewrite /inode_held_short.
-    iDestruct "H" as (k qt qi inum) "(%Hv & %Hk & %Hb & %Hq & [Hrs Hru])".
-    iExists k, qt, qi, inum. iFrame "%".
-    rewrite /inode_refp_short /inode_ref_short.
-    iDestruct "Hrs" as "(Hfrag & Hlv & Hid & Hsl)".
-    rewrite /inode_ident. iDestruct "Hid" as "[Hd Hi]".
-    iDestruct (TsoCtxShim.ctx_word4_reindex _ ξ cur_ctx with "Hd") as "Hd".
-    iDestruct (TsoCtxShim.ctx_word4_reindex _ ξ cur_ctx with "Hi") as "Hi".
-    iFrame "Hru Hfrag Hlv Hsl Hd Hi".
-  Qed.
+  (* [inode_held_short_any] (the ∃ξ wrapper over the short row, eliminated
+     through the SC shim) is GONE, as on tso-flip: it had no consumer, and at
+     TSO a ledger fact pinned to its context cannot be re-indexed by fiat. *)
 
   (* ---- THE TRANSPORTS.  [inode_ident]'s two cells are [↦₄], so everything
      over them re-indexes along [ctx_dom] rather than being ξ-constant; these
@@ -2930,9 +2904,9 @@ Section IcacheHeldAny.
     CtxMorph (λ ξ, inode_ident (XI := ξ) k dq dev inum).
   Proof.
     iIntros (ξ ξ') "Hd [Hdv Hin]".
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdv") as "[Hd Hdv]".
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hin") as "[Hd Hin]".
-    iFrame.
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hdv") as "[Hd Hdv]".
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hin") as "[Hd Hin]".
+    iModIntro. iFrame.
   Qed.
 
   Global Instance inode_shr_gen_morph (k : nat) (s : Qp) (dev inum : mword 32)
@@ -2940,9 +2914,9 @@ Section IcacheHeldAny.
     CtxMorph (λ ξ, inode_shr_gen (XI := ξ) k s dev inum g).
   Proof.
     iIntros (ξ ξ') "Hd (Hid & Hlv & Hsl)".
-    iDestruct (inode_ident_morph k (DfracOwn s) dev inum ξ ξ'
+    iMod (inode_ident_morph k (DfracOwn s) dev inum ξ ξ'
                  with "Hd Hid") as "[Hd Hid]".
-    iFrame.
+    iModIntro. iFrame.
   Qed.
 
   Global Instance inode_shr_held_gen_morph (v : mword 64) (s : Qp) (g : gname)
@@ -2950,9 +2924,9 @@ Section IcacheHeldAny.
     CtxMorph (λ ξ, inode_shr_held_gen (XI := ξ) v s g inum).
   Proof.
     iIntros (ξ ξ') "Hd (%k & %Hv & %Hk & %Hb & Hs)".
-    iDestruct (inode_shr_gen_morph k s icfg_dev inum g ξ ξ'
+    iMod (inode_shr_gen_morph k s icfg_dev inum g ξ ξ'
                  with "Hd Hs") as "[Hd Hs]".
-    iFrame "Hd". iExists k. by iFrame.
+    iModIntro. iFrame "Hd". iExists k. by iFrame.
   Qed.
 
 
@@ -2960,9 +2934,9 @@ Section IcacheHeldAny.
     CtxMorph (λ ξ, inode_refp (XI := ξ) k q dev inum).
   Proof.
     iIntros (ξ ξ') "Hd [[Htok Hid] Hru]". rewrite /inode_refp /inode_ref.
-    iDestruct (inode_ident_morph k (DfracOwn q) dev inum ξ ξ'
+    iMod (inode_ident_morph k (DfracOwn q) dev inum ξ ξ'
                  with "Hd Hid") as "[Hd Hid]".
-    iFrame.
+    iModIntro. iFrame.
   Qed.
 
   Global Instance inode_held_morph (v : mword 64) :
@@ -2970,9 +2944,9 @@ Section IcacheHeldAny.
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /inode_held.
     iDestruct "H" as (k q inum) "(%H1 & %H2 & %H3 & Hr)".
-    iDestruct (inode_refp_morph k q icfg_dev inum ξ ξ'
+    iMod (inode_refp_morph k q icfg_dev inum ξ ξ'
                  with "Hd Hr") as "[Hd Hr]".
-    iFrame "Hd". iExists k, q, inum. by iFrame.
+    iModIntro. iFrame "Hd". iExists k, q, inum. by iFrame.
   Qed.
 
   Global Instance inode_shr_gen_bare_morph (k : nat) (s : Qp)
@@ -2980,9 +2954,9 @@ Section IcacheHeldAny.
     CtxMorph (λ ξ, inode_shr_gen_bare (XI := ξ) k s dev inum g).
   Proof.
     iIntros (ξ ξ') "Hd (Hid & Hlv)".
-    iDestruct (inode_ident_morph k (DfracOwn s) dev inum ξ ξ'
+    iMod (inode_ident_morph k (DfracOwn s) dev inum ξ ξ'
                  with "Hd Hid") as "[Hd Hid]".
-    iFrame.
+    iModIntro. iFrame.
   Qed.
 
 End IcacheHeldAny.

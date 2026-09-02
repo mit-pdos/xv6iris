@@ -421,4 +421,7 @@ Module Type ACQUIRE.
   Parameter wp_acquire_llb_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string) (Tl : nat),
       wp_acquire_llb_sconf_body kt γl s R m n eb p av b lks Tl.
+  Parameter wp_acquire_llb_fresh_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string) (Tl : nat),
+      wp_acquire_llb_fresh_sconf_body kt γl s R m n eb p av b lks Tl.
 End ACQUIRE.

@@ -283,7 +283,7 @@ Section BioInitAt.
             with "Hrun Hstep2 Hemp") as "[Hrun Hboth]".
     iEval (rewrite big_sepL_sep) in "Hboth".
     iDestruct "Hboth" as "[#Hboxs Hslots0]".
-    iDestruct (big_sepL_llb_max (seq 0 NBUF)
+    iDestruct (CtxBox.big_sepL_llb_max (seq 0 NBUF)
                  (fun k Td => reg_drop bn k (SlotReg Td false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None) ∗
                               (brefcnt k ↦₄ (mword_of_int 0 : mword 32) ∗
                                reg_cnt bn k 0 ∗

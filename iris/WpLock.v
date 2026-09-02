@@ -1922,21 +1922,19 @@ Section Lock.
     iModIntro. iApply (is_lock_intro with "Hnm Hinv Hfl").
   Qed.
 
-  (* ENDGAME R1-pre (tso-flip cb3699cd9's caller; the lemma itself was not in
-     the pushed tree): [newlock_delayed] WITH THE FOLD AT THE BOOT FLOOR SLOT
-     -- the creator deposits the UNFLOORED payload [Rd] beside a loglen
-     receipt at [tl], and the lock is minted over the floored [R] through
-     [lock_pay_intro_llb].  Same proof as [newlock_delayed], one call moved. *)
+  (* BOX v2 boot (endgame §3.6): the creator cannot floor its own deposit,
+     so the lock is minted WITH the fold -- [lock_pay_intro_llb] in place
+     of [lock_pay_intro]: the payload row [Rdep] at [cur_ctx] plus [llb tl]
+     and the one-line entailment give the floored [R]. *)
   Lemma newlock_delayed_llb `{CID : CpuId} E (lk : mword 64) (s : string) :
     lock_name lk s -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lk_cpu_ready lk ==∗
-    ∃ γ : gname, ∀ (R Rd : CtxId → iProp Σ) (tl : nat),
-      ⌜CtxMorph Rd⌝ -∗
-      ⌜forall ξ : CtxId, Rd ξ ∗ TsoCtx.ctx_floor ξ tl ⊢ R ξ⌝ -∗
-      TsoGhost.llb loglen_name tl -∗
-      own_context cur_ctx -∗
-      Rd cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock γ lk s R.
+    ∃ γ : gname, ∀ (R Rdep : CtxId → iProp Σ) (tl : nat),
+      ⌜CtxMorph Rdep⌝ -∗
+      ⌜forall ξ : CtxId, Rdep ξ ∗ TsoCtx.ctx_floor ξ tl ⊢ R ξ⌝ -∗
+      TsoGhost.llb loglen_name tl -∗ own_context cur_ctx -∗
+      Rdep cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock γ lk s R.
   Proof.
     iIntros "#Hnm Hword Hready".
     rewrite /lk_cpu_ready /lk_cpu_ready_at.
@@ -1948,9 +1946,8 @@ Section Lock.
                          (◯E (0%nat : leibnizO nat)))) : lockUR)) as (γ) "H";
       [ split; apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
-    iModIntro. iExists γ. iIntros (R Rd tl) "%HmR %Hfold #Hllb Hrun HR".
-    iMod (lock_pay_intro_llb (CtxMorph0 := HmR) Rd R tl Hfold with "Hllb Hrun HR")
-      as "[Hrun HR]".
+    iModIntro. iExists γ. iIntros (R Rdep tl) "%HmR %Hfold #Hllb Hrun HR".
+    iMod (lock_pay_intro_llb (CtxMorph0 := HmR) Rdep R tl Hfold with "Hllb Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
     iMod (inv_alloc lockN E (lock_inv γ lk s R lo) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
     { iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None, 0%nat.

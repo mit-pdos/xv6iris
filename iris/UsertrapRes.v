@@ -1936,11 +1936,11 @@ Global Instance park_globals_morph `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
 Proof.
   iIntros (ξ ξ') "Hd H". rewrite /park_globals.
   iDestruct "H" as "(Hp & #Hft & #Hcc & Hcr & Hip)".
-  iDestruct (ctx_morph (R := λ ξ0 : CtxId, ConsoleInv.console_ready (XI := ξ0))
+  iMod (ctx_morph (R := λ ξ0 : CtxId, ConsoleInv.console_ready (XI := ξ0))
                ξ ξ' with "Hd Hcr") as "[Hd Hcr]".
   iDestruct "Hip" as (ip) "Hip".
-  iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hip") as "[Hd Hip]".
-  iFrame "Hd Hp Hft Hcc Hcr". iExists ip. iExact "Hip".
+  iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hip") as "[Hd Hip]".
+  iModIntro. iFrame "Hd Hp Hft Hcc Hcr". iExists ip. iExact "Hip".
 Qed.
 
 (* ------------------------------------------------------------------- *)

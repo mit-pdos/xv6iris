@@ -66,6 +66,7 @@ From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsBytesGamma.
 Require Import TsoCtx.
+Require Export BlkmapDefs.   (* [blkmap]: split out for Xv6Cameras §15 *)
   (* [fs_gamma_L] and [FsStateDefs.blk_owned_q]: THE BLOCK-INDEXED VIEWS
      BELOW ARE THE ABSTRACT ONES AT THE LOGGED VIEW (durable-disk EV
      stage 3).  [blk_res]/[ind_blk] used to be spelled over
@@ -240,11 +241,9 @@ Definition ireg_blocks_ok (inodestart : Z) (nib : nat)
 (*  The pure model: a file's block map                                    *)
 (* ===================================================================== *)
 
-Record blkmap := MkBlkmap {
-  bm_dir : list (bv 32);   (* the NDIRECT direct entries; 0 = unallocated *)
-  bm_ind : bv 32;          (* the indirect block itself;  0 = none        *)
-  bm_ent : list (bv 32);   (* the NINDIRECT entries of that block         *)
-}.
+(* [blkmap] lives in BlkmapDefs.v (re-exported above), so the camera bundle
+   (Xv6Cameras §15) can name the icache box's shape type without importing
+   the inode theory. *)
 
 (* file index -> disk block.  Total: an out-of-range index reads the
    [Inhabited] default (all zeros), i.e. "unallocated", which is exactly
@@ -1718,12 +1717,12 @@ Section InodeResMorph.
     CtxMorph (λ ξ : CtxId, inode_meta (XI := ξ) ip d).
   Proof.
     iIntros (ξ ξ') "Hd (Ht & Hmj & Hmi & Hnl & Hsz)". rewrite /inode_meta.
-    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Ht") as "[Hd Ht]".
-    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hmj") as "[Hd Hmj]".
-    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hmi") as "[Hd Hmi]".
-    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hnl") as "[Hd Hnl]".
-    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hsz") as "[Hd Hsz]".
-    iFrame.
+    iMod (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Ht") as "[Hd Ht]".
+    iMod (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hmj") as "[Hd Hmj]".
+    iMod (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hmi") as "[Hd Hmi]".
+    iMod (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hnl") as "[Hd Hnl]".
+    iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hsz") as "[Hd Hsz]".
+    iModIntro. iFrame.
   Qed.
 
   Global Instance inode_addrs_morph (ip : mword 64) (l : list (bv 32)) :

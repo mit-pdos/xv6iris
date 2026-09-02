@@ -947,19 +947,7 @@ Section BioBox.
     apply ctx_morph_sep; [apply buf_hdr_morph | apply buf_rest_morph].
   Qed.
 
-  (* two full ownerships of one cell, at any two contexts, clash *)
-  Lemma ctx_word4_excl_x (ξ1 ξ2 : CtxId) (a : Arch.pa) (dq : dfrac)
-      (w1 w2 : bv 32) :
-    ctx_word4_pointsto ξ1 a (DfracOwn 1) w1 -∗
-    ctx_word4_pointsto ξ2 a dq w2 -∗ False.
-  Proof.
-    iIntros "H1 H2".
-    iDestruct (ctx_word4_pointsto_bytes with "H1") as "H1".
-    iDestruct (ctx_word4_pointsto_bytes with "H2") as "H2".
-    iEval (cbn [seq]; rewrite big_sepL_cons) in "H1". iDestruct "H1" as "[H1 _]".
-    iEval (cbn [seq]; rewrite big_sepL_cons) in "H2". iDestruct "H2" as "[H2 _]".
-    iDestruct (ctx_pointsto_ne with "H1 H2") as %Hne. exfalso. by apply Hne.
-  Qed.
+  (* [ctx_word4_excl_x] is CtxBox's now (shared with the icache instance) *)
 
   (* ================================================================== *)
   (*  THE INSTANTIATION of CtxBox at bcache (endgame §4.1): id = dev ×     *)
@@ -1540,22 +1528,7 @@ Section BioBox.
     iDestruct (big_sepL_lookup with "Hbufs") as "[$ $]"; [exact Hlk].
   Qed.
 
-  (* the L1 floor slot at boot: the maximum of the per-buffer boot stamps *)
-  Lemma big_sepL_llb_max (l : list nat) (P : nat -> nat -> iProp Σ) :
-    ([∗ list] k ∈ l, ∃ Td : nat, llb loglen_name Td ∗ P k Td) -∗
-    ∃ tl : nat, llb loglen_name tl ∗
-      [∗ list] k ∈ l, ∃ Td : nat, ⌜(Td <= tl)%nat⌝ ∗ llb loglen_name Td ∗ P k Td.
-  Proof.
-    iInduction l as [|k l] "IH".
-    { iIntros "_". iExists 0%nat. iSplitR; [iApply TsoGhost.llb_0|]. done. }
-    iIntros "[Hk Hl]". iDestruct "Hk" as (Td) "[#Hllb HP]".
-    iDestruct ("IH" with "Hl") as (tl) "[#Hllbtl Hl]".
-    iExists (Nat.max tl Td). iSplitR.
-    { destruct (Nat.max_spec tl Td) as [[_ ->] | [_ ->]]; [iExact "Hllb" | iExact "Hllbtl"]. }
-    iSplitL "HP". { iExists Td. iSplitR; [iPureIntro; lia|]. iFrame "Hllb HP". }
-    iApply (big_sepL_mono with "Hl"). intros i k' _. iIntros "(%Td' & %Hb & #Hl' & HP')".
-    iExists Td'. iSplitR; [iPureIntro; lia|]. iFrame "Hl' HP'".
-  Qed.
+  (* [big_sepL_llb_max] moved to CtxBox.v (R3.3: the icache boot folds the same way) *)
 
   (* BOX CONSTRUCTION (box v2, endgame §3.6): the boot content is DEPOSITED
      into a fresh parked context (stamp T_boot); IN, m = ∅, slot_p =

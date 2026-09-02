@@ -1265,3 +1265,108 @@ tombstone and `RiscvAdequacy`'s boot-arm ghost record; `ProofBread` and
 - flip's `CtxAnchor.v` (the anchor ledger; `anchorR` camera landed with §15).
 - The blind FS-cone consumers of the sleeplock `genl` tiers keep the
   const-tier calls (still provided).
+
+# AMENDMENT 12 (2026-09-02, on `tso-cutover`, IN PROGRESS) — THE ICACHE LANE FROM tso-flip (A6.145 floored slices + the R3 box)
+
+The owner's ask: "start porting over the icache proofs from the tso-flip
+lane. They're not quite complete, but they are in the right shape, and they
+will get you unstuck past IcacheRef."  Source: `origin/tso-flip` at R3.3
+(`ec7d87efa`, 2026-09-02: "IcacheBox merged into IcacheEscrow; five inode
+proofs over the box (idup/iget/ilock/iunlock green, iput's tail+entry+gen
+green with ip_free_locked Admitted behind F30)").
+
+## 12.1 What this stage landed (verified by a full `make -k`)
+
+- **IcacheRef is green** (its red root was the shim tombstone at
+  `inode_held_short_any_elim`).  The `_any` trio had NO consumer and flip
+  dropped it: deleted.  The identity-cell transports (`inode_ident_morph`
+  and the five instances over it) put in flip's MODAL form (`iMod` the
+  context morph, `iModIntro` before the frame) -- main's non-modal
+  `CtxMorph` idiom is the one sanctioned departure that does not survive on
+  cutover, where `CtxMorph` is flip's `==∗`.  Same sweep in `InodeInv`
+  (`inode_meta_morph`), `InodeLock` (`inode_raw_morph`), `UsertrapRes`
+  (`park_globals`), `SpecMainSecondary` (`main_deposit_rows`): 11 sites.
+- **The lane's prerequisites refreshed to flip HEAD** (the bcache round had
+  used `4bc0c0e4d`): `CtxBox.v` (`box_deposit_L1_shape` = the (b') shape-
+  changing deposit, `box_alloc_at`, the `reference`/`mscale`/`max_stamp`
+  share arithmetic, `big_sepL_llb_max`, `ctx_word4_excl_x` -- the last two
+  MOVED here out of `BioInv`), `WpLock`/`WpLockAt` (flip's OWN
+  `newlock_delayed_llb`/`newlock_at_llb` replace A11's reconstructions --
+  same statements up to the binder name `Rdep`), `SpecAcquiresleep`/
+  `ProofAcquiresleep` (the NB acquiresleep `genl_llb` twin, F22),
+  `SpecAcquire` (`wp_acquire_llb_fresh_sconf` in `ACQUIRE`; `ProofAcquire`
+  already had it), `BioInv`/`BioInitAt` (the two moved lemmas).
+- **main's word-claim readers restored** in `WpSconfMem` (`wordw4_ctx`,
+  `wordw2_ctx`, `ctx_word4_claim`, `ctx_word2_claim`, `ctx_word_claim`):
+  cutover's `WpSconfMem` is flip's and lacked them, and seven FS-cone files
+  (`ProofIdup/Iget/Ilock/Iput/Iunlock`, `SpecEndOp`, `SpecIalloc`, …) read
+  their address claims through them.  Main's own lemmas, shim-free proofs.
+- **The icache box cameras** (flip's Xv6Cameras §15 R3.2 block): `ic_bid :=
+  option bio_id`, `ic_x := IcRaw | IcUnloaded g | IcLoaded g dn bm`,
+  `icboxG`/`icboxΣ`/`icbox_boxG`, `box_names_inhabited`; `xv6_icbox` in the
+  `xv6G` bundle.  `BlkmapDefs.v` (new, flip's split of the `blkmap` record
+  out of `InodeInv`, which now `Require Export`s it) so the camera file can
+  name the shape.
+
+Gate (full `make -k` after each step): the buildable cone grew from 154
+files (r13) to **~940** -- `IcacheRef`, `IcacheInv`, `IcacheEscrow`,
+`InodeInv`, `InodeLock`, `ProofIdup`, `ProofIget`, `ProofIlock`,
+`ProofIput`, `ProofIunlock`, `ProofAcquiresleep` and their cones compile.
+Reds: `IcacheBoot:1492` (main's boot passes no running token to
+`newlock_at` -- the icache port's own stage, see 12.2), `ProcInv:1013`
+(`TsoCtxShim.ctx_phys_word_shim`, the shim wall of 12.3), `ProofPipealloc`
+(`page_own_pipe_raw`, an M1 debt), `ProofSysKill` (shim), `RiscvAdequacy`
+(machine lane).  337 files still pending, behind `IcacheBoot` (the FS boot
+chain) and `ProcInv` (everything over procs).
+
+## 12.2 The analysis: what the real port is (NOT yet done)
+
+Both branches rewrote the four core files since the merge base
+`e1292b382` (2026-08-24), in DIFFERENT designs:
+
+| file | main since base | flip since base | 3-way conflicts |
+|---|---|---|---|
+| `IcacheRef` | 606+ 854- (durable-disk lanes A/B''/C: `icfg_lk/pool/pext/hpn/ptrn/pcrp`, `DepTx`/`DepRd`/`DepFrz` descriptors, `inode_shr_held_gen` names its inum, dview/fview retired, `inode_ref := iref_tok ∗ inode_ident`) | 928+ 194- (A6.145: `live_genlo k s g lo`, `iliveUR` payload `gname * nat`, `icfg_ieplo/istmp`, `icfg_box`, `ic_ref_stamps`, `inode_ref := iref_frag ∗ live_fracc ∗ slh_tok ∗ inode_ident ∗ ic_ref_stamps`, `inode_shr_held_gen` floored `∃ lo tl, cred_floor lo tl`) | 17 |
+| `IcacheInv` | 92+ 470- | 1578+ 760- (`itable_inv_pinw`, `pinw_slot` rows, `iref_set`, the racy-read accessors) | 16 |
+| `IcacheEscrow` | 3252+ 903- (the five arms + registry/corpse/transit ledgers) | 1420+ 1993- (R3: `ic_escrow` IS the box; arms, `ic_mid`, `ic_id`, `DepFrz`/`ic_out_frz`, `islot_free` DELETED per M-1..M-6) | 8 (+ whole deleted sections the merge cannot see) |
+| `IcacheBoot` | 281+ 566- | 192+ 123- (`box_alloc_at` per slot, stamps at 0) | 9 |
+| `CtxPinw` | (from flip r60) | +`pinw_arm_write_c`, `pinw_retire_write_c`, `ledger_retire_pinw_cells` (drops `ledger_retire_pinw_ok`) | -- |
+| new on flip | -- | `CtxAnchor.v`, `IcachePinwObl.v`, `IcacheBox.v` (a re-export of IcacheEscrow), `BlkmapDefs.v` (landed) | -- |
+| consumers | `ProofIget` 170+/127-, `ProofIlock` 325+/185-, `ProofIput` 944+/722-, `ProofIunlock`, `ProofIunlockput`, `ProofIdup`, `Spec{Ilock,Iput,Iunlock,Iunlockput,Iget,Idup}` (durable-disk shapes) | `ProofIget` 516+/278-, `ProofIlock` 151+/101-, `ProofIput` 980+/656-, … (over the box) | 18 / 23 / 77 / 10 / 8 / 8 + ~46 in the specs |
+
+THE POINT: flip's R3 shape deletes exactly the escrow machinery main's
+durable-disk lanes are built on (`DepTx`/`DepRd` arms parking `ln_tx`
+shares, the arm-keyed registry, the corpse and transit ledgers, `icfg_hpn`),
+and main's FS cone (~400 files) is written against those.  So "port flip's
+icache" is not a merge of two additive changes; it is adopting flip's
+reference/escrow shapes and RE-DERIVING main's durable-disk obligations on
+the box (the R3 site map in flip's `tso-escrow-endgame.md` §4.2 is the
+guide: (a)…(f) at each iget/ilock/iunlock/iput site; the frozen alternative
+lives inside `P_hdr`'s payload arm; `Q := emp`).  Flip itself has
+`ip_free_locked` Admitted behind F30 (the both-locks OUT_L1→OUT_L2
+transition (g)).  Recommended order for the next sessions:
+  1. `Xv6Cameras`: `iliveUR` payload → `leibnizO (gname * nat)` (A6.145),
+     `ic_dep` gains `(lo : nat)` on the credential-bearing arms (main's
+     `DepTx`/`DepRd`, as flip added it to `DepRef`/`DepShr`).
+  2. `IcacheRef`: flip's text as the base (`live_genlo`, `ic_ref_stamps`,
+     the floored bundle tier, `icfg_ieplo/istmp/box`), main's `icfg` fields
+     and descriptors re-added; `inode_shr_held_gen` keeps main's named inum
+     AND flip's floors.
+  3. `CtxPinw` (flip HEAD whole), `CtxAnchor.v`, `IcachePinwObl.v` (new).
+  4. `IcacheInv` (flip's `itable_inv_pinw` layer), then `IcacheEscrow` /
+     `IcacheBox.v` (flip's, then main's durable-disk rows re-derived over
+     the box), `IcacheBoot`.
+  5. The six inode proofs + specs, from flip, then the FS-cone consumers.
+
+## 12.3 The wall behind the icache lane (measured on this build)
+
+Once the icache files build, the FS cone's next reds are NOT icache: about
+thirty files still call the retired shim's raw↔ctx bridges
+(`TsoCtxShim.ctx_word4_of_mem`/`_to_mem` ×64/34 sites, `ctx_word_of_mem`
+×63, `ctx_pointsto_of_mem` ×14, `ctx_word2_of_mem`, `ctx_phys_word_shim`
+(`ProcInv`), `ctx_buf_*` (boot), `own_context_any`/`ctx_parked_any`/
+`hart_view_lb_any` (the 6.3 stubs)) -- `ProofSys*`, `ProofKexec*`,
+`ProofArgfd`, `BootShared`/`BootCarve*`, `ProcInv`, `ProofForkret*`,
+`ProofUservec`, `SystemAdequacy` -- and `ctx_word4_claim` (7 files) has no
+definition anywhere.  Each of those is a file flip has a TSO-proper version
+of; they are the remaining convergence work, lane by lane.
