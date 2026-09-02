@@ -1113,6 +1113,7 @@ IregLinkNz.v
 IgetLic.v
 IregDirBit.v
 IcacheEscrow.v
+IcacheBox.v
 IcacheBoot.v
 FsCfgBoot.v
 CodeIget.v

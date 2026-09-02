@@ -1204,6 +1204,45 @@ context, mapped to CtxBox's lemmas:
     serve the T3 racy read of ip->ref, not the box.  Only the sweep.
   - TABLE FIX taken: the icache's (c) runs at c ≥ 1 only; the ref-0 slot
     is the recycler's (a)…(b).
+  PROPOSER'S REVIEW OF THE MAP + VETTING (2026-09-01), AND THE SKELETON
+  (written against the vetting and the build agent's answers above):
+  iris/IcacheBox.v (type-checked on the VM against the current base;
+  proofs Admitted) is the icache instance's design of record, as
+  CtxBox.v is the box's.  Three corrections to the rulings above:
+  - M-1' THE DEAD SLOT IS AN IDENTITY, NOT A SHAPE.  The vetted M-1
+    discharge — "the recycler refutes non-Raw at c = 0 because the POOL
+    owns sr_ident's inum after eviction" — fails once the evicted inum
+    has been re-cached in ANOTHER slot k': k' 's box then owns the inum's
+    pool resource, the pool does not, and the recycler of k cannot see
+    either.  The build agent's named form has the same gap: "the
+    recycled slot's inum IS uncached" holds only if no other slot is
+    identified with it — the pool's domain is region ∖ ci_inums ci, and
+    a re-cached inum is in ci through k'.  Fix without a refutation: id := option (dev × inum), None =
+    never identified or evicted; P_hdr None x forces x = IcRaw (a fixed
+    raw header: valid/nlink/identity halves at any values, no payload
+    ghost); the recycler's (a) at c = 0 reads sr_ident = None off the
+    register and KNOWS the shape.  The L1 row's tie is ⌜sr_ident r =
+    ci !! k⌝ — the table's identification map itself — and ic_id
+    retires.  Eviction is (b) at c = 1 with identity None; boot is every
+    slot dead.  The unit (b) mints at None is dropped by the (d) that
+    follows.
+  - M-5 THE STAMPS MASS must be stated: a whole reference weighs 1, a
+    share of identity fraction s weighs s, a parent that has lent
+    (qt − qi) weighs 1 − (qt − qi) (the short-parent tie carries it).
+    "Mass q / s" as written would break (Σ): a whole reference holds
+    identity q ≤ 1/2 but must weigh 1 for Σ m = c.  IcacheBox.v:
+    ic_ref_stamps / inode_ref2 / inode_shr2 / inode_ref_lent2, with the
+    carve/gather statements.
+  - M-3 as vetted, with the regrouping stated: ic_payload_regroup —
+    the parked bundle (identity halves ∗ valid ∗ ic_payload_arm at
+    (inum, g, v)) ⊣⊢ ∃ x with gen g and polarity v, ic_hdr (Some
+    (dev,inum)) x ∗ ic_rest x.  P_rest's full cell is i_size; P_hdr's is
+    i_valid.  The frozen alternative rides inside ic_pay at the shape.
+  M-2, M-4 (ic_deposit2 at DepShr := l2_hold at the share singleton ∗
+  the share's cells ∗ its slice), M-6 (ic_slp := l2_row at ic_tok;
+  ic_slot_row) as vetted.  The skeleton states the eight site-shaped
+  lemmas (recycle a/b, hit c, decr d, ilock e, iunlock f, guard a/b,
+  evict b, boot) over CtxBox's; rule 0 applies to them as to CtxBox.v's.
 
 ### 4.3 inode_pay's cinv — round R4a
 
@@ -1661,3 +1700,11 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   pool's exclusive ledger cells for the uncached inum; M-3 X carries g;
   M-5 credential clause withdrawn; table fixed).  R3 code waits for
   reviewer 2.
+- 2026-09-01 (proposer, R3 map review + skeleton): iris/IcacheBox.v added
+  (type-checked, Admitted): id := option (dev × inum) with None = dead
+  (M-1' — the vetted pool-exclusivity discharge fails when the evicted
+  inum is re-cached elsewhere); X := IcRaw | IcUnloaded g | IcLoaded g dn
+  bm; ic_hdr/ic_rest with the payload ghost split from the cells and the
+  regrouping lemma stated; the stamps-mass rule for references and
+  shares (M-5 correction); ic_deposit2 as the handle row; ic_slp /
+  ic_slot_row; the site lemmas.  §4.2 amended in place.
