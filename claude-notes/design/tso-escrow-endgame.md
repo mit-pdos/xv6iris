@@ -1479,6 +1479,47 @@ context, mapped to CtxBox's lemmas:
   (recycle, hit, ilock, iunlock, idup, iput's Exit A and last closes) is
   unaffected and proceeds; the free path waits for the ruling.
 
+  (B) AS A STATEMENT (build agent, 2026-09-02, so the ruling is on code;
+  the R3.3 bank ec7d87efa has everything else green, ip_free_locked the
+  one Admitted).  The fused (b)+(e), CtxBox-generic, no fresh stamp:
+
+    Lemma box_take_L2_in_window `{CID : CpuId} (N : namespace) γ (ξ : CtxId)
+        (r : slot_reg id X) (c : nat) (x0 : X) (s0 : l2_reg id) (Kp : nat)
+        (E : coPset) :
+      ↑N ⊆ E → sr_win r = true → sr_x r = Some x0 →
+      lr_hold s0 = None → (lr_tp s0 ≤ Kp)%nat →
+      is_box N γ -∗ own_context ξ -∗ ctx_floor ξ Kp -∗
+      slotd_half γ r -∗ cnt_half γ c -∗ Q -∗ tok -∗ slotp_half γ s0 ={E}=∗
+      own_context ξ ∗ P_rest x0 ξ ∗
+      slotd_half γ (SlotReg (sr_td r) false (sr_ident r) None) ∗
+      cnt_half γ c ∗
+      ∃ m' : gmap (id * nat) ufrac,
+        ⌜qsum m' = Qp_to_Qc (unit_mass c)⌝ ∗ l2_hold γ (sr_ident r) m'.
+
+  Reading.  The caller is inside its own (a) window (the L1 register says
+  so: win = true, shape x0, the header in its hand) and holds the
+  sleeplock's tok.  The box's OUT_L1 arm carries P_rest x0 (parked at the
+  L2 stamp lr_tp s0, so Kp is the only floor needed -- rule 0: no content
+  is DEPOSITED, so nothing is minted) and the window's fragment m' of the
+  whole mass Σ = unit_mass c.  The transition hands P_rest out, closes L1
+  at ITS OWN old stamp sr_td r (no header goes back; the row's llb is the
+  one it already has), keeps the count, and moves the fragment into the
+  holder's l2_hold as (e) would.  What (e) rules out by mass (OUT_L1 with a
+  foreign reference) is here the caller's own state; what (b) mints
+  (T', the reference at T') is not needed because the header stays out.
+  The exit is the ordinary (f): P_hdr at the new shape (frozen alternative:
+  receipt + frzsel quarter) ∗ P_rest, parked at a fresh T''.
+  ICACHE WRAPPER: ic_free_take (ProofIput's +0x5a, replacing the
+  ic_guard_deposit_gen at ip_free_entry's tail + the (e) at
+  ip_free_locked's head); premise `ic_slp`'s floor for Kp (the L2 row
+  carries ctx_floor ξ (lr_tp s), so the PLAIN nb sleeplock tier suffices
+  and the F22 twin is not used by this site).  Statement sketch:
+    ic_box ⊢ own_context ξ -∗ ic_regd k r -∗ ic_cnt k 1 -∗ ic_tok cn k -∗
+    ic_regp k s0 -∗ ctx_floor ξ Kp ={E}=∗ own_context ξ ∗ ic_rest k x0 ξ ∗
+    ic_regd k (SlotReg (sr_td r) false (Some (dev,inum)) None) ∗ ic_cnt k 1 ∗
+    ic_deposit2 k (IcDep ...) at the unit -- i.e. the same handle row (e)
+    returns, so ip_free_locked's body is unchanged from the (e) point on.
+
   BUILD AGENT'S REVIEW OF THE SKELETON (2026-09-02, against ProofIget /
   ProofIlock / ProofIunlock / ProofIput and the bcache instance as built).
   The design is sound as stated; walked: (C) after a share's park while
