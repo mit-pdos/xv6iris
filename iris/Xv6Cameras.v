@@ -768,7 +768,7 @@ Inductive ic_dep : Type :=
      existentially-keyed share cannot re-identify: two halves of one
      element are not the whole. *)
   | DepTx (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
-          (t : nat) (q : Qp)
+          (lo : nat) (t : nat) (q : Qp)
   (* THE READ ARM (durable-fs-plan.md section 3, [ilock] without a
      transaction; durable-disk B''-join).  The write arm's content minus the
      parked share -- the credential does not change -- but the arm keeps THREE
@@ -781,7 +781,14 @@ Inductive ic_dep : Type :=
      A SEPARATE CONSTRUCTOR rather than a re-reading of the write arm,
      because what the ESCROW keeps differs and the deposit is what selects
      the arm. *)
-  | DepRd (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname).
+  | DepRd (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
+          (lo : nat)
+  (* A WHOLE REFERENCE checked out (tso-flip F16): the free path's and any
+     holder of a full [inode_ref]'s descriptor; [lo] is the credential's
+     epoch on every credential-bearing arm (tso-flip A6.145), so the park
+     hands the liveness slice back at the epoch the holder's floor names. *)
+  | DepRef (q : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
+           (lo : nat).
 
 (* THE LOCKED REGISTRY'S ENTRY (durable-disk lane A, re-keyed by B''-arm):
    one ARM.  [(t, q, S)] -- the transaction whose row is suspended, the

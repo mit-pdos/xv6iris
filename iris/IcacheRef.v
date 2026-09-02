@@ -622,8 +622,19 @@ Definition ic_dep_gname (d : ic_dep) : option gname :=
   match d with
   | DepNone => None
   | DepFrz _ _ _ _ _ => None
-  | DepTx _ _ _ g _ _ => Some g
-  | DepRd _ _ _ g => Some g
+  | DepTx _ _ _ g _ _ _ => Some g
+  | DepRd _ _ _ g _ => Some g
+  | DepRef _ _ _ g _ => Some g
+  end.
+
+(* the credential's EPOCH (tso-flip A6.145), where the descriptor has one *)
+Definition ic_dep_lo (d : ic_dep) : option nat :=
+  match d with
+  | DepNone => None
+  | DepFrz _ _ _ _ _ => None
+  | DepTx _ _ _ _ lo _ _ => Some lo
+  | DepRd _ _ _ _ lo => Some lo
+  | DepRef _ _ _ _ lo => Some lo
   end.
 
 (* IS THIS DESCRIPTOR THE READ ARM (durable-disk B''-join)?  The escrow's OUT
@@ -633,7 +644,7 @@ Definition ic_dep_gname (d : ic_dep) : option gname :=
    ([ic_swap_checkout], [ic_close_out]) carry so that they may keep taking an
    ABSTRACT descriptor. *)
 Definition ic_dep_rd (d : ic_dep) : bool :=
-  match d with DepRd _ _ _ _ => true | _ => false end.
+  match d with DepRd _ _ _ _ _ => true | _ => false end.
 
 (* The second field is [IcacheEscrow]'s per-slot IDENTIFICATION ghost
    ([icn_id], design §13.8 as widened by §13.10): an agreement between the
@@ -828,7 +839,11 @@ Class icfg := MkIcfg {
    reading is unchanged. *)
 Record ic_names := MkIcNames {
   icn_esc : nat -> gname;   (* entry k's CHECKOUT token                  *)
-  icn_mid : nat -> gname;   (* entry k's RECYCLE token                   *)
+  icn_dep : nat -> gname;   (* entry k's DESCRIPTOR variable (the stitch:
+                               the box holds [icn_esc] whole while a slot is
+                               checked out, so main's descriptor halves get
+                               their own gname; the recycle token this field
+                               used to be died with the arms -- [sr_win]) *)
   icn_id  : nat -> gname;   (* entry k's LIVE / EMPTY agreement          *)
 }.
 

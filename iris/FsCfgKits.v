@@ -136,7 +136,7 @@ Section FsCfgKits.
      ghost_var icfg_pext 1 (∅ : gset Z) ∗
      lock_free_tok fsc_itlock ∗
      ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
-     ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
+     ([∗ list] k ∈ seq 0 NINODE, ic_dep_neutral fsc_ic k) ∗
      (* the identification family at DUMMY recorded values: [ic_id] is a
         plain [ghost_var] and [icache_boot_at] re-tags every slot to the
         dev/inum words the entry cells actually hold ([ic_id_set]), so the
@@ -176,7 +176,7 @@ Section FsCfgKits.
       ghost_var icfg_pext 1 (∅ : gset Z) ∗
       lock_free_tok fsc_itlock ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
-      ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
+      ([∗ list] k ∈ seq 0 NINODE, ic_dep_neutral fsc_ic k) ∗
       ([∗ list] k ∈ seq 0 NINODE,
          ∃ (v : bool) (d n : mword 32), ic_id fsc_ic k 1 v d n) ∗
       bio_free_tok fsc_bio ∗
@@ -352,7 +352,7 @@ Section FsCfgKits.
      ghost_var icfg_pext 1 (∅ : gset Z) ∗
      lock_free_tok fsc_itlock ∗
      ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
-     ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
+     ([∗ list] k ∈ seq 0 NINODE, ic_dep_neutral fsc_ic k) ∗
      ([∗ list] k ∈ seq 0 NINODE,
         ∃ (v : bool) (d n : mword 32), ic_id fsc_ic k 1 v d n) ∗
      bio_free_tok fsc_bio ∗
@@ -402,7 +402,7 @@ Section FsCfgKits.
       ghost_var icfg_pext 1 (∅ : gset Z) ∗
       lock_free_tok fsc_itlock ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
-      ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
+      ([∗ list] k ∈ seq 0 NINODE, ic_dep_neutral fsc_ic k) ∗
       ([∗ list] k ∈ seq 0 NINODE,
          ∃ (v : bool) (d n : mword 32), ic_id fsc_ic k 1 v d n) ∗
       bio_free_tok fsc_bio ∗

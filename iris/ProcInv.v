@@ -1010,18 +1010,22 @@ Section ProcInv.
     tf_pa tfp (8 * Z.of_nat i) ↦₈{dq} w.
   Proof.
     iIntros (Hi) "(%Hkd & %Hpv & #Hk) Hw".
-    iEval (rewrite TsoCtxShim.ctx_phys_word_shim) in "Hw".
     iApply ctx_word_pointsto_intro; [exact (tf_pa_aligned8 tfp i Hi) |].
-    iDestruct (phys_word_pointsto_bytes with "Hw") as "Hbs".
+    iDestruct (TsoCtx.ctx_phys_word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").
     iIntros "!>" (k j Hkj) "Hp".
     apply lookup_seq in Hkj. destruct Hkj as [-> Hjlt].
     destruct (tf_pa_slot_facts tfp i (0 + k)%nat Hkd Hi ltac:(lia)) as (Hid & Hram & Hcan & Hsvpn).
     iAssert (kmap_at (svpn_of (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k))) tfp KP_rw) as "#Hk'".
     { rewrite Hsvpn. iExact "Hk". }
-    iApply TsoCtxShim.ctx_pointsto_of_mem.
-    iApply (phys_to_mem_claim (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k)) tfp dq (nth_byte w (0 + k))
-              Hid Hram Hcan with "Hk' Hp").
+    (* A6.69 (tso-flip's shim-free proof of this lemma, taken verbatim): the
+       THIRD premise is [ktier_pin cur_ktier tfp _], not the identity
+       equation a second time; at an identity mapping
+       [RiscvPtsto.ktier_pin_of_id] is exactly that, at any tier. *)
+    iApply (TsoCtx.ctx_pointsto_of_phys _ tfp
+              (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k)) dq
+              (nth_byte w (0 + k)) Hid Hcan (ktier_pin_of_id _ _ _ Hid)
+              with "Hk' Hp").
   Qed.
 
   Lemma tf_word_mem_to_phys (tfp : mword 44) (i : nat) (dq : dfrac) (w : mword 64) :
@@ -1031,8 +1035,8 @@ Section ProcInv.
     TsoCtx.ctx_phys_word_pointsto XI (tf_pa tfp (8 * Z.of_nat i)) dq w.
   Proof.
     iIntros (Hi) "(%Hkd & %Hpv & #Hk) Hw".
-    iEval (rewrite TsoCtxShim.ctx_phys_word_shim).
-    iApply phys_word_pointsto_intro; [exact (tf_pa_aligned8 tfp i Hi) |].
+    iApply TsoCtx.ctx_phys_word_pointsto_intro;
+      [exact (tf_pa_aligned8 tfp i Hi) |].
     iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").
     iIntros "!>" (k j Hkj) "Hp".
@@ -1040,9 +1044,10 @@ Section ProcInv.
     destruct (tf_pa_slot_facts tfp i (0 + k)%nat Hkd Hi ltac:(lia)) as (Hid & _ & _ & Hsvpn).
     iAssert (kmap_at (svpn_of (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k))) tfp KP_rw) as "#Hk'".
     { rewrite Hsvpn. iExact "Hk". }
-    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hp") as "Hp".
-    iApply (mem_to_phys_claim (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k)) tfp dq (nth_byte w (0 + k))
-              Hid with "Hk' Hp").
+    (* tso-flip's shim-free proof, taken verbatim *)
+    iApply (TsoCtx.ctx_pointsto_to_phys _ tfp
+              (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k)) dq
+              (nth_byte w (0 + k)) Hid with "Hk' Hp").
   Qed.
 
   (* THE MEM-TIER CONVENIENCE PAIR: what prepare_return/the syscall argument
@@ -2726,7 +2731,7 @@ Section ProcInv.
       iDestruct (IH (pa_add a 8) with "Ht") as "[Htb Htback]".
       rewrite (bwin_split a 0 8 (8 * length ws)) Nat.add_0_l.
       iSplitL "Hhb Htb".
-      { iSplitL "Hhb"; [iApply (bb_named_any with "Hhb")|].
+      { iSplitL "Hhb"; [iApply (bwin_named_any with "Hhb")|].
         rewrite (bwin_rebase a 8 (8 * length ws)). iExact "Htb". }
       iIntros (g) "Hg".
       rewrite (bb_split a 8 (8 * length ws) g).
