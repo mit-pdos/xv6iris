@@ -1789,3 +1789,64 @@ the stale `/shared/flip63` checkout (64 commits behind on 79 iris files).
   deferred "concrete accessor discharge" (the `HRut` token accessor for
   `Rut_at`, whose residue sits behind the `fd_frags` wand) -- taken up in
   the next pass with ProofUservec.
+
+## 12.15 L2/L4 r2 (second agent) — the 6.3 stubs, the boot carve, the boot specs, RiscvAdequacy (2026-09-02)
+
+- **ProofUservec** (`own_context_sc` ×2, the M2 "SC-minted token" seam):
+  the residue's parked token is what the walk runs on, as on flip (A6.140).
+  `UsertrapRes.ut_res_bare_tf_open` / `_tf_csrs_open` hand out `own_context
+  cur_ctx` beside the page and take it back in their closers (flip's text,
+  adapted to main's `(N av)`/`us_tf U` residue), and so do the two
+  descriptor-view openers `ut_res_bare_fd_open` / `_fd_tf_open` (main-only
+  U-tier lemmas; DEPARTURE -- no flip twin, same shape); the four module-type
+  copies (UtResFits, SpecUsertrap, ProofUsertrap) follow.  The walk
+  credential threads as on flip: `SpecUservec.wp_uservec_pt_body` and
+  `uservec_post` gain `KptShare.kpt_creds` (A6.135), read off `tlb_res_pt`
+  by flip's `uv_tlb_res_creds` / `urc_tlb_res_creds` (A6.91).
+- **r12's deferred "concrete accessor discharge"** (ProofUserretClosed,
+  UkRunFsLeaf were red at the `HRut` premise since r12): `Rut_at h sz γfd p`
+  now holds the token BESIDE its residue closer (the closer takes it back
+  with the fragments), `Rut_at_acc` is the `HRut` every loop lemma /
+  `wp_userret_user` takes, both producers (the trap-out `fd_open` site and
+  userret's entry) and the consumer (the trap-in) rewritten; `UkLeafFs`
+  gets the `HRut` hypothesis its callers were already passing.
+- **BootCarveMain** shim-free: merge3 with flip (9 conflicts, all the raw
+  carve's crossings → flip's "the carve builds ctx cells directly") and the
+  36 crossings main had added in non-conflicting regions deleted (flip's
+  `iExact`); residual diff vs flip = main's `DiskAddrs.disk_base`,
+  `pv_fdg`, the junk fd-name `1%positive` -- the three non-TSO edits.
+  **BootBridge** = flip exactly (`phys_word_to_word` through
+  `CtxKMap.ctx_phys_word_ident_mem`; `ctx_pointsto_of_mem` gone).
+- **The boot specs** (a step INTO L9, needed because SpecMain gated
+  BootCarveMain/BootBridge/ProofMainSecondary): cutover's `StartedInv.v` is
+  flip's, so main's A6.129 `started_inv P ∗ ctx_parked_inv xid` shape could
+  never compile here.  `SpecMain` = merge3 at flip's `started_inv γi ξd P ∗
+  started_prim γi`, `P : nat -> CtxId -> iProp` with `CtxMorph`, deposit rows
+  at `cur_ctx` (`↦₈□`), plus main's `S Pb Rspent`, `fs_boot_snap_wf`,
+  `fs_boot_supply … Rspent Pb …`, the eight `HInactive` receipts, `ufdG`;
+  `SpecMainSecondary` and `ProofMainSecondary` = flip whole + main's `ufdG`
+  (main's `main_deposit_rows`/`main_deposit xid`, `hart_view_lb_any` M2
+  debt, all dropped with the shape).  All three GREEN.  `ProofMain` (flip's
+  running-token `newlock`, the started deposit at `pos`) is now a ROOT
+  (`ProofMain:553`) instead of blocked -- L9's, not touched.
+- **L4 RiscvAdequacy** (`γs : CPU → gname` where `gname` was expected = the
+  18-arg `RiscvEraGS` call against flip's 24-field record): merge3 with flip
+  (6 conflicts): the deleted single-generation theorem stays deleted (main's
+  trace adequacy replaces it), main's observed power-off step kept, the
+  power arm allocates flip's five (`γkptb`, `γts`, `γlogm`, `γloglen`,
+  `γview`) and `era_img`, `power_boot_res` carries main's `Rb` AND flip's
+  `boot_led_all` + `⌜era_img = gimg⌝` (`power_boot_res_lend` re-indexed,
+  27 rows), the `riscvFixedGS` constructor at cutover's field list (13 + 3
+  anonymous slots, main's `γobs T Ptp` tail), `Require Import KptGhost`,
+  the TSO auths routed to the power interp beside main's trace conjunct.
+  GREEN; its 17 dependents are behind SpecMain's cone (BootShared, L9).
+- **Measure**: green 1364 → **1387** (roots 18, blocked 103).  All files
+  above green.
+- **Remaining `TsoCtxShim.` mentions outside comments**: BootShared (37, in
+  hand: merge3 done in scratch, its hart bundle wants `BootChain.
+  boot_hart_res` at flip's shape), SystemAdequacy (1, L9), ProofForkretPark
+  (1, L8), IcacheRef (dead `Require`, icache lane).
+- **Coordination**: the icache lane reports SpecFileread/Filewrite/Filestat
+  now carry `IcacheInv.iref_claims` in their env records; ProofSysRead/Write
+  pass the env through opaquely (`fileread_fs_env_out`) and need no change
+  -- to be confirmed at the next full build after their push.
