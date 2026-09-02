@@ -1609,3 +1609,16 @@ do not edit it until told).
   out arms of `box_arm`), after which every returner gets exactly its arm
   and no refutation is needed.  Until ruled, the (e′)/(f′) icache retarget
   (identity quarter into Q at OUT_L2, `ic_hdr_held` as P_hdr') waits.
+
+## 12.9 r19h — the second CtxBox edit (Q1 by count / Q2, Qc′, R) and F40/F42 (2026-09-02)
+
+See tso-cutover-endgame.md §6¹²–§6¹⁹ for the design and §6¹⁹ for the
+landed spellings.  Departures from the reviewers' text: `ic_dep_id DepFrz`
+names its identity (needed by `ic_q2`'s pure tie at (g)); `ic_park` rejoins
+the two descriptor halves into `ic_dep_neutral` inside the wrapper (the
+join wand is pure, so the halves come out separately and the wrapper's fupd
+merges them).  r20b rule (merge hazard): `sed 's/\bic_deposit\b/ic_handle/g'`
+on the FLIP copy of each inode proof before the three-way merge; the flip
+proofs' `ic_pin_rest` in the bundle intro/elim calls is gone (F42); every
+checkout is (e′) and returns the HELD header; the park takes the descriptor
+half and hands back the neutral descriptor.

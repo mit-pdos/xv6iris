@@ -475,14 +475,24 @@ Section box.
   (* ---- the client's parameters -------------------------------------- *)
   Context (P_hdr : id → X → CtxId → iProp Σ).
   Context (P_rest : X → CtxId → iProp Σ).
-  (* Q: the client's ξ-free ghost RESIDUE while the bundle is out -- of
-     BOTH out arms (owner ruling 2026-09-02, endgame plan §6⁵ item 2). *)
-  Context (Q : iProp Σ).
+  (* THE RESIDUES (the second edit, endgame plan §6¹²–§6¹⁸): the client's
+     ξ-free ghost while the bundle is out, INDEXED BY ARM so that every
+     party that gets a residue back -- (b)/(b′) at OUT_L1, (g) across, (f′)'s
+     join at OUT_L2 -- receives exactly its own and refutes nothing (F41):
+       Q1 c : the OUT_L1 window's residue at the body's COUNT c (stable
+              across the window: (c)/(d) need win = false), so the recycler
+              (c = 0) and the guard (c = 1) are separated by type (§6¹⁴);
+       Q2   : the OUT_L2 (checkout) residue.
+     A viewer (box_view) reads Q1 c / Q2 by arm; each arm of each must be
+     refutable or readable-with-identity from what a viewer holds, on EVERY
+     state the rows admit (F44's tripwire). *)
+  Context (Q1 : nat → iProp Σ).
+  Context (Q2 : iProp Σ).
 
   (* the client's obligations *)
   Context `{!∀ i x, CtxMorph (P_hdr i x)} `{!∀ x, CtxMorph (P_rest x)}.
   Context `{!∀ i x ξ, Timeless (P_hdr i x ξ)} `{!∀ x ξ, Timeless (P_rest x ξ)}.
-  Context `{!Timeless Q}.
+  Context `{!∀ c, Timeless (Q1 c)} `{!Timeless Q2}.
   (* THE EDIT (endgame plan §6⁶(A)): the arm is SELECTED by the two
      registers -- IN = (win false, hold None), OUT_L1 = (win true, hold
      None), OUT_L2 = (win false, hold Some) -- so the clients owe no
@@ -523,13 +533,13 @@ Section box.
   (* THE ARM, selected by (lr_hold s, sr_win r).  A PUBLIC definition: the
      collection's view lemma (box_view, §6⁸ Q5) exposes it, so a non-owner
      matches on this and never on the body's layout. *)
-  Definition box_arm γ (T : nat) (ξb : CtxId) m (r : slot_reg id X) (s : l2_reg id) : iProp Σ :=
+  Definition box_arm γ (T : nat) (ξb : CtxId) m (c : nat) (r : slot_reg id X) (s : l2_reg id) : iProp Σ :=
     (match lr_hold s with
      | Some (i, mh) =>                                          (* OUT_L2 *)
-         ⌜sr_win r = false⌝ ∗ ⌜mh ≠ ∅⌝ ∗ ⌜keyed mh i⌝ ∗ stamps_frag γ mh ∗ Q
+         ⌜sr_win r = false⌝ ∗ ⌜mh ≠ ∅⌝ ∗ ⌜keyed mh i⌝ ∗ stamps_frag γ mh ∗ Q2
      | None =>
          if sr_win r
-         then hdr_out γ m ∗ (∃ x, ⌜sr_x r = Some (x, T)⌝ ∗ P_rest x ξb) ∗ Q   (* OUT_L1 *)
+         then hdr_out γ m ∗ (∃ x, ⌜sr_x r = Some (x, T)⌝ ∗ P_rest x ξb) ∗ Q1 c   (* OUT_L1 *)
          else in_arm (sr_ident r) ξb                                          (* IN *)
      end)%I.
   (* the four pure rows, named for the view *)
@@ -543,7 +553,7 @@ Section box.
        ctx_parked ξb T ∗ llb loglen_name T ∗
        stamps_auth γ m ∗ cnt_half γ c ∗ slotd_half γ r ∗ slotp_half γ s ∗
        ⌜box_rows T m c r s⌝ ∗
-       box_arm γ T ξb m r s)%I.
+       box_arm γ T ξb m c r s)%I.
   Definition is_box (N : namespace) γ : iProp Σ := inv N (box_body γ).
 
   (* the boot fold: fifty deposit stamps under one llb bound (from BioInv) *)
@@ -572,7 +582,7 @@ Section box.
   Global Instance hdr_out_timeless γ m : Timeless (hdr_out γ m).
   Proof. rewrite /hdr_out /stamps_frag. apply _. Qed.
 
-  Global Instance box_arm_timeless γ T ξb m r s : Timeless (box_arm γ T ξb m r s).
+  Global Instance box_arm_timeless γ T ξb m c r s : Timeless (box_arm γ T ξb m c r s).
   Proof.
     rewrite /box_arm. destruct (lr_hold s) as [[i mh]|]; [apply _|].
     destruct (sr_win r); apply _.
@@ -730,7 +740,7 @@ Section box.
     slotd_half γ r -∗
     cnt_half γ c -∗
     stamps_frag γ mD -∗
-    Q ={E}=∗
+    Q1 c ={E}=∗
     own_context ξ ∗
     cnt_half γ c ∗
     ∃ (x0 : X) (T0 : nat),
@@ -807,7 +817,7 @@ Section box.
     slotd_half γ r -∗
     cnt_half γ c -∗
     P_hdr i' x1 ξ ={E}=∗
-    own_context ξ ∗ Q ∗
+    own_context ξ ∗ Q1 c ∗
     ∃ T' : nat,
       slotd_half γ (SlotReg T' false i' None) ∗
       cnt_half γ (Nat.max 1 c) ∗
@@ -870,7 +880,7 @@ Section box.
     slotd_half γ r -∗
     cnt_half γ c -∗
     P_hdr i' x0 ξ ={E}=∗
-    own_context ξ ∗ Q ∗
+    own_context ξ ∗ Q1 c ∗
     ∃ T' : nat,
       slotd_half γ (SlotReg T' false i' None) ∗
       cnt_half γ (Nat.max 1 c) ∗
@@ -1023,7 +1033,7 @@ Section box.
        the icache's Q is the descriptor half the caller mints ∗ the share in
        its hand ∗ the 3/4 leg from the header; only the leg comes out of
        P_hdr.  (e) is the instance Qc := Q, P_hdr' := P_hdr. *)
-    (∀ (x : X) (ξ' : CtxId), Qc ∗ P_hdr i x ξ' ⊢ P_hdr' i x ξ' ∗ Q) →
+    (∀ (x : X) (ξ' : CtxId), Qc ∗ P_hdr i x ξ' ⊢ P_hdr' i x ξ' ∗ Q2) →
     is_box N γ -∗
     own_context ξ -∗
     ctx_floor ξ Kt -∗
@@ -1094,7 +1104,7 @@ Section box.
     ctx_floor ξ Kt -∗
     ctx_floor ξ Kp -∗
     reference γ i mh -∗
-    Q -∗
+    Q2 -∗
     slotp_half γ s0 ={E}=∗
     own_context ξ ∗
     (∃ x, P_hdr i x ξ ∗ P_rest x ξ) ∗
@@ -1163,13 +1173,17 @@ Section box.
        (I) i = sr_ident r, (C) right disjunct T' ≤ tp = T', (D) T' ∈ dom.
        export llb T' for the _in releasesleep. *)
   Lemma box_park_join `{CID : CpuId} (N : namespace) γ (ξ : CtxId) (i : id)
-      (P_hdr' : id → X → CtxId → iProp Σ) (Q' : iProp Σ)
+      (P_hdr' : id → X → CtxId → iProp Σ) (Qc' Q' : iProp Σ)
       (mh : gmap (id * nat) ufrac) (E : coPset) :
     ↑N ⊆ E →
-    (∀ (x : X) (ξ' : CtxId), P_hdr' i x ξ' ∗ Q ⊢ P_hdr i x ξ' ∗ Q') →
+    (* F43 (the mirror of F33's Qc): the join sees the CALLER's residue Qc'
+       beside the split header and the arm's Q2 -- the icache's descriptor
+       half, which is what selects the arm within Q2. *)
+    (∀ (x : X) (ξ' : CtxId), Qc' ∗ P_hdr' i x ξ' ∗ Q2 ⊢ P_hdr i x ξ' ∗ Q') →
     is_box N γ -∗
     own_context ξ -∗
     (∃ x, P_hdr' i x ξ ∗ P_rest x ξ) -∗
+    Qc' -∗
     l2_hold γ i mh ={E}=∗
     own_context ξ ∗ Q' ∗
     ∃ (T' : nat) (q : ufrac),
@@ -1178,7 +1192,7 @@ Section box.
       reference γ i {[ (i, T') := q ]} ∗
       llb loglen_name T'.
   Proof.
-    iIntros (HE Hjoin) "#Hbox Hrun Hbun Hhold".
+    iIntros (HE Hjoin) "#Hbox Hrun Hbun HQc Hhold".
     iDestruct "Hhold" as (tp) "[Hrp0 #Hllbh]".
     rewrite /is_box. box_open "Hbox" "Hcl".
     iDestruct (ghost_var_agree with "Hrp Hrp0") as %->.
@@ -1191,7 +1205,7 @@ Section box.
     { eapply keyed_agree; [exact Hne0 | exact (gincl_dom _ _ Hincl0) | exact Hkeyed0 | exact HI]. }
     (* the join, at the holder's context, with the arm's residue *)
     iDestruct "Hbun" as (x) "[Hhdr' Hrest]".
-    iDestruct (Hjoin x ξ with "[$Hhdr' $HQ]") as "[Hhdr HQ']".
+    iDestruct (Hjoin x ξ with "[$HQc $Hhdr' $HQ]") as "[Hhdr HQ']".
     iMod (ctx_deposit (in_arm i) ξ ξb T with "Hrun Hpk [Hhdr Hrest]")
       as "(Hrun & %T' & %HTT' & Hpk & Hbun)".
     { rewrite /in_arm. iExists x. iFrame "Hhdr Hrest". }
@@ -1220,7 +1234,7 @@ Section box.
     rewrite max_stamp_singleton. iExact "Hllb'".
   Qed.
 
-  (* (f): the instance P_hdr' := P_hdr, Q' := Q (the arm's Q handed back) *)
+  (* (f): the instance P_hdr' := P_hdr, Qc' := emp, Q' := Q2 (the arm's Q2 handed back) *)
   Lemma box_park `{CID : CpuId} (N : namespace) γ (ξ : CtxId) (i : id)
       (mh : gmap (id * nat) ufrac) (E : coPset) :
     ↑N ⊆ E →
@@ -1228,15 +1242,18 @@ Section box.
     own_context ξ -∗
     (∃ x, P_hdr i x ξ ∗ P_rest x ξ) -∗
     l2_hold γ i mh ={E}=∗
-    own_context ξ ∗ Q ∗
+    own_context ξ ∗ Q2 ∗
     ∃ (T' : nat) (q : ufrac),
       ⌜Qp_to_Qc q = qsum mh⌝ ∗
       slotp_half γ (L2Reg T' None) ∗
       reference γ i {[ (i, T') := q ]} ∗
       llb loglen_name T'.
   Proof.
-    intros HE. apply (box_park_join N γ ξ i P_hdr Q mh E HE).
-    intros x ξ'. reflexivity.
+    intros HE.
+    assert (Hjoin : ∀ (x : X) (ξ' : CtxId), emp ∗ P_hdr i x ξ' ∗ Q2 ⊢ P_hdr i x ξ' ∗ Q2).
+    { intros x ξ'. by rewrite left_id. }
+    iIntros "#Hbox Hrun Hbun Hhold".
+    iApply (box_park_join N γ ξ i P_hdr emp Q2 mh E HE Hjoin with "Hbox Hrun Hbun [//] Hhold").
   Qed.
 
   (* ================================================================== *)
@@ -1265,9 +1282,9 @@ Section box.
     ctx_floor ξ K -∗
     slotd_half γ r -∗
     cnt_half γ 1 -∗
-    Q -∗
+    Q2 -∗
     slotp_half γ s0 ={E}=∗
-    own_context ξ ∗ Q ∗
+    own_context ξ ∗ Q1 1 ∗
     P_rest x0 ξ ∗
     slotd_half γ (SlotReg (sr_td r) false (sr_ident r) None) ∗
     cnt_half γ 1 ∗
@@ -1318,12 +1335,14 @@ Section box.
      ic_shrink_tx / ic_grow_tx: the descriptor half and the parked ln_tx
      share change together under two write locks).  Selects OUT_L2 by the
      caller's L2 half; runs the client's fupd on Q; puts it back. *)
-  Lemma box_q_update (N : namespace) γ (i : id) (mh : gmap (id * nat) ufrac) (E : coPset) :
+  Lemma box_q_update (N : namespace) γ (i : id) (R : iProp Σ) (mh : gmap (id * nat) ufrac) (E : coPset) :
     ↑N ⊆ E →
     is_box N γ -∗
     l2_hold γ i mh -∗
-    (Q ={E ∖ ↑N}=∗ Q) ={E}=∗
-    l2_hold γ i mh.
+    (* §6¹³: the client's fupd may hand an OUTPUT RESIDUE R back to the
+       caller (a shrink/grow's updated descriptor half rides out as R) *)
+    (Q2 ={E ∖ ↑N}=∗ Q2 ∗ R) ={E}=∗
+    l2_hold γ i mh ∗ R.
   Proof.
     iIntros (HE) "#Hbox Hhold Hupd".
     iDestruct "Hhold" as (tp) "[Hrp0 #Hllbh]".
@@ -1331,13 +1350,13 @@ Section box.
     iDestruct (ghost_var_agree with "Hrp Hrp0") as %->.
     iEval (cbn [lr_hold]) in "Harm".
     iDestruct "Harm" as "(>%Hwf & >%Hne0 & >%Hkeyed0 & >Hf0 & >HQ)".
-    iMod ("Hupd" with "HQ") as "HQ".
+    iMod ("Hupd" with "HQ") as "[HQ HR]".
     iMod ("Hcl" with "[Hpk Hst Hc Hrd Hrp Hf0 HQ]") as "_".
     { iNext. iExists T, ξb, m, cb, rb, (L2Reg tp (Some (i, mh))).
       iFrame "Hpk Hllb Hst Hc Hrd Hrp".
       iSplitR; [iPureIntro; exact (conj Hsum (conj HI (conj HC HD)))|].
       rewrite /box_arm. cbn [lr_hold]. iFrame "Hf0 HQ". iPureIntro. split_and!; done. }
-    iModIntro. rewrite /l2_hold. iExists tp. iFrame "Hrp0". iExact "Hllbh".
+    iModIntro. iFrame "HR". rewrite /l2_hold. iExists tp. iFrame "Hrp0". iExact "Hllbh".
   Qed.
 
   (* box_view: a read-only three-way view for a NON-OWNER (the commit's
@@ -1345,15 +1364,15 @@ Section box.
      out the registers' values with the four rows and the ARM (a public
      definition -- the caller matches on lr_hold / sr_win and reads the
      client content inside: IN's header and rest at ξb, OUT_L1's window
-     pair and Q, OUT_L2's parked fragment and Q), and closes with what it
+     pair and Q1 c, OUT_L2's parked fragment and Q2), and closes with what it
      opened.  The collection's ic_slot_cover is stated over box_arm. *)
   Lemma box_view (N : namespace) γ (E : coPset) :
     ↑N ⊆ E →
     is_box N γ ={E, E ∖ ↑N}=∗
     ∃ (T : nat) (ξb : CtxId) m (c : nat) (r : slot_reg id X) (s : l2_reg id),
       ⌜box_rows T m c r s⌝ ∗
-      box_arm γ T ξb m r s ∗
-      (box_arm γ T ξb m r s ={E ∖ ↑N, E}=∗ True).
+      box_arm γ T ξb m c r s ∗
+      (box_arm γ T ξb m c r s ={E ∖ ↑N, E}=∗ True).
   Proof.
     iIntros (HE) "#Hbox". rewrite /is_box.
     iMod (inv_acc E N with "Hbox") as "[Hbody Hcl]"; [exact HE|].

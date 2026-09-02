@@ -1489,20 +1489,19 @@ Section IcacheBootTable.
       iDestruct "Hmir" as "[(%dn & Hmeta) Haddrs]".
       iDestruct "Hmeta" as "(Hty & Hmaj & Hmin & Hnl & Hsz)".
       iModIntro.
-      iSplitR "Hd2 Hn2 Hgd1 Hgd2".
-      { iFrame "Hst Hc Hrd Hrp". iSplitL "Hv Hd1 Hn1 Hnl Hpin Hgdh".
+      iSplitR "Hd2 Hn2 Hgd1 Hgd2 Hpin".
+      { iFrame "Hst Hc Hrd Hrp". iSplitL "Hv Hd1 Hn1 Hnl Hgdh".
         { rewrite /ic_hdr /ic_hdr_amb. iSplitR; [done |].
           iSplitL "Hv"; [iExists w; iExact "Hv" |].
           iSplitL "Hd1 Hn1"; [iExists (dvs k).1, (dvs k).2; rewrite /inode_ident; iFrame "Hd1 Hn1" |].
           iSplitL "Hnl"; [iExists (di_nlink dn); iExact "Hnl" |].
-          iSplitL "Hpin"; [rewrite /ic_pin_rest; iExact "Hpin" |].
           iExists (dvs k).1, (dvs k).2. iExact "Hgdh". }
         rewrite /ic_rest /ic_rest_amb. iSplitL "Hty Hmaj Hmin Hsz".
         { iExists dn. rewrite /ic_meta_rest. iFrame "Hty Hmaj Hmin Hsz". }
         iExact "Haddrs". }
       iSplitR "Hgd2"; [| iExact "Hgd2"].
       rewrite /islot_empty /islot_free_at. iExists (dvs k).1, (dvs k).2.
-      rewrite /inode_ident. iFrame "Hd2 Hn2 Hgd1". }
+      rewrite /inode_ident /ic_pin_rest. iFrame "Hd2 Hn2 Hgd1 Hpin". }
     iMod (big_sepL_bupd with "Hall") as "Hall".
     iEval (rewrite big_sepL_sep) in "Hall".
     iDestruct "Hall" as "[Hbx Hrest]".

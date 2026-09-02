@@ -2188,8 +2188,17 @@ Section IcacheRefInv.
      THE PARK CARRIES NO MASS, so it is indexed by the slot and the inum
      alone -- [islot2]'s live arm re-parks it across every count move with no
      accompanying fraction. *)
+  (* F42/F42′ (tso-cutover endgame §6¹²–§6¹⁶): the window pin AT REST --
+     main's [hpn] register whole at [None] -- rides the TABLE ROW, here, and
+     only while the mirror bit is DOWN.  iput's guard (a) and iget's recycler
+     (a) both hold the row (itable.lock) when they must PRODUCE the box's
+     OUT_L1 residue, which is why it cannot ride the header (inside the box
+     until (a) opens it).  Bit UP -- iput's free window, from the release
+     after (g) to the last close -- the two halves are where the free path
+     put them: one in the header's frozen alternative ([ic_pin_tx]), one in
+     iput's hand. *)
   Definition frz_park (k : nat) (z : Z) : iProp Σ :=
-    ((frzm_h z false ∗ frzsel k (1/2)%Qp false)
+    ((frzm_h z false ∗ frzsel k (1/2)%Qp false ∗ IcacheRef.hpn_full k None)
      ∨ (frzm_h z true ∗ frzsel k ((1/2)/2)%Qp true))%I.
 
   Global Instance frz_park_timeless k z : Timeless (frz_park k z).
@@ -2245,8 +2254,8 @@ Section IcacheRefInv.
   Proof. rewrite /frz_park. iIntros "Hb Hs". iRight. iFrame. Qed.
 
   Lemma frz_park_intro_off (k : nat) (z : Z) :
-    frzm_h z false -∗ frzsel k (1/2)%Qp false -∗ frz_park k z.
-  Proof. rewrite /frz_park. iIntros "Hb Hs". iLeft. iFrame. Qed.
+    frzm_h z false -∗ frzsel k (1/2)%Qp false -∗ IcacheRef.hpn_full k None -∗ frz_park k z.
+  Proof. rewrite /frz_park. iIntros "Hb Hs Hp". iLeft. iFrame. Qed.
 
   (* THE WINDOW-ENTERING DECIDER AT REF-1 (iput+0x3a) and THE FOREIGN SHARE
      HOLDER's (idup's OPEN(2.6b)) ARE NOW ONE LEMMA, and that is R-e's whole
@@ -2261,11 +2270,12 @@ Section IcacheRefInv.
       (k : nat) (z : Z) (s : Qp) (g : gname) (lo : nat) :
     ↑icacheN ⊆ Eo -> (k < NINODE)%nat ->
     itable_inv -∗ IcacheRef.live_genlo k s g lo -∗ frz_park k z ={Eo}=∗
-      IcacheRef.live_genlo k s g lo ∗ frzm_h z false ∗ frzsel k (1/2)%Qp false.
+      IcacheRef.live_genlo k s g lo ∗ frzm_h z false ∗ frzsel k (1/2)%Qp false ∗
+      IcacheRef.hpn_full k None.
   Proof.
     iIntros (HE Hk) "#Hinv Hs Hpark".
     rewrite /frz_park.
-    iDestruct "Hpark" as "[[Hoff Hsel] | [_ Hq]]".
+    iDestruct "Hpark" as "[(Hoff & Hsel & Hp) | [_ Hq]]".
     - iModIntro. iFrame.
     - iMod (frz_slot_kill_pinw Eo k ((1/2)/2)%Qp s g lo HE Hk
               with "Hinv Hq Hs") as "[]".
@@ -2275,7 +2285,8 @@ Section IcacheRefInv.
       (k : nat) (z : Z) (qt : Qp) (g : gname) (lo : nat) :
     ↑icacheN ⊆ Eo -> (k < NINODE)%nat ->
     itable_inv -∗ IcacheRef.live_genlo k qt g lo -∗ frz_park k z ={Eo}=∗
-      IcacheRef.live_genlo k qt g lo ∗ frzm_h z false ∗ frzsel k (1/2)%Qp false.
+      IcacheRef.live_genlo k qt g lo ∗ frzm_h z false ∗ frzsel k (1/2)%Qp false ∗
+      IcacheRef.hpn_full k None.
   Proof.
     iIntros (HE Hk) "#Hinv Hq Hpark".
     iApply (frz_park_shr_off Eo k z qt g lo HE Hk with "Hinv Hq Hpark").
@@ -2860,7 +2871,9 @@ Section IcacheRefInvReg.
       (* RULING R-e: the OFF arm's SELECTOR half comes out beside the mirror
          bit, and it is what [iref_incr_store_au] spends to refute
          [live_slot]'s frozen alternative. *)
-      frzsel k (1/2)%Qp false.
+      frzsel k (1/2)%Qp false ∗
+      (* F42′: the resting pin comes out with the OFF arm, to be re-parked *)
+      IcacheRef.hpn_full k None.
   Proof.
     iIntros (HE Hin) "#Hinv Hl Hpark".
     pose proof (islot_lt inum) as Hsl.
@@ -2888,12 +2901,12 @@ Section IcacheRefInvReg.
     { rewrite /ireg_frzm_ok Hfz0 in Hmok. exact Hmok. }
     subst b0.
     iAssert (frzm_h (bv_unsigned inum) false ∗ frzm_h (bv_unsigned inum) false ∗
-             frzsel k (1/2)%Qp false)%I
-      with "[Hmr Hpark]" as "(Hmr & Hout & Hsel)".
+             frzsel k (1/2)%Qp false ∗ IcacheRef.hpn_full k None)%I
+      with "[Hmr Hpark]" as "(Hmr & Hout & Hsel & Hp)".
     { rewrite /frz_park.
-      iDestruct "Hpark" as "[[Ho Hs] | [Hbt _]]"; last first.
+      iDestruct "Hpark" as "[(Ho & Hs & Hp) | [Hbt _]]"; last first.
       { iDestruct (frzm_agree with "Hmr Hbt") as %Hbad. discriminate Hbad. }
-      iFrame "Hmr Ho Hs". }
+      iFrame "Hmr Ho Hs Hp". }
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
     iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hlnk Hslback Hback Hcnt Hfdisj Hmr]")
@@ -2911,7 +2924,7 @@ Section IcacheRefInvReg.
                 Hlok Hclm Hfrz
                 with "Hla Hep Hlnk Hdisj Hcnt Hfdisj [Hmr] Harm").
       iApply (ireg_frzc_intro _ _ false Hmok with "Hmr"). }
-    iModIntro. iFrame "Hl Hout Hsel".
+    iModIntro. iFrame "Hl Hout Hsel Hp".
   Qed.
 
   (* THE SAME OPEN, WITH THE MIRROR's [false] HALF IN HAND -- the

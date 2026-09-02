@@ -116,7 +116,7 @@ Section OffBox.
 
   (* THE BOX of file slot k, at names γ (fresh per publish lifetime) *)
   Definition off_box (k : nat) γ : iProp Σ :=
-    CtxBox.is_box (X := unit) off_hdr off_rest emp%I (offBoxN .@ k) γ.
+    CtxBox.is_box (X := unit) off_hdr off_rest (λ _ : nat, emp%I) emp%I (offBoxN .@ k) γ.
   Global Instance off_box_persistent k γ : Persistent (off_box k γ).
   Proof. rewrite /off_box /CtxBox.is_box. apply _. Qed.
 

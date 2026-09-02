@@ -1634,6 +1634,45 @@ that is the design ((b) is deposit AND bump).
 The second edit's content is now settled in full (§6¹³ bundle, §6¹⁴'s
 count index, §6¹⁷'s `Q1 0`); nothing on the design side is open for r20.
 
+## 6¹⁹. BUILD AGENT (2026-09-02): the second edit and F38/F40/F42/F42′ LANDED
+
+In code, on tso-cutover, all green (CtxBox, BioInv, BioInitAt, the four
+bread/brelse/bwrite proofs, OffBox, IcacheInv, IcacheEscrow, IcacheBoot,
+IcachePinwObl, FsCfgKits, FsCfgSnap):
+
+- `CtxBox.v` Section box: `Q1 : nat → iProp` and `Q2 : iProp` replace `Q`;
+  `box_arm γ T ξb m c r s` (the count is now an argument: OUT_L1 carries
+  `Q1 c`, OUT_L2 `Q2`); (a) takes `Q1 c`, (b)/(b′) return `Q1 c`, (g)
+  takes `Q2` and returns `Q1 1`; (e′)/(e) over `Q2`; (f′) `box_park_join
+  … P_hdr' Qc' Q' …` with the wand `∀ x ξ', Qc' ∗ P_hdr' i x ξ' ∗ Q2 ⊢
+  P_hdr i x ξ' ∗ Q'` and the premise `Qc'` between the bundle and the
+  hold; (f) is its `Qc' := emp` instance; `box_q_update … R …` takes
+  `Q2 ={E∖↑N}=∗ Q2 ∗ R` and returns `l2_hold ∗ R`; `box_view` exposes
+  `box_arm … c r s`.  Clients bcache/off: `(λ _ : nat, emp%I) emp%I`.
+- icache: `ic_q1 cn k c` (`O ↦ ic_q_recycle cn k`, F38's false quarter as
+  landed; `S _ ↦ ic_pin_tx k`), `ic_q2 cn … k := ∃ d dev inum, ⌜ic_dep_id d
+  = Some (dev, inum)⌝ ∗ ic_deposit cn k d ∗ ic_q_side … d ∗ ic_id cn k ¼
+  true dev inum` (F40); `ic_hdr_held` (= `ic_hdr` minus the quarter at an
+  identified slot, the header itself at None) with `ic_hdr_amb_split` /
+  `_join`; `ic_checkout` runs (e′) taking the descriptor half and the side
+  share, returning the HELD bundle; `ic_park_hold`/`ic_park` run (f′) with
+  `Qc' := ic_deposit cn k d`, take the held bundle at a named shape `x0`,
+  and return `ic_dep_neutral cn k ∗ ic_q_side … d` (the halves rejoin
+  inside, by `ic_dep_park`); `ic_free_take` takes `ic_q2` and returns
+  `ic_pin_tx k`; the (b) wrappers return `ic_q_recycle` / `ic_pin_tx` by
+  count.  ONE DEPARTURE FROM §6¹²'s text: `ic_dep_id (DepFrz _ dev inum _
+  _) = Some (dev, inum)` (it was `None`), because `ic_q2`'s pure tie would
+  otherwise exclude the free path's `DepFrz` residue at (g) — the hold is
+  at the slot's identity there.
+- F42/F42′: `ic_pin_rest k` leaves `ic_pay`'s ordinary arms and the dead
+  header (the bundle intro/elim lemmas lose the premise/conjunct); the
+  dead row `islot_empty` gains it; the live row's `IcacheInv.frz_park` OFF
+  arm gains `IcacheRef.hpn_full k None` (`frz_park_intro_off` takes it,
+  `frz_park_shr_off`/`_ref1_off`/`_lic_off` return it; `_pre_reclaim`
+  unchanged).  IcacheBoot hands the boot pin to the dead row.
+- Measure follows in main-tso-readiness.md A12.9 (the ProofIget/Iput/Idup
+  users of `frz_park_*` were roots already).
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build

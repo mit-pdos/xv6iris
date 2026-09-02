@@ -1029,7 +1029,7 @@ Section BioBox.
 
   (* THE BOX *)
   Definition buf_box (bn : bio_names) (V : bio_view Σ) (k : nat) : iProp Σ :=
-    is_box (bhdr bn V k) (brest k) emp (bioxN .@ k) (bn_box bn k).
+    is_box (bhdr bn V k) (brest k) (λ _ : nat, emp%I) emp%I (bioxN .@ k) (bn_box bn k).
   Global Instance buf_box_persistent bn V k : Persistent (buf_box bn V k).
   Proof. rewrite /buf_box /is_box. apply _. Qed.
 
@@ -1063,7 +1063,7 @@ Section BioBox.
     { rewrite /qsum map_fold_empty /nat_Qc /=. symmetry. apply Z2Qc_inj_0. }
     assert (Hm0 : (max_stamp (∅ : gmap (bio_id * nat) ufrac) <= 0)%nat).
     { rewrite /max_stamp map_fold_empty. lia. }
-    iMod (CtxBox.box_withdraw_L1 (bhdr bn V k) (brest k) emp%I
+    iMod (CtxBox.box_withdraw_L1 (bhdr bn V k) (brest k) (λ _ : nat, emp%I) emp%I
             (bioxN .@ k) (bn_box bn k) ξ r 0 ∅ Kd 0 E HEk Hw Hq0 HKd Hm0
             with "Hbox Hrun Hfl [] [] Hrd Hc [Hf0] []") as "(Hrun & Hc & Hout)".
     { iApply TsoCtx.ctx_floor_0. }
@@ -1091,7 +1091,7 @@ Section BioBox.
   Proof.
     iIntros (HE) "#Hbox Hrun Hrd Hc Hhdr".
     assert (HEk : ↑(bioxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
-    iMod (CtxBox.box_deposit_L1 (bhdr bn V k) (brest k) emp%I
+    iMod (CtxBox.box_deposit_L1 (bhdr bn V k) (brest k) (λ _ : nat, emp%I) emp%I
             (bioxN .@ k) (bn_box bn k) ξ
             (SlotReg Td true i0 (Some (x0, T0))) 0 (dev, bno) x0 T0 E HEk eq_refl eq_refl
             with "Hbox Hrun Hrd Hc Hhdr") as "(Hrun & _ & %T' & Hrd & Hc & Href & #Hllb)".
@@ -1114,7 +1114,7 @@ Section BioBox.
   Proof.
     iIntros (HE Hw Hid) "#Hbox Hrd Hc".
     assert (HEk : ↑(bioxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
-    iMod (CtxBox.box_ref_incr (bhdr bn V k) (brest k) emp%I
+    iMod (CtxBox.box_ref_incr (bhdr bn V k) (brest k) (λ _ : nat, emp%I) emp%I
             (bioxN .@ k) (bn_box bn k) r c E HEk Hw
             with "Hbox Hrd Hc") as "(Hrd & Hc & %T & Href)".
     iModIntro. iFrame "Hrd Hc". rewrite /bref_ghost. iExists T. rewrite Hid. iExact "Href".
@@ -1139,7 +1139,7 @@ Section BioBox.
     assert (HEk : ↑(bioxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
     assert (Hq1 : qsum ({[((dev, bno), t) := 1%Qp]} : gmap (bio_id * nat) ufrac) = nat_Qc 1).
     { rewrite /qsum map_fold_singleton /qsum_step Qcplus_0_r Qp_to_Qc_1 /nat_Qc /=. symmetry. apply Z2Qc_inj_1. }
-    iMod (CtxBox.box_ref_decr (bhdr bn V k) (brest k) emp%I
+    iMod (CtxBox.box_ref_decr (bhdr bn V k) (brest k) (λ _ : nat, emp%I) emp%I
             (bioxN .@ k) (bn_box bn k) r c (dev, bno)
             {[((dev, bno), t) := 1%Qp]} E HEk Hw Hq1
             with "Hbox Hrd Hllb Hc Href") as "(Hrd & Hc & #Hllb')".
@@ -1169,7 +1169,7 @@ Section BioBox.
     assert (HEk : ↑(bioxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
     assert (Hmt : (max_stamp ({[((dev, bno), t) := 1%Qp]} : gmap (bio_id * nat) ufrac) <= Kt)%nat).
     { rewrite /max_stamp map_fold_singleton /max_step /=. lia. }
-    iMod (CtxBox.box_checkout (bhdr bn V k) (brest k) emp%I
+    iMod (CtxBox.box_checkout (bhdr bn V k) (brest k) (λ _ : nat, emp%I) emp%I
             (bioxN .@ k) (bn_box bn k) ξ (dev, bno)
             {[((dev, bno), t) := 1%Qp]} s0 Kt Kp E HEk Hs0 Hmt HKp
             with "Hbox Hrun Hflt Hflp Href [] Hrp") as "(Hrun & Hbun & Hhold)".
@@ -1191,7 +1191,7 @@ Section BioBox.
   Proof.
     iIntros (HE) "#Hbox Hrun Hbun Hhold".
     assert (HEk : ↑(bioxN .@ k) ⊆ E) by (etrans; [apply nclose_subseteq | exact HE]).
-    iMod (CtxBox.box_park (bhdr bn V k) (brest k) emp%I
+    iMod (CtxBox.box_park (bhdr bn V k) (brest k) (λ _ : nat, emp%I) emp%I
             (bioxN .@ k) (bn_box bn k) ξ (dev, bno)
             {[((dev, bno), t) := 1%Qp]} E HEk
             with "Hbox Hrun Hbun Hhold") as "(Hrun & _ & %T' & %q & %Hq & Hrp & Href & #Hllb)".
@@ -1575,7 +1575,7 @@ Section BioBox.
       iExists bs. iSplitL "Hv Hdev Hbno Hpay".
       { iExists false. cbn [fst snd]. cbv iota. iFrame "Hv Hdev Hbno Hpay". }
       iFrame "Hdk Hdata". done. }
-    iMod (CtxBox.box_alloc_at_halves (bhdr bn V k) (brest k) emp%I
+    iMod (CtxBox.box_alloc_at_halves (bhdr bn V k) (brest k) (λ _ : nat, emp%I) emp%I
             (bioxN .@ k) (bn_box bn k) cur_ctx
             (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) E
             with "Hrun Hst Hc [Hrd] Hrp Hbun") as "(Hrun & %Tb & #Hbx & Hrd & #Hllb)".
