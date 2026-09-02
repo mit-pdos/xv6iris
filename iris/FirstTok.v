@@ -46,6 +46,7 @@ Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import KernelText KernelDataInv.
 Require Import WpLock.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
+Require Import CtxMorphTac.   (* [ctx_morph_solve] -- the boot arm's crossing (first_fsinit_morph) *)
 Require Import FdSlots.
 Require Import WpUart.
 Require Import DiskInv.
@@ -912,6 +913,22 @@ Section FirstTok.
   Qed.
 
 End FirstTok.
+
+(* THE BOOT ARM CROSSES THE PARK (L8 / A12.19; claude-notes/projects/
+   inode-pay-r4a.md Q7).  The first process is parked by userinit at the
+   boot hart's context and resumed at its own, where its forkret boot arm
+   spends [first_fsinit].  Every opaque row of it is context-free (the kit,
+   the mirror, the slot and bio tokens, the pures -- checked by [About],
+   2026-09-02) and the indexed rows are plain cells, so the crossing is the
+   structural instances applied by [ctx_morph_solve].  Stated BELOW the
+   section so that [(XI := ξ)] is an argument (FileInv.v's "closed term"
+   rule).  The steady arm ([fs_ready]) and [first_boot_persist] both end in
+   [ioff_escrows] and get theirs with the off box (plan L6). *)
+Global Instance first_fsinit_morph
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    `{GEN : GenId} `{ICFG : icfg} :
+  CtxMorph (λ ξ : CtxId, first_fsinit (XI := ξ)).
+Proof. rewrite /first_fsinit. ctx_morph_solve. Qed.
 
 (* ...AND THE SAME SEAL AT TOP LEVEL, for [FsReady.v]'s reason: a
    [Typeclasses Opaque] inside a Section does not survive it.

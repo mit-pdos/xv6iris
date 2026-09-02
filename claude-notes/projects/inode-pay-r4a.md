@@ -259,12 +259,17 @@ Q6. The child's `cwd` across the park (class D).  Options: (i) `proc_priv`'s
     the same move as §3 (c); (ii) the credential is dropped from
     `inode_held` for cwd altogether and re-derived at each use.  (i) keeps
     every cwd consumer's statement.
-Q7. `first_fsinit` (the boot arm's raw-image resource, only the first
-    process's) — morph it into the first child's twin, or hand the boot
-    arm to the first process at ITS context by construction (userinit
-    parks the first process; its forkret runs fsinit at the child's
-    context, so the arm could be minted there)?  Needs one reading of its
-    rows; not started.
+Q7. `first_fsinit` — RESOLVED, NO RULING NEEDED (2026-09-02).  Read: its
+    opaque rows (`fs_kit_fsinit_ghost`, `log_mirror_born`, `iref_slots`,
+    `bslots`, `log_free_tok`, the pures) are all context-free by `About`;
+    its indexed rows are plain cells (the 32 `&sb` bytes, the `struct log`
+    words, the header slots).  So the boot arm crosses the park by a
+    structural morph: `FirstTok.first_fsinit_morph` (stated below the
+    section; `rewrite /first_fsinit. ctx_morph_solve.`) is LANDED and
+    compiles.  What still waits: `first_boot_persist_morph` and
+    `fs_ready_morph` (both end in `ioff_escrows` — L6; `fs_ready` also has
+    `is_ftable`/`log_ctx` — L5/L7) and hence `first_tok_morph` and
+    `proc_priv_morph` (plus Q6's cwd).
 
 ## 9. Reviewer 1's answers (2026-09-02) — recorded in the plan of record
 

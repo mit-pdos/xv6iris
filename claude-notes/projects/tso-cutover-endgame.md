@@ -735,8 +735,11 @@ and law 10 (hooks).
     CORRECTION: L6 IS on L8's path (`ioff_escrows` is `fs_ready`'s last
     row; `fs_ready` rides in `first_tok` inside `proc_priv`, which the park
     deposits).  The honest order is the plan's: r25 then r26; parallelism
-    is inside r25.
-15. **REVIEWER 1 ON ITEM 14 AND `inode-pay-r4a.md` §1–§8 (2026-09-02).**  Read
+    is inside r25.  Q7 (`first_fsinit`) RESOLVED the same evening:
+    structural; `FirstTok.first_fsinit_morph` landed.  In flight: OffBox's
+    14 proofs (main worktree) and ONE agent in an isolated worktree for
+    the log lock λ-flip, the sleep-lock handle morph and the class-A
+    wrapper instances (`EnvMorph.v`).15. **REVIEWER 1 ON ITEM 14 AND `inode-pay-r4a.md` §1–§8 (2026-09-02).**  Read
     against the code: `inode_pay`, `inode_held_short`, `inode_ref_short`,
     `live_fracc`, `cred_floor`, `inode_shr_held_gen`, `lk_floor` and its
     morph, `live_genlo` (frac-agree on `(g, lo)`), `ctx_floor_dom`,
