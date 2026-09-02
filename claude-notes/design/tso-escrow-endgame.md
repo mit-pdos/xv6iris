@@ -1125,6 +1125,60 @@ context, mapped to CtxBox's lemmas:
   identity), M-2 (the eviction's (a)/(b) at c = 1 vs a pool insert at the
   park), M-5's credential rows.  Deletions on R3's green: ic_escrow's
   five arms and ~13 lemmas, ic_mid, ic_id, DepFrz/ic_out_frz, islot_free.
+  VETTED 2026-09-01 (second reviewer, against ProofIget's recycle design,
+  ProofIput's last-close sites, ProofIlock/ProofIunlock's racy reads, the
+  arm and payload definitions).  Shape and deletions RIGHT.  Rulings:
+  - M-1 ACCEPT, with the discharge NAMED.  Consistent with today's model
+    (ProofIget: "NO eviction and NO ipool_insert … eviction is iput's
+    job"; every last close goes through ic_close_to_empty*), so "ref 0 ⇒
+    evicted/raw" is a current invariant and EMPTY-as-raw-IN preserves it.
+    MISSING: how the recycler KNOWS the withdrawn x0 is Raw — (a) at
+    c = 0 returns P_hdr ident x0 with x0 ∃-bound and the box has no
+    "c = 0 ⇒ Raw" row.  The discharge is client-side and exists: the
+    recycler holds itable's payload, hence the POOL, which after
+    eviction owns sr_ident's inum (ipool_shape: icnt_half … 0 + the
+    dinode ownership); an Unloaded/Loaded payload for that inum would
+    duplicate an exclusive pool resource.  State the refutation and
+    NAME the exclusive resource it runs on (else the recycler handles
+    three shapes).
+  - M-2 ACCEPT.  Both iput windows are (a) at c = 1 … (b) with cnt :=
+    max 1 c; the eviction at the last close where icnt_half 0 is in
+    hand; (d) follows — matches today's ic_open_auth_frz at Some (q, 1).
+    Site notes: the guard's itable acquire is the llb tier at Tl :=
+    max_stamp of inode_refp's unit ((a)'s Kt); the last close's itable
+    re-acquire at Tl := T'' of the park.
+  - M-3 ACCEPT with one addition: X MUST CARRY THE GENERATION g.
+    ic_payload_arm is parameterized by (inum, g, v) — g is the slot's
+    liveness generation (fresh at each recycle) and the left alternative
+    carries live_gen k (1/2) g and ity_shot g / ity_pending g — so
+    Raw | Unloaded | Loaded dn bm does not determine it: X := (g, shape)
+    or the shape carries g.  P_hdr_excl is fine (full i_valid); confirm
+    P_rest has a FULL cell (the raw/loaded meta cells are full today).
+    The frozen alternative as a disjunction inside ipay is fine —
+    client-defined, parked by (f) like any x.
+  - M-4 ACCEPT.  ic_deposit at DepShr := l2_hold at the share singleton
+    {[((dev,inum), t) := s]} (R-1: mass s, only t existential) ∗ the
+    share's inode_ident cells ∗ live_genlo slice is F7's tool + the F9
+    nuance, and it removes iunlock's ic_open_out_genlo borrow.  ic_tok
+    stays the full ghost_var (the token).  Caveat as F7: "21 files pass
+    it opaquely" is certified only by a forced -B round.
+  - M-5 ACCEPT THE SWEEP, REJECT THE CREDENTIAL CLAUSE.  Adding the
+    stamps fragment to inode_ref / inode_shr in one sweep is right.  But
+    "the ⌜lo ≤ tl⌝ ∗ cred_floor lo tl rows are R1-pre residue replaced
+    by the llb-tier acquire" is WRONG: those rows are the credential for
+    the T3 RACY READ of ip->ref (the pinw tier, A6.145/146), not for the
+    box.  ilock reads at +0x0e (iref_read_obl with cred_floor,
+    ProofIlock:2345–2364) and acquiresleeps at +0x16 — the acquire's
+    floor does not exist yet; iunlock reads before releasesleep and has
+    no acquire at all.  A stamps llb t is a log-length bound, not a
+    view, and cannot cash a pin floor.  KEEP the rows; unrelated to R3.
+  - M-6 ACCEPT.
+  - TABLE FIX: "iget scan hit, ref++ (any ref, incl. 0)" is bcache
+    behaviour.  xv6's iget matches only ip->ref > 0 slots — the premise
+    M-1 itself relies on.  For the icache (c) happens only at c ≥ 1; the
+    ref-0 case is the recycler's (a)…(b).  Harmless for soundness (the
+    lemma allows c = 0) but the row must not contradict M-1.
+  R3 code may start on the map with these amendments.
 
 ### 4.3 inode_pay's cinv — round R4a
 
@@ -1567,3 +1621,12 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
 - 2026-09-01 (build agent): the bcache round is GREEN over CtxBox (every
   bcache proof file; full-tree -B round running).  R3 SITE MAP measured
   and recorded in §4.2 (M-1..M-6) for vetting before R3 code.
+- 2026-09-01 (second reviewer, vetting the R3 site map M-1..M-6): shape
+  and deletions right.  M-2/M-4/M-6 accepted; M-1 accepted with its
+  discharge named (the recycler refutes non-Raw at c = 0 by the pool's
+  exclusive resource for sr_ident's inum — name it); M-3 needs X to carry
+  the generation g (ic_payload_arm's parameter); M-5's sweep accepted but
+  its credential clause REJECTED — cred_floor rows serve the T3 racy read
+  of ip->ref before the acquire (ilock +0x0e) / with no acquire
+  (iunlock), keep them; table fix: iget hits only ref > 0 (M-1's own
+  premise).  Acquire notes for iput's two itable windows recorded.
