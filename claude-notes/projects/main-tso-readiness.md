@@ -1897,3 +1897,32 @@ the stale `/shared/flip63` checkout (64 commits behind on 79 iris files).
   the `Spec*AU` rows stay (FsAbs*Fire, FsFdMirror, FdRow*, UkInitFs,
   SpecFilewriteCons depend on them).
 - Measure (full `make -k -j24`, 2026-09-02, AU rows parked): total 1464, roots 20, blocked 60, green 1384 (was 1509/26/119/1364).  My-lane roots left: ProofFilewrite (a binder), ProofSysOpenTails, ProofSysLink, ProofSyscall, SpecMainSecondary, ProofMain, ProofNamexEra, ProofNparEra; the other twelve are the L-lane agent's (TsoCtxShim, page_own_pipe_raw, boot).
+
+## 12.16 L2 r3 (second agent) — the boot chain's shim mentions, textually (2026-09-02)
+
+- **BootShared** (37 crossings) and **BootChain** merged with flip (merge3,
+  8 + 11 conflicts; main's durable-disk `S Pb Rspent Rb gsn gln gtn` /
+  `fs_boot_snap_wf` / `fs_cfg_alloc_snap`, virtio finding 5's `HInactive`
+  receipts + `dn_claim` auth, and `ufdG` kept): the started deposit at flip's
+  `started_inv γi ξd (main_dep γd γv) ∗ started_prim γi` (`started_alloc` off
+  the carve's cell with `started_img`), `power_boot_res_unpack` with main's
+  `Rb` AND flip's `boot_led_all` + `⌜era_img = gimg⌝` (matching r2's
+  `power_boot_res`), `BootChain.boot_hart_res` = flip's (the hart's proc /
+  noff / intena cells at ITS context, not main's `∀ ξ` re-wrap minted through
+  the shim), `cpu_slot_raw` / `boot_hart_bss` at flip's ctx cells, the
+  carve's raw→ctx crossings and main's `boot_bytes_ctx` deleted (the carve
+  builds ctx cells, as BootCarveMain).  **SystemAdequacy**: the secondaries
+  mint their own token (`own_context_boot (CID := FS c)`, flip's text) instead
+  of `own_context_any`; the boot block at the γi/ξd shape.
+- **UNCOMPILED**: all three sit behind the FS cone (r21), ProofForkretPark
+  (L8) and ProofMain:553 (L9 -- taken by the icache lane after r2), so the
+  measure could not move them; L9 owes them their first honest compile (plan
+  §6 L9: "text written while unbuildable; budget a fallout tail").
+  Residual diff vs flip for each = main's non-TSO edits only.
+- **Shim census** (non-comment `TsoCtxShim.`): ProofForkretPark (L8,
+  `ctx_parked_any`), IcacheRef (a dead `Require`, icache lane).  Nothing else.
+- **Measure** unchanged from r2 (green 1387, roots 18, blocked 103; b6 at
+  515d47fa1).  Lanes L3 and L4 closed green; L2 closed except the two above.
+- **Open** (for the owner): none of the L2/L3/L4 work needed a design
+  ruling; the two departures (KexecOkQ at the ctx tier, the U-tier openers
+  exposing the token) are recorded in A12.14/A12.15.
