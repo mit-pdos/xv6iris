@@ -763,3 +763,12 @@ branch and recorded in §3.2 and §8 here.
     (= `tx_pin`) takes or gives exactly the crossing share, `ic_deposit2` /
     `ic_pay_live` do not read `q`.  In `IcacheEscrow.v` beside `ic_slp`.
     Reviewers: this is the note at CtxBox.v's `box_q_update` made concrete.
+
+13. **What r21 leaves red (2026-09-02, end of round 2):** `ProofForkretPark`
+    only (L8: A6.129 `own_context_twin`, `park_globals`; needs
+    SpecForkretParkPaid at flip's shape too -- the plan's r26 lane, untouched
+    by both agents), plus whatever the boot chain (BootShared / BootChain /
+    SystemAdequacy, textual from the L-lane) shows at its first honest
+    compile behind ProofMain.  Every FS-cone consumer is fused.  The edit loop
+    on the large files ran under `rocq-warm` (`claude-notes/rocq-warm.md`);
+    `make -k` stays the measure.

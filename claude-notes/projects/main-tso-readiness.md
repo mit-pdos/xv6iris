@@ -1961,7 +1961,28 @@ the stale `/shared/flip63` checkout (64 commits behind on 79 iris files).
   ProofMain (one `xid` pagetable cell in the wand's statement -- `↦₈□`,
   fixed), ProofForkretPark (L8: A6.129 `own_context_twin` / `park_globals`,
   the plan's r26 lane -- NOT this round).
-- NEXT: ProofCreate (65 hunks) and ProofSysUnlink (68) -- flip's `Hdview /
+- ProofCreate (65 hunks) and ProofSysUnlink (68) FUSED, green under
+  `rocq-warm` (the owner's edit-loop tool, `claude-notes/rocq-warm.md`; the
+  warm daemon on the VM turned each fix-and-check from a ten-minute `make`
+  into a 5-90 s replay).  The two-lock stage statements take
+  `∃ lodc tldc, ⌜⌝ ∗ cred_floor ∗ ic_handle … (DepTx … lodc t q)` where main
+  had the bare descriptor half (and the child's at `locc tlcc`); the retained
+  parents the `∃ lo tl` genlo form; the seams (`su_w1/2/3_seam`,
+  `cr_*_half`, the `Hm`/`Hf`/`Ht` continuations) carry the epochs beside
+  their generations -- in the seam DEFINITIONS right after the gname, in
+  flip's non-conflict LEMMA binders after the fractions (both orders exist;
+  the calls follow their target); every `ic_grow_tx`/`ic_shrink_tx` call
+  infers its epoch (`_`) and the floored descriptor is destructed once per
+  branch before the first move and re-wrapped (`iAssert (∃ lodc tldc, …)`)
+  before a continuation that states the ∃ form; flip's `Hdview / Hfview /
+  Hilink` rows and its `Hp3rl` assert do not come (main has them or has no
+  such ghost); `cr_carve_gen`/`sl_carve_gen` by `inode_ref_carve_gen`.
+- Measure at the end of round 2 (full `make -k`, 2026-09-02): total 1458,
+  roots 1, blocked 21, green 1436 (was 1418; 1387 after the L-lane's r2; 1364
+  at r20b-7).  The one root is ProofForkretPark (L8, plan §9 item 13); the 21
+  blocked are its cone (the boot chain, SystemAdequacy, the Uk* leaves).  Every
+  FS-cone consumer of the box-era inode contracts compiles.
+- Was NEXT: ProofCreate (65 hunks) and ProofSysUnlink (68) -- flip's `Hdview /
   Hfview / Hilink` rows are flip-only ghost and do not come; the stage
   statements take `∃ lodc tldc, ⌜⌝ ∗ cred_floor ∗ ic_handle … (DepTx … lodc t
   q)` where main had the bare descriptor half, and the retained parents the
