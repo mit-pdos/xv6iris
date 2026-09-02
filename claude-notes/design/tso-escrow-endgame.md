@@ -675,10 +675,14 @@ disjunct.
     ref / share := ∃ m, stamps ◯ m ∗ llb loglen_name (max (snd <$> dom m))
                    with ⌜∀ p ∈ dom m, p.1 = id⌝ for the holder's known id
     (= CtxBox.reference γ id m)
-    THE L2 HOLDER'S HANDLE (R-1): pins the parked fragment's KEYS AND
-    MASS — bcache `{[((dev,bno), t) := 1]}`, icache `{[((dev,inum), t)
-    := s]}` — only the stamp t existential; never ∃ over the map (else
-    (d)/SpecIunlock cannot state the mass).
+    THE L2 HOLDER'S HANDLE (R-1, refined by F21): pins the parked
+    fragment's MASS by a pure row (what (d) / SpecIunlock need); the
+    KEYS may be ∃-bound in the handle because the L2 register records
+    the exact map and (f) recovers it by agreement.  bcache pins the unit
+    singleton `{[((dev,bno), t) := 1]}` (t existential); icache pins
+    `∃ m, ⌜qsum m = mass d⌝ ∗ l2_hold m` — a unit gathered from shares
+    that parked at different stamps has several keys and may be checked
+    out.  Never a handle whose mass is unstated.
 
 plus the client's token/cells: bcache `bref := bref_tok ∗ ref ∗ the
 dev/bno fractions` (bpin's / the log layer's), `bchain := bref_tok0 ∗
@@ -1360,6 +1364,17 @@ context, mapped to CtxBox's lemmas:
   parents never check out (ilock takes a carved share, iput the merged
   unit), so ic_dep_mass (DepRef _) = 1 is the only reference mass at (e).
   R3 CODE MAY START once F21 is in the skeleton.
+  PROPOSER (2026-09-02): F21 REAL AND APPLIED, with one refinement to the
+  recommended fix: ic_hold pins the map ∃-BOUND with the mass as a pure
+  row (∃ m, ⌜qsum m = mass⌝ ∗ l2_hold m) rather than as a parameter — a
+  parameter would reach ic_deposit's arity (M-4/F19's promise), and the
+  keys are not needed in the handle: (f) reads the exact map off the L2
+  register by agreement.  R-1's rule is restated in §3.3 accordingly (the
+  mass pinned; keys recoverable).  ic_checkout's premise generalized to
+  any m with ⌜qsum m = mass d⌝ ∗ ⌜max_stamp m ≤ Kt⌝ (R1 at Tl :=
+  max_stamp m, which is what CtxBox.reference already carries).  Build
+  notes taken: ic_rest_to_raw cites the bm_cells length; boot restated
+  over pre-minted names (ic_box_alloc_at).  IcacheBox.v re-type-checks.
   OPERATIONS WALK (what the instance must support; status after F14–F19):
       iget hit (c) ✓ · iget recycle (a)/stores/pinw arm store/(b)→Unloaded
       needs F14 · idup (c) ✓ · ilock: T3 racy read unchanged, genl_llb at
@@ -1868,3 +1883,8 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   and ic_hold to a pinned general m (R-1 preserved; covers multi-key
   gathered units).  Two build notes (bm_cells length; boot over
   box_alloc_at).  R3 code may start once F21 is in.
+- 2026-09-02 (proposer, F21 applied): ic_hold := ∃ m, ⌜qsum m = mass⌝ ∗
+  l2_hold m (mass pinned by the row; keys recovered at (f) from the
+  register); ic_checkout over any fragment of the descriptor's mass with
+  max_stamp ≤ Kt; R-1 restated in §3.3; boot over pre-minted names
+  (ic_box_alloc_at); bm_cells note.  IcacheBox.v type-checks.

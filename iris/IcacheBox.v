@@ -214,7 +214,8 @@ Section IcacheBoxAmb.
   Proof. reflexivity. Qed.
   Lemma ic_rest_to_raw k x :
     ic_rest_amb k x ⊢ ic_rest_amb k IcRaw.
-  Proof. Admitted.
+  Proof. (* Loaded: ∃-intro the record; the addrs' length is
+            [length (bm_cells bm) = 13] -- cite the blkmap kit's lemma *) Admitted.
 
   (* THE REGROUPING (F2's icache twin): today's parked bundle -- the two
      identity halves, the valid cell and [ic_payload_arm] at (inum, g, v) --
@@ -313,10 +314,15 @@ Section IcacheBox.
   Proof. Admitted.
 
   (* ---- the holder's handle row (M-4, F7's tool, R-1) ----------------- *)
-  Definition ic_hold b k (dev inum : mword 32) (s : Qp) : iProp Σ :=
-    (∃ t : nat,
-       CtxBox.l2_hold (X := ic_x) (icb b k) (Some (dev, inum))
-         {[ (Some (dev, inum), t) := s ]})%I.
+  (* F21: the parked fragment is ANY map of the descriptor's mass -- a unit
+     gathered from shares that parked at different stamps has several keys
+     and may legitimately be checked out.  The MASS is pinned by the pure
+     row (all (d) needs: R-1's reason); the KEYS are recovered at (f) by
+     agreement on the register, which records the exact map. *)
+  Definition ic_hold b k (dev inum : mword 32) (μ : Qp) : iProp Σ :=
+    (∃ m : gmap (ic_bid * nat) ufrac,
+       ⌜qsum m = Qp_to_Qc μ⌝ ∗
+       CtxBox.l2_hold (X := ic_x) (icb b k) (Some (dev, inum)) m)%I.
   (* what the holder has IN HAND of its share / reference once acquiresleep
      has deposited slh_tok into the tracked lock (F15): the identity cells
      and the liveness slice, plus the count fragment for a whole reference
@@ -443,9 +449,11 @@ Section IcacheBox.
     own_context ξ -∗
     ctx_floor ξ Kt -∗ ctx_floor ξ Kp -∗
     ic_body k d -∗
-    (∃ t : nat, ⌜(t <= Kt)%nat⌝ ∗
-       CtxBox.reference (X := ic_x) (icb b k) (Some (dev, inum))
-         {[ (Some (dev, inum), t) := ic_dep_mass d ]}) -∗
+    (* F21: any fragment of the descriptor's mass, its stamps covered by Kt
+       (R1 at Tl := max_stamp m) -- what ic_ref_stamps / inode_shr2 give *)
+    (∃ m : gmap (ic_bid * nat) ufrac,
+       ⌜qsum m = Qp_to_Qc (ic_dep_mass d)⌝ ∗ ⌜(max_stamp m <= Kt)%nat⌝ ∗
+       CtxBox.reference (X := ic_x) (icb b k) (Some (dev, inum)) m) -∗
     ic_tok cn k -∗ ic_regp b k s0 ={E}=∗
     own_context ξ ∗
     (∃ x : ic_x, ic_hdr γfs γi cov logstart k (Some (dev, inum)) x ξ ∗ ic_rest k x ξ) ∗
@@ -531,17 +539,23 @@ Section IcacheBox.
       llb loglen_name T'.
   Proof. Admitted.
 
-  (* boot: every slot dead and IN, at the boot deposit's stamp *)
-  Lemma ic_box_alloc `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (ξ : CtxId) (E : coPset) :
+  (* boot: every slot dead and IN, at the boot deposit's stamp.  Over
+     PRE-MINTED names (CtxBox.box_alloc_at, as bio_init does): with F19 the
+     box gnames are fields of ic_names, minted before MkIcNames -- the
+     caller presents the fresh ghosts and receives the boxes. *)
+  Lemma ic_box_alloc_at `{CID : RiscvLang.CpuId} cn b γfs γi cov logstart (ξ : CtxId) (E : coPset) :
     own_context ξ -∗
     ([∗ list] k ∈ seq 0 NINODE,
+       CtxBox.stamps_auth (X := ic_x) (icb b k) ∅ ∗
+       ghost_var (bx_cnt (icb b k)) 1 0%nat ∗
+       ghost_var (bx_slotd (icb b k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+       ghost_var (bx_slotp (icb b k)) 1 (inhabitant : l2_reg ic_bid) ∗
        ic_hdr γfs γi cov logstart k None IcRaw ξ ∗ ic_rest k IcRaw ξ) ={E}=∗
     own_context ξ ∗
-    ∃ b : ic_boxes,
-      ic_boxes_all cn b γfs γi cov logstart ∗
-      ([∗ list] k ∈ seq 0 NINODE, ∃ T_boot : nat,
-         ic_regd b k (SlotReg T_boot false None None) ∗ llb loglen_name T_boot ∗
-         ic_cnt b k 0 ∗ ic_regp b k (L2Reg 0 None)).
+    ic_boxes_all cn b γfs γi cov logstart ∗
+    ([∗ list] k ∈ seq 0 NINODE, ∃ T_boot : nat,
+       ic_regd b k (SlotReg T_boot false None None) ∗ llb loglen_name T_boot ∗
+       ic_cnt b k 0 ∗ ic_regp b k (L2Reg 0 None)).
   Proof. Admitted.
 
 End IcacheBox.
