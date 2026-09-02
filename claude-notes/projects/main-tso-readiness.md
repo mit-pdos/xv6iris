@@ -1544,7 +1544,7 @@ main's durable-disk ghost rides beside it, exactly per the endgame plan §3.4:
 
 ## 12.7 r19d/r19e — the CtxBox edit landed and the icache re-instantiated (2026-09-02)
 
-See tso-cutover-endgame.md §6⁵–§6⁹.  In code: `CtxBox.v`'s Section box is
+See tso-cutover-endgame-log.md §6⁵–§6⁹.  In code: `CtxBox.v`'s Section box is
 the ruled edit (register-selected `box_arm`, `box_rows`, Q in both out arms,
 (e′)/(f′) with `Qc`, `box_q_update`, `box_view`, `box_alloc_at` whole-in and
 `box_alloc_at_halves` split-in), every proof adapted from CtxBox's; BioInv
@@ -1612,7 +1612,7 @@ do not edit it until told).
 
 ## 12.9 r19h — the second CtxBox edit (Q1 by count / Q2, Qc′, R) and F40/F42 (2026-09-02)
 
-See tso-cutover-endgame.md §6¹²–§6¹⁹ for the design and §6¹⁹ for the
+See tso-cutover-endgame-log.md §6¹²–§6¹⁹ for the design and §6¹⁹ for the
 landed spellings.  Departures from the reviewers' text: `ic_dep_id DepFrz`
 names its identity (needed by `ic_q2`'s pure tie at (g)); `ic_park` rejoins
 the two descriptor halves into `ic_dep_neutral` inside the wrapper (the
@@ -1625,7 +1625,7 @@ half and hands back the neutral descriptor.
 
 ## 12.10 r19i — the read arm under (e′)/(f′) (2026-09-02)
 
-See tso-cutover-endgame.md §6²¹.  `CtxBox.box_checkout_split`'s split wand
+See tso-cutover-endgame-log.md §6²¹.  `CtxBox.box_checkout_split`'s split wand
 is a view shift at `E ∖ ↑N` (third CtxBox change); `ic_hdr_held cn … k rd i
 x ξ` is arm-aware (`ic_pay_held`: at `rd = true` the quarter leg
 `ic_rd_held_ghost`, loaded and ordinary only); `ic_hdr_amb_split`/`_join`

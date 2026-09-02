@@ -228,6 +228,11 @@ outstanding; see the `completed/` section below).
   M-leg's refuted first drafts, and the process law distilled from that
   port's measured mistakes — followed by AMENDMENT 1, Slice 0's inventory of
   today's main, which corrects the brief in three places.
+  CONSOLIDATED 2026-09-02: that file is now the plan of record (law, the
+  box statements, the icache instance as landed, the site map, a rulings
+  table, open items); the original plan and the 27-round review
+  play-by-play are in
+  [`tso-cutover-endgame-log.md`](projects/tso-cutover-endgame-log.md).
 
 - **[`user-wp-slot-checkpoint.md`](projects/user-wp-slot-checkpoint.md)** — coordinator checkpoint 2026-08-28: the session's rulings, in-flight (possibly ungated) state, and how to resume.  Read FIRST if resuming user-wp-slot.
 - **[`user-wp-slot.md`](projects/user-wp-slot.md)** — the PER-PROCESS
