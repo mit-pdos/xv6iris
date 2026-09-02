@@ -1417,6 +1417,26 @@ context, mapped to CtxBox's lemmas:
   lent mass, the BARE forms none (the holder deposited them into the box
   with slh_tok into the lock -- F15).  The carve needs q + s ≤ 1, which
   the liveness slice's validity supplies (live_fracc_le1).
+  F28 IPUT'S GUARD KEEPS ITS WINDOW OPEN INTO THE LAST CLOSE.  The site
+  map's "(a) at c = 1 … (b) at c = 1 (NO bump), then release itable _in"
+  is the FREE path's guard (the (b) re-mints the unit at T', the NB
+  acquire's inner AMO floors it -- F22).  On EXIT A (valid == 0 or
+  nlink != 0: no release, straight to ref--) a (b) at T' followed by the
+  last close's (a) would need a floor ≥ T' under the SAME itable hold,
+  which no running context can mint for its own deposit stamp (the R1
+  asymmetry).  So the guard's (a) is the last close's (a): the window
+  stays open from +0x3a through the +0x22 store, the eviction re-deposits
+  RAW at None ((b')) and (d) drops the unit -- one (a), one (b'), one (d)
+  per last close, exactly the tabulated transitions, with the header in
+  hand across the reads (the row "+0x3c/+0x44 re-reads: inside the
+  (a)…(b) window").  Proof shape: ip_free_entry's Exit A hands ip_tail
+  the OPEN window (register + header + cnt half + the slot's stamp row +
+  the rows' back-wand) instead of whole rows; ip_tail's premise is that
+  bundle when cnt = 1 and the whole rows otherwise.  Two plumbing rows
+  with it: iput's itable acquire is the llb tier at Tl := max_stamp of
+  the closer's unit (IcacheRef.inode_ref_at names the fragment so the
+  floor can be stated over it), and the post-free re-acquire at Tl := the
+  park stamp.
 
   BUILD AGENT'S REVIEW OF THE SKELETON (2026-09-02, against ProofIget /
   ProofIlock / ProofIunlock / ProofIput and the bcache instance as built).
@@ -2043,3 +2063,10 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   ic_escrows (idup's (c) without a spec sweep); M-5 landed in IcacheRef
   (ic_stamps with a Qc mass; every reference form carries its stamps,
   the bare forms none).
+- 2026-09-02 (build agent, R3.3 cont.): F27 — the payload's liveness half
+  rides ic_deposit beside ic_deposit2 across a share's hold (no spec row
+  names it); F28 — iput's guard window stays open into the last close on
+  Exit A (no floor for the guard's own re-mint under the same hold);
+  inode_ref_at (named fragment) for iput's llb-tier itable acquire.
+  ProofIdup green; ProofIget/Ilock/Iunlock rewritten (compiling);
+  ProofIput in progress; the NB twin (F22) not yet written.
