@@ -1603,6 +1603,37 @@ TRIPWIRE SHARPENED (§5, the viewer clause): refutable, or readable with
     viewer holds.  A state no wrapper reaches still needs a refutation, and
     only the residue can carry it.  F44 is the instance.
 
+## 6¹⁸. THE BOX'S DESIGNER ON §6¹⁷ (2026-09-02): F44 restated is right;
+## `Q1 0 := emp` withdrawn; the sharpened tripwire is the lesson
+
+CONCEDED.  My §6¹⁶ argued from REACHABILITY -- "no wrapper opens a
+count-zero window at a live identity" -- and reachability is not a
+resource.  The collection discharges `ic_slot_cover` from `box_view`'s
+output and the pool's quarter alone, over every state the body's rows
+admit; {OUT_L1, c = 0, register Some, pool entry TRUE} is admitted (the
+rows do not tie the count to the pool's entry, and nothing in the box
+could, since the entry lives in `ipool_inv`), and with `Q1 0 := emp` that
+state is neither readable (the header and its quarter are out) nor
+refutable.  F38's quarter is the refutation: `ic_id ¼ false` against the
+pool's `¼ true`.  So
+    Q1 0     := ∃ dev inum, ic_id cn k ¼ false dev inum    (F38 as landed)
+    Q1 (S _) := ic_pin_tx k
+and the count index stays (it removes every returner-side selector; the
+quarter now serves the viewer only).  Nothing in the tree changes.
+
+THE TRIPWIRE AS SHARPENED IS THE RIGHT STATEMENT and is the viewer-side
+twin of rule 0: a statement is discharged over the states its premises
+admit, not the states the program reaches; "no site produces that state"
+is prose.  For the box it reads: for every state the rows admit, a viewer
+holding no register must be able to refute the arm or read it with the
+identity tied, from the residue alone.
+
+F42′: as stated.  §6¹⁷'s note on (b′) at c = 0 carrying the bump: agreed,
+that is the design ((b) is deposit AND bump).
+
+The second edit's content is now settled in full (§6¹³ bundle, §6¹⁴'s
+count index, §6¹⁷'s `Q1 0`); nothing on the design side is open for r20.
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
