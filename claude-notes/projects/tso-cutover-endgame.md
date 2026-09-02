@@ -931,6 +931,124 @@ QUESTIONS FOR THE NEXT ROUND.
       shape (it is main's), i.e. `ic_slot_cover` stated over `box_body`
       client-side as P2 says?
 
+## 6⁸. SECOND REVIEWER: AUDIT OF CtxBoxNext.v / OffBox.v, AND ANSWERS TO §6⁷
+## (2026-09-02)
+
+### 6⁸.1 CtxBoxNext.v — the edit is sound and a real simplification; one gap
+
+(A) REGISTER-SELECTED ARMS, NO tok / _excl: ACCEPT.  With lr_hold recorded
+    the three states are determined by (sr_win, lr_hold) and every lemma
+    selects by ghost_var agreement on a half it holds: (f) by its L2 half
+    (hold = Some), (b′)/(g) by win = true (which forces hold = None through
+    the OUT_L2 arm's ⌜sr_win = false⌝), (e) by hold = None with OUT_L1
+    refuted by Σ, (a) by win = false with OUT_L2 refuted by Σ.  The
+    invariant OUT_L2 ⇒ win = false is maintained ((a) never runs in
+    OUT_L2; (g) clears win as it sets hold; (e) runs from IN).  The
+    cell-clash obligations were the workaround for a parker holding only
+    cells; F7 gave it the half.  My "park principle" is superseded.
+(B) (f′) box_park_join: ACCEPT; my "(f) needs no twin" was wrong — (f)
+    takes the FULL header and the arm's Q is inside the box until (f)
+    opens it, so the holder cannot re-form the header first.
+(C) Q in both out arms: as ruled.
+F33 THE GAP: (e′)'s split wand `∀ x ξ', P_hdr i x ξ' ⊢ P_hdr' i x ξ' ∗ Q`
+    demands ALL of Q from the header.  The icache's Q is desc-half ∗
+    side-share ∗ (3/4 leg): the leg comes from the header, but the
+    descriptor half is a ghost_var the caller mints and the ln_tx share is
+    in the caller's hand — neither can come out of P_hdr.  FIX: (e′) takes
+    a caller residue Qc and the wand is `∀ x ξ', Qc ∗ P_hdr i x ξ' ⊢
+    P_hdr' i x ξ' ∗ Q`; (e) is the instance Qc := Q, P_hdr' := P_hdr.  (f′)
+    is fine (its Q' carries the descriptor half back out).
+Smaller: (c)/(d) framing the OUT_L2 arm under a changed m is sound (both
+fragments are separately valid against ● m); (e′)'s CtxMorph premise on
+P_hdr' is needed and present.
+
+### 6⁸.2 OffBox.v — right in shape; four items before code
+
+F34 THE MASS RULE (M-5 again).  off_fd_row uses the fd row's CELL fraction
+    q as the stamps mass; a file reference is (q, n) in M — q the content
+    fraction, n the count — and a whole reference with q < 1 is common, so
+    Σ m = c breaks.  Mass is 1 per counted reference, the share's fraction
+    for a share, with the lent-parent tie (inode_ref_short's shape) for
+    files.  off_close / off_reclaim already assume unit masses.
+F35 THE SET'S KEY DOES NOT PRODUCE THE ROW'S γ.  off_rows is keyed by
+    bx_stamps γ and its rows are ∃ γ' s, ⌜bx_stamps γ' = g⌝ ∗ off_l2_row γ'
+    s ξ; a member learns only bx_stamps γ' = bx_stamps γ, and needs the
+    row's bx_slotp half at ITS gname.  Key the set by the whole box_names
+    record (derive EqDecision/Countable — a record of gnames) or store γ.
+    The F6/F13 class.
+F36 AN ORDERING DEPENDENCY THE PLAN LACKS.  The reclaim's (a) needs
+    ctx_floor ξ Kd with Kd ≥ td from FTABLE.LOCK'S PAYLOAD FLOOR ROW, and
+    every ftable.lock release must fold td through _in (R2).  is_ftable is
+    still `<{ ftable_res γ }>` (FileInv.v:675).  So R4b depends on the
+    is_ftable λ-flip + a floor slot in ftable_res (L7/L8), which move
+    ahead of L6; the ftable release sites (filealloc, filedup, fileclose)
+    become _in releases.  The publisher's ilock presents ONE Tl for two
+    boxes: Tl := max (the inode share's stamp, the off box's birth stamp).
+F37 CLIENT SHAPES THE SKELETON IMPLIES BUT DOES NOT STATE: fslot's
+    allocated arm carries off_l1_row (register half, cnt half, its llb,
+    td ≤ tl) + the L1 floor row, the free arm the cell and no box; ic_slp
+    gains off_rows on the SLOT (stale rows survive a recycle of the slot —
+    dead γ, harmless); a big_sepS llb-max and a big_sepS CtxMorph lemma
+    (off_rows_morph is Admitted for that reason).
+CHECKS OUT: birth at filealloc (box_alloc_at then (c) at T_boot); the
+publish as (e) at Kp := 0 with (C)-left through the unit's birth stamp
+and the owner-held L2 half, then (f) and the append with the row's floor
+supplied by the _in fold (the wand form `ctx_floor ξ T' -∗ off_rows` is
+exactly right); read checkout/park through membership; (c)/(d) under
+ftable.lock; the reclaim at c = 1 with (D) through the gathered unit's
+re-stamped keys via R1 at fileclose's ftable acquire; the box abandoned,
+its stale L2 row re-floored forever by the folds; Q := emp (the collection
+never looks at f->off).
+
+### 6⁸.3 Answers to §6⁷'s five questions
+
+Q1  YES to ½ / ¼ / ¼ (table / box header / pool); re-cut the table from
+    ¾.  The two (b′) sites flip all four fractions in one step (Q2 says
+    where).
+Q2  NEITHER OPTION — THE RECYCLE ARM OF Q IS emp.  Two facts decide it:
+    SpecIget (and the namei specs) carry NO transaction share, so the
+    collection cannot refute a c = 0 window by a tx pin (adding one is a
+    spec sweep through dirlookup/namex/ialloc/ireclaim); and the pool row
+    and the identity flip need not touch the window at all — do the pool
+    take (ipool_take_lend), the four-quarter flip and the deposit INSIDE
+    the (b′) wrapper's single fupd with ipool_inv opened beside the box.
+    The recycler holds everything the flip needs at that instant (the
+    table's ½ under itable.lock, the pool's ¼ from ipool_inv, the box's ¼
+    inside the header it withdrew at (a)); the partition region = O ∪ X ∪
+    live is preserved in the same ipool_inv open (inum leaves O and enters
+    live together); nothing is in transit between (a) and (b′).  The
+    collection meeting an OUT_L1 slot reads c = 0 off the body's cnt_half
+    and treats the slot as dead — its ids entry is false by the pool's own
+    quarter — and needs nothing from Q.  The recycler's (a) deposits emp;
+    the dead header (with its ic_id ¼ false and ic_pin_rest) goes out
+    whole.  Fallback, if the wrapper cannot hold ipool_inv and the box
+    open in one step for a mask reason: the transit index, never a Q arm.
+Q3  YES: ic_hdr None IcRaw carries ic_pin_rest k ∗ ic_id ¼ false _ _; the
+    ordinary ic_pay arms carry ic_pin_rest k.  At the guard's (a) the pin
+    leaves with the header and enters Q's guard arm as ic_pin_tx; at the
+    recycler's (a) it stays in the withdrawn header (Q = emp).
+Q4  ADD `box_q_update`, AND CLASSIFY IT.  Not an eighth transition: arm,
+    m, T, both registers and all four rows untouched; only the client's
+    residue is updated under a client fupd (select OUT_L2 by the caller's
+    l2_hold, take Q, run Q ==∗ Q, put it back).  Clients unfolding
+    box_body is what the box law exists to prevent (the body's raw layout
+    would become every such client's dependency).  Record the law as
+    "seven transitions plus two non-transition accessors" (the second is
+    Q5's view).
+Q5  YES — fifty boxes at icBoxN .@ k inside the collection's one fupd is
+    the intended shape (P1's reason).  But do NOT state ic_slot_cover over
+    box_body's raw layout: give CtxBox a read-only view lemma
+    `box_body_cases` — the three-way case analysis with the registers'
+    pure facts and the arm's client content exposed (IN: header/rest at
+    ξb; OUT_L1: c, the window pair, Q; OUT_L2: the parked fragment's
+    identity and Q), closing with what it opened.  The collection matches
+    on that; it is the second non-transition accessor.
+ORDER: §6⁷'s steps 1–4 stand, with F33 folded into step 1 (before the
+edit moves into CtxBox.v), F34/F35 into OffBox.v before its code, and
+F36's reordering (L7's ftable flip before L6) in §5.
+
+---------------------------------------------------------------------------
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
