@@ -1788,6 +1788,55 @@ client-side selector I missed for (a)?  (Q7) `ic_park`'s return of the
 NEUTRAL descriptor (the wrapper runs `ic_dep_park`) rather than the two
 halves — any consumer that wanted the halves apart?
 
+## 6²². SECOND REVIEWER ON §6²¹ (2026-09-02): Q6 accepted with three
+## conditions; Q7 confirmed
+
+Q6 -- (e′)'S SPLIT WAND AS A VIEW SHIFT: ACCEPT (c).  The reader's split
+    must be total over the header's shapes, and the FROZEN alternative
+    cannot be refuted by an entailment: `frz_slot_kill_pinw`
+    (IcacheInv.v) takes `itable_inv_pinw`, a `frzsel k _ true` fraction and
+    the reader's `live_genlo` slice and yields `False` as a fupd at a mask
+    containing `icacheN` -- an invariant open, so the wand must be a view
+    shift.  The UNLOADED shape is different: `ity_pending_shot_excl` is
+    pure, so the one-shot kills it inside either form.  The rejected
+    alternatives are rightly rejected: the frozen pin in `Q2`'s DepRd side
+    fails the parker's selection (after F42 the ordinary parker holds no
+    pin piece); the frozen outcome as a checkout RESULT is impossible once
+    (e′) has closed OUT_L2.  No client-side selector exists for a pure
+    wand: a reader would need a `frzsel` fraction, and its fractions live
+    in the table row, the frozen alternative and iput's hand -- none a
+    reader holds; giving shares a selector fraction would redesign main's
+    freeze ghost (stitch rule).
+    THREE CONDITIONS:
+    (1) the wand's mask is the box's, `E ∖ ↑N`; the reader's fupd opens
+        `itable_inv` at `icacheN`, so `icacheN` must be disjoint from the
+        box's per-slot namespace -- true, but the wrapper's mask premise
+        should state it rather than rely on it;
+    (2) ONE box statement: a pure wand lifts to a view shift trivially, so
+        (e) and the write-arm wrapper are instances; no second box lemma;
+    (3) do not reopen F42: §6¹³'s "(a′) view-shift wand for the guard" is
+        now technically available, but the guard's pin is produced from
+        the row before (a) and that is landed.  Leave it.
+    Classification: the third CtxBox change is a premise-type change on
+    (e′) only, one line of proof, (e) unaffected -- mechanical.
+
+Q7 -- THE NEUTRAL DESCRIPTOR AT PARK: CONFIRMED; no consumer wants the
+    halves apart.  The park's result returns to the sleeplock payload at
+    releasesleep, and `ic_slp` carries `ic_dep_neutral`, so the whole at
+    `DepNone` is exactly the shape needed.  The only parties that handle
+    the halves separately are the shrink/grow updates, which run DURING the
+    hold through `box_q_update` (with the output residue R), not at park.
+    The free path's (g) starts from the neutral whole after acquiresleep,
+    and its park through `ic_park_hold` returns it.  Right for every
+    parker.
+
+TWO SMALLER POINTS: the arm-aware held header `ic_hdr_held … (rd : bool)`
+    is a client choice of `P_hdr'` per call and needs no box change;
+    `ic_park_side d = emp` at DepRd is consistent (the three quarters go
+    home into the header through the join, a DepTx parker gets its tx share
+    back), and the parker's join stays pure and total because descriptor
+    agreement inside the wand kills the other descriptor arms.
+
 ## 7. Process and tooling (measured facts, not preferences)
 
 ### 7.1 Build
