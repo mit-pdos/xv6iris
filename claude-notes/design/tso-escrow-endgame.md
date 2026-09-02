@@ -1401,6 +1401,26 @@ context, mapped to CtxBox's lemmas:
       not a box change.  The NB tier's free-lock evidence (slh_auth γt
       None) and the isl-pool return are untouched; only the payload form
       and the llb row change.  Add to the R3 list.
+  PROPOSER (2026-09-02, audit of F22 + the walk): F22 REAL; the twin is
+  the right fix and it is R1, not a new route.  The cover the free path
+  needs is (C)'s LEFT disjunct at the guard's re-minted unit: after (b)
+  at c = 1, m = {[(id, T') := 1]} and T = T', so any K ≥ T' covers — and
+  T' is the caller's OWN deposit stamp, which no floor it holds reaches
+  (the asymmetry); the only drain between (b) and the checkout is the NB
+  acquire's inner AMO.  Presenting llb T' there is exactly R1 on the NB
+  proof: wp_acquiresleep_nb_genl_llb_sconf relays the inner acquire's llb
+  post through the λ payload ic_slp, as genl_llb does on the blocking
+  proof.  "Necessary" is slightly strong — a seventh box transition
+  OUT_L1 → OUT_L2 (take P_rest under both locks with the (a)-time floor,
+  never re-depositing the header) would also cover it — but that breaks
+  the six-lemma law and the arm discipline for one site, while the twin
+  is a mechanical relay on a proof that already has the AMO.  Ruling
+  stands.  The skeleton needs no edit: ic_checkout already takes
+  ctx_floor ξ Kt with the fragment's max_stamp ≤ Kt; the free path
+  supplies Kt from the new tier at Tl := T' (llb T' is (b)'s own post).
+  The walk's other items agree with my reading; the non-free last close
+  is (a)(b)(a)(b')(d) in one itable critical section, the eviction being
+  the proof model's at every last close as today.
   VETTED 2026-09-02 (second reviewer, F21 as applied + the build agent's
   walk): F21's refinement ACCEPTED — the map ∃-bound in ic_hold with the
   mass as a pure row is right (a parameter would reach ic_deposit's
@@ -1952,3 +1972,8 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   walk vetted — no new issues; F22 accepted as a lock-relay item (the
   NB acquiresleep tier needs its genl_llb twin; no alternative cover for
   the free path's (e)).  R3 code may start.
+- 2026-09-02 (proposer, F22 audit): REAL; the NB acquiresleep tier's
+  genl_llb twin is R1 on the NB proof (the inner AMO is the only drain
+  between the guard's (b) and the free path's checkout, and the cover is
+  (C)-left at the re-minted unit).  A seventh transition could also cover
+  it and is rejected by the six-lemma law.  No skeleton change.
