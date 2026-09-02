@@ -1319,6 +1319,47 @@ context, mapped to CtxBox's lemmas:
     field icn_box; every b is cn at R3.  F20: applied.
   - The two F14 entailments are stated: ic_rest_raw_unloaded (reflexivity,
     proven) and ic_rest_to_raw (Admitted).
+  VETTED 2026-09-02 (second reviewer, rule-0 re-run on both files):
+  F14–F20 ALL CORRECTLY APPLIED.  box_deposit_L1_shape is a strict
+  generalization (same producers as (b) + the entailment applied to the
+  arm's P_rest before the close; build order: prove (b'), derive (b) as
+  x1 := x0).  ic_recycle_deposit (Raw → Unloaded g, reflexivity),
+  ic_evict_deposit (→ IcRaw at None, then ic_decr over ic_bid),
+  ic_checkout / ic_park over the descriptor (identity by (I) from the
+  key; q = ic_dep_mass d by Qp_to_Qc injectivity), ic_slot_row with cnt,
+  boot at IcRaw: all pass.  ONE NEW ITEM:
+  F21 THE FRAGMENT'S SHAPE BETWEEN SITES.  ic_checkout requires the
+      fragment as a SINGLETON {[(Some (dev,inum), t) := ic_dep_mass d]}
+      and ic_hold pins a singleton, but every producer that feeds it
+      hands out ic_ref_stamps … μ = ∃ m, qsum m = μ ∗ reference m —
+      ic_guard_deposit's post (iput's free path feeds its own checkout
+      from it), inode_ref2_carve's inode_shr2 (ilock's share),
+      ic_hit_incr, ic_recycle_deposit.  The box lemmas do produce
+      singletons; the site wrappers erase that, so the free path's
+      checkout is not dischargeable from the guard's post as stated.
+      FIX (recommended): generalize ic_checkout's fragment premise to any
+      m with ⌜qsum m = Qp_to_Qc (ic_dep_mass d)⌝ ∗ ⌜max_stamp m ≤ Kt⌝ ∗
+      reference … m, and ic_hold to pin THAT m.  R-1 still holds — the
+      register records the exact keys and the pure row pins the mass,
+      which is all (d) needs — and ic_park re-mints a singleton at T'
+      regardless.  It also covers the real multi-key case: a unit
+      gathered from shares that parked at different stamps has several
+      keys and may legitimately be checked out.  (The alternative —
+      every producer returns the named singleton — serves R1's Tl := t
+      but not the multi-key unit.)
+  BUILD NOTES (not design): ic_rest_to_raw needs length (bm_cells bm) =
+  13 — cite the lemma; with F19 the box names live in ic_names, so boot
+  mints them before MkIcNames — state ic_box_alloc over pre-minted names
+  (CtxBox.box_alloc_at, A6.159), as bio_init does.
+  CHECKED: iput's free path has (C) via the guard's re-mint at T' (Tl :=
+  T'); the +0x50 mint reaches iref_frag (ic_deposit2 is a plain
+  conjunction in iput's hand, not a frozen handle); the park sits at
+  IcUnloaded g on ic_pay's frozen alternative with live_gen k ½ g already
+  in the table's frz_park; the Loaded header ties i_nlink to di_nlink dn
+  so link/unlink via iupdate move the whole record consistently; lending
+  parents never check out (ilock takes a carved share, iput the merged
+  unit), so ic_dep_mass (DepRef _) = 1 is the only reference mass at (e).
+  R3 CODE MAY START once F21 is in the skeleton.
   OPERATIONS WALK (what the instance must support; status after F14–F19):
       iget hit (c) ✓ · iget recycle (a)/stores/pinw arm store/(b)→Unloaded
       needs F14 · idup (c) ✓ · ilock: T3 racy read unchanged, genl_llb at
@@ -1820,3 +1861,10 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   descriptors (F15/F16), ic_checkout / ic_park over d, ic_slot_row with
   the cnt half (F17), ic_decr over ic_bid (F18), F19 note, boot premise
   (F20), the two P_rest entailments.  Both files type-check on the VM.
+- 2026-09-02 (second reviewer, rule-0 re-run after F14–F20): all applied
+  correctly; box_deposit_L1_shape is a strict generalization of the
+  proven (b).  F21: ic_checkout's singleton fragment premise is not
+  producible from the site wrappers' ∃-m outputs — generalize the premise
+  and ic_hold to a pinned general m (R-1 preserved; covers multi-key
+  gathered units).  Two build notes (bm_cells length; boot over
+  box_alloc_at).  R3 code may start once F21 is in.
