@@ -1618,6 +1618,37 @@ context, mapped to CtxBox's lemmas:
     withdraw export the bound, the four deposit wrappers take T0, and
     the new wrapper `ic_free_take` (the (g) site) returns `ic_hold k dev
     inum 1` for the caller's ic_body.
+  VETTED 2026-09-02 (second reviewer, the R3.4 landing against the
+  ruling): MATCHES THE RULING; PROVEN; NO NEW ISSUES.
+  - The unnamed producer is correct and the right choice: hdr_out keeps
+    the fragment's `llb (max_stamp m')` and (a) takes the caller's
+    `llb (max_stamp mD)` — the persistent llb every reference already
+    carries (llb 0 at c = 0); neither a ghost nor a row; (b)/(b') drop
+    it.  The rejected alternative (a pure "every key ≤ T" row) would
+    touch every close.
+  - (g) checked against its producers: win agreement + Some-injectivity
+    give x = x0 AND T = T0; the cover is box_view at K ≥ T0 into
+    ctx_absorb_lb; m' ≠ ∅ from Σ = 1 (hence c = 1); keyed m' by (I) +
+    inclusion; L1 closes at its own td; L2 takes hold := Some (ident, m')
+    with tp unchanged; l2_hold's llb is hdr_out's.  The close re-uses the
+    body's T, m and the four pure facts verbatim — (Σ)(I)(C)(D) untouched.
+    (a)'s export ⌜T0 ≤ max Kd Kt⌝ is derived where the cover is
+    (qsum_eq_dom, max_stamp_ge).
+  - SUPERSEDED, do not revive: the pre-ruling sketch
+    `box_take_L2_in_window` covered P_rest with the L2 floor Kp ≥ lr_tp
+    s0.  UNSOUND in general — P_rest is clean at the box stamp T, and
+    after a recycle's (b) T exceeds tp ((C) then holds through the
+    unit's stamps, not tp).  The landed (g) covers from the register's
+    T0, as ruled.
+  - ic_free_take / ic_park_hold are client wrappers (the law stays at
+    seven); F22's twin at Tl := 0 IS the λ-payload NB tier (no plain
+    nb_genl exists) — live code, the const-tier pattern; F28's Exit A
+    runs the ref-- store through the count-store twin under icacheN, not
+    the box (the site check).  Zero Admitted in the tree; full tree green
+    modulo ForkretPark.
+  R3 is complete for the icache.  NEXT: R4 (inode_pay §4.3, off_hold
+  §4.4 with the main side), then R5 (the recorded reverts, log_res, and
+  ForkretPark's bullets), R6.
 
   (B) AS A STATEMENT (build agent, 2026-09-02, so the ruling is on code;
   the R3.3 bank ec7d87efa has everything else green, ip_free_locked the
@@ -2317,3 +2348,8 @@ Gate: full -B, zero red, zero admits.  THE SYSTEM IS PROVEN UNDER TSO.
   (f); (C) rejected as a client family for one site.  (g)'s statement,
   producers and row check recorded in §4.2 for the build agent; the law
   is seven lemmas, (g) the unique both-locks transition.  F23–F29 agreed.
+- 2026-09-02 (second reviewer, R3.4 landing vetted): matches the ruling,
+  proven, no new issues.  hdr_out's fragment llb accepted as the missing
+  producer; (g) checked producer by producer; the pre-ruling Kp-covered
+  sketch marked SUPERSEDED (unsound after a recycle's (b)).  R3 complete;
+  R4/R5/R6 next.
