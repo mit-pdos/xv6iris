@@ -18515,4 +18515,19 @@ NEXT: R1' per §4.1 once F1 is vetted (or as F1 says, absent objection).
   (e) loses the shape; the OUT_L1 -> OUT_L2 transition is recommended.
   The NB acquiresleep twin (F22) is written (asl_nested_core_llb /
   wp_acquiresleep_nb_genl_llb_sconf) and becomes unnecessary if (B) rules.
+- R3.3 BANKED: `tso-flip` ec7d87efa (54 files).  ProofIput compiles end
+  to end -- ip_tail (both close arms), ip_free_entry (the +0x3a guard
+  checkout, +0x46 AU, nlink read, generation bump, the (b) guard deposit at
+  the fresh generation) and wp_iput_gen's two exits -- with ip_free_locked
+  the ONE Admitted in the icache files (F30).  The NB twin re-verified
+  (SpecAcquire, SpecAcquiresleep, ProofAcquiresleep green).  Full tree:
+  one red, ProofForkretPark's bracketed park_globals frontier (A6.160).
+  Compile-iteration gotchas worth keeping: ip_rows' `if decide` is best
+  opened through the two equivalences `ip_rows_one` / `ip_rows_ne`
+  (`case_decide` inside) rather than `rewrite decide_True` at sites (the
+  match hides the `if` until `cbn beta iota`, and a `destruct (decide _)`
+  in an arm has already replaced it); the header's pieces in ip_free_entry
+  are `Hpayh`/`Hnl` (arm_pay is `Hpay`); `Hstampsback`'s fold takes four
+  goals (two pure, the row, the main).  CtxBox/IcacheEscrow's stale
+  "skeleton / Admitted" STATUS headers refreshed to PROVEN.
 
