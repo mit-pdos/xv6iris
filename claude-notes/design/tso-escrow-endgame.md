@@ -1592,6 +1592,73 @@ context, mapped to CtxBox's lemmas:
   is kept, which was F19's goal; F25: right, tying sr_td to tst would
   open icacheN at every (b)/(d); F28: the same principle as (B) — once
   the header is out, never re-deposit until the final (b')).
+  BUILD AGENT, LANDING (2026-09-02, R3.4): (B) + the register stamp landed
+  as ruled, with ONE producer the ruling's list did not name, recorded
+  here for the reviewers' check:
+  - l2_hold's second component is `llb loglen_name (max_stamp m)`, and
+    at (g) the window's fragment m' is ∃-bound inside hdr_out with no
+    llb beside it -- nothing in the box can produce that llb (the box
+    keeps llb T only, and no row bounds max_stamp m by T).  So hdr_out
+    now keeps the fragment's llb: `∃ m', ⌜qsum m' = qsum m⌝ ∗
+    stamps_frag γ m' ∗ llb loglen_name (max_stamp m')`, and (a) takes
+    `llb loglen_name (max_stamp mD)` from the caller -- the llb every
+    reference already carries (the c = 0 callers pass llb 0).  Not a
+    ghost, not a row: the window's fragment travels as a reference does.
+    (The alternative, a pure row "every key ≤ T", touches every lemma's
+    close for the same effect.)
+  - (g) `box_l1_to_l2` is stated at c = 1 (cnt_half γ 1 in and out, mass
+    `nat_Qc 1`), where the free path runs; the m' ≠ ∅ out_l2 needs comes
+    from the mass.  Premises exactly as ruled otherwise: win, sr_x =
+    Some (x0, T0), T0 ≤ K, lr_hold s0 = None; floor K; Q, tok, the L2 half.
+  - (a)'s post is `∃ x0 T0, ⌜T0 ≤ Nat.max Kd Kt⌝ ∗ slotd_half (SlotReg td
+    true ident (Some (x0, T0))) ∗ P_hdr ident x0 ξ`; (b)/(b') take
+    `sr_x r = Some (x0, T0)`; the body's OUT_L1 arm ties `sr_x r =
+    Some (x, T)`.  bcache: bbox_withdraw_L1 exports T0 ≤ Kd (Kt = 0);
+    bbox_deposit_L1 gains T0.  icache: ic_recycle_withdraw / ic_guard_
+    withdraw export the bound, the four deposit wrappers take T0, and
+    the new wrapper `ic_free_take` (the (g) site) returns `ic_hold k dev
+    inum 1` for the caller's ic_body.
+
+  (B) AS A STATEMENT (build agent, 2026-09-02, so the ruling is on code;
+  the R3.3 bank ec7d87efa has everything else green, ip_free_locked the
+  one Admitted).  The fused (b)+(e), CtxBox-generic, no fresh stamp:
+
+    Lemma box_take_L2_in_window `{CID : CpuId} (N : namespace) γ (ξ : CtxId)
+        (r : slot_reg id X) (c : nat) (x0 : X) (s0 : l2_reg id) (Kp : nat)
+        (E : coPset) :
+      ↑N ⊆ E → sr_win r = true → sr_x r = Some x0 →
+      lr_hold s0 = None → (lr_tp s0 ≤ Kp)%nat →
+      is_box N γ -∗ own_context ξ -∗ ctx_floor ξ Kp -∗
+      slotd_half γ r -∗ cnt_half γ c -∗ Q -∗ tok -∗ slotp_half γ s0 ={E}=∗
+      own_context ξ ∗ P_rest x0 ξ ∗
+      slotd_half γ (SlotReg (sr_td r) false (sr_ident r) None) ∗
+      cnt_half γ c ∗
+      ∃ m' : gmap (id * nat) ufrac,
+        ⌜qsum m' = Qp_to_Qc (unit_mass c)⌝ ∗ l2_hold γ (sr_ident r) m'.
+
+  Reading.  The caller is inside its own (a) window (the L1 register says
+  so: win = true, shape x0, the header in its hand) and holds the
+  sleeplock's tok.  The box's OUT_L1 arm carries P_rest x0 (parked at the
+  L2 stamp lr_tp s0, so Kp is the only floor needed -- rule 0: no content
+  is DEPOSITED, so nothing is minted) and the window's fragment m' of the
+  whole mass Σ = unit_mass c.  The transition hands P_rest out, closes L1
+  at ITS OWN old stamp sr_td r (no header goes back; the row's llb is the
+  one it already has), keeps the count, and moves the fragment into the
+  holder's l2_hold as (e) would.  What (e) rules out by mass (OUT_L1 with a
+  foreign reference) is here the caller's own state; what (b) mints
+  (T', the reference at T') is not needed because the header stays out.
+  The exit is the ordinary (f): P_hdr at the new shape (frozen alternative:
+  receipt + frzsel quarter) ∗ P_rest, parked at a fresh T''.
+  ICACHE WRAPPER: ic_free_take (ProofIput's +0x5a, replacing the
+  ic_guard_deposit_gen at ip_free_entry's tail + the (e) at
+  ip_free_locked's head); premise `ic_slp`'s floor for Kp (the L2 row
+  carries ctx_floor ξ (lr_tp s), so the PLAIN nb sleeplock tier suffices
+  and the F22 twin is not used by this site).  Statement sketch:
+    ic_box ⊢ own_context ξ -∗ ic_regd k r -∗ ic_cnt k 1 -∗ ic_tok cn k -∗
+    ic_regp k s0 -∗ ctx_floor ξ Kp ={E}=∗ own_context ξ ∗ ic_rest k x0 ξ ∗
+    ic_regd k (SlotReg (sr_td r) false (Some (dev,inum)) None) ∗ ic_cnt k 1 ∗
+    ic_deposit2 k (IcDep ...) at the unit -- i.e. the same handle row (e)
+    returns, so ip_free_locked's body is unchanged from the (e) point on.
 
   BUILD AGENT'S REVIEW OF THE SKELETON (2026-09-02, against ProofIget /
   ProofIlock / ProofIunlock / ProofIput and the bcache instance as built).

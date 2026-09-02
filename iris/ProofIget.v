@@ -1267,7 +1267,7 @@ Section ProofIget.
             iMod (ic_recycle_withdraw cn γfs γi cov logstart e TsoCtx.cur_ctx r tb ⊤
                     ltac:(solve_ndisj) Hrw Hrid Hrle
                     with "Hesc Hrun Hflb Hrd Hc")
-              as "(Hrun & Hc & Hrd & Hhdr)".
+              as "(Hrun & Hc & %T0 & %HT0 & Hrd & Hhdr)".
             iDestruct ("Hcgb" with "Hrun") as "Hcg".
             iModIntro.
             rewrite /ic_hdr /ic_hdr_amb.
@@ -1556,7 +1556,7 @@ Section ProofIget.
             iApply fupd_wp.
             iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
             iMod (ic_recycle_deposit cn γfs γi cov logstart e TsoCtx.cur_ctx
-                    (SlotReg (sr_td r) true None (Some IcRaw)) dev inum gnew ⊤
+                    (SlotReg (sr_td r) true None (Some (IcRaw, T0))) dev inum gnew T0 ⊤
                     ltac:(solve_ndisj) eq_refl eq_refl
                     with "Hesc Hrun Hrd Hc [Hvld Hd1 Hn1 Hnl Hbundle Hpend Hfoff Hlvh]")
               as "(Hrun & %Tb & Hrd & Hc & Hstnew & #HllbT)".

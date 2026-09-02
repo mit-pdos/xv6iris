@@ -705,7 +705,8 @@ Record slot_reg (id X : Type) := SlotReg {
   sr_td    : nat;      (* the stamp L1's payload floor row covers *)
   sr_win   : bool;     (* the L1 out-window is open *)
   sr_ident : id;       (* the box's current identity *)
-  sr_x     : option X; (* F10: the witness the open window's P_rest is at *)
+  sr_x     : option (X * nat); (* F10/F30: the witness the open window's P_rest is at,
+                                  and the box stamp the window opened at *)
 }.
 Arguments SlotReg {id X} _ _ _ _.
 Arguments sr_td {id X} _.

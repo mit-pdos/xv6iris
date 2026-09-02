@@ -2113,8 +2113,9 @@ Section IcacheBox.
     own_context ξ -∗ ctx_floor ξ Kd -∗
     ic_regd k r -∗ ic_cnt k 0 ={E}=∗
     own_context ξ ∗ ic_cnt k 0 ∗
-    ic_regd k (SlotReg (sr_td r) true None (Some IcRaw)) ∗
-    ic_hdr γfs γi cov logstart k None IcRaw ξ.
+    ∃ T0 : nat, ⌜(T0 <= Kd)%nat⌝ ∗
+      ic_regd k (SlotReg (sr_td r) true None (Some (IcRaw, T0))) ∗
+      ic_hdr γfs γi cov logstart k None IcRaw ξ.
   Proof.
     iIntros (HE Hw Hid HKd) "#Hbox Hrun #Hfl Hrd Hc".
     iMod (own_unit (authUR (gmapUR (ic_bid * nat) ufracR)) (bx_stamps (icfg_box k))) as "Hf0".
@@ -2124,12 +2125,13 @@ Section IcacheBox.
     { rewrite /max_stamp map_fold_empty. lia. }
     iMod (CtxBox.box_withdraw_L1 (ic_hdr γfs γi cov logstart k) (ic_rest k) emp%I (ic_tok cn k)
             icBoxN (icfg_box k) ξ r 0 ∅ Kd 0 E HE Hw Hq0 HKd Hm0
-            with "Hbox Hrun Hfl [] Hrd Hc [Hf0]") as "(Hrun & Hc & Hout)".
+            with "Hbox Hrun Hfl [] [] Hrd Hc [Hf0]") as "(Hrun & Hc & Hout)".
     { iApply ctx_floor_0. }
+    { rewrite /max_stamp map_fold_empty. iApply TsoGhost.llb_0. }
     { rewrite /stamps_frag. iExact "Hf0". }
-    iDestruct "Hout" as (x0) "[Hrd Hhdr]". rewrite Hid.
+    iDestruct "Hout" as (x0 T0) "(%HT0 & Hrd & Hhdr)". rewrite Hid.
     iDestruct (ic_hdr_dead_raw (XI := ξ) γfs γi cov logstart k x0 with "Hhdr") as %Hx0. subst x0.
-    iModIntro. iFrame "Hrun Hc Hrd". iExact "Hhdr".
+    iModIntro. iFrame "Hrun Hc". iExists T0. iFrame "Hrd Hhdr". iPureIntro. lia.
   Qed.
 
   (* iget's RECYCLE, part 2 -- (b') at c = 0 with the bump (F14: x0 = IcRaw,
@@ -2138,9 +2140,9 @@ Section IcacheBox.
      pool's bundle for inum taken under itable.lock, [live_slot_alloc]'s
      half and pending); the new reference is a unit at the deposit stamp. *)
   Lemma ic_recycle_deposit `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (k : nat)
-      (ξ : CtxId) (r : slot_reg ic_bid ic_x) (dev inum : mword 32) (g : gname) (E : coPset) :
+      (ξ : CtxId) (r : slot_reg ic_bid ic_x) (dev inum : mword 32) (g : gname) (T0 : nat) (E : coPset) :
     ↑icBoxN ⊆ E ->
-    sr_win r = true -> sr_x r = Some IcRaw ->
+    sr_win r = true -> sr_x r = Some (IcRaw, T0) ->
     ic_box cn γfs γi cov logstart k -∗
     own_context ξ -∗
     ic_regd k r -∗ ic_cnt k 0 -∗
@@ -2154,7 +2156,7 @@ Section IcacheBox.
   Proof.
     iIntros (HE Hw Hx) "#Hbox Hrun Hrd Hc Hhdr".
     iMod (CtxBox.box_deposit_L1_shape (ic_hdr γfs γi cov logstart k) (ic_rest k) emp%I (ic_tok cn k)
-            icBoxN (icfg_box k) ξ r 0 (Some (dev, inum)) IcRaw (IcUnloaded g) E HE Hw Hx
+            icBoxN (icfg_box k) ξ r 0 (Some (dev, inum)) IcRaw (IcUnloaded g) T0 E HE Hw Hx
             ltac:(intros ξb; rewrite /ic_rest; simpl; reflexivity)
             with "Hbox Hrun Hrd Hc Hhdr") as "(Hrun & %T' & Hrd & Hc & Href & #Hllb)".
     iModIntro. iFrame "Hrun". iExists T'. iFrame "Hrd Hllb".
@@ -2281,8 +2283,8 @@ Section IcacheBox.
     (∃ m : gmap (ic_bid * nat) ufrac, ⌜qsum m = Qp_to_Qc 1⌝ ∗ ⌜(max_stamp m <= Kt)%nat⌝ ∗
        CtxBox.reference (X := ic_x) (icfg_box k) (Some (dev, inum)) m) ={E}=∗
     own_context ξ ∗ ic_cnt k 1 ∗
-    ∃ x0 : ic_x, ⌜x0 ≠ IcRaw⌝ ∗
-      ic_regd k (SlotReg (sr_td r) true (Some (dev, inum)) (Some x0)) ∗
+    ∃ (x0 : ic_x) (T0 : nat), ⌜x0 ≠ IcRaw⌝ ∗ ⌜(T0 <= Nat.max Kd Kt)%nat⌝ ∗
+      ic_regd k (SlotReg (sr_td r) true (Some (dev, inum)) (Some (x0, T0))) ∗
       ic_hdr γfs γi cov logstart k (Some (dev, inum)) x0 ξ.
   Proof.
     iIntros (HE Hw Hid HKd) "#Hbox Hrun #Hfld #Hflt Hrd Hc Href".
@@ -2291,19 +2293,20 @@ Section IcacheBox.
     assert (Hq : qsum m = nat_Qc 1) by (rewrite Hm Qp_to_Qc_1 nat_Qc_1; reflexivity).
     iMod (CtxBox.box_withdraw_L1 (ic_hdr γfs γi cov logstart k) (ic_rest k) emp%I (ic_tok cn k)
             icBoxN (icfg_box k) ξ r 1 m Kd Kt E HE Hw Hq HKd Hmt
-            with "Hbox Hrun Hfld Hflt Hrd Hc Hf") as "(Hrun & Hc & Hout)".
-    iDestruct "Hout" as (x0) "[Hrd Hhdr]". rewrite Hid.
+            with "Hbox Hrun Hfld Hflt Hl Hrd Hc Hf") as "(Hrun & Hc & Hout)".
+    iDestruct "Hout" as (x0 T0) "(%HT0 & Hrd & Hhdr)". rewrite Hid.
     destruct x0 as [|g|g dn bm].
     { rewrite /ic_hdr /ic_hdr_amb. iDestruct "Hhdr" as "(_ & _ & _ & Hpay)".
       rewrite /ic_pay. iDestruct "Hpay" as %[]. }
-    all: iModIntro; iFrame "Hrun Hc"; iExists _; iSplitR; [| iFrame "Hrd"; iExact "Hhdr"];
+    all: iModIntro; iFrame "Hrun Hc"; iExists _, T0;
+         iSplitR; [| iSplitR; [iPureIntro; exact HT0 |]; iFrame "Hrd"; iExact "Hhdr"];
          iPureIntro; congruence.
   Qed.
 
   Lemma ic_guard_deposit `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (k : nat)
-      (ξ : CtxId) (r : slot_reg ic_bid ic_x) (dev inum : mword 32) (x0 : ic_x) (E : coPset) :
+      (ξ : CtxId) (r : slot_reg ic_bid ic_x) (dev inum : mword 32) (x0 : ic_x) (T0 : nat) (E : coPset) :
     ↑icBoxN ⊆ E ->
-    sr_win r = true -> sr_x r = Some x0 -> sr_ident r = Some (dev, inum) ->
+    sr_win r = true -> sr_x r = Some (x0, T0) -> sr_ident r = Some (dev, inum) ->
     ic_box cn γfs γi cov logstart k -∗
     own_context ξ -∗
     ic_regd k r -∗ ic_cnt k 1 -∗
@@ -2317,7 +2320,7 @@ Section IcacheBox.
   Proof.
     iIntros (HE Hw Hx Hid) "#Hbox Hrun Hrd Hc Hhdr".
     iMod (CtxBox.box_deposit_L1 (ic_hdr γfs γi cov logstart k) (ic_rest k) emp%I (ic_tok cn k)
-            icBoxN (icfg_box k) ξ r 1 (Some (dev, inum)) x0 E HE Hw Hx
+            icBoxN (icfg_box k) ξ r 1 (Some (dev, inum)) x0 T0 E HE Hw Hx
             with "Hbox Hrun Hrd Hc Hhdr") as "(Hrun & %T' & Hrd & Hc & Href & #Hllb)".
     iModIntro. iFrame "Hrun". iExists T'. iFrame "Hrd Hllb". iSplitL "Hc"; [iExact "Hc"|].
     rewrite /ic_ref_stamps /ic_ref_stamps_at /ic_stamps. iExists _. iFrame "Href". iPureIntro.
@@ -2331,9 +2334,9 @@ Section IcacheBox.
      on the rest (P_rest does not mention the generation). *)
   Lemma ic_guard_deposit_gen `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (k : nat)
       (ξ : CtxId) (r : slot_reg ic_bid ic_x) (dev inum : mword 32)
-      (g g' : gname) (dn : dinode) (bm : blkmap) (E : coPset) :
+      (g g' : gname) (dn : dinode) (bm : blkmap) (T0 : nat) (E : coPset) :
     ↑icBoxN ⊆ E ->
-    sr_win r = true -> sr_x r = Some (IcLoaded g dn bm) -> sr_ident r = Some (dev, inum) ->
+    sr_win r = true -> sr_x r = Some (IcLoaded g dn bm, T0) -> sr_ident r = Some (dev, inum) ->
     ic_box cn γfs γi cov logstart k -∗
     own_context ξ -∗
     ic_regd k r -∗ ic_cnt k 1 -∗
@@ -2347,7 +2350,7 @@ Section IcacheBox.
   Proof.
     iIntros (HE Hw Hx Hid) "#Hbox Hrun Hrd Hc Hhdr".
     iMod (CtxBox.box_deposit_L1_shape (ic_hdr γfs γi cov logstart k) (ic_rest k) emp%I (ic_tok cn k)
-            icBoxN (icfg_box k) ξ r 1 (Some (dev, inum)) (IcLoaded g dn bm) (IcLoaded g' dn bm) E HE Hw Hx
+            icBoxN (icfg_box k) ξ r 1 (Some (dev, inum)) (IcLoaded g dn bm) (IcLoaded g' dn bm) T0 E HE Hw Hx
             ltac:(intros ξb; rewrite /ic_rest; simpl; reflexivity)
             with "Hbox Hrun Hrd Hc Hhdr") as "(Hrun & %T' & Hrd & Hc & Href & #Hllb)".
     iModIntro. iFrame "Hrun". iExists T'. iFrame "Hrd Hllb". iSplitL "Hc"; [iExact "Hc"|].
@@ -2361,9 +2364,9 @@ Section IcacheBox.
      withdrawn shape, x1 = IcRaw, entailment ic_rest_to_raw): the slot is
      dead from here (M-1'), and (d) at None drops the unit (F18). *)
   Lemma ic_evict_deposit `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (k : nat)
-      (ξ : CtxId) (r : slot_reg ic_bid ic_x) (x0 : ic_x) (E : coPset) :
+      (ξ : CtxId) (r : slot_reg ic_bid ic_x) (x0 : ic_x) (T0 : nat) (E : coPset) :
     ↑icBoxN ⊆ E ->
-    sr_win r = true -> sr_x r = Some x0 ->
+    sr_win r = true -> sr_x r = Some (x0, T0) ->
     ic_box cn γfs γi cov logstart k -∗
     own_context ξ -∗
     ic_regd k r -∗ ic_cnt k 1 -∗
@@ -2378,12 +2381,45 @@ Section IcacheBox.
   Proof.
     iIntros (HE Hw Hx) "#Hbox Hrun Hrd Hc Hhdr".
     iMod (CtxBox.box_deposit_L1_shape (ic_hdr γfs γi cov logstart k) (ic_rest k) emp%I (ic_tok cn k)
-            icBoxN (icfg_box k) ξ r 1 None x0 IcRaw E HE Hw Hx
+            icBoxN (icfg_box k) ξ r 1 None x0 IcRaw T0 E HE Hw Hx
             ltac:(intros ξb; apply ic_rest_to_raw)
             with "Hbox Hrun Hrd Hc Hhdr") as "(Hrun & %T' & Hrd & Hc & Href & #Hllb)".
     iModIntro. iFrame "Hrun". iExists T'. iFrame "Hrd Hllb". iSplitL "Hc"; [iExact "Hc"|].
     iExists _. iFrame "Href". iPureIntro.
     rewrite /qsum map_fold_singleton /qsum_step Qcplus_0_r. change (unit_mass 1) with 1%Qp. reflexivity.
+  Qed.
+
+  (* iput's FREE PATH -- (g) under both locks (F30): P_rest comes out to the
+     freer at the window's shape, the L1 register closes at its own stamp
+     (no header goes back), and the unit's fragment parks in OUT_L2 as the
+     handle row (e) would have returned -- [ic_hold] at mass 1, which the
+     caller pairs with its [ic_body] into [ic_deposit2].  Cover: the
+     register's stamp T0 (bounded by (a)'s post) under a floor the caller
+     holds -- the itable acquire's Kt, or Kd, whichever (a) named. *)
+  Lemma ic_free_take `{CID : RiscvLang.CpuId} cn γfs γi cov logstart (k : nat)
+      (ξ : CtxId) (r : slot_reg ic_bid ic_x) (dev inum : mword 32) (x0 : ic_x)
+      (T0 K : nat) (s0 : l2_reg ic_bid) (E : coPset) :
+    ↑icBoxN ⊆ E ->
+    sr_win r = true -> sr_x r = Some (x0, T0) -> sr_ident r = Some (dev, inum) ->
+    (T0 <= K)%nat -> lr_hold s0 = None ->
+    ic_box cn γfs γi cov logstart k -∗
+    own_context ξ -∗ ctx_floor ξ K -∗
+    ic_regd k r -∗ ic_cnt k 1 -∗ ic_tok cn k -∗ ic_regp k s0 ={E}=∗
+    own_context ξ ∗
+    ic_rest k x0 ξ ∗
+    ic_regd k (SlotReg (sr_td r) false (Some (dev, inum)) None) ∗
+    ic_cnt k 1 ∗
+    ic_hold k dev inum 1%Qp.
+  Proof.
+    iIntros (HE Hw Hx Hid HTK Hs0) "#Hbox Hrun #Hfl Hrd Hc Htok Hrp".
+    iMod (CtxBox.box_l1_to_l2 (ic_hdr γfs γi cov logstart k) (ic_rest k) emp%I (ic_tok cn k)
+            icBoxN (icfg_box k) ξ r x0 T0 K s0 E HE Hw Hx HTK Hs0
+            with "Hbox Hrun Hfl Hrd Hc [] Htok Hrp")
+      as "(Hrun & Hrest & Hrd & Hc & %m & %Hm & Hhold)".
+    { done. }
+    iModIntro. iFrame "Hrun Hrest Hc". rewrite Hid. iFrame "Hrd".
+    rewrite /ic_hold. iExists m. iFrame "Hhold". iPureIntro.
+    rewrite Hm nat_Qc_1 Qp_to_Qc_1. reflexivity.
   Qed.
 
   (* boot: every slot dead and IN, at the boot deposit's stamp.  Over

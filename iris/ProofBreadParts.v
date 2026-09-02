@@ -636,7 +636,7 @@ Section BreadScan2.
     (* (a): the header out of the box at the slot's identity; the window opens *)
     iMod (bbox_withdraw_L1 bn V k cur_ctx r tl E HE Hw Hb with "Hbox Hrun Hfl Hrd Hc")
       as "(Hrun & Hc & Hout)".
-    iDestruct "Hout" as (bs) "[Hrd Hhdr]".
+    iDestruct "Hout" as (bs T0) "(%HT0 & Hrd & Hhdr)".
     iEval (rewrite /bhdr Hid; cbn [fst snd]) in "Hhdr".
     iDestruct "Hhdr" as (v) "(Hvld & Hdevb & Hbnob & Hpay)".
     iDestruct (ctx_word4_pointsto_half_join with "Hdevb Hdev") as "Hdev".
@@ -661,7 +661,7 @@ Section BreadScan2.
     iDestruct (ctx_word4_pointsto_half_split with "Hbno") as "[Hbnob Hbnos]".
     (* (b): the (invalid) header enters the box at the new stamp; the chain's
        unit is minted there *)
-    iMod (bbox_deposit_L1 bn V k cur_ctx (sr_td r) (sr_ident r) bs D B E HE
+    iMod (bbox_deposit_L1 bn V k cur_ctx (sr_td r) (sr_ident r) bs T0 D B E HE
             with "Hbox Hrun Hrd Hc [Hvld Hdevb Hbnob Hpay]")
       as "(Hrun & %T' & Hrd & Hc & Hgh & #Hllb')".
     { rewrite /bhdr. iExists false. cbn [fst snd]. rewrite /buf_hdr. cbv iota.

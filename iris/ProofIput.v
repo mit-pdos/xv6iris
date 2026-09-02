@@ -548,9 +548,9 @@ Section IputTail.
      (∃ tst : nat,
         mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
         TsoGhost.llb loglen_name tst ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx tst) ∗
-     (∃ (x0 : ic_x) (td : nat),
+     (∃ (x0 : ic_x) (td T0 : nat),
         ⌜x0 ≠ IcRaw⌝ ∗
-        ic_regd k (SlotReg td true (Some (dev, inum)) (Some x0)) ∗
+        ic_regd k (SlotReg td true (Some (dev, inum)) (Some (x0, T0))) ∗
         TsoGhost.llb loglen_name td ∗ ic_cnt k 1 ∗
         ic_hdr γfs γi cov logstart k (Some (dev, inum)) x0 TsoCtx.cur_ctx))%I.
 
@@ -1196,7 +1196,7 @@ Section IputTail.
       rewrite /ip_window.
       iDestruct "Hrows" as "(Hstampsback & Hsrow & Hwin)".
       iDestruct "Hsrow" as (tstk) "(Hstk & #Hllbk & #Hflk)".
-      iDestruct "Hwin" as (x0 td) "(%Hx0 & Hrd & #Hllbd & Hc & Hhdr)".
+      iDestruct "Hwin" as (x0 td T0) "(%Hx0 & Hrd & #Hllbd & Hc & Hhdr)".
       rewrite /ic_hdr /ic_hdr_amb.
       iDestruct "Hhdr" as "(Hvld & Hid & Hnlk & Hpayl)".
       iAssert (∃ ga : gname,
@@ -1320,7 +1320,7 @@ Section IputTail.
       iApply fupd_wp.
       iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
       iMod (ic_evict_deposit cn gfs gi cov logstart k TsoCtx.cur_ctx
-              (SlotReg td true (Some (dev, inum)) (Some x0)) x0 ⊤
+              (SlotReg td true (Some (dev, inum)) (Some (x0, T0))) x0 T0 ⊤
               ltac:(solve_ndisj) eq_refl eq_refl
               with "Hesc Hrun Hrd Hc [Hvld Hid Hnlk]")
         as "(Hrun & %Tb & Hrd & Hc & Hst0 & #HllbT)".
@@ -4290,7 +4290,7 @@ Section IputFreePath.
     iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (ic_guard_withdraw cn γfs γi cov logstart k TsoCtx.cur_ctx r dev inum tb Kt ⊤
             ltac:(solve_ndisj) Hrw Hrid Hrle with "Hesc Hrun Hflb Hflt Hreg Hc [Hrefm]")
-      as "(Hrun & Hc & %x0 & %Hx0 & Hreg & Hhdr)".
+      as "(Hrun & Hc & %x0 & %T0 & %Hx0 & %HT0 & Hreg & Hhdr)".
     { iExists mst. iFrame "Hrefm". iPureIntro. split; [exact Hmst | exact HKt]. }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
@@ -4360,7 +4360,7 @@ Section IputFreePath.
           iSplitR; [iPureIntro; exact Hlefe | iExact "Hflfe"]. }
         rewrite /ip_window. iFrame "Hstampsback".
         iSplitL "Hstk". { iExists tstk. iFrame "Hstk Hllbk Hflk". }
-        iExists (IcUnloaded ga), (sr_td r). iFrame "Hreg Hc".
+        iExists (IcUnloaded ga), (sr_td r), T0. iFrame "Hreg Hc".
         iSplitR; [iPureIntro; discriminate |]. iSplitR; [iExact "Hllbr" |].
         iExact "Hhdr". } }
     (* ===== valid == 1: LOADED -- fall through with the header in hand.
@@ -4845,8 +4845,8 @@ Section IputFreePath.
        selector's quarter are the header's ghost now *)
     iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (ic_guard_deposit_gen cn γfs γi cov logstart k TsoCtx.cur_ctx
-            (SlotReg (sr_td r) true (Some (dev, inum)) (Some (IcLoaded gfe dn bm)))
-            dev inum gfe ga' dn bm ⊤ ltac:(solve_ndisj) eq_refl eq_refl eq_refl
+            (SlotReg (sr_td r) true (Some (dev, inum)) (Some (IcLoaded gfe dn bm, T0)))
+            dev inum gfe ga' dn bm T0 ⊤ ltac:(solve_ndisj) eq_refl eq_refl eq_refl
             with "Hesc Hrun Hreg Hc [Hvld Hid Hnl Hrcpt Hsele]")
       as "(Hrun & %T' & Hreg & Hc & Hrst & #HllbT)".
     { rewrite /ic_hdr /ic_hdr_amb /ic_pay. iFrame "Hvld Hid Hnl". iRight. iFrame "Hrcpt Hsele". }

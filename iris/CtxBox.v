@@ -58,7 +58,7 @@
    THE ARMS: IN | OUT_L2 | OUT_L1, selected by the L1 register's flag:
      win = false:  (∃ x, P_hdr ident x ξb ∗ P_rest x ξb)  ∨  OUT_L2
      win = true :  hdr_out ∗ P_rest x ξb  at the x the register names
-                   (sr_x = Some x; (a) set it, (b) re-deposits at it)
+                   (sr_x = Some (x, T); (a) set it at the box stamp, (b) re-deposits at it)
    OUT_L2 := Q ∗ tok ∗ (the L2 payload's own row is NOT here: its slot_p
    half rides the holder's handle) ∗ the parked fragment named by [hold].
 
@@ -506,7 +506,7 @@ Section box.
   (* ---- the arms ----------------------------------------------------- *)
   (* the L1 out-window's ghost: the withdrawer's whole unit(s), or ∅ *)
   Definition hdr_out γ m : iProp Σ :=
-    (∃ m', ⌜qsum m' = qsum m⌝ ∗ stamps_frag γ m')%I.
+    (∃ m', ⌜qsum m' = qsum m⌝ ∗ stamps_frag γ m' ∗ llb loglen_name (max_stamp m'))%I.
 
   (* the L2 checkout's residue: the client's ghost, the token, and the
      fragment the holder parked -- named by the L2 register's [hold] *)
@@ -528,7 +528,7 @@ Section box.
        ⌜(∀ p, p ∈ dom m → (T ≤ p.2)%nat) ∨ (T ≤ lr_tp s)%nat⌝ ∗     (* C *)
        ⌜(T ≤ sr_td r)%nat ∨ ∃ p, p ∈ dom m ∧ p.2 = T⌝ ∗            (* D *)
        (if sr_win r
-        then hdr_out γ m ∗ ∃ x, ⌜sr_x r = Some x⌝ ∗ P_rest x ξb   (* F10 *)
+        then hdr_out γ m ∗ ∃ x, ⌜sr_x r = Some (x, T)⌝ ∗ P_rest x ξb   (* F10, F30 *)
         else in_arm (sr_ident r) ξb ∨ out_l2 γ s))%I.
 
   Definition is_box (N : namespace) γ : iProp Σ := inv N (box_body γ).
@@ -706,15 +706,18 @@ Section box.
     own_context ξ -∗
     ctx_floor ξ Kd -∗
     ctx_floor ξ Kt -∗
+    llb loglen_name (max_stamp mD) -∗
     slotd_half γ r -∗
     cnt_half γ c -∗
     stamps_frag γ mD ={E}=∗
     own_context ξ ∗
     cnt_half γ c ∗
-    ∃ x0, slotd_half γ (SlotReg (sr_td r) true (sr_ident r) (Some x0)) ∗
-          P_hdr (sr_ident r) x0 ξ.
+    ∃ (x0 : X) (T0 : nat),
+      ⌜(T0 ≤ Nat.max Kd Kt)%nat⌝ ∗
+      slotd_half γ (SlotReg (sr_td r) true (sr_ident r) (Some (x0, T0))) ∗
+      P_hdr (sr_ident r) x0 ξ.
   Proof.
-    iIntros (HE Hw HmD HKd HKt) "#Hbox Hrun #Hfld #Hflt Hrd0 Hcnt HfD".
+    iIntros (HE Hw HmD HKd HKt) "#Hbox Hrun #Hfld #Hflt #HllbD Hrd0 Hcnt HfD".
     rewrite /is_box. box_open "Hbox" "Hcl".
     iDestruct (ghost_var_agree with "Hrd Hrd0") as %->.
     iDestruct (ghost_var_agree with "Hc Hcnt") as %->.
@@ -726,7 +729,12 @@ Section box.
       iDestruct (stamps_frag_incl_2 with "Hst HfD Hf0") as %Hincl2.
       exfalso. apply qsum_incl_le in Hincl2. rewrite qsum_op HmD Hsum in Hincl2.
       exact (Qc_plus_pos_not_le_r _ _ (qsum_pos _ Hne0) Hincl2). }
-    (* the cover: (D) *)
+    (* the cover: (D) -- and its pure export, the window's stamp bound (F30) *)
+    assert (HTmax : (T ≤ Nat.max Kd Kt)%nat).
+    { destruct HD as [HD | (p & Hp & HpT)]; [lia|].
+      assert (Hp' : p ∈ dom mD).
+      { apply (qsum_eq_dom mD m HinclD); [by rewrite HmD Hsum | exact Hp]. }
+      pose proof (max_stamp_ge mD p Hp'). lia. }
     iAssert (own_context ξ ∗ ∃ K : nat, ⌜(T ≤ K)%nat⌝ ∗ hart_view_lb K)%I
       with "[Hrun]" as "[Hrun (%K & %HTK & #HKv)]".
     { destruct HD as [HD | (p & Hp & HpT)].
@@ -740,16 +748,17 @@ Section box.
     iDestruct "Hin" as (x0) "[Hhdr Hrest]".
     iMod (ctx_absorb_lb (P_hdr (sr_ident r) x0) ξb ξ T K HTK with "Hrun HKv Hpk Hhdr")
       as "(Hrun & Hpk & Hhdr)".
-    iMod (ghost_var_update_2 (SlotReg (sr_td r) true (sr_ident r) (Some x0)) with "Hrd Hrd0")
+    iMod (ghost_var_update_2 (SlotReg (sr_td r) true (sr_ident r) (Some (x0, T))) with "Hrd Hrd0")
       as "[Hrd Hrd0]"; [by rewrite Qp.half_half|].
     iMod ("Hcl" with "[Hpk Hst Hc Hrd Hrp HfD Hrest]") as "_".
-    { iNext. iExists T, ξb, m, c, (SlotReg (sr_td r) true (sr_ident r) (Some x0)), sb.
+    { iNext. iExists T, ξb, m, c, (SlotReg (sr_td r) true (sr_ident r) (Some (x0, T))), sb.
       iFrame "Hpk Hllb Hst Hc Hrd Hrp". simpl.
       iSplitR; [iPureIntro; exact Hsum|]. iSplitR; [iPureIntro; exact HI|].
       iSplitR; [iPureIntro; exact HC|]. iSplitR; [iPureIntro; exact HD|].
-      iSplitL "HfD". { iExists mD. iFrame "HfD". iPureIntro. by rewrite HmD Hsum. }
+      iSplitL "HfD".
+      { iExists mD. iSplitR; [iPureIntro; by rewrite HmD Hsum|]. iFrame "HfD". iExact "HllbD". }
       iExists x0. iFrame "Hrest". done. }
-    iModIntro. iFrame "Hrun Hcnt". iExists x0. iFrame "Hrd0 Hhdr".
+    iModIntro. iFrame "Hrun Hcnt". iExists x0, T. iFrame "Hrd0 Hhdr". iPureIntro. exact HTmax.
   Qed.
 
   (* ================================================================== *)
@@ -772,10 +781,10 @@ Section box.
        (I) singleton at id', (C) left disjunct (T' ≤ T'), (D) via td = T'.
        export llb T' (ctx_parked_llb). *)
   Lemma box_deposit_L1 `{CID : CpuId} (N : namespace) γ (ξ : CtxId) (r : slot_reg id X)
-      (c : nat) (i' : id) (x0 : X) (E : coPset) :
+      (c : nat) (i' : id) (x0 : X) (T0 : nat) (E : coPset) :
     ↑N ⊆ E →
     sr_win r = true →
-    sr_x r = Some x0 →
+    sr_x r = Some (x0, T0) →
     is_box N γ -∗
     own_context ξ -∗
     slotd_half γ r -∗
@@ -795,7 +804,7 @@ Section box.
     iEval (rewrite Hw) in "Harm".
     iDestruct "Harm" as "[>Hho >Hrest]". iDestruct "Hrest" as (x) "[%Hx' Hrest]".
     assert (x = x0) as -> by congruence.
-    iDestruct "Hho" as (m') "[%Hsum' Hf']".
+    iDestruct "Hho" as (m') "(%Hsum' & Hf' & _)".
     iMod (stamps_dealloc with "Hst Hf'") as (m1) "(Hst & %Hq1 & _ & _)".
     assert (m1 = ∅) as ->.
     { apply qsum_zero_empty. rewrite Hsum' in Hq1.
@@ -840,10 +849,10 @@ Section box.
      (b); the only new step is the entailment applied to the arm's P_rest
      before the close. *)
   Lemma box_deposit_L1_shape `{CID : CpuId} (N : namespace) γ (ξ : CtxId) (r : slot_reg id X)
-      (c : nat) (i' : id) (x0 x1 : X) (E : coPset) :
+      (c : nat) (i' : id) (x0 x1 : X) (T0 : nat) (E : coPset) :
     ↑N ⊆ E →
     sr_win r = true →
-    sr_x r = Some x0 →
+    sr_x r = Some (x0, T0) →
     (∀ ξb : CtxId, P_rest x0 ξb ⊢ P_rest x1 ξb) →
     is_box N γ -∗
     own_context ξ -∗
@@ -866,7 +875,7 @@ Section box.
     assert (x = x0) as -> by congruence.
     (* F14: the arm's rest converts to the target shape *)
     iDestruct (Hent ξb with "Hrest") as "Hrest".
-    iDestruct "Hho" as (m') "[%Hsum' Hf']".
+    iDestruct "Hho" as (m') "(%Hsum' & Hf' & _)".
     iMod (stamps_dealloc with "Hst Hf'") as (m1) "(Hst & %Hq1 & _ & _)".
     assert (m1 = ∅) as ->.
     { apply qsum_zero_empty. rewrite Hsum' in Hq1.
@@ -1051,7 +1060,7 @@ Section box.
     iDestruct (stamps_frag_incl with "Hst Hfh") as %Hinclh.
     destruct (sr_win rb) eqn:Hw.
     { (* OUT_L1: the window's fragment carries all of Σ; mine overflows it *)
-      iDestruct "Harm" as "[>Hho _]". iDestruct "Hho" as (m') "[%Hsum' Hf']".
+      iDestruct "Harm" as "[>Hho _]". iDestruct "Hho" as (m') "(%Hsum' & Hf' & _)".
       iDestruct (stamps_frag_incl_2 with "Hst Hf' Hfh") as %Hincl2.
       exfalso. apply qsum_incl_le in Hincl2. rewrite qsum_op Hsum' in Hincl2.
       exact (Qc_plus_pos_not_le_r _ _ (qsum_pos _ Hne) Hincl2). }
@@ -1170,6 +1179,78 @@ Section box.
     iSplitR; [iPureIntro; apply singleton_ne_empty_map|].
     iSplitR; [iPureIntro; apply keyed_singleton|].
     rewrite max_stamp_singleton. iExact "Hllb'".
+  Qed.
+
+  (* ================================================================== *)
+  (*  (g) l1_to_l2 : OUT_L1 → OUT_L2, under BOTH locks (F30)              *)
+  (* ================================================================== *)
+  (* iput's free path, the unique both-locks site: inside its own (a)
+     window (the register says so: win = true, shape x0, opened at the box
+     stamp T0 -- (a) exported T0 ≤ max Kd Kt) and holding the sleeplock's
+     tok, the caller takes P_rest out WITHOUT re-depositing the header.
+     Cover: P_rest is clean at the box stamp T = T0 (the body's tie), under
+     any floor K ≥ T0 the caller holds.  The L1 register closes at ITS OWN
+     old stamp (no content deposited, nothing minted: rule 0); the window's
+     fragment moves from hdr_out to out_l2 as the holder's l2_hold; the
+     count stays.  Rows: m, T, td, tp unchanged ⇒ (Σ)(I)(C)(D) untouched.
+     Refutation: none (win agreement selects OUT_L1).  Stated at c = 1,
+     which is where the free path runs (the guard's (a) at c = 1). *)
+  Lemma box_l1_to_l2 `{CID : CpuId} (N : namespace) γ (ξ : CtxId) (r : slot_reg id X)
+      (x0 : X) (T0 K : nat) (s0 : l2_reg id) (E : coPset) :
+    ↑N ⊆ E →
+    sr_win r = true →
+    sr_x r = Some (x0, T0) →
+    (T0 ≤ K)%nat →
+    lr_hold s0 = None →
+    is_box N γ -∗
+    own_context ξ -∗
+    ctx_floor ξ K -∗
+    slotd_half γ r -∗
+    cnt_half γ 1 -∗
+    Q -∗
+    tok -∗
+    slotp_half γ s0 ={E}=∗
+    own_context ξ ∗
+    P_rest x0 ξ ∗
+    slotd_half γ (SlotReg (sr_td r) false (sr_ident r) None) ∗
+    cnt_half γ 1 ∗
+    ∃ m', ⌜qsum m' = nat_Qc 1⌝ ∗ l2_hold γ (sr_ident r) m'.
+  Proof.
+    iIntros (HE Hw Hx HTK Hs0) "#Hbox Hrun #Hfl Hrd0 Hcnt HQ Htok Hrp0".
+    rewrite /is_box. box_open "Hbox" "Hcl".
+    iDestruct (ghost_var_agree with "Hrd Hrd0") as %->.
+    iDestruct (ghost_var_agree with "Hc Hcnt") as %->.
+    iDestruct (ghost_var_agree with "Hrp Hrp0") as %->.
+    iEval (rewrite Hw) in "Harm".
+    iDestruct "Harm" as "[>Hho >Hrest]". iDestruct "Hrest" as (x) "[%Hx' Hrest]".
+    rewrite Hx in Hx'. injection Hx' as -> ->.
+    iDestruct "Hho" as (m') "(%Hsum' & Hf' & #Hllb')".
+    iDestruct (stamps_frag_incl with "Hst Hf'") as %Hincl'.
+    assert (Hne' : m' ≠ ∅).
+    { intros ->. rewrite qsum_empty Hsum nat_Qc_1 in Hsum'.
+      assert (H01 : (0 < 1)%Qc) by (vm_compute; reflexivity).
+      exact (Qclt_not_eq _ _ H01 Hsum'). }
+    assert (Hkeyed' : keyed m' (sr_ident r))
+      by exact (keyed_sub _ _ _ (gincl_dom _ _ Hincl') HI).
+    (* the cover: the register's stamp IS the box's, under the caller's floor *)
+    iDestruct (box_view ξ K with "Hrun Hfl") as "[Hrun (%K' & %HKK' & #HKv)]".
+    iMod (ctx_absorb_lb (P_rest x) ξb ξ T K' ltac:(lia) with "Hrun HKv Hpk Hrest")
+      as "(Hrun & Hpk & Hrest)".
+    iMod (ghost_var_update_2 (SlotReg (sr_td r) false (sr_ident r) None) with "Hrd Hrd0")
+      as "[Hrd Hrd0]"; [by rewrite Qp.half_half|].
+    iMod (ghost_var_update_2 (L2Reg (lr_tp s0) (Some (sr_ident r, m'))) with "Hrp Hrp0")
+      as "[Hrp Hrp0]"; [by rewrite Qp.half_half|].
+    iMod ("Hcl" with "[Hpk Hst Hc Hrd Hrp HQ Htok Hf']") as "_".
+    { iNext. iExists T, ξb, m, 1, (SlotReg (sr_td r) false (sr_ident r) None),
+               (L2Reg (lr_tp s0) (Some (sr_ident r, m'))).
+      iFrame "Hpk Hllb Hst Hc Hrd Hrp". simpl.
+      iSplitR; [iPureIntro; exact Hsum|]. iSplitR; [iPureIntro; exact HI|].
+      iSplitR; [iPureIntro; exact HC|]. iSplitR; [iPureIntro; exact HD|].
+      iRight. rewrite /out_l2. iFrame "HQ Htok". iExists (sr_ident r), m'. iFrame "Hf'".
+      iPureIntro. split_and!; done. }
+    iModIntro. iFrame "Hrun Hrest Hrd0 Hcnt". iExists m'.
+    iSplitR; [iPureIntro; by rewrite Hsum' Hsum|].
+    rewrite /l2_hold. iExists (lr_tp s0). iFrame "Hrp0". iExact "Hllb'".
   Qed.
 
   (* ================================================================== *)
