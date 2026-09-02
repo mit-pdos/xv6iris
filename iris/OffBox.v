@@ -1,6 +1,6 @@
 (* OffBox.v -- THE OFF BOX: f->off under the transit-box law (tso-cutover
    endgame §6‴ P4 as corrected, §6⁗, §6⁵ ruling item 3, §6⁶ (A)), AS A
-   TYPE-CHECKED SKELETON over CtxBoxNext.  Proofs [Admitted].
+   TYPE-CHECKED SKELETON over CtxBox.  Proofs [Admitted].
 
    WHY A BOX.  Main's off ledger (off-ledger.md) keeps `a_foff k ↦₄ v` inside
    a plain inv at the ambient context and parks the INODE's valid cell as its
@@ -58,7 +58,6 @@ Require Import TsoCtx.
 Require Import SleepLock.
 Require Import Xv6Cameras Xv6G.
 Require Import CtxBox.
-Require Import CtxBoxNext.
 Require Import FileInvDefs.
 
 (* F35: the per-inode-slot set is keyed by the WHOLE names record, so a
@@ -117,9 +116,9 @@ Section OffBox.
 
   (* THE BOX of file slot k, at names γ (fresh per publish lifetime) *)
   Definition off_box (k : nat) γ : iProp Σ :=
-    CtxBoxNext.is_box (X := unit) off_hdr off_rest emp%I (offBoxN .@ k) γ.
+    CtxBox.is_box (X := unit) off_hdr off_rest emp%I (offBoxN .@ k) γ.
   Global Instance off_box_persistent k γ : Persistent (off_box k γ).
-  Proof. rewrite /off_box /CtxBoxNext.is_box. apply _. Qed.
+  Proof. rewrite /off_box /CtxBox.is_box. apply _. Qed.
 
   (* ---- registers, per box ------------------------------------------------ *)
   Definition off_cnt γ (c : nat) : iProp Σ := CtxBox.cnt_half (X := unit) γ c.
@@ -155,7 +154,7 @@ Section OffBox.
   (* one published box's L2 row at rest, with its llb (so the releasesleep
      fold can re-floor every row at the maximum) *)
   Definition off_l2_row γ (s : l2_reg nat) (ξ : CtxId) : iProp Σ :=
-    (CtxBoxNext.l2_row (X := unit) γ s ξ ∗ llb loglen_name (lr_tp s))%I.
+    (CtxBox.l2_row (X := unit) γ s ξ ∗ llb loglen_name (lr_tp s))%I.
 
   (* what rides in inode slot i's sleeplock payload (a conjunct of ic_slp):
      the set authority and every member box's row *)

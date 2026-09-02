@@ -584,7 +584,7 @@ Section ProofBrelse.
       as "(_ & %Hcov & %Hdv & Hstok & Hvalid & Hbdev & Hbuf & Hdb & Hbpay)".
     (* F7: the handle's token row carries the chain's count fragment and the
        L2 register half naming the parked unit *)
-    iDestruct "Hstok" as "(Hstok & Hbr0 & Hhold)". iDestruct "Hhold" as (th) "Hhold".
+    iDestruct "Hstok" as "(Hstok & Hbown & Hbr0 & Hhold)". iDestruct "Hhold" as (th) "Hhold".
     (* the payload the park deposits: the handle's disk cell and [bio_pay],
        re-packaged at the escrow's [buf_pay] shape.  The blockno is covered
        (bio_held's second conjunct), so the [decide] resolves LEFT and the
@@ -666,7 +666,7 @@ Section ProofBrelse.
     iApply fupd_wp.
     iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (bbox_park bn V k cur_ctx dev bno th ⊤ ltac:(solve_ndisj)
-            with "Hbox Hrun [Hvalid Hbdev Hbuf Hbpayload] Hhold") as "(Hrun & Hbown & Hr)".
+            with "Hbox Hrun [Hvalid Hbdev Hbuf Hbpayload] Hhold") as "(Hrun & Hr)".
     { rewrite buf_bundle_at_own. iExists true, bs. rewrite /bpa.
       iFrame "Hvalid Hbdev Hbuf Hbpayload". }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".

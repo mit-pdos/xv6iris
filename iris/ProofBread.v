@@ -694,14 +694,14 @@ Section BreadBlocks.
     iDestruct "Hs" as (s0) "(Hrp & %Hs0 & #Hflp)".
     iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (bbox_checkout bn V k cur_ctx dev bno t s0 Kt (lr_tp s0) ⊤ ltac:(solve_ndisj) Hs0 HKt ltac:(lia)
-            with "Hbox Hrun Hflt Hflp Href Hbown Hrp") as "(Hrun & Hbun & Hhold)".
+            with "Hbox Hrun Hflt Hflp Href Hrp") as "(Hrun & Hbun & Hhold)".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iEval (rewrite buf_bundle_at_own) in "Hbun".
     iDestruct "Hbun" as (vb0 bs0) "(Hvld & Hbdev & Hbuf & Hpay)".
     (* F7: the handle's token row carries the chain's count fragment and the
        register half naming the parked unit *)
-    iAssert (bstok bn k pidv dev bno) with "[Hstok Hbr0 Hhold]" as "Hstok".
-    { rewrite /bstok. iFrame "Hstok Hbr0". iExists t. iExact "Hhold". }
+    iAssert (bstok bn k pidv dev bno) with "[Hstok Hbown Hbr0 Hhold]" as "Hstok".
+    { rewrite /bstok. iFrame "Hstok Hbown Hbr0". iExists t. iExact "Hhold". }
     iDestruct (wordw_claim_of (KTR := KT0) 4 (b_valid (bpa k)) (DfracOwn 1)
                  (if vb0 then (mword_of_int 1 : mword 32)
                   else (mword_of_int 0 : mword 32)) ltac:(lia)
