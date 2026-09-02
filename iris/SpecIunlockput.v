@@ -153,7 +153,7 @@ Definition wp_iunlockput_dep_sconf_body
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
+    (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (d : ic_dep) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat) (tid : nat) (qtx : Qp)
     (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -169,7 +169,7 @@ Definition wp_iunlockput_dep_sconf_body
      to a bundleless arm happens in the SAME ghost step as the park
      ([IcacheEscrow.ic_swap_park_dep]), so no descriptor out-state stands
      between a disarm fupd and the release. *)
-  ic_dep_shr d = Some (s, icfg_dev, inum, gy) ->
+  ic_dep_shr d = Some (s, icfg_dev, inum, gy, loy) ->
   (* ENTRY BY SLOT -- iunlock's null test and iput's [ientry_inj] both *)
   (k < NINODE)%nat ->
   (* --- iput's geometry, threaded verbatim (SpecIput.v) --- *)
@@ -225,10 +225,15 @@ Definition wp_iunlockput_dep_sconf_body
      [rg := false] consumer on either of this file's two contracts.  The
      premise is persistent, so nothing comes back. *)
   ireg_open -∗
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp fsc_ic k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
-  ic_deposit fsc_ic k d -∗
+  (* A6.145 (tso-flip): the racy guard read's credential at the deposit's
+     epoch [loy], the ref words' address claims, and THE STITCH's handle *)
+  ⌜(loy <= tly)%nat⌝ -∗
+  IcacheRef.cred_floor loy tly -∗
+  IcacheInv.iref_claims -∗
+  ic_handle fsc_ic k d -∗
   i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -298,7 +303,7 @@ Definition wp_iunlockput_dep_gen_body
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
+    (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (d : ic_dep) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (tid : nat) (qtx : Qp)
@@ -315,7 +320,7 @@ Definition wp_iunlockput_dep_gen_body
      to a bundleless arm happens in the SAME ghost step as the park
      ([IcacheEscrow.ic_swap_park_dep]), so no descriptor out-state stands
      between a disarm fupd and the release. *)
-  ic_dep_shr d = Some (s, icfg_dev, inum, gy) ->
+  ic_dep_shr d = Some (s, icfg_dev, inum, gy, loy) ->
   (* ENTRY BY SLOT -- iunlock's null test and iput's [ientry_inj] both *)
   (k < NINODE)%nat ->
   (* the two absorption credits, threaded verbatim to iput *)
@@ -374,10 +379,15 @@ Definition wp_iunlockput_dep_gen_body
      [rg := false] consumer on either of this file's two contracts.  The
      premise is persistent, so nothing comes back. *)
   ireg_open -∗
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp fsc_ic k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
-  ic_deposit fsc_ic k d -∗
+  (* A6.145 (tso-flip): the racy guard read's credential at the deposit's
+     epoch [loy], the ref words' address claims, and THE STITCH's handle *)
+  ⌜(loy <= tly)%nat⌝ -∗
+  IcacheRef.cred_floor loy tly -∗
+  IcacheInv.iref_claims -∗
+  ic_handle fsc_ic k d -∗
   i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -463,7 +473,7 @@ Definition wp_iunlockput_tx_sconf_body
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+    (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -521,14 +531,17 @@ Definition wp_iunlockput_tx_sconf_body
      [rg := false] consumer on either of this file's two contracts.  The
      premise is persistent, so nothing comes back. *)
   ireg_open -∗
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp fsc_ic k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
   (* THE WRITE ARM COMES HOME (durable-disk B''-tx): the descriptor arrives
      at [DepTx] with the holder's residue beside it, and the disarm --
      iunlockput's own first ghost step -- returns exactly the share it
      recorded. *)
-  ic_tx_dep fsc_ic k s icfg_dev inum gy -∗
+  ⌜(loy <= tly)%nat⌝ -∗
+  IcacheRef.cred_floor loy tly -∗
+  IcacheInv.iref_claims -∗
+  ic_tx_dep fsc_ic k s icfg_dev inum gy loy -∗
   i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -593,7 +606,7 @@ Definition wp_iunlockput_tx_gen_body
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+    (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -654,14 +667,17 @@ Definition wp_iunlockput_tx_gen_body
      [rg := false] consumer on either of this file's two contracts.  The
      premise is persistent, so nothing comes back. *)
   ireg_open -∗
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp fsc_ic k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
   (* THE WRITE ARM COMES HOME (durable-disk B''-tx): the descriptor arrives
      at [DepTx] with the holder's residue beside it, and the disarm --
      iunlockput's own first ghost step -- returns exactly the share it
      recorded. *)
-  ic_tx_dep fsc_ic k s icfg_dev inum gy -∗
+  ⌜(loy <= tly)%nat⌝ -∗
+  IcacheRef.cred_floor loy tly -∗
+  IcacheInv.iref_claims -∗
+  ic_tx_dep fsc_ic k s icfg_dev inum gy loy -∗
   i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -746,7 +762,7 @@ Section IunlockputOfDep.
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -755,29 +771,30 @@ Section IunlockputOfDep.
     (forall (d : ic_dep) (tid : nat) (qtx : Qp),
        wp_iunlockput_dep_sconf_body gs j gl pd pav pu
                                     gil gisl
- k qi s gy d inum
+ k qi s gy loy tly d inum
                                     dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks
                                     Upr) ->
     wp_iunlockput_tx_sconf_body gs j gl pd pav pu
                                 gil gisl
- k qi s gy inum dn' bm' n
+ k qi s gy loy tly inum dn' bm' n
                                 pidv dq dqb dqs m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_iunlockput_tx_sconf_body wp_iunlockput_dep_sconf_body].
     intros Hgen pcE ip pj ret_tgt HK Hk Hgeom Hsz Hbm0 Hbmc Hbml Hist Hcov
       Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2 #Hitbl
-             #Hesc Hireg Hropen Hslk Hslkd Hdep Hidev Hiinum Hivalid Hload
+             #Hesc Hireg Hropen Hslk Hslkd %Hle #Hfl #Hclaims Hdep Hidev Hiinum Hivalid Hload
              Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid Hprocs Hdevi Hdgeom Hdlock
              Hbs Hopb Hcont".
     iDestruct (ic_tx_dep_at_of_half with "Hdep") as (t) "Hdep".
     rewrite /ic_tx_dep_at. iDestruct "Hdep" as "[Hdep Ht2]".
-    iApply (Hgen (DepTx s icfg_dev inum gy t (1/2)) t (1/2)%Qp HK eq_refl Hk Hgeom Hsz Hbm0
+    iApply (Hgen (DepTx s icfg_dev inum gy loy t (1/2)) t (1/2)%Qp HK eq_refl Hk Hgeom Hsz Hbm0
               Hbmc Hbml Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow eq_refl
               with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2
-                    Hitbl Hesc Hireg Hropen Hslk Hslkd Hdep Hidev Hiinum
+                    Hitbl Hesc Hireg Hropen Hslk Hslkd [%] Hfl Hclaims Hdep Hidev Hiinum
                     Hivalid [Hload] Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hbs Hopb [Ht2 Hcont]").
+    { exact Hle. }
     { rewrite /ic_dep_held /=. iExact "Hload". }
     iIntros (CIDx Hqx mf n') "%Hcs Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi
              Hbs %Hbnd Hopb Hslot Ht1".
@@ -794,7 +811,7 @@ Section IunlockputOfDep.
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -803,30 +820,31 @@ Section IunlockputOfDep.
     (forall (d : ic_dep) (tid : nat) (qtx : Qp),
        wp_iunlockput_dep_gen_body gs j gl pd pav pu
                                   gil gisl
- k qi s gy d inum
+ k qi s gy loy tly d inum
                                   dn' bm' n Sb crb cru crz e0 tid qtx
                                   pidv dq dqb dqs m K eb b lks Upr) ->
     wp_iunlockput_tx_gen_body gs j gl pd pav pu
                               gil gisl
- k qi s gy inum dn' bm' n Sb crb cru
+ k qi s gy loy tly inum dn' bm' n Sb crb cru
                               crz e0 pidv dq dqb dqs m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_iunlockput_tx_gen_body wp_iunlockput_dep_gen_body].
     intros Hgen pcE ip pj ret_tgt HK Hk Hcrb0 Hcru0 Hgeom Hsz Hbm0 Hbmc Hbml
       Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2 #Hitbl
-             #Hesc Hireg Hropen Hslk Hslkd Hdep Hidev Hiinum Hivalid Hload
+             #Hesc Hireg Hropen Hslk Hslkd %Hle #Hfl #Hclaims Hdep Hidev Hiinum Hivalid Hload
              Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid Hprocs Hdevi Hdgeom Hdlock
              Hbs Hcr Hops Hcont".
     iDestruct (ic_tx_dep_at_of_half with "Hdep") as (t) "Hdep".
     rewrite /ic_tx_dep_at. iDestruct "Hdep" as "[Hdep Ht2]".
-    iApply (Hgen (DepTx s icfg_dev inum gy t (1/2)) t (1/2)%Qp HK eq_refl Hk Hcrb0 Hcru0 Hgeom
+    iApply (Hgen (DepTx s icfg_dev inum gy loy t (1/2)) t (1/2)%Qp HK eq_refl Hk Hcrb0 Hcru0 Hgeom
               Hsz Hbm0 Hbmc Hbml Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0
               Hbelow eq_refl
               with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2
-                    Hitbl Hesc Hireg Hropen Hslk Hslkd Hdep Hidev Hiinum
+                    Hitbl Hesc Hireg Hropen Hslk Hslkd [%] Hfl Hclaims Hdep Hidev Hiinum
                     Hivalid [Hload] Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hbs Hcr Hops [Ht2 Hcont]").
+    { exact Hle. }
     { rewrite /ic_dep_held /=. iExact "Hload". }
     iIntros (CIDx Hqx mf n' Sb' w) "%Hcs Hcg Hown Hextc Hextm Hpc Hppid Hsbb
              Hsbi Hbs %Hsub %Hw %Hcrb %Hnn Hops Hslot Ht1".
@@ -852,7 +870,7 @@ Module Type IUNLOCKPUT.
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (d : ic_dep) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (tid : nat) (qtx : Qp)
@@ -861,7 +879,7 @@ Module Type IUNLOCKPUT.
       (b : bool) (lks : gset string) (Upr : ustate),
       wp_iunlockput_dep_gen_body gs j gl pd pav pu
                                  gil gisl
- k qi s gy d inum dn' bm' n Sb
+ k qi s gy loy tly d inum dn' bm' n Sb
                                  crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks
                                  Upr.
   (* the two TRANSACTIONAL forms (durable-disk B''-tx); [ProofIunlockput]
@@ -871,7 +889,7 @@ Module Type IUNLOCKPUT.
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -879,14 +897,14 @@ Module Type IUNLOCKPUT.
       (b : bool) (lks : gset string) (Upr : ustate),
       wp_iunlockput_tx_sconf_body gs j gl pd pav pu
                                   gil gisl
- k qi s gy inum dn' bm' n
+ k qi s gy loy tly inum dn' bm' n
                                   pidv dq dqb dqs m K eb b lks Upr.
   Parameter wp_iunlockput_tx_gen :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (k : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -894,6 +912,6 @@ Module Type IUNLOCKPUT.
       (b : bool) (lks : gset string) (Upr : ustate),
       wp_iunlockput_tx_gen_body gs j gl pd pav pu
                                 gil gisl
- k qi s gy inum dn' bm' n Sb crb cru
+ k qi s gy loy tly inum dn' bm' n Sb crb cru
                                 crz e0 pidv dq dqb dqs m K eb b lks Upr.
 End IUNLOCKPUT.

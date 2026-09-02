@@ -206,7 +206,7 @@ Definition wp_ilock_dep_sconf_body
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (lo tl : nat) (d : ic_dep) (o : ilkc) (inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Upr : ustate) :=
@@ -238,7 +238,7 @@ Definition wp_ilock_dep_sconf_body
      [ic_dep_shr] is what the three have in common -- the caller's own
      generation-named share, unchanged in all three -- and the two
      projections below are what differs. *)
-  ic_dep_shr d = Some (s, icfg_dev, inum, g) ->
+  ic_dep_shr d = Some (s, icfg_dev, inum, g, lo) ->
   (* ...AND WHAT THE READ ARM COSTS, which is nothing its two callers do not
      already pay.  [DepRd]'s arm keeps three quarters of the bundle, so the
      checkout can only be taken where one EXISTS -- and the record proxy stays
@@ -299,15 +299,20 @@ Definition wp_ilock_dep_sconf_body
      (claude-notes/projects/iput-acquiresleep.md).  The deposit ilock leaves
      is the [slh_tok] slice of the very share it consumes below, so no
      caller pays anything new. *)
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k)
-                   (slh_tok (icfg_isl k)) -∗
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp fsc_ic k)
+                    (slh_tok (icfg_isl k)) -∗
   (* THE CALLER'S SHARE (v3) -- consumed; deposited whole at the checkout.
      GENERATION-NAMED (design 17.3, ratified 17.4): the share's liveness
      slice belongs to slot [k]'s current generation [g], and naming it is
      what lets this contract EXPOSE that generation's type witness below.
      Mechanical for every existing caller: [IcacheRef.inode_shr_gen_intro]
      is the existential its [inode_shr] already carries. *)
-  inode_shr_gen k s icfg_dev inum g -∗
+  (* A6.145 (tso-flip): the share at its EPOCH [lo], under the caller's
+     floor receipt, and the ref words' address claims for the racy reads *)
+  ⌜(lo <= tl)%nat⌝ -∗
+  IcacheRef.cred_floor lo tl -∗
+  IcacheInv.iref_claims -∗
+  IcacheRef.inode_shr_genlo k s icfg_dev inum g lo -∗
   (* WHAT THE DESCRIPTOR PARKS BESIDE THE SHARE: the transaction share at
      [DepTx], [emp] at the other two. *)
   ic_dep_side d -∗
@@ -384,7 +389,9 @@ Definition wp_ilock_dep_sconf_body
          identity halves, the valid cell, and the loaded content at a
          record the region agrees with.  Exactly [ic_swap_park]'s input,
          i.e. exactly SpecIunlock v3's precondition. *)
-      ic_deposit fsc_ic k d -∗
+      (* THE STITCH: the holder's HANDLE -- the box register half naming the
+         parked stamps, the body, main's descriptor half *)
+      ic_handle fsc_ic k d -∗
       i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
@@ -461,7 +468,7 @@ Definition wp_ilock_tx_sconf_body
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (k : nat) (s : Qp) (g : gname) (o : ilkc) (inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (lo tl : nat) (o : ilkc) (inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Upr : ustate) :=
@@ -519,15 +526,20 @@ Definition wp_ilock_tx_sconf_body
      (claude-notes/projects/iput-acquiresleep.md).  The deposit ilock leaves
      is the [slh_tok] slice of the very share it consumes below, so no
      caller pays anything new. *)
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k)
-                   (slh_tok (icfg_isl k)) -∗
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp fsc_ic k)
+                    (slh_tok (icfg_isl k)) -∗
   (* THE CALLER'S SHARE (v3) -- consumed; deposited whole at the checkout.
      GENERATION-NAMED (design 17.3, ratified 17.4): the share's liveness
      slice belongs to slot [k]'s current generation [g], and naming it is
      what lets this contract EXPOSE that generation's type witness below.
      Mechanical for every existing caller: [IcacheRef.inode_shr_gen_intro]
      is the existential its [inode_shr] already carries. *)
-  inode_shr_gen k s icfg_dev inum g -∗
+  (* A6.145 (tso-flip): the share at its EPOCH [lo], under the caller's
+     floor receipt, and the ref words' address claims for the racy reads *)
+  ⌜(lo <= tl)%nat⌝ -∗
+  IcacheRef.cred_floor lo tl -∗
+  IcacheInv.iref_claims -∗
+  IcacheRef.inode_shr_genlo k s icfg_dev inum g lo -∗
   (* ---- THE FILL's LICENCE, INDEXED (iclaim-ledger.md §5''''', RULING C')
 
      §16.4's fill has a sub-arm -- the CLAIM BOX -- that no caller can be
@@ -621,7 +633,7 @@ Definition wp_ilock_tx_sconf_body
          identity halves, the valid cell, and the loaded content at a
          record the region agrees with.  Exactly [ic_swap_park]'s input,
          i.e. exactly SpecIunlock v3's precondition. *)
-      ic_tx_dep fsc_ic k s icfg_dev inum g -∗
+      ic_tx_dep fsc_ic k s icfg_dev inum g lo -∗
       i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
@@ -694,29 +706,30 @@ Lemma wp_ilock_tx_of_dep
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
     (gil gisl : gname)
-    (k : nat) (s : Qp) (g : gname) (o : ilkc) (inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (lo tl : nat) (o : ilkc) (inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Upr : ustate) :
   (forall d : ic_dep,
      wp_ilock_dep_sconf_body gs j gl pd pav pu gil gisl
- k s g d o inum
+ k s g lo tl d o inum
                              pidv dq dqs m K eb b lks Upr) ->
   wp_ilock_tx_sconf_body gs j gl pd pav pu gil gisl
- k s g o inum
+ k s g lo tl o inum
                          pidv dq dqs m K eb b lks Upr.
 Proof.
   cbv beta delta [wp_ilock_tx_sconf_body wp_ilock_dep_sconf_body].
   intros Hgen pcE ip pj ret_tgt HK Hk Hgeom Hst Hcov Hinlt Hj Hgl Ha0 Hbelow.
   iIntros "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio #Hitbl #Hesc Hireg
-           Hslk Hshr Hlic Hsb Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Htx Hcont".
+           Hslk %Hle #Hfl #Hclaims Hshr Hlic Hsb Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Htx Hcont".
   iDestruct (log_tx_halve with "Htx") as (t) "[Ht1 Ht2]".
-  iApply (Hgen (DepTx s icfg_dev inum g t (1/2))
+  iApply (Hgen (DepTx s icfg_dev inum g lo t (1/2))
             HK eq_refl ltac:(discriminate) Hk Hgeom Hst Hcov Hinlt Hj Hgl
             Ha0 Hbelow
             with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hitbl Hesc
-                  Hireg Hslk Hshr [Ht1] Hlic Hsb Hppid Hprocs Hdevi Hdgeom
+                  Hireg Hslk [%] Hfl Hclaims Hshr [Ht1] Hlic Hsb Hppid Hprocs Hdevi Hdgeom
                   Hdlock Hsl [Ht2 Hcont]").
+  { exact Hle. }
   { rewrite /ic_dep_side. iExact "Ht1". }
   iIntros (CIDx Hqx mf dn bm filled)
     "%Hcs Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hidev Hiinum
@@ -740,12 +753,12 @@ Module Type ILOCK.
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (lo tl : nat) (d : ic_dep) (o : ilkc) (inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Upr : ustate),
       wp_ilock_dep_sconf_body gs j gl pd pav pu gil gisl
- k s g d o inum
+ k s g lo tl d o inum
                               pidv dq dqs m K eb b lks Upr.
   (* THE TRANSACTIONAL FORM (durable-disk B''-tx).  Same C function, same
      proof; what selects it is whether the caller brings [LogInv.log_tx].
@@ -755,11 +768,11 @@ Module Type ILOCK.
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (k : nat) (s : Qp) (g : gname) (o : ilkc) (inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (lo tl : nat) (o : ilkc) (inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Upr : ustate),
       wp_ilock_tx_sconf_body gs j gl pd pav pu gil gisl
- k s g o inum
+ k s g lo tl o inum
                              pidv dq dqs m K eb b lks Upr.
 End ILOCK.

@@ -108,7 +108,7 @@ Definition wp_iunlock_dep_sconf_body
 
     (gs : list gname)
     (gil gisl : gname)
-    (k : nat) (s : Qp) (g : gname) (d : ic_dep) (dev inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (lo tl : nat) (d : ic_dep) (dev inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64)
@@ -122,7 +122,7 @@ Definition wp_iunlock_dep_sconf_body
      bundleless arm happens in the SAME ghost step as the park
      ([IcacheEscrow.ic_swap_park_dep]), so no bundleless out-arm stands
      between a disarm/unshed fupd and the release. *)
-  ic_dep_shr d = Some (s, dev, inum, g) ->
+  ic_dep_shr d = Some (s, dev, inum, g, lo) ->
   (* the entry is slot [k]: a0 = ip, and the null test dies here *)
   (k < NINODE)%nat ->
 
@@ -137,7 +137,7 @@ Definition wp_iunlock_dep_sconf_body
   (* the [ref] words, and the entry's content escrow *)
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k)
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp fsc_ic k)
                    (slh_tok (icfg_isl k)) -∗
   (* THE HOLDER'S BUNDLE -- the third dead panic test is exactly this *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
@@ -148,7 +148,14 @@ Definition wp_iunlock_dep_sconf_body
      SpecIlock v3's postcondition, and exactly [ic_swap_park]'s input;
      [ic_loaded]'s [dinode_at] at [dn'] IS the flushed-record obligation, and
      the descriptor half is what selects this holder's own arm (§14.8). *)
-  ic_deposit fsc_ic k d -∗
+  (* A6.145 (tso-flip): the RACY GUARD READ's credential -- the caller's
+     floor receipt at the deposit's epoch [lo] and the ref words' address
+     claims -- and THE STITCH's handle (the box register half, the body,
+     main's descriptor half) in place of the bare half *)
+  ⌜(lo <= tl)%nat⌝ -∗
+  IcacheRef.cred_floor lo tl -∗
+  IcacheInv.iref_claims -∗
+  ic_handle fsc_ic k d -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -184,7 +191,7 @@ Definition wp_iunlock_dep_sconf_body
          caller the ability to carry an [ity_shot] across its own
          [iunlock]/re-[ilock] window.  A consumer that does not want the
          name applies [IcacheRef.inode_shr_gen_forget] here. *)
-      inode_shr_gen k s dev inum g -∗
+      IcacheRef.inode_shr_genlo k s dev inum g lo -∗
       (* ...AND WHAT THE ARM PARKED, back: the transaction share at [DepTx],
          nothing at the other two. *)
       ic_dep_side d -∗
@@ -201,7 +208,7 @@ Definition wp_iunlock_tx_sconf_body
 
     (gs : list gname)
     (gil gisl : gname)
-    (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (lo tl : nat) (dev inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64)
@@ -224,7 +231,7 @@ Definition wp_iunlock_tx_sconf_body
   (* the [ref] words, and the entry's content escrow *)
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
-  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok fsc_ic k)
+  is_sleeplock_genl gil gisl (i_lock ip) "inode"%string (ic_slp fsc_ic k)
                    (slh_tok (icfg_isl k)) -∗
   (* THE HOLDER'S BUNDLE -- the third dead panic test is exactly this *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
@@ -241,7 +248,10 @@ Definition wp_iunlock_tx_sconf_body
      it ([IcacheEscrow.ic_tx_dep]), and the postcondition hands
      [LogInv.log_tx] back whole.  The park returns exactly the share the
      descriptor recorded, which is what makes the two halves rejoin. *)
-  ic_tx_dep fsc_ic k s dev inum g -∗
+  ⌜(lo <= tl)%nat⌝ -∗
+  IcacheRef.cred_floor lo tl -∗
+  IcacheInv.iref_claims -∗
+  ic_tx_dep fsc_ic k s dev inum g lo -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -277,7 +287,7 @@ Definition wp_iunlock_tx_sconf_body
          caller the ability to carry an [ity_shot] across its own
          [iunlock]/re-[ilock] window.  A consumer that does not want the
          name applies [IcacheRef.inode_shr_gen_forget] here. *)
-      inode_shr_gen k s dev inum g -∗
+      IcacheRef.inode_shr_genlo k s dev inum g lo -∗
       (* the transaction's token, whole again *)
       log_tx icfg_log -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -289,26 +299,27 @@ Lemma wp_iunlock_tx_of_dep
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname)
     (gil gisl : gname)
-    (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (lo tl : nat) (dev inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64)
     (b : bool) (lks : gset string) (Upr : ustate) :
   (forall d : ic_dep,
-     wp_iunlock_dep_sconf_body gs gil gisl k s g d
+     wp_iunlock_dep_sconf_body gs gil gisl k s g lo tl d
                                dev inum dn' bm' pidv dq m K eb p b lks Upr) ->
-  wp_iunlock_tx_sconf_body gs gil gisl k s g dev inum
+  wp_iunlock_tx_sconf_body gs gil gisl k s g lo tl dev inum
                            dn' bm' pidv dq m K eb p b lks Upr.
 Proof.
   cbv beta delta [wp_iunlock_tx_sconf_body wp_iunlock_dep_sconf_body].
   intros Hgen pcE ip ret_tgt HK Hk Ha0 Hbelow.
   iIntros "Hcg Hown Htext Hpc #Hitbl #Hesc Hslk Hslkd Hppid Hprocs
-           Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hcont".
+           %Hle #Hfl #Hclaims Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hcont".
   iDestruct (ic_tx_dep_at_of_half with "Hdep") as (t) "Hdep".
   rewrite /ic_tx_dep_at. iDestruct "Hdep" as "[Hdep Ht2]".
-  iApply (Hgen (DepTx s dev inum g t (1/2)) HK eq_refl Hk Ha0 Hbelow
+  iApply (Hgen (DepTx s dev inum g lo t (1/2)) HK eq_refl Hk Ha0 Hbelow
             with "Hcg Hown Htext Hpc Hitbl Hesc Hslk Hslkd Hppid Hprocs
-                  Hdep Hidev Hiinum Hivalid [Hload] Hshot Hfrz [Ht2 Hcont]").
+                  [%] Hfl Hclaims Hdep Hidev Hiinum Hivalid [Hload] Hshot Hfrz [Ht2 Hcont]").
+  { exact Hle. }
   { rewrite /ic_dep_held /=. iExact "Hload". }
   iIntros (CIDx Hqx mf) "%Hcs Hcg Hown Hpc Hppid Hshr Ht1".
   rewrite /ic_dep_side.
@@ -326,12 +337,12 @@ Module Type IUNLOCK.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (gs : list gname)
       (gil gisl : gname)
-      (k : nat) (s : Qp) (g : gname) (d : ic_dep) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (lo tl : nat) (d : ic_dep) (dev inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Upr : ustate),
-      wp_iunlock_dep_sconf_body gs gil gisl k s g d
+      wp_iunlock_dep_sconf_body gs gil gisl k s g lo tl d
                                 dev inum dn' bm' pidv dq m K eb p b lks Upr.
   (* the transactional form -- [ProofIunlock] defines it by
      [wp_iunlock_tx_of_dep]. *)
@@ -340,11 +351,11 @@ Module Type IUNLOCK.
 
       (gs : list gname)
       (gil gisl : gname)
-      (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (lo tl : nat) (dev inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Upr : ustate),
-      wp_iunlock_tx_sconf_body gs gil gisl k s g dev
+      wp_iunlock_tx_sconf_body gs gil gisl k s g lo tl dev
                                inum dn' bm' pidv dq m K eb p b lks Upr.
 End IUNLOCK.

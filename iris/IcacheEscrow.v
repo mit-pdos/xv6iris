@@ -2092,119 +2092,6 @@ Section IcacheEscrow.
     iSplitR; [iExact "Hesc" | iExact "Htk"].
   Qed.
 
-  (* ------------------------------------------------------------------ *)
-  (*  THE FREE PATH's FROZEN PARK (iclaim-ledger.md §3.16, RULING A⁗)     *)
-  (* ------------------------------------------------------------------ *)
-
-  (* (d') THE MID-FREE PARK, and the re-open the +0x70 store needs.
-
-     Between iput's window exit at +0x5e and its last close at +0x8a the
-     escrow sits on [ic_parked]'s FROZEN alternative: the cells, the recycle
-     token, the identification ghost and the freeze RECEIPT -- no payload, no
-     liveness half, no deposit.  That is what lets the freer
-
-       * carry [dinode_at], the block resources and [inode_raw] in its own
-         hand across [itrunc], the [ip->type = 0] store and [releasesleep]
-         (B2 dissolved), and
-       * leave the arm's liveness half and its own reference slice parked in
-         [islot2]'s FROZEN PARK for the whole lock-free span (OPEN(2.6b)
-         closed),
-
-     and it costs the escrow's five-arm shape nothing: the alternative lives
-     inside [ic_payload_arm], where the token slot's disjunction already was.
-
-     THE ARM IS DECIDED BY [ifreeze_pre] AT EVERY READER, which is why the
-     freer keeps that fragment in hand from the mint at +0x50 to the close at
-     +0x8a and parks the receipt instead. *)
-
-  (* ...and its opener.  The freer identifies the arm by the identity slice it
-     kept when the window exit split [i_inum] three ways (its own [q], the
-     arm's ½ and the table's ½ − q), refutes OUT with the sleeplock's own
-     token, MID/HELD/EMPTY with the cells, and [ic_parked]'s ORDINARY
-     alternative with the [ifreeze_pre] in its hand. *)
-
-  (* (e) THE RECYCLER'S RE-OPEN AT ITS VALID STORE (iget, +0x7c)
-     (BioInv.escrow_open_mid).
-
-     Its recycle token refutes BOTH normal arms, so the body is the window
-     it parked; the reclose is at a normal parked arm, which re-absorbs the
-     token.  The valid cell comes out for the physical [sw zero,64(s3)], and
-     the inum cell comes out FULL so that the closer can split ½ back to the
-     table and leave ½ in the arm. *)
-
-  Definition ic_tx_dep (cn : ic_names) (k : nat) (s : Qp)
-      (dev inum : mword 32) (g : gname) (lo : nat) : iProp Σ :=
-    (∃ t : nat, ic_deposit cn k (DepTx s dev inum g lo t (1/2))
-                ∗ t ↪[ln_tx icfg_log]{#(1/2)} tt)%I.
-
-  Global Instance ic_tx_dep_timeless cn k s dev inum g lo :
-    Timeless (ic_tx_dep cn k s dev inum g lo).
-  Proof. rewrite /ic_tx_dep. tl_struct. Qed.
-
-  Lemma ic_tx_dep_intro cn k s dev inum g lo (t : nat) :
-    ic_deposit cn k (DepTx s dev inum g lo t (1/2)) -∗
-    t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
-    ic_tx_dep cn k s dev inum g lo.
-  Proof. iIntros "Hd Ht". iExists t. iFrame. Qed.
-
-  (* ------------------------------------------------------------------ *)
-  (*  4c-2.  TWO SLOTS AT ONE TRANSACTION (durable-disk B''-tx2)          *)
-  (* ------------------------------------------------------------------ *)
-
-  (* WHY A SECOND SHAPE AT ALL.  [ic_tx_dep]'s invariant is "the arm holds
-     [q] and the holder holds [q] beside it", which forces [q = 1/2] for the
-     two to rejoin into the whole element [LogInv.log_tx] closes -- so TWO of
-     them at one transaction claim 2 and the pair is UNSATISFIABLE, a premise
-     nobody can discharge.  [create] (parent + fresh child) and [sys_unlink]
-     ([dp] + [ip]) each hold two write locks at once, so each needs the arms
-     at a QUARTER: two arms of 1/4 and a residue of 1/2 rejoin to 1 exactly
-     as one arm of 1/2 and a residue of 1/2 do.
-
-     THE ID IS NAMED HERE and closed existentially only at a boundary.  Two
-     arms of one transaction must be at the SAME [t] -- shares at different
-     ghost-map keys never rejoin into a whole element -- and nothing about
-     the escrow determines an id, so a walk that holds two locks binds [t]
-     in its stage statement and
-     spells each conjunct at [ic_tx_dep_at]'s own arity.  That is what keeps
-     the sweep POSITION-STABLE: a stage's bare [ic_deposit cn k d]
-     becomes [ic_tx_dep_at cn k .. t (1/4)] in place, its [log_tx g] (or its
-     whole [log_op g u], which becomes [log_opb g u]) loses the residue the
-     two [ic_tx_dep_at]s now carry, and only ONE binder is added. *)
-  Definition ic_tx_dep_at (cn : ic_names) (k : nat) (s : Qp)
-      (dev inum : mword 32) (g : gname) (lo : nat) (t : nat) (q : Qp) : iProp Σ :=
-    (ic_deposit cn k (DepTx s dev inum g lo t q)
-     ∗ t ↪[ln_tx icfg_log]{#q} tt)%I.
-
-  Global Instance ic_tx_dep_at_timeless cn k s dev inum g lo t q :
-    Timeless (ic_tx_dep_at cn k s dev inum g lo t q).
-  Proof. rewrite /ic_tx_dep_at. tl_struct. Qed.
-
-
-  Lemma ic_tx_dep_at_of_half cn k s dev inum g lo :
-    ic_tx_dep cn k s dev inum g lo -∗
-    ∃ t : nat, ic_tx_dep_at cn k s dev inum g lo t (1/2).
-  Proof.
-    rewrite /ic_tx_dep /ic_tx_dep_at. iIntros "H".
-    iDestruct "H" as (t) "[Hd Ht]". iExists t. iFrame.
-  Qed.
-
-  (* the element's own splitting, spelled once: a [ghost_map] element at
-     [#(q1 + q2)] IS the two, by the library's [Fractional] instance. *)
-  Local Lemma ic_tx_share_split (t : nat) (q q1 q2 : Qp) :
-    q = (q1 + q2)%Qp ->
-    t ↪[ln_tx icfg_log]{#q} tt -∗
-    t ↪[ln_tx icfg_log]{#q1} tt ∗ t ↪[ln_tx icfg_log]{#q2} tt.
-  Proof. intros ->. iIntros "H". iDestruct "H" as "[$ $]". Qed.
-
-  Local Lemma ic_tx_share_join (t : nat) (q q1 q2 : Qp) :
-    q = (q1 + q2)%Qp ->
-    t ↪[ln_tx icfg_log]{#q1} tt -∗ t ↪[ln_tx icfg_log]{#q2} tt -∗
-    t ↪[ln_tx icfg_log]{#q} tt.
-  Proof.
-    intros ->. iIntros "H1 H2".
-    iDestruct (ghost_map_elem_combine with "H1 H2") as "[H _]".
-    rewrite dfrac_op_own. iExact "H".
-  Qed.
 
   (* THE SHRINK, on the body: the OUT arm is already at [DepTx] and its
      share drops from [q1 + q2] to [q1], the difference coming home to the
@@ -4118,6 +4005,127 @@ Section IcacheBox.
      [ic_deposit cn k d]; on this branch that is [ic_handle]. *)
   Definition ic_handle (cn : ic_names) (k : nat) (d : ic_dep) : iProp Σ :=
     (ic_deposit2 k d ∗ ic_pay_live k d ∗ ic_deposit cn k d)%I.
+
+  (* ---- THE TRANSACTION-DEPOSIT BUNDLE (main's durable-disk B''-tx3), over
+     the handle: moved here from the first section because it names
+     [ic_handle]. ---- *)
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE FREE PATH's FROZEN PARK (iclaim-ledger.md §3.16, RULING A⁗)     *)
+  (* ------------------------------------------------------------------ *)
+
+  (* (d') THE MID-FREE PARK, and the re-open the +0x70 store needs.
+
+     Between iput's window exit at +0x5e and its last close at +0x8a the
+     escrow sits on [ic_parked]'s FROZEN alternative: the cells, the recycle
+     token, the identification ghost and the freeze RECEIPT -- no payload, no
+     liveness half, no deposit.  That is what lets the freer
+
+       * carry [dinode_at], the block resources and [inode_raw] in its own
+         hand across [itrunc], the [ip->type = 0] store and [releasesleep]
+         (B2 dissolved), and
+       * leave the arm's liveness half and its own reference slice parked in
+         [islot2]'s FROZEN PARK for the whole lock-free span (OPEN(2.6b)
+         closed),
+
+     and it costs the escrow's five-arm shape nothing: the alternative lives
+     inside [ic_payload_arm], where the token slot's disjunction already was.
+
+     THE ARM IS DECIDED BY [ifreeze_pre] AT EVERY READER, which is why the
+     freer keeps that fragment in hand from the mint at +0x50 to the close at
+     +0x8a and parks the receipt instead. *)
+
+  (* ...and its opener.  The freer identifies the arm by the identity slice it
+     kept when the window exit split [i_inum] three ways (its own [q], the
+     arm's ½ and the table's ½ − q), refutes OUT with the sleeplock's own
+     token, MID/HELD/EMPTY with the cells, and [ic_parked]'s ORDINARY
+     alternative with the [ifreeze_pre] in its hand. *)
+
+  (* (e) THE RECYCLER'S RE-OPEN AT ITS VALID STORE (iget, +0x7c)
+     (BioInv.escrow_open_mid).
+
+     Its recycle token refutes BOTH normal arms, so the body is the window
+     it parked; the reclose is at a normal parked arm, which re-absorbs the
+     token.  The valid cell comes out for the physical [sw zero,64(s3)], and
+     the inum cell comes out FULL so that the closer can split ½ back to the
+     table and leave ½ in the arm. *)
+
+  Definition ic_tx_dep (cn : ic_names) (k : nat) (s : Qp)
+      (dev inum : mword 32) (g : gname) (lo : nat) : iProp Σ :=
+    (* THE STITCH: the holder's HANDLE ([ic_handle]: the box register half,
+       the body, main's descriptor half) beside the transaction share -- what
+       a write checkout leaves in the caller's hand *)
+    (∃ t : nat, ic_handle cn k (DepTx s dev inum g lo t (1/2))
+                ∗ t ↪[ln_tx icfg_log]{#(1/2)} tt)%I.
+
+  Global Instance ic_tx_dep_timeless cn k s dev inum g lo :
+    Timeless (ic_tx_dep cn k s dev inum g lo).
+  Proof. rewrite /ic_tx_dep. tl_struct. Qed.
+
+  Lemma ic_tx_dep_intro cn k s dev inum g lo (t : nat) :
+    ic_handle cn k (DepTx s dev inum g lo t (1/2)) -∗
+    t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
+    ic_tx_dep cn k s dev inum g lo.
+  Proof. iIntros "Hd Ht". iExists t. iFrame. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  4c-2.  TWO SLOTS AT ONE TRANSACTION (durable-disk B''-tx2)          *)
+  (* ------------------------------------------------------------------ *)
+
+  (* WHY A SECOND SHAPE AT ALL.  [ic_tx_dep]'s invariant is "the arm holds
+     [q] and the holder holds [q] beside it", which forces [q = 1/2] for the
+     two to rejoin into the whole element [LogInv.log_tx] closes -- so TWO of
+     them at one transaction claim 2 and the pair is UNSATISFIABLE, a premise
+     nobody can discharge.  [create] (parent + fresh child) and [sys_unlink]
+     ([dp] + [ip]) each hold two write locks at once, so each needs the arms
+     at a QUARTER: two arms of 1/4 and a residue of 1/2 rejoin to 1 exactly
+     as one arm of 1/2 and a residue of 1/2 do.
+
+     THE ID IS NAMED HERE and closed existentially only at a boundary.  Two
+     arms of one transaction must be at the SAME [t] -- shares at different
+     ghost-map keys never rejoin into a whole element -- and nothing about
+     the escrow determines an id, so a walk that holds two locks binds [t]
+     in its stage statement and
+     spells each conjunct at [ic_tx_dep_at]'s own arity.  That is what keeps
+     the sweep POSITION-STABLE: a stage's bare [ic_deposit cn k d]
+     becomes [ic_tx_dep_at cn k .. t (1/4)] in place, its [log_tx g] (or its
+     whole [log_op g u], which becomes [log_opb g u]) loses the residue the
+     two [ic_tx_dep_at]s now carry, and only ONE binder is added. *)
+  Definition ic_tx_dep_at (cn : ic_names) (k : nat) (s : Qp)
+      (dev inum : mword 32) (g : gname) (lo : nat) (t : nat) (q : Qp) : iProp Σ :=
+    (ic_handle cn k (DepTx s dev inum g lo t q)
+     ∗ t ↪[ln_tx icfg_log]{#q} tt)%I.
+
+  Global Instance ic_tx_dep_at_timeless cn k s dev inum g lo t q :
+    Timeless (ic_tx_dep_at cn k s dev inum g lo t q).
+  Proof. rewrite /ic_tx_dep_at. tl_struct. Qed.
+
+
+  Lemma ic_tx_dep_at_of_half cn k s dev inum g lo :
+    ic_tx_dep cn k s dev inum g lo -∗
+    ∃ t : nat, ic_tx_dep_at cn k s dev inum g lo t (1/2).
+  Proof.
+    rewrite /ic_tx_dep /ic_tx_dep_at. iIntros "H".
+    iDestruct "H" as (t) "[Hd Ht]". iExists t. iFrame.
+  Qed.
+
+  (* the element's own splitting, spelled once: a [ghost_map] element at
+     [#(q1 + q2)] IS the two, by the library's [Fractional] instance. *)
+  Local Lemma ic_tx_share_split (t : nat) (q q1 q2 : Qp) :
+    q = (q1 + q2)%Qp ->
+    t ↪[ln_tx icfg_log]{#q} tt -∗
+    t ↪[ln_tx icfg_log]{#q1} tt ∗ t ↪[ln_tx icfg_log]{#q2} tt.
+  Proof. intros ->. iIntros "H". iDestruct "H" as "[$ $]". Qed.
+
+  Local Lemma ic_tx_share_join (t : nat) (q q1 q2 : Qp) :
+    q = (q1 + q2)%Qp ->
+    t ↪[ln_tx icfg_log]{#q1} tt -∗ t ↪[ln_tx icfg_log]{#q2} tt -∗
+    t ↪[ln_tx icfg_log]{#q} tt.
+  Proof.
+    intros ->. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_combine with "H1 H2") as "[H _]".
+    rewrite dfrac_op_own. iExact "H".
+  Qed.
 
   (* ---- the two payload rows (M-6) ------------------------------------ *)
   (* L2: the inode sleeplock's λ payload -- CtxBox.l2_row at ic_tok *)

@@ -471,7 +471,7 @@ Section CreateSpec.
       (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
     (∃ γil γisl : gname,
-       is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) ∗
+       is_sleeplock_genl γil γisl (i_lock (ientry k)) "inode"%string (ic_slp fsc_ic k) (slh_tok (icfg_isl k)) ∗
        sleeplocked_q γisl s (i_lock (ientry k)) pidv ∗
        (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): create returns with
           the child still write-locked, so what it hands over is the
@@ -480,7 +480,10 @@ Section CreateSpec.
           bare [ic_deposit fsc_ic k d] stands, at the same arguments, and it is
           why this contract's post no longer hands the
           caller a separate [LogInv.log_tx] on the success arm. *)
-       ic_tx_dep fsc_ic k s icfg_dev inum g ∗
+       (* A6.145 (tso-flip): at the checkout's EPOCH, under the caller's floor *)
+       (∃ loc tlc : nat,
+          ⌜(loc <= tlc)%nat⌝ ∗ IcacheRef.cred_floor loc tlc ∗
+          ic_tx_dep fsc_ic k s icfg_dev inum g loc) ∗
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} icfg_dev ∗
        i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
        i_valid (ientry k) ↦₄ valid_word true ∗
@@ -493,7 +496,11 @@ Section CreateSpec.
           over) and hands it on to whichever of sys_open / sys_mkdir /
           sys_mknod releases the child. *)
        ifreeze_off (bv_unsigned inum) ∗
-       inode_ref_short_gen k (qi + s)%Qp qi icfg_dev inum g ∗
+       (* A6.145: the retained parent travels FLOORED (genlo + the carrier's
+          floor receipt), so the eventual forget can rebuild the credential *)
+       (∃ lo tl : nat,
+          ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
+          inode_ref_short_genlo k (qi + s)%Qp qi icfg_dev inum g lo) ∗
        (* ...AND ITS PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md §5''.3).
           This bundle IS [SpecIunlockput]'s precondition, and since item
           7a-wire that precondition includes the unit the closing iput
@@ -510,16 +517,20 @@ Section CreateSpec.
      "Framing"). *)
   Lemma create_locked_mk pidv k qi s g inum dn bm
       γil γisl :
-    is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
+    is_sleeplock_genl γil γisl (i_lock (ientry k)) "inode"%string (ic_slp fsc_ic k) (slh_tok (icfg_isl k)) -∗
     sleeplocked_q γisl s (i_lock (ientry k)) pidv -∗
-    ic_tx_dep fsc_ic k s icfg_dev inum g -∗
+    (∃ loc tlc : nat,
+       ⌜(loc <= tlc)%nat⌝ ∗ IcacheRef.cred_floor loc tlc ∗
+       ic_tx_dep fsc_ic k s icfg_dev inum g loc) -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word true -∗
     ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm -∗
     ity_shot g (di_type dn) -∗
     ifreeze_off (bv_unsigned inum) -∗
-    inode_ref_short_gen k (qi + s)%Qp qi icfg_dev inum g -∗
+    (∃ lo tl : nat,
+       ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
+       inode_ref_short_genlo k (qi + s)%Qp qi icfg_dev inum g lo) -∗
     runit_any (bv_unsigned inum) -∗
     create_locked pidv k qi s g inum dn bm.
   Proof.

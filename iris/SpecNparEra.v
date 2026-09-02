@@ -150,18 +150,20 @@ Section NparEraDefs.
      lemmas recover the landed shapes, so every existing consumer of either
      composes unchanged. *)
   Definition inode_held_ty_at (v : mword 64) (ty : bv 16) (z : Z) : iProp Σ :=
-    (∃ (k : nat) (q : Qp) (inum : mword 32) (g : gname),
+    (∃ (k : nat) (q : Qp) (inum : mword 32) (g : gname) (lo tl : nat),
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜bv_unsigned inum = z⌝ ∗
-       inode_ref_gen k q icfg_dev inum g ∗ ity_shot g ty ∗
+       (* A6.145 (tso-flip): the reference at its epoch, under a floor *)
+       ⌜(lo <= tl)%nat⌝ ∗ cred_floor lo tl ∗
+       inode_ref_genlo k q icfg_dev inum g lo ∗ ity_shot g ty ∗
        runit_any (bv_unsigned inum))%I.
 
   Lemma inode_held_ty_at_ty (v : mword 64) (ty : bv 16) (z : Z) :
     inode_held_ty_at v ty z ⊢ inode_held_ty v ty.
   Proof.
-    iIntros "H". iDestruct "H" as (k q inum g) "(%&%&%&%&Hr&Hs&Hu)".
-    rewrite /inode_held_ty. iExists k, q, inum, g. by iFrame "% Hr Hs Hu".
+    iIntros "H". iDestruct "H" as (k q inum g lo tl) "(%&%&%&%&%&#Hfl&Hr&Hs&Hu)".
+    rewrite /inode_held_ty. iExists k, q, inum, g, lo, tl. by iFrame "% Hfl Hr Hs Hu".
   Qed.
 
   Lemma inode_held_ty_at_held (v : mword 64) (ty : bv 16) (z : Z) :
@@ -174,12 +176,12 @@ Section NparEraDefs.
   Lemma inode_held_ty_at_at (v : mword 64) (ty : bv 16) (z : Z) :
     inode_held_ty_at v ty z ⊢ inode_held_at v z.
   Proof.
-    iIntros "H". iDestruct "H" as (k q inum g) "(%Hv & %Hk & %Hb & %Hz & Hr & _ & Hu)".
+    iIntros "H". iDestruct "H" as (k q inum g lo tl) "(%Hv & %Hk & %Hb & %Hz & %Hle & #Hfl & Hr & _ & Hu)".
     rewrite /inode_held_at. iExists k, q, inum.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     rewrite /inode_refp. iFrame "Hu".
-    rewrite inode_ref_gen_intro. iExists g. iFrame.
+    rewrite inode_ref_gen_intro. iExists g, lo, tl. iFrame "Hfl Hr". by iPureIntro.
   Qed.
 
 End NparEraDefs.

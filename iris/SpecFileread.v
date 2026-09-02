@@ -569,11 +569,7 @@ Section SpecFileread.
     IcacheRef.inode_shr_gen ik (s1 + s2)%Qp icfg_dev inum g ⊣⊢
     IcacheRef.inode_shr_gen ik s1 icfg_dev inum g ∗
     IcacheRef.inode_shr_gen ik s2 icfg_dev inum g.
-  Proof.
-    rewrite /IcacheRef.inode_shr_gen IcacheRef.inode_ident_split
-            IcacheRef.live_gen_split SleepLock.slh_tok_split.
-    iSplit; [iIntros "[[$ $] [[$ $] [$ $]]]" | iIntros "[($ & $ & $) ($ & $ & $)]"].
-  Qed.
+  Proof. apply IcacheRef.inode_shr_gen_split. Qed.
 
   (* halving, as its OWN lemma -- durable-notes' [rewrite -(Qp.div_2 q)]
      trap: written at a call site inside the proofmode the split's evar lands
@@ -599,10 +595,15 @@ Section SpecFileread.
   Proof.
     iIntros "H1 H2".
     iEval (rewrite IcacheRef.inode_shr_gen_intro) in "H2".
-    iDestruct "H2" as (g2) "H2".
-    iDestruct "H1" as "(Hid1 & Hlv1 & Hs1)". iDestruct "H2" as "(Hid2 & Hlv2 & Hs2)".
+    iDestruct "H2" as (g2 lo2 tl2) "(%Hle2 & #Hfl2 & H2)".
+    iDestruct "H1" as "(Hid1 & Hlv1 & Hs1 & Hst1)".
+    iDestruct "H2" as "(Hid2 & Hlv2 & Hs2 & Hst2)".
+    iAssert (IcacheRef.live_gen ik s2 g2) with "[Hlv2]" as "Hlv2";
+      [by iExists lo2|].
     iDestruct (IcacheRef.live_gen_agree with "Hlv1 Hlv2") as %<-.
-    rewrite inode_shr_gen_split2. iFrame.
+    rewrite /IcacheRef.inode_shr_gen IcacheRef.inode_ident_split
+            IcacheRef.live_gen_split SleepLock.slh_tok_split
+            IcacheRef.ic_ref_stamps_split. iFrame.
   Qed.
 
   (* the per-entry escrow, out of the family *)
@@ -612,7 +613,7 @@ Section SpecFileread.
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ik
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
+    iIntros (Hk) "H". rewrite /ic_escrows /ic_boxes_all /ic_escrow.
     assert (Hl : seq 0 NINODE !! ik = Some ik) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ ik ik Hl with "H") as "$".
   Qed.
@@ -669,15 +670,16 @@ Section SpecFileread.
       (st : fdstate) :
     fc_type Cf = FD_INODE \/ fc_type Cf = FD_DEVICE ->
     file_pay_st γf k q Cf st -∗
-    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16),
+    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16) (lo tl : nat),
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
       ⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
       ⌜fc_type Cf = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝ ∗
+      ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
       IcacheRef.ity_shot g ty ∗
-      IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
+      IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo ∗
       carve_off (fc_type Cf) ik k q ∗
-      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗
+      (IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo -∗
        carve_off (fc_type Cf) ik k q -∗
          file_pay_st γf k q Cf st).
   Proof.
@@ -693,7 +695,7 @@ Section SpecFileread.
                    orb_true_r. }
     rewrite {1}/file_core /file_core_noff /file_core_off Hnp Hyes /inode_pay.
     iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
-    iDestruct "Hs" as (ik) "(%Hipk & %Hik & %Hinb & Hshr)".
+    iDestruct "Hs" as (ik lo tl) "(%Hipk & %Hik & %Hinb & %Hle & #Hfl & Hshr)".
     iDestruct "Hwt" as (ty) "(#Hshot & %Hnd & %Hdv)".
     (* the arm's off conjunct, re-keyed at the share's own [ik] *)
     iAssert (carve_off (fc_type Cf) ik k q ∗
@@ -709,9 +711,10 @@ Section SpecFileread.
         iSplitR; [iPureIntro; exact Hipk|].
         iSplitR; [iPureIntro; exact Hik|]. iExact "Hf".
       - iFrame "Hop". iIntros "$". }
-    iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty.
+    iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty, lo, tl.
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [done|].
+    iSplitR; [done|]. iSplitR; [iExact "Hfl"|].
     iSplitR; [iExact "Hshot"|].
     (* [iExact], not [iFrame]: both sides are the same FOLDED
        [IcacheRef.inode_shr_gen] and conversion closes it, while the [Frame]
@@ -723,7 +726,7 @@ Section SpecFileread.
     iSplitR "Hop Hopback"; last first.
     { iApply "Hopback". iExact "Hop". }
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
-    iSplitL "Hshr"; [iExists ik; iFrame "%"; iExact "Hshr"|].
+    iSplitL "Hshr"; [iExists ik, lo, tl; iFrame "% Hfl"; iExact "Hshr"|].
     iExists ty. iSplitR; [iExact "Hshot"|].
     iSplit; iPureIntro; [exact Hnd | exact Hdv].
   Qed.
