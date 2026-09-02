@@ -1622,3 +1622,17 @@ on the FLIP copy of each inode proof before the three-way merge; the flip
 proofs' `ic_pin_rest` in the bundle intro/elim calls is gone (F42); every
 checkout is (e′) and returns the HELD header; the park takes the descriptor
 half and hands back the neutral descriptor.
+
+## 12.10 r19i — the read arm under (e′)/(f′) (2026-09-02)
+
+See tso-cutover-endgame.md §6²¹.  `CtxBox.box_checkout_split`'s split wand
+is a view shift at `E ∖ ↑N` (third CtxBox change); `ic_hdr_held cn … k rd i
+x ξ` is arm-aware (`ic_pay_held`: at `rd = true` the quarter leg
+`ic_rd_held_ghost`, loaded and ordinary only); `ic_hdr_amb_split`/`_join`
+(write arm, pure), `ic_hdr_amb_join_rd` (pure), `ic_hdr_amb_split_rd` (fupd:
+`ity_pending_shot_excl`, `frz_slot_kill_pinw`, `ic_loaded_ghost_shed`);
+wrappers `ic_checkout` (`ic_dep_rd d = false`), `ic_checkout_rd`
+(`itable_inv`, `ity_shot g ty`, `↑icacheN ⊆ E`, `k < NINODE`; the slice
+rides `ic_hdr_held_rd_sl`), `ic_park`/`ic_park_hold` over `ic_dep_rd d`
+returning `ic_dep_neutral ∗ ic_park_side d`.  Green: CtxBox, BioInv,
+OffBox, IcacheEscrow, IcacheBoot, IcachePinwObl, FsCfgKits, FsCfgSnap.

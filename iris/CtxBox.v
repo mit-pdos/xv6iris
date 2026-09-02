@@ -1030,10 +1030,14 @@ Section box.
     (max_stamp mh ≤ Kt)%nat →
     (lr_tp s0 ≤ Kp)%nat →
     (* F33: the residue is built from the CALLER's Qc beside the header --
-       the icache's Q is the descriptor half the caller mints ∗ the share in
+       the icache's Q2 is the descriptor half the caller mints ∗ the share in
        its hand ∗ the 3/4 leg from the header; only the leg comes out of
-       P_hdr.  (e) is the instance Qc := Q, P_hdr' := P_hdr. *)
-    (∀ (x : X) (ξ' : CtxId), Qc ∗ P_hdr i x ξ' ⊢ P_hdr' i x ξ' ∗ Q2) →
+       P_hdr.  A VIEW SHIFT at the box's mask (endgame §6²⁰): the icache's
+       read arm must REFUTE the header's frozen alternative and its unloaded
+       shape inside the checkout's own ghost step (main's
+       [ic_swap_checkout_rd] did exactly that), which takes [itable_inv]; a
+       pure wand cannot.  (e) is proven directly, the same skeleton. *)
+    (∀ (x : X) (ξ' : CtxId), Qc ∗ P_hdr i x ξ' ={E ∖ ↑N}=∗ P_hdr' i x ξ' ∗ Q2) →
     is_box N γ -∗
     own_context ξ -∗
     ctx_floor ξ Kt -∗
@@ -1074,7 +1078,7 @@ Section box.
         iFrame "Hrun". iExists K. iFrame "HKv". iPureIntro. lia. }
     (* the split, at the box's context: the residue stays, the rest is absorbed *)
     iEval (rewrite -Hid /in_arm) in "Hin". iDestruct "Hin" as (x) "[Hhdr Hrest]".
-    iDestruct (Hsplit x ξb with "[$HQc $Hhdr]") as "[Hhdr' HQ]".
+    iMod (Hsplit x ξb with "[$HQc $Hhdr]") as "[Hhdr' HQ]".
     iMod (ctx_absorb_lb (in_arm_of P_hdr' i) ξb ξ T K HTK with "Hrun HKv Hpk [Hhdr' Hrest]")
       as "(Hrun & Hpk & Hin')".
     { rewrite /in_arm_of. iExists x. iFrame "Hhdr' Hrest". }
