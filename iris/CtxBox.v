@@ -520,22 +520,30 @@ Section box.
   Proof. rewrite /in_arm_of. apply ctx_morph_exist. intros x. apply ctx_morph_sep; apply _. Qed.
 
   (* ---- the body (§2; the edit's register-selected arms) ------------- *)
+  (* THE ARM, selected by (lr_hold s, sr_win r).  A PUBLIC definition: the
+     collection's view lemma (box_view, §6⁸ Q5) exposes it, so a non-owner
+     matches on this and never on the body's layout. *)
+  Definition box_arm γ (T : nat) (ξb : CtxId) m (r : slot_reg id X) (s : l2_reg id) : iProp Σ :=
+    (match lr_hold s with
+     | Some (i, mh) =>                                          (* OUT_L2 *)
+         ⌜sr_win r = false⌝ ∗ ⌜mh ≠ ∅⌝ ∗ ⌜keyed mh i⌝ ∗ stamps_frag γ mh ∗ Q
+     | None =>
+         if sr_win r
+         then hdr_out γ m ∗ (∃ x, ⌜sr_x r = Some (x, T)⌝ ∗ P_rest x ξb) ∗ Q   (* OUT_L1 *)
+         else in_arm (sr_ident r) ξb                                          (* IN *)
+     end)%I.
+  (* the four pure rows, named for the view *)
+  Definition box_rows (T : nat) m (c : nat) (r : slot_reg id X) (s : l2_reg id) : Prop :=
+    qsum m = nat_Qc c ∧                                        (* Σ *)
+    keyed m (sr_ident r) ∧                                     (* I *)
+    ((∀ p, p ∈ dom m → (T ≤ p.2)%nat) ∨ (T ≤ lr_tp s)%nat) ∧  (* C *)
+    ((T ≤ sr_td r)%nat ∨ ∃ p, p ∈ dom m ∧ p.2 = T).            (* D *)
   Definition box_body γ : iProp Σ :=
     (∃ (T : nat) (ξb : CtxId) m (c : nat) (r : slot_reg id X) (s : l2_reg id),
        ctx_parked ξb T ∗ llb loglen_name T ∗
        stamps_auth γ m ∗ cnt_half γ c ∗ slotd_half γ r ∗ slotp_half γ s ∗
-       ⌜qsum m = nat_Qc c⌝ ∗                                        (* Σ *)
-       ⌜keyed m (sr_ident r)⌝ ∗                                     (* I *)
-       ⌜(∀ p, p ∈ dom m → (T ≤ p.2)%nat) ∨ (T ≤ lr_tp s)%nat⌝ ∗     (* C *)
-       ⌜(T ≤ sr_td r)%nat ∨ ∃ p, p ∈ dom m ∧ p.2 = T⌝ ∗            (* D *)
-       match lr_hold s with
-       | Some (i, mh) =>                                          (* OUT_L2 *)
-           ⌜sr_win r = false⌝ ∗ ⌜mh ≠ ∅⌝ ∗ ⌜keyed mh i⌝ ∗ stamps_frag γ mh ∗ Q
-       | None =>
-           if sr_win r
-           then hdr_out γ m ∗ (∃ x, ⌜sr_x r = Some (x, T)⌝ ∗ P_rest x ξb) ∗ Q   (* OUT_L1 *)
-           else in_arm (sr_ident r) ξb                                          (* IN *)
-       end)%I.
+       ⌜box_rows T m c r s⌝ ∗
+       box_arm γ T ξb m r s)%I.
   Definition is_box (N : namespace) γ : iProp Σ := inv N (box_body γ).
 
   (* the boot fold: fifty deposit stamps under one llb bound (from BioInv) *)
@@ -564,6 +572,11 @@ Section box.
   Global Instance hdr_out_timeless γ m : Timeless (hdr_out γ m).
   Proof. rewrite /hdr_out /stamps_frag. apply _. Qed.
 
+  Global Instance box_arm_timeless γ T ξb m r s : Timeless (box_arm γ T ξb m r s).
+  Proof.
+    rewrite /box_arm. destruct (lr_hold s) as [[i mh]|]; [apply _|].
+    destruct (sr_win r); apply _.
+  Qed.
   Lemma stamps_frag_incl γ m m' :
     stamps_auth γ m -∗ stamps_frag γ m' -∗ ⌜m' ≼ m⌝.
   Proof.
@@ -606,10 +619,14 @@ Section box.
      b suffix so the caller's r / s / c stay distinct until agreement) *)
   Local Ltac box_open Hbox Hcl :=
     iInv Hbox as (T ξb m cb rb sb)
-      "(>Hpk & >#Hllb & >Hst & >Hc & >Hrd & >Hrp & >%Hsum & >%HI & >%HC & >%HD & Harm)" Hcl.
+      "(>Hpk & >#Hllb & >Hst & >Hc & >Hrd & >Hrp & >%Hrows & Harm)" Hcl;
+    lazymatch goal with
+    | Hr : box_rows _ _ _ _ _ |- _ => destruct Hr as (Hsum & HI & HC & HD)
+    end;
+    iEval (rewrite /box_arm) in "Harm".
 
   (* the floor → view bound plumbing of a withdraw *)
-  Local Lemma box_view `{CID : CpuId} (ξ : CtxId) (K : nat) :
+  Local Lemma box_floor_view `{CID : CpuId} (ξ : CtxId) (K : nat) :
     own_context ξ -∗ ctx_floor ξ K -∗
     own_context ξ ∗ ∃ K' : nat, ⌜(K ≤ K')%nat⌝ ∗ hart_view_lb K'.
   Proof.
@@ -742,12 +759,12 @@ Section box.
     iAssert (own_context ξ ∗ ∃ K : nat, ⌜(T ≤ K)%nat⌝ ∗ hart_view_lb K)%I
       with "[Hrun]" as "[Hrun (%K & %HTK & #HKv)]".
     { destruct HD as [HD | (p & Hp & HpT)].
-      - iDestruct (box_view ξ Kd with "Hrun Hfld") as "[Hrun (%K & %HKK & #HKv)]".
+      - iDestruct (box_floor_view ξ Kd with "Hrun Hfld") as "[Hrun (%K & %HKK & #HKv)]".
         iFrame "Hrun". iExists K. iFrame "HKv". iPureIntro. lia.
       - assert (Hp' : p ∈ dom mD).
         { apply (qsum_eq_dom mD m HinclD); [by rewrite HmD Hsum | exact Hp]. }
         pose proof (max_stamp_ge mD p Hp').
-        iDestruct (box_view ξ Kt with "Hrun Hflt") as "[Hrun (%K & %HKK & #HKv)]".
+        iDestruct (box_floor_view ξ Kt with "Hrun Hflt") as "[Hrun (%K & %HKK & #HKv)]".
         iFrame "Hrun". iExists K. iFrame "HKv". iPureIntro. lia. }
     iDestruct "Hin" as (x0) "[Hhdr Hrest]".
     iMod (ctx_absorb_lb (P_hdr (sr_ident r) x0) ξb ξ T K HTK with "Hrun HKv Hpk Hhdr")
@@ -757,8 +774,8 @@ Section box.
     iMod ("Hcl" with "[Hpk Hst Hc Hrd Hrp HfD Hrest HQ]") as "_".
     { iNext. iExists T, ξb, m, c, (SlotReg (sr_td r) true (sr_ident r) (Some (x0, T))), sb.
       iFrame "Hpk Hllb Hst Hc Hrd Hrp". simpl.
-      iSplitR; [iPureIntro; exact Hsum|]. iSplitR; [iPureIntro; exact HI|].
-      iSplitR; [iPureIntro; exact HC|]. iSplitR; [iPureIntro; exact HD|].
+      iSplitR; [iPureIntro; exact (conj Hsum (conj HI (conj HC HD)))|].
+      rewrite /box_arm.
       rewrite Hh. simpl.
       iSplitL "HfD".
       { iExists mD. iSplitR; [iPureIntro; by rewrite HmD Hsum|]. iFrame "HfD". iExact "HllbD". }
@@ -826,14 +843,14 @@ Section box.
     { iNext. iExists T', ξb, {[(i', T') := unit_mass c]}, (Nat.max 1 c), (SlotReg T' false i' None), sb.
       iFrame "Hpk Hllb' Hst Hc Hrd Hrp". simpl.
       iSplitR.
-      { iPureIntro. rewrite -insert_empty (qsum_insert ∅ _ _ (lookup_empty _)) qsum_empty Qcplus_0_r.
-        apply unit_mass_Qc. }
-      iSplitR; [iPureIntro; apply keyed_singleton|].
-      iSplitR.
-      { iPureIntro. left. intros p Hp. rewrite dom_singleton_L in Hp.
-        apply elem_of_singleton in Hp. subst p. simpl. lia. }
-      iSplitR; [iPureIntro; left; lia|].
-      rewrite Hh. simpl. iExists x1. iFrame "Hhdr Hrest". }
+      { iPureIntro. split_and!.
+        - rewrite -insert_empty (qsum_insert ∅ _ _ (lookup_empty _)) qsum_empty Qcplus_0_r.
+          apply unit_mass_Qc.
+        - apply keyed_singleton.
+        - left. intros p Hp. rewrite dom_singleton_L in Hp.
+          apply elem_of_singleton in Hp. subst p. simpl. lia.
+        - left. cbn [sr_td]. lia. }
+      rewrite /box_arm Hh. simpl. iExists x1. iFrame "Hhdr Hrest". }
     iModIntro. iFrame "Hrun HQ". iExists T'. iFrame "Hrd0 Hcnt".
     iSplitL "Hfr"; [| iExact "Hllb'"].
     rewrite /reference. iFrame "Hfr".
@@ -897,17 +914,17 @@ Section box.
     iMod ("Hcl" with "[Hpk Hst Hc Hrd Hrp Harm]") as "_".
     { iNext. iExists T, ξb, ({[(sr_ident r, T) := 1%Qp]} ⋅ m), (S c), r, sb.
       iFrame "Hpk Hllb Hst Hc Hrd Hrp".
-      iSplitR. { iPureIntro. rewrite qsum_singleton_op Hsum Qp_to_Qc_1 nat_Qc_S. done. }
-      iSplitR; [iPureIntro; by apply keyed_singleton_op|].
       iSplitR.
-      { iPureIntro. destruct HC as [HC | HC]; [left | by right].
-        intros p Hp. rewrite dom_op dom_singleton_L in Hp.
-        apply elem_of_union in Hp as [Hp | Hp]; [apply elem_of_singleton in Hp; subst p; simpl; lia | by apply HC]. }
-      iSplitR.
-      { iPureIntro. right. exists (sr_ident r, T). split; [| done].
-        rewrite dom_op dom_singleton_L. apply elem_of_union_l. by apply elem_of_singleton. }
+      { iPureIntro. split_and!.
+        - rewrite qsum_singleton_op Hsum Qp_to_Qc_1 nat_Qc_S. done.
+        - by apply keyed_singleton_op.
+        - destruct HC as [HC | HC]; [left | by right].
+          intros p Hp. rewrite dom_op dom_singleton_L in Hp.
+          apply elem_of_union in Hp as [Hp | Hp]; [apply elem_of_singleton in Hp; subst p; simpl; lia | by apply HC].
+        - right. exists (sr_ident r, T). split; [| done].
+          rewrite dom_op dom_singleton_L. apply elem_of_union_l. by apply elem_of_singleton. }
       (* the arm mentions m only inside the shut window *)
-      iEval (rewrite Hw) in "Harm". rewrite Hw. iExact "Harm". }
+      iEval (rewrite Hw) in "Harm". rewrite /box_arm Hw. iExact "Harm". }
     iModIntro. iFrame "Hrd0 Hcnt". iExists T. rewrite /reference. iFrame "Hfr".
     iSplitR; [iPureIntro; apply singleton_ne_empty_map|].
     iSplitR; [iPureIntro; apply keyed_singleton|].
@@ -959,17 +976,16 @@ Section box.
     { iNext. iExists T, ξb, m1, c, (SlotReg (Nat.max (sr_td r) (max_stamp mD)) false (sr_ident r) (sr_x r)), sb.
       iFrame "Hpk Hllb Hst Hc Hrd Hrp". simpl.
       iSplitR.
-      { iPureIntro. apply (Qc_plus_cancel_l 1%Qc). rewrite -{1}nat_Qc_1 -HmD Hq1 Hsum nat_Qc_S. done. }
-      iSplitR; [iPureIntro; exact (keyed_sub _ _ _ Hdom1 HI)|].
-      iSplitR.
-      { iPureIntro. destruct HC as [HC | HC]; [left | by right].
-        intros p Hp. apply HC. by apply Hdom1. }
-      iSplitR.
-      { iPureIntro. destruct HD as [HD | (p & Hp & HpT)]; [left; lia|].
-        destruct (decide (p ∈ dom mD)) as [HpD | HpD].
-        - left. pose proof (max_stamp_ge mD p HpD). lia.
-        - right. exists p. split; [by apply Hkeep | exact HpT]. }
-      simpl. iExact "Harm". }
+      { iPureIntro. split_and!.
+        - apply (Qc_plus_cancel_l 1%Qc). rewrite -{1}nat_Qc_1 -HmD Hq1 Hsum nat_Qc_S. done.
+        - exact (keyed_sub _ _ _ Hdom1 HI).
+        - destruct HC as [HC | HC]; [left | by right].
+          intros p Hp. apply HC. by apply Hdom1.
+        - cbn [sr_td]. destruct HD as [HD | (p & Hp & HpT)]; [left; lia|].
+          destruct (decide (p ∈ dom mD)) as [HpD | HpD].
+          + left. pose proof (max_stamp_ge mD p HpD). lia.
+          + right. exists p. split; [by apply Hkeep | exact HpT]. }
+      rewrite /box_arm. simpl. iExact "Harm". }
     iModIntro. iFrame "Hrd0 Hcnt". iApply (llb_max with "Hllbtd HllbD").
   Qed.
 
@@ -997,23 +1013,29 @@ Section box.
        rows unchanged (m, T, r untouched; s.tp untouched). *)
   Lemma box_checkout_split `{CID : CpuId} (N : namespace) γ (ξ : CtxId) (i : id)
       (P_hdr' : id → X → CtxId → iProp Σ) `{!∀ i x, CtxMorph (P_hdr' i x)}
+      (Qc : iProp Σ)
       (mh : gmap (id * nat) ufrac) (s0 : l2_reg id) (Kt Kp : nat) (E : coPset) :
     ↑N ⊆ E →
     lr_hold s0 = None →
     (max_stamp mh ≤ Kt)%nat →
     (lr_tp s0 ≤ Kp)%nat →
-    (∀ (x : X) (ξ' : CtxId), P_hdr i x ξ' ⊢ P_hdr' i x ξ' ∗ Q) →
+    (* F33: the residue is built from the CALLER's Qc beside the header --
+       the icache's Q is the descriptor half the caller mints ∗ the share in
+       its hand ∗ the 3/4 leg from the header; only the leg comes out of
+       P_hdr.  (e) is the instance Qc := Q, P_hdr' := P_hdr. *)
+    (∀ (x : X) (ξ' : CtxId), Qc ∗ P_hdr i x ξ' ⊢ P_hdr' i x ξ' ∗ Q) →
     is_box N γ -∗
     own_context ξ -∗
     ctx_floor ξ Kt -∗
     ctx_floor ξ Kp -∗
     reference γ i mh -∗
+    Qc -∗
     slotp_half γ s0 ={E}=∗
     own_context ξ ∗
     (∃ x, P_hdr' i x ξ ∗ P_rest x ξ) ∗
     l2_hold γ i mh.
   Proof.
-    iIntros (HE Hs0 HKt HKp Hsplit) "#Hbox Hrun #Hflt #Hflp Href Hrp0".
+    iIntros (HE Hs0 HKt HKp Hsplit) "#Hbox Hrun #Hflt #Hflp Href HQc Hrp0".
     iDestruct "Href" as "(%Hne & %Hkeyed & Hfh & #Hllbh)".
     rewrite /is_box. box_open "Hbox" "Hcl".
     iDestruct (ghost_var_agree with "Hrp Hrp0") as %->.
@@ -1036,13 +1058,13 @@ Section box.
       - destruct (map_choose mh Hne) as (p & q & Hp).
         assert (Hpd : p ∈ dom mh) by (apply elem_of_dom; by exists q).
         pose proof (HC p (gincl_dom _ _ Hinclh p Hpd)). pose proof (max_stamp_ge mh p Hpd).
-        iDestruct (box_view ξ Kt with "Hrun Hflt") as "[Hrun (%K & %HKK & #HKv)]".
+        iDestruct (box_floor_view ξ Kt with "Hrun Hflt") as "[Hrun (%K & %HKK & #HKv)]".
         iFrame "Hrun". iExists K. iFrame "HKv". iPureIntro. lia.
-      - iDestruct (box_view ξ Kp with "Hrun Hflp") as "[Hrun (%K & %HKK & #HKv)]".
+      - iDestruct (box_floor_view ξ Kp with "Hrun Hflp") as "[Hrun (%K & %HKK & #HKv)]".
         iFrame "Hrun". iExists K. iFrame "HKv". iPureIntro. lia. }
     (* the split, at the box's context: the residue stays, the rest is absorbed *)
     iEval (rewrite -Hid /in_arm) in "Hin". iDestruct "Hin" as (x) "[Hhdr Hrest]".
-    iDestruct (Hsplit x ξb with "Hhdr") as "[Hhdr' HQ]".
+    iDestruct (Hsplit x ξb with "[$HQc $Hhdr]") as "[Hhdr' HQ]".
     iMod (ctx_absorb_lb (in_arm_of P_hdr' i) ξb ξ T K HTK with "Hrun HKv Hpk [Hhdr' Hrest]")
       as "(Hrun & Hpk & Hin')".
     { rewrite /in_arm_of. iExists x. iFrame "Hhdr' Hrest". }
@@ -1051,8 +1073,8 @@ Section box.
     iMod ("Hcl" with "[Hpk Hst Hc Hrd Hrp HQ Hfh]") as "_".
     { iNext. iExists T, ξb, m, cb, rb, (L2Reg (lr_tp s0) (Some (i, mh))).
       iFrame "Hpk Hllb Hst Hc Hrd Hrp". simpl.
-      iSplitR; [iPureIntro; exact Hsum|]. iSplitR; [iPureIntro; exact HI|].
-      iSplitR; [iPureIntro; exact HC|]. iSplitR; [iPureIntro; exact HD|].
+      iSplitR; [iPureIntro; exact (conj Hsum (conj HI (conj HC HD)))|].
+      rewrite /box_arm.
       iFrame "Hfh HQ". iPureIntro. split_and!; done. }
     iModIntro. iFrame "Hrun". iSplitL "Hin'". { rewrite /in_arm_of. iExact "Hin'". }
     rewrite /l2_hold. iExists (lr_tp s0). iFrame "Hrp0". iExact "Hllbh".
@@ -1098,9 +1120,9 @@ Section box.
       - destruct (map_choose mh Hne) as (p & q & Hp).
         assert (Hpd : p ∈ dom mh) by (apply elem_of_dom; by exists q).
         pose proof (HC p (gincl_dom _ _ Hinclh p Hpd)). pose proof (max_stamp_ge mh p Hpd).
-        iDestruct (box_view ξ Kt with "Hrun Hflt") as "[Hrun (%K & %HKK & #HKv)]".
+        iDestruct (box_floor_view ξ Kt with "Hrun Hflt") as "[Hrun (%K & %HKK & #HKv)]".
         iFrame "Hrun". iExists K. iFrame "HKv". iPureIntro. lia.
-      - iDestruct (box_view ξ Kp with "Hrun Hflp") as "[Hrun (%K & %HKK & #HKv)]".
+      - iDestruct (box_floor_view ξ Kp with "Hrun Hflp") as "[Hrun (%K & %HKK & #HKv)]".
         iFrame "Hrun". iExists K. iFrame "HKv". iPureIntro. lia. }
     iMod (ctx_absorb_lb (in_arm (sr_ident rb)) ξb ξ T K HTK with "Hrun HKv Hpk Hin")
       as "(Hrun & Hpk & Hin)".
@@ -1109,8 +1131,8 @@ Section box.
     iMod ("Hcl" with "[Hpk Hst Hc Hrd Hrp HQ Hfh]") as "_".
     { iNext. iExists T, ξb, m, cb, rb, (L2Reg (lr_tp s0) (Some (i, mh))).
       iFrame "Hpk Hllb Hst Hc Hrd Hrp". simpl.
-      iSplitR; [iPureIntro; exact Hsum|]. iSplitR; [iPureIntro; exact HI|].
-      iSplitR; [iPureIntro; exact HC|]. iSplitR; [iPureIntro; exact HD|].
+      iSplitR; [iPureIntro; exact (conj Hsum (conj HI (conj HC HD)))|].
+      rewrite /box_arm.
       iFrame "Hfh HQ". iPureIntro. split_and!; done. }
     iModIntro. iFrame "Hrun". iSplitL "Hin". { rewrite Hid. iExact "Hin". }
     rewrite /l2_hold. iExists (lr_tp s0). iFrame "Hrp0". iExact "Hllbh".
@@ -1181,13 +1203,14 @@ Section box.
     iMod ("Hcl" with "[Hpk Hst Hc Hrd Hrp Hbun]") as "_".
     { iNext. iExists T', ξb, ({[(i, T') := q]} ⋅ m1), cb, rb, (L2Reg T' None).
       iFrame "Hpk Hllb' Hst Hc Hrd Hrp". simpl.
-      iSplitR. { iPureIntro. rewrite qsum_singleton_op. simpl. rewrite Hq1. exact Hsum. }
-      iSplitR. { iPureIntro. rewrite Hid. apply keyed_singleton_op. exact (keyed_sub _ _ _ Hdom1 HI). }
-      iSplitR; [iPureIntro; right; lia|].
       iSplitR.
-      { iPureIntro. right. exists (i, T'). split; [| done].
-        rewrite dom_op dom_singleton_L. apply elem_of_union_l. by apply elem_of_singleton. }
-      rewrite Hwf -Hid. iExact "Hbun". }
+      { iPureIntro. split_and!.
+        - rewrite qsum_singleton_op. simpl. rewrite Hq1. exact Hsum.
+        - rewrite Hid. apply keyed_singleton_op. exact (keyed_sub _ _ _ Hdom1 HI).
+        - right. cbn [lr_tp]. lia.
+        - right. exists (i, T'). split; [| done].
+          rewrite dom_op dom_singleton_L. apply elem_of_union_l. by apply elem_of_singleton. }
+      rewrite /box_arm. simpl. rewrite Hwf -Hid. iExact "Hbun". }
     iModIntro. iFrame "Hrun HQ'". iExists T', q. iFrame "Hrp0".
     iSplitR; [iPureIntro; reflexivity|].
     iSplitL "Hfr"; [| iExact "Hllb'"].
@@ -1267,7 +1290,7 @@ Section box.
     assert (Hkeyed' : keyed m' (sr_ident r))
       by exact (keyed_sub _ _ _ (gincl_dom _ _ Hincl') HI).
     (* the cover: the register's stamp IS the box's, under the caller's floor *)
-    iDestruct (box_view ξ K with "Hrun Hfl") as "[Hrun (%K' & %HKK' & #HKv)]".
+    iDestruct (box_floor_view ξ K with "Hrun Hfl") as "[Hrun (%K' & %HKK' & #HKv)]".
     iMod (ctx_absorb_lb (P_rest x) ξb ξ T K' ltac:(lia) with "Hrun HKv Hpk Hrest")
       as "(Hrun & Hpk & Hrest)".
     iMod (ghost_var_update_2 (SlotReg (sr_td r) false (sr_ident r) None) with "Hrd Hrd0")
@@ -1278,12 +1301,68 @@ Section box.
     { iNext. iExists T, ξb, m, 1, (SlotReg (sr_td r) false (sr_ident r) None),
                (L2Reg (lr_tp s0) (Some (sr_ident r, m'))).
       iFrame "Hpk Hllb Hst Hc Hrd Hrp". simpl.
-      iSplitR; [iPureIntro; exact Hsum|]. iSplitR; [iPureIntro; exact HI|].
-      iSplitR; [iPureIntro; exact HC|]. iSplitR; [iPureIntro; exact HD|].
+      iSplitR; [iPureIntro; exact (conj Hsum (conj HI (conj HC HD)))|].
+      rewrite /box_arm.
       iFrame "Hf' HQn". iPureIntro. split_and!; done. }
     iModIntro. iFrame "Hrun HQo Hrest Hrd0 Hcnt". iExists m'.
     iSplitR; [iPureIntro; by rewrite Hsum' Hsum|].
     rewrite /l2_hold. iExists (lr_tp s0). iFrame "Hrp0". iExact "Hllb'".
+  Qed.
+
+  (* ================================================================== *)
+  (*  THE TWO NON-TRANSITION ACCESSORS (§6⁸ Q4/Q5).  Neither moves an arm,  *)
+  (*  a stamp, a register or a row; the law stays "seven transitions".     *)
+  (* ================================================================== *)
+
+  (* box_q_update: the L2 holder rewrites its residue in place (main's
+     ic_shrink_tx / ic_grow_tx: the descriptor half and the parked ln_tx
+     share change together under two write locks).  Selects OUT_L2 by the
+     caller's L2 half; runs the client's fupd on Q; puts it back. *)
+  Lemma box_q_update (N : namespace) γ (i : id) (mh : gmap (id * nat) ufrac) (E : coPset) :
+    ↑N ⊆ E →
+    is_box N γ -∗
+    l2_hold γ i mh -∗
+    (Q ={E ∖ ↑N}=∗ Q) ={E}=∗
+    l2_hold γ i mh.
+  Proof.
+    iIntros (HE) "#Hbox Hhold Hupd".
+    iDestruct "Hhold" as (tp) "[Hrp0 #Hllbh]".
+    rewrite /is_box. box_open "Hbox" "Hcl".
+    iDestruct (ghost_var_agree with "Hrp Hrp0") as %->.
+    iEval (cbn [lr_hold]) in "Harm".
+    iDestruct "Harm" as "(>%Hwf & >%Hne0 & >%Hkeyed0 & >Hf0 & >HQ)".
+    iMod ("Hupd" with "HQ") as "HQ".
+    iMod ("Hcl" with "[Hpk Hst Hc Hrd Hrp Hf0 HQ]") as "_".
+    { iNext. iExists T, ξb, m, cb, rb, (L2Reg tp (Some (i, mh))).
+      iFrame "Hpk Hllb Hst Hc Hrd Hrp".
+      iSplitR; [iPureIntro; exact (conj Hsum (conj HI (conj HC HD)))|].
+      rewrite /box_arm. cbn [lr_hold]. iFrame "Hf0 HQ". iPureIntro. split_and!; done. }
+    iModIntro. rewrite /l2_hold. iExists tp. iFrame "Hrp0". iExact "Hllbh".
+  Qed.
+
+  (* box_view: a read-only three-way view for a NON-OWNER (the commit's
+     collection, which holds no lock of the box's).  Opens the inv, hands
+     out the registers' values with the four rows and the ARM (a public
+     definition -- the caller matches on lr_hold / sr_win and reads the
+     client content inside: IN's header and rest at ξb, OUT_L1's window
+     pair and Q, OUT_L2's parked fragment and Q), and closes with what it
+     opened.  The collection's ic_slot_cover is stated over box_arm. *)
+  Lemma box_view (N : namespace) γ (E : coPset) :
+    ↑N ⊆ E →
+    is_box N γ ={E, E ∖ ↑N}=∗
+    ∃ (T : nat) (ξb : CtxId) m (c : nat) (r : slot_reg id X) (s : l2_reg id),
+      ⌜box_rows T m c r s⌝ ∗
+      box_arm γ T ξb m r s ∗
+      (box_arm γ T ξb m r s ={E ∖ ↑N, E}=∗ True).
+  Proof.
+    iIntros (HE) "#Hbox". rewrite /is_box.
+    iMod (inv_acc E N with "Hbox") as "[Hbody Hcl]"; [exact HE|].
+    iDestruct "Hbody" as (T ξb m c r s) "(>Hpk & >#Hllb & >Hst & >Hc & >Hrd & >Hrp & >%Hrows & >Harm)".
+    iModIntro. iExists T, ξb, m, c, r, s. iSplitR; [iPureIntro; exact Hrows|].
+    iFrame "Harm". iIntros "Harm".
+    iMod ("Hcl" with "[Hpk Hst Hc Hrd Hrp Harm]") as "_"; [| done].
+    iNext. iExists T, ξb, m, c, r, s. iFrame "Hpk Hllb Hst Hc Hrd Hrp Harm".
+    iPureIntro. exact Hrows.
   Qed.
 
   (* ================================================================== *)
@@ -1325,11 +1404,13 @@ Section box.
     { iNext. rewrite /box_body.
       iExists Tb, ξb, ∅, 0%nat, (SlotReg Tb false i0 None), (L2Reg 0 None).
       iFrame "Hpk Hllb Hst Hc1 Hd1 Hp1". simpl.
-      iSplitR; [iPureIntro; by rewrite qsum_empty nat_Qc_0|].
-      iSplitR. { iPureIntro. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp. }
-      iSplitR. { iPureIntro. left. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp. }
-      iSplitR; [iPureIntro; left; lia|].
-      simpl. iExact "Hbun". }
+      iSplitR.
+      { iPureIntro. split_and!.
+        - by rewrite qsum_empty nat_Qc_0.
+        - intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp.
+        - left. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp.
+        - left. cbn [sr_td]. lia. }
+      rewrite /box_arm. simpl. iExact "Hbun". }
     iModIntro. iFrame "Hrun". iExists γ, Tb. iFrame "Hinv Hd2 Hllb Hc2 Hp2".
   Qed.
 
@@ -1368,11 +1449,13 @@ Section box.
     { iNext. rewrite /box_body.
       iExists Tb, ξb, ∅, 0%nat, (SlotReg Tb false i0 None), (L2Reg 0 None).
       iFrame "Hpk Hllb Hst Hc1 Hd1 Hp1". simpl.
-      iSplitR; [iPureIntro; by rewrite qsum_empty nat_Qc_0|].
-      iSplitR. { iPureIntro. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp. }
-      iSplitR. { iPureIntro. left. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp. }
-      iSplitR; [iPureIntro; left; lia|].
-      iExact "Hbun". }
+      iSplitR.
+      { iPureIntro. split_and!.
+        - by rewrite qsum_empty nat_Qc_0.
+        - intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp.
+        - left. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp.
+        - left. cbn [sr_td]. lia. }
+      rewrite /box_arm. simpl. iExact "Hbun". }
     iModIntro. iFrame "Hrun". iExists Tb. iFrame "Hinv Hd2 Hllb Hc2 Hp2".
   Qed.
 
@@ -1404,11 +1487,13 @@ Section box.
     { iNext. rewrite /box_body.
       iExists Tb, ξb, ∅, 0%nat, (SlotReg Tb false i0 None), (L2Reg 0 None).
       iFrame "Hpk Hllb Hst Hc Hd1 Hp". simpl.
-      iSplitR; [iPureIntro; by rewrite qsum_empty nat_Qc_0|].
-      iSplitR. { iPureIntro. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp. }
-      iSplitR. { iPureIntro. left. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp. }
-      iSplitR; [iPureIntro; left; lia|].
-      iExact "Hbun". }
+      iSplitR.
+      { iPureIntro. split_and!.
+        - by rewrite qsum_empty nat_Qc_0.
+        - intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp.
+        - left. intros p Hp. rewrite dom_empty_L in Hp. by apply not_elem_of_empty in Hp.
+        - left. cbn [sr_td]. lia. }
+      rewrite /box_arm. simpl. iExact "Hbun". }
     iModIntro. iFrame "Hrun". iExists Tb. iFrame "Hinv Hd2 Hllb".
   Qed.
   (* ---- the derived facts the client rows need ------------------------ *)
