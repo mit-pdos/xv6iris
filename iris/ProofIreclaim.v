@@ -121,6 +121,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Require Import TsoCtx.
 
@@ -279,9 +280,8 @@ Section IreclaimDefs.
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
-    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
-    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
+    iIntros (Hk) "H".
+    iApply (ic_escrows_lookup fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k Hk with "H").
   Qed.
 
 End IreclaimDefs.
@@ -1694,9 +1694,10 @@ Section IreclaimOrphan.
     iDestruct (iu_slots_split 2 1 with "Hsl") as "[Hsl Hsl1]".
     (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)) *)
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
-    iDestruct "Hshr" as (gsh) "Hshr".
+    iDestruct "Hshr" as (gsh losh tlsh) "(%Hlesh & #Hflsh & Hshr)".
+    iDestruct (is_itable2_claims with "Hitb2") as "#Hclaims2".
     iApply (IL.wp_ilock_tx_sconf γs j γl pd pav pu gil gisl
- kslot (q/2)%Qp gsh PlainK inum
+ kslot (q/2)%Qp gsh losh tlsh PlainK inum
               pidv dq dqs OC (K - 8)%nat eb b lks Upr
               ltac:(lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
               HOCa0
@@ -1704,8 +1705,9 @@ Section IreclaimOrphan.
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hitbl Hescrow Hireg Hslk
-                    Hshr Hru Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1 Htx").
+                    [%] Hflsh Hclaims2 Hshr Hru Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1 Htx").
     all: try lkbelow.
+    all: try (exact Hlesh).
     iIntros (CID18 Hq18 mL dnl bml fl_)
       "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbi Hsl1 Hslkd Hdep Hidev Hiinum
        Hvalid Hloaded #Hshot Hfrz %Hfr_ Hru %Hilkp".
@@ -1808,22 +1810,26 @@ Section IreclaimOrphan.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
+    iDestruct (is_itable2_claims with "Hitb2") as "#Hclaims".
     iApply (IU.wp_iunlock_tx_sconf γs gil gisl kslot
-              (q/2)%Qp gsh icfg_dev inum dnl bml pidv dq OE (K - 8)%nat eb
+              (q/2)%Qp gsh losh tlsh icfg_dev inum dnl bml pidv dq OE (K - 8)%nat eb
               (proc_addr j) b lks Upr
               ltac:(lia) Hkslot HOEa0
               (* iunlock's bound is "sleep lock"(6); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hitbl Hescrow Hslk Hslkd
-                    Hppid Hprocs Hdep Hidev Hiinum Hvalid Hloaded Hshot Hfrz").
+                    Hppid Hprocs [%] Hflsh Hclaims Hdep Hidev Hiinum Hvalid
+                    Hloaded Hshot Hfrz").
     all: try lkbelow.
+    all: try (exact Hlesh).
     iIntros (CID21 Hq21 mU) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr Htx".
     (* ...AND THE WRITE ARM COMES HOME inside [iunlock] (B''-tx): the
        descriptor named the share, so the token is whole again. *)
-
     iDestruct (log_opb_op with "Hopb Htx") as "Hop".
-    iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
+    (* the returned genlo slice rejoins its retained credential (A6.145) *)
+    iDestruct (inode_shr_gen_forget kslot (q/2)%Qp icfg_dev inum gsh losh tlsh Hlesh
+                 with "Hflsh Hshr") as "Hshr".
     assert (Hpc64 : ret_pc (OE !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x64))
       by (rewrite HOEra; pcw).
