@@ -782,13 +782,14 @@ Inductive ic_dep : Type :=
      because what the ESCROW keeps differs and the deposit is what selects
      the arm. *)
   | DepRd (s : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
-          (lo : nat)
-  (* A WHOLE REFERENCE checked out (tso-flip F16): the free path's and any
-     holder of a full [inode_ref]'s descriptor; [lo] is the credential's
-     epoch on every credential-bearing arm (tso-flip A6.145), so the park
-     hands the liveness slice back at the epoch the holder's floor names. *)
-  | DepRef (q : Qp) (dev inum : SailStdpp.Values.mword 32) (g : gname)
-           (lo : nat).
+          (lo : nat).
+  (* [lo] is the credential's epoch on every credential-bearing arm
+     (tso-flip A6.145), so the park hands the liveness slice back at the
+     epoch the holder's floor names.  tso-flip's [DepRef] (F16, a WHOLE
+     reference checked out by iput's free path) is GONE (tso-cutover
+     endgame F39): under the stitch iput's free path is main's -- the
+     ref == 1 GUARD (a) at count 1 and the (g) exchange to [DepFrz]; no
+     whole-unit (e) exists. *)
 
 (* THE LOCKED REGISTRY'S ENTRY (durable-disk lane A, re-keyed by B''-arm):
    one ARM.  [(t, q, S)] -- the transaction whose row is suspended, the

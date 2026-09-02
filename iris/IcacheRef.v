@@ -624,7 +624,6 @@ Definition ic_dep_gname (d : ic_dep) : option gname :=
   | DepFrz _ _ _ _ _ => None
   | DepTx _ _ _ g _ _ _ => Some g
   | DepRd _ _ _ g _ => Some g
-  | DepRef _ _ _ g _ => Some g
   end.
 
 (* the credential's EPOCH (tso-flip A6.145), where the descriptor has one *)
@@ -634,7 +633,6 @@ Definition ic_dep_lo (d : ic_dep) : option nat :=
   | DepFrz _ _ _ _ _ => None
   | DepTx _ _ _ _ lo _ _ => Some lo
   | DepRd _ _ _ _ lo => Some lo
-  | DepRef _ _ _ _ lo => Some lo
   end.
 
 (* IS THIS DESCRIPTOR THE READ ARM (durable-disk B''-join)?  The escrow's OUT

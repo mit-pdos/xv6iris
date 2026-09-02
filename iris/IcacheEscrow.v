@@ -1571,7 +1571,6 @@ Section IcacheEscrow.
        commit (where the authority is empty) this arm is refuted outright
        ([TxPin.tx_pin_no_ops] at the share).  The descriptor names [(t, q)],
        so the park gives back exactly the share the checkout took. *)
-    | DepRef _ _ _ _ _ => False%I
     | DepTx s dv nu g lo t q =>
         (⌜dv = dev /\ nu = inum⌝ ∗ inode_shr_genlo_bare k s dev inum g lo ∗
          tx_pin icfg_log t q)%I
@@ -1592,7 +1591,6 @@ Section IcacheEscrow.
     match d with
     | DepNone => False%I
     | DepFrz _ _ _ _ _ => False%I
-    | DepRef _ _ _ g _ => live_gen k (1/2) g
     | DepTx _ _ _ g _ _ _ => live_gen k (1/2) g
     | DepRd _ _ _ g _ => live_gen k (1/2) g
     end.
@@ -1620,8 +1618,8 @@ Section IcacheEscrow.
     ∃ g : gname, ⌜ic_dep_gname d = Some g⌝ ∗ live_gen k (1/2) g.
   Proof.
     rewrite /ic_dep_half /ic_dep_gname.
-    destruct d as [| qf dv nu | s dv nu g lo t q | s dv nu g lo | q dv nu g lo];
-      [iIntros "[]" | iIntros "[]" | | |];
+    destruct d as [| qf dv nu | s dv nu g lo t q | s dv nu g lo];
+      [iIntros "[]" | iIntros "[]" | |];
       iIntros "H"; iExists g; by iFrame.
   Qed.
 
@@ -1636,8 +1634,8 @@ Section IcacheEscrow.
       (inode_ident k (DfracOwn f) dev inum -∗ ic_dep_own k d dev inum).
   Proof.
     rewrite /ic_dep_own.
-    destruct d as [| qf dv nu | s dv nu g lo t q | s dv nu g lo | ];
-      [iIntros "[]" | iIntros "[]" | | | iIntros "[]"].
+    destruct d as [| qf dv nu | s dv nu g lo t q | s dv nu g lo];
+      [iIntros "[]" | iIntros "[]" | |].
     - iIntros "[%Heq [[Hid Hlv] Htx]]". iExists s. iFrame "Hid".
       iIntros "Hid". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_shr_gen_bare. iFrame.
@@ -1657,8 +1655,8 @@ Section IcacheEscrow.
     ∃ s : Qp, live_frac k s ∗ (live_frac k s -∗ ic_dep_res k d dev inum).
   Proof.
     rewrite /ic_dep_res /ic_dep_half /live_frac.
-    destruct d as [| qf dv nu | s dv nu g lo t q | s dv nu g lo | ];
-      [iIntros "[[] _]" | iIntros "[[] _]" | | | iIntros "[[] _]"].
+    destruct d as [| qf dv nu | s dv nu g lo t q | s dv nu g lo];
+      [iIntros "[[] _]" | iIntros "[[] _]" | |].
     - iIntros "[Hown Hhalf]". iExists (1/2)%Qp.
       iSplitL "Hhalf"; [iExists g; iExact "Hhalf" |].
       iIntros "[%g2 Hhalf]".
@@ -1691,8 +1689,8 @@ Section IcacheEscrow.
       (IcacheRef.live_genlo k s g lo -∗ ic_dep_own k d dev inum).
   Proof.
     rewrite /ic_dep_own /ic_dep_gname /ic_dep_lo.
-    destruct d as [| qf dv nu | s dv nu g lo t q | s dv nu g lo | ];
-      [iIntros "[]" | iIntros "[]" | | | iIntros "[]"].
+    destruct d as [| qf dv nu | s dv nu g lo t q | s dv nu g lo];
+      [iIntros "[]" | iIntros "[]" | |].
     - iIntros "[%Heq [[Hid Hlv] Htx]]". iExists s, g, lo.
       iSplitR; [done |]. iSplitR; [done |].
       iFrame "Hlv". iIntros "Hlv". iSplitR; [iPureIntro; exact Heq |].
@@ -1707,9 +1705,9 @@ Section IcacheEscrow.
     ic_dep_gname d = Some g -> live_gen k (1/2) g -∗ ic_dep_half k d.
   Proof.
     rewrite /ic_dep_gname /ic_dep_half.
-    destruct d as [| qf dv nu | s dv nu g2 lo t q | s dv nu g2 lo | q dv nu g2 lo];
+    destruct d as [| qf dv nu | s dv nu g2 lo t q | s dv nu g2 lo];
       intros H;
-      [discriminate | discriminate | | |];
+      [discriminate | discriminate | |];
       injection H as <-; iIntros "$".
   Qed.
 
@@ -3411,9 +3409,10 @@ End IcacheEscrow.
    F15  the holder has the share MINUS slh_tok (acquiresleep deposited it):
         (e)/(f) take and return [ic_body k d], the descriptor's cells and
         slice; the client re-forms inode_shr2 after releasesleep.
-   F16  iput's own (e)/(f) run at mass 1 with the WHOLE unit: DepRef stays
-        as the descriptor of that hold (its identity fraction q, its slice,
-        its count fragment, hold mass 1).  ic_deposit2 has both arms.
+   F16  (tso-flip) iput's own (e)/(f) at mass 1 with the WHOLE unit and a
+        [DepRef] descriptor: NOT on this branch (endgame F39) -- iput's free
+        path is main's guard (a) at count 1 plus the (g) exchange to
+        [DepFrz]; [DepRef] is deleted from [ic_dep].
    F17  ic_slot_row carries the cnt half (tied to M !! k's count, 0 at
         None); the table's dead row keeps [islot_free_at] as the
         complement of the dead header's identity halves.
@@ -3881,17 +3880,22 @@ Section IcacheBox.
         (iref_frag k qf ∗ frzsel k ((1/2)/2)%Qp true ∗ tx_pin icfg_log t qt)%I
     | _ => False%I
     end.
-  (* iget's RECYCLE window (OUT_L1 at c = 0) parks THIS in Q.  Endgame plan
-     §6⁷ Q2 is open on what it must hold for the collection's partition;
-     [emp] until ruled. *)
-  Definition ic_q_recycle (k : nat) : iProp Σ := emp%I.
+  (* iget's RECYCLE window (OUT_L1 at c = 0) parks THIS in Q: a FALSE
+     identity quarter, so the collection's partition (r21) reads the slot
+     dead while its header is out (endgame F38, ruled by reviewer 1).  The
+     recycler supplies it from the table's half at (a) -- the dead row's
+     [islot_empty] holds 1/2 -- and gets it back at (b′) BEFORE the
+     identification flip, which needs table 1/2 + header 1/4 + pool 1/4 in
+     one hand ([ic_id_quarters_join]). *)
+  Definition ic_q_recycle cn (k : nat) : iProp Σ :=
+    (∃ dev inum : mword 32, ic_id cn k (1/4) false dev inum)%I.
   Definition ic_q cn (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z)
       (k : nat) : iProp Σ :=
     ((∃ d : ic_dep, ic_deposit cn k d ∗ ic_q_side γfs γi cov logstart k d)
      (* iput's GUARD window (OUT_L1 at c = 1): main's [ic_held] pin, the
         share the commit refutes (F32 as Q-reuse, §6″) *)
      ∨ ic_pin_tx k
-     ∨ ic_q_recycle k)%I.
+     ∨ ic_q_recycle cn k)%I.
   Local Ltac tl_struct :=
     lazymatch goal with
     | |- Timeless (bi_exist _) => apply bi.exist_timeless; intro; tl_struct
@@ -3903,12 +3907,12 @@ Section IcacheBox.
   Global Instance ic_q_side_timeless γfs γi cov logstart k d :
     Timeless (ic_q_side γfs γi cov logstart k d).
   Proof. rewrite /ic_q_side. destruct d; tl_struct. Qed.
-  Global Instance ic_q_recycle_timeless k : Timeless (ic_q_recycle k).
-  Proof. rewrite /ic_q_recycle. apply _. Qed.
+  Global Instance ic_q_recycle_timeless cn k : Timeless (ic_q_recycle cn k).
+  Proof. rewrite /ic_q_recycle. tl_struct. Qed.
   Global Instance ic_q_timeless cn γfs γi cov logstart k :
     Timeless (ic_q cn γfs γi cov logstart k).
   Proof. rewrite /ic_q. tl_struct. Qed.
-  Lemma ic_q_of_recycle cn γfs γi cov logstart k : ic_q_recycle k -∗ ic_q cn γfs γi cov logstart k.
+  Lemma ic_q_of_recycle cn γfs γi cov logstart k : ic_q_recycle cn k -∗ ic_q cn γfs γi cov logstart k.
   Proof. iIntros "H". rewrite /ic_q. iRight. iRight. iExact "H". Qed.
   Lemma ic_q_of_pin cn γfs γi cov logstart k : ic_pin_tx k -∗ ic_q cn γfs γi cov logstart k.
   Proof. iIntros "H". rewrite /ic_q. iRight. iLeft. iExact "H". Qed.
@@ -3950,8 +3954,6 @@ Section IcacheBox.
     match d with
     | DepTx s dev inum g lo _ _ | DepRd s dev inum g lo =>
         (inode_ident k (DfracOwn s) dev inum ∗ live_genlo k s g lo)%I
-    | DepRef q dev inum g lo =>
-        (inode_ident k (DfracOwn q) dev inum ∗ live_genlo k q g lo ∗ iref_frag k q)%I
     | _ => False%I
     end.
   (* the stamps mass the descriptor's holder parked: a share its fraction
@@ -3960,7 +3962,7 @@ Section IcacheBox.
     match d with DepTx s _ _ _ _ _ _ | DepRd s _ _ _ _ => s | _ => 1%Qp end.
   Definition ic_dep_id (d : ic_dep) : ic_bid :=
     match d with
-    | DepTx _ dev inum _ _ _ _ | DepRd _ dev inum _ _ | DepRef _ dev inum _ _ => Some (dev, inum)
+    | DepTx _ dev inum _ _ _ _ | DepRd _ dev inum _ _ => Some (dev, inum)
     | _ => None
     end.
   (* [ic_deposit cn k d] REDEFINED (name and arity kept for its opaque
@@ -4177,7 +4179,7 @@ Section IcacheBox.
     sr_win r = false -> sr_ident r = None -> (sr_td r <= Kd)%nat ->
     ic_box cn γfs γi cov logstart k -∗
     own_context ξ -∗ ctx_floor ξ Kd -∗
-    ic_regd k r -∗ ic_cnt k 0 -∗ ic_q_recycle k ={E}=∗
+    ic_regd k r -∗ ic_cnt k 0 -∗ ic_q_recycle cn k ={E}=∗
     own_context ξ ∗ ic_cnt k 0 ∗
     ∃ T0 : nat, ⌜(T0 <= Kd)%nat⌝ ∗
       ic_regd k (SlotReg (sr_td r) true None (Some (IcRaw, T0))) ∗
@@ -4275,7 +4277,7 @@ Section IcacheBox.
   Qed.
 
   (* ilock's and iput's CHECKOUT -- (e) with the descriptor's holder body
-     (F15: the share minus slh_tok; F16: iput's whole unit at DepRef).  R1
+     (F15: the share minus slh_tok; no whole-unit hold, F39).  R1
      at the genl_llb acquiresleep presents the fragment's stamp; the L2
      row's pieces come from the payload.  Out: the bundle at the identity
      (one binder over the shape), and the handle row [ic_deposit2 k d]. *)

@@ -1557,3 +1557,53 @@ IcacheBoot splits the identity 1 → ½ + ¼ + ¼ and hands the pin to the dead
 header.  `CtxBoxNext.v` deleted; `OffBox.v` retargeted to CtxBox.  Green:
 CtxBox, BioInv, BioInitAt, ProofBreadParts/Bread/Brelse/Bwrite, IcacheEscrow,
 IcacheBoot, OffBox (Admitted as delivered).
+
+## 12.8 r19f/r19g/r20a and reviewer 1's §6¹⁰ findings (2026-09-02)
+
+Recorded here because the endgame doc is under reviewer 2's analysis (owner:
+do not edit it until told).
+
+- r19f/r19g (fallout sweep, commits 8e57a0347 and before): the ProcInv-cone
+  files take flip's spellings verbatim (ByteBuf, `ctx_word_pointsto_split4`
+  / `_join4` with the alignment side condition, `lk_cpu_ready`,
+  `page_filled`/`bb_any_named`/`kalloc_junk`, `pipe_res_at`,
+  `fkr_kpt_of_res` with `kpt_creds`, `TsoCtx.ctx_pointsto_ktier_mono`).
+  Reviewer 1's sweep hazard (§6¹⁰): for each swept file `git diff main --
+  <file>` was scanned for REMOVED `∗`-conjuncts that never reappear; the
+  three hits are flip's shape changes (`delayed_locks_alloc`'s ∀R form,
+  `sys_pipe_post … d bs`, `lk_cpu_ready clk` in place of the bare `c_ccpu`
+  cell), not dropped conjuncts.
+- r20a (8e57a0347): SpecIlock/SpecIunlock/SpecIunlockput/SpecIput/SpecCreate/
+  SpecFileread/SpecNparEra spell the credentials at an epoch (`lo tl`,
+  `cred_floor lo tl`, `inode_shr_genlo`, `ic_dep_shr d = Some (s, dev,
+  inum, g, lo)`), the sleeplock over `ic_slp fsc_ic k`, the checked-out
+  handle as `ic_handle fsc_ic k d`.  Measure after r20a: 33 roots, 138
+  blocked, 1335 green of 1506 (from 25/204/1277).
+- §6¹⁰ F38 (DONE, this commit): `ic_q_recycle cn k := ∃ dev inum, ic_id cn
+  k (1/4) false dev inum`; `ic_recycle_withdraw` takes it, `ic_q_of_recycle`
+  builds Q from it.  The recycler's fraction budget: table 1/2 → 1/4 into Q
+  at (a) + 1/4 kept; header 1/4 (out, in hand); pool 1/4; (b′) returns Q's
+  quarter BEFORE the flip, which then joins table 1/2 + header 1/4 + pool
+  1/4.
+- §6¹⁰ F39 (DONE, this commit): `DepRef` deleted from `ic_dep`
+  (Xv6Cameras), from `ic_dep_gname`/`ic_dep_lo` (IcacheRef) and from every
+  arm/`destruct` in IcacheEscrow.  Reason recorded at the constructor: under
+  the stitch iput's free path is main's guard (a) at count 1 plus the (g)
+  exchange to `DepFrz`; no whole-unit (e) exists.
+- §6¹⁰ merge hazard (r20b rule): before 3-way merging a flip inode proof,
+  `sed 's/\bic_deposit\b/ic_handle/g'` on the FLIP copy (flip's handle is
+  spelled `ic_deposit`; main's `ic_deposit cn k d` is the descriptor half).
+- OPEN for the reviewers (raised 2026-09-02, see the session report): Q is
+  ONE constant proposition with three arms, and (b), (b′), (g) and (f′)
+  each return "Q" to a caller that must SELECT its arm by refutation with
+  what it holds.  The recycler (table 1/4 false vs the true quarters) and
+  the ordinary parker (its resting pin vs the guard arm's `hpn_h`) can; the
+  GUARD's (b) cannot tell the guard arm from a checkout arm (both carry a
+  true quarter, iput holds no descriptor half), and the FROZEN parker
+  (iput's mid-free (f′)) cannot tell the guard arm from its own `DepFrz`
+  arm (both `hpn_h (Some _)`).  Proposed ruling: index Q by the box's own
+  arm — `Q1 : nat → iProp` for OUT_L1 (by count: 0 recycle, 1 guard) and
+  `Q2 : iProp` for OUT_L2 — a small CtxBox edit (Q appears only in the two
+  out arms of `box_arm`), after which every returner gets exactly its arm
+  and no refutation is needed.  Until ruled, the (e′)/(f′) icache retarget
+  (identity quarter into Q at OUT_L2, `ic_hdr_held` as P_hdr') waits.
