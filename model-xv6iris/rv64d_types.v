@@ -1036,6 +1036,7 @@ Instance dummy_write_kind : Inhabited write_kind := { inhabitant := Write_plain 
 Inductive read_kind :=
   | Read_plain
   | Read_ifetch
+  | Read_ttw
   | Read_RISCV_acquire
   | Read_RISCV_strong_acquire
   | Read_RISCV_reserved
@@ -1045,21 +1046,23 @@ Definition num_of_read_kind (arg_ : read_kind) : Z :=
    match arg_ with
    | Read_plain => 0
    | Read_ifetch => 1
-   | Read_RISCV_acquire => 2
-   | Read_RISCV_strong_acquire => 3
-   | Read_RISCV_reserved => 4
-   | Read_RISCV_reserved_acquire => 5
-   | Read_RISCV_reserved_strong_acquire => 6
+   | Read_ttw => 2
+   | Read_RISCV_acquire => 3
+   | Read_RISCV_strong_acquire => 4
+   | Read_RISCV_reserved => 5
+   | Read_RISCV_reserved_acquire => 6
+   | Read_RISCV_reserved_strong_acquire => 7
    end.
 
-Definition read_kind_of_num (arg_ : Z) (*(0 <=? arg_) && (arg_ <=? 6)*) : read_kind :=
+Definition read_kind_of_num (arg_ : Z) (*(0 <=? arg_) && (arg_ <=? 7)*) : read_kind :=
    let l__0 := arg_ in
    if Z.eqb (l__0) (0) then Read_plain
    else if Z.eqb (l__0) (1) then Read_ifetch
-   else if Z.eqb (l__0) (2) then Read_RISCV_acquire
-   else if Z.eqb (l__0) (3) then Read_RISCV_strong_acquire
-   else if Z.eqb (l__0) (4) then Read_RISCV_reserved
-   else if Z.eqb (l__0) (5) then Read_RISCV_reserved_acquire
+   else if Z.eqb (l__0) (2) then Read_ttw
+   else if Z.eqb (l__0) (3) then Read_RISCV_acquire
+   else if Z.eqb (l__0) (4) then Read_RISCV_strong_acquire
+   else if Z.eqb (l__0) (5) then Read_RISCV_reserved
+   else if Z.eqb (l__0) (6) then Read_RISCV_reserved_acquire
    else Read_RISCV_reserved_strong_acquire.
 
 Lemma read_kind_num_of_roundtrip (x : read_kind) : read_kind_of_num (num_of_read_kind x) = x.

@@ -542,6 +542,35 @@ Proof.
     exact (Hbytes j Hj).
 Qed.
 
+(* the fetch twin, at [Read_ifetch] (RiscvExtras.rk_select) -- same proof *)
+Lemma exec_read_ram_ifetch_4 (addr : mword 64) (w : bv 32) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 4)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (read_ram Read_ifetch (Physaddr addr) 4 false) s = Some ((w, default_meta), s).
+Proof.
+  intros Hdev Hbytes.
+  apply (run_to_exec _ _ _ _ (run_read_ram_ifetch_4_pin addr w s Hdev Hbytes)).
+  unfold read_ram. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  (* collapse [Defs.bind (Next (MemRead ..) k) matchK] to a single Next, then
+     expose the read_bytes match via exec_MemRead. *)
+  unfold Defs.bind. cbn [Interface.iMon_bind].
+  rewrite exec_MemRead; last exact Hdev.
+  cbn [Interface.ReadReq.pa].
+  case_match eqn:Hrb.
+  - (* read_bytes = Some _: the continuation is a Ret-chain, hence Some <> None *)
+    cbn [Interface.iMon_bind]. cbn match beta iota. discriminate.
+  - (* read_bytes = None: impossible, the 4 bytes are present *)
+    exfalso.
+    refine (read_bytes_ne (mem s) addr (Z.to_N 4) w _ Hrb).
+    intros j Hj.
+    change (RiscvModelBytes.pa_add addr j) with (pa_add addr j).
+    change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
+    exact (Hbytes j Hj).
+Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* Easy exec sub-twins (pure returnM).                                     *)
 (* ---------------------------------------------------------------------- *)
@@ -699,10 +728,8 @@ Proof.
   rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
   rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 4 0 s)). cbn beta.
   rewrite misaligned_order_1. cbn zeta.
-  rewrite (execR_liftR_seq _ _ _ _ _
-             (_ : exec (read_kind_of_flags false false false) s = Some (Read_plain, s))).
-  2:{ unfold read_kind_of_flags. apply exec_returnM. }
-  cbn beta.
+  (* the read kind: an instruction fetch takes [rk_select]'s [Read_ifetch] arm *)
+  cbn match. rewrite mbind_returnR. cbn beta.
   (* the split loop: ONE iteration at offset 0 (see RiscvExtras' pma_ok_aligned) *)
   match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
     assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s)) end.
@@ -724,7 +751,7 @@ Proof.
       |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
       assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
                     = Some (inr w, s)) end.
-    { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_plain_4 addr w s Hdev Hbytes)).
+    { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_ifetch_4 addr w s Hdev Hbytes)).
       cbn beta match. apply execR_returnR_fwd. }
     rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
     rewrite autocast_id. rewrite usvd_zeros_full_32.
@@ -1265,6 +1292,51 @@ Proof.
     exact (Hbytes j Hj).
 Qed.
 
+(* the fetch twins, at [Read_ifetch] (RiscvExtras.rk_select) -- same proofs *)
+Lemma run_read_ram_ifetch_2_pin (addr : mword 64) (w : bv 16) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 2)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  run (read_ram Read_ifetch (Physaddr addr) 2 false) s (w, default_meta) s.
+Proof.
+  intros Hdev Hbytes.
+  unfold read_ram. cbn match.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  eexists _, s. split; [ apply run_returnM_fwd | ]. cbn beta zeta.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  eexists _, s. split.
+  - eapply run_MemRead_ram_intro.
+    + exact Hdev.
+    + intros j Hj. exact (Hbytes j Hj).
+    + apply run_returnM_fwd.
+  - cbn match beta. apply run_returnM_fwd.
+Qed.
+
+Lemma exec_read_ram_ifetch_2 (addr : mword 64) (w : bv 16) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 2)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (read_ram Read_ifetch (Physaddr addr) 2 false) s = Some ((w, default_meta), s).
+Proof.
+  intros Hdev Hbytes.
+  apply (run_to_exec _ _ _ _ (run_read_ram_ifetch_2_pin addr w s Hdev Hbytes)).
+  unfold read_ram. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  unfold Defs.bind. cbn [Interface.iMon_bind].
+  rewrite exec_MemRead; last exact Hdev.
+  cbn [Interface.ReadReq.pa].
+  case_match eqn:Hrb.
+  - cbn [Interface.iMon_bind]. cbn match beta iota. discriminate.
+  - exfalso.
+    refine (read_bytes_ne (mem s) addr (Z.to_N 2) w _ Hrb).
+    intros j Hj.
+    change (RiscvModelBytes.pa_add addr j) with (pa_add addr j).
+    change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
+    exact (Hbytes j Hj).
+Qed.
+
 Lemma exec_pmaCheck_ram_2 (addr : mword 64) (pbmt : page_based_mem_type)
     (region : PMA_Region) s :
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 2
@@ -1312,10 +1384,8 @@ Proof.
   rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
   rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 2 0 s)). cbn beta.
   rewrite misaligned_order_1. cbn zeta.
-  rewrite (execR_liftR_seq _ _ _ _ _
-             (_ : exec (read_kind_of_flags false false false) s = Some (Read_plain, s))).
-  2:{ unfold read_kind_of_flags. apply exec_returnM. }
-  cbn beta.
+  (* the read kind: an instruction fetch takes [rk_select]'s [Read_ifetch] arm *)
+  cbn match. rewrite mbind_returnR. cbn beta.
   match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
     assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s)) end.
   { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
@@ -1334,7 +1404,7 @@ Proof.
       |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
       assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
                     = Some (inr w, s)) end.
-    { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_plain_2 addr w s Hdev Hbytes)).
+    { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_ifetch_2 addr w s Hdev Hbytes)).
       cbn beta match. apply execR_returnR_fwd. }
     rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
     rewrite autocast_id. rewrite usvd_zeros_full_16.

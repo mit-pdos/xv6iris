@@ -642,7 +642,11 @@ Section CheckedMemReadSplit.
     exec (split_misaligned (Physaddr pa) width
             (Phys_Mem_Access_Info_granule_size_exp plan)
             (Phys_Mem_Access_Info_splittable plan)) s = Some ((n, bytes), s) ->
-    exec (read_kind_of_flags aq rl res) s = Some (rk, s) ->
+    (* the read-kind selection, at the caller's access type ([rk_select]:
+       [Read_ifetch] for a fetch, [Read_ttw] for a non-reserved PTE load,
+       the flag-derived kind for everything else) *)
+    execR (rk_select (R := result (mword (8 * width) * unit) (physaddr * ExceptionType))
+             acc aq rl res) s = Some (inr rk, s) ->
     exec (checked_mem_read acc pbmt priv (Physaddr pa) width aq rl res meta) s
       = Some (Ok (autocast (T := mword) (rdata_seq N), default_meta), s).
   Proof.
@@ -652,7 +656,7 @@ Section CheckedMemReadSplit.
     rewrite execR_bind. rewrite execR_returnR. cbn match beta.
     rewrite (execR_liftR_seq _ _ _ _ _ Hsplit). cbn beta zeta.
     rewrite misaligned_order_split. cbn zeta.
-    rewrite (execR_liftR_seq _ _ _ _ _ Hrk). cbn beta.
+    rewrite (execR_bind_Some _ _ _ _ _ Hrk). cbn beta.
     match goal with
     | |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
         assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (rsplit_var N), s))

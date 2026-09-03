@@ -693,7 +693,8 @@ Section pteread.
     change (Instances.generic_eq CannotSplit CannotSplit) with true.
     cbn beta iota.
     rewrite /returnM mliftR_ret mbind_ret. cbn beta iota zeta.
-    rewrite mliftR_ret mbind_ret. cbn beta iota zeta.
+    (* the read kind: [rk_select] gives a non-reserved PTE load [Read_ttw] *)
+    rewrite mbind_returnR. cbn beta iota zeta.
     cbn beta iota zeta delta [Defs.untilMT Defs.untilMT' Defs.Zwf_guarded
       Z_ge_dec Z_ge_lt_dec Zcompare_rec Z.compare].
     cbn beta iota zeta delta [Defs.assert_exp' bits_of_physaddr].
@@ -715,16 +716,17 @@ Section pteread.
                    ltac:(lia) HDhtif Hhtif Hram)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    (* A6.36: the walk's PTE read is a [Read_plain] like every other
-       non-exclusive read, and the obligation is handed straight on.
-       (The RESERVED re-read, [res = true], still falls through to
-       [Read_RISCV_reserved]; that is the [_excl] twin below.) *)
-    iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 8 false)
+    (* the walk's PTE read is a [Read_ttw] ([rk_select]): tagged [AK_ttw] at
+       the event but, like every other non-exclusive read, owing the PLAIN
+       obligation, which is handed straight on.  (The RESERVED re-read,
+       [res = true], still falls through to [Read_RISCV_reserved]; that is
+       the [_excl] twin below.) *)
+    iApply (swp_use_cer4 (read_ram Read_ttw (Physaddr pa) 8 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_hart_ram_read_plain 8 (mread_req8 pa) _
+    { iApply (swp_hart_ram_read_plain 8 (mread_req8_ttw pa) _
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
-                (hread_req_at_read_ram8 pa)
+                (hread_req_at_read_ram8_ttw pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
       iIntros (σ img log tv V) "%Htv Hσ Htso".
@@ -732,7 +734,7 @@ Section pteread.
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
       iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
       iIntros (tvn _ _) "_".
-      rewrite hread_resume_read_ram8. iApply swp_ret. by iFrame. }
+      rewrite hread_resume_read_ram8_ttw. iApply swp_ret. by iFrame. }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
     change (0 =? 1 - 1) with true. cbn beta iota zeta.
@@ -961,7 +963,8 @@ Section pteread.
     change (Instances.generic_eq CannotSplit CannotSplit) with true.
     cbn beta iota.
     rewrite /returnM mliftR_ret mbind_ret. cbn beta iota zeta.
-    rewrite mliftR_ret mbind_ret. cbn beta iota zeta.
+    (* the read kind: [rk_select] gives a non-reserved PTE load [Read_ttw] *)
+    rewrite mbind_returnR. cbn beta iota zeta.
     cbn beta iota zeta delta [Defs.untilMT Defs.untilMT' Defs.Zwf_guarded
       Z_ge_dec Z_ge_lt_dec Zcompare_rec Z.compare].
     cbn beta iota zeta delta [Defs.assert_exp' bits_of_physaddr].
@@ -983,14 +986,14 @@ Section pteread.
                    ltac:(lia) HDhtif Hhtif Hram)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    (* the plain arm -- see the pinned twin above. *)
-    iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 8 false)
+    (* the plain arm at [Read_ttw] -- see the pinned twin above. *)
+    iApply (swp_use_cer4 (read_ram Read_ttw (Physaddr pa) 8 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_hart_ram_read_plain_ex 8 (mread_req8 pa) _
+    { iApply (swp_hart_ram_read_plain_ex 8 (mread_req8_ttw pa) _
                 (fun r => (∃ w, ⌜r = (w, default_meta)⌝ ∗ ⌜P w⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
                 P
-                (hread_req_at_read_ram8 pa)
+                (hread_req_at_read_ram8_ttw pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
       iIntros (σ img log tv V) "%Htv Hσ Htso".
@@ -998,7 +1001,7 @@ Section pteread.
       iModIntro. iSplitR; [done|]. iNext.
       iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
       iIntros (tvn w) "%Hlo %Hhi %Hrd' %HP _".
-      rewrite hread_resume_read_ram8. iApply swp_ret. iExists w.
+      rewrite hread_resume_read_ram8_ttw. iApply swp_ret. iExists w.
       by iFrame. }
     iIntros (v) "(%w & -> & %HP & Hrw & Hro)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.

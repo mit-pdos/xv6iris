@@ -821,8 +821,13 @@ Section PteRead.
   (* --- the loop body, both halves --- *)
   Section Flags.
     Context (aq rl res : bool) (rk : read_kind).
-    Hypothesis Hrkf : exec (read_kind_of_flags aq rl res) s = Some (rk, s).
-    Hypothesis Hrkg : goodmb Dr Dw (read_kind_of_flags aq rl res) s mm = true.
+    (* the read-kind selection at [Load PageTableEntry] ([RiscvExtras.rk_select]):
+       [Read_ttw] for the plain walk read, the flag-derived kind for the
+       RESERVED A/D re-read *)
+    Hypothesis Hrkf : execR (rk_select (R := result (mword (8 * 8) * unit) (physaddr * ExceptionType))
+                               (Load PageTableEntry) aq rl res) s = Some (inr rk, s).
+    Hypothesis Hrkg : goodmb Dr Dw (rk_select (R := result (mword (8 * 8) * unit) (physaddr * ExceptionType))
+                                      (Load PageTableEntry) aq rl res) s mm = true.
     Hypothesis Hrkok : rk_ram_ok rk = true.
     Hypothesis Hram : exec (read_ram rk (Physaddr addr) 8 false) s
                       = Some ((w, default_meta), s).
@@ -837,7 +842,7 @@ Section PteRead.
       rewrite pma_ok_aligned_splittable; rewrite pma_ok_aligned_granule.
       rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 8 0 s)).
       cbn beta. rewrite misaligned_order_1. cbn zeta.
-      rewrite (execR_liftR_seq _ _ _ _ _ Hrkf). cbn beta.
+      rewrite (execR_bind_Some _ _ _ _ _ Hrkf). cbn beta.
       match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
         assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s)) end.
       { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
@@ -877,7 +882,7 @@ Section PteRead.
       gmm_lift (goodmb_split_misaligned_unsplit Dr Dw addr 8 0 s mm)
                (exec_split_misaligned_unsplit addr 8 0 s). cbn beta.
       cbn match beta. rewrite misaligned_order_1. cbn match zeta beta.
-      gmm_lift Hrkg Hrkf. cbn beta.
+      erewrite gm_bindR; [ | exact Hrkg | exact Hrkf ]. cbn beta.
       match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
         assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s));
         [ | assert (Hug : goodmb Dr Dw (Defs.untilMT vs m c b) s mm = true) ] end.
@@ -964,13 +969,16 @@ Section PteRead.
   Lemma goodmb_read_pte_S :
     goodmb Dr Dw (read_pte (Physaddr addr) 8) s mm = true.
   Proof.
-    assert (Hrkf : exec (read_kind_of_flags false false false) s
-                   = Some (rv64d_types.Read_plain, s))
-      by (unfold read_kind_of_flags; apply exec_returnM).
-    pose proof (pr_good_chk false false false rv64d_types.Read_plain Hrkf eq_refl
-                  eq_refl (exec_read_ram_plain_8 addr w s Hdev Hbytes)) as Hchkg.
-    pose proof (pr_exec_chk false false false rv64d_types.Read_plain Hrkf
-                  (exec_read_ram_plain_8 addr w s Hdev Hbytes)) as Hchk.
+    (* the walk's PTE read is a [Read_ttw]: [rk_select]'s tagged arm *)
+    pose proof (execR_rk_select_ttw (R := result (mword (8 * 8) * unit) (physaddr * ExceptionType))
+                  false false s) as Hrkf.
+    pose proof (goodmb_rk_select Dr Dw (R := result (mword (8 * 8) * unit) (physaddr * ExceptionType))
+                  (Load PageTableEntry) false false false s mm
+                  (goodmb_read_kind_of_flags_plain Dr Dw s mm)) as Hrkg.
+    pose proof (pr_good_chk false false false rv64d_types.Read_ttw Hrkf Hrkg
+                  eq_refl (exec_read_ram_ttw_8 addr w s Hdev Hbytes)) as Hchkg.
+    pose proof (pr_exec_chk false false false rv64d_types.Read_ttw Hrkf
+                  (exec_read_ram_ttw_8 addr w s Hdev Hbytes)) as Hchk.
     unfold read_pte, mem_read_priv.
     assert (Hmrg : goodmb Dr Dw (mem_read_priv_meta (Load PageTableEntry) PBMT_PMA
                      Supervisor (Physaddr addr) 8 false false false false) s mm = true).
@@ -989,11 +997,18 @@ Section PteRead.
   Lemma goodmb_read_pte_exclusive_S :
     goodmb Dr Dw (read_pte_exclusive (Physaddr addr) 8) s mm = true.
   Proof.
-    assert (Hrkf : exec (read_kind_of_flags false false true) s
-                   = Some (rv64d_types.Read_RISCV_reserved, s))
+    (* the RESERVED re-read keeps the flag-derived kind ([rk_select]'s
+       fall-through arm): [Read_RISCV_reserved] *)
+    assert (Hrkf0 : exec (read_kind_of_flags false false true) s
+                    = Some (rv64d_types.Read_RISCV_reserved, s))
       by (unfold read_kind_of_flags; apply exec_returnM).
-    pose proof (pr_good_chk false false true rv64d_types.Read_RISCV_reserved Hrkf
-                  eq_refl eq_refl (exec_read_ram_resv_8 addr w s Hdev Hbytes)) as Hchkg.
+    pose proof (execR_rk_select_flags (R := result (mword (8 * 8) * unit) (physaddr * ExceptionType))
+                  (Load PageTableEntry) false false true _ s eq_refl Hrkf0) as Hrkf.
+    pose proof (goodmb_rk_select Dr Dw (R := result (mword (8 * 8) * unit) (physaddr * ExceptionType))
+                  (Load PageTableEntry) false false true s mm
+                  ltac:(unfold read_kind_of_flags; apply goodmb_returnm)) as Hrkg.
+    pose proof (pr_good_chk false false true rv64d_types.Read_RISCV_reserved Hrkf Hrkg
+                  eq_refl (exec_read_ram_resv_8 addr w s Hdev Hbytes)) as Hchkg.
     pose proof (pr_exec_chk false false true rv64d_types.Read_RISCV_reserved Hrkf
                   (exec_read_ram_resv_8 addr w s Hdev Hbytes)) as Hchk.
     unfold read_pte_exclusive, mem_read_priv.

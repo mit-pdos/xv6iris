@@ -1366,6 +1366,30 @@ Proof.
   - cbn match beta. apply run_returnM_fwd.
 Qed.
 
+(* THE FETCH TWIN.  The fork's model reads an instruction at [Read_ifetch]
+   (see [RiscvExtras.rk_select]); [read_ram]'s arm for it is a plain
+   [returnM (AK_ifetch tt)], so the proof is the [Read_plain] one verbatim --
+   only the request's access kind differs, and nothing here inspects it. *)
+Lemma run_read_ram_ifetch_4_pin (addr : mword 64) (w : bv 32) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 4)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  run (read_ram Read_ifetch (Physaddr addr) 4 false) s (w, default_meta) s.
+Proof.
+  intros Hdev Hbytes.
+  unfold read_ram. cbn match.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  eexists _, s. split; [ apply run_returnM_fwd | ]. cbn beta zeta.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  eexists _, s. split.
+  - eapply run_MemRead_ram_intro.
+    + exact Hdev.
+    + intros j Hj. exact (Hbytes j Hj).
+    + apply run_returnM_fwd.
+  - cbn match beta. apply run_returnM_fwd.
+Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* 2. pmaCheck = None for an executable, aligned RAM region (InstructionFetch). *)
 (*    The InstructionFetch arm returns the region's [PMA_executable] bool, *)

@@ -1410,7 +1410,8 @@ Section SmodeCorePt.
     change (Instances.generic_eq CannotSplit CannotSplit) with true.
     cbn beta iota.
     rewrite /returnM mliftR_ret mbind_ret. cbn beta iota zeta.
-    rewrite mliftR_ret mbind_ret. cbn beta iota zeta.
+    (* the read kind: [rk_select] gives an instruction fetch [Read_ifetch] *)
+    rewrite mbind_returnR. cbn beta iota zeta.
     cbn beta iota zeta delta [Defs.untilMT Defs.untilMT' Defs.Zwf_guarded
       Z_ge_dec Z_ge_lt_dec Zcompare_rec Z.compare].
     cbn beta iota zeta delta [Defs.assert_exp' bits_of_physaddr].
@@ -1432,12 +1433,12 @@ Section SmodeCorePt.
                    ltac:(lia) HDhtif Hhtif Hram)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 4 false)
+    iApply (swp_use_cer4 (read_ram Read_ifetch (Physaddr pa) 4 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_hart_ram_read_plain 4 (mread_req pa) _
+    { iApply (swp_hart_ram_read_plain 4 (mread_req_ifetch pa) _
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
-                (hread_req_at_read_ram pa)
+                (hread_req_at_read_ram_ifetch pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
       iIntros (σ img log tv V) "%Htv Hσ Htso".
@@ -1445,7 +1446,7 @@ Section SmodeCorePt.
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
       iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
       iIntros (tvn _ _) "_".
-      rewrite hread_resume_read_ram. iApply swp_ret. by iFrame. }
+      rewrite hread_resume_read_ram_ifetch. iApply swp_ret. by iFrame. }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
     change (0 =? 1 - 1) with true. cbn beta iota zeta.
@@ -1517,7 +1518,8 @@ Section SmodeCorePt.
     change (Instances.generic_eq CannotSplit CannotSplit) with true.
     cbn beta iota.
     rewrite /returnM mliftR_ret mbind_ret. cbn beta iota zeta.
-    rewrite mliftR_ret mbind_ret. cbn beta iota zeta.
+    (* the read kind: [rk_select] gives an instruction fetch [Read_ifetch] *)
+    rewrite mbind_returnR. cbn beta iota zeta.
     cbn beta iota zeta delta [Defs.untilMT Defs.untilMT' Defs.Zwf_guarded
       Z_ge_dec Z_ge_lt_dec Zcompare_rec Z.compare].
     cbn beta iota zeta delta [Defs.assert_exp' bits_of_physaddr].
@@ -1539,12 +1541,12 @@ Section SmodeCorePt.
                    ltac:(lia) HDhtif Hhtif Hram)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 2 false)
+    iApply (swp_use_cer4 (read_ram Read_ifetch (Physaddr pa) 2 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_hart_ram_read_plain 2 (mread_req2 pa) _
+    { iApply (swp_hart_ram_read_plain 2 (mread_req2_ifetch pa) _
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
-                (hread_req_at_read_ram2 pa)
+                (hread_req_at_read_ram2_ifetch pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
       iIntros (σ img log tv V) "%Htv Hσ Htso".
@@ -1552,7 +1554,7 @@ Section SmodeCorePt.
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
       iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
       iIntros (tvn _ _) "_".
-      rewrite hread_resume_read_ram2. iApply swp_ret. by iFrame. }
+      rewrite hread_resume_read_ram2_ifetch. iApply swp_ret. by iFrame. }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
     change (0 =? 1 - 1) with true. cbn beta iota zeta.

@@ -427,6 +427,7 @@ Proof.
   rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
   rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 8 0 s)). cbn beta.
   rewrite misaligned_order_1. cbn zeta.
+  cbn match. (* [rk_select] at a data access: the flag arm *)
   rewrite (execR_liftR_seq _ _ _ _ _
              (_ : exec (read_kind_of_flags _ _ false) s = Some (rv64d_types.Read_plain, s))).
   2:{ unfold read_kind_of_flags. apply exec_returnM. }

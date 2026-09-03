@@ -378,13 +378,112 @@ Proof.
 Qed.
 
 
-(* THE FETCH TWINS OF THE 4- AND 2-BYTE REQUESTS ARE GONE with the A6.7(B)
-   Sail patch (tso-machine-flip.md A6.36): the pinned model derives the read
-   kind from the acquire/release/reserved FLAGS alone, so an instruction
-   fetch reaches [read_ram] as [Read_plain] and builds the very same request
-   record as a data load.  [mread_req] / [mread_req2] above therefore serve
-   the fetch lane again, and the fetch owes the PLAIN obligation like every
-   other non-exclusive read. *)
+(* THE FETCH TWINS OF THE 4- AND 2-BYTE REQUESTS.  The fork's model chooses
+   the read kind from the ACCESS TYPE as well as the flags
+   ([RiscvExtras.rk_select]): an instruction fetch reaches [read_ram] as
+   [Read_ifetch], whose arm tags the request [AK_ifetch tt].  That access
+   kind is the whole difference from [mread_req] / [mread_req2] above -- the
+   address, width and everything else are byte-for-byte a data load's -- and
+   the machine classifies RAM reads by exclusivity alone ([ak_excl]), so a
+   fetch still owes the PLAIN obligation like every other non-exclusive read.
+   Twins rather than edits, because the shared records above are consumed by
+   the data lanes ([HartSMem], [SmodeCorePt]'s loads, [HartMLoad]). *)
+Definition mread_req_ifetch (pa : SailStdpp.Values.mword 64)
+    : Interface.ReadReq.t 4 :=
+  {| Interface.ReadReq.pa := pa;
+     Interface.ReadReq.access_kind :=
+       SailStdpp.ConcurrencyInterfaceTypes.AK_ifetch tt;
+     Interface.ReadReq.va := None;
+     Interface.ReadReq.translation := tt;
+     Interface.ReadReq.tag := false |}.
+
+Lemma hread_req_at_read_ram_ifetch (pa : SailStdpp.Values.mword 64) :
+  hread_req_at 4 (read_ram Read_ifetch (Physaddr pa) 4 false)
+  = Some (mread_req_ifetch pa).
+Proof.
+  unfold read_ram, Defs.sail_mem_read.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.returnm returnM
+     Z.to_N bits_of_physaddr
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_pa
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_access_kind
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_va
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_translation
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_tag
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_size].
+  cbn [hread_req_at].
+  destruct (decide (4%N = 4%N)) as [Heq|Hne]; [|congruence].
+  assert (Heq = eq_refl) as -> by apply proof_irrel.
+  reflexivity.
+Qed.
+
+Lemma hread_resume_read_ram_ifetch (pa : SailStdpp.Values.mword 64) (w : bv 32) :
+  hread_resume (bv_unsigned w) (read_ram Read_ifetch (Physaddr pa) 4 false)
+  = Interface.Ret (w, default_meta).
+Proof.
+  unfold read_ram, Defs.sail_mem_read.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.returnm returnM
+     Z.to_N bits_of_physaddr
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_pa
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_access_kind
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_va
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_translation
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_tag
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_size].
+  cbn [hread_resume].
+  rewrite Z_to_bv_bv_unsigned TypeCasts.cast_N_refl.
+  reflexivity.
+Qed.
+
+Definition mread_req2_ifetch (pa : SailStdpp.Values.mword 64)
+    : Interface.ReadReq.t 2 :=
+  {| Interface.ReadReq.pa := pa;
+     Interface.ReadReq.access_kind :=
+       SailStdpp.ConcurrencyInterfaceTypes.AK_ifetch tt;
+     Interface.ReadReq.va := None;
+     Interface.ReadReq.translation := tt;
+     Interface.ReadReq.tag := false |}.
+
+Lemma hread_req_at_read_ram2_ifetch (pa : SailStdpp.Values.mword 64) :
+  hread_req_at 2 (read_ram Read_ifetch (Physaddr pa) 2 false)
+  = Some (mread_req2_ifetch pa).
+Proof.
+  unfold read_ram, Defs.sail_mem_read.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.returnm returnM
+     Z.to_N bits_of_physaddr
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_pa
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_access_kind
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_va
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_translation
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_tag
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_size].
+  cbn [hread_req_at].
+  destruct (decide (2%N = 2%N)) as [Heq|Hne]; [|congruence].
+  assert (Heq = eq_refl) as -> by apply proof_irrel.
+  reflexivity.
+Qed.
+
+Lemma hread_resume_read_ram2_ifetch (pa : SailStdpp.Values.mword 64) (w : bv 16) :
+  hread_resume (bv_unsigned w) (read_ram Read_ifetch (Physaddr pa) 2 false)
+  = Interface.Ret (w, default_meta).
+Proof.
+  unfold read_ram, Defs.sail_mem_read.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.returnm returnM
+     Z.to_N bits_of_physaddr
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_pa
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_access_kind
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_va
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_translation
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_tag
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_size].
+  cbn [hread_resume].
+  rewrite Z_to_bv_bv_unsigned TypeCasts.cast_N_refl.
+  reflexivity.
+Qed.
+
 
 
 (* THE 8-BYTE TWINS, for the page walk's PTE read.  A third concrete
@@ -444,15 +543,59 @@ Proof.
 Qed.
 
 
-(* THE WALK'S 8-BYTE [Read_ttw] TWIN IS GONE, with the Sail patch it needed
-   (tso-machine-flip.md A6.36).  The owner's overruling of RULING 1 removed
-   the access-kind distinction from the machine, the model was restored to
-   its pinned baseline, and [Read_ttw] is no longer a constructor of
-   [read_kind] -- so [mread_req8_ttw] and its two projection lemmas cannot
-   even be STATED here any more.  A page-table walk now builds the ordinary
-   [mread_req8] request at [Read_plain] and owes the PLAIN obligation like
-   every other non-exclusive read.  The de-confliction project restores both
-   the constructor and this block together with the parked patch. *)
+(* THE WALK'S 8-BYTE [Read_ttw] TWIN, for the page walk's non-reserved PTE
+   read: [RiscvExtras.rk_select] sends [Load PageTableEntry] at [res = false]
+   to [Read_ttw], whose [read_ram] arm tags the request [AK_ttw tt].  Same
+   shape as [mread_req8], same plain obligation ([ak_excl] is false on
+   [AK_ttw]); only the access-kind field differs. *)
+Definition mread_req8_ttw (pa : SailStdpp.Values.mword 64)
+    : Interface.ReadReq.t 8 :=
+  {| Interface.ReadReq.pa := pa;
+     Interface.ReadReq.access_kind :=
+       SailStdpp.ConcurrencyInterfaceTypes.AK_ttw tt;
+     Interface.ReadReq.va := None;
+     Interface.ReadReq.translation := tt;
+     Interface.ReadReq.tag := false |}.
+
+Lemma hread_req_at_read_ram8_ttw (pa : SailStdpp.Values.mword 64) :
+  hread_req_at 8 (read_ram Read_ttw (Physaddr pa) 8 false)
+  = Some (mread_req8_ttw pa).
+Proof.
+  unfold read_ram, Defs.sail_mem_read.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.returnm returnM
+     Z.to_N bits_of_physaddr
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_pa
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_access_kind
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_va
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_translation
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_tag
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_size].
+  cbn [hread_req_at].
+  destruct (decide (8%N = 8%N)) as [Heq|Hne]; [|congruence].
+  assert (Heq = eq_refl) as -> by apply proof_irrel.
+  reflexivity.
+Qed.
+
+Lemma hread_resume_read_ram8_ttw (pa : SailStdpp.Values.mword 64) (w : bv 64) :
+  hread_resume (bv_unsigned w) (read_ram Read_ttw (Physaddr pa) 8 false)
+  = Interface.Ret (w, default_meta).
+Proof.
+  unfold read_ram, Defs.sail_mem_read.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.returnm returnM
+     Z.to_N bits_of_physaddr
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_pa
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_access_kind
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_va
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_translation
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_tag
+     SailStdpp.ConcurrencyInterfaceTypes.Mem_read_request_size].
+  cbn [hread_resume].
+  rewrite Z_to_bv_bv_unsigned TypeCasts.cast_N_refl.
+  reflexivity.
+Qed.
+
 (* ...and the RESERVED 8-byte read, which is what the page walk's A/D
    write-back issues for its exclusive re-read of the leaf.
    [read_kind_of_flags false false true] is [Read_RISCV_reserved], which the
@@ -689,7 +832,8 @@ Section fetch.
     change (Instances.generic_eq CannotSplit CannotSplit) with true.
     cbn beta iota.
     rewrite /returnM mliftR_ret mbind_ret. cbn beta iota zeta.
-    rewrite mliftR_ret mbind_ret. cbn beta iota zeta.
+    (* the read kind: [rk_select] gives an instruction fetch [Read_ifetch] *)
+    rewrite mbind_returnR. cbn beta iota zeta.
     cbn beta iota zeta delta [Defs.untilMT Defs.untilMT' Defs.Zwf_guarded
       Z_ge_dec Z_ge_lt_dec Zcompare_rec Z.compare].
     cbn beta iota zeta delta [Defs.assert_exp' bits_of_physaddr].
@@ -709,17 +853,17 @@ Section fetch.
                    ltac:(lia) HDhtif Hhtif Hram)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    (* [rk] is [Read_plain], so the request is the ordinary [mread_req]. *)
-    iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 4 false)
+    (* [rk] is [Read_ifetch], so the request is the fetch twin [mread_req_ifetch]. *)
+    iApply (swp_use_cer4 (read_ram Read_ifetch (Physaddr pa) 4 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
     (* THE ONE EVENT.  With no strong arm left this is the PLAIN rule, and
        the obligation it asks for is the view-indexed [fobl_ram] -- which is
        exactly what [Hmem] carries, so this is a hand-over and not a proof.
-       The last [reflexivity] is [ak_excl = false] at [Read_plain]. *)
-    { iApply (swp_hart_ram_read_plain 4 (mread_req pa) _
+       The last [reflexivity] is [ak_excl = false] at [AK_ifetch]. *)
+    { iApply (swp_hart_ram_read_plain 4 (mread_req_ifetch pa) _
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
-                (hread_req_at_read_ram pa)
+                (hread_req_at_read_ram_ifetch pa)
                 (addr_is_ram_not_dev pa Hram)
                 ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
@@ -730,7 +874,7 @@ Section fetch.
       (* the plain rule's receipt (A6.47 ruling 2): a FETCH has no use for
          it -- text is pristine and needs no view fact -- so it is dropped. *)
       iIntros (tvn _ _) "_".
-      rewrite hread_resume_read_ram. iApply swp_ret. by iFrame. }
+      rewrite hread_resume_read_ram_ifetch. iApply swp_ret. by iFrame. }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
     change (0 =? 1 - 1) with true. cbn beta iota zeta.
@@ -791,7 +935,8 @@ Section fetch.
     change (Instances.generic_eq CannotSplit CannotSplit) with true.
     cbn beta iota.
     rewrite /returnM mliftR_ret mbind_ret. cbn beta iota zeta.
-    rewrite mliftR_ret mbind_ret. cbn beta iota zeta.
+    (* the read kind: [rk_select] gives an instruction fetch [Read_ifetch] *)
+    rewrite mbind_returnR. cbn beta iota zeta.
     cbn beta iota zeta delta [Defs.untilMT Defs.untilMT' Defs.Zwf_guarded
       Z_ge_dec Z_ge_lt_dec Zcompare_rec Z.compare].
     cbn beta iota zeta delta [Defs.assert_exp' bits_of_physaddr].
@@ -811,14 +956,14 @@ Section fetch.
                    ltac:(lia) HDhtif Hhtif Hram)
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    (* [rk] is [Read_plain], so the request is the ordinary [mread_req2]. *)
-    iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 2 false)
+    (* [rk] is [Read_ifetch], so the request is the fetch twin [mread_req2_ifetch]. *)
+    iApply (swp_use_cer4 (read_ram Read_ifetch (Physaddr pa) 2 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
     (* as at width 4: the plain rule, and the obligation handed straight on. *)
-    { iApply (swp_hart_ram_read_plain 2 (mread_req2 pa) _
+    { iApply (swp_hart_ram_read_plain 2 (mread_req2_ifetch pa) _
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
-                (hread_req_at_read_ram2 pa)
+                (hread_req_at_read_ram2_ifetch pa)
                 (addr_is_ram_not_dev pa Hram)
                 ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
@@ -827,7 +972,7 @@ Section fetch.
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
       iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
       iIntros (tvn _ _) "_".
-      rewrite hread_resume_read_ram2. iApply swp_ret. by iFrame. }
+      rewrite hread_resume_read_ram2_ifetch. iApply swp_ret. by iFrame. }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
     change (0 =? 1 - 1) with true. cbn beta iota zeta.

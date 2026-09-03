@@ -66,12 +66,15 @@ USER_DIR   := $(XV6_DIR)/user
 # THE Sail model this development is proved against.  Like $(XV6_DIR), the
 # checkout is .gitignored, so these two lines are the only record of where the
 # generated model-xv6iris/*.v came from.  It is a FORK of riscv/sail-riscv: its
-# delta upstream is the atomic PTE A/D-bit update (an exclusive PTE read + a
+# deltas upstream are the atomic PTE A/D-bit update (an exclusive PTE read + a
 # conditional PTE write, with the tablewalk checks re-run on the freshly read
-# value), which is what the page-table proofs are stated against.
+# value), which is what the page-table proofs are stated against; the `coq:`
+# bindings on the platform hooks; and the tagging of instruction fetches /
+# page-table walks as AK_ifetch / AK_ttw at the concurrency interface (see
+# README.md > "Regenerating the Sail model").
 SAIL_RISCV_DIR ?= sail-riscv
 SAIL_RISCV_URL ?= https://github.com/zeldovich/sail-riscv
-SAIL_RISCV_REV ?= 23dcf8fd923eb8a1958795393d2975632aa940b2
+SAIL_RISCV_REV ?= 070832a1e4b086f0c6f7635de54cc2b4cfd66993
 
 # THE xv6 revision this development is proved against.  $(XV6_DIR) is
 # .gitignored, so this is the only record of which upstream commit the tracked

@@ -376,10 +376,8 @@ Proof.
     rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
     rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 8 0 s)). cbn beta.
     rewrite misaligned_order_1. cbn zeta.
-    rewrite (execR_liftR_seq _ _ _ _ _
-               (_ : exec (read_kind_of_flags false false false) s = Some (rv64d_types.Read_plain, s))).
-    2:{ unfold read_kind_of_flags. apply exec_returnM. }
-    cbn beta.
+    (* the read kind: a non-reserved PTE load takes [rk_select]'s [Read_ttw] arm *)
+    cbn match. rewrite mbind_returnR. cbn beta.
     match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
       assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s)) end.
     { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
@@ -398,7 +396,7 @@ Proof.
         |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
         assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
                       = Some (inr w, s)) end.
-      { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_plain_8 addr w s Hdev Hbytes)).
+      { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_ttw_8 addr w s Hdev Hbytes)).
         cbn beta match. apply execR_returnR_fwd. }
       rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
       rewrite autocast_id. rewrite usvd_zeros_full_64.
@@ -461,6 +459,7 @@ Proof.
     rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
     rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 8 0 s)). cbn beta.
     rewrite misaligned_order_1. cbn zeta.
+    cbn match. (* [rk_select]: a RESERVED PTE read keeps the flag arm *)
     rewrite (execR_liftR_seq _ _ _ _ _
                (_ : exec (read_kind_of_flags false false true) s = Some (rv64d_types.Read_RISCV_reserved, s))).
     2:{ unfold read_kind_of_flags. apply exec_returnM. }

@@ -770,8 +770,10 @@ Section GmCheckedMemReadSplit.
     exec (split_misaligned (Physaddr pa) width
             (Phys_Mem_Access_Info_granule_size_exp plan)
             (Phys_Mem_Access_Info_splittable plan)) s = Some ((n, bytes), s) ->
-    goodmb Dr Dw (read_kind_of_flags aq rl res) s mm = true ->
-    exec (read_kind_of_flags aq rl res) s = Some (rk, s) ->
+    goodmb Dr Dw (rk_select (R := result (mword (8 * width) * unit) (physaddr * ExceptionType))
+                    acc aq rl res) s mm = true ->
+    execR (rk_select (R := result (mword (8 * width) * unit) (physaddr * ExceptionType))
+             acc aq rl res) s = Some (inr rk, s) ->
     goodmb Dr Dw (checked_mem_read acc pbmt priv (Physaddr pa) width aq rl res meta)
       s mm = true.
   Proof.
@@ -782,7 +784,7 @@ Section GmCheckedMemReadSplit.
     cbn match beta.
     gmm_lift Hsplitg Hsplit. cbn beta zeta match.
     rewrite misaligned_order_split. cbn zeta.
-    gmm_lift Hrkg Hrk. cbn beta.
+    erewrite gm_bindR; [ | exact Hrkg | exact Hrk ]. cbn beta.
     match goal with
     | |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?bb) _] =>
         assert (Hu : execR (Defs.untilMT vs m0 c bb) s
@@ -1523,7 +1525,7 @@ Section MisPhys.
                   false false false false Read_plain
                   (fun k => ram_chunk Read_plain (add_vec_int pa (Z.of_nat k * bytes))
                               bytes false s) s HN Hpmp Hmmio Hramc plan Hcpp Hsplit
-                  ltac:(unfold read_kind_of_flags; apply exec_returnM)) as Hchk.
+                  (execR_rk_select_plain (Load Data) s eq_refl)) as Hchk.
     eexists.
     exact (exec_mem_read_of_checked_plain (Load Data) PBMT_PMA pa W _ User s Heff Hchk).
   Qed.
@@ -1629,11 +1631,12 @@ Section MisPhys.
                (Hdevk k Hk)
                (bytes_owned_chunk mm pa W bytes N k Hbpos Hwidth Hk Hown)
                (Hramc k Hk)). }
-    assert (Hrkf : exec (read_kind_of_flags false false false) s
-                   = Some (rv64d_types.Read_plain, s))
-      by (unfold read_kind_of_flags; apply exec_returnM).
-    assert (Hrkg : goodmb Dr Dw (read_kind_of_flags false false false) s mm = true)
-      by (unfold read_kind_of_flags; apply goodmb_returnm).
+    (* the read kind at a data load: [rk_select]'s flag arm, [Read_plain] *)
+    pose proof (execR_rk_select_plain (R := result (mword (8 * W) * unit) (physaddr * ExceptionType))
+                  (Load Data) s eq_refl) as Hrkf.
+    pose proof (goodmb_rk_select Dr Dw (R := result (mword (8 * W) * unit) (physaddr * ExceptionType))
+                  (Load Data) false false false s mm
+                  (goodmb_read_kind_of_flags_plain Dr Dw s mm)) as Hrkg.
     pose proof (exec_checked_mem_read_split (Load Data) PBMT_PMA User pa W bytes N
                   false false false false Read_plain
                   (fun k => ram_chunk Read_plain (add_vec_int pa (Z.of_nat k * bytes))

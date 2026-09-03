@@ -19,8 +19,9 @@
 # xv6-riscv/).  The MODEL IS TAKEN FROM A FORK, zeldovich/sail-riscv, pinned at
 # $SAIL_RISCV_REV (the fork's `xv6` branch); its deltas against riscv/sail-riscv
 # upstream are the atomic PTE A/D-bit update, the `coq:` extern bindings on the
-# platform hooks, and the matching `Axiom`s in handwritten_support/riscv_extras.v
-# (all described in README.md).  A checkout that is not at the
+# platform hooks, the matching `Axiom`s in handwritten_support/riscv_extras.v,
+# and the AK_ifetch/AK_ttw tagging of fetches and page-table walks at the
+# concurrency interface (all described in README.md).  A checkout that is not at the
 # pinned revision is a warning, not an error: regenerating at another revision
 # is a deliberate act (an upstream bump), and the proofs then have to be
 # replayed against the new model.
@@ -35,8 +36,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 SAIL_RISCV_URL="${SAIL_RISCV_URL:-https://github.com/zeldovich/sail-riscv}"
-SAIL_RISCV_REV="${SAIL_RISCV_REV:-23dcf8fd923eb8a1958795393d2975632aa940b2}"
+SAIL_RISCV_REV="${SAIL_RISCV_REV:-070832a1e4b086f0c6f7635de54cc2b4cfd66993}"
 SAIL_RISCV_DIR="${1:-${SAIL_RISCV_DIR:-$REPO_ROOT/sail-riscv}}"
+# Absolute, because the sail invocation below runs from $SAIL_RISCV_DIR/model
+# and passes --memo-z3-path under $SAIL_RISCV_DIR: a relative argument (e.g.
+# `make model-gen`'s default `sail-riscv`) would otherwise fail AFTER the whole
+# run with "sail_smt_cache: No such file or directory".
+case "$SAIL_RISCV_DIR" in /*) ;; *) SAIL_RISCV_DIR="$PWD/$SAIL_RISCV_DIR" ;; esac
 
 CONFIG_JSON="$REPO_ROOT/model-xv6iris/sail-config-rv64d.json"
 MODULES_FILE="$REPO_ROOT/model-xv6iris/sail-modules.txt"
@@ -94,6 +100,10 @@ echo "   modules: $SAIL_MODULES"
 TMP_OUT="$(mktemp -d)"
 CHECK_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_OUT" "$CHECK_DIR"' EXIT
+# The z3 memo store lives where sail-riscv's cmake build would put it; a fresh
+# clone has no build/ tree, and sail dies AFTER the whole (slow) run when it
+# cannot write the file, so create the directory up front.
+mkdir -p "$SAIL_RISCV_DIR/build/model"
 (
   cd "$SAIL_RISCV_DIR/model"
   sail --strict-var --strict-bitvector --strict-exponentials \

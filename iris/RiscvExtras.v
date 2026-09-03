@@ -1150,6 +1150,93 @@ Proof. reflexivity. Qed.
 Lemma misaligned_order_1 : misaligned_order 1 = (0, 0, 1).
 Proof. vm_compute. reflexivity. Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* THE READ-KIND SELECTION [checked_mem_read] MAKES.  The fork's model picks *)
+(* a read's [read_kind] from the ACCESS TYPE as well as the aq/rl/res flags: *)
+(* an instruction fetch is [Read_ifetch] ([AK_ifetch] at the MemRead        *)
+(* event), a non-reserved page-table-entry load is [Read_ttw] ([AK_ttw]),   *)
+(* and everything else -- data loads, and the A/D update's EXCLUSIVE PTE    *)
+(* re-read, which is [res = true] -- falls through to [read_kind_of_flags]  *)
+(* exactly as before.  [rk_select] is that match, spelled the way the       *)
+(* generated model inlines it, so a proof over an ABSTRACT access type can  *)
+(* name it in a hypothesis; a concrete site just lets [cbn match] reduce it *)
+(* and takes the arm's lemma below.                                          *)
+(* ---------------------------------------------------------------------- *)
+Definition rk_select {R : Type} (access : MemoryAccessType mem_payload)
+    (aq rl res : bool) : Defs.monadR R exception read_kind :=
+  match (access, res) with
+  | (InstructionFetch tt, false) => Defs.returnR R Read_ifetch
+  | (Load PageTableEntry, false) => Defs.returnR R Read_ttw
+  | (_, _) => Defs.liftR (read_kind_of_flags aq rl res)
+  end.
+
+(* does [rk_select] take the flag-derived arm? *)
+Definition rk_from_flags (access : MemoryAccessType mem_payload) (res : bool) : bool :=
+  match access, res with
+  | InstructionFetch tt, false => false
+  | Load PageTableEntry, false => false
+  | _, _ => true
+  end.
+
+Lemma rk_select_flags {R : Type} (access : MemoryAccessType mem_payload) (aq rl res : bool) :
+  rk_from_flags access res = true ->
+  @rk_select R access aq rl res = Defs.liftR (read_kind_of_flags aq rl res).
+Proof.
+  intros Hff. unfold rk_from_flags in Hff. unfold rk_select.
+  destruct access as [p|p|p|p|p|u|c]; try destruct u; try destruct p; destruct res;
+    cbn in *; first [ reflexivity | discriminate Hff ].
+Qed.
+
+(* a RESERVED read never takes a tagged arm, whatever the access type *)
+Lemma rk_from_flags_true (access : MemoryAccessType mem_payload) :
+  rk_from_flags access true = true.
+Proof. destruct access as [p|p|p|p|p|u|c]; try destruct u; try destruct p; reflexivity. Qed.
+
+Lemma rk_select_ifetch {R : Type} (aq rl : bool) :
+  @rk_select R (InstructionFetch tt) aq rl false = Defs.returnR R Read_ifetch.
+Proof. reflexivity. Qed.
+
+Lemma rk_select_ttw {R : Type} (aq rl : bool) :
+  @rk_select R (Load PageTableEntry) aq rl false = Defs.returnR R Read_ttw.
+Proof. reflexivity. Qed.
+
+Lemma exec_read_kind_of_flags_plain s :
+  exec (read_kind_of_flags false false false) s = Some (Read_plain, s).
+Proof. unfold read_kind_of_flags. apply exec_returnM. Qed.
+
+Lemma execR_rk_select_ifetch {R : Type} (aq rl : bool) s :
+  execR (@rk_select R (InstructionFetch tt) aq rl false) s = Some (inr Read_ifetch, s).
+Proof. reflexivity. Qed.
+
+Lemma execR_rk_select_ttw {R : Type} (aq rl : bool) s :
+  execR (@rk_select R (Load PageTableEntry) aq rl false) s = Some (inr Read_ttw, s).
+Proof. reflexivity. Qed.
+
+Lemma execR_rk_select_flags {R : Type} (access : MemoryAccessType mem_payload)
+    (aq rl res : bool) (rk : read_kind) s :
+  rk_from_flags access res = true ->
+  exec (read_kind_of_flags aq rl res) s = Some (rk, s) ->
+  execR (@rk_select R access aq rl res) s = Some (inr rk, s).
+Proof.
+  intros Hff Hrk. rewrite (rk_select_flags access aq rl res Hff).
+  rewrite execR_liftR. rewrite Hrk. reflexivity.
+Qed.
+
+(* the data-load instance: flags all clear, the kind is [Read_plain] *)
+Lemma execR_rk_select_plain {R : Type} (access : MemoryAccessType mem_payload) s :
+  rk_from_flags access false = true ->
+  execR (@rk_select R access false false false) s = Some (inr Read_plain, s).
+Proof.
+  intros Hff. exact (execR_rk_select_flags access false false false Read_plain s Hff
+                        (exec_read_kind_of_flags_plain s)).
+Qed.
+
+(* [Defs.bind] on a [returnR] -- the shape the ifetch/ttw arms leave behind,
+   the [returnR] twin of [HartSwp.mbind_ret]. *)
+Lemma mbind_returnR {E R A B : Type} (v : A) (f : A -> Defs.monadR R E B) :
+  Defs.bind (Defs.returnR R v) f = f v.
+Proof. reflexivity. Qed.
+
 (* A FULL-WIDTH [update_subrange_vec_dec] over zeros is the value itself --
    which is what [checked_mem_read]'s split loop leaves in its accumulator on
    the (always taken, since every access here is aligned) one-split path.  The

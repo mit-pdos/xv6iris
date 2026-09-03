@@ -69,9 +69,9 @@ Import Defs.
 (* [read_ram]'s value index is [mword (8*k)] and resists abstraction       *)
 (* inside [sail_mem_read]'s cast (the reason [UserMemPt] section 5 closes  *)
 (* over two width-TYPED bricks), but a CERTIFICATE never scrutinises the   *)
-(* value -- so taking [Hread_plain] as a hypothesis keeps everything here  *)
+(* value -- so taking [Hread_ifetch] as a hypothesis keeps everything here  *)
 (* generic and costs each caller one already-proved brick                  *)
-(* ([exec_read_ram_plain_2] / [_4]).                                       *)
+(* ([exec_read_ram_ifetch_2] / [_4] -- the fork's model fetches at [Read_ifetch]).                                       *)
 (* ===================================================================== *)
 
 (* the PMA check at the fetch access type, both halves, width-generic *)
@@ -185,8 +185,8 @@ Section FetchReadGen.
   Hypothesis Hhtif : register_lookup htif_tohost_base s.(sregs) = None.
   Hypothesis Hdev : dev_addr addr = false.
   Hypothesis Hown : bytes_owned mm addr (Z.to_N k) = true.
-  Hypothesis Hread_plain :
-    exec (read_ram Read_plain (Physaddr addr) k false) s
+  Hypothesis Hread_ifetch :
+    exec (read_ram Read_ifetch (Physaddr addr) k false) s
       = Some ((w, default_meta), s).
 
   Let Hh : exec (within_htif_readable (Physaddr addr) k) s = Some (false, s)
@@ -234,12 +234,10 @@ Section FetchReadGen.
     gmm_lift (goodmb_split_misaligned_unsplit Dr Dw addr k 0 s mm)
              (exec_split_misaligned_unsplit addr k 0 s). cbn beta.
     cbn match beta. rewrite misaligned_order_1. cbn match zeta beta.
-    assert (Hrkf : exec (read_kind_of_flags false false false) s
-                   = Some (rv64d_types.Read_plain, s))
-      by (unfold read_kind_of_flags; apply exec_returnM).
-    assert (Hrkg : goodmb Dr Dw (read_kind_of_flags false false false) s mm = true)
-      by (unfold read_kind_of_flags; apply goodmb_returnm).
-    gmm_lift Hrkg Hrkf. cbn beta.
+    (* the read kind: [rk_select] gives an instruction fetch [Read_ifetch],
+       a pure [returnR] (already reduced by the [cbn match] above) *)
+    erewrite gm_bindR; [ | apply goodmb_returnm | apply execR_returnR_fwd ].
+    cbn beta.
     assert (Havi : add_vec_int addr (0 * k) = addr)
       by (assert (H0 : (0 * k)%Z = 0) by lia; rewrite H0; apply avi0).
     match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?bb) _] =>
@@ -261,7 +259,7 @@ Section FetchReadGen.
         |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?ad ?wd ?mt)) ?k1) _] =>
         assert (Hrdr : execR (Defs.bind (Defs.liftR (read_ram rk ad wd mt)) k1) s
                        = Some (inr w, s)) end.
-      { rewrite (execR_liftR_seq _ _ _ _ _ Hread_plain).
+      { rewrite (execR_liftR_seq _ _ _ _ _ Hread_ifetch).
         cbn beta match. apply execR_returnR_fwd. }
       rewrite (execR_bind_Some _ _ _ _ _ Hrdr). cbn beta zeta.
       change (update_subrange_vec_dec (zeros' (8 * 1 * k))
@@ -295,11 +293,11 @@ Section FetchReadGen.
           [ | assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk ad wd mt)) k1) s
                             = Some (inr w, s)) ] end.
         { erewrite gm_liftR_seq;
-            [ | exact (goodmb_read_ram_of_exec Dr Dw Read_plain k addr false
-                         (w, default_meta) s s mm eq_refl Hdev Hown Hread_plain)
-              | exact Hread_plain ].
+            [ | exact (goodmb_read_ram_of_exec Dr Dw Read_ifetch k addr false
+                         (w, default_meta) s s mm eq_refl Hdev Hown Hread_ifetch)
+              | exact Hread_ifetch ].
           cbn beta match. apply goodmb_returnm. }
-        { rewrite (execR_liftR_seq _ _ _ _ _ Hread_plain).
+        { rewrite (execR_liftR_seq _ _ _ _ _ Hread_ifetch).
           cbn beta match. apply execR_returnR_fwd. }
         erewrite (gm_bindR Dr Dw _ _ s s mm w Hrdg Hrd). cbn beta zeta.
         change (update_subrange_vec_dec (zeros' (8 * 1 * k))
@@ -323,7 +321,7 @@ Section FetchReadGen.
           |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?ad ?wd ?mt)) ?k1) _] =>
           assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk ad wd mt)) k1) s
                         = Some (inr w, s)) end.
-        { rewrite (execR_liftR_seq _ _ _ _ _ Hread_plain).
+        { rewrite (execR_liftR_seq _ _ _ _ _ Hread_ifetch).
           cbn beta match. apply execR_returnR_fwd. }
         rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
         change (update_subrange_vec_dec (zeros' (8 * 1 * k))
@@ -412,7 +410,7 @@ Proof.
   intros HDc HDa HDp HDh HDms HDcp HA Hord Hrange HX Hmatch Halign Hexec
     Hc Hsig Hhtif Hdev Hown Hbytes.
   assert (Hk4 : 0 < 4) by lia.
-  pose proof (exec_read_ram_plain_4 addr w s Hdev Hbytes) as Hrp.
+  pose proof (exec_read_ram_ifetch_4 addr w s Hdev Hbytes) as Hrp.
   apply (goodmb_checked_mem_read_ram_g_U Dr Dw 4 Hk4 pbmt addr region w s mm);
     assumption.
 Qed.
@@ -449,7 +447,7 @@ Proof.
   intros HDc HDa HDp HDh HDms HDcp HA Hord Hrange HX Hmatch Halign Hexec
     Hc Hsig Hhtif Hdev Hown Hbytes Hpriv.
   assert (Hk4 : 0 < 4) by lia.
-  pose proof (exec_read_ram_plain_4 addr w s Hdev Hbytes) as Hrp.
+  pose proof (exec_read_ram_ifetch_4 addr w s Hdev Hbytes) as Hrp.
   pose proof (exec_checked_mem_read_ram_4_U pbmt addr region w s
                 HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig
                 (within_htif_false addr 4 s Hhtif) Hdev Hbytes) as Hchk.
@@ -490,7 +488,7 @@ Proof.
   intros HDc HDa HDp HDh HDms HDcp HA Hord Hrange HX Hmatch Halign Hexec
     Hc Hsig Hhtif Hdev Hown Hbytes.
   assert (Hk2 : 0 < 2) by lia.
-  pose proof (exec_read_ram_plain_2 addr w s Hdev Hbytes) as Hrp.
+  pose proof (exec_read_ram_ifetch_2 addr w s Hdev Hbytes) as Hrp.
   apply (goodmb_checked_mem_read_ram_g_U Dr Dw 2 Hk2 pbmt addr region w s mm);
     assumption.
 Qed.
@@ -527,7 +525,7 @@ Proof.
   intros HDc HDa HDp HDh HDms HDcp HA Hord Hrange HX Hmatch Halign Hexec
     Hc Hsig Hhtif Hdev Hown Hbytes Hpriv.
   assert (Hk2 : 0 < 2) by lia.
-  pose proof (exec_read_ram_plain_2 addr w s Hdev Hbytes) as Hrp.
+  pose proof (exec_read_ram_ifetch_2 addr w s Hdev Hbytes) as Hrp.
   pose proof (exec_checked_mem_read_ram_2_U pbmt addr region w s
                 HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig
                 (within_htif_false addr 2 s Hhtif) Hdev Hbytes) as Hchk.

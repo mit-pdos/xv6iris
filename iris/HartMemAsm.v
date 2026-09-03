@@ -45,7 +45,7 @@ From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvExec RiscvTryStep RiscvExtras RiscvFetchExec.
 Require Import HartMemRun.
 Local Open Scope Z_scope.
 
@@ -377,19 +377,33 @@ Qed.
 
 (* the read kinds and write kinds that reach a RAM node (the others are the
    model's [internal_error] placeholders for unused Sail access kinds) *)
-(* [Read_ttw] IS GONE with the A6.7(B) Sail patch (RULING 1 overruled): the
-   pinned model has no walk kind, and every read this tree performs -- fetch,
-   page walk and data load alike -- arrives as [Read_plain] or one of the
-   reserved kinds.  If the de-confliction project restores the patch, this
-   list gets [Read_ttw] back, and note the hazard the wildcard creates:
-   omitting it costs no error, just a walk silently classified as
-   not-reaching-RAM. *)
+(* [Read_ttw] is the fork's walk kind (a non-reserved page-table-entry load,
+   see [RiscvExtras.rk_select]) and [Read_ifetch] its fetch kind; both reach
+   RAM.  Note the hazard the wildcard creates: omitting a kind here costs no
+   error, just a read silently classified as not-reaching-RAM. *)
 Definition rk_ram_ok (rk : read_kind) : bool :=
   match rk with
-  | Read_plain | Read_ifetch | Read_RISCV_reserved
+  | Read_plain | Read_ifetch | Read_ttw | Read_RISCV_reserved
   | Read_RISCV_reserved_acquire | Read_RISCV_reserved_strong_acquire => true
   | _ => false
   end.
+
+(* [goodmb] of the read-kind selection ([RiscvExtras.rk_select]): the two
+   tagged arms are pure [returnR]s, the flag arm is the (lifted) flag chain,
+   so it inherits whatever the caller knows about [read_kind_of_flags]. *)
+Lemma goodmb_rk_select (Dr Dw : register -> bool) {R : Type}
+    (access : MemoryAccessType mem_payload) (aq rl res : bool) (s : mstate) mm :
+  goodmb Dr Dw (read_kind_of_flags aq rl res) s mm = true ->
+  goodmb Dr Dw (@rk_select R access aq rl res) s mm = true.
+Proof.
+  intros Hf. unfold rk_select.
+  destruct access as [p|p|p|p|p|u|c]; try destruct u; try destruct p; destruct res;
+    first [ apply goodmb_returnm | apply goodmb_liftR; exact Hf ].
+Qed.
+
+Lemma goodmb_read_kind_of_flags_plain (Dr Dw : register -> bool) (s : mstate) mm :
+  goodmb Dr Dw (read_kind_of_flags false false false) s mm = true.
+Proof. unfold read_kind_of_flags. apply goodmb_returnm. Qed.
 
 Definition wk_ram_ok (wk : write_kind) : bool :=
   match wk with

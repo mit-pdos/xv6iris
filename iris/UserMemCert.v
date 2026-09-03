@@ -1409,8 +1409,11 @@ Section GenCheckedReadU.
                             (Physaddr addr) k res) s = Some (Ok pma_ok_aligned, s).
   Hypothesis Hcpg : goodmb Dr Dw (check_pma_with_pmp_priority acc pbmt priv
                             (Physaddr addr) k res) s mm = true.
-  Hypothesis Hrkf : exec (read_kind_of_flags aq rl res) s = Some (rk, s).
-  Hypothesis Hrkg : goodmb Dr Dw (read_kind_of_flags aq rl res) s mm = true.
+  (* the read-kind selection at THIS access type ([RiscvExtras.rk_select]) *)
+  Hypothesis Hrkf : execR (rk_select (R := result (mword (8 * k) * unit) (physaddr * ExceptionType))
+                             acc aq rl res) s = Some (inr rk, s).
+  Hypothesis Hrkg : goodmb Dr Dw (rk_select (R := result (mword (8 * k) * unit) (physaddr * ExceptionType))
+                                    acc aq rl res) s mm = true.
   Hypothesis Hpmpe : exec (pmpCheck (Physaddr addr) k acc priv) s = Some (None, s).
   Hypothesis Hpmpg : goodmb Dr Dw (pmpCheck (Physaddr addr) k acc priv) s mm = true.
   Hypothesis Hmmioe : exec (within_mmio_readable (Physaddr addr) k) s = Some (false, s).
@@ -1434,7 +1437,7 @@ Section GenCheckedReadU.
     rewrite pma_ok_aligned_splittable. rewrite pma_ok_aligned_granule.
     rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr k 0 s)).
     cbn beta. rewrite misaligned_order_1. cbn zeta.
-    rewrite (execR_liftR_seq _ _ _ _ _ Hrkf). cbn beta.
+    rewrite (execR_bind_Some _ _ _ _ _ Hrkf). cbn beta.
     match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?bb) _] =>
       assert (Hu : execR (Defs.untilMT vs m0 c bb) s = Some (inr (w, true, 0), s)) end.
     { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
@@ -1477,7 +1480,7 @@ Section GenCheckedReadU.
     gmm_lift (goodmb_split_misaligned_unsplit Dr Dw addr k 0 s mm)
              (exec_split_misaligned_unsplit addr k 0 s). cbn beta.
     cbn match beta. rewrite misaligned_order_1. cbn match zeta beta.
-    gmm_lift Hrkg Hrkf. cbn beta.
+    erewrite gm_bindR; [ | exact Hrkg | exact Hrkf ]. cbn beta.
     match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?bb) _] =>
       assert (Hu : execR (Defs.untilMT vs m0 c bb) s = Some (inr (w, true, 0), s));
       [ | assert (Hug : goodmb Dr Dw (Defs.untilMT vs m0 c bb) s mm = true) ] end.
@@ -1872,13 +1875,17 @@ Proof.
                           (Physaddr pa) k maq mrl true false) s'
                   = Some (Ok (dv, default_meta), s'))
     by exact (exec_checked_mem_read_u k Hk (LoadReserved (aq, rl, Data)) PBMT_PMA User
-                pa maq mrl true rk dv s' Hcpe Hrkf Hpmpe Hmmioe Hrame).
+                pa maq mrl true rk dv s' Hcpe
+                (execR_rk_select_flags _ _ _ _ _ _ (rk_from_flags_true _) Hrkf)
+                Hpmpe Hmmioe Hrame).
   assert (Hchkg : goodmb Du_r Du_w
                     (checked_mem_read (LoadReserved (aq, rl, Data)) PBMT_PMA User
                        (Physaddr pa) k maq mrl true false) s' mm' = true)
     by exact (goodmb_checked_mem_read_u Du_r Du_w k Hk (LoadReserved (aq, rl, Data))
                 PBMT_PMA User pa maq mrl true rk dv s' mm'
-                Hcpe Hcpg Hrkf (goodmb_read_kind_of_flags_resv Du_r Du_w maq mrl s' mm' Hfl)
+                Hcpe Hcpg (execR_rk_select_flags _ _ _ _ _ _ (rk_from_flags_true _) Hrkf)
+                (goodmb_rk_select Du_r Du_w _ _ _ _ _ _
+                   (goodmb_read_kind_of_flags_resv Du_r Du_w maq mrl s' mm' Hfl))
                 Hpmpe Hpmpg Hmmioe Hmmiog Hdev Hown (rk_resv_ram_ok rk Hrk) Hrame).
   assert (Heffe : exec (effectivePrivilege (LoadReserved (aq, rl, Data))
                           (register_lookup mstatus rs')
@@ -2815,13 +2822,16 @@ Proof.
                            aq (andb aq rl) true false) s'
                    = Some (Ok (dv, default_meta), s'))
     by exact (exec_checked_mem_read_u k Hk ac PBMT_PMA User pa aq (andb aq rl) true
-                rk dv s' Hcpe Hrkf Hpmpe Hmmiore Hrame).
+                rk dv s' Hcpe (execR_rk_select_flags _ _ _ _ _ _ (rk_from_flags_true _) Hrkf)
+                Hpmpe Hmmiore Hrame).
   assert (Hchkrg : goodmb Du_r Du_w (checked_mem_read ac PBMT_PMA User (Physaddr pa) k
                      aq (andb aq rl) true false) s' mm' = true)
     by exact (goodmb_checked_mem_read_u Du_r Du_w k Hk ac PBMT_PMA User pa
-                aq (andb aq rl) true rk dv s' mm' Hcpe Hcpg Hrkf
-                (goodmb_read_kind_of_flags_resv Du_r Du_w aq (andb aq rl) s' mm'
-                   (mem_flags_ok_amo aq rl))
+                aq (andb aq rl) true rk dv s' mm' Hcpe Hcpg
+                (execR_rk_select_flags _ _ _ _ _ _ (rk_from_flags_true _) Hrkf)
+                (goodmb_rk_select Du_r Du_w _ _ _ _ _ _
+                   (goodmb_read_kind_of_flags_resv Du_r Du_w aq (andb aq rl) s' mm'
+                      (mem_flags_ok_amo aq rl)))
                 Hpmpe Hpmpg Hmmiore Hmmiorg Hdev Hown (rk_resv_ram_ok rk Hrk) Hrame).
   (* the WRITE half.  The write KIND is value-independent, so it is derived
      once, here; only the leaf and the two shells above it are re-derived per

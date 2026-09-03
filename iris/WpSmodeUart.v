@@ -78,7 +78,7 @@ Proof.
   rewrite misaligned_order_1. cbn zeta.
   assert (Hrkf : exec (read_kind_of_flags false false false) s = Some (Read_plain, s))
     by (unfold read_kind_of_flags; apply exec_returnM).
-  rewrite (execR_liftR_seq _ _ _ _ _ Hrkf). cbn beta.
+  cbn match. rewrite (execR_liftR_seq _ _ _ _ _ Hrkf). cbn beta.
   match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?bb) _] =>
     assert (Hu : execR (Defs.untilMT vs m0 c bb) s = Some (inr (b, true, 0), sd)) end.
   { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].

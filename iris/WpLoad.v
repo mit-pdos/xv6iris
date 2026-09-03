@@ -117,6 +117,53 @@ Proof.
     exact (Hbytes j Hj).
 Qed.
 
+(* THE WALK TWINS.  The fork's model reads a (non-reserved) page-table entry
+   at [Read_ttw] (RiscvExtras.rk_select); [read_ram]'s arm for it is a plain
+   [returnM (AK_ttw tt)], so both proofs are the [Read_plain] ones verbatim. *)
+Lemma run_read_ram_ttw_8_pin (addr : mword 64) (w : bv 64) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 8)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  run (read_ram Read_ttw (Physaddr addr) 8 false) s (w, default_meta) s.
+Proof.
+  intros Hdev Hbytes.
+  unfold read_ram. cbn match.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  eexists _, s. split; [ apply run_returnM_fwd | ]. cbn beta zeta.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  eexists _, s. split.
+  - eapply run_MemRead_ram_intro.
+    + exact Hdev.
+    + intros j Hj. exact (Hbytes j Hj).
+    + apply run_returnM_fwd.
+  - cbn match beta. apply run_returnM_fwd.
+Qed.
+
+Lemma exec_read_ram_ttw_8 (addr : mword 64) (w : bv 64) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 8)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (read_ram Read_ttw (Physaddr addr) 8 false) s = Some ((w, default_meta), s).
+Proof.
+  intros Hdev Hbytes.
+  apply (run_to_exec _ _ _ _ (run_read_ram_ttw_8_pin addr w s Hdev Hbytes)).
+  unfold read_ram. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  unfold Defs.bind. cbn [Interface.iMon_bind].
+  rewrite exec_MemRead; last exact Hdev.
+  cbn [Interface.ReadReq.pa].
+  case_match eqn:Hrb.
+  - cbn [Interface.iMon_bind]. cbn match beta iota. discriminate.
+  - exfalso.
+    refine (read_bytes_ne (mem s) addr (Z.to_N 8) w _ Hrb).
+    intros j Hj.
+    change (RiscvModelBytes.pa_add addr j) with (pa_add addr j).
+    change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
+    exact (Hbytes j Hj).
+Qed.
+
 (* pmaCheck for Load Data: returns None when the region is readable+aligned. *)
 Lemma exec_pmaCheck_ram_load (addr : mword 64) (pbmt : page_based_mem_type)
     (region : PMA_Region) s :
@@ -168,6 +215,7 @@ Proof.
   rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
   rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 8 0 s)). cbn beta.
   rewrite misaligned_order_1. cbn zeta.
+  cbn match. (* [rk_select] at a data access: the flag arm *)
   rewrite (execR_liftR_seq _ _ _ _ _
              (_ : exec (read_kind_of_flags false false false) s = Some (Read_plain, s))).
   2:{ unfold read_kind_of_flags. apply exec_returnM. }
