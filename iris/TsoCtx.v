@@ -4663,6 +4663,165 @@ Section ctx.
   Qed.
 
   (* ================================================================== *)
+  (* THE PHYSICAL STAMPED BYTE (claude-notes/projects/icache.md):        *)
+  (* [ctx_phys_pointsto]'s body plus the pure stamp "latest write at or  *)
+  (* below [IK]", an instruction-view position.  [ctx_xpointsto]'s twin  *)
+  (* at the tier [HartMemRun.bytes_own] is stated over.  The gates: a    *)
+  (* data load reads it like any context byte ([ctx_phys_xload_ok]), a   *)
+  (* FETCH reads it through the icache agent at every view from the      *)
+  (* instruction view up once that view has passed the stamp             *)
+  (* ([ctx_phys_xfetch_ok] / [_bytes_ok], [HartMFetch.fobl_ifetch]'s     *)
+  (* shape); [ctx_phys_xstamp] mints it from a running context's fact at *)
+  (* a [fence.i], whose drain covers every timestamp the context owns.   *)
+  (* ================================================================== *)
+  Definition ctx_phys_xpointsto_def (ξ : CtxId) (IK : nat) (a : Arch.pa)
+      (dq : dfrac) (v : bv 8) : iProp Σ :=
+    (∃ t : nat,
+       phys_pointsto a dq v ∗
+       a ↪[ts_name]{dq} (t, ts_pay_none) ∗
+       (llb (ctx_bound_name ξ) t ∨ dset_in (ctx_dirty_name ξ) (t, a)) ∗
+       ⌜(t <= IK)%nat⌝)%I.
+  Lemma ctx_phys_xpointsto_aux : { f | f = ctx_phys_xpointsto_def }.
+  Proof. by eexists. Qed.
+  Definition ctx_phys_xpointsto (ξ : CtxId) (IK : nat) (a : Arch.pa)
+      (dq : dfrac) (v : bv 8) : iProp Σ :=
+    proj1_sig ctx_phys_xpointsto_aux ξ IK a dq v.
+  Lemma ctx_phys_xpointsto_unseal (ξ : CtxId) (IK : nat) (a : Arch.pa)
+      (dq : dfrac) (v : bv 8) :
+    ctx_phys_xpointsto ξ IK a dq v = ctx_phys_xpointsto_def ξ IK a dq v.
+  Proof.
+    unfold ctx_phys_xpointsto. by rewrite (proj2_sig ctx_phys_xpointsto_aux).
+  Qed.
+
+  Global Instance ctx_phys_xpointsto_timeless ξ IK a dq v :
+    Timeless (ctx_phys_xpointsto ξ IK a dq v).
+  Proof. rewrite ctx_phys_xpointsto_unseal /ctx_phys_xpointsto_def. apply _. Qed.
+
+  Lemma ctx_phys_xpointsto_forget ξ IK a dq v :
+    ctx_phys_xpointsto ξ IK a dq v ⊢ ctx_phys_pointsto ξ a dq v.
+  Proof.
+    rewrite ctx_phys_xpointsto_unseal /ctx_phys_xpointsto_def
+            ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
+    iIntros "(%t & Hp & Hts & Hbit & _)". iExists t. by iFrame.
+  Qed.
+
+  Lemma ctx_phys_xpointsto_mono ξ IK IK' a dq v :
+    (IK <= IK')%nat ->
+    ctx_phys_xpointsto ξ IK a dq v ⊢ ctx_phys_xpointsto ξ IK' a dq v.
+  Proof.
+    intros Hle. rewrite !ctx_phys_xpointsto_unseal /ctx_phys_xpointsto_def.
+    iIntros "(%t & Hp & Hts & Hbit & %Ht)". iExists t. iFrame. iPureIntro. lia.
+  Qed.
+
+  (* the stamp, at a fence.i: [ctx_xstamp]'s physical twin *)
+  Lemma ctx_phys_xstamp `{CID : CpuId} (g : gstate) (ξ : CtxId) (IK : nat)
+      (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    (g.(gtv) cpu_id <= IK)%nat ->
+    (own_pub (hart_agent cpu_id) g.(glog) <= IK)%nat ->
+    tso_interp_at riscv_eraGS g -∗
+    own_context ξ -∗
+    ctx_phys_pointsto ξ a dq v -∗
+    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗ ctx_phys_xpointsto ξ IK a dq v.
+  Proof.
+    intros Htv Hpub.
+    rewrite own_context_unseal /own_context_def
+            ctx_phys_pointsto_unseal /ctx_phys_pointsto_def
+            ctx_phys_xpointsto_unseal /ctx_phys_xpointsto_def.
+    iIntros "Hint Hrun Hfact".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
+    destruct Hmm as ((Hflat & Htv0 & Hcov) & Hera).
+    iDestruct "Hrun"
+      as "(%B & %K & %W & %D & [Hb Hd] & #HK & %HBK & #HW & %HDW & #Hoks)".
+    iDestruct "Hfact" as "(%t & Hpt & Htse & Hbit)".
+    iDestruct (view_auth_valid with "Hv HK") as %HKtvs.
+    rewrite avf_hart in HKtvs.
+    iAssert (⌜(t <= IK)%nat⌝)%I as %HtIK.
+    { iDestruct "Hbit" as "[Hcl | Hdt]".
+      - iDestruct (llb_valid with "Hb Hcl") as %HtB. iPureIntro. lia.
+      - iDestruct (dset_lookup with "Hd Hdt") as %HDt.
+        iDestruct (big_sepS_elem_of _ _ _ HDt with "Hoks") as "[%HtB | Hown]".
+        + iPureIntro. simpl in HtB. lia.
+        + iDestruct "Hown" as (i mg) "(%Hti & Hi & %Htid)".
+          iDestruct (ghost_map_lookup with "Hm Hi") as %HLi.
+          iPureIntro. simpl in Hti. rewrite Hti. rewrite HLM in HLi.
+          pose proof (own_pub_lookup _ _ _ _ HLi Htid). lia. }
+    iSplitL "Hts Hm Hlen Hv".
+    { iExists TM, LM. iFrame. iPureIntro. split_and!; done. }
+    iSplitL "Hb Hd".
+    { iExists B, K, W, D. iFrame "Hb Hd HK HW Hoks". by iPureIntro. }
+    iExists t. iFrame "Hpt Htse Hbit". by iPureIntro.
+  Qed.
+
+  (* a stamped byte loads like any context byte: forget the stamp *)
+  Lemma ctx_phys_xload_ok `{CID : CpuId} (g : gstate) (ξ : CtxId) (IK : nat)
+      (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    own_context ξ -∗
+    ctx_phys_xpointsto ξ IK a dq v -∗
+    ⌜forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
+       tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv' a = Some v⌝.
+  Proof.
+    iIntros "Hgh Hint Hrun Hx". iDestruct (ctx_phys_xpointsto_forget with "Hx") as "Hf".
+    iApply (ctx_phys_load_ok with "Hgh Hint Hrun Hf").
+  Qed.
+
+  (* THE FETCH GATE, one byte: the icache agent sees no store forwarding,
+     so the read at a view [tv'] is the latest write only if that write is
+     under [tv'] -- which the stamp and the receipt [IK <= itv] give. *)
+  Lemma ctx_phys_xfetch_ok `{CID : CpuId} (g : gstate) (ξ : CtxId)
+      (IK itv : nat) (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    (IK <= itv)%nat ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    ctx_phys_xpointsto ξ IK a dq v -∗
+    ⌜forall tv' : nat, (itv <= tv')%nat ->
+       tso_read g.(gimg) g.(glog) (ifetch_agent (hart_agent cpu_id)) tv' a
+       = Some v⌝.
+  Proof.
+    intros HIK.
+    rewrite ctx_phys_xpointsto_unseal /ctx_phys_xpointsto_def.
+    iIntros "Hgh Hint Hfact".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
+    iDestruct "Hfact" as "(%t & Hpt & Htse & Hbit & %HtIK)".
+    iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
+    iDestruct (ghost_map_lookup with "Hts Htse") as %HTMt.
+    destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat).
+    rewrite Hgm in Hgm0. injection Hgm0 as <-.
+    iPureIntro. intros tv' Htv'.
+    apply (tso_read_of_latest _ _ _ _ _ t); [exact Hlat|].
+    apply visibleb_below. lia.
+  Qed.
+
+  (* ... and the window form, [HartMFetch.fobl_ifetch]'s shape *)
+  Lemma ctx_phys_xfetch_bytes_ok `{CID : CpuId} (g : gstate) (ξ : CtxId)
+      (IK itv : nat) (a : Arch.pa) (n : N) {m : N} (w : bv m) (dq : dfrac) :
+    (IK <= itv)%nat ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n),
+       ctx_phys_xpointsto ξ IK (pa_add a j) dq (nth_byte w j)) -∗
+    ⌜forall tv' : nat, (itv <= tv')%nat ->
+       tso_read_bytes g.(gimg) g.(glog) (ifetch_agent (hart_agent cpu_id))
+         tv' a n w⌝.
+  Proof.
+    intros HIK. iIntros "Hgh Hint Hb".
+    iAssert (⌜forall j : nat, (N.of_nat j < n)%N ->
+               forall tv' : nat, (itv <= tv')%nat ->
+                 tso_read g.(gimg) g.(glog) (ifetch_agent (hart_agent cpu_id))
+                   tv' (pa_add a j) = Some (nth_byte w j)⌝)%I as %HH.
+    { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
+      iDestruct (big_sepL_lookup _ (seq 0 (N.to_nat n)) j j with "Hb")
+        as "Hbj".
+      { rewrite lookup_seq_lt; [reflexivity|lia]. }
+      iApply (ctx_phys_xfetch_ok g ξ IK itv (pa_add a j) dq (nth_byte w j) HIK
+                with "Hgh Hint Hbj"). }
+    iPureIntro. intros tv' Htv' j Hj. exact (HH j Hj tv' Htv').
+  Qed.
+
+  (* ================================================================== *)
   (* THE CONTEXT-FREE LOAD GATE: A LEDGER BYTE PLUS A MACHINE RECEIPT   *)
   (* (tso-machine-flip.md A6.37, the secondary-hart half of the         *)
   (* corrected RULING 1 discharge plan)                                 *)
