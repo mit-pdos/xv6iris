@@ -1336,16 +1336,26 @@ Section BootAlloc.
       "(Hmm & Hpmpc & Hpmpa & Hpc & Hfile & Hmh & Hmepc & Hsatp & Hmede & Hmdl &
         Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec & Hsepc & Hscause & Hstval &
         Hssc & Hmse & Hsse & Hseip & Hmeip)".
+    (* [cpu_ctx_free] is a PARKED record (SchedCtx A6.68), not a bare ∃ ξ: the
+       save area belongs to no thread at boot, so its 14 cells sit in a FRESH
+       context parked at stamp 0 -- never the minter's ambient, which is what
+       let [boot_shared_alloc]'s eight bundles pin one evar to eight contexts
+       (plan §9 items 38/39).  The carve's [∀ ξ] row is instantiated at that
+       context; the receipt is the boot one, [view_lb_0]. *)
+    iMod TsoCtx.ctx_parked_alloc as (ξb) "Hpk".
     iModIntro. iFrame "Hseip Hmeip".
     iDestruct "Hint" as (iv) "Hint".
     iExists iv.
-    (* [cpu_ctx_free] stays FOLDED in the goal: it is the ∃ ξ crossing for an
-       UNOWNED cell (SchedCtx's header), so the witness is chosen HERE -- any
-       will do -- and the row then matches syntactically. *)
+    (* [cpu_ctx_free] stays FOLDED in the goal so the row matches syntactically. *)
     rewrite /boot_hart_res /strans_pending /sie_gname /sret_bits /spp_gname
             /spie_gname /cid_word.
-    iAssert (cpu_ctx_free (CID := h)) with "[Hctx]" as "Hctx".
-    { rewrite /cpu_ctx_free. iExists cur_ctx. iApply ("Hctx" $! cur_ctx). }
+    iAssert (cpu_ctx_free (CID := h)) with "[Hctx Hpk]" as "Hctx".
+    { rewrite /cpu_ctx_free /cid_word.
+      iSpecialize ("Hctx" $! ξb). rewrite /own_ctx.
+      iDestruct "Hctx" as (vs) "[%Hlen Hcells]".
+      iExists vs, ξb, 0%nat. iFrame "Hpk Hcells". iSplit; [done|].
+      rewrite TsoCtx.hart_view_lb_unseal /TsoCtx.hart_view_lb_def.
+      iApply TsoGhost.view_lb_0. }
     iFrame "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
             Hmcen Hstc Htlb Hstvec Hsepc Hscause Hstval Hssc Hmse Hsse
             Hword Hpr Hstk
@@ -1502,7 +1512,7 @@ Section BootAlloc.
     destruct Hv0' as (v0 & Hv0).
     iIntros "Hdursnap H".
     iDestruct (power_boot_res_unpack Rb g ndisk with "H") as
-      "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hstrans & Hsie & Hspp & Hspie &
+      "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hkptb & Hstrans & Hsie & Hspp & Hspie &
         Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hswlb &
         HRb & Hled & #Hcinv & #Hcert & %Hera)".
     (* DROPPED HERE: the lent resource this fupd carries is the CALLER's
@@ -1533,11 +1543,16 @@ Section BootAlloc.
     iDestruct (bss_cut g text_end text_end rodata_end ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "Hdata")
       as "[Hro Hrw]".
-    iDestruct (boot_cran_raw g text_end rodata_end with "Hro") as "Hro".
+    (* the elements are KEPT, not dropped (A6.81): persisted, they are the
+       [pristine_va] half [kernel_data_intro] takes beside the bytes *)
+    iDestruct (boot_cran_elim g text_end rodata_end with "Hro") as "[Hro Hroled]".
     iDestruct (boot_ran_own g text_end rodata_end Hram ltac:(zlit)
                  with "Hcl Hro") as "Hro".
     iMod (boot_ran_persist g text_end rodata_end with "Hro") as "#Hro".
-    iDestruct (kernel_data_intro g Hmem with "Hro") as "#Hkdata".
+    iMod (boot_led_ran_persist g text_end rodata_end with "Hroled") as "#Hroled".
+    iDestruct (boot_ran_pristine g text_end rodata_end Hram ltac:(zlit)
+                 with "Hcl Hroled") as "#Hropr".
+    iDestruct (kernel_data_intro g Hmem with "Hro Hropr") as "#Hkdata".
     (* ---- [rodata_end, ram_hi), walked in ADDRESS order exactly like the
            .bss walk below: `first`, `nextpid`, [_entry]'s GOT slot, and the
            .bss tail.  The gaps (`.data`'s leading and trailing padding, the
@@ -1586,7 +1601,7 @@ Section BootAlloc.
       with "[Hgotled]" as ">#Hpr0".
     { iDestruct (boot_led_word g entry_got Hmem ltac:(zlit) ltac:(zlit) with "Hgotled") as "Hle".
       rewrite /TsoCtx.pristine_win. iApply big_sepL_bupd.
-      iApply (big_sepL_mono with "Hle"). iIntros (j _ _) "He".
+      iApply (big_sepL_mono with "Hle"). iIntros (j y _) "He".
       rewrite /TsoCtx.ledger_elem0 /TsoCtx.pristine_byte /pristine_elem.
       by iMod (ghost_map_elem_persist with "He") as "$". }
     iAssert (TsoCtx.pristine_win mb_ld_ea 8) as "#Hpr".
@@ -1636,7 +1651,7 @@ Section BootAlloc.
     (* ---- the .bss, in address order ---- *)
     iDestruct (boot_bss_carve g Hbf
                  with "Hcl Hfdslots Hirslots Hirfile Hfdauth Hbsproc Hbss") as
-      "(Hstartcell & Hlocks & Hglobals & Hharts & Hpages)".
+      "(#Hstcl & Hstw & Hlocks & Hglobals & Hharts & Hpages)".
     (* ---- the device fabric ---- *)
     iMod (uart_ghosts_alloc (g.(gdev).(duart))) as (γd)
       "(Hacc & Hout & Htxa & Hdla & Htx & Hsent & Hdlab)".
@@ -1731,7 +1746,18 @@ Section BootAlloc.
     (* [big_sepL_impl], not [big_sepL_mono]: the per-element goal must still see
        the intuitionistic context (the claims bundle, [gen_cert] and the image
        word are all shared), and [_mono]'s goal is a fresh entailment. *)
-    { iApply (big_sepL_impl with "Hpre").
+    (* Ψ is given EXPLICITLY: with [boot_hart_res] context-free the unifier
+       no longer infers it from the goal (measured: the bare [iApply] fails,
+       the explicit one unifies). *)
+    { iApply (big_sepL_impl _
+                (λ _ c, (|={⊤}=>
+                   ((∃ iv : mword 32,
+                       boot_hart_res (CID := c) (g.(gregs) c) iv DfracDiscarded) ∗
+                    reg_pointsto_at c sig_seip (DfracOwn 1)
+                      (register_lookup sig_seip (g.(gregs) c)) ∗
+                    reg_pointsto_at c sig_meip (DfracOwn 1)
+                      (register_lookup sig_meip (g.(gregs) c))))%I)
+                with "Hpre").
       iIntros "!>" (k c _) "(Hr & Hs & Hg & Hsp & Hspe & Hlk & Hrv & Hb)".
       iApply (boot_hart_pre c g ⊤ Hbf with
                 "Hcl Hcert Hword Hpr Hr Hs Hg Hsp Hspe Hlk Hrv Hb"). }
@@ -1743,7 +1769,6 @@ Section BootAlloc.
       as "#Hwinv".
     { iApply RiscvAdequacy.big_sepL_enum_to_set. iExact "Hpins". }
     (* ---- the handover channel, at the settled payload ---- *)
-    iDestruct "Hstartcell" as "[#Hstcl Hstw]".
     iMod ctx_parked_alloc as (ξd) "Hpkd".
     assert (Hsimg : started_img).
     { pose proof Hbf as Hbf2.
@@ -1791,6 +1816,7 @@ Section BootAlloc.
     iSplitL "Hcmauth"; [iExact "Hcmauth" |].
     iSplitR; [iExact "Hdone" |].
     iSplitL "Hkpt"; [iExact "Hkpt" |].
+    iSplitL "Hkptb"; [iExact "Hkptb" |].
     iSplitL "Hkauth"; [iExact "Hkauth" |].
     iSplitL "Hmir".
     { rewrite /log_mirror_born.

@@ -437,7 +437,7 @@ Section SystemBoot.
       as (Hfd Hir Hpav Hbs HF γd γv Rspent γi ξd)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
-        Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkmap & Hmir & Hpages & Hirauth &
+        Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkptb & Hkmap & Hmir & Hpages & Hirauth &
         Hirslot & Hfs)".
     (* THE FILE SYSTEM'S BOOT KITS ARE NO LONGER DROPPED (stage (e)).
        [Hfs] is the ten configuration ties plus [fs_kit_icache] plus
@@ -474,12 +474,12 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hthr0 Hprim Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hcmauth Hkpt Hkmap
+    iSplitL "Hthr0 Hprim Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hthr0 Hprim Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hcmauth Hkpt Hkmap
+      iSplitL "Hthr0 Hprim Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hcmauth Hkpt Hkptb Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         (* AT [HF] EXPLICITLY, not by resolution.  [SpecMain.MAIN]'s
@@ -550,6 +550,7 @@ Section SystemBoot.
         iSpecialize ("HP" with "Hcmauth").
         iSpecialize ("HP" with "Hdone").
         iSpecialize ("HP" with "Hkpt").
+        iSpecialize ("HP" with "Hkptb").
         iSpecialize ("HP" with "Hkmap").
         iSpecialize ("HP" with "Hpages").
         iApply "HP". }

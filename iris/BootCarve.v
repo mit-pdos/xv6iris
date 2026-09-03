@@ -1251,6 +1251,45 @@ Section BootCarve.
     by iMod (ghost_map_elem_persist with "He") as "$".
   Qed.
 
+  (* THE PRISTINE SIDE OF [boot_ran_own] (r25 lane (i)): the range's ledger
+     elements, persisted, become [pristine_va] through the same static claim
+     -- the second premise [kernel_data_intro] takes beside the persisted
+     bytes.  Two steps so the persist is a bupd and the claim step is pure. *)
+  Lemma boot_led_ran_persist (g : gstate) (lo hi : Z) :
+    boot_led_ran g lo hi
+    ==∗ ([∗ map] a ↦ _ ∈ ran_bytes g lo hi, pristine_elem a).
+  Proof.
+    iIntros "H". rewrite /boot_led_ran. iApply big_sepM_bupd.
+    iApply (big_sepM_mono with "H"). iIntros (a b _) "He".
+    rewrite /TsoCtx.ledger_elem0 /pristine_elem.
+    by iMod (ghost_map_elem_persist with "He") as "$".
+  Qed.
+
+  Lemma boot_ran_pristine (g : gstate) (lo hi : Z) :
+    (forall a b, g.(gmem) !! a = Some b -> addr_is_ram a) ->
+    text_end <= lo ->
+    kmap_static_claims -∗
+    ([∗ map] a ↦ _ ∈ ran_bytes g lo hi, pristine_elem a)
+    -∗ ([∗ map] a ↦ _ ∈ ran_bytes g lo hi, TsoCtx.pristine_va a).
+  Proof.
+    iIntros (Hram Hlo) "#Hkbundle Hd".
+    iApply (big_sepM_impl with "Hd").
+    iIntros "!>" (a b Ha) "He".
+    rewrite /ran_bytes in Ha.
+    apply map_lookup_filter_Some in Ha. destruct Ha as [Ha Hge]. cbn in Hge.
+    pose proof (Hram a b Ha) as Hr.
+    assert (Hkd : addr_is_kdata a)
+      by (unfold addr_is_kdata; unfold addr_is_ram in Hr; lia).
+    assert (Hcanon : uint a < 274877906944)
+      by (unfold addr_is_kdata, ram_base, ram_size, text_end in Hkd; lia).
+    iDestruct (kmap_static_claims_at (svpn_of a) KP_rw (kdata_svpn_class a Hkd)
+                 with "Hkbundle") as "#Hk0".
+    rewrite /TsoCtx.pristine_va. iExists (kpt_leaf_ppn (svpn_of a)).
+    rewrite (pa_of_id a Hcanon). iFrame "Hk0".
+    rewrite /TsoCtx.pristine_byte. iExact "He".
+  Qed.
+
+
   (* THE RUN, [boot_ran_bytes]' induction over the range's LENGTH. *)
   Lemma boot_led_bytes (g : gstate) (lo : Z) (n : nat) :
     (forall x : Z, ram_lo <= x < ram_hi ->

@@ -1658,9 +1658,14 @@ SpecFilereadAU.v
 # [Q := Q_pin pb], where the one paying site is kxc_cd's [Q (kxq_entry ef)];
 # LinkKexecPin closes the functor over LinkNameiEra beside LinkNamei.
 ProofKexecPinTrace.v
-ProofKexecPinA.v
-ProofKexecPin.v
-LinkKexecPin.v
+# [tso-cutover r25: parked, owner 2026-09-03 -- kxc_phaseAp's statement uses
+#  loyf/tlyf without binding them (r21's kexec-chain sweep); the three files
+#  are behind SystemAdequacy and were never compiled on the cutover.  Un-park
+#  with the AU lane (plan item 10): bind (loyf tlyf : nat) in the ∀ and thread
+#  them at ProofKexecPin's one application.]
+# ProofKexecPinA.v
+# ProofKexecPin.v
+# LinkKexecPin.v
 
 # THE CONSOLE TRACE CONNECTION (fs-syscall-specs; claude-notes/projects/
 # uart-trace.md, the SAFETY direction).
