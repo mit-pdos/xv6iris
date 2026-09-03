@@ -16,9 +16,8 @@
    switch to `Require Import FileInvDefs` wherever only the light half is
    needed.  See claude-notes/optimization.md.
 
-   The off LEDGER's closer-side reclaim ([ioff_reclaim]) lives here too --
-   it is the one ledger step that reads the liveness AUTHORITY.  See
-   claude-notes/projects/off-ledger.md and FileOff.v. *)
+   The off BOX's last-close step ([file_off_reclaim], over
+   [OffBox.off_last_close]) lives here too.  See design/ctx-box.md. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import auth gmap frac numbers.
@@ -315,47 +314,6 @@ Section FileInv.
     - apply pos_included in Hlt. lia.
   Qed.
 
-  (* OBLIGATION (b): THE RECLAIM, and it is the LAST CLOSER'S move.
-     fileclose's last-reference arm is the only party that ever again holds
-     fraction one of the slot INSIDE ftable.lock, so it is where the
-     FD_INODE file's ledger entry is retired and the [f->off] cell comes
-     back for [fslot]'s free arm and the next filealloc.  The whole
-     fragment proves membership and licenses the delete; what resolves the
-     ledger's disjunction is the COUNT -- at the last reference the
-     authority records ONE unit and the closer holds it, so the parked one
-     cannot exist ([flive_excl_last]).  fileclose never READS [off] (gcc
-     emits no such load), so this is internal to the lock and
-     [SpecFileclose] does not move.  Holding no inode lock is the POINT:
-     this is the one ledger step with no marker, which is why it needs the
-     authority and lives here rather than in FileOff.v. *)
-  Lemma ioff_reclaim (E : coPset) (γ : gname) (i k : nat)
-      (M : gmap nat (Qp * positive)) (qt : Qp) :
-    ↑(offN .@ i) ⊆ E ->
-    M !! k = Some (qt, 1%positive) ->
-    ioff_escrow i -∗ ioff_frag i k 1 -∗ ftable_auth γ M -∗ flive_tok k
-    ={E}=∗
-    ftable_auth γ M ∗ flive_tok k ∗ ∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝.
-  Proof.
-    iIntros (HE HM) "#Hinv Hfrag [Ha Hl] Hlv".
-    assert (Hml : Mcount M !! k = Some 1%positive)
-      by (rewrite Mcount_lookup HM; reflexivity).
-    rewrite /ioff_escrow.
-    iMod (inv_acc with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as ">(%S & Hsa & Hslots)".
-    iDestruct (ghost_map_lookup with "Hsa Hfrag") as %HSk.
-    assert (Hdom : k ∈ dom S) by (apply elem_of_dom; by rewrite HSk).
-    iMod (ghost_map_delete with "Hsa Hfrag") as "Hsa".
-    iDestruct (big_sepS_delete _ _ k Hdom with "Hslots") as "[Hk Hrest]".
-    rewrite {1}/ioff_slot_res.
-    iDestruct "Hk" as "[Hres | [_ Hlv2]]"; last first.
-    { iExFalso. iApply (flive_excl_last (Mcount M) k Hml with "Hl Hlv Hlv2"). }
-    iDestruct "Hres" as (v) "[Hc %Hwf]".
-    iMod ("Hclose" with "[Hsa Hrest]") as "_".
-    { iApply bi.later_intro. iExists (delete k S). iFrame "Hsa".
-      rewrite dom_delete_L. iExact "Hrest". }
-    iModIntro. rewrite /ftable_auth. iFrame "Ha Hl Hlv".
-    iExists v. iFrame. done.
-  Qed.
 
   (* THE CLOSER'S ONE CALL: the off conjunct of a WHOLE payload becomes the
      dead cell, whatever the type -- the FD_INODE arm is the ledger reclaim,

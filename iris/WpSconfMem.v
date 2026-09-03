@@ -204,16 +204,6 @@ Section WpSconfMem.
 
   (* main's claim readers off a ctx cell (main-tso-readiness A12): the
      address claim a leaf wants, from the window the caller holds *)
-  Lemma ctx_word4_claim `{KTR2 : !CurKtier} (a : Arch.pa)
-      (dq : dfrac) (w : mword 32) :
-    (0 < 4)%Z ->
-    ctx_word4_pointsto (KTR := KTR2) cur_ctx a dq w -∗
-    wordw_claim (KTR := KTR2) 4 a.
-  Proof.
-    intros _.
-    rewrite -(wordw4_ctx (KTR2 := KTR2)).
-    iApply (wordw_claim_of (KTR := KTR2) 4 a dq w ltac:(lia)).
-  Qed.
 
   Lemma ctx_word2_claim `{KTR2 : !CurKtier} (a : Arch.pa)
       (dq : dfrac) (w : mword 16) :

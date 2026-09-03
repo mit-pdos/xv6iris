@@ -1,5 +1,7 @@
 # tso-cutover ENDGAME — PLAN OF RECORD (consolidated 2026-09-02 at 10de366d1)
 
+> ARCHIVED 2026-09-03 (owner): the cutover LANDED ON MAIN -- `tso-cutover` merged at `87e0484e5`, clean build 1429 files, `audit-only` at the thirteen-axiom baseline, no `Admitted`.  The box law now lives in `design/ctx-box.md`; this file is the plan of record as it ended (rounds, rulings, open items).  Parked at the close: the AU proofs (item 10), the era walk, `ProofKexecPin*` (item 40).
+
 This file is the current law, the current state and the current order for
 landing the TSO proofs on `main`.  It was consolidated from the original
 plan and 27 rounds of review, which are kept verbatim in

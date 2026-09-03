@@ -820,7 +820,6 @@ Require Import UserPtTree.
 Require Import SchedCtx.
 Require Import WpLock.
 Require Import SpecPanic.
-Require Import FileOff.
 (* [diskGhostG], [uartGhostG], [fsLogG] and [iregG] USED TO live unexported in
    [DiskPtsto], [WpUart], [FsBlocks] and [InodeRegion], and this block
    re-imported those four so the functor's [Context] would not invent four

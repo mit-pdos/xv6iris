@@ -4259,16 +4259,6 @@ Section IcacheTable.
     | Some (q, n) => (islot_rest k q ∗ iref_slots (Pos.to_nat n))%I
     end.
 
-  Definition itable_res : iProp Σ :=
-    (∃ M : gmap nat (Qp * positive),
-       itable_half M ∗ ⌜icM_wf M⌝ ∗ iref_slots_auth ∗
-       [∗ list] k ∈ seq 0 NINODE, islot M k)%I.
-
-  Definition is_itable (γl : gname) : iProp Σ :=
-    is_lock γl itable_lock "itable"%string <{ itable_res }>.
-
-  Global Instance is_itable_persistent γl : Persistent (is_itable γl).
-  Proof. apply _. Qed.
 
   (* The lock resource's slot accessor, in the form a WRITER needs: the map
      may come back CHANGED, provided it changed only at [k].  Same shape and

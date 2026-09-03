@@ -19,12 +19,11 @@
    * the other fields are immutable while [ref > 0] and are read with no lock
      at all, so a reference has to carry a real points-to FRACTION of them.
    * [off] is mutable under ip->lock, and its ownership follows that
-     discipline: an FD_INODE file's cell is DEPOSITED in its inode's OFF
-     LEDGER ([ioff_escrow], a per-itable-slot invariant whose ghost map
-     tracks which file slots refer to that inode) and the reference carries
-     a fragment of that map; any other file owns the cell directly at its
-     own fraction ([foff_dead]).  See the "off ledger" note above
-     [ioff_escrow] below.
+     discipline: an FD_INODE file's cell lives in the slot's OFF BOX
+     (OffBox.v, a CtxBox instance whose L2 rows ride the inode's sleeplock
+     payload) and the reference carries a share of that box ([off_fd]);
+     any other file holds the word at the visibility-free tier
+     ([off_free]).  design/ctx-box.md has the law.
 
    The two halves are tied together by one authoritative ghost map, keyed by
    slot index: [M !! k = Some (q,n)] says slot k has n outstanding references
@@ -245,9 +244,8 @@ Definition frefUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    not a content field -- it is mutable under ip->lock by a holder of an
    arbitrarily small fraction -- but its home is no longer a per-slot
    cancellable invariant with a per-publication name: an FD_INODE file's
-   cell sits in its INODE's off ledger ([ioff_escrow] below, a permanent
-   per-itable-slot invariant), and the reference carries a fractional
-   fragment of that ledger's ghost map instead of a cinv token.  The
+   cell sits in the slot's off BOX ([off_fd] below), and the reference
+   carries a fractional share of that box instead of a cinv token.  The
    fragment needs no recorded name -- the ledger's gnames are the ambient
    [fsc_foff] family, keyed by the itable slot the payload already pins
    through [inode_shr_held_gen]. *)
@@ -288,8 +286,8 @@ Definition fpayUR : ucmra :=
 (*  The off-borrow LIVENESS COUNTER (third component)                   *)
 (* ------------------------------------------------------------------ *)
 
-(* An FD_INODE file's [off] cell lives in its inode's off ledger
-   ([ioff_escrow] below) whose checked-out disjunct parks a token.  The
+(* An FD_INODE file's [off] cell lives in the slot's off box ([off_fd]
+   below), whose checkout is the box's (e) under ip->lock.  The
    EXCLUSIVE holder of a slot ([q = 1]) has to be able to refute a STALE
    checked-out state -- fileclose reclaims the cell holding no inode lock at
    all, so it has nothing to contradict the borrower's marker with.  What
@@ -759,10 +757,6 @@ Proof. lia. Qed.
 (*  [off]: the namespace and the value bound                           *)
 (* ------------------------------------------------------------------ *)
 
-(* one namespace, one ledger invariant per ITABLE slot ([ioff_escrow]
-   below; [offN .@ i] so two inodes' ledgers can be open at one ghost step,
-   the [ic_escrow] per-slot-namespace argument) *)
-Definition offN : namespace := nroot .@ "fileoff".
 
 (* THE VALUE BOUND.  An offset never exceeds MAXFILE*BSIZE, and this is not
    decoration: readi's contract demands [off + n < 2^31] and NOTHING IN MEMORY
@@ -825,17 +819,15 @@ Section FileInv.
 
   (* ---- the content cells, at an arbitrary fraction ----
 
-     SIX fields: [off] is gone (an FD_INODE file's cell is in the off
-     ledger, any other rides [file_core] as [foff_dead]), and [ref] was
-     never here.
+     SIX fields: [off] is gone (an FD_INODE file's cell is in the off box,
+     any other rides [file_core] as [off_free]), and [ref] was never here.
 
      [a_fip] IS BACK AT THE FULL NOMINAL FRACTION (off-ledger ruling).  The
      old per-slot borrow invariant held half of this cell permanently --
      that was the only way a per-FILE invariant could know WHICH INODE
-     governs its offset.  The ledger is per-INODE, so it names [ientry i]
-     outright and the asymmetry retires: the tie between a file and its
-     ledger is the [ioff_frag] in [file_core]'s FD_INODE arm, pinned to
-     [fc_ip C] by the same [∃ i, fc_ip C = ientry i] the payload's
+     governs its offset.  The off box's row set is per-INODE, so the tie
+     between a file and its inode is the [∃ i, fc_ip C = ientry i] in
+     [off_fd]'s FD_INODE arm, the same one the payload's
      [inode_shr_held_gen] already carries.
 
      A [Qp] rather than a [dfrac]: every use is [DfracOwn] and the whole
@@ -1331,171 +1323,6 @@ Section FileInv.
   (* [off_resident] MOVED to FileOffCell.v (r25 shapes): the box's header
      cell, shared with OffBox.v which now builds before this file. *)
 
-  (* the borrower's marker: the inode's [valid] flag, which ilock hands out
-     at 1 and which no fs.c callee below ilock touches.  It is EXCLUSIVE, it
-     is keyed by the INODE'S ADDRESS (unlike a ghost-named token, which a
-     second borrower has no way to match) and it is CLOSED -- the value is
-     pinned at 1 -- so what a borrower takes back on return is provably what
-     it parked.  See FileOff.v's header for the full argument. *)
-  Definition off_mark (ip : mword 64) : iProp Σ :=
-    (i_valid ip ↦₄ (mword_of_int 1 : mword 32))%I.
-
-  (* [tso FileInvDefs.v:1071]: the marker's accessor.  On main the marker is
-     the ambient cell itself, so this is definitional. *)
-  Lemma off_mark_acc (ip : mword 64) :
-    off_mark ip ⊣⊢ i_valid ip ↦₄ (mword_of_int 1 : mword 32).
-  Proof. reflexivity. Qed.
-
-  (* ================================================================== *)
-  (*  THE OFF LEDGER (claude-notes/projects/off-ledger.md)               *)
-  (* ================================================================== *)
-
-  (* [off] is protected by [ip->lock], and ownership now follows that
-     discipline: each ITABLE slot [i] carries a permanent invariant -- its
-     off LEDGER -- whose ghost map records WHICH file slots hold an
-     FD_INODE reference on that inode, and which owns, per such file slot
-     [k], either the resident [f->off] cell (with [off_wf], the bound
-     fileread needs) or the borrower's parked credentials.
-
-     The CHECKOUT CREDENTIAL is [off_mark (ientry i)] -- the inode's
-     [valid] cell, which only the sleeplock holder has (ilock hands it out
-     at 1 and nothing below ilock touches it).  It is exclusive, keyed by
-     the inode's ADDRESS, and closed, so a borrower provably takes back
-     what it parked; and because the ledger is per-INODE it can name
-     [ientry i] outright -- no [a_fip] half, no ghost shadow.  The parked
-     [flive_tok] is the LAST CLOSER's handle: fileclose reclaims the cell
-     holding NO inode lock, and what refutes a stale checked-out arm there
-     is the liveness COUNT read against the authority inside ftable.lock
-     ([FileInv.ioff_reclaim]).
-
-     A file that is NOT an FD_INODE file (pipe, device, free) owns its cell
-     directly at its own fraction ([foff_dead] -- the cell is dead memory
-     there, no bound needed; sys_open re-establishes [off_wf] by writing 0
-     when it publishes).
-
-     The ghost maps' gnames are the ambient [fsc_foff] family and the
-     invariant is allocated once per era by the boot fupd
-     ([ioff_escrows_alloc_at] below), so [ioff_escrows] is a FIXED
-     PERSISTENT FAMILY that rides [FsReady.fs_ready] -- exactly what the
-     old per-publication cancellable invariant could never be. *)
-
-  Definition foff_dead (k : nat) (q : Qp) : iProp Σ :=
-    (∃ v : mword 32, a_foff k ↦₄{DfracOwn q} v)%I.
-
-  Lemma foff_dead_split (k : nat) (q1 q2 : Qp) :
-    foff_dead k (q1 + q2) ⊣⊢ foff_dead k q1 ∗ foff_dead k q2.
-  Proof.
-    rewrite /foff_dead. iSplit.
-    - iIntros "(%v & Hc)".
-      iEval (rewrite (ctx_word4_pointsto_frac_split _ (a_foff k))) in "Hc".
-      iDestruct "Hc" as "[H1 H2]".
-      iSplitL "H1"; iExists v; iFrame.
-    - iIntros "[(%v1 & H1) (%v2 & H2)]".
-      iDestruct (ctx_word4_pointsto_agree with "H1 H2") as %<-.
-      iExists v1.
-      iEval (rewrite (ctx_word4_pointsto_frac_split _ (a_foff k))).
-      iFrame.
-  Qed.
-
-  Global Instance foff_dead_timeless k q : Timeless (foff_dead k q).
-  Proof.
-    rewrite /foff_dead.
-    apply bi.exist_timeless; intro v. apply _.
-  Qed.
-
-  (* one file slot's membership fragment in inode slot [i]'s ledger, at the
-     reference's own fraction.  [unit] values: membership IS the content. *)
-  Definition ioff_frag (i k : nat) (q : Qp) : iProp Σ :=
-    (k ↪[fsc_foff i]{# q} ())%I.
-
-  Lemma ioff_frag_split (i k : nat) (q1 q2 : Qp) :
-    ioff_frag i k (q1 + q2) ⊣⊢ ioff_frag i k q1 ∗ ioff_frag i k q2.
-  Proof.
-    rewrite /ioff_frag. iSplit.
-    - iIntros "H". iDestruct "H" as "[H1 H2]". iFrame.
-    - iIntros "[H1 H2]".
-      iDestruct (ghost_map_elem_combine with "H1 H2") as "[H _]".
-      rewrite dfrac_op_own. iExact "H".
-  Qed.
-
-  Global Instance ioff_frag_timeless i k q : Timeless (ioff_frag i k q).
-  Proof. rewrite /ioff_frag. apply _. Qed.
-
-  (* THE TIE A REFERENCE CARRIES (file_core's FD_INODE arm): the fragment,
-     pinned to the file's own [f->ip] value.  The [∃ i] joins across shares
-     by [ientry_inj]. *)
-  Definition ioff_ref (v : mword 64) (k : nat) (q : Qp) : iProp Σ :=
-    (∃ i : nat, ⌜v = ientry i⌝ ∗ ⌜(i < NINODE)%nat⌝ ∗ ioff_frag i k q)%I.
-
-  Lemma ioff_ref_split (v : mword 64) (k : nat) (q1 q2 : Qp) :
-    ioff_ref v k (q1 + q2) ⊣⊢ ioff_ref v k q1 ∗ ioff_ref v k q2.
-  Proof.
-    rewrite /ioff_ref. iSplit.
-    - iIntros "(%i & %Hv & %Hi & H)". rewrite ioff_frag_split.
-      iDestruct "H" as "[H1 H2]".
-      iSplitL "H1"; iExists i; by iFrame.
-    - iIntros "[(%i1 & %Hv1 & %Hi1 & H1) (%i2 & %Hv2 & %Hi2 & H2)]".
-      assert (i2 = i1) as ->.
-      { apply (ientry_inj i2 i1); [lia | lia | congruence]. }
-      iExists i1. rewrite ioff_frag_split. by iFrame.
-  Qed.
-
-  Global Instance ioff_ref_timeless v k q : Timeless (ioff_ref v k q).
-  Proof.
-    rewrite /ioff_ref.
-    apply bi.exist_timeless; intro i.
-    apply bi.sep_timeless; [apply _|].
-    apply bi.sep_timeless; [apply _| apply _].
-  Qed.
-
-  (* what the ledger owns for one member file slot [k] of inode slot [i] *)
-  Definition ioff_slot_res (i k : nat) : iProp Σ :=
-    (off_resident k ∨ (off_mark (ientry i) ∗ flive_tok k))%I.
-
-  Global Instance ioff_slot_res_timeless i k : Timeless (ioff_slot_res i k).
-  Proof.
-    rewrite /ioff_slot_res /off_resident /off_mark.
-    apply bi.or_timeless.
-    - apply bi.exist_timeless; intro v.
-      apply bi.sep_timeless; [apply _ | apply _].
-    - apply bi.sep_timeless; [apply _ | apply _].
-  Qed.
-
-  Definition ioff_body (i : nat) : iProp Σ :=
-    (∃ S : gmap nat unit,
-       ghost_map_auth (fsc_foff i) 1 S ∗
-       [∗ set] k ∈ dom S, ioff_slot_res i k)%I.
-
-  Global Instance ioff_body_timeless i : Timeless (ioff_body i).
-  Proof.
-    rewrite /ioff_body.
-    apply bi.exist_timeless; intro S.
-    apply bi.sep_timeless; [apply _|].
-    apply big_sepS_timeless. intros k _. apply _.
-  Qed.
-
-  Definition ioff_escrow (i : nat) : iProp Σ := inv (offN .@ i) (ioff_body i).
-
-  Global Instance ioff_escrow_persistent i : Persistent (ioff_escrow i).
-  Proof. apply _. Qed.
-
-  (* EVERY inode slot's ledger, as one persistent bundle -- what
-     [FsReady.fs_ready] carries and every environment reads. *)
-  Definition ioff_escrows : iProp Σ :=
-    ([∗ list] i ∈ seq 0 NINODE, ioff_escrow i)%I.
-
-  Global Instance ioff_escrows_persistent : Persistent ioff_escrows.
-  Proof. apply _. Qed.
-
-  Lemma ioff_escrows_acc (i : nat) :
-    (i < NINODE)%nat -> ioff_escrows -∗ ioff_escrow i.
-  Proof.
-    iIntros (Hi) "H". rewrite /ioff_escrows.
-    assert (Hl : seq 0 NINODE !! i = Some i) by (rewrite lookup_seq; lia).
-    iDestruct (big_sepL_lookup _ _ i i Hl with "H") as "$".
-  Qed.
-
-
 
   (* [f->writable] as the BOOL that indexes the pipe's two ends -- the same
      bool pipeclose takes as its second argument, and the truth value of the
@@ -1510,14 +1337,12 @@ Section FileInv.
      payload -- which is the real xv6 invariant: fileclose writes FD_NONE
      before releasing, and the BSS starts zeroed.
 
-     THE OFF CONJUNCT IS TYPE-INDEXED (off-ledger ruling): the FD_INODE arm
-     carries the ledger fragment [ioff_ref] -- the cell itself is deposited
-     in the inode's ledger, where [ip->lock] governs it -- and every other
-     arm carries the dead cell itself, fractionally ([foff_dead]).
-     Publishing to FD_INODE is therefore the ONE payload change with a
-     ghost step ([FileOff.ioff_publish], under the inode's lock, which
-     sys_open holds at its stores); every other retype is still a pure
-     store. *)
+     THE OFF CONJUNCT IS TYPE-INDEXED (tso-cutover r25, item 24): the
+     FD_INODE arm is the fd's share of the slot's off BOX ([off_fd]); every
+     other arm holds the [f->off] word at the visibility-free tier
+     ([off_free]).  Publishing to FD_INODE is the one payload change with a
+     ghost step (the box's birth, under the inode's lock at sys_open's
+     stores); every other retype is a pure store. *)
   (* THE ENTRY'S IREF UNIT RIDES THE UNTYPED AND PIPE ARMS.  [IREFSLOTS]
      provisions one unit per ftable entry ([IrefSlots.v]'s header: "each
      ftable entry holding an FD_INODE / FD_DEVICE file"), and this is where
@@ -2041,43 +1866,20 @@ Section FilePayloadMorph.
 End FilePayloadMorph.
 
 (* ====================================================================
-   THE LEDGER'S BOOT FACE (fs-cfg-boot.md's [_at] constructor discipline)
-
-   The era fupd that allocates the ledgers runs at [fileGpreS], BEFORE the
-   [fileG] instance exists, so it cannot state [ioff_escrows].  These are
-   the same definitions with the two gnames explicit; once the class is
-   assembled the two spellings are CONVERTIBLE ([ioff_escrows_at_eq]). *)
-Section FileOffLedgerAt.
+   THE FILE-LIVENESS AUTHORITY'S BOOT FACE (fs-cfg-boot.md's [_at]
+   constructor discipline).  The era fupd that mints it runs at
+   [fileGpreS], BEFORE the [fileG] instance exists, so it cannot say
+   [flive_own]; this is the same definition with the gname explicit, and
+   the two spellings are CONVERTIBLE once the class is assembled
+   ([flive_auth_at_eq]).  (Until 2026-09-03 this section also carried the
+   off LEDGER's boot face; the ledger is gone -- the off BOX, OffBox.v.) *)
+Section FileLiveAt.
   Context `{!riscvGS Σ}.
   Context `{FLV : flivG Σ}.
-  Context `{GMF : ghost_mapG Σ nat unit}.
-  Context `{XI : TsoCtx.CurCtx}.
-
-  Definition flive_tok_at (γfol : gname) (k : nat) : iProp Σ :=
-    own γfol (◯ {[ k := 1%positive ]} : fliveUR).
-
-  Definition ioff_slot_res_at (γfol : gname) (i k : nat) : iProp Σ :=
-    ((∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝)
-     ∨ (i_valid (ientry i) ↦₄ (mword_of_int 1 : mword 32) ∗
-        flive_tok_at γfol k))%I.
-
-  Definition ioff_body_at (γfol : gname) (γm : nat -> gname) (i : nat) : iProp Σ :=
-    (∃ S : gmap nat unit,
-       ghost_map_auth (γm i) 1 S ∗
-       [∗ set] k ∈ dom S, ioff_slot_res_at γfol i k)%I.
-
-  Definition ioff_escrow_at (γfol : gname) (γm : nat -> gname) (i : nat) : iProp Σ :=
-    inv (offN .@ i) (ioff_body_at γfol γm i).
-
-  Definition ioff_escrows_at (γfol : gname) (γm : nat -> gname) : iProp Σ :=
-    ([∗ list] i ∈ seq 0 NINODE, ioff_escrow_at γfol γm i)%I.
-  (* sealed for [ioff_escrows]'s reason (the classy family unfolds to this
-     one, so an unsealed boot face would reopen the same seam) *)
 
   (* the off-borrow liveness AUTHORITY at the boot value -- what the era
      fupd mints beside the [fsc_fol] name it records, and what
-     [FileInv.ftable_res_boot] takes as its [flive_own (● ∅)] premise (the
-     two spellings are convertible once [fileG] is assembled). *)
+     [FileInv.ftable_res_boot] takes as its [flive_own (● ∅)] premise. *)
   Definition flive_auth_at (γfol : gname) : iProp Σ :=
     own γfol (● (∅ : gmap nat positive) : fliveUR).
 
@@ -2088,71 +1890,16 @@ Section FileOffLedgerAt.
     { apply auth_auth_valid. intros i. rewrite lookup_empty. done. }
     iModIntro. iExists γfol. iExact "H".
   Qed.
+End FileLiveAt.
 
-  (* the gname family, allocated as [IcacheRef.isl_fun_alloc] allocates the
-     sleeplock family: one fresh EMPTY map authority per slot. *)
-  Lemma foff_fun_alloc (n j : nat) :
-    ⊢@{iPropI Σ} |==> ∃ f : nat -> gname,
-      [∗ list] i ∈ seq j n, ghost_map_auth (f i) 1 (∅ : gmap nat unit).
-  Proof.
-    iInduction n as [|n IH] forall (j).
-    { iModIntro. iExists (fun _ => inhabitant). cbn [seq]. done. }
-    iMod (ghost_map_alloc_empty (K:=nat) (V:=unit)) as (γ) "Hg".
-    iMod ("IH" $! (S j)) as (f) "Hf".
-    iModIntro. iExists (fun z => if decide (z = j) then γ else f z).
-    assert (Hcons : seq j (S n) = j :: seq (S j) n) by reflexivity.
-    rewrite Hcons big_sepL_cons. iSplitL "Hg".
-    { case_decide as Hd; [iExact "Hg" | congruence]. }
-    iApply (big_sepL_mono with "Hf"). intros i k Hk.
-    apply lookup_seq in Hk as [-> _].
-    case_decide as Hd; [exfalso; lia | done].
-  Qed.
-
-  (* the NINODE ledgers, minted EMPTY: at boot no file refers to any inode
-     (the image's ftable is all-FD_NONE, [fentry_raw]) *)
-  Lemma ioff_escrows_alloc_at (E : coPset) (γfol : gname) (γm : nat -> gname) :
-    ([∗ list] i ∈ seq 0 NINODE, ghost_map_auth (γm i) 1 (∅ : gmap nat unit))
-    ={E}=∗ ioff_escrows_at γfol γm.
-  Proof.
-    iIntros "H". rewrite /ioff_escrows_at.
-    iApply big_sepL_fupd. iApply (big_sepL_mono with "H").
-    intros idx i _. iIntros "Ha".
-    iApply (inv_alloc (offN .@ i) E with "[Ha]").
-    iApply bi.later_intro. rewrite /ioff_body_at. iExists ∅.
-    iFrame "Ha". rewrite dom_empty_L big_sepS_empty. done.
-  Qed.
-
-  Global Instance ioff_escrows_at_persistent γfol γm :
-    Persistent (ioff_escrows_at γfol γm).
-  Proof. rewrite /ioff_escrows_at. apply _. Qed.
-
-End FileOffLedgerAt.
-
-(* SEALED, AT TOP LEVEL so the setting travels (a section-local
-   [Typeclasses Opaque] names the section constant and dies at discharge --
-   FsReady.v's note).  A fifty-way big-op behind a [Definition] is exactly
-   the seam durable-notes' [iFrame]-delta rule is about: an [iFrame] asked
-   to move the family walks into the elements and fails (measured at
-   [FsReady.fs_ready_establish]).  Head-symbol matching is all any consumer
-   needs; a proof that wants the body says [rewrite /…]. *)
-Typeclasses Opaque ioff_escrows.
-Typeclasses Opaque ioff_escrows_at.
-
-Section FileOffLedgerEq.
+Section FileLiveEq.
   Context `{XI : TsoCtx.CurCtx}.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !offboxG Σ,
             !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ,
             !ghost_mapG Σ nat unit, !flivG Σ,
-            (* A12: the inode share carries the box's stamps (tso-flip M-5) *)
             !icboxG Σ, !kallocG Σ}.
-
-  (* the boot face IS the classy family, by conversion: the class-side
-     definitions unfold to the [_at] ones at the two [fscfg] fields. *)
-  Lemma ioff_escrows_at_eq :
-    ioff_escrows_at fsc_fol fsc_foff = ioff_escrows.
-  Proof. reflexivity. Qed.
 
   Lemma flive_auth_at_eq :
     flive_auth_at fsc_fol = flive_own (● (∅ : gmap nat positive)).
   Proof. reflexivity. Qed.
-End FileOffLedgerEq.
+End FileLiveEq.

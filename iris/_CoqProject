@@ -62,7 +62,6 @@ PtreeType.v
 Ktier.v
 RiscvPtsto.v
 TsoCtx.v
-TsoCtxShim.v
 TsoCtxAbsorbLb.v
 CtxMorphTac.v
 TsoCtxPark.v
@@ -529,7 +528,6 @@ OffBox.v
 FileInvDefs.v
 FileInv.v
 FileOffProtocol.v
-FileOff.v
 KallocInv.v
 ByteBuf.v
 WpHoldingInv.v

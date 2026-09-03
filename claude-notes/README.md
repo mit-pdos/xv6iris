@@ -198,41 +198,19 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   the standing constraint that (L6) must NEVER be stated) over a verification
   report against the landed tree.
 
+- **[`ctx-box.md`](design/ctx-box.md)** — THE TRANSIT BOX (`CtxBox.v`): the
+  one mechanism for a cell that crosses locks under TSO — tiers, the
+  register-selected arms, the seven hooked transitions, the accessors, the
+  free-tier exit, the tripwires and checklist lines, the three instances.
+  Read before touching `CtxBox.v`, `IcacheEscrow.v`, `OffBox.v` or `BioInv.v`.
+
 ## `projects/` — ongoing worklists & plans (one per effort)
 
-Five are open; each file's top banner says precisely what is left.
+Each file's top banner says precisely what is left.
 Audited against the tree 2026-08-28, when six moved to
 [`completed/`](completed/) — the last two of them `durable-disk.md`
 (finished) and `sp-migration.md` (archived by the owner with work still
 outstanding; see the `completed/` section below).
-
-- **[`tso-cutover-endgame.md`](projects/tso-cutover-endgame.md)** — THE PLAN
-  OF RECORD for branch `tso-cutover` (worktree `/shared/xv6iris-2-main`),
-  the vehicle that lands the real-TSO proofs on `main`: the measured
-  frontier (red roots, blocked cone, honest green), the law it works under
-  (the owner's stitch rule: tso-flip for the physical words, main for the
-  durable-disk ghost), the icache stitch in detail (per-slot IcacheInv
-  fusion, the box instance with main's ghost placed in Q / the payload arm /
-  the L1 row / ipool_inv, the R3′ site map), the remaining lanes (ProcInv
-  keystone, shim sweep, R4–R6) with rounds and gates, and the items that may
-  need an owner ruling.  Read it before touching anything on that branch.
-- **[`main-tso-readiness.md`](projects/main-tso-readiness.md)** — getting
-  `main` ready for the eventual TSO cutover, in SLICES that each leave main
-  FULLY GREEN.  The goal is "TSO-ready SC": a tree whose STATEMENTS (specs,
-  resource shapes, channels, obligation premises) are converged with the TSO
-  proof's, over sealed SC bodies, so that the cutover becomes a below-seal
-  swap.  Nothing in it introduces weak memory; every slice is SC-provable.
-  The file is the owner-authorized handoff brief from the TSO port (branches
-  `tso`/`tso-flip`) — mission, the seal principle that decides what lands and
-  what never does, the corrected shapes to land DIRECTLY rather than the
-  M-leg's refuted first drafts, and the process law distilled from that
-  port's measured mistakes — followed by AMENDMENT 1, Slice 0's inventory of
-  today's main, which corrects the brief in three places.
-  CONSOLIDATED 2026-09-02: that file is now the plan of record (law, the
-  box statements, the icache instance as landed, the site map, a rulings
-  table, open items); the original plan and the 27-round review
-  play-by-play are in
-  [`tso-cutover-endgame-log.md`](projects/tso-cutover-endgame-log.md).
 
 - **[`user-wp-slot-checkpoint.md`](projects/user-wp-slot-checkpoint.md)** — coordinator checkpoint 2026-08-28: the session's rulings, in-flight (possibly ungated) state, and how to resume.  Read FIRST if resuming user-wp-slot.
 - **[`user-wp-slot.md`](projects/user-wp-slot.md)** — the PER-PROCESS
@@ -291,6 +269,24 @@ outstanding; see the `completed/` section below).
   direction.
 
 ## `completed/` — finished projects, archived for reference
+
+**[`tso-cutover-endgame.md`](completed/tso-cutover-endgame.md)** is the
+close-out of THE TSO PORT (2026-09-03): the proofs run under the real TSO
+memory model (per-hart views, a global write log, contexts, floors, the
+transit box), landed on `main` as one merge with a clean 1429-file build,
+`make audit-only` at the thirteen-axiom baseline and no `Admitted`.  The
+law it produced is [`design/ctx-box.md`](design/ctx-box.md).  Its history:
+[`tso-cutover-endgame-log.md`](completed/tso-cutover-endgame-log.md) (the
+27 review rounds), [`main-tso-readiness.md`](completed/main-tso-readiness.md)
+(the readiness brief and amendments A12.1–A12.20),
+[`inode-pay-r4a.md`](completed/inode-pay-r4a.md) (the parked-share
+design), [`tso-escrow-endgame.md`](completed/tso-escrow-endgame.md) and
+[`tso-escrow-box-v2.md`](completed/tso-escrow-box-v2.md) (the box's design
+on the flip), [`virtio-tso-port.md`](completed/virtio-tso-port.md) (the
+virtio lane), and [`off-ledger.md`](completed/off-ledger.md) (the `f->off`
+ledger the box SUPERSEDED — its code was deleted at the archive).  Parked
+at the close, commented out in `iris/_CoqProject` with a note each: the AU
+proofs, the era walk, `ProofKexecPin*`.
 
 **[`durable-disk.md`](completed/durable-disk.md)** is the close-out:
 xv6 is correct across crashes including FS consistency

@@ -473,7 +473,7 @@ ftable-protected: it is mutable, under `ip->lock`, by a holder of an
 arbitrarily small fraction of the reference (fileread does `f->off += r`
 with whatever share its descriptor has).  Its ownership now FOLLOWS the
 inode's lock discipline (owner's ask; the full design-of-record is
-`claude-notes/projects/off-ledger.md` until its content is folded in here):
+`claude-notes/completed/off-ledger.md` (superseded by the off box, `design/ctx-box.md`) until its content is folded in here):
 
 - **Each itable slot `i` carries a permanent per-era invariant, its off
   LEDGER** (`FileInvDefs.ioff_escrow i`, family `ioff_escrows`, allocated

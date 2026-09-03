@@ -1,5 +1,7 @@
 # The virtio TSO port (DiskInv + WpUart lane) — CHECKPOINT
 
+> ARCHIVED 2026-09-03: the virtio lane's checkpoint; its work was banked into `tso-cutover` (r13) and is on main.  Branch `tso-cutover-virtio-wip` is that lane's stale working branch.
+
 **State: the LANE IS GREEN, WIP branch `tso-cutover-virtio-wip` (HEAD
 `324c2a5c7`, 2026-09-01 late).  The green baseline is `tso-cutover` at r12
 (`18601527e`); everything here is the delta on top of it.  Every virtio file

@@ -1,5 +1,7 @@
 # R4a — `inode_pay`'s parked share, the shape L8 needs (design for review)
 
+> ARCHIVED 2026-09-03: the R4a design as reviewed; what landed is `FileInvDefs.inode_pay` (D1 revised, plan items 15-16); see `design/ctx-box.md` and `design/file-table.md`.
+
 Status: DRAFT for the reviewers (2026-09-02, tso-cutover at 104621253).
 Nothing below is implemented.  The L8 edits that led here are saved as a
 patch (`scratchpad/l8-park.patch` of this session; ten files, summarised

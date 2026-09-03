@@ -1,4 +1,7 @@
 > **THIS FILE IS THE LOG, NOT THE PLAN.**  On 2026-09-02 (after §6²⁷) the
+
+> ARCHIVED 2026-09-03 with the plan of record (`tso-cutover-endgame.md`, same directory): the 27-round review play-by-play.
+
 > plan of record was consolidated into `tso-cutover-endgame.md` (this
 > directory).  Start THERE.  This file keeps the original plan (§1–§5, now
 > stale in places) and the full review play-by-play (§6′–§6²⁷) for the

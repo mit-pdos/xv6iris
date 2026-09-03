@@ -1,5 +1,7 @@
 # Main TSO-readiness: the incremental landing project
 
+> ARCHIVED 2026-09-03: the readiness brief and its amendments A12.1-A12.20; the last amendment records the landing on main.
+
 **Status**: owner-authorized handoff spec (2026-08-28).  This document is the
 complete brief for the agent executing the incremental restructuring of
 `main` toward TSO-readiness.  It was written by the coordinator of the TSO

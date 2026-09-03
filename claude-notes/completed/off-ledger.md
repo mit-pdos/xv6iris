@@ -1,5 +1,7 @@
 # off-ledger — moving `f->off` ownership under the inode's lock discipline
 
+> ARCHIVED 2026-09-03: SUPERSEDED.  The off LEDGER this note designed landed on main 2026-08-31 and was REPLACED by the off BOX (tso-cutover r25, `OffBox.v`, `design/ctx-box.md`), because a ξ-bodied invariant cannot cross contexts under TSO; `FileOff.v` and the `ioff_*`/`foff_dead` definitions were deleted at the archive.  Kept for the design argument (why `f->off` needs counted custody at all).
+
 STATUS 2026-08-31 (end of day): LANDED — the tree builds green with the
 ledger in place (`make -k` exit 0 on the GCP builder; honest full-rebuild
 gate green at 1374 files and `make audit-only` clean — see the close-out

@@ -870,8 +870,7 @@ Section SnapMint.
          [ioff_escrows_at fsc_fol fsc_foff] is RETIRED (plan item 16, the
          ledger's retirement from [fs_ready]); what stays is the off-borrow
          liveness authority, which is what [FileInv.ftable_res_boot] parks
-         inside ftable.lock.  [fsc_foff] is dead and its field goes in a
-         later cleanup. *)
+         inside ftable.lock. *)
       flive_auth_at fsc_fol ∗
       (* STATEMENT CHANGE (r25 pass 1): [icfg_alloc]'s NEW ROW, handed on.
          [IcacheEscrow.ic_slp] now carries [OffBox.off_rows off_cfg k ξ], so
@@ -1229,14 +1228,11 @@ Section SnapMint.
     iExists ICFG,
       (MkFscfg gpr gkm gkp γd γv gdl bn γfs γi cn git
                cov (sb_logstart (fss_sb S)) (sb_bmapstart (fss_sb S))
-               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol
-               (* [fsc_foff] is dead (the ledger is retired); the field is
-                  removed in a later cleanup *)
-               (fun _ : nat => 1%positive)).
+               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol).
     rewrite /fs_kit_icache /fs_kit_fsinit_ghost.
     cbn [fsc_printk fsc_kalloc fsc_kpages fsc_uart fsc_disk fsc_dlock
          fsc_bio fsc_fs fsc_ireg fsc_ic fsc_itlock fsc_cov fsc_logst
-         fsc_bmapstart fsc_size fsc_ninodes fsc_fol fsc_foff].
+         fsc_bmapstart fsc_size fsc_ninodes fsc_fol].
     rewrite Hdev Histq Hlogq.
     assert (Hset : (((((cov ∖ ({[ (1:Z) ]} : gset Z))
                          ∖ log_region_set (sb_logstart (fss_sb S)))

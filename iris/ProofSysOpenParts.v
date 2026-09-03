@@ -81,10 +81,8 @@ Require Import IcacheRef.             (* the reference algebra the publication
    sweep still calls them dead against THIS tree, they can go then. *)
 Require Import FsTree.
 Require Import IcacheEscrow.          (* [ic_loaded] -- the O_TRUNC bridge *)
-Require Import FileInvDefs.
+Require Import FileInvDefs.   (* [fcontent], [fc_wbool] -- the omode bit cluster's target *)
 Require Import OffBox.   (* [offBoxN], the off box (r25 item 24) *)
-Require Import FileOff.   (* [ioff_publish] -- the ledger deposit *)           (* [fcontent], [fc_wbool] -- the omode
-                                         bit cluster's target *)
 Require Import SpecArgstr.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
