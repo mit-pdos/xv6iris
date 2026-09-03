@@ -45,6 +45,24 @@ Definition a_fip       (k : nat) : mword 64 := foff_of (fnode k) 24.
 Definition a_foff      (k : nat) : mword 64 := foff_of (fnode k) 32.
 Definition a_fmajor    (k : nat) : mword 64 := foff_of (fnode k) 36.
 
+(* [f->off] is 4-aligned for EVERY [k]: [ftable] is 16-aligned, the entry
+   stride is 40 and the field offset 32, and the wrap-around modulus is a
+   multiple of 4.  The visibility-free cell [off_free] carries this fact, and
+   the last close has no word cell to read it from (r25 pass 1, reviewer 1). *)
+Lemma a_foff_aligned (k : nat) : is_aligned_paddr (Physaddr (a_foff k)) 4 = true.
+Proof.
+  unfold is_aligned_paddr. apply Z.eqb_eq. rewrite uint_unsigned.
+  unfold a_foff, foff_of. rewrite add_vec64_unsigned.
+  assert (H32 : bv_unsigned (sign_extend' 64 (mword_of_int 32 : mword 12)) = 32)
+    by (vm_compute; reflexivity).
+  rewrite H32. unfold fnode, acur. rewrite moi64_unsigned.
+  assert (Hm : bv_modulus 64 = 18446744073709551616) by reflexivity.
+  unfold bv_wrap. rewrite Hm.
+  unfold file_base, file_stride, KernelSyms.ftable.
+  rewrite Z.rem_mod_nonneg; [| apply Z.mod_pos_bound; lia | lia].
+  Z.div_mod_to_equations. lia.
+Qed.
+
 
 Definition off_wf (v : mword 32) : Prop :=
   bv_unsigned v <= Z.of_nat MAXFILE * Z.of_nat BSIZE.

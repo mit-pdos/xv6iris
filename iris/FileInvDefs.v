@@ -99,6 +99,7 @@ Require Import IrefSlots.  (* [iref_frac]: an ftable entry holds one unit.
      NO CYCLE -- IrefSlots reaches only ProcGeom and FdSlots, which is exactly
      why [NFILE] was moved to FdSlots (see the note below). *)
 Require Import TsoCtx.
+Require Import CtxMorphTac.   (* [ctx_morph_solve] -- the payload rows' instances (r25 pass 1) *)
 Local Open Scope Z_scope.
 
 
@@ -1572,6 +1573,17 @@ Section FileInv.
      [∗ list] j ∈ seq 0 4, TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn q))%I.
   (* item 25 note 2: the fractional split/join, so [file_pay_split]
      distributes the non-INODE arm *)
+  (* a resident word cell (the ftable's own [f->off], any fraction) is, at the
+     visibility-free tier, exactly the free cell: drop the four bytes'
+     visibility (r25 item 24, [TsoCtx.ctx_pointsto_free]). *)
+  Lemma off_free_of_word (k : nat) (q : Qp) (v : mword 32) :
+    a_foff k ↦₄{DfracOwn q} v ⊢ off_free k q.
+  Proof.
+    rewrite TsoCtx.ctx_word4_pointsto_unfold /off_free.
+    iIntros "[$ Hb]". iApply (big_sepL_mono with "Hb").
+    intros ? j _. iApply TsoCtx.ctx_pointsto_free.
+  Qed.
+
   Lemma off_free_split (k : nat) (q1 q2 : Qp) :
     off_free k (q1 + q2) ⊣⊢ off_free k q1 ∗ off_free k q2.
   Proof.
@@ -1945,38 +1957,76 @@ Section FilePayloadMorph.
 
   Global Instance file_fields_morph k q C :
     CtxMorph (λ ξ : CtxId, file_fields (XI := ξ) k q C).
-  Proof. (* SKELETON r25 *) Admitted.
+  Proof. rewrite /file_fields. ctx_morph_solve. Qed.
   Global Instance inode_ref_side_morph v s g inum :
     CtxMorph (λ ξ : CtxId, inode_ref_side (XI := ξ) v s g inum).
-  Proof. (* SKELETON r25 *) Admitted.
+  Proof. rewrite /inode_ref_side /inode_ident. ctx_morph_solve. Qed.
   Global Instance inode_pay_morph γx Q g inum v fdty wr q :
     CtxMorph (λ ξ : CtxId, inode_pay (XI := ξ) γx Q g inum v fdty wr q).
-  Proof. (* SKELETON r25: cinv/cinv_own const, side structural, share by inode_shr_held_gen_morph *) Admitted.
+  Proof.
+    rewrite /inode_pay.
+    apply ctx_morph_sep; [apply ctx_morph_const |].
+    apply ctx_morph_sep; [apply ctx_morph_const |].
+    apply ctx_morph_sep; [apply inode_ref_side_morph |].
+    apply ctx_morph_sep; [apply inode_shr_held_gen_morph | apply ctx_morph_const].
+  Qed.
   Global Instance file_core_noff_morph q pn C :
     CtxMorph (λ ξ : CtxId, file_core_noff (XI := ξ) q pn C).
-  Proof. (* SKELETON r25: the if-body; is_pipe_morph, inode_pay_morph, const *) Admitted.
+  Proof.
+    rewrite /file_core_noff.
+    apply ctx_morph_if.
+    - apply ctx_morph_sep; [apply is_pipe_morph |]. apply ctx_morph_const.
+    - apply ctx_morph_if; [apply inode_pay_morph | apply ctx_morph_const].
+  Qed.
   (* [file_core_off] takes NO context (the gate refused `(XI := ξ)`, as rule 0
      predicts): both arms -- the fd's share [off_fd] and the free word
      [off_free] -- are ghost, a persistent handle, or free-tier bytes.  It
      crosses as a constant ([ctx_morph_const]); no instance. *)
   Global Instance file_core_morph k q pn C :
     CtxMorph (λ ξ : CtxId, file_core (XI := ξ) k q pn C).
-  Proof. (* SKELETON r25 *) Admitted.
+  Proof.
+    rewrite /file_core. apply ctx_morph_sep; [apply file_core_noff_morph | apply ctx_morph_const].
+  Qed.
   Global Instance file_pay_morph γ k q C :
     CtxMorph (λ ξ : CtxId, file_pay (XI := ξ) γ k q C).
-  Proof. (* SKELETON r25 *) Admitted.
+  Proof.
+    rewrite /file_pay. apply ctx_morph_exist => pn.
+    apply ctx_morph_sep; [apply ctx_morph_const | apply file_core_morph].
+  Qed.
   Global Instance file_pay_st_morph γ k q C st :
     CtxMorph (λ ξ : CtxId, file_pay_st (XI := ξ) γ k q C st).
-  Proof. (* SKELETON r25 *) Admitted.
+  Proof.
+    rewrite /file_pay_st. apply ctx_morph_exist => pn.
+    apply ctx_morph_sep; [apply ctx_morph_const |].
+    apply ctx_morph_sep; [apply ctx_morph_const | apply file_core_morph].
+  Qed.
   Global Instance file_ref_morph γ k q st :
     CtxMorph (λ ξ : CtxId, file_ref (XI := ξ) γ k q st).
-  Proof. (* SKELETON r25 *) Admitted.
+  Proof.
+    rewrite /file_ref. apply ctx_morph_exist => C.
+    apply ctx_morph_sep; [apply ctx_morph_const |].
+    apply ctx_morph_sep; [apply file_fields_morph |].
+    apply ctx_morph_sep; [apply file_pay_st_morph | apply ctx_morph_const].
+  Qed.
   Global Instance file_rest_morph γ k q :
     CtxMorph (λ ξ : CtxId, file_rest (XI := ξ) γ k q).
-  Proof. (* SKELETON r25: the match-body *) Admitted.
+  Proof.
+    rewrite /file_rest. destruct ((1 - q)%Qp) as [q'|]; [| apply ctx_morph_const].
+    apply ctx_morph_exist => C.
+    apply ctx_morph_sep; [apply file_fields_morph | apply file_pay_morph].
+  Qed.
   Global Instance fslot_morph γ M k :
     CtxMorph (λ ξ : CtxId, fslot (XI := ξ) γ M k).
-  Proof. (* SKELETON r25: the match-body *) Admitted.
+  Proof.
+    rewrite /fslot. destruct (M !! k) as [[q n]|].
+    - apply ctx_morph_sep; [apply ctx_morph_const |].
+      apply ctx_morph_sep; [apply ctx_morph_word4 |].
+      apply ctx_morph_sep; [apply file_rest_morph | apply ctx_morph_const].
+    - apply ctx_morph_sep; [apply ctx_morph_word4 |].
+      apply ctx_morph_exist => C.
+      apply ctx_morph_sep; [apply ctx_morph_const |].
+      apply ctx_morph_sep; [apply file_fields_morph | apply file_pay_morph].
+  Qed.
 End FilePayloadMorph.
 
 (* ====================================================================

@@ -29,6 +29,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvPtsto.
 Require Import WpLock.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
+Require Import CtxMorphTac.   (* [ctx_morph_exist] & co. for [ftable_res_at_morph] (r25 pass 1) *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export FileInvDefs.
@@ -368,7 +369,15 @@ Section FileInv.
   Lemma file_off_reclaim (E : coPset) (k : nat) (pn : fpnames) (C : fcontent) :
     ↑(offBoxN .@ k) ⊆ E ->
     file_core_off k 1 pn C ={E}=∗ off_free k 1.
-  Proof. (* SKELETON r25 (item 24) *) Admitted.
+  Proof.
+    iIntros (HE) "Hoff". rewrite /file_core_off.
+    destruct (bool_decide (fc_type C = FD_INODE)); [| by iModIntro].
+    rewrite /off_fd.
+    iDestruct "Hoff" as (i T0) "(%Hip & %Hi & Hbox & _ & Hregd & Hcnt & Hst)".
+    rewrite /off_ref_stamps. iDestruct "Hst" as (m) "[%Hq Href]".
+    iMod (off_last_close k _ T0 m E HE Hq with "Hbox Hregd Hcnt Href") as "[_ Hfree]".
+    iModIntro. rewrite /off_free. iFrame "Hfree". iPureIntro. apply a_foff_aligned.
+  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  The three ghost steps, all performed under ftable.lock              *)
@@ -664,7 +673,14 @@ Definition ftable_res_at `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefs
    (reviewer 1's pitfall 6: it must be a Global Instance). *)
 Global Instance ftable_res_at_morph `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}
     (γ : gname) : CtxMorph (ftable_res_at γ).
-Proof. (* SKELETON r25: structural via fslot_morph *) Admitted.
+Proof.
+  rewrite /ftable_res_at /ftable_res.
+  apply ctx_morph_exist => M.
+  apply ctx_morph_sep; [apply ctx_morph_const |].
+  apply ctx_morph_sep; [apply ctx_morph_const |].
+  apply ctx_morph_sep; [apply ctx_morph_const |].
+  apply ctx_morph_big_sepL. intros ? k. apply fslot_morph.
+Qed.
 
 Section FileLock.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
@@ -810,6 +826,45 @@ Section FileGhostAlloc.
     fd_slots_auth -∗
     iref_slots NFILE ={E}=∗
     ∃ γ : gname, ftable_res γ.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof.
+    iIntros "Hfol Hraw Hfda Hir".
+    iMod (ftable_ghosts_alloc with "Hfol") as (γ) "[Hauth Htoks]".
+    iDestruct (iref_slots_to_any (seq 0 NFILE) with "[Hir]") as "Hunits".
+    { rewrite length_seq. iExact "Hir". }
+    iAssert ([∗ list] k ∈ seq 0 NFILE,
+               (fentry_raw k ∗ (∃ pn, fpay_tok γ k 1 pn) ∗ iref_slot))%I
+      with "[Hraw Htoks Hunits]" as "Hall".
+    { iApply (big_sepL_sep_2 with "Hraw [Htoks Hunits]").
+      iApply (big_sepL_sep_2 with "Htoks Hunits"). }
+    iAssert ([∗ list] k ∈ seq 0 NFILE, fslot γ ∅ k)%I
+      with "[Hall]" as "Hslots".
+    { iApply (big_sepL_mono with "Hall").
+      intros i k _. iIntros "(Hraw & (%pn & Htok) & Hu)".
+      rewrite /fentry_raw.
+      iDestruct "Hraw" as "(Hty & Href & (%r & Hrd) & (%w & Hwr) &
+                            (%pp & Hpp) & (%ip & Hip) & Hoff & (%mj & Hmj))".
+      rewrite /fslot lookup_empty.
+      iSplitL "Href"; [iExact "Href"|].
+      iExists (MkFContent FD_NONE r w pp ip mj).
+      iSplitR; [iPureIntro; reflexivity|].
+      iSplitL "Hty Hrd Hwr Hpp Hip Hmj".
+      { rewrite /file_fields.
+        cbn [fc_type fc_readable fc_writable fc_pipe fc_ip fc_major].
+        iFrame "Hty Hrd Hwr Hpp Hmj". iExact "Hip". }
+      rewrite /file_pay.
+      iExists pn.
+      iSplitL "Htok"; [iExact "Htok"|].
+      rewrite (file_core_none k 1 pn (MkFContent FD_NONE r w pp ip mj) eq_refl).
+      iSplitL "Hu".
+      { rewrite -iref_slot_frac. iExact "Hu". }
+      (* the raw [f->off] word joins the visibility-free tier (r25 item 24) *)
+      iApply (off_free_of_word with "Hoff"). }
+    iModIntro. iExists γ. rewrite /ftable_res.
+    iExists ∅. iFrame "Hauth Hfda".
+    iSplitR.
+    { iPureIntro. intros k Hk. rewrite lookup_empty in Hk.
+      by destruct Hk as [? ?]. }
+    iExact "Hslots".
+  Qed.
 
 End FileGhostAlloc.
