@@ -8602,7 +8602,7 @@ Section ProofCreateMain.
                    with "Hcetk1") as "Hcdlnk1".
       (* THE FIRST LINK ALLOCATED, and the whole arm's ledger rests on it *)
       assert (Hc1sz : bv_unsigned (di_size dc1) = 16).
-      { rewrite Hc1szmax Hcsz0 Ht161. lia. }
+      { rewrite Hc1szmax Hcsz0 Ht161. clear -dc1. lia. }
       assert (Hal1 : SpecBmap.bmap_alloced bmc bm1 0 = true).
       { apply cr_alloced_first; [exact Hcell0 |].
         apply (bm_covers_get bm1 (bv_unsigned (di_size dc1)) 0%nat Hcov1
@@ -8611,12 +8611,17 @@ Section ProofCreateMain.
       assert (Hal1' : SpecBmap.bmap_alloced bmc bm1 (16 * 0 / BSIZE)%nat
                       = true) by exact Hal1.
       rewrite Hal1' in Hspend1.
+      (* [Hmem1]'s premise, hoisted: spliced as [ltac:(lia)] it was reified
+         against this arm's whole context three times over
+         (claude-notes/optimization.md, "an [ltac:(lia)] in argument position
+         cannot be fixed by [clear -] -- hoist it"). *)
+      assert (Htot1pos : (0 < tot1)%nat) by (clear -Ht161; lia).
       assert (Hbmem4 : fsc_bmapstart ∈ Sb4)
-        by exact (proj2 (proj2 (Hmem1 ltac:(lia))) Hal1).
+        by exact (proj2 (proj2 (Hmem1 Htot1pos)) Hal1).
       assert (Hcmem4 : IBLOCK cinum icfg_ist ∈ Sb4)
-        by exact (proj1 (proj2 (Hmem1 ltac:(lia)))).
+        by exact (proj1 (proj2 (Hmem1 Htot1pos))).
       assert (Hdmem4 : wi_tgt_blk bm1 (16 * 0)%nat ∈ Sb4)
-        by exact (proj1 (Hmem1 ltac:(lia))).
+        by exact (proj1 (Hmem1 Htot1pos)).
       assert (Hcrb2 : bool_decide (fsc_bmapstart ∈ Sb4) = true)
         by exact (cr_crb_claim Sb4 fsc_bmapstart Hbmem4).
       (* the SECOND link's slot: record zero is LIVE at the child's inum *)
@@ -8625,7 +8630,7 @@ Section ProofCreateMain.
                 = dirent_bytes (de_of_name (cr_low16 cinum)
                                   (bname 14 cr_dot_f)) !!! jj).
       { intros jj Hjj. rewrite (Hrng1 (16 * 0 + jj)%nat).
-        rewrite decide_True; [| lia].
+        rewrite decide_True; [| clear -Hjj Ht161; lia].
         (* optimization.md: [replace ... by lia] pays the whole ambient
            context in its side proof; the identity needs [jj] alone. *)
         replace (16 * 0 + jj - 16 * 0)%nat with jj by (clear -jj; lia).
