@@ -59,7 +59,7 @@ IRIS  := iris
 DUMPER     := tools/dump_elf.py
 GENCODE    := tools/gen_code.py
 XV6_DIR    := xv6-riscv
-XV6_URL    ?= https://github.com/zeldovich/xv6-riscv
+XV6_URL    ?= https://github.com/mit-pdos/xv6-riscv
 KERNEL_ELF := $(XV6_DIR)/kernel/kernel
 USER_DIR   := $(XV6_DIR)/user
 
