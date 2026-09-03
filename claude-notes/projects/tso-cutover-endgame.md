@@ -524,6 +524,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | item 26 | ALTERNATIVE to the off box: a per-slot three-arm invariant (cell / marker / free) with two tokens and a per-(inode, file slot) mono_nat row in the inode payload; no box, no fresh names, no set, no CtxBox change; ~a wash in proof volume, simpler in coupling | QUESTION to reviewers 1 and 2 (owner, 2026-09-02); item 24 stands until answered |
 | item 27 | reviewer 2 on items 24-26: item 24 RULED R1-R5 (premise checked in the tree: `ctx_pointsto_free` at any context/fraction, the free-word store leaf, fileclose never loads +32); `box_withdraw_L1_free` = the box's free-tier form of exit; item 26 DECLINED (re-review cost, an unclosed selector at the park, coupling argument weaker after 24, 5000 mono_nats + law-5 exception); the owner concurs -- stay on the box | RULED; to reviewer 1, then the impl agent's skeletons |
 | item 28/29 | the re-cut skeletons (2673a2a7b): reviewer 1's audit -- shapes final and consistent; points (a)-(d) answered; ONE fix before pass 1 (`proto_fork_child_read` must return both halves); pass-1 items: `a_foff_aligned`, `ientry` injectivity for `off_fd_split`'s join, the unused `off_member` premise | SIGNED OFF by reviewer 1; the chain-link fix LANDED (item 30); reviewer 2's pass next |
+| item 31 | reviewer 2's audit of 619580606: shapes final and consistent as a system; ONE unprovable link -- `proto_read_checkout`'s `Kt` untied to the share's hidden stamps (fix: `off_fd_at … m`, `proto_read_llb`, the checkout and fork links take `max_stamp m ≤ Kt`); item 28's (a)-(d) answered | SIGNED OFF subject to the link fix (statements only); pass 1 starts on landing |
 | item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RULED -- reviewer 1 agrees (item 17), with `file_core_off`'s FD_INODE arm named as the FIFTH final shape and "0 Admitted in `EnvMorph`" added to r25's gate |
 | item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; the two fixes LANDED (item 20) -- reviewer 2's audit next |
 | item 21 | reviewer 2's audit of d53e4a4e5: NOT signed off -- (1) the cell claimed twice and the unit unowned at non-FD_INODE arms (unit unconditional; `file_core_off := emp`; the free arm holds `off_resident`; the L2 half rides the FD_NONE unit); (2) `file_pay_st_split` false (one-sided over a unitless `file_pay_tie`); (3) the three ghost steps, the last-close pair, `so_deposit`, `so_open_slot` not at final shape; plus `ftable_res_at`'s fold/unfold pair | AUDITED by reviewer 2; fixes pending |
@@ -1931,6 +1932,77 @@ branch and recorded in §3.2 and §8 here.
       lemma's premises exactly the previous one's conclusions, no program.
       Sign-off from me on that commit is the chain file compiling with its
       links stated, plus the two checklist lines walked per arm.
+
+31. **THE BOX'S DESIGNER'S AUDIT OF THE RE-CUT SKELETONS (619580606;
+    2026-09-02): the shapes are final and consistent; ONE chain link is
+    unprovable as stated (the read checkout's `Kt` is untied to the share's
+    stamps, and the fork link inherits it); SIGNED OFF subject to that
+    statement fix.  Item 28's four points answered.**  Read: `off_free`/
+    `_split`, `off_fd`/`_split`, `file_core_off`/`file_core`, `fslot`,
+    `ftable_res`/`_at`, `file_off_reclaim`, `file_close_last_step`,
+    `off_publish_park`/`off_read_checkout`/`off_read_park`/`off_last_close`/
+    `off_ref_stamps`, `box_withdraw_L1_free`, `so_deposit`/`so_publish`,
+    every link of `FileOffProtocol.v`, the census (62 tags = 61 Admitted +
+    CtxBox's comment tag).
+    - **AS A SYSTEM, checked.**  The birth (`box_alloc_at` on the re-minted
+      cell, (c) at the birth stamp `T`, the row at `L2Reg 0 None`) satisfies
+      the C row by its LEFT disjunct (the one fragment is at `T`); after
+      the first park the row's `lr_tp` carries the cover for every fd
+      whose fragment is older, exactly item 23's caution.  `off_fd` at
+      `q = 1` yields the register half, the count half and mass 1, which
+      is `off_last_close`'s premise set; the D row is met by the last
+      parker's stamp in the fragment map (a join keeps both keys).
+      `file_core_off` is a constant in ξ, so `fslot`, `ftable_res_at` and
+      the L8 bundles need no new instance for it.  `off_free_split` is
+      provable (`phys_free` is `dq`-indexed; value, element and `ppn` agree
+      across fractions).  `so_deposit` returns exactly `off_fd kf 1 γb C`
+      from `off_publish_park`'s pieces.  `box_withdraw_L1_free` is the
+      ruled statement verbatim; `Q1 c` at the off box is `emp`, so the
+      hook is `off_resident (XI := ξb) k ⊢ the four free bytes` by
+      `ctx_pointsto_free` -- context-free, as required.
+    - **THE FIX -- `proto_read_checkout` (and the wand inside
+      `proto_fork_child_read`) CANNOT BE PROVED.**  Its premises are
+      `ctx_floor ξ Kt` for an ARBITRARY `Kt` and `off_fd k q γb C`, whose
+      stamps fragment `m` is ∃-bound inside `off_ref_stamps`; its conclusion
+      asserts `⌜max_stamp m ≤ Kt⌝` for that hidden `m`.  Nothing ties `Kt`
+      to the share.  `OffBox.off_read_checkout` gets it right (it takes `m`
+      and `max_stamp m ≤ Kt` as premises); the chain link lost the tie when
+      it folded the share into `off_fd`.  This is R5 doing its job: the
+      real proof presents the share's llb at the ilock acquire and R1
+      returns a floor AT LEAST that high, and the chain must say so.
+      THE STATEMENT (the `inode_ref_at` precedent, IcacheRef R3):
+        Definition off_fd_at k q γb C (m : gmap (nat*nat) ufrac) := (off_fd with
+            `⌜qsum m = Qp_to_Qc q⌝ ∗ CtxBox.reference γb k m` in place of `off_ref_stamps γb k q`)
+        Lemma proto_read_llb k q γb C :
+          off_fd k q γb C -∗ ∃ m, off_fd_at k q γb C m ∗ llb loglen_name (max_stamp m).
+        Lemma proto_read_checkout … (m) (Kt) (ξ) :
+          ↑(offBoxN .@ k) ⊆ E -> fc_ip C = ientry i -> (max_stamp m ≤ Kt)%nat ->
+          own_context ξ -∗ ctx_floor ξ Kt -∗ off_fd_at k q γb C m -∗ off_rows off_cfg i ξ ={E}=∗
+          (the present conclusion, with `m` the given one)
+      and `proto_fork_child_read`'s wand takes the same `m`/`Kt` premises
+      over `off_fd_at k (q/2) γb C m` (the child runs `proto_read_llb` on its
+      half first).  `proto_read_park` is unaffected (it takes `m`
+      already).  Each link's premises are again the previous link's
+      conclusions plus the acquire's floor at the llb it was shown.
+    - **ITEM 28's POINTS.**  (a) `off_publish_park`'s shape is right; I would
+      have it discharge `ctx_floor ξ 0` itself (`ctx_floor_0`) and return
+      `off_rows` directly, so the chain's conclusion IS the next premise --
+      optional, five lines.  (b) yes, the bare bytes in OffBox, `off_free`
+      one file up; `a_foff_aligned` is a pure fact about the address, pass
+      1.  (c) yes, `is_itable2_morph` into EnvMorph in pass 1.  (d) fine.
+      Reviewer 1's three pass-1 items stand (the alignment pure, `ientry`
+      injectivity for the join -- `ientry_inj` exists, IcacheRef uses it in
+      `inode_shr_held_gen_split` -- and the unused `off_member` premise:
+      keep it, it documents where the row comes from).
+    - **OPTIONAL LINKS, not blocking:** `proto_retype_other` (FD_PIPE /
+      FD_DEVICE keep `off_free`, one line) and the fdalloc-failed close at
+      FD_NONE (= `proto_retype_none` followed by the free row), so the
+      chain names every arm of `file_core_off`.
+    - **SIGN-OFF:** with `off_fd_at`, `proto_read_llb` and the two link
+      restatements landed (statements only), I sign off on the re-cut shapes
+      and the chain, and pass 1 starts.  Reviewer 1 need not re-read: the
+      fix is the R1 tie they described in item 29 ("Kt by R1 from the
+      share's llb"), made explicit in the statement.
 
 17. **REVIEWER 1 ON ITEM 16 (2026-09-02): the three corrections and the
     four tripwires are taken; two additions.**
