@@ -277,7 +277,11 @@ Definition gfocus (g : gstate) (c : CPU) : mstate :=
 Definition gwb (g : gstate) (c : CPU) (s : mstate) (log' : list pwmsg)
     (tv' : nat) : gstate :=
   GState (<[c := sregs s]> (gregs g)) (mem s) (mdev s)
-         (ggen g) (gpow g) (gresv g) (gimg g) log' (<[c := tv']> (gtv g)).
+         (ggen g) (gpow g) (gresv g) (gimg g) log' (<[c := tv']> (gtv g))
+         (* the INSTRUCTION view (icache.md) is not modelled by this
+            harness: it stays where it was.  VIcache.v is the one that
+            threads it, for the one hart. *)
+         (gitv g).
 
 (* one whole instruction of hart [c] *)
 Definition thart (pol : rpol) (c : CPU) (g : gstate) : option gstate :=
@@ -294,4 +298,4 @@ Definition thart (pol : rpol) (c : CPU) (g : gstate) : option gstate :=
    sets get onto the log afterwards, in the order they happened. *)
 Definition glog_dma (g : gstate) (ws : list (gmap Arch.pa (bv 8))) : gstate :=
   GState (gregs g) (gmem g) (gdev g) (ggen g) (gpow g) (gresv g) (gimg g)
-         (glog g ++ ((fun w => PWMsg w disk_agent) <$> ws))%list (gtv g).
+         (glog g ++ ((fun w => PWMsg w disk_agent) <$> ws))%list (gtv g) (gitv g).

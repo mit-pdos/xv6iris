@@ -231,3 +231,23 @@ session) is that they survive by never entering the walker's map:
   describes `uv_swp_execute` at the unstamped submap -- the landed name is
   `uv_swp_exec_mem` (WpUmodeStore) over `uv_swp_walk` (WpUmodeFetch);
   `UkAbi`'s header comment still says R needs no bit.
+
+## The differential test (2026-09-03)
+
+`tools/vtest/tests/core_icache.S` (`builder=icache`): a one-instruction
+probe is executed once, its word is overwritten with an ordinary store, it
+is executed three more times, then once more after a `fence.i`.  QEMU
+answers the new instruction at once on every run; the VisionFive 2's U74
+keeps the OLD instruction on every fetch until the `fence.i`, five runs of
+five -- finding 34 in tools/vtest/README.md.  (A first capture showed one
+"coherent" run: the board runner reloads an image only when it changes, so
+repeats had warmed up on the previous run's patched probe.  `selfmod=1` in
+the directive now forces the reload.)
+The model side is `vtest-rocq/VIcache.v`: `VTso.texec` with the
+INSTRUCTION view threaded and the fetch arm transcribed from
+`RiscvLang.mnode_step` (no store forwarding to the icache agent; the view a
+schedule chooses, `IFresh` = top of the log, `IStale` = the instruction
+view; `fence.i` raises it).  `CoreIcacheSched.v` names the two schedules
+and both captures are exhibited.  `VTso`/`VConc` were also given the new
+`gitv` field of `gstate` (unmodelled there: it stays put), which the
+harness had been missing since checkpoint 1.
