@@ -1436,6 +1436,35 @@ and law 10 (hooks).
     context-free; its context-indexed cells are `∀ ξ` if exclusive and
     timestamp-zero, `∃ ξ` if unowned, and NEVER at the minter's ambient.
 
+39. **(2026-09-03) HAND-OFF: where the boot cone stands, and the one open
+    proof.**  Banked at `b0c9c86a8` (pushed).  GREEN: `BootConfig.v`,
+    `BootChain.v` (its bundle is context-free -- the four rows are `∀ ξ` and
+    `boot_entry_bridge` instantiates each once at its own hart's context),
+    and everything outside the cone.  RED: `BootShared.v` alone, and
+    `SystemAdequacy.v` behind it.
+    THE OPEN PROOF is `BootShared.boot_hart_pre`'s `cpu_ctx_free` row
+    (BootShared.v ~1345).  `SchedCtx.cpu_ctx_free` is not `∃ ξ, own_ctx ξ`
+    but
+    `∃ (vs : list (mword 64)) (ξ : CtxId) (T : nat), ⌜length vs = 14⌝ ∗
+     TsoCtx.ctx_parked ξ T ∗ TsoCtx.hart_view_lb T ∗
+     ctx_cells (XI := ξ) (a_cpu_ctx cid_word) vs`
+    -- it wants a PARKED context, not merely some context.  The carve now
+    hands `∀ ξ, own_ctx (XI := ξ) (a_cpu_ctx (cid_word_of h))`, so the row
+    should be built inside `boot_hart_pre`'s own fupd:
+    `iMod TsoCtx.ctx_parked_alloc as (ξb) "Hpk"` (`⊢ |==> ∃ ξc, ctx_parked ξc
+    0`), instantiate the carve's `∀ ξ` AT `ξb`, unfold `own_ctx` to get
+    `vs` with its length, and close with `T := 0` and `hart_view_lb 0`
+    (`TsoGhost.view_lb_0`, which the SchedCtx header names as the boot
+    receipt).  The goal must keep `cpu_ctx_free` FOLDED (drop it from the
+    `rewrite` list, as the working tree already does) so the row matches
+    syntactically.  Everything else in that proof frames as before.
+    AFTER IT: run the gate -- `About BootChain.boot_hart_res` and every
+    BootAlloc lemma must list no `CurCtx` argument -- then
+    `SystemAdequacy`'s existing `boot_hart_primary (XI := ξ0)` /
+    `boot_hart_secondary (XI := ξc)` should compile unchanged, and the L9
+    chain closes.  Iterate with `rocq-warm` (BootShared replays in ~1 s from
+    an edit); a full `make -k` is the gate, not the loop.
+
 ## 10. Process and tooling (measured facts)
 
 ### 10.1 Build
