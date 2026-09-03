@@ -59,16 +59,24 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
 Require Import RegFile.
+Require Import WpMmodeLeafBase.
 Require Import WpUmodeBranch.
-Require Import UmodeAbi.
-Require Import UserHeap UkRun.
+Require Import UmodeArith UmodeAbi.
+Require Import UserHeap UkRun UkRunLeaf UkRunMem UkRunSys.
 Require Import UCodeInit.
 Require Import TsoCtx.
 Require User.InitSyms User.InitInstrs.
 Local Open Scope Z_scope.
 Import Defs.
+Require Import UkInit.
+Require Import UkInitLit.
+Require Import UkInitPrintf.
+Require Import UkFork.
+Require Import UkRunBr.
 Require Import UkInitMain.
 (* ...UkInitMain.v's block above, VERBATIM; the pilot's own imports below. *)
+Require Import TfUser.
+Require Import UsysMemOk.
 Require Import UexecRet.     (* [tf_of]/[tf_of_num]/[tf_of_arg0..2] *)
 Require Import ConsoleInv.      (* [CONSOLE] *)
 Require Import SpecSysMknodAU.  (* [dev_arg] *)

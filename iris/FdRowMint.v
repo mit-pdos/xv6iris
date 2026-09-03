@@ -79,7 +79,20 @@ From iris.base_logic.lib Require Import ghost_map ghost_var.
 Require Import Xv6Cameras.
 Require Import FsState.
 
+Require Import BioDefs.
+Require Import DinodeEnc.
+Require Import DirView.
+Require Import InodeInv.
+Require Import FsTree.
+Require Import IcacheEscrow.
+Require Import FsCrash.
 Require Import FsDurSnap.
+Require Import FsDurSyscall.
+Require Import FsCfgBoot.
+Require Import FsDurImg.
+Require Import SystemAdequacy.
+Require Import FsImgDisk.
+Require Import FsImgCheck.
 Require Import FsImg.
 Require Import FsAbs.
 Require Import FsInitPin.       (* [era0_D], [era0_root_row], [img_astep_root] *)
@@ -89,14 +102,20 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RegFile.
+Require Import UserHeap.
+Require Import UsysMemOk.
 Require Import UexecRet.
 
 (* ...and the pilot's own vocabulary *)
 Require Import ProcGeom.
 Require Import FdSlots.
+Require Import ConsoleInv.      (* [CONSOLE], [NDEV_max] *)
+Require Import PathElems.
 Require Import SpecSysMknodAU.  (* [dev_arg], [mknod_parent_elems],
                                    [delta_create] + its row algebra *)
+Require Import SpecSysOpenAU.   (* [om_arg] / [om_readable] / [om_writable] *)
 Require Import TsoCtx.
 Require Import FsFdMirror.
 Require Import UexecRetFs.

@@ -16,6 +16,9 @@
 (* [functional_extensionality_dep], and nothing else -- no [Parameter]     *)
 (* stand-in survives under the pilot.                                     *)
 (* ===================================================================== *)
+Require Import UexecRetFs.
+Require Import UkRunSysFs.
+Require Import UkRunFsLeaf.
 Require Import FdRowPilot.
 Require Import UkInitFs.
 Require Import UkStepGenFs.

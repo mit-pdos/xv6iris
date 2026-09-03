@@ -46,23 +46,55 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
+Require Import InstrBytes.
+Require Import RegFile.
 Require Import RiscvExtras.
+Require Import CalleeSaved KernelText KernelDataInv.
+Require Import IntrDefs.
+Require Import WpNext.
+Require Import WpLock.
 Require Import VcGen.        (* [trunc32_unsigned] -- argfd's C [int] read *)
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
+Require Import CpuOwn.
+Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskInv.
-Require Import LogInv.
+Require Import BioInv.
+Require Import FsBlocks LogInv.
+Require Import FsCrash.
 Require Import BitmapInv.
+Require Import InodeInv.
+Require Import InodeRegion.
+Require Import IrefSlots.
+Require Import IcacheRef.
+Require Import IcacheInv.
+Require Import IcacheEscrow.
+Require Import KvmSpec.
+Require Import FileInv.
+Require Import UserPtTree.
+Require Import ProcPtOwn.
 Require Import ProcInv.
+Require Import SpecPrintk.
+Require Import SpecDirlink.
+Require Import SpecFdalloc.
 Require Import ConsoleInv.
+Require Import SpecSysOpen.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
+Require Import Xv6G.
+Require Import FsCfg.
 Require Import PathElems.
 Require Import FsTree.
+Require Import FsBytesGamma.
 Require FsImg.
 Require Import SpecSysMknodAU.
+Require Import SpecSysWriteAU.
+Require Import FsAbsEra.
+Require Import FsAbsEraMknod.
+Require Import FsAbsMknodFire.
 Require Import FsAbs.
 Import Defs.
 Require Import TsoCtx.

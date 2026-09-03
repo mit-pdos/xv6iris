@@ -95,6 +95,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Require Import TsoCtx.
+Require TsoCtxShim.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
    tens of minutes FORMATTING the goal -- see durable-notes. *)

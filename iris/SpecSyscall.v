@@ -146,6 +146,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import RiscvModelBytes.  (* [nth_byte] -- pipe's two words *)
 Require Import UserPtTree.       (* [umem_wr] *)
 Import Defs.
 
