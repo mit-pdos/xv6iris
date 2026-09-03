@@ -349,6 +349,7 @@ Lemma gm_MemRead (Dr Dw : register -> bool) {X} (n : N)
     (req : Interface.ReadReq.t n)
     (k : (bv (8 * n) * option bool + Arch.abort)%type -> M X) s mm :
   dev_addr (Interface.ReadReq.pa req) = false ->
+  ak_ifetch (Interface.ReadReq.access_kind req) = false ->
   bytes_owned mm (Interface.ReadReq.pa req) n = true ->
   goodmb Dr Dw (Interface.Next (Interface.MemRead n req) k) s mm
   = match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
@@ -356,7 +357,7 @@ Lemma gm_MemRead (Dr Dw : register -> bool) {X} (n : N)
     | None => false
     end.
 Proof.
-  intros Hd Hfp. cbn [goodmb]. rewrite Hd. rewrite Hfp.
+  intros Hd Hif Hfp. cbn [goodmb]. rewrite Hd Hif. rewrite Hfp.
   cbn [negb andb]. reflexivity.
 Qed.
 
@@ -377,13 +378,19 @@ Qed.
 
 (* the read kinds and write kinds that reach a RAM node (the others are the
    model's [internal_error] placeholders for unused Sail access kinds) *)
-(* [Read_ttw] is the fork's walk kind (a non-reserved page-table-entry load,
-   see [RiscvExtras.rk_select]) and [Read_ifetch] its fetch kind; both reach
-   RAM.  Note the hazard the wildcard creates: omitting a kind here costs no
-   error, just a read silently classified as not-reaching-RAM. *)
+(* the read kinds a WALKER read may carry (the others are the model's
+   [internal_error] placeholders, or the instruction fetch).  [Read_ttw] is
+   the fork's walk kind (a non-reserved page-table-entry load, see
+   [RiscvExtras.rk_select]) and reaches RAM like a data load.  [Read_ifetch]
+   is deliberately NOT here (claude-notes/projects/icache.md): a fetch reads
+   through the icache, at the instruction view, and [goodmb]/[hmrun] refuse
+   it -- a fetch node is stepped by [HartEvents.swp_hart_ram_read_ifetch],
+   never answered off the walker's map.  Note the hazard the wildcard
+   creates: omitting a kind here costs no error, just a read silently
+   classified as not-reaching-RAM. *)
 Definition rk_ram_ok (rk : read_kind) : bool :=
   match rk with
-  | Read_plain | Read_ifetch | Read_ttw | Read_RISCV_reserved
+  | Read_plain | Read_ttw | Read_RISCV_reserved
   | Read_RISCV_reserved_acquire | Read_RISCV_reserved_strong_acquire => true
   | _ => false
   end.
@@ -428,7 +435,7 @@ Proof.
      cbn beta zeta;
      unfold Defs.sail_mem_read; cbn beta zeta;
      unfold Defs.bind; cbn [Interface.iMon_bind];
-     erewrite gm_MemRead; [ | exact Hdev | exact Hfp ];
+     erewrite gm_MemRead; [ | exact Hdev | reflexivity | exact Hfp ];
      match goal with
      | |- context[read_bytes ?m ?a ?n] =>
          destruct (read_bytes m a n) as [w|] eqn:Hr

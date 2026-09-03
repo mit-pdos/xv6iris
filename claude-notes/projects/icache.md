@@ -76,25 +76,47 @@ later step.
 
 ## The U-mode tiers (rulings 2-3)
 
-- The fetch node inside the walker: `hmrun` keeps answering an `AK_ifetch`
-  read from its map; `swp_hmrun` justifies it with a FETCH twin of
-  `bytes_own_tso_read_of` — the map's bytes are what `ifetch_read` returns
-  at every view `>= itv` — paid by the context's `IB` (each fetched byte has
-  `ts <= IB`) and the tie `IB <= IK` with `hart_iview_lb IK`.
-- The context's instruction bound: `ctx_at` grows a second monotone
-  authority `IB`; a text byte's fact carries "under `IB`" the way a clean
-  data fact carries "under `B`".  `exec` writing text moves `IB` past its
-  writes before the process runs; `own_context` (while running) carries
-  `∃ IK, hart_iview_lb IK ∗ ⌜IB <= IK⌝`, minted at `userret` STEP 0 — where
-  `own_context`'s data tie gives `ts <= B <= K <= tv` (clean) or
-  `ts <= own_pub` (dirty, mine on this hart) for everything the context
-  owns, and the arm sets `itv' >= max tv own_pub` — and dropped by `park`.
+**The walker never answers a fetch.**  `HartMemRun.hmrun`/`goodmb` refuse an
+`AK_ifetch` read (`rk_ram_ok` has no `Read_ifetch`): the walker's value is
+its own map's, which a stale fetch need not return, and `goodmb`'s ~4000
+occurrences cannot grow a fetch-footprint parameter.  So every fetch node
+is stepped by `HartEvents.swp_hart_ram_read_ifetch`, outside the walker,
+and the U-mode fetch composers are re-cut at that node:
+
+- `fetch tt` is `catch_early_return` of PC reads, the alignment tests,
+  `fetch_bytes` (= `translateAddr` then `mem_read (InstructionFetch)`) and
+  the `isRVC` split (`UserFetch.exec_fetch_bytes_ok` is the exec-level
+  composition).  The swp composer walks it in the same pieces: register
+  and pure nodes by the silent walker, `translateAddr` by
+  `swp_hmrun_of_exec` over the existing walk certificate
+  (`UserFetchCert.u_walk_fetch_pure`'s `goodmb` half, a data-arm read of
+  the PTEs), `checked_mem_read (InstructionFetch)` by a User-privilege twin
+  of `SmodeCorePt.swp_checked_mem_read_ifetch4_S`/`_ifetch2_S` (the PMP
+  grant is `UserMem.exec_pmpCheck_user_grant`), and the tail by the walker
+  again.  Four geometries, as today.
+- The fetch node pays with **stamped bytes**: `TsoCtx.ctx_xpointsto ξ IK a
+  dq v` is `ctx_pointsto` plus the pure stamp `ts <= IK`; `ctx_xfetch_ok`
+  turns it, under `IK <= itv` (from `hart_iview_lb_at cpu_id IK` against the
+  rule's `hart_iview_auth`), into `fobl_ifetch` byte by byte.  Data use of
+  a text byte (rodata) goes through `ctx_xpointsto_forget`.
+- **Where the stamp comes from.**  `ctx_xstamp` mints it from a RUNNING
+  context's fact at a `fence.i`: with `own_context` every fact is clean
+  (`ts <= B <= K <= tv`) or dirty and mine-on-this-hart (`ts <= own_pub`,
+  `TsoMemPa.own_pub_lookup`) or under the bound, and the arm's `itv'` passes
+  both `tv` and `own_pub`.  The `fence.i` leaf (a `HartBarrier`-style rule
+  at `Barrier_RISCV_i`, minting `hart_iview_lb_at cpu_id itv'`, with a ghost
+  step at `⌜gtv <= itv'⌝ ∗ ⌜own_pub <= itv'⌝`) is where `userret` STEP 0
+  stamps the process's executable pages.  No `CtxId` field, no
+  `own_context` change: the context's "instruction bound" IS the `IK` the
+  stamped facts and the receipt carry.
 - Why it stays true while the process runs: executable user pages are
-  non-writable (the `user_pt_inv` permission map: X ⇒ ¬W), so their bytes'
-  timestamps do not move under user execution.
-- The bundle: `uvb`/`ukb` carry the tie from the slot entry (`userret`)
-  down to the fetch composers (`UserFetchCert` for the safety tier,
-  `UmodeFetch` for the verified one — both take the same payer).
+  non-writable (the `user_pt_inv` permission map: X ⇒ ¬W), so a stamped
+  byte's timestamp does not move under user execution; the kernel writes
+  text only in `exec`, before the next `fence.i`.
+- The bundle: `uvb`/`ukb` carry `hart_iview_lb_at cpu_id IK` and the text
+  pages as `ctx_xpointsto ξ IK`, from the slot entry (`userret`) to both
+  tiers' fetch composers (`UserFetchCert`/`UserActiveClass.swp_fetch_of_pure`
+  for the safety tier, `UmodeFetch` for the verified one).
 
 ## Order of work (gate: full build green + `make audit-only` unchanged)
 
@@ -105,9 +127,9 @@ later step.
    `RiscvAdequacy` (the mint at era birth).
 3. `HartEvents` rules; `HartSpan`/`HartLift2` fence arm; `HartMemRun`
    refusal; `HartMFetch`/`SmodeCorePt` swap; fence.i leaves mint.
-4. The context's instruction bound (`TsoCtx`: the authority, the tie in
-   `own_context`, `park`/resume, the `fence.i` mint) and the walker's fetch
-   payer (`bytes_own` fetch twin, `HartMemRun`); `user_pt_inv`'s X ⇒ ¬W
-   fact.
-5. The bundle threading from `userret` STEP 0 to both tiers' fetch
-   composers.
+4. `TsoCtx.ctx_xpointsto` + `ctx_xstamp` + `ctx_xfetch_ok` (landed); the
+   `fence.i` leaf minting the receipt and running the stamp.
+5. The U-mode fetch composers re-cut at the fetch node (the `_U` twins of
+   the S-mode `checked_mem_read` fetch lemmas, the four-geometry composer),
+   `user_pt_inv`'s X ⇒ ¬W fact, and the bundle threading from `userret`
+   STEP 0 to both tiers.

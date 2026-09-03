@@ -180,6 +180,28 @@ Lemma foldr_max_le (l : list nat) (n : nat) :
   Forall (λ x, x ≤ n)%nat l → (foldr Nat.max 0 l ≤ n)%nat.
 Proof. induction 1 => /=; lia. Qed.
 
+Lemma foldr_max_ge (l : list nat) (x : nat) :
+  x ∈ l → (x ≤ foldr Nat.max 0 l)%nat.
+Proof.
+  induction l as [|y l IH] => Hin.
+  - by apply elem_of_nil in Hin.
+  - apply elem_of_cons in Hin as [->|Hin]; simpl; first lia.
+    specialize (IH Hin). lia.
+Qed.
+
+(** ... and it covers every one of the author's messages: the drain that
+    passes [own_pub] passes them all. *)
+Lemma own_pub_lookup h log i m :
+  log !! i = Some m → pm_tid m = h → (S i ≤ own_pub h log)%nat.
+Proof.
+  move => Hlk Htid. rewrite /own_pub.
+  apply (foldr_max_ge
+           (imap (λ j m0, if bool_decide (pm_tid m0 = h) then S j else 0%nat) log)
+           (S i)).
+  rewrite elem_of_lookup_imap. exists i, m. split; last done.
+  by rewrite Htid bool_decide_eq_true_2.
+Qed.
+
 Lemma own_pub_le h log : (own_pub h log ≤ length log)%nat.
 Proof.
   apply foldr_max_le. apply Forall_forall => x Hx.

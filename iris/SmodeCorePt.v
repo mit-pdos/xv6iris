@@ -1373,12 +1373,14 @@ Section SmodeCorePt.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ img log tv V,
+    (∀ σ img log tv itv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        ⌜(itv <= length log)%nat⌝ -∗
         mstate_interp σ -∗
+        hart_iview_auth cpu_id itv -∗
         tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜fobl_ram img log tv pa 4 bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+        ⌜fobl_ifetch img log itv pa 4 bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
              tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
            (Physaddr pa) 4 false false false false)
@@ -1435,18 +1437,18 @@ Section SmodeCorePt.
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     iApply (swp_use_cer4 (read_ram Read_ifetch (Physaddr pa) 4 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_hart_ram_read_plain 4 (mread_req_ifetch pa) _
+    { iApply (swp_hart_ram_read_ifetch 4 (mread_req_ifetch pa) _
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
                 (hread_req_at_read_ram_ifetch pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
-      iIntros (σ img log tv V) "%Htv Hσ Htso".
-      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
+      iIntros (σ img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+      iMod ("Hmem" $! σ img log tv itv V with "[//] [//] Hσ Hiv Htso")
+        as "[%Hrd Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
-      iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
-      iIntros (tvn _ _) "_".
-      rewrite hread_resume_read_ram_ifetch. iApply swp_ret. by iFrame. }
+      iMod "Hclose" as "(Hσ & Hiv & Htso)". iModIntro. iFrame "Hσ Hiv Htso".
+            rewrite hread_resume_read_ram_ifetch. iApply swp_ret. by iFrame. }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
     change (0 =? 1 - 1) with true. cbn beta iota zeta.
@@ -1481,12 +1483,14 @@ Section SmodeCorePt.
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ img log tv V,
+    (∀ σ img log tv itv V,
         ⌜V (hart_agent cpu_id) = tv⌝ -∗
+        ⌜(itv <= length log)%nat⌝ -∗
         mstate_interp σ -∗
+        hart_iview_auth cpu_id itv -∗
         tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-        ⌜fobl_ram img log tv pa 2 bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗
+        ⌜fobl_ifetch img log itv pa 2 bytes⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
              tso_interp_of riscv_eraGS img σ.(mem) log V)) -∗
     swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
            (Physaddr pa) 2 false false false false)
@@ -1543,18 +1547,18 @@ Section SmodeCorePt.
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     iApply (swp_use_cer4 (read_ram Read_ifetch (Physaddr pa) 2 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_hart_ram_read_plain 2 (mread_req2_ifetch pa) _
+    { iApply (swp_hart_ram_read_ifetch 2 (mread_req2_ifetch pa) _
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
                 (hread_req_at_read_ram2_ifetch pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
-      iIntros (σ img log tv V) "%Htv Hσ Htso".
-      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
+      iIntros (σ img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+      iMod ("Hmem" $! σ img log tv itv V with "[//] [//] Hσ Hiv Htso")
+        as "[%Hrd Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
-      iMod "Hclose" as "(Hσ & Htso)". iModIntro. iFrame "Hσ Htso".
-      iIntros (tvn _ _) "_".
-      rewrite hread_resume_read_ram2_ifetch. iApply swp_ret. by iFrame. }
+      iMod "Hclose" as "(Hσ & Hiv & Htso)". iModIntro. iFrame "Hσ Hiv Htso".
+            rewrite hread_resume_read_ram2_ifetch. iApply swp_ret. by iFrame. }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota zeta.
     rewrite mbind_ret. cbn beta.
     change (0 =? 1 - 1) with true. cbn beta iota zeta.
@@ -1628,12 +1632,14 @@ Section SmodeCorePt.
     (forall j : nat, (N.of_nat j < n)%N -> g (lo + j)%nat = nth_byte w j) ->
     kmap_at (svpn_of b) ppn KP_rx -∗
     ([∗ list] j ∈ seq 0 Nw, (pa_add pc j) ↦ₓ□ g j) -∗
-    (∀ σ img log tv V,
+    (∀ σ img log tv itv V,
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       ⌜(itv <= length log)%nat⌝ -∗
        mstate_interp σ -∗
+       hart_iview_auth cpu_id itv -∗
        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-       ⌜fobl_ram img log tv (pa_of ppn b) n w⌝ ∗
-       ▷ (|={∅,⊤}=> mstate_interp σ ∗
+       ⌜fobl_ifetch img log itv (pa_of ppn b) n w⌝ ∗
+       ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
             tso_interp_of riscv_eraGS img σ.(mem) log V)).
   Proof.
     intros Hlon Hlen Hbase Hoff Hcan Hg.
@@ -1656,7 +1662,7 @@ Section SmodeCorePt.
       apply lookup_seq in Hk. destruct Hk as [-> Hlt].
       iDestruct (s_text_byte pc b lo Nw k g ppn ltac:(lia) Hbase
                    (Hoffj k Hlt) Hcan with "Hk Hbytes") as "[_ $]". }
-    iIntros (σ img log tv V) "%Htv Hσ Htso".
+    iIntros (σ img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
     rewrite /mstate_interp. iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
@@ -1667,7 +1673,7 @@ Section SmodeCorePt.
       as %Hok.
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
     iSplitR.
-    { iPureIntro. intros tv' _ _. exact (Hok (hart_agent cpu_id) tv'). }
+    { iPureIntro. intros tv' _ _. exact (Hok _ tv'). }
     iNext. iMod "Hmask" as "_". iModIntro. by iFrame.
   Qed.
 

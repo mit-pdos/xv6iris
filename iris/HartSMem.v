@@ -1944,7 +1944,7 @@ Section snodes.
   Local Ltac node_read req Hproj Hres :=
     iIntros "#Hcert Hmem";
     iApply (swp_hart_ram_read_plain _ req _ _ Hproj ltac:(assumption)
-              ltac:(reflexivity) with "Hcert [Hmem]");
+              ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]");
     iIntros (s ? ? ? ?) "%Htv Hs Htso";
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "[Hb Hcl]";
     iModIntro; iExists _;
@@ -2043,7 +2043,7 @@ Section snodes.
     let bs := fresh "bs" in
     iIntros "#Hcert Hmem";
     iApply (swp_hart_ram_read_plain _ req _ _ Hproj ltac:(assumption)
-              ltac:(reflexivity) with "Hcert [Hmem]");
+              ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]");
     iIntros (s ? ? ? ?) "%Htv Hs Htso";
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as (bs) "[Hb Hcl]";
     iModIntro; iExists bs;
@@ -2076,7 +2076,7 @@ Section snodes.
     let tn := fresh "tn" in
     iIntros "#Hcert Hmem";
     iApply (swp_hart_ram_read_plain_ex _ req _ _ pr Hproj ltac:(assumption)
-              ltac:(reflexivity) with "Hcert [Hmem]");
+              ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]");
     iIntros (s ? ? ? ?) "%Htv Hs Htso";
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "[% Hcl]";
     iModIntro; iSplitR; [ iPureIntro; assumption | ];
@@ -2211,7 +2211,7 @@ Section snodes.
     intro Hdev.
     iIntros "#Hcert Hmem".
     iApply (swp_hart_ram_read_plain_ex _ (mread_req1 pa) _ _ (fun _ => True) (hread_req_at_read_ram1 pa)
-              ltac:(assumption) ltac:(reflexivity) with "Hcert [Hmem]").
+              ltac:(assumption) ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]").
     iIntros (s ? ? ? ?) "%Htv Hs Htso".
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "(%HQ & %Htot & Hcl)".
     iModIntro. iSplitR.
@@ -2262,7 +2262,7 @@ Section snodes.
     intro Hdev.
     iIntros "#Hcert Hmem".
     iApply (swp_hart_ram_read_plain_ex _ (mread_req1 pa) _ _ (fun _ => True) (hread_req_at_read_ram1 pa)
-              ltac:(assumption) ltac:(reflexivity) with "Hcert [Hmem]").
+              ltac:(assumption) ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]").
     iIntros (s ? ? ? ?) "%Htv Hs Htso".
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "(%Htot & Hcl)".
     iModIntro. iSplitR.
@@ -2301,7 +2301,7 @@ Section snodes.
     intro Hdev.
     iIntros "#Hcert Hmem".
     iApply (swp_hart_ram_read_plain_ex _ (mread_req2 pa) _ _ (fun _ => True) (hread_req_at_read_ram2 pa)
-              ltac:(assumption) ltac:(reflexivity) with "Hcert [Hmem]").
+              ltac:(assumption) ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]").
     iIntros (s ? ? ? ?) "%Htv Hs Htso".
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "(%Htot & Hcl)".
     iModIntro. iSplitR.
@@ -2340,7 +2340,7 @@ Section snodes.
     intro Hdev.
     iIntros "#Hcert Hmem".
     iApply (swp_hart_ram_read_plain_ex _ (mread_req pa) _ _ (fun _ => True) (hread_req_at_read_ram pa)
-              ltac:(assumption) ltac:(reflexivity) with "Hcert [Hmem]").
+              ltac:(assumption) ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]").
     iIntros (s ? ? ? ?) "%Htv Hs Htso".
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "(%Htot & Hcl)".
     iModIntro. iSplitR.
@@ -2379,7 +2379,7 @@ Section snodes.
     intro Hdev.
     iIntros "#Hcert Hmem".
     iApply (swp_hart_ram_read_plain_ex _ (mread_req8 pa) _ _ (fun _ => True) (hread_req_at_read_ram8 pa)
-              ltac:(assumption) ltac:(reflexivity) with "Hcert [Hmem]").
+              ltac:(assumption) ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]").
     iIntros (s ? ? ? ?) "%Htv Hs Htso".
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "(%Htot & Hcl)".
     iModIntro. iSplitR.
@@ -2418,7 +2418,7 @@ Section snodes.
     intro Hdev.
     iIntros "#Hcert Hmem".
     iApply (swp_hart_ram_read_plain_ex _ (mread_req2 pa) _ _ (fun _ => True) (hread_req_at_read_ram2 pa)
-              ltac:(assumption) ltac:(reflexivity) with "Hcert [Hmem]").
+              ltac:(assumption) ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]").
     iIntros (s ? ? ? ?) "%Htv Hs Htso".
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "(%HQ & %Htot & Hcl)".
     iModIntro. iSplitR.
@@ -2458,7 +2458,7 @@ Section snodes.
     intro Hdev.
     iIntros "#Hcert Hmem".
     iApply (swp_hart_ram_read_plain_ex _ (mread_req pa) _ _ (fun _ => True) (hread_req_at_read_ram pa)
-              ltac:(assumption) ltac:(reflexivity) with "Hcert [Hmem]").
+              ltac:(assumption) ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]").
     iIntros (s ? ? ? ?) "%Htv Hs Htso".
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "(%HQ & %Htot & Hcl)".
     iModIntro. iSplitR.
@@ -2498,7 +2498,7 @@ Section snodes.
     intro Hdev.
     iIntros "#Hcert Hmem".
     iApply (swp_hart_ram_read_plain_ex _ (mread_req8 pa) _ _ (fun _ => True) (hread_req_at_read_ram8 pa)
-              ltac:(assumption) ltac:(reflexivity) with "Hcert [Hmem]").
+              ltac:(assumption) ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]").
     iIntros (s ? ? ? ?) "%Htv Hs Htso".
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "(%HQ & %Htot & Hcl)".
     iModIntro. iSplitR.
@@ -2542,7 +2542,7 @@ Section snodes.
     intro Hdev.
     iIntros "#Hcert Hmem".
     iApply (swp_hart_ram_read_plain_ex _ (mread_req1 pa) _ _ (fun _ => True) (hread_req_at_read_ram1 pa)
-              ltac:(assumption) ltac:(reflexivity) with "Hcert [Hmem]").
+              ltac:(assumption) ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]").
     iIntros (s ? ? ? ?) "%Htv Hs Htso".
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "(#HQ & %Htot & Hcl)".
     iModIntro. iSplitR.
@@ -2582,7 +2582,7 @@ Section snodes.
     intro Hdev.
     iIntros "#Hcert Hmem".
     iApply (swp_hart_ram_read_plain_ex _ (mread_req2 pa) _ _ (fun _ => True) (hread_req_at_read_ram2 pa)
-              ltac:(assumption) ltac:(reflexivity) with "Hcert [Hmem]").
+              ltac:(assumption) ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]").
     iIntros (s ? ? ? ?) "%Htv Hs Htso".
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "(#HQ & %Htot & Hcl)".
     iModIntro. iSplitR.
@@ -2622,7 +2622,7 @@ Section snodes.
     intro Hdev.
     iIntros "#Hcert Hmem".
     iApply (swp_hart_ram_read_plain_ex _ (mread_req pa) _ _ (fun _ => True) (hread_req_at_read_ram pa)
-              ltac:(assumption) ltac:(reflexivity) with "Hcert [Hmem]").
+              ltac:(assumption) ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]").
     iIntros (s ? ? ? ?) "%Htv Hs Htso".
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "(#HQ & %Htot & Hcl)".
     iModIntro. iSplitR.
@@ -2662,7 +2662,7 @@ Section snodes.
     intro Hdev.
     iIntros "#Hcert Hmem".
     iApply (swp_hart_ram_read_plain_ex _ (mread_req8 pa) _ _ (fun _ => True) (hread_req_at_read_ram8 pa)
-              ltac:(assumption) ltac:(reflexivity) with "Hcert [Hmem]").
+              ltac:(assumption) ltac:(reflexivity) ltac:(reflexivity) with "Hcert [Hmem]").
     iIntros (s ? ? ? ?) "%Htv Hs Htso".
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "(#HQ & %Htot & Hcl)".
     iModIntro. iSplitR.

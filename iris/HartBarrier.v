@@ -301,6 +301,97 @@ Section barrier.
     rewrite -Hres. iApply ("H" with "HQ").
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* THE FENCE.I LEAF (claude-notes/projects/icache.md).  [fence.i]      *)
+  (* drains nothing on the data side ([fence_drains] is false), but it    *)
+  (* raises this hart's INSTRUCTION view past its data view and its own  *)
+  (* last store ([RiscvLang.mnode_step]'s Barrier arm), and that is the   *)
+  (* one moment an instruction-view RECEIPT is honestly born.  The rule   *)
+  (* mints [hart_iview_lb_at cpu_id IK] at the raised view and runs the   *)
+  (* client's ghost step with the two bounds the stamp needs             *)
+  (* ([TsoCtx.ctx_xstamp]: the hart's view and its own last message are  *)
+  (* both under [IK]) -- the [userret] STEP 0 stamping of a process's     *)
+  (* executable pages is exactly such a step.                             *)
+  (* ------------------------------------------------------------------ *)
+  Definition ifence_step (P Q : iProp Σ) : iProp Σ :=
+    (∀ (g : gstate) (IK : nat),
+       ⌜(g.(gtv) cpu_id <= IK)%nat⌝ -∗
+       ⌜(own_pub (hart_agent cpu_id) g.(glog) <= IK)%nat⌝ -∗
+       hart_iview_lb_at cpu_id IK -∗
+       gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+       tso_interp_at riscv_eraGS g -∗ P ==∗
+       gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+       tso_interp_at riscv_eraGS g ∗ Q)%I.
+
+  Lemma ifence_step_id (P : iProp Σ) : ⊢ ifence_step P P.
+  Proof. iIntros (g IK) "_ _ _ $ $ $". done. Qed.
+
+  Lemma wp_hart_fence_i {X : Type} (C : M X -> M unit) (m : M X)
+      (P Q : iProp Σ) :
+    mctx C ->
+    hbar_at m = Some Barrier_RISCV_i ->
+    gen_cert -∗ ifence_step P Q -∗ P -∗
+    ▷ (Q -∗ WP (HartE gen_id cpu_id (C (hbar_resume m)) : expr riscv_lang)) -∗
+    WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
+  Proof.
+    iIntros (HC Hproj) "#Hcert Hstep HP H".
+    destruct (hbar_at_inv _ _ Hproj) as (K & Hm & Hres).
+    assert (Hg : C m = Interface.Next (Interface.Barrier Barrier_RISCV_i)
+                         (fun v => C (K v)))
+      by (rewrite Hm; exact (HC _ (Interface.Barrier Barrier_RISCV_i) K eq_refl)).
+    rewrite Hg.
+    iApply (wp_hart_step with "Hcert").
+    { intros oth0 h0 img0 σ0 log0 tv0 itv0 r0 m'0 σ'0 log'0 tv'0 itv'0 r'0 Hs.
+      rewrite /mnode_step in Hs. cbn beta iota in Hs.
+      by destruct Hs as (_ & _ & _ & _ & _ & ->). }
+    iIntros (σ oth rv img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    set (h := hart_agent cpu_id).
+    (* the data view does not move; the instruction view goes to [itvn] *)
+    set (itvn := Nat.max itv (fence_post h log true tv)).
+    iMod (hart_iview_auth_update cpu_id itv itvn with "Hiv") as "Hiv".
+    { rewrite /itvn. lia. }
+    iDestruct (hart_iview_lb_at_get with "Hiv") as "#Hlb".
+    assert (Hpin' : forall h', (NCPU <= h')%nat -> V h' = length log)
+      by exact Hpin.
+    iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
+    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+               σ.(sregs) σ.(mdev) Hpin').
+    iMod ("Hstep" $! (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev)) itvn
+            with "[%] [%] Hlb Hmem Htso HP") as "(Hmem & Htso & HQ)".
+    { cbn [gtv gs_of]. rewrite /h /hart_agent in Htv. rewrite Htv.
+      rewrite /itvn /fence_post. lia. }
+    { cbn [glog gs_of]. rewrite /itvn /fence_post. lia. }
+    rewrite -(tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+                σ.(sregs) σ.(mdev) Hpin').
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iExists (C (K tt)), σ, log, tv, itvn, rv.
+    iSplitR.
+    { iPureIntro. rewrite /mnode_step. cbn beta iota. by split_and!. }
+    iNext. iIntros (m' σ' log' tv' itv' rv') "%Hstep".
+    rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
+    destruct Hstep as (-> & -> & -> & -> & -> & ->).
+    iMod "Hclose" as "_". iModIntro.
+    iFrame "Hri Hmem Hdev Hiv".
+    iSplitL "Htso".
+    { rewrite -Htv. iApply (tso_interp_of_idle with "Htso"). }
+    rewrite -Hres. iApply ("H" with "HQ").
+  Qed.
+
+  Lemma swp_hart_fence_i {X : Type} (m : M X) (Φ : X -> iProp Σ)
+      (P Q : iProp Σ) :
+    hbar_at m = Some Barrier_RISCV_i ->
+    gen_cert -∗ ifence_step P Q -∗ P -∗
+    ▷ (Q -∗ swp (hbar_resume m) Φ) -∗
+    swp m Φ.
+  Proof.
+    iIntros (Hproj) "#Hcert Hstep HP H".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    iApply (wp_hart_fence_i C m P Q HC Hproj with "Hcert Hstep HP [H Hcont]").
+    iNext. iIntros "HQ".
+    iApply (swp_use _ Φ C HC with "[H HQ] Hcont"). by iApply "H".
+  Qed.
+
   Lemma swp_hart_barrier_gs {X : Type} (bk : barrier_kind) (m : M X)
       (Φ : X -> iProp Σ) (P Q : iProp Σ) :
     hbar_at m = Some bk ->

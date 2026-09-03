@@ -727,7 +727,7 @@ Section pteread.
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
                 (hread_req_at_read_ram8_ttw pa)
-                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
+                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
       iIntros (σ img log tv V) "%Htv Hσ Htso".
       iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
@@ -994,7 +994,7 @@ Section pteread.
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
                 P
                 (hread_req_at_read_ram8_ttw pa)
-                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
+                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
       iIntros (σ img log tv V) "%Htv Hσ Htso".
       iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".

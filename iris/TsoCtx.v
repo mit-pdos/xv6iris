@@ -1866,6 +1866,157 @@ Section ctx.
   Qed.
 
   (* ---------------------------------------------------------------- *)
+  (* THE STAMPED BYTE (claude-notes/projects/icache.md): a context's    *)
+  (* fact PLUS a pure stamp -- its latest write is at or below [IK], an *)
+  (* INSTRUCTION-view position.  Paired with the hart's [hart_iview_lb  *)
+  (* IK] receipt this is what an instruction fetch pays with            *)
+  (* ([ctx_xfetch_ok]): the icache agent sees no store forwarding, so a *)
+  (* fetch at any view from the instruction view up reads the byte's    *)
+  (* latest write only if that write is under the view.  Minted from a  *)
+  (* RUNNING context's fact at a [fence.i] ([ctx_xstamp]), whose drain  *)
+  (* covers everything the context owns at that instant; forgotten back *)
+  (* to the plain fact for data use.  The stamp is pure and indexed by  *)
+  (* [IK] rather than by a context ghost, so nothing in [CtxId] or the   *)
+  (* token surface moves; a user store to the byte (which re-times it    *)
+  (* above [IK]) is exactly what cannot be stamped -- executable pages   *)
+  (* are the non-writable ones.                                          *)
+  (* ---------------------------------------------------------------- *)
+  Definition ctx_xpointsto_def `{KTR : !CurKtier} (ξ : CtxId) (IK : nat)
+      (va : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
+    (∃ (ppn : mword 44) (t : nat),
+       kmap_at (svpn_of va) ppn KP_rw ∗
+       ⌜(uint va < 274877906944)%Z⌝ ∗
+       ⌜addr_is_ram (pa_of ppn va)⌝ ∗
+       ⌜ktier_pin cur_ktier ppn va⌝ ∗
+       pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn va) dq v ∗
+       (pa_of ppn va) ↪[ts_name]{dq} (t, ts_pay_none) ∗
+       (llb (ctx_bound_name ξ) t
+        ∨ dset_in (ctx_dirty_name ξ) (t, pa_of ppn va)) ∗
+       ⌜(t <= IK)%nat⌝)%I.
+  Lemma ctx_xpointsto_aux : { f | f = @ctx_xpointsto_def }.
+  Proof. by eexists. Qed.
+  Definition ctx_xpointsto `{KTR : !CurKtier} (ξ : CtxId) (IK : nat)
+      (va : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
+    proj1_sig ctx_xpointsto_aux KTR ξ IK va dq v.
+  Lemma ctx_xpointsto_unseal `{KTR : !CurKtier} (ξ : CtxId) (IK : nat)
+      (va : Arch.pa) (dq : dfrac) (v : bv 8) :
+    ctx_xpointsto ξ IK va dq v = ctx_xpointsto_def ξ IK va dq v.
+  Proof. unfold ctx_xpointsto. by rewrite (proj2_sig ctx_xpointsto_aux). Qed.
+
+  Global Instance ctx_xpointsto_timeless `{KTR : !CurKtier} ξ IK va dq v :
+    Timeless (ctx_xpointsto ξ IK va dq v).
+  Proof. rewrite ctx_xpointsto_unseal /ctx_xpointsto_def. apply _. Qed.
+
+  (* forgetting the stamp gives the plain fact back *)
+  Lemma ctx_xpointsto_forget `{KTR : !CurKtier} ξ IK va dq v :
+    ctx_xpointsto ξ IK va dq v ⊢ ctx_pointsto ξ va dq v.
+  Proof.
+    rewrite ctx_xpointsto_unseal /ctx_xpointsto_def
+            ctx_pointsto_unseal /ctx_pointsto_def.
+    iIntros "(%ppn & %t & Hk & % & % & % & Hp & Hts & Hbit & _)".
+    iExists ppn, t. by iFrame.
+  Qed.
+
+  (* the stamp only ever moves UP, with the instruction view *)
+  Lemma ctx_xpointsto_mono `{KTR : !CurKtier} ξ IK IK' va dq v :
+    (IK <= IK')%nat -> ctx_xpointsto ξ IK va dq v ⊢ ctx_xpointsto ξ IK' va dq v.
+  Proof.
+    intros Hle. rewrite !ctx_xpointsto_unseal /ctx_xpointsto_def.
+    iIntros "(%ppn & %t & Hk & % & % & % & Hp & Hts & Hbit & %Ht)".
+    iExists ppn, t. iFrame. iPureIntro. split_and!; [done|done|done|lia].
+  Qed.
+
+  (* THE STAMP, at a [fence.i]: a running context's fact is clean -- under
+     the bound, which the hart's view dominates -- or dirty and either under
+     the bound or this hart's own message, which [own_pub] covers; the
+     drained instruction view passes both the hart's view and its own last
+     message ([RiscvLang.mnode_step]'s Barrier arm), so it passes every
+     timestamp the context owns at that instant. *)
+  Lemma ctx_xstamp `{CID : CpuId} {KTR : CurKtier} (g : gstate)
+      (ξ : CtxId) (IK : nat) (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    (g.(gtv) cpu_id <= IK)%nat ->
+    (own_pub (hart_agent cpu_id) g.(glog) <= IK)%nat ->
+    tso_interp_at riscv_eraGS g -∗
+    own_context ξ -∗
+    ctx_pointsto (KTR := KTR) ξ a dq v -∗
+    tso_interp_at riscv_eraGS g ∗ own_context ξ ∗
+    ctx_xpointsto (KTR := KTR) ξ IK a dq v.
+  Proof.
+    intros Htv Hpub.
+    rewrite own_context_unseal /own_context_def
+            ctx_pointsto_unseal /ctx_pointsto_def
+            ctx_xpointsto_unseal /ctx_xpointsto_def.
+    iIntros "Hint Hrun Hfact".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
+    destruct Hmm as ((Hflat & Htv0 & Hcov) & Hera).
+    iDestruct "Hrun"
+      as "(%B & %K & %W & %D & [Hb Hd] & #HK & %HBK & #HW & %HDW & #Hoks)".
+    iDestruct "Hfact"
+      as "(%ppn & %t & #Hk & %Hc & %Hr & %Hpin & Hpt & Htse & Hbit)".
+    iDestruct (view_auth_valid with "Hv HK") as %HKtvs.
+    rewrite avf_hart in HKtvs.
+    iAssert (⌜(t <= IK)%nat⌝)%I as %HtIK.
+    { iDestruct "Hbit" as "[Hcl | Hdt]".
+      - iDestruct (llb_valid with "Hb Hcl") as %HtB. iPureIntro. lia.
+      - iDestruct (dset_lookup with "Hd Hdt") as %HDt.
+        iDestruct (big_sepS_elem_of _ _ _ HDt with "Hoks") as "[%HtB | Hown]".
+        + iPureIntro. simpl in HtB. lia.
+        + iDestruct "Hown" as (i m) "(%Hti & Hi & %Htid)".
+          iDestruct (ghost_map_lookup with "Hm Hi") as %HLi.
+          iPureIntro. simpl in Hti. rewrite Hti.
+          rewrite HLM in HLi.
+          pose proof (own_pub_lookup _ _ _ _ HLi Htid). lia. }
+    iSplitL "Hts Hm Hlen Hv".
+    { iExists TM, LM. iFrame. iPureIntro. split_and!; done. }
+    iSplitL "Hb Hd".
+    { iExists B, K, W, D. iFrame "Hb Hd HK HW Hoks". by iPureIntro. }
+    iExists ppn, t. iFrame "Hk Hpt Htse Hbit". by iPureIntro.
+  Qed.
+
+  (* THE FETCH GATE: with the receipt that this hart's instruction view is
+     at or above the stamp, the byte reads its value through the icache
+     agent at every view from the instruction view up -- exactly
+     [HartMFetch.fobl_ifetch]'s shape, byte by byte. *)
+  Lemma ctx_xfetch_ok `{CID : CpuId} {KTR : CurKtier} (g : gstate)
+      (ξ : CtxId) (IK itv : nat) (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    (IK <= itv)%nat ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    ctx_xpointsto (KTR := KTR) ξ IK a dq v -∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗
+    ctx_xpointsto (KTR := KTR) ξ IK a dq v ∗
+    ∃ ppn : mword 44,
+      kmap_at (svpn_of a) ppn KP_rw ∗
+      ⌜∀ tv', (itv ≤ tv')%nat →
+         tso_read g.(gimg) g.(glog) (ifetch_agent (hart_agent cpu_id)) tv'
+           (pa_of ppn a) = Some v⌝.
+  Proof.
+    intros HIK.
+    rewrite ctx_xpointsto_unseal /ctx_xpointsto_def.
+    iIntros "Hgh Hint Hfact".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
+    destruct Hmm as ((Hflat & Htv0 & Hcov) & Hera).
+    iDestruct "Hfact"
+      as "(%ppn & %t & #Hk & %Hc & %Hr & %Hpin & Hpt & Htse & Hbit & %HtIK)".
+    iDestruct (gen_heap_valid with "Hgh Hpt") as %Hgm.
+    iDestruct (ghost_map_lookup with "Hts Htse") as %HTMt.
+    destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat).
+    rewrite Hgm in Hgm0. injection Hgm0 as <-.
+    iSplitL "Hgh"; first iExact "Hgh".
+    iSplitL "Hts Hm Hlen Hv".
+    { iExists TM, LM. iFrame. iPureIntro. split_and!; done. }
+    iSplitL.
+    { iExists ppn, t. iFrame "Hk Hpt Htse Hbit". by iPureIntro. }
+    iExists ppn. iFrame "Hk". iPureIntro.
+    intros tv' Htv'.
+    apply (tso_read_of_latest _ _ _ _ _ t); [exact Hlat|].
+    apply visibleb_below. lia.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (* THE PRISTINE BYTE, and the load gate that needs NO context         *)
   (* (tso-machine-flip.md §6 amendment A6.10).                          *)
   (*                                                                   *)

@@ -1043,15 +1043,18 @@ Section InstrBytes.
      what it was. *)
   Lemma text_fetch_obl (pa : Arch.pa) (n : N) (w : bv (8 * n)) :
     ([∗ list] j ∈ seq 0 (N.to_nat n), (pa_add pa j) ↦ₓ□ nth_byte w j) -∗
-    (∀ σ img log tv V,
+    (∀ σ img log tv itv V,
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
+       ⌜(itv <= length log)%nat⌝ -∗
        mstate_interp σ -∗
+       hart_iview_auth cpu_id itv -∗
        tso_interp_of riscv_eraGS img σ.(mem) log V ={⊤,∅}=∗
-       ⌜HartMFetch.fobl_ram img log tv pa n w⌝ ∗
-       ▷ (|={∅,⊤}=> mstate_interp σ ∗
+       ⌜HartMFetch.fobl_ifetch img log itv pa n w⌝ ∗
+       ▷ (|={∅,⊤}=> mstate_interp σ ∗ hart_iview_auth cpu_id itv ∗
             tso_interp_of riscv_eraGS img σ.(mem) log V)).
   Proof.
-    iIntros "#Htext" (σ img log tv V) "%Htv Hσ Htso". rewrite /mstate_interp.
+    iIntros "#Htext" (σ img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+    rewrite /mstate_interp.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
@@ -1061,7 +1064,8 @@ Section InstrBytes.
                  with "Hmem Htso Htext") as %Hok.
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
     iSplitR.
-    { iPureIntro. intros tv' _ _. exact (Hok (hart_agent cpu_id) tv'). }
+    { (* pristine text reads alike at EVERY agent -- the icache agent included *)
+      iPureIntro. intros tv' _ _. exact (Hok _ tv'). }
     iNext. iMod "Hmask" as "_". iModIntro. by iFrame.
   Qed.
 
