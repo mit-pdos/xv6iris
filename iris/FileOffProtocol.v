@@ -87,8 +87,8 @@ Section FileOffProtocol.
   Lemma proto_publish (E : coPset) (i k : nat) (C : fcontent) :
     ↑(offBoxN .@ k) ⊆ E -> (i < NINODE)%nat -> fc_ip C = ientry i -> fc_type C = FD_INODE ->
     own_context cur_ctx -∗ off_resident k -∗ off_rows off_cfg i cur_ctx ={E}=∗
-    own_context cur_ctx ∗
-    ∃ γb : box_names, off_fd k 1 γb C ∗ (ctx_floor cur_ctx 0 -∗ off_rows off_cfg i cur_ctx).
+    own_context cur_ctx ∗ off_rows off_cfg i cur_ctx ∗
+    ∃ γb : box_names, off_fd k 1 γb C.
   Proof. (* SKELETON r25 chain: = ProofSysOpenParts.so_deposit *) Admitted.
 
   (* ---- dup: a pure split of the share by fraction ---- *)
@@ -115,12 +115,13 @@ Section FileOffProtocol.
     off_fd_at k q γb C m -∗
     off_rows off_cfg i ξ ={E}=∗
     own_context ξ ∗ off_resident (XI := ξ) k ∗
+    off_box k γb ∗ off_member off_cfg i γb ∗
     ∃ T0 : nat,
       CtxBox.l2_hold (X := unit) γb k m ∗
       ghost_var (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2) 1%nat ∗
       (∀ s' : l2_reg nat, off_l2_row γb s' ξ -∗ off_rows off_cfg i ξ).
-  Proof. (* SKELETON r25 chain: off_rows_take + OffBox.off_read_checkout *) Admitted.
+  Proof. (* SKELETON r25 chain: off_rows_take + OffBox.off_read_checkout; the handle and membership are persistent and come back out (reviewer 1) *) Admitted.
 
   (* ---- read: park after the read; the row goes back into the set at the
           fresh stamp ---- *)
@@ -178,6 +179,7 @@ Section FileOffProtocol.
          ⌜(max_stamp m ≤ Kt)%nat⌝ -∗
          own_context ξ' -∗ ctx_floor ξ' Kt -∗ off_fd_at k (q / 2) γb C m -∗ off_rows off_cfg i ξ' ={E}=∗
          own_context ξ' ∗ off_resident (XI := ξ') k ∗
+         off_box k γb ∗ off_member off_cfg i γb ∗
          ∃ T0 : nat,
            CtxBox.l2_hold (X := unit) γb k m ∗
            ghost_var (bx_slotd γb) (q / 2 / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗

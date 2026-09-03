@@ -1114,6 +1114,13 @@ and law 10 (hooks).
     then lanes (i) L8/L9 and (ii) the OffBox consumers.  Pass-1 extras from
     items 29/31: `a_foff_aligned`, `ientry_inj` for the join,
     `is_itable2_morph` into EnvMorph; `off_member` premise kept.
+    TWO STATEMENT TIDY-UPS landed the same night (reviewer 1's note, reviewer
+    2's option): `proto_read_checkout` and the fork link's read wand RETURN
+    `off_box k γb ∗ off_member off_cfg i γb` beside their other conclusions
+    (the persistent parts of the consumed `off_fd_at`, so the park's
+    premises are literally the checkout's conclusions); `off_publish_park`
+    discharges `ctx_floor ξ 0` itself and returns `off_rows on i ξ`
+    directly, and `so_deposit` / `proto_publish` do the same.
 
 ## 10. Process and tooling (measured facts)
 

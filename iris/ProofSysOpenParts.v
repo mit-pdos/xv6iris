@@ -864,9 +864,8 @@ Section ProofSysOpenPublish.
     own_context cur_ctx -∗
     off_resident kf -∗
     off_rows off_cfg kk cur_ctx ={E}=∗
-    own_context cur_ctx ∗
-    ∃ γb : box_names,
-      off_fd kf 1 γb C ∗ (ctx_floor cur_ctx 0 -∗ off_rows off_cfg kk cur_ctx).
+    own_context cur_ctx ∗ off_rows off_cfg kk cur_ctx ∗
+    ∃ γb : box_names, off_fd kf 1 γb C.
   Proof. (* SKELETON r25 (item 24): fresh box ghosts, off_publish_park, assemble off_fd at q = 1 *) Admitted.
 
   Lemma so_publish `{XI : CurCtx} (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)

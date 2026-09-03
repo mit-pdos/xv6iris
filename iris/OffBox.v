@@ -317,8 +317,8 @@ Section OffBox.
       off_cnt γ 1 ∗
       CtxBox.reference (X := unit) γ k {[ (k, T) := 1%Qp ]} ∗
       off_member on i γ ∗
-      (ctx_floor ξ 0 -∗ off_rows on i ξ).
-  Proof. (* SKELETON r25 (item 24): box_alloc_at, box_ref_incr, off_rows_insert_row at L2Reg 0 None *) Admitted.
+      off_rows on i ξ.
+  Proof. (* SKELETON r25 (item 24): box_alloc_at, box_ref_incr, off_rows_insert_row at L2Reg 0 None, the row's floor by ctx_floor_0 (reviewer 2's option) *) Admitted.
 
   (* fileread / filewrite, under ip->lock: select the row by membership,
      (e), the cell in hand, (f), the row back (re-floored at the fold) *)
