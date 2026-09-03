@@ -290,10 +290,51 @@ Section OffBox.
          ⌜(lr_tp s ≤ T)%nat⌝)%I.
   Lemma off_rows_fold on i (T : nat) (ξ : CtxId) :
     off_rows_dep on i T ∗ ctx_floor ξ T ⊢ off_rows on i ξ.
-  Proof. (* SKELETON r25 (lane ii): per row, [ctx_floor_le] from T down to lr_tp *) Admitted.
+  Proof.
+    rewrite /off_rows_dep /off_rows /off_l2_row /CtxBox.l2_row /off_regp.
+    iIntros "[(%L & Hauth & #HllbT & Hset) #Hfl]".
+    iExists L. iFrame "Hauth".
+    iApply (big_sepS_impl with "Hset").
+    iIntros "!#" (γ Hγ) "(%s & Hp & %Hh & #Hllbs & %Hle)".
+    iExists s. iFrame "Hp Hllbs". iSplitR; [by iPureIntro|].
+    iApply (TsoCtx.ctx_floor_le with "Hfl"). exact Hle.
+  Qed.
+
+  (* the rows' maximum, by [set_ind_L]: each row's llb joins into one bound
+     ([llb_max]) and every row's [lr_tp] stays under it *)
+  Lemma off_rows_bound (L : gset box_names) (ξ : CtxId) :
+    ([∗ set] γ ∈ L, ∃ s : l2_reg nat, off_l2_row γ s ξ) -∗
+    ∃ T : nat, llb loglen_name T ∗
+      [∗ set] γ ∈ L, ∃ s : l2_reg nat,
+        off_regp γ s ∗ ⌜lr_hold s = None⌝ ∗ llb loglen_name (lr_tp s) ∗
+        ⌜(lr_tp s ≤ T)%nat⌝.
+  Proof.
+    rewrite /off_l2_row /CtxBox.l2_row /off_regp.
+    induction L as [|γ L Hγ IH] using set_ind_L.
+    - iIntros "_". iExists 0%nat. rewrite !big_sepS_empty.
+      iSplitR; [iApply llb_0 | done].
+    - iIntros "Hset". rewrite big_sepS_insert; [|exact Hγ].
+      iDestruct "Hset" as "[Hrow Hset]".
+      iDestruct "Hrow" as (s) "[(Hp & %Hh & _) #Hllbs]".
+      iDestruct (IH with "Hset") as (T) "[#HllbT Hset]".
+      iExists (Nat.max (lr_tp s) T).
+      iSplitR; [iApply (llb_max with "Hllbs HllbT")|].
+      rewrite big_sepS_insert; [|exact Hγ].
+      iSplitL "Hp".
+      + iExists s. iFrame "Hp Hllbs". iPureIntro. split; [exact Hh | lia].
+      + iApply (big_sepS_impl with "Hset").
+        iIntros "!#" (γ' Hγ') "(%s' & Hp' & %Hh' & #Hl' & %Hle')".
+        iExists s'. iFrame "Hp' Hl'". iPureIntro. split; [exact Hh' | lia].
+  Qed.
+
   Lemma off_rows_to_dep on i (ξ : CtxId) :
     off_rows on i ξ -∗ ∃ T : nat, off_rows_dep on i T.
-  Proof. (* SKELETON r25 (lane ii): T := the rows' maximum, llb by the maximum lemma *) Admitted.
+  Proof.
+    rewrite /off_rows /off_rows_dep.
+    iIntros "(%L & Hauth & Hset)".
+    iDestruct (off_rows_bound with "Hset") as (T) "[#HllbT Hset]".
+    iExists T, L. iFrame "Hauth HllbT Hset".
+  Qed.
 
   (* ================================================================== *)
   (*  THE SITES                                                            *)
@@ -346,7 +387,26 @@ Section OffBox.
       CtxBox.reference (X := unit) γ k {[ (k, T) := 1%Qp ]} ∗
       off_member on i γ ∗
       off_rows on i ξ.
-  Proof. (* SKELETON r25 (item 24): box_alloc_at, box_ref_incr, off_rows_insert_row at L2Reg 0 None, the row's floor by ctx_floor_0 (reviewer 2's option) *) Admitted.
+  Proof. (* box_alloc_at (the deposit), box_ref_incr (the birth share),
+            off_rows_insert_row at [L2Reg 0 None] -- whose floor the lemma
+            discharges itself with [ctx_floor_0], so what comes out is the
+            next link's premise (item 31 (a)) *)
+    intros HE.
+    rewrite /off_box /off_regd /off_cnt /off_regp.
+    iIntros "Hst Hc Hd Hp Hrun Hcell Hrows".
+    iMod (CtxBox.box_alloc_at off_hdr off_rest (λ _ : nat, emp%I) emp%I
+            (offBoxN .@ k) γ ξ k E with "Hst Hc Hd Hp Hrun [Hcell]")
+      as "(Hrun & %Tb & #Hbx & Hrd & #Hllb & Hcnt & Hrp)".
+    { iExists tt. rewrite /off_rest. iSplitL; [iExact "Hcell"|done]. }
+    iMod (CtxBox.box_ref_incr off_hdr off_rest (λ _ : nat, emp%I) emp%I
+            (offBoxN .@ k) γ (SlotReg Tb false k None) 0 E HE eq_refl
+            with "Hbx Hrd Hcnt") as "(Hrd & Hcnt & %T & Href)".
+    iMod (off_rows_insert_row on i γ 0 ξ with "Hrows Hrp []") as "[Hfold #Hmem]".
+    { iApply llb_0. }
+    iModIntro. iFrame "Hrun Hbx". iExists Tb, T.
+    iFrame "Hrd Hllb Hcnt Href Hmem".
+    iApply "Hfold". iApply TsoCtx.ctx_floor_0.
+  Qed.
 
   (* fileread / filewrite, under ip->lock: select the row by membership,
      (e), the cell in hand, (f), the row back (re-floored at the fold) *)
@@ -429,5 +489,33 @@ Section OffBox.
     CtxBox.reference (X := unit) γ k m ={E}=∗
     off_cnt γ 1 ∗
     ([∗ list] j ∈ seq 0 4, TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn 1)).
-  Proof. (* SKELETON r25 (item 24): box_withdraw_L1_free with the hook off_resident (XI := ξb) k ⊢ the free bytes (ctx_pointsto_free) *) Admitted.
+  Proof. (* [box_withdraw_L1_free] at [Qc := emp], [Q1 1 = emp]; the hook is
+            the plain entailment [off_resident (XI := ξb) k ⊢ the four free
+            bytes] -- one [ctx_pointsto_free] per byte, at the box's own
+            context, with no floor and no [own_context] *)
+    intros HE Hq. rewrite /off_box /off_regd /off_cnt.
+    iIntros "#Hbox Hrd Hcnt Href".
+    iDestruct "Href" as "(%Hne & %Hkeyed & HfD & #HllbD)".
+    assert (Hq1 : qsum m = CtxBox.nat_Qc 1).
+    { rewrite Hq CtxBox.nat_Qc_1. exact Qp_to_Qc_1. }
+    assert (Hhook : ∀ (x : unit) (ξb : CtxId),
+              emp ∗ off_hdr k x ξb
+              ={E ∖ ↑(offBoxN .@ k)}=∗
+              ([∗ list] j ∈ seq 0 4, TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn 1))
+              ∗ emp).
+    { intros x ξb. rewrite /off_hdr /off_resident.
+      iIntros "[_ (%v & Hw & _)]".
+      rewrite TsoCtx.ctx_word4_pointsto_unfold.
+      iDestruct "Hw" as "[_ Hbytes]".
+      iModIntro. iSplitL; [| done].
+      iApply (big_sepL_impl with "Hbytes").
+      iIntros "!#" (j y Hy) "Hb". iApply (TsoCtx.ctx_pointsto_free with "Hb"). }
+    iMod (CtxBox.box_withdraw_L1_free off_hdr off_rest (λ _ : nat, emp%I) emp%I
+            (offBoxN .@ k) γ (SlotReg T0 false k None) 1 m emp%I
+            ([∗ list] j ∈ seq 0 4, TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn 1))%I
+            E HE eq_refl Hq1 Hhook
+            with "Hbox Hrd Hcnt HfD HllbD []") as "(Hcnt & Hfree & _)".
+    { done. }
+    iModIntro. iFrame "Hcnt Hfree".
+  Qed.
 End OffBox.

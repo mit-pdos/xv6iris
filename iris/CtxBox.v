@@ -807,7 +807,36 @@ Section box.
     llb loglen_name (max_stamp mD) -∗ Qc ={E}=∗
     cnt_half γ c ∗ Q' ∗
     ∃ (x0 : X) (T0 : nat), slotd_half γ (SlotReg (sr_td r) true (sr_ident r) (Some (x0, T0))).
-  Proof. (* SKELETON r25 (ruled R2): the hooked (a) with the absorb elided *) Admitted.
+  Proof.
+    iIntros (HE Hw HmD Hhook) "#Hbox Hrd0 Hcnt HfD #HllbD HQc".
+    rewrite /is_box. box_open "Hbox" "Hcl".
+    iDestruct (ghost_var_agree with "Hrd Hrd0") as %->.
+    iDestruct (ghost_var_agree with "Hc Hcnt") as %->.
+    iDestruct (stamps_frag_incl with "Hst HfD") as %HinclD.
+    destruct (lr_hold sb) as [[i0 m0]|] eqn:Hh.
+    { (* OUT_L2: the parked fragment's mass beside all c units overflows Σ *)
+      iDestruct "Harm" as "(_ & >%Hne0 & _ & >Hf0 & _)".
+      iDestruct (stamps_frag_incl_2 with "Hst HfD Hf0") as %Hincl2.
+      exfalso. apply qsum_incl_le in Hincl2. rewrite qsum_op HmD Hsum in Hincl2.
+      exact (Qc_plus_pos_not_le_r _ _ (qsum_pos _ Hne0) Hincl2). }
+    iEval (rewrite Hw) in "Harm". iDestruct "Harm" as ">Hin".
+    iDestruct "Hin" as (x0) "[Hhdr Hrest]".
+    (* THE HOOK, at the box's own context -- and NO absorb: [Q'] leaves
+       context-free, so neither floor nor [own_context] is needed. *)
+    iMod (Hhook x0 ξb with "[$HQc $Hhdr]") as "[HQ' HQ]".
+    iMod (ghost_var_update_2 (SlotReg (sr_td r) true (sr_ident r) (Some (x0, T))) with "Hrd Hrd0")
+      as "[Hrd Hrd0]"; [by rewrite Qp.half_half|].
+    iMod ("Hcl" with "[Hpk Hst Hc Hrd Hrp HfD Hrest HQ]") as "_".
+    { iNext. iExists T, ξb, m, c, (SlotReg (sr_td r) true (sr_ident r) (Some (x0, T))), sb.
+      iFrame "Hpk Hllb Hst Hc Hrd Hrp". simpl.
+      iSplitR; [iPureIntro; exact (conj Hsum (conj HI (conj HC HD)))|].
+      rewrite /box_arm.
+      rewrite Hh. simpl.
+      iSplitL "HfD".
+      { iExists mD. iSplitR; [iPureIntro; by rewrite HmD Hsum|]. iFrame "HfD". iExact "HllbD". }
+      iSplitL "Hrest"; [iExists x0; iFrame "Hrest"; done | iExact "HQ"]. }
+    iModIntro. iFrame "Hcnt HQ'". iExists x0, T. iExact "Hrd0".
+  Qed.
 
   (* ================================================================== *)
   (*  (a) withdraw_L1 : IN → OUT_L1, under L1                            *)
