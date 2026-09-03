@@ -35,21 +35,13 @@ From iris.base_logic.lib Require Import ghost_map ghost_var.
 (* the ghost classes first, so the file-system stack's names win over the
    block layer's twins (durable-notes, AND WHERE THAT IMPORT COLLIDES,
    PUT IT EARLY) -- FsInitPin.v's own block, kept verbatim *)
-Require Import Xv6Cameras.
 Require Import FsState.
 
-Require Import BioDefs.
 Require Import DinodeEnc.
 Require Import DirView.
-Require Import InodeInv.
 Require Import FsTree.
-Require Import IcacheEscrow.
-Require Import FsCrash.
 Require Import FsDurSnap.
-Require Import FsDurSyscall.
 Require Import FsCfgBoot.
-Require Import FsDurImg.
-Require Import SystemAdequacy.
 Require Import FsImgDisk.
 Require Import FsImgCheck.
 Require Import FsImg.
@@ -61,7 +53,7 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import UserHeap.
 Require Import UsysMemOk.

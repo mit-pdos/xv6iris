@@ -48,7 +48,6 @@ From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import dfrac.
 From iris.base_logic.lib Require Import iprop ghost_map.
 Require Import BioDefs.        (* [BSIZE] -- the flattening's stride       *)
-Require Import FsImg.          (* [BSIZE_z] -- [byte_range]'s own stride   *)
 Require Import LogDefs.        (* [fs_dbytes] -- the byte flattening       *)
 Require Import DiskImg.        (* [diskImgG] -- section 3's byte class.
                                   IMPORTED, not merely required: a capacity
