@@ -128,10 +128,10 @@ Section barrier.
       by (rewrite Hm; exact (HC _ (Interface.Barrier bk) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step with "Hcert").
-    { intros oth0 h0 img0 σ0 log0 tv0 r0 m'0 σ'0 log'0 tv'0 r'0 Hs.
+    { intros oth0 h0 img0 σ0 log0 tv0 itv0 r0 m'0 σ'0 log'0 tv'0 itv'0 r'0 Hs.
       rewrite /mnode_step in Hs. cbn beta iota in Hs.
-      by destruct Hs as (_ & _ & _ & _ & ->). }
-    iIntros (σ oth rv img log tv V) "%Htv Hσ Htso".
+      by destruct Hs as (_ & _ & _ & _ & _ & ->). }
+    iIntros (σ oth rv img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
     iDestruct (tso_interp_of_bound with "Htso") as %Hb.
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     assert (Htvlen : (tv <= length log)%nat) by (rewrite -Htv; apply Hb).
@@ -170,14 +170,18 @@ Section barrier.
     rewrite -(tso_interp_of_at_gs riscv_eraGS img σ.(mem) log
                 (vstep h tvn log V) σ.(sregs) σ.(mdev) Hpin').
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
-    iExists (C (K tt)), σ, log, tvn, rv.
+    (* a DRAINING fence is not fence.i: the instruction view stays *)
+    assert (Hfi : fence_ifetch bk = false)
+      by (destruct bk; try reflexivity; discriminate Hdrain).
+    iExists (C (K tt)), σ, log, tvn, itv, rv.
     iSplitR.
-    { iPureIntro. rewrite /mnode_step. cbn beta iota. by split_and!. }
-    iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
-    rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
-    destruct Hstep as (-> & -> & -> & -> & ->).
+    { iPureIntro. rewrite /mnode_step. cbn beta iota. rewrite Hfi.
+      by split_and!. }
+    iNext. iIntros (m' σ' log' tv' itv' rv') "%Hstep".
+    rewrite /mnode_step in Hstep. cbn beta iota in Hstep. rewrite Hfi in Hstep.
+    destruct Hstep as (-> & -> & -> & -> & -> & ->).
     iMod "Hclose" as "_". iModIntro.
-    iFrame "Hri Hmem Hdev Htso".
+    iFrame "Hri Hmem Hdev Htso Hiv".
     rewrite -Hres. iApply ("H" with "HQ").
   Qed.
 
@@ -247,10 +251,10 @@ Section barrier.
       by (rewrite Hm; exact (HC _ (Interface.Barrier bk) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step with "Hcert").
-    { intros oth0 h0 img0 σ0 log0 tv0 r0 m'0 σ'0 log'0 tv'0 r'0 Hs.
+    { intros oth0 h0 img0 σ0 log0 tv0 itv0 r0 m'0 σ'0 log'0 tv'0 itv'0 r'0 Hs.
       rewrite /mnode_step in Hs. cbn beta iota in Hs.
-      by destruct Hs as (_ & _ & _ & _ & ->). }
-    iIntros (σ oth rv img log tv V) "%Htv Hσ Htso".
+      by destruct Hs as (_ & _ & _ & _ & _ & ->). }
+    iIntros (σ oth rv img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
     iDestruct (tso_interp_of_bound with "Htso") as %Hb.
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     assert (Htvlen : (tv <= length log)%nat) by (rewrite -Htv; apply Hb).
@@ -279,14 +283,21 @@ Section barrier.
     rewrite -(tso_interp_of_at_gs riscv_eraGS img σ.(mem) log
                 (vstep h tvn log V) σ.(sregs) σ.(mdev) Hpin').
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
-    iExists (C (K tt)), σ, log, tvn, rv.
+    (* the INSTRUCTION view (icache.md): a fence.i raises it past the data
+       view and the hart's own last store; any other barrier leaves it *)
+    set (itvn := if fence_ifetch bk
+                 then Nat.max itv (fence_post h log true tv) else itv).
+    iExists (C (K tt)), σ, log, tvn, itvn, rv.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota. by split_and!. }
-    iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' rv') "%Hstep".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
-    destruct Hstep as (-> & -> & -> & -> & ->).
-    iMod "Hclose" as "_". iModIntro.
-    iFrame "Hri Hmem Hdev Htso".
+    destruct Hstep as (-> & -> & -> & -> & -> & ->).
+    iMod "Hclose" as "_".
+    iMod (hart_iview_auth_update cpu_id itv itvn with "Hiv") as "Hiv".
+    { rewrite /itvn. case_match; lia. }
+    iModIntro.
+    iFrame "Hri Hmem Hdev Htso Hiv".
     rewrite -Hres. iApply ("H" with "HQ").
   Qed.
 

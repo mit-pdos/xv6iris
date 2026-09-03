@@ -90,13 +90,33 @@ Local Open Scope Z_scope.
 (* the only thing the fold-back needs to know about it.                    *)
 (* ====================================================================== *)
 
+(* THE THIRD TIE (claude-notes/projects/icache.md): an instruction fetch
+   reads through the icache -- at ANY view at or above the hart's
+   instruction view, with no store forwarding -- so a block folds back onto
+   the flat [run] only if the bytes it FETCHES are UNWRITTEN in the log
+   (kernel text: image bytes at timestamp 0).  Stated per node, at the fetch
+   node's own footprint. *)
+Definition fetch_unwritten (log : list pwmsg) (m : M unit) : Prop :=
+  match m with
+  | Interface.Next oc _ =>
+      match oc with
+      | Interface.MemRead n req =>
+          ak_ifetch (Interface.ReadReq.access_kind req) = true ->
+          forall j : nat, (N.of_nat j < n)%N ->
+            unwritten log (pa_add (Interface.ReadReq.pa req) j)
+      | _ => True
+      end
+  | _ => True
+  end.
+
 Definition mstep1 (h : agent) (img : gmap Arch.pa (bv 8))
     (c c' : M unit * mstate) : Prop :=
   match c.1 with
   | Interface.Ret _ => False
-  | _ => exists (log log' : list pwmsg) (tv tv' : nat) (r r' : option resv),
-      c.2.(mem) = flat img log /\ all_own h log /\
-      mnode_step ∅ h img c.2 log tv r c.1 c'.1 c'.2 log' tv' r'
+  | _ => exists (log log' : list pwmsg) (tv tv' itv itv' : nat)
+                (r r' : option resv),
+      c.2.(mem) = flat img log /\ all_own h log /\ fetch_unwritten log c.1 /\
+      mnode_step ∅ h img c.2 log tv itv r c.1 c'.1 c'.2 log' tv' itv' r'
   end.
 
 Definition mblock (h : agent) (img : gmap Arch.pa (bv 8))
@@ -105,10 +125,11 @@ Definition mblock (h : agent) (img : gmap Arch.pa (bv 8))
 (* ====================================================================== *)
 (* 2. One node folds back into [run] -- the whole bracket in one step.      *)
 (*                                                                         *)
-(* Only ONE arm has changed since the SC proof: the plain explicit RAM      *)
-(* load, which is now a [tso_read] at the arm's chosen view and is folded   *)
-(* back onto [run]'s flat read by the two era ties.  The strongly-ordered   *)
-(* read (ifetch / page walk, RULING 1) and the exclusive read still read    *)
+(* Two arms differ from the SC proof: the plain RAM load, a [tso_read] at   *)
+(* the arm's chosen view folded back onto [run]'s flat read by the two era  *)
+(* ties, and the instruction FETCH, a [tso_read] through the icache agent   *)
+(* folded back by the third tie (the fetched bytes are unwritten, so every  *)
+(* agent reads the image at every view).  The exclusive read still reads    *)
 (* [s.(mem)] verbatim, and the write arm's [s.(mem)] update is untouched    *)
 (* by the append beside it.                                                 *)
 (* ====================================================================== *)
@@ -120,22 +141,32 @@ Lemma mnode_step_run (h : agent) (img : gmap Arch.pa (bv 8))
 Proof.
   rewrite /mstep1 /=.
   destruct m as [y|T oc k]; [by intros []|].
-  intros (log & log' & tv & tv' & r & r' & Hflat & Hown & Hn). revert Hn.
-  rewrite /mnode_step.
+  intros (log & log' & tv & tv' & itv & itv' & r & r' & Hflat & Hown & Hfu & Hn).
+  revert Hfu Hn.
+  rewrite /mnode_step /fetch_unwritten.
   (* [cbn beta iota] and NOT [simpl]: it reduces the dependent match that
      selects this outcome's arm WITHOUT also unfolding the [run] in the
      conclusion -- which would pre-destruct [dev_addr] and leave the memory
      arms with nothing to rewrite. *)
-  destruct oc; cbn beta iota; try (by intros []);
-    try (intros (-> & -> & _); intros x s2 H; exact H).
+  destruct oc; cbn beta iota; try (by intros _ []);
+    try (intros _ (-> & -> & _); intros x s2 H; exact H).
   - (* MemRead *)
     destruct (dev_addr _) eqn:Hd.
-    + intros (w & d' & Hdr & Hm & Hs & _) x s2 H. subst m' s'.
+    + intros _ (w & d' & Hdr & Hm & Hs & _) x s2 H. subst m' s'.
       cbn [run]. rewrite Hd Hdr. exact H.
-    + intros [(_ & tvn & w & _ & _ & Hbytes & Hm & Hs & _)
-             |(_ & [(Hov & _) | (_ & w & Hbytes & Hm & Hs & _)])] x s2 H.
-      * (* THE PLAIN LOAD -- now EVERY non-exclusive read, implicit ones
-           included (RULING 1 overruled).  [Hbytes] reads
+    + intros Hfu [(Hif & tvn & w & _ & _ & Hbytes & Hm & Hs & _)
+                 |[(_ & _ & tvn & w & _ & _ & Hbytes & Hm & Hs & _)
+                  |(_ & [(Hov & _) | (_ & w & Hbytes & Hm & Hs & _)])]] x s2 H.
+      * (* THE FETCH: [Hbytes] reads through the icache agent at some view
+           [tvn] at or above the instruction view; the third tie says the
+           fetched bytes are unwritten, so that read IS the image byte,
+           which is also what the flat cache holds there. *)
+        subst m' s'. cbn [run]. rewrite Hd.
+        exists w. split; [|exact H].
+        intros j Hj. pose proof (Hbytes j Hj) as Hb.
+        rewrite (tso_read_unwritten _ _ _ _ _ (Hfu Hif j Hj)) in Hb.
+        rewrite Hflat (flat_unwritten _ _ _ (Hfu Hif j Hj)). exact Hb.
+      * (* THE PLAIN LOAD -- every non-exclusive DATA read.  [Hbytes] reads
            [tso_read] at the drained view [tvn]; the solo era collapses that
            onto the flat cache at ANY view, and the flat tie names the flat
            cache [s.(mem)]. *)
@@ -151,12 +182,12 @@ Proof.
         exists w. split; [exact Hbytes|exact H].
   - (* MemWrite *)
     destruct (dev_addr _) eqn:Hd.
-    + intros (d' & Hdw & Hm & Hs & _) x s2 H. subst m' s'.
+    + intros _ (d' & Hdw & Hm & Hs & _) x s2 H. subst m' s'.
       cbn [run]. rewrite Hd Hdw. exact H.
-    + intros [(Hov & _) | (_ & Hm & Hs & _)] x s2 H;
+    + intros _ [(Hov & _) | (_ & Hm & Hs & _)] x s2 H;
         [by exfalso; apply Hov; set_solver|].
       subst m' s'. cbn [run]. rewrite Hd. exact H.
-  - (* Choose *) intros (ch & -> & -> & _) x s2 H. cbn [run]. by exists ch.
+  - (* Choose *) intros _ (ch & -> & -> & _) x s2 H. cbn [run]. by exists ch.
 Qed.
 
 (* ====================================================================== *)
@@ -197,10 +228,10 @@ Proof. intros H. exact (mblock_run _ _ _ _ H tt eq_refl). Qed.
 (* ====================================================================== *)
 
 Lemma mnode_step_all_own (oth : gset Arch.pa) (h : agent)
-    (img : gmap Arch.pa (bv 8)) (s : mstate) (log : list pwmsg) (tv : nat)
+    (img : gmap Arch.pa (bv 8)) (s : mstate) (log : list pwmsg) (tv itv : nat)
     (r : option resv) (m m' : M unit) (s' : mstate) (log' : list pwmsg)
-    (tv' : nat) (r' : option resv) :
-  mnode_step oth h img s log tv r m m' s' log' tv' r' ->
+    (tv' itv' : nat) (r' : option resv) :
+  mnode_step oth h img s log tv itv r m m' s' log' tv' itv' r' ->
   all_own h log -> all_own h log'.
 Proof.
   rewrite /mnode_step. destruct m as [y|T oc k].
@@ -211,7 +242,8 @@ Proof.
     destruct (dev_addr _).
     + by intros (w & d' & _ & _ & _ & -> & _).
     + by intros [(_ & tvn & w & _ & _ & _ & _ & _ & -> & _)
-                |(_ & [(_ & _ & _ & -> & _) | (_ & w & _ & _ & _ & -> & _)])].
+                |[(_ & _ & tvn & w & _ & _ & _ & _ & _ & -> & _)
+                 |(_ & [(_ & _ & _ & -> & _) | (_ & w & _ & _ & _ & -> & _)])]].
   - (* MemWrite: the MMIO half is strongly ordered (no log); the RAM half
        appends THIS hart's message *)
     destruct (dev_addr _).

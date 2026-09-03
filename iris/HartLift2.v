@@ -154,11 +154,11 @@ Lemma hsil_node2_mnode (Drw Dro : gset register) (rs rs' : regstate)
     (m m' : M unit) (mem : gmap Arch.pa (bv 8)) (dev : dev_state) :
   hsil_node2 Drw Dro rs m = Some (rs', m') ->
   forall (oth : gset Arch.pa) (h : agent) (img : gmap Arch.pa (bv 8))
-         (log : list pwmsg) (tv : nat) (r : option resv),
-    mnode_step oth h img (MState rs mem dev) log tv r m m'
-      (MState rs' mem dev) log (hsil_tv h log m tv) r.
+         (log : list pwmsg) (tv itv : nat) (r : option resv),
+    mnode_step oth h img (MState rs mem dev) log tv itv r m m'
+      (MState rs' mem dev) log (hsil_tv h log m tv) (hsil_itv h log m tv itv) r.
 Proof.
-  intros Hnode oth h img log tv r. destruct m as [y|T oc k];
+  intros Hnode oth h img log tv itv r. destruct m as [y|T oc k];
     [by simpl in Hnode|].
   destruct oc; simpl in Hnode |- *; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
@@ -168,17 +168,17 @@ Qed.
 Lemma hsil_node2_mnode_inv (Drw Dro : gset register) (rs rs' : regstate)
     (m m' m2 : M unit) (mem : gmap Arch.pa (bv 8)) (dev : dev_state)
     (σ2 : mstate) (oth : gset Arch.pa) (h : agent)
-    (img : gmap Arch.pa (bv 8)) (log log2 : list pwmsg) (tv tv2 : nat)
+    (img : gmap Arch.pa (bv 8)) (log log2 : list pwmsg) (tv tv2 itv itv2 : nat)
     (r r2 : option resv) :
   hsil_node2 Drw Dro rs m = Some (rs', m') ->
-  mnode_step oth h img (MState rs mem dev) log tv r m m2 σ2 log2 tv2 r2 ->
+  mnode_step oth h img (MState rs mem dev) log tv itv r m m2 σ2 log2 tv2 itv2 r2 ->
   m2 = m' /\ σ2 = MState rs' mem dev /\ log2 = log /\
-  tv2 = hsil_tv h log m tv /\ r2 = r.
+  tv2 = hsil_tv h log m tv /\ itv2 = hsil_itv h log m tv itv /\ r2 = r.
 Proof.
   intros Hnode Hstep. destruct m as [y|T oc k]; [by simpl in Hnode|].
   destruct oc; simpl in Hnode |- *; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
-    injection Hnode as <- <-; destruct Hstep as (-> & -> & -> & -> & ->);
+    injection Hnode as <- <-; destruct Hstep as (-> & -> & -> & -> & -> & ->);
     by split_and!.
 Qed.
 
@@ -188,16 +188,16 @@ Lemma hsil_node2_pres (Drw Dro : gset register) (rs rs' : regstate)
     (m m' : M unit) :
   hsil_node2 Drw Dro rs m = Some (rs', m') ->
   forall (oth : gset Arch.pa) (h : agent) (img : gmap Arch.pa (bv 8))
-         (s : mstate) (log : list pwmsg) (tv : nat) (r : option resv)
-         (m2 : M unit) (s2 : mstate) (log2 : list pwmsg) (tv2 : nat)
+         (s : mstate) (log : list pwmsg) (tv itv : nat) (r : option resv)
+         (m2 : M unit) (s2 : mstate) (log2 : list pwmsg) (tv2 itv2 : nat)
          (r2 : option resv),
-    mnode_step oth h img s log tv r m m2 s2 log2 tv2 r2 -> r2 = r.
+    mnode_step oth h img s log tv itv r m m2 s2 log2 tv2 itv2 r2 -> r2 = r.
 Proof.
-  intros Hnode oth h img s log tv r m2 s2 log2 tv2 r2 Hstep.
+  intros Hnode oth h img s log tv itv r m2 s2 log2 tv2 itv2 r2 Hstep.
   destruct m as [y|T oc k]; [by simpl in Hnode|].
   destruct oc; simpl in Hnode; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
-    injection Hnode as <- <-; destruct Hstep as (_ & _ & _ & _ & ->);
+    injection Hnode as <- <-; destruct Hstep as (_ & _ & _ & _ & _ & ->);
     reflexivity.
 Qed.
 
@@ -258,10 +258,10 @@ Section batch2.
   Proof.
     iIntros (Hdisj Hnode) "#Hcert Hrf Hro H".
     iApply (wp_hart_step with "Hcert").
-    { intros oth0 h0 img0 σ0 log0 tv0 r0 m'0 σ'0 log'0 tv'0 r'0 Hs.
+    { intros oth0 h0 img0 σ0 log0 tv0 itv0 r0 m'0 σ'0 log'0 tv'0 itv'0 r'0 Hs.
       exact (hsil_node2_pres Drw Dro rs rs1 m m1 Hnode oth0 h0 img0 σ0 log0
-               tv0 r0 m'0 σ'0 log'0 tv'0 r'0 Hs). }
-    iIntros (σ oth r img log tv V) "%Htv Hσ Htso".
+               tv0 itv0 r0 m'0 σ'0 log'0 tv'0 itv'0 r'0 Hs). }
+    iIntros (σ oth r img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
     destruct σ as [rs0 mem0 dev0].
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (hreg_frame_agree rs Drw rs0 with "Hri Hrf") as %HagW.
@@ -285,15 +285,19 @@ Section batch2.
            with "Htso") as "Htso".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iExists m1, (MState rs2 mem0 dev0), log,
-      (hsil_tv (hart_agent cpu_id) log m tv), r.
+      (hsil_tv (hart_agent cpu_id) log m tv),
+      (hsil_itv (hart_agent cpu_id) log m tv itv), r.
     iSplitR.
     { iPureIntro.
       exact (hsil_node2_mnode Drw Dro rs0 rs2 m m1 mem0 dev0 Hnode2 oth
-               (hart_agent cpu_id) img log tv r). }
-    iNext. iIntros (m' σ' log' tv' r') "%Hstep".
+               (hart_agent cpu_id) img log tv itv r). }
+    iNext. iIntros (m' σ' log' tv' itv' r') "%Hstep".
     destruct (hsil_node2_mnode_inv Drw Dro rs0 rs2 m m1 m' mem0 dev0 σ' oth
-                (hart_agent cpu_id) img log log' tv tv' r r' Hnode2 Hstep)
-      as (-> & -> & -> & -> & ->).
+                (hart_agent cpu_id) img log log' tv tv' itv itv' r r' Hnode2 Hstep)
+      as (-> & -> & -> & -> & -> & ->).
+    (* the instruction view follows the fence.i arm ([HartLift.hsil_itv]) *)
+    iMod (hart_iview_auth_update cpu_id itv (hsil_itv (hart_agent cpu_id) log m tv itv)
+            (hsil_itv_ge _ _ _ _ _) with "Hiv") as "Hiv".
     (* re-establish: for a RegWrite one [Drw] register moves (the ro-frame
        re-anchors through disjointness), otherwise the file is untouched *)
     iAssert (|==> reg_interp rs2 ∗ hreg_frame rs1 Drw ∗
@@ -344,7 +348,8 @@ Section batch2.
             by iApply (hreg_frame_ro_ext_local Df rs
                          (register_set reg regval rs) Dro HagO') ]. }
     iMod "Hmask" as "_". iModIntro.
-    iSplitR "H Hrf Hro Htso"; [iFrame "Hri Hmem Hdev"|].
+    iSplitR "H Hrf Hro Htso Hiv"; [iFrame "Hri Hmem Hdev"|].
+    iSplitL "Hiv"; [iExact "Hiv"|].
     iSplitL "Htso"; [iExact "Htso"|].
     iApply ("H" with "Hrf Hro").
   Qed.
