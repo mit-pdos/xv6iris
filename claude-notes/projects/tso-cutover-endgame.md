@@ -526,6 +526,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | item 28/29 | the re-cut skeletons (2673a2a7b): reviewer 1's audit -- shapes final and consistent; points (a)-(d) answered; ONE fix before pass 1 (`proto_fork_child_read` must return both halves); pass-1 items: `a_foff_aligned`, `ientry` injectivity for `off_fd_split`'s join, the unused `off_member` premise | SIGNED OFF by reviewer 1; the chain-link fix LANDED (item 30); reviewer 2's pass next |
 | item 31 | reviewer 2's audit of 619580606: shapes final and consistent as a system; ONE unprovable link -- `proto_read_checkout`'s `Kt` untied to the share's hidden stamps (fix: `off_fd_at … m`, `proto_read_llb`, the checkout and fork links take `max_stamp m ≤ Kt`); item 28's (a)-(d) answered | SIGNED OFF; the link fix LANDED (item 32) -- PASS 1 STARTED |
 | item 34/35 | the fold-back problem (rows folded at acquire, deferred after a park; one predicate cannot be both): reviewer 1 RULES option (A) -- SpecIlock's post hands `off_rows` folded, SpecIunlock/Iunlockput's pre takes `∃ T, off_rows_dep` (the DEP form, CtxMorph; not the deferred wand), `ic_handle` back to pre-item-33, callers pass `off_rows_to_dep`; (B)/(C) declined (coupling / no gain); third checklist line | RULED by reviewer 1; to reviewer 2 |
+| item 36 | reviewer 2 on items 33-35: (A) CONFIRMED; the dep-in-handle and derive-the-old-specs alternatives collapse into (A)/(C); pre-empts: `off_rows_take_dep` + `off_rows_dep_insert` (statements before ProofFileread; `proto_read_park` restated to the dep form), ONE off step per hold, contexts stable across sleeps (no morph), site counts 30/32 by grep; third checklist line adopted | SIGNED OFF on (A) |
 | item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RULED -- reviewer 1 agrees (item 17), with `file_core_off`'s FD_INODE arm named as the FIFTH final shape and "0 Admitted in `EnvMorph`" added to r25's gate |
 | item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; the two fixes LANDED (item 20) -- reviewer 2's audit next |
 | item 21 | reviewer 2's audit of d53e4a4e5: NOT signed off -- (1) the cell claimed twice and the unit unowned at non-FD_INODE arms (unit unconditional; `file_core_off := emp`; the free arm holds `off_resident`; the L2 half rides the FD_NONE unit); (2) `file_pay_st_split` false (one-sided over a unitless `file_pay_tie`); (3) the three ghost steps, the last-close pair, `so_deposit`, `so_open_slot` not at final shape; plus `ftable_res_at`'s fold/unfold pair | AUDITED by reviewer 2; fixes pending |
@@ -2255,6 +2256,77 @@ branch and recorded in §3.2 and §8 here.
       and the chain, and pass 1 starts.  Reviewer 1 need not re-read: the
       fix is the R1 tie they described in item 29 ("Kt by R1 from the
       share's llb"), made explicit in the statement.
+
+36. **THE BOX'S DESIGNER ON ITEMS 33-35 (2026-09-03): option (A) CONFIRMED;
+    two alternatives I tried collapse into it; four things to pre-empt
+    before ProofFileread opens, one of them a statement.**  Read: items
+    33-35, `ic_handle` (IcacheEscrow.v:4368, the item-33 tail), `off_rows_take`/
+    `_insert`/`_insert_row`/`_fold`/`_bound`/`_to_dep`, `off_rows_dep_le`,
+    `ic_slp_dep_of_rows`, `off_read_park`, `proto_read_park`, SpecSleep.v
+    (no `own_context`), the spec files that mention `ic_handle` (three:
+    SpecIlock, SpecIunlock, SpecIunlockput), the consumer counts.
+    - **THE DIAGNOSIS AND (A) ARE RIGHT.**  A deposit stamps at the parker's
+      `max K W`, never below its bound, so the parker holds no floor at the
+      parked stamp; the acquire hands rows folded (R2), the park returns one
+      deferred; one predicate cannot be both.  The DEP form at the release
+      is forced by `lock_finisher_close_in_llb`'s `CtxMorph Rdep` (a wand
+      over the context is not).  Item 33's reversal is the right call: a
+      minimal-churn guess that failed the third checklist line, which did
+      not exist when it was made.
+    - **TWO ALTERNATIVES, TRIED AND DISCARDED, so nobody re-tries them.**
+      (i) Rows in DEP form INSIDE `ic_handle` (context-free, no caller churn)
+      with `Kp` from step 1's floor: the reader's `Kp` must cover the rows'
+      bound `T`, which is hidden inside the handle, so the spec would have
+      to relate the continuation's `K` to that `T` -- that is option (C),
+      a parametrised handle, and its sites are the same sites as (A).  (ii)
+      Derive the OLD ilock/iunlock specs from the new ones for the ~40
+      callers that never touch `f->off`: impossible as two lemmas, because
+      the new iunlock's PRE needs what only the new ilock's POST hands out;
+      the pair is a corollary only jointly.  So the churn is inherent in
+      "the rows leave the lock and come back"; (A) spends it in the open.
+    - **PRE-EMPT 1 (a statement, before ProofFileread): `off_rows_take`'s
+      return wand demands the row back FOLDED** (`∀ s', off_l2_row γ s' ξ -∗
+      off_rows on i ξ`, OffBox.v:202), i.e. with `ctx_floor ξ (lr_tp s')`;
+      after the park the parker has `off_regp γb (L2Reg T' None) ∗ llb T'`
+      and no floor, so it cannot discharge it.  Needed: `off_rows_take_dep`
+      -- take the row out, hand the REMAINDER in dep form (`off_rows_bound`
+      on the remaining set is the ingredient), and `off_rows_dep_insert :
+      off_rows_dep on i T -∗ off_regp γ s' -∗ ⌜lr_hold s' = None⌝ -∗ llb
+      (lr_tp s') -∗ off_rows_dep on i (max T (lr_tp s'))` (membership
+      already held).  Then fileread's path is: folded rows from ilock →
+      `off_rows_take_dep` (the row with its floor as `Kp`; the rest in dep
+      form) → checkout → access → park → `off_rows_dep_insert` → `∃ T,
+      off_rows_dep` to iunlock.  `proto_read_park`'s deferred-wand
+      conclusion should be restated to this dep form too, so the chain's
+      last link matches iunlock's pre (R5).
+    - **PRE-EMPT 2 (a protocol invariant, write it down): ONE OFF STEP PER
+      HOLD.**  After a park the rows are in dep form with no floors; a
+      second checkout in the same hold would have no `Kp`.  fileread and
+      filewrite do exactly one per hold (filewrite's loop re-locks per
+      chunk); sys_open's birth inserts at tp 0 and needs no floor.  Record
+      it in FileOffProtocol's header so a future site does not discover it.
+    - **PRE-EMPT 3 (a non-issue, but state it so nobody adds a morph): a
+      thread's context is STABLE across sleeps.**  SpecSleep.v never
+      mentions `own_context`; acquiresleep's post is `R cur_ctx`.  So the
+      folded rows and the R1 floor a holder carries across readi's disk
+      waits need no morph; the only crossings in this lane are the lock
+      hand-offs (R2) and the L8 park.
+    - **PRE-EMPT 4 (sizing): the site lists come from grep, not memory.**
+      Files using ilock's spec outside its own: 30; iunlock/iunlockput: 32;
+      specs that mention `ic_handle`: SpecIlock, SpecIunlock, SpecIunlockput
+      only, plus `create_locked` as the one non-spec carrier of a locked
+      inode.  Item 35's 19/25 is low by about a third; still one mechanical
+      sweep, and the ilock continuations are already open from step 1.
+    - **ON STEP 1's corollary note:** agreed, and the general rule is worth
+      stating: a spec that GROWS a premise states the strong form and
+      derives the old one; a spec that grows a POST-and-PRE pair (like the
+      rows here) cannot, and the sweep is the honest cost.
+    - **THE THIRD CHECKLIST LINE: adopted.**  With it the three lines read:
+      per-arm producers; the acquire that pays every self-absorbed deposit;
+      a lock's payload piece comes back in a `CtxMorph` shape or it is not
+      a handle conjunct.
+    - **SIGN-OFF on (A)** as ruled in item 35, with pre-empt 1's two
+      statements landed before ProofFileread's off step is attempted.
 
 17. **REVIEWER 1 ON ITEM 16 (2026-09-02): the three corrections and the
     four tripwires are taken; two additions.**
