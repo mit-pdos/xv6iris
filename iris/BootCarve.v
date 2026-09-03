@@ -1885,7 +1885,7 @@ Section BootCarve.
   Qed.
 
   (* A6.132: a 4-byte .bss cell carved STRAIGHT TO THE LEDGER TIER at
-     timestamp 0, with the address facts a [WpSconfMem.wordw_claim] needs
+     timestamp 0, with the address facts a [MemClaim.wordw_claim] needs
      beside it.  [started] is the client: a barrier word is neither a ctx
      cell (no stable view) nor a payload cell yet (the release store mints
      that), so what boot hands over is the plain window plus the claim. *)

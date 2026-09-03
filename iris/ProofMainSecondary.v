@@ -335,7 +335,7 @@ Section ProofMainSecondary.
     iIntros "Hcg #Htext Hpc #Hsinv Hcont".
     iLöb as "IH" forall (m Ha4).
     (* ---- +0x16 c.lw a5,0(a4) : the spin load, under the invariant ---- *)
-    (* THE ADDRESS CLAIM the per-node load asks for (WpSconfMem.wordw_claim):
+    (* THE ADDRESS CLAIM the per-node load asks for (MemClaim.wordw_claim):
        the access TRANSLATES several nodes before the atomic update is opened,
        so the window's mapping has to arrive up front.  It is persistent and
        says nothing about the VALUE, so one peek-open of the started

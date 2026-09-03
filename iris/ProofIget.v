@@ -1303,7 +1303,7 @@ Section ProofIget.
             assert (Hsv6e : trunc32 (rget N1 Rs2) = icfg_dev).
             { rewrite (rget_ne N1 Rs2 ltac:(nz)) HN1s2. apply trunc32_sext. }
     (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
-       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       [MemClaim.wordw_claim] beside the (linear) atomic update, so it has
        to arrive first; the claim is persistent and says nothing about the
        VALUE, so a RESTORING peek of the same cell delivers it. *)
     (* Here the peek is [ic_open_empty_dev] run at [devN := devT]: it hands
@@ -1346,7 +1346,7 @@ Section ProofIget.
             assert (Hsv72 : trunc32 (rget N1 Rs4) = inum).
             { rewrite (rget_ne N1 Rs4 ltac:(nz)) HN1s4. apply trunc32_sext. }
     (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
-       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       [MemClaim.wordw_claim] beside the (linear) atomic update, so it has
        to arrive first; the claim is persistent and says nothing about the
        VALUE, so a RESTORING peek of the same cell delivers it. *)
     (* Here no peek is needed at all: the caller already OWNS half of the
@@ -1560,7 +1560,7 @@ Section ProofIget.
             assert (Hsv7c : trunc32 (rget V1 Rz) = valid_word false).
             { rewrite (rget_ne V1 Rz ltac:(nz)) Hx0. exact ig_trunc32_zero. }
     (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
-       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       [MemClaim.wordw_claim] beside the (linear) atomic update, so it has
        to arrive first; the claim is persistent and says nothing about the
        VALUE, so a RESTORING peek of the same cell delivers it. *)
             (* the valid cell came out of the box with the header: a plain store,

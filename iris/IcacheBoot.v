@@ -93,7 +93,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvPtsto RiscvModelBytes.
 Require Import ArrCursor.
 Require Import WpLock.
-Require Import WpSconfMem.  (* [wordw_claim]: the ref cells' read claims, minted at boot *)
+Require Import MemClaim.  (* [wordw_claim]: the ref cells' read claims,
+     minted at boot.  NOT WpSconfMem; see that file's header. *)
 Require Import CtxBox.      (* the box's boot allocation and the llb fold *)
 Require Import SepThread.   (* A6.68: the running token threaded through the fifty sleeplocks *)
 Require Import WpLockAt.   (* [lock_free_tok] / [newlock_at]: the pre-minted
@@ -1454,12 +1455,12 @@ Section IcacheBootTable.
       iSplitR; [iPureIntro; exact icM_wf_empty |]. iExact "Hslots0". }
     (* THE ADDRESS CLAIMS, read once off the boot cells (persistent) *)
     iAssert ([∗ list] k ∈ seq 0 NINODE,
-               WpSconfMem.wordw_claim (KTR := KT0) 4 (i_ref (ientry k)) ∗
+               MemClaim.wordw_claim (KTR := KT0) 4 (i_ref (ientry k)) ∗
                i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32))%I
       with "[Href]" as "Hrefc".
     { iApply (big_sepL_mono with "Href"). intros idx k _.
       iIntros "Hc".
-      iDestruct (WpSconfMem.wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+      iDestruct (MemClaim.wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
                    (DfracOwn 1) (mword_of_int 0 : mword 32) ltac:(lia)
                    with "Hc") as "#Hk".
       iFrame "Hk Hc". }

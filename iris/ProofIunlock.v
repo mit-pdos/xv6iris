@@ -431,7 +431,7 @@ Section ProofIunlockMain.
                       = i_ref ip).
     { rgne. rewrite HmHs1. reflexivity. }
     (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
-       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
+       [MemClaim.wordw_claim] beside the (linear) atomic update, so it has
        to arrive first.  Both accessors this read uses RESTORE, so one peek
        -- the escrow's checked-out arm, then the itable's liveness read --
        hands out the ref word's own points-to; [wordw_claim_of] reads the

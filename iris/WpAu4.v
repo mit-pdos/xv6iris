@@ -93,7 +93,7 @@ Section Au4Leaves.
     pc_is pc -∗
     instr pc cmp (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
     (* THE ADDRESS CLAIM the per-node forms ask for
-       ([WpSconfMem.wordw_claim]): per node the access TRANSLATES several
+       ([MemClaim.wordw_claim]): per node the access TRANSLATES several
        nodes before the memory node where the one-shot atomic update is
        opened, so the window's mapping, alignment, canonicality and RAM-ness
        have to arrive UP FRONT, beside the (linear) update rather than
@@ -294,7 +294,7 @@ Section Au4Leaves.
     pc_is pc -∗
     instr pc cmp (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
     (* THE ADDRESS CLAIM the per-node forms ask for
-       ([WpSconfMem.wordw_claim]): per node the access TRANSLATES several
+       ([MemClaim.wordw_claim]): per node the access TRANSLATES several
        nodes before the memory node where the one-shot atomic update is
        opened, so the window's mapping, alignment, canonicality and RAM-ness
        have to arrive UP FRONT, beside the (linear) update rather than

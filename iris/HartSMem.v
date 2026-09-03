@@ -563,7 +563,7 @@ Qed.
    access's ([option (bv (8*n))]), and at a SYMBOLIC width the two indices --
    [8 * Z.to_N width] and [Z_idx (8 * width)] -- are equal only by [lia].  The
    byte-wise spelling has no such tie, and it is already the shape the S-mode
-   leaves own their data in ([WpSconfMem.wordw_pointsto]). *)
+   leaves own their data in ([MemClaim.wordw_pointsto]). *)
 Definition mem_bytes_at (s : mstate) (pa : Arch.pa) (width : Z)
     (w : SailStdpp.Values.mword (8 * width)) : Prop :=
   forall j : nat, (N.of_nat j < Z.to_N width)%N ->

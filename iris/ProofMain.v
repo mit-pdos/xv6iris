@@ -2064,7 +2064,7 @@ Section ProofMain.
     assert (Hsvst : trunc32 (rget S3 (mword_of_int 14 : mword 5)) = started_set).
     { rewrite HS3a4 /trunc32 /started_set. apply bv_eq; vm_compute; reflexivity. }
     (* ---- +0xb0 sw a4,0(a5) : started = 1, paying [P] into the escrow ---- *)
-    (* THE ADDRESS CLAIM the per-node store asks for (WpSconfMem.wordw_claim):
+    (* THE ADDRESS CLAIM the per-node store asks for (MemClaim.wordw_claim):
        per node the access TRANSLATES before it writes, so the window's
        mapping is needed BEFORE the atomic update is opened.  The claim is
        persistent and says nothing about the VALUE, so one peek-open of the

@@ -7048,7 +7048,7 @@ Section VirtioProto.
   (* SPENDS the receipt, bumps [disk_done_lb] and hands out the payoff      *)
   (* map.  A caller that only needs the element's ADDRESS CLAIM cannot use  *)
   (* it -- and under per-node stepping every such caller needs exactly      *)
-  (* that, because [WpSconfMem.wordw_claim] must arrive BESIDE the atomic   *)
+  (* that, because [MemClaim.wordw_claim] must arrive BESIDE the atomic   *)
   (* update rather than inside it (the access translates several nodes      *)
   (* before the memory node where the update is opened).  Deriving the      *)
   (* claim from the static map instead is forbidden (the standing ruling:   *)
