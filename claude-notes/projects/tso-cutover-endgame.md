@@ -526,6 +526,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | item 28/29 | the re-cut skeletons (2673a2a7b): reviewer 1's audit -- shapes final and consistent; points (a)-(d) answered; ONE fix before pass 1 (`proto_fork_child_read` must return both halves); pass-1 items: `a_foff_aligned`, `ientry` injectivity for `off_fd_split`'s join, the unused `off_member` premise | SIGNED OFF by reviewer 1; the chain-link fix LANDED (item 30); reviewer 2's pass next |
 | item 31 | reviewer 2's audit of 619580606: shapes final and consistent as a system; ONE unprovable link -- `proto_read_checkout`'s `Kt` untied to the share's hidden stamps (fix: `off_fd_at … m`, `proto_read_llb`, the checkout and fork links take `max_stamp m ≤ Kt`); item 28's (a)-(d) answered | SIGNED OFF; the link fix LANDED (item 32) -- PASS 1 STARTED |
 | item 34/35 | the fold-back problem (rows folded at acquire, deferred after a park; one predicate cannot be both): reviewer 1 RULES option (A) -- SpecIlock's post hands `off_rows` folded, SpecIunlock/Iunlockput's pre takes `∃ T, off_rows_dep` (the DEP form, CtxMorph; not the deferred wand), `ic_handle` back to pre-item-33, callers pass `off_rows_to_dep`; (B)/(C) declined (coupling / no gain); third checklist line | RULED by reviewer 1; to reviewer 2 |
+| item 40 | the boot cone closed (2026-09-03): six compile-order fixes in BootShared/BootCarve/SystemAdequacy; KexecPin ×3 parked (owner); clean build + `audit-only`; merged main; pushed to tso-cutover and main | DONE |
 | item 36 | reviewer 2 on items 33-35: (A) CONFIRMED; the dep-in-handle and derive-the-old-specs alternatives collapse into (A)/(C); pre-empts: `off_rows_take_dep` + `off_rows_dep_insert` (statements before ProofFileread; `proto_read_park` restated to the dep form), ONE off step per hold, contexts stable across sleeps (no morph), site counts 30/32 by grep; third checklist line adopted | SIGNED OFF on (A) |
 | item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RULED -- reviewer 1 agrees (item 17), with `file_core_off`'s FD_INODE arm named as the FIFTH final shape and "0 Admitted in `EnvMorph`" added to r25's gate |
 | item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; the two fixes LANDED (item 20) -- reviewer 2's audit next |
@@ -2448,6 +2449,49 @@ branch and recorded in §3.2 and §8 here.
       a handle conjunct.
     - **SIGN-OFF on (A)** as ruled in item 35, with pre-empt 1's two
       statements landed before ProofFileread's off step is attempted.
+
+40. **(2026-09-03) THE BOOT CONE CLOSED -- BootShared and SystemAdequacy
+    green; the tree builds; three KexecPin files parked.**  Six edits, each
+    a mismatch between the L2 lane's uncompiled text and the shapes the
+    cutover had already landed, found in compile order:
+    (1) `boot_hart_pre`'s `cpu_ctx_free` row (item 39): `ctx_parked_alloc`
+        for a fresh context at stamp 0 BEFORE the fupd's `iModIntro`, the
+        carve's `∀ ξ` row instantiated at it, `own_ctx` unfolded for `vs`,
+        `T := 0`, `hart_view_lb_unseal` + `view_lb_0`.  The old `iExists
+        cur_ctx` was the item-38 mistake in one line.
+    (2) `boot_shared_alloc`'s unpack pattern lacked `kptb_unset` (A6.71's
+        one-shot sits between `kpt_unset` and the strans row), so every
+        later name was off by one and `#Hswlb` landed on the mirror half.
+        Named `Hkptb`; framed into the `kpt_unset ∗ kptb_unset` row.
+    (3) `big_sepL_mono`'s `iIntros (j _ _)`: the element is used in the
+        conclusion; named `y`.
+    (4) `boot_bss_carve` yields SIX rows (`started_claim ∗ started_win_plain
+        ∗ …`); the five-name pattern folded the first two into one and the
+        proof later re-split it.  Six names, the re-split deleted.
+    (5) `big_sepL_impl` no longer infers Ψ for the per-hart fupd once
+        `boot_hart_res` is context-free (measured on the VM: the bare
+        `iApply` fails, `big_sepL_mono` and the explicit-Ψ `iApply` unify).
+        Ψ given explicitly.
+    (6) `kernel_data_intro` takes the rodata range's `pristine_va` map
+        beside its persisted bytes (A6.81); the proof dropped the range's
+        ledger elements (`boot_cran_raw`).  Kept (`boot_cran_elim`),
+        persisted (`BootCarve.boot_led_ran_persist`), lifted to VA through
+        the static claims (`BootCarve.boot_ran_pristine`, the `pristine`
+        twin of `boot_ran_own`).
+    SystemAdequacy then needed only `Hkptb` in its pattern and one more
+    `iSpecialize` into `boot_hart_primary`, which already took it.
+    PARKED (owner, 2026-09-03): `ProofKexecPinA.v`, `ProofKexecPin.v`,
+    `LinkKexecPin.v` -- `kxc_phaseAp`'s `∀` uses `loyf`/`tlyf` unbound
+    (r21's kexec sweep); they sit behind SystemAdequacy and had never
+    compiled on the cutover.  The `_CoqProject` note says how to un-park
+    (bind the two, thread them at ProofKexecPin's one application); item 10's
+    AU lane is the natural round.
+    CERTIFICATION: a clean `iris/` build on the VM (all `.vo` removed first,
+    so no stale artifact from a `make -k` round survives) and
+    `make audit-only` (`Print Assumptions` on the system theorem).  Results
+    in the readiness record (A12.20).  `origin/main` merged (one Makefile
+    URL line; the dead-import sweep and its revert cancel); the branch
+    pushed to `tso-cutover` and to `main`.
 
 17. **REVIEWER 1 ON ITEM 16 (2026-09-02): the three corrections and the
     four tripwires are taken; two additions.**

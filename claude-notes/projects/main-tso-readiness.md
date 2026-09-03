@@ -2051,3 +2051,29 @@ Reviewer 2 signed off (item 31) subject to the Kt tie; landed (item 32:
 `off_fd_at`, `proto_read_llb`, the checkout and fork links at the named
 fragment; two optional arm links).  65 tagged Admitted.  PASS 1 begins.
 
+
+### A12.20 -- the boot cone closed; the cutover builds (2026-09-03)
+
+Plan §9 item 40 is the record.  `BootShared.v` and `SystemAdequacy.v` are
+green: `boot_hart_pre` builds `cpu_ctx_free` as the parked record it is
+(`ctx_parked_alloc` at stamp 0, the carve's `∀ ξ` instantiated there,
+`view_lb_0`); `boot_shared_alloc`'s two destruct patterns re-aligned to the
+cutover's lemma shapes (`kptb_unset`, `started_win_plain`); the per-hart
+fupd's `big_sepL_impl` given its Ψ; `kernel_data`'s `pristine_va` half built
+from the rodata range's ledger elements (`BootCarve.boot_led_ran_persist`,
+`boot_ran_pristine`); SystemAdequacy threads `kptb_unset` to
+`boot_hart_primary`.  Parked by the owner: `ProofKexecPinA.v`,
+`ProofKexecPin.v`, `LinkKexecPin.v` (`kxc_phaseAp` uses `loyf`/`tlyf`
+unbound; the `_CoqProject` note says how to un-park).
+
+Certification: a CLEAN `iris/` build on the VM (every `.vo` removed first):
+1429 files, `make -k` exit 0, no error.  Remaining `Admitted`: 16 in 13
+files (CtxBox, FileInvDefs, FsShPin, IcacheEscrow, ProcInv, ProofIalloc,
+ProofKexecB, ProofKexecPinnedA, ProofKforkMain, ProofSyscall, ProofKexecA,
+ProofVirtioDiskRwF, UkShParse) -- the pre-existing main set plus the r25
+skeletons still tagged; outside the gate per item 7.  `origin/main` merged
+(the xv6 upstream URL; the dead-import sweep and its revert).
+`make audit-only` (`Print Assumptions xv6_fs_adequacy_xv6Σ`): exactly the
+thirteen expected axioms (functional_extensionality_dep, the two
+`xv6iris_extras.resv_*` parameters, the ten PrimString/PrimInt63
+primitives); nothing else.  Pushed to `tso-cutover` and to `main`.
