@@ -74,11 +74,6 @@ Section EnvHandles.
   Global Instance is_tickslock_morph (γl : gname) :
     CtxMorph (λ ξ : CtxId, (is_tickslock (XI := ξ) γl : iProp Σ)).
   Proof. rewrite /is_tickslock. ctx_morph_solve. Qed.
-
-  (* the four superblock cells [fsinit] froze: [↦₄□]s and nothing else. *)
-  Global Instance fs_sb_cells_morph :
-    CtxMorph (λ ξ : CtxId, (fs_sb_cells (XI := ξ) : iProp Σ)).
-  Proof. rewrite /fs_sb_cells. ctx_morph_solve. Qed.
 End EnvHandles.
 
 (* ===================================================================== *)
@@ -88,14 +83,6 @@ Section EnvCaches.
   Context `{!riscvGS Σ, !lockG Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
-
-  (* the bcache: the "bcache" spinlock's HANDLE (its payload is already the
-     λ [bcache_res2]) plus one sleeplock handle and one box handle per
-     buffer.  The sleeplock's own payload λ is [bslp bn k], covered by
-     [BioInv.bslp_morph]; [buf_box] is a box handle and so ξ-free. *)
-  Global Instance bio_ctx_morph (bn : bio_names) (V : bio_view Σ) :
-    CtxMorph (λ ξ : CtxId, (bio_ctx (XI := ξ) bn V : iProp Σ)).
-  Proof. rewrite /bio_ctx. ctx_morph_solve. Qed.
 
   (* the icache's NINODE inode sleeplocks, under their two gname
      existentials; the payload λ is [ic_slp cn k] ([ic_slp_morph]). *)
@@ -160,15 +147,4 @@ End EnvPark.
 (* ===================================================================== *)
 Section EnvProcPt.
   Context `{!riscvGS Σ}.
-
-  (* [proc_ptm_at] is [proc_pt_at]'s lazy twin: the same two [↦₈] cells,
-     then the page-table frame and the LAZY user memory -- which is
-     [umem_own] under three pure facts, so it closes on
-     [ProcPtOwn.umem_own_morph] and [PtTreeMove.pt_frame_at_morph]. *)
-  Global Instance proc_ptm_at_morph (pa : SailStdpp.Values.mword 64)
-      (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
-    CtxMorph (λ ξ : CtxId, (proc_ptm_at (XI := ξ) pa P sz M : iProp Σ)).
-  Proof.
-    rewrite /proc_ptm_at /proc_ptm /UserPtTree.umem_lazy. ctx_morph_solve.
-  Qed.
 End EnvProcPt.

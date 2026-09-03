@@ -963,7 +963,7 @@ Proof.
   iEval (rewrite /first_boot_persist) in "Hbp".
   iDestruct "Hbp" as "(_ & #Hkdata & #Hpenv & %Hpkc & #Hbio & #Hseam & #Hgen &
                        #Hdevi & #Hdisk & #Hitb2 & #Hitbl & #Hesc & #Hslks &
-                       #Hireg & #Hbits & #Hkmem & %Hgeom & #Hioffs)".
+                       #Hireg & #Hbits & #Hkmem & %Hgeom)".
   iDestruct "Hdisk" as (pd pav pu) "[#Hdgeom #Hdlock]".
   (* fsinit's (c)/(d)/(e)/(f) and its log geometry are all projections of
      [FsReady.fs_geom_ok], which is why the token carries the record and not
@@ -1208,8 +1208,7 @@ Proof.
     iSplitR; [iExact "Hireg" |].
     iSplitR; [iExact "Hbits" |].
     iSplitR; [iExact "Hkmem" |].
-    iSplitR; [iPureIntro; exact Hgeom |].
-    iExact "Hioffs". }
+    iPureIntro; exact Hgeom. }
   iMod (fs_ready_establish with "Hpre Hboot") as "#Hfsr".
   (* the token, rebuilt at its steady arm -- and with it the whole process
      block, which every later step (kexec, prepare_return, the residue) takes

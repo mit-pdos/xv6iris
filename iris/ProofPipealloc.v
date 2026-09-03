@@ -1607,10 +1607,10 @@ Section ProofPipealloc.
        [foff_dead] -- pipealloc still has no off-side ghost step. *)
     iDestruct "Hpay0" as (pn0) "(_ & Hpn0 & Hiru0 & Hoffd0)".
     iEval (rewrite (file_core_noff_none 1 pn0 Cf0 Hk0ty)) in "Hiru0".
-    iEval (rewrite (file_core_off_none k0 1 Cf0 Hk0ty)) in "Hoffd0".
+    iEval (rewrite (file_core_off_none k0 1 pn0 Cf0 Hk0ty)) in "Hoffd0".
     iDestruct "Hpay1" as (pn1) "(_ & Hpn1 & Hiru1 & Hoffd1)".
     iEval (rewrite (file_core_noff_none 1 pn1 Cf1 Hk1ty)) in "Hiru1".
-    iEval (rewrite (file_core_off_none k1 1 Cf1 Hk1ty)) in "Hoffd1".
+    iEval (rewrite (file_core_off_none k1 1 pn1 Cf1 Hk1ty)) in "Hoffd1".
     iMod (fpay_tok_update γf k0 pn0
             (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_inum pn0) (fp_obox pn0))
             with "Hpn0") as "Hpn0".

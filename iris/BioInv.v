@@ -76,6 +76,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
 Require Import WpLock.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
+Require Import CtxMorphTac.   (* [bio_ctx_morph] (r25 pass 1) *)
 Require Import TsoMemPa TsoGhost.
 Require Import TsoCtxPark.
 Require Import TsoCtxAbsorbLb.
@@ -1810,3 +1811,19 @@ End BioBox.
 Global Typeclasses Opaque bio_ctx.
 (* AT THE END OF THE FILE: this file's own lemmas take [bio_ctx] apart, and
    they are the accessors every consumer should use instead of unfolding it. *)
+
+(* ===================================================================== *)
+(*  [bio_ctx]'s context instance -- HOME (moved from EnvMorph.v, which is  *)
+(*  registered after FsReady and invisible to fs_ready_morph; r25 pass 1) *)
+(* ===================================================================== *)
+Section BioCtxMorph.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+
+  (* the bcache: the "bcache" spinlock's HANDLE (its payload is already the
+     λ [bcache_res2]) plus one sleeplock handle and one box handle per
+     buffer.  The sleeplock's own payload λ is [bslp bn k], covered by
+     [BioInv.bslp_morph]; [buf_box] is a box handle and so ξ-free. *)
+  Global Instance bio_ctx_morph (bn : bio_names) (V : bio_view Σ) :
+    CtxMorph (λ ξ : CtxId, (bio_ctx (XI := ξ) bn V : iProp Σ)).
+  Proof. rewrite /bio_ctx. ctx_morph_solve. Qed.
+End BioCtxMorph.

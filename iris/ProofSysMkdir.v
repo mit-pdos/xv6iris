@@ -1254,7 +1254,7 @@ Section ProofSysMkdirBody.
           exact (Hcrthr c Hc N2' N8). }
         (* the ten conjuncts create hands back ARE iunlockput's precondition *)
         iDestruct "Hlocked" as (gil gisl)
-          "(Hslk & Hslkd & Hdep & Hidev & Hiinum & Hivalid & Hload &
+          "(%Hqs & Hslk & Hslkd & Hdep & Hidev & Hiinum & Hivalid & Hload &
             Hshot & Hfrz & Href & Hru)".
         (* create's payout is GENERATION-NAMED now; iunlockput takes the
            erased reference, so weaken it back here.  One line, and the

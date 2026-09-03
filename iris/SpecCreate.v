@@ -471,6 +471,11 @@ Section CreateSpec.
       (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
     (∃ γil γisl : gname,
+       (* r25 shapes (plan item 33): the parked ident fraction IS the
+          travelling share -- create lends exactly half of the fresh
+          reference to its own ilock, and sys_open's publish
+          ([ProofSysOpenParts.so_publish]) parks the payload at [s + s]. *)
+       ⌜qi = s⌝ ∗
        is_sleeplock_genl γil γisl (i_lock (ientry k)) "inode"%string (ic_slp fsc_ic k) (slh_tok (icfg_isl k)) ∗
        sleeplocked_q γisl s (i_lock (ientry k)) pidv ∗
        (* THE CHECKOUT IS ARMED (durable-disk B''-tx2): create returns with
@@ -517,6 +522,7 @@ Section CreateSpec.
      "Framing"). *)
   Lemma create_locked_mk pidv k qi s g inum dn bm
       γil γisl :
+    qi = s ->
     is_sleeplock_genl γil γisl (i_lock (ientry k)) "inode"%string (ic_slp fsc_ic k) (slh_tok (icfg_isl k)) -∗
     sleeplocked_q γisl s (i_lock (ientry k)) pidv -∗
     (∃ loc tlc : nat,
@@ -534,8 +540,10 @@ Section CreateSpec.
     runit_any (bv_unsigned inum) -∗
     create_locked pidv k qi s g inum dn bm.
   Proof.
+    intros Hqs.
     iIntros "Hlk Hlkd Hdep Hdev Hinum Hvalid Hload Hshot Hfrz Href Hru".
     rewrite /create_locked. iExists γil, γisl.
+    iSplitR; [iPureIntro; exact Hqs |].
     iSplitL "Hlk"; [iExact "Hlk" |]. iSplitL "Hlkd"; [iExact "Hlkd" |].
     iSplitL "Hdep"; [iExact "Hdep" |].
     iSplitL "Hdev"; [iExact "Hdev" |]. iSplitL "Hinum"; [iExact "Hinum" |].

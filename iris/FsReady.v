@@ -126,6 +126,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import KernelText KernelDataInv.
 Require Import WpLock.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
+Require Import CtxMorphTac.   (* [ctx_morph_solve] for the day-one instances (r25 pass 1) *)
 Require Import FdSlots.
 Require Import WpUart.
 Require Import DiskInv.
@@ -351,13 +352,7 @@ Section FsReady.
         EXCLUSIVELY beside this predicate ([fileclose_bm]), and the one that
         would have serialized user mode had it stayed in the trap residue
         (projects/forkret-park.md). *)
-     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
-     (* ...AND THE OFF LEDGERS (off-ledger ruling): the per-inode
-        invariants that own each FD_INODE file's [f->off] cell while it is
-        resident.  fileread/filewrite borrow through them under [ip->lock],
-        sys_open deposits at publish, fileclose's last arm reclaims.  LAST,
-        so no destructuring pattern above moved. *)
-     ioff_escrows)%I.
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size)%I.
 
   Global Instance fs_ready_persistent : Persistent fs_ready.
   Proof. rewrite /fs_ready. apply _. Qed.
@@ -423,8 +418,7 @@ Section FsReady.
      kalloc_avail fsc_kpages None ∗
      ⌜fs_geom_ok⌝ ∗
      fs_sb_cells ∗
-     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
-     ioff_escrows)%I.
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size)%I.
 
   Global Instance fs_ready_pre_persistent : Persistent fs_ready_pre.
   Proof. rewrite /fs_ready_pre. apply _. Qed.
@@ -605,12 +599,7 @@ Section FsReady.
      bundle carries in place of the exclusive [bitmap_res] it used to. *)
   Lemma fs_ready_bitmap :
     fs_ready -∗ bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size.
-  Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $ & _)". Qed.
-
-  (* the off ledgers (off-ledger ruling): what the borrow protocol's three
-     movers and fileclose's reclaim read out of the one persistent row *)
-  Lemma fs_ready_ioff : fs_ready -∗ ioff_escrows.
-  Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $)". Qed.
+  Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $)". Qed.
 
   (* the same four cells, spelled one by one -- the form every existing fs
      contract states them in, at [dq := DfracDiscarded]. *)
@@ -656,7 +645,7 @@ Section FsReady.
     rewrite /fs_ready.
     iDestruct "H" as "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & H10
                        & H11 & H12 & H13 & H14 & H15 & H16 & _ & _
-                       & %H19 & #H20 & #H21 & _)".
+                       & %H19 & #H20 & #H21)".
     iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 Hka H20 H21".
     iFrame "%".
   Qed.
@@ -673,8 +662,14 @@ Section FsReadyMorph.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{ICFG : icfg}.
 
+
+  (* the four superblock cells [fsinit] froze: [↦₄□]s and nothing else. *)
+  Global Instance fs_sb_cells_morph :
+    CtxMorph (λ ξ : CtxId, (fs_sb_cells (XI := ξ) : iProp Σ)).
+  Proof. rewrite /fs_sb_cells. ctx_morph_solve. Qed.
+
   Global Instance fs_ready_morph : CtxMorph (λ ξ : CtxId, fs_ready (XI := ξ)).
-  Proof. (* SKELETON r25 (lane i, after L7 + the ledger's retirement) *) Admitted.
+  Proof. rewrite /fs_ready. ctx_morph_solve. Qed.
 End FsReadyMorph.
 
 (* AND THE SAME TWO SEALS AT TOP LEVEL.  [Typeclasses Opaque] inside a

@@ -727,5 +727,4 @@ Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
    (* the off LEDGERS and the off-borrow liveness authority (off-ledger
       ruling); see [FsCfgSnap.fs_cfg_alloc_snap]'s conclusion, which this
       body restates verbatim. *)
-   FileInvDefs.ioff_escrows_at fsc_fol fsc_foff ∗
    FileInvDefs.flive_auth_at fsc_fol)%I.

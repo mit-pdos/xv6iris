@@ -466,10 +466,6 @@ Section SpecFilewrite.
      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      ic_sleeplocks fsc_ic ∗
-     (* ...AND EVERY ENTRY'S OFF LEDGER (off-ledger ruling): the FD_INODE
-        arm's [f->off] cell lives in its inode's ledger and the borrow
-        window opens it ([FileOff.ioff_checkout]/[ioff_checkin]). *)
-     ioff_escrows ∗
      (* THE LENT SHARE AND ITS GENERATION'S TYPE WITNESS ARE NOT HERE.
         Both used to be: the generation-named share (design fs-icache.md
         §17.3, ratified §17.4) and [ity_shot] at that generation (§17.6 (5),
@@ -540,7 +536,7 @@ Section SpecFilewrite.
   Proof.
     rewrite /filewrite_fs_env /filewrite_fs_out.
     iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-              _ & _ & Hsbi & Hsbs & Hsbb & _ & _ & _ & _ & Hbsl)".
+              _ & Hsbi & Hsbs & Hsbb & _ & _ & _ & _ & Hbsl)".
     iFrame "Hsbi Hsbs Hsbb Hbsl".
   Qed.
 

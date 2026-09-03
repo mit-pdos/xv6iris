@@ -92,6 +92,7 @@ Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import CtxMorphTac.   (* [ctx_morph_solve] for the day-one instances (r25 pass 1) *)
 Import Defs.
 Require Import TsoCtx.
 
@@ -1962,7 +1963,7 @@ Proof. rewrite /park_globals. apply _. Qed.
 Global Instance park_globals_morph `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
     !irefslotG Σ, !pavG Σ} `{GEN : GenId} (γs : list gname) (γw γft γf γtl : gname) :
   CtxMorph (λ ξ0 : CtxId, park_globals ξ0 γs γw γft γf γtl).
-Proof. (* SKELETON r25 (lane i, the L8 patch) *) Admitted.
+Proof. rewrite /park_globals. ctx_morph_solve. Qed.
 
 Lemma disk_geom_agree_x `{!riscvGS Σ, !xv6G Σ} `{!ufdG Σ} (ξ1 ξ2 : CtxId) (γ : disk_names)
     (pd pav pu pd' pav' pu' : mword 64) :

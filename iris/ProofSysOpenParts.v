@@ -37,7 +37,7 @@
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import excl auth gmap frac numbers.
+From iris.algebra Require Import excl auth gmap frac numbers ufrac.
 From iris.base_logic.lib Require Import ghost_var gen_heap invariants ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -834,7 +834,17 @@ Section ProofSysOpenPublish.
       a_fmajor kf    ↦₂ fc_major Cf ∗
       a_fip kf       ↦₈ fc_ip Cf ∗
       off_free kf 1.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof.
+    iIntros "(%Cf & Href & Hflds & (%pn & %Hok & Hnames & Hcore) & Hlive)".
+    cbn in Hok. set (Ht := Hok : fc_type Cf = FD_NONE).
+    iEval (rewrite (file_core_none kf 1 pn Cf Ht)) in "Hcore".
+    iDestruct "Hcore" as "[Hiru Hoffd]".
+    iEval (rewrite -iref_slot_frac) in "Hiru".
+    iDestruct "Hflds" as "(Hty & Hrd & Hwr & Hpip & Hip & Hmaj)".
+    iModIntro. iExists Cf, pn.
+    iSplitR; [iPureIntro; exact Ht |].
+    iFrame "Hiru Href Hlive Hnames Hty Hrd Hwr Hpip Hmaj Hip Hoffd".
+  Qed.
 
   (* the DEVICE arm's vacuous bound: an FD_DEVICE store is not the inode
      arm, so the conditional [off_wf] premise costs it nothing *)
@@ -866,7 +876,25 @@ Section ProofSysOpenPublish.
     off_rows off_cfg kk cur_ctx ={E}=∗
     own_context cur_ctx ∗ off_rows off_cfg kk cur_ctx ∗
     ∃ γb : box_names, off_fd kf 1 γb C.
-  Proof. (* SKELETON r25 (item 24): fresh box ghosts, off_publish_park, assemble off_fd at q = 1 *) Admitted.
+  Proof.
+    iIntros (HE Hkk Hip Hty) "Hctx Hres Hrows".
+    (* the fd's box: four fresh ghosts, then the birth (OffBox.off_publish_park) *)
+    iMod (own_alloc (● (∅ : gmap (nat * nat) ufrac))) as (γs) "Hst".
+    { apply auth_auth_valid. exact (ucmra_unit_valid (A := gmapUR (nat * nat) ufracR)). }
+    iMod (ghost_var_alloc (ghost_varG0 := kalloc_count_inG) 0%nat) as (γc) "Hc".
+    iMod (ghost_var_alloc (inhabitant : slot_reg nat unit)) as (γd) "Hd".
+    iMod (ghost_var_alloc (inhabitant : l2_reg nat)) as (γp) "Hp".
+    set (γb := BoxNames γs γc γd γp).
+    iMod (off_publish_park off_cfg kk kf γb cur_ctx E HE
+            with "Hst Hc Hd Hp Hctx Hres Hrows")
+      as "(Hctx & #Hbox & %T0 & %T & Hregd & Hllb & Hcnt & Href & #Hmem & Hrows)".
+    iModIntro. iFrame "Hctx Hrows". iExists γb.
+    rewrite /off_fd. iExists kk, T0.
+    iSplitR; [iPureIntro; exact Hip|]. iSplitR; [iPureIntro; exact Hkk|].
+    iFrame "Hbox Hmem Hregd Hcnt".
+    rewrite /off_ref_stamps. iExists {[ (kf, T) := 1%Qp ]}.
+    iSplitR; [iPureIntro; apply CtxBox.qsum_singleton|]. iExact "Href".
+  Qed.
 
   Lemma so_publish `{XI : CurCtx} (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)
       (gy : gname) (inum : mword 32) (ty : bv 16) (C : fcontent)
@@ -928,7 +956,57 @@ Section ProofSysOpenPublish.
        by [C] and [inum] ([fdstate_ok_inj]); it is a parameter rather than a
        projection because [fdstate_ok] is a relation -- see its note. *)
     |={E}=> ∃ st : fdstate, ⌜fdstate_ok inum C st⌝ ∗ file_ref gf kf 1 st.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof.
+    intros Hqs HEi Hkk Hinb Hip Hty Hwrb Hrdb Hwdb Hdir Hdvw Hle. subst qi.
+    iIntros "#Hfl Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hcoff".
+    rewrite inode_shr_gen_intro.
+    iDestruct "Hshr" as (g2 lo2 tl2) "(%Hle2 & #Hfl2 & Hshr)".
+    iDestruct (IcacheRef.inode_ref_short_shr_genlo_agree with "Hkeep Hshr")
+      as %[<- <-].
+    iAssert (inode_shr_held_gen (ientry kk) s gy inum) with "[Hshr]" as "Hs".
+    { iExists kk, lo, tl2.
+      iSplitR; [iPureIntro; reflexivity|].
+      iSplitR; [iPureIntro; exact Hkk|].
+      iSplitR; [iPureIntro; exact Hinb|].
+      iSplitR; [iPureIntro; exact Hle2|].
+      iFrame "Hfl2". iExact "Hshr". }
+    (* r25 (inode_pay D1): the parent's SHORT reference itself is parked --
+       its ghost-only core behind the cinv, its ident side beside it. *)
+    iMod (inode_pay_alloc E kk s gy lo inum (fc_type C) (fc_wbool C) ty
+            Hkk Hinb (so_pay_witness om ty C Hwrb Hdir) Hdvw
+            with "Hkeep Hru Hs Hshot")
+      as (gx) "Hpay".
+    iMod (fpay_tok_update gf kf pn
+            (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy inum γb) with "Hnames")
+      as "Hnames".
+    iModIntro.
+    assert (Hnp : bool_decide (fc_type C = FD_PIPE) = false).
+    { apply bool_decide_false. destruct Hty as [Ht | Ht]; rewrite Ht;
+        intro Hc; by vm_compute in Hc. }
+    assert (Hor : (bool_decide (fc_type C = FD_INODE)
+                   || bool_decide (fc_type C = FD_DEVICE))%bool = true).
+    { destruct Hty as [Ht | Ht]; rewrite Ht.
+      - rewrite bool_decide_true; [reflexivity | reflexivity].
+      - rewrite orb_true_r. reflexivity. }
+    set (stpub := if bool_decide (fc_type C = FD_INODE)
+                  then FdOpen rb wb (FdInode (bv_unsigned inum))
+                  else FdOpen rb wb (FdDevice (bv_unsigned (fc_major C)))).
+    assert (Hokpub : fdstate_ok inum C stpub).
+    { rewrite /stpub. destruct Hty as [Ht | Ht].
+      - rewrite (bool_decide_true _ Ht). cbn. by repeat split.
+      - rewrite bool_decide_false.
+        2:{ rewrite Ht. unfold FD_DEVICE, FD_INODE. intro Hc.
+            apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc. }
+        cbn. by repeat split. }
+    iExists stpub. iSplitR; [iPureIntro; exact Hokpub|].
+    rewrite /file_ref /file_pay_st /file_core /file_core_noff /file_core_off.
+    iExists C. iFrame "Href Hflds Hlive".
+    iExists (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy inum γb).
+    cbn [fp_inum]. iSplitR; [iPureIntro; exact Hokpub|].
+    iFrame "Hnames". rewrite Hnp Hor.
+    cbn [fp_icv fp_iq fp_ig fp_obox].
+    rewrite Hip. iFrame "Hpay". iExact "Hcoff".
+  Qed.
 
   (* ==== THE O_TRUNC BRIDGE ============================================
      sys_open is the FIRST caller that has to REBUILD [ic_loaded] after

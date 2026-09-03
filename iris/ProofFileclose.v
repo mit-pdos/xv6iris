@@ -323,7 +323,7 @@ Section ProofFileclose.
       rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γfl "ftable"%string <{ ftable_res γf }> mA
+    iApply (Acquire.wp_acquire_sconf KT1 γfl "ftable"%string (ftable_res_at γf) mA
               n eb p (K - 8)%nat b lks
               HnZ ltac:(lia) ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -556,7 +556,7 @@ Section ProofFileclose.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string <{ ftable_res γf }> E3 n eb p (K - 8)%nat
+      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string (ftable_res_at γf) E3 n eb p (K - 8)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
@@ -637,38 +637,14 @@ Section ProofFileclose.
         as "[Hfl Hpy]".
       iDestruct "Hpy" as (pn) "[Hpn Hpl]".
       iDestruct "Hpl" as "[Hcore Hoffc]".
-      (* ---- off-ledger ruling: RECLAIM THE CELL, and it has to happen
-             HERE.  The refutation of a stale checked-out arm is the
-             liveness COUNT, which reads the very authority entry the ghost
-             step below deletes.  On the FD_INODE arm this is the ledger
-             reclaim ([FileInv.file_off_reclaim]), and the family comes off
-             the environment's own [fs_ready]: an FD_INODE-typed file's
-             descriptor state is [FdInode] ([fdstate_ok_inode]), so the
-             dispatch selected the fs arm.  On every other arm the payload
-             already carried the dead cell and the premise is [emp].  The
-             environment is rebuilt intact -- its pures and its two
-             persistent rows come straight back, only [bslots 3] is moved
-             through. ---- *)
-      iAssert ((if bool_decide (fc_type Cf = FD_INODE)
-                then ioff_escrows else emp) ∗
-               fileclose_env fn on n eb p st)%I
-        with "[Henv]" as "[Hoffam Henv]".
-      { case_bool_decide as Hin; [|by iFrame].
-        destruct (fdstate_ok_inode _ _ _ Hok Hin) as (bdr & bdw & Hsti).
-        iEval (rewrite Hsti /fileclose_env /fileclose_fs_env
-                       /fileclose_fs_env_nopid) in "Henv".
-        iDestruct "Henv" as "(%He1 & %He2 & %He3 & %He4 & #Hprocs & #Hrdy
-                              & Hbs)".
-        iDestruct (FsReady.fs_ready_ioff with "Hrdy") as "#Hioffs".
-        iFrame "Hioffs".
-        rewrite Hsti /fileclose_env /fileclose_fs_env
-                /fileclose_fs_env_nopid.
-        iFrame "Hprocs Hrdy Hbs".
-        iPureIntro. by repeat split. }
+      (* ---- r25 item 24: RECLAIM THE CELL.  The payload's off conjunct is
+             the fd's whole share of its box (FD_INODE: [off_fd] at 1) or the
+             free cell already; [FileInv.file_off_reclaim] withdraws the box
+             on the inode arm and hands back the visibility-free cell, which
+             is exactly what the retyped FD_NONE payload carries.  No
+             environment row is needed any more: the box is the fd's own. ---- *)
       iApply fupd_wp.
-      iMod (file_off_reclaim ⊤ γf k Cf Mg q ltac:(solve_ndisj) HMk
-              with "Hoffam Hoffc Hauth Hrlv")
-        as "(Hauth & Hrlv & Hdead)".
+      iMod (file_off_reclaim ⊤ k pn Cf ltac:(solve_ndisj) with "Hoffc") as "Hdead".
       iMod (file_close_last_ghost γf Mg k q HMk with "Hauth Hrtok Hrlv")
         as "Hauth".
       iModIntro.
@@ -989,7 +965,7 @@ Section ProofFileclose.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string <{ ftable_res γf }> G3 n eb p (K - 8)%nat
+      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string (ftable_res_at γf) G3 n eb p (K - 8)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)

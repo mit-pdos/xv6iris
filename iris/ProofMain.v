@@ -1385,11 +1385,6 @@ Section ProofMain.
       (λ ξ : CtxId, kmem_res (XIk := ξ) fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
     gen_cert -∗
     FsCrash.fs_crash_seam fsc_cov fsc_logst -∗
-    (* ---- off-ledger ruling: the era's off LEDGERS (persistent; parked
-       into [FirstTok.first_boot_persist] at +0x9e) and the off-borrow
-       liveness AUTHORITY ([FileInv.ftable_res_boot]'s premise, spent at
-       fileinit's return). ---- *)
-    ioff_escrows -∗
     flive_own ((● ∅) : fliveUR) -∗
     (* ---- `static int first = 1', PINNED (fs-cfg-boot.md (f-2)).  One of
        the image's two writable initialized .data words, carved at
@@ -1500,7 +1495,7 @@ Section ProofMain.
     intros Hn Hlen Hlive Hdevq Hnibq Hcov0 Hnibeq Hpures
            Huartq Hdiskq Hgeomok Hpkc.
     iIntros "Hcg #Htext #Hkdata #Hdev #Hwire #Htramp #Hccaps #Hcready #Htl #Hwaitlk
-             #Hpenv #Hkmem #Hcert #Hseam #Hioffs Hfolauth Hfirst
+             #Hpenv #Hkmem #Hcert #Hseam Hfolauth Hfirst
              #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail #Hlpidlk Hkenv".
     iIntros "Hlbc Hbufl Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
              Hsbb Hlogr Hmir Hirslot Hirauth Hient Hlft Hfents Hirfile Hfdauth
@@ -1693,7 +1688,7 @@ Section ProofMain.
        this proof holds the kernel bundle, so it borrows its own and puts
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (newlock ⊤ (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string <{ ftable_res γf }> with "Hftnm Hrun Hftw Hftc Hfres") as "[Hrun Hft0]".
+    iMod (newlock ⊤ (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string (ftable_res_at γf) with "Hftnm Hrun Hftw Hftc Hfres") as "[Hrun Hft0]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct "Hft0" as (γft) "#Hftable".
     iModIntro.
@@ -1908,8 +1903,7 @@ Section ProofMain.
       iSplitR; [iExact "Hireg"|].
       iSplitR; [iExact "Hbminv"|].
       iSplitR; [iExact "Hkmem"|].
-      iSplitR; [iPureIntro; exact Hgeomok|].
-      iExact "Hioffs". }
+      iPureIntro; exact Hgeomok. }
     (* BOTH BUNDLES GO TO USERINIT (fs-cfg-boot.md (f-5)), beside the pinned
        `first` cell: userinit is the one function that PARKS, and forkret --
        the token's only consumer -- runs on the context that park saves.
@@ -2226,9 +2220,9 @@ Section ProofMain.
            are stage (f)'s, at the [fs_ready] seal. ---- *)
     iDestruct "Hfs" as "(%Hdevq & %Hnibq & %Histq & %Huartq & %Hdiskq &
                          %Hcovq & %Hlogstq & %Hbmapq & %Hsizeq & %Hninq &
-                         Hkit1 & Hkit2 & #Hioffat & Hfolat)".
-    (* the boot face IS the classy family / authority (off-ledger ruling) *)
-    iEval (rewrite ioff_escrows_at_eq) in "Hioffat".
+                         Hkit1 & Hkit2 & Hfolat)".
+    (* the boot face IS the liveness authority (the off LEDGER is retired,
+       r25 item 24: the off cell lives in the fd's own box) *)
     iEval (rewrite flive_auth_at_eq) in "Hfolat".
     assert (Hnibpos : (0 < icfg_nib)%nat) by (rewrite Hnibq; exact Hnib0).
     assert (Hcovpos : (0 : Z) ∉ fsc_cov) by (rewrite Hcovq; exact Hcov0).
@@ -2307,7 +2301,7 @@ Section ProofMain.
               Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
               Huartq Hdiskq Hgeomok Hpkc
               with "Hcg Htext Hkdata Hdev Hwire Htramp Hccaps Hcready Htl Hwaitlock
-                    Hpenvc Hkmem Hcert Hseamc Hioffat Hfolat Hfirst
+                    Hpenvc Hkmem Hcert Hseamc Hfolat Hfirst
                     [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail
                     Hpidlock Hkenv Hlbc Hbufl
                     Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2

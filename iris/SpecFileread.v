@@ -472,10 +472,6 @@ Section SpecFileread.
      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      ic_sleeplocks fsc_ic ∗
-     (* ...AND EVERY ENTRY'S OFF LEDGER (off-ledger ruling): the FD_INODE
-        arm's [f->off] cell lives in its inode's ledger and the borrow
-        window opens it ([FileOff.ioff_checkout]/[ioff_checkin]). *)
-     ioff_escrows ∗
      sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int icfg_ist : mword 32) ∗
      (* the disk fabric *)
@@ -529,7 +525,7 @@ Section SpecFileread.
     fileread_fs_env γf fn -∗ fileread_fs_out fn.
   Proof.
     rewrite /fileread_fs_env /fileread_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
     iFrame "Hsb Hbs".
   Qed.
 
@@ -645,23 +641,27 @@ Section SpecFileread.
      ([SpecSysWriteAUEra]'s third arm) and gives read its "FdInode => AFile
      or ADir" tie ([SpecSysReadAU]'s owner question 2).  The invariant-level
      statement of the same fact is [FileInvDefs.inode_pay_not_dev]. *)
-  (* THE OFF OUTPUT IS TYPE-INDEXED (off-ledger ruling): the FD_INODE arm
-     hands out the LEDGER FRAGMENT at the payload's own slot [ik] -- the
-     arm's [ioff_ref] existential is identified with the share's [ik] by
-     [ientry_inj] -- and the FD_DEVICE arm hands out the dead cell.  Both
-     come back through the wand at the same fraction. *)
-  Definition carve_off (tyc : mword 32) (ik k : nat) (q : Qp) : iProp Σ :=
+  (* THE OFF OUTPUT IS TYPE-INDEXED (r25 item 24, the visibility-free
+     off cell): the FD_INODE arm hands out the file's OFF BOX HANDLE
+     ([FileInvDefs.off_fd] -- the box, its membership in the inode's rows,
+     the register and count halves at [q], and the stamps share), and the
+     FD_DEVICE arm hands out the free cell at [q].  Both come back through
+     the wand at the same fraction.  The box's names [γb] are the payload's
+     own [fp_obox pn], so the carve exposes them existentially: a returned
+     handle at OTHER names could not be rejoined to the payload. *)
+  Definition carve_off (tyc : mword 32) (k : nat) (q : Qp)
+      (γb : Xv6Cameras.box_names) (Cf : fcontent) : iProp Σ :=
     (if bool_decide (tyc = FD_INODE)
-     then ioff_frag ik k q else foff_dead k q)%I.
+     then off_fd k q γb Cf else off_free k q)%I.
 
-  Lemma carve_off_inode (tyc : mword 32) (ik k : nat) (q : Qp) :
-    tyc = FD_INODE -> carve_off tyc ik k q = ioff_frag ik k q.
+  Lemma carve_off_inode (tyc : mword 32) (k : nat) (q : Qp) γb Cf :
+    tyc = FD_INODE -> carve_off tyc k q γb Cf = off_fd k q γb Cf.
   Proof.
     intros ->. rewrite /carve_off. case_bool_decide; [reflexivity | congruence].
   Qed.
 
-  Lemma carve_off_dev (tyc : mword 32) (ik k : nat) (q : Qp) :
-    tyc = FD_DEVICE -> carve_off tyc ik k q = foff_dead k q.
+  Lemma carve_off_dev (tyc : mword 32) (k : nat) (q : Qp) γb Cf :
+    tyc = FD_DEVICE -> carve_off tyc k q γb Cf = off_free k q.
   Proof.
     intros ->. rewrite /carve_off. case_bool_decide as Hc; [|reflexivity].
     exfalso. apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
@@ -671,7 +671,8 @@ Section SpecFileread.
       (st : fdstate) :
     fc_type Cf = FD_INODE \/ fc_type Cf = FD_DEVICE ->
     file_pay_st γf k q Cf st -∗
-    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16) (lo tl : nat),
+    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16) (lo tl : nat)
+      (γb : Xv6Cameras.box_names),
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
       ⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
@@ -679,9 +680,9 @@ Section SpecFileread.
       ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
       IcacheRef.ity_shot g ty ∗
       IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo ∗
-      carve_off (fc_type Cf) ik k q ∗
+      carve_off (fc_type Cf) k q γb Cf ∗
       (IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo -∗
-       carve_off (fc_type Cf) ik k q -∗
+       carve_off (fc_type Cf) k q γb Cf -∗
          file_pay_st γf k q Cf st).
   Proof.
     intros Hty. iIntros "(%pn & %Hst & Hpn & Hpl)".
@@ -695,24 +696,13 @@ Section SpecFileread.
       - by rewrite (bool_decide_eq_true_2 (FD_DEVICE = FD_DEVICE) eq_refl)
                    orb_true_r. }
     rewrite {1}/file_core /file_core_noff /file_core_off Hnp Hyes /inode_pay.
-    iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
+    (* r25 (inode_pay D1): the reference's IDENT SIDE ([inode_ref_side])
+       rides between the cancel token and the travelling share; the carve
+       carries it across and puts it back. *)
+    iDestruct "Hpl" as "((#Hci & Hown & Hside & Hs & Hwt) & Hop)".
     iDestruct "Hs" as (ik lo tl) "(%Hipk & %Hik & %Hinb & %Hle & #Hfl & Hshr)".
     iDestruct "Hwt" as (ty) "(#Hshot & %Hnd & %Hdv)".
-    (* the arm's off conjunct, re-keyed at the share's own [ik] *)
-    iAssert (carve_off (fc_type Cf) ik k q ∗
-             (carve_off (fc_type Cf) ik k q -∗
-              (if bool_decide (fc_type Cf = FD_INODE)
-               then ioff_ref (fc_ip Cf) k q else foff_dead k q)))%I
-      with "[Hop]" as "[Hop Hopback]".
-    { rewrite /carve_off. case_bool_decide as Hin.
-      - iDestruct "Hop" as (i) "(%Hv & %Hi & Hfrag)".
-        assert (i = ik) as ->.
-        { apply (ientry_inj i ik); [lia | lia | congruence]. }
-        iFrame "Hfrag". iIntros "Hf". iExists ik.
-        iSplitR; [iPureIntro; exact Hipk|].
-        iSplitR; [iPureIntro; exact Hik|]. iExact "Hf".
-      - iFrame "Hop". iIntros "$". }
-    iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty, lo, tl.
+    iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty, lo, tl, (fp_obox pn).
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [done|].
     iSplitR; [done|]. iSplitR; [iExact "Hfl"|].
@@ -721,12 +711,13 @@ Section SpecFileread.
        [IcacheRef.inode_shr_gen] and conversion closes it, while the [Frame]
        instance search does not see through the definition. *)
     iSplitL "Hshr"; [iExact "Hshr"|].
+    (* the arm's off conjunct IS the carve at the payload's own box names *)
     iSplitL "Hop"; [iExact "Hop"|].
     iIntros "Hshr Hop". iExists pn. iFrame "%". iFrame "Hpn".
     rewrite /file_core /file_core_noff /file_core_off Hnp Hyes /inode_pay.
-    iSplitR "Hop Hopback"; last first.
-    { iApply "Hopback". iExact "Hop". }
+    iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
+    iSplitL "Hside"; [iExact "Hside"|].
     iSplitL "Hshr"; [iExists ik, lo, tl; iFrame "% Hfl"; iExact "Hshr"|].
     iExists ty. iSplitR; [iExact "Hshot"|].
     iSplit; iPureIntro; [exact Hnd | exact Hdv].

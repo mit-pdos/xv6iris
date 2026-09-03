@@ -1122,6 +1122,53 @@ and law 10 (hooks).
     discharges `ctx_floor ξ 0` itself and returns `off_rows on i ξ`
     directly, and `so_deposit` / `proto_publish` do the same.
 
+33. **(2026-09-02, pass 1) Where the off rows live across the ilock hold:
+    `IcacheEscrow.ic_handle`.**  `ic_slp cn k ξ` now carries `off_rows off_cfg
+    k ξ` (item 24), so the acquirer holds the rows from acquiresleep to the
+    `_in` releasesleep.  Two consumers need them mid-hold: sys_open's
+    `so_deposit` (the birth of the fd's box, item 24) and fileread's
+    `proto_read_checkout`.  SpecIlock/SpecIunlock's callers pass the holder's
+    bundle `ic_handle fsc_ic k d` OPAQUELY, and `ic_handle` is already where
+    the payload's `ic_tok` lives across the hold ("across the hold it lives
+    HERE").  RULING (impl, minimal-churn; flagged to the owner): `ic_handle cn
+    k d` gains the conjunct `off_rows off_cfg k cur_ctx` (last), with the
+    accessor `ic_handle_off_rows_acc`; ProofIlock puts the acquire's rows into
+    the handle at the checkout, ProofIunlock takes them out at the `_in`
+    release and folds them by `off_rows_to_dep`.  No ilock/iunlock caller's
+    statement changes; sys_open borrows the rows through the accessor around
+    `so_deposit` (and the running token through
+    `SieCapCtx.sie_cap_gpr_own_ctx_acc`).  The alternative -- a new row in
+    both specs and their ~15 callers (ProofSysOpenAU*, ProofCreateAU*,
+    ProofSysUnlinkAU*, SpecDirlink) -- is exactly the churn item 24 refused.
+    Constructor sites of `ic_handle` other than ilock's checkout must show
+    where their rows come from; the inode lane reports them (no invention).
+
+    Also in pass 1 (same day): `SpecFileread.carve_off tyc k q γb Cf := if
+    tyc = FD_INODE then off_fd k q γb Cf else off_free k q` -- the carve
+    exposes the payload's box names `γb = fp_obox pn` existentially (a
+    returned handle at other names could not rejoin the payload; two boxes
+    for one slot do not agree).  `fileread_pay_carve` gains the `γb` binder;
+    its consumers (ProofFileread/Filewrite/FilereadAU/FilewriteAU's
+    `carve_off_inode` sites and the two `iAssert carve_off` re-keyings) are
+    lane (ii)'s first edits.  `SpecFilestat`'s carve only carries the new
+    `inode_ref_side` conjunct across.
+
+    Pass-1 consequences of `so_publish`'s `qi = s` (2026-09-02, same day):
+    `SpecCreate.create_locked` carries `⌜qi = s⌝` (create lends exactly
+    half; `create_locked_mk` takes the equality, ProofCreate's three
+    constructions pass `eq_refl`; the three unpackings -- sys_open's create
+    arm, sys_mkdir, sys_mknod -- bind `%Hqs`); ProofSysOpen's four body
+    lemmas `so_tail_pub`/`so_stores`/`so_alloc`/`so_join` gain the premise
+    `qi = s ->` (the namei arm passes `eq_refl` at `qq/2`, the create arm
+    passes create's `Hqs`).  The off LEDGER is retired from every
+    environment (`fs_ready`, `fs_ready_pre`, `first_boot_persist`, the
+    fileread/filewrite fs envs, SpecSysOpen, the six sys_open bodies, the
+    boot face in FsCfgBoot/FsCfgSnap, ProofMain's group) -- `ioff_*`
+    definitions and `FileOff.v` are now dead code (r28 deletes them).
+    `SpecFileread.carve_off` is over the box handle (above).  ProofMain's
+    `mn_grp_fs` has a Type-level evar left by the current (skeleton)
+    `icache_boot_at`; it goes away with the inode lane's statement.
+
 ## 10. Process and tooling (measured facts)
 
 ### 10.1 Build

@@ -88,6 +88,7 @@ Require Import RiscvExtras.
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import CtxMorphTac.   (* [ctx_morph_solve] for the day-one instances (r25 pass 1) *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -2777,6 +2778,25 @@ Section ProcInv.
   (* =================================================================== *)
 End ProcInv.
 
+
+(* [proc_ptm_at]'s instance lives HERE, upstream of every consumer (it was
+   in EnvMorph.v, which is registered after FsReady and so is invisible to
+   this file's own day-one instances -- r25 pass 1). *)
+Section ProcPtMorph.
+  Context `{!riscvGS Σ}.
+
+  (* [proc_ptm_at] is [proc_pt_at]'s lazy twin: the same two [↦₈] cells,
+     then the page-table frame and the LAZY user memory -- which is
+     [umem_own] under three pure facts, so it closes on
+     [ProcPtOwn.umem_own_morph] and [PtTreeMove.pt_frame_at_morph]. *)
+  Global Instance proc_ptm_at_morph (pa : SailStdpp.Values.mword 64)
+      (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    CtxMorph (λ ξ : CtxId, (proc_ptm_at (XI := ξ) pa P sz M : iProp Σ)).
+  Proof.
+    rewrite /proc_ptm_at /proc_ptm /UserPtTree.umem_lazy. ctx_morph_solve.
+  Qed.
+End ProcPtMorph.
+
 (* ==================================================================== *)
 (*  DAY-ONE INSTANCE SKELETONS (r25 shapes; rule 0, plan §9 items 16/17). *)
 (*  L8's second deposit moves the child's private block into its twin     *)
@@ -2793,19 +2813,19 @@ Section ProcPrivMorph.
 
   Global Instance ofile_slot_morph γf γd pa fd v :
     CtxMorph (λ ξ : CtxId, ofile_slot (XI := ξ) γf γd pa fd v).
-  Proof. (* SKELETON r25 *) Admitted.
+  Proof. rewrite /ofile_slot. ctx_morph_solve; apply _. Qed.
   Global Instance proc_ofiles_morph γf γd pa fs :
     CtxMorph (λ ξ : CtxId, proc_ofiles (XI := ξ) γf γd pa fs).
-  Proof. (* SKELETON r25 *) Admitted.
+  Proof. rewrite /proc_ofiles. ctx_morph_solve; apply _. Qed.
   Global Instance proc_priv_core_morph pa pid U :
     CtxMorph (λ ξ : CtxId, proc_priv_core (XI := ξ) pa pid U).
-  Proof. (* SKELETON r25 *) Admitted.
+  Proof. rewrite /proc_priv_core. ctx_morph_solve; apply _. Qed.
   Global Instance proc_priv_morph γf pa pid U :
     CtxMorph (λ ξ : CtxId, proc_priv (XI := ξ) γf pa pid U).
-  Proof. (* SKELETON r25 *) Admitted.
+  Proof. rewrite /proc_priv. ctx_morph_solve; apply _. Qed.
   Global Instance proc_priv_nopt_morph γf pa pid V :
     CtxMorph (λ ξ : CtxId, proc_priv_nopt (XI := ξ) γf pa pid V).
-  Proof. (* SKELETON r25 *) Admitted.
+  Proof. rewrite /proc_priv_nopt. ctx_morph_solve; apply _. Qed.
 End ProcPrivMorph.
 
 (* ====================================================================== *)

@@ -428,7 +428,10 @@ Section SpecFilestat.
     (* the off conjunct ([file_core_off], off-ledger ruling): filestat
        never touches [f->off], so it is simply carried across and put
        back -- one slot in the pattern and one [iExact]. *)
-    iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
+    (* r25 (inode_pay D1): the reference's IDENT SIDE ([inode_ref_side])
+       rides between the cancel token and the travelling share; filestat
+       carries it across and puts it back, like the off conjunct. *)
+    iDestruct "Hpl" as "((#Hci & Hown & Hside & Hs & Hwt) & Hop)".
     iDestruct "Hs" as (ik lo tl)
       "(%Hipk & %Hik & %Hinb & %Hle & #Hfl & Hshr)".
     (* THREE conjuncts under the [∃ ty] now, not two: the owner's FD_INODE
@@ -448,6 +451,7 @@ Section SpecFilestat.
     rewrite /file_core /file_core_noff Hnp Hyes /inode_pay.
     iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
+    iSplitL "Hside"; [iExact "Hside"|].
     iSplitL "Hshr"; [iExists ik, lo, tl; iFrame "% Hfl"; iExact "Hshr"|].
     iExists ty. iSplitR; [iExact "Hshot"|].
     iSplit; iPureIntro; [exact Hnd | exact Hdv].

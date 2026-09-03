@@ -4288,7 +4288,7 @@ Section ProofCreateMain.
                   split; [exact Htyf |].
                   exact (cr_trange_in (di_type dnc) Hrng). }
                 iApply (create_locked_mk
-                          _ _ _ _ _ _ _ _ gilc gislc
+                          _ _ _ _ _ _ _ _ gilc gislc eq_refl
                           with "Hslkc Hcslkd [Hcdep] Hcidev Hciinum
                                 Hcivalid Hcload Hcshot Hcfrz [Hckeep] Hruc").
                 { iExists lock, tlc. iSplitR; [by iPureIntro|].
@@ -6163,7 +6163,7 @@ Section ProofCreateMain.
                as "Hcshot1".
              { rewrite cr_setf_type. iExact "Hcshot". }
              iApply (create_locked_mk
- _ _ _ _ _ _ _ _ gil gisl
+ _ _ _ _ _ _ _ _ gil gisl eq_refl
                        with "Hslkc Hcslkd [Hcdep] Hcidev Hciinum
                              Hcivalid Hcload Hcshot1 Hcfrz [Hckeep] Hruc").
              { iExists locg, tlcg. iSplitR; [iPureIntro; exact Hlecg|].
@@ -10179,7 +10179,7 @@ Section ProofCreateMain.
             split; [exact Hc2nlz |].
             intro Hnd. exfalso. exact (Hnd Htdir). }
           iApply (create_locked_mk
- _ _ _ _ _ _ _ _ gil gisl
+ _ _ _ _ _ _ _ _ gil gisl eq_refl
                     with "Hslkc Hcslkd [Hcdep] Hcidev Hciinum
                           Hcivalid Hcloadf Hcshot2 Hcfrz [Hckeep] Hruc").
           { iExists locc, tlcc. iSplitR; [iPureIntro; exact Hlecc|].
