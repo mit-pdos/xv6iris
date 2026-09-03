@@ -79,57 +79,114 @@ later step.
 **The walker never answers a fetch.**  `HartMemRun.hmrun`/`goodmb` refuse an
 `AK_ifetch` read (`rk_ram_ok` has no `Read_ifetch`): the walker's value is
 its own map's, which a stale fetch need not return, and `goodmb`'s ~4000
-occurrences cannot grow a fetch-footprint parameter.  So every fetch node
-is stepped by `HartEvents.swp_hart_ram_read_ifetch`, outside the walker,
-and the U-mode fetch composers are re-cut at that node:
+occurrences cannot grow a fetch-footprint parameter.  So NO `goodmb`
+certificate of a `fetch` that reaches its read exists any more
+(`UserFetchCert` section 1, `UserFaultCert`'s two split-fetch success
+lemmas and `WpUmodeStep`'s `uv_read_*`/`uv_fetch_*` are gone or must go),
+and every fetch is driven node by node at the memory node.
 
-- `fetch tt` is `catch_early_return` of PC reads, the alignment tests,
-  `fetch_bytes` (= `translateAddr` then `mem_read (InstructionFetch)`) and
-  the `isRVC` split (`UserFetch.exec_fetch_bytes_ok` is the exec-level
-  composition).  The swp composer walks it in the same pieces: register
-  and pure nodes by the silent walker, `translateAddr` by
-  `swp_hmrun_of_exec` over the existing walk certificate
-  (`UserFetchCert.u_walk_fetch_pure`'s `goodmb` half, a data-arm read of
-  the PTEs), `checked_mem_read (InstructionFetch)` by a User-privilege twin
-  of `SmodeCorePt.swp_checked_mem_read_ifetch4_S`/`_ifetch2_S` (the PMP
-  grant is `UserMem.exec_pmpCheck_user_grant`), and the tail by the walker
-  again.  Four geometries, as today.
-- The fetch node pays with **stamped bytes**: `TsoCtx.ctx_xpointsto ξ IK a
-  dq v` is `ctx_pointsto` plus the pure stamp `ts <= IK`; `ctx_xfetch_ok`
-  turns it, under `IK <= itv` (from `hart_iview_lb_at cpu_id IK` against the
-  rule's `hart_iview_auth`), into `fobl_ifetch` byte by byte.  Data use of
-  a text byte (rodata) goes through `ctx_xpointsto_forget`.
-- **Where the stamp comes from.**  `ctx_xstamp` mints it from a RUNNING
-  context's fact at a `fence.i`: with `own_context` every fact is clean
-  (`ts <= B <= K <= tv`) or dirty and mine-on-this-hart (`ts <= own_pub`,
-  `TsoMemPa.own_pub_lookup`) or under the bound, and the arm's `itv'` passes
-  both `tv` and `own_pub`.  The `fence.i` leaf (a `HartBarrier`-style rule
-  at `Barrier_RISCV_i`, minting `hart_iview_lb_at cpu_id itv'`, with a ghost
-  step at `⌜gtv <= itv'⌝ ∗ ⌜own_pub <= itv'⌝`) is where `userret` STEP 0
-  stamps the process's executable pages.  No `CtxId` field, no
-  `own_context` change: the context's "instruction bound" IS the `IK` the
-  stamped facts and the receipt carry.
-- Why it stays true while the process runs: executable user pages are
-  non-writable (the `user_pt_inv` permission map: X ⇒ ¬W), so a stamped
-  byte's timestamp does not move under user execution; the kernel writes
-  text only in `exec`, before the next `fence.i`.
-- The bundle: `uvb`/`ukb` carry `hart_iview_lb_at cpu_id IK` and the text
-  pages as `ctx_xpointsto ξ IK`, from the slot entry (`userret`) to both
-  tiers' fetch composers (`UserFetchCert`/`UserActiveClass.swp_fetch_of_pure`
-  for the safety tier, `UmodeFetch` for the verified one).
+### The safety tier: the word is EXISTENTIAL (landed 2026-09-03)
+
+The generic any-user-code proof is total over the fetched word
+(`base_exec_total_u`/`rvc_exec_total_u` quantify it), so it pays NO icache
+obligation at all:
+
+- `SmodeCorePt` PART G: `wp/swp_hart_ram_read_ifetch_any` (continuation
+  `∀ w`, progress from `mm_ok`'s RAM coverage via `tso_read_total`),
+  `swp_checked_mem_read_ifetch{4,2}_U_any`, `swp_mem_read_M{,2}_any`,
+  `spt_fetch_bytes_any{,2}_P`, `spt_fetch_bytes_fault_P` (the translate
+  faults: `mcer_early` reduces the early return), the shells
+  `spt_fetch_any4_P` / `spt_fetch_any2_P` (post = `F_RVC ilo` or
+  `fr_of_fb2 pc ilo fb` for the second half's three outcomes).
+- `UserActiveClass` §6a': `u_swp_fetch_gen` is the old `u_swp_fetch` tail
+  behind an abstract bridge whose post is `u_fetch_bridge_post` (landing
+  tree/map/file, pins carried on `u_Dfix`, `tlb_ok_pt` AT THE LANDING FILE,
+  the step); `u_swp_fetch` (pure `exec (fetch tt)`, the fault arms) and the
+  three bridges `u_fetch_bridge_any4` / `_any2_ok` / `_any2_fault` (walk by
+  `swp_hmrun_of_exec` over `u_walk_fetch_pure` /
+  `UserFaultCert.u_walk_fetch_fault_pure`, read by the `_any` rule) feed it.
+  The second walk of a split fetch starts from the FIRST half's Iris
+  landing file `rs1` (only `u_Drw ∪ u_Dro` is pinned), which is why the
+  bridge post speaks about `rs2` on `u_Dfix` and not about a pure `rsf'`.
+
+### The verified tier: the word is the program's -- STAMPS (open)
+
+`WpUmodeStep`'s value-precise tier must fetch the program's own word, so
+its fetch node pays `fobl_ifetch` with stamped bytes, and the stamps must
+SURVIVE the process's execution.  Analysis of 2026-09-03:
+
+- **The walker-write wall.**  A stamped byte (`TsoCtx.ctx_phys_xpointsto ξ
+  IK a dq v`, stamp `t <= IK` on the byte's LATEST-write timestamp) cannot
+  ride inside `bytes_own` through `swp_hmrun_of_exec`: the walker returns
+  plain bytes, and no pure post can tell the tier a text byte was NOT
+  written -- `mm' !! a = mm !! a` is silent about a same-value write, which
+  moves `t` past `IK`.  A "no write into X" certificate would be a second
+  `goodmb` (the read and write checks share one map); holding text at a
+  fraction the walker cannot write needs the same certificate.  Loads from
+  text pages (xv6's `.rodata` shares the R+X segment) rule out keeping text
+  outside the walker's map.
+- **The way out is a STABILITY payload.**  `TsoMemPa.ts_pay` gains
+  `tsp_stab : option nat` -- "the byte has read the same value at every
+  position from here" -- with `stab_ok1` in `ts_ok`, a frame arm at
+  `msg_byte m a = None` like every other payload, and a store rule that
+  KEEPS it on a same-value write.  Then the stamp is `stab = Some c ∧ c <=
+  IK`, a same-value write is harmless, and a payload-generic walker
+  (`bytes_own_p F mm`, `bytes_own` = `F ≡ ts_pay_none`, `swp_hmrun` itself
+  generalised, `swp_hmrun_of_exec` its corollary so no kernel caller moves)
+  gives back `bytes_own_p F' mm'` with `F' a = F a` wherever `mm' !! a = mm
+  !! a` -- which the verified tier knows for its image (`uv_mm t' M` is
+  literally the same `M`).
+- **Where the stamp comes from.**  `ctx_phys_xstamp` at a `fence.i` from a
+  RUNNING context's fact (clean: `t <= B <= K <= tv`; dirty and mine:
+  `TsoMemPa.own_pub_lookup`), the `fence.i` leaf (`HartBarrier.swp_hart_fence_i`,
+  landed) minting `hart_iview_lb_at cpu_id IK` with `⌜gtv <= IK⌝ ∗ ⌜own_pub
+  <= IK⌝`.  `userret` STEP 0 stamps the process's executable pages; the
+  slot (`uslot`) carries them into `uv_amb`/`umem` and the fetch composer
+  (`uv_swp_fetch`, re-cut: walk over the PT bytes by `swp_hmrun_of_exec`,
+  read by `swp_checked_mem_read_ifetch{4,2}_U` paid by
+  `ctx_phys_xfetch_bytes_ok`).  Executable user pages are non-writable
+  (`user_pt_inv`: X ⇒ ¬W), so the stamps are never dropped.
+- The `TsoCtx.ctx_xpointsto`/`ctx_phys_xpointsto` block that landed in
+  checkpoints 3-4 carries the stamp on `e.1`; it is re-based on the stab
+  payload as step 6 below and its gates keep their names.
 
 ## Order of work (gate: full build green + `make audit-only` unchanged)
 
 1. `TsoMemPa` (`ifetch_agent`, `ifetch_read`, its lemmas), `TsoMem` +
-   `TsoLitmus` (the verdicts above).
+   `TsoLitmus` (the verdicts above).  DONE.
 2. `RiscvLang` (field, arms, `mm_ok`, insert instance, write-back,
    reset), `TsoGhost`/`RiscvPtsto` (gname, auth conjunct, receipt),
-   `RiscvAdequacy` (the mint at era birth).
+   `RiscvAdequacy` (the mint at era birth).  DONE.
 3. `HartEvents` rules; `HartSpan`/`HartLift2` fence arm; `HartMemRun`
-   refusal; `HartMFetch`/`SmodeCorePt` swap; fence.i leaves mint.
-4. `TsoCtx.ctx_xpointsto` + `ctx_xstamp` + `ctx_xfetch_ok` (landed); the
-   `fence.i` leaf minting the receipt and running the stamp.
-5. The U-mode fetch composers re-cut at the fetch node (the `_U` twins of
-   the S-mode `checked_mem_read` fetch lemmas, the four-geometry composer),
-   `user_pt_inv`'s X ⇒ ¬W fact, and the bundle threading from `userret`
-   STEP 0 to both tiers.
+   refusal; `HartMFetch`/`SmodeCorePt` swap; fence.i leaves mint.  DONE.
+4. `TsoCtx.ctx_xpointsto` + `ctx_xstamp` + `ctx_xfetch_ok`; the `fence.i`
+   leaf minting the receipt.  DONE (to be re-based, step 6).
+5. The safety tier at the any-word node: `SmodeCorePt` PART G,
+   `UserFetchCert`/`UserFaultCert` trimmed, `UserActiveClass` §6a'.  DONE
+   modulo the build gate.
+6. The stability payload (`TsoMemPa.tsp_stab`, `stab_ok1`, frame arm,
+   `ts_ok` conjunct, the same-value store rule), `TsoCtx` stamps re-based on
+   it, `HartMemRun.bytes_own_p` + the payload-generic walker.
+7. The verified tier: `WpUmodeStep.uv_fetch_*` restated as walk facts +
+   read grants, `uv_swp_fetch` re-cut at the node, `umem`/`uv_amb` carrying
+   the stamps and `hart_iview_lb_at`, the ~60 `Uk*`/`WpUmode*` call sites
+   (mechanical: `Hfe Hfg` become the walk pair), `UmodeKernelTie` crossing,
+   `userret` STEP 0 minting from `user_pt_inv`'s X ⇒ ¬W pages.
+
+## State at checkpoint 5 (2026-09-03, handoff)
+
+- Green through `UserActiveClass` (safety tier any-word fetch); local
+  commits: checkpoints 1-4 on the machine/ghost/stamps, checkpoint 5 is the
+  safety-tier re-cut.  Nothing pushed.
+- RED from `WpUmodeStep` up: its `uv_read_4`/`uv_read_2` cite the deleted
+  `UserFetchCert.goodmb_mem_read_fetch_{4,2}_U`, so the verified tier and
+  everything above it (71 files: `Uk*`, `WpUmode*`, `UmodeKernelTie`,
+  `USyncKernel`/`UEchoKernel`, `UexecCond`, `Proof*`/`Link*`,
+  `SystemAdequacy`) does not build.  That is steps 6-7 above, not a bug.
+- Build recipe for one file: `opam exec --switch=/shared/xv6rocq -- make -C
+  iris -f CoqMakefile -j20 <File>.vo` (the top-level `make` has no per-file
+  target).  Do not `git checkout` a low file to revert it -- the fresh mtime
+  rebuilds the world; `touch -d` it back below its `.vo` instead.
+- Next: step 6 (the stability payload).  Every `ts_ok`-restoring store site
+  is in `TsoCtx` (four frame blocks, search `pinw_ok1_app_frame`) plus
+  `RiscvAdequacy`/`RiscvExec`; `ts_ok_unpinned` covers the written bytes.

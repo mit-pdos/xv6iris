@@ -3115,6 +3115,788 @@ Section SmodeCorePt.
   Qed.
 
 
+  (* =================================================================== *)
+  (* PART G -- THE NONDETERMINISTIC FETCH (claude-notes/projects/icache.md,  *)
+  (* the safety tier).  The generic any-user-code proof is total over the  *)
+  (* fetched word, so it pays NO stability obligation: the node rule       *)
+  (* quantifies the continuation over every word and needs only that the  *)
+  (* footprint is RAM -- the era image covers RAM ([mm_ok]'s third         *)
+  (* conjunct), so the fetch arm always has a step to take.  Everything    *)
+  (* below is the S/U fetch stack of PARTS D-F re-said with the word       *)
+  (* EXISTENTIAL in the post.                                              *)
+  (* =================================================================== *)
+  Lemma tso_read_bytes_top_ex img (log : list pwmsg)
+      (h : agent) (pa : Arch.pa) (n : N) :
+    (forall j : nat, (N.of_nat j < n)%N -> is_Some (img !! pa_add pa j)) ->
+    exists w : bv (8 * n), tso_read_bytes img log h (length log) pa n w.
+  Proof.
+    intros Hcov.
+    set (c := fun j : nat =>
+      match tso_read img log h (length log) (pa_add pa j) with
+      | Some b => b | None => bv_0 8 end).
+    exists (Z_to_bv (8 * n) (assemble_bytes (c <$> seq 0 (N.to_nat n)))).
+    intros j Hj.
+    destruct (Hcov j Hj) as [b Hb].
+    destruct (TsoMemPa.tso_read_total img log h (length log) (pa_add pa j) b Hb)
+      as [b' Hb'].
+    rewrite (nth_byte_assemble_len (8 * n) (c <$> seq 0 (N.to_nat n)) j);
+      [ | rewrite length_fmap length_seq; lia
+        | rewrite length_fmap length_seq; lia ].
+    rewrite list_lookup_total_alt list_lookup_fmap lookup_seq_lt; [|lia].
+    change (0 + j)%nat with j.
+    cbn [default fmap option_fmap option_map].
+    rewrite Hb'. try rewrite /c. try rewrite Hb'. reflexivity.
+  Qed.
+
+  Lemma ram_window (pa : Arch.pa) (n : N) :
+    (n <= 16)%N ->
+    addr_is_ram pa -> addr_is_ram (pa_add pa (N.to_nat n - 1)) ->
+    forall j : nat, (N.of_nat j < n)%N ->
+      (ram_lo <= SailStdpp.Operators_mwords.uint (pa_add pa j) < ram_hi)%Z.
+  Proof.
+    intros Hn H0 Hk j Hj.
+    unfold addr_is_ram, ram_base, ram_size in H0, Hk. unfold ram_lo, ram_hi.
+    rewrite uint_pa_add in Hk; [|lia].
+    rewrite uint_pa_add; lia.
+  Qed.
+
+  Lemma wp_hart_ram_read_ifetch_any {X : Type} (C : M X -> M unit)
+      (n : N) (req : Interface.ReadReq.t n) (m : M X) :
+    mctx C ->
+    hread_req_at n m = Some req ->
+    dev_addr (Interface.ReadReq.pa req) = false ->
+    ak_ifetch (Interface.ReadReq.access_kind req) = true ->
+    (forall j : nat, (N.of_nat j < n)%N ->
+       (ram_lo <= SailStdpp.Operators_mwords.uint
+                    (pa_add (Interface.ReadReq.pa req) j) < ram_hi)%Z) ->
+    gen_cert -∗
+    ▷ (∀ w : bv (8 * n),
+         WP (HartE gen_id cpu_id (C (hread_resume (bv_unsigned w) m))
+             : expr riscv_lang)) -∗
+    WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
+  Proof.
+    iIntros (HC Hproj Hdev Hif Hram) "#Hcert H".
+    destruct (hread_req_at_inv _ _ _ Hproj) as (K & Hm & Hres).
+    assert (Hg : C m = Interface.Next (Interface.MemRead n req)
+                         (fun v => C (K v)))
+      by (rewrite Hm; exact (HC _ (Interface.MemRead n req) K eq_refl)).
+    rewrite Hg.
+    iApply (RiscvExec.wp_hart_step with "Hcert").
+    { intros oth0 h0 img0 σ0 log0 tv0 itv0 r0 m'0 σ'0 log'0 tv'0 itv'0 r'0 Hs.
+      rewrite /mnode_step in Hs. cbn beta iota in Hs.
+      rewrite Hdev in Hs. cbn beta iota in Hs.
+      destruct Hs as [(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)
+                     |[(Hif' & _) |(Hex & _)]];
+        [done|congruence|by rewrite (ak_ifetch_excl _ Hif) in Hex]. }
+    iIntros (σ oth rv img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+    iDestruct (RiscvExec.tso_interp_of_pin with "Htso") as %Hpin.
+    rewrite (RiscvExec.tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+               σ.(sregs) σ.(mdev) Hpin).
+    iDestruct (tso_interp_at_mm_ok with "Htso") as %Hmm.
+    rewrite -(RiscvExec.tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+                σ.(sregs) σ.(mdev) Hpin).
+    destruct Hmm as (_ & _ & Hcov). cbn [gimg RiscvExec.gs_of] in Hcov.
+    destruct (tso_read_bytes_top_ex img log (ifetch_agent (hart_agent cpu_id))
+                (Interface.ReadReq.pa req) n
+                (fun j Hj => Hcov _ (Hram j Hj))) as [w0 Hrd0].
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iExists (C (K (inl (w0, None)))), σ, log, tv, itv, rv.
+    iSplitR.
+    { iPureIntro. rewrite /mnode_step. cbn beta iota.
+      rewrite Hdev. cbn beta iota.
+      left. split; [exact Hif|].
+      exists (length log), w0.
+      split_and!; [exact Hitv|lia|exact Hrd0|done|done|done|done|done|done]. }
+    iNext. iIntros (m' σ' log' tv' itv' rv') "%Hstep".
+    rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
+    rewrite Hdev in Hstep. cbn beta iota in Hstep.
+    destruct Hstep as [(_ & tvn & w' & Hlo & Hhi & Hbytes' & -> & -> & ->
+                        & -> & -> & ->)
+                      |[(Hif' & _) | (Hex & _)]];
+      [|congruence|by rewrite (ak_ifetch_excl _ Hif) in Hex].
+    iMod "Hclose" as "_". iModIntro. rewrite -(Hres w'). iFrame "Hσ Hiv".
+    iSplitL "Htso".
+    { rewrite -Htv. iApply (RiscvExec.tso_interp_of_idle with "Htso"). }
+    iApply "H".
+  Qed.
+
+  Lemma swp_hart_ram_read_ifetch_any {X : Type} (n : N)
+      (req : Interface.ReadReq.t n) (m : M X) (Φ : X -> iProp Σ) :
+    hread_req_at n m = Some req ->
+    dev_addr (Interface.ReadReq.pa req) = false ->
+    ak_ifetch (Interface.ReadReq.access_kind req) = true ->
+    (forall j : nat, (N.of_nat j < n)%N ->
+       (ram_lo <= SailStdpp.Operators_mwords.uint
+                    (pa_add (Interface.ReadReq.pa req) j) < ram_hi)%Z) ->
+    gen_cert -∗
+    ▷ (∀ w : bv (8 * n), swp (hread_resume (bv_unsigned w) m) Φ) -∗
+    swp m Φ.
+  Proof.
+    iIntros (Hproj Hdev Hif Hram) "#Hcert H".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    iApply (wp_hart_ram_read_ifetch_any C n req m HC Hproj Hdev Hif Hram
+              with "Hcert").
+    iNext. iIntros (w).
+    iApply (swp_use _ Φ C HC with "[H] Hcont"). iApply "H".
+  Qed.
+
+  (* an [early_return] under its [catch_early_return] IS the value *)
+  Lemma mcer_early {E R B : Type} (x : R) (K : B -> Defs.monadR R E R) :
+    Defs.catch_early_return
+      (Defs.bind (Defs.early_return (E := E) (R := R) (A := B) x) K)
+    = Interface.Ret x.
+  Proof. reflexivity. Qed.
+
+  Lemma swp_checked_mem_read_ifetch4_U_any (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) :
+    Drw ## Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pcfg 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    pma_allows_ram pmar0 ->
+    addr_is_ram pa ->
+    addr_is_ram (pa_add pa 3) ->
+    is_aligned_paddr (Physaddr pa) 4 = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (checked_mem_read (InstructionFetch tt) PBMT_PMA User
+           (Physaddr pa) 4 false false false false)
+      (fun r => ∃ bytes : bv 32, ⌜r = Values.Ok (bytes, tt)⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HD HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr
+      HA Hord HX Hcov Hpallow Hram Hram3 Hpa.
+    pose proof (ram_fetch_pmp pa (vec_access_dec paddr 0) 4 3
+                  ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity)
+                  ltac:(reflexivity) Hram Hram3 Hcov) as Hrange.
+    iIntros "#Hcert Hrw Hro".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold checked_mem_read.
+    iApply (swp_use_cer
+              (check_pma_with_pmp_priority (InstructionFetch tt) PBMT_PMA
+                 User (Physaddr pa) 4 false) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 6 Drw Dro Df rs rs _ _ Hdisj
+                (hfrun_check_pma_ifetch_U (Drw ∪ Dro) Drw rs pa pmar0 4
+                   HD Hpma Hpallow (pma_access_ram pa 4 3 Hram Hram3
+                      (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl) Hpa)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    rewrite mbind_ret. cbn beta iota zeta.
+    cbn [Phys_Mem_Access_Info_granule_size_exp Phys_Mem_Access_Info_splittable].
+    cbn beta iota zeta delta [split_misaligned misaligned_order
+      sys_misaligned_order_decreasing read_kind_of_flags].
+    change (Instances.generic_eq CannotSplit CannotSplit) with true.
+    cbn beta iota.
+    rewrite /returnM mliftR_ret mbind_ret. cbn beta iota zeta.
+    (* the read kind: [rk_select] gives an instruction fetch [Read_ifetch] *)
+    rewrite mbind_returnR. cbn beta iota zeta.
+    cbn beta iota zeta delta [Defs.untilMT Defs.untilMT' Defs.Zwf_guarded
+      Z_ge_dec Z_ge_lt_dec Zcompare_rec Z.compare].
+    cbn beta iota zeta delta [Defs.assert_exp' bits_of_physaddr].
+    rewrite mliftR_ret mbind_ret. cbn beta iota.
+    change (0 * 4) with 0. rewrite avi0.
+    iApply (swp_use_cer3
+              (pmpCheck (Physaddr pa) 4 (InstructionFetch tt) User)
+              _ _ _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_pmpCheck_U (InstructionFetch tt) Drw Dro Df rs pcfg paddr
+                pa 4 Hdisj HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange
+                ltac:(unfold pmpCheckRWX; cbn match; rewrite HX; reflexivity)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    rewrite mbind0_ret.
+    iApply (swp_use_cer3 (within_mmio_readable (Physaddr pa) 4)
+              _ _ _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 12 Drw Dro Df rs rs _ _ Hdisj
+                (hfrun_within_mmio_ram (Drw ∪ Dro) Drw rs pa 4
+                   ltac:(lia) HDhtif Hhtif Hram)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    iApply (swp_use_cer4 (read_ram Read_ifetch (Physaddr pa) 4 false)
+              _ _ _ _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_hart_ram_read_ifetch_any 4 (mread_req_ifetch pa) _
+                (fun r => (∃ bytes : bv 32, ⌜r = (bytes, default_meta)⌝ ∗
+                           hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
+                (hread_req_at_read_ram_ifetch pa)
+                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
+                (ram_window pa 4 ltac:(lia) Hram Hram3)
+                with "Hcert [Hrw Hro]").
+      iNext. iIntros (w). rewrite hread_resume_read_ram_ifetch.
+      iApply swp_ret. iExists w. by iFrame. }
+    iIntros (v) "(%bytes & -> & Hrw & Hro)". cbn beta iota zeta.
+    rewrite mbind_ret. cbn beta.
+    change (0 =? 1 - 1) with true. cbn beta iota zeta.
+    rewrite !autocast_id usvd_zeros_full_32 mcer_ret.
+    iApply ("Hcont" $! (Values.Ok (bytes, tt))). iExists bytes. by iFrame.
+  Qed.
+
+  Lemma swp_checked_mem_read_ifetch2_U_any (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) :
+    Drw ## Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pcfg 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    pma_allows_ram pmar0 ->
+    addr_is_ram pa ->
+    addr_is_ram (pa_add pa 1) ->
+    is_aligned_paddr (Physaddr pa) 2 = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (checked_mem_read (InstructionFetch tt) PBMT_PMA User
+           (Physaddr pa) 2 false false false false)
+      (fun r => ∃ bytes : bv 16, ⌜r = Values.Ok (bytes, tt)⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HD HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr
+      HA Hord HX Hcov Hpallow Hram Hram1 Hpa.
+    pose proof (ram_fetch_pmp pa (vec_access_dec paddr 0) 2 1
+                  ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity)
+                  ltac:(reflexivity) Hram Hram1 Hcov) as Hrange.
+    iIntros "#Hcert Hrw Hro".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold checked_mem_read.
+    iApply (swp_use_cer
+              (check_pma_with_pmp_priority (InstructionFetch tt) PBMT_PMA
+                 User (Physaddr pa) 2 false) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 6 Drw Dro Df rs rs _ _ Hdisj
+                (hfrun_check_pma_ifetch_U (Drw ∪ Dro) Drw rs pa pmar0 2
+                   HD Hpma Hpallow (pma_access_ram pa 2 1 Hram Hram1
+                      (pma_width_ok 2 eq_refl eq_refl) eq_refl eq_refl) Hpa)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    rewrite mbind_ret. cbn beta iota zeta.
+    cbn [Phys_Mem_Access_Info_granule_size_exp Phys_Mem_Access_Info_splittable].
+    cbn beta iota zeta delta [split_misaligned misaligned_order
+      sys_misaligned_order_decreasing read_kind_of_flags].
+    change (Instances.generic_eq CannotSplit CannotSplit) with true.
+    cbn beta iota.
+    rewrite /returnM mliftR_ret mbind_ret. cbn beta iota zeta.
+    (* the read kind: [rk_select] gives an instruction fetch [Read_ifetch] *)
+    rewrite mbind_returnR. cbn beta iota zeta.
+    cbn beta iota zeta delta [Defs.untilMT Defs.untilMT' Defs.Zwf_guarded
+      Z_ge_dec Z_ge_lt_dec Zcompare_rec Z.compare].
+    cbn beta iota zeta delta [Defs.assert_exp' bits_of_physaddr].
+    rewrite mliftR_ret mbind_ret. cbn beta iota.
+    change (0 * 2) with 0. rewrite avi0.
+    iApply (swp_use_cer3
+              (pmpCheck (Physaddr pa) 2 (InstructionFetch tt) User)
+              _ _ _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_pmpCheck_U (InstructionFetch tt) Drw Dro Df rs pcfg paddr
+                pa 2 Hdisj HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange
+                ltac:(unfold pmpCheckRWX; cbn match; rewrite HX; reflexivity)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    rewrite mbind0_ret.
+    iApply (swp_use_cer3 (within_mmio_readable (Physaddr pa) 2)
+              _ _ _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 12 Drw Dro Df rs rs _ _ Hdisj
+                (hfrun_within_mmio_ram (Drw ∪ Dro) Drw rs pa 2
+                   ltac:(lia) HDhtif Hhtif Hram)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    iApply (swp_use_cer4 (read_ram Read_ifetch (Physaddr pa) 2 false)
+              _ _ _ _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_hart_ram_read_ifetch_any 2 (mread_req2_ifetch pa) _
+                (fun r => (∃ bytes : bv 16, ⌜r = (bytes, default_meta)⌝ ∗
+                           hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
+                (hread_req_at_read_ram2_ifetch pa)
+                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
+                (ram_window pa 2 ltac:(lia) Hram Hram1)
+                with "Hcert [Hrw Hro]").
+      iNext. iIntros (w). rewrite hread_resume_read_ram2_ifetch.
+      iApply swp_ret. iExists w. by iFrame. }
+    iIntros (v) "(%bytes & -> & Hrw & Hro)". cbn beta iota zeta.
+    rewrite mbind_ret. cbn beta.
+    change (0 =? 1 - 1) with true. cbn beta iota zeta.
+    rewrite !autocast_id usvd_zeros_full_16 mcer_ret.
+    iApply ("Hcont" $! (Values.Ok (bytes, tt))). iExists bytes. by iFrame.
+  Qed.
+
+  Lemma swp_mem_read_M_any (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pa : physaddr)
+      (pv : Privilege) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = pv ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA pv pa 4
+              false false false false)
+         (fun r => ∃ w : SailStdpp.Values.mword 32, ⌜r = Values.Ok (w, tt)⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (mem_read (InstructionFetch tt) PBMT_PMA pa 4 false false false)
+      (fun r => ∃ w : SailStdpp.Values.mword 32, ⌜r = Values.Ok w⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDmst HDpriv Hpriv.
+    iIntros "#Hcert Hrw Hro Hcmr".
+    unfold mem_read.
+    iApply (swp_bind_use (Defs.read_reg mstatus) _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmst
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
+    unfold effectivePrivilege.
+    change (Instances.generic_neq (InstructionFetch tt) (InstructionFetch tt))
+      with false.
+    cbn beta iota zeta delta [Defs.returnm returnM].
+    rewrite mbind_ret.
+    unfold mem_read_priv, mem_read_priv_meta.
+    cbn beta iota.
+    iApply (swp_bind_use _ _
+              (fun r => (∃ w : SailStdpp.Values.mword 32, ⌜r = Values.Ok (w, tt)⌝ ∗
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I) _
+              with "[Hrw Hro Hcmr] [-]").
+    { iApply (swp_bind_use _ _
+                (fun r => (∃ w : SailStdpp.Values.mword 32, ⌜r = Values.Ok (w, tt)⌝ ∗
+                           hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I) _
+                with "[Hrw Hro Hcmr] [-]").
+      - iApply ("Hcmr" with "Hrw Hro").
+      - iIntros (v) "(%w & -> & Hrw & Hro)". iApply swp_ret. iExists w. by iFrame. }
+    iIntros (v) "(%w & -> & Hrw & Hro)". iApply swp_ret.
+    cbn [MemoryOpResult_drop_meta]. iExists w. by iFrame.
+  Qed.
+
+  Lemma swp_mem_read_M2_any (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pa : physaddr)
+      (pv : Privilege) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = pv ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA pv pa 2
+              false false false false)
+         (fun r => ∃ w : SailStdpp.Values.mword 16, ⌜r = Values.Ok (w, tt)⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (mem_read (InstructionFetch tt) PBMT_PMA pa 2 false false false)
+      (fun r => ∃ w : SailStdpp.Values.mword 16, ⌜r = Values.Ok w⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDmst HDpriv Hpriv.
+    iIntros "#Hcert Hrw Hro Hcmr".
+    unfold mem_read.
+    iApply (swp_bind_use (Defs.read_reg mstatus) _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmst
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
+    unfold effectivePrivilege.
+    change (Instances.generic_neq (InstructionFetch tt) (InstructionFetch tt))
+      with false.
+    cbn beta iota zeta delta [Defs.returnm returnM].
+    rewrite mbind_ret.
+    unfold mem_read_priv, mem_read_priv_meta.
+    cbn beta iota.
+    iApply (swp_bind_use _ _
+              (fun r => (∃ w : SailStdpp.Values.mword 16, ⌜r = Values.Ok (w, tt)⌝ ∗
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I) _
+              with "[Hrw Hro Hcmr] [-]").
+    { iApply (swp_bind_use _ _
+                (fun r => (∃ w : SailStdpp.Values.mword 16, ⌜r = Values.Ok (w, tt)⌝ ∗
+                           hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I) _
+                with "[Hrw Hro Hcmr] [-]").
+      - iApply ("Hcmr" with "Hrw Hro").
+      - iIntros (v) "(%w & -> & Hrw & Hro)". iApply swp_ret. iExists w. by iFrame. }
+    iIntros (v) "(%w & -> & Hrw & Hro)". iApply swp_ret.
+    cbn [MemoryOpResult_drop_meta]. iExists w. by iFrame.
+  Qed.
+
+  Lemma spt_fetch_bytes_any_P (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (Qf : regstate -> Prop) (Rf : regstate -> iProp Σ)
+      (pc pa : mword 64) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (forall rsf, Qf rsf -> register_lookup cur_privilege rsf = User) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translateAddr (Virtaddr pc) (InstructionFetch tt))
+         (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                   ∃ rsf : regstate, ⌜Qf rsf⌝ ∗ Rf rsf ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    (∀ rsf : regstate, ⌜Qf rsf⌝ -∗
+     hreg_frame rsf Drw -∗ hreg_frame_ro Df rsf Dro -∗
+       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA User
+              (Physaddr pa) 4 false false false false)
+         (fun r => ∃ w : mword 32, ⌜r = Values.Ok (w, tt)⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    swp (fetch_bytes pc pc 4)
+      (fun r => ∃ w : mword 32, ⌜r = @FetchBytes_Success 4 w⌝ ∗
+                ∃ rsf : regstate, ⌜Qf rsf⌝ ∗ Rf rsf ∗
+                hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro).
+  Proof.
+    intros Hdisj HDmst HDpriv Hpriv.
+    iIntros "#Hcert Hrw Hro Htr Hcmr".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold fetch_bytes.
+    cbn beta iota zeta delta [ext_fetch_check_pc].
+    rewrite mbind0_ret.
+    iApply (swp_use_cer (translateAddr (Virtaddr pc) (InstructionFetch tt))
+              _ _ C HC with "[Hrw Hro Htr] [-]").
+    { iApply ("Htr" with "Hrw Hro"). }
+    iIntros (v) "(-> & Hf)". cbn beta iota.
+    iDestruct "Hf" as (rsf) "(%HQ & HRf & Hrw & Hro)".
+    iApply (swp_use_cer
+              (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 4
+                 false false false) _ _ C HC with "[Hrw Hro Hcmr] [-]").
+    { iApply (swp_mem_read_M_any Drw Dro Df rsf (Physaddr pa) User Hdisj
+                HDmst HDpriv (Hpriv rsf HQ) with "Hcert Hrw Hro [Hcmr]").
+      iApply ("Hcmr" $! rsf with "[%]"). exact HQ. }
+    iIntros (v) "(%w & -> & Hrw & Hro)". cbn beta iota.
+    rewrite autocast_id mcer_ret.
+    iApply ("Hcont" $! (@FetchBytes_Success 4 w)).
+    iExists w. iSplitR; [done|]. iExists rsf. by iFrame.
+  Qed.
+
+  Lemma spt_fetch_bytes_any2_P (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (Qf : regstate -> Prop) (Rf : regstate -> iProp Σ)
+      (fs gs pa : mword 64) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (forall rsf, Qf rsf -> register_lookup cur_privilege rsf = User) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translateAddr (Virtaddr gs) (InstructionFetch tt))
+         (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                   ∃ rsf : regstate, ⌜Qf rsf⌝ ∗ Rf rsf ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    (∀ rsf : regstate, ⌜Qf rsf⌝ -∗
+     hreg_frame rsf Drw -∗ hreg_frame_ro Df rsf Dro -∗
+       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA User
+              (Physaddr pa) 2 false false false false)
+         (fun r => ∃ h : mword 16, ⌜r = Values.Ok (h, tt)⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    swp (fetch_bytes fs gs 2)
+      (fun r => ∃ h : mword 16, ⌜r = @FetchBytes_Success 2 h⌝ ∗
+                ∃ rsf : regstate, ⌜Qf rsf⌝ ∗ Rf rsf ∗
+                hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro).
+  Proof.
+    intros Hdisj HDmst HDpriv Hpriv.
+    iIntros "#Hcert Hrw Hro Htr Hcmr".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold fetch_bytes.
+    cbn beta iota zeta delta [ext_fetch_check_pc].
+    rewrite mbind0_ret.
+    iApply (swp_use_cer (translateAddr (Virtaddr gs) (InstructionFetch tt))
+              _ _ C HC with "[Hrw Hro Htr] [-]").
+    { iApply ("Htr" with "Hrw Hro"). }
+    iIntros (v) "(-> & Hf)". cbn beta iota.
+    iDestruct "Hf" as (rsf) "(%HQ & HRf & Hrw & Hro)".
+    iApply (swp_use_cer
+              (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 2
+                 false false false) _ _ C HC with "[Hrw Hro Hcmr] [-]").
+    { iApply (swp_mem_read_M2_any Drw Dro Df rsf (Physaddr pa) User Hdisj
+                HDmst HDpriv (Hpriv rsf HQ) with "Hcert Hrw Hro [Hcmr]").
+      iApply ("Hcmr" $! rsf with "[%]"). exact HQ. }
+    iIntros (v) "(%h & -> & Hrw & Hro)". cbn beta iota.
+    rewrite autocast_id mcer_ret.
+    iApply ("Hcont" $! (@FetchBytes_Success 2 h)).
+    iExists h. iSplitR; [done|]. iExists rsf. by iFrame.
+  Qed.
+
+  (* [fetch_bytes] when the translation FAULTS: no read, the exception
+     rides out through the early return *)
+  Lemma spt_fetch_bytes_fault_P (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (Qf : regstate -> Prop) (Rf : regstate -> iProp Σ)
+      (fs gs : SailStdpp.Values.mword 64) (width : Z) (e : ExceptionType) :
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translateAddr (Virtaddr gs) (InstructionFetch tt))
+         (fun r => ⌜r = Values.Err (e, tt)⌝ ∗
+                   ∃ rsf : regstate, ⌜Qf rsf⌝ ∗ Rf rsf ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    swp (fetch_bytes fs gs width)
+      (fun r => ⌜r = @FetchBytes_Exception width e⌝ ∗
+                ∃ rsf : regstate, ⌜Qf rsf⌝ ∗ Rf rsf ∗
+                hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro).
+  Proof.
+    iIntros "#Hcert Hrw Hro Htr".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold fetch_bytes.
+    cbn beta iota zeta delta [ext_fetch_check_pc].
+    rewrite mbind0_ret.
+    iApply (swp_use_cer (translateAddr (Virtaddr gs) (InstructionFetch tt))
+              _ _ C HC with "[Hrw Hro Htr] [-]").
+    { iApply ("Htr" with "Hrw Hro"). }
+    iIntros (v) "(-> & Hf)". cbn beta iota.
+    rewrite mcer_early.
+    iApply ("Hcont" $! (@FetchBytes_Exception width e)).
+    iSplitR; [done|]. iExact "Hf".
+  Qed.
+
+  Lemma spt_fetch_any4_P (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pc : SailStdpp.Values.mword 64)
+      (P : SailStdpp.Values.mword 32 -> iProp Σ) :
+    Drw ## Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    neq_vec (access_vec_dec pc 0) zerobit = false ->
+    neq_vec (access_vec_dec pc 1) zerobit = false ->
+    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (fetch_bytes pc pc 4)
+         (fun r => ∃ w : SailStdpp.Values.mword 32,
+                   ⌜r = @FetchBytes_Success 4 w⌝ ∗ P w)) -∗
+    swp (fetch tt)
+      (fun r => ∃ w : SailStdpp.Values.mword 32,
+                ⌜r = (if isRVC (subrange_vec_dec w 15 0)
+                      then F_RVC (subrange_vec_dec w 15 0)
+                      else F_Base w)⌝ ∗ P w).
+  Proof.
+    intros Hdisj HDpc Hpc Hb0 Hb1 Hal.
+    iIntros "#Hcert Hrw Hro Hfb".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold fetch. spt_mf.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". spt_mf.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". spt_mf.
+    rewrite mbind0_ret. unfold Defs.or_boolM.
+    iApply (swp_use_cer3 (Defs.read_reg (R_bitvector_64 PC)) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite Hpc mbind_ret. cbn beta. rewrite Hb0.
+    unfold Defs.and_boolM.
+    iApply (swp_use_cer3 (Defs.read_reg (R_bitvector_64 PC)) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite Hpc mbind_ret. cbn beta. rewrite Hb1.
+    rewrite mbind_ret. cbn beta.
+    unfold Defs.and_boolM.
+    iApply (swp_use_cer3 (Defs.read_reg (R_bitvector_64 PC)) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite Hpc mbind_ret. cbn beta. rewrite Hal.
+    rewrite spt_cE_Ziccif /returnM mliftR_ret mbind_ret. cbn beta.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
+    iApply (swp_use_cer (fetch_bytes pc pc 4) _ _ C HC
+              with "[Hrw Hro Hfb] [-]").
+    { iApply ("Hfb" with "Hrw Hro"). }
+    iIntros (v) "(%w & -> & HP)". cbn beta iota.
+    rewrite mcer_ret.
+    iApply ("Hcont" $! (if isRVC (subrange_vec_dec w 15 0)
+                        then F_RVC (subrange_vec_dec w 15 0)
+                        else F_Base w)). iExists w. by iFrame.
+  Qed.
+
+  Definition fr_of_fb2 (pc : SailStdpp.Values.mword 64)
+      (ilo : SailStdpp.Values.mword 16) (fb : FetchBytes_Result 2) : FetchResult :=
+    match fb with
+    | FetchBytes_Ext_Error e => F_Ext_Error e
+    | FetchBytes_Exception e => F_Error (e, add_vec_int pc 2)
+    | FetchBytes_Success ihi => F_Base (concat_vec ihi ilo)
+    end.
+
+  Lemma spt_fetch_any2_P (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (Qf1 : regstate -> Prop) (Rf1 : regstate -> iProp Σ)
+      (pc : SailStdpp.Values.mword 64)
+      (Ψ : SailStdpp.Values.mword 16 -> regstate -> FetchBytes_Result 2
+           -> regstate -> iProp Σ) :
+    Drw ## Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    neq_vec (access_vec_dec pc 0) zerobit = false ->
+    neq_vec (access_vec_dec pc 1) zerobit = true ->
+    is_aligned_vaddr (Virtaddr pc) 4 = false ->
+    eq_vec (_get_Misa_C (register_lookup misa rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
+    (forall rs1, Qf1 rs1 -> register_lookup (R_bitvector_64 PC) rs1 = pc) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (fetch_bytes pc pc 2)
+         (fun r => ∃ ilo : SailStdpp.Values.mword 16,
+                   ⌜r = @FetchBytes_Success 2 ilo⌝ ∗
+                   ∃ rs1 : regstate, ⌜Qf1 rs1⌝ ∗ Rf1 rs1 ∗
+                   hreg_frame rs1 Drw ∗ hreg_frame_ro Df rs1 Dro)) -∗
+    (∀ (ilo : SailStdpp.Values.mword 16) (rs1 : regstate),
+       ⌜isRVC ilo = false⌝ -∗ ⌜Qf1 rs1⌝ -∗ Rf1 rs1 -∗
+       hreg_frame rs1 Drw -∗ hreg_frame_ro Df rs1 Dro -∗
+       swp (fetch_bytes pc (add_vec_int pc 2) 2)
+         (fun r => ∃ rs2 : regstate,
+                   ⌜register_lookup (R_bitvector_64 PC) rs2 = pc⌝ ∗
+                   Ψ ilo rs1 r rs2 ∗
+                   hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro)) -∗
+    swp (fetch tt)
+      (fun r =>
+         (∃ (ilo : SailStdpp.Values.mword 16) (rs1 : regstate),
+            ⌜isRVC ilo = true⌝ ∗ ⌜r = F_RVC ilo⌝ ∗ ⌜Qf1 rs1⌝ ∗ Rf1 rs1 ∗
+            hreg_frame rs1 Drw ∗ hreg_frame_ro Df rs1 Dro)
+         ∨ (∃ (ilo : SailStdpp.Values.mword 16) (rs1 : regstate)
+              (fb : FetchBytes_Result 2) (rs2 : regstate),
+            ⌜isRVC ilo = false⌝ ∗ ⌜r = fr_of_fb2 pc ilo fb⌝ ∗ Ψ ilo rs1 fb rs2 ∗
+            hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro)).
+  Proof.
+    intros Hdisj HDpc HDmisa Hpc Hb0 Hb1 Hal4 HmisaC Hpc1.
+    iIntros "#Hcert Hrw Hro Hlo Hhi".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold fetch. spt_mf.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". spt_mf.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". spt_mf.
+    rewrite mbind0_ret. unfold Defs.or_boolM.
+    iApply (swp_use_cer3 (Defs.read_reg (R_bitvector_64 PC)) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite Hpc mbind_ret. cbn beta. rewrite Hb0.
+    unfold Defs.and_boolM.
+    iApply (swp_use_cer3 (Defs.read_reg (R_bitvector_64 PC)) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite Hpc mbind_ret. cbn beta. rewrite Hb1.
+    rewrite mf_cE_Zca_eq_local.
+    iApply (swp_use_cer3 (Defs.read_reg misa) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmisa
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite HmisaC. cbn beta iota.
+    rewrite mbind_ret. cbn beta.
+    unfold Defs.and_boolM.
+    iApply (swp_use_cer3 (Defs.read_reg (R_bitvector_64 PC)) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite Hpc mbind_ret. cbn beta.
+    rewrite Hal4. cbn beta iota.
+    rewrite mbind_ret. cbn beta.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
+    iApply (swp_use_cer (fetch_bytes pc pc 2) _ _ C HC
+              with "[Hrw Hro Hlo] [-]").
+    { iApply ("Hlo" with "Hrw Hro"). }
+    iIntros (v) "(%ilo & -> & Hf)". cbn beta iota.
+    iDestruct "Hf" as (rs1) "(%HQ1 & HRf1 & Hrw & Hro)".
+    destruct (isRVC ilo) eqn:Hrvc; cbn beta iota.
+    { rewrite mcer_ret.
+      iApply ("Hcont" $! (F_RVC ilo)). iLeft. iExists ilo, rs1. by iFrame. }
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs1 _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite (Hpc1 rs1 HQ1).
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs1 _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite (Hpc1 rs1 HQ1).
+    iApply (swp_use_cer (fetch_bytes pc (add_vec_int pc 2) 2) _ _ C HC
+              with "[Hrw Hro Hhi HRf1] [-]").
+    { iApply ("Hhi" $! ilo rs1 with "[%] [%] HRf1 Hrw Hro"); done. }
+    iIntros (v) "(%rs2 & %Hpc2 & HΨ & Hrw & Hro)".
+    destruct v as [e|e|ihi]; cbn beta iota.
+    - rewrite mcer_ret.
+      iApply ("Hcont" $! (F_Ext_Error e)). iRight.
+      iExists ilo, rs1, (FetchBytes_Ext_Error e), rs2. by iFrame.
+    - iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+                with "[Hrw Hro] [-]").
+      { iApply (swp_read_reg_pinned Drw Dro Df rs2 _ Hdisj HDpc
+                  with "Hcert Hrw Hro"). }
+      iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc2 mcer_ret.
+      iApply ("Hcont" $! (F_Error (e, add_vec_int pc 2))). iRight.
+      iExists ilo, rs1, (FetchBytes_Exception e), rs2. by iFrame.
+    - rewrite mcer_ret.
+      iApply ("Hcont" $! (F_Base (concat_vec ihi ilo))). iRight.
+      iExists ilo, rs1, (FetchBytes_Success ihi), rs2. by iFrame.
+  Qed.
+
   (* the two RAM endpoints of a text chunk, with NO heap interpretation:
      they come off the bytes' own claims ([code_ram]), which is what lets
      the fetch's PMA/PMP premises be discharged before any node runs.
