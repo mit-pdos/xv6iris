@@ -60,7 +60,7 @@ From iris.base_logic.lib Require Import gen_heap invariants own ghost_var mono_n
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvExtras.
-Require Import WpLock SleepLock.
+Require Import SleepLock.
 Require Import Xv6Cameras.
 Require Import WpSconfMem.  (* [wordw_claim]: the pinw read leaves need it *)
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
