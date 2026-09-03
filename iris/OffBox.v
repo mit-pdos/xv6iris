@@ -137,6 +137,34 @@ Section OffBox.
      whenever no one needs it, so the table holds no box ghost. *)
 
   (* ---- the L2 side: the inode payload's APPEND-ONLY set of rows --------- *)
+  (* the share splits and joins by mass (item 24: "shares split by mass") --
+     [IcacheRef.ic_ref_stamps_split]'s proof over this box's reference *)
+  Lemma off_ref_stamps_mass_eq γ k (μ1 μ2 : Qp) :
+    μ1 = μ2 -> off_ref_stamps γ k μ1 -∗ off_ref_stamps γ k μ2.
+  Proof. intros ->. iIntros "$". Qed.
+  Lemma off_ref_stamps_join γ k (μ1 μ2 : Qp) :
+    off_ref_stamps γ k μ1 -∗ off_ref_stamps γ k μ2 -∗ off_ref_stamps γ k (μ1 + μ2)%Qp.
+  Proof.
+    rewrite /off_ref_stamps.
+    iIntros "(%m1 & %Hq1 & H1) (%m2 & %Hq2 & H2)".
+    iDestruct (CtxBox.reference_join with "H1 H2") as "H".
+    iExists (m1 ⋅ m2). iFrame "H". iPureIntro.
+    rewrite CtxBox.qsum_op Hq1 Hq2 Qp.to_Qc_inj_add. reflexivity.
+  Qed.
+  Lemma off_ref_stamps_split γ k (μ1 μ2 : Qp) :
+    off_ref_stamps γ k (μ1 + μ2)%Qp -∗ off_ref_stamps γ k μ1 ∗ off_ref_stamps γ k μ2.
+  Proof.
+    rewrite /off_ref_stamps. iIntros "(%m & %Hq & H)".
+    iDestruct (CtxBox.reference_split _ _ _ (μ1 / (μ1 + μ2))%Qp (μ2 / (μ1 + μ2))%Qp
+                 with "H") as "[H1 H2]".
+    { rewrite -Qp.div_add_distr Qp.div_diag. reflexivity. }
+    iSplitL "H1".
+    - iExists (CtxBox.mscale (μ1 / (μ1 + μ2))%Qp m). iFrame "H1". iPureIntro.
+      rewrite CtxBox.qsum_mscale Hq -Qp.to_Qc_inj_mul Qp.mul_div_r. reflexivity.
+    - iExists (CtxBox.mscale (μ2 / (μ1 + μ2))%Qp m). iFrame "H2". iPureIntro.
+      rewrite CtxBox.qsum_mscale Hq -Qp.to_Qc_inj_mul Qp.mul_div_r. reflexivity.
+  Qed.
+
   Definition off_set_auth on i (L : gset box_names) : iProp Σ := own (on_set on i) (● L).
   Definition off_member on i γ : iProp Σ := own (on_set on i) (◯ {[ γ ]}).
   Global Instance off_member_persistent on i γ : Persistent (off_member on i γ).

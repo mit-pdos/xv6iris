@@ -1095,7 +1095,7 @@ Section FileInv.
      by agreement with the travelling share's ([live_genlo_agree]). *)
   Definition inode_ref_side (v : mword 64) (s : Qp) (g : gname) (inum : mword 32) : iProp Σ :=
     (∃ (k : nat) (lo : nat),
-       ⌜v = ientry k⌝ ∗
+       ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        inode_ident k (DfracOwn s) icfg_dev inum ∗
        live_genlo k s g lo ∗
        SleepLock.slh_tok (icfg_isl k) s)%I.
@@ -1111,10 +1111,35 @@ Section FileInv.
      ∃ ty : bv 16, ity_shot g ty ∗ ⌜wr = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
                    ⌜fdty = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝)%I.
 
+  Lemma inode_ref_side_split (v : mword 64) (s1 s2 : Qp) (g : gname) (inum : mword 32) :
+    inode_ref_side v (s1 + s2)%Qp g inum ⊣⊢
+    inode_ref_side v s1 g inum ∗ inode_ref_side v s2 g inum.
+  Proof.
+    rewrite /inode_ref_side. iSplit.
+    - iIntros "(%k & %lo & %Hv & %Hk & Hid & Hl & Hs)".
+      rewrite inode_ident_split live_genlo_split SleepLock.slh_tok_split.
+      iDestruct "Hid" as "[Hid1 Hid2]". iDestruct "Hl" as "[Hl1 Hl2]".
+      iDestruct "Hs" as "[Hs1 Hs2]".
+      iSplitL "Hid1 Hl1 Hs1"; iExists k, lo; by iFrame.
+    - iIntros "[(%k1 & %lo1 & %Hv1 & %Hk1 & Hid1 & Hl1 & Hs1) (%k2 & %lo2 & %Hv2 & %Hk2 & Hid2 & Hl2 & Hs2)]".
+      assert (k2 = k1) as ->.
+      { apply ientry_inj; [lia | lia |]. rewrite -Hv1 -Hv2. reflexivity. }
+      iDestruct (live_genlo_agree with "Hl1 Hl2") as %[_ <-].
+      iExists k1, lo1. iSplitR; [done|]. iSplitR; [done|].
+      rewrite inode_ident_split live_genlo_split SleepLock.slh_tok_split. iFrame.
+  Qed.
+
   Lemma inode_pay_split γx Q g inum v fdty wr q1 q2 :
     inode_pay γx Q g inum v fdty wr (q1 + q2) ⊣⊢
     inode_pay γx Q g inum v fdty wr q1 ∗ inode_pay γx Q g inum v fdty wr q2.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof.
+    rewrite /inode_pay cinv_own_fractional Qp.mul_add_distr_r
+            inode_ref_side_split inode_shr_held_gen_split.
+    iSplit.
+    - iIntros "(#Hi & [H1 H2] & [R1 R2] & [S1 S2] & #Hw)". iFrame "Hi H1 H2 R1 R2 S1 S2 Hw".
+    - iIntros "[(#Hi & H1 & R1 & S1 & #Hw) (_ & H2 & R2 & S2 & _)]".
+      iFrame "Hi H1 H2 R1 R2 S1 S2 Hw".
+  Qed.
 
   (* THE LAST CLOSER'S MOVE, packaged: fraction one is the whole reference.
      A fupd, and the only one the file layer performs.  The gather is what
@@ -1123,7 +1148,29 @@ Section FileInv.
   Lemma inode_pay_cancel (E : coPset) (γx : gname) (Q : Qp) (g : gname)
       (inum : mword 32) (v : mword 64) (fdty : mword 32) (wr : bool) :
     ↑fileipN ⊆ E -> inode_pay γx Q g inum v fdty wr 1 ={E}=∗ inode_held v.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof.
+    iIntros (HE) "(#Hi & Hown & Hside & Hs & _)".
+    iMod (cinv_cancel with "Hi Hown") as "H"; [exact HE|].
+    iMod "H". iModIntro. rewrite !Qp.mul_1_l.
+    iDestruct "H" as (k) "(%Hv & %Hk & %Hb & Hf & Hlent & Hru)".
+    iDestruct "Hside" as (k1 lo) "(%Hv1 & %Hk1 & Hid & Hl & Hslh)".
+    iDestruct "Hs" as (k2 lo2 tl) "(%Hv2 & %Hk2 & %Hb2 & %Hle & #Hfl & Hshr)".
+    assert (k1 = k) as -> by (apply ientry_inj; [lia | lia | congruence]).
+    assert (k2 = k) as -> by (apply ientry_inj; [lia | lia | congruence]).
+    rewrite /inode_shr_genlo. iDestruct "Hshr" as "(Hid2 & Hl2 & Hslh2 & Hst2)".
+    iDestruct (live_genlo_agree with "Hl Hl2") as %[_ <-].
+    iAssert (inode_ref_short_genlo k (Q + Q)%Qp Q icfg_dev inum g lo)
+      with "[Hf Hl Hid Hslh Hlent]" as "Hshort".
+    { rewrite /inode_ref_short_genlo. iFrame. }
+    iAssert (inode_shr_genlo k Q icfg_dev inum g lo) with "[Hid2 Hl2 Hslh2 Hst2]" as "Hshr".
+    { rewrite /inode_shr_genlo. iFrame. }
+    iDestruct (inode_ref_gather_genlo with "Hshort Hshr") as "Href".
+    rewrite /inode_held. iExists k, (Q + Q)%Qp, inum.
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    rewrite /inode_refp. iFrame "Hru".
+    rewrite /inode_ref_genlo /inode_ref. iDestruct "Href" as "(Hf & Hl & Hid & Hslh & Hst)".
+    iFrame "Hf Hid Hslh Hst". rewrite /live_fracc. iExists g, lo, tl. iFrame "Hl Hfl". done.
+  Qed.
 
   (* the travelling share names SOME generation -- the one every slice of
      this slot names, since [iliveUR]'s agree is per-KEY ([IcacheRef.
@@ -1181,7 +1228,19 @@ Section FileInv.
     runit_any (bv_unsigned inum) -∗
     inode_shr_held_gen (ientry k) Q g inum -∗ ity_shot g ty
     ={E}=∗ ∃ γx : gname, inode_pay γx Q g inum (ientry k) fdty wr 1.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof.
+    iIntros (Hk Hb Hwr Hdv) "Hshort Hru Hs #Hty".
+    rewrite /inode_ref_short_genlo. iDestruct "Hshort" as "(Hf & Hl & Hid & Hslh & Hlent)".
+    iMod (cinv_alloc E fileipN (inode_core (ientry k) Q inum) with "[Hf Hlent Hru]")
+      as (γx) "[#Hi Hown]".
+    { iNext. rewrite /inode_core. iExists k. iFrame "Hf Hlent Hru". done. }
+    iModIntro. iExists γx. rewrite /inode_pay Qp.mul_1_l.
+    iFrame "Hi Hown Hs".
+    iSplitL "Hl Hid Hslh".
+    { rewrite /inode_ref_side. iExists k, lo. iFrame. iPureIntro. split; done. }
+    iExists ty. iFrame "Hty".
+    iSplit; iPureIntro; [exact Hwr | exact Hdv].
+  Qed.
 
   (* ---- THE READING THE FD_INODE ARM'S CONSUMERS ASK FOR ----
 
@@ -1203,7 +1262,12 @@ Section FileInv.
       (v : mword 64) (wr : bool) (q : Qp) (ty : bv 16) :
     inode_pay γx Q g inum v FD_INODE wr q -∗ ity_shot g ty -∗
     ⌜bv_unsigned ty <> FsImg.T_DEVICE_z⌝.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof.
+    iIntros "(_ & _ & _ & _ & Hwt) #Hshot".
+    iDestruct "Hwt" as (ty') "(#Hs & _ & %Hdv)".
+    iDestruct (ity_shot_agree with "Hs Hshot") as %<-.
+    iPureIntro. exact (Hdv eq_refl).
+  Qed.
 
   (* the per-slot payload-names ghost: fractional, agreeing, and updatable
      by whoever holds the whole of it.  See the header above [fpnames]. *)
@@ -1510,7 +1574,32 @@ Section FileInv.
      distributes the non-INODE arm *)
   Lemma off_free_split (k : nat) (q1 q2 : Qp) :
     off_free k (q1 + q2) ⊣⊢ off_free k q1 ∗ off_free k q2.
-  Proof. (* SKELETON r25 (item 25 note 2): phys_free's ∃-bound value and element agree across fractions *) Admitted.
+  Proof.
+    rewrite /off_free. iSplit.
+    - iIntros "[#Hal H]".
+      iAssert ([∗ list] j ∈ seq 0 4,
+                 TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn q1) ∗
+                 TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn q2))%I with "[H]" as "H".
+      { iApply (big_sepL_mono with "H"). iIntros (j x _) "H".
+        rewrite /TsoCtx.mem_free /TsoCtx.phys_free /phys_pointsto.
+        iDestruct "H" as (ppn) "(#Hk & %Hc & %Hp & %v & %e & [Hb %Hram] & He)".
+        iDestruct "Hb" as "[Hb1 Hb2]". iDestruct "He" as "[He1 He2]".
+        iSplitL "Hb1 He1"; iExists ppn; iFrame "Hk"; (iSplitR; [done|]); (iSplitR; [done|]);
+          iExists v, e; iFrame; done. }
+      rewrite big_sepL_sep. iDestruct "H" as "[H1 H2]". iFrame "H1 H2". by iSplit.
+    - iIntros "[[#Hal H1] [_ H2]]". iSplitR; [done|].
+      iCombine "H1 H2" as "H". rewrite -big_sepL_sep.
+      iApply (big_sepL_mono with "H"). iIntros (j x _) "[H1 H2]".
+      rewrite /TsoCtx.mem_free /TsoCtx.phys_free /phys_pointsto.
+      iDestruct "H1" as (ppn1) "(#Hk1 & %Hc & %Hp1 & %v1 & %e1 & [Hb1 %Hram] & He1)".
+      iDestruct "H2" as (ppn2) "(#Hk2 & _ & %Hp2 & %v2 & %e2 & [Hb2 _] & He2)".
+      iDestruct (kmap_at_agree with "Hk1 Hk2") as %[-> _].
+      iDestruct (pointsto_agree with "Hb1 Hb2") as %<-.
+      iDestruct (ghost_map_elem_agree with "He1 He2") as %<-.
+      iCombine "Hb1 Hb2" as "Hb". iCombine "He1 He2" as "He".
+      iExists _. iFrame "Hk1". iSplitR; [done|]. iSplitR; [done|].
+      iExists v1, e1. iFrame. done.
+  Qed.
 
   (* THE FD'S SHARE OF THE OFF BOX (item 24; note 3): every piece at the fd's
      fraction [q] -- the two register halves of the box's client side (the
@@ -1541,7 +1630,25 @@ Section FileInv.
 
   Lemma off_fd_split (k : nat) (q1 q2 : Qp) (γb : box_names) (C : fcontent) :
     off_fd k (q1 + q2) γb C ⊣⊢ off_fd k q1 γb C ∗ off_fd k q2 γb C.
-  Proof. (* SKELETON r25 (item 24): ghost_var fractions + agreement on T0, reference_split by mass *) Admitted.
+  Proof.
+    rewrite /off_fd. iSplit.
+    - iIntros "(%i & %T0 & %Hip & %Hi & #Hbox & #Hmem & Hd & Hc & Hst)".
+      rewrite Qp.div_add_distr.
+      iDestruct "Hd" as "[Hd1 Hd2]". iDestruct "Hc" as "[Hc1 Hc2]".
+      iDestruct (off_ref_stamps_split with "Hst") as "[Hst1 Hst2]".
+      iSplitL "Hd1 Hc1 Hst1"; iExists i, T0; iFrame "Hbox Hmem"; iFrame; done.
+    - iIntros "[(%i1 & %T1 & %Hip1 & %Hi1 & #Hbox & #Hmem & Hd1 & Hc1 & Hst1)
+                (%i2 & %T2 & %Hip2 & %Hi2 & _ & _ & Hd2 & Hc2 & Hst2)]".
+      assert (i2 = i1) as ->.
+      { apply ientry_inj; [lia | lia |]. rewrite -Hip1 -Hip2. reflexivity. }
+      iDestruct (ghost_var_agree with "Hd1 Hd2") as %Heq.
+      injection Heq as <-.
+      iExists i1, T1. iFrame "Hbox Hmem".
+      iSplitR; [done|]. iSplitR; [done|].
+      rewrite Qp.div_add_distr.
+      iCombine "Hd1 Hd2" as "Hd". iCombine "Hc1 Hc2" as "Hc". iFrame "Hd Hc".
+      iApply (off_ref_stamps_join with "Hst1 Hst2").
+  Qed.
 
   (* THE FIFTH FINAL SHAPE (items 17/24): an FD_INODE fd's [f->off] is its
      share of the off box named by [fp_obox]; every other type holds the
@@ -1579,8 +1686,12 @@ Section FileInv.
   Qed.
 
   Lemma file_core_none k q pn C :
-    fc_type C = FD_NONE -> file_core k q pn C ⊣⊢ iref_frac q ∗ foff_dead k q.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+    fc_type C = FD_NONE -> file_core k q pn C ⊣⊢ iref_frac q ∗ off_free k q.
+  Proof.
+    intro Ht.
+    by rewrite /file_core (file_core_noff_none _ _ _ Ht)
+               (file_core_off_none _ _ _ _ Ht).
+  Qed.
 
   Lemma file_core_noff_split q1 q2 pn C :
     file_core_noff (q1 + q2) pn C ⊣⊢
@@ -1600,7 +1711,10 @@ Section FileInv.
   Lemma file_core_off_split k q1 q2 pn C :
     file_core_off k (q1 + q2) pn C ⊣⊢
     file_core_off k q1 pn C ∗ file_core_off k q2 pn C.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof.
+    rewrite /file_core_off.
+    case_bool_decide; [apply off_fd_split | apply off_free_split].
+  Qed.
 
   Lemma file_core_split k q1 q2 pn C :
     file_core k (q1 + q2) pn C ⊣⊢ file_core k q1 pn C ∗ file_core k q2 pn C.
@@ -1657,7 +1771,7 @@ Section FileInv.
      [file_pay_st_none], which is filealloc's. *)
   Lemma file_pay_st_pay γ k q C st :
     file_pay_st γ k q C st -∗ file_pay γ k q C.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof. iIntros "(%pn & _ & Hn & Hp)". iExists pn. iFrame. Qed.
 
 
   (* an UNTYPED payload gives [FdClosed] and there is nothing to choose:
@@ -1665,7 +1779,10 @@ Section FileInv.
   Lemma file_pay_st_none γ k q C :
     fc_type C = FD_NONE ->
     file_pay γ k q C -∗ file_pay_st γ k q C FdClosed.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof.
+    iIntros (Hty) "(%pn & Hn & Hp)". iExists pn. iFrame.
+    iPureIntro. exact Hty.
+  Qed.
 
   (* THE SPLIT, at ONE state: filedup's two shares describe one file.  It is
      the names ghost that makes this true rather than merely stated
@@ -1673,7 +1790,16 @@ Section FileInv.
   Lemma file_pay_st_split γ k q1 q2 C st :
     file_pay_st γ k (q1 + q2) C st ⊣⊢
     file_pay_st γ k q1 C st ∗ file_pay_st γ k q2 C st.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof.
+    rewrite /file_pay_st. iSplit.
+    - iIntros "(%pn & %Hi & Hn & Hp)".
+      rewrite fpay_tok_split file_core_split.
+      iDestruct "Hn" as "[Hn1 Hn2]". iDestruct "Hp" as "[Hp1 Hp2]".
+      iSplitL "Hn1 Hp1"; iExists pn; by iFrame.
+    - iIntros "[(%pn1 & %Hi1 & Hn1 & Hp1) (%pn2 & %Hi2 & Hn2 & Hp2)]".
+      iDestruct (fpay_tok_agree with "Hn1 Hn2") as %<-.
+      iExists pn1. rewrite fpay_tok_split file_core_split. by iFrame.
+  Qed.
 
   (* THE TIE, READ WITHOUT SPENDING THE PAYLOAD.  An [∧] rather than a [∗]
      so that both sides see the whole resource: the pure fact is what a proof
