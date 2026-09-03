@@ -357,7 +357,7 @@ Lemma gm_MemRead (Dr Dw : register -> bool) {X} (n : N)
     | None => false
     end.
 Proof.
-  intros Hd Hif Hfp. cbn [goodmb]. rewrite Hd Hif. rewrite Hfp.
+  intros Hd Hif Hfp. cbn [goodmb]. rewrite Hd, Hif. rewrite Hfp.
   cbn [negb andb]. reflexivity.
 Qed.
 
@@ -554,8 +554,10 @@ Proof.
       by apply (IH _ s s' mm y). }
     { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
       by apply (IH tt _ s' mm y). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He |- *.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp].
+      apply andb_prop in Hg1 as [Hdev Hif].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hif.
+      rewrite Hdev in He |- *. rewrite Hif.
       rewrite Hfp. cbn [negb andb].
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
@@ -592,8 +594,10 @@ Proof.
       by apply (IH _ s s' mm y). }
     { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
       by apply (IH tt _ s' mm y). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He |- *.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp].
+      apply andb_prop in Hg1 as [Hdev Hif].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hif.
+      rewrite Hdev in He |- *. rewrite Hif.
       rewrite Hfp. cbn [negb andb].
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
@@ -632,8 +636,10 @@ Proof.
       by apply (IH _ s s' mm y). }
     { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
       by apply (IH tt _ s' mm y). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He |- *.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp].
+      apply andb_prop in Hg1 as [Hdev Hif].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hif.
+      rewrite Hdev in He |- *. rewrite Hif.
       rewrite Hfp. cbn [negb andb].
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].

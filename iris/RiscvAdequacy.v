@@ -1064,8 +1064,10 @@ Section power.
            fresh era's bottom, and the bound is trivial over an empty log *)
         iSplitL "Hivauths2".
         { rewrite /iview_auth_at. iApply big_sepL_enum_to_set.
-          iApply (big_sepL_mono with "Hivauths2").
-          intros k c Hk. simpl. rewrite Hitv0. done. }
+          iApply (big_sepL_mono
+                    (fun _ c => mono_nat_auth_own (fiv c) 1 0%nat)).
+          { intros k c Hk. rewrite Hitv0. iIntros "H". iExact "H". }
+          iExact "Hivauths2". }
         iPureIntro. intros c. rewrite Hitv0. lia. }
       iSplitR; [iApply "IH"|].
       (* the fork obligations: the new generation's whole complement *)
@@ -1230,7 +1232,7 @@ Proof.
   (* A6.71: one more conjunct -- [tso_interp_at] sits between the durable
      disk's and the reservation mirror's, so the positional walk is one
      underscore longer. *)
-  iDestruct "Hera" as (E) "(_ & _ & _ & _ & _ & _ & _ & %Hok)".
+  iDestruct "Hera" as (E) "(_ & _ & _ & _ & _ & _ & _ & %Hok & _)".
   iPureIntro. intros _. exact Hok.
 Qed.
 

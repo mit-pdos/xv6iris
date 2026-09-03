@@ -359,9 +359,8 @@ Section barrier.
                σ.(sregs) σ.(mdev) Hpin').
     iMod ("Hstep" $! (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev)) itvn
             with "[%] [%] Hlb Hmem Htso HP") as "(Hmem & Htso & HQ)".
-    { cbn [gtv gs_of]. rewrite /h /hart_agent in Htv. rewrite Htv.
-      rewrite /itvn /fence_post. lia. }
-    { cbn [glog gs_of]. rewrite /itvn /fence_post. lia. }
+    { cbn [gtv gs_of]. rewrite Htv /itvn /fence_post /=. lia. }
+    { cbn [glog gs_of]. rewrite /itvn /h /fence_post /=. lia. }
     rewrite -(tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
                 σ.(sregs) σ.(mdev) Hpin').
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
