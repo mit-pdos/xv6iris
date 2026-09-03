@@ -922,6 +922,96 @@ and law 10 (hooks).
     Per reviewer 2's condition (item 17's process note), pass 1 waits for
     reviewer 2's audit of this state and reviewer 1's sign-off.
 
+28. **THE SHAPES RE-CUT PER ITEMS 24/25/27 (2026-09-02) -- FOR THE NEXT REVIEW
+    PASS (both reviewers).**  Statements and instance headers only; every
+    proof the re-cut reopened is a tagged `SKELETON r25` Admitted.
+    WHAT MOVED (item 25's list, item 27's skeleton list):
+    - `OffBox.v`: DELETED `off_l1_row`, `obox_auth/frag/full`, the unit row,
+      `off_filealloc`, `off_publish_checkout`, `off_dup`, `off_close`,
+      `off_reclaim`; `off_names` is `{ on_set }` again; KEPT the L2 side
+      (`off_hdr/rest/box/regd/regp/cnt/ref_stamps/member/l2_row/rows*`,
+      `off_read_checkout`, `off_read_park`); `off_publish_park` RESTATED as
+      the birth (`box_alloc_at` on the re-minted cell + (c) + the row insert
+      at `L2Reg 0 None`; the creator deposits and never absorbs); NEW
+      `off_last_close` over `box_withdraw_L1_free` (yields the four free
+      bytes); item 25 note 5 (shared namespace) recorded.
+    - `CtxBox.v`: `box_withdraw_L1_free` beside the hooked (a), statement as
+      ruled (R2), no `own_context`, no floors, no `P_hdr'`.
+    - `Xv6Cameras`/`IcacheRef`: the tie camera (`offbox_oboxG`) and the tie
+      name (`icfg_obox`, its `icfg_alloc` row) are gone; `icfg_off` stays.
+    - `FileInvDefs.v`: `fpnames` gains `fp_obox : box_names` (8 constructor
+      sites: the inhabitant, ProofPipealloc ×4 at `(fp_obox pn)`); NEW
+      `off_free k q` (four `mem_free` bytes at fraction `q`, context-free)
+      with `off_free_split` (note 2); NEW `off_fd k q γb C` (the fd's share:
+      register halves at `q/2` with the birth stamp ∃-bound and the count at
+      the constant 1, the stamps share at mass `q`, membership, the handle;
+      note 3) with `off_fd_split`; `file_core_off k q pn C := if FD_INODE
+      then off_fd k q (fp_obox pn) C else off_free k q` (the fifth shape,
+      final); `file_pay_st` and `fslot γ M k` back to main's shapes;
+      `off_fd_unit` gone; `foff_dead` retired from the payload (definition
+      kept, dead).  `file_core_off` is CONTEXT-FREE now -- the gate refused
+      its skeleton's `(XI := ξ)`, so it has no instance (constant).
+    - `FileInv.v`: `ftable_res γ` main's shape (no `Kd`, no `B`, no map
+      authority); `ftable_res_at γ ξ := ftable_res (XI := ξ) γ` -- the λ
+      payload WITHOUT a floor row (R4, T2); `ftable_res_boot` main's
+      statement; `file_off_reclaim : ↑(offBoxN.@k) ⊆ E → file_core_off k 1 pn
+      C ={E}=∗ off_free k 1` (the last close's off step).
+    - `ProofSysOpenParts.v`: `so_open_slot` yields `off_free kf 1` (no
+      `voff`); `so_deposit` is the birth (`own_context ∗ off_resident kf ∗
+      off_rows off_cfg kk ={E}=∗ own_context ∗ ∃ γb, off_fd kf 1 γb C ∗ (the
+      rows back)`); `so_publish` takes `(if FD_INODE then off_fd kf 1 γb C
+      else off_free kf 1)` and a `γb` binder (note 4: `fpay_tok_update`
+      records `fp_obox := γb`).
+    - `ic_slp ∗ off_rows`, `ic_slp_dep` at one bound, the sixth shape
+      (`islot2 ξ`), the L8 skeletons: UNCHANGED (item 24: the L2 side is
+      untouched).
+    - NEW `FileOffProtocol.v` (R5, the day-one gate): the life of the cell as
+      14 chained statements with no program -- `proto_boot_row`,
+      `proto_filealloc`, `proto_open_slot`, `proto_store_free` (`off_free k 1
+      ⊣⊢ wordw_free 4 (a_foff k)`), `proto_store_remint`, `proto_publish`,
+      `proto_dup`, `proto_read_checkout` (the ONE absorb, after the ilock
+      acquire: `Kt` by R1 from the share's llb, `Kp` from the row's floor),
+      `proto_read_park`, `proto_close_join`, `proto_last_close`,
+      `proto_retype_none`, `proto_realloc`, and reviewer 1's link
+      `proto_fork_child_read` (the share is context-free, the child's `Kt`
+      is its own acquire, its `Kp` the row's floor at its context).  Each
+      lemma's premises are the previous one's conclusions.  It compiles with
+      its links stated; proofs are lane (ii).
+    ITEM 21/22/23 DIAGNOSES, by item 24: blocking 1 (cell twice / unit
+    unowned) -- no unit, the cell is free at every non-INODE type;
+    blocking 2 (`file_pay_st_split` false) -- shares split by fraction,
+    `file_pay_st` is main's; blocking 3 (five statements not final) -- the
+    three ghost steps are main's pure ones, `file_off_reclaim`/`so_deposit`/
+    `so_open_slot` at the forms above; the `ftable_res_dep` fold pair -- not
+    needed (no `td` is raised in the table); finding 4 (the publish checkout
+    has no floor) -- no publish checkout exists; `box_alloc_out_l2_at` --
+    withdrawn (R3), never landed.
+    THE TWO CHECKLIST LINES, walked: per arm, `file_core_off` FD_NONE/PIPE/
+    DEVICE is produced by the free row and by `proto_last_close`, split by
+    `off_free_split`; FD_INODE by `proto_publish` whole and by `proto_dup`
+    at a fraction, consumed whole by `proto_last_close`.  Self-absorb: the
+    creator deposits (birth) and never absorbs; the reader absorbs in
+    `proto_read_checkout` after its ilock acquire; the closer never absorbs.
+    ADMITTED INVENTORY, 61 (all `SKELETON r25`): CtxBox 1
+    (`box_withdraw_L1_free`), OffBox 4 (`off_rows_fold`, `off_rows_to_dep`,
+    `off_publish_park`, `off_last_close`), FileInvDefs 21 (the reopened
+    `inode_pay_*` ×4, `file_core_none`, `file_core_off_split`,
+    `file_pay_st_pay/_none/_split`; NEW `off_free_split`, `off_fd_split`; 10
+    skeleton instances), FileInv 3, FileOffProtocol 14, IcacheEscrow 4,
+    IcacheBoot 1, ProcInv 5, FirstTok 3, FsReady 1, UsertrapRes 1,
+    ProofSysOpenParts 3.  None survives the bank.
+    GATE: `CtxBox`, `Xv6Cameras`, `IcacheRef`, `OffBox`, `FileInvDefs`,
+    `FileInv`, `FileOffProtocol`, `IcacheEscrow`, `IcacheBoot`, `FsReady`,
+    `FirstTok`, `ProcInv`, `UsertrapRes`, `ProofSysOpenParts` compile
+    (round 1 green after the import fixes; consumers red by design).
+    OPEN FOR THE REVIEWERS: (a) `off_publish_park`'s statement (the birth
+    at `L2Reg 0 None`, returning the pieces of `off_fd` at q = 1 plus `(ctx_floor
+    ξ 0 -∗ off_rows on i ξ)`); (b) `off_last_close`'s conclusion (the four
+    free bytes; `off_free k 1` is FileInvDefs's name, one file above OffBox);
+    (c) `is_itable2_morph` is now provable (the sixth shape) and belongs in
+    EnvMorph -- added in pass 1 so EnvMorph stays at 0 Admitted; (d) the
+    measure after this commit, next amendment.
+
 ## 10. Process and tooling (measured facts)
 
 ### 10.1 Build

@@ -788,6 +788,27 @@ Section box.
     iModIntro. iFrame "Hrun Hcnt". iExists x0, T. iFrame "Hrd0 Hhdr'". iPureIntro. exact HTmax.
   Qed.
 
+  (* THE FREE-TIER FORM OF EXIT (plan §9 items 24/25/27, ruled R2; §0.26′
+     for the box).  (a) with the absorb elided: the hook runs at the box's
+     context [ξb] and hands [Q'] out context-free -- a header that leaves at
+     the visibility-free tier costs no floor.  ABSENT by design: [own_context],
+     both floors, [P_hdr'].  Not a corollary of the hooked (a) (the
+     remainder's stamps are learned only after the closer's acquire).  The
+     off box's last close is its one client; bcache and icache never call
+     it.  SKELETON r25: statement ruled, proof = the hooked (a) with the
+     absorb elided ([hdr_out] takes the fragment; rows as (a)). *)
+  Lemma box_withdraw_L1_free (N : namespace) γ (r : slot_reg id X)
+      (c : nat) (mD : gmap (id * nat) ufrac) (Qc Q' : iProp Σ) (E : coPset) :
+    ↑N ⊆ E →
+    sr_win r = false →
+    qsum mD = nat_Qc c →
+    (∀ (x : X) (ξb : CtxId), Qc ∗ P_hdr (sr_ident r) x ξb ={E ∖ ↑N}=∗ Q' ∗ Q1 c) →
+    is_box N γ -∗ slotd_half γ r -∗ cnt_half γ c -∗ stamps_frag γ mD -∗
+    llb loglen_name (max_stamp mD) -∗ Qc ={E}=∗
+    cnt_half γ c ∗ Q' ∗
+    ∃ (x0 : X) (T0 : nat), slotd_half γ (SlotReg (sr_td r) true (sr_ident r) (Some (x0, T0))).
+  Proof. (* SKELETON r25 (ruled R2): the hooked (a) with the absorb elided *) Admitted.
+
   (* ================================================================== *)
   (*  (a) withdraw_L1 : IN → OUT_L1, under L1                            *)
   (* ================================================================== *)

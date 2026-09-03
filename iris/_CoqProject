@@ -528,6 +528,7 @@ FileOffCell.v
 OffBox.v
 FileInvDefs.v
 FileInv.v
+FileOffProtocol.v
 FileOff.v
 KallocInv.v
 ByteBuf.v

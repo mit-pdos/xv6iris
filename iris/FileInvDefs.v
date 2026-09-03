@@ -71,16 +71,18 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import auth gmap frac numbers.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants own cancelable_invariants ghost_map.
+From iris.base_logic.lib Require Import gen_heap invariants own cancelable_invariants ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvExtras.
+Require Import RiscvModelBytes.   (* [pa_add] -- the free word (item 24) *)
 Require Import ArrCursor.
 Require Export FdSlots.
 Require Import PipeInvDefs.
 Require Import IcacheRef.
 Require Import FsCfg.   (* [fscfg] -- see the note on [fileG] below *)
 Require Export FileOffCell.   (* the entry addresses, [off_wf], [off_resident] (r25 shapes) *)
+Require Import CtxBox.   (* [bx_slotd]/[bx_cnt], [SlotReg] -- the fd share's register halves (item 24) *)
 Require Import OffBox.        (* the off box's rows: [fslot]'s L1 row, [file_core_off]'s fd row (r25 shapes) *)
 (* for [T_DIR_z] alone -- [inode_pay]'s witness says "not a directory", and
    the number is stated once, where [IcacheEscrow.ic_loaded]'s [dir_ok]
@@ -267,12 +269,16 @@ Definition frefUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    [file_ref]'s state index, which ignores it off the FD_INODE arm. *)
 Record fpnames := MkFPNames
   { fp_lock : gname; fp_pipe : pipe_names; fp_icv : gname; fp_iq : Qp;
-    fp_ig : gname; fp_inum : mword 32 }.
+    fp_ig : gname; fp_inum : mword 32;
+    (* the off box's names (plan §9 item 24): set at sys_open's publish,
+       read by every fd of the file through [fpay_tok]'s agreement *)
+    fp_obox : box_names }.
 
 Global Instance fpnames_inhabited : Inhabited fpnames :=
   populate (MkFPNames 1%positive
               (MkPipeNames 1%positive 1%positive 1%positive 1%positive)
-              1%positive 1%Qp 1%positive (mword_of_int 0)).
+              1%positive 1%Qp 1%positive (mword_of_int 0)
+              (BoxNames 1%positive 1%positive 1%positive 1%positive)).
 
 Definition fpayUR : ucmra :=
   gmapUR nat (prodR fracR (agreeR (leibnizO fpnames))).
@@ -1491,17 +1497,49 @@ Section FileInv.
      carries the ledger fragment (the cell itself is deposited in the
      inode's ledger), every other arm carries the dead cell at the arm's
      own fraction. *)
-  (* THE FIFTH FINAL SHAPE (item 17): an FD_INODE file's [f->off] is the off
-     box's fd row -- the box handle, the slot->box tie, membership in the
-     inode's published set, the fd's stamp share -- not the retired ledger's
-     fragment.  Everything else keeps the cell as before. *)
-  Definition file_core_off (k : nat) (q : Qp) (C : fcontent) : iProp Σ :=
+  (* THE CELL AT THE VISIBILITY-FREE TIER (plan §9 items 24/25/27, §0.26′):
+     whenever nobody needs [f->off] -- every non-FD_INODE type, the free
+     row -- the word is simply free, fractional, context-free.  The next
+     publish's store RE-ESTABLISHES it ([wp_store_s_sconf_free_gen]).
+     [off_free k 1] is [WpSconfMem.wordw_free 4 (a_foff k)] (stated where
+     that file is in scope: FileOffProtocol.v). *)
+  Definition off_free (k : nat) (q : Qp) : iProp Σ :=
+    (⌜is_aligned_paddr (Physaddr (a_foff k)) 4 = true⌝ ∗
+     [∗ list] j ∈ seq 0 4, TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn q))%I.
+  (* item 25 note 2: the fractional split/join, so [file_pay_split]
+     distributes the non-INODE arm *)
+  Lemma off_free_split (k : nat) (q1 q2 : Qp) :
+    off_free k (q1 + q2) ⊣⊢ off_free k q1 ∗ off_free k q2.
+  Proof. (* SKELETON r25 (item 25 note 2): phys_free's ∃-bound value and element agree across fractions *) Admitted.
+
+  (* THE FD'S SHARE OF THE OFF BOX (item 24; note 3): every piece at the fd's
+     fraction [q] -- the two register halves of the box's client side (the
+     birth stamp [T0] ∃-bound, the count at the constant 1), the stamps share
+     at mass [q], membership in the inode's published set, the handle.
+     [file_pay_split] distributes it by [q]; the closer's rejoin recovers one
+     [T0] by [ghost_var_agree].  Context-free: ghost and a persistent
+     invariant. *)
+  Definition off_fd (k : nat) (q : Qp) (γb : box_names) (C : fcontent) : iProp Σ :=
+    (∃ (i : nat) (T0 : nat),
+       ⌜fc_ip C = ientry i⌝ ∗ ⌜(i < NINODE)%nat⌝ ∗
+       off_box k γb ∗ off_member off_cfg i γb ∗
+       ghost_var (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
+       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2) 1%nat ∗
+       off_ref_stamps γb k q)%I.
+  Lemma off_fd_split (k : nat) (q1 q2 : Qp) (γb : box_names) (C : fcontent) :
+    off_fd k (q1 + q2) γb C ⊣⊢ off_fd k q1 γb C ∗ off_fd k q2 γb C.
+  Proof. (* SKELETON r25 (item 24): ghost_var fractions + agreement on T0, reference_split by mass *) Admitted.
+
+  (* THE FIFTH FINAL SHAPE (items 17/24): an FD_INODE fd's [f->off] is its
+     share of the off box named by [fp_obox]; every other type holds the
+     word at the free tier.  [foff_dead] is retired from this arm. *)
+  Definition file_core_off (k : nat) (q : Qp) (pn : fpnames) (C : fcontent) : iProp Σ :=
     (if bool_decide (fc_type C = FD_INODE)
-     then emp
-     else foff_dead k q)%I.
+     then off_fd k q (fp_obox pn) C
+     else off_free k q)%I.
 
   Definition file_core (k : nat) (q : Qp) (pn : fpnames) (C : fcontent) : iProp Σ :=
-    (file_core_noff q pn C ∗ file_core_off k q C)%I.
+    (file_core_noff q pn C ∗ file_core_off k q pn C)%I.
 
   (* AN UNTYPED SLOT'S PAYLOAD IS EXACTLY ITS IREF UNIT.  What filealloc
      hands out and what a retype to FD_PIPE moves into the pipe arm.
@@ -1520,8 +1558,8 @@ Section FileInv.
     reflexivity.
   Qed.
 
-  Lemma file_core_off_none k q C :
-    fc_type C = FD_NONE -> file_core_off k q C ⊣⊢ foff_dead k q.
+  Lemma file_core_off_none k q pn C :
+    fc_type C = FD_NONE -> file_core_off k q pn C ⊣⊢ off_free k q.
   Proof.
     intro Ht. rewrite /file_core_off Ht.
     rewrite bool_decide_eq_false_2; [|by vm_compute]. reflexivity.
@@ -1529,11 +1567,7 @@ Section FileInv.
 
   Lemma file_core_none k q pn C :
     fc_type C = FD_NONE -> file_core k q pn C ⊣⊢ iref_frac q ∗ foff_dead k q.
-  Proof.
-    intro Ht.
-    by rewrite /file_core (file_core_noff_none _ _ _ Ht)
-               (file_core_off_none _ _ _ Ht).
-  Qed.
+  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   Lemma file_core_noff_split q1 q2 pn C :
     file_core_noff (q1 + q2) pn C ⊣⊢
@@ -1550,9 +1584,9 @@ Section FileInv.
     - apply iref_frac_op.
   Qed.
 
-  Lemma file_core_off_split k q1 q2 C :
-    file_core_off k (q1 + q2) C ⊣⊢
-    file_core_off k q1 C ∗ file_core_off k q2 C.
+  Lemma file_core_off_split k q1 q2 pn C :
+    file_core_off k (q1 + q2) pn C ⊣⊢
+    file_core_off k q1 pn C ∗ file_core_off k q2 pn C.
   Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   Lemma file_core_split k q1 q2 pn C :
@@ -1598,23 +1632,10 @@ Section FileInv.
      and FD_PIPE arms would carry a number that means nothing.  [st] is what
      the consumers actually want, and by [fdstate_ok] it is the same fact --
      in BOTH directions, which is what lets [file_ref] hide [C]. *)
-  (* THE OFF BOX'S UNIT ON THE FD SIDE (reviewer 1, plan §9 item 19; the
-     fifth shape as corrected): an FD_INODE fd holds ONE unit of its file's
-     off box (mass 1 per counted reference, [OffBox.off_fd_row]) and, beside
-     it, the slot->box tie frag at its CELL fraction [q] -- [file_pay_split]
-     distributes the frag, the unit is one per fd by construction
-     ([file_pay_st] is used only inside [file_ref]).  Other files: nothing. *)
-  Definition off_fd_unit (k : nat) (q : Qp) (C : fcontent) : iProp Σ :=
-    (if bool_decide (fc_type C = FD_INODE)
-     then ∃ (i : nat) (γb : box_names),
-            ⌜fc_ip C = ientry i⌝ ∗ ⌜(i < NINODE)%nat⌝ ∗
-            obox_frag off_cfg k q γb ∗ off_fd_row off_cfg i k γb
-     else emp)%I.
-
   Definition file_pay_st (γ : gname) (k : nat) (q : Qp) (C : fcontent)
       (st : fdstate) : iProp Σ :=
     (∃ pn, ⌜fdstate_ok (fp_inum pn) C st⌝ ∗ fpay_tok γ k q pn ∗
-           file_core k q pn C ∗ off_fd_unit k q C)%I.
+           file_core k q pn C)%I.
 
   (* the forgetful direction only.  There is no [file_pay -∗ ∃ st,
      file_pay_st]: a payload whose [f->type] is none of the four codes has NO
@@ -1751,34 +1772,21 @@ Section FileInv.
      authority at every slot would infect every consumer.  It is not an
      independent assumption: every operation that changes a count re-derives
      it from [fd_slots_no_overflow]. *)
-  (* THE FOURTH FINAL SHAPE (item 16, F37): the allocated arm carries the off
-     box's L1 half at the count [n] (F34: mass = one per counted reference)
-     and at the table's floor [Kd] ([ftable_res_at]'s floor row bounds every
-     slot's stamp); the box is the one the slot->box map [B] names, so the
-     fd rows' tie ([obox_frag]) meets it.  The free arm keeps the cell (the
-     FD_NONE payload's [foff_dead]) and holds the map's pointsto whole, so
-     filealloc can point it at the box it births. *)
-  Definition fslot (γ : gname) (M : gmap nat (Qp * positive))
-      (B : gmap nat box_names) (Kd : nat) (k : nat) : iProp Σ :=
+  (* main's shape (plan §9 item 24): NO box row in the table -- the free
+     arm's [file_pay] at FD_NONE holds the word at the free tier through
+     [file_core_off]; the allocated arm's [file_rest] carries the complement
+     pieces of [off_fd] inside [file_pay] at [1 - q]. *)
+  Definition fslot (γ : gname) (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
     match M !! k with
     | None =>
         (a_fref k ↦₄ (mword_of_int 0 : mword 32) ∗
-         (∃ γ0 : box_names, obox_full off_cfg k γ0) ∗
          ∃ C, ⌜fc_type C = FD_NONE⌝ ∗ file_fields k 1 C ∗
               file_pay γ k 1 C)%I
     | Some (q, n) =>
         (⌜Z.pos n < 2 ^ 31⌝ ∗
          a_fref k ↦₄ (mword_of_int (Z.pos n) : mword 32) ∗
          file_rest γ k q ∗
-         fd_slots (Pos.to_nat n) ∗
-         ∃ γb : box_names, ⌜B !! k = Some γb⌝ ∗
-           off_box k γb ∗ off_l1_row γb k (Pos.to_nat n) Kd ∗
-           (* the tie's COMPLEMENT frag (item 19): the fd units carry [q] of
-              it between them, the table the rest, so the frags sum to one *)
-           (match (1 - q)%Qp with
-            | Some q' => obox_frag off_cfg k q' γb
-            | None => emp
-            end))%I
+         fd_slots (Pos.to_nat n))%I
     end.
 End FileInv.
 
@@ -1808,9 +1816,10 @@ Section FilePayloadMorph.
   Global Instance file_core_noff_morph q pn C :
     CtxMorph (λ ξ : CtxId, file_core_noff (XI := ξ) q pn C).
   Proof. (* SKELETON r25: the if-body; is_pipe_morph, inode_pay_morph, const *) Admitted.
-  Global Instance file_core_off_morph k q C :
-    CtxMorph (λ ξ : CtxId, file_core_off (XI := ξ) k q C).
-  Proof. (* SKELETON r25: the if-body; off_fd_row is context-free (box handle, ghosts), foff_dead a cell *) Admitted.
+  (* [file_core_off] takes NO context (the gate refused `(XI := ξ)`, as rule 0
+     predicts): both arms -- the fd's share [off_fd] and the free word
+     [off_free] -- are ghost, a persistent handle, or free-tier bytes.  It
+     crosses as a constant ([ctx_morph_const]); no instance. *)
   Global Instance file_core_morph k q pn C :
     CtxMorph (λ ξ : CtxId, file_core (XI := ξ) k q pn C).
   Proof. (* SKELETON r25 *) Admitted.
@@ -1826,9 +1835,9 @@ Section FilePayloadMorph.
   Global Instance file_rest_morph γ k q :
     CtxMorph (λ ξ : CtxId, file_rest (XI := ξ) γ k q).
   Proof. (* SKELETON r25: the match-body *) Admitted.
-  Global Instance fslot_morph γ M B Kd k :
-    CtxMorph (λ ξ : CtxId, fslot (XI := ξ) γ M B Kd k).
-  Proof. (* SKELETON r25: the match-body; off_l1_row is context-free *) Admitted.
+  Global Instance fslot_morph γ M k :
+    CtxMorph (λ ξ : CtxId, fslot (XI := ξ) γ M k).
+  Proof. (* SKELETON r25: the match-body *) Admitted.
 End FilePayloadMorph.
 
 (* ====================================================================

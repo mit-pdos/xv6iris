@@ -82,6 +82,7 @@ Require Import IcacheRef.             (* the reference algebra the publication
 Require Import FsTree.
 Require Import IcacheEscrow.          (* [ic_loaded] -- the O_TRUNC bridge *)
 Require Import FileInvDefs.
+Require Import OffBox.   (* [offBoxN], the off box (r25 item 24) *)
 Require Import FileOff.   (* [ioff_publish] -- the ledger deposit *)           (* [fcontent], [fc_wbool] -- the omode
                                          bit cluster's target *)
 Require Import SpecArgstr.
@@ -822,7 +823,7 @@ Section ProofSysOpenPublish.
      says it. *)
   Lemma so_open_slot `{XI : CurCtx} (E : coPset) (gf : gname) (kf : nat) :
     file_ref gf kf 1 FdClosed ={E}=∗
-    ∃ (Cf : fcontent) (pn : fpnames) (voff : mword 32),
+    ∃ (Cf : fcontent) (pn : fpnames),
       ⌜fc_type Cf = FD_NONE⌝ ∗
       iref_slot ∗
       fref_tok gf kf 1 ∗ flive_tok kf ∗ fpay_tok gf kf 1 pn ∗
@@ -832,7 +833,7 @@ Section ProofSysOpenPublish.
       a_fpipe kf     ↦₈ fc_pipe Cf ∗
       a_fmajor kf    ↦₂ fc_major Cf ∗
       a_fip kf       ↦₈ fc_ip Cf ∗
-      a_foff kf      ↦₄ voff.
+      off_free kf 1.
   Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
   (* the DEVICE arm's vacuous bound: an FD_DEVICE store is not the inode
@@ -850,21 +851,27 @@ Section ProofSysOpenPublish.
      the conditional bound -- goes into inode [kk]'s ledger and the
      fragment comes out; on the device arm the cell simply becomes the
      payload's own [foff_dead]. *)
-  Lemma so_deposit `{XI : CurCtx} (E : coPset) (kk kf : nat) (C : fcontent)
-      (voff : mword 32) :
-    ↑(offN .@ kk) ⊆ E ->
+  (* THE BIRTH AT THE PUBLISH (plan §9 item 24, note 4's order): the store
+     [f->off = 0] over the free word has re-minted the cell at this context
+     ([wp_store_s_sconf_free_gen]); this step births the box on it, mints
+     the share and inserts the L2 row into the inode's set -- the creator
+     deposits and never absorbs.  Yields the fd's whole share. *)
+  Lemma so_deposit `{XI : CurCtx} `{CID : CpuId} (E : coPset) (kk kf : nat) (C : fcontent) :
+    ↑(offBoxN .@ kf) ⊆ E ->
     (kk < NINODE)%nat ->
     fc_ip C = ientry kk ->
-    (fc_type C = FD_INODE -> off_wf voff) ->
-    ioff_escrows -∗
-    i_valid (ientry kk) ↦₄ valid_word true -∗
-    a_foff kf ↦₄ voff ={E}=∗
-    i_valid (ientry kk) ↦₄ valid_word true ∗ file_core_off kf 1 C.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+    fc_type C = FD_INODE ->
+    own_context cur_ctx -∗
+    off_resident kf -∗
+    off_rows off_cfg kk cur_ctx ={E}=∗
+    own_context cur_ctx ∗
+    ∃ γb : box_names,
+      off_fd kf 1 γb C ∗ (ctx_floor cur_ctx 0 -∗ off_rows off_cfg kk cur_ctx).
+  Proof. (* SKELETON r25 (item 24): fresh box ghosts, off_publish_park, assemble off_fd at q = 1 *) Admitted.
 
   Lemma so_publish `{XI : CurCtx} (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)
       (gy : gname) (inum : mword 32) (ty : bv 16) (C : fcontent)
-      (pn : fpnames) (om : mword 32) (rb wb : bool) (lo tl : nat) :
+      (pn : fpnames) (γb : box_names) (om : mword 32) (rb wb : bool) (lo tl : nat) :
     (* r25 shapes (items 15/16): the parked ident fraction is PINNED to the
        travelling share's -- sys_open lends exactly half of the incoming
        reference's share fraction, so [inode_pay_alloc] parks at [Q + Q]. *)
@@ -913,7 +920,10 @@ Section ProofSysOpenPublish.
        step ran under [ip->lock] -- [so_deposit] below, called by
        [ProofSysOpen.so_tail_pub] before iunlock spends the valid cell --
        so what reaches the publication is the finished [file_core_off]. *)
-    file_core_off kf 1 C -∗
+    (* item 24: the share from [so_deposit] at FD_INODE, the free word at
+       FD_DEVICE; [fpay_tok_update] records [fp_obox := γb] (the creator
+       still holds the token whole after fdalloc, note 4) *)
+    (if bool_decide (fc_type C = FD_INODE) then off_fd kf 1 γb C else off_free kf 1) -∗
     (* AT THE STATE THE PUBLISHED FILE GIVES ITS DESCRIPTOR, which is the
        output sys_open then installs in the fd's ghost.  [st] is determined
        by [C] and [inum] ([fdstate_ok_inj]); it is a parameter rather than a

@@ -60,6 +60,7 @@ Require Import TsoCtx.
 Require Import CtxMorphTac.
 Require Import Xv6Cameras Xv6G.
 Require Import CtxBox.
+Require Import RiscvModelBytes.   (* [pa_add] -- the free bytes of the last close (item 24) *)
 Require Import IcacheRef.   (* [icfg] -- the two names ride in it (r25 shapes) *)
 Require Import FileOffCell.   (* [off_resident] -- the boxed cell; this file builds BEFORE FileInvDefs (r25 shapes) *)
 
@@ -71,11 +72,15 @@ Require Import FileOffCell.   (* [off_resident] -- the boxed cell; this file bui
    Xv6Cameras.v (r25 shapes): [xv6G] bundles the class. *)
 
 (* THE NAMES.  Per inode SLOT the set of published boxes (rows outlive a
-   recycle of the slot: dead γ, harmless -- F37), and the file table's
-   slot -> box-names agreement map.  Both are [icfg] fields ([icfg_off],
-   [icfg_obox]); [off_cfg] is the record every consumer spells. *)
-Record off_names := MkOffNames { on_set : nat -> gname; on_obox : gname }.
-Definition off_cfg `{ICFG : icfg} : off_names := MkOffNames icfg_off icfg_obox.
+   recycle of the slot: dead γ, harmless -- F37), an [icfg] field
+   ([icfg_off]); [off_cfg] is the record every consumer spells.  The fd
+   names ITS box through [FileInvDefs.fpnames.fp_obox] (plan §9 item 24).
+   SUCCESSIVE BOXES OF ONE SLOT SHARE [offBoxN .@ k] (item 25 note 5): a
+   slot's box is born at each publish with fresh names and left OUT_L1 at
+   its last close; the stale invariants are not a leak -- no proof opens
+   two off boxes at once and the collection never opens one. *)
+Record off_names := MkOffNames { on_set : nat -> gname }.
+Definition off_cfg `{ICFG : icfg} : off_names := MkOffNames icfg_off.
 
 
 Definition offBoxN : namespace := nroot .@ "xv6offbox".
@@ -128,11 +133,8 @@ Section OffBox.
      (the inode share's stamp, this box's unit stamp) for its two boxes. *)
   (* the register half, shut and empty, identity = k, its llb; the count is
      f->ref (M !! k's count), beside which the cnt half sits in fslot's arm *)
-  Definition off_l1_row γ k (c tl : nat) : iProp Σ :=
-    (∃ r : slot_reg nat unit,
-       off_regd γ r ∗ ⌜sr_win r = false⌝ ∗ ⌜sr_x r = None⌝ ∗ ⌜sr_ident r = k⌝ ∗
-       llb loglen_name (sr_td r) ∗ ⌜(sr_td r ≤ tl)%nat⌝ ∗
-       off_cnt γ c)%I.
+  (* NO L1 ROW (plan §9 item 24): the cell is at the visibility-free tier
+     whenever no one needs it, so the table holds no box ghost. *)
 
   (* ---- the L2 side: the inode payload's APPEND-ONLY set of rows --------- *)
   Definition off_set_auth on i (L : gset box_names) : iProp Σ := own (on_set on i) (● L).
@@ -242,29 +244,8 @@ Section OffBox.
      weighs 1 whatever its q; a share carved from it (fileread's
      `fileread_pay_carve`) weighs its share fraction and the lending parent
      1 − that (inode_ref_short's tie).  Σ over the slot's rows = f->ref. *)
-  (* THE SLOT -> BOX TIE (r25 shapes, STATEMENT CHANGE to the skeleton's
-     [off_fd_row]): a file slot's fd rows and its table row ([fslot]'s
-     allocated arm, [off_l1_row]) must name ONE box, and nothing in the box
-     itself relates two names at the same slot.  So the fd side carries a
-     fraction of a ghost-map pointsto [k ↦ γ] beside its stamps, the table
-     holds the map's authority ([ftable_res]), and the free slot row holds
-     the whole pointsto (stale names) so filealloc can update it under
-     ftable.lock when it births the next box. *)
-  Definition obox_frag on (k : nat) (q : Qp) γ : iProp Σ :=
-    (k ↪[on_obox on]{#q} γ)%I.
-  Definition obox_full on (k : nat) γ : iProp Σ := (k ↪[on_obox on] γ)%I.
-  Definition obox_auth on (B : gmap nat box_names) : iProp Σ :=
-    ghost_map_auth (on_obox on) 1 B.
-  (* THE UNIT (reviewer 1, plan §9 item 19; F34): ONE per counted reference,
-     mass 1, riding the fd-only [FileInvDefs.file_pay_st] -- never a cell
-     fraction (Σ demands qsum = the count n).  The box handle, membership
-     in the inode's published set, and the reference's whole stamp share;
-     the slot->box tie frag rides BESIDE it at the fd's cell fraction
-     ([FileInvDefs.off_fd_unit]), the table holding the complement frag
-     next to its L1 row, so the frags sum to one without [file_rest]
-     carrying any box ghost. *)
-  Definition off_fd_row on (i k : nat) γ : iProp Σ :=
-    (off_box k γ ∗ off_member on i γ ∗ off_ref_stamps γ k 1%Qp)%I.
+  (* NO TIE, NO UNIT (item 24): the fd's reference is a SHARE at the fd's
+     fraction ([FileInvDefs.off_fd]), the box named by [fp_obox]. *)
 
   (* THE ROWS' CONTEXT-FREE FORM (r25 shapes; SKELETON statements, proofs in
      lane (ii)).  What an [_in] release of ip->lock holds: every row's L2
@@ -306,92 +287,38 @@ Section OffBox.
      sets [box_cntG] to), exactly as BioInv and IcacheEscrow spell it: with
      the instance left to search the premise is a DIFFERENT camera from the
      one [box_alloc_at] consumes. *)
-  Lemma off_filealloc `{CID : RiscvLang.CpuId} k γ (ξ : CtxId) (E : coPset) :
-    ↑(offBoxN .@ k) ⊆ E ->
-    CtxBox.stamps_auth (X := unit) γ ∅ -∗
-    ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γ) 1 0%nat -∗
-    ghost_var (bx_slotd γ) 1 (inhabitant : slot_reg nat unit) -∗
-    ghost_var (bx_slotp γ) 1 (inhabitant : l2_reg nat) -∗
-    own_context ξ -∗
-    off_resident (XI := ξ) k ={E}=∗
-    own_context ξ ∗ off_box k γ ∗
-    ∃ T_boot : nat,
-      off_regd γ (SlotReg T_boot false k None) ∗ llb loglen_name T_boot ∗
-      off_cnt γ 1 ∗
-      off_regp γ (L2Reg 0 None) ∗
-      off_ref_stamps γ k 1%Qp.
-  Proof. (* box_alloc_at, then box_ref_incr (the unit at T_boot) *)
-    intros HE.
-    rewrite /off_box /off_regd /off_cnt /off_regp /off_ref_stamps.
-    iIntros "Hst Hc Hd Hp Hrun Hcell".
-    iMod (CtxBox.box_alloc_at off_hdr off_rest (λ _ : nat, emp%I) emp%I
-            (offBoxN .@ k) γ ξ k E with "Hst Hc Hd Hp Hrun [Hcell]")
-      as "(Hrun & %Tb & #Hbx & Hrd & #Hllb & Hcnt & Hrp)".
-    { iExists tt. rewrite /off_rest. iSplitL; [iExact "Hcell"|done]. }
-    iMod (CtxBox.box_ref_incr off_hdr off_rest (λ _ : nat, emp%I) emp%I
-            (offBoxN .@ k) γ (SlotReg Tb false k None) 0 E HE eq_refl
-            with "Hbx Hrd Hcnt") as "(Hrd & Hcnt & %T & Href)".
-    iModIntro. iFrame "Hrun Hbx". iExists Tb. iFrame "Hrd Hllb Hcnt Hrp".
-    iExists {[ (k, T) := 1%Qp ]}.
-    iSplitR; [iPureIntro; by rewrite qsum_singleton|].
-    iExact "Href".
-  Qed.
 
   (* sys_open's PUBLISH, under ip->lock, ftable.lock released: (e) with the
      owner-held L2 half -- cover (C)-left, the unit at the birth stamp
      presented at the acquiresleep (Kt ≥ its stamp), lr_tp = 0 needs no
      floor -- the cell in hand for `f->off = 0`, then (f), then the returned
      row is appended to inode i's set.  Stated as the two box steps. *)
-  Lemma off_publish_checkout `{CID : RiscvLang.CpuId} k γ (ξ : CtxId)
-      (m : gmap (nat * nat) ufrac) (Kt : nat) (E : coPset) :
-    ↑(offBoxN .@ k) ⊆ E ->
-    qsum m = Qp_to_Qc 1 -> (max_stamp m ≤ Kt)%nat ->
-    off_box k γ -∗ own_context ξ -∗ ctx_floor ξ Kt -∗
-    CtxBox.reference (X := unit) γ k m -∗
-    off_regp γ (L2Reg 0 None) ={E}=∗
-    own_context ξ ∗ off_resident (XI := ξ) k ∗ CtxBox.l2_hold (X := unit) γ k m.
-  Proof. (* box_checkout at Q := emp, Kp := 0 *)
-    intros HE Hq HKt. rewrite /off_box /off_regp.
-    iIntros "#Hbox Hrun #Hflt Href Hrp".
-    assert (Hh0 : lr_hold (L2Reg 0 None : l2_reg nat) = None) by reflexivity.
-    assert (Hp0 : (lr_tp (L2Reg 0 None : l2_reg nat) ≤ 0)%nat) by (simpl; lia).
-    iMod (CtxBox.box_checkout off_hdr off_rest (λ _ : nat, emp%I) emp%I
-            (offBoxN .@ k) γ ξ k m (L2Reg 0 None) Kt 0 E HE Hh0 HKt Hp0
-            with "Hbox Hrun Hflt [] Href [] Hrp") as "(Hrun & Hbun & Hhold)".
-    { iApply ctx_floor_0. }
-    { done. }
-    iDestruct "Hbun" as (x) "[Hcell _]".
-    iModIntro. iFrame "Hrun Hhold". iExact "Hcell".
-  Qed.
 
-  Lemma off_publish_park `{CID : RiscvLang.CpuId} on i k γ (ξ : CtxId)
-      (m : gmap (nat * nat) ufrac) (E : coPset) :
+  (* THE BIRTH, AT THE PUBLISH (item 24, note 4's order): sys_open has just
+     stored [f->off = 0] over the free word ([wp_store_s_sconf_free_gen],
+     re-minting the cell at its context) under ip->lock at [ref = 1]; then
+     [box_alloc_at] deposits the cell (the creator never absorbs it -- the
+     self-absorb line holds), (c) mints the reference at mass 1, and the L2
+     row is inserted into inode [i]'s set.  What comes out is exactly
+     [FileInvDefs.off_fd]'s pieces at [q = 1]: the two register halves, the
+     share, membership, the handle. *)
+  Lemma off_publish_park `{CID : RiscvLang.CpuId} on i k γ (ξ : CtxId) (E : coPset) :
     ↑(offBoxN .@ k) ⊆ E ->
-    off_box k γ -∗ own_context ξ -∗
+    CtxBox.stamps_auth (X := unit) γ ∅ -∗
+    ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γ) 1 0%nat -∗
+    ghost_var (bx_slotd γ) 1 (inhabitant : slot_reg nat unit) -∗
+    ghost_var (bx_slotp γ) 1 (inhabitant : l2_reg nat) -∗
+    own_context ξ -∗
     off_resident (XI := ξ) k -∗
-    CtxBox.l2_hold (X := unit) γ k m -∗
     off_rows on i ξ ={E}=∗
-    own_context ξ ∗
-    ∃ (T' : nat) (q : ufrac),
-      ⌜Qp_to_Qc q = qsum m⌝ ∗
-      CtxBox.reference (X := unit) γ k {[ (k, T') := q ]} ∗
-      llb loglen_name T' ∗
-      (* the row goes into the inode payload at the fresh box; the caller
-         re-floors the set at its _in releasesleep *)
-      (ctx_floor ξ T' -∗ off_rows on i ξ) ∗ off_member on i γ.
-  Proof. (* box_park at Q := emp, then off_rows_insert *)
-    intros HE. rewrite /off_box.
-    iIntros "#Hbox Hrun Hcell Hhold Hrows".
-    iMod (CtxBox.box_park off_hdr off_rest (λ _ : nat, emp%I) emp%I
-            (offBoxN .@ k) γ ξ k m E HE with "Hbox Hrun [Hcell] Hhold")
-      as "(Hrun & _ & %T' & %q & %Hq & Hrp & Href & #Hllb)".
-    { iExists tt. rewrite /off_rest. iSplitL; [iExact "Hcell"|done]. }
-    iMod (off_rows_insert_row on i γ T' ξ with "Hrows Hrp Hllb")
-      as "[Hback #Hmem]".
-    iModIntro. iFrame "Hrun". iExists T', q.
-    iSplitR; [iPureIntro; exact Hq|].
-    iFrame "Href Hllb Hback Hmem".
-  Qed.
+    own_context ξ ∗ off_box k γ ∗
+    ∃ (T0 T : nat),
+      off_regd γ (SlotReg T0 false k None) ∗ llb loglen_name T0 ∗
+      off_cnt γ 1 ∗
+      CtxBox.reference (X := unit) γ k {[ (k, T) := 1%Qp ]} ∗
+      off_member on i γ ∗
+      (ctx_floor ξ 0 -∗ off_rows on i ξ).
+  Proof. (* SKELETON r25 (item 24): box_alloc_at, box_ref_incr, off_rows_insert_row at L2Reg 0 None *) Admitted.
 
   (* fileread / filewrite, under ip->lock: select the row by membership,
      (e), the cell in hand, (f), the row back (re-floored at the fold) *)
@@ -446,76 +373,33 @@ Section OffBox.
      [reference γ (sr_ident r) …]), so the row it hands back is keyed at k
      only when the register says k.  The L1 row (off_l1_row) carries
      exactly this equation, so every call site has it. *)
-  Lemma off_dup k γ (r : slot_reg nat unit) (c : nat) (E : coPset) :
-    ↑(offBoxN .@ k) ⊆ E -> sr_win r = false -> sr_ident r = k ->
-    off_box k γ -∗ off_regd γ r -∗ off_cnt γ (S c) ={E}=∗
-    off_regd γ r ∗ off_cnt γ (S (S c)) ∗ off_ref_stamps γ k 1%Qp.
-  Proof.
-    intros HE Hw Hid.
-    rewrite /off_box /off_regd /off_cnt /off_ref_stamps.
-    iIntros "#Hbox Hrd Hcnt".
-    iMod (CtxBox.box_ref_incr off_hdr off_rest (λ _ : nat, emp%I) emp%I
-            (offBoxN .@ k) γ r (S c) E HE Hw with "Hbox Hrd Hcnt")
-      as "(Hrd & Hcnt & %T & Href)".
-    iModIntro. iFrame "Hrd Hcnt". rewrite -Hid.
-    iExists {[ (sr_ident r, T) := 1%Qp ]}.
-    iSplitR; [iPureIntro; by rewrite qsum_singleton|].
-    iExact "Href".
-  Qed.
 
   (* fileclose, non-last, under ftable.lock: (d) *)
   (* STATEMENT CHANGE (L6 skeleton→proof): [sr_ident r = k] added, for the
      same reason as (c) -- [box_ref_decr] re-stamps the register AT ITS OWN
      identity, so the returned [SlotReg td' false k (sr_x r)] is the box's
      register only when the register's identity is k. *)
-  Lemma off_close k γ (r : slot_reg nat unit) (c : nat) (E : coPset) :
-    ↑(offBoxN .@ k) ⊆ E -> sr_win r = false -> sr_ident r = k ->
-    off_box k γ -∗ off_regd γ r -∗ llb loglen_name (sr_td r) -∗ off_cnt γ (S (S c)) -∗
-    off_ref_stamps γ k 1%Qp ={E}=∗
-    ∃ td' : nat, ⌜(sr_td r ≤ td')%nat⌝ ∗
-      off_regd γ (SlotReg td' false k (sr_x r)) ∗ off_cnt γ (S c) ∗ llb loglen_name td'.
-  Proof.
-    intros HE Hw Hid.
-    rewrite /off_box /off_regd /off_cnt /off_ref_stamps.
-    iIntros "#Hbox Hrd #Hllb Hcnt (%m & %Hq & Href)".
-    assert (Hq1 : qsum m = nat_Qc 1).
-    { rewrite Hq Qp_to_Qc_1 nat_Qc_1. reflexivity. }
-    iMod (CtxBox.box_ref_decr off_hdr off_rest (λ _ : nat, emp%I) emp%I
-            (offBoxN .@ k) γ r (S c) k m E HE Hw Hq1
-            with "Hbox Hrd Hllb Hcnt Href") as "(Hrd & Hcnt & #Hllb')".
-    iModIntro. iExists (Nat.max (sr_td r) (max_stamp m)).
-    iSplitR; [iPureIntro; lia|].
-    rewrite -Hid. iFrame "Hrd Hcnt Hllb'".
-  Qed.
 
   (* fileclose, LAST reference, under ftable.lock, no inode lock: (a) at
      c = 1 with the gathered unit (its stamps re-minted by every fileread
      park; R1 at fileclose's ftable acquire presents their max), the cell
      comes back for the free-slot row, and the box is abandoned. *)
-  Lemma off_reclaim `{CID : RiscvLang.CpuId} k γ (ξ : CtxId) (r : slot_reg nat unit)
-      (m : gmap (nat * nat) ufrac) (Kd Kt : nat) (E : coPset) :
-    ↑(offBoxN .@ k) ⊆ E ->
-    sr_win r = false -> sr_ident r = k -> (sr_td r ≤ Kd)%nat ->
-    qsum m = Qp_to_Qc 1 -> (max_stamp m ≤ Kt)%nat ->
-    off_box k γ -∗ own_context ξ -∗ ctx_floor ξ Kd -∗ ctx_floor ξ Kt -∗
-    off_regd γ r -∗ off_cnt γ 1 -∗
-    CtxBox.reference (X := unit) γ k m ={E}=∗
-    own_context ξ ∗ off_resident (XI := ξ) k.
-    (* the window stays open forever: the box is dead; its L1 half and cnt
-       half are dropped by the caller (affine) *)
-  Proof. (* box_withdraw_L1 at Q := emp; drop the returned register half *)
-    intros HE Hw Hid HKd Hq HKt.
-    rewrite /off_box /off_regd /off_cnt.
-    iIntros "#Hbox Hrun #Hfld #Hflt Hrd Hcnt Href".
-    assert (Hq1 : qsum m = nat_Qc 1).
-    { rewrite Hq Qp_to_Qc_1 nat_Qc_1. reflexivity. }
-    iDestruct "Href" as "(%Hne & %Hkey & Hfr & #HllbM)".
-    iMod (CtxBox.box_withdraw_L1 off_hdr off_rest (λ _ : nat, emp%I) emp%I
-            (offBoxN .@ k) γ ξ r 1 m Kd Kt E HE Hw Hq1 HKd HKt
-            with "Hbox Hrun Hfld Hflt HllbM Hrd Hcnt Hfr []")
-      as "(Hrun & Hcnt & %x0 & %T0 & %HT0 & Hrd & Hhdr)".
-    { done. }
-    iModIntro. iFrame "Hrun". rewrite -Hid. iExact "Hhdr".
-  Qed.
 
+  (* THE LAST CLOSE (item 24; ruled R2): with the fd's whole share in hand
+     (q = 1: its own fraction plus the remainder from [file_rest]), the
+     closer drops the parked header to the free tier INSIDE the box at ξb
+     by [CtxBox.box_withdraw_L1_free] -- nothing absorbed, no floor, no
+     [own_context]; the box is left OUT_L1 with the whole mass inside (a
+     stale reader would hold mass > 0 beside it: refuted by Σ).  What comes
+     out is the free word, which the retype to FD_NONE puts in the free row. *)
+  Lemma off_last_close k γ (T0 : nat) (m : gmap (nat * nat) ufrac) (E : coPset) :
+    ↑(offBoxN .@ k) ⊆ E ->
+    qsum m = Qp_to_Qc 1 ->
+    off_box k γ -∗
+    off_regd γ (SlotReg T0 false k None) -∗
+    off_cnt γ 1 -∗
+    CtxBox.reference (X := unit) γ k m ={E}=∗
+    off_cnt γ 1 ∗
+    ([∗ list] j ∈ seq 0 4, TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn 1)).
+  Proof. (* SKELETON r25 (item 24): box_withdraw_L1_free with the hook off_resident (XI := ξb) k ⊢ the free bytes (ctx_pointsto_free) *) Admitted.
 End OffBox.

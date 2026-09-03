@@ -2036,4 +2036,10 @@ Handed to reviewer 2.
 Measure after the fix round: total 1459 / roots 15 / blocked 100 / green
 1344; the 15 roots are exactly the pass-1 sites (item 20 lists them) plus
 ProofForkretPark (L8).
+Re-cut per plan §9 items 24/25/27 (same day): the off box loses its L1
+side (free tier), `off_free`/`off_fd`/`fp_obox`, `file_core_off` final and
+context-free, `fslot`/`ftable_res` back to main's shapes with the λ payload
+only, `box_withdraw_L1_free` in CtxBox, `FileOffProtocol.v` with 14 chained
+statements.  61 tagged Admitted; gate green round 1.  Plan §9 item 28; for
+the next review pass.
 

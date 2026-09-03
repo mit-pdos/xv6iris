@@ -813,11 +813,9 @@ Class icfg := MkIcfg {
   icfg_box  : nat -> box_names;
   (* THE OFF BOX'S TWO NAMES (R4b; r25 shapes, 2026-09-02).  Per inode SLOT,
      the auth of the append-only set of published off boxes ([ic_slp]'s
-     [off_rows] conjunct); and the one slot->box-names agreement map the
-     file table keys its rows by.  Here rather than in [fscfg] because
-     [ic_slp] is stated under [icfg] alone. *)
+     [off_rows] conjunct).  Here rather than in [fscfg] because [ic_slp] is
+     stated under [icfg] alone. *)
   icfg_off  : nat -> gname;
-  icfg_obox : gname;
 }.
 
 (* ---------------------------------------------------------------------- *)
@@ -1136,10 +1134,9 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ, !icboxG Σ, !offbox
          no corpses either -- [IcacheBoot.icache_boot_at] hands this straight
          to [IcacheEscrow.ipool_alloc_inv], whose [X] is [∅]. *)
       ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
-      (* the off box's names, empty (r25 shapes): the set auths go into
-         [ic_slp] at IcacheBoot, the map auth into [ftable_res] at its boot *)
-      ([∗ list] k ∈ seq 0 NINODE, own (icfg_off k) (● (∅ : gsetUR box_names))) ∗
-      ghost_map_auth icfg_obox 1 (∅ : gmap nat box_names).
+      (* the off box's set names, empty (r25 shapes): the auths go into
+         [ic_slp] at IcacheBoot *)
+      ([∗ list] k ∈ seq 0 NINODE, own (icfg_off k) (● (∅ : gsetUR box_names))).
 Proof.
   intros HLM HCM HBM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
@@ -1177,13 +1174,12 @@ Proof.
   iMod (ghost_map_alloc (∅ : gmap Z icorpse)) as (γpcrp) "[Hpcrp _]".
   iMod (icfg_box_fun_alloc NINODE 0) as (fbox) "Hbox".
   iMod (icfg_off_fun_alloc NINODE 0) as (foff) "Hoff".
-  iMod (ghost_map_alloc_empty (K:=nat) (V:=box_names)) as (γob) "Hob".
   iModIntro.
   iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γpext γcnt γfrzm γhpn γptrn γpcrp
-             feplo fstmp fbox foff γob), g0.
+             feplo fstmp fbox foff), g0.
   cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_pool icfg_pext icfg_icnt
-       icfg_frzm icfg_hpn icfg_ptrn icfg_pcrp icfg_ieplo icfg_istmp icfg_box icfg_off icfg_obox].
-  by iFrame "Ha Hl Hlk Hcnt Hfrzm Hep Hisl Heplo Hstmp Hboot Hreg Hlkr Hpool Hpext Hhpn Hptrn Hpcrp Hbox Hoff Hob".
+       icfg_frzm icfg_hpn icfg_ptrn icfg_pcrp icfg_ieplo icfg_istmp icfg_box icfg_off].
+  by iFrame "Ha Hl Hlk Hcnt Hfrzm Hep Hisl Heplo Hstmp Hboot Hreg Hlkr Hpool Hpext Hhpn Hptrn Hpcrp Hbox Hoff".
 Qed.
 
 (* ===================================================================== *)

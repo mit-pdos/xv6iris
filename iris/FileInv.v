@@ -42,23 +42,15 @@ Section FileInv.
   Context `{XI : CurCtx}.
 
 
-  (* THE TABLE'S PAYLOAD AT A FLOOR [Kd] (r25 shapes; items 15-17).  [Kd]
-     is the one floor the [ftable_res_at] row below carries at the
-     acquirer's context; every allocated slot's off L1 row is stamped at or
-     below it, which is what [OffBox.off_reclaim] needs from the last
-     closer (tripwire T2: this floor row exists for that and for nothing
-     else).  [B] is the slot->box-names map; its authority lives here so
-     filealloc updates it under this lock. *)
-  Definition ftable_res (γ : gname) (Kd : nat) : iProp Σ :=
-    (∃ (M : gmap nat (Qp * positive)) (B : gmap nat box_names),
+  (* main's shape (plan §9 item 24, T2): no floor row and no box ghost in the
+     table -- the only consumer a floor row had, [off_reclaim], is gone with
+     the box's L1 side. *)
+  Definition ftable_res (γ : gname) : iProp Σ :=
+    (∃ M : gmap nat (Qp * positive),
        ftable_auth γ M ∗
-       obox_auth off_cfg B ∗
-       ⌜∀ k, (k < NFILE)%nat -> is_Some (B !! k)⌝ ∗
-       (* the fd-slot supply: the table is where the conservation law is
-          checked, because the table is what holds one unit per reference. *)
        fd_slots_auth ∗
        ⌜∀ k, is_Some (M !! k) -> (k < NFILE)%nat⌝ ∗
-       [∗ list] k ∈ seq 0 NFILE, fslot γ M B Kd k)%I.
+       [∗ list] k ∈ seq 0 NFILE, fslot γ M k)%I.
 
   (* the whole table: the spinlock named "ftable" over that resource.  ITS
      HANDLE IS A CLOSED TERM and its definition therefore lives BELOW this
@@ -135,22 +127,21 @@ Section FileInv.
      scan borrows slot after slot unchanged (M' := M), and the slot it takes
      is given back at [<[i := (1,1)]> M].  Since [fslot γ M k] reads only
      [M !! k], every other slot is untouched by the update. *)
-  Lemma ftable_slots_acc (γ : gname) (M : gmap nat (Qp * positive))
-      (B : gmap nat box_names) (Kd : nat) (i : nat) :
+  Lemma ftable_slots_acc (γ : gname) (M : gmap nat (Qp * positive)) (i : nat) :
     (i < NFILE)%nat ->
-    ([∗ list] k ∈ seq 0 NFILE, fslot γ M B Kd k) -∗
-    fslot γ M B Kd i ∗
+    ([∗ list] k ∈ seq 0 NFILE, fslot γ M k) -∗
+    fslot γ M i ∗
     (∀ M' : gmap nat (Qp * positive),
-       ⌜∀ k, k ≠ i -> M' !! k = M !! k⌝ -∗ fslot γ M' B Kd i -∗
-       [∗ list] k ∈ seq 0 NFILE, fslot γ M' B Kd k).
+       ⌜∀ k, k ≠ i -> M' !! k = M !! k⌝ -∗ fslot γ M' i -∗
+       [∗ list] k ∈ seq 0 NFILE, fslot γ M' k).
   Proof.
     iIntros (Hi) "H".
     assert (Hlk : seq 0 NFILE !! i = Some i).
     { apply lookup_seq. lia. }
-    rewrite (big_sepL_delete (fun _ k => fslot γ M B Kd k) (seq 0 NFILE) i i Hlk).
+    rewrite (big_sepL_delete (fun _ k => fslot γ M k) (seq 0 NFILE) i i Hlk).
     iDestruct "H" as "[$ Hrest]".
     iIntros (M' HM') "Hi".
-    rewrite (big_sepL_delete (fun _ k => fslot γ M' B Kd k) (seq 0 NFILE) i i Hlk).
+    rewrite (big_sepL_delete (fun _ k => fslot γ M' k) (seq 0 NFILE) i i Hlk).
     iFrame "Hi".
     iApply (big_sepL_mono with "Hrest").
     intros idx y Hy. destruct (decide (idx = i)) as [->|Hne]; [done|].
@@ -370,15 +361,14 @@ Section FileInv.
      every other arm already had the cell in hand.  The family premise is
      type-conditional because fileclose's environment is: a pipe's closer
      owns no file system and owes none ([SpecFileclose]'s dispatch). *)
-  Lemma file_off_reclaim (E : coPset) (γ : gname) (k : nat) (C : fcontent)
-      (M : gmap nat (Qp * positive)) (qt : Qp) :
-    ↑offN ⊆ E ->
-    M !! k = Some (qt, 1%positive) ->
-    (if bool_decide (fc_type C = FD_INODE) then ioff_escrows else emp) -∗
-    file_core_off k 1 C -∗ ftable_auth γ M -∗ flive_tok k
-    ={E}=∗
-    ftable_auth γ M ∗ flive_tok k ∗ foff_dead k 1.
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  (* THE LAST CLOSE'S OFF STEP (item 24): the closer holds the fd's whole
+     share (its own fraction plus the remainder) and drops the cell to the
+     free tier through [OffBox.off_last_close]; at a non-INODE type the word
+     is already free.  Statement final; proof in lane (ii). *)
+  Lemma file_off_reclaim (E : coPset) (k : nat) (pn : fpnames) (C : fcontent) :
+    ↑(offBoxN .@ k) ⊆ E ->
+    file_core_off k 1 pn C ={E}=∗ off_free k 1.
+  Proof. (* SKELETON r25 (item 24) *) Admitted.
 
   (* ------------------------------------------------------------------ *)
   (*  The three ghost steps, all performed under ftable.lock              *)
@@ -661,22 +651,20 @@ End FileInv.
    removed even the cinv token from the slot: a slot's ξ-dependence is now
    [file_fields] plus the plain cells/own-ghosts of [file_core], and the
    instance is the structural ones applied AS TERMS. *)
-(* THE λ PAYLOAD WITH ITS FLOOR ROW (L7, items 15-17; FINAL name, tripwire
-   T1).  Stated below the section so [(XI := ξ)] is an argument: the
-   acquirer re-indexes it along its [ctx_dom] via the instance below, and
-   the eight releases are [_in] releases that re-floor it at the releaser's
-   context ([SpecRelease.wp_release_in_sconf], the fold like
-   [IcacheEscrow.ic_slp_fold]). *)
+(* THE λ PAYLOAD (L7, items 15-17; item 24 R4: NO floor row).  FINAL name
+   (tripwire T1).  Stated below the section so [(XI := ξ)] is an argument:
+   the acquirer re-indexes it along its [ctx_dom] via the instance below.
+   The eight ftable releases stay plain releases. *)
 Definition ftable_res_at `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}
     (γ : gname) (ξ : CtxId) : iProp Σ :=
-  (∃ Kd : nat, ctx_floor ξ Kd ∗ ftable_res (XI := ξ) γ Kd)%I.
+  ftable_res (XI := ξ) γ.
 
 (* DAY-ONE SKELETON (rule 0): the payload's morph, which [SpecAcquire] /
    [SpecRelease] resolve at the eleven sites and ProofMain's [newlock]
    (reviewer 1's pitfall 6: it must be a Global Instance). *)
 Global Instance ftable_res_at_morph `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}
     (γ : gname) : CtxMorph (ftable_res_at γ).
-Proof. (* SKELETON r25: ctx_morph_exist; ctx_floor_dom for the floor; ftable_res structural via fslot_morph *) Admitted.
+Proof. (* SKELETON r25: structural via fslot_morph *) Admitted.
 
 Section FileLock.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
@@ -818,11 +806,10 @@ Section FileGhostAlloc.
   (* ================================================================== *)
   Lemma ftable_res_boot (E : coPset) :
     flive_own (● (∅ : gmap nat positive)) -∗
-    obox_auth off_cfg ∅ -∗
     ([∗ list] k ∈ seq 0 NFILE, fentry_raw k) -∗
     fd_slots_auth -∗
     iref_slots NFILE ={E}=∗
-    ∃ γ : gname, ftable_res_at γ cur_ctx.
+    ∃ γ : gname, ftable_res γ.
   Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
 
 End FileGhostAlloc.

@@ -1081,11 +1081,11 @@ Global Instance icbox_boxG {Σ} `{!icboxG Σ} `{!kallocG Σ} : boxG ic_bid ic_x 
    The third instance of the box (OffBox.v): X := unit, id := the file slot.
    Moved here from OffBox.v so that [xv6G] can bundle the class and no
    consumer section names it (the same reason [icboxG] lives here).  Two
-   cameras beyond the box's own: the per-inode-slot APPEND-ONLY SET of
-   published boxes ([off_rows], an auth over a gset of box names) and the
-   SLOT -> BOX-NAMES agreement map ([obox_frag]: a file slot's fd rows and
-   its table row name the same box, fractional pointsto, updated under
-   ftable.lock at filealloc).  [box_names] is countable for the set. *)
+   camera beyond the box's own: the per-inode-slot APPEND-ONLY SET of
+   published boxes ([off_rows], an auth over a gset of box names).
+   [box_names] is countable for the set.  (The slot->box tie of the first
+   shapes commit is gone with the box's L1 side -- plan §9 item 24: the
+   fd names its box through [fpnames.fp_obox].) *)
 Global Instance box_names_eq_dec : EqDecision box_names.
 Proof. solve_decision. Defined.
 Global Instance box_names_countable : Countable box_names.
@@ -1100,11 +1100,10 @@ Class offboxG (Σ : gFunctors) := OffboxG {
   offbox_slotdG  :: ghost_varG Σ (slot_reg nat unit);
   offbox_slotpG  :: ghost_varG Σ (l2_reg nat);
   offbox_setG    :: inG Σ (authR (gsetUR box_names));
-  offbox_oboxG   :: ghost_mapG Σ nat box_names;
 }.
 Definition offboxΣ : gFunctors :=
   #[ GFunctor (stampsR nat); ghost_varΣ (slot_reg nat unit); ghost_varΣ (l2_reg nat);
-     GFunctor (authR (gsetUR box_names)); ghost_mapΣ nat box_names ].
+     GFunctor (authR (gsetUR box_names)) ].
 Global Instance subG_offboxΣ {Σ} : subG offboxΣ Σ -> offboxG Σ.
 Proof. solve_inG. Qed.
 Global Instance offbox_boxG {Σ} `{!offboxG Σ} `{!kallocG Σ} : boxG nat unit Σ :=
