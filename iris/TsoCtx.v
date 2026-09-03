@@ -219,7 +219,7 @@ Local Lemma tso_foldr_ins_dom {A} (l : list nat) (pa : Arch.pa)
 Proof.
   induction l as [|j l IH].
   - cbn [foldr fmap list_fmap list_to_set]. set_solver.
-  - cbn [foldr fmap list_fmap list_to_set]. rewrite dom_insert_L IH. set_solver.
+  - cbn [foldr fmap list_fmap list_to_set]. rewrite dom_insert_L IH. set_solver + mm.
 Qed.
 
 Local Lemma tso_nodup_win (pa : Arch.pa) (k : nat) :
@@ -405,11 +405,6 @@ Section ctx.
     Timeless (hart_view_lb K).
   Proof. rewrite hart_view_lb_unseal /hart_view_lb_def. apply _. Qed.
 
-  Lemma hart_view_lb_le `{CID : CpuId} (K K' : nat) :
-    (K' ≤ K)%nat → hart_view_lb K -∗ hart_view_lb K'.
-  Proof.
-    rewrite !hart_view_lb_unseal /hart_view_lb_def. apply view_lb_le.
-  Qed.
 
   (* ================================================================== *)
   (* §0.35′(iii): THE ABSORB OF THE CONTEXT BOUND -- "B_ξ rises to K".    *)
@@ -469,35 +464,6 @@ Section ctx.
       iApply (mono_nat_lb_own_le with "Hlb"). lia.
   Qed.
 
-  (* Exclusivity, in all three pairings: one bound authority per context,
-     one token.  ([TsoCtxTwin2.own_context_excl] / [ctx_parked_excl] /
-     [own_context_parked_excl]; the running form holds across DIFFERENT
-     ambient harts too, which is the statement here.) *)
-  Lemma own_context_excl {CID1 CID2 : CpuId} (ξ : CtxId) :
-    own_context (CID := CID1) ξ -∗ own_context (CID := CID2) ξ -∗ False.
-  Proof.
-    rewrite !own_context_unseal /own_context_def.
-    iIntros "(%B1 & %K1 & %W1 & %D1 & [Hb1 _] & _)".
-    iIntros "(%B2 & %K2 & %W2 & %D2 & [Hb2 _] & _)".
-    iApply (mono_nat_auth_own_exclusive with "Hb1 Hb2").
-  Qed.
-
-  Lemma ctx_parked_excl (ξ : CtxId) (T1 T2 : nat) :
-    ctx_parked ξ T1 -∗ ctx_parked ξ T2 -∗ False.
-  Proof.
-    rewrite !ctx_parked_unseal /ctx_parked_def.
-    iIntros "(%D1 & [Hb1 _] & _) (%D2 & [Hb2 _] & _)".
-    iApply (mono_nat_auth_own_exclusive with "Hb1 Hb2").
-  Qed.
-
-  Lemma own_context_parked_excl `{CID : CpuId} (ξ : CtxId) (T : nat) :
-    own_context ξ -∗ ctx_parked ξ T -∗ False.
-  Proof.
-    rewrite own_context_unseal /own_context_def
-            ctx_parked_unseal /ctx_parked_def.
-    iIntros "(%B & %K & %W & %D & [Hb1 _] & _) (%D2 & [Hb2 _] & _)".
-    iApply (mono_nat_auth_own_exclusive with "Hb1 Hb2").
-  Qed.
 
   Global Instance own_context_timeless `{CID : CpuId} ξ :
     Timeless (own_context ξ).
@@ -585,20 +551,6 @@ Section ctx.
     iLeft. iPureIntro. by apply HDT.
   Qed.
 
-  (* THE SWTCH EXCHANGE: a hart always runs exactly one thread, so the
-     primitive crossing swaps the running token against a parked one --
-     the parker's identity parks, the target's runs, on this hart.
-     ([TsoCtxTwin2.twin_exchange], derived from park + resume.) *)
-  Lemma ctx_exchange `{CID : CpuId} (ξ1 ξ2 : CtxId) (T K : nat) :
-    (T ≤ K)%nat →
-    hart_view_lb K -∗ own_context ξ1 -∗ ctx_parked ξ2 T ==∗
-    own_context ξ2 ∗ ∃ T1, ctx_parked ξ1 T1.
-  Proof.
-    iIntros (HTK) "#HK Hrun Hpk".
-    iMod (ctx_park with "Hrun") as (T1) "Hpk1".
-    iMod (ctx_resume ξ2 T K HTK with "HK Hpk") as "Hrun".
-    iModIntro. iFrame "Hrun". iExists T1. iExact "Hpk1".
-  Qed.
 
   (* ---------------------------------------------------------------- *)
   (* The context-indexed points-to                                     *)
@@ -948,15 +900,6 @@ Section ctx.
   Section ctx_word2.
     Context `{KTR : !CurKtier}.
 
-    Lemma ctx_word2_pointsto_unfold ξ a dq w :
-      ctx_word2_pointsto ξ a dq w ⊣⊢
-      ⌜is_aligned_paddr (Physaddr a) 2 = true⌝ ∗
-      ([∗ list] j ∈ seq 0 2, ctx_pointsto ξ (pa_add a j) dq (nth_byte w j)).
-    Proof. reflexivity. Qed.
-
-    Lemma ctx_word2_pointsto_aligned_p ξ a dq w :
-      ctx_word2_pointsto ξ a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 2 = true⌝.
-    Proof. iIntros "[$ _]". Qed.
 
     Lemma ctx_word2_pointsto_bytes ξ a dq w :
       ctx_word2_pointsto ξ a dq w ⊢
@@ -986,18 +929,6 @@ Section ctx.
       iSplit; [iIntros "[#$ [$ $]]" | iIntros "[[#$ $] [_ $]]"].
     Qed.
 
-    Lemma ctx_word2_pointsto_persist ξ a dq w :
-      ctx_word2_pointsto ξ a dq w ==∗
-      ctx_word2_pointsto ξ a DfracDiscarded w.
-    Proof.
-      iIntros "[#Hal H]".
-      iAssert (|==> [∗ list] j ∈ seq 0 2,
-        ctx_pointsto ξ (pa_add a j) DfracDiscarded (nth_byte w j))%I
-        with "[H]" as ">H".
-      { iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
-        iIntros "!>" (k j Hj) "Hb". by iApply ctx_pointsto_persist. }
-      iModIntro. by iFrame "Hal H".
-    Qed.
 
     (* the HALF split/join, the form the escrow and fraction protocols
        use ([word2_pointsto_half*]'s images) *)
@@ -1007,28 +938,7 @@ Section ctx.
       ctx_word2_pointsto ξ a (DfracOwn (1/2)) w.
     Proof. rewrite -ctx_word2_pointsto_frac_split Qp.div_2. reflexivity. Qed.
 
-    Lemma ctx_word2_pointsto_half_split ξ a w :
-      ctx_word2_pointsto ξ a (DfracOwn 1) w -∗
-      ctx_word2_pointsto ξ a (DfracOwn (1/2)) w ∗
-      ctx_word2_pointsto ξ a (DfracOwn (1/2)) w.
-    Proof. rewrite ctx_word2_pointsto_half. iIntros "$". Qed.
 
-    Lemma ctx_word2_pointsto_half_join ξ a w :
-      ctx_word2_pointsto ξ a (DfracOwn (1/2)) w -∗
-      ctx_word2_pointsto ξ a (DfracOwn (1/2)) w -∗
-      ctx_word2_pointsto ξ a (DfracOwn 1) w.
-    Proof. iIntros "H1 H2". rewrite ctx_word2_pointsto_half. iFrame "H1 H2". Qed.
-
-    (* the forgetful projection at the tower ([ctx_pointsto_forget]'s
-       warning applies verbatim -- one-way, and the result licenses no
-       plain load) *)
-    Lemma ctx_word2_pointsto_forget ξ a dq w :
-      ctx_word2_pointsto ξ a dq w ⊢ word2_pointsto a dq w.
-    Proof.
-      rewrite /ctx_word2_pointsto /word2_pointsto.
-      iIntros "[$ H]". iApply (big_sepL_mono with "H").
-      iIntros (k j _) "H". iApply (ctx_pointsto_forget with "H").
-    Qed.
   End ctx_word2.
 
   Lemma ctx_word2_pointsto_agree {kt1 kt2 : ktier} (ξ1 ξ2 : CtxId)
@@ -1039,15 +949,6 @@ Section ctx.
     iIntros "[_ H1] [_ H2]".
     iDestruct (ctx_bytes_agree ξ1 ξ2 a 0 2 with "H1 H2") as %Hb.
     iPureIntro. apply (bv_eq_of_bytes (n:=2)). intros j Hj. apply Hb. lia.
-  Qed.
-
-  Lemma ctx_word2_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} ξ a dq w :
-    ctx_word2_pointsto (KTR := kt) ξ a dq w ⊢
-    ctx_word2_pointsto (KTR := kt') ξ a dq w.
-  Proof.
-    rewrite /ctx_word2_pointsto. iIntros "[$ H]".
-    iApply (big_sepL_mono with "H").
-    iIntros (k j _) "H". iApply (ctx_ktier_mono kt kt' with "H").
   Qed.
 
 
@@ -1137,16 +1038,6 @@ Section ctx.
       ctx_word4_pointsto ξ a (DfracOwn 1) w.
     Proof. iIntros "H1 H2". rewrite ctx_word4_pointsto_half. iFrame "H1 H2". Qed.
 
-    (* the forgetful projection at the tower ([ctx_pointsto_forget]'s
-       warning applies verbatim -- one-way, and the result licenses no
-       plain load) *)
-    Lemma ctx_word4_pointsto_forget ξ a dq w :
-      ctx_word4_pointsto ξ a dq w ⊢ word4_pointsto a dq w.
-    Proof.
-      rewrite /ctx_word4_pointsto /word4_pointsto.
-      iIntros "[$ H]". iApply (big_sepL_mono with "H").
-      iIntros (k j _) "H". iApply (ctx_pointsto_forget with "H").
-    Qed.
   End ctx_word4.
 
   Lemma ctx_word4_pointsto_agree {kt1 kt2 : ktier} (ξ1 ξ2 : CtxId)
@@ -1159,14 +1050,6 @@ Section ctx.
     iPureIntro. apply (bv_eq_of_bytes (n:=4)). intros j Hj. apply Hb. lia.
   Qed.
 
-  Lemma ctx_word4_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} ξ a dq w :
-    ctx_word4_pointsto (KTR := kt) ξ a dq w ⊢
-    ctx_word4_pointsto (KTR := kt') ξ a dq w.
-  Proof.
-    rewrite /ctx_word4_pointsto. iIntros "[$ H]".
-    iApply (big_sepL_mono with "H").
-    iIntros (k j _) "H". iApply (ctx_ktier_mono kt kt' with "H").
-  Qed.
 
   (* ---- the STRING tower ([↦ₛ]) ---------------------------------------
      [RiscvPtsto.string_pointsto]'s shape over the context fact: a
@@ -1205,15 +1088,6 @@ Section ctx.
       [∗ list] j ↦ b ∈ cstring_bytes s, ctx_pointsto ξ (pa_add a j) dq b.
     Proof. reflexivity. Qed.
 
-    Lemma ctx_string_pointsto_bytes ξ a dq s :
-      ctx_string_pointsto ξ a dq s ⊢
-      [∗ list] j ↦ b ∈ cstring_bytes s, ctx_pointsto ξ (pa_add a j) dq b.
-    Proof. iIntros "$". Qed.
-
-    Lemma ctx_string_pointsto_intro ξ a dq s :
-      ([∗ list] j ↦ b ∈ cstring_bytes s, ctx_pointsto ξ (pa_add a j) dq b)
-      ⊢ ctx_string_pointsto ξ a dq s.
-    Proof. iIntros "$". Qed.
 
     Global Instance ctx_string_pointsto_timeless ξ a dq s :
       Timeless (ctx_string_pointsto ξ a dq s).
@@ -1232,52 +1106,9 @@ Section ctx.
       apply big_opL_proper. intros ? b ?. apply ctx_pointsto_frac_split.
     Qed.
 
-    Lemma ctx_string_pointsto_half ξ a s :
-      ctx_string_pointsto ξ a (DfracOwn 1) s ⊣⊢
-      ctx_string_pointsto ξ a (DfracOwn (1/2)) s ∗
-      ctx_string_pointsto ξ a (DfracOwn (1/2)) s.
-    Proof. rewrite -ctx_string_pointsto_frac_split Qp.div_2. reflexivity. Qed.
 
-    Lemma ctx_string_pointsto_persist ξ a dq s :
-      ctx_string_pointsto ξ a dq s ==∗ ctx_string_pointsto ξ a DfracDiscarded s.
-    Proof.
-      iIntros "H". rewrite /ctx_string_pointsto.
-      iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
-      iIntros "!>" (j b Hj) "Hb". by iApply ctx_pointsto_persist.
-    Qed.
-
-    (* the forgetful projection at the tower ([ctx_pointsto_forget]'s
-       warning applies verbatim -- one-way, and the result licenses no
-       plain load) *)
-    Lemma ctx_string_pointsto_forget ξ a dq s :
-      ctx_string_pointsto ξ a dq s ⊢ string_pointsto a dq s.
-    Proof.
-      rewrite /ctx_string_pointsto /string_pointsto.
-      iIntros "H". iApply (big_sepL_mono with "H").
-      iIntros (k b _) "H". iApply (ctx_pointsto_forget with "H").
-    Qed.
   End ctx_string.
 
-  (* Agreement, cross-context like the word towers' -- but stated at the
-     BYTE level, which is the strongest form that is TRUE here.  Two string
-     facts at one address need NOT name the same string: [s1] may be a
-     proper prefix of [s2] when [s2] has an embedded NUL character (Coq's
-     [string] permits one; the tree's [PrintkFmt.nonul] is exactly the
-     predicate that rules it out, and it lives far above this file).  So the
-     law says what the memory says: wherever both byte lists reach, they
-     agree. *)
-  Lemma ctx_string_pointsto_bytes_agree {kt1 kt2 : ktier} (ξ1 ξ2 : CtxId)
-      a dq1 s1 dq2 s2 :
-    ctx_string_pointsto (KTR := kt1) ξ1 a dq1 s1 -∗
-    ctx_string_pointsto (KTR := kt2) ξ2 a dq2 s2 -∗
-    ⌜forall j b1 b2, cstring_bytes s1 !! j = Some b1 ->
-                     cstring_bytes s2 !! j = Some b2 -> b1 = b2⌝.
-  Proof.
-    iIntros "H1 H2". iIntros (j b1 b2 Hb1 Hb2).
-    iDestruct (big_sepL_lookup with "H1") as "Hc1"; [exact Hb1|].
-    iDestruct (big_sepL_lookup with "H2") as "Hc2"; [exact Hb2|].
-    by iApply (ctx_pointsto_agree with "Hc1 Hc2").
-  Qed.
 
   (* >>> A6.91: THE BYTE'S AND THE 4-BYTE WORD'S [ktier]-TYPED TWINS, and
      they were the two the family was missing.  [Class CurKtier :=
@@ -1352,9 +1183,6 @@ Section ctx.
   Section ctx_string_all.
     Context `{KTR : !CurKtier}.
 
-    Lemma ctx_string_all_unfold a dq s :
-      ctx_string_all a dq s ⊣⊢ ∀ ξ : CtxId, ctx_string_pointsto ξ a dq s.
-    Proof. reflexivity. Qed.
 
     (* USE IT AT YOUR OWN CONTEXT: the only elimination, and the one every
        consumer of a handle's string runs. *)
@@ -1362,9 +1190,6 @@ Section ctx.
       ctx_string_all a dq s ⊢ ctx_string_pointsto ξ a dq s.
     Proof. iIntros "H". iApply "H". Qed.
 
-    Lemma ctx_string_all_intro a dq s :
-      (∀ ξ : CtxId, ctx_string_pointsto ξ a dq s) ⊢ ctx_string_all a dq s.
-    Proof. iIntros "$". Qed.
 
     Global Instance ctx_string_all_persistent a s :
       Persistent (ctx_string_all a DfracDiscarded s).
@@ -1374,13 +1199,6 @@ Section ctx.
   Global Instance ctx_string_all_persistent' (ktr : ktier) a s :
     Persistent (ctx_string_all (KTR := ktr) a DfracDiscarded s).
   Proof. exact (ctx_string_all_persistent (KTR := ktr) a s). Qed.
-
-  Lemma ctx_string_all_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} a dq s :
-    ctx_string_all (KTR := kt) a dq s ⊢ ctx_string_all (KTR := kt') a dq s.
-  Proof.
-    rewrite /ctx_string_all. iIntros "H" (ξ).
-    iApply (ctx_string_ktier_mono kt kt'). iApply "H".
-  Qed.
 
 
   (* ---------------------------------------------------------------- *)
@@ -1574,15 +1392,6 @@ Section ctx.
     iModIntro. iFrame "Hd". iSplit; [done|]. iExact "H".
   Qed.
 
-  (* The composition acid test: a lock-payload-shaped assertion is
-     morphable by typeclass search alone.  If this ever needs a manual
-     proof, an instance regressed. *)
-  Lemma ctx_morph_demo (kt : ktier) a1 a2 v1 (P : iProp Σ) :
-    CtxMorph (λ ξ, ctx_pointsto (KTR := kt) ξ a1 (DfracOwn 1) v1 ∗
-                   (∃ v2 : bv 8, ⌜v2 ≠ v1⌝ ∗
-                      ctx_pointsto (KTR := kt) ξ a2 (DfracOwn 1) v2) ∗
-                   P)%I.
-  Proof. apply _. Qed.
 
   (* ---------------------------------------------------------------- *)
   (* The ctx_dom mints -- borrow accessors on the tokens               *)
@@ -1776,94 +1585,7 @@ Section ctx.
   (* lower bound has no role left at the acquire -- the interp supplies  *)
   (* it.  The premise is therefore a STRENGTHENING of the statement and  *)
   (* a WEAKENING of what the caller must invent.                         *)
-  (* ---------------------------------------------------------------- *)
-  Lemma ctx_absorb `{CID : CpuId} (R : CtxId -> iProp Σ) `{!CtxMorph R}
-      (g : gstate) (ξ ξ' : CtxId) (T : nat) :
-    (length g.(glog) <= g.(gtv) cpu_id)%nat ->
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ' -∗ ctx_parked ξ T -∗ R ξ ==∗
-    tso_interp_at riscv_eraGS g ∗ own_context ξ' ∗ ctx_parked ξ T ∗ R ξ'.
-  Proof.
-    iIntros (Htop) "Hint Hrun Hpk HR".
-    iMod (ctx_dom_of_parked g ξ ξ' T Htop with "Hint Hrun Hpk")
-      as "(Hint & Hrun & Hdom & Hback)".
-    iMod (ctx_morph with "Hdom HR") as "[Hdom HR]".
-    iModIntro. iFrame "Hint Hrun HR". by iApply "Hback".
-  Qed.
 
-
-  (* THE LOAD GATE ([TsoCtxTwin2.twin_load_ok]): a running context's
-     fact predicts the machine's plain load at EVERY admissible view
-     advance of its hart -- both arms: a clean fact through the
-     bound-under-view tie, a dirty one through the author/forwarding
-     arm.  Any fraction; nothing is consumed.  This is what the
-     [Mobl_ram_plain] leaf obligation (tso-machine-flip.md §6)
-     discharges the arm's [tso_read] premise with; the gen_heap conjunct
-     rides beside [tso_interp_at] because the fact's VALUE lives in the
-     flat cell while its TIMESTAMP lives in the tso ghosts. *)
-  Lemma ctx_load_ok `{CID : CpuId} {KTR : CurKtier} (g : gstate)
-      (ξ : CtxId) (a : Arch.pa) (dq : dfrac) (v : bv 8) :
-    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
-    tso_interp_at riscv_eraGS g -∗
-    own_context ξ -∗
-    ctx_pointsto (KTR := KTR) ξ a dq v -∗
-    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
-    tso_interp_at riscv_eraGS g ∗
-    own_context ξ ∗ ctx_pointsto (KTR := KTR) ξ a dq v ∗
-    ∃ ppn : mword 44,
-      kmap_at (svpn_of a) ppn KP_rw ∗
-      ⌜∀ tv', (g.(gtv) cpu_id ≤ tv')%nat →
-         tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv' (pa_of ppn a)
-         = Some v⌝.
-  Proof.
-    rewrite own_context_unseal /own_context_def
-            ctx_pointsto_unseal /ctx_pointsto_def.
-    iIntros "Hgh Hint Hrun Hfact".
-    iDestruct "Hint"
-      as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
-    destruct Hmm as ((Hflat & Htv & Hcov) & Hera).
-    iDestruct "Hrun"
-      as "(%B & %K & %W & %D & [Hb Hd] & #HK & %HBK & #HW & %HDW & #Hoks)".
-    iDestruct "Hfact"
-      as "(%ppn & %t & #Hk & %Hc & %Hr & %Hpin & Hpt & Htse & Hbit)".
-    (* the flat cell pins the value; the timestamp ghost pins its t *)
-    iDestruct (gen_heap_valid with "Hgh Hpt") as %Hgm.
-    iDestruct (ghost_map_lookup with "Hts Htse") as %HTMt.
-    destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat).
-    rewrite Hgm in Hgm0. injection Hgm0 as <-.
-    (* the hart's view dominates the context's bound *)
-    iDestruct (view_auth_valid with "Hv HK") as %HKtvs.
-    rewrite avf_hart in HKtvs.
-    (* visibility of [t], by the bit *)
-    iAssert (⌜∀ tv', (g.(gtv) cpu_id ≤ tv')%nat →
-               visibleb (hart_agent cpu_id) tv' g.(glog) t = true⌝)%I
-      as %Hvis.
-    { iDestruct "Hbit" as "[Hcl | Hdt]".
-      - (* clean: t ≤ B ≤ K ≤ gtv ≤ tv' -- and on [llb]'s [t = 0] arm,
-           [0 ≤ tv'] outright (the image byte needs no bound at all) *)
-        iDestruct (llb_valid with "Hb Hcl") as %HtB.
-        iPureIntro. intros tv' Htv'. apply visibleb_below. lia.
-      - (* dirty: the bundle's justification *)
-        iDestruct (dset_lookup with "Hd Hdt") as %HDt.
-        iDestruct (big_sepS_elem_of _ _ _ HDt with "Hoks") as "[%HtB | Hown]".
-        + iPureIntro. intros tv' Htv'. apply visibleb_below.
-          simpl in HtB. lia.
-        + iDestruct "Hown" as (i m) "(%Hti & Hi & %Htid)".
-          iDestruct (ghost_map_lookup with "Hm Hi") as %HLi.
-          iPureIntro. intros tv' _. simpl in Hti. rewrite Hti.
-          apply (visibleb_own _ _ _ _ m); [by rewrite -HLM | done]. }
-    (* reassemble everything *)
-    iSplitL "Hgh"; first iExact "Hgh".
-    iSplitL "Hts Hm Hlen Hv".
-    { iExists TM, LM. iFrame. iPureIntro. split_and!; done. }
-    iSplitL "Hb Hd".
-    { iExists B, K, W, D. iFrame "Hb Hd HK HW Hoks". by iPureIntro. }
-    iSplitL.
-    { iExists ppn, t. iFrame "Hk Hpt Htse Hbit". by iPureIntro. }
-    iExists ppn. iFrame "Hk". iPureIntro.
-    intros tv' Htv'.
-    apply (tso_read_of_latest _ _ _ _ _ t); [exact Hlat|by apply Hvis].
-  Qed.
 
   (* ---------------------------------------------------------------- *)
   (* THE PRISTINE BYTE, and the load gate that needs NO context         *)
@@ -1997,18 +1719,6 @@ Section ctx.
     iLeft. iApply llb_0.
   Qed.
 
-  (* … and the form the boot carve actually wants: every premise is
-     persistent, so the ∀ costs nothing. *)
-  Lemma ctx_pointsto_of_pristine_all `{KTR : !CurKtier}
-      (ppn : mword 44) (a : Arch.pa) (v : bv 8) :
-    kmap_at (svpn_of a) ppn KP_rw -∗
-    mem_pointsto a DfracDiscarded v -∗
-    pristine_byte (pa_of ppn a) -∗
-    ∀ ξ : CtxId, ctx_pointsto ξ a DfracDiscarded v.
-  Proof.
-    iIntros "#Hk #Hm #Hpr" (ξ).
-    iApply (ctx_pointsto_of_pristine ξ ppn a v with "Hk Hm Hpr").
-  Qed.
 
   (* THE VA-SIDE RECEIPT, which is the one a caller can actually hold.
      [pristine_byte] lives at a PHYSICAL address (the interpretation is keyed
@@ -2033,45 +1743,6 @@ Section ctx.
     iApply (ctx_pointsto_of_pristine ξ ppn a v with "Hk Hm Hpr").
   Qed.
 
-  (* the every-context form: THE BOOT MINT.  A persisted image byte plus its
-     receipt IS [KernelDataInv.kernel_data]'s per-byte conjunct at every
-     context at once. *)
-  Lemma ctx_pointsto_of_pristine_va_all `{KTR : !CurKtier}
-      (a : Arch.pa) (v : bv 8) :
-    mem_pointsto a DfracDiscarded v -∗ pristine_va a -∗
-    ∀ ξ : CtxId, ctx_pointsto ξ a DfracDiscarded v.
-  Proof.
-    iIntros "#Hm #Hpr" (ξ).
-    iApply (ctx_pointsto_of_pristine_va ξ a v with "Hm Hpr").
-  Qed.
-
-  (* THE ⌜t = 0⌝ ARM, SPELLED AT THE STRING TIER (tso-machine-flip.md
-     A6.71's "the ONE arm this tree owes"): a rodata literal's bytes,
-     discarded and pristine, ARE the ∀-context string fact
-     [ctx_string_all].  Main could only sketch this -- its twin is
-     degenerate -- and here it is one line over the byte mint above,
-     because the mint is per-BYTE and the ∀ costs nothing when every
-     premise is persistent.  The justification is [llb]'s [t = 0] arm,
-     which mentions no context: THAT is why the clean arm is [llb]-shaped.
-
-     [KernelDataInv.kernel_data_string_all] does not need to go through
-     this lemma -- it holds [kernel_data]'s ∀ already, and the boot carve
-     built THAT ∀ exactly this way, one byte at a time -- so this is the
-     form for a producer holding raw image bytes plus their receipts
-     directly. *)
-  Lemma ctx_string_all_of_pristine `{KTR : !CurKtier}
-      (a : Arch.pa) (s : string) :
-    string_pointsto a DfracDiscarded s -∗
-    ([∗ list] j ↦ _ ∈ cstring_bytes s, pristine_va (pa_add a j)) -∗
-    ctx_string_all a DfracDiscarded s.
-  Proof.
-    rewrite /string_pointsto /ctx_string_all /ctx_string_pointsto.
-    iIntros "#Hm #Hpr" (ξ).
-    iApply big_sepL_intro. iIntros "!>" (j b Hj).
-    iDestruct (big_sepL_lookup _ _ j b with "Hm") as "Hmj"; [exact Hj|].
-    iDestruct (big_sepL_lookup _ _ j b with "Hpr") as "Hprj"; [exact Hj|].
-    iApply (ctx_pointsto_of_pristine_va ξ (pa_add a j) b with "Hmj Hprj").
-  Qed.
 
   (* ================================================================== *)
   (* THE PHYSICAL LEDGER BYTE, AND THE STORE GATE                       *)
@@ -2131,14 +1802,6 @@ Section ctx.
     rewrite ctx_phys_pointsto_forget /phys_pointsto. by iIntros "[_ $]".
   Qed.
 
-  Lemma ctx_phys_pointsto_agree ξ1 ξ2 a dq1 b1 dq2 b2 :
-    ctx_phys_pointsto ξ1 a dq1 b1 -∗ ctx_phys_pointsto ξ2 a dq2 b2 -∗
-    ⌜b1 = b2⌝.
-  Proof.
-    rewrite !ctx_phys_pointsto_forget /phys_pointsto.
-    iIntros "[H1 _] [H2 _]".
-    by iDestruct (pointsto_agree with "H1 H2") as %->.
-  Qed.
 
   (* THE VA FAMILY IS THIS ONE UNDER THE KMAP CLAIM.  Both directions:
      the ledger residue never moves, only the mapping plumbing does. *)
@@ -2215,13 +1878,6 @@ Section ctx.
     rewrite /phys_free /phys_pointsto. by iIntros "(% & % & [_ $] & _)".
   Qed.
 
-  Lemma phys_free_ne a1 a2 dq2 :
-    phys_free a1 (DfracOwn 1) -∗ phys_free a2 dq2 -∗ ⌜a1 ≠ a2⌝.
-  Proof.
-    rewrite /phys_free /phys_pointsto.
-    iIntros "(% & % & [H1 _] & _) (% & % & [H2 _] & _)".
-    by iDestruct (pointsto_ne with "H1 H2") as %?.
-  Qed.
 
   (* the REGISTERED byte forgets to the visibility-free one: the bit is
      dropped, and with it the load license, nothing else.  (The
@@ -2268,15 +1924,6 @@ Section ctx.
     by iApply ctx_phys_pointsto_free.
   Qed.
 
-  (* the tier weakening at this tier ([ktier_pin_mono]'s only content) *)
-  Lemma mem_free_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'}
-      (a : Arch.pa) (dq : dfrac) :
-    mem_free (KTR := kt) a dq ⊢ mem_free (KTR := kt') a dq.
-  Proof.
-    rewrite /mem_free. iIntros "(%ppn & #Hk & %Hc & %Hp & Hb)".
-    iExists ppn. iFrame "Hk Hb". iPureIntro. split; [exact Hc|].
-    exact (ktier_pin_mono kt kt' ppn a Hp).
-  Qed.
 
   (* ---------------------------------------------------------------- *)
   (* A6.61: THE TIER WEAKENING, the ctx twin of                        *)
@@ -2355,12 +2002,12 @@ Section ctx.
     - iIntros "Hgh Hts Hd Hold".
       (* pull the byte's OLD entry out of [Pold] *)
       assert (Ha : a ∈ dom Pold).
-      { rewrite Hdom dom_insert_L. set_solver. }
+      { rewrite Hdom dom_insert_L. by apply elem_of_union_l, elem_of_singleton. }
       apply elem_of_dom in Ha as [vo Hvo].
       iDestruct (big_sepM_delete _ _ a vo Hvo with "Hold") as "[Hb Hrest]".
       assert (Hdom2 : dom (delete a Pold) = dom P2).
       { rewrite dom_delete_L Hdom dom_insert_L.
-        assert (a ∉ dom P2) by (by apply not_elem_of_dom). set_solver. }
+        assert (a ∉ dom P2) by (by apply not_elem_of_dom). set_solver + H. }
       iMod (IH (delete a Pold) Hdom2 HD with "Hgh Hts Hd Hrest")
         as "(%D2 & %Hsub2 & %HD2 & Hgh & Hts & Hd & Hbig)".
       (* now the one byte *)
@@ -2381,12 +2028,12 @@ Section ctx.
         assert (Hin : a ∈ dom mem).
         { apply elem_of_dom_2 in Hmem. rewrite dom_union_L elem_of_union in Hmem.
           destruct Hmem as [Hx|Hx]; last done.
-          apply not_elem_of_dom in Hfresh. set_solver. }
-        set_solver. }
+          apply not_elem_of_dom in Hfresh. set_solver + Hx Hfresh. }
+        set_solver + Hin. }
       intros k. rewrite elem_of_union elem_of_singleton dom_insert_L.
       split.
-      + intros [Hk| ->]; last (right; simpl; set_solver).
-        apply HD2 in Hk as [Hk|[Hk1 Hk2]]; [by left|]. right. set_solver.
+      + intros [Hk| ->]; last (right; simpl; set_solver + P2).
+        apply HD2 in Hk as [Hk|[Hk1 Hk2]]; [by left|]. right. set_solver + Hk1 Hk2.
       + intros [Hk|[Hk1 Hk2]]; first (left; apply HD2; by left).
         apply elem_of_union in Hk2 as [Hk2|Hk2].
         * apply elem_of_singleton in Hk2. right. destruct k; cbn in *. by subst.
@@ -2668,7 +2315,6 @@ Section ctx.
   Proof. rewrite /phys_ledger_at. apply _. Qed.
 
 
-
   (* ---------------------------------------------------------------- *)
   (* THE CANON-PINNED LEDGER BYTE (tso-pin-memo.md §5.2; ruling 2).     *)
   (*                                                                   *)
@@ -2691,28 +2337,11 @@ Section ctx.
     Timeless (phys_ledger_pin a dq v t B Sv).
   Proof. rewrite /phys_ledger_pin. apply _. Qed.
 
-  Lemma phys_ledger_pin_ram a dq v t B Sv :
-    phys_ledger_pin a dq v t B Sv ⊢ ⌜addr_is_ram a⌝.
-  Proof.
-    iIntros "[Hp _]". rewrite /phys_pointsto. by iDestruct "Hp" as "[_ $]".
-  Qed.
 
   Lemma phys_ledger_pin_forget a dq v t B Sv :
     phys_ledger_pin a dq v t B Sv ⊢ phys_pointsto a dq v.
   Proof. by iIntros "[$ _]". Qed.
 
-  (* two pinned bytes, one fully owned, cannot name the same address *)
-  Lemma phys_ledger_pin_ne a1 a2 dq2 v1 v2 t1 t2 B1 B2 S1 S2 :
-    phys_ledger_pin a1 (DfracOwn 1) v1 t1 B1 S1 -∗
-    phys_ledger_pin a2 dq2 v2 t2 B2 S2 -∗ ⌜a1 ≠ a2⌝.
-  Proof.
-    iIntros "H1 H2".
-    iDestruct (phys_ledger_pin_forget with "H1") as "Hp1".
-    iDestruct (phys_ledger_pin_forget with "H2") as "Hp2".
-    iEval (rewrite /phys_pointsto) in "Hp1". iDestruct "Hp1" as "[Hp1 _]".
-    iEval (rewrite /phys_pointsto) in "Hp2". iDestruct "Hp2" as "[Hp2 _]".
-    by iDestruct (pointsto_ne with "Hp1 Hp2") as %?.
-  Qed.
 
   (* the OWNED footprint of a pinned store, per-address sets *)
   Definition pin_map_own (Pv : gmap Arch.pa (bv 8)) (dq : dfrac)
@@ -2731,9 +2360,6 @@ Section ctx.
     Timeless (phys_ledger_wpay a dq v t W).
   Proof. rewrite /phys_ledger_wpay. apply _. Qed.
 
-  Lemma phys_ledger_wpay_forget a dq v t W :
-    phys_ledger_wpay a dq v t W ⊢ phys_pointsto a dq v.
-  Proof. by iIntros "[$ _]". Qed.
 
   (* the window analogue of [pin_map_own]: the footprint a window store
      hands in.  Same shape, and the [Wf] is a FUNCTION of the address
@@ -2784,16 +2410,6 @@ Section ctx.
     iIntros "(%t & Hp & He)". iExists v, (t, ts_pay_none). iFrame.
   Qed.
 
-  Lemma phys_ledger_at_free a dq v t :
-    phys_ledger_at a dq v t ⊢ phys_free a dq.
-  Proof. rewrite phys_ledger_at_ledger. apply phys_ledger_free. Qed.
-
-  Lemma phys_ledger_pin_free a dq v t B Sv :
-    phys_ledger_pin a dq v t B Sv ⊢ phys_free a dq.
-  Proof.
-    rewrite /phys_ledger_pin /phys_free.
-    iIntros "[Hp He]". iExists v, (t, ts_pay_pin Sv B). iFrame.
-  Qed.
 
   Lemma phys_ledger_wpay_free a dq v t W :
     phys_ledger_wpay a dq v t W ⊢ phys_free a dq.
@@ -2904,13 +2520,6 @@ Section ctx.
     iSplit; by iPureIntro.
   Qed.
 
-  Lemma own_context_w_fold `{CID : CpuId} (ξ : CtxId) (W : nat) :
-    own_context_w ξ W -∗ llb loglen_name W -∗ own_context ξ.
-  Proof.
-    rewrite own_context_unseal /own_context_def.
-    iIntros "(%B & %K & %D & Hat & #HK & %HBK & %HDW & #Hoks) #HW".
-    iExists B, K, W, D. iFrame "Hat HK HW Hoks". iSplit; by iPureIntro.
-  Qed.
 
   (* the store's own message, registered as a dirty key of its context *)
   Lemma ctx_wrote_register `{CID : CpuId} (ξ : CtxId) (W i : nat)
@@ -3086,12 +2695,6 @@ Section ctx.
   Definition ledger_elem0 (a : Arch.pa) (dq : dfrac) : iProp Σ :=
     (a ↪[ts_name]{dq} (0%nat, ts_pay_none))%I.
 
-  Lemma phys_ledger_of_elem (a : Arch.pa) (dq : dfrac) (v : bv 8) :
-    phys_pointsto a dq v -∗ ledger_elem0 a dq -∗ phys_ledger a dq v.
-  Proof.
-    iIntros "Hp He". rewrite phys_ledger_unseal /phys_ledger_def.
-    iExists 0%nat. iFrame "Hp He".
-  Qed.
 
   (* ...AND THE TIMESTAMP-EXPOSED TWIN, WHICH IS THE SAME TERM (A6.80).
      [ledger_wpay_mint] asks for [phys_ledger_at … 0] -- "this byte is
@@ -3105,9 +2708,6 @@ Section ctx.
     phys_pointsto a dq v -∗ ledger_elem0 a dq -∗ phys_ledger_at a dq v 0%nat.
   Proof. iIntros "Hp He". rewrite /phys_ledger_at /ledger_elem0. iFrame. Qed.
 
-  Lemma phys_ledger_at0_elem (a : Arch.pa) (dq : dfrac) (v : bv 8) :
-    phys_ledger_at a dq v 0%nat ⊢ phys_pointsto a dq v ∗ ledger_elem0 a dq.
-  Proof. rewrite /phys_ledger_at /ledger_elem0. iIntros "$". Qed.
 
   Lemma ctx_phys_pointsto_of_elem (ξ : CtxId) (a : Arch.pa) (dq : dfrac)
       (v : bv 8) :
@@ -3164,38 +2764,11 @@ Section ctx.
     (⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
      [∗ list] j ∈ seq 0 8, phys_ledger (pa_add a j) dq (nth_byte w j))%I.
 
-  Lemma phys_ledger_word_unfold a dq w :
-    phys_ledger_word a dq w ⊣⊢
-    ⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
-    ([∗ list] j ∈ seq 0 8, phys_ledger (pa_add a j) dq (nth_byte w j)).
-  Proof. reflexivity. Qed.
-
-  Lemma phys_ledger_word_aligned_p a dq w :
-    phys_ledger_word a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 8 = true⌝.
-  Proof. iIntros "[$ _]". Qed.
-
-  Lemma phys_ledger_word_bytes a dq w :
-    phys_ledger_word a dq w ⊢
-    [∗ list] j ∈ seq 0 8, phys_ledger (pa_add a j) dq (nth_byte w j).
-  Proof. iIntros "[_ $]". Qed.
-
-  Lemma phys_ledger_word_intro a dq w :
-    is_aligned_paddr (Physaddr a) 8 = true ->
-    ([∗ list] j ∈ seq 0 8, phys_ledger (pa_add a j) dq (nth_byte w j))
-    ⊢ phys_ledger_word a dq w.
-  Proof. iIntros (Hal) "H". by iFrame. Qed.
 
   Global Instance phys_ledger_word_timeless a dq w :
     Timeless (phys_ledger_word a dq w).
   Proof. rewrite /phys_ledger_word. apply _. Qed.
 
-  Lemma phys_ledger_word_forget a dq w :
-    phys_ledger_word a dq w ⊢ phys_word_pointsto a dq w.
-  Proof.
-    iIntros "[%Hal Hb]". rewrite /phys_word_pointsto. iSplitR; first done.
-    iApply (big_sepL_impl with "Hb"). iIntros "!>" (k j _) "H".
-    by iApply phys_ledger_forget.
-  Qed.
 
   (* ---------------------------------------------------------------- *)
   (* THE PINNED WORD TOWER (tso-pin-memo.md §5.4; A6.53's ruling 1).     *)
@@ -3214,23 +2787,6 @@ Section ctx.
      [∗ list] j ∈ seq 0 8, ∃ t : nat,
        phys_ledger_pin (pa_add a j) dq (nth_byte w j) t B (Sf j))%I.
 
-  Lemma phys_ledger_word_pin_unfold a dq w B Sf :
-    phys_ledger_word_pin a dq w B Sf ⊣⊢
-    ⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
-    ([∗ list] j ∈ seq 0 8, ∃ t : nat,
-       phys_ledger_pin (pa_add a j) dq (nth_byte w j) t B (Sf j)).
-  Proof. reflexivity. Qed.
-
-  Lemma phys_ledger_word_pin_aligned_p a dq w B Sf :
-    phys_ledger_word_pin a dq w B Sf ⊢
-    ⌜is_aligned_paddr (Physaddr a) 8 = true⌝.
-  Proof. iIntros "[$ _]". Qed.
-
-  Lemma phys_ledger_word_pin_bytes a dq w B Sf :
-    phys_ledger_word_pin a dq w B Sf ⊢
-    [∗ list] j ∈ seq 0 8, ∃ t : nat,
-      phys_ledger_pin (pa_add a j) dq (nth_byte w j) t B (Sf j).
-  Proof. iIntros "[_ $]". Qed.
 
   Lemma phys_ledger_word_pin_intro a dq w B Sf :
     is_aligned_paddr (Physaddr a) 8 = true ->
@@ -3243,33 +2799,6 @@ Section ctx.
     Timeless (phys_ledger_word_pin a dq w B Sf).
   Proof. rewrite /phys_ledger_word_pin. apply _. Qed.
 
-  (* the pinned word forgets to the RAW physical word -- which is all the
-     pure memory facts of the walk lane ever wanted of a slot, and is why
-     [PtTree.pt_slot_own_forget] stays a one-liner at both arms.  It does
-     NOT forget to [phys_ledger_word]: that tier's element is [None] by
-     definition, so the two are incomparable and the A6.21 remark about the
-     registered tier being "strictly stronger" no longer applies to the
-     KERNEL arm.  Nothing used it. *)
-  Lemma phys_ledger_word_pin_forget a dq w B Sf :
-    phys_ledger_word_pin a dq w B Sf ⊢ phys_word_pointsto a dq w.
-  Proof.
-    iIntros "[%Hal Hb]". rewrite /phys_word_pointsto. iSplitR; first done.
-    iApply (big_sepL_impl with "Hb"). iIntros "!>" (k j _) "(%t & H)".
-    by iApply phys_ledger_pin_forget.
-  Qed.
-
-  (* the set family may be replaced by a pointwise-equal one -- which is
-     what makes the pin survive its OWN A/D write-back: the written word's
-     set family is the old one ([PtTree.pte_slot_set_set_ad]). *)
-  Lemma phys_ledger_word_pin_sets a dq w B (Sf Sg : nat -> TsoMemPa.byteset) :
-    (forall j, (j < 8)%nat -> Sf j = Sg j) ->
-    phys_ledger_word_pin a dq w B Sf ⊢ phys_ledger_word_pin a dq w B Sg.
-  Proof.
-    intros HS. iIntros "[%Hal Hb]". iSplitR; first done.
-    iApply (big_sepL_impl with "Hb"). iIntros "!>" (k j Hk) "H".
-    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
-    by rewrite (HS (0 + k)%nat ltac:(lia)).
-  Qed.
 
   (* the REGISTERED byte forgets to the unregistered one -- the bit is what
      is dropped, and with it the load license, nothing else *)
@@ -3320,21 +2849,6 @@ Section ctx.
        a ↪[ts_name]{DfracOwn (1/2)} (t, TsoMemPa.ts_pay_none) ∗
        (llb (ctx_bound_name ξ) t ∨ dset_in (ctx_dirty_name ξ) (t, a)))%I.
 
-  Lemma ctx_phys_pointsto_split (ξ : CtxId) (a : Arch.pa) (v : bv 8) :
-    ctx_phys_pointsto ξ a (DfracOwn 1) v ⊢
-    ctx_phys_pointsto_h ξ a v ∗ phys_ledger a (DfracOwn (1/2)) v.
-  Proof.
-    rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def /ctx_phys_pointsto_h
-            phys_ledger_unseal /phys_ledger_def /phys_pointsto.
-    iIntros "(%t & [Hp %Hr] & Hts & Harm)".
-    iEval (rewrite (fractional_half (pointsto (L := Arch.pa) (V := bv 8) a (DfracOwn 1) v)))
-      in "Hp".
-    iEval (rewrite (fractional_half (a ↪[ts_name] (t, TsoMemPa.ts_pay_none)))) in "Hts".
-    iDestruct "Hp" as "[Hp1 Hp2]". iDestruct "Hts" as "[Ht1 Ht2]".
-    iSplitL "Hp1 Ht1 Harm".
-    { iExists t. iFrame "Ht1 Harm Hp1". by iPureIntro. }
-    iExists t. iFrame "Ht2 Hp2". by iPureIntro.
-  Qed.
 
   Lemma ctx_phys_pointsto_join (ξ : CtxId) (a : Arch.pa) (v v' : bv 8) :
     ctx_phys_pointsto_h ξ a v -∗ phys_ledger a (DfracOwn (1/2)) v' -∗
@@ -3479,7 +2993,7 @@ Section ctx.
       iDestruct (big_sepM_delete _ _ a vo Hvo with "Hold") as "[Hb Hrest]".
       assert (Hdom2 : dom (delete a Pold) = dom P2).
       { rewrite dom_delete_L Hdom dom_insert_L.
-        assert (a ∉ dom P2) by (by apply not_elem_of_dom). set_solver. }
+        assert (a ∉ dom P2) by (by apply not_elem_of_dom). set_solver + H. }
       iMod (IH (delete a Pold) Hdom2 with "Hgh Hts Hrest")
         as "(%Hsub2 & Hgh & Hts & Hbig)".
       rewrite phys_ledger_unseal /phys_ledger_def.
@@ -3495,8 +3009,8 @@ Section ctx.
         assert (Hin : a ∈ dom mem).
         { apply elem_of_dom_2 in Hmem. rewrite dom_union_L elem_of_union in Hmem.
           destruct Hmem as [Hx|Hx]; last done.
-          apply not_elem_of_dom in Hfresh. set_solver. }
-        set_solver. }
+          apply not_elem_of_dom in Hfresh. set_solver + Hx Hfresh. }
+        set_solver + Hin. }
       rewrite /phys_ledger_at. iFrame "Hpt Hte".
   Qed.
 
@@ -3563,7 +3077,7 @@ Section ctx.
       iDestruct (big_sepM_delete _ _ a vo Hvo with "Hold") as "[Hb Hrest]".
       assert (Hdom2 : dom (delete a Pold) = dom P2).
       { rewrite dom_delete_L Hdom dom_insert_L.
-        assert (a ∉ dom P2) by (by apply not_elem_of_dom). set_solver. }
+        assert (a ∉ dom P2) by (by apply not_elem_of_dom). set_solver + H. }
       iMod (IH (delete a Pold) Hdom2 with "Hgh Hts Hrest")
         as "(%Hsub2 & %Hold2 & Hgh & Hts & Hbig)".
       iDestruct "Hb" as "(%t & Hpt & Hte)".
@@ -3583,8 +3097,8 @@ Section ctx.
         assert (Hin : a ∈ dom mem).
         { apply elem_of_dom_2 in Hmem. rewrite dom_union_L elem_of_union in Hmem.
           destruct Hmem as [Hx|Hx]; last done.
-          apply not_elem_of_dom in Hfresh. set_solver. }
-        set_solver. }
+          apply not_elem_of_dom in Hfresh. set_solver + Hx Hfresh. }
+        set_solver + Hin. }
       iSplitR.
       { iPureIntro. intros a' Ha'. rewrite dom_insert_L elem_of_union in Ha'.
         destruct Ha' as [Ha'|Ha'].
@@ -3756,7 +3270,7 @@ Section ctx.
       iDestruct (big_sepM_delete _ _ a vo Hvo with "Hold") as "[Hb Hrest]".
       assert (Hdom2 : dom (delete a Pold) = dom P2).
       { rewrite dom_delete_L Hdom dom_insert_L.
-        assert (a ∉ dom P2) by (by apply not_elem_of_dom). set_solver. }
+        assert (a ∉ dom P2) by (by apply not_elem_of_dom). set_solver + H. }
       iMod (IH (delete a Pold) Hdom2 with "Hgh Hts Hrest")
         as "(%Hsub2 & %Hold2 & Hgh & Hts & Hbig)".
       iDestruct "Hb" as "(%t & Hpt & Hte)".
@@ -3776,8 +3290,8 @@ Section ctx.
         assert (Hin : a ∈ dom mem).
         { apply elem_of_dom_2 in Hmem. rewrite dom_union_L elem_of_union in Hmem.
           destruct Hmem as [Hx|Hx]; last done.
-          apply not_elem_of_dom in Hfresh. set_solver. }
-        set_solver. }
+          apply not_elem_of_dom in Hfresh. set_solver + Hx Hfresh. }
+        set_solver + Hin. }
       iSplitR.
       { iPureIntro. intros a' Ha'. rewrite dom_insert_L elem_of_union in Ha'.
         destruct Ha' as [Ha'|Ha'].
@@ -4089,7 +3603,7 @@ Section ctx.
     assert (Hsplit : mm = Pold ∪ (mm ∖ Pold))
       by (symmetry; by apply map_difference_union).
     assert (Hdisj2 : Pnew ##ₘ mm ∖ Pold).
-    { apply map_disjoint_dom. rewrite dom_difference_L -Hdom. set_solver. }
+    { apply map_disjoint_dom. rewrite dom_difference_L -Hdom. set_solver + Pold. }
     assert (Hjoin : Pnew ∪ mm = Pnew ∪ (mm ∖ Pold)).
     { apply map_eq. intros a. destruct (Pnew !! a) as [b|] eqn:Hp.
       - by rewrite !(lookup_union_Some_l _ _ _ _ Hp).
@@ -4771,22 +4285,6 @@ Section ctx.
     rewrite Hgm in Hgm0. injection Hgm0 as <-. by iPureIntro.
   Qed.
 
-  (* the floor a payload carries is a real log position -- the receipt
-     comparison every reader of a floored cell has to make *)
-  Lemma ledger_wpay_floor_le (g : gstate) (a : Arch.pa) (dq : dfrac)
-      (v : bv 8) (t : nat) (W : ts_win) :
-    tso_interp_at riscv_eraGS g -∗
-    phys_ledger_wpay a dq v t W -∗
-    ⌜(tw_lo W <= length g.(glog))%nat⌝.
-  Proof.
-    iIntros "Hint [_ Hts]".
-    iDestruct "Hint"
-      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
-    destruct Hmm as (Hmm & Hera).
-    iDestruct (ghost_map_lookup with "Hauth Hts") as %HTM.
-    pose proof (ts_ok_win _ _ _ _ _ _ (Htie _ _ HTM) eq_refl) as Hw.
-    destruct Hw as (_ & _ & _ & _ & Hlo & _). by iPureIntro.
-  Qed.
 
   (* THE GHOST STEP, at an ALREADY-PROVED window claim.  Splitting the
      pure content off is what lets the window form below establish
@@ -4983,38 +4481,10 @@ Section ctx.
   Proof. iIntros "[$ _]". Qed.
 
 
-  (* THE MINT, off the store gate's own message fragment: a word this hart
-     JUST WROTE is visible to it at every view, by forwarding. *)
-  Lemma phys_ledger_word4_vis_of_store (h : agent) (i : nat)
-      (a : Arch.pa) (w : bv 32) (msg : pwmsg) :
-    pm_tid msg = h ->
-    is_aligned_paddr (Physaddr a) 4 = true ->
-    ledger_msg_at i msg -∗
-    ([∗ list] j ∈ seq 0 4,
-       phys_ledger_at (pa_add a j) (DfracOwn 1) (nth_byte w j) (S i)) -∗
-    phys_ledger_word4_vis h 0 a (DfracOwn 1) w.
-  Proof.
-    intros Hh Hal. iIntros "#Hm Hb".
-    rewrite /phys_ledger_word4_vis. iSplitR; [done|].
-    iApply (big_sepL_impl with "Hb"). iIntros "!>" (k j _) "Hbj".
-    iExists (S i). iFrame "Hbj". rewrite /ledger_vis.
-    iRight. iExists i, msg. iFrame "Hm". by iPureIntro.
-  Qed.
-
   Lemma phys_ledger_word4_aligned_p a dq w :
     phys_ledger_word4 a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 4 = true⌝.
   Proof. iIntros "[$ _]". Qed.
 
-  Lemma phys_ledger_word4_bytes a dq w :
-    phys_ledger_word4 a dq w ⊢
-    [∗ list] j ∈ seq 0 4, phys_ledger (pa_add a j) dq (nth_byte w j).
-  Proof. iIntros "[_ $]". Qed.
-
-  Lemma phys_ledger_word4_intro a dq w :
-    is_aligned_paddr (Physaddr a) 4 = true ->
-    ([∗ list] j ∈ seq 0 4, phys_ledger (pa_add a j) dq (nth_byte w j))
-    ⊢ phys_ledger_word4 a dq w.
-  Proof. iIntros (Hal) "H". by iFrame. Qed.
 
   Global Instance phys_ledger_word4_timeless a dq w :
     Timeless (phys_ledger_word4 a dq w).
@@ -5030,14 +4500,6 @@ Section ctx.
     by iApply ctx_pointsto_ledger_kt0.
   Qed.
 
-  Lemma ctx_word_ledger_kt0 (ξ : CtxId) (a : Arch.pa) (dq : dfrac) (w : bv 64) :
-    ctx_word_pointsto (KTR := KT0) ξ a dq w ⊢ phys_ledger_word a dq w.
-  Proof.
-    rewrite ctx_word_pointsto_unfold /phys_ledger_word.
-    iIntros "[$ Hb]".
-    iApply (big_sepL_impl with "Hb"). iIntros "!>" (k j _) "H".
-    by iApply ctx_pointsto_ledger_kt0.
-  Qed.
 
   (* ---- THE HOLDER'S READ, at a cell whose payload is set ----
      [ledger_read_vis_ok]'s twin for a WPAY cell.  Same proof: the
@@ -5102,12 +4564,6 @@ Section ctx.
     iPureIntro. intros tv' Htv' j Hj. apply HH; [lia|exact Htv'].
   Qed.
 
-  (* a windowed byte is RAM, like every other ledger byte *)
-  Lemma phys_ledger_wpay_ram a dq v t W :
-    phys_ledger_wpay a dq v t W ⊢ ⌜addr_is_ram a⌝.
-  Proof.
-    iIntros "[Hp _]". rewrite /phys_pointsto. by iDestruct "Hp" as "[_ $]".
-  Qed.
 
   (* ---- THE WINDOW STORE, in the shape the two cpu-field stores want ----
      [ledger_store_win_pin_ok]'s twin: the payload's [z], [cp] and FLOOR
@@ -5294,35 +4750,6 @@ Section ctx.
     iModIntro. iFrame "Hgh Hint Hnew Hmsg".
   Qed.
 
-  (* the fragment-dropping form, kept for its existing caller
-     ([SmodeCorePt.word_pointsto_wpay_mint_c]'s pre-A6.120 shape). *)
-  Lemma ledger_store_win_wpay_mint_ok `{CID : CpuId} (g g' : gstate)
-      (pa : Arch.pa) (n : N) {m : N} (vold vnew : bv m)
-      (cp : agent -> nat -> bv 8) :
-    (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->
-    g'.(gimg) = g.(gimg) ->
-    g'.(glog) = (g.(glog) ++ [PWMsg (snap_of pa n vnew) (hart_agent cpu_id)])%list ->
-    g'.(gmem) = write_bytes g.(gmem) pa n vnew ->
-    (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
-    (forall c : CPU, (g'.(gtv) c <= length g'.(glog))%nat) ->
-    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
-    tso_interp_at riscv_eraGS g -∗
-    ([∗ list] j ∈ seq 0 (N.to_nat n),
-       phys_ledger (pa_add pa j) (DfracOwn 1) (nth_byte vold j)) ==∗
-    gen_heap_interp (hG := riscv_memGS) g'.(gmem) ∗
-    tso_interp_at riscv_eraGS g' ∗
-    ([∗ list] j ∈ seq 0 (N.to_nat n),
-       phys_ledger_wpay (pa_add pa j) (DfracOwn 1) (nth_byte vnew j)
-         (S (length g.(glog)))
-         (TsWin pa (N.to_nat n) j (nth_byte vnew) cp
-            (fun _ => Some (S (length g.(glog)))) (S (length g.(glog))))).
-  Proof.
-    iIntros (Hn Himg Hlog Hmem Htv Htvok') "Hgh Hint Hold".
-    iMod (ledger_store_win_wpay_mint_frag_ok g g' pa n vold vnew cp
-            Hn Himg Hlog Hmem Htv Htvok' with "Hgh Hint Hold")
-      as "(Hgh & Hint & Hnew & _)".
-    iModIntro. iFrame "Hgh Hint Hnew".
-  Qed.
 
   (* (2) THE READ, and it is a PROJECTION: the pin's tie IS the           *)
   (* conclusion, so all this does is turn the reader's receipt into       *)
@@ -5602,13 +5029,6 @@ Section ctx.
     Persistent (rel_floor_vis h K n tf).
   Proof. rewrite /rel_floor_vis. apply _. Qed.
 
-  Lemma rel_floor_vis_below (h : agent) (K n : nat) (tf : nat -> nat) :
-    (forall k, (k < n)%nat -> (tf k <= K)%nat) -> ⊢ rel_floor_vis h K n tf.
-  Proof.
-    intros Hle. rewrite /rel_floor_vis. iApply big_sepL_intro. iIntros "!>" (k j Hkj).
-    apply lookup_seq in Hkj as [-> Hj].
-    iApply (ledger_vis_below _ _ _ (Hle _ Hj)).
-  Qed.
 
   Lemma rel_floor_vis_visibleb `{CID : CpuId} (g : gstate) (K n : nat)
       (tf : nat -> nat) :
@@ -5899,41 +5319,6 @@ Section ctx.
     - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
   Qed.
 
-  (* THE READ GATE: the [nn] fragments at a common floor [lo], against a
-     view receipt at the floor -- one member word serves every byte, at
-     every view at or past the hart's. *)
-  Lemma ledger_read_pinw_ok `{CID : CpuId} (g : gstate) (base : Arch.pa)
-      (nn lo : nat) (Sw : (nat -> bv 8) -> Prop) (dq : dfrac)
-      (f : nat -> bv 8) :
-    (0 < nn)%nat ->
-    tso_interp_at riscv_eraGS g -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) lo -∗
-    ([∗ list] j ∈ seq 0 nn, ∃ t : nat,
-       phys_ledger_pinw (pa_add base j) dq (f j) t (TsPinw base nn j lo Sw)) -∗
-    ⌜forall tv : nat, (g.(gtv) cpu_id <= tv)%nat ->
-       exists fw : nat -> bv 8,
-         Sw fw /\
-         forall j, (j < nn)%nat ->
-           tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv (pa_add base j)
-           = Some (fw j)⌝.
-  Proof.
-    iIntros (Hn) "Hint #Hlo Hb".
-    iAssert (⌜forall j, (j < nn)%nat ->
-               pinw_ok1 g.(gimg) g.(glog) (pa_add base j)
-                 (TsPinw base nn j lo Sw)⌝)%I as %Hok.
-    { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
-      iDestruct (big_sepL_lookup _ (seq 0 nn) j j with "Hb") as (t) "Hbj".
-      { rewrite lookup_seq_lt; [reflexivity|lia]. }
-      iApply (ledger_pinw_ok g (pa_add base j) dq (f j) t _ with "Hint Hbj"). }
-    iDestruct "Hint"
-      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
-    iDestruct (view_auth_valid with "Hvw Hlo") as %Hlotv.
-    rewrite avf_hart in Hlotv.
-    iPureIntro. intros tv Htv.
-    apply (TsoMemPa.pinw_read g.(gimg) g.(glog) base nn lo Sw
-             (hart_agent cpu_id) tv Hn Hok).
-    apply TsoMemPa.visibleb_below. lia.
-  Qed.
 
   (* A6.146: the same gate, at the TWO-ARMED licence ([ledger_vis]) -- the
      window is readable below the receipt OR the reader authored the arm
@@ -6163,26 +5548,6 @@ Section ctx.
     destruct (HH j Hjn tv) as (c & Hc). by rewrite Hc.
   Qed.
 
-  (* ...and a WINDOWED cell supplies its own image coverage: [win_ok1]'s
-     conjunct (2).  So the free-path read of a cell that already carries the
-     racy payload costs nothing extra. *)
-  Lemma ledger_win_img_cover `{CID : CpuId} (g : gstate)
-      (base : Arch.pa) (n : nat) (dq : dfrac) (v : bv 8) (t j : nat)
-      (W : ts_win) :
-    tw_base W = base -> tw_n W = n ->
-    tso_interp_at riscv_eraGS g -∗
-    phys_ledger_wpay (pa_add base j) dq v t W -∗
-    ⌜forall k, (k < n)%nat -> is_Some (g.(gimg) !! pa_add base k)⌝.
-  Proof.
-    iIntros (Hb Hn) "Hint [_ He]".
-    iDestruct "Hint"
-      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
-    destruct Hmm as (Hmm & Hera).
-    iDestruct (ghost_map_lookup with "Hauth He") as %HTM.
-    pose proof (ts_ok_win _ _ _ _ _ _ (Htie _ _ HTM) eq_refl) as Hw.
-    destruct Hw as (_ & _ & _ & Hcov & _).
-    iPureIntro. intros k Hk. rewrite -Hb. apply Hcov. lia.
-  Qed.
 
   (* ...and the WORD form the leaf actually consumes: a byte that differs
      makes the assembled word differ.  [n = 8] at the lock, but stated at
@@ -6344,35 +5709,6 @@ Section ctx.
   Qed.
 
 
-  (* the window form, in the shape the plain read rule asks for: the slot
-     facts arrive one per byte, each with its OWN timestamp under the same
-     receipt (a page-table page is written slot by slot, so a single [t]
-     for the whole window would be a lie). *)
-  Lemma ledger_read_ok `{CID : CpuId} (g : gstate)
-      (a : Arch.pa) (n : N) {m : N} (w : bv m) (dq : dfrac) (F : nat) :
-    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
-    tso_interp_at riscv_eraGS g -∗
-    view_lb view_name loglen_name (hart_agent cpu_id) F -∗
-    ([∗ list] j ∈ seq 0 (N.to_nat n),
-       ∃ t : nat, ⌜(t ≤ F)%nat⌝ ∗
-         phys_ledger_at (pa_add a j) dq (nth_byte w j) t) -∗
-    ⌜forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
-       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv' a n w⌝.
-  Proof.
-    iIntros "Hgh Hint #HF Hb".
-    iAssert (⌜forall j : nat, (N.of_nat j < n)%N ->
-               forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
-                 tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv' (pa_add a j)
-                 = Some (nth_byte w j)⌝)%I as %HH.
-    { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
-      iDestruct (big_sepL_lookup _ (seq 0 (N.to_nat n)) j j with "Hb")
-        as (t) "[%HtF Hbj]".
-      { rewrite lookup_seq_lt; [reflexivity|lia]. }
-      iApply (ledger_read_at_ok g (pa_add a j) dq (nth_byte w j) t F HtF
-                with "Hgh Hint HF Hbj"). }
-    iPureIntro. intros tv' Htv' j Hj. exact (HH j Hj tv' Htv').
-  Qed.
-
   (* ---------------------------------------------------------------- *)
   (* THE 8-BYTE PHYSICAL LEDGER WORD -- [phys_word_pointsto]'s twin, and *)
   (* the resource THREE of A6.14's four members actually hold ([↦ₚ₈]):   *)
@@ -6423,13 +5759,6 @@ Section ctx.
     by iApply ctx_phys_pointsto_forget.
   Qed.
 
-  Lemma ctx_phys_word_ledger ξ a dq w :
-    ctx_phys_word_pointsto ξ a dq w ⊢ phys_ledger_word a dq w.
-  Proof.
-    iIntros "[%Hal Hb]". rewrite /phys_ledger_word. iSplitR; first done.
-    iApply (big_sepL_impl with "Hb"). iIntros "!>" (k j _) "H".
-    by iApply ctx_phys_pointsto_ledger.
-  Qed.
 
   (* ---------------------------------------------------------------- *)
   (* THE IDENTITY-MAPPED CROSSING between the VA ledger family and the  *)
@@ -6669,10 +5998,6 @@ Section main_compat.
 
   (* main's [log_lb] is the flip's [llb] at the era's log-length name. *)
   Definition log_lb (lo : nat) : iProp Σ := TsoGhost.llb loglen_name lo.
-  Lemma log_lb_0 : ⊢ log_lb 0.
-  Proof. iApply TsoGhost.llb_0. Qed.
-  Lemma log_lb_le (K K' : nat) : (K' ≤ K)%nat -> log_lb K -∗ log_lb K'.
-  Proof. intros H. iApply TsoGhost.llb_le. exact H. Qed.
   Global Instance log_lb_persistent lo : Persistent (log_lb lo).
   Proof. apply _. Qed.
   Global Instance log_lb_timeless lo : Timeless (log_lb lo).
@@ -6684,10 +6009,6 @@ Section main_compat.
     (⌜(t ≤ K)%nat⌝ ∨ ∃ a : Arch.pa, ctx_wrote ξ t a)%I.
   Global Instance ctx_vis_persistent ξ K t : Persistent (ctx_vis ξ K t).
   Proof. rewrite /ctx_vis. apply _. Qed.
-  Lemma ctx_vis_below ξ K t : (t ≤ K)%nat -> ⊢ ctx_vis ξ K t.
-  Proof. iIntros (Hle). iLeft. by iPureIntro. Qed.
-  Lemma ctx_vis_own ξ K t (a : Arch.pa) : ctx_wrote ξ t a -∗ ctx_vis ξ K t.
-  Proof. iIntros "#Hw". iRight. by iExists a. Qed.
 
   (* the structural [CtxMorph] combinators main added (body-independent) *)
   Global Instance ctx_morph_or (R1 R2 : CtxId → iProp Σ) :
