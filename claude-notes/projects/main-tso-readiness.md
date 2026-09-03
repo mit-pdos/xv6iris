@@ -2067,11 +2067,9 @@ from the rodata range's ledger elements (`BootCarve.boot_led_ran_persist`,
 unbound; the `_CoqProject` note says how to un-park).
 
 Certification: a CLEAN `iris/` build on the VM (every `.vo` removed first):
-1429 files, `make -k` exit 0, no error.  Remaining `Admitted`: 16 in 13
-files (CtxBox, FileInvDefs, FsShPin, IcacheEscrow, ProcInv, ProofIalloc,
-ProofKexecB, ProofKexecPinnedA, ProofKforkMain, ProofSyscall, ProofKexecA,
-ProofVirtioDiskRwF, UkShParse) -- the pre-existing main set plus the r25
-skeletons still tagged; outside the gate per item 7.  `origin/main` merged
+1429 files, `make -k` exit 0, no error.  `Admitted`: NONE -- `grep
+'^ *Admitted\.' iris/*.v` is empty (an earlier draft of this amendment
+counted comment mentions of the word; corrected).  `origin/main` merged
 (the xv6 upstream URL; the dead-import sweep and its revert).
 `make audit-only` (`Print Assumptions xv6_fs_adequacy_xv6Σ`): exactly the
 thirteen expected axioms (functional_extensionality_dep, the two
