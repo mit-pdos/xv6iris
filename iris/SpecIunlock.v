@@ -83,7 +83,7 @@ Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import SleepLock.
 Require Import Xv6Cameras.
 Require Import DinodeEnc.
-Require Import InodeInv.
+Require Import BlkmapDefs.
 Require Import InodeLock.
 Require Import IcacheRef.
 Require Import IrefSlots.

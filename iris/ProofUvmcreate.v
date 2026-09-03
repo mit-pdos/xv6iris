@@ -23,9 +23,7 @@ Require Import WpLock.
 Require Import CalleeSaved StackOwn.
 Require Import CpuOwn.
 Require Import KallocInv.
-Require Import KMap.            (* mem_page_to_phys *)
 Require Import PtBuild KptPt KptTree KvmSpec.
-Require Import WpMemsetPage.    (* bytes_choose *)
 Require Import CodeUvmcreate.
 Require Import SpecKalloc SpecMemset SpecUvmcreate.
 From Kernel Require KernelSyms.

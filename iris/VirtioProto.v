@@ -59,8 +59,6 @@ Notation phys_ledger_def := TsoCtx.phys_ledger_def.
 Notation phys_ledger_at_ledger := TsoCtx.phys_ledger_at_ledger.
 Notation rel_cells := TsoCtx.rel_cells.
 Notation rel_pre_cells := TsoCtx.rel_pre_cells.
-Require Import DiskAddrs.   (* [disk.info[i].b] -- the receipt names it *)
-Require Import BufOwn.      (* [b_disk] *)
 Require Import PermInv.
 
 Local Open Scope Z_scope.

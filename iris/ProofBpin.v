@@ -51,7 +51,7 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import BufOwn BcacheInv BioInv ProofBreadParts SieCapCtx.
+Require Import BcacheInv BioInv ProofBreadParts.
 Require Import CodeBpin.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecBpin.

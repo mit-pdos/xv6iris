@@ -79,7 +79,7 @@ From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gmap ufrac.
 From iris.base_logic.lib Require Import own ghost_var invariants.
 Require Import RiscvLang RiscvPtsto.
-Require Import TsoMemPa TsoGhost.
+Require Import TsoGhost.
 Require Import TsoCtx.
 Require Import TsoCtxPark.
 Require Import TsoCtxAbsorbLb.

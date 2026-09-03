@@ -26,11 +26,9 @@ From iris.algebra Require Import auth dfrac.
 From iris.base_logic.lib Require Import invariants gen_heap own mono_nat.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExec Ktier.
+Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExec.
 Require Import TsoMemPa TsoGhost TsoCtx.
-Require Import HartTp.
 Require Import CtxPinw.
-Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import Xv6G.

@@ -73,7 +73,6 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import DiskPtsto DiskInv.
 Require Import WpLock.
-Require Import SleepLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import ByteCursor.
 Require Import ByteBuf.

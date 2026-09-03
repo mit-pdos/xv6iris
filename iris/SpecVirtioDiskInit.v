@@ -98,7 +98,6 @@ Require Import KvmSpec.
 Require Import VirtioModel.
 Require Import DiskPtsto.
 Require Import VirtioProto.
-Require Import VirtioQueue.   (* [ring_bytes] *)
 Require Import DiskAvail.
 Require Import WpUart.
 Require Import IntrDefs.

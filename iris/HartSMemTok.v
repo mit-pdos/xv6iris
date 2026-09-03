@@ -36,13 +36,12 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values
         SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes TsoMemPa.
+Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartEvents HartMPmp HartMFetch HartMFrame
         HartMLoad HartMStore.
 Require Import RiscvExtras RiscvFetchExec.
 Require Import RegFile WpGpr.
-Require Import WpMmodeLeafBase SmodePte PtTreeAdue.
 Require Import TsoCtx.
 Require Import HartSMem.
 Local Open Scope Z_scope.

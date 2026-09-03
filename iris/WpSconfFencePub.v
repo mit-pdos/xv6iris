@@ -31,14 +31,12 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import InstrBytes RegFile HartTp WpNext.
-Require Import RiscvExtras.
-Require Import WpMmodeLeafBase.
-Require Import HartSwp HartLift HartEvents HartBarrier.
+Require Import InstrBytes RegFile WpNext.
+Require Import HartSwp HartBarrier.
 Require Import WpSconfEngine.
 Require Import IntrDefs WpIntrInv WpSmodeIntr.
 Require Import Xv6G.
-Require Import TsoMemPa TsoGhost TsoCtx.
+Require Import TsoCtx.
 Import Defs.
 
 (* THE DISPATCH FACT, once: `fence rw,rw`'s effective sets keep bits [1:0]

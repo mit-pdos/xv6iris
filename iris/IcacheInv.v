@@ -66,7 +66,6 @@ Require Import WpSconfMem.  (* [wordw_claim]: the pinw read leaves need it *)
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import RiscvModelBytes.  (* [nth_byte]/[bv_eq_of_bytes]: A6.145's
    word-set pin states the count word per byte *)
-Require Import CtxPinw.  (* A6.145: the word-set pin's store/read kit *)
 
 (* ====================================================================== *)
 Require Import LogInv.

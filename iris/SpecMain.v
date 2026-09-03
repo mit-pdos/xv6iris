@@ -182,7 +182,6 @@ From Kernel Require KernelSyms.
 Require Import WaitInv.   (* [wait_res] -- what wait_lock is over *)
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx.
 
 
 (* main's stack budget: its own 16-byte / 2-slot frame over its deepest

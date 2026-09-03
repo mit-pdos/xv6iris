@@ -37,7 +37,7 @@ From iris.base_logic.lib Require Import own ghost_var invariants.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvLang RiscvPtsto.
-Require Import TsoMemPa TsoGhost TsoCtx CtxBox.   (* [llb loglen_name], [ufrac] stamps *)
+Require Import TsoGhost TsoCtx CtxBox.   (* [llb loglen_name], [ufrac] stamps *)
 Require Import WpSconfMem.   (* [wordw_free], [wordw_pointsto] -- the store's two faces *)
 Require Import FdSlots IrefSlots FileInvDefs FileInv OffBox.   (* [irefslotG] must be IMPORTED, or the binder below silently generalises it *)
 Require Import IcacheRef.   (* [NINODE], [ientry] *)

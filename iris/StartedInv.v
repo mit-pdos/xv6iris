@@ -56,7 +56,7 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExec Ktier.
 From Kernel Require KernelSyms.
-Require Import TsoMemPa TsoGhost TsoCtx TsoCtxMove TsoCtxAbsorbLb CtxMorphTac.
+Require Import TsoMemPa TsoGhost TsoCtx TsoCtxAbsorbLb.
 Require Import HartTp WpSconfMem.
 Local Open Scope Z_scope.
 

@@ -39,7 +39,7 @@ Require Import Xv6Cameras.
 Require Import ProcGeom.
 Require Import LogInv.
 Require Import BitmapInv.
-Require Import InodeInv.
+Require Import BlkmapDefs.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.

@@ -45,8 +45,8 @@ From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartEvents.
-Require Import TsoMemPa TsoGhost.
+Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartEvents.
+Require Import TsoMemPa.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 

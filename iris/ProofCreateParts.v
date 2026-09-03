@@ -48,7 +48,7 @@ Require Import KernelDataInv.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
-Require Import InodeInv.
+Require Import BlkmapDefs.
 Require Import InodeLock.
 Require Import SpecIalloc.
 Require Import SpecCreate.

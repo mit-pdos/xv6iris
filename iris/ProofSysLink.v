@@ -106,7 +106,6 @@ Require Import DirentEnc.
 Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
-Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.

@@ -20,7 +20,6 @@ Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KallocInv.
-Require Import KMap.   (* mem_page_to_phys: kalloc-page ↦ₘ → ↦ₚ for the PT node *)
 Require Import CtxKMap.   (* A6.68: the same disassembly AT THE CONTEXT TOWER *)
 Require Import WpLock.
 Require Import CommonWalk PtTree.
@@ -33,7 +32,6 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecMemset.
 Require Import SpecKalloc.
 Require Import CodeWalk.
-Require Import WpMemsetPage.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import SpecWalk.

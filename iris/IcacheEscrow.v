@@ -206,7 +206,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* R3.3 (endgame §4.2): the box instance lives here -- its kit *)
 From Stdlib Require Import QArith Qcanon.
 From iris.algebra Require Import ufrac.
-Require Import TsoMemPa TsoGhost.
+Require Import TsoGhost.
 Require Import CtxBox.
 Require Import OffBox.   (* [off_rows] / [off_rows_dep] -- ip->lock's payload carries the off rows (r25 shapes) *)
 Require Import CtxMorphTac.   (* [ctx_morph_solve] -- the three [itable_res2*] instances (r25 pass 1) *)

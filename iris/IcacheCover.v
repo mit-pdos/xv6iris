@@ -22,35 +22,21 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants own ghost_map ghost_var mono_nat.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvPtsto RiscvExtras.
-Require Import WpLock.
-Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
+Require Import RiscvPtsto.
+Require Import Xv6Cameras.
 Require Import FsBlocks.
-Require Import DinodeEnc.
-Require Import DirView.
-Require Import FsTree.        (* [dir_uniq] -- the name-uniqueness payload clause *)
-Require Import InodeInv.
-Require Import InodeLock.
-Require Import SleepLock.  (* [is_sleeplock_gen] / [slh_tok] -- see [ic_sleeplocks] below *)
+Require Import IcacheRef.
 Require Import InodeRegion.
-Require Import FsState.
-Require Import FsBytesGamma.
+Require Import FsStateInode.
 Require Import LogDefs.       (* [fs_home_set] -- [ic_loaded_open]'s row *)
 Require Import TxPin.
 Require Import FsStateEra.
-Require Import EscrowDefs.
-Require Import EscrowInode.   (* OPTION A: pool_pending, reg_full *)
 Require Import IrefSlots.
-Require Import IgetLic.
-Require Import IcacheInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 From Stdlib Require Import QArith Qcanon.
 From iris.algebra Require Import ufrac.
-Require Import TsoMemPa TsoGhost.
-Require Import CtxBox.
-Require Import SepThread.   (* the boot threads own_context through the slots *)
 Require Import TsoCtx.
 Require Import CtxBox.
 Require Import IcacheEscrow.

@@ -27,7 +27,7 @@ From iris.algebra Require Import csum excl agree.
 From iris.base_logic.lib Require Import own.
 From iris.proofmode Require Import proofmode.
 Require Import RiscvPtsto.
-Require Import TsoMemPa TsoGhost.   (* A6.71: [llb] rides inside [kpt_bound] *)
+Require Import TsoGhost.   (* A6.71: [llb] rides inside [kpt_bound] *)
 Require Import PtTree.
 
 Section KptGhost.

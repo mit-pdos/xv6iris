@@ -23,7 +23,6 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import MinstretInv InstrBytes.
 Require Import RiscvExtras.
 Require Import SmodePte.
 Require Import PtreeType PtTree PtBytes KptTree UptTree TrampPt.
@@ -31,9 +30,8 @@ Require Import CommonWalk Pt4kWalk KptPt PtAdBits PtTreeAdue SRegime.
 Require Import UserBytes UserFetchCert PtWalkCert UserClassifyAsm.
 Require Import HartSwp HartLift HartSpan HartSFrame HartMemRun.
 Require Import WpDecodeBridge KptGoodb.
-Require Import SmodeCorePt TrampStepPt WpSmodePtEngine.
+Require Import WpSmodePtEngine.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.

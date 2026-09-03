@@ -125,7 +125,6 @@ Require Import ByteBuf.
 Require Import VirtioModel VirtioQueue.
 Require Import DiskPtsto VirtioProto DiskInv WpUart WpVirtioDev.
 Require Import DiskBoot DiskAvail.
-Require Import WpMemsetPage.
 Require Import CodeVirtioDiskInit.
 Require Import SpecInitlock SpecKalloc SpecMemset SpecVirtioDiskInit.
 From Kernel Require KernelSyms.

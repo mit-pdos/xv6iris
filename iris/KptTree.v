@@ -46,7 +46,6 @@ Require Import SmodePte.
 Require Import PtAdBits.
 Require Import CommonWalk.
 Require Import PtTree.
-Require Import PtBytes.
 Require Import PtTreeAdue.
 Require Import KptPt.
 Require Import KptExecMap.
@@ -54,7 +53,6 @@ Require Import KMap.
 Require Import Pt4kWalk.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import TsoMemPa.
-Require Import TsoGhost.   (* A6.55: [view_lb] for the pin receipt *)
 Require Import TsoCtx.
 Require Import CtxValues.
 (* NO SHIM: the slot bridge is an ISOMORPHISM between the two LEDGER

@@ -35,7 +35,7 @@ Require Import BufOwn BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoMemPa TsoGhost.   (* [llb] *)
+Require Import TsoGhost.   (* [llb] *)
 Require Import CtxBox.              (* [reference], [max_stamp] *)
 Local Open Scope Z_scope.
 

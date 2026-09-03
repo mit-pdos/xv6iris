@@ -58,7 +58,7 @@ Require Import ByteBuf.
 Require Import ProcGeom.
 Require Import DinodeEnc.
 Require Import DirView.
-Require Import InodeInv.
+Require Import BlkmapDefs.
 Require Import InodeLock.
 Require Import InodeRegion.
 Require Import SpecArgstr.

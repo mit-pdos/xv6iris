@@ -33,7 +33,6 @@ Require Import HartSwp HartLift HartSpan HartSpanChar HartMFrame HartMPmp
         HartMLoad.
 (* [pwmsg]/[agent]/[tso_read_bytes]: the read node's obligation is stated
    over the era's write log.  Import is not transitive. *)
-Require Import TsoMemPa.
 Require Import TsoCtx.
 Import Defs.
 Import Defs.

@@ -38,8 +38,7 @@ Require Import WpLockAt.
 Require Import SleepLockAt.
 Require Import BufOwn.
 Require Import BcacheInv.
-Require Import TsoMemPa TsoGhost.
-Require Import TsoCtxPark.
+Require Import TsoGhost.
 (* CtxAnchor: dead in box v2 *)
 Require Export BioInv.
 From Kernel Require KernelSyms.

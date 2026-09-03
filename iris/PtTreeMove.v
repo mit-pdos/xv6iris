@@ -12,8 +12,7 @@ From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto Ktier.
-Require Import TsoMemPa TsoGhost.
+Require Import RiscvLang RiscvPtsto.
 Require Import TsoCtx TsoCtxMove CtxMorphTac PtTree.
 
 Section PtTreeMove.

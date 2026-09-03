@@ -51,7 +51,7 @@ Require Import MinstretInv.
 Require Import MemAccessGen.
 Require Import WpSmodeHalf.
 Require Import VirtioQueue DiskPtsto VirtioProto DiskInv DiskAvail.
-Require Import RiscvExec TsoMemPa TsoGhost WpLock.
+Require Import RiscvExec TsoMemPa WpLock.
 Require Import VirtioModel.
 Require Import WpUart.
 Require Import PermInv.

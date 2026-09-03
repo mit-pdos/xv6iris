@@ -80,7 +80,7 @@ Require Import DinodeEnc.
 Require Import DirView.          (* [T_DIR_z]                               *)
 Require Import FsBlocks.         (* [fs_names]                              *)
 Require Import FsBytesGamma.     (* [fs_gamma_L]                            *)
-Require Import InodeInv.
+Require Import BlkmapDefs.
 Require Import IrefSlots.
 Require Import Xv6Cameras.
 (* the three binder classes the section list names, IMPORTED rather than

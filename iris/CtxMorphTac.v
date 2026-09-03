@@ -24,8 +24,8 @@ From iris.algebra Require Import dfrac.
 From iris.base_logic.lib Require Import mono_nat.
 Require Import SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto Ktier.
-Require Import TsoMemPa TsoGhost.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto.
+Require Import TsoGhost.
 Require Import TsoCtx.
 
 (* A6.129: THE LEAVES THE p->lock PAYLOAD NEEDS -- [or], [big_sepS], the

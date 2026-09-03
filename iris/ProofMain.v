@@ -110,8 +110,6 @@ Require Import LogDefs LogInv.
 Require Import FsReady FirstTok.
 Require Import WpLockAt.   (* [newlock_at] / [lock_free_tok] *)
 Require Import BioInitAt.  (* [bio_init_at] / [bio_free_tok] / [buf_raw] *)
-Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: bio_init_at's deposit *)
-Require Import CtxRecord.   (* [ctx_parked_inv]: the started deposit's record *)
 Require Import IcacheBoot IcacheEscrow InodeInv.
 Require Import IcacheRef.
 Require Import IrefSlots FsCfg FsBlocks.

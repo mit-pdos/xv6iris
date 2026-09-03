@@ -36,7 +36,6 @@ From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Import ghost_var gen_heap invariants.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import FdSlots.
-Require Import SchedCtx.  (* [procs_inv_len]: the accessor, not a destruct *)
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -60,7 +59,7 @@ Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoMemPa TsoGhost.
+Require Import TsoGhost.
 Import Defs.
 Local Open Scope Z_scope.
 

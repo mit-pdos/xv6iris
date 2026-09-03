@@ -99,7 +99,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
    [IcacheEscrow]) holds HALVES OF THE SAME CELLS, so the tier has to be
    decided here or the cluster disagrees with itself.  LAST, after
    RiscvPtsto, as the replay runbook's pass 1 requires. *)
-Require Import TsoCtx.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 (* M1 FLIP, STAGE 2 (tso-machine-flip.md A6.15).  This file OWNS the two
    identity cells ([i_dev]/[i_inum], the [↦₄] pair inside [inode_ident]) and

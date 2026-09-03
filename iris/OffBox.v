@@ -55,10 +55,10 @@ From iris.algebra Require Import auth gmap ufrac gset.
 From iris.base_logic.lib Require Import own ghost_var invariants ghost_map.
 Require Import SailStdpp.Values.
 Require Import RiscvLang RiscvPtsto.
-Require Import TsoMemPa TsoGhost.
+Require Import TsoGhost.
 Require Import TsoCtx.
 Require Import CtxMorphTac.
-Require Import Xv6Cameras Xv6G.
+Require Import Xv6Cameras.
 Require Import CtxBox.
 Require Import RiscvModelBytes.   (* [pa_add] -- the free bytes of the last close (item 24) *)
 Require Import IcacheRef.   (* [icfg] -- the two names ride in it (r25 shapes) *)

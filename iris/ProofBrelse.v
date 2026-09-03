@@ -70,7 +70,6 @@ Require Import VcGen.
 Require Import WpPushOffBridges.
 Require Import KptGhost.
 Require Import MinstretInv.
-Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import CpuOwn.
 Require Import FdSlots.
@@ -78,7 +77,7 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import KernelText.
 Require Import InstrBytes.
-Require Import BufOwn BcacheInv BioInv ProofBreadParts SieCapCtx WpLock.
+Require Import BcacheInv BioInv ProofBreadParts SieCapCtx WpLock.
 Require Import CodeBrelse.
 Require Import SpecHoldingsleep SpecReleasesleep.
 Require Import SpecAcquire SpecRelease.

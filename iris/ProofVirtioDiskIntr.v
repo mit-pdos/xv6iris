@@ -42,7 +42,6 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn SchedCtx FdSlots.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpLoad WpAu4.
 Require Import MinstretInv.
 Require Import WpSmodeHalf.
 Require Import VirtioQueue DiskPtsto VirtioProto DiskInv DiskAvail.

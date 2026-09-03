@@ -61,10 +61,9 @@ Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import WpPushOffBridges.
 Require Import IntrDefs.
-Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import CpuOwn.
-Require Import BufOwn BcacheInv BioInv ProofBreadParts SieCapCtx WpLock.
+Require Import BcacheInv BioInv ProofBreadParts WpLock.
 Require Import CodeBpin.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecBunpin.

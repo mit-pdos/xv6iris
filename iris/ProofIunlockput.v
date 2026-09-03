@@ -37,7 +37,7 @@ Require Import FdSlots.
 Require Import WpUart.
 Require Import LogInv.
 Require Import DinodeEnc.
-Require Import InodeInv.
+Require Import BlkmapDefs.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
@@ -51,7 +51,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import TsoCtx.
-Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.

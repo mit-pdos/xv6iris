@@ -53,7 +53,6 @@ Require Import KptGhost.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import TsoMemPa.
 Require Import TsoGhost.   (* A6.55: [view_lb] for the pin receipt *)
-Require Import TsoCtx.
 Require Import CtxValues.
 Local Open Scope Z_scope.
 Import Defs.

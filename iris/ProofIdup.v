@@ -87,7 +87,6 @@ Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
-Require Import TsoCtx.
 
 
 (* ---- THE MINT'S TWO FRACTION FACTS ----------------------------------

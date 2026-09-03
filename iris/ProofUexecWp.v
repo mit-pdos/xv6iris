@@ -45,7 +45,6 @@ Require Import RiscvLang RiscvPtsto.
 Require Import UserPtTree UserExec.
 Require Import UexecWp.
 Require Import SpecUser.
-Require TsoCtx.   (* qualified: the class only, no notation flip *)
 Local Open Scope Z_scope.
 Import Defs.
 

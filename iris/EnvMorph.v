@@ -40,24 +40,19 @@ Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import TsoCtx CtxMorphTac.
-Require Import WpLock SleepLock.
-Require Import BioDefs.     (* [bio_names] / [bio_view] *)
-Require Import FsBlocks.    (* [fs_names] *)
+Require Import Xv6Cameras.
 Require Import WpUart.      (* [uart_names] *)
 Require Import DiskPtsto.   (* [disk_names] *)
 Require Import IcacheRef.   (* [ic_names] / the [icfg] class *)
-Require Import UserPtTree.  (* [uptd] *)
-Require Import ConsoleInv TicksInv DiskInv.
-Require Import BioInv IcacheEscrow.
+Require Import TicksInv.
 Require Import Xv6G.        (* the [xv6G] bundle -- NAMED in the section
                                binders below, so it must be IMPORTED, not
                                merely required: an unresolved class name
                                inside a generalising binder becomes a fresh
                                variable instead of an error. *)
 Require Import FdSlots FileInvDefs.  (* [fdslotG] / [fileG], same rule *)
-Require Import SchedCtx ProcPtOwn.
-Require Import SpecMainSecondary.
-Require Import FsReady.
+Require Import IrefSlots.
+Require Import ProcAvail.
 Require Import UsertrapRes SyscParkEnv.
 
 (* ===================================================================== *)

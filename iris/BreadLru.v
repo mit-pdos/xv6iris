@@ -41,11 +41,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvPtsto.
 Require Import RiscvExtras.
 Require Import ArrCursor.
-Require Import BufOwn.
 Require Import BcacheInv.
-Require Import BioInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* M1 STAGE 2: this file's ↦₄ cells are bcache slot data -- thread data --
    so it takes the flip.  LAST, after RiscvPtsto, as pass 1 of the replay
    runbook requires. *)

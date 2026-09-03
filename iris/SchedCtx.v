@@ -50,7 +50,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import IntrDefs.
 Require Import HartTp.
-Require Import WpLock CtxMorphTac.
+Require Import WpLock.
 Require Import ProcGeom.
 (* the proc table's two regimes: [pslot_used_at] is the marker
    [proc_slots] carries on every arm but UNUSED.  EXPORTed because every
@@ -62,15 +62,13 @@ Require Export IrefSlots.
 (* A6.128: [proc_pt]'s pieces are named by the payload's move instances.
    [PtTreeMove] carries the tree; main's [proc_pt] keys the image bytes by
    [M] beside it. *)
-Require Import ProcPtOwn PtTreeMove CtxMorphTac.
+Require Import ProcPtOwn CtxMorphTac.
 Require Import ProcDefs.
 Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxPark.
 Require Import TsoCtxMove.
-Require Import CpuOwnMove.
 Local Open Scope Z_scope.
 
 (* the context-slot payload while nobody is parked in it: the raw

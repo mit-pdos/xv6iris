@@ -72,7 +72,7 @@ Require Import WpLock.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import ArrCursor.
-Require Import PageGeom KallocInv ByteBuf.
+Require Import PageGeom KallocInv.
 Require Import PtTree PtBuild.
 Require Import UserPtTree ProcPtOwn.
 Require Import ProcGeom CpuOwn.

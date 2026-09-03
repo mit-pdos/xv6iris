@@ -134,7 +134,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoMemPa TsoGhost.   (* [llb] *)
+Require Import TsoGhost.   (* [llb] *)
 Require Import SieCapCtx.           (* [own_context] off the cap *)
 Require Import CtxBox.
 Local Open Scope Z_scope.

@@ -27,8 +27,7 @@ Require Import LockRank.
 Require Import CalleeSaved StackOwn.
 Require Import InstrBytes KernelText.
 Require Import KallocInv.
-Require Import ByteBuf.   (* bb_choose: a window of existentials is an existential function *)
-Require Import PtTree PtBuild KptPt KptExecMap KMap KptTree KvmMap KvmSpec.
+Require Import PtTree PtBuild KptPt KptExecMap KptTree KvmMap KvmSpec.
 Require Import CodeKvmmake.
 Require Import SpecKalloc SpecMemset SpecKvmmap SpecProcMapstacks SpecKvmmake.
 From Kernel Require KernelSyms.

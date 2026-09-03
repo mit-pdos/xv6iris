@@ -29,7 +29,6 @@ Require Import ExecCommon WpGpr.
 Require Import WpGprCsrwCommon WpGprCsrrCommon.
 Require Import TrampPt.
 Require Import UptTree.
-Require Import PtTreeAdue.
 Require Import WpSmodePtLeaves.
 Require Import HartLift HartSpan HartSpanChar HartSwp HartSMem.
 Require Import WpSmodePtEngine HartSCsr KptGoodb WpDecodeBridge.

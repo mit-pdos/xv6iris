@@ -130,7 +130,7 @@ Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcachePinwObl.
 Require Import RiscvExec.
-Require Import TsoMemPa RiscvModelBytes CtxPinw.
+Require Import TsoMemPa CtxPinw.
 Require Import SmodeCorePt.
 Require Import IcacheEscrow.
 Require Import FdSlots.

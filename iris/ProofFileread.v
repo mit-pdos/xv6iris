@@ -109,7 +109,6 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import TsoCtx.
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the off checkout borrows the running token *)
 Require Import FileOffProtocol.   (* proto_read_llb / _checkout / _park (r25 item 24) *)
-Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 

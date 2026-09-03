@@ -127,7 +127,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
 Require Import KallocInv.
 Require Import WpLock.
-Require Import TsoCtx CtxMorphTac.   (* the lock payload's context axis *)
+Require Import CtxMorphTac.   (* the lock payload's context axis *)
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import TsoCtx.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)

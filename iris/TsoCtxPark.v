@@ -31,7 +31,7 @@ From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth.
 From iris.base_logic.lib Require Import ghost_map mono_nat.
 Require Import RiscvLang RiscvPtsto.
-Require Import TsoMemPa TsoGhost.
+Require Import TsoGhost.
 Require Import TsoCtx.
 
 Section Park.

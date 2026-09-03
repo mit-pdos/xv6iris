@@ -90,8 +90,7 @@ Require Import DirView.
 (* for [MAXFILE] and [BSIZE] alone -- [off_wf], the bound the off cell carries,
    is stated over the inode layer's two constants, and the cell now lives here
    (R-open-1b).  Neither file mentions the file table, so this closes no cycle. *)
-Require Import InodeInv.
-Require Import BioDefs.
+Require Import Xv6Cameras.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import IrefSlots.  (* [iref_frac]: an ftable entry holds one unit.

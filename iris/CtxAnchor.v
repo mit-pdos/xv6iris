@@ -67,7 +67,7 @@ From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth agree gmap.
 From iris.base_logic.lib Require Import own.
 Require Import RiscvLang RiscvPtsto.
-Require Import TsoMemPa TsoGhost.
+Require Import TsoGhost.
 Require Import TsoCtx.
 Require Import TsoCtxAbsorbLb.
 Require Import Xv6Cameras.

@@ -28,7 +28,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvPtsto.
 Require Import WpLock.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
-Require Import CtxMorphTac.   (* [ctx_morph_exist] & co. for [ftable_res_at_morph] (r25 pass 1) *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export FileInvDefs.

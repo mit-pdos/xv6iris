@@ -77,9 +77,7 @@ Require Import RiscvPtsto.
 Require Import WpLock.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import CtxMorphTac.   (* [bio_ctx_morph] (r25 pass 1) *)
-Require Import TsoMemPa TsoGhost.
-Require Import TsoCtxPark.
-Require Import TsoCtxAbsorbLb.
+Require Import TsoGhost.
 Require Import CtxBox.   (* the generic transit box; bcache instantiates it below *)
 Require Import SleepLock.
 Require Import BufOwn.

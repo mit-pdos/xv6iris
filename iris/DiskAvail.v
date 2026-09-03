@@ -30,7 +30,7 @@ From iris.base_logic.lib Require Import gen_heap ghost_map.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras.
-Require Import TsoMemPa TsoGhost TsoCtx CtxMorphTac.
+Require Import TsoMemPa TsoCtx CtxMorphTac.
 Require Import KptPt KMap.
 Require Import VirtioModel VirtioQueue WpVirtio VirtioProto.
 Require Import DiskAddrs.   (* [d_ring] *)
