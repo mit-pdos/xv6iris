@@ -1258,6 +1258,13 @@ Section BioBox.
      bio_pool V bnos ∗
      [∗ list] k ∈ seq 0 NBUF, bio_slot_res2 bn V M k (devs k) (bnos k) tl ξ)%I.
 
+  (* the body ends in a [big_sepL] over the 30 buffer slots, and it sits BARE
+     in every fold's goal -- so an unsealed name makes each [iFrame] candidate
+     walk all 30 (claude-notes/optimization.md, "a big-op under a transparent
+     name is an iFrame bomb").  [rewrite /bcache_scan2], which every fold site
+     does on the next line, is unaffected by the seal. *)
+  Global Typeclasses Opaque bcache_scan2.
+
   (* the payload, with its floor slot: R2 folds the releaser's llb here
      ([lock_pay_intro_llb] with [bcache_scan2] as the unfloored body) *)
   Definition bcache_res2 (bn : bio_names) (V : bio_view Σ) (ξ : CtxId) : iProp Σ :=
@@ -1289,8 +1296,9 @@ Section BioBox.
     (tl <= tl')%nat ->
     bcache_scan2 bn V M ord devs bnos tl ξ -∗ bcache_scan2 bn V M ord devs bnos tl' ξ.
   Proof.
+    rewrite /bcache_scan2.
     iIntros (Hle) "(Hauth & Hsauth & %Hdom & %Hord & %Hinj & %Hdev & Hlru & Hpool & Hslots)".
-    rewrite /bcache_scan2. iFrame "Hauth Hsauth Hlru Hpool".
+    iFrame "Hauth Hsauth Hlru Hpool".
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iApply (big_sepL_mono with "Hslots"). intros i k Hk.
     rewrite /bio_slot_res2. iIntros "[Hregs Hslot]". iFrame "Hslot".
@@ -1520,7 +1528,18 @@ Section BioBox.
         buf_box bn V k))%I.
 
   Global Instance bio_ctx_persistent bn V : Persistent (bio_ctx bn V).
-  Proof. apply _. Qed.
+  (* structurally: one [apply _] over the [∗] and the 30-slot [big_sepL]
+     backtracks through both lock abstractions' own instances *)
+  Proof.
+    rewrite /bio_ctx.
+    apply bi.sep_persistent; [apply _|].
+    apply big_sepL_persistent; intros ? ? ?.
+    (* NAME the two leaves: neither [is_sleeplock_genl] nor [buf_box] is
+       sealed, so a leaf [apply _] unfolds each into its own body and
+       backtracks over it -- which was the whole residue after the peel. *)
+    apply bi.sep_persistent;
+      [apply is_sleeplock_genl_persistent | apply buf_box_persistent].
+  Qed.
 
   Lemma bio_ctx_lock bn V :
     bio_ctx bn V -∗

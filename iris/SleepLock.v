@@ -892,6 +892,23 @@ Section SleepLock.
     iApply (sl_fresh_new_gen E slk s R slh_tok with "Hf Hrun HR").
   Qed.
 
+
+  (* PERFORMANCE, the same one WpLock.v records for [is_lock] one layer down.
+     Without these, every [iIntros "#Hslk"] re-derives persistence by
+     UNFOLDING the definition and descending into it, and an fs-altitude
+     proof's entry [iIntros] pays that once per sleeplock row it takes in --
+     on ProofIunlock that single intro was the whole entry statement
+     (claude-notes/optimization.md, "give every big-resource abstraction with
+     a Persistent/Timeless instance a [Typeclasses Opaque] right next to
+     it").  They sit at the END of the section on purpose: this file's own
+     projection lemmas destructure the definitions with [iIntros "[$ _]"],
+     which a seal above them would break.  [rewrite /is_sleeplock_genl] is
+     unaffected, which is what the CtxMorph instance below uses. *)
+  Global Typeclasses Opaque is_sleeplock_genl.
+  Global Typeclasses Opaque is_sleeplock_gen.
+  Global Typeclasses Opaque is_sleeplock.
+  Global Typeclasses Opaque is_sleeplock_tok.
+
 End SleepLock.
 
 (* ====================================================================== *)

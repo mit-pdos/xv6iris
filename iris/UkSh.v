@@ -2128,7 +2128,22 @@ Section UkSh.
   Proof.
     rewrite ustack_12.
     iIntros "%H H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12".
-    iSplit; [ iPureIntro; exact H | ]. iFrame.
+    iSplit; [ iPureIntro; exact H | ].
+    (* BUILT, not framed: a bare [iFrame] over twelve [∃]-wrapped cells is
+       twelve goal walks (claude-notes/optimization.md, "a rebuild is a
+       construction, so build it"). *)
+    iSplitL "H1"; [iExact "H1"|].
+    iSplitL "H2"; [iExact "H2"|].
+    iSplitL "H3"; [iExact "H3"|].
+    iSplitL "H4"; [iExact "H4"|].
+    iSplitL "H5"; [iExact "H5"|].
+    iSplitL "H6"; [iExact "H6"|].
+    iSplitL "H7"; [iExact "H7"|].
+    iSplitL "H8"; [iExact "H8"|].
+    iSplitL "H9"; [iExact "H9"|].
+    iSplitL "H10"; [iExact "H10"|].
+    iSplitL "H11"; [iExact "H11"|].
+    iExact "H12".
   Qed.
 
   (* the callee-saved set, as an arithmetic disjunction *)

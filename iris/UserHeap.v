@@ -1399,7 +1399,14 @@ Section UserHeap.
     ustack γd sp 6.
   Proof.
     intros Hal. iIntros "H0 H1 H2 H3 H4 H5".
-    rewrite ustack_6. iSplit; [ iPureIntro; exact Hal | ]. iFrame.
+    rewrite ustack_6. iSplit; [ iPureIntro; exact Hal | ].
+    (* built, not framed -- see [ustack_intro_12]'s note *)
+    iSplitL "H0"; [iExact "H0"|].
+    iSplitL "H1"; [iExact "H1"|].
+    iSplitL "H2"; [iExact "H2"|].
+    iSplitL "H3"; [iExact "H3"|].
+    iSplitL "H4"; [iExact "H4"|].
+    iExact "H5".
   Qed.
 
   Lemma ustack_10_open (γd : gname) (sp : mword 64) :
@@ -1432,7 +1439,18 @@ Section UserHeap.
     ustack γd sp 10.
   Proof.
     intros Hal. iIntros "H0 H1 H2 H3 H4 H5 H6 H7 H8 H9".
-    rewrite ustack_10. iSplit; [ iPureIntro; exact Hal | ]. iFrame.
+    rewrite ustack_10. iSplit; [ iPureIntro; exact Hal | ].
+    (* built, not framed -- see [ustack_intro_12]'s note *)
+    iSplitL "H0"; [iExact "H0"|].
+    iSplitL "H1"; [iExact "H1"|].
+    iSplitL "H2"; [iExact "H2"|].
+    iSplitL "H3"; [iExact "H3"|].
+    iSplitL "H4"; [iExact "H4"|].
+    iSplitL "H5"; [iExact "H5"|].
+    iSplitL "H6"; [iExact "H6"|].
+    iSplitL "H7"; [iExact "H7"|].
+    iSplitL "H8"; [iExact "H8"|].
+    iExact "H9".
   Qed.
 
   (* the eight-word frame, directed -- cat()'s (64 bytes) *)
@@ -1462,7 +1480,16 @@ Section UserHeap.
     ustack γd sp 8.
   Proof.
     intros Hal. iIntros "H0 H1 H2 H3 H4 H5 H6 H7".
-    rewrite ustack_8. iSplit; [ iPureIntro; exact Hal | ]. iFrame.
+    rewrite ustack_8. iSplit; [ iPureIntro; exact Hal | ].
+    (* built, not framed -- see [ustack_intro_12]'s note *)
+    iSplitL "H0"; [iExact "H0"|].
+    iSplitL "H1"; [iExact "H1"|].
+    iSplitL "H2"; [iExact "H2"|].
+    iSplitL "H3"; [iExact "H3"|].
+    iSplitL "H4"; [iExact "H4"|].
+    iSplitL "H5"; [iExact "H5"|].
+    iSplitL "H6"; [iExact "H6"|].
+    iExact "H7".
   Qed.
 
   (* the twelve-word frame, directed -- printf's and vprintf's (96 bytes) *)
@@ -1500,7 +1527,20 @@ Section UserHeap.
     ustack γd sp 12.
   Proof.
     intros Hal. iIntros "H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11".
-    rewrite ustack_12. iSplit; [ iPureIntro; exact Hal | ]. iFrame.
+    rewrite ustack_12. iSplit; [ iPureIntro; exact Hal | ].
+    (* built, not framed -- see [UkSh.ush_stack_12]'s note *)
+    iSplitL "H0"; [iExact "H0"|].
+    iSplitL "H1"; [iExact "H1"|].
+    iSplitL "H2"; [iExact "H2"|].
+    iSplitL "H3"; [iExact "H3"|].
+    iSplitL "H4"; [iExact "H4"|].
+    iSplitL "H5"; [iExact "H5"|].
+    iSplitL "H6"; [iExact "H6"|].
+    iSplitL "H7"; [iExact "H7"|].
+    iSplitL "H8"; [iExact "H8"|].
+    iSplitL "H9"; [iExact "H9"|].
+    iSplitL "H10"; [iExact "H10"|].
+    iExact "H11".
   Qed.
 
   Lemma ustack_acc (γd : gname) (sp : mword 64) (n i : nat) :

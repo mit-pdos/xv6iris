@@ -1078,6 +1078,7 @@ Section ProofBrelse.
       iDestruct "Hafter" as (Mg' ord' devs' bnos' tl') "(%Htl' & #Hllbtl' & Hscan')".
       clear Mg ord devs bnos.
       rename Mg' into Mg; rename ord' into ord; rename devs' into devs; rename bnos' into bnos.
+      iEval (rewrite /bcache_scan2) in "Hscan'".
       iDestruct "Hscan'" as "(Hauth & Hsauth & %Hdom' & %Hord & %Hinj & %Hdev & Hlru & Hpool & Hslots)".
       (* ===== +0x32 c.bnez a5 : NOT taken, the splice runs ===== *)
       assert (Hbnez : neq_vec (D2 !!! Regidx Ra5) zero_reg = false)

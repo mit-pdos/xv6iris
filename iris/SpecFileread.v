@@ -718,7 +718,17 @@ Section SpecFileread.
     iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
     iSplitL "Hside"; [iExact "Hside"|].
-    iSplitL "Hshr"; [iExists ik, lo, tl; iFrame "% Hfl"; iExact "Hshr"|].
+    iSplitL "Hshr".
+    { iExists ik, lo, tl.
+      (* NOT [iFrame "%"]: it searches the whole Coq context for each pure
+         conjunct of a goal whose tail is [inode_shr_gen], and that search
+         was the whole statement.  Named, each row is one [exact]. *)
+      iSplitR; [iPureIntro; exact Hipk|].
+      iSplitR; [iPureIntro; exact Hik|].
+      iSplitR; [iPureIntro; exact Hinb|].
+      iSplitR; [iPureIntro; exact Hle|].
+      iSplitR; [iExact "Hfl"|].
+      iExact "Hshr". }
     iExists ty. iSplitR; [iExact "Hshot"|].
     iSplit; iPureIntro; [exact Hnd | exact Hdv].
   Qed.

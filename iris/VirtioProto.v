@@ -1098,6 +1098,13 @@ Definition done_dom (c : virtio_cfg) (dn : gmap nat (nat * vslot)) : gset Arch.p
 Lemma done_dom_empty (c : virtio_cfg) : done_dom c ∅ = ∅.
 Proof. unfold done_dom. apply map_fold_empty. Qed.
 
+(* the [map_fold] side condition, at VARIABLES: the instance below has [a]
+   and [b] standing for [slot_done_dom]s, which [set_solver] would unfold
+   into the slot's computed footprint before it ever reached the shuffle. *)
+Lemma union_swap_head {A} `{EqDecision A, Countable A} (a b s : gset A) :
+  a ∪ (b ∪ s) = b ∪ (a ∪ s).
+Proof. set_solver. Qed.
+
 Lemma done_dom_insert (c : virtio_cfg) (dn : gmap nat (nat * vslot)) (p : nat)
     (usl : nat * vslot) :
   dn !! p = None ->
@@ -1108,7 +1115,7 @@ Proof.
            (fun (_ : nat) (usl : nat * vslot) acc => slot_done_dom c usl.1 usl.2 ∪ acc)
            ∅ p usl dn);
     [| exact H].
-  intros. set_solver.
+  intros. apply union_swap_head.
 Qed.
 
 Lemma done_dom_delete (c : virtio_cfg) (dn : gmap nat (nat * vslot)) (p : nat)
@@ -1341,6 +1348,20 @@ Definition lease_hole_pure (c : virtio_cfg) (pr : vproto) : gset Arch.pa :=
 
 Lemma footprint_idx (c : virtio_cfg) : footprint (used_idx_pa c) 2 = used_idx_dom c.
 Proof. reflexivity. Qed.
+
+(* THE PUBLISH'S HOLE MOVE IS ONE UNION SHUFFLE, AND IT IS STATED AT
+   VARIABLES ON PURPOSE.  The instance the publish arm needs has [a]/[r]/[u]
+   standing for [avail_idx_dom], [ring_cells_dom] and [dom (pins_union ...)]
+   -- all COMPUTED carriers -- so proving it in place by [apply set_eq; intro
+   x; rewrite !elem_of_union; tauto] made every [elem_of] instance chain drag
+   those carriers behind it, and the closer then reified the whole arm's
+   context.  At variables there is nothing to unfold and nothing to reify
+   (claude-notes/optimization.md, "never let a general-purpose closer meet a
+   large context"). *)
+Lemma union_shuffle_pub {A} `{EqDecision A, Countable A}
+    (a r p u i d : gset A) :
+  a ∪ r ∪ (p ∪ u) ∪ i ∪ d = (a ∪ r ∪ u ∪ i ∪ d) ∪ p.
+Proof. set_solver. Qed.
 
 (* the hole GROWS by the completing slot's done footprint, keyed at the used
    index the completion is reported at: the control set is untouched by a
@@ -2294,6 +2315,7 @@ Section VirtioProto.
 
   Lemma half_map_empty : half_map ∅ ⊣⊢ emp.
   Proof. rewrite /half_map. apply big_sepM_empty. Qed.
+
 
   (* the dq-generic form of [phys_map_idx_list] *)
   Lemma ledger_map_idx_list (dq : dfrac) (a : Arch.pa) (l : list nat) (f : nat -> bv 8) :
@@ -4800,7 +4822,7 @@ Section VirtioProto.
     rewrite (vp_spins_step pr p sl Hsl) vps_nc vps_np vps_pend vps_done vps_uix.
     rewrite (big_sepM_insert _ (vp_uix pr) p (vp_nc pr) Hunone).
     iEval (rewrite -(vproto_step_ctl (v_cfg v) pr p sl)) in "Hhalf".
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordp Hordm Hnc Hnp Hnr Hfl Hflr Hpos
+    iFrame "Hcfg Hdma Hhalf Hfl Hflr Hpos Hslot Hordm Hord Hordp Hnc Hnp Hnr
             Hstage Hheads".
     iSplitR.
     { iPureIntro. rewrite (vproto_step_ctl (v_cfg v) pr p sl).
@@ -5061,8 +5083,8 @@ Section VirtioProto.
                   = vproto_ctl (v_cfg v) pr) by reflexivity.
     iEval (rewrite -Hpc) in "Hhalf".
     iEval (rewrite /lease_hole -(lease_hole_pop (v_cfg v) pr sl)) in "Hdma".
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-            Hposm Hstage Hheads Hdone".
+    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr Hstage Hheads Hdone".
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact (vproto_ok_pop _ _ _ sl Hok Hlt Hsl)|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -5133,8 +5155,8 @@ Section VirtioProto.
       in "Hhalf".
     iEval (rewrite /lease_hole -(lease_hole_advance (v_cfg v) pr (vs_hd sl)
                                    (PhFetched (vs_req sl)))) in "Hdma".
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-            Hposm Hstage Hheads Hdone".
+    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr Hstage Hheads Hdone".
     iSplitR.
     { iPureIntro. rewrite (vproto_advance_ctl (v_cfg v) pr _ _). exact Hctl. }
     iSplitR; [iPureIntro; exact (vproto_ok_fetch _ _ _ p sl Hok Hsl Hfl)|].
@@ -5238,8 +5260,8 @@ Section VirtioProto.
                   = vproto_ctl (v_cfg v) pr) by reflexivity.
     iEval (rewrite -Hpc) in "Hhalf".
     iEval (rewrite /lease_hole -(lease_hole_capture (v_cfg v) pr p sl)) in "Hdma".
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-            Hposm Hstage Hheads Hdone".
+    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr Hstage Hheads Hdone".
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact (vproto_ok_capture _ _ _ p sl Hok Hsl Hfl)|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -5453,8 +5475,8 @@ Section VirtioProto.
       in "Hhalf".
     iEval (rewrite /lease_hole -(lease_hole_advance (v_cfg v) pr (vs_hd sl)
                                    (vwrite_to k (vs_req sl)))) in "Hdma".
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos
-            Hposm Hstage Hheads".
+    iFrame "Hcfg Hdma Hhalf Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc Hnp Hnr
+            Hstage Hheads".
     iSplitR.
     { iPureIntro. rewrite (vproto_advance_ctl (v_cfg v) pr _ _).
       exact (virtio_ctl_union _ _ _ Hwctl Hctl). }
@@ -5635,8 +5657,8 @@ Section VirtioProto.
     cbn [v_cfg v_isr v_seen v_inflight v_used_idx v_disk v_cache v_taken].
     rewrite Hlive.
     iExists pr, dma, t0, t1, lw, F, hist, pm.
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-            Hposm Hstage Hheads Hdone".
+    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr Hstage Hheads Hdone".
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact Hok|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -5703,8 +5725,8 @@ Section VirtioProto.
       as "Hhalf".
     { rewrite (half_map_ctl_split _ _ _ Hok). iFrame. }
     iFrame "Hpub". iExists pr, dma, t0, t1, lw, F, hist, pm.
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-            Hposm Hstage Hheads Hpend Hdone".
+    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr Hstage Hheads Hpend Hdone".
     iPureIntro. split_and!; assumption.
   Qed.
 
@@ -5772,8 +5794,8 @@ Section VirtioProto.
                (half_map_union _ _ HcellR)).
       iFrame "Hcellh HringR". }
     iFrame "Hpub". iExists pr, dma, t0, t1, lw, F, hist, pm.
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-            Hposm Hstage Hheads Hpend Hdone".
+    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr Hstage Hheads Hpend Hdone".
     iPureIntro. split_and!; assumption.
   Qed.
 
@@ -5882,8 +5904,8 @@ Section VirtioProto.
       iExists qc, bs. iSplitR; [iPureIntro; exact HqF|].
       rewrite /chain_back_at. iFrame "Hpinm Hbpm Hbq". }
       iExists pr, dma, t0, t1, lw, F, hist, pm.
-      iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-              Hposm Hstage Hpend Hdone".
+      iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+              Hnp Hnr Hstage Hpend Hdone".
       iSplitR; [iPureIntro; exact Hctl|].
       iSplitR; [iPureIntro; exact Hok|].
       iSplitR; [iPureIntro; exact Hal|].
@@ -6167,8 +6189,8 @@ Section VirtioProto.
       iFrame "Hcellh HringR". }
     (* the ring store changes only [vp_ring]; the slots -- hence the
        receipts -- are untouched *)
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-            Hposm Hheads".
+    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr Hheads".
     (* the cell's two bytes sit inside the ring region *)
     assert (Hcellring : pa_range (ring_slot_pa (v_cfg v) (vp_np pr `mod` 8)%nat) 2
                         ⊆ ring_cells_dom (v_cfg v))
@@ -6437,8 +6459,7 @@ Section VirtioProto.
       assert (Hzz : map_zip (vp_uix (vproto_publish_state pr sl pin))
                             (vp_done (vproto_publish_state pr sl pin))
                     = map_zip (vp_uix pr) (vp_done pr)) by reflexivity.
-      rewrite Hzz HctlD' HctlD.
-      apply set_eq. intro x. rewrite !elem_of_union. tauto. }
+      rewrite Hzz HctlD' HctlD. apply union_shuffle_pub. }
     assert (HholeSub : lease_hole (v_cfg v) pr ⊆ dom dma)
       by exact (lease_hole_sub (v_cfg v) pr (dom dma) Hok).
     assert (Hd2' : wrb ##ₘ filter (fun p : Arch.pa * bv 8 =>
@@ -6557,8 +6578,8 @@ Section VirtioProto.
          (nth_byte (wrap16 (S np))) ∪ dma))),
       t0, t1, lw, F, hist, pm.
     rewrite (vp_spins_publish pr sl pin) vpp_nc vpp_np vpp_pend vpp_done Hnpeq.
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-            Hposm".
+    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr".
     iSplitR.
     (* the ring cells are the lease's and this publish does not touch them *)
     assert (Hringsub : ring_bytes (v_cfg v) (vp_ring pr) ⊆ dma).
@@ -6825,8 +6846,8 @@ Section VirtioProto.
     { iPureIntro. pose proof (vproto_ncnp _ _ _ Hok). lia. }
     iSplitR; [iExact "Hcfg"|]. iSplitR; [iPureIntro; exact Hal|].
     iFrame "Hlb Hpub". iExists pr, dma, t0, t1, lw, F, hist, pm.
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-            Hposm Hstage Hheads Hpend Hdone".
+    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr Hstage Hheads Hpend Hdone".
     iPureIntro. split_and!; assumption.
   Qed.
 
@@ -6890,8 +6911,8 @@ Section VirtioProto.
     iSplitR "Hpub Hnr0 Hflr0 Hfl0b Hfl1b"; last first.
     { iFrame "Hpub Hnr0 Hflr0 Hfl0b Hfl1b". }
     iExists pr, dma, t0, t1, lw, F, hist, pm.
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl0a Hfl1a Hflr
-            Hpos Hposm Hstage Hheads Hpend Hdone".
+    iFrame "Hcfg Hdma Hhalf Hfl0a Hfl1a Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr Hstage Hheads Hpend Hdone".
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact Hok|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -7118,8 +7139,8 @@ Section VirtioProto.
     iSplitR; [ iExists q, w; by iFrame "Hqu" |].
     iFrame "Hpub Hlb Hrd Hcm".
     iExists pr, dma, t0, t1, lw, F, hist, pm.
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-            Hposm Hstage Hpend Hdone".
+    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr Hstage Hpend Hdone".
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact Hok|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -7240,8 +7261,8 @@ Section VirtioProto.
     iFrame "Hh". iIntros "Hh".
     iSplitR "Hpub Hrd Hcm"; [| by iFrame "Hpub Hrd Hcm"].
     iExists pr, dma, t0, t1, lw, F, hist, pm.
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-            Hposm Hstage Hpend".
+    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr Hstage Hpend".
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact Hok|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -7361,8 +7382,8 @@ Section VirtioProto.
     iFrame "Hstm". iIntros "Hstm".
     iSplitR "Hpub Hrd Hcm"; [| by iFrame "Hpub Hrd Hcm"].
     iExists pr, dma, t0, t1, lw, F, hist, pm.
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-            Hposm Hstage Hpend".
+    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr Hstage Hpend".
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact Hok|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -7961,8 +7982,8 @@ Section VirtioProto.
                (vpo_fp_disj _ _ _ Hok q p slq sl pinq pin Hqne
                   (vproto_pend_slot pr _ _ Hq) Hpinq Hs Hpin)
                x (slot_fp_wr slq pinq x Hx) Hc'). }
-    iFrame "Hcfg Hdma Hhalf Hslot Hord Hordm Hnc Hnp Hnr Hfl Hflr Hpos Hrel
-            Hposm Hstage Hheads Hpend".
+    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
+            Hnp Hnr Hstage Hheads Hpend".
     iSplitR.
     { iPureIntro. rewrite Hctlr. apply map_sub_difference; [exact HAsub|].
       rewrite HdomMM. exact HAdisj. }

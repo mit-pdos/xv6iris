@@ -457,6 +457,41 @@ worth more than an order of magnitude on individual files.
     in context, so `by (apply elem_of_union_l; exact HWtlb)` is the whole fix.
     Grep for `∈ .* ∪ .*) by set_solver` before believing a file is
     intrinsically slow.
+    **`HartSTrans.v` carried TWO MORE of exactly that assert** (`swp_translate`
+    and the update arm, 2.7 s and 2.1 s), with the same `HWtlb : tlb ∈ Drw`
+    already in context; the same one-line replacement took the file 10.3 s →
+    6.0 s, and it is on the critical path. The grep above now finds none left
+    in the tree — every remaining `by set_solver` over a `∪` has a LITERAL
+    carrier, which is the case the override handles.
+  - **A HYPOTHESIS THAT IS A SET EQUATION IS KEPT BY THE FILTER BY
+    CONSTRUCTION, SO `clear` IT ONCE THE REWRITE HAS USED IT.** The override
+    keeps every hypothesis mentioning a set operation — that is its
+    correctness condition — so a giant `assert (Hws : dom (write_bytes
+    (write_bytes …)) = …)` that the proof has already rewritten away is still
+    reified by the closer that follows. Measured on
+    `VirtioProto.vslot_writes_dom_eq`: two `set_solver`s at 2.0 s each, both
+    with their computed carriers already behind `set`/`clearbody`, went to
+    nothing under one `clear Hws` on the line above. **That exhibit is gone**
+    — the one-bus-transaction-per-step rewrite replaced the lemma with
+    `vslot_write_dom_elem`, which reasons per byte and calls no closer — but
+    the rule is not: the tell is that every ATOM in the goal is already a
+    variable and the closer is still slow, and then it is not the goal, it is
+    what the filter kept.
+  - **A PURE UNION SHUFFLE BELONGS IN A LEMMA STATED AT VARIABLES.** The
+    publish arm of `VirtioProto`'s lease-hole move closed
+    `a ∪ r ∪ (p ∪ u) ∪ i ∪ d = (a ∪ r ∪ u ∪ i ∪ d) ∪ p` with
+    `apply set_eq. intro x. rewrite !elem_of_union. tauto.`, where every
+    letter stands for a COMPUTED carrier (`avail_idx_dom`, `ring_cells_dom`,
+    `dom (pins_union …)`): 7.9 s in the `rewrite` and 5.7 s in the `tauto`,
+    the tree's most expensive non-`Qed` pair. The same identity as a
+    six-variable lemma closed by `set_solver` — where there is nothing to
+    unfold and nothing to reify — plus `apply` at the site, took the file
+    115.8 s → 99.4 s including its `Qed`. Same edit retired that file's
+    `map_fold` commutation side condition (`intros. set_solver.` over two
+    `slot_done_dom`s). This is "a side condition that is the SAME at every
+    call site belongs in a lemma proved where the context is EMPTY" with the
+    emphasis moved: what the lemma buys here is not sharing, it is that its
+    ARGUMENTS ARE RIGID.
   - **Two things the override does NOT fix**, both goal-side rather than
     context-side, so the old workarounds stand: `gset (mword n)` still fails
     (instance divergence — see the durable notes), and `set_unfold` still
@@ -895,6 +930,59 @@ diagnostic.
   reflexivity`, so the conversion happens once and both directions then frame
   syntactically. The tell in the profile is a one-token statement (`iFrame.`)
   costing tens of seconds.
+- **A ONE-NAME `iFrame` IS STILL A WHOLE-GOAL WALK, so it is expensive
+  wherever the goal's TAIL is, and it is the easiest hot statement in a
+  profile to misread.** The 2026-09-03 profile had a cluster of them, each
+  framing one small persistent row that was already the goal's FIRST
+  conjunct: `BioInitAt:328` and `BioInv:1778` (`iFrame "Hllbtl"`, 4.8 s
+  each), `ProofBreadParts:354` (2.6 s), `UsertrapRes`'s four
+  `iFrame "Hkpt"` (1.6 s each). Read such a statement as a claim about what
+  comes AFTER the conjunct being framed, never about the name. Both fixes
+  apply and they are not interchangeable: where the tail's expensive
+  conjunct is a big-op under a transparent name, seal it and every site in
+  the tree is fixed at once (the `Hllbtl` three were one
+  `Typeclasses Opaque bcache_scan2`); where it is not, the local
+  `iSplitR; [iExact "Hkpt" |]` is a one-line edit and took `UsertrapRes`
+  21.4 s → 14.0 s.
+- **THE SAME EDIT AT A RUN OF STACK CELLS IS WORTH HALF THE FILE.**
+  `UserHeap`'s four `ustack_intro_*` lemmas and `UkSh`'s twelve-cell twin
+  rebuild an N-cell `ustack` from N `∃ w, uword …` hypotheses with a bare
+  `iFrame` — N goal walks with a conversion per attempt. The
+  `iSplitL "Hk"; [iExact "Hk" |]` chain took `UserHeap` 11.5 s → 6.6 s and
+  `UkSh` 21.5 s → 18.7 s; `SpecKexecB2.kxc_slot63_split`'s two directions
+  (nine `ctx_word_pointsto` cells) 10.9 s → 7.8 s. Where the two sides group
+  differently — that lemma splits one cell off an eight-cell block — the
+  chain needs one `iSplitR "H9"` first and `done` for the big-op's trailing
+  `emp`; everything else is mechanical.
+- **`iFrame "%"` IS A CONTEXT-SIDE SEARCH AND IT SHOWS UP AS A HOT
+  STATEMENT.** It looks for a proof of each pure conjunct among *all* the Coq
+  hypotheses in scope. `SpecFilestat:457` / `SpecFileread:721` (four pure
+  rows in front of an `inode_shr_gen`) were 2.9 s each; four
+  `iSplitR; [iPureIntro; exact H |]` lines took both files to under half
+  their cost. Naming the pures in the destructuring pattern is the enabling
+  step — a `(% & % & % & …)` pattern is what makes `iFrame "%"` look like the
+  only option.
+- **GIVING THE NAMES IN THE GOAL'S ORDER IS SOMETIMES WORTH A LOT AND
+  SOMETIMES NOTHING — measure, do not assume.** The rule stands, but its
+  size does not: reordering the fifteen `iFrame "Hcfg Hdma Hhalf …"` rebuilds
+  in `VirtioProto.v` into `virtio_proto`'s own conjunct order (the list had
+  the six ghost-map rows six places early) was **6.4 s of 23.6 s**, with no
+  other change; the identical edit on `FirstTok.first_persist_pre` had
+  already measured as noise (13.68 → 13.56). The difference is how far the
+  misplaced names are from their conjuncts and how expensive the conjuncts
+  they walk past are. It is a `sed`, so try it before the chain.
+- **SEALING THE BIG-OP CONJUNCTS OF A THIRTY-ROW BUNDLE IS A NULL — do not
+  redo it.** `virtio_proto`'s rebuild sites frame seventeen names into ~30
+  conjuncts, three of which are big-ops behind transparent names
+  (`WpVirtio.dma_own`, `VirtioProto.half_map`, and `dma_own_x`, whose body
+  puts a `filter` in front of `dma_own`'s). `Global Typeclasses Opaque` on
+  all three, with the two `Timeless` instances the seal then requires, was
+  99.4 s → 99.1 s on an isolated A/B and moved no individual statement. This
+  is `UsertrapRes`'s case, not `inode_blocks`': no single row is enormous,
+  it is the COUNT of (name × definition-valued conjunct) attempts, and no
+  seal fixes that. What is left there — the ~17 s the reorder did not get —
+  needs the `iSplitL`/`iExact` chain at all fifteen sites, or a constructor
+  lemma for the live body; neither has been done.
 - **`proc_priv_core` IS THE WORST INSTANCE IN THE TREE, and it is reached by
   every syscall-altitude proof**: its last conjunct is `ProcInv.tf_page`, a
   **4096**-element big-op, so a bare `iFrame` rebuilding it does not
@@ -1155,6 +1243,33 @@ whose goal is a raw payload body, that needs a tactic.
   the projection lemmas, which is the point: nothing else can then `iDestruct`
   the abstraction apart. Measure before sealing; cost tracks the size of the
   resource, not the number of sites.
+  - **AND THE MISSING SEAL SHOWS UP AS THE ENTRY `iIntros` OF EVERY PROOF THAT
+    TAKES THE ROW IN — the biggest single cluster in the 2026-09-03 profile,
+    and the fix is one line.** Thirty-four statements in eleven files, all of
+    the shape `iIntros "Hcg Hown #Htext #Hda…"` at the top of an fs-altitude
+    whole-function proof, 67 s of ΣCPU between them. That uniformity is this
+    file's standing tell for ONE shared cause, and splitting `ProofIunlock`'s
+    twenty-two-name intro one name per sentence named it exactly: `iIntros
+    "#Hslk"` alone was 1.92 s of the 2.07 s, and `Hslk` is
+    `SleepLock.is_sleeplock_genl`, which had a declared `Persistent` instance
+    and no seal. Four `Global Typeclasses Opaque` lines (`is_sleeplock_genl`,
+    `_gen`, `is_sleeplock`, `_tok`) took ProofIunlockput 11.8 s → 8.1 s,
+    ProofSysOpenTails 28.9 s → 20.9 s, and — measured on the whole-tree
+    profile — ProofCreate −20 s, ProofNamex −19 s, ProofSysOpen −16 s,
+    ProofKexecB3 −12 s, none of which anyone had opened.
+  - **PUT THE SEALS AT THE END OF THE DEFINING SECTION, not next to the
+    definition.** A file that defines a bundle almost always also states its
+    own projection lemmas (`is_sleeplock_genl_name` is `iIntros "[$ _]"`), and
+    those are what a seal above them breaks — the error is *"iAndDestructChoice:
+    cannot destruct"* in the file you just edited. `BioInv.v`'s `bio_ctx` seal
+    already sat at the end of its section for the same reason.
+  - **A CONSUMER THAT DESTRUCTURES THE SEALED NAME NEEDS ONE `rewrite /X`, and
+    the build names every one.** Sealing `BioInv.bcache_scan2` (a `big_sepL`
+    over the 30 buffer slots, bare in every fold's goal) cost exactly two
+    repairs across the 80 references in seven files — an `iIntros` pattern in
+    `bcache_scan2_floor_mono` and an `iDestruct` in `ProofBrelse` — and paid
+    BioInv 21.7 s → 12.7 s, BioInitAt 12.1 s → 6.9 s, ProofBreadParts
+    9.3 s → 6.8 s.
 - **Prove a big `Timeless`/`Persistent` instance STRUCTURALLY, never with one
   `apply _`** — one `apply _` over an `∃/∗/∨` tower backtracks across the whole
   space, for a fact whose every leaf instance already exists. Peel one
@@ -1179,6 +1294,25 @@ whose goal is a raw payload body, that needs a tactic.
   unifies up to delta, so it peels straight *through* a named abstraction that
   already has its own instance and then backtracks over everything underneath.
   **Descend through the connectives, never through a name.**
+
+  **Third and fourth files, 2026-09-03, and the point is that the peel is
+  worth doing on a SMALL body too.** `OffBox.off_hdr_timeless` — one
+  `apply _` over `∃ v, a_foff k ↦₄ v ∗ ⌜off_wf v⌝`, three connectives — was
+  **more than half the file** (3.65 s of 6.7 s), because `apply` walks
+  through `↦₄`'s own instance into the byte tower and backtracks. Three
+  lines of peel took the file to 3.7 s. `IcacheEscrow` still had two arms
+  (`ic_hdr_bare_amb`, `ic_hdr_frz_amb`) on a bare `apply _` while the same
+  file already carried `tl_struct` twice elsewhere; giving that section its
+  own copy was 4.4 s, on a critical-path file. Do not read "small body" as
+  "not worth peeling": the predictor is the LEAF, not the connective count.
+
+  **And when the peel bottoms out, NAME the leaf instances rather than
+  leaving `apply _` there.** `BioInv.bio_ctx_persistent`'s peel left
+  `apply _` on `is_sleeplock_genl … ∗ buf_box …`, neither of which was
+  sealed, and that residue was still 2.3 s;
+  `[apply is_sleeplock_genl_persistent | apply buf_box_persistent]` took it
+  to nothing. A named `apply` is the leaf-level twin of the syntactic
+  dispatch above.
 - **Pay deeply nested polymorphic structure once behind a fully typed
   wrapper.** `IcacheRef` applied `prod_local_update'` six levels down the same
   named seven-component CMRA at twelve callers; elaboration rediscovered the
@@ -1381,6 +1515,17 @@ updates pairwise, and the cost is exponential in the depth.
   that, `etransitivity; [apply L | symmetry; apply L]`, which unifies one side at
   a time and never converts. A `first [apply .. | .. ]` over 19 alternatives is
   NOT a fix — the failing branches are exactly where the unifier deltas.
+  **AND FALLBACK (2) IS NOT FREE — it is the second-best answer and it reads
+  as the settled one, so check for the missing `_ro_agree` twin before you
+  believe a file's cost.** `WpInstrConfig.mc_ro_nPC` — `HartMFrame.mm_ro_nPC`'s
+  twin at the parametric tower, and its own comment even cites `mm_ro_nPC` as
+  the reason it is not a `first` — was on fallback (2): an `etransitivity`
+  whose two halves are each a TWELVE-way `first [apply mc_rs_… ]`, run once
+  per register, 4.0 s, most of the file. The file had `mc_rs_agree`
+  (nineteen rows, `mm_Drw ∪ mm_Dro`) but no `mc_rs_ro_agree` (twelve rows,
+  `mm_Dro`) — HartMFrame has both. Writing the missing twelve-row twin, a
+  copy of `mm_rs_ro_agree` with `priv` parametric, and applying it
+  positionally took the file 13.5 s → 9.1 s.
 
 - **`ltac:(tac)` in argument position runs BEFORE the surrounding evars are
   solved.** `rewrite (Hag _ ltac:(set_solver))` and

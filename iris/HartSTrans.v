@@ -295,7 +295,12 @@ Section strans.
       Hvar H0i H0nl Hchk0 H0N H0ig Hchk0g Hupd Hmisa Hmenv HPBMTE HADUE
       HDpma HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr HA Hord Hrange HR HW
       Hpallow Hacc Hram Hpa.
-    assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro) by set_solver.
+    (* NOT [set_solver]: a single membership in a union of two [gset register]
+       VARIABLES is expensive with or without the override, and [HWtlb] is
+       already the left disjunct (claude-notes/optimization.md, "a single
+       membership in a union of two gset register variables"). *)
+    assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro)
+      by (apply elem_of_union_l; exact HWtlb).
     iIntros "#Hcert Hfrag Hrw Hro Hrd Hwr".
     unfold translate.
     iApply (swp_bind_use (lookup_TLB 39 asid vpn) _ _ _ with "[Hrw Hro] [-]").
@@ -818,7 +823,12 @@ Section strans.
       HPvar HPupd H0i H0nl Hchk0 H0N H0ig Hchk0g Hmisa Hmenv HPBMTE HADUE
       HDpma HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr HA Hord Hrange HR HW
       Hpallow Hacc Hram Hpa.
-    assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro) by set_solver.
+    (* NOT [set_solver]: a single membership in a union of two [gset register]
+       VARIABLES is expensive with or without the override, and [HWtlb] is
+       already the left disjunct (claude-notes/optimization.md, "a single
+       membership in a union of two gset register variables"). *)
+    assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro)
+      by (apply elem_of_union_l; exact HWtlb).
     iIntros "#Hcert Hfrag Hrw Hro Hrd Hwr".
     (* THE ARM: does the CACHED word need the update? *)
     assert (Hcase : {x | update_PTE_Bits (autocast (T := mword) q0 : mword 64) acc

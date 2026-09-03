@@ -104,7 +104,16 @@ Section OffBox.
   Global Instance off_rest_morph x : CtxMorph (off_rest x).
   Proof. rewrite /off_rest. apply ctx_morph_const. Qed.
   Global Instance off_hdr_timeless k x ξ : Timeless (off_hdr k x ξ).
-  Proof. rewrite /off_hdr /off_resident. apply _. Qed.
+  (* peel the connectives and let [apply _] see only the LEAVES: a single
+     [apply _] over the [∃ ∗ ⌜⌝] tower unifies up to delta, walks straight
+     through [↦₄]'s own instance into the byte tower and backtracks over the
+     lot (claude-notes/optimization.md, "prove a big Timeless/Persistent
+     instance STRUCTURALLY").  This one instance was over half of the file. *)
+  Proof.
+    rewrite /off_hdr /off_resident.
+    apply bi.exist_timeless; intros ?.
+    apply bi.sep_timeless; apply _.
+  Qed.
   Global Instance off_rest_timeless x ξ : Timeless (off_rest x ξ).
   Proof. rewrite /off_rest. apply _. Qed.
 
