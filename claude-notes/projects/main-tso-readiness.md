@@ -2045,4 +2045,6 @@ the next review pass.
 Reviewer 1 signed off on the re-cut (item 29) subject to one link fix,
 landed (item 30: `proto_fork_child_read` returns both halves).  Checkpoint
 for reviewer 2.
+Measure after the re-cut: 1460 / 15 / 100 / 1345; the 15 roots are the
+pass-1 sites (item 30) plus ProofForkretPark.
 

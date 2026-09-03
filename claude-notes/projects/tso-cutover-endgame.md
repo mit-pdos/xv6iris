@@ -1078,6 +1078,17 @@ and law 10 (hooks).
     unused `off_member` premise (keep as documentation or drop).  Reviewer 1
     has SIGNED OFF on the re-cut shapes and the chain (item 29); pass 1
     starts on reviewer 2's word.  Admitted inventory unchanged (61).
+    MEASURE after the re-cut (full `make -k -j192`, `tools/cone.py`): total
+    1460 / roots 15 / blocked 100 / green 1345.  The 15 roots are the pass-1
+    list, unchanged in kind: SpecFileread:699 / SpecFilestat:432 (the
+    `inode_pay` unfolds), ProofIput:963 / ProofIunlock:605 / ProofIget:687 /
+    ProofIlock:2579 / ProofIdup:369 (the `ic_slp_dep` / `islot2` sites),
+    ProofFileclose:331 / ProofFiledup:286 / ProofFilealloc:339 (the ftable
+    acquires' `<{ ftable_res }>` -> `ftable_res_at` re-spell -- plain
+    releases, per R4), ProofPipealloc:1610 (`file_core_off` at the retype),
+    ProofSysOpen:379 (the publish), ProofMain:1702 (the ftable `newlock`
+    over the λ payload), FsCfgSnap:1271 (`icfg_alloc`'s new row), and the
+    pre-existing ProofForkretPark:238 (L8).
 
 ## 10. Process and tooling (measured facts)
 
