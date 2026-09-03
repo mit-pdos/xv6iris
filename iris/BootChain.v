@@ -438,7 +438,15 @@ Section BootRun.
         which is what [SpecEntry.wp_entry_boot]'s raw load reads through
         (TsoCtx.pristine_read); minted once by [BootShared] beside the word *)
      TsoCtx.pristine_win mb_ld_ea 8 ∗
-     stack_own_phys (mword_of_int (sp_of (fin_to_nat cpu_id))) boot_stack_depth ∗
+     (* CONTEXT-FREE (item 38, checklist line four): this bundle is minted
+        ONCE for all eight harts, so its context-indexed cells are [∀ ξ] --
+        exclusive and timestamp-zero -- and the hart's own chain instantiates
+        them at its own ξ ([boot_entry_bridge], below).  Spelled exactly as
+        [BootShared.boot_hart_bss]'s rows so the carve's frames go through
+        syntactically. *)
+     (∀ ξ : CtxId,
+        stack_own_phys (XI := ξ) (mword_of_int (sp_of (fin_to_nat cpu_id)))
+          boot_stack_depth) ∗
      (* --- the bridge's adequacy-minted and .bss inputs --- *)
      strans_pending ∗
      strans_pending ∗
@@ -450,11 +458,13 @@ Section BootRun.
         so nothing here depends on which value that is. *)
      sret_bits ('b"0" : mword 1) ('b"0" : mword 1) ∗
      sret_bits ('b"0" : mword 1) ('b"0" : mword 1) ∗
-     a_cpu_noff cid_word ↦₄ noff_val 0 ∗
-     a_cpu_int cid_word ↦₄ iv ∗
+     (∀ ξ : CtxId,
+        ctx_word4_pointsto ξ (a_cpu_noff cid_word) (DfracOwn 1) (noff_val 0)) ∗
+     (∀ ξ : CtxId,
+        ctx_word4_pointsto ξ (a_cpu_int cid_word) (DfracOwn 1) iv) ∗
      (* the WHOLE [cpus[cid].proc] cell -- see [BootShared.boot_hart_bss].
         It is private to this hart and goes into [IntrDefs.cpu_cells]. *)
-     cur_proc zero_reg ∗
+     (∀ ξ : CtxId, cur_proc (XI := ξ) zero_reg) ∗
      (* this hart's HELD-LOCK AUTHORITY at the empty set (LockSet.v), minted
         by adequacy beside the other per-hart ghosts.  It goes straight into
         [IntrDefs.cpu_priv] at the M->S bridge and is never named again. *)
@@ -521,6 +531,12 @@ Section BootRun.
               Hmede & Hmdl & Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec &
               Hsepc & Hscause & Hstval & Hssc & Hmse & Hsse & Hgot & #Hpr & Hstk & Hbit & Hbit2 & Hg2 &
               Hg4a & Hg4b & Hspp1 & Hspp2 & Hnoff & Hint & Hproc & Hlks & Hctx & _) Hthr Hcont".
+    (* the bundle's [∀ ξ] cells, instantiated ONCE at THIS hart's own context
+       (item 38): eight bundles, eight contexts, never the minter's. *)
+    iSpecialize ("Hstk" $! cur_ctx).
+    iSpecialize ("Hnoff" $! cur_ctx).
+    iSpecialize ("Hint" $! cur_ctx).
+    iSpecialize ("Hproc" $! cur_ctx).
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     (* the two persistent halves of the config bundle, kept for the bridge *)
     iDestruct (mmode_config_persist with "Hmm") as "[[#Hhw #Hmin] Hmm]".

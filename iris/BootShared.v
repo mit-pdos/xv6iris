@@ -122,7 +122,10 @@ Qed.
    keeping the tail.  The skipped prefix is DROPPED -- every gap in the layout
    table (tx_chan, ticks, sb, log, a record's padding) is claimed by
    nobody, and [boot_cran] is affine.  With this, one bundle is one line. *)
-Lemma bss_cut `{!riscvGS Σ} `{XI : TsoCtx.CurCtx} (g : gstate) (lo a b hi : Z) :
+(* NO [CurCtx] BINDER: [boot_cran] is context-free, so an XI here is a
+   spurious binder that leaves an unresolved instance at every application
+   (item 38's shadowing trap in its other guise). *)
+Lemma bss_cut `{!riscvGS Σ} (g : gstate) (lo a b hi : Z) :
   lo <= a -> a <= b -> b <= hi ->
   boot_cran g lo hi ⊢ boot_cran g a b ∗ boot_cran g b hi.
 Proof.
@@ -270,8 +273,14 @@ Section BootBss.
          see through), and it is stated at the slice's TOP because that is
          where [_entry]'s sp lands: the hart's own 4096 bytes are
          [uint sp0 - 8*512, uint sp0). *)
+  (* PER-HART, hence CONTEXT-FREE (item 38, checklist line four): the row is
+     [∀ ξ], exclusive and timestamp-zero, and the hart's own chain
+     instantiates it once at its own context.  It is NOT at the minter's
+     ambient: this family is carved once for all eight harts. *)
   Local Definition hart_stack_raw (a : Arch.pa) : iProp Σ :=
-    stack_own_phys (add_vec a (mword_of_int 4096 : mword 64)) boot_stack_depth.
+    (∀ ξ : CtxId,
+       stack_own_phys (XI := ξ) (add_vec a (mword_of_int 4096 : mword 64))
+         boot_stack_depth)%I.
 
   Lemma boot_hart_stack_raw (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
@@ -283,8 +292,8 @@ Section BootBss.
     rewrite /hart_stack_raw off_of_z.
     assert (Hu : uint (pa_of_z (A + 4096)) = A + 4096)
       by (apply boot_uint_pa; lia).
-    iIntros "H".
-    iApply (boot_cran_stack_own_phys g (pa_of_z (A + 4096)) boot_stack_depth Hmem
+    iIntros "H" (ξ).
+    iApply (boot_cran_stack_own_phys (XI := ξ) g (pa_of_z (A + 4096)) boot_stack_depth Hmem
               ltac:(rewrite Hu; exact (z_stk_lo A Hlo))
               ltac:(rewrite Hu; exact (z_stk_top A ltac:(lia)))
               ltac:(rewrite Hu; exact (z_mod_addo 8 A 4096 Hal eq_refl))).
@@ -313,11 +322,22 @@ Section BootBss.
      The ∀ is sound exactly here and would not be elsewhere: the cell is
      EXCLUSIVE, so the ∀ is not duplicable (it is not under a [□]), and it is
      a t = 0 boot-image fact -- §0.4 item 6's one sanctioned case. *)
+  (* PER-HART, hence CONTEXT-FREE (item 38): every cell row is [∀ ξ] and the
+     [intena] contents-existential sits OUTSIDE its [∀] (a value the harts
+     disagree on would be no value at all).  The rows are written at an
+     EXPLICIT ξ, never through the [↦₈]/[↦₄] notations, because TsoCtx's
+     notations shadow RiscvPtsto's and that shadowing is what silently made
+     this carve context-indexed in the first place. *)
   Local Definition cpu_slot_raw (a : Arch.pa) : iProp Σ :=
-    (a ↦₈ (zero_reg : mword 64) ∗
-     own_ctx (add_vec a (mword_of_int 8 : mword 64)) ∗
-     (add_vec a (mword_of_int 120 : mword 64)) ↦₄ noff_val 0 ∗
-     (∃ iv : mword 32, (add_vec a (mword_of_int 124 : mword 64)) ↦₄ iv))%I.
+    ((∀ ξ : CtxId, ctx_word_pointsto ξ a (DfracOwn 1) (zero_reg : mword 64)) ∗
+     (∀ ξ : CtxId, own_ctx (XI := ξ) (add_vec a (mword_of_int 8 : mword 64))) ∗
+     (∀ ξ : CtxId,
+        ctx_word4_pointsto ξ (add_vec a (mword_of_int 120 : mword 64))
+          (DfracOwn 1) (noff_val 0)) ∗
+     (∃ iv : mword 32,
+        ∀ ξ : CtxId,
+          ctx_word4_pointsto ξ (add_vec a (mword_of_int 124 : mword 64))
+            (DfracOwn 1) iv))%I.
 
   Lemma boot_cpu_slot_raw (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
@@ -334,21 +354,32 @@ Section BootBss.
                  ltac:(lia) ltac:(lia) ltac:(lia) with "H") as "[H2 H]".
     iDestruct (bss_cut g (A + 120 + 4) (A + 124) (A + 124 + 4) (A + 128)
                  ltac:(lia) ltac:(lia) ltac:(lia) with "H") as "[H3 _]".
-    iDestruct (boot_cran_cell8_bss g A (zero_reg : mword 64) Hmem Hlo Hbss
-                 ltac:(lia) Hal nth_byte_zero8 with "Hcl H0") as "H0".
-    iDestruct (boot_own_ctx g (A + 8) Hmem ltac:(lia) ltac:(lia)
-                 ltac:(exact (z_mod_addo 8 A 8 Hal eq_refl)) with "Hcl H1")
-      as "H1".
-    iDestruct (boot_cran_cell4_bss g (A + 120) (noff_val 0) Hmem
-                 ltac:(lia) ltac:(lia) ltac:(lia)
-                 ltac:(exact (z_mod_addo 4 A 120 (z_mod8_mod4 A Hal) eq_refl))
-                 ltac:(intros j _; apply nth_byte_zero;
-                       vm_compute; reflexivity) with "Hcl H2") as "H2".
-    iDestruct (boot_cran_cell4 g (A + 124) Hmem ltac:(lia) ltac:(lia)
-                 ltac:(exact (z_mod_addo 4 A 124 (z_mod8_mod4 A Hal) eq_refl))
-                 with "Hcl H3") as (iv) "H3".
+    (* each row's carve slice is disjoint, so the [∀ ξ] is introduced per row
+       and the carve lemma applied at THAT ξ (all four are ξ-polymorphic) *)
     rewrite /cpu_slot_raw !off_of_z.
-    iFrame "H0 H1 H2". iExists iv. iExact "H3".
+    iSplitL "H0".
+    { iIntros (ξ).
+      iApply (boot_cran_cell8_bss (XI := ξ) g A (zero_reg : mword 64) Hmem Hlo Hbss
+                ltac:(lia) Hal nth_byte_zero8 with "Hcl H0"). }
+    iSplitL "H1".
+    { iIntros (ξ).
+      iApply (boot_own_ctx (XI := ξ) g (A + 8) Hmem ltac:(lia) ltac:(lia)
+                ltac:(exact (z_mod_addo 8 A 8 Hal eq_refl)) with "Hcl H1"). }
+    iSplitL "H2".
+    { iIntros (ξ).
+      iApply (boot_cran_cell4_bss (XI := ξ) g (A + 120) (noff_val 0) Hmem
+                ltac:(lia) ltac:(lia) ltac:(lia)
+                ltac:(exact (z_mod_addo 4 A 120 (z_mod8_mod4 A Hal) eq_refl))
+                ltac:(intros j _; apply nth_byte_zero;
+                      vm_compute; reflexivity) with "Hcl H2"). }
+    (* [intena] is .bss, so its image value is ZERO and the existential is
+       discharged HERE, outside the [∀] *)
+    iExists (mword_of_int 0 : mword 32). iIntros (ξ).
+    iApply (boot_cran_cell4_bss (XI := ξ) g (A + 124) (mword_of_int 0 : mword 32) Hmem
+              ltac:(lia) ltac:(lia) ltac:(lia)
+              ltac:(exact (z_mod_addo 4 A 124 (z_mod8_mod4 A Hal) eq_refl))
+              ltac:(intros j _; apply nth_byte_zero;
+                    vm_compute; reflexivity) with "Hcl H3").
   Qed.
 
 End BootBss.
@@ -411,12 +442,23 @@ Section BootBssChain.
      [h] (no invariant and no lock reads it), so it lives in that hart's
      [IntrDefs.cpu_cells] and the scheduler's two stores to it are plain
      stores to memory it already owns. *)
+  (* CONTEXT-FREE (item 38, checklist line four): one bundle per hart, minted
+     once for all eight, so every context-indexed cell is [∀ ξ] and the
+     hart's own chain instantiates at its own ξ. *)
   Definition boot_hart_bss (h : CPU) : iProp Σ :=
-    (stack_own_phys (mword_of_int (sp_of (fin_to_nat h))) boot_stack_depth ∗
-     a_cpu_noff (cid_word_of h) ↦₄ noff_val 0 ∗
-     (∃ iv : mword 32, a_cpu_int (cid_word_of h) ↦₄ iv) ∗
-     a_cpu_proc (cid_word_of h) ↦₈ (zero_reg : mword 64) ∗
-     own_ctx (a_cpu_ctx (cid_word_of h)))%I.
+    ((∀ ξ : CtxId,
+        stack_own_phys (XI := ξ) (mword_of_int (sp_of (fin_to_nat h)))
+          boot_stack_depth) ∗
+     (∀ ξ : CtxId,
+        ctx_word4_pointsto ξ (a_cpu_noff (cid_word_of h)) (DfracOwn 1)
+          (noff_val 0)) ∗
+     (∃ iv : mword 32,
+        ∀ ξ : CtxId,
+          ctx_word4_pointsto ξ (a_cpu_int (cid_word_of h)) (DfracOwn 1) iv) ∗
+     (∀ ξ : CtxId,
+        ctx_word_pointsto ξ (a_cpu_proc (cid_word_of h)) (DfracOwn 1)
+          (zero_reg : mword 64)) ∗
+     (∀ ξ : CtxId, own_ctx (XI := ξ) (a_cpu_ctx (cid_word_of h))))%I.
 
   (* the two families' per-element outputs, restated in the consumer's
      vocabulary. *)
@@ -437,7 +479,11 @@ Section BootBssChain.
   (* ------------------------------------------------------------------ *)
   (* THE WALK.                                                          *)
   (* ------------------------------------------------------------------ *)
-  Lemma boot_bss_carve (g : gstate) :
+  (* the LEMMA takes the context binder, not the section: main's rows
+     ([main_globals_raw], [main_data_raw]) are primary-only and may be
+     context-indexed, while the per-hart rows below are [∀ ξ] and so
+     context-free (item 38, checklist line four). *)
+  Lemma boot_bss_carve `{XI : CurCtx} (g : gstate) :
     boot_facts g ->
     kmap_static_claims -∗
     fd_slots FDSLOTS -∗
@@ -870,7 +916,10 @@ Section BootBssChain.
     (* ================================================================ *)
     (* everything is carved; assemble.                                   *)
     (* ================================================================ *)
-    iSplitL "Hst"; [iSplitR; [iExact "Hstcl" | iExact "Hst"] |].
+    (* the two started rows are SEPARATE conjuncts (the pair was ungrouped
+       upstream; this file had not been rebuilt since) *)
+    iSplitR; [iExact "Hstcl" |].
+    iSplitL "Hst"; [iExact "Hst" |].
     iSplitL "Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11".
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
@@ -1031,7 +1080,11 @@ Proof.
     vm_compute; apply (f_equal Some), bv_eq; reflexivity.
 Qed.
 
-Definition main_data_raw `{!riscvGS Σ} : iProp Σ :=
+(* PRIMARY-ONLY (item 38, checklist line four): these two cells go to main,
+   i.e. to ONE hart, so they may be context-INDEXED -- the shared alloc is
+   instantiated at the primary's ξ0.  The binder is explicit because this
+   definition sits outside every section. *)
+Definition main_data_raw `{!riscvGS Σ} `{XI : CurCtx} : iProp Σ :=
   ((pa_of_z KernelSyms.first_1) ↦₄ (mword_of_int 1 : mword 32) ∗
    (∃ w : bv 32, (pa_of_z KernelSyms.nextpid)  ↦₄ w))%I.
 
@@ -1140,7 +1193,7 @@ Section BootAlloc.
       (g : gstate) (ndisk : nat) :
     power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk
       (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) Rb g ⊢
-      ([∗ list] c ∈ enum CPU, boot_reg_res (CID := c) (g.(gregs) c)) ∗
+      ([∗ list] c ∈ enum CPU, boot_reg_res_at c (g.(gregs) c)) ∗
       boot_raw_bytes g ∗
       kmap_auth kmap_M0 ∗
       ([∗ map] vpn ↦ pc ∈ kmap_M0,
@@ -1189,7 +1242,19 @@ Section BootAlloc.
       crash_inv ∗ gen_cert ∗
       (* A6.131: the era's image is the boot state's memory, as a pure fact *)
       ⌜era_img riscv_eraGS = g.(gimg)⌝.
-  Proof. iIntros "H". iExact "H". Qed.
+  Proof.
+    (* a pure repackaging: the goal's rows are this file's wrapper names for
+       [power_boot_res]'s own.  Row by row rather than one conversion: two
+       wrappers ([reg_pointsto]'s notation, the strans/sie/spp/spie splits)
+       are sealed, so [iFrame] must unify them one at a time. *)
+    iIntros "H". rewrite /power_boot_res.
+    iDestruct "H" as "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26)".
+    rewrite /boot_reg_res /boot_raw_bytes /kmap_auth /kpt_unset /kptb_unset
+            /hart_strans /hart_sie /hart_spp /hart_spie /hart_locks /hart_full
+            /pstate_full /resv_frag /uart_frag /plic_frag /virtio_frag
+            /log_mirror_half /BootCarve.boot_led_all /gen_cert.
+    iFrame.
+  Qed.
 
   (* ZIPPING THE FOUR PER-HART FAMILIES: DO IT HERE, NOT AT THE USE SITE.
      [big_sepL_sep] is a [⊣⊢], so [rewrite !big_sepL_sep] is a SETOID rewrite
@@ -1205,7 +1270,7 @@ Section BootAlloc.
      [wp_next_off] -> [wp_next_off_intro] rule in claude-notes/optimization.md:
      never leave a big-op/KernelSyms.binit identity to a setoid rewrite inside a large goal. *)
   Lemma boot_hart_pre_combine (g : gstate) :
-    ([∗ list] c ∈ enum CPU, boot_reg_res (CID := c) (g.(gregs) c)) -∗
+    ([∗ list] c ∈ enum CPU, boot_reg_res_at c (g.(gregs) c)) -∗
     ([∗ list] c ∈ enum CPU, hart_strans c) -∗
     ([∗ list] c ∈ enum CPU, hart_sie c) -∗
     ([∗ list] c ∈ enum CPU, hart_spp c) -∗
@@ -1214,7 +1279,7 @@ Section BootAlloc.
     ([∗ list] c ∈ enum CPU, hart_resv c) -∗
     ([∗ list] c ∈ enum CPU, boot_hart_bss c) -∗
     [∗ list] c ∈ enum CPU,
-      (boot_reg_res (CID := c) (g.(gregs) c) ∗ hart_strans c ∗ hart_sie c ∗
+      (boot_reg_res_at c (g.(gregs) c) ∗ hart_strans c ∗ hart_sie c ∗
        hart_spp c ∗ hart_spie c ∗ hart_locks c ∗ hart_resv c ∗
        boot_hart_bss c).
   Proof.
@@ -1244,7 +1309,7 @@ Section BootAlloc.
     boot_facts g ->
     kmap_static_claims -∗ gen_cert -∗ (mb_ld_ea ↦ₚ₈□ v_stack0) -∗
     TsoCtx.pristine_win mb_ld_ea 8 -∗
-    boot_reg_res (CID := h) (g.(gregs) h) -∗
+    boot_reg_res_at h (g.(gregs) h) -∗
     hart_strans h -∗
     hart_sie h -∗
     hart_spp h -∗
@@ -1274,9 +1339,13 @@ Section BootAlloc.
     iModIntro. iFrame "Hseip Hmeip".
     iDestruct "Hint" as (iv) "Hint".
     iExists iv.
+    (* [cpu_ctx_free] stays FOLDED in the goal: it is the ∃ ξ crossing for an
+       UNOWNED cell (SchedCtx's header), so the witness is chosen HERE -- any
+       will do -- and the row then matches syntactically. *)
     rewrite /boot_hart_res /strans_pending /sie_gname /sret_bits /spp_gname
-            /spie_gname /cpu_ctx_free /cid_word.
-    iEval (rewrite /own_ctx) in "Hctx".
+            /spie_gname /cid_word.
+    iAssert (cpu_ctx_free (CID := h)) with "[Hctx]" as "Hctx".
+    { rewrite /cpu_ctx_free. iExists cur_ctx. iApply ("Hctx" $! cur_ctx). }
     iFrame "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
             Hmcen Hstc Htlb Hstvec Hsepc Hscause Hstval Hssc Hmse Hsse
             Hword Hpr Hstk
@@ -1645,7 +1714,7 @@ Section BootAlloc.
     (* ---- the eight harts' register sides, and the sixteen wire pins ---- *)
     iDestruct (big_sepS_enum_to_list hart_resv with "Hresv") as "Hresv".
     iAssert ([∗ list] c ∈ enum CPU,
-               (boot_reg_res (CID := c) (g.(gregs) c) ∗
+               (boot_reg_res_at c (g.(gregs) c) ∗
                 hart_strans c ∗ hart_sie c ∗ hart_spp c ∗ hart_spie c ∗
                 hart_locks c ∗ hart_resv c ∗ boot_hart_bss c))%I
       with "[Hregs Hstrans Hsie Hspp Hspie Hlkauth Hresv Hharts]" as "Hpre".

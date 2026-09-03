@@ -533,6 +533,19 @@ Section BootRegs.
   Definition boot_reg_res (rs : regstate) : iProp Σ :=
     ([∗ set] r ∈ boot_D cpu_id, r ↦ᵣ register_lookup r rs)%I.
 
+  (* THE PER-HART SPELLING (item 38, checklist line four).  [boot_reg_res] is
+     at the AMBIENT hart, which is what a hart's own chain wants; a resource
+     minted ONCE for all eight harts must name the hart instead, or the row
+     silently becomes the minter's.  Definitionally the same term. *)
+  Definition boot_reg_res_at (c : CPU) (rs : regstate) : iProp Σ :=
+    ([∗ set] r ∈ boot_D c,
+       reg_pointsto_at c r (DfracOwn 1) (register_lookup r rs))%I.
+
+  (* [boot_reg_res_at c] and [boot_reg_res] at the ambient [c] are the SAME
+     term, so a consumer converts between them for free; no bridge lemma is
+     stated here because inside this section [boot_reg_res]'s hart is a
+     section variable and cannot be named. *)
+
   Local Lemma boot_reg_list (rs : regstate) :
     boot_reg_res rs
     ⊣⊢ [∗ list] r ∈ boot_D_list, r ↦ᵣ register_lookup r rs.

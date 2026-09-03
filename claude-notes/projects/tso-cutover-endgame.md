@@ -1392,6 +1392,50 @@ and law 10 (hooks).
     to the dep form handed to iunlock; the retired ledger's env token in
     filewrite's 25-conjunct destruct removed.
 
+38. **REVIEWER ON THE BOOT CONE (2026-09-03): the cutover broke the cone's
+    own rule silently, twice; fix it ONCE, with a gate.**  The rule is in the
+    cone's headers: `boot_shared_alloc` mints all eight harts' bundles under
+    ONE ambient context and `SystemAdequacy` instantiates
+    `boot_hart_primary` at ξ0 and each `boot_hart_secondary` at its own ξc
+    from eight `own_context_boot` mints -- which works only if
+    `boot_hart_res` is CONTEXT-FREE (BootShared.v:1078, SchedCtx's
+    `cpu_ctx_free` header).  The proc cell was written to that rule: raw in
+    the carve, crossing at the consumer under a `∀ ξ`, sound because the cell
+    is exclusive and a timestamp-zero image fact.  TWO SILENT BREAKS:
+    (a) `StackOwn.stack_own_phys` became `ctx_phys_word_pointsto XI` (flip's
+    r4; it was `phys_word_pointsto` on main) -- that is the line-273 error;
+    (b) TsoCtx's `↦₈`/`↦₄`/`↦ₘ` notations SHADOW RiscvPtsto's raw ones and all
+    three boot files import TsoCtx after RiscvPtsto with
+    `-w -notation-overridden`, so every cell the carve meant to keep raw
+    (`cpu_slot_raw`'s proc/noff/int, `main_data_raw`, and every cell row of
+    `boot_hart_res`) is now `ctx_word_pointsto cur_ctx`.  Fixing them as they
+    surface is the spiral the endgame was written to avoid (my ambient-`XI`
+    binders were exactly that mistake and are reverted).
+    THE FIX, APPLIED ONCE: (i) restore the rule as a GATE -- `About
+    BootChain.boot_hart_res` must list no `CurCtx` argument, same for every
+    BootAlloc lemma (whose XI binder is a proof-script resolver only); (ii)
+    ONE spelling for a per-hart cell in the bundle: `∀ ξ, <cell at ξ>`,
+    exclusive, with the existentials (`iv`) OUTSIDE the `∀`; the stack becomes
+    `∀ ξ, stack_own_phys (XI := ξ) …` by ∀-introduction from BootCarve's
+    lemma (generic in its section's XI); proc/noff/int follow the proc cell's
+    precedent; consumers instantiate once (`iSpecialize … $! cur_ctx`);
+    (iii) in the carve write the RAW form explicitly
+    (`RiscvPtsto.word_pointsto`, or `boot_cran_ledger_at0_*`) so the
+    shadowing cannot recur, and mint the `∀ ξ` at `boot_hart_pre` from
+    timestamp zero (`ctx_phys_pointsto_of_at_floor` with `ctx_floor_0` for
+    the phys tier, the ledger-at-zero lemmas for the kernel tier); (iv) grep
+    `↦₈`/`↦₄`/`↦ₘ` inside every boot-file section that binds no `CurCtx`
+    before compiling further -- each hit is a raw cell that silently became a
+    context cell.  SURVEY (done): BootBss 3 rows (`cpu_slot_raw`),
+    BootBssChain 3 rows (`boot_hart_bss`), `main_data_raw` 2 rows, plus the
+    stack in both.  NOT AT ISSUE: SystemAdequacy's design is right (eight
+    mints, bundle context-free, each chain at its own context);
+    `cpu_ctx_free`'s `∃ ξ` and the proc cell's `∀ ξ` are the two sanctioned
+    crossings and no third form is needed.
+    **CHECKLIST LINE FOUR (adopted):** a resource minted ONCE for N harts is
+    context-free; its context-indexed cells are `∀ ξ` if exclusive and
+    timestamp-zero, `∃ ξ` if unowned, and NEVER at the minter's ambient.
+
 ## 10. Process and tooling (measured facts)
 
 ### 10.1 Build
