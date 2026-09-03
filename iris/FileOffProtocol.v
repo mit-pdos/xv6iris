@@ -155,19 +155,27 @@ Section FileOffProtocol.
     ftable_auth γ (<[k := (1%Qp, 1%positive)]> M) ∗ file_ref γ k 1 FdClosed.
   Proof. (* SKELETON r25 chain: = proto_filealloc *) Admitted.
 
-  (* ---- fork: the parent dups (a pure split), the child reads at ITS
-          context ξ': the share is context-free, so no morph is needed; the
-          child's [Kt] is its own ilock acquire, its [Kp] the row's floor at
-          ξ' (transported by the previous holder's _in release) ---- *)
+  (* ---- fork: the parent dups (a pure split) and KEEPS one half; the child
+          reads at ITS context ξ' with the other: the share is context-free,
+          so no morph is needed; the child's [Kt] is its own ilock acquire
+          presenting its half's llb, its [Kp] the row's floor at ξ'
+          (transported by the previous holder's _in release).  Both halves
+          are returned (reviewer 1, item 29); the read is
+          [proto_read_checkout] at ξ' over one of them, restated here as a
+          persistent wand so the link's conclusions are the next link's
+          premises. ---- *)
   Lemma proto_fork_child_read (E : coPset) (i k : nat) (q : Qp) (γb : box_names) (C : fcontent)
       (Kt : nat) (ξ' : CtxId) :
     ↑(offBoxN .@ k) ⊆ E -> fc_ip C = ientry i ->
     off_fd k q γb C -∗
-    (off_fd k (q / 2) γb C ∗
-     (own_context ξ' -∗ ctx_floor ξ' Kt -∗ off_fd k (q / 2) γb C -∗ off_rows off_cfg i ξ' ={E}=∗
-        own_context ξ' ∗ off_resident (XI := ξ') k ∗
-        ∃ (m : gmap (nat * nat) ufrac), ⌜qsum m = Qp_to_Qc (q / 2)⌝ ∗ ⌜(max_stamp m ≤ Kt)%nat⌝ ∗
-          CtxBox.l2_hold (X := unit) γb k m ∗
-          (∀ s' : l2_reg nat, off_l2_row γb s' ξ' -∗ off_rows off_cfg i ξ'))).
-  Proof. (* SKELETON r25 chain: proto_dup at q/2 + q/2, then proto_read_checkout at ξ' *) Admitted.
+    off_fd k (q / 2) γb C ∗ off_fd k (q / 2) γb C ∗
+    □ (own_context ξ' -∗ ctx_floor ξ' Kt -∗ off_fd k (q / 2) γb C -∗ off_rows off_cfg i ξ' ={E}=∗
+         own_context ξ' ∗ off_resident (XI := ξ') k ∗
+         ∃ (m : gmap (nat * nat) ufrac) (T0 : nat),
+           ⌜qsum m = Qp_to_Qc (q / 2)⌝ ∗ ⌜(max_stamp m ≤ Kt)%nat⌝ ∗
+           CtxBox.l2_hold (X := unit) γb k m ∗
+           ghost_var (bx_slotd γb) (q / 2 / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
+           ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2 / 2) 1%nat ∗
+           (∀ s' : l2_reg nat, off_l2_row γb s' ξ' -∗ off_rows off_cfg i ξ')).
+  Proof. (* SKELETON r25 chain: proto_dup at q/2 + q/2 (both kept), then proto_read_checkout at ξ' *) Admitted.
 End FileOffProtocol.

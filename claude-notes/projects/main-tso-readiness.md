@@ -2042,4 +2042,7 @@ context-free, `fslot`/`ftable_res` back to main's shapes with the λ payload
 only, `box_withdraw_L1_free` in CtxBox, `FileOffProtocol.v` with 14 chained
 statements.  61 tagged Admitted; gate green round 1.  Plan §9 item 28; for
 the next review pass.
+Reviewer 1 signed off on the re-cut (item 29) subject to one link fix,
+landed (item 30: `proto_fork_child_read` returns both halves).  Checkpoint
+for reviewer 2.
 
