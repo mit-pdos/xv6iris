@@ -525,6 +525,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | item 27 | reviewer 2 on items 24-26: item 24 RULED R1-R5 (premise checked in the tree: `ctx_pointsto_free` at any context/fraction, the free-word store leaf, fileclose never loads +32); `box_withdraw_L1_free` = the box's free-tier form of exit; item 26 DECLINED (re-review cost, an unclosed selector at the park, coupling argument weaker after 24, 5000 mono_nats + law-5 exception); the owner concurs -- stay on the box | RULED; to reviewer 1, then the impl agent's skeletons |
 | item 28/29 | the re-cut skeletons (2673a2a7b): reviewer 1's audit -- shapes final and consistent; points (a)-(d) answered; ONE fix before pass 1 (`proto_fork_child_read` must return both halves); pass-1 items: `a_foff_aligned`, `ientry` injectivity for `off_fd_split`'s join, the unused `off_member` premise | SIGNED OFF by reviewer 1; the chain-link fix LANDED (item 30); reviewer 2's pass next |
 | item 31 | reviewer 2's audit of 619580606: shapes final and consistent as a system; ONE unprovable link -- `proto_read_checkout`'s `Kt` untied to the share's hidden stamps (fix: `off_fd_at … m`, `proto_read_llb`, the checkout and fork links take `max_stamp m ≤ Kt`); item 28's (a)-(d) answered | SIGNED OFF; the link fix LANDED (item 32) -- PASS 1 STARTED |
+| item 34/35 | the fold-back problem (rows folded at acquire, deferred after a park; one predicate cannot be both): reviewer 1 RULES option (A) -- SpecIlock's post hands `off_rows` folded, SpecIunlock/Iunlockput's pre takes `∃ T, off_rows_dep` (the DEP form, CtxMorph; not the deferred wand), `ic_handle` back to pre-item-33, callers pass `off_rows_to_dep`; (B)/(C) declined (coupling / no gain); third checklist line | RULED by reviewer 1; to reviewer 2 |
 | item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RULED -- reviewer 1 agrees (item 17), with `file_core_off`'s FD_INODE arm named as the FIFTH final shape and "0 Admitted in `EnvMorph`" added to r25's gate |
 | item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; the two fixes LANDED (item 20) -- reviewer 2's audit next |
 | item 21 | reviewer 2's audit of d53e4a4e5: NOT signed off -- (1) the cell claimed twice and the unit unowned at non-FD_INODE arms (unit unconditional; `file_core_off := emp`; the free arm holds `off_resident`; the L2 half rides the FD_NONE unit); (2) `file_pay_st_split` false (one-sided over a unitless `file_pay_tie`); (3) the three ghost steps, the last-close pair, `so_deposit`, `so_open_slot` not at final shape; plus `ftable_res_at`'s fold/unfold pair | AUDITED by reviewer 2; fixes pending |
@@ -1279,6 +1280,68 @@ and law 10 (hooks).
     Until ruled, fileread/filewrite stay red at their off steps; everything
     else in the tree is green or in progress.  Ilock's llb-tier floor (step
     1) is independent of the choice and stays.
+
+35. **REVIEWER 1 ON ITEM 34 (the fold-back problem) AND ROUND 6 (2026-09-03):
+    OPTION (A), rows OUTSIDE the handle, with the release-side shape the DEP
+    form, not the deferred wand; item 33's handle ruling reversed; (B) and
+    (C) declined with reasons.**  Read: item 34, round 6's body
+    (5e870d6dd), `ic_handle`/`ic_slp`/`ic_slp_dep`/`ic_slp_dep_of_rows`,
+    `off_rows`/`off_rows_dep`/`off_rows_fold`/`off_rows_to_dep`,
+    `off_read_park`/`proto_read_park`, `lock_finisher_close_in_llb` (its
+    `CtxMorph Rdep` premise), `ctx_dom_to_parked` (the stamp rule), ProofIlock's
+    llb-tier acquire (2531), the 29 `wp_ilock` callers.  Tree: 0 Admitted;
+    red = ProofFileread/ProofFilewrite and their cone only.
+    - **THE DIAGNOSIS IS RIGHT.**  The acquire hands the rows FOLDED (R2: the
+      previous release's floors transported to the acquirer) and the
+      reader's `Kp` is exactly one of those floors; a park returns the row
+      DEFERRED at `T'`, and the parker has no floor at `T'` (the deposit
+      stamps at `max K W` of the parker, never below its bound).  One
+      predicate cannot be folded going in and deferred coming out.  Item
+      33's "rows ride `ic_handle`" was a reasonable minimal-churn guess and
+      it is wrong for this reason; it is REVERSED here, not patched.
+    - **(A) RULED, with one precision.**  SpecIlock's post gains `off_rows
+      off_cfg k cur_ctx` (folded).  SpecIunlock's and SpecIunlockput's pre
+      gain `∃ T, off_rows_dep off_cfg k T` -- the DEP FORM, context-free,
+      NOT the deferred wand `ctx_floor cur_ctx T -∗ off_rows …`: the `_in`
+      release's `Rdep` must be `CtxMorph` (`lock_finisher_close_in_llb`),
+      and a wand over the context is not; `off_rows_dep` is ghost + pures +
+      llbs and morphs as a constant.  `ic_slp_dep_of_rows` (already in the
+      tree) is the assembler at the combined maximum.  `create_locked`
+      carries the folded rows.  `ic_handle` returns to its pre-item-33
+      shape; the three `*_off_rows_acc` accessors go.  A caller that never
+      touches `f->off` threads the folded rows to its iunlock and passes
+      `off_rows_to_dep` (one line).  fileread/filewrite: folded rows from
+      ilock; `off_rows_take` for the row (its floor is `Kp`); `proto_read_llb`
+      + step 1's R1 floor for `Kt`; checkout; the access at the running
+      context; park -> the row in dep form at `T'` (`off_regp γb (L2Reg T'
+      None) ∗ llb T'`) re-inserted into the dep set at `max` (`off_rows_dep_le`,
+      `llb_max`); hand `∃ T, off_rows_dep` to iunlock.  The birth in
+      sys_open is unaffected (its row is at tp 0; `ctx_floor_0` re-folds).
+    - **COST, honestly.**  The 19 ilock continuation intros are ALREADY open
+      from step 1 (they bind the floor row; one more bound hypothesis rides
+      the same edit); the ~25 iunlock/iunlockput sites gain one argument
+      each.  Mechanical, one sweep, no shape (T1) touched: `off_rows`,
+      `off_rows_dep`, `ic_slp`, `ic_slp_dep` are as landed.  This is the
+      "L6 changes ic_slp's release fold at every iunlock" cost the third
+      reviewer priced in item 27's log entry; it did not go away by moving
+      the rows into the handle, it only moved.
+    - **(B) DECLINED:** it makes the INODE lock's release perform the OFF
+      box's park and puts an fd-shaped optional row into SpecIunlock/
+      SpecIunlockput -- cross-instance coupling of the kind item 26 was
+      declined for; smaller churn today, a second mechanism forever.
+      **(C) DECLINED:** the parametrised handle moves ~26 sites for no gain
+      over (A) and keeps a context-indexed piece inside a bundle that
+      should stay context-free.
+    - **ON STEP 1 as landed:** the corollary form (new `_llb` bodies with
+      the old bodies derived at `Tl := 0`) would have left the 19 callers
+      untouched; since the churn is done and the callers are open anyway
+      for (A), no reason to redo it.  Noted for the next spec that grows a
+      premise: state the strong form and DERIVE the old one.
+    - **CHECKLIST LINE (the third, beside the per-arm producers and the
+      self-absorb line):** for every payload piece a lock hands to its
+      holder, name the shape it comes back in at the release and check
+      that shape is `CtxMorph`; if the two shapes differ, the piece is NOT
+      a handle conjunct.
 
 ## 10. Process and tooling (measured facts)
 
