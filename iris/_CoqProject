@@ -1456,35 +1456,42 @@ SpecSysMknodAU.v
 FsAbsPins.v
 FsAbsEra.v
 SpecNamexEra.v
-# [tso-cutover r21: era walk parked, owner 2026-09-02] ProofNamexEra.v
-# [tso-cutover r21: era walk parked, owner 2026-09-02] LinkNamexEra.v
+# [tso-cutover r21: era walk parked, owner 2026-09-02]
+# ProofNamexEra.v
+# LinkNamexEra.v
 SpecNameiEra.v
 ProofNameiEra.v
-# [tso-cutover r21: era walk parked, owner 2026-09-02] LinkNameiEra.v
+# [tso-cutover r21: era walk parked, owner 2026-09-02]
+# LinkNameiEra.v
 FsAbsEraMknod.v
 SpecSysWriteAU.v
 FsAbsNpar.v
 FsAbsNparMknod.v
 SpecNparEra.v
-# [tso-cutover r21: era walk parked, owner 2026-09-02] ProofNparEra.v
-# [tso-cutover r21: era walk parked, owner 2026-09-02] LinkNparEra.v
+# [tso-cutover r21: era walk parked, owner 2026-09-02]
+# ProofNparEra.v
+# LinkNparEra.v
 SpecNparWrapEra.v
 ProofNparWrapEra.v
-# [tso-cutover r21: era walk parked, owner 2026-09-02] LinkNparWrapEra.v
+# [tso-cutover r21: era walk parked, owner 2026-09-02]
+# LinkNparWrapEra.v
 SpecSysReadAU.v
 FsAbsMknodFire.v
 SpecCreateAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofCreateAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkCreateAU.v
+# [tso-cutover r21: AU proofs parked, owner 2026-09-02]
+# ProofCreateAU.v
+# LinkCreateAU.v
 SpecSysMknodAUEra.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysMknodAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkSysMknodAU.v
+# [tso-cutover r21: AU proofs parked, owner 2026-09-02]
+# ProofSysMknodAU.v
+# LinkSysMknodAU.v
 # ...and the mknod stable corollary, DERIVED from the sealed AU form
 # (SYSMKNOD_AU_ERA -> SYSMKNOD_AU_ERA_STABLE, no second walk).  Its arms are
 # NOT the frozen file's: those key on the fetched string, which no cursor
 # can see -- SpecSysMknodAUEra's closing note has the obstruction in full.
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysMknodAUEraStable.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkSysMknodAUStable.v
+# [tso-cutover r21: AU proofs parked, owner 2026-09-02]
+# ProofSysMknodAUEraStable.v
+# LinkSysMknodAUStable.v
 
 # fs-syscall-specs lane P: the era-0 /init pins, re-derived on the abstract
 # state (the port the banner of claude-notes/projects/namei-pinned-lookup.md
@@ -1507,15 +1514,16 @@ SpecSysWriteConsAU.v
 FsFlushed.v
 SpecSysSyncFlush.v
 FsAbsOpenFire.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysOpenAUBits.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysOpenAUParts.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysOpenAUPub.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysOpenAUStores.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysOpenAUAlloc.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysOpenAUJoin.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysOpenAUWalk.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysOpenAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkSysOpenAU.v
+# [tso-cutover r21: AU proofs parked, owner 2026-09-02]
+# ProofSysOpenAUBits.v
+# ProofSysOpenAUParts.v
+# ProofSysOpenAUPub.v
+# ProofSysOpenAUStores.v
+# ProofSysOpenAUAlloc.v
+# ProofSysOpenAUJoin.v
+# ProofSysOpenAUWalk.v
+# ProofSysOpenAU.v
+# LinkSysOpenAU.v
 
 # fs-syscall-specs lane P, transport half: the era-0 identification that
 # closes lane P GAP (1) -- the map the boot mint founds the era at IS
@@ -1523,9 +1531,10 @@ FsAbsOpenFire.v
 # a LEAF: its import cone is FsInitPin's own and nothing requires it.
 FsInitPinBoot.v
 SpecSysUnlinkAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysDupAUTail.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysDupAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkSysDupAU.v
+# [tso-cutover r21: AU proofs parked, owner 2026-09-02]
+# ProofSysDupAUTail.v
+# ProofSysDupAU.v
+# LinkSysDupAU.v
 FsAbsReadFire.v
 SpecSysReadAUAt.v
 # fs-syscall-specs lane W: the T_FILE CREATE CARRY, which unlocks
@@ -1538,8 +1547,9 @@ SpecSysReadAUAt.v
 # R10: SpecCreate, SpecCreateAU and SpecSysOpenAU are untouched.
 FsAbsCreateFire.v
 SpecCreateAUF.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofCreateAUF.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkCreateAUF.v
+# [tso-cutover r21: AU proofs parked, owner 2026-09-02]
+# ProofCreateAUF.v
+# LinkCreateAUF.v
 SpecCreateAUFOpen.v
 # ...and lane W's O_CREATE ARM itself, which the carry unlocks.
 # ProofSysOpenAUCreArm is the SHIM: the blocks from the join down are
@@ -1553,15 +1563,17 @@ SpecCreateAUFOpen.v
 # RETIRED SpecSysOpenAUPlain.v: with the whole contract sealed, the
 # split-off module type had no consumer, and ProofSysOpenAU's functor is
 # unascribed.
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysOpenAUCreArm.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysOpenAUEntryC.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysOpenAUFull.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkSysOpenAUFull.v
+# [tso-cutover r21: AU proofs parked, owner 2026-09-02]
+# ProofSysOpenAUCreArm.v
+# ProofSysOpenAUEntryC.v
+# ProofSysOpenAUFull.v
+# LinkSysOpenAUFull.v
 FsAbsWriteFire.v
 SpecSysWriteAUEra.v
 SpecFilewriteAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysWriteAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysWriteAUStable.v
+# [tso-cutover r21: AU proofs parked, owner 2026-09-02]
+# ProofSysWriteAU.v
+# ProofSysWriteAUStable.v
 # fs-syscall-specs, THE CONSOLE-WRITE LANE: init.c's printf path, and the
 # campaign's last device-side gap on init.  The observable is ACCEPTANCE --
 # the bytes reached the UART transmitter, in order, after a seed the caller
@@ -1588,7 +1600,8 @@ SpecConsolewriteLoc.v
 ProofConsolewriteLoc.v
 LinkConsolewriteLoc.v
 SpecFilewriteCons.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysWriteConsAU.v
+# [tso-cutover r21: AU proofs parked, owner 2026-09-02]
+# ProofSysWriteConsAU.v
 
 # The era-0 SHELL pins: FsInitPin's /init pair (path pin, content pin,
 # arun walk) and FsInitPinBoot's boot transport, replayed at inum 13 with
@@ -1599,7 +1612,8 @@ SpecFilewriteCons.v
 FsShPin.v
 ProofFilewriteCons.v
 LinkFilewriteCons.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkSysWriteConsAU.v
+# [tso-cutover r21: AU proofs parked, owner 2026-09-02]
+# LinkSysWriteConsAU.v
 SpecKexecPin.v
 # THE CHUNK LOOP, AND THE SEAL IT CLOSES (lane W, FILEWRITE-AU).
 #   ProofFilewriteAU is ProofFilewrite's walk on the inode arm only, with
@@ -1607,10 +1621,11 @@ SpecKexecPin.v
 # Link files below make SYSWRITE_AU_ERA (and its stable corollary) an
 # unconditional theorem, WITHOUT LinkConsolewrite's Axiom -- the device arm
 # is refuted by the contract's premise rather than walked.
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofFilewriteAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkFilewriteAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkSysWriteAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkSysWriteAUStable.v
+# [tso-cutover r21: AU proofs parked, owner 2026-09-02]
+# ProofFilewriteAU.v
+# LinkFilewriteAU.v
+# LinkSysWriteAU.v
+# LinkSysWriteAUStable.v
 # THE READ SEAL, CLOSED END TO END (lane W, SYSREAD_AU_AT).
 #   SpecFilereadAU is SpecFileread's body with the descriptor pinned to
 # [FdOpen true wb (FdInode i)] and the armed post in place of the return
@@ -1622,11 +1637,12 @@ SpecKexecPin.v
 # The two Link files make the pair unconditional WITHOUT LinkConsoleread's
 # Axiom: the device arm is refuted by the contract's premise, not walked.
 SpecFilereadAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofFilereadAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysReadAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysReadAUStable.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkFilereadAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkSysReadAU.v
+# [tso-cutover r21: AU proofs parked, owner 2026-09-02]
+# ProofFilereadAU.v
+# ProofSysReadAU.v
+# ProofSysReadAUStable.v
+# LinkFilereadAU.v
+# LinkSysReadAU.v
 # INIT STAGE 1 (bare tier, echo/sync mold): init.c on the Uk engine --
 # start + main prologue + the console preamble with BOTH arms of the
 # open(...) < 0 test, up to the restart loop head at 0x32, which the two
@@ -1705,14 +1721,15 @@ SystemUartAccepted.v
 # it unconditional -- assumption set = resv_matches, resv_is_valid, funext,
 # i.e. LinkNamexEra's, with nothing new entering the cone.
 FsAbsUnlinkFire.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysUnlinkAUParts.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysUnlinkAUW1.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysUnlinkAUW2.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysUnlinkAUW3.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysUnlinkAUW5F.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysUnlinkAUW5D.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] ProofSysUnlinkAU.v
-# [tso-cutover r21: AU proofs parked, owner 2026-09-02] LinkSysUnlinkAU.v
+# [tso-cutover r21: AU proofs parked, owner 2026-09-02]
+# ProofSysUnlinkAUParts.v
+# ProofSysUnlinkAUW1.v
+# ProofSysUnlinkAUW2.v
+# ProofSysUnlinkAUW3.v
+# ProofSysUnlinkAUW5F.v
+# ProofSysUnlinkAUW5D.v
+# ProofSysUnlinkAU.v
+# LinkSysUnlinkAU.v
 
 # fs-syscall-specs lane SH-TO-URUN, STAGES 1-2: the shell's program proof
 # on the urun engine.  UCodeShK.v is a SECOND code catalog over the SAME
