@@ -524,7 +524,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | item 26 | ALTERNATIVE to the off box: a per-slot three-arm invariant (cell / marker / free) with two tokens and a per-(inode, file slot) mono_nat row in the inode payload; no box, no fresh names, no set, no CtxBox change; ~a wash in proof volume, simpler in coupling | QUESTION to reviewers 1 and 2 (owner, 2026-09-02); item 24 stands until answered |
 | item 27 | reviewer 2 on items 24-26: item 24 RULED R1-R5 (premise checked in the tree: `ctx_pointsto_free` at any context/fraction, the free-word store leaf, fileclose never loads +32); `box_withdraw_L1_free` = the box's free-tier form of exit; item 26 DECLINED (re-review cost, an unclosed selector at the park, coupling argument weaker after 24, 5000 mono_nats + law-5 exception); the owner concurs -- stay on the box | RULED; to reviewer 1, then the impl agent's skeletons |
 | item 28/29 | the re-cut skeletons (2673a2a7b): reviewer 1's audit -- shapes final and consistent; points (a)-(d) answered; ONE fix before pass 1 (`proto_fork_child_read` must return both halves); pass-1 items: `a_foff_aligned`, `ientry` injectivity for `off_fd_split`'s join, the unused `off_member` premise | SIGNED OFF by reviewer 1; the chain-link fix LANDED (item 30); reviewer 2's pass next |
-| item 31 | reviewer 2's audit of 619580606: shapes final and consistent as a system; ONE unprovable link -- `proto_read_checkout`'s `Kt` untied to the share's hidden stamps (fix: `off_fd_at … m`, `proto_read_llb`, the checkout and fork links take `max_stamp m ≤ Kt`); item 28's (a)-(d) answered | SIGNED OFF subject to the link fix (statements only); pass 1 starts on landing |
+| item 31 | reviewer 2's audit of 619580606: shapes final and consistent as a system; ONE unprovable link -- `proto_read_checkout`'s `Kt` untied to the share's hidden stamps (fix: `off_fd_at … m`, `proto_read_llb`, the checkout and fork links take `max_stamp m ≤ Kt`); item 28's (a)-(d) answered | SIGNED OFF; the link fix LANDED (item 32) -- PASS 1 STARTED |
 | item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RULED -- reviewer 1 agrees (item 17), with `file_core_off`'s FD_INODE arm named as the FIFTH final shape and "0 Admitted in `EnvMorph`" added to r25's gate |
 | item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; the two fixes LANDED (item 20) -- reviewer 2's audit next |
 | item 21 | reviewer 2's audit of d53e4a4e5: NOT signed off -- (1) the cell claimed twice and the unit unowned at non-FD_INODE arms (unit unconditional; `file_core_off := emp`; the free arm holds `off_resident`; the L2 half rides the FD_NONE unit); (2) `file_pay_st_split` false (one-sided over a unitless `file_pay_tie`); (3) the three ghost steps, the last-close pair, `so_deposit`, `so_open_slot` not at final shape; plus `ftable_res_at`'s fold/unfold pair | AUDITED by reviewer 2; fixes pending |
@@ -1090,6 +1090,30 @@ and law 10 (hooks).
     ProofSysOpen:379 (the publish), ProofMain:1702 (the ftable `newlock`
     over the λ payload), FsCfgSnap:1271 (`icfg_alloc`'s new row), and the
     pre-existing ProofForkretPark:238 (L8).
+
+32. **ITEM 31's FIX LANDED -- BOTH REVIEWERS SIGNED OFF; PASS 1 STARTS
+    (2026-09-02).**  `FileInvDefs.off_fd_at k q γb C m` (the share with its
+    stamps fragment named: `⌜qsum m = Qp_to_Qc q⌝ ∗ CtxBox.reference γb k m` in
+    place of `off_ref_stamps γb k q`); `FileOffProtocol.proto_read_llb :
+    off_fd k q γb C -∗ ∃ m, off_fd_at k q γb C m ∗ llb loglen_name (max_stamp
+    m)`; `proto_read_checkout` takes `m` and `⌜max_stamp m ≤ Kt⌝` over
+    `off_fd_at` (its conclusion at that `m`); `proto_fork_child_read`'s
+    persistent read wand quantifies `m`/`Kt` with the same premise over
+    `off_fd_at k (q/2) γb C m`.  Reviewer 2's optional links added:
+    `proto_retype_other` (pipe/device keep `off_free`) and
+    `proto_close_fdalloc_failed` (the FD_NONE last close = the pure step, the
+    payload holding `off_free k 1`), so every arm of `file_core_off` is named
+    in the chain.  `off_publish_park` left as is (reviewer 2's five-line
+    option deferred to its proof).  Compiles.  Admitted inventory: +4 (the
+    three new chain links, `proto_read_llb`) = 65, all tagged.
+    PASS 1 (r25) BEGINS on this commit: the 65 skeletons and the fifteen
+    roots (item 30's list), in the order of item 16: the ftable acquires'
+    re-spell, filealloc/filedup/fileclose's off steps, sys_open's publish,
+    the three fs spec unfolds, the ledger's retirement from `fs_ready`, the
+    inode proofs' one conjunct, `icfg_alloc`'s callers and IcacheBoot's mint;
+    then lanes (i) L8/L9 and (ii) the OffBox consumers.  Pass-1 extras from
+    items 29/31: `a_foff_aligned`, `ientry_inj` for the join,
+    `is_itable2_morph` into EnvMorph; `off_member` premise kept.
 
 ## 10. Process and tooling (measured facts)
 

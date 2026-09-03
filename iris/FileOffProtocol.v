@@ -96,19 +96,26 @@ Section FileOffProtocol.
     off_fd k (q1 + q2) γb C ⊣⊢ off_fd k q1 γb C ∗ off_fd k q2 γb C.
   Proof. (* SKELETON r25 chain: = FileInvDefs.off_fd_split *) Admitted.
 
-  (* ---- read: checkout under ip->lock.  [Kt] is R1's floor at the ilock
-          acquire presenting the share's llb (the share carries it: reference
-          = own ∗ llb); [Kp] is the row's transported floor inside off_rows.
-          THE ONE ABSORB, after the acquire. ---- *)
-  Lemma proto_read_checkout (E : coPset) (i k : nat) (q : Qp) (γb : box_names) (C : fcontent)
-      (Kt : nat) (ξ : CtxId) :
-    ↑(offBoxN .@ k) ⊆ E -> fc_ip C = ientry i ->
-    own_context ξ -∗ ctx_floor ξ Kt -∗
+  (* ---- read, step 0: name the share's stamps fragment and present its
+          llb at the ilock acquire; R1 returns a floor at least that high
+          (reviewer 2, item 31: the tie that makes the checkout provable) ---- *)
+  Lemma proto_read_llb (k : nat) (q : Qp) (γb : box_names) (C : fcontent) :
     off_fd k q γb C -∗
+    ∃ m : gmap (nat * nat) ufrac, off_fd_at k q γb C m ∗ llb loglen_name (max_stamp m).
+  Proof. (* SKELETON r25 chain: off_ref_stamps unfolds to the fragment and its llb *) Admitted.
+
+  (* ---- read: checkout under ip->lock.  [Kt] is R1's floor at the ilock
+          acquire, at least the share's llb ([max_stamp m ≤ Kt]); [Kp] is the
+          row's transported floor inside off_rows.  THE ONE ABSORB, after the
+          acquire. ---- *)
+  Lemma proto_read_checkout (E : coPset) (i k : nat) (q : Qp) (γb : box_names) (C : fcontent)
+      (m : gmap (nat * nat) ufrac) (Kt : nat) (ξ : CtxId) :
+    ↑(offBoxN .@ k) ⊆ E -> fc_ip C = ientry i -> (max_stamp m ≤ Kt)%nat ->
+    own_context ξ -∗ ctx_floor ξ Kt -∗
+    off_fd_at k q γb C m -∗
     off_rows off_cfg i ξ ={E}=∗
     own_context ξ ∗ off_resident (XI := ξ) k ∗
-    ∃ (m : gmap (nat * nat) ufrac) (T0 : nat),
-      ⌜qsum m = Qp_to_Qc q⌝ ∗ ⌜(max_stamp m ≤ Kt)%nat⌝ ∗
+    ∃ T0 : nat,
       CtxBox.l2_hold (X := unit) γb k m ∗
       ghost_var (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2) 1%nat ∗
@@ -157,25 +164,38 @@ Section FileOffProtocol.
 
   (* ---- fork: the parent dups (a pure split) and KEEPS one half; the child
           reads at ITS context ξ' with the other: the share is context-free,
-          so no morph is needed; the child's [Kt] is its own ilock acquire
-          presenting its half's llb, its [Kp] the row's floor at ξ'
-          (transported by the previous holder's _in release).  Both halves
-          are returned (reviewer 1, item 29); the read is
-          [proto_read_checkout] at ξ' over one of them, restated here as a
-          persistent wand so the link's conclusions are the next link's
-          premises. ---- *)
+          so no morph is needed; the child runs [proto_read_llb] on its half,
+          presents the llb at its ilock acquire ([max_stamp m ≤ Kt] by R1),
+          and its [Kp] is the row's floor at ξ'.  Both halves are returned
+          (reviewer 1, item 29); the read is [proto_read_checkout] at ξ' over
+          one of them (reviewer 2, item 31: at the named fragment). ---- *)
   Lemma proto_fork_child_read (E : coPset) (i k : nat) (q : Qp) (γb : box_names) (C : fcontent)
-      (Kt : nat) (ξ' : CtxId) :
+      (ξ' : CtxId) :
     ↑(offBoxN .@ k) ⊆ E -> fc_ip C = ientry i ->
     off_fd k q γb C -∗
     off_fd k (q / 2) γb C ∗ off_fd k (q / 2) γb C ∗
-    □ (own_context ξ' -∗ ctx_floor ξ' Kt -∗ off_fd k (q / 2) γb C -∗ off_rows off_cfg i ξ' ={E}=∗
+    □ (∀ (m : gmap (nat * nat) ufrac) (Kt : nat),
+         ⌜(max_stamp m ≤ Kt)%nat⌝ -∗
+         own_context ξ' -∗ ctx_floor ξ' Kt -∗ off_fd_at k (q / 2) γb C m -∗ off_rows off_cfg i ξ' ={E}=∗
          own_context ξ' ∗ off_resident (XI := ξ') k ∗
-         ∃ (m : gmap (nat * nat) ufrac) (T0 : nat),
-           ⌜qsum m = Qp_to_Qc (q / 2)⌝ ∗ ⌜(max_stamp m ≤ Kt)%nat⌝ ∗
+         ∃ T0 : nat,
            CtxBox.l2_hold (X := unit) γb k m ∗
            ghost_var (bx_slotd γb) (q / 2 / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
            ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2 / 2) 1%nat ∗
            (∀ s' : l2_reg nat, off_l2_row γb s' ξ' -∗ off_rows off_cfg i ξ')).
   Proof. (* SKELETON r25 chain: proto_dup at q/2 + q/2 (both kept), then proto_read_checkout at ξ' *) Admitted.
+
+  (* ---- the other arms of [file_core_off], named (reviewer 2, optional
+          links): pipe and device keep the free word through the retype; the
+          fdalloc-failed close at FD_NONE is the retype followed by the free
+          row (there is no box to abandon). ---- *)
+  Lemma proto_retype_other (k : nat) (q : Qp) (pn : fpnames) (C : fcontent) :
+    fc_type C = FD_PIPE \/ fc_type C = FD_DEVICE ->
+    off_free k q ⊢ file_core_off k q pn C.
+  Proof. (* SKELETON r25 chain: the non-INODE arm IS off_free *) Admitted.
+  Lemma proto_close_fdalloc_failed (γ : gname) (M : gmap nat (Qp * positive)) (k : nat) (C : fcontent) :
+    M !! k = Some (1%Qp, 1%positive) -> fc_type C = FD_NONE ->
+    ftable_auth γ M -∗ file_ref γ k 1 FdClosed ==∗
+    ftable_auth γ (delete k M) ∗ ∃ C' : fcontent, file_fields k 1 C' ∗ file_pay γ k 1 C'.
+  Proof. (* SKELETON r25 chain: = FileInv.file_close_last_step at FD_NONE; the payload holds off_free k 1 *) Admitted.
 End FileOffProtocol.

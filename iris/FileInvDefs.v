@@ -69,7 +69,7 @@
    See claude-notes/optimization.md. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
-From iris.algebra Require Import auth gmap frac numbers.
+From iris.algebra Require Import auth gmap frac ufrac numbers.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants own cancelable_invariants ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -1526,6 +1526,19 @@ Section FileInv.
        ghost_var (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2) 1%nat ∗
        off_ref_stamps γb k q)%I.
+  (* THE SHARE WITH ITS STAMPS FRAGMENT NAMED (reviewer 2, plan §9 item 31;
+     the [inode_ref_at] precedent): what a reader presents at its ilock
+     acquire is the fragment's llb, and R1 returns a floor AT LEAST that
+     high -- so the checkout's [Kt] is tied to THIS [m]. *)
+  Definition off_fd_at (k : nat) (q : Qp) (γb : box_names) (C : fcontent)
+      (m : gmap (nat * nat) ufrac) : iProp Σ :=
+    (∃ (i : nat) (T0 : nat),
+       ⌜fc_ip C = ientry i⌝ ∗ ⌜(i < NINODE)%nat⌝ ∗
+       off_box k γb ∗ off_member off_cfg i γb ∗
+       ghost_var (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
+       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2) 1%nat ∗
+       ⌜qsum m = Qp_to_Qc q⌝ ∗ CtxBox.reference (X := unit) γb k m)%I.
+
   Lemma off_fd_split (k : nat) (q1 q2 : Qp) (γb : box_names) (C : fcontent) :
     off_fd k (q1 + q2) γb C ⊣⊢ off_fd k q1 γb C ∗ off_fd k q2 γb C.
   Proof. (* SKELETON r25 (item 24): ghost_var fractions + agreement on T0, reference_split by mass *) Admitted.

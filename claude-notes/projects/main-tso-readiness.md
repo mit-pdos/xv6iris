@@ -2047,4 +2047,7 @@ landed (item 30: `proto_fork_child_read` returns both halves).  Checkpoint
 for reviewer 2.
 Measure after the re-cut: 1460 / 15 / 100 / 1345; the 15 roots are the
 pass-1 sites (item 30) plus ProofForkretPark.
+Reviewer 2 signed off (item 31) subject to the Kt tie; landed (item 32:
+`off_fd_at`, `proto_read_llb`, the checkout and fork links at the named
+fragment; two optional arm links).  65 tagged Admitted.  PASS 1 begins.
 
