@@ -724,7 +724,10 @@ Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
    ⌜fsc_size = FsImg.sb_size sb⌝ ∗ ⌜fsc_ninodes = FsImg.sb_ninodes sb⌝ ∗
    fs_kit_icache ICFG FSC ∗
    fs_kit_fsinit_ghost ICFG FSC (FsCrash.fs_blocks dk) Rspent Pb Xexc ∗
-   (* the off LEDGERS and the off-borrow liveness authority (off-ledger
-      ruling); see [FsCfgSnap.fs_cfg_alloc_snap]'s conclusion, which this
-      body restates verbatim. *)
-   FileInvDefs.flive_auth_at fsc_fol)%I.
+   (* the off-borrow liveness authority and, r25 (item 24/33), the NINODE
+      per-inode-slot set authorities of the off boxes (minted EMPTY; the
+      icache boot puts them into each slot's sleeplock payload); see
+      [FsCfgSnap.fs_cfg_alloc_snap]'s conclusion, which this body restates
+      verbatim. *)
+   FileInvDefs.flive_auth_at fsc_fol ∗
+   ([∗ list] k ∈ seq 0 IcacheRef.NINODE, OffBox.off_set_auth OffBox.off_cfg k ∅))%I.

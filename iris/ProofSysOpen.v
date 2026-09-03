@@ -79,6 +79,7 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import OffBox.   (* [off_rows] -- the fd box birth borrows the inode's rows (r25 item 33) *)
 Require Import KvmSpec.
 Require Import DirView.
 Require Import FileInvDefs.

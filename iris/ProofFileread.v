@@ -1964,7 +1964,7 @@ Section ProofFileread.
              rewrite /fileread_fs_env.
              iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
                                    #Hbio & #Hitbl & #Hclaimsfr & #Hescs &
-                                   #Hireg & #Hslks & #Hoffs & Hsb &
+                                   #Hireg & #Hslks & Hsb &
                                    #Hdevi & #Hdgeom & #Hdlock & Hbslot)".
              (* ---- THE CARVE (fs-sysfile S4', blocker 2's ratified
                 alternative; ProofFilestat is the landed instance).  The
@@ -1981,7 +1981,7 @@ Section ProofFileread.
                   "(%Hipk & %Hik & %Hinlt & %Hnd0 & %Hdv0 & %Hlesh & #Hflsh &
                     #Hshot0 & Hshr0 & Hoh & Hpayback)".
              (* the off output IS the ledger fragment on this arm *)
-             iEval (rewrite (carve_off_inode _ _ _ _ Htyi)) in "Hoh".
+             iEval (rewrite (carve_off_inode _ _ _ _ _ Htyi)) in "Hoh".
              iDestruct (ioff_escrows_acc ikk Hik with "Hoffs") as "#Hoesc".
              assert (Hibcov : IBLOCK inm icfg_ist ∈ fsc_cov)
                by (apply Hgeo; exact Hinlt).
@@ -2614,7 +2614,7 @@ Section ProofFileread.
                            gsh losh)
                   with "[Hkeep Hrefout]" as "Hshr".
                 { rewrite (IcacheRef.inode_shr_genlo_halve ikk ssh). iFrame. }
-                iEval (rewrite -(carve_off_inode _ _ _ _ Htyi)) in "Hoh".
+                iEval (rewrite -(carve_off_inode _ _ _ _ _ Htyi)) in "Hoh".
                 iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x5a)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2910,7 +2910,7 @@ Section ProofFileread.
                            gsh losh)
                   with "[Hkeep Hrefout]" as "Hshr".
                 { rewrite (IcacheRef.inode_shr_genlo_halve ikk ssh). iFrame. }
-                iEval (rewrite -(carve_off_inode _ _ _ _ Htyi)) in "Hoh".
+                iEval (rewrite -(carve_off_inode _ _ _ _ _ Htyi)) in "Hoh".
                 iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x5a)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }

@@ -250,9 +250,9 @@ Proof.
           cur_ctx XIc with "Hrun Hthr Hpinv") as "(Hrun & Hthr & #Hpinvc)".
   iMod ctx_parked_alloc as (ξb) "Hbox".
   iMod (ctx_park_box XIc ξb 0 with "Hthr Hbox") as (Tc Tb) "(_ & Hbox & Hthr & _)".
-  iMod (ctx_deposit (R := λ ξ, UsertrapRes.park_globals ξ γs γw γft γf γtl) cur_ctx XIc Tc
+  iMod (ctx_deposit (λ ξ, UsertrapRes.park_globals ξ γs γw γft γf γtl) cur_ctx XIc Tc
           with "Hrun Hthr Hglobp") as "(Hrun & %T1 & %HT1 & Hthr & #Hglobc)".
-  iMod (ctx_deposit (R := λ ξ, proc_priv (XI := ξ) γf (proc_addr j) pid U) cur_ctx XIc T1
+  iMod (ctx_deposit (λ ξ, proc_priv (XI := ξ) γf (proc_addr j) pid U) cur_ctx XIc T1
           with "Hrun Hthr Hpriv") as "(Hrun & %T2 & %HT2 & Hthr & Hpriv)".
   iDestruct (ctx_parked_llb XIc T2 with "Hthr") as "[Hthr #Hllb]".
   iMod (ctx_parked_raise ξb Tb T2 with "Hllb Hbox") as "[Hbox #Hfl]".
@@ -398,7 +398,11 @@ Proof.
             (MkUstate V M) av Hrest Hj Hav with "Hrun [Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
   iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
-  iFrame "Htext Hwire Hkmap Hpinv Hglobp Hmk Hstk".
+  iFrame "Htext Hwire Hkmap Hmk Hstk".
+  (* [procs_inv] and the globals by [iExact]: the persistent [Hpinv] would
+     otherwise be framed INTO the transparent globals bundle's first row *)
+  iSplitR; [iExact "Hpinv"|].
+  iSplitR; [iExact "Hglobp"|].
   iNext.
   iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg #Hglob #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
   iApply ("Hclose" $! h Xc pt' U'

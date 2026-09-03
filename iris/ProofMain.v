@@ -1386,6 +1386,9 @@ Section ProofMain.
     gen_cert -∗
     FsCrash.fs_crash_seam fsc_cov fsc_logst -∗
     flive_own ((● ∅) : fliveUR) -∗
+    (* r25 (item 24/33): the off boxes' per-inode-slot set authorities, minted
+       empty at the era mint and put into the icache slots' payloads here *)
+    ([∗ list] k ∈ seq 0 IcacheRef.NINODE, OffBox.off_set_auth OffBox.off_cfg k ∅) -∗
     (* ---- `static int first = 1', PINNED (fs-cfg-boot.md (f-2)).  One of
        the image's two writable initialized .data words, carved at
        [BootShared]'s boot data run and threaded pinned-not-existential the
@@ -1495,7 +1498,7 @@ Section ProofMain.
     intros Hn Hlen Hlive Hdevq Hnibq Hcov0 Hnibeq Hpures
            Huartq Hdiskq Hgeomok Hpkc.
     iIntros "Hcg #Htext #Hkdata #Hdev #Hwire #Htramp #Hccaps #Hcready #Htl #Hwaitlk
-             #Hpenv #Hkmem #Hcert #Hseam Hfolauth Hfirst
+             #Hpenv #Hkmem #Hcert #Hseam Hfolauth Hoffa Hfirst
              #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail #Hlpidlk Hkenv".
     iIntros "Hlbc Hbufl Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
              Hsbb Hlogr Hmir Hirslot Hirauth Hient Hlft Hfents Hirfile Hfdauth
@@ -1646,7 +1649,7 @@ Section ProofMain.
             fsc_logst icfg_nib icfg_dev
             with "Hiref Hlivef Hislg Hitw Hitnm Hitcpu Hslf Hient Hirauth
                   Histmp Hipool Hpkey Hxkey Hitfree Hictok Hicmid Hicid Hhpn Htkey
-                  Hckey Hicbox Hrun")
+                  Hckey Hicbox Hoffa Hrun")
       as "(Hrun & #Hitl & #Hitinv & #Hesc & Hicsl)".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
@@ -2220,7 +2223,7 @@ Section ProofMain.
            are stage (f)'s, at the [fs_ready] seal. ---- *)
     iDestruct "Hfs" as "(%Hdevq & %Hnibq & %Histq & %Huartq & %Hdiskq &
                          %Hcovq & %Hlogstq & %Hbmapq & %Hsizeq & %Hninq &
-                         Hkit1 & Hkit2 & Hfolat)".
+                         Hkit1 & Hkit2 & Hfolat & Hoffa)".
     (* the boot face IS the liveness authority (the off LEDGER is retired,
        r25 item 24: the off cell lives in the fd's own box) *)
     iEval (rewrite flive_auth_at_eq) in "Hfolat".
@@ -2301,7 +2304,7 @@ Section ProofMain.
               Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
               Huartq Hdiskq Hgeomok Hpkc
               with "Hcg Htext Hkdata Hdev Hwire Htramp Hccaps Hcready Htl Hwaitlock
-                    Hpenvc Hkmem Hcert Hseamc Hfolat Hfirst
+                    Hpenvc Hkmem Hcert Hseamc Hfolat Hoffa Hfirst
                     [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail
                     Hpidlock Hkenv Hlbc Hbufl
                     Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2

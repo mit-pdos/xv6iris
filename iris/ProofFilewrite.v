@@ -1542,7 +1542,6 @@ Section ProofFilewrite.
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     ic_sleeplocks fsc_ic -∗
     (* ...and the off LEDGERS (off-ledger ruling) *)
-    ioff_escrows -∗
     dev_inv (fsc_uart) (fsc_disk) -∗
     DiskInv.disk_geom (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) -∗
     is_lock (fsc_dlock) DiskAddrs.d_lock "virtio_disk"%string
@@ -1591,7 +1590,7 @@ Section ProofFilewrite.
              Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
              Href Hpriv #Hkenv
              #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hclaimsfw #Hescs #Hireg
-             #Hslks #Hoffs #Hdev #Hgeo #Hdlk #Hbm Hout Hcont".
+             #Hslks #Hdev #Hgeo #Hdlk #Hbm Hout Hcont".
     (* ---- THE REFERENCE, OPENED, AND THE TWO FIELD FACTS OFF THE STATE ----
        The loop reads [f->type] and [f->writable] off the field cells, so it
        needs equations about the [fcontent] the reference carries -- but not
@@ -1755,7 +1754,7 @@ Section ProofFilewrite.
          "(%P8 & %P9 & %P5 & %P10 & %P10d & %Hlex & #Hflx & #Hty & Hshr & Hoh &
            Hpayback)".
     (* the off output IS the ledger fragment on this arm *)
-    iEval (rewrite (carve_off_inode _ _ _ _ Htyi)) in "Hoh".
+    iEval (rewrite (carve_off_inode _ _ _ _ _ Htyi)) in "Hoh".
     iDestruct (ioff_escrows_acc ik P9 with "Hoffs") as "#Hoesc".
     assert (P3 : IBLOCK inum icfg_ist ∈ fsc_cov)
       by (apply P3q; exact P5).
@@ -2402,7 +2401,7 @@ Section ProofFilewrite.
     { rewrite (IcacheRef.inode_shr_genlo_halve ik sh). iFrame. }
     (* ...and back into the payload it came from.  From here the reference is
        intact again and the postcondition carries no share at all. *)
-    iEval (rewrite -(carve_off_inode _ _ _ _ Htyi)) in "Hoh".
+    iEval (rewrite -(carve_off_inode _ _ _ _ _ Htyi)) in "Hoh".
     iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
     (* ---- +0xbc jal ra,end_op : the transaction closes at whatever the
            chunk left of its reservation ([SpecEndOp] takes any [u]) ---- *)
@@ -2647,7 +2646,7 @@ Section ProofFilewrite.
                         Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                         Href Hpriv Hkenv
                         Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hclaimsfw Hescs Hireg
-                        Hslks Hoffs Hdev Hgeo Hdlk Hbm Hout Hcont").
+                        Hslks Hdev Hgeo Hdlk Hbm Hout Hcont").
     - (* ====== THE SHORT WRITE (and writei's -1): straight to +0xe2 ======
          Before 31f115a this arm ran its own five restores at +0xea first;
          gcc now sends both loop exits into the tail, which owns them. *)
