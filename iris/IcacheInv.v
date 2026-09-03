@@ -62,7 +62,10 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvPtsto RiscvExtras.
 Require Import SleepLock.
 Require Import Xv6Cameras.
-Require Import WpSconfMem.  (* [wordw_claim]: the pinw read leaves need it *)
+Require Import MemClaim.  (* [wordw_claim]: the pinw read leaves need it.
+     NOT WpSconfMem -- that would put the whole WP engine in front of this
+     file, and it was the tree's most expensive require edge (see
+     MemClaim.v's header). *)
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import RiscvModelBytes.  (* [nth_byte]/[bv_eq_of_bytes]: A6.145's
    word-set pin states the count word per byte *)

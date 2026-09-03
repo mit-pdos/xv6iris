@@ -17,7 +17,7 @@ From stdpp Require Import base list option gmap bitvector.definitions.
 Import ListNotations.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes RiscvExec VirtioModel DevModel TsoMemPa.
+Require Import RiscvModelBytes RiscvExec VirtioModel DevModel.
 Require Import VTest VConc.
 Local Open Scope Z_scope.
 
@@ -49,51 +49,53 @@ Proof.
   by rewrite H3.
 Qed.
 
-(* ...and once the device is stalled, NEITHER ordinary arm is enabled: the
-   completion and the capture are both None at the head it stalled on,
-   while that head stays in flight.  So there is no schedule of ordinary
-   steps -- no [sitem] list built from [SDiskPop], [SDiskDma],
-   [SDiskCapture] and [SDiskDrain] -- that gets the used ring moving.  Only
-   [SDiskWild] is left. *)
+(* ...and once the device is stalled, NO ordinary arm gets the ring moving:
+   either a popped head has a chain that does not parse -- it has no fetch,
+   and nothing else touches a head whose chain is unread -- or the entry at
+   the pop index names a head still in flight, and there is no pop.  So
+   there is no schedule of ordinary steps -- no [sitem] list built from
+   [SDiskPop], [SDiskFetch], [SDiskCapture], [SDiskWrite], [SDiskDma] and
+   [SDiskDrain] -- that serves it.  Only [SDiskWild] is left. *)
 Lemma model_stalled_leaves_only_wild (v : virtio_state) (mv : vmem) :
   virtio_stalled v mv = true ->
   virtio_pending v mv = true
-  /\ exists i, virtio_req_step v mv i = None
-               /\ virtio_capture_step v mv i = None.
+  /\ ((exists h, virtio_phase v h = Some PhPopped
+                /\ virtio_fetch_step v mv h = None)
+      \/ virtio_pop_step v mv = None).
 Proof.
   intro H. split; [ exact (virtio_stalled_pending v mv H) | ].
-  destruct (virtio_stalled_pos v mv H) as (i & _ & Hbad).
-  exists i. exact (virtio_chain_bad_no_step v mv i Hbad).
+  destruct (virtio_stalled_pos v mv H) as [(h & Hph & Hbad) | [Hl Hdup]].
+  - left. exists h. split; [exact Hph | exact (virtio_chain_bad_no_fetch v mv h Hbad)].
+  - right. unfold virtio_pop_step, virtio_pop_ok. unfold virtio_pop_dup in Hdup.
+    apply andb_prop in Hdup as [Hne Hin]. rewrite Hl, Hne, Hin. reflexivity.
 Qed.
 
 (* ---- from the retired DiskOrder.v ---- *)
 
 (* ---------------------------------------------------------------------- *)
 
-Lemma model_completes_any_inflight_head (v : virtio_state) (mv : vmem)
-    (i : bv 16) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
-  virtio_req_step v mv i = Some (v', w) ->
-  (* it answered the head it was handed... *)
-  (exists r, req_from (v_cfg v) mv i = Some r)
-  (* ...which was in flight, and nothing more was asked of it *)
-  /\ i ∈ v_inflight v
-  (* ...and afterwards exactly that head is gone from the in-flight set,
+Lemma model_completes_any_inflight_head (v : virtio_state)
+    (h : bv 16) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
+  virtio_complete_step v h = Some (v', w) ->
+  (* it answered the head it was handed, which was in flight and had been
+     pushed -- its element written -- and nothing more was asked of it *)
+  (exists r, v_inflight v !! h = Some (PhPushed r))
+  (* ...and afterwards exactly that head is gone from the in-flight map,
      while the pop index has not moved *)
-  /\ v_inflight v' = v_inflight v ∖ {[ i ]}
+  /\ v_inflight v' = delete h (v_inflight v)
   /\ v_seen v' = v_seen v.
 Proof.
   intro H.
-  destruct (virtio_req_step_shape _ _ _ _ _ H) as (r & Hr & Hserve & _ & _).
-  split; [by exists r|].
-  split; [exact (virtio_serve_in _ _ _ Hserve)|].
-  split; [exact (virtio_req_step_inflight _ _ _ _ _ H)|].
-  exact (virtio_req_step_seen _ _ _ _ _ H).
+  destruct (virtio_complete_step_shape _ _ _ _ H) as (r & Hph & _ & _ & _).
+  split; [exists r; exact (virtio_phase_in _ _ _ Hph)|].
+  split; [exact (virtio_complete_step_inflight _ _ _ _ H)|].
+  exact (virtio_complete_step_seen _ _ _ _ H).
 Qed.
 
 Lemma model_pops_in_order (v : virtio_state) (mv : vmem) (v' : virtio_state) :
   virtio_pop_step v mv = Some v' ->
   (* the entry taken is the one at the pop index, and only that one... *)
-  v_inflight v' = {[ avail_ring_at (v_cfg v) mv (v_seen v) ]} ∪ v_inflight v
+  v_inflight v' = <[ avail_ring_at (v_cfg v) mv (v_seen v) := PhPopped ]> (v_inflight v)
   (* ...and the index advances by exactly one *)
   /\ v_seen v' = bv_add (v_seen v) one16.
 Proof.
@@ -104,18 +106,16 @@ Qed.
 (* ---- from the retired DiskErr.v ---- *)
 
 (* an unrecognised type is answered, and answered with UNSUPP *)
-Lemma model_unknown_type_is_unsupp (v : virtio_state) (mv : vmem) (r : vio_req)
-    (i : bv 16) :
+Lemma model_unknown_type_is_unsupp (r : vio_req) :
   bv_unsigned (vr_type r) <> virtio_blk_t_in ->
   bv_unsigned (vr_type r) <> virtio_blk_t_out ->
   bv_unsigned (vr_type r) <> virtio_blk_t_flush ->
-  (virtio_complete v mv r i).2 !! vr_status r
-  = Some (Z_to_bv 8 virtio_blk_s_unsupp).
+  virtio_status_writes r !! vr_status r = Some (Z_to_bv 8 virtio_blk_s_unsupp).
 Proof.
-  intros Hi Ho Hf. unfold virtio_complete. cbv zeta.
+  intros Hi Ho Hf. unfold virtio_status_writes, virtio_status_of.
   rewrite (proj2 (Z.eqb_neq _ _) Hi), (proj2 (Z.eqb_neq _ _) Ho),
           (proj2 (Z.eqb_neq _ _) Hf).
-  cbn [orb snd]. by rewrite lookup_insert.
+  cbn [orb]. apply lookup_singleton.
 Qed.
 
 (* ...and it does not wait for the CACHE TO DRAIN the way a write does, only
@@ -161,53 +161,15 @@ Proof.
   rewrite Hf. unfold virtio_blk_t_flush, virtio_blk_t_out. lia.
 Qed.
 
-(* ---- from the retired ConcSb.v, restated for the Ztso machine ---- *)
+(* ---- from the retired ConcSb.v ---- *)
 
 (* ---------------------------------------------------------------------- *)
-(* These two used to say the opposite -- that a hart reads THE one memory  *)
-(* and a store is global the instant it retires -- and were the model-side *)
-(* record of finding 24.  Since the machine flip they are false, and what  *)
-(* replaces them is the pair of arms that make store buffering a model     *)
-(* execution: a PLAIN STORE appends its message and leaves the author's    *)
-(* view where it was, and a PLAIN LOAD may read at the view the hart       *)
-(* already has, where another hart's later stores are not yet visible.     *)
-(* ConcSbSched.sb_00 is the run that uses exactly these two transitions.   *)
-(* ---------------------------------------------------------------------- *)
 
-Lemma model_plain_store_buffers oth h img s log tv r n req k :
-  dev_addr (Interface.WriteReq.pa req) = false ->
-  ak_excl (Interface.WriteReq.access_kind req) = false ->
-  footprint (Interface.WriteReq.pa req) n ## oth ->
-  mnode_step oth h img s log tv r
-    (Interface.Next (Interface.MemWrite n req) k)
-    (k (inl None))
-    (MState (sregs s)
-       (write_bytes (mem s) (Interface.WriteReq.pa req) n
-                    (Interface.WriteReq.value req)) (mdev s))
-    (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
-                            (Interface.WriteReq.value req)) h])%list
-    tv None.
-Proof.
-  intros Hdev Hex Hfp. unfold mnode_step. rewrite Hdev, Hex. cbv beta iota.
-  right. split_and!; first [reflexivity | exact Hfp].
-Qed.
+Lemma model_hart_sees_the_one_memory : forall g c, mem (ghart g c) = gmem g.
+Proof. reflexivity. Qed.
 
-Lemma model_plain_load_may_read_stale oth h img s log tv r n req k
-    (w : bv (8 * n)) :
-  dev_addr (Interface.ReadReq.pa req) = false ->
-  ak_excl (Interface.ReadReq.access_kind req) = false ->
-  (tv <= length log)%nat ->
-  (forall j : nat, (N.of_nat j < n)%N ->
-     tso_read img log h tv (pa_add (Interface.ReadReq.pa req) j)
-     = Some (nth_byte w j)) ->
-  mnode_step oth h img s log tv r
-    (Interface.Next (Interface.MemRead n req) k)
-    (k (inl (w, None))) s log tv r.
-Proof.
-  intros Hdev Hex Htv Hrd. unfold mnode_step. rewrite Hdev. cbv beta iota.
-  left. split; [exact Hex|]. exists tv, w.
-  split_and!; first [reflexivity | exact Hrd | lia].
-Qed.
+Lemma model_store_is_immediately_global : forall g c s, gmem (gput g c s) = mem s.
+Proof. reflexivity. Qed.
 
 (* ---- from the retired PtTlb.v ---- *)
 

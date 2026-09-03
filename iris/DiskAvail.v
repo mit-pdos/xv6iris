@@ -486,6 +486,25 @@ Section DiskAvail.
     iApply (ctx_byte_of_at _ _ _ (Hs (0 + k)%nat ltac:(lia)) (Hc (0 + k)%nat ltac:(lia))
               with "Hkm Hfl Hb").
   Qed.
+  (* A6.126 §6, STAGED: the chain's bytes come back with their stamps
+     BOUNDED by the completion's position rather than equal to it
+     ([VirtioProto.ledger_le]) -- each was written by one of the request's
+     earlier transactions -- and a floor at the bound is a floor at each *)
+  Lemma ctx_bytes_of_le_seq (a : Arch.pa) (n : nat) (f : nat -> bv 8) (q : nat) :
+    (forall j, (j < n)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
+    (forall j, (j < n)%nat ->
+       (uint (pa_add a j : SailStdpp.Values.mword 64) < 274877906944)%Z) ->
+    kmap_static_claims -∗ TsoCtx.ctx_floor cur_ctx q -∗
+    ([∗ list] j ∈ seq 0 n, ledger_le (pa_add a j) (f j) q) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add a j) ↦ₘ f j).
+  Proof.
+    iIntros (Hs Hc) "#Hkm #Hfl H".
+    iApply (big_sepL_impl with "H"). iIntros "!>" (k j Hk) "(%t & %Ht & Hb)".
+    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    iDestruct (TsoCtx.ctx_floor_le _ _ _ Ht with "Hfl") as "#Hflt".
+    iApply (ctx_byte_of_at _ _ _ (Hs (0 + k)%nat ltac:(lia)) (Hc (0 + k)%nat ltac:(lia))
+              with "Hkm Hflt Hb").
+  Qed.
 End DiskAvail.
 
 Section DiskAvailMorph.

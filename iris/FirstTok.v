@@ -560,7 +560,17 @@ Section FirstTok.
     first_addr ↦₄ (mword_of_int 1 : mword 32) -∗
     first_boot_persist -∗ kalloc_avail fsc_kpages None -∗ first_fsinit -∗
     first_tok.
-  Proof. iIntros "H #P #K F". iLeft. iFrame "H P K F". Qed.
+  (* BUILT, not framed: [first_boot_persist] and [kalloc_avail] are both
+     multi-row abstractions, so a four-name [iFrame] pays a conversion per
+     (name x conjunct) against them (claude-notes/optimization.md, "framing:
+     name the context side, construct the goal side"). *)
+  Proof.
+    iIntros "H #P #K F". iLeft.
+    iSplitL "H"; [iExact "H"|].
+    iSplitR; [iExact "P"|].
+    iSplitR; [iExact "K"|].
+    iExact "F".
+  Qed.
 
   (* THE SEAL SITE'S WHOLE fs ASSEMBLY, one wand: the sixteen persistent
      rows main built, the count userinit sealed, and the two things fsinit
@@ -600,8 +610,32 @@ Section FirstTok.
        the frame needs no resource bookkeeping, is FIVE TIMES WORSE
        (13.7 s -> 74.3 s) -- [iFrame] then searches the intuitionistic
        context once per goal conjunct. *)
-    iFrame "H1 H2 H3 H5 HLp H7 H8 H9 H10 H11 H12 H13 H14 H15s H17 HK HC H16s".
-    iFrame "%".
+    (* AND NOW BUILD IT.  Even fully named and in the goal's order, [iFrame]
+       walks the goal once per name and every conjunct here is
+       definition-valued, so each attempt is a conversion -- the case the
+       notes call "when every conjunct is definition-valued, there is no big
+       one to split off; build the WHOLE bundle".  Each row below is one
+       syntactic check.  The two pure rows go in place. *)
+    iSplitL "H1"; [iExact "H1"|].
+    iSplitL "H2"; [iExact "H2"|].
+    iSplitL "H3"; [iExact "H3"|].
+    iSplitR; [iPureIntro; exact H4|].
+    iSplitL "H5"; [iExact "H5"|].
+    iSplitR; [iExact "HLp"|].
+    iSplitL "H7"; [iExact "H7"|].
+    iSplitL "H8"; [iExact "H8"|].
+    iSplitL "H9"; [iExact "H9"|].
+    iSplitL "H10"; [iExact "H10"|].
+    iSplitL "H11"; [iExact "H11"|].
+    iSplitL "H12"; [iExact "H12"|].
+    iSplitL "H13"; [iExact "H13"|].
+    iSplitL "H14"; [iExact "H14"|].
+    iSplitR; [iExact "H15s"|].
+    iSplitL "H17"; [iExact "H17"|].
+    iSplitL "HK"; [iExact "HK"|].
+    iSplitR; [iPureIntro; exact H18|].
+    iSplitR; [iExact "HC"|].
+    iExact "H16s".
   Qed.
 
   (* THE TWO ARMS ARE MUTUALLY EXCLUSIVE, and this is the lemma that says

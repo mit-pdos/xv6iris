@@ -50,6 +50,7 @@ Require Import DiskPtsto VirtioQueue VirtioProto.
    append, so it names the message and the store gate. *)
 Require Import TsoMemPa.
 Require Import PermInv.
+Require Export UartNames.  (* [uart_names]: split out for the build DAG *)
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)
 (* and the nightly dead-import sweep skips [Require Export] lines.         *)
@@ -299,25 +300,7 @@ Qed.
 (*  write WOULD shrink it, so no such write can be verified under [dev_inv].*)
 (* ===================================================================== *)
 
-(*  The UART's ghost names travel together in ONE record, so [dev_inv] and
-    every client-facing resource take a single [γ : uart_names] rather than a
-    fistful of gnames:
-
-      un_acc   mono_list over [uart_acc]  -- the persistent accepted-byte
-               history.  Grows only on a THR push; a lower bound
-               [uart_sent γ l] is a permanent record that [l] was accepted.
-      un_out   mono_list over [u_out]     -- the transmitted prefix.  Its
-               lower bound is what carries a THRE observation forward across
-               later device steps (see [uart_tx_still_empty], DevModel.v).
-      un_tx    ghost_var halves over the accepted trace -- EXCLUSIVE
-               ownership of the transmitter (see [uart_tx_own] below).
-      un_dlab  dfrac_agree over DLAB -- freezable to a persistent fact.       *)
-Record uart_names := UartNames {
-  un_acc  : gname;
-  un_out  : gname;
-  un_tx   : gname;
-  un_dlab : gname;
-}.
+(* [uart_names] moved to UartNames.v (build DAG; see that header). *)
 
 
 Section DevLoops.
@@ -1020,68 +1003,243 @@ Section DevLoops.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iNext. iIntros (d' W log') "%Hstep %Hlog".
     iMod "Hmask" as "_".
-    destruct Hstep as [mv i vnew w Hview Hdisk | mv i vnew Hview Hcap
-                      | mv vnew Hview Hpop
-                      | s vnew Hdrain
+    destruct Hstep as [mv vnew Hview Hpop | mv h vnew Hview Hfetch
+                      | mv h vnew Hview Hcap | h vnew w Hwrite
+                      | h vnew w Hdisk | s vnew Hdrain
                       | mv w Hview Hstall | p' Hirq Hlatch |].
-    - (* the disk completes a queued request.  This is the only step that
-         touches the byte memory, and the ONLY thing that justifies it is the
-         DMA lease inside the invariant: [virtio_proto_step] consumes the
-         lease's ownership of the written bytes and hands the same lease back,
-         because the write set provably lands inside it and misses the queue's
-         control region (VirtioModel.virtio_dma_ok).
+    - (* THE POP -- the device takes the next available-ring entry
+         (tools/vtest/README.md finding 5).  This is the phase QEMU does
+         strictly IN ORDER, and it is what xv6's reuse of
+         [avail->ring[idx % NUM]] rests on.  It reads the ring and moves the
+         pop index; it writes NO byte memory, produces no used-ring entry,
+         raises no interrupt and moves no durable disk byte, so there is no
+         permit to spend and no image to move. *)
+      iInv "Hvinv" as ">Hbody" "Hclose".
+      iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
+      iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
+      (* A6.11: this arm's write set is [∅], so the log disjunct forces
+         [log' = log] and the memory is untouched -- the bundle comes
+         straight back ([RiscvExec.tso_interp_of_disk_idle] pays the disk
+         agent's pinned view). *)
+      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
+      rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
+      rewrite Hv in Hpop.
+      iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
+      iDestruct (virtio_proto_pop_step γd vs m mv vnew Hview Hpop
+                   with "Hmem Hlease") as "[Hmem Hlease]".
+      iMod ("Hclose" with "[Hv' Hlease]") as "_".
+      { iNext. iExists vnew. iFrame "Hv' Hlease".
+        iPureIntro. exact (virtio_pop_step_isr_ok vs mv vnew Hvok Hpop). }
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
+      assert (Hdk : v_disk vnew = v_disk (dvirtio d))
+        by (rewrite Hv; exact (virtio_pop_step_disk vs mv vnew Hpop)).
+      iModIntro. iFrame "Hgr Hmem Hdev'".
+      iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
+      rewrite <- Hdk in Hdview.
+      iSplitL "Hdauth".
+      { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
+      iEval (rewrite <- Hdk) in "Htie".
+      iFrame "Htie Hsa".
+      iSplitL "Htso"; [iApply (tso_interp_of_disk_idle with "Htso") |].
+      iApply "IH".
+    - (* THE FETCH -- the device reads a popped head's descriptor chain and
+         request header, once, through the same bus view the pop read the
+         ring through.  Like the pop it writes no byte memory and moves no
+         disk byte; what the invariant learns is that the request the device
+         now holds is the one the driver pinned. *)
+      iInv "Hvinv" as ">Hbody" "Hclose".
+      iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
+      iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
+      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
+      rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
+      rewrite Hv in Hfetch.
+      iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
+      iDestruct (virtio_proto_fetch_step γd vs m mv h vnew Hview Hfetch
+                   with "Hmem Hlease") as "[Hmem Hlease]".
+      iMod ("Hclose" with "[Hv' Hlease]") as "_".
+      { iNext. iExists vnew. iFrame "Hv' Hlease".
+        iPureIntro. exact (virtio_fetch_step_isr_ok vs mv h vnew Hvok Hfetch). }
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
+      assert (Hdk : v_disk vnew = v_disk (dvirtio d))
+        by (rewrite Hv; exact (virtio_fetch_step_disk vs mv h vnew Hfetch)).
+      iModIntro. iFrame "Hgr Hmem Hdev'".
+      iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
+      rewrite <- Hdk in Hdview.
+      iSplitL "Hdauth".
+      { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
+      iEval (rewrite <- Hdk) in "Htie".
+      iFrame "Htie Hsa".
+      iSplitL "Htso"; [iApply (tso_interp_of_disk_idle with "Htso") |].
+      iApply "IH".
+    - (* THE CAPTURE: a write request's data enters the device's VOLATILE
+         cache (claude-notes/completed/async-disk.md).  It reads the driver's
+         buffer off the bus once -- which is the only reason this arm carries
+         a memory view at all -- and moves NOTHING else: no byte memory (the
+         step's [m' = m]), no used ring, no ISR, no consumed index, and NO
+         DURABLE DISK BYTE.  So there is no permit to spend and [crashN] is
+         NOT opened here: a power cycle between the capture and the drains
+         loses the whole request, which is exactly what the client's
+         still-unspent sequential permit says.  Both the era image auth and
+         the FS tie are FRAMED. *)
+      iInv "Hvinv" as ">Hbody" "Hclose".
+      iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
+      iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
+      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
+      rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
+      rewrite Hv in Hcap.
+      iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
+      iDestruct (virtio_proto_capture_step γd vs m mv h vnew Hview Hcap
+                   with "Hmem Hlease") as "[Hmem Hlease]".
+      iMod ("Hclose" with "[Hv' Hlease]") as "_".
+      { iNext. iExists vnew. iFrame "Hv' Hlease".
+        iPureIntro. exact (virtio_capture_step_isr_ok vs mv h vnew Hvok Hcap). }
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
+      assert (Hdk : v_disk vnew = v_disk (dvirtio d))
+        by (rewrite Hv; exact (virtio_capture_step_disk vs mv h vnew Hcap)).
+      iModIntro. iFrame "Hgr Hmem Hdev'".
+      iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
+      rewrite <- Hdk in Hdview.
+      iSplitL "Hdauth".
+      { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
+      iEval (rewrite <- Hdk) in "Htie".
+      iFrame "Htie Hsa".
+      iSplitL "Htso"; [iApply (tso_interp_of_disk_idle with "Htso") |].
+      iApply "IH".
+    - (* ONE WRITE TRANSACTION into the driver's memory -- a read's data
+         buffer, the status byte, or the used-ring element, whichever the
+         request's phase calls for (VirtioModel section 6).  The ONLY thing
+         that justifies it is the DMA lease inside the invariant:
+         [virtio_proto_write_step] hands out the written bytes' OLD sealed
+         cells and takes the new ones back sealed, because the write set
+         provably lands inside the lease and misses the queue's control
+         region.  It moves no disk byte and spends no permit -- the request
+         stays pending until its index bump -- so [crashN] stays closed; the
+         era image auth goes in only so the FILL can read the block's bytes
+         off the slot's fragments, and comes straight back.
 
-         IT NO LONGER MOVES THE DURABLE IMAGE (sector-atomic-disk.md stage 2):
-         every sector of an OUT request landed at its own earlier step, so the
-         [wr] this arm gets back is [None] and the permit it spends is the
-         request's trivial COMPLETION permit.  The arm's SHAPE is unchanged --
-         that is the point of keeping a uniform completion key: the disk
-         thread still cannot tell a read from a write here. *)
+         THE APPEND IS PERFORMED HERE, by the disk loop, and not inside the
+         protocol lemma (A6.48 ruling 4): [TsoCtx.ledger_store_ok] moves
+         [gen_heap_interp] and [tso_interp_at] TOGETHER, and the loop is the
+         one holder of both.  The device is an agent of the era log, so the
+         transaction goes in as ONE message authored by [disk_agent]; the
+         stamp the new cells come back with is hidden again at once -- the
+         completion is what bounds it, from the log, when it publishes. *)
+      iInv "Hvinv" as ">Hbody" "Hclose".
+      iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
+      iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
+      rewrite Hv in Hwrite.
+      iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
+      iEval (rewrite -Himg Hv) in "Hdur".
+      iDestruct (virtio_proto_write_step γd vs h vnew w Hwrite with "Hdur Hlease")
+        as (old) "(%Hdomold & Hold & Hback)".
+      iAssert (|==> gen_heap_interp (w ∪ m) ∗
+                 tso_interp_of riscv_eraGS img (w ∪ m) log'
+                   (vstep disk_agent (length log') log' V) ∗
+                 phys_map w)%I
+        with "[Hmem Htso Hold]" as ">(Hmem & Htso & Hnew)".
+      { iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+        iDestruct (tso_interp_of_bound with "Htso") as %Hbnd.
+        destruct Hlog as [[Hw Hl] | [Hne Hl]].
+        - (* nothing written: the bundle comes straight back *)
+          subst w log'. rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
+          iModIntro. iFrame "Hmem".
+          iSplitL "Htso"; [iApply (tso_interp_of_disk_idle with "Htso") |].
+          rewrite /phys_map big_sepM_empty. done.
+        - (* the real append, at the [disk_agent] author *)
+          subst log'.
+          set (V' := vstep disk_agent
+                       (length (log ++ [TsoMemPa.PWMsg w disk_agent])%list)
+                       (log ++ [TsoMemPa.PWMsg w disk_agent])%list V).
+          assert (Hpin' : forall h, (NCPU <= h)%nat ->
+                    V' h = length (log ++ [TsoMemPa.PWMsg w disk_agent])%list).
+          { intros h' Hh. rewrite /V' /vstep. case_decide as Hd; [done|].
+            destruct (lt_dec h' NCPU) as [|Hge]; [lia|done]. }
+          assert (Htvmono : forall c : CPU,
+                    (V (hart_agent c) <= V' (hart_agent c))%nat).
+          { intros c. rewrite /V' /vstep. case_decide as Hd.
+            - exfalso. pose proof (fin_to_nat_lt c).
+              rewrite /hart_agent /disk_agent in Hd. lia.
+            - destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; [lia|].
+              exfalso. pose proof (fin_to_nat_lt c).
+              rewrite /hart_agent in Hge. lia. }
+          assert (Htvtop : forall c : CPU,
+                    (V' (hart_agent c) <= length
+                       (log ++ [TsoMemPa.PWMsg w disk_agent])%list)%nat).
+          { intros c. rewrite /V' /vstep. case_decide as Hd; [lia|].
+            destruct (lt_dec (hart_agent c) NCPU) as [|Hge].
+            - rewrite length_app /=. have := Hbnd (hart_agent c). lia.
+            - lia. }
+          rewrite (tso_interp_of_at_gs riscv_eraGS img m log V
+                     (gr 0%fin) d Hpin).
+          iEval (rewrite /phys_map) in "Hold".
+          iMod (TsoCtx.ledger_store_ok
+                  (gs_of img m log V (gr 0%fin) d)
+                  (gs_of img (w ∪ m)
+                     (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'
+                     (gr 0%fin) d)
+                  disk_agent old w Hdomold eq_refl eq_refl eq_refl
+                  Htvmono Htvtop with "Hmem Htso Hold")
+            as "(Hmem & Htso & _ & Hnew)".
+          iModIntro. iFrame "Hmem".
+          rewrite -(tso_interp_of_at_gs riscv_eraGS img (w ∪ m)
+                      (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'
+                      (gr 0%fin) d Hpin').
+          iFrame "Htso". rewrite /phys_map.
+          iApply (big_sepM_impl with "Hnew"). iIntros "!>" (a b _) "H".
+          iApply phys_ledger_at_ledger. iExact "H". }
+      iDestruct ("Hback" with "Hnew") as "[Hdur Hlease']".
+      iMod ("Hclose" with "[Hv' Hlease']") as "_".
+      { iNext. iExists vnew. iFrame.
+        iPureIntro. exact (virtio_write_step_isr_ok vs h vnew w Hvok Hwrite). }
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
+      assert (Hdk : v_disk vnew = v_disk vs)
+        by exact (virtio_write_step_disk vs h vnew w Hwrite).
+      iModIntro. iFrame "Hgr Hmem Hdev'".
+      iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
+      iEval (rewrite Himg) in "Hdauth".
+      rewrite <- Hdk in Hdview.
+      iSplitL "Hdauth".
+      { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
+      iEval (rewrite Hv -Hdk) in "Htie".
+      iFrame "Htie Hsa Htso".
+      iApply "IH".
+    - (* THE COMPLETION -- the used index, the last of a request's
+         transactions and the one the driver waits for.  Two bytes into the
+         lease, and the ghost moves that publish the request to the
+         interrupt handler.
+
+         IT DOES NOT MOVE THE DURABLE IMAGE (sector-atomic-disk.md stage 2):
+         every sector of an OUT request landed at its own earlier drain, so
+         the [wr] this arm gets back is [None] and the permit it spends is the
+         request's trivial COMPLETION permit -- the LEAF of the sequential
+         permit, where a client's receipt is delivered in both directions.
+         The arm's SHAPE is direction-agnostic on purpose: the disk thread
+         cannot tell a read from a write here.  The crash predicate is still
+         re-established, because the permit's view shift is what delivers
+         the client's receipt; the image it is run at is the one the machine
+         already has. *)
       iInv "Hvinv" as ">Hbody" "Hclose".
       iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
       iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
       rewrite Hv in Hdisk.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
-      (* the auth [wp_disk_step] handed over is at the ERA's gname; the
-         fragments this invariant holds are at [dn_img γd] -- the same map,
-         by [Himg]. *)
-      iEval (rewrite -Himg Hv) in "Hdur".
       (* the protocol step is an ACCESSOR over the permit channel: it hands
          out the completing request's PENDING token and owes the SPENT one *)
-      iMod (virtio_proto_step γd vs m mv i vnew w Hview Hdisk
-              with "Hmem Hdur Hlease")
+      iMod (virtio_proto_step γd vs h vnew w Hdisk with "Hlease")
         as (kq wr old nc lo tf hist)
-           "(%Hwr & %Hdomold & %Hsnapw & %Hho & %Htf & %Hlo & Hmem & Hold & Hrel & Hpend & Hback)".
+           "(%Hwr & %Hsnapw & %Hho & %Htf & %Hlo & Hold & Hrel & Hpend & Hback)".
       (* the post-completion image, in the form the tie must move to: the
          IDENTITY, because every sector landed at its own earlier step *)
       assert (Hpost : wr_apply None (v_disk (dvirtio d)) = v_disk vnew)
         by (rewrite Hv Hwr; reflexivity).
-      (* THE COMMIT INSTANT -- the linearization point of every disk write in
-         the system.  The durable image has just changed, so the crash
-         predicate is re-established HERE, by running the client's own view
-         shift (deposited at enqueue, transported by [PermInv]) on the
-         [▷]-body of [crash_inv].  The crash predicate's later is NOT
-         stripped: it is arbitrary, hence not timeless, and the permit's type
-         takes it under the later.  This is the only opening of [crashN] in
-         the tree. *)
-      iInv "Hcinv" as "HP" "Hcclose".
-      (* THE TIE IS THE AUTH: [wp_disk_step] handed over the durable disk's
-         fixed auth at the machine's own image ([Htie]), and the permit
-         below is the client's view shift WITH THAT AUTH LENT -- it agrees
-         its own fragments against it, moves them, and returns it at the
-         image the device just produced (design/crash.md, "The durable
-         disk").  No [ghost_var] halves to agree or move any more. *)
       (* THE CLIENT'S VIEW SHIFT, at the image the machine is moving FROM;
-         it lands the crash predicate at [wr_apply wr] of it. *)
-      (* THE LIVE-ERA ARITHMETIC GOES IN WITH THE VIEW SHIFT (phase C2b/D1):
-         [state_interp]'s started-generations auth at [n = gen_id + 1].  The
-         channel is held at THIS thread's [gen_id], so every permit in it was
-         authored by this era and its [⌜n = gd + 1⌝] is exactly the fact
-         [wp_disk_step] already handed us -- which is what lets a client fupd
-         identify the crash record's recorded custodian as ITSELF. *)
-      (* the permit is a mask-[∅] fupd (RiscvPtsto: a timeless client
-         predicate must be able to strip the [▷] this hands it), and we hold
-         three invariants open, so shrink the mask around it and restore. *)
+         it lands the crash predicate at [wr_apply wr] of it -- the identity.
+         [state_interp]'s started-generations auth goes in at
+         [n = gen_id + 1] (phase C2b/D1): the channel is held at THIS
+         thread's [gen_id], so every permit in it was authored by this era.
+         The permit is a mask-[∅] fupd and three invariants are open, so
+         shrink the mask around it and restore. *)
+      iInv "Hcinv" as "HP" "Hcclose".
       iMod (fupd_mask_subseteq ∅) as "Hmclose"; [set_solver|].
       iMod (perm_consume_kq gen_id (dn_perm γd) kq wr (v_disk (dvirtio d)) n
               with "Hpbody Hpend Hsa [//] Htie HP")
@@ -1090,30 +1248,22 @@ Section DevLoops.
       iEval (rewrite Hpost) in "Htie".
       iMod ("Hcclose" with "HP") as "_".
       (* ================================================================ *)
-      (* THE DMA COMPLETION'S APPEND (A6.48 ruling 4, closing A6.28/A6.29). *)
-      (* The device is an AGENT of the era log: its whole write set goes in *)
-      (* as ONE message authored by [disk_agent], and the ghost steps that  *)
-      (* append owes are paid HERE, by the one holder of both authorities.  *)
-      (* That is why [virtio_proto_step] had to be turned inside out --     *)
-      (* [ledger_store_ok] moves [gen_heap_interp] and [tso_interp_at]      *)
-      (* TOGETHER (the interp's tie relates the flat cell to the timestamp  *)
-      (* element), so it cannot be split across the protocol and the loop.  *)
-      (* A6.11's log disjunct decides which half runs: an EMPTY write set   *)
-      (* hands both authorities straight back, a non-empty one stores.      *)
+      (* THE INDEX BUMP'S APPEND (A6.48 ruling 4, A6.126 §6).  The write   *)
+      (* set is exactly the index word's snapshot; it goes in as ONE       *)
+      (* message authored by [disk_agent] through the RELEASE-WINDOW gate  *)
+      (* ([TsoCtx.ledger_store_rel_map_ok]), which re-mints the window     *)
+      (* with its history extended by this append's position.  The record  *)
+      (* the handler will read was written by the EARLIER transactions:    *)
+      (* its sealed cells come out of the protocol and go back as          *)
+      (* [ledger_le] at the append's position, their hidden stamps bounded  *)
+      (* by the log's length BEFORE the append ([phys_map_ledger_le]).     *)
       (* ================================================================ *)
-      (* A6.126 §6: the append is ONE message carrying the slot's bytes AND
-         the index word; the slot's bytes come back STAMPED at the append's
-         position and the index word as the release window with its history
-         extended -- [TsoCtx.ledger_store_rel_map_ok].  The window is minted
-         here if this is the device's first completion (the boot's stamped
-         zero bytes, [rel_pre_cells]). *)
       iAssert (|==> gen_heap_interp (w ∪ m) ∗
                  tso_interp_of riscv_eraGS img (w ∪ m) log'
                    (vstep disk_agent (length log') log' V) ∗
                  (∃ q : nat,
                     ⌜forall k q' g, hist !! k = Some (q', g) -> (q' < q)%nat⌝ ∗
-                    ([∗ map] a ↦ b ∈ w ∖ snap_of (used_idx_pa (v_cfg vs)) 2 (wrap16 (S nc)),
-                       TsoCtx.phys_ledger_at a (DfracOwn 1) b q) ∗
+                    ([∗ map] a ↦ b ∈ old, ledger_le a b q) ∗
                     TsoCtx.rel_cells (used_idx_pa (v_cfg vs)) 2 (DfracOwn 1) disk_agent lo tf
                       (nth_byte (wrap16 0)) (nth_byte (wrap16 (S nc)))
                       (hist ++ [(q, nth_byte (wrap16 (S nc)))])))%I
@@ -1126,8 +1276,7 @@ Section DevLoops.
           assert (Hs : snap_of (used_idx_pa (v_cfg vs)) 2 (wrap16 (S nc))
                          !! pa_add (used_idx_pa (v_cfg vs)) 0 = Some (nth_byte (wrap16 (S nc)) 0))
             by (apply write_bytes_lookup; lia).
-          rewrite map_subseteq_spec in Hsnapw.
-          pose proof (Hsnapw _ _ Hs) as Hc. rewrite lookup_empty in Hc. discriminate Hc.
+          rewrite <- Hsnapw in Hs. rewrite lookup_empty in Hs. discriminate Hs.
         - (* the real append, at the [disk_agent] author *)
           subst log'.
           set (V' := vstep disk_agent
@@ -1135,8 +1284,8 @@ Section DevLoops.
                        (log ++ [TsoMemPa.PWMsg w disk_agent])%list V).
           assert (Hpin' : forall h, (NCPU <= h)%nat ->
                     V' h = length (log ++ [TsoMemPa.PWMsg w disk_agent])%list).
-          { intros h Hh. rewrite /V' /vstep. case_decide as Hd; [done|].
-            destruct (lt_dec h NCPU) as [|Hge]; [lia|done]. }
+          { intros h' Hh. rewrite /V' /vstep. case_decide as Hd; [done|].
+            destruct (lt_dec h' NCPU) as [|Hge]; [lia|done]. }
           assert (Htvmono : forall c : CPU,
                     (V (hart_agent c) <= V' (hart_agent c))%nat).
           { intros c. rewrite /V' /vstep. case_decide as Hd.
@@ -1182,113 +1331,51 @@ Section DevLoops.
             destruct Hok0 as (_ & _ & _ & _ & H1b & _). cbn in H1b.
             destruct (H1b q' g (elem_of_list_lookup_2 _ _ _ Hk)) as (_ & i0 & mg & -> & Hlk & _).
             apply lookup_lt_Some in Hlk. lia. }
+          (* THE RECORD'S CELLS: stamped by earlier appends, so under the log *)
+          iDestruct (phys_map_ledger_le (gs_of img m log V (gr 0%fin) d) old
+                       with "Hmem Htso Hold") as "(Hmem & Htso & Hold)".
+          iEval (cbn [gs_of glog]) in "Hold".
+          (* the append: the index word alone, through the window gate *)
           iMod (TsoCtx.ledger_store_rel_map_ok
                   (gs_of img m log V (gr 0%fin) d)
                   (gs_of img (w ∪ m)
                      (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'
                      (gr 0%fin) d)
-                  disk_agent old w (used_idx_pa (v_cfg vs)) 2 (wrap16 nc) (wrap16 (S nc))
+                  disk_agent ∅ w (used_idx_pa (v_cfg vs)) 2 (wrap16 nc) (wrap16 (S nc))
                   lo tf (nth_byte (wrap16 0)) hist
-                  ltac:(cbn; lia) Hsnapw Hdomold eq_refl eq_refl eq_refl
-                  Htvmono Htvtop with "Hmem Htso Hold Hrel")
-            as "(Hmem & Htso & _ & Hnew & Hrel)".
+                  ltac:(cbn; lia) ltac:(rewrite Hsnapw; reflexivity)
+                  ltac:(rewrite dom_empty_L Hsnapw !dom_snap_of difference_diag_L; reflexivity)
+                  eq_refl eq_refl eq_refl
+                  Htvmono Htvtop with "Hmem Htso [] Hrel")
+            as "(Hmem & Htso & _ & _ & Hrel)"; [by rewrite big_sepM_empty|].
           iModIntro. iFrame "Hmem".
           rewrite -(tso_interp_of_at_gs riscv_eraGS img (w ∪ m)
                       (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'
                       (gr 0%fin) d Hpin').
-          iFrame "Htso". iEval (cbn [gs_of glog]) in "Hnew Hrel".
-          iExists (S (length log)). iFrame "Hnew".
+          iFrame "Htso". iEval (cbn [gs_of glog]) in "Hrel".
+          iExists (S (length log)).
           iSplitR; [iPureIntro; exact Hqgt|].
+          iSplitL "Hold".
+          { iApply (big_sepM_impl with "Hold"). iIntros "!>" (a b _) "H".
+            iApply (ledger_le_mono _ _ (length log)); [lia | iExact "H"]. }
           iEval (change (N.to_nat 2) with 2%nat) in "Hrel".
           rewrite /TsoCtx.rel_cells.
           iApply (big_sepL_mono with "Hrel"). iIntros (k j _) "H".
           iExists (S (length log)). iExact "H". }
       iDestruct "Hnew" as (q) "(%Hqgt & Hnew & Hrel)".
-      iMod ("Hback" $! q with "[%] Hdone Hnew Hrel") as "(Hdur' & Hlease')"; [exact Hqgt|].
+      iMod ("Hback" $! q with "[%] Hdone Hnew Hrel") as "Hlease'"; [exact Hqgt|].
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
-        iPureIntro. exact (virtio_req_step_isr_ok vs mv vnew w i Hvok Hdisk). }
+        iPureIntro. exact (virtio_complete_step_isr_ok vs h vnew w Hvok Hdisk). }
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
+      assert (Hdk : v_disk vnew = v_disk (dvirtio d))
+        by (rewrite Hv; exact (virtio_complete_step_disk vs h vnew w Hdisk)).
       iModIntro. iFrame "Hgr Hmem Hdev'".
-      iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdv']".
-      iEval (rewrite Himg) in "Hdauth'".
-      iSplitL "Hdauth'".
-      { iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdv'. }
+      iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
+      rewrite <- Hdk in Hdview.
+      iSplitL "Hdauth".
+      { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
       iFrame "Htie Hsa Htso".
-      iApply "IH".
-    - (* THE CAPTURE: the head write request's data enters the device's
-         VOLATILE cache (claude-notes/completed/async-disk.md).  It reads the
-         driver's buffer off the bus once -- which is the only reason this
-         arm carries a memory view at all -- and moves NOTHING else: no byte
-         memory (the step's [m' = m]), no used ring, no ISR, no consumed
-         index, and NO DURABLE DISK BYTE.  So there is no permit to spend and
-         [crashN] is NOT opened here: a power cycle between the capture and
-         the drains loses the whole request, which is exactly what the
-         client's still-unspent sequential permit says.  Both the era image
-         auth and the FS tie are FRAMED. *)
-      iInv "Hvinv" as ">Hbody" "Hclose".
-      iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
-      iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
-      (* A6.11: this arm's write set is [∅], so the log disjunct forces
-         [log' = log] and the memory is untouched -- the bundle comes
-         straight back ([RiscvExec.tso_interp_of_disk_idle] pays the disk
-         agent's pinned view). *)
-      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
-      rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
-      rewrite Hv in Hcap.
-      iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
-      iDestruct (virtio_proto_capture_step γd vs m mv i vnew Hview Hcap
-                   with "Hmem Hlease") as "[Hmem Hlease]".
-      iMod ("Hclose" with "[Hv' Hlease]") as "_".
-      { iNext. iExists vnew. iFrame "Hv' Hlease".
-        iPureIntro. exact (virtio_capture_step_isr_ok vs mv vnew i Hvok Hcap). }
-      iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
-      assert (Hdk : v_disk vnew = v_disk (dvirtio d))
-        by (rewrite Hv; exact (virtio_capture_step_disk vs mv vnew i Hcap)).
-      iModIntro. iFrame "Hgr Hmem Hdev'".
-      iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
-      rewrite <- Hdk in Hdview.
-      iSplitL "Hdauth".
-      { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
-      iEval (rewrite <- Hdk) in "Htie".
-      iFrame "Htie Hsa".
-      iSplitL "Htso"; [iApply (tso_interp_of_disk_idle with "Htso") |].
-      iApply "IH".
-
-    - (* THE POP -- the device takes the next available-ring entry
-         (tools/vtest/README.md finding 5).  This is the phase QEMU does
-         strictly IN ORDER, and it is what xv6's reuse of
-         [avail->ring[idx % NUM]] rests on.  It reads the ring and moves the
-         pop index; it writes NO byte memory, produces no used-ring entry,
-         raises no interrupt and moves no durable disk byte, so -- like the
-         capture -- there is no permit to spend and no image to move. *)
-      iInv "Hvinv" as ">Hbody" "Hclose".
-      iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
-      iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
-      (* A6.11: this arm's write set is [∅], so the log disjunct forces
-         [log' = log] and the memory is untouched -- the bundle comes
-         straight back ([RiscvExec.tso_interp_of_disk_idle] pays the disk
-         agent's pinned view). *)
-      destruct Hlog as [[_ ->] | [Hne _]]; [| exfalso; exact (Hne eq_refl)].
-      rewrite (left_id_L (∅ : gmap Arch.pa (bv 8)) union).
-      rewrite Hv in Hpop.
-      iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
-      iDestruct (virtio_proto_pop_step γd vs m mv vnew Hview Hpop
-                   with "Hmem Hlease") as "[Hmem Hlease]".
-      iMod ("Hclose" with "[Hv' Hlease]") as "_".
-      { iNext. iExists vnew. iFrame "Hv' Hlease".
-        iPureIntro. exact (virtio_pop_step_isr_ok vs mv vnew Hvok Hpop). }
-      iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
-      assert (Hdk : v_disk vnew = v_disk (dvirtio d))
-        by (rewrite Hv; exact (virtio_pop_step_disk vs mv vnew Hpop)).
-      iModIntro. iFrame "Hgr Hmem Hdev'".
-      iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
-      rewrite <- Hdk in Hdview.
-      iSplitL "Hdauth".
-      { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
-      iEval (rewrite <- Hdk) in "Htie".
-      iFrame "Htie Hsa".
-      iSplitL "Htso"; [iApply (tso_interp_of_disk_idle with "Htso") |].
       iApply "IH".
     - (* ONE CACHED SECTOR DRAINS -- THE COMMIT INSTANT
          (claude-notes/completed/sector-atomic-disk.md, restated for the

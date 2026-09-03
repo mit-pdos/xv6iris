@@ -164,9 +164,35 @@ Section KexecB2Frame.
   Proof.
     rewrite (kxc_slots_asc sp0 9 54) (kxc_slots_asc sp0 8 54).
     cbn [seq big_opL Nat.add].
+    (* BUILT, not framed, in both directions: a bare [iFrame] over nine
+       [ctx_word_pointsto] stack cells is nine goal walks with a conversion
+       per attempt (claude-notes/optimization.md, "a rebuild is a
+       construction, so build it").  The 63 slot is the one that splits off,
+       so it is [iSplitR "H9"] first and the eight-cell block after. *)
     iSplit.
-    - iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & _)". iFrame.
-    - iIntros "((H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & _) & H9)". iFrame.
+    - iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & _)".
+      iSplitR "H9".
+      iSplitL "H1"; [iExact "H1"|].
+      iSplitL "H2"; [iExact "H2"|].
+      iSplitL "H3"; [iExact "H3"|].
+      iSplitL "H4"; [iExact "H4"|].
+      iSplitL "H5"; [iExact "H5"|].
+      iSplitL "H6"; [iExact "H6"|].
+      iSplitL "H7"; [iExact "H7"|].
+      iSplitL "H8"; [iExact "H8"|].
+      { done. }
+      iExact "H9".
+    - iIntros "((H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & _) & H9)".
+      iSplitL "H1"; [iExact "H1"|].
+      iSplitL "H2"; [iExact "H2"|].
+      iSplitL "H3"; [iExact "H3"|].
+      iSplitL "H4"; [iExact "H4"|].
+      iSplitL "H5"; [iExact "H5"|].
+      iSplitL "H6"; [iExact "H6"|].
+      iSplitL "H7"; [iExact "H7"|].
+      iSplitL "H8"; [iExact "H8"|].
+      iSplitL "H9"; [iExact "H9"|].
+      done.
   Qed.
 
   Definition kxc_frameBpin (sp0 ra0 s00 s10 s20 pv av : mword 64)

@@ -220,7 +220,7 @@ Proof.
   iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbs") as "Hb0".
   { rewrite lookup_seq_lt; [reflexivity | lia]. }
   (* A6.68: [↦₄] is the CONTEXT tower now, so the raw byte law wants the
-     forgetful projection first ([WpSconfMem.mem_pointsto_claim]'s shape). *)
+     forgetful projection first ([MemClaim.mem_pointsto_claim]'s shape). *)
   iDestruct (TsoCtx.ctx_pointsto_forget with "Hb0") as "Hb0".
   iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(_ & _ & %Hram & %Hid & _)".
   iPureIntro.

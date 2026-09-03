@@ -1178,7 +1178,36 @@ Proof.
              feplo fstmp fbox foff), g0.
   cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_pool icfg_pext icfg_icnt
        icfg_frzm icfg_hpn icfg_ptrn icfg_pcrp icfg_ieplo icfg_istmp icfg_box icfg_off].
-  by iFrame "Ha Hl Hlk Hcnt Hfrzm Hep Hisl Heplo Hstmp Hboot Hreg Hlkr Hpool Hpext Hhpn Hptrn Hpcrp Hbox Hoff".
+  (* BUILD the bundle, do not frame it: six of the rows are [big_sepL]s over
+     NINODE (and one over the inode region), so a named [iFrame] pays a
+     conversion for each of its nineteen names against each of them -- and the
+     name list was not even in the goal's order, which the notes call worse
+     than none.  Each row is now one syntactic check
+     (claude-notes/optimization.md, "framing: name the context side,
+     construct the goal side").  The [by]'s trailing [done] went with it. *)
+  iSplitR; [iPureIntro; reflexivity|].
+  iSplitR; [iPureIntro; reflexivity|].
+  iSplitR; [iPureIntro; reflexivity|].
+  iSplitR; [iPureIntro; reflexivity|].
+  iSplitL "Ha"; [iExact "Ha"|].
+  iSplitL "Hl"; [iExact "Hl"|].
+  iSplitL "Hlk"; [iExact "Hlk"|].
+  iSplitL "Hcnt"; [iExact "Hcnt"|].
+  iSplitL "Hfrzm"; [iExact "Hfrzm"|].
+  iSplitL "Hboot"; [iExact "Hboot"|].
+  iSplitL "Hep"; [iExact "Hep"|].
+  iSplitL "Hisl"; [iExact "Hisl"|].
+  iSplitL "Heplo"; [iExact "Heplo"|].
+  iSplitL "Hstmp"; [iExact "Hstmp"|].
+  iSplitL "Hbox"; [iExact "Hbox"|].
+  iSplitL "Hreg"; [iExact "Hreg"|].
+  iSplitL "Hlkr"; [iExact "Hlkr"|].
+  iSplitL "Hpool"; [iExact "Hpool"|].
+  iSplitL "Hpext"; [iExact "Hpext"|].
+  iSplitL "Hhpn"; [iExact "Hhpn"|].
+  iSplitL "Hptrn"; [iExact "Hptrn"|].
+  iSplitL "Hpcrp"; [iExact "Hpcrp"|].
+  iExact "Hoff".
 Qed.
 
 (* ===================================================================== *)

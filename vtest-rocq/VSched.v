@@ -8,9 +8,10 @@
 (* choice of arm, computes the successor.  That is [sapply] below, and a    *)
 (* [sitem] is exactly "which arm, with which parameters".                   *)
 (*                                                                         *)
-(* SO A TEST'S WITNESS IS A SHORT LIST.  [SCpu 812; SDiskPop;               *)
-(* SDiskCapture 0; SDiskDrain 2; SDiskDma 0; SCpu 40] is a whole disk       *)
-(* round trip.  Nothing materialises a list of machine states or of Sail    *)
+(* SO A TEST'S WITNESS IS A SHORT LIST.  [SCpu 812; SDiskPop; SDiskFetch 0;  *)
+(* SDiskCapture 0; SDiskDrain 2; SDiskWrite 0; SDiskWrite 0; SDiskDma 0;    *)
+(* SCpu 40] is a whole disk round trip.  Nothing materialises a list of     *)
+(* machine states or of Sail                                                *)
 (* monad terms: each item carries a COUNT or a CHOICE, and [srun] folds.    *)
 (*                                                                         *)
 (* WHAT IS NOT HERE YET: the soundness lemma                                *)
@@ -37,7 +38,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvModelBytes RiscvExec DevModel.
 (* EXPORT what a test reasons about: the language ([mstate]), the device model
-   ([virtio_state], [virtio_req_step] and their lemmas -- a test that records a
+   ([virtio_state], [virtio_complete_step] and their lemmas -- a test that records a
    FINDING states it against those, see DiskOrder.v) and the model's own types
    ([Arch.pa]).  [Require Import VTest] should be all a test file needs. *)
 Require Export Riscv.rv64d_types RiscvLang VirtioModel.
@@ -46,7 +47,7 @@ Local Open Scope Z_scope.
 (* ---------------------------------------------------------------------- *)
 (* 1. The bus view.                                                        *)
 (*                                                                         *)
-(*    [disk_step]'s DMA and capture arms read a TOTAL view [vmem] that      *)
+(*    [disk_step]'s pop, fetch and capture arms read a TOTAL view [vmem]   *)
 (*    agrees with the byte map wherever the map is defined and is           *)
 (*    UNCONSTRAINED elsewhere -- a real bus returns something for an        *)
 (*    address nobody accounted for.  A witness has to pick one; this picks  *)
@@ -102,18 +103,21 @@ Inductive sitem : Type :=
   (* the UART ([uart_step]) *)
   | SUartTx                       (* drain one byte of the transmit FIFO *)
   | SUartRx (b : Z)               (* the host types a byte *)
-  (* the disk ([disk_step]).  Four ordinary arms and the wild one.
-     A REQUEST HAS TWO PHASES AND THEY ORDER DIFFERENTLY (VirtioModel's
-     [virtio_state]): the POP takes available-ring entries strictly in
-     order, one per item, and needs no parameter; everything after it --
-     capture, completion -- is keyed by the DESCRIPTOR HEAD the pop took,
+  (* the disk ([disk_step]).  ONE BUS TRANSACTION PER ITEM, and the wild
+     one (VirtioModel's [virtio_state]): the POP takes available-ring
+     entries strictly in order, one per item, and needs no parameter;
+     everything after it -- fetch, capture, the write transactions, the
+     completion -- is keyed by the DESCRIPTOR HEAD the pop took,
      and any in-flight head may go first.  So a schedule says WHICH head it
      is answering, and that choice is how a test exhibits a REORDERED
      completion (DiskOrder.v).  The head is what the used ring reports back,
      so it is the same number the test reads out of [used.ring[i].id]. *)
   | SDiskPop                      (* take the next available-ring entry *)
+  | SDiskFetch (h : Z)            (* read in-flight head [h]'s chain and header *)
   | SDiskCapture (h : Z)          (* take in-flight head [h]'s data into the cache *)
-  | SDiskDma (h : Z)              (* complete in-flight head [h] *)
+  | SDiskWrite (h : Z)            (* head [h]'s next write transaction: the fill,
+                                     the status byte or the used element *)
+  | SDiskDma (h : Z)              (* complete in-flight head [h]: the used index *)
   | SDiskDrain (sec : Z)          (* one cached sector reaches the durable image *)
   | SDiskWild (w : list (Z * Z))  (* a malformed queue: write anything, anywhere *)
   (* the PLIC gateway, per SOURCE -- an arm of the DEVICE that drives it *)
@@ -175,13 +179,24 @@ Definition sapply_w (i : sitem) (s : mstate)
       | Some v' => Some (with_dev s (set_dvirtio d v'), ∅)
       | None => None
       end
+  | SDiskFetch h =>
+      match virtio_fetch_step (dvirtio d) (view_of (mem s)) (Z_to_bv 16 h) with
+      | Some v' => Some (with_dev s (set_dvirtio d v'), ∅)
+      | None => None
+      end
   | SDiskCapture h =>
       match virtio_capture_step (dvirtio d) (view_of (mem s)) (Z_to_bv 16 h) with
       | Some v' => Some (with_dev s (set_dvirtio d v'), ∅)
       | None => None
       end
+  | SDiskWrite h =>
+      match virtio_write_step (dvirtio d) (Z_to_bv 16 h) with
+      | Some (v', w) =>
+          Some (MState (sregs s) (w ∪ mem s) (set_dvirtio d v'), w)
+      | None => None
+      end
   | SDiskDma h =>
-      match virtio_req_step (dvirtio d) (view_of (mem s)) (Z_to_bv 16 h) with
+      match virtio_complete_step (dvirtio d) (Z_to_bv 16 h) with
       | Some (v', w) =>
           Some (MState (sregs s) (w ∪ mem s) (set_dvirtio d v'), w)
       | None => None
@@ -225,10 +240,11 @@ Definition srun (sch : list sitem) (s : mstate) : option mstate :=
 (*    writes its [sitem] list by hand instead -- and the list then          *)
 (*    DOCUMENTS what the test is about, which the eager default cannot.     *)
 (*                                                                         *)
-(*    Note what the priority means for the write path: pop before capture   *)
-(*    before drain before completion is the order a WRITETHROUGH device     *)
-(*    must use ([virtio_complete_ok] gates completion on the request's      *)
-(*    sectors having drained), so the eager schedule serves xv6-style       *)
+(*    Note what the priority means for the write path: pop, fetch, capture, *)
+(*    drain, then the write transactions and the completion is the order a *)
+(*    WRITETHROUGH device must use ([virtio_complete_ok] gates a write's    *)
+(*    report on the request's sectors having drained), so the eager        *)
+(*    schedule serves xv6-style                                             *)
 (*    writes without a hand-written list.  It drains only sector [d_sec],   *)
 (*    the lowest cached one, per round.  The pop coming FIRST is what puts  *)
 (*    every published request in flight before any of them completes --    *)
@@ -271,13 +287,14 @@ Definition settle_wire (s : mstate) : option mstate :=
    with two requests in flight does (DiskOrder.v).  Everything else about
    the two schedules is identical.
 
-   [v_inflight] is a SET -- the device keeps the heads it holds, not the
-   order it took them in -- so "in order" here means by descriptor index.
+   [v_inflight] is keyed by HEAD -- the device keeps the heads it holds,
+   not the order it took them in -- so "in order" here means by descriptor
+   index.
    That is publication order for every program in this suite and for xv6's
    driver, which allocates a batch's chains at ascending indices; a test
    whose heads run the other way writes its [sitem] list by hand. *)
 Definition inflight_heads (v : virtio_state) : list Z :=
-  bv_unsigned <$> elements (v_inflight v).
+  bv_unsigned <$> elements (dom (v_inflight v)).
 
 Definition lowest_head (v : virtio_state) : option Z :=
   match inflight_heads v with
@@ -328,8 +345,10 @@ Definition settle1_gated_w (pick : virtio_state -> option Z) (latch : bool)
     (s : mstate) : option (mstate * gmap Arch.pa (bv 8)) :=
   match sapply_w SUartTx s with Some r => Some r | None =>
   match sapply_w SDiskPop s with Some r => Some r | None =>
+  match pick_at_w pick SDiskFetch s with Some r => Some r | None =>
   match pick_at_w pick SDiskCapture s with Some r => Some r | None =>
   match drain_one_w s with Some r => Some r | None =>
+  match pick_at_w pick SDiskWrite s with Some r => Some r | None =>
   match pick_at_w pick SDiskDma s with Some r => Some r | None =>
   (* the two interrupt gateways, then the wire.  [plic_latch] is itself
      guarded -- a level source is forwarded only when it is neither already
@@ -339,7 +358,7 @@ Definition settle1_gated_w (pick : virtio_state -> option Z) (latch : bool)
   match (if latch then sapply_w (SLatch uart_irq_id) s else None) with
   | Some r => Some r | None =>
   settle_wire_w s
-  end end end end end end end.
+  end end end end end end end end end.
 
 Definition settle1_gated (pick : virtio_state -> option Z) (latch : bool)
     (s : mstate) : option mstate :=

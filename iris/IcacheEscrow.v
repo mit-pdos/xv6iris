@@ -4034,8 +4034,26 @@ Section IcacheBoxAmb.
           | _ => ∃ n : bv 16, i_nlink (ientry k) ↦₂ n
           end))%I
     end.
+  (* the same peel this file already uses twice (§3559, §4256): a single
+     [apply _] over the arm's [∗]/[∃] tower unifies up to delta and walks
+     THROUGH [↦₄]/[↦₂]'s own instances into the byte tower, backtracking
+     over the lot. *)
+  Local Ltac tl_struct_amb :=
+    lazymatch goal with
+    | |- Timeless (bi_exist _) => apply bi.exist_timeless; intro; tl_struct_amb
+    | |- Timeless (bi_sep _ _) =>
+        apply bi.sep_timeless; [tl_struct_amb | tl_struct_amb]
+    | |- Timeless (bi_or _ _) =>
+        apply bi.or_timeless; [tl_struct_amb | tl_struct_amb]
+    | |- Timeless (bi_pure _) => apply bi.pure_timeless
+    | |- _ => apply _
+    end.
+
   Global Instance ic_hdr_bare_amb_timeless k i x : Timeless (ic_hdr_bare_amb k i x).
-  Proof. rewrite /ic_hdr_bare_amb. destruct i as [[d n]|]; [destruct x|]; apply _. Qed.
+  Proof.
+    rewrite /ic_hdr_bare_amb.
+    destruct i as [[d n]|]; [destruct x|]; tl_struct_amb.
+  Qed.
   (* THE FROZEN HEADER MINUS ITS PIN (Q10, option B): what the last close's
      HOOKED (a) hands out -- the bare cells, the selector's escrow quarter,
      the identification quarter, and the walk's own freeze token carried
@@ -4055,7 +4073,7 @@ Section IcacheBoxAmb.
          ifreeze_pre rg (bv_unsigned inum))%I
     end.
   Global Instance ic_hdr_frz_amb_timeless cn rg k i x : Timeless (ic_hdr_frz_amb cn rg k i x).
-  Proof. rewrite /ic_hdr_frz_amb. destruct i as [[d n]|]; apply _. Qed.
+  Proof. rewrite /ic_hdr_frz_amb. destruct i as [[d n]|]; tl_struct_amb. Qed.
 End IcacheBoxAmb.
 
 (* ====================================================================== *)

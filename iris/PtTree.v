@@ -1120,7 +1120,7 @@ Section PtTreeIris.
   (*                                                                      *)
   (*   [Some ξ]  a USER page table -- owned by a THREAD, read by SOFTWARE  *)
   (*             ([walk]) at [Read_plain] through                          *)
-  (*             [WpSconfMem.wordw_pointsto], which needs a plain-load     *)
+  (*             [MemClaim.wordw_pointsto], which needs a plain-load     *)
   (*             licence.  That is the REGISTERED ledger word              *)
   (*             ([TsoCtx.ctx_phys_word_pointsto], A6.16).                 *)
   (*                                                                      *)

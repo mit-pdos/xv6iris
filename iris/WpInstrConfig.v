@@ -183,6 +183,42 @@ Section cagree.
       | by rewrite H17 mc_rs_htif | by rewrite H18 mc_rs_elp
       | by rewrite H19 mc_rs_senv ].
   Qed.
+
+  (* [HartMFrame.mm_rs_ro_agree]'s twin: the READ-ONLY half of the
+     decomposition, again with ONE side a VARIABLE.  [mc_ro_nPC] below is
+     what wants it -- it used to be discharged by an [etransitivity] whose
+     two halves were each a twelve-way [first [apply ...]] over a goal with a
+     tower on BOTH sides, run once per register, which is the shape
+     HartMFrame's note forbids and was most of this file. *)
+  Lemma mc_rs_ro_agree (rs : regstate) :
+    register_lookup cur_privilege rs = priv ->
+    register_lookup mstatus rs = mst0 ->
+    register_lookup hart_state rs = HART_ACTIVE tt ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup (R_bitvector_32 mcountinhibit) rs = mc ->
+    register_lookup (R_bitvector_64 minstretcfg) rs = micfg ->
+    register_lookup misa rs = misa0 ->
+    register_lookup mseccfg rs = mseccfg0 ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup elp rs = elp0 ->
+    register_lookup senvcfg rs = senv0 ->
+    reg_agree_on mm_Dro rs
+      (mc_rs priv pc npc ms bmi cy ti ip mst0 pcfg mc micfg misa0 mseccfg0
+         pmar0 elp0 senv0).
+  Proof.
+    intros H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12.
+    intros r Hr. rewrite /mm_Dro in Hr.
+    repeat (apply elem_of_union in Hr as [Hr|Hr]);
+      apply elem_of_singleton in Hr; subst r.
+    all: first
+      [ by rewrite H1 mc_rs_priv | by rewrite H2 mc_rs_mst
+      | by rewrite H3 mc_rs_hart | by rewrite H4 mc_rs_pcfg
+      | by rewrite H5 mc_rs_mc | by rewrite H6 mc_rs_micfg
+      | by rewrite H7 mc_rs_misa | by rewrite H8 mc_rs_sec
+      | by rewrite H9 mc_rs_pma | by rewrite H10 mc_rs_htif
+      | by rewrite H11 mc_rs_elp | by rewrite H12 mc_rs_senv ].
+  Qed.
 End cagree.
 
 (* the tail transport, [mm_tick_agree]'s twin at the parametric tower: the
@@ -232,19 +268,14 @@ Lemma mc_ro_nPC (priv : Privilege) (pc x y ms : SailStdpp.Values.mword 64)
     (mc_rs priv pc y ms bmi cy ti ip mst0 pcfg mc micfg misa0 mseccfg0
        pmar0 elp0 senv0).
 Proof.
-  intros r Hr. rewrite /mm_Dro in Hr.
-  repeat (apply elem_of_union in Hr as [Hr|Hr]);
-    apply elem_of_singleton in Hr; subst r.
-  all: (etransitivity;
-        [ first [ apply mc_rs_priv | apply mc_rs_mst | apply mc_rs_hart
-                | apply mc_rs_pcfg | apply mc_rs_mc | apply mc_rs_micfg
-                | apply mc_rs_misa | apply mc_rs_sec | apply mc_rs_pma
-                | apply mc_rs_htif | apply mc_rs_elp | apply mc_rs_senv ]
-        | symmetry;
-          first [ apply mc_rs_priv | apply mc_rs_mst | apply mc_rs_hart
-                | apply mc_rs_pcfg | apply mc_rs_mc | apply mc_rs_micfg
-                | apply mc_rs_misa | apply mc_rs_sec | apply mc_rs_pma
-                | apply mc_rs_htif | apply mc_rs_elp | apply mc_rs_senv ] ]).
+  (* POSITIONALLY, exactly as [HartMFrame.mm_ro_nPC] is: one side of
+     [mc_rs_ro_agree] is a variable, so no [apply] here ever meets a tower on
+     both sides and none of them fails. *)
+  apply mc_rs_ro_agree;
+    [ apply mc_rs_priv | apply mc_rs_mst | apply mc_rs_hart | apply mc_rs_pcfg
+    | apply mc_rs_mc | apply mc_rs_micfg | apply mc_rs_misa | apply mc_rs_sec
+    | apply mc_rs_pma | apply mc_rs_htif | apply mc_rs_elp
+    | apply mc_rs_senv ].
 Qed.
 
 Section WpInstrConfig.

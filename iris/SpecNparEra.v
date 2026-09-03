@@ -162,8 +162,20 @@ Section NparEraDefs.
   Lemma inode_held_ty_at_ty (v : mword 64) (ty : bv 16) (z : Z) :
     inode_held_ty_at v ty z ⊢ inode_held_ty v ty.
   Proof.
-    iIntros "H". iDestruct "H" as (k q inum g lo tl) "(%&%&%&%&%&#Hfl&Hr&Hs&Hu)".
-    rewrite /inode_held_ty. iExists k, q, inum, g, lo, tl. by iFrame "% Hfl Hr Hs Hu".
+    iIntros "H". iDestruct "H" as (k q inum g lo tl)
+      "(%Hv & %Hk & %Hb & %Hz & %Hle & #Hfl & Hr & Hs & Hu)".
+    rewrite /inode_held_ty. iExists k, q, inum, g, lo, tl.
+    (* named rather than [by iFrame "% ..."]: the frame searched the whole
+       context for each of the four pure conjuncts and the goal for each of
+       the four resources, and [by]'s [done] walked the context again. *)
+    iSplitR; [iPureIntro; exact Hv|].
+    iSplitR; [iPureIntro; exact Hk|].
+    iSplitR; [iPureIntro; exact Hb|].
+    iSplitR; [iPureIntro; exact Hle|].
+    iSplitR; [iExact "Hfl"|].
+    iSplitL "Hr"; [iExact "Hr"|].
+    iSplitL "Hs"; [iExact "Hs"|].
+    iExact "Hu".
   Qed.
 
   Lemma inode_held_ty_at_held (v : mword 64) (ty : bv 16) (z : Z) :

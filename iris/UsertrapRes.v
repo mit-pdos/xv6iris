@@ -1042,7 +1042,7 @@ Section UsertrapRes.
     iDestruct (proc_priv_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
-    iExists kroot. iFrame "Hkpt".
+    iExists kroot. iSplitR; [iExact "Hkpt"|].
     iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf".
     iIntros (ws') "%Htfk' Htf'".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
@@ -1490,7 +1490,7 @@ Section UsertrapRes.
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
-    iExists kroot. iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf Hctx".
+    iExists kroot. iSplitR; [iExact "Hkpt"|]. iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf Hctx".
     iIntros (ws' sts') "%Htfk' Htf' Hfr Hctx".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
     iDestruct ("Hownback" $! (upd_tf (us_V U) ws') sts' with "Hpv' Hfr Hsy") as "Hown'".
@@ -1535,7 +1535,7 @@ Section UsertrapRes.
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
-    iExists kroot. iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf Hctx".
+    iExists kroot. iSplitR; [iExact "Hkpt"|]. iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf Hctx".
     iIntros (ws') "%Htfk' Htf' Hctx".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
     iDestruct ("Hownback" $! (upd_tf (us_V U) ws') with "Hpv' Hfr Hsy") as "Hown'".
@@ -1623,7 +1623,7 @@ Section UsertrapRes.
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
-    iExists kroot. iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |].
+    iExists kroot. iSplitR; [iExact "Hkpt"|]. iSplitR; [iPureIntro; exact Htfk |].
     iFrame "Htf Hcsrs Hctx".
     iIntros (ws') "%Htfk' Htf' Hcsrs' Hctx".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".

@@ -273,9 +273,10 @@ Faithful, defined behaviours:
 
 - **An unrecognised request type completes with status `UNSUPP`** and no data
   transfer, as a real block device does.
-- **A request completes atomically** (data + status + used element + used index
-  in one transition). The index bump is what a driver waits on and is ordered
-  last either way.
+- **A request is served one bus transaction per step** (`design/device.md`):
+  pop, fetch, capture or fill, status byte, used element, used index, each its
+  own transition, so every intermediate state is observable. The index bump
+  is what a driver waits on and it is last because it is the last step.
 
 One thing the model is deliberately silent about: the request HEADER
 (`disk.ops[]`) is not part of the control region, so the request *type* and

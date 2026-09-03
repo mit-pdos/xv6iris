@@ -583,13 +583,13 @@ Section Lock.
      SC-era trade for the acting hart's ambient form died with the shim,
      and recovering it is the M4 racy-kit entry spelled out there. *)
   (* THE ADDRESS CLAIM a ledger cell does not carry.  Character for
-     character [WpSconfMem.mem_claim] under its alignment -- that file
+     character [MemClaim.mem_claim] under its alignment -- that file
      sits ABOVE this one, so the content is restated here and
      [WpSconfLock.lock_claims] is the one line that converts (they are
      convertible at [KT0], which is the only tier a lock lives at). *)
   (* THE ADDRESS CLAIM A LEDGER CELL DOES NOT CARRY.
      PER BYTE, not merely at the base (A6.86).  The base form is what the
-     translation engines want ([WpSconfMem.mem_claim] under its alignment),
+     translation engines want ([MemClaim.mem_claim] under its alignment),
      but the PAGE that reclaims the cell wants one per byte -- a free page's
      bytes are [TsoCtx.mem_free], and [mem_free] is the kmap claim over the
      visibility-free byte.  Both readings are here because the producer has

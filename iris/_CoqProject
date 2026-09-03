@@ -61,8 +61,10 @@ HartTp.v
 WpNext.v
 PtreeType.v
 Ktier.v
+UartNames.v
 RiscvPtsto.v
 TsoCtx.v
+MemClaim.v
 TsoCtxAbsorbLb.v
 CtxMorphTac.v
 TsoCtxPark.v

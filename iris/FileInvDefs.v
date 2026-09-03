@@ -1390,7 +1390,7 @@ Section FileInv.
      whenever nobody needs [f->off] -- every non-FD_INODE type, the free
      row -- the word is simply free, fractional, context-free.  The next
      publish's store RE-ESTABLISHES it ([wp_store_s_sconf_free_gen]).
-     [off_free k 1] is [WpSconfMem.wordw_free 4 (a_foff k)] (stated where
+     [off_free k 1] is [MemClaim.wordw_free 4 (a_foff k)] (stated where
      that file is in scope: FileOffProtocol.v). *)
   Definition off_free (k : nat) (q : Qp) : iProp Σ :=
     (⌜is_aligned_paddr (Physaddr (a_foff k)) 4 = true⌝ ∗

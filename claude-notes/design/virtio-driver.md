@@ -58,12 +58,17 @@ bound is not assumed: `vproto_ok_publish` DERIVES it, because publishing at
 `lo + 8` would claim the available-ring entry position `lo` still pins, and
 the publisher's fresh pin is disjoint from the lease that holds it.
 
-The device side (`VirtioModel` section 5b) carries the same window as
-`v_seen` (the watermark) plus `v_ahead` (the positions served out of turn),
-with modular-distance arithmetic (`vdist`, `vpos_pub`, `vfree`) rather than a
-walk. `vseen_adv_vp` is the single lemma that says the two walks agree, and
-`vproto_serve_slot` is what turns the `bv 16` position a device step names
-back into the keyed state's `nat` one.
+The device side (`VirtioModel` sections 5b and 6) carries the same window as
+`v_seen` (the pop index) plus `v_inflight : gmap (bv 16) vphase` — the heads
+popped and not yet completed, each with its PHASE: `PhPopped` (chain unread),
+`PhFetched r` (chain and header read, request parsed), `PhServed r` (data
+phase done: a read's buffer written, a write's payload captured),
+`PhStatus r` (status byte written), `PhPushed r` (used element written at the
+current used index; only the index bump is left). The protocol mirrors the
+map as `vp_fl` and `vproto_phase_slot` is what turns the head a device step
+names back into the keyed state's `nat` position — and, once the chain has
+been fetched, says the request the device holds is the slot's own
+(`vpo_fl_req`).
 
 **The latch is per position.** `v_taken : option (bv 16)` rather than a flag:
 a write's payload is captured under the position that owns it, the completion
@@ -133,32 +138,55 @@ sleep must record the fragment's VALUE.**
 `req_at c mv (wrap16 p) = Some (vs_req sl)`, the ring entry bytes are in `pin`,
 the type is IN or OUT with `vr_len = 1024`, and for OUT
 `view_bytes mv (vr_buf) 1024 = vs_data sl`. Because the request is a function
-of the pin alone, the device step from position `p` is DETERMINED:
-`vslot_step` computes the exact post-state and write-set
-(`virtio_complete` at a determined request; the only view-dependence left is
-the OUT payload, which the pin fixes). The status byte a step writes is
-`0` (OK), because the type is IN/OUT — that is what refutes
-`virtio_disk_intr`'s status panic.
+of the pin alone, every device transaction at position `p` is DETERMINED
+(`vproto_fetch_det`, `vproto_capture_det`, `vproto_write_det`,
+`vproto_step_det`): the fetch parses exactly `vs_req sl`, and each later step's
+write set is one of the three `vslot_write`s — the FILL (`vslot_fill`, a
+read's block out of the durable image; the gate collapses the cache overlay,
+`vslot_fill_cache_view`), the STATUS byte (`0` = OK, because the type is
+IN/OUT — that is what refutes `virtio_disk_intr`'s status panic), the used
+ELEMENT (`virtio_used_elem_writes` at the current count) — or the completion's
+two index bytes (`virtio_used_idx_writes`). `vwrite` names the three, with
+`vwrite_from`/`vwrite_to` the phases around each.
 
-`vproto_ok c nc np pend done ctl dma_dom` (pure) packages: pend/done domains as
-above; `ctl` = the avail-idx bytes (content `wrap16 np`) ∪ the disjoint union
-of all pins of `pend ∪ done`; every slot `slot_pin_ok`; write-sets bounded by
-the lease and missing `ctl`; the used-page ⊆ dma; and the used-ring
-completion records: for `p ∈ done`, the used element at `used+4+8*(p mod 8)`
-holds `id = vr_head` (as bv 32) and the status byte holds 0. From it the FLAT
-`virtio_queue_ok c ctl dma_dom S ai sn` of VirtioModel §7 is DERIVED
-(`S = wrap16 <$> dom pend`, `ai = wrap16 np`, `sn = wrap16 nc`), so the
-device-thread rules (`virtio_lease_not_stalled` / the step rule) keep working
-off the flat form; the keyed form is what the driver's surgery manipulates:
+**The stage facts.** A request's element, status byte and (for a read) buffer
+are written several steps before the index bump that publishes them, so the
+invariant carries, per pending slot, `slot_stage_ok c dma nc (vp_fl pr !!
+vs_hd sl) sl` — the facts about the lease's bytes its phase has already
+established, monotone in `vphase_rank`: buffer holds `vs_data sl` from rank 2
+(IN only), status byte is 0 from rank 3, the element at `used_elem_pa c nc`
+names the head from rank 4. Each write step adds exactly one clause
+(`slot_stage_ok_frame` transports the others), the completion reads all three
+off to build `slot_done_res`, and the driver's lease-changing accessors
+(ring store, publish, reclaim) transport them with `pend_stage_frame` under the
+same three-window condition `slot_done_res_mono` uses.
 
-- `vproto_publish` : append `np ↦ sl` given `slot_pin_ok` for the new pin,
-  pin disjoint from dma, avail-idx bytes updated to `wrap16 (np+1)`.
-- `vproto_step`    : the device consumes position `nc` (pend → done, nc+1);
-  the write set is exactly `vslot_step`'s, so the used-ring record for `nc`
-  and the status-byte-0 fact come out.
-- `vproto_reclaim` : remove any `p ∈ done`; `ctl`/`dma` shrink by `pin(p)` and
-  the slot's writable bytes; every other slot survives (their footprints are
-  disjoint sub-maps).
+`vproto_ok c pr dma_dom` (pure) packages: pend/done domains as above; `ctl` =
+the avail-idx bytes (content `wrap16 np`) ∪ the ring cells ∪ the disjoint
+union of all pins of `pend ∪ done`; every slot `slot_pin_ok`; footprints
+disjoint and inside the lease; the in-flight map keyed by exactly the popped,
+uncompleted slots' heads (`vpo_fl_slots`), every phase's request the slot's
+own (`vpo_fl_req`), at most one head pushed (`vpo_pushed_uniq` — the element
+is written at the current count, so a second push before the bump would land
+on the same slot); and the used-index bookkeeping (`vp_uix`, `vp_nr`). From
+it the FLAT `virtio_queue_ok c ctl S ai lo ah` of VirtioModel §7 is DERIVED
+(`vproto_flat`; `S` = the pending heads, `ah = dom vp_fl`): every reachable
+head parses and the next ring entry is nobody's, which is all
+`virtio_proto_not_stalled` needs. The keyed form is what the surgeries
+manipulate, one per transition:
+
+- `vproto_publish_state` : append `np ↦ sl` given `slot_pin_ok` for the new
+  pin, pin disjoint from dma, avail-idx bytes updated to `wrap16 (np+1)`.
+- `vproto_pop_state`     : `lo + 1`, the slot's head enters `vp_fl` at
+  `PhPopped`.
+- `vproto_advance_state` : one head moves to a new phase (the fetch and the
+  three write transactions, `vproto_ok_fetch`/`vproto_ok_write`);
+  `vproto_capture_state` is the advance to `PhServed` plus the latch.
+- `vproto_step_state`    : the completion (pend → done, nc+1, the head
+  leaves `vp_fl`); the record for `nc` comes out of the stage facts.
+- `vproto_reclaim_state` : remove any `p ∈ done`; `ctl`/`dma` shrink by
+  `pin(p)` and the slot's writable bytes; every other slot survives (their
+  footprints are disjoint sub-maps).
 
 ## The Iris protocol: `virtio_proto` replaces `virtio_lease` in `dev_inv_body`
 
@@ -178,14 +206,17 @@ New ghost names bundle `disk_names` (class `diskGhostG`, wired through
 over a write set and `phys_map_store` the one store gate — `dma_update` is
 now that gate's engine and nothing else calls it):
 
-    ∃ nc np pend done ctl dma dmap,
-      dma_own dma ∗ ⌜ctl ⊆ dma⌝ ∗
-      ⌜vproto_ok (v_cfg v) nc np pend done ctl (dom dma)⌝ ∗
-      ⌜v_seen v = wrap16 nc ∧ v_used_idx v = wrap16 nc⌝ ∗
+    ∃ pr dma dmap,
+      dma_own dma ∗ ⌜vproto_ctl pr ⊆ dma⌝ ∗
+      ⌜vproto_ok (v_cfg v) pr (dom dma)⌝ ∗
+      ⌜v_seen v = wrap16 (vp_lo pr) ∧ v_inflight v = vp_fl pr ∧
+       v_used_idx v = wrap16 (vp_nc pr)⌝ ∗ (the latch coupling, wce = false, vp_wt) ∗
       ghost_map_auth γslot 1 (pend ∪ done) ∗
       mono_nat_auth γnc 1 nc ∗
       ghost_map_auth γdk 1 dmap ∗ ⌜disk_view dmap (v_disk v)⌝ ∗
-      ([∗ map] p ↦ sl ∈ pend, slot_res sl) ∗
+      ([∗ map] p ↦ sl ∈ pend,
+         ⌜slot_stage_ok (v_cfg v) dma (vp_nc pr) (vp_fl pr !! vs_hd sl) sl⌝ ∗
+         slot_res sl) ∗
       ([∗ map] p ↦ sl ∈ done, slot_res sl)
 
 where `disk_view dmap dk := ∀ o b, dmap !! o = Some b → dk o = b` (the disk
@@ -258,26 +289,37 @@ inside a `dev_inv`-opening leaf; conclusions ⌜…⌝ mean facts learned):
    CLAIM MAP" below); the first three are read-only peeks, the deposit
    (`b->disk = 0`) reclaims the slot AND parks the chain in the receipt's
    came-back arm in one step, advancing the watermark.
-4. **device step** (`wp_dev_loop` only): `vproto_step` + the `γdk` update for
-   an OUT slot + `mono_nat` bump; packaged as `virtio_proto_step`, plus
-   `virtio_proto_not_stalled` refuting `DevStepDiskWild`. These two are what
-   `WpUart.wp_dev_loop`'s disk case now consumes.
+4. **device steps** (`wp_disk_loop` only), one rule per arm of
+   `RiscvLang.disk_step`: `virtio_proto_not_stalled` refutes `DiskStepWild`;
+   `virtio_proto_pop_step`, `_fetch_step` and `_capture_step` are plain wands
+   (they read the bus through the lease and write nothing);
+   `virtio_proto_drain_step` is the accessor over the sequential permit at the
+   sector that just became durable; `virtio_proto_write_step` is the accessor
+   for the three write transactions (fill/status/element — the fill takes the
+   image auth to read the block's bytes off the slot's fragments and hands it
+   straight back); `virtio_proto_step` is the completion: the accessor over the
+   permit channel (the LEAF, `wr = None`) and over the two index bytes, plus
+   the `mono_nat` bump, the persistent `disk_ord` record, and the move of the
+   slot from pending to done with `slot_done_res` assembled from the stage
+   facts.
 
-   **`virtio_proto_step` PERFORMS NO MEMORY WRITE.** It is an accessor over
-   the completion's bytes as well as over the permit: it hands the write
-   set's OLD bytes out (`∃ old`, at `dom old = dom w`), takes
-   `gen_heap_interp m` in for `dma_agree`'s pure fact and hands it straight
-   back UNTOUCHED, and its close-wand takes the NEW bytes along with the
-   spent permit. The store itself is `WpVirtio.phys_map_store`, run by
-   `WpUart.wp_disk_loop` — the one caller holding both authorities. The
-   reason is not about which memory model is underneath: a value-changing
-   law may not split two authorities the state interpretation ties
-   together, so the update belongs where both are held. `virtio_lease_acc`
-   (the unkeyed ancestor) has the same shape for the same reason.
+   **THE ACCESSORS PERFORM NO MEMORY WRITE.** Each hands the write set's OLD
+   cells out (`∃ old`, at `dom old = dom w`, sealed — `dma_acc_x`) and its
+   close-wand takes the NEW ones back (along with the spent permit, for the
+   completion). The store itself is the era-log APPEND, run by
+   `WpUart.wp_disk_loop` — the one caller holding both authorities:
+   `TsoCtx.ledger_store_ok` for a write transaction (the stamped cells are
+   resealed at once), `ledger_store_rel_map_ok` for the completion's index
+   word (the release window re-minted; the record's cells go back as
+   `ledger_le` at the append's position, their hidden stamps bounded by the
+   log — `completed/virtio-tso-port.md` decision 9). The reason is not about
+   which memory model is underneath: a value-changing law may not split two
+   authorities the state interpretation ties together, so the update belongs
+   where both are held.
 
 MMIO writes the driver performs while live (`QUEUE_NOTIFY`, `INTERRUPT_ACK`)
-are cfg/seen/used-idx-stable, so `virtio_proto` rides through them
-(`virtio_proto_stable`, the analogue of `virtio_lease_stable`).
+are cfg/seen/inflight/used-idx-stable, so `virtio_proto` rides through them
+(`virtio_proto_stable`).
 
 ## The per-descriptor RECEIPT: where a request's state lives (finding 5)
 
@@ -449,11 +491,11 @@ holds); its `i < 8` arm by the caller's bound.
 | file | contents | depends on |
 | --- | --- | --- |
 | `VSlot.v` (iris-free) | the `vslot` RECORD and nothing else, so that `Xv6Cameras.v` can have the type without the slot theory; `Require Export`ed by `VirtioQueue.v`, so every other consumer is unaffected | VirtioModel |
-| `VirtioQueue.v` (iris-free) | wrap16, slot geometry, `slot_pin_ok`, `vproto_ok`, flat-derivation, publish/step/reclaim surgery, step determinism | VSlot |
+| `VirtioQueue.v` (iris-free) | wrap16, slot geometry, `slot_pin_ok`, the three `vslot_write`s and `slot_stage_ok`, `vproto_ok`, flat-derivation, the per-transition surgeries, per-transaction determinism | VSlot |
 | `DiskPtsto.v` | `γdk` ghost, `disk_byte/bytes/block`, `disk_view`, mint/agree/update | RiscvPtsto |
 | `VirtioProto.v` | `disk_names`/`diskGhostG`, `virtio_proto`, the four protocol view shifts, `virtio_proto_intro/init/stable` | WpVirtio, VirtioQueue, DiskPtsto |
-| `WpVirtio.v` | the base (`dma_own` etc.); the unkeyed `virtio_lease` survives here, used by nothing | — |
-| `WpUart.v` | the device invariants; `disk_inv_body` carries `virtio_proto`; `wp_dev_loop`'s disk case runs on `virtio_proto_step`/`_not_stalled` | VirtioProto |
+| `WpVirtio.v` | the base: `dma_own` (at `phys_ledger`), `dma_acc` | — |
+| `WpUart.v` | the device invariants; `disk_inv_body` carries `virtio_proto`; `wp_disk_loop` has one arm per `disk_step` constructor, on the rules of operation 4 | VirtioProto |
 | `RiscvAdequacy.v` | allocates `disk_names` and the initial `virtio_proto` | VirtioProto |
 | `WpVirtioDev.v` | the MMIO leaves above | WpPlic(Exec), VirtioProto |
 | `DiskInv.v` | `struct disk` geometry, `disk_res` (counters, claim-map authority, free bundles with their receipts), `slot_buf_link`, the tier bridges | VirtioProto, WpLock, ProcGeom |

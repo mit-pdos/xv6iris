@@ -80,7 +80,6 @@ Lemma mf_cE_Zca_eq_local :
 Proof. reflexivity. Qed.
 
 
-
 Local Ltac mf_glue :=
   cbn beta iota zeta delta [get_config_rvfi ext_fetch_check_pc].
 
@@ -262,14 +261,6 @@ Definition mread_req (pa : SailStdpp.Values.mword 64)
      Interface.ReadReq.translation := tt;
      Interface.ReadReq.tag := false |}.
 
-Local Lemma hread_req_at_red_local (n : N) (req : Interface.ReadReq.t n)
-    (K : (bv (8 * n) * option bool + Arch.abort)%type -> M unit) :
-  hread_req_at n (Interface.Next (Interface.MemRead n req) K) = Some req.
-Proof.
-  simpl. destruct (decide (n = n)) as [Heq|Hne]; [|congruence].
-  assert (Heq = eq_refl) as -> by apply proof_irrel.
-  reflexivity.
-Qed.
 
 Lemma hread_req_at_read_ram (pa : SailStdpp.Values.mword 64) :
   hread_req_at 4 (read_ram Read_plain (Physaddr pa) 4 false)
@@ -329,14 +320,6 @@ Definition mread_req2 (pa : SailStdpp.Values.mword 64)
      Interface.ReadReq.translation := tt;
      Interface.ReadReq.tag := false |}.
 
-Local Lemma hread_req_at_red_local2 (n : N) (req : Interface.ReadReq.t n)
-    (K : (bv (8 * n) * option bool + Arch.abort)%type -> M unit) :
-  hread_req_at n (Interface.Next (Interface.MemRead n req) K) = Some req.
-Proof.
-  simpl. destruct (decide (n = n)) as [Heq|Hne]; [|congruence].
-  assert (Heq = eq_refl) as -> by apply proof_irrel.
-  reflexivity.
-Qed.
 
 Lemma hread_req_at_read_ram2 (pa : SailStdpp.Values.mword 64) :
   hread_req_at 2 (read_ram Read_plain (Physaddr pa) 2 false)
@@ -483,7 +466,6 @@ Proof.
   rewrite Z_to_bv_bv_unsigned TypeCasts.cast_N_refl.
   reflexivity.
 Qed.
-
 
 
 (* THE 8-BYTE TWINS, for the page walk's PTE read.  A third concrete
@@ -758,38 +740,6 @@ Section fetch.
     ∀ tv' : nat, (tv <= tv')%nat -> (tv' <= length log)%nat ->
       ∃ w : bv m, tso_read_bytes img log (hart_agent cpu_id) tv' pa n w /\ P w.
 
-  Lemma fobl_ram_ex_of (img : TsoMemPa.bytemap) (log : list pwmsg)
-      (tv : nat) (pa : Arch.pa) (n : N) {m : N} (w : bv m) (P : bv m -> Prop) :
-    fobl_ram img log tv pa n w -> P w -> fobl_ram_ex img log tv pa n P.
-  Proof. intros Hf HP tv' Hlo Hhi. exists w. split; [by apply Hf | exact HP]. Qed.
-
-  (* THE TEXT PAYER, and the mirror of [HartMLoad.robl_ram_ctx] one tier
-     down: a fetch of ERA-IMAGE bytes owes nothing beyond the pristine
-     receipt.  [TsoCtx.pristine_read_bytes_ok] concludes at EVERY agent and
-     EVERY view, so both of [fobl_ram]'s premises are discarded here -- which
-     is exactly the sense in which "kernel text is timestamp 0" survives the
-     overruling of RULING 1.  The A6.1a bridge ([tso_interp_of_pin] +
-     [tso_interp_of_at_gs] at [gs_of]) is what lets a LEAF, which never sees
-     a [gstate], reach a kit gate that is stated at one. *)
-  Lemma fobl_ram_pristine (img : TsoMemPa.bytemap) (sg : mstate)
-      (log : list pwmsg) (V : agent -> nat)
-      (pa : Arch.pa) (n : N) {m : N} (w : bv m) (dq : dfrac) (tv : nat) :
-    gen_heap_interp (hG := riscv_memGS) sg.(mem) -∗
-    tso_interp_of riscv_eraGS img sg.(mem) log V -∗
-    ([∗ list] j ∈ seq 0 (N.to_nat n),
-       phys_pointsto (pa_add pa j) dq (nth_byte w j)) -∗
-    TsoCtx.pristine_win pa (N.to_nat n) -∗
-    ⌜fobl_ram img log tv pa n w⌝.
-  Proof.
-    iIntros "Hgh Htso Hb #Hpr".
-    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
-    rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log V
-               sg.(sregs) sg.(mdev) Hpin).
-    iDestruct (TsoCtx.pristine_read_bytes_ok
-                 (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
-                 pa n w dq with "Hgh Htso Hb Hpr") as %Hok.
-    iPureIntro. intros tv' _ _. exact (Hok (hart_agent cpu_id) tv').
-  Qed.
 
   Lemma swp_checked_mem_read_ifetch4 (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (pa : SailStdpp.Values.mword 64)

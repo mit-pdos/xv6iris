@@ -787,7 +787,7 @@ Section VdrwdLeaves.
   Qed.
 
 
-  (* the 2-byte twin of [WpSconfMem.wordw8_ctx]: the AU leaves' window IS
+  (* the 2-byte twin of [MemClaim.wordw8_ctx]: the AU leaves' window IS
      the ↦₂ cell, up to [Z.to_nat] *)
   Local Lemma vdrwd_wordw2_ctx `{KTR2 : !CurKtier} (a : Arch.pa)
       (dq : dfrac) (v : SailStdpp.Values.mword 16) :

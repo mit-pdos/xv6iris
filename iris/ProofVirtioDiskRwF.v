@@ -1021,8 +1021,10 @@ Section VdrwfP6.
       by (unfold d_info_status; apply vdrwf_disk_canon; lia).
     (* the status byte, STAMPED at the completion: it re-enters through the
        reader floor this holder carries *)
-    iDestruct (ctx_byte_of_at (d_info_status h) byte_zero qc Hstatst Hcanst
-                 with "Hkm Hflqc Hstat") as "Hstat".
+    iDestruct "Hstat" as (qs) "[%Hqs Hstat]".
+    iDestruct (TsoCtx.ctx_floor_le _ _ _ Hqs with "Hflqc") as "#Hflqs".
+    iDestruct (ctx_byte_of_at (d_info_status h) byte_zero qs Hstatst Hcanst
+                 with "Hkm Hflqs Hstat") as "Hstat".
     (* ================= +0x1d2 .. +0x1f0 ============================== *)
     iDestruct "Hidx" as "(Hx0 & Hx1 & Hx2 & Hxp)".
     assert (Hidxa : add_vec (M !!! Regidx Rs0)
@@ -1780,7 +1782,7 @@ Section VdrwfP6.
         assert (Hlbs : length bs = 1024%nat) by (rewrite Hbsd; exact Hlendisk).
         iEval (rewrite Hslen -Hlbs) in "Hbufp".
         rewrite (Hsl_in eq_refl) -Hbsd.
-        iDestruct (ctx_bytes_of_at_seq (b_data b) (length bs) (fun j => bs !!! j) qc
+        iDestruct (ctx_bytes_of_le_seq (b_data b) (length bs) (fun j => bs !!! j) qc
                      ltac:(rgall; rewrite Hlbs; exact Hsbuf)
                      ltac:(rgall; rewrite Hlbs; exact Hcbuf) with "Hkm Hflqc Hbufp") as "Hbufp".
         iEval (rewrite -(vdrwd_ctx_bytes_of_fun (b_data b) (length bs)

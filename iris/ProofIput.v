@@ -1160,7 +1160,7 @@ Section IputTail.
       by (rewrite /iref_word HMk; reflexivity).
     (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF (the standing per-node
        rule: never from a static bundle).  [WpAu4]'s wrapped leaves take
-       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so the
+       [MemClaim.wordw_claim] beside the (linear) atomic update, so the
        window's mapping, alignment, canonicality and RAM-ness have to arrive
        UP FRONT.  It is persistent and says nothing about the VALUE, so a
        RESTORING peek of the same cell delivers it. *)
@@ -5329,7 +5329,7 @@ Section ProofIput.
     iDestruct (is_itable2_claims with "Hitab") as "#Hclaims0".
     (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF (the standing per-node
        rule: never from a static bundle).  [WpAu4]'s wrapped leaves take
-       [WpSconfMem.wordw_claim] beside the (linear) atomic update, so the
+       [MemClaim.wordw_claim] beside the (linear) atomic update, so the
        window's mapping, alignment, canonicality and RAM-ness have to arrive
        UP FRONT.  It is persistent and says nothing about the VALUE, so a
        RESTORING peek of the same cell delivers it. *)

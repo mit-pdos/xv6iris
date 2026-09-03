@@ -158,7 +158,7 @@ Section ProofBrelse.
     pc_is pc -∗
     instr pc true (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), Regidx rs2, sp, 8)) -∗
     (* THE ADDRESS CLAIM the per-node store asks for
-       ([WpSconfMem.wordw_claim]): per node the access TRANSLATES before it
+       ([MemClaim.wordw_claim]): per node the access TRANSLATES before it
        writes, so the window's mapping must arrive BEFORE the (linear) atomic
        update is opened.  It is persistent and says nothing about the VALUE,
        so the caller reads it straight off the frame slot it is about to
@@ -198,9 +198,9 @@ Section ProofBrelse.
               with "Hcg Hpc Hinstr [] [HAU] Hcont").
     { rewrite Hsp. iExact "Hcl". }
     { (* the AU's datum premise is the engine's RAW window
-         ([WpSconfMem.wordw_pointsto], deliberately raw); this wrapper's
+         ([MemClaim.wordw_pointsto], deliberately raw); this wrapper's
          statement is the flipped [↦₈].  One named crossing each way
-         ([WpSconfMem.wordw8_ctx]), done by hand under the [∃ vold] because
+         ([MemClaim.wordw8_ctx]), done by hand under the [∃ vold] because
          setoid_rewrite cannot reach under it here. *)
       rewrite Hsp.
       iMod "HAU" as (vold) "[Hw Hclose]".
@@ -651,7 +651,7 @@ Section ProofBrelse.
        [Hr24] is still here for the atomic update below. *)
     (* the claim is read off the engine's RAW window; the frame slot is the
        flipped [↦₈] ([StackOwn] is thread data), so the slot crosses by name
-       ([WpSconfMem.wordw8_ctx]) and crosses straight back. *)
+       ([MemClaim.wordw8_ctx]) and crosses straight back. *)
     iEval (rewrite -(wordw8_ctx (KTR2 := KT1))) in "Hr24".
     iDestruct (wordw_claim_of (KTR := KT1) 8
                  (add_vec (R1 !!! Regidx csp_rs1)
@@ -1078,6 +1078,7 @@ Section ProofBrelse.
       iDestruct "Hafter" as (Mg' ord' devs' bnos' tl') "(%Htl' & #Hllbtl' & Hscan')".
       clear Mg ord devs bnos.
       rename Mg' into Mg; rename ord' into ord; rename devs' into devs; rename bnos' into bnos.
+      iEval (rewrite /bcache_scan2) in "Hscan'".
       iDestruct "Hscan'" as "(Hauth & Hsauth & %Hdom' & %Hord & %Hinj & %Hdev & Hlru & Hpool & Hslots)".
       (* ===== +0x32 c.bnez a5 : NOT taken, the splice runs ===== *)
       assert (Hbnez : neq_vec (D2 !!! Regidx Ra5) zero_reg = false)
