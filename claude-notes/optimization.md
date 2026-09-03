@@ -11,40 +11,33 @@ so the last line in the log is the stalling sentence. If the slow line is a
 *tactic*, no amount of proof-term work will help. Map `Chars A-B` to a line with
 `head -c B <f>.v | wc -l`.
 
-- **Isolate before measuring.** Inside a `-j32` build a file reads 3–4× its real
-  cost and the per-sentence *ranking* reorders (a 5 GB-heap process pays GC on
-  every allocating tactic). Judge a change by an isolated A/B, one `coqc` each,
-  min of two interleaved runs — never by diffing per-file times between two
-  parallel builds. Run-to-run variance on a 30 s file is ±10 s in **both**
-  directions, so untouched files routinely "improve" by 10 s.
+- **Isolate before measuring.** Inside a parallel build a file reads several
+  times its real cost and the per-sentence *ranking* reorders (a multi-gigabyte
+  heap pays GC on every allocating tactic). Judge a change by an isolated A/B,
+  one `coqc` each, min of two interleaved runs — never by diffing per-file times
+  between two parallel builds. Run-to-run variance is large in **both**
+  directions, so untouched files routinely "improve".
 - **"Isolated" MEANS CHECK `uptime` FIRST — this box is shared, and a busy one
-  INVERTS an A/B, not merely widens it.** At load 13.5 the `Strategy opaque`
-  arm of `ProofIput` read 118.4 s / 119.3 s against a 122.0 s baseline, i.e. a
-  clean 3 % win with the per-tactic breakdown agreeing (`Qed` 23.3 → 21.1 s);
-  the same interleaved A/B at load 3.4 read **+11 s and +17 s the other way**.
-  The same file's baseline read 290 s and 338 s on one afternoon. Min-of-N is
-  the guard that survives this, because contention only ever ADDS — a single
-  reading, or two readings taken hours apart, prove nothing at all.
+  INVERTS an A/B, not merely widens it.** The same arm of the same file has read
+  as a clean win on a loaded box and a clear regression on a quiet one, with the
+  per-tactic breakdown agreeing both times. Min-of-N is the guard that survives
+  this, because contention only ever ADDS — a single reading, or two readings
+  taken hours apart, prove nothing at all.
 - **Per-file wall from two DIFFERENT parallel builds is not a comparison
-  either, and it will hand you a large fake win.** `ProofIput` reads 112 s in a
-  full 1327-file build and 80 s in a 396-file incremental one with nothing about
-  the file changed — GC pressure tracks the width of the build, so even the
-  `user` column moves. Confirm any cross-build delta with an isolated A/B
-  before believing it; that one would have been reported as a 32 s improvement
-  from an unrelated commit.
-- **`iris/.lia.cache` MAKES A WARM MEASUREMENT LIE, BY UP TO 9×.** micromega
-  persists every `lia` certificate in a per-DIRECTORY `.lia.cache` (with
-  `.nia.cache` beside it), both gitignored and both excluded from the VM push,
-  so they survive everything. `FsEffCreateEntry.v` measured **23 s warm and
-  216 s with the cache deleted**, and the cache itself had reached 780 MB.
-  Two consequences for any A/B. (1) The FIRST compile after an edit re-derives
-  every certificate the edit moved, so a change that improves a file reads as
-  a 3× REGRESSION on the run that introduces it — the same source measured
-  17.3 s, then 43.0 s, then 15.9 s over three consecutive `coqc`s — the
-  middle one being the first compile after the edit. Always take the second
-  reading. (2) Compare cold against cold when the number you want is
-  what CI or a fresh worktree pays: `rm -f .lia.cache` before each arm. The
-  gap is not noise, it is the whole certificate search.
+  either, and it will hand you a large fake win.** The same unchanged file reads
+  very differently in a full build and in a narrow incremental one — GC pressure
+  tracks the width of the build, so even the `user` column moves. Confirm any
+  cross-build delta with an isolated A/B before believing it.
+- **`iris/.lia.cache` MAKES A WARM MEASUREMENT LIE, BY A LARGE FACTOR.**
+  micromega persists every `lia` certificate in a per-DIRECTORY `.lia.cache`
+  (with `.nia.cache` beside it), both gitignored and both excluded from the VM
+  push, so they survive everything. A file can read an order of magnitude faster
+  warm than with the cache deleted. Two consequences for any A/B. (1) The FIRST
+  compile after an edit re-derives every certificate the edit moved, so a change
+  that improves a file reads as a REGRESSION on the run that introduces it.
+  Always take the second reading. (2) Compare cold against cold when the number
+  you want is what CI or a fresh worktree pays: `rm -f .lia.cache` before each
+  arm. The gap is not noise, it is the whole certificate search.
 - **`-async-proofs off`** when the question involves `Qed`: `coqc` offloads
   kernel-checking to a `rocqworker` that `-time` does not count, so `-time`'s
   sum can be tiny while the wall is minutes.
@@ -62,15 +55,14 @@ so the last line in the log is the stalling sentence. If the slow line is a
 - **RANK BY ms PER SENTENCE BEFORE YOU OPEN THE FILE — it decides whether you
   are hunting a bug or looking at a floor.** One `awk` over every `.v.timing`
   (sum the `secs`, divide by the sentence count) separates the two kinds of
-  expensive file: `ProofUvmcopy` 30.0, `ProofSysLink` 28.9, `ProofSysUnlink`
-  25.6 — against `ProofCreate` **21.0**, which is the tree's single most
-  expensive file and is merely the biggest (6475 sentences). A file at or
-  below its peers' rate has no hot statement to find; see "ProofCreate IS THE
-  FLOOR" below for what that verdict costs to reach the long way.
+  expensive file. A file at or below its peers' rate has no hot statement to
+  find; the tree's single most expensive file is routinely one of them, merely
+  the biggest. See "ProofCreate IS THE FLOOR" below for what that verdict costs
+  to reach the long way.
 - **`.v.timing` roll-ups beat reading the proof.** After a build that felt slow,
-  list every sentence ≥ 5 s across the tree and cross off the honest `Qed`s;
-  what remains is the bug list. These sentences are exactly the ones a reader
-  skips.
+  list every sentence over a few seconds across the tree and cross off the
+  honest `Qed`s; what remains is the bug list. These sentences are exactly the
+  ones a reader skips.
 - **When a `clear -H..` needs a hypothesis grepping sibling call sites won't
   find, dump the goal and context instead of guessing.** A temporary
   `match goal with |- ?G => idtac G end. repeat match goal with H : ?T |- _
@@ -84,25 +76,24 @@ so the last line in the log is the stalling sentence. If the slow line is a
 
 `tree ≈ 2 × (#proofmode steps) × |Δ|`, because every proofmode step's term
 mentions the whole context twice — the `tac_*` lemma's input and output
-environment. Measured: 44 *trivial* `iPoseProof`s cost ~54,000 tree nodes EACH
-while the DAG grew by ~50 per step. Two consequences: **`Qed` time is the size
-of the context times the number of steps it survives**, and splitting a proof
-into `Qed`-sealed chunks buys nothing by itself — each chunk carries its own
-context.
+environment. Even a *trivial* `iPoseProof` costs tens of thousands of tree nodes
+while the DAG grows by a handful. Two consequences: **`Qed` time is the size of
+the context times the number of steps it survives**, and splitting a proof into
+`Qed`-sealed chunks buys nothing by itself — each chunk carries its own context.
 
 So a whole-function proof can be the slowest file in the tree **with no hot
-sentence at all** — a flat tail at 3–6× per sentence what a comparable proof
-pays. That ratio *is* the diagnosis.
+sentence at all** — a flat tail at several times per sentence what a comparable
+proof pays. That ratio *is* the diagnosis.
 
 ### Fold block continuations into named definitions
 
 This tree hands control between basic blocks with nested `iAssert (□ wp_next …
-(fun CIDs => <40–80 lines of ∀/wands>))`. Ten live at once is ~390 lines of
-statement against ~40 lines of actual resources, and every step pays for all of
-it. **Before hunting a hot statement, count the lines of `iAssert` statement
-live at the deepest point; if they outweigh the resources, the file's cost is
-its own continuations.** Folding is a drop-in — the proof script does not change
-— and is worth 12–32 % on the proofs that have the shape:
+(fun CIDs => <40–80 lines of ∀/wands>))`. Ten live at once is far more statement
+than actual resources, and every step pays for all of it. **Before hunting a hot
+statement, count the lines of `iAssert` statement live at the deepest point; if
+they outweigh the resources, the file's cost is its own continuations.** Folding
+is a drop-in — the proof script does not change — and is worth a solid double
+-digit percentage on the proofs that have the shape:
 
 ```coq
   Definition nx_head_body (j : nat) (b : bool) (K plen : nat)
@@ -116,9 +107,9 @@ its own continuations.** Folding is a drop-in — the proof script does not chan
 1. **Keep the definition TRANSPARENT — do NOT `Typeclasses Opaque` it.**
    `iApply ("Hhead" $! off Ms with "…")` unifies through a transparent constant;
    through an opaque one it fails and forces an `iEval (rewrite /X)` per use
-   site, which is itself context-proportional (measured +48 % for a term only
-   5 % smaller). `Typeclasses Opaque` is right for a post nobody applies inside
-   the proof, wrong for a continuation applied everywhere.
+   site, which is itself context-proportional and measured as a clear
+   regression even for a smaller term. `Typeclasses Opaque` is right for a post
+   nobody applies inside the proof, wrong for a continuation applied everywhere.
 2. **Fold only the INNER body** — the `∀ fuel` and the `wp_next`/`□` must stay
    syntactically visible for the call sites' `iSpecialize`.
 3. **For a `∀ fuel, …` block, parameterize by `fuel` and keep the `∀` outside.**
@@ -135,8 +126,8 @@ blocks; the rule-3 `iApply ("IH" $! …)` fails the same way, so the fold's own
 IH is subject to the limit), ProofFilealloc (the descriptor scan); each file's
 header records the exact error. The limit is that pinned-`false` shape
 specifically, NOT bare folds: ProofScheduler's four `□ (∀ …)` blocks have no
-`wp_next` wrapper either and three folded clean for −17 % (its leaves take the
-zero process pointer literally, so nothing needs `?p` through the fold).
+`wp_next` wrapper either and three folded clean (its leaves take the zero
+process pointer literally, so nothing needs `?p` through the fold).
 
 ### Seal a whole-function proof's continuation
 
@@ -153,19 +144,19 @@ shows up as a hot sentence; it just sits in `Δ` making every step of the walk
 dearer. `ProofForkret`'s residue closer (`∀ h pt' V', ⌜..⌝ -∗ ⌜..⌝ -∗ ⌜..⌝ -∗
 ut_tfk -∗ first_done -∗ W -∗ timer_cap -∗ forkret_yield -∗ URes h pt' ksp`) was
 spelled out in THREE statements — `wp_forkret_gen_body` and both of the proof's
-two block lemmas — and measured **13 % of the Iris context** of every step of a
-1300-step walk. One `Definition SpecForkret.forkret_closer` naming it, used in
-all three, took the file **27.1 s → 20.7 s (−24 %)** with a byte-identical
-assumption set. Keep it TRANSPARENT for the reason the previous subsection
-gives: the tail applies it with `iDestruct ("Hyield" $! …)`.
+two block lemmas — and was a double-digit percentage of the Iris context of
+every step of a very long walk. One `Definition SpecForkret.forkret_closer`
+naming it, used in all three, paid clearly and left a byte-identical assumption
+set. Keep it TRANSPARENT for the reason the previous subsection gives: the tail
+applies it with `iDestruct ("Hyield" $! …)`.
 
 **How to find the entry worth sealing: dump `Δ` and rank it by printed size.**
 `Unset Printing Notations. Set Printing Depth 200. Show.` on a line in the
 middle of the walk, on a scratch copy, prints `environments.Envs` in full;
 splitting it on the quoted hypothesis names gives a size per entry. On
-`ProofForkret` at the `kexec` call that was 55 entries / 15 kB, and the closer
-was the biggest single row by 30 %. This beats guessing — the entries that LOOK
-big (`big_opS`/`big_opL` rows over the fs kit) were 300–900 bytes each.
+`ProofForkret` at the `kexec` call the closer was the biggest single row by a
+wide margin. This beats guessing — the entries that LOOK big (`big_opS`/`big_opL`
+rows over the fs kit) are among the smallest.
 
 **A closer that is a premise of a MODULE-TYPE contract has to be defined
 outside the spec file's `Section`.** The closer quantifies over the hart `h`
@@ -175,86 +166,58 @@ fixes `CID` those rows do not take a `CID` argument yet — the error is
 own `` `{!riscvGS Σ, …} `{GEN : GenId} `` binders at top level, exactly as the
 contract body beside it already does.
 
-### ProofSysUnlink: the two CONTINUATIONS were 55 % of Δ (measured 2026-08-27)
+### ProofSysUnlink: the two CONTINUATIONS were the bulk of Δ
 
 `ProofSysUnlink.v` was the tree's most expensive file, and it is the worked
-example for this whole section — the diagnosis, the two folds, and why it lands on the
-opposite side of the ledger from `ProofIput` below.
+example for this whole section — the diagnosis, the two folds, and why it lands
+on the opposite side of the ledger from `ProofIput` below.
 
-**The profile says RULE ONE and nothing else.** Isolated `coqc -time`, 151.8 s
-over 4832 sentences, no sentence above 10.9 s (a `Qed`):
-
-| head | total | n | avg |
-|---|---|---|---|
-| `iApply` | 41.8 s | 402 | 104 ms |
-| `Qed` | 38.9 s | 63 | 618 ms |
-| `iDestruct` | 16.7 s | 215 | 77 ms |
-| `iIntros` | 15.9 s | 225 | 71 ms |
-| `rewrite` | 6.3 s | 330 | 19 ms |
-| `set` | 5.9 s | 102 | 58 ms |
-| `iEval` | 4.2 s | 329 | 13 ms |
-| `iNext` | 3.5 s | 7 | **495 ms** |
-| `assert` | 2.7 s | 786 | 3 ms |
-
-82 s of proofmode steps plus 39 s of `Qed` is 80 % of the file, and both are
-priced by `|Δ|`. **The 786 `assert`s, which look like the problem, are 2.7 s
-total** — do not chase them.
+**The profile says RULE ONE and nothing else.** Isolated `coqc -time` showed no
+hot sentence at all: the cost was spread over `iApply`, `Qed`, `iDestruct` and
+`iIntros`, all of which are priced by `|Δ|`, and together they were the great
+majority of the file. **The hundreds of `assert`s, which look like the problem,
+are a rounding error** — do not chase them.
 
 **Δ, dumped and ranked** (`Unset Printing Notations. Set Printing Depth 250.
 Show.` on a copy with the other blocks `Admitted`, then split on the quoted
 names — the `Esnoc` scaffolding has to be stripped first or the last
-intuitionistic row absorbs the whole spatial-env prefix and reads ~1.3 kB too
-big):
-
-| point | hyps | Δ | biggest | second |
-|---|---|---|---|---|
-| `su_w3` @+0x84 | 87 | 11.7 kB | `Hseamk` 5626 (**48 %**) | `Hcont` 879 (7.5 %) |
-| `su_w5_dir` @+0xae | 84 | 6.5 kB | `Hcont` 879 (**13.4 %**) | `Hmetai` 429 |
-| `su_w5_dir` @+0xca | 71 | 5.8 kB | `Hcont` 879 (**15.2 %**) | `Hetki` 268 |
-
-Two entries, both continuations, both spelled inline:
+intuitionistic row absorbs the whole spatial-env prefix and reads much too
+big). Two entries dominated, both continuations, both spelled inline:
 
 - **`Hcont`, the RETURN continuation** — fifteen rows, written out TEN times
   (the contract in `SpecSysUnlink.v` and nine block-lemma statements), and a
   further copy inside each block's own seam.
-- **`Hseamk`, the block's fall-through seam** — 58 / 96 / 121 source lines in
-  W1 / W2 / W3, one per block, inert in Δ for the whole walk and applied twice
-  at the end.
+- **`Hseamk`, the block's fall-through seam** — one per block, dozens to
+  low-hundreds of source lines each, inert in Δ for the whole walk and applied
+  twice at the end.
 
-Everything else is a flat tail of ~100–150-character rows: the two 20-row
-open-inode bundles, the 15-row stack frame, the ambient fs fabric. **Do not
-fold those.** The walk consumes them row by row, so a bundle would have to be
-taken apart at every callee call and the cost would move rather than go — see
-"Extracting a persistent fact out of a bundle" below.
+Everything else is a flat tail of short rows: the two 20-row open-inode
+bundles, the 15-row stack frame, the ambient fs fabric. **Do not fold those.**
+The walk consumes them row by row, so a bundle would have to be taken apart at
+every callee call and the cost would move rather than go — see "Extracting a
+persistent fact out of a bundle" below.
 
 Both folds are DROP-IN. `Definition sys_unlink_closer` in `SpecSysUnlink.v`
 (outside the `Section`, because it is a premise of the module-type contract)
 and one `Definition su_wN_seam` per block beside its lemma, all TRANSPARENT.
 **Not one line of proof script changed** — `iApply ("Hcont" $! …)`,
 `iApply ("Hseamk" $! …)` and the `iIntros` that discharges the seam goal in
-`wp_sys_unlink_sconf` all unify straight through a transparent constant.
+`wp_sys_unlink_sconf` all unify straight through a transparent constant. The
+closer alone was a modest win; the three seams on top of it took both the wall
+and the `.vo` down substantially, with peak RSS following.
 
-Isolated `coqc`, arms interleaved, box at load 2–3:
-
-| arm | wall | `.vo` | peak RSS |
-|---|---|---|---|
-| baseline | 153.7 s (153.7 / 154.9 / 155.3) | 8,941,931 | 3.24 GB |
-| + `sys_unlink_closer` | 147.4 s | 8,513,058 (−4.8 %) | 3.07 GB |
-| + the three seams | **133.1 s (−13.4 %)** (133.3 / 133.1 / 153.0) | 7,616,840 (**−14.8 %**) | 3.02 GB |
-
-Min of three, arms interleaved. The one 153.0 s seam reading is the shared box,
-not the arm: the other two agree to 0.15 % and the closer arm's own pair
-(147.4 / 158.9) straddles it the same way at load 20. Contention only ADDS —
-take the min, never the mean.
+Min of three, arms interleaved. One outlying reading in the seam arm was the
+shared box, not the arm: the other two agreed to a fraction of a percent, and
+the closer arm's own pair straddled it the same way under load. Contention only
+ADDS — take the min, never the mean.
 
 **`su_w3_seam` is a 58-ARGUMENT constant and it pays, where `ProofIput`'s
-28-argument closer cost +13 s.** Argument count is not the predictor. What
-separates them is the SHARE of Δ removed against the number of steps that
-carry it: `ProofIput`'s fold took Δ 7.6 → 5.4 kB in a file whose per-step cost
-was already modest, while here W3's Δ goes 11.7 → ~6 kB under a 402-`iApply`,
-63-`Qed` walk. Rank Δ first; fold the row that is tens of percent of it, and
-only that row. (The 6 kB is arithmetic on the printed sizes, not a second
-dump — what was measured is the wall and the `.vo`.)
+28-argument closer was a regression.** Argument count is not the predictor.
+What separates them is the SHARE of Δ removed against the number of steps that
+carry it: `ProofIput`'s fold shrank Δ in a file whose per-step cost was already
+modest, while here W3's Δ nearly halved under a walk with hundreds of `iApply`s
+and dozens of `Qed`s. Rank Δ first; fold the row that is tens of percent of it,
+and only that row.
 
 **GET THE `Definition`'s TYPECLASS BINDER LIST EXACTLY RIGHT — the two ways
 of getting it wrong fail in OPPOSITE directions, and only one of them
@@ -267,42 +230,38 @@ means restating the `` `{!riscvGS Σ, …} `` list by hand, and:
   for ProcAvail.pavG"* — or, on a whole statement, `UNDEFINED EVARS`.
 - **Too FEW classes** (one a row does need) does NOT error. Instance
   resolution goes hunting through the `gFunctors` instances for the missing
-  evar and **DIVERGES**: `KexecOkQ.v` alone reached **300 GB** and had to be
-  killed, against 1.57 s / 768 MB with the right list. There is no error
-  message to read, and on a shared box it takes the machine with it.
+  evar and **DIVERGES**, consuming hundreds of gigabytes until it is killed,
+  against a second or two with the right list. There is no error message to
+  read, and on a shared box it takes the machine with it.
   This is durable-notes.md's "NAMING AN AMBIENT CLASS FIELD OUTSIDE ITS
-  CLASS'S SCOPE IS A MEMORY BOMB" (~190 GB, lane R1b) reached from a second
-  direction — same root cause, a class search with an unknown `Σ` — so if
-  either bites you, read both.
+  CLASS'S SCOPE IS A MEMORY BOMB" reached from a second direction — same root
+  cause, a class search with an unknown `Σ` — so if either bites you, read both.
 
 So derive the list, do not guess it: for each row, open the module that
 defines it and copy that section's `Context`. The one that catches people is
 `ProcInv` — `proc_priv` needs `` `{!riscvGS, !fileG, !xv6G, !bioslotG,
 !fdslotG, !irefslotG} ``, i.e. `fileG` and `fdslotG` even though nothing in
 the row's spelling mentions a file or an fd. **And cap the memory while
-experimenting**: `ulimit -v 25000000` before `coqc`/`make` is ~7x the largest
-legitimate file in the tree, so it never bites a real build and turns this
-failure into a fast one.
+experimenting**: `ulimit -v 25000000` before `coqc`/`make` is many times the
+largest legitimate file in the tree, so it never bites a real build and turns
+this failure into a fast one.
 
-**THE PRIZE IS ABSOLUTE BYTES OFF Δ, NOT THE SHARE — measured 2026-08-27,
-do not redo these.** Below ~1 kB removed it is worth nothing however good the
-share looks: `ProofCopyout.co_loop` (0.46 kB, 27 % of a 33.8 s lemma) came out
-flat at +0.5 % though its `.vo` fell 4.0 %, and `ProofNamex`/`NamexTr`
-(~1 kB) bought only −1.2 / −1.6 %. Against `ProofSysUnlink`'s ~6.5 kB for
-−13.4 %.** `ProofPrintk`'s eleven `wp_printk_arm_*` exit continuations are
-character-for-character identical and 35–43 % of each statement, which reads
-exactly like this section's shape. Folding all eleven measured **48.40 s →
-48.44 s** (`.vo` −0.18 %) on a quiet box, two reps interleaved: nothing.
-`|Δ| × steps` is per PROOF, and those eleven lemmas are 15.6 s of that file
-between them — 0.3–2.7 s each, so 40 % off a 0.8 s proof's Δ is ~0.3 s and
-eleven of them is noise. `su_w3` is the contrasting case: ONE lemma at 26.5 s
-with a 48 % entry. **Rank candidates by the lemma's own `coqc -time` cost
-times its share, never by the file's cost times the share** — the file-level
-metric is what put ProofPrintk top of the list.
+**THE PRIZE IS ABSOLUTE BYTES OFF Δ, NOT THE SHARE.** Below roughly a kilobyte
+removed it is worth nothing however good the share looks: several folds with
+excellent-looking shares came out flat or within noise even where the `.vo`
+fell. `ProofPrintk`'s eleven `wp_printk_arm_*` exit continuations are
+character-for-character identical and a third to a half of each statement,
+which reads exactly like this section's shape — folding all eleven measured as
+nothing. `|Δ| × steps` is per PROOF, and those eleven lemmas are individually
+cheap, so a large share of a cheap proof's Δ is noise. `su_w3` is the
+contrasting case: ONE expensive lemma with a single entry approaching half of
+its Δ. **Rank candidates by the lemma's own `coqc -time` cost times its share,
+never by the file's cost times the share** — the file-level metric is what put
+ProofPrintk top of the list.
 
-**Still on the table in this file, not done**: its seven `iNext`s are 3.5 s at
-495 ms each, against the ~60 ms `iApply bi.later_intro` costs — which the same
-file already uses at thirteen other sites. See "Modalities and rewriting".
+**Still on the table in this file, not done**: its seven `iNext`s cost several
+times what `iApply bi.later_intro` costs — which the same file already uses at
+thirteen other sites. See "Modalities and rewriting".
 
 ### Do not pose instruction facts AT ALL — close them as subgoals
 
@@ -324,41 +283,37 @@ size of the block that used to sit there. Purely mechanical: delete the
 `iPoseProof (pai_<off> with "Htext") as "Hi<off>"` lines and rewrite each
 `with "Hcg Hpc Hi<off> …"` into `with "Hcg Hpc [] …"` plus the brace.
 
-**The whole tree now follows this discipline** — 226 proof files converted
-2026-08-22, verified by a from-scratch rebuild (every `.vo` deleted): 1297/1297,
-zero errors. Measured over the ~110 files where before/after pairs were taken:
-
-| | range | median |
-|---|---|---|
-| wall | −4 % … −49 % | ≈ −18 % |
-| `Qed` | −6 % … −62 % | ≈ −27 % |
-| `.vo` | −24 % … **+0.2 %** | ≈ −5 % |
+**The whole tree now follows this discipline** — 226 proof files converted,
+verified by a from-scratch rebuild (every `.vo` deleted): 1297/1297, zero
+errors. Wall and `Qed` both improved solidly across the ~110 files where
+before/after pairs were taken; `.vo` mostly shrank but is **not** a proxy and
+occasionally grew.
 
 On the reference file (`ProofPipealloc.v`, one whole-function proof, 58 posed
-facts) the proof term went 26.6 M → 8.3 M nodes (−69 %) while the shared DAG
-moved only −13 % — the derivations are still there, sharing subterms, but no
-longer re-embedded in every following step's environment. That is RULE ONE from
-the `|Δ|` side, and it is why the saving is FLAT: no sentence gets dramatically
+facts) the proof term shrank by roughly two thirds while the shared DAG barely
+moved — the derivations are still there, sharing subterms, but no longer
+re-embedded in every following step's environment. That is RULE ONE from the
+`|Δ|` side, and it is why the saving is FLAT: no sentence gets dramatically
 faster, the whole tail does.
 
 **What predicts the size of the win** is `min(peak live block net of iClears,
 poses per Qed)` — `tools/instr_subgoal.py --rank` computes it. Not the file's
-site count: `ProofUartinit` (27 sites, one block) got −35 % while `ProofSysExec`
-(92 sites over ~30 proofs) got −14 %, and `ProofVirtioDiskInit` (127 poses, but
-posed-and-cleared one at a time) got −7.5 %. It sorts candidates; it sizes the
-win only to ±10 points, and `ProofSysLink` has the tree's largest block at
-−14 % because most of its time is not proofmode work at all.
+site count: a 27-site single-block file beat a 92-site file spread over ~30
+proofs, and a file with 127 poses that posed-and-cleared one at a time barely
+moved. It sorts candidates; it sizes the win only roughly, and `ProofSysLink`
+has the tree's largest block yet lands mid-pack because most of its time is not
+proofmode work at all.
 
 Four things measurement refuted, all of which looked true after the first file:
-`Qed` does NOT always improve more than wall (fails below ~20-pose blocks);
-`.vo` is not a proxy and can grow; peak RSS is not a reliable benefit (−37 % to
-+0.2 %); and a `Löb`/`iInduction` body is NOT a special case (in-loop and
-out-of-loop discounts agree — measured −56/−45, −43/−42, −26/−30).
+`Qed` does NOT always improve more than wall (fails on small blocks); `.vo` is
+not a proxy and can grow; peak RSS is not a reliable benefit; and a
+`Löb`/`iInduction` body is NOT a special case (in-loop and out-of-loop
+discounts agree).
 
 **Do not measure this on a loaded box.** The error is BIASED, not just noisy:
 eight files measured concurrently reported seven apparent REGRESSIONS that were
-all 5–20 % wins when re-measured serially. One `coqc` at a time, arms
-interleaved, 2–3 reps.
+all wins when re-measured serially. One `coqc` at a time, arms interleaved,
+2–3 reps.
 
 **The user tier (`UProof*.v`) is out of scope and should stay that way**: its
 `uinstr` is a `Prop` over a pure process image, passed positionally as a Coq
@@ -394,48 +349,45 @@ an explicit `iClear "HiXX"` after the last use, not just a later pose.
 persistent leftover does not trip the "spatial hypotheses remain" check at
 `Qed`, so a copy-pasted block of 30 poses can carry 16 that the proof never
 reads. `ProofForkret.wp_forkret` had exactly that (`fkr_64` … `fkr_8e`, which
-its callee `fkr_tail` poses for itself). Retrofit measured on that file
-(77 poses over three block lemmas): 16 dead poses dropped, 56 moved to the
-sentence of their first use, 57 `iClear`s added — **28.9 s → 27.1 s**.
-Grep for it with "a pose whose name never appears again in the same
-`Proof.`…`Qed.`"; the name is reused across the file's lemmas, so the search
-has to be scoped to one proof block or every pose looks live. **That retrofit
-is superseded by the subsection above** — converting the same 61 surviving
-poses to `[]` subgoals is the bigger win, and it makes the dead ones vanish by
-construction; the numbers here stand only as the cost of the poses themselves.
+its callee `fkr_tail` poses for itself). Grep for it with "a pose whose name
+never appears again in the same `Proof.`…`Qed.`"; the name is reused across the
+file's lemmas, so the search has to be scoped to one proof block or every pose
+looks live. **That retrofit is superseded by the subsection above** —
+converting the surviving poses to `[]` subgoals is the bigger win, and it makes
+the dead ones vanish by construction.
 
-### Hypothesis names are 10–20 % of a whole-function proof term
+### Hypothesis names are a measurable share of a whole-function proof term
 
 Iris's `ident` is a Stdlib `string` — a cons-list of `Ascii` over eight
 booleans, ~10 term nodes per character — and the environment is embedded once
-per step. Measured slope: **~730 nodes per character of hypothesis name**. The
-only lever here is shorter names, a bad trade for readability except in the two
-or three longest monoliths. **Sealing the name does not help and cannot**:
-opacity is a reduction control, not a representation change, and a name behind a
-constant breaks `envs_lookup`, which must COMPARE names under `pm_eval`'s
-delta whitelist. What would fix it is a primitive-string `ident` upstream.
+per step, so the term grows by hundreds of nodes per character of hypothesis
+name. The only lever here is shorter names, a bad trade for readability except
+in the two or three longest monoliths. **Sealing the name does not help and
+cannot**: opacity is a reduction control, not a representation change, and a
+name behind a constant breaks `envs_lookup`, which must COMPARE names under
+`pm_eval`'s delta whitelist. What would fix it is a primitive-string `ident`
+upstream.
 
 ## Never let a general-purpose closer meet a large context
 
 This is the single most productive rule in this file — instances of it have been
-worth 20× on individual files.
+worth more than an order of magnitude on individual files.
 
 - **`set_solver` IS FIXED — the tree overrides it, and the old prohibition no
   longer applies.** `iris/FastSetSolver.v` replaces stdpp's `set_solver` tree-wide
-  (hooked in from `RiscvModelBytes.v`, a transitive dependency of 1071 of the
-  1090 files; `BitmapEnc.v` and `CrashProto.v` import it directly). Read that
-  file's header for the measurements. The short version:
-  - stdpp's `set_solver` spends **~97 % of its time in three whole-context
+  (hooked in from `RiscvModelBytes.v`, a transitive dependency of nearly every
+  file; `BitmapEnc.v` and `CrashProto.v` import it directly). Read that
+  file's header for the details. The short version:
+  - stdpp's `set_solver` spends **almost all of its time in three whole-context
     sweeps that have nothing to do with sets** — `setoid_subst`, `set_unfold`'s
     `csimpl in *`, and `naive_solver`'s `unfold … in *` / `simplify_eq/=`. The
-    step that actually reasons about sets is 0.5 s of a 19.9 s call.
+    step that actually reasons about sets is a rounding error.
   - The override clears the hypotheses that cannot reach the goal (the
     connected component of the goal in the "hypothesis mentions variable"
     graph, plus every hypothesis mentioning a set operation) and then runs
     stdpp's own pipeline on what is left. Cost becomes **linear** in the
-    context instead of quadratic-to-cubic: the 80-hypothesis benchmark goes
-    19.9 s → 0.10 s, and 640 hypotheses still cost 0.10 s where upstream needs
-    105 s at 160.
+    context instead of quadratic-to-cubic: hundreds of hypotheses cost the
+    same as dozens, where upstream is already unusable at eighty.
   - **Solving power is unchanged, and this was checked properly.** The whole
     stdpp 1.12.0 library was recompiled against the override with the fallback
     DELETED (`set_solver := set_solver_fast`): all 55 files build clean and all
@@ -464,18 +416,17 @@ worth 20× on individual files.
     `iris/FsInitPinBoot.v` — an `FsImgCheck`-consumer leaf — got stdpp's
     upstream one, and ONE `set_solver` closing `b ∉ ∅` with
     `b ∈ fs_home_set fsimg_cov …` in the context (`fsimg_cov` is a
-    1,999-element `list_to_set` literal) cost **3 m 45 s of a 3.2 s file**.
-    `Print Ltac set_solver.` answering *"set_solver is not a user defined
-    tactic"* is the check: the override is not in scope. Then either
-    `Require Import FastSetSolver` or close the goal by hand
+    1,999-element `list_to_set` literal) took minutes in a file that is
+    otherwise trivial. `Print Ltac set_solver.` answering *"set_solver is not
+    a user defined tactic"* is the check: the override is not in scope. Then
+    either `Require Import FastSetSolver` or close the goal by hand
     (`exact (not_elem_of_empty b)`) — in a deliberate leaf, prefer the
     second and leave the cone alone.
-  - **Measured on a REAL site, not a synthetic:** `ProofSysDup.v:836`'s
+  - **Confirmed on a REAL site, not a synthetic:** `ProofSysDup.v:836`'s
     workaround (`ltac:(apply not_elem_of_empty)`, written because `set_solver`
-    there cost 106 s) put back to `ltac:(set_solver)` now costs **0.73 s**
-    (0.49 s filtering + 0.23 s solving) against **105.2 s** for the same
-    sentence with upstream — **144×**. That one site took two further fixes,
-    both worth knowing:
+    there was unusable) put back to `ltac:(set_solver)` is now free, against
+    upstream's two-figure minutes for the same sentence. That one site took two
+    further fixes, both worth knowing:
     - **A goal reached through `ltac:(…)` inside a term is an EVAR**, and an
       evar carries an instance listing every variable in scope. Walking into it
       made the goal "mention" the whole context, so the filter kept everything.
@@ -483,30 +434,29 @@ worth 20× on individual files.
     - **`Std.clear` is ALL-OR-NOTHING.** One name Coq refuses — something
       outside the analysis still depends on it — fails the whole call, and then
       NOTHING is cleared and the filter silently degrades to upstream with no
-      error anywhere. This is what kept that site at 105 s even once the
-      analysis was running correctly (0.05 s to decide, then a 105 s solve over
-      the context it had failed to clear). `clear_greedily` now bisects on
-      failure and keeps the halves that go.
+      error anywhere. This is what kept that site slow even once the analysis
+      was running correctly (instant to decide, then a full solve over the
+      context it had failed to clear). `clear_greedily` now bisects on failure
+      and keeps the halves that go.
     - The general lesson: **a filter that fails open is invisible.** Both bugs
       presented as "the tactic is just as slow as before", never as an error.
       If the override ever looks like it is doing nothing, check that
       `set_shrink` is in scope and that it is actually clearing, before
       believing anything about the goal.
-  - **A SINGLE MEMBERSHIP IN A UNION OF TWO `gset register` VARIABLES STILL
-    COSTS 24 s, override or not.** `assert ((tlb : register) ∈ Drw ∪ Dro) by
-    set_solver` inside a `swp` translation proof measures **24 s per call**
-    (`coqc -time`) — and adding `Require Import FastSetSolver` to the file
-    changes nothing, so this is not a "the override is not in scope" case.
-    Two of them made `Pt2WalkPt.v` a 62 s file; `by (apply elem_of_union_l;
-    exact HWtlb)` makes it 13 s. The rule the durable notes give for
-    tower-carrying proofs (name the union lemma) is therefore still the rule
-    whenever the sets are VARIABLES rather than literals — which is exactly
-    the `Drw`/`Dro` frame idiom. `HartSKpt.swp_translate_kpt` carried the
-    `set_solver` form until 2026-08-20, at **24.5 s for that one `assert`** —
-    the whole file was 29.6 s. Its premise `HWtlb : tlb ∈ Drw` was already in
-    context, so `by (apply elem_of_union_l; exact HWtlb)` is the whole fix:
-    file **29.6 s → 5.1 s**. Grep for `∈ .* ∪ .*) by set_solver` before
-    believing a file is intrinsically slow.
+  - **A SINGLE MEMBERSHIP IN A UNION OF TWO `gset register` VARIABLES IS STILL
+    EXPENSIVE, override or not.** `assert ((tlb : register) ∈ Drw ∪ Dro) by
+    set_solver` inside a `swp` translation proof costs many seconds per call —
+    and adding `Require Import FastSetSolver` to the file changes nothing, so
+    this is not a "the override is not in scope" case. Two of them dominated
+    `Pt2WalkPt.v`; `by (apply elem_of_union_l; exact HWtlb)` is the fix. The
+    rule the durable notes give for tower-carrying proofs (name the union
+    lemma) is therefore still the rule whenever the sets are VARIABLES rather
+    than literals — which is exactly the `Drw`/`Dro` frame idiom.
+    `HartSKpt.swp_translate_kpt` carried the `set_solver` form and that one
+    `assert` was most of the file; its premise `HWtlb : tlb ∈ Drw` was already
+    in context, so `by (apply elem_of_union_l; exact HWtlb)` is the whole fix.
+    Grep for `∈ .* ∪ .*) by set_solver` before believing a file is
+    intrinsically slow.
   - **Two things the override does NOT fix**, both goal-side rather than
     context-side, so the old workarounds stand: `gset (mword n)` still fails
     (instance divergence — see the durable notes), and `set_unfold` still
@@ -521,35 +471,33 @@ worth 20× on individual files.
 - **`done` ENDS IN A NO-ARGUMENT `discriminate`, WHICH HEAD-NORMALISES EVERY
   HYPOTHESIS TYPE WITH DELTA — so `by` is a general-purpose closer too, and one
   `⊆` between two gmaps is a large context all by itself.** `VirtioQueue.v`'s
-  `by exists (vp_lo pr + k)%nat, sl` cost **214.9 s** to close
+  `by exists (vp_lo pr + k)%nat, sl` took minutes to close
   `vp_pend pr !! q = Some sl ∧ vs_hd sl = vs_hd sl` — a goal whose two halves
-  are a hypothesis and `eq_refl`. `coqc -profile-ltac` put 99.9 % of it in a
-  SINGLE `discriminate` call, and clearing the context down to one hypothesis
-  at a time named the culprit exactly: `Hrsub : ring_bytes c (vp_ring pr) ⊆
-  vproto_ctl c pr`, on its own, is the whole 210 s. Nothing else in that
-  17-hypothesis context cost more than 0.011 s. The mechanism is that no-arg
+  are a hypothesis and `eq_refl`. `coqc -profile-ltac` put essentially all of it
+  in a SINGLE `discriminate` call, and clearing the context down to one
+  hypothesis at a time named the culprit exactly: `Hrsub : ring_bytes c
+  (vp_ring pr) ⊆ vproto_ctl c pr`, on its own, was the whole cost. Nothing else
+  in that 17-hypothesis context registered at all. The mechanism is that no-arg
   `discriminate` walks the local context looking for an equation between
   distinct constructors, and to decide that it `hnf`s each hypothesis's type
   WITH delta — so a `⊆`/`##ₘ` between two *computed* gmaps (here a `write_bytes`
   fold over eight ring cells, unioned into a lease) gets unfolded, and the
   goal's own triviality never gets a chance to matter.
   - **The fix is to say what the goal is**: `exists q, sl. exact (conj Hsl
-    eq_refl)` in place of `by exists q, sl` took the sentence 214.9 s → 0 s and
-    the FILE **227 s → 7.9 s**. Same shape as the `iPureIntro. done.` bullet
-    above, one level deeper: the giveaway is again that the goal is trivial to
-    read, so nobody suspects the closer.
+    eq_refl)` in place of `by exists q, sl` took the sentence to nothing and
+    the file with it. Same shape as the `iPureIntro. done.` bullet above, one
+    level deeper: the giveaway is again that the goal is trivial to read, so
+    nobody suspects the closer.
   - **Name the hypothesis whenever you do want `discriminate`.** The same file's
     remaining cost was a bare `discriminate` in a branch whose goal was a fat
     `⊆`: `discriminate H1`, where `H1 : None = Some _` is the equation meant all
-    along, skips the walk (4.1 s → 0 s across five sites). `discriminate Hreq`
-    likewise.
+    along, skips the walk. `discriminate Hreq` likewise.
     **AND THE BILL IS PER BRANCH, so a `destruct` over a wide inductive
     multiplies it.** `UserTotalU`'s two `destruct i; try (cbn in Hdi;
     discriminate)` over the decoded-instruction type run the context walk once
-    per constructor: naming it (`discriminate Hdi`) took each sentence
-    **4.70 s → 0.62 s** and the file **9.2 s → 3.7 s** (2026-08-29). The tell is
-    the same as ever — the equation being refuted is one you can read, and it is
-    already named in the line above.
+    per constructor; naming it (`discriminate Hdi`) fixes each sentence and the
+    file. The tell is the same as ever — the equation being refuted is one you
+    can read, and it is already named in the line above.
   - **This is not specific to `by`.** Every `done`, every `by tac`, and every
     bare `discriminate` in scope of a map-inclusion, map-disjointness or
     map-subset hypothesis carries the same bill. Before believing such a
@@ -563,29 +511,25 @@ worth 20× on individual files.
 - **Never `simplify_eq` inside a whole-function proof's Iris context** — like
   `congruence`, it scans every hypothesis in scope looking for equalities to
   substitute/discriminate, so cost tracks context size, not the one hypothesis
-  you meant to consume. Closing `(e', b') = (Ep, uint bno) -> …` this way cost
-  12–17 s **per call**, four calls in one file. Fix: `injection H as pat…`
-  names exactly the hypothesis and produces one pattern per NON-trivial
-  component — a component syntactically equal on both sides (`Ep = Ep`) is
-  dropped automatically, so a `(Ep, b') = (Ep, uint bno)` equality takes one
-  pattern (`as ->`) where a `(e', b') = (Ep, uint bno)` one — both sides
-  genuinely distinct — takes two (`as -> ->`); guess wrong and the error is
-  *"Unexpected introduction pattern (at most N was expected)"*, which names
-  the fix. Four-call fix took one file from 95 s to 35 s.
-- **Never `congruence` anywhere but LAST** in a peel's side-goal alternation
-  (4–80 s per call), and never `done` / bare `cbn` / bare `reflexivity` as the
-  last tactic of a step. The giveaway is that the tactic is *trivially*
-  discharging a goal you can read at a glance, so nobody suspects it: `iPureIntro.
-  done.` on `(0%nat = 0%nat ∧ true = true)` was 16.1 s where `exact (conj eq_refl
+  you meant to consume. Fix: `injection H as pat…` names exactly the hypothesis
+  and produces one pattern per NON-trivial component — a component syntactically
+  equal on both sides (`Ep = Ep`) is dropped automatically, so a
+  `(Ep, b') = (Ep, uint bno)` equality takes one pattern (`as ->`) where a
+  `(e', b') = (Ep, uint bno)` one — both sides genuinely distinct — takes two
+  (`as -> ->`); guess wrong and the error is *"Unexpected introduction pattern
+  (at most N was expected)"*, which names the fix.
+- **Never `congruence` anywhere but LAST** in a peel's side-goal alternation,
+  and never `done` / bare `cbn` / bare `reflexivity` as the last tactic of a
+  step. The giveaway is that the tactic is *trivially* discharging a goal you
+  can read at a glance, so nobody suspects it: `iPureIntro. done.` on
+  `(0%nat = 0%nat ∧ true = true)` is expensive where `exact (conj eq_refl
   eq_refl)` is free. When the same one-liner is cheap in one place and lethal in
   another, the difference is whether its subject is CONCRETE.
   **`by split` IS THE SAME TACTIC WEARING A HAT** — `split` then `done`, so the
   walk still happens. The tree's only two sites (`ProofPipealloc.v:1625,1647`,
-  closing `fdstate_ok` at a literal `MkFContent` — three `eq_refl`s) measured
-  **4.91 s and 4.98 s**; `exact (conj eq_refl (conj eq_refl eq_refl))` took both
-  out of the profile's top 1000 and the file from **35.1 s to 26.2 s** (isolated,
-  min of two, 2026-08-29 — and the after arm ran at the higher load of the two,
-  so it is the conservative direction).
+  closing `fdstate_ok` at a literal `MkFContent` — three `eq_refl`s) were both
+  expensive; `exact (conj eq_refl (conj eq_refl eq_refl))` took both out of the
+  profile and the file with them.
 - **`upd_ne`'s side goal has exactly one answer: `CalleeSaved.reg_ne_side`.**
   Write `Local Ltac regne := reg_ne_side.` and never hand-roll the alternation.
   Its branch order is the point: (1) the disequality already in context, via
@@ -597,7 +541,7 @@ worth 20× on individual files.
   it picks the right one of the six-to-nine disequalities a transport carries —
   an Ltac body cannot mention a hypothesis its own `injection` introduced.
 
-### A BESPOKE SIDE-CONDITION TACTIC IS THE SAME BUG, AND IT HIDES BETTER: `wp_next_chain` WAS 26 % OF ProofNamex (measured 2026-08-31)
+### A BESPOKE SIDE-CONDITION TACTIC IS THE SAME BUG, AND IT HIDES BETTER: `wp_next_chain`
 
 Everything above is about a STDLIB closer meeting a large context. This is the
 same mechanism in a tactic this tree wrote itself, and it hid for much longer
@@ -612,9 +556,9 @@ equation you can read.
 equalities a straight-line stretch accumulates, one per instruction. As landed
 it was two `repeat match goal … specialize` loops over the WHOLE context, so it
 proved a one-hop equation by specializing every link in scope. A whole-function
-walk accumulates ~69 of them by its deepest point, and ProofNamex calls it 127
-times: **8800 `specialize`s plus 8900 `destruct`s, 26 % of the file**, for
-goals that need a handful of links.
+walk accumulates dozens of them by its deepest point, and ProofNamex calls it
+127 times: thousands of `specialize`s and `destruct`s, a quarter of the file,
+for goals that need a handful of links.
 
 **The chain is a PATH, so follow it from the goal.** At `?x = ?z` the only link
 that can matter is the one whose conclusion is `?x = _`; consume it with
@@ -632,26 +576,20 @@ Three things make it drop-in and worth copying:
 
 - **`refine (eq_trans …)`, never `rewrite`.** The equation lands in the proof
   TERM and the context is never touched. The `rewrite He` spelling of the very
-  same walk is a **REGRESSION** — ssr `rewrite` became 47 % of the file (2573
-  calls) and ProofNamex read 110 s against the `specialize` version's 100 s.
+  same walk is a **REGRESSION** — ssr `rewrite` becomes about half the file.
   Measured, so do not re-run it.
 - **Keep the old loops as branches four and five.** The fast path fails
   cheaply (nothing is specialized, `first` rolls the state back), so no call
-  site can regress and a shape the walk cannot follow still closes. ~25 of
-  ProofNamex's 127 calls still take a fallback.
+  site can regress and a shape the walk cannot follow still closes. Roughly a
+  fifth of ProofNamex's calls still take a fallback.
 - **`clear H` after the `refine`** is what makes `repeat` terminate against a
   cyclic pair; the already-built term keeps its own reference, so clearing it
   from the residual goal is sound.
 
-240 files call this tactic. Whole-tree clean builds, TIMED, same box:
-
-| | ΣCPU | ProofNamex | ProofNparEra | ProofNamexEra | ProofSysLink | ProofBmap |
-|---|---|---|---|---|---|---|
-| before | 9128 s | 121.1 | 111.7 | 97.7 | 81.2 | 47.6 |
-| after (with the `rdok` fix below) | **8821 s (−3.4 %)** | **92.6 (−24 %)** | 91.6 (−18 %) | 80.0 (−18 %) | 71.2 (−12 %) | 38.0 (−20 %) |
-
-Isolated, min of two, ProofNamex **114.6 s → 84.3 s (−26 %)**; its `.lia.cache`
-cold reading agrees with its warm one, so none of this was certificate work.
+240 files call this tactic; the whole-tree ΣCPU moved by a few percent and the
+register-chain-heavy files by a fifth to a quarter each. ProofNamex's
+`.lia.cache` cold reading agrees with its warm one, so none of this was
+certificate work.
 
 **`rdok_tpne`'s bare `congruence` is the second instance, and it is the
 `discriminate` bullet above at 3673 call sites.** `IntrDefs.rdok` — the
@@ -661,43 +599,38 @@ the goal at that point is `False` and `H2 : 9%positive = 4%positive`.
 `congruence` head-normalises every hypothesis in scope to get there.
 `first [ discriminate H2 | congruence ]` (the fallback for a site whose two
 indices are not both concrete costs nothing, because a NAMED `discriminate`
-fails immediately) took ProofCreate's 419 calls out of the profile and the
-file **133.6 s → 130.8 s**, isolated, arms interleaved, both reps agreeing.
-The same edit is in `rgne`, whose side condition is the identical script.
+fails immediately) took ProofCreate's 419 calls out of the profile. The same
+edit is in `rgne`, whose side condition is the identical script.
 
-### ProofCreate IS THE FLOOR, NOT A BUG (measured 2026-08-31)
+### ProofCreate IS THE FLOOR, NOT A BUG
 
-`ProofCreate.v` is the tree's most expensive file (142 s CPU) and it has **no
-pathology at all** — this is the record of what was measured, so nobody
-re-runs it looking for one.
+`ProofCreate.v` is the tree's most expensive file and it has **no pathology at
+all** — this is the record of what was measured, so nobody re-runs it looking
+for one.
 
-- **Per SENTENCE it is CHEAPER than its peers**: 21.0 ms over 6475 sentences,
-  against ProofSysUnlink's 25.6, ProofUvmcopy's 30.0, ProofSysLink's 28.9.
-  It is the top file because it is the tree's biggest walk — five halves
-  (`cr_found_half` 38 s, `cr_mkdir_half` 42 s, `cr_alloc_half` 26 s, and the
-  two failure halves) of a straight-line-with-branches function. Compute this
-  ratio from the `.v.timing` roll-up BEFORE opening a slow file; it decides
-  whether you are looking for a bug or at a floor.
+- **Per SENTENCE it is CHEAPER than its peers.** It is the top file because it
+  is the tree's biggest walk — five halves (`cr_found_half`, `cr_mkdir_half`,
+  `cr_alloc_half`, and the two failure halves) of a straight-line-with-branches
+  function. Compute this ratio from the `.v.timing` roll-up BEFORE opening a
+  slow file; it decides whether you are looking for a bug or at a floor.
 - **Δ is already flat and already folded.** Dumped mid-walk in `cr_mkdir_half`
-  (the recipe in "Seal a whole-function proof's continuation"): 90 rows,
-  ~7 kB, no entry over ~160 B once the last intuitionistic row's absorbed
+  (the recipe in "Seal a whole-function proof's continuation"): 90 rows, no
+  entry anywhere near dominant once the last intuitionistic row's absorbed
   spatial prefix is discounted — the artefact that section warns about, seen
   again. The parked bodies (`cr_alloc_body`, `cr_mkdir_body`, `cr_fail_body`,
   `cr_cont_body`, `cr_tail_body`) are already named `Definition`s, so the
   ProofSysUnlink lever was spent here before it was written down.
-- **The tail is 57 % of the file**: 6428 sentences under 0.3 s. The 47
-  sentences above it are 55 s, of which 32 s is five honest `Qed`s.
-- **The `.lia.cache` is not hiding anything**: cold 138.0 s against warm
-  134.8 s, and this file contributes 6 MB to the directory cache where
-  `ProofFilewriteAU` contributed 190 MB.
+- **The tail is the majority of the file**: thousands of sentences well under a
+  second. The few dozen above that are mostly honest `Qed`s.
+- **The `.lia.cache` is not hiding anything**: cold and warm agree, and this
+  file's contribution to the directory cache is small.
 - **`Strategy opaque [rget] [tp_pin] [rf_upd]`** is already on in this file;
   adding the same three to `ProofNamex` — the obvious next candidate, a
-  register-chain-heavy whole-function proof — is a **NULL** (88.1 s → 87.4 s,
-  min of two, interleaved). That lever is still confined to
-  `ProofVirtioDiskInit`'s shape.
-- What is left is `|Δ| × steps` and nothing else: 31 % `iSpecializePat_go`
-  (21873 pattern items), 25 % `notypeclasses refine`, 14 % `tc_solve`, 12 %
-  `_iIntros_go`. **The only lever that could still move it is fewer RESOURCE
+  register-chain-heavy whole-function proof — is a **NULL**. That lever is
+  still confined to `ProofVirtioDiskInit`'s shape.
+- What is left is `|Δ| × steps` and nothing else: the Ltac profile is
+  `iSpecializePat_go`, `notypeclasses refine`, `tc_solve` and `_iIntros_go`, in
+  that order. **The only lever that could still move it is fewer RESOURCE
   ROWS per callee call** — ~30 names go out at each fs-callee `iApply` and
   ~20 come back at the `iIntros` — i.e. bundling the two 20-row open-inode
   bundles behind one abstraction with a constructor and an accessor. That is
@@ -706,90 +639,82 @@ re-runs it looking for one.
   go"); it has NOT been measured, and it should not be attempted as a perf
   edit alone.
 - **It is not on the critical path**, so splitting the file buys nothing:
-  `tools/proof_profile.py` puts the 414 s path through ProofSysUnlink, with
-  avg parallelism 21.8× and ~3 s effectively serial.
+  `tools/proof_profile.py` puts the path elsewhere.
 
-### ProofIput RESISTS ALL FOUR OF THIS FILE'S LEVERS (measured 2026-08-27)
+### ProofIput RESISTS ALL FOUR OF THIS FILE'S LEVERS
 
-**Except the fold — 68.0 s → 61.1 s (−10.2 %) in two steps, later the same
-day.** `ip_free_entry`'s two continuations (1.7 kB and 7.6 kB, the largest
-inline one in the tree) gave −6.5 %, and `ip_free_locked`'s own 3.9 kB gave a
-further −4.4 % — i.e. the very continuation the +13 s result below is about
-now measures NEGATIVE, folded as a seam on the current tree. The two
-measurements are not reconciled (the file has changed a great deal since, and
-the 60-row span that note describes is not obviously the 26-row one folded
-here); take it as: **re-measure before trusting an old per-file verdict, and
-never read "this file resists the lever" as "this continuation does".**
+**Except the fold.** `ip_free_entry`'s two continuations (the largest inline one
+in the tree) and `ip_free_locked`'s own both paid, in two steps — i.e. the very
+continuation the regression below is about now measures NEGATIVE, folded as a
+seam on the current tree. The two results are not reconciled (the file has
+changed a great deal since, and the span that note describes is not obviously
+the one folded later); take it as: **re-measure before trusting an old per-file
+verdict, and never read "this file resists the lever" as "this continuation
+does".**
 
-`ProofIput.v` is 113 s in the build and 2.3x the tree's median cost per
-sentence, so it reads like a textbook RULE ONE file. It is not fixable by the
-rules above, and here is what was tried so nobody re-runs it:
+`ProofIput.v` is well above the tree's median cost per sentence, so it reads
+like a textbook RULE ONE file. It is not fixable by the rules above, and here
+is what was tried so nobody re-runs it:
 
 - **Naming the closer made it SLOWER.** `ip_free_locked`'s +0x30 continuation
-  was 60 rows spelled inline and measured **31.7 % of Δ** at a mid-walk dump
-  (2472 B of 7.6 kB, biggest entry by 2.5x) — a bigger share than the
-  `ProofForkret` case that bought −24 %. One `Definition` for it did exactly
-  what it should to the context (Δ 7.6 kB → 5.4 kB, `Hcont` 31.7 % → **3.0 %**)
-  and cost the file **+13 s**, confirmed on a second reading. The regression is
-  +8.5 s inside `ip_free_locked` itself, spread UNIFORMLY across every tactic at
-  identical call counts (`iApply` +25 %, `iMod` +24 %, `iDestruct` +20 %): the
+  was 60 rows spelled inline and was the biggest entry in Δ by a wide margin —
+  a bigger share than the `ProofForkret` case that paid. One `Definition` for it
+  did exactly what it should to the context (Δ shrank by nearly a third, and
+  that entry went from dominant to negligible) and made the file **slower**,
+  confirmed on a second reading. The regression is inside `ip_free_locked`
+  itself, spread UNIFORMLY across every tactic at identical call counts: the
   per-step delta-unfold of a **28-argument** constant costs more than the
-  smaller Δ saves. Its CALLER improved (`wp_iput_gen` −3.0 s), which is the tell
-  — a fold helps whoever SUPPLIES the closer and hurts whoever USES it.
+  smaller Δ saves. Its CALLER improved, which is the tell — a fold helps
+  whoever SUPPLIES the closer and hurts whoever USES it.
 - **Sealing that constant does not rescue it, either way.** `Typeclasses
   Opaque` and `Strategy opaque` both fail identically at
   *"iSpecialize: cannot instantiate"*, and the `iEval (rewrite /X)` repair puts
   the expansion straight back into Δ, which is the thing being removed.
-- **`Strategy opaque [rget] [tp_pin] [rf_upd]` is a REGRESSION here**, +11 to
-  +17 s over two interleaved pairs, even though the mechanism is real
-  elsewhere (`ProofPipewrite` keeps the same three lines for −6 %).
-- **Hoisting inline `ltac:` is not available**: the file's 247 splices cost
-  0.18–0.27 s each (27.9 s total, max sentence 1.65 s), against the ~1.55 s per
-  splice that made the same edit worth 28 s in `ProofSysUnlink`.
+- **`Strategy opaque [rget] [tp_pin] [rf_upd]` is a REGRESSION here**, over two
+  interleaved pairs, even though the mechanism is real elsewhere
+  (`ProofPipewrite` keeps the same three lines and benefits).
+- **Hoisting inline `ltac:` is not available**: the file's 247 splices are
+  individually cheap, against the much dearer splices that made the same edit
+  worth doing in `ProofSysUnlink`.
 
 **AND THE FIRST THREE READINGS SAID THE OPPOSITE, because the box was loaded.**
-The `Strategy` arm measured 118.4 s / 119.3 s against a 122.0 s baseline at load
-13.5 — a 3 % "win" — and reversed to +11/+17 s once the same interleaved A/B ran
-at load 3.4. A single reading on a shared machine is worth nothing here; take
-`uptime` before believing an A/B, and interleave.
+The `Strategy` arm read as a clean win under load and reversed once the same
+interleaved A/B ran on a quiet box. A single reading on a shared machine is
+worth nothing here; take `uptime` before believing an A/B, and interleave.
 
 ### `lia` IS A GENERAL-PURPOSE CLOSER TOO, AND 180 HYPOTHESES IS A LARGE CONTEXT
 
 **THE EXHIBITS ARE GONE, THE LESSON IS NOT.** `iris/FsEff*.v` and
-`iris/FsOp*.v` were deleted (2026-08-27) — the whole-state pure
-preservation layer `design/fs-state.md` §6 superseded, with no reader
-left. The measurements below stand as measurements; you just cannot
-open the files to re-read them. Every rule they produced applies
-unchanged to any monolithic proof with a wide context.
+`iris/FsOp*.v` were deleted — the whole-state pure preservation layer
+`design/fs-state.md` §6 superseded, with no reader left. You cannot open the
+files to re-read them. Every rule they produced applies unchanged to any
+monolithic proof with a wide context.
 
 The whole cost of the stage-F2 effect band (`iris/FsEff*.v`: eight PURE files,
 no Iris, no `set_solver`, no `vm_compute`) was one tactic. `coqc -profile-ltac`
-put **86.8 % of `FsEffCreateEntry.v` in `lia`** — `xlia` 70.3 % LOCAL,
-`Zify.zify` 12.5 % — across 381 calls whose goals are three atoms wide. What
-they cost is their CALL SITE: a monolithic whole-transaction proof carries
-~180 hypotheses, ~45 of them arithmetic, two of those mentioning `Z.div`, and
-every call reifies the lot and re-eliminates the divisions. Cold, that file
-was **593.9 s**; it is 65.0 s now, and the band went **946 s → 133 s**.
-
-Three fixes, in the order they paid:
+put the overwhelming majority of `FsEffCreateEntry.v` in `lia` — `xlia` the
+bulk of it LOCAL, `Zify.zify` most of the rest — across 381 calls whose goals
+are three atoms wide. What they cost is their CALL SITE: a monolithic
+whole-transaction proof carries ~180 hypotheses, ~45 of them arithmetic, two of
+those mentioning `Z.div`, and every call reifies the lot and re-eliminates the
+divisions. Three fixes took the band from unusable to unremarkable:
 
 1. **A side condition that is the SAME at every call site belongs in a lemma
    proved where the context is EMPTY.** Each effect proof case-splits
    `fs_dinode` through a local `Hdec` whose premise is the inode region's
    width, `0 <= z < 16 * (sb_ninodes sb / 16 + 1)`, and all 124 sites spelled
-   it `ltac:(lia)`. At the ticket sweeps that identical goal measured **19.7 s
-   and 12.6 s per site**; `FsEffBase.v`'s six `iblk_*_range` / `inum_*`
-   lemmas make it free. That is "Inline `ltac:` in argument position" again —
-   but note WHY it is worth hunting rather than tolerating: **a `lia`
-   certificate reifies the hypotheses it was handed, so the PROOF TERM
-   carries them too.** Those two sentences were also the whole of that file's
-   53 s of `Qed`, which fell to 5 s with them and needed no separate work.
+   it `ltac:(lia)`. `FsEffBase.v`'s six `iblk_*_range` / `inum_*` lemmas make
+   it free. That is "Inline `ltac:` in argument position" again — but note WHY
+   it is worth hunting rather than tolerating: **a `lia` certificate reifies
+   the hypotheses it was handed, so the PROOF TERM carries them too.** Those
+   two sentences were also the whole of that file's `Qed` cost, which fell with
+   them and needed no separate work.
 2. **`clear -H..` before a `lia` at a deep site — and use `match goal` to NAME
    the hypothesis, so one `Local Ltac` covers a whole family.** `destruct
    (bool_decide …); destruct (bool_decide …); lia`, closing the four arms of
-   the links sweep from two equations already in hand, was 4.6 s; `(clear -Hc
-   Hold; lia)` is free. Where the wanted hypothesis is named differently at
-   every site, match it by SHAPE and pass the answer as a term:
+   the links sweep from two equations already in hand, is expensive;
+   `(clear -Hc Hold; lia)` is free. Where the wanted hypothesis is named
+   differently at every site, match it by SHAPE and pass the answer as a term:
 
    ```coq
    Local Ltac blk_ne d3 i3 :=
@@ -814,68 +739,50 @@ Three fixes, in the order they paid:
    sites in seven files, one pass, zero fixups).
 3. **Close a CONCRETE goal with `discriminate`, not `lia`.** 46 sites of
    `rewrite Hty; unfold T_DIR_z; lia` prove `1 <> 0` and still paid the
-   context scan. Worth ~2 % of the band — the smallest of the three, listed
-   because it is the cheapest to spot.
-
-| file | cold before | cold after |
-|---|---|---|
-| `FsEffCreateEntry` | **593.9 s** | 65.0 s |
-| `FsEffLinkEntry` | 275.5 s | 30.5 s |
-| `FsEffUnlinkEntry` | 45.3 s | 9.3 s |
-| `FsEffAllocBlock` | 23.6 s | 20.6 s |
-| the other four | 7.9 s | 7.4 s |
+   context scan. The smallest of the three, listed because it is the cheapest
+   to spot.
 
 **Negative results from the same afternoon — do not redo them.** The suspects
 that looked structural were all null: the common-ground `Section` closing
 under `Set Default Proof Using "All"`, the seven per-file blocks of ~45
 `Local Notation`s re-applying its seventeen context arguments, the `set … in
 *` chains, and the ticket `mjoin` over `seq 0 (Z.to_nat (sb_ninodes sb))`.
-`FsEffBase.v`, which carries the entire common-ground section, is **3.4 s**,
-and it did not move.
+`FsEffBase.v`, which carries the entire common-ground section, is trivial and
+did not move.
 
-#### `ProofFilewriteAU`: 234.7 s → 34.2 s from twelve one-line side conditions (measured 2026-08-31)
+#### `ProofFilewriteAU`: twelve one-line side conditions were the whole file
 
 The same rule at a WHOLE-FUNCTION proof rather than a pure band, and the
 worked example to copy — because the file looked innocent by every other
-diagnostic. Isolated `coqc -time -async-proofs off` on the VM:
+diagnostic.
 
-| | wall | peak RSS | this file's `.lia.cache` |
-|---|---|---|---|
-| baseline, cache WARM | 45.0 s | 3.54 GB | |
-| baseline, cache COLD | **234.7 s** | 2.74 GB | **190 MB** |
-| after, cache COLD | **34.2 s** | 1.87 GB | **0.76 MB** |
-
-Cold against cold, and the AFTER arm ran at load 29–47 against the baseline's
-5 — so the 7× is the conservative direction. Warm against warm it is
-45.0 → 34.5 s.
-
-- **`.lia.cache` hid it 5.2×, which is the Diagnosis section's warning seen
-  live.** 45 s warm reads like an ordinary file; nothing in the warm profile
-  is over 3.5 s and the shape is a flat RULE ONE tail. Cold, the top TWELVE
-  sentences are 196 s of 234 (84 %) and every one of them is a `lia`. **If a
-  file is reported slow and your warm reading disagrees, delete the cache
-  before believing the reading.**
+- **`.lia.cache` hid it several-fold, which is the Diagnosis section's warning
+  seen live.** Warm it reads like an ordinary file; nothing in the warm profile
+  stands out and the shape is a flat RULE ONE tail. Cold, the top TWELVE
+  sentences are the great majority of the file and every one of them is a
+  `lia`. **If a file is reported slow and your warm reading disagrees, delete
+  the cache before believing the reading.**
 - **The certificates are the tell, and they are visible without any
-  profiling.** This one file had put **190 MB into the directory's 463 MB
-  `.lia.cache`** — 41 % of it — because a certificate carries the hypotheses
-  it was handed and `fw_loop` hands over ~300 of them (~40 arithmetic, over
-  `Z.to_nat` / `bv_unsigned` / `MAXFILE * BSIZE`). After the fix the same
-  file contributes 0.76 MB. `ls -laS` on the per-directory cache is not a
-  ranking tool, but a file that can be shown to own a large share of it is a
-  confirmed instance of this section.
+  profiling.** This one file owned a large fraction of the whole directory's
+  `.lia.cache` — because a certificate carries the hypotheses it was handed and
+  `fw_loop` hands over hundreds of them (dozens arithmetic, over `Z.to_nat` /
+  `bv_unsigned` / `MAXFILE * BSIZE`). After the fix its contribution is
+  negligible. `ls -laS` on the per-directory cache is not a ranking tool, but a
+  file that can be shown to own a large share of it is a confirmed instance of
+  this section.
 - **NEGATIVE RESULT — the cache's SIZE is not itself a cost, do not chase
-  it.** The fixed file compiled against the full 463 MB cache and against an
-  empty one measured 30.7 s and 34.2 s, the gap being load and not the file.
-  micromega does not pay for entries it does not look up.
+  it.** The fixed file compiled against the full cache and against an empty one
+  reads the same within load noise. micromega does not pay for entries it does
+  not look up.
 - **AN `ltac:(lia)` IN ARGUMENT POSITION CANNOT BE FIXED BY `clear -` — the
   goal is an evar whose instance names every variable in scope, so there is
   nothing to clear. Hoist it.** This is the "Inline `ltac:` in argument
-  position" rule with its largest measured instance: the loop's back edge
-  spells `iApply (IH … ltac:(lia) ltac:(lia) ltac:(… lia) ltac:(… lia) …)`,
-  and that ONE sentence was **43.4 s**, the most expensive in the file. Four
-  named `assert`s above it, passed positionally, take it to 0.46 s. The
-  second and third worst (37.5 s at `fw_au_raw_fail`'s `ltac:(left; lia)`,
-  13.1 s at `fw_au_raw_take`'s two) are the same edit.
+  position" rule with its largest instance: the loop's back edge spells
+  `iApply (IH … ltac:(lia) ltac:(lia) ltac:(… lia) ltac:(… lia) …)`, and that
+  ONE sentence was the most expensive in the file. Four named `assert`s above
+  it, passed positionally, make it free. The second and third worst
+  (`fw_au_raw_fail`'s `ltac:(left; lia)`, `fw_au_raw_take`'s two) are the same
+  edit.
 - **One `Tactic Notation` per file makes the rest a `sed`.** The keep-lists
   differ per site, so a bare `Local Ltac` cannot carry them; `hyp_list` can,
   and this is `FastSetSolver.v`'s own `set_solver +` idiom:
@@ -894,14 +801,14 @@ Cold against cold, and the AFTER arm ran at load 29–47 against the baseline's
   file's other closer bugs: a bare `discriminate` after `exfalso` (which
   walks the whole context — `discriminate Hex` instead) at two sites, and an
   `f_equal. lia.` closing `c + iz = iz + c` (`exact (Z.add_comm c iz)`).
-- **What is left is honest.** 32.9 s over 2742 sentences, top sentence a
-  4.05 s `Qed`, nothing else above 1.7 s. The continuation fold was NOT
-  attempted: this file's blocks are already lemmas and its return closer is
-  ~0.9 kB, under the ~1 kB floor "THE PRIZE IS ABSOLUTE BYTES OFF Δ" gives.
+- **What is left is honest.** A flat tail, top sentence an honest `Qed`. The
+  continuation fold was NOT attempted: this file's blocks are already lemmas
+  and its return closer is under the floor "THE PRIZE IS ABSOLUTE BYTES OFF Δ"
+  gives.
 - **The sibling has the same shape and was not touched.** `ProofFilewrite.v`
   carries five `ltac:(lia)` splices at the same four sites (its `IH` apply,
-  `fw_addw_moi`, `fw_tail`'s width premise, `fw_offupd`) and reads 107 s of
-  `.v.timing`. Nobody has measured it cold.
+  `fw_addw_moi`, `fw_tail`'s width premise, `fw_offupd`). Nobody has measured
+  it cold.
 
 ## Framing: name the context side, construct the goal side
 
@@ -911,7 +818,7 @@ Cold against cold, and the AFTER arm ran at load 29–47 against the baseline's
   same nine by name is instant.
 - **A NAMED `iFrame` still pays a GOAL-side search.** When the goal's conjuncts
   include a big payload (an escrow arm hiding a 268-element big-op), a named
-  `iFrame` is 90–170 s. **Give every multi-conjunct resource abstraction a
+  `iFrame` is minutes. **Give every multi-conjunct resource abstraction a
   CONSTRUCTOR lemma when you define it**, for the same reason it gets an
   accessor: the constructor assembles the arm structurally where the context is
   six hypotheses wide, and the caller writes one `iApply (ic_mk_parked … with
@@ -923,18 +830,12 @@ Cold against cold, and the AFTER arm ran at load 29–47 against the baseline's
   it is the ONE definition-valued conjunct in the goal — the escrow arm, the
   parked bundle, the pool shape — that makes it expensive, never the six
   points-tos. Dispatch that conjunct into its own goal with `iSplitL`/`iSplitR`
-  *before* framing anything, and the frame that remains is syntactic. Measured
-  on the four worst frames in the tree (2026-08-20; isolated `coqc`, per file):
-  | site | what it framed past | file before → after |
-  |---|---|---|
-  | `IcacheEscrow.ipool_shape_to_np` ×2 | `ipool_shape_np` (∃ over a block-map big-op) | **183.6 s → 15.7 s** |
-  | `ProofIput` held-arm close | `ic_payload_np`, reached past to the mirror | 100.7 s → 82.3 s |
-  | `ProofIget` mid-arm re-park (bare `iFrame`) | `ic_unloaded` | 80.1 s → 52.6 s |
-  | `UsertrapRes.ut_res_bare_sstc` ×2 | the residue's whole ∃ body | 23.5 s → 14.1 s |
-  The two `IcacheEscrow` sentences were 90.9 s and 83.3 s — the two most
-  expensive in the tree after the assumption audit, and both on the critical
-  path. The rewrite is mechanical: `iSplitL "Hl"; [iExact "Hl"|]`, then
+  *before* framing anything, and the frame that remains is syntactic. The
+  rewrite is mechanical: `iSplitL "Hl"; [iExact "Hl"|]`, then
   `iSplitR "<the rest>"` around the arm's own proof, then frame the tail.
+  `IcacheEscrow.ipool_shape_to_np`, `ProofIput`'s held-arm close, `ProofIget`'s
+  mid-arm re-park and `UsertrapRes.ut_res_bare_sstc` were the four worst
+  instances in the tree and all four took this edit.
 - **WHEN EVERY CONJUNCT IS DEFINITION-VALUED, THERE IS NO BIG ONE TO SPLIT OFF
   — build the WHOLE bundle.** The two closing-bundle lemmas
   `ProofSyscall.sysc_filestat_env` and `sysc_fclose_fs_env` assemble
@@ -942,32 +843,20 @@ Cold against cold, and the AFTER arm ran at load 29–47 against the baseline's
   `SpecFileclose.fileclose_fs_env_nopid` (16), and their tails are `dev_inv`,
   `disk_geom`, an `is_lock` over `disk_res`, `bslots`, `fileclose_ic_env`,
   `fileclose_bm` — every one a definition, so every (name × conjunct) attempt
-  is a conversion and no single `iSplitL` helps. Named `iFrame`s over them cost
-  **33.1 s and 58.4 s** — 91 s of a 123 s file, with nothing else in it above
-  1.3 s. Replaced by the `iSplitR; [iExact "H"|]` chain in the goal's own
-  conjunct order (the idiom `sysc_fs_fabric` in the same file already used),
-  the **file went 122.7 s → 31.7 s** and both statements left the profile
-  entirely. Two tells that you are in this case rather than the split-one-off
-  case above: the lemma's whole job is to REASSEMBLE a named bundle, and its
-  own siblings in the file already spell out the chain.
-  **The three worst remaining instances were the top three statements in the
-  tree**, and all three are the same edit — the bundle's conjunct order, one
-  `iSplitR`/`iSplitL` per row, `iExact` at each:
-  | site | the bundle | file before → after |
-  |---|---|---|
-  | `ProofMain` `Hpersist` assert | `FirstTok.first_boot_persist`, 16 rows (one a 50-fold `ic_sleeplocks` big-op) | **108.8 s → 32.7 s** |
-  | `FsSyscalls.fs_world_all` | the 20-row unpack of `fs_world` | **30.7 s → 6.7 s** |
-  | `ForkretParkClose.forkret_park_pkg_intro` | `forkret_park_pkg`, whose 7th row is the residue closer | **31.2 s → 2.6 s** |
-  Three further instances, all the same edit (2026-08-21):
-  | site | the bundle | before → after |
-  |---|---|---|
-  | `ProofForkret`'s `first_persist_pre` premise | `FirstTok.first_boot_persist`, 17 rows | statement **62.7 s → 0** |
-  | `ProofForkret`'s `Hfab` assert | `SpecKexec.fs_fabric`, 16 rows | statement **61.0 s → 0** |
-  | `UsertrapRes`, ELEVEN sites | the residue's ∃ body, whose last row is `ut_env` → `proc_priv` → `tf_page` | file **60.1 s → 7.1 s** |
+  is a conversion and no single `iSplitL` helps. Named `iFrame`s over them were
+  most of that file. Replaced by the `iSplitR; [iExact "H"|]` chain in the
+  goal's own conjunct order (the idiom `sysc_fs_fabric` in the same file
+  already used), both statements left the profile entirely. Two tells that you
+  are in this case rather than the split-one-off case above: the lemma's whole
+  job is to REASSEMBLE a named bundle, and its own siblings in the file already
+  spell out the chain. The same edit retired `ProofMain`'s `Hpersist` assert,
+  `FsSyscalls.fs_world_all`, `ForkretParkClose.forkret_park_pkg_intro`,
+  `ProofForkret`'s `first_persist_pre` premise and `Hfab` assert, and eleven
+  sites in `UsertrapRes`.
 
-  `UsertrapRes` is the one to read: no single row is enormous and the frames
-  were only 4–6 s each — it was the COUNT that made the file, and no seal
-  fixes that (sealing `tf_page` locally there was worth 8 s of the 53).
+  `UsertrapRes` is the one to read: no single row is enormous and no individual
+  frame was expensive — it was the COUNT that made the file, and no seal fixes
+  that (sealing `tf_page` locally there helped, but only partly).
   The residue's body is right-nested, so a row that is itself a bundle
   (`ut_trap_parked`'s seven) needs `iSplitR "<the tail>"; [| …]` around it
   rather than a flat chain; that is the only place the mechanical rewrite
@@ -982,31 +871,30 @@ Cold against cold, and the AFTER arm ran at load 29–47 against the baseline's
 - **A rebuild is a construction, so build it — do not frame it.** Even fully
   named, `iFrame` walks the goal once per name, and the goal is the abstraction
   UNFOLDED, so its tail conjuncts are whatever the abstraction ends in. Handing
-  `ut_caps` back with `iFrame "Hpi Hkd Hks Hdev Hrest Hown"` cost **7.5 s of a
-  14.1 s file** — its tail is `is_lock`s over `disk_res` / `kmem_res` and an
+  `ut_caps` back with `iFrame "Hpi Hkd Hks Hdev Hrest Hown"` was half its
+  file — its tail is `is_lock`s over `disk_res` / `kmem_res` and an
   `is_ftable`, and each match attempt against one of those is a conversion over
   a big resource. The `iSplitL "H"; [iExact "H"|]` chain over the same six
-  conjuncts is a syntactic check each: **file 14.1 s → 6.6 s**, and the
-  statement leaves the profile entirely (nothing in the file is above 1 s).
+  conjuncts is a syntactic check each, and the statement leaves the profile
+  entirely.
 - **Extracting a persistent fact out of a bundle must not take the bundle
   APART.** `ut_res_bare_sstc` destructured `ut_caps` to read one
   `sstc_enabled` out of it and then rebuilt it conjunct-by-conjunct inside the
   residue's body. Doing the extraction in a five-line lemma over ONE hypothesis
   and handing the bundle back whole is the fix — and note the intermediate
-  attempt made it WORSE (16.9 s → 24.4 s) because the rebuild moved rather than
-  disappeared. The tell that you are in this case: the proof reads differently
-  from its own siblings, which pass `Henv` straight through.
+  attempt made it WORSE, because the rebuild moved rather than disappeared.
+  The tell that you are in this case: the proof reads differently from its own
+  siblings, which pass `Henv` straight through.
 - **A SHAPE MISMATCH turns every match attempt into a CONVERSION, and that is
   the expensive kind.** `ProcInv.tf_words` is a `big_sepL`, so its conjuncts
   carry offsets `8 * Z.of_nat i` while every consumer names them as LITERALS
   (`tf_pa tfp 40`): convertible, not syntactically equal. A bare `iFrame`
-  across that pays a conversion on each of its ~36×36 attempts — **19.1 s and
-  17.6 s** at the two sites in `ProofUservec.v`, over half the file. Fix:
-  factor the shape change into ONE `⊣⊢` lemma (`tf_words36`) proved by
-  `rewrite /tf_words /= bi.sep_emp; reflexivity`, so the conversion happens
-  once (1.7 s) and both directions then frame syntactically. File went
-  **66.6 s → 31.0 s** of statement time. The tell in the profile is a
-  one-token statement (`iFrame.`) costing tens of seconds.
+  across that pays a conversion on each of its ~36×36 attempts, which was over
+  half of `ProofUservec.v` at two sites. Fix: factor the shape change into ONE
+  `⊣⊢` lemma (`tf_words36`) proved by `rewrite /tf_words /= bi.sep_emp;
+  reflexivity`, so the conversion happens once and both directions then frame
+  syntactically. The tell in the profile is a one-token statement (`iFrame.`)
+  costing tens of seconds.
 - **`proc_priv_core` IS THE WORST INSTANCE IN THE TREE, and it is reached by
   every syscall-altitude proof**: its last conjunct is `ProcInv.tf_page`, a
   **4096**-element big-op, so a bare `iFrame` rebuilding it does not
@@ -1019,7 +907,7 @@ Cold against cold, and the AFTER arm ran at load 29–47 against the baseline's
 
 ## Typeclass search
 
-### AN INSTANCE WITH A LOW PRIORITY IS AN INSTANCE THAT RUNS LAST — and if the class's OTHER instances are structural, "last" means "after the whole payload has been walked" (measured 2026-08-29)
+### AN INSTANCE WITH A LOW PRIORITY IS AN INSTANCE THAT RUNS LAST — and if the class's OTHER instances are structural, "last" means "after the whole payload has been walked"
 
 The regression this cost, and the one-token fix, are the reference case for
 reading a profile at all.
@@ -1038,16 +926,9 @@ have no instance and never will (`pstate_lock`, `hart_at_any` — the ξ-depende
 facts the class documents as deliberately uncovered). It proves nothing, and
 only after backtracking over the whole space does 99 get its turn.
 
-Changing the `| 99` to `| 0` is the entire fix. Isolated `coqc`, min of two,
-the AFTER arm at load 26 against the BEFORE arm's 0.6–16 (so understated):
-
-| | before | after |
-|---|---|---|
-| `SpecProcinit.v` (whose `apply _.` IS the goal) | 11.9 s | **2.95 s** |
-| — that sentence | 10.09 s | **0.34 s** |
-| `ProofKforkB1.v` | 21.9 s | **3.92 s** |
-| — its `iApply (wp_release_sconf … <{ proc_lock_res … }> …)` | 18.40 s | **0.34 s** |
-| lock call sites in the tree's top 1000 | 67 sites / 444 s | **3 sites / 2.5 s** |
+Changing the `| 99` to `| 0` is the entire fix, and it took the whole
+`wp_acquire_sconf`/`wp_release_sconf` family — dozens of sites across the tree's
+most expensive statements — down to a handful of sub-second ones.
 
 - **THE EVAR GUARD IS NOT WHAT THE PRIORITY WAS BUYING.** `ctx_morph_const` is
   `CtxMorph (λ _, P)`, whose head unifies with a payload that is still a bare
@@ -1070,13 +951,13 @@ the AFTER arm at load 26 against the BEFORE arm's 0.6–16 (so understated):
   statements was an honest `Qed`. After it, **twenty of the thirty were the same
   sentence shape** — an `iApply (Acquire.wp_acquire_sconf …)` /
   `(Release.wp_release_sconf …)` — in eleven unrelated files, all within a few
-  seconds of one another, with ΣCPU up 12 %. That uniformity is this file's
+  seconds of one another, with ΣCPU up sharply. That uniformity is this file's
   standing tell for ONE shared cause (see the `inode_blocks` seal below), and it
   named the cause without anyone reading a proof. The cheapest confirmation is
   the site that is the goal and nothing else: `SpecProcinit.v`'s bare `apply _.`
-  discharging `CtxMorph <{ proc_lock_res … }>`, 71.1 s on CI.
+  discharging `CtxMorph <{ proc_lock_res … }>`.
 
-### A HAND-ROLLED `first [apply … | apply … | …]` IS INSTANCE SEARCH, AND IT PAYS THE SAME BILL (measured 2026-08-29)
+### A HAND-ROLLED `first [apply … | apply … | …]` IS INSTANCE SEARCH, AND IT PAYS THE SAME BILL
 
 The subsection above is about a class whose search went wrong. This one is
 about the tactic that was written to *avoid* that search and reproduced it
@@ -1091,29 +972,29 @@ at every node. **That IS instance search**, with the same three costs and none
 of the tuning: one failing higher-order unification per lemma per node, no
 discrimination on the goal's head, and the cheap catch-all last.
 
-`DiskInv.v`'s four obligations, isolated `coqc -time` on the VM: **161 s in a
-168 s file**, and its top sentence (132 s) was the tree's most expensive
-non-`Qed` statement by a factor of twenty. `Set Ltac Profiling`:
+`DiskInv.v`'s four obligations were almost the whole file, and its top sentence
+was the tree's most expensive non-`Qed` statement by a wide margin.
+`Set Ltac Profiling` on it:
 
-| | share | calls | avg |
-|---|---|---|---|
-| `apply ctx_morph_exist` | 30 % | 1268 | 38 ms |
-| `ctx_morph_word` / `_word2` / `_word4` / `_string` | 41 % | 175 each | ~100 ms |
-| `apply ctx_morph_sep` | 8.6 % | 1176 | 12 ms |
-| `apply ctx_morph_or` | 8.5 % | 586 | |
-| `apply ctx_morph_big_sepL` / `_big_sepM` | 9.3 % | 594 each | |
+| | share |
+|---|---|
+| `apply ctx_morph_exist` | ~30 % |
+| `ctx_morph_word` / `_word2` / `_word4` / `_string` | ~41 % |
+| `apply ctx_morph_sep` | ~9 % |
+| `apply ctx_morph_or` | ~9 % |
+| `apply ctx_morph_big_sepL` / `_big_sepM` | ~9 % |
 
-**Read the equal call counts.** `word`, `word2`, `word4` and `string` are all
-called exactly 175 times, which in a `first` means every one of those 175
-visits fell through all four — the leaf lemmas had **zero successes** and were
-41 % of the file. `ctx_word_pointsto` is not sealed (each width is a tower over
-the sealed byte fact), so `apply ctx_morph_sep`, tried earlier, matched the
-tower and took every `↦₈` apart byte by byte. 586 leaf visits, each preceded by
-seven failing structural `apply`s.
+**Read the equal call counts.** `word`, `word2`, `word4` and `string` were all
+called exactly the same number of times, which in a `first` means every one of
+those visits fell through all four — the leaf lemmas had **zero successes** and
+were the single largest share of the file. `ctx_word_pointsto` is not sealed
+(each width is a tower over the sealed byte fact), so `apply ctx_morph_sep`,
+tried earlier, matched the tower and took every `↦₈` apart byte by byte. Every
+leaf visit was preceded by seven failing structural `apply`s.
 
 **The fix is a `lazymatch` on the goal's head — one `apply` per node, no
-failing unification anywhere.** 161 s → **0.15 s** (53 steps), file 168 s →
-~5 s, one commit, no proof script changed:
+failing unification anywhere.** The obligations become instant, the file
+becomes cheap, one commit, no proof script changed:
 
 ```coq
 Ltac ctx_morph_step :=
@@ -1143,22 +1024,21 @@ Four transferable rules:
   free_slot_res_morph`). It did not: `free_slot_res` is a transparent
   `Definition`, so `apply ctx_morph_sep` matched *through* it and re-walked a
   body a named instance already covered — three times over, which is why the
-  four obligations cost 7 s, 6 s, 15 s and 132 s rather than four times 7 s.
-  A head dispatch stops by construction.
+  four obligations were so unevenly priced. A head dispatch stops by
+  construction.
 - **DO NOT MOVE `ctx_morph_const` TO THE FRONT.** It is the obvious "cheap
   test — does the body mention ξ?" and on a *leaf* it is exactly that. On a
   whole payload body the unifier tries to eliminate ξ by delta (every cell is
-  spelled `ctx_pointsto (cur_ctx ξ) …`) and does not come back: >10 min at
-  1.3 GB on `disk_res`, against 161 s for the version that had it last.
+  spelled `ctx_pointsto (cur_ctx ξ) …`) and does not come back.
 
-**A HINT DATABASE IS A VALID ALTERNATIVE AND IT WAS MEASURED, NOT GUESSED
-(2026-08-29).** `Hint Extern n (CtxMorph (fun _ => bi_sep _ _)) => apply
-ctx_morph_sep : ctx_morph` gives the same syntactic dispatch — an `Extern`
-hint's pattern IS a filter checked before its tactic runs — and a custom db is
-small, so `eauto with ctx_morph` never meets the ~55 wildcard instances in
+**A HINT DATABASE IS A VALID ALTERNATIVE AND IT WAS MEASURED, NOT GUESSED.**
+`Hint Extern n (CtxMorph (fun _ => bi_sep _ _)) => apply ctx_morph_sep :
+ctx_morph` gives the same syntactic dispatch — an `Extern` hint's pattern IS a
+filter checked before its tactic runs — and a custom db is small, so `eauto
+with ctx_morph` never meets the ~55 wildcard instances in
 `typeclass_instances`. Built as ten `Extern` rows plus `Hint Resolve` for the
 component instances, DiskInv's four obligations close with a plain
-`eauto 40 with nocore ctx_morph` and the worst statement is **0.74 s** — no
+`eauto 40 with nocore ctx_morph` and are just as fast — no
 `all: apply free_slot_res_morph` tail needed, because a db is TOTAL where the
 walk is partial. Two reasons main keeps the `lazymatch` for now, neither of
 them performance:
@@ -1174,9 +1054,8 @@ them performance:
 CLOSED table in one file, so a new payload shape or leaf family means editing
 `CtxMorphTac.v` — which is why main carries an empty branch for the T-leg's
 A6.125 half-cell shape. A db is open: each file registers its own rows.
-**Owner's call, 2026-08-29: fix the performance now, revisit the single global
-table if and when it becomes a problem.** The measurement above is what a
-revisit starts from.
+**Owner's call: fix the performance now, revisit the single global table if and
+when it becomes a problem.**
 
 **And the question this leaves — why is there a tactic at all?** Because three
 properties of `CtxMorph` are not tunable from the instance side. (1) Every
@@ -1191,127 +1070,94 @@ closes most leaves runs after ~54 failures. Making search do this job means
 restating every payload as a keyed `_at` constant plus `Typeclasses Opaque` —
 a ~55-instance, 20-file refactor that still cannot express (2). **Search is
 already the right answer at the CALL sites**, where the payload is a named
-constant with a keyed zero-premise instance: after the `const_pay` fix above,
-the whole `wp_acquire_sconf`/`wp_release_sconf` family is 3 sites and 2.5 s in
-the tree's top 1000, and the fresh whole-tree profile taken for this fix shows
-no lock call site over 2 s. It is the INSTANCE CONSTRUCTION, whose goal is a
-raw payload body, that needs a tactic.
+constant with a keyed zero-premise instance. It is the INSTANCE CONSTRUCTION,
+whose goal is a raw payload body, that needs a tactic.
 
 - **A BIG-OP UNDER A TRANSPARENT NAME IS AN `iFrame` BOMB, AND SEALING IT IS A
-  ONE-LINE FIX FOR EVERY CALL SITE AT ONCE** (measured 2026-08-21). `iFrame`'s
-  `Frame` search unfolds a transparent constant to get at the `big_sepL`
-  underneath, and then tries every candidate hypothesis against every element.
-  `InodeInv.inode_blocks` is `[∗ list] i ∈ seq 0 MAXFILE` with `MAXFILE = 268`,
-  and it is the last-but-two conjunct of `IcacheEscrow.ic_loaded` — so the
-  bundle rebuild every fs proof ends with (`iSplitL "Hdlk"; [iExact "Hdlk" |].
-  iFrame.`) paid ~50 s. **Seventeen statements between 48.9 s and 62.7 s, in
-  twelve files, were all this one shape**; `Global Typeclasses Opaque
-  inode_blocks` removed every one of them and the tree's serial tail with it:
-  | | before | after |
-  |---|---|---|
-  | wall span | 891 s | 467 s |
-  | critical path | 758 s | 467 s |
-  | effectively serial (≤1 in flight) | 378 s | 58 s |
-  | worst non-`Qed` statement | 62.7 s | 6.7 s |
-
-  Per file (CPU): ProofNamex 277→137, ProofCreate 252→161, ProofNamexTr
-  200→101, ProofSysLink 186→86, ProofSysChdir 149→59, ProofIlock 93→47,
-  ProofFilestat 75→23. Diagnose it by the *uniformity*: a dozen sentences all
-  within a second of each other, in unrelated files, is one shared conjunct,
-  not twelve local problems.
+  ONE-LINE FIX FOR EVERY CALL SITE AT ONCE.** `iFrame`'s `Frame` search unfolds
+  a transparent constant to get at the `big_sepL` underneath, and then tries
+  every candidate hypothesis against every element. `InodeInv.inode_blocks` is
+  `[∗ list] i ∈ seq 0 MAXFILE` with `MAXFILE = 268`, and it is the last-but-two
+  conjunct of `IcacheEscrow.ic_loaded` — so the bundle rebuild every fs proof
+  ends with (`iSplitL "Hdlk"; [iExact "Hdlk" |]. iFrame.`) was expensive
+  everywhere. **Seventeen statements in twelve files were all this one shape**;
+  `Global Typeclasses Opaque inode_blocks` removed every one of them, roughly
+  halved the build's wall span and critical path, and cut the effectively
+  serial tail by most of its length. Diagnose it by the *uniformity*: a dozen
+  sentences all within a second of each other, in unrelated files, is one
+  shared conjunct, not twelve local problems.
   - **`Global`, not bare `Typeclasses Opaque` — the bare form is
     compilation-local.** `ProcDefs.v:84` and `ProcInv.v:57` seal
     `tf_words`/`tf_tail`/`tf_page` twice for exactly that reason, and their
     comment records it. The consequence nobody had drawn: **every other file
-    in the tree still sees those three transparent**, and a local repeat is
-    worth ~8 s in a file that frames past `proc_priv` (measured on
-    `UsertrapRes`).
+    in the tree still sees those three transparent**, and a local repeat pays
+    in any file that frames past `proc_priv`.
 
-    **THAT SEAL IS NOW `Global` (2026-08-27), and the old advice here -- a
-    repeat line where the profile says so, not a global seal -- was wrong on
-    the measurement.** Five more files carried the same 1.5-2.1 s frame and
-    never got a repeat, which is the uniformity tell for one shared conjunct.
-    One `Global` line in `ProcDefs.v` (and `UsertrapRes`'s local repeat
-    dropped as redundant) measured, isolated, min of two runs:
-    | file | before | after |
-    |---|---|---|
-    | `ProofAllocproc` | 35.74 s | **26.77 s** |
-    | `ProofSyscall` | 48.36 s | 47.17 s |
-    | `UserActiveClass` | 8.92 s | 8.45 s |
-    | `ProofUserinit` | 13.59 s | 13.49 s |
-    | `ProofKforkB5` | 8.44 s | 8.64 s (no benefit) |
-    `ProofAllocproc` is nine tenths of it, so the lesson is not "seal
-    everything globally" -- it is that a LOCAL seal hides the size of the
-    prize, because the files that would have paid for a repeat never appear
-    in the profile as a cluster until you look for one.
+    **THAT SEAL IS NOW `Global`, and the old advice here — a repeat line where
+    the profile says so, not a global seal — was wrong on the measurement.**
+    Five more files carried the same frame and never got a repeat, which is the
+    uniformity tell for one shared conjunct. One `Global` line in `ProcDefs.v`
+    (and `UsertrapRes`'s local repeat dropped as redundant) paid, almost all of
+    it in a single file. The lesson is not "seal everything globally" — it is
+    that a LOCAL seal hides the size of the prize, because the files that would
+    have paid for a repeat never appear in the profile as a cluster until you
+    look for one.
   - `rewrite /X` and `unfold X` are unaffected by the seal, so the sites that
     genuinely take the big-op apart keep working, and a `Timeless` instance
     proved `rewrite /X. apply _.` still goes through. Nothing in 1293 files
     broke on the `inode_blocks` seal.
-- **BREADTH IS NOT THE PREDICTOR -- A BIG-OP BODY IS.  Measured 2026-08-27, so
-  do not re-run it.** The tempting next step after sealing a few big-ops is to
-  seal the constants NAMED in the most files, whatever their body. It does not
-  pay. Ranked by how many other files name them, the top unsealed iProp
-  definitions are `pc_is` (483 files), `sie_cap_gpr` (418), `wp_next` (415),
-  `instr` (332) -- and none of them has a big-op body. Sealing `pc_is` and
-  `sie_cap_gpr` in `ProofSysUnlink`, then the tree's most expensive file (see
-  the case study above; it is 133 s now), measured
-  **150.36 s -> 151.49 s**: no gain, slightly negative. `wp_next` cannot be
-  sealed at all -- it is the WP continuation former that every proof
-  `iIntros` THROUGH, so the seal fails at `iIntro: cannot turn (wp_next ...)`.
-  The mechanism explains it: `iFrame`'s cost is (candidate hypotheses x
-  ELEMENTS of the goal conjunct), so unfolding a non-big-op is cheap however
-  many files do it. Compare the same experiment on bodies that ARE big-ops:
-  `bio_ctx` (92 files) bought 9.3 s in one file, `ic_sleeplocks` (NINODE) 4.7 s,
-  `word_pointsto` (8 bytes) 3.8 s -- while `disk_res`, a 47-line body with one
-  `∃` and no big-op in 98 files, bought 1.0 s. **Filter candidates by
-  `big_sep`/`[∗` in the body first; sort by breadth only within that set.**
+- **BREADTH IS NOT THE PREDICTOR — A BIG-OP BODY IS. Measured, so do not
+  re-run it.** The tempting next step after sealing a few big-ops is to seal
+  the constants NAMED in the most files, whatever their body. It does not pay.
+  Ranked by how many other files name them, the top unsealed iProp definitions
+  are `pc_is` (483 files), `sie_cap_gpr` (418), `wp_next` (415), `instr` (332)
+  — and none of them has a big-op body. Sealing `pc_is` and `sie_cap_gpr` in
+  `ProofSysUnlink`, then the tree's most expensive file, measured as no gain
+  and slightly negative. `wp_next` cannot be sealed at all — it is the WP
+  continuation former that every proof `iIntros` THROUGH, so the seal fails at
+  `iIntro: cannot turn (wp_next ...)`. The mechanism explains it: `iFrame`'s
+  cost is (candidate hypotheses × ELEMENTS of the goal conjunct), so unfolding
+  a non-big-op is cheap however many files do it. The same experiment on bodies
+  that ARE big-ops (`bio_ctx`, `ic_sleeplocks`, `word_pointsto`) paid, while
+  `disk_res` — a 47-line body with one `∃` and no big-op, named in 98 files —
+  barely moved. **Filter candidates by `big_sep`/`[∗` in the body first; sort
+  by breadth only within that set.**
 
-- **AN `∃` OVER A BIG-OP ALREADY SEALS IT — measured 2026-08-27, do not re-run.**
+- **AN `∃` OVER A BIG-OP ALREADY SEALS IT — do not re-run this.**
   `FdSlots.fd_frags` is a sixteen-element big-op (one `fd_st` per descriptor)
   and it rides in `UsertrapRes.ut_own` beside `proc_priv`, so it is in the
   goal of every syscall arm: exactly the profile that paid for `tf_page` and
-  `inode_blocks`. It buys **nothing**. `Global Typeclasses Opaque fd_frags
-  fd_frags_any`, measured isolated, min of two runs:
-  | file | unsealed | sealed |
-  |---|---|---|
-  | `ProofSyscall` | 45.42 s | 45.87 s |
-  | `ProofSysPipe` | 34.83 s | 35.11 s |
-  | `ProofAllocproc` | 26.47 s | 26.30 s |
-  | `ProofKexit` | 16.06 s | 16.12 s |
-  | `ProofUserinit` | 10.81 s | 10.90 s |
-
-  Every delta is inside the run-to-run spread (0.3–0.6 s). **The mechanism is
-  the reason, and it generalises:** what these files actually hold is
-  `fd_frags_any γ = ∃ sts, fd_frags γ sts`, and `iFrame` will not instantiate
-  an existential to go looking inside it — so the big-op is never walked and
-  there is nothing for a seal to prevent. Check the shape a consumer holds,
-  not the shape of the definition: **if the big-op is under an `∃` at every
-  use site, it is already sealed and the `Typeclasses Opaque` is dead
-  weight.** `tf_page` and `inode_blocks` are bare in the goal, which is why
-  they paid.
+  `inode_blocks`. `Global Typeclasses Opaque fd_frags fd_frags_any` buys
+  **nothing** — every delta across five consumer files was inside the
+  run-to-run spread. **The mechanism is the reason, and it generalises:** what
+  these files actually hold is `fd_frags_any γ = ∃ sts, fd_frags γ sts`, and
+  `iFrame` will not instantiate an existential to go looking inside it — so the
+  big-op is never walked and there is nothing for a seal to prevent. Check the
+  shape a consumer holds, not the shape of the definition: **if the big-op is
+  under an `∃` at every use site, it is already sealed and the `Typeclasses
+  Opaque` is dead weight.** `tf_page` and `inode_blocks` are bare in the goal,
+  which is why they paid.
 
   Priced `ProcInv.proc_ofiles` (16 slots, bare inside `proc_priv`, hence in
   every syscall goal) the cheap way in the same round — a LOCAL `Typeclasses
   Opaque` in the consumer, no accessor refactor, the technique this file uses
-  for `pc_is`/`sie_cap_gpr` above: `ProofSyscall` 45.66 s against 45.42 s
-  unsealed. Also nothing. Sixteen elements is an order of magnitude under the
-  big-ops that paid (4096, NINODE, 8 × 92 files), and `proc_priv`'s frame cost
-  is dominated by `tf_page`, which is already sealed. **Do not pay the eight
+  for `pc_is`/`sie_cap_gpr` above. Also nothing. Sixteen elements is an order
+  of magnitude under the big-ops that paid, and `proc_priv`'s frame cost is
+  dominated by `tf_page`, which is already sealed. **Do not pay the eight
   accessor `rewrite /proc_ofiles`es it would cost.**
 - **Give every big-resource abstraction with a `Persistent`/`Timeless` instance a
   `Typeclasses Opaque` right next to it.** Otherwise each `#`-intro re-derives
   the instance by unfolding and descending into the resource: one `iIntros
-  "#Hdlock"` on `is_lock … (disk_res …)` was **5.1 s**, 0.14 s sealed, and the
-  one line was worth 14–45 s CPU each across six other files. Diagnose by
-  splitting the `iIntros` one name per sentence. Sealing the *resource* instead
-  changes nothing — the cost is the persistence search, not the hypothesis. The
-  seal costs a `rewrite /X` inside the projection lemmas, which is the point:
-  nothing else can then `iDestruct` the abstraction apart. Measure before
-  sealing; cost tracks the size of the resource, not the number of sites.
+  "#Hdlock"` on `is_lock … (disk_res …)` was expensive, and the one line paid
+  across six other files. Diagnose by splitting the `iIntros` one name per
+  sentence. Sealing the *resource* instead changes nothing — the cost is the
+  persistence search, not the hypothesis. The seal costs a `rewrite /X` inside
+  the projection lemmas, which is the point: nothing else can then `iDestruct`
+  the abstraction apart. Measure before sealing; cost tracks the size of the
+  resource, not the number of sites.
 - **Prove a big `Timeless`/`Persistent` instance STRUCTURALLY, never with one
   `apply _`** — one `apply _` over an `∃/∗/∨` tower backtracks across the whole
-  space (49 s for a fact whose every leaf instance already exists). Peel one
+  space, for a fact whose every leaf instance already exists. Peel one
   connective per step with `apply _` only at the leaves. A recursive helper does
   it uniformly, but **its dispatch must be SYNTACTIC**:
 
@@ -1325,121 +1171,113 @@ raw payload body, that needs a tactic.
     end.
   ```
 
-  Second file (`BioInv`, 2026-08-20): four such instances over the buffer
-  escrow's arms were 31.5 s of a 41.5 s file — `buf_parked_timeless`'s single
-  `apply _` alone was 19.7 s — and the same `tl_struct` took the file to
-  **20.1 s**. The dispatch must be SYNTACTIC:
-  The `first [apply bi.exist_timeless; … | …]` spelling is a REGRESSION (33–42 s,
-  an order of magnitude worse than the monolithic `apply _`): `apply` unifies up
-  to delta, so it peels straight *through* a named abstraction that already has
-  its own instance and then backtracks over everything underneath.
+  Second file (`BioInv`): four such instances over the buffer escrow's arms
+  were most of the file — `buf_parked_timeless`'s single `apply _` alone was
+  half of that — and `tl_struct` halved it. The dispatch must be SYNTACTIC: the
+  `first [apply bi.exist_timeless; … | …]` spelling is a REGRESSION, an order
+  of magnitude worse than even the monolithic `apply _`, because `apply`
+  unifies up to delta, so it peels straight *through* a named abstraction that
+  already has its own instance and then backtracks over everything underneath.
   **Descend through the connectives, never through a name.**
 - **Pay deeply nested polymorphic structure once behind a fully typed
   wrapper.** `IcacheRef` applied `prod_local_update'` six levels down the same
   named seven-component CMRA at twelve callers; elaboration rediscovered the
-  outer product at every site, and the first application alone cost 4.5 s each
-  time. A helper stated over the named constructor and all seven component
+  outer product at every site, and the first application alone was expensive
+  each time. A helper stated over the named constructor and all seven component
   updates pays that inference once in its proof; callers then supply identity
   or component-local updates to the fixed signature. The profile now has one
-  4.5 s structural application instead of twelve. This is useful when the
-  repeated cost is in the first polymorphic constructor application, not when
-  the component updates themselves are slow.
+  structural application instead of twelve. This is useful when the repeated
+  cost is in the first polymorphic constructor application, not when the
+  component updates themselves are slow.
 - **Mark big concrete literals `Global Typeclasses Opaque`** (`kernel_bytes`,
   `kernel_data`, `kernel_symbols`, `mem_pointsto`) or instance search unfolds a
-  23K-entry gmap, ~108 s a time. Use `Typeclasses Opaque`, never `Opaque` — a
+  23K-entry gmap every time. Use `Typeclasses Opaque`, never `Opaque` — a
   tactic may need to `unfold`, and `vm_compute`/`reflexivity` ignore the former.
 
 ## Modalities and rewriting
 
 - **Strip only the GOAL's later with `iApply bi.later_intro`** — and this is
-worth SWEEPING, not just applying to new proofs. Converting `ProofKexecB3`'s
-fifteen `iNext`s measured **74.4 s → 64.8 s (−13.0 %)**, `.vo` −1.7 %, peak
-RSS −6.8 %: **0.64 s per call**, with no other change. **THE SWEEP IS DONE (2026-08-27): 420 sites in 139 files.** A sample
-re-measured isolated — `ProofSysOpen` 63.1 → 55.3 s, `ProofDirlookup` 40.5 →
-38.2 s, `ProofKexecB2` 31.3 → 28.4 s — is **−13.0 s over 29 sites, 0.45 s per
-site**, matching the 0.64 s/site on `ProofKexecB3`. The converted files span
-2177 s of build, so the whole sweep is worth on the order of a minute and a
-half of tree time.
+  worth SWEEPING, not just applying to new proofs. **THE SWEEP IS DONE: 420
+  sites in 139 files**, worth a consistent fraction of a second per call site
+  with no other change, and on the order of a minute and a half of tree time
+  across the files it touched.
 
-The `iNext;` sequencing form was swept too: 24 code sites, 18 kept in 10
-files (`FsCrash`, `HartSpan`, `HartSMem` rejected it). Not separately timed —
-it is the same substitution, and 18 sites mostly in cheap files is under the
-noise floor of a shared box. **The `[iNext]` occurrences are PROSE**, the
-notes' own bracket convention for naming a tactic: all 42 are inside comments
-and none is a code site, so a `\biNext\b` sweep must blank comments first.
+  The `iNext;` sequencing form was swept too: 24 code sites, 18 kept in 10
+  files (`FsCrash`, `HartSpan`, `HartSMem` rejected it). Not separately timed —
+  it is the same substitution, and 18 sites mostly in cheap files is under the
+  noise floor of a shared box. **The `[iNext]` occurrences are PROSE**, the
+  notes' own bracket convention for naming a tactic: all 42 are inside comments
+  and none is a code site, so a `\biNext\b` sweep must blank comments first.
 
-**Where it is NOT replaceable, `coqc` says so**, which is what makes the sweep
-safe: ~90 files rejected it and were reverted, and they are almost all the
-engine/leaf layer (`WpSmode*`, `UserStep*`, `HartStep*`, `ParkCap`,
-`TrampStepPt`, `UptWalkPt`, `SchedCtx`, `FsCrash`, `InodeRegion`) — i.e. the
-Löb back edges, where `iNext` genuinely has to strip the hypothesis-side
-later. Reverting on failure takes ~14 build rounds because each round only
-surfaces the next dependency layer.; reach for `iNext`
-  only at a genuine Löb back edge. `iNext` is `iModIntro` at `▷`, so it runs
-  `MaybeIntoLaterN` over every hypothesis in both environments: ~1.1 s per call
-  in a whole-function proof against ~0.06 s for the same effect. The tell that a
-  file has this backwards is an `iNext` followed by `iAssert (▷ X)%I … { iNext.
-  iExact "H". }` — that block is *repairing* a `▷` the `iNext` stripped, so both
-  tactics are the expensive one and the pair does no net work.
+  **Where it is NOT replaceable, `coqc` says so**, which is what makes the sweep
+  safe: ~90 files rejected it and were reverted, and they are almost all the
+  engine/leaf layer (`WpSmode*`, `UserStep*`, `HartStep*`, `ParkCap`,
+  `TrampStepPt`, `UptWalkPt`, `SchedCtx`, `FsCrash`, `InodeRegion`) — i.e. the
+  Löb back edges, where `iNext` genuinely has to strip the hypothesis-side
+  later. Reverting on failure takes ~14 build rounds because each round only
+  surfaces the next dependency layer.
+
+  Reach for `iNext` only at a genuine Löb back edge. `iNext` is `iModIntro` at
+  `▷`, so it runs `MaybeIntoLaterN` over every hypothesis in both environments,
+  where `bi.later_intro` touches only the goal. The tell that a file has this
+  backwards is an `iNext` followed by `iAssert (▷ X)%I … { iNext. iExact "H". }`
+  — that block is *repairing* a `▷` the `iNext` stripped, so both tactics are
+  the expensive one and the pair does no net work.
 - **A modality step at a `▷` costs the CONTEXT, so pay it in a lemma.** An
-  `iMod` at a `▷` inside a whole-function proof was 34 s where the `Timeless`
-  search on the same bundle standalone is 0.4 s. Gotcha when writing the lemma:
-  **its conclusion must be a FANCY update, not `|==>`** — `IsExcept0 (|={E1,E2}=>
-  P)` holds unconditionally while `is_except_0_bupd` needs `IsExcept0 P`, so
-  `iMod` fails with *"cannot eliminate modality"*, which reads like a missing
-  `Timeless` instance and is not. Take the mask as a parameter.
+  `iMod` at a `▷` inside a whole-function proof is expensive where the
+  `Timeless` search on the same bundle standalone is free. Gotcha when writing
+  the lemma: **its conclusion must be a FANCY update, not `|==>`** —
+  `IsExcept0 (|={E1,E2}=> P)` holds unconditionally while `is_except_0_bupd`
+  needs `IsExcept0 P`, so `iMod` fails with *"cannot eliminate modality"*, which
+  reads like a missing `Timeless` instance and is not. Take the mask as a
+  parameter.
 - **Prefer the WAND form of a big-op law to a setoid rewrite.** `rewrite
   !big_sepL_sep` is setoid rewriting over `envs_entails Δ Q`, and its cost is in
   the `Proper` proofs over the PREDICATES — so hoisting it into an empty-context
-  lemma changes nothing (11.76 s vs 12.7 s). `iApply (big_sepL_sep_2 with …)`
-  matches by head and never enters setoid rewriting: 1.85× on the file. Do not
-  sweep this — the tree's other sites are sub-second because their predicates are
-  small. Check the `.v.timing` cost of a candidate first; the site count tells
-  you nothing.
+  lemma changes nothing. `iApply (big_sepL_sep_2 with …)` matches by head and
+  never enters setoid rewriting. Do not sweep this — the tree's other sites are
+  sub-second because their predicates are small. Check the `.v.timing` cost of a
+  candidate first; the site count tells you nothing.
   - **Two sites were still on the rewrite form and BOTH were worth it**
-    (2026-08-29; `BootShared.v`'s eight-way chain is the idiom to copy, and its
-    comment already cites this rule). Each zips three families into one walk:
-    `FileInv.ftable_res_boot` **4.94 s → 0.78 s** for that sentence (file
-    14.6 s → 7.9 s) and `ProcInv`'s ofile block **1.79 s → 0.88 s** — the latter
-    small in itself but `ProcInv` is ON THE CRITICAL PATH, so it is chain
-    seconds. Grep is `rewrite !big_sepL_sep` followed by an `iFrame`.
+    (`BootShared.v`'s eight-way chain is the idiom to copy, and its comment
+    already cites this rule). Each zips three families into one walk:
+    `FileInv.ftable_res_boot` and `ProcInv`'s ofile block — the latter small in
+    itself but `ProcInv` is ON THE CRITICAL PATH, so it is chain seconds. Grep
+    is `rewrite !big_sepL_sep` followed by an `iFrame`.
 - **PEEL A CHAIN BY `apply`, NEVER BY `erewrite` — an equation lemma builds an
   `eq_ind_r` motive over the whole remaining term at every step.** `goodb_bind`
   is stated as `goodb D (bind m f) s = goodb D (f x) s`, so
   `repeat (erewrite goodb_bind by (vm_compute; reflexivity))` re-copies the
   entire monadic tail once per bind — and once a continuation has been
   instantiated with symbolic bitvector data the tail is large. Ltac profiling
-  is what settles it: **81.5 % LOCAL to the `erewrite`**, against 3 % in the
-  `vm_compute` side conditions and 11 % in their `reflexivity` — i.e. the side
-  conditions everyone suspects are not the cost. The intro form
-  (`goodb_bind_i : … → goodb D (f x) s = true → goodb D (bind m f) s = true`,
-  one line off the equation) has the same two side conditions and no motive,
-  and the proof term becomes a chain of applications, which takes the `Qed`
-  down with it: `WpGprCsrwA.goodb_legalize_menvcfg` **18.6 s → 6.9 s of tactic
-  and 18.0 s → 9.4 s of `Qed`**, file 46.3 s → 25.9 s. Not a sweep: the same
-  `goodb_step` in `WpSconfCsr` / `WpGprCsrwC` costs ~1.4 s, because nothing has
-  put a symbolic value in their tails.
+  is what settles it: the overwhelming majority is LOCAL to the `erewrite`,
+  against a few percent in the `vm_compute` side conditions and a little more
+  in their `reflexivity` — i.e. the side conditions everyone suspects are not
+  the cost. The intro form (`goodb_bind_i : … → goodb D (f x) s = true → goodb
+  D (bind m f) s = true`, one line off the equation) has the same two side
+  conditions and no motive, and the proof term becomes a chain of applications,
+  which takes the `Qed` down with it. Not a sweep: the same `goodb_step` in
+  `WpSconfCsr` / `WpGprCsrwC` is cheap, because nothing has put a symbolic
+  value in their tails.
 - **WHAT IS LEFT OF THAT PEEL IS THE `eapply` ITSELF, and five further
-  interventions all measured null** (2026-08-20; do not redo them). Ltac
-  profiling: **61.8 % LOCAL to `eapply goodb_bind_i`**, 30 % `reflexivity`,
-  8 % `vm_compute`. Unrolling the `repeat` shows the cost is not spread — the
-  five steps are 2.4 s, 2.1 s, 2.0 s, then under 0.3 s each — i.e. it tracks the
-  size of the CONTINUATION the step has to retype, which is exactly what a
-  one-node-at-a-time peel cannot avoid. Tried and within noise: `cbv beta`
-  before the loop; `cbv beta` after every step (worse); `vm_cast_no_check
-  (eq_refl true)` for the `goodb` side condition; a `lazymatch` dispatch on
-  `bind`/`bind0` instead of `first` (so no branch ever fails); and a
-  `Hint Resolve` database of the per-leaf `exec_*` lemmas so the exec side
-  condition is a lookup rather than a `vm_compute` (6.25/6.38 s against a
-  6.40/6.58 s baseline). Getting below this needs a different formulation — a
-  multi-bind peel lemma, or a `goodb` that computes without touching the data —
-  not another tactic.
+  interventions all measured null; do not redo them.** Ltac profiling puts the
+  majority LOCAL to `eapply goodb_bind_i`, then `reflexivity`, then
+  `vm_compute`. Unrolling the `repeat` shows the cost is not spread — it decays
+  sharply step by step, i.e. it tracks the size of the CONTINUATION the step has
+  to retype, which is exactly what a one-node-at-a-time peel cannot avoid.
+  Tried and within noise: `cbv beta` before the loop; `cbv beta` after every
+  step (worse); `vm_cast_no_check (eq_refl true)` for the `goodb` side
+  condition; a `lazymatch` dispatch on `bind`/`bind0` instead of `first` (so no
+  branch ever fails); and a `Hint Resolve` database of the per-leaf `exec_*`
+  lemmas so the exec side condition is a lookup rather than a `vm_compute`.
+  Getting below this needs a different formulation — a multi-bind peel lemma,
+  or a `goodb` that computes without touching the data — not another tactic.
 - **`Qed` re-checks and therefore DOUBLES every `vm_compute`** — the kernel
-  re-runs the reflexivity check at `Qed` time, so a lemma whose tactic is 50 s
-  of `vm_compute` costs ~100 s of wall clock (measured: `FsImgCheck.fsimg_wf_ok`
-  65.9 s tactic + 62.6 s `Qed`). Budget 2× the `-time` figure for any
-  vm_compute-heavy lemma, and prefer one big boolean sweep with lookup spec
-  lemmas over N per-item `vm_compute` lemmas — the sweep pays the 2× once.
+  re-runs the reflexivity check at `Qed` time, so a lemma whose tactic is heavy
+  `vm_compute` costs about twice that in wall clock. Budget 2× the `-time`
+  figure for any vm_compute-heavy lemma, and prefer one big boolean sweep with
+  lookup spec lemmas over N per-item `vm_compute` lemmas — the sweep pays the
+  2× once.
 - **THE DOUBLING IS AVOIDABLE: build the cast, do not run the tactic.** The
   kernel's re-check is the reduction that has to happen; the tactic's is the
   one that does not. `vm_cast_no_check` puts the `vm_cast` straight in the
@@ -1452,24 +1290,20 @@ surfaces the next dependency layer.; reach for `iNext`
     | |- _ = ?r => vm_cast_no_check (@eq_refl _ r)
     end.
   ```
-  Measured, isolated `coqc`: **`FsImgCheck` 195.4 s → 99.5 s** (its
-  `fsimg_wf_ok` alone was 128.5 s of that), **`ElfKernel` 54.0 s → 28.9 s**,
-  **`ElfUser` 25.1 s → 14.0 s**. The whole tactic column of those files drops
-  to zero and only `Qed` pays.
+  It roughly halves each of `FsImgCheck`, `ElfKernel` and `ElfUser`: the whole
+  tactic column of those files drops to zero and only `Qed` pays.
   - **IT MUST BE THE RIGHT-HAND SIDE.** `eq_refl r` casts `r = r` to `l = r`,
     so the VM evaluates the heavy side once; the mirror spelling
     `eq_refl l` makes it evaluate that side TWICE and is **worse than the
-    `vm_compute` it replaces** — `ElfKernel` 78.3 s against a 54.0 s
-    baseline. The two spellings read identically; only the A/B tells them
-    apart, so measure after writing one.
+    `vm_compute` it replaces**. The two spellings read identically; only the
+    A/B tells them apart, so measure after writing one.
   - The cost is diagnostic, which is why this is for the HEAVY sentences and
     not a sweep (647 `vm_compute. reflexivity.` sites in the tree, nearly all
     sub-second): a disagreement now surfaces at `Qed` as a kernel conversion
     failure with no goal in view. Put `vm_compute. reflexivity.` back on the
     one failing lemma to see it.
 - **A CONSTRUCTOR IS INJECTIVE AT VARIABLES — NEVER AT A FILE'S CONTENTS.**
-  Measured 2026-08-28 on `iris/FsInitPin.v` (fs-syscall-specs lane P), by
-  `coqc -time` plus truncation probes. The lemma wanted was
+  Measured on `iris/FsInitPin.v` (fs-syscall-specs lane P). The lemma wanted was
 
   ```coq
   file_bytes (fs_data_of fsimg_P (fs_dinode fsimg_P fsimg_sb 7)) <size>
@@ -1478,9 +1312,8 @@ surfaces the next dependency layer.; reach for `iNext`
 
   off `FsImgCheck.fsimg_init_at`, i.e. `Some (NFile X) = Some (NFile Y)` with
   `Y` the literal. **Both obvious spellings — `injection H` and `exact H`
-  through a projection `nfile_bytes` — ran past 15 minutes and never
-  finished**, while every other sentence in the file was 0.00 s and its first
-  two sections compiled in 35 s. The reason is `FsImgCheck.v`'s own header
+  through a projection `nfile_bytes` — never finished**, while every other
+  sentence in the file was free. The reason is `FsImgCheck.v`'s own header
   rule one level down: conversion is free to unfold `FsTree.file_bytes`
   instead of the projection, and `file_bytes` is quadratic in the file size
   and rebuilds the block once per byte.
@@ -1496,7 +1329,7 @@ surfaces the next dependency layer.; reach for `iNext`
   Proof. intros H. exact (f_equal nfile_bytes H). Qed.
   (* instance: apply nfile_inj; transitivity (node_at P sb i); ... *)
   ```
-  **>15 min → 5.5 s for the whole file.** The same rule retired an
+  That took the file from not finishing to trivial. The same rule retired an
   `injection` on a row carrying those bytes (`Some_inj` instead). Read it as
   the converse of the `vm_eq` rule above: there the kernel SHOULD reduce and
   you make it do so once; here it should not reduce at all and you must give
@@ -1506,10 +1339,10 @@ surfaces the next dependency layer.; reach for `iNext`
   line is not where the compile is. Use `script -q -e -c "coqc -time …" log`
   (a pty) or, better, bisect with `head -N file.v` probes.
 - **AND MEASURE ON A QUIET VM.** Three of those five variants first read as
-  regressions of 20–30 % (25 s → 31 s on the same file), purely because another
-  tree was building; the same variants re-measured at load 9 were within 2 %.
-  `uptime` before an A/B is worth the second it costs — the builder is SHARED,
-  which the isolation rule at the top of this file assumes away.
+  clear regressions, purely because another tree was building; the same
+  variants re-measured on a quiet box were within noise. `uptime` before an A/B
+  is worth the second it costs — the builder is SHARED, which the isolation
+  rule at the top of this file assumes away.
 - **`rewrite wp_next_off` is a setoid rewrite over the whole goal — use `iApply
   wp_next_off_intro`.** Same continuation, matches only the head. A `b`-generic
   proof has no such sites at all (it threads `wp_next … b …` and discharges with
@@ -1532,10 +1365,10 @@ updates pairwise, and the cost is exponential in the depth.
 - **Make the tower `Opaque` the moment its lookup lemmas are proved.**
   `Global Opaque mm_rs.` right after the section that establishes the nineteen
   `mm_rs_*` lookup equations. Left transparent, every `apply`/`iApply` whose
-  unifier meets a concrete tower may delta-expand it. Measured: an `InstrBytes`
-  with four `wp_instr` arms did **not finish in 15 minutes** transparent, and
-  the same arms' setup ran in **3 s** opaque. The lookup lemmas are the only
-  interface any consumer needs, so nothing is lost.
+  unifier meets a concrete tower may delta-expand it: an `InstrBytes` with four
+  `wp_instr` arms did not finish at all transparent, and the same arms' setup
+  was instant opaque. The lookup lemmas are the only interface any consumer
+  needs, so nothing is lost.
 
 - **Never leave a goal with a tower on BOTH sides to `reflexivity`.** A
   `reg_agree_on D (mm_rs .. x ..) (mm_rs .. y ..)` goal looks like two rewrites,
@@ -1563,10 +1396,10 @@ updates pairwise, and the cost is exponential in the depth.
 `hreg_frame_ext`, `hreg_frame_ro_ext`, `mm_rw_split`, `mm_ro_split` are `↔`/`⊣⊢`,
 so using them means `rewrite` — and **a `rewrite` inside a proofmode goal fires
 on the whole `envs_entails Δ Q`, context included** (this is RULE ONE again, in
-a shape that is easy to miss because the lemma looks tiny). Measured inside one
-`wp_instr` arm: `rewrite mm_rw_split mm_rs_PC .. mm_rs_ip` — a seven-cell split
-plus its seven lookup rewrites — cost **~110 s**; nothing else in the arm cost
-more than a second.
+a shape that is easy to miss because the lemma looks tiny). Inside one
+`wp_instr` arm, `rewrite mm_rw_split mm_rs_PC .. mm_rs_ip` — a seven-cell split
+plus its seven lookup rewrites — was the whole arm; nothing else in it
+registered at all.
 
 The fix is not to tune the rewrite, it is to **not rewrite at the call site**.
 Export the same steps as one-directional lemmas, proved once where the goal is
@@ -1587,11 +1420,10 @@ frame lemma appears under `rewrite` anywhere downstream of the file that proves
 it, that is a directed lemma waiting to be written.
 
 The READ-ONLY twins (`mm_ro_open` in HartMFrame, `mc_ro_close` in
-WpInstrConfig) were written on 2026-08-20 for exactly one site that had been
-missed: `WpInstrConfig.mc_ro_acc`, whose goal carries a whole `mc_rs` tower
-inside its ∀-closure, so its `rewrite mm_ro_split` was **24.9 s** — file
-38.5 s → 13.6 s once both bridges are applied instead. **Where the goal is
-small the same `rewrite` is free**, which is why the other five
+WpInstrConfig) were written for exactly one site that had been missed:
+`WpInstrConfig.mc_ro_acc`, whose goal carries a whole `mc_rs` tower inside its
+∀-closure, so its `rewrite mm_ro_split` was most of the file. **Where the goal
+is small the same `rewrite` is free**, which is why the other five
 `mm_rw_split`/`mm_ro_split` sites in that file and in `InstrBytes` were left
 alone: read the `.v.timing` cost of a candidate site, never its shape.
 
@@ -1601,26 +1433,25 @@ alone: read the `.v.timing` cost of a candidate site, never its shape.
   keeps the goal one insert deep, so there is no deep term for `set`'s occurrence
   abstraction to collapse — but `set` pays a whole-goal pattern search per
   instruction, and the goal is `envs_entails Δ Q` with the entire context inside
-  it. Cost scales with CONTEXT, not chain: 0.1 s in a small proof, 1.7 s (158 s
-  of a 305 s file) in a big one. Keep `set` only where the abstraction is the
-  point — a value that really does occur throughout the goal. Note `set (x := e)`
-  *with parentheses* is vanilla Coq's `set`, not ssr's, so it does not fail when
-  it finds no occurrence. A `set (X := e)` immediately followed by `change e
-  with X` is the fully-redundant form — the `change` alone produces the same
-  goal, so the pair is `pose` + `change` (measured in ProofPipewrite: 66 such
-  `set`s cost 4.4 s where the sibling's 83 `pose`s cost 0.29 s, ~20× per call).
+  it. Cost scales with CONTEXT, not chain: free in a small proof, half the file
+  in a big one. Keep `set` only where the abstraction is the point — a value
+  that really does occur throughout the goal. Note `set (x := e)` *with
+  parentheses* is vanilla Coq's `set`, not ssr's, so it does not fail when it
+  finds no occurrence. A `set (X := e)` immediately followed by `change e with
+  X` is the fully-redundant form — the `change` alone produces the same goal, so
+  the pair is `pose` + `change`; in `ProofPipewrite` the `set`s cost an order of
+  magnitude per call over the sibling's `pose`s.
   **Where the file already uses `set`, deleting the trailing `change` is the
   free half of that fix and needs no other edit**: the `change` is then a
   whole-goal conversion that folds nothing, because `set` has already folded
-  every occurrence. 45 of them in `ProofForkret` cost **1.44 s** of a 30.3 s
-  file (30.3 s → 28.9 s to delete, proof script otherwise untouched). Grep is
-  `set (X := T).` immediately followed by `change T with X.` with `T` equal up
-  to whitespace.
+  every occurrence. 45 of them in `ProofForkret` were worth deleting with the
+  proof script otherwise untouched. Grep is `set (X := T).` immediately followed
+  by `change T with X.` with `T` equal up to whitespace.
 - **`Local Strategy opaque [rget tp_pin rf_upd]` in a whole-function proof whose
   leaves state their premises over `rget`.** Every such `iApply` otherwise makes
   the unifier walk `rget → tp_pin → rf_upd` down the whole update chain, and the
-  `Qed` re-walks it (ProofPipewrite: 8 hot `iApply`s ~14 s → ~1.5 s, final `Qed`
-  18.9 s → 15.5 s). The trap: any premise spelled `M !!! Regidx r` where the
+  `Qed` re-walks it (ProofPipewrite: eight hot `iApply`s and the final `Qed` all
+  improved sharply). The trap: any premise spelled `M !!! Regidx r` where the
   leaf's statement says `rget M r` was bridging by delta and now REGRESSES —
   restate it in the `rget` spelling via `rget_ne` (HartTp.v) before the `iApply`
   and the site goes syntactic. Audit: `-time` before and after; the regressing
@@ -1628,15 +1459,15 @@ alone: read the `.v.timing` cost of a candidate site, never its shape.
   **Sealing can regress a DIFFERENT, distant site.** `Strategy opaque` deepens
   the unifier's walk at every `rget`-typed premise in the file, and an inline
   general-purpose closer (the "Inline `ltac:`" rule below) is priced by
-  exactly that depth — measured, a `dl_need` bound three `dirlink`s deep
-  regressed 1.36 s → 8.26 s from a `Strategy opaque` elsewhere in the same
-  file with no textual connection to it. Audit `-time` across the WHOLE file
-  after sealing, not just the sites the seal touches directly; fix a
-  regressed site with the same inline-`ltac:` hoist as any other (`assert (H
-  : …) by (clear -H..; lia)`), whose keep-list must include every hypothesis
-  the final `lia` draws on — not just the ones the tactic script names
-  textually. Grep sibling call sites for the same derived bound, or dump the
-  goal and context at the failing site (above) if none exists.
+  exactly that depth — a `dl_need` bound three `dirlink`s deep regressed
+  sharply from a `Strategy opaque` elsewhere in the same file with no textual
+  connection to it. Audit `-time` across the WHOLE file after sealing, not just
+  the sites the seal touches directly; fix a regressed site with the same
+  inline-`ltac:` hoist as any other (`assert (H : …) by (clear -H..; lia)`),
+  whose keep-list must include every hypothesis the final `lia` draws on — not
+  just the ones the tactic script names textually. Grep sibling call sites for
+  the same derived bound, or dump the goal and context at the failing site
+  (above) if none exists.
 - **`reg_lookup` (RegFile.v) by default** — one `vm_compute` over the concrete-key
   if-chain. Where the target value is SYMBOLIC, `vm_compute` would try to reduce
   it and hang; use the lemma-based `peel_reg`, which peels via `upd_eq`/`upd_ne`
@@ -1651,7 +1482,7 @@ alone: read the `.v.timing` cost of a candidate site, never its shape.
     disequality with `reg_neq` (`tryif unify a b then fail else (vm_compute;
     discriminate)`). Miss-first order attempts `upd_ne` at the terminating layer,
     whose side goal is FALSE, and `discriminate` exhaustively hunts a
-    discriminating position in two equal records: ~4–8 s per call.
+    discriminating position in two equal records.
   - Auditing an existing file: a site is safe to collapse to the generic peel
     when its unfold list is EXHAUSTIVE down to the chain's genuine non-`set` base;
     it is unsafe when it deliberately stops at an interior link to hand off to a
@@ -1689,7 +1520,7 @@ alone: read the `.v.timing` cost of a candidate site, never its shape.
 evars.** The proofmode re-elaborates the spliced term without the `Qed` vm-seal,
 and against unresolved width/map evars it can fail to terminate outright. Prove
 it first as `assert (H : …) by (tac)` and pass `H` by name — a named hypothesis's
-type is fixed, so there is no re-elaboration. Measured at 12–29 s *per call site*
+type is fixed, so there is no re-elaboration. This was expensive *per call site*
 for the `kernel_data_string` / `kernel_data_window` byte-lookup premises, and
 non-terminating for an `iApply` whose map argument is a ∀-bound `Mr` from a loop
 invariant. If several such args exist, use the **unshelve hoist**: replace the
@@ -1700,14 +1531,14 @@ subgoals as standalone `{ … }` goals.
 DEPTH of its call site, not by its goal** — so the identical sentence
 terminates in one arm of a function and does not terminate in another. Three
 `lia`s in `ProofCreate.cr_mkdir_half` (the post-`dirlink` size read-back, and
-two `ltac:(lia)`s in `DirLinks.dir_link_at_dirlink`'s `2 <= tot` slot) ran
-**>10 min at 22 GB** where `cr_alloc_half` runs the same `cr_wi_size_max` chain
-inline and is fine; the difference is only that the mkdir arm sits three
-`dirlink`s deeper, so `lia`'s atom scan meets three calls' worth of accumulated
-arithmetic. Each goal was one equation away from trivial. Hoisting them to
-`assert (H : …). { clear -<the one equation>. lia. }` took the file to **3:13 /
-5.1 GB**, faster than the baseline that did not contain the arm at all. The tell
-is that the goal looks tiny; do not read a stalling `lia` as a hard arithmetic
+two `ltac:(lia)`s in `DirLinks.dir_link_at_dirlink`'s `2 <= tot` slot) never
+finished, and ate tens of gigabytes doing it, where `cr_alloc_half` runs the
+same `cr_wi_size_max` chain inline and is fine; the difference is only that the
+mkdir arm sits three `dirlink`s deeper, so `lia`'s atom scan meets three calls'
+worth of accumulated arithmetic. Each goal was one equation away from trivial.
+Hoisting them to `assert (H : …). { clear -<the one equation>. lia. }` made the
+file cheaper than the baseline that did not contain the arm at all. The tell is
+that the goal looks tiny; do not read a stalling `lia` as a hard arithmetic
 problem, read it as a context problem, and note that `clear -H` is only
 available once the goal is a NAMED assert — which is the second reason not to
 splice a closer into argument position.
@@ -1715,91 +1546,89 @@ splice a closer into argument position.
 **AND THE GOAL CAN BE A CLOSED NUMERAL AND STILL COST SECONDS.**
 `ProofSysUnlink.v:4935,6570` spliced `ltac:(lia)` for `wi16_post`'s `0 < tot`
 guard — on an arm that has already `destruct (decide (tot = 16%nat)) as [-> |
-_]`, so the goal is literally `0 < 16`. It measured **3.50 s and 3.56 s**,
-because `lia` reifies the context it is handed and this is the tree's largest.
+_]`, so the goal is literally `0 < 16`. It was seconds each, because `lia`
+reifies the context it is handed and this is the tree's largest.
 `assert (Htot16 : (0 < 16)%nat) by (apply Nat.lt_0_succ).` on the line above,
-passed by name, took both out of the profile's top 1000 (2026-08-29). Read a
-slow closer as a CONTEXT problem before you read the goal at all.
+passed by name, took both out of the profile. Read a slow closer as a CONTEXT
+problem before you read the goal at all.
 
 - Grep for `ltac:(intros` inside a `kernel_data_window` / `kernel_data_string`
   argument list — every hit is this bug.
 - The related fix is often to state the byte premise over a SYMBOLIC index as its
   own pure lemma, which deletes a `destruct i` on the Iris goal entirely.
 - **The 18k-entry `list_to_map` is NOT the cost** — the VM compiles `kernel_data`
-  to bytecode once per process, so the first lookup is ~0.15 s and every later
-  one ~2 ms. When a `vm_compute`-over-a-big-map sentence is slow, suspect the
+  to bytecode once per process, so the first lookup pays and every later one is
+  free. When a `vm_compute`-over-a-big-map sentence is slow, suspect the
   inline-`ltac:` position, not the map.
 
 ## Conversion and `Qed`
 
 - **A check that grows past a few hundred MB / minutes on a small file is a
-  DEGENERATE PROOF, not something to wait out** (user-wp-slot lane,
-  2026-08-28).  The two culprits that session: any reduction/unification
-  that touches the dumped literal `SyncInstrs.sync_bytes` (`cbn [fst]` on a
-  goal mentioning it, `decide` on a symbolic image `M` — keep the literal
-  behind opaque lemmas and gate `sync_layout`-first), and ssr
-  `rewrite`/`iFrame` against the 32-insert `userret_gpr` chain (enumerate
-  the 32 `mword 5` indices and peel per case; an insert-chain `rewrite`
-  unifies the `Insert` instance up to delta and does not terminate).
-  A THIRD DOOR into the same divergence (2026-08-28, a lane's
-  `tf_ueq_resume_gpr`): `f_equal` — it begins by trying `reflexivity`
-  on the whole goal, and that conversion check delta-unfolds
-  `userret_gpr` into the tower on both sides with UNEQUAL leaves and
-  backtracks forever.  Rule: never let `reflexivity`/`f_equal`/any
-  unification see a goal whose two sides contain the tower but differ —
-  rewrite the leaf equalities first (each pattern a closed `tf !!! i`),
-  so `reflexivity` only ever runs on syntactically identical sides.
+  DEGENERATE PROOF, not something to wait out** (user-wp-slot lane). The two
+  culprits that session: any reduction/unification that touches the dumped
+  literal `SyncInstrs.sync_bytes` (`cbn [fst]` on a goal mentioning it,
+  `decide` on a symbolic image `M` — keep the literal behind opaque lemmas and
+  gate `sync_layout`-first), and ssr `rewrite`/`iFrame` against the 32-insert
+  `userret_gpr` chain (enumerate the 32 `mword 5` indices and peel per case; an
+  insert-chain `rewrite` unifies the `Insert` instance up to delta and does not
+  terminate). A THIRD DOOR into the same divergence (a lane's
+  `tf_ueq_resume_gpr`): `f_equal` — it begins by trying `reflexivity` on the
+  whole goal, and that conversion check delta-unfolds `userret_gpr` into the
+  tower on both sides with UNEQUAL leaves and backtracks forever. Rule: never
+  let `reflexivity`/`f_equal`/any unification see a goal whose two sides contain
+  the tower but differ — rewrite the leaf equalities first (each pattern a
+  closed `tf !!! i`), so `reflexivity` only ever runs on syntactically identical
+  sides.
 - **`vm_compute; reflexivity` is rechecked by the kernel's LAZY conversion at
   `Qed`** — the VM's speed does not carry over, and on model code that is a
-  different order of magnitude (one such equation over the cold-boot chain
-  reached >3.8 GB; fifteen inside one `Qed` reached 25 GB). Close such goals with
-  `vm_cast_no_check (eq_refl <rhs>)` so the kernel rechecks with the VM too, and
-  compute the result ONCE into its own `Definition` plus a single VM-cast lemma,
-  after which downstream facts are shallow conversions.
+  different order of magnitude (one such equation over the cold-boot chain ran
+  the box out of memory; fifteen inside one `Qed` far worse). Close such goals
+  with `vm_cast_no_check (eq_refl <rhs>)` so the kernel rechecks with the VM
+  too, and compute the result ONCE into its own `Definition` plus a single
+  VM-cast lemma, after which downstream facts are shallow conversions.
 - **A guard fixed by `change`/a plain cast pushes a slow non-VM conversion to
-  `Qed`** (minutes). Use `replace g with v by (vm_compute; reflexivity)`. For
+  `Qed`.** Use `replace g with v by (vm_compute; reflexivity)`. For
   CSR/extension dispatch guards use `csr_dispatch_eq` (ExecCommon.v). **NEVER
   `cbv -[…]`** (negative delta) to collapse a Sail dispatch guard — it unfolds a
-  definition with a huge normal form and OOMs the box (125 GB).
+  definition with a huge normal form and OOMs the box.
 - **Never `vm_compute` a goal containing a symbolic `mword` variable or a
   concrete built-up `mstate`** — it tries to normalize 64-bit modular arithmetic
   symbolically and does not terminate. Compute only the CLOSED offset, or prove
   the pure fact against an abstract state and `apply` it.
 - **Never let an `exact`/`reflexivity` cross an update layer.** Peel every layer
   down to the map the named fact is actually about, or the kernel converts the
-  whole transparent `rf_upd`/`bool_decide`/`mword_of_int` tower — 401 s for one
-  `exact`, and the tell is that the sentence right below it, four explicit layers
-  down, is free.
+  whole transparent `rf_upd`/`bool_decide`/`mword_of_int` tower, and the tell is
+  that the sentence right below it, four explicit layers down, is free.
 - **A `reflexivity`/`exact` that folds a `gset` back into its name normalises the
   underlying `list_to_set`.** Unfold the two names first so the match is
   syntactic.
 - **Sealing a definition tower halfway buys nothing — seal every layer down to
   the one that computes, or none.** `rget` → `tp_pin` → `rf_upd`: with `rf_upd`
-  transparent, sealing the top two cannot change anything. Sealing all three took
-  one file 575 s → 261 s and its `Qed` 235 s → 35 s. **But do this per file with a
+  transparent, sealing the top two cannot change anything. Sealing all three cut
+  one file and its `Qed` by more than half. **But do this per file with a
   measurement, never as a sweep** — across ten of the tree's most expensive
-  proofs the same three `Strategy` lines were all inside noise, and one file does
-  not even compile with them (it `unfold`s `tp_pin`). The outlier had both a
-  20+-link `pose` chain and a large Iris context; that combination is what makes
-  conversion dominate. **`ProofSysUnlink` is the best-fitting candidate left
-  (101 links, the tree's largest context) and it is a NULL: 128.0 s → 129.5 s,
-  min of two (2026-08-27), compiling with no `rget_ne` repair needed.** So the
-  lever really is confined to `ProofVirtioDiskInit`'s shape; stop looking.
-  A caution from that same A/B: the first pair read **−15.8 %** because the
-  base arm happened to run at load 52 and the sealed arm at load 81 — the
-  inversion this file's Diagnosis section warns about, seen live. Only the
-  second pair, at load 9–15, showed the truth. The cost is invisible to tactic profiling — it lands in
-  the kernel at `Qed` and inside `iEval`/`pm_reduce`.
+  proofs the same three `Strategy` lines were all inside noise, and one file
+  does not even compile with them (it `unfold`s `tp_pin`). The outlier had both
+  a 20+-link `pose` chain and a large Iris context; that combination is what
+  makes conversion dominate. **`ProofSysUnlink` is the best-fitting candidate
+  left (101 links, the tree's largest context) and it is a NULL**, compiling
+  with no `rget_ne` repair needed. So the lever really is confined to
+  `ProofVirtioDiskInit`'s shape; stop looking. A caution from that same A/B: the
+  first pair read as a large win purely because the two arms ran at very
+  different loads — the inversion this file's Diagnosis section warns about,
+  seen live. Only the second pair, on a quiet box, showed the truth. The cost is
+  invisible to tactic profiling — it lands in the kernel at `Qed` and inside
+  `iEval`/`pm_reduce`.
 - **Invert a symbolic-step executor over its ABSTRACT parameters** — never
   `cbn`/`unfold` it into a hypothesis and destruct the guards there. Each
   `destruct` of a guard buried in the reduced term reverts the hypothesis into
   the match's dependent motive, and at `Qed` the kernel must normalise the
-  immediate there; an immediate carrying an `autocast` (`concat_vec`) is ~17×
-  costlier than a plain `sign_extend'`. Result: ~30 s per lemma, 100 % in
-  `Typeops.execute`. **Not fixable by opacity** — sealing sent the file to 40 GB /
-  16 min at *tactic* time (the kernel never explodes from opacity; only the
-  tactic engine does). The fix is one inversion lemma doing the guard case
-  analysis with the displacement OPAQUE: ~30 s → <1 s.
+  immediate there; an immediate carrying an `autocast` (`concat_vec`) is far
+  costlier than a plain `sign_extend'`. The whole cost lands in
+  `Typeops.execute`. **Not fixable by opacity** — sealing sent the file to tens
+  of gigabytes at *tactic* time (the kernel never explodes from opacity; only
+  the tactic engine does). The fix is one inversion lemma doing the guard case
+  analysis with the displacement OPAQUE.
 
 ## Where a `Qed` actually goes
 
@@ -1810,15 +1639,15 @@ each a `Constr.fold` with no memo, i.e. linear in the number of *occurrences*.
 So the lever on `Qed` is term size, and the question is never "what is the kernel
 converting?" but "how big is the tree?".
 
-Terms here are 200–700× bigger as trees than as DAGs, and **this cannot be fixed
-by sharing in the kernel — do not repeat that experiment.** A patched Rocq with
-a physical-identity memo on `of_constr` and unconditional `Typeops` memoization
-found 0.5–1.6 % memo hits across three big proofs; RSS corroborates (~70 bytes
-per node means the tree really is materialised). The only asymptotic fix is for
-the proof term to NAME the environment rather than spell it, which `pm_reduce`
-(a `cbv` over the `pm_*` constants) zeta-reduces straight back open — the
-proofmode is *designed* to keep the environment in normal form so `envs_lookup`
-computes. That is an Iris redesign, not a tactic swap.
+Terms here are hundreds of times bigger as trees than as DAGs, and **this cannot
+be fixed by sharing in the kernel — do not repeat that experiment.** A patched
+Rocq with a physical-identity memo on `of_constr` and unconditional `Typeops`
+memoization found almost no memo hits across three big proofs; RSS corroborates
+(the tree really is materialised). The only asymptotic fix is for the proof term
+to NAME the environment rather than spell it, which `pm_reduce` (a `cbv` over
+the `pm_*` constants) zeta-reduces straight back open — the proofmode is
+*designed* to keep the environment in normal form so `envs_lookup` computes.
+That is an Iris redesign, not a tactic swap.
 
 ## Build shape
 
@@ -1835,7 +1664,7 @@ and runs in CI on every checkin.
   reaching for a shared *block*, not the sibling's capstone — and a shared block
   belongs in a third file both require. A Rocq functor cannot span two files, so
   whatever they share has to become its own functor, applied twice. **Do not
-  expect the split to pay in ΣCPU**; it pays in the chain, and it costs ~2 s of
+  expect the split to pay in ΣCPU**; it pays in the chain, and it costs an
   import prelude per new file. Judge it on the profiler's "Longest dependency
   chain" table (any `Proof*` immediately following another `Proof*`), never on
   the per-file list.
@@ -1843,31 +1672,31 @@ and runs in CI on every checkin.
   proved in phases turns into a strictly serial require chain. Measure the
   coupling: usually the heavy phase proofs sit ENTIRELY before the functor and
   need nothing from their predecessor but shared vocabulary, while the actual
-  seam module is under a second. Hoist the vocabulary into one functor-free file
+  seam module is trivial. Hoist the vocabulary into one functor-free file
   and split each phase into heavy-part + seam. Finding the cut is mechanical:
   `.glob`'s `R` lines give every reference with its defining library; filter to
   the byte range before the functor.
 - **Where ΣCPU goes tree-wide, by leading tactic:** `iApply` ~16 %, `Qed` ~15 %,
   `Require`/`From` ~17 %, `iIntros` ~8 %, `iDestruct` ~4 %. The import line is
-  the one to internalise — ~1.9 s per file of pure module loading, a floor rather
-  than a bug (empty file 0.36 s for Stdlib, +0.47 s stdpp, **+1.12 s for
-  `iris.proofmode`+algebra+base_logic+program_logic**, +0.35 s for the whole Sail
-  model — `.vo` loading is lazy, so do not go hunting in the 22.7 MB model file).
+  the one to internalise — pure module loading, a floor rather than a bug, and
+  `iris.proofmode`+algebra+base_logic+program_logic is the bulk of it (`.vo`
+  loading is lazy, so do not go hunting in the 22.7 MB model file).
 - **Negative results — do not redo these.** `_CoqProject` order does not matter
-  (three orders measured within 2 %; level-order visibly changed the schedule and
-  make refilled the freed slots either way). Oversubscribing `-j` does not help
-  (it fixes the queueing gap and costs exactly what it buys). `Proof using`
-  tree-wide is ~5 % of `Qed` = 0.75 % of the build, and the non-minimal forms
-  (`Type*`/`All`) change which section variables a lemma is generalized over, i.e.
-  its ARGUMENT LIST, which breaks positional application. `vm_cast_no_check` in
-  the generated decode band only MOVES cost from `Qed` to elaboration.
+  (three orders measured within noise; level-order visibly changed the schedule
+  and make refilled the freed slots either way). Oversubscribing `-j` does not
+  help (it fixes the queueing gap and costs exactly what it buys). `Proof using`
+  tree-wide is a fraction of a percent of the build, and the non-minimal forms
+  (`Type*`/`All`) change which section variables a lemma is generalized over,
+  i.e. its ARGUMENT LIST, which breaks positional application.
+  `vm_cast_no_check` in the generated decode band only MOVES cost from `Qed` to
+  elaboration.
 - **The generated decode band's cost is the PROOFMODE, not the `vm_compute`s** —
-  ~76 % generic Iris plumbing re-paid by each of ~8,500 `mk_rvc`/`mk_base` calls,
-  against ~9 % for the side conditions everyone suspects first. The fix was to
-  state the whole `instr` introduction as ONE lemma
-  (`KernelText.instr_intro_rvc`/`_base`) so the proofmode work happens once, in
-  those two proofs; `mk_rvc`/`mk_base` keep their signatures. 2.8× on the band,
-  which is what an `XV6_REV` bump re-pays.
+  the great majority is generic Iris plumbing re-paid by each of ~8,500
+  `mk_rvc`/`mk_base` calls, against a small share for the side conditions
+  everyone suspects first. The fix was to state the whole `instr` introduction
+  as ONE lemma (`KernelText.instr_intro_rvc`/`_base`) so the proofmode work
+  happens once, in those two proofs; `mk_rvc`/`mk_base` keep their signatures.
+  Worth a large multiple on the band, which is what an `XV6_REV` bump re-pays.
 
 ## `Print Assumptions` is a whole-tree walk, and it is not on the build path
 
@@ -1876,19 +1705,11 @@ audit` / `make audit-only` and by CI after every build (output in the run's
 step summary). It is deliberately **not** a row in `iris/_CoqProject` — the
 commented-out row there is what tells `tools/proof_coverage.py --check` the
 omission is on purpose. It used to be a line at the bottom of
-`SystemAdequacy.v`, and that is what it cost (measured 2026-08-20, isolated
-`coqc` on the GCP VM):
-
-| | |
-|---|---|
-| `SystemAdequacy.v` with the statement | **98.6 s**, peak RSS 2.47 GB |
-| the same file without it | **3.6 s**, peak RSS 0.85 GB |
-
-So one sentence was 96 % of the file — and `SystemAdequacy.v` is the strictly
-serial tail of the build (`BootChain → BootShared → SystemAdequacy`, all 1×),
-so it was ~30 % of a clean build's wall clock, re-paid whenever anything in the
-1000-file cone changed. CI still pays it; a developer's `make proofs` no
-longer does.
+`SystemAdequacy.v`, where it was almost the entire cost of that file — and
+`SystemAdequacy.v` is the strictly serial tail of the build (`BootChain →
+BootShared → SystemAdequacy`, all 1×), so it was a large fraction of a clean
+build's wall clock, re-paid whenever anything in the 1000-file cone changed. CI
+still pays it; a developer's `make proofs` no longer does.
 
 **Why it costs that.** `Print Assumptions` forces the opaque body of every
 constant in the transitive cone and walks it. Forcing is not a read:
@@ -1900,29 +1721,24 @@ another full rebuild for anything reached through an applied functor. Then
 at every `Case` node. Each proof term in the cone is therefore rebuilt 2–3× and
 walked once. Both of this tree's universal idioms are on that path: 778 of the
 1265 `iris/*.v` use `Section`, and the whole `SpecF`/`LinkF` design routes
-lemmas through sealed functor applications. Controlled A/B, 400 lemmas with
-byte-identical proof terms:
+lemmas through sealed functor applications. A controlled A/B over 400 lemmas
+with byte-identical proof terms puts `Section` + `Context` packaging at roughly
+2.7× plain top-level lemmas, and an applied sealed functor at roughly 1.5×.
 
-| packaging | `Print Assumptions` over all 400 |
-|---|---|
-| plain top-level lemmas | 0.18 s |
-| inside `Section` + `Context` | **0.49 s (≈ 2.7×)** |
-| inside an applied sealed functor | 0.28 s (≈ 1.5×) |
-
-So the command is ~linear in total proof-term bytes in the cone (302 MB of
-`.vo` in `iris/`) with a 2–3× constant on top. It is therefore also a **proxy
-metric for whole-tree proof-term size**: a jump in the audit's time is a jump
-in what every rule in this file is fighting.
+So the command is ~linear in total proof-term bytes in the cone with a 2–3×
+constant on top. It is therefore also a **proxy metric for whole-tree
+proof-term size**: a jump in the audit's time is a jump in what every rule in
+this file is fighting. Treat it as a tripwire.
 
 - **Negative results — do not redo these.** It is not disk I/O: `Require
-  Import SystemAdequacy` — loading the entire cone — is 0.76 s, and a *second*
-  identical `Print Assumptions` in the same process costs full price again
-  (94.5 s, then 100.6 s). Nothing is cached between calls, so **batching audits
-  in one file does not amortize** — adding an `xv6_fs_adequacy_xv6Σ` audit
-  beside the existing one would roughly double the bill, not ride along. Nor
-  does auditing at lower altitude decompose the cost: `Print Assumptions
-  BootChain.boot_hart_primary` alone is 91.4 s of the 94, against 6.5 s for
-  `BootShared.boot_shared_alloc` and 2.4 s for
+  Import SystemAdequacy` — loading the entire cone — is fast, and a *second*
+  identical `Print Assumptions` in the same process costs full price again.
+  Nothing is cached between calls, so **batching audits in one file does not
+  amortize** — adding an `xv6_fs_adequacy_xv6Σ` audit beside the existing one
+  would roughly double the bill, not ride along. Nor does auditing at lower
+  altitude decompose the cost: `Print Assumptions
+  BootChain.boot_hart_primary` alone is nearly the whole thing, against a
+  fraction for `BootShared.boot_shared_alloc` or
   `RiscvAdequacy.riscv_power_adequacy`. `Set Printing Depth` and the printing
   of the seven-odd axioms are free.
 - **`-noglob` on the audit compile is load-bearing**, not tidiness. The nightly
@@ -1930,33 +1746,22 @@ in what every rule in this file is fighting.
   in `iris/`, and `SystemAssumptions.v`'s single `Require` is the one thing it
   must not lose; with no `.glob` the file is reported UNANALYSED and left alone.
 
-### The 95 s figure is stale: the audit is now 379 s (re-measured 2026-08-22)
-
-Same command, same VM, `iris/` at 344 MB of `.vo` — up only 14 % from the
-302 MB the 95 s was measured at, so **the cone widened, the tree did not**.
-Budget the audit at ~6½ minutes and treat the number as a tripwire: it is the
-proxy metric this section says it is, and it just moved 4×.
-
-Measured beside it, on the same tree (isolated `coqc`, one `Print Assumptions`
-per process):
-
-| constant | wall | peak RSS |
-|---|---|---|
-| `SystemAdequacy.xv6_power_adequacy_xv6Σ` (the audit) | 379 s | 5.8 GB |
-| **`Forkret.wp_forkret`** | **336 s** | 5.5 GB |
-| `UserretClosedD.wp_userret_closed` | **334 s** | 5.2 GB |
-| `Kexec.wp_kexec_sconf` | 149 s | 4.0 GB |
-| `Fsinit.wp_fsinit_sconf` | 85 s | 2.6 GB |
+**The cone widens faster than the tree does.** Re-measured on a tree only
+slightly larger by `.vo` bytes, the audit had grown several-fold. Measured
+beside it, the deepest contract audits (`Forkret.wp_forkret`,
+`UserretClosedD.wp_userret_closed`) cost nearly as much as the whole system
+audit, while shallower ones (`Kexec.wp_kexec_sconf`, `Fsinit.wp_fsinit_sconf`)
+cost a fraction.
 
 **So "auditing forkret takes forever" is not about forkret.** `ProofForkret`'s
-own proof terms are ~2 s of the 336; the other 334 is the closed trap loop it
-concludes in, and every contract that ends in `UserretClosedD` pays exactly
-that. Cutting `ProofForkret.v`'s compile time by a third (2026-08-22) moved its
-audit by nothing — 336 s → 343 s, i.e. run-to-run noise, with a byte-identical
-axiom list. Do not go looking for the cost in the file you are auditing;
-audit its deepest callee first and see whether the difference is worth anything.
+own proof terms are a rounding error of its audit; the rest is the closed trap
+loop it concludes in, and every contract that ends in `UserretClosedD` pays
+exactly that. Cutting `ProofForkret.v`'s compile time by a third moved its
+audit by nothing, with a byte-identical axiom list. Do not go looking for the
+cost in the file you are auditing; audit its deepest callee first and see
+whether the difference is worth anything.
 
-**Where the time actually goes** (`perf record` over the 336 s run, flat self
+**Where the time actually goes** (`perf record` over one such run, flat self
 time; the tree's opam switch carries OCaml symbols, so this is readable):
 
 | cluster | share |
@@ -1967,18 +1772,16 @@ time; the tree's opam switch carries OCaml symbols, so this is readable):
 | OCaml GC (`caml_oldify_one`, `do_some_marking`) | ~4 % |
 
 The command spends five times as long re-COOKING terms out of their sections as
-it does walking them, which is the mechanism behind the 2.7× section-packaging
-figure above. The lever, if anyone wants it, is per-lemma `` `{!riscvGS Σ, …} ``
+it does walking them, which is the mechanism behind the section-packaging figure
+above. The lever, if anyone wants it, is per-lemma `` `{!riscvGS Σ, …} ``
 binders instead of `Section` + `Context` in the hot cone — `ProofForkret.v`
 already writes its lemmas that way, which is part of why it contributes so
 little. That is a ~778-file change, so it is a campaign, not a fix.
 
 - **GC tuning does nothing — do not redo it.** `OCAMLRUNPARAM=s=8M,o=200`,
-  `s=64M,o=400` and `s=256M,o=1000` against a 336 s / 5.5 GB baseline came back
-  350 s, 350 s and 342 s (all three run concurrently, so slightly inflated).
-  `s=256M,o=1000` doubles peak RSS to 11 GB and buys ~2 %. Consistent with the
-  perf profile: GC is 4 % of the run.
-
+  `s=64M,o=400` and `s=256M,o=1000` all came back within noise of the baseline;
+  the largest doubles peak RSS for nothing. Consistent with the perf profile: GC
+  is a few percent of the run.
 
 ## Smaller traps
 
@@ -1990,12 +1793,11 @@ little. That is a ~778-file change, so it is a campaign, not a fix.
   when the lemma is expensive to MATCH.** `rewrite !H` fires until failure, so
   it runs one more match attempt than the goal has occurrences — and that
   attempt is a complete setoid traversal of the goal, instance search included.
-  Measured (`ProcPtOwn.uva_dom_delete`, 2026-08-21): `rewrite
-  elem_of_difference !elem_of_uva_dom` over a goal with exactly TWO
-  `va ∈ uva_dom _` occurrences cost **3.3 s in the file / 4.3 s isolated**;
-  naming the two rewrites (`… elem_of_uva_dom elem_of_uva_dom`) cost **0.33 s**,
-  a ~10× cut with an identical proof term, and it was the slowest sentence in a
-  5 000-line file by 4×. What makes the failing pass expensive is the LHS:
+  In `ProcPtOwn.uva_dom_delete`, `rewrite elem_of_difference !elem_of_uva_dom`
+  over a goal with exactly TWO `va ∈ uva_dom _` occurrences was the slowest
+  sentence in a 5,000-line file by a wide margin; naming the two rewrites
+  (`… elem_of_uva_dom elem_of_uva_dom`) cut it by an order of magnitude with an
+  identical proof term. What makes the failing pass expensive is the LHS:
   `uva_dom` is a `list_to_set (mjoin (… <$> map_to_list _))`, so every candidate
   subterm drags the `elem_of` instance chain behind it. The rule is NOT "avoid
   `!`" — 261 files use it, nearly all harmlessly. It is that a `!` over a
@@ -2004,79 +1806,71 @@ little. That is a ~778-file change, so it is a campaign, not a fix.
   (Same family as the two bullets below: what costs is the tactic that fails.)
   **`rewrite n!L` is the spelling that keeps the `!` reading without the
   failing pass** — it performs exactly `n` rewrites and never attempts an
-  `n+1`th. Second instance (`FsCfgBoot.v`'s coverage-remainder `set_eq`,
-  2026-08-21): `rewrite !elem_of_difference !elem_of_union` over a goal with
-  six differences and four unions, whose carriers are five *computed* sets
-  (`log_region_set`, `ireg_blk_set`, `fs_live_blocks`, `fs_bitmap_spent`), was
-  **6.1 s** — two whole-goal traversals for nothing. `rewrite
-  6!elem_of_difference 4!elem_of_union` took the file **15.4 s → 6.4 s**.
-  Counting is mechanical: differences on both sides of the `↔`, unions in the
-  set the right-hand side names. Third instance (`VirtioProto.vinit_dma_dom`,
-  2026-08-25): `rewrite !dom_union_L !range_map_dom ring_bytes_dom_eq` was
-  **17.3 s**, of which **16.0 s** was the one failing `dom_union_L` pass —
-  deciding that `range_map (vc_used c) 4096 _` is not a `∪` unfolds
-  `range_map`'s 4096-step `foldr`. `rewrite 2!dom_union_L 2!range_map_dom …`
-  is **2.1 s**. The carrier does not have to be a set for this to bite: a
-  `gmap`-valued definition over a literal size is just as expensive to refute,
-  and here the *successful* rewrites cost 2 s between them for the same reason.
+  `n+1`th. Second instance (`FsCfgBoot.v`'s coverage-remainder `set_eq`):
+  `rewrite !elem_of_difference !elem_of_union` over a goal with six differences
+  and four unions, whose carriers are five *computed* sets (`log_region_set`,
+  `ireg_blk_set`, `fs_live_blocks`, `fs_bitmap_spent`), paid two whole-goal
+  traversals for nothing; `rewrite 6!elem_of_difference 4!elem_of_union` more
+  than halved the file. Counting is mechanical: differences on both sides of the
+  `↔`, unions in the set the right-hand side names. Third instance
+  (`VirtioProto.vinit_dma_dom`): `rewrite !dom_union_L !range_map_dom
+  ring_bytes_dom_eq` spent nearly all of its time in the one failing
+  `dom_union_L` pass — deciding that `range_map (vc_used c) 4096 _` is not a `∪`
+  unfolds `range_map`'s 4096-step `foldr`. `rewrite 2!dom_union_L
+  2!range_map_dom …` is cheap. The carrier does not have to be a set for this to
+  bite: a `gmap`-valued definition over a literal size is just as expensive to
+  refute, and here the *successful* rewrites cost as much again for the same
+  reason.
 - **`rewrite` ABSTRACTS, `exact` only UNIFIES — and a `nat` NUMERAL makes the
   gap enormous.** `rewrite H` must locate the occurrence, abstract it and build
   a motive that conversion then carries; `exact`/`apply` of the same equation
   only unifies two terms. Where the rewritten subterm holds a `nat` numeral the
   difference explodes, because `nat` numerals are UNARY: `4096%nat` is a
   4096-constructor term, so `umem_write _ _ 4096 _` drags all 4096 through
-  every conversion the motive forces. Measured on one goal
-  (`ProofUvmcopy.v:1695`, 2026-08-21) — all three close the SAME goal with the
-  same proof term:
-
-  | | |
-  |---|---|
-  | `rewrite <- (umem_write_app … 4096 …)` | 13.7 s |
-  | the same, run length a VARIABLE not a literal | 5.1 s |
-  | `transitivity <middle>` + `apply`/`exact` | 0.09 s |
-
-  So ~2.7× of it is the literal and the rest is the motive; killing both is
-  ~150×. The shape to reach for is `transitivity <the middle term>` and then
-  `apply`/`exact` on each side — it names the intermediate explicitly, which
-  reads better than a backwards rewrite anyway. This is the PURE-GOAL cousin of
-  "Directed entailments, not `⊣⊢` rewrites" above; that section is the same
-  trade inside a proofmode goal, where RULE ONE supplies the blow-up instead.
+  every conversion the motive forces. On one goal (`ProofUvmcopy.v:1695`) all
+  three of `rewrite <- (umem_write_app … 4096 …)`, the same with the run length
+  a VARIABLE, and `transitivity <middle>` + `apply`/`exact` close the SAME goal
+  with the same proof term — and they span two orders of magnitude, with the
+  literal responsible for a modest factor and the motive for the rest. The shape
+  to reach for is `transitivity <the middle term>` and then `apply`/`exact` on
+  each side — it names the intermediate explicitly, which reads better than a
+  backwards rewrite anyway. This is the PURE-GOAL cousin of "Directed
+  entailments, not `⊣⊢` rewrites" above; that section is the same trade inside a
+  proofmode goal, where RULE ONE supplies the blow-up instead.
   **The cheapest instance of it is `rewrite L. reflexivity.` where `L` already
   closes the goal**: `ProofKexecPinned.v:651`'s `rewrite (fv_of_file_byte …).
   reflexivity.` builds a motive over the whole `file_byte`/`fv_of` term only to
   throw it away one line later — `exact (fv_of_file_byte …)` is the same proof
-  term with no motive, and took the statement from **5.5 s** to nothing (file
-  13.4 s → 10.0 s). Grep for a `rewrite <lemma>.` immediately followed by
-  `reflexivity.`
+  term with no motive, and took the statement out of the profile. Grep for a
+  `rewrite <lemma>.` immediately followed by `reflexivity.`
 - **In a `first [ … ]` alternation, put the CHEAP-FAILING branch first.** The
   cost of a tactic that FAILS grows with the proof term, so an alternation
-  leading with an expensive-to-fail branch pays that cost at every use — 42 s
-  over one function, purely in the failures of the first branch, fixed by
-  reordering and nothing else. `exact`/`assumption` fail cheaply on a type
-  mismatch; `rewrite … in H` and `congruence` do not. Second measurement
-  (`HartLift2.wp_hsil2_node`, 2026-08-20): one `all: first [RegWrite | RegRead |
-  announce]` over the monad node type's constructors, where the RegWrite branch
-  fails only after two `case_decide`s, two `injection`s, a `set_solver` and an
-  `iMod` — so every announce-class and RegRead goal paid that whole prefix.
-  Reordered announce < RegRead < RegWrite, nothing else changed: **16.2 s →
-  ~0.1 s, file 18.2 s → 2.5 s.** Each branch still ends by closing its own
+  leading with an expensive-to-fail branch pays that cost at every use — in one
+  function it was the dominant cost, purely in the failures of the first branch,
+  fixed by reordering and nothing else. `exact`/`assumption` fail cheaply on a
+  type mismatch; `rewrite … in H` and `congruence` do not. Second measurement
+  (`HartLift2.wp_hsil2_node`): one `all: first [RegWrite | RegRead | announce]`
+  over the monad node type's constructors, where the RegWrite branch fails only
+  after two `case_decide`s, two `injection`s, a `set_solver` and an `iMod` — so
+  every announce-class and RegRead goal paid that whole prefix. Reordered
+  announce < RegRead < RegWrite, nothing else changed, and both the site and the
+  file collapsed to near nothing. Each branch still ends by closing its own
   goal, which is what makes reordering sound — `first` commits only to a branch
   that finishes.
 - **A branch order is only worth changing where the branches FAIL, and a
   nineteen-wide `first [apply …]` over a family of lookup lemmas is NOT that
-  case** (negative result, 2026-08-20). `HartMFrame.mm_rs_lk` /
-  `WpInstrConfig.mc_rs_lk` cost 5.7 s / 6.1 s at their `all:` sites, which
-  looks exactly like the trap above; replacing the alternation with a
-  `lazymatch` that dispatches on the register in the goal changed nothing
-  (5.65 s → 5.54 s). The towers are already `Global Opaque`, so the failing
-  `apply`s are cheap and the cost is in the ~19 SUCCEEDING ones. Do not redo
-  this; if these sites ever matter, the lever is the number of goals, not the
-  dispatch.
+  case** (negative result). `HartMFrame.mm_rs_lk` / `WpInstrConfig.mc_rs_lk`
+  cost several seconds at their `all:` sites, which looks exactly like the trap
+  above; replacing the alternation with a `lazymatch` that dispatches on the
+  register in the goal changed nothing. The towers are already `Global Opaque`,
+  so the failing `apply`s are cheap and the cost is in the ~19 SUCCEEDING ones.
+  Do not redo this; if these sites ever matter, the lever is the number of
+  goals, not the dispatch.
 - **Order `repeat (first [ … ])` loops** with cheap structural rewrites first and
   broad whole-goal normalisation LAST — the loop re-tries its first branch after
   every success.
 - **Give `iFrame`'s names in the GOAL's conjunct order** — a wrong order is worse
-  than none (one reordering took a frame from 2.2 s to 3.8 s).
+  than none.
 - **`Local Strategy 1000 [pa_stk]`-style deprioritising** keeps failed
   comparisons first-order while `unfold` still works where the arithmetic is
   wanted. `Local Opaque` does not — it blocks `unfold` too.
@@ -2101,18 +1895,17 @@ little. That is a ~778-file change, so it is a campaign, not a fix.
   shows the very term, character-identical. State register facts CID-generically
   up front (`assert (∀ CID', rget (CID := CID') M2 r = v)`) and rewrite with that.
 
-## A HINT-DATABASE DISPATCH IS A DEPTH PROBLEM, NOT A BREADTH ONE (measured 2026-08-18, UserTotalU)
+## A HINT-DATABASE DISPATCH IS A DEPTH PROBLEM, NOT A BREADTH ONE
 
 `UserTotalU`'s two dispatch tables discharge ~98 per-family `goodmb`
 obligations through one tactic that ends in `eauto … with u_gm`, where
 `u_gm` holds the ~80 twins of P5's catalogue plus the gpr-index side
 conditions.  Breadth is cheap — a twin whose head instruction does not match
-fails its `apply` immediately — but DEPTH is not: at `eauto 6` each call
-site cost **~15 s** and the file took **half an hour**; at `eauto 3` it is a
-few seconds each.  The obligation is only ever "apply the family's twin,
-then its side conditions, then at most one step inside one", so 3 is the
-real bound and everything above it is backtracking through side conditions
-that were already going to fail.
+fails its `apply` immediately — but DEPTH is not: at `eauto 6` the file took
+half an hour; at `eauto 3` it is trivial.  The obligation is only ever "apply
+the family's twin, then its side conditions, then at most one step inside one",
+so 3 is the real bound and everything above it is backtracking through side
+conditions that were already going to fail.
 
 Two companion rules from the same measurement:
 
