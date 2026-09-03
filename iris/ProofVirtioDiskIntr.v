@@ -1471,7 +1471,7 @@ Section VtDevRam.
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       (TsoCtx.hart_view_lb (CID := CID) V0 ∗ ⌜(q0 <= V0)%nat⌝ ∗
        ([∗ list] j ∈ seq 0 4,
-          phys_ledger_at (pa_add ea j) (DfracOwn 1) (nth_byte head j) q0) ∗ W) -∗
+          ledger_le (pa_add ea j) (nth_byte head j) q0) ∗ W) -∗
       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
          (exists v : mword 32,
             tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
@@ -1496,13 +1496,13 @@ Section VtDevRam.
                tso_read img log (hart_agent (@cpu_id CIDw)) tvr (pa_add ea j)
                = Some (nth_byte head j)⌝)%I as %Hrd.
     { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
-      iDestruct (big_sepL_lookup _ (seq 0 4) j j with "Hcells") as "Hc".
+      iDestruct (big_sepL_lookup _ (seq 0 4) j j with "Hcells") as (t) "[%Ht Hc]".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (TsoCtx.ledger_read_at_vis_ok (CID := CIDw)
                    (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
-                   (pa_add ea j) (DfracOwn 1) (nth_byte head j) q0 V0
+                   (pa_add ea j) (DfracOwn 1) (nth_byte head j) t V0
                    with "Hgh Htso HV0 [] Hc") as %H.
-      { iApply TsoCtx.ledger_vis_below. exact Hq0V. }
+      { iApply TsoCtx.ledger_vis_below. lia. }
       iPureIntro. exact H. }
     cbn in Hrd.
     assert (H4N : Z.to_N 4 = 4%N) by reflexivity.
@@ -1528,7 +1528,7 @@ Section VtDevRam.
       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
       (TsoCtx.hart_view_lb (CID := CID) V0 ∗ ⌜(q0 <= V0)%nat⌝ ∗
-       phys_ledger_at ea (DfracOwn 1) b q0 ∗ W) -∗
+       ledger_le ea b q0 ∗ W) -∗
       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
          (exists v : mword 8,
             tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
@@ -1540,7 +1540,7 @@ Section VtDevRam.
     intros CIDw img sigma log V ppn Hcan Hoff Hid Hcid.
     pose proof (Hcid (or_introl eq_refl)) as Hceq.
     rewrite (ktier_pin_id ppn _ Hid).
-    iIntros "#Hk Hgh Htso Hctx (#HV0 & %Hq0V & Hc & _)".
+    iIntros "#Hk Hgh Htso Hctx (#HV0 & %Hq0V & (%t & %Ht & Hc) & _)".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
                sigma.(sregs) sigma.(mdev) Hpin).
@@ -1550,9 +1550,9 @@ Section VtDevRam.
     iEval (rewrite Hagent) in "HV0".
     iDestruct (TsoCtx.ledger_read_at_vis_ok (CID := CIDw)
                  (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
-                 ea (DfracOwn 1) b q0 V0
+                 ea (DfracOwn 1) b t V0
                  with "Hgh Htso HV0 [] Hc") as %Hrd.
-    { iApply TsoCtx.ledger_vis_below. exact Hq0V. }
+    { iApply TsoCtx.ledger_vis_below. lia. }
     assert (H1N : Z.to_N 1 = 1%N) by reflexivity.
     iPureIntro. intros tvr Htvr. split.
     - exists b. intros j Hj. rewrite H1N in Hj.
@@ -1644,7 +1644,7 @@ Section VtDevRam.
       by (rewrite -Hceqp; exact Hspop).
     iAssert (⌜addr_is_ram (pa_add (used_elem_pa (v_cfg vstp) u) 0)⌝)%I as %Hram.
     { iDestruct "Hw4p" as "(Hc & _)".
-      iDestruct (phys_ledger_at_ledger with "Hc") as "Hc".
+      iDestruct (ledger_le_ledger with "Hc") as "Hc".
       iApply (phys_ledger_ram with "Hc"). }
     rewrite -Haddrp pa_add_zero in Hram.
     iDestruct (vt_claim_of_ram 4 (pa_add pu (vt_uoff u)) Halign
@@ -1662,11 +1662,9 @@ Section VtDevRam.
               (fun w _ => w = head)
               (TsoCtx.hart_view_lb (CID := CID) V0 ∗ ⌜(q0 <= V0)%nat⌝ ∗
                ([∗ list] j ∈ seq 0 4,
-                  phys_ledger_at (pa_add (pa_add pu (vt_uoff u)) j) (DfracOwn 1)
-                    (nth_byte head j) q0) ∗
+                  ledger_le (pa_add (pa_add pu (vt_uoff u)) j) (nth_byte head j) q0) ∗
                (([∗ list] j ∈ seq 0 4,
-                   phys_ledger_at (pa_add (pa_add pu (vt_uoff u)) j) (DfracOwn 1)
-                     (nth_byte head j) q0) -∗
+                   ledger_le (pa_add (pa_add pu (vt_uoff u)) j) (nth_byte head j) q0) -∗
                 |={⊤ ∖ ↑minstretN ∖ ↑diskN, ⊤ ∖ ↑minstretN}=>
                   disk_pub γd np ∗ disk_read_at γd u ∗ ghost_map_auth (dn_claim γd) 1 cm))%I
               (disk_pub γd np ∗ disk_read_at γd u ∗ ghost_map_auth (dn_claim γd) 1 cm)%I
@@ -2567,7 +2565,7 @@ Section VtBody.
       as "(_ & _ & _ & (%qp & #Hposp & Hstp & Hbackp))".
     iEval (rewrite Hstatus) in "Hstp".
     iAssert (⌜addr_is_ram (d_info_status h)⌝)%I as %Hram.
-    { iDestruct (phys_ledger_at_ledger with "Hstp") as "Hc".
+    { iDestruct (ledger_le_ledger with "Hstp") as "Hc".
       iApply (phys_ledger_ram with "Hc"). }
     iDestruct (vt_claim_of_ram 1 (d_info_status h) (is_aligned_paddr_1 _) Hstk Hstc Hram
                  with "Hkm") as "#Hcl".
@@ -2585,8 +2583,8 @@ Section VtBody.
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false
               (fun w _ => w = (byte_zero : SailStdpp.Values.mword 8))
               (TsoCtx.hart_view_lb (CID := CID) V0 ∗ ⌜(q0 <= V0)%nat⌝ ∗
-               phys_ledger_at (d_info_status h) (DfracOwn 1) byte_zero q0 ∗
-               (phys_ledger_at (d_info_status h) (DfracOwn 1) byte_zero q0 -∗
+               ledger_le (d_info_status h) byte_zero q0 ∗
+               (ledger_le (d_info_status h) byte_zero q0 -∗
                 |={⊤ ∖ ↑minstretN ∖ ↑diskN, ⊤ ∖ ↑minstretN}=>
                   disk_pub γd np ∗ disk_read_at γd u ∗ ghost_map_auth (dn_claim γd) 1 cm))%I
               (disk_pub γd np ∗ disk_read_at γd u ∗ ghost_map_auth (dn_claim γd) 1 cm)%I

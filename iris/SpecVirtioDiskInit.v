@@ -42,7 +42,7 @@
        half, [disk_cfg_is γv (DfracOwn (1/2)) c0], and hence knows
        deterministically which configuration the function has programmed so far
        even though the state itself lives under an invariant.  The device never
-       writes [v_cfg] ([virtio_req_step_cfg]), so the pair is stable across
+       writes [v_cfg] ([virtio_complete_cfg]), so the pair is stable across
        device steps.  [⌜virtio_live c0 = false⌝] is what says the invariant is
        in its not-live arm at entry -- which the reset (STATUS <- 0) would
        re-establish anyway, but which the FIRST reads need before the reset.

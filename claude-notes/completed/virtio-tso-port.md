@@ -97,6 +97,31 @@ the T-leg's): `phys_ledger{,_at,_pin}`, `ledger_store_ok`,
 8. `WpVirtio.dma_own` is at `phys_ledger` now; `dma_update`/`phys_map_store`
    are DELETED (inside-out: the loop stores via `ledger_store_rel_map_ok`).
    `virtio_lease_acc` keeps the pop `i` argument, hands out/back ledger maps.
+9. **STAGED DEVICE WRITES under the seal (2026-09-03).** The device serves a
+   request one bus transaction per `disk_step` arm (`design/device.md`): the
+   fill / status byte / used element are `DiskStepWrite`s, each with its own
+   write set, and the completion writes ONLY the index word (`w = snap_of
+   (used_idx_pa c) 2 (wrap16 (S nc))`, `used_idx_writes_snap`). Under the
+   seal that means: a write transaction takes its old cells out of the
+   SEALED lease (`dma_acc_x` — the cells are off the hole, `pend_done_hole`)
+   and the loop appends them with plain `TsoCtx.ledger_store_ok`, resealing
+   the stamped result at once (`phys_ledger_at_ledger`); nobody needs the
+   stamp yet. The completion takes the record's footprint out
+   (`dma_own_x_take`, as before), and since it wrote none of those bytes, the
+   record's map is READ OFF the pending slot's stage facts
+   (`slot_done_map_of_stage`, `VirtioQueue.slot_stage_ok`). The loop bounds
+   every sealed cell's hidden stamp by the log length BEFORE its append
+   (`VirtioProto.phys_map_ledger_le`, via `TsoCtx.ledger_latest_ok` +
+   `log_byte_some_le`) and appends the index word alone through
+   `ledger_store_rel_map_ok` with `old = ∅`. So a done record's cells are
+   **`ledger_le a b q := ∃ t ≤ q, phys_ledger_at a … t`** at the completion's
+   position `q` (`slot_done_cells`, `chain_back_at`, the two peeks) rather
+   than `phys_ledger_at … q`. Every reader still cashes with what it had:
+   the handler's racy reads use `ledger_vis_below` at `t ≤ q ≤ V0`
+   (`ProofVirtioDiskIntr.vt_used_elem_read_ok`/`vt_byte_read_ok`), the
+   collector re-enters through `ctx_floor_le` at `t ≤ qc ≤ F`
+   (`DiskAvail.ctx_bytes_of_le_seq`). Nothing about the release window
+   changed: the index word is still the only thing the completion appends.
 
 ## THE ROW DESIGN (owner-directed, 2026-09-01 evening; IMPLEMENTED the same night): the two driver cells move to the vdisk-lock payload
 

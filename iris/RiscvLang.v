@@ -449,8 +449,8 @@ Inductive mobs :=
 (*   not confined to the device fabric: [disk_step] therefore carries the    *)
 (*   byte memory -- and since the machine flip it carries it as the WRITE    *)
 (*   SET the step produced, not as the post-state map                        *)
-(*   (tso-machine-flip.md §6 amendment A6.11).  [DiskStepDma] yields the     *)
-(*   DMA's own [w] (VirtioModel.virtio_req_step); every other arm yields     *)
+(*   (tso-machine-flip.md §6 amendment A6.11).  [DiskStepWrite] and           *)
+(*   [DiskStepComplete] yield their own [w] (VirtioModel section 6); every   *)
 (*   [∅].  THE OLD SHAPE WAS A WEAKER MACHINE THAN THE DEVICE CONTRACT       *)
 (*   INTENDS: with the post-state map as the index, the prim_step arm had to *)
 (*   re-existentialise a [W] tied only by [W ∪ m = m'], which does not       *)
@@ -529,46 +529,69 @@ Proof. intros H. destruct H; reflexivity. Qed.
    the log arm needs in order NOT to publish a message. *)
 Inductive disk_step (d : dev_state) (m : gmap Arch.pa (bv 8))
     : dev_state -> gmap Arch.pa (bv 8) -> Prop :=
-  (* The disk masters the bus.  It does not read the byte MAP -- it reads a
-     total VIEW of the bus that agrees with the map wherever the map is
-     defined and is UNCONSTRAINED everywhere else (VirtioModel section 4), and
-     the view is quantified here, existentially.  So a DMA read of an address
-     nobody has accounted for returns an arbitrary byte, which is what a real
-     bus does, and what forces a driver proof to account for every address it
-     hands the device. *)
-  | DiskStepDma (mv : vmem) (i : bv 16) v' w :
-      mem_view m mv ->
-      virtio_req_step d.(dvirtio) mv i = Some (v', w) ->
-      disk_step d m (set_dvirtio d v') w
-  (* THE DISK HAS A VOLATILE WRITE-BACK CACHE
-     (claude-notes/projects/async-disk.md), so an outstanding WRITE request
-     reaches the durable image in two separate autonomous actions.  FIRST the
-     CAPTURE: the device reads the driver's data buffer off the bus (hence
-     the same existentially-quantified view as [DiskStepDma]) and deposits
-     every sector of it in its own cache.  WHICH request it picks up is
-     existentially quantified too ([i]): the device serves the available ring
-     in whatever order it finishes, which is what a device with more than one
-     request in flight does (tools/vtest/README.md finding 5).  It writes NO byte memory, produces
-     no used-ring entry, raises no interrupt, and -- the point -- moves no
-     DURABLE disk byte: a crash here loses the whole request. *)
-  | DiskStepCapture (mv : vmem) (i : bv 16) v' :
-      mem_view m mv ->
-      virtio_capture_step d.(dvirtio) mv i = Some v' ->
-      disk_step d m (set_dvirtio d v') ∅
-  (* THE POP: the device takes the next available-ring entry.  This is the
+  (* A request's lifecycle is a sequence of SEPARATE memory events
+     (VirtioModel section 6): the POP reads the ring entry; the FETCH reads
+     the descriptor chain and the header; a write's payload is READ at the
+     capture; then the device WRITES the data buffer (for a read), the status
+     byte, the used-ring element -- one [DiskStepWrite] each -- and finally
+     the used index ([DiskStepComplete]).  So a hart, and the memory model,
+     see every intermediate state: the index bump a driver waits for is
+     ordered last because it IS last, not because a single transition put it
+     there.  Which in-flight request each step advances is the device's
+     choice ([h]): it serves what it has popped in whatever order it
+     finishes (tools/vtest/README.md finding 5).
+
+     THE POP: the device takes the next available-ring entry.  This is the
      phase that is STRICTLY IN ORDER -- QEMU's [virtqueue_pop] increments
      [last_avail_idx] by one -- and it is what xv6's reuse of
      [avail->ring[idx % NUM]] depends on: the entry the driver overwrites
-     belonged to a position the device is provably past.  It reads the
-     available index off the bus and moves no other byte: no memory write,
-     no used-ring entry, no interrupt, no disk byte.  WHICH requests then
-     complete, and in what order, is the separate freedom of
-     [DiskStepDma] (tools/vtest/README.md finding 5). *)
+     belonged to a position the device is provably past.
+
+     The disk masters the bus.  It does not read the byte MAP -- it reads a
+     total VIEW of the bus that agrees with the map wherever the map is
+     defined and is UNCONSTRAINED everywhere else (VirtioModel section 4),
+     and the view is quantified here, existentially.  So a DMA read of an
+     address nobody has accounted for returns an arbitrary byte, which is
+     what a real bus does, and what forces a driver proof to account for
+     every address it hands the device.  The three READING arms -- pop,
+     fetch, capture -- all take such a view; nothing after the fetch reads
+     the bus again. *)
   | DiskStepPop (mv : vmem) v' :
       mem_view m mv ->
       virtio_pop_step d.(dvirtio) mv = Some v' ->
       disk_step d m (set_dvirtio d v') ∅
-  (* ...and THEN the DRAINS: one cached 512-byte sector reaches the durable
+  (* THE FETCH: the chain and the request header are read, once, and the
+     parsed request is kept.  A malformed chain has no fetch, which is the
+     wild arm's case below. *)
+  | DiskStepFetch (mv : vmem) (h : bv 16) v' :
+      mem_view m mv ->
+      virtio_fetch_step d.(dvirtio) mv h = Some v' ->
+      disk_step d m (set_dvirtio d v') ∅
+  (* THE DISK HAS A VOLATILE WRITE-BACK CACHE
+     (claude-notes/completed/async-disk.md), so an outstanding WRITE request
+     reaches the durable image in two separate autonomous actions.  FIRST the
+     CAPTURE: the device reads the driver's data buffer off the bus and
+     deposits every sector of it in its own cache.  It writes NO byte memory,
+     produces no used-ring entry, raises no interrupt, and -- the point --
+     moves no DURABLE disk byte: a crash here loses the whole request. *)
+  | DiskStepCapture (mv : vmem) (h : bv 16) v' :
+      mem_view m mv ->
+      virtio_capture_step d.(dvirtio) mv h = Some v' ->
+      disk_step d m (set_dvirtio d v') ∅
+  (* ONE WRITE TRANSACTION into the driver's memory: a read's data buffer,
+     the status byte, or the used-ring element ([VirtioModel.virtio_write_step]
+     says which, from the request's phase).  No view: the bytes a read
+     delivers are the device's own, and the request was parsed at the
+     fetch.  Under TSO each of these is its OWN message on the era log. *)
+  | DiskStepWrite (h : bv 16) v' w :
+      virtio_write_step d.(dvirtio) h = Some (v', w) ->
+      disk_step d m (set_dvirtio d v') w
+  (* THE COMPLETION: the used index -- the last of a request's transactions
+     and the one the driver waits for; the interrupt goes up here. *)
+  | DiskStepComplete (h : bv 16) v' w :
+      virtio_complete_step d.(dvirtio) h = Some (v', w) ->
+      disk_step d m (set_dvirtio d v') w
+  (* ...and THE DRAINS: one cached 512-byte sector reaches the durable
      image per step, in ANY order, at times of the device's own choosing --
      so a power cycle between two of them leaves a half-written BLOCK on the
      disk, which is exactly what real hardware does
@@ -581,15 +604,17 @@ Inductive disk_step (d : dev_state) (m : gmap Arch.pa (bv 8))
   | DiskStepDrain (s : Z) v' :
       virtio_drain_step d.(dvirtio) s = Some v' ->
       disk_step d m (set_dvirtio d v') ∅
-  (* ... and when the queue the driver published is MALFORMED, the device may
-     do anything at all: [w] is arbitrary, so this constructor lets the disk
-     scribble over any address in the machine.  That is the honest reading of
-     a driver-must-not obligation.  An earlier model instead had the device
-     quietly do NOTHING, which let a driver that misconfigured the queue
-     satisfy its DMA obligation vacuously and be verified anyway.
-     [wp_disk_loop] can only be proven by REFUTING this case from the disk
-     invariant, so queue well-formedness becomes a standing obligation on the
-     driver rather than a gift from the model. *)
+  (* ... and when the queue the driver published is MALFORMED -- a popped
+     head whose chain does not parse, or a ring entry naming a head still
+     in flight -- the device may do anything at all: [w] is arbitrary, so
+     this constructor lets the disk scribble over any address in the
+     machine.  That is the honest reading of a driver-must-not obligation.
+     An earlier model instead had the device quietly do NOTHING, which let a
+     driver that misconfigured the queue satisfy its DMA obligation
+     vacuously and be verified anyway.  [wp_disk_loop] can only be proven by
+     REFUTING this case from the disk invariant, so queue well-formedness
+     becomes a standing obligation on the driver rather than a gift from the
+     model. *)
   | DiskStepWild (mv : vmem) (w : gmap Arch.pa (bv 8)) :
       mem_view m mv ->
       virtio_stalled d.(dvirtio) mv = true ->

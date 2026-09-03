@@ -511,8 +511,8 @@ GHOST mirror deliberately is not.
     sleeper's `disk_bytes` fragments sit in the per-era `disk_inv`, so a
     crash abandons them together with the auth that remembers their keys.
     Nothing is lost, because the next boot's map is brand new.
-- `v_disk` changes in exactly ONE place (the device thread's DMA
-  completion of an OUT slot, `vslot_post`), so that step carries the only
+- `v_disk` changes in exactly ONE place (the device thread's drain of a
+  cached sector; the completion, `virtio_complete`, moves no disk byte), so that step carries the only
   crash obligation in the whole kernel: `wp_disk_loop` opens `crash_inv`,
   `permN` and `disk_inv` together (disjoint namespaces) at that instant,
   does the MECHANICAL update of the FS tie's two halves (it is the only

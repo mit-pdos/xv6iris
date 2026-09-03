@@ -633,12 +633,14 @@ it and not completed it, and afterwards exactly that head is gone from
 **The device-side design is QEMU's two-phase lifecycle** (design/virtio-driver.md
 has the rules): `virtio_pop_step` takes available-ring entries strictly in
 order (`v_seen` is the pop index) and what it takes is the DESCRIPTOR HEAD the
-entry names; `v_inflight : gset (bv 16)` is the set of heads popped and not
-yet completed; `virtio_req_step`/`virtio_capture_step` take the head as a
-parameter and are enabled exactly when it is in flight; `v_taken` names the
+entry names; `v_inflight : gmap (bv 16) vphase` is the map of heads popped and not
+yet completed, each with how far along it is; `virtio_fetch_step`/
+`virtio_capture_step`/`virtio_write_step`/`virtio_complete_step` take the
+head as a parameter and are enabled exactly when it is at the right phase; `v_taken` names the
 head whose payload is latched, and a completion releases the latch only if it
 held it.  On the vtest side (`VSched.v`) that is one `SDiskPop` item per
-published request plus `SDiskCapture h`/`SDiskDma h` keyed by head; the eager
+published request plus `SDiskFetch h`/`SDiskCapture h`/`SDiskWrite h`/
+`SDiskDma h` keyed by head; the eager
 schedule pops first, and `run_until`/`run_until_rev` differ only in
 `lowest_head` versus `highest_head`.
 
@@ -650,7 +652,7 @@ behind a used index, `vp_nr`/`vpo_done_uix` for "the used ring never
 overwrites an unread element", the lock-held claim map as the handler's
 carrier, and the ring window as a pigeonhole over heads).
 
-Finding 4's fix IS local — `virtio_used_writes` needs the request type to
+Finding 4's fix IS local — `virtio_used_elem_writes` needs the request type to
 choose between `1` and `vr_len r + 1` — but it still moves a definition in
 `VirtioModel.v`, whose reverse-dependency closure is **1286 files** (942 of
 them built at the time of writing).  Both fixes want to be made together, once.

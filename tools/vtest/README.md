@@ -533,7 +533,7 @@ them are one modelling shortcut seen from different sides.
 | 14 | virtio `QueueReset` (0x0c0) and the SHM registers (0x0ac..) | not decoded -- STUCK | `QueueReset` reads 0 (this device does not offer `RING_RESET`); every SHM region reads all-ones, which is how the transport says a region does not exist | incompleteness | `disk_ident_qreset`, `disk_ident_shmsel` |
 | 15 | sub-word access anywhere in the virtio window | not decoded -- STUCK | the transport is 32-bit: a 1- or 2-byte read reaches no register and answers 0, and a narrow write is dropped | incompleteness | `disk_ident_rd1/rd2/wr1` |
 | 16 | a per-queue write with `QueueSel` /= 0, and `QueueNotify` /= 0 | REFUSED -- STUCK | both accepted and ignored.  What kept the queue geometry legal was never the refusal but `virtio_live`'s own conditions | incompleteness | `disk_ident_qsel`, `disk_ident_notify` |
-| 5 | **the completion ORDER of two in-flight requests** | publication order ONLY -- `virtio_req_step` read the chain at `v_seen` and handed back `v_seen + 1`, so no schedule could reorder | EITHER order, and the model now has both: the device POPS available-ring entries in order (`virtio_pop_step`, `v_inflight` = the popped heads) and completes ANY in-flight head (`virtio_req_step` takes the head), `VSched` picks which, and `DiskOrder.v` exhibits the two executions against the two captures.  The Iris driver proofs are ported to it (design/virtio-driver.md) | **UNSOUNDNESS**, RESOLVED | `disk_order` |
+| 5 | **the completion ORDER of two in-flight requests** | publication order ONLY -- `virtio_req_step` read the chain at `v_seen` and handed back `v_seen + 1`, so no schedule could reorder | EITHER order, and the model now has both: the device POPS available-ring entries in order (`virtio_pop_step`, `v_inflight` = the popped heads) and completes ANY in-flight head (`virtio_complete_step` takes the head), `VSched` picks which, and `DiskOrder.v` exhibits the two executions against the two captures.  The Iris driver proofs are ported to it (design/virtio-driver.md) | **UNSOUNDNESS**, RESOLVED | `disk_order` |
 
 **Finding 10 was the serious one of the PLIC three**, and the only PLIC
 finding that was not mere incompleteness: the threshold appeared in `plic_eip`
@@ -612,7 +612,7 @@ input than the machine, never fewer:
 Finding 4 is the one worth acting on.  The spec defines the used element's
 `len` as the number of bytes written into the DEVICE-WRITABLE part of the
 chain -- the status byte alone for a write request, the data buffer plus the
-status byte for a read.  `VirtioModel.virtio_used_writes` writes the data
+status byte for a read.  `VirtioModel.virtio_used_elem_writes` writes the data
 descriptor's length regardless of direction, which is a value no real device
 produces.  Nothing in the tree has noticed because xv6's driver ignores the
 field.  The fix needs the request TYPE at that point, so it is local; what
@@ -642,8 +642,9 @@ live in xv6: `virtio_disk_intr` reads each used element's ID and wakes
 What the model does now (VirtioModel.v section 5b): the device POPS
 available-ring entries strictly in order (`virtio_pop_step`; `v_seen` is the
 pop index and `v_inflight` the set of popped, uncompleted descriptor HEADS)
-and CAPTURES/COMPLETES any in-flight head (`virtio_capture_step` /
-`virtio_req_step` take the head).  `VSched`'s eager schedules differ only
+and serves any in-flight head one bus transaction at a time
+(`virtio_fetch_step` / `virtio_capture_step` / `virtio_write_step` /
+`virtio_complete_step` take the head).  `VSched`'s eager schedules differ only
 in which in-flight head they pick (`lowest_head` / `highest_head`), and
 `DiskOrder.v` proves the model admits both captured orders
 (`disk_order_admits_inorder`, `disk_order_admits_reordered`,
