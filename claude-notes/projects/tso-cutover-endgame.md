@@ -399,6 +399,9 @@ L7. (If §9 item 24 rules: the ftable keeps ONLY the λ-flip; no floor slot,
     dead `<{ itable_res }>` (delete).
 
 L6. **R4b: THE OFF BOX** (`OffBox.v`, skeleton type-checked, 14 Admitted).
+    **ALTERNATIVE for the reviewers (§9 item 26): no box at all -- a per-slot
+    three-arm invariant plus a monotone stamp row per (inode, file slot) in
+    the inode payload; item 24 stands until they answer.**
     **RE-CUT PROPOSED (§9 item 24, for ruling): the cell is at the
     VISIBILITY-FREE tier whenever no one needs it (§0.26′), so the box has NO
     L1 side -- born at the publish after the free-tier store of zero, the
@@ -518,6 +521,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | Q10 | the last close's (a) must not consume iput's pin name-half: the hooked (a) moves the frozen alternative's own pin into `Q1 1` (option B); no ghost change; `ic_hdr_frz` carries `ifreeze_pre` out and needs a `CtxMorph` instance | RULED B by reviewer 1, confirmed by the box's designer (item 9); to land in ProofIput |
 | §6²⁷ | run L2/L3/L4 in parallel now; sweep the file layer once; two tripwires before r21 | RECOMMENDED to the owner |
 | item 24 | the off cell at the visibility-free tier while unneeded: no L1 side for the off box, `box_withdraw_L1_free`, shares at the fd fraction, no ftable floor row; `box_alloc_out_l2_at` withdrawn; the protocol chain file as a gate | PROPOSED (R1-R5), awaiting the owner; reviewer 1 ENDORSES R1-R5 (item 25) with five shape notes (free withdraw is a genuine statement; `off_free` split lemma; ∃-bound `T₀`; the publish order; shared namespace) |
+| item 26 | ALTERNATIVE to the off box: a per-slot three-arm invariant (cell / marker / free) with two tokens and a per-(inode, file slot) mono_nat row in the inode payload; no box, no fresh names, no set, no CtxBox change; ~a wash in proof volume, simpler in coupling | QUESTION to reviewers 1 and 2 (owner, 2026-09-02); item 24 stands until answered |
 | item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RULED -- reviewer 1 agrees (item 17), with `file_core_off`'s FD_INODE arm named as the FIFTH final shape and "0 Admitted in `EnvMorph`" added to r25's gate |
 | item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; the two fixes LANDED (item 20) -- reviewer 2's audit next |
 | item 21 | reviewer 2's audit of d53e4a4e5: NOT signed off -- (1) the cell claimed twice and the unit unowned at non-FD_INODE arms (unit unconditional; `file_core_off := emp`; the free arm holds `off_resident`; the L2 half rides the FD_NONE unit); (2) `file_pay_st_split` false (one-sided over a unitless `file_pay_tie`); (3) the three ghost steps, the last-close pair, `so_deposit`, `so_open_slot` not at final shape; plus `ftable_res_at`'s fold/unfold pair | AUDITED by reviewer 2; fixes pending |
@@ -1572,6 +1576,134 @@ branch and recorded in §3.2 and §8 here.
       landed, the publish birth, fileread's checkout/park, the last close's
       free withdraw, `file_core_off` at the six file proofs, `fp_obox` at
       six `MkFPNames` sites.
+
+26. **THIRD REVIEWER (2026-09-02): AN ALTERNATIVE TO THE OFF BOX, FOR THE
+    REVIEWERS TO ASSESS -- with the free tier at the last close, the cell
+    needs no box at all: a per-slot three-arm invariant plus a monotone
+    stamp row in the inode payload.  Recorded at the owner's request as a
+    QUESTION to reviewers 1 and 2 ("is this simpler than item 24?"), not as
+    a proposal that supersedes it; item 24 as endorsed in item 25 stands
+    until they answer.**
+
+    THE OBSERVATION BEHIND IT (the owner's, continuing item 24): once the
+    last close needs only the cell's future half, everything the box exists
+    for is gone for this cell -- no identity change (the identity is the
+    file slot, forever), no L1 floor side (the free tier), no per-holder
+    stamps (nothing on the fd side is ever absorbed).  What remains is (i) a
+    rendezvous any party can open, because the registered pointsto cannot
+    sit in the OLD inode's payload at the last close and cannot be re-minted
+    for the same address; and (ii) the floor for the parked stamp, delivered
+    by the inode lock's acquire.  (i) is a plain per-slot invariant; (ii) is
+    a MONOTONE number, and monotone things may sit in an inode payload
+    forever without ever needing to come back -- which is exactly what
+    forced fresh box names, the append-only set and the membership witness
+    (§6⁗, P4) in the box design.
+
+    THE SHAPES.  Per file slot k, one persistent invariant born at boot,
+    with a permanent parked context and three arms; two ghost tokens per
+    slot (`ftok k q`, `otok k q`, both `ghost_var … q ()`); one mono_nat per
+    (inode slot i, file slot k) in the inode payload:
+      off_inv k := inv (offN.@k) (∃ ξb T, ctx_parked ξb T ∗
+         (  (* IN   *) ∃ pn, fpay_tok γ k ε pn ∗ off_resident (XI:=ξb) k ∗ otok k 1
+                             ∗ mono_nat_lb (γst (fp_islot pn) k) T
+          ∨ (* OUT  *) ∃ pn q, fpay_tok γ k ε pn ∗ mono_nat_auth (γst (fp_islot pn) k) ½ _ ∗ ftok k q
+          ∨ (* FREE *) ftok k 1 ))
+      off_row i k ξ := ∃ T, mono_nat_auth (γst i k) 1 T ∗ llb T ∗ ctx_floor ξ T
+      ic_slp cn i ξ := … ∗ [∗ list] k ∈ seq 0 NFILE, off_row i k ξ        (a LIST, not a set)
+      file_core_off k q pn C := if FD_INODE then ftok k q else off_free k q ∗ otok k q
+      fpnames gains fp_islot : nat (the inode SLOT, set at the publish)
+    The invariant's arms hold ghost, a parked-record cell (0.26′'s
+    invariant principle: data beside a stamp, claimable by bound-raising)
+    and persistent lower bounds; no counts, no stamps map, no registers.
+
+    THE SITES, each with the arm it SELECTS from what it holds (the
+    per-arm producer line and the self-absorb line, applied):
+      sys_open publish (ip->lock, q = 1): store zero on the free cell
+          (`wp_store_s_sconf_free_gen`: registered at ξ).  Open the inv:
+          refute IN by `otok 1` (gathered from the FD_NONE arm at q = 1),
+          refute OUT by `ftok 1`, select FREE.  Raise row (i,k)'s auth (in
+          the held payload) to the deposit stamp, `ctx_deposit` the cell,
+          mint `mono_nat_lb`, leave IN with `otok 1` and an ε of `fpay_tok`;
+          take `ftok 1` out and distribute it over the fd fractions.  No
+          floor (a deposit).  The creator still holds `fpay_tok` whole after
+          `fdalloc` (item 25 note 4), so `fp_islot` can be set here.
+      fileread / filewrite checkout (ip->lock): refute FREE by `ftok q`,
+          refute OUT by the row's auth at 1 (OUT holds ½ at the same γ:
+          `fpay_tok_agree` on the ε makes `fp_islot pn` the reader's inode),
+          select IN.  `mono_nat_lb_own_valid`: the arm's T ≤ the row's
+          value, so the row's `ctx_floor ξ` covers T and `ctx_absorb` brings
+          the cell to ξ.  Take `otok 1`; leave OUT with half the auth and
+          the fd's `ftok q`.  THE ONE ABSORB, after the ilock acquire.
+      park (ip->lock): refute IN by `otok 1`, refute FREE by `ftok`, select
+          OUT.  Rejoin the auth, raise it to the fresh deposit stamp,
+          `ctx_deposit` the cell with the new lb, leave IN, take the `ftok`
+          fraction back.  The `_in` release folds the row's floor (as
+          today's `ic_slp_fold`).
+      filedup / fileclose non-last (ftable.lock): pure fraction split /
+          join of `file_pay`.  The invariant is not touched.
+      fileclose last (ftable.lock only, q = 1 gathered): refute FREE by
+          `ftok 1`, refute OUT by `ftok 1` against the reader's fraction,
+          select IN.  `ctx_pointsto_free` on the parked cell at ξb (a plain
+          entailment, no floor, no `own_context`), giving `off_free k 1`;
+          take `otok 1` and the ε back; leave FREE with `ftok 1`.  Row
+          (i_old, k) keeps its auth forever.
+      pipealloc / device retype / fdalloc-failed close: the cell is at the
+          free tier in `file_core_off`'s non-INODE arm; nothing happens.
+    Rows: the reader's floor is R1's acquire-transported payload floor (the
+    row); every `_in` release re-floors through the fold (R2).  Two routes,
+    as the law requires.  Every absorb has an acquire in front of it.
+
+    WHAT IT DELETES relative to item 24 (as endorsed in item 25): all of
+    `OffBox.v` and the third box instance; `box_withdraw_L1_free` (item 25
+    note 1 says it is a genuine ninth statement, so CtxBox stops growing);
+    fresh box names per publish, `box_names`' Countable instance,
+    `fp_obox`, `off_member`, the append-only set and its take/insert, the
+    shared-namespace note (note 5); the share masses and the split-by-mass
+    lemma; the ∃-bound birth stamp in register fractions (note 3).  `off_free`'s
+    fractional split (note 2) is still needed.  The `ic_slp` conjunct stays
+    one conjunct (a list fold instead of a set fold); the seven inode
+    proofs' edit is unchanged in kind.
+    WHAT IT ADDS: one new file (`FileOffInv.v`, ~350-450 lines: the
+    definitions, four site lemmas, the row fold, morph instances, boot
+    allocation); two `ghost_var` families per file slot and a mono_nat per
+    (inode slot, file slot) -- 5000 names, allocated at boot in `icfg`.
+
+    THE HONEST COMPARISON (the owner asked "is it simpler than the box?"):
+      proof volume     about a wash: item 24 keeps ~350 proven lines of
+                       OffBox's L2 side and adds ~100 (one CtxBox lemma,
+                       three small lemmas); this route writes ~400 new
+                       unproven lines and throws the proven L2 side away
+      CtxBox           item 24: one more statement + a ruling; this: none
+      fd-side ghost    item 24: is_box, membership, two register fractions
+                       with an ∃-bound stamp, a share at mass q, fp_obox;
+                       this: one ghost_var fraction and fp_islot
+      per-publish      item 24: fresh names, set insert; this: raise one
+                       mono_nat already in the payload
+      review cost      item 24: two reviewers already agree; this: an
+                       exception to law 5 / R4b's "no bespoke third
+                       mechanism", the designer's consent needed
+      what it removes  the seam that produced items 19, 21, 22, 23 and
+                       notes 2-3: the fd side carries no stamps and no
+                       masses, so that class of defect has nowhere to live
+      argument size    fits on one page and depends on nothing in CtxBox;
+                       a reviewer checks four lemmas end to end without
+                       the box law
+    My sense: marginally simpler overall, with the margin in the right
+    place (coupling, not lines), but not a large win, and it costs a review
+    round plus a rewrite of proven code.  If velocity this week matters
+    most, item 24 as endorsed is the faster landing.  If the team is
+    willing to hold the line that `f->off` is the LAST cross-lock cell (so
+    the box stays a two-instance mechanism and nobody argues for a fourth
+    box later), this route is the cleaner one.  Either way, R5 (the
+    protocol chain file, with item 25's fork-then-child-read link) applies
+    unchanged; under this route its links are the five sites above.
+
+    QUESTIONS TO REVIEWERS 1 AND 2: (a) do you agree the two designs are
+    proof-equivalent in volume and that the difference is coupling?  (b) is
+    the law-5 exception acceptable on the argument that the box's generic
+    machinery serves identity change and L1 floors, neither of which this
+    cell has under the free tier?  (c) any arm above whose selector you
+    cannot name from what the party holds?  (d) which route lands first?
 
 17. **REVIEWER 1 ON ITEM 16 (2026-09-02): the three corrections and the
     four tripwires are taken; two additions.**
