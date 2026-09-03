@@ -84,26 +84,12 @@ Section EnvCaches.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
 
-  (* the icache's NINODE inode sleeplocks, under their two gname
-     existentials; the payload λ is [ic_slp cn k] ([ic_slp_morph]). *)
-  Global Instance ic_sleeplocks_morph (cn : ic_names) :
-    CtxMorph (λ ξ : CtxId, (ic_sleeplocks (XI := ξ) cn : iProp Σ)).
-  Proof. rewrite /ic_sleeplocks. ctx_morph_solve. Qed.
 
-  (* NO [is_itable2] ROW, and the reason is a SHAPE defect, not a missing
-     lemma.  Its lock payload is
-       [fun ξ0 => itable_res2 (XI := ξ) ξ0 cn γfs γi cov logstart nib dv]
-     -- [IcacheEscrow.itable_res2] takes the DEFINER'S ambient context as
-     well as the payload's own, so the handle at ξ and the handle at ξ' name
-     two DIFFERENT payloads and no handle transport can bridge them
-     (measured: [iExact] reports [itable_res2 … ξ ξ0 …] against a goal
-     wanting [itable_res2 … ξ' ξ0 …]).  [WpLock.is_lock_pay_iff] would need
-     the two payloads to be persistently equivalent, which is exactly what
-     an ambient-indexed body does not give.  The fix is in [IcacheEscrow]:
-     drop [itable_res2]'s ambient parameter so the payload is a closed λ,
-     the way [BioInv.bcache_res2] (whose [bio_ctx] row above goes through)
-     and [DiskInv.disk_res_at] already are.  That file is the parent's for
-     the shapes commit, so this row waits on it. *)
+  (* NO [ic_sleeplocks_morph] AND NO [is_itable2_morph] ROW HERE any more
+     (r25 pass 1, plan item 33): both live in [IcacheEscrow.v], beside the
+     definitions they close over.  This file is registered AFTER [FsReady.v]
+     and imports it, so [FsReady.fs_ready_morph] -- which needs both rows --
+     could never see a copy stated here. *)
 
 End EnvCaches.
 

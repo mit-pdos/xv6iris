@@ -2575,7 +2575,10 @@ Section ProofIlockMain.
        reader's one-shot) and the frozen alternative (its slice), so what
        comes out is LOADED and ORDINARY. ---- *)
     iDestruct "Hflk" as (Kt) "[%HTlK #Hflt]".
-    iDestruct "Hslp" as (s0) "((Hrp & %Hs0 & #Hflp) & Htok & Hneu)".
+    (* r25 pass 1: the payload has a FOURTH conjunct now -- the inode's
+       published off rows ([OffBox.off_rows]).  It rides the handle across
+       the hold, beside [ic_tok] (plan item 33). *)
+    iDestruct "Hslp" as (s0) "((Hrp & %Hs0 & #Hflp) & Htok & Hneu & Hoffr)".
     iMod (ic_dep_checkout fsc_ic k d with "Hneu") as "[Hd Hd2]".
     iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iAssert (|={⊤}=> TsoCtx.own_context TsoCtx.cur_ctx ∗
@@ -2685,9 +2688,9 @@ Section ProofIlockMain.
       { iEval (rewrite /ic_deposit2 Hid0 (ic_body_of_shr k d s icfg_dev inum g lo Hdshr)) in "Hdep2".
         iDestruct "Hdep2" as "[_ [_ Hblv]]".
         iDestruct (IcacheRef.live_genlo_agree with "Hlgx Hblv") as %[-> _]. done. }
-      iAssert (ic_handle fsc_ic k d) with "[Hdep2 Hlgx Hd Htok]" as "Hdep".
+      iAssert (ic_handle fsc_ic k d) with "[Hdep2 Hlgx Hd Htok Hoffr]" as "Hdep".
       { rewrite /ic_handle (ic_pay_live_of_shr k d s icfg_dev inum g lo Hdshr) /live_gen.
-        iFrame "Hdep2 Hd Htok". iExists lox. iExact "Hlgx". }
+        iFrame "Hdep2 Hd Htok Hoffr". iExists lox. iExact "Hlgx". }
       iModIntro.
       rewrite /inode_ident. iDestruct "Hid" as "[Hidev Hinumc]".
       iEval (rewrite -Hipe) in "Hidev". iEval (rewrite -Hipe) in "Hinumc".
@@ -2775,9 +2778,9 @@ Section ProofIlockMain.
       { iEval (rewrite /ic_deposit2 Hid0 (ic_body_of_shr k d s icfg_dev inum g lo Hdshr)) in "Hdep2".
         iDestruct "Hdep2" as "[_ [_ Hblv]]".
         iDestruct (IcacheRef.live_genlo_agree with "Hlgx Hblv") as %[-> _]. done. }
-      iAssert (ic_handle fsc_ic k d) with "[Hdep2 Hlgx Hd Htok]" as "Hdep".
+      iAssert (ic_handle fsc_ic k d) with "[Hdep2 Hlgx Hd Htok Hoffr]" as "Hdep".
       { rewrite /ic_handle (ic_pay_live_of_shr k d s icfg_dev inum g lo Hdshr) /live_gen.
-        iFrame "Hdep2 Hd Htok". iExists lox. iExact "Hlgx". }
+        iFrame "Hdep2 Hd Htok Hoffr". iExists lox. iExact "Hlgx". }
       iModIntro.
       iDestruct (ic_raw_of_rest with "Hnl Hm Ha") as "Hraw".
       rewrite /inode_ident. iDestruct "Hid" as "[Hidev Hinumc]".

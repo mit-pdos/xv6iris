@@ -209,6 +209,7 @@ From iris.algebra Require Import ufrac.
 Require Import TsoMemPa TsoGhost.
 Require Import CtxBox.
 Require Import OffBox.   (* [off_rows] / [off_rows_dep] -- ip->lock's payload carries the off rows (r25 shapes) *)
+Require Import CtxMorphTac.   (* [ctx_morph_solve] -- the three [itable_res2*] instances (r25 pass 1) *)
 Require Import SepThread.   (* the boot threads own_context through the slots *)
 
 Local Open Scope Z_scope.
@@ -4371,7 +4372,32 @@ Section IcacheBox.
         and hands it back at releasesleep ([ic_slp_dep]); across the hold it
         lives HERE (main put it into the escrow arm at the checkout; the box
         has no token slot after the second edit). *)
-     ic_tok cn k)%I.
+     ic_tok cn k ∗
+     (* STATEMENT CHANGE (r25 pass 1): ...AND THE INODE'S PUBLISHED OFF ROWS,
+        for [ic_tok]'s reason exactly.  [ic_slp] gained [OffBox.off_rows
+        off_cfg k ξ] (the third final shape), and the set AUTHORITY inside it
+        cannot be re-minted -- so what ilock takes out of the payload at
+        acquiresleep has to live somewhere until iunlock puts it back through
+        [ic_slp_dep], and the handle is where the payload's other travelling
+        conjunct already lives.  ARITY UNCHANGED, so the twenty-six opaque
+        [ic_handle] sites (SpecIlock / SpecIunlock / SpecIunlockput /
+        ProofCreate / ProofCreateFreshTy / ProofSysUnlink) do not move; only
+        the three files that UNFOLD it thread one more conjunct.  The rows are
+        at the holder's own context, which is where the file layer's checkout
+        ([FileOffProtocol.proto_read_checkout]) wants them. *)
+     off_rows off_cfg k cur_ctx)%I.
+
+  (* the row in and out of the handle without unfolding it: what sys_open's
+     [so_deposit] and fileread's checkout take while they hold ip->lock
+     (plan item 33). *)
+  Lemma ic_handle_off_rows_acc cn k d :
+    ic_handle cn k d ⊢
+    off_rows off_cfg k cur_ctx ∗ (off_rows off_cfg k cur_ctx -∗ ic_handle cn k d).
+  Proof.
+    rewrite /ic_handle. iIntros "(H1 & H2 & H3 & H4 & Hoff)".
+    iFrame "Hoff". iIntros "Hoff". iFrame "H1 H2 H3 H4 Hoff".
+  Qed.
+
   (* the descriptor's PURE projections at a share-bearing descriptor *)
   Lemma ic_dep_id_of_shr d (s : Qp) (dev inum : mword 32) (g : gname) (lo : nat) :
     ic_dep_shr d = Some (s, dev, inum, g, lo) -> ic_dep_id d = Some (dev, inum).
@@ -4455,6 +4481,21 @@ Section IcacheBox.
     Timeless (ic_tx_dep cn k s dev inum g lo).
   Proof. rewrite /ic_tx_dep. tl_struct. Qed.
 
+  (* the write arm'''s holder bundle wraps the handle, so it gets the rows'''
+     accessor too: sys_open'''s [so_deposit] and the AU publisher hold
+     [ic_tx_dep], not [ic_handle] (plan item 33). *)
+  Lemma ic_tx_dep_off_rows_acc cn k s dev inum g lo :
+    ic_tx_dep cn k s dev inum g lo ⊢
+    off_rows off_cfg k cur_ctx ∗
+    (off_rows off_cfg k cur_ctx -∗ ic_tx_dep cn k s dev inum g lo).
+  Proof.
+    rewrite /ic_tx_dep. iIntros "(%t & Hh & Htx)".
+    iDestruct (ic_handle_off_rows_acc with "Hh") as "[Hoff Hback]".
+    iFrame "Hoff". iIntros "Hoff". iExists t.
+    iDestruct ("Hback" with "Hoff") as "Hh". iFrame "Hh Htx".
+  Qed.
+
+
   Lemma ic_tx_dep_intro cn k s dev inum g lo (t : nat) :
     ic_handle cn k (DepTx s dev inum g lo t (1/2)) -∗
     t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
@@ -4492,6 +4533,16 @@ Section IcacheBox.
   Global Instance ic_tx_dep_at_timeless cn k s dev inum g lo t q :
     Timeless (ic_tx_dep_at cn k s dev inum g lo t q).
   Proof. rewrite /ic_tx_dep_at. tl_struct. Qed.
+  Lemma ic_tx_dep_at_off_rows_acc cn k s dev inum g lo t q :
+    ic_tx_dep_at cn k s dev inum g lo t q ⊢
+    off_rows off_cfg k cur_ctx ∗
+    (off_rows off_cfg k cur_ctx -∗ ic_tx_dep_at cn k s dev inum g lo t q).
+  Proof.
+    rewrite /ic_tx_dep_at. iIntros "[Hh Htx]".
+    iDestruct (ic_handle_off_rows_acc with "Hh") as "[Hoff Hback]".
+    iFrame "Hoff". iIntros "Hoff".
+    iDestruct ("Hback" with "Hoff") as "Hh". iFrame "Hh Htx".
+  Qed.
 
 
   Lemma ic_tx_dep_at_of_half cn k s dev inum g lo :
@@ -4544,7 +4595,7 @@ Section IcacheBox.
       i_valid (ientry k) ↦₄ valid_word v ∗
       ic_handle cn k (DepTx s dev inum g lo t q).
   Proof.
-    iIntros (Hq HE) "#Hesc Hvld (Hd2 & Hpl & Hdep & Htok) Htx".
+    iIntros (Hq HE) "#Hesc Hvld (Hd2 & Hpl & Hdep & Htok & Hoffh) Htx".
     iFrame "Hvld".
     rewrite /ic_deposit2. cbn [ic_dep_id ic_dep_mass].
     iDestruct "Hd2" as "[Hhold Hbody]".
@@ -4567,7 +4618,7 @@ Section IcacheBox.
       rewrite /ic_q_side; cbn. rewrite /TxPin.tx_pin.
       iApply (ic_tx_share_join t q q1 q2 Hq with "Hside Htx"). }
     iModIntro. rewrite /ic_handle /ic_deposit2. cbn [ic_dep_id ic_dep_mass].
-    iFrame "Hpl Hdep Htok Hbody". rewrite /ic_hold. iExists mh. iFrame "Hl2".
+    iFrame "Hpl Hdep Htok Hoffh Hbody". rewrite /ic_hold. iExists mh. iFrame "Hl2".
     by iPureIntro.
   Qed.
 
@@ -4583,7 +4634,7 @@ Section IcacheBox.
       ic_handle cn k (DepTx s dev inum g lo t q1) ∗
       t ↪[ln_tx icfg_log]{#q2} tt.
   Proof.
-    iIntros (Hq HE) "#Hesc Hvld (Hd2 & Hpl & Hdep & Htok)".
+    iIntros (Hq HE) "#Hesc Hvld (Hd2 & Hpl & Hdep & Htok & Hoffh)".
     iFrame "Hvld".
     rewrite /ic_deposit2. cbn [ic_dep_id ic_dep_mass].
     iDestruct "Hd2" as "[Hhold Hbody]".
@@ -4606,7 +4657,7 @@ Section IcacheBox.
       iFrame "Hdep' Hq". iSplitR; [iPureIntro; exact Hid |].
       rewrite /ic_q_side; cbn. rewrite /TxPin.tx_pin. iExact "Hside". }
     iModIntro. iFrame "Htx". rewrite /ic_handle /ic_deposit2. cbn [ic_dep_id ic_dep_mass].
-    iFrame "Hpl Hdep Htok Hbody". rewrite /ic_hold. iExists mh. iFrame "Hl2".
+    iFrame "Hpl Hdep Htok Hoffh Hbody". rewrite /ic_hold. iExists mh. iFrame "Hl2".
     by iPureIntro.
   Qed.
 
@@ -4642,9 +4693,64 @@ Section IcacheBox.
   Proof. iIntros "(% & _ & #H & _)". iExact "H". Qed.
   Lemma ic_slp_fold cn k T (ξ : CtxId) :
     ic_slp_dep cn k T ∗ ctx_floor ξ T ⊢ ic_slp cn k ξ.
-  Proof. (* SKELETON r25 (lane ii): ctx_floor_le T -> Tp for the register row; off_rows_fold *) Admitted.
+  Proof.
+    iIntros "[(%Tp & %HTp & #Hllb & Ht & Hrp & Hn & Hoff) #Hfl]".
+    rewrite /ic_slp. iExists (L2Reg Tp None).
+    iSplitL "Hrp".
+    { (* the register row: its own park stamp is [Tp ≤ T], so the one floor
+         the [_in] release presents weakens to it (TsoCtx.ctx_floor_le) *)
+      rewrite /CtxBox.l2_row /ic_regp. iFrame "Hrp". iSplitR; [done |].
+      iApply (TsoCtx.ctx_floor_le ξ T Tp HTp with "Hfl"). }
+    iFrame "Ht Hn".
+    (* ...and the off rows weaken per row inside [off_rows_fold] *)
+    iApply (off_rows_fold off_cfg k T ξ).
+    iSplitL "Hoff"; [iExact "Hoff" | iExact "Hfl"].
+  Qed.
   Global Instance ic_slp_dep_morph cn k T' : CtxMorph (fun _ => ic_slp_dep cn k T').
   Proof. apply ctx_morph_const. Qed.
+
+  (* [off_rows_dep] is monotone in its bound, given the bigger bound's own
+     [llb] -- what the [_in] releases need to lift the off rows from their
+     own maximum to the COMBINED one.  (OffBox states no such lemma; it is
+     five lines over the definition, so it is proved here rather than
+     re-opening the box lane's file.) *)
+  Lemma off_rows_dep_le (i : nat) (T T' : nat) :
+    (T <= T')%nat ->
+    llb loglen_name T' -∗ off_rows_dep off_cfg i T -∗ off_rows_dep off_cfg i T'.
+  Proof.
+    iIntros (Hle) "#Hllb (%L & Hauth & _ & Hset)".
+    iExists L. iFrame "Hauth Hllb".
+    iApply (big_sepS_impl with "Hset"). iIntros "!>" (γ _) "(%s & Hp & %Hh & #Hl & %Hb)".
+    iExists s. iFrame "Hp Hl". iPureIntro. split; [exact Hh | lia].
+  Qed.
+
+  (* THE [_in] RELEASE'S ASSEMBLER (r25, correction 2).  A holder of
+     ip->lock arrives at [releasesleep] with the park's register half at its
+     own stamp [Tp] and the off rows it destructed out of the acquire's
+     [ic_slp]; the release must present ONE lower bound.  This takes the
+     rows' own maximum ([OffBox.off_rows_to_dep]) and joins the two
+     ([TsoGhost.llb_max]), so every inode proof's site is one [iDestruct]. *)
+  Lemma ic_slp_dep_of_rows cn k (Tp : nat) (ξ : CtxId) :
+    llb loglen_name Tp -∗
+    ic_tok cn k -∗ ic_regp k (L2Reg Tp None) -∗ ic_dep_neutral cn k -∗
+    off_rows off_cfg k ξ -∗
+    ∃ T : nat, ⌜(Tp <= T)%nat⌝ ∗ llb loglen_name T ∗ ic_slp_dep cn k T.
+  Proof.
+    iIntros "#HllbP Ht Hrp Hn Hoff".
+    iDestruct (off_rows_to_dep off_cfg k ξ with "Hoff") as (T') "Hdep".
+    iAssert (llb loglen_name T') as "#HllbO".
+    { iDestruct "Hdep" as (L) "(_ & #H & _)". iExact "H". }
+    iDestruct (TsoGhost.llb_max loglen_name Tp T' with "HllbP HllbO") as "#HllbM".
+    iDestruct (off_rows_dep_le k T' (Nat.max Tp T') ltac:(lia) with "HllbM Hdep") as "Hdep".
+    iExists (Nat.max Tp T'). iSplitR; [iPureIntro; lia |].
+    iSplitR; [iExact "HllbM" |].
+    rewrite /ic_slp_dep. iExists Tp.
+    iSplitR; [iPureIntro; lia |].
+    iSplitR; [iExact "HllbM" |].
+    iSplitL "Ht"; [iExact "Ht" |].
+    iSplitL "Hrp"; [iExact "Hrp" |].
+    iSplitL "Hn"; [iExact "Hn" | iExact "Hdep"].
+  Qed.
   (* L1: the slot's row in itable_res2 -- the register half, shut and
      empty, IDENTITY = the table's ci !! k (None when unidentified: M-1'),
      bounded by the payload's floor slot [tl] *)
@@ -5516,6 +5622,52 @@ Section IcacheTable.
     | _, _ => False%I
     end.
 
+  (* THE SIXTH SHAPE'S TRANSPORT (r25 pass 1).  With [islot2]/[islot_empty]
+     at the payload's own context the three [itable_res2*] instances can no
+     longer close structurally: the big-op's body is a NAMED piece and
+     [ctx_morph_solve] stops at it (which is the point of the head dispatch
+     -- optimization.md's rule against [apply _] on a large unfolded body).
+     So the row gets its own instance, and its two cell arms get theirs.
+     Everything else in either arm is ghost: [iref_slots], [ic_id],
+     [icnt_half], [frz_park] and [ic_pin_rest] are [own]s / [ghost_var]s and
+     take no context. *)
+  Global Instance islot_rest_at_morph (k : nat) (q : Qp) (dev inum : mword 32) :
+    CtxMorph (fun ξ => islot_rest_at (XI := ξ) k q dev inum).
+  Proof.
+    rewrite /islot_rest_at.
+    destruct (1/2 - q)%Qp as [q'|].
+    - apply inode_ident_morph.
+    - apply ctx_morph_const.
+  Qed.
+
+  Global Instance islot_free_at_morph (k : nat) (dev inum : mword 32) :
+    CtxMorph (fun ξ => islot_free_at (XI := ξ) k dev inum).
+  Proof. rewrite /islot_free_at. apply inode_ident_morph. Qed.
+
+  Global Instance islot_empty_morph (cn : ic_names) (k : nat) :
+    CtxMorph (fun ξ => islot_empty ξ cn k).
+  Proof.
+    rewrite /islot_empty.
+    apply ctx_morph_exist; intros dev. apply ctx_morph_exist; intros inum.
+    apply ctx_morph_sep; [apply islot_free_at_morph |].
+    apply ctx_morph_sep; apply ctx_morph_const.
+  Qed.
+
+  Global Instance islot2_morph (cn : ic_names) (M : gmap nat (Qp * positive))
+      (ci : gmap nat (mword 32 * mword 32)) (k : nat) :
+    CtxMorph (fun ξ => islot2 ξ cn M ci k).
+  Proof.
+    rewrite /islot2.
+    destruct (M !! k) as [[q n]|]; destruct (ci !! k) as [[dev inum]|].
+    - apply ctx_morph_sep; [apply islot_rest_at_morph |].
+      apply ctx_morph_sep; [apply ctx_morph_const |].
+      apply ctx_morph_sep; [apply ctx_morph_const |].
+      apply ctx_morph_sep; apply ctx_morph_const.
+    - apply ctx_morph_const.
+    - apply ctx_morph_const.
+    - apply islot_empty_morph.
+  Qed.
+
   (* A6.145: the per-slot PAYLOAD row.  A FREE slot's count cell rides the
      lock as a plain ctx cell (value 0 -- boot's and every retire's), with
      the FULL stamp auth and its loglen receipt; a LIVE slot's row is the
@@ -5764,7 +5916,7 @@ Section IcacheTable.
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
       (dv : mword 32) :
     CtxMorph (fun ξ => itable_res2_llb ξ cn γfs γi cov logstart nib dv).
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof. rewrite /itable_res2_llb. ctx_morph_solve. Qed.
 
   (* THE BARE TABLE: every row's floor stripped and bounded by ONE [tl] --
      what the boot deposits through [newlock_at_llb] (the fifty boot stamps
@@ -5799,7 +5951,7 @@ Section IcacheTable.
   Global Instance itable_res2_bare_morph (tl : nat) (cn : ic_names) (γfs : fs_names)
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
     CtxMorph (fun ξ => itable_res2_bare ξ tl cn γfs γi cov logstart nib dv).
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof. rewrite /itable_res2_bare. ctx_morph_solve. Qed.
 
   Lemma itable_res2_of_bare (ξ : TsoCtx.CtxId) (tl : nat)
       (cn : ic_names) (γfs : fs_names) (γi : gname)
@@ -5888,7 +6040,7 @@ Section IcacheTable.
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
       (dv : mword 32) :
     CtxMorph (fun ξ => itable_res2 ξ cn γfs γi cov logstart nib dv).
-  Proof. (* SKELETON r25 (pass 1): reopened by the shape change *) Admitted.
+  Proof. rewrite /itable_res2. ctx_morph_solve. Qed.
 
     Definition is_itable2 (γl : gname) (cn : ic_names) (γfs : fs_names)
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
@@ -6040,6 +6192,45 @@ Section IcacheTable.
   Qed.
 
 End IcacheTable.
+
+(* ===================================================================== *)
+(*  6c.  THE TWO ICACHE ENVIRONMENT ROWS' TRANSPORT OBLIGATIONS           *)
+(*                                                                        *)
+(*  They live HERE rather than in [EnvMorph.v] (r25 pass 1, plan item 33): *)
+(*  EnvMorph is registered after [FsReady.v] and imports it, so            *)
+(*  [FsReady.fs_ready_morph] -- which needs both rows -- cannot see a copy *)
+(*  stated there.  Same rule as [ic_sleeplocks] itself: the invariant      *)
+(*  layer must own what the invariant layer needs.  OUTSIDE the section    *)
+(*  above, because the payload context can only be abstracted once [XI]    *)
+(*  is a real argument.                                                   *)
+(* ===================================================================== *)
+Section IcacheEnvMorph.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
+  Context `{GEN : GenId}.
+  Context `{ICFG : icfg}.
+
+  (* the icache's NINODE inode sleeplocks, under their two gname
+     existentials; the payload λ is [ic_slp cn k] ([ic_slp_morph]). *)
+  Global Instance ic_sleeplocks_morph (cn : ic_names) :
+    CtxMorph (fun ξ : CtxId => (ic_sleeplocks (XI := ξ) cn : iProp Σ)).
+  Proof. rewrite /ic_sleeplocks. ctx_morph_solve. Qed.
+
+  (* THE ITABLE (plan item 28 (c)): the row that could not be stated before
+     the SIXTH shape landed.  [itable_res2] used to take the DEFINER's
+     ambient context beside the payload's own, so the handle at ξ and the
+     handle at ξ' named two DIFFERENT payloads and no handle transport could
+     bridge them.  With [islot2]/[islot_empty] at the payload's context
+     [itable_res2] is CLOSED in ξ, so this is [WpLock.is_lock_handle_morph]
+     over the λ payload ([itable_res2_morph]) beside three ξ-free rows --
+     the pinw address claims, the escrow family and the pool invariant. *)
+  Global Instance is_itable2_morph (γl : gname) (cn : ic_names) (γfs : fs_names)
+      (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
+    CtxMorph (fun ξ : CtxId =>
+      (is_itable2 (XI := ξ) γl cn γfs γi cov logstart nib dv : iProp Σ)).
+  Proof. rewrite /is_itable2. ctx_morph_solve. Qed.
+
+End IcacheEnvMorph.
+
 
 (* ===================================================================== *)
 (*  7.  ALLOCATION OF THE TOKEN FAMILIES                                  *)

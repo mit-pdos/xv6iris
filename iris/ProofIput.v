@@ -2886,7 +2886,10 @@ Section IputFreePath.
        register's stamp under the floor the entry picked; the L1 register
        shuts at its own stamp (no header goes back); the unit's fragment
        parks in OUT_L2 as this thread's hold. ---- *)
-    iDestruct "Hslp" as (s0) "((Hrp & %Hs0 & #Hflp) & Hictok & Hneu)".
+    (* r25 pass 1: the payload has a FOURTH conjunct -- the inode's published
+       off rows; iput's free window keeps them in hand across its own
+       acquire/release pair (nothing publishes or reads them here). *)
+    iDestruct "Hslp" as (s0) "((Hrp & %Hs0 & #Hflp) & Hictok & Hneu & Hoffr)".
     iApply fupd_wp.
     iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     (* THE OUT_L2 RESIDUE AT DepFrz (F40): the descriptor half minted off the
@@ -3221,15 +3224,18 @@ Section IputFreePath.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* the _in release: the L2 row goes back UNFLOORED at the park stamp and
        the callee re-floors it at the parked context (M-6, R2) *)
+    (* r25 pass 1 (correction 2): ONE bound for the combined maximum *)
+    iDestruct (ic_slp_dep_of_rows fsc_ic k Tp TsoCtx.cur_ctx
+                 with "HllbT Hictok Hrp Hneu Hoffr") as (Tc) "(%HTpc & #HllbC & Hdepc)".
     iApply (RS.wp_releasesleep_genin_sconf γs gil gisl "inode"%string (ic_slp fsc_ic k)
-              (fun _ => ic_slp_dep fsc_ic k Tp) (slh_tok (icfg_isl k)) q J6 pidv pj (K - 6)%nat eb eb lks Tp
+              (fun _ => ic_slp_dep fsc_ic k Tc) (slh_tok (icfg_isl k)) q J6 pidv pj (K - 6)%nat eb eb lks Tc
               ltac:(lia) ltac:(lkbelow)
-              (ic_slp_fold fsc_ic k Tp)
-              with "Hcg Hcnt Htext Hpc [] [Hstok] HllbT [Hictok Hrp Hneu] Hprocs").
+              (ic_slp_fold fsc_ic k Tc)
+              with "Hcg Hcnt Htext Hpc [] [Hstok] HllbC [Hdepc] Hprocs").
     all: try lkbelow.
     { iEval (rewrite HJ6a0). iExact "Hslk". }
     { iEval (rewrite HJ6a0). iExact "Hstok". }
-    { rewrite /ic_slp_dep. iFrame "Hictok Hrp Hneu". }
+    { iExact "Hdepc". }
     iIntros (CIDrs Hsrs mrs) "%Hcsr Hcg Hcnt Hpc Hrslh".
     (* the sleeplock's share comes home; the live slice is in [islot2]'s
        frozen park until +0x82.  Across the lock-free span this thread holds

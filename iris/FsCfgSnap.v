@@ -51,6 +51,7 @@ Require Import DinodeEnc FsTree.
 Require Import FsCrash LogDefs.
 Require Import InodeInv InodeLock InodeRegion.
 Require Import IcacheEscrow IcacheBoot.
+Require Import OffBox.   (* [off_cfg] / [off_set_auth] -- icfg_alloc's new row (r25 pass 1) *)
 Require Import BitmapEnc BitmapInv.
 Require Import FsImg FsImgBridge.
 Require Import FsDurSnap FsDurImg.
@@ -865,12 +866,21 @@ Section SnapMint.
       ⌜fsc_ninodes = sb_ninodes (fss_sb S)⌝ ∗
       fs_kit_icache ICFG FSC ∗
       fs_kit_fsinit_ghost ICFG FSC (fs_blocks dk) (snap_spent S nib) Pb Xexc ∗
-      (* the off LEDGERS and the off-borrow liveness authority (off-ledger
-         ruling): the ledgers are per-era persistent invariants over the
-         [fsc_foff] family, minted EMPTY; the authority is what
-         [FileInv.ftable_res_boot] parks inside ftable.lock. *)
-      ioff_escrows_at fsc_fol fsc_foff ∗
-      flive_auth_at fsc_fol.
+      (* STATEMENT CHANGE (r25 pass 1): the old off LEDGER row
+         [ioff_escrows_at fsc_fol fsc_foff] is RETIRED (plan item 16, the
+         ledger's retirement from [fs_ready]); what stays is the off-borrow
+         liveness authority, which is what [FileInv.ftable_res_boot] parks
+         inside ftable.lock.  [fsc_foff] is dead and its field goes in a
+         later cleanup. *)
+      flive_auth_at fsc_fol ∗
+      (* STATEMENT CHANGE (r25 pass 1): [icfg_alloc]'s NEW ROW, handed on.
+         [IcacheEscrow.ic_slp] now carries [OffBox.off_rows off_cfg k ξ], so
+         [IcacheBoot.icache_boot_at]'s per-slot sleeplock mint needs each
+         slot's set authority at [∅].  The boot does NOT run here (it runs
+         in [BootShared.boot_shared_alloc], out of [FsCfgKits.fs_kit_icache]),
+         so the row leaves in this lemma's own postcondition rather than
+         inside the kit; its consumer threads it to [icache_boot_at]. *)
+      ([∗ list] k ∈ seq 0 NINODE, off_set_auth off_cfg k ∅).
   Proof.
     intros HlPb HXsub HX1 Hagr Hnibeq Hnib32 Hcovin Hcovmeta.
     (* the WAL's own row (b) at the boot's ledger: every block of the
@@ -902,7 +912,7 @@ Section SnapMint.
       as (ICFG g0) "(%Hdev & %Hnibq & %Hlogq & %Histq & Hiref & Hlive &
                      Hlk & Hcnt & Hfrzm & Hboot & Hep &
                      Hisl & Heplo & Hstmp & Hbox & Hrauth & Hlkauth & Hpkey & Hxkey & Hhpn & Htkey &
-                     Hckey)".
+                     Hckey & Hoffa)".
     iDestruct (hpn_boot_split with "Hhpn") as "Hhpn".
     symmetry in Hnibq. subst nib.
     (* ---- the pure geometry, off [sk_sbok] alone --------------------- *)
@@ -1215,13 +1225,14 @@ Section SnapMint.
        authority's gname, the NINODE ghost-map family, and the NINODE
        per-inode invariants over it, all minted empty ---- *)
     iMod flive_auth_at_alloc as (γfol) "Hfol".
-    iMod (foff_fun_alloc NINODE 0) as (γfoff) "Hfoffa".
-    iMod (ioff_escrows_alloc_at E γfol γfoff with "Hfoffa") as "#Hioffs".
     iModIntro.
     iExists ICFG,
       (MkFscfg gpr gkm gkp γd γv gdl bn γfs γi cn git
                cov (sb_logstart (fss_sb S)) (sb_bmapstart (fss_sb S))
-               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol γfoff).
+               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol
+               (* [fsc_foff] is dead (the ledger is retired); the field is
+                  removed in a later cleanup *)
+               (fun _ : nat => 1%positive)).
     rewrite /fs_kit_icache /fs_kit_fsinit_ghost.
     cbn [fsc_printk fsc_kalloc fsc_kpages fsc_uart fsc_disk fsc_dlock
          fsc_bio fsc_fs fsc_ireg fsc_ic fsc_itlock fsc_cov fsc_logst
@@ -1288,7 +1299,7 @@ Section SnapMint.
       iSplitL "Hbmres"; [iExact "Hbmres" |].
       iSplitL "Hrem"; [iExact "Hrem" |].
       iSplitR; [iExact "Hbinv" | iExact "Hxo"]. }
-    iSplitR; [iExact "Hioffs" | iExact "Hfol"].
+    iSplitL "Hfol"; [iExact "Hfol" | iExact "Hoffa"].
   Qed.
 
 End SnapMint.
