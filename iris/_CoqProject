@@ -1380,6 +1380,12 @@ SpecSysWrite.v
 SpecCreate.v
 CreateBudget.v
 ProofCreateParts.v
+ProofCreateShared.v
+ProofCreateFound.v
+ProofCreateAlloc.v
+ProofCreateFail.v
+ProofCreateFailMkdir.v
+ProofCreateMkdir.v
 ProofCreate.v
 ProofCreateFreshTy.v
 LinkCreate.v
