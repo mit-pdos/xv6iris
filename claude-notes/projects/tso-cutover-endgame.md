@@ -165,6 +165,7 @@ The box owns exactly: the parked context, stamps, cnt, slot_d, slot_p.
 | accessor | `box_q1_update` | under the L1 half at win = true and the cnt half: `Q1 c ={E∖↑N}=∗ Q1 c ∗ R` | ruled ACCEPT; BUILT side-by-side as `CtxBoxHooked.box_q1_update` (§3.2b) |
 | view | `box_view` | opens the inv for a non-owner: rows + `box_arm` + closing wand | landed |
 | boot | `box_alloc`, `box_alloc_at`, `box_alloc_at_halves` | born IN at T_boot | landed |
+| (a)-free | `box_withdraw_L1_free` | (a)'s hook with the absorb elided: the header leaves at the visibility-free tier, no floors, no `own_context` (§0.26′ for the box) | PROPOSED, §9 item 24 (R2); makes item 23's `box_alloc_out_l2_at` unnecessary (R3) |
 
 **The scheduled consolidation (law 10; §7 r20c).**  The hooked forms become
 THE statements — (a), (b), (e), (f), (g) each with the hook — and the plain
@@ -389,7 +390,8 @@ L5. **R4a `inode_pay`'s cinv** (`FileInvDefs`): ghost identity for the
     (`∃ m, ◯ m ∗ llb …`) from the FIRST sweep.  The cinv becomes
     ghost+pure ⇒ `is_ftable`'s λ-flip stops recursing into it.
 
-L7. **The const-payload class**: `is_ftable`'s `<{ ftable_res γ }>` → a λ
+L7. (If §9 item 24 rules: the ftable keeps ONLY the λ-flip; no floor slot,
+    no `_in` ftable releases, F36 void.)  **The const-payload class**: `is_ftable`'s `<{ ftable_res γ }>` → a λ
     with a FLOOR SLOT (R4b needs `ctx_floor ξ Kd` from ftable's payload
     row, and every ftable release at filealloc/filedup/fileclose becomes an
     `_in` release — F36, which is why L7 precedes L6); `LogInv`'s
@@ -397,6 +399,14 @@ L7. **The const-payload class**: `is_ftable`'s `<{ ftable_res γ }>` → a λ
     dead `<{ itable_res }>` (delete).
 
 L6. **R4b: THE OFF BOX** (`OffBox.v`, skeleton type-checked, 14 Admitted).
+    **RE-CUT PROPOSED (§9 item 24, for ruling): the cell is at the
+    VISIBILITY-FREE tier whenever no one needs it (§0.26′), so the box has NO
+    L1 side -- born at the publish after the free-tier store of zero, the
+    reference a share at the fd's fraction inside `file_pay` (γ pinned by
+    `fpnames`), the last close a floorless `box_withdraw_L1_free`; no
+    `off_l1_row`, no tie, no ftable floor row, no `off_dup`/`off_close`.  The
+    design below is the one the shapes commit implements and stands until
+    the ruling.**
     Mandatory: main's off ledger put `a_foff k ↦₄ v` at the ambient context
     in a ξ-bodied invariant and parks the inode's `valid` cell as a marker,
     both unlawful under the box.  The design, as ruled:
@@ -457,7 +467,7 @@ L10. **Loose ends from flip** (A6.163): `IcacheBox.v` stub — not carried;
 | r20c | THE HOOK CONSOLIDATION (law 10): hooked forms become the statements for (a), (b), (e), (f), (g); plain forms as corollaries; the six wrapper files retargeted | CtxBox/BioInv/IcacheEscrow/OffBox green, 0 Admitted in CtxBox |
 | r21 | the FS-cone consumer sweep incl. FsCollect/FsCollectAll (the acceptance test); `ic_slp`'s final shape; merge `main` | THE ICACHE BANK: honest green ≥ 1336 + the icache cone; zero new admits |
 | PARALLEL, starting now (a second agent) | L2 shim sweep, L3 pipe, L4 RiscvAdequacy | no `TsoCtxShim.` outside comments; RiscvAdequacy green; measure re-run after each sweep, green never drops |
-| r25 | the file layer as ONE sweep: L5 + L7 (the `is_ftable` λ-flip with the floor slot FIRST) + L6 (OffBox's 14 proofs) | no ξ-bodied cinv left; OffBox 0 Admitted; 0 Admitted in `EnvMorph` (the day-one instance skeletons closed before the bank) |
+| r25 (shape re-cut per §9 item 24 pending ruling; then the protocol chain file; then pass 1) | the file layer as ONE sweep: L5 + L7 (the `is_ftable` λ-flip with the floor slot FIRST) + L6 (OffBox's 14 proofs) | no ξ-bodied cinv left; OffBox 0 Admitted; 0 Admitted in `EnvMorph` (the day-one instance skeletons closed before the bank) |
 | r26 | L8 | ProofForkretPark green |
 | r27 | L9 | SystemAdequacy green |
 | r28 | forced `-B` certification, `make audit`, admit inventory, delete `ctx_word4_claim` / the TsoCtxShim tombstone / dead `itable_res`; final `main` merge-in | zero red, audit at baseline |
@@ -507,6 +517,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | §3.2b | the consolidated box BUILT side-by-side (`iris/CtxBoxHooked.v`): hooks on (a)/(b)/(e)/(f)/(g), `box_q1_update`, eight verbatim-typed corollaries; green on the VM, assumptions closed | landed side-by-side (commit ded0fa1de); slot-in = r20c |
 | Q10 | the last close's (a) must not consume iput's pin name-half: the hooked (a) moves the frozen alternative's own pin into `Q1 1` (option B); no ghost change; `ic_hdr_frz` carries `ifreeze_pre` out and needs a `CtxMorph` instance | RULED B by reviewer 1, confirmed by the box's designer (item 9); to land in ProofIput |
 | §6²⁷ | run L2/L3/L4 in parallel now; sweep the file layer once; two tripwires before r21 | RECOMMENDED to the owner |
+| item 24 | the off cell at the visibility-free tier while unneeded: no L1 side for the off box, `box_withdraw_L1_free`, shares at the fd fraction, no ftable floor row; `box_alloc_out_l2_at` withdrawn; the protocol chain file as a gate | PROPOSED (R1-R5), awaiting the owner |
 | item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RULED -- reviewer 1 agrees (item 17), with `file_core_off`'s FD_INODE arm named as the FIFTH final shape and "0 Admitted in `EnvMorph`" added to r25's gate |
 | item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; the two fixes LANDED (item 20) -- reviewer 2's audit next |
 | item 21 | reviewer 2's audit of d53e4a4e5: NOT signed off -- (1) the cell claimed twice and the unit unowned at non-FD_INODE arms (unit unconditional; `file_core_off := emp`; the free arm holds `off_resident`; the L2 half rides the FD_NONE unit); (2) `file_pay_st_split` false (one-sided over a unitless `file_pay_tie`); (3) the three ghost steps, the last-close pair, `so_deposit`, `so_open_slot` not at final shape; plus `ftable_res_at`'s fold/unfold pair | AUDITED by reviewer 2; fixes pending |
@@ -1326,6 +1337,176 @@ branch and recorded in §3.2 and §8 here.
       the fold pair, `box_alloc_out_l2_at`, the two new wrappers, the
       deletion), I sign off; the per-arm producer line and the
       self-absorb line go into the day-one checklist together.
+
+24. **THIRD REVIEWER (2026-09-02): `f->off` NEED NOT BE STABLE WHILE NOBODY
+    NEEDS IT -- §0.26′'s visibility-free tier removes the off box's whole
+    L1 side.  A re-cut of the r25 off shapes, FOR RULING; where it lands
+    it supersedes the repairs of items 19-23 (each named below).**  The
+    observation is the owner's: once the next `sys_open` stores zero, the
+    store RE-ESTABLISHES the cell (a store does not read; one's own write is
+    visible by forwarding -- §0.26′ verbatim, the kfree/kalloc memset
+    precedent).  So the ordering the box was carrying from the last writer
+    to the NEXT OPENER was never needed; only the ordering to the last
+    READER under `ip->lock` is, and the L2 row already carries that.
+    Checked against the tree before writing:
+    - **fileclose never loads `f->off`.**  `ff = *f` is scalarized
+      (kernel.asm 80004148-80004158): `lw 0(s1)` type, `lbu 9(s1)` writable,
+      `ld 16(s1)` pipe, `ld 24(s1)` ip.  No load at +32.  The last closer
+      needs the cell's FUTURE half only (fraction + element), never a value.
+    - **The tier exists at the word level.**  `TsoCtx.phys_free`/`mem_free`
+      (the VA-keyed visibility-free byte, fractional), `WpSconfMem.wordw_free
+      width a` (the whole word), `wordw_pointsto_free : wordw_pointsto … 1 w
+      ⊢ wordw_free` (the drop, no floor, at ANY context -- it is
+      `ctx_pointsto_free` per byte), `wp_store_s_sconf_free_gen` (the store
+      leaf that takes `wordw_free` and returns `wordw_pointsto … 1 sv` at the
+      storer's context -- the re-mint).  Nothing new below the box.
+    - **No one else reads `f->off` without `ip->lock`**: fileread/filewrite
+      under `ilock`; sys_open's `f->off = 0` under `ilock`, at `ref = 1`;
+      pipes and devices never touch it; filestat reads the inode, not the
+      file.
+
+    THE LIFE OF THE CELL under the re-cut (one story, every site named):
+      boot        the free row holds the word at the free tier: `off_free k 1`
+      filealloc   (ftable.lock) the opener takes `file_pay γ k 1 C` at FD_NONE
+                  with `off_free k 1` inside; NO box, NO birth
+      pipealloc / sys_open's device arm
+                  the retype changes nothing about the cell: `file_core_off`
+                  is `off_free k q` at every non-INODE type, forever
+      sys_open's inode arm (ip->lock held, q = 1)
+                  `f->off = 0` through `wp_store_s_sconf_free_gen` (the
+                  re-mint: `a_foff k ↦₄ 0` at ξ, registered) -- THEN the box
+                  is born, `box_alloc_at` with `off_resident (XI := ξ) k` (a
+                  deposit; the creator never absorbs it), (c) mints the
+                  share at mass 1, `off_rows_insert` puts the L2 row into
+                  inode i's set, `fpay_tok_update` records `fp_obox := γb`
+      fileread / filewrite (ip->lock)
+                  `off_read_checkout` / `off_read_park` AS LANDED: (e) with
+                  the fd's share (mass q), `Kt` by R1 at the ilock acquire
+                  presenting the share's llb, `Kp` from the row in `off_rows`
+      filedup / fileclose non-last (ftable.lock)
+                  pure fraction split / join of `file_pay` -- the share splits
+                  by mass, the register halves by fraction, `is_box` and
+                  `off_member` are persistent; NO box step, NO mask
+      fileclose last (ftable.lock, q = 1 in hand: own fraction + the
+      remainder from `file_rest`)
+                  `box_withdraw_L1_free` (below): the hook drops the parked
+                  header to `off_free k 1` INSIDE the box at ξb, nothing is
+                  absorbed, NO floor, no `own_context`; the box is left
+                  OUT_L1 with the whole mass inside (a stale reader would
+                  hold mass > 0 beside it -- refuted by Σ); the retype to
+                  FD_NONE puts `off_free k 1` in the free row
+      fdalloc-failed close at FD_NONE
+                  the cell is still `off_free k 1` in `file_pay`; the free
+                  row takes it back; there is no box to abandon
+
+    THE SHAPES (delta against the shapes commit as fixed by items 19-23):
+      off_free k q      := ⌜aligned⌝ ∗ [∗ list] j ∈ seq 0 4, mem_free (a_foff k +ₚ j) (DfracOwn q)
+                           (`off_free k 1 ⊣⊢ wordw_free 4 (a_foff k)`; splits/joins by q)
+      file_core_off k q pn C
+                        := if FD_INODE then off_fd k q (fp_obox pn) else off_free k q
+      off_fd k q γb     := off_box k γb ∗ off_member off_cfg (fp_inode…) γb ∗
+                           ghost_var (bx_slotd γb) (q/2) (SlotReg T₀ false k None) ∗
+                           ghost_var (bx_cnt γb) (q/2) 1 ∗ off_ref_stamps γb k q
+                           (every piece at the fd's fraction; γb pinned by `fpnames.fp_obox`,
+                           agreement through `fpay_tok_agree`; `file_pay_split` distributes
+                           it by q, so `file_rest` needs NO change and carries the complement)
+      fpnames           gains `fp_obox : box_names` (6 `MkFPNames` sites, mechanical)
+      fslot γ M k       LOSES `B`, `Kd`, `off_l1_row`, the tie complement; the free arm is
+                        main's shape with `off_free k 1` where `foff_dead k 1` stood
+      ftable_res γ      LOSES `obox_auth`, `B`, `Kd`; `ftable_res_at γ ξ` is the λ payload
+                        WITHOUT a floor row (T2: its only named consumer, `off_reclaim`, is gone)
+      is_ftable         the λ-flip stays (L8's park morph needs it); the eight `_in` ftable
+                        releases go back to plain releases; `ftable_res_dep`/fold pair NOT needed
+      ic_slp ∗ off_rows UNCHANGED (the L2 side is untouched); `ic_slp_dep`'s one bound, the
+                        seven inode proofs' one conjunct, `off_rows_fold`/`_to_dep`: as in the tree
+      OffBox.v          KEEP `off_hdr`/`off_rest`/`off_box`/`off_regp`/`off_ref_stamps`/
+                        `off_member`/`off_l2_row`/`off_rows*`/`off_read_checkout`/`off_read_park`/
+                        `off_publish_park` (now the birth: `box_alloc_at` + (c) + insert);
+                        DELETE `off_l1_row`, `obox_auth/frag/full`, `off_filealloc`, `off_dup`,
+                        `off_close`, `off_reclaim`, `off_publish_checkout`; item 23's
+                        `off_retype_park`/`off_abandon` NOT needed (no box exists at a retype
+                        or at an FD_NONE close); NEW `off_last_close` over the free withdraw
+      CtxBox.v          ONE NEW STATEMENT (rule 0; the impl agent lands it beside the hooked (a)):
+        Lemma box_withdraw_L1_free (N : namespace) γ (r : slot_reg id X)
+            (c : nat) (mD : gmap (id * nat) ufrac) (Qc Q' : iProp Σ) (E : coPset) :
+          ↑N ⊆ E →
+          sr_win r = false →
+          qsum mD = nat_Qc c →
+          (∀ (x : X) (ξb : CtxId), Qc ∗ P_hdr (sr_ident r) x ξb ={E ∖ ↑N}=∗ Q' ∗ Q1 c) →
+          is_box N γ -∗ slotd_half γ r -∗ cnt_half γ c -∗ stamps_frag γ mD -∗
+          llb loglen_name (max_stamp mD) -∗ Qc ={E}=∗
+          cnt_half γ c ∗ Q' ∗
+          ∃ (x0 : X) (T0 : nat), slotd_half γ (SlotReg (sr_td r) true (sr_ident r) (Some (x0, T0))).
+        ABSENT by design: `own_context`, both floors, `P_hdr'`.  Proof: the
+        hooked (a) with the absorb elided (the hook runs at ξb and hands `Q'`
+        out context-free; `hdr_out` takes the fragment; rows as (a)).  It is
+        §0.26′ stated for the box: a header that leaves at the visibility-free
+        tier costs no floor.  bcache and icache never call it.  Classification
+        under law 10: the free-tier corollary of (a)'s hook -- a premise-
+        WEAKENING (fewer premises, weaker conclusion), not a transition; but
+        it is a statement in CtxBox.v, hence this ruling.  `box_alloc_out_l2_at`
+        (item 23) is no longer needed by any client -- the off box is born
+        AFTER the store and the creator never absorbs -- so that ruling can be
+        withdrawn or kept as a spare; I recommend withdrawing it (one
+        statement fewer).
+
+    WHAT THIS DISSOLVES, finding by finding:
+      item 19 (unit vs cell fraction; Σ unsatisfiable at n ≥ 2): the reference IS a share at
+              the fd's fraction and the count is constant 1 -- F34 becomes "mass = the fd's
+              cell fraction", the shape the skeleton had before item 19
+      item 21 blocking 1 (cell claimed twice; unit unowned at non-INODE types): the cell is at
+              the free tier at every non-INODE type and in the box only while FD_INODE; there
+              is no unit, only the share, and it exists only while the box does
+      item 21 blocking 2 (`file_pay_st_split` false): shares split by mass; `file_pay_tie`
+              and the one-sided pair are not needed
+      item 21 blocking 3 (five statements not final): `file_alloc_step`/`file_dup_step`/
+              `file_close_step` stay PURE ghost steps (no box premise, no mask) -- main's
+              shapes; `file_close_last_step` takes the free withdraw; `so_deposit` is the
+              free-tier store + birth; `so_open_slot` yields `off_free k 1`
+      item 21's fold pair: not needed (no `td` is ever raised in the table)
+      item 22 blocking 4 (the publish checkout has no floor): there is no publish checkout
+              and no self-absorb anywhere -- the SELF-ABSORB CHECKLIST LINE, applied: the
+              creator deposits at the birth and never absorbs; a reader absorbs after ITS
+              ilock acquire (R1 with the share's llb for `Kt`; the row's floor for `Kp`); the
+              closer never absorbs.  Every absorb has an acquire in front of it.
+      F36 (L7's ftable floor slot before L6): no floor slot; L7 for the ftable is the λ-flip
+              alone; the ordering constraint is gone
+      item 23's caution (other fds' `Kp` via the L2 cover): unchanged and still right
+
+    PRODUCERS PER ARM (reviewer 2's checklist line, applied to every `match`):
+      file_core_off FD_NONE / FD_PIPE / FD_DEVICE: `off_free k q` -- produced by the free row
+              (boot: `off_wf_zero` is irrelevant at the free tier; the word is simply free) and
+              by the last close's `box_withdraw_L1_free`; split/joined by `file_pay_split`
+      file_core_off FD_INODE: `off_fd k q γb` -- produced whole at the birth (q = 1) from
+              `box_alloc_at` (the two register halves at ½, split to q/2) + (c) (the share) +
+              `off_member` (from `off_rows_insert`) + `is_box`; consumed whole at the last close
+      fslot free arm: `file_pay γ k 1 C` at FD_NONE -- from boot, from the last close's retype
+      fslot allocated arm: `file_rest γ k q` -- unchanged from main (the complement pieces of
+              `off_fd` ride inside `file_pay` at 1 - q)
+      off_rows (ic_slp): rows keyed by γb, inserted at the birth, taken/returned by the
+              read checkout/park, stale forever after the last close -- unchanged
+
+    WHAT REMAINS OF L6 AFTER THE RE-CUT: the L2 side (unchanged), `so_publish`'s birth,
+    fileread/filewrite's checkout/park, the last close's free withdraw, the retype of
+    `file_core_off` at the six file proofs, `fp_obox` at the six `MkFPNames` sites.  Pass 1
+    of r25 loses the eight `_in` ftable releases, the fold pair, the box steps at filealloc/
+    filedup/fileclose-non-last, and the tie plumbing (`icfg_obox`, `obox_*`, `B`).
+
+    PROCESS (independent of which shape rules): rule 0 checks well-typed, not satisfiable.
+    Before either reviewer signs off on the re-cut shapes, land `FileOffProtocol.v`: the
+    lifecycle above as a CHAIN of ghost lemmas over the final shapes with no program --
+    boot, filealloc, publish, dup, read checkout and park, non-last close, last close and
+    the retype, filealloc again on the same slot -- each lemma's premises exactly the
+    previous one's conclusions.  A double-claimed cell is an unprovable filealloc step; a
+    false split an unprovable dup step; a floorless absorb an unprovable checkout.  This
+    is the mechanical form of the two checklist lines and would have caught items 19-22
+    without a reviewer.
+
+    RULINGS ASKED: (R1) the re-cut as the L6 shape (supersedes items 19-23's repairs where
+    named above; keeps their diagnoses); (R2) `box_withdraw_L1_free` as the box's free-tier
+    corollary of (a); (R3) `box_alloc_out_l2_at` withdrawn as unneeded; (R4) the ftable
+    floor row and the `_in` ftable releases dropped from L7 (T2); (R5) the protocol chain
+    file as a day-one gate beside the two checklist lines.
 
 17. **REVIEWER 1 ON ITEM 16 (2026-09-02): the three corrections and the
     four tripwires are taken; two additions.**
