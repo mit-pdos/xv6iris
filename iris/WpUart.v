@@ -50,6 +50,7 @@ Require Import DiskPtsto VirtioQueue VirtioProto.
    append, so it names the message and the store gate. *)
 Require Import TsoMemPa.
 Require Import PermInv.
+Require Export UartNames.  (* [uart_names]: split out for the build DAG *)
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)
 (* and the nightly dead-import sweep skips [Require Export] lines.         *)
@@ -299,25 +300,7 @@ Qed.
 (*  write WOULD shrink it, so no such write can be verified under [dev_inv].*)
 (* ===================================================================== *)
 
-(*  The UART's ghost names travel together in ONE record, so [dev_inv] and
-    every client-facing resource take a single [γ : uart_names] rather than a
-    fistful of gnames:
-
-      un_acc   mono_list over [uart_acc]  -- the persistent accepted-byte
-               history.  Grows only on a THR push; a lower bound
-               [uart_sent γ l] is a permanent record that [l] was accepted.
-      un_out   mono_list over [u_out]     -- the transmitted prefix.  Its
-               lower bound is what carries a THRE observation forward across
-               later device steps (see [uart_tx_still_empty], DevModel.v).
-      un_tx    ghost_var halves over the accepted trace -- EXCLUSIVE
-               ownership of the transmitter (see [uart_tx_own] below).
-      un_dlab  dfrac_agree over DLAB -- freezable to a persistent fact.       *)
-Record uart_names := UartNames {
-  un_acc  : gname;
-  un_out  : gname;
-  un_tx   : gname;
-  un_dlab : gname;
-}.
+(* [uart_names] moved to UartNames.v (build DAG; see that header). *)
 
 
 Section DevLoops.

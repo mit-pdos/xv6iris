@@ -1804,6 +1804,16 @@ start ≈ mtime − its `real`), never from per-file time sums, which mislead be
 big files run in parallel. `tools/proof_profile.py` does all of it in one pass
 and runs in CI on every checkin.
 
+- **THE PATH CAN REBALANCE ONTO A SECOND ROUTE, SO PRICE THE RUNNER-UP BEFORE
+  YOU INVEST.** Cutting `IcacheInv -> WpSconfMem` (see `MemClaim.v`) took the
+  path off the WP engine and left the tree with TWO routes within a few
+  seconds of each other: engine -> `ProofCreate` -> the Link chain, and
+  `TsoCtx` -> `VirtioProto` -> the fs cone.  Taking 15 s out of `VirtioProto`
+  after that moved the wall by **one second**, because its route simply
+  dropped below the other one.  The static model (coqdep x per-file wall,
+  longest weighted path) predicts this in seconds and it agreed with the
+  measurement to within 5 s on three separate cuts — run it on the runner-up
+  route before spending a day on the leader.
 - **A `Require` between two `Proof<F>.v` files is pure critical path.** A
   whole-function proof requiring a sibling whole-function proof is nearly always
   reaching for a shared *block*, not the sibling's capstone — and a shared block
@@ -2015,7 +2025,15 @@ little. That is a ~778-file change, so it is a campaign, not a fix.
   broad whole-goal normalisation LAST — the loop re-tries its first branch after
   every success.
 - **Give `iFrame`'s names in the GOAL's conjunct order** — a wrong order is worse
-  than none.
+  than none.  **And do not read the order off the frame LIST when you convert
+  one to a chain: `iFrame` matches by TYPE, so a list can be in a plausible
+  order and still not say which name is which row.** Converting
+  `VirtioProto`'s rebuilds, `Hpos`/`Hposm` and `Hord`/`Hordm` both turned out
+  to be the opposite way round from the frame lists' order, and the chain
+  failed at `iExact` with the hypothesis's real type printed beside it. The
+  authority is the DESTRUCTURING PATTERN consumers use on the same
+  definition (`… & Hrel & Hfl & Hflr & Hpos & %Hpmh & #Hposm & …`), which is
+  the definition's own order by construction — read the mapping off that.
 - **`Local Strategy 1000 [pa_stk]`-style deprioritising** keeps failed
   comparisons first-order while `unfold` still works where the arithmetic is
   wanted. `Local Opaque` does not — it blocks `unfold` too.

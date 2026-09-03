@@ -5083,8 +5083,9 @@ Section VirtioProto.
                   = vproto_ctl (v_cfg v) pr) by reflexivity.
     iEval (rewrite -Hpc) in "Hhalf".
     iEval (rewrite /lease_hole -(lease_hole_pop (v_cfg v) pr sl)) in "Hdma".
-    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
-            Hnp Hnr Hstage Hheads Hdone".
+    iSplitR; [iExact "Hcfg"|].
+    iSplitL "Hdma"; [iExact "Hdma"|].
+    iSplitL "Hhalf"; [iExact "Hhalf"|].
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact (vproto_ok_pop _ _ _ sl Hok Hlt Hsl)|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -5096,10 +5097,24 @@ Section VirtioProto.
     iSplitR; [iPureIntro; rewrite virtio_pop_taken; exact Htkc|].
     iSplitR; [iPureIntro; rewrite virtio_pop_uidx; exact Hui|].
     iSplitR; [iPureIntro; exact Hridx|].
+    iSplitL "Hrel"; [iExact "Hrel"|].
+    iSplitL "Hfl"; [iExact "Hfl"|].
+    iSplitL "Hflr"; [iExact "Hflr"|].
+    iSplitL "Hpos"; [iExact "Hpos"|].
     iSplitR; [iPureIntro; exact Hpmh|].
+    iSplitR; [iExact "Hposm"|].
     iSplitR; [iPureIntro; exact HhF|].
     iSplitR; [iPureIntro; exact Hwce|].
     iSplitR; [iPureIntro; rewrite /vp_wt virtio_pop_cache; exact Hwt|].
+    iSplitL "Hslot"; [iExact "Hslot"|].
+    iSplitL "Hord"; [iExact "Hord"|].
+    iSplitR; [iExact "Hordm"|].
+    iSplitL "Hnc"; [iExact "Hnc"|].
+    iSplitL "Hnp"; [iExact "Hnp"|].
+    iSplitL "Hnr"; [iExact "Hnr"|].
+    iSplitL "Hstage"; [iExact "Hstage"|].
+    iSplitL "Hheads"; [iExact "Hheads"|].
+    iFrame "Hdone".
     rewrite virtio_pop_cache.
     iApply (big_sepM_mono _ _ _ Hpmono). iExact "Hpend".
   Qed.
@@ -5155,8 +5170,9 @@ Section VirtioProto.
       in "Hhalf".
     iEval (rewrite /lease_hole -(lease_hole_advance (v_cfg v) pr (vs_hd sl)
                                    (PhFetched (vs_req sl)))) in "Hdma".
-    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
-            Hnp Hnr Hstage Hheads Hdone".
+    iSplitR; [iExact "Hcfg"|].
+    iSplitL "Hdma"; [iExact "Hdma"|].
+    iSplitL "Hhalf"; [iExact "Hhalf"|].
     iSplitR.
     { iPureIntro. rewrite (vproto_advance_ctl (v_cfg v) pr _ _). exact Hctl. }
     iSplitR; [iPureIntro; exact (vproto_ok_fetch _ _ _ p sl Hok Hsl Hfl)|].
@@ -5166,10 +5182,24 @@ Section VirtioProto.
     iSplitR; [iPureIntro; rewrite vpa_tk; exact Htkc|].
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR; [iPureIntro; exact Hridx|].
+    iSplitL "Hrel"; [iExact "Hrel"|].
+    iSplitL "Hfl"; [iExact "Hfl"|].
+    iSplitL "Hflr"; [iExact "Hflr"|].
+    iSplitL "Hpos"; [iExact "Hpos"|].
     iSplitR; [iPureIntro; exact Hpmh|].
+    iSplitR; [iExact "Hposm"|].
     iSplitR; [iPureIntro; rewrite vpa_nr; exact HhF|].
     iSplitR; [iPureIntro; exact Hwce|].
     iSplitR; [iPureIntro; exact Hwt|].
+    iSplitL "Hslot"; [iExact "Hslot"|].
+    iSplitL "Hord"; [iExact "Hord"|].
+    iSplitR; [iExact "Hordm"|].
+    iSplitL "Hnc"; [iExact "Hnc"|].
+    iSplitL "Hnp"; [iExact "Hnp"|].
+    iSplitL "Hnr"; [iExact "Hnr"|].
+    iSplitL "Hstage"; [iExact "Hstage"|].
+    iSplitL "Hheads"; [iExact "Hheads"|].
+    iFrame "Hdone".
     iApply (big_sepM_mono _ _ _ Hpmono). iExact "Hpend".
   Qed.
 
@@ -5260,8 +5290,9 @@ Section VirtioProto.
                   = vproto_ctl (v_cfg v) pr) by reflexivity.
     iEval (rewrite -Hpc) in "Hhalf".
     iEval (rewrite /lease_hole -(lease_hole_capture (v_cfg v) pr p sl)) in "Hdma".
-    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
-            Hnp Hnr Hstage Hheads Hdone".
+    iSplitR; [iExact "Hcfg"|].
+    iSplitL "Hdma"; [iExact "Hdma"|].
+    iSplitL "Hhalf"; [iExact "Hhalf"|].
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact (vproto_ok_capture _ _ _ p sl Hok Hsl Hfl)|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -5273,12 +5304,26 @@ Section VirtioProto.
     { iPureIntro. rewrite vpc_tk. exists sl. split; [exact Hsl | reflexivity]. }
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR; [iPureIntro; exact Hridx|].
+    iSplitL "Hrel"; [iExact "Hrel"|].
+    iSplitL "Hfl"; [iExact "Hfl"|].
+    iSplitL "Hflr"; [iExact "Hflr"|].
+    iSplitL "Hpos"; [iExact "Hpos"|].
     iSplitR; [iPureIntro; exact Hpmh|].
+    iSplitR; [iExact "Hposm"|].
     iSplitR; [iPureIntro; rewrite vpc_nr; exact HhF|].
     iSplitR; [iPureIntro; exact Hwce|].
     iSplitR.
     { iPureIntro. rewrite /vp_wt vpc_tk. exists sl.
       split; [exact Hsl | reflexivity]. }
+    iSplitL "Hslot"; [iExact "Hslot"|].
+    iSplitL "Hord"; [iExact "Hord"|].
+    iSplitR; [iExact "Hordm"|].
+    iSplitL "Hnc"; [iExact "Hnc"|].
+    iSplitL "Hnp"; [iExact "Hnp"|].
+    iSplitL "Hnr"; [iExact "Hnr"|].
+    iSplitL "Hstage"; [iExact "Hstage"|].
+    iSplitL "Hheads"; [iExact "Hheads"|].
+    iFrame "Hdone".
     iApply (big_sepM_mono _ _ _ Hpmono). iExact "Hpend".
   Qed.
 
@@ -5657,8 +5702,9 @@ Section VirtioProto.
     cbn [v_cfg v_isr v_seen v_inflight v_used_idx v_disk v_cache v_taken].
     rewrite Hlive.
     iExists pr, dma, t0, t1, lw, F, hist, pm.
-    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
-            Hnp Hnr Hstage Hheads Hdone".
+    iSplitR; [iExact "Hcfg"|].
+    iSplitL "Hdma"; [iExact "Hdma"|].
+    iSplitL "Hhalf"; [iExact "Hhalf"|].
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact Hok|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -5667,12 +5713,26 @@ Section VirtioProto.
     iSplitR; [iPureIntro; exact Htkc|].
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR; [iPureIntro; exact Hridx|].
+    iSplitL "Hrel"; [iExact "Hrel"|].
+    iSplitL "Hfl"; [iExact "Hfl"|].
+    iSplitL "Hflr"; [iExact "Hflr"|].
+    iSplitL "Hpos"; [iExact "Hpos"|].
     iSplitR; [iPureIntro; exact Hpmh|].
+    iSplitR; [iExact "Hposm"|].
     iSplitR; [iPureIntro; exact HhF|].
     iSplitR; [iPureIntro; exact Hwce|].
     iSplitR.
     { iPureIntro. rewrite /vp_wt Htkq. exists sl. split; [exact Hsl|].
       exact (vslot_cache_sub_delete (v_cache v) sl s Hcsub). }
+    iSplitL "Hslot"; [iExact "Hslot"|].
+    iSplitL "Hord"; [iExact "Hord"|].
+    iSplitR; [iExact "Hordm"|].
+    iSplitL "Hnc"; [iExact "Hnc"|].
+    iSplitL "Hnp"; [iExact "Hnp"|].
+    iSplitL "Hnr"; [iExact "Hnr"|].
+    iSplitL "Hstage"; [iExact "Hstage"|].
+    iSplitL "Hheads"; [iExact "Hheads"|].
+    iFrame "Hdone".
     iApply (big_sepM_delete _ (vp_pend pr) q sl Hsl).
     assert (Hhtd : pend_todo pr (delete s (v_cache v)) q sl
                    = vs_todo sl (dom (v_cache v)) ∖ {[ i ]}).
@@ -5904,8 +5964,9 @@ Section VirtioProto.
       iExists qc, bs. iSplitR; [iPureIntro; exact HqF|].
       rewrite /chain_back_at. iFrame "Hpinm Hbpm Hbq". }
       iExists pr, dma, t0, t1, lw, F, hist, pm.
-      iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
-              Hnp Hnr Hstage Hpend Hdone".
+      iSplitR; [iExact "Hcfg"|].
+      iSplitL "Hdma"; [iExact "Hdma"|].
+      iSplitL "Hhalf"; [iExact "Hhalf"|].
       iSplitR; [iPureIntro; exact Hctl|].
       iSplitR; [iPureIntro; exact Hok|].
       iSplitR; [iPureIntro; exact Hal|].
@@ -5914,10 +5975,23 @@ Section VirtioProto.
       iSplitR; [iPureIntro; exact Htkc|].
       iSplitR; [iPureIntro; exact Hui|].
       iSplitR; [iPureIntro; exact Hridx|].
+      iSplitL "Hrel"; [iExact "Hrel"|].
+      iSplitL "Hfl"; [iExact "Hfl"|].
+      iSplitL "Hflr"; [iExact "Hflr"|].
+      iSplitL "Hpos"; [iExact "Hpos"|].
       iSplitR; [iPureIntro; exact Hpmh|].
+      iSplitR; [iExact "Hposm"|].
       iSplitR; [iPureIntro; exact HhF|].
       iSplitR; [iPureIntro; exact Hwce|].
       iSplitR; [iPureIntro; exact Hwt|].
+      iSplitL "Hslot"; [iExact "Hslot"|].
+      iSplitL "Hord"; [iExact "Hord"|].
+      iSplitR; [iExact "Hordm"|].
+      iSplitL "Hnc"; [iExact "Hnc"|].
+      iSplitL "Hnp"; [iExact "Hnp"|].
+      iSplitL "Hnr"; [iExact "Hnr"|].
+      iSplitL "Hstage"; [iExact "Hstage"|].
+      iFrame "Hpend Hdone".
       iExists (<[ i := HInactive ]> hs). iFrame "Hhauth".
       iSplitR; [iPureIntro; rewrite dom_insert_L Hhdom;
                 apply subseteq_union_1_L, singleton_subseteq_l;
@@ -7139,8 +7213,9 @@ Section VirtioProto.
     iSplitR; [ iExists q, w; by iFrame "Hqu" |].
     iFrame "Hpub Hlb Hrd Hcm".
     iExists pr, dma, t0, t1, lw, F, hist, pm.
-    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
-            Hnp Hnr Hstage Hpend Hdone".
+    iSplitR; [iExact "Hcfg"|].
+    iSplitL "Hdma"; [iExact "Hdma"|].
+    iSplitL "Hhalf"; [iExact "Hhalf"|].
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact Hok|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -7149,10 +7224,23 @@ Section VirtioProto.
     iSplitR; [iPureIntro; exact Htkc|].
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR; [iPureIntro; exact Hridx|].
+    iSplitL "Hrel"; [iExact "Hrel"|].
+    iSplitL "Hfl"; [iExact "Hfl"|].
+    iSplitL "Hflr"; [iExact "Hflr"|].
+    iSplitL "Hpos"; [iExact "Hpos"|].
     iSplitR; [iPureIntro; exact Hpmh|].
+    iSplitR; [iExact "Hposm"|].
     iSplitR; [iPureIntro; exact HhF|].
     iSplitR; [iPureIntro; exact Hwce|].
     iSplitR; [iPureIntro; exact Hwt|].
+    iSplitL "Hslot"; [iExact "Hslot"|].
+    iSplitL "Hord"; [iExact "Hord"|].
+    iSplitR; [iExact "Hordm"|].
+    iSplitL "Hnc"; [iExact "Hnc"|].
+    iSplitL "Hnp"; [iExact "Hnp"|].
+    iSplitL "Hnr"; [iExact "Hnr"|].
+    iSplitL "Hstage"; [iExact "Hstage"|].
+    iFrame "Hpend Hdone".
     rewrite /heads_res_at. iExists hs. iFrame "Hhauth".
     iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|]. iExact "Hhbig".
   Qed.
@@ -7261,8 +7349,9 @@ Section VirtioProto.
     iFrame "Hh". iIntros "Hh".
     iSplitR "Hpub Hrd Hcm"; [| by iFrame "Hpub Hrd Hcm"].
     iExists pr, dma, t0, t1, lw, F, hist, pm.
-    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
-            Hnp Hnr Hstage Hpend".
+    iSplitR; [iExact "Hcfg"|].
+    iSplitL "Hdma"; [iExact "Hdma"|].
+    iSplitL "Hhalf"; [iExact "Hhalf"|].
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact Hok|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -7271,10 +7360,23 @@ Section VirtioProto.
     iSplitR; [iPureIntro; exact Htkc|].
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR; [iPureIntro; exact Hridx|].
+    iSplitL "Hrel"; [iExact "Hrel"|].
+    iSplitL "Hfl"; [iExact "Hfl"|].
+    iSplitL "Hflr"; [iExact "Hflr"|].
+    iSplitL "Hpos"; [iExact "Hpos"|].
     iSplitR; [iPureIntro; exact Hpmh|].
+    iSplitR; [iExact "Hposm"|].
     iSplitR; [iPureIntro; exact HhF|].
     iSplitR; [iPureIntro; exact Hwce|].
     iSplitR; [iPureIntro; exact Hwt|].
+    iSplitL "Hslot"; [iExact "Hslot"|].
+    iSplitL "Hord"; [iExact "Hord"|].
+    iSplitR; [iExact "Hordm"|].
+    iSplitL "Hnc"; [iExact "Hnc"|].
+    iSplitL "Hnp"; [iExact "Hnp"|].
+    iSplitL "Hnr"; [iExact "Hnr"|].
+    iSplitL "Hstage"; [iExact "Hstage"|].
+    iFrame "Hpend".
     iSplitL "Hhauth Hhbig".
     { rewrite /heads_res_at. iExists hs. iFrame "Hhauth".
       iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|]. iExact "Hhbig". }
@@ -7382,8 +7484,9 @@ Section VirtioProto.
     iFrame "Hstm". iIntros "Hstm".
     iSplitR "Hpub Hrd Hcm"; [| by iFrame "Hpub Hrd Hcm"].
     iExists pr, dma, t0, t1, lw, F, hist, pm.
-    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
-            Hnp Hnr Hstage Hpend".
+    iSplitR; [iExact "Hcfg"|].
+    iSplitL "Hdma"; [iExact "Hdma"|].
+    iSplitL "Hhalf"; [iExact "Hhalf"|].
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact Hok|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -7392,10 +7495,23 @@ Section VirtioProto.
     iSplitR; [iPureIntro; exact Htkc|].
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR; [iPureIntro; exact Hridx|].
+    iSplitL "Hrel"; [iExact "Hrel"|].
+    iSplitL "Hfl"; [iExact "Hfl"|].
+    iSplitL "Hflr"; [iExact "Hflr"|].
+    iSplitL "Hpos"; [iExact "Hpos"|].
     iSplitR; [iPureIntro; exact Hpmh|].
+    iSplitR; [iExact "Hposm"|].
     iSplitR; [iPureIntro; exact HhF|].
     iSplitR; [iPureIntro; exact Hwce|].
     iSplitR; [iPureIntro; exact Hwt|].
+    iSplitL "Hslot"; [iExact "Hslot"|].
+    iSplitL "Hord"; [iExact "Hord"|].
+    iSplitR; [iExact "Hordm"|].
+    iSplitL "Hnc"; [iExact "Hnc"|].
+    iSplitL "Hnp"; [iExact "Hnp"|].
+    iSplitL "Hnr"; [iExact "Hnr"|].
+    iSplitL "Hstage"; [iExact "Hstage"|].
+    iFrame "Hpend".
     iSplitL "Hhauth Hhbig".
     { rewrite /heads_res_at. iExists hs. iFrame "Hhauth".
       iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|]. iExact "Hhbig". }
@@ -7982,8 +8098,9 @@ Section VirtioProto.
                (vpo_fp_disj _ _ _ Hok q p slq sl pinq pin Hqne
                   (vproto_pend_slot pr _ _ Hq) Hpinq Hs Hpin)
                x (slot_fp_wr slq pinq x Hx) Hc'). }
-    iFrame "Hcfg Hdma Hhalf Hrel Hfl Hflr Hposm Hpos Hslot Hordm Hord Hnc
-            Hnp Hnr Hstage Hheads Hpend".
+    iSplitR; [iExact "Hcfg"|].
+    iSplitL "Hdma"; [iExact "Hdma"|].
+    iSplitL "Hhalf"; [iExact "Hhalf"|].
     iSplitR.
     { iPureIntro. rewrite Hctlr. apply map_sub_difference; [exact HAsub|].
       rewrite HdomMM. exact HAdisj. }
@@ -8002,7 +8119,12 @@ Section VirtioProto.
       apply Hframe. intro Hc'.
       exact (proj1 (elem_of_disjoint _ _) Hstand _ Hc'
                (elem_of_union_r _ _ _ (used_idx_in_page (v_cfg v) j Hj2))). }
+    iSplitL "Hrel"; [iExact "Hrel"|].
+    iSplitL "Hfl"; [iExact "Hfl"|].
+    iSplitL "Hflr"; [iExact "Hflr"|].
+    iSplitL "Hpos"; [iExact "Hpos"|].
     iSplitR; [iPureIntro; exact Hpmh|].
+    iSplitR; [iExact "Hposm"|].
     (* the floor bound, one record higher: the new entry's stamp is [qv],
        which the caller's view [V0] has, and the floor moved up to it *)
     iSplitR.
@@ -8013,6 +8135,15 @@ Section VirtioProto.
         pose proof (HhF u2 q2 g2 Hu2 Hlt3). lia. }
     iSplitR; [iPureIntro; exact Hwce|].
     iSplitR; [iPureIntro; exact Hwt|].
+    iSplitL "Hslot"; [iExact "Hslot"|].
+    iSplitL "Hord"; [iExact "Hord"|].
+    iSplitR; [iExact "Hordm"|].
+    iSplitL "Hnc"; [iExact "Hnc"|].
+    iSplitL "Hnp"; [iExact "Hnp"|].
+    iSplitL "Hnr"; [iExact "Hnr"|].
+    iSplitL "Hstage"; [iExact "Hstage"|].
+    iSplitL "Hheads"; [iExact "Hheads"|].
+    iSplitL "Hpend"; [iExact "Hpend"|].
     (* the OTHER done records survive the shrink *)
     assert (Hmono : forall k u' x, delete p (vp_done pr) !! k = Some x ->
               vp_uix pr !! k = Some u' ->

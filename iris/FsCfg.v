@@ -68,7 +68,8 @@ From stdpp Require Import gmap list bitvector.definitions.
 From iris.base_logic.lib Require Import own.   (* [gname] *)
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import WpUart.        (* [uart_names] *)
+Require Import UartNames.     (* [uart_names] -- NOT WpUart, which would
+     put the device model in front of every fs file (see UartNames.v) *)
 Require Import DiskPtsto.     (* [disk_names] *)
 Require Import BioDefs.       (* [bio_names]  *)
 Require Import FsBlocks.      (* [fs_names]   *)
