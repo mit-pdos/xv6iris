@@ -2630,6 +2630,7 @@ Section ProofNamexTrMain.
                       whole locked window, and the residue rides the
                       descriptor conjunct home. *)
 
+                   iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
                    iApply (IL.wp_ilock_tx_sconf gs j gl pd pav pu
                              gilk gislk
                              ik (iq/2)%Qp gsh PlainK iinum pidv dq dqs
@@ -2638,10 +2639,10 @@ Section ProofNamexTrMain.
                              ltac:(lkbelow)
                              with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hitbl Hesck
                                    Hireg Hslkk Hshr Hru Hinos Hppid Hprocs Hdev
-                                   Hgeom Hdlk Hbs1 Htx").
+                                   Hgeom Hdlk Hbs1 Htx Hllb0").
                    all: try lkbelow.
                    iIntros (CIDil Hqil mil dnl bml fl_)
-                     "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hinos Hbs1 Hslkd Hdep
+                     "%Hcsil _ Hcg Hcnt Hextc Hclmc Hpc Hppid Hinos Hbs1 Hslkd Hdep
                       Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfr_
                       Hru %Hilkp".
                    assert (Hpcbc : ret_pc (V2 !!! Regidx Rra)

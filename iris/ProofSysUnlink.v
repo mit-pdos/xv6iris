@@ -1889,6 +1889,7 @@ Section ProofSysUnlinkBody.
     iDestruct (log_tx_open with "Htx") as (t) "Htw".
     iDestruct (log_tx_split icfg_log t 1 (1/2) (1/2)
                  (eq_sym Qp.half_half) with "Htw") as "[Htp Htx]".
+    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (Ilock.wp_ilock_dep_sconf (CID := CID1) gs jx gl pd pav pu
               gild gisld kd (qd/2)%Qp
               gyd lod tld (DepTx (qd/2)%Qp icfg_dev dinum gyd lod t (1/2)) PlainK dinum
@@ -1898,12 +1899,12 @@ Section ProofSysUnlinkBody.
               Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl HR0a0
               (Hlb "bcache"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpenv2 Hbio Hitinv Hescd Hireg
-                    Hslkd0 [//] Hfld Hclaimssu Hshrd [Htp] Hrud Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
+                    Hslkd0 [//] Hfld Hclaimssu Hshrd [Htp] Hrud Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1 Hllb0").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htp". }
     iIntros (CID2 Hq2 mil dnd bmd fld)
-      "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkdd Hdep
+      "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkdd Hdep
        Hidev Hiinum Hivalid Hload #Hshotl Hfrz %Hfld Hrud %Hilkpd".
     iEval (rewrite /ic_dep_held /=) in "Hload".
     assert (Hpc34 : ret_pc (R0 !!! Regidx Rra : mword 64)
@@ -3863,6 +3864,7 @@ Section ProofSysUnlinkBody.
             ltac:(solve_ndisj) with "Hescd Hivalidd Hdepd")
       as "(Hivalidd & Hdepd & Htp)".
     iModIntro.
+    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0b".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (Ilock.wp_ilock_dep_sconf (CID := CID2) gs jx gl pd pav pu
               gili gisli ks (qs/2)%Qp
               gyi loyi tlyi (DepTx (qs/2)%Qp icfg_dev
@@ -3874,12 +3876,12 @@ Section ProofSysUnlinkBody.
               Hks Hgeom Hist0 Hiblki Hinb Hj Hgl HR0a0
               (Hlb "bcache"%string)
               with "Hcg Hown [] [] Htext Hkd Hpc Hpe Hbio Hitinv Hesci Hireg
-                    Hslki [//] Hflyi Hclaimsyd Hshri [Htp] Hrui Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
+                    Hslki [//] Hflyi Hclaimsyd Hshri [Htp] Hrui Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1 Hllb0b").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htp". }
     iIntros (CID3 Hq3 mil dni bmi fldi)
-      "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkiq Hdepi
+      "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkiq Hdepi
        Hidevi Hiinumi Hivalidi Hloadi #Hshoti Hfrzi %Hfldi Hrui %Hilkpi".
     iEval (rewrite /ic_dep_held /=) in "Hloadi".
     assert (Hpc78 : ret_pc (R0 !!! Regidx Rra : mword 64)

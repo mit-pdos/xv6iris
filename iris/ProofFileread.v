@@ -1977,7 +1977,7 @@ Section ProofFileread.
                 of the off FAMILY by the slot THIS CONTRACT names. ---- *)
              iDestruct (fileread_pay_carve γf k q Cf _ (or_introl Htyi)
                           with "Hrpay")
-               as (ikk inm ssh gsh ty0 losh tlsh)
+               as (ikk inm ssh gsh ty0 losh tlsh γb0)
                   "(%Hipk & %Hik & %Hinlt & %Hnd0 & %Hdv0 & %Hlesh & #Hflsh &
                     #Hshot0 & Hshr0 & Hoh & Hpayback)".
              (* the off output IS the ledger fragment on this arm *)
@@ -2106,6 +2106,7 @@ Section ProofFileread.
                 the payload's slice already does, so nothing has to be
                 introduced here -- the [inode_shr_gen_intro] this call used
                 to open with is gone with the caller-supplied [inode_shr]. *)
+             iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
              iApply (Ilock.wp_ilock_dep_sconf γs j γlp
  (frn_pd fn) (frn_pav fn) (frn_pu fn)
 
@@ -2122,7 +2123,7 @@ Section ProofFileread.
                        ltac:(rewrite HI2a0; exact Hipk) Hbelow
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
                              Hslk [%] Hflsh Hclaimsfr Href [] Hshot0 Hsb Hppid Hprocs
-                             Hdevi Hdgeom Hdlock Hbslot").
+                             Hdevi Hdgeom Hdlock Hbslot Hllb0").
              all: try lkbelow.
              all: try (exact Hlesh).
              { rewrite Heb /trap_csrs_ext. done. }
@@ -2132,7 +2133,7 @@ Section ProofFileread.
                 half, which iunlock consumes to select its own escrow arm
                 (design §14.8) *)
              iIntros (CIDil Hsil mil dnl bml fl_)
-               "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hdep
+               "%Hcsil _ Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hdep
                 Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
              iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
              assert (Hpc34 : ret_pc (I2 !!! Regidx Rra) = mword_of_int (FR + 0x3a)).

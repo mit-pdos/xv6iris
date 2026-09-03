@@ -598,6 +598,7 @@ Proof.
     iDestruct (inode_ref_short_shr_genlo_agree with "Hkeep Hshr") as %[-> ->].
     iDestruct (cpu_own_transport CID4 CID7 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (Hil CID7 XI γs j γl pd pav pu gilc gislc
               kslot (q/2)%Qp gsh losh tlsh
               (DepTx (q/2)%Qp icfg_dev inum gsh losh t qt) (ClaimK ty t qc) inum pidv dq dqs
@@ -606,13 +607,13 @@ Proof.
               Hkslt Hlg Hist Hcblk Hinb Hj Hgs HB1a0 ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescc Hireg
                     Hslkc [%] Hflsh Hclaimsf Hshr [Htx] Hlic Hsbi Hppid Hprocs Hdevi Hdgeom
-                    Hdlk Hbs1").
+                    Hdlk Hbs1 Hllb0").
     all: try (exact Hlesh).
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htx". }
     iIntros (CID8 Hq8 Mo dnc bmc filled)
-      "%Hcso Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslq Hdep
+      "%Hcso _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslq Hdep
        Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrf Hwb %Hilkp".
     (* THE CLAIM ARM'S PAYOUT IS A PAIR since durable-disk C-5: the plain
        provenance unit the child reference carries from here on, and the

@@ -2235,7 +2235,7 @@ Section ProofIlockMain.
     pose proof (ic_dep_gname_of_shr d s icfg_dev inum g lo Hdshr) as Hdg.
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hitbl #Hesc #Hireg #Hslk
               %Hle #Hfl #Hclaims Href Hside Hcl Hsb Hppid #Hprocs #Hdevi #Hdgeom
-              #Hdlock Hsl Hcont".
+              #Hdlock Hsl" (Tl) "Hllb Hcont".
     (* THE READ ARM'S ONE-SHOT, TAKEN OUT OF THE LICENCE AND KEPT (durable-disk
        B''-tx3).  At [DepRd] the caller is a [ShotK] site, so its licence IS
        [IcacheRef.ity_shot] -- persistent, hence the licence itself survives
@@ -2251,9 +2251,8 @@ Section ProofIlockMain.
     pose proof (ic_dep_id_of_shr d s icfg_dev inum g lo Hdshr) as Hid0.
     (* LEVEL 0 TIES THE TWO INDICES, as in [il_epilogue]/[il_load]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
-    iAssert (il_cont (CID0 := CID) gisl s g lo d o k ip
- inum pidv dq dqs j m K eb b lks Upr)%I
-      with "[Hcont]" as "Hcont"; [rewrite /il_cont; iExact "Hcont" |].
+    (* the continuation is re-wrapped as [il_cont] AFTER the acquire below,
+       once the floor it owes the caller (the llb-tier post) is in hand *)
     (* ===== +0x00 c.addi sp,sp,-32 ===== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1 : mword 64)
                       (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
@@ -2528,13 +2527,16 @@ Section ProofIlockMain.
        is the box's L2 row [ic_slp]. *)
     iDestruct "Hrst" as (mst) "(%Hmst & Hrefm)".
     iDestruct (CtxBox.reference_llb with "Hrefm") as "#Hllbm".
+    (* the caller's bound joins the share's: ONE llb, ONE floor covering both *)
+    iDestruct (TsoGhost.llb_max with "Hllb Hllbm") as "#Hllbx".
     iApply (ASL.wp_acquiresleep_genl_llb_sconf gs j gil gisl "inode"%string (ic_slp fsc_ic k)
-              (slh_tok (icfg_isl k)) s R6 pidv Upr (K - 4)%nat eb b lks (CtxBox.max_stamp mst)
+              (slh_tok (icfg_isl k)) s R6 pidv Upr (K - 4)%nat eb b lks
+              (Nat.max Tl (CtxBox.max_stamp mst))
               Hj ltac:(lia)
               (* acquiresleep's bound is "sleep lock"(6); ilock's own is
                  "bcache"(4), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hllbm Hrs Hppid Hprocs").
+              with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hllbx Hrs Hppid Hprocs").
     all: try lkbelow.
     { iEval (rewrite HR6a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDa], handing the complement
@@ -2574,7 +2576,17 @@ Section ProofIlockMain.
        the split is a view shift that kills the unloaded shape (the
        reader's one-shot) and the frozen alternative (its slice), so what
        comes out is LOADED and ORDINARY. ---- *)
-    iDestruct "Hflk" as (Kt) "[%HTlK #Hflt]".
+    iDestruct "Hflk" as (Kt) "[%HTlKx #Hflt]".
+    assert (HTlK : (CtxBox.max_stamp mst <= Kt)%nat) by lia.
+    (* the caller's continuation, specialised at the floor it was promised:
+       from here on it is exactly [il_cont] *)
+    iAssert (il_cont (CID0 := CID11) gisl s g lo d o k ip
+ inum pidv dq dqs j m K eb b lks Upr)%I
+      with "[Hcont]" as "Hcont".
+    { rewrite /il_cont /wp_next. iIntros (CIDy) "%Hqy". iIntros (mf2 dn2 bm2 fl2) "%Hcs2".
+      iSpecialize ("Hcont" $! CIDy with "[%]"); [exact Hqy|].
+      iApply ("Hcont" $! mf2 dn2 bm2 fl2 with "[%] []"); [exact Hcs2|].
+      iExists Kt. iFrame "Hflt". iPureIntro. lia. }
     (* r25 pass 1: the payload has a FOURTH conjunct now -- the inode's
        published off rows ([OffBox.off_rows]).  It rides the handle across
        the hold, beside [ic_tok] (plan item 33). *)

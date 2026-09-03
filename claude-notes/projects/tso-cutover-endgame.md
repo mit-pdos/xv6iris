@@ -1216,6 +1216,70 @@ and law 10 (hooks).
     the running context -> `proto_read_park` before iunlock; filewrite the
     same with one checkin.
 
+    LANE (ii) STEP 1 LANDED IN THE TREE (2026-09-03, early): SpecIlock's two
+    bodies take `∀ Tl, TsoGhost.llb loglen_name Tl -∗` as their last premise
+    and hand the continuation `(∃ K, ⌜Tl ≤ K⌝ ∗ TsoCtx.ctx_floor cur_ctx K)`
+    right after `⌜callee_saved m mf⌝` (STATEMENT CHANGE, flagged for the
+    reviewers; the allowed-forms law leaves no other source of a floor for the
+    fd share's checkout).  ProofIlock joins the caller's bound with the inode
+    share's (`llb_max`), presents the max to its llb-tier acquiresleep and
+    re-wraps the continuation as `il_cont` only after the acquire, with the
+    floor specialised in.  Every caller (18 sites in 16 files) presents
+    `TsoGhost.llb_0` and binds the row `_`; fileread/filewrite will present
+    `proto_read_llb`'s bound instead when their off steps land.  Also
+    re-applied: `ctx_morph_const_pay` at priority 0 (the build-time audit found
+    flip's 99 inherited on the cutover; optimization.md's measured fix).
+    Build-time audit (owner's request, 2026-09-03): the 8-minute compiles were
+    the inode lane's worktree still spelling `<{ ftable_res γf }>` at the
+    three ftable acquires -- each spent ~11 CPU-minutes in one failing
+    `iExact "Hlock"` (delta-unfolding `ftable_res` on both sides); main's
+    copies take 6-19 s.  Suggested follow-up: a conversion seal on
+    `ftable_res` (`Strategy opaque`) so a payload-spelling mismatch fails
+    fast; needs an isolated A/B first.
+
+34. **(2026-09-03, lane (ii)) THE FOLD-BACK PROBLEM -- where the off rows go
+    AFTER a fileread/filewrite park.  Reviewer question.**  Item 33 put the
+    inode's off rows into `IcacheEscrow.ic_handle` FOLDED
+    (`off_rows off_cfg k cur_ctx`: every row `l2_row γ s ξ ∗ llb (lr_tp s)`
+    carries `ctx_floor ξ (lr_tp s)`).  That is right for the two consumers
+    that need a row's floor as `Kp` (`proto_read_checkout`; sys_open's
+    birth inserts a row and needs the folded set), and it is what the ilock
+    acquire hands out (the payload is folded at the acquirer by R2 at the
+    previous release).  But `proto_read_park` returns the rows DEFERRED:
+    `∃ T', llb T' ∗ (ctx_floor ξ T' -∗ off_rows off_cfg i ξ)`, and the
+    parker has NO floor at `T'`: `ctx_deposit`'s stamp is `max(T_box, ...)`
+    and `ctx_dom_def` only gives `B ≤ B'` (the parked stamp is at least the
+    parker's bound, never at most).  So fileread cannot re-fold the rows into
+    `ic_handle` for iunlock; the fold has to happen at iunlock's `_in`
+    releasesleep (R2: `Rdep cur_ctx` + `llb tl` + `∀ ξ, Rdep ξ ∗ ctx_floor ξ
+    tl ⊢ R ξ`), exactly as finding 4 / item 24 said ("the `_in` releasesleep
+    fold").  ONE predicate at both ends of the hold cannot be folded going in
+    and deferred coming out unless its bound is a parameter.  Options:
+    (A) ROWS OUTSIDE THE HANDLE (recommended): SpecIlock's post gains the row
+        `off_rows off_cfg k cur_ctx`; SpecIunlock's (and SpecIunlockput's)
+        pre gains `off_rows_defer off_cfg k cur_ctx := ∃ T, llb loglen_name
+        T ∗ (ctx_floor cur_ctx T -∗ off_rows off_cfg k cur_ctx)`, folded by
+        the `_in` release (`ic_slp_dep` gets the same deferred conjunct in
+        place of `off_rows_dep`, or a variant); `create_locked` carries the
+        row; `ic_handle` goes back to its pre-item-33 shape (the accessors
+        go).  A caller that does not touch f->off threads the row and
+        defers it trivially (`T := 0`).  Cost: SpecIlock/SpecIunlock/
+        SpecIunlockput/SpecCreate + ProofIlock/Iunlock/Iunlockput/Create +
+        ~19 ilock callers' continuation intros + ~25 iunlock/iunlockput
+        call sites (one hypothesis each) -- mechanical, one sweep.
+    (B) KEEP THE HANDLE, MOVE THE PARK: fileread/filewrite do not park the
+        off box; the L2 hold + the resident cell travel to iunlock through a
+        NEW optional row of SpecIunlock's pre (`off_held k`), and iunlock's
+        `_in` release parks it (the release's own floor is `T'`).  Smaller
+        caller churn (only fileread/filewrite/iunlock), but iunlock's spec
+        gains an fd-shaped row and ProofIunlock a box park.
+    (C) A PARAMETRISED HANDLE (`ic_handle cn k d T`, the rows' bound as a
+        parameter): every `ic_handle` site moves (~26) and `ic_dep` sites
+        may too; not recommended.
+    Until ruled, fileread/filewrite stay red at their off steps; everything
+    else in the tree is green or in progress.  Ilock's llb-tier floor (step
+    1) is independent of the choice and stays.
+
 ## 10. Process and tooling (measured facts)
 
 ### 10.1 Build

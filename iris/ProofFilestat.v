@@ -687,6 +687,7 @@ Section ProofFilestat.
                    with "Hcnt") as "Hcnt".
       (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)); the
          payload's slice already does, so nothing has to be introduced here. *)
+      iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
       iApply (Ilock.wp_ilock_dep_sconf γs j γlp
  (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)
 
@@ -704,14 +705,14 @@ Section ProofFilestat.
                 Hbelow
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
                       Hslk [%] Hflsh Hclaimsfs Hshr [] Hshot0 Hsb Hppid Hprocs
-                      Hdevi Hdgeom Hdlock Hbslot").
+                      Hdevi Hdgeom Hdlock Hbslot Hllb0").
       all: try (exact Hlesh).
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { rewrite /ic_dep_side. done. }
       iIntros (CIDil Hsil mil dnl bml fl_)
-        "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hdep
+        "%Hcsil _ Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hdep
          Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
       iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
       assert (Hpc2a : ret_pc (Q3 !!! Regidx Rra) = mword_of_int (FST + 0x2a)).

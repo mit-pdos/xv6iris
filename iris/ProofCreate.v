@@ -3105,6 +3105,7 @@ Section ProofCreateMain.
       iDestruct (log_tx_open with "Htx") as (t) "Htw".
       iDestruct (log_tx_split icfg_log t 1 (1/2) (1/2)
                    (eq_sym Qp.half_half) with "Htw") as "[Htp Htx]".
+      iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
       iApply (IL.wp_ilock_dep_sconf γs j γl pd pav pu
                 gild gisld kd (qd/2)%Qp gd lod tld
                 (DepTx (qd/2)%Qp icfg_dev dind gd lod t (1/2)) PlainK
@@ -3113,13 +3114,13 @@ Section ProofCreateMain.
                 U ltac:(exact HKil) eq_refl ltac:(discriminate)
                 Hkd Hlg Hist0 Hdblk Hdib' Hj Hgs HQ2a0
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescd Hiregi
-                      Hslkd [//] Hfld Hclaimscr Hshr [Htp] Hrud Hsbi Hppid Hprocs Hdevi Hgeom Hdlk Hbs1").
+                      Hslkd [//] Hfld Hclaimscr Hshr [Htp] Hrud Hsbi Hppid Hprocs Hdevi Hgeom Hdlk Hbs1 Hllb0").
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { rewrite /ic_dep_side. iExact "Htp". }
       iIntros (CIDil Hqil mil dnl bml fld)
-        "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslkdd Hdep
+        "%Hcsil _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslkdd Hdep
          Hidev Hiinum Hivalid Hload #Hshotl Hfrzl %Hfrd Hrud %Hilkpd".
       iEval (rewrite /ic_dep_held /=) in "Hload".
       assert (Hpcil : ret_pc (Q2 !!! Regidx Rra : mword 64)
@@ -3780,6 +3781,7 @@ Section ProofCreateMain.
              CHECKOUT ITSELF (B''-tx3).  The parent went home at +0x50, so
              this arm parks exactly the half that came back from its disarm,
              at the same transaction. *)
+          iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0b".   (* r25 lane (ii): nothing to present at this ilock *)
           iApply (IL.wp_ilock_dep_sconf γs j γl pd pav pu
                     gilc gislc kslot (qq/2)%Qp gc lock tlc
                     (DepTx (qq/2)%Qp icfg_dev cinum gc lock t (1/2)) PlainK
@@ -3788,13 +3790,13 @@ Section ProofCreateMain.
                     Hkslot Hlg Hist0 Hcblk Hcinb Hj Hgs HF5a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescc
                           Hiregi Hslkc [//] Hflc Hclaimscr Hcshr [Htp] Hruc Hsbi Hppid Hprocs Hdevi Hgeom
-                          Hdlk Hbs1").
+                          Hdlk Hbs1 Hllb0b").
           all: try lkbelow.
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           { rewrite /ic_dep_side. iExact "Htp". }
           iIntros (CIDic Hqic mic dnc bmc flc)
-            "%Hcsic Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hcslkd Hcdep
+            "%Hcsic _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hcslkd Hcdep
              Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrc Hruc %Hilkpc".
           iEval (rewrite /ic_dep_held /=) in "Hcload".
           assert (Hpcic : ret_pc (F5 !!! Regidx Rra : mword 64)

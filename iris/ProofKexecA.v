@@ -1129,17 +1129,18 @@ Section KexecABody.
        seam is the BUDGET half. *)
     iDestruct (log_op_split with "Hlog") as "[Hlog Htx]".
 
+    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (Ilock.wp_ilock_tx_sconf gs jp gl pd pav pu
               gilk gislk k (q/2)%Qp gy loy tly PlainK
  inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat eb eb lks
               U ltac:(lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hitinv Hesck Hireg Hslkk
-                    [%] Hfly Hclaimskx Hshr Hru Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1 Htx").
+                    [%] Hfly Hclaimskx Hshr Hru Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1 Htx Hllb0").
     all: try (exact Hley).
     all: try lkbelow.
     all: try (exact Hley).
-    iIntros (CIDil Hsil M1 dnl bml fl_) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hins Hbs1
+    iIntros (CIDil Hsil M1 dnl bml fl_) "%Hcsil _ Hcg Hcnt Hextc Hclmc Hpc Hppid Hins Hbs1
              Hslkd Hdep Hidev Hiinum Hivalid Hload Hity Hfrz %Hfr_
              Hru %Hilkp".
     assert (Hpc3a : ret_pc (Q2 !!! Regidx Rra) = mword_of_int (KXA + 0x03a))

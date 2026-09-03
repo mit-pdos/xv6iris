@@ -4298,6 +4298,48 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
+  (* THE SAME STORE OF x0 INTO A FREE CELL (r25 item 24, the visibility-free
+     tier): [sw zero, imm(rs1)] re-establishes a word nobody owns a view of --
+     the ftable's [f->off] between a close and the next publish -- exactly
+     as [wp_store_s_sconf_free_gen] does for a general source register.  The
+     result is the generic [wordw_pointsto] at width 4; a caller folds it
+     into [↦₄] by [ctx_word4_pointsto_unfold] (the two are the same
+     conjunction once [Z.to_nat 4] is computed). *)
+  Lemma wp_sw_zero_s_sconf_free {ktd : ktier}
+      (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (b : bool) `{!KtierLe ktd kt} :
+    let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    let storeval := (mword_of_int 0 : mword 32) in
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
+    wordw_free (KTR := ktd) 4 ea -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      wordw_pointsto (KTR := ktd) 4 ea (DfracOwn 1) storeval -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros ea storeval.
+    iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
+    iDestruct (gpr_file_x0 (tp_pin m) (mword_of_int 0 : mword 5)
+                 ltac:(vm_compute; reflexivity) with "Hfile") as "[%Hx0 Hfile]".
+    iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
+    assert (Hsv : (autocast (T := mword)
+              (subrange_vec_dec (rget m (mword_of_int 0 : mword 5)) (4*8-1) 0)
+              : mword (8*4)) = storeval).
+    { unfold storeval, rget. rewrite Hx0. rewrite (store_ext_4 zero_reg).
+      apply bv_eq. vm_compute. reflexivity. }
+    iApply (wp_store_s_sconf_free_gen (ktd := ktd) 4 false pc
+              (mword_of_int 0 : mword 5) rs1 imm m n storeval b
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia)
+              ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+              exec_write_ram_plain_4 Hsv
+              with "Hcg Hpc Hinstr Hbytes Hcont").
+  Qed.
+
   (* ------------------------------------------------------------------- *)
   (* [SrcOk] SMOKE TEST -- see IntrDefs.v's checker block for why this is  *)
   (* here and not only there.  An unresolved [SrcOk] inside an [iApply] is *)

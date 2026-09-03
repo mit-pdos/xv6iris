@@ -1696,6 +1696,7 @@ Section IreclaimOrphan.
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
     iDestruct "Hshr" as (gsh losh tlsh) "(%Hlesh & #Hflsh & Hshr)".
     iDestruct (is_itable2_claims with "Hitb2") as "#Hclaims2".
+    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (IL.wp_ilock_tx_sconf γs j γl pd pav pu gil gisl
  kslot (q/2)%Qp gsh losh tlsh PlainK inum
               pidv dq dqs OC (K - 8)%nat eb b lks Upr
@@ -1705,11 +1706,11 @@ Section IreclaimOrphan.
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hitbl Hescrow Hireg Hslk
-                    [%] Hflsh Hclaims2 Hshr Hru Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1 Htx").
+                    [%] Hflsh Hclaims2 Hshr Hru Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1 Htx Hllb0").
     all: try lkbelow.
     all: try (exact Hlesh).
     iIntros (CID18 Hq18 mL dnl bml fl_)
-      "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbi Hsl1 Hslkd Hdep Hidev Hiinum
+      "%Hcsil _ Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbi Hsl1 Hslkd Hdep Hidev Hiinum
        Hvalid Hloaded #Hshot Hfrz %Hfr_ Hru %Hilkp".
     assert (Hpc5e : ret_pc (OC !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x5e))

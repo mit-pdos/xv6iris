@@ -1750,7 +1750,7 @@ Section ProofFilewrite.
        names below are local to the iteration and everything derived from
        them is re-derived on the next one. ---- *)
     iDestruct (fileread_pay_carve gf kx qx Cf _ (or_introl Htyi) with "Hrpay")
-      as (ik inum sh g ty lox tlx)
+      as (ik inum sh g ty lox tlx γb0)
          "(%P8 & %P9 & %P5 & %P10 & %P10d & %Hlex & #Hflx & #Hty & Hshr & Hoh &
            Hpayback)".
     (* the off output IS the ledger fragment on this arm *)
@@ -1874,6 +1874,7 @@ Section ProofFilewrite.
       as "[Hppid Hpbk2]".
     iDestruct (cpu_own_transport CIDbo CIDa3 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (Ilock.wp_ilock_tx_sconf gs jx glp
  (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
 
@@ -1890,13 +1891,13 @@ Section ProofFilewrite.
               ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hit Hesc Hireg
                     Hslk2 [%] Hflx Hclaimsfw Hshrl Hty Hsbi Hppid Hprocs
-                    Hdev Hgeo Hdlk Hbsl1 Htx").
+                    Hdev Hgeo Hdlk Hbsl1 Htx Hllb0").
     all: try lkbelow.
     all: try (exact Hlex).
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDil Hsil mil dnl bml fl_)
-      "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hbsl1 Hheld Hdep
+      "%Hcsil _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbsl1 Hheld Hdep
        Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
     iDestruct ("Hpbk2" with "Hppid") as "Hpriv".
     assert (Hpc90 : ret_pc (D3 !!! Regidx Rra) = mword_of_int (FW + 0x98)).

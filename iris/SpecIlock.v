@@ -370,9 +370,19 @@ Definition wp_ilock_dep_sconf_body
      the contract was pinned at [b = true] the two spellings coincided; at
      [b = false] the [b] form would claim the function returns on the hart
      that called it, which is false. *)
+  (* THE LLB-TIER ACQUIRE POST (r25 lane (ii), plan §9 item 33): ilock's
+     inner acquiresleep runs at the llb tier, so a caller may PRESENT a
+     log-length lower bound -- the stamps of a share it is about to check out
+     of a box under this lock (the fd's off share, [FileOffProtocol.
+     proto_read_checkout]) -- and receives a floor at its running context
+     covering it (R1).  A caller with nothing to present passes
+     [TsoGhost.llb_0] and ignores the row.  The inode share's own llb is
+     joined in by the proof ([TsoGhost.llb_max]). *)
+  ∀ Tl : nat, TsoGhost.llb loglen_name Tl -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (dn : dinode) (bm : blkmap) (filled : bool),
       ⌜callee_saved m mf⌝ -∗
+      (∃ K : nat, ⌜(Tl ≤ K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K) -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -614,9 +624,19 @@ Definition wp_ilock_tx_sconf_body
      [SpecDirlink], [SpecBmap], [SpecBalloc], [SpecBfree],
      [SpecIunlockput]).  Every one of them already has it. *)
   log_tx icfg_log -∗
+  (* THE LLB-TIER ACQUIRE POST (r25 lane (ii), plan §9 item 33): ilock's
+     inner acquiresleep runs at the llb tier, so a caller may PRESENT a
+     log-length lower bound -- the stamps of a share it is about to check out
+     of a box under this lock (the fd's off share, [FileOffProtocol.
+     proto_read_checkout]) -- and receives a floor at its running context
+     covering it (R1).  A caller with nothing to present passes
+     [TsoGhost.llb_0] and ignores the row.  The inode share's own llb is
+     joined in by the proof ([TsoGhost.llb_max]). *)
+  ∀ Tl : nat, TsoGhost.llb loglen_name Tl -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (dn : dinode) (bm : blkmap) (filled : bool),
       ⌜callee_saved m mf⌝ -∗
+      (∃ K : nat, ⌜(Tl ≤ K)%nat⌝ ∗ TsoCtx.ctx_floor TsoCtx.cur_ctx K) -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -721,23 +741,24 @@ Proof.
   cbv beta delta [wp_ilock_tx_sconf_body wp_ilock_dep_sconf_body].
   intros Hgen pcE ip pj ret_tgt HK Hk Hgeom Hst Hcov Hinlt Hj Hgl Ha0 Hbelow.
   iIntros "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio #Hitbl #Hesc Hireg
-           Hslk %Hle #Hfl #Hclaims Hshr Hlic Hsb Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Htx Hcont".
+           Hslk %Hle #Hfl #Hclaims Hshr Hlic Hsb Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Htx"
+          (Tl) "Hllb Hcont".
   iDestruct (log_tx_halve with "Htx") as (t) "[Ht1 Ht2]".
   iApply (Hgen (DepTx s icfg_dev inum g lo t (1/2))
             HK eq_refl ltac:(discriminate) Hk Hgeom Hst Hcov Hinlt Hj Hgl
             Ha0 Hbelow
             with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hitbl Hesc
                   Hireg Hslk [%] Hfl Hclaims Hshr [Ht1] Hlic Hsb Hppid Hprocs Hdevi Hdgeom
-                  Hdlock Hsl [Ht2 Hcont]").
+                  Hdlock Hsl Hllb [Ht2 Hcont]").
   { exact Hle. }
   { rewrite /ic_dep_side. iExact "Ht1". }
   iIntros (CIDx Hqx mf dn bm filled)
-    "%Hcs Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hidev Hiinum
+    "%Hcs Hflk Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hidev Hiinum
      Hivalid Hload #Hshot Hfrz %Hfl Hlicb %Hilk".
   iEval (rewrite /ic_dep_held; cbn [ic_dep_rd]) in "Hload".
   iDestruct (ic_tx_dep_intro with "Hdep Ht2") as "Hdep".
   iApply ("Hcont" $! CIDx Hqx mf dn bm filled with
-            "[%] Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hidev
+            "[%] Hflk Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hidev
              Hiinum Hivalid Hload Hshot Hfrz [%] Hlicb [%]");
     [exact Hcs | exact Hfl | exact Hilk].
 Qed.

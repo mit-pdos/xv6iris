@@ -1376,6 +1376,7 @@ Section ProofSysLinkBody.
              the escrow's checked-out arm for the whole locked window,
              and the residue rides the descriptor conjunct home. *)
 
+          iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
           iApply (Ilock.wp_ilock_tx_sconf (CID := CID27) gs j gl pd pav pu
  gil gisl
                     kk (qq/2)%Qp gsh losh tlsh PlainK inum pid (DfracOwn (1/4)) dqs
@@ -1384,11 +1385,11 @@ Section ProofSysLinkBody.
                     (Hlb "bcache"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck
                           Hireg Hslkk [//] Hflsh Hclaimssl Hshr Hru Hsbi Hpidq Hprocs Hdev Hgeo Hdlk
-                          Hbs1 Htx").
+                          Hbs1 Htx Hllb0").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           iIntros (CID28 Hq28 mil dn bm fl)
-            "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkd Hdep
+            "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkd Hdep
              Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl Hru %Hilkp".
           assert (Hpc46 : ret_pc (R0 !!! Regidx Rra : mword 64)
                           = mword_of_int (SL + 0x46)) by (rewrite HR0ra; pcw).
@@ -2241,6 +2242,7 @@ Section ProofSysLinkBody.
                       (durable-fs-plan.md section 3, [ilock];
                       durable-disk B''-tx) *)
 
+                   iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0b".   (* r25 lane (ii): nothing to present at this ilock *)
                    iApply (Ilock.wp_ilock_tx_sconf (CID := CID51) gs j gl pd
                              pav pu gild gisld
  kd (qd/2)%Qp gyd lod tld PlainK dinum pid
@@ -2250,11 +2252,11 @@ Section ProofSysLinkBody.
                              HU0a0 (Hlb "bcache"%string)
                              with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv
                                    Hescd Hireg Hslkd0 [//] Hfld Hclaimssl Hshrd Hrud Hsbi Hpidq Hprocs
-                                   Hdev Hgeo Hdlk Hbs1d Htx").
+                                   Hdev Hgeo Hdlk Hbs1d Htx Hllb0b").
                    { rewrite Heb /trap_csrs_ext. done. }
                    { rewrite Heb /cpu_claim_ext. done. }
                    iIntros (CID52 Hq52 mild dnd bmd fld)
-                     "%Hcsild Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1d Hslkdd
+                     "%Hcsild _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1d Hslkdd
                       Hdepd Hidevd Hiinumd Hivalidd Hloadd #Hshotd2 Hfrzd
                       %Hfld Hrud %Hilkpd".
                    (* ilock's RETURN ADDRESS IS +0x84, NOT +0x8a.  The

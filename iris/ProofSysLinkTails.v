@@ -1187,6 +1187,7 @@ Section ProofSysLinkTails.
        undo its nlink, and half the transaction's element sits in the
        escrow for that window. *)
 
+    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (Ilock.wp_ilock_tx_sconf (CID := CID2) gs jx gl pd pav pu
               gil gisl kk s gy loy tly PlainK
  inum
@@ -1194,11 +1195,11 @@ Section ProofSysLinkTails.
               Upr HKil Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck Hireg
-                    Hslkk [//] Hfly Hclaimsy Hshr Hru Hsbi Hpid Hprocs Hdev Hgeo Hdlk Hbs1 Htx").
+                    Hslkk [//] Hfly Hclaimsy Hshr Hru Hsbi Hpid Hprocs Hdev Hgeo Hdlk Hbs1 Htx Hllb0").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CID3 Hq3 mil dn bm fl)
-      "%Hcsil Hcg Hown _ _ Hpc Hpid Hsbi Hbs1 Hslkd Hdep Hidev Hiinum
+      "%Hcsil _ Hcg Hown _ _ Hpc Hpid Hsbi Hbs1 Hslkd Hdep Hidev Hiinum
        Hivalid Hload #Hshot Hfrz %Hfl Hru %Hilkp".
     assert (Hpcfa : ret_pc (M2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0xfa)) by (rewrite HM2ra; pcw).

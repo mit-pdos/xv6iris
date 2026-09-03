@@ -6515,7 +6515,13 @@ Notation "<{ P }>" := (const_pay P%I)
 (* the combinator's transport obligation: same guard role and priority
    story as [ctx_morph_const] (which still serves bare λ-spellings). *)
 Global Instance ctx_morph_const_pay `{!riscvGS Σ} (P : iProp Σ) :
-  CtxMorph (const_pay P) | 99.
+  CtxMorph (const_pay P) | 0.
+(* PRIORITY 0, NOT 99 (main's M2 fix, re-applied on the cutover 2026-09-03):
+   at 99, [apply _] on [CtxMorph <{ big payload }>] unfolds the payload and
+   "succeeds" structurally through its big-ops with a proof term the next
+   tactic never finishes with (claude-notes/optimization.md; the memory note
+   "ctx_morph_const_pay priority").  The build-time audit of 2026-09-03 found
+   the cutover had inherited flip's 99. *)
 Proof. iIntros (ξ ξ') "Hd HP !>". iFrame. Qed.
 
 (* The class TYPE is transparent to typeclass unification: [CurCtx] is

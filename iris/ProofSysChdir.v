@@ -1547,6 +1547,7 @@ Section ProofSysChdirBody.
            residue rides home inside [IcacheEscrow.ic_tx_dep], so nothing but
            the descriptor conjunct crosses the window. *)
 
+        iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
         iApply (Ilock.wp_ilock_tx_sconf (CID := CID23) gs j gl pd pav pu
  gil gisl
                   kk (qq/2)%Qp gsh losh tlsh PlainK inum pid (DfracOwn (1/4)) dqs
@@ -1555,12 +1556,12 @@ Section ProofSysChdirBody.
                   (Hlb "bcache"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck
                         Hireg Hslkk [%] Hflsh Hclaims Hshr Hruip Hsbi Hpbare Hprocs Hdev Hgeo Hdlk
-                        Hbs1 Htx").
+                        Hbs1 Htx Hllb0").
         all: try (exact Hlesh).
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CID24 Hq24 mil dn bm fl)
-          "%Hcsil Hcg Hown _ _ Hpc Hpbare Hsbi Hbs1 Hslkd Hdep
+          "%Hcsil _ Hcg Hown _ _ Hpc Hpbare Hsbi Hbs1 Hslkd Hdep
            Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl Hruip %Hilkp".
         assert (Hpc38 : ret_pc (P0 !!! Regidx Rra : mword 64)
                         = mword_of_int (SC + 0x38)) by (rewrite HP0ra; pcw).

@@ -79,6 +79,7 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import FileOffProtocol.   (* [proto_store_free]: the free off cell is the free word (r25 item 24) *)
 Require Import OffBox.   (* [off_rows] -- the fd box birth borrows the inode's rows (r25 item 33) *)
 Require Import KvmSpec.
 Require Import DirView.
@@ -321,7 +322,10 @@ Section ProofSysOpenBody.
     flive_tok kf -∗
     file_fields kf 1 C -∗
     fpay_tok gf kf 1 pn -∗
-    a_foff kf ↦₄ voff -∗
+    (* the fd's off cell, TYPE-INDEXED (r25 item 24): the inode arm stored
+       zero into the free cell and holds the word at the running context;
+       the device arm never touches [f->off] and carries the free cell *)
+    (if bool_decide (fc_type C = FD_INODE) then a_foff kf ↦₄ voff else off_free kf 1) -∗
     (* THE UNTYPED SLOT'S OWN UNIT, released when [so_open_slot] took the
        reference apart and handed straight back to the ledger here: the
        publication below parks the walk's inode in this same entry, so the
@@ -388,17 +392,13 @@ Section ProofSysOpenBody.
                  if bool_decide (fc_type C = FD_INODE)
                  then off_fd kf 1 γb C else off_free kf 1)%I
       with "[Hrun Hrows Hfoff]" as ">(Hrun & Hrows & %γb & Hcoff)".
-    { destruct Htyor as [Hin | Hdv].
-      - iMod (so_deposit ⊤ kk kf C ltac:(solve_ndisj) Hkk Hip Hin
+    { destruct (bool_decide (fc_type C = FD_INODE)) eqn:Hbd.
+      - apply bool_decide_eq_true_1 in Hbd.
+        iMod (so_deposit ⊤ kk kf C ltac:(solve_ndisj) Hkk Hip Hbd
                 with "Hrun [Hfoff] Hrows") as "(Hrun & Hrows & %γb & Hfd)".
-        { iExists voff. iFrame "Hfoff". iPureIntro. exact (Hwf Hin). }
-        iModIntro. iFrame "Hrun Hrows". iExists γb.
-        rewrite (bool_decide_eq_true_2 _ Hin). iExact "Hfd".
-      - iModIntro. iFrame "Hrun Hrows". iExists inhabitant.
-        rewrite bool_decide_eq_false_2.
-        2:{ rewrite Hdv. intro Hc. apply (f_equal bv_unsigned) in Hc.
-            by vm_compute in Hc. }
-        iApply (off_free_of_word with "Hfoff"). }
+        { iExists voff. iFrame "Hfoff". iPureIntro. exact (Hwf Hbd). }
+        iModIntro. iFrame "Hrun Hrows". iExists γb. iExact "Hfd".
+      - iModIntro. iFrame "Hrun Hrows". iExists inhabitant. iExact "Hfoff". }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct ("Hdepb" with "Hrows") as "Hdep".
     iModIntro.
@@ -655,7 +655,7 @@ Section ProofSysOpenBody.
     a_fpipe kf     ↦₈ pip -∗
     a_fmajor kf    ↦₂ maj -∗
     a_fip kf       ↦₈ ipold -∗
-    a_foff kf      ↦₄ voff -∗
+    (if bool_decide (tyw = FD_INODE) then a_foff kf ↦₄ voff else off_free kf 1) -∗
     (* the untyped slot's own unit, on its way back to the ledger -- see
        [so_tail_pub]'s row for why the entry ends up owing nothing *)
     iref_slot -∗
@@ -1730,8 +1730,8 @@ Section ProofSysOpenBody.
     (* ---- THE FRESH SLOT, OPENED: six cells plain, [f->ip] WHOLE ---- *)
     iApply fupd_wp.
     iMod (so_open_slot ⊤ gf kf with "Href")
-      as (Cf pn voff) "(%Hty0 & Hiru & Hfref & Hflive & Hfpn & Hfty
-                        & Hfrd & Hfwr & Hfpip & Hfmaj & Hfip & Hfoff)".
+      as (Cf pn) "(%Hty0 & Hiru & Hfref & Hflive & Hfpn & Hfty
+                        & Hfrd & Hfwr & Hfpip & Hfmaj & Hfip & Hfree)".
     iModIntro.
     (* the loan is not spent on this arm -- the file is about to be PUBLISHED,
        not closed -- so fold it back before the stores block, which is where
@@ -1906,19 +1906,23 @@ Section ProofSysOpenBody.
                 gil gisl
  kk qi s gy loy tly inum dn bm kf fd ll pn FD_DEVICE
                 (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
-                (di_major dn) om voff lo nsj u pidv dqb dqs U sts m M7 sp0 K eb b
+                (di_major dn) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb dqs U sts m M7 sp0 K eb b
                 lks w6 w24 bp
                 Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl
                 Hlkempty Hkf Hfdlt Hlen Hfrees (or_intror eq_refl) Hdir
-                (so_dev_vac (di_type dn)) (so_wf_dev voff)
+                (so_dev_vac (di_type dn)) (so_wf_dev (mword_of_int 0 : mword 32))
                 Hal23 Hsp0 HM7sp HM7thr HM7s0 HM7s1 HM7s2 HM7s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hireg Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum
                       Hivalid Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd
-                      Hfwr Hfpip Hfmaj Hfip Hfoff Hiru Hcore Howe Hprocs Hdev Hgeo
+                      Hfwr Hfpip Hfmaj Hfip [Hfree] Hiru Hcore Howe Hprocs Hdev Hgeo
                       Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4
-                      Hf5 Hf6 HbP H23lo H23hi H24 Hcont"). }
+                      Hf5 Hf6 HbP H23lo H23hi H24 Hcont").
+      (* the device arm never touches [f->off]: the free cell rides through *)
+      { try (rewrite bool_decide_eq_false_2;
+             [| intro Hc; apply (f_equal bv_unsigned) in Hc; by vm_compute in Hc]).
+        iExact "Hfree". } }
     (* ---- not a device: the FD_INODE pair ---- *)
     iApply (wp_beq_fall_s_sconf (CID := CID12) (mword_of_int (SO + 0x7a))
               (mword_of_int 198 : mword 13) Ra5 Ra4 M6 (K - 24)%nat b
@@ -1981,14 +1985,20 @@ Section ProofSysOpenBody.
                     = mword_of_int (SO + 0x84)) by pcw.
     iEval (rewrite Hpp80) in "Hpc".
     (* ===== +0x84 sw zero,32(s2) -- f->off = 0 ===== *)
-    iEval (rewrite /a_foff /foff_of) in "Hfoff".
-    iApply (wp_sw_zero_s_sconf (kt := KT1) (ktd := KT0) (CID := CID15) (mword_of_int (SO + 0x84)) Rs2
-              (mword_of_int 32 : mword 12) M8 (K - 24)%nat voff b
-              with "Hcg Hpc [] [Hfoff]").
+    (* r25 item 24: the slot's off cell arrives FREE (nobody owns a view of
+       it); the store of zero re-establishes the word at the running
+       context ([wp_sw_zero_s_sconf_free]), and that word is what the
+       publish deposits into the fd's box. *)
+    iEval (rewrite proto_store_free /a_foff /foff_of) in "Hfree".
+    iApply (wp_sw_zero_s_sconf_free (kt := KT1) (ktd := KT0) (CID := CID15) (mword_of_int (SO + 0x84)) Rs2
+              (mword_of_int 32 : mword 12) M8 (K - 24)%nat b
+              with "Hcg Hpc [] [Hfree]").
     { iApply (soi_084 with "Htext"). }
-    { iEval (rgne; rewrite HM8s2). iExact "Hfoff". }
+    { iEval (rgne; rewrite HM8s2). iExact "Hfree". }
     iIntros (CID16 Hq16) "Hcg Hpc Hfoff".
     iEval (rgne; rewrite HM8s2) in "Hfoff".
+    iEval (rewrite /wordw_pointsto; change (Z.to_nat 4) with 4%nat;
+           rewrite -TsoCtx.ctx_word4_pointsto_unfold) in "Hfoff".
     assert (Hpp84 : add_vec_int (mword_of_int (SO + 0x84) : mword 64) 4
                     = mword_of_int (SO + 0x88)) by pcw.
     iEval (rewrite Hpp84) in "Hpc".
@@ -2014,9 +2024,10 @@ Section ProofSysOpenBody.
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                     Hitinv Hesck Hireg Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum
                     Hivalid Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd
-                    Hfwr Hfpip Hfmaj Hfip Hfoff Hiru Hcore Howe Hprocs Hdev Hgeo
+                    Hfwr Hfpip Hfmaj Hfip [Hfoff] Hiru Hcore Howe Hprocs Hdev Hgeo
                     Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4
                     Hf5 Hf6 HbP H23lo H23hi H24 Hcont").
+    { try (rewrite (bool_decide_eq_true_2 _ eq_refl)). iExact "Hfoff". }
   Qed.
 
   (* ================================================================== *)
@@ -3351,6 +3362,7 @@ Section ProofSysOpenBody.
        half of the token from here on. *)
 
     iDestruct (log_tx_halve with "Htx") as (t) "[Htp Htr]".
+    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (Ilock.wp_ilock_dep_sconf (CID := CID6) gs jx gl pd pav pu
               gil gisl
               kk (qq/2)%Qp gy loy tly (DepTx (qq/2)%Qp icfg_dev inum gy loy t (1/2)) PlainK
@@ -3360,12 +3372,12 @@ Section ProofSysOpenBody.
               Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HP2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck Hireg
-                    Hslkk [//] Hfly Hclaimsy Hshr [Htp] Hru Hsbi Hpbare Hprocs Hdev Hgeo Hdlk Hbs1").
+                    Hslkk [//] Hfly Hclaimsy Hshr [Htp] Hru Hsbi Hpbare Hprocs Hdev Hgeo Hdlk Hbs1 Hllb0").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htp". }
     iIntros (CID7 Hq7 mil dn bm fl)
-      "%Hcsil Hcg Hown _ _ Hpc Hpbare Hsbi Hbs1 Hslkd Hdep
+      "%Hcsil _ Hcg Hown _ _ Hpc Hpbare Hsbi Hbs1 Hslkd Hdep
        Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl Hru %Hilkp".
     iEval (rewrite /ic_dep_held /=) in "Hload".
     iDestruct (ic_tx_dep_intro with "Hdep Htr") as "Hdep".
