@@ -842,6 +842,9 @@ Require Import SpecFileread.
 Require Import CodeFilewrite ProofFilereadParts ProofFilewriteParts.
 Require Import ProcAvail.
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the off checkout borrows the running token *)
+Require Import FileOffProtocol.   (* proto_read_llb / _checkout / _park (r25 item 24) *)
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Set Printing Depth 40.
 
@@ -1755,7 +1758,6 @@ Section ProofFilewrite.
            Hpayback)".
     (* the off output IS the ledger fragment on this arm *)
     iEval (rewrite (carve_off_inode _ _ _ _ _ Htyi)) in "Hoh".
-    iDestruct (ioff_escrows_acc ik P9 with "Hoffs") as "#Hoesc".
     assert (P3 : IBLOCK inum icfg_ist ∈ fsc_cov)
       by (apply P3q; exact P5).
     assert (P4 : IBLOCK inum icfg_ist
@@ -1874,7 +1876,10 @@ Section ProofFilewrite.
       as "[Hppid Hpbk2]".
     iDestruct (cpu_own_transport CIDbo CIDa3 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
+    (* the share's own stamps, presented at the acquire (R1): the floor ilock
+       hands back is the checkout's [Kt] *)
+    iDestruct (proto_read_llb with "Hoh") as (mo) "[Hat #Hllbo]".
+    iDestruct (off_fd_at_qsum with "Hat") as "[%Hqmo Hat]".
     iApply (Ilock.wp_ilock_tx_sconf gs jx glp
  (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
 
@@ -1891,14 +1896,15 @@ Section ProofFilewrite.
               ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hit Hesc Hireg
                     Hslk2 [%] Hflx Hclaimsfw Hshrl Hty Hsbi Hppid Hprocs
-                    Hdev Hgeo Hdlk Hbsl1 Htx Hllb0").
+                    Hdev Hgeo Hdlk Hbsl1 Htx Hllbo").
     all: try lkbelow.
     all: try (exact Hlex).
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDil Hsil mil dnl bml fl_)
-      "%Hcsil _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbsl1 Hheld Hdep
+      "%Hcsil Hflk Hcg Hcnt _ _ Hpc Hppid Hsbi Hbsl1 Hheld Hdep Hoffr
        Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
+    iDestruct "Hflk" as (Kt) "[%HKt #Hflt]".
     iDestruct ("Hpbk2" with "Hppid") as "Hpriv".
     assert (Hpc90 : ret_pc (D3 !!! Regidx Rra) = mword_of_int (FW + 0x98)).
     { rewrite HD3ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1935,12 +1941,14 @@ Section ProofFilewrite.
            ruling): the fragment proves membership, ilock's valid cell is
            the marker, and one liveness unit is parked. ---- *)
     iApply fupd_wp.
-    iMod (ioff_checkout ⊤ ik kx qx ltac:(solve_ndisj)
-            with "Hoesc Hoh [Hvalid] Hrlv")
-      as "(Hoh & Hoffc)".
-    { rewrite /off_mark. iExact "Hvalid". }
+    (* r25 item 24: CHECK OUT the fd's off box (see ProofFileread) *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (proto_read_checkout ⊤ ik kx qx γb0 Cf mo Kt TsoCtx.cur_ctx
+            ltac:(solve_ndisj) P8 P9 HKt with "Hrun Hflt Hat Hoffr")
+      as "(Hrun & Hres & #Hbox0 & #Hmem0 & %T0 & Hhold & Hd0 & Hc0 & %Tr & Hrest)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
-    iDestruct "Hoffc" as (v) "[Hcell %Hwf]".
+    iDestruct "Hres" as (v) "[Hcell %Hwf]".
     pose proof (bv_unsigned_in_range _ v) as Hvr.
     assert (Hoffz : Z.of_nat (Z.to_nat (bv_unsigned v)) = bv_unsigned v)
       by (apply Z2Nat.id; exact (proj1 Hvr)).
@@ -2268,9 +2276,15 @@ Section ProofFilewrite.
     { intros r Hr N1. rewrite (Hxcs r Hr). exact (HW1cs r Hr N1). }
     (* ---- CHECK IN the cell and REBUILD the checked-out bundle ---- *)
     iApply fupd_wp.
-    iMod (ioff_checkin ⊤ ik kx qx v2 ltac:(solve_ndisj) Hwf2
-            with "Hoesc Hoh Hcell")
-      as "(Hoh & Hmark & Hrlv)".
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (proto_read_park ⊤ ik kx qx γb0 Cf mo T0 Tr TsoCtx.cur_ctx
+            ltac:(solve_ndisj) P8 P9 Hqmo
+            with "Hrun [Hcell] Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")
+      as "(Hrun & Hoh & Hoffd)".
+    { iExists v2. iFrame "Hcell". iPureIntro. exact Hwf2. }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    (* the marker was never consumed: the box needs no marker *)
+    iRename "Hvalid" into "Hmark".
     (* THE MOVER (namei-pinned-lookup.md §9 W3, the file-write row): writei
        moved this inode's bytes, so the hold moves with them.  The value is
        determined garbage -- the fd is provably not a directory here -- and
@@ -2374,7 +2388,7 @@ Section ProofFilewrite.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hit Hesc Hslk2
                     Hheld Hppid Hprocs
-                    [%] Hflx Hclaimsfw Hdep Hidev Hinum Hvalid Hlk [Hshot] Hfrz").
+                    [%] Hflx Hclaimsfw Hdep Hoffd Hidev Hinum Hvalid Hlk [Hshot] Hfrz").
     all: try lkbelow.
     all: try (exact Hlex).
     { rewrite Htyq. iExact "Hshot". }
@@ -4298,7 +4312,7 @@ Section ProofFilewrite.
                     environment (the cinv is minted per publication, so no
                     fixed persistent family can exist); the names below keep
                     their meanings and the seventh slot is simply gone. *)
-                 iDestruct "Henv" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & #E8 & #E9 & #E10 & #E11 & #E12 & #E13 & #E14 & #E26 & #E15 & #E16 & #E17 & #EOFF & E18 & E19 & E20 & #E21 & #E22 & #E23 & #E24 & E25)".
+                 iDestruct "Henv" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & #E8 & #E9 & #E10 & #E11 & #E12 & #E13 & #E14 & #E26 & #E15 & #E16 & #E17 & E18 & E19 & E20 & #E21 & #E22 & #E23 & #E24 & E25)".
                  (* the loop still takes the ONE slot's off-borrow invariant;
                     the environment now carries the family, so it is selected
                     here rather than by the caller. *)
@@ -4340,7 +4354,7 @@ Section ProofFilewrite.
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] Hkenv
                                  E8 E9 E10 E11 E12 E13 E14 E26 E15 E16 E17
-                                 EOFF E22 E23 E24 E21 [E18 E19 E20 E25]").
+                                 E22 E23 E24 E21 [E18 E19 E20 E25]").
                  { rewrite /file_ref /file_fields. iExists Cf.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                  { rewrite HVid. iExact "Hpriv". }

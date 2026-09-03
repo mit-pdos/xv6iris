@@ -51,6 +51,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -113,7 +114,7 @@ Section ProofIunlockputMain.
     pose proof HK as HK'. 
     assert (Hipe : ip = ientry k) by reflexivity.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
-              Hropen #Hslk Hstok %Hley #Hfly #Hclaims Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hparp
+              Hropen #Hslk Hstok %Hley #Hfly #Hclaims Hdep Hoffr Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hparp
               Hbms Hins #Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hnlz Hlogop
               Hcont".
     (* SIMP-2: the short parent arrives PACKAGED with its provenance unit
@@ -265,12 +266,13 @@ Section ProofIunlockputMain.
     (* "sleep lock" outranks "itable": weaken [Hfresh]'s bound. *)
     assert (Hfresh_sl : locks_below lks "sleep lock")
       by lkbelow.
+    iRename "Hoffr" into "Hoffd".   (* iunlockput's pre already carries the DEP form *)
     iApply (IU.wp_iunlock_dep_sconf gs gil gisl k s gy loy tly d icfg_dev inum
               dn' bm' pidv dq R4 (K - 4)%nat eb pj b lks Upr
               ltac:(lia) Hdsh Hk ltac:(rewrite HR4a0; exact Hipe)
               Hfresh_sl
               with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk Hstok Hppid
-                    Hprocs [%] Hfly Hclaims Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz").
+                    Hprocs [%] Hfly Hclaims Hdep Hoffd Hidev Hinumc Hvalid Hlk Hshot Hfrz").
     all: try lkbelow.
     { exact Hley. }
     iIntros (CID8 Hq8 mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr Hside".
@@ -609,11 +611,12 @@ Section ProofIunlockputMain.
     intros pcE ip pj ret_tgt HK Hdsh Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
            Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh Hdside.
     iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
-              Hropen #Hslk Hstok %Hley #Hfly #Hclaims Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hparp
+              Hropen #Hslk Hstok %Hley #Hfly #Hclaims Hdep Hoffr Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hparp
               Hbms Hins #Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
               Hcont".
     rewrite {1}/log_opb. iDestruct "Hlogop" as (Sb0) "Hlogop".
     iDestruct (log_opS_named with "Hlogop") as (e00) "Hlogop".
+    iRename "Hoffr" into "Hoffd".   (* iunlockput's pre already carries the DEP form *)
     iApply (wp_iunlockput_dep_gen gs j gl pd pav pu gil gisl
 
               k qi s gy loy tly d inum dn' bm' n Sb0 false false false e00 tid qtx
@@ -622,7 +625,7 @@ Section ProofIunlockputMain.
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh Hdside
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
-                    Hropen Hslk Hstok [%] Hfly Hclaims Hdep Hidev Hinumc Hvalid Hlk Hshot Hfrz
+                    Hropen Hslk Hstok [%] Hfly Hclaims Hdep Hoffd Hidev Hinumc Hvalid Hlk Hshot Hfrz
                     Hparp
                     Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk Hbslots []
                     Hlogop [Hcont]").

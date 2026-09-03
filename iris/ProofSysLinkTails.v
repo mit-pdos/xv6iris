@@ -104,6 +104,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Set Printing Depth 40.
 
@@ -394,6 +395,7 @@ Section ProofSysLinkTails.
     IcacheRef.cred_floor loy tly -∗
     IcacheInv.iref_claims -∗
     ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
+    off_rows off_cfg kk cur_ctx -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -447,7 +449,7 @@ Section ProofSysLinkTails.
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs2 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hoffr Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -502,6 +504,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl
               pd pav pu gil gisl
  kk qi s gy loy tly inum dn bm u pidv dq
@@ -510,7 +513,7 @@ Section ProofSysLinkTails.
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2)
@@ -718,6 +721,7 @@ Section ProofSysLinkTails.
     IcacheRef.cred_floor loy tly -∗
     IcacheInv.iref_claims -∗
     ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
+    off_rows off_cfg kk cur_ctx -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -771,7 +775,7 @@ Section ProofSysLinkTails.
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs2 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hoffr Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -826,6 +830,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl
               pd pav pu gil gisl
  kk qi s gy loy tly inum dn bm u pidv dq
@@ -834,7 +839,7 @@ Section ProofSysLinkTails.
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2)
@@ -1199,7 +1204,7 @@ Section ProofSysLinkTails.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CID3 Hq3 mil dn bm fl)
-      "%Hcsil _ Hcg Hown _ _ Hpc Hpid Hsbi Hbs1 Hslkd Hdep Hidev Hiinum
+      "%Hcsil _ Hcg Hown _ _ Hpc Hpid Hsbi Hbs1 Hslkd Hdep Hoffr Hidev Hiinum
        Hivalid Hload #Hshot Hfrz %Hfl Hru %Hilkp".
     assert (Hpcfa : ret_pc (M2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0xfa)) by (rewrite HM2ra; pcw).
@@ -1504,6 +1509,7 @@ Section ProofSysLinkTails.
       exact (HQ1thr c Hc N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID9 CID11 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID11) gs jx gl
               pd pav pu gil gisl
  kk qi s gy loy tly inum dn' bm (S u) pidv dq
@@ -1512,7 +1518,7 @@ Section ProofSysLinkTails.
               Hinb Hcovb Hiu Hj Hgl HQ2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshot' Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl [Hop]").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -1769,6 +1775,7 @@ Section ProofSysLinkTails.
     IcacheRef.cred_floor loyd tlyd -∗
     IcacheInv.iref_claims -∗
     ic_tx_dep fsc_ic kd sd icfg_dev dinum gyd loyd -∗
+    off_rows off_cfg kd cur_ctx -∗
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
     i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -1822,7 +1829,7 @@ Section ProofSysLinkTails.
            HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
               #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru %Hley #Hfly #Hclaimsy Hshr #Hshotc Htoken Hslkd
-              %Hleyd #Hflyd #Hclaimsyd Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
+              %Hleyd #Hflyd #Hclaimsyd Hdep Hoffr Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
               #Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1873,6 +1880,7 @@ Section ProofSysLinkTails.
       exact (HM1thr c Hc N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (Iunlockput.wp_iunlockput_tx_gen (CID := CID2) gs jx gl
               pd pav pu gild gisld
  kd qd sd gyd loyd tlyd dinum dnd bmd
@@ -1882,7 +1890,7 @@ Section ProofSysLinkTails.
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                    Hescd Hireg Hropen Hslkd0 Hslkd [//] Hflyd Hclaimsyd Hdep Hidev Hiinum Hivalid
+                    Hescd Hireg Hropen Hslkd0 Hslkd [//] Hflyd Hclaimsyd Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshotd Hfrz [$Hkeepd $Hrud] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl [] Hop").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -2046,6 +2054,7 @@ Section ProofSysLinkTails.
     IcacheRef.cred_floor loyd tlyd -∗
     IcacheInv.iref_claims -∗
     ic_tx_dep fsc_ic kd sd icfg_dev dinum gyd loyd -∗
+    off_rows off_cfg kd cur_ctx -∗
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
     i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -2099,7 +2108,7 @@ Section ProofSysLinkTails.
            HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
               #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru %Hley #Hfly #Hclaimsy Hshr #Hshotc Htoken Hslkd
-              %Hleyd #Hflyd #Hclaimsyd Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
+              %Hleyd #Hflyd #Hclaimsyd Hdep Hoffr Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
               #Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -2150,6 +2159,7 @@ Section ProofSysLinkTails.
       exact (HM1thr c Hc N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (Iunlockput.wp_iunlockput_tx_gen (CID := CID2) gs jx gl
               pd pav pu gild gisld
  kd qd sd gyd loyd tlyd dinum dnd bmd
@@ -2159,7 +2169,7 @@ Section ProofSysLinkTails.
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                    Hescd Hireg Hropen Hslkd0 Hslkd [//] Hflyd Hclaimsyd Hdep Hidev Hiinum Hivalid
+                    Hescd Hireg Hropen Hslkd0 Hslkd [//] Hflyd Hclaimsyd Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshotd Hfrz [$Hkeepd $Hrud] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl [] Hop").
     { rewrite Heb /trap_csrs_ext. done. }

@@ -454,7 +454,7 @@ Section KexecMain.
     { iModIntro. iIntros (CX) "H". iExact "H". }
     iIntros (CIDa) "%Hsa".
     iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf loyf tlyf n2 ef)
-            "%Hregs90 %Hn2 Hpc Hcg Hcnt Hextc Hclmc Hslk Hslked %Hle90 #Hfl90 #Hclaims90 Hdep Hidev Hiinum
+            "%Hregs90 %Hn2 Hpc Hcg Hcnt Hextc Hclmc Hslk Hslked %Hle90 #Hfl90 #Hclaims90 Hdep Hoffr Hidev Hiinum
              Hival Hloaded Hity Hfrz Hiref Hru Hlog Hirs Hbm Hins Hbits Hbs #Hka2
              Hpriv
              Hpath Hargv Hargs #Hhdr Hframe Hcont".
@@ -463,7 +463,7 @@ Section KexecMain.
     (* the nine resources phase B threads whole and never looks inside *)
     iAssert (kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf
                       bmf gilf gislf)
-      with "[Hslk Hslked Hdep Hidev Hiinum Hival Hloaded Hity Hfrz
+      with "[Hslk Hslked Hdep Hoffr Hidev Hiinum Hival Hloaded Hity Hfrz
              Hiref Hru]"
       as "Hopen".
     { rewrite /kxc_open.
@@ -474,6 +474,7 @@ Section KexecMain.
       iSplitR; [iExact "Hclaims90" |].
 
       iSplitL "Hdep"; [iExact "Hdep" |].
+      iSplitL "Hoffr"; [iExact "Hoffr" |].
       iSplitL "Hidev"; [iExact "Hidev" |].
       iSplitL "Hiinum"; [iExact "Hiinum" |].
       iSplitL "Hival"; [iExact "Hival" |].

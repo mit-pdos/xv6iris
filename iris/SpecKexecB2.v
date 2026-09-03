@@ -110,6 +110,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] -- the inode's off rows ride the open bundle (items 35/36) *)
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
    printing one takes tens of minutes, so a one-line mistake reads as a hang.
@@ -446,6 +447,7 @@ Section KexecB2Res.
     IcacheRef.cred_floor loyf tlyf -∗
     IcacheInv.iref_claims -∗
     ic_tx_dep fsc_ic kf sf icfg_dev inumf gyf loyf -∗
+    off_rows off_cfg kf cur_ctx -∗
     i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
     i_valid (ientry kf) ↦₄ valid_word true -∗
@@ -459,11 +461,11 @@ Section KexecB2Res.
              gilf gislf.
   Proof.
     rewrite /kxc_open.
-    iIntros "A B %C1 #C2 #C3 D E F G H I I2 J K".
+    iIntros "A B %C1 #C2 #C3 D D2 E F G H I I2 J K".
     iSplitL "A"; [iExact "A" |]. iSplitL "B"; [iExact "B" |].
     iSplitR; [iPureIntro; exact C1 |].
     iSplitR; [iExact "C2" |]. iSplitR; [iExact "C3" |].
-    iSplitL "D"; [iExact "D" |].
+    iSplitL "D"; [iExact "D" |]. iSplitL "D2"; [iExact "D2" |].
     iSplitL "E"; [iExact "E" |]. iSplitL "F"; [iExact "F" |].
     iSplitL "G"; [iExact "G" |]. iSplitL "H"; [iExact "H" |].
     iSplitL "I"; [iExact "I" |]. iSplitL "I2"; [iExact "I2" |].

@@ -137,6 +137,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Set Printing Depth 40.
 
@@ -1561,7 +1562,7 @@ Section ProofSysChdirBody.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CID24 Hq24 mil dn bm fl)
-          "%Hcsil _ Hcg Hown _ _ Hpc Hpbare Hsbi Hbs1 Hslkd Hdep
+          "%Hcsil _ Hcg Hown _ _ Hpc Hpbare Hsbi Hbs1 Hslkd Hdep Hoffr
            Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl Hruip %Hilkp".
         assert (Hpc38 : ret_pc (P0 !!! Regidx Rra : mword 64)
                         = mword_of_int (SC + 0x38)) by (rewrite HP0ra; pcw).
@@ -1729,12 +1730,13 @@ Section ProofSysChdirBody.
              half the [ilock] parked. *)
           iDestruct (cpu_own_transport CID24 CID29 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
+          iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
           iApply (Iunlock.wp_iunlock_tx_sconf (CID := CID29) gs gil gisl
                     kk (qq/2)%Qp gsh losh tlsh icfg_dev inum dn bm
                     pid (DfracOwn (1/4)) P4 (K - 20)%nat eb pj b lks
                     (us_upt U P') ltac:(lia) Hkk HP4a0 (Hlb "sleep lock"%string)
                     with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk Hslkd
-                          Hpbare Hprocs [%] Hflsh Hclaims Hdep Hidev Hiinum Hivalid Hload
+                          Hpbare Hprocs [%] Hflsh Hclaims Hdep Hoffd Hidev Hiinum Hivalid Hload
                           Hshot Hfrz").
           all: try (exact Hlesh).
           iIntros (CID30 Hq30 miu) "%Hcsiu Hcg Hown Hpc Hpbare Hshr Htx".
@@ -2107,6 +2109,7 @@ iExact "Hrefnew". }
              transactional form runs the same disarm. *)
           iDestruct (cpu_own_transport CID24 CID29 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
+          iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
           iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID29) gs j gl
                     pd pav pu gil gisl
  kk (qq/2)%Qp (qq/2)%Qp gsh losh tlsh inum
@@ -2116,7 +2119,7 @@ iExact "Hrefnew". }
                     Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl HQ1a0 (Hlb "log"%string)
 
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                          Hesck Hireg Hropen Hslkk Hslkd [%] Hflsh Hclaims Hdep Hidev Hiinum
+                          Hesck Hireg Hropen Hslkk Hslkd [%] Hflsh Hclaims Hdep Hoffd Hidev Hiinum
                           Hivalid Hload Hshot Hfrz [$Hkeep $Hruip] Hsbb Hsbi Hbmres Hpbare
                           Hprocs Hdev Hgeo Hdlk Hbsl [HopS]").
           all: try (exact Hlesh).

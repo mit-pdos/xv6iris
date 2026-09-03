@@ -108,6 +108,7 @@ Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] -- the child's off rows (items 35/36) *)
 
 Local Open Scope Z_scope.
 
@@ -282,6 +283,8 @@ Definition create_fresh_ty_body
          (∃ loc tlc : nat,
             ⌜(loc <= tlc)%nat⌝ ∗ IcacheRef.cred_floor loc tlc ∗
             ic_handle fsc_ic kslot (DepTx (q/2)%Qp icfg_dev inum g loc t qt)) ∗
+         (* the child's off rows, FOLDED, out of create's ilock (items 35/36) *)
+         off_rows off_cfg kslot cur_ctx ∗
          i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} icfg_dev ∗
          i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} inum ∗
          i_valid (ientry kslot) ↦₄ valid_word true ∗
@@ -613,7 +616,7 @@ Proof.
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htx". }
     iIntros (CID8 Hq8 Mo dnc bmc filled)
-      "%Hcso _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslq Hdep
+      "%Hcso _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslq Hdep Hoffr
        Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrf Hwb %Hilkp".
     (* THE CLAIM ARM'S PAYOUT IS A PAIR since durable-disk C-5: the plain
        provenance unit the child reference carries from here on, and the
@@ -631,7 +634,7 @@ Proof.
     iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! Mo true kslot q gsh inum gilc gislc dnc bmc
               with "[%] Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev
-                    [Hpc Hslq Hdep Hcidev Hciinum Hcivalid Hcload Hcfrz
+                    [Hpc Hslq Hdep Hoffr Hcidev Hciinum Hcivalid Hcload Hcfrz
                      Hkeep Hwb Hws Hop]").
     { intros c Hc Hne.
       rewrite (callee_saved_lookup Hcso c Hc) (HB1cs c Hc Hne)
@@ -649,6 +652,7 @@ Proof.
     iSplitL "Hdep".
     { iExists losh, tlsh. iSplitR; [iPureIntro; exact Hlesh |].
       iSplitR; [iExact "Hflsh" | iExact "Hdep"]. }
+    iSplitL "Hoffr"; [iExact "Hoffr"|].
     iSplitL "Hcidev"; [iExact "Hcidev" |].
     iSplitL "Hciinum"; [iExact "Hciinum" |].
     iSplitL "Hcivalid"; [iExact "Hcivalid" |].

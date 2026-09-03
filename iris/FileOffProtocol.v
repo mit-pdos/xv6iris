@@ -44,6 +44,16 @@ Require Import IcacheRef.   (* [NINODE], [ientry] *)
 Require Import Xv6G.
 Local Open Scope Z_scope.
 
+(* PROTOCOL INVARIANT -- ONE OFF STEP PER HOLD (plan §9 item 36, pre-empt 2).
+   Under one ip->lock hold a holder checks its fd's off box out at most once:
+   the checkout takes the box's row FOLDED (its floor is the [Kp]) and leaves
+   the inode's other rows in DEP form; after the park the parker holds no
+   floor at the new stamp, so the rows go back to iunlock in dep form and are
+   re-floored only by the `_in` release (R2).  A second checkout in the same
+   hold would have no [Kp].  fileread and filewrite do exactly one per hold
+   (filewrite re-locks per chunk); sys_open's birth inserts at tp 0 and needs
+   no floor. *)
+
 Section FileOffProtocol.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{XI : CurCtx} `{CID : CpuId}.
@@ -169,7 +179,7 @@ Section FileOffProtocol.
       CtxBox.l2_hold (X := unit) γb k m ∗
       ghost_var (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2) 1%nat ∗
-      (∀ s' : l2_reg nat, off_l2_row γb s' ξ -∗ off_rows off_cfg i ξ).
+      (∃ T : nat, off_rows_dep_but off_cfg i γb T).
   Proof.
     iIntros (HE Hip Hi HKt) "Hctx #Hflt Hat Hrows".
     rewrite /off_fd_at.
@@ -177,7 +187,7 @@ Section FileOffProtocol.
     assert (i' = i) as ->.
     { apply (ientry_inj i' i); [lia | lia | congruence]. }
     (* the box's own L2 row, out of the inode's rows: its floor is the [Kp] *)
-    iDestruct (off_rows_take off_cfg i γb ξ with "Hmem Hrows") as "[(%s & Hrow) Hback]".
+    iDestruct (off_rows_take_dep off_cfg i γb ξ with "Hmem Hrows") as "[(%s & Hrow) Hback]".
     rewrite /off_l2_row /CtxBox.l2_row.
     iDestruct "Hrow" as "[(Hrp & %Hh & #Hflp) #Hllbs]".
     iMod (off_read_checkout off_cfg i k γb ξ m Kt (lr_tp s) E HE HKt
@@ -190,7 +200,7 @@ Section FileOffProtocol.
   (* ---- read: park after the read; the row goes back into the set at the
           fresh stamp ---- *)
   Lemma proto_read_park (E : coPset) (i k : nat) (q : Qp) (γb : box_names) (C : fcontent)
-      (m : gmap (nat * nat) ufrac) (T0 : nat) (ξ : CtxId) :
+      (m : gmap (nat * nat) ufrac) (T0 Tr : nat) (ξ : CtxId) :
     ↑(offBoxN .@ k) ⊆ E -> fc_ip C = ientry i -> (i < NINODE)%nat ->
     qsum m = Qp_to_Qc q ->
     own_context ξ -∗ off_resident (XI := ξ) k -∗
@@ -198,11 +208,11 @@ Section FileOffProtocol.
     ghost_var (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) -∗
     ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2) 1%nat -∗
     off_box k γb -∗ off_member off_cfg i γb -∗
-    (∀ s' : l2_reg nat, off_l2_row γb s' ξ -∗ off_rows off_cfg i ξ) ={E}=∗
+    off_rows_dep_but off_cfg i γb Tr ={E}=∗
     own_context ξ ∗ off_fd k q γb C ∗
-    ∃ T' : nat, llb loglen_name T' ∗ (ctx_floor ξ T' -∗ off_rows off_cfg i ξ).
+    ∃ T' : nat, off_rows_dep off_cfg i T'.
   Proof.
-    iIntros (HE Hip Hi Hq) "Hctx Hres Hhold Hd Hc #Hbox #Hmem Hback".
+    iIntros (HE Hip Hi Hq) "Hctx Hres Hhold Hd Hc #Hbox #Hmem Hrest".
     iMod (off_read_park k γb ξ m E HE with "Hbox Hctx Hres Hhold")
       as "(Hctx & %T' & %q' & %Hq' & Hrp & Href & #Hllb)".
     iModIntro. iFrame "Hctx". iSplitL "Hd Hc Href".
@@ -210,8 +220,10 @@ Section FileOffProtocol.
       iSplitR; [iPureIntro; exact Hip|]. iSplitR; [iPureIntro; exact Hi|].
       rewrite /off_ref_stamps. iExists {[ (k, T') := q' ]}. iFrame "Href".
       iPureIntro. rewrite CtxBox.qsum_singleton Hq'. exact Hq. }
-    iExists T'. iFrame "Hllb". iIntros "Hfl". iApply "Hback".
-    rewrite /off_l2_row /CtxBox.l2_row /=. iFrame "Hrp Hllb Hfl". done.
+    (* the parked row goes back into the dep set at the joined bound; no
+       floor is needed (item 36) -- the `_in` release folds *)
+    iExists (Nat.max Tr T').
+    iApply (off_rows_dep_insert off_cfg i γb Tr (L2Reg T' None) eq_refl with "Hrest Hrp Hllb").
   Qed.
 
   (* ---- close, non-last: a pure join ---- *)
@@ -265,7 +277,7 @@ Section FileOffProtocol.
            CtxBox.l2_hold (X := unit) γb k m ∗
            ghost_var (bx_slotd γb) (q / 2 / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
            ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2 / 2) 1%nat ∗
-           (∀ s' : l2_reg nat, off_l2_row γb s' ξ' -∗ off_rows off_cfg i ξ')).
+           (∃ T : nat, off_rows_dep_but off_cfg i γb T)).
   Proof.
     iIntros (HE Hip Hi) "Hfd".
     rewrite -{1}(Qp.div_2 q) off_fd_split. iDestruct "Hfd" as "[$ $]".

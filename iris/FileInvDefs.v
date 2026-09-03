@@ -1640,6 +1640,17 @@ Section FileInv.
        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2) 1%nat ∗
        ⌜qsum m = Qp_to_Qc q⌝ ∗ CtxBox.reference (X := unit) γb k m)%I.
 
+  (* the named fragment's mass, read off without disturbing the share *)
+  Lemma off_fd_at_qsum (k : nat) (q : Qp) (γb : box_names) (C : fcontent)
+      (m : gmap (nat * nat) ufrac) :
+    off_fd_at k q γb C m ⊢ ⌜qsum m = Qp_to_Qc q⌝ ∗ off_fd_at k q γb C m.
+  Proof.
+    rewrite /off_fd_at.
+    iIntros "(%i & %T0 & %Hip & %Hi & #Hbox & #Hmem & Hd & Hc & %Hq & Href)".
+    iSplitR; [iPureIntro; exact Hq|]. iExists i, T0. iFrame "Hbox Hmem Hd Hc Href".
+    iPureIntro. auto.
+  Qed.
+
   Lemma off_fd_split (k : nat) (q1 q2 : Qp) (γb : box_names) (C : fcontent) :
     off_fd k (q1 + q2) γb C ⊣⊢ off_fd k q1 γb C ∗ off_fd k q2 γb C.
   Proof.

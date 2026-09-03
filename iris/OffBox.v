@@ -327,6 +327,49 @@ Section OffBox.
         iExists s'. iFrame "Hp' Hl'". iPureIntro. split; [exact Hh' | lia].
   Qed.
 
+  (* THE REMAINDER WITH ONE ROW TAKEN OUT, IN DEP FORM (plan §9 item 36,
+     pre-empt 1): what a reader holds while its own box is checked out.  The
+     set authority still names the taken box; its row is re-inserted by
+     [off_rows_dep_insert] at whatever stamp the park gave it -- no floor
+     needed, which is the point: after a park the parker has none. *)
+  Definition off_rows_dep_but on i (γ : box_names) (T : nat) : iProp Σ :=
+    (∃ L : gset box_names,
+       ⌜γ ∈ L⌝ ∗ off_set_auth on i L ∗ llb loglen_name T ∗
+       [∗ set] γ' ∈ L ∖ {[ γ ]}, ∃ s : l2_reg nat,
+         off_regp γ' s ∗ ⌜lr_hold s = None⌝ ∗ llb loglen_name (lr_tp s) ∗
+         ⌜(lr_tp s ≤ T)%nat⌝)%I.
+
+  Lemma off_rows_take_dep on i γ (ξ : CtxId) :
+    off_member on i γ -∗ off_rows on i ξ -∗
+    (∃ s, off_l2_row γ s ξ) ∗ ∃ T : nat, off_rows_dep_but on i γ T.
+  Proof.
+    rewrite /off_rows /off_member /off_rows_dep_but /off_set_auth.
+    iIntros "Hmem (%L & Hauth & Hset)".
+    iDestruct (own_valid_2 with "Hauth Hmem") as %Hv.
+    apply auth_both_valid_discrete in Hv as [Hincl _].
+    apply gset_included in Hincl.
+    assert (HγL : γ ∈ L) by set_solver.
+    iDestruct (big_sepS_delete _ _ _ HγL with "Hset") as "[Hrow Hset]".
+    iSplitL "Hrow"; [iExact "Hrow"|].
+    iDestruct (off_rows_bound with "Hset") as (T) "[#HllbT Hset]".
+    iExists T, L. iFrame "Hauth HllbT Hset". iPureIntro. exact HγL.
+  Qed.
+
+  Lemma off_rows_dep_insert on i γ (T : nat) (s' : l2_reg nat) :
+    lr_hold s' = None ->
+    off_rows_dep_but on i γ T -∗ off_regp γ s' -∗ llb loglen_name (lr_tp s') -∗
+    off_rows_dep on i (Nat.max T (lr_tp s')).
+  Proof.
+    iIntros (Hh) "(%L & %HγL & Hauth & #HllbT & Hset) Hrp #Hllbs".
+    rewrite /off_rows_dep. iExists L. iFrame "Hauth".
+    iSplitR; [iApply (llb_max with "HllbT Hllbs")|].
+    rewrite (big_sepS_delete _ L γ HγL).
+    iSplitL "Hrp".
+    { iExists s'. iFrame "Hrp Hllbs". iPureIntro. split; [exact Hh | lia]. }
+    iApply (big_sepS_impl with "Hset"). iIntros "!>" (γ' _) "(%s & Hp & %Hh' & #Hl & %Hb)".
+    iExists s. iFrame "Hp Hl". iPureIntro. split; [exact Hh' | lia].
+  Qed.
+
   Lemma off_rows_to_dep on i (ξ : CtxId) :
     off_rows on i ξ -∗ ∃ T : nat, off_rows_dep on i T.
   Proof.

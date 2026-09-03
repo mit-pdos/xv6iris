@@ -103,6 +103,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Local Open Scope Z_scope.
 
@@ -234,6 +235,10 @@ Definition wp_iunlockput_dep_sconf_body
   IcacheRef.cred_floor loy tly -∗
   IcacheInv.iref_claims -∗
   ic_handle fsc_ic k d -∗
+  (* THE INODE'S OFF ROWS, IN DEP FORM (items 35/36): folded when ilock
+     handed them out, possibly re-parked by the holder (fileread/filewrite)
+     and then without a floor -- the `_in` release folds them (R2) *)
+  (∃ T : nat, off_rows_dep off_cfg k T) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -388,6 +393,10 @@ Definition wp_iunlockput_dep_gen_body
   IcacheRef.cred_floor loy tly -∗
   IcacheInv.iref_claims -∗
   ic_handle fsc_ic k d -∗
+  (* THE INODE'S OFF ROWS, IN DEP FORM (items 35/36): folded when ilock
+     handed them out, possibly re-parked by the holder (fileread/filewrite)
+     and then without a floor -- the `_in` release folds them (R2) *)
+  (∃ T : nat, off_rows_dep off_cfg k T) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -542,6 +551,10 @@ Definition wp_iunlockput_tx_sconf_body
   IcacheRef.cred_floor loy tly -∗
   IcacheInv.iref_claims -∗
   ic_tx_dep fsc_ic k s icfg_dev inum gy loy -∗
+  (* THE INODE'S OFF ROWS, IN DEP FORM (items 35/36): folded when ilock
+     handed them out, possibly re-parked by the holder (fileread/filewrite)
+     and then without a floor -- the `_in` release folds them (R2) *)
+  (∃ T : nat, off_rows_dep off_cfg k T) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -678,6 +691,10 @@ Definition wp_iunlockput_tx_gen_body
   IcacheRef.cred_floor loy tly -∗
   IcacheInv.iref_claims -∗
   ic_tx_dep fsc_ic k s icfg_dev inum gy loy -∗
+  (* THE INODE'S OFF ROWS, IN DEP FORM (items 35/36): folded when ilock
+     handed them out, possibly re-parked by the holder (fileread/filewrite)
+     and then without a floor -- the `_in` release folds them (R2) *)
+  (∃ T : nat, off_rows_dep off_cfg k T) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
@@ -783,7 +800,7 @@ Section IunlockputOfDep.
     intros Hgen pcE ip pj ret_tgt HK Hk Hgeom Hsz Hbm0 Hbmc Hbml Hist Hcov
       Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2 #Hitbl
-             #Hesc Hireg Hropen Hslk Hslkd %Hle #Hfl #Hclaims Hdep Hidev Hiinum Hivalid Hload
+             #Hesc Hireg Hropen Hslk Hslkd %Hle #Hfl #Hclaims Hdep Hoffd Hidev Hiinum Hivalid Hload
              Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid Hprocs Hdevi Hdgeom Hdlock
              Hbs Hopb Hcont".
     iDestruct (ic_tx_dep_at_of_half with "Hdep") as (t) "Hdep".
@@ -791,7 +808,7 @@ Section IunlockputOfDep.
     iApply (Hgen (DepTx s icfg_dev inum gy loy t (1/2)) t (1/2)%Qp HK eq_refl Hk Hgeom Hsz Hbm0
               Hbmc Hbml Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow eq_refl
               with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2
-                    Hitbl Hesc Hireg Hropen Hslk Hslkd [%] Hfl Hclaims Hdep Hidev Hiinum
+                    Hitbl Hesc Hireg Hropen Hslk Hslkd [%] Hfl Hclaims Hdep Hoffd Hidev Hiinum
                     Hivalid [Hload] Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hbs Hopb [Ht2 Hcont]").
     { exact Hle. }
@@ -832,7 +849,7 @@ Section IunlockputOfDep.
     intros Hgen pcE ip pj ret_tgt HK Hk Hcrb0 Hcru0 Hgeom Hsz Hbm0 Hbmc Hbml
       Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2 #Hitbl
-             #Hesc Hireg Hropen Hslk Hslkd %Hle #Hfl #Hclaims Hdep Hidev Hiinum Hivalid Hload
+             #Hesc Hireg Hropen Hslk Hslkd %Hle #Hfl #Hclaims Hdep Hoffd Hidev Hiinum Hivalid Hload
              Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid Hprocs Hdevi Hdgeom Hdlock
              Hbs Hcr Hops Hcont".
     iDestruct (ic_tx_dep_at_of_half with "Hdep") as (t) "Hdep".
@@ -841,7 +858,7 @@ Section IunlockputOfDep.
               Hsz Hbm0 Hbmc Hbml Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0
               Hbelow eq_refl
               with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2
-                    Hitbl Hesc Hireg Hropen Hslk Hslkd [%] Hfl Hclaims Hdep Hidev Hiinum
+                    Hitbl Hesc Hireg Hropen Hslk Hslkd [%] Hfl Hclaims Hdep Hoffd Hidev Hiinum
                     Hivalid [Hload] Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hbs Hcr Hops [Ht2 Hcont]").
     { exact Hle. }

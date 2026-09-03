@@ -126,6 +126,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
    printing one takes tens of minutes, so a one-line mistake reads as a hang.
@@ -1063,7 +1064,7 @@ Section KexecB3Body.
       apply (w32_moi_arg 56); lia. }
     (* ---- what readi borrows ---- *)
     iDestruct "Hopen" as "(#Hslkk & Hslkd & %Hley & #Hfly & #Hclaimsy &
-                           Hdep & Hidev & Hiinum &
+                           Hdep & Hoffr & Hidev & Hiinum &
                            Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
     iDestruct (kxc_load_peel with "Hload") as
       (datl) "(%Hiok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta
@@ -1113,7 +1114,7 @@ Section KexecB3Body.
     iDestruct (A.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
     iDestruct (kxc_open_intro pidv kf qf sf gyf loyf tlyf
                  inumf dnf bmf gilf gislf
-                 with "Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid Hload
+                 with "Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid Hload
                        Hity Hfrz Hkeep Hru") as "Hopen".
     set (pf := rd_delivered datl phb offn tot).
     assert (HM2get : forall r : mword 5, is_cs_idx r = true ->
@@ -3249,7 +3250,7 @@ Section KexecB3Close.
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct "Hopen" as "(#Hslkk & Hslkd & %Hley & #Hfly & #Hclaimsy &
-                           Hdep & Hidev & Hiinum &
+                           Hdep & Hoffr & Hidev & Hiinum &
                            Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
     iDestruct (proc_priv_bare_acc gf (proc_addr jp) pidv U with "Hpriv")
       as "[Hppid Hpvbk]".
@@ -3314,6 +3315,7 @@ Section KexecB3Close.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CIDj1 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (Iunlockput.wp_iunlockput_tx_sconf gs jp gl pd pav pu
               gilf gislf
  kf qf sf gyf loyf tlyf inumf dnf bmf n2 pidv (DfracOwn (1/4))
@@ -3321,7 +3323,7 @@ Section KexecB3Close.
               U ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0 ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
-                    Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid Hload
+                    Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid Hload
                     Hity Hfrz [$Hkeep $Hru] Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock
                     Hbs Hlog").
     all: try lkbelow.

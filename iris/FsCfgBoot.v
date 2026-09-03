@@ -84,6 +84,7 @@ Require Import FsStateEra.     (* [era_node] / [inode_rec_local] -- the era node
 Require Import FsCfg.          (* the record this file finally gives a value *)
 Require Import Xv6G.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Local Open Scope Z_scope.
 

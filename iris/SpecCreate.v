@@ -357,6 +357,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Local Open Scope Z_scope.
 
@@ -489,6 +490,8 @@ Section CreateSpec.
        (∃ loc tlc : nat,
           ⌜(loc <= tlc)%nat⌝ ∗ IcacheRef.cred_floor loc tlc ∗
           ic_tx_dep fsc_ic k s icfg_dev inum g loc) ∗
+       (* the child's off rows, FOLDED, out of create's own ilock (items 35/36) *)
+       off_rows off_cfg k cur_ctx ∗
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} icfg_dev ∗
        i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
        i_valid (ientry k) ↦₄ valid_word true ∗
@@ -528,6 +531,7 @@ Section CreateSpec.
     (∃ loc tlc : nat,
        ⌜(loc <= tlc)%nat⌝ ∗ IcacheRef.cred_floor loc tlc ∗
        ic_tx_dep fsc_ic k s icfg_dev inum g loc) -∗
+    off_rows off_cfg k cur_ctx -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word true -∗
@@ -541,11 +545,12 @@ Section CreateSpec.
     create_locked pidv k qi s g inum dn bm.
   Proof.
     intros Hqs.
-    iIntros "Hlk Hlkd Hdep Hdev Hinum Hvalid Hload Hshot Hfrz Href Hru".
+    iIntros "Hlk Hlkd Hdep Hoffr Hdev Hinum Hvalid Hload Hshot Hfrz Href Hru".
     rewrite /create_locked. iExists γil, γisl.
     iSplitR; [iPureIntro; exact Hqs |].
     iSplitL "Hlk"; [iExact "Hlk" |]. iSplitL "Hlkd"; [iExact "Hlkd" |].
     iSplitL "Hdep"; [iExact "Hdep" |].
+    iSplitL "Hoffr"; [iExact "Hoffr" |].
     iSplitL "Hdev"; [iExact "Hdev" |]. iSplitL "Hinum"; [iExact "Hinum" |].
     iSplitL "Hvalid"; [iExact "Hvalid" |]. iSplitL "Hload"; [iExact "Hload" |].
     iSplitL "Hshot"; [iExact "Hshot" |].

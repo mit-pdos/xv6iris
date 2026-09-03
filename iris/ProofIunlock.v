@@ -73,6 +73,7 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import SieCapCtx.   (* R3: [own_context] off the cap, for the box steps *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Set Printing Depth 40.
 
@@ -159,7 +160,7 @@ Section ProofIunlockMain.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (iul_entry_nonzero k Hk)).
     iIntros "Hcg Hcnt #Htext Hpc #Hitbl #Hesc #Hslk Hstok Hppid
-              #Hprocs %Hle #Hfl #Hclaims Hdep Hidev Hinumc Hvalid Hlk
+              #Hprocs %Hle #Hfl #Hclaims Hdep Hoffd Hidev Hinumc Hvalid Hlk
               #Hshot Hfrz Hcont".
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
@@ -482,7 +483,7 @@ Section ProofIunlockMain.
          (R3/F27: it rides the handle) -- borrow the window only *)
       iEval (rewrite /ic_handle /ic_deposit2 Hid (ic_body_of_shr k d s dev inum g lo Hdshr)
                      (ic_pay_live_of_shr k d s dev inum g lo Hdshr) /live_gen) in "Hdep".
-      iDestruct "Hdep" as "([Hhold [Hbid Hblv]] & (%lo2 & Hlg) & Hd & Htok & Hoffr)".
+      iDestruct "Hdep" as "([Hhold [Hbid Hblv]] & (%lo2 & Hlg) & Hd & Htok)".
       iDestruct (IcacheRef.live_genlo_agree with "Hblv Hlg") as %[_ <-].
       iMod (IcacheInv.iref_load_pinw_au (⊤ ∖ ↑minstretN) k
               (1/2)%Qp g lo ltac:(solve_ndisj) Hk with "Hitbl Hlg")
@@ -495,7 +496,7 @@ Section ProofIunlockMain.
       iModIntro. iFrame "Hvalid".
       rewrite /ic_handle /ic_deposit2 Hid (ic_body_of_shr k d s dev inum g lo Hdshr)
               (ic_pay_live_of_shr k d s dev inum g lo Hdshr) /live_gen.
-      iFrame "Hhold Hbid Hblv Hd Htok Hoffr". iExists lo. iExact "Hlg". }
+      iFrame "Hhold Hbid Hblv Hd Htok". iExists lo. iExact "Hlg". }
     iIntros (refv CID14 Hq14) "Hcg Hpc Hqv (Hvalid & Hdep)".
     iDestruct "Hqv" as (V0) "[_ %Href]".
     set (R7 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 refv)]> mH).
@@ -578,7 +579,7 @@ Section ProofIunlockMain.
        and slice), with the parked fragment's stamps at the park stamp [Tp]. *)
     iDestruct (ic_dep_held_bm_len with "Hlk") as %Hlen.
     iEval (rewrite /ic_handle (ic_pay_live_of_shr k d s dev inum g lo Hdshr)) in "Hdep".
-    iDestruct "Hdep" as "(Hdep2 & Hlg & Hd & Htok & Hoffr)".
+    iDestruct "Hdep" as "(Hdep2 & Hlg & Hd & Htok)".
     iDestruct (ic_dep_held_intro_held fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k d s dev inum g lo dn' bm'
                  Hdshr Hlen with "[Hidev Hinumc] Hvalid Hlk Hshot Hfrz Hlg") as "[Hhdr Hrest]".
     { rewrite /inode_ident. iFrame "Hidev Hinumc". }
@@ -597,8 +598,9 @@ Section ProofIunlockMain.
        maximum of the register's park stamp [Tp] and the off rows' own --
        [ic_slp_dep_of_rows] takes the rows out to [off_rows_dep] and joins
        the two [llb]s. *)
-    iDestruct (ic_slp_dep_of_rows fsc_ic k Tp TsoCtx.cur_ctx
-                 with "HllbT Htok Hrp Hn Hoffr") as (Tc) "(%HTpc & #HllbC & Hdepc)".
+    iDestruct "Hoffd" as (Tr) "Hoffd".
+    iDestruct (ic_slp_dep_of_dep fsc_ic k Tp Tr
+                 with "HllbT Htok Hrp Hn Hoffd") as (Tc) "(%HTpc & #HllbC & Hdepc)".
     iApply (RS.wp_releasesleep_genin_sconf gs gil gisl "inode"%string (ic_slp fsc_ic k)
               (fun _ => ic_slp_dep fsc_ic k Tc) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks Tc
               ltac:(lia)

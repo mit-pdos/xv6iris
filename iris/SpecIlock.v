@@ -192,6 +192,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Local Open Scope Z_scope.
 
@@ -402,6 +403,10 @@ Definition wp_ilock_dep_sconf_body
       (* THE STITCH: the holder's HANDLE -- the box register half naming the
          parked stamps, the body, main's descriptor half *)
       ic_handle fsc_ic k d -∗
+      (* THE INODE'S OFF ROWS, FOLDED (items 35/36): out of the payload at the
+         acquire, at the holder's context with every row's floor; the holder
+         hands them back to iunlock in DEP form *)
+      off_rows off_cfg k cur_ctx -∗
       i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
@@ -654,6 +659,10 @@ Definition wp_ilock_tx_sconf_body
          record the region agrees with.  Exactly [ic_swap_park]'s input,
          i.e. exactly SpecIunlock v3's precondition. *)
       ic_tx_dep fsc_ic k s icfg_dev inum g lo -∗
+      (* THE INODE'S OFF ROWS, FOLDED (items 35/36): out of the payload at the
+         acquire, at the holder's context with every row's floor; the holder
+         hands them back to iunlock in DEP form *)
+      off_rows off_cfg k cur_ctx -∗
       i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
@@ -753,12 +762,12 @@ Proof.
   { exact Hle. }
   { rewrite /ic_dep_side. iExact "Ht1". }
   iIntros (CIDx Hqx mf dn bm filled)
-    "%Hcs Hflk Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hidev Hiinum
+    "%Hcs Hflk Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hoffr Hidev Hiinum
      Hivalid Hload #Hshot Hfrz %Hfl Hlicb %Hilk".
   iEval (rewrite /ic_dep_held; cbn [ic_dep_rd]) in "Hload".
   iDestruct (ic_tx_dep_intro with "Hdep Ht2") as "Hdep".
   iApply ("Hcont" $! CIDx Hqx mf dn bm filled with
-            "[%] Hflk Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hidev
+            "[%] Hflk Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hoffr Hidev
              Hiinum Hivalid Hload Hshot Hfrz [%] Hlicb [%]");
     [exact Hcs | exact Hfl | exact Hilk].
 Qed.

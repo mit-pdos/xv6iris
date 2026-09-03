@@ -247,6 +247,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -852,6 +853,7 @@ Section KexecABody.
         IcacheRef.cred_floor loyf tlyf -∗
         IcacheInv.iref_claims -∗
         ic_tx_dep fsc_ic kf sf icfg_dev inumf gyf loyf -∗
+        off_rows off_cfg kf cur_ctx -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
@@ -1141,7 +1143,7 @@ Section KexecABody.
     all: try lkbelow.
     all: try (exact Hley).
     iIntros (CIDil Hsil M1 dnl bml fl_) "%Hcsil _ Hcg Hcnt Hextc Hclmc Hpc Hppid Hins Hbs1
-             Hslkd Hdep Hidev Hiinum Hivalid Hload Hity Hfrz %Hfr_
+             Hslkd Hdep Hoffr Hidev Hiinum Hivalid Hload Hity Hfrz %Hfr_
              Hru %Hilkp".
     assert (Hpc3a : ret_pc (Q2 !!! Regidx Rra) = mword_of_int (KXA + 0x03a))
       by (rewrite HQ2ra; pcw).
@@ -1583,7 +1585,7 @@ Section KexecABody.
           destruct (decide (j < tot)%nat) as [_ | Hno]; [| lia].
           by rewrite Nat.add_0_l. }
         iApply ("Hcont90" $! Q12 k (q/2)%Qp (q/2)%Qp inum dnl bml gilk gislk gy
-                  loy tly n1 gb with "[%] [%] Hpc Hcg Hcnt Hextc Hclmc Hslkk Hslkd [//] Hfly Hclaimskx Hdep
+                  loy tly n1 gb with "[%] [%] Hpc Hcg Hcnt Hextc Hclmc Hslkk Hslkd [//] Hfly Hclaimskx Hdep Hoffr
                   Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hlog Hirs Hbm Hins Hbits
                   Hbs Hka Hpriv Hpath Hargv Hargs [] [-Hcont] Hcont").
         * split_and!; [exact HQ12sp | exact HQ12s0 | exact HQ12s1 | exact HQ12s2
@@ -1672,7 +1674,7 @@ Section KexecABody.
                   m Q12 K eb lks sp0 ra0 s00 s10 s20 pv av
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                   Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HQ12sp HQ12s4 HQ12thr
-                  with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd [//] Hfly Hclaimskx Hdep
+                  with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd [//] Hfly Hclaimskx Hdep Hoffr
                         Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
         { iExact "Hfab". }
@@ -1752,7 +1754,7 @@ Section KexecABody.
                 m Q9 K eb lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                 Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HQ9sp HQ9s4 HQ9thr
-                with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd [//] Hfly Hclaimskx Hdep
+                with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd [//] Hfly Hclaimskx Hdep Hoffr
                       Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
       { iExact "Hfab". }
@@ -1936,6 +1938,7 @@ Section KexecAMain.
         IcacheRef.cred_floor loyf tlyf -∗
         IcacheInv.iref_claims -∗
         ic_tx_dep fsc_ic kf sf icfg_dev inumf gyf loyf -∗
+        off_rows off_cfg kf cur_ctx -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗

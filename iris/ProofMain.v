@@ -185,6 +185,7 @@ Proof. lia. Qed.
 
 (* ===================================================================== *)
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 Module MainProof
   (Cpuid : CPUID) (Consoleinit : CONSOLEINIT) (Printkinit : PRINTKINIT)
   (PrintkGen : PRINTK_GEN) (Kinit : KINIT) (Kvminit : KVMINIT)

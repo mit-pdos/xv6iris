@@ -144,6 +144,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Set Printing Depth 40.
 
@@ -1480,6 +1481,7 @@ Section ProofSysUnlinkBody.
     IcacheRef.cred_floor loy tly -∗
     IcacheInv.iref_claims -∗
     ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
+    off_rows off_cfg kk cur_ctx -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1529,7 +1531,7 @@ Section ProofSysUnlinkBody.
            Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs2
            HMs3 Hal Heb Hupt1.
     iIntros "Hcg Hown #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-             #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev Hiinum Hivalid Hload
+             #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid Hload
              #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hsbs #Hbmres Hpidq Hpre #Hprocs #Hdev
              #Hgeo
              #Hdlk Hbsl Hir Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27
@@ -1544,7 +1546,7 @@ Section ProofSysUnlinkBody.
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr
               HMs1 HMs2 HMs3 Hal
               with "Hcg Hown [] [] Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen Hitab
-                    Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum
+                    Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum
                     Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpidq
                     Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbNj
@@ -1654,6 +1656,7 @@ Section ProofSysUnlinkBody.
        IcacheRef.cred_floor loyd tlyd -∗
        IcacheInv.iref_claims -∗
        ic_handle fsc_ic kd (DepTx sd icfg_dev dinum gyd loyd t (1/2)) -∗
+       off_rows off_cfg kd cur_ctx -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} icfg_dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -1904,7 +1907,7 @@ Section ProofSysUnlinkBody.
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htp". }
     iIntros (CID2 Hq2 mil dnd bmd fld)
-      "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkdd Hdep
+      "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkdd Hdep Hoffr
        Hidev Hiinum Hivalid Hload #Hshotl Hfrz %Hfld Hrud %Hilkpd".
     iEval (rewrite /ic_dep_held /=) in "Hload".
     assert (Hpc34 : ret_pc (R0 !!! Regidx Rra : mword 64)
@@ -2054,7 +2057,7 @@ Section ProofSysUnlinkBody.
                 (su_regs_s2 _ _ _ _ _ _ Hn1regs)
                 (su_regs_s3 _ _ _ _ _ _ Hn1regs) Hal Heb Hupt1
                 with "Hcg Hown Htext Hdata Hpc Hpenv2 Hbio Hlog Hseam Hgen Hitab
-                      Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd [//] Hfld Hclaimssu Hdep Hidev
+                      Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd [//] Hfld Hclaimssu Hdep Hoffr Hidev
                       Hiinum Hivalid Hload Hshotl Hfrz Hkeepd Hrud Hsbb Hsbi Hsbs
                       Hbmres Hpidq Hpre Hprocs Hdev Hgeo Hdlk
                       [Hbs1 Hbs2] Hir [HopS] Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD
@@ -2211,7 +2214,7 @@ Section ProofSysUnlinkBody.
                   (su_regs_s2 _ _ _ _ _ _ Hn2regs)
                   (su_regs_s3 _ _ _ _ _ _ Hn2regs) Hal Heb Hupt1
                   with "Hcg Hown Htext Hdata Hpc Hpenv2 Hbio Hlog Hseam Hgen Hitab
-                        Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd [//] Hfld Hclaimssu Hdep Hidev
+                        Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd [//] Hfld Hclaimssu Hdep Hoffr Hidev
                         Hiinum Hivalid Hload Hshotl Hfrz Hkeepd Hrud Hsbb Hsbi Hsbs
                         Hbmres Hpidq Hpre Hprocs Hdev Hgeo Hdlk
                         [Hbs1 Hbs2] Hir [HopS] Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD
@@ -2464,7 +2467,7 @@ Section ProofSysUnlinkBody.
                     with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     [%] [%]
                     Hcg Hown Hpc Hseam Hgen [Hbs1 Hbs2] Hsbb Hsbi Hsbs
-                    Hpriv Hslkd0 Hslkdd [//] Hfld Hclaimssu Hdep Hidev Hiinum Hivalid
+                    Hpriv Hslkd0 Hslkdd [//] Hfld Hclaimssu Hdep Hoffr Hidev Hiinum Hivalid
                     Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Htop Hshotl Hfrz Hkeepd Hrud
                     Hchild Hruc HopS Htx Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP
                     H27lo H27hi HbE H30 [Hcont]").
@@ -2555,7 +2558,7 @@ Section ProofSysUnlinkBody.
                     Hist0 Hdiblk Hdiblog Hdinb Hcovb Hiu Hj Hgl Hlkempty
                     Hsp0 HR13sp HR13thr HR13s1 HR13s3 Hal
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpenv2 Hbio Hlog Hseam Hgen
-                          Hitab Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd [//] Hfld Hclaimssu Hdep
+                          Hitab Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd [//] Hfld Hclaimssu Hdep Hoffr
                           Hidev Hiinum Hivalid Hload Hshotl Hfrz Hkeepd Hrud Hsbb
                           Hsbi
                           Hbmres Hpidq Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2]
@@ -3512,6 +3515,7 @@ Section ProofSysUnlinkBody.
        IcacheRef.cred_floor loyd tlyd -∗
        IcacheInv.iref_claims -∗
        ic_handle fsc_ic kd (DepTx sd icfg_dev dinum gyd loyd t (1/4)) -∗
+       off_rows off_cfg kd cur_ctx -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} icfg_dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -3540,6 +3544,7 @@ Section ProofSysUnlinkBody.
        ic_handle fsc_ic ks (DepTx si icfg_dev
          (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi loyi
          t (1/4)) -∗
+       off_rows off_cfg ks cur_ctx -∗
        i_dev (ientry ks) ↦₄{DfracOwn (1/2)} icfg_dev -∗
        i_inum (ientry ks) ↦₄{DfracOwn (1/2)}
          (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
@@ -3681,6 +3686,7 @@ Section ProofSysUnlinkBody.
     IcacheRef.cred_floor loyd tlyd -∗
     IcacheInv.iref_claims -∗
     ic_handle fsc_ic kd (DepTx sd icfg_dev dinum gyd loyd t (1/2)) -∗
+    off_rows off_cfg kd cur_ctx -∗
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
     i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -3754,7 +3760,7 @@ Section ProofSysUnlinkBody.
                               & Kiupd & Kiup & Knc & K2 & K10 & K30 & Kpop).
     iIntros "Hcg Hown #Htext #Hkd #Hpe Hpc #Hbio #Hlog Hseam Hgen #Hdev #Hgeo
              #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks #Hireg #Hropen Hsbb Hsbi Hsbs
-             #Hbmres #Hkenv #Hprocs Hpriv #Hslkd Hslkdq %Hleyd #Hflyd #Hclaimsyd Hdepd Hidevd
+             #Hbmres #Hkenv #Hprocs Hpriv #Hslkd Hslkdq %Hleyd #Hflyd #Hclaimsyd Hdepd Hoffrd Hidevd
              Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd
              Htop #Hshotd Hfrz Hkeepd Hrud Hchild Hrui HopS Htx
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
@@ -3881,7 +3887,7 @@ Section ProofSysUnlinkBody.
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htp". }
     iIntros (CID3 Hq3 mil dni bmi fldi)
-      "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkiq Hdepi
+      "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkiq Hdepi Hoffri
        Hidevi Hiinumi Hivalidi Hloadi #Hshoti Hfrzi %Hfldi Hrui %Hilkpi".
     iEval (rewrite /ic_dep_held /=) in "Hloadi".
     assert (Hpc78 : ret_pc (R0 !!! Regidx Rra : mword 64)
@@ -4022,8 +4028,8 @@ Section ProofSysUnlinkBody.
       (* the loop's opaque [X]: dp's bundle, the ledger, the frame and BOTH
          continuations, combined so [su_w4]'s exits can hand them back *)
       iCombine "Hseam Hgen Hbs2 Hsbb Hsbi Hsbs Hpre Hslkdq
-                Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad Haddrsd
-                Hindd Hblocksd Htop Hfrz Hkeepd Hrud Hslkiq Hdepi Hiinumi
+                Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad Haddrsd
+                Hindd Hblocksd Htop Hfrz Hkeepd Hrud Hslkiq Hdepi Hoffri Hiinumi
                 Hivalidi
                 Hdlnki Hdiati Htopi Hfrzi Hkeepi Hrui HopS Htx Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14
                 Hnm2 HbP H27lo H27hi H30 Hseamk Hcont" as "HX".
@@ -4046,11 +4052,11 @@ Section ProofSysUnlinkBody.
         iIntros (CIDx Mx s3x bex) "%Hxregs Hcg Hown Hpc Hidevi Hmetai Hmapi
                                     Hblocksi Hbuf Hpidq Hbslot HX".
         iDestruct "HX" as "(Hseam & Hgen & Hbs2 & Hsbb & Hsbi & Hsbs
-                            & Hpre & Hslkdq & Hdepd & Hidevd &
+                            & Hpre & Hslkdq & Hdepd & Hoffrd & Hidevd &
                             Hiinumd & Hivalidd & Hdlnkd & Hdiatd & Hmetad &
                             Haddrsd & Hindd & Hblocksd & Htop & Hfrz & Hkeepd & Hrud &
                             Hslkiq &
-                             Hdepi & Hiinumi & Hivalidi & Hdlnki &
+                             Hdepi & Hoffri & Hiinumi & Hivalidi & Hdlnki &
                             Hdiati & Htopi & Hfrzi & Hkeepi & Hrui & HopS & Htx & Hf1 & Hf2 & Hf3 & Hf4 &
                             Hf5 & Hf6 & HbD & Hnm14 & Hnm2 & HbP & H27lo &
                             H27hi & H30 & Hseamk & Hcont)".
@@ -4115,9 +4121,9 @@ Section ProofSysUnlinkBody.
                   Hj Hgl Hlkempty Hsp0 HMxsp HMxthr HMxs1 HMxs2 Hal
                   with "Hcg Hown [] [] Htext Hkd Hpc Hpe Hbio Hlog Hseam Hgen
                         Hitab Hitinv Hescd Hesci Hireg Hropen Hslkd Hslkdq
-                        [//] Hflyd Hclaimsyd Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd Hfrz
+                        [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hloadd Hshotd Hfrz
                         Hkeepd Hrud
-                        Hslki Hslkiq [//] Hflyi Hclaimsyd Hdepi Hidevi Hiinumi Hivalidi
+                        Hslki Hslkiq [//] Hflyi Hclaimsyd Hdepi Hoffri Hidevi Hiinumi Hivalidi
                         Hloadi Hshoti Hfrzi Hkeepi Hrui Hsbb Hsbi Hbmres Hpidq Hprocs
                         Hdev Hgeo Hdlk [Hbslot Hbs2] [HopS] Hf1 Hf2 Hf3 Hf4
                         Hf5 Hf6 HbD HbNj HbP H27 Hbuf H30
@@ -4143,11 +4149,11 @@ Section ProofSysUnlinkBody.
                                     Hmetai Hmapi Hblocksi Hbuf Hpidq Hbslot
                                     HX".
         iDestruct "HX" as "(Hseam & Hgen & Hbs2 & Hsbb & Hsbi & Hsbs
-                            & Hpre & Hslkdq & Hdepd & Hidevd &
+                            & Hpre & Hslkdq & Hdepd & Hoffrd & Hidevd &
                             Hiinumd & Hivalidd & Hdlnkd & Hdiatd & Hmetad &
                             Haddrsd & Hindd & Hblocksd & Htop & Hfrz & Hkeepd & Hrud &
                             Hslkiq &
-                             Hdepi & Hiinumi & Hivalidi & Hdlnki &
+                             Hdepi & Hoffri & Hiinumi & Hivalidi & Hdlnki &
                             Hdiati & Htopi & Hfrzi & Hkeepi & Hrui & HopS & Htx & Hf1 & Hf2 & Hf3 & Hf4 &
                             Hf5 & Hf6 & HbD & Hnm14 & Hnm2 & HbP & H27lo &
                             H27hi & H30 & Hseamk & Hcont)".
@@ -4163,9 +4169,9 @@ Section ProofSysUnlinkBody.
                   (qs/2)%Qp loyi tlyi dni bmi dati
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hown Hpc Hseam Hgen
                         [Hbslot Hbs2] Hsbb Hsbi Hsbs Hpriv Hslkd
-                        Hslkdq [//] Hflyd Hclaimsyd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
+                        Hslkdq [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd
                         Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud
-                        Hslki Hslkiq [//] Hflyi Hclaimsyd Hdepi Hidevi Hiinumi Hivalidi
+                        Hslki Hslkiq [//] Hflyi Hclaimsyd Hdepi Hoffri Hidevi Hiinumi Hivalidi
                         Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Htopi Hshoti
                         Hfrzi Hkeepi Hrui HopS Htx Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2
                         HbP H27lo H27hi Hbuf H30 [Hcont]").
@@ -4205,9 +4211,9 @@ Section ProofSysUnlinkBody.
                 gili gisli gyi (qs/2)%Qp (qs/2)%Qp loyi tlyi dni bmi dati
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hown Hpc Hseam Hgen
                       [Hbs1 Hbs2] Hsbb Hsbi Hsbs Hpriv Hslkd Hslkdq [//] Hflyd Hclaimsyd
-                      Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd
+                      Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd
                       Hmetad Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud Hslki
-                      Hslkiq [//] Hflyi Hclaimsyd Hdepi Hidevi Hiinumi Hivalidi Hdlnki
+                      Hslkiq [//] Hflyi Hclaimsyd Hdepi Hoffri Hidevi Hiinumi Hivalidi Hdlnki
                       Hdiati Hmetai Haddrsi Hindi Hblocksi Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
                       Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                       HbE H30 [Hcont]").
@@ -4336,6 +4342,7 @@ Section ProofSysUnlinkBody.
     IcacheRef.cred_floor loyd tlyd -∗
     IcacheInv.iref_claims -∗
     ic_handle fsc_ic kd (DepTx sd icfg_dev dinum gyd loyd t (1/4)) -∗
+    off_rows off_cfg kd cur_ctx -∗
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
     i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -4361,6 +4368,7 @@ Section ProofSysUnlinkBody.
     IcacheRef.cred_floor loyi tlyi -∗
     IcacheInv.iref_claims -∗
     ic_handle fsc_ic ks (DepTx si icfg_dev (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi loyi t (1/4)) -∗
+    off_rows off_cfg ks cur_ctx -∗
     i_dev (ientry ks) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry ks) ↦₄{DfracOwn (1/2)}
       (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
@@ -4423,9 +4431,9 @@ Section ProofSysUnlinkBody.
     iIntros "Hcg Hown #Htext #Hdata #Hprenv Hpc #Hbio #Hlog Hseam Hgen
              #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hireg #Hropen
              Hsbb Hsbi Hsbs #Hbmres #Hkenv #Hprocs Hpriv
-             #Hslkd Hslkdq %Hleyd #Hflyd #Hclaimsyd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
+             #Hslkd Hslkdq %Hleyd #Hflyd #Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd
              Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop #Hshotd Hfrz Hkeepd Hrud
-             #Hslki Hslkiq %Hleyi #Hflyi #Hclaimsyi Hdepi Hidevi Hiinumi Hivalidi Hdlnki
+             #Hslki Hslkiq %Hleyi #Hflyi #Hclaimsyi Hdepi Hoffri Hidevi Hiinumi Hivalidi Hdlnki
              Hdiati Hmetai Haddrsi Hindi Hblocksi Htopi #Hshoti Hfrzi Hkeepi Hrui HopS Htx
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
@@ -5215,6 +5223,7 @@ Section ProofSysUnlinkBody.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the quarter it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
+    iDestruct (off_rows_to_dep with "Hoffrd") as "Hoffdd".
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D20) gs jx gl pd pav
               pu gild gisld
  kd qdi sd gyd loyd tlyd
@@ -5226,7 +5235,7 @@ Section ProofSysUnlinkBody.
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk Hdiblog Hdinb Hcovb
               ltac:(unfold iput_units; lia) Hj Hgl HC5a0 (Hlb "log"%string) eq_refl
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
-                    Hescd Hireg Hropen Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hidevd Hiinumd
+                    Hescd Hireg Hropen Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hoffdd Hidevd Hiinumd
                     Hivalidd Hloadd Hshotd2 Hfrz [$Hkeepd $Hrud] Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk Hbsl [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -5558,6 +5567,7 @@ Section ProofSysUnlinkBody.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the quarter it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
+    iDestruct (off_rows_to_dep with "Hoffri") as "Hoffdi".
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D29) gs jx gl pd pav
               pu gili gisli
  ks qsi si gyi loyi tlyi
@@ -5574,7 +5584,7 @@ Section ProofSysUnlinkBody.
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi Hinb Hcovb
               Hnu2 Hj Hgl HE2a0 (Hlb "log"%string) eq_refl
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
-                    Hesci Hireg Hropen Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hidevi Hiinumi
+                    Hesci Hireg Hropen Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hoffdi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti2 Hfrzi [$Hkeepi $Hrui] Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2] [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -5959,6 +5969,7 @@ Section ProofSysUnlinkBody.
     IcacheRef.cred_floor loyd tlyd -∗
     IcacheInv.iref_claims -∗
     ic_handle fsc_ic kd (DepTx sd icfg_dev dinum gyd loyd t (1/4)) -∗
+    off_rows off_cfg kd cur_ctx -∗
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
     i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -5984,6 +5995,7 @@ Section ProofSysUnlinkBody.
     IcacheRef.cred_floor loyi tlyi -∗
     IcacheInv.iref_claims -∗
     ic_handle fsc_ic ks (DepTx si icfg_dev (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi loyi t (1/4)) -∗
+    off_rows off_cfg ks cur_ctx -∗
     i_dev (ientry ks) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry ks) ↦₄{DfracOwn (1/2)}
       (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
@@ -6047,9 +6059,9 @@ Section ProofSysUnlinkBody.
     iIntros "Hcg Hown #Htext #Hdata #Hprenv Hpc #Hbio #Hlog Hseam Hgen
              #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hireg #Hropen
              Hsbb Hsbi Hsbs #Hbmres #Hkenv #Hprocs Hpriv
-             #Hslkd Hslkdq %Hleyd #Hflyd #Hclaimsyd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
+             #Hslkd Hslkdq %Hleyd #Hflyd #Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd
              Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop #Hshotd Hfrz Hkeepd Hrud
-             #Hslki Hslkiq %Hleyi #Hflyi #Hclaimsyi Hdepi Hidevi Hiinumi Hivalidi Hdlnki
+             #Hslki Hslkiq %Hleyi #Hflyi #Hclaimsyi Hdepi Hoffri Hidevi Hiinumi Hivalidi Hdlnki
              Hdiati Hmetai Haddrsi Hindi Hblocksi Htopi #Hshoti Hfrzi Hkeepi Hrui HopS Htx
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
@@ -7376,6 +7388,7 @@ Section ProofSysUnlinkBody.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the quarter it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
+    iDestruct (off_rows_to_dep with "Hoffrd") as "Hoffdd".
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D20) gs jx gl pd pav
               pu gild gisld
  kd qdi sd gyd loyd tlyd
@@ -7386,7 +7399,7 @@ Section ProofSysUnlinkBody.
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk Hdiblog Hdinb Hcovb
               Hnud2 Hj Hgl HC5a0 (Hlb "log"%string) eq_refl
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
-                    Hescd Hireg Hropen Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hidevd Hiinumd
+                    Hescd Hireg Hropen Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hoffdd Hidevd Hiinumd
                     Hivalidd Hloadd Hshotd2 Hfrz [$Hkeepd $Hrud] Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2] [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -7776,6 +7789,7 @@ Section ProofSysUnlinkBody.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the quarter it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
+    iDestruct (off_rows_to_dep with "Hoffri") as "Hoffdi".
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D29) gs jx gl pd pav
               pu gili gisli
  ks qsi si gyi loyi tlyi
@@ -7792,7 +7806,7 @@ Section ProofSysUnlinkBody.
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi Hinb Hcovb
               Hnu2 Hj Hgl HE2a0 (Hlb "log"%string) eq_refl
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
-                    Hesci Hireg Hropen Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hidevi Hiinumi
+                    Hesci Hireg Hropen Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hoffdi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti2 Hfrzi [$Hkeepi $Hrui] Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2] [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -8115,7 +8129,7 @@ Section ProofSysUnlinkBody.
              %Hdoc %Hduq
              %Hnotdot %Hnotdd %Hfst %Hma02 %Hal27
              Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
-             Hslkd Hslkdq %Hleyd #Hflyd #Hclaimsyd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
+             Hslkd Hslkdq %Hleyd #Hflyd #Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd
              Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS Htx
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
@@ -8135,7 +8149,7 @@ Section ProofSysUnlinkBody.
               with "Hcg Hown Htext Hdata Hpetop Hpc Hbio Hlog Hseam Hgen Hdev Hgeo
                     Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hropen Hsbb Hsbi
                     Hsbs Hbmres Hkenv Hprocs Hpriv Hslkd Hslkdq
-                    [//] Hflyd Hclaimsyd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad
+                    [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad
                     Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS Htx
                     Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                     HbE H30 [] Hcont").
@@ -8143,9 +8157,9 @@ Section ProofSysUnlinkBody.
     iIntros "%Hregs3 %Hnlzi %Hioki %Hrl_dati %Hdoki %Hddixi %Hdoci %Hduqi
              %Hisd
              Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
-             Hslkd Hslkdq %Hleyd5 #Hflyd5 #Hclaimsyd5 Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
+             Hslkd Hslkdq %Hleyd5 #Hflyd5 #Hclaimsyd5 Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd
              Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud
-             Hslki Hslkiq %Hleyi #Hflyi #Hclaimsyi Hdepi Hidevi Hiinumi Hivalidi Hdlnki
+             Hslki Hslkiq %Hleyi #Hflyi #Hclaimsyi Hdepi Hoffri Hidevi Hiinumi Hivalidi Hdlnki
              Hdiati Hmetai Haddrsi Hindi Hblocksi Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
@@ -8170,9 +8184,9 @@ Section ProofSysUnlinkBody.
                 with "Hcg Hown Htext Hdata Hprenv Hpc Hbio Hlog Hseam
                       Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg Hropen
                       Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
-                      Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hidevd Hiinumd Hivalidd
+                      Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd
                       Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd
-                      Hfrz Hkeepd Hrud Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hidevi Hiinumi
+                      Hfrz Hkeepd Hrud Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hoffri Hidevi Hiinumi
                       Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
                       Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
                       Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
@@ -8192,9 +8206,9 @@ Section ProofSysUnlinkBody.
                 with "Hcg Hown Htext Hdata Hprenv Hpc Hbio Hlog Hseam
                       Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg Hropen
                       Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
-                      Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hidevd Hiinumd Hivalidd
+                      Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd
                       Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd
-                      Hfrz Hkeepd Hrud Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hidevi Hiinumi
+                      Hfrz Hkeepd Hrud Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hoffri Hidevi Hiinumi
                       Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
                       Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
                       Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi

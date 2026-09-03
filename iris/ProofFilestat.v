@@ -113,6 +113,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -712,7 +713,7 @@ Section ProofFilestat.
       { rewrite Heb /cpu_claim_ext. done. }
       { rewrite /ic_dep_side. done. }
       iIntros (CIDil Hsil mil dnl bml fl_)
-        "%Hcsil _ Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hdep
+        "%Hcsil _ Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hdep Hoffr
          Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
       iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
       assert (Hpc2a : ret_pc (Q3 !!! Regidx Rra) = mword_of_int (FST + 0x2a)).
@@ -996,6 +997,7 @@ Section ProofFilestat.
       iDestruct (proc_priv_core_bare_acc pj pidv U with "Hpriv") as "[Hppid Hpivbk2]".
       iDestruct (cpu_own_transport CIDil CID26 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
+      iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
       iApply (Iunlock.wp_iunlock_dep_sconf γs
                 gil gisl
                 ikk (ssh/2)%Qp gsh losh tlsh (DepRd (ssh/2)%Qp icfg_dev inm gsh losh)
@@ -1009,7 +1011,7 @@ Section ProofFilestat.
                 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                       Hheld Hppid Hprocs
-                      [//] Hflsh Hclaimsfs Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
+                      [//] Hflsh Hclaimsfs Hdep Hoffd Hidev Hinum Hvalid Hlk Hshot Hfrz").
       all: try lkbelow.
       iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr _".
       iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".

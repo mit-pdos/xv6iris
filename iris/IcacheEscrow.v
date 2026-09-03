@@ -4372,31 +4372,12 @@ Section IcacheBox.
         and hands it back at releasesleep ([ic_slp_dep]); across the hold it
         lives HERE (main put it into the escrow arm at the checkout; the box
         has no token slot after the second edit). *)
-     ic_tok cn k ∗
-     (* STATEMENT CHANGE (r25 pass 1): ...AND THE INODE'S PUBLISHED OFF ROWS,
-        for [ic_tok]'s reason exactly.  [ic_slp] gained [OffBox.off_rows
-        off_cfg k ξ] (the third final shape), and the set AUTHORITY inside it
-        cannot be re-minted -- so what ilock takes out of the payload at
-        acquiresleep has to live somewhere until iunlock puts it back through
-        [ic_slp_dep], and the handle is where the payload's other travelling
-        conjunct already lives.  ARITY UNCHANGED, so the twenty-six opaque
-        [ic_handle] sites (SpecIlock / SpecIunlock / SpecIunlockput /
-        ProofCreate / ProofCreateFreshTy / ProofSysUnlink) do not move; only
-        the three files that UNFOLD it thread one more conjunct.  The rows are
-        at the holder's own context, which is where the file layer's checkout
-        ([FileOffProtocol.proto_read_checkout]) wants them. *)
-     off_rows off_cfg k cur_ctx)%I.
+     ic_tok cn k)%I.
+  (* NO off-rows conjunct here (plan §9 items 35/36 reversed item 33): the
+     inode's off rows leave the lock FOLDED in ilock's post and come back in
+     DEP form in iunlock's pre -- one predicate cannot be both, and a
+     handle conjunct must be a shape that comes back ([CtxMorph]). *)
 
-  (* the row in and out of the handle without unfolding it: what sys_open's
-     [so_deposit] and fileread's checkout take while they hold ip->lock
-     (plan item 33). *)
-  Lemma ic_handle_off_rows_acc cn k d :
-    ic_handle cn k d ⊢
-    off_rows off_cfg k cur_ctx ∗ (off_rows off_cfg k cur_ctx -∗ ic_handle cn k d).
-  Proof.
-    rewrite /ic_handle. iIntros "(H1 & H2 & H3 & H4 & Hoff)".
-    iFrame "Hoff". iIntros "Hoff". iFrame "H1 H2 H3 H4 Hoff".
-  Qed.
 
   (* the descriptor's PURE projections at a share-bearing descriptor *)
   Lemma ic_dep_id_of_shr d (s : Qp) (dev inum : mword 32) (g : gname) (lo : nat) :
@@ -4481,19 +4462,6 @@ Section IcacheBox.
     Timeless (ic_tx_dep cn k s dev inum g lo).
   Proof. rewrite /ic_tx_dep. tl_struct. Qed.
 
-  (* the write arm'''s holder bundle wraps the handle, so it gets the rows'''
-     accessor too: sys_open'''s [so_deposit] and the AU publisher hold
-     [ic_tx_dep], not [ic_handle] (plan item 33). *)
-  Lemma ic_tx_dep_off_rows_acc cn k s dev inum g lo :
-    ic_tx_dep cn k s dev inum g lo ⊢
-    off_rows off_cfg k cur_ctx ∗
-    (off_rows off_cfg k cur_ctx -∗ ic_tx_dep cn k s dev inum g lo).
-  Proof.
-    rewrite /ic_tx_dep. iIntros "(%t & Hh & Htx)".
-    iDestruct (ic_handle_off_rows_acc with "Hh") as "[Hoff Hback]".
-    iFrame "Hoff". iIntros "Hoff". iExists t.
-    iDestruct ("Hback" with "Hoff") as "Hh". iFrame "Hh Htx".
-  Qed.
 
 
   Lemma ic_tx_dep_intro cn k s dev inum g lo (t : nat) :
@@ -4529,20 +4497,6 @@ Section IcacheBox.
       (dev inum : mword 32) (g : gname) (lo : nat) (t : nat) (q : Qp) : iProp Σ :=
     (ic_handle cn k (DepTx s dev inum g lo t q)
      ∗ t ↪[ln_tx icfg_log]{#q} tt)%I.
-
-  Global Instance ic_tx_dep_at_timeless cn k s dev inum g lo t q :
-    Timeless (ic_tx_dep_at cn k s dev inum g lo t q).
-  Proof. rewrite /ic_tx_dep_at. tl_struct. Qed.
-  Lemma ic_tx_dep_at_off_rows_acc cn k s dev inum g lo t q :
-    ic_tx_dep_at cn k s dev inum g lo t q ⊢
-    off_rows off_cfg k cur_ctx ∗
-    (off_rows off_cfg k cur_ctx -∗ ic_tx_dep_at cn k s dev inum g lo t q).
-  Proof.
-    rewrite /ic_tx_dep_at. iIntros "[Hh Htx]".
-    iDestruct (ic_handle_off_rows_acc with "Hh") as "[Hoff Hback]".
-    iFrame "Hoff". iIntros "Hoff".
-    iDestruct ("Hback" with "Hoff") as "Hh". iFrame "Hh Htx".
-  Qed.
 
 
   Lemma ic_tx_dep_at_of_half cn k s dev inum g lo :
@@ -4595,7 +4549,7 @@ Section IcacheBox.
       i_valid (ientry k) ↦₄ valid_word v ∗
       ic_handle cn k (DepTx s dev inum g lo t q).
   Proof.
-    iIntros (Hq HE) "#Hesc Hvld (Hd2 & Hpl & Hdep & Htok & Hoffh) Htx".
+    iIntros (Hq HE) "#Hesc Hvld (Hd2 & Hpl & Hdep & Htok) Htx".
     iFrame "Hvld".
     rewrite /ic_deposit2. cbn [ic_dep_id ic_dep_mass].
     iDestruct "Hd2" as "[Hhold Hbody]".
@@ -4618,7 +4572,7 @@ Section IcacheBox.
       rewrite /ic_q_side; cbn. rewrite /TxPin.tx_pin.
       iApply (ic_tx_share_join t q q1 q2 Hq with "Hside Htx"). }
     iModIntro. rewrite /ic_handle /ic_deposit2. cbn [ic_dep_id ic_dep_mass].
-    iFrame "Hpl Hdep Htok Hoffh Hbody". rewrite /ic_hold. iExists mh. iFrame "Hl2".
+    iFrame "Hpl Hdep Htok Hbody". rewrite /ic_hold. iExists mh. iFrame "Hl2".
     by iPureIntro.
   Qed.
 
@@ -4634,7 +4588,7 @@ Section IcacheBox.
       ic_handle cn k (DepTx s dev inum g lo t q1) ∗
       t ↪[ln_tx icfg_log]{#q2} tt.
   Proof.
-    iIntros (Hq HE) "#Hesc Hvld (Hd2 & Hpl & Hdep & Htok & Hoffh)".
+    iIntros (Hq HE) "#Hesc Hvld (Hd2 & Hpl & Hdep & Htok)".
     iFrame "Hvld".
     rewrite /ic_deposit2. cbn [ic_dep_id ic_dep_mass].
     iDestruct "Hd2" as "[Hhold Hbody]".
@@ -4657,7 +4611,7 @@ Section IcacheBox.
       iFrame "Hdep' Hq". iSplitR; [iPureIntro; exact Hid |].
       rewrite /ic_q_side; cbn. rewrite /TxPin.tx_pin. iExact "Hside". }
     iModIntro. iFrame "Htx". rewrite /ic_handle /ic_deposit2. cbn [ic_dep_id ic_dep_mass].
-    iFrame "Hpl Hdep Htok Hoffh Hbody". rewrite /ic_hold. iExists mh. iFrame "Hl2".
+    iFrame "Hpl Hdep Htok Hbody". rewrite /ic_hold. iExists mh. iFrame "Hl2".
     by iPureIntro.
   Qed.
 
@@ -4730,6 +4684,27 @@ Section IcacheBox.
      [ic_slp]; the release must present ONE lower bound.  This takes the
      rows' own maximum ([OffBox.off_rows_to_dep]) and joins the two
      ([TsoGhost.llb_max]), so every inode proof's site is one [iDestruct]. *)
+  (* the same assembler from rows ALREADY in dep form -- what iunlock's pre
+     hands it (items 35/36: the holder may have parked an off box and then
+     has no floor to re-fold) *)
+  Lemma ic_slp_dep_of_dep cn k (Tp T : nat) :
+    llb loglen_name Tp -∗
+    ic_tok cn k -∗ ic_regp k (L2Reg Tp None) -∗ ic_dep_neutral cn k -∗
+    off_rows_dep off_cfg k T -∗
+    ∃ Tc : nat, ⌜(Tp <= Tc)%nat⌝ ∗ llb loglen_name Tc ∗ ic_slp_dep cn k Tc.
+  Proof.
+    iIntros "#HllbP Ht Hrp Hn Hdep".
+    iAssert (llb loglen_name T) as "#HllbO".
+    { iDestruct "Hdep" as (L) "(_ & #H & _)". iExact "H". }
+    iDestruct (llb_max with "HllbP HllbO") as "#HllbC".
+    iDestruct (off_rows_dep_le k T (Nat.max Tp T) (Nat.le_max_r Tp T) with "HllbC Hdep") as "Hdep'".
+    iExists (Nat.max Tp T). iSplitR; [iPureIntro; lia|]. iSplitR; [iExact "HllbC"|].
+    (* [iSplitL]/[iExact], not [iFrame]: the rows' own [llb] would be framed *)
+    rewrite /ic_slp_dep. iExists Tp. iSplitR; [iPureIntro; lia|].
+    iSplitR; [iExact "HllbC"|]. iSplitL "Ht"; [iExact "Ht"|].
+    iSplitL "Hrp"; [iExact "Hrp"|]. iSplitL "Hn"; [iExact "Hn"|]. iExact "Hdep'".
+  Qed.
+
   Lemma ic_slp_dep_of_rows cn k (Tp : nat) (ξ : CtxId) :
     llb loglen_name Tp -∗
     ic_tok cn k -∗ ic_regp k (L2Reg Tp None) -∗ ic_dep_neutral cn k -∗

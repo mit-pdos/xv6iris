@@ -164,6 +164,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 (* claude-notes/optimization.md "Register maps": the leaves' premises are
    stated over [rget] (see e.g. [cri_*]'s consumers below), so with these
@@ -2105,6 +2106,7 @@ Section ProofCreateMain.
        (∃ lodc tldc : nat,
           ⌜(lodc <= tldc)%nat⌝ ∗ IcacheRef.cred_floor lodc tldc ∗
           ic_handle fsc_ic kd (DepTx (qd/2)%Qp icfg_dev dind gd lodc t (1/2))) -∗
+          off_rows off_cfg kd cur_ctx -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} icfg_dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -2276,6 +2278,7 @@ Section ProofCreateMain.
        (∃ lodc tldc : nat,
           ⌜(lodc <= tldc)%nat⌝ ∗ IcacheRef.cred_floor lodc tldc ∗
           ic_handle fsc_ic kd (DepTx (qd/2)%Qp icfg_dev dind gd lodc t (1/4))) -∗
+          off_rows off_cfg kd cur_ctx -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} icfg_dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -2307,6 +2310,7 @@ Section ProofCreateMain.
        (∃ locc tlcc : nat,
           ⌜(locc <= tlcc)%nat⌝ ∗ IcacheRef.cred_floor locc tlcc ∗
           ic_handle fsc_ic kslot (DepTx (q/2)%Qp icfg_dev cinum g locc t (1/4))) -∗
+          off_rows off_cfg kslot cur_ctx -∗
        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} icfg_dev -∗
        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
        i_valid (ientry kslot) ↦₄ valid_word true -∗
@@ -2482,6 +2486,7 @@ Section ProofCreateMain.
        (∃ lodc tldc : nat,
           ⌜(lodc <= tldc)%nat⌝ ∗ IcacheRef.cred_floor lodc tldc ∗
           ic_handle fsc_ic kd (DepTx (qd/2)%Qp icfg_dev dind gd lodc t (1/4))) -∗
+          off_rows off_cfg kd cur_ctx -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} icfg_dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -2516,6 +2521,7 @@ Section ProofCreateMain.
        (∃ locc tlcc : nat,
           ⌜(locc <= tlcc)%nat⌝ ∗ IcacheRef.cred_floor locc tlcc ∗
           ic_handle fsc_ic kslot (DepTx (q/2)%Qp icfg_dev cinum g locc t (1/4))) -∗
+          off_rows off_cfg kslot cur_ctx -∗
        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} icfg_dev -∗
        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
        i_valid (ientry kslot) ↦₄ valid_word true -∗
@@ -3120,7 +3126,7 @@ Section ProofCreateMain.
       { rewrite Heb /cpu_claim_ext. done. }
       { rewrite /ic_dep_side. iExact "Htp". }
       iIntros (CIDil Hqil mil dnl bml fld)
-        "%Hcsil _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslkdd Hdep
+        "%Hcsil _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslkdd Hdep Hoffr
          Hidev Hiinum Hivalid Hload #Hshotl Hfrzl %Hfrd Hrud %Hilkpd".
       iEval (rewrite /ic_dep_held /=) in "Hload".
       assert (Hpcil : ret_pc (Q2 !!! Regidx Rra : mword 64)
@@ -3246,6 +3252,7 @@ Section ProofCreateMain.
         iDestruct (log_opS_named with "Hop") as (e0) "Hop".
         iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hled
                      with "Hfld Hkeep") as "Hkeep2".
+        iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
         iApply (IUP.wp_iunlockput_dep_gen γs j γl pd pav pu
                   gild gisld
                   kd (qd/2)%Qp (qd/2)%Qp gd lod tld (DepTx (qd/2)%Qp icfg_dev dind gd lod t (1/2)%Qp) dind dnl bml n1 Sb1
@@ -3255,7 +3262,7 @@ Section ProofCreateMain.
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HG2a0 ltac:(lkbelow) eq_refl
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                        Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfld Hclaimscr Hdep Hidev Hiinum
+                        Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfld Hclaimscr Hdep Hoffd Hidev Hiinum
                         Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                         Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
         all: try lkbelow.
@@ -3691,6 +3698,7 @@ Section ProofCreateMain.
           iDestruct (log_opS_named with "Hop") as (e0) "Hop".
           iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hled
                      with "Hfld Hkeep") as "Hkeep2".
+          iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
           iApply (IUP.wp_iunlockput_dep_gen γs j γl pd pav pu
                     gild gisld
  kd (qd/2)%Qp (qd/2)%Qp gd lod tld (DepTx (qd/2)%Qp icfg_dev dind gd lod t (1/2)%Qp) dind dnl bml n1 Sb1
@@ -3700,7 +3708,7 @@ Section ProofCreateMain.
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                     ltac:(exact Hn1ip) Hj Hgs HF3a0 ltac:(lkbelow) eq_refl
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                          Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfld Hclaimscr Hdep Hidev Hiinum
+                          Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfld Hclaimscr Hdep Hoffd Hidev Hiinum
                           Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                           Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
           all: try lkbelow.
@@ -3796,7 +3804,7 @@ Section ProofCreateMain.
           { rewrite Heb /cpu_claim_ext. done. }
           { rewrite /ic_dep_side. iExact "Htp". }
           iIntros (CIDic Hqic mic dnc bmc flc)
-            "%Hcsic _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hcslkd Hcdep
+            "%Hcsic _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hcslkd Hcdep Hoffrc
              Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrc Hruc %Hilkpc".
           iEval (rewrite /ic_dep_held /=) in "Hcload".
           assert (Hpcic : ret_pc (F5 !!! Regidx Rra : mword 64)
@@ -3837,6 +3845,7 @@ Section ProofCreateMain.
                           pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf0 jj) -∗
                        sleeplocked_q gislc (qq/2)%Qp (i_lock (ientry kslot)) pidv -∗
                        ic_handle fsc_ic kslot (DepTx (qq/2)%Qp icfg_dev cinum gc lock t (1/2)) -∗
+                       off_rows off_cfg kslot cur_ctx -∗
                        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} icfg_dev -∗
                        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
                        i_valid (ientry kslot) ↦₄ valid_word true -∗
@@ -3873,7 +3882,7 @@ Section ProofCreateMain.
           { iModIntro.
             iIntros (CIDb Hsb Mb)
               "%HBr Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-               Hcslkd Hcdep Hcidev Hciinum Hcivalid Hcload Hcshotb
+               Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcload Hcshotb
                Hcfrz Hckeep Hruc Hsbn Hsbi Hsbs Hsbb Hppid Hppback Hpath Hbsl
                Hisl Hislr Hop Htx Hcontb".
             pose proof HBr as HBr2.
@@ -3926,6 +3935,7 @@ Section ProofCreateMain.
             iDestruct (log_opS_named with "Hop") as (ec) "Hop".
             iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hleck
                      with "Hflck Hckeep") as "Hckeep2".
+            iDestruct (off_rows_to_dep with "Hoffrc") as "Hoffdc".
             iApply (IUP.wp_iunlockput_dep_gen γs j γl pd pav pu
                       gilc gislc
  kslot (qq/2)%Qp (qq/2)%Qp gc lock tlc (DepTx (qq/2)%Qp icfg_dev cinum gc lock t (1/2)%Qp) cinum dnc bmc
@@ -3936,7 +3946,7 @@ Section ProofCreateMain.
                       Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
                       ltac:(exact Hn2ip) Hj Hgs HB2a0 ltac:(lkbelow) eq_refl
                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
-                            Hitbl Hescc Hiregi Hiopen Hslkc Hcslkd [//] Hflc Hclaimscr Hcdep
+                            Hitbl Hescc Hiregi Hiopen Hslkc Hcslkd [//] Hflc Hclaimscr Hcdep Hoffdc
                             Hcidev Hciinum Hcivalid Hcload Hcshotb Hcfrz [$Hckeep2 $Hruc] Hsbb
                             Hsbi Hbmr Hppid Hprocs Hdevi Hgeom Hdlk Hbsl []
                             Hop").
@@ -4242,7 +4252,7 @@ Section ProofCreateMain.
                 iSpecialize ("Hfb" with "[%]"); [wp_next_chain |].
                 iApply ("Hfb" $! FB with
                           "[%] Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                           Hnb14 Hnb2 Hcslkd Hcdep Hcidev Hciinum
+                           Hnb14 Hnb2 Hcslkd Hcdep Hoffrc Hcidev Hciinum
                            Hcivalid Hcload Hcshot Hcfrz Hckeep Hruc Hsbn Hsbi Hsbs
                            Hsbb
                            Hppid Hppback Hpath Hbsl Hisl Hislr Hop Htx Hcont").
@@ -4275,7 +4285,7 @@ Section ProofCreateMain.
                 iApply ("Hcont" $! mf true false kslot (qq/2)%Qp (qq/2)%Qp gc
                           cinum dnc bmc n2 Sb2 (1 + (ns - 2))%nat
                           with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv
-                                Hpath Hbsl [%] Hisl [%] Hop [Hcslkd Hcdep
+                                Hpath Hbsl [%] Hisl [%] Hop [Hcslkd Hcdep Hoffrc
                                 Hcidev Hciinum Hcivalid Hcload Hcfrz Hckeep Hruc]").
                 { exact Hcsf. }
                 { exact (cr_slots_1 _ ns eq_refl Hns). }
@@ -4291,7 +4301,7 @@ Section ProofCreateMain.
                   exact (cr_trange_in (di_type dnc) Hrng). }
                 iApply (create_locked_mk
                           _ _ _ _ _ _ _ _ gilc gislc eq_refl
-                          with "Hslkc Hcslkd [Hcdep] Hcidev Hciinum
+                          with "Hslkc Hcslkd [Hcdep] Hoffrc Hcidev Hciinum
                                 Hcivalid Hcload Hcshot Hcfrz [Hckeep] Hruc").
                 { iExists lock, tlc. iSplitR; [by iPureIntro|].
                   iFrame "Hflc Hcdep". }
@@ -4316,7 +4326,7 @@ Section ProofCreateMain.
              iSpecialize ("Hfb" with "[%]"); [wp_next_chain |].
              iApply ("Hfb" $! F6 with
                        "[%] Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                        Hnb14 Hnb2 Hcslkd Hcdep Hcidev Hciinum
+                        Hnb14 Hnb2 Hcslkd Hcdep Hoffrc Hcidev Hciinum
                         Hcivalid Hcload Hcshot Hcfrz Hckeep Hruc Hsbn Hsbi Hsbs
                         Hsbb
                         Hppid Hppback Hpath Hbsl Hisl Hislr Hop Htx Hcont").
@@ -4381,7 +4391,7 @@ Section ProofCreateMain.
                     with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                           [%] [%] [%]
                           Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                          Hnb14 Hnb2 Hslkd Hslkdd [Hdep] Hidev Hiinum
+                          Hnb14 Hnb2 Hslkd Hslkdd [Hdep] Hoffr Hidev Hiinum
                           Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Htop Hshotl Hfrzl Hkeep Hrud
                           Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath Hbsl Hisl Hop Htx
                           Hcont").
@@ -4476,6 +4486,7 @@ Section ProofCreateMain.
         iDestruct (log_opS_named with "Hop") as (e0) "Hop".
         iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hled
                      with "Hfld Hkeep") as "Hkeep2".
+        iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
         iApply (IUP.wp_iunlockput_dep_gen γs j γl pd pav pu
                   gild gisld
                   kd (qd/2)%Qp (qd/2)%Qp gd lod tld (DepTx (qd/2)%Qp icfg_dev dind gd lod t (1/2)%Qp) dind dnl bml n1 Sb1
@@ -4485,7 +4496,7 @@ Section ProofCreateMain.
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HJ2a0 ltac:(lkbelow) eq_refl
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                        Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfld Hclaimscr Hdep Hidev Hiinum
+                        Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfld Hclaimscr Hdep Hoffd Hidev Hiinum
                         Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                         Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
         all: try lkbelow.
@@ -4947,7 +4958,7 @@ Section ProofCreateMain.
     iIntros "%HAregs %Hkdlt %Hdib %Htydir %Hnl0 %Hnlmax %Hiok %Hdok %Hddix %Hduq %Hrl %Hnpname
              %Hnone %Hsb1 %Hwmem %Hnp1".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-             #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
+             #Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks Htop #Hshotl Hfrzl Hkeep Hrud
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hpriv Hpath Hbsl Hisl Hop Htx Hcont".
     iDestruct "Hkeep" as (lod tld) "(%Hled & #Hfld & Hkeep)".
@@ -5039,7 +5050,7 @@ Section ProofCreateMain.
          [ilock]'s return, and [SpecIlock]'s post now hands it over).  It is
          what pays the freeze pin at the +0xc4 [ip->nlink = 1] below, where
          the pure arm is FALSE. *)
-      iDestruct "Hres" as "(%Hpure & Hpc & #Hslkc & Hcslkd & Hcdep &
+      iDestruct "Hres" as "(%Hpure & Hpc & #Hslkc & Hcslkd & Hcdep & Hoffrc &
                             Hcidev & Hciinum & Hcivalid & Hcload & #Hcshot &
                             Hcfrz & Hckeep & Hruc & Htcl & Hop)".
       (* the claim box's quarter is home (durable-disk C-5) *)
@@ -5391,9 +5402,9 @@ Section ProofCreateMain.
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                        Hnb14 Hnb2 Hslkd Hslkdd Hdep Hidev Hiinum
+                        Hnb14 Hnb2 Hslkd Hslkdd Hdep Hoffr Hidev Hiinum
                         Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Htop Hshotl Hfrzl Hkeep Hrud
-                        Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
+                        Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid
                         Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hctop Hcshot Hcfrz [%] []
                         Hckeep Hruc Htoken Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath
                         Hbsl Hislr Hop Hdirty Hcont").
@@ -5967,6 +5978,7 @@ Section ProofCreateMain.
                      with "Hfld Hkeep") as "Hkeep2".
              iAssert (ity_shot gd (di_type dn')) as "#Hshotl'".
              { rewrite Hty'. iExact "Hshotl". }
+             iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
              iApply (IUP.wp_iunlockput_dep_gen γs j γl pd pav pu
                        γil γisl
  kd (qd/2)%Qp (qd/2)%Qp gd lodc tldc (DepTx (qd/2)%Qp icfg_dev dind gd lodc t (1/4)%Qp) dind dn' bm'
@@ -5976,7 +5988,7 @@ Section ProofCreateMain.
                        Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                        ltac:(exact Hipn') Hj Hgs HY2a0 ltac:(lkbelow) eq_refl
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
-                             Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hidev
+                             Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hoffd Hidev
                              Hiinum Hivalid Hload Hshotl' Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr
                              Hppid Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
              all: try lkbelow.
@@ -6092,7 +6104,7 @@ Section ProofCreateMain.
                        n2 Sb2 (1 + (1 + (ns - 3)))%nat
                        with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv
                              Hpath Hbsl [%] Hisl [%] Hop [Hslkc Hcslkd
-                             Hcdep Hcidev Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta
+                             Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta
                              Hcmap Hcblocks Hctop Hcfrz Hckeep Hruc]").
              { exact Hcsf. }
              { exact (cr_slots_3 _ ns eq_refl Hns). }
@@ -6166,7 +6178,7 @@ Section ProofCreateMain.
              { rewrite cr_setf_type. iExact "Hcshot". }
              iApply (create_locked_mk
  _ _ _ _ _ _ _ _ gil gisl eq_refl
-                       with "Hslkc Hcslkd [Hcdep] Hcidev Hciinum
+                       with "Hslkc Hcslkd [Hcdep] Hoffrc Hcidev Hciinum
                              Hcivalid Hcload Hcshot1 Hcfrz [Hckeep] Hruc").
              { iExists locg, tlcg. iSplitR; [iPureIntro; exact Hlecg|].
                iFrame "Hflcg Hcdep". }
@@ -6232,9 +6244,9 @@ Section ProofCreateMain.
                              [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                              [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                              Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                             Hnb14 Hnb2 Hslkd Hslkdd Hdep Hidev Hiinum
+                             Hnb14 Hnb2 Hslkd Hslkdd Hdep Hoffr Hidev Hiinum
                              Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Htop Hshotl
-                             Hfrzl Hkeep Hrud Hslkc Hcslkd Hcdep Hcidev
+                             Hfrzl Hkeep Hrud Hslkc Hcslkd Hcdep Hoffrc Hcidev
                              Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta Hcmap
                              Hcblocks Hctop Hcshot Hcfrz [%] [] Hckeep Hruc Htoken Hsbn Hsbi Hsbs Hsbb Hbmr
                              Hppid Hppback Hpath Hbsl Hislr Hop Htx Hcont").
@@ -6369,6 +6381,7 @@ Section ProofCreateMain.
       iDestruct (log_opS_named with "Hop") as (e0) "Hop".
       iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hled
                      with "Hfld Hkeep") as "Hkeep2".
+      iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
       iApply (IUP.wp_iunlockput_dep_gen γs j γl pd pav pu
                 γil γisl
                 kd (qd/2)%Qp (qd/2)%Qp gd lodc tldc (DepTx (qd/2)%Qp icfg_dev dind gd lodc t (1/2)%Qp) dind dn bm (S q1) Sb1
@@ -6378,7 +6391,7 @@ Section ProofCreateMain.
                 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                 ltac:(exact Hn1ip) Hj Hgs HZ2a0 ltac:(lkbelow) eq_refl
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                      Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hidev Hiinum
+                      Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hoffd Hidev Hiinum
                       Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                       Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
       all: try lkbelow.
@@ -6602,9 +6615,9 @@ Section ProofCreateMain.
              %Haddr' %Hsz31' %Hcov' %Hszcap' %Hsized' %Hdn' %Hdn0' %Hrng
              %Hsb4 %Hmem4 %Hn4 %Hledge".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-             #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
+             #Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks Htop #Hshotl Hfrzl Hkeep Hrud
-             #Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid Hcdlnk
+             #Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcdlnk
              Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hcshot Hcfrz %Hlek #Hflk Hckeep Hruc Htoken
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Htx
              Hcont".
@@ -6855,6 +6868,7 @@ Section ProofCreateMain.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the share it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
+    iDestruct (off_rows_to_dep with "Hoffrc") as "Hoffdc".
     iApply (IUP.wp_iunlockput_dep_gen γs j γl pd pav pu
               gil gisl
               kslot (q/2)%Qp (q/2)%Qp g locc tlcc (DepTx (q/2)%Qp icfg_dev cinum g locc t (1/4)%Qp) cinum
@@ -6871,7 +6885,7 @@ Section ProofCreateMain.
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
               ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0 ltac:(lkbelow) eq_refl
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescc Hiregi Hiopen Hslkc Hcslkd [//] Hflcc Hclaimscr Hcdep Hcidev Hciinum
+                    Hescc Hiregi Hiopen Hslkc Hcslkd [//] Hflcc Hclaimscr Hcdep Hoffdc Hcidev Hciinum
                     Hcivalid Hcload Hcshot' Hcfrz [$Hckp $Hruc] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -7087,6 +7101,7 @@ Section ProofCreateMain.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the share it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (IUP.wp_iunlockput_dep_gen γs j γl pd pav pu
               γil γisl
               kd (qd/2)%Qp (qd/2)%Qp gd lodc tldc (DepTx (qd/2)%Qp icfg_dev dind gd lodc t (1/4)%Qp) dind dn' bm'
@@ -7096,7 +7111,7 @@ Section ProofCreateMain.
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0 ltac:(lkbelow) eq_refl
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hidev Hiinum
+                    Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hoffd Hidev Hiinum
                     Hivalid Hload Hshotl' Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -7301,6 +7316,7 @@ Section ProofCreateMain.
        (∃ lodc tldc : nat,
           ⌜(lodc <= tldc)%nat⌝ ∗ IcacheRef.cred_floor lodc tldc ∗
           ic_handle fsc_ic kd (DepTx (qd/2)%Qp icfg_dev dind gd lodc t (1/4))) -∗
+          off_rows off_cfg kd cur_ctx -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} icfg_dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -7331,6 +7347,7 @@ Section ProofCreateMain.
        (∃ locc tlcc : nat,
           ⌜(locc <= tlcc)%nat⌝ ∗ IcacheRef.cred_floor locc tlcc ∗
           ic_handle fsc_ic kslot (DepTx (q/2)%Qp icfg_dev cinum g locc t (1/4))) -∗
+          off_rows off_cfg kslot cur_ctx -∗
        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} icfg_dev -∗
        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
        i_valid (ientry kslot) ↦₄ valid_word true -∗
@@ -7447,9 +7464,9 @@ Section ProofCreateMain.
              %Hcpos %Hcinb %Htyc %Hcmaj %Hcmin %Hcnl1 %Hciok %Hrl_datc %Hcdok %Hcduq %Hcdots
              %Hsb4 %Hmem4 %Hn4 %Hledge".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-             #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
+             #Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks Htop #Hshotl Hfrzl Hkeep Hrud
-             #Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
+             #Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid
              Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hcshot Hcfrz %Hlek #Hflk Hckeep Hruc Htoken
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Hdirty
              Hcont".
@@ -7746,6 +7763,7 @@ Section ProofCreateMain.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the share it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
+    iDestruct (off_rows_to_dep with "Hoffrc") as "Hoffdc".
     iApply (IUP.wp_iunlockput_dep_gen γs j γl pd pav pu
               gil gisl
               kslot (q/2)%Qp (q/2)%Qp g locc tlcc (DepTx (q/2)%Qp icfg_dev cinum g locc t (1/4)%Qp) cinum
@@ -7762,7 +7780,7 @@ Section ProofCreateMain.
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
               ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0 ltac:(lkbelow) eq_refl
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescc Hiregi Hiopen Hslkc Hcslkd [//] Hflcc Hclaimscr Hcdep Hcidev Hciinum
+                    Hescc Hiregi Hiopen Hslkc Hcslkd [//] Hflcc Hclaimscr Hcdep Hoffdc Hcidev Hciinum
                     Hcivalid Hcload Hcshot' Hcfrz [$Hckp $Hruc] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -7858,6 +7876,7 @@ Section ProofCreateMain.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the share it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (IUP.wp_iunlockput_dep_gen γs j γl pd pav pu
               γil γisl
               kd (qd/2)%Qp (qd/2)%Qp gd lodc tldc (DepTx (qd/2)%Qp icfg_dev dind gd lodc t (1/4)%Qp) dind dp bmp
@@ -7867,7 +7886,7 @@ Section ProofCreateMain.
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0 ltac:(lkbelow) eq_refl
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hidev Hiinum
+                    Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hoffd Hidev Hiinum
                     Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -8069,9 +8088,9 @@ Section ProofCreateMain.
              %Hrl_datc %Htyc %Hciok %Hcdok
              %Hsb3 %Hmem3 %Hn3 %Hcorr".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-             #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
+             #Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks Htop #Hshotl Hfrzl Hkeep Hrud
-             #Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
+             #Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid
              Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hcshot Hcfrz %Hlek #Hflk Hckeep Hruc Htoken
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Hdirty
              Hcont".
@@ -10006,6 +10025,7 @@ Section ProofCreateMain.
           iDestruct (log_opS_named with "Hop") as (e0) "Hop".
           iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hled
                      with "Hfld Hkeep") as "Hkeep2".
+          iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
           iApply (IUP.wp_iunlockput_dep_gen γs j γl pd pav pu
                     γil γisl
  kd (qd/2)%Qp (qd/2)%Qp gd lodc tldc (DepTx (qd/2)%Qp icfg_dev dind gd lodc t (1/4)%Qp) dind
@@ -10018,7 +10038,7 @@ Section ProofCreateMain.
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                     ltac:(exact Hipn6) Hj Hgs HT2a0 ltac:(lkbelow) eq_refl
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
-                          Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hidev
+                          Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd [//] Hfldc Hclaimscr Hdep Hoffd Hidev
                           Hiinum Hivalid Hload Hshotf Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr
                           Hppid Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
           all: try lkbelow.
@@ -10146,7 +10166,7 @@ Section ProofCreateMain.
                     dc2 bm2 n7 Sb7 (1 + (1 + (ns - 3)))%nat
                     with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv
                           Hpath Hbsl [%] Hisl [%] Hop [Hslkc Hcslkd
-                          Hcdep Hcidev Hciinum Hcivalid Hcdlnk2 Hcdiat Hcmeta
+                          Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcdlnk2 Hcdiat Hcmeta
                           Hcmap Hcblocks Hctop Hcfrz Hckeep
                           Hruc]").
           { exact Hcsf. }
@@ -10182,7 +10202,7 @@ Section ProofCreateMain.
             intro Hnd. exfalso. exact (Hnd Htdir). }
           iApply (create_locked_mk
  _ _ _ _ _ _ _ _ gil gisl eq_refl
-                    with "Hslkc Hcslkd [Hcdep] Hcidev Hciinum
+                    with "Hslkc Hcslkd [Hcdep] Hoffrc Hcidev Hciinum
                           Hcivalid Hcloadf Hcshot2 Hcfrz [Hckeep] Hruc").
           { iExists locc, tlcc. iSplitR; [iPureIntro; exact Hlecc|].
             iFrame "Hflcc Hcdep". }
@@ -10345,9 +10365,9 @@ Section ProofCreateMain.
                           [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                           [%]
                           Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14
-                          Hnb2 Hslkd Hslkdd Hdep Hidev Hiinum Hivalid
+                          Hnb2 Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid
                           Hdlnk Hdiat Hmeta Hmap Hblocks Htop Hshotp3 Hfrzl Hkeep Hrud
-                          Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
+                          Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid
                           Hcdiat Hcmeta Hcmap Hcblocks Hctop Hcshot2 Hcfrz [%] Hflk Hckeep Hruc
                           Htoken
                           Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
@@ -10477,9 +10497,9 @@ Section ProofCreateMain.
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-                        Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk
+                        Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid Hdlnk
                         Hdiat Hmeta Hmap Hblocks Htop Hshotl Hfrzl Hkeep Hrud
-                        Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
+                        Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid
                         Hcdiat Hcmeta Hcmap Hcblocks Hctop Hcshot2 Hcfrz [%] Hflk Hckeep Hruc Htoken
                         Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
                         Hislr Hop Hdirty Hcont").
@@ -10582,9 +10602,9 @@ Section ProofCreateMain.
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                       [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                       Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-                      Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk
+                      Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid Hdlnk
                       Hdiat Hmeta Hmap Hblocks Htop Hshotl Hfrzl Hkeep Hrud
-                      Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
+                      Hslkc Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid
                       Hcdiat Hcmeta Hcmap Hcblocks Hctop Hcshot1 Hcfrz [%] Hflk Hckeep Hruc Htoken
                       Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
                       Hislr Hop Hdirty Hcont").

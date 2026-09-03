@@ -434,6 +434,10 @@ Section BootRun.
      sstateen0 ↦ᵣ (mword_of_int 0 : mword 32) ∗
      (* --- this hart's slice of the image and of the stack --- *)
      mb_ld_ea ↦ₚ₈{ dq } v_stack0 ∗
+     (* ...and the window it sits in is PRISTINE -- nobody writes the GOT --
+        which is what [SpecEntry.wp_entry_boot]'s raw load reads through
+        (TsoCtx.pristine_read); minted once by [BootShared] beside the word *)
+     TsoCtx.pristine_win mb_ld_ea 8 ∗
      stack_own_phys (mword_of_int (sp_of (fin_to_nat cpu_id))) boot_stack_depth ∗
      (* --- the bridge's adequacy-minted and .bss inputs --- *)
      strans_pending ∗
@@ -515,7 +519,7 @@ Section BootRun.
     pose proof (reset_regs_pmpcfg _ _ Hreset) as Hpmpc0.
     iIntros "#Htext (Hmm & Hpmpc & Hpmpa & Hpc & Hfile & Hmh & Hmepc & Hsatp &
               Hmede & Hmdl & Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec &
-              Hsepc & Hscause & Hstval & Hssc & Hmse & Hsse & Hgot & Hstk & Hbit & Hbit2 & Hg2 &
+              Hsepc & Hscause & Hstval & Hssc & Hmse & Hsse & Hgot & #Hpr & Hstk & Hbit & Hbit2 & Hg2 &
               Hg4a & Hg4b & Hspp1 & Hspp2 & Hnoff & Hint & Hproc & Hlks & Hctx & _) Hthr Hcont".
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     (* the two persistent halves of the config bundle, kept for the bridge *)
@@ -535,7 +539,7 @@ Section BootRun.
               eq_refl Hmie0 Hmdl0
               (ti_ea_ra_bound _ Hn) (ti_ea_s0_bound _ Hn)
               with "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
-                    Hmenv Hmcen Hstc Hgot Hstk Htext").
+                    Hmenv Hmcen Hstc Hgot Hpr Hstk Hthr Htext").
     (* Everything the M-mode side computed arrives ABSTRACT, with the eight
        facts the bridge wants (the eighth is [mief = MIE_S], the pin
        [IntrDefs.sconf] needs -- see claude-notes/completed/kerneltrap.md);
@@ -546,7 +550,7 @@ Section BootRun.
       "(%Hsp & %Htpf & %Hkf & %Hmenvl & %Hmiez & %Hmiev & %Hsatpm & %Hpmpo & %HmcenTM
         & %Hmedv)
        Hhs Hpriv Hmst Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
-       Hmenv Hmcen Hstc Hgot Hstk".
+       Hmenv Hmcen Hstc Hgot Hstk Hthr".
     (* the two stack-location bounds: [sp0_uint] rewrites only at ITS OWN
        elaboration of [uint]'s width index, so the facts are asserted here at
        §1's form and handed to the bridge by [exact] (conversion sees through
@@ -779,7 +783,7 @@ Section BootPrimary.
                     Hfirst Hnext Hpark Hpst Hpav Hfs Hmir Hirslot Hirauth
                     Hcert Hseam
                     Hdev Hwire Htx Hsent Hlb Hdlab
-                    Hcfg Hclaim Hcmauth Hdone Htimc Hraw Hkpt Hkmap Hpages").
+                    Hcfg Hclaim Hcmauth Hdone Htimc Hraw Hkpt Hkptb Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
        nine conjuncts at exactly its eight existential witnesses, plus
        (A6.138) the position-indexed bound tie the store site supplies. *)

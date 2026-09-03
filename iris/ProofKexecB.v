@@ -1221,7 +1221,7 @@ Section KexecBBody.
       iDestruct (cpu_claim_ext_transport CID3 CID8 eb (proc_addr jp)
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iDestruct "Hopen" as "(#Hslkk & Hslkd & %Hley & #Hfly & #Hclaimsy &
-                             Hdep & Hidev & Hiinum &
+                             Hdep & Hoffr & Hidev & Hiinum &
                              Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
       (* [kxc_bad64] is applied AT [CID8] (its [sie_cap_gpr] premise pins its
          own [CID0] from "Hcg"), so kexec's exit -- still anchored at the
@@ -1238,7 +1238,7 @@ Section KexecBBody.
                 m B1 K eb lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
                 Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HB1sp HB1s4 HB1thr
-                with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hslkk Hslkd [//] Hfly Hclaimsy Hdep
+                with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr
                       Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits
                       Hka Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont]
                       Hcont").

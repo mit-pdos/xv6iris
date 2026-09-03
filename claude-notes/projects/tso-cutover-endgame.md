@@ -1344,6 +1344,54 @@ and law 10 (hooks).
       that shape is `CtxMorph`; if the two shapes differ, the piece is NOT
       a handle conjunct.
 
+37. **(2026-09-03) OPTION (A) IMPLEMENTED (items 35/36), one sweep, in the
+    tree pending its full build.**  OffBox: `off_rows_dep_but on i γ T` (the
+    set with one row taken out, in dep form; the authority still names the
+    box), `off_rows_take_dep` (the row folded -- its floor is the reader's
+    `Kp` -- plus the remainder in dep form), `off_rows_dep_insert` (the parked
+    row back at `max`; the hold premise is a Coq hypothesis).  FileOffProtocol:
+    `proto_read_checkout` and `proto_fork_child_read` return `∃ T,
+    off_rows_dep_but off_cfg i γb T` instead of the folded-return wand;
+    `proto_read_park` takes it and returns `∃ T', off_rows_dep off_cfg i T'`
+    (pre-empt 1; all 17 links re-proved).  IcacheEscrow: `ic_handle` back to
+    its pre-item-33 shape, the three accessors gone, `ic_slp_dep_of_dep` (the
+    assembler from the dep form) beside `ic_slp_dep_of_rows`.  SpecIlock: the
+    continuation hands `off_rows off_cfg k cur_ctx` after the handle (both
+    bodies; `wp_ilock_tx_of_dep` threads it); SpecIunlock/SpecIunlockput: `∃ T,
+    off_rows_dep off_cfg k T` after the handle / the tx bundle (four sites);
+    `create_locked` carries the folded rows, `create_locked_mk` takes them.
+    ProofIlock hands the acquire's rows to the continuation (il_cont, both
+    arms); ProofIunlock releases from the dep row (`ic_slp_dep_of_dep`).
+    CALLERS (grep-driven): every lemma with an `ic_tx_dep fsc_ic k …`/`ic_handle
+    fsc_ic k d` premise gains `off_rows off_cfg k cur_ctx -∗` after it
+    (ProofSysOpen's four bodies, the SysOpen/SysLink/SysUnlink tails,
+    ProofKexecA/KexecTail); intros bind `Hoffr<suffix>` after `Hdep<suffix>`,
+    applications pass it, and each iunlock/iunlockput call passes
+    `off_rows_to_dep` of it (`Hoffd<suffix>`).  sys_open's birth uses the
+    folded rows row directly.  ONE OFF STEP PER HOLD (pre-empt 2) goes into
+    FileOffProtocol's header with fileread's step.
+
+    SWEEP CLOSED (2026-09-03, later): every caller compiles under rocq-warm;
+    the full-tree gate build is running (round 7 commit follows it).  What
+    the sweep needed beyond item 37's plan, for the record: the handle
+    travels in FIVE spellings and each carries the rows beside it --
+    `ic_tx_dep fsc_ic k …` / `ic_tx_dep_at … t q` / `ic_handle fsc_ic k (DepTx
+    …)` premises (a `-∗` row after each), `∗`-bundles (`kxc_open`, create's
+    fresh-type post, the local `iAssert`ed continuations in ProofCreate),
+    and the opaque `iCombine … as "HX"` packs in ProofSysUnlink (pack and
+    unpack both grow).  Naming: `Hoffr<suffix>` mirrors the handle's
+    `Hdep<suffix>` (`Hoffrd`/`Hoffri` for the second inode, `Hoffrc` for
+    create's child); the dep form at an iunlock is `Hoffd<suffix>` from
+    `off_rows_to_dep` one line before the call; iunlockput's own pre already
+    IS the dep form.  Low-level lemmas that take the handle alone
+    (`ic_tx_dep_at_of_half`, `ic_tx_dep_intro`, `ic_grow_tx`, the
+    `iAssert (ic_tx_dep_at …)` re-packs) do not take the rows.  fileread/
+    filewrite: `proto_read_llb` before the ilock (the share's llb is the
+    presented bound), the floor row bound as `Hflk`, `proto_read_checkout`
+    with the acquire's floor and the folded rows, the access, `proto_read_park`
+    to the dep form handed to iunlock; the retired ledger's env token in
+    filewrite's 25-conjunct destruct removed.
+
 ## 10. Process and tooling (measured facts)
 
 ### 10.1 Build

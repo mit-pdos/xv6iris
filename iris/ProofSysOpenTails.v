@@ -109,6 +109,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Set Printing Depth 40.
 
@@ -625,6 +626,7 @@ Section ProofSysOpenTails.
     IcacheRef.cred_floor loy tly -∗
     IcacheInv.iref_claims -∗
     ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
+    off_rows off_cfg kk cur_ctx -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -677,7 +679,7 @@ Section ProofSysOpenTails.
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs2 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hoffr Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
@@ -742,6 +744,7 @@ Section ProofSysOpenTails.
        the other half inside the descriptor ever since.  The release takes
        the ARMED contract (B''-tx4), which retires the descriptor in the
        ghost step that parks the payload and hands the whole token back. *)
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl
               pd pav pu gil gisl
  kk qi s gy loy tly inum dn bm u pidv dq
@@ -750,7 +753,7 @@ Section ProofSysOpenTails.
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2)
@@ -974,6 +977,7 @@ Section ProofSysOpenTails.
     IcacheRef.cred_floor loy tly -∗
     IcacheInv.iref_claims -∗
     ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
+    off_rows off_cfg kk cur_ctx -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1026,7 +1030,7 @@ Section ProofSysOpenTails.
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs2 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hoffr Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
@@ -1091,6 +1095,7 @@ Section ProofSysOpenTails.
        the other half inside the descriptor ever since.  The release takes
        the ARMED contract (B''-tx4), which retires the descriptor in the
        ghost step that parks the payload and hands the whole token back. *)
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl
               pd pav pu gil gisl
  kk qi s gy loy tly inum dn bm u pidv dq
@@ -1099,7 +1104,7 @@ Section ProofSysOpenTails.
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2)
@@ -1322,6 +1327,7 @@ Section ProofSysOpenTails.
     IcacheRef.cred_floor loy tly -∗
     IcacheInv.iref_claims -∗
     ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
+    off_rows off_cfg kk cur_ctx -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1374,7 +1380,7 @@ Section ProofSysOpenTails.
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hoffr Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
@@ -1435,6 +1441,7 @@ Section ProofSysOpenTails.
        the other half inside the descriptor ever since.  The release takes
        the ARMED contract (B''-tx4), which retires the descriptor in the
        ghost step that parks the payload and hands the whole token back. *)
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl
               pd pav pu gil gisl
  kk qi s gy loy tly inum dn bm u pidv dq
@@ -1443,7 +1450,7 @@ Section ProofSysOpenTails.
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2)
@@ -1725,6 +1732,7 @@ Section ProofSysOpenTails.
     IcacheRef.cred_floor loy tly -∗
     IcacheInv.iref_claims -∗
     ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
+    off_rows off_cfg kk cur_ctx -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -1787,7 +1795,7 @@ Section ProofSysOpenTails.
            HMs2 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hftab Hfref Hfenv
               #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hoffr Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hiru Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
@@ -1904,7 +1912,7 @@ Section ProofSysOpenTails.
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HP1sp HP1thr
               HP1s1 HP1s3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev
+                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev
                     Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                     HbP H23 H24 [Hfd Hfout Hiru Hcont]").
@@ -1989,6 +1997,7 @@ Section ProofSysOpenTails.
     IcacheRef.cred_floor loy tly -∗
     IcacheInv.iref_claims -∗
     ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
+    off_rows off_cfg kk cur_ctx -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -2030,7 +2039,7 @@ Section ProofSysOpenTails.
     intros HKiu HKeo HK24 Kpop Hkk Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitinv #Hesck #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hidev Hiinum Hivalid
+              #Hitinv #Hesck #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid
               Hload #Hshot Hfrz Hpid #Hprocs #Hdev #Hgeo #Hdlk Hop Hf1 Hf2 Hf3 Hf4
               Hf5 Hf6 HbP H23 H24 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -2086,13 +2095,14 @@ Section ProofSysOpenTails.
        the other half inside the descriptor ever since.  The release takes
        the ARMED contract (B''-tx4), which retires the descriptor in the
        ghost step that parks the payload and hands the whole token back. *)
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (Iunlock.wp_iunlock_tx_sconf (CID := CID2) gs gil gisl
               kk s gy loy tly icfg_dev inum dn bm pidv dq M2 (K - 24)%nat eb
               (proc_addr jx) b lks
               Upr HKiu Hkk HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk Hslkd
-                    Hpid Hprocs [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz").
+                    Hpid Hprocs [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid Hload Hshot Hfrz").
     iIntros (CID3 Hq3 miu) "%Hcsiu Hcg Hown Hpc Hpid Hshr Htx".
 
     iDestruct (log_opb_op with "Hop Htx") as "Hop".

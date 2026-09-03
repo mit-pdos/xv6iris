@@ -124,6 +124,7 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -1710,7 +1711,7 @@ Section IreclaimOrphan.
     all: try lkbelow.
     all: try (exact Hlesh).
     iIntros (CID18 Hq18 mL dnl bml fl_)
-      "%Hcsil _ Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbi Hsl1 Hslkd Hdep Hidev Hiinum
+      "%Hcsil _ Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbi Hsl1 Hslkd Hdep Hoffr Hidev Hiinum
        Hvalid Hloaded #Hshot Hfrz %Hfr_ Hru %Hilkp".
     assert (Hpc5e : ret_pc (OC !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x5e))
@@ -1812,6 +1813,7 @@ Section IreclaimOrphan.
     iDestruct (wp_next_shift (b := true) (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iDestruct (is_itable2_claims with "Hitb2") as "#Hclaims".
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (IU.wp_iunlock_tx_sconf γs gil gisl kslot
               (q/2)%Qp gsh losh tlsh icfg_dev inum dnl bml pidv dq OE (K - 8)%nat eb
               (proc_addr j) b lks Upr
@@ -1820,7 +1822,7 @@ Section IreclaimOrphan.
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hitbl Hescrow Hslk Hslkd
-                    Hppid Hprocs [%] Hflsh Hclaims Hdep Hidev Hiinum Hvalid
+                    Hppid Hprocs [%] Hflsh Hclaims Hdep Hoffd Hidev Hiinum Hvalid
                     Hloaded Hshot Hfrz").
     all: try lkbelow.
     all: try (exact Hlesh).

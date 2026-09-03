@@ -159,6 +159,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Set Printing Depth 40.
 
@@ -3167,7 +3168,7 @@ Section ProofNamexMain.
                                    Hgeom Hdlk Hbs1 Htx Hllb0").
                    all: try lkbelow.
                    iIntros (CIDil Hqil mil dnl bml fl_)
-                     "%Hcsil _ Hcg Hcnt Hextc Hclmc Hpc Hppid Hinos Hbs1 Hslkd Hdep
+                     "%Hcsil _ Hcg Hcnt Hextc Hclmc Hpc Hppid Hinos Hbs1 Hslkd Hdep Hoffr
                       Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfr_
                       Hru %Hilkp".
                    assert (Hpcbc : ret_pc (V2 !!! Regidx Rra)
@@ -3378,6 +3379,7 @@ Section ProofNamexMain.
                      iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
                      iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _
                                   Hlekp with "Hflkp Hkeep") as "Hkeep2".
+                     iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl pd pav pu
  gilk gislk
 
@@ -3390,7 +3392,7 @@ Section ProofNamexMain.
                                HND2a0 Hbelow
                                with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
-                                     [%] Hflkp Hclaimsnx Hdep Hidev Hiinum Hivalid Hload
+                                     [%] Hflkp Hclaimsnx Hdep Hoffd Hidev Hiinum Hivalid Hload
                                      Hshot Hfrz [$Hkeep2 $Hru] Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
@@ -3671,13 +3673,14 @@ Section ProofNamexMain.
                                     ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
                        iDestruct (cpu_claim_ext_transport CIDil CIDP5 eb (proc_addr j)
                                     ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                       iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
                        iApply (IU.wp_iunlock_tx_sconf gs gilk gislk
                                  ik (iq/2)%Qp gkp lokp tlkp icfg_dev iinum dnl bml
                                  pidv dq NP3 (K - 12)%nat eb (proc_addr j) b lks Upr
                                  Kiu Hik HP3a0
                                  ltac:(lkbelow)
                                  with "Hcg Hcnt Htext Hpc Hitbl Hesck
-                                       Hslkk Hslkd Hppid Hprocs [%] Hflkp Hclaimsnx Hdep
+                                       Hslkk Hslkd Hppid Hprocs [%] Hflkp Hclaimsnx Hdep Hoffd
                                        Hidev Hiinum Hivalid Hload Hshot Hfrz").
                        all: try (exact Hlekp).
                        all: try lkbelow.
@@ -3845,7 +3848,7 @@ Section ProofNamexMain.
                          with "[IHl Hcont Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                                 Hb10 Hb11 Hb12 Hisl Hbmap Hinos Hppid
                                 Hcwdr Hname Hbs1 Hbs2 Hlog Hkeep Hru Hslkd
-                                Hdep Hidev Hiinum Hivalid Hfrz Hdiat Hity
+                                Hdep Hoffr Hidev Hiinum Hivalid Hfrz Hdiat Hity
                                 Himaj Himin Hinl Hisz Haddrs Hind Hblocks
                                Hdlnk Htopl]"
                          as "Hdlblk".
@@ -4207,6 +4210,7 @@ Section ProofNamexMain.
                            iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _
                                         _ _ Hlekp with "Hflkp Hkeep")
                              as "Hkeep2".
+                           iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl
                                      pd pav pu gilk gislk
 
@@ -4220,7 +4224,7 @@ Section ProofNamexMain.
                                      Hiu Hj Hgs HGB3a0 Hbelow
                                      with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg []
-                                           Hslkk Hslkd [%] Hflkp Hclaimsnx Hdep Hidev
+                                           Hslkk Hslkd [%] Hflkp Hclaimsnx Hdep Hoffd Hidev
                                            Hiinum Hivalid Hload Hshot Hfrz [$Hkeep2 $Hru] Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
@@ -4440,6 +4444,7 @@ Section ProofNamexMain.
                            iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _
                                         _ _ Hlekp with "Hflkp Hkeep")
                              as "Hkeep2".
+                           iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl
                                      pd pav pu gilk gislk
 
@@ -4453,7 +4458,7 @@ Section ProofNamexMain.
                                      Hiu Hj Hgs HGC3a0 Hbelow
                                      with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg []
-                                           Hslkk Hslkd [%] Hflkp Hclaimsnx Hdep Hidev
+                                           Hslkk Hslkd [%] Hflkp Hclaimsnx Hdep Hoffd Hidev
                                            Hiinum Hivalid Hload Hshot Hfrz [$Hkeep2 $Hru] Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
@@ -4752,6 +4757,7 @@ Section ProofNamexMain.
                      iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
                      iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _
                                   Hlekp with "Hflkp Hkeep") as "Hkeep2".
+                     iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl pd pav pu
  gilk gislk
 
@@ -4764,7 +4770,7 @@ Section ProofNamexMain.
                                HND2a0 Hbelow
                                with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
-                                     [%] Hflkp Hclaimsnx Hdep Hidev Hiinum Hivalid Hload
+                                     [%] Hflkp Hclaimsnx Hdep Hoffd Hidev Hiinum Hivalid Hload
                                      Hshot Hfrz [$Hkeep2 $Hru] Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.

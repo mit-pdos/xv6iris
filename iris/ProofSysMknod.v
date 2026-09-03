@@ -135,6 +135,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
    minutes FORMATTING the goal -- see claude-notes/durable-notes.md. *)
@@ -1723,7 +1724,7 @@ Section ProofSysMknodBody.
           exact (Hcrthr c Hc N2' N8). }
         (* the ten conjuncts create hands back ARE iunlockput's precondition *)
         iDestruct "Hlocked" as (gil gisl)
-          "(%Hqs & Hslk & Hslkd & Hdep & Hidev & Hiinum & Hivalid & Hload &
+          "(%Hqs & Hslk & Hslkd & Hdep & Hoffr & Hidev & Hiinum & Hivalid & Hload &
             Hshot & Hfrz & Href & Hru)".
         (* create's payout is GENERATION-NAMED now; iunlockput takes the
            erased reference, so weaken it back here.  One line, and the
@@ -1745,6 +1746,7 @@ Section ProofSysMknodBody.
           as "[Hpbare Hpback]".
         iDestruct (cpu_own_transport CID26 CID28 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
+        iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
         iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID28) gs j gl
                   pd pav pu gil gisl
  kk qi ss gy loc tlc inum dn bm un1
@@ -1754,7 +1756,7 @@ Section ProofSysMknodBody.
                   ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
                   (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                        Hesc Hireg [] Hslk Hslkd [%] Hflc Hclaims Hdep Hidev Hiinum Hivalid
+                        Hesc Hireg [] Hslk Hslkd [%] Hflc Hclaims Hdep Hoffd Hidev Hiinum Hivalid
                         Hload Hshot Hfrz [$Href $Hru] Hsbb Hsbi Hbmres Hpbare Hprocs Hdev
                         Hgeo Hdlk Hbsl [HopS]").
         all: try (exact Hlec).

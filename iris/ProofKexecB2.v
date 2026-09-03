@@ -645,7 +645,7 @@ Section KexecB2Body.
     iDestruct (cpu_claim_ext_transport CID3 CID13 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct "Hopen" as "(#Hslkk & Hslkd & %Hley & #Hfly & #Hclaimsy &
-                           Hdep & Hidev & Hiinum &
+                           Hdep & Hoffr & Hidev & Hiinum &
                            Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
     (* [kxc_bad64] pins its own [CID0] from "Hcg", so kexec's exit -- still
        anchored at the section's [CID0] -- is re-anchored there, and the
@@ -661,7 +661,7 @@ Section KexecB2Body.
               m U8 K eb lks sp0 ra0 s00 s10 s20 pv av
               HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
               Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HU8sp HU8s4 HU8thr
-              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hslkk Hslkd [//] Hfly Hclaimsy Hdep
+              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr
                     Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits
                     Hka Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont]
                     Hcont").
@@ -1331,7 +1331,7 @@ Section KexecB2Loops.
         exact (HD3get r Hr Hne). }
       (* ---- the resources readi asks for ---- *)
       iDestruct "Hopen" as "(#Hslkk & Hslkd & %Hley & #Hfly & #Hclaimsy &
-                           Hdep & Hidev & Hiinum &
+                           Hdep & Hoffr & Hidev & Hiinum &
                              Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
       iDestruct (kxc_load_peel with "Hload") as
         (datl) "(%Hiok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta
@@ -1393,7 +1393,7 @@ Section KexecB2Loops.
       iDestruct (A.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
       iDestruct (kxc_open_intro pidv kf qf sf gyf loyf tlyf
                    inumf dnf bmf gilf gislf
-                   with "Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hidev Hiinum Hivalid Hload
+                   with "Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid Hload
                          Hity Hfrz Hkeep Hru") as "Hopen".
       (* ---- the register facts on the far side of readi ---- *)
       assert (HM2s2 : M2 !!! Regidx Rs2

@@ -1243,6 +1243,7 @@ Section BootAlloc.
   Lemma boot_hart_pre (h : CPU) (g : gstate) (E : coPset) :
     boot_facts g ->
     kmap_static_claims -∗ gen_cert -∗ (mb_ld_ea ↦ₚ₈□ v_stack0) -∗
+    TsoCtx.pristine_win mb_ld_ea 8 -∗
     boot_reg_res (CID := h) (g.(gregs) h) -∗
     hart_strans h -∗
     hart_sie h -∗
@@ -1262,7 +1263,7 @@ Section BootAlloc.
     intro Hbf.
     rewrite /hart_strans /hart_sie /hart_spp /hart_spie /hart_locks
             /hart_resv /boot_hart_bss.
-    iIntros "#Hcl #Hcert #Hword Hregs [Hs1 Hs2] (Hg2 & Hg4a & Hg4b)
+    iIntros "#Hcl #Hcert #Hword #Hpr Hregs [Hs1 Hs2] (Hg2 & Hg4a & Hg4b)
              [Hspp1 Hspp2] [Hspie1 Hspie2] Hlks Hresv
              (Hstk & Hnoff & Hint & Hproc & Hctx)".
     iMod (boot_entry_pre (CID := h) E (g.(gregs) h)
@@ -1278,7 +1279,7 @@ Section BootAlloc.
     iEval (rewrite /own_ctx) in "Hctx".
     iFrame "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
             Hmcen Hstc Htlb Hstvec Hsepc Hscause Hstval Hssc Hmse Hsse
-            Hword Hstk
+            Hword Hpr Hstk
             Hs1 Hs2 Hg2 Hg4a Hg4b Hspp1 Hspie1 Hspp2 Hspie2 Hnoff Hint Hproc
             Hlks Hctx".
   Qed.
@@ -1503,11 +1504,24 @@ Section BootAlloc.
            so it is persisted here as ONE cell rather than claimed wholesale
            by [kernel_data] -- nothing ever writes the GOT (xv6 is statically
            linked and non-PIE), but the section flags cannot say so. ---- *)
-    iDestruct (boot_cran_raw g entry_got (entry_got + 8) with "Hgot") as "Hgot".
+    iDestruct (boot_cran_elim g entry_got (entry_got + 8) with "Hgot") as "[Hgot Hgotled]".
     iMod (boot_ran_phys_word g entry_got v_stack0 mb_ld_ea entry_ld_ea_addr
             Hmem ltac:(zlit) ltac:(zlit) ltac:(zeq)
             (boot_byte_data_run entry_got v_stack0 8%nat ltac:(zlit)
                entry_got_bytes) with "Hcl Hgot") as "#Hword".
+    (* the GOT slot's window is PRISTINE (r25 lane (i)): nothing ever writes
+       the GOT, so its eight ledger elements are at stamp 0 and can be
+       PERSISTED -- [pristine_elem] IS [ledger_elem0] at [DfracDiscarded].
+       The entry boot's raw load reads the slot through this window. *)
+    iAssert (|==> TsoCtx.pristine_win (pa_of_z entry_got) 8)%I
+      with "[Hgotled]" as ">#Hpr0".
+    { iDestruct (boot_led_word g entry_got Hmem ltac:(zlit) ltac:(zlit) with "Hgotled") as "Hle".
+      rewrite /TsoCtx.pristine_win. iApply big_sepL_bupd.
+      iApply (big_sepL_mono with "Hle"). iIntros (j _ _) "He".
+      rewrite /TsoCtx.ledger_elem0 /TsoCtx.pristine_byte /pristine_elem.
+      by iMod (ghost_map_elem_persist with "He") as "$". }
+    iAssert (TsoCtx.pristine_win mb_ld_ea 8) as "#Hpr".
+    { rewrite entry_ld_ea_addr. iExact "Hpr0". }
     (* ---- the fd-slot supply (no memory footprint: a pure ghost) ---- *)
     (* the proc table's COUNTED regime, at the whole table: every slot is
        UNUSED at boot, so [userinit]'s allocproc cannot come back empty
@@ -1651,7 +1665,7 @@ Section BootAlloc.
     { iApply (big_sepL_impl with "Hpre").
       iIntros "!>" (k c _) "(Hr & Hs & Hg & Hsp & Hspe & Hlk & Hrv & Hb)".
       iApply (boot_hart_pre c g ⊤ Hbf with
-                "Hcl Hcert Hword Hr Hs Hg Hsp Hspe Hlk Hrv Hb"). }
+                "Hcl Hcert Hword Hpr Hr Hs Hg Hsp Hspe Hlk Hrv Hb"). }
     iMod (big_sepL_fupd with "Hpre") as "Hpre".
     iEval (rewrite big_sepL_sep) in "Hpre".
     iDestruct "Hpre" as "[Hres Hpins]".

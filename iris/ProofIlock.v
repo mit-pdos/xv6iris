@@ -151,6 +151,7 @@ Require Import RiscvExec.
 Require Import IcachePinwObl.
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Set Printing Depth 40.
 
@@ -410,6 +411,7 @@ Section IlockDefs.
         bslot -∗
         sleeplocked_q gisl s (i_lock ip) pidv -∗
         ic_handle fsc_ic k d -∗
+        off_rows off_cfg k cur_ctx -∗
         i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
         i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
         i_valid ip ↦₄ valid_word true -∗
@@ -465,6 +467,7 @@ Section IlockEpilogue.
     bslot -∗
     sleeplocked_q gisl s (i_lock ip) pidv -∗
     ic_handle fsc_ic k d -∗
+    off_rows off_cfg k cur_ctx -∗
     i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
     i_valid ip ↦₄ valid_word true -∗
@@ -479,7 +482,7 @@ Section IlockEpilogue.
     intros HK Hsp Hthr Hfr Hpost.
     pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hppid Hsb
-              Hsl Hstok Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfoff Hwb Hcont".
+              Hsl Hstok Hdep Hoffr Hidev Hinumc Hvalid Hlk #Hshot Hfoff Hwb Hcont".
     (* LEVEL 0 TIES THE TWO INDICES: ilock never push_off's on its own (only
        acquiresleep/bread do, opaquely), so [cpu_own]'s [n] is [0] throughout
        and [cpu_own_eb_agree] gives [eb = b] outright (kept as a hypothesis,
@@ -678,7 +681,7 @@ Section IlockEpilogue.
     rewrite /il_cont.
     iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P4 dn bm filled with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsb
-                     Hsl Hstok Hdep Hidev Hinumc Hvalid Hlk Hshot Hfoff [%] Hwb [%]").
+                     Hsl Hstok Hdep Hoffr Hidev Hinumc Hvalid Hlk Hshot Hfoff [%] Hwb [%]").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hfr. }
     { exact Hpost. }
@@ -777,6 +780,7 @@ Section IlockLoad.
     bslot -∗
     sleeplocked_q gisl s (i_lock ip) pidv -∗
     ic_handle fsc_ic k d -∗
+    off_rows off_cfg k cur_ctx -∗
     i_valid ip ↦₄ (mword_of_int 0 : mword 32) -∗
     inode_raw ip -∗
     (* THE [_np] FORM, not the full pool row (iclaim-ledger.md §3.5
@@ -832,7 +836,7 @@ Section IlockLoad.
     pose proof (il_thr6_of_5 m M Hthr) as Hthr6.
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hireg #Hprocs #Hdevi #Hdgeom
               #Hdlock Hframe Hppid Hidev Hinumc Hsb Hsl
-              Hstok Hdep Hvalid Hraw Hpool Hpend Hfoff Hcl Hcont".
+              Hstok Hdep Hoffr Hvalid Hraw Hpool Hpend Hfoff Hcl Hcont".
     (* LEVEL 0 TIES THE TWO INDICES, as in [il_epilogue]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
     (* THE POOL ENTRY STAYS OPAQUE UNTIL THE BUFFER HAS BEEN READ (§16.4).
@@ -2186,7 +2190,7 @@ Section IlockLoad.
               k ip inum dn bm fl pidv dq dqs m Z0 K eb b lks Upr
               HK HZ0sp HZ0thr Hfr Hpost
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok
-                    Hdep Hidev Hinumc Hvalid
+                    Hdep Hoffr Hidev Hinumc Hvalid
                     [Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hindres Hblocks Hdn Hdlk
                      Htop]
                     Hshot Hfoff Hwb [Hcont]").
@@ -2700,9 +2704,9 @@ Section ProofIlockMain.
       { iEval (rewrite /ic_deposit2 Hid0 (ic_body_of_shr k d s icfg_dev inum g lo Hdshr)) in "Hdep2".
         iDestruct "Hdep2" as "[_ [_ Hblv]]".
         iDestruct (IcacheRef.live_genlo_agree with "Hlgx Hblv") as %[-> _]. done. }
-      iAssert (ic_handle fsc_ic k d) with "[Hdep2 Hlgx Hd Htok Hoffr]" as "Hdep".
+      iAssert (ic_handle fsc_ic k d) with "[Hdep2 Hlgx Hd Htok]" as "Hdep".
       { rewrite /ic_handle (ic_pay_live_of_shr k d s icfg_dev inum g lo Hdshr) /live_gen.
-        iFrame "Hdep2 Hd Htok Hoffr". iExists lox. iExact "Hlgx". }
+        iFrame "Hdep2 Hd Htok". iExists lox. iExact "Hlgx". }
       iModIntro.
       rewrite /inode_ident. iDestruct "Hid" as "[Hidev Hinumc]".
       iEval (rewrite -Hipe) in "Hidev". iEval (rewrite -Hipe) in "Hinumc".
@@ -2753,7 +2757,7 @@ Section ProofIlockMain.
  k ip inum dnp bmp false pidv dq dqs m Q1 K eb b lks Upr
                 HK HQ1sp HQ1thr ltac:(discriminate) Hpost
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok
-                      Hdep Hidev Hinumc Hvalid Hlk Hshot Hfoff Hwb Hcont").
+                      Hdep Hoffr Hidev Hinumc Hvalid Hlk Hshot Hfoff Hwb Hcont").
     - (* ---- UNCACHED: valid = 0, branch to +0x36 ---- *)
       assert (Htk : add_vec (mword_of_int (KernelSyms.ilock + 0x1c) : mword 64)
                       (sign_extend' 64 (sign_extend' 13
@@ -2790,9 +2794,9 @@ Section ProofIlockMain.
       { iEval (rewrite /ic_deposit2 Hid0 (ic_body_of_shr k d s icfg_dev inum g lo Hdshr)) in "Hdep2".
         iDestruct "Hdep2" as "[_ [_ Hblv]]".
         iDestruct (IcacheRef.live_genlo_agree with "Hlgx Hblv") as %[-> _]. done. }
-      iAssert (ic_handle fsc_ic k d) with "[Hdep2 Hlgx Hd Htok Hoffr]" as "Hdep".
+      iAssert (ic_handle fsc_ic k d) with "[Hdep2 Hlgx Hd Htok]" as "Hdep".
       { rewrite /ic_handle (ic_pay_live_of_shr k d s icfg_dev inum g lo Hdshr) /live_gen.
-        iFrame "Hdep2 Hd Htok Hoffr". iExists lox. iExact "Hlgx". }
+        iFrame "Hdep2 Hd Htok". iExists lox. iExact "Hlgx". }
       iModIntro.
       iDestruct (ic_raw_of_rest with "Hnl Hm Ha") as "Hraw".
       rewrite /inode_ident. iDestruct "Hid" as "[Hidev Hinumc]".
@@ -2831,7 +2835,7 @@ Section ProofIlockMain.
                 Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hireg Hprocs Hdevi Hdgeom
                       Hdlock Hframe Hppid Hidev Hinumc Hsb
-                      Hsl Hstok Hdep Hvalid Hraw Hpool Hpend Hfoff Hcl Hcont").
+                      Hsl Hstok Hdep Hoffr Hvalid Hraw Hpool Hpend Hfoff Hcl Hcont").
   Qed.
 
   (* THE TRANSACTIONAL FORM (durable-disk B''-tx, re-based by B''-tx3): the

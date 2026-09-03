@@ -142,6 +142,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Set Printing Depth 40.
 
@@ -1389,7 +1390,7 @@ Section ProofSysLinkBody.
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           iIntros (CID28 Hq28 mil dn bm fl)
-            "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkd Hdep
+            "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkd Hdep Hoffr
              Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl Hru %Hilkp".
           assert (Hpc46 : ret_pc (R0 !!! Regidx Rra : mword 64)
                           = mword_of_int (SL + 0x46)) by (rewrite HR0ra; pcw).
@@ -1496,7 +1497,7 @@ Section ProofSysLinkBody.
                        (sl_regs_sp _ _ _ _ _ HR2regs)
                        (sl_regs_thr _ _ _ _ _ HR2regs) HR2s1 HR2s2 Hal
                        with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                             Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hflsh Hclaimssl Hdep
+                             Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hflsh Hclaimssl Hdep Hoffr
                              Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb
                              Hsbi
                              Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl [HopS]
@@ -1656,7 +1657,7 @@ Section ProofSysLinkBody.
                           (sl_regs_thr _ _ _ _ _ HR5regs) HR5s1 HR5s2 Hal
                           with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                 Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
-                                [//] Hflsh Hclaimssl Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru
+                                [//] Hflsh Hclaimssl Hdep Hoffr Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru
                                 Hsbb
                                 Hsbi Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl
                                 [HopS] Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
@@ -2005,13 +2006,14 @@ Section ProofSysLinkBody.
                   by (rewrite /S4; apply sl_regs_caller;
                       [exact Hcsra | exact HS3regs]).
                 sl_own_transport CID41 CID43 eb pj b.
+                iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
                 iApply (Iunlock.wp_iunlock_tx_sconf (CID := CID43) gs gil
                           gisl kk (qq/2)%Qp gsh losh tlsh icfg_dev inum
                           (sl_incnl dn) bm pid (DfracOwn (1/4))
                           S4 (K - 38)%nat eb pj b lks
                           (us_upt U P2) ltac:(exact Kiu) Hkk HS4a0 (Hlb "sleep lock"%string)
                           with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk
-                                Hslkd Hpidq Hprocs [//] Hflsh Hclaimssl Hdep Hidev Hiinum
+                                Hslkd Hpidq Hprocs [//] Hflsh Hclaimssl Hdep Hoffd Hidev Hiinum
                                 Hivalid Hload Hshot2 Hfrz").
                 iIntros (CID44 Hq44 mul) "%Hcsul Hcg Hown Hpc Hpidq Hshr Htx".
 
@@ -2257,7 +2259,7 @@ Section ProofSysLinkBody.
                    { rewrite Heb /cpu_claim_ext. done. }
                    iIntros (CID52 Hq52 mild dnd bmd fld)
                      "%Hcsild _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1d Hslkdd
-                      Hdepd Hidevd Hiinumd Hivalidd Hloadd #Hshotd2 Hfrzd
+                      Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hloadd #Hshotd2 Hfrzd
                       %Hfld Hrud %Hilkpd".
                    (* ilock's RETURN ADDRESS IS +0x84, NOT +0x8a.  The
                       relayout maps offsets by where the OLD instruction
@@ -2401,7 +2403,7 @@ Section ProofSysLinkBody.
                                with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                      Hgen Hitab Hitinv Hesck Hescd Hireg Hropen Hslkk
                                      Hslkd0 Hkeep Hru [//] Hflsh Hclaimssl Hshr Hshot2 Htoken Hslkdd
-                                     [//] Hfld Hclaimssl Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
+                                     [//] Hfld Hclaimssl Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
                                      Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                      Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
                                      HbN HbW HbO
@@ -2814,7 +2816,7 @@ Section ProofSysLinkBody.
                                  with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                        Hgen Hitab Hitinv Hesck Hescd Hireg Hropen Hslkk
                                        Hslkd0 Hkeep Hru [//] Hflsh Hclaimssl Hshr Hshot2 Htoken Hslkdd
-                                       [//] Hfld Hclaimssl Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
+                                       [//] Hfld Hclaimssl Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
                                        Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                        Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
                                        HbN HbW HbO
@@ -3168,6 +3170,7 @@ Section ProofSysLinkBody.
                                           (sl_sub_le _ _))).
                             iDestruct (log_opS_named with "HopS") as (e0) "HopE".
                             sl_own_transport CID60 CID63 eb pj b.
+                            iDestruct (off_rows_to_dep with "Hoffrd") as "Hoffdd".
                             iApply (Iunlockput.wp_iunlockput_tx_gen (CID := CID63) gs j
                                       gl pd pav pu gild
                                       gisld
@@ -3184,7 +3187,7 @@ Section ProofSysLinkBody.
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
                                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hitab Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd
-                                            [//] Hfld Hclaimssl Hdepd Hidevd Hiinumd Hivalidd
+                                            [//] Hfld Hclaimssl Hdepd Hoffdd Hidevd Hiinumd Hivalidd
                                             Hloadd Hshotd3 Hfrzd [$Hkeepd $Hrud] Hsbb Hsbi
                                             Hbmres
                                             Hpidq Hprocs Hdev Hgeo Hdlk Hbsl [] HopE").
@@ -3657,7 +3660,7 @@ Section ProofSysLinkBody.
                                             Hseam Hgen Hitab Hitinv Hesck Hescd
                                             Hireg Hropen Hslkk Hslkd0 Hkeep Hru [//] Hflsh Hclaimssl Hshr Hshot2
                                             Htoken
-                                            Hslkdd [//] Hfld Hclaimssl Hdepd Hidevd Hiinumd
+                                            Hslkdd [//] Hfld Hclaimssl Hdepd Hoffrd Hidevd Hiinumd
                                             Hivalidd Hloadd Hshotd3 Hfrzd Hkeepd Hrud
                                             Hsbb
                                             Hsbi Hbmres Hpidq Hprocs Hdev Hgeo

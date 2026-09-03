@@ -122,6 +122,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
    printing one takes tens of minutes, so a one-line mistake reads as a hang.
@@ -1381,6 +1382,7 @@ Section KexecABad.
     IcacheRef.cred_floor loy tly -∗
     IcacheInv.iref_claims -∗
     ic_tx_dep fsc_ic k sq icfg_dev inum gy loy -∗
+    off_rows off_cfg k cur_ctx -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word true -∗
@@ -1418,7 +1420,7 @@ Section KexecABad.
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
            Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts4 Hthr.
     
-    iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab #Hslkk Hslkd %Hley #Hfly #Hclaims Hdep Hidev
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab #Hslkk Hslkd %Hley #Hfly #Hclaims Hdep Hoffr Hidev
              Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins #Hbits #Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs Hlog Hframe Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
@@ -1474,6 +1476,7 @@ Section KexecABad.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CIDj1 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+    iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
     iApply (Iunlockput.wp_iunlockput_tx_sconf gs jp gl pd pav pu
               gil gisl
               k qi sq gy loy tly inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
@@ -1481,7 +1484,7 @@ Section KexecABad.
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0 ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
-                    Hireg Hropen Hslkk Hslkd [%] Hfly Hclaims Hdep Hidev Hiinum Hivalid Hload
+                    Hireg Hropen Hslkk Hslkd [%] Hfly Hclaims Hdep Hoffd Hidev Hiinum Hivalid Hload
                     Hity Hfrz [$Hkeep $Hru] Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
                     Hlog").
     all: try (exact Hley).
