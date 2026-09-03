@@ -138,11 +138,11 @@ Definition forkret_park_pkg
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (* the trap loop's kernel-side bundle, abstract exactly as [SpecForkret]
        takes it *)
-    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
+    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (* what the closer is handed at the resume beside [first_done] -- the
        park token, abstract here; see [SpecForkret] and ParkCap.v *)
     (W : iProp Σ)
-    (γs : list gname) (γf : gname) (pa ks : mword 64)
+    (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64)
     (* THE PARKED PROCESS'S fd-STATE GHOST NAME.  The package's closer holds
        that process's fragment bundle, which is keyed on this name; the
        resume hands back a record [V'] for the same process, and the
@@ -159,6 +159,7 @@ Definition forkret_park_pkg
    wire_inv ∗
    kmap_at tramp_vpn tramp_ppn KP_rx ∗
    procs_inv γs ∗
+   UsertrapRes.park_globals cur_ctx γs γw γft γf γtl ∗
    pslot_used_at pa ∗
    (* ---- the child's kernel stack, free below its top ---- *)
    stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) av ∗
@@ -187,7 +188,7 @@ Definition forkret_park_pkg
           forkret pays both instead (SpecForkret.v, "...AND THE CLOSER IS
           HANDED [first_done]") and the builder here owes only the
           persistent rows neither supplies. *)
-   (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+   ▷ (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate),
       ⌜pv_upt (us_V U') = pt'⌝ -∗
       ⌜ud_data pt' = ud_pas pt'⌝ -∗
       ⌜proc_pt_wf pt'⌝ -∗
@@ -198,8 +199,9 @@ Definition forkret_park_pkg
          one).  Saying so here is what lets the closed-over bundle be handed
          to the residue at [V']. *)
       ⌜pv_fdg (us_V U') = g⌝ -∗
+      UsertrapRes.park_globals Xc γs γw γft γf γtl -∗
       UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) (us_V U') -∗
-      FirstTok.first_done -∗
+      FirstTok.first_done (XI := Xc) -∗
       W -∗
  (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
     [IntrDefs.sie_cap] now (see the note there), so the residue cannot
@@ -209,7 +211,7 @@ Definition forkret_park_pkg
     could not hold it.  forkret has one, out of the very capability it
     is about to hand back. *)
       TimerCap.timer_cap (CID := h) -∗
-      forkret_yield (CID := h) γf pa (add_vec ks (mword_of_int 4096)) pid av (us_V U') -∗
+      forkret_yield (CID := h) (XI := Xc) γf pa (add_vec ks (mword_of_int 4096)) pid av (us_V U') -∗
       fd_slots FDSPARE -∗
       iref_slots IREFSPARE -∗
       (* ...AND IT YIELDS A SLOT KEYED AT THE RECORD IT RESUMES WITH, beside
@@ -218,13 +220,13 @@ Definition forkret_park_pkg
       (* ONE [sts] for the residue and the key -- [ParkCap.park_pkg], of
          which this is the forkret-side spelling, has the argument *)
       (∃ sts : list fdstate,
-         URes h pt' (add_vec ks (mword_of_int 4096)) U' sts
+         URes h Xc pt' (add_vec ks (mword_of_int 4096)) U' sts
          ∗ uslot (uvis_of U' sts))))%I.
 
 Definition forkret_park_paid_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
-    (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
+    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
+    (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (U : ustate) (av : nat) : Prop :=
   (length rest = 12%nat) ->
   (* the record is stored in [procs_inv]'s slot for [pa], so [pa] is one of
@@ -249,14 +251,15 @@ Definition forkret_park_paid_body
      lets [ParkCap.park_token] -- whose cap this is -- be a guarded
      fixpoint: the package's closer names the token, and a parker holds the
      token only under a later. *)
-  ⊢ ▷ forkret_park_pkg URes W γs γf pa ks (pv_fdg (us_V U)) pid av -∗
+  ⊢ own_context cur_ctx -∗
+    forkret_park_pkg URes W γs γw γft γf γtl pa ks (pv_fdg (us_V U)) pid av -∗
     ▷ W -∗
     is_kstack pa ks -∗
     ctx_cells (p_context pa) (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗
     proc_priv γf pa pid U -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
-    |==> proc_ctx_boxed γs pa.
+    |==> own_context cur_ctx ∗ proc_ctx_boxed γs pa.
 
 Require Import UserFd.   (* [ufdG] -- carried through the park/forkret seals *)
 Module Type FORKRET_PARK_PAID.
@@ -271,10 +274,11 @@ Module Type FORKRET_PARK_PAID.
   Parameter forkret_park_paid :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
-      (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
+      (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (U : ustate) (av : nat),
-      forkret_park_paid_body (fun h : CpuId => usertrap_res_bare (CID := h)) W
-        γs γf pa ks rest pid U av.
+      forkret_park_paid_body
+        (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
+        γs γw γft γf γtl pa ks rest pid U av.
   (* ...AND THE TOKEN, which is the park as every parker sees it
      ([ParkCap.park_token]): the cap above at [W := the token] plus the
      residue's channel, tied into the fixpoint.  This is the one entry the

@@ -157,7 +157,7 @@ Section Res.
   Definition usertrap_res_bare_park
       (N : ut_names) (av : nat)
     : ut_park_intro_body
-        (fun h : CpuId => UC.usertrap_res_bare (CID := h))
+        (fun (h : CpuId) (Xc : CurCtx) => UC.usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av
     := UC.usertrap_res_bare_park N av.
 
@@ -206,7 +206,7 @@ End Res.
    [FirstTok.first_tok_of_done] after persisting the store. *)
 Lemma fkr_tail
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (W : iProp Σ) (j : nat) (γf : gname)
+    (W : iProp Σ) (j : nat) (γs : list gname) (γw γft γf γtl : gname)
     (pid : mword 32) (U : ustate)
     (ks : mword 64) (mt : regfile) (av av2 : nat) (eb : bool) :
   let p   : mword 64 := proc_addr j in
@@ -245,12 +245,16 @@ Lemma fkr_tail
      this used to spell out.  It is ~13 % of the Iris context of every step
      of this walk, and a proofmode step's term carries the whole context
      twice -- see that definition's header. *)
-  forkret_closer (fun h : CpuId => usertrap_res_bare (CID := h))
-                 W γf p ksp (pv_fdg (us_V U)) pid av -∗
+  (* THE RESUMER'S OWN GLOBALS (L8, A12.19): the closer takes them now
+     ([UsertrapRes.park_globals], SpecForkret's premise list), so the block
+     that applies the closer has to be holding them. *)
+  UsertrapRes.park_globals cur_ctx γs γw γft γf γtl -∗
+  forkret_closer (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
+                 W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hpr Havsum Hmtsp Hmts1.
-  iIntros "#Htext #Hwire #Hclaimmap Hpc Hcg Hcpu Hext Hcx #Hks Hf16 Hpv #Hdone HW Hyield".
+  iIntros "#Htext #Hwire #Hclaimmap Hpc Hcg Hcpu Hext Hcx #Hks Hf16 Hpv #Hdone HW #Hpg Hyield".
   (*  +0x64: jal ra, prepare_return.                                     *)
   (* ================================================================== *)
   iApply (wp_jal_s_sconf (mword_of_int (FR + 0x64)) Rra
@@ -707,8 +711,8 @@ Proof.
      BOTH ARE SPENT NOW (milestone J, S5): [wp_userret_closed] runs the
      process's own continuation, so the second is what the trap loop's
      first round consumes. *)
-  iDestruct ("Hyield" $! CIDf pt (MkUstate (upd_upt V' pt) (us_M U))
-               with "[%] [%] [%] [%] Htfk' Hdone HW Htc Hyld")
+  iDestruct ("Hyield" $! CIDf XI pt (MkUstate (upd_upt V' pt) (us_M U))
+               with "[%] [%] [%] [%] Hpg Htfk' Hdone HW Htc Hyld")
     as (sts) "[Hures Hslot]"; [reflexivity | exact Hnorm | exact Hptwf | | ].
   (* the resumed record names the parked process's fd-state ghost: forkret
      moved only [pv_upt], and [upd_upt] does not touch [pv_fdg]. *)
@@ -812,7 +816,7 @@ Qed.
 
 Lemma fkr_boot
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (W : iProp Σ) (j : nat) (γs : list gname) (γl γf : gname)
+    (W : iProp Σ) (j : nat) (γs : list gname) (γl γw γft γf γtl : gname)
     (pid : mword 32) (U : ustate)
     (ks : mword 64) (mr : regfile) (av av2 : nat) (eb : bool) :
   let p   : mword 64 := proc_addr j in
@@ -858,8 +862,12 @@ Lemma fkr_boot
      this used to spell out.  It is ~13 % of the Iris context of every step
      of this walk, and a proofmode step's term carries the whole context
      twice -- see that definition's header. *)
-  forkret_closer (fun h : CpuId => usertrap_res_bare (CID := h))
-                 W γf p ksp (pv_fdg (us_V U)) pid av -∗
+  (* THE RESUMER'S OWN GLOBALS (L8, A12.19): the closer takes them now
+     ([UsertrapRes.park_globals], SpecForkret's premise list), so the block
+     that applies the closer has to be holding them. *)
+  UsertrapRes.park_globals cur_ctx γs γw γft γf γtl -∗
+  forkret_closer (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
+                 W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1.
@@ -868,7 +876,7 @@ Proof.
      at; both are [Notation]s for literals, so [lia] sees them directly. *)
   assert (Hav2fs : (K_fsinit <= av2)%nat) by lia.
   iIntros "#Htext #Hwire #Hclaimmap Hpc #Hpinv Hcg Hcpu Hextc Hclmc #Hks
-           Hf16 Hpnc Hcwd Hf1 #Hbp Hka Hfsi HW Hyield".
+           Hf16 Hpnc Hcwd Hf1 #Hbp Hka Hfsi HW #Hpg Hyield".
   iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hebb.
   (* ================================================================== *)
   (*  +0x14 .. +0x24: [if (first)] -- TAKEN, because the token is the      *)
@@ -1649,11 +1657,11 @@ Proof.
     (* hoisted: an [ltac:] in argument position runs before the term's own
        instance evars are solved, and then sees a goal with evars in it *)
     assert (Hav2k : (K_prepare_return <= av2)%nat) by kxarith.
-    iApply (fkr_tail W j γf pid
+    iApply (fkr_tail W j γs γw γft γf γtl pid
               (MkUstate (upd_tf V' (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V'))) M')
               ks E4 av av2 eb Hjlt Hav2k Havsum HE4sp HE4s1
               with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hextc Hclmc Hks Hf16
-                    Hpriv Hdone HW [Hyield]").
+                    Hpriv Hdone HW Hpg [Hyield]").
     (* [upd_tf] does not touch [pv_fdg], so the closer the caller handed in
        at the ENTRY record's name is the one this tail wants. *)
     iEval (cbn [pv_fdg upd_tf]; rewrite Hfgk). iExact "Hyield".
@@ -1661,11 +1669,12 @@ Qed.
 
 Theorem wp_forkret
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (W : iProp Σ) (j : nat) (γs : list gname) (γl γf : gname)
+    (W : iProp Σ) (j : nat) (γs : list gname) (γl γw γft γf γtl : gname)
     (pid : mword 32) (U : ustate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :
-    wp_forkret_gen_body (fun h : CpuId => usertrap_res_bare (CID := h)) W
-      j γs γl γf pid U ks m av av2 eb.
+    wp_forkret_gen_body
+      (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
+      j γs γl γw γft γf γtl pid U ks m av av2 eb.
 Proof.
   cbv beta delta [wp_forkret_gen_body].
   intros pcE p ksp Hjlt Hgl Hav2 Hkx Hut Hsp.
@@ -1678,7 +1687,7 @@ Proof.
   
   (* the frame's six slots come off the top and go back on at the exit *)
   assert (Havsum : av = (6 + (trap_res eb + av2))%nat) by lia.
-  iIntros "#Htext #Hwire #Hclaimmap Hpc #Hpinv Hcg Hcpu Htc Hclm
+  iIntros "#Htext #Hwire #Hclaimmap Hpc #Hpinv #Hpg Hcg Hcpu Htc Hclm
            Hlocked HR #Hks Hpv HW Hyield".
   (* p->lock IS the process table's slot [j] -- which is why this contract
      takes [procs_inv] and no longer takes an [is_lock] of its own. *)
@@ -1896,10 +1905,10 @@ Proof.
                  ltac:(wp_next_chain) with "Hext") as "Hext".
     iDestruct (cpu_claim_ext_transport CID CIDr eb p
                  ltac:(wp_next_chain) with "Hcx") as "Hcx".
-    iApply (fkr_boot (CID := CIDr) W j γs γl γf pid U ks mr av av2 eb
+    iApply (fkr_boot (CID := CIDr) W j γs γl γw γft γf γtl pid U ks mr av av2 eb
               Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1
             with "Htext Hwire Hclaimmap Hpc Hpinv Hcg Hcpu Hext Hcx Hks
-                  Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi HW Hyield"). }
+                  Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi HW Hpg Hyield"). }
   (* ---------------- THE STEADY ARM: [first] is 0, the boot arm is dead -- *)
   iDestruct (first_tok_of_done with "Hdone") as "#Hftok".
   (* the token's steady disjunct IS [first_done]; keep the bundled form for
@@ -2013,10 +2022,10 @@ Proof.
                ltac:(wp_next_chain) with "Hcx") as "Hcx".
   (* the steady arm's [first_done] IS [first_tok]'s persistent steady
      disjunct, read at +0x24; it goes straight to the tail. *)
-  iApply (fkr_tail (CID := CID6) W j γf pid U ks T4 av av2 eb
+  iApply (fkr_tail (CID := CID6) W j γs γw γft γf γtl pid U ks T4 av av2 eb
             Hjlt Hpr Havsum HT4sp HT4s1
           with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hext Hcx Hks Hf16 Hpv
-                Hdone2 HW Hyield").
+                Hdone2 HW Hpg Hyield").
 Qed.
 
 End ForkretProof.

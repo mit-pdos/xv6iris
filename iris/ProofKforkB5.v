@@ -79,6 +79,7 @@ Require Import SchedCtx.
 Require Import WaitInv.
 Require Import SpecProcinit.
 Require Import SpecForkretPark.
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park borrows the running token (L8) *)
 Require Import ParkCap.   (* [park_token] / [park_token_park] -- the park, as a resource *)
 Require Import UsertrapRes SyscParkEnv FsReady FileInv FirstTok DiskInv ProcDefs FsCfg.   (* the park's vocabulary *)
 Require Import UexecSlot. (* [uvis] *)
@@ -262,6 +263,8 @@ Section ProofKforkB5.
       (* the two PURE rows are gone (rank 1d): [fclose_ties] and the printk
          equation both named [fclose_names]/[ut_names] fields that no longer
          exist. *)
+      (* L8: the initproc share the record carries is the DISCARDED one *)
+      iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iExact "Hpinv"|].
       iSplitR; [iExact "Hks"|].
       iSplitR; [iExact "Hdcaps"|].
@@ -277,13 +280,16 @@ Section ProofKforkB5.
        one descriptor per turn) carries the partially copied table in its
        invariant, so the list arrives here under a name and the park is
        keyed at it. *)
+    (* L8: the park takes and returns the parker's running token; borrow it from the cap *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (park_token_park N rest Uc stsP Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfrag Hjslot
+            with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirsp]")
-      as "Hpctx".
+      as "[Hrun Hpctx]".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirsp".
       (* the two files each define forkret's entry; the constants are equal *)
       iExact "Hctx". }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct "Hheld" as "(Htok & Hpstcell & Hpwhole & Hpchan & Hppub)".
     iEval (rewrite kfkb5_pwhole_used) in "Hpwhole".
     iDestruct "Hpwhole" as "[Hplock Hpclaim]".

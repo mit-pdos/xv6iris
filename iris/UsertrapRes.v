@@ -88,6 +88,7 @@ Require Import SpecKernelvec.   (* the two kernelvec trap-vector facts *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import CtxMorphTac.   (* [ctx_morph_solve] -- the lock handles' morph, park_globals *)
 Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -695,7 +696,13 @@ Section UsertrapRes.
      [FsCfg.fscfg] field now, so a park package owes the file system nothing
      pure at all. *)
   Definition ut_park_caps (N : ut_names) : iProp Σ :=
-    (procs_inv (un_s N) ∗
+    (* THE INITPROC SHARE IS DISCARDED (L8, A12.19): the resumer's copy of
+       the cell comes from [park_globals] at ITS context, and it can stand
+       in for the parker's [un_dqi N] share only because that share is the
+       persistent one.  Both parkers build the record with [DfracDiscarded]
+       ([ProofUserinit], [ProofKforkB5]); [ut_res_bare_park] spends it. *)
+    (⌜un_dqi N = DfracDiscarded⌝ ∗
+     procs_inv (un_s N) ∗
      is_kstack (un_pj N) (un_ks N) ∗
      devintr_caps_any (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
@@ -707,49 +714,10 @@ Section UsertrapRes.
   Global Instance ut_park_caps_persistent N : Persistent (ut_park_caps N).
   Proof. rewrite /ut_park_caps. apply _. Qed.
 
-  Lemma ut_caps_of_park (N : ut_names) :
-    ut_park_caps N -∗ FsReady.fs_ready -∗ ut_caps N.
-  Proof.
-    iIntros "(#Hprocs & #Hkst & #Hdev & #Hwl & #Hft & #Hdg & #Hpw) #Hfs".
-    (* NOT ONE [rewrite] BY A TIE (rank 1d).  Every equation this proof used
-       to spell out -- twelve of them, from [un_fn]'s projections to the
-       ambient fields -- is now [X = X], which Rocq refuses to rewrite by.
-       Both sides of the goal name the [fscfg] fields directly. *)
-    (* THE DISK FABRIC, and it is the only row that is not a copy: the
-       record's three pages are identified with [fs_ready]'s witness by the
-       persistent cells both [disk_geom]s read. *)
-    iDestruct (fs_ready_disk with "Hfs") as "[#Hdinv Hdex]".
-    iDestruct "Hdex" as (pd pav pu) "[#Hdg2 #Hdlk]".
-    iDestruct (disk_geom_agree (fsc_disk) (un_pd N) (un_pav N) (un_pu N)
-                 pd pav pu with "[] []") as %(Hpd & Hpav & Hpu);
-      [ iExact "Hdg" | iExact "Hdg2" |].
-    iDestruct (fs_ready_kmem with "Hfs") as "[#Hkml #Hkav]".
-    iDestruct (fs_ready_printk with "Hfs") as "[#Hpe _]".
-    (* SEVENTEEN [iSplitR]s, NOT one [iFrame]: the goal's tail conjuncts are
-       [is_lock]s over [disk_res]/[kmem_res], an [is_ftable] and [fs_ready]
-       itself, and every match attempt a named frame makes against one of
-       those is a conversion over a big resource (optimization.md, and
-       [ut_env_nopt_sstc] below measures the same shape at 7.5 s). *)
-    rewrite /ut_caps.
-    iSplitR; [iExact "Hprocs"|].
-    iSplitR; [iApply (fs_ready_data with "Hfs")|].
-    iSplitR; [iExact "Hkst"|].
-    iSplitR; [iExact "Hdev"|].
-    iSplitR; [iExact "Hpe"|].
-    iSplitR; [iExact "Hwl"|].
-    iSplitR; [iExact "Hft"|].
-    iSplitR; [iExact "Hkml"|].
-    iSplitR; [rewrite Hpd Hpav Hpu; iExact "Hdlk"|].
-    iSplitR; [iApply (fs_ready_bio with "Hfs")|].
-    iSplitR; [iApply (fs_ready_log with "Hfs")|].
-    iSplitR; [ iApply (fs_ready_seam with "Hfs")|].
-    iSplitR; [iApply (fs_ready_gen with "Hfs")|].
-    iSplitR; [iExact "Hdinv"|].
-    iSplitR; [iExact "Hdg"|].
-    iSplitR; [iExact "Hkav"|].
-    iSplitR; [iExact "Hfs"|].
-    iExact "Hpw".
-  Qed.
+  (* [ut_caps_of_park] moved below the section (L8, A12.19): it now joins
+     the PARKER's [ut_park_caps] with the RESUMER's [park_globals] and
+     [fs_ready] at the resumer's context, so it is stated over two contexts
+     and cannot live under the section's ambient one. *)
 
 
   (* vmfault's and the kalloc cone's bundle, assembled out of three
@@ -2010,6 +1978,98 @@ Qed.
    caps half is process/device plumbing every parker already has, and the
    [Rsys] half is the syscall table's, which only [SpecSyscall.SYSCALL] can
    produce ([syscall_env_park]). *)
+(* THE RESUMER'S ENVIRONMENT, OUT OF TWO CONTEXTS (L8, A12.19).  The parker's
+   [ut_park_caps] is at the parker's (ambient) context; the resumer runs at
+   [Xc] and supplies its own [park_globals] and [fs_ready] there.  Everything
+   context-indexed in [ut_caps] is rebuilt at [Xc]: the file-system rows out
+   of [fs_ready], the globals as handed in, [devintr_caps_any] and
+   [park_world] reassembled from both.  The parker's copies of [disk_geom]
+   and [is_kstack] pin the record's values by agreement across contexts;
+   [procs_avail], [wire_inv] and [kmap_at] are context-free and come out of
+   the parker's [park_world].  tso-flip's [ut_caps_of_park], with main's
+   rows (no ties: the names are ambient here). *)
+Lemma ut_caps_of_park `{XI : CurCtx} `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+    !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId}
+    (Xc : CtxId) (N : ut_names) :
+  ut_wf N ->
+  ut_park_caps N -∗
+  park_globals Xc (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N) -∗
+  FsReady.fs_ready (XI := Xc) -∗
+  ut_caps (XI := Xc) N.
+Proof.
+  iIntros (Hwf) "(%Hdq & #Hprocs0 & #Hkst0 & #Hdev0 & #Hwl0 & #Hft0 & #Hdg0 & #Hpw0)
+                (#Hprocs & #Hwl & #Hft & #Hcc & #Hcr & #Htl & #Hnp & #Hipx) #Hfs".
+  destruct Hwf as (Hj & Hlk & _ & _).
+  iDestruct (park_world_open with "Hpw0") as (γtl0 pd0 pav0 pu0)
+    "(_ & #Hextra0 & #Hwire & #Hkmap & _)".
+  iDestruct "Hextra0" as "(_ & #Hpav & _ & _)".
+  iDestruct (fs_ready_disk with "Hfs") as "[#Hdinv Hdex]".
+  iDestruct "Hdex" as (pd pav pu) "[#Hdg2 #Hdlk]".
+  iDestruct (disk_geom_agree_x cur_ctx Xc (fsc_disk) (un_pd N) (un_pav N)
+               (un_pu N) pd pav pu with "Hdg0 Hdg2") as %(Hpd & Hpav & Hpu).
+  iDestruct (procs_inv_kstack (XI := Xc) (un_s N) (un_j N) (un_l N) Hlk
+               with "Hprocs") as (ks2) "#Hkst2".
+  iDestruct (is_kstack_agree_x cur_ctx Xc (un_pj N) (un_ks N) ks2
+               with "Hkst0 Hkst2") as %Hks.
+  iDestruct (fs_ready_kmem with "Hfs") as "[#Hkml #Hkav]".
+  iDestruct (fs_ready_printk with "Hfs") as "[#Hpe _]".
+  iAssert (devintr_caps_any (XI := Xc) (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N)
+             (un_s N) (un_pd N) (un_pav N) (un_pu N)) as "#Hdca".
+  { rewrite /devintr_caps_any.
+    iSplitR; [iExact "Hdinv"|].
+    iSplitR; [iExact "Hcc"|].
+    iSplitR; [rewrite Hpd Hpav Hpu; iExact "Hdg2"|].
+    iSplitR; [rewrite Hpd Hpav Hpu; iExact "Hdlk"|].
+    iSplitR; [iExact "Htl" | iExact "Hprocs"]. }
+  iAssert (park_world (XI := Xc) (un_s N)) as "#Hpw".
+  { rewrite /park_world. iExists (un_tk N), pd, pav, pu.
+    iSplitR; [iExact "Hdinv"|].
+    iSplitR; [iExact "Hcc"|].
+    iSplitR; [iExact "Hdg2"|].
+    iSplitR; [iExact "Hdlk"|].
+    iSplitR; [iExact "Htl"|].
+    iSplitR; [iExact "Hprocs"|].
+    iSplitR; [iExact "Hcr"|].
+    iSplitR; [iExact "Hnp"|].
+    iSplitR; [iExact "Hpav"|].
+    iSplitR; [iExact "Hwire"|].
+    iSplitR; [iExact "Hkmap"|].
+    iExact "Hipx". }
+  rewrite /ut_caps.
+  iSplitR; [iExact "Hprocs"|].
+  iSplitR; [iApply (fs_ready_data with "Hfs")|].
+  iSplitR; [rewrite Hks; iExact "Hkst2"|].
+  iSplitR; [iExact "Hdca"|].
+  iSplitR; [iExact "Hpe"|].
+  iSplitR; [iExact "Hwl"|].
+  iSplitR; [iExact "Hft"|].
+  iSplitR; [iExact "Hkml"|].
+  iSplitR; [rewrite Hpd Hpav Hpu; iExact "Hdlk"|].
+  iSplitR; [iApply (fs_ready_bio with "Hfs")|].
+  iSplitR; [iApply (fs_ready_log with "Hfs")|].
+  iSplitR; [iApply (fs_ready_seam with "Hfs")|].
+  iSplitR; [iApply (fs_ready_gen with "Hfs")|].
+  iSplitR; [iExact "Hdinv"|].
+  iSplitR; [rewrite Hpd Hpav Hpu; iExact "Hdg2"|].
+  iSplitR; [iExact "Hkav"|].
+  iSplitR; [iExact "Hfs"|].
+  iExact "Hpw".
+Qed.
+
+(* ...AND THE PARKER'S GLOBALS, at ITS OWN CONTEXT, out of what it holds
+   anyway: the park package carries them so the twin can be given a copy
+   ([ParkCap.park_token_park]). *)
+Lemma park_globals_of_park_env `{XI : CurCtx} `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+    !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} (N : ut_names) :
+  ut_park_caps N -∗ sysc_park_extra (un_tk N) -∗
+  park_globals cur_ctx (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N).
+Proof.
+  iIntros "(_ & #Hprocs & _ & #Hdev & #Hwl & #Hft & _ & #Hpw) (#Hnp & _ & #Htl & #Hcr)".
+  iDestruct "Hdev" as "(_ & #Hcc & _)".
+  iDestruct (park_world_open with "Hpw") as (γtl0 pd0 pav0 pu0) "(_ & _ & _ & _ & #Hipx)".
+  rewrite /park_globals. iFrame "Hprocs Hwl Hft Hcc Hcr Htl Hnp". iExact "Hipx".
+Qed.
+
 Definition park_env `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
                       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (N : ut_names) : iProp Σ :=
@@ -2036,103 +2096,90 @@ Proof. rewrite /park_env. apply _. Qed.
    that mentions no context instantiates at every [Xc] for nothing. *)
 Definition ut_park_intro_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
-    (URB : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
-    (* WHAT THE SYSCALL ENVIRONMENT WANTS BESIDE THE FILE SYSTEM, supplied
-       at the RESUME like [first_done] and the timer capability: an abstract
-       [W] here, the fit check instantiates it ([UtResFits]).  It is the
-       channel through which a process's park token reaches its children
-       ([ParkCap.park_token]) -- and the reason it arrives at the resume
-       rather than at the park is that the parker holds it only under a
-       later (the token is a guarded fixpoint), while forkret holds it
-       outright. *)
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    (URB : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (W : iProp Σ)
     (N : ut_names) (av : nat) : Prop :=
   ut_wf N ->
   (K_usertrap <= av)%nat ->
-  ⊢ park_env N -∗
-    park_own N -∗
-    (∀ (h : CpuId) (pt' : uptd) (U' : ustate) (sts' : list fdstate),
+  ⊢ ∀ ξp : CtxId,
+    park_env (XI := ξp) N -∗
+    park_own (XI := ξp) N -∗
+    (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate) (sts' : list fdstate),
        ⌜pv_upt (us_V U') = pt'⌝ -∗
-       (* THE KERNEL WORDS, at the resuming hart: prepare_return wrote them
-          there, and [V'] is the descriptor it handed back -- see [ut_tfk]. *)
+       park_globals Xc (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N) -∗
        ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) (us_V U') -∗
-       FirstTok.first_done -∗
+       FirstTok.first_done (XI := Xc) -∗
        W -∗
-       (* THE RESUMING HART'S TIMER CAPABILITY, supplied per application and
-          not owned by the record: it is [mcounteren]/[stimecmp] at THAT
-          hart, minted in that hart's own boot chain (see
-          [devintr_caps_any]).  The party that resumes the process has one;
-          a record parked before any of that happened could not. *)
        timer_cap (CID := h) -∗
-       ut_trap_parked (CID := h) (un_pj N)
+       ut_trap_parked (CID := h) (XI := Xc) (un_pj N)
          (add_vec (un_ks N) (mword_of_int 4096)) av ∅ -∗
-       proc_priv_nopt (un_f N) (un_pj N) (un_pid N) (us_V U') -∗
+       proc_priv_nopt (XI := Xc) (un_f N) (un_pj N) (un_pid N) (us_V U') -∗
        fd_slots FDSPARE -∗
        iref_slots IREFSPARE -∗
-       (* ...and the descriptor-state fragments, on the same channel the
-          three allowances above travel: allocproc minted them with the
-          block ([ProcInv.proc_dormant_unused]) and whoever resumes the
-          process hands them back in. *)
-       (* NO USER-EXECUTION WP ROW (milestone J, S6): [ut_own_nopt] no longer
-          carries one, so the park channel has nothing to spend it on.  What
-          the park DOES carry across is [ParkCap.park_pkg]'s keyed
-          [uslot (uvis_of U')], built from the generic family the parker
-          captured -- projects/user-wp-slot.md SS4c (R-a / R-b). *)
        fd_frags (pv_fdg (us_V U')) sts' -∗
-       URB h pt' (add_vec (un_ks N) (mword_of_int 4096)) U' sts').
+       URB h Xc pt' (add_vec (un_ks N) (mword_of_int 4096)) U' sts').
 
+(* THE PARK'S HALF OF THE RESIDUE, ACROSS CONTEXTS (L8, A12.19).  The parker
+   is at [ξp] and holds [ut_park_caps] and [park_own] there; the closer is
+   applied by the resumer at [Xc], which hands in its own [park_globals],
+   [first_done], trap slot and private rows at [Xc].  [Rsys] is indexed on
+   the resumer's context too, since the syscall environment it stands for is
+   ([UtResFits] instantiates it at [SY.syscall_env (XI := Xc)]).  The one
+   parker-side row the residue needs at [Xc] -- the initproc share -- is
+   the resumer's copy, by the discarded-fraction tie in [ut_park_caps] and
+   agreement with the parker's cell. *)
 Lemma ut_res_bare_park
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{XI : CurCtx}
-    (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
+      !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId}
+    (Rsys : CurCtx -> gname -> mword 64 -> fclose_names -> iProp Σ)
     (W : iProp Σ)
     (N : ut_names) (av : nat) :
   ut_wf N ->
   (K_usertrap <= av)%nat ->
-  ut_park_caps N -∗
-  (FirstTok.first_done -∗ W -∗ Rsys (un_f N) (un_pj N) (un_fn N)) -∗
-  park_own N -∗
-  (∀ (h : CpuId) (pt' : uptd) (U' : ustate) (sts' : list fdstate),
+  ∀ ξp : CtxId,
+  ut_park_caps (XI := ξp) N -∗
+  park_own (XI := ξp) N -∗
+  (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate) (sts' : list fdstate),
      ⌜pv_upt (us_V U') = pt'⌝ -∗
+     park_globals Xc (un_s N) (un_w N) (un_ft N) (un_f N) (un_tk N) -∗
+     (FirstTok.first_done (XI := Xc) -∗ W -∗ Rsys Xc (un_f N) (un_pj N) (un_fn N)) -∗
      ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) (us_V U') -∗
-     FirstTok.first_done -∗
+     FirstTok.first_done (XI := Xc) -∗
      W -∗
-     (* THE RESUMING HART'S TIMER CAPABILITY, supplied per application and
-        not owned by the record: it is [mcounteren]/[stimecmp] at THAT
-        hart, minted in that hart's own boot chain (see
-        [devintr_caps_any]).  The party that resumes the process has one;
-        a record parked before any of that happened could not. *)
      timer_cap (CID := h) -∗
-     ut_trap_parked (CID := h) (un_pj N)
+     ut_trap_parked (CID := h) (XI := Xc) (un_pj N)
        (add_vec (un_ks N) (mword_of_int 4096)) av ∅ -∗
-     proc_priv_nopt (un_f N) (un_pj N) (un_pid N) (us_V U') -∗
+     proc_priv_nopt (XI := Xc) (un_f N) (un_pj N) (un_pid N) (us_V U') -∗
      fd_slots FDSPARE -∗
      iref_slots IREFSPARE -∗
      fd_frags (pv_fdg (us_V U')) sts' -∗
-     ut_res_bare (CID := h) Rsys pt'
+     ut_res_bare (CID := h) (XI := Xc) (Rsys Xc) pt'
        (add_vec (un_ks N) (mword_of_int 4096)) U' sts').
 Proof.
-  iIntros (Hwf Hav) "#Hpark Hderive Hown".
-  iIntros (h pt' U' sts') "%Hupt #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref Hfrag".
+  iIntros (Hwf Hav ξp) "#Hpark Hown".
+  iIntros (h Xc pt' U' sts') "%Hupt #Hglob Hderive #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref Hfrag".
   iDestruct ("Hderive" with "Hdone HW") as "Hsys".
   iDestruct "Hdone" as "[_ #Hrdy]".
-  iDestruct (ut_caps_of_park with "Hpark Hrdy") as "#Hcaps".
-  iDestruct "Hown" as "(Hbs & Hip)".
+  iDestruct (ut_caps_of_park (XI := ξp) Xc N Hwf with "Hpark Hglob Hrdy") as "#Hcaps".
+  iDestruct "Hpark" as "(%Hdq & _)".
+  iDestruct "Hglob" as "(_ & _ & _ & _ & _ & _ & _ & Hipx)".
+  iDestruct "Hipx" as (ip) "#Hip2".
+  iDestruct "Hown" as "(Hbs & Hip0)".
+  iDestruct (ctx_word_pointsto_agree ξp Xc with "Hip0 Hip2") as %Hip.
   rewrite /ut_res_bare.
   iExists N, av.
   iSplitR; [iPureIntro; exact Hupt|].
   iSplitR; [iPureIntro; reflexivity|].
   iSplitR; [iPureIntro; exact Hwf|].
   iSplitR; [iPureIntro; exact Hav|].
-  (* row by row, not framed -- see [ut_res_tlb_close] *)
   iSplitR; [iExact "Htfk" |].
   iSplitR; [iExact "Htc" |].
   iSplitL "Htrap"; [iExact "Htrap" |].
   rewrite /ut_env_nopt /ut_own_nopt.
   iSplitR; [iExact "Hcaps" |].
   iSplitL "Hbs"; [iExact "Hbs" |].
-  iSplitL "Hip"; [iExact "Hip" |].
+  iSplitR; [rewrite Hdq Hip; iExact "Hip2" |].
   iSplitL "Hfd"; [iExact "Hfd" |].
   iSplitL "Hiref"; [iExact "Hiref" |].
   iSplitL "Hpriv"; [iExact "Hpriv" |].

@@ -473,7 +473,7 @@ Section Res.
   Definition usertrap_res_bare_park
       (N : ut_names) (av : nat)
     : ut_park_intro_body
-        (fun h : CpuId => UV.usertrap_res_bare (CID := h))
+        (fun (h : CpuId) (Xc : CurCtx) => UV.usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av
     := UV.usertrap_res_bare_park N av.
 

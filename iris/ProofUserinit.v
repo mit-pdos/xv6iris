@@ -109,6 +109,7 @@ Require Import SpecNameiRootBoot.
 Require Import SpecRelease.
 Require Import SpecForkretPark.
 Require Import SpecForkretParkPaid.   (* [FORKRET_PARK_PAID] -- [park_token_intro] *)
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park borrows the running token (L8) *)
 Require Import ParkCap.               (* [park_token_park] *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
 Require Import SyscParkEnv.           (* [sysc_park_extra] / [park_world] *)
@@ -727,7 +728,7 @@ Section ProofUserinit.
     { iPoseProof "Hpersist" as "Hp".
       iEval (rewrite /first_boot_persist) in "Hp".
       iDestruct "Hp" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-                         _ & _ & _ & _ & %Hg & _)".
+                         _ & _ & _ & _ & %Hg)".
       iPureIntro. exact Hg. }
     pose (N := MkUtNames γft γf γw γs j γl pd pav pu
                  γtl
@@ -742,6 +743,8 @@ Section ProofUserinit.
       iSplitL.
       { (* the two PURE rows are gone (rank 1d): [fclose_ties] and the printk
            equation both named record fields that no longer exist. *)
+        (* L8: the initproc share the record carries is the DISCARDED one *)
+        iSplitR; [iPureIntro; reflexivity|].
         iSplitR; [iExact "Hpinv"|].
         iSplitR; [iExact "Hks"|].
         iSplitR; [iExact "Hdcaps"|].
@@ -782,11 +785,14 @@ Section ProofUserinit.
     iAssert (∀ W : uvis, ⌜uvis_fd W = fdt0⌝ -∗ uslot W)%I as "Hjslot".
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
       iIntros (W) "_". iApply (UexecCond.cond_entry_slot W with "Hgen"). }
+    (* L8: the park takes and returns the parker's running token; borrow it from the cap *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (park_token_park N rest (MkUstate (upd_cwd V ipv) M) fdt0 Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hjslot
+            with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirs]")
-      as "Hpctx".
+      as "[Hrun Hpctx]".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirs". iExact "Hctx". }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iMod (pstate_whole_update (proc_addr j) USED RUNNABLE with "Hpwhole")
       as "Hpwhole".
     iEval (rewrite uin_pwhole_runnable) in "Hpwhole".

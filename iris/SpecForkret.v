@@ -244,12 +244,12 @@ End SpecForkret.
    into named definitions"). *)
 Definition forkret_closer
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
-    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
-    (W : iProp Σ) (γf : gname) (p ksp : mword 64)
+    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
+    (W : iProp Σ) (γs : list gname) (γw γft γf γtl : gname) (p ksp : mword 64)
     (* the parked process's fd-state ghost name *)
     (g : gname)
     (pid : mword 32) (av : nat) : iProp Σ :=
-  (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+  (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate),
      ⌜pv_upt (us_V U') = pt'⌝ -∗
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
@@ -259,6 +259,10 @@ Definition forkret_closer
         no step between park and resume reassigns a live process's
         descriptor ghost.  See [SpecForkretParkPaid.forkret_park_pkg]. *)
      ⌜pv_fdg (us_V U') = g⌝ -∗
+     (* THE RESUMER'S OWN GLOBALS, at ITS context -- forkret holds them and
+        hands them in, exactly as it does [first_done] and [timer_cap]
+        (UsertrapRes.v, the park half; L8, A12.19). *)
+     UsertrapRes.park_globals Xc γs γw γft γf γtl -∗
      (* THE TRAPFRAME'S KERNEL WORDS, at the resuming hart: prepare_return
         wrote them there and [V'] is the descriptor it handed back, so this
         is forkret's to pay -- see [UsertrapRes.ut_tfk]. *)
@@ -267,7 +271,7 @@ Definition forkret_closer
         RATHER THAN HELD BY IT.  [FirstTok.first_done] is exactly
         [first_addr ↦₄□ 0 ∗ fs_ready] -- see the header's last section for
         why the closer's builder cannot own either half. *)
-     FirstTok.first_done -∗
+     FirstTok.first_done (XI := Xc) -∗
      W -∗
      (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
         [IntrDefs.sie_cap] now (see the note there), so the residue cannot
@@ -277,7 +281,7 @@ Definition forkret_closer
         could not hold it.  forkret has one, out of the very capability it
         is about to hand back. *)
      TimerCap.timer_cap (CID := h) -∗
-     forkret_yield (CID := h) γf p ksp pid av (us_V U') -∗
+     forkret_yield (CID := h) (XI := Xc) γf p ksp pid av (us_V U') -∗
      (* THE RESIDUE, AND THE SLOT FOR THE RECORD THIS RESUME LANDS ON.  The
         parker captured the GENERIC family and the closer instantiates it
         here -- see [ParkCap.park_pkg], of which this is the forkret-side
@@ -286,7 +290,7 @@ Definition forkret_closer
      (* one [sts] for both: the residue's fragments and the slot's key --
         see [ParkCap.park_pkg], of which this is the forkret-side spelling *)
      (∃ sts : list fdstate,
-        URes h pt' ksp U' sts ∗ uslot (uvis_of U' sts)))%I.
+        URes h Xc pt' ksp U' sts ∗ uslot (uvis_of U' sts)))%I.
 
 
 (* THE CONTRACT.  One statement, no [first] premise and no [first] reading:
@@ -297,14 +301,14 @@ Definition wp_forkret_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (* the trap loop's kernel-side bundle, abstract exactly as
        [SpecUserretClosed] takes it *)
-    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
+    (URes : CpuId -> CurCtx -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (* WHAT THE RESIDUE CLOSER IS HANDED BESIDE [first_done] -- the park
        token ([ParkCap.park_token]) in practice, abstract here: forkret
        holds it ([W -∗] below), reads nothing off it, and hands it to the
        closer at its tail.  The parker holds it only under a later, so the
        package cannot carry it outright; see ParkCap.v. *)
     (W : iProp Σ)
-    (j : nat) (γs : list gname) (γl γf : gname)
+    (j : nat) (γs : list gname) (γl γw γft γf γtl : gname)
     (pid : mword 32) (U : ustate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.forkret in
@@ -335,6 +339,9 @@ Definition wp_forkret_gen_body
   (* the process table: [is_lock] for the lock released at +0x10, and what
      fsinit's and kexec's cones take for sleep/wakeup *)
   procs_inv γs -∗
+  (* ...AND THE REST OF THE RESUMER'S GLOBALS, which forkret hands to the
+     residue closer at its tail (UsertrapRes.park_globals). *)
+  UsertrapRes.park_globals cur_ctx γs γw γft γf γtl -∗
   (* ---- the running kernel thread, as swtch left it ---- *)
   sie_cap_gpr KT1 m av false p -∗
   cpu_own 1%nat eb p false {["proc"%string]} -∗
@@ -349,7 +356,7 @@ Definition wp_forkret_gen_body
   W -∗
   (* ---- the residue closer -- see the header, and [forkret_closer] above
      for why it is a name rather than the wand spelled out ---- *)
-  forkret_closer URes W γf p ksp (pv_fdg (us_V U)) pid av -∗
+  forkret_closer URes W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) pid av -∗
   WP (Loop : expr riscv_lang).
 
 (* The residue is the module-type parameter it is everywhere else: forkret's
@@ -366,9 +373,10 @@ Module Type FORKRET.
   Parameter wp_forkret :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
-      (j : nat) (γs : list gname) (γl γf : gname)
+      (j : nat) (γs : list gname) (γl γw γft γf γtl : gname)
       (pid : mword 32) (U : ustate)
       (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool),
-      wp_forkret_gen_body (fun h : CpuId => usertrap_res_bare (CID := h)) W
-        j γs γl γf pid U ks m av av2 eb.
+      wp_forkret_gen_body
+        (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
+        j γs γl γw γft γf γtl pid U ks m av av2 eb.
 End FORKRET.

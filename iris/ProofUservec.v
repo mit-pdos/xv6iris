@@ -105,7 +105,7 @@ Section UservecAllPt.
   Definition usertrap_res_bare_park
       (N : ut_names) (av : nat)
     : ut_park_intro_body
-        (fun h : CpuId => UT.usertrap_res_bare (CID := h))
+        (fun (h : CpuId) (Xc : CurCtx) => UT.usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av
     := UT.usertrap_res_bare_park N av.
   Definition usertrap_res_csrs_open := UT.usertrap_res_csrs_open.

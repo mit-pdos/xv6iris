@@ -25,6 +25,7 @@ Require Import ProcInv.   (* [us_tf] / [us_upt] -- the residue index's updaters 
 Require Import IntrDefs KptShare.
 Require Import UsertrapRes.
 Require Import ParkCap.
+Require Import SyscParkEnv.   (* [sysc_park_extra] (L8: the resumer's syscall environment) *)
 Require Import SpecSyscall.
 Require Import SpecUsertrap.
 Require Import Xv6G.
@@ -59,7 +60,7 @@ Module Type USERTRAP_RES_PARK.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{XI : CurCtx}
       (N : ut_names) (av : nat),
-      ut_park_intro_body (fun h : CpuId => usertrap_res_bare (CID := h))
+      ut_park_intro_body (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av.
 End USERTRAP_RES_PARK.
 
@@ -72,7 +73,7 @@ Module Type USERTRAP_PARK.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{XI : CurCtx}
       (N : ut_names) (av : nat),
-      ut_park_intro_body (fun h : CpuId => usertrap_res_bare (CID := h))
+      ut_park_intro_body (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av.
 End USERTRAP_PARK.
 
@@ -212,22 +213,36 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
         !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{XI : CurCtx}
       (N : ut_names) (av : nat) :
-      ut_park_intro_body (fun h : CpuId => usertrap_res_bare (CID := h))
+      ut_park_intro_body (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av.
   Proof.
-    rewrite /ut_park_intro_body /usertrap_res_bare.
+    rewrite /ut_park_intro_body.
     intros Hwf Hav.
     pose proof Hwf as Hwf2.
     destruct Hwf2 as (Hj & Hplock & _ & _).
-    iIntros "#Henv Hown".
+    (* the parker's context, and its environment there *)
+    iIntros (ξp) "#Henv Hown".
     iDestruct "Henv" as "[#Hcaps #Hextra]".
-    iApply (ut_res_bare_park (SY.syscall_env) (park_token (un_s N)) N av Hwf Hav
-            with "Hcaps [] Hown").
-    iIntros "#Hdone #Htok".
-    iDestruct "Hcaps" as "(#Hprocs & _ & _ & #Hwl & #Hft & #Hdg & #Hpw)".
-    iApply (SY.syscall_env_park (un_f N) (un_w N) (un_ft N) (un_tk N)
+    (* the resumer's hart and context, and its rows there *)
+    iIntros (h Xc pt' U' sts') "%Hupt #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref Hfrag".
+    rewrite /usertrap_res_bare.
+    iApply (ut_res_bare_park (λ Xc0 : CurCtx, SY.syscall_env (XI := Xc0))
+              (park_token (un_s N)) N av Hwf Hav ξp
+            with "Hcaps Hown [//] Hglob [] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag").
+    (* THE SYSCALL ENVIRONMENT AT THE RESUMER'S CONTEXT: its rows are the
+       resumer's globals, the parker's context-free rows, and what
+       [ut_caps_of_park] rebuilds at [Xc] out of both. *)
+    iIntros "#Hdone2 #Htok".
+    iPoseProof "Hdone2" as "Hdone3". iDestruct "Hdone3" as "[_ #Hrdy]".
+    iDestruct (ut_caps_of_park (XI := ξp) Xc N Hwf with "Hcaps Hglob Hrdy") as "#Hc".
+    iDestruct "Hc" as "(#Hprocs & _ & _ & _ & _ & #Hwl & #Hft & _ & _ & _ & _ & _ & _
+                        & _ & #Hdg & _ & _ & #Hpw)".
+    iDestruct "Hglob" as "(_ & _ & _ & _ & #Hcr & #Htl & #Hnp & _)".
+    iDestruct "Hextra" as "(_ & #Hpav & _ & _)".
+    iApply (SY.syscall_env_park (XI := Xc) (un_f N) (un_w N) (un_ft N) (un_tk N)
               (un_fn N) Hj Hplock eq_refl
-            with "Hextra Hwl Hft Hprocs Hdg Hdone Hpw Htok").
+            with "[] Hwl Hft Hprocs Hdg Hdone2 Hpw Htok").
+    rewrite /sysc_park_extra. iFrame "Hnp Hpav Htl Hcr".
   Qed.
 
 End UtResFits.

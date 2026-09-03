@@ -91,7 +91,6 @@ Require Import FsCollect.
    onto the critical path for two declarations out of seventy-six. *)
 Require Import FsCfgKits.
 Require Import FsReady.
-Require Import EnvMorph.   (* the environment rows' instances for first_boot_persist_morph (r25 pass 1) *)
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -922,7 +921,7 @@ End FirstTok.
    rule).  The steady arm ([fs_ready]) and [first_boot_persist] both end in
    [ioff_escrows] and get theirs with the off box (plan L6). *)
 Global Instance first_fsinit_morph
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ}
     `{GEN : GenId} `{ICFG : icfg} :
   CtxMorph (λ ξ : CtxId, first_fsinit (XI := ξ)).
 Proof. rewrite /first_fsinit. ctx_morph_solve. Qed.
@@ -932,20 +931,20 @@ Proof. rewrite /first_fsinit. ctx_morph_solve. Qed.
    persistent half and the steady arm both end in [ioff_escrows] and carry
    the two λ-flipped handles, so they close with L6/L7 (lane i). *)
 Global Instance first_boot_persist_morph
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ}
     `{GEN : GenId} `{ICFG : icfg} :
   CtxMorph (λ ξ : CtxId, first_boot_persist (XI := ξ)).
-Proof. rewrite /first_boot_persist. ctx_morph_solve. Qed.
+Proof. rewrite /first_boot_persist. ctx_morph_solve; apply _. Qed.
 Global Instance first_done_morph
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ}
     `{GEN : GenId} `{ICFG : icfg} :
   CtxMorph (λ ξ : CtxId, first_done (XI := ξ)).
-Proof. rewrite /first_done. ctx_morph_solve. Qed.
+Proof. rewrite /first_done. ctx_morph_solve; apply _. Qed.
 Global Instance first_tok_morph
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ}
     `{GEN : GenId} `{ICFG : icfg} :
   CtxMorph (λ ξ : CtxId, first_tok (XI := ξ)).
-Proof. rewrite /first_tok. ctx_morph_solve. Qed.
+Proof. rewrite /first_tok. ctx_morph_solve; apply _. Qed.
 
 (* ...AND THE SAME SEAL AT TOP LEVEL, for [FsReady.v]'s reason: a
    [Typeclasses Opaque] inside a Section does not survive it.

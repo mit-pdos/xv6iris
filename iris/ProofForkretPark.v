@@ -88,6 +88,7 @@ Require Import ProcAvail.
 Require Import ProcInv.
 Require Import SchedCtx CtxMorphTac.
 Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
+Require Import StackOwn.   (* [stack_own] -- the kernel stack moves into the twin (L8) *)
 Require Import SpecKexec.   (* [K_kexec] -- forkret's deepest callee, on the boot arm *)
 Require Import SpecForkret.
 Require Import FirstTok.
@@ -102,7 +103,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
 Require Import TsoCtxPark.   (* [ctx_box_over] -- the record's PARK BOX (A6.127 §5) *)
-Require Import TsoCtxShim.   (* [ctx_parked_any] -- the record's token, SC stub *)
+Require Import TsoCtxMove.   (* [own_context_twin] / [ctx_move] -- the child's own context (A6.129) *)   (* [ctx_parked_any] -- the record's token, SC stub *)
 
 (* ===================================================================== *)
 (* MAIN'S DEVIATION AT THIS SITE (Amendment 6.3 / Amendment 9).           *)
@@ -177,7 +178,7 @@ Section Res.
   Definition usertrap_res_bare_park
       (N : ut_names) (av : nat)
     : ut_park_intro_body
-        (fun h : CpuId => FR.usertrap_res_bare (CID := h))
+        (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av
     := FR.usertrap_res_bare_park N av.
 End Res.
@@ -220,38 +221,47 @@ Proof. rewrite /is_kstack. ctx_morph_solve. Qed.
 Theorem forkret_park_paid
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ)
-    (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
+    (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (U : ustate) (av : nat) :
-    forkret_park_paid_body (fun h : CpuId => FR.usertrap_res_bare (CID := h)) W
-      γs γf pa ks rest pid U av.
+    forkret_park_paid_body
+      (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) W
+      γs γw γft γf γtl pa ks rest pid U av.
 Proof.
   cbv beta delta [forkret_park_paid_body].
   intros Hrest [j [Hpa Hj]] Hut.
   subst pa.
-  iIntros "Hpkg HW #Hks Hctx Hpriv Hfd Hirsp".
-  (* THE CHILD'S RECORD IS STATED AT THE PARKER'S CONTEXT, AND ITS TOKEN IS
-     THE SHIM'S ([TsoCtxShim.ctx_parked_any]; main-tso-readiness Amendment
-     6).  Both legs mint a FRESH context here ([TsoCtx.ctx_parked_alloc])
-     and restate the child's rows at it; main cannot ([procs_inv] has no
-     transport without the caps channel), so the record keeps the parker's
-     context and the SC stub supplies the token. *)
-  iPoseProof (TsoCtxShim.ctx_parked_any cur_ctx 0) as "Hthr0".
-  (* THE PARK BOX (A6.127 §5): a fresh stamped context whose stamp is over
-     the record's, carrying the link the resumer will cash.  This half is
-     honest; only the record's identity [XIp := cur_ctx] and its token are
-     the stub's (file header). *)
-  iMod (ctx_box_over cur_ctx 0 with "Hthr0") as "[Hthr (%ξb & Hbox & #Hfl)]".
-  iModIntro.
-  rewrite /proc_ctx_boxed. iExists ξb, 0%nat. iFrame "Hbox".
-  rewrite /proc_ctx_at. iExists cur_ctx, 0%nat. iFrame "Hthr Hfl".
-  (* the package is under a later and is opened only past the context's
-     own [▷] -- which is what lets the token it names be a fixpoint *)
-  iNext.
+  iIntros "Hrun Hpkg HW #Hks Hctx Hpriv Hfd Hirsp".
+  (* THE CHILD'S OWN CONTEXT (A6.129, L8/A12.19): twin the parker's running
+     token, move the record's rows across while both are running, then park
+     the twin and box it.  The rows that only MORPH (the globals' handles and
+     the process's private rows) are deposited into the parked twin, and the
+     box's floor is raised to the twin's stamp afterwards. *)
+  iMod (own_context_twin cur_ctx with "Hrun") as "[Hrun (%XIc & Hthr)]".
   iEval (rewrite /forkret_park_pkg) in "Hpkg".
-  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hmk & Hstk & Hclose)".
-  (* ---- the record: the cells allocproc left, and the free stack ---- *)
+  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
+  iMod (ctx_move (R := λ ξ, ctx_cells (XI := ξ) (p_context (proc_addr j))
+                              (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest))
+          cur_ctx XIc with "Hrun Hthr Hctx") as "(Hrun & Hthr & Hctx)".
+  iMod (ctx_move (R := λ ξ, stack_own (KTR := KT1) (XI := ξ) (add_vec ks (mword_of_int 4096)) av)
+          cur_ctx XIc with "Hrun Hthr Hstk") as "(Hrun & Hthr & Hstk)".
+  iMod (ctx_move (R := λ ξ, is_kstack (XI := ξ) (proc_addr j) ks)
+          cur_ctx XIc with "Hrun Hthr Hks") as "(Hrun & Hthr & #Hksc)".
+  iMod (ctx_move (R := λ ξ, procs_inv (XI := ξ) γs)
+          cur_ctx XIc with "Hrun Hthr Hpinv") as "(Hrun & Hthr & #Hpinvc)".
+  iMod ctx_parked_alloc as (ξb) "Hbox".
+  iMod (ctx_park_box XIc ξb 0 with "Hthr Hbox") as (Tc Tb) "(_ & Hbox & Hthr & _)".
+  iMod (ctx_deposit (R := λ ξ, UsertrapRes.park_globals ξ γs γw γft γf γtl) cur_ctx XIc Tc
+          with "Hrun Hthr Hglobp") as "(Hrun & %T1 & %HT1 & Hthr & #Hglobc)".
+  iMod (ctx_deposit (R := λ ξ, proc_priv (XI := ξ) γf (proc_addr j) pid U) cur_ctx XIc T1
+          with "Hrun Hthr Hpriv") as "(Hrun & %T2 & %HT2 & Hthr & Hpriv)".
+  iDestruct (ctx_parked_llb XIc T2 with "Hthr") as "[Hthr #Hllb]".
+  iMod (ctx_parked_raise ξb Tb T2 with "Hllb Hbox") as "[Hbox #Hfl]".
+  iModIntro. iFrame "Hrun".
+  rewrite /proc_ctx_boxed. iExists ξb, (Nat.max Tb T2). iFrame "Hbox".
+  rewrite /proc_ctx_at. iExists XIc, T2. iFrame "Hthr Hfl".
+  iNext.
   rewrite (valid_context_unfold (p_sched γs) None (p_context (proc_addr j))
-             (proc_addr j) cur_ctx)
+             (proc_addr j) XIc)
           /valid_context_pre.
   iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av.
   iSplit; [iPureIntro; cbn [length]; lia |].
@@ -264,26 +274,29 @@ Proof.
   (* the child's two allowances are captured HERE, at the build, and fed
      to the closer at the resume: they are the record's, not the resuming
      hart's, and forkret itself never sees them. *)
-  iAssert (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+  iAssert (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate),
              ⌜pv_upt (us_V U') = pt'⌝ -∗
              ⌜ud_data pt' = ud_pas pt'⌝ -∗
              ⌜proc_pt_wf pt'⌝ -∗
              (* the resumed record names the same fd-state ghost the parked
                 one did -- see [SpecForkretParkPaid.forkret_park_pkg] *)
              ⌜pv_fdg (us_V U') = pv_fdg (us_V U)⌝ -∗
+             (* ...and the resumer's globals, at ITS context (L8, A12.19) *)
+             UsertrapRes.park_globals Xc γs γw γft γf γtl -∗
              UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) (us_V U') -∗
-             first_done -∗
+             first_done (XI := Xc) -∗
              W -∗
              TimerCap.timer_cap (CID := h) -∗
-             forkret_yield (CID := h) γf (proc_addr j)
+             forkret_yield (CID := h) (XI := Xc) γf (proc_addr j)
                (add_vec ks (mword_of_int 4096)) pid av (us_V U') -∗
              (∃ sts : list fdstate,
-                FR.usertrap_res_bare (CID := h) pt'
+                FR.usertrap_res_bare (CID := h) (XI := Xc) pt'
                   (add_vec ks (mword_of_int 4096)) U' sts
                 ∗ uslot (uvis_of U' sts)))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
-  { iIntros (h pt' U') "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc Hy".
-    iApply ("Hclose" with "[%] [%] [%] [%] Htfk Hdone HW Htc Hy Hfd Hirsp");
+  { iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg #Hglob #Htfk Hdone HW #Htc Hy".
+    iApply ("Hclose" $! h Xc pt' U'
+              with "[%] [%] [%] [%] Hglob Htfk Hdone HW Htc Hy Hfd Hirsp");
       [exact HV | exact Hnorm | exact Hptwf | exact Hfg]. }
   iIntros (h m eb') "%Hadm %Himg Hcg Hcpu Hpc Hcells Hpay".
   iDestruct "Hpay" as (A' cret backr) "[Hrec Hpay]".
@@ -309,7 +322,7 @@ Proof.
   iDestruct (cpu_claim_proc (CID := h) j Hj with "Hhlf2 Htag1") as "Hclm".
   (* ---- the lock resource: the raw context cells the wand handed back,
          and THAT hart's parked scheduler, which is [run_slot] ---- *)
-  iAssert (own_ctx (XI := cur_ctx) (p_context (proc_addr j))) with "[Hcells]" as "Hown".
+  iAssert (own_ctx (XI := XIc) (p_context (proc_addr j))) with "[Hcells]" as "Hown".
   { iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest).
     iFrame "Hcells". iPureIntro. cbn [length]. lia. }
   (* the dispatching scheduler's record came back with its RUNNING token
@@ -318,9 +331,9 @@ Proof.
   iDestruct "Hrec" as (XIo) "[Htok Hrec]".
   iEval (rewrite /park_tok) in "Htok".
   iDestruct (sched_vc_at_intro γs h _ _ XIo with "Htok Hrec") as "Hrec".
-  iDestruct (proc_slots_running_intro (XI := cur_ctx) γs j h Hj with "Htag2 Hown Hrec Hmk")
+  iDestruct (proc_slots_running_intro (XI := XIc) γs j h Hj with "Htag2 Hown Hrec Hmk")
     as "Hslots".
-  iDestruct (proc_lock_res_intro (XI := cur_ctx) γs γl (proc_addr j) RUNNING ch
+  iDestruct (proc_lock_res_intro (XI := XIc) γs γl (proc_addr j) RUNNING ch
                with "Hstate Hplock Hchan Hpub Hslots") as "HR".
   (* ---- the two register facts, off the saved image ---- *)
   assert (Hra : m !!! Regidx (mword_of_int 1 : mword 5) = forkret_pc).
@@ -342,11 +355,11 @@ Proof.
   (* ================================================================== *)
   (* forkret, at the resuming hart.                                      *)
   (* ================================================================== *)
-  iApply (FR.wp_forkret (CID := h) (XI := cur_ctx) W j γs γl γf pid U ks m av
+  iApply (FR.wp_forkret (CID := h) (XI := XIc) W j γs γl γw γft γf γtl pid U ks m av
             (av - 6 - trap_res eb')%nat eb'
             Hj Hgl Hbud Hkx Hut Hsp
-          with "Htext Hwire Hkmap Hpc [] Hcg Hcpu Htc Hclm
-                Hlocked HR Hks [Hpriv] HW Hclose").
+          with "Htext Hwire Hkmap Hpc [] [] Hcg Hcpu Htc Hclm
+                Hlocked HR Hksc [Hpriv] HW Hclose").
   (* THE FRONTIER (tso-port.md §0.43′): three rows are still at the
      PARKER's context -- [procs_inv], [park_globals]'s handles, and the
      child's private block through [BioInv.buf_escrow] -- constant
@@ -357,7 +370,8 @@ Proof.
      record's identity already, BY THE STUB ([XIp := cur_ctx], file header),
      so the brackets close by [iExact]; main has no [park_globals] row, so
      the T-leg's middle bracket has no counterpart. *)
-  { iExact "Hpinv". }
+  { iExact "Hpinvc". }
+  { iExact "Hglobc". }
   iExact "Hpriv".
 Qed.
 
@@ -373,20 +387,22 @@ Theorem park_token_intro
     (γs : list gname) :
     ⊢ park_token γs.
 Proof.
-  iApply (park_token_intro_of (fun h : CpuId => FR.usertrap_res_bare (CID := h)) γs).
+  iApply (park_token_intro_of
+            (fun (h : CpuId) (Xc : CurCtx) => FR.usertrap_res_bare (CID := h) (XI := Xc)) γs).
   { intros N av. exact (FR.usertrap_res_bare_park N av). }
   rewrite /park_cap. iModIntro.
-  iIntros (γf pa ks rest pid U av) "%Hrest %Hj %Hav Hpkg HW Hchild".
+  iIntros (hp ξp γw γft γf γtl pa ks rest pid U av) "%Hrest %Hj %Hav Hrun Hpkg HW Hchild".
   destruct U as [V M].
   iDestruct "Hchild" as "(#Hks & Hctx & Hpriv & Hfd & Hirsp)".
-  iApply (forkret_park_paid (CID := 0%fin) (park_token γs) γs γf pa ks rest pid (MkUstate V M) av
-            Hrest Hj Hav with "[Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
-  iNext. iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
-  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hmk & Hstk & Hclose)".
-  iFrame "Htext Hwire Hkmap Hpinv Hmk Hstk".
-  iIntros (h pt' U') "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
-  iApply ("Hclose" $! h pt' U'
-            with "[%] [%] [%] [%] Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
+  iApply (forkret_park_paid (CID := hp) (XI := ξp) (park_token γs) γs γw γft γf γtl pa ks rest pid
+            (MkUstate V M) av Hrest Hj Hav with "Hrun [Hpkg] HW Hks Hctx Hpriv Hfd Hirsp").
+  iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
+  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
+  iFrame "Htext Hwire Hkmap Hpinv Hglobp Hmk Hstk".
+  iNext.
+  iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg #Hglob #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
+  iApply ("Hclose" $! h Xc pt' U'
+            with "[%] [%] [%] [%] Hglob Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
     [exact HV | exact Hnorm | exact Hptwf | exact Hfg].
 Qed.
 

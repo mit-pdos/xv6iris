@@ -1292,7 +1292,7 @@ Definition usertrap_res_bare_park
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{XI : CurCtx}
     (N : ut_names) (av : nat)
   : ut_park_intro_body
-      (fun h : CpuId => Fits.usertrap_res_bare (CID := h))
+      (fun (h : CpuId) (Xc : CurCtx) => Fits.usertrap_res_bare (CID := h) (XI := Xc))
         (park_token (un_s N)) N av
   := Fits.usertrap_res_bare_park N av.
 

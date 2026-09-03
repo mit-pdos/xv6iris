@@ -795,7 +795,7 @@ Section box.
      both floors, [P_hdr'].  Not a corollary of the hooked (a) (the
      remainder's stamps are learned only after the closer's acquire).  The
      off box's last close is its one client; bcache and icache never call
-     it.  SKELETON r25: statement ruled, proof = the hooked (a) with the
+     it.  r25 (proved in pass 1): statement ruled; the proof is the hooked (a) with the
      absorb elided ([hdr_out] takes the fragment; rows as (a)). *)
   Lemma box_withdraw_L1_free (N : namespace) γ (r : slot_reg id X)
       (c : nat) (mD : gmap (id * nat) ufrac) (Qc Q' : iProp Σ) (E : coPset) :

@@ -1169,6 +1169,53 @@ and law 10 (hooks).
     `mn_grp_fs` has a Type-level evar left by the current (skeleton)
     `icache_boot_at`; it goes away with the inode lane's statement.
 
+    LANE (i) STARTED (2026-09-02, late night): `/shared/xv6iris-2-l8-park.patch`
+    applied to its nine clean files; its UsertrapRes hunk #4 (park_globals at
+    the flip arity + hand instances for the handles) is SUPERSEDED -- the
+    r25 shapes commit already carries the flip-arity `park_globals`, and
+    `park_globals_morph` closes by `ctx_morph_solve`.  Pass-1 fixes on top of
+    the patch: ParkCap's `park_pkg` rows by `iExact` (the persistent
+    `procs_inv` was being framed INTO the transparent globals bundle);
+    UtResFits imports SyscParkEnv; the two spender sites
+    (ProofUserinit, ProofKforkB5) borrow the running token through
+    `sie_cap_gpr_own_ctx_acc` around `park_token_park` and supply the caps'
+    new pure row `un_dqi N = DfracDiscarded`.  L8 instance homes:
+    `proc_pt_cells_morph`/`proc_ptm_at_morph` in ProcInv, `bio_ctx_morph` in
+    BioInv, `fs_sb_cells_morph` in FsReady; EnvMorph.v keeps only the rows
+    whose home is downstream of FsReady.  FileOffProtocol: 14 of the 17 links
+    proved as corollaries (boot row, filealloc/realloc = `file_alloc_step`,
+    open slot, store free/remint, publish = the birth, dup/close-join =
+    `off_fd_split`, read-llb, last close, the two retypes, fdalloc-failed);
+    `proto_read_checkout`/`proto_read_park`/`proto_fork_child_read` are lane
+    (ii)'s (the box's L2 checkout under the ilock floor).
+
+    FileOffProtocol.v: ALL 17 LINKS PROVED (0 Admitted; the day-one gate is
+    discharged).  STATEMENT FIX flagged for the reviewers: `proto_read_checkout`
+    and `proto_fork_child_read` gain the premise `(i < NINODE)%nat` (beside
+    `fc_ip C = ientry i`), because identifying the handle's own slot with the
+    caller's needs `ientry_inj`, which needs both bounds; `proto_read_park`
+    already had it, and every consumer has the bound from the payload's pures.
+    `proto_read_checkout` = `off_rows_take` (the box's row out of the inode's
+    rows, its floor as `Kp`) + `off_read_checkout`; `proto_read_park` =
+    `off_read_park` + the rows wand at `L2Reg T' None`; `proto_fork_child_read`
+    = `off_fd_split` at `q/2` + the checkout link under `□`.
+
+    LANE (ii) STEP 1 (identified 2026-09-02, late night; to do after the
+    inode lane lands): the fileread/filewrite checkout needs `ctx_floor ξ Kt`
+    with `max_stamp m ≤ Kt` for the fd's share `m` (`proto_read_llb` gives
+    the llb).  By the allowed-forms law the only source is an llb-tier
+    acquire post (R1): SpecIlock's bodies gain the llb-tier form of their
+    inner acquiresleep (`wp_acquiresleep_genl_llb_sconf_body`: present
+    `llb loglen_name Tl`, receive `∃ K, ⌜Tl ≤ K⌝ ∗ ctx_floor cur_ctx K`);
+    callers that need no floor present `llb_0`.  Cost: SpecIlock (2 bodies)
+    + ProofIlock's acquire + the intro patterns of ilock's callers (sys_open
+    bodies, create, link/unlink, mkdir/mknod, fileread/filewrite/filestat,
+    ...): ordering/cost flagged to the owner, not skippable.  Then fileread's
+    off step: `proto_read_llb` -> ilock at that llb -> `proto_read_checkout`
+    (the rows out of the holder's handle, item 33) -> the word read/write at
+    the running context -> `proto_read_park` before iunlock; filewrite the
+    same with one checkin.
+
 ## 10. Process and tooling (measured facts)
 
 ### 10.1 Build

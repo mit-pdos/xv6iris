@@ -663,13 +663,25 @@ Section FsReadyMorph.
   Context `{GEN : GenId} `{ICFG : icfg}.
 
 
+  (* STOPGAP HOMES for two icache environment rows (r25 pass 1): their
+     home is IcacheEscrow.v (the inode lane adds them there); these copies
+     let [fs_ready_morph] close now and are deleted when that lands. *)
+  Global Instance ic_sleeplocks_morph_fsready (cn : ic_names) :
+    CtxMorph (λ ξ : CtxId, (ic_sleeplocks (XI := ξ) cn : iProp Σ)).
+  Proof. rewrite /ic_sleeplocks. ctx_morph_solve; apply _. Qed.
+  Global Instance is_itable2_morph_fsready (γl : gname) (cn : ic_names) (γfs : fs_names)
+      (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
+    CtxMorph (λ ξ : CtxId,
+      (is_itable2 (XI := ξ) γl cn γfs γi cov logstart nib dv : iProp Σ)).
+  Proof. rewrite /is_itable2. ctx_morph_solve; apply _. Qed.
+
   (* the four superblock cells [fsinit] froze: [↦₄□]s and nothing else. *)
   Global Instance fs_sb_cells_morph :
     CtxMorph (λ ξ : CtxId, (fs_sb_cells (XI := ξ) : iProp Σ)).
   Proof. rewrite /fs_sb_cells. ctx_morph_solve. Qed.
 
   Global Instance fs_ready_morph : CtxMorph (λ ξ : CtxId, fs_ready (XI := ξ)).
-  Proof. rewrite /fs_ready. ctx_morph_solve. Qed.
+  Proof. rewrite /fs_ready. ctx_morph_solve; apply _. Qed.
 End FsReadyMorph.
 
 (* AND THE SAME TWO SEALS AT TOP LEVEL.  [Typeclasses Opaque] inside a

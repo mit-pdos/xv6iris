@@ -2789,6 +2789,11 @@ Section ProcPtMorph.
      then the page-table frame and the LAZY user memory -- which is
      [umem_own] under three pure facts, so it closes on
      [ProcPtOwn.umem_own_morph] and [PtTreeMove.pt_frame_at_morph]. *)
+  (* the descriptor's two page-table cells ([p_pagetable], [p_trapframe]) *)
+  Global Instance proc_pt_cells_morph (pa : SailStdpp.Values.mword 64) (P : uptd) :
+    CtxMorph (λ ξ : CtxId, (proc_pt_cells (XI := ξ) pa P : iProp Σ)).
+  Proof. rewrite /proc_pt_cells. ctx_morph_solve. Qed.
+
   Global Instance proc_ptm_at_morph (pa : SailStdpp.Values.mword 64)
       (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
     CtxMorph (λ ξ : CtxId, (proc_ptm_at (XI := ξ) pa P sz M : iProp Σ)).
@@ -2813,19 +2818,19 @@ Section ProcPrivMorph.
 
   Global Instance ofile_slot_morph γf γd pa fd v :
     CtxMorph (λ ξ : CtxId, ofile_slot (XI := ξ) γf γd pa fd v).
-  Proof. rewrite /ofile_slot. ctx_morph_solve; apply _. Qed.
+  Proof. rewrite /ofile_slot. ctx_morph_solve; first [apply _ | apply first_tok_morph]. Qed.
   Global Instance proc_ofiles_morph γf γd pa fs :
     CtxMorph (λ ξ : CtxId, proc_ofiles (XI := ξ) γf γd pa fs).
-  Proof. rewrite /proc_ofiles. ctx_morph_solve; apply _. Qed.
+  Proof. rewrite /proc_ofiles. ctx_morph_solve; first [apply _ | apply first_tok_morph]. Qed.
   Global Instance proc_priv_core_morph pa pid U :
     CtxMorph (λ ξ : CtxId, proc_priv_core (XI := ξ) pa pid U).
-  Proof. rewrite /proc_priv_core. ctx_morph_solve; apply _. Qed.
+  Proof. rewrite /proc_priv_core. ctx_morph_solve; first [apply _ | apply first_tok_morph]. Qed.
   Global Instance proc_priv_morph γf pa pid U :
     CtxMorph (λ ξ : CtxId, proc_priv (XI := ξ) γf pa pid U).
-  Proof. rewrite /proc_priv. ctx_morph_solve; apply _. Qed.
+  Proof. rewrite /proc_priv. ctx_morph_solve; first [apply _ | apply first_tok_morph]. Qed.
   Global Instance proc_priv_nopt_morph γf pa pid V :
     CtxMorph (λ ξ : CtxId, proc_priv_nopt (XI := ξ) γf pa pid V).
-  Proof. rewrite /proc_priv_nopt. ctx_morph_solve; apply _. Qed.
+  Proof. rewrite /proc_priv_nopt. ctx_morph_solve; first [apply _ | apply first_tok_morph]. Qed.
 End ProcPrivMorph.
 
 (* ====================================================================== *)
