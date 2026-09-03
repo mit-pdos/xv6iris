@@ -148,16 +148,24 @@ Defined.
 (* ===================================================================== *)
 
 (* the page of [va] is a readable page of the key *)
+(* icache (claude-notes/projects/icache.md): a readable window of the
+   ENGINE is a WRITABLE one -- a text page's bytes are stamped and outside
+   the walker, and the one text read the engine speaks goes through
+   UkLoadText.v -- so [uk_rpage] now demands the W bit, exactly as
+   [UkLoad.uk_load_ok] does. *)
 Definition uk_rpage (π : gmap (mword 27) uperm) (va : mword 64) : Prop :=
-  exists q : uperm, uperm_at π va = Some q.
+  exists q : uperm, uperm_at π va = Some q /\ up_W q = true.
 
 Global Instance uk_rpage_dec (π : gmap (mword 27) uperm) (va : mword 64) :
   Decision (uk_rpage π va).
 Proof.
   unfold uk_rpage, uperm_at.
   destruct (π !! svpn_of va) as [q |].
-  - left. exists q. reflexivity.
-  - right. intros (q & Hq). discriminate Hq.
+  - destruct (up_W q) eqn:E.
+    + left. exists q. split; [ reflexivity | exact E ].
+    + right. intros (q' & Hq & Hw). injection Hq as <-. rewrite E in Hw.
+      discriminate Hw.
+  - right. intros (q & Hq & _). discriminate Hq.
 Defined.
 
 (* THE POINT OF THE NOTION: it is the load leaf's own key premise. *)
@@ -179,7 +187,7 @@ Lemma uk_rpage_leaf (pt : uptd) (sz : Z) (π : gmap (mword 27) uperm)
   uk_rpage π va -> ud_um pt !! svpn_of va = Some w ->
   uleaf_ok (Load Data) w.
 Proof.
-  intros Hwf Hpm (q & Hq) Hw. unfold uperm_at in Hq. rewrite <- Hpm in Hq.
+  intros Hwf Hpm (q & Hq & _) Hw. unfold uperm_at in Hq. rewrite <- Hpm in Hq.
   exact (perm_of_R pt sz _ q w Hwf Hq Hw).
 Qed.
 

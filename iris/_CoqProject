@@ -37,6 +37,7 @@ HartRegNode.v
 HartSpan.v
 HartSpanChar.v
 HartMemRun.v
+HartMemRunX.v
 HartMemAsm.v
 HartRunGen.v
 HartSFrame.v
@@ -263,6 +264,8 @@ UserMem.v
 UserFetch.v
 UserStepFull.v
 UmodeMem.v
+UmodeText.v
+UmodeFetchX.v
 UmodeRegs.v
 UexecRet.v
 UexecRound.v
@@ -273,11 +276,13 @@ UmodeAbi.v
 UmodeArith.v
 UmodeSyscall.v
 UmodeIo.v
+WpUmodeFetch.v
 WpUmodeStep.v
 WpUmodeLeaf.v
 WpUmodeBranch.v
 WpUmodeStore.v
 WpUmodeLoad.v
+WpUmodeTextLoad.v
 UCodeSync.v
 UmodeKernelTie.v
 UkStep.v
@@ -290,6 +295,7 @@ UkLeaf.v
 UkBranch.v
 UkStore.v
 UkLoad.v
+UkLoadText.v
 UserHeap.v
 UkRun.v
 UkRunLeaf.v

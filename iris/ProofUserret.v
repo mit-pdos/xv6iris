@@ -43,11 +43,12 @@ Section UserretAllPt.
       (mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0 : mword 64)
       (vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
        vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f : bv 64)
-      (dqm : dfrac) :
+      (dqm : dfrac) (Pimg Qimg : iProp Σ) :
     wp_userret_pt_body kroot uroot tfp um m usatp
       mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0
       vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
-      vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f dqm.
+      vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f dqm
+      Pimg Qimg.
   Proof.
     cbv beta delta [wp_userret_pt_body].
     (* [tf_pa] deliberately NOT unfolded here — see the twin note in
@@ -58,7 +59,7 @@ Section UserretAllPt.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hpmm HPBMTE Hmenvval0 Hsenvval0 Hwf HTSR Hsup
       Ha0 HuMode Huasid Huppn.
     iIntros "#Hkt #Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc
-             #Hclaim #Hcreds Hktlb Hufr Htok Hpc Hfile
+             #Hclaim #Hcreds Hktlb Hufr Htok Hstep HPimg Hpc Hfile
              Htf_vra
              Htf_vsp
              Htf_vgp
@@ -98,12 +99,12 @@ Section UserretAllPt.
     iPoseProof (ui_sfence2 with "Hkt") as "Hi_sfence2".
     (* ================= entry: the page-table switch ================= *)
     iApply (wp_userret_entry_pt kroot uroot tfp um m usatp
-              mstatus0 mie_v mdv0 menvcfg0
+              mstatus0 mie_v mdv0 menvcfg0 Pimg Qimg
  HSIE HMPRV HSXL HTVM Hmm HPBMTE Hmenvval0 Hwf Ha0 HuMode Huasid Huppn
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hclaim Hcreds Hktlb
-                    Hufr Htok Hpc Hfile Hi_fencei Hi_sfence1 Hi_csrw
+                    Hufr Htok Hstep HPimg Hpc Hfile Hi_fencei Hi_sfence1 Hi_csrw
                     Hi_sfence2").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Htok Hpc Hfile".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Htok HQimg Hpc Hfile".
     iClear "Hi_fencei".
     iClear "Hi_sfence1".
     iClear "Hi_csrw".
@@ -1276,7 +1277,7 @@ Section UserretAllPt.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Htok Hpc Hfile".
     iClear "Hi_sret".
     subst M31 M30 M29 M28 M27 M26 M25 M24 M23 M22 M21 M20 M19 M18 M17 M16 M15 M14 M13 M12 M11 M10 M9 M8 M7 M6 M5 M4 M3 M2 M1 M0.
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Htok Hpc Hfile
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Htok HQimg Hpc Hfile
 Htf_vra Htf_vsp Htf_vgp Htf_vtp Htf_vt0 Htf_vt1 Htf_vt2 Htf_vs0 Htf_vs1 Htf_va1 Htf_va2 Htf_va3 Htf_va4 Htf_va5 Htf_va6 Htf_va7 Htf_vs2 Htf_vs3 Htf_vs4 Htf_vs5 Htf_vs6 Htf_vs7 Htf_vs8 Htf_vs9 Htf_vs10 Htf_vs11 Htf_vt3 Htf_vt4 Htf_vt5 Htf_vt6 Htf_va0f").
   Qed.
 

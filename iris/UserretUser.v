@@ -76,6 +76,7 @@ Require Import SpecUserret.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import UmodeText.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -305,17 +306,20 @@ Section UserretUser.
               mstatus0 (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0) sepc0
               vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
               vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f dqm
+              (umem_lazy pt sz M) (umem_lazy_x pt sz M)
               HSIE HMPRV HSXL HTVM HMXR Hmm
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               eq_refl eq_refl Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
               with "Hkt Hhw Hmi Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc
-                    Hclaim Hcreds Hktlb Hufr Hctx Hpc Hfile
+                    Hclaim Hcreds Hktlb Hufr Hctx [] Hdata Hpc Hfile
                     Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104
                     Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176
                     Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240
                     Htf248 Htf256 Htf264 Htf272 Htf280 Htf112").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hctx Hpc Hfile
+    { (* the STEP 0 fence.i stamps the process's text image (icache) *)
+      iApply umem_lazy_x_mint. }
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hctx Hdata Hpc Hfile
              Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120
              Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264

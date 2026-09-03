@@ -53,868 +53,13 @@ Require Import UserExec UserStep UserTrap UserExecFacts.
 Require UserTotalU.
 Require Import UserActiveClass.
 Require Import UmodeMem UmodeCap UmodeFetch.
+Require Import HartMemRunX UmodeText UmodeFetchX UmodeArith.
+Require Export WpUmodeFetch.
 Require Import WpDecode.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
-
-(* ===================================================================== *)
-(* §1 THE TIER'S BYTE MAP.                                                *)
-(*                                                                        *)
-(* [uv_mm t md] is what the hart owns: the page table's bytes, plus the    *)
-(* process image [md] (which is [UmodeMem.upa_map pt M], the image re-keyed *)
-(* by physical address).  The two halves are DISJOINT -- derived from the  *)
-(* ownership, never assumed -- and the image half is what every step of    *)
-(* this file carries through unchanged.                                   *)
-(* ===================================================================== *)
-
-Definition uv_mm (t : ptree) (md : PtBytes.pamap) : PtBytes.pamap :=
-  ptree_bytes 2 t ∪ md.
-
-(* the tree half's well-formedness, at a fixed image half *)
-Definition uv_tree_ok (pt : uptd) (md : PtBytes.pamap) (t : ptree) : Prop :=
-  maps_disj (pt_maps 2 t) /\
-  ptree_bytes 2 t ##ₘ md /\
-  (forall a : Arch.pa, a ∈ (dom (uv_mm t md) : gset Arch.pa) -> addr_is_ram a) /\
-  upt_map_wf (ud_um pt) /\
-  upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt) t.
-
-Lemma uv_tree_mem_ok (pt : uptd) (md : PtBytes.pamap) (t : ptree) :
-  uv_tree_ok pt md t -> u_mem_ok pt t (uv_mm t md).
-Proof.
-  intros (Hdisj & Hdj & Hram & Hwfm & Hspec).
-  exists md. split_and!;
-    [ exact Hdisj | exact Hdj | reflexivity | exact Hram | exact Hwfm
-    | exact Hspec ].
-Qed.
-
-(* a same-shaped tree change keeps the domain, hence the RAM clause *)
-Lemma uv_tree_ok_shape (pt : uptd) (md : PtBytes.pamap) (t t' : ptree) :
-  uv_tree_ok pt md t ->
-  pt_same_shape 2 t t' ->
-  upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt) t' ->
-  ptree_bytes 2 t' ##ₘ md ->
-  uv_tree_ok pt md t'.
-Proof.
-  intros (Hdisj & Hdj & Hram & Hwfm & Hspec) Hshape Hspec' Hdj'.
-  split_and!;
-    [ exact (pt_maps_disj_shape 2 t t' Hshape Hdisj) | exact Hdj' | | exact Hwfm
-    | exact Hspec' ].
-  intros a Ha. apply Hram.
-  assert (Hd : (dom (uv_mm t' md) : gset Arch.pa) = dom (uv_mm t md))
-    by exact (dom_union_shape (ptree_bytes 2 t') (ptree_bytes 2 t) md
-                (eq_sym (ptree_bytes_dom_shape 2 t t' Hshape))).
-  rewrite <- Hd. exact Ha.
-Qed.
-
-(* ===================================================================== *)
-(* §2 THE WALK, WITH THE LANDING MAP NAMED.                               *)
-(*                                                                        *)
-(* [UserFetchCert.u_walk_fetch_pure] answers with [exists mm', ... /\      *)
-(* u_mem_step_ok P t t' mm mm'], which pins [mm']'s DOMAIN and nothing     *)
-(* else: for the safety tier that is enough (its data bytes are            *)
-(* existential), for a tier that owns a NAMED image it is not.  The three  *)
-(* arms of [KptTree.ptree_translateAddr_cases] do say it -- the TLB hit    *)
-(* and the fill leave memory alone, and the A/D write-back writes the LEAF *)
-(* SLOT, which is inside the tree half -- so the walk is re-derived here   *)
-(* with the map spelled [uv_mm t' md] at the same [md].                    *)
-(*                                                                        *)
-(* Only the [goodmb] certificate is taken from the safety tier's producer: *)
-(* it is stated at the PRE map alone and so is untouched by all this.      *)
-(* ===================================================================== *)
-
-Lemma uv_walk_fetch (pt : uptd) (t : ptree) (md : PtBytes.pamap)
-    (rsf : regstate) (w va : mword 64) :
-  ud_um pt !! svpn_of va = Some w ->
-  uleaf_ok (InstructionFetch tt) w ->
-  uva_canon va ->
-  register_lookup cur_privilege rsf = User ->
-  _get_Mstatus_SXL (register_lookup mstatus rsf) = 'b"10" ->
-  register_lookup menvcfg rsf = MENVCFG_S ->
-  u_exec_pins pt t rsf ->
-  uv_tree_ok pt md t ->
-  exists (rsf' : regstate) (t' : ptree),
-    exec (translateAddr (Virtaddr va) (InstructionFetch tt))
-      (u_state rsf (uv_mm t md))
-      = Some (Values.Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw),
-              u_state rsf' (uv_mm t' md)) /\
-    goodmb Du_r Du_w (translateAddr (Virtaddr va) (InstructionFetch tt))
-      (u_state rsf (uv_mm t md)) (uv_mm t md) = true /\
-    u_tlb_only rsf rsf' /\
-    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
-    uv_tree_ok pt md t' /\
-    pt_same_shape 2 t t'.
-Proof.
-  intros Hl Hleaf Hcanon Lcp Lsxl Lmenv Hpins Htok.
-  pose proof (uv_tree_mem_ok pt md t Htok) as Hwf.
-  pose proof Htok as (Hdisj & Hdj & Hram & Hwfm & Hspec).
-  pose proof Hpins as (Hhw & Hcfgp & Hpt & Htlbok).
-  pose proof Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
-  pose proof Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HXp & HWp & HRp & Hcovp).
-  pose proof Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
-  pose proof Hspec as (Hbase & _).
-  (* the certificate, from the safety tier's producer *)
-  destruct (u_walk_fetch_pure pt t (uv_mm t md) rsf w va Hl Hleaf Hcanon Lcp
-              Lsxl Lmenv Hpins Hwf)
-    as (rsfX & mmX & tX & HtrX & Htrg & HfileX & HtlbokX & HstepX).
-  clear HtrX HfileX HtlbokX HstepX.
-  (* the walk's own data *)
-  destruct (upt_spec_maps (ud_root pt) (ud_tfp pt) (ud_um pt) t (svpn_of va) w
-              Hspec (or_intror (or_intror Hl)))
-    as (p2 & p1 & a0 & d0 & Hmaps).
-  pose proof (upt_variant (ud_tfp pt) (ud_um pt) (svpn_of va) w Hwfm
-                (or_intror (or_intror Hl))) as Hvar.
-  assert (Hsm2 : pt_slot_mem (u_state rsf (uv_mm t md)) (pt_addr2 t (svpn_of va)) p2)
-    by exact (u_slot_mem_at pt t (uv_mm t md) rsf (pt_base t)
-                (vpn_idx 2 (svpn_of va)) p2 Hwf
-                (ptree_maps_slot2 t (svpn_of va) p2 p1 _ Hmaps)).
-  assert (Hsm1 : pt_slot_mem (u_state rsf (uv_mm t md)) (pt_addr1 p2 (svpn_of va)) p1)
-    by exact (u_slot_mem_at pt t (uv_mm t md) rsf (u_next_base p2)
-                (vpn_idx 1 (svpn_of va)) p1 Hwf
-                (ptree_maps_slot1 t (svpn_of va) p2 p1 _ Hmaps)).
-  assert (Hsm0 : pt_slot_mem (u_state rsf (uv_mm t md)) (pt_addr0 p1 (svpn_of va))
-                   (pte_set_ad w a0 d0))
-    by exact (u_slot_mem_at pt t (uv_mm t md) rsf (u_next_base p1)
-                (vpn_idx 0 (svpn_of va)) _ Hwf
-                (ptree_maps_slot0 t (svpn_of va) p2 p1 _ Hmaps)).
-  assert (Htm : exec (translationMode User) (u_state rsf (uv_mm t md))
-                = Some (Sv39, u_state rsf (uv_mm t md)))
-    by exact (exec_translationMode_U_sv39 usatp (u_state rsf (uv_mm t md))
-                Lsxl Hsatp Hmode).
-  assert (Heff : exec (effectivePrivilege (InstructionFetch tt)
-                        (register_lookup mstatus (u_state rsf (uv_mm t md)).(sregs))
-                        User) (u_state rsf (uv_mm t md))
-                 = Some (User, u_state rsf (uv_mm t md)))
-    by exact (exec_effectivePrivilege_fetch _ User (u_state rsf (uv_mm t md))).
-  assert (Hss : exec (is_shadow_stack_access (InstructionFetch tt))
-                  (u_state rsf (uv_mm t md))
-                = Some (false, u_state rsf (uv_mm t md)))
-    by exact (exec_is_shadow_stack_fetch (u_state rsf (uv_mm t md))).
-  destruct (ptree_translateAddr_cases (InstructionFetch tt) User
-              (ud_root pt) va w (u_walk_pa w va) usatp t
-              (register_lookup tlb rsf) p2 p1 a0 d0 (u_state rsf (uv_mm t md))
-              Hleaf Hcanon eq_refl (fun a d => proj2 (proj2 (proj2 (Hvar a d))))
-              Hbase Hmaps Htlbok Hsm2 Hsm1 Hsm0
-              Hmisa Lmenv Hhtif Lcp Htm Heff Hss
-              Hsatp Hppn Hasid eq_refl HA Hord HRp HWp Hcovp
-              (pma_allows_all_pte_read _ Hall) (Hpmaw_of _ Hall))
-    as (sf & Htr & Harms).
-  (* WHERE THE WALK LANDED, with the image half NAMED *)
-  assert (Hland : exists (rsf' : regstate) (t' : ptree),
-            sf = u_state rsf' (uv_mm t' md) /\
-            (rsf' = rsf \/ exists tv, rsf' = register_set tlb tv rsf) /\
-            tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
-            pt_same_shape 2 t t' /\
-            upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt) t' /\
-            ptree_bytes 2 t' ##ₘ md).
-  { destruct Harms as [-> | [-> | (a1 & d1 & ->)]].
-    - exists rsf, t. split_and!;
-        [ reflexivity | left; reflexivity | exact Htlbok
-        | apply pt_same_shape_refl | exact Hspec | exact Hdj ].
-    - eexists _, t. split_and!.
-      + reflexivity.
-      + right. eexists. reflexivity.
-      + rewrite register_lookup_set.
-        exact (tlb_ok_pt_fill_self (mword_of_int 0) t (register_lookup tlb rsf)
-                 (svpn_of va) p2 p1 _ Hmaps Htlbok).
-      + apply pt_same_shape_refl.
-      + exact Hspec.
-      + exact Hdj.
-    - assert (Habs : pte_set_ad (pte_set_ad w a0 d0) a1 d1 = pte_set_ad w a1 d1)
-        by exact (pte_set_ad_absorb w a0 d0 a1 d1).
-      assert (Hv' : pte_valid (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
-        by (rewrite Habs; exact (proj1 (Hvar a1 d1))).
-      assert (Hl' : pte_leaf (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
-        by (rewrite Habs; exact (proj1 (proj2 (Hvar a1 d1)))).
-      assert (Hn' : pte_no_napot (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
-        by (rewrite Habs; exact (proj1 (proj2 (proj2 (Hvar a1 d1))))).
-      assert (Hp' : pte_pbmt0 (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
-        by (rewrite Habs; exact (proj2 (proj2 (proj2 (Hvar a1 d1))))).
-      assert (Hspec' : upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt)
-                (ptree_set_leaf t (svpn_of va)
-                   (pte_set_ad (pte_set_ad w a0 d0) a1 d1))).
-      { rewrite Habs.
-        exact (upt_tree_spec_set_leaf (ud_root pt) (ud_tfp pt) (ud_um pt) t
-                 (svpn_of va) w p2 p1 a0 d0 a1 d1 Hwfm Hspec
-                 (or_intror (or_intror Hl)) Hmaps). }
-      (* the tree half absorbs the write; the image half is untouched *)
-      assert (Heqt : ptree_bytes 2 (ptree_set_leaf t (svpn_of va)
-                       (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
-                     = write_bytes (ptree_bytes 2 t) (pt_addr0 p1 (svpn_of va)) 8
-                         (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
-        by exact (ptree_bytes_set_leaf t (svpn_of va) p2 p1 _ _ Hdisj Hmaps).
-      assert (Hwdj : word_bytes (pt_addr0 p1 (svpn_of va))
-                       (pte_set_ad (pte_set_ad w a0 d0) a1 d1) ##ₘ md).
-      { apply map_disjoint_spec. intros x b1 b2 H1 H2.
-        destruct (word_bytes_is_Some (pt_addr0 p1 (svpn_of va))
-                    (pte_set_ad (pte_set_ad w a0 d0) a1 d1) (pte_set_ad w a0 d0)
-                    x (mk_is_Some _ _ H1)) as [b0 Hb0].
-        pose proof (maps_disj_subseteq (pt_maps 2 t)
-                      (word_bytes (pt_addr0 p1 (svpn_of va)) (pte_set_ad w a0 d0))
-                      Hdisj (ptree_maps_slot0 t (svpn_of va) p2 p1 _ Hmaps))
-          as Hsubt.
-        pose proof (lookup_weaken _ _ x b0 Hb0 Hsubt) as Hbt.
-        exact (proj1 (map_disjoint_spec (ptree_bytes 2 t) md) Hdj x b0 b2 Hbt H2). }
-      assert (Hdj' : ptree_bytes 2 (ptree_set_leaf t (svpn_of va)
-                       (pte_set_ad (pte_set_ad w a0 d0) a1 d1)) ##ₘ md).
-      { rewrite Heqt write_bytes_word. apply map_disjoint_union_l.
-        split; [ exact Hwdj | exact Hdj ]. }
-      eexists _,
-        (ptree_set_leaf t (svpn_of va) (pte_set_ad (pte_set_ad w a0 d0) a1 d1)).
-      split_and!.
-      + rewrite /set_reg. cbn [sregs mem mdev]. rewrite /uv_mm.
-        rewrite Heqt. rewrite <- write_bytes_union_l. reflexivity.
-      + right. eexists. reflexivity.
-      + rewrite register_lookup_set.
-        exact (tlb_ok_pt_fill_self (mword_of_int 0)
-                 (ptree_set_leaf t (svpn_of va)
-                    (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
-                 (register_lookup tlb rsf) (svpn_of va) p2 p1 _
-                 (ptree_set_leaf_maps_self t (svpn_of va) p2 p1
-                    (pte_set_ad w a0 d0) _ Hmaps Hv' Hl' Hn' Hp')
-                 (tlb_ok_pt_set_leaf (mword_of_int 0) t (register_lookup tlb rsf)
-                    (svpn_of va) p2 p1 (pte_set_ad w a0 d0) a1 d1
-                    Hmaps Hv' Hl' Hn' Hp' Htlbok)).
-      + exact (pt_same_shape_set_leaf t (svpn_of va) p2 p1 _ _ Hmaps).
-      + exact Hspec'.
-      + exact Hdj'. }
-  destruct Hland as (rsf' & t' & -> & Hfile & Htlbok' & Hshape & Hspec' & Hdj').
-  exists rsf', t'. split_and!.
-  - exact Htr.
-  - exact Htrg.
-  - exact (u_tlb_only_land rsf rsf' Hfile).
-  - exact Htlbok'.
-  - exact (uv_tree_ok_shape pt md t t' Htok Hshape Hspec' Hdj').
-  - exact Hshape.
-Qed.
-
-(* ===================================================================== *)
-(* §3 THE VALUE-PRECISE FETCH.                                            *)
-(*                                                                        *)
-(* Four geometries, exactly as the pre-port file had them (all four occur  *)
-(* in the binaries this tier verifies): compressed / base x 4-aligned /    *)
-(* 2-mod-4.  Each takes the [uinstr] data and produces the CONCRETE        *)
-(* [FetchResult] together with its [goodmb] certificate, the landing file  *)
-(* and the landing tree -- the image half of the map never moves.          *)
-(* ===================================================================== *)
-
-(* the image half of the map is read through the union's right slot *)
-Lemma uv_mm_lookup (t : ptree) (md : PtBytes.pamap) (x : Arch.pa) (b : bv 8) :
-  ptree_bytes 2 t ##ₘ md -> md !! x = Some b -> uv_mm t md !! x = Some b.
-Proof.
-  intros Hdj Hx. rewrite /uv_mm.
-  destruct (ptree_bytes 2 t !! x) as [c|] eqn:Ht.
-  - exfalso. exact (proj1 (map_disjoint_spec _ _) Hdj x c b Ht Hx).
-  - rewrite (lookup_union_r _ md x Ht). exact Hx.
-Qed.
-
-(* [uinstr]'s "these bytes are in [M]" AT THE PHYSICAL WINDOW *)
-Lemma uv_win_bytes (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
-    (w_leaf pc : mword 64) (k : nat) (n : N) (iw : bv n) :
-  uva_inj pt M ->
-  ptree_bytes 2 t ##ₘ upa_map pt M ->
-  ud_um pt !! svpn_of pc = Some w_leaf ->
-  (forall j : nat, (j < k)%nat -> bv_unsigned pc mod 4096 + Z.of_nat j < 4096) ->
-  uM_bytes M (uint pc) k iw ->
-  forall j : nat, (j < k)%nat ->
-    uv_mm t (upa_map pt M) !! pa_add (u_walk_pa w_leaf pc) j
-    = Some (nth_byte iw j).
-Proof.
-  intros Hinj Hdj Hl Hnc Hb j Hj.
-  rewrite <- (uva_pa_window pt w_leaf pc j Hl (Hnc j Hj)).
-  apply (uv_mm_lookup t (upa_map pt M) _ (nth_byte iw j) Hdj).
-  exact (upa_map_lookup pt M (uint pc + Z.of_nat j) (nth_byte iw j) Hinj
-           (Hb j Hj)).
-Qed.
-
-Lemma uv_win_some (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
-    (w_leaf pc : mword 64) (k : nat) (n : N) (iw : bv n) :
-  uva_inj pt M ->
-  ptree_bytes 2 t ##ₘ upa_map pt M ->
-  ud_um pt !! svpn_of pc = Some w_leaf ->
-  (forall j : nat, (j < k)%nat -> bv_unsigned pc mod 4096 + Z.of_nat j < 4096) ->
-  uM_bytes M (uint pc) k iw ->
-  forall j : nat, (j < k)%nat ->
-    is_Some (uv_mm t (upa_map pt M) !! pa_add (u_walk_pa w_leaf pc) j).
-Proof.
-  intros Hinj Hdj Hl Hnc Hb j Hj. exists (nth_byte iw j).
-  exact (uv_win_bytes pt M t w_leaf pc k n iw Hinj Hdj Hl Hnc Hb j Hj).
-Qed.
-
-(* ---- the two instruction READS, at the state the walk landed on ------- *)
-
-Lemma uv_read_4 (pt : uptd) (M : gmap Z (bv 8)) (t t' : ptree)
-    (rsf rsf' : regstate) (w_leaf pc : mword 64) (iw : mword 32) :
-  uva_inj pt M ->
-  ud_um pt !! svpn_of pc = Some w_leaf ->
-  (forall j : nat, (j < 4)%nat ->
-     bv_unsigned pc mod 4096 + Z.of_nat j < 4096) ->
-  is_aligned_vaddr (Virtaddr pc) 4 = true ->
-  uM_bytes M (uint pc) 4 iw ->
-  register_lookup cur_privilege rsf = User ->
-  u_exec_pins pt t rsf ->
-  uv_tree_ok pt (upa_map pt M) t ->
-  uv_tree_ok pt (upa_map pt M) t' ->
-  u_tlb_only rsf rsf' ->
-  exec (mem_read (InstructionFetch tt) PBMT_PMA
-          (Physaddr (u_walk_pa w_leaf pc)) 4 false false false)
-    (u_state rsf' (uv_mm t' (upa_map pt M)))
-    = Some (Ok iw, u_state rsf' (uv_mm t' (upa_map pt M))) /\
-  goodmb Du_r Du_w (mem_read (InstructionFetch tt) PBMT_PMA
-           (Physaddr (u_walk_pa w_leaf pc)) 4 false false false)
-    (u_state rsf' (uv_mm t' (upa_map pt M))) (uv_mm t (upa_map pt M)) = true.
-Proof.
-  intros Hinj Hl Hnc Hal Hb Lcp Hpins Htok Htok' Tr.
-  pose proof (uv_win_bytes pt M t' w_leaf pc 4 32 iw Hinj
-                (proj1 (proj2 Htok')) Hl Hnc Hb) as Hbytes'.
-  destruct (u_fetch_read_ok pt t t' (uv_mm t (upa_map pt M))
-              (uv_mm t' (upa_map pt M)) rsf rsf' 4 w_leaf pc
-              ltac:(lia) (Z.divide_factor_l 4 1024) ltac:(lia)
-              ltac:(vm_compute; reflexivity) Hal Hl Lcp Hpins
-              (uv_tree_mem_ok pt (upa_map pt M) t Htok)
-              (uv_tree_mem_ok pt (upa_map pt M) t' Htok')
-              ltac:(intros j Hj;
-                    exact (uv_win_some pt M t w_leaf pc 4 32 iw Hinj
-                             (proj1 (proj2 Htok)) Hl Hnc Hb j ltac:(lia)))
-              ltac:(intros j Hj;
-                    exact (uv_win_some pt M t' w_leaf pc 4 32 iw Hinj
-                             (proj1 (proj2 Htok')) Hl Hnc Hb j ltac:(lia)))
-              Tr)
-    as (region & HA & Hord & Hrange & HX & Hpmam & Halp & Hexecp &
-        Hclint & Hsig & Hhtif & Hdev & Hown & Lcp').
-  split.
-  - exact (exec_mem_read_fetch_4_U PBMT_PMA (u_walk_pa w_leaf pc) region iw
-             (u_state rsf' (uv_mm t' (upa_map pt M)))
-             HA Hord Hrange HX Hpmam Halp Hexecp Hclint Hsig
-             (within_htif_false (u_walk_pa w_leaf pc) 4
-                (u_state rsf' (uv_mm t' (upa_map pt M))) Hhtif)
-             Hdev ltac:(intros j Hj; apply Hbytes'; lia) Lcp').
-  - exact (goodmb_mem_read_fetch_4_U Du_r Du_w PBMT_PMA (u_walk_pa w_leaf pc)
-             region iw (u_state rsf' (uv_mm t' (upa_map pt M)))
-             (uv_mm t (upa_map pt M))
-             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-             HA Hord Hrange HX Hpmam Halp Hexecp Hclint Hsig Hhtif Hdev Hown
-             ltac:(intros j Hj; apply Hbytes'; lia) Lcp').
-Qed.
-
-Lemma uv_read_2 (pt : uptd) (M : gmap Z (bv 8)) (t t' : ptree)
-    (rsf rsf' : regstate) (w_leaf pc : mword 64) (ih : mword 16) :
-  uva_inj pt M ->
-  ud_um pt !! svpn_of pc = Some w_leaf ->
-  (forall j : nat, (j < 2)%nat ->
-     bv_unsigned pc mod 4096 + Z.of_nat j < 4096) ->
-  is_aligned_vaddr (Virtaddr pc) 2 = true ->
-  uM_bytes M (uint pc) 2 ih ->
-  register_lookup cur_privilege rsf = User ->
-  u_exec_pins pt t rsf ->
-  uv_tree_ok pt (upa_map pt M) t ->
-  uv_tree_ok pt (upa_map pt M) t' ->
-  u_tlb_only rsf rsf' ->
-  exec (mem_read (InstructionFetch tt) PBMT_PMA
-          (Physaddr (u_walk_pa w_leaf pc)) 2 false false false)
-    (u_state rsf' (uv_mm t' (upa_map pt M)))
-    = Some (Ok ih, u_state rsf' (uv_mm t' (upa_map pt M))) /\
-  goodmb Du_r Du_w (mem_read (InstructionFetch tt) PBMT_PMA
-           (Physaddr (u_walk_pa w_leaf pc)) 2 false false false)
-    (u_state rsf' (uv_mm t' (upa_map pt M))) (uv_mm t (upa_map pt M)) = true.
-Proof.
-  intros Hinj Hl Hnc Hal Hb Lcp Hpins Htok Htok' Tr.
-  pose proof (uv_win_bytes pt M t' w_leaf pc 2 16 ih Hinj
-                (proj1 (proj2 Htok')) Hl Hnc Hb) as Hbytes'.
-  destruct (u_fetch_read_ok pt t t' (uv_mm t (upa_map pt M))
-              (uv_mm t' (upa_map pt M)) rsf rsf' 2 w_leaf pc
-              ltac:(lia) (Z.divide_factor_l 2 2048) ltac:(lia)
-              ltac:(vm_compute; reflexivity) Hal Hl Lcp Hpins
-              (uv_tree_mem_ok pt (upa_map pt M) t Htok)
-              (uv_tree_mem_ok pt (upa_map pt M) t' Htok')
-              ltac:(intros j Hj;
-                    exact (uv_win_some pt M t w_leaf pc 2 16 ih Hinj
-                             (proj1 (proj2 Htok)) Hl Hnc Hb j ltac:(lia)))
-              ltac:(intros j Hj;
-                    exact (uv_win_some pt M t' w_leaf pc 2 16 ih Hinj
-                             (proj1 (proj2 Htok')) Hl Hnc Hb j ltac:(lia)))
-              Tr)
-    as (region & HA & Hord & Hrange & HX & Hpmam & Halp & Hexecp &
-        Hclint & Hsig & Hhtif & Hdev & Hown & Lcp').
-  split.
-  - exact (exec_mem_read_fetch_2_U PBMT_PMA (u_walk_pa w_leaf pc) region ih
-             (u_state rsf' (uv_mm t' (upa_map pt M)))
-             HA Hord Hrange HX Hpmam Halp Hexecp Hclint Hsig
-             (within_htif_false (u_walk_pa w_leaf pc) 2
-                (u_state rsf' (uv_mm t' (upa_map pt M))) Hhtif)
-             Hdev ltac:(intros j Hj; apply Hbytes'; lia) Lcp').
-  - exact (goodmb_mem_read_fetch_2_U Du_r Du_w PBMT_PMA (u_walk_pa w_leaf pc)
-             region ih (u_state rsf' (uv_mm t' (upa_map pt M)))
-             (uv_mm t (upa_map pt M))
-             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-             HA Hord Hrange HX Hpmam Halp Hexecp Hclint Hsig Hhtif Hdev Hown
-             ltac:(intros j Hj; apply Hbytes'; lia) Lcp').
-Qed.
-
-(* the domain does not move along a same-shaped tree change -- which is what
-   transports the SECOND walk's certificate back to the entry map *)
-Lemma uv_mm_dom (t t' : ptree) (md : PtBytes.pamap) :
-  pt_same_shape 2 t t' ->
-  (dom (uv_mm t md) : gset Arch.pa) = dom (uv_mm t' md).
-Proof.
-  intros Hs.
-  exact (dom_union_shape (ptree_bytes 2 t) (ptree_bytes 2 t') md
-           (ptree_bytes_dom_shape 2 t t' Hs)).
-Qed.
-
-(* ---- (a) a 4-ALIGNED pc: ONE 4-byte read ----------------------------- *)
-Lemma uv_fetch_4 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree) (rsf : regstate)
-    (w_leaf pc : mword 64) (iw : mword 32) :
-  uva_inj pt M ->
-  ud_um pt !! svpn_of pc = Some w_leaf ->
-  uleaf_ok (InstructionFetch tt) w_leaf ->
-  uva_canon pc ->
-  (* no in-page premise: a 4-ALIGNED pc has a page offset that is a multiple
-     of 4, hence at most 4092, so a 4-byte read starting there cannot leave
-     the page ([ualign4_nc]).  The one geometry that CAN cross is the
-     2-mod-4 base fetch, and it takes the second halfword's leaf instead. *)
-  is_aligned_vaddr (Virtaddr pc) 4 = true ->
-  uM_bytes M (uint pc) 4 iw ->
-  register_lookup PC rsf = pc ->
-  register_lookup cur_privilege rsf = User ->
-  _get_Mstatus_SXL (register_lookup mstatus rsf) = 'b"10" ->
-  register_lookup menvcfg rsf = MENVCFG_S ->
-  u_exec_pins pt t rsf ->
-  uv_tree_ok pt (upa_map pt M) t ->
-  exists (rsf' : regstate) (t' : ptree),
-    exec (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
-      = Some ((if isRVC (subrange_vec_dec iw 15 0)
-               then F_RVC (subrange_vec_dec iw 15 0) else F_Base iw),
-              u_state rsf' (uv_mm t' (upa_map pt M))) /\
-    goodmb Du_r Du_w (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
-      (uv_mm t (upa_map pt M)) = true /\
-    u_tlb_only rsf rsf' /\
-    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
-    uv_tree_ok pt (upa_map pt M) t' /\
-    pt_same_shape 2 t t'.
-Proof.
-  intros Hinj Hl Hleaf Hcanon Hal Hb Lpc Lcp Lsxl Lmenv Hpins Htok.
-  assert (Hnc : forall j : nat, (j < 4)%nat ->
-            bv_unsigned pc mod 4096 + Z.of_nat j < 4096)
-    by (intros j Hj; exact (ualign4_nc pc (Z.of_nat j) Hal ltac:(lia))).
-  destruct (uv_walk_fetch pt t (upa_map pt M) rsf w_leaf pc
-              Hl Hleaf Hcanon Lcp Lsxl Lmenv Hpins Htok)
-    as (rsf1 & t1 & Htr & Htrg & Tr1 & Htlbok1 & Htok1 & Hshape1).
-  destruct (uv_read_4 pt M t t1 rsf rsf1 w_leaf pc iw
-              Hinj Hl Hnc Hal Hb Lcp Hpins Htok Htok1 Tr1) as [Hmr Hmrg].
-  exists rsf1, t1. split_and!.
-  - pose proof (exec_fetch_ok_4 (u_state rsf (uv_mm t (upa_map pt M)))
-                  (u_state rsf1 (uv_mm t1 (upa_map pt M))) pc
-                  (u_walk_pa w_leaf pc) iw Lpc Hal Htr Hmr) as Hf.
-    rewrite autocast_mword_id in Hf. exact Hf.
-  - exact (goodmb_fetch_ok_4 Du_r Du_w (u_state rsf (uv_mm t (upa_map pt M)))
-             (u_state rsf1 (uv_mm t1 (upa_map pt M))) (uv_mm t (upa_map pt M))
-             pc (u_walk_pa w_leaf pc) iw ltac:(vm_compute; reflexivity)
-             Lpc Hal Htr Htrg Hmr Hmrg).
-  - exact Tr1.
-  - exact Htlbok1.
-  - exact Htok1.
-  - exact Hshape1.
-Qed.
-
-(* ---- (b) a 2-mod-4 pc holding a COMPRESSED instruction: ONE 2-byte read *)
-Lemma uv_fetch_rvc_2 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
-    (rsf : regstate) (w_leaf pc : mword 64) (h : mword 16) :
-  uva_inj pt M ->
-  ud_um pt !! svpn_of pc = Some w_leaf ->
-  uleaf_ok (InstructionFetch tt) w_leaf ->
-  uva_canon pc ->
-  (* likewise: a 2-ALIGNED pc's page offset is even, hence at most 4094, so
-     a 2-byte read starting there cannot leave the page ([ualign2_nc]) *)
-  is_aligned_vaddr (Virtaddr pc) 2 = true ->
-  is_aligned_vaddr (Virtaddr pc) 4 = false ->
-  uM_bytes M (uint pc) 2 h ->
-  isRVC h = true ->
-  register_lookup PC rsf = pc ->
-  register_lookup cur_privilege rsf = User ->
-  _get_Mstatus_SXL (register_lookup mstatus rsf) = 'b"10" ->
-  register_lookup menvcfg rsf = MENVCFG_S ->
-  u_exec_pins pt t rsf ->
-  uv_tree_ok pt (upa_map pt M) t ->
-  exists (rsf' : regstate) (t' : ptree),
-    exec (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
-      = Some (F_RVC h, u_state rsf' (uv_mm t' (upa_map pt M))) /\
-    goodmb Du_r Du_w (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
-      (uv_mm t (upa_map pt M)) = true /\
-    u_tlb_only rsf rsf' /\
-    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
-    uv_tree_ok pt (upa_map pt M) t' /\
-    pt_same_shape 2 t t'.
-Proof.
-  intros Hinj Hl Hleaf Hcanon Hal2 Hnal4 Hb Hrvc Lpc Lcp Lsxl Lmenv
-    Hpins Htok.
-  pose proof Hpins as ((Hmisa & _ & _ & _ & _ & _) & _).
-  assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa rsf)) ('b"1") = true)
-    by (rewrite Hmisa; vm_compute; reflexivity).
-  destruct (align2_not4_facts pc Hal2 Hnal4) as (_ & Hbit0 & Hbit1).
-  assert (Hnc : forall j : nat, (j < 2)%nat ->
-            bv_unsigned pc mod 4096 + Z.of_nat j < 4096)
-    by (intros j Hj; exact (ualign2_nc pc (Z.of_nat j) Hal2 ltac:(lia))).
-  destruct (uv_walk_fetch pt t (upa_map pt M) rsf w_leaf pc
-              Hl Hleaf Hcanon Lcp Lsxl Lmenv Hpins Htok)
-    as (rsf1 & t1 & Htr & Htrg & Tr1 & Htlbok1 & Htok1 & Hshape1).
-  destruct (uv_read_2 pt M t t1 rsf rsf1 w_leaf pc h
-              Hinj Hl Hnc Hal2 Hb Lcp Hpins Htok Htok1 Tr1) as [Hmr Hmrg].
-  exists rsf1, t1. split_and!.
-  - exact (exec_fetch_rvc_2 (u_state rsf (uv_mm t (upa_map pt M)))
-             (u_state rsf1 (uv_mm t1 (upa_map pt M))) pc (u_walk_pa w_leaf pc)
-             Lpc HmisaC Hbit0 Hbit1 Hnal4 h Htr Hmr Hrvc).
-  - exact (goodmb_fetch_rvc_2 Du_r Du_w (u_state rsf (uv_mm t (upa_map pt M)))
-             (u_state rsf1 (uv_mm t1 (upa_map pt M))) (uv_mm t (upa_map pt M))
-             pc (u_walk_pa w_leaf pc)
-             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-             Lpc HmisaC Hbit0 Hbit1 Hnal4 h Htr Htrg Hmr Hmrg Hrvc).
-  - exact Tr1.
-  - exact Htlbok1.
-  - exact Htok1.
-  - exact Hshape1.
-Qed.
-
-(* ---- (c) a 2-mod-4 pc holding a BASE instruction: TWO 2-byte reads ---- *)
-Lemma uv_fetch_base_2 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
-    (rsf : regstate) (w_leaf w_leaf2 pc : mword 64) (iw : mword 32) :
-  uva_inj pt M ->
-  ud_um pt !! svpn_of pc = Some w_leaf ->
-  uleaf_ok (InstructionFetch tt) w_leaf ->
-  uva_canon pc ->
-  (* THE SECOND HALFWORD'S OWN FACTS.  This is the one fetch geometry that
-     can STRADDLE A PAGE BOUNDARY -- a 4-byte instruction at a 2-mod-4 pc
-     whose page offset is 4094 reads its low half from one page and its high
-     half from the next -- so the second halfword's leaf, canonicity and
-     no-wrap are TAKEN here rather than derived from an in-page premise that
-     would have forbidden the case outright.  When the two halves do share a
-     page these are exactly what [uv_fetch_base_2_pg] below derives. *)
-  ud_um pt !! svpn_of (add_vec_int pc 2) = Some w_leaf2 ->
-  uleaf_ok (InstructionFetch tt) w_leaf2 ->
-  uva_canon (add_vec_int pc 2) ->
-  uint (add_vec_int pc 2) = uint pc + 2 ->
-  is_aligned_vaddr (Virtaddr pc) 2 = true ->
-  is_aligned_vaddr (Virtaddr pc) 4 = false ->
-  uM_bytes M (uint pc) 4 iw ->
-  isRVC (subrange_vec_dec iw 15 0) = false ->
-  register_lookup PC rsf = pc ->
-  register_lookup cur_privilege rsf = User ->
-  _get_Mstatus_SXL (register_lookup mstatus rsf) = 'b"10" ->
-  register_lookup menvcfg rsf = MENVCFG_S ->
-  u_exec_pins pt t rsf ->
-  uv_tree_ok pt (upa_map pt M) t ->
-  exists (rsf' : regstate) (t' : ptree),
-    exec (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
-      = Some (F_Base iw, u_state rsf' (uv_mm t' (upa_map pt M))) /\
-    goodmb Du_r Du_w (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
-      (uv_mm t (upa_map pt M)) = true /\
-    u_tlb_only rsf rsf' /\
-    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
-    uv_tree_ok pt (upa_map pt M) t' /\
-    pt_same_shape 2 t t'.
-Proof.
-  intros Hinj Hl Hleaf Hcanon Hl2 Hleaf2 Hcanon2 Hu2 Hal2 Hnal4 Hb HnRVC Lpc Lcp Lsxl Lmenv
-    Hpins Htok.
-  pose proof Hpins as ((Hmisa & _ & _ & _ & _ & _) & _).
-  assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa rsf)) ('b"1") = true)
-    by (rewrite Hmisa; vm_compute; reflexivity).
-  destruct (align2_not4_facts pc Hal2 Hnal4) as (_ & Hbit0 & Hbit1).
-  (* each halfword's window is bounded by its OWN alignment: pc is 2-aligned
-     and so is pc+2, so neither 2-byte read leaves its page -- whether or not
-     the two pages are the same one *)
-  pose proof (ualign2_nc pc 1 Hal2 ltac:(lia)) as Hnc1.
-  assert (Hnch : forall j : nat, (j < 2)%nat ->
-            bv_unsigned (add_vec_int pc 2) mod 4096 + Z.of_nat j < 4096).
-  { intros j Hj.
-    exact (ualign2_nc (add_vec_int pc 2) (Z.of_nat j)
-             (ualign2_plus2 pc Hal2) ltac:(lia)). }
-  assert (Hncl : forall j : nat, (j < 2)%nat ->
-            bv_unsigned pc mod 4096 + Z.of_nat j < 4096)
-    by (intros j Hj; lia).
-  assert (Hb2 : uM_bytes M (uint (add_vec_int pc 2)) 2
-                  (subrange_vec_dec iw 31 16 : mword 16)).
-  { intros j Hj.
-    rewrite (nth_byte_subrange_hi iw j ltac:(lia)).
-    pose proof (Hb (2 + j)%nat ltac:(lia)) as Hbj.
-    rewrite Nat2Z.inj_add in Hbj. change (Z.of_nat 2) with 2 in Hbj.
-    rewrite Hu2. rewrite <- Z.add_assoc. exact Hbj. }
-  assert (Hb1 : uM_bytes M (uint pc) 2 (subrange_vec_dec iw 15 0 : mword 16)).
-  { intros j Hj. rewrite (nth_byte_subrange_lo iw j ltac:(lia)).
-    exact (Hb j ltac:(lia)). }
-  assert (Hal2h : is_aligned_vaddr (Virtaddr (add_vec_int pc 2)) 2 = true)
-    by exact (ualign2_plus2 pc Hal2).
-  (* ---- the low halfword ---- *)
-  destruct (uv_walk_fetch pt t (upa_map pt M) rsf w_leaf pc
-              Hl Hleaf Hcanon Lcp Lsxl Lmenv Hpins Htok)
-    as (rsf1 & t1 & Htr1 & Htr1g & Tr1 & Htlbok1 & Htok1 & Hshape1).
-  destruct (uv_read_2 pt M t t1 rsf rsf1 w_leaf pc
-              (subrange_vec_dec iw 15 0 : mword 16)
-              Hinj Hl Hncl Hal2 Hb1 Lcp Hpins Htok Htok1 Tr1) as [Hmr1 Hmr1g].
-  (* ---- the high halfword, at the state the first walk landed on ---- *)
-  assert (Hpins1 : u_exec_pins pt t1 rsf1)
-    by exact (u_exec_pins_only pt t t1 rsf rsf1 Tr1 Htlbok1 Hpins).
-  assert (Lcp1 : register_lookup cur_privilege rsf1 = User)
-    by (rewrite (Tr1 cur_privilege ltac:(vm_compute; reflexivity)); exact Lcp).
-  assert (Lsxl1 : _get_Mstatus_SXL (register_lookup mstatus rsf1) = 'b"10")
-    by (rewrite (Tr1 mstatus ltac:(vm_compute; reflexivity)); exact Lsxl).
-  assert (Lmenv1 : register_lookup menvcfg rsf1 = MENVCFG_S)
-    by (rewrite (Tr1 menvcfg ltac:(vm_compute; reflexivity)); exact Lmenv).
-  assert (Lpc1 : register_lookup PC rsf1 = pc)
-    by (rewrite (Tr1 PC ltac:(vm_compute; reflexivity)); exact Lpc).
-  destruct (uv_walk_fetch pt t1 (upa_map pt M) rsf1 w_leaf2 (add_vec_int pc 2)
-              Hl2 Hleaf2 Hcanon2 Lcp1 Lsxl1 Lmenv1 Hpins1 Htok1)
-    as (rsf2 & t2 & Htr2 & Htr2g & Tr2 & Htlbok2 & Htok2 & Hshape2).
-  destruct (uv_read_2 pt M t1 t2 rsf1 rsf2 w_leaf2 (add_vec_int pc 2)
-              (subrange_vec_dec iw 31 16 : mword 16)
-              Hinj Hl2 Hnch Hal2h Hb2 Lcp1 Hpins1 Htok1 Htok2 Tr2)
-    as [Hmr2 Hmr2g].
-  (* the second walk's and read's certificates are at [uv_mm t1 md]; the
-     shell wants every certificate at the ENTRY map, and the domain has not
-     moved *)
-  pose proof (uv_mm_dom t t1 (upa_map pt M) Hshape1) as Hdom1.
-  exists rsf2, t2. split_and!.
-  - rewrite <- (concat_subranges_id iw).
-    exact (exec_fetch_base_2 (u_state rsf (uv_mm t (upa_map pt M)))
-             (u_state rsf1 (uv_mm t1 (upa_map pt M))) pc (u_walk_pa w_leaf pc)
-             Lpc HmisaC Hbit0 Hbit1 Hnal4 (subrange_vec_dec iw 15 0)
-             Htr1 Hmr1 (u_state rsf2 (uv_mm t2 (upa_map pt M)))
-             (u_walk_pa w_leaf2 (add_vec_int pc 2)) Lpc1 HnRVC
-             (subrange_vec_dec iw 31 16) Htr2 Hmr2).
-  - exact (goodmb_fetch_base_2 Du_r Du_w
-             (u_state rsf (uv_mm t (upa_map pt M)))
-             (u_state rsf1 (uv_mm t1 (upa_map pt M))) (uv_mm t (upa_map pt M))
-             pc (u_walk_pa w_leaf pc)
-             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-             Lpc HmisaC Hbit0 Hbit1 Hnal4 (subrange_vec_dec iw 15 0)
-             Htr1 Htr1g Hmr1 Hmr1g (u_state rsf2 (uv_mm t2 (upa_map pt M)))
-             (u_walk_pa w_leaf2 (add_vec_int pc 2)) Lpc1 HnRVC
-             (subrange_vec_dec iw 31 16) Htr2
-             ltac:(rewrite (goodmb_dom Du_r Du_w
-                     (translateAddr (Virtaddr (add_vec_int pc 2))
-                        (InstructionFetch tt))
-                     (u_state rsf1 (uv_mm t1 (upa_map pt M)))
-                     (uv_mm t (upa_map pt M)) (uv_mm t1 (upa_map pt M)) Hdom1);
-                   exact Htr2g)
-             Hmr2 ltac:(rewrite (goodmb_dom Du_r Du_w
-                     (mem_read (InstructionFetch tt) PBMT_PMA
-                        (Physaddr (u_walk_pa w_leaf2 (add_vec_int pc 2))) 2
-                        false false false)
-                     (u_state rsf2 (uv_mm t2 (upa_map pt M)))
-                     (uv_mm t (upa_map pt M)) (uv_mm t1 (upa_map pt M)) Hdom1);
-                   exact Hmr2g)).
-  - exact (u_tlb_only_trans rsf rsf1 rsf2 Tr1 Tr2).
-  - exact Htlbok2.
-  - exact Htok2.
-  - exact (pt_same_shape_trans 2 t t1 t2 Hshape1 Hshape2).
-Qed.
-
-(* ...and the OLD signature, for callers that still know their fetch window
-   sits on one page: the four facts above are exactly what in-page gives. *)
-Lemma uv_fetch_base_2_pg (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
-    (rsf : regstate) (w_leaf pc : mword 64) (iw : mword 32) :
-  uva_inj pt M ->
-  ud_um pt !! svpn_of pc = Some w_leaf ->
-  uleaf_ok (InstructionFetch tt) w_leaf ->
-  uva_canon pc ->
-  Z.rem (uint pc) 4096 <= 4092 ->
-  is_aligned_vaddr (Virtaddr pc) 2 = true ->
-  is_aligned_vaddr (Virtaddr pc) 4 = false ->
-  uM_bytes M (uint pc) 4 iw ->
-  isRVC (subrange_vec_dec iw 15 0) = false ->
-  register_lookup PC rsf = pc ->
-  register_lookup cur_privilege rsf = User ->
-  _get_Mstatus_SXL (register_lookup mstatus rsf) = 'b"10" ->
-  register_lookup menvcfg rsf = MENVCFG_S ->
-  u_exec_pins pt t rsf ->
-  uv_tree_ok pt (upa_map pt M) t ->
-  exists (rsf' : regstate) (t' : ptree),
-    exec (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
-      = Some (F_Base iw, u_state rsf' (uv_mm t' (upa_map pt M))) /\
-    goodmb Du_r Du_w (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
-      (uv_mm t (upa_map pt M)) = true /\
-    u_tlb_only rsf rsf' /\
-    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
-    uv_tree_ok pt (upa_map pt M) t' /\
-    pt_same_shape 2 t t'.
-Proof.
-  intros Hinj Hl Hleaf Hcanon Hpg Hal2 Hnal4 Hb HnRVC Lpc Lcp Lsxl Lmenv Hpins Htok.
-  pose proof (uinpage_nc pc 2 Hpg ltac:(lia)) as Hnc2.
-  assert (Hl2 : ud_um pt !! svpn_of (add_vec_int pc 2) = Some w_leaf)
-    by (rewrite (usvpn_window pc 2 ltac:(lia) Hnc2); exact Hl).
-  pose proof (uva_canon_add pc 2 Hcanon ltac:(lia) Hnc2) as Hcanon2.
-  destruct (uwin_shift pc 2 Hpg ltac:(lia)) as [Hu2 _].
-  exact (uv_fetch_base_2 pt M t rsf w_leaf w_leaf pc iw
-           Hinj Hl Hleaf Hcanon Hl2 Hleaf Hcanon2 Hu2 Hal2 Hnal4 Hb HnRVC
-           Lpc Lcp Lsxl Lmenv Hpins Htok).
-Qed.
-
-(* ===================================================================== *)
-(* §4 THE RESOURCE BRIDGES.                                               *)
-(*                                                                        *)
-(* [utlb_inv_pt] + [umem] in, ONE byte map out -- plus the four register   *)
-(* cells the walk reads and writes and a closer that takes a same-shaped   *)
-(* tree back.  This is [UserBytes.user_pt_inv_bytes] for a tier that owns  *)
-(* its NAMED image instead of the whole data half, so the memory predicate *)
-(* is [uv_tree_ok] (i.e. [u_mem_ok], not [u_mem_wf]) and the image half of *)
-(* the map is literally [UmodeMem.upa_map pt M].                           *)
-(* ===================================================================== *)
-
-Section UvOpen.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-
-  Lemma uv_pt_open (pt : uptd) (M : gmap Z (bv 8)) :
-    utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem pt M -∗
-    ∃ (t : ptree) (usatp : mword 64) (tlbvec : type_of_register tlb)
-      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
-      ⌜uva_inj pt M⌝ ∗ ⌜uv_tree_ok pt (upa_map pt M) t⌝ ∗
-      ⌜upt_satp_ok_pt (ud_root pt) usatp⌝ ∗ ⌜pmp_ent0_ok pcfg paddr⌝ ∗
-      ⌜tlb_ok_pt (mword_of_int 0) t tlbvec⌝ ∗
-      satp ↦ᵣ usatp ∗ tlb ↦ᵣ tlbvec ∗
-      pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
-      pt_claims 2 t ∗ bytes_own (uv_mm t (upa_map pt M)) ∗
-      (∀ (t' : ptree) (tlbvec' : type_of_register tlb),
-         ⌜pt_same_shape 2 t t'⌝ -∗
-         ⌜uv_tree_ok pt (upa_map pt M) t'⌝ -∗
-         ⌜tlb_ok_pt (mword_of_int 0) t' tlbvec'⌝ -∗
-         satp ↦ᵣ usatp -∗ tlb ↦ᵣ tlbvec' -∗
-         pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-         bytes_own (uv_mm t' (upa_map pt M)) -∗
-         utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M).
-  Proof.
-    iIntros "Hinv HM".
-    iDestruct (umem_uva_inj pt M with "HM") as %Hinj.
-    iDestruct (umem_to_bytes pt M with "HM") as "HMb".
-    iDestruct (upt_swp_open (ud_root pt) (ud_tfp pt) (ud_um pt) with "Hinv")
-      as (usatp tlbvec pcfg paddr) "(%Hsatpok & %Hpmpok & Hsatp & Htlb &
-                                     Hpcfg & Hpaddr & Hres)".
-    iDestruct "Hres" as (t) "(%Htlbok & %Hspec & %Hwfm & Htree)".
-    iDestruct (ptree_own_bytes 2 t with "Htree") as "(#Hclaims & %Hdisj & Hmt)".
-    iDestruct (bytes_own_disj with "Hmt HMb") as %Hdj.
-    iAssert (bytes_own (uv_mm t (upa_map pt M))) with "[Hmt HMb]" as "Hmm".
-    { rewrite /uv_mm (bytes_own_union _ _ Hdj). iFrame. }
-    iDestruct (bytes_own_ram with "Hmm") as %Hram.
-    iExists t, usatp, tlbvec, pcfg, paddr.
-    iSplitR; [ by iPureIntro |].
-    iSplitR.
-    { iPureIntro. split_and!;
-        [ exact Hdisj | exact Hdj | exact Hram | exact Hwfm | exact Hspec ]. }
-    iSplitR; [ by iPureIntro |]. iSplitR; [ by iPureIntro |].
-    iSplitR; [ by iPureIntro |].
-    iFrame "Hsatp Htlb Hpcfg Hpaddr Hclaims Hmm".
-    iIntros (t' tlbvec') "%Hshape %Htok' %Htlbok' Hsatp Htlb Hpcfg Hpaddr Hmm".
-    pose proof Htok' as (Hdisj' & Hdj' & _ & _ & Hspec').
-    rewrite /uv_mm (bytes_own_union _ _ Hdj').
-    iDestruct "Hmm" as "[Hmt' HMb']".
-    iSplitR "HMb'".
-    - iApply (upt_swp_close (ud_root pt) (ud_tfp pt) (ud_um pt) usatp tlbvec'
-                pcfg paddr Hsatpok Hpmpok with "Hsatp Htlb Hpcfg Hpaddr").
-      iExists t'. iSplitR; [ by iPureIntro |]. iSplitR; [ by iPureIntro |].
-      iSplitR; [ by iPureIntro |].
-      iApply (ptree_own_of_bytes 2 t' Hdisj' with "[] Hmt'").
-      by iApply (pt_claims_shape 2 t t' Hshape).
-    - iApply (bytes_to_umem pt M Hinj with "HMb'").
-  Qed.
-
-  (* ---- the [swp] bridge over a PURE fetch fact -------------------------
-     [UserActiveClass.swp_fetch_of_pure] at the tier's map: the landing map
-     is pinned by [UserClassifyAsm.u_map_eq] (a submap with the full domain
-     IS the map) rather than by [u_landing_map], because the tier's step
-     relation is [uv_tree_ok] plus the shape, not [u_mem_step_ok]. *)
-  Lemma uv_swp_fetch (pt : uptd) (M : gmap Z (bv 8)) (t t' : ptree)
-      (dq : dfrac) (rsf rsf' : regstate) (fr : FetchResult)
-      (Pe : ExecutionResult -> mword 32 -> iProp Σ)
-      (Pf : mword 64 -> ExceptionType -> iProp Σ)
-      (Px : ext_fetch_addr_error -> iProp Σ) :
-    exec (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
-      = Some (fr, u_state rsf' (uv_mm t' (upa_map pt M))) ->
-    goodmb Du_r Du_w (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
-      (uv_mm t (upa_map pt M)) = true ->
-    pt_same_shape 2 t t' ->
-    gen_cert -∗ resv_any cpu_id -∗
-    hreg_frame rsf u_Drw -∗ hreg_frame_ro (u_Df dq) rsf u_Dro -∗
-    TsoCtx.own_context XI -∗
-    bytes_own (uv_mm t (upa_map pt M)) -∗
-    (∀ rs2 : regstate,
-       ⌜reg_agree_on (u_Drw ∪ u_Dro) rs2 rsf'⌝ -∗
-       hreg_frame rs2 u_Drw -∗ hreg_frame_ro (u_Df dq) rs2 u_Dro -∗
-       TsoCtx.own_context XI -∗
-       bytes_own (uv_mm t' (upa_map pt M)) -∗ resv_any cpu_id -∗
-       run_fetch_post u_Drw u_Dro (u_Df dq) Pe Pf Px fr) -∗
-    swp (fetch tt) (run_fetch_post u_Drw u_Dro (u_Df dq) Pe Pf Px).
-  Proof.
-    intros He Hg Hshape.
-    (* A6.140: the running token is a PREMISE now and returns through the
-       post -- the SC mint died with the shim *)
-    iIntros "#Hcert Hany Hrw Hro Hrun Hown Hk".
-    iApply (swp_mono with "[Hk] [Hany Hrw Hro Hrun Hown]").
-    2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq) (fetch tt)
-                  (u_state rsf (uv_mm t (upa_map pt M)))
-                  (u_state rsf' (uv_mm t' (upa_map pt M))) fr rsf
-                  (uv_mm t (upa_map pt M))
-                  u_disj Du_r_sub Du_w_sub
-                  ltac:(intros r _; reflexivity) ltac:(reflexivity) Hg He
-                  with "Hcert Hany Hrw Hro Hrun Hown"). }
-    iIntros (v) "(-> & Hpost)".
-    iDestruct "Hpost"
-      as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hrun & Hown & Hany)".
-    assert (Hmm2 : mm2 = uv_mm t' (upa_map pt M)).
-    { apply (u_map_eq mm2 (uv_mm t' (upa_map pt M)) Hsub).
-      rewrite Hdom. exact (uv_mm_dom t t' (upa_map pt M) Hshape). }
-    subst mm2.
-    iApply ("Hk" $! rs2 with "[%] Hrw Hro Hrun Hown Hany"). exact Hag.
-  Qed.
-
-  (* ---- and over a PURE execute fact, for the register-only instructions
-     this file's funnel serves.  The map does not move at all, so the
-     landing map is pinned by the SAME argument at [t' := t]. *)
-  Lemma uv_swp_execute (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
-      (dq : dfrac) (rsx : regstate) (instr : instruction)
-      (r : ExecutionResult) (rs_x : regstate) (ib : mword 32)
-      (Pe : ExecutionResult -> mword 32 -> iProp Σ) :
-    exec (execute instr) (u_state rsx (uv_mm t (upa_map pt M)))
-      = Some (r, u_state rs_x (uv_mm t (upa_map pt M))) ->
-    goodmb Du_r Du_w (execute instr) (u_state rsx (uv_mm t (upa_map pt M)))
-      (uv_mm t (upa_map pt M)) = true ->
-    (match r with ExecuteAs _ => False | _ => True end) ->
-    gen_cert -∗ resv_any cpu_id -∗
-    hreg_frame rsx u_Drw -∗ hreg_frame_ro (u_Df dq) rsx u_Dro -∗
-    TsoCtx.own_context XI -∗
-    bytes_own (uv_mm t (upa_map pt M)) -∗
-    (∀ rs2 : regstate,
-       ⌜reg_agree_on (u_Drw ∪ u_Dro) rs2 rs_x⌝ -∗
-       hreg_frame rs2 u_Drw -∗ hreg_frame_ro (u_Df dq) rs2 u_Dro -∗
-       TsoCtx.own_context XI -∗
-       bytes_own (uv_mm t (upa_map pt M)) -∗ resv_any cpu_id -∗
-       Pe r ib) -∗
-    swp (execute instr) (run_exec_post Pe ib).
-  Proof.
-    intros He Hg Hnr.
-    iIntros "#Hcert Hany Hrw Hro Hrun Hown Hk".
-    iApply (swp_mono with "[Hk] [Hany Hrw Hro Hrun Hown]").
-    2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
-                  (execute instr) (u_state rsx (uv_mm t (upa_map pt M)))
-                  (u_state rs_x (uv_mm t (upa_map pt M))) r rsx
-                  (uv_mm t (upa_map pt M))
-                  u_disj Du_r_sub Du_w_sub
-                  ltac:(intros q _; reflexivity) ltac:(reflexivity) Hg He
-                  with "Hcert Hany Hrw Hro Hrun Hown"). }
-    iIntros (v) "(-> & Hpost)".
-    iDestruct "Hpost"
-      as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hrun & Hown & Hany)".
-    assert (Hmm2 : mm2 = uv_mm t (upa_map pt M))
-      by (apply (u_map_eq mm2 (uv_mm t (upa_map pt M)) Hsub); exact Hdom).
-    subst mm2.
-    iApply (run_exec_post_direct Pe ib r Hnr).
-    iApply ("Hk" $! rs2 with "[%] Hrw Hro Hrun Hown Hany"). exact Hag.
-  Qed.
-
-End UvOpen.
 
 (* ===================================================================== *)
 (* §5 THE CYCLE.                                                          *)
@@ -1043,8 +188,8 @@ Section UvEngine.
        ⌜tlb_ok_pt (mword_of_int 0) t' tlbv'⌝ -∗
        satp ↦ᵣ usatp -∗ tlb ↦ᵣ tlbv' -∗
        pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-       bytes_own (uv_mm t' (upa_map pt M)) -∗
-       utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M)%I.
+       uv_bytes pt M t' -∗
+       utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem_x pt M)%I.
 
   Definition uv_res (M : gmap Z (bv 8)) (t : ptree) (usatp : mword 64)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
@@ -1174,7 +319,7 @@ Section UvObl.
        hreg_frame rsA u_Drw -∗
        hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
        TsoCtx.own_context (CID := CIDo) XIo -∗
-       bytes_own (XI := XIo) (uv_mm t (upa_map pt M)) -∗
+       uv_bytes (XI := XIo) pt M t -∗
        uv_res (CID := CIDo) (XI := XIo) pt M t usatp pcfg paddr -∗
        swp (fetch tt)
          (run_fetch_post u_Drw u_Dro (u_Df (uc_dqc C))
@@ -1235,7 +380,7 @@ Section UvLandClose.
     tlb_ok_pt (mword_of_int 0) t (register_lookup tlb rs2) ->
     hreg_frame rs3 u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rs3 u_Dro -∗
     resv_any cpu_id -∗
-    bytes_own (uv_mm t (upa_map pt M)) -∗
+    uv_bytes pt M t -∗
     uv_res pt M t usatp pcfg paddr -∗
     (hart_state ↦ᵣ HART_ACTIVE tt ∗ cur_privilege ↦ᵣ p ∗
      mstatus ↦ᵣ (register_lookup (R_bitvector_64 mstatus) rs2) ∗
@@ -1243,7 +388,7 @@ Section UvLandClose.
      stval ↦ᵣ (register_lookup (R_bitvector_64 stval) rs2) ∗
      sepc ↦ᵣ (register_lookup (R_bitvector_64 sepc) rs2) ∗
      pc_is npc ∗ gpr_file g ∗ user_cfg C ∗
-     utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M).
+     utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem_x pt M).
   Proof.
     intros Htail Lhs Lpriv Lnpc Hgag Hx0 Lstvec Lmie Lmdl Lmedl Lmenv Lmste
       Lsste Lsenv Lsatp Lpcfg Lpaddr Htok Htlbok.
@@ -1423,7 +568,7 @@ Section UvArms.
     tlb_ok_pt (mword_of_int 0) t (register_lookup tlb rs2) ->
     uv_amb -∗ uv_cap C pt Ψ -∗
     resv_any cpu_id -∗
-    bytes_own (uv_mm t (upa_map pt M)) -∗
+    uv_bytes pt M t -∗
     uv_res pt M t usatp pcfg paddr -∗
     TsoCtx.own_context XI -∗
     (R -∗ ∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx), uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M m' -∗
@@ -1477,7 +622,7 @@ Section UvArms.
     uv_tree_ok pt (upa_map pt M) t ->
     tlb_ok_pt (mword_of_int 0) t (register_lookup tlb rs2) ->
     resv_any cpu_id -∗
-    bytes_own (uv_mm t (upa_map pt M)) -∗
+    uv_bytes pt M t -∗
     uv_res pt M t usatp pcfg paddr -∗
     TsoCtx.own_context XI -∗
     (uv_trap_frame C pt sc_v stv_v sep_v g M -∗ TsoCtx.own_context XI -∗ R -∗
@@ -1499,6 +644,7 @@ Section UvArms.
                  with "Hrw Hro Hresv Hmm Hres")
       as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hgpr & Hcfg &
            Hutlb & Humem)".
+    iDestruct (umem_x_forget with "Humem") as "Humem".
     iApply ("Hcont" with "[-Hresume Hctx] Hctx Hresume"). rewrite /uv_trap_frame.
     iExists _. iSplitR; [ iPureIntro; exact Hmsok |].
     iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr Hutlb Humem Hcfg".
@@ -1516,7 +662,7 @@ Section UvArms.
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     TsoCtx.own_context XI -∗
-    bytes_own (uv_mm t (upa_map pt M)) -∗
+    uv_bytes pt M t -∗
     uv_res pt M t usatp pcfg paddr -∗
     uv_step_obl C pt Kc Ψ M m pc -∗
     uv_step_post C (uv_ih C pt Kc Ψ M m pc ∗ Kc)%I rs1
@@ -1764,7 +910,7 @@ Section UvStepEngine.
                    (wrap_pre RS) User
                    (resv_frag cpu_id None ∗
                     TsoCtx.own_context XIv ∗
-                    bytes_own (uv_mm t (upa_map pt M)) ∗
+                    uv_bytes pt M t ∗
                     uv_res pt M t usatp pcfg paddr ∗
                     uv_step_obl C pt Kc Ψ M m pc)%I
                    (fun (ii : InterruptType) (pr : Privilege) =>
@@ -2391,7 +1537,7 @@ Section UvFunnel.
        WP (Loop : expr riscv_lang)) -∗
     resv_any cpu_id -∗
     TsoCtx.own_context XI -∗
-    bytes_own (uv_mm t' (upa_map pt M)) -∗
+    uv_bytes pt M t' -∗
     uv_res pt M t' usatp pcfg paddr -∗
     hreg_frame (register_set nextPC (add_vec_int pc k) rs2) u_Drw -∗
     hreg_frame_ro (u_Df (uc_dqc C))
@@ -2514,18 +1660,10 @@ Section UvObligation.
   Lemma uv_obl_base (R : iProp Σ) (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
       (m : regfile) (pc : mword 64) (w : mword 32) (i : instruction)
       (o : option instruction) (jt : option (mword 64))
-      (wr : option (mword 5 * mword 64)) (t t' : ptree) (usatp : mword 64)
+      (wr : option (mword 5 * mword 64)) (t : ptree) (usatp : mword 64)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
-      (rs1 rsA rsf : regstate) :
+      (rs1 rsA : regstate) :
     uv_pre C pt M m pc t rs1 rsA usatp pcfg paddr ->
-    exec (fetch tt) (u_state rsA (uv_mm t (upa_map pt M)))
-      = Some (F_Base w, u_state rsf (uv_mm t' (upa_map pt M))) ->
-    goodmb Du_r Du_w (fetch tt) (u_state rsA (uv_mm t (upa_map pt M)))
-      (uv_mm t (upa_map pt M)) = true ->
-    u_tlb_only rsA rsf ->
-    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf) ->
-    uv_tree_ok pt (upa_map pt M) t' ->
-    pt_same_shape 2 t t' ->
     udecode_base w i ->
     uv_wrok wr -> uv_redirect i o ->
     (forall s_pc : mstate,
@@ -2560,13 +1698,14 @@ Section UvObligation.
        exec (execute (uv_exp i o)) s_pc
          = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
     gen_cert -∗ uv_amb -∗ uv_cap C pt Ψ -∗
+    uv_fetch_bridge (uc_dqc C) pt M rsA t (F_Base w) -∗
     (R -∗ ∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx), uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M (uv_upd m wr) -∗
        pc_is (CID := CID0) (uv_next jt (add_vec_int pc 4)) -∗
        WP (Loop : expr riscv_lang)) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     TsoCtx.own_context XI -∗
-    bytes_own (uv_mm t (upa_map pt M)) -∗
+    uv_bytes pt M t -∗
     uv_res pt M t usatp pcfg paddr -∗
     swp (fetch tt)
       (run_fetch_post u_Drw u_Dro (u_Df (uc_dqc C))
@@ -2576,14 +1715,16 @@ Section UvObligation.
             uv_step_post C R rs1 (Step_Fetch_Failure (Virtaddr xv, e)))
          (fun _ : ext_fetch_addr_error => False)).
   Proof.
-    intros Hpre Hfe Hfg Tr Htlbok' Htok' Hshape Hdec Hwrok Hred Hg1 Hg2 Hexec.
+    intros Hpre Hdec Hwrok Hred Hg1 Hg2 Hexec.
     pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
-    iIntros "#Hcert #Hamb #Hcap Hk Hany Hrw Hro Hctx Hmm Hres".
-    iApply (uv_swp_fetch pt M t t' (uc_dqc C) rsA rsf (F_Base w) _ _ _
-              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hctx Hmm [Hk Hres]").
-    iIntros (rs2) "%Hag Hrw Hro Hctx Hmm Hany".
+    iIntros "#Hcert #Hamb #Hcap Hbridge Hk Hany Hrw Hro Hctx Hmm Hres".
+    iApply (swp_mono with "[Hk Hres] [Hbridge Hany Hrw Hro Hctx Hmm]").
+    2:{ iApply ("Hbridge" with "Hcert Hany Hrw Hro Hctx Hmm"). }
+    iIntros (r) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs2 rsf t')
+      "(%Tr & %Hag & %Htlbok' & %Htok' & %Hshape & Hrw & Hro & Hctx & Hmm & Hany)".
     iDestruct (uv_res_move pt M t t' usatp pcfg paddr Hshape with "Hres")
       as "Hres".
     assert (T2 : forall (r : register) (val : type_of_register r),
@@ -2650,18 +1791,10 @@ Section UvObligation.
   Lemma uv_obl_rvc (R : iProp Σ) (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
       (m : regfile) (pc : mword 64) (h : mword 16) (i : instruction)
       (o : option instruction) (jt : option (mword 64))
-      (wr : option (mword 5 * mword 64)) (t t' : ptree) (usatp : mword 64)
+      (wr : option (mword 5 * mword 64)) (t : ptree) (usatp : mword 64)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
-      (rs1 rsA rsf : regstate) :
+      (rs1 rsA : regstate) :
     uv_pre C pt M m pc t rs1 rsA usatp pcfg paddr ->
-    exec (fetch tt) (u_state rsA (uv_mm t (upa_map pt M)))
-      = Some (F_RVC h, u_state rsf (uv_mm t' (upa_map pt M))) ->
-    goodmb Du_r Du_w (fetch tt) (u_state rsA (uv_mm t (upa_map pt M)))
-      (uv_mm t (upa_map pt M)) = true ->
-    u_tlb_only rsA rsf ->
-    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf) ->
-    uv_tree_ok pt (upa_map pt M) t' ->
-    pt_same_shape 2 t t' ->
     udecode_rvc h i ->
     uv_wrok wr -> uv_redirect i o ->
     (forall s_pc : mstate,
@@ -2696,13 +1829,14 @@ Section UvObligation.
        exec (execute (uv_exp i o)) s_pc
          = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
     gen_cert -∗ uv_amb -∗ uv_cap C pt Ψ -∗
+    uv_fetch_bridge (uc_dqc C) pt M rsA t (F_RVC h) -∗
     (R -∗ ∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx), uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M (uv_upd m wr) -∗
        pc_is (CID := CID0) (uv_next jt (add_vec_int pc 2)) -∗
        WP (Loop : expr riscv_lang)) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     TsoCtx.own_context XI -∗
-    bytes_own (uv_mm t (upa_map pt M)) -∗
+    uv_bytes pt M t -∗
     uv_res pt M t usatp pcfg paddr -∗
     swp (fetch tt)
       (run_fetch_post u_Drw u_Dro (u_Df (uc_dqc C))
@@ -2712,14 +1846,16 @@ Section UvObligation.
             uv_step_post C R rs1 (Step_Fetch_Failure (Virtaddr xv, e)))
          (fun _ : ext_fetch_addr_error => False)).
   Proof.
-    intros Hpre Hfe Hfg Tr Htlbok' Htok' Hshape Hdec Hwrok Hred Hg1 Hg2 Hexec.
+    intros Hpre Hdec Hwrok Hred Hg1 Hg2 Hexec.
     pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
-    iIntros "#Hcert #Hamb #Hcap Hk Hany Hrw Hro Hctx Hmm Hres".
-    iApply (uv_swp_fetch pt M t t' (uc_dqc C) rsA rsf (F_RVC h) _ _ _
-              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hctx Hmm [Hk Hres]").
-    iIntros (rs2) "%Hag Hrw Hro Hctx Hmm Hany".
+    iIntros "#Hcert #Hamb #Hcap Hbridge Hk Hany Hrw Hro Hctx Hmm Hres".
+    iApply (swp_mono with "[Hk Hres] [Hbridge Hany Hrw Hro Hctx Hmm]").
+    2:{ iApply ("Hbridge" with "Hcert Hany Hrw Hro Hctx Hmm"). }
+    iIntros (r) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs2 rsf t')
+      "(%Tr & %Hag & %Htlbok' & %Htok' & %Hshape & Hrw & Hro & Hctx & Hmm & Hany)".
     iDestruct (uv_res_move pt M t t' usatp pcfg paddr Hshape with "Hres")
       as "Hres".
     assert (T2 : forall (r : register) (val : type_of_register r),
@@ -2886,8 +2022,6 @@ Section UvRetire.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hwrok Hg1 Hg2 Hexec.
-    destruct Hui as [Hal2 Hcanon Hleaf Hinpage Hcode].
-    destruct Hleaf as (w_leaf & Hum & Hlok).
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_step C pt _ Ψ M m pc with "Hcg Hpc [] Hcont").
     rewrite /uv_step_obl.
@@ -2900,56 +2034,18 @@ Section UvRetire.
     pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
+    iPoseProof (uv_swp_fetch_uinstr (CID := CIDo) (XI := XIo) pt M t (uc_dqc C)
+                  rsA pc is_rvc i Hinj Hui LpcA LcpA (proj1 HmsokA) LmenvA
+                  HpinsA Htok) as "Hf".
     destruct is_rvc.
-    - (* ================= COMPRESSED ================= *)
-      destruct Hcode as (h & HisRVC & Hbytes & Hdecrvc & Hnext2).
-      destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
-      + (* 4-aligned: one 4-byte read, low half is the instruction *)
-        destruct (Hnext2 ltac:(first [ exact Hal4 | reflexivity ])) as (b2 & b3 & Hb2 & Hb3).
-        assert (Hbytes4 : uM_bytes M (uint pc) 4 (urvc4_word h b2 b3)).
-        { intros j Hj. rewrite (urvc4_byte h b2 b3 j Hj).
-          destruct j as [ | [ | [ | [ | j ] ] ] ]; try lia;
-            cbn [lookup_total list_lookup_total];
-            [ exact (Hbytes 0%nat ltac:(lia)) | exact (Hbytes 1%nat ltac:(lia))
-            | exact Hb2 | exact Hb3 ]. }
-        destruct (uv_fetch_4 pt M t rsA w_leaf pc (urvc4_word h b2 b3)
-                    Hinj Hum Hlok Hcanon Hal4 Hbytes4 LpcA LcpA
-                    (proj1 HmsokA) LmenvA HpinsA Htok)
-          as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
-        rewrite urvc4_low HisRVC in Hfe.
-        iApply (uv_obl_rvc C pt R Ψ M m pc h i o jt wr t t' usatp pcfg paddr
-                  rs1 rsA rsf Hpre Hfe Hfg Tr Htlbok' Htok' Hshape Hdecrvc
-                  Hwrok Hred Hg1 Hg2 Hexec
-                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hctx Hmm Hres").
-      + (* 2 mod 4: one 2-byte read *)
-        destruct (uv_fetch_rvc_2 pt M t rsA w_leaf pc h
-                    Hinj Hum Hlok Hcanon Hal2 Hal4 Hbytes HisRVC
-                    LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
-          as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
-        iApply (uv_obl_rvc C pt R Ψ M m pc h i o jt wr t t' usatp pcfg paddr
-                  rs1 rsA rsf Hpre Hfe Hfg Tr Htlbok' Htok' Hshape Hdecrvc
-                  Hwrok Hred Hg1 Hg2 Hexec
-                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hctx Hmm Hres").
-    - (* ================= BASE (4-byte) ================= *)
-      destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
-      destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
-      + destruct (uv_fetch_4 pt M t rsA w_leaf pc w
-                    Hinj Hum Hlok Hcanon Hal4 Hbytes LpcA LcpA
-                    (proj1 HmsokA) LmenvA HpinsA Htok)
-          as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
-        rewrite HnRVC in Hfe.
-        iApply (uv_obl_base C pt R Ψ M m pc w i o jt wr t t' usatp pcfg paddr
-                  rs1 rsA rsf Hpre Hfe Hfg Tr Htlbok' Htok' Hshape Hdecbase
-                  Hwrok Hred Hg1 Hg2 Hexec
-                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hctx Hmm Hres").
-      + destruct (uv_fetch_base_2_pg pt M t rsA w_leaf pc w
-                    Hinj Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes HnRVC
-                    LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
-          as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
-        iApply (uv_obl_base C pt R Ψ M m pc w i o jt wr t t' usatp pcfg paddr
-                  rs1 rsA rsf Hpre Hfe Hfg Tr Htlbok' Htok' Hshape Hdecbase
-                  Hwrok Hred Hg1 Hg2 Hexec
-                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hctx Hmm Hres").
+    - iDestruct "Hf" as (h) "[[%HisRVC %Hdecrvc] Hbridge]".
+      iApply (uv_obl_rvc C pt R Ψ M m pc h i o jt wr t usatp pcfg paddr
+                rs1 rsA Hpre Hdecrvc Hwrok Hred Hg1 Hg2 Hexec
+                with "Hcert Hamb Hcap Hbridge Hk Hany Hrw Hro Hctx Hmm Hres").
+    - iDestruct "Hf" as (w) "[[%HnRVC %Hdecbase] Hbridge]".
+      iApply (uv_obl_base C pt R Ψ M m pc w i o jt wr t usatp pcfg paddr
+                rs1 rsA Hpre Hdecbase Hwrok Hred Hg1 Hg2 Hexec
+                with "Hcert Hamb Hcap Hbridge Hk Hany Hrw Hro Hctx Hmm Hres").
   Qed.
 
   (* the later-free restatement: the shape every leaf takes *)
@@ -3072,7 +2168,7 @@ Section UvEcallPost.
     (R -∗ Ψ (uint (m !!! Regidx a7_idx)) m pc M) -∗
     resv_any cpu_id -∗
     TsoCtx.own_context XI -∗
-    bytes_own (uv_mm t' (upa_map pt M)) -∗
+    uv_bytes pt M t' -∗
     uv_res pt M t' usatp pcfg paddr -∗
     hreg_frame (register_set nextPC (add_vec_int pc 4) rs2) u_Drw -∗
     hreg_frame_ro (u_Df (uc_dqc C))
@@ -3279,7 +2375,7 @@ Section UvEcall.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hg.
-    destruct Hui as [Hal2 Hcanon Hleaf Hinpage Hcode].
+    destruct Hui as [Hal2 Hcanon Hleaf Hinpage Hcode Htext].
     destruct Hleaf as (w_leaf & Hum & Hlok).
     destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
     iIntros "Hcg Hpc HPsi".
@@ -3295,35 +2391,20 @@ Section UvEcall.
     pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
-    assert (Hfetch : exists (rsf : regstate) (t' : ptree),
-              exec (fetch tt) (u_state rsA (uv_mm t (upa_map pt M)))
-                = Some (F_Base w, u_state rsf (uv_mm t' (upa_map pt M))) /\
-              goodmb Du_r Du_w (fetch tt) (u_state rsA (uv_mm t (upa_map pt M)))
-                (uv_mm t (upa_map pt M)) = true /\
-              u_tlb_only rsA rsf /\
-              tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf) /\
-              uv_tree_ok pt (upa_map pt M) t' /\
-              pt_same_shape 2 t t').
-    { destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
-      - destruct (uv_fetch_4 pt M t rsA w_leaf pc w
-                    Hinj Hum Hlok Hcanon Hal4 Hbytes LpcA LcpA
-                    (proj1 HmsokA) LmenvA HpinsA Htok)
-          as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
-        rewrite HnRVC in Hfe.
-        exists rsf, t'. split_and!;
-          [ exact Hfe | exact Hfg | exact Tr | exact Htlbok' | exact Htok'
-          | exact Hshape ].
-      - destruct (uv_fetch_base_2_pg pt M t rsA w_leaf pc w
-                    Hinj Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes HnRVC
-                    LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
-          as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
-        exists rsf, t'. split_and!;
-          [ exact Hfe | exact Hfg | exact Tr | exact Htlbok' | exact Htok'
-          | exact Hshape ]. }
-    destruct Hfetch as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
-    iApply (uv_swp_fetch pt M t t' (uc_dqc C) rsA rsf (F_Base w) _ _ _
-              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hctx Hmm [Hk Hres]").
-    iIntros (rs2) "%Hag Hrw Hro Hctx Hmm Hany".
+    iApply (swp_mono with "[Hk Hres] [Hany Hrw Hro Hctx Hmm]").
+    2:{ destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
+        - iPoseProof (uv_swp_fetch4 (CID := CIDo) (XI := XIo) pt M t (uc_dqc C)
+                        rsA w_leaf pc w Hinj Hum Hlok Hcanon Hal4 Hbytes Htext
+                        LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok
+                        with "Hcert Hany Hrw Hro Hctx Hmm") as "H".
+          rewrite HnRVC. iExact "H".
+        - iApply (uv_swp_fetch_base2 (CID := CIDo) (XI := XIo) pt M t (uc_dqc C)
+                    rsA w_leaf pc w Hinj Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes
+                    HnRVC Htext LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok
+                    with "Hcert Hany Hrw Hro Hctx Hmm"). }
+    iIntros (r) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs2 rsf t')
+      "(%Tr & %Hag & %Htlbok' & %Htok' & %Hshape & Hrw & Hro & Hctx & Hmm & Hany)".
     iDestruct (uv_res_move pt M t t' usatp pcfg paddr Hshape with "Hres")
       as "Hres".
     assert (T2 : forall (r : register) (val : type_of_register r),

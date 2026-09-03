@@ -61,6 +61,7 @@ Require Import WpSmodePtEngine.
 Require Import WpSconfSfence WpSconfCsr WpSconfEngine.
 Require Import SRegime TrampStepPt UptWalkPt TransPt Pt2WalkPt KptShare.
 Require Import UserretDefs.
+Require Import HartBarrier.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -75,7 +76,12 @@ Section UserretEntryPt.
   Lemma wp_userret_entry_pt (kroot uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64))
       (m : regfile) (usatp : mword 64)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac}
+      (* THE STAMP MINT (icache): the process image the caller holds, and
+         the ghost step the fence.i at STEP 0 runs on it.  The step is
+         abstract here; [UserretUser] instantiates it with the lazy image
+         and [UmodeText.umem_lazy_x_mint]. *)
+      (Pimg Qimg : iProp Σ) :
     (* S-mode config *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -105,6 +111,8 @@ Section UserretEntryPt.
     tlb_res_pt kroot -∗
     pt_frame (upt_tree_spec uroot tfp um) -∗
     own_context XI -∗
+    ifence_step (Pimg ∗ own_context XI) (Qimg ∗ own_context XI) -∗
+    Pimg -∗
     pc_is (uva 0x9c) -∗
     gpr_file m -∗
     instr (upa 0x9c) false ai_fencei -∗
@@ -119,6 +127,7 @@ Section UserretEntryPt.
       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       utlb_inv_pt uroot tfp um -∗
       own_context XI -∗
+      Qimg -∗
       pc_is (uva 0xac) -∗
       gpr_file m -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -126,7 +135,7 @@ Section UserretEntryPt.
   Proof.
     intros HSIE HMPRV HSXL HTVM Hmm HPBMTE Hmenvval0 Hwf Ha0 HuMode Huasid Huppn.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv #Hclaim #Hcreds Hktlb
-             Hufr Htok Hpc Hfmap Hi0 Hi1 Hi2 Hi3 Hcont".
+             Hufr Htok Hstep HPimg Hpc Hfmap Hi0 Hi1 Hi2 Hi3 Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -149,7 +158,7 @@ Section UserretEntryPt.
     iApply (wp_instr_ktramp_pt_share kroot (uva 0x9c) (upa 0x9c) false ai_fencei
               mstatus0 mie_v mdv0 menvcfg0 mie_v menvcfg0
               (fun npc ms1 mdv1 =>
-                 (⌜npc = uva 0xa0⌝ ∗ ⌜ms1 = mstatus0⌝ ∗ ⌜mdv1 = mdv0⌝)%I)
+                 (⌜npc = uva 0xa0⌝ ∗ ⌜ms1 = mstatus0⌝ ∗ ⌜mdv1 = mdv0⌝ ∗ Qimg)%I)
               (dq := dq) HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -160,17 +169,19 @@ Section UserretEntryPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "Hclaim Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Htok
-                    Hpc Hi0 [] [Hufr Hfmap Hi1 Hi2 Hi3 Hcont]").
+                    Hpc Hi0 [Hstep HPimg] [Hufr Hfmap Hi1 Hi2 Hi3 Hcont]").
     { iIntros (satp0 pcfg paddr tv') "%Hsok %Hpok
         Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Htok Hclk HPC
         HnPC Hresv".
       change (execute ai_fencei)
         with (execute (FENCEI (zeros' 12, zreg, zreg))).
       iApply (swp_mono with
-                "[Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Htok
+                "[Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes
                   Hclk HPC HnPC Hresv] [-]").
-      2:{ iApply (swp_execute_FENCEI_s (zeros' 12) zreg zreg with "Hcert"). }
-      iIntros (e) "->".
+      2:{ iApply (swp_execute_FENCEI_mint (zeros' 12) zreg zreg _ _
+                    with "Hcert Hstep [HPimg Htok]").
+          iFrame "HPimg Htok". }
+      iIntros (e) "(-> & HQimg & Htok)".
       iSplitR; [done|].
       iFrame "Hpriv Hmie Hmenv Hsatp Hpcfg Hpaddr".
       iSplitL "Htlbc HRes". { iExists tv'. iFrame "Htlbc HRes". }
@@ -178,9 +189,10 @@ Section UserretEntryPt.
       iSplitR "Htok Hresv"; [| iFrame "Htok"; iExact "Hresv"].
       iExists mstatus0, mdv0, _.
       iFrame "Hms Hmdl HPC HnPC".
-      iSplitR; [iPureIntro; exact Hva00 |]. iSplitR; [done|]. done. }
+      iSplitR; [iPureIntro; exact Hva00 |]. iSplitR; [done|].
+      iSplitR; [done|]. iExact "HQimg". }
     iNext. iIntros (npc0 ms10 mdv10)
-      "Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Htok Hpc (-> & -> & ->)".
+      "Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Htok Hpc (-> & -> & -> & HQimg)".
     (* ============ STEP 1: sfence.vma under the kernel invariant ======== *)
     iApply (wp_instr_ktramp_pt_share kroot (uva 0xa0) (upa 0xa0) false ai_sfence
               mstatus0 mie_v mdv0 menvcfg0 mie_v menvcfg0
@@ -196,7 +208,7 @@ Section UserretEntryPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "Hclaim Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Htok
-                    Hpc Hi1 [] [Hufr Hfmap Hi2 Hi3 Hcont]").
+                    Hpc Hi1 [] [Hufr Hfmap Hi2 Hi3 Hcont HQimg]").
     { iIntros (satp0 pcfg paddr tv') "%Hsok %Hpok
         Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Htok Hclk HPC
         HnPC Hresv".
@@ -272,7 +284,7 @@ Section UserretEntryPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
-                    Htlbc HRes Htok Hpc Hi2 [] [Hfmap] [Hufr Hi3 Hcont]").
+                    Htlbc HRes Htok Hpc Hi2 [] [Hfmap] [Hufr Hi3 Hcont HQimg]").
     { iApply (ktramp_fetch_tr_share kroot dq (uva 0xa4) mstatus0 satp2 mie_v
                 mdv0 menvcfg0 pcfg2 paddr2 Hmenvval0 HSXL HMPRV Hsok2 Hpok2
                 with "Hclaim Hhw"). }
@@ -374,7 +386,7 @@ Section UserretEntryPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr
-                    Htlbc HRes Htok Hpc Hi3 [] [] [Hfmap Hcont]").
+                    Htlbc HRes Htok Hpc Hi3 [] [] [Hfmap Hcont HQimg]").
     { iApply (pt2_tramp_fetch_tr_kprev uroot kroot
                 (upt_tree_spec uroot tfp um) dq (uva 0xa8) mstatus0 satp3
                 mie_v mdv0 menvcfg0 pcfg3 paddr3 Hmenvval0 HSXL HMPRV Hsok3
@@ -428,7 +440,7 @@ Section UserretEntryPt.
        (-> & -> & ->)".
     iDestruct (upt_swp_close uroot tfp um satp3 tv3 pcfg3 paddr3 Hsok3 Hpok3
                  with "Hsatp Htlbc Hpcfg Hpaddr HRes") as "Hutlb".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Htok Hpc Hfmap").
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Htok HQimg Hpc Hfmap").
   Qed.
 
 End UserretEntryPt.

@@ -80,6 +80,7 @@ Section UmodeFrame.
     (exists w : mword 64,
        ud_um pt !! svpn_of (mword_of_int a : mword 64) = Some w /\
        uleaf_ok (Store Data) w /\ uleaf_ok (Load Data) w) /\
+    ~ uva_text pt (uint (mword_of_int a : mword 64)) /\
     uva_canon (mword_of_int a : mword 64) /\
     Z.rem (uint (mword_of_int a : mword 64)) 4096 <= 4088 /\
     is_aligned_vaddr (Virtaddr (mword_of_int a : mword 64)) 8 = true /\
@@ -139,10 +140,10 @@ Section UmodeFrame.
     pose proof (us_lo _ _ _ _ Hst) as Hlo.
     destruct (uv_slot16 M sp0 8 (uint sp0 - 8) Hst ltac:(lia) ltac:(lia)
                 ltac:(reflexivity) ltac:(lia))
-      as (Hq8 & (w8 & Hl8 & Hok8s & _) & Hcanon8 & Hpg8 & Hal8 & Hb8).
+      as (Hq8 & (w8 & Hl8 & Hok8s & _) & Hnt8 & Hcanon8 & Hpg8 & Hal8 & Hb8).
     destruct (uv_slot16 M sp0 0 (uint sp0 - 16) Hst ltac:(lia) ltac:(lia)
                 ltac:(reflexivity) ltac:(lia))
-      as (Hq0 & (w0 & Hl0 & Hok0s & _) & Hcanon0 & Hpg0 & Hal0 & Hb0).
+      as (Hq0 & (w0 & Hl0 & Hok0s & _) & Hnt0 & Hcanon0 & Hpg0 & Hal0 & Hb0).
     iIntros "Hcg Hpc Hcont".
     (* ---- pro  c.addi sp,sp,-16 ---- *)
     assert (Hwsp : (mword_of_int (uint sp0 - 16) : mword 64)
@@ -182,7 +183,7 @@ Section UmodeFrame.
               (mword_of_int 1 : mword 6) ra_idx
               w8 (mword_of_int (uint sp0 - 8)) (m !!! Regidx ra_idx)
               (Hu2 M HT)
-              Htg8 Hwra Hl8 Hok8s Hcanon8 Hpg8 Hal8 Hb8
+              Htg8 Hwra Hl8 Hok8s Hcanon8 Hpg8 Hal8 Hb8 Hnt8
               with "Hcg Hpc").
     iIntros (CID2 ?) "Hcg Hpc".
     iEval (rewrite Hq8) in "Hcg".
@@ -214,7 +215,7 @@ Section UmodeFrame.
               (mword_of_int 0 : mword 6) s0_idx
               w0 (mword_of_int (uint sp0 - 16)) (m !!! Regidx s0_idx)
               (Hu4 M1 HT1)
-              Htg0 Hws0 Hl0 Hok0s Hcanon0 Hpg0 Hal0 Hb0'
+              Htg0 Hws0 Hl0 Hok0s Hcanon0 Hpg0 Hal0 Hb0' Hnt0
               with "Hcg Hpc").
     iIntros (CID3 ?) "Hcg Hpc".
     iEval (rewrite Hq0) in "Hcg".
@@ -277,10 +278,10 @@ Section UmodeFrame.
     pose proof (us_lo _ _ _ _ Hst) as Hlo.
     destruct (uv_slot16 Mx sp0 8 (uint sp0 - 8) Hst ltac:(lia) ltac:(lia)
                 ltac:(reflexivity) ltac:(lia))
-      as (Hq8 & (w8 & Hl8 & _ & Hok8) & Hcanon8 & Hpg8 & Hal8 & Hb8).
+      as (Hq8 & (w8 & Hl8 & _ & Hok8) & Hnt8 & Hcanon8 & Hpg8 & Hal8 & Hb8).
     destruct (uv_slot16 Mx sp0 0 (uint sp0 - 16) Hst ltac:(lia) ltac:(lia)
                 ltac:(reflexivity) ltac:(lia))
-      as (Hq0 & (w0 & Hl0 & _ & Hok0) & Hcanon0 & Hpg0 & Hal0 & Hb0).
+      as (Hq0 & (w0 & Hl0 & _ & Hok0) & Hnt0 & Hcanon0 & Hpg0 & Hal0 & Hb0).
     iIntros "Hcg Hpc Hcont".
     (* ---- epi  c.ldsp ra,8(sp) ---- *)
     assert (Hva8 : (mword_of_int (uint sp0 - 8) : mword 64)
@@ -299,7 +300,7 @@ Section UmodeFrame.
     iApply (wp_uv_cldsp C pt Ps Mx mF (mword_of_int epi)
               (mword_of_int 1 : mword 6) ra_idx
               w8 (mword_of_int (uint sp0 - 8)) v8
-              Hu0 ltac:(vm_compute; discriminate) Hva8 Hl8 Hok8 Hcanon8 Hpg8
+              Hu0 ltac:(vm_compute; discriminate) Hva8 Hl8 Hok8 Hcanon8 Hnt8 Hpg8
               Hal8 Hb8 Hwv8
               with "Hcg Hpc").
     iIntros (CID1 ?) "Hcg Hpc".
@@ -324,7 +325,7 @@ Section UmodeFrame.
     iApply (wp_uv_cldsp C pt Ps Mx mF1 (mword_of_int (epi + 2))
               (mword_of_int 0 : mword 6) s0_idx
               w0 (mword_of_int (uint sp0 - 16)) v0
-              Hu2 ltac:(vm_compute; discriminate) Hva0 Hl0 Hok0 Hcanon0 Hpg0
+              Hu2 ltac:(vm_compute; discriminate) Hva0 Hl0 Hok0 Hcanon0 Hnt0 Hpg0
               Hal0 Hb0 Hwv0
               with "Hcg Hpc").
     iIntros (CID2 ?) "Hcg Hpc".
@@ -424,13 +425,13 @@ Section UmodeFrame.
     intros Hui HS Hd0 Hdn Hd8 Hsp Himm.
     destruct (uv_stack_slot_moi pt M sp0 n d (mword_of_int (uint sp0 - n + d))
                 HS Hd0 Hdn Hd8 eq_refl)
-      as (Hu & (w & Hl & Hok & _) & Hcanon & Hpg & Hal & Hb).
+      as (Hu & (w & Hl & Hok & _) & Hnt & Hcanon & Hpg & Hal & Hb).
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_csdsp C pt Ps M m pc uimm rs2 w
               (mword_of_int (uint sp0 - n + d)) (m !!! Regidx rs2)
               Hui
               ltac:(rewrite Hsp; rewrite Himm; rewrite moi_add; reflexivity)
-              eq_refl Hl Hok Hcanon Hpg Hal Hb
+              eq_refl Hl Hok Hcanon Hpg Hal Hb Hnt
               with "Hcg Hpc [Hcont]").
     iIntros (CID0 XI0) "Hcg Hpc".
     iEval (rewrite Hu) in "Hcg".
@@ -460,7 +461,7 @@ Section UmodeFrame.
     intros Hui Hrd HS Hd0 Hdn Hd8 Hsp Himm Hwv.
     destruct (uv_stack_slot_moi pt M sp0 n d (mword_of_int (uint sp0 - n + d))
                 HS Hd0 Hdn Hd8 eq_refl)
-      as (Hu & (w & Hl & _ & Hok) & Hcanon & Hpg & Hal & Hb).
+      as (Hu & (w & Hl & _ & Hok) & Hnt & Hcanon & Hpg & Hal & Hb).
     iIntros "Hcg Hpc Hcont".
     assert (Hva : (mword_of_int (uint sp0 - n + d) : mword 64)
                   = add_vec (m !!! Regidx csp_rs1)
@@ -468,7 +469,7 @@ Section UmodeFrame.
       by (rewrite Hsp; rewrite Himm; rewrite moi_add; reflexivity).
     iApply (wp_uv_cldsp C pt Ps M m pc uimm rd w
               (mword_of_int (uint sp0 - n + d)) wval
-              Hui Hrd Hva Hl Hok Hcanon Hpg Hal Hb
+              Hui Hrd Hva Hl Hok Hcanon Hnt Hpg Hal Hb
               ltac:(rewrite Hu; exact Hwv)
               with "Hcg Hpc Hcont").
   Qed.

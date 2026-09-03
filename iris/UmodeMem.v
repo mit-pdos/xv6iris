@@ -123,6 +123,31 @@ Definition uva_fetch_leaf (pt : uptd) (pc : mword 64) : Prop :=
     ud_um pt !! svpn_of pc = Some w /\
     uleaf_ok (InstructionFetch tt) w.
 
+(* THE TEXT PAGES (claude-notes/projects/icache.md): [va] is on a page the
+   table maps EXECUTABLE AND NOT WRITABLE -- PTE bit 3 set, bit 2 clear
+   ([UserHeap.utext_part]'s class, read off the leaf word so that no
+   permission projection and no [sz] is needed).  A verified process holds
+   these bytes STAMPED for its instruction fetch and keeps them out of the
+   walker's map; every store lands on a W page, hence never here. *)
+Definition uva_text (pt : uptd) (va : Z) : Prop :=
+  exists w : mword 64,
+    ud_um pt !! svpn_of (mword_of_int va : mword 64) = Some w /\
+    Z.testbit (bv_unsigned w) 3 = true /\ Z.testbit (bv_unsigned w) 2 = false.
+
+Global Instance uva_text_dec (pt : uptd) (va : Z) : Decision (uva_text pt va).
+Proof.
+  unfold uva_text.
+  destruct (ud_um pt !! svpn_of (mword_of_int va : mword 64)) as [w|] eqn:E.
+  - destruct (Z.testbit (bv_unsigned w) 3) eqn:Ex.
+    + destruct (Z.testbit (bv_unsigned w) 2) eqn:Ew.
+      * right. intros (w' & Hw' & _ & Hw2). injection Hw' as <-.
+        rewrite Ew in Hw2. discriminate.
+      * left. exists w. split_and!; [reflexivity | exact Ex | exact Ew].
+    + right. intros (w' & Hw' & Hx' & _). injection Hw' as <-.
+      rewrite Ex in Hx'. discriminate.
+  - right. intros (w' & Hw' & _). discriminate Hw'.
+Defined.
+
 (* transportable decode facts: proved once against the U-mode reference
    state ([dstateU] / the misa.C gate), transported to the fetched machine
    state by the caller's agreement facts. *)
@@ -164,7 +189,9 @@ Record uinstr (pt : uptd) (M : gmap Z (bv 8)) (pc : mword 64)
     else exists w : mword 32,
         isRVC (subrange_vec_dec w 15 0) = false /\
         uM_bytes M (uint pc) 4 w /\
-        udecode_base w i
+        udecode_base w i;
+  (* the pc's page is TEXT (X and not W): the fetch window is stamped *)
+  ui_text   : uva_text pt (uint pc)
 }.
 
 (* ===================================================================== *)

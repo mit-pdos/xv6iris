@@ -58,6 +58,7 @@ Require Import MstatusBits.
 Require Import UserFrame.
 Require Import UptTree UserPtTree UserExec.
 Require Import TsoCtx.
+Require Import UmodeText.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -169,12 +170,13 @@ Section UserKernelBridge.
     (R_bitvector_32 mcounteren) ↦ᵣ□ mcounteren_v -∗
     (R_bitvector_32 scounteren) ↦ᵣ□ scounteren_v -∗
     mhpmcounter ↦ᵣ□ mhpmcounter_v -∗
-    (* ---- the process's memory, NAMED, at the lazy sz-region view ---- *)
-    umem_lazy pt sz Mim -∗
+    (* ---- the process's memory, NAMED, at the lazy sz-region view, its
+       text STAMPED by userret's fence.i (icache) ---- *)
+    umem_lazy_x pt sz Mim -∗
     ⌜user_mstatus_ok (sret_ms5 mstatus0)⌝ ∗
     u_regs (HART_ACTIVE tt) (sret_ms5 mstatus0) sc_v stval_v sepc0
            (ret_pc sepc0) (ret_pc sepc0) g ∗
-    user_ptm_inv pt sz Mim ∗
+    user_ptm_inv_x pt sz Mim ∗
     user_cfg C.
   Proof.
     intros HSXL HMXR HFS HVS HTVM HTSR HXS HSD HMPP HSPIE Hdqc Hstvec Hmie Hmdl Hmedl
@@ -188,7 +190,7 @@ Section UserKernelBridge.
       iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr". }
     iSplitL "Hutlb Hmem".
     { (* user_ptm_inv, at the NAMED lazy image -- row by row *)
-      rewrite /user_ptm_inv.
+      rewrite /user_ptm_inv_x.
       rewrite Hroot Htfp Hum.
       iSplitL "Hutlb"; [iExact "Hutlb" |].
       iSplitL "Hmem"; [iExact "Hmem" |].

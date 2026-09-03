@@ -118,6 +118,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
+Require Import UmodeText.   (* [user_ptm_inv_x] -- the image STAMPED (icache) *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -307,7 +308,10 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
        next round.  [user_ptm_inv] at the post's OWN index [U'] is what the
        round's image half above relates to, and it is the conjunct
        [UexecRet.uvb] carries. *)
-    user_ptm_inv pt' (uint (pv_sz (us_V U'))) (us_M U') -∗
+    (* ...STAMPED (claude-notes/projects/icache.md): the round ends past
+       userret's fence.i, so the text bytes carry the receipt the verified
+       tier's slot bundle ([UexecRet.uvb]) expects *)
+    user_ptm_inv_x pt' (uint (pv_sz (us_V U'))) (us_M U') -∗
     pc_is (ret_pc uepc) -∗
     gpr_file mf -∗
     (* the leftover: usertrap's OWN kernel-internal BARE bundle (no address

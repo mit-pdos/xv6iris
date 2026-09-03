@@ -43,6 +43,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import UserPtTree UserExec.
+Require Import UmodeText.
 Require Import UexecWp.
 Require Import SpecUser.
 Local Open Scope Z_scope.
@@ -92,7 +93,10 @@ Section ProofUexecWp.
     (* [user_regs] IS [u_regs] (UserExec.v defines it as the alias), so the
        slot's bundle goes straight across. *)
     iSplitL "Hregs"; [ rewrite /user_regs; iExact "Hregs" | ].
-    iSplitL "Hpt"; [ iApply (user_pt_any_intro pt M with "Hpt") | ].
+    iSplitL "Hpt".
+    { (* the generic tier reads the image UNSTAMPED (icache): forget *)
+      iDestruct (user_pt_inv_x_forget with "Hpt") as "Hpt".
+      iApply (user_pt_any_intro pt M with "Hpt"). }
     iSplitL "Hcfg"; [ iExact "Hcfg" | ].
     iExact "Hrut".
   Qed.
