@@ -522,6 +522,7 @@ Amendment (`main-tso-readiness.md`), commit with explicit paths, push.
 | §6²⁷ | run L2/L3/L4 in parallel now; sweep the file layer once; two tripwires before r21 | RECOMMENDED to the owner |
 | item 24 | the off cell at the visibility-free tier while unneeded: no L1 side for the off box, `box_withdraw_L1_free`, shares at the fd fraction, no ftable floor row; `box_alloc_out_l2_at` withdrawn; the protocol chain file as a gate | PROPOSED (R1-R5), awaiting the owner; reviewer 1 ENDORSES R1-R5 (item 25) with five shape notes (free withdraw is a genuine statement; `off_free` split lemma; ∃-bound `T₀`; the publish order; shared namespace) |
 | item 26 | ALTERNATIVE to the off box: a per-slot three-arm invariant (cell / marker / free) with two tokens and a per-(inode, file slot) mono_nat row in the inode payload; no box, no fresh names, no set, no CtxBox change; ~a wash in proof volume, simpler in coupling | QUESTION to reviewers 1 and 2 (owner, 2026-09-02); item 24 stands until answered |
+| item 27 | reviewer 2 on items 24-26: item 24 RULED R1-R5 (premise checked in the tree: `ctx_pointsto_free` at any context/fraction, the free-word store leaf, fileclose never loads +32); `box_withdraw_L1_free` = the box's free-tier form of exit; item 26 DECLINED (re-review cost, an unclosed selector at the park, coupling argument weaker after 24, 5000 mono_nats + law-5 exception); the owner concurs -- stay on the box | RULED; to reviewer 1, then the impl agent's skeletons |
 | item 16 | r25's "shapes final" = FOUR shapes (`inode_pay`, `fslot` with the off rows, `ftable_res_at` with the floor row, `ic_slp ∗ off_rows`) landed on OffBox's statements; the two L8 `CtxMorph` instances stated as skeletons on day one; log lock λ-only (no floor row); tripwires T1-T4 | RULED -- reviewer 1 agrees (item 17), with `file_core_off`'s FD_INODE arm named as the FIFTH final shape and "0 Admitted in `EnvMorph`" added to r25's gate |
 | item 18 | the shapes commit (2aba5506b): reviewer 1's audit (item 19) -- NOT signed off until two statement-level fixes land: (1) the off box's UNIT rides the fd-only `file_pay_st` (one per counted reference, mass 1) with the tie frag at the fd's cell fraction and the table holding the complement frag beside its L1 row; `file_core_off`'s FD_INODE arm becomes `emp` (the landed `off_fd_row … q` puts mass = cell fraction against a count = n: Σ unsatisfiable at n ≥ 2); (2) the duplicate `!kallocG Σ` binder in both Section FileInv contexts.  Questions (a)-(d) answered yes as landed; the sixth shape, the floor row, the skeletons, EnvMorph and the L7 commits approved | AUDITED by reviewer 1; the two fixes LANDED (item 20) -- reviewer 2's audit next |
 | item 21 | reviewer 2's audit of d53e4a4e5: NOT signed off -- (1) the cell claimed twice and the unit unowned at non-FD_INODE arms (unit unconditional; `file_core_off := emp`; the free arm holds `off_resident`; the L2 half rides the FD_NONE unit); (2) `file_pay_st_split` false (one-sided over a unitless `file_pay_tie`); (3) the three ghost steps, the last-close pair, `so_deposit`, `so_open_slot` not at final shape; plus `ftable_res_at`'s fold/unfold pair | AUDITED by reviewer 2; fixes pending |
@@ -1704,6 +1705,64 @@ branch and recorded in §3.2 and §8 here.
     machinery serves identity change and L1 floors, neither of which this
     cell has under the free tier?  (c) any arm above whose selector you
     cannot name from what the party holds?  (d) which route lands first?
+
+27. **THE BOX'S DESIGNER ON ITEMS 24-26 (2026-09-02): item 24 RULED (R1-R5),
+    item 26 DECLINED; the owner concurs -- the off box stays, re-cut per
+    item 24 as endorsed in item 25.**
+    - **ITEM 24's PREMISE CHECKED.**  `ctx_pointsto_free` (TsoCtx.v:2261)
+      drops a registered byte to `mem_free` at ANY context and ANY fraction
+      with no floor; `wordw_pointsto_free` (WpSconfMem.v:285) is the word
+      form at fraction 1; `wp_store_s_sconf_free_gen` (WpSconfMem.v:3260)
+      is the store leaf over a free word that re-mints at the storer's
+      context.  fileclose's struct copy loads offsets 0, 4, 9, 16, 24 of
+      the file and never 32 (kernel.asm 800040ea-8000410e).  So the last
+      closer needs only the cell's future half, and the ordering the L1
+      side carried (last writer → next opener) was never needed.  Adopted.
+    - **RULINGS.**  R1 yes: the re-cut is the L6 shape; items 19-23's
+      diagnoses stand, their repairs are superseded where item 24 names
+      them.  R2 yes: `box_withdraw_L1_free` as stated, recorded as the box's
+      FREE-TIER FORM OF EXIT -- justified by the memory model's own tier
+      (§0.26′), not by a client's need, so it does not reopen law 10;
+      reviewer 1's note 1 is right that it is not a corollary of the hooked
+      (a) (the remainder's stamps are learned only after the acquire).  R3
+      yes: `box_alloc_out_l2_at` withdrawn; finding 4's diagnosis stands as
+      a checklist line.  R4 yes: the ftable keeps the λ-flip only; no floor
+      row, no `_in` ftable releases, no `ftable_res_dep` pair; the `ic_slp`
+      fold pair stays.  R5 yes, strongly: `FileOffProtocol.v` as a day-one
+      gate with reviewer 1's fork-then-child-read link.  Notes 1-5 of item
+      25 are all right; note 2 (`mem_free`/`off_free` fractional split) is a
+      genuine gap for the shapes commit -- `phys_free` is already `dq`-
+      indexed with agreement on its ∃-bound value and element, so the
+      lemma is short.
+    - **ITEM 26 DECLINED, with reasons.**  (i) It discards the proven L2 side
+      and two reviewers' endorsement for a third bespoke mechanism -- the
+      re-review cycle is the spiral risk this lane is guarding against.
+      (ii) Its selectors are not yet closed: at the PARK the reader has
+      deposited its whole `ftok q` into OUT and holds nothing the FREE arm
+      (`ftok k 1`) contradicts; fixable by depositing `q/2` and keeping
+      `q/2`, but found only by walking the chain -- which is what R5
+      exists for.  (iii) The coupling argument is weaker after item 24: the
+      defects of items 19-22 lived on the L1 side, which item 24 deletes;
+      what remains on the fd side (a share at the fd's fraction, two
+      register fractions, membership, the persistent handle) is small and
+      is coupling to a law the team already knows.  (iv) Its cost is not
+      lines: 5000 boot-allocated mono_nats, a 100-row fold at every inode
+      unlock, and a law-5 exception whose justification (no identity
+      change, no L1 floors) would have to be re-argued if a fourth
+      cross-lock cell ever appeared.  Answers to its questions: (a) equal
+      in volume, not in review cost or reuse; (b) coherent, not granted
+      while the generic route is endorsed; (c) the park's FREE selector;
+      (d) item 24.  The owner concurs (2026-09-02): stay on the box.
+    - **FOR THE SKELETONS (the impl agent, after reviewer 1's read):** the
+      shapes commit sheds what item 25 lists; lands `box_withdraw_L1_free`
+      beside the hooked (a); `off_free` with its split/join; `off_fd k q γb`
+      with the ∃-bound `T₀` and the count fraction at the constant 1;
+      `fp_obox` in `fpnames`; `so_publish`'s order per note 4; the
+      shared-namespace note per note 5; and `FileOffProtocol.v` with the
+      links of item 24's "life of the cell" plus the fork link -- every
+      lemma's premises exactly the previous one's conclusions, no program.
+      Sign-off from me on that commit is the chain file compiling with its
+      links stated, plus the two checklist lines walked per arm.
 
 17. **REVIEWER 1 ON ITEM 16 (2026-09-02): the three corrections and the
     four tripwires are taken; two additions.**
