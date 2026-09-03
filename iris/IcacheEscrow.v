@@ -5887,6 +5887,67 @@ Section IcacheTable.
        ([∗ list] k ∈ seq 0 NINODE, islot2 ξ cn M ci k) ∗
        ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅)%I.
 
+  (* THE TWO CONSTRUCTORS.  Both tables are eight-conjunct abstractions whose
+     second and seventh rows are 50-element big-ops, so a caller that closes
+     one with [iFrame] pays (names x conjuncts) attempts and each attempt
+     against a big-op row is a conversion: the four sites doing that were
+     10.2 s, 13.5 s and 9.7 s of the 2026-09-03 profile.  Assembled HERE the
+     context is six hypotheses wide and every row is one [iExact], so the
+     search happens once, at the definition, instead of at every use --
+     claude-notes/optimization.md, "give every multi-conjunct resource
+     abstraction a CONSTRUCTOR lemma when you define it".  The two pure rows
+     are Coq premises rather than [⌜⌝] wands so that a caller proves them in
+     Ltac, where they are cheap, and the [iApply] stays first-order. *)
+  Lemma itable_res2_intro (ξ : TsoCtx.CtxId)
+      (cn : ic_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32)
+      (M : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
+      (Hwf : icM_wf M) (Hciwf : ic_ci_wf M ci nib dv) :
+    itable_half M -∗
+    ([∗ list] k ∈ seq 0 NINODE, itable_slot_res ξ M ci k) -∗
+    iref_slots_auth -∗
+    isl_pool M -∗
+    ([∗ list] k ∈ seq 0 NINODE, islot2 ξ cn M ci k) -∗
+    ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
+    itable_res2 ξ cn γfs γi cov logstart nib dv.
+  Proof.
+    iIntros "Hhalf Hrows Hia Hip Hslots Hpool".
+    rewrite /itable_res2. iExists M, ci.
+    iSplitL "Hhalf"; [iExact "Hhalf"|].
+    iSplitL "Hrows"; [iExact "Hrows"|].
+    iSplitR; [by iPureIntro|].
+    iSplitR; [by iPureIntro|].
+    iSplitL "Hia"; [iExact "Hia"|].
+    iSplitL "Hip"; [iExact "Hip"|].
+    iSplitL "Hslots"; [iExact "Hslots"|].
+    iExact "Hpool".
+  Qed.
+
+  Lemma itable_res2_llb_intro (ξ : TsoCtx.CtxId)
+      (cn : ic_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32)
+      (M : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
+      (Hwf : icM_wf M) (Hciwf : ic_ci_wf M ci nib dv) :
+    itable_half M -∗
+    ([∗ list] k ∈ seq 0 NINODE, itable_slot_res_llb ξ M ci k) -∗
+    iref_slots_auth -∗
+    isl_pool M -∗
+    ([∗ list] k ∈ seq 0 NINODE, islot2 ξ cn M ci k) -∗
+    ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) ∅ -∗
+    itable_res2_llb ξ cn γfs γi cov logstart nib dv.
+  Proof.
+    iIntros "Hhalf Hrows Hia Hip Hslots Hpool".
+    rewrite /itable_res2_llb. iExists M, ci.
+    iSplitL "Hhalf"; [iExact "Hhalf"|].
+    iSplitL "Hrows"; [iExact "Hrows"|].
+    iSplitR; [by iPureIntro|].
+    iSplitR; [by iPureIntro|].
+    iSplitL "Hia"; [iExact "Hia"|].
+    iSplitL "Hip"; [iExact "Hip"|].
+    iSplitL "Hslots"; [iExact "Hslots"|].
+    iExact "Hpool".
+  Qed.
+
   Global Instance itable_res2_llb_morph (cn : ic_names) (γfs : fs_names)
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
       (dv : mword 32) :
@@ -5936,11 +5997,15 @@ Section IcacheTable.
   Proof.
     iIntros "[H #Hfl]".
     iDestruct "H" as (M ci) "(Hhalf & Hrows & %Hwf & %Hciwf & Hia & Hip & Hslots & Hpool)".
-    iExists M, ci. iFrame "Hhalf Hia Hip Hslots Hpool".
-    iSplitL "Hrows".
+    (* re-floor the rows FIRST, then hand the six to the constructor: the
+       named [iFrame] this replaces still walked all eight goal conjuncts per
+       name, two of them 50-element big-ops, for 10.2 s (2026-09-03 profile). *)
+    iAssert ([∗ list] k ∈ seq 0 NINODE, itable_slot_res ξ M ci k)%I
+      with "[Hrows]" as "Hrows".
     { iApply (big_sepL_impl with "Hrows"). iIntros "!>" (i k _) "H".
       iApply (itable_slot_res_of_bare ξ tl M ci k). iFrame "H Hfl". }
-    iSplitR; [by iPureIntro|]. by iPureIntro.
+    iApply (itable_res2_intro ξ cn γfs γi cov logstart nib dv M ci Hwf Hciwf
+              with "Hhalf Hrows Hia Hip Hslots Hpool").
   Qed.
 
   Local Lemma itable_slot_row_raise (ξc : TsoCtx.CtxId) (T : nat)

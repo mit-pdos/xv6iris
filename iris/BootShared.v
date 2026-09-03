@@ -1253,7 +1253,43 @@ Section BootAlloc.
             /hart_strans /hart_sie /hart_spp /hart_spie /hart_locks /hart_full
             /pstate_full /resv_frag /uart_frag /plic_frag /virtio_frag
             /log_mirror_half /BootCarve.boot_led_all /gen_cert.
-    iFrame.
+    (* NOT a bare [iFrame]: it prices (27 hypotheses x 27 goal conjuncts) and
+       every attempt against a row whose wrapper is sealed is a CONVERSION, so
+       this one token cost 16.3 s of the file (2026-09-03 profile).  The rows
+       are already in [power_boot_res]'s own order, so an [iExact] each is 27
+       syntactic checks instead -- claude-notes/optimization.md, "a rebuild is
+       a construction, so build it -- do not frame it".  The one place the
+       chain is not flat is the [gen_cert] bundle: the goal spells the last
+       three fixed-layer rows as ONE conjunct (which is why [power_boot_res]
+       puts [Rb] before them, RiscvAdequacy §BT-1), so H23..H25 are split off
+       together and the pure tail is what remains. *)
+    iSplitL "H0"; [iExact "H0"|].
+    iSplitL "H1"; [iExact "H1"|].
+    iSplitL "H2"; [iExact "H2"|].
+    iSplitL "H3"; [iExact "H3"|].
+    iSplitL "H4"; [iExact "H4"|].
+    iSplitL "H5"; [iExact "H5"|].
+    iSplitL "H6"; [iExact "H6"|].
+    iSplitL "H7"; [iExact "H7"|].
+    iSplitL "H8"; [iExact "H8"|].
+    iSplitL "H9"; [iExact "H9"|].
+    iSplitL "H10"; [iExact "H10"|].
+    iSplitL "H11"; [iExact "H11"|].
+    iSplitL "H12"; [iExact "H12"|].
+    iSplitL "H13"; [iExact "H13"|].
+    iSplitL "H14"; [iExact "H14"|].
+    iSplitL "H15"; [iExact "H15"|].
+    iSplitL "H16"; [iExact "H16"|].
+    iSplitL "H17"; [iExact "H17"|].
+    iSplitL "H18"; [iExact "H18"|].
+    iSplitL "H19"; [iExact "H19"|].
+    iSplitL "H20"; [iExact "H20"|].
+    iSplitL "H21"; [iExact "H21"|].
+    iSplitL "H22"; [iExact "H22"|].
+    iSplitL "H23 H24 H25"; [| iExact "H26"].
+    iSplitL "H23"; [iExact "H23"|].
+    iSplitL "H24"; [iExact "H24"|].
+    iExact "H25".
   Qed.
 
   (* ZIPPING THE FOUR PER-HART FAMILIES: DO IT HERE, NOT AT THE USE SITE.

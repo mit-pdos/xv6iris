@@ -2925,7 +2925,12 @@ Section IputFreePath.
       iExact "Hstk". }
     iAssert (itable_res2_llb TsoCtx.cur_ctx fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
       with "[Hhalf Hstampsllb Hiauth Hipool Hslots Hpool]" as "HRres".
-    { iExists Mt, ci. iFrame. iPureIntro. split; assumption. }
+    { (* the constructor, not [iFrame]: the goal's eight conjuncts include two
+         50-element big-ops, so the bare frame walked them once per name for
+         9.7 s (2026-09-03 profile).  [IcacheEscrow.itable_res2_llb_intro]. *)
+      iApply (IcacheEscrow.itable_res2_llb_intro TsoCtx.cur_ctx fsc_ic fsc_fs
+                fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev Mt ci HMwf Hciwf
+                with "Hhalf Hstampsllb Hiauth Hipool Hslots Hpool"). }
     (* ===== +0x5e auipc a0 ; +0x62 addi a0,a0,1306 ; +0x66 jal release ===== *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.iput + 0x5e)) Ra0
               (mword_of_int 29 : mword 20) mfa (trap_res eb + (K - 6))%nat false
@@ -3689,12 +3694,16 @@ Section IputFreePath.
     iEval (rewrite -Hpoolset) in "Hpool".
     iAssert (itable_res2_llb TsoCtx.cur_ctx fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
       with "[Hhalf Hstampsllb Hiauth Hipool Hslots Hpool]" as "HRres3".
-    { iExists (delete k Mt2), (delete k ci2). iFrame. iPureIntro. split.
+    { (* the two pure rows in Ltac, where they are cheap, then the
+         constructor: the bare [iFrame] this replaces was 13.5 s of the
+         2026-09-03 profile.  [IcacheEscrow.itable_res2_llb_intro]. *)
+      assert (Hwf3 : icM_wf (delete k Mt2)).
       { destruct Hwf2 as [Hdom Hcnt']. split.
         - intros i0 Hi0. apply Hdom. destruct Hi0 as [e He].
           exists e. rewrite lookup_delete_Some in He. apply He.
         - intros i0 qi ni Hi0. rewrite lookup_delete_Some in Hi0.
           destruct Hi0 as [_ Hi0]. by apply (Hcnt' i0 qi). }
+      assert (Hciwf3 : ic_ci_wf (delete k Mt2) (delete k ci2) icfg_nib icfg_dev).
       { destruct Hciwf2 as (Hdom & Hinj & Hrange & Hdv). split_and!.
         - rewrite !dom_delete_L Hdom. reflexivity.
         - intros k1 k2 p1 p2 Hp1' Hp2' Heq.
@@ -3703,7 +3712,11 @@ Section IputFreePath.
         - intros k1 p1 Hp1'. rewrite lookup_delete_Some in Hp1'.
           exact (Hrange k1 p1 (proj2 Hp1')).
         - intros k1 p1 Hp1'. rewrite lookup_delete_Some in Hp1'.
-          exact (Hdv k1 p1 (proj2 Hp1')). } }
+          exact (Hdv k1 p1 (proj2 Hp1')). }
+      iApply (IcacheEscrow.itable_res2_llb_intro TsoCtx.cur_ctx fsc_ic fsc_fs
+                fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev
+                (delete k Mt2) (delete k ci2) Hwf3 Hciwf3
+                with "Hhalf Hstampsllb Hiauth Hipool Hslots Hpool"). }
     (* ===== +0x8c auipc a0 ; +0x90 addi a0,a0,1260 ; +0x94 jal release ===== *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.iput + 0x8c)) Ra0
               (mword_of_int 29 : mword 20) F1 (trap_res eb + (K - 6))%nat false
