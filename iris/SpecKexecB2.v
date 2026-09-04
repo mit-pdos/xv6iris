@@ -323,7 +323,7 @@ Section KexecB2Res.
       (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) : iProp Σ :=
     (kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf
               gilf gislf ∗
      log_opb icfg_log n2 ∗
@@ -332,7 +332,7 @@ Section KexecB2Res.
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
-     (∃ M : gmap Z (bv 8), proc_pt P M) ∗
+     proc_pt P Mi ∗
      proc_priv gf (proc_addr jp) pidv U ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
@@ -615,7 +615,7 @@ Definition kxc_bad324_body `{XI : CurCtx}
     (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
     (m Mt : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
-    (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string) :=
+    (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szf : mword 64) (eb : bool) (lks : gset string) :=
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
@@ -661,7 +661,7 @@ Definition kxc_bad324_body `{XI : CurCtx}
      this block's [kxc_bad64] runs iunlockput, whose iput frees into it. *)
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   kalloc_env fsc_kalloc None -∗
-  (∃ M : gmap Z (bv 8), proc_pt P M) -∗
+  proc_pt P Mi -∗
   proc_priv gf (proc_addr jp) pidv U -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -703,7 +703,7 @@ Definition kxc_ls_body `{XI : CurCtx}
     (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
     (m : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
-    (ef : nat -> bv 8) (P : uptd)
+    (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8))
     (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string) :=
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
@@ -762,7 +762,7 @@ Definition kxc_ls_body `{XI : CurCtx}
           (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
           (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
           (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
-          w63 w65 w67 ef P -∗
+          w63 w65 w67 ef P Mi -∗
   (* ---- kexec's OWN continuation.  Convention 3: this block owns its
      [bad:] exit (+0x0ea -> +0x324) and discharges it against the
      contract rather than handing it out; the ONE output below therefore
@@ -775,9 +775,18 @@ Definition kxc_ls_body `{XI : CurCtx}
   (* ---- THE ONE OUTPUT: +0x116, the segment is in memory.  s1 and s2
      are dead there (+0x116 reloads s2 from slot 65 and the phdr loop
      never reads s1 again), so the state is the entry state with the
-     cursor dropped. ---- *)
+     cursor dropped.
+
+     THE IMAGE [Mo] IS UNIVERSALLY BOUND AND UNCONSTRAINED.  Each turn of
+     the loop moves the image by exactly one [umem_write] (the page the
+     readi delivered -- [KexecPtImage.proc_pt_page_load_split] is what
+     states that step), but this lemma is proved by induction on the FUEL,
+     so naming the composite would take a fold over the remaining
+     iterations, i.e. a loop invariant this stage does not yet have.  What
+     the caller can still read off is the DOMAIN: [P] is the same at entry
+     and exit, so [proc_pt]'s own [dom Mi = uva_dom P = dom Mo]. ---- *)
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    ∀ (Mx : regfile),
+    ∀ (Mx : regfile) (Mo : gmap Z (bv 8)),
       ⌜Mx !!! Regidx csp_rs1 = pa_stk sp0 68 /\
         Mx !!! Regidx Rs0 = sp0 /\
         Mx !!! Regidx Rs4 = ientry kf /\
@@ -797,7 +806,7 @@ Definition kxc_ls_body `{XI : CurCtx}
               (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
               (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
               (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
-              w63 w65 w67 ef P -∗
+              w63 w65 w67 ef P Mo -∗
       wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
         KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
              eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
@@ -820,12 +829,12 @@ Module Type KEXECB2.
       (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string),
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szf : mword 64) (eb : bool) (lks : gset string),
     kxc_bad324_body Q gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
-      ef P szf eb lks.
+      ef P Mi szf eb lks.
 
   Parameter kxc_ls :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
@@ -841,11 +850,11 @@ Module Type KEXECB2.
       (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd)
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8))
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string),
     kxc_ls_body Q gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
-      ef P ip va fz po eb lks.
+      ef P Mi ip va fz po eb lks.
 End KEXECB2.

@@ -87,6 +87,7 @@ Require Import ProofKexecParts.
    critical path: ProofKexecSeam.v already requires it. *)
 Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
+Require Import KexecPtImage.
 Require Import ProofKforkParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
@@ -763,6 +764,23 @@ Section KexecDCommit.
   (*  [kxd_res ... pv] IS [kxc_d_res ...]; the scan's exit is at some       *)
   (*  [pa_add pv q'] instead.                                              *)
   (* ------------------------------------------------------------------- *)
+  (* THE ENTRY-POINT OBLIGATION, GUARDED BY THE STATE THE COMMIT BUILDS.
+     [kexec_ok_q]'s success arm asks for [Q (kxq_entry ef) U'] at the exit's
+     own final process state, and after this stage's image threading the
+     commit KNOWS that state: its image is the [M] the phases built (no ∃
+     left), its size is [sz1], its address space is [P] and its trapframe is
+     the three words +0x2ce..+0x2f8 store.  So the premise is asked not at
+     EVERY [U'] but at every [U'] with those four projections -- which is
+     what a caller (the AU contract) has to be able to pay.  Above
+     [kxd_commit] the four are still ∀-bound, where it is equivalent to the
+     unguarded form; S3 is what carries them up. *)
+  Definition kxq_pay (Q : mword 64 -> ustate -> Prop) (e : mword 64)
+      (M : gmap Z (bv 8)) (sz : mword 64) (Pf : uptd)
+      (tf : list (mword 64)) : Prop :=
+    forall U' : ustate,
+      us_M U' = M -> pv_sz (us_V U') = sz -> pv_upt (us_V U') = Pf ->
+      pv_tf (us_V U') = tf -> Q e U'.
+
   Definition kxd_res
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
@@ -771,13 +789,13 @@ Section KexecDCommit.
       (pidv : mword 32) (Uc : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (c : nat) (last : mword 64) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (c : nat) (last : mword 64) : iProp Σ :=
     (iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
-     proc_pt_any P ∗
+     proc_pt P Mi ∗
      proc_priv gf (proc_addr jp) pidv Uc ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
@@ -894,18 +912,24 @@ Section KexecDCommit.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (sz1 : mword 64) (c q : nat) :
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (sz1 : mword 64) (c q : nat) :
     (* the ENTRY-POINT OBLIGATION, and the only site in the cone that
        pays it: the commit block's [ld a4,-408(s0)] loads exactly
        [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
        fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
        generic for free and takes no such premise.
 
-       The [forall U'] is the widened hole's second argument: the closer
+       [kxq_pay] is the widened hole's second argument, GUARDED: the closer
        plugs [kexec_ok_q] with [fun e => Q e U'] at the exit's own final
-       state, and this sweep does not yet expose that state's facts here,
-       so the premise is asked at EVERY [U']. *)
-    (forall U' : ustate, Q (kxq_entry ef) U') ->
+       state, and this block builds that state, so it names its four
+       projections rather than asking the premise at every [U']. *)
+    kxq_pay Q (kxq_entry ef) Mi sz1 P
+      (<[kxc_tf_sp_idx
+         := (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)]>
+         (<[tf_epc_idx := (Z_to_bv 64 (le_at ef 24 8) : mword 64)]>
+            (<[tf_arg_idx 1
+               := (mword_of_int (kxc_sp_final (uint sz1) alen c)
+                   : mword 64)]> (pv_tf (us_V U))))) ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (q <= plen)%nat ->
@@ -946,7 +970,7 @@ Section KexecDCommit.
                          := (mword_of_int (kxc_sp_final (uint sz1) alen c)
                              : mword 64)]> (pv_tf (us_V U))))
             dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
-            w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c (pa_add pv q) -∗
+            w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi c (pa_add pv q) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
@@ -1481,22 +1505,25 @@ Section KexecDCommit.
     (* ---- the process block CLOSES here, at the new table and size: this is
        the commit.  [upd_exec_compose] is what turns the three successive
        accessor closes into the contract's own one-shot move. ---- *)
-    iDestruct (proc_pt_any_wf_get with "Hpt") as %Hwf.
+    iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
     pose proof (proc_pt_covered_maxsz P sz1 Hwf Hcov) as Hmaxsz1.
     (* THE NEW ADDRESS SPACE'S IMAGE.  kexec loaded the program into the
        table it built, so what the commit installs is a FRESH image; the
        callees below [proc_pt] speak the ∃-weakened form, and the closer
        ([ProcInv.proc_priv_newspace]) takes the moved image beside the
        moved descriptor -- so it is named here, at the commit. *)
-    iEval (rewrite (proc_pt_ptm P (uint sz1))) in "Hpt".
-    iDestruct "Hpt" as (Mx) "Hpt".
+    (* ...and the crossing is at the SAME map -- the space kexec built
+       COVERS [sz1], so [KexecPtImage.proc_pt_to_ptm_cov] hands the lazy
+       view back at [Mi] itself.  The old spelling opened an ∃ here, which
+       is where [us_M U'] used to be born anonymous. *)
+    iDestruct (proc_pt_to_ptm_cov P sz1 Mi Hwf Hcov with "Hpt") as "Hpt".
     iSpecialize ("Hprivback" $! P sz1
                    (<[kxc_tf_sp_idx
                       := (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)]>
                       (<[tf_epc_idx := (Z_to_bv 64 (le_at ef 24 8) : mword 64)]>
                          (<[tf_arg_idx 1
                             := (mword_of_int (kxc_sp_final (uint sz1) alen c)
-                                : mword 64)]> (pv_tf (us_V U))))) Mx).
+                                : mword 64)]> (pv_tf (us_V U))))) Mi).
     iSpecialize ("Hprivback" with "[%]"); [exact HPtfp |].
     iSpecialize ("Hprivback" with "[%]");
       [rewrite uint_unsigned; exact Hmaxsz1 |].
@@ -1838,16 +1865,17 @@ Section KexecDCommit.
                        (<[tf_arg_idx 1
                           := (mword_of_int (kxc_sp_final (uint sz1) alen c)
                               : mword 64)]> (pv_tf (us_V U)))))
-                 (h <$> seq 0 PNAMELEN)) Mx)
+                 (h <$> seq 0 PNAMELEN)) Mi)
               (Z_to_bv 64 (le_at ef 24 8) : mword 64)
               (mword_of_int (kxc_sp_final (uint sz1) alen c)) sz1).
     iApply ("Hcont" with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath
                     Hargv Hargs Hbs Hirs").
     - exact Hcs.
     - apply kxd_kexec_ok; try assumption.
-      (* the widened hole, at the state this block just built: the premise
-         is asked at every [U'], so it is asked at this one. *)
-      + exact (HQe _).
+      (* the widened hole, at the state this block just built -- the four
+         projections the premise guards on hold by [reflexivity] here,
+         which is the whole point of naming them. *)
+      + apply HQe; reflexivity.
       + rewrite (Hpres Ra0 ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz)).
         exact HG10a0.
       + apply kxd_name_fn_len.
@@ -1929,7 +1957,7 @@ Section KexecDMain.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (sz1 : mword 64) (c : nat) :
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (sz1 : mword 64) (c : nat) :
     (* the ENTRY-POINT OBLIGATION, and the only site in the cone that
        pays it: the commit block's [ld a4,-408(s0)] loads exactly
        [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
@@ -1957,7 +1985,7 @@ Section KexecDMain.
     kxc_at_2a6 jp gf
                plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) c -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
@@ -1966,6 +1994,13 @@ Section KexecDMain.
   Proof.
     intros HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12.
+    (* the guarded form [kxd_commit] asks for: at THIS altitude the four
+       projections are still ∀-bound, so it follows from the unguarded
+       premise this lemma (and everything above it) carries. *)
+    assert (HQpay : forall (Mg : gmap Z (bv 8)) (szg : mword 64) (Pg : uptd)
+                      (tfg : list (mword 64)),
+                      kxq_pay Q (kxq_entry ef) Mg szg Pg tfg)
+      by (intros Mg szg Pg tfg U' _ _ _ _; exact (HQe U')).
     
     iIntros "#Htext Hst Hcont".
     rewrite /kxc_at_2a6.
@@ -2162,7 +2197,7 @@ Section KexecDMain.
                                           (kxc_sp_final (uint sz1) alen c)
                                         : mword 64)]> (pv_tf (us_V U))))
                        dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
-                       w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c last)%I
+                       w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi c last)%I
       with "[Hirs Hbm Hins Hbits Hbs Hpt Hpriv Hargv Hargs Helf
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10 Hf11 Hf12 Hf13
              Hust Hph Hf64 Hf65 Hf67 Hf68]" as "Hmk".
@@ -2217,8 +2252,8 @@ Section KexecDMain.
       iApply (kxd_commit (CID0 := CID5) Q jp gf
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m D3 K sp0 ra0 s00 s10 s20 pv av
-                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0%nat
-                HQe ltac:(lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
+                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi sz1 c 0%nat
+                (HQpay _ _ _ _) ltac:(lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
@@ -2362,8 +2397,8 @@ Section KexecDMain.
       iApply (kxd_commit (CID0 := CID9) Q jp gf
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m Mf K sp0 ra0 s00 s10 s20 pv av
-                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c q'
-                HQe ltac:(lia) Hcstr Hq' Hnamax Hsz1ge Hceq
+                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi sz1 c q'
+                (HQpay _ _ _ _) ltac:(lia) Hcstr Hq' Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12

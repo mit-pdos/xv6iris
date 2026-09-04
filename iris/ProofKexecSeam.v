@@ -593,7 +593,7 @@ Section KexecBSeam.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs1 = proc_addr jp /\
@@ -625,7 +625,7 @@ Section KexecBSeam.
      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
      kalloc_env fsc_kalloc None ∗
-     proc_pt_any P ∗
+     proc_pt P Mi ∗
      proc_priv gf (proc_addr jp) pidv U ∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) ∗
      ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) ∗
@@ -672,7 +672,7 @@ Section KexecBSeam.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (i : nat) (szv : mword 64) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs2 = szv /\
@@ -707,7 +707,7 @@ Section KexecBSeam.
      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
      kalloc_env fsc_kalloc None ∗
-     proc_pt_any P ∗
+     proc_pt P Mi ∗
      proc_priv gf (proc_addr jp) pidv U ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
@@ -742,7 +742,7 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (szv sv11 : mword 64) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szv sv11 : mword 64) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs2 = szv /\
@@ -775,7 +775,7 @@ Section KexecBSeam.
      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
      kalloc_env fsc_kalloc None ∗
-     proc_pt_any P ∗
+     proc_pt P Mi ∗
      proc_priv gf (proc_addr jp) pidv U ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
@@ -802,7 +802,7 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (szv sv11 : mword 64) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szv sv11 : mword 64) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs2 = szv /\
@@ -826,7 +826,7 @@ Section KexecBSeam.
      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
      kalloc_env fsc_kalloc None ∗
-     proc_pt_any P ∗
+     proc_pt P Mi ∗
      proc_priv gf (proc_addr jp) pidv U ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
@@ -882,7 +882,7 @@ Section KexecBSeam.
       (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (c : nat) (sz1 : mword 64)
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (c : nat) (sz1 : mword 64)
       (alen : nat -> nat) : iProp Σ :=
     (iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) ∗
@@ -890,7 +890,7 @@ Section KexecBSeam.
      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
      kalloc_env fsc_kalloc None ∗
-     proc_pt_any P ∗
+     proc_pt P Mi ∗
      proc_priv gf (proc_addr jp) pidv U ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
@@ -914,7 +914,7 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
@@ -939,7 +939,7 @@ Section KexecBSeam.
      kxc_c_res jp gf
                plen pfun na avf aslen afun pidv U dqb dqs dqa dqpv dqas
                sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen)%I.
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi c sz1 alen)%I.
 
   (* --------------------------------------------------------------- *)
   (*  +0x272 -- THE LOOP'S OWN EXIT STATE, at index [c] -- reached either   *)
@@ -969,7 +969,7 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
@@ -1009,7 +1009,7 @@ Section KexecBSeam.
      kxc_c_res jp gf
                plen pfun na avf aslen afun pidv U dqb dqs dqa dqpv dqas
                sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen)%I.
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi c sz1 alen)%I.
 
   (* --------------------------------------------------------------- *)
   (*  PHASE D'S RESOURCES.  [kxc_c_res] with the ustack folded back to a     *)
@@ -1027,14 +1027,14 @@ Section KexecBSeam.
       (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (c : nat) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (c : nat) : iProp Σ :=
     (iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
      kalloc_env fsc_kalloc None ∗
-     proc_pt_any P ∗
+     proc_pt P Mi ∗
      proc_priv gf (proc_addr jp) pidv U ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
@@ -1062,7 +1062,7 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
@@ -1086,6 +1086,6 @@ Section KexecBSeam.
      kxc_d_res jp gf
                plen pfun na avf aslen afun pidv U dqb dqs dqa dqpv dqas
                sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c)%I.
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi c)%I.
 
 End KexecBSeam.

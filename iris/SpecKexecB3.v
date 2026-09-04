@@ -98,7 +98,7 @@ Definition kxc_b2_body
     (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
     (m M : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
-    (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) :=
+    (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (i : nat) (szv : mword 64) :=
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
@@ -126,20 +126,20 @@ Definition kxc_b2_body
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
              (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
              (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
-             w67 ef P i szv -∗
+             w67 ef P Mi i szv -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    ∀ (M' : regfile) (P' : uptd) (szv' : mword 64),
+    ∀ (M' : regfile) (P' : uptd) (Mo : gmap Z (bv 8)) (szv' : mword 64),
       kxc_at_1ae jp gf
                  plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
                  M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                  (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
-                 w67 ef P' szv' (m !!! Regidx Rs11) -∗
+                 w67 ef P' Mo szv' (m !!! Regidx Rs11) -∗
       wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
         KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
              eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
@@ -164,7 +164,7 @@ Definition kxc_b2z_body
     (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
     (m M : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w13 w67 : mword 64)
-    (ef : nat -> bv 8) (P : uptd) :=
+    (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) :=
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
@@ -187,7 +187,7 @@ Definition kxc_b2z_body
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
              (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
              (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13
-             w67 ef P -∗
+             w67 ef P Mi -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (M' : regfile),
       kxc_at_1ae jp gf
@@ -196,7 +196,7 @@ Definition kxc_b2z_body
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                  (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13
-                 w67 ef P (mword_of_int 0 : mword 64) (m !!! Regidx Rs11) -∗
+                 w67 ef P Mi (mword_of_int 0 : mword 64) (m !!! Regidx Rs11) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -215,12 +215,12 @@ Module Type KEXECB3.
       (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64),
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (i : nat) (szv : mword 64),
     kxc_b2_body Q gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
-      ef P i szv.
+      ef P Mi i szv.
 
   Parameter kxc_b2z :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
@@ -235,9 +235,9 @@ Module Type KEXECB3.
       (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd),
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)),
     kxc_b2z_body gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w13 w67 ef P.
+      pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w13 w67 ef P Mi.
 End KEXECB3.

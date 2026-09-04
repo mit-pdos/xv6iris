@@ -50,8 +50,12 @@ Require Import KMap.
 Require Import PageGeom.
 Require Import ByteBuf.
 Require Import TsoCtx.
+Require Import PtTree.
+Require Import PtBuild.
+Require Import UptTree.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
+Require Import UmCovered.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -289,5 +293,200 @@ Section KexecPtImage.
       rewrite decide_False; [reflexivity | lia].
     - by rewrite big_sepL_nil.
   Qed.
+
+  (* the same split with the page's OWN byte name supplied by the caller.
+     [SpecKexecB2.kxc_page_take] hands the anonymous page out under an
+     ∃-bound [f] and the whole loadseg block is written against that name;
+     this is the same statement with [f] a parameter constrained to be
+     [M]'s bytes, so the block reads unchanged and only the closer's
+     conclusion gains the [umem_write]. *)
+  Lemma proc_pt_page_load_split_f (P : uptd) (M : gmap Z (bv 8))
+      (vpn : mword 27) (w : mword 64) (base : Z) (nn : nat) (f : nat -> bv 8) :
+    proc_pt_wf P -> P.(ud_um) !! vpn = Some w ->
+    base = (bv_unsigned vpn * 4096)%Z -> (nn <= 4096)%nat ->
+    (forall j : nat, (j < 4096)%nat -> f j = M !!! (base + Z.of_nat j)%Z) ->
+    kmap_static_claims -∗ proc_pt P M -∗
+      ([∗ list] j ∈ seq 0 nn,
+         (pa_add (page_base (pte_ppn w)) j : Arch.pa) ↦ₘ f j) ∗
+      ([∗ list] j ∈ seq 0 (4096 - nn),
+         (pa_add (pa_add (page_base (pte_ppn w)) nn) j : Arch.pa)
+           ↦ₘ f (nn + j)%nat) ∗
+      (∀ new : nat -> bv 8,
+         ([∗ list] j ∈ seq 0 nn,
+            (pa_add (page_base (pte_ppn w)) j : Arch.pa) ↦ₘ new j) -∗
+         ([∗ list] j ∈ seq 0 (4096 - nn),
+            (pa_add (pa_add (page_base (pte_ppn w)) nn) j : Arch.pa)
+              ↦ₘ f (nn + j)%nat) -∗
+         proc_pt P (umem_write M base nn new)).
+  Proof.
+    intros Hwf Hl Hbase Hnn Hf. iIntros "#Hb Hpt".
+    iDestruct (proc_pt_page_load_split P M vpn w base nn Hwf Hl Hbase Hnn
+                 with "Hb Hpt") as "(HA & HB & Hback)".
+    iSplitL "HA".
+    { iApply (big_sepL_mono with "HA"). intros i j Hj.
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+      rewrite (Hf i ltac:(lia)). reflexivity. }
+    iSplitL "HB".
+    { iApply (big_sepL_mono with "HB"). intros i j Hj.
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+      rewrite (Hf (nn + i)%nat ltac:(lia)). reflexivity. }
+    iIntros (new) "HA HB". iApply ("Hback" $! new with "HA [HB]").
+    iApply (big_sepL_mono with "HB"). intros i j Hj.
+    apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+    rewrite (Hf (nn + i)%nat ltac:(lia)). reflexivity.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* §5b THE WALK BRACKET, at the named image.  loadseg calls walkaddr    *)
+  (* between the two halves of the page borrow, and [ProcPtOwn]'s pair    *)
+  (* ([proc_pt_acc_rep0] / [proc_pt_rebuild]) is stated at the            *)
+  (* ∃-weakened tier, so replaying it would drop the image the borrow is  *)
+  (* there to keep.  These are the same two proofs with [umem_own P M]    *)
+  (* in place of [proc_pt_own P] -- the bytes ride through untouched,     *)
+  (* which is exactly why the tree half can be opened at all.  ([ProcPtOwn]
+     already has the [proc_ptm] pair, [proc_ptm_acc_rep0] /               *)
+  (* [proc_ptm_rebuild]; this is its [proc_pt] twin.) *)
+  (* ------------------------------------------------------------------ *)
+  (* [proc_ptm]'s well-formedness projection, the twin of [proc_pt_wf_get]
+     -- ProcPtOwn has the [proc_pt_any] one only. *)
+  Lemma proc_ptm_wf_get (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_ptm P sz M ⊢ ⌜proc_pt_wf P⌝.
+  Proof. rewrite /proc_ptm. iIntros "(%Hwf & _)". iPureIntro. exact Hwf. Qed.
+
+  Lemma proc_pt_acc_rep0_m (P : uptd) (M : gmap Z (bv 8)) :
+    proc_pt P M ⊢ ∃ t m_ad, ⌜pt_rep0 t m_ad⌝ ∗
+      ⌜upt_ad_view P.(ud_tfp) P.(ud_um) m_ad⌝ ∗
+      ⌜pt_base t = P.(ud_root)⌝ ∗ ⌜proc_pt_wf P⌝ ∗
+      ptree_own 2 (DfracOwn 1) t ∗ umem_own P M.
+  Proof.
+    rewrite /proc_pt. iIntros "(%Hwf & Ht & Hm)".
+    iDestruct "Ht" as (t) "(%Hspec & Ht)".
+    destruct (upt_spec_rep0 P.(ud_root) P.(ud_tfp) P.(ud_um) t Hspec)
+      as (m_ad & Hrep & Hview).
+    iExists t, m_ad.
+    iSplitR; [iPureIntro; exact Hrep |].
+    iSplitR; [iPureIntro; exact Hview |].
+    iSplitR; [iPureIntro; exact (proj1 Hspec) |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iFrame "Ht Hm".
+  Qed.
+
+  Lemma proc_pt_rebuild_m (P : uptd) (M : gmap Z (bv 8)) (t' : ptree)
+      (m_ad : gmap (mword 27) (mword 64)) :
+    proc_pt_wf P -> upt_ad_view P.(ud_tfp) P.(ud_um) m_ad ->
+    pt_rep0 t' m_ad -> pt_base t' = P.(ud_root) ->
+    ptree_own 2 (DfracOwn 1) t' -∗ umem_own P M -∗ proc_pt P M.
+  Proof.
+    intros Hwf Hview Hrep Hbase. iIntros "Ht Hm".
+    rewrite /proc_pt. iSplitR; [iPureIntro; exact Hwf |].
+    iSplitL "Ht"; [| iFrame "Hm"].
+    rewrite /pt_frame. iExists t'. iFrame "Ht". iPureIntro.
+    exact (upt_spec_of_rep0 P.(ud_root) P.(ud_tfp) P.(ud_um) m_ad t'
+             (proj1 Hwf) Hview Hrep Hbase).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* §6 THE COVERED CROSSING -- [proc_pt] and [proc_ptm] at the SAME map. *)
+  (*                                                                     *)
+  (* kexec builds an address space in which EVERY page below the running  *)
+  (* size is mapped ([um_covered], which every seam of the cone carries), *)
+  (* and there the lazy view has nothing left to be lazy about: its zero  *)
+  (* filler set is empty and [umem_lazy P sz M] is [umem_own P M] on the  *)
+  (* nose.  That is what lets the cone thread ONE image [M] through both  *)
+  (* the loader (which speaks [proc_pt], §3-§5) and the _mem contracts    *)
+  (* copyout / uvmalloc / the commit speak ([proc_ptm]), with no [∃]      *)
+  (* re-supplied at the crossing -- the map that goes out is the map that *)
+  (* comes back.                                                         *)
+  (* ------------------------------------------------------------------ *)
+
+  (* every live va of a covered space is a MAPPED va.  Pure; the [2^38]
+     bound is [uvm_maxsz]'s, and is what makes [svpn_of] read the vpn
+     back out of the address. *)
+  Lemma uva_live_mapped_covered (P : uptd) (sz : Z) :
+    (sz <= 274877906944)%Z -> um_covered_z sz P.(ud_um) ->
+    forall va : Z, uva_live sz va -> uva_mapped P va.
+  Proof.
+    intros Hsz Hcov va Hlv. unfold uva_live, UserPtTree.pgroundup in Hlv.
+    pose proof (Z.div_mod va 4096 ltac:(lia)) as Hdm.
+    pose proof (Z.mod_pos_bound va 4096 ltac:(lia)) as Hmb.
+    pose proof (Z.div_mod (sz + 4095) 4096 ltac:(lia)) as Hds.
+    pose proof (Z.mod_pos_bound (sz + 4095) 4096 ltac:(lia)) as Hsb.
+    (* the page base is a multiple of 4096 strictly below [pgroundup sz],
+       hence strictly below [sz] itself *)
+    assert (Hlt : (4096 * (va / 4096) < sz)%Z) by lia.
+    assert (Hb : (0 <= va < 274877906944)%Z) by lia.
+    assert (Hu : bv_unsigned (svpn_of (mword_of_int va : mword 64)) = (va / 4096)%Z).
+    { assert (Hmod : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
+      assert (Hui : uint (mword_of_int va : mword 64) = va).
+      { rewrite uint_unsigned moi64_unsigned. apply bv_wrap_small. lia. }
+      rewrite (svpn_of_unsigned_lo (mword_of_int va) ltac:(rewrite Hui; lia)).
+      rewrite Hui Z.shiftr_div_pow2; [| lia]. reflexivity. }
+    destruct (Hcov (svpn_of (mword_of_int va : mword 64)) ltac:(rewrite Hu; lia))
+      as [w Hw].
+    exists (svpn_of (mword_of_int va : mword 64)), w, (Z.to_nat (va `mod` 4096)).
+    split_and!; [exact Hw | lia |]. rewrite Hu Z2Nat.id; lia.
+  Qed.
+
+  (* ...and the crossing itself, at the map the caller names. *)
+  Lemma proc_pt_ptm_live (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    (forall va : Z, uva_live sz va -> uva_mapped P va) ->
+    proc_pt P M ⊣⊢ proc_ptm P sz M.
+  Proof.
+    intros Hlm. rewrite /proc_pt /proc_ptm. iSplit.
+    - iIntros "(%Hwf & Ht & Hm)". iSplitR; [done |]. iFrame "Ht".
+      iDestruct "Hm" as "[%Hdom Hm]". iExists M.
+      iSplitR; [iPureIntro; reflexivity |].
+      iSplitR.
+      { iPureIntro. intros va. rewrite <- elem_of_dom, Hdom, elem_of_uva_dom.
+        split; [by left |]. intros [Hm | Hl]; [exact Hm | exact (Hlm va Hl)]. }
+      iSplitR; [iPureIntro; intros va Hnm Hl; destruct (Hnm (Hlm va Hl)) |].
+      iSplitR; [iPureIntro; exact Hdom |]. iExact "Hm".
+    - iIntros "(%Hwf & Ht & Hm)". iSplitR; [done |]. iFrame "Ht".
+      iDestruct (umem_lazy_dom with "Hm") as %Hdm.
+      assert (Hdom : dom M = uva_dom P).
+      { apply set_eq. intros va. rewrite elem_of_dom (Hdm va) elem_of_uva_dom.
+        split; [intros [Hm | Hl]; [exact Hm | exact (Hlm va Hl)] | by left]. }
+      iApply (umem_own_of_lazy P sz M M (reflexivity _) Hdom with "Hm").
+  Qed.
+
+  (* the same, with the bound supplied by the caller. *)
+  Lemma proc_pt_ptm_covered (P : uptd) (szv : mword 64) (M : gmap Z (bv 8)) :
+    (bv_unsigned szv <= 274877906944)%Z -> um_covered szv P.(ud_um) ->
+    proc_pt P M ⊣⊢ proc_ptm P (uint szv) M.
+  Proof.
+    intros Hsz Hcov. rewrite uint_unsigned.
+    apply (proc_pt_ptm_live P (bv_unsigned szv) M).
+    exact (uva_live_mapped_covered P (bv_unsigned szv) Hsz Hcov).
+  Qed.
+
+  (* the spelling the cone actually uses: coverage alone, with the size
+     bound read off it ([UmCovered.proc_pt_covered_maxsz] -- a covered
+     space cannot reach past [uvm_maxsz], because there are only 2^27
+     user vpns), so a call site needs nothing but its seam's own
+     [proc_pt_wf] / [um_covered] pair. *)
+  Lemma proc_pt_ptm_cov (P : uptd) (szv : mword 64) (M : gmap Z (bv 8)) :
+    proc_pt_wf P -> um_covered szv P.(ud_um) ->
+    proc_pt P M ⊣⊢ proc_ptm P (uint szv) M.
+  Proof.
+    intros Hwf Hcov.
+    assert (Hb : (bv_unsigned szv <= uvm_maxsz)%Z)
+      by exact (proc_pt_covered_maxsz P szv Hwf Hcov).
+    rewrite uvm_maxsz_val in Hb.
+    exact (proc_pt_ptm_covered P szv M ltac:(lia) Hcov).
+  Qed.
+
+  (* the two directions as ENTAILMENTS, which is the form a call site
+     wants: [iDestruct] then unifies the size and the map against the
+     hypothesis it already holds, and the coverage side condition arrives
+     as an [ltac:] argument. *)
+  Lemma proc_pt_to_ptm_cov (P : uptd) (szv : mword 64) (M : gmap Z (bv 8)) :
+    proc_pt_wf P -> um_covered szv P.(ud_um) ->
+    proc_pt P M -∗ proc_ptm P (uint szv) M.
+  Proof. intros Hwf Hcov. rewrite (proc_pt_ptm_cov P szv M Hwf Hcov). auto. Qed.
+
+  Lemma proc_ptm_to_pt_cov (P : uptd) (szv : mword 64) (M : gmap Z (bv 8)) :
+    proc_pt_wf P -> um_covered szv P.(ud_um) ->
+    proc_ptm P (uint szv) M -∗ proc_pt P M.
+  Proof. intros Hwf Hcov. rewrite (proc_pt_ptm_cov P szv M Hwf Hcov). auto. Qed.
 
 End KexecPtImage.

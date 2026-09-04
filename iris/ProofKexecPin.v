@@ -297,7 +297,7 @@ Section KexecPinTail.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (sz1 : mword 64) (c : nat) :
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (sz1 : mword 64) (c : nat) :
     (* the ENTRY-POINT OBLIGATION, and the only site in the cone that
        pays it: the commit block's [ld a4,-408(s0)] loads exactly
        [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
@@ -325,7 +325,7 @@ Section KexecPinTail.
     kxc_at_272 jp gf
                plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) c -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
@@ -338,15 +338,15 @@ Section KexecPinTail.
     iApply (PC.kxc_c_close (CID0 := CID0) Q jp gf
  plen pfun na avf alen aslen afun
               pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
-              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz (us_V U)) sz1 c
+              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi (pv_sz (us_V U)) sz1 c
               HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               with "Htext Hst Hcont []").
-    iIntros (CIDd) "%Hsd". iIntros (Md Pd) "Hst2a6 Hcont".
+    iIntros (CIDd) "%Hsd". iIntros (Md Pd Mid) "Hst2a6 Hcont".
     iApply (PD.kxd_phaseD (CID0 := CIDd) Q jp gf
  plen pfun na avf alen aslen afun
               pidv U eb dqb dqs dqa dqpv dqas m Md K sp0 ra0 s00 s10 s20 pv av
-              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pd sz1 c
+              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pd Mid sz1 c
               HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               with "Htext Hst2a6 Hcont").
@@ -365,7 +365,7 @@ Section KexecPinTail.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (szv : mword 64) :
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szv : mword 64) :
     (* the ENTRY-POINT OBLIGATION, and the only site in the cone that
        pays it: the commit block's [ld a4,-408(s0)] loads exactly
        [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
@@ -394,7 +394,7 @@ Section KexecPinTail.
     kxc_at_1ae jp gf
                plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv (m !!! Regidx Rs11) -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi szv (m !!! Regidx Rs11) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
@@ -415,7 +415,7 @@ Section KexecPinTail.
     iAssert (kxc_at_1ae jp gf
                plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv (m !!! Regidx Rs11))
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi szv (m !!! Regidx Rs11))
       with "[Hrest]" as "Hst".
     { rewrite /kxc_at_1ae.
       iSplitR; [iPureIntro; exact Hregs |].
@@ -425,12 +425,12 @@ Section KexecPinTail.
     iApply (PC.kxc_c_setup (CID0 := CID0) Q jp gf
  plen pfun na avf alen aslen
               afun pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
-              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv
+              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi szv
               HK Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               Halen_b Halen_c Halen_4 Havf_na
               with "Htext Hst Hcont []").
-    iIntros (CID1) "%Hs1". iIntros (M1 P1 sz1) "%Hsz1ge Hdisj Hcont".
+    iIntros (CID1) "%Hs1". iIntros (M1 P1 Mim1 sz1) "%Hsz1ge Hdisj Hcont".
     iDestruct "Hdisj" as "[Hloop | Hskip]".
     - (* argv[0] <> NULL: run the loop from c = 0 *)
       (* [0 < na] is not a conjunct of the head and cannot be: what says it
@@ -444,7 +444,7 @@ Section KexecPinTail.
       iAssert (kxc_at_21a jp gf
  plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                  M1 K sp0 ra0 s00 s10 s20 pv av
-                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P1 (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) 0)
+                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P1 Mim1 (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) 0)
         with "[Hrest2]" as "Hloop".
       { rewrite /kxc_at_21a.
         iSplitR; [iPureIntro; exact Hq1 |].
@@ -458,13 +458,13 @@ Section KexecPinTail.
                 HK Halen_b Halen_c Halen_4 Havf_na Hsz1ge Hnamax Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
-                na M1 P1 0%nat H0na ltac:(lia)
+                na M1 P1 Mim1 0%nat H0na ltac:(lia)
                 with "Htext Hloop Hcont []").
-      iIntros (CID2) "%Hs2". iIntros (M2 P2 c2) "Hst272 Hcont".
+      iIntros (CID2) "%Hs2". iIntros (M2 P2 Mim2 c2) "Hst272 Hcont".
       iApply (kxc_d_tail (CID0 := CID2) Q jp gf
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m M2 K sp0 ra0 s00 s10 s20 pv av
-                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P2 sz1 c2
+                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P2 Mim2 sz1 c2
                 HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 with "Htext Hst272 Hcont").
@@ -472,7 +472,7 @@ Section KexecPinTail.
       iApply (kxc_d_tail (CID0 := CID1) Q jp gf
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m M1 K sp0 ra0 s00 s10 s20 pv av
-                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P1 sz1 0
+                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P1 Mim1 sz1 0
                 HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 with "Htext Hskip Hcont").
@@ -613,14 +613,14 @@ Section KexecPinMain.
               with "Htext Hfab Hpc Hcg Hcnt Hextc Hclmc Hopen Hlog Hirs Hbm Hins
                     Hbits Hbs Hka2 Hpriv Hpath Hargv Hargs Hframe Hcont [] []").
     - (* ---- OUTPUT 1: elf.phnum = 0, the phdr loop is skipped ---- *)
-      iIntros (CIDz) "%Hsz1". iIntros (Mz Pz w13z w67z) "Hst1a2 Hcont".
+      iIntros (CIDz) "%Hsz1". iIntros (Mz Pz Miz w13z w67z) "Hst1a2 Hcont".
       iApply (PB3.kxc_b2z (CID0 := CIDz) gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                 m Mz K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
-                (m !!! Regidx Ra0) (m !!! Regidx Ra1) w13z w67z ef Pz
+                (m !!! Regidx Ra0) (m !!! Regidx Ra1) w13z w67z ef Pz Miz
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
                 with "Htext Hfab Hst1a2 [Hcont]").
       iIntros (CIDy) "%Hsy". iIntros (My) "Hst1ae".
@@ -635,13 +635,13 @@ Section KexecPinMain.
                 (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13z
-                w67z ef Pz (mword_of_int 0 : mword 64)
+                w67z ef Pz Miz (mword_of_int 0 : mword 64)
                 (Q_pin_of_hdr pb ef Hhp) HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
     - (* ---- OUTPUT 2: the phdr loop's body, entered at i = 0, sz = 0 ---- *)
-      iIntros (CIDl) "%Hsl". iIntros (Ml Pl) "Hst12c Hcont".
+      iIntros (CIDl) "%Hsl". iIntros (Ml Pl Mil) "Hst12c Hcont".
       iApply (PB3.kxc_b2 (CID0 := CIDl) (kxp_entry_ok pb) gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf n2
@@ -649,12 +649,12 @@ Section KexecPinMain.
                 m Ml K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-                (mword_of_int 4095 : mword 64) ef Pl 0%nat
+                (mword_of_int 4095 : mword 64) ef Pl Mil 0%nat
                 (mword_of_int 0 : mword 64)
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hfab Hst12c Hcont []").
-      iIntros (CIDy) "%Hsy". iIntros (My Py szvy) "Hst1ae Hcont".
+      iIntros (CIDy) "%Hsy". iIntros (My Py Miy szvy) "Hst1ae Hcont".
       iApply (kxc_cd (CID0 := CIDy) (kxp_entry_ok pb) jp gf
  plen pfun na avf alen aslen afun
                 pidv U eb dqb dqs dqa dqpv dqas m My K
@@ -664,7 +664,7 @@ Section KexecPinMain.
                 (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
-                (mword_of_int 4095 : mword 64) ef Py szvy
+                (mword_of_int 4095 : mword 64) ef Py Miy szvy
                 (Q_pin_of_hdr pb ef Hhp) HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl

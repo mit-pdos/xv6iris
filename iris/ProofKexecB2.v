@@ -139,6 +139,7 @@ Require Import SpecWalkaddr.
 Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
 Require Import SpecKexecB2.
+Require Import KexecPtImage.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -303,12 +304,12 @@ Section KexecB2Body.
       (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string) :
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szf : mword 64) (eb : bool) (lks : gset string) :
     kxc_bad324_body Q gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
-      ef P szf eb lks.
+      ef P Mi szf eb lks.
   Proof.
     cbv beta delta [kxc_bad324_body].
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs
@@ -406,7 +407,10 @@ Section KexecB2Body.
     assert (HT3s4 : T3 !!! Regidx Rs4 = ientry kf)
       by (rewrite /T3 upd_ne; [exact HT2s4 | nz]).
     (* the size bound, read off COVERAGE -- see the header *)
-    iDestruct (proc_pt_any_wf_get P with "Hpt") as %Hwf.
+    iDestruct (proc_pt_wf_get P Mi with "Hpt") as %Hwf.
+    (* proc_freepagetable is stated at the ∃-weakened tier; this arm frees
+       the half-built space, so the image is dropped here on purpose. *)
+    iDestruct (proc_pt_forget with "Hpt") as "Hpt".
     iDestruct (cpu_own_transport CID0 CID3 0%nat eb (proc_addr jp) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CID3 eb (proc_addr jp)
@@ -787,13 +791,13 @@ Section KexecB2Loops.
       (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd)
+      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8))
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string) :
     kxc_ls_body Q gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
-      ef P ip va fz po eb lks.
+      ef P Mi ip va fz po eb lks.
   Proof.
     cbv beta delta [kxc_ls_body].
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs
@@ -801,9 +805,11 @@ Section KexecB2Loops.
     pose proof HK as HK'. 
     assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
       by (vm_compute; reflexivity).
-    intro W. revert CID0.
+    (* the image MOVES on the back edge (one [umem_write] a turn), so it is
+       generalised over the induction beside the register file. *)
+    intro W. revert CID0 Mi.
     induction W as [| W IH];
-      intros CID0 Ml ii Hiir Hfuel Hguard
+      intros CID0 Mi Ml ii Hiir Hfuel Hguard
              HMsp HMs0 HMs1 HMs3 HMs4 HMs5 HMs6 HMs7 HMs8 HMs9 HMs10 HMs11.
     { (* NO FUEL.  [off] is an unsigned 32-bit reading, so [2^32 - off] is at
          least one and the zero case cannot arise. *)
@@ -902,7 +908,7 @@ Section KexecB2Loops.
       rewrite /N2 upd_ne; [| lregne]. rewrite /N1 upd_ne; [| lregne].
       reflexivity. }
     (* ---- +0x100: jal ra,walkaddr ---- *)
-    iDestruct (proc_pt_acc_rep0 P with "Hpt") as
+    iDestruct (proc_pt_acc_rep0_m P Mi with "Hpt") as
       (t m_ad) "(%Hrep & %Hview & %Hbase & %Hwf & Hptree & Hown)".
     assert (HN4root : N4 !!! Regidx Ra0
                       = zero_extend' 64 (concat_vec (pt_base t)
@@ -1049,7 +1055,7 @@ Section KexecB2Loops.
       by exact (um_page_valid P (svpn_of vai) w0 Hwf Hum0).
     assert (Hpa0v : mr !!! Regidx Ra0 = page_base (pte_ppn w0))
       by (rewrite Ha0v Hppn0; reflexivity).
-    iDestruct (proc_pt_rebuild P t m_ad Hwf Hview Hrep Hbase
+    iDestruct (proc_pt_rebuild_m P Mi t m_ad Hwf Hview Hrep Hbase
                  with "Hptree Hown") as "Hpt".
     assert (Ha0nz : eq_vec (rget N6 Ra0) zero_reg = false).
     { rewrite (rget_ne N6 Ra0 ltac:(lnz)) HN6a0 Hpa0v.
@@ -1345,11 +1351,19 @@ Section KexecB2Loops.
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
           #Hkmapb & _)".
-      iDestruct (proc_pt_page_acc P (svpn_of vai) w0 Hum0 with "Hkmapb Hpt")
-        as "[Hpage Hgive]".
-      iEval (rewrite /ProcPtOwn.page_named) in "Hpage".
-      iDestruct (kxc_page_take (page_base (pte_ppn w0)) nn ltac:(lia)
-                   with "Hpage") as (fpg) "[Hdst Hrest]".
+      (* THE PAGE BORROW, AT THE NAMED IMAGE.  The anonymous
+         [proc_pt_page_acc] + [kxc_page_take] / [kxc_page_give] sandwich this
+         replaces handed the page out under an ∃-bound byte name and folded
+         back to [proc_pt_any], so nothing downstream could say what the
+         loaded address space contains.  [KexecPtImage]'s borrow is the same
+         split at [Mi]'s own bytes, and its closer moves [Mi] by exactly the
+         [nn]-byte write readi performs. *)
+      pose (fpg := fun j : nat =>
+              Mi !!! (bv_unsigned (svpn_of vai) * 4096 + Z.of_nat j)%Z).
+      iDestruct (proc_pt_page_load_split_f P Mi (svpn_of vai) w0
+                   (bv_unsigned (svpn_of vai) * 4096)%Z nn fpg Hwf Hum0
+                   eq_refl ltac:(lia) ltac:(intros j _; reflexivity)
+                   with "Hkmapb Hpt") as "(Hdst & Hrest & Hgive)".
       iEval (rewrite -HD6a2) in "Hdst".
       iDestruct (cpu_own_transport CIDd CIDd6 0%nat eb (proc_addr jp) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -1383,10 +1397,8 @@ Section KexecB2Loops.
       iEval (rewrite HD6a2) in "Hdst".
       (* ---- put back everything readi borrowed ---- *)
       iDestruct ("Hpvbk" with "Hppid") as "Hpriv".
-      iDestruct (kxc_page_give (page_base (pte_ppn w0)) nn fpg
-                   (rd_delivered datl fpg offn tot) ltac:(lia)
-                   with "Hdst Hrest") as "Hpage".
-      iDestruct ("Hgive" with "Hpage") as "Hpt".
+      iDestruct ("Hgive" $! (rd_delivered datl fpg offn tot)
+                   with "Hdst Hrest") as "Hpt".
       iDestruct (kxc_load_seal kf inumf dnf bmf datl
                    Hiok Hrl Hdok Hddix Hdoc Hduq
                    with "Hdlk Hdiat Hmeta Hmap Hblocks Htop") as "Hload".
@@ -1516,7 +1528,7 @@ Section KexecB2Loops.
           iDestruct (cpu_claim_ext_transport CIDrd CIDx1 eb (proc_addr jp)
                        ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
           iSpecialize ("Hc116" $! CIDx1 with "[%]"); [wp_next_chain |].
-          iApply ("Hc116" $! E1 with "[%] Hcg Hcnt Hextc Hclmc Hpc [Hopen Hlog Hirs Hbm Hins
+          iApply ("Hc116" $! E1 _ with "[%] Hcg Hcnt Hextc Hclmc Hpc [Hopen Hlog Hirs Hbm Hins
                     Hbits Hbs Hpt Hpriv Hpath Hargv Hargs Helf Hframe] [Hcont]").
           { split_and!.
             - rewrite (HE1get csp_rs1 ltac:(vm_compute; reflexivity)
@@ -1583,7 +1595,7 @@ Section KexecB2Loops.
             apply Z.mod_small. lia. }
           assert (Hguard' : (w32_uarg ii' < w32_uarg fz)%Z).
           { rewrite Z.geb_leb in Egf. apply Z.leb_gt in Egf. lia. }
-          iApply (IH CIDx2 E1 ii' Hii'r ltac:(rewrite Hoff'; lia) Hguard'
+          iApply (IH CIDx2 _ E1 ii' Hii'r ltac:(rewrite Hoff'; lia) Hguard'
                     ltac:(rewrite (HE1get csp_rs1 ltac:(vm_compute; reflexivity)
                                     ltac:(lnz) ltac:(lnz)); exact HMsp)
                     ltac:(rewrite (HE1get Rs0 ltac:(vm_compute; reflexivity)
@@ -1646,7 +1658,7 @@ Section KexecB2Loops.
                   gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen
                   pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas m M2 K
-                  sp0 ra0 s00 s10 s20 pv av w63 w67 ef P w65 eb lks
+                  sp0 ra0 s00 s10 s20 pv av w63 w67 ef P _ w65 eb lks
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                   Hgs Hsp Hra Hs0 Hs1 Hs2
                   ltac:(rewrite (HM2get csp_rs1 ltac:(vm_compute; reflexivity)

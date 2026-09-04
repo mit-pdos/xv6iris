@@ -291,7 +291,7 @@ Section KexecBBody.
            av dqa avf aslen dqas afun) -∗
     (* ---- OUTPUT 1: [elf.phnum = 0], the loop is skipped ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (M : regfile) (P : uptd) (w13 w67 : mword 64),
+      ∀ (M : regfile) (P : uptd) (Mi : gmap Z (bv 8)) (w13 w67 : mword 64),
         kxc_at_1a2 jp gf
  kf qf sf gyf loyf tlyf inumf dnf bmf
                    gilf gislf n2
@@ -300,7 +300,7 @@ Section KexecBBody.
                    (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                    (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                    (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13
-                   w67 ef P -∗
+                   w67 ef P Mi -∗
         (* THE EXIT, HANDED BACK: a [wp_next] continuation is LINEAR, and the
            +0x31c tail above already owns one copy, so the successor cannot
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
@@ -311,7 +311,7 @@ Section KexecBBody.
         WP (Loop : expr riscv_lang)) -∗
     (* ---- OUTPUT 2: the phdr loop's body entry, at [i = 0], [sz = 0] ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (M : regfile) (P : uptd),
+      ∀ (M : regfile) (P : uptd) (Mi : gmap Z (bv 8)),
         kxc_at_12c jp gf
  kf qf sf gyf loyf tlyf inumf dnf bmf
                    gilf gislf n2
@@ -321,7 +321,7 @@ Section KexecBBody.
                    (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                    (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                    (mword_of_int 4095 : mword 64)
-                   ef P 0%nat (mword_of_int 0 : mword 64) -∗
+                   ef P Mi 0%nat (mword_of_int 0 : mword 64) -∗
         (* THE EXIT, HANDED BACK: a [wp_next] continuation is LINEAR, and the
            +0x31c tail above already owns one copy, so the successor cannot
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
@@ -777,7 +777,7 @@ Section KexecBBody.
         iSpecialize ("Hcont1a2" $! CID15 with "[%]"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply ("Hcont1a2" $! G4 P v13 v67 with "[-Hcont] Hcont").
+        iApply ("Hcont1a2" $! G4 P ∅ v13 v67 with "[-Hcont] Hcont").
         rewrite /kxc_at_1a2.
         iSplitR.
         { iPureIntro. split_and!;
@@ -812,7 +812,7 @@ Section KexecBBody.
         iSplitR; [iExact "Hbits" |].
         iSplitL "Hbs"; [iExact "Hbs" |].
         iSplitR; [iExact "Hka" |].
-        iSplitL "Hpt"; [iApply (proc_pt_forget with "Hpt") |].
+        iSplitL "Hpt"; [iExact "Hpt" |].
         iSplitL "Hpriv"; [iExact "Hpriv" |].
         iSplitL "Hpath"; [iExact "Hpath" |].
         iSplitL "Hargv"; [iExact "Hargv" |].
@@ -1085,7 +1085,7 @@ Section KexecBBody.
         iSpecialize ("Hcont12c" $! CID24 with "[%]"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID24 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply ("Hcont12c" $! G11 P with "[-Hcont] Hcont").
+        iApply ("Hcont12c" $! G11 P ∅ with "[-Hcont] Hcont").
         rewrite /kxc_at_12c.
         (* [kxc_at_12c] has NO threading conjunct -- see its header: by +0x12c
            no callee-saved register still holds kexec's entry value, so the
@@ -1125,7 +1125,7 @@ Section KexecBBody.
         iSplitR; [iExact "Hbits" |].
         iSplitL "Hbs"; [iExact "Hbs" |].
         iSplitR; [iExact "Hka" |].
-        iSplitL "Hpt"; [iApply (proc_pt_forget with "Hpt") |].
+        iSplitL "Hpt"; [iExact "Hpt" |].
         iSplitL "Hpriv"; [iExact "Hpriv" |].
         iSplitL "Hpath"; [iExact "Hpath" |].
         iSplitL "Hargv"; [iExact "Hargv" |].
