@@ -1610,6 +1610,10 @@ ProofFilewriteCons.v
 LinkFilewriteCons.v
 LinkSysWriteConsAU.v
 SpecKexecPin.v
+# exec's ATOMIC-UPDATE contract: the walk, one observation of the file, and
+# the caller's own u-mode WP for the program observed (SpecKexecAU.v's header).
+SpecKexecAU.v
+SpecSysExecAU.v
 # THE CHUNK LOOP, AND THE SEAL IT CLOSES (lane W, FILEWRITE-AU).
 #   ProofFilewriteAU is ProofFilewrite's walk on the inode arm only, with
 # FsAbsWriteFire.wrf_awrite_fire in place of the ireg_top_retag; the three
