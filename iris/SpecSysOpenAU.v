@@ -24,22 +24,30 @@
 
    ==== WHAT THIS CONTRACT IS ==========================================
 
-   A PARALLEL FORM beside [SpecSysOpen.wp_sys_open_sconf] (R10: the
-   landed contract does not move).  Same calling convention, same ambient
-   premises, same threaded resources -- INCLUDING the landed descriptor
-   story verbatim: the LEAST free descriptor ([SpecFdalloc.fd_frees]),
-   the fd-state fragment bundle ([FdSlots.fd_frags_any]) in, and the
-   retype at [ProcInv.proc_priv_settle].  What is NEW: the caller hands
-   in commit steps fired at the syscall's linearization instants against
-   the ONE abstract state, the postcondition ties the returned a0 to the
-   values OBSERVED at those instants, and the success arm SHARPENS the
-   landed bundle return to [fd_frags] at an EXPLICIT state list whose row
-   at the new descriptor is typed -- [FdOpen rb wb (FdDevice ma)] on the
-   device arm, [FdOpen rb wb (FdInode i)] on the file/dir/create arms
-   ([FdSlots]: [FdDevice] carries its major, [FdInode] its inum, the two
-   mode booleans ride [FdOpen]).  [proc_priv_settle]'s payout IS the
-   typed row; [open_fd_frags_any] ties the sharpened post back to the
-   landed shape.
+   A PARALLEL FORM beside [SpecSysOpen.wp_sys_open_sconf], and since
+   2026-09-03 the form that REPLACES it at the dispatch: the landed
+   contract is derived from this one ([open_arms_plain_landed] /
+   [open_arms_create_landed], section 2h).  Same calling convention, same
+   ambient premises, same threaded resources -- INCLUDING the landed
+   descriptor story verbatim: the LEAST free descriptor
+   ([SpecFdalloc.fd_frees]), the fd-state fragment bundle
+   ([FdSlots.fd_frags]) in at the caller's OWN table [sts] and back with
+   exactly ONE row moved on success (the landed row since 34375379c: the
+   failure arms return [sts] on the nose, the success arm
+   [<[fd := FdOpen rb wb t]> sts] beside [sts !! fd = Some FdClosed]),
+   the mode bits pinned to the FLAGS (the landed [so_rd_of]/[so_wr_of]
+   and this file's [om_readable]/[om_writable] are one function,
+   [om_modes_landed]), and the retype at [ProcInv.proc_priv_settle].
+   What is NEW: the caller hands in commit steps fired at the syscall's
+   linearization instants against the ONE abstract state, the
+   postcondition ties the returned a0 to the values OBSERVED at those
+   instants, and the success arm TYPES the new descriptor's row --
+   [FdOpen rb wb (FdDevice ma)] on the device arm, [FdOpen rb wb
+   (FdInode i)] on the file/dir/create arms ([FdSlots]: [FdDevice]
+   carries its major, [FdInode] its inum) -- where the landed post leaves
+   the type existential.  [proc_priv_settle]'s payout IS the typed row.
+   THE IMAGE DOES NOT MOVE and the page-table report is the SIZED one
+   ([uptd_ext_sz]), the landed continuation's rows verbatim.
 
    TWO SEALED FORMS, keyed by the O_CREATE bit AS A PREMISE (the
    exclusion-by-premise pattern: omode is the caller's own trapframe
@@ -248,6 +256,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import RiscvExtras.
+Require Import VcGen.           (* [trunc32_unsigned], for the mode-bit tie *)
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
@@ -302,6 +311,7 @@ Require Import FsAbsEraMknod.   (* [mknod_walk_pre_era], [mknod_walk_dead_era]
                                    -- the parent-prefix one-shot, REUSED *)
 Require Import FsAbsMknodFire.  (* [acre_commit_at], [dlookup_commit_at],
                                    [mkf_auth_nview] *)
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
@@ -578,8 +588,8 @@ Section SysOpenAU.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (open_walk_pre_era γfs P Pmiss
-     ∗ aopen_commit_at Γ ∅ Φo
-     ∗ atrunc_commit_at Γ ∅ Φt)%I.
+     ∗ aopen_commit_at Γ fsabsE Φo
+     ∗ atrunc_commit_at Γ fsabsE Φt)%I.
 
   (* ...and the O_CREATE caller: the parent-prefix one-shot REUSED from
      the mknod era file, create's fused delta at the child [AFile []],
@@ -590,10 +600,10 @@ Section SysOpenAU.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (mknod_walk_pre_era γfs P Pmiss
-     ∗ acre_commit_at Γ ∅ (AFile []) Φok
-     ∗ dlookup_commit_at Γ ∅ Φex
-     ∗ aopen_commit_at Γ ∅ Φo
-     ∗ atrunc_commit_at Γ ∅ Φt)%I.
+     ∗ acre_commit_at Γ fsabsE (AFile []) Φok
+     ∗ dlookup_commit_at Γ fsabsE Φex
+     ∗ aopen_commit_at Γ fsabsE Φo
+     ∗ atrunc_commit_at Γ fsabsE Φt)%I.
 
   (* ------------------------------------------------------------------ *)
   (*  2e.  The descriptor story                                           *)
@@ -613,13 +623,19 @@ Section SysOpenAU.
      descriptor's type -- [proc_priv_settle]'s payout, re-packed through
      [fd_frags_acc]. *)
   Definition open_fd_ok `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
-      (UW : ustate) (rb wb : bool) (t : fdtype) (r : mword 64) : iProp Σ :=
-    (∃ (fd : nat) (l : list nat) (k : nat) (sts : list fdstate),
+      (UW : ustate) (rb wb : bool) (t : fdtype) (sts : list fdstate)
+      (r : mword 64) : iProp Σ :=
+    (∃ (fd : nat) (l : list nat) (k : nat),
        ⌜r = (mword_of_int (Z.of_nat fd) : mword 64)
-        /\ fd_frees (pv_ofile (us_V UW)) = fd :: l⌝ ∗
-       ⌜sts !! fd = Some (FdOpen rb wb t)⌝ ∗
+        /\ fd_frees (pv_ofile (us_V UW)) = fd :: l
+        (* ...AND THE SLOT WAS CLOSED -- [SpecSysOpen.sys_open_post]'s
+           conjunct, verbatim: fdalloc hands its authority back at
+           [FdClosed], and [UserFd.ufd_open]'s insert needs the key free *)
+        /\ sts !! fd = Some FdClosed⌝ ∗
        proc_priv γf p pid (us_ofile UW fd (fnode k)) ∗
-       fd_frags (pv_fdg (us_V UW)) sts)%I.
+       (* the caller's OWN table with exactly ONE row moved -- the landed
+          success row's shape, at the arm's typed row *)
+       fd_frags (pv_fdg (us_V UW)) (<[fd := FdOpen rb wb t]> sts))%I.
 
   (* ------------------------------------------------------------------ *)
   (*  2f.  The PLAIN arms                                                 *)
@@ -633,7 +649,7 @@ Section SysOpenAU.
       (P : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
-      (UW : ustate) (r : mword 64) : iProp Σ :=
+      (sts : list fdstate) (UW : ustate) (r : mword 64) : iProp Σ :=
     (∃ (pl : list (bv 8)) (av : aview) (i : Z),
        P (length (path_elems pl)) i ∗
        ((* DEVICE (the init arm): the major is in range, the fragment is
@@ -642,9 +658,9 @@ Section SysOpenAU.
            ⌜av !! i = Some (MkAnode (ADev ma mi) nl)⌝ ∗
            ⌜0 <= ma <= NDEV_max⌝ ∗
            Φo av i (MkAnode (ADev ma mi) nl) ∗
-           atrunc_commit_at Γ ∅ Φt ∗
+           atrunc_commit_at Γ fsabsE Φt ∗
            open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
-             (FdDevice ma) r)
+             (FdDevice ma) sts r)
         ∨ (* FILE: the ONE delta of this surface, iff O_TRUNC -- the trunc
              fired at a state still holding the OBSERVED row (the
              lock-hold tie, header) *)
@@ -655,9 +671,9 @@ Section SysOpenAU.
             then ∃ av' : aview,
                    ⌜av' !! i = Some (MkAnode (AFile bs0) nl)⌝ ∗
                    Φt av' i bs0
-            else atrunc_commit_at Γ ∅ Φt) ∗
+            else atrunc_commit_at Γ fsabsE Φt) ∗
            open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
-             (FdInode i) r)
+             (FdInode i) sts r)
         ∨ (* DIRECTORY, at O_RDONLY exactly: the arm's own key is what
              pays the writable-fd-is-not-a-directory theorem here
              ([om_rdonly_modes]) *)
@@ -665,8 +681,8 @@ Section SysOpenAU.
            ⌜av !! i = Some (MkAnode (ADir ents) nl)⌝ ∗
            ⌜om_arg vom = 0⌝ ∗
            Φo av i (MkAnode (ADir ents) nl) ∗
-           atrunc_commit_at Γ ∅ Φt ∗
-           open_fd_ok γf p pid UW true false (FdInode i) r)))%I.
+           atrunc_commit_at Γ fsabsE Φt ∗
+           open_fd_ok γf p pid UW true false (FdInode i) sts r)))%I.
 
   (* ret -1: the header's three-way fold, residue returned per arm.  The
      third disjunct's observation is FIRED, not optional: every post-walk
@@ -678,29 +694,32 @@ Section SysOpenAU.
     (open_au_pre_plain Γ γfs P Pmiss Φo Φt
      ∨ (∃ pl : list (bv 8),
           (open_walk_dead_era γfs P Pmiss pl
-             ∗ aopen_commit_at Γ ∅ Φo
-             ∗ atrunc_commit_at Γ ∅ Φt)
+             ∗ aopen_commit_at Γ fsabsE Φo
+             ∗ atrunc_commit_at Γ fsabsE Φt)
           ∨ (∃ i : Z,
                P (length (path_elems pl)) i
                ∗ (∃ (av : aview) (a : anode),
                     ⌜av !! i = Some a⌝ ∗ Φo av i a)
-               ∗ atrunc_commit_at Γ ∅ Φt)))%I.
+               ∗ atrunc_commit_at Γ fsabsE Φt)))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0, with
-     the landed post's fd-side bundle folded in per arm ([fd_frags_any]
-     back untouched on failure -- no arm that installed a descriptor can
-     fail after doing so -- and [fd_slot] back on every arm) *)
+     the landed post's fd-side bundle folded in per arm (the caller's
+     [sts] back on the nose on failure, one row moved on success, and
+     [fd_slot] back on every arm); [open_arms_plain_landed] below is the
+     tie to [SpecSysOpen.sys_open_post] *)
   Definition open_arms_plain `{XI : CurCtx} Γ (γfs : fs_names) (γf : gname)
       (p : mword 64) (pid : mword 32) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
-      (UW : ustate) (r : mword 64) : iProp Σ :=
+      (sts : list fdstate) (UW : ustate) (r : mword 64) : iProp Σ :=
     (((⌜r = (mword_of_int (-1) : mword 64)⌝
        ∗ proc_priv γf p pid UW
-       ∗ fd_frags_any (pv_fdg (us_V UW))
+       (* the failure arms hand the caller's table back ON THE NOSE: no
+          arm that installed a descriptor can fail after doing so *)
+       ∗ fd_frags (pv_fdg (us_V UW)) sts
        ∗ open_post_fail_plain Γ γfs P Pmiss Φo Φt)
-      ∨ open_post_ok_plain Γ γf p pid vom P Φo Φt UW r)
+      ∨ open_post_ok_plain Γ γf p pid vom P Φo Φt sts UW r)
      ∗ fd_slot)%I.
 
   (* ------------------------------------------------------------------ *)
@@ -719,7 +738,7 @@ Section SysOpenAU.
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
-      (UW : ustate) (r : mword 64) : iProp Σ :=
+      (sts : list fdstate) (UW : ustate) (r : mword 64) : iProp Σ :=
     (∃ (pl : list (bv 8)) (d i : Z) (nm : fname),
        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
        P (length (mknod_parent_elems pl)) d ∗
@@ -728,17 +747,17 @@ Section SysOpenAU.
            ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
            ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
            Φok av d nm i ∗
-           dlookup_commit_at Γ ∅ Φex ∗
-           aopen_commit_at Γ ∅ Φo ∗
-           atrunc_commit_at Γ ∅ Φt ∗
+           dlookup_commit_at Γ fsabsE Φex ∗
+           aopen_commit_at Γ fsabsE Φo ∗
+           atrunc_commit_at Γ fsabsE Φt ∗
            open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
-             (FdInode i) r)
+             (FdInode i) sts r)
         ∨ (* EXISTS-OPENS *)
         (∃ (avx : aview) (entsx : gmap fname Z) (nlx : nat),
            ⌜avx !! d = Some (MkAnode (ADir entsx) nlx)⌝ ∗
            ⌜entsx !! nm = Some i⌝ ∗
            Φex avx d nm i ∗
-           acre_commit_at Γ ∅ (AFile []) Φok ∗
+           acre_commit_at Γ fsabsE (AFile []) Φok ∗
            (∃ (av : aview) (nl : nat),
               ((* the found node is a FILE *)
                (∃ bs0 : list (bv 8),
@@ -748,18 +767,18 @@ Section SysOpenAU.
                    then ∃ av' : aview,
                           ⌜av' !! i = Some (MkAnode (AFile bs0) nl)⌝ ∗
                           Φt av' i bs0
-                   else atrunc_commit_at Γ ∅ Φt) ∗
+                   else atrunc_commit_at Γ fsabsE Φt) ∗
                   open_fd_ok γf p pid UW (om_readable vom)
-                    (om_writable vom) (FdInode i) r)
+                    (om_writable vom) (FdInode i) sts r)
                ∨ (* ...or a DEVICE (F-OK admits it; the major test still
                     stands between it and the fd) *)
                (∃ ma mi : Z,
                   ⌜av !! i = Some (MkAnode (ADev ma mi) nl)⌝ ∗
                   ⌜0 <= ma <= NDEV_max⌝ ∗
                   Φo av i (MkAnode (ADev ma mi) nl) ∗
-                  atrunc_commit_at Γ ∅ Φt ∗
+                  atrunc_commit_at Γ fsabsE Φt ∗
                   open_fd_ok γf p pid UW (om_readable vom)
-                    (om_writable vom) (FdDevice ma) r))))))%I.
+                    (om_writable vom) (FdDevice ma) sts r))))))%I.
 
   (* ret -1: the fold.  Note arm (a): a FRESH create that succeeded
      before open's table-full failure leaves its delta STANDING, and the
@@ -772,13 +791,13 @@ Section SysOpenAU.
     (open_au_pre_create Γ γfs P Pmiss Φok Φex Φo Φt
      ∨ (∃ pl : list (bv 8),
           (mknod_walk_dead_era γfs P Pmiss pl
-             ∗ acre_commit_at Γ ∅ (AFile []) Φok
-             ∗ dlookup_commit_at Γ ∅ Φex
-             ∗ aopen_commit_at Γ ∅ Φo
-             ∗ atrunc_commit_at Γ ∅ Φt)
+             ∗ acre_commit_at Γ fsabsE (AFile []) Φok
+             ∗ dlookup_commit_at Γ fsabsE Φex
+             ∗ aopen_commit_at Γ fsabsE Φo
+             ∗ atrunc_commit_at Γ fsabsE Φt)
           ∨ (∃ d : Z,
                P (length (mknod_parent_elems pl)) d
-               ∗ atrunc_commit_at Γ ∅ Φt
+               ∗ atrunc_commit_at Γ fsabsE Φt
                ∗ ((* (a) create succeeded FRESH; open failed past it *)
                   (∃ (av : aview) (i : Z) (nm : fname)
                      (ents : gmap fname Z) (nl : nat),
@@ -786,8 +805,8 @@ Section SysOpenAU.
                      ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
                      ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
                      Φok av d nm i
-                     ∗ dlookup_commit_at Γ ∅ Φex
-                     ∗ aopen_commit_at Γ ∅ Φo)
+                     ∗ dlookup_commit_at Γ fsabsE Φex
+                     ∗ aopen_commit_at Γ fsabsE Φo)
                   ∨ (* (b) the name existed: found DIR (F-BAD), a bad
                        found-device major, or table full past a good
                        found node; -1 does not say which *)
@@ -797,15 +816,15 @@ Section SysOpenAU.
                      ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
                      ⌜ents !! nm = Some i⌝ ∗
                      Φex av d nm i
-                     ∗ acre_commit_at Γ ∅ (AFile []) Φok
-                     ∗ (aopen_commit_at Γ ∅ Φo
+                     ∗ acre_commit_at Γ fsabsE (AFile []) Φok
+                     ∗ (aopen_commit_at Γ fsabsE Φo
                         ∨ (∃ (av' : aview) (a : anode),
                              ⌜av' !! i = Some a⌝ ∗ Φo av' i a)))
                   ∨ (* (c) nothing observed: the nlink guard, out of
                        inodes, dirlink failure, "/" *)
-                  (acre_commit_at Γ ∅ (AFile []) Φok
-                   ∗ dlookup_commit_at Γ ∅ Φex
-                   ∗ aopen_commit_at Γ ∅ Φo)))))%I.
+                  (acre_commit_at Γ fsabsE (AFile []) Φok
+                   ∗ dlookup_commit_at Γ fsabsE Φex
+                   ∗ aopen_commit_at Γ fsabsE Φo)))))%I.
 
   Definition open_arms_create `{XI : CurCtx} Γ (γfs : fs_names) (γf : gname)
       (p : mword 64) (pid : mword 32) (vom : mword 64)
@@ -813,13 +832,133 @@ Section SysOpenAU.
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
-      (UW : ustate) (r : mword 64) : iProp Σ :=
+      (sts : list fdstate) (UW : ustate) (r : mword 64) : iProp Σ :=
     (((⌜r = (mword_of_int (-1) : mword 64)⌝
        ∗ proc_priv γf p pid UW
-       ∗ fd_frags_any (pv_fdg (us_V UW))
+       ∗ fd_frags (pv_fdg (us_V UW)) sts
        ∗ open_post_fail_create Γ γfs P Pmiss Φok Φex Φo Φt)
-      ∨ open_post_ok_create Γ γf p pid vom P Φok Φex Φo Φt UW r)
+      ∨ open_post_ok_create Γ γf p pid vom P Φok Φex Φo Φt sts UW r)
      ∗ fd_slot)%I.
+
+  (* ------------------------------------------------------------------ *)
+  (*  2h.  The tie to the landed post                                     *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE MODE READINGS ARE THE LANDED ONES.  [SpecSysOpen.so_rd_of] /
+     [so_wr_of] read the two mode bits off the argint'd word ([trunc32
+     vom]); this file's [om_readable]/[om_writable] read the same bits
+     off [om_arg vom].  One lemma says they are one function. *)
+  Lemma om_arg_trunc32 `{XI : CurCtx} (v : mword 64) :
+    bv_unsigned (trunc32 v) = om_arg v.
+  Proof.
+    rewrite trunc32_unsigned /om_arg /bv_wrap /bv_modulus.
+    change (Z.of_N (MachineWord.MachineWord.Z_idx 32)) with 32. reflexivity.
+  Qed.
+
+  Lemma om_modes_landed `{XI : CurCtx} (v : mword 64) :
+    so_rd_of (trunc32 v) = om_readable v
+    /\ so_wr_of (trunc32 v) = om_writable v.
+  Proof.
+    rewrite /so_rd_of /so_wr_of /om_readable /om_writable /om_wronly /om_rdwr
+      om_arg_trunc32.
+    set (x := om_arg v).
+    (* both bits as Euclidean arithmetic, then the four cases by computation *)
+    rewrite (Z.testbit_eqb x 0); [| lia]. rewrite (Z.testbit_eqb x 1); [| lia].
+    rewrite Z.pow_0_r Z.pow_1_r Z.div_1_r.
+    pose proof (Z.div_mod x 2 ltac:(lia)) as Hd2.
+    pose proof (Z.div_mod x 4 ltac:(lia)) as Hd4.
+    pose proof (Z.div_mod (x `div` 2) 2 ltac:(lia)) as Hd22.
+    pose proof (Z.mod_pos_bound x 2 ltac:(lia)) as Hb2.
+    pose proof (Z.mod_pos_bound x 4 ltac:(lia)) as Hb4.
+    pose proof (Z.mod_pos_bound (x `div` 2) 2 ltac:(lia)) as Hb22.
+    assert (H4 : x `mod` 4 = x `mod` 2 + 2 * ((x `div` 2) `mod` 2)) by lia.
+    assert (Hm2 : x `mod` 2 = 0 \/ x `mod` 2 = 1) by lia.
+    assert (Hm2' : (x `div` 2) `mod` 2 = 0 \/ (x `div` 2) `mod` 2 = 1) by lia.
+    clear Hd2 Hd4 Hd22 Hb2 Hb4 Hb22.
+    rewrite H4.
+    destruct Hm2 as [Hm2 | Hm2], Hm2' as [Hm2' | Hm2']; rewrite Hm2 Hm2';
+      split; vm_compute; reflexivity.
+  Qed.
+
+  (* THE PLAIN ARMS IMPLY THE LANDED POST.  The receipts and the walk
+     package are dropped, the typed row becomes the landed existential
+     [t], and the modes are read through [om_modes_landed] (the dir arm's
+     [true]/[false] through [om_rdonly_modes]).  This is what lets a
+     consumer of [SpecSysOpen.sys_open_post] -- the dispatch -- run on the
+     AU contract unchanged. *)
+  Lemma open_fd_ok_landed `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
+      (UW : ustate) (rb wb : bool) (t : fdtype) (sts : list fdstate)
+      (om : mword 32) (r : mword 64) :
+    so_rd_of om = rb -> so_wr_of om = wb ->
+    open_fd_ok γf p pid UW rb wb t sts r ⊢
+      (∃ (fd : nat) (l : list nat) (k : nat) (t : fdtype),
+         ⌜r = (mword_of_int (Z.of_nat fd) : mword 64) /\
+          fd_frees (pv_ofile (us_V UW)) = fd :: l /\
+          sts !! fd = Some FdClosed⌝ ∗
+         proc_priv γf p pid (us_ofile UW fd (fnode k)) ∗
+         fd_frags (pv_fdg (us_V UW))
+           (<[fd := FdOpen (so_rd_of om) (so_wr_of om) t]> sts)).
+  Proof.
+    intros -> ->. rewrite /open_fd_ok.
+    iIntros "H". iDestruct "H" as (fd l k) "(%Hpu & Hp & Hb)".
+    iExists fd, l, k, t. iFrame "Hp Hb". iPureIntro. exact Hpu.
+  Qed.
+
+  Lemma open_arms_plain_landed `{XI : CurCtx} Γ (γfs : fs_names) (γf : gname)
+      (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
+      (sts : list fdstate) (UW : ustate) (r : mword 64) :
+    open_arms_plain Γ γfs γf p pid vom P Pmiss Φo Φt sts UW r ⊢
+      sys_open_post γf p pid UW sts (trunc32 vom) r.
+  Proof.
+    destruct (om_modes_landed vom) as [Hrd Hwr].
+    rewrite /open_arms_plain /open_post_ok_plain /sys_open_post.
+    iIntros "[[(%Hr & Hp & Hb & _) | H] $]".
+    - iLeft. by iFrame "Hp Hb".
+    - iRight.
+      iDestruct "H" as (pl av i) "(_ & [H | [H | H]])".
+      + iDestruct "H" as (ma mi nl) "(_ & _ & _ & _ & H)".
+        iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
+          [exact Hrd | exact Hwr].
+      + iDestruct "H" as (bs0 nl) "(_ & _ & _ & H)".
+        iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
+          [exact Hrd | exact Hwr].
+      + iDestruct "H" as (ents nl) "(_ & %Hom & _ & _ & H)".
+        destruct (om_rdonly_modes vom Hom) as [Hrd0 Hwr0].
+        iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
+          [by rewrite Hrd Hrd0 | by rewrite Hwr Hwr0].
+  Qed.
+
+  Lemma open_arms_create_landed `{XI : CurCtx} Γ (γfs : fs_names) (γf : gname)
+      (p : mword 64) (pid : mword 32) (vom : mword 64)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φo : aview -> Z -> anode -> iProp Σ)
+      (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
+      (sts : list fdstate) (UW : ustate) (r : mword 64) :
+    open_arms_create Γ γfs γf p pid vom P Pmiss Φok Φex Φo Φt sts UW r ⊢
+      sys_open_post γf p pid UW sts (trunc32 vom) r.
+  Proof.
+    destruct (om_modes_landed vom) as [Hrd Hwr].
+    rewrite /open_arms_create /open_post_ok_create /sys_open_post.
+    iIntros "[[(%Hr & Hp & Hb & _) | H] $]".
+    - iLeft. by iFrame "Hp Hb".
+    - iRight.
+      iDestruct "H" as (pl d i nm) "(_ & _ & [H | H])".
+      + iDestruct "H" as (av ents nl) "(_ & _ & _ & _ & _ & _ & H)".
+        iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
+          [exact Hrd | exact Hwr].
+      + iDestruct "H" as (avx entsx nlx) "(_ & _ & _ & _ & H)".
+        iDestruct "H" as (av nl) "[H | H]".
+        * iDestruct "H" as (bs0) "(_ & _ & _ & H)".
+          iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
+            [exact Hrd | exact Hwr].
+        * iDestruct "H" as (ma mi) "(_ & _ & _ & _ & H)".
+          iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
+            [exact Hrd | exact Hwr].
+  Qed.
 
 End SysOpenAU.
 
@@ -847,14 +986,14 @@ Global Typeclasses Opaque open_walk_pre_era open_walk_dead_era
    this frame at their own bundle and arms. *)
 Definition wp_sys_open_au_frame
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γfl γf : gname)   (* ftable lock + ghost, kalloc, printk *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
     (pd pav pu : mword 64)                              (* disk fabric + lock  *)
     (ns : nat)                                          (* the iref ledger     *)
     (dqb dqs dqbs dqn : dfrac)
     (v vom : mword 64)                       (* syscall arguments 0 and 1   *)
-    (pid : mword 32) (U : ustate)
+    (pid : mword 32) (U : ustate) (sts : list fdstate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (EXTRA : iProp Σ) (ARMS : ustate -> mword 64 -> iProp Σ) :=
@@ -915,13 +1054,18 @@ Definition wp_sys_open_au_frame
   iref_slots ns -∗
   fd_slot -∗
   proc_priv γf pj pid U -∗
-  fd_frags_any (pv_fdg (us_V U)) -∗
+  (* the descriptor-state fragments at the caller's OWN table -- the
+     landed row since 34375379c; the arms return it with one row moved *)
+  fd_frags (pv_fdg (us_V U)) sts -∗
   (* ---- THE AU SIDE (the one addition to the landed premise list) ---- *)
   EXTRA -∗
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (ns' : nat) (P' : uptd) (M' : gmap Z (bv 8)),
+  (* THE IMAGE DOES NOT MOVE ([SpecSysOpen]'s note): sys_open only READS
+     user memory, so the binders are [(mf, ns', P')] and the block returns
+     at [us_upt U P'] -- no [M'].  [uptd_ext_sz] is argstr's own report. *)
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -936,7 +1080,7 @@ Definition wp_sys_open_au_frame
       iref_slots ns' -∗
       (* the armed post on the final process state and the returned a0
          (implies the landed [sys_open_post]) *)
-      ARMS (upd_usM (us_upt U P') M')
+      ARMS (us_upt U P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -947,14 +1091,14 @@ Definition wp_sys_open_au_frame
    O_CREATE bit is excluded BY PREMISE (header: two sealed forms). *)
 Definition wp_sys_open_au_plain_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γfl γf : gname)
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
     (ns : nat)
     (dqb dqs dqbs dqn : dfrac)
     (v vom : mword 64)
-    (pid : mword 32) (U : ustate)
+    (pid : mword 32) (U : ustate) (sts : list fdstate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (P Pmiss : nat -> Z -> iProp Σ)
@@ -963,21 +1107,21 @@ Definition wp_sys_open_au_plain_body
   let Γfs := fs_gamma_L fsc_fs in
   om_create vom = false ->
   wp_sys_open_au_frame γfl γf gs j gl pd pav pu ns dqb dqs dqbs dqn
-    v vom pid U m K eb b lks
+    v vom pid U sts m K eb b lks
     (open_au_pre_plain Γfs fsc_fs P Pmiss Φo Φt)
-    (open_arms_plain Γfs fsc_fs γf (proc_addr j) pid vom P Pmiss Φo Φt).
+    (open_arms_plain Γfs fsc_fs γf (proc_addr j) pid vom P Pmiss Φo Φt sts).
 
 (* THE O_CREATE FORM: create's surface at the child [AFile []]. *)
 Definition wp_sys_open_au_create_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γfl γf : gname)
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
     (ns : nat)
     (dqb dqs dqbs dqn : dfrac)
     (v vom : mword 64)
-    (pid : mword 32) (U : ustate)
+    (pid : mword 32) (U : ustate) (sts : list fdstate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
     (P Pmiss : nat -> Z -> iProp Σ)
@@ -987,10 +1131,10 @@ Definition wp_sys_open_au_create_body
   let Γfs := fs_gamma_L fsc_fs in
   om_create vom = true ->
   wp_sys_open_au_frame γfl γf gs j gl pd pav pu ns dqb dqs dqbs dqn
-    v vom pid U m K eb b lks
+    v vom pid U sts m K eb b lks
     (open_au_pre_create Γfs fsc_fs P Pmiss Φok Φex Φo Φt)
     (open_arms_create Γfs fsc_fs γf (proc_addr j) pid vom P Pmiss
-       Φok Φex Φo Φt).
+       Φok Φex Φo Φt sts).
 
 (* ===================================================================== *)
 (*  4.  THE SEAL                                                          *)
@@ -1011,14 +1155,14 @@ Module Type SYSOPEN_AU.
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v vom : mword 64)
-      (pid : mword 32) (U : ustate)
+      (pid : mword 32) (U : ustate) (sts : list fdstate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ),
       wp_sys_open_au_plain_body γfl γf gs j gl pd pav pu ns
-        dqb dqs dqbs dqn v vom pid U m K eb b lks P Pmiss Φo Φt.
+        dqb dqs dqbs dqn v vom pid U sts m K eb b lks P Pmiss Φo Φt.
 
   Parameter wp_sys_open_au_create :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -1029,7 +1173,7 @@ Module Type SYSOPEN_AU.
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v vom : mword 64)
-      (pid : mword 32) (U : ustate)
+      (pid : mword 32) (U : ustate) (sts : list fdstate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
@@ -1037,5 +1181,5 @@ Module Type SYSOPEN_AU.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ),
       wp_sys_open_au_create_body γfl γf gs j gl pd pav pu ns
-        dqb dqs dqbs dqn v vom pid U m K eb b lks P Pmiss Φok Φex Φo Φt.
+        dqb dqs dqbs dqn v vom pid U sts m K eb b lks P Pmiss Φok Φex Φo Φt.
 End SYSOPEN_AU.

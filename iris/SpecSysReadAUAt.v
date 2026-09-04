@@ -65,6 +65,7 @@ Require Import SpecSysRead.    (* the landed contract this file states a
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.          (* the abstract state (lane A, landed)       *)
 Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ                  *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -94,7 +95,7 @@ Definition wp_sys_read_au_at_body
   let n := sys_rw_count v2 in
   wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv wb i
-    (aread_commit_at Γfs ∅ i Φr)
+    (aread_commit_at Γfs fsabsE i Φr)
     (read_arms Γfs i n Φr).
 
 (* THE STABLE COROLLARY at the same swap. *)
@@ -116,7 +117,7 @@ Definition wp_sys_read_au_at_stable_body
   wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv wb i
     (nview Γfs q i (MkAnode (AFile bs0) nl)
-     ∗ aread_commit_at Γfs ∅ i Φr)%I
+     ∗ aread_commit_at Γfs fsabsE i Φr)%I
     (read_stable_arms Γfs i n q bs0 nl Φr).
 
 Module Type SYSREAD_AU_AT.

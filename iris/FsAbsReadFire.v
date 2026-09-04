@@ -101,6 +101,7 @@ Require Import SpecReadi.        (* [rd_clamp]                              *)
 Require Import SpecSysReadAU.    (* the contract this file serves           *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import
                                     ([FsAbsOpenFire]'s reason)              *)
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
 Require Import TsoCtx.
 
@@ -301,11 +302,11 @@ Section ReadFire.
   Lemma arf_read_fire (γfs : fs_names) (E : coPset) (dq : dfrac)
       (Φ : aview -> nat -> anode -> iProp Σ) (i : Z) (off : nat)
       (n : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     (off <= MAXFILE * BSIZE)%nat ->
     anode_size_ok (abs_of n) ->
     ftop_inv γfs -∗
-    aread_commit_at (fs_gamma_L γfs) ∅ i Φ -∗
+    aread_commit_at (fs_gamma_L γfs) fsabsE i Φ -∗
     top_frag_q (fs_gamma_L γfs) dq i n ={E}=∗
       top_frag_q (fs_gamma_L γfs) dq i n
       ∗ ∃ av : aview,
@@ -315,7 +316,7 @@ Section ReadFire.
     (* the same re-spelling [opf_open_fire] does, and for the same reason:
        the unifier cannot solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag_q /fs_gamma_L /=.
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
@@ -323,7 +324,7 @@ Section ReadFire.
       by exact (abs_view_lookup I i n Hlk).
     assert (Hpre : ard_pre (abs_view I) i off (abs_of n))
       by (split; [exact Hrow | split; [exact Hoff | exact Hsz]]).
-    iMod (fupd_mask_subseteq ∅) as "Hcl2"; [set_solver |].
+    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
     iMod ("Hcm" $! I off (abs_of n) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
@@ -337,11 +338,11 @@ Section ReadFire.
   Lemma arf_read_fire_1 (γfs : fs_names) (E : coPset)
       (Φ : aview -> nat -> anode -> iProp Σ) (i : Z) (off : nat)
       (n : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     (off <= MAXFILE * BSIZE)%nat ->
     anode_size_ok (abs_of n) ->
     ftop_inv γfs -∗
-    aread_commit_at (fs_gamma_L γfs) ∅ i Φ -∗
+    aread_commit_at (fs_gamma_L γfs) fsabsE i Φ -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       top_frag (fs_gamma_L γfs) i n
       ∗ ∃ av : aview,

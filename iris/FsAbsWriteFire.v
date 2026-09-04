@@ -135,6 +135,7 @@ Require Import SpecSysWriteAU.   (* the contract this file serves           *)
 Require Import FsAbsMknodFire.   (* [mkf_auth_nview]                        *)
 Require Import FsAbsOpenFire.    (* [opf_era_file_row], [opf_era_type]      *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import       *)
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
 Require Import TsoCtx.
 
@@ -454,7 +455,7 @@ Section WriteFire.
   Lemma wrf_awrite_fire (γfs : fs_names) (E : coPset) (i : Z) (k : nat)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
       (off : nat) (bs bs0 : list (bv 8)) (nl : nat) (n n' : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     inode_local i n' ->
     (0 < length bs)%nat ->
     (off <= length bs0)%nat ->
@@ -462,7 +463,7 @@ Section WriteFire.
     abs_of n = MkAnode (AFile bs0) nl ->
     abs_of n' = MkAnode (AFile (blk_splice off bs bs0)) nl ->
     ftop_inv γfs -∗
-    awrite_commit_at (fs_gamma_L γfs) ∅ i k Φ -∗
+    awrite_commit_at (fs_gamma_L γfs) fsabsE i k Φ -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
       ∗ ∃ av : aview, ⌜wri_pre av i off bs bs0 nl⌝ ∗ Φ k av off bs.
@@ -471,7 +472,7 @@ Section WriteFire.
     (* the re-spelling [mkf_acre_fire] does, and for the same reason: the
        unifier cannot solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag /fs_gamma_L /=.
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
@@ -486,7 +487,7 @@ Section WriteFire.
                      = delta_write i off bs (abs_view I)).
     { rewrite (abs_view_insert I i n') Habs'.
       by rewrite (delta_write_file (abs_view I) i off bs bs0 nl Hrow). }
-    iMod (fupd_mask_subseteq ∅) as "Hcl2"; [set_solver |].
+    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
     iMod ("Hcm" $! I off bs bs0 nl with "[//] Hta") as "[Hta Hph2]".
     iMod (ghost_map_update n' with "Hta Hf") as "[Hta Hf]".
     iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "[Hta HΦ]".

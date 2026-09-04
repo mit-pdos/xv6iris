@@ -32,7 +32,7 @@
        ∗ ⌜Z.of_nat (length (concat bss)) = iz⌝     (* the offset IS the total *)
        ∗ ⌜iz = FW_MAX * Z.of_nat p⌝                (* every fired chunk is full *)
        ∗ wri_receipts i Φw bss                      (* the fired receipts       *)
-       ∗ awrite_commits_at Γfs ∅ i Φw p (wchunks n - p)   (* the unfired suffix *)
+       ∗ awrite_commits_at Γfs fsabsE i Φw p (wchunks n - p)   (* the unfired suffix *)
 
    -- and the three arithmetic facts it needs are
    [FsAbsWriteFire.wri_count_lt] (the bundle is not exhausted while the loop
@@ -114,6 +114,7 @@ Require Import SpecSysWriteAU.     (* [wchunks], [wri_receipts]             *)
 Require Import FsAbsWriteFire.     (* [awrite_commits_at]                   *)
 Require Import SpecCopyin.         (* [ubytes_at]: the content seam         *)
 Require Import SpecSysWriteAUEra.  (* [write_arms_at]                       *)
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.              (* LAST (FsAbs's own rule)               *)
 Import Defs.
 Require Import TsoCtx.
@@ -168,7 +169,7 @@ Definition wp_filewrite_au_body
   filewrite_env γf fn st -∗
   (* EDIT 2: THE CALLER'S PER-CHUNK COMMIT BUNDLE, one commit per possible
      chunk, indexed from 0 ([wchunks n] of them). *)
-  awrite_commits_at Γfs ∅ i Φw 0%nat (wchunks n) -∗
+  awrite_commits_at Γfs fsabsE i Φw 0%nat (wchunks n) -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (r : mword 64) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
@@ -246,10 +247,10 @@ Section FilewriteAUState.
           included -- and both exits read it off unchanged. *)
        ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
-       awrite_commits_at Γ ∅ i Φ p (wchunks n - p)%nat)%I.
+       awrite_commits_at Γ fsabsE i Φ p (wchunks n - p)%nat)%I.
 
   Lemma fw_au_raw_init Γ (i n : Z) M ua Φ :
-    awrite_commits_at Γ ∅ i Φ 0%nat (wchunks n) -∗
+    awrite_commits_at Γ fsabsE i Φ 0%nat (wchunks n) -∗
     fw_au_raw Γ i n M ua Φ 0 0%nat.
   Proof.
     iIntros "Hcm". rewrite /fw_au_raw. iExists [].
@@ -264,7 +265,7 @@ Section FilewriteAUState.
   Lemma fw_au_raw_take Γ (i n : Z) M ua Φ (t : Z) (p : nat) :
     (0 <= t)%Z -> (t < n)%Z -> t = FW_MAX * Z.of_nat p ->
     fw_au_raw Γ i n M ua Φ t p -∗
-      awrite_commit_at Γ ∅ i p Φ ∗
+      awrite_commit_at Γ fsabsE i p Φ ∗
       (∀ (bs : list (bv 8)) (av : aview) (off : nat) (bs0 : list (bv 8))
          (nl : nat),
          ⌜wri_pre av i off bs bs0 nl⌝ -∗

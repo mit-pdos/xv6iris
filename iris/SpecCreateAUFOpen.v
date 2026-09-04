@@ -57,6 +57,7 @@ Require Import SpecSysMknodAU.   (* [cre_pre], [mknod_parent_elems]         *)
 Require Import FsAbsMknodFire.   (* the two commits                         *)
 Require Import SpecCreateAUF.    (* [cauf_ok], [cauf_fail]                  *)
 Require Import SpecSysOpenAU.    (* the consumer, which does NOT move       *)
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
 Require Import TsoCtx.
 
@@ -94,8 +95,8 @@ Section CreateAUFOpen.
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
       (pl : list (bv 8)) :
     cauf_fail Γ γfs P Pmiss Φok Φex pl -∗
-    aopen_commit_at Γ ∅ Φo -∗
-    atrunc_commit_at Γ ∅ Φt -∗
+    aopen_commit_at Γ fsabsE Φo -∗
+    atrunc_commit_at Γ fsabsE Φt -∗
     open_post_fail_create Γ γfs P Pmiss Φok Φex Φo Φt.
   Proof.
     iIntros "Hcf Ho Ht".
@@ -139,14 +140,14 @@ Section CreateAUFOpen.
          (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
             ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
             Φok av d nm i ∗
-            dlookup_commit_at Γ ∅ Φex)
+            dlookup_commit_at Γ fsabsE Φex)
          ∨ (* ...and the EXISTS-OPENS half, ahead of the found node's own
               observation *)
          (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
             ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
             ⌜ents !! nm = Some i⌝ ∗
             Φex av d nm i ∗
-            acre_commit_at Γ ∅ (AFile []) Φok)).
+            acre_commit_at Γ fsabsE (AFile []) Φok)).
   Proof.
     destruct made.
     - iIntros "H".

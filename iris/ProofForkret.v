@@ -99,6 +99,8 @@ Local Open Scope Z_scope.
 Set Printing Depth 40.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
+Require Import FsBytesGamma.   (* [fs_gamma_L] *)
+Require Import FsAbsInv.       (* [fsabs_alloc]: the boot arm mints the client copy *)
 Module ForkretProof (MP : MYPROC) (RL : RELEASE) (PR : PREPARE_RETURN)
                     (FS : FSINIT) (KX : KEXEC) (PN : PANIC)
                     (UC : USERRET_CLOSED) : FORKRET.
@@ -1218,11 +1220,16 @@ Proof.
     iSplitR; [iExact "Hkmem" |].
     iPureIntro; exact Hgeom. }
   iMod (fs_ready_establish with "Hpre Hboot") as "#Hfsr".
+  (* THE APPLICATION-SIDE ABSTRACT-STATE INVARIANT, minted here beside the
+     sealed file system ([FirstTok.fsabs_env]): a fresh client copy of the
+     abstract state, seeded empty -- nothing below reads the seed, and the
+     AU dischargers overwrite it at every fire point ([FsAbsInvFire]). *)
+  iMod (fsabs_alloc (fs_gamma_L fsc_fs) ∅ ⊤) as (γa) "#Hfsabs".
   (* the token, rebuilt at its steady arm -- and with it the whole process
      block, which every later step (kexec, prepare_return, the residue) takes
      as [proc_priv]. *)
   iAssert (first_done) as "#Hdone".
-  { rewrite /first_done. iFrame "Hfirst0 Hfsr". }
+  { rewrite /first_done. iFrame "Hfirst0 Hfsr". iExists γa. iExact "Hfsabs". }
   iDestruct (first_tok_of_done with "Hdone") as "#Hftok".
   (* ================================================================== *)
   (*  +0x3c .. +0x52: kexec("/init", (char *[]){"/init", 0}).            *)

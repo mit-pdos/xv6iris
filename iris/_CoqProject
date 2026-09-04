@@ -1453,6 +1453,7 @@ LogSnapLaw.v
 FsFlushedCore.v
 FsDurSyscall.v
 FsAbs.v
+FsAbsInv.v
 FsAbsSeam.v
 SpecSysMknodAU.v
 FsAbsPins.v
@@ -1723,6 +1724,7 @@ SystemUartAccepted.v
 # it unconditional -- assumption set = resv_matches, resv_is_valid, funext,
 # i.e. LinkNamexEra's, with nothing new entering the cone.
 FsAbsUnlinkFire.v
+FsAbsInvFire.v
 # [tso-cutover r21: AU proofs parked, owner 2026-09-02]
 # ProofSysUnlinkAUParts.v
 # ProofSysUnlinkAUW1.v

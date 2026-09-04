@@ -76,6 +76,8 @@ Require Import ProcAvail.
    definition of THIS file and [FsCfgBoot] sits below it, so stating the
    second lemma there would be a dependency cycle. *)
 Require Import FsBoot.
+Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ the client copy shadows *)
+Require Import FsAbsInv.       (* [fsabs_inv]: the application-side abstract-state invariant *)
 Require Import FsImg.
 Require Import FsImgBridge.
 (* THE COLLECTION'S GEOMETRY (durable-disk C-8).  [FsCollect.col_geom] is
@@ -505,16 +507,30 @@ Section FirstTok.
      unreachable from a bundle at all ([WpLock.is_lock] is an [inv], and
      Iris invariants do not agree), which is the whole reason the pinning
      happened. *)
+  (* THE APPLICATION-SIDE ABSTRACT-STATE INVARIANT ([FsAbsInv]), minted
+     beside the sealed file system and carried SIDE BY SIDE with it -- not
+     inside [fs_ready], and not inside any fs-internal invariant (the
+     owner's 2026-09-03 ruling: it is the piece that changes with the
+     application proven on top of xv6, so nothing of the kernel's own
+     invariants may depend on it).  Its gname is existential: no consumer
+     needs to name it, every consumer opens it through [fsabs_inv]. *)
+  Definition fsabs_env : iProp Σ :=
+    (∃ γa : gname, fsabs_inv (fsabs_client (fs_gamma_L fsc_fs) γa))%I.
+
+  Global Instance fsabs_env_persistent : Persistent fsabs_env.
+  Proof. rewrite /fsabs_env. apply _. Qed.
+
   Definition first_tok : iProp Σ :=
     ((first_addr ↦₄ (mword_of_int 1 : mword 32)
         ∗ first_boot_persist ∗ kalloc_avail fsc_kpages None ∗ first_fsinit)
-     ∨ (first_addr ↦₄□ (mword_of_int 0 : mword 32) ∗ fs_ready))%I.
+     ∨ (first_addr ↦₄□ (mword_of_int 0 : mword 32) ∗ fs_ready ∗ fsabs_env))%I.
 
   (* the steady-state arm is persistent, so a process that has booted can
      hand a copy to every process it creates -- which is how kfork pays the
      child's block without the parent losing anything. *)
-  Lemma first_tok_done : first_addr ↦₄□ (mword_of_int 0 : mword 32) -∗ fs_ready -∗ first_tok.
-  Proof. iIntros "H #F". iRight. iFrame "H F". Qed.
+  Lemma first_tok_done :
+    first_addr ↦₄□ (mword_of_int 0 : mword 32) -∗ fs_ready -∗ fsabs_env -∗ first_tok.
+  Proof. iIntros "H #F #A". iRight. iFrame "H F A". Qed.
 
   (* ...AND THAT ARM AS A NAME OF ITS OWN.  [first_tok] now rides inside
      [ProcInv.proc_priv], and the parent's copy is NOT duplicable -- its boot
@@ -531,13 +547,16 @@ Section FirstTok.
      forkret will discharge it: forkret's boot arm persists the store and
      seals the file system, and its steady arm already holds both halves. *)
   Definition first_done : iProp Σ :=
-    (first_addr ↦₄□ (mword_of_int 0 : mword 32) ∗ fs_ready)%I.
+    (first_addr ↦₄□ (mword_of_int 0 : mword 32) ∗ fs_ready ∗ fsabs_env)%I.
+
+  Lemma first_done_fsabs : first_done -∗ fsabs_env.
+  Proof. iIntros "(_ & _ & $)". Qed.
 
   Global Instance first_done_persistent : Persistent first_done.
   Proof. rewrite /first_done. apply _. Qed.
 
   Lemma first_tok_of_done : first_done -∗ first_tok.
-  Proof. iIntros "[H F]". iRight. iFrame "H F". Qed.
+  Proof. iIntros "(H & F & A)". iRight. iFrame "H F A". Qed.
 
   (* THE DESTRUCTOR, so that forkret's walk never has to unfold the seal.
      [first_tok] is [Typeclasses Opaque] for a correctness reason (see the

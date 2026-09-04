@@ -133,6 +133,7 @@ Require Import FsCfg.
 Require Import SpecSysReadAU.      (* [read_arms], the armed post            *)
 Require Import FsAbsReadFire.      (* [aread_commit_at], the dischargeable
                                       form of the commit                     *)
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.              (* LAST (FsAbs's own rule)                *)
 Import Defs.
 Require Import TsoCtx.
@@ -184,7 +185,7 @@ Definition wp_fileread_au_body
   (* EDIT 2: THE CALLER'S ONE READ-ONLY COMMIT, fired at the single instant
      inside the lock window (the RAW-MAP form: the astate-shaped one is not
      dischargeable -- FsAbsReadFire's header). *)
-  aread_commit_at Γfs ∅ i Φr -∗
+  aread_commit_at Γfs fsabsE i Φr -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗

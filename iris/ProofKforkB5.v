@@ -248,7 +248,7 @@ Section ProofKforkB5.
     iDestruct "Hipx" as (iv1) "#Hip1".
     iDestruct (SchedCtx.procs_inv_len with "Hpinv") as %Hnproc.
     iAssert (⌜FsReady.fs_geom_ok⌝)%I as %Hgeomok.
-    { iDestruct "Hfdone" as "[_ #Hrdy]". iApply (FsReady.fs_ready_geom with "Hrdy"). }
+    { iDestruct "Hfdone" as "(_ & #Hrdy & _)". iApply (FsReady.fs_ready_geom with "Hrdy"). }
     pose (N := MkUtNames γft γf γw γs j γl pd pav pu
                  γtl
                  iv1 DfracDiscarded
