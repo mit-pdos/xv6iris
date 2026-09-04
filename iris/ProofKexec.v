@@ -176,7 +176,7 @@ Section KexecTail.
   (*  copies of the same two [iApply]s.                                   *)
   (* ------------------------------------------------------------------ *)
   Local Lemma kxc_d_tail `{CID0 : CpuId} `{XI : CurCtx}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -190,8 +190,13 @@ Section KexecTail.
        pays it: the commit block's [ld a4,-408(s0)] loads exactly
        [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
        fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
-       generic for free and takes no such premise. *)
-    Q (kxq_entry ef) ->
+       generic for free and takes no such premise.
+
+       The [forall U'] is the widened hole's second argument: the closer
+       plugs [kexec_ok_q] with [fun e => Q e U'] at the exit's own final
+       state, and this sweep does not yet expose that state's facts here,
+       so the premise is asked at EVERY [U']. *)
+    (forall U' : ustate, Q (kxq_entry ef) U') ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -239,7 +244,7 @@ Section KexecTail.
   (*  +0x1ae .. ret -- PHASES C AND D, over phase B's output state.       *)
   (* ------------------------------------------------------------------ *)
   Local Lemma kxc_cd `{CID0 : CpuId} `{XI : CurCtx}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -253,8 +258,13 @@ Section KexecTail.
        pays it: the commit block's [ld a4,-408(s0)] loads exactly
        [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
        fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
-       generic for free and takes no such premise. *)
-    Q (kxq_entry ef) ->
+       generic for free and takes no such premise.
+
+       The [forall U'] is the widened hole's second argument: the closer
+       plugs [kexec_ok_q] with [fun e => Q e U'] at the exit's own final
+       state, and this sweep does not yet expose that state's facts here,
+       so the premise is asked at EVERY [U']. *)
+    (forall U' : ustate, Q (kxq_entry ef) U') ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -382,8 +392,10 @@ Section KexecMain.
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra1 := (mword_of_int 11 : mword 5).
 
-  (* the vacuous plug: the landed contract IS the cone at this [Q]. *)
-  Notation QT := (fun _ : mword 64 => True) (only parsing).
+  (* the vacuous plug: the landed contract IS the cone at this [Q].  Two
+     arguments since the exit-generic hole was widened -- [kexec_closer]
+     applies it to the entry word AND to the final process state. *)
+  Notation QT := (fun (_ : mword 64) (_ : ustate) => True) (only parsing).
 
   Lemma wp_kexec_sconf
       (gs : list gname) (jp : nat) (gl : gname)
@@ -520,7 +532,7 @@ Section KexecMain.
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13z
                 w67z ef Pz (mword_of_int 0 : mword 64)
-                I HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+                (fun _ => I) HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
@@ -549,7 +561,7 @@ Section KexecMain.
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                 (mword_of_int 4095 : mword 64) ef Py szvy
-                I HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+                (fun _ => I) HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").

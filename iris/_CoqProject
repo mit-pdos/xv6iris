@@ -702,6 +702,7 @@ DirentEnc.v
 ElfEnc.v
 PStringBytes.v
 ElfFile.v
+ElfBridge.v
 ElfKernel.v
 ElfUser.v
 FsImg.v
@@ -1353,6 +1354,7 @@ ProofKexecSeam.v
 ProofKexecA.v
 ProofKexecB.v
 SpecKexecB2.v
+KexecPtImage.v
 ProofKexecB2.v
 SpecKexecB3.v
 ProofKexecB3.v

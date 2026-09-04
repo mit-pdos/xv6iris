@@ -801,7 +801,7 @@ Section KexecB3Body.
 
 
   Lemma kxc_ph_step `{CID0 : CpuId} `{XI : CurCtx}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
@@ -2942,7 +2942,7 @@ Section KexecB3Loop.
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
   Lemma kxc_phdr `{CID0 : CpuId} `{XI : CurCtx}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
@@ -3467,7 +3467,7 @@ Section KexecB3Main.
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
   Lemma kxc_b2
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)

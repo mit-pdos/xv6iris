@@ -1079,7 +1079,7 @@ Section KexecExitQ.
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
   Lemma kxc_exit_qgen `{XI : CurCtx} `{CIDx : CpuId}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (pj : mword 64) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -1216,7 +1216,7 @@ Section KexecAExit.
   (*  the commit block touched the process.                               *)
   (* =================================================================== *)
   Lemma kxc_exit_m1
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (pj : mword 64) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -1327,7 +1327,7 @@ Section KexecABad.
   (*  makes [callee_saved]'s s4 conjunct hold at the return.              *)
   (* =================================================================== *)
   Lemma kxc_bad64
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gil gisl : gname) (gf : gname)
@@ -1725,7 +1725,7 @@ Section KexecCBad.
   (*  end_op to do first -- this reaches [T.kxc_exit_m1] directly. *)
   (* =================================================================== *)
   Lemma kxc_bad_1d6
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (jp : nat)
       (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)

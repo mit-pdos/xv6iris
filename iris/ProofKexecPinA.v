@@ -182,7 +182,7 @@ Section KexecPinABody.
   Qed.
 
   Lemma kxc_a1p
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (pb : kx_pin) (ds : list Z)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -725,7 +725,7 @@ Section KexecPinAMain.
   Notation Ra1 := (mword_of_int 11 : mword 5).
 
   Lemma kxc_phaseAp
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (pb : kx_pin) (ds : list Z)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)

@@ -288,7 +288,7 @@ Section KexecPinTail.
   (*  copies of the same two [iApply]s.                                   *)
   (* ------------------------------------------------------------------ *)
   Local Lemma kxc_d_tail `{CID0 : CpuId} `{XI : CurCtx}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -302,8 +302,13 @@ Section KexecPinTail.
        pays it: the commit block's [ld a4,-408(s0)] loads exactly
        [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
        fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
-       generic for free and takes no such premise. *)
-    Q (kxq_entry ef) ->
+       generic for free and takes no such premise.
+
+       The [forall U'] is the widened hole's second argument: the closer
+       plugs [kexec_ok_q] with [fun e => Q e U'] at the exit's own final
+       state, and this sweep does not yet expose that state's facts here,
+       so the premise is asked at EVERY [U']. *)
+    (forall U' : ustate, Q (kxq_entry ef) U') ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -351,7 +356,7 @@ Section KexecPinTail.
   (*  +0x1ae .. ret -- PHASES C AND D, over phase B's output state.       *)
   (* ------------------------------------------------------------------ *)
   Local Lemma kxc_cd `{CID0 : CpuId} `{XI : CurCtx}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -365,8 +370,13 @@ Section KexecPinTail.
        pays it: the commit block's [ld a4,-408(s0)] loads exactly
        [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
        fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
-       generic for free and takes no such premise. *)
-    Q (kxq_entry ef) ->
+       generic for free and takes no such premise.
+
+       The [forall U'] is the widened hole's second argument: the closer
+       plugs [kexec_ok_q] with [fun e => Q e U'] at the exit's own final
+       state, and this sweep does not yet expose that state's facts here,
+       so the premise is asked at EVERY [U']. *)
+    (forall U' : ustate, Q (kxq_entry ef) U') ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->

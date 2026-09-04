@@ -722,6 +722,9 @@ Section KexecDCommit.
      commit block reaches it from a register file it has just reloaded nine
      registers into, and mixing the arithmetic in there is what makes such a
      block unreadable. *)
+  (*  [Q] here is [kexec_ok_q]'s OWN hole, which the widening left at
+      [mword 64 -> Prop]: the commit applies this at [fun e => Q e U'] for
+      the closer's [U'], so the [Q entry] premise below is [Q entry U']. *)
   Lemma kxd_kexec_ok (Q : mword 64 -> Prop)
       (V : pprivate) (na : nat) (alen : nat -> nat)
       (P : uptd) (entry sz1 : mword 64) (ns : list (bv 8)) (r : mword 64) :
@@ -882,7 +885,7 @@ Section KexecDCommit.
   (*  rest of the way to the contract's [upd_exec].                        *)
   (* ------------------------------------------------------------------- *)
   Lemma kxd_commit
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -896,8 +899,13 @@ Section KexecDCommit.
        pays it: the commit block's [ld a4,-408(s0)] loads exactly
        [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
        fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
-       generic for free and takes no such premise. *)
-    Q (kxq_entry ef) ->
+       generic for free and takes no such premise.
+
+       The [forall U'] is the widened hole's second argument: the closer
+       plugs [kexec_ok_q] with [fun e => Q e U'] at the exit's own final
+       state, and this sweep does not yet expose that state's facts here,
+       so the premise is asked at EVERY [U']. *)
+    (forall U' : ustate, Q (kxq_entry ef) U') ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (q <= plen)%nat ->
@@ -1837,6 +1845,9 @@ Section KexecDCommit.
                     Hargv Hargs Hbs Hirs").
     - exact Hcs.
     - apply kxd_kexec_ok; try assumption.
+      (* the widened hole, at the state this block just built: the premise
+         is asked at every [U'], so it is asked at this one. *)
+      + exact (HQe _).
       + rewrite (Hpres Ra0 ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz)).
         exact HG10a0.
       + apply kxd_name_fn_len.
@@ -1909,7 +1920,7 @@ Section KexecDMain.
   (*  is what lets the exit quote [alen na] where the state says [alen c]. *)
   (* =================================================================== *)
   Lemma kxd_phaseD
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -1923,8 +1934,13 @@ Section KexecDMain.
        pays it: the commit block's [ld a4,-408(s0)] loads exactly
        [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
        fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
-       generic for free and takes no such premise. *)
-    Q (kxq_entry ef) ->
+       generic for free and takes no such premise.
+
+       The [forall U'] is the widened hole's second argument: the closer
+       plugs [kexec_ok_q] with [fun e => Q e U'] at the exit's own final
+       state, and this sweep does not yet expose that state's facts here,
+       so the premise is asked at EVERY [U']. *)
+    (forall U' : ustate, Q (kxq_entry ef) U') ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->

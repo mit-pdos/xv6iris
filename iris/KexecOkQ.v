@@ -26,13 +26,21 @@
     eight of kexec's [bad:] tails prove [kexec_ok_q Q] with the SAME proof
     term they proved [kexec_ok] with, at every [Q].  The one site that has
     to pay is the commit block's [ld a4,-408(s0)] -- and it pays with the
-    premise [Q (kxq_entry ef)], which is a fact about the ELF header the
-    walk read, i.e. exactly the fact the pinned walk brings.
+    premise [forall U', Q (kxq_entry ef) U'], which is a fact about the ELF
+    header the walk read, i.e. exactly the fact the pinned walk brings.
+
+    THE HOLE'S SECOND ARGUMENT IS THE FINAL PROCESS STATE.  [kexec_ok_q]
+    itself stays a claim on the ENTRY word alone -- its [Q] is
+    [mword 64 -> Prop], and every [bad:] tail's proof term is unchanged --
+    but [kexec_closer], which BINDS the exit's [U'], plugs the hole with
+    [fun e => Q e U'] for a client-supplied [Q : mword 64 -> ustate -> Prop].
+    A client of [SpecKexecAU.v] needs to say things about the image the run
+    built ([us_M U'], its size), and only the closer can see it.
 
     [SpecKexec.v] IS UNTOUCHED: [kexec_ok] stays what it is and
     [kexec_ok_q_True] below is the row that keeps [wp_kexec_sconf] the
     theorem it has always been -- the cone is instantiated at
-    [Q := fun _ => True] and the two relations are then equivalent.       *)
+    [Q := fun _ _ => True] and the two relations are then equivalent.     *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
@@ -176,7 +184,10 @@ Definition kexec_closer `{XI : TsoCtx.CurCtx}
        cap the memory when experimenting with this binder list. *)
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Q : mword 64 -> Prop)
+    (* the hole, WIDENED to the final process state: [kexec_ok_q]'s own
+       slot is still a claim on [entry], and the row below plugs it with
+       [fun e => Q e U'] at the [U'] this continuation binds. *)
+    (Q : mword 64 -> ustate -> Prop)
     (gf ga : gname) (pj : mword 64) (pidv : mword 32) (U : ustate)
     (m : regfile) (ret_tgt : mword 64) (K : nat) (b eb : bool)
     (lks : gset string) (dqb dqs : dfrac) (bmapstart : Z)
@@ -189,7 +200,8 @@ Definition kexec_closer `{XI : TsoCtx.CurCtx}
   (∀ (mf : regfile) (U' : ustate)
       (entry spv szv' : mword 64),
       ⌜callee_saved m mf⌝ -∗
-      ⌜kexec_ok_q Q (us_V U) (us_V U') (mf !!! Regidx (mword_of_int 10 : mword 5))
+      ⌜kexec_ok_q (fun e => Q e U') (us_V U) (us_V U')
+                  (mf !!! Regidx (mword_of_int 10 : mword 5))
                   entry spv szv' na alen⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
@@ -215,8 +227,9 @@ Definition kexec_closer `{XI : TsoCtx.CurCtx}
 (*  The word the commit block loads at +0x2f0 ([ld a4,-408(s0)], byte 24 of
     the frame's [struct elfhdr]) and stores into [trapframe->epc] --
     spelled here EXACTLY as [ProofKexecD.kxd_commit] produces it, so its
-    [Q entry] obligation is discharged by [assumption] from the premise
-    [Q (kxq_entry ef)].  It is [ElfEnc.eh_entry] at the 64-bit width.     *)
+    [Q entry U'] obligation is discharged from the premise
+    [forall U', Q (kxq_entry ef) U'].  It is [ElfEnc.eh_entry] at the
+    64-bit width.                                                         *)
 Definition kxq_entry (ef : nat -> bv 8) : mword 64 :=
   (Z_to_bv 64 (le_at ef 24 8) : mword 64).
 

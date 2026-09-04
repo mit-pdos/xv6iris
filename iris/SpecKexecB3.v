@@ -85,7 +85,7 @@ Notation Ra0 := (mword_of_int 10 : mword 5).
 (*  from ProofKexecB3.v; see that file for the design. *)
 (* ===================================================================== *)
 Definition kxc_b2_body
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
@@ -203,7 +203,7 @@ Definition kxc_b2z_body
 Module Type KEXECB3.
   Parameter kxc_b2 :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)

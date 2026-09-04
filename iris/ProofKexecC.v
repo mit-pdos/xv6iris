@@ -258,7 +258,7 @@ Section KexecCSetup.
   (*  [kxc_at_272 0] if the loop is skipped outright.                      *)
   (* =================================================================== *)
   Lemma kxc_c_setup
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -2014,7 +2014,7 @@ Section KexecCExitM1.
      instruction before the shared tail reloads everything else from the
      frame. *)
   Lemma kxc_c_exit_m1
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -2277,7 +2277,7 @@ Section KexecCLoop.
   Qed.
 
   Lemma kxc_argv_step
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -3720,7 +3720,7 @@ Section KexecCArgvLoop.
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
   Lemma kxc_argv_loop `{CID0 : CpuId} `{XI : CurCtx}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -4014,7 +4014,7 @@ Section KexecCClose.
   Qed.
 
   Lemma kxc_c_close
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)

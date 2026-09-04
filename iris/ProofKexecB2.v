@@ -291,7 +291,7 @@ Section KexecB2Body.
   (*  ([UmCovered.proc_pt_covered_maxsz]), so that is what this asks for.  *)
   (* =================================================================== *)
   Lemma kxc_bad324
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
@@ -775,7 +775,7 @@ Section KexecB2Loops.
   (*  head can always supply.                                              *)
   (* =================================================================== *)
   Lemma kxc_ls `{CID0 : CpuId} `{XI : CurCtx}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)

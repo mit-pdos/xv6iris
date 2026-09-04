@@ -209,7 +209,7 @@ Section KexecBBody.
   (*  +0x090 .. +0x0cc, PLUS the [bad:] tail at +0x31c.                   *)
   (* =================================================================== *)
   Lemma kxc_b1
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gf : gname)

@@ -325,7 +325,7 @@ Section KexecABody.
   (*  +0x000 .. +0x030, PLUS the namei-null tail at +0x088.               *)
   (* =================================================================== *)
   Lemma kxc_a1
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gf : gname)
@@ -905,7 +905,7 @@ Section KexecABody.
   (*  existential either way -- and would cost a third frame shape.        *)
   (* =================================================================== *)
   Lemma kxc_a2
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gf : gname)
@@ -1819,7 +1819,7 @@ Section KexecAMain.
   (*  binder's own crossing fact ([WpNext.wp_next_retarget]).              *)
   (* =================================================================== *)
   Lemma kxc_phaseA
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gf : gname)

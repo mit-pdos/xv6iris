@@ -30,9 +30,11 @@
 
     ---- Q_pin's EXACT STRENGTH, AND THE UPGRADE GAP ---------------------
 
-    [KexecOkQ.kexec_ok_q]'s hole is [Q : mword 64 -> Prop], applied to
-    [entry] alone.  So what can ride the THIRTY-ONE landed relays with no
-    restatement is precisely a pure claim on the entry PC, and [Q_pin pb]
+    [KexecOkQ.kexec_closer]'s hole is [Q : mword 64 -> ustate -> Prop],
+    but [kexec_ok_q]'s own slot is still applied to [entry] alone (the
+    closer plugs it with [fun e => Q e U']).  So what [Q_pin pb] says is
+    still precisely a pure claim on the entry PC -- the ustate argument is
+    there for the AU clients, which DO read [U'] -- and [Q_pin pb]
     is the strongest such claim: [entry] is the 8-byte little-endian word
     at offset 24 of the pinned bytes -- [kxq_entry] of the pinned header,
     i.e. the pinned ELF's e_entry ([pin_init_entry] computes it to
@@ -50,9 +52,10 @@
     tier's own premises ([kxp_image_init] : it implies
     [UCodeInit.init_img_sub], which is [USpecInit]'s image premise;
     [kxp_image_sh] likewise), and the gap recorded: landing it in the post
-    needs EITHER a second exit-generic sweep widening the hole to
-    [Q' : mword 64 -> gmap Z (bv 8) -> Prop] (mechanical, the same 31
-    sites, priced like the first sweep) OR stage C's M-threading of the
+    needs EITHER the ustate half of the hole to be USABLE at the paying
+    site (the widening landed -- [kexec_closer]'s [Q] does take [U'] --
+    but [kxd_commit] still asks its premise at every [U'], so nothing about
+    the built state can be spent yet) OR stage C's M-threading of the
     kexec cone (namei-pinned-lookup.md sect. 14: [proc_ptm] through
     [kxc_grow_inv]; ProofKexecB2's loadseg reseal already NAMES the
     delivered bytes one line before folding them away).  Neither is this
@@ -256,7 +259,10 @@ Proof. reflexivity. Qed.
     /init literal to the pack.  This is the REAL [Q] the contract's post
     runs [kexec_ok_q] at; the thirty-one landed relays carry it with no
     restatement because they are generic in [Q] (the exit-generic sweep). *)
-Definition kxp_entry_ok (pb : kx_pin) (e : mword 64) : Prop :=
+(*  The second argument is [kexec_closer]'s widened hole's final process
+    state, which this claim does not read: the pinned guarantee is a fact
+    about the entry PC alone. *)
+Definition kxp_entry_ok (pb : kx_pin) (e : mword 64) (_ : ustate) : Prop :=
   e = kxp_entry pb.
 
 Notation Q_pin := kxp_entry_ok (only parsing).
@@ -266,26 +272,27 @@ Notation Q_pin := kxp_entry_ok (only parsing).
     header the walk read.  Under the phase-A header claim ("these are the
     pinned bytes' first 64") it is this lemma.                            *)
 Lemma Q_pin_of_hdr (pb : kx_pin) (ef : nat -> bv 8) :
-  kxq_hdr_ok (Some (kxp_ef pb)) ef -> kxp_entry_ok pb (kxq_entry ef).
+  kxq_hdr_ok (Some (kxp_ef pb)) ef ->
+  forall U' : ustate, kxp_entry_ok pb (kxq_entry ef) U'.
 Proof.
-  intros H. rewrite /kxp_entry_ok kxp_entry_kxq.
+  intros H U'. rewrite /kxp_entry_ok kxp_entry_kxq.
   exact (kxq_entry_of_hdr (kxp_ef pb) ef H).
 Qed.
 
 (*  THE WEAKENING TO THE LANDED RELATION -- the [Q := True] projection,
     which is [KexecOkQ]'s own row applied.                                *)
-Lemma kexec_ok_pin_weaken (pb : kx_pin) (V V' : pprivate)
+Lemma kexec_ok_pin_weaken (pb : kx_pin) (U' : ustate) (V V' : pprivate)
     (r entry spv szv' : mword 64) (na : nat) (alen : nat -> nat) :
-  kexec_ok_q (kxp_entry_ok pb) V V' r entry spv szv' na alen ->
+  kexec_ok_q (fun e => kxp_entry_ok pb e U') V V' r entry spv szv' na alen ->
   kexec_ok V V' r entry spv szv' na alen.
 Proof. apply kexec_ok_q_weaken. Qed.
 
 (*  THE SENTENCE, read off the relation: failed and untouched, or resumed
     at the pinned entry with argc in a0 and the three trapframe words
     written ([kxc_tf] puts [entry] in epc and [spv] in sp/a1).            *)
-Lemma kexec_ok_pin_read (pb : kx_pin) (V V' : pprivate)
+Lemma kexec_ok_pin_read (pb : kx_pin) (U' : ustate) (V V' : pprivate)
     (r entry spv szv' : mword 64) (na : nat) (alen : nat -> nat) :
-  kexec_ok_q (kxp_entry_ok pb) V V' r entry spv szv' na alen ->
+  kexec_ok_q (fun e => kxp_entry_ok pb e U') V V' r entry spv szv' na alen ->
   (r = (mword_of_int (-1) : mword 64) /\ V' = V)
   \/ (entry = kxp_entry pb
       /\ r = (mword_of_int (Z.of_nat na) : mword 64)
@@ -684,7 +691,7 @@ Qed.
 Lemma kexec_closer_weaken `{XI : TsoCtx.CurCtx}
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Q : mword 64 -> Prop)
+    (Q : mword 64 -> ustate -> Prop)
     (gf ga : gname) (pj : mword 64) (pidv : mword 32) (U : ustate)
     (m : regfile) (ret_tgt : mword 64) (K : nat) (b eb : bool)
     (lks : gset string) (dqb dqs : dfrac) (bmapstart : Z)
@@ -692,7 +699,7 @@ Lemma kexec_closer_weaken `{XI : TsoCtx.CurCtx}
     (plen : nat) (pv : mword 64) (dqpv : dfrac) (pfun : nat -> bv 8)
     (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64)
     (aslen : nat -> nat) (dqas : dfrac) (afun : nat -> nat -> bv 8) :
-  kexec_closer (fun _ : mword 64 => Logic.True) gf ga pj pidv U m ret_tgt K b
+  kexec_closer (fun (_ : mword 64) (_ : ustate) => Logic.True) gf ga pj pidv U m ret_tgt K b
                eb lks dqb dqs
                bmapstart na alen plen pv dqpv pfun av dqa avf aslen dqas afun
   -∗
@@ -707,7 +714,7 @@ Proof.
                   Has Hbs Hir").
   - exact Hcs.
   - apply kexec_ok_q_of_True.
-    exact (kexec_ok_q_weaken Q _ _ _ _ _ _ _ _ Hok).
+    exact (kexec_ok_q_weaken _ _ _ _ _ _ _ _ _ Hok).
 Qed.
 
 (*  THE BODY: [SpecKexec.wp_kexec_sconf_body] VERBATIM -- same machine

@@ -602,7 +602,7 @@ End KexecB2Res.
 (*  design (which size is freed, why no threading clause is needed). *)
 (* ===================================================================== *)
 Definition kxc_bad324_body `{XI : CurCtx}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
@@ -690,7 +690,7 @@ Definition kxc_bad324_body `{XI : CurCtx}
 (*  carry). *)
 (* ===================================================================== *)
 Definition kxc_ls_body `{XI : CurCtx}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
@@ -808,7 +808,7 @@ Definition kxc_ls_body `{XI : CurCtx}
 Module Type KEXECB2.
   Parameter kxc_bad324 :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
@@ -829,7 +829,7 @@ Module Type KEXECB2.
 
   Parameter kxc_ls :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
-      (Q : mword 64 -> Prop)
+      (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
