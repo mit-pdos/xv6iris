@@ -12,6 +12,8 @@ an Iris `language` is built over the Sail model's execution monad, and machine
 code is specified with separation-logic points-to assertions for registers,
 memory, and devices.
 
+A paper about this project: <https://arxiv.org/abs/2609.04043>.
+
 ## Layout
 
 ```
