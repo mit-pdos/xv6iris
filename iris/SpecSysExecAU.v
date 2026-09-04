@@ -19,13 +19,30 @@
    THE ONE THING THIS LEVEL ADDS: the argument vector is not a
    parameter.  sys_exec [fetchaddr]s each [argv[i]] out of the user's
    image at trapframe argument 1 and [fetchstr]s each string into a
-   kernel page, then calls kexec with what it read.  So the arguments
-   kexec sees are a READING of the user image at the argv pointer,
-   [exec_args_of (us_M U) v1 na alen afun] (section 1), and the
-   caller's WP premise is quantified over every reading the image
-   admits ([sys_exec_slot_pre]): a caller that knows its own argv
-   (init: ["sh"] at a known address of its own image) instantiates it
-   once; the success arm then names the reading kexec ran at.
+   kernel page, then calls kexec with what it read.  So the caller's WP
+   premise is quantified over the argument vectors kexec may be handed
+   ([sys_exec_slot_pre]), and the success arm names the one it ran at.
+
+   WHAT THE QUANTIFICATION IS OVER, HONESTLY.  The intended premise is
+   the READING of the user image at the argv pointer --
+   [exec_args_of (us_M U) v1 na alen afun] below, kept as the named
+   upgrade target -- so that a caller that knows its own argv (init:
+   ["sh"] at a known address of its image) would instantiate it once.
+   That reading is NOT DERIVABLE today (finding, 2026-09-03, the first
+   proof attempt): [SpecFetchaddr.fetchaddr_post] is about OWNERSHIP of
+   the destination word, not its value, [SpecFetchstr]'s post ties the
+   copied bytes to nothing in the image, and [SpecCopyinstr] has no
+   content promise at any tier (only [SpecCopyin.copyin_got] exists).
+   So the premise is quantified over every vector of the right SHAPE
+   ([exec_args_shape]: below MAXARG, NUL-terminated strings within a
+   page -- kexec's own premises) and nothing else.  For the init -> sh
+   chain this loses nothing: xv6's sh ignores its arguments, so sh's
+   start WP holds at every vector.  The upgrade is: memory-indexed
+   [wp_fetchaddr_sconf_mem] / [wp_fetchstr_sconf_mem] twins paying out
+   of [copyin_got] (and a [copyinstr_got] to build the second on),
+   threaded through sys_exec's argv loop, after which
+   [sys_exec_slot_pre] moves from [exec_args_shape] to [exec_args_of]
+   and every arm below is unchanged.
 
    THE CONTINUATION keeps the landed shape: [(mf, P', M')] with the
    page-table growth report and an EXISTENTIAL image, exactly as
@@ -51,9 +68,9 @@
 
    ==== WHAT THE PROVER OWES ===========================================
 
-   1. The argv reading: [fetchaddr]/[fetchstr]'s posts relate the words
-      and bytes they copied to [us_M U] at [v1] -- [exec_args_of] is
-      exactly the conjunction of those posts over the loop.
+   1. The argv shape: [exec_args_shape] is the walk's own loop invariant
+      ([fetchstr]'s [bb_cstr] and length, the MAXARG bound) -- free.
+      The reading [exec_args_of] is the upgrade (header).
    2. [SpecKexecAU]'s contract at the reading, with the bundle
       specialized by [sys_exec_slot_pre]'s ∀.
    3. The kfree/kalloc bookkeeping of the landed proof, verbatim.
@@ -127,26 +144,35 @@ Definition uimg_word_at (M : gmap Z (bv 8)) (a : Z) (w : mword 64) : Prop :=
   forall k, (k < 8)%nat ->
     M !! (a + Z.of_nat k) = bv_to_little_endian 8 8 (bv_unsigned w) !! k.
 
-(* THE READING sys_exec performs: [argv[0 .. na)] are non-null pointers
-   read at [av + 8 i], [argv[na]] is NULL, and each pointer names a
-   NUL-terminated string of [alen i] characters ([bb_cstr]: non-NUL
-   below, NUL at [alen i]) whose bytes are [afun i].  The bound
-   [na < MAXARG] and the per-argument page bound are kexec's own
-   premises; here they are what makes the reading one kexec accepts, so
-   they ride in the predicate rather than the frame. *)
+(* THE SHAPE of an argument vector kexec accepts (its own premises):
+   below MAXARG, each argument a NUL-terminated string of [alen i]
+   characters ([bb_cstr]: non-NUL below, NUL at [alen i]) shorter than a
+   page.  This is what the WP premise is quantified over today (header). *)
+Definition exec_args_shape (na : nat) (alen : nat -> nat)
+    (afun : nat -> nat -> bv 8) : Prop :=
+  (na < MAXARG)%nat
+  /\ (forall i, (i < na)%nat -> bb_cstr (afun i) (alen i))
+  /\ (forall i, (i < na)%nat -> (Z.of_nat (alen i) < 4096)%Z).
+
+(* THE READING sys_exec performs -- the upgrade target (header): the
+   shape, and [argv[0 .. na)] non-null pointers read at [av + 8 i],
+   [argv[na]] NULL, each pointer naming its string's bytes in the image. *)
 Definition exec_args_of (M : gmap Z (bv 8)) (av : mword 64)
     (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) : Prop :=
-  (na < MAXARG)%nat
+  exec_args_shape na alen afun
   /\ (exists avf : nat -> mword 64,
         (forall i, (i <= na)%nat ->
            uimg_word_at M (bv_unsigned av + 8 * Z.of_nat i) (avf i))
         /\ (forall i, (i < na)%nat -> avf i <> (mword_of_int 0 : mword 64))
         /\ avf na = (mword_of_int 0 : mword 64)
         /\ (forall i, (i < na)%nat ->
-              bb_cstr (afun i) (alen i)
-              /\ (Z.of_nat (alen i) < 4096)%Z
-              /\ (forall j, (j <= alen i)%nat ->
-                    M !! (bv_unsigned (avf i) + Z.of_nat j) = Some (afun i j)))).
+              (forall j, (j <= alen i)%nat ->
+                 M !! (bv_unsigned (avf i) + Z.of_nat j) = Some (afun i j)))).
+
+Lemma exec_args_of_shape (M : gmap Z (bv 8)) (av : mword 64)
+    (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
+  exec_args_of M av na alen afun -> exec_args_shape na alen afun.
+Proof. intros [H _]. exact H. Qed.
 
 (* ===================================================================== *)
 (*  2.  THE BUNDLE AND THE ARMS AT THE SYSCALL BOUNDARY                   *)
@@ -158,11 +184,13 @@ Section SysExecAU.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
-  (* the caller's WP, for every argument reading the image admits *)
+  (* the caller's WP, for every argument vector of the right shape
+     (header: the image reading is the upgrade target; the [M av]
+     parameters are kept so the upgrade moves nothing but this wand) *)
   Definition sys_exec_slot_pre (Φo : aview -> Z -> anode -> iProp Σ)
       (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate) : iProp Σ :=
     (∀ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8),
-       ⌜exec_args_of M av na alen afun⌝ -∗
+       ⌜exec_args_shape na alen afun⌝ -∗
        exec_slot_pre Φo na alen afun sts)%I.
 
   Definition sys_exec_au_pre Γ (γfs : fs_names)
@@ -181,7 +209,7 @@ Section SysExecAU.
       (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate) : iProp Σ :=
     (sys_exec_au_pre Γ γfs P Pmiss Φo M av sts
      ∨ (∃ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8),
-          ⌜exec_args_of M av na alen afun⌝ ∗
+          ⌜exec_args_shape na alen afun⌝ ∗
           exec_post_fail Γ γfs P Pmiss Φo na alen afun sts))%I.
 
   (* the armed disjunction on the block after the copy-ins' growth [V]
@@ -197,7 +225,7 @@ Section SysExecAU.
        ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = V⌝
          ∗ sys_exec_post_fail Γ γfs P Pmiss Φo M av sts)
         ∨ (∃ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8),
-             ⌜exec_args_of M av na alen afun⌝ ∗
+             ⌜exec_args_shape na alen afun⌝ ∗
              exec_post_ok Γ P Φo na alen afun sts (MkUstate V M) U' r)))%I.
 
   (* SANITY: the arms imply the landed [SpecSysExec.sys_exec_post] *)
