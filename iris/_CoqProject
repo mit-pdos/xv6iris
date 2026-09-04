@@ -1363,6 +1363,9 @@ ProofKexecD.v
 ProofKexec.v
 LinkKexec.v
 SpecSysExec.v
+# The blocks, split off so the atomic-update composition (ProofSysExecAU.v)
+# can reuse them: everything that does not name [Kexec].
+ProofSysExecParts.v
 ProofSysExec.v
 LinkSysExec.v
 SpecSysFstat.v
@@ -1615,7 +1618,15 @@ SpecKexecPin.v
 # exec's ATOMIC-UPDATE contract: the walk, one observation of the file, and
 # the caller's own u-mode WP for the program observed (SpecKexecAU.v's header).
 SpecKexecAU.v
+# THE PURE LOADER ALGEBRA the exec proofs' loop invariants consume: the
+# image inclusion laws ([uimg_sub] over [elf_image]), the loadseg window,
+# the [sz] chain ([kexec_sz_after] = [elf_mem_end], hence [kexec_sz]) and
+# the stack page's zero fill / [kexec_args_at].  iris-free (no proofmode);
+# it sits HERE rather than beside ElfBridge.v only because [kxc_sp] /
+# [kexec_args_at] / [loads_ascending] have no home below SpecKexec*.v.
+KexecImageAlg.v
 SpecSysExecAU.v
+ProofSysExecAU.v
 # THE CHUNK LOOP, AND THE SEAL IT CLOSES (lane W, FILEWRITE-AU).
 #   ProofFilewriteAU is ProofFilewrite's walk on the inode arm only, with
 # FsAbsWriteFire.wrf_awrite_fire in place of the ireg_top_retag; the three
