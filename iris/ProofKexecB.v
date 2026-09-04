@@ -214,7 +214,7 @@ Section KexecBBody.
       (pd pav pu : mword 64)
  (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap)
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8))
       (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
@@ -269,7 +269,7 @@ Section KexecBBody.
     cpu_own 0 eb (proc_addr jp) b lks -∗
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jp) -∗
-    kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf
+    kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf datl
               gilf gislf -∗
     log_opb icfg_log n2 -∗
     iref_slots 1 -∗
@@ -293,7 +293,7 @@ Section KexecBBody.
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (P : uptd) (Mi : gmap Z (bv 8)) (w13 w67 : mword 64),
         kxc_at_1a2 jp gf
- kf qf sf gyf loyf tlyf inumf dnf bmf
+ kf qf sf gyf loyf tlyf inumf dnf bmf datl
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
@@ -313,7 +313,7 @@ Section KexecBBody.
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (P : uptd) (Mi : gmap Z (bv 8)),
         kxc_at_12c jp gf
- kf qf sf gyf loyf tlyf inumf dnf bmf
+ kf qf sf gyf loyf tlyf inumf dnf bmf datl
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
@@ -1223,6 +1223,9 @@ Section KexecBBody.
       iDestruct "Hopen" as "(#Hslkk & Hslkd & %Hley & #Hfly & #Hclaimsy &
                              Hdep & Hoffr & Hidev & Hiinum &
                              Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
+      (* the [bad:] tail closes the inode through iunlockput, which asks for
+         [ic_loaded] again -- one of the walk's two ∃ conversions (S3b). *)
+      iDestruct (kxc_ldat_to_loaded with "Hload") as "Hload".
       (* [kxc_bad64] is applied AT [CID8] (its [sie_cap_gpr] premise pins its
          own [CID0] from "Hcg"), so kexec's exit -- still anchored at the
          section's [CID0] -- has to be re-anchored there.  The crossing fact

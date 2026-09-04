@@ -43,6 +43,9 @@ Require Import RiscvModelBytes.
 Require Import RiscvExtras.     (* [uint_unsigned]                           *)
 Require Import UserBits.        (* [uint_add_vec_int_small]                  *)
 Require Import PageGeom.        (* [PGSIZE]                                  *)
+Require Import UmodeAbi.        (* [uimg_sub]                                *)
+Require Import ElfEnc.          (* [le_at], [ph_at], [eh_phnum]              *)
+Require Import ElfFile.         (* the image semantics                       *)
 Require Import UserPtTree.      (* [umem_write], [umem_wr], [umem_grow],
                                    [uva_live]                               *)
 Require Import ProcDefs.        (* [ustate], [us_M], [us_V], [pv_sz]         *)
@@ -512,6 +515,565 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(*  0.  Two spellings of the same zero byte                               *)
+(* ====================================================================== *)
+
+(* [ElfFile] writes the bss byte as [Z_to_bv 8 0]; the kernel tier writes
+   the freshly-zeroed page's byte as [bv_0 8].  They are the same value,
+   but not by [reflexivity] -- [bv_eq] is the bridge. *)
+Lemma elf_zero_byte_bv0 : elf_zero_byte = bv_0 8.
+Proof. unfold elf_zero_byte. apply bv_eq. reflexivity. Qed.
+
+(* ====================================================================== *)
+(*  1.  IMAGE ALGEBRA                                                     *)
+(* ====================================================================== *)
+
+Lemma uimg_sub_empty (M : gmap Z (bv 8)) : uimg_sub ∅ M.
+Proof. intros a b Hb. rewrite lookup_empty in Hb. discriminate. Qed.
+
+(* No disjointness side condition: [∪] is left-biased, so every entry of
+   [m1 ∪ m2] is an entry of [m1] or of [m2]. *)
+Lemma uimg_sub_union (m1 m2 M : gmap Z (bv 8)) :
+  uimg_sub m1 M -> uimg_sub m2 M -> uimg_sub (m1 ∪ m2) M.
+Proof.
+  intros H1 H2 a b Hb.
+  apply lookup_union_Some_raw in Hb as [Hb | [_ Hb]];
+    [exact (H1 a b Hb) | exact (H2 a b Hb)].
+Qed.
+
+Lemma uimg_sub_segs_union {A : Type} `{EqDecision A}
+    (g : A -> gmap Z (bv 8)) (ps : list A) (M : gmap Z (bv 8)) :
+  (forall p, p ∈ ps -> uimg_sub (g p) M) -> uimg_sub (segs_union g ps) M.
+Proof.
+  intros H a b Hb.
+  apply segs_union_lookup_inv in Hb as (p & Hp & Hg).
+  exact (H p Hp a b Hg).
+Qed.
+
+Lemma uimg_sub_seg_map (f : elf_bytes) (p : elf_phdr) (M : gmap Z (bv 8)) :
+  uimg_sub (seg_file_map f p) M -> uimg_sub (seg_zero_map p) M ->
+  uimg_sub (seg_map f p) M.
+Proof. unfold seg_map. apply uimg_sub_union. Qed.
+
+Lemma uimg_sub_elf_image (f : elf_bytes) (M : gmap Z (bv 8)) :
+  (forall p, p ∈ elf_loads f -> uimg_sub (seg_map f p) M) ->
+  uimg_sub (elf_image f) M.
+Proof. unfold elf_image. apply uimg_sub_segs_union. Qed.
+
+(* THE FILE HALF, from the bytes the loop actually wrote.  The source
+   index is [Z.to_nat (ep_offset p + j)] -- exactly the [f !!! ...] the
+   loadseg step below writes, because [seg_file_bytes]'s [take]/[drop]
+   window at list index [j] IS the file at [ep_offset p + j]
+   ([ElfFile.seg_file_bytes_lookup]). *)
+Lemma uimg_sub_seg_file_map (f : elf_bytes) (p : elf_phdr) (M : gmap Z (bv 8)) :
+  phdr_ok f p ->
+  (forall j, 0 <= j < ep_filesz p ->
+     M !! (ep_vaddr p + j) = Some (f !!! Z.to_nat (ep_offset p + j))) ->
+  uimg_sub (seg_file_map f p) M.
+Proof.
+  intros Hok Hb a b Ha.
+  apply (proj1 (lookup_seg_file_map f p a b Hok)) in Ha as [Hrange Hf].
+  pose proof (Hb (a - ep_vaddr p) ltac:(lia)) as HM.
+  replace (ep_vaddr p + (a - ep_vaddr p)) with a in HM by lia.
+  rewrite HM. f_equal. apply list_lookup_total_correct. exact Hf.
+Qed.
+
+(* THE bss HALF, from the zeros [umem_grow] left behind. *)
+Lemma uimg_sub_seg_zero_map (p : elf_phdr) (M : gmap Z (bv 8)) :
+  ep_filesz p <= ep_memsz p ->
+  (forall j, ep_filesz p <= j < ep_memsz p ->
+     M !! (ep_vaddr p + j) = Some (bv_0 8)) ->
+  uimg_sub (seg_zero_map p) M.
+Proof.
+  intros Hm Hb a b Ha.
+  apply (proj1 (lookup_seg_zero_map p a b Hm)) in Ha as [Hrange ->].
+  pose proof (Hb (a - ep_vaddr p) ltac:(lia)) as HM.
+  replace (ep_vaddr p + (a - ep_vaddr p)) with a in HM by lia.
+  rewrite HM, elf_zero_byte_bv0. reflexivity.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  PRESERVATION: what a later step of the loop cannot disturb.            *)
+(* ---------------------------------------------------------------------- *)
+
+(* [umem_grow_lookup_old] / [umem_grow_lookup_zero] are [KexecBuilt]'s. *)
+
+Lemma uimg_sub_umem_grow (img M : gmap Z (bv 8)) (sz : Z) :
+  uimg_sub img M -> uimg_sub img (umem_grow M sz).
+Proof. intros H a b Hb. apply umem_grow_lookup_old. exact (H a b Hb). Qed.
+
+(* A write that lands entirely OUTSIDE the image's domain leaves it. *)
+Lemma uimg_sub_umem_write (img M : gmap Z (bv 8)) (a : Z) (n : nat)
+    (g : nat -> bv 8) :
+  uimg_sub img M ->
+  (forall j, (j < n)%nat -> img !! (a + Z.of_nat j) = None) ->
+  uimg_sub img (umem_write M a n g).
+Proof.
+  intros Hsub Hout va b Hb.
+  assert (Hne : forall j, (j < n)%nat -> va <> (a + Z.of_nat j)).
+  { intros j Hj Heq. rewrite Heq, (Hout j Hj) in Hb. discriminate. }
+  rewrite (umem_write_lookup_out M a n g va Hne). exact (Hsub va b Hb).
+Qed.
+
+(* ...the same, stated on the RANGE rather than on the indices, which is
+   what a caller holding [dom (elf_image f) ⊆ [0, sz)] has in hand. *)
+Lemma uimg_sub_umem_write_range (img M : gmap Z (bv 8)) (a : Z) (n : nat)
+    (g : nat -> bv 8) :
+  uimg_sub img M ->
+  (forall va, a <= va < a + Z.of_nat n -> img !! va = None) ->
+  uimg_sub img (umem_write M a n g).
+Proof.
+  intros Hsub Hout. apply (uimg_sub_umem_write img M a n g Hsub).
+  intros j Hj. apply Hout. lia.
+Qed.
+
+(* ...and the va-keyed run a copyout's contract posts. *)
+Lemma uimg_sub_umem_wr (img M : gmap Z (bv 8)) (dstva : mword 64) (n : nat)
+    (src : nat -> bv 8) :
+  uimg_sub img M ->
+  (forall j, (j < n)%nat ->
+     img !! uint (add_vec_int dstva (Z.of_nat j)) = None) ->
+  uimg_sub img (umem_wr M dstva n src).
+Proof.
+  intros Hsub Hout va b Hb.
+  assert (Hne : forall j, (j < n)%nat ->
+                  va <> uint (add_vec_int dstva (Z.of_nat j))).
+  { intros j Hj Heq. rewrite Heq, (Hout j Hj) in Hb. discriminate. }
+  rewrite (umem_wr_lookup_out M dstva n src va Hne). exact (Hsub va b Hb).
+Qed.
+
+(* ====================================================================== *)
+(*  2.  THE loadseg LOOP, PAGE BY PAGE                                    *)
+(* ====================================================================== *)
+
+(* THE INVARIANT: the first [n] bytes of the segment are in place.  [n]
+   runs [0, PGSIZE, 2*PGSIZE, ..., filesz] as loadseg walks pages. *)
+Definition load_win (f : elf_bytes) (off va n : Z) (M : gmap Z (bv 8)) : Prop :=
+  forall j, 0 <= j < n -> M !! (va + j) = Some (f !!! Z.to_nat (off + j)).
+
+Lemma load_win_0 (f : elf_bytes) (off va : Z) (M : gmap Z (bv 8)) :
+  load_win f off va 0 M.
+Proof. intros j Hj. exfalso. lia. Qed.
+
+(* ONE PAGE STEP: loadseg's body is
+     [umem_write M (va + i) nn (fun k => f !!! Z.to_nat (off + i + k))]
+   with [nn = min PGSIZE (filesz - i)], and it extends the window by [nn]. *)
+Lemma load_win_step (f : elf_bytes) (off va i : Z) (nn : nat)
+    (M : gmap Z (bv 8)) :
+  0 <= i ->
+  load_win f off va i M ->
+  load_win f off va (i + Z.of_nat nn)
+    (umem_write M (va + i) nn (fun k => f !!! Z.to_nat (off + i + Z.of_nat k))).
+Proof.
+  intros Hi Hinv j Hj.
+  destruct (Z_lt_le_dec j i) as [Hlt | Hge].
+  - assert (Hne : forall k, (k < nn)%nat -> (va + j) <> (va + i + Z.of_nat k))
+      by (intros k Hk; lia).
+    rewrite (umem_write_lookup_out M (va + i) nn _ (va + j) Hne).
+    exact (Hinv j ltac:(lia)).
+  - assert (Hk : (Z.to_nat (j - i) < nn)%nat) by lia.
+    replace (va + j) with (va + i + Z.of_nat (Z.to_nat (j - i))) by lia.
+    rewrite (umem_write_lookup_in M (va + i) nn _ (Z.to_nat (j - i)) Hk).
+    cbn beta. do 2 f_equal. lia.
+Qed.
+
+(* the window survives a later uvmalloc... *)
+Lemma load_win_grow (f : elf_bytes) (off va n sz : Z) (M : gmap Z (bv 8)) :
+  load_win f off va n M -> load_win f off va n (umem_grow M sz).
+Proof. intros H j Hj. apply umem_grow_lookup_old. exact (H j Hj). Qed.
+
+(* ...and a later write that misses it. *)
+Lemma load_win_write_out (f : elf_bytes) (off va n a : Z) (nn : nat)
+    (g : nat -> bv 8) (M : gmap Z (bv 8)) :
+  load_win f off va n M ->
+  (forall k, (k < nn)%nat -> ~ (va <= a + Z.of_nat k < va + n)) ->
+  load_win f off va n (umem_write M a nn g).
+Proof.
+  intros H Hout j Hj.
+  assert (Hne : forall k, (k < nn)%nat -> (va + j) <> (a + Z.of_nat k)).
+  { intros k Hk Heq. apply (Hout k Hk). lia. }
+  rewrite (umem_write_lookup_out M a nn g (va + j) Hne). exact (H j Hj).
+Qed.
+
+(* AT [n = filesz] THE WINDOW IS THE FILE HALF OF THE SEGMENT. *)
+Lemma uimg_sub_seg_file_map_win (f : elf_bytes) (p : elf_phdr)
+    (M : gmap Z (bv 8)) :
+  phdr_ok f p ->
+  load_win f (ep_offset p) (ep_vaddr p) (ep_filesz p) M ->
+  uimg_sub (seg_file_map f p) M.
+Proof. intros Hok Hw. exact (uimg_sub_seg_file_map f p M Hok Hw). Qed.
+
+(* ====================================================================== *)
+(*  3.  THE SIZE CHAIN                                                    *)
+(* ====================================================================== *)
+
+(* uvmalloc's return value: [oldsz] when the request is a shrink, else the
+   request.  (The memory effect is [umem_grow]; this is the SIZE.) *)
+Definition kx_uvmalloc (oldsz newsz : Z) : Z :=
+  if newsz <? oldsz then oldsz else newsz.
+
+Lemma kx_uvmalloc_max (o n : Z) : kx_uvmalloc o n = Z.max o n.
+Proof. unfold kx_uvmalloc. destruct (Z.ltb_spec n o); lia. Qed.
+
+Definition kx_grow (sz : Z) (p : elf_phdr) : Z :=
+  kx_uvmalloc sz (ep_vaddr p + ep_memsz p).
+
+(* the loop's [sz] after the PT_LOADs in [ps] have been allocated *)
+Definition kexec_sz_after (ps : list elf_phdr) : Z := foldl kx_grow 0 ps.
+
+Lemma kexec_sz_after_nil : kexec_sz_after [] = 0.
+Proof. reflexivity. Qed.
+
+Lemma kexec_sz_after_snoc (ps : list elf_phdr) (p : elf_phdr) :
+  kexec_sz_after (ps ++ [p])
+  = kx_uvmalloc (kexec_sz_after ps) (ep_vaddr p + ep_memsz p).
+Proof. unfold kexec_sz_after. rewrite foldl_app. reflexivity. Qed.
+
+(* THE SHRINK CASE NEVER FIRES: this is the whole content of "ascending". *)
+Lemma kexec_sz_after_snoc_le (ps : list elf_phdr) (p : elf_phdr) :
+  kexec_sz_after ps <= ep_vaddr p + ep_memsz p ->
+  kexec_sz_after (ps ++ [p]) = ep_vaddr p + ep_memsz p.
+Proof. intros H. rewrite kexec_sz_after_snoc, kx_uvmalloc_max. lia. Qed.
+
+(* ---- [Z.max] folds: order does not matter, so [elf_mem_end] needs no
+        ascending hypothesis ---- *)
+
+Lemma foldr_Zmax_ge (l : list Z) (s : Z) : s <= foldr Z.max s l.
+Proof. induction l as [| x l IH]; simpl; lia. Qed.
+
+Lemma foldr_Zmax_max (l : list Z) (s t : Z) :
+  foldr Z.max (Z.max s t) l = Z.max s (foldr Z.max t l).
+Proof. induction l as [| x l IH]; simpl; [lia |]. rewrite IH. lia. Qed.
+
+Lemma foldl_Zmax_foldr (l : list Z) (s : Z) :
+  foldl Z.max s l = foldr Z.max s l.
+Proof.
+  revert s. induction l as [| x l IH]; simpl; intros s; [reflexivity |].
+  rewrite IH, (Z.max_comm s x). apply foldr_Zmax_max.
+Qed.
+
+Lemma foldl_kx_grow_map (ps : list elf_phdr) (s : Z) :
+  foldl kx_grow s ps
+  = foldl Z.max s ((fun p => ep_vaddr p + ep_memsz p) <$> ps).
+Proof.
+  revert s. induction ps as [| q ps IH]; intros s; [reflexivity |].
+  rewrite fmap_cons. simpl. rewrite <- kx_uvmalloc_max. apply IH.
+Qed.
+
+Lemma kexec_sz_after_zlist_max (ps : list elf_phdr) :
+  kexec_sz_after ps
+  = match zlist_max ((fun p => ep_vaddr p + ep_memsz p) <$> ps) with
+    | Some e => Z.max 0 e
+    | None => 0
+    end.
+Proof.
+  unfold kexec_sz_after. rewrite foldl_kx_grow_map.
+  destruct ps as [| q ps]; [reflexivity |].
+  rewrite fmap_cons. simpl foldl. unfold zlist_max.
+  rewrite foldl_Zmax_foldr. apply foldr_Zmax_max.
+Qed.
+
+Lemma kexec_sz_after_nonneg (ps : list elf_phdr) : 0 <= kexec_sz_after ps.
+Proof.
+  rewrite kexec_sz_after_zlist_max.
+  destruct (zlist_max _); lia.
+Qed.
+
+(* the two nonnegativity facts [elf_wf] buys, in the shape the folds want *)
+Definition phdrs_nonneg (ps : list elf_phdr) : Prop :=
+  Forall (fun p => 0 <= ep_vaddr p /\ 0 <= ep_memsz p) ps.
+
+Lemma elf_wf_phdrs_nonneg (f : elf_bytes) :
+  elf_wf f = true -> phdrs_nonneg (elf_loads f).
+Proof.
+  intros Hwf. apply Forall_lookup. intros i p Hp.
+  destruct (elf_wf_phdr_ok f p Hwf (elem_of_list_lookup_2 _ _ _ Hp)).
+  lia.
+Qed.
+
+(* THE SIZE THE LOOP LEAVES BEHIND IS [elf_mem_end].  [Z.max] is
+   commutative, so this holds with NO ordering hypothesis at all; only the
+   [0] the loop starts from needs [ep_vaddr + ep_memsz >= 0]. *)
+Lemma kexec_sz_after_mem_end (f : elf_bytes) :
+  elf_wf f = true ->
+  kexec_sz_after (elf_loads f)
+  = match elf_mem_end f with Some e => e | None => 0 end.
+Proof.
+  intros Hwf.
+  pose proof (elf_wf_phdrs_nonneg f Hwf) as Hnn.
+  rewrite kexec_sz_after_zlist_max. unfold elf_mem_end.
+  destruct (elf_loads f) as [| q ps] eqn:Hl; [reflexivity |].
+  rewrite fmap_cons. unfold zlist_max.
+  assert (Hq : 0 <= ep_vaddr q + ep_memsz q).
+  { destruct (Forall_lookup_1 _ _ 0%nat q Hnn ltac:(reflexivity)).
+    lia. }
+  pose proof (foldr_Zmax_ge
+                ((fun p => ep_vaddr p + ep_memsz p) <$> ps)
+                (ep_vaddr q + ep_memsz q)).
+  lia.
+Qed.
+
+
+Fixpoint kxb_ascending (ps : list elf_phdr) : Prop :=
+  match ps with
+  | [] => True
+  | p :: ps' =>
+      (match ps' with
+       | [] => True
+       | q :: _ => ep_vaddr p + ep_memsz p <= ep_vaddr q
+       end) /\ kxb_ascending ps'
+  end.
+
+(* ---- ASCENDING SEGMENTS: prefixes, and the [take i]-indexed invariant ----
+       [SpecKexecAU.kxb_ascending], spelled below it (this file's header:
+       the kernel-side loops must not depend on the AU cone).
+       [KexecImageAlg] §3 is the (one-[rewrite]) bridge. *)
+
+Lemma kxb_ascending_app_l (ps qs : list elf_phdr) :
+  kxb_ascending (ps ++ qs) -> kxb_ascending ps.
+Proof.
+  induction ps as [| p ps IH]; simpl; intros H; [exact I |].
+  destruct H as [Hstep Hrest]. split; [| exact (IH Hrest)].
+  destruct ps as [| q ps]; [exact I |]. simpl in Hstep. exact Hstep.
+Qed.
+
+Lemma kxb_ascending_take (ps : list elf_phdr) (i : nat) :
+  kxb_ascending ps -> kxb_ascending (take i ps).
+Proof.
+  intros H. apply (kxb_ascending_app_l (take i ps) (drop i ps)).
+  rewrite take_drop. exact H.
+Qed.
+
+Lemma kxb_ascending_adj (ps : list elf_phdr) (i : nat) (p q : elf_phdr) :
+  kxb_ascending ps -> ps !! i = Some p -> ps !! S i = Some q ->
+  ep_vaddr p + ep_memsz p <= ep_vaddr q.
+Proof.
+  revert i. induction ps as [| x ps IH]; intros i H Hp Hq;
+    [rewrite lookup_nil in Hp; discriminate |].
+  destruct i as [| i]; simpl in H, Hp, Hq.
+  - injection Hp as <-. destruct H as [Hstep _].
+    destruct ps as [| y ps]; [discriminate Hq |].
+    simpl in Hq. injection Hq as <-. exact Hstep.
+  - destruct H as [_ Hrest]. exact (IH i Hrest Hp Hq).
+Qed.
+
+(* THE LOOP INVARIANT, at the phdr number.  Before phdr [i] the running
+   [sz] is at or below [ep_vaddr p] (so uvmalloc's growth starts exactly
+   at this segment and the shrink case is dead), and after it the running
+   [sz] IS [ep_vaddr p + ep_memsz p]. *)
+Lemma kxb_sz_after_take_step (ps : list elf_phdr) (i : nat) (p : elf_phdr) :
+  kxb_ascending ps -> phdrs_nonneg ps -> ps !! i = Some p ->
+  kexec_sz_after (take i ps) <= ep_vaddr p
+  /\ kexec_sz_after (take (S i) ps) = ep_vaddr p + ep_memsz p.
+Proof.
+  intros Hasc Hnn. revert p. induction i as [| i IH]; intros p Hp.
+  - destruct (Forall_lookup_1 _ _ _ _ Hnn Hp) as [Hv Hm].
+    rewrite (take_S_r ps 0%nat p Hp), take_0, kexec_sz_after_nil.
+    split; [lia |].
+    apply kexec_sz_after_snoc_le. rewrite kexec_sz_after_nil. lia.
+  - destruct (Forall_lookup_1 _ _ _ _ Hnn Hp) as [Hv Hm].
+    assert (Hlt : (i < length ps)%nat)
+      by (pose proof (lookup_lt_Some _ _ _ Hp); lia).
+    destruct (lookup_lt_is_Some_2 ps i Hlt) as [q Hq].
+    destruct (IH q Hq) as [_ Hprev].
+    pose proof (kxb_ascending_adj ps i q p Hasc Hq Hp) as Hadj.
+    split; [lia |].
+    rewrite (take_S_r ps (S i) p Hp), kexec_sz_after_snoc_le;
+      [reflexivity | lia].
+Qed.
+
+
+(* ====================================================================== *)
+(*  3b.  THE LOADER'S OWN VIEW OF THE PROGRAM HEADER TABLE                *)
+(* ====================================================================== *)
+
+(*  The phdr loop reads header [i] out of the FILE, into a 56-byte frame
+    buffer it overwrites on the next turn.  So its invariant cannot be
+    stated on the buffer: it has to be stated on a TOTAL pure function of
+    the file's bytes and the ELF header's own [ph_at], which is what these
+    four are.  [kxb_phdr_at] is [ElfFile.elf_parse_phdr]'s record without
+    the option ([KexecImageAlg] §4 is the identification, under the bounds
+    [SpecKexecAU.kexec_loadable] carries); [kxb_phoff] is the offset readi
+    is actually handed, i.e. the 32-bit truncation the ABI performs.       *)
+
+Definition kxb_phdr_at (f : elf_bytes) (o : nat) : elf_phdr :=
+  ElfPhdr (elf_le_at f o 4) (elf_le_at f (o + 4) 4)
+          (elf_le_at f (o + 8) 8) (elf_le_at f (o + 16) 8)
+          (elf_le_at f (o + 24) 8) (elf_le_at f (o + 32) 8)
+          (elf_le_at f (o + 40) 8) (elf_le_at f (o + 48) 8).
+
+Definition kxb_phoff (ef : nat -> bv 8) (i : nat) : nat :=
+  Z.to_nat ((ph_at ef i) `mod` 2 ^ 32).
+
+Definition kxb_phdr (f : elf_bytes) (ef : nat -> bv 8) (i : nat) : elf_phdr :=
+  kxb_phdr_at f (kxb_phoff ef i).
+
+(* the PT_LOADs among the first [n] headers, in program-header order --
+   the loop's [take i]-indexed list.  Written as a snoc recursion because
+   that is exactly the step the loop takes. *)
+Fixpoint kxb_loads (f : elf_bytes) (ef : nat -> bv 8) (n : nat)
+  : list elf_phdr :=
+  match n with
+  | O => []
+  | S k => kxb_loads f ef k
+           ++ (if decide (ep_type (kxb_phdr f ef k) = 1)
+               then [kxb_phdr f ef k] else [])
+  end.
+
+Lemma kxb_loads_S_load (f : elf_bytes) (ef : nat -> bv 8) (k : nat) :
+  ep_type (kxb_phdr f ef k) = 1 ->
+  kxb_loads f ef (S k) = (kxb_loads f ef k ++ [kxb_phdr f ef k])%list.
+Proof. intros H. simpl. rewrite decide_True by exact H. reflexivity. Qed.
+
+Lemma kxb_loads_S_skip (f : elf_bytes) (ef : nat -> bv 8) (k : nat) :
+  ep_type (kxb_phdr f ef k) <> 1 ->
+  kxb_loads f ef (S k) = kxb_loads f ef k.
+Proof.
+  intros H. simpl. rewrite decide_False by exact H.
+  apply List.app_nil_r.
+Qed.
+
+Lemma kxb_loads_prefix (f : elf_bytes) (ef : nat -> bv 8) (i n : nat) :
+  (i <= n)%nat -> exists r, kxb_loads f ef n = (kxb_loads f ef i ++ r)%list.
+Proof.
+  induction 1 as [| n Hn [r IH]].
+  - exists []. rewrite List.app_nil_r. reflexivity.
+  - simpl. rewrite IH.
+    eexists. rewrite <- app_assoc. reflexivity.
+Qed.
+
+Lemma kxb_loads_take (f : elf_bytes) (ef : nat -> bv 8) (i n : nat) :
+  (i <= n)%nat ->
+  take (length (kxb_loads f ef i)) (kxb_loads f ef n) = kxb_loads f ef i.
+Proof.
+  intros Hi. destruct (kxb_loads_prefix f ef i n Hi) as [r ->].
+  rewrite take_app_length. reflexivity.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  THE PHDR LOOP'S INVARIANT, and the guard that makes its step true.     *)
+(* ---------------------------------------------------------------------- *)
+
+(* after [n] headers: the running [sz] is the [uvmalloc] fold over the
+   PT_LOADs seen so far, and each of their segments is already in the
+   image. *)
+Definition kxb_at (f : elf_bytes) (ef : nat -> bv 8) (n : nat)
+    (szv : Z) (M : gmap Z (bv 8)) : Prop :=
+  szv = kexec_sz_after (kxb_loads f ef n)
+  /\ (forall p, p ∈ kxb_loads f ef n -> uimg_sub (seg_map f p) M).
+
+(* THE GUARD.  Nothing above is true of an arbitrary file: the step needs
+   the walk to be reading the table the ELF semantics parses, that table's
+   PT_LOADs to be well-formed, and them to ASCEND (which is what makes the
+   later segments' writes miss the earlier ones and the [uvmalloc] fold a
+   plain running maximum).  It is a PREMISE of the block lemmas, not a
+   conjunct of the states -- [SpecKexecAU.kexec_loadable] is where it comes
+   from, and [KexecImageAlg] §4 is the (only) glue. *)
+Definition kxb_walk_ok (f : elf_bytes) (ef : nat -> bv 8) : Prop :=
+  kxb_loads f ef (Z.to_nat (eh_phnum ef)) = elf_loads f
+  /\ Forall (phdr_ok f) (elf_loads f)
+  /\ kxb_ascending (elf_loads f).
+
+Lemma kxb_walk_phdr_ok (f : elf_bytes) (ef : nat -> bv 8) (n : nat)
+    (p : elf_phdr) :
+  kxb_walk_ok f ef -> (n <= Z.to_nat (eh_phnum ef))%nat ->
+  p ∈ kxb_loads f ef n -> phdr_ok f p.
+Proof.
+  intros (Hid & Hok & _) Hn Hp.
+  destruct (kxb_loads_prefix f ef n (Z.to_nat (eh_phnum ef)) Hn) as [r Hr].
+  rewrite Hid in Hr.
+  assert (Hin : p ∈ elf_loads f)
+    by (rewrite Hr; apply elem_of_app; left; exact Hp).
+  apply elem_of_list_lookup in Hin as [j Hj].
+  exact (Forall_lookup_1 _ _ _ _ Hok Hj).
+Qed.
+
+(* THE STEP, at a PT_LOAD header: the running [sz] starts at or below this
+   segment's [vaddr] (so uvmalloc's shrink case is dead and the growth is
+   exactly this segment) and ends at its top. *)
+Lemma kxb_walk_step (f : elf_bytes) (ef : nat -> bv 8) (i : nat) :
+  kxb_walk_ok f ef -> (S i <= Z.to_nat (eh_phnum ef))%nat ->
+  ep_type (kxb_phdr f ef i) = 1 ->
+  phdr_ok f (kxb_phdr f ef i)
+  /\ kexec_sz_after (kxb_loads f ef i) <= ep_vaddr (kxb_phdr f ef i)
+  /\ kexec_sz_after (kxb_loads f ef (S i))
+     = ep_vaddr (kxb_phdr f ef i) + ep_memsz (kxb_phdr f ef i).
+Proof.
+  intros Hw Hi Hty. pose proof Hw as (Hid & Hok & Hasc).
+  set (p := kxb_phdr f ef i).
+  set (k := length (kxb_loads f ef i)).
+  assert (HSi : kxb_loads f ef (S i) = (kxb_loads f ef i ++ [p])%list)
+    by (apply kxb_loads_S_load; exact Hty).
+  assert (Hpok : phdr_ok f p)
+    by (apply (kxb_walk_phdr_ok f ef (S i) p Hw Hi);
+        rewrite HSi; apply elem_of_app; right; apply elem_of_list_singleton;
+        reflexivity).
+  assert (Htk : take k (elf_loads f) = kxb_loads f ef i).
+  { rewrite <- Hid. apply kxb_loads_take. lia. }
+  assert (HlenS : length (kxb_loads f ef (S i)) = S k)
+    by (rewrite HSi, length_app; unfold k; simpl; lia).
+  assert (HtSk : take (S k) (elf_loads f) = (kxb_loads f ef i ++ [p])%list).
+  { rewrite <- HSi, <- HlenS, <- Hid. apply kxb_loads_take. lia. }
+  assert (Hlk : elf_loads f !! k = Some p).
+  { assert (Hpref : take (S k) (elf_loads f) !! k = Some p).
+    { rewrite HtSk. apply list_lookup_middle. unfold k. reflexivity. }
+    rewrite lookup_take in Hpref by lia. exact Hpref. }
+  assert (Hnn : phdrs_nonneg (elf_loads f)).
+  { unfold phdrs_nonneg. apply Forall_lookup. intros j q Hq.
+    pose proof (Forall_lookup_1 _ _ _ _ Hok Hq) as Hq'.
+    pose proof (po_vaddr f q Hq'). pose proof (po_filesz f q Hq').
+    pose proof (po_memsz f q Hq'). split; lia. }
+  destruct (kxb_sz_after_take_step (elf_loads f) k p Hasc Hnn Hlk)
+    as [Hle Heq].
+  rewrite Htk in Hle. rewrite HtSk in Heq. rewrite <- HSi in Heq.
+  split; [exact Hpok | split; [exact Hle | exact Heq]].
+Qed.
+
+(* the fold is at least every member's top -- what says an already-loaded
+   segment sits strictly below the size the loop has reached. *)
+Lemma foldr_Zmax_elem (l : list Z) (s x : Z) :
+  x ∈ l -> x <= foldr Z.max s l.
+Proof.
+  induction l as [| y l IH]; intros Hx; [inversion Hx |].
+  apply elem_of_cons in Hx as [-> | Hx]; simpl; [lia |].
+  pose proof (IH Hx). lia.
+Qed.
+
+Lemma kexec_sz_after_elem (ps : list elf_phdr) (p : elf_phdr) :
+  p ∈ ps -> ep_vaddr p + ep_memsz p <= kexec_sz_after ps.
+Proof.
+  intros Hp. unfold kexec_sz_after.
+  rewrite foldl_kx_grow_map, foldl_Zmax_foldr.
+  apply foldr_Zmax_elem.
+  apply elem_of_list_fmap. exists p. split; [reflexivity | exact Hp].
+Qed.
+
+(* ...and a segment's own bytes live inside its own [vaddr] window, which
+   is what turns that into "a later write cannot disturb it". *)
+Lemma seg_map_lookup_range (f : elf_bytes) (p : elf_phdr) (a : Z) (b : bv 8) :
+  phdr_ok f p -> seg_map f p !! a = Some b ->
+  ep_vaddr p <= a < ep_vaddr p + ep_memsz p.
+Proof.
+  intros Hok Ha. pose proof (po_memsz f p Hok) as Hm.
+  pose proof (po_filesz f p Hok) as Hf.
+  unfold seg_map in Ha.
+  apply lookup_union_Some_raw in Ha as [Ha | [_ Ha]].
+  - destruct (proj1 (lookup_seg_file_map f p a b Hok) Ha) as [Hr _]. lia.
+  - destruct (proj1 (lookup_seg_zero_map p a b Hm) Ha) as [Hr _]. lia.
+Qed.
+
+Lemma uimg_sub_seg_map_above (f : elf_bytes) (p : elf_phdr)
+    (M : gmap Z (bv 8)) (a : Z) (n : nat) (g : nat -> bv 8) :
+  phdr_ok f p -> ep_vaddr p + ep_memsz p <= a ->
+  uimg_sub (seg_map f p) M -> uimg_sub (seg_map f p) (umem_write M a n g).
+Proof.
+  intros Hok Hab Hsub. apply uimg_sub_umem_write_range; [exact Hsub |].
+  intros va Hva. destruct (seg_map f p !! va) as [b |] eqn:Hb;
+    [| reflexivity].
+  exfalso. pose proof (seg_map_lookup_range f p va b Hok Hb). lia.
+Qed.
+
+(* ====================================================================== *)
 (*  4.  THE FACT BUNDLE THE CONE CARRIES TO ITS ENTRY-POINT HOLE          *)
 (* ====================================================================== *)
 
@@ -539,18 +1101,33 @@ Qed.
     values, and [bv_le_nth_byte] above is the row that a word's [nth_byte]s
     ARE [bv_to_little_endian 8 8] of it.
 
-    WHAT IT DOES NOT CARRY YET, and why -- both are the SAME missing
-    ingredient.  [kexec_image_ok] also asks for [uimg_sub (elf_image f)]
-    and for [uint sz1 = kexec_sz f], and each of those is a claim about the
-    FILE's bytes.  The kernel-side cone cannot state either: the file's
-    byte function is ∃-bound inside [IcacheInv.ic_loaded] (kexec holds the
-    inode as [ProofKexecSeam.kxc_open], and [SpecKexecB2.kxc_load_peel] is
-    what opens it, under an ∃ that is re-introduced at every readi).  So
-    the loadseg window and the phdr loop's [kexec_sz_after] chain cannot be
-    written down at [kxc_at_12c] / [kxc_ls_body] at all until that name is
-    threaded through the open-inode bundle -- a sweep of its own.  Adding
-    the two conjuncts here is then a local edit: this Prop gains the file's
-    bytes as a parameter and two more rows, and the five premise sites gain
+    WHAT IT DOES NOT CARRY YET, and what is now in place for it.
+    [kexec_image_ok] also asks for [uimg_sub (elf_image f)] and for
+    [uint sz1 = kexec_sz f], and each of those is a claim about the FILE's
+    bytes.  Until S3b the kernel-side cone could not state either: the
+    file's byte function was ∃-bound inside [IcacheEscrow.ic_loaded], and
+    [SpecKexecB2.kxc_load_peel] re-introduced the ∃ at every readi, so no
+    phase state could even MENTION it.  That blocker is gone --
+    [ProofKexecTail.kxc_ldat] is [ic_loaded]'s payload at a NAMED [datl],
+    [ProofKexecSeam.kxc_open] carries it, phase A chooses the name at its
+    header readi and publishes [forall j < 64, ef j = file_byte datl j]
+    beside it, and every phase-B/B2/B3 state passes it along.  §1-§3b below
+    are the vocabulary the two remaining invariants are to be written in:
+    [load_win] (the loadseg window), [kexec_sz_after] over [kxb_loads]
+    (the phdr loop's size fold) and [kxb_at] / [kxb_walk_ok] (the loop
+    invariant and the ascending/well-formedness guard its step needs;
+    [KexecImageAlg.kxb_walk_ok_of_loadable] discharges the guard from
+    [SpecKexecAU.kexec_loadable]).  What is STILL missing is the in-proof
+    work: [ProofKexecB2.kxc_ls] must carry [load_win] through its fuel
+    induction and publish it at +0x116, and [ProofKexecB3.kxc_ph_step]
+    must step [kxb_at] across the uvmalloc/loadseg pair.  Only then can
+    this Prop gain the file's bytes as a parameter and the two rows
+
+        uimg_sub (elf_image f) (us_M U')
+        uint sz1 = pgroundup (kexec_sz_after (elf_loads f)) + 8192
+
+    with the five premise sites ([ProofKexecD.kxd_phaseD],
+    [ProofKexec.kxc_d_tail] / [kxc_cd], [ProofKexecPin]'s two) gaining
     them by name.                                                          *)
 Definition kexec_built (sz1 : mword 64) (na : nat) (alen : nat -> nat)
     (afun : nat -> nat -> bv 8) (U' : ustate) : Prop :=

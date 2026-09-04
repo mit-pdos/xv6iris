@@ -316,7 +316,8 @@ Section KexecB2Res.
       (jp : nat)
       (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap) (gilf gislf : gname) (n2 : nat)
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8))
+      (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -324,7 +325,7 @@ Section KexecB2Res.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) : iProp Σ :=
-    (kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf
+    (kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf datl
               gilf gislf ∗
      log_opb icfg_log n2 ∗
      iref_slots 1 ∗
@@ -350,10 +351,9 @@ Section KexecB2Res.
   (* ------------------------------------------------------------------ *)
   Lemma kxc_load_peel `{XI : CurCtx}
       (kf : nat) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap) :
-    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf ⊢
-    ∃ datl : nat -> list (bv 8),
-      ⌜inode_ok fsc_cov fsc_logst dnf bmf datl⌝ ∗
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) :
+    kxc_ldat kf inumf dnf bmf datl ⊢
+      (⌜inode_ok fsc_cov fsc_logst dnf bmf datl⌝ ∗
       (* durable-disk 2b-inode-3: the payload's record-only facts and the
          era's abstract value ride the same self-cancelling bracket the two
          contents holds do -- readi moves no byte, so the node does not
@@ -372,26 +372,8 @@ Section KexecB2Res.
          rides the bracket is the era fragment alone, and readi -- the one
          callee this bracket is opened for -- moves no byte, so the node does
          not move and the SEAL hands it back unchanged. *)
-      top_frag (fs_gamma_L fsc_fs) (bv_unsigned inumf) (era_node dnf bmf datl).
-  Proof.
-    rewrite /inode_map.
-    iIntros "H".
-    iDestruct (ic_loaded_open with "H") as (datl)
-      "(%Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta &
-        Haddrs & Hind & Hbl & Htop)".
-    iExists datl.
-    iSplitR; [iPureIntro; exact Hok |].
-    iSplitR; [iPureIntro; exact Hrl |].
-    iSplitR; [iPureIntro; exact Hdok |].
-    iSplitR; [iPureIntro; exact Hddix |].
-    iSplitR; [iPureIntro; exact Hdoc |].
-    iSplitR; [iPureIntro; exact Hduq |].
-    iSplitL "Hdlk"; [iExact "Hdlk" |]. iSplitL "Hdiat"; [iExact "Hdiat" |].
-    iSplitL "Hmeta"; [iExact "Hmeta" |].
-    iSplitR "Hbl Htop";
-      [| iSplitL "Hbl"; [iExact "Hbl" | iExact "Htop"]].
-    iSplitL "Haddrs"; [iExact "Haddrs" | iExact "Hind"].
-  Qed.
+      top_frag (fs_gamma_L fsc_fs) (bv_unsigned inumf) (era_node dnf bmf datl)).
+  Proof. rewrite /kxc_ldat. iIntros "H". iExact "H". Qed.
 
   Lemma kxc_load_seal `{XI : CurCtx}
       (kf : nat) (inumf : mword 32)
@@ -408,13 +390,20 @@ Section KexecB2Res.
     inode_map fsc_fs (ientry kf) bmf -∗
     inode_blocks fsc_fs bmf datl -∗
     top_frag (fs_gamma_L fsc_fs) (bv_unsigned inumf) (era_node dnf bmf datl) -∗
-    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf.
+    kxc_ldat kf inumf dnf bmf datl.
   Proof.
-    intros Hok Hrl Hdok Hddix Hdoc Hduq. rewrite /inode_map.
-    iIntros "Hdlk Hdiat Hmeta [Haddrs Hind] Hbl Htop".
-    iApply (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf datl
-              Hok Hrl Hdok Hddix Hdoc Hduq
-              with "Hdlk Hdiat Hmeta Haddrs Hind Hbl Htop").
+    intros Hok Hrl Hdok Hddix Hdoc Hduq. rewrite /kxc_ldat.
+    iIntros "Hdlk Hdiat Hmeta Hmap Hbl Htop".
+    iSplitR; [iPureIntro; exact Hok |].
+    iSplitR; [iPureIntro; exact Hrl |].
+    iSplitR; [iPureIntro; exact Hdok |].
+    iSplitR; [iPureIntro; exact Hddix |].
+    iSplitR; [iPureIntro; exact Hdoc |].
+    iSplitR; [iPureIntro; exact Hduq |].
+    iSplitL "Hdlk"; [iExact "Hdlk" |]. iSplitL "Hdiat"; [iExact "Hdiat" |].
+    iSplitL "Hmeta"; [iExact "Hmeta" |].
+    iSplitL "Hmap"; [iExact "Hmap" |].
+    iSplitL "Hbl"; [iExact "Hbl" | iExact "Htop"].
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -466,7 +455,8 @@ Section KexecB2Res.
   Lemma kxc_open_intro `{XI : CurCtx}
       (pidv : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap) (gilf gislf : gname) :
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8))
+      (gilf gislf : gname) :
     is_sleeplock_genl gilf gislf (i_lock (ientry kf)) "inode"%string (ic_slp fsc_ic kf) (slh_tok (icfg_isl kf)) -∗
     sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
     ⌜(loyf <= tlyf)%nat⌝ -∗
@@ -477,13 +467,13 @@ Section KexecB2Res.
     i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
     i_valid (ientry kf) ↦₄ valid_word true -∗
-    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf -∗
+    kxc_ldat kf inumf dnf bmf datl -∗
     ity_shot gyf (di_type dnf) -∗
     (* ...and the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned inumf) -∗
     inode_ref_short kf (qf + sf)%Qp qf icfg_dev inumf -∗
     runit_any (bv_unsigned inumf) -∗
-    kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf
+    kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf datl
              gilf gislf.
   Proof.
     rewrite /kxc_open.
@@ -608,7 +598,7 @@ Definition kxc_bad324_body `{XI : CurCtx}
  (pd pav pu : mword 64)
     (gilf gislf : gname) (gf : gname)
     (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
-    (dnf : dinode) (bmf : blkmap) (n2 : nat)
+    (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) (n2 : nat)
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
@@ -653,7 +643,7 @@ Definition kxc_bad324_body `{XI : CurCtx}
   pc_is (mword_of_int (KXB + 0x31e) : mword 64) -∗
   fs_fabric gs pd pav pu
  -∗
-  kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf
+  kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf datl
            gilf gislf -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
@@ -696,7 +686,7 @@ Definition kxc_ls_body `{XI : CurCtx}
  (pd pav pu : mword 64)
     (gilf gislf : gname) (gf : gname)
     (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
-    (dnf : dinode) (bmf : blkmap) (n2 : nat)
+    (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) (n2 : nat)
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
@@ -757,7 +747,7 @@ Definition kxc_ls_body `{XI : CurCtx}
  -∗
   kalloc_env fsc_kalloc None -∗
   kxc_res jp gf
-          kf qf sf gyf loyf tlyf inumf dnf bmf gilf gislf n2 plen pfun na avf
+          kf qf sf gyf loyf tlyf inumf dnf bmf datl gilf gislf n2 plen pfun na avf
           aslen afun pidv U dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
           (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
           (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -801,7 +791,7 @@ Definition kxc_ls_body `{XI : CurCtx}
       cpu_claim_ext eb (proc_addr jp) -∗
       pc_is (mword_of_int (KXB + 0x116) : mword 64) -∗
       kxc_res jp gf
-              kf qf sf gyf loyf tlyf inumf dnf bmf gilf gislf n2 plen pfun na avf
+              kf qf sf gyf loyf tlyf inumf dnf bmf datl gilf gislf n2 plen pfun na avf
               aslen afun pidv U dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
               (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
               (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -822,7 +812,7 @@ Module Type KEXECB2.
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap) (n2 : nat)
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -832,7 +822,7 @@ Module Type KEXECB2.
       (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szf : mword 64) (eb : bool) (lks : gset string),
     kxc_bad324_body Q gs jp gl pd pav pu gilf gislf
  gf
-      kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
+      kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P Mi szf eb lks.
 
@@ -843,7 +833,7 @@ Module Type KEXECB2.
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap) (n2 : nat)
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -854,7 +844,7 @@ Module Type KEXECB2.
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string),
     kxc_ls_body Q gs jp gl pd pav pu gilf gislf
  gf
-      kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
+      kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P Mi ip va fz po eb lks.
 End KEXECB2.

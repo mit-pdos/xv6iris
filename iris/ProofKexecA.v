@@ -829,7 +829,7 @@ Section KexecABody.
     (∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
         (loyf tlyf : nat)
-        (n2 : nat) (ef : nat -> bv 8),
+        (n2 : nat) (ef : nat -> bv 8) (datl : nat -> list (bv 8)),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
           M90 !!! Regidx Rs1 = proc_addr jp /\
@@ -841,6 +841,11 @@ Section KexecABody.
              r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 ->
              M90 !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ (iput_units <= n2)%nat ⌝ -∗
+        (* THE HEADER IS THE FILE'S FIRST 64 BYTES (S3b).  Phase A's readi
+           delivered them out of [datl], and the payload goes back at THAT
+           name below, so phase B's loops can read the program-header table
+           off the file rather than off a buffer they overwrite. *)
+        ⌜ forall j, (j < 64)%nat -> ef j = file_byte datl j ⌝ -∗
         pc_is (mword_of_int (KXA + 0x090) : mword 64) -∗
         sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
@@ -857,7 +862,7 @@ Section KexecABody.
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
-        ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf -∗
+        kxc_ldat kf inumf dnf bmf datl -∗
         (* SpecIlock v5's additive type witness, at the generation the
            share names -- what SpecIunlockput now needs at +0x064. *)
         ity_shot gyf (di_type dnf) -∗
@@ -1532,9 +1537,11 @@ Section KexecABody.
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDrd CID15 eb (proc_addr jp)
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-        iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dnl bml)
+        (* S3b: the payload goes back AT THE NAME readi just read it under,
+           so the seam can say what the file's bytes are. *)
+        iAssert (kxc_ldat k inum dnl bml datl)
           with "[Hdiat Hmeta Hmap Hblocks Hdlk Htopl]" as "Hload".
-        { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map. iExists datl.
+        { rewrite /kxc_ldat.
           iSplitR; [iPureIntro; split_and!;
             [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
             | exact Hszb | exact Hholes | exact Hsized] |].
@@ -1544,13 +1551,10 @@ Section KexecABody.
           iSplitR; [iPureIntro; exact Hdoc |].
           iSplitR; [iPureIntro; exact Hduq |].
           iSplitL "Hdlk"; [iExact "Hdlk" |].
-          iDestruct "Hmap" as "[Haddrs Hindres]".
           iSplitL "Hdiat"; [iExact "Hdiat" |].
           iSplitL "Hmeta"; [iExact "Hmeta" |].
-          iSplitL "Haddrs"; [iExact "Haddrs" |].
-          iSplitL "Hindres"; [iExact "Hindres" |].
-          iSplitL "Hblocks"; [iExact "Hblocks" |].
-          iExact "Htopl". }
+          iSplitL "Hmap"; [iExact "Hmap" |].
+          iSplitL "Hblocks"; [iExact "Hblocks" | iExact "Htopl"]. }
         iDestruct (T.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
         iSpecialize ("Hcont90" $! CID15 with "[%]"); [wp_next_chain |].
         (* [b] is gone by here -- [kxc_sie_b_agree] pinned it and the proof
@@ -1585,12 +1589,13 @@ Section KexecABody.
           destruct (decide (j < tot)%nat) as [_ | Hno]; [| lia].
           by rewrite Nat.add_0_l. }
         iApply ("Hcont90" $! Q12 k (q/2)%Qp (q/2)%Qp inum dnl bml gilk gislk gy
-                  loy tly n1 gb with "[%] [%] Hpc Hcg Hcnt Hextc Hclmc Hslkk Hslkd [//] Hfly Hclaimskx Hdep Hoffr
+                  loy tly n1 gb datl with "[%] [%] [%] Hpc Hcg Hcnt Hextc Hclmc Hslkk Hslkd [//] Hfly Hclaimskx Hdep Hoffr
                   Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hlog Hirs Hbm Hins Hbits
                   Hbs Hka Hpriv Hpath Hargv Hargs [] [-Hcont] Hcont").
         * split_and!; [exact HQ12sp | exact HQ12s0 | exact HQ12s1 | exact HQ12s2
                       | exact HQ12s4 | exact Hk | exact Hib' | exact HQ12thr].
         * exact Hiu.
+        * exact Hgb.
         * iDestruct "Hhdr" as "[%Hh | Hx]".
           { iModIntro. iLeft. iPureIntro.
             exact (kxq_hdr_ok_ext HD gb (fun j => file_byte datl j) Hgb Hh). }
@@ -1914,7 +1919,7 @@ Section KexecAMain.
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
         (loyf tlyf : nat)
-        (n2 : nat) (ef : nat -> bv 8),
+        (n2 : nat) (ef : nat -> bv 8) (datl : nat -> list (bv 8)),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
           M90 !!! Regidx Rs1 = proc_addr jp /\
@@ -1926,6 +1931,11 @@ Section KexecAMain.
              r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 ->
              M90 !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ (iput_units <= n2)%nat ⌝ -∗
+        (* THE HEADER IS THE FILE'S FIRST 64 BYTES (S3b).  Phase A's readi
+           delivered them out of [datl], and the payload goes back at THAT
+           name below, so phase B's loops can read the program-header table
+           off the file rather than off a buffer they overwrite. *)
+        ⌜ forall j, (j < 64)%nat -> ef j = file_byte datl j ⌝ -∗
         pc_is (mword_of_int (KXA + 0x090) : mword 64) -∗
         sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
@@ -1942,7 +1952,7 @@ Section KexecAMain.
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
-        ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf -∗
+        kxc_ldat kf inumf dnf bmf datl -∗
         (* SpecIlock v5's additive type witness, at the generation the
            share names -- what SpecIunlockput now needs at +0x064. *)
         ity_shot gyf (di_type dnf) -∗

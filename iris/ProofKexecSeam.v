@@ -544,11 +544,19 @@ Section KexecBSeam.
   (* THE OPEN INODE, as ilock produced it and iunlockput will consume it
      (convention 6): nine resources phases A and B both carry and neither
      looks inside.  Bundled here so the two output states below do not each
-     spell them out. *)
+     spell them out.
+
+     THE ONE THING THEY DO LOOK INSIDE (S3b): the payload rides as
+     [ProofKexecTail.kxc_ldat] at a NAMED [datl] rather than as
+     [ic_loaded], whose ∃ hides the file's bytes from every phase state.
+     Phase A chooses the name at its header readi and publishes
+     [forall j < 64, ef j = file_byte datl j] beside it; the two [bad:]
+     tails, which run iunlockput, spend [kxc_ldat_to_loaded] to hand the ∃
+     back.  See [KexecBuilt] §4 for what this unblocks. *)
   Definition kxc_open
  (pidv : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap)
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8))
       (gilf gislf : gname) : iProp Σ :=
     (is_sleeplock_genl gilf gislf (i_lock (ientry kf)) "inode"%string (ic_slp fsc_ic kf) (slh_tok (icfg_isl kf)) ∗
      sleeplocked_q gislf sf (i_lock (ientry kf)) pidv ∗
@@ -560,7 +568,7 @@ Section KexecBSeam.
      i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev ∗
      i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf ∗
      i_valid (ientry kf) ↦₄ valid_word true ∗
-     ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf ∗
+     kxc_ldat kf inumf dnf bmf datl ∗
      ity_shot gyf (di_type dnf) ∗
      (* ...and the payload's freeze token (§3.9, RULING A-prime) *)
      ifreeze_off (bv_unsigned inumf) ∗
@@ -585,7 +593,7 @@ Section KexecBSeam.
       (jp : nat)
       (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap)
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8))
       (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
@@ -617,7 +625,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf
+     kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf datl
               gilf gislf ∗
      log_opb icfg_log n2 ∗
      iref_slots 1 ∗
@@ -664,7 +672,7 @@ Section KexecBSeam.
       (jp : nat)
       (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap)
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8))
       (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
@@ -699,7 +707,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf
+     kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf datl
               gilf gislf ∗
      log_opb icfg_log n2 ∗
      iref_slots 1 ∗
@@ -734,7 +742,7 @@ Section KexecBSeam.
       (jp : nat)
       (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap)
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8))
       (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
@@ -767,7 +775,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf
+     kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf bmf datl
               gilf gislf ∗
      log_opb icfg_log n2 ∗
      iref_slots 1 ∗

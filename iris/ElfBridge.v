@@ -323,6 +323,52 @@ Proof.
      | exact Hv6 | exact Hv7].
 Qed.
 
+(* ...ALL EIGHT FIELDS, which is what identifies the parsed record with the
+   TOTAL reader the phdr loop's invariant is stated on
+   ([KexecBuilt.kxb_phdr_at]).  [elf_parse_phdr_fields] above exposes only
+   the six the code reads; the invariant needs the record itself. *)
+Lemma elf_parse_phdr_all (l : elf_bytes) (o : Z) (p : elf_phdr) :
+  elf_parse_phdr l o = Some p ->
+  p = ElfPhdr (elf_le_at l (Z.to_nat o) 4) (elf_le_at l (Z.to_nat o + 4) 4)
+              (elf_le_at l (Z.to_nat o + 8) 8) (elf_le_at l (Z.to_nat o + 16) 8)
+              (elf_le_at l (Z.to_nat o + 24) 8) (elf_le_at l (Z.to_nat o + 32) 8)
+              (elf_le_at l (Z.to_nat o + 40) 8) (elf_le_at l (Z.to_nat o + 48) 8).
+Proof.
+  unfold elf_parse_phdr, elf_read_u32, elf_read_u64.
+  destruct (elf_read l o 4) as [ty|] eqn:E1; [|discriminate].
+  destruct (elf_read l (o + 4) 4) as [fl|] eqn:E2; [|discriminate].
+  destruct (elf_read l (o + 8) 8) as [off|] eqn:E3; [|discriminate].
+  destruct (elf_read l (o + 16) 8) as [va|] eqn:E4; [|discriminate].
+  destruct (elf_read l (o + 24) 8) as [pa|] eqn:E5; [|discriminate].
+  destruct (elf_read l (o + 32) 8) as [fsz|] eqn:E6; [|discriminate].
+  destruct (elf_read l (o + 40) 8) as [msz|] eqn:E7; [|discriminate].
+  destruct (elf_read l (o + 48) 8) as [al|] eqn:E8; [|discriminate].
+  simpl. intros Heq. injection Heq as <-.
+  pose proof (proj1 (elf_read_Some l o 4 ty ltac:(lia)) E1) as (Ho & _ & Hv1).
+  pose proof (proj1 (elf_read_Some l (o + 4) 4 fl ltac:(lia)) E2) as (_ & _ & Hv2).
+  pose proof (proj1 (elf_read_Some l (o + 8) 8 off ltac:(lia)) E3) as (_ & _ & Hv3).
+  pose proof (proj1 (elf_read_Some l (o + 16) 8 va ltac:(lia)) E4) as (_ & _ & Hv4).
+  pose proof (proj1 (elf_read_Some l (o + 24) 8 pa ltac:(lia)) E5) as (_ & _ & Hv5).
+  pose proof (proj1 (elf_read_Some l (o + 32) 8 fsz ltac:(lia)) E6) as (_ & _ & Hv6).
+  pose proof (proj1 (elf_read_Some l (o + 40) 8 msz ltac:(lia)) E7) as (_ & _ & Hv7).
+  pose proof (proj1 (elf_read_Some l (o + 48) 8 al ltac:(lia)) E8) as (_ & _ & Hv8).
+  rewrite (Z2Nat.inj_add o 4) in Hv2 by lia.
+  rewrite (Z2Nat.inj_add o 8) in Hv3 by lia.
+  rewrite (Z2Nat.inj_add o 16) in Hv4 by lia.
+  rewrite (Z2Nat.inj_add o 24) in Hv5 by lia.
+  rewrite (Z2Nat.inj_add o 32) in Hv6 by lia.
+  rewrite (Z2Nat.inj_add o 40) in Hv7 by lia.
+  rewrite (Z2Nat.inj_add o 48) in Hv8 by lia.
+  change (Z.to_nat 4) with 4%nat in Hv2.
+  change (Z.to_nat 8) with 8%nat in Hv3.
+  change (Z.to_nat 16) with 16%nat in Hv4.
+  change (Z.to_nat 24) with 24%nat in Hv5.
+  change (Z.to_nat 32) with 32%nat in Hv6.
+  change (Z.to_nat 40) with 40%nat in Hv7.
+  change (Z.to_nat 48) with 48%nat in Hv8.
+  rewrite Hv1, Hv2, Hv3, Hv4, Hv5, Hv6, Hv7, Hv8. reflexivity.
+Qed.
+
 (* THE PROGRAM-HEADER BRIDGE.  [g] is the 56-byte [struct proghdr] kexec
    [readi]d out of the file at offset [o]; [ph_off] is the FOUR-byte read,
    so it needs [kexec_loadable]'s [ep_offset p < 2 ^ 31]. *)

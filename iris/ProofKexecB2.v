@@ -297,7 +297,7 @@ Section KexecB2Body.
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap) (n2 : nat)
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -307,7 +307,7 @@ Section KexecB2Body.
       (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szf : mword 64) (eb : bool) (lks : gset string) :
     kxc_bad324_body Q gs jp gl pd pav pu gilf gislf
  gf
-      kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
+      kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P Mi szf eb lks.
   Proof.
@@ -651,6 +651,9 @@ Section KexecB2Body.
     iDestruct "Hopen" as "(#Hslkk & Hslkd & %Hley & #Hfly & #Hclaimsy &
                            Hdep & Hoffr & Hidev & Hiinum &
                            Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
+    (* the [bad:] tail runs iunlockput, which asks for [ic_loaded] again
+       -- one of the walk's two ∃ conversions (S3b). *)
+    iDestruct (kxc_ldat_to_loaded with "Hload") as "Hload".
     (* [kxc_bad64] pins its own [CID0] from "Hcg", so kexec's exit -- still
        anchored at the section's [CID0] -- is re-anchored there, and the
        crossing fact goes by NAME (durable-notes.md). *)
@@ -784,7 +787,7 @@ Section KexecB2Loops.
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (loyf tlyf : nat) (inumf : mword 32)
-      (dnf : dinode) (bmf : blkmap) (n2 : nat)
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -795,7 +798,7 @@ Section KexecB2Loops.
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string) :
     kxc_ls_body Q gs jp gl pd pav pu gilf gislf
  gf
-      kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
+      kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P Mi ip va fz po eb lks.
   Proof.
@@ -1340,7 +1343,7 @@ Section KexecB2Loops.
                            Hdep & Hoffr & Hidev & Hiinum &
                              Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
       iDestruct (kxc_load_peel with "Hload") as
-        (datl) "(%Hiok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta
+        "(%Hiok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta
                & Hmap & Hblocks & Htop)".
       pose proof Hiok as Hiok'.
       destruct Hiok' as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
@@ -1404,7 +1407,7 @@ Section KexecB2Loops.
                    with "Hdlk Hdiat Hmeta Hmap Hblocks Htop") as "Hload".
       iDestruct (A.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
       iDestruct (kxc_open_intro pidv kf qf sf gyf loyf tlyf
-                   inumf dnf bmf gilf gislf
+                   inumf dnf bmf datl gilf gislf
                    with "Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid Hload
                          Hity Hfrz Hkeep Hru") as "Hopen".
       (* ---- the register facts on the far side of readi ---- *)
@@ -1656,7 +1659,7 @@ Section KexecB2Loops.
                      with "Hcont") as "Hcont".
         iApply (kxc_bad324 (CID0 := CIDb1) Q gs jp gl pd pav pu
                   gilf gislf gf
- kf qf sf gyf loyf tlyf inumf dnf bmf n2 plen
+ kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen
                   pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas m M2 K
                   sp0 ra0 s00 s10 s20 pv av w63 w67 ef P _ w65 eb lks
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp

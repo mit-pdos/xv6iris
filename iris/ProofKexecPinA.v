@@ -819,7 +819,7 @@ Section KexecPinAMain.
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
         (loyf tlyf : nat)
-        (n2 : nat) (ef : nat -> bv 8),
+        (n2 : nat) (ef : nat -> bv 8) (datl : nat -> list (bv 8)),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
           M90 !!! Regidx Rs1 = proc_addr jp /\
@@ -831,6 +831,9 @@ Section KexecPinAMain.
              r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 ->
              M90 !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ (iput_units <= n2)%nat ⌝ -∗
+        (* the header IS the file's first 64 bytes (S3b) -- ProofKexecA's
+           own exit row, relayed verbatim. *)
+        ⌜ forall j, (j < 64)%nat -> ef j = file_byte datl j ⌝ -∗
         pc_is (mword_of_int (KXA + 0x090) : mword 64) -∗
         sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
@@ -847,7 +850,7 @@ Section KexecPinAMain.
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
-        ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf -∗
+        kxc_ldat kf inumf dnf bmf datl -∗
         (* SpecIlock v5's additive type witness, at the generation the
            share names -- what SpecIunlockput now needs at +0x064. *)
         ity_shot gyf (di_type dnf) -∗

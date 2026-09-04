@@ -119,6 +119,12 @@ Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import InodeRegion.
+Require Import FsState.
+Require Import FsStateEra.
+Require Import FsBytesGamma.
+Require Import DirView.
+Require Import FsTree.
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
@@ -1053,6 +1059,85 @@ Section KexecASeam.
      kxc_frameA sp0 ra0 s00 s10 s20 pv av)%I.
 
 End KexecASeam.
+
+(* ===================================================================== *)
+(*  THE OPEN INODE'S PAYLOAD, AT A NAMED [data] (S3b).                    *)
+(*  Spelled HERE because both phase A (ProofKexecA.v, which chooses the    *)
+(*  name at its header readi) and the seam states (ProofKexecSeam.v,       *)
+(*  which carry it from +0x090 to +0x1a4) must see it, and those two are   *)
+(*  siblings.                                                              *)
+(* ===================================================================== *)
+Section KexecLdat.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
+
+  (* [ic_loaded]'s PAYLOAD, AT A NAMED [data] (S3b).  [IcacheEscrow.ic_loaded]
+     binds the file's byte function existentially, so a phase state that
+     carries [ic_loaded] cannot say one word about the FILE -- and every
+     [readi] the loader performs re-introduces the ∃ at a fresh name.  This
+     is the same bundle at a [datl] the phase state OWNS, so the loadseg
+     window and the phdr chain below can be stated on it; it is exactly
+     [SpecKexecB2.kxc_load_peel]'s tuple, and [ic_loaded_open] /
+     [ic_mk_loaded] are the (only) two conversions, spent once each at the
+     ilock / iunlockput ends of the walk. *)
+  Definition kxc_ldat (kf : nat) (inumf : mword 32)
+      (dnf : dinode) (bmf : blkmap) (datl : nat -> list (bv 8)) : iProp Σ :=
+    (⌜inode_ok fsc_cov fsc_logst dnf bmf datl⌝ ∗
+     ⌜inode_rec_local dnf⌝ ∗
+     ⌜dir_ok icfg_nib dnf datl⌝ ∗
+     ⌜dir_dots_ix (bv_unsigned inumf) dnf datl⌝ ∗
+     ⌜dir_orphan_clean dnf datl⌝ ∗
+     ⌜dir_uniq dnf datl⌝ ∗
+     dlinks fsc_fs (bv_unsigned inumf) dnf bmf datl ∗
+     dinode_at fsc_ireg inumf dnf ∗
+     inode_meta (ientry kf) dnf ∗
+     inode_map fsc_fs (ientry kf) bmf ∗
+     inode_blocks fsc_fs bmf datl ∗
+     top_frag (fs_gamma_L fsc_fs) (bv_unsigned inumf) (era_node dnf bmf datl))%I.
+
+  (* THE TWO ENDS OF THE WALK.  [ilock] publishes [ic_loaded] (∃-bound
+     bytes) and [iunlockput] consumes it again; between them the kexec cone
+     carries [kxc_ldat] at a name it chose here.  These are the only two
+     places the ∃ is opened and closed. *)
+  Lemma kxc_ldat_of_loaded
+      (kf : nat) (inumf : mword 32) (dnf : dinode) (bmf : blkmap) :
+    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf ⊢
+    ∃ datl : nat -> list (bv 8), kxc_ldat kf inumf dnf bmf datl.
+  Proof.
+    rewrite /kxc_ldat /inode_map. iIntros "H".
+    iDestruct (ic_loaded_open with "H") as (datl)
+      "(%Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta &
+        Haddrs & Hind & Hbl & Htop)".
+    iExists datl.
+    iSplitR; [iPureIntro; exact Hok |].
+    iSplitR; [iPureIntro; exact Hrl |].
+    iSplitR; [iPureIntro; exact Hdok |].
+    iSplitR; [iPureIntro; exact Hddix |].
+    iSplitR; [iPureIntro; exact Hdoc |].
+    iSplitR; [iPureIntro; exact Hduq |].
+    iSplitL "Hdlk"; [iExact "Hdlk" |]. iSplitL "Hdiat"; [iExact "Hdiat" |].
+    iSplitL "Hmeta"; [iExact "Hmeta" |].
+    iSplitR "Hbl Htop";
+      [| iSplitL "Hbl"; [iExact "Hbl" | iExact "Htop"]].
+    iSplitL "Haddrs"; [iExact "Haddrs" | iExact "Hind"].
+  Qed.
+
+  Lemma kxc_ldat_to_loaded
+      (kf : nat) (inumf : mword 32) (dnf : dinode) (bmf : blkmap)
+      (datl : nat -> list (bv 8)) :
+    kxc_ldat kf inumf dnf bmf datl ⊢
+    ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf.
+  Proof.
+    rewrite /kxc_ldat /inode_map.
+    iIntros "(%Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat &
+              Hmeta & [Haddrs Hind] & Hbl & Htop)".
+    iApply (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf datl
+              Hok Hrl Hdok Hddix Hdoc Hduq
+              with "Hdlk Hdiat Hmeta Haddrs Hind Hbl Htop").
+  Qed.
+End KexecLdat.
+
+
 
 (* ===================================================================== *)
 (*  THE EXIT, FROM THE LANDED RELATION TO THE GENERIC ONE (N-5.2B §13.3)  *)

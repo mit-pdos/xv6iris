@@ -564,8 +564,8 @@ Section KexecPinMain.
        contract's own continuation. *)
     { iModIntro. iIntros (CX) "H". iExact "H". }
     iIntros (CIDa) "%Hsa".
-    iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf loyf tlyf n2 ef)
-            "%Hregs90 %Hn2 Hpc Hcg Hcnt Hextc Hclmc Hslk Hslked %Hle90 #Hfl90 #Hclaims90 Hdep Hoffr Hidev Hiinum
+    iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf loyf tlyf n2 ef datl)
+            "%Hregs90 %Hn2 %Hef Hpc Hcg Hcnt Hextc Hclmc Hslk Hslked %Hle90 #Hfl90 #Hclaims90 Hdep Hoffr Hidev Hiinum
              Hival Hloaded Hity Hfrz Hiref Hru Hlog Hirs Hbm Hins Hbits Hbs #Hka2
              Hpriv
              Hpath Hargv Hargs #Hhdr Hframe Hcont".
@@ -578,7 +578,7 @@ Section KexecPinMain.
                          Hinumf & HM90thr).
     (* the nine resources phase B threads whole and never looks inside *)
     iAssert (kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf
-                      bmf gilf gislf)
+                      bmf datl gilf gislf)
       with "[Hslk Hslked Hdep Hoffr Hidev Hiinum Hival Hloaded Hity Hfrz
              Hiref Hru]"
       as "Hopen".
@@ -601,7 +601,7 @@ Section KexecPinMain.
     (* ---- PHASE B1: +0x090 .. +0x0cc, plus the +0x31c tail ---- *)
     iApply (PB.kxc_b1 (CID0 := CIDa) (kxp_entry_ok pb) gs jp gl pd pav pu
  gf
-              kf qf sf gyf loyf tlyf inumf dnf bmf gilf gislf n2
+              kf qf sf gyf loyf tlyf inumf dnf bmf datl gilf gislf n2
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m M90 K eb eb ∅
               (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
@@ -616,7 +616,7 @@ Section KexecPinMain.
       iIntros (CIDz) "%Hsz1". iIntros (Mz Pz Miz w13z w67z) "Hst1a2 Hcont".
       iApply (PB3.kxc_b2z (CID0 := CIDz) gs jp gl pd pav pu
                 gilf gislf gf
- kf qf sf gyf loyf tlyf inumf dnf bmf n2
+ kf qf sf gyf loyf tlyf inumf dnf bmf datl n2
                 plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                 m Mz K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
@@ -644,7 +644,7 @@ Section KexecPinMain.
       iIntros (CIDl) "%Hsl". iIntros (Ml Pl Mil) "Hst12c Hcont".
       iApply (PB3.kxc_b2 (CID0 := CIDl) (kxp_entry_ok pb) gs jp gl pd pav pu
                 gilf gislf gf
- kf qf sf gyf loyf tlyf inumf dnf bmf n2
+ kf qf sf gyf loyf tlyf inumf dnf bmf datl n2
                 plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                 m Ml K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
