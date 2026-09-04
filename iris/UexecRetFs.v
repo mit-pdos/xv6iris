@@ -64,7 +64,8 @@ Import Defs.
 (* ...UexecRet.v's block above, VERBATIM (durable-notes: trimmed imports
    have OOM'd the build); the enrichment's own imports below. *)
 From iris.base_logic.lib Require Import ghost_var ghost_map.
-Require Import UexecRet.     (* the plain contract this file encloses --
+Require Import UexecRet.
+Require Import UmodeText.     (* the plain contract this file encloses --
                                 REQUIRED DIRECTLY: [uslot]/[uvb] are
                                 [Typeclasses Opaque] and the seal does not
                                 travel through a re-export *)
@@ -189,7 +190,7 @@ Section UexecRetFs.
       (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (fdv : list fdstate)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
-    (uv_amb ∗ uv_regs ∗ ⌜usz_ok sz⌝ ∗ user_ptm_inv pt sz M ∗ Rfd fdv ∗
+    (uv_amb ∗ uv_regs ∗ ⌜usz_ok sz⌝ ∗ user_ptm_inv_x pt sz M ∗ Rfd fdv ∗
      user_cfg C ∗
      gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ukont_fs_F γm X C pt Rfd Rut sz π fdv)%I.
 

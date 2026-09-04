@@ -89,8 +89,8 @@ Qed.
 
 (* the twin of [ObsTrace.mnode_step_u_out]'s [u_wire] version: a hart node
    reaches the UART only through the bus *)
-Lemma mnode_step_u_out oth h img s log tv r m m' s' log' tv' r' :
-  mnode_step oth h img s log tv r m m' s' log' tv' r' ->
+Lemma mnode_step_u_out oth h img s log tv itv r m m' s' log' tv' itv' r' :
+  mnode_step oth h img s log tv itv r m m' s' log' tv' itv' r' ->
   u_out (duart (mdev s')) = u_out (duart (mdev s)).
 Proof.
   rewrite /mnode_step. destruct m as [y|T oc k].
@@ -102,7 +102,8 @@ Proof.
     + intros (w & d' & Hdr & _ & -> & _). cbn.
       exact (dev_read_u_out _ _ _ _ _ Hdr).
     + by intros [(_ & tvn & w & _ & _ & _ & _ & -> & _)
-                |(_ & [(_ & _ & -> & _) | (_ & w & _ & _ & -> & _)])].
+                |[(_ & _ & tvn & w & _ & _ & _ & _ & -> & _)
+                 |(_ & [(_ & _ & -> & _) | (_ & w & _ & _ & -> & _)])]].
   - (* MemWrite *)
     destruct (dev_addr _).
     + intros (d' & Hdw & _ & -> & _). cbn.
@@ -186,10 +187,10 @@ Proof.
     try exact Hok.
   - (* a hart node: it reaches the UART through the bus only, and the bus
        moves neither list *)
-    destruct Hn as (m' & s' & log' & tv' & r' & Hn & _ & ->). cbn.
+    destruct Hn as (m' & s' & log' & tv' & itv' & r' & Hn & _ & ->). cbn.
     intros Hon. rewrite /out_wire_ok.
-    rewrite (mnode_step_u_wire _ _ _ _ _ _ _ _ _ _ _ _ _ Hn)
-            (mnode_step_u_out _ _ _ _ _ _ _ _ _ _ _ _ _ Hn).
+    rewrite (mnode_step_u_wire _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn)
+            (mnode_step_u_out _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn).
     exact (Hok Hon).
   - (* the UART thread: the one mover *)
     cbn. intros _. exact (uart_step_out_wire_ok _ _ _ Hu (Hok Hpw)).

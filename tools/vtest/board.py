@@ -467,6 +467,7 @@ class Board:
     # -- one run -----------------------------------------------------------
 
     def run(self, name, image, regions, harts, timeout=15.0, takeover=False,
+            reload=False,
             elf=None):
         """Load [image], start it on [harts], wait for DONE, read the result.
 
@@ -487,7 +488,12 @@ class Board:
         # and re-establishes the registers, and that is all it needs to.
         g.cmd("\n".join("restore %s binary 0x%x" % (zero_file(size), base)
                         for base, size in regions))
-        if self._loaded != (name, bytes(image)):
+        # ...EXCEPT for a program that writes its OWN TEXT (`selfmod=1` in
+        # its directive): what a repeat would find in DRAM is the previous
+        # run's patched code, and its first observation would be of a
+        # program nobody built.  Measured on core_icache: the warm-up
+        # answer was the PATCHED instruction on repeats 2 and 3.
+        if reload or self._loaded != (name, bytes(image)):
             g.cmd("restore %s binary 0x%x" % (img, ABI["TEXT_BASE"]))
             if elf:
                 g.cmd("file %s" % elf)          # symbols only, for _vtest_done
@@ -822,7 +828,8 @@ def main():
             try:
                 for _ in range(reps):
                     r = b.run(n, text, regions_for(n), harts,
-                              timeout=a.timeout, takeover=a.takeover, elf=elf)
+                              timeout=a.timeout, takeover=a.takeover, elf=elf,
+                              reload=bool(cfg.get("selfmod", 0)))
                     st = int.from_bytes(r["result"][4:8], "little")
                     if st == ABI["STATUS_MTRAP"]:
                         w8 = lambda o: int.from_bytes(

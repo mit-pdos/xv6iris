@@ -52,7 +52,7 @@ Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
 Require Import WpMmodeLeafBase.
 Require Import WpUmodeLoad.
 Require Import UserPerm UkStore.
-Require Import UkLoad.
+Require Import UkLoad UkLoadText.
 Require Import UkRun.
 
 (* ---- THE OFFSET AN ADDRESSING MODE ADDS, as a number.  The decoder's
@@ -408,7 +408,7 @@ Section UkRunMem.
     { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_ld C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv imm rs1 rd
               (mword_of_int a) w Hui Hrd Htgt
-              ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
+              Hok Hcan Hpg Hal8
               ltac:(intros j Hj; exists (nth_byte w j);
                     rewrite Hua; exact (Hmap j Hj))
               ltac:(rewrite Hua; exact (eq_sym (uM_word_w8 M a w Hmap)))
@@ -444,7 +444,7 @@ Section UkRunMem.
       reflexivity. }
     iApply (UkLoad.wp_uk_cldsp C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv uimm rd
               (mword_of_int a) w Hui Hrd Htgt
-              ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
+              Hok Hcan Hpg Hal8
               ltac:(intros j Hj; exists (nth_byte w j);
                     rewrite Hua; exact (Hmap j Hj))
               ltac:(rewrite Hua; exact (eq_sym (uM_word_w8 M a w Hmap)))
@@ -483,7 +483,7 @@ Section UkRunMem.
       reflexivity. }
     iApply (UkLoad.wp_uk_cld C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv uimm crs1 crd rs1 rd
               (mword_of_int a) w Hui He1 He2 Hrd Htgt
-              ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
+              Hok Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap)
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
     iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ Hns with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
@@ -516,7 +516,7 @@ Section UkRunMem.
     { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_lw C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv imm rs1 rd
               (mword_of_int a) (sign_extend' 64 wv) wv Hui Hrd Htgt
-              ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
+              Hok Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
     iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ Hns with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
@@ -549,7 +549,7 @@ Section UkRunMem.
     { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_lwu C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv imm rs1 rd
               (mword_of_int a) (zero_extend' 64 wv) wv Hui Hrd Htgt
-              ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
+              Hok Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
     iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ Hns with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
@@ -586,7 +586,7 @@ Section UkRunMem.
       reflexivity. }
     iApply (UkLoad.wp_uk_clw C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv uimm crs1 crd rs1 rd
               (mword_of_int a) (sign_extend' 64 wv) wv Hui He1 He2 Hrd Htgt
-              ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
+              Hok Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
     iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ Hns with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
@@ -620,7 +620,7 @@ Section UkRunMem.
     { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_lbu C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv imm rs1 rd
               (mword_of_int a) (zero_extend' 64 b0) b0 Hui Hrd Htgt
-              ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan
+              Hok Hcan
               ltac:(rewrite Hua; exact HM) eq_refl
               with "Hb [Hheap Hstk Hufd Hw Hcont]").
     iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ Hns with "Hheap Hstk Hufd"). iApply ("Hcont" with "Hw").
@@ -657,13 +657,21 @@ Section UkRunMem.
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_text with "Hheap Hw") as %(HM & Hok & Hbnd).
+    iDestruct (uheap_text_nw with "Hheap Hw") as %Hnw.
     destruct (ucanon_of_bound a Hbnd) as [Hua Hcan].
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
     { exact (umoi_add_i12 _ imm a Ha). }
-    iApply (UkLoad.wp_uk_lbu C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv imm rs1 rd
-              (mword_of_int a) (zero_extend' 64 b0) b0 Hui Hrd Htgt
-              ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan
+    (* a TEXT page: X and, by the heap's own invariant, not W -- so the
+       load is driven at the node (UkLoadText.v, icache) *)
+    assert (Htok : UkLoadText.uk_text_ok pm (mword_of_int a)).
+    { destruct Hok as (q & Hq & Hqx). exists q. split; [ exact Hq | ].
+      split; [ exact Hqx | ].
+      destruct (up_W q) eqn:E; [ | reflexivity ].
+      exfalso. apply Hnw. exists q. exact (conj Hq E). }
+    iApply (UkLoadText.wp_uk_lbu_text_x C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv
+              imm rs1 rd (mword_of_int a) (zero_extend' 64 b0) b0 Hui Hrd Htgt
+              Htok Hcan
               ltac:(rewrite Hua; exact HM) eq_refl
               with "Hb [Hheap Hstk Hufd Hcont]").
     iApply (urun_close_upd _ _ _ _ _ _ m rd _ _ _ _ _ Hns with "Hheap Hstk Hufd").

@@ -417,6 +417,73 @@ Proof.
   rewrite Hl. cbn. split; [reflexivity | exact Hag13].
 Qed.
 
+(* the same grant at USER (claude-notes/projects/icache.md: the U-mode fetch
+   composer steps its fetch node outside the walker): no PMP entry is a
+   Machine entry here either, so the proof is the Supervisor one verbatim *)
+Lemma upmp_hval_grant (D Drw : gset register)
+    (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+    (addr : SailStdpp.Values.mword 64) (rs : regstate) (wd : Z)
+    (acc : MemoryAccessType mem_payload) :
+  (pmpcfg_n : register) ∈ D ->
+  (pmpaddr_n : register) ∈ D ->
+  register_lookup pmpcfg_n rs = pcfg ->
+  register_lookup pmpaddr_n rs = paddr ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec paddr 0)) 4)
+    (uint addr) (uint (to_bits 64 wd)) = PMP_Match ->
+  (* the entry GRANTS this access class.  Pure: [pmpCheckRWX] only reads the
+     entry's permission bits, so the caller supplies it as an equation and no
+     state reaches this premise. *)
+  pmpCheckRWX (vec_access_dec pcfg 0) acc = returnM true ->
+  hval D Drw rs (pmpCheck (Physaddr addr) wd acc User) None rs.
+Proof.
+  intros HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange Hrwx rs0 l Hag0 Hchain Hstop.
+  unfold pmpCheck in Hchain.
+  replace (Z.eqb sys_pmp_count 0) with false in Hchain
+    by (vm_compute; reflexivity).
+  replace (Z.sub sys_pmp_count 1) with 15 in Hchain
+    by (vm_compute; reflexivity).
+  unfold Defs.foreach_ZM_up in Hchain.
+  replace (S (Z.abs_nat (Z.sub 0 15))) with 16%nat in Hchain
+    by (vm_compute; reflexivity).
+  spmp_red Hchain.
+  (* ONE iteration: entry 0 matches, so the walk never reaches entry 1 *)
+  cbn [Defs.foreach_ZM_up'] in Hchain.
+  spmp_red Hchain.
+  (* the entry's cfg byte, pinned *)
+  spmp_peel_D pmpcfg_n Hchain Hstop HDcfg rs1 Hag1.
+  rewrite (Hag0 _ HDcfg) Hpcfg in Hchain.
+  spmp_red Hchain.
+  (* [pmpReadAddrReg 0] reads cfg again (value-dead: the grain adjustment is
+     [false] at [sys_pmp_grain = 0] whatever the entry says) then pmpaddr *)
+  spmp_peel_any pmpcfg_n Hchain Hstop w2 rs2 Hag2. spmp_red Hchain.
+  (* the peel substitutes the value read from the file it was AT, so the
+     agreement that transports it is the one for the PRE-peel file *)
+  assert (Hag12 : reg_agree_on D rs2 rs).
+  { intros r Hr. rewrite (Hag2 r Hr) (Hag1 r Hr). exact (Hag0 r Hr). }
+  spmp_peel_D pmpaddr_n Hchain Hstop HDaddr rs3 Hag3.
+  rewrite (Hag12 _ HDaddr) Hpaddr in Hchain.
+  assert (Hag13 : reg_agree_on D rs3 rs).
+  { intros r Hr. rewrite (Hag3 r Hr). exact (Hag12 r Hr). }
+  spmp_red Hchain.
+  (* the address match is now on concrete values: TOR + in range = Match *)
+  rewrite (pmpMatchAddr_TOR_match_pure addr (to_bits 64 wd)
+             (vec_access_dec pcfg 0) (vec_access_dec paddr 0) (zeros' 64)
+             HA Hord Hrange) in Hchain.
+  spmp_red Hchain.
+  (* granted by the entry's permission bit -- at User the second
+     disjunct of [or_boolM] (Machine and unlocked) is unavailable, and this
+     is the whole difference from the M-mode walk *)
+  rewrite Hrwx in Hchain.
+  spmp_red Hchain.
+  assert (Hl : l = (Interface.Ret None, rs3))
+    by (apply (hspan_stop_refl D Drw _ rs3 l); [reflexivity | exact Hchain]).
+  rewrite Hl. cbn. split; [reflexivity | exact Hag13].
+Qed.
+
 
 (* THE PURE CONVERSE of [read_bytes_spec], which the tree does not have.
    [HartLift2.text_read_bytes] and [HartPilot.phys_read_bytes] both END here
@@ -518,6 +585,35 @@ Section SPmpSwp.
     intros Hdisj HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange Hrwx.
     exact (swp_span Drw Dro Df rs rs _ None Hdisj
              (spmp_hval_grant (Drw ∪ Dro) Drw pcfg paddr addr rs wd acc
+                HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange Hrwx)).
+  Qed.
+
+  Lemma swp_pmpCheck_U (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (addr : SailStdpp.Values.mword 64) (wd : Z) :
+    Drw ## Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup pmpaddr_n rs = paddr ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec paddr 0)) 4)
+      (uint addr) (uint (to_bits 64 wd)) = PMP_Match ->
+    pmpCheckRWX (vec_access_dec pcfg 0) acc = returnM true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (pmpCheck (Physaddr addr) wd acc User)
+      (fun r => ⌜r = None⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange Hrwx.
+    exact (swp_span Drw Dro Df rs rs _ None Hdisj
+             (upmp_hval_grant (Drw ∪ Dro) Drw pcfg paddr addr rs wd acc
                 HDcfg HDaddr Hpcfg Hpaddr HA Hord Hrange Hrwx)).
   Qed.
 
@@ -637,7 +733,7 @@ Section pteread.
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
                 (hread_req_at_read_ram8_ttw pa)
-                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
+                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
       iIntros (σ img log tv V) "%Htv Hσ Htso".
       iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".
@@ -904,7 +1000,7 @@ Section pteread.
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
                 P
                 (hread_req_at_read_ram8_ttw pa)
-                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
+                (addr_is_ram_not_dev pa Hram) ltac:(reflexivity) ltac:(reflexivity)
                 with "Hcert [Hrw Hro Hmem]").
       iIntros (σ img log tv V) "%Htv Hσ Htso".
       iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso") as "[%Hrd Hclose]".

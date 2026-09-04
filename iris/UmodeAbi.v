@@ -77,7 +77,9 @@ Record uv_stack (pt : uptd) (M : gmap Z (bv 8)) (sp0 : mword 64) (n : Z)
   us_leaf  : 0 < n ->
              exists w : mword 64,
                ud_um pt !! svpn_of (add_vec_int sp0 (- n)) = Some w /\
-               uleaf_ok (Store Data) w /\ uleaf_ok (Load Data) w;
+               uleaf_ok (Store Data) w /\ uleaf_ok (Load Data) w /\
+               (* icache: the page has W -- hence is NOT a text page *)
+               Z.testbit (bv_unsigned w) 2 = true;
   us_bytes : forall j : Z, 0 <= j < n ->
                exists b : bv 8, M !! (uint sp0 - n + j) = Some b
 }.
@@ -345,7 +347,7 @@ Proof.
       try (rewrite Z.rem_mod_nonneg; [ | lia | lia ]); try lia.
     + exact (Hmod n1 ltac:(lia) ltac:(lia)).
     + intros Hpos.
-      destruct (Hleaf ltac:(lia)) as (w & Hw & Hst & Hld).
+      destruct (Hleaf ltac:(lia)) as (w & Hw & Hst & Hld & Hwb).
       exists w. split_and!; try assumption.
       rewrite <- Hw. f_equal.
       rewrite <- Etop.
@@ -361,7 +363,7 @@ Proof.
     + replace (bv_unsigned sp0 - n1 - n2) with (bv_unsigned sp0 - (n1 + n2)) by lia.
       pose proof (Hmod (n1 + n2) ltac:(lia) ltac:(lia)). lia.
     + intros Hpos.
-      destruct (Hleaf ltac:(lia)) as (w & Hw & Hst & Hld).
+      destruct (Hleaf ltac:(lia)) as (w & Hw & Hst & Hld & Hwb).
       exists w. split_and!; try assumption.
       rewrite Ebot. exact Hw.
     + intros j Hj. replace (bv_unsigned sp0 - n1 - n2 + j)
@@ -377,6 +379,7 @@ Lemma uv_stack_slot (pt : uptd) (M : gmap Z (bv 8)) (sp0 : mword 64) (n d : Z) :
   (exists w : mword 64,
      ud_um pt !! svpn_of tgt = Some w /\
      uleaf_ok (Store Data) w /\ uleaf_ok (Load Data) w) /\
+  ~ uva_text pt (uint tgt) /\
   uva_canon tgt /\
   Z.rem (uint tgt) 4096 <= 4088 /\
   is_aligned_vaddr (Virtaddr tgt) 8 = true /\
@@ -404,11 +407,18 @@ Proof.
   { pose proof (Z.mod_pos_bound (bv_unsigned sp0 - n) 4096 ltac:(lia)). lia. }
   split_and!.
   - rewrite !uint_unsigned. exact Htu.
-  - destruct (Hleaf ltac:(lia)) as (w & Hw & Hst & Hld). exists w.
+  - destruct (Hleaf ltac:(lia)) as (w & Hw & Hst & Hld & Hwb). exists w.
     assert (Hv : svpn_of tgt = svpn_of (add_vec_int sp0 (- n))).
     { unfold tgt. apply (usvpn_window (add_vec_int sp0 (- n)) d ltac:(lia)).
       rewrite Hlow. exact Hpgd. }
     rewrite Hv. split_and!; assumption.
+  - (* icache: a stack page has W, so it is not a text page *)
+    destruct (Hleaf ltac:(lia)) as (w & Hw & _ & _ & Hwb).
+    assert (Hv : svpn_of tgt = svpn_of (add_vec_int sp0 (- n))).
+    { unfold tgt. apply (usvpn_window (add_vec_int sp0 (- n)) d ltac:(lia)).
+      rewrite Hlow. exact Hpgd. }
+    intros (w' & Hl' & _ & Hnw). rewrite moi_of_uint Hv Hw in Hl'.
+    injection Hl' as <-. rewrite Hwb in Hnw. discriminate Hnw.
   - apply uva_canon_small. rewrite Htu. lia.
   - rewrite uint_unsigned Htu.
     rewrite Z.rem_mod_nonneg; [ | lia | lia ].
@@ -607,6 +617,7 @@ Lemma uv_stack_slot_moi (pt : uptd) (M : gmap Z (bv 8)) (sp0 : mword 64)
   (exists w : mword 64,
      ud_um pt !! svpn_of tgt = Some w /\
      uleaf_ok (Store Data) w /\ uleaf_ok (Load Data) w) /\
+  ~ uva_text pt (uint tgt) /\
   uva_canon tgt /\
   Z.rem (uint tgt) 4096 <= 4088 /\
   is_aligned_vaddr (Virtaddr tgt) 8 = true /\
@@ -642,6 +653,7 @@ Lemma uv_stack_slotk_moi (pt : uptd) (M : gmap Z (bv 8)) (sp0 : mword 64)
   (exists w : mword 64,
      ud_um pt !! svpn_of tgt = Some w /\
      uleaf_ok (Store Data) w /\ uleaf_ok (Load Data) w) /\
+  ~ uva_text pt (uint tgt) /\
   uva_canon tgt /\
   Z.rem (uint tgt) 4096 <= 4096 - k /\
   is_aligned_vaddr (Virtaddr tgt) k = true /\
@@ -681,12 +693,20 @@ Proof.
     rewrite Hn16. apply Zmod_0_l. }
   split_and!.
   - exact Htu.
-  - destruct (Hleaf ltac:(lia)) as (w & Hw & Hst & Hld). exists w.
+  - destruct (Hleaf ltac:(lia)) as (w & Hw & Hst & Hld & Hwb). exists w.
     assert (Hv : svpn_of tgt = svpn_of (add_vec_int sp0 (- n))).
     { rewrite <- Haddr.
       apply (usvpn_window (add_vec_int sp0 (- n)) d ltac:(lia)).
       rewrite Hlow. exact Hpgd. }
     rewrite Hv. split_and!; assumption.
+  - (* icache: a stack page has W, so it is not a text page *)
+    destruct (Hleaf ltac:(lia)) as (w & Hw & _ & _ & Hwb).
+    assert (Hv : svpn_of tgt = svpn_of (add_vec_int sp0 (- n))).
+    { rewrite <- Haddr.
+      apply (usvpn_window (add_vec_int sp0 (- n)) d ltac:(lia)).
+      rewrite Hlow. exact Hpgd. }
+    intros (w' & Hl' & _ & Hnw). rewrite moi_of_uint Hv Hw in Hl'.
+    injection Hl' as <-. rewrite Hwb in Hnw. discriminate Hnw.
   - apply uva_canon_small. rewrite <- uint_unsigned. rewrite Htu.
     rewrite !uint_unsigned. lia.
   - rewrite Htu. rewrite !uint_unsigned.
@@ -718,15 +738,16 @@ Lemma uv_stack_byte_moi (pt : uptd) (M : gmap Z (bv 8)) (sp0 : mword 64)
   (exists w : mword 64,
      ud_um pt !! svpn_of tgt = Some w /\
      uleaf_ok (Store Data) w /\ uleaf_ok (Load Data) w) /\
+  ~ uva_text pt (uint tgt) /\
   uva_canon tgt /\
   (exists b : bv 8, M !! (uint tgt) = Some b).
 Proof.
   intros HS Hd0 Hdn Htgt.
   destruct (uv_stack_slotk_moi pt M sp0 n d 1 tgt HS ltac:(lia)
               ltac:(reflexivity) Hd0 Hdn ltac:(apply Z.rem_1_r) Htgt)
-    as (Hu & Hl & Hcan & _ & _ & Hbs).
+    as (Hu & Hl & Hnt & Hcan & _ & _ & Hbs).
   destruct (Hbs 0 ltac:(lia)) as (b & Hb). rewrite Z.add_0_r in Hb.
-  split_and!; [ exact Hu | exact Hl | exact Hcan | exists b; exact Hb ].
+  split_and!; [ exact Hu | exact Hl | exact Hnt | exact Hcan | exists b; exact Hb ].
 Qed.
 
 (* ... and of the bottom of a budget (the post-prologue sp) *)

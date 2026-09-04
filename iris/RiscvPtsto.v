@@ -377,6 +377,12 @@ Record riscvEraGS := RiscvEraGS {
      from the image; a pure tie in the interpretation ([tso_interp_at],
      [tso_interp_of]) makes every image byte a persistent pure fact. *)
   era_img : gmap Arch.pa (bv 8);
+  (* THE INSTRUCTION-VIEW MIRROR (claude-notes/projects/icache.md): one
+     monotone counter per hart, at the machine's [gitv]; its lower bound
+     [hart_iview_lb] is the [fence.i] receipt.  Per hart like
+     [era_reg_name], and LAST so the positional mint in RiscvAdequacy only
+     grows at its tail. *)
+  era_iview_name : CPU -> gname
 }.
 
 Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
@@ -2037,6 +2043,73 @@ Definition resv_auth_at `{!riscvFixedGS Σ} (E : riscvEraGS)
 Definition resv_frag `{!riscvGS Σ} (c : CPU) (r : option resv) : iProp Σ :=
   (c ↪[era_resv_name riscv_eraGS] r)%I.
 
+(* ---------------------------------------------------------------------- *)
+(* THE INSTRUCTION-VIEW MIRROR (claude-notes/projects/icache.md).           *)
+(* [iview_auth_at E f] is the era's authority over every hart's instruction *)
+(* view [gitv]; the lifting rule lends the focused hart's counter to the    *)
+(* node's callback as [hart_iview_auth] (the fetch rule reads it, the       *)
+(* fence.i arm raises it) and takes it back; [hart_iview_lb] is the         *)
+(* persistent lower bound -- monotone because the view only ever grows      *)
+(* ([RiscvLang.mnode_step]'s Barrier arm takes a [Nat.max]).                *)
+(* ---------------------------------------------------------------------- *)
+Definition iview_auth_at `{!riscvFixedGS Σ} (E : riscvEraGS)
+    (f : CPU -> nat) : iProp Σ :=
+  ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
+     mono_nat_auth_own (era_iview_name E c) 1 (f c))%I.
+
+Definition hart_iview_auth `{!riscvGS Σ} (c : CPU) (v : nat) : iProp Σ :=
+  mono_nat_auth_own (era_iview_name riscv_eraGS c) 1 v.
+
+Definition hart_iview_lb_at `{!riscvGS Σ} (c : CPU) (K : nat) : iProp Σ :=
+  mono_nat_lb_own (era_iview_name riscv_eraGS c) K.
+
+Global Instance hart_iview_lb_at_persistent `{!riscvGS Σ} c K :
+  Persistent (hart_iview_lb_at c K).
+Proof. apply _. Qed.
+
+Lemma hart_iview_lb_at_get `{!riscvGS Σ} (c : CPU) (v : nat) :
+  hart_iview_auth c v -∗ hart_iview_lb_at c v.
+Proof. iIntros "H". by iDestruct (mono_nat_lb_own_get with "H") as "#$". Qed.
+
+Lemma hart_iview_lb_at_valid `{!riscvGS Σ} (c : CPU) (v K : nat) :
+  hart_iview_auth c v -∗ hart_iview_lb_at c K -∗ ⌜(K <= v)%nat⌝.
+Proof.
+  iIntros "Ha Hl". by iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ ?].
+Qed.
+
+Lemma hart_iview_auth_update `{!riscvGS Σ} (c : CPU) (v v' : nat) :
+  (v <= v')%nat -> hart_iview_auth c v ==∗ hart_iview_auth c v'.
+Proof. intros Hle. iIntros "H". by iMod (mono_nat_own_update v' with "H") as "[$ _]". Qed.
+
+Lemma iview_interp_acc `{!riscvGS Σ} (c : CPU) (f : CPU -> nat) :
+  iview_auth_at riscv_eraGS f ⊢ hart_iview_auth c (f c) ∗
+    (∀ v, hart_iview_auth c v -∗ iview_auth_at riscv_eraGS (<[c := v]> f)).
+Proof.
+  rewrite /iview_auth_at /hart_iview_auth.
+  iIntros "H".
+  iDestruct (big_sepS_delete _ _ c with "H") as "[Hcur Hrest]";
+    [ apply elem_of_fin_to_set |].
+  iFrame "Hcur".
+  iIntros (v) "Hv".
+  iApply (big_sepS_delete _ _ c); [ apply elem_of_fin_to_set |].
+  rewrite /insert /gtv_insert decide_True //.
+  iFrame "Hv".
+  iApply (big_sepS_mono with "Hrest").
+  intros c' Hc'. apply elem_of_difference in Hc' as [_ Hne].
+  rewrite decide_False; [ done | ].
+  intros ->. apply Hne, elem_of_singleton. reflexivity.
+Qed.
+
+(* the insert at the SAME value is the identity, pointwise -- what a node
+   that leaves the instruction view alone hands back *)
+Lemma iview_auth_at_insert_id `{!riscvFixedGS Σ} (E : riscvEraGS)
+    (f : CPU -> nat) (c : CPU) :
+  iview_auth_at E (<[c := f c]> f) ⊣⊢ iview_auth_at E f.
+Proof.
+  rewrite /iview_auth_at. apply big_sepS_proper. intros c' _.
+  rewrite /insert /gtv_insert. case_decide as Hd; [by subst|done].
+Qed.
+
 (* the frag at SOME value: what a hart owns between instructions.  A leaf
    that leaves a dangling reservation (an AMOCAS mismatch, an A/D re-read
    that found the bits set) ends at [Some]; the boundary drops it.  This is
@@ -2147,6 +2220,13 @@ Proof.
   iPureIntro. exact (proj2 Hmm).
 Qed.
 
+Lemma tso_interp_at_mm_ok `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) :
+  tso_interp_at E g -∗ ⌜mm_ok g⌝.
+Proof.
+  iIntros "H". iDestruct "H" as (TM LM) "(_ & _ & _ & _ & _ & _ & _ & %Hmm)".
+  iPureIntro. exact (proj1 Hmm).
+Qed.
+
 Definition era_interp `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) : iProp Σ :=
   (gregs_interp_at E g.(gregs) ∗
    gen_heap_interp (hG := era_memGS_of E) g.(gmem) ∗
@@ -2156,7 +2236,10 @@ Definition era_interp `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) : iProp 
    (* the reservation mirror and its snapshot invariant (design §3a).  The
       pure conjunct is a STEP invariant of the language, so every arm
       re-establishes it and no rule has to carry it. *)
-   resv_auth_at E g.(gresv) ∗ ⌜resv_ok g⌝)%I.
+   resv_auth_at E g.(gresv) ∗ ⌜resv_ok g⌝ ∗
+   (* the instruction-view mirror and its bound (icache.md), LAST per the
+      new-conjunct rule *)
+   iview_auth_at E g.(gitv) ∗ ⌜itv_ok g⌝)%I.
 
 (* THE DURABLE DISK's MACHINE SIDE: the fixed gname's AUTH, always at the
    machine's own disk image.  A FIXED conjunct, NOT part of [era_interp]: the

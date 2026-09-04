@@ -95,8 +95,10 @@ Proof.
       by apply (IH _ s mm). }
     { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
       by apply (IH tt _ mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He. rewrite Hdev.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp].
+      apply andb_prop in Hg1 as [Hdev Hif].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hif.
+      rewrite Hdev in He. rewrite Hdev, Hif.
       rewrite Hfp. cbn [negb andb] in Hg2 |- *.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
@@ -177,8 +179,10 @@ Proof.
       by apply (IH _ s mm). }
     { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
       by apply (IH tt _ mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He. rewrite Hdev.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp].
+      apply andb_prop in Hg1 as [Hdev Hif].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hif.
+      rewrite Hdev in He. rewrite Hdev, Hif.
       rewrite Hfp. cbn [negb andb] in Hg2 |- *.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].

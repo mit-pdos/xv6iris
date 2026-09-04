@@ -1814,6 +1814,60 @@ and runs in CI on every checkin.
   longest weighted path) predicts this in seconds and it agreed with the
   measurement to within 5 s on three separate cuts — run it on the runner-up
   route before spending a day on the leader.
+### SPLITTING A WHOLE-FUNCTION PROOF ACROSS FILES: the recipe, and the one trap
+
+`ProofCreate` (146 s) and `ProofSysUnlink` (139 s) were each ONE file with
+one lemma per basic block, both on the critical path.  Both are now seven
+files whose blocks compile in parallel — 146 → 79 s and 139 → 70 s on their
+routes, and both are now OFF the path.  The recipe, in the order the checks
+have to happen:
+
+1. **Are the blocks independent?** They are if each seam is the NEXT block's
+   PREMISE LIST rather than a call — that is the shape a whole-function proof
+   already has, and the tell is that the capstone is a chain of `iApply`s
+   with no glue.  Confirm it by listing cross-references with comments
+   BLANKED: in both files nearly every apparent cross-reference was prose.
+2. **Which blocks name a functor argument?** In both files no non-block
+   helper named one, so the shared vocabulary is a plain functor-free file
+   and each block is its own small functor over only what it names.  That is
+   what makes the split cheap; a shared FUNCTOR applied per block would put
+   its instances at the mercy of convertibility.
+3. **Does anything shared appear in a STATEMENT?**  `ProofSysUnlink`'s blocks
+   all name `Tails.…`, which would have forced a functor — but only inside
+   proofs, never in a statement, so each file makes its own `Tails` and
+   nothing has to match across the boundary.  Check this before writing a
+   Module Type you do not need.
+4. Expect ΣCPU to RISE (ProofCreate: 146 → 185 s): that is the import
+   prelude paid once per new file, and it is the trade the section above
+   describes.  Section-local `Notation`s do not survive `End Section`, so
+   each file repeats them.
+
+**THE TRAP, which cost three failed attempts and is invisible in the
+source.**  A definition inside the section that mentions the AMBIENT `CID`
+(here `wp_next (CID0 := CID)` in four parked bodies) is fine while everything
+lives in one file: `CID` is the section variable and there is nothing to
+resolve.  Split, and the discharged `CID` becomes an INSTANCE-IMPLICIT
+argument — and every use site of those bodies sits under a
+`fun CIDa : CpuId => …`, so instance search picks the **λ-bound hart**
+instead of the section's.  The symptom is
+
+```
+iSpecialize: cannot instantiate (wp_next … -∗ WP Loop) with (wp_next …)
+```
+
+at a spec pattern that has not changed, which reads like an off-by-one in
+the premise walk and is not one.  **It is invisible without
+`Set Printing Implicit`** — the premise and the hypothesis print
+identically; with implicits on, one is `@wp_next Σ GEN CID25 …` and the
+other `@wp_next Σ GEN CID …`.  The fix is to say it: `cr_alloc_body
+(CID := CID) …` at each body site, and the same at each cross-module
+application of a block lemma (`cr_fail_mkdir_half (CID := CID)`, and the
+seal's four), where the ambient `CIDX3` is likewise in scope when the
+lemma's own implicit is resolved.  `ProofSysUnlink` needed none of this,
+because its section `Context` binds no `CID` at all and every callee
+application already writes `(CID := …)` explicitly — so **check the section
+Context for an ambient hart before starting.**
+
 - **A `Require` between two `Proof<F>.v` files is pure critical path.** A
   whole-function proof requiring a sibling whole-function proof is nearly always
   reaching for a shared *block*, not the sibling's capstone — and a shared block

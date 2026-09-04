@@ -50,7 +50,8 @@ Require Import UserFrame.    (* [u_regs] -- the loop's own cell bundle *)
 Require Import UmodeRegs.    (* [uv_regs] / [uv_amb] and the two movers *)
 Require Import UexecWp.      (* [loop_ok] -- [uslot]'s own guard *)
 Require Import ProcGeom.     (* [tf_arg_idx] / [tf_epc_idx] / [TFWORDS] *)
-Require Import UserPtTree.   (* [uptd] / [user_ptm_inv] / [pgroundup] on Z *)
+Require Import UserPtTree.
+Require Import UmodeText.   (* [uptd] / [user_ptm_inv] / [pgroundup] on Z *)
 Require Import ProcPtOwn.    (* [uvm_maxsz] *)
 Require Import UserPerm.     (* [uperm] / [usz_ok] *)
 Require Import UserExec.     (* [user_trap_frame_at] *)
@@ -804,7 +805,7 @@ Section LoopApply.
     ukc (perm_of (ud_um pt) sz) M sz fdv m pc -∗
     hw_config -∗ minstret_inv -∗ wire_inv -∗
     u_regs (HART_ACTIVE tt) ms_v sc_v stv_v sepc_v pc pc m -∗
-    user_ptm_inv pt sz M -∗
+    user_ptm_inv_x pt sz M -∗
     Rfd fdv -∗
     user_cfg C -∗
     Rut pt -∗
@@ -857,7 +858,7 @@ Section LoopApply.
     uslot W -∗
     hw_config -∗ minstret_inv -∗ wire_inv -∗
     u_regs (HART_ACTIVE tt) ms_v sc_v stv_v sepc_v pc pc m -∗
-    user_ptm_inv pt sz M -∗
+    user_ptm_inv_x pt sz M -∗
     Rfd fdv -∗
     user_cfg C -∗
     Rut pt -∗

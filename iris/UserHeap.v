@@ -128,6 +128,12 @@ Proof.
   intros [b Hb]. apply map_lookup_filter_Some in Hb as [_ [Hx _]]. exact Hx.
 Qed.
 
+Lemma utext_part_nw (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) :
+  is_Some (utext_part M pm !! a) -> ~ uw_addr (pm) a.
+Proof.
+  intros [b Hb]. apply map_lookup_filter_Some in Hb as [_ [_ Hw]]. exact Hw.
+Qed.
+
 Lemma udata_part_w (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) :
   is_Some (udata_part M pm !! a) -> uw_addr (pm) a.
 Proof. intros [b Hb]. apply map_lookup_filter_Some in Hb as [_ Hw]. exact Hw. Qed.
@@ -559,6 +565,10 @@ Section UserHeap.
           [uk_args_slot], [uk_stack_slot]) from each re-deriving it. *)
        ⌜ forall a : Z, is_Some (M !! a) -> 0 <= a < 2 ^ 38 ⌝ ∗
        ⌜ forall a : Z, is_Some (Mt !! a) -> ux_addr (pm) a ⌝ ∗
+       (* ... and NOT writable: the text half is [utext_part]'s class, and
+          the verified tier's fetch pays with STAMPED text bytes that the
+          walker must never own (claude-notes/projects/icache.md) *)
+       ⌜ forall a : Z, is_Some (Mt !! a) -> ~ uw_addr (pm) a ⌝ ∗
        ⌜ forall a : Z, is_Some (Md !! a) -> uw_addr (pm) a ⌝ ∗
        ghost_map_auth γt 1 Mt ∗ ghost_map_auth γd 1 Md ∗
        (* THE BREAK, and THE SLACK ABOVE IT.  NOTE [0 <= sz] is deliberately
@@ -597,13 +607,24 @@ Section UserHeap.
   Proof.
     iIntros "Hrun Hb".
     iDestruct "Hrun" as (Mt Md Mslack sz)
-      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
     iDestruct (ghost_map_lookup with "Ht Hb") as %HMt.
     assert (HM : M !! a = Some b)
       by exact (proj1 (map_subseteq_spec Mt (M)) Hst a b HMt).
     (* NOTE: not [split_and!] -- it would split [0 <= a < 2 ^ 38] too *)
     iPureIntro. split; [ exact HM | ].
     split; [ exact (Hx a (mk_is_Some _ _ HMt)) | exact (Hcan a (mk_is_Some _ _ HM)) ].
+  Qed.
+
+  (* ...and its page is NOT writable: a text byte is on an X-and-not-W page *)
+  Lemma uheap_text_nw (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b : bv 8) :
+    uheap γt γd γs M pm -∗ utext γt a b -∗ ⌜ ~ uw_addr (pm) a ⌝.
+  Proof.
+    iIntros "Hrun Hb".
+    iDestruct "Hrun" as (Mt Md Mslack sz)
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
+    iDestruct (ghost_map_lookup with "Ht Hb") as %HMt.
+    iPureIntro. exact (Hxw a (mk_is_Some _ _ HMt)).
   Qed.
 
   (* ...and a DATA byte names its byte and its page is WRITABLE. *)
@@ -613,7 +634,7 @@ Section UserHeap.
   Proof.
     iIntros "Hrun Hb".
     iDestruct "Hrun" as (Mt Md Mslack sz)
-      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
     iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
     assert (HM : M !! a = Some b)
       by exact (proj1 (map_subseteq_spec Md (M)) Hsd a b HMd).
@@ -655,7 +676,7 @@ Section UserHeap.
   Proof.
     iIntros "Hrun Hb".
     iDestruct "Hrun" as (Mt Md Mslack sz)
-      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
     iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
     assert (Hnt : Mt !! a = None)
       by exact (map_disjoint_Some_r Mt Md a b Hdisj HMd).
@@ -672,6 +693,7 @@ Section UserHeap.
       + exact (mk_is_Some _ _ (proj1 (map_subseteq_spec Md (M)) Hsd a b HMd)).
       + rewrite lookup_insert_ne in Hk; [ exact Hk | exact (not_eq_sym Hne) ].
     - exact Hx.
+    - exact Hxw.
     - intros k Hk. apply Hw.
       destruct (decide (k = a)) as [-> | Hne].
       + exact (mk_is_Some _ _ HMd).
@@ -728,6 +750,7 @@ Section UserHeap.
     - apply utext_udata_disjoint.
     - exact Hcan.
     - exact (utext_part_x M pm).
+    - exact (utext_part_nw M pm).
     - exact (udata_part_w M pm).
     - exact (udata_slack_above M pm sz).
   Qed.
@@ -1073,7 +1096,7 @@ Section UserHeap.
     ([∗ map] a ↦ b ∈ utext_part M pm, utext γt a b) -∗ uinstr_is γt pc rvc i.
   Proof.
     intros Hui Hperm. iIntros "#Ht".
-    destruct Hui as [Hal2 Hcan Hleaf Hpg Hcode].
+    destruct Hui as [Hal2 Hcan Hleaf Hpg Hcode _].
     destruct rvc.
     - destruct Hcode as (h & Hrvc & Hbytes & Hdec & Htrail).
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.

@@ -13,6 +13,7 @@ VConc.v
 VNode.v
 VRun.v
 VRunConc.v
+VIcache.v
 VModelFacts.v
 ClintMsipGen.v
 ClintMsipHwGen.v
@@ -86,6 +87,13 @@ CoreHartJh7110Pass.v
 CoreHartJh7110Run.v
 CoreHartQemuPass.v
 CoreHartQemuRun.v
+CoreIcacheGen.v
+CoreIcacheHwGen.v
+CoreIcacheJh7110Pass.v
+CoreIcacheJh7110Run.v
+CoreIcacheQemuPass.v
+CoreIcacheQemuRun.v
+CoreIcacheSched.v
 CoreRegsCtrGen.v
 CoreRegsCtrQemuPass.v
 CoreRegsCtrQemuRun.v

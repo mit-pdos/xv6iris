@@ -73,6 +73,7 @@ Require Import TrampPt.     (* [TRAMPOLINE] -- the stvec value [loop_ok] pins *)
 Require Import IntrDefs.    (* [MEDELEG_S] -- ditto for medeleg *)
 Require Import ProcPtOwn.   (* [ud_pas] / [proc_pt_wf] -- the descriptor facts *)
 Require Import UserPtTree.  (* [uptd] / [user_pt_inv] *)
+Require Import UmodeText.   (* [user_pt_inv_x] -- the image STAMPED (icache) *)
 Require Import UserFrame.   (* [u_regs] -- the per-step mutable cells *)
 Require Import UserExec.    (* [ucfg] / [user_cfg] / [user_mstatus_ok] /
                                [user_trap_frame] *)
@@ -129,7 +130,10 @@ Section UexecWp.
        ⌜user_mstatus_ok ms_v⌝ -∗
        hw_config (CID := h) -∗ minstret_inv -∗ wire_inv -∗
        u_regs (CID := h) (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
-       user_pt_inv (CID := h) (XI := xi) pt M -∗
+       (* the image STAMPED (claude-notes/projects/icache.md): the text
+          bytes at an instruction-view position the hart has passed, minted
+          at userret's fence.i and carried in by the slot's bundle *)
+          user_pt_inv_x (CID := h) (XI := xi) pt M -∗
        user_cfg (CID := h) C -∗
        Rut pt -∗
        (* THE TRAP SEAM, in both directions at once: the kernel promises to

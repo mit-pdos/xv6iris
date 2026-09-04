@@ -42,7 +42,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes WpGpr RegFile.
 Require Import WpIntrCore.
 Require Import UptTree UserPtTree UserExec UserTrap.
-Require Import UmodeMem.
+Require Import UmodeMem UmodeText.
 Require Import TsoCtx.
 Require Export UmodeRegs.  (* [uv_regs] / [uv_amb] and their movers *)
 Local Open Scope Z_scope.
@@ -75,7 +75,11 @@ Section UmodeFrames.
     (uv_amb ∗
      uv_regs ∗
      utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
-     umem pt M ∗
+     (* the image STAMPED: text bytes at some instruction-view position this
+        hart has passed, minted at [userret]'s [fence.i]
+        (claude-notes/projects/icache.md); the trap frame below hands the
+        kernel the plain image back *)
+     umem_x pt M ∗
      user_cfg C ∗
      TsoCtx.own_context XI)%I.
 

@@ -106,6 +106,7 @@ Require Import UexecSlot.    (* [uvis] / [tf_w] / [tf_resume_gpr] / [tf_resume_p
 Require Import TfUser.       (* [tf_ueq] *)
 Require Import UsysMemOk.    (* [usys_mem_ok] / [bump_tf] / [uecall_scause] *)
 Require Import UmodeRegs.    (* [uv_regs] / [uv_amb] *)
+Require Import UmodeText.    (* [user_ptm_inv_x]: the image STAMPED while the process runs *)
 Require Import UserPerm.     (* [uperm] / [perm_of] *)
 Require Import FdSlots.      (* [fdstate] -- the descriptor view in the key *)
 Local Open Scope Z_scope.
@@ -666,7 +667,11 @@ Section UexecRet.
       (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (fdv : list fdstate)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
-    (uv_amb ∗ uv_regs ∗ ⌜usz_ok sz⌝ ∗ user_ptm_inv pt sz M ∗
+    (uv_amb ∗ uv_regs ∗ ⌜usz_ok sz⌝ ∗
+     (* the image STAMPED (claude-notes/projects/icache.md): text bytes at an
+        instruction-view position this hart has passed, minted at [userret]'s
+        [fence.i]; the trapped frame hands the plain image back *)
+     user_ptm_inv_x pt sz M ∗
      Rfd fdv ∗ user_cfg C ∗
      gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ukont_F X C pt Rfd Rut sz π fdv)%I.
 
@@ -891,7 +896,7 @@ Section UexecRetGen.
     rewrite /uvb /uvb_F.
     iDestruct "Hb" as
       "(#Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
-    iDestruct (user_ptm_inv_pt with "Hpt") as (Mp) "Hpt".
+    iDestruct (user_ptm_inv_x_pt with "Hpt") as (Mp) "Hpt".
     iDestruct (uv_regs_u_regs with "Hur Hg Hpc") as (ms_v sc_v stval_v sepc_v) "[%Hms Hregs]".
     iDestruct "Hamb" as "(Hhw & Hmi & Hwi)".
     iPoseProof "Hwp" as "Hwp0".

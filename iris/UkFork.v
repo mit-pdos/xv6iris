@@ -277,7 +277,7 @@ Section UkFork.
   Proof.
     iIntros "Hheap #Htf Hpf Hdf".
     iDestruct "Hheap" as (Mt Md Mslack isz)
-      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
     (* ---- pure inventory, all non-consuming ---- *)
     iDestruct (ghost_frags_sub γt 1 Mt Ft DfracDiscarded with "Ht Htf") as %HFt.
     iDestruct (ghost_frags_sub γd 1 Md Fp DfracDiscarded with "Hd Hpf") as %HFp.
@@ -323,6 +323,7 @@ Section UkFork.
         [ iPureIntro; exact (map_disjoint_weaken_r Mt Fd Md Hdisj HFdMd) | ].
       iSplitR; [ iPureIntro; exact Hcan | ].
       iSplitR; [ iPureIntro; exact Hx | ].
+      iSplitR; [ iPureIntro; exact Hxw | ].
       iSplitR.
       { iPureIntro. intros a Ha. apply Hw.
         destruct Ha as [b Hb].

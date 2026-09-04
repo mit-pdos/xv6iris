@@ -44,6 +44,7 @@ Require Import TrampPt UptTree KptShare UserretDefs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import HartBarrier.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -85,7 +86,11 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : Cp
     (mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0 : mword 64)
     (vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
      vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f : bv 64)
-    (dqm : dfrac) :=
+    (dqm : dfrac)
+    (* THE STAMP MINT (icache): the process image in, stamped image out;
+       the fence.i at STEP 0 runs the ghost step ([HartBarrier.ifence_step])
+       the caller supplies -- see UserretEntryPt.v. *)
+    (Pimg Qimg : iProp Σ) :=
   (* S-mode config facts *)
   eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
   eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -123,6 +128,9 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : Cp
   tlb_res_pt kroot -∗
   pt_frame (upt_tree_spec uroot tfp um) -∗
   TsoCtx.own_context TsoCtx.cur_ctx -∗
+  ifence_step (Pimg ∗ TsoCtx.own_context TsoCtx.cur_ctx)
+              (Qimg ∗ TsoCtx.own_context TsoCtx.cur_ctx) -∗
+  Pimg -∗
   pc_is (uva 0x9c) -∗
   gpr_file m -∗
   tf_pa tfp 40 ↦ₚ₈c{ dqm } vra -∗
@@ -166,6 +174,7 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : Cp
     sepc ↦ᵣ sepc0 -∗
     utlb_inv_pt uroot tfp um -∗
     TsoCtx.own_context TsoCtx.cur_ctx -∗
+    Qimg -∗
     pc_is (ret_pc sepc0) -∗
     gpr_file (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3
                 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11
@@ -212,9 +221,10 @@ Module Type USERRET.
       (mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0 : mword 64)
       (vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
        vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f : bv 64)
-      (dqm : dfrac),
+      (dqm : dfrac) (Pimg Qimg : iProp Σ),
       wp_userret_pt_body kroot uroot tfp um m usatp
         mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0
         vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
-        vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f dqm.
+        vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f dqm
+        Pimg Qimg.
 End USERRET.

@@ -99,6 +99,7 @@ Fixpoint hmrun {X : Type} (n : nat) (D Drw : gset register) (rs : regstate)
               holds ([read_bytes] over the map); MMIO refused *)
            | Interface.MemRead nb req => fun k =>
                if dev_addr (Interface.ReadReq.pa req) then None
+               else if ak_ifetch (Interface.ReadReq.access_kind req) then None
                else match read_bytes mm (Interface.ReadReq.pa req) nb with
                     | Some w => hmrun n' D Drw rs mm (k (inl (w, None)))
                     | None => None
@@ -480,6 +481,8 @@ Section memrun.
          those bytes because the caller owns them *)
       destruct (dev_addr (Interface.ReadReq.pa rreq)) eqn:Hdev;
         [discriminate Hf|].
+      destruct (ak_ifetch (Interface.ReadReq.access_kind rreq)) eqn:Hif;
+        [discriminate Hf|].
       destruct (read_bytes mm (Interface.ReadReq.pa rreq) nb) as [w|] eqn:Hrb;
         [|discriminate Hf].
       assert (Hproj : hread_req_at nb
@@ -518,7 +521,7 @@ Section memrun.
            walker's own bytes owes [Mobl_ram_plain] -- which only the ledger
            map can pay (A6.12/A6.16).  That the user tier already carried
            [ctx_phys_pointsto] is why this collapse costs it nothing. *)
-        iApply (swp_hart_ram_read_plain nb rreq _ _ Hproj Hdev Hex
+        iApply (swp_hart_ram_read_plain nb rreq _ _ Hproj Hdev Hif Hex
                   with "Hcert").
         iIntros (sg img log tv V) "%Htv Hsi Htso". rewrite /mstate_interp.
         iDestruct "Hsi" as "(Hri & Hmem & Hdv)".
@@ -621,7 +624,8 @@ Fixpoint goodmb (Dr Dw : register -> bool) {E X} (m : Defs.monad E X)
        | Interface.RegWrite r _ v => fun k =>
            andb (Dw r) (goodmb Dr Dw (k tt) (set_reg s r v) mm)
        | Interface.MemRead n req => fun k =>
-           andb (andb (negb (dev_addr (Interface.ReadReq.pa req)))
+           andb (andb (andb (negb (dev_addr (Interface.ReadReq.pa req)))
+                         (negb (ak_ifetch (Interface.ReadReq.access_kind req))))
                    (bytes_owned mm (Interface.ReadReq.pa req) n))
              (match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
               | Some w => goodmb Dr Dw (k (inl (w, None))) s mm
@@ -680,6 +684,7 @@ Lemma hmrun_ram_read {X : Type} (n : nat) (D Drw : gset register)
     (req : Interface.ReadReq.t nb) (k : _ -> M X) :
   hmrun (S n) D Drw rs mm (Interface.Next (Interface.MemRead nb req) k)
   = if dev_addr (Interface.ReadReq.pa req) then None
+    else if ak_ifetch (Interface.ReadReq.access_kind req) then None
     else match read_bytes mm (Interface.ReadReq.pa req) nb with
          | Some w => hmrun n D Drw rs mm (k (inl (w, None)))
          | None => None
@@ -796,17 +801,19 @@ Proof.
       rewrite sregs_set_reg in Hw.
       exists (S n0), mm'. split; [|split; [exact Hs1|exact Hd1]].
       rewrite hmrun_write (bool_decide_eq_true_2 _ (Hdw reg HD)). exact Hw. }
-    { (* RAM READ; MMIO is refused by the certificate *)
+    { (* RAM READ; MMIO and the instruction fetch are refused by the
+         certificate (icache.md: a fetch is not a walker read) *)
       apply andb_prop in Hg as [Hg1 Hg2].
-      apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev.
+      apply andb_prop in Hg1 as [Hg1 Hfp].
+      apply andb_prop in Hg1 as [Hdev Hif].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hif.
       rewrite Hdev in He. cbn beta iota in He.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb)
         as [w|] eqn:Hrb; [|discriminate Hg2].
       destruct (IH (inl (w, None)) s s' x mm Hsub Hg2 He)
         as (n0 & mm' & Hw & Hs1 & Hd1).
       exists (S n0), mm'. split; [|split; [exact Hs1|exact Hd1]].
-      rewrite hmrun_ram_read Hdev.
+      rewrite hmrun_ram_read Hdev Hif.
       by rewrite (read_bytes_owned_mono mm s.(mem) _ nb w Hfp Hsub Hrb). }
     { (* RAM WRITE; MMIO is refused by the certificate *)
       apply andb_prop in Hg as [Hg1 Hg2].
@@ -1034,8 +1041,10 @@ Proof.
       by apply (IH _ s mm). }
     { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
       by apply (IH tt _ mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He, Hg2 |- *.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp].
+      apply andb_prop in Hg1 as [Hdev Hif].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hif.
+      rewrite Hdev in He, Hg2 |- *. rewrite Hif.
       rewrite Hfp. cbn [negb andb] in Hg2 |- *.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
@@ -1076,8 +1085,10 @@ Proof.
       by apply (IH _ s mm). }
     { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
       by apply (IH tt _ mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He, Hg2 |- *.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp].
+      apply andb_prop in Hg1 as [Hdev Hif].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hif.
+      rewrite Hdev in He, Hg2 |- *. rewrite Hif.
       rewrite Hfp. cbn [negb andb] in Hg2 |- *.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
@@ -1339,8 +1350,10 @@ Proof.
       by apply (IH _ s mm). }
     { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
       by apply (IH tt _ mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He, Hg2 |- *.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp].
+      apply andb_prop in Hg1 as [Hdev Hif].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hif.
+      rewrite Hdev in He, Hg2 |- *. rewrite Hif.
       rewrite Hfp. cbn [negb andb] in Hg2 |- *.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
@@ -1405,8 +1418,10 @@ Proof.
       by apply (IH _ s mm). }
     { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
       by apply (IH tt _ mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He, Hg2 |- *.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp].
+      apply andb_prop in Hg1 as [Hdev Hif].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hif.
+      rewrite Hdev in He, Hg2 |- *. rewrite Hif.
       rewrite Hfp. cbn [negb andb] in Hg2 |- *.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
@@ -1444,8 +1459,10 @@ Proof.
       by apply (IH _ s mm). }
     { apply andb_prop in Hg as [HD Hg]. rewrite HD. cbn [andb].
       by apply (IH tt _ mm). }
-    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev. rewrite Hdev in He, Hg2 |- *.
+    { apply andb_prop in Hg as [Hg1 Hg2]. apply andb_prop in Hg1 as [Hg1 Hfp].
+      apply andb_prop in Hg1 as [Hdev Hif].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hif.
+      rewrite Hdev in He, Hg2 |- *. rewrite Hif.
       rewrite Hfp. cbn [negb andb] in Hg2 |- *.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb) as [w|];
         [|discriminate Hg2].
@@ -1671,15 +1688,16 @@ Proof.
       rewrite hmrun_write (bool_decide_eq_true_2 _ (Hdw reg HD)). exact Hw. }
     { (* RAM READ *)
       apply andb_prop in Hg as [Hg1 Hg2].
-      apply andb_prop in Hg1 as [Hdev Hfp].
-      apply negb_true_iff in Hdev.
+      apply andb_prop in Hg1 as [Hg1 Hfp].
+      apply andb_prop in Hg1 as [Hdev Hif].
+      apply negb_true_iff in Hdev. apply negb_true_iff in Hif.
       rewrite Hdev in He. cbn beta iota in He.
       destruct (read_bytes s.(mem) (Interface.ReadReq.pa rreq) nb)
         as [w|] eqn:Hrb; [|discriminate Hg2].
       destruct (IH (inl (w, None)) s s' x mm Hsub Hg2 He)
         as (n0 & Hw & Hs1 & Hd1).
       exists (S n0). split; [|split; [exact Hs1|exact Hd1]].
-      rewrite hmrun_ram_read Hdev.
+      rewrite hmrun_ram_read Hdev Hif.
       by rewrite (read_bytes_owned_mono mm s.(mem) _ nb w Hfp Hsub Hrb). }
     { (* RAM WRITE *)
       apply andb_prop in Hg as [Hg1 Hg2].
@@ -1747,11 +1765,13 @@ Proof.
   { (* RAM READ: answered off the map, which does not depend on the file *)
     destruct (dev_addr (Interface.ReadReq.pa rreq)) eqn:Hdev;
       [discriminate Hf|].
+    destruct (ak_ifetch (Interface.ReadReq.access_kind rreq)) eqn:Hif;
+      [discriminate Hf|].
     destruct (read_bytes mm (Interface.ReadReq.pa rreq) nb) as [w|] eqn:Hrb;
       [|discriminate Hf].
     destruct (IH rs1 rs2 mm _ x rs1' mm' Hag Hf) as (rs2' & Hf2 & Hag2).
     exists rs2'. split; [|exact Hag2].
-    rewrite hmrun_ram_read Hdev Hrb. exact Hf2. }
+    rewrite hmrun_ram_read Hdev Hif Hrb. exact Hf2. }
   { (* RAM WRITE *)
     destruct (dev_addr (Interface.WriteReq.pa wreq)) eqn:Hdev;
       [discriminate Hf|].

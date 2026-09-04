@@ -92,7 +92,9 @@ Definition g0_of_at (base : Z) (text : list Z) (rs : list region) : gstate :=
          m dev0_state 0%nat true (fun _ => None)
          (* the TSO axis at power-on ([RiscvLang.boot_facts]): the era image
             IS the loaded memory, the write log is empty, every view is 0 *)
-         m [] (fun _ => 0%nat).
+         m [] (fun _ => 0%nat)
+         (* ...and so is every hart's INSTRUCTION view (icache.md) *)
+         (fun _ => 0%nat).
 
 Definition g0_of (text : list Z) (rs : list region) : gstate :=
   g0_of_at 0 text rs.
@@ -105,7 +107,7 @@ Definition ghart (g : gstate) (c : CPU) : mstate :=
 
 Definition gput (g : gstate) (c : CPU) (s : mstate) : gstate :=
   GState (<[c := sregs s]> (gregs g)) (mem s) (mdev s)
-         (ggen g) (gpow g) (gresv g) (gimg g) (glog g) (gtv g).
+         (ggen g) (gpow g) (gresv g) (gimg g) (glog g) (gtv g) (gitv g).
 
 (* ---------------------------------------------------------------------- *)
 (* 2. The schedule.                                                        *)

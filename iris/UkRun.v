@@ -42,7 +42,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import RegFile InstrBytes.
 Require Import UserPtTree UserExec ProcPtOwn.
-Require Import UmodeMem UmodeArith.
+Require Import UmodeMem UmodeArith UmodeText.
 Require Import UserPerm UexecWp UexecSlot UexecRet.
 Require Import FdSlots.      (* [fdstate] -- the key's descriptor view *)
 Require Import WpMmodeLeafBase.
@@ -252,6 +252,27 @@ Section UkRun.
     exact (conj Hcan Hlf).
   Qed.
 
+  (* ...and the pc's page is TEXT of every table the projection came from:
+     X off the text half's class, not-W off its new clause, and
+     [UmodeText.uva_text_of_perm] reads both off the leaf word *)
+  Lemma uheap_text_pc_text (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+      (pc : mword 64) (b : bv 8) :
+    uheap γt γd γs M pm -∗ utext γt (uint pc + Z.of_nat 0) b -∗
+    ⌜ forall pt sz, proc_pt_wf pt -> perm_of (ud_um pt) sz = pm ->
+                    uva_text pt (uint pc) ⌝.
+  Proof.
+    iIntros "Hheap Hb".
+    iDestruct (uheap_text with "Hheap Hb") as %(_ & Hx & _).
+    iDestruct (uheap_text_nw with "Hheap Hb") as %Hnw.
+    iPureIntro.
+    change (Z.of_nat 0) with 0 in Hx, Hnw. rewrite Z.add_0_r in Hx, Hnw.
+    intros pt sz Hwf Hpmeq. subst pm.
+    destruct Hx as (q & Hq & Hqx).
+    destruct (up_W q) eqn:Hqw.
+    - exfalso. apply Hnw. exists q. split; [ exact Hq | exact Hqw ].
+    - exact (uva_text_of_perm pt sz (uint pc) q Hq Hqx Hqw).
+  Qed.
+
   (* THE BRIDGE: [uinstr_is] plus the heap gives the Prop-level decode fact
      the existing engine consumes.  Every clause of [UmodeMem.uinstr] comes
      off a text fragment -- the leaf and canonicity from the byte at the pc,
@@ -274,8 +295,10 @@ Section UkRun.
         iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbs") as "#H0";
           [ reflexivity | ].
         iDestruct (uheap_text_pc with "Hheap H0") as %[Hcanon Hlf].
+        iDestruct (uheap_text_pc_text with "Hheap H0") as %Htx.
         iPureIntro. intros pt sz Hwf Hpmeq.
-        refine (UInstr pt M pc true i Hal2 Hcanon (Hlf pt sz Hwf Hpmeq) Hpg _).
+        refine (UInstr pt M pc true i Hal2 Hcanon (Hlf pt sz Hwf Hpmeq) Hpg _
+                  (Htx pt sz Hwf Hpmeq)).
         exists h. split_and!; [ exact HisRVC | | exact Hdec | ].
         * intros j Hj. rewrite <- Hlow.
           rewrite (nth_byte_subrange_lo w j ltac:(lia)).
@@ -291,8 +314,10 @@ Section UkRun.
         iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbs") as "#H0";
           [ reflexivity | ].
         iDestruct (uheap_text_pc with "Hheap H0") as %[Hcanon Hlf].
+        iDestruct (uheap_text_pc_text with "Hheap H0") as %Htx.
         iPureIntro. intros pt sz Hwf Hpmeq.
-        refine (UInstr pt M pc true i Hal2 Hcanon (Hlf pt sz Hwf Hpmeq) Hpg _).
+        refine (UInstr pt M pc true i Hal2 Hcanon (Hlf pt sz Hwf Hpmeq) Hpg _
+                  (Htx pt sz Hwf Hpmeq)).
         exists h. split_and!; [ exact HisRVC | exact Hb2 | exact Hdec | ].
         intros Hc. rewrite Hc in Hal4. discriminate Hal4.
     - iDestruct "Hcode" as (w) "(%HnRVC & %Hdec & #Hbs)".
@@ -300,8 +325,10 @@ Section UkRun.
       iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbs") as "#H0";
         [ reflexivity | ].
       iDestruct (uheap_text_pc with "Hheap H0") as %[Hcanon Hlf].
+      iDestruct (uheap_text_pc_text with "Hheap H0") as %Htx.
       iPureIntro. intros pt sz Hwf Hpmeq.
-      refine (UInstr pt M pc false i Hal2 Hcanon (Hlf pt sz Hwf Hpmeq) Hpg _).
+      refine (UInstr pt M pc false i Hal2 Hcanon (Hlf pt sz Hwf Hpmeq) Hpg _
+                (Htx pt sz Hwf Hpmeq)).
       exists w. split_and!; [ exact HnRVC | exact Hb4 | exact Hdec ].
   Qed.
 
@@ -454,9 +481,9 @@ Section UkRun.
      sits in a page the table maps, and [upt_map_wf] puts every such page
      below the trapframe; a LIVE address is below the break, and [usz_ok]
      puts the break below the trapframe too. *)
-  Lemma umem_lazy_bound {XIL : TsoCtx.CurCtx} (pt : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+  Lemma umem_lazy_bound {CIDL : CpuId} {XIL : TsoCtx.CurCtx} (pt : uptd) (sz : Z) (M : gmap Z (bv 8)) :
     proc_pt_wf pt -> usz_ok sz ->
-    umem_lazy pt sz M -∗ ⌜ forall a : Z, is_Some (M !! a) -> 0 <= a < 2 ^ 38 ⌝.
+    umem_lazy_x pt sz M -∗ ⌜ forall a : Z, is_Some (M !! a) -> 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros (Hwf Hsz) "H". iDestruct "H" as (Mp) "(_ & %Hiff & _ & _)".
     iPureIntro. intros a Ha.
@@ -523,7 +550,7 @@ Section UkRun.
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
       by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
-    rewrite /uvb /uvb_F /user_ptm_inv.
+    rewrite /uvb /uvb_F /user_ptm_inv_x.
     iDestruct "Hb" as
       "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
         Hfrag & Hcfg & Hgpr & Hpc & Hrut & Hkont)".
@@ -556,7 +583,7 @@ Section UkRun.
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
     iFrame "Hheap Hstk Hufd".
-    rewrite /uvb /uvb_F /user_ptm_inv.
+    rewrite /uvb /uvb_F /user_ptm_inv_x.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
   Qed.
@@ -615,7 +642,7 @@ Section UkRun.
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
       by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
-    rewrite /uvb /uvb_F /user_ptm_inv.
+    rewrite /uvb /uvb_F /user_ptm_inv_x.
     iDestruct "Hb" as
       "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
         Hfrag & Hcfg & Hgpr & Hpc & Hrut & Hkont)".
@@ -660,7 +687,7 @@ Section UkRun.
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
     iFrame "Hheap Hstk Hufd".
-    rewrite /uvb /uvb_F /user_ptm_inv.
+    rewrite /uvb /uvb_F /user_ptm_inv_x.
     iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
   Qed.

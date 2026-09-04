@@ -13,6 +13,7 @@ VConc.v
 VNode.v
 VRun.v
 VRunConc.v
+VIcache.v
 VModelFacts.v
 ClintMsipGen.v
 ClintMsipHwGen.v
@@ -38,6 +39,8 @@ CoreCsrwideGen.v
 CoreHartGen.v
 CoreHartHart1Gen.v
 CoreHartHwGen.v
+CoreIcacheGen.v
+CoreIcacheHwGen.v
 CoreRegsCtrGen.v
 CoreRegsFcsrGen.v
 CoreRegsFcsrHart1Gen.v
@@ -118,6 +121,7 @@ ConcLostSched.v
 ConcMpSched.v
 ConcSbSched.v
 ConcSmokeSched.v
+CoreIcacheSched.v
 ClintMsipJh7110Run.v
 ClintMsipQemuRun.v
 ClintTimeJh7110Run.v
@@ -139,6 +143,8 @@ CoreCsrprobeQemuRun.v
 CoreCsrwideQemuRun.v
 CoreHartJh7110Run.v
 CoreHartQemuRun.v
+CoreIcacheJh7110Run.v
+CoreIcacheQemuRun.v
 CoreRegsCtrQemuRun.v
 CoreRegsFcsrJh7110Run.v
 CoreRegsFcsrQemuRun.v
@@ -225,6 +231,8 @@ CoreCsrprobeQemuPass.v
 CoreCsrwideQemuPass.v
 CoreHartJh7110Pass.v
 CoreHartQemuPass.v
+CoreIcacheJh7110Pass.v
+CoreIcacheQemuPass.v
 CoreRegsFcsrQemuPass.v
 CoreRegsHpmQemuPass.v
 CoreRegsPmpQemuPass.v

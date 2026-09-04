@@ -267,8 +267,8 @@ Lemma hp_fetch_req : hread_req_at 4 hp_x1.2 = Some hp_reqf.
 Proof. vm_cast_no_check (eq_refl (Some hp_reqf)). Qed.
 Lemma hp_fetch_ram : dev_addr (Interface.ReadReq.pa hp_reqf) = false.
 Proof. vm_cast_no_check (eq_refl false). Qed.
-Lemma hp_fetch_plain : ak_excl (Interface.ReadReq.access_kind hp_reqf) = false.
-Proof. vm_cast_no_check (eq_refl false). Qed.
+Lemma hp_fetch_ifetch : ak_ifetch (Interface.ReadReq.access_kind hp_reqf) = true.
+Proof. vm_cast_no_check (eq_refl true). Qed.
 (* [hp_fetch_strong] IS GONE (tso-machine-flip.md A6.36).  It VM-checked that
    the A6.7(B) Sail patch tagged this fetch [AK_ifetch] and so sent it to the
    machine's strongly-ordered arm; the owner's overruling of RULING 1 deleted
@@ -370,7 +370,7 @@ Section pilot.
     ([∗ list] j ∈ seq 0 (N.to_nat n),
        phys_pointsto (pa_add pa j) dq (nth_byte w j)) -∗
     TsoCtx.pristine_win pa (N.to_nat n) -∗
-    ⌜∀ tv' : nat, tso_read_bytes img log (hart_agent cpu_id) tv' pa n w⌝.
+    ⌜∀ (h : agent) (tv' : nat), tso_read_bytes img log h tv' pa n w⌝.
   Proof.
     iIntros "Hgh Htso Hb #Hpr".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
@@ -379,7 +379,7 @@ Section pilot.
     iDestruct (TsoCtx.pristine_read_bytes_ok
                  (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
                  pa n w dq with "Hgh Htso Hb Hpr") as %Hok.
-    iPureIntro. intros tv'. exact (Hok (hart_agent cpu_id) tv').
+    iPureIntro. intros h tv'. exact (Hok h tv').
   Qed.
 
   Lemma wp_hart_rw_seq (D : gset register) (n1 n2 n3 : nat)
@@ -392,7 +392,7 @@ Section pilot.
     x3 = hsil n3 D (hcur_write x2) ->
     hread_req_at nf x1.2 = Some reqf ->
     dev_addr (Interface.ReadReq.pa reqf) = false ->
-    ak_excl (Interface.ReadReq.access_kind reqf) = false ->
+    ak_ifetch (Interface.ReadReq.access_kind reqf) = true ->
     hwrite_req_at nw x2.2 = Some reqw ->
     dev_addr (Interface.WriteReq.pa reqw) = false ->
     hnode_tag x3.2 = 0%nat ->
@@ -437,20 +437,20 @@ Section pilot.
     (* stretch 1 *)
     iApply (wp_hart_batch D n1 x0 with "Hcert Hrf").
     rewrite -Hx1. iIntros "Hrf".
-    (* THE FETCH READ, on the plain arm: the owed fact is the view-indexed
-       one, and the pristine receipt pays it at EVERY view (A6.36). *)
-    iApply (wp_hart_ram_read_plain (fun m' : M unit => m') nf reqf x1.2
+    (* THE FETCH READ, through the icache (icache.md): the owed fact is
+       indexed by the INSTRUCTION view at the icache agent, and the pristine
+       receipt pays it at EVERY agent and view. *)
+    iApply (wp_hart_ram_read_ifetch (fun m' : M unit => m') nf reqf x1.2
               mctx_id Hreqf Hdevf Hexf with "Hcert").
-    iIntros (σ imgf logf tvf Vf) "%Htvf Hσ Htso". rewrite /mstate_interp.
+    iIntros (σ imgf logf tvf itvf Vf) "%Htvf %Hitvf Hσ Hiv Htso". rewrite /mstate_interp.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (hp_read_pristine imgf σ logf Vf (Interface.ReadReq.pa reqf)
                  nf wf dqf with "Hmem Htso Hfetch Hpr") as %Hok.
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
     iExists wf.
-    iSplitR; [iPureIntro; intros tv' _ _; exact (Hok tv')|].
+    iSplitR; [iPureIntro; intros tv' _ _; exact (Hok _ tv')|].
     iNext. iMod "Hmask" as "_". iModIntro.
-    iSplitL "Hri Hmem Hdev"; [by iFrame|]. iFrame "Htso".
-    iIntros (tvn ? ?) "_".
+    iSplitL "Hri Hmem Hdev"; [by iFrame|]. iFrame "Hiv Htso".
     (* stretch 2 *)
     iApply (wp_hart_batch D n2 (hcur_read (bv_unsigned wf) x1)
               with "Hcert Hrf").
@@ -525,7 +525,7 @@ Section pilot.
     iIntros "#Hcert Hfrag Hrf Hfetch #Hpr Hold Hwobl Hcont".
     iApply (wp_hart_rw_seq hp_D 400 600 400 hp_x0 hp_x1 hp_x2 hp_x3
               4 hp_reqf hp_wf 4 hp_reqw vold dqf rr
-              Hx1 Hx2 Hx3 hp_fetch_req hp_fetch_ram hp_fetch_plain
+              Hx1 Hx2 Hx3 hp_fetch_req hp_fetch_ram hp_fetch_ifetch
               hp_store_req hp_store_ram hp_tail_ret
               with "Hcert Hfrag Hrf Hfetch Hpr [Hold] Hwobl [Hcont]").
     - rewrite hp_store_pa. iExact "Hold".

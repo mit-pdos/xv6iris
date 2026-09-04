@@ -180,6 +180,28 @@ Lemma foldr_max_le (l : list nat) (n : nat) :
   Forall (λ x, x ≤ n)%nat l → (foldr Nat.max 0 l ≤ n)%nat.
 Proof. induction 1 => /=; lia. Qed.
 
+Lemma foldr_max_ge (l : list nat) (x : nat) :
+  x ∈ l → (x ≤ foldr Nat.max 0 l)%nat.
+Proof.
+  induction l as [|y l IH] => Hin.
+  - by apply elem_of_nil in Hin.
+  - apply elem_of_cons in Hin as [->|Hin]; simpl; first lia.
+    specialize (IH Hin). lia.
+Qed.
+
+(** ... and it covers every one of the author's messages: the drain that
+    passes [own_pub] passes them all. *)
+Lemma own_pub_lookup h log i m :
+  log !! i = Some m → pm_tid m = h → (S i ≤ own_pub h log)%nat.
+Proof.
+  move => Hlk Htid. rewrite /own_pub.
+  apply (foldr_max_ge
+           (imap (λ j m0, if bool_decide (pm_tid m0 = h) then S j else 0%nat) log)
+           (S i)).
+  rewrite elem_of_lookup_imap. exists i, m. split; last done.
+  by rewrite Htid bool_decide_eq_true_2.
+Qed.
+
 Lemma own_pub_le h log : (own_pub h log ≤ length log)%nat.
 Proof.
   apply foldr_max_le. apply Forall_forall => x Hx.
@@ -440,6 +462,51 @@ Lemma tso_read_all_own img log h tv a :
 Proof.
   move => Hown. rewrite -(tso_read_top_flat img log h a) /tso_read.
   apply read_down_vis_irrel; move => t Ht; by apply all_own_visible.
+Qed.
+
+(** THE UNWRITTEN BYTE: no message in the log touches [a], so EVERY agent
+    reads the image at EVERY view -- in particular the icache agent
+    (RiscvLang.ifetch_agent), which never sees store forwarding.  This is
+    what "kernel text is timestamp 0" means at the machine, and the premise
+    the solo-block bracket (HartBlock.v) needs of the bytes a block fetches. *)
+Definition unwritten (log : list pwmsg) (a : Arch.pa) : Prop :=
+  ∀ m, m ∈ log → msg_byte m a = None.
+
+Lemma unwritten_app_inv log m a :
+  unwritten (log ++ [m]) a → unwritten log a ∧ msg_byte m a = None.
+Proof.
+  move => Hu. split.
+  - move => m0 Hin. apply Hu. apply elem_of_app. by left.
+  - apply Hu. apply elem_of_app. right. by apply elem_of_list_singleton.
+Qed.
+
+Lemma log_byte_unwritten img log a t :
+  unwritten log a → (0 < t)%nat → log_byte img log t a = None.
+Proof.
+  move => Hu Ht. destruct t as [|i]; first lia.
+  rewrite /log_byte. destruct (log !! i) as [m|] eqn:Hlk; last done.
+  apply Hu. by eapply elem_of_list_lookup_2.
+Qed.
+
+Lemma read_down_unwritten img log h tv a t :
+  unwritten log a → read_down img log h tv a t = img !! a.
+Proof.
+  move => Hu. induction t as [|t IH].
+  - apply read_down_0.
+  - rewrite read_down_S (log_byte_unwritten img log a (S t) Hu ltac:(lia)).
+    by destruct (visibleb h tv log (S t)).
+Qed.
+
+Lemma tso_read_unwritten img log h tv a :
+  unwritten log a → tso_read img log h tv a = img !! a.
+Proof. move => Hu. by apply read_down_unwritten. Qed.
+
+Lemma flat_unwritten img log a :
+  unwritten log a → flat img log !! a = img !! a.
+Proof.
+  induction log as [|m log IH] using rev_ind => Hu; first done.
+  apply unwritten_app_inv in Hu as [Hu Hm].
+  rewrite flat_snoc (lookup_union_r (pm_map m) (flat img log) a Hm). by apply IH.
 Qed.
 
 (* ------------------------------------------------------------------ *)

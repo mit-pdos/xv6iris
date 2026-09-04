@@ -390,6 +390,27 @@ Section reg_alloc.
 
 End reg_alloc.
 
+(* THE INSTRUCTION-VIEW MIRROR's per-hart counters (icache.md), born at 0
+   like every view of a fresh era; [reg_alloc_cpus]' shape. *)
+Lemma iview_alloc_cpus `{!riscvFixedGS Σ} (cs : list CPU) :
+  NoDup cs ->
+  ⊢ |==> ∃ f : CPU -> gname,
+    [∗ list] c ∈ cs, mono_nat_auth_own (f c) 1 0%nat.
+Proof.
+  induction cs as [|c cs' IH]; intros Hnd.
+  - iModIntro. iExists (fun _ => 1%positive). done.
+  - apply NoDup_cons in Hnd as [Hc Hnd'].
+    iMod (IH Hnd') as (fr) "Hrest".
+    iMod (mono_nat_own_alloc 0%nat) as (γ) "[Hauth _]".
+    iModIntro. iExists (fun c' => if decide (c' = c) then γ else fr c').
+    rewrite big_sepL_cons. iSplitL "Hauth".
+    { rewrite decide_True //. }
+    iApply (big_sepL_mono with "Hrest").
+    intros k c' Hk. simpl.
+    rewrite decide_False; [done|].
+    intros ->. apply Hc. by eapply elem_of_list_lookup_2.
+Qed.
+
 (* Bridge a big-sep over the LIST [enum CPU] to one over the SET
    [fin_to_set CPU] (the spelling [gregs_interp] and the caller-facing
    resources use).  Proven standalone: rewriting [big_sepS_list_to_set]
@@ -741,7 +762,7 @@ Section power.
              log and the views are the DURABLE record of RAM across a power
              cycle -- [RiscvLang]'s own arm spells it exactly this way. *)
           (GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv)
-             g.(gimg) g.(glog) g.(gtv)), [].
+             g.(gimg) g.(glog) g.(gtv) g.(gitv)), [].
         do 4 right. split_and!; [done|done|].
         left. split_and!; done. }
       iIntros (e2 g2 efs Hstep) "!>".
@@ -897,7 +918,8 @@ Section power.
         as (γlogm) "Hlogmauth2".
       iMod (mono_nat_own_alloc 0%nat) as (γloglen) "[Hloglenauth2 _]".
       iMod (view_auth_alloc (avf g2)) as (γview) "Hviewauth2".
-      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γkptb γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv γts γlogm γloglen γview g2.(gimg)).
+      iMod (iview_alloc_cpus (enum CPU) (NoDup_enum CPU)) as (fiv) "Hivauths2".
+      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γkptb γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv γts γlogm γloglen γview g2.(gimg) fiv).
       (* the started counter ticks (PowerOff had already bumped [ggen], so
          the count moves from [ggen + 0] to [ggen + 1]) *)
       iMod (mono_nat_own_update (n := start_count g) (g.(ggen) + 1)%nat
@@ -954,11 +976,11 @@ Section power.
       iModIntro.
       rewrite /start_count Hpw /= Nat.add_0_r in Hdom.
       iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth
-               Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2 Hoauth".
+               Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2 Hivauths2 Hoauth".
       { rewrite /state_interp /=.
         (* the trace conjunct, at the extended history *)
         iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth
-                 Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2";
+                 Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2 Hivauths2";
           last first.
         { iDestruct (obs_interp_close _ _ _ _ _ _ h κs Hstep0 Hwf Htot
                        with "Hoauth") as "Hobs". iExact "Hobs". }
@@ -997,7 +1019,7 @@ Section power.
         (* [boot_shape]'s own reset clause supplies every one of them.    *)
         (* ============================================================ *)
         destruct Hbf as (_ & _ & Hramtot2 & _ & _ & _ & _ & Hreset).
-        destruct Hreset as (Hresv0 & Hlog0 & Himg0 & Htv0).
+        destruct Hreset as (Hresv0 & Hlog0 & Himg0 & Htv0 & Hitv0).
         iSplitL "Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2".
         { rewrite /tso_interp_at.
           iExists ((fun _ : bv 8 => ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem))
@@ -1035,8 +1057,18 @@ Section power.
           lia. }
         (* the reservation mirror: minted at the reset machine's all-[None]
            map, and the snapshot invariant is vacuous there *)
-        iFrame "Hresvauth". iPureIntro.
-        intros c r Hc. rewrite Hresv0 in Hc. discriminate. }
+        iFrame "Hresvauth".
+        iSplitR.
+        { iPureIntro. intros c r Hc. rewrite Hresv0 in Hc. discriminate. }
+        (* the instruction-view mirror (icache.md): every counter at the
+           fresh era's bottom, and the bound is trivial over an empty log *)
+        iSplitL "Hivauths2".
+        { rewrite /iview_auth_at. iApply big_sepL_enum_to_set.
+          iApply (big_sepL_mono
+                    (fun _ c => mono_nat_auth_own (fiv c) 1 0%nat)).
+          { intros k c Hk. rewrite Hitv0. iIntros "H". iExact "H". }
+          iExact "Hivauths2". }
+        iPureIntro. intros c. rewrite Hitv0. lia. }
       iSplitR; [iApply "IH"|].
       (* the fork obligations: the new generation's whole complement *)
       rewrite /power_fork big_sepL_app big_sepL_fmap /=.
@@ -1200,7 +1232,7 @@ Proof.
   (* A6.71: one more conjunct -- [tso_interp_at] sits between the durable
      disk's and the reservation mirror's, so the positional walk is one
      underscore longer. *)
-  iDestruct "Hera" as (E) "(_ & _ & _ & _ & _ & _ & _ & %Hok)".
+  iDestruct "Hera" as (E) "(_ & _ & _ & _ & _ & _ & _ & %Hok & _)".
   iPureIntro. intros _. exact Hok.
 Qed.
 

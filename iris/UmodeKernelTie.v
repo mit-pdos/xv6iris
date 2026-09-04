@@ -38,7 +38,7 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import InstrBytes RegFile.
 Require Import MinstretInv WireInv.
 Require Import UptTree UserPtTree UserFrame UserExec.
-Require Import UmodeMem UmodeCap.
+Require Import UmodeMem UmodeText UmodeCap.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
@@ -57,11 +57,11 @@ Section UmodeKernelTie.
      WEAKENING, and the pure facts are exactly what would be needed to go
      back. *)
   Lemma user_pt_inv_umode (pt : uptd) (M : gmap Z (bv 8)) :
-    user_pt_inv pt M -∗
-    utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M.
+    user_pt_inv_x pt M -∗
+    utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem_x pt M.
   Proof.
     iIntros "(Htlb & [%Hdom Hmem] & _ & _)".
-    rewrite /umem. iFrame "Htlb Hmem".
+    iFrame "Htlb Hmem".
   Qed.
 
   (* SS2 The machine-cell half -- [u_regs_uv_regs] / [uv_amb_intro] -- lives
@@ -81,7 +81,7 @@ Section UmodeKernelTie.
     uv_cap C pt Psi -∗
     hw_config -∗ minstret_inv -∗ wire_inv -∗
     u_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
-    user_pt_inv pt M -∗
+    user_pt_inv_x pt M -∗
     user_cfg C -∗
     (* A6.140: the RUNNING TOKEN goes into [uv_lin]'s new conjunct *)
     TsoCtx.own_context XI -∗

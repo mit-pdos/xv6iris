@@ -157,6 +157,33 @@ Definition hsil_tv {X : Type} (h : agent) (log : list pwmsg) (m : M X)
   | Interface.Next oc _ => hbar_tv h log oc tv
   end.
 
+(* ... and the INSTRUCTION view (claude-notes/projects/icache.md): among the
+   silent nodes only [fence.i] moves it, past the hart's data view and its
+   own last store, and only ever forward. *)
+Definition hbar_itv {T : Type} (h : agent) (log : list pwmsg)
+    (oc : Interface.outcome (fun _ => exception) T) (tv itv : nat) : nat :=
+  match oc with
+  | Interface.Barrier b =>
+      if fence_ifetch b then Nat.max itv (fence_post h log true tv) else itv
+  | _ => itv
+  end.
+
+Definition hsil_itv {X : Type} (h : agent) (log : list pwmsg) (m : M X)
+    (tv itv : nat) : nat :=
+  match m with
+  | Interface.Ret _ => itv
+  | Interface.Next oc _ => hbar_itv h log oc tv itv
+  end.
+
+Lemma hbar_itv_ge {T : Type} (h : agent) (log : list pwmsg)
+    (oc : Interface.outcome (fun _ => exception) T) (tv itv : nat) :
+  (itv <= hbar_itv h log oc tv itv)%nat.
+Proof. destruct oc; try done. rewrite /hbar_itv. case_match; lia. Qed.
+
+Lemma hsil_itv_ge {X : Type} (h : agent) (log : list pwmsg) (m : M X)
+    (tv itv : nat) : (itv <= hsil_itv h log m tv itv)%nat.
+Proof. destruct m as [y|T oc k]; [done|]. apply hbar_itv_ge. Qed.
+
 (* the drain only ever moves the view FORWARD ... *)
 Lemma hbar_tv_ge {T : Type} (h : agent) (log : list pwmsg)
     (oc : Interface.outcome (fun _ => exception) T) (tv : nat) :
@@ -190,11 +217,11 @@ Lemma hsil_node_mnode (D : gset register) (rs rs' : regstate)
     (m m' : M unit) (mem : gmap Arch.pa (bv 8)) (dev : dev_state) :
   hsil_node D rs m = Some (rs', m') ->
   forall (oth : gset Arch.pa) (h : agent) (img : gmap Arch.pa (bv 8))
-         (log : list pwmsg) (tv : nat) (r : option resv),
-    mnode_step oth h img (MState rs mem dev) log tv r m m'
-      (MState rs' mem dev) log (hsil_tv h log m tv) r.
+         (log : list pwmsg) (tv itv : nat) (r : option resv),
+    mnode_step oth h img (MState rs mem dev) log tv itv r m m'
+      (MState rs' mem dev) log (hsil_tv h log m tv) (hsil_itv h log m tv itv) r.
 Proof.
-  intros Hnode oth h img log tv r. destruct m as [y|T oc k];
+  intros Hnode oth h img log tv itv r. destruct m as [y|T oc k];
     [by simpl in Hnode|].
   destruct oc; simpl in Hnode |- *; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
@@ -204,17 +231,17 @@ Qed.
 Lemma hsil_node_mnode_inv (D : gset register) (rs rs' : regstate)
     (m m' m2 : M unit) (mem : gmap Arch.pa (bv 8)) (dev : dev_state)
     (σ2 : mstate) (oth : gset Arch.pa) (h : agent)
-    (img : gmap Arch.pa (bv 8)) (log log2 : list pwmsg) (tv tv2 : nat)
+    (img : gmap Arch.pa (bv 8)) (log log2 : list pwmsg) (tv tv2 itv itv2 : nat)
     (r r2 : option resv) :
   hsil_node D rs m = Some (rs', m') ->
-  mnode_step oth h img (MState rs mem dev) log tv r m m2 σ2 log2 tv2 r2 ->
+  mnode_step oth h img (MState rs mem dev) log tv itv r m m2 σ2 log2 tv2 itv2 r2 ->
   m2 = m' /\ σ2 = MState rs' mem dev /\ log2 = log /\
-  tv2 = hsil_tv h log m tv /\ r2 = r.
+  tv2 = hsil_tv h log m tv /\ itv2 = hsil_itv h log m tv itv /\ r2 = r.
 Proof.
   intros Hnode Hstep. destruct m as [y|T oc k]; [by simpl in Hnode|].
   destruct oc; simpl in Hnode |- *; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
-    injection Hnode as <- <-; destruct Hstep as (-> & -> & -> & -> & ->);
+    injection Hnode as <- <-; destruct Hstep as (-> & -> & -> & -> & -> & ->);
     by split_and!.
 Qed.
 
@@ -224,16 +251,16 @@ Lemma hsil_node_pres (D : gset register) (rs rs' : regstate)
     (m m' : M unit) :
   hsil_node D rs m = Some (rs', m') ->
   forall (oth : gset Arch.pa) (h : agent) (img : gmap Arch.pa (bv 8))
-         (s : mstate) (log : list pwmsg) (tv : nat) (r : option resv)
-         (m2 : M unit) (s2 : mstate) (log2 : list pwmsg) (tv2 : nat)
+         (s : mstate) (log : list pwmsg) (tv itv : nat) (r : option resv)
+         (m2 : M unit) (s2 : mstate) (log2 : list pwmsg) (tv2 itv2 : nat)
          (r2 : option resv),
-    mnode_step oth h img s log tv r m m2 s2 log2 tv2 r2 -> r2 = r.
+    mnode_step oth h img s log tv itv r m m2 s2 log2 tv2 itv2 r2 -> r2 = r.
 Proof.
-  intros Hnode oth h img s log tv r m2 s2 log2 tv2 r2 Hstep.
+  intros Hnode oth h img s log tv itv r m2 s2 log2 tv2 itv2 r2 Hstep.
   destruct m as [y|T oc k]; [by simpl in Hnode|].
   destruct oc; simpl in Hnode; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
-    injection Hnode as <- <-; destruct Hstep as (_ & _ & _ & _ & ->);
+    injection Hnode as <- <-; destruct Hstep as (_ & _ & _ & _ & _ & ->);
     reflexivity.
 Qed.
 
@@ -521,10 +548,10 @@ Section batch.
   Proof.
     iIntros (Hnode) "#Hcert Hrf H".
     iApply (wp_hart_step with "Hcert").
-    { intros oth0 h0 img0 σ0 log0 tv0 r0 m'0 σ'0 log'0 tv'0 r'0 Hs.
-      exact (hsil_node_pres D rs rs1 m m1 Hnode oth0 h0 img0 σ0 log0 tv0 r0
-               m'0 σ'0 log'0 tv'0 r'0 Hs). }
-    iIntros (σ oth r img log tv V) "%Htv Hσ Htso".
+    { intros oth0 h0 img0 σ0 log0 tv0 itv0 r0 m'0 σ'0 log'0 tv'0 itv'0 r'0 Hs.
+      exact (hsil_node_pres D rs rs1 m m1 Hnode oth0 h0 img0 σ0 log0 tv0 itv0 r0
+               m'0 σ'0 log'0 tv'0 itv'0 r'0 Hs). }
+    iIntros (σ oth r img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
     destruct σ as [rs0 mem0 dev0].
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (hreg_frame_agree rs D rs0 with "Hri Hrf") as %Hag.
@@ -537,15 +564,20 @@ Section batch.
       iPureIntro. rewrite -Htv. apply Hb. }
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iExists m1, (MState rs2 mem0 dev0), log,
-      (hsil_tv (hart_agent cpu_id) log m tv), r.
+      (hsil_tv (hart_agent cpu_id) log m tv),
+      (hsil_itv (hart_agent cpu_id) log m tv itv), r.
     iSplitR.
     { iPureIntro.
       exact (hsil_node_mnode D rs0 rs2 m m1 mem0 dev0 Hnode2 oth
-               (hart_agent cpu_id) img log tv r). }
-    iNext. iIntros (m' σ' log' tv' r') "%Hstep".
+               (hart_agent cpu_id) img log tv itv r). }
+    iNext. iIntros (m' σ' log' tv' itv' r') "%Hstep".
     destruct (hsil_node_mnode_inv D rs0 rs2 m m1 m' mem0 dev0 σ' oth
-                (hart_agent cpu_id) img log log' tv tv' r r' Hnode2 Hstep)
-      as (-> & -> & -> & -> & ->).
+                (hart_agent cpu_id) img log log' tv tv' itv itv' r r' Hnode2 Hstep)
+      as (-> & -> & -> & -> & -> & ->).
+    (* the INSTRUCTION view: a fence.i raises it, everything else leaves it;
+       the mirror follows ([hsil_itv_ge] is the monotone update) *)
+    iMod (hart_iview_auth_update cpu_id itv (hsil_itv (hart_agent cpu_id) log m tv itv)
+            (hsil_itv_ge _ _ _ _ _) with "Hiv") as "Hiv".
     (* THE ONE MEMORY-MODEL EFFECT (see [hsil_tv]): a draining fence moves
        this hart's view forward.  Every other silent node leaves it where it
        was, and [tso_interp_of_advance] is then the identity update. *)
@@ -581,7 +613,8 @@ Section batch.
             injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
             iModIntro; iFrame "Hri"; by iApply (hreg_frame_ext rs rs D) ]. }
     iMod "Hmask" as "_". iModIntro.
-    iSplitR "H Hrf Htso"; [iFrame "Hri Hmem Hdev"|].
+    iSplitR "H Hrf Htso Hiv"; [iFrame "Hri Hmem Hdev"|].
+    iSplitL "Hiv"; [iExact "Hiv"|].
     iSplitL "Htso"; [iExact "Htso"|].
     by iApply "H".
   Qed.

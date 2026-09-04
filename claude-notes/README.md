@@ -212,6 +212,10 @@ Audited against the tree 2026-08-28, when six moved to
 (finished) and `sp-migration.md` (archived by the owner with work still
 outstanding; see the `completed/` section below).
 
+- **[`icache.md`](projects/icache.md)** — the non-coherent instruction
+  cache: a per-hart instruction view beside the data view, the `AK_ifetch`
+  fetch arm and the `fence.i` arm of the Ztso machine, the fetch node rule
+  and its payers, and how the two U-mode tiers absorb it.
 - **[`user-wp-slot-checkpoint.md`](projects/user-wp-slot-checkpoint.md)** — coordinator checkpoint 2026-08-28: the session's rulings, in-flight (possibly ungated) state, and how to resume.  Read FIRST if resuming user-wp-slot.
 - **[`user-wp-slot.md`](projects/user-wp-slot.md)** — the PER-PROCESS
   user-execution WP slot: making a verified process run IN PLACE of the

@@ -61,6 +61,7 @@ Require Import ParkCap.   (* [park_token] *)
 Require Import UsertrapRes UtResFits.  (* [ut_park_intro_body] -- the park's producer entry *)
 Require Import UexecRet.  (* the round's vocabulary *)
 Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
+Require Import UmodeText.   (* [umem_lazy_x_mint] / [user_ptm_inv_x_close] (icache) *)
 Import Defs.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
@@ -1708,6 +1709,10 @@ Section UservecAllPt.
               u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280
               u112
               (DfracOwn 1)
+              (* THE STAMP RE-MINTED for the resumed process (icache): the
+                 residue's own lazy image goes in, the stamped one comes out *)
+              (umem_lazy pt' (uint (pv_sz (us_V U2))) (us_M U2))
+              (umem_lazy_x pt' (uint (pv_sz (us_V U2))) (us_M U2))
               HSIE2 HMPRV2 HSXL2 HTVM2 HMXR2 Hmask Hpmm HPBMTE eq_refl eq_refl
               Hmapwf HTSR2 Hsretnp2 Ha0usatp HuMode Huasid Huppn) as "Hwup".
     (* [Hhw2]/[Hmin2]: THE RESUMING HART'S OWN copies, handed back by
@@ -1717,12 +1722,14 @@ Section UservecAllPt.
        See [SpecUsertrap.usertrap_post]'s comment. *)
     (* the resuming hart's running token: out of ITS residue (the opener
        above), handed to userret and back through the closer below *)
-    iApply ("Hwup" with "Hkt Hhw2 Hmin2 Hhs2 Hpriv2 Hms2 Hmie3 Hmdl3 Hmenv3 Hsenv2 Hsepc2 Hclaim Hcreds2 Hkres2 Hufr' Hctx2 Hpc2 Hfile2
+    iApply ("Hwup" with "Hkt Hhw2 Hmin2 Hhs2 Hpriv2 Hms2 Hmie3 Hmdl3 Hmenv3 Hsenv2 Hsepc2 Hclaim Hcreds2 Hkres2 Hufr' Hctx2 [] Hdata' Hpc2 Hfile2
                     Hutf40 Hutf48 Hutf56 Hutf64 Hutf72 Hutf80 Hutf88 Hutf96 Hutf104
                     Hutf120 Hutf128 Hutf136 Hutf144 Hutf152 Hutf160 Hutf168 Hutf176 Hutf184
                     Hutf192 Hutf200 Hutf208 Hutf216 Hutf224 Hutf232 Hutf240 Hutf248 Hutf256
                     Hutf264 Hutf272 Hutf280 Hutf112").
-    iIntros "Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hsenv3 Hsepc3 Hutlb3 Hctx3 Hpc3 Hfile3
+    { (* userret's fence.i stamps the pages (icache) *)
+      iApply umem_lazy_x_mint. }
+    iIntros "Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hsenv3 Hsepc3 Hutlb3 Hctx3 Hdata' Hpc3 Hfile3
              Hutf40' Hutf48' Hutf56' Hutf64' Hutf72' Hutf80' Hutf88' Hutf96' Hutf104'
              Hutf120' Hutf128' Hutf136' Hutf144' Hutf152' Hutf160' Hutf168' Hutf176' Hutf184'
              Hutf192' Hutf200' Hutf208' Hutf216' Hutf224' Hutf232' Hutf240' Hutf248' Hutf256'
@@ -1751,7 +1758,7 @@ Section UservecAllPt.
        the descriptor only through the three real fields, so that is free.
          After this the post holds the user address space EXACTLY ONCE, in
        the user's view, beside a residue that holds none of it. *)
-    iDestruct (user_ptm_inv_close pt' _ _ Hptwf' with "Hutlb3 Hdata'") as "Hupt3".
+    iDestruct (user_ptm_inv_x_close pt' _ _ Hptwf' with "Hutlb3 Hdata'") as "Hupt3".
     iDestruct (UT.usertrap_res_bare_norm (CID:=CID2) pt' vksp _ with "Hures3") as "Hures3".
     (* THE CONTINUATION LANDS AT THE RESUMING HART.  [Hcont] is a [wp_next]
        over the hart usertrap came back on; at a real proc the pinning

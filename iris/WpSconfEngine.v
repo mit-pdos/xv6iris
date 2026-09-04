@@ -50,6 +50,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import RegFile HartTp WpNext WpGpr InstrBytes WpMmodeLeafBase.
 Require Import HartSwp HartMFrame.
+Require Import HartBarrier.
 Require Import HartLift HartSpan HartSpanChar HartMCycle WpMmodeJump.
 Require Import HartGoodb WpDecodeBridge WpDecode RiscvExtras.
 Require Import IntrDefs WpIntrInv WpSmodeIntr.
@@ -425,6 +426,21 @@ Section WpSconfCtlEng.
     gen_cert -∗
     swp (execute (FENCEI (imm, rs, rd))) (fun e => ⌜e = RETIRE_SUCCESS⌝).
   Proof. exact (swp_barrier_ret Barrier_RISCV_i). Qed.
+
+  (* THE FENCE.I LEAF THAT MINTS.  [swp_execute_FENCEI_s] above is the
+     identity; [userret] STEP 0 instead runs a ghost step at the barrier
+     node ([HartBarrier.swp_hart_fence_i]) -- the stamp on the process's
+     text image is minted there (claude-notes/projects/icache.md). *)
+  Lemma swp_execute_FENCEI_mint (imm : SailStdpp.Values.mword 12)
+      (rs rd : regidx) (P Q : iProp Σ) :
+    gen_cert -∗ ifence_step P Q -∗ P -∗
+    swp (execute (FENCEI (imm, rs, rd))) (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ Q).
+  Proof.
+    iIntros "#Hcert Hstep HP".
+    iApply (swp_hart_fence_i (execute (FENCEI (imm, rs, rd))) _ P Q
+              ltac:(reflexivity) with "Hcert Hstep HP").
+    iNext. iIntros "HQ". iApply swp_ret. by iFrame.
+  Qed.
 
   Lemma swp_is_fiom_active_S (menv : SailStdpp.Values.mword 64) :
     gen_cert -∗ cur_privilege ↦ᵣ Supervisor -∗ menvcfg ↦ᵣ menv -∗
