@@ -128,19 +128,43 @@
        rows, plus the a0 the dispatcher writes on return);
      - the ELF's file image and its .bss zeros are IN the image
        ([UmodeAbi.uimg_sub (elf_image f)]);
-     - the argument strings and the [ustack] pointer vector are at the
-       addresses [kxc_sp] computes ([kexec_args_at]);
+     - THE STACK kexec allocates ON TOP of the image ([kexec_stack_at]):
+       two pages above the rounded-up segment end, the lower one the
+       guard [uvmclear] makes inaccessible, the upper one the initial
+       stack; the arguments are pushed from its top -- argument [i]'s
+       characters and NUL at [kxc_sp top alen (S i)], then the
+       [na + 1]-word [ustack] vector at [kxc_sp_final], [ustack[i]] the
+       address of string [i] and [ustack[na] = 0], every word
+       little-endian ([kexec_args_at]); every other byte of the stack
+       page reads ZERO (uvmalloc's zero fill, in the lazy view); [sp]
+       and [a1] are the vector's address and [a0] is [argc] -- so
+       main's [argv] is exactly that vector, which is what a slot
+       constructor reads off the key through [kexec_image_ok_argv];
      - the descriptor view is the caller's ([sts]) and the trapframe is
        [TFWORDS] long.
    NOT YET STATED, and deliberately named here so the follow-on is a
    list: (d1) the PERMISSION projection [uvis_perm W'] (X on the text
    segment's pages per the segment flags, W on the stack page, the
-   guard page cleared) -- the slot constructors ([UkRun.uslot_of_urun],
-   [USyncKernel.sync_uexec_slot]) want an X page at the entry and a W
-   stack, so (d1) is the first conjunct the sh chain will ask for;
-   (d2) every image byte OUTSIDE the ELF image and the argument block
-   reads ZERO (uvmalloc's zeroed pages, the lazy view); (d3) [p->name].
-   Each is a pure conjunct on [W'], added without moving any shape.
+   guard page's U bit cleared) -- the slot constructors
+   ([UkRun.uslot_of_urun], [USyncKernel.sync_uexec_slot]) want an X page
+   at the entry and a W stack, so (d1) is the first conjunct the sh
+   chain will ask for; (d2) the zero fill of the .bss-to-page-end tail
+   and of the guard page's reading; (d3) [p->name].  Each is a pure
+   conjunct on [W'], added without moving any shape.
+
+   ==== LOADABLE MEANS SUCCESS, MODULO MEMORY ===========================
+
+   The failure arm past the lock (arm (iii)) names its CAUSE
+   ([exec_fail_cause]): the node was not a loadable file, or the
+   arguments did not fit the stack page ([kxc_stack_ok] false), or an
+   allocation failed (a kalloc / uvmalloc / proc_pagetable exhaustion --
+   the one cause with no pure witness, since the pool is uncounted).
+   So a caller that proves [kexec_loadable f] and the fit condition for
+   its arguments learns that the only way exec fails after resolving
+   its path is running out of memory -- and that on success it holds
+   its own WP at the image it computed.  A caller that proves nothing
+   about the file runs under the generic user-mode safety WP, which
+   does not care what the image holds, and takes arm (b).
 
    ==== WHAT THE PROVER OWES ===========================================
 
@@ -303,6 +327,24 @@ Definition kexec_args_at (top : Z) (alen : nat -> nat) (na : nat)
         M !! (kxc_sp_final top alen na + 8 * Z.of_nat i + Z.of_nat k)
         = bv_to_little_endian 8 8 (kexec_ustack top alen na i) !! k).
 
+(* the byte addresses the argument block occupies: the strings (with
+   their NULs) and the pointer vector *)
+Definition kexec_arg_addr (top : Z) (alen : nat -> nat) (na : nat) (a : Z) : Prop :=
+  (exists i, (i < na)%nat
+     /\ kxc_sp top alen (S i) <= a <= kxc_sp top alen (S i) + Z.of_nat (alen i))
+  \/ (kxc_sp_final top alen na <= a < kxc_sp_final top alen na + 8 * (Z.of_nat na + 1)).
+
+(* THE STACK (header, THE IMAGE): the stack page is the top page of the
+   image, the guard page sits below it, the arguments fit ([kxc_stack_ok]
+   at the guard's top as the base, the landed fit condition), and every
+   stack-page byte outside the argument block reads zero.  The guard
+   page's own reading and both pages' permissions are (d1)/(d2). *)
+Definition kexec_stack_at (top : Z) (alen : nat -> nat) (na : nat)
+    (M : gmap Z (bv 8)) : Prop :=
+  kxc_stack_ok top (top - PGSIZE) alen na
+  /\ (forall a, top - PGSIZE <= a < top -> ~ kexec_arg_addr top alen na a ->
+        M !! a = Some (bv_0 8)).
+
 (* THE KEY kexec BUILT (header, THE IMAGE): what the new process resumes
    at, stated on the user-visible record the slot is keyed by.  [sts] is
    the caller's descriptor view: exec closes no descriptor. *)
@@ -318,8 +360,31 @@ Definition kexec_image_ok (f : elf_bytes) (na : nat) (alen : nat -> nat)
   /\ tf_w (uvis_tf W') (tf_arg_idx 0) = (mword_of_int (Z.of_nat na) : mword 64)
   /\ uimg_sub (elf_image f) (uvis_M W')
   /\ kexec_args_at top alen na afun (uvis_M W')
+  /\ kexec_stack_at top alen na (uvis_M W')
   /\ uvis_fd W' = sts
   /\ length (uvis_tf W') = TFWORDS.
+
+(* WHY exec FAILED past the lock (header, LOADABLE MEANS SUCCESS) *)
+Inductive exec_fail_cause :=
+| EfNotLoadable   (* the node is not a loadable file: a directory or
+                     device, a bad magic, headers outside
+                     [kexec_loadable] *)
+| EfArgsFit       (* the arguments do not fit the stack page *)
+| EfNoMem.        (* kalloc / uvmalloc / proc_pagetable exhaustion *)
+
+Definition anode_loadable (a : anode) : Prop :=
+  exists (f : elf_bytes) (nl : nat), a = MkAnode (AFile f) nl /\ kexec_loadable f.
+
+Definition exec_fail_ok (a : anode) (na : nat) (alen : nat -> nat)
+    (c : exec_fail_cause) : Prop :=
+  match c with
+  | EfNotLoadable => ~ anode_loadable a
+  | EfArgsFit =>
+      exists (f : elf_bytes) (nl : nat),
+        a = MkAnode (AFile f) nl
+        /\ ~ kxc_stack_ok (kexec_sz f) (kexec_sz f - PGSIZE) alen na
+  | EfNoMem => True
+  end.
 
 (* the landed success conjuncts, at the ELF's entry, the failure arm
    refuted: [kexec_ok] with [entry] the file's ([SpecKexec.kexec_ok]'s
@@ -354,7 +419,32 @@ Qed.
 Lemma kexec_image_ok_fd (f : elf_bytes) (na : nat) (alen : nat -> nat)
     (afun : nat -> nat -> bv 8) (sts : list fdstate) (W' : uvis) :
   kexec_image_ok f na alen afun sts W' -> uvis_fd W' = sts.
-Proof. intros (_ & _ & _ & _ & _ & _ & _ & Hfd & _). exact Hfd. Qed.
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & Hfd & _). exact Hfd. Qed.
+
+(* THE ARGV READER (header, THE STACK): what main sees.  [a1] is the
+   vector's address; the [i]-th word of the vector, for [i < na], is the
+   address of the [i]-th string, whose characters and NUL are in the
+   image; the word after the last is NULL.  This is the whole of what a
+   program's slot constructor needs to know about its arguments. *)
+Lemma kexec_image_ok_argv (f : elf_bytes) (na : nat) (alen : nat -> nat)
+    (afun : nat -> nat -> bv 8) (sts : list fdstate) (W' : uvis) :
+  kexec_image_ok f na alen afun sts W' ->
+  let vec := kxc_sp_final (kexec_sz f) alen na in
+  tf_w (uvis_tf W') (tf_arg_idx 1) = (mword_of_int vec : mword 64)
+  /\ tf_w (uvis_tf W') (tf_arg_idx 0) = (mword_of_int (Z.of_nat na) : mword 64)
+  /\ (forall i k, (i <= na)%nat -> (k < 8)%nat ->
+        uvis_M W' !! (vec + 8 * Z.of_nat i + Z.of_nat k)
+        = bv_to_little_endian 8 8 (kexec_ustack (kexec_sz f) alen na i) !! k)
+  /\ (forall i j, (i < na)%nat -> (j < alen i)%nat ->
+        uvis_M W' !! (kxc_sp (kexec_sz f) alen (S i) + Z.of_nat j) = Some (afun i j))
+  /\ (forall i, (i < na)%nat ->
+        uvis_M W' !! (kxc_sp (kexec_sz f) alen (S i) + Z.of_nat (alen i))
+        = Some (bv_0 8)).
+Proof.
+  intros (_ & _ & _ & Ha1 & Ha0 & _ & (Hstr & Hnul & Hvec) & _).
+  split; [exact Ha1 |]. split; [exact Ha0 |]. split; [exact Hvec |].
+  split; [exact Hstr | exact Hnul].
+Qed.
 
 (* ===================================================================== *)
 (*  2.  THE AU BUNDLE AND THE ARMS                                        *)
@@ -435,11 +525,13 @@ Section KexecAU.
              ∗ aopen_commit_at Γ fsabsE Φo
              ∗ exec_slot_pre Φo na alen afun sts)
           ∨ (* (iii) the walk completed and the node was observed; exec
-               failed past the lock (not a file, bad magic or headers, an
-               allocation failure, the argument block did not fit) *)
-          (∃ i : Z,
+               failed past the lock, and the arm says WHY (header,
+               LOADABLE MEANS SUCCESS): not a loadable file, the
+               arguments did not fit, or out of memory *)
+          (∃ (i : Z) (av : aview) (a : anode) (c : exec_fail_cause),
              P (length (path_elems pl)) i
-             ∗ (∃ (av : aview) (a : anode), ⌜av !! i = Some a⌝ ∗ Φo av i a)
+             ∗ ⌜av !! i = Some a⌝ ∗ Φo av i a
+             ∗ ⌜exec_fail_ok a na alen c⌝
              ∗ exec_slot_pre Φo na alen afun sts)))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0, beside
