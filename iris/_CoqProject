@@ -298,11 +298,23 @@ UkRun.v
 UkRunLeaf.v
 UkRunMem.v
 UkRunSys.v
+# UkRunX = the data-run constructors at UexecRetExec's enriched slot
+# ([uslot_x_of_urun] / [_ro] / [_all]), the bundle-supplied downgrade
+# [urun_x -∗ urun], and the [_x] close/bump helpers; UkRunSysX = the
+# enriched exec ecall leaf [wp_uk_ecall_exec_x] on UkStepGen's X-generic
+# engine at [(uexec_ret_x_F, uslot_x)].
+UkRunX.v
+UkRunSysX.v
 UkFork.v
 UkSync.v
 USyncKernel.v
 UkEcho.v
 UEchoKernel.v
+# UShKernel = sh's slot at the ENRICHED tier ([sh_uexec_slot_x], via
+# UkRunX.uslot_x_of_urun_all + UkSh.wp_ksh_start, with UkSh's read-leaf
+# Hypothesis discharged) and the bridge from the kernel's image fact
+# ([sh_slot_of_kexec], off SpecKexecAU.kexec_image_ok at ElfUser.sh_elf).
+UShKernel.v
 UkAbi.v
 UexecCond.v
 UCodeEcho.v
