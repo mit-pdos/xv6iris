@@ -70,6 +70,7 @@ Require Import IrefSlots.
 Require Import UserPtTree.
 Require Import FileInvDefs.
 Require Import SpecKexec.
+Require Import ElfFile.      (* [elf_bytes] *)
 Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 Require Import KexecOkQ.
 Require Import SpecMyproc.
@@ -298,7 +299,7 @@ Section KexecPinTail.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (sz1 : mword 64) (c : nat) :
+      (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (sz1 : mword 64) (c : nat) :
     (* the ENTRY-POINT OBLIGATION, and the only site in the cone that
        pays it: the commit block's [ld a4,-408(s0)] loads exactly
        [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
@@ -308,7 +309,8 @@ Section KexecPinTail.
        THE PREMISE IS GUARDED BY WHAT THE RUN BUILT (S3), exactly as
        [ProofKexec.kxc_d_tail]'s is; [Q_pin] ignores the state, so the pin's
        own instantiation just drops the guard. *)
-    (forall U' : ustate, kexec_built sz1 na alen afun U' -> Q (kxq_entry ef) U') ->
+    (forall U' : ustate,
+       kexec_built fb ef sz1 na alen afun U' -> Q (kxq_entry ef) U') ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -325,7 +327,7 @@ Section KexecPinTail.
     kxc_at_272 jp gf
                plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) c -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
@@ -338,7 +340,7 @@ Section KexecPinTail.
     iApply (PC.kxc_c_close (CID0 := CID0) Q jp gf
  plen pfun na avf alen aslen afun
               pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
-              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi (pv_sz (us_V U)) sz1 c
+              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi (pv_sz (us_V U)) sz1 c
               HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               with "Htext Hst Hcont []").
@@ -346,7 +348,7 @@ Section KexecPinTail.
     iApply (PD.kxd_phaseD (CID0 := CIDd) Q jp gf
  plen pfun na avf alen aslen afun
               pidv U eb dqb dqs dqa dqpv dqas m Md K sp0 ra0 s00 s10 s20 pv av
-              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pd Mid sz1 c
+              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef Pd Mid sz1 c
               HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               with "Htext Hst2a6 Hcont").
@@ -365,7 +367,7 @@ Section KexecPinTail.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szv : mword 64) :
+      (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szv : mword 64) :
     (* the ENTRY-POINT OBLIGATION, and the only site in the cone that
        pays it: the commit block's [ld a4,-408(s0)] loads exactly
        [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
@@ -375,7 +377,7 @@ Section KexecPinTail.
        THE PREMISE IS GUARDED BY WHAT THE RUN BUILT (S3), with the stack
        top still ∀-bound here -- [kxc_c_setup]'s uvmalloc picks it. *)
     (forall (szg : mword 64) (U' : ustate),
-       kexec_built szg na alen afun U' -> Q (kxq_entry ef) U') ->
+       kexec_built fb ef szg na alen afun U' -> Q (kxq_entry ef) U') ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -393,7 +395,7 @@ Section KexecPinTail.
     kxc_at_1ae jp gf
                plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi szv (m !!! Regidx Rs11) -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi szv (m !!! Regidx Rs11) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
@@ -414,7 +416,7 @@ Section KexecPinTail.
     iAssert (kxc_at_1ae jp gf
                plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi szv (m !!! Regidx Rs11))
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi szv (m !!! Regidx Rs11))
       with "[Hrest]" as "Hst".
     { rewrite /kxc_at_1ae.
       iSplitR; [iPureIntro; exact Hregs |].
@@ -424,7 +426,7 @@ Section KexecPinTail.
     iApply (PC.kxc_c_setup (CID0 := CID0) Q jp gf
  plen pfun na avf alen aslen
               afun pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
-              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi szv
+              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi szv
               HK Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               Halen_b Halen_c Halen_4 Havf_na
@@ -443,7 +445,7 @@ Section KexecPinTail.
       iAssert (kxc_at_21a jp gf
  plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                  M1 K sp0 ra0 s00 s10 s20 pv av
-                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P1 Mim1 (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) 0)
+                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P1 Mim1 (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) 0)
         with "[Hrest2]" as "Hloop".
       { rewrite /kxc_at_21a.
         iSplitR; [iPureIntro; exact Hq1 |].
@@ -454,7 +456,7 @@ Section KexecPinTail.
       iApply (PC.kxc_argv_loop (CID0 := CID1) Q jp gf
  plen pfun na avf alen aslen
                 afun pidv U eb dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av
-                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef (pv_sz (us_V U)) sz1
+                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef (pv_sz (us_V U)) sz1
                 HK Halen_b Halen_c Halen_4 Havf_na Hsz1ge Hnamax Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
@@ -464,7 +466,7 @@ Section KexecPinTail.
       iApply (kxc_d_tail (CID0 := CID2) Q jp gf
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m M2 K sp0 ra0 s00 s10 s20 pv av
-                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P2 Mim2 sz1 c2
+                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P2 Mim2 sz1 c2
                 (HQe sz1) HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 with "Htext Hst272 Hcont").
@@ -472,7 +474,7 @@ Section KexecPinTail.
       iApply (kxc_d_tail (CID0 := CID1) Q jp gf
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m M1 K sp0 ra0 s00 s10 s20 pv av
-                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P1 Mim1 sz1 0
+                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P1 Mim1 sz1 0
                 (HQe sz1) HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 with "Htext Hskip Hcont").
@@ -635,7 +637,7 @@ Section KexecPinMain.
                 (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13z
-                w67z ef Pz Miz (mword_of_int 0 : mword 64)
+                w67z (kxc_fb datl dnf) ef Pz Miz (mword_of_int 0 : mword 64)
                 (fun _ U' _ => Q_pin_of_hdr pb ef Hhp U') HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
@@ -664,7 +666,7 @@ Section KexecPinMain.
                 (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
-                (mword_of_int 4095 : mword 64) ef Py Miy szvy
+                (mword_of_int 4095 : mword 64) (kxc_fb datl dnf) ef Py Miy szvy
                 (fun _ U' _ => Q_pin_of_hdr pb ef Hhp U') HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl

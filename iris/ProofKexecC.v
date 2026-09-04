@@ -65,6 +65,8 @@ Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecKexec.
+Require Import UmodeAbi.     (* [uimg_sub] *)
+Require Import ElfFile.      (* [elf_bytes], [elf_image], [elf_loads] *)
 Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 Require Import KexecOkQ.
 Require Import SpecMyproc.
@@ -216,6 +218,18 @@ Section KexecCSetup.
   Local Lemma uvm_maxsz_lit : uvm_maxsz = 274877898752%Z.
   Proof. unfold uvm_maxsz. vm_compute. reflexivity. Qed.
 
+  (* THE TWO SPELLINGS OF PGROUNDUP.  [ProcPtOwn]'s is the mword one the
+     page tables run on; [UserPtTree]'s is the [Z] one [KexecBuilt]'s size
+     row is stated over.  Same function, off [pgroundup_unsigned]. *)
+  Local Lemma kxc_pgu_bridge (x : mword 64) :
+    (bv_unsigned x + 4095 < 2 ^ 64)%Z ->
+    bv_unsigned (pgroundup x) = UserPtTree.pgroundup (bv_unsigned x).
+  Proof.
+    intros Hlt. rewrite (pgroundup_unsigned x Hlt).
+    unfold UserPtTree.pgroundup.
+    pose proof (Z.div_mod (bv_unsigned x + 4095) 4096 ltac:(lia)). lia.
+  Qed.
+
   Local Lemma add_neg8192_eq_sub (x : mword 64) :
     add_vec (mword_of_int (-8192) : mword 64) x
     = sub_vec x (mword_of_int 8192 : mword 64).
@@ -269,7 +283,8 @@ Section KexecCSetup.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szv : mword 64) :
+      (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8))
+      (szv : mword 64) :
     (K_kexec <= K)%nat ->
     m !!! Regidx csp_rs1 = sp0 -> m !!! Regidx Rra = ra0 ->
     m !!! Regidx Rs0 = s00 -> m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs2 = s20 ->
@@ -290,7 +305,8 @@ Section KexecCSetup.
     kxc_at_1ae jp gf
                plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi szv (m !!! Regidx Rs11) -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi szv
+               (m !!! Regidx Rs11) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
@@ -309,11 +325,11 @@ Section KexecCSetup.
         ( kxc_at_21a jp gf
                      plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                      M' K sp0 ra0 s00 s10 s20 pv av
-                     w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' Mo (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) 0
+                     w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P' Mo (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) 0
           ∨ kxc_at_272 jp gf
                        plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                        M' K sp0 ra0 s00 s10 s20 pv av
-                       w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' Mo (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) 0 ) -∗
+                       w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P' Mo (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) 0 ) -∗
         (* THE EXIT, HANDED BACK.  A [wp_next] continuation is LINEAR, so a
            block that owns a failure path cannot also leave its successor
            one: the caller supplies exactly one and whichever path runs
@@ -333,7 +349,7 @@ Section KexecCSetup.
     rewrite /kxc_at_1ae.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs6 & %HMs11) &
                          %Hal &
-                         (%HPtfp & %Hbelow & %Hcov) &
+                         (%HPtfp & %Hbelow & %Hcov & %Himg & %Hszr) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hirs & Hbm & Hins &
                          Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
@@ -1522,6 +1538,28 @@ Section KexecCSetup.
           rewrite uint_unsigned Hszu in Ha. unfold PGSIZE in Ha. lia. }
       assert (Hstr0 : kx_str_at (uint sz1) alen afun 0 (umem_grow Mi (uint sz1)))
         by apply kx_str_at_0.
+      (* ---- THE SIZE ROW, CONVERTED (S3d).  [kxc_at_1ae] said [szv] IS the
+         phdr loop's [uvmalloc] fold; uvmalloc has now chosen the stack top
+         as [PGROUNDUP(szv) + 8192], so from here on the row is stated at
+         [sz1].  [kxc_pgu_bridge] is the only work: the page tables round up
+         in [mword], [KexecBuilt] in [Z]. ---- *)
+      assert (Hsz1row : (uint sz1
+                         = UserPtTree.pgroundup (uint szv) + 2 * PGSIZE)%Z).
+      { rewrite !uint_unsigned Hszu
+                (kxc_pgu_bridge szv
+                   ltac:(rewrite uvm_maxsz_lit in Hmaxszv;
+                         change (2 ^ 64)%Z with 18446744073709551616%Z; lia)).
+        unfold PGSIZE. lia. }
+      assert (Hrows0 : (kxb_walk_ok fb ef ->
+                          uimg_sub (elf_image fb) (umem_grow Mi (uint sz1)))
+                       /\ (kxb_walk_ok fb ef ->
+                            (uint sz1
+                             = UserPtTree.pgroundup
+                                 (kexec_sz_after (elf_loads fb))
+                               + 2 * PGSIZE)%Z)).
+      { split; intros Hwk.
+        - apply uimg_sub_umem_grow. exact (Himg Hwk).
+        - rewrite <- (Hszr Hwk). exact Hsz1row. }
       destruct (decide (avf 0%nat = (mword_of_int 0 : mword 64))) as [Heq0 | Hne0].
       + (* ==================== argv[0] = NULL: skip the loop ==================== *)
         (* THE TARGET IS THE COLD TRAMPOLINE AT +0x2b6, NOT +0x268, since
@@ -1635,7 +1673,10 @@ Section KexecCSetup.
         iSplitR.
         { iPureIntro. split_and!;
             [rewrite HtfpF Htfp'; exact HPtfp | exact HbelowF | exact HcovF]. }
-        iSplitR; [iPureIntro; exact (conj Hstr0 Hzero0) |].
+        iSplitR;
+          [iPureIntro; split_and!;
+             [exact Hstr0 | exact Hzero0
+              | exact (proj1 Hrows0) | exact (proj2 Hrows0)] |].
         iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
         iSplitL "Hcnt"; [iExact "Hcnt" |].
         iSplitL "Hextc"; [iExact "Hextc" |].
@@ -1788,7 +1829,10 @@ Section KexecCSetup.
         iSplitR.
         { iPureIntro. split_and!;
             [rewrite HtfpF Htfp'; exact HPtfp | exact HbelowF | exact HcovF]. }
-        iSplitR; [iPureIntro; exact (conj Hstr0 Hzero0) |].
+        iSplitR;
+          [iPureIntro; split_and!;
+             [exact Hstr0 | exact Hzero0
+              | exact (proj1 Hrows0) | exact (proj2 Hrows0)] |].
         iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
         iSplitL "Hcnt"; [iExact "Hcnt" |].
         iSplitL "Hextc"; [iExact "Hextc" |].
@@ -2337,7 +2381,7 @@ Section KexecCLoop.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 : mword 64) (c : nat) :
+      (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 : mword 64) (c : nat) :
     (K_kexec <= K)%nat ->
     (c < na)%nat ->
     (alen c < aslen c)%nat ->
@@ -2364,7 +2408,7 @@ Section KexecCLoop.
     kxc_at_21a jp gf
                plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi oldsz sz1 (m !!! Regidx Rs11) c -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi oldsz sz1 (m !!! Regidx Rs11) c -∗
     (* ---- kexec's OWN continuation: the three early exits close it ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
@@ -2376,11 +2420,11 @@ Section KexecCLoop.
         ( kxc_at_21a jp gf
                      plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                      M' K sp0 ra0 s00 s10 s20 pv av
-                     w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' Mo oldsz sz1 (m !!! Regidx Rs11) (S c)
+                     w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P' Mo oldsz sz1 (m !!! Regidx Rs11) (S c)
           ∨ kxc_at_272 jp gf
                        plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                        M' K sp0 ra0 s00 s10 s20 pv av
-                       w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' Mo oldsz sz1 (m !!! Regidx Rs11) (S c) ) -∗
+                       w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P' Mo oldsz sz1 (m !!! Regidx Rs11) (S c) ) -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
           KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
                eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
@@ -2398,7 +2442,7 @@ Section KexecCLoop.
                           %HMs7 & %HMs9 & %HMs11 & %HMs10) &
                          (%Hcna' & %Hc32 & %Havfc & %Hspok) &
                          (%HPtfp & %Hbelow & %Hcov) &
-                         (%Hstr & %Hzero) &
+                         (%Hstr & %Hzero & %Himg & %Hszr) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hres)".
     rewrite /kxc_c_res.
     iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & #Hka & Hpt & Hpriv &
@@ -3301,6 +3345,21 @@ Section KexecCLoop.
         { destruct Hco_wrote as [[_ Heq] | [Hbad _]]; [exact Heq |].
           exfalso. rewrite Hcook in Hbad.
           apply (f_equal bv_unsigned) in Hbad. vm_compute in Hbad. discriminate. }
+        (* ---- THE FILE'S IMAGE, ACROSS THE COPYOUT (S3d).  Every byte this
+           call wrote is at or above [kxc_sp (uint sz1) alen (S c)], which
+           [HspokS] puts at or above [uint sz1 - 4096]; under the walk's
+           guard that is [PGROUNDUP(fold) + 4096], strictly above every
+           segment's top.  So the image survives verbatim, and the size row
+           is about [sz1] alone and does not move at all. ---- *)
+        assert (HimgS : kxb_walk_ok fb ef -> uimg_sub (elf_image fb) M0').
+        { intros Hwk. rewrite HM0'.
+          apply (uimg_sub_elf_image_wr_above fb Mi (Z2 !!! Regidx Ra2)
+                   (S (alen c)) (afun c));
+            [ destruct Hwk as (_ & Hpok & _); exact Hpok | exact (Himg Hwk) |].
+          intros j Hj. rewrite (Hlinc j Hj) Hspval.
+          pose proof (Hszr Hwk) as Hsz1r.
+          pose proof (pgroundup_ge (kexec_sz_after (elf_loads fb))) as Hpge.
+          unfold PGSIZE in Hsz1r. lia. }
         iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KXC + 0x24a))
                   (mword_of_int 268 : mword 13) Ra0
                   T13 (K - 68)%nat eb ltac:(nz)
@@ -3675,7 +3734,9 @@ Section KexecCLoop.
           iSplitR.
           { iPureIntro. split_and!; [exact HtfpS | exact HbelowF2 | exact HcovF2]. }
           iSplitR.
-          { iPureIntro. rewrite HM0'. exact (conj HstrS0 HzeroS0). }
+          { iPureIntro. split_and!;
+              [rewrite HM0'; exact HstrS0 | rewrite HM0'; exact HzeroS0
+               | exact HimgS | exact Hszr]. }
           iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
           iSplitL "Hcnt"; [iExact "Hcnt" |].
           iSplitL "Hextc"; [iExact "Hextc" |].
@@ -3714,7 +3775,9 @@ Section KexecCLoop.
        iSplitR.
        { iPureIntro. split_and!; [exact HtfpS | exact HbelowF2 | exact HcovF2]. }
        iSplitR.
-       { iPureIntro. rewrite HM0'. exact (conj HstrS0 HzeroS0). }
+       { iPureIntro. split_and!;
+           [rewrite HM0'; exact HstrS0 | rewrite HM0'; exact HzeroS0
+            | exact HimgS | exact Hszr]. }
        iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
        iSplitL "Hcnt"; [iExact "Hcnt" |].
        iSplitL "Hextc"; [iExact "Hextc" |].
@@ -3826,7 +3889,7 @@ Section KexecCArgvLoop.
       (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (oldsz sz1 : mword 64) :
+      (fb : elf_bytes) (ef : nat -> bv 8) (oldsz sz1 : mword 64) :
     (K_kexec <= K)%nat ->
     (forall i, (i < na)%nat -> (alen i < aslen i)%nat) ->
     (forall i, (i < na)%nat -> bb_cstr (afun i) (alen i)) ->
@@ -3848,7 +3911,7 @@ Section KexecCArgvLoop.
     kxc_at_21a jp gf
                plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi oldsz sz1 (m !!! Regidx Rs11) c -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi oldsz sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
@@ -3858,7 +3921,7 @@ Section KexecCArgvLoop.
         kxc_at_272 jp gf
                    plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                    M' K sp0 ra0 s00 s10 s20 pv av
-                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' Mo oldsz sz1 (m !!! Regidx Rs11) c' -∗
+                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P' Mo oldsz sz1 (m !!! Regidx Rs11) c' -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
           KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
                eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
@@ -3883,7 +3946,7 @@ Section KexecCArgvLoop.
     iApply (kxc_argv_step (CID0 := CID0) Q jp gf
  plen pfun na avf alen aslen afun
               pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
-              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi oldsz sz1 c
+              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi oldsz sz1 c
               HK Hcna (Halen_bound c Hcna) (Halen_cstr c Hcna)
               (Halen_4096 c Hcna) Hsz1ge Hnamax Hal
               Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
@@ -4121,7 +4184,7 @@ Section KexecCClose.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 : mword 64) (c : nat) :
+      (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 : mword 64) (c : nat) :
     (K_kexec <= K)%nat ->
     (8192 <= uint sz1)%Z ->
     (forall i, (i < 8)%nat ->
@@ -4135,7 +4198,7 @@ Section KexecCClose.
     kxc_at_272 jp gf
                plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi oldsz sz1 (m !!! Regidx Rs11) c -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi oldsz sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
@@ -4145,7 +4208,7 @@ Section KexecCClose.
         kxc_at_2a6 jp gf
                    plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                    M' K sp0 ra0 s00 s10 s20 pv av
-                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' Mo oldsz sz1 (m !!! Regidx Rs11) c -∗
+                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P' Mo oldsz sz1 (m !!! Regidx Rs11) c -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
           KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
                eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
@@ -4163,7 +4226,7 @@ Section KexecCClose.
                           %HMs7 & %HMs11 & %HMs10) &
                          (%Hcna & %Hc32 & %Havfc & %Hspok) &
                          (%HPtfp & %Hbelow & %Hcov) &
-                         (%Hstr & %Hzero) &
+                         (%Hstr & %Hzero & %Himg & %Hszr) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hres)".
     rewrite /kxc_c_res.
     iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & #Hka & Hpt & Hpriv &
@@ -5055,6 +5118,21 @@ Section KexecCClose.
         { destruct Hco_wrote as [[_ Heq] | [Hbad _]]; [exact Heq |].
           exfalso. rewrite Hcook in Hbad.
           apply (f_equal bv_unsigned) in Hbad. vm_compute in Hbad. discriminate. }
+        (* ---- THE FILE'S IMAGE, ACROSS THE CLOSING COPYOUT (S3d).  Same
+           argument as the string pushes: the vector starts at
+           [kxc_sp_final], which [Hstackok]'s second conjunct puts at or
+           above [uint sz1 - 4096], and under the walk's guard that is
+           [PGROUNDUP(fold) + 4096] -- above every segment's top. ---- *)
+        assert (HimgV : kxb_walk_ok fb ef -> uimg_sub (elf_image fb) M0').
+        { intros Hwk. rewrite HM0v.
+          apply (uimg_sub_elf_image_wr_above fb Mi (X12 !!! Regidx Ra2)
+                   (8 * S c)%nat ufun);
+            [ destruct Hwk as (_ & Hpok & _); exact Hpok | exact (Himg Hwk) |].
+          intros j Hj. rewrite (Hlinv j Hj) Hvecval.
+          pose proof (Hszr Hwk) as Hsz1r.
+          pose proof (pgroundup_ge (kexec_sz_after (elf_loads fb))) as Hpge.
+          destruct Hstackok as [_ Hbase].
+          unfold PGSIZE in Hsz1r. lia. }
         iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KXC + 0x298))
                   (mword_of_int 7998 : mword 13) Ra0
                   X13 (K - 68)%nat eb ltac:(nz)
@@ -5093,7 +5171,9 @@ Section KexecCClose.
         { iPureIntro. split_and!;
             [rewrite Htfp2; exact HPtfp | exact Hbelow2 | exact Hcov2]. }
         iSplitR.
-        { iPureIntro. rewrite HM0v. exact (conj HstrV HzeroV). }
+        { iPureIntro. split_and!;
+            [rewrite HM0v; exact HstrV | rewrite HM0v; exact HzeroV
+             | exact HimgV | exact Hszr]. }
         iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
         iSplitL "Hcnt"; [iExact "Hcnt" |].
         iSplitL "Hextc"; [iExact "Hextc" |].

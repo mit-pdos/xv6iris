@@ -1626,6 +1626,7 @@ SpecKexecAU.v
 # it sits HERE rather than beside ElfBridge.v only because [kxc_sp] /
 # [kexec_args_at] / [loads_ascending] have no home below SpecKexec*.v.
 KexecImageAlg.v
+KexecAUBridge.v
 SpecSysExecAU.v
 ProofSysExecAU.v
 # THE CHUNK LOOP, AND THE SEAL IT CLOSES (lane W, FILEWRITE-AU).

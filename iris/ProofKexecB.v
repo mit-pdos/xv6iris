@@ -147,6 +147,9 @@ Require Import SpecDirlink.
 Require Import SpecNamei.
 Require Import SpecProcPagetable.
 Require Import ProofKexecTail.
+Require Import UmodeAbi.     (* [uimg_sub]                                 *)
+Require Import ElfFile.      (* [elf_image], [elf_loads]                   *)
+Require Import KexecBuilt.   (* [kxb_walk_ok], [kxb_walk_phnum0]           *)
 Require Import ProofKexecSeam.
 Require Import ProofKforkParts.
 Require Import CodeKexec.
@@ -777,6 +780,30 @@ Section KexecBBody.
         iSpecialize ("Hcont1a2" $! CID15 with "[%]"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
+        (* [elf.phnum = 0] IS what this edge decided, and the phdr loop's
+           image rows are trivial at it: under the walk's guard the ELF
+           semantics' own table is empty, so the image is [∅] (which [Mi] is
+           here) and the [uvmalloc] fold is 0 (S3d). *)
+        assert (Hphnzero : eh_phnum ef = 0%Z).
+        { pose proof (eh_phnum_bound ef) as Hpb.
+          assert (Hzz : rget G4 Ra5 = (zero_reg : mword 64))
+            by exact (proj1 (eq_vec_true_iff _ _) Ephn).
+          rewrite (rget_ne G4 Ra5 ltac:(nz)) in Hzz.
+          assert (HG4a5 : G4 !!! Regidx Ra5
+                          = (mword_of_int (eh_phnum ef) : mword 64))
+            by (rewrite /G4 upd_eq; apply kxc_phnum_moi).
+          rewrite HG4a5 in Hzz.
+          apply (f_equal bv_unsigned) in Hzz.
+          rewrite moi64_unsigned
+                  (bvw64_small (eh_phnum ef)
+                     ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z; lia))
+            in Hzz.
+          assert (Hz0 : bv_unsigned (zero_reg : mword 64) = 0%Z)
+            by (vm_compute; reflexivity).
+          lia. }
+        assert (Hnoloads : kxb_walk_ok (kxc_fb datl dnf) ef ->
+                  elf_loads (kxc_fb datl dnf) = [])
+          by (intros Hwk; exact (kxb_walk_phnum0 _ ef Hwk Hphnzero)).
         iApply ("Hcont1a2" $! G4 P ∅ v13 v67 with "[-Hcont] Hcont").
         rewrite /kxc_at_1a2.
         iSplitR.
@@ -790,7 +817,11 @@ Section KexecBBody.
         { iPureIntro. split_and!;
             [exact HPtfp
             | rewrite HPum; exact (um_below_empty _)
-            | exact (um_covered_zero _)]. }
+            | exact (um_covered_zero _)
+            | intros Hwk; apply uimg_sub_elf_image; intros p Hp;
+              rewrite (Hnoloads Hwk) in Hp; apply elem_of_nil in Hp;
+              destruct Hp
+            | intros Hwk; rewrite (Hnoloads Hwk); reflexivity]. }
         (* [iFrame] is NOT usable here: its [Frame] search unfolds [proc_priv]
            and the goal's big-ops, and this state carries a syscall-altitude
            block (measured: >19 GB and climbing before it was replaced).

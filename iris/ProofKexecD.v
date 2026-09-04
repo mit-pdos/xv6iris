@@ -77,6 +77,8 @@ Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecKexec.
+Require Import UmodeAbi.     (* [uimg_sub] *)
+Require Import ElfFile.      (* [elf_bytes], [elf_image], [elf_loads] *)
 Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 Require Import KexecOkQ.
 Require Import SpecProcFreepagetable.
@@ -1958,7 +1960,8 @@ Section KexecDMain.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (sz1 : mword 64) (c : nat) :
+      (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8))
+      (sz1 : mword 64) (c : nat) :
     (* the ENTRY-POINT OBLIGATION, and the only site in the cone that
        pays it: the commit block's [ld a4,-408(s0)] loads exactly
        [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
@@ -1973,7 +1976,8 @@ Section KexecDMain.
        exit reports.  So a caller pays [Q] not at EVERY [U'] but at every
        [U'] the run could have produced -- [KexecBuilt.kexec_built], which
        is what the AU contract's [kexec_image_ok] can be reached from. *)
-    (forall U' : ustate, kexec_built sz1 na alen afun U' -> Q (kxq_entry ef) U') ->
+    (forall U' : ustate,
+       kexec_built fb ef sz1 na alen afun U' -> Q (kxq_entry ef) U') ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -1990,7 +1994,7 @@ Section KexecDMain.
     kxc_at_2a6 jp gf
                plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) c -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
@@ -2006,7 +2010,7 @@ Section KexecDMain.
                           %HMs11 & %HMs10) &
                          (%Hcna & %Hcmax & %Havfc & %Hstackok) &
                          (%HPtfp & %Hbelow & %Hcov) &
-                         (%Hstr & %Hzero) &
+                         (%Hstr & %Hzero & %Himg & %Hszr) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hres)".
     assert (Hceq : c = na).
     { destruct (Nat.lt_ge_cases c na) as [Hlt | Hge];
@@ -2021,7 +2025,10 @@ Section KexecDMain.
       unfold kexec_built. rewrite HM -Hceq.
       split_and!;
         [exact Hsz | exact Hstr
-        | apply kxb_stack_at_intro; [exact Hstackok | exact Hzero]]. }
+        | apply kxb_stack_at_intro; [exact Hstackok | exact Hzero]
+        (* the two S3d rows, straight off [kxc_at_2a6]: phase D writes only
+           trapframe words, so the image at the commit IS [Mi]. *)
+        | exact Himg | exact Hszr]. }
     rewrite /kxc_d_res.
     iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & #Hka & Hpt & Hpriv &
                           Hpath & Hargv & Hargs & Helf & Hframe)".

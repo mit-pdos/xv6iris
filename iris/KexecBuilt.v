@@ -1254,6 +1254,72 @@ Proof.
       * exact (uimg_sub_seg_zero_map p Mo Hmf Hzero).
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(*  THE LOOP'S EXIT, AND WHAT THE ARGUMENT BLOCK CANNOT DISTURB (S3d).     *)
+(* ---------------------------------------------------------------------- *)
+
+(* THE EXIT: at [n = phnum] the walk has seen the whole table, so
+   [kxb_walk_ok]'s first conjunct collapses [kxb_loads] to [elf_loads] and
+   [kxb_at]'s two conjuncts become the two rows the cone carries from
+   [ProofKexecB3.kxc_incr]'s +0x1a4 exit all the way to [kexec_built]. *)
+Lemma kxb_at_done (f : elf_bytes) (ef : nat -> bv 8) (n : nat)
+    (szv : Z) (M : gmap Z (bv 8)) :
+  kxb_walk_ok f ef -> n = Z.to_nat (eh_phnum ef) ->
+  kxb_at f ef n szv M ->
+  uimg_sub (elf_image f) M /\ szv = kexec_sz_after (elf_loads f).
+Proof.
+  intros Hw Hn [Hsz Hsub]. pose proof Hw as (Hid & _ & _).
+  subst n. rewrite Hid in Hsz. rewrite Hid in Hsub.
+  split; [apply uimg_sub_elf_image; exact Hsub | exact Hsz].
+Qed.
+
+(* THE NO-SEGMENTS PATH: [phnum = 0] makes the walked table empty, so the
+   ELF semantics' own [elf_loads] is empty too -- which is how kexec's
+   [elf.phnum = 0] arm gets the same two rows at [sz = 0]. *)
+Lemma kxb_walk_phnum0 (f : elf_bytes) (ef : nat -> bv 8) :
+  kxb_walk_ok f ef -> eh_phnum ef = 0 -> elf_loads f = [].
+Proof. intros (Hid & _ & _) H0. rewrite <- Hid, H0. reflexivity. Qed.
+
+(* [pgroundup] never moves a size DOWN -- what says the stack page the argv
+   loop writes in sits strictly above every segment. *)
+Lemma pgroundup_ge (sz : Z) : sz <= pgroundup sz.
+Proof.
+  unfold pgroundup.
+  pose proof (Z.div_mod (sz + 4095) 4096 ltac:(lia)) as Hdm.
+  pose proof (Z.mod_pos_bound (sz + 4095) 4096 ltac:(lia)). lia.
+Qed.
+
+(* every byte of the finished image lives strictly below the fold the phdr
+   loop reached *)
+Lemma elf_image_lookup_below (f : elf_bytes) (a : Z) (b : bv 8) :
+  Forall (phdr_ok f) (elf_loads f) ->
+  elf_image f !! a = Some b -> a < kexec_sz_after (elf_loads f).
+Proof.
+  intros Hok Ha. unfold elf_image in Ha.
+  apply segs_union_lookup_inv in Ha as (p & Hp & Hg).
+  pose proof (kexec_sz_after_elem (elf_loads f) p Hp) as Htop.
+  apply elem_of_list_lookup in Hp as [j Hj].
+  pose proof (Forall_lookup_1 _ _ _ _ Hok Hj) as Hpok.
+  pose proof (seg_map_lookup_range f p a b Hpok Hg). lia.
+Qed.
+
+(* ...so a copyout whose whole run sits at or above that fold leaves it. *)
+Lemma uimg_sub_elf_image_wr_above (f : elf_bytes) (M : gmap Z (bv 8))
+    (dstva : mword 64) (n : nat) (src : nat -> bv 8) :
+  Forall (phdr_ok f) (elf_loads f) ->
+  uimg_sub (elf_image f) M ->
+  (forall j, (j < n)%nat ->
+     kexec_sz_after (elf_loads f) <= uint (add_vec_int dstva (Z.of_nat j))) ->
+  uimg_sub (elf_image f) (umem_wr M dstva n src).
+Proof.
+  intros Hok Hsub Habove. apply uimg_sub_umem_wr; [exact Hsub |].
+  intros j Hj.
+  destruct (elf_image f !! uint (add_vec_int dstva (Z.of_nat j)))
+    as [b |] eqn:Hb; [| reflexivity].
+  exfalso. pose proof (elf_image_lookup_below f _ b Hok Hb).
+  pose proof (Habove j Hj). lia.
+Qed.
+
 (* ====================================================================== *)
 (*  4.  THE FACT BUNDLE THE CONE CARRIES TO ITS ENTRY-POINT HOLE          *)
 (* ====================================================================== *)
@@ -1323,32 +1389,41 @@ Qed.
         test buys [0 < phnum]) and the pin [w67 = 4095], without which the
         alignment test cannot be read back.
 
-    WHAT IS STILL MISSING (S3d) is only the CARRYING: [ProofKexecB3.kxc_incr]
-    DROPS the invariant at its +0x1a4 exit rather than converting it.  The
-    conversion itself is now one step -- at that exit [i < phnum] and
-    [S i >= phnum] give [S i = phnum], and [kxb_walk_ok]'s first conjunct
-    says [kxb_loads f ef phnum] IS [elf_loads f], so [kxb_at] becomes
-    [uimg_sub (elf_image f)] ([uimg_sub_elf_image]) together with
-    [uint szv = kexec_sz_after (elf_loads f)].  What that costs is the
-    threading: [kxc_at_1a4] / [kxc_at_1ae] / [kxc_at_21a] / [kxc_at_272] /
-    [kxc_at_2a6] (all in [ProofKexecSeam]) and phase D's states must carry
-    the two rows; the argv loop's copyouts must be shown to miss the image
-    (they land in the stack page, at or above
-    [pgroundup (kexec_sz_after (elf_loads f))], and every segment byte is
-    strictly below it -- [kexec_sz_after_elem] + [seg_map_lookup_range]);
-    and [kxc_c_setup]'s [sz1 = pgroundup szv + 8192] has to be published.
-    Only then can this Prop gain the file's bytes as a parameter and the
-    two rows
+    WHAT S3d LANDED -- THE CARRYING, AND THE TWO ROWS BELOW.
+    [ProofKexecB3.kxc_incr] no longer DROPS the invariant at its +0x1a4
+    exit: there [i < phnum] (which is why [kxc_at_11a]'s bound is now
+    strict) and [S i >= phnum] give [S i = phnum], and [kxb_walk_ok]'s
+    first conjunct says [kxb_loads f ef phnum] IS [elf_loads f], so
+    [kxb_at_done] turns [kxb_at] into [uimg_sub (elf_image f)] together
+    with [uint szv = kexec_sz_after (elf_loads f)].  Those two rows then
+    ride [kxc_at_1a4] / [kxc_at_1ae] / [kxc_at_21a] / [kxc_at_272] /
+    [kxc_at_2a6] (all in [ProofKexecSeam], which is where phase C's states
+    gained the file [fb] as a parameter -- past +0x1ae the inode is closed
+    and [datl]/[dnf] are gone) to phase D.  The argv loop's copyouts miss
+    the image because they land in the stack page, at or above
+    [uint sz1 - 4096 = pgroundup (kexec_sz_after (elf_loads f)) + 4096],
+    and every segment byte is strictly below the fold
+    ([elf_image_lookup_below] + [uimg_sub_elf_image_wr_above]);
+    [kxc_c_setup]'s uvmalloc is where [uint sz1 = pgroundup (uint szv)
+    + 8192] is discovered, so that is where the size row is converted.
+
+    So this Prop takes the file's bytes and the header buffer, and its two
+    new rows
 
         kxb_walk_ok f ef -> uimg_sub (elf_image f) (us_M U')
         kxb_walk_ok f ef ->
-          uint sz1 = pgroundup (kexec_sz_after (elf_loads f)) + 8192
+          uint sz1 = pgroundup (kexec_sz_after (elf_loads f)) + 2 * PGSIZE
 
-    with the five premise sites ([ProofKexecD.kxd_phaseD],
-    [ProofKexec.kxc_d_tail] / [kxc_cd], [ProofKexecPin]'s two) gaining
-    them by name.                                                          *)
-Definition kexec_built (sz1 : mword 64) (na : nat) (alen : nat -> nat)
+    are named at the five premise sites ([ProofKexecD.kxd_phaseD],
+    [ProofKexec.kxc_d_tail] / [kxc_cd], [ProofKexecPin]'s two).  The
+    right-hand side is spelled to match [KexecImageAlg.kexec_sz_of_sz_after],
+    which is S4's (identity) bridge to [SpecKexecAU.kexec_sz f].            *)
+Definition kexec_built (f : elf_bytes) (ef : nat -> bv 8) (sz1 : mword 64)
+    (na : nat) (alen : nat -> nat)
     (afun : nat -> nat -> bv 8) (U' : ustate) : Prop :=
   pv_sz (us_V U') = sz1
   /\ kxb_args_at (uint sz1) alen na afun (us_M U')
-  /\ kxb_stack_at (uint sz1) alen na (us_M U').
+  /\ kxb_stack_at (uint sz1) alen na (us_M U')
+  /\ (kxb_walk_ok f ef -> uimg_sub (elf_image f) (us_M U'))
+  /\ (kxb_walk_ok f ef ->
+        uint sz1 = pgroundup (kexec_sz_after (elf_loads f)) + 2 * PGSIZE).

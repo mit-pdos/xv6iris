@@ -121,6 +121,7 @@ Require Import SpecKexecB2.
 Require Import SpecKexecB3.
 Require Import KexecPtImage.
 Require Import ElfBridge.   (* [file_bytes_lookup] -- readi's bytes ARE the file's *)
+Require Import UmodeAbi.    (* [uimg_sub] *)
 Require Import ElfFile.     (* [elf_phdr] fields, [phdr_ok], [seg_map] *)
 Require Import KexecBuilt.  (* [kxb_at] / [kxb_walk_ok] / [load_win] *)
 Require Import CodeKexec.
@@ -411,7 +412,7 @@ Section KexecB3Seam.
        (forall j, (j < 8)%nat ->
           is_aligned_paddr (Physaddr (pa_stk sp0 (54 - j))) 8 = true) /\
        w67 = (mword_of_int 4095 : mword 64) ⌝ ∗
-     ⌜ (Z.of_nat i <= eh_phnum ef)%Z /\
+     ⌜ (Z.of_nat i < eh_phnum ef)%Z /\
        ud_tfp P = ud_tfp (pv_upt (us_V U)) /\
        um_below szv P.(ud_um) /\
        um_covered szv P.(ud_um) /\
@@ -761,6 +762,20 @@ Section KexecB3Incr.
       iDestruct (cpu_claim_ext_transport CID0 CID5b eb (proc_addr jp)
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iSpecialize ("Hout" $! CID5b with "[%]"); [wp_next_chain |].
+      (* ---- THE INVARIANT, CONVERTED (S3d).  This edge is taken exactly
+         when [S i >= phnum], and the state's own [i < phnum] closes it to
+         [S i = phnum] -- at which index [kxb_walk_ok]'s first conjunct
+         makes [kxb_loads] the file's own [elf_loads], so [kxb_at]'s two
+         conjuncts are the two rows [kxc_at_1a4] carries. ---- *)
+      assert (Hphle : (eh_phnum ef <= Z.of_nat i + 1)%Z)
+        by (apply Z.geb_le; exact Egeb).
+      assert (HSieq : S i = Z.to_nat (eh_phnum ef)) by lia.
+      assert (Hdone : kxb_walk_ok (kxc_fb datl dnf) ef ->
+                uimg_sub (elf_image (kxc_fb datl dnf)) Mi
+                /\ (uint szv = kexec_sz_after (elf_loads (kxc_fb datl dnf)))%Z).
+      { intros Hwk.
+        apply (kxb_at_done (kxc_fb datl dnf) ef (S i) (uint szv) Mi Hwk HSieq).
+        apply (Himg Hwk). lia. }
       iApply ("Hout" $! T5). iRight. rewrite /kxc_at_1a4.
       iSplitR.
       { iPureIntro. split_and!;
@@ -770,7 +785,10 @@ Section KexecB3Incr.
       { iPureIntro. split_and!;
           [exact Hk | exact Hib | exact Hn2 | exact Hal]. }
       iSplitR.
-      { iPureIntro. split_and!; [exact HPtfp | exact Hbelow | exact Hcov]. }
+      { iPureIntro. split_and!;
+          [exact HPtfp | exact Hbelow | exact Hcov
+          | intros Hwk; exact (proj1 (Hdone Hwk))
+          | intros Hwk; exact (proj2 (Hdone Hwk))]. }
       (* NEVER [iFrame] HERE.  At this altitude the goal carries
          [ProcInv.tf_page]'s 4096-conjunct big-op inside [proc_priv], and
          [iFrame]'s search does not terminate on it (durable-notes.md).  The
@@ -3510,7 +3528,7 @@ Section KexecB3Close.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs1 & %HMs2 & %HMs4 & %HMs6 &
                           %HMthr) &
                          (%Hk & %Hib & %Hn2 & %Hal) &
-                         (%HPtfp & %Hbelow & %Hcov) &
+                         (%HPtfp & %Hbelow & %Hcov & %Himg0 & %Hsz0) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hopen & Hlog & Hirs & Hbm & Hins &
                          Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
@@ -3565,6 +3583,10 @@ Section KexecB3Close.
     iDestruct (cpu_claim_ext_transport CID0 CID1b eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iSpecialize ("Hout" $! CID1b with "[%]"); [wp_next_chain |].
+    (* the no-segments arm reports [sz = 0], and its two image rows are
+       [kxc_at_1a2]'s own -- the fold over an empty table (S3d). *)
+    assert (Hu0 : uint (mword_of_int 0 : mword 64) = 0%Z)
+      by (rewrite uint_unsigned moi64_unsigned; vm_compute; reflexivity).
     iApply ("Hout" $! T1). rewrite /kxc_at_1a4.
     iSplitR.
     { iPureIntro. split_and!;
@@ -3574,7 +3596,9 @@ Section KexecB3Close.
     { iPureIntro. split_and!;
         [exact Hk | exact Hib | exact Hn2 | exact Hal]. }
     iSplitR.
-    { iPureIntro. split_and!; [exact HPtfp | exact Hbelow | exact Hcov]. }
+    { iPureIntro. split_and!;
+        [exact HPtfp | exact Hbelow | exact Hcov | exact Himg0
+        | intros Hwk; rewrite Hu0; exact (Hsz0 Hwk)]. }
     iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hextc"; [iExact "Hextc" |]. iSplitL "Hclmc"; [iExact "Hclmc" |]. iSplitL "Hopen"; [iExact "Hopen" |].
@@ -3628,7 +3652,8 @@ Section KexecB3Close.
         kxc_at_1ae jp gf
                    plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
                    M' K sp0 ra0 s00 s10 s20 pv av
-                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi szv sv11 -∗
+                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w67
+                   (kxc_fb datl dnf) ef P Mi szv sv11 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -3638,7 +3663,7 @@ Section KexecB3Close.
     rewrite /kxc_at_1a4.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs4 & %HMs6 & %HMs11) &
                          (%Hk & %Hib & %Hn2 & %Hal) &
-                         (%HPtfp & %Hbelow & %Hcov) &
+                         (%HPtfp & %Hbelow & %Hcov & %Himg & %Hszr) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hopen & Hlog & Hirs & Hbm & Hins &
                          #Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
@@ -3825,7 +3850,8 @@ Section KexecB3Close.
     iSplitR.
     { iPureIntro. exact Hal. }
     iSplitR.
-    { iPureIntro. split_and!; [exact HPtfp | exact Hbelow | exact Hcov]. }
+    { iPureIntro. split_and!;
+        [exact HPtfp | exact Hbelow | exact Hcov | exact Himg | exact Hszr]. }
     iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hextc"; [iExact "Hextc" |]. iSplitL "Hclmc"; [iExact "Hclmc" |]. iSplitL "Hirs2"; [iExact "Hirs2" |].

@@ -73,6 +73,8 @@ Require Import SpecIput.
 Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import SpecKexec.
+Require Import UmodeAbi.     (* [uimg_sub]                                 *)
+Require Import ElfFile.      (* [elf_image], [elf_loads]                   *)
 Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -629,7 +631,16 @@ Section KexecBSeam.
           is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt (us_V U)) /\
        um_below (mword_of_int 0 : mword 64) P.(ud_um) /\
-       um_covered (mword_of_int 0 : mword 64) P.(ud_um) ⌝ ∗
+       um_covered (mword_of_int 0 : mword 64) P.(ud_um) /\
+       (* ---- THE IMAGE ROWS ON THE NO-SEGMENTS PATH (S3d).  [elf.phnum = 0]
+          is what the +0x0b0 test just decided, and under the walk's guard
+          that makes the ELF semantics' own table empty -- so the image is
+          empty and the fold is 0, which is exactly what [kxc_at_1a4] needs
+          from this arm ([KexecBuilt.kxb_walk_phnum0]). ---- *)
+       (kxb_walk_ok (kxc_fb datl dnf) ef ->
+          uimg_sub (elf_image (kxc_fb datl dnf)) Mi) /\
+       (kxb_walk_ok (kxc_fb datl dnf) ef ->
+          (0 = kexec_sz_after (elf_loads (kxc_fb datl dnf)))%Z) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1f2) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -789,7 +800,15 @@ Section KexecBSeam.
           is_aligned_paddr (Physaddr (pa_stk sp0 (54 - j))) 8 = true) ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt (us_V U)) /\
        um_below szv P.(ud_um) /\
-       um_covered szv P.(ud_um) ⌝ ∗
+       um_covered szv P.(ud_um) /\
+       (* ---- THE PHDR LOOP'S INVARIANT, CONVERTED (S3d).  The loop's exit
+          is [S i = phnum], so [KexecBuilt.kxb_at_done] has already turned
+          [kxb_at] into these two rows; from here down the walk index is
+          gone and only they travel. ---- *)
+       (kxb_walk_ok (kxc_fb datl dnf) ef ->
+          uimg_sub (elf_image (kxc_fb datl dnf)) Mi) /\
+       (kxb_walk_ok (kxc_fb datl dnf) ef ->
+          uint szv = kexec_sz_after (elf_loads (kxc_fb datl dnf))) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1a4) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -831,7 +850,7 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szv sv11 : mword 64) : iProp Σ :=
+      (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szv sv11 : mword 64) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs2 = szv /\
@@ -843,7 +862,13 @@ Section KexecBSeam.
           is_aligned_paddr (Physaddr (pa_stk sp0 (54 - j))) 8 = true) ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt (us_V U)) /\
        um_below szv P.(ud_um) /\
-       um_covered szv P.(ud_um) ⌝ ∗
+       um_covered szv P.(ud_um) /\
+       (* [kxc_at_1a4]'s two image rows, verbatim.  The inode is closed by
+          now, so the file's bytes travel as the PARAMETER [fb] rather than
+          as [kxc_fb datl dnf] -- phase B's caller instantiates it with
+          exactly that. ---- *)
+       (kxb_walk_ok fb ef -> uimg_sub (elf_image fb) Mi) /\
+       (kxb_walk_ok fb ef -> uint szv = kexec_sz_after (elf_loads fb)) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1ae) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -943,7 +968,7 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
+      (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
@@ -968,7 +993,15 @@ Section KexecBSeam.
         argument count, so it is not monotone in [c] and cannot be a loop
         invariant -- see [KexecBuilt] §2. ---- *)
      ⌜ kx_str_at (uint sz1) alen afun c Mi /\
-       kx_zero_except (uint sz1) (kxb_str_zone (uint sz1) alen c) Mi ⌝ ∗
+       kx_zero_except (uint sz1) (kxb_str_zone (uint sz1) alen c) Mi /\
+       (* ---- THE FILE'S IMAGE, AND THE SIZE IT SETTLED AT (S3d).  Both
+          rode [kxc_at_1ae]; [kxc_c_setup]'s uvmalloc converted the size row
+          to the stack top it chose, and every copyout below lands at or
+          above [uint sz1 - 4096], which is strictly above every segment. ---- *)
+       (kxb_walk_ok fb ef -> uimg_sub (elf_image fb) Mi) /\
+       (kxb_walk_ok fb ef ->
+          (uint sz1 = UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
+                      + 2 * PGSIZE)%Z) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x218) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -1007,7 +1040,7 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
+      (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
@@ -1043,7 +1076,11 @@ Section KexecBSeam.
         byte, and the closing block below reads it to introduce
         [kxb_args_at] over the pointer vector it is about to write. *)
      ⌜ kx_str_at (uint sz1) alen afun c Mi /\
-       kx_zero_except (uint sz1) (kxb_str_zone (uint sz1) alen c) Mi ⌝ ∗
+       kx_zero_except (uint sz1) (kxb_str_zone (uint sz1) alen c) Mi /\
+       (kxb_walk_ok fb ef -> uimg_sub (elf_image fb) Mi) /\
+       (kxb_walk_ok fb ef ->
+          (uint sz1 = UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
+                      + 2 * PGSIZE)%Z) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x268) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -1105,7 +1142,7 @@ Section KexecBSeam.
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
+      (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 sv11 : mword 64) (c : nat) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
@@ -1130,7 +1167,13 @@ Section KexecBSeam.
         [SpecKexecAU.kexec_stack_at]; phase D hands both to the
         entry-point hole as [KexecBuilt.kexec_built]. ---- *)
      ⌜ kxb_args_at (uint sz1) alen c afun Mi /\
-       kx_zero_except (uint sz1) (kxb_arg_addr (uint sz1) alen c) Mi ⌝ ∗
+       kx_zero_except (uint sz1) (kxb_arg_addr (uint sz1) alen c) Mi /\
+       (* the two image rows, one copyout further on and unmoved: the
+          pointer vector too sits inside the stack page. ---- *)
+       (kxb_walk_ok fb ef -> uimg_sub (elf_image fb) Mi) /\
+       (kxb_walk_ok fb ef ->
+          (uint sz1 = UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
+                      + 2 * PGSIZE)%Z) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x29c) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
