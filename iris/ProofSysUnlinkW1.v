@@ -382,7 +382,7 @@ Qed.
 Definition su_dummyV : pprivate :=
   MkPPriv (mword_of_int 0)
           (UPTD (mword_of_int 0) (mword_of_int 0) ∅ ∅)
-          [] [] 1%positive (mword_of_int 0) [].
+          [] [] 1%positive (mword_of_int 0) [] 0.
 
 (* readi's delivered byte at [tot = 16] is the file's byte *)
 Lemma su_rdd_eq `{XI : CurCtx} (data : nat -> list (bv 8)) (olds : nat -> bv 8)
@@ -924,7 +924,7 @@ Section ProofSysUnlinkW1.
         as "[Hpnc [Href Hftok]]".
       iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
       iDestruct "Hpnc" as "[Hpidq Hofiles]".
-      iDestruct (cwd_ref_held with "Href") as "Hcwdref".
+      iDestruct (cwd_ref_at_held_at with "Href") as "Hcwdref".
       iEval (cbn [upd_upt pv_cwd pv_fdg]) in "Hcwdref".
       (* ===== +0x1c jal ra,begin_op ===== *)
       iApply (wp_jal_s_sconf (CID := CID11) (mword_of_int (SU + 0x1c)) Rra
@@ -1115,7 +1115,7 @@ Section ProofSysUnlinkW1.
                         = mword_of_int (SU + 0x30)) by pcw.
         iEval (rewrite Hpp30) in "Hpc".
         (* the process block, rebuilt whole for the seam *)
-        iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+        iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
         iCombine "Hpidq Hofiles" as "Hpnc".
         iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
         iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1)
@@ -1192,7 +1192,7 @@ Section ProofSysUnlinkW1.
         iEval (rewrite /wp_next).
         iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce
                                              Hpc Hpidq".
-        iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+        iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
         iCombine "Hpidq Hofiles" as "Hpnc".
         iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
         iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1)

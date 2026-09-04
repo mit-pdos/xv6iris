@@ -644,7 +644,7 @@ Section KexecPinnedABody.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDb CIDj3 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iEval (rewrite /cwd_ref) in "Hcref".
+    iEval (rewrite /cwd_ref_at) in "Hcref".
     (* namei names the path buffer by ITS OWN a0; ours is [pv]. *)
     iEval (rewrite -HN5a0) in "Hpath".
     (* ---- THE SET FORM, NOT THE COUNTED ONE, AND THAT IS WHAT LIFTS
@@ -752,7 +752,7 @@ Section KexecPinnedABody.
       iEval (rewrite Hpp032) in "Hpc".
       (* close the private block back up, at the cwd it lent out *)
       iDestruct ("Hpvbk" with "Hppid [Hcref]") as "Hpriv".
-      { iEval (rewrite /cwd_ref). iExact "Hcref". }
+      { iEval (rewrite /cwd_ref_at). iExact "Hcref". }
       iDestruct (cpu_own_transport CIDn CIDz 0%nat eb (proc_addr jp) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CIDn CIDz eb (proc_addr jp)
@@ -879,7 +879,7 @@ Section KexecPinnedABody.
       iEval (rewrite Htj72) in "Hpc".
       (* ---- close the private block and take the shared exit ---- *)
       iDestruct ("Hpvbk" with "Hppid [Hcref]") as "Hpriv".
-      { iEval (rewrite /cwd_ref). iExact "Hcref". }
+      { iEval (rewrite /cwd_ref_at). iExact "Hcref". }
       iDestruct (cpu_own_transport CIDe1 CIDz2 0%nat eb (proc_addr jp) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CIDe1 CIDz2 eb (proc_addr jp)

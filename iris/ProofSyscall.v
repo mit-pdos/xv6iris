@@ -1678,6 +1678,8 @@ Section SyscallVocab.
            syscall reassigns a live process's [pv_fdg], so the bundle is
            stated at the ENTRY record and this equation re-keys it. *)
         ⌜ pv_fdg (us_V U') = pv_fdg (us_V U) ⌝ -∗
+        (* ...and the cwd's inum: chdir (9) alone moves it (lane C1) *)
+        ⌜ sysc_num (us_V U) = 9 \/ pv_cwi (us_V U') = pv_cwi (us_V U) ⌝ -∗
         sie_cap_gpr KT1 mf av true pj -∗
         cpu_own 0%nat true pj true lks -∗
         bslots 3 -∗
@@ -1860,6 +1862,8 @@ Section SyscallVocab.
     ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ->
     (* ...and the fd-state ghost name, which no syscall moves *)
     pv_fdg (us_V U') = pv_fdg (us_V U) ->
+    (* ...and the cwd's inum, which only chdir moves (lane C1) *)
+    (sysc_num (us_V U) = 9 \/ pv_cwi (us_V U') = pv_cwi (us_V U)) ->
     (* THIS ARM RETURNS, hence is not [exit] (milestone J, K1) -- the last
        pure premise, so that every call site adds exactly one argument
        immediately before its [with "..."].  Free at every one of them:
@@ -1884,7 +1888,7 @@ Section SyscallVocab.
     sysc_exec_out U U' sts sts' -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hne2.
+    intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hne2.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont Hxo".
     assert (Hb1 : pa_stk sp0 1 = add_vec (pa_stk sp0 4) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))))
@@ -2031,7 +2035,7 @@ Section SyscallVocab.
               (Hst3 (or_intror Hgood)) (Hst2 (or_intror Hgood)) (Hst1 (or_intror Hgood)).
       reflexivity. }
     iApply ("Hcont" $! T5 U' sts'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hxo").
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hxo").
     { unfold callee_saved.
       split_and!.
       - exact HT5sp.
@@ -2057,7 +2061,8 @@ Section SyscallVocab.
     { exact Hupte. }
     { exact Hszv. }
     { exact Hud. }
-    exact Hfg.
+    { exact Hfg. }
+    exact Hcwi.
   Qed.
 
   (* the jalr's target, at a symbolic table index -- [ret_pc] is the
@@ -2565,6 +2570,8 @@ Section SyscallRet.
     ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ->
     (* ...and the fd-state ghost name, which no syscall moves *)
     pv_fdg (us_V U') = pv_fdg (us_V U) ->
+    (* ...and the cwd's inum, which only chdir moves (lane C1) *)
+    (sysc_num (us_V U) = 9 \/ pv_cwi (us_V U') = pv_cwi (us_V U)) ->
     (* THIS ARM RETURNS, hence is not [exit] (milestone J, K1) -- the last
        pure premise, so that every call site adds exactly one argument
        immediately before its [with "..."].  Free at every one of them:
@@ -2595,7 +2602,7 @@ Section SyscallRet.
       sts sts' -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hne2.
+    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hne2.
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont Hxo".
     (* the stored word, as the store lemma spells it *)
     assert (Hrg : rget E Ra0 = E !!! Regidx Ra0) by (rgne; reflexivity).
@@ -2685,6 +2692,7 @@ Section SyscallRet.
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_sz]; exact Hszv)
               Hud
               ltac:(cbn [pv_fdg upd_tf]; exact Hfg)
+              ltac:(cbn [us_V us_tf upd_usV upd_tf pv_cwi]; exact Hcwi)
               Hne2
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont Hxo").
   Qed.
@@ -2963,6 +2971,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3167,6 +3176,7 @@ Section SyscallArms.
               ltac:(right; left; rewrite Hnum; reflexivity)
               ltac:(right; left; rewrite Hnum; reflexivity)
               Htfp' ltac:(reflexivity)
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3255,6 +3265,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hext)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3336,6 +3347,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3411,6 +3423,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3486,6 +3499,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3525,6 +3539,7 @@ Section SyscallArms.
     ∃ (V' : pprivate) (sts' : list fdstate),
       ⌜ud_tfp (pv_upt V') = ud_tfp (pv_upt (us_V U))⌝ ∗
       ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
+      ⌜pv_cwi V' = pv_cwi (us_V U)⌝ ∗
       ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
       ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
@@ -3538,13 +3553,13 @@ Section SyscallArms.
     destruct (decide (10 = USYS_dup)) as [_ | Hdd]; [| exfalso; exact (Hdd eq_refl)].
     iIntros "[[[%Hr _] [Hp Hfr]] | [Hb | Hc]]".
     - iExists (us_V U), sts. iFrame "Hp Hfr". iPureIntro.
-      split_and!; [reflexivity | reflexivity | reflexivity
+      split_and!; [reflexivity | reflexivity | reflexivity | reflexivity
                   | apply uptd_ext_sz_refl | reflexivity |].
       (* nothing was installed: the row's right disjunct *)
       by right.
     - iDestruct "Hb" as (fd0 fv) "[[%Hr _] [Hp Hfr]]".
       iExists (us_V U), sts. iFrame "Hp Hfr". iPureIntro.
-      split_and!; [reflexivity | reflexivity | reflexivity
+      split_and!; [reflexivity | reflexivity | reflexivity | reflexivity
                   | apply uptd_ext_sz_refl | reflexivity |].
       (* nothing was installed: the row's right disjunct *)
       by right.
@@ -3570,7 +3585,7 @@ Section SyscallArms.
                    with "Hp Hfr") as %Hleast.
       iExists (upd_ofile (us_V U) fd1 fv), (<[fd1 := sts !!! fd0]> sts).
       iFrame "Hp Hfr". iPureIntro.
-      split_and!; [reflexivity | reflexivity | reflexivity
+      split_and!; [reflexivity | reflexivity | reflexivity | reflexivity
                   | apply uptd_ext_sz_refl | reflexivity |].
       (* THE TWO INDICES ARE THE POST'S.  The row reads the returned and the
          argument descriptor as C [int]s; the post names them [fd1] and
@@ -3627,7 +3642,7 @@ Section SyscallArms.
     iDestruct (sysc_dup_priv _ _ _ _ _ _ _ Hnum
                  (list_lookup_total_correct _ _ _ Hv0) Hoflen with "Hpost")
       as (V' sts')
-      "(%Htfp' & %Hfg' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag)".
+      "(%Htfp' & %Hfg' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag)".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
@@ -3657,6 +3672,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
+              ltac:(right; exact Hcwi')
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3755,6 +3771,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3894,21 +3911,23 @@ Section SyscallArms.
        at a loadable file: the slot is minted at [exec_key], which IS this
        record once a0 holds argc.  Success elsewhere: the gap, r <> -1. ---- *)
     iAssert (⌜ud_tfp (pv_upt V') = ud_tfp (pv_upt (us_V U))
-             /\ pv_fdg V' = pv_fdg (us_V U)⌝ ∗
+             /\ pv_fdg V' = pv_fdg (us_V U)
+             /\ pv_cwi V' = pv_cwi (us_V U)⌝ ∗
              sysc_exec_out U
                (us_tf (MkUstate V' Mk)
                   (<[tf_arg_idx 0 := mf !!! Regidx Ra0]>
                      (pv_tf (us_V (MkUstate V' Mk)))))
                sts sts)%I
-      with "[Harm]" as "[(%Htfp' & %Hfg') Hxo]".
+      with "[Harm]" as "[(%Htfp' & %Hfg' & %Hcwi') Hxo]".
     { iDestruct "Harm" as "[[(%Hr & %HV & %HM) _] | Hok]".
       - (* FAILED *)
         cbn [us_V us_M] in HV, HM.
         iSplitR.
-        { iPureIntro. split.
+        { iPureIntro. split_and!.
           - rewrite (f_equal (fun x => ud_tfp (pv_upt x)) HV).
             cbn [pv_upt upd_upt pv_fdg]. exact Htf.
-          - exact (f_equal pv_fdg HV). }
+          - exact (f_equal pv_fdg HV).
+          - exact (f_equal pv_cwi HV). }
         rewrite /sysc_exec_out. iIntros "_". iLeft. iPureIntro.
         rewrite /sysc_exec_failed.
         cbn [us_V us_M us_tf upd_usV upd_tf pv_tf pv_upt pv_sz].
@@ -3924,24 +3943,26 @@ Section SyscallArms.
           iDestruct "Ha" as (f nl) "(_ & _ & %Hkx & _ & Hslot)".
           destruct Hkx as (e & spv & szv' & _ & Hne & Hkok).
           cbn [us_V] in Hkok.
-          destruct Hkok as [(Hm1 & _) | (Hr & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _)];
+          destruct Hkok as [(Hm1 & _) | (Hr & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _ & Hcwi & _)];
             [exact (False_ind _ (Hne Hm1)) |].
           iSplitR.
-          { iPureIntro. split.
+          { iPureIntro. split_and!.
             - rewrite Htf'. cbn [pv_upt upd_upt pv_fdg]. exact Htf.
-            - revert Hfg. cbn [pv_fdg upd_upt]. exact id. }
+            - revert Hfg. cbn [pv_fdg upd_upt]. exact id.
+            - revert Hcwi. cbn [pv_cwi upd_upt]. exact id. }
           rewrite /sysc_exec_out. iIntros "_". iRight. iLeft.
           rewrite /exec_key. rewrite Hr. cbn [us_V]. iExact "Hslot".
         + (* (b) the loadability gap: only [r <> -1] is known *)
           iDestruct "Hb" as "(_ & %Hok & _)".
           destruct Hok as (entry & spv & szv' & Hne & Hkok).
           cbn [us_V] in Hkok.
-          destruct Hkok as [(Hm1 & _) | (_ & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _)];
+          destruct Hkok as [(Hm1 & _) | (_ & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _ & Hcwi & _)];
             [exact (False_ind _ (Hne Hm1)) |].
           iSplitR.
-          { iPureIntro. split.
+          { iPureIntro. split_and!.
             - rewrite Htf'. cbn [pv_upt upd_upt pv_fdg]. exact Htf.
-            - revert Hfg. cbn [pv_fdg upd_upt]. exact id. }
+            - revert Hfg. cbn [pv_fdg upd_upt]. exact id.
+            - revert Hcwi. cbn [pv_cwi upd_upt]. exact id. }
           rewrite /sysc_exec_out. iIntros "_". iRight. iRight. iPureIntro.
           cbn [us_V us_tf upd_usV upd_tf pv_tf].
           rewrite list_lookup_total_insert; [exact Hne |].
@@ -3972,6 +3993,7 @@ Section SyscallArms.
               ltac:(left; rewrite Hnum; reflexivity)
               ltac:(left; rewrite Hnum; reflexivity)
               Htfp' Hfg'
+              ltac:(right; exact Hcwi')
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont Hxo").
   Qed.
@@ -4141,6 +4163,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4271,6 +4294,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4377,6 +4401,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4467,6 +4492,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4547,10 +4573,10 @@ Section SyscallArms.
                proc_priv γf (proc_addr j) pid (MkUstate V' (us_M U)))%I with "[Hpost]" as
       (V') "(%Htfp' & %Hfg' & %Htfw' & %Hupte' & %Hszv' & Hpriv)".
     { pose proof Hextz as Hue. destruct Hext as (_ & Htf & _).
-      iDestruct "Hpost" as "[[_ Hpv] | (%ipv & _ & Hpv)]".
+      iDestruct "Hpost" as "[[_ Hpv] | (%ipv & %z & _ & Hpv)]".
       - iExists (upd_upt (us_V U) P'). iFrame "Hpv". iPureIntro.
         split_and!; [exact Htf | reflexivity | reflexivity | exact Hue | reflexivity].
-      - iExists (upd_cwd (upd_upt (us_V U) P') ipv). iFrame "Hpv". iPureIntro.
+      - iExists (upd_cwi (upd_cwd (upd_upt (us_V U) P') ipv) z). iFrame "Hpv". iPureIntro.
         split_and!; [exact Htf | reflexivity | reflexivity | exact Hue | reflexivity]. }
     iDestruct (sysc_iref_join with "Hirk Hirc") as "Hir".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
@@ -4582,6 +4608,8 @@ Section SyscallArms.
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
+              (* chdir: the one entry that moves the inum -- the row's left arm *)
+              ltac:(left; rewrite Hnum; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4698,6 +4726,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4795,6 +4824,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4864,6 +4894,7 @@ Section SyscallArms.
     iAssert (∃ (V' : pprivate) (sts' : list fdstate),
                ⌜ud_tfp (pv_upt V') = ud_tfp (pv_upt (us_V U))⌝ ∗
                ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
+               ⌜pv_cwi V' = pv_cwi (us_V U)⌝ ∗
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
                ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
                ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
@@ -4872,7 +4903,7 @@ Section SyscallArms.
                proc_priv γf (proc_addr j) pid (MkUstate V' ((us_M U))) ∗
                fd_frags (pv_fdg (us_V U)) sts')%I
       with "[Hpost]" as (V' sts')
-        "(%Htfp' & %Hfg' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag)".
+        "(%Htfp' & %Hfg' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag)".
     { rewrite /sysc_fd_ok /usys_fd_ok Hnum.
       destruct (decide (21 = USYS_close)) as [_ | Hcc];
         [| exfalso; exact (Hcc eq_refl)].
@@ -4886,7 +4917,7 @@ Section SyscallArms.
         iDestruct (fd_frags_len with "Hfr") as %Hstslen.
         iDestruct (proc_priv_states_agree with "Hpv Hfr") as %Hag.
         iExists (us_V U), sts. iFrame "Hpv Hfr". iPureIntro.
-        split_and!; [reflexivity | reflexivity | reflexivity
+        split_and!; [reflexivity | reflexivity | reflexivity | reflexivity
                     | apply uptd_ext_sz_refl | reflexivity |].
         split.
         + (* the failure arm returns -1, so the guard is false *)
@@ -4910,7 +4941,7 @@ Section SyscallArms.
       - iExists (upd_ofile (us_V U) fd (zero_reg : mword 64)),
                 (<[fd := FdClosed]> sts).
         iFrame "Hpv Hfr". iPureIntro.
-        split_and!; [reflexivity | reflexivity | reflexivity
+        split_and!; [reflexivity | reflexivity | reflexivity | reflexivity
                     | apply uptd_ext_sz_refl | reflexivity |].
         split.
         + (* success returns 0, and the row's index is [arg_fd]'s own *)
@@ -4947,6 +4978,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
+              ltac:(right; exact Hcwi')
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_iref_join3 with "Hir Hiru").
@@ -5052,6 +5084,7 @@ Section SyscallArms.
     iAssert (∃ (V' : pprivate) (sts' : list fdstate),
                ⌜ud_tfp (pv_upt V') = ud_tfp (pv_upt (us_V U))⌝ ∗
                ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
+               ⌜pv_cwi V' = pv_cwi (us_V U)⌝ ∗
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
                ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
                ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
@@ -5065,7 +5098,7 @@ Section SyscallArms.
                              sts sts'⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' M') ∗
                fd_frags (pv_fdg (us_V U)) sts')%I with "[Hpv]" as
-      (V' sts') "(%Htfp' & %Hfg' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow
+      (V' sts') "(%Htfp' & %Hfg' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow
                   & %Hpiperow & Hpriv & Hufrag)".
     { rewrite /sysc_fd_ok /usys_fd_ok Hnum.
       destruct (decide (4 = USYS_close)) as [Hcc | _]; [discriminate Hcc |].
@@ -5077,7 +5110,7 @@ Section SyscallArms.
           | (%fd0 & %fd1 & %l & %k0 & %k1 &
              (%Hr & %Hfl & %Hne & %Hcl0 & %Hcl1 & %Hd8 & %Hbytes) & Hpv & Hb)]".
       - iExists (upd_upt (us_V U) P'), sts. iFrame "Hpv Hb". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Huptz | reflexivity | |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | |].
         { rewrite decide_False; [reflexivity |].
           rewrite Hr. vm_compute. discriminate. }
         (* a failed pipe returned -1, so the joined row's [uint r = 0]
@@ -5164,7 +5197,7 @@ Section SyscallArms.
                 (<[fd1 := FdOpen false true FdPipe]>
                    (<[fd0 := FdOpen true false FdPipe]> sts)).
         iFrame "Hpv Hb". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Huptz | reflexivity | |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | exact Huptz | reflexivity | |].
         { rewrite decide_True; [| rewrite Hr; vm_compute; reflexivity].
         (* the table's row binds the two NUMBERS existentially -- at this
            vocabulary they are reported by being WRITTEN -- and the post
@@ -5221,6 +5254,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
+              ltac:(right; exact Hcwi')
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_iref_join3 with "Hir Hiru").
@@ -5350,6 +5384,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5465,6 +5500,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              ltac:(right; reflexivity)
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5630,6 +5666,7 @@ Section SyscallArms.
     iAssert (∃ (V' : pprivate) (sts' : list fdstate),
                ⌜ud_tfp (pv_upt V') = ud_tfp (pv_upt (us_V U))⌝ ∗
                ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
+               ⌜pv_cwi V' = pv_cwi (us_V U)⌝ ∗
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
                ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
                ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
@@ -5637,7 +5674,7 @@ Section SyscallArms.
                            sts sts'⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' (us_M U)) ∗
                fd_frags (pv_fdg (us_V U)) sts')%I with "[Hpv]" as
-      (V' sts') "(%Htfp' & %Hfg' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag)".
+      (V' sts') "(%Htfp' & %Hfg' & %Hcwi' & %Htfw' & %Hupte' & %Hszv' & %Hfdrow & Hpriv & Hufrag)".
     { rewrite /sysc_fd_ok /usys_fd_ok Hnum.
       destruct (decide (15 = USYS_close)) as [Hcc | _]; [discriminate Hcc |].
       destruct (decide (15 = USYS_dup)) as [Hcd | _]; [discriminate Hcd |].
@@ -5645,7 +5682,7 @@ Section SyscallArms.
       iDestruct "Hpv" as
         "[(%Hr & Hpv & Hb) | (%fd & %ll & %kf & %tp & %Hpu & Hpv & Hb)]".
       - iExists (upd_upt (us_V U) P'), sts. iFrame "Hpv Hb". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Hextz | reflexivity |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity |].
         (* the failure arm installs nothing: the row's right disjunct *)
         by right.
       - destruct Hpu as (Hr & Hfrees & Hcl).
@@ -5674,7 +5711,7 @@ Section SyscallArms.
         iExists (upd_ofile (upd_upt (us_V U) P') fd (fnode kf)),
                 (<[fd := FdOpen (so_rd_of (trunc32 v1)) (so_wr_of (trunc32 v1)) tp]> sts).
         iFrame "Hpv Hb". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Hextz | reflexivity |].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity |].
         (* the table's open row binds the descriptor, the mode bits and the
            type existentially; the post names all four, so the arm exhibits
            them.  The mode bits are not existential HERE -- they are the
@@ -5709,6 +5746,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
+              ltac:(right; exact Hcwi')
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -6112,6 +6150,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              ltac:(right; reflexivity)
               (sysc_num_ne2_range _ Hrange)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7_range _ Hrange)).

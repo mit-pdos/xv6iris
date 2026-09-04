@@ -3513,6 +3513,44 @@ Section IcacheHeld.
     apply ientry_ne_zero. lia.
   Qed.
 
+  (* [inode_held] WITH THE INUM EXPOSED -- the pinned package.  Same four
+     conjuncts, one new pure tie; [inode_held_at_held] recovers the landed
+     shape so every existing consumer composes unchanged, and
+     [inode_held_zi] is the ∃-introduction the other way.  (Lane C1 moved
+     it here from SpecNameiTr / ProofKexecTail: the process block's cwd tie
+     [ProcInv.cwd_ref_at] and idup's contract both speak it, and both sit
+     below the walker cone.) *)
+  Definition inode_held_at (v : mword 64) (z : Z) : iProp Σ :=
+    (∃ (k : nat) (q : Qp) (inum : mword 32),
+       ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
+       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+       ⌜bv_unsigned inum = z⌝ ∗
+       inode_refp k q icfg_dev inum)%I.
+
+  Lemma inode_held_at_held (v : mword 64) (z : Z) :
+    inode_held_at v z ⊢ inode_held v.
+  Proof.
+    iIntros "H". iDestruct "H" as (k q inum) "(%&%&%&%&Hr)".
+    rewrite /inode_held. eauto 10 with iFrame.
+  Qed.
+
+  Lemma inode_held_zi (v : mword 64) :
+    inode_held v ⊢ ∃ z : Z, inode_held_at v z.
+  Proof.
+    rewrite /inode_held /inode_held_at. iIntros "H".
+    iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hlt & Hr)".
+    iExists (bv_unsigned inum), k, q, inum.
+    iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
+    iExact "Hr".
+  Qed.
+
+  Lemma inode_held_at_ne_zero (v : mword 64) (z : Z) :
+    inode_held_at v z -∗ ⌜v <> (zero_reg : mword 64)⌝.
+  Proof. iIntros "H". iApply inode_held_ne_zero. by iApply inode_held_at_held. Qed.
+
+  Global Instance inode_held_at_timeless v z : Timeless (inode_held_at v z).
+  Proof. apply _. Qed.
+
   (* ---- THE SAME TWO SHAPES FOR A SHARE, AND FOR A PARKED SHORT PARENT ----
 
      [FileInv]'s FD_INODE payload is "a reference parked in a cancellable

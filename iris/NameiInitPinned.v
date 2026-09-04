@@ -372,7 +372,7 @@ Section NameiInitPinnedBody.
     InodeInv.sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_inv gfs bmapstart cov logstart size -∗
     proc_priv_bare (proc_addr j) pidv Upr -∗
-    inode_held (pv_cwd (us_V Upr)) -∗
+    inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
     ([∗ list] i ∈ seq 0 (S plen),
        pa_add (m !!! Regidx (mword_of_int 10 : mword 5)) i
          ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -396,7 +396,7 @@ Section NameiInitPinnedBody.
         BitmapInv.sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         InodeInv.sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         proc_priv_bare (proc_addr j) pidv Upr -∗
-        inode_held (pv_cwd (us_V Upr)) -∗
+        inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
         ([∗ list] i ∈ seq 0 (S plen),
            pa_add (m !!! Regidx (mword_of_int 10 : mword 5)) i
              ↦ₘ[KT1]{dqpv} pfun i) -∗

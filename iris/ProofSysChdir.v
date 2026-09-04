@@ -1403,7 +1403,7 @@ Section ProofSysChdirBody.
          everything between. *)
       iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
       iDestruct "Hpnc" as "[Hpbare Hofiles]".
-      iDestruct (cwd_ref_held with "Href") as "Hcwdref".
+      iDestruct (cwd_ref_at_held_at with "Href") as "Hcwdref".
       iEval (cbn [upd_upt pv_cwd pv_fdg]) in "Hcwdref".
       iDestruct (sc_buf_split (pa_stk sp0 20) bf pk Hpk with "Hbuf")
         as "[Hbufk Hbufrest]".
@@ -1826,7 +1826,7 @@ Section ProofSysChdirBody.
           { intros c Hc N2' N8 N9 N18. rewrite /P6 upd_ne; [| regne].
             exact (HP5thr c Hc N2' N8 N9 N18). }
           (* THE OLD WORKING DIRECTORY's reference, taken apart *)
-          iDestruct "Hcwdref" as (kc qc inumc) "(%Hcwde & %Hkc & %Hinumcc & Hrefc & Hruc)".
+          iDestruct "Hcwdref" as (kc qc inumc) "(%Hcwde & %Hkc & %Hinumcc & %Hcwdz & Hrefc & Hruc)".
 
           assert (Hinbc : bv_unsigned inumc < 16 * Z.of_nat icfg_nib)
             by (exact Hinumcc).
@@ -1943,23 +1943,32 @@ Section ProofSysChdirBody.
                           = mword_of_int (SC + 0x58)) by pcw.
           iEval (rewrite Hpp58) in "Hpc".
           (* THE BLOCK, REBUILT at the new working directory *)
-          iAssert (inode_held (ientry kk)) with "[Hrefnew Hruip]" as "Hheldnew".
-          { rewrite /inode_held. iExists kk, (qq/2 + qq/2)%Qp, inum.
+          (* AT ITS INUM (lane C1): the reference the walk landed carries
+             [inum], and the block is rebuilt with [pv_cwi] set to it beside
+             the pointer -- this is what [sys_chdir_post]'s [z] is. *)
+          iAssert (inode_held_at (ientry kk) (bv_unsigned inum)) with "[Hrefnew Hruip]" as "Hheldnew".
+          { rewrite /inode_held_at. iExists kk, (qq/2 + qq/2)%Qp, inum.
             iSplitR; [done |]. iSplitR; [iPureIntro; exact Hkk |].
-            iSplitR; [iPureIntro; exact Hinumc |]. iFrame "Hruip".
-iExact "Hrefnew". }
+            iSplitR; [iPureIntro; exact Hinumc |]. iSplitR; [iPureIntro; reflexivity |].
+            iFrame "Hruip". iExact "Hrefnew". }
           iDestruct ("Hcwdbk" $! (ientry kk) with "Hcwd") as "Hpbare".
-          iAssert (proc_priv_nocwd gf pj pid (upd_usV U (upd_cwd (upd_upt (us_V U) P') (ientry kk))))
+          iAssert (proc_priv_nocwd gf pj pid
+                     (upd_usV U (upd_cwi (upd_cwd (upd_upt (us_V U) P') (ientry kk))
+                                         (bv_unsigned inum))))
             with "[Hpbare Hofiles]" as "Hpnc".
           { rewrite proc_priv_nocwd_bare.
-            cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+            cbn [upd_cwi upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
             iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"]. }
-          iDestruct (cwd_ref_of_held with "Hheldnew") as "Hrefcwd".
-          iAssert (proc_priv gf pj pid (upd_usV U (upd_cwd (upd_upt (us_V U) P') (ientry kk))))
+          iDestruct (cwd_ref_at_of_held_at with "Hheldnew") as "Hrefcwd".
+          iAssert (proc_priv gf pj pid
+                     (upd_usV U (upd_cwi (upd_cwd (upd_upt (us_V U) P') (ientry kk))
+                                         (bv_unsigned inum))))
             with "[Hpnc Hrefcwd Hftok]" as "Hpriv".
-          { rewrite (proc_priv_split_cwd gf pj pid (upd_usV U (upd_cwd (upd_upt (us_V U) P') (ientry kk)))).
+          { rewrite (proc_priv_split_cwd gf pj pid
+                       (upd_usV U (upd_cwi (upd_cwd (upd_upt (us_V U) P') (ientry kk))
+                                           (bv_unsigned inum)))).
             iSplitL "Hpnc"; [iExact "Hpnc" |].
-            iEval (cbn [upd_cwd pv_cwd pv_fdg]). iFrame "Hrefcwd Hftok". }
+            iEval (cbn [upd_cwi upd_cwd pv_cwd pv_cwi pv_fdg]). iFrame "Hrefcwd Hftok". }
           iDestruct (iref_slots_combine 1 1 with "Hislot Hir") as "Hir".
           (* ============ +0x58 c.li a0,0 ============ *)
           iApply (wp_cli_s_sconf (CID := CID36) (mword_of_int (SC + 0x58)) Ra0
@@ -2027,7 +2036,7 @@ iExact "Hrefnew". }
           { exact Hupt. }
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          { rewrite /sys_chdir_post. iRight. iExists (ientry kk).
+          { rewrite /sys_chdir_post. iRight. iExists (ientry kk), (bv_unsigned inum).
             iSplitR; [iPureIntro; rewrite Ha0f; exact HP9a0 |]. iExact "Hpriv". }
         * (* ======== ARM C: NOT a directory ======== *)
           iApply (wp_bne_taken_s_sconf (CID := CID26) (mword_of_int (SC + 0x3e))
@@ -2237,7 +2246,7 @@ iExact "Hrefnew". }
                           = mword_of_int (SC + 0x5c)) by pcw.
           iEval (rewrite Htg5c) in "Hpc".
           (* the block goes back UNCHANGED: [p->cwd] never moved *)
-          iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+          iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
           iAssert (proc_priv gf pj pid (us_upt U P'))
             with "[Hpbare Hofiles Href Hftok]" as "Hpriv".
           { rewrite (proc_priv_split_cwd gf pj pid (us_upt U P'))
@@ -2329,7 +2338,7 @@ iExact "Hrefnew". }
         { iApply (log_opS_op with "HopS Htx"). }
         iEval (rewrite /wp_next).
         iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
-        iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+        iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
         iAssert (proc_priv gf pj pid (us_upt U P'))
           with "[Hpbare Hofiles Href Hftok]" as "Hpriv".
         { rewrite (proc_priv_split_cwd gf pj pid (us_upt U P'))

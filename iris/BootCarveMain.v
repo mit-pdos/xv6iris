@@ -2079,8 +2079,8 @@ Section BootCarveMain.
                  (* the fd-state name is JUNK on a dormant slot: it has no
                     descriptors, and allocproc mints the real one. *)
                  1%positive
-                 (zero_reg : mword 64) bs), vpid.
-      cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+                 (zero_reg : mword 64) bs 0), vpid.
+      cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
       iSplitR; [iPureIntro; split_and!;
                 [reflexivity | reflexivity | vm_compute; discriminate] |].
       iSplitL "Hpid1"; [iExact "Hpid1" |].

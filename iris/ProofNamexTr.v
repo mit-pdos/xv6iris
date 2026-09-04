@@ -713,7 +713,7 @@ Section ProofNamexTrMain.
      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
      proc_priv_bare (proc_addr j) pidv Upr -∗
-     inode_held (pv_cwd (us_V Upr)) -∗
+     inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
      bslots 3 -∗
@@ -770,7 +770,7 @@ Section ProofNamexTrMain.
      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
      proc_priv_bare (proc_addr j) pidv Upr -∗
-     inode_held (pv_cwd (us_V Upr)) -∗
+     inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf' i) -∗
      bslots 3 -∗

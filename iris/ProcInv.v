@@ -129,7 +129,7 @@ Qed.
 (* functional update of one fd slot -- fdalloc / sys_close / kexit. *)
 Definition upd_ofile (V : pprivate) (fd : nat) (v : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (<[fd := v]> (pv_ofile V)) (pv_fdg V)
-          (pv_cwd V) (pv_name V).
+          (pv_cwd V) (pv_name V) (pv_cwi V).
 
 (* THE ONE UPDATE THAT MOVES THE GHOST NAME: allocproc's mint.  A slot comes
    out of [proc_dormant] with whatever junk name its existential carried (a
@@ -138,10 +138,12 @@ Definition upd_ofile (V : pprivate) (fd : nat) (v : mword 64) : pprivate :=
    [proc_dormant_unused], which is the only caller, and FdSlots.v's header
    for why the name must not outlive the incarnation. *)
 Definition upd_fdg (V : pprivate) (g : gname) : pprivate :=
-  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) g (pv_cwd V) (pv_name V).
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) g (pv_cwd V) (pv_name V)
+          (pv_cwi V).
 
 Definition upd_sz (V : pprivate) (v : mword 64) : pprivate :=
-  MkPPriv v (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V).
+  MkPPriv v (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
+          (pv_cwi V).
 
 (* functional update of the trapframe words -- what prepare_return does to
    the four KERNEL slots (kernel_satp / kernel_sp / kernel_trap /
@@ -149,12 +151,14 @@ Definition upd_sz (V : pprivate) (v : mword 64) : pprivate :=
    return value write does to the a0 slot.  The page itself is unchanged;
    only [pv_tf]'s contents move. *)
 Definition upd_tf (V : pprivate) (ws : list (mword 64)) : pprivate :=
-  MkPPriv (pv_sz V) (pv_upt V) ws (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V).
+  MkPPriv (pv_sz V) (pv_upt V) ws (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
+          (pv_cwi V).
 
 (* the descriptor moves, everything else stays -- what copyin / copyout /
    vmfault do to a process when they fault a page in ([uptd_ext], below). *)
 Definition upd_upt (V : pprivate) (P : uptd) : pprivate :=
-  MkPPriv (pv_sz V) P (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V).
+  MkPPriv (pv_sz V) P (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
+          (pv_cwi V).
 
 (* [upd_cwd] and [upd_cwd_id] live in [ProcDefs], next to [pprivate]
    itself and to [proc_priv_bare_cwd], the borrow that needs them. *)
@@ -163,12 +167,13 @@ Definition upd_upt (V : pprivate) (P : uptd) : pprivate :=
    move, the scalar fields stay.  allocproc's move, once kalloc has produced
    the trapframe page and proc_pagetable the table. *)
 Definition upd_pt (V : pprivate) (P : uptd) (ws : list (mword 64)) : pprivate :=
-  MkPPriv (pv_sz V) P ws (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V).
+  MkPPriv (pv_sz V) P ws (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V) (pv_cwi V).
 
 (* the 16 debug-name bytes -- kfork's [safestrcpy(np->name, p->name, 16)] and
    kexec's [safestrcpy(p->name, last, 16)]. *)
 Definition upd_name (V : pprivate) (ns : list (bv 8)) : pprivate :=
-  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) ns.
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) ns
+          (pv_cwi V).
 
 (* EXEC'S MOVE: a process REPLACES its address space.  The size, the
    descriptor, the trapframe words and the name all change at once; the
@@ -179,7 +184,7 @@ Definition upd_name (V : pprivate) (ns : list (bv 8)) : pprivate :=
    SpecKexec's success arm readable. *)
 Definition upd_exec (V : pprivate) (szv : mword 64) (P : uptd)
     (ws : list (mword 64)) (ns : list (bv 8)) : pprivate :=
-  MkPPriv szv P ws (pv_ofile V) (pv_fdg V) (pv_cwd V) ns.
+  MkPPriv szv P ws (pv_ofile V) (pv_fdg V) (pv_cwd V) ns (pv_cwi V).
 
 Lemma upd_exec_compose (V : pprivate) (szv : mword 64) (P : uptd)
     (ws : list (mword 64)) (ns : list (bv 8)) :
@@ -1125,21 +1130,40 @@ Section ProcInv.
      neither [proc_ctx]'s nor [proc_dormant]'s contents.  A [cwd <> 0]
      conjunct anywhere near it would break exactly that; as a projection it
      rides inside the Löb'd obligation and no recast ever looks at it. *)
-  Definition cwd_ref (v : mword 64) : iProp Σ := inode_held v.
+  (* AT ITS INUM (lane C1): the block ties the pointer to [pv_cwi], the
+     inum the process's cwd names, and this is the tie --
+     [IcacheRef.inode_held_at], the same package with its inum a pure
+     conjunct.  [cwd_ref] is its ∃-form, kept for the consumers that only
+     ever wanted the reference. *)
+  Definition cwd_ref_at (v : mword 64) (z : Z) : iProp Σ := inode_held_at v z.
+  Definition cwd_ref (v : mword 64) : iProp Σ := (∃ z : Z, cwd_ref_at v z)%I.
 
   (* The two directions, kept as NAMES so consumers do not unfold: they are
      definitional now, but they were not, and the call sites read better
      for saying which way they are going. *)
-  Lemma cwd_ref_held (v : mword 64) : cwd_ref v -∗ inode_held v.
+  Lemma cwd_ref_at_held_at (v : mword 64) (z : Z) : cwd_ref_at v z -∗ inode_held_at v z.
   Proof. iIntros "$". Qed.
+
+  Lemma cwd_ref_at_of_held_at (v : mword 64) (z : Z) : inode_held_at v z -∗ cwd_ref_at v z.
+  Proof. iIntros "$". Qed.
+
+  Lemma cwd_ref_at_held (v : mword 64) (z : Z) : cwd_ref_at v z -∗ inode_held v.
+  Proof. rewrite /cwd_ref_at. iApply inode_held_at_held. Qed.
+
+  Lemma cwd_ref_held (v : mword 64) : cwd_ref v -∗ inode_held v.
+  Proof. iIntros "(%z & H)". by iApply cwd_ref_at_held. Qed.
 
   Lemma cwd_ref_of_held (v : mword 64) : inode_held v -∗ cwd_ref v.
-  Proof. iIntros "$". Qed.
+  Proof. rewrite /cwd_ref /cwd_ref_at. iApply inode_held_zi. Qed.
 
   (* ... and the projection the missing arm buys. *)
+  Lemma cwd_ref_at_nonzero (v : mword 64) (z : Z) :
+    cwd_ref_at v z -∗ ⌜v <> (zero_reg : mword 64)⌝.
+  Proof. iIntros "H". iApply inode_held_ne_zero. by iApply cwd_ref_at_held. Qed.
+
   Lemma cwd_ref_nonzero (v : mword 64) :
     cwd_ref v -∗ ⌜v <> (zero_reg : mword 64)⌝.
-  Proof. iIntros "H". by iApply (inode_held_ne_zero with "H"). Qed.
+  Proof. iIntros "(%z & H)". by iApply (cwd_ref_at_nonzero with "H"). Qed.
 
   (* [p->sz] NEVER EXCEEDS MAXVA.  This is a real invariant of a live
      process -- exec and growproc are the only writers and both bound the
@@ -1204,7 +1228,7 @@ Section ProcInv.
      proc_fields pa (DfracOwn 1) (us_V U) ∗
      proc_ptm_at pa (pv_upt (us_V U)) (uint (pv_sz (us_V U))) (us_M U) ∗
      tf_page (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) ∗
-     cwd_ref (pv_cwd (us_V U)) ∗
+     cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) ∗
      first_tok)%I.
 
   (* ...AND ITS FILE-LAYER-FREE PART, WHICH IS WHAT THE BLOCK LAYER TAKES.
@@ -1214,7 +1238,7 @@ Section ProcInv.
      and rejoins with a rewrite -- no borrow and no closer to carry. *)
   Lemma proc_priv_core_bare (pa : mword 64) (pid : mword 32) (U : ustate) :
     proc_priv_core pa pid U ⊣⊢
-    proc_priv_bare pa pid U ∗ cwd_ref (pv_cwd (us_V U)) ∗ first_tok.
+    proc_priv_bare pa pid U ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) ∗ first_tok.
   Proof.
     rewrite /proc_priv_core /proc_priv_bare. iSplit.
     - iIntros "(%A & %B & Hpid & Hf & Hpt & Htfp & Hc & Hft)".
@@ -1331,7 +1355,7 @@ Section ProcInv.
   Lemma proc_priv_split_cwd (γf : gname) (pa : mword 64) (pid : mword 32)
       (U : ustate) :
     proc_priv γf pa pid U ⊣⊢
-    proc_priv_nocwd γf pa pid U ∗ cwd_ref (pv_cwd (us_V U)) ∗ first_tok.
+    proc_priv_nocwd γf pa pid U ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) ∗ first_tok.
   Proof.
     rewrite /proc_priv /proc_priv_core /proc_priv_nocwd.
     iSplit.
@@ -1396,7 +1420,7 @@ Section ProcInv.
      proc_fields pa (DfracOwn 1) V ∗
      proc_pt_cells pa (pv_upt V) ∗
      tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
-     cwd_ref (pv_cwd V) ∗
+     cwd_ref_at (pv_cwd V) (pv_cwi V) ∗
      proc_ofiles γf (pv_fdg V) pa (pv_ofile V) ∗
      first_tok)%I.
 
@@ -1507,7 +1531,7 @@ Section ProcInv.
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iFrame "Hcwd". iIntros (v') "Hcwd".
     rewrite /proc_priv_nocwd /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
     iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
@@ -1538,13 +1562,23 @@ Section ProcInv.
     iDestruct "Hpid" as "[Hq1 Hq2]".
     iFrame "Hcwd Hq1". iIntros (v') "Hcwd Hq1".
     rewrite /proc_priv_nocwd /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
     iSplitR; [done|]. iSplitR; [done|].
     rewrite Hq ctx_word4_pointsto_frac_split. iFrame "Hq1 Hq2".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
     iFrame.
   Qed.
+
+  (* THE DEFICIT BLOCK DOES NOT MENTION THE INUM: nothing in it ties
+     [p->cwd] to anything, so it is the same resource at every [pv_cwi].
+     This is what lets the installer (userinit, kfork's child) pick the inum
+     the reference it is about to install actually carries, and then rejoin
+     through [proc_priv_split_cwd] at that inum. *)
+  Lemma proc_priv_nocwd_cwi (γf : gname) (pa : mword 64) (pid : mword 32)
+      (U : ustate) (z : Z) :
+    proc_priv_nocwd γf pa pid (us_cwi U z) = proc_priv_nocwd γf pa pid U.
+  Proof. destruct U as [[] M]. reflexivity. Qed.
 
   (* and the deficit block's own projections, for a holder that has not yet
      installed a cwd.  (The [pv_cwd V <> 0] projection is NOT among them --
@@ -1653,7 +1687,7 @@ Section ProcInv.
     proc_ptm_at pa P (uint (pv_sz (us_V U))) (us_M U) -∗
     tf_page (ud_tfp P) ws -∗
     proc_ofiles γf (pv_fdg (us_V U)) pa (pv_ofile (us_V U)) -∗
-    cwd_ref (pv_cwd (us_V U)) -∗
+    cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) -∗
     (* ...AND THE TOKEN.  [proc_priv_nocwd_intro] above has NO such premise
        and must not: allocproc produces the deficit block, and allocproc
        does not park a RUNNABLE or SLEEPING process. *)
@@ -1664,7 +1698,7 @@ Section ProcInv.
     iDestruct (proc_priv_nocwd_intro γf pa pid U P ws Hsz Hbel
                  with "Hpid Hf Hpt Htf Ho") as "H".
     iApply proc_priv_split_cwd. iFrame "H Hft".
-    by cbn [upd_pt pv_cwd pv_fdg].
+    by cbn [upd_pt pv_cwd pv_fdg pv_cwi].
   Qed.
 
   (* ---- projections: what callers actually use ---- *)
@@ -1737,9 +1771,10 @@ Section ProcInv.
      placeholder (C6b, design/fs-icache.md §3). *)
   Lemma proc_priv_cwd (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
     proc_priv γf pa pid U -∗
-    p_cwd pa ↦₈ pv_cwd (us_V U) ∗ cwd_ref (pv_cwd (us_V U)) ∗
-    (∀ v' : mword 64,
-       p_cwd pa ↦₈ v' -∗ cwd_ref v' -∗ proc_priv γf pa pid (us_cwd U v')).
+    p_cwd pa ↦₈ pv_cwd (us_V U) ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) ∗
+    (∀ (v' : mword 64) (z' : Z),
+       p_cwd pa ↦₈ v' -∗ cwd_ref_at v' z' -∗
+       proc_priv γf pa pid (us_cwi (us_cwd U v') z')).
   Proof.
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
@@ -1748,9 +1783,10 @@ Section ProcInv.
        FOLDED [cwd_ref _] and conversion closes it.  (This is what kept the
        lemma standing across C6b, when the predicate gained content.) *)
     iSplitL "Hc"; [iExact "Hc"|].
-    iIntros (v') "Hcwd Hc".
+    iIntros (v' z') "Hcwd Hc".
     rewrite /proc_priv /proc_priv_core /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+    cbn [us_cwi us_cwd upd_usV us_V us_M upd_cwi upd_cwd
+         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
     iSplitR "Ho"; [| iExact "Ho"].
     iSplitR; [done|]. iSplitR; [done|].
     iFrame "Hpid".
@@ -1783,8 +1819,9 @@ Section ProcInv.
   Lemma proc_priv_bare_cref (γf : gname) (pa : mword 64) (pid : mword 32)
       (U : ustate) :
     proc_priv γf pa pid U -∗
-    proc_priv_bare pa pid U ∗ cwd_ref (pv_cwd (us_V U)) ∗
-    (proc_priv_bare pa pid U -∗ cwd_ref (pv_cwd (us_V U)) -∗ proc_priv γf pa pid U).
+    proc_priv_bare pa pid U ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) ∗
+    (proc_priv_bare pa pid U -∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) -∗
+     proc_priv γf pa pid U).
   Proof.
     (* one [rewrite] does both occurrences -- the hypothesis AND the one
        under the wand -- so the give-back needs no second one. *)
@@ -1795,11 +1832,11 @@ Section ProcInv.
 
   Lemma proc_priv_cwd_pid (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
     proc_priv γf pa pid U -∗
-    p_cwd pa ↦₈ pv_cwd (us_V U) ∗ cwd_ref (pv_cwd (us_V U)) ∗
+    p_cwd pa ↦₈ pv_cwd (us_V U) ∗ cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) ∗
     p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
-    (∀ v' : mword 64,
-       p_cwd pa ↦₈ v' -∗ cwd_ref v' -∗ p_pid pa ↦₄{DfracOwn (1/4)} pid -∗
-       proc_priv γf pa pid (us_cwd U v')).
+    (∀ (v' : mword 64) (z' : Z),
+       p_cwd pa ↦₈ v' -∗ cwd_ref_at v' z' -∗ p_pid pa ↦₄{DfracOwn (1/4)} pid -∗
+       proc_priv γf pa pid (us_cwi (us_cwd U v') z')).
   Proof.
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
@@ -1810,9 +1847,10 @@ Section ProcInv.
     (* [iExact], not [iFrame] -- see [proc_priv_cwd]. *)
     iSplitL "Hc"; [iExact "Hc"|].
     iSplitL "Hq1"; [iExact "Hq1"|].
-    iIntros (v') "Hcwd Hc Hq1".
+    iIntros (v' z') "Hcwd Hc Hq1".
     rewrite /proc_priv /proc_priv_core /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+    cbn [us_cwi us_cwd upd_usV us_V us_M upd_cwi upd_cwd
+         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
     iSplitR "Ho"; [| iExact "Ho"].
     iSplitR; [done|]. iSplitR; [done|].
     rewrite Hq ctx_word4_pointsto_frac_split. iFrame "Hq1 Hq2".
@@ -1835,7 +1873,7 @@ Section ProcInv.
     proc_priv γf pa pid U -∗ ⌜pv_cwd (us_V U) <> (zero_reg : mword 64)⌝.
   Proof.
     iIntros "[(_ & _ & _ & _ & _ & _ & Hc & _) _]".
-    by iApply (cwd_ref_nonzero with "Hc").
+    by iApply (cwd_ref_at_nonzero with "Hc").
   Qed.
 
   Lemma proc_priv_ofile_len (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
@@ -2573,7 +2611,7 @@ Section ProcInv.
     iDestruct (fd_frags_of_closed γd with "Hfrag") as "Hfrag".
     iModIntro. iFrame "Hctx Hpg Htf Hsp Hir Hbs Hkst".
     iExists (upd_fdg V γd), pid.
-    cbn [upd_fdg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name].
+    cbn [upd_fdg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name pv_cwi].
     iSplit; [done|]. iFrame "Hpid Hf".
     iSplitR "Hfrag"; [| rewrite /fdt0; iExact "Hfrag"].
     iDestruct (fd_st_closed_to_any γd (replicate NOFILE (zero_reg : mword 64))

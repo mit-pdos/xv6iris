@@ -982,16 +982,8 @@ Section KexecASeam.
 
   (* [inode_held] IS [inode_held_at] with the inum forgotten, so the walk
      publishes the sharper form by ∃-introduction and no landed contract
-     grows a premise.  N-5.2B's whole cost at this seam. *)
-  Lemma inode_held_zi (v : mword 64) :
-    inode_held v ⊢ ∃ z : Z, inode_held_at v z.
-  Proof.
-    rewrite /inode_held /inode_held_at. iIntros "H".
-    iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hlt & Hr)".
-    iExists (bv_unsigned inum), k, q, inum.
-    iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
-    iExact "Hr".
-  Qed.
+     grows a premise.  N-5.2B's whole cost at this seam.  The lemma is
+     [IcacheRef.inode_held_zi] now (lane C1). *)
 
   Definition kxc_at_a2
       (jp : nat)

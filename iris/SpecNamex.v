@@ -344,7 +344,7 @@ Definition namex_post
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       proc_priv_bare pj pidv Upr -∗
-      inode_held (pv_cwd (us_V Upr)) -∗
+      inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       (* the name buffer, at an UNSPECIFIED naming function -- the short
          branch leaves the bytes above [len] alone *)
@@ -392,7 +392,7 @@ Definition namex_postS
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       proc_priv_bare pj pidv Upr -∗
-      inode_held (pv_cwd (us_V Upr)) -∗
+      inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       (* the name buffer, at an UNSPECIFIED naming function -- the short
          branch leaves the bytes above [len] alone *)
@@ -534,7 +534,7 @@ Definition wp_namex_sconf_body
   (* ---- the caller's own pid cell (acquiresleep records it) ---- *)
   proc_priv_bare pj pidv Upr -∗
   (* ---- THE WORKING DIRECTORY: cell and reference, both handed back ---- *)
-  inode_held (pv_cwd (us_V Upr)) -∗
+  inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
   (* ---- THE PATH: [plen] content bytes and the terminator, AT THE CALLER'S
      FRACTION [dqpv].  The rule the tree follows: a byte run the callee only
      READS takes the caller's dfrac, a run it WRITES stays whole.  namex only
@@ -690,7 +690,7 @@ Definition wp_namex_gen_body
   (* ---- the caller's own pid cell (acquiresleep records it) ---- *)
   proc_priv_bare pj pidv Upr -∗
   (* ---- THE WORKING DIRECTORY: cell and reference, both handed back ---- *)
-  inode_held (pv_cwd (us_V Upr)) -∗
+  inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
   (* ---- THE PATH: [plen] content bytes and the terminator, AT THE CALLER'S
      FRACTION [dqpv].  The rule the tree follows: a byte run the callee only
      READS takes the caller's dfrac, a run it WRITES stays whole.  namex only
@@ -877,7 +877,10 @@ Definition wp_namex_root_body
       pc_is ret_tgt -∗
       pa_add pv 0 ↦ₘ{dqp} SLASH -∗
       pa_add pv 1 ↦ₘ{dqp} NUL -∗
-      inode_held ipv -∗
+      (* AT ROOTINO (lane C1): the absolute arm's one [iget] names the
+         inum, and userinit's [p->cwd = namei("/")] installs it beside the
+         pointer ([ProcDefs.pv_cwi]). *)
+      inode_held_at ipv (bv_unsigned ROOTINO) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

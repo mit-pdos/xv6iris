@@ -3153,7 +3153,7 @@ Section ProofSysOpenBody.
       as "[Hpnc [Href Hftok]]".
     iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
     iDestruct "Hpnc" as "[Hpbare Hofiles]".
-    iDestruct (cwd_ref_held with "Href") as "Hcwdref".
+    iDestruct (cwd_ref_at_held_at with "Href") as "Hcwdref".
     iDestruct (iref_slots_split 2 (ns - 2) with "[Hisl]") as "[Hir2 Hirr]".
     { replace (2 + (ns - 2))%nat with ns by lia. iExact "Hisl". }
     iDestruct (so_buf_split (pa_stk sp0 22) bp plen Hplen with "HbP")
@@ -3245,7 +3245,7 @@ Section ProofSysOpenBody.
                       = mword_of_int (SO + 0x10c)) by pcw.
       iEval (rewrite Htge6) in "Hpc".
       (* the process, put back whole and then re-carved for the tail's pid *)
-      iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+      iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
       iCombine "Hpbare Hofiles" as "Hpnc".
     iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
       iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv U
@@ -3392,7 +3392,7 @@ Section ProofSysOpenBody.
     iDestruct (so_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     (* the process, put back whole: everything below wants [proc_priv] *)
-    iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+    iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
     iCombine "Hpbare Hofiles" as "Hpnc".
     iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
     iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv U

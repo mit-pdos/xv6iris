@@ -44,10 +44,30 @@ Record pprivate := MkPPriv {
   pv_fdg   : gname;
   pv_cwd   : mword 64;
   pv_name  : list (bv 8);
+  (* THE WORKING DIRECTORY'S INUM (lane C1, 2026-09-04): the process's cwd
+     is process-visible state, and what user code can observe of it is the
+     directory it names, not the [struct inode *] the kernel happens to
+     cache it in.  So the block carries the inum beside the pointer, and
+     [ProcInv.proc_priv_core] ties the two with [ProcInv.cwd_ref_at]
+     ([IcacheRef.inode_held_at] -- the reference AT this inum).  It is not
+     a cell: nothing in [struct proc] stores it, the icache's identity does.
+     LAST, so every positional [MkPPriv] only gained a trailing argument.
+     chdir writes it ([upd_cwi]), fork copies it, exec and everything else
+     preserve it -- every other [upd_*] keeps it. *)
+  pv_cwi   : Z;
 }.
 
 Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
-  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) v (pv_name V).
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) v (pv_name V)
+          (pv_cwi V).
+
+(* the inum alone -- chdir's second write, beside the pointer's *)
+Definition upd_cwi (V : pprivate) (z : Z) : pprivate :=
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
+          (pv_name V) z.
+
+Lemma upd_cwi_id (V : pprivate) : upd_cwi V (pv_cwi V) = V.
+Proof. destruct V; reflexivity. Qed.
 
 (* re-storing what was already there is the identity, which is what a BORROW
    of the cell out of a block needs in order to close: a load leaves [p->cwd]
@@ -109,6 +129,12 @@ Definition us_cwd (U : ustate) (v : mword 64) : ustate :=
 
 Lemma us_cwd_id (U : ustate) : us_cwd U (pv_cwd (us_V U)) = U.
 Proof. destruct U as [V M]. rewrite /us_cwd /upd_usV /=. by rewrite upd_cwd_id. Qed.
+
+Definition us_cwi (U : ustate) (z : Z) : ustate :=
+  upd_usV U (upd_cwi (us_V U) z).
+
+Lemma us_cwi_id (U : ustate) : us_cwi U (pv_cwi (us_V U)) = U.
+Proof. destruct U as [V M]. rewrite /us_cwi /upd_usV /=. by rewrite upd_cwi_id. Qed.
 
 Section ProcDefs.
   Context `{!riscvGS Σ}.
@@ -491,7 +517,7 @@ Section ProcDefs.
     iFrame "Hcwd". iIntros (v') "Hcwd".
     rewrite /proc_priv_bare /proc_fields.
     cbn [us_cwd upd_usV us_V us_M upd_cwd
-         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
     iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }

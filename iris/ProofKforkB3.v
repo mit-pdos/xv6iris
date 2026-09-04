@@ -191,7 +191,7 @@ Qed.
 
 Definition kfk_childV (V0 : pprivate) (Vp_of : list (mword 64)) (i : nat) : pprivate :=
   MkPPriv (pv_sz V0) (pv_upt V0) (pv_tf V0)
-          (kfk_at Vp_of (pv_ofile V0) i) (pv_fdg V0) (pv_cwd V0) (pv_name V0).
+          (kfk_at Vp_of (pv_ofile V0) i) (pv_fdg V0) (pv_cwd V0) (pv_name V0) (pv_cwi V0).
 
 Lemma kfk_childV_0 (V0 : pprivate) (Vp_of : list (mword 64)) :
   kfk_childV V0 Vp_of 0 = V0.

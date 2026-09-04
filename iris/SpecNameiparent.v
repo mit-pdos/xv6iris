@@ -157,7 +157,7 @@ Definition wp_nameiparent_sconf_body
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   proc_priv_bare pj pidv Upr -∗
-  inode_held (pv_cwd (us_V Upr)) -∗
+  inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
   (* ---- THE PATH RIDES THE CALLER'S FRACTION [dqpv]; THE NAME BUFFER STAYS
      WHOLE.  The rule the tree follows: a byte run the callee only READS takes
      the caller's dfrac, a run it WRITES stays at [DfracOwn 1].  The walk only
@@ -191,7 +191,7 @@ Definition wp_nameiparent_sconf_body
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       proc_priv_bare pj pidv Upr -∗
-      inode_held (pv_cwd (us_V Upr)) -∗
+      inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
       bslots 3 -∗
@@ -290,7 +290,7 @@ Definition wp_nameiparent_gen_body
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   proc_priv_bare pj pidv Upr -∗
-  inode_held (pv_cwd (us_V Upr)) -∗
+  inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
   bslots 3 -∗
@@ -316,7 +316,7 @@ Definition wp_nameiparent_gen_body
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       proc_priv_bare pj pidv Upr -∗
-      inode_held (pv_cwd (us_V Upr)) -∗
+      inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
       bslots 3 -∗

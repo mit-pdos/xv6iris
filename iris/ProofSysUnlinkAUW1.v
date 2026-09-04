@@ -610,7 +610,7 @@ Section ProofSysUnlinkAUW1.
         as "[Hpnc [Href Hftok]]".
       iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
       iDestruct "Hpnc" as "[Hpidq Hofiles]".
-      iDestruct (cwd_ref_held with "Href") as "Hcwdref".
+      iDestruct (cwd_ref_at_held_at with "Href") as "Hcwdref".
       iEval (cbn [upd_upt pv_cwd pv_fdg]) in "Hcwdref".
       (* ===== +0x1c jal ra,begin_op ===== *)
       iApply (wp_jal_s_sconf (CID := CID11) (mword_of_int (SU + 0x1c)) Rra
@@ -810,7 +810,7 @@ Section ProofSysUnlinkAUW1.
                         = mword_of_int (SU + 0x30)) by pcw.
         iEval (rewrite Hpp30) in "Hpc".
         (* the process block, rebuilt whole for the seam *)
-        iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+        iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
         iCombine "Hpidq Hofiles" as "Hpnc".
         iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
         iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1)
@@ -890,7 +890,7 @@ Section ProofSysUnlinkAUW1.
         iEval (rewrite /wp_next).
         iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce
                                              Hpc Hpidq".
-        iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+        iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
         iCombine "Hpidq Hofiles" as "Hpnc".
         iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
         iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1)

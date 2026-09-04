@@ -387,7 +387,7 @@ Qed.
 Definition su_dummyV : pprivate :=
   MkPPriv (mword_of_int 0)
           (UPTD (mword_of_int 0) (mword_of_int 0) ∅ ∅)
-          [] [] 1%positive (mword_of_int 0) [].
+          [] [] 1%positive (mword_of_int 0) [] 0.
 
 (* readi's delivered byte at [tot = 16] is the file's byte *)
 Lemma su_rdd_eq `{XI : CurCtx} (data : nat -> list (bv 8)) (olds : nat -> bv 8)

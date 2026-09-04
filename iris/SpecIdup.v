@@ -186,7 +186,7 @@ Notation K_idup := (14%nat) (only parsing).
 Require Import TsoCtx.
 Definition wp_idup_sconf_body
     `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (k : nat)
+    (k : nat) (z : Z)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.idup in
@@ -240,8 +240,14 @@ Definition wp_idup_sconf_body
      which is what §3.11's wall said it could never have; and the COPY is
      minted at the PARENT's flavour, which is what keeps (R3) true.  Under
      RULING C' that flavour is the plain one at every rest home, so both
-     packages that leave are [inode_refp]-shaped and iput-ready. *)
-  inode_held (ientry k) -∗
+     packages that leave are [inode_refp]-shaped and iput-ready.
+       AT ITS INUM (lane C1): the package comes in pinned to [z] and both
+     packages leave pinned to the same [z] -- idup moves the count word
+     and nothing else, so the identity the caller's reference carries is
+     the identity the copy carries.  The process block's cwd tie
+     ([ProcInv.cwd_ref_at]) is what needs this: namex lends the cwd
+     reference through this call and must return it AT ITS INUM. *)
+  inode_held_at (ientry k) z -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr KT1 mr K b p -∗
@@ -250,19 +256,19 @@ Definition wp_idup_sconf_body
     ⌜ callee_saved m mr
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
     (* the caller's own package, whole and at its own fraction *)
-    inode_held (ientry k) -∗
+    inode_held_at (ientry k) z -∗
     (* ...and the new one, minted from the table's retained share at a
        fraction only the table knows -- which [inode_held] hides anyway. *)
-    inode_held (ientry k) -∗
+    inode_held_at (ientry k) z -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type IDUP.
   Parameter wp_idup_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (k : nat)
+      (k : nat) (z : Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_idup_sconf_body k
+      wp_idup_sconf_body k z
                          m n eb p K b lks.
 End IDUP.

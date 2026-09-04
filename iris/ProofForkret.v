@@ -849,7 +849,7 @@ Lemma fkr_boot
   (* the block WITHOUT its token: the boot arm spends the token's contents
      and rebuilds it, at the steady arm, out of what fsinit returns *)
   proc_priv_nocwd γf p pid U -∗
-  cwd_ref (pv_cwd (us_V U)) -∗
+  cwd_ref_at (pv_cwd (us_V U)) (pv_cwi (us_V U)) -∗
   (* ...and the token's boot disjunct, opened *)
   first_addr ↦₄ (mword_of_int 1 : mword 32) -∗
   first_boot_persist -∗

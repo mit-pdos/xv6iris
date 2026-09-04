@@ -316,6 +316,9 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
       fragment bundle rides beside the block and has to be re-keyed. *)
    pv_fdg V' = pv_fdg V /\
    pv_cwd V' = pv_cwd V /\
+   (* ...and the cwd's inum beside the pointer (lane C1): exec does not
+      chdir, so [ProcDefs.pv_cwi] is untouched like the cell it labels *)
+   pv_cwi V' = pv_cwi V /\
    length (pv_name V') = PNAMELEN /\
    (* the stack geometry: [sp] sits in the top page of the image, above the
       guard page uvmclear turned unusable *)

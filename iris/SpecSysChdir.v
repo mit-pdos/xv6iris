@@ -166,9 +166,13 @@ Section SpecSysChdir.
   Definition sys_chdir_post (γf : gname) (pa : mword 64) (pid : mword 32)
       (U : ustate) (r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf pa pid U
-     ∨ ∃ ipv : mword 64,
+     ∨ ∃ (ipv : mword 64) (z : Z),
          ⌜r = (zero_reg : mword 64)⌝ ∗
-         proc_priv γf pa pid (us_cwd U ipv))%I.
+         (* ...at the pointer AND its inum (lane C1).  [z] is existential
+            here as [ipv] is; it is the REAL inum of the installed inode --
+            the one [ProcInv.cwd_ref_at] ties the pointer to -- and lane C3
+            names it through the era walk. *)
+         proc_priv γf pa pid (us_cwi (us_cwd U ipv) z))%I.
 
 End SpecSysChdir.
 

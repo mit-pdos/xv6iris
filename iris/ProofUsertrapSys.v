@@ -568,7 +568,7 @@ Section UtSysBlock.
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
       iIntros (CID2 Hk2 mg U2 stsR)
-        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc Hxo".
+        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg %Hcwig Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc Hxo".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).

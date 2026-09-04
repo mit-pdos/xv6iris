@@ -531,10 +531,10 @@ Section ProofNamexRoot.
     { rewrite HA3ra. pcw. }
     iEval (rewrite Hpc050) in "Hpc".
     (* the answer, in the currency the contract speaks *)
-    iAssert (inode_held (ientry kig)) with "[Href Hru]" as "Hip".
-    { rewrite /inode_held. iExists kig, qig, ROOTINO.
+    iAssert (inode_held_at (ientry kig) (bv_unsigned ROOTINO)) with "[Href Hru]" as "Hip".
+    { rewrite /inode_held_at. iExists kig, qig, ROOTINO.
       iSplitR; [done |]. iSplitR; [iPureIntro; exact Hkig |].
-      iSplitR; [iPureIntro;exact Hrino |].
+      iSplitR; [iPureIntro;exact Hrino |]. iSplitR; [iPureIntro; reflexivity |].
       iFrame "Hru". iExact "Href". }
     (* ===== +0x050 c.mv s4,a0 ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x50)) Rs4 Ra0 mig (K - 12)%nat b

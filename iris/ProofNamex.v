@@ -1064,7 +1064,7 @@ Section ProofNamexMain.
      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
      proc_priv_bare (proc_addr j) pidv Upr -∗
-     inode_held (pv_cwd (us_V Upr)) -∗
+     inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
      bslots 3 -∗
@@ -1118,7 +1118,7 @@ Section ProofNamexMain.
      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
      proc_priv_bare (proc_addr j) pidv Upr -∗
-     inode_held (pv_cwd (us_V Upr)) -∗
+     inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf' i) -∗
      bslots 3 -∗
@@ -5813,11 +5813,12 @@ Section ProofNamexMain.
          the SLOT (the pointer [a0] is set to) and the two pure facts; the
          carve and the gather that used to bracket the call are inside
          [SpecIdup] now, and the cwd's fraction is untouched either way. *)
-      iDestruct "Hcwdr" as (ck cq cinum) "(%Hcwde & %Hckl & %Hcinb & Hcrefp)".
-      iAssert (inode_held (ientry ck)) with "[Hcrefp]" as "Hcheld".
+      iDestruct "Hcwdr" as (ck cq cinum) "(%Hcwde & %Hckl & %Hcinb & %Hcinz & Hcrefp)".
+      iAssert (inode_held_at (ientry ck) (pv_cwi (us_V Upr))) with "[Hcrefp]" as "Hcheld".
       { iExists ck, cq, cinum.
         iSplitR; [done |]. iSplitR; [iPureIntro; exact Hckl |].
-        iSplitR; [iPureIntro; exact Hcinb |]. iExact "Hcrefp". }
+        iSplitR; [iPureIntro; exact Hcinb |]. iSplitR; [iPureIntro; exact Hcinz |].
+        iExact "Hcrefp". }
       (* +0x36 jal ra,idup *)
       assert (Htgtid : add_vec (mword_of_int (NX + 0x36) : mword 64)
                          (sign_extend' 64 (mword_of_int 2095360 : mword 21))
@@ -5851,7 +5852,7 @@ Section ProofNamexMain.
          walk already carries -- persistent, and the same [Hireg] the iget
          above was given. *)
       iApply (ID.wp_idup_sconf
-                ck B3 0%nat eb (proc_addr j) (K - 12)%nat b lks
+                ck (pv_cwi (us_V Upr)) B3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kid ltac:(vm_compute; reflexivity) Hckl HB3a0
                 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hireg Hisl1 Hcheld").
@@ -5873,7 +5874,9 @@ Section ProofNamexMain.
                     (add_vec (zero_reg : mword 64) (mid !!! Regidx Ra0))]> mid).
       assert (HB4s4 : B4 !!! Regidx Rs4 = ientry ck).
       { rewrite /B4 upd_eq. rewrite Hida0. apply add_vec_zero_l. }
-      (* the walk's starting reference: idup's second package, as it stands *)
+      (* the walk's starting reference: idup's second package, as it stands
+         (its inum forgotten -- the walk's cursor is the cwd's copy) *)
+      iDestruct (inode_held_at_held with "Hip0") as "Hip0".
       iRename "Hip0" into "Hip".
       (* ---- the register facts the two [callee_saved]s carry over ---- *)
       assert (Hcsa1 : is_cs_idx Ra1 = false) by (vm_compute; reflexivity).

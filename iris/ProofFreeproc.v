@@ -608,10 +608,11 @@ Section ProofFreeproc.
       { (* proc_dormant pa UNUSED, at the emptied V *)
         iApply (fp_to_dormant_unused pa
                   (MkPPriv (zero_reg : mword 64) (pv_upt V) (pv_tf V)
-                           (pv_ofile V) (pv_fdg V) (pv_cwd V) (<[0%nat := (mword_of_int 0 : mword 8)]> (pv_name V)))
+                           (pv_ofile V) (pv_fdg V) (pv_cwd V) (<[0%nat := (mword_of_int 0 : mword 8)]> (pv_name V))
+                           (pv_cwi V))
                   (mword_of_int 0 : mword 32) (pv_sz V)
                   with "[Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx] [Hpg] [Htf]").
-        - rewrite /fp_rest. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+        - rewrite /fp_rest. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi].
           iSplitR.
           { iPureIntro. split_and!; [exact Hofv | exact Hcwdv |].
             rewrite uint_unsigned. unfold uvm_maxsz. vm_compute. discriminate. }

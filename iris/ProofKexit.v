@@ -1642,7 +1642,7 @@ Section KexitRest.
        is borrowed for the two instructions that touch it (+0x50's load and
        +0x5c's store) and stays in the block for everything between. *)
     rewrite proc_priv_nocwd_bare. iDestruct "Hpriv" as "[Hpbare Hofiles]".
-    iDestruct (cwd_ref_held (pv_cwd (us_V U)) with "Href") as "Href".
+    iDestruct (cwd_ref_at_held (pv_cwd (us_V U)) (pv_cwi (us_V U)) with "Href") as "Href".
     iDestruct "Href" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href & Hru)".
     iDestruct (ic_escrows_acc kk Hkk with "Hescrows") as "#Hescrow".
     iDestruct (ic_sleeplocks_lookup _ kk Hkk with "Hslks") as (gil gisl) "#Hslk".

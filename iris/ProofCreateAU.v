@@ -2903,7 +2903,7 @@ Section ProofCreateMain.
     (* ---- the running process: the BLOCK and the cwd reference ---- *)
     iDestruct (proc_priv_bare_cref γf (proc_addr j) pidv U with "Hpriv")
       as "(Hppid & Hcref & Hpclose)".
-    iDestruct (cwd_ref_held with "Hcref") as "Hcref".
+    iDestruct (cwd_ref_at_held_at with "Hcref") as "Hcref".
     iEval (rewrite -HR7a0) in "Hpath".
     iEval (rewrite -HR7a1) in "Hnb14".
     iDestruct (cpu_own_transport CID CID14 0%nat eb (proc_addr j) b
@@ -2938,7 +2938,7 @@ Section ProofCreateMain.
       by exact (cr_regs_cs m sp0 _ _ ty major minor R7 mnp Hcsnp HR7regs).
     (* the process block goes back whole: create copies nothing to or from
        user memory, so [V] is unchanged. *)
-    iDestruct (cwd_ref_of_held with "Hcref") as "Hcref".
+    iDestruct (cwd_ref_at_of_held_at with "Hcref") as "Hcref".
     iDestruct ("Hpclose" with "Hppid Hcref") as "Hpriv".
     (* ===== +0x20 c.mv s1,a0 : s1 = dp ================================ *)
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x20)) Rs1 Ra0 mnp (K - 10)%nat b

@@ -111,6 +111,7 @@ Definition kexec_ok_q (Q : mword 64 -> Prop) (V V' : pprivate) (r : mword 64)
    (* ...and its fd-state ghost name -- see [SpecKexec.kexec_ok]'s note *)
    pv_fdg V' = pv_fdg V /\
    pv_cwd V' = pv_cwd V /\
+   pv_cwi V' = pv_cwi V /\
    length (pv_name V') = PNAMELEN /\
    (uint szv' - 4096 <= uint spv)%Z /\
    (uint spv <= uint szv')%Z).
@@ -178,6 +179,7 @@ Inductive kxf_cause :=
    pv_ofile V' = pv_ofile V /\
    pv_fdg V' = pv_fdg V /\
    pv_cwd V' = pv_cwd V /\
+   pv_cwi V' = pv_cwi V /\
    length (pv_name V') = PNAMELEN /\
    (uint szv' - 4096 <= uint spv)%Z /\
    (uint spv <= uint szv')%Z)EEDED is unchanged; the [bad:] tails are the ones
@@ -198,6 +200,7 @@ Definition kexec_ok_qf (Q : mword 64 -> Prop) (QF : kxf_cause -> Prop)
    pv_ofile V' = pv_ofile V /\
    pv_fdg V' = pv_fdg V /\
    pv_cwd V' = pv_cwd V /\
+   pv_cwi V' = pv_cwi V /\
    length (pv_name V') = PNAMELEN /\
    (uint szv' - 4096 <= uint spv)%Z /\
    (uint spv <= uint szv')%Z).

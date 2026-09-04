@@ -188,7 +188,9 @@ Definition wp_namei_root_boot_body
       pc_is ret_tgt -∗
       pa_add pv 0 ↦ₘ{dqp} SLASH -∗
       pa_add pv 1 ↦ₘ{dqp} NUL -∗
-      inode_held ipv -∗
+      (* at ROOTINO -- [SpecNamei.wp_namei_root_body]'s row, verbatim; this
+         is where userinit reads the inum it installs in [pv_cwi] *)
+      inode_held_at ipv (bv_unsigned InodeInv.ROOTINO) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

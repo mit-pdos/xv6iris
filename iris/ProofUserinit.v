@@ -597,8 +597,14 @@ Section ProofUserinit.
       rewrite Hr. exact Hnma0. }
     iEval (rewrite Hstored_cwd Hcwdaddr) in "Hcwd".
     iDestruct ("Hback" $! ipv with "Hcwd Hpid4") as "Hpnc".
+    (* ...AND AT THE ROOT'S INUM (lane C1): the deficit block does not
+       mention [pv_cwi], so it is relabelled to the inum the reference
+       carries -- [proc_priv_nocwd_cwi] -- and the rejoin below is at
+       [upd_cwi (upd_cwd V ipv) (bv_unsigned ROOTINO)]. *)
+    iEval (rewrite -(proc_priv_nocwd_cwi γf (proc_addr j) pid _
+                       (bv_unsigned InodeInv.ROOTINO))) in "Hpnc".
     (* the reference namei's [iget] returned, in the shape the block wants *)
-    iDestruct (cwd_ref_of_held ipv with "Hip") as "Hcref".
+    iDestruct (cwd_ref_at_of_held_at ipv _ with "Hip") as "Hcref".
     (* THE BLOCK IS *NOT* CLOSED HERE any more.  Since [FirstTok.first_tok]
        became a conjunct of [proc_priv], closing it needs the token too, and
        the token's allocator row is minted by a ghost step -- so the three
@@ -691,10 +697,11 @@ Section ProofUserinit.
     iDestruct (kalloc_env_at_avail with "Hkenv") as "#Hkav".
     iDestruct (first_tok_boot with "Hfirst Hpersist Hkav Hfsinit")
       as "Hftok".
-    iAssert (proc_priv γf (proc_addr j) pid (MkUstate (upd_cwd V ipv) M))
+    iAssert (proc_priv γf (proc_addr j) pid
+               (MkUstate (upd_cwi (upd_cwd V ipv) (bv_unsigned InodeInv.ROOTINO)) M))
       with "[Hpnc Hcref Hftok]" as "Hpriv".
     { rewrite proc_priv_split_cwd. iFrame "Hpnc".
-      iSplitL "Hcref"; [cbn [upd_cwd pv_cwd pv_fdg]; iExact "Hcref" |].
+      iSplitL "Hcref"; [cbn [upd_cwi upd_cwd pv_cwd pv_cwi pv_fdg]; iExact "Hcref" |].
       iExact "Hftok". }
     (* ...AND THE SLOT LEDGER'S SEAL, beside the allocator's.  allocproc's
        draw at +0x0a was the last counted proc allocation in the boot, and
@@ -787,7 +794,8 @@ Section ProofUserinit.
       iIntros (W) "_". iApply (UexecCond.cond_entry_slot W with "Hgen"). }
     (* L8: the park takes and returns the parker's running token; borrow it from the cap *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (park_token_park N rest (MkUstate (upd_cwd V ipv) M) fdt0 Hwf Hrest
+    iMod (park_token_park N rest
+            (MkUstate (upd_cwi (upd_cwd V ipv) (bv_unsigned InodeInv.ROOTINO)) M) fdt0 Hwf Hrest
             with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirs]")
       as "[Hrun Hpctx]".

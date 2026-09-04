@@ -561,6 +561,10 @@ Definition wp_syscall_sconf_body
          chooses the CHILD's.  So the bundle below is stated at the ENTRY
          record and this equation is what lets the caller re-key it. *)
       ⌜ pv_fdg (us_V U') = pv_fdg (us_V U) ⌝ -∗
+      (* ...and the cwd's inum (lane C1): chdir (9) is the one entry that
+         moves it; every other entry hands the block back at the inum it
+         came in with. *)
+      ⌜ sysc_num (us_V U) = 9 \/ pv_cwi (us_V U') = pv_cwi (us_V U) ⌝ -∗
       sie_cap_gpr KT1 mf av true pj -∗
       cpu_own 0%nat true pj true lks -∗
       bslots 3 -∗

@@ -991,10 +991,10 @@ Section ProofIdup.
      half stays behind as the short parent, exactly as before, but now
      inside the contract instead of at every call site. *)
   Lemma wp_idup_sconf
-      (k : nat)
+      (k : nat) (z : Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_idup_sconf_body k
+    : wp_idup_sconf_body k z
                          m n eb p K b lks.
   Proof.
     cbv beta delta [wp_idup_sconf_body].
@@ -1002,7 +1002,7 @@ Section ProofIdup.
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hrinv Hislot Hheld Hcont".
     iDestruct (is_itable2_lock with "Hlock") as "#Hlk2".
     iDestruct (is_itable2_claims with "Hlock") as "#Hclaims".
-    iDestruct "Hheld" as (k0 q inum) "(%Hent & %Hk0 & %Hinb & Href & Hru)".
+    iDestruct "Hheld" as (k0 q inum) "(%Hent & %Hk0 & %Hinb & %Hinz & Href & Hru)".
     assert (Hkk : k0 = k).
     { symmetry. apply (ientry_inj k k0); [lia | lia | exact Hent]. }
     subst k0.
@@ -1028,11 +1028,11 @@ Section ProofIdup.
     { exact Hpost. }
     - iExists k, q, inum.
       iSplitR; [done |]. iSplitR; [iPureIntro; exact Hk |].
-      iSplitR; [iPureIntro; exact Hinb |].
+      iSplitR; [iPureIntro; exact Hinb |]. iSplitR; [iPureIntro; exact Hinz |].
       rewrite /inode_refp. iFrame "Hold Hru".
     - iExists k, qn, inum.
       iSplitR; [done |]. iSplitR; [iPureIntro; exact Hk |].
-      iSplitR; [iPureIntro; exact Hinb |].
+      iSplitR; [iPureIntro; exact Hinb |]. iSplitR; [iPureIntro; exact Hinz |].
       rewrite /inode_refp. iFrame "Hnew Hru2".
   Qed.
 

@@ -99,7 +99,8 @@ Notation KF := KernelSyms.kfork (only parsing).
    projections is a no-op -- the [MkPPriv]-eta law every [upd_*] identity
    in this file reduces to. *)
 Lemma pprivate_eta (V : pprivate) :
-  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V) = V.
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
+          (pv_cwi V) = V.
 Proof. destruct V; reflexivity. Qed.
 
 Lemma upd_cwd_id (V : pprivate) : upd_cwd V (pv_cwd V) = V.
@@ -155,7 +156,7 @@ Section KforkB4Res.
     pname_cells pa (DfracOwn 1) (pv_name (us_V U)) ∗
     ⌜length (pv_name (us_V U)) = PNAMELEN⌝ ∗
     (∀ ns : list (bv 8), ⌜length ns = PNAMELEN⌝ -∗ pname_cells pa (DfracOwn 1) ns -∗
-       proc_priv γf pa pid (upd_usV U (MkPPriv (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_tf (us_V U)) (pv_ofile (us_V U)) (pv_fdg (us_V U)) (pv_cwd (us_V U)) ns))).
+       proc_priv γf pa pid (upd_usV U (MkPPriv (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_tf (us_V U)) (pv_ofile (us_V U)) (pv_fdg (us_V U)) (pv_cwd (us_V U)) ns (pv_cwi (us_V U))))).
   Proof.
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
@@ -275,7 +276,11 @@ Section KforkB4Proof.
            ⌜pv_sz Vc' = pv_sz (us_V Uc) /\ pv_upt Vc' = pv_upt (us_V Uc) /\
             pv_tf Vc' = pv_tf (us_V Uc) /\ pv_ofile Vc' = pv_ofile (us_V Uc) /\
             pv_cwd Vc' = pv_cwd (us_V Up) /\ pv_fdg Vc' = pv_fdg (us_V Uc) /\
-            length (pv_name Vc') = PNAMELEN⌝ ∗
+            length (pv_name Vc') = PNAMELEN /\
+            (* ...and the cwd's inum, COPIED from the parent (lane C1):
+               idup's copy carries the identity the parent's reference
+               does, and the child's block is built at it. *)
+            pv_cwi Vc' = pv_cwi (us_V Up)⌝ ∗
            proc_priv γf npa pid_c (MkUstate Vc' ((us_M Uc)))) -∗
         iref_slots IREFSPARE -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -299,17 +304,18 @@ Section KforkB4Proof.
        hidden -- it is the cache's [icfg_dev] (design §13.11's
        single-device pin), which is what lets the itable this block holds
        the lock for be named without a coherence premise. *)
-    iDestruct (cwd_ref_held (pv_cwd (us_V Up)) with "Hpcref") as "Hpcref".
+    iDestruct (cwd_ref_at_held_at (pv_cwd (us_V Up)) (pv_cwi (us_V Up)) with "Hpcref") as "Hpcref".
     (* SIMP-2: the three hidden data are still read off the package -- the
        SLOT is what [a0] is set to and the two pure facts are what the
        child's [cwd_ref] wants back -- but the package itself now travels
        WHOLE.  What used to stand here (the shed, and the gather after the
        call) is idup's own business since [SpecIdup] took [inode_held]. *)
-    iDestruct "Hpcref" as (ck cq cinum) "(%Hcwd & %Hcklt & %Hcinumb & Hrefp)".
-    iAssert (inode_held (ientry ck)) with "[Hrefp]" as "Hpheld".
+    iDestruct "Hpcref" as (ck cq cinum) "(%Hcwd & %Hcklt & %Hcinumb & %Hcinz & Hrefp)".
+    iAssert (inode_held_at (ientry ck) (pv_cwi (us_V Up))) with "[Hrefp]" as "Hpheld".
     { iExists ck, cq, cinum.
       iSplitR; [done |]. iSplitR; [iPureIntro; exact Hcklt |].
-      iSplitR; [iPureIntro; exact Hcinumb |]. iExact "Hrefp". }
+      iSplitR; [iPureIntro; exact Hcinumb |]. iSplitR; [iPureIntro; exact Hcinz |].
+      iExact "Hrefp". }
     (* THE SHED THAT USED TO STAND HERE IS GONE (SIMP-2).  idup still runs
        on a count-0 share and still mints the child's reference from the
        table's retained slice (design §14.7(3)) -- but the carve, and the
@@ -369,7 +375,7 @@ Section KforkB4Proof.
     (* THE idup CALL.                                                 *)
     (* ------------------------------------------------------------- *)
     iApply (ID.wp_idup_sconf
-              ck M1 lvl eb pme (rsv + (K - 8))%nat false lks
+              ck (pv_cwi (us_V Up)) M1 lvl eb pme (rsv + (K - 8))%nat false lks
               (* the callee's bound is stated with a NAMED constant, so go through
                  [etransitivity] rather than [lia]: [exact] converts the name to
                  its literal, and only the [rsv] slack is left for [lia]. *)
@@ -381,10 +387,11 @@ Section KforkB4Proof.
     iIntros (mr) "Hcg Hown Hpc %Hidup_post Hpheld1 Hpheld2".
     (* the parent's own package, whole and at its own fraction: straight
        back into its block. *)
-    iDestruct (cwd_ref_of_held (ientry ck) with "Hpheld1") as "Hpcref1".
+    iDestruct (cwd_ref_at_of_held_at (ientry ck) _ with "Hpheld1") as "Hpcref1".
     iEval (rewrite -Hcwd) in "Hpcref1".
-    iDestruct ("Hpback" $! (pv_cwd (us_V Up)) with "Hpcwd Hpcref1") as "Hparent2".
-    iEval (rewrite us_cwd_id) in "Hparent2".
+    iDestruct ("Hpback" $! (pv_cwd (us_V Up)) (pv_cwi (us_V Up)) with "Hpcwd Hpcref1")
+      as "Hparent2".
+    iEval (rewrite us_cwd_id us_cwi_id) in "Hparent2".
     destruct Hidup_post as [Hcs_idup Hidup_a0].
     assert (Hpc0ac : ret_pc (M1 !!! Regidx Rra) = mword_of_int (KF + 0xac)).
     { rewrite HM1ra. apply bv_eq; vm_compute; reflexivity. }
@@ -410,17 +417,22 @@ Section KforkB4Proof.
     assert (Hstoreval : rget mr Ra0 = ientry ck).
     { rewrite (rget_ne mr Ra0 ltac:(vm_compute; discriminate)). exact Hidup_a0. }
     iEval (rewrite Hstoreval) in "Hccwd".
-    iDestruct (cwd_ref_of_held (ientry ck) with "Hpheld2") as "Hccref2".
+    iDestruct (cwd_ref_at_of_held_at (ientry ck) _ with "Hpheld2") as "Hccref2".
     iDestruct ("Hcback" $! (ientry ck) with "Hccwd") as "Hchild2".
+    (* ...AND AT THE PARENT'S INUM (lane C1): the deficit block does not
+       mention [pv_cwi], so it is relabelled to the inum idup's copy carries
+       -- the parent's ([proc_priv_nocwd_cwi]) -- and the rejoin is there. *)
+    iEval (rewrite -(proc_priv_nocwd_cwi γf npa pid_c _ (pv_cwi (us_V Up)))) in "Hchild2".
     (* THE WINDOW CLOSES HERE: cell + reference = the real block. *)
-    iAssert (proc_priv γf npa pid_c (us_cwd Uc (ientry ck))) with "[Hchild2 Hccref2]"
-      as "Hchild2".
+    iAssert (proc_priv γf npa pid_c (us_cwi (us_cwd Uc (ientry ck)) (pv_cwi (us_V Up))))
+      with "[Hchild2 Hccref2]" as "Hchild2".
     { iApply proc_priv_split_cwd. iFrame "Hchild2".
-      iSplitL "Hccref2"; [by cbn [upd_cwd pv_cwd pv_fdg] |].
+      iSplitL "Hccref2";
+        [by cbn [us_cwi us_cwd upd_usV us_V upd_cwi upd_cwd pv_cwd pv_cwi pv_fdg] |].
       (* THE MINT.  The child's token is the steady arm of the disjunction,
          built from the persistent [first_done] the caller threaded in. *)
       iApply (first_tok_of_done with "Hfdone"). }
-    set (Vc2 := upd_cwd (us_V Uc) (ientry ck)).
+    set (Vc2 := upd_cwi (upd_cwd (us_V Uc) (ientry ck)) (pv_cwi (us_V Up))).
     (* the store touches no register *)
     set (M2 := mr).
     assert (HM2a1 : M2 !!! Regidx Ra1 = M2 !!! Regidx Ra1) by reflexivity.
@@ -585,7 +597,7 @@ Section KforkB4Proof.
                  with "HnmCfold") as "HnmCfold".
     iDestruct ("HnmCback" $! (h <$> seq 0 16%nat) Hlen_hn with "HnmCfold") as "Hchild3".
     set (Vc3 := MkPPriv (pv_sz Vc2) (pv_upt Vc2) (pv_tf Vc2) (pv_ofile Vc2)
-                  (pv_fdg Vc2) (pv_cwd Vc2) (h <$> seq 0 16%nat)).
+                  (pv_fdg Vc2) (pv_cwd Vc2) (h <$> seq 0 16%nat) (pv_cwi Vc2)).
     (* ------------------------------------------------------------- *)
     (* +0xbe: lw s1,48(s4) -- s1 := np->pid, THE RETURN VALUE.        *)
     (* ------------------------------------------------------------- *)
@@ -629,12 +641,14 @@ Section KforkB4Proof.
                ⌜pv_sz Vc' = pv_sz (us_V Uc) /\ pv_upt Vc' = pv_upt (us_V Uc) /\
                 pv_tf Vc' = pv_tf (us_V Uc) /\ pv_ofile Vc' = pv_ofile (us_V Uc) /\
                 pv_cwd Vc' = pv_cwd (us_V Up) /\ pv_fdg Vc' = pv_fdg (us_V Uc) /\
-                length (pv_name Vc') = PNAMELEN⌝ ∗
+                length (pv_name Vc') = PNAMELEN /\
+                pv_cwi Vc' = pv_cwi (us_V Up)⌝ ∗
                proc_priv γf npa pid_c (MkUstate Vc' ((us_M Uc))))%I
       with "[Hchild4]" as "HchildFinal".
     { iExists Vc3.
       iSplitR.
-      - iPureIntro. rewrite /Vc3 /Vc2 /upd_cwd. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_fdg].
+      - iPureIntro. rewrite /Vc3 /Vc2 /upd_cwi /upd_cwd.
+        cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_fdg pv_cwi].
         rewrite Hcwd. repeat split; reflexivity.
       - iExact "Hchild4". }
     iSpecialize ("Hcont" $! CID0 with "[%]"); [intros _; reflexivity |].

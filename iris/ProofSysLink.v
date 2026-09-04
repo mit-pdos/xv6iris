@@ -1155,7 +1155,7 @@ Section ProofSysLinkBody.
           as "[Hpnc [Href Hftok]]".
         iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
         iDestruct "Hpnc" as "[Hpidq Hofiles]".
-        iDestruct (cwd_ref_held with "Href") as "Hcwdref".
+        iDestruct (cwd_ref_at_held_at with "Href") as "Hcwdref".
         iEval (cbn [upd_upt pv_cwd pv_fdg]) in "Hcwdref".
         iDestruct (sl_ir3 with "Hir") as "[Hir2 Hir1]".
         assert (Htgbc : add_vec (mword_of_int (SL + 0x40) : mword 64)
@@ -1510,7 +1510,7 @@ Section ProofSysLinkBody.
                "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
                 Hbsl Hislot".
              iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-             iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+             iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
              iCombine "Hpidq Hofiles" as "Hpnc".
              iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
              iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
@@ -1669,7 +1669,7 @@ Section ProofSysLinkBody.
                   "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
                    Hbsl Hislot".
                 iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-                iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+                iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                 iCombine "Hpidq Hofiles" as "Hpnc".
                 iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                 iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
@@ -2412,7 +2412,7 @@ Section ProofSysLinkBody.
                        "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb
                         Hsbi Hbsl Hislots".
                      iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-                     iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+                     iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                      iCombine "Hpidq Hofiles" as "Hpnc".
                      iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                      iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
@@ -2825,7 +2825,7 @@ Section ProofSysLinkBody.
                          "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb
                           Hsbi Hbsl Hislots".
                        iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-                       iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+                       iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                        iCombine "Hpidq Hofiles" as "Hpnc".
                        iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                        iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
@@ -3468,7 +3468,7 @@ Section ProofSysLinkBody.
                             sl_own_transport CID73 CIDy eb pj b.
                             iSpecialize ("Hcont" $! CIDy with "[%]");
                               [wp_next_chain |].
-                            iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+                            iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                             iCombine "Hpidq Hofiles" as "Hpnc".
                             iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                             iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
@@ -3672,7 +3672,7 @@ Section ProofSysLinkBody.
                                Hsbb Hsbi Hbsl Hislots".
                             iSpecialize ("Hcont" $! CIDy with "[%]");
                               [wp_next_chain |].
-                            iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+                            iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                             iCombine "Hpidq Hofiles" as "Hpnc".
                             iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                             iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
@@ -3751,7 +3751,7 @@ Section ProofSysLinkBody.
                      "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
                       Hbsl Hislot".
                    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-                   iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+                   iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                    iCombine "Hpidq Hofiles" as "Hpnc".
                    iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                    iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
@@ -3801,7 +3801,7 @@ Section ProofSysLinkBody.
           iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce
                                                Hpc Hpidq".
           iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-          iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
+          iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
           iCombine "Hpidq Hofiles" as "Hpnc".
           iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
           iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)

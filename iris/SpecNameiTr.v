@@ -120,22 +120,11 @@ Section NameiTrDefs.
      fupd, and that ghost no longer exists; [FsAbsEra.ex_hop] /
      [ex_hops_from] are the era walk's replacements. *)
 
-  (* [IcacheRef.inode_held] with the inum EXPOSED -- the pinned package.
-     Same four conjuncts, one new pure tie; [inode_held_at_held] recovers
-     the landed shape so every existing consumer composes unchanged. *)
-  Definition inode_held_at (v : mword 64) (z : Z) : iProp Σ :=
-    (∃ (k : nat) (q : Qp) (inum : mword 32),
-       ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
-       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
-       ⌜bv_unsigned inum = z⌝ ∗
-       inode_refp k q icfg_dev inum)%I.
-
-  Lemma inode_held_at_held (v : mword 64) (z : Z) :
-    inode_held_at v z ⊢ inode_held v.
-  Proof.
-    iIntros "H". iDestruct "H" as (k q inum) "(%&%&%&%&Hr)".
-    rewrite /inode_held. eauto 10 with iFrame.
-  Qed.
+  (* [IcacheRef.inode_held] with the inum EXPOSED -- the pinned package --
+     is [IcacheRef.inode_held_at] now (lane C1 moved it down: the process
+     block's cwd tie and idup's contract speak it too).  Same four
+     conjuncts, one new pure tie; [inode_held_at_held] recovers the landed
+     shape so every existing consumer composes unchanged. *)
 
 End NameiTrDefs.
 

@@ -692,7 +692,7 @@ Section ProofNamexTrMain.
      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
      proc_priv_bare (proc_addr j) pidv Upr -∗
-     inode_held (pv_cwd (us_V Upr)) -∗
+     inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
      bslots 3 -∗
@@ -749,7 +749,7 @@ Section ProofNamexTrMain.
      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
      proc_priv_bare (proc_addr j) pidv Upr -∗
-     inode_held (pv_cwd (us_V Upr)) -∗
+     inode_held_at (pv_cwd (us_V Upr)) (pv_cwi (us_V Upr)) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf' i) -∗
      bslots 3 -∗
@@ -5079,11 +5079,12 @@ Section ProofNamexTrMain.
          the SLOT (the pointer [a0] is set to) and the two pure facts; the
          carve and the gather that used to bracket the call are inside
          [SpecIdup] now, and the cwd's fraction is untouched either way. *)
-      iDestruct "Hcwdr" as (ck cq cinum) "(%Hcwde & %Hckl & %Hcinb & Hcrefp)".
-      iAssert (inode_held (ientry ck)) with "[Hcrefp]" as "Hcheld".
+      iDestruct "Hcwdr" as (ck cq cinum) "(%Hcwde & %Hckl & %Hcinb & %Hcinz & Hcrefp)".
+      iAssert (inode_held_at (ientry ck) (pv_cwi (us_V Upr))) with "[Hcrefp]" as "Hcheld".
       { iExists ck, cq, cinum.
         iSplitR; [done |]. iSplitR; [iPureIntro; exact Hckl |].
-        iSplitR; [iPureIntro; exact Hcinb |]. iExact "Hcrefp". }
+        iSplitR; [iPureIntro; exact Hcinb |]. iSplitR; [iPureIntro; exact Hcinz |].
+        iExact "Hcrefp". }
       (* +0x36 jal ra,idup *)
       assert (Htgtid : add_vec (mword_of_int (NX + 0x36) : mword 64)
                          (sign_extend' 64 (mword_of_int 2095360 : mword 21))
@@ -5117,7 +5118,7 @@ Section ProofNamexTrMain.
          walk already carries -- persistent, and the same [Hireg] the iget
          above was given. *)
       iApply (ID.wp_idup_sconf
-                ck B3 0%nat eb (proc_addr j) (K - 12)%nat b lks
+                ck (pv_cwi (us_V Upr)) B3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kid ltac:(vm_compute; reflexivity) Hckl HB3a0
                 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hireg Hisl1 Hcheld").
@@ -5146,7 +5147,7 @@ Section ProofNamexTrMain.
          with the witness named, which is exactly the currency the era
          loop's invariant carries ([inode_held_at ipv dcur]).  No new
          reading of [ProcInv.cwd_ref] is needed, and none exists. *)
-      iDestruct "Hip0" as (ik iq iinum) "(%Hipe & %Hikl & %Hiinb & Hirefp)".
+      iDestruct "Hip0" as (ik iq iinum) "(%Hipe & %Hikl & %Hiinb & %Hiinz & Hirefp)".
       iAssert (inode_held_at (ientry ck) (bv_unsigned iinum))
         with "[Hirefp]" as "Hip".
       { rewrite /inode_held_at. iExists ik, iq, iinum.
