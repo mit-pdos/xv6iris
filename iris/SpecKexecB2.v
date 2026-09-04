@@ -104,6 +104,7 @@ Require Import SpecDirlink.
 Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
+Require Import KexecBuilt.   (* [load_win] / [load_out] -- the loadseg window *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -118,6 +119,31 @@ Require Import OffBox.   (* [off_rows] -- the inode's off rows ride the open bun
 Set Printing Depth 40.
 
 Notation KXB := KernelSyms.kexec (only parsing).
+
+(* ---------------------------------------------------------------------- *)
+(*  [w32_uarg] IS STRICTLY MONOTONE on the 32-bit range, which is what      *)
+(*  turns the loadseg loop's [bgeu] verdicts back into orderings on the     *)
+(*  cursor.  ([W32Arith] carries the three one-sided rows; these are the    *)
+(*  inversions, and they live here rather than there so that changing them  *)
+(*  does not rebuild the world.)                                           *)
+(* ---------------------------------------------------------------------- *)
+Lemma w32_uarg_lt_inv (x y : Z) :
+  (0 <= x < 2 ^ 32)%Z -> (0 <= y < 2 ^ 32)%Z ->
+  (w32_uarg x < w32_uarg y)%Z -> (x < y)%Z.
+Proof.
+  unfold w32_uarg. change (2 ^ 31)%Z with 2147483648%Z.
+  change (2 ^ 32)%Z with 4294967296%Z. change (2 ^ 64)%Z with 18446744073709551616%Z.
+  intros Hx Hy. repeat case_decide; lia.
+Qed.
+
+Lemma w32_uarg_ge_inv (x y : Z) :
+  (0 <= x < 2 ^ 32)%Z -> (0 <= y < 2 ^ 32)%Z ->
+  (w32_uarg y <= w32_uarg x)%Z -> (y <= x)%Z.
+Proof.
+  unfold w32_uarg. change (2 ^ 31)%Z with 2147483648%Z.
+  change (2 ^ 32)%Z with 4294967296%Z. change (2 ^ 64)%Z with 18446744073709551616%Z.
+  intros Hx Hy. repeat case_decide; lia.
+Qed.
 
 (* Register-number notations, shared by [kxc_bad324_body] and [kxc_ls_body]
    below -- pure parser sugar (matches ProofKexecB2.v's own per-section
@@ -693,7 +719,7 @@ Definition kxc_ls_body `{XI : CurCtx}
     (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
     (m : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
-    (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8))
+    (ef : nat -> bv 8) (P : uptd) (Mi Mb : gmap Z (bv 8))
     (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string) :=
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
@@ -720,11 +746,24 @@ Definition kxc_ls_body `{XI : CurCtx}
   um_covered w65 P.(ud_um) ->
   (0 <= fz < 2 ^ 32)%Z ->
   (0 <= po < 2 ^ 32)%Z ->
+  (* ---- THE SEGMENT'S GEOMETRY, which the phdr loop's own checks buy:
+     [ph.vaddr] is page-aligned (+0x168) and the top of the segment is
+     inside the address space uvmalloc just grew to (+0x184). ---- *)
+  (uint va `mod` 4096 = 0)%Z ->
+  (uint va + fz <= uvm_maxsz)%Z ->
   (* ---- THE FUEL, and the cursor under it ---- *)
   forall (W : nat) (Ml : regfile) (ii : Z),
   (0 <= ii < 2 ^ 32)%Z ->
   (2 ^ 32 - (po + ii) `mod` 2 ^ 32 <= Z.of_nat W)%Z ->
   (w32_uarg ii < w32_uarg fz)%Z ->
+  (* ---- THE WINDOW INVARIANT: the first [ii] bytes of the segment are
+     already in memory, and nothing outside [va, va + filesz) has moved
+     since the loop was entered at [Mb]. ---- *)
+  (po + ii < 2 ^ 32)%Z ->
+  (ii `mod` 4096 = 0)%Z ->
+  load_win (file_bytes datl (Z.to_nat (bv_unsigned (di_size dnf))))
+           po (uint va) ii Mi ->
+  load_out (uint va) fz Mb Mi ->
   Ml !!! Regidx csp_rs1 = pa_stk sp0 68 ->
   Ml !!! Regidx Rs0 = sp0 ->
   Ml !!! Regidx Rs1 = sign_extend' 64 (mword_of_int ii : mword 32) ->
@@ -784,7 +823,10 @@ Definition kxc_ls_body `{XI : CurCtx}
         Mx !!! Regidx Rs6 = page_base P.(ud_root) /\
         Mx !!! Regidx Rs9 = (mword_of_int 4096 : mword 64) /\
         Mx !!! Regidx Rs10 = (mword_of_int (Z.of_nat ip) : mword 64) /\
-        Mx !!! Regidx Rs11 = (mword_of_int 56 : mword 64)⌝ -∗
+        Mx !!! Regidx Rs11 = (mword_of_int 56 : mword 64) /\
+        load_win (file_bytes datl (Z.to_nat (bv_unsigned (di_size dnf))))
+                 po (uint va) fz Mo /\
+        load_out (uint va) fz Mb Mo⌝ -∗
       sie_cap_gpr KT1 Mx (K - 68)%nat eb (proc_addr jp) -∗
       cpu_own 0 eb (proc_addr jp) eb lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -840,11 +882,11 @@ Module Type KEXECB2.
       (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8))
+      (ef : nat -> bv 8) (P : uptd) (Mi Mb : gmap Z (bv 8))
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string),
     kxc_ls_body Q gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
-      ef P Mi ip va fz po eb lks.
+      ef P Mi Mb ip va fz po eb lks.
 End KEXECB2.

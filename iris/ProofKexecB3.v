@@ -120,6 +120,9 @@ Require Import ProofKexecSeam.
 Require Import SpecKexecB2.
 Require Import SpecKexecB3.
 Require Import KexecPtImage.
+Require Import ElfBridge.   (* [file_bytes_lookup] -- readi's bytes ARE the file's *)
+Require Import ElfFile.     (* [elf_phdr] fields, [phdr_ok], [seg_map] *)
+Require Import KexecBuilt.  (* [kxb_at] / [kxb_walk_ok] / [load_win] *)
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -171,6 +174,105 @@ Lemma kxc_ph_o40 `{XI : CurCtx} (X : mword 64) : pa_add (pa_stk X 61) 40 = pa_st
 Proof. unfold pa_add, pa_stk. rewrite avi_assoc. f_equal; lia. Qed.
 
 (* [w32_uarg] at zero -- the loadseg loop's entry guard is stated over it. *)
+(* ---------------------------------------------------------------------- *)
+(*  THE BLIND SPLITS, READ BACK.  Three of the phdr body's tests carry      *)
+(*  real information for the image invariant -- the PT_LOAD type test, the  *)
+(*  vaddr+memsz wrap test and the vaddr alignment test -- and these are the  *)
+(*  rows that turn the machine's verdicts into arithmetic on the file's      *)
+(*  own fields.                                                              *)
+(* ---------------------------------------------------------------------- *)
+Lemma kxc_wrap_sum (a b : Z) :
+  (0 <= a < 18446744073709551616)%Z -> (0 <= b < 18446744073709551616)%Z ->
+  (b <= bv_wrap 64 (a + b))%Z -> bv_wrap 64 (a + b) = (a + b)%Z.
+Proof.
+  intros Ha Hb Hle.
+  destruct (Z_lt_le_dec (a + b) 18446744073709551616) as [Hlt | Hge].
+  - apply bvw64_small.
+    change (2 ^ 64)%Z with 18446744073709551616%Z. lia.
+  - exfalso.
+    assert (Hw : bv_wrap 64 (a + b) = (a + b - 18446744073709551616)%Z).
+    { unfold bv_wrap, bv_modulus.
+      change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z.
+      assert (Heq : ((a + b) `mod` 18446744073709551616)%Z
+                    = ((a + b - 18446744073709551616
+                        + 1 * 18446744073709551616)
+                       `mod` 18446744073709551616)%Z) by (f_equal; lia).
+      rewrite Heq Z_mod_plus_full. apply Z.mod_small. lia. }
+    rewrite Hw in Hle. lia.
+Qed.
+
+Lemma kxc_neq_false {n : Z} (x y : mword n) : neq_vec x y = false -> x = y.
+Proof.
+  intro H. unfold neq_vec in H. apply negb_false_iff in H.
+  apply eq_vec_true_iff. exact H.
+Qed.
+
+Lemma kxc_neq_true {n : Z} (x y : mword n) : neq_vec x y = true -> x <> y.
+Proof.
+  intros H Hxy. unfold neq_vec in H. rewrite Hxy in H.
+  rewrite (proj2 (eq_vec_true_iff y y) eq_refl) in H. discriminate.
+Qed.
+
+(* the 32-bit ABI word is injective on the 32-bit range *)
+Lemma kxc_w32_inj (a b : Z) :
+  (0 <= a < 2 ^ 32)%Z -> (0 <= b < 2 ^ 32)%Z ->
+  (sign_extend' 64 (mword_of_int a : mword 32) : mword 64)
+  = (sign_extend' 64 (mword_of_int b : mword 32) : mword 64) -> a = b.
+Proof.
+  intros Ha Hb Heq. apply (f_equal bv_unsigned) in Heq.
+  rewrite (w32_arg_unsigned a Ha) (w32_arg_unsigned b Hb) in Heq.
+  revert Heq. unfold w32_uarg.
+  change (2 ^ 31)%Z with 2147483648%Z.
+  change (2 ^ 32)%Z with 4294967296%Z in Ha. change (2 ^ 32)%Z with 4294967296%Z in Hb.
+  repeat case_decide; lia.
+Qed.
+
+(* [ph.type = ELF_PROG_LOAD] as a test on the FILE's own field *)
+Lemma kxc_type_read (t : Z) :
+  (0 <= t < 2 ^ 32)%Z ->
+  (sign_extend' 64 (Z_to_bv 32 t : mword 32) : mword 64)
+  = (mword_of_int 1 : mword 64) -> t = 1%Z.
+Proof.
+  intros Ht Heq. rewrite -kxc_moi32_ztobv in Heq.
+  apply (kxc_w32_inj t 1 Ht ltac:(change (2 ^ 32)%Z with 4294967296%Z; lia)).
+  rewrite Heq. apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma kxc_type_read_ne (t : Z) :
+  (0 <= t < 2 ^ 32)%Z ->
+  (sign_extend' 64 (Z_to_bv 32 t : mword 32) : mword 64)
+  <> (mword_of_int 1 : mword 64) -> t <> 1%Z.
+Proof.
+  intros Ht Hne Hz. apply Hne. rewrite Hz -kxc_moi32_ztobv.
+  apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+(* [(vaddr & (PGSIZE-1)) = 0] IS page alignment *)
+Lemma kxc_and4095_zero (x : mword 64) :
+  and_vec x (mword_of_int 4095 : mword 64) = (zero_reg : mword 64) ->
+  (bv_unsigned x `mod` 4096 = 0)%Z.
+Proof.
+  intro H.
+  assert (Hb : bv_unsigned (and_vec x (mword_of_int 4095 : mword 64)) = 0%Z)
+    by (rewrite H; vm_compute; reflexivity).
+  rewrite and_vec64_unsigned in Hb.
+  assert (Hm : bv_unsigned (mword_of_int 4095 : mword 64) = Z.ones 12)
+    by (vm_compute; reflexivity).
+  rewrite Hm Z.land_ones in Hb; [| lia].
+  change (2 ^ 12)%Z with 4096%Z in Hb. exact Hb.
+Qed.
+
+(* an 8-byte little-endian field fits a 64-bit register verbatim *)
+Lemma kxc_le8_unsigned (g : nat -> bv 8) (o : nat) :
+  bv_unsigned (Z_to_bv 64 (le_at g o 8) : mword 64) = le_at g o 8.
+Proof.
+  pose proof (le_at_bound g o 8) as Hb.
+  change (2 ^ (8 * Z.of_nat 8))%Z with 18446744073709551616%Z in Hb.
+  change (Z_to_bv 64 (le_at g o 8) : mword 64)
+    with (mword_of_int (le_at g o 8) : mword 64).
+  apply moi64_small. exact Hb.
+Qed.
+
 Lemma kxc_uarg0 `{XI : CurCtx} : w32_uarg 0 = 0.
 Proof.
   unfold w32_uarg. case_decide as Hd; [reflexivity |].
@@ -307,11 +409,18 @@ Section KexecB3Seam.
        bv_unsigned inumf < 16 * Z.of_nat icfg_nib /\
        (iput_units <= n2)%nat /\
        (forall j, (j < 8)%nat ->
-          is_aligned_paddr (Physaddr (pa_stk sp0 (54 - j))) 8 = true) ⌝ ∗
+          is_aligned_paddr (Physaddr (pa_stk sp0 (54 - j))) 8 = true) /\
+       w67 = (mword_of_int 4095 : mword 64) ⌝ ∗
      ⌜ (Z.of_nat i <= eh_phnum ef)%Z /\
        ud_tfp P = ud_tfp (pv_upt (us_V U)) /\
        um_below szv P.(ud_um) /\
-       um_covered szv P.(ud_um) ⌝ ∗
+       um_covered szv P.(ud_um) /\
+       (* header [i] is DONE: the invariant has moved to [S i], under the
+          walk's guard AND under [S i] still being inside the table (which
+          is what the back edge's own test then discharges). *)
+       (kxb_walk_ok (kxc_fb datl dnf) ef ->
+        (S i <= Z.to_nat (eh_phnum ef))%nat ->
+          kxb_at (kxc_fb datl dnf) ef (S i) (uint szv) Mi) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x11a) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -427,8 +536,8 @@ Section KexecB3Incr.
     rewrite /kxc_at_11a.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs4 & %HMs5 & %HMs6 &
                           %HMs9 & %HMs10 & %HMs11) &
-                         (%Hk & %Hib & %Hn2 & %Hal) &
-                         (%Hiphn & %HPtfp & %Hbelow & %Hcov) &
+                         (%Hk & %Hib & %Hn2 & %Hal & %Hw67) &
+                         (%Hiphn & %HPtfp & %Hbelow & %Hcov & %Himg) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & #Hka & Hres)".
     rewrite /kxc_res.
     iDestruct "Hres" as "(Hopen & Hlog & Hirs & Hbm & Hins & Hbits & Hbs & Hpt &
@@ -711,7 +820,7 @@ Section KexecB3Incr.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID0 CID5 eb (proc_addr jp)
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-      assert (HSi : (Z.of_nat (S i) <= eh_phnum ef)%Z)
+      assert (HSi : (Z.of_nat (S i) < eh_phnum ef)%Z)
         by (rewrite Nat2Z.inj_succ; rewrite Z.geb_leb in Egeb;
             apply Z.leb_gt in Egeb; lia).
       assert (HT4s10' : T4 !!! Regidx Rs10
@@ -726,10 +835,13 @@ Section KexecB3Incr.
           | exact HT4a3]. }
       iSplitR.
       { iPureIntro. split_and!;
-          [exact Hk | exact Hib | exact Hn2 | exact Hal]. }
+          [exact Hk | exact Hib | exact Hn2 | exact Hal | exact Hw67]. }
       iSplitR.
       { iPureIntro. split_and!;
-          [exact HSi | exact HPtfp | exact Hbelow | exact Hcov]. }
+          [exact HSi | exact HPtfp | exact Hbelow | exact Hcov
+          | (* the back edge's own test discharges the [S i < phnum] guard *)
+            intros Hwk; apply (Himg Hwk);
+            pose proof (eh_phnum_bound ef); lia]. }
       (* NEVER [iFrame] HERE.  At this altitude the goal carries
          [ProcInv.tf_page]'s 4096-conjunct big-op inside [proc_priv], and
          [iFrame]'s search does not terminate on it (durable-notes.md).  The
@@ -885,8 +997,8 @@ Section KexecB3Body.
     rewrite /kxc_at_12c.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs4 & %HMs5 & %HMs6 &
                           %HMs9 & %HMs10 & %HMs11 & %HMa3) &
-                         (%Hk2 & %Hib & %Hn2 & %Hal) &
-                         (%Hiphn & %HPtfp & %Hbelow & %Hcov) &
+                         (%Hk2 & %Hib & %Hn2 & %Hal & %Hw67) &
+                         (%Hiphn & %HPtfp & %Hbelow & %Hcov & %Himg) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hopen & Hlog & Hirs & Hbm & Hins &
                          Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
@@ -896,6 +1008,10 @@ Section KexecB3Body.
                           #Hdlock)".
     iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
     pose proof (proc_pt_covered_maxsz P szv Hwf Hcov) as Hmax.
+    (* the image has NOTHING at or above any page-aligned bound the running
+       size has already reached -- the freshness the next segment's bss half
+       needs, taken while [proc_pt] is still in hand (S3c). *)
+    iDestruct (proc_pt_fresh_above_z P Mi szv Hbelow with "Hpt") as %Hfz0.
     rewrite /kxc_frameB.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & Hf7 & Hf8 &
                             Hf9 & Hf10 & Hf11 & Hf12 & Hf13 & Hust & Hmid &
@@ -1172,6 +1288,51 @@ Section KexecB3Body.
       assert (Hpp142 : add_vec_int (mword_of_int (KXB + 0x13e) : mword 64) 4
                        = mword_of_int (KXB + 0x142)) by bpcw.
       iEval (rewrite Hpp142) in "Hpc".
+      (* =================================================================
+         THE HEADER, AS THE ELF SEMANTICS READS IT.  [readi] delivered the
+         file's own 56 bytes at [offn = kxb_phoff ef i], so every field the
+         body reads out of [pf] IS the matching field of [kxb_phdr] -- which
+         is what turns the body's blind splits into statements about the
+         file (S3c).
+         ================================================================= *)
+      assert (Htoteq : tot = rd_clamp (di_size dnf) offn 56%nat).
+      { destruct Hret as [(_ & Hbad) | (_ & Hv)];
+          [discriminate Hbad | exact Hv]. }
+      assert (Hfitsz : (offn + 56 <= Z.to_nat (bv_unsigned (di_size dnf)))%nat).
+      { rewrite /rd_clamp in Htoteq.
+        destruct (decide (Z.to_nat (bv_unsigned (di_size dnf)) < offn + 56)%nat)
+          as [Hltf | Hgef]; lia. }
+      assert (Hpfb : forall j, (j < 56)%nat ->
+                pf j = kxc_fb datl dnf !!! (offn + j)%nat).
+      { intros j Hj.
+        rewrite /pf (rd_delivered_bytes datl phb offn tot j ltac:(lia))
+                /rd_bytes /kxc_fb.
+        symmetry. apply ElfBridge.file_bytes_lookup. lia. }
+      assert (Hpeq : kxb_phdr_at (kxc_fb datl dnf) offn
+                     = kxb_phdr (kxc_fb datl dnf) ef i) by reflexivity.
+      destruct (kxb_phdr_fields (kxc_fb datl dnf) pf offn Hpfb)
+        as (Hfty & Hfoff & Hfva & Hffz8 & Hffz4 & Hfmz).
+      rewrite Hpeq in Hfty Hfoff Hfva Hffz8 Hffz4 Hfmz.
+      assert (Hty32 : (0 <= le_at pf 0 4 < 2 ^ 32)%Z).
+      { pose proof (le_at_bound pf 0 4) as Hb04.
+        change (2 ^ (8 * Z.of_nat 4))%Z with 4294967296%Z in Hb04.
+        change (2 ^ 32)%Z with 4294967296%Z. exact Hb04. }
+      assert (Hb168 : (0 <= le_at pf 16 8 < 18446744073709551616)%Z).
+      { pose proof (le_at_bound pf 16 8) as Hb.
+        change (2 ^ (8 * Z.of_nat 8))%Z with 18446744073709551616%Z in Hb.
+        exact Hb. }
+      assert (Hb408 : (0 <= le_at pf 40 8 < 18446744073709551616)%Z).
+      { pose proof (le_at_bound pf 40 8) as Hb.
+        change (2 ^ (8 * Z.of_nat 8))%Z with 18446744073709551616%Z in Hb.
+        exact Hb. }
+      assert (Hfz4le : (le_at pf 32 4 <= le_at pf 32 8)%Z).
+      { rewrite Hffz4 Hffz8.
+        pose proof (le_at_bound pf 32 8) as Hb.
+        rewrite Hffz8 in Hb.
+        pose proof (Z.mod_pos_bound (ep_filesz (kxb_phdr (kxc_fb datl dnf) ef i))
+                      (2 ^ 32) ltac:(lia)) as Hm.
+        pose proof (Z.mod_le (ep_filesz (kxb_phdr (kxc_fb datl dnf) ef i))
+                      (2 ^ 32) ltac:(lia) ltac:(lia)). lia. }
       (* ---- +0x142: lw a5,-488(s0) -- ph.type ---- *)
       assert (Hph61 : add_vec (rget M2 Rs0)
                         (sign_extend' 64 (mword_of_int 3608 : mword 12))
@@ -1204,6 +1365,12 @@ Section KexecB3Body.
       iIntros (CIDg3 Hsg3) "Hcg Hpc".
       set (U7 := <[Regidx Ra4 := regval_into_reg
                     (mword_of_int 1 : mword 64)]> U6).
+      assert (HU7a5 : U7 !!! Regidx Ra5
+                = (sign_extend' 64 (Z_to_bv 32 (le_at pf 0 4) : mword 32)
+                   : mword 64))
+        by (rewrite /U7 upd_ne; [rewrite /U6; apply upd_eq | bnz]).
+      assert (HU7a4 : U7 !!! Regidx Ra4 = (mword_of_int 1 : mword 64))
+        by (rewrite /U7; apply upd_eq).
       assert (HU7get : forall r : mword 5, is_cs_idx r = true ->
                 U7 !!! Regidx r = M2 !!! Regidx r).
       { intros r Hr. rewrite /U7 upd_ne; [| reg_ne_side].
@@ -1244,6 +1411,12 @@ Section KexecB3Body.
         { iApply (kxc_148 with "Htext"). }
         iIntros (CIDg4 Hsg4). iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htgt11a) in "Hpc".
+        (* the test the loop just failed, as a statement about the FILE *)
+        assert (Hnety : ep_type (kxb_phdr (kxc_fb datl dnf) ef i) <> 1%Z).
+        { rewrite -Hfty. apply (kxc_type_read_ne _ Hty32).
+          rewrite -HU7a5 -HU7a4
+                  -(rget_ne U7 Ra5 ltac:(bnz)) -(rget_ne U7 Ra4 ltac:(bnz)).
+          exact (kxc_neq_true _ _ Ety). }
         iDestruct (kxc_ph_give sp0 pf Hphal with "Hphb") as "Hph7".
         iDestruct (kxc_stack8_of_ph sp0 w62 with "Hph7 Hf62") as "Hph8".
         iDestruct (kxc_pin_intro sp0 ra0 s00 s10 s20 pv av
@@ -1277,10 +1450,13 @@ Section KexecB3Body.
               | exact HU7s11]. }
           iSplitR.
           { iPureIntro. split_and!;
-              [exact Hk2 | exact Hib | exact Hn2 | exact Hal]. }
+              [exact Hk2 | exact Hib | exact Hn2 | exact Hal | exact Hw67]. }
           iSplitR.
           { iPureIntro. split_and!;
-              [exact Hiphn | exact HPtfp | exact Hbelow | exact Hcov]. }
+              [lia | exact HPtfp | exact Hbelow | exact Hcov
+              | intros Hwk _;
+                exact (kxb_at_step_skip (kxc_fb datl dnf) ef i (uint szv) Mi
+                         Hnety (Himg Hwk))]. }
           iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
           iSplitL "Hcnt"; [iExact "Hcnt" |].
           iSplitL "Hextc"; [iExact "Hextc" |]. iSplitL "Hclmc"; [iExact "Hclmc" |]. iSplitR; [iExact "Hka" |].
@@ -1307,6 +1483,33 @@ Section KexecB3Body.
                   with "Hcg Hpc []").
         { iApply (kxc_148 with "Htext"). }
         iIntros (CIDg4 Hsg4) "Hcg Hpc".
+        (* the test the loop just passed, as a statement about the FILE *)
+        assert (Hty1 : ep_type (kxb_phdr (kxc_fb datl dnf) ef i) = 1%Z).
+        { rewrite -Hfty. apply (kxc_type_read _ Hty32).
+          rewrite -HU7a5 -HU7a4
+                  -(rget_ne U7 Ra5 ltac:(bnz)) -(rget_ne U7 Ra4 ltac:(bnz)).
+          exact (kxc_neq_false _ _ Ety). }
+        (* UNDER THE WALK'S GUARD the two FOUR-byte reads are exact: the
+           file's own well-formedness bounds [off] and [filesz] by the
+           inode's size, which is far below 2^32. *)
+        assert (Hexact : kxb_walk_ok (kxc_fb datl dnf) ef ->
+                  (S i <= Z.to_nat (eh_phnum ef))%nat ->
+                  le_at pf 8 4 = ep_offset (kxb_phdr (kxc_fb datl dnf) ef i)
+                  /\ le_at pf 32 4
+                     = ep_filesz (kxb_phdr (kxc_fb datl dnf) ef i)).
+        { intros Hwk HSi'.
+          destruct (kxb_walk_step (kxc_fb datl dnf) ef i Hwk HSi' Hty1)
+            as (Hpok & _ & _).
+          pose proof (po_offset _ _ Hpok) as Hpo0.
+          pose proof (po_filesz _ _ Hpok) as Hpf0.
+          pose proof (po_window _ _ Hpok) as Hpw.
+          assert (Hlenf : (Z.of_nat (length (kxc_fb datl dnf)) <= 274432)%Z).
+          { unfold kxc_fb. rewrite file_bytes_length.
+            pose proof (bv_unsigned_in_range 32 (di_size dnf)) as [Hs0x _].
+            rewrite Z2Nat.id; [| exact Hs0x]. rewrite -Hmb. exact Hszb. }
+          rewrite Hfoff Hffz4.
+          split; apply Z.mod_small;
+            change (2 ^ 32)%Z with 4294967296%Z; lia. }
         assert (Hpp14c : add_vec_int (mword_of_int (KXB + 0x148) : mword 64) 4
                          = mword_of_int (KXB + 0x14c)) by bpcw.
         iEval (rewrite Hpp14c) in "Hpc".
@@ -1328,6 +1531,9 @@ Section KexecB3Body.
         iDestruct ("Hbk" with "Hw") as "Hphb".
         set (U8 := <[Regidx Rs1 := regval_into_reg
                       (Z_to_bv 64 (le_at pf 40 8) : mword 64)]> U7).
+        assert (HU8s1 : U8 !!! Regidx Rs1
+                  = (Z_to_bv 64 (le_at pf 40 8) : mword 64))
+          by (rewrite /U8; apply upd_eq).
         assert (HU8s0 : U8 !!! Regidx Rs0 = sp0)
           by (rewrite /U8 upd_ne; [exact HU7s0 | bnz]).
         assert (Hpp150 : add_vec_int (mword_of_int (KXB + 0x14c) : mword 64) 4
@@ -1351,6 +1557,12 @@ Section KexecB3Body.
         iDestruct ("Hbk" with "Hw") as "Hphb".
         set (U9 := <[Regidx Ra5 := regval_into_reg
                       (Z_to_bv 64 (le_at pf 32 8) : mword 64)]> U8).
+        assert (HU9a5 : U9 !!! Regidx Ra5
+                  = (Z_to_bv 64 (le_at pf 32 8) : mword 64))
+          by (rewrite /U9; apply upd_eq).
+        assert (HU9s1 : U9 !!! Regidx Rs1
+                  = (Z_to_bv 64 (le_at pf 40 8) : mword 64))
+          by (rewrite /U9 upd_ne; [exact HU8s1 | bnz]).
         assert (HU9get : forall r : mword 5, is_cs_idx r = true -> r <> Rs1 ->
                   U9 !!! Regidx r = U7 !!! Regidx r).
         { intros r Hr Hne. rewrite /U9 upd_ne; [| reg_ne_side].
@@ -1458,6 +1670,16 @@ Section KexecB3Body.
                     with "Hcg Hpc []").
           { iApply (kxc_154 with "Htext"). }
           iIntros (CIDx1 Hsx1) "Hcg Hpc".
+          (* the [memsz < filesz] test did not fire *)
+          assert (Hmemge : (le_at pf 32 8 <= le_at pf 40 8)%Z).
+          { assert (Hb1 : uint (rget U9 Rs1) = le_at pf 40 8).
+            { rewrite (rget_ne U9 Rs1 ltac:(bnz)) HU9s1 uint_unsigned.
+              apply kxc_le8_unsigned. }
+            assert (Hb2 : uint (rget U9 Ra5) = le_at pf 32 8).
+            { rewrite (rget_ne U9 Ra5 ltac:(bnz)) HU9a5 uint_unsigned.
+              apply kxc_le8_unsigned. }
+            unfold zopz0zI_u in Emf. rewrite Hb1 Hb2 in Emf.
+            apply Z.ltb_ge in Emf. exact Emf. }
           assert (Hpp158 : add_vec_int (mword_of_int (KXB + 0x154) : mword 64) 4
                            = mword_of_int (KXB + 0x158)) by bpcw.
           iEval (rewrite Hpp158) in "Hpc".
@@ -1479,6 +1701,12 @@ Section KexecB3Body.
           iDestruct ("Hbk" with "Hw") as "Hphb".
           set (U10 := <[Regidx Ra5 := regval_into_reg
                         (Z_to_bv 64 (le_at pf 16 8) : mword 64)]> U9).
+          assert (HU10a5 : U10 !!! Regidx Ra5
+                    = (Z_to_bv 64 (le_at pf 16 8) : mword 64))
+            by (rewrite /U10; apply upd_eq).
+          assert (HU10s1 : U10 !!! Regidx Rs1
+                    = (Z_to_bv 64 (le_at pf 40 8) : mword 64))
+            by (rewrite /U10 upd_ne; [exact HU9s1 | bnz]).
           assert (Hpp15c : add_vec_int (mword_of_int (KXB + 0x158) : mword 64) 4
                            = mword_of_int (KXB + 0x15c)) by bpcw.
           iEval (rewrite Hpp15c) in "Hpc".
@@ -1493,6 +1721,13 @@ Section KexecB3Body.
           set (U11 := <[Regidx Rs1 := regval_into_reg nsz]> U10).
           assert (HU11s1 : U11 !!! Regidx Rs1 = nsz)
             by (rewrite /U11; apply upd_eq).
+          assert (HU11a5 : U11 !!! Regidx Ra5
+                    = (Z_to_bv 64 (le_at pf 16 8) : mword 64))
+            by (rewrite /U11 upd_ne; [exact HU10a5 | bnz]).
+          assert (Hnszw : (bv_unsigned nsz
+                    = bv_wrap 64 (le_at pf 40 8 + le_at pf 16 8))%Z).
+          { rewrite /nsz add_vec64_unsigned HU10s1 HU10a5 !kxc_le8_unsigned.
+            reflexivity. }
           assert (HU11get : forall r : mword 5, is_cs_idx r = true -> r <> Rs1 ->
                     U11 !!! Regidx r = U7 !!! Regidx r).
           { intros r Hr Hne. rewrite /U11 upd_ne; [| congruence].
@@ -1598,6 +1833,21 @@ Section KexecB3Body.
                        with "Hcg Hpc []").
              { iApply (kxc_15e with "Htext"). }
              iIntros (CIDx4 Hsx4) "Hcg Hpc".
+             (* the wrap test did not fire, so [vaddr + memsz] is EXACT *)
+             assert (Hnowr : (le_at pf 16 8 <= bv_unsigned nsz)%Z).
+             { assert (Hc1 : uint (rget U11 Rs1) = bv_unsigned nsz)
+                 by (rewrite (rget_ne U11 Rs1 ltac:(bnz)) HU11s1 uint_unsigned;
+                     reflexivity).
+               assert (Hc2 : uint (rget U11 Ra5) = le_at pf 16 8).
+               { rewrite (rget_ne U11 Ra5 ltac:(bnz)) HU11a5 uint_unsigned.
+                 apply kxc_le8_unsigned. }
+               unfold zopz0zI_u in Ewr. rewrite Hc1 Hc2 in Ewr.
+               apply Z.ltb_ge in Ewr. exact Ewr. }
+             assert (Hnszv : (bv_unsigned nsz
+                       = le_at pf 16 8 + le_at pf 40 8)%Z).
+             { rewrite Hnszw in Hnowr |- *.
+               rewrite (kxc_wrap_sum (le_at pf 40 8) (le_at pf 16 8)
+                          Hb408 Hb168 Hnowr). lia. }
              assert (Hpp162 : add_vec_int
                                 (mword_of_int (KXB + 0x15e) : mword 64) 4
                               = mword_of_int (KXB + 0x162)) by bpcw.
@@ -1616,6 +1866,11 @@ Section KexecB3Body.
              iIntros (CIDx5 Hsx5) "Hcg Hpc Hf67".
              iEval (rewrite Hpa67) in "Hf67".
              set (U12 := <[Regidx Ra4 := regval_into_reg w67]> U11).
+             assert (HU12a4 : U12 !!! Regidx Ra4 = w67)
+               by (rewrite /U12; apply upd_eq).
+             assert (HU12a5 : U12 !!! Regidx Ra5
+                       = (Z_to_bv 64 (le_at pf 16 8) : mword 64))
+               by (rewrite /U12 upd_ne; [exact HU11a5 | bnz]).
              assert (Hpp166 : add_vec_int
                                 (mword_of_int (KXB + 0x162) : mword 64) 4
                               = mword_of_int (KXB + 0x166)) by bpcw.
@@ -1630,6 +1885,9 @@ Section KexecB3Body.
              set (U13 := <[Regidx Ra5 := regval_into_reg
                             (and_vec (U12 !!! Regidx Ra5)
                                      (U12 !!! Regidx Ra4))]> U12).
+             assert (HU13a5 : U13 !!! Regidx Ra5
+                       = and_vec (U12 !!! Regidx Ra5) (U12 !!! Regidx Ra4))
+               by (rewrite /U13; apply upd_eq).
              assert (HU13get : forall r : mword 5, is_cs_idx r = true ->
                        r <> Rs1 -> U13 !!! Regidx r = U7 !!! Regidx r).
              { intros r Hr Hne. rewrite /U13 upd_ne; [| reg_ne_side].
@@ -1739,6 +1997,15 @@ Section KexecB3Body.
                           with "Hcg Hpc []").
                 { iApply (kxc_168 with "Htext"). }
                 iIntros (CIDx7 Hsx7) "Hcg Hpc".
+                (* the alignment test did not fire: [ph.vaddr] IS page
+                   aligned, which is what makes the loadseg loop's page
+                   walk land on the window's own bytes (S3c). *)
+                assert (Hvaal : (le_at pf 16 8 `mod` 4096 = 0)%Z).
+                { rewrite -(kxc_le8_unsigned pf 16).
+                  apply kxc_and4095_zero.
+                  rewrite -Hw67 -HU12a4 -HU12a5 -HU13a5
+                          -(rget_ne U13 Ra5 ltac:(bnz)).
+                  exact (kxc_neq_false _ _ Eal). }
                 assert (Hpp16c : add_vec_int
                                    (mword_of_int (KXB + 0x168) : mword 64) 4
                                  = mword_of_int (KXB + 0x16c)) by bpcw.
@@ -2096,7 +2363,10 @@ Section KexecB3Body.
                             (bv_unsigned (M4 !!! Regidx Ra0) <> 0 ->
                                um_below (M4 !!! Regidx Ra0) P4.(ud_um) /\
                                um_covered (M4 !!! Regidx Ra0) P4.(ud_um) /\
-                               M4i = umem_grow Mi (uint (M4 !!! Regidx Ra0))) /\
+                               M4i = umem_grow Mi (uint (M4 !!! Regidx Ra0)) /\
+                               (* the SIZE, as [KexecBuilt]'s fold spells it *)
+                               uint (M4 !!! Regidx Ra0)
+                               = kx_uvmalloc (uint szv) (bv_unsigned nsz)) /\
                             (bv_unsigned (M4 !!! Regidx Ra0) = 0 ->
                                um_below szv P4.(ud_um) /\
                                um_covered szv P4.(ud_um) /\ M4i = Mi)⌝ ∗
@@ -2135,7 +2405,14 @@ Section KexecB3Body.
                     destruct Hext as (Hrt & Htf & _).
                     split_and!; [exact Hrt | exact Htf | | ].
                     + intros _. split_and!;
-                        [exact Hbel4 | exact Hcov4 | reflexivity].
+                        [exact Hbel4 | exact Hcov4 | reflexivity |].
+                      rewrite !uint_unsigned. unfold kx_uvmalloc.
+                      destruct Harm as [[Hlt Hv] | [Hle Hv]]; rewrite Hv;
+                        [ rewrite (proj2 (Z.ltb_lt _ _) Hlt); reflexivity
+                        | replace (bv_unsigned nsz <? bv_unsigned szv)%Z
+                            with false;
+                          [ reflexivity
+                          | symmetry; apply Z.ltb_ge; lia ] ].
                     + intro Hz0.
                       assert (Hsq : szv = M4 !!! Regidx Ra0).
                       { destruct Harm as [[Hlt Hv] | [Hle Hv]].
@@ -2282,7 +2559,24 @@ Section KexecB3Body.
                    { intro Hz0. apply eq_vec_false_iff in Eoom. apply Eoom.
                      etransitivity; [exact Hsta0b |].
                      apply bv_eq. rewrite Hz0. vm_compute. reflexivity. }
-                   destruct (HP4ne Ha0nz) as (Hbel4n & Hcov4n & Himgn).
+                   destruct (HP4ne Ha0nz) as (Hbel4n & Hcov4n & Himgn & Ha0eq).
+                   (* ---- the size the loop reached, and the room left ---- *)
+                   iDestruct (proc_pt_wf_get with "Hpt") as %Hwf4.
+                   pose proof (proc_pt_covered_maxsz P4 (M4 !!! Regidx Ra0)
+                                 Hwf4 Hcov4n) as Hmax4.
+                   rewrite !uint_unsigned in Ha0eq.
+                   assert (Hnszle : (bv_unsigned nsz
+                             <= bv_unsigned (M4 !!! Regidx Ra0))%Z)
+                     by (rewrite Ha0eq kx_uvmalloc_max; apply Z.le_max_r).
+                   assert (Hvatop : (uint (Z_to_bv 64 (le_at pf 16 8)
+                                           : mword 64)
+                             + le_at pf 32 4 <= uvm_maxsz)%Z).
+                   { rewrite uint_unsigned kxc_le8_unsigned.
+                     eapply Z.le_trans; [| exact Hmax4].
+                     eapply Z.le_trans; [| exact Hnszle].
+                     rewrite Hnszv. apply Z.add_le_mono;
+                       [ apply Z.le_refl
+                       | eapply Z.le_trans; [exact Hfz4le | exact Hmemge] ]. }
                    (* ---- +0x188: lw s3,-456(s0) -- ph.filesz as an int ---- *)
                    assert (Hph32w : add_vec (rget M4 Rs0)
                                       (sign_extend' 64 (mword_of_int 3640
@@ -2455,6 +2749,42 @@ Section KexecB3Body.
                        assert (HU21s11 : U21 !!! Regidx Rs11
                                          = (mword_of_int 56 : mword 64))
                          by (rewrite /U21 upd_ne; [exact HU20s11 | bnz]).
+                       (* THE SEGMENT WITH NO FILE HALF: uvmalloc's zeros ARE
+                          the whole of it (S3c). *)
+                       assert (Hstep11 : kxb_walk_ok (kxc_fb datl dnf) ef ->
+                                 (S i <= Z.to_nat (eh_phnum ef))%nat ->
+                                 kxb_at (kxc_fb datl dnf) ef (S i)
+                                   (uint (M4 !!! Regidx Ra0)) M4i).
+                       { intros Hwk HSi'.
+                         destruct (Hexact Hwk HSi') as [Hpoe Hpfe].
+                         destruct (Himg Hwk) as [Hszeq Hsubi].
+                         destruct (kxb_walk_step (kxc_fb datl dnf) ef i
+                                     Hwk HSi' Hty1) as (Hpok & Hle & _).
+                         assert (Hfzz : ep_filesz (kxb_phdr (kxc_fb datl dnf) ef i)
+                                        = 0%Z).
+                         { rewrite -Hpfe. apply Z.eqb_eq in Efz.
+                           pose proof (le_at_bound pf 32 4) as Hb324.
+                           change (2 ^ (8 * Z.of_nat 4))%Z
+                             with 4294967296%Z in Hb324.
+                           revert Efz. unfold w32_uarg. case_decide;
+                             change (2 ^ 31)%Z with 2147483648%Z in *;
+                             change (2 ^ 64)%Z with 18446744073709551616%Z;
+                             change (2 ^ 32)%Z with 4294967296%Z; lia. }
+                         rewrite Himgn.
+                         apply (kxb_at_step_load (kxc_fb datl dnf) ef i
+                                  (uint szv) (uint (M4 !!! Regidx Ra0)) Mi
+                                  (umem_grow Mi (uint (M4 !!! Regidx Ra0)))
+                                  Hwk HSi' Hty1 (Himg Hwk)).
+                         - rewrite !uint_unsigned Ha0eq Hnszv Hfva Hfmz.
+                           reflexivity.
+                         - intros a Ha.
+                           apply (Hfz0 (ep_vaddr (kxb_phdr (kxc_fb datl dnf)
+                                                    ef i)));
+                             [ rewrite -Hfva; exact Hvaal
+                             | rewrite -(uint_unsigned szv) Hszeq; exact Hle
+                             | exact Ha ].
+                         - rewrite Hfzz. apply load_win_0.
+                         - apply load_out_refl. }
                        iApply (kxc_incr (CID0 := CIDv3) jp gf
 
                                  kf qf sf gyf loyf tlyf inumf dnf bmf datl gilf
@@ -2477,12 +2807,13 @@ Section KexecB3Body.
                          iSplitR.
                          { iPureIntro. split_and!;
                              [exact Hk2 | exact Hib | exact Hn2
-                             | exact Hal]. }
+                             | exact Hal | exact Hw67]. }
                          iSplitR.
                          { iPureIntro. split_and!;
-                             [exact Hiphn
+                             [lia
                              | rewrite HP4tf; exact HPtfp
-                             | exact Hbel4n | exact Hcov4n]. }
+                             | exact Hbel4n | exact Hcov4n
+                             | exact Hstep11]. }
                          iSplitL "Hpc"; [iExact "Hpc" |].
                          iSplitL "Hcg"; [iExact "Hcg" |].
                          iSplitL "Hcnt"; [iExact "Hcnt" |].
@@ -2711,12 +3042,15 @@ Section KexecB3Body.
                                  kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na
                                  avf alen aslen afun pidv U dqb dqs dqa dqpv dqas m K
                                  sp0 ra0 s00 s10 s20 pv av (kxc_off ef i)
-                                 (M4 !!! Regidx Ra0) w67 ef P4 M4i i
+                                 (M4 !!! Regidx Ra0) w67 ef P4 M4i M4i i
                                  (Z_to_bv 64 (le_at pf 16 8) : mword 64)
                                  (le_at pf 32 4) (le_at pf 8 4) eb ∅
                                  HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb
                                  Hib Hn2 Hjp Hgs Hsp Hra Hs0 Hs1 Hs2
                                  Hal Hbel4n Hcov4n Hfzr Hpor
+                                 ltac:(rewrite uint_unsigned kxc_le8_unsigned;
+                                       exact Hvaal)
+                                 Hvatop
                                  (Z.to_nat (2 ^ 32)) U24 0%Z
                                  ltac:(change (2 ^ 32)%Z with 4294967296%Z; lia)
                                  ltac:(rewrite Z2Nat.id;
@@ -2726,7 +3060,12 @@ Section KexecB3Body.
                                                  with 4294967296%Z; lia)); lia
                                        | change (2 ^ 32)%Z with 4294967296%Z;
                                          lia ])
-                                 Hguard HU24sp HU24s0 HU24s1 HU24s3 HU24s4
+                                 Hguard
+                                 ltac:(lia)
+                                 ltac:(reflexivity)
+                                 (load_win_0 _ _ _ _)
+                                 (load_out_refl _ _ _)
+                                 HU24sp HU24s0 HU24s1 HU24s3 HU24s4
                                  HU24s5 HU24s6 HU24s7 HU24s8 HU24s9 HU24s10
                                  HU24s11
                                  with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hka
@@ -2749,7 +3088,8 @@ Section KexecB3Body.
                        (* ---- +0x116: the segment is in memory ---- *)
                        iIntros (CIDq1 Hsq1 Mx Mls) "%Hmx Hcg Hcnt Hextc Hclmc Hpc Hres Hcont".
                        destruct Hmx as (HMxsp & HMxs0 & HMxs4 & HMxs5 & HMxs6 &
-                                        HMxs9 & HMxs10 & HMxs11).
+                                        HMxs9 & HMxs10 & HMxs11 &
+                                        Hlswin & Hlsout).
                        rewrite /kxc_res.
                        iDestruct "Hres" as "(Hopen & Hlog & Hirs & Hbm & Hins &
                                              Hbits & Hbs & Hpt & Hpriv & Hpath &
@@ -2800,6 +3140,32 @@ Section KexecB3Body.
                        assert (HU25s11 : U25 !!! Regidx Rs11
                                          = (mword_of_int 56 : mword 64))
                          by (rewrite /U25 upd_ne; [exact HMxs11 | bnz]).
+                       (* THE SEGMENT LOADED: the window loadseg published is
+                          the file half, and uvmalloc's zeros are the bss
+                          half; nothing outside the window moved (S3c). *)
+                       rewrite uint_unsigned kxc_le8_unsigned in Hlswin Hlsout.
+                       assert (Hstep11 : kxb_walk_ok (kxc_fb datl dnf) ef ->
+                                 (S i <= Z.to_nat (eh_phnum ef))%nat ->
+                                 kxb_at (kxc_fb datl dnf) ef (S i)
+                                   (uint (M4 !!! Regidx Ra0)) Mls).
+                       { intros Hwk HSi'.
+                         destruct (Hexact Hwk HSi') as [Hpoe Hpfe].
+                         destruct (Himg Hwk) as [Hszeq Hsubi].
+                         destruct (kxb_walk_step (kxc_fb datl dnf) ef i
+                                     Hwk HSi' Hty1) as (Hpok & Hle & _).
+                         apply (kxb_at_step_load (kxc_fb datl dnf) ef i
+                                  (uint szv) (uint (M4 !!! Regidx Ra0)) Mi Mls
+                                  Hwk HSi' Hty1 (Himg Hwk)).
+                         - rewrite !uint_unsigned Ha0eq Hnszv Hfva Hfmz.
+                           reflexivity.
+                         - intros a Ha.
+                           apply (Hfz0 (ep_vaddr (kxb_phdr (kxc_fb datl dnf)
+                                                    ef i)));
+                             [ rewrite -Hfva; exact Hvaal
+                             | rewrite -(uint_unsigned szv) Hszeq; exact Hle
+                             | exact Ha ].
+                         - rewrite -Hpoe -Hpfe -Hfva. exact Hlswin.
+                         - rewrite -Hpfe -Hfva -Himgn. exact Hlsout. }
                        assert (Hpp11ab : add_vec_int
                                            (mword_of_int (KXB + 0x116)
                                             : mword 64) 4
@@ -2845,12 +3211,13 @@ Section KexecB3Body.
                          iSplitR.
                          { iPureIntro. split_and!;
                              [exact Hk2 | exact Hib | exact Hn2
-                             | exact Hal]. }
+                             | exact Hal | exact Hw67]. }
                          iSplitR.
                          { iPureIntro. split_and!;
-                             [exact Hiphn
+                             [lia
                              | rewrite HP4tf; exact HPtfp
-                             | exact Hbel4n | exact Hcov4n]. }
+                             | exact Hbel4n | exact Hcov4n
+                             | exact Hstep11]. }
                          iSplitL "Hpc"; [iExact "Hpc" |].
                          iSplitL "Hcg"; [iExact "Hcg" |].
                          iSplitL "Hcnt"; [iExact "Hcnt" |].
@@ -3050,7 +3417,7 @@ Section KexecB3Loop.
       iIntros (CIDn Hsn M' P' Mo szv') "[Hnext | Hexit] Hcont".
     - (* NO FUEL, and the back edge is what refutes it. *)
       iDestruct "Hnext" as "(_ & _ & %Hp3 & _)".
-      destruct Hp3 as (HSi & _ & _ & _).
+      destruct Hp3 as (HSi & _ & _ & _ & _).
       exfalso. rewrite Nat2Z.inj_succ in HSi.
       change (Z.of_nat 0%nat) with 0%Z in Hfuel. lia.
     - (* NO FUEL: the loop is over anyway. *)
@@ -3058,7 +3425,7 @@ Section KexecB3Loop.
       iApply ("Hc1a4" $! M' P' Mo szv' with "Hexit Hcont").
     - (* another header *)
       iDestruct "Hnext" as "(%Hp1 & %Hp2 & %Hp3 & Hrest)".
-      destruct Hp3 as (HSi & Hp3b & Hp3c & Hp3d).
+      destruct Hp3 as (HSi & Hp3b & Hp3c & Hp3d & Hp3e).
       assert (Hcr : true = false \/ proc_addr jp = zero_reg ->
                 (CIDn : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CIDn true (proc_addr jp) _ Hcr
@@ -3071,7 +3438,8 @@ Section KexecB3Loop.
       iSplitR; [iPureIntro; exact Hp1 |].
       iSplitR; [iPureIntro; exact Hp2 |].
       iSplitR; [iPureIntro; split_and!;
-                [exact HSi | exact Hp3b | exact Hp3c | exact Hp3d] |].
+                [exact HSi | exact Hp3b | exact Hp3c | exact Hp3d
+                | exact Hp3e] |].
       iExact "Hrest".
     - (* the loop is over *)
       iSpecialize ("Hc1a4" $! CIDn with "[%]"); [wp_next_chain |].

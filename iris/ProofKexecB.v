@@ -1085,6 +1085,22 @@ Section KexecBBody.
         iSpecialize ("Hcont12c" $! CID24 with "[%]"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID24 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
+        (* [elf.phnum] IS POSITIVE on this path -- the +0x0b0 test said so,
+           and the phdr loop's invariant needs it: header [i] is only ever
+           read when [i < phnum], which is what makes [kxb_loads] a prefix
+           of the ELF semantics' own [elf_loads] (S3c). *)
+        assert (Hphnpos : (0 < eh_phnum ef)%Z).
+        { pose proof (eh_phnum_bound ef) as Hpb.
+          destruct (Z.eq_dec (eh_phnum ef) 0) as [Hz | Hnz]; [| lia].
+          exfalso.
+          assert (Hzz : rget G4 Ra5 = (zero_reg : mword 64)).
+          { rewrite (rget_ne G4 Ra5 ltac:(nz)) /G4 upd_eq.
+            unfold eh_phnum in Hz. rewrite Hz.
+            apply bv_eq; vm_compute; reflexivity. }
+          pose proof (proj2 (eq_vec_true_iff _ _) Hzz) as Ht.
+          rewrite Ht in Ephn. discriminate. }
+        assert (Hu0 : uint (mword_of_int 0 : mword 64) = 0%Z)
+          by (rewrite uint_unsigned moi64_unsigned; vm_compute; reflexivity).
         iApply ("Hcont12c" $! G11 P ∅ with "[-Hcont] Hcont").
         rewrite /kxc_at_12c.
         (* [kxc_at_12c] has NO threading conjunct -- see its header: by +0x12c
@@ -1098,13 +1114,18 @@ Section KexecBBody.
             | exact HG11s10 | exact HG11s11 | exact HG11a3]. }
         iSplitR.
         { iPureIntro. split_and!;
-            [exact Hk | exact Hib | exact Hn2 | exact Hal]. }
+            [exact Hk | exact Hib | exact Hn2 | exact Hal | reflexivity]. }
         iSplitR.
         { iPureIntro. split_and!;
-            [ pose proof (eh_phnum_bound ef); lia
+            [ exact Hphnpos
             | exact HPtfp
             | rewrite HPum; exact (um_below_empty _)
-            | exact (um_covered_zero _) ]. }
+            | exact (um_covered_zero _)
+            | (* nothing has been loaded yet, and [sz] is 0 *)
+              intros _; split;
+                [ rewrite Hu0; reflexivity
+                | intros p Hp; cbn in Hp; exfalso;
+                  exact (not_elem_of_nil p Hp) ] ]. }
         (* [iFrame] is NOT usable here: its [Frame] search unfolds [proc_priv]
            and the goal's big-ops, and this state carries a syscall-altitude
            block (measured: >19 GB and climbing before it was replaced).

@@ -46,6 +46,7 @@ Require Import PageGeom.        (* [PGSIZE]                                  *)
 Require Import UmodeAbi.        (* [uimg_sub]                                *)
 Require Import ElfEnc.          (* [le_at], [ph_at], [eh_phnum]              *)
 Require Import ElfFile.         (* the image semantics                       *)
+Require Import ElfBridge.       (* [le_at_shift_of_list], [file_bytes_lookup] *)
 Require Import UserPtTree.      (* [umem_write], [umem_wr], [umem_grow],
                                    [uva_live]                               *)
 Require Import ProcDefs.        (* [ustate], [us_M], [us_V], [pv_sz]         *)
@@ -646,6 +647,17 @@ Qed.
 (*  2.  THE loadseg LOOP, PAGE BY PAGE                                    *)
 (* ====================================================================== *)
 
+(* [umem_write] only reads its source below [n]. *)
+Lemma umem_write_ext_kxb (M : gmap Z (bv 8)) (a : Z) (n : nat)
+    (bs cs : nat -> bv 8) :
+  (forall j, (j < n)%nat -> bs j = cs j) ->
+  umem_write M a n bs = umem_write M a n cs.
+Proof.
+  induction n as [| k IH]; intros He; [reflexivity |].
+  cbn [umem_write]. rewrite (IH ltac:(intros j Hj; apply He; lia)).
+  rewrite (He k ltac:(lia)). reflexivity.
+Qed.
+
 (* THE INVARIANT: the first [n] bytes of the segment are in place.  [n]
    runs [0, PGSIZE, 2*PGSIZE, ..., filesz] as loadseg walks pages. *)
 Definition load_win (f : elf_bytes) (off va n : Z) (M : gmap Z (bv 8)) : Prop :=
@@ -693,6 +705,53 @@ Proof.
   assert (Hne : forall k, (k < nn)%nat -> (va + j) <> (a + Z.of_nat k)).
   { intros k Hk Heq. apply (Hout k Hk). lia. }
   rewrite (umem_write_lookup_out M a nn g (va + j) Hne). exact (H j Hj).
+Qed.
+
+(* ...and it is DOWNWARD CLOSED in the width, which is how the loadseg
+   loop's exit ([i >= filesz]) hands back a window at exactly [filesz]. *)
+Lemma load_win_mono (f : elf_bytes) (off va n n' : Z) (M : gmap Z (bv 8)) :
+  n' <= n -> load_win f off va n M -> load_win f off va n' M.
+Proof. intros Hn H j Hj. apply H. lia. Qed.
+
+(* ONE PAGE STEP, at an ARBITRARY source function.  [load_win_step] above
+   is the instance where the bytes written are spelled as the file's; what
+   a [readi] hands back is a different total function that AGREES with the
+   file over the run it delivered, and this is that statement. *)
+Lemma load_win_step_g (f : elf_bytes) (off va i : Z) (nn : nat)
+    (g : nat -> bv 8) (M : gmap Z (bv 8)) :
+  0 <= i ->
+  (forall k, (k < nn)%nat -> g k = f !!! Z.to_nat (off + i + Z.of_nat k)) ->
+  load_win f off va i M ->
+  load_win f off va (i + Z.of_nat nn) (umem_write M (va + i) nn g).
+Proof.
+  intros Hi Hg Hinv.
+  rewrite (umem_write_ext_kxb M (va + i) nn g
+             (fun k => f !!! Z.to_nat (off + i + Z.of_nat k)) Hg).
+  apply load_win_step; [exact Hi | exact Hinv].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  THE FRAME ROW: what the loadseg loop did NOT touch.  The loop writes    *)
+(*  only inside [va, va + n), so every byte outside that window reads back  *)
+(*  what it held when the loop started -- which is what lets the phdr       *)
+(*  loop's step carry the EARLIER segments' [uimg_sub] across this one.     *)
+(* ---------------------------------------------------------------------- *)
+Definition load_out (va n : Z) (Mb M : gmap Z (bv 8)) : Prop :=
+  forall a, a < va \/ va + n <= a -> M !! a = Mb !! a.
+
+Lemma load_out_refl (va n : Z) (M : gmap Z (bv 8)) : load_out va n M M.
+Proof. intros a _. reflexivity. Qed.
+
+Lemma load_out_write (va n a : Z) (nn : nat) (g : nat -> bv 8)
+    (Mb M : gmap Z (bv 8)) :
+  load_out va n Mb M ->
+  va <= a -> a + Z.of_nat nn <= va + n ->
+  load_out va n Mb (umem_write M a nn g).
+Proof.
+  intros Hout Hlo Hhi b Hb.
+  assert (Hne : forall k, (k < nn)%nat -> b <> (a + Z.of_nat k))
+    by (intros k Hk Heq; lia).
+  rewrite (umem_write_lookup_out M a nn g b Hne). exact (Hout b Hb).
 Qed.
 
 (* AT [n = filesz] THE WINDOW IS THE FILE HALF OF THE SEGMENT. *)
@@ -1073,6 +1132,128 @@ Proof.
   exfalso. pose proof (seg_map_lookup_range f p va b Hok Hb). lia.
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(*  THE FIELD AGREEMENT.  The 56-byte frame buffer [g] the phdr loop        *)
+(*  [readi]s at file offset [o] reads, field by field, as [kxb_phdr_at]     *)
+(*  does -- and the two fields the code reads at FOUR bytes ([off] and the  *)
+(*  second read of [filesz]) agree once the file's own well-formedness      *)
+(*  bounds them below 2^32.                                                 *)
+(* ---------------------------------------------------------------------- *)
+(* the abstract file's length is the inode's size *)
+Lemma file_bytes_length (data : nat -> list (bv 8)) (n : nat) :
+  length (FsTree.file_bytes data n) = n.
+Proof. unfold FsTree.file_bytes. rewrite length_fmap, length_seq. reflexivity. Qed.
+
+Lemma kxb_phdr_fields (f : elf_bytes) (g : nat -> bv 8) (o : nat) :
+  (forall j, (j < 56)%nat -> g j = f !!! (o + j)%nat) ->
+  le_at g 0 4 = ep_type (kxb_phdr_at f o)
+  /\ le_at g 8 4 = ep_offset (kxb_phdr_at f o) `mod` 2 ^ 32
+  /\ le_at g 16 8 = ep_vaddr (kxb_phdr_at f o)
+  /\ le_at g 32 8 = ep_filesz (kxb_phdr_at f o)
+  /\ le_at g 32 4 = ep_filesz (kxb_phdr_at f o) `mod` 2 ^ 32
+  /\ le_at g 40 8 = ep_memsz (kxb_phdr_at f o).
+Proof.
+  intros Hag.
+  assert (Hsh : forall a n : nat, (a + n <= 56)%nat ->
+            le_at g a n = elf_le_at f (o + a) n).
+  { intros a n Han. apply le_at_shift_of_list. intros j Hj.
+    replace (o + a + j)%nat with (o + (a + j))%nat by lia.
+    apply Hag. lia. }
+  unfold kxb_phdr_at. cbn [ep_type ep_offset ep_vaddr ep_filesz ep_memsz].
+  rewrite (Hsh 0%nat 4%nat ltac:(lia)), (Hsh 8%nat 4%nat ltac:(lia)),
+          (Hsh 16%nat 8%nat ltac:(lia)), (Hsh 32%nat 8%nat ltac:(lia)),
+          (Hsh 32%nat 4%nat ltac:(lia)), (Hsh 40%nat 8%nat ltac:(lia)).
+  rewrite Nat.add_0_r.
+  split; [reflexivity | split; [| split; [reflexivity
+          | split; [reflexivity | split; [| reflexivity]]]]].
+  - rewrite (elf_le_at_trunc f (o + 8) 4 8 ltac:(lia)).
+    change (2 ^ (8 * Z.of_nat 4))%Z with (2 ^ 32)%Z. reflexivity.
+  - rewrite (elf_le_at_trunc f (o + 32) 4 8 ltac:(lia)).
+    change (2 ^ (8 * Z.of_nat 4))%Z with (2 ^ 32)%Z. reflexivity.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  THE PHDR LOOP'S STEP, AS ONE PURE ROW EACH.                            *)
+(* ---------------------------------------------------------------------- *)
+
+(* A header the loop skips changes nothing at all. *)
+Lemma kxb_at_step_skip (f : elf_bytes) (ef : nat -> bv 8) (i : nat)
+    (szv : Z) (M : gmap Z (bv 8)) :
+  ep_type (kxb_phdr f ef i) <> 1 ->
+  kxb_at f ef i szv M -> kxb_at f ef (S i) szv M.
+Proof.
+  unfold kxb_at. intros Hty [Hsz Hsub].
+  rewrite (kxb_loads_S_skip f ef i Hty).
+  split; [exact Hsz | exact Hsub].
+Qed.
+
+(* what an already-established [uimg_sub] survives when only a WINDOW of
+   the map moved and the image sits strictly below it *)
+Lemma uimg_sub_load_out (img Mb M : gmap Z (bv 8)) (va n : Z) :
+  (forall a b, img !! a = Some b -> a < va) ->
+  load_out va n Mb M -> uimg_sub img Mb -> uimg_sub img M.
+Proof.
+  intros Hdom Hout Hsub a b Hb.
+  rewrite (Hout a (or_introl (Hdom a b Hb))). exact (Hsub a b Hb).
+Qed.
+
+(* ONE PT_LOAD HEADER, DONE: the uvmalloc/loadseg pair, as the step of
+   [kxb_at].  [Mi] is the image before the header and [szv] the running
+   size; uvmalloc grew to [sz'] (zero-filling everything that became live)
+   and loadseg then wrote the file window and nothing else. *)
+Lemma kxb_at_step_load (f : elf_bytes) (ef : nat -> bv 8) (i : nat)
+    (szv sz' : Z) (Mi Mo : gmap Z (bv 8)) :
+  kxb_walk_ok f ef -> (S i <= Z.to_nat (eh_phnum ef))%nat ->
+  ep_type (kxb_phdr f ef i) = 1 ->
+  kxb_at f ef i szv Mi ->
+  sz' = kx_uvmalloc szv (ep_vaddr (kxb_phdr f ef i)
+                         + ep_memsz (kxb_phdr f ef i)) ->
+  (forall a, ep_vaddr (kxb_phdr f ef i) <= a -> Mi !! a = None) ->
+  load_win f (ep_offset (kxb_phdr f ef i)) (ep_vaddr (kxb_phdr f ef i))
+             (ep_filesz (kxb_phdr f ef i)) Mo ->
+  load_out (ep_vaddr (kxb_phdr f ef i)) (ep_filesz (kxb_phdr f ef i))
+           (umem_grow Mi sz') Mo ->
+  kxb_at f ef (S i) sz' Mo.
+Proof.
+  intros Hw HSi Hty [Hsz Hsub] Hsz' Hfresh Hwin Hout.
+  destruct (kxb_walk_step f ef i Hw HSi Hty) as (Hpok & Hle & Heq).
+  set (p := kxb_phdr f ef i) in *.
+  pose proof (po_memsz f p Hpok) as Hmf.
+  pose proof (po_filesz f p Hpok) as Hf0.
+  pose proof (po_vaddr f p Hpok) as Hv0.
+  assert (Hsz'v : sz' = ep_vaddr p + ep_memsz p).
+  { rewrite Hsz', kx_uvmalloc_max. lia. }
+  (* the zeros uvmalloc left over the segment's bss half survive loadseg *)
+  assert (Hzero : forall j, ep_filesz p <= j < ep_memsz p ->
+            Mo !! (ep_vaddr p + j) = Some (bv_0 8)).
+  { intros j Hj. rewrite (Hout (ep_vaddr p + j) ltac:(right; lia)).
+    apply umem_grow_lookup_zero.
+    - apply Hfresh. lia.
+    - unfold uva_live. unfold pgroundup.
+      pose proof (Z.div_mod (sz' + 4095) 4096 ltac:(lia)) as Hdm.
+      pose proof (Z.mod_pos_bound (sz' + 4095) 4096 ltac:(lia)). lia. }
+  split.
+  - rewrite Heq. exact Hsz'v.
+  - intros q Hq. rewrite (kxb_loads_S_load f ef i Hty) in Hq.
+    apply elem_of_app in Hq as [Hq | Hq].
+    + (* an EARLIER segment: it sits below [szv], so neither move reached it *)
+      apply (uimg_sub_load_out (seg_map f q) (umem_grow Mi sz') Mo
+               (ep_vaddr p) (ep_filesz p)).
+      * intros a b Hb.
+        assert (Hqok : phdr_ok f q)
+          by exact (kxb_walk_phdr_ok f ef i q Hw ltac:(lia) Hq).
+        pose proof (seg_map_lookup_range f q a b Hqok Hb).
+        pose proof (kexec_sz_after_elem (kxb_loads f ef i) q Hq). lia.
+      * exact Hout.
+      * apply uimg_sub_umem_grow. exact (Hsub q Hq).
+    + (* THIS segment: the file half from the window, the bss half from
+         the zeros uvmalloc left *)
+      apply elem_of_list_singleton in Hq. rewrite Hq.
+      apply uimg_sub_seg_map.
+      * exact (uimg_sub_seg_file_map_win f p Mo Hpok Hwin).
+      * exact (uimg_sub_seg_zero_map p Mo Hmf Hzero).
+Qed.
+
 (* ====================================================================== *)
 (*  4.  THE FACT BUNDLE THE CONE CARRIES TO ITS ENTRY-POINT HOLE          *)
 (* ====================================================================== *)
@@ -1111,20 +1292,57 @@ Qed.
     [ProofKexecTail.kxc_ldat] is [ic_loaded]'s payload at a NAMED [datl],
     [ProofKexecSeam.kxc_open] carries it, phase A chooses the name at its
     header readi and publishes [forall j < 64, ef j = file_byte datl j]
-    beside it, and every phase-B/B2/B3 state passes it along.  §1-§3b below
-    are the vocabulary the two remaining invariants are to be written in:
-    [load_win] (the loadseg window), [kexec_sz_after] over [kxb_loads]
-    (the phdr loop's size fold) and [kxb_at] / [kxb_walk_ok] (the loop
-    invariant and the ascending/well-formedness guard its step needs;
-    [KexecImageAlg.kxb_walk_ok_of_loadable] discharges the guard from
-    [SpecKexecAU.kexec_loadable]).  What is STILL missing is the in-proof
-    work: [ProofKexecB2.kxc_ls] must carry [load_win] through its fuel
-    induction and publish it at +0x116, and [ProofKexecB3.kxc_ph_step]
-    must step [kxb_at] across the uvmalloc/loadseg pair.  Only then can
-    this Prop gain the file's bytes as a parameter and the two rows
+    beside it, and every phase-B/B2/B3 state passes it along.
 
-        uimg_sub (elf_image f) (us_M U')
-        uint sz1 = pgroundup (kexec_sz_after (elf_loads f)) + 8192
+    WHAT S3c LANDED -- THE TWO LOOP INDUCTIONS, BOTH CLOSED.
+
+      * [ProofKexecB2.kxc_ls] carries [load_win] and [load_out] through its
+        fuel induction and publishes them at +0x116: the segment's file
+        window IS in memory at [ph.vaddr], and nothing outside
+        [[vaddr, vaddr + filesz)] moved.  The page-base identity
+        [bv_unsigned (svpn_of vai) * 4096 = uint va + i] is
+        [ProcPtOwn.svpn_of_unsigned_small] under the two new premises
+        [uint va mod 4096 = 0] and [uint va + filesz <= uvm_maxsz]; the
+        bytes are [SpecReadi.rd_delivered_bytes] plus
+        [ElfBridge.file_bytes_lookup], sized by readi's own
+        [tot = rd_clamp].
+
+      * [ProofKexecB3.kxc_ph_step] steps [kxb_at] across the
+        uvmalloc/loadseg pair.  The invariant rides in
+        [ProofKexecSeam.kxc_at_12c] (index [i], unguarded) and
+        [ProofKexecB3.kxc_at_11a] (index [S i], guarded by
+        [S i <= phnum], which the back edge's own test discharges), both
+        CONDITIONAL on [kxb_walk_ok] -- the landed
+        [SpecKexec.wp_kexec_sconf] carries no premise about the file, so
+        the guard may not become a premise of the cone.  Below,
+        [kxb_phdr_fields] turns the body's three informative blind splits
+        (the PT_LOAD type test, the vaddr+memsz wrap test, the vaddr
+        alignment test) into statements about the file's own fields, and
+        [kxb_at_step_load] / [kxb_at_step_skip] are the step itself.
+        [kxc_at_12c] also gained [i < eh_phnum ef] (ProofKexecB's +0x0b0
+        test buys [0 < phnum]) and the pin [w67 = 4095], without which the
+        alignment test cannot be read back.
+
+    WHAT IS STILL MISSING (S3d) is only the CARRYING: [ProofKexecB3.kxc_incr]
+    DROPS the invariant at its +0x1a4 exit rather than converting it.  The
+    conversion itself is now one step -- at that exit [i < phnum] and
+    [S i >= phnum] give [S i = phnum], and [kxb_walk_ok]'s first conjunct
+    says [kxb_loads f ef phnum] IS [elf_loads f], so [kxb_at] becomes
+    [uimg_sub (elf_image f)] ([uimg_sub_elf_image]) together with
+    [uint szv = kexec_sz_after (elf_loads f)].  What that costs is the
+    threading: [kxc_at_1a4] / [kxc_at_1ae] / [kxc_at_21a] / [kxc_at_272] /
+    [kxc_at_2a6] (all in [ProofKexecSeam]) and phase D's states must carry
+    the two rows; the argv loop's copyouts must be shown to miss the image
+    (they land in the stack page, at or above
+    [pgroundup (kexec_sz_after (elf_loads f))], and every segment byte is
+    strictly below it -- [kexec_sz_after_elem] + [seg_map_lookup_range]);
+    and [kxc_c_setup]'s [sz1 = pgroundup szv + 8192] has to be published.
+    Only then can this Prop gain the file's bytes as a parameter and the
+    two rows
+
+        kxb_walk_ok f ef -> uimg_sub (elf_image f) (us_M U')
+        kxb_walk_ok f ef ->
+          uint sz1 = pgroundup (kexec_sz_after (elf_loads f)) + 8192
 
     with the five premise sites ([ProofKexecD.kxd_phaseD],
     [ProofKexec.kxc_d_tail] / [kxc_cd], [ProofKexecPin]'s two) gaining

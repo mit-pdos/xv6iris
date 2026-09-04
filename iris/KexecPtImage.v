@@ -126,6 +126,32 @@ Section KexecPtImage.
     lia.
   Qed.
 
+  (* ...and the same fact at EVERY page-aligned bound at or above the
+     [um_below] size, extracted ONCE.  The phdr loop needs the freshness at
+     the NEXT segment's [vaddr] -- which it only knows is above the running
+     [sz] under the walk's own guard, i.e. after the resource is gone -- so
+     the bound has to be universally quantified inside the ⌜⌝. *)
+  Lemma proc_pt_fresh_above_z (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) :
+    um_below szv P.(ud_um) ->
+    proc_pt P M -∗
+    ⌜forall bnd : Z, (bnd `mod` 4096 = 0)%Z ->
+       (bv_unsigned szv <= bnd)%Z ->
+       forall a : Z, (bnd <= a)%Z -> M !! a = None⌝.
+  Proof.
+    intros Hbel. iIntros "Hpt".
+    iDestruct (proc_pt_dom with "Hpt") as %Hdom.
+    iPureIntro. intros bnd Halign Hge a Ha.
+    destruct (M !! a) as [b |] eqn:E; [exfalso | reflexivity].
+    assert (Hin : a ∈ dom M) by (apply elem_of_dom; exists b; exact E).
+    rewrite Hdom in Hin.
+    apply elem_of_uva_dom in Hin as (vpn & w & j & Hl & Hj & ->).
+    pose proof (Hbel vpn w Hl) as Hlt.
+    (* the page BASE is a multiple of 4096 strictly below [bnd], and [bnd]
+       is one too, so the whole page is below it *)
+    pose proof (Z.div_mod bnd 4096 ltac:(lia)) as Hdm. rewrite Halign in Hdm.
+    lia.
+  Qed.
+
   (* every byte of a MAPPED page is recorded in [M] -- what turns the
      total lookup [M !!! va] the accessor names into a real [Some] *)
   Lemma proc_pt_page_bytes (P : uptd) (M : gmap Z (bv 8))

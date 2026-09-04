@@ -140,6 +140,8 @@ Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
 Require Import SpecKexecB2.
 Require Import KexecPtImage.
+Require Import ElfBridge.   (* [file_bytes_lookup] -- readi's bytes ARE the file's *)
+Require Import KexecBuilt.  (* [load_win] / [load_out] *)
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -794,17 +796,17 @@ Section KexecB2Loops.
       (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8))
+      (ef : nat -> bv 8) (P : uptd) (Mi Mb : gmap Z (bv 8))
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string) :
     kxc_ls_body Q gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
-      ef P Mi ip va fz po eb lks.
+      ef P Mi Mb ip va fz po eb lks.
   Proof.
     cbv beta delta [kxc_ls_body].
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs
- Hsp Hra Hs0 Hs1 Hs2 Hal Hbelow Hcovp Hfzr Hpor.
+ Hsp Hra Hs0 Hs1 Hs2 Hal Hbelow Hcovp Hfzr Hpor Hvaal Hvatop.
     pose proof HK as HK'. 
     assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
       by (vm_compute; reflexivity).
@@ -812,7 +814,7 @@ Section KexecB2Loops.
        generalised over the induction beside the register file. *)
     intro W. revert CID0 Mi.
     induction W as [| W IH];
-      intros CID0 Mi Ml ii Hiir Hfuel Hguard
+      intros CID0 Mi Ml ii Hiir Hfuel Hguard Hnowrap Hiial Hwin Houtw
              HMsp HMs0 HMs1 HMs3 HMs4 HMs5 HMs6 HMs7 HMs8 HMs9 HMs10 HMs11.
     { (* NO FUEL.  [off] is an unsigned 32-bit reading, so [2^32 - off] is at
          least one and the zero case cannot arise. *)
@@ -877,6 +879,32 @@ Section KexecB2Loops.
     { iApply (kxc_0fc with "Htext"). }
     iIntros (CID3 Hsq3) "Hcg Hpc". iEval (rgne) in "Hcg". iEval (rgne) in "Hcg".
     set (vai := add_vec (mword_of_int ii : mword 64) va).
+    (* THE PAGE THE BORROW IS TAKEN AT IS [va + i].  [ph.vaddr] is
+       page-aligned (the phdr loop's +0x168 test) and the cursor advances
+       by whole pages, so the page walkaddr resolves is exactly where the
+       window's next bytes belong -- which is the ONE geometric fact the
+       image invariant needs out of this loop. *)
+    assert (Hiifz : (ii < fz)%Z)
+      by exact (w32_uarg_lt_inv ii fz Hiir Hfzr Hguard).
+    assert (Hvamx : (uint va + ii <= uvm_maxsz)%Z) by lia.
+    assert (Hvaib : (bv_unsigned vai = uint va + ii)%Z).
+    { assert (Hiir' : (0 <= ii < 4294967296)%Z)
+        by (change (2 ^ 32)%Z with 4294967296%Z in Hiir; exact Hiir).
+      pose proof (bv_unsigned_in_range _ va) as [Hv0 _].
+      rewrite uvm_maxsz_val uint_unsigned in Hvamx.
+      rewrite /vai add_vec64_unsigned moi64_unsigned.
+      rewrite (bvw64_small ii
+                 ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z; lia)).
+      rewrite uint_unsigned.
+      rewrite (Z.add_comm ii (bv_unsigned va)).
+      apply bvw64_small.
+      change (2 ^ 64)%Z with 18446744073709551616%Z. lia. }
+    assert (Hbasei : (bv_unsigned (svpn_of vai) * 4096 = uint va + ii)%Z).
+    { rewrite (svpn_of_unsigned_small vai ltac:(rewrite Hvaib; exact Hvamx)).
+      rewrite Hvaib.
+      assert (Hmm : ((uint va + ii) `mod` 4096 = 0)%Z).
+      { rewrite Zplus_mod Hvaal Hiial. reflexivity. }
+      pose proof (Z.div_mod (uint va + ii) 4096 ltac:(lia)) as Hdm. lia. }
     assert (HN2s8 : N2 !!! Regidx Rs8 = va).
     { rewrite /N2 upd_ne; [| lnz]. rewrite /N1 upd_ne; [exact HMs8 | lnz]. }
     set (N3 := <[Regidx Ra1 := regval_into_reg
@@ -1154,6 +1182,7 @@ Section KexecB2Loops.
                ⌜true = false \/ proc_addr jp = zero_reg ->
                  (CIDd : CPU) = (CID0 : CPU)⌝ -∗
                ⌜(1 <= nn)%nat /\ (nn <= 4096)%nat /\
+                 (Z.of_nat nn = Z.min 4096 (fz - ii))%Z /\
                  Md !!! Regidx Rs2 = (mword_of_int (Z.of_nat nn) : mword 64) /\
                  Md !!! Regidx Ra2 = page_base (pte_ppn w0) /\
                  (forall r : mword 5, is_cs_idx r = true -> r <> Rs2 ->
@@ -1172,12 +1201,16 @@ Section KexecB2Loops.
          back edge.
          ============================================================= *)
       iIntros (CIDd Md nn) "%Hcrd %Hdf Hcg Hcnt Hextc Hclmc Hpc".
-      destruct Hdf as (Hnn1 & Hnn2 & HMds2 & HMda2 & HMdget).
+      destruct Hdf as (Hnn1 & Hnn2 & Hnnmin & HMds2 & HMda2 & HMdget).
       set (offz := ((po + ii) `mod` 2 ^ 32)%Z).
       assert (Hoffr : (0 <= offz < 2 ^ 32)%Z)
         by (rewrite /offz; apply Z.mod_pos_bound; lia).
       set (offn := Z.to_nat offz).
       assert (HoffnZ : Z.of_nat offn = offz) by (rewrite /offn Z2Nat.id; lia).
+      assert (Hoffzv : (offz = po + ii)%Z)
+        by (rewrite /offz; apply Z.mod_small; lia).
+      assert (HoffnZ' : (Z.of_nat offn = po + ii)%Z)
+        by (rewrite HoffnZ; exact Hoffzv).
       (* ---- +0x0da: c.addiw s2,s2,0 -- the C's [n] is a [uint] ---- *)
       iApply (wp_caddiw_s_sconf (mword_of_int (KXB + 0x0da)) Rs2
                 (mword_of_int 0 : mword 6) Md (K - 68)%nat eb
@@ -1402,6 +1435,16 @@ Section KexecB2Loops.
       iDestruct ("Hpvbk" with "Hppid") as "Hpriv".
       iDestruct ("Hgive" $! (rd_delivered datl fpg offn tot)
                    with "Hdst Hrest") as "Hpt".
+      (* THE FRAME ROW, at once: the page this turn wrote sits inside
+         [va, va + filesz) ([nn = min PGSIZE (filesz - i)]), so every byte
+         outside the segment's own window still reads what it held when
+         the loop was entered. *)
+      assert (Hout' : load_out (uint va) fz Mb
+                (umem_write Mi (bv_unsigned (svpn_of vai) * 4096)%Z nn
+                   (rd_delivered datl fpg offn tot))).
+      { rewrite Hbasei.
+        apply (load_out_write (uint va) fz (uint va + ii) nn
+                 (rd_delivered datl fpg offn tot) Mb Mi Houtw); lia. }
       iDestruct (kxc_load_seal kf inumf dnf bmf datl
                    Hiok Hrl Hdok Hddix Hdoc Hduq
                    with "Hdlk Hdiat Hmeta Hmap Hblocks Htop") as "Hload".
@@ -1463,6 +1506,29 @@ Section KexecB2Loops.
                             < offn + nn)%nat) as [Hlt | Hge]; lia. }
         assert (Hoffb : (offz + 4096 < 2 ^ 32)%Z).
         { rewrite -HoffnZ. change (2 ^ 32)%Z with 4294967296%Z. lia. }
+        (* ...AND THE WINDOW GREW BY WHAT readi DELIVERED.  [rd_delivered]
+           below [tot] IS [file_byte], and the file's bytes below the
+           inode's size ARE [file_bytes]'s ([ElfBridge.file_bytes_lookup]);
+           the offset does not wrap because the loop only continues on a
+           FULL count, which bounds [off + n] by the size. *)
+        assert (Hwin' : load_win
+                  (FsTree.file_bytes datl (Z.to_nat (bv_unsigned (di_size dnf))))
+                  po (uint va) (ii + Z.of_nat nn)
+                  (umem_write Mi (bv_unsigned (svpn_of vai) * 4096)%Z nn
+                     (rd_delivered datl fpg offn tot))).
+        { rewrite Hbasei.
+          apply (load_win_step_g _ po (uint va) ii nn _ Mi ltac:(lia));
+            [| exact Hwin].
+          intros kb Hkb.
+          assert (Hkeq : (offn + kb)%nat = Z.to_nat (po + ii + Z.of_nat kb))
+            by lia.
+          rewrite (rd_delivered_bytes datl fpg offn tot kb ltac:(lia)).
+          rewrite /rd_bytes.
+          rewrite (ElfBridge.file_bytes_lookup datl
+                     (Z.to_nat (bv_unsigned (di_size dnf)))
+                     (Z.to_nat (po + ii + Z.of_nat kb))%nat ltac:(lia)).
+          rewrite Hkeq. reflexivity. }
+        assert (Hii4 : (ii + 4096 < 2 ^ 32)%Z) by lia.
         (* ---- +0x0ee: addw s1,s5,s1 -- i += PGSIZE ---- *)
         assert (HM2s5 : M2 !!! Regidx Rs5 = (mword_of_int 4096 : mword 64))
           by (rewrite (HM2get Rs5 ltac:(vm_compute; reflexivity) ltac:(lnz));
@@ -1480,6 +1546,8 @@ Section KexecB2Loops.
         set (ii' := ((ii + 4096) `mod` 2 ^ 32)%Z).
         assert (Hii'r : (0 <= ii' < 2 ^ 32)%Z)
           by (rewrite /ii'; apply Z.mod_pos_bound; lia).
+        assert (Hii'v : (ii' = ii + 4096)%Z)
+          by (rewrite /ii'; apply Z.mod_small; lia).
         set (E1 := <[Regidx Rs1 := regval_into_reg
                       (sign_extend' 64 (add_vec
                          (subrange_vec_dec (M2 !!! Regidx Rs5) 31 0 : mword 32)
@@ -1531,7 +1599,13 @@ Section KexecB2Loops.
           iDestruct (cpu_claim_ext_transport CIDrd CIDx1 eb (proc_addr jp)
                        ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
           iSpecialize ("Hc116" $! CIDx1 with "[%]"); [wp_next_chain |].
-          iApply ("Hc116" $! E1 _ with "[%] Hcg Hcnt Hextc Hclmc Hpc [Hopen Hlog Hirs Hbm Hins
+          assert (Hexit : (fz <= ii')%Z).
+          { rewrite Z.geb_leb in Egf. apply Z.leb_le in Egf.
+            exact (w32_uarg_ge_inv ii' fz Hii'r Hfzr Egf). }
+          iApply ("Hc116" $! E1
+                    (umem_write Mi (bv_unsigned (svpn_of vai) * 4096)%Z nn
+                       (rd_delivered datl fpg offn tot))
+                    with "[%] Hcg Hcnt Hextc Hclmc Hpc [Hopen Hlog Hirs Hbm Hins
                     Hbits Hbs Hpt Hpriv Hpath Hargv Hargs Helf Hframe] [Hcont]").
           { split_and!.
             - rewrite (HE1get csp_rs1 ltac:(vm_compute; reflexivity)
@@ -1549,7 +1623,11 @@ Section KexecB2Loops.
             - rewrite (HE1get Rs10 ltac:(vm_compute; reflexivity)
                          ltac:(lnz) ltac:(lnz)). exact HMs10.
             - rewrite (HE1get Rs11 ltac:(vm_compute; reflexivity)
-                         ltac:(lnz) ltac:(lnz)). exact HMs11. }
+                         ltac:(lnz) ltac:(lnz)). exact HMs11.
+            - (* the whole segment is in the window now *)
+              apply (load_win_mono _ po (uint va) (ii + Z.of_nat nn) fz);
+                [lia | exact Hwin'].
+            - exact Hout'. }
           { rewrite /kxc_res.
             iSplitL "Hopen"; [iExact "Hopen" |].
             iSplitL "Hlog"; [iExact "Hlog" |]. iSplitL "Hirs"; [iExact "Hirs" |].
@@ -1598,7 +1676,17 @@ Section KexecB2Loops.
             apply Z.mod_small. lia. }
           assert (Hguard' : (w32_uarg ii' < w32_uarg fz)%Z).
           { rewrite Z.geb_leb in Egf. apply Z.leb_gt in Egf. lia. }
-          iApply (IH CIDx2 _ E1 ii' Hii'r ltac:(rewrite Hoff'; lia) Hguard'
+          assert (Hback : (ii' < fz)%Z)
+            by exact (w32_uarg_lt_inv ii' fz Hii'r Hfzr Hguard').
+          iApply (IH CIDx2
+                    (umem_write Mi (bv_unsigned (svpn_of vai) * 4096)%Z nn
+                       (rd_delivered datl fpg offn tot))
+                    E1 ii' Hii'r ltac:(rewrite Hoff'; lia) Hguard'
+                    ltac:(lia)
+                    ltac:(rewrite Hii'v Zplus_mod Hiial; reflexivity)
+                    ltac:(replace ii' with (ii + Z.of_nat nn) by lia;
+                          exact Hwin')
+                    Hout'
                     ltac:(rewrite (HE1get csp_rs1 ltac:(vm_compute; reflexivity)
                                     ltac:(lnz) ltac:(lnz)); exact HMsp)
                     ltac:(rewrite (HE1get Rs0 ltac:(vm_compute; reflexivity)
@@ -1708,9 +1796,12 @@ Section KexecB2Loops.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iApply ("AT0DA" $! CIDt1 N9 (Z.to_nat dz) with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc").
       + wp_next_chain.
-      + split_and!.
+      + assert (Hdzv : (dz = fz - ii)%Z)
+          by (rewrite /dz; apply Z.mod_small; lia).
+        split_and!.
         * lia.
         * lia.
+        * rewrite Z2Nat.id; lia.
         * rewrite HN9s2 Z2Nat.id; [| lia].
           apply w32_sext_moi. change (2 ^ 31)%Z with 2147483648%Z. lia.
         * exact HN9a2.
@@ -1774,9 +1865,12 @@ Section KexecB2Loops.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iApply ("AT0DA" $! CIDf3 Nf 4096%nat with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc").
       + wp_next_chain.
-      + split_and!.
+      + assert (Hdzv : (dz = fz - ii)%Z)
+          by (rewrite /dz; apply Z.mod_small; lia).
+        split_and!.
         * lia.
         * lia.
+        * change (Z.of_nat 4096) with 4096%Z. lia.
         * rewrite HNfs2; f_equal; vm_compute; reflexivity.
         * exact HNfa2.
         * exact HNfget.

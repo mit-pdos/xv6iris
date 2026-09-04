@@ -316,6 +316,16 @@ Qed.
 Definition kxc_off (ef : nat -> bv 8) (i : nat) : mword 64 :=
   sign_extend' 64 (Z_to_bv 32 (ph_at ef i) : mword 32).
 
+(* ===================================================================== *)
+(*  THE FILE THE PHDR LOOP'S IMAGE INVARIANT IS STATED OVER.              *)
+(* ===================================================================== *)
+(*  The inode kexec has open holds [datl] over [di_size dnf] bytes, and
+    [FsTree.file_bytes] is exactly the [elf_bytes] list the ELF semantics
+    ([ElfFile.v]) reads.  Every kexec phase state that mentions the image
+    quotes it through this abbreviation so the states stay readable.      *)
+Definition kxc_fb (datl : nat -> list (bv 8)) (dnf : dinode) : list (bv 8) :=
+  FsTree.file_bytes datl (Z.to_nat (bv_unsigned (di_size dnf))).
+
 Lemma kxc_off_0 (ef : nat -> bv 8) :
   kxc_off ef 0 = sign_extend' 64 (Z_to_bv 32 (eh_phoff ef) : mword 32).
 Proof. unfold kxc_off. rewrite ph_at_0. reflexivity. Qed.
@@ -696,12 +706,22 @@ Section KexecBSeam.
        bv_unsigned inumf < 16 * Z.of_nat icfg_nib /\
        (iput_units <= n2)%nat /\
        (forall j, (j < 8)%nat ->
-          is_aligned_paddr (Physaddr (pa_stk sp0 (54 - j))) 8 = true) ⌝ ∗
+          is_aligned_paddr (Physaddr (pa_stk sp0 (54 - j))) 8 = true) /\
+       (* slot 67 is the PGSIZE-1 mask the body's +0x162 reloads every turn;
+          the alignment test at +0x168 is only readable with it pinned. *)
+       w67 = (mword_of_int 4095 : mword 64) ⌝ ∗
      (* ---- THE LOOP INVARIANT ---- *)
-     ⌜ (Z.of_nat i <= eh_phnum ef)%Z /\
+     ⌜ (Z.of_nat i < eh_phnum ef)%Z /\
        ud_tfp P = ud_tfp (pv_upt (us_V U)) /\
        um_below szv P.(ud_um) /\
-       um_covered szv P.(ud_um) ⌝ ∗
+       um_covered szv P.(ud_um) /\
+       (* ---- THE IMAGE INVARIANT (S3c).  Conditional on the walk's own
+          guard, because the unconditional cone ([SpecKexec.wp_kexec_sconf])
+          carries no premise about the file: after [i] headers the running
+          [sz] is the [uvmalloc] fold over the PT_LOADs seen so far and each
+          of their segments is already in the process's image. ---- *)
+       (kxb_walk_ok (kxc_fb datl dnf) ef ->
+          kxb_at (kxc_fb datl dnf) ef i (uint szv) Mi) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x12c) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
