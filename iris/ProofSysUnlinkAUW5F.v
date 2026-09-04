@@ -122,6 +122,7 @@ Require Import Xv6G.
 Require Import FsCfg.
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Set Printing Depth 40.
 
@@ -178,11 +179,12 @@ Section ProofSysUnlinkAUW5F.
       (pid : mword 32) (U : ustate) (P1 : uptd)
       (n1 : nat) (Sb1 : gset Z) (w1 : bool)
       (kd ks kk : nat) (gild gisld gyd : gname) (qdi sd qs : Qp)
+      (loyd tlyd : nat)
       (dinum : mword 32) (dnd : dinode) (bmd : blkmap)
       (datd : nat -> list (bv 8)) (lo : bv 32)
       (nf bnm0 bp bd bex : nat -> bv 8)
       (w6 w30 : mword 64)
-      (gili gisli gyi : gname) (si qsi : Qp)
+      (gili gisli gyi : gname) (si qsi : Qp) (loyi tlyi : nat)
       (dni : dinode) (bmi : blkmap) (dati : nat -> list (bv 8))
       (m M3 : regfile) (sp0 s3x : mword 64) (K : nat) (eb b : bool)
       (lks : gset string) (t : nat)
@@ -265,10 +267,14 @@ Section ProofSysUnlinkAUW5F.
     procs_inv gs -∗
     proc_priv gf (proc_addr jx) pid (us_upt U P1) -∗
     (* ---- [dp], LOCKED and OPEN ---- *)
-    is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                     (ic_tok fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
+    is_sleeplock_genl gild gisld (i_lock (ientry kd)) "inode"%string
+                     (ic_slp fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
     sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
-    ic_deposit fsc_ic kd (DepTx sd icfg_dev dinum gyd t (1/4)) -∗
+    ⌜(loyd <= tlyd)%nat⌝ -∗
+    IcacheRef.cred_floor loyd tlyd -∗
+    IcacheInv.iref_claims -∗
+    ic_handle fsc_ic kd (DepTx sd icfg_dev dinum gyd loyd t (1/4)) -∗
+    off_rows off_cfg kd cur_ctx -∗
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
     i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -287,12 +293,14 @@ Section ProofSysUnlinkAUW5F.
     (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
     runit_any (bv_unsigned dinum) -∗
     (* ---- [ip], LOCKED and OPEN ---- *)
-    is_sleeplock_gen gili gisli (i_lock (ientry ks)) "inode"%string
-                     (ic_tok fsc_ic ks) (slh_tok (icfg_isl ks)) -∗
+    is_sleeplock_genl gili gisli (i_lock (ientry ks)) "inode"%string
+                     (ic_slp fsc_ic ks) (slh_tok (icfg_isl ks)) -∗
     sleeplocked_q gisli si (i_lock (ientry ks)) pid -∗
-    ic_deposit fsc_ic ks (DepTx si icfg_dev
-      (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi
-      t (1/4)) -∗
+    ⌜(loyi <= tlyi)%nat⌝ -∗
+    IcacheRef.cred_floor loyi tlyi -∗
+    IcacheInv.iref_claims -∗
+    ic_handle fsc_ic ks (DepTx si icfg_dev (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi loyi t (1/4)) -∗
+    off_rows off_cfg ks cur_ctx -∗
     i_dev (ientry ks) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry ks) ↦₄{DfracOwn (1/2)}
       (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
@@ -363,9 +371,9 @@ Section ProofSysUnlinkAUW5F.
     iIntros "Hcg Hown #Htext #Hdata #Hprenv Hpc #Hbio #Hlog Hseam Hgen
              #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hireg #Hropen
              Hsbb Hsbi Hsbs #Hbmres #Hkenv #Hprocs Hpriv
-             #Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
+             #Hslkd Hslkdq %Hleyd #Hflyd #Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd
              Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop #Hshotd Hfrz Hkeepd Hrud
-             #Hslki Hslkiq Hdepi Hidevi Hiinumi Hivalidi Hdlnki
+             #Hslki Hslkiq %Hleyi #Hflyi #Hclaimsyi Hdepi Hoffri Hidevi Hiinumi Hivalidi Hdlnki
              Hdiati Hmetai Haddrsi Hindi Hblocksi Htopi #Hshoti Hfrzi Hkeepi Hrui HopS Htx
              %Hname HP Hcent Hctgt Hcex Hcmiss
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
@@ -1185,10 +1193,11 @@ Section ProofSysUnlinkAUW5F.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the quarter it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
+    iDestruct (off_rows_to_dep with "Hoffrd") as "Hoffdd".
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D20) gs jx gl pd pav
               pu gild gisld
- kd qdi sd gyd
-              (DepTx sd icfg_dev dinum gyd t (1/4)%Qp) dinum dnW bm'
+ kd qdi sd gyd loyd tlyd
+              (DepTx sd icfg_dev dinum gyd loyd t (1/4)%Qp) dinum dnW bm'
               nw Sbw false true false e0 _ _ pid (DfracOwn (1/4)) dqb dqs
               C5 (K - 30)%nat eb b lks
               (us_upt U P1) ltac:(exact Kiup) eq_refl Hkd ltac:(discriminate)
@@ -1196,7 +1205,7 @@ Section ProofSysUnlinkAUW5F.
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk Hdiblog Hdinb Hcovb
               ltac:(unfold iput_units; lia) Hj Hgl HC5a0 (Hlb "log"%string) eq_refl
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
-                    Hescd Hireg Hropen Hslkd Hslkdq Hdepd Hidevd Hiinumd
+                    Hescd Hireg Hropen Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hoffdd Hidevd Hiinumd
                     Hivalidd Hloadd Hshotd2 Hfrz [$Hkeepd $Hrud] Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk Hbsl [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -1552,12 +1561,13 @@ Section ProofSysUnlinkAUW5F.
     (* THE ARM RETIRES AT THE PARK (durable-disk B''-tx4): the descriptor
        goes in and the quarter it parked comes back in the post, so no
        bundleless out-state stands across the call. *)
+    iDestruct (off_rows_to_dep with "Hoffri") as "Hoffdi".
     iApply (Iunlockput.wp_iunlockput_dep_gen (CID := D29) gs jx gl pd pav
               pu gili gisli
- ks qsi si gyi
+ ks qsi si gyi loyi tlyi
               (DepTx si icfg_dev
                  (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
-                 gyi t (1/4)%Qp)
+                 gyi loyi t (1/4)%Qp)
               (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
               dni2
               bmi c2 (Sb2 ∪ {[IBLOCK (zero_extend' 32
@@ -1568,7 +1578,7 @@ Section ProofSysUnlinkAUW5F.
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi Hinb Hcovb
               Hnu2 Hj Hgl HE2a0 (Hlb "log"%string) eq_refl
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
-                    Hesci Hireg Hropen Hslki Hslkiq Hdepi Hidevi Hiinumi
+                    Hesci Hireg Hropen Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hoffdi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti2 Hfrzi [$Hkeepi $Hrui] Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2] [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }

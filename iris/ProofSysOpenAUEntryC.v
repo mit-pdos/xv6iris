@@ -270,8 +270,6 @@ Section ProofSysOpenAUEntryC.
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     ic_sleeplocks fsc_ic -∗
-    (* ...and the off LEDGERS (off-ledger ruling) *)
-    ioff_escrows -∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     ireg_open -∗
     sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
@@ -321,7 +319,7 @@ Section ProofSysOpenAUEntryC.
                               HKiu & HKit & HKip & HKup & HKfc & HKfa & HKfd &
                               HK10 & HK24 & Kpop).
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpre #Hftab #Hbio
-              #Hlog Hseam Hgen #Hkenv #Hitab #Hitinv #Hescrows #Hslks #Hoffs
+              #Hlog Hseam Hgen #Hkenv #Hitab #Hitinv #Hescrows #Hslks
               #Hireg
               #Hropen
               Hsbn Hsbi Hsbs Hsbb #Hbmres Hpriv #Hprocs #Hdev #Hgeo #Hdlk HopS Htx
@@ -599,8 +597,10 @@ Section ProofSysOpenAUEntryC.
     destruct (Hiregb inum ltac:(lia)) as [Hibcov Hiblog].
     iDestruct (so_esc_acc kk ltac:(lia) with "Hescrows") as "#Hesc".
     iDestruct "Hlocked" as (gil gisl)
-      "(Hslk & Hslkd & Hdep & Hidev & Hiinum & Hivalid & Hload &
+      "(%Hqs & Hslk & Hslkd & Hdep & Hoffr & Hidev & Hiinum & Hivalid & Hload &
         Hshot & Hfrz & Href & Hru)".
+    iDestruct "Hdep" as (loy tly) "(%Hley & #Hfly & Hdep)".
+    iDestruct (is_itable2_claims with "Hitab") as "#Hclaimsy".
     iApply (wp_cbeqz_fall_s_sconf (CID := CID7) (mword_of_int (SO + 0x48))
               (mword_of_int 69 : mword 8) (Cregidx (mword_of_int 2)) Ra0
               P1 (K - 24)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
@@ -673,7 +673,7 @@ Section ProofSysOpenAUEntryC.
         { exact Hcsf. }
         { cbn in Hns1. unfold sys_open_slots, create_slots in *. lia. } }
       iApply (Join.so_join_au (CID0 := CID8) gfl gf gs jx gl pd pav pu
-                gil gisl kk qi ss gy inum dn bm om lo ns1 u1 pidv dqb dqs
+                gil gisl kk qi ss gy loy tly inum dn bm om lo ns1 u1 pidv dqb dqs
                 U m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
                 data vom (bview plen bp)
                 (socr_P (socr_fresh P Phiok Phiex Phio Phit
@@ -685,14 +685,14 @@ Section ProofSysOpenAUEntryC.
                    (MkAnode (AFile (fn_file_bytes (era_node dn bm data)))
                             (fn_nlink (era_node dn bm data))))
                 socr_Phit_triv
-                HKfull Hkk ltac:(exact (proj2 Hinum)) Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                Hqs HKfull Hkk ltac:(exact (proj2 Hinum)) Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hibcov Hiblog Hcovb
                 ltac:(exact (proj2 (proj2 Hu1) eq_refl)) Hj Hgl Hlkempty
                 Hdirw Hom Hal23 Hsp0 HP1sp HP1thr HP1s0 HP1s1i HP1s2 HP1s3
                 Hal ltac:(cbn in Hns1; unfold sys_open_slots, create_slots in *; lia)
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
-                      Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hoffs Hslk Hslkd Hdep
-                      Hidev Hiinum Hivalid Hflat Hshot Hfrz Href Hru Hpriv Hprocs
+                      Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hslk Hslkd
+                      [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid Hflat Hshot Hfrz Href Hru Hpriv Hprocs
                       Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
                       [HR] Hobs [] Hcontj").
@@ -755,7 +755,7 @@ Section ProofSysOpenAUEntryC.
         { exact Hcsf. }
         { cbn in Hns1. unfold sys_open_slots, create_slots in *. lia. } }
       iApply (Join.so_join_au (CID0 := CID8) gfl gf gs jx gl pd pav pu
-                gil gisl kk qi ss gy inum dn bm om lo ns1 u1 pidv dqb dqs
+                gil gisl kk qi ss gy loy tly inum dn bm om lo ns1 u1 pidv dqb dqs
                 U m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
                 data vom (bview plen bp)
                 (socr_P (socr_exists P Phiok Phiex (bview plen bp)
@@ -765,14 +765,14 @@ Section ProofSysOpenAUEntryC.
                 (socr_Phio_tag (bv_unsigned inum)
                    (abs_of (era_node dn bm data)) Phio)
                 Phit
-                HKfull Hkk ltac:(exact (proj2 Hinum)) Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                Hqs HKfull Hkk ltac:(exact (proj2 Hinum)) Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hibcov Hiblog Hcovb
                 ltac:(exact (proj2 (proj2 Hu1) eq_refl)) Hj Hgl Hlkempty
                 Hdirw Hom Hal23 Hsp0 HP1sp HP1thr HP1s0 HP1s1i HP1s2 HP1s3
                 Hal ltac:(cbn in Hns1; unfold sys_open_slots, create_slots in *; lia)
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
-                      Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hoffs Hslk Hslkd Hdep
-                      Hidev Hiinum Hivalid Hflat Hshot Hfrz Href Hru Hpriv Hprocs
+                      Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hslk Hslkd
+                      [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid Hflat Hshot Hfrz Href Hru Hpriv Hprocs
                       Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
                       [HR] Hobs Htc Hcontj").

@@ -80,6 +80,7 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import OffBox.   (* [off_rows] / [off_free] -- the fd off cell (r25 item 24) *)
 Require Import DirView.
 Require Import FileInvDefs.
 Require Import ProcInv.
@@ -169,7 +170,7 @@ Section ProofSysOpenAUStores.
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (kk : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (kf fd : nat) (l : list nat) (pn : fpnames)
       (tyw : mword 32) (rd0 wr0 : bv 8) (pip ipold : mword 64) (maj : bv 16)
@@ -186,6 +187,7 @@ Section ProofSysOpenAUStores.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
       (t : fdtype) :
+    qi = s ->   (* r25 shapes: the parked ident fraction IS the travelling share (so_publish) *)
     (K_iunlock <= K - 24)%nat -> (K_end_op <= K - 24)%nat ->
     (K_itrunc <= K - 24)%nat ->
     (24 <= K)%nat -> ((K - 24) + 24 = K)%nat ->
@@ -240,9 +242,13 @@ Section ProofSysOpenAUStores.
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep fsc_ic kk s icfg_dev inum gy -∗
+    ⌜(loy <= tly)%nat⌝ -∗
+    IcacheRef.cred_floor loy tly -∗
+    IcacheInv.iref_claims -∗
+    ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
+    off_rows off_cfg kk cur_ctx -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -251,7 +257,9 @@ Section ProofSysOpenAUStores.
     (* the payload's freeze token (§3.9, RULING A-prime), relayed to
        [so_tail_s]'s iunlock *)
     ifreeze_off (bv_unsigned inum) -∗
-    inode_ref_short_gen kk (qi + s)%Qp qi icfg_dev inum gy -∗
+    (∃ loK tlK : nat,
+       ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
+       IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi icfg_dev inum gy loK) -∗
     (* its PROVENANCE UNIT (item 7a-wire): the parent parks in the fd slot's
        [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
@@ -266,9 +274,7 @@ Section ProofSysOpenAUStores.
     a_fpipe kf     ↦₈ pip -∗
     a_fmajor kf    ↦₂ maj -∗
     a_fip kf       ↦₈ ipold -∗
-    a_foff kf      ↦₄ voff -∗
-    (* the off LEDGERS (off-ledger ruling), forwarded to the tail's deposit *)
-    ioff_escrows -∗
+    (if bool_decide (tyw = FD_INODE) then a_foff kf ↦₄ voff else off_free kf 1) -∗
     (* the untyped slot's own unit, on its way back to the ledger -- see
        [so_tail_pub]'s row for why the entry ends up owing nothing *)
     iref_slot -∗
@@ -313,7 +319,7 @@ Section ProofSysOpenAUStores.
                dqb dqs (proc_addr jx) pidv vom U P Pmiss Φo Φt m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize Hbm0
+    intros Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize Hbm0
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty Hkf
            Hfdlt Hlen Hfrees Htyor Hdir Hwf Hom Htd Hti Hal23 Hsp0 HNsp HNthr
            HNs0 HNs1 HNs2 HNs3 Hal.
@@ -323,9 +329,9 @@ Section ProofSysOpenAUStores.
        lets the [log_op] hypothesis meet it without a rewrite. *)
     destruct u as [| [| u2]]; [ exfalso; lia | exfalso; lia | ].
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitinv #Hesck #Hireg #Hslkk Hslkd Hdep Hidev Hiinum
+              #Hitinv #Hesck #Hireg #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hoffr Hidev Hiinum
               Hivalid Hflat #Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd Hfwr
-              Hfpip Hfmaj Hfip Hfoff #Hoffs Hiru Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop
+              Hfpip Hfmaj Hfip Hfoff Hiru Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop
               Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP
               H23lo H23hi H24 HP Hobs Htc Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -587,16 +593,16 @@ Section ProofSysOpenAUStores.
                    with "HP Hobs Htc") as "Harm".
       iApply (Pub.so_tail_pub_au (CID0 := CID10) gf gs jx gl pd pav pu
                 gil gisl
- kk qi s gy inum dn bm kf fd l C pn om voff nsj
+ kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs U m N6 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t
-                HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
+                Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hom Hfdty
                 Hsp0 HN6sp HN6thr HN6s1 HN6s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                      Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
-                      Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff Hoffs
+                      Hitinv Hesck Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid
+                      Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff
                       Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                       Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                       Harm Hcont"). }
@@ -696,16 +702,16 @@ Section ProofSysOpenAUStores.
                    with "HP Hobs Htc") as "Harm".
       iApply (Pub.so_tail_pub_au (CID0 := CID13) gf gs jx gl pd pav pu
                 gil gisl
- kk qi s gy inum dn bm kf fd l C pn om voff nsj
+ kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs U m N8 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t
-                HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
+                Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hom Hfdty
                 Hsp0 HN8sp HN8thr HN8s1 HN8s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                      Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
-                      Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff Hoffs
+                      Hitinv Hesck Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid
+                      Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff
                       Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                       Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                       Harm Hcont"). }
@@ -922,17 +928,17 @@ Section ProofSysOpenAUStores.
     iEval (rewrite -Htis) in "Harm".
     iApply (Pub.so_tail_pub_au (CID0 := CID17) gf gs jx gl pd pav pu
               gil gisl
- kk qi s gy inum (di_trunc dn) bm_empty kf fd l C pn
+ kk qi s gy loy tly inum (di_trunc dn) bm_empty kf fd l C pn
               om voff nsj u3 pidv dqb dqs U m mit sp0 K
               eb b lks w6 (word_of_words lo om) w24 bp
               vom P Pmiss Φo Φt t
-              HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
+              Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
               Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
               Hom Hfdty
               Hsp0 Hitsp Hitthr Hits1 Hits3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
-                    Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff Hoffs
+                    Hitinv Hesck Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid
+                    Hload Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff
                     Hiru Hcore Howe Hprocs Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres
                     Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                     Harm Hcont").

@@ -193,13 +193,13 @@ Section ProofSysUnlinkAU.
                     Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27 HbE H30
                     [] Hcont").
     { exact Hname1. }
-    iIntros (CIDb M2 kd ks kk gild gisld gyd qdi sd qs dinum dnd bmd datd lo t).
+    iIntros (CIDb M2 kd ks kk gild gisld gyd loyd tlyd qdi sd qs dinum dnd bmd datd lo t).
     iIntros "%Hregs2 %Hkd %Hks %Hdinb %Htydir %Hiok %Hrl_datd %Hdok %Hddix
              %Hdoc %Hduq
              %Hnotdot %Hnotdd %Hfst %Hma02 %Hal27
              Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
              %Hname2 HP Hcent Hctgt Hcex Hcmiss
-             Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
+             Hslkd Hslkdq %Hleyd #Hflyd #Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd
              Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS Htx
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
@@ -208,7 +208,7 @@ Section ProofSysUnlinkAU.
     iPoseProof (printk_env_panic with "Hprenv") as "#Hpetop".
     iApply (W3.su_w3_au gf gs jx gl pd pav pu
  dqb dqs dqbs
-              pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd qdi sd qs
+              pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd qdi sd qs loyd tlyd
               dinum dnd bmd datd lo nf bnm0 bp bd be w5 w6 w30
               m M2 (m !!! Regidx csp_rs1 : mword 64) K eb b lks t
               pl P Pmiss Phient Phitgt Phiex Phimiss
@@ -220,19 +220,19 @@ Section ProofSysUnlinkAU.
               with "Hcg Hown Htext Hdata Hpetop Hpc Hbio Hlog Hseam Hgen Hdev Hgeo
                     Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hropen Hsbb Hsbi
                     Hsbs Hbmres Hkenv Hprocs Hpriv Hslkd Hslkdq
-                    Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad
+                    [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad
                     Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS Htx
                     [%] HP Hcent Hctgt Hcex Hcmiss
                     Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                     HbE H30 [] Hcont").
     { exact Hname2. }
-    iIntros (CIDc M3 s3x bex isdir gili gisli gyi si qsi dni bmi dati).
+    iIntros (CIDc M3 s3x bex isdir gili gisli gyi si qsi loyi tlyi dni bmi dati).
     iIntros "%Hregs3 %Hnlzi %Hioki %Hrl_dati %Hdoki %Hddixi %Hdoci %Hduqi
              %Hisd
              Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
-             Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
+             Hslkd Hslkdq %Hleyd5 #Hflyd5 #Hclaimsyd5 Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd
              Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud
-             Hslki Hslkiq Hdepi Hidevi Hiinumi Hivalidi Hdlnki
+             Hslki Hslkiq %Hleyi #Hflyi #Hclaimsyi Hdepi Hoffri Hidevi Hiinumi Hivalidi Hdlnki
              Hdiati Hmetai Haddrsi Hindi Hblocksi Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
              %Hname3 HP Hcent Hctgt Hcex Hcmiss
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
@@ -246,8 +246,8 @@ Section ProofSysUnlinkAU.
       iApply (W5D.su_w5_dir_au gf gs jx gl pd pav pu
 
                 dqb dqs dqbs pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd
-                qdi sd qs dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
-                gili gisli gyi si qsi dni bmi dati
+                qdi sd qs loyd tlyd dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
+                gili gisli gyi si qsi loyi tlyi dni bmi dati
                 m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks t
                 pl P Pmiss Phient Phitgt Phiex Phimiss
                 HK Hprk Hnib0 Hgeom Hsize Hbm0
@@ -259,9 +259,9 @@ Section ProofSysUnlinkAU.
                 with "Hcg Hown Htext Hdata Hprenv Hpc Hbio Hlog Hseam
                       Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg Hropen
                       Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
-                      Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd
+                      Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd
                       Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd
-                      Hfrz Hkeepd Hrud Hslki Hslkiq Hdepi Hidevi Hiinumi
+                      Hfrz Hkeepd Hrud Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hoffri Hidevi Hiinumi
                       Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
                       Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
                       [%] HP Hcent Hctgt Hcex Hcmiss
@@ -271,8 +271,8 @@ Section ProofSysUnlinkAU.
     - iApply (W5F.su_w5_file_au gf gs jx gl pd pav pu
 
                 dqb dqs dqbs pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd
-                qdi sd qs dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
-                gili gisli gyi si qsi dni bmi dati
+                qdi sd qs loyd tlyd dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
+                gili gisli gyi si qsi loyi tlyi dni bmi dati
                 m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks t
                 pl P Pmiss Phient Phitgt Phiex Phimiss
                 HK Hprk Hnib0 Hgeom Hsize Hbm0
@@ -284,9 +284,9 @@ Section ProofSysUnlinkAU.
                 with "Hcg Hown Htext Hdata Hprenv Hpc Hbio Hlog Hseam
                       Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg Hropen
                       Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
-                      Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd
+                      Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd
                       Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd
-                      Hfrz Hkeepd Hrud Hslki Hslkiq Hdepi Hidevi Hiinumi
+                      Hfrz Hkeepd Hrud Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hoffri Hidevi Hiinumi
                       Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
                       Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
                       [%] HP Hcent Hctgt Hcex Hcmiss

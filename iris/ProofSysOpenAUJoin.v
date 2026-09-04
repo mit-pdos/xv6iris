@@ -62,6 +62,7 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import OffBox.   (* [off_rows] -- the inode's off rows ride the holder's handle (r25 item 33) *)
 Require Import DirView.
 Require Import FileInvDefs.
 Require Import FileInv.
@@ -154,7 +155,7 @@ Section ProofSysOpenAUJoin.
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (kk : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (om lo : mword 32) (nsj : nat)
       (u : nat) (pidv : mword 32) (dqb dqs : dfrac)
@@ -168,6 +169,7 @@ Section ProofSysOpenAUJoin.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) :
+    qi = s ->   (* r25 shapes: the parked ident fraction IS the travelling share (so_publish) *)
     (K_sys_open <= K)%nat ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
@@ -213,11 +215,13 @@ Section ProofSysOpenAUJoin.
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     ireg_open -∗
-    (* the off LEDGERS (off-ledger ruling), rode down to the deposit *)
-    ioff_escrows -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep fsc_ic kk s icfg_dev inum gy -∗
+    ⌜(loy <= tly)%nat⌝ -∗
+    IcacheRef.cred_floor loy tly -∗
+    IcacheInv.iref_claims -∗
+    ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
+    off_rows off_cfg kk cur_ctx -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -226,7 +230,9 @@ Section ProofSysOpenAUJoin.
     (* the payload's freeze token (§3.9, RULING A-prime), relayed to
        [so_tail_s]'s iunlock *)
     ifreeze_off (bv_unsigned inum) -∗
-    inode_ref_short_gen kk (qi + s)%Qp qi icfg_dev inum gy -∗
+    (∃ loK tlK : nat,
+       ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
+       IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi icfg_dev inum gy loK) -∗
     (* its PROVENANCE UNIT (item 7a-wire): the parent parks in the fd slot's
        [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
@@ -268,7 +274,7 @@ Section ProofSysOpenAUJoin.
                dqb dqs (proc_addr jx) pidv vom U P Pmiss Φo Φt m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
+    intros Hqs HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
            Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom Hal23 Hsp0 HMsp HMthr
            HMs0 HMs1 HMs2 HMs3 Hal Hnspos.
     pose proof HK as HKfull.
@@ -277,7 +283,7 @@ Section ProofSysOpenAUJoin.
                               HK10 & HK24 & Kpop).
 
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpe #Hftab #Hbio #Hlog
-              Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hoffs #Hslkk Hslkd Hdep
+              Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hoffr
               Hidev Hiinum Hivalid Hflat #Hshot Hfrz Hkeep Hru Hpriv #Hprocs #Hdev #Hgeo
               #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
               HbP H23lo H23hi H24 HP Hobs Htc Hcont".
@@ -363,18 +369,18 @@ Section ProofSysOpenAUJoin.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (Alloc.so_alloc_au (CID0 := CID3) gfl gf gs jx gl pd pav pu
                 gil gisl
- kk qi s gy inum dn bm om lo nsj u
+ kk qi s gy loy tly inum dn bm om lo nsj u
                 pidv dqb dqs U m M2 sp0 K eb b lks w4 w5 w6 w24 bp
                 data vom pl P Pmiss Φo Φt
-                HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                Hqs HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom
                 ltac:(intros Hq; exfalso; apply Hnd3; apply bv_eq;
                       rewrite Hq; vm_compute; reflexivity)
                 Hal23 Hsp0
                 HM2sp HM2thr HM2s0 HM2s1 HM2s2 HM2s3 Hal Hnspos
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Hbio Hlog
-                      Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hoffs Hslkk Hslkd
-                      Hdep Hidev Hiinum Hivalid Hflat Hshot Hfrz Hkeep Hru Hpriv Hprocs
+                      Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
+                      [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid Hflat Hshot Hfrz Hkeep Hru Hpriv Hprocs
                       Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
                       HP Hobs Htc Hcont"). }
@@ -464,7 +470,9 @@ Section ProofSysOpenAUJoin.
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
       iDestruct (so_flat_close with "Hflat") as "Hload".
       iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback]".
-      iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep".
+      iDestruct "Hkeep" as (loK tlK) "(%HleK & #HflK & Hkeep)".
+      iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ HleK
+                   with "HflK Hkeep") as "Hkeep".
       iDestruct (cpu_own_transport CID0 CID6 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iDestruct (trap_csrs_ext_transport CID0 CID6 eb (proc_addr jx)
@@ -473,14 +481,14 @@ Section ProofSysOpenAUJoin.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
       iApply (Tails.so_tail_d (CID0 := CID6) gs jx gl pd pav pu
                 gil gisl
- kk qi s gy inum dn bm u pidv
+ kk qi s gy loy tly inum dn bm u pidv
                 (DfracOwn (1/4)) dqb dqs m M4 sp0 K eb b lks w4 w5 w6
                 (word_of_words lo om) w24 bp U
                 HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                 Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM4sp HM4thr
                 HM4s1 HM4s2 HM4s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                      Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
+                      Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev
                       Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
                       Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24
@@ -536,17 +544,17 @@ Section ProofSysOpenAUJoin.
        halfword is at most 9 -- which IS [0 <= ma <= NDEV_max]. *)
     iApply (Alloc.so_alloc_au (CID0 := CID6) gfl gf gs jx gl pd pav pu
               gil gisl
- kk qi s gy inum dn bm om lo nsj u
+ kk qi s gy loy tly inum dn bm om lo nsj u
                pidv dqb dqs U m M4 sp0 K eb b lks w4 w5 w6 w24 bp
                data vom pl P Pmiss Φo Φt
-               HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
+               Hqs HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
                Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom
                Hmajb
                Hal23 Hsp0
                HM4sp HM4thr HM4s0 HM4s1 HM4s2 HM4s3 Hal Hnspos
                with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Hbio Hlog
-                     Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hoffs Hslkk Hslkd
-                     Hdep Hidev Hiinum Hivalid Hflat Hshot Hfrz Hkeep Hru Hpriv Hprocs
+                     Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
+                     [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid Hflat Hshot Hfrz Hkeep Hru Hpriv Hprocs
                      Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hf1
                      Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24
                      HP Hobs Htc Hcont").

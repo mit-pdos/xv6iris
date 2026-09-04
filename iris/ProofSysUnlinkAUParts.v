@@ -272,17 +272,16 @@ Section ProofSysUnlinkAUParts.
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
-    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
-    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
+    iIntros (Hk) "H".
+    iApply (ic_escrows_lookup fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k Hk with "H").
   Qed.
 
   Lemma su_slk_acc `{XI : CurCtx} `{GEN : GenId} (k : nat) :
     (k < NINODE)%nat ->
     (ic_sleeplocks fsc_ic -∗
      ∃ gil gisl : gname,
-       is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string
-                        (ic_tok fsc_ic k) (slh_tok (icfg_isl k))
+       is_sleeplock_genl gil gisl (i_lock (ientry k)) "inode"%string
+                        (ic_slp fsc_ic k) (slh_tok (icfg_isl k))
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_sleeplocks.
@@ -304,13 +303,7 @@ Section ProofSysUnlinkAUParts.
   Lemma su_carve_gen `{XI : CurCtx} (k : nat) (q s : Qp) (dv inum : mword 32) (gy : gname) :
     inode_ref_gen k (q + s)%Qp dv inum gy ⊣⊢
     inode_ref_short_gen k (q + s)%Qp q dv inum gy ∗ inode_shr_gen k s dv inum gy.
-  Proof.
-    rewrite /inode_ref_gen /inode_ref_short_gen /inode_shr_gen
-            live_gen_split inode_ident_split SleepLock.slh_tok_split.
-    iSplit.
-    - iIntros "($ & [$ Hl2] & [$ Hi2] & [$ Hs2])". iFrame.
-    - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
-  Qed.
+  Proof. apply inode_ref_carve_gen. Qed.
 
   Lemma su_shed_gen `{XI : CurCtx} (k : nat) (q : Qp) (dv inum : mword 32) (gy : gname) :
     inode_ref_gen k q dv inum gy ⊣⊢

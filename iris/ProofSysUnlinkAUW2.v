@@ -115,6 +115,7 @@ Require Import Xv6G.
 Require Import FsCfg.
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Set Printing Depth 40.
 
@@ -189,7 +190,7 @@ Section ProofSysUnlinkAUW2.
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (kk : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (u : nat) (pidv : mword 32) (dqb dqs dqbs : dfrac)
       (U : ustate) (P1 : uptd)
@@ -238,10 +239,14 @@ Section ProofSysUnlinkAUW2.
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     ireg_open -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string
-                     (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string
+                     (ic_slp fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep fsc_ic kk s icfg_dev inum gy -∗
+    ⌜(loy <= tly)%nat⌝ -∗
+    IcacheRef.cred_floor loy tly -∗
+    IcacheInv.iref_claims -∗
+    ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
+    off_rows off_cfg kk cur_ctx -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -297,7 +302,7 @@ Section ProofSysUnlinkAUW2.
            Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs2
            HMs3 Hal Heb Hupt1.
     iIntros "Hcg Hown #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-             #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload
+             #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid Hload
              #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hsbs #Hbmres Hpidq Hpre #Hprocs #Hdev
              #Hgeo
              #Hdlk Hbsl Hir Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27
@@ -306,13 +311,13 @@ Section ProofSysUnlinkAUW2.
     iDestruct (su_bytes_name (pa_stk sp0 10) 16 with "HbNj") as (bnf) "HbNj".
     iApply (Tails.su_tail_bad (CID0 := CID0) gs jx gl pd pav pu
               gil gisl
- kk qi s gy inum dn bm u pidv (DfracOwn (1/4)) dqb dqs
+ kk qi s gy loy tly inum dn bm u pidv (DfracOwn (1/4)) dqb dqs
               m M sp0 K eb b lks w4 w5 w6 w27 w30 bd bnf bp be
               (us_upt U P1) HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr
               HMs1 HMs2 HMs3 Hal
               with "Hcg Hown [] [] Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen Hitab
-                    Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum
+                    Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum
                     Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpidq
                     Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbNj
@@ -380,7 +385,7 @@ Section ProofSysUnlinkAUW2.
       (w5 : mword 64) (w6 : mword 64) (w30 : mword 64) (m : regfile)
       (sp0 : mword 64) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (M2 : regfile) (kd : nat) (ks : nat) (kk : nat) (gild : gname)
-      (gisld : gname) (gyd : gname) (qdi : Qp) (sd : Qp) (qs : Qp)
+      (gisld : gname) (gyd : gname) (loyd tlyd : nat) (qdi : Qp) (sd : Qp) (qs : Qp)
       (dinum : mword 32) (dnd : dinode) (bmd : blkmap)
       (datd : nat -> list (bv 8)) (lo : bv 32) (t : nat)
       (* ---- THE AU SIDE.  [pl] and the name tie come from W1's seam; the
@@ -433,10 +438,14 @@ Section ProofSysUnlinkAUW2.
        dlookup_commit_at (fs_gamma_L fsc_fs) ∅ Phiex -∗
        dmiss_commit_at (fs_gamma_L fsc_fs) ∅ Phimiss -∗
        (* ---- [dp], LOCKED and OPEN ---- *)
-       is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
-                        (ic_tok fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
+       is_sleeplock_genl gild gisld (i_lock (ientry kd)) "inode"%string
+                        (ic_slp fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
        sleeplocked_q gisld sd (i_lock (ientry kd)) pid -∗
-       ic_deposit fsc_ic kd (DepTx sd icfg_dev dinum gyd t (1/2)) -∗
+       ⌜(loyd <= tlyd)%nat⌝ -∗
+       IcacheRef.cred_floor loyd tlyd -∗
+       IcacheInv.iref_claims -∗
+       ic_handle fsc_ic kd (DepTx sd icfg_dev dinum gyd loyd t (1/2)) -∗
+       off_rows off_cfg kd cur_ctx -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} icfg_dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
        i_valid (ientry kd) ↦₄ valid_word true -∗
@@ -584,13 +593,13 @@ Section ProofSysUnlinkAUW2.
     (pa_stk sp0 30) ↦₈[KT1] w30 -∗
     (* ---- THE SEAM: the fall-through, at +0x72 with [ip] resolved ---- *)
     (∀ (CIDs : CpuId) (M2 : regfile)
-       (kd ks kk : nat) (gild gisld gyd : gname) (qdi sd qs : Qp)
+       (kd ks kk : nat) (gild gisld gyd : gname) (loyd tlyd : nat) (qdi sd qs : Qp)
        (dinum : mword 32) (dnd : dinode) (bmd : blkmap)
        (datd : nat -> list (bv 8)) (lo : bv 32) (t : nat),
        su_w2_seam_au (CIDs := CIDs)
           gf jx dqb
           dqs dqbs pid U P1 n1 Sb1 nf bnm0 bp bd be w5 w6 w30 m sp0 K eb b
-          lks M2 kd ks kk gild gisld gyd qdi sd qs dinum dnd bmd datd lo t
+          lks M2 kd ks kk gild gisld gyd loyd tlyd qdi sd qs dinum dnd bmd datd lo t
           pl P Pmiss Phient Phitgt Phiex Phimiss) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       su_au_closer (CID := CIDx) gf (proc_addr jx) pid U m
@@ -622,8 +631,9 @@ Section ProofSysUnlinkAUW2.
        one-shot names.  That is what lets [ity_shot_agree] below turn
        nameiparent's promise into [di_type dnd = T_DIR] at ilock's own
        record, which is dirlookup's first premise. ---- *)
-    iDestruct "Hheld" as (kd qd dinum gyd)
-      "(%Hdpe & %Hkd & %Hdinumc & %HiL & Hrefdp & #Hshotd & Hrud)".
+    iDestruct "Hheld" as (kd qd dinum gyd lod tld)
+      "(%Hdpe & %Hkd & %Hdinumc & %HiL & %Hled & #Hfld &
+        Hrefdp & #Hshotd & Hrud)".
     (* the cursor's index IS the parent's inum, which is what makes every
        arm below able to name the abstract row [ilock] just resolved *)
     subst iL.
@@ -631,12 +641,14 @@ Section ProofSysUnlinkAUW2.
       by (exact Hdinumc).
     destruct (Hiregb dinum Hdinb) as [Hdiblk Hdiblog].
 
-    iEval (rewrite su_shed_gen) in "Hrefdp".
+    iEval (rewrite IcacheRef.inode_ref_genlo_shed) in "Hrefdp".
     iDestruct "Hrefdp" as "[Hkeepd Hshrd]".
-    iDestruct (inode_ref_short_gen_forget with "Hkeepd") as "Hkeepd".
+    iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ Hled
+                 with "Hfld Hkeepd") as "Hkeepd".
     iDestruct (su_esc_acc kd Hkd with "Hescrows")
       as "#Hescd".
     iDestruct (su_slk_acc kd Hkd with "Hslks") as (gild gisld) "#Hslkd0".
+    iDestruct (is_itable2_claims with "Hitab") as "#Hclaimssu".
     iDestruct (su_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     (* the process block, opened for the callees' pid fraction *)
     iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1)
@@ -690,21 +702,22 @@ Section ProofSysUnlinkAUW2.
     iDestruct (log_tx_open with "Htx") as (t) "Htw".
     iDestruct (log_tx_split icfg_log t 1 (1/2) (1/2)
                  (eq_sym Qp.half_half) with "Htw") as "[Htp Htx]".
+    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
     iApply (Ilock.wp_ilock_dep_sconf (CID := CID1) gs jx gl pd pav pu
               gild gisld kd (qd/2)%Qp
-              gyd (DepTx (qd/2)%Qp icfg_dev dinum gyd t (1/2)) PlainK dinum
+              gyd lod tld (DepTx (qd/2)%Qp icfg_dev dinum gyd lod t (1/2)) PlainK dinum
               pid (DfracOwn (1/4)) dqs R0 (K - 30)%nat eb b
               lks
               (us_upt U P1) ltac:(exact Kil) eq_refl ltac:(discriminate)
               Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl HR0a0
               (Hlb "bcache"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpenv2 Hbio Hitinv Hescd Hireg
-                    Hslkd0 Hshrd [Htp] Hrud Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
+                    Hslkd0 [//] Hfld Hclaimssu Hshrd [Htp] Hrud Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1 Hllb0").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htp". }
     iIntros (CID2 Hq2 mil dnd bmd fld)
-      "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkdd Hdep
+      "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkdd Hdep Hoffr
        Hidev Hiinum Hivalid Hload #Hshotl Hfrz %Hfld Hrud %Hilkpd".
     iEval (rewrite /ic_dep_held /=) in "Hload".
     assert (Hpc34 : ret_pc (R0 !!! Regidx Rra : mword 64)
@@ -844,7 +857,7 @@ Section ProofSysUnlinkAUW2.
       iDestruct (ic_tx_dep_intro with "Hdep Htx") as "Hdep".
       iApply (su_w2_bad_au (CID0 := CID8) gf gs jx gl pd pav pu
                 gild gisld
- kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd n1 pid
+ kd (qd/2)%Qp (qd/2)%Qp gyd lod tld dinum dnd bmd n1 pid
                 dqb dqs dqbs U P1 m mn1 sp0 K eb b lks w4 w5 w6 w27 w30
                 bd nf bnm0 bp be
                 P Pmiss Phient Phitgt Phiex Phimiss
@@ -855,7 +868,7 @@ Section ProofSysUnlinkAUW2.
                 (su_regs_s2 _ _ _ _ _ _ Hn1regs)
                 (su_regs_s3 _ _ _ _ _ _ Hn1regs) Hal Heb Hupt1
                 with "Hcg Hown Htext Hdata Hpc Hpenv2 Hbio Hlog Hseam Hgen Hitab
-                      Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd Hdep Hidev
+                      Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd [//] Hfld Hclaimssu Hdep Hoffr Hidev
                       Hiinum Hivalid Hload Hshotl Hfrz Hkeepd Hrud Hsbb Hsbi Hsbs
                       Hbmres Hpidq Hpre Hprocs Hdev Hgeo Hdlk
                       [Hbs1 Hbs2] Hir [HopS] Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD
@@ -1012,7 +1025,7 @@ Section ProofSysUnlinkAUW2.
         iDestruct (ic_tx_dep_intro with "Hdep Htx") as "Hdep".
         iApply (su_w2_bad_au (CID0 := CID14) gf gs jx gl pd pav pu
                   gild gisld
- kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd
+ kd (qd/2)%Qp (qd/2)%Qp gyd lod tld dinum dnd bmd
                   n1 pid dqb dqs dqbs U P1 m mn2 sp0 K eb b lks
                   w4 w5 w6 w27 w30 bd nf bnm0 bp be
                   P Pmiss Phient Phitgt Phiex Phimiss
@@ -1024,7 +1037,7 @@ Section ProofSysUnlinkAUW2.
                   (su_regs_s2 _ _ _ _ _ _ Hn2regs)
                   (su_regs_s3 _ _ _ _ _ _ Hn2regs) Hal Heb Hupt1
                   with "Hcg Hown Htext Hdata Hpc Hpenv2 Hbio Hlog Hseam Hgen Hitab
-                        Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd Hdep Hidev
+                        Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd [//] Hfld Hclaimssu Hdep Hoffr Hidev
                         Hiinum Hivalid Hload Hshotl Hfrz Hkeepd Hrud Hsbb Hsbi Hsbs
                         Hbmres Hpidq Hpre Hprocs Hdev Hgeo Hdlk
                         [Hbs1 Hbs2] Hir [HopS] Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD
@@ -1281,13 +1294,13 @@ Section ProofSysUnlinkAUW2.
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           rewrite Hdpe in HR13regs.
 
-          iApply ("Hseamk" $! CID22 R13 kd kslot kk gild gisld gyd (qd/2)%Qp
+          iApply ("Hseamk" $! CID22 R13 kd kslot kk gild gisld gyd lod tld (qd/2)%Qp
                     (qd/2)%Qp qs dinum dnd bmd datd (word_lo w27) t
                     with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     [%] [%]
                     Hcg Hown Hpc Hseam Hgen [Hbs1 Hbs2] Hsbb Hsbi Hsbs
                     Hpriv [%] HP Hcent Hctgt Hcex Hcmiss
-                    Hslkd0 Hslkdd Hdep Hidev Hiinum Hivalid
+                    Hslkd0 Hslkdd [//] Hfld Hclaimssu Hdep Hoffr Hidev Hiinum Hivalid
                     Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Htop Hshotl Hfrz Hkeepd Hrud
                     Hchild Hruc HopS Htx Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP
                     H27lo H27hi HbE H30 [Hcont]").
@@ -1393,7 +1406,7 @@ Section ProofSysUnlinkAUW2.
           iDestruct (ic_tx_dep_intro with "Hdep Htx") as "Hdep".
           iApply (Tails.su_tail_d (CID0 := CID22) gs jx gl pd pav pu
  gild gisld
- kd (qd/2)%Qp (qd/2)%Qp gyd
+ kd (qd/2)%Qp (qd/2)%Qp gyd lod tld
                     dinum dnd bmd n1 pid (DfracOwn (1/4)) dqb dqs
                     m R13 sp0 K eb b lks w5 w6 (word_of_words (word_lo w27)
                     (word_hi w27)) w30 bd bnf bp be
@@ -1401,7 +1414,7 @@ Section ProofSysUnlinkAUW2.
                     Hist0 Hdiblk Hdiblog Hdinb Hcovb Hiu Hj Hgl Hlkempty
                     Hsp0 HR13sp HR13thr HR13s1 HR13s3 Hal
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpenv2 Hbio Hlog Hseam Hgen
-                          Hitab Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd Hdep
+                          Hitab Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd [//] Hfld Hclaimssu Hdep Hoffr
                           Hidev Hiinum Hivalid Hload Hshotl Hfrz Hkeepd Hrud Hsbb
                           Hsbi
                           Hbmres Hpidq Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2]

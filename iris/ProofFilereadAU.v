@@ -102,7 +102,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import FdSlots FileOff.
+Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import Xv6Cameras.
 Require Import UserPtTree.
@@ -132,6 +132,8 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import TsoCtx.
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the off checkout borrows the running token *)
+Require Import FileOffProtocol.   (* proto_read_llb / _checkout / _park (r25 item 24) *)
 (* ---- the AU side ---- *)
 Require Import ProofFileread.      (* the pure prefix ([fr_maxfile_bsize],
                                       [fr_K6], [fr_clamp_le], [fr_ret_of_readi],
@@ -262,17 +264,19 @@ Section ProofFilereadAU.
       (st' : fdstate) :
     fc_type Cf' = FD_INODE \/ fc_type Cf' = FD_DEVICE ->
     file_pay_st γf' kk qq Cf' st' -∗
-    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16),
+    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16)
+      (lo tl : nat) (γb : Xv6Cameras.box_names),
       ⌜fdstate_ok inum Cf' st'⌝ ∗
       ⌜fc_ip Cf' = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜(bv_unsigned inum < 16 * Z.of_nat icfg_nib)%Z⌝ ∗
       ⌜fc_wbool Cf' = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
       ⌜fc_type Cf' = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝ ∗
+      ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
       IcacheRef.ity_shot g ty ∗
-      IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
-      SpecFileread.carve_off (fc_type Cf') ik kk qq ∗
-      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗
-         SpecFileread.carve_off (fc_type Cf') ik kk qq -∗
+      IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo ∗
+      SpecFileread.carve_off (fc_type Cf') kk qq γb Cf' ∗
+      (IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo -∗
+         SpecFileread.carve_off (fc_type Cf') kk qq γb Cf' -∗
          file_pay_st γf' kk qq Cf' st').
   Proof.
     intros Hty. iIntros "(%pn & %Hst & Hpn & Hpl)".
@@ -286,35 +290,34 @@ Section ProofFilereadAU.
       - by rewrite (bool_decide_eq_true_2 (FD_DEVICE = FD_DEVICE) eq_refl)
                    orb_true_r. }
     rewrite {1}/file_core /file_core_noff /file_core_off Hnp Hyes /inode_pay.
-    iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
-    iDestruct "Hs" as (ik) "(%Hipk & %Hik & %Hinb & Hshr)".
+    (* r25 (inode_pay D1): the reference's IDENT SIDE ([inode_ref_side])
+       rides between the cancel token and the travelling share; the carve
+       carries it across and puts it back. *)
+    iDestruct "Hpl" as "((#Hci & Hown & Hside & Hs & Hwt) & Hop)".
+    iDestruct "Hs" as (ik lo tl) "(%Hipk & %Hik & %Hinb & %Hle & #Hfl & Hshr)".
     iDestruct "Hwt" as (ty) "(#Hshot & %Hnd & %Hdv)".
-    (* the arm's off conjunct, re-keyed at the share's own [ik] *)
-    iAssert (SpecFileread.carve_off (fc_type Cf') ik kk qq ∗
-             (SpecFileread.carve_off (fc_type Cf') ik kk qq -∗
-              (if bool_decide (fc_type Cf' = FD_INODE)
-               then ioff_ref (fc_ip Cf') kk qq else foff_dead kk qq)))%I
-      with "[Hop]" as "[Hop Hopback]".
-    { rewrite /SpecFileread.carve_off. case_bool_decide as Hin.
-      - iDestruct "Hop" as (i) "(%Hv & %Hi & Hfrag)".
-        assert (i = ik) as ->.
-        { apply (ientry_inj i ik); [lia | lia | congruence]. }
-        iFrame "Hfrag". iIntros "Hf". iExists ik.
-        iSplitR; [iPureIntro; exact Hipk|].
-        iSplitR; [iPureIntro; exact Hik|]. iExact "Hf".
-      - iFrame "Hop". iIntros "$". }
-    iExists ik, (fp_inum pn), (qq * fp_iq pn)%Qp, (fp_ig pn), ty.
+    iExists ik, (fp_inum pn), (qq * fp_iq pn)%Qp, (fp_ig pn), ty, lo, tl,
+      (fp_obox pn).
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|]. iSplitR; [iExact "Hfl"|].
     iSplitR; [iExact "Hshot"|].
     iSplitL "Hshr"; [iExact "Hshr"|].
+    (* the arm's off conjunct IS the carve at the payload's own box names *)
     iSplitL "Hop"; [iExact "Hop"|].
     iIntros "Hshr Hop". iExists pn. iFrame "%". iFrame "Hpn".
     rewrite /file_core /file_core_noff /file_core_off Hnp Hyes /inode_pay.
-    iSplitR "Hop Hopback"; last first.
-    { iApply "Hopback". iExact "Hop". }
+    iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
-    iSplitL "Hshr"; [iExists ik; iFrame "%"; iExact "Hshr"|].
+    iSplitL "Hside"; [iExact "Hside"|].
+    iSplitL "Hshr".
+    { iExists ik, lo, tl.
+      iSplitR; [iPureIntro; exact Hipk|].
+      iSplitR; [iPureIntro; exact Hik|].
+      iSplitR; [iPureIntro; exact Hinb|].
+      iSplitR; [iPureIntro; exact Hle|].
+      iSplitR; [iExact "Hfl"|].
+      iExact "Hshr". }
     iExists ty. iSplitR; [iExact "Hshot"|].
     iSplit; iPureIntro; [exact Hnd | exact Hdv].
   Qed.
@@ -952,8 +955,8 @@ Section ProofFilereadAU.
              iDestruct (fr_env_fs γf fn st Cf inumx Hok Htyi with "Henv") as "Henv".
              rewrite /fileread_fs_env.
              iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
-                                   #Hbio & #Hitbl & #Hescs &
-                                   #Hireg & #Hslks & #Hoffs & Hsb &
+                                   #Hbio & #Hitbl & #Hclaimsfr & #Hescs &
+                                   #Hireg & #Hslks & Hsb &
                                    #Hdevi & #Hdgeom & #Hdlock & Hbslot)".
              (* ---- THE CARVE (fs-sysfile S4', blocker 2's ratified
                 alternative; ProofFilestat is the landed instance).  The
@@ -966,12 +969,11 @@ Section ProofFilereadAU.
                 of the off FAMILY by the slot THIS CONTRACT names. ---- *)
              iDestruct (frau_pay_carve γf k q Cf _ (or_introl Htyi)
                           with "Hrpay")
-               as (ikk inm ssh gsh ty0)
-                  "(%Hokc & %Hipk & %Hik & %Hinlt & %Hnd0 & %Hdv0 & #Hshot0 & Hshr0 &
-                    Hoh & Hpayback)".
-             (* the off output IS the ledger fragment on this arm *)
-             iEval (rewrite (SpecFileread.carve_off_inode _ _ _ _ Htyi)) in "Hoh".
-             iDestruct (ioff_escrows_acc ikk Hik with "Hoffs") as "#Hoesc".
+               as (ikk inm ssh gsh ty0 losh tlsh γb0)
+                  "(%Hokc & %Hipk & %Hik & %Hinlt & %Hnd0 & %Hdv0 & %Hlesh & #Hflsh &
+                    #Hshot0 & Hshr0 & Hoh & Hpayback)".
+             (* the off output IS the fd's off box handle on this arm *)
+             iEval (rewrite (SpecFileread.carve_off_inode _ _ _ _ _ Htyi)) in "Hoh".
              (* AU EDIT (difference 4): THE INUM BRIDGE.  The carve's
                 [fdstate_ok] output and the contract's premise read the SAME
                 payload record, so the [i] the commit is indexed by IS the
@@ -994,7 +996,7 @@ Section ProofFilereadAU.
                 pinned on the way back, and the kept half is what pins it
                 ([inode_shr_regen2]).  filestat and filewrite both do
                 exactly this. *)
-             iEval (rewrite inode_shr_gen_halve2) in "Hshr0".
+             iEval (rewrite IcacheRef.inode_shr_genlo_halve) in "Hshr0".
              iDestruct "Hshr0" as "[Href Hkeep]".
              assert (HB7a0 : B7 !!! Regidx Ra0 = fnode k).
              { rewrite /B7 upd_ne; [| vm_compute; discriminate].
@@ -1105,13 +1107,18 @@ Section ProofFilereadAU.
                 the payload's slice already does, so nothing has to be
                 introduced here -- the [inode_shr_gen_intro] this call used
                 to open with is gone with the caller-supplied [inode_shr]. *)
+             (* THE SHARE'S OWN STAMPS, presented at the acquire (R1): the floor
+                ilock hands back is the checkout's [Kt] (FileOffProtocol,
+                proto_read_llb -> proto_read_checkout) *)
+             iDestruct (proto_read_llb with "Hoh") as (mo) "[Hat #Hllbo]".
+             iDestruct (off_fd_at_qsum with "Hat") as "[%Hqmo Hat]".
              iApply (Ilock.wp_ilock_dep_sconf γs j γlp
  (frn_pd fn) (frn_pav fn) (frn_pu fn)
 
                        gil gisl
 
- ikk (ssh/2)%Qp gsh
-                       (DepRd (ssh/2)%Qp icfg_dev inm gsh) (ShotK ty0)
+ ikk (ssh/2)%Qp gsh losh tlsh
+                       (DepRd (ssh/2)%Qp icfg_dev inm gsh losh) (ShotK ty0)
  inm
                        pidv (DfracOwn (1/4)) (frn_dqs fn)
                        I2 (K - 6)%nat eb b
@@ -1120,9 +1127,10 @@ Section ProofFilereadAU.
                        Hik Hlg Hist Hibcov Hinlt Hj Hgs
                        ltac:(rewrite HI2a0; exact Hipk) Hbelow
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
-                             Hslk Href [] Hshot0 Hsb Hppid Hprocs
-                             Hdevi Hdgeom Hdlock Hbslot").
+                             Hslk [%] Hflsh Hclaimsfr Href [] Hshot0 Hsb Hppid Hprocs
+                             Hdevi Hdgeom Hdlock Hbslot Hllbo").
              all: try lkbelow.
+             all: try (exact Hlesh).
              { rewrite Heb /trap_csrs_ext. done. }
              { rewrite Heb /cpu_claim_ext. done. }
              { rewrite /ic_dep_side. done. }
@@ -1130,8 +1138,9 @@ Section ProofFilereadAU.
                 half, which iunlock consumes to select its own escrow arm
                 (design §14.8) *)
              iIntros (CIDil Hsil mil dnl bml fl_)
-               "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hdep
+               "%Hcsil Hflk Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hdep Hoffr
                 Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
+             iDestruct "Hflk" as (Kt) "[%HKt #Hflt]".
              iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
              assert (Hpc34 : ret_pc (I2 !!! Regidx Rra) = mword_of_int (FR + 0x3a)).
              { rewrite HI2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1195,14 +1204,17 @@ Section ProofFilereadAU.
              iAssert (inode_map_q fsc_fs (DfracOwn (1/4)) (fc_ip Cf) bml)
                with "[Haddrs Hindres]" as "Hmap".
              { rewrite /inode_map_q. iFrame. }
-             (* ---- CHECK OUT the offset cell, from the inode's LEDGER
-                    (off-ledger ruling) ---- *)
+             (* ---- CHECK OUT the offset cell (r25 item 24): the row out of
+                    the inode's rows (its floor is [Kp]), the share's floor
+                    from the acquire ([Kt]), the cell resident at the running
+                    context ---- *)
              iApply fupd_wp.
-             iMod (ioff_checkout ⊤ ikk k q ltac:(solve_ndisj)
-                     with "Hoesc Hoh [Hvalid] Hrlv")
-               as "(Hoh & Hoffc)".
-             { rewrite /off_mark. iExact "Hvalid". }
-             iDestruct "Hoffc" as (v) "[Hoff %Hwf]".
+             iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+             iMod (proto_read_checkout ⊤ ikk k q γb0 Cf mo Kt TsoCtx.cur_ctx
+                     ltac:(solve_ndisj) Hipk Hik HKt with "Hrun Hflt Hat Hoffr")
+               as "(Hrun & Hres & #Hbox0 & #Hmem0 & %T0 & Hhold & Hd0 & Hc0 & %Tr & Hrest)".
+             iDestruct ("Hcgb" with "Hrun") as "Hcg".
+             iDestruct "Hres" as (v) "[Hoff %Hwf]".
              pose proof (bv_unsigned_in_range _ v) as Hvr.
              assert (Hoffz : Z.of_nat (Z.to_nat (bv_unsigned v)) = bv_unsigned v)
                by (apply Z2Nat.id; exact (proj1 Hvr)).
@@ -1553,9 +1565,13 @@ Section ProofFilereadAU.
                 iEval (rewrite Htgt54) in "Hpc".
                 (* CHECK IN the cell, at the value it went out with *)
                 iApply fupd_wp.
-                iMod (ioff_checkin ⊤ ikk k q v ltac:(solve_ndisj) Hwf
-                        with "Hoesc Hoh Hoff")
-                  as "(Hoh & Hvalid & Hrlv)".
+                iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+                iMod (proto_read_park ⊤ ikk k q γb0 Cf mo T0 Tr TsoCtx.cur_ctx
+                        ltac:(solve_ndisj) Hipk Hik Hqmo
+                        with "Hrun [Hoff] Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")
+                  as "(Hrun & Hoh & Hoffd)".
+                { iExists v. iFrame "Hoff". iPureIntro. exact Hwf. }
+                iDestruct ("Hcgb" with "Hrun") as "Hcg".
                 iModIntro.
                 (* ---- THE READ ARM COMES HOME (B''-join).  readi changed
                    no byte, so the quarter goes back exactly as it came out
@@ -1574,7 +1590,7 @@ Section ProofFilereadAU.
                    ghost step (durable-disk B''-tx3); nothing is unshed
                    first. *)
                 iAssert (ic_dep_held fsc_fs fsc_ireg fsc_cov
-                           fsc_logst (DepRd (ssh/2)%Qp icfg_dev inm gsh)
+                           fsc_logst (DepRd (ssh/2)%Qp icfg_dev inm gsh losh)
                            ikk inm dnl bml)%I
                   with "[Hmeta Haddrs Hquarter]" as "Hlk".
                 { rewrite /ic_dep_held /=.
@@ -1639,8 +1655,8 @@ Section ProofFilereadAU.
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
                 iApply (Iunlock.wp_iunlock_dep_sconf γs
                           gil gisl
-                          ikk (ssh/2)%Qp gsh
-                          (DepRd (ssh/2)%Qp icfg_dev inm gsh) icfg_dev inm
+                          ikk (ssh/2)%Qp gsh losh tlsh
+                          (DepRd (ssh/2)%Qp icfg_dev inm gsh losh) icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj b
                           lks (upd_usM (us_upt U P') Mrd) (fr_av_iunlock K HK) eq_refl Hik
@@ -1648,20 +1664,17 @@ Section ProofFilereadAU.
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                                 Hheld Hppid Hprocs
-                                Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
+                                [//] Hflsh Hclaimsfr Hdep Hoffd Hidev Hinum Hvalid Hlk Hshot Hfrz").
                 all: try lkbelow.
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout _".
-                iDestruct (inode_shr_gen_forget with "Hrefout") as "Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
-                (* THE GATHER: iunlock gives the half back WITHOUT its
-                   generation; the half that never left pins it
-                   ([IcacheRef.live_gen_agree], inside [inode_shr_regen2]),
-                   and the payload takes the whole slice back.  From here the
-                   reference is intact again. *)
-                iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp
- inm gsh with "Hkeep Hrefout") as "Hshr".
-                iEval (rewrite Qp.div_2) in "Hshr".
-                iEval (rewrite -(SpecFileread.carve_off_inode _ _ _ _ Htyi)) in "Hoh".
+                (* THE GATHER (A6.145): the kept half PINS the returned
+                   half's (g, lo) by agreement; the genlo halves rejoin. *)
+                iAssert (IcacheRef.inode_shr_genlo ikk ssh icfg_dev inm
+                           gsh losh)
+                  with "[Hkeep Hrefout]" as "Hshr".
+                { rewrite (IcacheRef.inode_shr_genlo_halve ikk ssh). iFrame. }
+                iEval (rewrite -(SpecFileread.carve_off_inode _ _ _ _ _ Htyi)) in "Hoh".
                 iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x5a)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1874,10 +1887,13 @@ Section ProofFilereadAU.
                 iEval (rewrite Hpp54) in "Hpc".
                 (* CHECK IN the advanced cell *)
                 iApply fupd_wp.
-                iMod (ioff_checkin ⊤ ikk k q
-                        (mword_of_int (bv_unsigned v + Z.of_nat tot))
-                        ltac:(solve_ndisj) Hwf2 with "Hoesc Hoh Hoff")
-                  as "(Hoh & Hvalid & Hrlv)".
+                iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+                iMod (proto_read_park ⊤ ikk k q γb0 Cf mo T0 Tr TsoCtx.cur_ctx
+                        ltac:(solve_ndisj) Hipk Hik Hqmo
+                        with "Hrun [Hoff] Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")
+                  as "(Hrun & Hoh & Hoffd)".
+                { iExists (mword_of_int (bv_unsigned v + Z.of_nat tot)). iFrame "Hoff". iPureIntro. exact Hwf2. }
+                iDestruct ("Hcgb" with "Hrun") as "Hcg".
                 iModIntro.
                 (* ---- THE READ ARM COMES HOME (B''-join).  readi changed
                    no byte, so the quarter goes back exactly as it came out
@@ -1896,7 +1912,7 @@ Section ProofFilereadAU.
                    ghost step (durable-disk B''-tx3); nothing is unshed
                    first. *)
                 iAssert (ic_dep_held fsc_fs fsc_ireg fsc_cov
-                           fsc_logst (DepRd (ssh/2)%Qp icfg_dev inm gsh)
+                           fsc_logst (DepRd (ssh/2)%Qp icfg_dev inm gsh losh)
                            ikk inm dnl bml)%I
                   with "[Hmeta Haddrs Hquarter]" as "Hlk".
                 { rewrite /ic_dep_held /=.
@@ -1961,8 +1977,8 @@ Section ProofFilereadAU.
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
                 iApply (Iunlock.wp_iunlock_dep_sconf γs
                           gil gisl
-                          ikk (ssh/2)%Qp gsh
-                          (DepRd (ssh/2)%Qp icfg_dev inm gsh) icfg_dev inm
+                          ikk (ssh/2)%Qp gsh losh tlsh
+                          (DepRd (ssh/2)%Qp icfg_dev inm gsh losh) icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj b
                           lks (upd_usM (us_upt U P') Mrd) (fr_av_iunlock K HK) eq_refl Hik
@@ -1970,20 +1986,17 @@ Section ProofFilereadAU.
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                                 Hheld Hppid Hprocs
-                                Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
+                                [//] Hflsh Hclaimsfr Hdep Hoffd Hidev Hinum Hvalid Hlk Hshot Hfrz").
                 all: try lkbelow.
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout _".
-                iDestruct (inode_shr_gen_forget with "Hrefout") as "Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
-                (* THE GATHER: iunlock gives the half back WITHOUT its
-                   generation; the half that never left pins it
-                   ([IcacheRef.live_gen_agree], inside [inode_shr_regen2]),
-                   and the payload takes the whole slice back.  From here the
-                   reference is intact again. *)
-                iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp
- inm gsh with "Hkeep Hrefout") as "Hshr".
-                iEval (rewrite Qp.div_2) in "Hshr".
-                iEval (rewrite -(SpecFileread.carve_off_inode _ _ _ _ Htyi)) in "Hoh".
+                (* THE GATHER (A6.145): the kept half PINS the returned
+                   half's (g, lo) by agreement; the genlo halves rejoin. *)
+                iAssert (IcacheRef.inode_shr_genlo ikk ssh icfg_dev inm
+                           gsh losh)
+                  with "[Hkeep Hrefout]" as "Hshr".
+                { rewrite (IcacheRef.inode_shr_genlo_halve ikk ssh). iFrame. }
+                iEval (rewrite -(SpecFileread.carve_off_inode _ _ _ _ _ Htyi)) in "Hoh".
                 iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x5a)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }

@@ -223,9 +223,8 @@ Section ProofNparEraMain.
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /ic_escrows.
-    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
-    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
+    iIntros (Hk) "H".
+    iApply (ic_escrows_lookup fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k Hk with "H").
   Qed.
 
   (* the three-slot pool, split for the ONE slot ilock / dirlookup take.
@@ -2800,7 +2799,10 @@ Section ProofNparEraMain.
                    iDestruct (cpu_claim_ext_transport CIDt CIDV2 eb (proc_addr j)
                                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                    iEval (rewrite inode_shr_gen_intro) in "Hshr".
-                   iDestruct "Hshr" as (gsh) "Hshr".
+                   iDestruct "Hshr" as (gsh losh tlsh)
+                     "(%Hlesh & #Hflsh & Hshr)".
+                   iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr")
+                     as "Hshr".
                    (* NAME THE RETAINED PARENT'S GENERATION TOO (fs-log.md
                       §G.24).  The share and the short parent are two slices
                       of one slot, so [live_gen_agree] pins them to ONE
@@ -2808,9 +2810,11 @@ Section ProofNparEraMain.
                       ilock's one-shot against the reference it re-forms,
                       since iunlock hands the share back generation-ERASED. *)
                    iEval (rewrite inode_ref_short_gen_intro) in "Hkeep".
-                   iDestruct "Hkeep" as (gkp) "Hkeep".
-                   iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr")
-                     as %->.
+                   iDestruct "Hkeep" as (gkp lokp tlkp)
+                     "(%Hlekp & #Hflkp & Hkeep)".
+                   iDestruct (IcacheRef.inode_shr_gen_pin_on_keep_short
+                                with "Hkeep Hshr") as "[Hkeep Hshr]".
+                   iDestruct (is_itable2_claims with "Hitb2") as "#Hclaimsnx".
                    (* ---- THE WRITE ARM (durable-fs-plan.md section 3,
                       [ilock]; durable-disk B''-tx).  namex holds this
                       directory's lock from here to its [iunlock] /
@@ -2821,12 +2825,12 @@ Section ProofNparEraMain.
                    iPoseProof (TsoGhost.llb_0 loglen_name) as "#Hllb0".   (* r25 lane (ii): nothing to present at this ilock *)
                    iApply (IL.wp_ilock_tx_sconf gs j gl pd pav pu
                              gilk gislk
-                             ik (iq/2)%Qp gsh PlainK iinum pidv dq dqs
+                             ik (iq/2)%Qp gkp lokp tlkp PlainK iinum pidv dq dqs
                              V2 (K - 12)%nat eb b lks Upr
                              Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0
                              ltac:(lkbelow)
                              with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hitbl Hesck
-                                   Hireg Hslkk Hshr Hru Hinos Hppid Hprocs Hdev
+                                   Hireg Hslkk [//] Hflkp Hclaimsnx Hshr Hru Hinos Hppid Hprocs Hdev
                                    Hgeom Hdlk Hbs1 Htx Hllb0").
                    all: try lkbelow.
                    iIntros (CIDil Hqil mil dnl bml fl_)
@@ -3039,13 +3043,14 @@ Section ProofNparEraMain.
                      iDestruct (cpu_claim_ext_transport CIDil CIDN2 eb (proc_addr j)
                                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                      iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
-                     iDestruct (inode_ref_short_gen_forget with "Hkeep")
+                     iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _
+                          Hlekp with "Hflkp Hkeep")
                        as "Hkeep2".
                      iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl pd pav pu
  gilk gislk
 
-                               ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
+                               ik (iq/2)%Qp (iq/2)%Qp gkp lokp tlkp iinum dnl bml ncur
                                Scur wc false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Upr
                                Kiup Hik HbW ltac:(discriminate)
@@ -3054,10 +3059,11 @@ Section ProofNparEraMain.
                                HND2a0 Hbelow
                                with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
-                                     Hdep Hoffd Hidev Hiinum Hivalid Hload
+                                     [%] Hflkp Hclaimsnx Hdep Hoffd Hidev Hiinum Hivalid Hload
                                      Hshot Hfrz [$Hkeep2 $Hru] Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
+                     all: try (exact Hlekp).
                      (* RULING G: a runtime caller lends the SEALED arm. *)
                      { iExact "Hropen". }
                      { iEval (cbn beta iota). iEmpIntro. }
@@ -3372,19 +3378,24 @@ Section ProofNparEraMain.
                                     ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                        iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
                        iApply (IU.wp_iunlock_tx_sconf gs gilk gislk
-                                 ik (iq/2)%Qp gsh icfg_dev iinum dnl bml
+                                 ik (iq/2)%Qp gkp lokp tlkp icfg_dev iinum dnl bml
                                  pidv dq NP3 (K - 12)%nat eb (proc_addr j) b lks Upr
                                  Kiu Hik HP3a0
                                  ltac:(lkbelow)
                                  with "Hcg Hcnt Htext Hpc Hitbl Hesck
-                                       Hslkk Hslkd Hppid Hprocs Hdep Hoffd
+                                       Hslkk Hslkd Hppid Hprocs [%] Hflkp Hclaimsnx Hdep Hoffd
                                        Hidev Hiinum Hivalid Hload Hshot Hfrz").
+                       all: try (exact Hlekp).
                        all: try lkbelow.
                        iIntros (CIDiu Hqiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid
                                                   Hshr Htx".
 
-                       iDestruct (inode_shr_gen_forget with "Hshr")
+                       iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr")
                          as "Hshr".
+                       iDestruct (inode_shr_gen_forget_on_keep
+                                      _ _ _ _ _ _ _ _ _ _ _ _ Hlekp
+                                      with "Hflkp Hkeep Hshr")
+                         as "[Hkeep Hshr]".
                        assert (Hpc80 : ret_pc (NP3 !!! Regidx Rra)
                                 = mword_of_int (NX + 0x8a)).
                        { rewrite HP3ra. pcw. }
@@ -3400,21 +3411,27 @@ Section ProofNparEraMain.
                           this is the fact that closes fs-sysfile's Blocker
                           B. *)
                        iEval (rewrite inode_shr_gen_intro) in "Hshr".
-                       iDestruct "Hshr" as (gsh2) "Hshr".
-                       iDestruct (inode_ref_short_shr_gen_agree
-                                    with "Hkeep Hshr") as %<-.
-                       iDestruct (inode_ref_gather_gen ik (iq/2)%Qp (iq/2)%Qp
-                                    icfg_dev iinum gsh with "Hkeep Hshr") as "Href".
+                       iDestruct "Hshr" as (gsh2 losh2 tlsh2)
+                         "(%Hlesh2 & #Hflsh2 & Hshr)".
+                       iDestruct (inode_ref_short_shr_genlo_agree
+                                    with "Hkeep Hshr") as %[Hg2 Hlo2].
+                       subst gsh2 losh2.
+                       iDestruct (inode_ref_gather_genlo ik (iq/2)%Qp (iq/2)%Qp
+                                    icfg_dev iinum gkp lokp with "Hkeep Hshr")
+                         as "Href".
                        iEval (rewrite Qp.div_2) in "Href".
                        assert (HtydP : di_type dnl = T_DIR)
                          by (unfold T_DIR; exact Hty).
                        iAssert (inode_held_ty_at ipv T_DIR dcur)
                          with "[Href Hru]" as "Hip".
-                       { rewrite /inode_held_ty_at. iExists ik, iq, iinum, gsh.
+                       { rewrite /inode_held_ty_at.
+                         iExists ik, iq, iinum, gkp, lokp, tlkp.
                          iSplitR; [iPureIntro; exact Hie |].
                          iSplitR; [iPureIntro; exact Hik |].
                          iSplitR; [iPureIntro; exact Hib |].
                          iSplitR; [iPureIntro; exact Hiz |].
+                         iSplitR; [iPureIntro; exact Hlekp |].
+                         iSplitR; [iExact "Hflkp" |].
                          iSplitL "Href"; [iExact "Href" |].
                          iFrame "Hru". rewrite -HtydP. iExact "Hshot". }
                        assert (Hmiuregs : nx_regs m sp0 (pa_add pv o2) ipv nb
@@ -3971,13 +3988,14 @@ Section ProofNparEraMain.
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
                            iDestruct (cpu_claim_ext_transport CIDdl CIDG8 eb (proc_addr j)
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-                           iDestruct (inode_ref_short_gen_forget with "Hkeep")
+                           iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _
+                                Hlekp with "Hflkp Hkeep")
                              as "Hkeep2".
                            iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl
                                      pd pav pu gilk gislk
 
- ik (iq/2)%Qp (iq/2)%Qp gsh
+ ik (iq/2)%Qp (iq/2)%Qp gkp lokp tlkp
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
                                      GB3 (K - 12)%nat eb b lks Upr
@@ -3987,11 +4005,12 @@ Section ProofNparEraMain.
                                      Hiu Hj Hgs HGB3a0 Hbelow
                                      with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg []
-                                           Hslkk Hslkd Hdep Hoffd Hidev
+                                           Hslkk Hslkd [%] Hflkp Hclaimsnx Hdep Hoffd Hidev
                                            Hiinum Hivalid Hload Hshot Hfrz [$Hkeep2 $Hru] Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
                            all: try lkbelow.
+                           all: try (exact Hlekp).
                            (* RULING G: a runtime caller lends the SEALED arm of
                               the borrowed regime and discards what comes back --
                               its own copy is persistent. *)
@@ -4234,13 +4253,14 @@ Section ProofNparEraMain.
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
                            iDestruct (cpu_claim_ext_transport CIDdl CIDG8 eb (proc_addr j)
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-                           iDestruct (inode_ref_short_gen_forget with "Hkeep")
+                           iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _
+                                Hlekp with "Hflkp Hkeep")
                              as "Hkeep2".
                            iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl
                                      pd pav pu gilk gislk
 
- ik (iq/2)%Qp (iq/2)%Qp gsh
+ ik (iq/2)%Qp (iq/2)%Qp gkp lokp tlkp
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
                                      GC3 (K - 12)%nat eb b lks Upr
@@ -4250,11 +4270,12 @@ Section ProofNparEraMain.
                                      Hiu Hj Hgs HGC3a0 Hbelow
                                      with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg []
-                                           Hslkk Hslkd Hdep Hoffd Hidev
+                                           Hslkk Hslkd [%] Hflkp Hclaimsnx Hdep Hoffd Hidev
                                            Hiinum Hivalid Hload Hshot Hfrz [$Hkeep2 $Hru] Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
                            all: try lkbelow.
+                           all: try (exact Hlekp).
                            (* RULING G: a runtime caller lends the SEALED arm of
                               the borrowed regime and discards what comes back --
                               its own copy is persistent. *)
@@ -4528,13 +4549,14 @@ Section ProofNparEraMain.
                      iDestruct (cpu_claim_ext_transport CIDil CIDN2 eb (proc_addr j)
                                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                      iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
-                     iDestruct (inode_ref_short_gen_forget with "Hkeep")
+                     iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _
+                          Hlekp with "Hflkp Hkeep")
                        as "Hkeep2".
                      iDestruct (off_rows_to_dep with "Hoffr") as "Hoffd".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl pd pav pu
  gilk gislk
 
-                               ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
+                               ik (iq/2)%Qp (iq/2)%Qp gkp lokp tlkp iinum dnl bml ncur
                                Scur wc false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Upr
                                Kiup Hik HbW ltac:(discriminate)
@@ -4543,10 +4565,11 @@ Section ProofNparEraMain.
                                HND2a0 Hbelow
                                with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
-                                     Hdep Hoffd Hidev Hiinum Hivalid Hload
+                                     [%] Hflkp Hclaimsnx Hdep Hoffd Hidev Hiinum Hivalid Hload
                                      Hshot Hfrz [$Hkeep2 $Hru] Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
+                     all: try (exact Hlekp).
                      (* RULING G: a runtime caller lends the SEALED arm. *)
                      { iExact "Hropen". }
                      { iEval (cbn beta iota). iEmpIntro. }

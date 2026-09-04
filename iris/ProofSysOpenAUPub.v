@@ -73,6 +73,8 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import FileOffProtocol.   (* [proto_store_free]: the free off cell is the free word (r25 item 24) *)
+Require Import OffBox.   (* [off_rows] -- the fd box birth borrows the inode's rows (r25 item 33) *)
 Require Import DirView.
 Require Import FileInvDefs.
 Require Import ProcInv.
@@ -85,6 +87,7 @@ Require Import SpecFdalloc.
 Require Import SpecItrunc.
 Require Import ProofSysOpenParts.
 Require Import ProofSysOpenTails.
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the off box birth borrows the running token (r25) *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -131,7 +134,7 @@ Section ProofSysOpenAUPub.
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (kk : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (kf fd : nat) (l : list nat) (C : fcontent) (pn : fpnames)
       (om voff : mword 32) (nsj : nat)
@@ -146,6 +149,7 @@ Section ProofSysOpenAUPub.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
       (t : fdtype) :
+    qi = s ->   (* r25 shapes: the parked ident fraction IS the travelling share (so_publish) *)
     (K_iunlock <= K - 24)%nat -> (K_end_op <= K - 24)%nat ->
     (24 <= K)%nat -> ((K - 24) + 24 = K)%nat ->
     (kk < NINODE)%nat ->
@@ -194,9 +198,13 @@ Section ProofSysOpenAUPub.
     gen_cert -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep fsc_ic kk s icfg_dev inum gy -∗
+    ⌜(loy <= tly)%nat⌝ -∗
+    IcacheRef.cred_floor loy tly -∗
+    IcacheInv.iref_claims -∗
+    ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
+    off_rows off_cfg kk cur_ctx -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -205,7 +213,9 @@ Section ProofSysOpenAUPub.
     (* the payload's freeze token (§3.9, RULING A-prime), relayed to
        [so_tail_s]'s iunlock *)
     ifreeze_off (bv_unsigned inum) -∗
-    inode_ref_short_gen kk (qi + s)%Qp qi icfg_dev inum gy -∗
+    (∃ loK tlK : nat,
+       ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
+       IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi icfg_dev inum gy loK) -∗
     (* its PROVENANCE UNIT (item 7a-wire): the parent parks in the fd slot's
        [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
@@ -215,10 +225,10 @@ Section ProofSysOpenAUPub.
     flive_tok kf -∗
     file_fields kf 1 C -∗
     fpay_tok gf kf 1 pn -∗
-    a_foff kf ↦₄ voff -∗
-    (* the off LEDGERS (off-ledger ruling): [ProofSysOpenParts.so_deposit]
-       runs here, under the lock, before iunlock spends the valid cell *)
-    ioff_escrows -∗
+    (* the fd's off cell, TYPE-INDEXED (r25 item 24): the inode arm stored
+       zero into the free cell and holds the word at the running context;
+       the device arm never touches [f->off] and carries the free cell *)
+    (if bool_decide (fc_type C = FD_INODE) then a_foff kf ↦₄ voff else off_free kf 1) -∗
     (* THE UNTYPED SLOT'S OWN UNIT, released when [so_open_slot] took the
        reference apart and handed straight back to the ledger here: the
        publication below parks the walk's inode in this same entry, so the
@@ -268,29 +278,47 @@ Section ProofSysOpenAUPub.
                dqb dqs (proc_addr jx) pidv vom U P Pmiss Φo Φt m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf Hfdlt
+    intros Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf Hfdlt
            Hlen Hfrees Hip Htyor Hwrb Hrdw Hdir Hdvw Hwf Hom Htyt Hsp0 HMsp HMthr
            HMs1 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitinv #Hesck #Hslkk Hslkd Hdep Hidev Hiinum Hivalid
-              Hload #Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff #Hoffs
+              #Hitinv #Hesck #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid
+              Hload #Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfoff
               Hiru Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl
               Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Harm Hcont".
     iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
-    (* ---- THE LEDGER DEPOSIT, under the lock (off-ledger ruling) ---- *)
+    (* ---- THE BIRTH OF THE FD'S OFF BOX (r25 item 24), under the lock:
+           the landed twin's block verbatim -- on the FD_INODE arm the
+           stored [f->off] word is deposited into a fresh box registered in
+           the inode's rows; on the FD_DEVICE arm the word simply joins the
+           visibility-free tier. ---- *)
     iApply fupd_wp.
-    iMod (so_deposit ⊤ kk kf C voff ltac:(solve_ndisj) Hkk Hip Hwf
-            with "Hoffs Hivalid Hfoff") as "[Hivalid Hcoff]".
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iRename "Hoffr" into "Hrows".
+    iAssert (|={⊤}=> own_context cur_ctx ∗ off_rows off_cfg kk cur_ctx ∗
+               ∃ γb : box_names,
+                 if bool_decide (fc_type C = FD_INODE)
+                 then off_fd kf 1 γb C else off_free kf 1)%I
+      with "[Hrun Hrows Hfoff]" as ">(Hrun & Hrows & %γb & Hcoff)".
+    { destruct (bool_decide (fc_type C = FD_INODE)) eqn:Hbd.
+      - apply bool_decide_eq_true_1 in Hbd.
+        iMod (so_deposit ⊤ kk kf C ltac:(solve_ndisj) Hkk Hip Hbd
+                with "Hrun [Hfoff] Hrows") as "(Hrun & Hrows & %γb & Hfd)".
+        { iExists voff. iFrame "Hfoff". iPureIntro. exact (Hwf Hbd). }
+        iModIntro. iFrame "Hrun Hrows". iExists γb. iExact "Hfd".
+      - iModIntro. iFrame "Hrun Hrows". iExists inhabitant. iExact "Hfoff". }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iRename "Hrows" into "Hoffr".
     iModIntro.
     iApply (Tails.so_tail_s (CID0 := CID0) gs jx gl pd pav pu
-              gil gisl kk s gy inum dn bm
+              gil gisl kk s gy loy tly inum dn bm
               (mword_of_int (Z.of_nat fd) : mword 64) u pidv (DfracOwn (1/4))
               m M sp0 K eb b lks w6 w23 w24 bp U
               HKiu HKeo HK24 Kpop Hkk Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr
               HMs1 HMs3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
+                    Hitinv Hesck Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum Hivalid
                     Hload Hshot Hfrz Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3
                     Hf4
                     Hf5 Hf6 HbP H23 H24
@@ -307,11 +335,14 @@ Section ProofSysOpenAUPub.
     destruct (so_rd_byte_bool om) as [rb Hrdb].
     destruct (so_wr_byte_bool om) as [wb Hwdb].
     iApply fupd_wp.
-    iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn om rb wb
-            ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb
+    (* A6.146: the retained parent arrives GENLO with its credential. *)
+    iDestruct "Hkeep" as (loK tlK) "(%HleK & #HflK & Hkeep)".
+    iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn γb om rb wb
+            loK tlK
+            Hqs ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb
             ltac:(rewrite Hrdw; exact Hrdb) ltac:(rewrite Hwrb; exact Hwdb)
-            Hdir Hdvw
-            with "Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hcoff")
+            Hdir Hdvw HleK
+            with "HflK Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hcoff")
       as (stpub) "[%Hokpub Href]".
     (* the descriptor's ghost state: the file is FD_INODE or FD_DEVICE, so
        the descriptor sys_open returns is OPEN at that type -- [stpub] is the

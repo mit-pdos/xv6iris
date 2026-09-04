@@ -784,14 +784,17 @@ Section ProofSysUnlinkAUW1.
       destruct ok1.
       + (* ---------- the parent RESOLVED: the SEAM ---------- *)
         iDestruct "Hres1" as (iL es1 e1) "(%Hnp & %Hnpn & Hhelddp & HP & Hir1)".
-        iDestruct "Hhelddp" as (kd qd dinum gyd)
-          "(%Hdpe & %Hkd & %Hdinumc & %HiL & Hrefdp & #Hshotd & Hrud)".
+        iDestruct "Hhelddp" as (kd qd dinum gyd lod tld)
+          "(%Hdpe & %Hkd & %Hdinumc & %HiL & %Hled & #Hfld &
+            Hrefdp & #Hshotd & Hrud)".
         assert (Hdpnz : dpv <> (zero_reg : mword 64))
           by (rewrite Hdpe; apply ientry_ne_zero; lia).
         iAssert (inode_held_ty_at dpv T_DIR iL) with "[Hrefdp Hrud]"
           as "Hhelddp".
-        { iExists kd, qd, dinum, gyd. iSplitR; [done |]. iSplitR; [done |].
+        { iExists kd, qd, dinum, gyd, lod, tld.
           iSplitR; [done |]. iSplitR; [done |].
+          iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+          iSplitR; [iExact "Hfld" |].
           iFrame "Hrefdp Hrud". iExact "Hshotd". }
         iApply (wp_cbeqz_fall_s_sconf (CID := CID18)
                   (mword_of_int (SU + 0x2e)) (mword_of_int 90 : mword 8)

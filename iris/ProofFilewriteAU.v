@@ -902,7 +902,6 @@ Require Import UserPtTree.
 Require Import SchedCtx.
 Require Import WpLock.
 Require Import SpecPanic.
-Require Import FileOff.
 (* [diskGhostG], [uartGhostG], [fsLogG] and [iregG] USED TO live unexported in
    [DiskPtsto], [WpUart], [FsBlocks] and [InodeRegion], and this block
    re-imported those four so the functor's [Context] would not invent four
@@ -924,6 +923,8 @@ Require Import SpecFileread.
 Require Import CodeFilewrite ProofFilereadParts ProofFilewriteParts.
 Require Import ProcAvail.
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the off checkout borrows the running token *)
+Require Import FileOffProtocol.   (* proto_read_llb / _checkout / _park (r25 item 24) *)
 
 Set Printing Depth 40.
 
@@ -1109,17 +1110,19 @@ Section ProofFilewriteAU.
       (st' : fdstate) :
     fc_type Cf' = FD_INODE \/ fc_type Cf' = FD_DEVICE ->
     file_pay_st γf' kk qq Cf' st' -∗
-    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16),
+    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16)
+      (lo tl : nat) (γb : Xv6Cameras.box_names),
       ⌜fdstate_ok inum Cf' st'⌝ ∗
       ⌜fc_ip Cf' = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜(bv_unsigned inum < 16 * Z.of_nat icfg_nib)%Z⌝ ∗
       ⌜fc_wbool Cf' = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
       ⌜fc_type Cf' = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝ ∗
+      ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
       IcacheRef.ity_shot g ty ∗
-      IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
-      SpecFileread.carve_off (fc_type Cf') ik kk qq ∗
-      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗
-         SpecFileread.carve_off (fc_type Cf') ik kk qq -∗
+      IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo ∗
+      SpecFileread.carve_off (fc_type Cf') kk qq γb Cf' ∗
+      (IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo -∗
+         SpecFileread.carve_off (fc_type Cf') kk qq γb Cf' -∗
          file_pay_st γf' kk qq Cf' st').
   Proof.
     intros Hty. iIntros "(%pn & %Hst & Hpn & Hpl)".
@@ -1133,35 +1136,34 @@ Section ProofFilewriteAU.
       - by rewrite (bool_decide_eq_true_2 (FD_DEVICE = FD_DEVICE) eq_refl)
                    orb_true_r. }
     rewrite {1}/file_core /file_core_noff /file_core_off Hnp Hyes /inode_pay.
-    iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
-    iDestruct "Hs" as (ik) "(%Hipk & %Hik & %Hinb & Hshr)".
+    (* r25 (inode_pay D1): the reference's IDENT SIDE ([inode_ref_side])
+       rides between the cancel token and the travelling share; the carve
+       carries it across and puts it back. *)
+    iDestruct "Hpl" as "((#Hci & Hown & Hside & Hs & Hwt) & Hop)".
+    iDestruct "Hs" as (ik lo tl) "(%Hipk & %Hik & %Hinb & %Hle & #Hfl & Hshr)".
     iDestruct "Hwt" as (ty) "(#Hshot & %Hnd & %Hdv)".
-    (* the arm's off conjunct, re-keyed at the share's own [ik] *)
-    iAssert (SpecFileread.carve_off (fc_type Cf') ik kk qq ∗
-             (SpecFileread.carve_off (fc_type Cf') ik kk qq -∗
-              (if bool_decide (fc_type Cf' = FD_INODE)
-               then ioff_ref (fc_ip Cf') kk qq else foff_dead kk qq)))%I
-      with "[Hop]" as "[Hop Hopback]".
-    { rewrite /SpecFileread.carve_off. case_bool_decide as Hin.
-      - iDestruct "Hop" as (i) "(%Hv & %Hi & Hfrag)".
-        assert (i = ik) as ->.
-        { apply (ientry_inj i ik); [lia | lia | congruence]. }
-        iFrame "Hfrag". iIntros "Hf". iExists ik.
-        iSplitR; [iPureIntro; exact Hipk|].
-        iSplitR; [iPureIntro; exact Hik|]. iExact "Hf".
-      - iFrame "Hop". iIntros "$". }
-    iExists ik, (fp_inum pn), (qq * fp_iq pn)%Qp, (fp_ig pn), ty.
+    iExists ik, (fp_inum pn), (qq * fp_iq pn)%Qp, (fp_ig pn), ty, lo, tl,
+      (fp_obox pn).
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|]. iSplitR; [iExact "Hfl"|].
     iSplitR; [iExact "Hshot"|].
     iSplitL "Hshr"; [iExact "Hshr"|].
+    (* the arm's off conjunct IS the carve at the payload's own box names *)
     iSplitL "Hop"; [iExact "Hop"|].
     iIntros "Hshr Hop". iExists pn. iFrame "%". iFrame "Hpn".
     rewrite /file_core /file_core_noff /file_core_off Hnp Hyes /inode_pay.
-    iSplitR "Hop Hopback"; last first.
-    { iApply "Hopback". iExact "Hop". }
+    iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
-    iSplitL "Hshr"; [iExists ik; iFrame "%"; iExact "Hshr"|].
+    iSplitL "Hside"; [iExact "Hside"|].
+    iSplitL "Hshr".
+    { iExists ik, lo, tl.
+      iSplitR; [iPureIntro; exact Hipk|].
+      iSplitR; [iPureIntro; exact Hik|].
+      iSplitR; [iPureIntro; exact Hinb|].
+      iSplitR; [iPureIntro; exact Hle|].
+      iSplitR; [iExact "Hfl"|].
+      iExact "Hshr". }
     iExists ty. iSplitR; [iExact "Hshot"|].
     iSplit; iPureIntro; [exact Hnd | exact Hdv].
   Qed.
@@ -1977,14 +1979,13 @@ Section ProofFilewriteAU.
     KernelDataInv.kernel_data -∗
     SpecPrintk.printk_env (fsc_printk) (fsc_uart) (fsc_disk) -∗
     IcacheInv.itable_inv -∗
+    IcacheInv.iref_claims -∗
     (* the FAMILIES, since the slot is the carve's output and not the
        caller's to name *)
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov
       fsc_logst -∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     ic_sleeplocks fsc_ic -∗
-    (* ...and the off LEDGERS (off-ledger ruling) *)
-    ioff_escrows -∗
     dev_inv (fsc_uart) (fsc_disk) -∗
     DiskInv.disk_geom (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) -∗
     is_lock (fsc_dlock) DiskAddrs.d_lock "virtio_disk"%string
@@ -2036,8 +2037,8 @@ Section ProofFilewriteAU.
     iIntros "Hcg Hcnt #Htext Hpc #Hprocs
              Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
              Href Hpriv #Hkenv
-             #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hescs #Hireg
-             #Hslks #Hoffs #Hdev #Hgeo #Hdlk #Hbm Hout Hau Hcont".
+             #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hclaimsfw #Hescs #Hireg
+             #Hslks #Hdev #Hgeo #Hdlk #Hbm Hout Hau Hcont".
     (* ---- THE REFERENCE, OPENED, AND THE TWO FIELD FACTS OFF THE STATE ----
        The loop reads [f->type] and [f->writable] off the field cells, so it
        needs equations about the [fcontent] the reference carries -- but not
@@ -2197,11 +2198,11 @@ Section ProofFilewriteAU.
        names below are local to the iteration and everything derived from
        them is re-derived on the next one. ---- *)
     iDestruct (fwau_pay_carve gf kx qx Cf _ (or_introl Htyi) with "Hrpay")
-      as (ik inum sh g ty)
-         "(%Pst & %P8 & %P9 & %P5 & %P10 & %P10d & #Hty & Hshr & Hoh & Hpayback)".
-    (* the off output IS the ledger fragment on this arm *)
-    iEval (rewrite (SpecFileread.carve_off_inode _ _ _ _ Htyi)) in "Hoh".
-    iDestruct (ioff_escrows_acc ik P9 with "Hoffs") as "#Hoesc".
+      as (ik inum sh g ty lox tlx γb0)
+         "(%Pst & %P8 & %P9 & %P5 & %P10 & %P10d & %Hlex & #Hflx & #Hty & Hshr &
+           Hoh & Hpayback)".
+    (* the off output IS the fd's off box handle on this arm *)
+    iEval (rewrite (SpecFileread.carve_off_inode _ _ _ _ _ Htyi)) in "Hoh".
     (* AU EDIT: THE INUM BRIDGE.  The row the fire retags ([bv_unsigned inum])
        IS the row the contract's receipts are indexed by ([nx]) -- the sixth
        output is what makes the two the same existential. *)
@@ -2317,7 +2318,7 @@ Section ProofFilewriteAU.
     (* THE SHARE, HALVED (fs-icache 17.3): ilock is lent [s/2] and the
        retained half's [live_gen] is what pins the generation of the share
        iunlock hands back ([fw_shr_regen] on the way out). *)
-    iEval (rewrite fw_shr_gen_halve) in "Hshr".
+    iEval (rewrite (IcacheRef.inode_shr_genlo_halve ik sh)) in "Hshr".
     iDestruct "Hshr" as "[Hshrk Hshrl]".
     iEval (rewrite fw_bslots3) in "Hbsl".
     iDestruct "Hbsl" as "[Hbsl1 Hbsl2]".
@@ -2325,12 +2326,16 @@ Section ProofFilewriteAU.
       as "[Hppid Hpbk2]".
     iDestruct (cpu_own_transport CIDbo CIDa3 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+    (* the share's own stamps, presented at the acquire (R1): the floor ilock
+       hands back is the checkout's [Kt] *)
+    iDestruct (proto_read_llb with "Hoh") as (mo) "[Hat #Hllbo]".
+    iDestruct (off_fd_at_qsum with "Hat") as "[%Hqmo Hat]".
     iApply (Ilock.wp_ilock_tx_sconf gs jx glp
  (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
 
               gil gisl
 
- ik (sh / 2)%Qp g (ShotK ty)
+ ik (sh / 2)%Qp g lox tlx (ShotK ty)
  inum
               pidv (DfracOwn (1/4)) (fwn_dqs fn)
               D3 (K - 12)%nat eb b lks (us_upt U PI)
@@ -2340,14 +2345,16 @@ Section ProofFilewriteAU.
                  and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hit Hesc Hireg
-                    Hslk2 Hshrl Hty Hsbi Hppid Hprocs
-                    Hdev Hgeo Hdlk Hbsl1 Htx").
+                    Hslk2 [%] Hflx Hclaimsfw Hshrl Hty Hsbi Hppid Hprocs
+                    Hdev Hgeo Hdlk Hbsl1 Htx Hllbo").
     all: try lkbelow.
+    all: try (exact Hlex).
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDil Hsil mil dnl bml fl_)
-      "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hbsl1 Hheld Hdep
+      "%Hcsil Hflk Hcg Hcnt _ _ Hpc Hppid Hsbi Hbsl1 Hheld Hdep Hoffr
        Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
+    iDestruct "Hflk" as (Kt) "[%HKt #Hflt]".
     iDestruct ("Hpbk2" with "Hppid") as "Hpriv".
     assert (Hpc90 : ret_pc (D3 !!! Regidx Rra) = mword_of_int (FW + 0x98)).
     { rewrite HD3ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2399,12 +2406,14 @@ Section ProofFilewriteAU.
     (* ---- CHECK OUT the offset cell, from the inode's LEDGER (off-ledger
            ruling) ---- *)
     iApply fupd_wp.
-    iMod (ioff_checkout ⊤ ik kx qx ltac:(solve_ndisj)
-            with "Hoesc Hoh [Hvalid] Hrlv")
-      as "(Hoh & Hoffc)".
-    { rewrite /off_mark. iExact "Hvalid". }
+    (* r25 item 24: CHECK OUT the fd's off box (see ProofFileread) *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (proto_read_checkout ⊤ ik kx qx γb0 Cf mo Kt TsoCtx.cur_ctx
+            ltac:(solve_ndisj) P8 P9 HKt with "Hrun Hflt Hat Hoffr")
+      as "(Hrun & Hres & #Hbox0 & #Hmem0 & %T0 & Hhold & Hd0 & Hc0 & %Tr & Hrest)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
-    iDestruct "Hoffc" as (v) "[Hcell %Hwf]".
+    iDestruct "Hres" as (v) "[Hcell %Hwf]".
     pose proof (bv_unsigned_in_range _ v) as Hvr.
     assert (Hoffz : Z.of_nat (Z.to_nat (bv_unsigned v)) = bv_unsigned v)
       by (apply Z2Nat.id; exact (proj1 Hvr)).
@@ -2768,9 +2777,15 @@ Section ProofFilewriteAU.
     { intros r Hr N1. rewrite (Hxcs r Hr). exact (HW1cs r Hr N1). }
     (* ---- CHECK IN the cell and REBUILD the checked-out bundle ---- *)
     iApply fupd_wp.
-    iMod (ioff_checkin ⊤ ik kx qx v2 ltac:(solve_ndisj) Hwf2
-            with "Hoesc Hoh Hcell")
-      as "(Hoh & Hmark & Hrlv)".
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (proto_read_park ⊤ ik kx qx γb0 Cf mo T0 Tr TsoCtx.cur_ctx
+            ltac:(solve_ndisj) P8 P9 Hqmo
+            with "Hrun [Hcell] Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")
+      as "(Hrun & Hoh & Hoffd)".
+    { iExists v2. iFrame "Hcell". iPureIntro. exact Hwf2. }
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    (* the marker was never consumed: the box needs no marker *)
+    iRename "Hvalid" into "Hmark".
     (* THE MOVER (namei-pinned-lookup.md §9 W3, the file-write row): writei
        moved this inode's bytes, so the hold moves with them.  The value is
        determined garbage -- the fd is provably not a directory here -- and
@@ -2996,7 +3011,7 @@ Section ProofFilewriteAU.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Iunlock.wp_iunlock_tx_sconf gs
               gil gisl
-              ik (sh / 2)%Qp g icfg_dev
+              ik (sh / 2)%Qp g lox tlx icfg_dev
               inum dn' bm'
               pidv (DfracOwn (1/4)) X2 (K - 12)%nat eb (proc_addr jx) b lks
               (upd_usV U (upd_upt (upd_upt (us_V U) PI) P')) (fw_av_iunlock K HK) P9 ltac:(rewrite HX2a0; exact P8)
@@ -3005,8 +3020,9 @@ Section ProofFilewriteAU.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hit Hesc Hslk2
                     Hheld Hppid Hprocs
-                    Hdep Hidev Hinum Hvalid Hlk [Hshot] Hfrz").
+                    [%] Hflx Hclaimsfw Hdep Hoffd Hidev Hinum Hvalid Hlk [Hshot] Hfrz").
     all: try lkbelow.
+    all: try (exact Hlex).
     { rewrite Htyq. iExact "Hshot". }
     iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshrb Htx".
     (* ...AND THE WRITE ARM COMES HOME inside [iunlock] (B''-tx): the
@@ -3014,7 +3030,6 @@ Section ProofFilewriteAU.
        gets its [log_op] back. *)
 
     iDestruct (log_opS_op with "HlogS Htx") as "Hlogop".
-    iDestruct (inode_shr_gen_forget with "Hshrb") as "Hshrb".
     iDestruct ("Hpbk3" with "Hppid") as "Hpriv".
     assert (Hpcbc : ret_pc (X2 !!! Regidx Rra) = mword_of_int (FW + 0xc4)).
     { rewrite HX2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -3028,12 +3043,12 @@ Section ProofFilewriteAU.
     { rewrite (callee_saved_lookup Hcsiu_cs Rs1 ltac:(vm_compute; reflexivity)).
       exact HX2s1. }
     (* THE SHARE, WHOLE AGAIN, at the generation the retained half names *)
-    iDestruct (fw_shr_regen ik (sh / 2)%Qp (sh / 2)%Qp
-                 icfg_dev inum g with "Hshrk Hshrb") as "Hshr".
-    iEval (rewrite fw_qp_halves) in "Hshr".
+    iAssert (IcacheRef.inode_shr_genlo ik sh icfg_dev inum g lox)
+      with "[Hshrk Hshrb]" as "Hshr".
+    { rewrite (IcacheRef.inode_shr_genlo_halve ik sh). iFrame. }
     (* ...and back into the payload it came from.  From here the reference is
        intact again and the postcondition carries no share at all. *)
-    iEval (rewrite -(SpecFileread.carve_off_inode _ _ _ _ Htyi)) in "Hoh".
+    iEval (rewrite -(SpecFileread.carve_off_inode _ _ _ _ _ Htyi)) in "Hoh".
     iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
     (* ---- +0xbc jal ra,end_op : the transaction closes at whatever the
            chunk left of its reservation ([SpecEndOp] takes any [u]) ---- *)
@@ -3319,8 +3334,8 @@ Section ProofFilewriteAU.
                   with "Hcg Hcnt Htext Hpc Hprocs
                         Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                         Href Hpriv Hkenv
-                        Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hescs Hireg
-                        Hslks Hoffs Hdev Hgeo Hdlk Hbm Hout Hau Hcont").
+                        Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hclaimsfw Hescs Hireg
+                        Hslks Hdev Hgeo Hdlk Hbm Hout Hau Hcont").
     - (* ====== THE SHORT WRITE (and writei's -1): straight to +0xe2 ======
          Before 31f115a this arm ran its own five restores at +0xea first;
          gcc now sends both loop exits into the tail, which owns them. *)
@@ -4386,7 +4401,7 @@ Section ProofFilewriteAU.
                     environment (the cinv is minted per publication, so no
                     fixed persistent family can exist); the names below keep
                     their meanings and the seventh slot is simply gone. *)
-                 iDestruct "Henv" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & #E8 & #E9 & #E10 & #E11 & #E12 & #E13 & #E14 & #E15 & #E16 & #E17 & #EOFF & E18 & E19 & E20 & #E21 & #E22 & #E23 & #E24 & E25)".
+                 iDestruct "Henv" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & #E8 & #E9 & #E10 & #E11 & #E12 & #E13 & #E14 & #E26 & #E15 & #E16 & #E17 & E18 & E19 & E20 & #E21 & #E22 & #E23 & #E24 & E25)".
                  (* the loop still takes the ONE slot's off-borrow invariant;
                     the environment now carries the family, so it is selected
                     here rather than by the caller. *)
@@ -4424,8 +4439,8 @@ Section ProofFilewriteAU.
                                  Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] Hkenv
-                                 E8 E9 E10 E11 E12 E13 E14 E15 E16 E17
-                                 EOFF E22 E23 E24 E21 [E18 E19 E20 E25] [Hbundle]").
+                                 E8 E9 E10 E11 E12 E13 E14 E26 E15 E16 E17
+                                 E22 E23 E24 E21 [E18 E19 E20 E25] [Hbundle]").
                  { rewrite /file_ref /file_fields. iExists Cf.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                  { rewrite HVid. iExact "Hpriv". }

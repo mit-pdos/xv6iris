@@ -65,6 +65,8 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import FileOffProtocol.   (* [proto_store_free]: the free off cell is the free word (r25 item 24) *)
+Require Import OffBox.   (* [off_rows] / [off_free] -- the fd off cell (r25 item 24) *)
 Require Import DirView.
 Require Import FileInvDefs.
 Require Import FileInv.
@@ -156,7 +158,7 @@ Section ProofSysOpenAUAlloc.
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
-      (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (kk : nat) (qi s : Qp) (gy : gname) (loy tly : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (om lo : mword 32) (nsj : nat)
       (u : nat) (pidv : mword 32) (dqb dqs : dfrac)
@@ -170,6 +172,7 @@ Section ProofSysOpenAUAlloc.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) :
+    qi = s ->   (* r25 shapes: the parked ident fraction IS the travelling share (so_publish) *)
     (K_sys_open <= K)%nat ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
@@ -218,11 +221,13 @@ Section ProofSysOpenAUAlloc.
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kk -∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     ireg_open -∗
-    (* the off LEDGERS (off-ledger ruling), rode down to the deposit *)
-    ioff_escrows -∗
-    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_genl gil gisl (i_lock (ientry kk)) "inode"%string (ic_slp fsc_ic kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
-    ic_tx_dep fsc_ic kk s icfg_dev inum gy -∗
+    ⌜(loy <= tly)%nat⌝ -∗
+    IcacheRef.cred_floor loy tly -∗
+    IcacheInv.iref_claims -∗
+    ic_tx_dep fsc_ic kk s icfg_dev inum gy loy -∗
+    off_rows off_cfg kk cur_ctx -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry kk) ↦₄ valid_word true -∗
@@ -231,7 +236,9 @@ Section ProofSysOpenAUAlloc.
     (* the payload's freeze token (§3.9, RULING A-prime), relayed to
        [so_tail_s]'s iunlock *)
     ifreeze_off (bv_unsigned inum) -∗
-    inode_ref_short_gen kk (qi + s)%Qp qi icfg_dev inum gy -∗
+    (∃ loK tlK : nat,
+       ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
+       IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi icfg_dev inum gy loK) -∗
     (* its PROVENANCE UNIT (item 7a-wire): the parent parks in the fd slot's
        [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
@@ -278,7 +285,7 @@ Section ProofSysOpenAUAlloc.
                dqb dqs (proc_addr jx) pidv vom U P Pmiss Φo Φt m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
+    intros Hqs HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
            Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom Hmajb Hal23 Hsp0 HNsp
            HNthr HNs0 HNs1 HNs2 HNs3 Hal Hnspos.
     destruct (so_kb K HK) as (HKcr & HKna & HKai & HKas & HKbo & HKeo & HKil &
@@ -287,7 +294,7 @@ Section ProofSysOpenAUAlloc.
     assert (Hu2 : (2 <= u)%nat) by (revert Hiu; unfold iput_units; lia).
 
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpe #Hftab #Hbio #Hlog
-              Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hoffs #Hslkk Hslkd Hdep
+              Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd %Hley #Hfly #Hclaimsy Hdep Hoffr
               Hidev Hiinum Hivalid Hflat #Hshot Hfrz Hkeep Hru Hpriv #Hprocs #Hdev #Hgeo
               #Hdlk Hop Hsbb Hsbi #Hbmres Hbsl Hisl Hfds Hfrag Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
               HbP H23lo H23hi H24 HP Hobs Htc Hcont".
@@ -416,7 +423,9 @@ Section ProofSysOpenAUAlloc.
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
       iDestruct (so_flat_close with "Hflat") as "Hload".
       iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback]".
-      iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep".
+      iDestruct "Hkeep" as (loK tlK) "(%HleK & #HflK & Hkeep)".
+      iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ HleK
+                   with "HflK Hkeep") as "Hkeep".
       iDestruct (cpu_own_transport CID3 CID5 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iDestruct (trap_csrs_ext_transport CID3 CID5 eb (proc_addr jx)
@@ -425,14 +434,14 @@ Section ProofSysOpenAUAlloc.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
       iApply (Tails.so_tail_e (CID0 := CID5) gs jx gl pd pav pu
                 gil gisl
- kk qi s gy inum dn bm u pidv
+ kk qi s gy loy tly inum dn bm u pidv
                 (DfracOwn (1/4)) dqb dqs m M2 sp0 K eb b lks w5 w6
                 (word_of_words lo om) w24 bp U
                 HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                 Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM2sp HM2thr
                 HM2s1 HM2s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                      Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
+                      Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev
                       Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
                       Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24
@@ -593,7 +602,9 @@ Section ProofSysOpenAUAlloc.
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
       iDestruct (so_flat_close with "Hflat") as "Hload".
       iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
-      iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep".
+      iDestruct "Hkeep" as (loK tlK) "(%HleK & #HflK & Hkeep)".
+      iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ HleK
+                   with "HflK Hkeep") as "Hkeep".
       iDestruct (cpu_own_transport CID8 CID10 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iDestruct (trap_csrs_ext_transport CID8 CID10 eb (proc_addr jx)
@@ -602,7 +613,7 @@ Section ProofSysOpenAUAlloc.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
       iApply (Tails.so_tail_f (CID0 := CID10) gfl gf gs jx gl pd pav
                 pu gil gisl
- kk qi s gy inum dn bm
+ kk qi s gy loy tly inum dn bm
                 kf 1%Qp _ inhabitant None u pidv
                 (DfracOwn (1/4)) dqb dqs m M4 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp U
@@ -611,7 +622,7 @@ Section ProofSysOpenAUAlloc.
                 HM4thr HM4s1 HM4s2 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Href
                       [] Hbio Hlog Hseam Hgen
-                      Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
+                      Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev
                       Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
                       Hprocs Hdev Hgeo Hdlk Hbsl Hires Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24
@@ -654,8 +665,8 @@ Section ProofSysOpenAUAlloc.
     (* ---- THE FRESH SLOT, OPENED: six cells plain, [f->ip] WHOLE ---- *)
     iApply fupd_wp.
     iMod (so_open_slot ⊤ gf kf with "Href")
-      as (Cf pn voff) "(%Hty0 & Hiru & Hfref & Hflive & Hfpn & Hfty
-                        & Hfrd & Hfwr & Hfpip & Hfmaj & Hfip & Hfoff)".
+      as (Cf pn) "(%Hty0 & Hiru & Hfref & Hflive & Hfpn & Hfty
+                        & Hfrd & Hfwr & Hfpip & Hfmaj & Hfip & Hfree)".
     iModIntro.
     (* the loan is not spent on this arm -- the file is about to be PUBLISHED,
        not closed -- so fold it back before the stores block, which is where
@@ -832,16 +843,16 @@ Section ProofSysOpenAUAlloc.
         by (rewrite Hdev3; vm_compute; reflexivity).
       iApply (Stores.so_stores_au (CID0 := CID17) gf gs jx gl pd pav pu
                 gil gisl
- kk qi s gy inum dn bm kf fd ll pn FD_DEVICE
+ kk qi s gy loy tly inum dn bm kf fd ll pn FD_DEVICE
                 (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
-                (di_major dn) om voff lo nsj u pidv dqb dqs U m M7 sp0 K eb b
+                (di_major dn) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb dqs U m M7 sp0 K eb b
                 lks w6 w24 bp
                 data vom pl P Pmiss Φo Φt
                 (FdDevice (bv_unsigned (di_major dn)))
-                HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
+                Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl
                 Hlkempty Hkf Hfdlt Hlen Hfrees (or_intror eq_refl) Hdir
-                (so_wf_dev voff)
+                (so_wf_dev (mword_of_int 0 : mword 32))
                 Hom
                 ltac:(intros _;
                       exact (conj eq_refl
@@ -850,11 +861,15 @@ Section ProofSysOpenAUAlloc.
                 ltac:(intros Hq; exfalso; exact (Hq Hdvz))
                 Hal23 Hsp0 HM7sp HM7thr HM7s0 HM7s1 HM7s2 HM7s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                      Hitinv Hesck Hireg Hslkk Hslkd Hdep Hidev Hiinum
+                      Hitinv Hesck Hireg Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum
                       Hivalid Hflat Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd
-                      Hfwr Hfpip Hfmaj Hfip Hfoff Hoffs Hiru Hcore Howe Hprocs Hdev Hgeo
+                      Hfwr Hfpip Hfmaj Hfip [Hfree] Hiru Hcore Howe Hprocs Hdev Hgeo
                       Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4
-                      Hf5 Hf6 HbP H23lo H23hi H24 HP Hobs Htc Hcont"). }
+                      Hf5 Hf6 HbP H23lo H23hi H24 HP Hobs Htc Hcont").
+      (* the device arm never touches [f->off]: the free cell rides through *)
+      { try (rewrite bool_decide_eq_false_2;
+             [| intro Hc; apply (f_equal bv_unsigned) in Hc; by vm_compute in Hc]).
+        iExact "Hfree". } }
     (* ---- not a device: the FD_INODE pair ---- *)
     iApply (wp_beq_fall_s_sconf (CID := CID12) (mword_of_int (SO + 0x7a))
               (mword_of_int 198 : mword 13) Ra5 Ra4 M6 (K - 24)%nat b
@@ -917,14 +932,20 @@ Section ProofSysOpenAUAlloc.
                     = mword_of_int (SO + 0x84)) by pcw.
     iEval (rewrite Hpp80) in "Hpc".
     (* ===== +0x84 sw zero,32(s2) -- f->off = 0 ===== *)
-    iEval (rewrite /a_foff /foff_of) in "Hfoff".
-    iApply (wp_sw_zero_s_sconf (kt := KT1) (ktd := KT0) (CID := CID15) (mword_of_int (SO + 0x84)) Rs2
-              (mword_of_int 32 : mword 12) M8 (K - 24)%nat voff b
-              with "Hcg Hpc [] [Hfoff]").
+    (* r25 item 24: the slot's off cell arrives FREE (nobody owns a view of
+       it); the store of zero re-establishes the word at the running
+       context ([wp_sw_zero_s_sconf_free]), and that word is what the
+       publish deposits into the fd's box. *)
+    iEval (rewrite proto_store_free /a_foff /foff_of) in "Hfree".
+    iApply (wp_sw_zero_s_sconf_free (kt := KT1) (ktd := KT0) (CID := CID15) (mword_of_int (SO + 0x84)) Rs2
+              (mword_of_int 32 : mword 12) M8 (K - 24)%nat b
+              with "Hcg Hpc [] [Hfree]").
     { iApply (soi_084 with "Htext"). }
-    { iEval (rgne; rewrite HM8s2). iExact "Hfoff". }
+    { iEval (rgne; rewrite HM8s2). iExact "Hfree". }
     iIntros (CID16 Hq16) "Hcg Hpc Hfoff".
     iEval (rgne; rewrite HM8s2) in "Hfoff".
+    iEval (rewrite /wordw_pointsto; change (Z.to_nat 4) with 4%nat;
+           rewrite -TsoCtx.ctx_word4_pointsto_unfold) in "Hfoff".
     assert (Hpp84 : add_vec_int (mword_of_int (SO + 0x84) : mword 64) 4
                     = mword_of_int (SO + 0x88)) by pcw.
     iEval (rewrite Hpp84) in "Hpc".
@@ -943,12 +964,12 @@ Section ProofSysOpenAUAlloc.
       vm_compute. reflexivity. }
     iApply (Stores.so_stores_au (CID0 := CID16) gf gs jx gl pd pav pu
               gil gisl
- kk qi s gy inum dn bm kf fd ll pn FD_INODE
+ kk qi s gy loy tly inum dn bm kf fd ll pn FD_INODE
               (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
               (fc_major Cf) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb
               dqs U m M8 sp0 K eb b lks w6 w24 bp
               data vom pl P Pmiss Φo Φt (FdInode (bv_unsigned inum))
-              HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
+              Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
               Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty
               Hkf Hfdlt Hlen Hfrees (or_introl eq_refl) Hdir
               (fun _ => off_wf_zero)
@@ -957,11 +978,12 @@ Section ProofSysOpenAUAlloc.
               ltac:(intros _; split; reflexivity)
               Hal23 Hsp0 HM8sp HM8thr HM8s0 HM8s1 HM8s2 HM8s3 Hal
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                    Hitinv Hesck Hireg Hslkk Hslkd Hdep Hidev Hiinum
+                    Hitinv Hesck Hireg Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum
                     Hivalid Hflat Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd
-                    Hfwr Hfpip Hfmaj Hfip Hfoff Hoffs Hiru Hcore Howe Hprocs Hdev Hgeo
+                    Hfwr Hfpip Hfmaj Hfip [Hfoff] Hiru Hcore Howe Hprocs Hdev Hgeo
                     Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4
                     Hf5 Hf6 HbP H23lo H23hi H24 HP Hobs Htc Hcont").
+    { try (rewrite (bool_decide_eq_true_2 _ eq_refl)). iExact "Hfoff". }
   Qed.
 
 End ProofSysOpenAUAlloc.
