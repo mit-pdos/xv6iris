@@ -562,9 +562,13 @@ Definition wp_syscall_sconf_body
          record and this equation is what lets the caller re-key it. *)
       ⌜ pv_fdg (us_V U') = pv_fdg (us_V U) ⌝ -∗
       (* ...and the cwd's inum (lane C1): chdir (9) is the one entry that
-         moves it; every other entry hands the block back at the inum it
-         came in with. *)
-      ⌜ sysc_num (us_V U) = 9 \/ pv_cwi (us_V U') = pv_cwi (us_V U) ⌝ -∗
+         moves it, AND ONLY WHEN IT SUCCEEDS (lane C2: a chdir that returns
+         -1 hands the block back at the inum it came in with, which is what
+         [UsysMemOk.usys_cwd_ok]'s chdir arm pins); every other entry hands
+         the block back at the inum it came in with.  The return value is
+         the outgoing a0 word, as [sysc_fd_ok]'s is. *)
+      ⌜ (sysc_num (us_V U) = 9 /\ uint (pv_tf (us_V U') !!! tf_arg_idx 0) = 0)
+        \/ pv_cwi (us_V U') = pv_cwi (us_V U) ⌝ -∗
       sie_cap_gpr KT1 mf av true pj -∗
       cpu_own 0%nat true pj true lks -∗
       bslots 3 -∗

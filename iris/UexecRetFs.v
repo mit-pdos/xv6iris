@@ -108,20 +108,24 @@ Section UexecRetFs.
        let n := usys_num (uvis_tf W) in
        if decide (n = UsysMemOk.USYS_exit) then emp
        else if decide (n = UsysMemOk.USYS_fork) then
-         ((∀ (r : mword 64) (fdv' : list fdstate),
+         ((∀ (r : mword 64) (fdv' : list fdstate) (cw' : Z),
              ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
              (* the parent's own table does not move -- see
                 [UexecRet.uexec_ret_F]'s note on the same guard *)
              ⌜fdv' = uvis_fd W⌝ -∗
-             X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')) ∗
-          (∀ fdv' : list fdstate,
-             (* the child's table is the parent's -- see [UexecRet]'s note *)
+             ⌜cw' = uvis_cwd W⌝ -∗
+             X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv' cw')) ∗
+          (∀ (fdv' : list fdstate) (cw' : Z),
+             (* the child's table is the parent's -- see [UexecRet]'s note;
+                and so is its working directory *)
              ⌜fdv' = uvis_fd W⌝ -∗
+             ⌜cw' = uvis_cwd W⌝ -∗
              X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
-                  fdv')))
+                  fdv' cw')))
        else if uenr_dom n then
          ((∀ (r : mword 64) (M' : gmap Z (bv 8))
-             (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate),
+             (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate)
+             (cw' : Z),
              ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W)
                           (uvis_sz W) M' π' szv'⌝ -∗
              (* the descriptor row, beside the image's -- see
@@ -133,12 +137,13 @@ Section UexecRetFs.
                 only this says the bytes NAME the slots -- which is the whole
                 of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
              ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
-             X (bump W r M' π' szv' fdv'))
+             ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
+             X (bump W r M' π' szv' fdv' cw'))
           ∨ (∃ u : umirror,
                mcur γm u ∗
                (∀ (r : mword 64) (M' : gmap Z (bv 8))
                   (π' : gmap (mword 27) uperm) (szv' : Z)
-                  (fdv' : list fdstate) (u' : umirror),
+                  (fdv' : list fdstate) (cw' : Z) (u' : umirror),
                   ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W)
                                (uvis_sz W) M' π' szv'⌝ -∗
                   ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
@@ -148,11 +153,13 @@ Section UexecRetFs.
                      only this says the bytes NAME the slots -- which is the whole
                      of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
                   ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
+                  ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
                   ⌜ufs_step n (uvis_tf W) (uvis_M W) r u u'⌝ -∗
                   mcur γm u' -∗
-                  X (bump W r M' π' szv' fdv'))))
+                  X (bump W r M' π' szv' fdv' cw'))))
        else (∀ (r : mword 64) (M' : gmap Z (bv 8))
-               (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate),
+               (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate)
+               (cw' : Z),
                ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W)
                             (uvis_sz W) M' π' szv'⌝ -∗
                ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
@@ -162,7 +169,8 @@ Section UexecRetFs.
                   only this says the bytes NAME the slots -- which is the whole
                   of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
                ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
-               X (bump W r M' π' szv' fdv'))
+               ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
+               X (bump W r M' π' szv' fdv' cw'))
      else X W)%I.
 
   (* (B) the kernel obligation, and (C) the bundle -- UexecRet.v verbatim
@@ -170,11 +178,12 @@ Section UexecRetFs.
   Definition ukb_fs_F (γm : gname) (X : uvis -d> iPropO Σ) `{CID : CpuId}
       (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ) (sz : Z)
-      (π : gmap (mword 27) uperm) (fdv : list fdstate) : iProp Σ :=
+      (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z) : iProp Σ :=
     (∀ (W' : uvis) (sc stv : mword 64),
        ⌜uvis_perm W' = π⌝ -∗
        ⌜uvis_sz W' = sz⌝ -∗
        ⌜uvis_fd W' = fdv⌝ -∗
+       ⌜uvis_cwd W' = cw⌝ -∗
        trapped_machine C pt Rut sz sc stv W' ∗ Rfd (uvis_fd W') ∗
        uexec_ret_fs_F γm X sc W' -∗
        WP (Loop : expr riscv_lang))%I.
@@ -182,17 +191,17 @@ Section UexecRetFs.
   Definition ukont_fs_F (γm : gname) (X : uvis -d> iPropO Σ) `{CID : CpuId}
       (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ) (sz : Z)
-      (π : gmap (mword 27) uperm) (fdv : list fdstate) : iProp Σ :=
-    (▷ ukb_fs_F γm X C pt Rfd Rut sz π fdv)%I.
+      (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z) : iProp Σ :=
+    (▷ ukb_fs_F γm X C pt Rfd Rut sz π fdv cw)%I.
 
   Definition uvb_fs_F (γm : gname) (X : uvis -d> iPropO Σ) `{CID : CpuId}
       (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ) (sz : Z)
-      (π : gmap (mword 27) uperm) (fdv : list fdstate)
+      (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
     (uv_amb ∗ uv_regs ∗ ⌜usz_ok sz⌝ ∗ user_ptm_inv_x pt sz M ∗ Rfd fdv ∗
      user_cfg C ∗
-     gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ukont_fs_F γm X C pt Rfd Rut sz π fdv)%I.
+     gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ukont_fs_F γm X C pt Rfd Rut sz π fdv cw)%I.
 
   Definition uslot_fs_F (γm : gname) (X : uvis -d> iPropO Σ)
       : uvis -d> iPropO Σ :=
@@ -208,7 +217,7 @@ Section UexecRetFs.
          ⌜loop_ok C pt⌝ -∗
          ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
          uvb_fs_F γm X (CID := h) C pt Rfd Rut (uvis_sz W) (uvis_perm W)
-           (uvis_fd W) (uvis_M W)
+           (uvis_fd W) (uvis_cwd W) (uvis_M W)
            (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
          -∗
          WP (Loop : expr riscv_lang))%I.
@@ -226,17 +235,17 @@ Section UexecRetFs.
     uexec_ret_fs_F γm (uslot_fs γm).
   Definition ukb_fs `{CID : CpuId} (γm : gname) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
-      (π : gmap (mword 27) uperm) (fdv : list fdstate)
-      : iProp Σ := ukb_fs_F γm (uslot_fs γm) C pt Rfd Rut sz π fdv.
+      (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z)
+      : iProp Σ := ukb_fs_F γm (uslot_fs γm) C pt Rfd Rut sz π fdv cw.
   Definition ukont_fs `{CID : CpuId} (γm : gname) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
-      (π : gmap (mword 27) uperm) (fdv : list fdstate)
-      : iProp Σ := ukont_fs_F γm (uslot_fs γm) C pt Rfd Rut sz π fdv.
+      (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z)
+      : iProp Σ := ukont_fs_F γm (uslot_fs γm) C pt Rfd Rut sz π fdv cw.
   Definition uvb_fs `{CID : CpuId} (γm : gname) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
-      (π : gmap (mword 27) uperm) (fdv : list fdstate)
+      (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
-    uvb_fs_F γm (uslot_fs γm) C pt Rfd Rut sz π fdv M m pc.
+    uvb_fs_F γm (uslot_fs γm) C pt Rfd Rut sz π fdv cw M m pc.
 
   Lemma uslot_fs_unfold (γm : gname) (W : uvis) :
     uslot_fs γm W ⊣⊢
@@ -248,7 +257,7 @@ Section UexecRetFs.
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
        uvb_fs (CID := h) γm C pt Rfd Rut (uvis_sz W) (uvis_perm W) (uvis_fd W)
-         (uvis_M W)
+         (uvis_cwd W) (uvis_M W)
          (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
        WP (Loop : expr riscv_lang)).
   Proof. exact (fixpoint_unfold (uslot_fs_F γm) W). Qed.
@@ -285,20 +294,20 @@ Section UexecRetFs.
     destruct (decide (usys_num (uvis_tf W) = UsysMemOk.USYS_fork)).
     { iDestruct "Hret" as "[Hp Hc]".
       iSplitL "Hp".
-      - iIntros (r fdv') "%Hr %Hfv".
-        iApply "Hup". iApply ("Hp" $! r fdv' with "[%] [%]");
-          [ exact Hr | exact Hfv ].
-      - iIntros (fdv') "%Hfvl". iApply "Hup".
-        iApply ("Hc" $! fdv' with "[%]"). exact Hfvl. }
+      - iIntros (r fdv' cw') "%Hr %Hfv %Hcv".
+        iApply "Hup". iApply ("Hp" $! r fdv' cw' with "[%] [%] [%]");
+          [ exact Hr | exact Hfv | exact Hcv ].
+      - iIntros (fdv' cw') "%Hfvl %Hcvl". iApply "Hup".
+        iApply ("Hc" $! fdv' cw' with "[%] [%]"); [ exact Hfvl | exact Hcvl ]. }
     destruct (uenr_dom (usys_num (uvis_tf W))) eqn:He.
-    - iLeft. iIntros (r M' π' szv' fdv') "%Hok %Hfdok %Hpiperow".
+    - iLeft. iIntros (r M' π' szv' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow".
       iApply "Hup".
-      iApply ("Hret" $! r M' π' szv' fdv' with "[%] [%] [%]");
-        [exact Hok | exact Hfdok | exact Hpiperow].
-    - iIntros (r M' π' szv' fdv') "%Hok %Hfdok %Hpiperow".
+      iApply ("Hret" $! r M' π' szv' fdv' cw' with "[%] [%] [%] [%]");
+        [exact Hok | exact Hfdok | exact Hpiperow | exact Hcwrow].
+    - iIntros (r M' π' szv' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow".
       iApply "Hup".
-      iApply ("Hret" $! r M' π' szv' fdv' with "[%] [%] [%]");
-        [exact Hok | exact Hfdok | exact Hpiperow].
+      iApply ("Hret" $! r M' π' szv' fdv' cw' with "[%] [%] [%] [%]");
+        [exact Hok | exact Hfdok | exact Hpiperow | exact Hcwrow].
   Qed.
 
   (* THE BRIDGE: every plain-safe process is enriched-safe.  This is what
@@ -330,9 +339,9 @@ Section UexecRetFs.
     iEval (rewrite /ukont_fs_F) in "Hk".
     iNext.
     rewrite /ukb_F /ukb_fs_F.
-    iIntros (W' sc stv) "%Hp %Hs' %Hf' (Htm & Hfr & Hret)".
-    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [Htm Hfr Hret]");
-      [exact Hp | exact Hs' | exact Hf' |].
+    iIntros (W' sc stv) "%Hp %Hs' %Hf' %Hc' (Htm & Hfr & Hret)".
+    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [%] [Htm Hfr Hret]");
+      [exact Hp | exact Hs' | exact Hf' | exact Hc' |].
     iFrame "Htm Hfr".
     iApply (uexec_ret_fs_of with "IH Hret").
   Qed.
@@ -350,15 +359,15 @@ Section UexecRetFs.
   Lemma ukont_fs_ukont `{CID : CpuId} (γm : gname) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm)
-      (fdv : list fdstate) :
-    ukont_fs γm C pt Rfd Rut sz π fdv -∗ ukont C pt Rfd Rut sz π fdv.
+      (fdv : list fdstate) (cw : Z) :
+    ukont_fs γm C pt Rfd Rut sz π fdv cw -∗ ukont C pt Rfd Rut sz π fdv cw.
   Proof.
     iIntros "Hk". rewrite /ukont /ukont_F.
     iEval (rewrite /ukont_fs /ukont_fs_F) in "Hk".
     iNext. rewrite /ukb_F.
-    iIntros (W' sc stv) "%Hp %Hs %Hf (Htm & Hfr & Hret)".
-    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [Htm Hfr Hret]");
-      [exact Hp | exact Hs | exact Hf |].
+    iIntros (W' sc stv) "%Hp %Hs %Hf %Hc (Htm & Hfr & Hret)".
+    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [%] [Htm Hfr Hret]");
+      [exact Hp | exact Hs | exact Hf | exact Hc |].
     iFrame "Htm Hfr".
     iApply (uexec_ret_to_fs with "Hret").
   Qed.
@@ -373,7 +382,8 @@ Section UexecRetFs.
     (∃ (C : ucfg) (pt : uptd)
        (Rfd : list fdstate -> iProp Σ)
        (Rut : uptd -> iProp Σ) (sz : Z)
-       (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (fdv : list fdstate),
+       (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (fdv : list fdstate)
+       (cw : Z),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        (* A6.140: the residue-token accessor rides the bundle as a PURE
           fact, exactly as [UkRun.urun] carries it (pinned at the ambient) *)
@@ -390,7 +400,7 @@ Section UexecRetFs.
           needs that slot's fragment.  Bundling the two is what keeps every
           lemma that opens and closes a [urun_fs] unchanged. *)
        ufd_state γfd fdv ∗
-       uvb_fs (CID := h) γm C pt Rfd Rut sz pm fdv M m pc)%I.
+       uvb_fs (CID := h) γm C pt Rfd Rut sz pm fdv cw M m pc)%I.
 
   (* ...AND THE LEDGER COMES OUT WITH IT.  [urun_fs] bundles the ledger with
      the authority because its own rows move the table without naming it;
@@ -403,13 +413,13 @@ Section UexecRetFs.
     urun γt γd γs γfd h m pc avail ∗ ustd_any γfd.
   Proof.
     iIntros "H".
-    iDestruct "H" as (C pt Rfd Rut sz M pm fdv)
+    iDestruct "H" as (C pt Rfd Rut sz M pm fdv cw)
       "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct "Hufd" as "[Hufd Hstd]".
     iSplitR "Hstd"; [| iExact "Hstd"].
     (* the fs bundle's pieces are pinned at the ambient (its ∃ xi is
        vacuous), so the plain urun repacks at the ambient *)
-    rewrite /urun. iExists XI, C, pt, Rfd, Rut, sz, M, pm, fdv.
+    rewrite /urun. iExists XI, C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
     iSplitR; [iPureIntro; exact Hlo |].
     iSplitR; [iPureIntro; exact Hpm |].
     iSplitR; [iPureIntro; exact HRut |].

@@ -430,7 +430,7 @@ Section UtSysBlock.
         by (rewrite /V1; destruct (us_V U); reflexivity).
       assert (Hnumeq0 : sysc_num V1 = usys_num (pv_tf (us_V U))).
       { rewrite (sysc_num_usys V1). rewrite HV1tf0. apply usys_num_epc. }
-      pose proof Hpro as Hpro'. destruct Hpro' as (Hpr1 & Hpr2 & Hpr3 & Hpr4).
+      pose proof Hpro as Hpro'. destruct Hpro' as (Hpr1 & Hpr2 & Hpr3 & Hpr4 & _).
       (* the entry record's number and a1 word are the dispatcher's: neither
          epc rewrite reads them -- the exec bundle's key congruence
          ([SpecUsertrap.ut_exec_in_cong]) *)
@@ -642,7 +642,11 @@ Section UtSysBlock.
       assert (Ha5 : rget S3 Ra5 = add_vec_int (pv_tf (us_V U) !!! tf_epc_idx) 4).
       { rewrite (list_lookup_total_correct _ _ _ Hepc) HS3a5 HS2a5.
         apply addv_sext4. }
-      cbn [us_V us_M] in Hmemg, Hmemne2, Hmema0, Hmemupt, Hmemsz.
+      cbn [us_V us_M] in Hmemg, Hmemne2, Hmema0, Hmemupt, Hmemsz, Hcwig.
+      (* the dispatcher's record is the entry one but for the epc word, so
+         its cwd inum is the entry's *)
+      assert (HV1cwi : pv_cwi V1 = pv_cwi (us_V U))
+        by (rewrite /V1; destruct (us_V U); reflexivity).
       (* SBRK'S PERMISSION ROW, out of the dispatcher's own sbrk row.  It is
          no longer a premise anybody has to conjure: [sysc_sbrk_ok] names
          the descriptor's move and uvmdealloc's run, and the two entry facts
@@ -661,14 +665,21 @@ Section UtSysBlock.
                  (pv_sz V1) (pv_sz V2) (us_M U) M2 Hbel1 Hszb1).
         exact (sysc_mem_ok_sbrk_row V1 V2 (us_M U) M2 Hsb Hmemg). }
       assert (Hrda : ut_round epv scv U0 (MkUstate V2 M2)).
-      { destruct Hpro as (Hp1 & Hp2 & Hp3 & Hp4).
+      { destruct Hpro as (Hp1 & Hp2 & Hp3 & Hp4 & Hp5).
         unfold ut_round.
         rewrite <- Hp1. rewrite <- Hp2. rewrite <- Hp3. rewrite <- Hp4.
+        rewrite <- Hp5.
         unfold uround_ok.
         destruct (decide (scv = uecall_scause)) as [_ | Hc];
           [ | contradiction (Hc Hscec) ].
         destruct (decide (sysc_num V1 = 7)) as [Hex | Hnex].
-        - left. rewrite <- Hnumeq. exact Hex.
+        - (* exec, whose cwd inum the dispatcher's clause pins: exec is not
+             chdir, so the clause's right arm is the one that holds *)
+          left. split; [ rewrite <- Hnumeq; exact Hex | ].
+          cbn [us_V pv_cwi].
+          destruct Hcwig as [[H9 _] | Hc9];
+            [ exfalso; rewrite Hex in H9; discriminate H9 | ].
+          rewrite Hc9. exact HV1cwi.
         - right.
           (* THE ARM RETURNED, SO IT WAS NOT [exit] (milestone J, K1).  The
              dispatcher's returning post now says so outright; without it
@@ -680,7 +691,24 @@ Section UtSysBlock.
           exists w.
           assert (Hbump : pv_tf V2 = bump_tf (pv_tf (us_V U)) w).
           { rewrite Hw HV1tf Ha5. unfold bump_tf. reflexivity. }
-          split.
+          (* THE CWD ROW, off the dispatcher's clause: a chdir that returned
+             nonzero moved nothing, and every other entry moved nothing.
+             The clause reads the stored a0 word, which is [w]. *)
+          assert (Hcwrow : usys_cwd_ok (usys_num (pv_tf (us_V U))) w
+                             (pv_cwi (us_V U)) (pv_cwi V2)).
+          { rewrite <- Hnumeq.
+            assert (Ha0w : pv_tf V2 !!! tf_arg_idx 0 = w).
+            { rewrite Hw. apply list_lookup_total_insert.
+              rewrite HV1tf length_insert Htflen0. unfold tf_arg_idx, TFWORDS. lia. }
+            unfold usys_cwd_ok.
+            destruct (decide (sysc_num V1 = USYS_chdir)) as [H9 | Hn9].
+            - intros Hnz0.
+              destruct Hcwig as [[_ Hz] | Hc9].
+              + exfalso. apply Hnz0. rewrite <- Ha0w. exact Hz.
+              + rewrite Hc9. exact HV1cwi.
+            - destruct Hcwig as [[H9 _] | Hc9]; [ contradiction (Hn9 H9) | ].
+              rewrite Hc9. exact HV1cwi. }
+          split; [ | split; [ | exact Hcwrow ] ].
           + (* THE BUMP *)
             unfold uround_bump_ok. rewrite Hbump. split.
             * unfold tf_resume_gpr0.
@@ -750,7 +778,7 @@ Section UtSysBlock.
       assert (Hpipe : ut_pipe_ecall scv (pv_tf (us_V U0))
                         (pv_tf (us_V (MkUstate V2 M2)))
                         (us_M U0) (us_M (MkUstate V2 M2)) sts stsR).
-      { intros _. destruct Hpro as (Hp1 & _ & _ & HM1).
+      { intros _. destruct Hpro as (Hp1 & _ & _ & HM1 & _).
         assert (Hlen1 : (tf_epc_idx < length (pv_tf (us_V U)))%nat)
           by (rewrite Htflen0; unfold tf_epc_idx, TFWORDS; lia).
         assert (Hlen0 : (tf_epc_idx < length (pv_tf (us_V U0)))%nat).

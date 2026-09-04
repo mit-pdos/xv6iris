@@ -282,6 +282,7 @@ Proof.
              (* the resumed record names the same fd-state ghost the parked
                 one did -- see [SpecForkretParkPaid.forkret_park_pkg] *)
              ⌜pv_fdg (us_V U') = pv_fdg (us_V U)⌝ -∗
+             ⌜pv_cwi (us_V U') = pv_cwi (us_V U)⌝ -∗
              (* ...and the resumer's globals, at ITS context (L8, A12.19) *)
              UsertrapRes.park_globals Xc γs γw γft γf γtl -∗
              UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) (us_V U') -∗
@@ -295,10 +296,10 @@ Proof.
                   (add_vec ks (mword_of_int 4096)) U' sts
                 ∗ uslot (uvis_of U' sts)))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
-  { iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg #Hglob #Htfk Hdone HW #Htc Hy".
+  { iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg %Hcwi #Hglob #Htfk Hdone HW #Htc Hy".
     iApply ("Hclose" $! h Xc pt' U'
-              with "[%] [%] [%] [%] Hglob Htfk Hdone HW Htc Hy Hfd Hirsp");
-      [exact HV | exact Hnorm | exact Hptwf | exact Hfg]. }
+              with "[%] [%] [%] [%] [%] Hglob Htfk Hdone HW Htc Hy Hfd Hirsp");
+      [exact HV | exact Hnorm | exact Hptwf | exact Hfg | exact Hcwi]. }
   iIntros (h m eb') "%Hadm %Himg Hcg Hcpu Hpc Hcells Hpay".
   iDestruct "Hpay" as (A' cret backr) "[Hrec Hpay]".
   (* the payload can only be the DISPATCH one -- the parking disjunct would
@@ -405,10 +406,10 @@ Proof.
   iSplitR; [iExact "Hpinv"|].
   iSplitR; [iExact "Hglobp"|].
   iNext.
-  iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg #Hglob #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
+  iIntros (h Xc pt' U') "%HV %Hnorm %Hptwf %Hfg %Hcwi #Hglob #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
   iApply ("Hclose" $! h Xc pt' U'
-            with "[%] [%] [%] [%] Hglob Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
-    [exact HV | exact Hnorm | exact Hptwf | exact Hfg].
+            with "[%] [%] [%] [%] [%] Hglob Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
+    [exact HV | exact Hnorm | exact Hptwf | exact Hfg | exact Hcwi].
 Qed.
 
 End ForkretParkProof.

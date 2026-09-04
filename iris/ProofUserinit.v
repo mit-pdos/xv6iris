@@ -789,7 +789,13 @@ Section ProofUserinit.
        other, so a family covering every other view is asking for what is
        never used.  The generic inhabitant satisfies the restriction by
        ignoring it. *)
-    iAssert (∀ W : uvis, ⌜uvis_fd W = fdt0⌝ -∗ uslot W)%I as "Hjslot".
+    iAssert (∀ W : uvis,
+               ⌜uvis_fd W = fdt0
+                /\ uvis_cwd W
+                   = pv_cwi (us_V (MkUstate (upd_cwi (upd_cwd V ipv)
+                                               (bv_unsigned InodeInv.ROOTINO)) M))⌝
+               -∗ uslot W)%I
+      as "Hjslot".
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
       iIntros (W) "_". iApply (UexecCond.cond_entry_slot W with "Hgen"). }
     (* L8: the park takes and returns the parker's running token; borrow it from the cap *)

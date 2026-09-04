@@ -163,10 +163,13 @@ Definition uv_round (U : ustate) (M : gmap Z (bv 8)) (g : regfile)
     M
     (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
     (uint (pv_sz (us_V U)))
+    (* the cwd's inum rides inside the block on both sides, so the round
+       reads it there and the post needs no binder for it *)
+    (pv_cwi (us_V U))
     (pv_tf (us_V U'))
     (us_M U')
     (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
-    (uint (pv_sz (us_V U'))).
+    (uint (pv_sz (us_V U'))) (pv_cwi (us_V U')).
 
 (* the bridge: usertrap's round, read at the machine that trapped.  The
    premise is the SAVE WALK's own fact -- the 31 words uservec stored are
@@ -179,11 +182,12 @@ Lemma uv_round_of_ut (Uut U : ustate) (M : gmap Z (bv 8)) (g : regfile)
     = perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))) ->
   us_M Uut = M ->
   pv_sz (us_V Uut) = pv_sz (us_V U) ->
+  pv_cwi (us_V Uut) = pv_cwi (us_V U) ->
   SpecUsertrap.ut_round sepc_v sc_v Uut U' ->
   uv_round U M g sepc_v sc_v U'.
 Proof.
-  intros Hu Hpi Hm Hs Hr. unfold uv_round.
-  rewrite <- Hpi. rewrite <- Hm. rewrite <- Hs.
+  intros Hu Hpi Hm Hs Hc Hr. unfold uv_round.
+  rewrite <- Hpi. rewrite <- Hm. rewrite <- Hs. rewrite <- Hc.
   eapply uround_ok_ueq_l; [ exact Hu | exact Hr ].
 Qed.
 

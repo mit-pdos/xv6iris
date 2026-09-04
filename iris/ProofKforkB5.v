@@ -207,7 +207,7 @@ Section ProofKforkB5.
        instantiates it at the record the child actually resumes with -- whose
        descriptor view is [stsP], which is why the family is restricted to
        that table.  LINEAR -- see claude-notes/design/user-wp-slot.md. *)
-    (∀ W : uvis, ⌜uvis_fd W = stsP⌝ -∗ uslot W) -∗
+    (∀ W : uvis, ⌜uvis_fd W = stsP /\ uvis_cwd W = pv_cwi (us_V Uc)⌝ -∗ uslot W) -∗
     (* the slot's ALLOCATION MARKER, minted by allocproc and carried here
        through kfork's body: every non-UNUSED arm of the lock invariant
        holds it, so both releases below need it ([ProcAvail.v]).

@@ -216,6 +216,8 @@ Section UtEntry.
           word -- which is what makes it [usertrap_post]'s own [tf0]. *)
        ⌜pv_tf V' = <[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))⌝ -∗
        ⌜pv_sz V' = pv_sz (us_V U)⌝ -∗
+       (* ...nor the cwd's inum *)
+       ⌜pv_cwi V' = pv_cwi (us_V U)⌝ -∗
        pc_is (mword_of_int (UT + 0x30)) -∗
        sie_cap_gpr KT1 M (av - 4)%nat false (un_pj N) -∗
        cpu_own 0%nat false (un_pj N) false ∅ -∗ cpu_claim (un_pj N) -∗
@@ -666,7 +668,7 @@ Section UtEntry.
       iSplitL "Hb3"; [iExact "Hb3" | iExact "Hb4"]. }
     assert (HS3a4 : rget S3 Ra4 = ret_pc sepc_v)
       by (rgne; rewrite /S3; apply upd_eq).
-    iApply ("Hcont" $! S3 V' with "[%] [%] [%] [%] [%] [%] [%] Hpc Hcg Hcpu Hclm
+    iApply ("Hcont" $! S3 V' with "[%] [%] [%] [%] [%] [%] [%] [%] Hpc Hcg Hcpu Hclm
               Hraw Henv Hfr").
     - exact HS3sp.
     - exact HS3s1.
@@ -674,6 +676,7 @@ Section UtEntry.
     - exact Hcss3.
     - exact HuptV'.
     - rewrite /V'. cbn [pv_tf upd_tf]. rewrite HS3a4. reflexivity.
+    - rewrite /V'; destruct (us_V U); reflexivity.
     - rewrite /V'; destruct (us_V U); reflexivity.
   Qed.
 
@@ -1376,11 +1379,11 @@ Section UtSeal.
               Hms Hav Hsp Htp Hmiev Hmask Hmenvv
               with "Htext Hpc Hhw Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
                     Hmie Hmdl Hmenv Hgpr Htc Htrap Henv [Hcont Hxin]").
-    iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV %HtfV %HszV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
+    iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV %HtfV %HszV %HcwiV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
     iApply (ut_dispatch N (MkUstate V Mu) (MkUstate V' Mu) pt ksp m M av (av - 4)%nat sepc_v sc_v stval_v
               mie_v menvcfg0 sts
               (ut_printk (fsc_printk) (fsc_uart) (fsc_disk))
-              (conj HtfV (conj HuptV (conj HszV eq_refl)))
+              (conj HtfV (conj HuptV (conj HszV (conj eq_refl HcwiV))))
               Hwf Hav
               (trap_res_off (av - 4)%nat)
               ltac:(rewrite HuptV Hupt; reflexivity) Hksp Hsp HMsp HMs1 HMa0 HcsM

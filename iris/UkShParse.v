@@ -914,11 +914,11 @@ Section UkShParse.
     ⌜ m !!! Regidx x0_idx = zero_reg ⌝ ∗ urun γt γd γs γfd h m pc avail.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv)
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw)
       "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iSplitR; [ iPureIntro; exact Hx0 | ].
-    iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv.
+    iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
     iFrame "Hheap Hstk Hufd Hb".
     iPureIntro. split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.

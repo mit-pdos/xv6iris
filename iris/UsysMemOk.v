@@ -104,6 +104,11 @@ Definition USYS_dup   : Z := 10.
 Definition USYS_open  : Z := 15.
 Definition USYS_close : Z := 21.
 
+(* ...and the one that moves the WORKING DIRECTORY (kernel/syscall.h): the
+   cwd's inum is in the key ([UexecSlot.uvis_cwd]), and this is the only
+   entry that may change it. *)
+Definition USYS_chdir : Z := 9.
+
 (* [read]'s count, as the C reads it: argument 2 into an [int].  The read
    row is the one whose length is not a constant.  Definitionally
    [SpecSyscall.sysc_rdcount V] at [tf := pv_tf V]. *)
@@ -535,6 +540,53 @@ Proof.
       rewrite length_insert. apply length_insert.
     - subst. reflexivity. }
   subst. reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* SS2d THE WORKING-DIRECTORY ROW: one number moves it.                    *)
+(*                                                                         *)
+(* [c] / [c'] are the cwd's inum before and after ([ProcDefs.pv_cwi], the  *)
+(* value [UexecSlot.uvis_cwd] carries).  NO TRAPFRAME ARGUMENT: chdir's    *)
+(* new inum is the file system's business -- which inode the path names -- *)
+(* so the plain tier pins only the FAILURE case (sys_chdir returns -1 and  *)
+(* the directory is untouched) and leaves the landed inum to the enriched  *)
+(* tier's naming.  Every other entry preserves it: exec inherits the       *)
+(* caller's ([SpecKexec.kexec_ok]'s row), fork copies it parent to child   *)
+(* (the fork arm of [UexecRet.uexec_ret_F] says so directly), and nothing  *)
+(* else touches [p->cwd].                                                  *)
+(* ===================================================================== *)
+Definition usys_cwd_ok (n : Z) (r : mword 64) (c c' : Z) : Prop :=
+  if decide (n = USYS_chdir) then (uint r <> 0 -> c' = c) else c' = c.
+
+(* the twenty-one entries that leave the working directory alone -- the cwd
+   counterpart of [usys_fd_ok_quiet] *)
+Lemma usys_cwd_ok_quiet (n : Z) (r : mword 64) (c c' : Z) :
+  n <> USYS_chdir -> usys_cwd_ok n r c c' -> c' = c.
+Proof.
+  intros Hc H. unfold usys_cwd_ok in H.
+  destruct (decide (n = USYS_chdir)); [contradiction | exact H].
+Qed.
+
+(* ...and the row in the direction a prover supplies it, keyed on the
+   entry's own number ([usys_fd_ok_refl_at]): one number is excluded, and
+   a dispatch arm discharges the exclusion with its [Hnum] and one
+   [discriminate] *)
+Lemma usys_cwd_ok_refl_at (n k : Z) (r : mword 64) (c : Z) :
+  n = k -> k <> USYS_chdir -> usys_cwd_ok n r c c.
+Proof.
+  intros -> Hc. unfold usys_cwd_ok.
+  destruct (decide (k = USYS_chdir)); [contradiction | reflexivity].
+Qed.
+
+(* ...and chdir's own arm: a failed chdir moves nothing, a successful one
+   lands anywhere the file system says.  (No [_arg_cong] / [_epc]: the row
+   reads no trapframe word.) *)
+Lemma usys_cwd_ok_chdir (r : mword 64) (c c' : Z) :
+  (uint r <> 0 -> c' = c) -> usys_cwd_ok USYS_chdir r c c'.
+Proof.
+  intros H. unfold usys_cwd_ok.
+  destruct (decide (USYS_chdir = USYS_chdir)) as [_ | Hne];
+    [ exact H | contradiction (Hne eq_refl) ].
 Qed.
 
 (* the sixteen quiet entries, by name: what a program calling one of them

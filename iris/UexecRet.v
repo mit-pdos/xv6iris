@@ -150,15 +150,18 @@ Definition tf_of (m : regfile) (pc : mword 64) : list (mword 64) :=
    descriptor pin in [ukb_F] below [reflexivity] at the dispatcher rather
    than an obligation: the trap-out key is built AT the contract's own
    [fdv]. *)
+(* ...and [cw], the cwd's inum, is the same kind of parameter: the KERNEL
+   holds it (the block's [pv_cwi]) and the trap-out key is built at it. *)
 Definition uvis_of_run (m : regfile) (pc : mword 64) (M : gmap Z (bv 8))
-    (π : gmap (mword 27) uperm) (szv : Z) (fdv : list fdstate) : uvis :=
-  MkUvis (tf_of m pc) M π szv fdv.
+    (π : gmap (mword 27) uperm) (szv : Z) (fdv : list fdstate) (cw : Z) : uvis :=
+  MkUvis (tf_of m pc) M π szv fdv cw.
 
 (* the resume key after a returning syscall: the trapframe bumped, the
    image and the permission map at whatever the syscall's row allows *)
 Definition bump (W : uvis) (r : mword 64) (M' : gmap Z (bv 8))
-    (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate) : uvis :=
-  MkUvis (bump_tf (uvis_tf W) r) M' π' szv' fdv'.
+    (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate) (cw' : Z)
+    : uvis :=
+  MkUvis (bump_tf (uvis_tf W) r) M' π' szv' fdv' cw'.
 
 Lemma tf_of_length (m : regfile) (pc : mword 64) : length (tf_of m pc) = TFWORDS.
 Proof. reflexivity. Qed.
@@ -368,9 +371,9 @@ Qed.
 (* ...and at the trap-out key: the program's own continuation state *)
 Lemma bump_run_gpr (m : regfile) (pc : mword 64) (M M' : gmap Z (bv 8))
     (π π' : gmap (mword 27) uperm) (szv szv' : Z) (fdv fdv' : list fdstate)
-    (r : mword 64) :
+    (cw cw' : Z) (r : mword 64) :
   m !!! Regidx (mword_of_int 0) = zero_reg ->
-  tf_resume_gpr0 (uvis_tf (bump (uvis_of_run m pc M π szv fdv) r M' π' szv' fdv'))
+  tf_resume_gpr0 (uvis_tf (bump (uvis_of_run m pc M π szv fdv cw) r M' π' szv' fdv' cw'))
   = <[Regidx (mword_of_int 10) := r]> m.
 Proof.
   intros Hx0. cbn [uvis_tf bump uvis_of_run]. unfold tf_resume_gpr0.
@@ -381,9 +384,9 @@ Qed.
 
 Lemma bump_run_pc (m : regfile) (pc : mword 64) (M M' : gmap Z (bv 8))
     (π π' : gmap (mword 27) uperm) (szv szv' : Z) (fdv fdv' : list fdstate)
-    (r : mword 64) :
+    (cw cw' : Z) (r : mword 64) :
   is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-  tf_resume_pc (uvis_tf (bump (uvis_of_run m pc M π szv fdv) r M' π' szv' fdv'))
+  tf_resume_pc (uvis_tf (bump (uvis_of_run m pc M π szv fdv cw) r M' π' szv' fdv' cw'))
   = add_vec_int pc 4.
 Proof.
   intros Hal. cbn [uvis_tf bump uvis_of_run].
@@ -392,29 +395,39 @@ Proof.
 Qed.
 
 Lemma bump_M (W : uvis) (r : mword 64) (M' : gmap Z (bv 8))
-    (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate) :
-  uvis_M (bump W r M' π' szv' fdv') = M'.
+    (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate) (cw' : Z) :
+  uvis_M (bump W r M' π' szv' fdv' cw') = M'.
 Proof. reflexivity. Qed.
 
 Lemma bump_perm (W : uvis) (r : mword 64) (M' : gmap Z (bv 8))
-    (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate) :
-  uvis_perm (bump W r M' π' szv' fdv') = π'.
+    (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate) (cw' : Z) :
+  uvis_perm (bump W r M' π' szv' fdv' cw') = π'.
 Proof. reflexivity. Qed.
 
 Lemma bump_fd (W : uvis) (r : mword 64) (M' : gmap Z (bv 8))
-    (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate) :
-  uvis_fd (bump W r M' π' szv' fdv') = fdv'.
+    (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate) (cw' : Z) :
+  uvis_fd (bump W r M' π' szv' fdv' cw') = fdv'.
+Proof. reflexivity. Qed.
+
+Lemma bump_cwd (W : uvis) (r : mword 64) (M' : gmap Z (bv 8))
+    (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate) (cw' : Z) :
+  uvis_cwd (bump W r M' π' szv' fdv' cw') = cw'.
 Proof. reflexivity. Qed.
 
 (* the trap-out key reads back its parts *)
 Lemma uvis_of_run_perm (m : regfile) (pc : mword 64) (M : gmap Z (bv 8))
-    (π : gmap (mword 27) uperm) (szv : Z) (fdv : list fdstate) :
-  uvis_perm (uvis_of_run m pc M π szv fdv) = π.
+    (π : gmap (mword 27) uperm) (szv : Z) (fdv : list fdstate) (cw : Z) :
+  uvis_perm (uvis_of_run m pc M π szv fdv cw) = π.
 Proof. reflexivity. Qed.
 
 Lemma uvis_of_run_fd (m : regfile) (pc : mword 64) (M : gmap Z (bv 8))
-    (π : gmap (mword 27) uperm) (szv : Z) (fdv : list fdstate) :
-  uvis_fd (uvis_of_run m pc M π szv fdv) = fdv.
+    (π : gmap (mword 27) uperm) (szv : Z) (fdv : list fdstate) (cw : Z) :
+  uvis_fd (uvis_of_run m pc M π szv fdv cw) = fdv.
+Proof. reflexivity. Qed.
+
+Lemma uvis_of_run_cwd (m : regfile) (pc : mword 64) (M : gmap Z (bv 8))
+    (π : gmap (mword 27) uperm) (szv : Z) (fdv : list fdstate) (cw : Z) :
+  uvis_cwd (uvis_of_run m pc M π szv fdv cw) = cw.
 Proof. reflexivity. Qed.
 
 (* ===================================================================== *)
@@ -474,10 +487,11 @@ Section TrappedMachine.
   (* the old existential frame is a trapped machine at the key uservec
      saves -- the one direction the generic inhabitant needs *)
   Lemma user_trap_frame_trapped (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) :
+      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z) :
     user_trap_frame C pt Rut -∗
     ∃ (W : uvis) (sc stv : mword 64),
       ⌜uvis_perm W = π⌝ ∗ ⌜uvis_sz W = sz⌝ ∗ ⌜uvis_fd W = fdv⌝ ∗
+      ⌜uvis_cwd W = cw⌝ ∗
       trapped_machine C pt Rut sz sc stv W.
   Proof.
     rewrite /user_trap_frame.
@@ -487,7 +501,8 @@ Section TrappedMachine.
     iDestruct (user_ptm_inv_intro pt sz with "Hany") as (M) "Hpt".
     iDestruct (gpr_file_x0 g (mword_of_int 0) ltac:(vm_compute; reflexivity)
                  with "Hg") as "[%Hx0 Hg]".
-    iExists (uvis_of_run g sepc_v M π sz fdv), sc_v, stval_v.
+    iExists (uvis_of_run g sepc_v M π sz fdv cw), sc_v, stval_v.
+    iSplitR; [ iPureIntro; reflexivity | ].
     iSplitR; [ iPureIntro; reflexivity | ].
     iSplitR; [ iPureIntro; reflexivity | ].
     iSplitR; [ iPureIntro; reflexivity | ].
@@ -527,7 +542,7 @@ Section UexecRet.
        let n := usys_num (uvis_tf W) in
        if decide (n = USYS_exit) then emp
        else if decide (n = USYS_fork) then
-         ((∀ (r : mword 64) (fdv' : list fdstate),
+         ((∀ (r : mword 64) (fdv' : list fdstate) (cw' : Z),
              ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
              (* THE PARENT'S OWN TABLE DOES NOT MOVE.  fork copies the
                 parent's descriptors INTO THE CHILD and leaves the parent's
@@ -539,8 +554,10 @@ Section UexecRet.
                 program cannot keep a descriptor handle across its own
                 fork. *)
              ⌜fdv' = uvis_fd W⌝ -∗
-             X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')) ∗
-          (∀ fdv' : list fdstate,
+             (* ...NOR ITS WORKING DIRECTORY: fork does not chdir. *)
+             ⌜cw' = uvis_cwd W⌝ -∗
+             X (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv' cw')) ∗
+          (∀ (fdv' : list fdstate) (cw' : Z),
              (* THE CHILD'S TABLE IS THE PARENT'S.  fork() copies it --
                 [np->ofile[i] = filedup(p->ofile[i])] -- and this is the arm
                 that says so.  It used to say only [length fdv' = NOFILE], a
@@ -555,9 +572,14 @@ Section UexecRet.
                 the FORK ROW note in [UexecApply.uexec_ret_round_slot] is
                 what the kernel still owes. *)
              ⌜fdv' = uvis_fd W⌝ -∗
-             X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')))
+             (* ...AND SO IS ITS WORKING DIRECTORY: [np->cwd = idup(p->cwd)],
+                and the child's block is built at the parent's inum
+                ([SpecKfork]'s post says so; lane C1). *)
+             ⌜cw' = uvis_cwd W⌝ -∗
+             X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
+                  fdv' cw')))
        else (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
-               (szv' : Z) (fdv' : list fdstate),
+               (szv' : Z) (fdv' : list fdstate) (cw' : Z),
                ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
                             M' π' szv'⌝ -∗
                (* ...AND THE DESCRIPTOR VIEW IS NOT ARBITRARY EITHER.  [fdv']
@@ -581,13 +603,18 @@ Section UexecRet.
                   only this says the bytes NAME the slots -- which is the whole
                   of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
                ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
-               X (bump W r M' π' szv' fdv'))
+               (* ...AND THE WORKING DIRECTORY, off the same return value:
+                  chdir may move it (and the plain tier says only that a
+                  FAILED chdir does not), every other entry keeps it.
+                  [UsysMemOk.v] SS2d. *)
+               ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
+               X (bump W r M' π' szv' fdv' cw'))
      else X W)%I.
 
   (* (B) the kernel obligation: its later-free BODY, and the guarded form *)
   Definition ukb_F (X : uvis -d> iPropO Σ) `{CID : CpuId} `{XI : TsoCtx.CurCtx}
       (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
-      (π : gmap (mword 27) uperm) (fdv : list fdstate)
+      (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z)
       : iProp Σ :=
     (∀ (W' : uvis) (sc stv : mword 64),
        ⌜uvis_perm W' = π⌝ -∗
@@ -607,6 +634,13 @@ Section UexecRet.
           INTERRUPT CANNOT RETYPE A DESCRIPTOR.  (The SYSCALL arms rebind
           it; see [uexec_ret_F].) *)
        ⌜uvis_fd W' = fdv⌝ -∗
+       (* ...and its WORKING DIRECTORY is the one it was resumed at.  The
+          fourth pin, and the one with no resource behind it: user
+          execution runs no kernel code, so the cwd a process trapped at is
+          the cwd it was resumed at, and the loop -- which holds the block
+          the inum lives in -- is what reads this pin to state the round
+          ([UexecRound.uround_ok]) at the key. *)
+       ⌜uvis_cwd W' = cw⌝ -∗
        (* THE FRAGMENTS COME BACK, at the trap-out key's own view.  This is
           the other half of the hand-out, and it is the IMAGE's arrangement
           again: the image returns inside [trapped_machine] (whose
@@ -623,9 +657,9 @@ Section UexecRet.
 
   Definition ukont_F (X : uvis -d> iPropO Σ) `{CID : CpuId} `{XI : TsoCtx.CurCtx}
       (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
-      (π : gmap (mword 27) uperm) (fdv : list fdstate)
+      (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z)
       : iProp Σ :=
-    (▷ ukb_F X C pt Rfd Rut sz π fdv)%I.
+    (▷ ukb_F X C pt Rfd Rut sz π fdv cw)%I.
 
   (* (C) the bundle *)
   (* THE DESCRIPTOR FRAGMENTS RIDE HERE, at the key's own view, exactly as
@@ -665,7 +699,7 @@ Section UexecRet.
      only what the view IS. *)
   Definition uvb_F (X : uvis -d> iPropO Σ) `{CID : CpuId} `{XI : TsoCtx.CurCtx}
       (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
-      (π : gmap (mword 27) uperm) (fdv : list fdstate)
+      (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
     (uv_amb ∗ uv_regs ∗ ⌜usz_ok sz⌝ ∗
      (* the image STAMPED (claude-notes/projects/icache.md): text bytes at an
@@ -673,7 +707,7 @@ Section UexecRet.
         [fence.i]; the trapped frame hands the plain image back *)
      user_ptm_inv_x pt sz M ∗
      Rfd fdv ∗ user_cfg C ∗
-     gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ukont_F X C pt Rfd Rut sz π fdv)%I.
+     gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ukont_F X C pt Rfd Rut sz π fdv cw)%I.
 
   (* NOTE the ∀ over [sz] is GONE: the key carries the break, so the slot is
      at THE process's size rather than at every size a table might realize. *)
@@ -690,6 +724,7 @@ Section UexecRet.
          ⌜loop_ok C pt⌝ -∗
          ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
          uvb_F X (CID := h) (XI := xi) C pt Rfd Rut (uvis_sz W) (uvis_perm W) (uvis_fd W)
+           (uvis_cwd W)
            (uvis_M W) (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
          WP (Loop : expr riscv_lang))%I.
 
@@ -703,24 +738,25 @@ Section UexecRet.
   Definition uexec_ret : mword 64 -> uvis -> iProp Σ := uexec_ret_F uslot.
   Definition ukb `{CID : CpuId} `{XI : TsoCtx.CurCtx} (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ)
-      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) : iProp Σ :=
-    ukb_F uslot C pt Rfd Rut sz π fdv.
+      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z) : iProp Σ :=
+    ukb_F uslot C pt Rfd Rut sz π fdv cw.
   Definition ukont `{CID : CpuId} `{XI : TsoCtx.CurCtx} (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ)
-      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) : iProp Σ :=
-    ukont_F uslot C pt Rfd Rut sz π fdv.
+      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z) : iProp Σ :=
+    ukont_F uslot C pt Rfd Rut sz π fdv cw.
   Definition uvb `{CID : CpuId} `{XI : TsoCtx.CurCtx} (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ)
-      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate)
+      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
-    uvb_F uslot C pt Rfd Rut sz π fdv M m pc.
+    uvb_F uslot C pt Rfd Rut sz π fdv cw M m pc.
 
   (* THE U-MODE CONTINUATION at a natural state: what every U-mode leaf's
      continuation is, and what a program function proves -- "safe from
      (M, m, pc) under any table realizing the key's permission map".  The
      slot is this at the key's state ([uslot_ukc]). *)
   Definition ukc (π : gmap (mword 27) uperm) (M : gmap Z (bv 8))
-      (szv : Z) (fdv : list fdstate) (m : regfile) (pc : mword 64) : iProp Σ :=
+      (szv : Z) (fdv : list fdstate) (cw : Z) (m : regfile) (pc : mword 64)
+      : iProp Σ :=
     (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
        (Rut : uptd -> iProp Σ)
        (* A6.140: the residue-token accessor rides the ∀ as a Coq-level
@@ -731,7 +767,7 @@ Section UexecRet.
                               (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt')),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) szv = π⌝ -∗
-       uvb (CID := h) (XI := xi) C pt Rfd Rut szv π fdv M m pc -∗
+       uvb (CID := h) (XI := xi) C pt Rfd Rut szv π fdv cw M m pc -∗
        WP (Loop : expr riscv_lang))%I.
 
   Lemma uslot_unfold (W : uvis) :
@@ -747,7 +783,7 @@ Section UexecRet.
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
        uvb (CID := h) (XI := xi) C pt Rfd Rut (uvis_sz W) (uvis_perm W) (uvis_fd W)
-         (uvis_M W)
+         (uvis_cwd W) (uvis_M W)
          (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
        WP (Loop : expr riscv_lang)).
   Proof. exact (fixpoint_unfold uslot_F W). Qed.
@@ -768,7 +804,7 @@ Section UexecRet.
 
   Lemma uslot_ukc (W : uvis) :
     uslot W ⊣⊢
-    ukc (uvis_perm W) (uvis_M W) (uvis_sz W) (uvis_fd W)
+    ukc (uvis_perm W) (uvis_M W) (uvis_sz W) (uvis_fd W) (uvis_cwd W)
       (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)).
   Proof. exact (uslot_unfold W). Qed.
 
@@ -776,13 +812,13 @@ Section UexecRet.
      the round trip, under x0 = 0 (every [gpr_file] has it) and a 2-aligned
      pc (every fetched pc has it) *)
   Lemma uslot_run (m : regfile) (pc : mword 64) (M : gmap Z (bv 8))
-      (π : gmap (mword 27) uperm) (szv : Z) (fdv : list fdstate) :
+      (π : gmap (mword 27) uperm) (szv : Z) (fdv : list fdstate) (cw : Z) :
     m !!! Regidx (mword_of_int 0) = zero_reg ->
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
-    uslot (uvis_of_run m pc M π szv fdv) ⊣⊢ ukc π M szv fdv m pc.
+    uslot (uvis_of_run m pc M π szv fdv cw) ⊣⊢ ukc π M szv fdv cw m pc.
   Proof.
     intros Hx0 Hal. rewrite uslot_ukc.
-    cbn [uvis_tf uvis_M uvis_perm uvis_fd uvis_of_run].
+    cbn [uvis_tf uvis_M uvis_perm uvis_fd uvis_cwd uvis_of_run].
     rewrite (tf_of_resume_gpr m pc Hx0) (tf_of_resume_pc m pc Hal). reflexivity.
   Qed.
 
@@ -790,23 +826,23 @@ Section UexecRet.
      syscall returned: a0 := r, pc + 4 *)
   Lemma uslot_bump_run (m : regfile) (pc : mword 64) (M M' : gmap Z (bv 8))
       (π π' : gmap (mword 27) uperm) (szv szv' : Z) (fdv fdv' : list fdstate)
-      (r : mword 64) :
+      (cw cw' : Z) (r : mword 64) :
     m !!! Regidx (mword_of_int 0) = zero_reg ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uslot (bump (uvis_of_run m pc M π szv fdv) r M' π' szv' fdv')
-    ⊣⊢ ukc π' M' szv' fdv'
+    uslot (bump (uvis_of_run m pc M π szv fdv cw) r M' π' szv' fdv' cw')
+    ⊣⊢ ukc π' M' szv' fdv' cw'
           (<[Regidx (mword_of_int 10) := r]> m) (add_vec_int pc 4).
   Proof.
     intros Hx0 Hal. rewrite uslot_ukc.
-    rewrite (bump_run_gpr m pc M M' π π' szv szv' fdv fdv' r Hx0)
-            (bump_run_pc m pc M M' π π' szv szv' fdv fdv' r Hal).
+    rewrite (bump_run_gpr m pc M M' π π' szv szv' fdv fdv' cw cw' r Hx0)
+            (bump_run_pc m pc M M' π π' szv szv' fdv fdv' cw cw' r Hal).
     reflexivity.
   Qed.
 
   Lemma ukont_unfold `{CID : CpuId} `{XI : TsoCtx.CurCtx} (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ)
-      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) :
-    ukont C pt Rfd Rut sz π fdv ⊣⊢ ▷ ukb C pt Rfd Rut sz π fdv.
+      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z) :
+    ukont C pt Rfd Rut sz π fdv cw ⊣⊢ ▷ ukb C pt Rfd Rut sz π fdv cw.
   Proof. reflexivity. Qed.
 
   (* the arms, read at the fixpoint *)
@@ -816,15 +852,18 @@ Section UexecRet.
     (let n := usys_num (uvis_tf W) in
      if decide (n = USYS_exit) then emp
      else if decide (n = USYS_fork) then
-       ((∀ (r : mword 64) (fdv' : list fdstate),
+       ((∀ (r : mword 64) (fdv' : list fdstate) (cw' : Z),
            ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
            ⌜fdv' = uvis_fd W⌝ -∗
-           uslot (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')) ∗
-        (∀ fdv' : list fdstate,
+           ⌜cw' = uvis_cwd W⌝ -∗
+           uslot (bump W r (uvis_M W) (uvis_perm W) (uvis_sz W) fdv' cw')) ∗
+        (∀ (fdv' : list fdstate) (cw' : Z),
            ⌜fdv' = uvis_fd W⌝ -∗
-           uslot (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W) fdv')))
+           ⌜cw' = uvis_cwd W⌝ -∗
+           uslot (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W) (uvis_sz W)
+                    fdv' cw')))
      else (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
-             (szv' : Z) (fdv' : list fdstate),
+             (szv' : Z) (fdv' : list fdstate) (cw' : Z),
              ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) (uvis_sz W)
                           M' π' szv'⌝ -∗
              ⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗
@@ -834,7 +873,8 @@ Section UexecRet.
                 only this says the bytes NAME the slots -- which is the whole
                 of pipe() to the program that called it.  [UsysMemOk.v] SS2c. *)
              ⌜usys_pipe_ok n (uvis_tf W) r (uvis_M W) M' (uvis_fd W) fdv'⌝ -∗
-             uslot (bump W r M' π' szv' fdv'))).
+             ⌜usys_cwd_ok n r (uvis_cwd W) cw'⌝ -∗
+             uslot (bump W r M' π' szv' fdv' cw'))).
   Proof.
     intros ->. rewrite /uexec_ret /uexec_ret_F.
     destruct (decide (uecall_scause = uecall_scause)); [ reflexivity | contradiction ].
@@ -856,8 +896,8 @@ Section UexecRet.
     destruct (decide (sc = uecall_scause)); [ | iApply "H" ].
     destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ done | ].
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
-    { iSplitR; [ iIntros (r fdv' _ _); iApply "H" | iIntros (fdv' _); iApply "H" ]. }
-    iIntros (r M' π' szv' fdv' _ _ _). iApply "H".
+    { iSplitR; [ iIntros (r fdv' cw' _ _ _); iApply "H" | iIntros (fdv' cw' _ _); iApply "H" ]. }
+    iIntros (r M' π' szv' fdv' cw' _ _ _ _). iApply "H".
   Qed.
 
 End UexecRet.
@@ -908,10 +948,10 @@ Section UexecRetGen.
     rewrite /ukont_F /ukb_F.
     iNext. iIntros "[Hframe _]".
     iDestruct (user_trap_frame_trapped C pt Rut (uvis_sz W) (uvis_perm W)
-                 (uvis_fd W) with "Hframe")
-      as (W' sc stv) "[%Hperm [%Hszw [%Hfdw Htm]]]".
-    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [Htm Hfrag]");
-      [ exact Hperm | exact Hszw | exact Hfdw | ].
+                 (uvis_fd W) (uvis_cwd W) with "Hframe")
+      as (W' sc stv) "[%Hperm [%Hszw [%Hfdw [%Hcww Htm]]]]".
+    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [%] [Htm Hfrag]");
+      [ exact Hperm | exact Hszw | exact Hfdw | exact Hcww | ].
     (* the fragments were carried across the excursion and go back at the
        trap-out key's view, which [Hfdw] says is the one they are held at *)
     rewrite Hfdw. iFrame "Htm Hfrag".

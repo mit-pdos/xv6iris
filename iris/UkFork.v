@@ -777,7 +777,7 @@ Section UkFork.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hal4. iIntros "#Hi HP Hsz Hstd HD Hrun [Hpar Hchild]".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     (* the caller's handles ARE the parent's table, at the slots they name --
@@ -801,7 +801,7 @@ Section UkFork.
       "(Hheap' & Hsz' & #Htf' & #Hpf' & Hdf')".
     iMod ("Hrebuild" $! γt' γd' γs' with "Htf' Hpf' Hdf'") as "[HP' Hstk']".
     (* ---- the trap ---- *)
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -810,7 +810,7 @@ Section UkFork.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv)) = USYS_fork).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = USYS_fork).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_fork = USYS_exit)) as [He | _];
@@ -822,16 +822,16 @@ Section UkFork.
        touch the parent's table -- and the CHILD mints its own below. *)
     iSplitL "Hpar HP Hsz Hstd HD Hheap Hstk Hufd".
     (* ---- the parent: same heap, r <> 0, a quiet-shaped resume ---- *)
-    - iIntros (r fdv') "%Hr %Hfv". subst fdv'.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv r Hx0 Hal4).
-      iApply (urun_close_upd γt γd γs γfd M pm m (mword_of_int 10) r sz fdv
+    - iIntros (r fdv' cw') "%Hr %Hfv %Hcv". subst fdv' cw'.
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw r Hx0 Hal4).
+      iApply (urun_close_upd γt γd γs γfd M pm m (mword_of_int 10) r sz fdv cw
                 (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd").
       iIntros (h') "Hrun".
       iApply ("Hpar" $! h' r with "[%] HP Hsz Hstd HD Hrun"). exact Hr.
     (* ---- the child: fresh heap, r = 0, payload rebuilt at the new names *)
-    - iIntros (fdv') "%Hfdv'". subst fdv'.
+    - iIntros (fdv' cw') "%Hfdv' %Hcv'". subst fdv' cw'.
       (* THE CHILD'S OWN DESCRIPTOR AUTHORITY, minted at the view the kernel
          handed it -- BEFORE the key is rewritten to [ukc], since the update
          is absorbed by the [uslot] and not by what it unfolds to.  The
@@ -848,10 +848,10 @@ Section UkFork.
         as (γfd') "(Hufd' & Hstd' & Hfrag')".
       iEval (rewrite Hstl) in "Hstd'".
       iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw
                  (mword_of_int 0) Hx0 Hal4).
       iApply (urun_close_upd γt' γd' γs' γfd' M pm m (mword_of_int 10)
-                (mword_of_int 0) sz fdv (add_vec_int pc 4) avail
+                (mword_of_int 0) sz fdv cw (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap' Hstk' Hufd'").
       iIntros (h') "Hrun".

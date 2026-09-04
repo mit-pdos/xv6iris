@@ -209,7 +209,8 @@ Section ProofSysFork.
        generic inhabitant satisfies by ignoring the restriction -- and which
        is the shape a VERIFIED parent's fork-continuation can be handed in
        instead. *)
-    iAssert (∀ W : uvis, ⌜uvis_fd W = sts⌝ -∗ uslot W)%I as "Hjslot".
+    iAssert (∀ W : uvis, ⌜uvis_fd W = sts /\ uvis_cwd W = pv_cwi (us_V U)⌝ -∗ uslot W)%I
+      as "Hjslot".
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
       iIntros (W) "_". iApply (UexecCond.cond_entry_slot W with "Hgen"). }
     iApply (Kfork.wp_kfork_sconf γp γw γl γf γs

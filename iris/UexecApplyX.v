@@ -76,7 +76,8 @@ Section LoopApplyX.
          (uvis_tf W' !!! tf_arg_idx 0) (uvis_M W) (uvis_M W')
          (uvis_fd W) (uvis_fd W')) ->
     uround_ok sc (uvis_tf (uvis_run W)) (uvis_M W) (uvis_perm W) (uvis_sz W)
-      (uvis_tf W') (uvis_M W') (uvis_perm W') (uvis_sz W') ->
+      (uvis_cwd W)
+      (uvis_tf W') (uvis_M W') (uvis_perm W') (uvis_sz W') (uvis_cwd W') ->
     (∀ W'' : uvis, uslot_x W'') -∗
     (⌜sc = uecall_scause /\ usys_num (uvis_tf (uvis_run W)) = USYS_exec⌝ -∗
        (⌜exists r : mword 64,
@@ -102,8 +103,8 @@ Section LoopApplyX.
         [| contradiction].
       destruct (uround_ok_ecall (uvis_tf (uvis_run W)) (uvis_M W) (uvis_M W')
                   (uvis_perm W) (uvis_perm W') (uvis_sz W) (uvis_sz W')
-                  (uvis_tf W') Hr)
-        as [Hexec | [Hnex [r [Hb Hm]]]].
+                  (uvis_cwd W) (uvis_cwd W') (uvis_tf W') Hr)
+        as [[Hexec Hcwx] | [Hnex [r [Hb [Hm Hc]]]]].
       + (* exec: the kernel's answer decides *)
         destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_exit))
           as [Hx | _]; [ exfalso; rewrite Hexec in Hx; discriminate Hx | ].
@@ -111,11 +112,17 @@ Section LoopApplyX.
           as [Hx | _]; [ exfalso; rewrite Hexec in Hx; discriminate Hx | ].
         iDestruct ("Hxo" with "[%]") as "[%Hfail | [Hslot | %Hgap]]";
           [ split; [reflexivity | exact Hexec] | | | ].
-        * (* failed: the returning arm at [r = -1] *)
+        * (* failed: the returning arm at [r = -1].  Its cwd row is the
+             round's exec disjunct: exec inherits, so the field did not
+             move, and exec is not chdir. *)
           destruct Hfail as (r & Hb & Hm & Hfd').
           rewrite <- Hexec in Hm.
+          assert (Hne : USYS_exec <> USYS_chdir) by discriminate.
+          assert (Hc : usys_cwd_ok (usys_num (uvis_tf (uvis_run W))) r
+                         (uvis_cwd W) (uvis_cwd W')).
+          { rewrite Hcwx. exact (usys_cwd_ok_refl_at _ USYS_exec r _ Hexec Hne). }
           iApply (uexec_ret_F_returning uslot_x uslot_x_key_cong W W' r Hl Hb Hm
-                    (Hfdrow eq_refl) (Hpiperow eq_refl) with "Hret").
+                    (Hfdrow eq_refl) (Hpiperow eq_refl) Hc with "Hret").
         * (* loadable: the new image's slot *)
           iExact "Hslot".
         * (* the loadability gap: the mint *)
@@ -127,18 +134,18 @@ Section LoopApplyX.
         * (* fork: both arms are kernel mints -- [UexecApply]'s note *)
           iApply "Hmk".
         * iApply (uexec_ret_F_returning uslot_x uslot_x_key_cong W W' r Hl Hb Hm
-                    (Hfdrow eq_refl) (Hpiperow eq_refl) with "Hret").
+                    (Hfdrow eq_refl) (Hpiperow eq_refl) Hc with "Hret").
     - (* ---- TRANSPARENT: interrupt, page fault, anything else ---- *)
       rewrite /uexec_ret_F.
       destruct (decide (sc = uecall_scause)) as [Hc | _]; [ contradiction | ].
       destruct (uround_ok_transparent sc (uvis_tf (uvis_run W))
                   (uvis_M W) (uvis_M W') (uvis_perm W) (uvis_perm W')
-                  (uvis_sz W) (uvis_sz W')
-                  (uvis_tf W') Hne Hr) as [[Hi1 Hi2] [HM [Hpi Hsz]]].
+                  (uvis_sz W) (uvis_sz W') (uvis_cwd W) (uvis_cwd W')
+                  (uvis_tf W') Hne Hr) as [[Hi1 Hi2] [HM [Hpi [Hsz Hcw]]]].
       iEval (rewrite (uslot_x_key_cong (uvis_run W) W'
                         (eq_sym Hi1) (eq_sym Hi2)
                         (eq_sym HM) (eq_sym Hpi) (eq_sym Hsz)
-                        (eq_sym (Hfd Hne)))) in "Hret".
+                        (eq_sym (Hfd Hne)) (eq_sym Hcw))) in "Hret".
       iExact "Hret".
   Qed.
 
@@ -160,9 +167,10 @@ Section LoopApplyX.
          (pv_tf (us_V U') !!! tf_arg_idx 0) (uvis_M W) (us_M U')
          (uvis_fd W) fdv') ->
     uround_ok sc (tf_of g (ret_pc sepc_v)) (uvis_M W) (uvis_perm W) (uvis_sz W)
+      (uvis_cwd W)
       (pv_tf (us_V U')) (us_M U')
       (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
-      (uint (pv_sz (us_V U'))) ->
+      (uint (pv_sz (us_V U'))) (pv_cwi (us_V U')) ->
     (∀ W'' : uvis, uslot_x W'') -∗
     (⌜sc = uecall_scause /\ usys_num (tf_of g (ret_pc sepc_v)) = USYS_exec⌝ -∗
        (⌜exists r : mword 64,
@@ -191,8 +199,8 @@ Section LoopApplyX.
       (HRut : forall pt' : uptd,
                 ⊢ Rut pt' -∗ TsoCtx.own_context XI ∗
                              (TsoCtx.own_context XI -∗ Rut pt'))
-      (sz : Z) (fdv : list fdstate) (W : uvis) (M : gmap Z (bv 8)) (m : regfile)
-      (ms_v sc_v stv_v sepc_v pc : mword 64) :
+      (sz : Z) (fdv : list fdstate) (cw : Z) (W : uvis) (M : gmap Z (bv 8))
+      (m : regfile) (ms_v sc_v stv_v sepc_v pc : mword 64) :
     loop_ok C pt ->
     usz_ok sz ->
     user_mstatus_ok ms_v ->
@@ -200,6 +208,7 @@ Section LoopApplyX.
     uvis_M W = M ->
     uvis_sz W = sz ->
     uvis_fd W = fdv ->
+    uvis_cwd W = cw ->
     tf_resume_gpr0 (uvis_tf W) = m ->
     tf_resume_pc (uvis_tf W) = pc ->
     uslot_x W -∗
@@ -209,13 +218,13 @@ Section LoopApplyX.
     Rfd fdv -∗
     user_cfg C -∗
     Rut pt -∗
-    ▷ ukb_x C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv -∗
+    ▷ ukb_x C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv cw -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hlo Hsz Hms Hpi HM Hsw Hfd Hg Hpc.
+    intros Hlo Hsz Hms Hpi HM Hsw Hfd Hcw Hg Hpc.
     iIntros "Hs Hhw Hmi Hwi Hregs Hupt Hfrag Hcfg Hrut Hk".
     iEval (rewrite uslot_x_unfold) in "Hs".
-    iEval (rewrite Hpi HM Hsw Hfd Hg Hpc) in "Hs".
+    iEval (rewrite Hpi HM Hsw Hfd Hcw Hg Hpc) in "Hs".
     iDestruct (u_regs_uv_regs ms_v sc_v stv_v sepc_v pc m Hms with "Hregs")
       as "(Hur & Hg & Hpc)".
     iApply ("Hs" $! CID XI C pt Rfd Rut HRut

@@ -151,6 +151,8 @@ Definition forkret_park_pkg
        does not carry [V] (see this file's header), and the name is the only
        part of it the bundle needs. *)
     (g : gname)
+    (* ...and its cwd's inum -- see [ParkCap.park_pkg] *)
+    (cw : Z)
     (pid : mword 32) (av : nat) : iProp Σ :=
   (* [ksp] is spelled out rather than [let]-bound: this bundle is DESTRUCTED
      by its consumer, and a [let] survives [rewrite /forkret_park_pkg]. *)
@@ -199,6 +201,7 @@ Definition forkret_park_pkg
          one).  Saying so here is what lets the closed-over bundle be handed
          to the residue at [V']. *)
       ⌜pv_fdg (us_V U') = g⌝ -∗
+      ⌜pv_cwi (us_V U') = cw⌝ -∗
       UsertrapRes.park_globals Xc γs γw γft γf γtl -∗
       UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) (us_V U') -∗
       FirstTok.first_done (XI := Xc) -∗
@@ -252,7 +255,8 @@ Definition forkret_park_paid_body
      fixpoint: the package's closer names the token, and a parker holds the
      token only under a later. *)
   ⊢ own_context cur_ctx -∗
-    forkret_park_pkg URes W γs γw γft γf γtl pa ks (pv_fdg (us_V U)) pid av -∗
+    forkret_park_pkg URes W γs γw γft γf γtl pa ks (pv_fdg (us_V U))
+      (pv_cwi (us_V U)) pid av -∗
     ▷ W -∗
     is_kstack pa ks -∗
     ctx_cells (p_context pa) (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗

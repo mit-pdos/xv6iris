@@ -299,7 +299,10 @@ Definition wp_kfork_sconf_body
      and a parent with a continuation for its child has one at its own
      table and at no other.  [ParkCap.park_token_park] carries the same
      restriction and discharges it by [reflexivity]. *)
-  (∀ W : uvis, ⌜uvis_fd W = stsP⌝ -∗ uslot W) -∗
+  (* ...AND TO THE PARENT'S OWN WORKING DIRECTORY, for the same reason:
+     the child's block is built at the parent's inum
+     ([ProofKforkB4]'s post) and resumed at a key carrying it. *)
+  (∀ W : uvis, ⌜uvis_fd W = stsP /\ uvis_cwd W = pv_cwi (us_V Up)⌝ -∗ uslot W) -∗
   (* THE STEADY ARM OF [FirstTok.first_tok], and the ONE thing fork cannot
      take out of the parent's block: the parent's token may be the EXCLUSIVE
      boot arm, and the child needs a token of its own.  [first_done] is

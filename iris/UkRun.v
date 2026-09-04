@@ -119,7 +119,13 @@ Section UkRun.
       (avail : nat) : iProp Σ :=
     (∃ (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
        (Rut : uptd -> iProp Σ) (sz : Z)
-       (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (fdv : list fdstate),
+       (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (fdv : list fdstate)
+       (* THE WORKING DIRECTORY IS HIDDEN TOO, and with no ghost beside it:
+          a program that never looks at its cwd should not have to name
+          it, and nothing in the running bundle reads it -- it only rides
+          the bundle so the trap-out key can be built at the inum the
+          process was resumed at ([UexecRet.ukb_F]'s pin). *)
+       (cw : Z),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        (* A6.140: the residue-token accessor rides the bundle as a PURE
           fact, so a leaf that re-enters [ukc] can hand it back over *)
@@ -139,7 +145,7 @@ Section UkRun.
           fragment bundle, chosen by the loop and handed back whole at every
           trap, and a program never learns its ghost name. *)
        ufd_auth γfd fdv ∗
-       uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv M m pc)%I.
+       uvb (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw M m pc)%I.
 
   (* "this instruction does not write sp".  Every leaf that writes a general
      register carries it; a concrete [rd] decides it by [vm_compute]. *)
@@ -156,17 +162,18 @@ Section UkRun.
      that is closing back up has just destructed it, so it can say which one.
      Re-introducing the existential at THAT size is all this does. *)
   Lemma urun_close (γt γd γs γfd : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (sz : Z) (fdv : list fdstate) (m : regfile) (pc : mword 64) (avail : nat) :
+      (sz : Z) (fdv : list fdstate) (cw : Z) (m : regfile) (pc : mword 64)
+      (avail : nat) :
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     (* ...and the descriptor authority, at the same [fdv] the key is at *)
     ufd_auth γfd fdv -∗
     (∀ h : CpuId, urun γt γd γs γfd h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
-    ukc pm M sz fdv m pc.
+    ukc pm M sz fdv cw m pc.
   Proof.
     iIntros "Hheap Hstk Hufd Hcont".
     rewrite /ukc. iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
-    iApply ("Hcont" $! h). iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv.
+    iApply ("Hcont" $! h). iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
     iFrame "Hheap Hstk Hufd Hb". iPureIntro.
     split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
@@ -191,14 +198,14 @@ Section UkRun.
      is keyed by sp, and [unot_sp] says this write was not to sp. *)
   Lemma urun_close_upd (γt γd γs γfd : gname) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5) (v : mword 64)
-      (sz : Z) (fdv : list fdstate) (pc' : mword 64) (avail : nat) :
+      (sz : Z) (fdv : list fdstate) (cw : Z) (pc' : mword 64) (avail : nat) :
     unot_sp rd ->
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     ufd_auth γfd fdv -∗
     (∀ h : CpuId, urun γt γd γs γfd h (<[Regidx rd := v]> m) pc' avail -∗
                   WP (Loop : expr riscv_lang)) -∗
-    ukc pm M sz fdv (<[Regidx rd := v]> m) pc'.
+    ukc pm M sz fdv cw (<[Regidx rd := v]> m) pc'.
   Proof.
     intros Hns. iIntros "Hheap Hstk Hufd Hcont".
     iApply (urun_close with "Hheap [Hstk] Hufd Hcont").
@@ -460,7 +467,7 @@ Section UkRun.
       /\ 8 * Z.of_nat avail <= uint (m !!! Regidx csp_rs1) ⌝.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (ustack_align with "Hstk") as %Hal.
     iDestruct (ustack_room with "Hheap Hstk") as %Hroom.
     iPureIntro. exact (conj Hal Hroom).
@@ -578,7 +585,8 @@ Section UkRun.
     iSpecialize ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht Hstd");
       [ exact Hsz | ].
     iApply "Hprog".
-    iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W).
+    iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
+      (uvis_cwd W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
@@ -682,7 +690,8 @@ Section UkRun.
     iSpecialize ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht Hstd Dhi");
       [ exact Hsz | ].
     iApply "Hprog".
-    iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W).
+    iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
+      (uvis_cwd W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].

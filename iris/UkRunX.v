@@ -191,7 +191,8 @@ Section UkRunX.
       [ exact Hsz | ].
     iApply "Hprog".
     rewrite /urun_x.
-    iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W).
+    iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
+      (uvis_cwd W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iSplitR; [ iPureIntro; exact HRut | ].
@@ -294,9 +295,9 @@ Section UkRunX.
     iNext.
     rewrite /ukb_F.
     iEval (rewrite /ukb_x_F) in "Hk".
-    iIntros (W' sc stv) "%Hp %Hs' %Hf' (Htm & Hfr & Hret)".
-    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [Htm Hfr Hret]");
-      [exact Hp | exact Hs' | exact Hf' |].
+    iIntros (W' sc stv) "%Hp %Hs' %Hf' %Hc' (Htm & Hfr & Hret)".
+    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [%] [Htm Hfr Hret]");
+      [exact Hp | exact Hs' | exact Hf' | exact Hc' |].
     iFrame "Htm Hfr".
     iApply (uexec_ret_x_of_bundle with "IH [] Hret").
     iApply "Hxb".
@@ -308,18 +309,18 @@ Section UkRunX.
   Lemma ukont_x_ukont_of `{CID : CpuId} `{XI : TsoCtx.CurCtx} (C : ucfg)
       (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
-      (π : gmap (mword 27) uperm) (fdv : list fdstate) :
+      (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z) :
     □ (∀ W : uvis, uslot W -∗ uslot_x W) -∗
     □ (∀ W : uvis, xbundle uslot_x W) -∗
-    ukont_x C pt Rfd Rut sz π fdv -∗ ukont C pt Rfd Rut sz π fdv.
+    ukont_x C pt Rfd Rut sz π fdv cw -∗ ukont C pt Rfd Rut sz π fdv cw.
   Proof.
     iIntros "#Hup #Hxb Hk". rewrite /ukont /ukont_F.
     iEval (rewrite /ukont_x /ukont_x_F) in "Hk".
     iNext. rewrite /ukb_F.
     iEval (rewrite /ukb_x_F) in "Hk".
-    iIntros (W' sc stv) "%Hp %Hs %Hf (Htm & Hfr & Hret)".
-    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [Htm Hfr Hret]");
-      [exact Hp | exact Hs | exact Hf |].
+    iIntros (W' sc stv) "%Hp %Hs %Hf %Hc (Htm & Hfr & Hret)".
+    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [%] [Htm Hfr Hret]");
+      [exact Hp | exact Hs | exact Hf | exact Hc |].
     iFrame "Htm Hfr".
     iApply (uexec_ret_x_of_bundle with "Hup [] Hret").
     iApply "Hxb".
@@ -327,12 +328,12 @@ Section UkRunX.
 
   Lemma uvb_x_uvb_of `{CID : CpuId} `{XI : TsoCtx.CurCtx} (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
-      (π : gmap (mword 27) uperm) (fdv : list fdstate)
+      (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) :
     □ (∀ W : uvis, uslot W -∗ uslot_x W) -∗
     □ (∀ W : uvis, xbundle uslot_x W) -∗
-    uvb_x C pt Rfd Rut sz π fdv M m pc -∗
-    uvb C pt Rfd Rut sz π fdv M m pc.
+    uvb_x C pt Rfd Rut sz π fdv cw M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw M m pc.
   Proof.
     iIntros "#Hup #Hxb Hb". rewrite /uvb /uvb_F.
     iEval (rewrite /uvb_x /uvb_x_F) in "Hb".
@@ -354,9 +355,9 @@ Section UkRunX.
     iIntros "#Hxb H".
     iDestruct (uslot_x_lift_bundle with "Hxb") as "#Hup".
     rewrite /urun_x.
-    iDestruct "H" as (xi C pt Rfd Rut sz M pm fdv)
+    iDestruct "H" as (xi C pt Rfd Rut sz M pm fdv cw)
       "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
-    rewrite /urun. iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv.
+    rewrite /urun. iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
     iSplitR; [iPureIntro; exact Hlo |].
     iSplitR; [iPureIntro; exact Hpm |].
     iSplitR; [iPureIntro; exact HRut |].
@@ -373,10 +374,10 @@ Section UkRunX.
   Lemma uvb_x_x0 `{CID : CpuId} `{XI : TsoCtx.CurCtx} (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ) (sz : Z) (π : gmap (mword 27) uperm)
-      (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) :
-    uvb_x C pt Rfd Rut sz π fdv M m pc -∗
+      (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) :
+    uvb_x C pt Rfd Rut sz π fdv cw M m pc -∗
     ⌜m !!! Regidx (mword_of_int 0) = zero_reg⌝ ∗
-    uvb_x C pt Rfd Rut sz π fdv M m pc.
+    uvb_x C pt Rfd Rut sz π fdv cw M m pc.
   Proof.
     rewrite /uvb_x /uvb_x_F.
     iIntros "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
@@ -391,7 +392,7 @@ Section UkRunX.
      with the enriched bundle; the enriched slot IS this at the key's own
      state ([uslot_x_ukc]) *)
   Definition ukc_x (π : gmap (mword 27) uperm) (M : gmap Z (bv 8))
-      (szv : Z) (fdv : list fdstate) (m : regfile) (pc : mword 64) : iProp Σ :=
+      (szv : Z) (fdv : list fdstate) (cw : Z) (m : regfile) (pc : mword 64) : iProp Σ :=
     (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd)
        (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
        (HRut : forall pt' : uptd,
@@ -399,12 +400,12 @@ Section UkRunX.
                               (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt')),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) szv = π⌝ -∗
-       uvb_x (CID := h) (XI := xi) C pt Rfd Rut szv π fdv M m pc -∗
+       uvb_x (CID := h) (XI := xi) C pt Rfd Rut szv π fdv cw M m pc -∗
        WP (Loop : expr riscv_lang))%I.
 
   Lemma uslot_x_ukc (W : uvis) :
     uslot_x W ⊣⊢
-    ukc_x (uvis_perm W) (uvis_M W) (uvis_sz W) (uvis_fd W)
+    ukc_x (uvis_perm W) (uvis_M W) (uvis_sz W) (uvis_fd W) (uvis_cwd W)
       (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)).
   Proof. exact (uslot_x_unfold W). Qed.
 
@@ -412,47 +413,47 @@ Section UkRunX.
      syscall returned (a0 := r, pc + 4) -- [UexecRet.uslot_bump_run] *)
   Lemma uslot_x_bump_run (m : regfile) (pc : mword 64)
       (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z)
-      (fdv fdv' : list fdstate) (r : mword 64) :
+      (fdv fdv' : list fdstate) (cw cw' : Z) (r : mword 64) :
     m !!! Regidx (mword_of_int 0) = zero_reg ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uslot_x (bump (uvis_of_run m pc M π szv fdv) r M' π' szv' fdv')
-    ⊣⊢ ukc_x π' M' szv' fdv' (<[Regidx (mword_of_int 10) := r]> m)
+    uslot_x (bump (uvis_of_run m pc M π szv fdv cw) r M' π' szv' fdv' cw')
+    ⊣⊢ ukc_x π' M' szv' fdv' cw' (<[Regidx (mword_of_int 10) := r]> m)
              (add_vec_int pc 4).
   Proof.
     intros Hx0 Hal. rewrite uslot_x_ukc.
-    rewrite (bump_run_gpr m pc M M' π π' szv szv' fdv fdv' r Hx0)
-            (bump_run_pc m pc M M' π π' szv szv' fdv fdv' r Hal).
+    rewrite (bump_run_gpr m pc M M' π π' szv szv' fdv fdv' cw cw' r Hx0)
+            (bump_run_pc m pc M M' π π' szv szv' fdv fdv' cw cw' r Hal).
     reflexivity.
   Qed.
 
   (* THE RE-CLOSE, at [urun_x] -- [UkRun.urun_close(_upd)]'s twins *)
   Lemma urun_x_close (γt γd γs γfd : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate)
+      (pm : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate) (cw : Z)
       (m : regfile) (pc : mword 64) (avail : nat) :
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     ufd_auth γfd fdv -∗
     (∀ h : CpuId, urun_x γt γd γs γfd h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
-    ukc_x pm M sz fdv m pc.
+    ukc_x pm M sz fdv cw m pc.
   Proof.
     iIntros "Hheap Hstk Hufd Hcont".
     rewrite /ukc_x. iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h). rewrite /urun_x.
-    iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv.
+    iExists xi, C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
     iFrame "Hheap Hstk Hufd Hb". iPureIntro.
     split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 
   Lemma urun_x_close_upd (γt γd γs γfd : gname) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5) (v : mword 64)
-      (sz : Z) (fdv : list fdstate) (pc' : mword 64) (avail : nat) :
+      (sz : Z) (fdv : list fdstate) (cw : Z) (pc' : mword 64) (avail : nat) :
     unot_sp rd ->
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     ufd_auth γfd fdv -∗
     (∀ h : CpuId, urun_x γt γd γs γfd h (<[Regidx rd := v]> m) pc' avail -∗
                   WP (Loop : expr riscv_lang)) -∗
-    ukc_x pm M sz fdv (<[Regidx rd := v]> m) pc'.
+    ukc_x pm M sz fdv cw (<[Regidx rd := v]> m) pc'.
   Proof.
     intros Hns. iIntros "Hheap Hstk Hufd Hcont".
     iApply (urun_x_close with "Hheap [Hstk] Hufd Hcont").

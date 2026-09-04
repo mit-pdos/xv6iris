@@ -274,9 +274,11 @@ Section UexecCondCongr.
     = perm_of (ud_um (pv_upt (us_V U2))) (uint (pv_sz (us_V U2))) ->
     (* the break is key material now *)
     pv_sz (us_V U1) = pv_sz (us_V U2) ->
+    (* ...and so is the cwd's inum *)
+    pv_cwi (us_V U1) = pv_cwi (us_V U2) ->
     uslot (uvis_of U1 sts) -∗ uslot (uvis_of U2 sts).
   Proof.
-    intros Htf Hm Hp Hs. rewrite /uvis_of Htf Hm Hp Hs. iIntros "H". iExact "H".
+    intros Htf Hm Hp Hs Hc. rewrite /uvis_of Htf Hm Hp Hs Hc. iIntros "H". iExact "H".
   Qed.
 
 End UexecCondCongr.

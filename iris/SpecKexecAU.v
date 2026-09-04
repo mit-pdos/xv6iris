@@ -447,6 +447,24 @@ Definition exec_key (U' : ustate) (sts : list fdstate) (na : nat) : uvis :=
                        (pv_tf (us_V U'))))
           sts.
 
+(* THE KEY'S WORKING DIRECTORY IS THE BLOCK'S, and the block's is the
+   caller's: exec inherits the cwd ([SpecKexec.kexec_ok]'s row, read off
+   [kexec_ok_exec] by [kexec_ok_exec_cwi]).  So [kexec_image_ok] names no
+   cwd -- the key is [uvis_of] of the post-exec block, whose inum the entry
+   block already pins. *)
+Lemma exec_key_cwd (U' : ustate) (sts : list fdstate) (na : nat) :
+  uvis_cwd (exec_key U' sts na) = pv_cwi (us_V U').
+Proof. destruct U' as [V' M']. destruct V'. reflexivity. Qed.
+
+Lemma kexec_ok_exec_cwi (f : elf_bytes) (V V' : pprivate) (r : mword 64)
+    (na : nat) (alen : nat -> nat) :
+  kexec_ok_exec f V V' r na alen -> pv_cwi V' = pv_cwi V.
+Proof.
+  intros (e & spv & szv' & _ & Hne & Hok).
+  destruct Hok as [[Hr _] | Hs]; [ contradiction (Hne Hr) | ].
+  destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hcwi & _). exact Hcwi.
+Qed.
+
 (* the two conjuncts a slot constructor reads first off the key *)
 Lemma kexec_image_ok_pc (f : elf_bytes) (na : nat) (alen : nat -> nat)
     (afun : nat -> nat -> bv 8) (sts : list fdstate) (W' : uvis) (e : Z) :

@@ -84,6 +84,10 @@ Section ParkCap.
       (* the parked process's fd-state ghost name -- see
          [SpecForkretParkPaid.forkret_park_pkg], which is this verbatim *)
       (g : gname)
+      (* ...and its cwd's inum, for the same reason the name is here: the
+         family the parker captured is restricted to it ([park_token_park]
+         below), so the closer needs the resumed record to agree *)
+      (cw : Z)
       (pid : mword 32) (av : nat) : iProp Σ :=
     (kernel_text ∗
      wire_inv ∗
@@ -105,6 +109,10 @@ Section ParkCap.
         ⌜proc_pt_wf pt'⌝ -∗
         (* the resumed record names the parked process's fd-state ghost *)
         ⌜pv_fdg (us_V U') = g⌝ -∗
+        (* ...and is at the parked process's working directory: nothing
+           between park and resume calls chdir (forkret's boot arm runs
+           kexec, which inherits it) *)
+        ⌜pv_cwi (us_V U') = cw⌝ -∗
         park_globals Xc γs γw γft γf γtl -∗
         ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) (us_V U') -∗
         first_done (XI := Xc) -∗
@@ -167,7 +175,8 @@ Section ParkCap.
           twins it for the child's context and moves the record's rows there
           -- see [ProofForkretPark]. *)
        own_context (CID := hp) ξp -∗
-       park_pkg (XI := ξp) URB W γs γw γft γf γtl pa ks (pv_fdg (us_V U)) pid av -∗
+       park_pkg (XI := ξp) URB W γs γw γft γf γtl pa ks (pv_fdg (us_V U))
+         (pv_cwi (us_V U)) pid av -∗
        (* ...and [W] itself, for forkret to hand the closer: under the same
           later, for the same reason *)
        ▷ W -∗
@@ -281,8 +290,11 @@ Section ParkCap.
        and at nothing else; this premise is the shape that accepts it.
        LINEAR: the parker has to own one, which is what makes a slot enter
        the world only at the two mint sites (userinit's park and sys_fork's
-       kfork call), each eliminating [UEXEC_GEN.uexec_wp_gen]'s [box] once. *)
-    (∀ W : uvis, ⌜uvis_fd W = sts⌝ -∗ uslot W) -∗
+       kfork call), each eliminating [UEXEC_GEN.uexec_wp_gen]'s [box] once.
+       ...AND TO THE PARKED BLOCK'S WORKING DIRECTORY, the other key field
+       the resume cannot choose: the closer's own premise says the resumed
+       record is at it. *)
+    (∀ W : uvis, ⌜uvis_fd W = sts /\ uvis_cwd W = pv_cwi (us_V U)⌝ -∗ uslot W) -∗
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U -∗
     |==> own_context cur_ctx ∗ proc_ctx_boxed (un_s N) (un_pj N).
   Proof.
@@ -314,7 +326,7 @@ Section ParkCap.
       iSplitR; [iExact "Hglobp"|].
       iNext.
       iDestruct ("Hclose" with "Henv Hown") as "Hclose'".
-      iIntros (h Xc pt' U') "%Hupt %Hnorm %Hptwf %Hfg #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+      iIntros (h Xc pt' U') "%Hupt %Hnorm %Hptwf %Hfg %Hcwi #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
       (* the parked bundle, re-keyed onto the resumed record *)
       iEval (rewrite -Hfg) in "Hfrag".
       (* ...AND ITS STATES, NAMED.  This is the only place in the park
@@ -336,8 +348,10 @@ Section ParkCap.
       + (* THE INSTANTIATION -- the whole of milestone J's park channel:
            a family in, the resumed record's key out, keyed at the
            descriptor states the residue is about to carry.  The family's own
-           side condition is that very keying, so it is [reflexivity]. *)
-        iApply ("Hslot" $! (uvis_of U' sts)). iPureIntro. reflexivity.
+           side condition is that very keying, so it is [reflexivity] -- and
+           the closer's cwd premise for the other half. *)
+        iApply ("Hslot" $! (uvis_of U' sts)). iPureIntro.
+        split; [ reflexivity | exact Hcwi ].
     - iNext. iExact "Htok".
   Qed.
 

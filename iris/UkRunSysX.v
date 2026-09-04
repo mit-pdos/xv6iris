@@ -97,7 +97,7 @@ Section UkRunSysX.
   Lemma uslot_x_unfold_gen (W : uvis) :
     uslot_x W ⊣⊢
     ukc' uexec_ret_x_F uslot_x (fun _ : TsoCtx.CurCtx => Logic.True)
-      (uvis_perm W) (uvis_M W) (uvis_sz W) (uvis_fd W)
+      (uvis_perm W) (uvis_M W) (uvis_sz W) (uvis_fd W) (uvis_cwd W)
       (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)).
   Proof.
     rewrite (uslot_x_unfold W) /ukc'.
@@ -119,19 +119,19 @@ Section UkRunSysX.
       (HRut : forall pt' : uptd,
                 ⊢ Rut pt' -∗ TsoCtx.own_context XI ∗
                              (TsoCtx.own_context XI -∗ Rut pt'))
-      (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) :
+      (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) :
     uk_instr π M pc false (ECALL tt) ->
     (forall s : mstate,
        register_lookup cur_privilege s.(sregs) = User ->
        register_lookup (R_bitvector_64 PC) s.(sregs) = pc ->
        goodmb Du_r Du_w (execute (ECALL tt)) s ∅ = true) ->
-    uvb_x C pt Rfd Rut sz π fdv M m pc -∗
-    uexec_ret_x uecall_scause (uvis_of_run m pc M π sz fdv) -∗
+    uvb_x C pt Rfd Rut sz π fdv cw M m pc -∗
+    uexec_ret_x uecall_scause (uvis_of_run m pc M π sz fdv cw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     exact (wp_uk_ecall' uexec_ret_x_F uslot_x (fun _ : TsoCtx.CurCtx => Logic.True)
              uslot_x_unfold_gen uexec_ret_x_transparent
-             C pt Rfd Rut π sz Hlo Hpm HRut I M m pc fdv).
+             C pt Rfd Rut π sz Hlo Hpm HRut I M m pc fdv cw).
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -147,10 +147,10 @@ Section UkRunSysX.
        image, map, break and view the run hides, with the two authorities
        lent for the pure facts the program needs off them *)
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
-       (fdv : list fdstate),
+       (fdv : list fdstate) (cw : Z),
        uheap γt γd γs M pm -∗ ufd_auth γfd fdv -∗
        uheap γt γd γs M pm ∗ ufd_auth γfd fdv ∗
-       xbundle uslot_x (uvis_of_run m pc M pm sz fdv)) -∗
+       xbundle uslot_x (uvis_of_run m pc M pm sz fdv cw)) -∗
     (* the failure return: -1, and not one byte moved *)
     (∀ h' : CpuId,
        urun_x γt γd γs γfd h'
@@ -162,13 +162,13 @@ Section UkRunSysX.
     intros Hn Hal4.
     iIntros "#Hi Hrun Hbundle Hcont".
     rewrite /urun_x.
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv)
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw)
       "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x_x0 with "Hb") as "[%Hx0 Hb]".
-    iDestruct ("Hbundle" $! M pm sz fdv with "Hheap Hufd")
+    iDestruct ("Hbundle" $! M pm sz fdv cw with "Hheap Hufd")
       as "(Hheap & Hufd & Hx)".
-    iApply (wp_uk_ecall_x C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv Hui
+    iApply (wp_uk_ecall_x C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
               (fun (s : mstate)
                    (Hp : register_lookup cur_privilege s.(sregs) = User)
                    (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
@@ -176,12 +176,12 @@ Section UkRunSysX.
                    s pc ltac:(vm_compute; reflexivity)
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv)) = USYS_exec).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = USYS_exec).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite (uexec_ret_x_ecall_exec _ _ eq_refl Hnum).
     rewrite Hnum.
     iSplitL "Hx"; [ iExact "Hx" | ].
-    iIntros (r M' pm' sz' fdv') "%Hok %Hfdok %Hpiperow".
+    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow".
     destruct (usys_mem_ok_exec_row USYS_exec _ r _ _ _ _ _ _ eq_refl Hok)
       as [-> [-> [-> ->]]].
     cbn [uvis_M uvis_perm uvis_of_run].
@@ -193,9 +193,9 @@ Section UkRunSysX.
     { refine (usys_fd_ok_quiet _ _ _ _ _ _ _ _ _ Hfdok);
         vm_compute; discriminate. }
     subst fdv'.
-    rewrite (uslot_x_bump_run m pc M M pm pm sz sz fdv fdv
+    rewrite (uslot_x_bump_run m pc M M pm pm sz sz fdv fdv cw cw'
                (mword_of_int (-1) : mword 64) Hx0 Hal4).
-    iApply (urun_x_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _
+    iApply (urun_x_close_upd _ _ _ _ _ _ m (mword_of_int 10) _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate)
               with "Hheap Hstk Hufd").
     iIntros (h') "Hrun".

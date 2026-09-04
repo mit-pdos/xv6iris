@@ -83,8 +83,9 @@ Import Defs.
 (* ([perm_of]), never as stored state; the table's structure stays hidden.  *)
 (* [uvis_fd] is the DESCRIPTOR VIEW (FdSlots.v): one [fdstate] per          *)
 (* descriptor, taken by [uvis_of] from the [fd_frags] bundle the boundary   *)
-(* holds.  Future user-visible state (the pid) becomes a FIELD the same     *)
-(* way, never an arity change here or at a consumer.                        *)
+(* holds.  [uvis_cwd] is the WORKING DIRECTORY's inum ([ProcDefs.pv_cwi]),  *)
+(* taken off the block.  Future user-visible state (the pid) becomes a     *)
+(* FIELD the same way, never an arity change here or at a consumer.        *)
 (* ===================================================================== *)
 Record uvis := MkUvis {
   uvis_tf   : list (mword 64);
@@ -111,11 +112,20 @@ Record uvis := MkUvis {
      [uvis_perm] have: the trap boundary INSTANTIATES the key at the value
      it is holding ([uvis_of] takes it), and nothing else may. *)
   uvis_fd   : list fdstate;
+  (* THE WORKING DIRECTORY, as its inum.  A process observes its cwd --
+     every relative path it opens starts there -- and chdir(2) moves it,
+     so it is resume state exactly as the descriptor view is.  A VALUE,
+     [ProcDefs.pv_cwi], the inum the kernel's [p->cwd] pointer labels: the
+     boundary instantiates it off the block ([uvis_of]), the syscall rows
+     say which entry may move it ([UsysMemOk.usys_cwd_ok]: chdir, and only
+     when it succeeds), fork's arm copies it parent to child, and exec
+     inherits it ([SpecKexec.kexec_ok]). *)
+  uvis_cwd  : Z;
 }.
 
 (* the projection from the kernel's process state to the slot's key: drop
    the descriptor (and everything else only the kernel reads), keeping its
-   permission view *)
+   permission view -- and its cwd inum, which the block carries *)
 (* [sts] is a PARAMETER, not a projection: [ustate] carries the fd ghost's
    NAME ([pv_fdg]) and not the states under it, so the value comes from the
    [fd_frags] bundle the boundary is holding.  Every call site is a place
@@ -124,7 +134,8 @@ Definition uvis_of (U : ustate) (sts : list fdstate) : uvis :=
   MkUvis (pv_tf (us_V U)) (us_M U)
          (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
          (uint (pv_sz (us_V U)))
-         sts.
+         sts
+         (pv_cwi (us_V U)).
 
 (* ===================================================================== *)
 (* SS1 The trapframe as a word reader.                                     *)

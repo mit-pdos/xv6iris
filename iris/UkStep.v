@@ -14,14 +14,14 @@
 (* capability and are taken verbatim.  What is NEW is exactly the part      *)
 (* that mentions the trap contract:                                         *)
 (*                                                                         *)
-(*   uk_step_obl π Kc sz fdv M m pc   the caller's fetch-onward obligation, at    *)
+(*   uk_step_obl π Kc sz fdv cw M m pc   the caller's fetch-onward obligation, at    *)
 (*                            EVERY table realizing the key's permission   *)
 (*                            map [π] AND every mapped sub-image [Mp] of   *)
 (*                            the key's LAZY image [M] (the continuation   *)
 (*                            re-binds the table, so the obligation must   *)
 (*                            too).  It is taken PERSISTENTLY (see the     *)
 (*                            note on the store's fault arm below);        *)
-(*   uk_ih π Kc fdv M m pc         the Löb hypothesis: from the bundle [uvb]    *)
+(*   uk_ih π Kc fdv cw M m pc         the Löb hypothesis: from the bundle [uvb]    *)
 (*                            at any such table, with the obligation and   *)
 (*                            a ▷-guarded continuation, the loop is safe;  *)
 (*   uk_psi_active             the retiring payload rebuilds [uvb];        *)
@@ -35,7 +35,7 @@
 (*                                                                         *)
 (* THE PAYLOAD.  The cycle rule's continuation is the only later-stripping *)
 (* point, so what an arm needs at the tail travels in the abstract [R]:    *)
-(* here [R := (Kc ∧ ukc π M sz fdv m pc) ∗ Rut pt ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv] -- the     *)
+(* here [R := (Kc ∧ ukc π M sz fdv cw m pc) ∗ Rut pt ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw] -- the     *)
 (* caller's continuation OR the slot at the CURRENT key, the parked        *)
 (* residue and the LATER-FREE BODY of the kernel obligation ([ukont] is    *)
 (* [▷ ukb]; the wrapper strips it together with everything else at the     *)
@@ -45,7 +45,7 @@
 (* A trap that RETIRES nothing -- the interrupt arm, and now the STORE's   *)
 (* page-fault arm -- must hand the kernel [uexec_ret]'s transparent arm,   *)
 (* i.e. the slot at the key the machine is standing on, which is           *)
-(* [ukc π M sz fdv m pc] and NOT the leaf's post-instruction [Kc].  Both cannot   *)
+(* [ukc π M sz fdv cw m pc] and NOT the leaf's post-instruction [Kc].  Both cannot   *)
 (* be owned separately (they are the same resources spent two ways), so    *)
 (* the payload carries their [∧] and each arm picks its side.  Building    *)
 (* the [ukc] side at the cycle's tail needs the Löb hypothesis AND the     *)
@@ -315,8 +315,8 @@ Section UkBundle.
 
   Lemma uvb_elim (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (sz : Z)
-      (π : gmap (mword 27) uperm) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) :
-    uvb C pt Rfd Rut sz π fdv M m pc -∗
+      (π : gmap (mword 27) uperm) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) :
+    uvb C pt Rfd Rut sz π fdv cw M m pc -∗
     ∃ Mp : gmap Z (bv 8),
     ⌜uk_pt_pure pt sz M Mp⌝ ∗
     uv_amb ∗ uv_regs ∗
@@ -325,7 +325,7 @@ Section UkBundle.
        beside it ([uvb_intro]): the engine threads them unchanged, exactly
        as it threads [umem] *)
     Rfd fdv ∗
-    user_cfg C ∗ gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ▷ ukb C pt Rfd Rut sz π fdv.
+    user_cfg C ∗ gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ▷ ukb C pt Rfd Rut sz π fdv cw.
   Proof.
     rewrite /uvb /uvb_F /user_ptm_inv_x /umem_lazy_x /umem_own_x.
     iIntros "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
@@ -339,13 +339,13 @@ Section UkBundle.
   Lemma uvb_intro (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (sz : Z)
       (π : gmap (mword 27) uperm) (M Mp : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) :
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) :
     uk_pt_pure pt sz M Mp ->
     uv_amb -∗ uv_regs -∗
     utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem_x pt Mp -∗
     Rfd fdv -∗
-    user_cfg C -∗ gpr_file m -∗ pc_is pc -∗ Rut pt -∗ ukb C pt Rfd Rut sz π fdv -∗
-    uvb C pt Rfd Rut sz π fdv M m pc.
+    user_cfg C -∗ gpr_file m -∗ pc_is pc -∗ Rut pt -∗ ukb C pt Rfd Rut sz π fdv cw -∗
+    uvb C pt Rfd Rut sz π fdv cw M m pc.
   Proof.
     intros (Hsub & Himg & Hz & Hdom & Hinj & Hacc & Hsz).
     iIntros "Hamb Hur Htlb Hmem Hfrag Hcfg Hg Hpc Hrut Hk".
@@ -366,9 +366,9 @@ Section UkBundle.
 
   (* the pure half, for program proofs that need the key's image law *)
   Lemma uvb_pure (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
-      (π : gmap (mword 27) uperm) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) :
-    uvb C pt Rfd Rut sz π fdv M m pc -∗
-    ⌜exists Mp : gmap Z (bv 8), uk_pt_pure pt sz M Mp⌝ ∗ uvb C pt Rfd Rut sz π fdv M m pc.
+      (π : gmap (mword 27) uperm) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) :
+    uvb C pt Rfd Rut sz π fdv cw M m pc -∗
+    ⌜exists Mp : gmap Z (bv 8), uk_pt_pure pt sz M Mp⌝ ∗ uvb C pt Rfd Rut sz π fdv cw M m pc.
   Proof.
     rewrite /uvb /uvb_F.
     iIntros "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
@@ -395,9 +395,9 @@ Section UkBundle.
 
   (* x0 is pinned inside the bundle *)
   Lemma uvb_x0 (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
-      (π : gmap (mword 27) uperm) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) :
-    uvb C pt Rfd Rut sz π fdv M m pc -∗
-    ⌜m !!! Regidx (mword_of_int 0) = zero_reg⌝ ∗ uvb C pt Rfd Rut sz π fdv M m pc.
+      (π : gmap (mword 27) uperm) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) :
+    uvb C pt Rfd Rut sz π fdv cw M m pc -∗
+    ⌜m !!! Regidx (mword_of_int 0) = zero_reg⌝ ∗ uvb C pt Rfd Rut sz π fdv cw M m pc.
   Proof.
     rewrite /uvb /uvb_F.
     iIntros "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
@@ -412,11 +412,11 @@ Section UkBundle.
      the trap-out key, once the residue and the pure facts are beside it *)
   Lemma trapped_of_uv_trap_frame (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (sc stv : mword 64) (m : regfile) (pc : mword 64) (M Mp : gmap Z (bv 8))
-      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) :
+      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) (cw : Z) :
     uk_pt_pure pt sz M Mp ->
     m !!! Regidx (mword_of_int 0) = zero_reg ->
     uv_trap_frame C pt sc stv pc m Mp -∗ Rut pt -∗
-    trapped_machine C pt Rut sz sc stv (uvis_of_run m pc M π sz fdv).
+    trapped_machine C pt Rut sz sc stv (uvis_of_run m pc M π sz fdv cw).
   Proof.
     intros (Hsub & Himg & Hz & Hdom & Hinj & Hacc & Hsz) Hx0.
     iIntros "Hf Hrut".
@@ -457,7 +457,7 @@ Section UkObl.
      obligation has to be at THE size, and saying so is what makes the
      caller's continuation usable here. *)
   Definition uk_step_obl (π : gmap (mword 27) uperm) (Kc : iProp Σ) (sz : Z)
-      (fdv : list fdstate)
+      (fdv : list fdstate) (cw : Z)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
     (∀ (R : iProp Σ) (CIDo : CpuId) (XIo : TsoCtx.CurCtx)
        (C : ucfg) (pt : uptd)
@@ -478,7 +478,7 @@ Section UkObl.
        (* the residue slot carries the BORROW WAND, not [Rut pt]: the loop
           body took the running token out of the residue at the cycle's
           head (A6.140), and whichever arm ends the step restores it *)
-       (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut pt) ∗ Rfd fdv ∗ ukb (CID := CIDo) C pt Rfd Rut sz π fdv ∗ (Kc ∧ ukc π M sz fdv m pc)) -∗
+       (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut pt) ∗ Rfd fdv ∗ ukb (CID := CIDo) C pt Rfd Rut sz π fdv cw ∗ (Kc ∧ ukc π M sz fdv cw m pc)) -∗
        resv_any cpu_id -∗
        hreg_frame rsA u_Drw -∗
        hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
@@ -495,7 +495,7 @@ Section UkObl.
             (fun _ : ext_fetch_addr_error => False)))%I.
 
   Definition uk_ih (π : gmap (mword 27) uperm) (Kc : iProp Σ)
-      (fdv : list fdstate)
+      (fdv : list fdstate) (cw : Z)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
     (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
        (Rut : uptd -> iProp Σ)
@@ -505,18 +505,18 @@ Section UkObl.
                               (TsoCtx.own_context (CID := h) (cur_ctx (CurCtx := xi)) -∗ Rut pt'))
        (sz : Z),
        ⌜loop_ok C pt⌝ -∗ ⌜perm_of (ud_um pt) sz = π⌝ -∗
-       uvb (CID := h) (XI := xi) C pt Rfd Rut sz π fdv M m pc -∗
-       □ uk_step_obl π Kc sz fdv M m pc -∗ ▷ Kc -∗ WP (Loop : expr riscv_lang))%I.
+       uvb (CID := h) (XI := xi) C pt Rfd Rut sz π fdv cw M m pc -∗
+       □ uk_step_obl π Kc sz fdv cw M m pc -∗ ▷ Kc -∗ WP (Loop : expr riscv_lang))%I.
 
   (* the payload the wrapper hands the closer at the cycle's tail *)
   Definition uk_payload `{CID : CpuId} (sz : Z) (π : gmap (mword 27) uperm)
-      (fdv : list fdstate) (Kc : iProp Σ)
+      (fdv : list fdstate) (cw : Z) (Kc : iProp Σ)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64)
       (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ) : iProp Σ :=
-    ((Kc ∧ ukc π M sz fdv m pc) ∗
+    ((Kc ∧ ukc π M sz fdv cw m pc) ∗
      (TsoCtx.own_context TsoCtx.cur_ctx -∗ Rut pt) ∗
-     Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv)%I.
+     Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw)%I.
 
 End UkObl.
 
@@ -534,7 +534,7 @@ Section UkArms.
       (π : gmap (mword 27) uperm) (M Mp : gmap Z (bv 8))
       (m' : regfile) (npc : mword 64) (t : ptree) (usatp : mword 64)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
-      (rs2 : regstate) (fdv : list fdstate) :
+      (rs2 : regstate) (fdv : list fdstate) (cw : Z) :
     register_lookup hart_state rs2 = HART_ACTIVE tt ->
     register_lookup cur_privilege rs2 = User ->
     user_mstatus_ok (register_lookup (R_bitvector_64 mstatus) rs2) ->
@@ -560,8 +560,8 @@ Section UkArms.
     uv_bytes pt Mp t -∗
     uv_res pt Mp t usatp pcfg paddr -∗
     TsoCtx.own_context XI -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
-          (uvb C pt Rfd Rut sz π fdv M m' npc -∗ WP (Loop : expr riscv_lang))) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw ∗
+          (uvb C pt Rfd Rut sz π fdv cw M m' npc -∗ WP (Loop : expr riscv_lang))) -∗
     uv_psi C R rs2.
   Proof.
     intros Lhs Lpriv Hmsok Lnpc Hgag Hx0 Lstvec Lmie Lmdl Lmedl Lmenv Lmste
@@ -579,7 +579,7 @@ Section UkArms.
       as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hgpr & Hcfg &
            Hutlb & Humem)".
     iApply "Hcont".
-    iApply (uvb_intro C pt Rfd Rut sz π M Mp m' npc fdv Hpure
+    iApply (uvb_intro C pt Rfd Rut sz π M Mp m' npc fdv cw Hpure
               with "Hamb [Hhs Hpriv Hms Hsc Hstval Hsepc] Hutlb Humem Hfdr
                     Hcfg Hgpr Hpc Hrut Hkb").
     rewrite /uv_regs.
@@ -595,7 +595,7 @@ Section UkArms.
       (Kc : iProp Σ) (M Mp : gmap Z (bv 8)) (m : regfile)
       (pc : mword 64) (t : ptree) (usatp : mword 64)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
-      (rs1 rsA : regstate) (i : InterruptType) (fdv : list fdstate) :
+      (rs1 rsA : regstate) (i : InterruptType) (fdv : list fdstate) (cw : Z) :
     uv_pre C pt Mp m pc t rs1 rsA usatp pcfg paddr ->
     uk_pt_pure pt sz M Mp ->
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
@@ -605,7 +605,7 @@ Section UkArms.
     TsoCtx.own_context XI -∗
     uv_bytes pt Mp t -∗
     uv_res pt Mp t usatp pcfg paddr -∗
-    uv_step_post C (uk_payload sz π fdv Kc M m pc C pt Rfd Rut) rs1
+    uv_step_post C (uk_payload sz π fdv cw Kc M m pc C pt Rfd Rut) rs1
       (Step_Pending_Interrupt (i, Supervisor)).
   Proof.
     intros Hpre Hpure Hal2.
@@ -655,7 +655,7 @@ Section UkArms.
                  (u_trap_rs rsA (Interrupt i) None pc (uc_stvec C)) u_Dro
                  ltac:(intros r Hr; apply Hag, elem_of_union_r, Hr)).
     iFrame "Hrw Hro".
-    iApply (uv_psi_trap C pt (uk_payload sz π fdv Kc M m pc C pt Rfd Rut) Mp m t usatp pcfg paddr
+    iApply (uv_psi_trap C pt (uk_payload sz π fdv cw Kc M m pc C pt Rfd Rut) Mp m t usatp pcfg paddr
               (u_trap_rs rsA (Interrupt i) None pc (uc_stvec C))
               (utrap_scause (Interrupt i) (register_lookup (R_bitvector_64 scause) rsA))
               (tval None) pc
@@ -683,12 +683,12 @@ Section UkArms.
               with "Hany Hmm Hres Hctx []").
     iIntros "Hframe Hctx (Hkc & Hbak & Hfdr & Hkb)".
     iDestruct ("Hbak" with "Hctx") as "Hrut".
-    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv)
+    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw)
               (utrap_scause (Interrupt i) (register_lookup (R_bitvector_64 scause) rsA))
-              (tval None) with "[%] [%] [%] [Hframe Hrut Hfdr Hkc]");
-      [ reflexivity | reflexivity | reflexivity | ].
+              (tval None) with "[%] [%] [%] [%] [Hframe Hrut Hfdr Hkc]");
+      [ reflexivity | reflexivity | reflexivity | reflexivity | ].
     iSplitL "Hframe Hrut".
-    { iApply (trapped_of_uv_trap_frame C pt Rut _ _ m pc M Mp sz π fdv Hpure Hx0
+    { iApply (trapped_of_uv_trap_frame C pt Rut _ _ m pc M Mp sz π fdv cw Hpure Hx0
                 with "Hframe Hrut"). }
     (* the bundle takes the descriptor view back at the trap ([ukb_F]'s
        second conjunct); the key is built AT [fdv], so this is [Rfd fdv] *)
@@ -697,9 +697,9 @@ Section UkArms.
        [rewrite] cannot see [uexec_ret] in it, but [iApply] unifies up to
        the (delta-)conversion [uexec_ret = uexec_ret_F uslot] *)
     iApply (bi.equiv_entails_1_2 _ _
-              (uexec_ret_transparent _ (uvis_of_run m pc M π sz fdv)
+              (uexec_ret_transparent _ (uvis_of_run m pc M π sz fdv cw)
                  (utrap_scause_intr_ne i (register_lookup (R_bitvector_64 scause) rsA)))).
-    rewrite (uslot_run m pc M π sz fdv Hx0 Hal2).
+    rewrite (uslot_run m pc M π sz fdv cw Hx0 Hal2).
     iDestruct "Hkc" as "[_ Hkc]". iExact "Hkc".
   Qed.
 
@@ -713,9 +713,9 @@ Section UkStepEngine.
   Context `{GEN : GenId} `{XI : CurCtx}.
 
   Lemma wp_uk_step_gen (π : gmap (mword 27) uperm) (Kc : iProp Σ)
-      (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) :
+      (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) :
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
-    ⊢ uk_ih π Kc fdv M m pc.
+    ⊢ uk_ih π Kc fdv cw M m pc.
   Proof.
     intros Hal2.
     rewrite /uk_ih.
@@ -827,7 +827,7 @@ Section UkStepEngine.
        under one later) goes into the payload; the wrapper strips the later *)
     (* ---- the one cycle ---- *)
     iApply (swp_exec_step_full u_Drw u_Dro (u_Df (uc_dqc C)) RS (wrap_pre RS)
-              (uv_land RS) (uv_psi C (uk_payload sz π fdv Kc M m pc C pt Rfd Rut))
+              (uv_land RS) (uv_psi C (uk_payload sz π fdv cw Kc M m pc C pt Rfd Rut))
               u_disj u_w_cy u_w_ti u_w_ip u_in_priv u_w_hart u_in_hart
               u_in_mc u_in_micfg u_w_mi u_in_mi u_w_ms u_in_ms
               u_w_PC u_in_PC u_in_nPC
@@ -846,13 +846,13 @@ Section UkStepEngine.
                     uv_bytes pt Mp t ∗
                     uv_res pt Mp t usatp pcfg paddr)%I
                    (fun (ii : InterruptType) (pr : Privilege) =>
-                      uv_step_post C (uk_payload sz π fdv Kc M m pc C pt Rfd Rut) RS
+                      uv_step_post C (uk_payload sz π fdv cw Kc M m pc C pt Rfd Rut) RS
                         (Step_Pending_Interrupt (ii, pr)))
                    (fun (r : ExecutionResult) (ib : mword 32) =>
-                      uv_step_post C (uk_payload sz π fdv Kc M m pc C pt Rfd Rut) RS
+                      uv_step_post C (uk_payload sz π fdv cw Kc M m pc C pt Rfd Rut) RS
                         (Step_Execute (r, ib)))
                    (fun (xv : mword 64) (e : ExceptionType) =>
-                      uv_step_post C (uk_payload sz π fdv Kc M m pc C pt Rfd Rut) RS
+                      uv_step_post C (uk_payload sz π fdv cw Kc M m pc C pt Rfd Rut) RS
                         (Step_Fetch_Failure (Virtaddr xv, e)))
                    (fun _ : ext_fetch_addr_error => False%I)
                    u_disj u_in_priv u_in_PC u_w_nPC LcpA
@@ -899,14 +899,14 @@ Section UkStepEngine.
           iDestruct "HWd" as "(Hfrag & Hctx & Hmm & Hres)".
           iDestruct (resv_any_intro cpu_id None with "Hfrag") as "Hany".
           iApply (uk_arm_intr C pt Rfd Rut sz π Kc M Mp m pc t usatp pcfg paddr RS
-                    (wrap_pre RS) ii fdv Hpre Hpure Hal2
+                    (wrap_pre RS) ii fdv cw Hpre Hpure Hal2
                     with "Hcert Hany Hrw Hro Hctx Hmm Hres").
         * iFrame.
       + (* ---- THE FETCH: the caller's obligation ---- *)
         iIntros "HWd Hrw Hro".
         iDestruct "HWd" as "(Hfrag & Hctx & Hmm & Hres)".
         iDestruct (resv_any_intro cpu_id None with "Hfrag") as "Hany".
-        iApply ("Hobl" $! (uk_payload sz π fdv Kc M m pc C pt Rfd Rut) CID XIv C pt Rfd Rut HRut Mp t RS
+        iApply ("Hobl" $! (uk_payload sz π fdv cw Kc M m pc C pt Rfd Rut) CID XIv C pt Rfd Rut HRut Mp t RS
                   (wrap_pre RS) usatp pcfg paddr
                   with "[%] [%] [%] [%] Hamb [] Hany Hrw Hro Hctx Hmm Hres");
           [ exact Hlo | exact Hpm | exact Hpure | exact Hpre | ].
@@ -944,14 +944,14 @@ Section UkFunnel.
                                     (TsoCtx.own_context XI -∗ Rut pt')).
 
   (* the engine at the ambient hart and table *)
-  Lemma wp_uk_step (Kc : iProp Σ) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) :
+  Lemma wp_uk_step (Kc : iProp Σ) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) :
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
-    uvb C pt Rfd Rut sz π fdv M m pc -∗ □ uk_step_obl π Kc sz fdv M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw M m pc -∗ □ uk_step_obl π Kc sz fdv cw M m pc -∗
     ▷ Kc -∗ WP (Loop : expr riscv_lang).
   Proof.
     intros Hal2.
     iIntros "Hb #Hobl Hkc".
-    iPoseProof (wp_uk_step_gen π Kc M m pc fdv Hal2) as "H". rewrite /uk_ih.
+    iPoseProof (wp_uk_step_gen π Kc M m pc fdv cw Hal2) as "H". rewrite /uk_ih.
     iApply ("H" $! CID XI C pt Rfd Rut HRut sz with "[%] [%] Hb Hobl Hkc"); [ exact Hlo | exact Hpm ].
   Qed.
 
@@ -970,7 +970,7 @@ Section UkPostFetch.
       (i : instruction) (o : option instruction) (jt : option (mword 64))
       (wr : option (mword 5 * mword 64)) (ib : mword 32) (t' : ptree)
       (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (rs1 rs2 : regstate) (fdv : list fdstate) :
+      (paddr : type_of_register pmpaddr_n) (rs1 rs2 : regstate) (fdv : list fdstate) (cw : Z) :
     uv_wrok wr ->
     uv_redirect i o ->
     (forall s_pc : mstate,
@@ -1030,8 +1030,8 @@ Section UkPostFetch.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
-          (uvb C pt Rfd Rut sz π fdv M (uv_upd m wr) (uv_next jt (add_vec_int pc k)) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw ∗
+          (uvb C pt Rfd Rut sz π fdv cw M (uv_upd m wr) (uv_next jt (add_vec_int pc k)) -∗
            WP (Loop : expr riscv_lang))) -∗
     resv_any cpu_id -∗
     TsoCtx.own_context XI -∗
@@ -1100,7 +1100,7 @@ Section UkPostFetch.
     iFrame "Hrw Hro".
     iApply (uk_psi_active C pt Rfd R Rut sz π M Mp (uv_upd m wr)
               (uv_next jt (add_vec_int pc k)) t' usatp pcfg paddr
-              (uv_post_rs rsx jt wr) fdv
+              (uv_post_rs rsx jt wr) fdv cw
               (uv_land_reg rs2 _ jt wr hart_state _
                  ltac:(vm_compute; reflexivity) uv_nogpr_hart Lhs2)
               (uv_land_reg rs2 _ jt wr cur_privilege _
@@ -1157,7 +1157,7 @@ Section UkObligation.
       (o : option instruction) (jt : option (mword 64))
       (wr : option (mword 5 * mword 64)) (t : ptree) (usatp : mword 64)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
-      (rs1 rsA : regstate) (fdv : list fdstate) :
+      (rs1 rsA : regstate) (fdv : list fdstate) (cw : Z) :
     uv_pre C pt Mp m pc t rs1 rsA usatp pcfg paddr ->
     uk_pt_pure pt sz M Mp ->
     udecode_base w i ->
@@ -1195,8 +1195,8 @@ Section UkObligation.
          = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_Base w) -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
-          (uvb C pt Rfd Rut sz π fdv M (uv_upd m wr) (uv_next jt (add_vec_int pc 4)) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw ∗
+          (uvb C pt Rfd Rut sz π fdv cw M (uv_upd m wr) (uv_next jt (add_vec_int pc 4)) -∗
            WP (Loop : expr riscv_lang))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
@@ -1261,7 +1261,7 @@ Section UkObligation.
     iFrame "Hrw Hro".
     iIntros "Hrw Hro".
     iApply (uk_retire_post_fetch C pt Rfd R Rut sz π M Mp m pc 4 i o jt wr
-              (zero_extend' 32 w) t' usatp pcfg paddr rs1 rs2 fdv
+              (zero_extend' 32 w) t' usatp pcfg paddr rs1 rs2 fdv cw
               Hwrok Hred Hg1 Hg2 Hexec
               (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
               (T2 _ _ u_in_hart ltac:(vm_compute; reflexivity) LhsA)
@@ -1290,7 +1290,7 @@ Section UkObligation.
       (o : option instruction) (jt : option (mword 64))
       (wr : option (mword 5 * mword 64)) (t : ptree) (usatp : mword 64)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
-      (rs1 rsA : regstate) (fdv : list fdstate) :
+      (rs1 rsA : regstate) (fdv : list fdstate) (cw : Z) :
     uv_pre C pt Mp m pc t rs1 rsA usatp pcfg paddr ->
     uk_pt_pure pt sz M Mp ->
     udecode_rvc h i ->
@@ -1328,8 +1328,8 @@ Section UkObligation.
          = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_RVC h) -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
-          (uvb C pt Rfd Rut sz π fdv M (uv_upd m wr) (uv_next jt (add_vec_int pc 2)) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw ∗
+          (uvb C pt Rfd Rut sz π fdv cw M (uv_upd m wr) (uv_next jt (add_vec_int pc 2)) -∗
            WP (Loop : expr riscv_lang))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
@@ -1399,7 +1399,7 @@ Section UkObligation.
     iFrame "Hrw Hro".
     iIntros "Hrw Hro".
     iApply (uk_retire_post_fetch C pt Rfd R Rut sz π M Mp m pc 2 i o jt wr
-              (zero_extend' 32 h) t' usatp pcfg paddr rs1 rs2 fdv
+              (zero_extend' 32 h) t' usatp pcfg paddr rs1 rs2 fdv cw
               Hwrok Hred Hg1 Hg2 Hexec
               (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
               (T2 _ _ u_in_hart ltac:(vm_compute; reflexivity) LhsA)
@@ -1442,7 +1442,7 @@ Section UkRetire.
                                     (TsoCtx.own_context XI -∗ Rut pt')).
 
   Lemma wp_uk_retire_later (M : gmap Z (bv 8))
-      (m : regfile) (pc : mword 64) (fdv : list fdstate)
+      (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z)
       (is_rvc : bool) (i : instruction)
       (o : option instruction) (jt : option (mword 64))
       (wr : option (mword 5 * mword 64)) :
@@ -1484,15 +1484,15 @@ Section UkRetire.
           = m !!! Regidx r) ->
        exec (execute (uv_exp i o)) s_pc
          = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
-    uvb C pt Rfd Rut sz π fdv M m pc -∗
-    ▷ ukc π M sz fdv (uv_upd m wr) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
+    uvb C pt Rfd Rut sz π fdv cw M m pc -∗
+    ▷ ukc π M sz fdv cw (uv_upd m wr) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hwrok Hg1 Hg2 Hexec.
     pose proof (Hui pt sz (loop_ok_wf C pt Hlo) Hpm) as Hui0.
     pose proof (ui_al2 _ _ _ _ _ Hui0) as Hal2.
     iIntros "Hb Hcont".
-    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ M m pc fdv Hal2 with "Hb [] Hcont").
+    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ M m pc fdv cw Hal2 with "Hb [] Hcont").
     iModIntro.
     rewrite /uk_step_obl.
     iIntros (R CIDo XIo C' pt' Rfd' Rut' HRut' Mp' t rs1 rsA usatp pcfg paddr)
@@ -1508,8 +1508,8 @@ Section UkRetire.
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
     (* the continuation at THIS table, out of the table-generic one *)
     iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗
-             ukb C' pt' Rfd' Rut' sz π fdv ∗
-             (uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv M (uv_upd m wr)
+             ukb C' pt' Rfd' Rut' sz π fdv cw ∗
+             (uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw M (uv_upd m wr)
                 (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
               WP (Loop : expr riscv_lang)))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hbak & Hfdr & Hkb & Hkc)".
@@ -1524,17 +1524,17 @@ Section UkRetire.
     destruct is_rvc.
     - iDestruct "Hf" as (h) "[[%HisRVC %Hdecrvc] Hbridge]".
       iApply (uk_obl_rvc C' pt' Rfd' R Rut' sz π M Mp' m pc h i o jt wr t usatp pcfg paddr
-                rs1 rsA fdv Hpre Hpure Hdecrvc Hwrok Hred Hg1 Hg2 Hexec
+                rs1 rsA fdv cw Hpre Hpure Hdecrvc Hwrok Hred Hg1 Hg2 Hexec
                 with "Hcert Hamb Hbridge Hk Hany Hrw Hro Hctx Hmm Hres").
     - iDestruct "Hf" as (w) "[[%HnRVC %Hdecbase] Hbridge]".
       iApply (uk_obl_base C' pt' Rfd' R Rut' sz π M Mp' m pc w i o jt wr t usatp pcfg paddr
-                rs1 rsA fdv Hpre Hpure Hdecbase Hwrok Hred Hg1 Hg2 Hexec
+                rs1 rsA fdv cw Hpre Hpure Hdecbase Hwrok Hred Hg1 Hg2 Hexec
                 with "Hcert Hamb Hbridge Hk Hany Hrw Hro Hctx Hmm Hres").
   Qed.
 
   (* the later-free restatement: the shape every leaf takes *)
   Lemma wp_uk_retire (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (is_rvc : bool) (i : instruction)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (is_rvc : bool) (i : instruction)
       (o : option instruction) (jt : option (mword 64))
       (wr : option (mword 5 * mword 64)) :
     uk_instr π M pc is_rvc i ->
@@ -1575,13 +1575,13 @@ Section UkRetire.
           = m !!! Regidx r) ->
        exec (execute (uv_exp i o)) s_pc
          = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
-    uvb C pt Rfd Rut sz π fdv M m pc -∗
-    ukc π M sz fdv (uv_upd m wr) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
+    uvb C pt Rfd Rut sz π fdv cw M m pc -∗
+    ukc π M sz fdv cw (uv_upd m wr) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hwrok Hg1 Hg2 Hexec.
     iIntros "Hb Hcont".
-    iApply (wp_uk_retire_later M m pc fdv is_rvc i o jt wr
+    iApply (wp_uk_retire_later M m pc fdv cw is_rvc i o jt wr
               Hui Hred Hlpad Hwrok Hg1 Hg2 Hexec with "Hb [Hcont]").
     iNext. iExact "Hcont".
   Qed.
@@ -1601,7 +1601,7 @@ Section UkEcallPost.
       (π : gmap (mword 27) uperm)
       (M Mp : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (ib : mword 32)
       (t' : ptree) (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (rs1 rs2 : regstate) (fdv : list fdstate) :
+      (paddr : type_of_register pmpaddr_n) (rs1 rs2 : regstate) (fdv : list fdstate) (cw : Z) :
     (forall s : mstate,
        register_lookup cur_privilege s.(sregs) = User ->
        register_lookup (R_bitvector_64 PC) s.(sregs) = pc ->
@@ -1634,7 +1634,7 @@ Section UkEcallPost.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗ uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv)) -∗
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw ∗ uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw)) -∗
     resv_any cpu_id -∗
     TsoCtx.own_context XI -∗
     uv_bytes pt Mp t' -∗
@@ -1818,14 +1818,14 @@ Section UkEcallPost.
     iIntros "Hframe Hrun HR".
     iDestruct ("Hk" with "HR") as "(Hbak & Hfdr & Hkb & Hret)".
     iDestruct ("Hbak" with "Hrun") as "Hrut".
-    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv)
+    iApply ("Hkb" $! (uvis_of_run m pc M π sz fdv cw)
               (utrap_scause (rv64d_types.Exception (E_U_EnvCall tt))
                  (register_lookup (R_bitvector_64 scause) rsx))
               (tval (xtval_exception_value (E_U_EnvCall tt) (zeros' 64)))
-              with "[%] [%] [%] [Hframe Hrut Hfdr Hret]");
-      [ reflexivity | reflexivity | reflexivity | ].
+              with "[%] [%] [%] [%] [Hframe Hrut Hfdr Hret]");
+      [ reflexivity | reflexivity | reflexivity | reflexivity | ].
     iSplitL "Hframe Hrut".
-    { iApply (trapped_of_uv_trap_frame C pt Rut _ _ m pc M Mp sz π fdv Hpure Hx0
+    { iApply (trapped_of_uv_trap_frame C pt Rut _ _ m pc M Mp sz π fdv cw Hpure Hx0
                 with "Hframe Hrut"). }
     (* the bundle takes the descriptor view back at the trap ([ukb_F]'s
        second conjunct); the key is built AT [fdv], so this is [Rfd fdv] *)
@@ -1846,29 +1846,29 @@ Section UkEcall.
                        ⊢ Rut pt' -∗ TsoCtx.own_context XI ∗
                                     (TsoCtx.own_context XI -∗ Rut pt')).
 
-  Lemma wp_uk_ecall (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) :
+  Lemma wp_uk_ecall (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) :
     uk_instr π M pc false (ECALL tt) ->
     (forall s : mstate,
        register_lookup cur_privilege s.(sregs) = User ->
        register_lookup (R_bitvector_64 PC) s.(sregs) = pc ->
        goodmb Du_r Du_w (execute (ECALL tt)) s ∅ = true) ->
-    uvb C pt Rfd Rut sz π fdv M m pc -∗
-    uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv) -∗
+    uvb C pt Rfd Rut sz π fdv cw M m pc -∗
+    uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hg.
     pose proof (Hui pt sz (loop_ok_wf C pt Hlo) Hpm) as Hui0.
     pose proof (ui_al2 _ _ _ _ _ Hui0) as Hal2.
     iIntros "Hb Hret".
-    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ M m pc fdv Hal2 with "Hb [] [Hret]").
+    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ M m pc fdv cw Hal2 with "Hb [] [Hret]").
     2:{ iNext. iExact "Hret". }
     iModIntro.
     rewrite /uk_step_obl.
     iIntros (R CIDo XIo C' pt' Rfd' Rut' HRut' Mp' t rs1 rsA usatp pcfg paddr)
       "%Hlo' %Hpm' %Hpure %Hpre #Hamb Hk Hany Hrw Hro Hctx Hmm Hres".
     iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗
-             ukb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv ∗
-             uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv))%I with "[Hk]" as "Hk".
+             ukb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw ∗
+             uexec_ret uecall_scause (uvis_of_run m pc M π sz fdv cw))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hbak & Hfdr & Hkb & Hkc)".
       iDestruct "Hkc" as "[Hkc _]". iFrame "Hbak Hfdr Hkb". iExact "Hkc". }
     destruct (uk_instr_mapped π M Mp' pc false (ECALL tt) pt' sz
@@ -1936,7 +1936,7 @@ Section UkEcall.
     iFrame "Hrw Hro".
     iIntros "Hrw Hro".
     iApply (uk_ecall_post_fetch C' pt' Rfd' R Rut' sz π M Mp' m pc (zero_extend' 32 w) t' usatp
-              pcfg paddr rs1 rs2 fdv Hg
+              pcfg paddr rs1 rs2 fdv cw Hg
               (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
               (T2 _ _ u_in_hart ltac:(vm_compute; reflexivity) LhsA)
               Lcp2

@@ -227,14 +227,18 @@ Qed.
 (* ([UsysMemOkSpec.usys_sbrk_perm_of_row], over                            *)
 (* [UsysMemOkSpec.perm_of_grow] and [UserPerm.perm_of_del_run]).           *)
 (* ===================================================================== *)
+(* ...and the cwd's inum on both sides, READ OFF THE BLOCKS: unlike the
+   descriptor states, which the block names only by ghost name, the inum
+   is a field ([ProcDefs.pv_cwi]), so the round states it without a new
+   binder in any post. *)
 Definition ut_round (sepc_v sc_v : mword 64) (U U' : ustate) : Prop :=
   uround_ok sc_v
     (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
     (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-    (uint (pv_sz (us_V U)))
+    (uint (pv_sz (us_V U))) (pv_cwi (us_V U))
     (pv_tf (us_V U')) (us_M U')
     (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
-    (uint (pv_sz (us_V U'))).
+    (uint (pv_sz (us_V U'))) (pv_cwi (us_V U')).
 
 (* THE DESCRIPTOR HALF OF THE ROUND, and the reason it is CONDITIONAL.
    [ut_round] speaks the trapframe, image, permission map and break; it says
@@ -441,10 +445,12 @@ Lemma ut_exec_out_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
   perm_of (ud_um (pv_upt (us_V U''))) (uint (pv_sz (us_V U'')))
     = perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))) ->
   pv_sz (us_V U'') = pv_sz (us_V U') ->
+  (* ...and the cwd's inum, which the loadable arm's key carries *)
+  pv_cwi (us_V U'') = pv_cwi (us_V U') ->
   ut_exec_out sc_v tf M π szv U' sts sts' -∗
   ut_exec_out sc_v tf' M π szv U'' sts sts'.
 Proof.
-  intros Hu Hu' HM Hpi Hsz. rewrite /ut_exec_out. iIntros "H %Hc".
+  intros Hu Hu' HM Hpi Hsz Hcwi. rewrite /ut_exec_out. iIntros "H %Hc".
   iDestruct ("H" with "[%]") as "[%Hf | [Hs | %Hg]]";
     [ split; [exact (proj1 Hc) | rewrite (tf_ueq_num tf tf' Hu); exact (proj2 Hc)]
     | | | ].
@@ -459,7 +465,8 @@ Proof.
   - iRight. iLeft.
     iEval (rewrite (uslot_x_key_cong (uvis_of U' sts') (uvis_of U'' sts')
                       (tf_ueq_resume_gpr0 _ _ Hu') (tf_ueq_resume_pc _ _ Hu')
-                      (eq_sym HM) (eq_sym Hpi) (f_equal uint (eq_sym Hsz)) eq_refl))
+                      (eq_sym HM) (eq_sym Hpi) (f_equal uint (eq_sym Hsz)) eq_refl
+                      (eq_sym Hcwi)))
       in "Hs".
     iExact "Hs".
   - iRight. iRight. iPureIntro.
@@ -473,7 +480,9 @@ Definition ut_pro (sepc_v : mword 64) (U U' : ustate) : Prop :=
   pv_tf (us_V U') = <[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))
   /\ pv_upt (us_V U') = pv_upt (us_V U)
   /\ pv_sz (us_V U') = pv_sz (us_V U)
-  /\ us_M U' = us_M U.
+  /\ us_M U' = us_M U
+  (* ...and the cwd's inum, which the prologue's one store does not touch *)
+  /\ pv_cwi (us_V U') = pv_cwi (us_V U).
 
 (* THE ENTRY INSTANCE: at the record the prologue hands on, the round has
    done nothing yet, so every arm of the relation is an identity. *)
@@ -484,9 +493,9 @@ Lemma ut_round_entry (sepc_v sc_v : mword 64) (U U' : ustate) :
   sc_v <> uecall_scause ->
   ut_pro sepc_v U U' -> ut_round sepc_v sc_v U U'.
 Proof.
-  intros Hne (Htf & Hupt & Hsz & HM). unfold ut_round, uround_ok.
+  intros Hne (Htf & Hupt & Hsz & HM & Hcwi). unfold ut_round, uround_ok.
   destruct (decide (sc_v = uecall_scause)) as [Heq | _]; [ contradiction (Hne Heq) | ].
-  rewrite Htf Hupt Hsz HM. unfold uround_id_ok.
+  rewrite Htf Hupt Hsz HM Hcwi. unfold uround_id_ok.
   split_and!; reflexivity.
 Qed.
 
@@ -499,10 +508,12 @@ Lemma ut_round_same (sepc_v sc_v : mword 64) (U U' U'' : ustate) :
   (* the break is user-visible now, so "does not move the user-visible
      state" has to say so *)
   pv_sz (us_V U'') = pv_sz (us_V U') ->
+  (* ...and the cwd's inum, now that the key carries it *)
+  pv_cwi (us_V U'') = pv_cwi (us_V U') ->
   ut_round sepc_v sc_v U U' -> ut_round sepc_v sc_v U U''.
 Proof.
-  intros H1 H2 H3 H4 H. unfold ut_round in H |- *.
-  rewrite H1 H2 H3 H4. exact H.
+  intros H1 H2 H3 H4 H5 H. unfold ut_round in H |- *.
+  rewrite H1 H2 H3 H4 H5. exact H.
 Qed.
 
 (* ...and one that moves it only in the four KERNEL words (prepare_return). *)
@@ -512,9 +523,10 @@ Lemma ut_round_ueq (sepc_v sc_v : mword 64) (U U' U'' : ustate) :
     = perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))) ->
   us_M U'' = us_M U' ->
   pv_sz (us_V U'') = pv_sz (us_V U') ->
+  pv_cwi (us_V U'') = pv_cwi (us_V U') ->
   ut_round sepc_v sc_v U U' -> ut_round sepc_v sc_v U U''.
 Proof.
-  intros Hu H2 H3 H4 H. unfold ut_round in H |- *. rewrite H2 H3 H4.
+  intros Hu H2 H3 H4 H5 H. unfold ut_round in H |- *. rewrite H2 H3 H4 H5.
   eapply uround_ok_ueq_r; [ exact Hu | exact H ].
 Qed.
 

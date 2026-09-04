@@ -248,6 +248,8 @@ Definition forkret_closer
     (W : iProp Σ) (γs : list gname) (γw γft γf γtl : gname) (p ksp : mword 64)
     (* the parked process's fd-state ghost name *)
     (g : gname)
+    (* ...and its cwd's inum -- see [ParkCap.park_pkg] *)
+    (cw : Z)
     (pid : mword 32) (av : nat) : iProp Σ :=
   (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (U' : ustate),
      ⌜pv_upt (us_V U') = pt'⌝ -∗
@@ -259,6 +261,9 @@ Definition forkret_closer
         no step between park and resume reassigns a live process's
         descriptor ghost.  See [SpecForkretParkPaid.forkret_park_pkg]. *)
      ⌜pv_fdg (us_V U') = g⌝ -∗
+     (* ...and the resumed record is at the parked process's working
+        directory: the family the parker captured is restricted to it *)
+     ⌜pv_cwi (us_V U') = cw⌝ -∗
      (* THE RESUMER'S OWN GLOBALS, at ITS context -- forkret holds them and
         hands them in, exactly as it does [first_done] and [timer_cap]
         (UsertrapRes.v, the park half; L8, A12.19). *)
@@ -356,7 +361,7 @@ Definition wp_forkret_gen_body
   W -∗
   (* ---- the residue closer -- see the header, and [forkret_closer] above
      for why it is a name rather than the wand spelled out ---- *)
-  forkret_closer URes W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) pid av -∗
+  forkret_closer URes W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U)) pid av -∗
   WP (Loop : expr riscv_lang).
 
 (* The residue is the module-type parameter it is everywhere else: forkret's

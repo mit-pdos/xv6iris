@@ -838,10 +838,14 @@ Section UtRet.
                       (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))
       by (rewrite /Vr; destruct (us_V U); reflexivity).
     assert (Hrdr : ut_round epw scw U0 (MkUstate Vr (us_M U))).
-    { refine (ut_round_ueq epw scw U0 U (MkUstate Vr (us_M U)) _ _ eq_refl _ Hrd).
+    { refine (ut_round_ueq epw scw U0 U (MkUstate Vr (us_M U)) _ _ eq_refl _ _ Hrd).
       - cbn [us_V]. rewrite HVrtf. apply prepare_return_tf_ueq.
       - cbn [us_V]. rewrite HVrupt HVrsz. reflexivity.
-      - cbn [us_V]. exact HVrsz. }
+      - cbn [us_V]. exact HVrsz.
+      - cbn [us_V]. rewrite /Vr; destruct (us_V U); reflexivity. }
+    (* ...and the cwd's inum, which prepare_return's four stores leave alone *)
+    assert (HVrcwi : pv_cwi (us_V (MkUstate Vr (us_M U))) = pv_cwi (us_V U))
+      by (cbn [us_V]; rewrite /Vr; destruct (us_V U); reflexivity).
     (* ...and the exec row across the same re-arming ([ut_exec_out_ueq]):
        the entry frame is untouched and the parked record moves in the four
        kernel words only *)
@@ -852,7 +856,7 @@ Section UtRet.
                     = perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))).
     { cbn [us_V]. rewrite HVrupt HVrsz. reflexivity. }
     iDestruct (ut_exec_out_ueq scw _ _ _ _ _ U (MkUstate Vr (us_M U)) sts0 sts
-                 (tf_ueq_refl _) HVru eq_refl HVrpi HVrsz with "Hxo") as "Hxo".
+                 (tf_ueq_refl _) HVru eq_refl HVrpi HVrsz HVrcwi with "Hxo") as "Hxo".
     (* THE DESCRIPTOR ROW ACROSS prepare_return.  The row reads the parked
        trapframe at a0 alone, and prepare_return re-arms the four KERNEL
        words -- which is exactly what [tf_ueq] is blind to -- so it crosses

@@ -1826,8 +1826,8 @@ Section UservecAllPt.
          [ud_data], which [perm_of] does not read. *)
       match goal with
       | |- uv_round _ _ _ _ _ ?UU =>
-          refine (uv_round_of_ut _ U M g sepc_v sc_v UU _ _ _ _
-                    (ut_round_same sepc_v sc_v _ U2 UU _ _ eq_refl _ Hrd2))
+          refine (uv_round_of_ut _ U M g sepc_v sc_v UU _ _ _ _ _
+                    (ut_round_same sepc_v sc_v _ U2 UU _ _ eq_refl _ _ Hrd2))
       end.
       + exact Hu36.
       + reflexivity.
@@ -1837,10 +1837,14 @@ Section UservecAllPt.
       + (* the ENTRY BREAK: neither [us_tf] nor [upd_usM] moves [pv_sz] *)
         cbn [us_V pv_sz us_upt upd_upt upd_usV upd_usM us_tf upd_tf].
         reflexivity.
+      + (* ...nor the cwd's inum *)
+        cbn [us_V pv_cwi us_upt upd_upt upd_usV upd_usM us_tf upd_tf].
+        reflexivity.
       + cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. exact Hws1.
       + cbn [us_V pv_upt pv_sz us_upt upd_upt upd_usV us_tf upd_tf].
         rewrite Huptpt2. reflexivity.
       + cbn [us_V pv_sz us_upt upd_upt upd_usV us_tf upd_tf]. reflexivity.
+      + cbn [us_V pv_cwi us_upt upd_upt upd_usV us_tf upd_tf]. reflexivity.
     - (* THE ROUND'S DESCRIPTOR HALF, forwarded verbatim: this boundary
          moves no descriptor state of its own -- it saves and restores a
          trapframe -- so whatever usertrap certified about the states is
@@ -1897,6 +1901,8 @@ Section UservecAllPt.
                     ltac:(cbn [us_V pv_upt pv_sz us_upt upd_upt upd_usV us_tf upd_tf];
                           rewrite Huptpt2; reflexivity)
                     eq_refl
+                    ltac:(cbn [us_V pv_cwi us_upt upd_upt upd_usV us_tf upd_tf];
+                          reflexivity)
                     with "Hxo2")
       end.
   Qed.

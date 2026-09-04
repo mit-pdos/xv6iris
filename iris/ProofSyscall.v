@@ -1678,8 +1678,10 @@ Section SyscallVocab.
            syscall reassigns a live process's [pv_fdg], so the bundle is
            stated at the ENTRY record and this equation re-keys it. *)
         ⌜ pv_fdg (us_V U') = pv_fdg (us_V U) ⌝ -∗
-        (* ...and the cwd's inum: chdir (9) alone moves it (lane C1) *)
-        ⌜ sysc_num (us_V U) = 9 \/ pv_cwi (us_V U') = pv_cwi (us_V U) ⌝ -∗
+        (* ...and the cwd's inum: chdir (9) alone moves it, and only when
+           it succeeds (lanes C1/C2) *)
+        ⌜ (sysc_num (us_V U) = 9 /\ uint (pv_tf (us_V U') !!! tf_arg_idx 0) = 0)
+          \/ pv_cwi (us_V U') = pv_cwi (us_V U) ⌝ -∗
         sie_cap_gpr KT1 mf av true pj -∗
         cpu_own 0%nat true pj true lks -∗
         bslots 3 -∗
@@ -1862,8 +1864,10 @@ Section SyscallVocab.
     ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ->
     (* ...and the fd-state ghost name, which no syscall moves *)
     pv_fdg (us_V U') = pv_fdg (us_V U) ->
-    (* ...and the cwd's inum, which only chdir moves (lane C1) *)
-    (sysc_num (us_V U) = 9 \/ pv_cwi (us_V U') = pv_cwi (us_V U)) ->
+    (* ...and the cwd's inum, which only a SUCCESSFUL chdir moves (lanes
+       C1/C2), read at the stored a0 word like the descriptor row *)
+    ((sysc_num (us_V U) = 9 /\ uint (pv_tf (us_V U') !!! tf_arg_idx 0) = 0)
+     \/ pv_cwi (us_V U') = pv_cwi (us_V U)) ->
     (* THIS ARM RETURNS, hence is not [exit] (milestone J, K1) -- the last
        pure premise, so that every call site adds exactly one argument
        immediately before its [with "..."].  Free at every one of them:
@@ -2570,8 +2574,11 @@ Section SyscallRet.
     ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ->
     (* ...and the fd-state ghost name, which no syscall moves *)
     pv_fdg (us_V U') = pv_fdg (us_V U) ->
-    (* ...and the cwd's inum, which only chdir moves (lane C1) *)
-    (sysc_num (us_V U) = 9 \/ pv_cwi (us_V U') = pv_cwi (us_V U)) ->
+    (* ...and the cwd's inum, which only a SUCCESSFUL chdir moves (lanes
+       C1/C2) -- at the return REGISTER here, like the descriptor row: the
+       store below is what turns it into the trapframe-word form *)
+    ((sysc_num (us_V U) = 9 /\ uint (E !!! Regidx (mword_of_int 10 : mword 5)) = 0)
+     \/ pv_cwi (us_V U') = pv_cwi (us_V U)) ->
     (* THIS ARM RETURNS, hence is not [exit] (milestone J, K1) -- the last
        pure premise, so that every call site adds exactly one argument
        immediately before its [with "..."].  Free at every one of them:
@@ -2646,6 +2653,14 @@ Section SyscallRet.
               sts sts').
     { rewrite list_lookup_total_insert; [| exact Hi14].
       rgne. exact Hpiperow. }
+    (* ...and the cwd clause's return value moves from the register to the
+       slot the same way *)
+    assert (Hcwstored : (sysc_num (us_V U) = 9
+                         /\ uint (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U'))
+                                  !!! tf_arg_idx 0) = 0)
+                        \/ pv_cwi (us_V U') = pv_cwi (us_V U)).
+    { rewrite list_lookup_total_insert; [| exact Hi14].
+      rgne. exact Hcwi. }
     assert (Hp3e : add_vec_int (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64) 4
                    = mword_of_int (KernelSyms.syscall + 0x3e)) by pcw.
     iEval (rewrite Hp3e) in "Hpc".
@@ -2692,7 +2707,7 @@ Section SyscallRet.
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_sz]; exact Hszv)
               Hud
               ltac:(cbn [pv_fdg upd_tf]; exact Hfg)
-              ltac:(cbn [us_V us_tf upd_usV upd_tf pv_cwi]; exact Hcwi)
+              ltac:(cbn [us_V us_tf upd_usV upd_tf pv_cwi pv_tf]; exact Hcwstored)
               Hne2
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont Hxo").
   Qed.
@@ -4566,18 +4581,24 @@ Section SyscallArms.
                ⌜ud_tfp (pv_upt V') = ud_tfp (pv_upt (us_V U))⌝ ∗
                (* ...and the fd-state ghost name: chdir moves neither *)
                ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
+               (* ...and the cwd's inum moved ONLY IF THE CALL SUCCEEDED
+                  (lane C2): the -1 arm hands the block back as it was *)
+               ⌜uint (mf !!! Regidx (mword_of_int 10 : mword 5)) = 0
+                \/ pv_cwi V' = pv_cwi (us_V U)⌝ ∗
                (* ...and everything the RESUME state reads *)
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
                ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
                ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' (us_M U)))%I with "[Hpost]" as
-      (V') "(%Htfp' & %Hfg' & %Htfw' & %Hupte' & %Hszv' & Hpriv)".
+      (V') "(%Htfp' & %Hfg' & %Hcw' & %Htfw' & %Hupte' & %Hszv' & Hpriv)".
     { pose proof Hextz as Hue. destruct Hext as (_ & Htf & _).
-      iDestruct "Hpost" as "[[_ Hpv] | (%ipv & %z & _ & Hpv)]".
+      iDestruct "Hpost" as "[[_ Hpv] | (%ipv & %z & %Hr & Hpv)]".
       - iExists (upd_upt (us_V U) P'). iFrame "Hpv". iPureIntro.
-        split_and!; [exact Htf | reflexivity | reflexivity | exact Hue | reflexivity].
+        split_and!; [exact Htf | reflexivity | right; reflexivity | reflexivity
+                     | exact Hue | reflexivity].
       - iExists (upd_cwi (upd_cwd (upd_upt (us_V U) P') ipv) z). iFrame "Hpv". iPureIntro.
-        split_and!; [exact Htf | reflexivity | reflexivity | exact Hue | reflexivity]. }
+        split_and!; [exact Htf | reflexivity | left; rewrite Hr; reflexivity
+                     | reflexivity | exact Hue | reflexivity]. }
     iDestruct (sysc_iref_join with "Hirk Hirc") as "Hir".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
@@ -4608,8 +4629,11 @@ Section SyscallArms.
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
-              (* chdir: the one entry that moves the inum -- the row's left arm *)
-              ltac:(left; rewrite Hnum; reflexivity)
+              (* chdir: the one entry that moves the inum -- the row's left
+                 arm, at a successful call; a failed one is the right arm *)
+              ltac:(destruct Hcw' as [Hz | Heq];
+                    [ left; split; [ rewrite Hnum; reflexivity | exact Hz ]
+                    | right; exact Heq ])
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).

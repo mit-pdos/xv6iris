@@ -59,7 +59,7 @@ Section UkLbuTextPostFetch.
       (imm : mword 12) (lr1 lrd : mword 5)
       (w_ld va : mword 64) (bb : mword 8) (ib : mword 32)
       (t' : ptree) (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (rsE rs2 : regstate) (fdv : list fdstate) :
+      (paddr : type_of_register pmpaddr_n) (rsE rs2 : regstate) (fdv : list fdstate) (cw : Z) :
     uint lrd <> 0 ->
     va = add_vec (m !!! Regidx lr1) (sign_extend' 64 imm) ->
     ud_um pt !! svpn_of va = Some w_ld ->
@@ -94,8 +94,8 @@ Section UkLbuTextPostFetch.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
-          (uvb C pt Rfd Rut sz π fdv M
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw ∗
+          (uvb C pt Rfd Rut sz π fdv cw M
              (<[Regidx lrd := regval_into_reg (zero_extend' 64 bb)]> m)
              (add_vec_int pc 4) -∗
            WP (Loop : expr riscv_lang))) -∗
@@ -205,7 +205,7 @@ Section UkLbuTextPostFetch.
     iApply (uk_psi_active C pt Rfd R Rut sz π M Mp
               (<[Regidx lrd := regval_into_reg wval]> m) (add_vec_int pc 4)
               t'' usatp pcfg paddr
-              (uv_post_rs rsr None (Some (lrd, wval))) fdv
+              (uv_post_rs rsr None (Some (lrd, wval))) fdv cw
               (Tw _ _ Lhs2 ltac:(vm_compute; reflexivity)
                  ltac:(vm_compute; reflexivity) uv_nogpr_hart)
               (Tw _ _ Lcp2 ltac:(vm_compute; reflexivity)
@@ -261,7 +261,7 @@ Section UkLbuTextObl.
       (M Mp : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (w : mword 32)
       (imm : mword 12) (lr1 lrd : mword 5) (w_ld va : mword 64) (bb : mword 8)
       (t : ptree) (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (rs1 rsA : regstate) (fdv : list fdstate) :
+      (paddr : type_of_register pmpaddr_n) (rs1 rsA : regstate) (fdv : list fdstate) (cw : Z) :
     uv_pre C pt Mp m pc t rs1 rsA usatp pcfg paddr ->
     uk_pt_pure pt sz M Mp ->
     udecode_base w (LOAD (imm, Regidx lr1, Regidx lrd, true, 1)) ->
@@ -274,11 +274,11 @@ Section UkLbuTextObl.
     uva_text pt (uint va) ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_Base w) -∗
-    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv ∗
-          ((uvb C pt Rfd Rut sz π fdv M
+    (R -∗ (TsoCtx.own_context XI -∗ Rut pt) ∗ Rfd fdv ∗ ukb C pt Rfd Rut sz π fdv cw ∗
+          ((uvb C pt Rfd Rut sz π fdv cw M
               (<[Regidx lrd := regval_into_reg (zero_extend' 64 bb)]> m)
               (add_vec_int pc 4) -∗ WP (Loop : expr riscv_lang))
-           ∧ uslot (uvis_of_run m pc M π sz fdv))) -∗
+           ∧ uslot (uvis_of_run m pc M π sz fdv cw))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     TsoCtx.own_context XI -∗
@@ -342,7 +342,7 @@ Section UkLbuTextObl.
     iFrame "Hrw Hro".
     iIntros "Hrw Hro".
     iApply (uk_lbu_text_post_fetch C pt Rfd R Rut sz π M Mp m pc imm lr1 lrd
-              w_ld va bb (zero_extend' 32 w) t' usatp pcfg paddr rs1 rs2 fdv
+              w_ld va bb (zero_extend' 32 w) t' usatp pcfg paddr rs1 rs2 fdv cw
               Hrd Hva Hl Hchk Hcanon Hbb Htx Hinj
               Hpins2
               (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
@@ -389,7 +389,7 @@ Section UkLbuText.
     exists q : uperm, uperm_at π va = Some q /\ up_X q = true /\ up_W q = false.
 
   Lemma wp_uk_lbu_text_later (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (imm : mword 12) (rs1 rd : mword 5)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (imm : mword 12) (rs1 rd : mword 5)
       (va wval : mword 64) (bb : mword 8) :
     uk_instr π M pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) ->
     uint rd <> 0 ->
@@ -398,15 +398,15 @@ Section UkLbuText.
     uva_canon va ->
     M !! (uint va) = Some bb ->
     wval = zero_extend' 64 bb ->
-    uvb C pt Rfd Rut sz π fdv M m pc -∗
-    ▷ ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv cw M m pc -∗
+    ▷ ukc π M sz fdv cw (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hva Hkok Hcanon Hbb Hwval. subst wval.
     pose proof (Hui pt sz (loop_ok_wf C pt Hlo) Hpm) as Hui0.
     pose proof (ui_al2 _ _ _ _ _ Hui0) as Hal2.
     iIntros "Hb Hcont".
-    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ M m pc fdv Hal2 with "Hb [] Hcont").
+    iApply (wp_uk_step C pt Rfd Rut π sz Hlo Hpm HRut _ M m pc fdv cw Hal2 with "Hb [] Hcont").
     iModIntro.
     rewrite /uk_step_obl.
     iIntros (R CIDo XIo C' pt' Rfd' Rut' HRut' Mp' t rs1s rsA usatp pcfg paddr)
@@ -441,12 +441,12 @@ Section UkLbuText.
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
     (* the continuation at THIS table, out of the table-generic one *)
-    iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗ ukb C' pt' Rfd' Rut' sz π fdv ∗
-             ((uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv M
+    iAssert (R -∗ (TsoCtx.own_context (CID := CIDo) XIo -∗ Rut' pt') ∗ Rfd' fdv ∗ ukb C' pt' Rfd' Rut' sz π fdv cw ∗
+             ((uvb (CID := CIDo) C' pt' Rfd' Rut' sz π fdv cw M
                  (<[Regidx rd := regval_into_reg (zero_extend' 64 bb)]> m)
                  (add_vec_int pc 4) -∗
                WP (Loop : expr riscv_lang))
-              ∧ uslot (uvis_of_run m pc M π sz fdv)))%I with "[Hk]" as "Hk".
+              ∧ uslot (uvis_of_run m pc M π sz fdv cw)))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hfdr & Hkb & Hkc)".
       iFrame "Hrut Hfdr Hkb". iSplit.
       - iDestruct "Hkc" as "[Hkc _]".
@@ -454,21 +454,21 @@ Section UkLbuText.
         iApply ("Hkc" $! CIDo XIo C' pt' Rfd' Rut' HRut' with "[%] [%] Hb");
           [ exact Hlo' | exact Hpm' ].
       - iDestruct "Hkc" as "[_ Hkc]".
-        rewrite (uslot_run m pc M π sz fdv Hx0 Hal2). iExact "Hkc". }
+        rewrite (uslot_run m pc M π sz fdv cw Hx0 Hal2). iExact "Hkc". }
     iPoseProof (uv_swp_fetch_uinstr (CID := CIDo) (XI := XIo) pt' Mp' t (uc_dqc C')
                   rsA pc false _ Hinj Hui' LpcA LcpA (proj1 HmsokA) LmenvA
                   HpinsA Htok) as "Hf".
     iEval (cbn beta iota) in "Hf".
     iDestruct "Hf" as (w) "[[%HnRVC %Hdecbase] Hbridge]".
     iApply (uk_lbu_text_obl_base C' pt' Rfd' R Rut' sz π M Mp' m pc w imm rs1 rd
-              w_ld va bb t usatp pcfg paddr rs1s rsA fdv Hpre Hpure
+              w_ld va bb t usatp pcfg paddr rs1s rsA fdv cw Hpre Hpure
               Hdecbase Hrd Hva Hl Hchk Hcanon Hbb' Htx
               with "Hcert Hamb Hbridge Hk Hany Hrw Hro Hctx Hmm Hres").
   Qed.
 
   (* the later-free restatement: the shape the run layer takes *)
   Lemma wp_uk_lbu_text_x (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (fdv : list fdstate) (imm : mword 12) (rs1 rd : mword 5)
+      (pc : mword 64) (fdv : list fdstate) (cw : Z) (imm : mword 12) (rs1 rd : mword 5)
       (va wval : mword 64) (bb : mword 8) :
     uk_instr π M pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) ->
     uint rd <> 0 ->
@@ -477,13 +477,13 @@ Section UkLbuText.
     uva_canon va ->
     M !! (uint va) = Some bb ->
     wval = zero_extend' 64 bb ->
-    uvb C pt Rfd Rut sz π fdv M m pc -∗
-    ukc π M sz fdv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
+    uvb C pt Rfd Rut sz π fdv cw M m pc -∗
+    ukc π M sz fdv cw (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hva Hkok Hcanon Hbb Hwval.
     iIntros "Hb Hcont".
-    iApply (wp_uk_lbu_text_later M m pc fdv imm rs1 rd va wval bb
+    iApply (wp_uk_lbu_text_later M m pc fdv cw imm rs1 rd va wval bb
               Hui Hrd Hva Hkok Hcanon Hbb Hwval with "Hb [Hcont]").
     iApply bi.later_intro. iExact "Hcont".
   Qed.

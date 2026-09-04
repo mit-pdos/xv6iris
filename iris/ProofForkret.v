@@ -253,7 +253,7 @@ Lemma fkr_tail
      that applies the closer has to be holding them. *)
   UsertrapRes.park_globals cur_ctx γs γw γft γf γtl -∗
   forkret_closer (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
-                 W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) pid av -∗
+                 W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U)) pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hpr Havsum Hmtsp Hmts1.
@@ -324,6 +324,8 @@ Proof.
                 [upd_tf] does not touch: the closer this proof feeds was
                 stated at the parked process's name. *)
              ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
+             (* ...nor the cwd's inum *)
+             ⌜pv_cwi V' = pv_cwi (us_V U)⌝ ∗
              (* ...and that the four kernel stores are INVISIBLE to the
                 resume state ([SpecPrepareReturn.prepare_return_tf_ueq]).
                 Milestone J's entry needs it: the slot the park deposited is
@@ -331,9 +333,10 @@ Proof.
                 sret's to is the [sepc] cell prepare_return wrote from it. *)
              ⌜tf_ueq (pv_tf (us_V U)) (pv_tf V')⌝ ∗
              UsertrapRes.ut_tfk (CID := CIDf) ksp V' ∗ proc_priv γf p pid (MkUstate V' ((us_M U))))%I
-    with "[Hpv]" as (V') "(%HuptV' & %Hfg & %Htueq & #Htfk & Hpv)".
+    with "[Hpv]" as (V') "(%HuptV' & %Hfg & %Hcwi & %Htueq & #Htfk & Hpv)".
   { iExists (upd_tf (us_V U) (prepare_return_tf (pv_tf (us_V U)) ksat ksp (cid_word (CID := CIDf)))).
     iFrame "Hpv". iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro;
               exact (prepare_return_tf_ueq (pv_tf (us_V U)) ksat ksp
@@ -715,11 +718,13 @@ Proof.
      process's own continuation, so the second is what the trap loop's
      first round consumes. *)
   iDestruct ("Hyield" $! CIDf XI pt (MkUstate (upd_upt V' pt) (us_M U))
-               with "[%] [%] [%] [%] Hpg Htfk' Hdone HW Htc Hyld")
-    as (sts) "[Hures Hslot]"; [reflexivity | exact Hnorm | exact Hptwf | | ].
+               with "[%] [%] [%] [%] [%] Hpg Htfk' Hdone HW Htc Hyld")
+    as (sts) "[Hures Hslot]"; [reflexivity | exact Hnorm | exact Hptwf | | | ].
   (* the resumed record names the parked process's fd-state ghost: forkret
      moved only [pv_upt], and [upd_upt] does not touch [pv_fdg]. *)
   { exact Hfg. }
+  (* ...nor [pv_cwi] *)
+  { exact Hcwi. }
   (* ---- the config record for this round ---- *)
   assert (HSEa0 : tp_pin SE !!! Regidx (mword_of_int 10)
                   = kvi_satp_word (ud_root pt)).
@@ -870,7 +875,7 @@ Lemma fkr_boot
      that applies the closer has to be holding them. *)
   UsertrapRes.park_globals cur_ctx γs γw γft γf γtl -∗
   forkret_closer (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc))
-                 W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) pid av -∗
+                 W γs γw γft γf γtl p ksp (pv_fdg (us_V U)) (pv_cwi (us_V U)) pid av -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1.
@@ -1461,6 +1466,11 @@ Proof.
   { destruct Hkok as [ (_ & HV') | Hs ].
     - exact (f_equal pv_fdg HV').
     - destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & Hfg & _). exact Hfg. }
+  (* ...and the cwd's inum, which exec inherits ([SpecKexec.kexec_ok]) *)
+  assert (Hcwik : pv_cwi V' = pv_cwi (us_V U)).
+  { destruct Hkok as [ (_ & HV') | Hs ].
+    - exact (f_equal pv_cwi HV').
+    - destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hcwi & _). exact Hcwi. }
   assert (Hpck : ret_pc (D5 !!! Regidx Rra : mword 64) = mword_of_int (FR + 0x56))
     by (rewrite HD5ra; pcw).
   iEval (rewrite Hpck) in "Hpc".
@@ -1673,7 +1683,7 @@ Proof.
                     Hpriv Hdone HW Hpg [Hyield]").
     (* [upd_tf] does not touch [pv_fdg], so the closer the caller handed in
        at the ENTRY record's name is the one this tail wants. *)
-    iEval (cbn [pv_fdg upd_tf]; rewrite Hfgk). iExact "Hyield".
+    iEval (cbn [pv_fdg pv_cwi upd_tf]; rewrite Hfgk Hcwik). iExact "Hyield".
 Qed.
 
 Theorem wp_forkret

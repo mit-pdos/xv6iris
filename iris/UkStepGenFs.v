@@ -76,7 +76,7 @@ Section UkGenFs.
   Lemma uslot_fs_unfold_gen (γm : gname) (W : uvis) :
     uslot_fs γm W ⊣⊢
     ukc' (uexec_ret_fs_F γm) (uslot_fs γm) (fun xi : CurCtx => xi = XI)
-      (uvis_perm W) (uvis_M W) (uvis_sz W) (uvis_fd W)
+      (uvis_perm W) (uvis_M W) (uvis_sz W) (uvis_fd W) (uvis_cwd W)
       (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)).
   Proof.
     rewrite (uslot_fs_unfold γm W) /ukc'.
@@ -118,22 +118,22 @@ Section UkGenFs.
       (γm : gname) (h : CpuId) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (π : gmap (mword 27) uperm) (sz : Z)
-      (M : gmap Z (bv 8)) (fdv : list fdstate) (m : regfile) (pc : mword 64) :
+      (M : gmap Z (bv 8)) (fdv : list fdstate) (cw : Z) (m : regfile) (pc : mword 64) :
     loop_ok C pt ->
     perm_of (ud_um pt) sz = π ->
     (forall pt' : uptd,
          ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h) TsoCtx.cur_ctx ∗
                       (TsoCtx.own_context (CID := h) TsoCtx.cur_ctx -∗ Rut pt')) ->
     uk_instr π M pc false (ECALL tt) ->
-    uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv M m pc -∗
-    uexec_ret_fs γm uecall_scause (uvis_of_run m pc M π sz fdv) -∗
+    uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv cw M m pc -∗
+    uexec_ret_fs γm uecall_scause (uvis_of_run m pc M π sz fdv cw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hlo Hpm HRut Hui.
     exact (wp_uk_ecall' (uexec_ret_fs_F γm) (uslot_fs γm)
              (fun xi : CurCtx => xi = XI)
              (uslot_fs_unfold_gen γm) (uexec_ret_fs_transparent γm)
-             (CID := h) C pt Rfd Rut π sz Hlo Hpm HRut eq_refl M m pc fdv Hui
+             (CID := h) C pt Rfd Rut π sz Hlo Hpm HRut eq_refl M m pc fdv cw Hui
              (uk_ecall_goodmb pc)).
   Qed.
 
@@ -141,11 +141,11 @@ Section UkGenFs.
      [ukc'] with the ambient-context binder collapsed, so the two directions
      are the two directions of [Q]'s singleton. *)
   Lemma ukc_fs_gen (γm : gname) (π : gmap (mword 27) uperm)
-      (M : gmap Z (bv 8)) (szv : Z) (fdv : list fdstate)
+      (M : gmap Z (bv 8)) (szv : Z) (fdv : list fdstate) (cw : Z)
       (m : regfile) (pc : mword 64) :
-    ukc_fs γm π M szv fdv m pc ⊣⊢
+    ukc_fs γm π M szv fdv cw m pc ⊣⊢
     ukc' (uexec_ret_fs_F γm) (uslot_fs γm) (fun xi : CurCtx => xi = XI)
-      π M szv fdv m pc.
+      π M szv fdv cw m pc.
   Proof.
     rewrite /ukc_fs /ukc'.
     iSplit.
@@ -162,7 +162,7 @@ Section UkGenFs.
   Lemma wp_uk_retire_fs_later_proved
       (γm : gname) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
-      (π : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate)
+      (π : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate) (cw : Z)
       `{CID : CpuId} :
     loop_ok C pt ->
     perm_of (ud_um pt) sz = π ->
@@ -179,8 +179,8 @@ Section UkGenFs.
     uk_gmb_at m pc is_rvc i ->
     uk_gmb_at m pc is_rvc (uv_exp i o) ->
     uk_exec_at m pc is_rvc (uv_exp i o) jt wr ->
-    uvb_fs (CID := CID) γm C pt Rfd Rut sz π fdv M m pc -∗
-    ▷ ukc_fs γm π M sz fdv (uv_upd m wr)
+    uvb_fs (CID := CID) γm C pt Rfd Rut sz π fdv cw M m pc -∗
+    ▷ ukc_fs γm π M sz fdv cw (uv_upd m wr)
         (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -189,7 +189,7 @@ Section UkGenFs.
     iApply (wp_uk_retire_later' (uexec_ret_fs_F γm) (uslot_fs γm)
               (fun xi : CurCtx => xi = XI)
               (uslot_fs_unfold_gen γm) (uexec_ret_fs_transparent γm)
-              C pt Rfd Rut π sz Hlo Hpm HRut eq_refl M m pc fdv is_rvc i o jt wr
+              C pt Rfd Rut π sz Hlo Hpm HRut eq_refl M m pc fdv cw is_rvc i o jt wr
               Hui Hred Hlpad Hwrok Hg1 Hg2 Hex with "Hb [Hcont]").
     iNext. iApply (ukc_fs_gen with "Hcont").
   Qed.
@@ -206,15 +206,15 @@ Module FdRowUkfsStepGen <: FDROW_UKFS_STEP.
       (γm : gname) (h : CpuId) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (π : gmap (mword 27) uperm) (sz : Z)
-      (M : gmap Z (bv 8)) (fdv : list fdstate) (m : regfile) (pc : mword 64),
+      (M : gmap Z (bv 8)) (fdv : list fdstate) (cw : Z) (m : regfile) (pc : mword 64),
       loop_ok C pt ->
       perm_of (ud_um pt) sz = π ->
       (forall pt' : uptd,
          ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h) TsoCtx.cur_ctx ∗
                       (TsoCtx.own_context (CID := h) TsoCtx.cur_ctx -∗ Rut pt')) ->
       uk_instr π M pc false (ECALL tt) ->
-      uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv M m pc -∗
-      uexec_ret_fs γm uecall_scause (uvis_of_run m pc M π sz fdv) -∗
+      uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv cw M m pc -∗
+      uexec_ret_fs γm uecall_scause (uvis_of_run m pc M π sz fdv cw) -∗
       WP (Loop : expr riscv_lang).
   Proof. intros. apply wp_uk_ecall_fs_step_proved; assumption. Qed.
 End FdRowUkfsStepGen.
@@ -235,7 +235,7 @@ Module FdRowUkfsRetireGen <: FDROW_UKFS_RETIRE.
            `{!ghost_varG Σ Z} `{!ghost_varG Σ umirror}
       (γm : gname) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
-      (π : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate),
+      (π : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate) (cw : Z),
       loop_ok C pt ->
       perm_of (ud_um pt) sz = π ->
       (forall pt' : uptd,
@@ -251,8 +251,8 @@ Module FdRowUkfsRetireGen <: FDROW_UKFS_RETIRE.
       uk_gmb_at m pc is_rvc i ->
       uk_gmb_at m pc is_rvc (uv_exp i o) ->
       uk_exec_at m pc is_rvc (uv_exp i o) jt wr ->
-      uvb_fs (CID := CID) γm C pt Rfd Rut sz π fdv M m pc -∗
-      ▷ ukc_fs γm π M sz fdv (uv_upd m wr)
+      uvb_fs (CID := CID) γm C pt Rfd Rut sz π fdv cw M m pc -∗
+      ▷ ukc_fs γm π M sz fdv cw (uv_upd m wr)
           (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
       WP (Loop : expr riscv_lang).
   Proof.

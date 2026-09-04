@@ -240,10 +240,10 @@ Section UkRunSysFs.
   Lemma uvb_fs_x0 (γm : gname) (h : CpuId) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ)
       (Rut : uptd -> iProp Σ) (sz : Z) (π : gmap (mword 27) uperm)
-      (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) :
-    uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv M m pc -∗
+      (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (fdv : list fdstate) (cw : Z) :
+    uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv cw M m pc -∗
     ⌜m !!! Regidx (mword_of_int 0) = zero_reg⌝ ∗
-    uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv M m pc.
+    uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv cw M m pc.
   Proof.
     rewrite /uvb_fs /uvb_fs_F.
     iIntros "(Hamb & Hur & %Hsz & Hpt & Hfrag & Hcfg & Hg & Hpc & Hrut & Hk)".
@@ -258,7 +258,7 @@ Section UkRunSysFs.
      with the enriched bundle.  A leaf's continuation is this; the enriched
      slot IS this at the key's own state ([uslot_fs_ukc]). *)
   Definition ukc_fs (γm : gname) (π : gmap (mword 27) uperm)
-      (M : gmap Z (bv 8)) (szv : Z) (fdv : list fdstate)
+      (M : gmap Z (bv 8)) (szv : Z) (fdv : list fdstate) (cw : Z)
       (m : regfile) (pc : mword 64) : iProp Σ :=
     (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rfd : list fdstate -> iProp Σ)
        (Rut : uptd -> iProp Σ)
@@ -267,12 +267,12 @@ Section UkRunSysFs.
                               (TsoCtx.own_context (CID := h) TsoCtx.cur_ctx -∗ Rut pt')),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) szv = π⌝ -∗
-       uvb_fs (CID := h) γm C pt Rfd Rut szv π fdv M m pc -∗
+       uvb_fs (CID := h) γm C pt Rfd Rut szv π fdv cw M m pc -∗
        WP (Loop : expr riscv_lang))%I.
 
   Lemma uslot_fs_ukc (γm : gname) (W : uvis) :
     uslot_fs γm W ⊣⊢
-    ukc_fs γm (uvis_perm W) (uvis_M W) (uvis_sz W) (uvis_fd W)
+    ukc_fs γm (uvis_perm W) (uvis_M W) (uvis_sz W) (uvis_fd W) (uvis_cwd W)
       (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)).
   Proof. exact (uslot_fs_unfold γm W). Qed.
 
@@ -280,16 +280,16 @@ Section UkRunSysFs.
      after the syscall returned (a0 := r, pc + 4) *)
   Lemma uslot_fs_bump_run (γm : gname) (m : regfile) (pc : mword 64)
       (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z)
-      (fdv fdv' : list fdstate) (r : mword 64) :
+      (fdv fdv' : list fdstate) (cw cw' : Z) (r : mword 64) :
     m !!! Regidx (mword_of_int 0) = zero_reg ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-    uslot_fs γm (bump (uvis_of_run m pc M π szv fdv) r M' π' szv' fdv')
-    ⊣⊢ ukc_fs γm π' M' szv' fdv' (<[Regidx (mword_of_int 10) := r]> m)
+    uslot_fs γm (bump (uvis_of_run m pc M π szv fdv cw) r M' π' szv' fdv' cw')
+    ⊣⊢ ukc_fs γm π' M' szv' fdv' cw' (<[Regidx (mword_of_int 10) := r]> m)
                 (add_vec_int pc 4).
   Proof.
     intros Hx0 Hal. rewrite uslot_fs_ukc.
-    rewrite (bump_run_gpr m pc M M' π π' szv szv' fdv fdv' r Hx0)
-            (bump_run_pc m pc M M' π π' szv szv' fdv fdv' r Hal).
+    rewrite (bump_run_gpr m pc M M' π π' szv szv' fdv fdv' cw cw' r Hx0)
+            (bump_run_pc m pc M M' π π' szv szv' fdv fdv' cw cw' r Hal).
     reflexivity.
   Qed.
 
@@ -297,7 +297,7 @@ Section UkRunSysFs.
   (* §3 THE RE-CLOSE, at [urun_fs] -- [UkRun.urun_close(_upd)]'s twins.    *)
   (* =================================================================== *)
   Lemma urun_fs_close (γm γt γd γs γfd : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate)
+      (pm : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate) (cw : Z)
       (m : regfile) (pc : mword 64)
       (avail : nat) :
     uheap γt γd γs M pm -∗
@@ -306,19 +306,19 @@ Section UkRunSysFs.
     ufd_state γfd fdv -∗
     (∀ h : CpuId,
        urun_fs γm γt γd γs γfd h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
-    ukc_fs γm pm M sz fdv m pc.
+    ukc_fs γm pm M sz fdv cw m pc.
   Proof.
     iIntros "Hheap Hstk Hufd Hcont".
     rewrite /ukc_fs. iIntros (h C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h). rewrite /urun_fs.
-    iExists C, pt, Rfd, Rut, sz, M, pm, fdv.
+    iExists C, pt, Rfd, Rut, sz, M, pm, fdv, cw.
     iFrame "Hheap Hstk Hufd Hb". iPureIntro.
     split_and!; [ exact Hlo | exact Hpm | exact HRut ].
   Qed.
 
   Lemma urun_fs_close_upd (γm γt γd γs γfd : gname) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5)
-      (v : mword 64) (sz : Z) (fdv : list fdstate) (pc' : mword 64)
+      (v : mword 64) (sz : Z) (fdv : list fdstate) (cw : Z) (pc' : mword 64)
       (avail : nat) :
     unot_sp rd ->
     uheap γt γd γs M pm -∗
@@ -327,7 +327,7 @@ Section UkRunSysFs.
     (∀ h : CpuId,
        urun_fs γm γt γd γs γfd h (<[Regidx rd := v]> m) pc' avail -∗
        WP (Loop : expr riscv_lang)) -∗
-    ukc_fs γm pm M sz fdv (<[Regidx rd := v]> m) pc'.
+    ukc_fs γm pm M sz fdv cw (<[Regidx rd := v]> m) pc'.
   Proof.
     intros Hns. iIntros "Hheap Hstk Hufd Hcont".
     iApply (urun_fs_close with "Hheap [Hstk] Hufd Hcont").
@@ -348,7 +348,7 @@ Section UkRunSysFs.
       (STEP : forall (γm' : gname) (h' : CpuId) (C : ucfg) (pt : uptd)
                 (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (π : gmap (mword 27) uperm) (sz : Z)
-                (M : gmap Z (bv 8)) (fdv' : list fdstate)
+                (M : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z)
                 (m' : regfile) (pc' : mword 64),
                 loop_ok C pt ->
                 perm_of (ud_um pt) sz = π ->
@@ -356,9 +356,9 @@ Section UkRunSysFs.
          ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h') TsoCtx.cur_ctx ∗
                       (TsoCtx.own_context (CID := h') TsoCtx.cur_ctx -∗ Rut pt')) ->
                 uk_instr π M pc' false (ECALL tt) ->
-                uvb_fs (CID := h') γm' C pt Rfd Rut sz π fdv' M m' pc' -∗
+                uvb_fs (CID := h') γm' C pt Rfd Rut sz π fdv' cw' M m' pc' -∗
                 uexec_ret_fs γm' uecall_scause
-                  (uvis_of_run m' pc' M π sz fdv') -∗
+                  (uvis_of_run m' pc' M π sz fdv' cw') -∗
                 WP (Loop : expr riscv_lang))
       (γm γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (n : Z) (u : umirror) (pl : list (bv 8)) (dq : dfrac) (avail : nat) :
@@ -370,7 +370,7 @@ Section UkRunSysFs.
     intros Hn Hdom Hal4.
     rewrite /wp_uk_ecall_fs_body.
     iIntros "#Hi Hrun Hmc Hstr Hcont".
-    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv)
+    iDestruct "Hrun" as (C pt Rfd Rut sz M pm fdv cw)
       "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_fs_x0 with "Hb") as "[%Hx0 Hb]".
@@ -378,13 +378,13 @@ Section UkRunSysFs.
     iDestruct (uheap_ustrq with "Hheap Hstr") as %Hread.
     assert (Hread0 : ustr_read M (uint (ufs_arg (tf_of m pc) 0)) = Some pl)
       by exact Hread.
-    iApply (STEP γm h C pt Rfd Rut pm sz M fdv m pc Hlo Hpm HRut Hui with "Hb").
+    iApply (STEP γm h C pt Rfd Rut pm sz M fdv cw m pc Hlo Hpm HRut Hui with "Hb").
     (* ---- the ENRICHED return, at the trap-out key ---- *)
     rewrite /uexec_ret_fs /uexec_ret_fs_F.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hc];
       [| exfalso; exact (Hc eq_refl) ].
     cbv zeta.
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv)) = n).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) = n).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum.
     destruct (uenr_dom_rows n Hdom)
@@ -396,7 +396,7 @@ Section UkRunSysFs.
     rewrite Hdom.
     (* THE DEPOSIT: the process takes the arm's RIGHT disjunct *)
     iRight. iExists u. iFrame "Hmc".
-    iIntros (r M' pm' sz' fdv' u') "%Hok %Hfdok %Hpiperow %Hstep Hmc".
+    iIntros (r M' pm' sz' fdv' cw' u') "%Hok %Hfdok %Hpiperow %Hcwrow %Hstep Hmc".
     (* the enriched rows are QUIET: nothing about the image moved *)
     destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _
                 Hexec Hsbrk Hwait Hpipe Hrd Hfst Hok) as [-> [-> ->]].
@@ -411,8 +411,8 @@ Section UkRunSysFs.
     iMod (ufd_state_move γfd n (tf_of m pc) r fdv fdv'
             (uenr_dom_ne_close n Hdom) Hfdok with "Hufd") as "Hufd".
     iModIntro.
-    rewrite (uslot_fs_bump_run γm m pc M M pm pm sz sz fdv fdv' r Hx0 Hal4).
-    iApply (urun_fs_close_upd γm γt γd γs γfd M pm m (mword_of_int 10) r sz fdv'
+    rewrite (uslot_fs_bump_run γm m pc M M pm pm sz sz fdv fdv' cw cw' r Hx0 Hal4).
+    iApply (urun_fs_close_upd γm γt γd γs γfd M pm m (mword_of_int 10) r sz fdv' cw'
               (add_vec_int pc 4) avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               with "Hheap Hstk Hufd").
@@ -441,7 +441,7 @@ Module Type FDROW_UKFS_STEP.
       (γm : gname) (h : CpuId) (C : ucfg) (pt : uptd)
       (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
       (π : gmap (mword 27) uperm) (sz : Z)
-      (M : gmap Z (bv 8)) (fdv : list fdstate) (m : regfile) (pc : mword 64),
+      (M : gmap Z (bv 8)) (fdv : list fdstate) (cw : Z) (m : regfile) (pc : mword 64),
       loop_ok C pt ->
       perm_of (ud_um pt) sz = π ->
       (* A6.140: the loop borrows the running token out of [Rut pt] per step *)
@@ -449,8 +449,8 @@ Module Type FDROW_UKFS_STEP.
          ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h) TsoCtx.cur_ctx ∗
                       (TsoCtx.own_context (CID := h) TsoCtx.cur_ctx -∗ Rut pt')) ->
       uk_instr π M pc false (ECALL tt) ->
-      uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv M m pc -∗
-      uexec_ret_fs γm uecall_scause (uvis_of_run m pc M π sz fdv) -∗
+      uvb_fs (CID := h) γm C pt Rfd Rut sz π fdv cw M m pc -∗
+      uexec_ret_fs γm uecall_scause (uvis_of_run m pc M π sz fdv cw) -∗
       WP (Loop : expr riscv_lang).
 End FDROW_UKFS_STEP.
 

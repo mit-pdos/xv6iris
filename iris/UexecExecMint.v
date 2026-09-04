@@ -151,9 +151,9 @@ Section UexecExecMint.
     iNext.
     rewrite /ukb_F.
     iEval (rewrite /ukb_x_F) in "Hk".
-    iIntros (W' sc stv) "%Hp %Hs' %Hf' (Htm & Hfr & Hret)".
-    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [Htm Hfr Hret]");
-      [exact Hp | exact Hs' | exact Hf' |].
+    iIntros (W' sc stv) "%Hp %Hs' %Hf' %Hc' (Htm & Hfr & Hret)".
+    iApply ("Hk" $! W' sc stv with "[%] [%] [%] [%] [Htm Hfr Hret]");
+      [exact Hp | exact Hs' | exact Hf' | exact Hc' |].
     iFrame "Htm Hfr".
     iApply (uexec_ret_x_of_bundle with "IH [] Hret").
     iApply (xbundle_mint with "Henv").

@@ -1028,11 +1028,12 @@ Section UtD0.
       assert (HV'tf : pv_tf V' = pv_tf (us_V U))
         by (rewrite /V'; destruct (us_V U); reflexivity).
       assert (Hrd' : ut_round epv scv U0 (MkUstate V' (us_M U))).
-      { refine (ut_round_same epv scv U0 U (MkUstate V' (us_M U)) _ _ eq_refl _ Hrd).
+      { refine (ut_round_same epv scv U0 U (MkUstate V' (us_M U)) _ _ eq_refl _ _ Hrd).
         - cbn [us_V]. exact HV'tf.
         - cbn [us_V]. rewrite HV'upt HV'sz.
           exact (perm_of_uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) Pd Hextd).
-        - cbn [us_V]. exact HV'sz. }
+        - cbn [us_V]. exact HV'sz.
+        - cbn [us_V]. rewrite /V'; destruct (us_V U); reflexivity. }
       iAssert (ut_exec_out scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) (us_M U0)
                  (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
                  (uint (pv_sz (us_V U0))) (MkUstate V' (us_M U)) sts sts) as "Hxo".

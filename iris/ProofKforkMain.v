@@ -533,7 +533,7 @@ Section KforkArms.
        own table, which is the one the child is parked and resumed at.
        LINEAR, unlike the two rows above it: see [SpecKfork]'s premise of the
        same name. *)
-    (∀ W : uvis, ⌜uvis_fd W = stsP⌝ -∗ uslot W) -∗
+    (∀ W : uvis, ⌜uvis_fd W = stsP /\ uvis_cwd W = pv_cwi (us_V Up)⌝ -∗ uslot W) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
@@ -671,6 +671,18 @@ Section KforkArms.
       iEval (rewrite Hnpa) in "Hpvcx4".
       iEval (rewrite Hnpa) in "Hmk".
       iEval (rewrite Hnpa) in "Hkst".
+      (* THE FAMILY, RE-KEYED ONTO THE CHILD'S BLOCK: it arrived restricted
+         to the PARENT's working directory ([SpecKfork]'s premise), and the
+         child's block was built at that inum (B4's post, lane C1), so the
+         two restrictions are the same one. *)
+      assert (Hcwi4 : pv_cwi Vc4 = pv_cwi (us_V Up))
+        by (destruct HVc4 as (_ & _ & _ & _ & _ & _ & _ & Hc); exact Hc).
+      iAssert (∀ W : uvis,
+                 ⌜uvis_fd W = stsP
+                  /\ uvis_cwd W = pv_cwi (us_V (MkUstate Vc4 ((us_M Uc'))))⌝
+                 -∗ uslot W)%I with "[Hjslot]" as "Hjslot".
+      { iIntros (W) "%HW". iApply "Hjslot". iPureIntro.
+        cbn [us_V] in HW. rewrite Hcwi4 in HW. exact HW. }
       (* ---- ProofKforkB5: the two lock crossings, the RUNNABLE park ---- *)
       (* pass B5's exit arm as THIS proof's [b] (with [eq_sym Hbeq] for B5's
          own [b = match lvl ...] premise) rather than as the [match] itself:
