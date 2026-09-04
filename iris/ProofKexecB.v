@@ -213,6 +213,7 @@ Section KexecBBody.
   (* =================================================================== *)
   Lemma kxc_b1
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gf : gname)
@@ -236,6 +237,10 @@ Section KexecBBody.
          Nothing else about the block moves -- it reads [elf.phnum] and
          [elf.phoff] out of exactly the same run. *)
       (ef : nat -> bv 8) :
+    (* THE FAILURE-SIDE PLUG (S5).  This stretch owns exactly ONE [bad:]
+       tail -- proc_pagetable returned 0 -- so its cause is [KfNoMem] on
+       the nose, and that is the only premise it takes. *)
+    QF KexecOkQ.KfNoMem ->
     (K_kexec <= K)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
     0 < fsc_size <= BPB ->
@@ -289,7 +294,7 @@ Section KexecBBody.
     kxc_frameA6x sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) ef -∗
     (* ---- kexec's OWN continuation: the +0x31c tail closes the -1 arm ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
            eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- OUTPUT 1: [elf.phnum = 0], the loop is skipped ---- *)
@@ -308,7 +313,7 @@ Section KexecBBody.
            +0x31c tail above already owns one copy, so the successor cannot
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
+          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
                eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -329,13 +334,13 @@ Section KexecBBody.
            +0x31c tail above already owns one copy, so the successor cannot
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
+          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
                eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
+    intros Hqfnm HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
            Hk Hib Hn2 Hsp Hra Hs0 Hs1 Hs2
            HM90sp HM90s0 HM90s1 HM90s2 HM90s4 HM90thr.
     pose proof HK as HK'. 
@@ -1286,12 +1291,12 @@ Section KexecBBody.
                      (CID8 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID8 true (proc_addr jp) _ Hcr8
                    with "Hcont") as "Hcont".
-      iApply (A.kxc_bad64 Q gs jp gl pd pav pu
+      iApply (A.kxc_bad64 Q QF gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
                 m B1 K eb lks sp0 ra0 s00 s10 s20 pv av
-                HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
+                (ex_intro _ KexecOkQ.KfNoMem Hqfnm) HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
                 Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HB1sp HB1s4 HB1thr
                 with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr
                       Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits

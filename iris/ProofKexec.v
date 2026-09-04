@@ -179,6 +179,7 @@ Section KexecTail.
   (* ------------------------------------------------------------------ *)
   Local Lemma kxc_d_tail `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -200,6 +201,15 @@ Section KexecTail.
        [KexecBuilt.kexec_built]. *)
     (forall U' : ustate,
        kexec_built fb ef sz1 na alen afun U' -> Q (kxq_entry ef) U') ->
+    (* THE FAILURE-SIDE PLUG'S TWO CAUSES (S5), relayed to phases C/D:
+       [KfNoMem] for the copyout / allocation tails and, at the size the
+       run settled on, [KfArgsFit] for the two [sp < stackbase] tails. *)
+    QF KexecOkQ.KfNoMem ->
+    (forall z : Z,
+       (KexecBuilt.kxb_walk_ok fb ef ->
+          (z = UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
+               + 2 * PageGeom.PGSIZE)%Z) ->
+       ~ kxc_stack_ok z (z - PageGeom.PGSIZE) alen na -> QF KexecOkQ.KfArgsFit) ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -218,23 +228,23 @@ Section KexecTail.
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
            pfun av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
+    intros HQe Hqfnm Hqfaf HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12.
     iIntros "#Htext Hst Hcont".
-    iApply (PC.kxc_c_close (CID0 := CID0) Q jp gf
+    iApply (PC.kxc_c_close (CID0 := CID0) Q QF jp gf
  plen pfun na avf alen aslen afun
               pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi (pv_sz (us_V U)) sz1 c
-              HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
+              Hqfnm Hqfaf HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               with "Htext Hst Hcont []").
     iIntros (CIDd) "%Hsd". iIntros (Md Pd Mid) "Hst2a6 Hcont".
-    iApply (PD.kxd_phaseD (CID0 := CIDd) Q jp gf
+    iApply (PD.kxd_phaseD (CID0 := CIDd) Q QF jp gf
  plen pfun na avf alen aslen afun
               pidv U eb dqb dqs dqa dqpv dqas m Md K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef Pd Mid sz1 c
@@ -248,6 +258,7 @@ Section KexecTail.
   (* ------------------------------------------------------------------ *)
   Local Lemma kxc_cd `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -269,6 +280,15 @@ Section KexecTail.
        instantiates it with its own [sz1]. *)
     (forall (szg : mword 64) (U' : ustate),
        kexec_built fb ef szg na alen afun U' -> Q (kxq_entry ef) U') ->
+    (* THE FAILURE-SIDE PLUG'S TWO CAUSES (S5), relayed to phases C/D:
+       [KfNoMem] for the copyout / allocation tails and, at the size the
+       run settled on, [KfArgsFit] for the two [sp < stackbase] tails. *)
+    QF KexecOkQ.KfNoMem ->
+    (forall z : Z,
+       (KexecBuilt.kxb_walk_ok fb ef ->
+          (z = UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
+               + 2 * PageGeom.PGSIZE)%Z) ->
+       ~ kxc_stack_ok z (z - PageGeom.PGSIZE) alen na -> QF KexecOkQ.KfArgsFit) ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -288,12 +308,12 @@ Section KexecTail.
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi szv (m !!! Regidx Rs11) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
            pfun av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HQe HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+    intros HQe Hqfnm Hqfaf HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
            Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12.
     iIntros "#Htext Hst Hcont".
@@ -314,11 +334,11 @@ Section KexecTail.
       iSplitR; [iPureIntro; exact Hal |].
       iSplitR; [iPureIntro; exact Hpure3 |].
       iExact "Hrest". }
-    iApply (PC.kxc_c_setup (CID0 := CID0) Q jp gf
+    iApply (PC.kxc_c_setup (CID0 := CID0) Q QF jp gf
  plen pfun na avf alen aslen
               afun pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi szv
-              HK Hmsp Hmra Hms0 Hms1 Hms2
+              Hqfnm HK Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               Halen_b Halen_c Halen_4 Havf_na
               with "Htext Hst Hcont []").
@@ -344,29 +364,29 @@ Section KexecTail.
         iSplitR; [iPureIntro; exact Hq3 |].
         iSplitR; [iPureIntro; exact Hq4 |].
         iExact "Hrest2". }
-      iApply (PC.kxc_argv_loop (CID0 := CID1) Q jp gf
+      iApply (PC.kxc_argv_loop (CID0 := CID1) Q QF jp gf
  plen pfun na avf alen aslen
                 afun pidv U eb dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef (pv_sz (us_V U)) sz1
-                HK Halen_b Halen_c Halen_4 Havf_na Hsz1ge Hnamax Hal
+                Hqfnm Hqfaf HK Halen_b Halen_c Halen_4 Havf_na Hsz1ge Hnamax Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 na M1 P1 Mim1 0%nat H0na ltac:(lia)
                 with "Htext Hloop Hcont []").
       iIntros (CID2) "%Hs2". iIntros (M2 P2 Mim2 c2) "Hst272 Hcont".
-      iApply (kxc_d_tail (CID0 := CID2) Q jp gf
+      iApply (kxc_d_tail (CID0 := CID2) Q QF jp gf
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m M2 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P2 Mim2 sz1 c2
-                (HQe sz1) HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
+                (HQe sz1) Hqfnm Hqfaf HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 with "Htext Hst272 Hcont").
     - (* argv[0] = NULL: the loop is skipped, and c = 0 *)
-      iApply (kxc_d_tail (CID0 := CID1) Q jp gf
+      iApply (kxc_d_tail (CID0 := CID1) Q QF jp gf
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m M1 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P1 Mim1 sz1 0
-                (HQe sz1) HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
+                (HQe sz1) Hqfnm Hqfaf HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 with "Htext Hskip Hcont").
   Qed.
@@ -401,6 +421,10 @@ Section KexecMain.
      arguments since the exit-generic hole was widened -- [kexec_closer]
      applies it to the entry word AND to the final process state. *)
   Notation QT := (fun (_ : mword 64) (_ : ustate) => True) (only parsing).
+  (* ...and its FAILURE-side twin (S5): the landed contract says nothing
+     about why a run gave up, so every [bad:] tail pays [KfNoMem] here and
+     the whole sweep is free again. *)
+  Notation QTF := (fun (_ : KexecOkQ.kxf_cause) => True) (only parsing).
 
   Lemma wp_kexec_sconf
       (gs : list gname) (jp : nat) (gl : gname)
@@ -439,19 +463,20 @@ Section KexecMain.
        [kexec_ok_q Q]; this contract's caller handed us a [kexec_ok]-shaped
        continuation, and at [Q := QT] the two differ by a [True] that sits
        to the LEFT of a wand.  One [iApply]. ---- *)
-    iDestruct (kxc_exit_qgen (CIDx := CID0) QT (proc_addr jp) gf
+    iDestruct (kxc_exit_qgen (CIDx := CID0) QT QTF (proc_addr jp) gf
  plen pfun na avf alen aslen afun pidv U
                  dqb dqs dqa dqpv dqas m K eb eb ∅
                  (m !!! Regidx Rra) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
                  with "Hcont") as "Hcont".
     (* ---- PHASE A: +0x000 .. +0x090, and two of the eight [bad:] tails ---- *)
-    iApply (PA.kxc_phaseA (CID0 := CID0) QT gs jp gl pd pav pu
+    iApply (PA.kxc_phaseA (CID0 := CID0) QT QTF gs jp gl pd pav pu
  gf
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m K eb eb ∅
               (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
               (m !!! Regidx Rs1) (m !!! Regidx Rs2)
               (m !!! Regidx Ra0) (m !!! Regidx Ra1) None emp%I _
+              (ex_intro _ KexecOkQ.KfNoMem I)
               HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml
               Hins0 Hcovb Hiregb Hcstr Hplen Hjp Hgs
               eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
@@ -500,7 +525,7 @@ Section KexecMain.
       iSplitL "Hfrz"; [iExact "Hfrz" |].
       iSplitL "Hiref"; [iExact "Hiref" | iExact "Hru"]. }
     (* ---- PHASE B1: +0x090 .. +0x0cc, plus the +0x31c tail ---- *)
-    iApply (PB.kxc_b1 (CID0 := CIDa) QT gs jp gl pd pav pu
+    iApply (PB.kxc_b1 (CID0 := CIDa) QT QTF gs jp gl pd pav pu
  gf
               kf qf sf gyf loyf tlyf inumf dnf bmf datl gilf gislf n2
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
@@ -508,6 +533,7 @@ Section KexecMain.
               (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
               (m !!! Regidx Rs1) (m !!! Regidx Rs2)
               (m !!! Regidx Ra0) (m !!! Regidx Ra1) ef
+              I
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
               Hkf Hinumf Hn2 eq_refl eq_refl eq_refl eq_refl eq_refl
               HM90sp HM90s0 HM90s1 HM90s2 HM90s4 HM90thr
@@ -527,7 +553,7 @@ Section KexecMain.
       iIntros (CIDy) "%Hsy". iIntros (My) "Hst1ae".
       iDestruct (wp_next_retarget CIDz CIDy true (proc_addr jp) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (kxc_cd (CID0 := CIDy) QT jp gf
+      iApply (kxc_cd (CID0 := CIDy) QT QTF jp gf
  plen pfun na avf alen aslen afun
                 pidv U eb dqb dqs dqa dqpv dqas m My K
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
@@ -537,13 +563,14 @@ Section KexecMain.
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13z
                 w67z (kxc_fb datl dnf) ef Pz Miz (mword_of_int 0 : mword 64)
-                (fun _ _ _ => I) HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+                (fun _ _ _ => I) I (fun _ _ _ => I)
+                HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
     - (* ---- OUTPUT 2: the phdr loop's body, entered at i = 0, sz = 0 ---- *)
       iIntros (CIDl) "%Hsl". iIntros (Ml Pl Mil) "Hst12c Hcont".
-      iApply (PB3.kxc_b2 (CID0 := CIDl) QT gs jp gl pd pav pu
+      iApply (PB3.kxc_b2 (CID0 := CIDl) QT QTF gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl n2
                 plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
@@ -552,11 +579,12 @@ Section KexecMain.
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1)
                 (mword_of_int 4095 : mword 64) ef Pl Mil 0%nat
                 (mword_of_int 0 : mword 64)
+                (fun _ => I) I
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hfab Hst12c Hcont []").
       iIntros (CIDy) "%Hsy". iIntros (My Py Miy szvy) "Hst1ae Hcont".
-      iApply (kxc_cd (CID0 := CIDy) QT jp gf
+      iApply (kxc_cd (CID0 := CIDy) QT QTF jp gf
  plen pfun na avf alen aslen afun
                 pidv U eb dqb dqs dqa dqpv dqas m My K
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
@@ -566,7 +594,8 @@ Section KexecMain.
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                 (mword_of_int 4095 : mword 64) (kxc_fb datl dnf) ef Py Miy szvy
-                (fun _ _ _ => I) HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+                (fun _ _ _ => I) I (fun _ _ _ => I)
+                HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").

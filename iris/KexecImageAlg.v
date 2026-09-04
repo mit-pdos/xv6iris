@@ -189,32 +189,17 @@ Proof. rewrite take_ge by lia. reflexivity. Qed.
     carries -- that the 64-byte [struct elfhdr] in kexec's frame IS the
     file's first 64 bytes.  Everything else the loop needs is derived. *)
 
-Lemma kxb_phdr_at_parse (l : elf_bytes) (o : Z) (p : elf_phdr) :
-  elf_parse_phdr l o = Some p -> kxb_phdr_at l (Z.to_nat o) = p.
-Proof.
-  intros H. unfold kxb_phdr_at. symmetry. exact (elf_parse_phdr_all l o p H).
-Qed.
+(*  [kxb_phdr_at_parse] and [kxb_loads_of_list] MOVED to [KexecBuilt.v]
+    (S5): the [bad:] tails' own [~ kxb_walk_loadable] rows need them and
+    sit below this file.  Re-exported by the [Require Export] above.     *)
 
-Lemma kxb_loads_of_list (f : elf_bytes) (ef : nat -> bv 8)
-    (ps : list elf_phdr) (n : nat) :
-  (n <= length ps)%nat ->
-  (forall i p, (i < n)%nat -> ps !! i = Some p -> kxb_phdr f ef i = p) ->
-  kxb_loads f ef n = List.filter (fun p => Z.eqb (ep_type p) 1) (take n ps).
+(* [KexecBuilt.kxb_loadable] IS this contract's [kexec_loadable]: the same
+   four conjuncts with [loads_ascending] restated as [kxb_ascending]. *)
+Lemma kxb_loadable_eq (f : elf_bytes) :
+  kexec_loadable f <-> kxb_loadable f.
 Proof.
-  induction n as [| n IH]; intros Hn Hag; [reflexivity |].
-  assert (Hlt : (n < length ps)%nat) by lia.
-  destruct (lookup_lt_is_Some_2 ps n Hlt) as [p Hp].
-  rewrite (take_S_r ps n p Hp), List.filter_app.
-  rewrite <- (IH ltac:(lia)
-                 ltac:(intros i q Hi Hq; apply Hag; [lia | exact Hq])).
-  assert (Hpe : kxb_phdr f ef n = p) by (apply Hag; [lia | exact Hp]).
-  destruct (decide (ep_type p = 1)) as [Ht | Ht].
-  - rewrite (kxb_loads_S_load f ef n ltac:(rewrite Hpe; exact Ht)), Hpe.
-    f_equal. simpl. rewrite (proj2 (Z.eqb_eq _ _) Ht). reflexivity.
-  - rewrite (kxb_loads_S_skip f ef n ltac:(rewrite Hpe; exact Ht)).
-    simpl. replace (Z.eqb (ep_type p) 1) with false
-      by (symmetry; apply Z.eqb_neq; exact Ht).
-    rewrite List.app_nil_r. reflexivity.
+  unfold kexec_loadable, kxb_loadable.
+  rewrite loads_ascending_kxb. reflexivity.
 Qed.
 
 Lemma kxb_walk_ok_of_loadable (f : elf_bytes) (ef : nat -> bv 8) :
@@ -222,36 +207,21 @@ Lemma kxb_walk_ok_of_loadable (f : elf_bytes) (ef : nat -> bv 8) :
   (forall j, (j < 64)%nat -> ef j = f !!! j) ->
   kxb_walk_ok f ef.
 Proof.
-  intros (Hwf & (e & He & Hpo) & _ & Hasc) Hag.
-  destruct (elf_wf_phdrs f Hwf) as [ps Hps].
-  destruct (eh_fields_of_ehdr ef f e He Hag) as (_ & Hphnum & _).
-  pose proof (elf_phdrs_length f e ps He Hps) as Hlen.
-  (* the two range facts that kill the 32-bit truncation *)
-  assert (Hpo0 : 0 <= ee_phoff e).
-  { destruct (elf_parse_ehdr_fields f e He) as (_ & _ & H2 & _).
-    rewrite H2. apply elf_le_at_bound. }
-  assert (Hpn : 0 <= ee_phnum e < 65536).
-  { destruct (elf_parse_ehdr_fields f e He) as (_ & _ & _ & _ & H5).
-    rewrite H5. pose proof (elf_le_at_bound f 56 2) as Hb.
-    change (2 ^ (8 * Z.of_nat 2)) with 65536 in Hb. exact Hb. }
-  assert (Hag' : forall i p, (i < length ps)%nat -> ps !! i = Some p ->
-                   kxb_phdr f ef i = p).
-  { intros i p Hi Hp.
-    assert (Hio : ph_at ef i = ee_phoff e + 56 * Z.of_nat i)
-      by exact (ph_at_of_ehdr ef f e i He Hag Hpo).
-    assert (Hib : 0 <= ee_phoff e + 56 * Z.of_nat i < 2 ^ 32).
-    { change (2 ^ 31) with 2147483648 in Hpo. rewrite Hlen in Hi.
-      assert (Hiz : Z.of_nat i < 65536) by lia.
-      change (2 ^ 32) with 4294967296. lia. }
-    unfold kxb_phdr, kxb_phoff. rewrite Hio, (Z.mod_small _ _ Hib).
-    exact (kxb_phdr_at_parse f _ p (elf_phdrs_parse f e ps i p Hwf He Hps Hp)). }
-  split; [| split].
-  - rewrite <- Hphnum in Hlen. rewrite <- Hlen.
-    rewrite (kxb_loads_of_list f ef ps (length ps) ltac:(lia) Hag').
-    rewrite take_ge by lia. unfold elf_loads. rewrite Hps. reflexivity.
-  - apply Forall_forall. intros p Hp.
-    apply elf_wf_phdr_ok; [exact Hwf | apply elem_of_list_In; exact Hp].
-  - apply loads_ascending_kxb. exact Hasc.
+  intros Hl Hag.
+  exact (proj1 (proj2 (kxb_walk_loadable_of_loadable f ef
+                         (proj1 (kxb_loadable_eq f) Hl) Hag))).
+Qed.
+
+(* ...and the row the AU composition pays the failure-side plug with: a
+   [bad:] tail's [~ kxb_walk_loadable f ef] IS [~ kexec_loadable f], once
+   the caller supplies the agreement phase A published. *)
+Lemma kexec_loadable_of_walk (f : elf_bytes) (ef : nat -> bv 8) :
+  (forall j, (j < 64)%nat -> ef j = f !!! j) ->
+  ~ kxb_walk_loadable f ef -> ~ kexec_loadable f.
+Proof.
+  intros Hag Hn Hl.
+  exact (Hn (kxb_walk_loadable_of_loadable f ef
+               (proj1 (kxb_loadable_eq f) Hl) Hag)).
 Qed.
 
 (* ====================================================================== *)

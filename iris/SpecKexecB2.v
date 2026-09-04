@@ -619,6 +619,7 @@ End KexecB2Res.
 (* ===================================================================== *)
 Definition kxc_bad324_body `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
@@ -632,6 +633,10 @@ Definition kxc_bad324_body `{XI : CurCtx}
     (m Mt : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szf : mword 64) (eb : bool) (lks : gset string) :=
+  (* THE CAUSE THE SIX ENTRIES CARRY IN (S5).  This tail is SHARED, so it
+     decides nothing: each of the six [bad:] entries names its own cause
+     before jumping here, and this relays it to [kxc_bad64]. *)
+  (exists c : KexecOkQ.kxf_cause, QF c) ->
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
@@ -694,7 +699,7 @@ Definition kxc_bad324_body `{XI : CurCtx}
     w63 szf w67 -∗
   (* ---- kexec's own continuation, which [kxc_bad64] closes ---- *)
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
   WP (Loop : expr riscv_lang).
@@ -707,6 +712,7 @@ Definition kxc_bad324_body `{XI : CurCtx}
 (* ===================================================================== *)
 Definition kxc_ls_body `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
@@ -721,6 +727,13 @@ Definition kxc_ls_body `{XI : CurCtx}
     (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) (Mi Mb : gmap Z (bv 8))
     (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string) :=
+  (* the failure-side plug (S5): loadseg's own [bad:] entry is the short
+     readi at +0x0ea.  See the note at its branch site in ProofKexecB2 --
+     the window fact it holds is stated on the TRUNCATED [off]/[filesz]
+     the ABI passes, and relating those to [phdr_ok]'s is exactly the
+     [Hexact] step the phdr loop makes UNDER the walk guard, which this
+     block does not carry.  So it is left at [KfNoMem]. *)
+  QF KexecOkQ.KfNoMem ->
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
@@ -798,7 +811,7 @@ Definition kxc_ls_body `{XI : CurCtx}
      hands the continuation BACK, which is what keeps the single linear
      [wp_next] enough for both. ---- *)
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
   (* ---- THE ONE OUTPUT: +0x116, the segment is in memory.  s1 and s2
@@ -840,7 +853,7 @@ Definition kxc_ls_body `{XI : CurCtx}
               (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
               w63 w65 w67 ef P Mo -∗
       wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-        KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+        KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
              eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
              pfun av dqa avf aslen dqas afun) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -850,6 +863,7 @@ Module Type KEXECB2.
   Parameter kxc_bad324 :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
@@ -862,7 +876,7 @@ Module Type KEXECB2.
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szf : mword 64) (eb : bool) (lks : gset string),
-    kxc_bad324_body Q gs jp gl pd pav pu gilf gislf
+    kxc_bad324_body Q QF gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
@@ -871,6 +885,7 @@ Module Type KEXECB2.
   Parameter kxc_ls :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
@@ -884,7 +899,7 @@ Module Type KEXECB2.
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (Mi Mb : gmap Z (bv 8))
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string),
-    kxc_ls_body Q gs jp gl pd pav pu gilf gislf
+    kxc_ls_body Q QF gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67

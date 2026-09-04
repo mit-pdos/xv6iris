@@ -263,6 +263,20 @@ Proof.
   change (2 ^ 12)%Z with 4096%Z in Hb. exact Hb.
 Qed.
 
+(* ...and its converse, which is what the MISALIGNED tail pays with (S5) *)
+Lemma kxc_and4095_nonzero (x : mword 64) :
+  and_vec x (mword_of_int 4095 : mword 64) <> (zero_reg : mword 64) ->
+  (bv_unsigned x `mod` 4096 <> 0)%Z.
+Proof.
+  intros H Hm. apply H. apply bv_eq.
+  rewrite and_vec64_unsigned.
+  assert (Hmm : bv_unsigned (mword_of_int 4095 : mword 64) = Z.ones 12)
+    by (vm_compute; reflexivity).
+  rewrite Hmm Z.land_ones; [| lia].
+  change (2 ^ 12)%Z with 4096%Z. rewrite Hm.
+  symmetry. vm_compute. reflexivity.
+Qed.
+
 (* an 8-byte little-endian field fits a 64-bit register verbatim *)
 Lemma kxc_le8_unsigned (g : nat -> bv 8) (o : nat) :
   bv_unsigned (Z_to_bv 64 (le_at g o 8) : mword 64) = le_at g o 8.
@@ -934,6 +948,7 @@ Section KexecB3Body.
 
   Lemma kxc_ph_step `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
@@ -946,6 +961,10 @@ Section KexecB3Body.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (i : nat) (szv : mword 64) :
+    (* the failure-side plug's two causes (S5; SpecKexecB3's note) *)
+    (~ KexecBuilt.kxb_walk_loadable (kxc_fb datl dnf) ef ->
+       QF KexecOkQ.KfNotLoadable) ->
+    QF KexecOkQ.KfNoMem ->
     (K_kexec <= K)%nat ->
     (kf < NINODE)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -976,7 +995,7 @@ Section KexecB3Body.
                w67 ef P Mi i szv -∗
     (* ---- kexec's OWN continuation: the five [bad:] exits close it ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
            pfun av dqa avf aslen dqas afun) -∗
     (* ---- THE ONE OUTPUT: the back edge's verdict, and the exit back ---- *)
@@ -1000,13 +1019,13 @@ Section KexecB3Body.
                        (m !!! Regidx Rs11) w67 ef P' Mo szv'
                        (m !!! Regidx Rs11) ) -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
                eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
+    intros Hqfnl Hqfnm HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
            Hsp Hra Hs0 Hs1 Hs2.
     pose proof HK as HK'. 
     assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
@@ -1669,11 +1688,30 @@ Section KexecB3Body.
                     (CIDy2 : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_retarget CID0 CIDy2 true (proc_addr jp) _ Hbcr
                        with "Hcont") as "Hcont".
-          iApply (B2.kxc_bad324 (CID0 := CIDy2) Q gs jp gl pd pav pu
+          (* ---- THE CAUSE (S5): [memsz < filesz] refutes [phdr_ok]'s
+             [po_memsz] for this very header, so the file is not one
+             [kexec_loadable] describes. ---- *)
+          assert (HSin : (S i <= Z.to_nat (eh_phnum ef))%nat) by lia.
+          assert (Hnl : ~ KexecBuilt.kxb_walk_loadable (kxc_fb datl dnf) ef).
+          { apply (kxb_not_walk_loadable (kxc_fb datl dnf) ef i HSin Hty1).
+            intros (Hpok & _ & _).
+            pose proof Emf as Emf'.
+            assert (Hb1 : uint (rget U9 Rs1) = le_at pf 40 8).
+            { rewrite (rget_ne U9 Rs1 ltac:(bnz)) HU9s1 uint_unsigned.
+              apply kxc_le8_unsigned. }
+            assert (Hb2 : uint (rget U9 Ra5) = le_at pf 32 8).
+            { rewrite (rget_ne U9 Ra5 ltac:(bnz)) HU9a5 uint_unsigned.
+              apply kxc_le8_unsigned. }
+            unfold zopz0zI_u in Emf'. rewrite Hb1 Hb2 in Emf'.
+            apply Z.ltb_lt in Emf'.
+            pose proof (po_memsz _ _ Hpok) as Hpm.
+            rewrite -Hfmz -Hffz8 in Hpm. lia. }
+          iApply (B2.kxc_bad324 (CID0 := CIDy2) Q QF gs jp gl pd pav pu
                     gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl
                     n2 plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas m U9
                     K sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef P Mi szv eb ∅
+                    (ex_intro _ KexecOkQ.KfNotLoadable (Hqfnl Hnl))
                     HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                     Hgs Hsp Hra Hs0 Hs1 Hs2 Hbsp Hbs0 Hbs4 Hbs6
                     Hal Hbelow Hcov
@@ -1833,11 +1871,38 @@ Section KexecB3Body.
                        (CIDy2 : CPU) = (CID0 : CPU)) by wp_next_chain.
              iDestruct (wp_next_retarget CID0 CIDy2 true (proc_addr jp) _ Hbcr
                           with "Hcont") as "Hcont".
-             iApply (B2.kxc_bad324 (CID0 := CIDy2) Q gs jp gl pd pav pu
+             (* ---- THE CAUSE (S5): [vaddr + memsz] wrapped, which
+                [phdr_ok]'s [po_vaddr]/[po_top] forbid. ---- *)
+             assert (HSin : (S i <= Z.to_nat (eh_phnum ef))%nat) by lia.
+             assert (Hnl : ~ KexecBuilt.kxb_walk_loadable (kxc_fb datl dnf) ef).
+             { apply (kxb_not_walk_loadable (kxc_fb datl dnf) ef i HSin Hty1).
+               intros (Hpok & _ & _).
+               pose proof Ewr as Ewr'.
+               assert (Hc1 : uint (rget U11 Rs1) = bv_unsigned nsz)
+                 by (rewrite (rget_ne U11 Rs1 ltac:(bnz)) HU11s1 uint_unsigned;
+                     reflexivity).
+               assert (Hc2 : uint (rget U11 Ra5) = le_at pf 16 8).
+               { rewrite (rget_ne U11 Ra5 ltac:(bnz)) HU11a5 uint_unsigned.
+                 apply kxc_le8_unsigned. }
+               unfold zopz0zI_u in Ewr'. rewrite Hc1 Hc2 in Ewr'.
+               apply Z.ltb_lt in Ewr'.
+               pose proof (po_vaddr _ _ Hpok) as Hv0.
+               pose proof (po_top _ _ Hpok) as Hvt.
+               pose proof (po_memsz _ _ Hpok) as Hpm.
+               pose proof (po_filesz _ _ Hpok) as Hpz.
+               rewrite -Hfva in Hv0 Hvt. rewrite -Hfmz in Hvt Hpm.
+               rewrite -Hffz8 in Hpm.
+               assert (Hns : bv_unsigned nsz
+                             = (le_at pf 40 8 + le_at pf 16 8)%Z).
+               { rewrite Hnszw. apply bvw64_small.
+                 change (2 ^ 64)%Z with 18446744073709551616%Z. lia. }
+               lia. }
+             iApply (B2.kxc_bad324 (CID0 := CIDy2) Q QF gs jp gl pd pav pu
                        gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl
                        n2 plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas m U11
                        K sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef P Mi szv eb ∅
+                       (ex_intro _ KexecOkQ.KfNotLoadable (Hqfnl Hnl))
                        HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                        Hgs Hsp Hra Hs0 Hs1 Hs2 Hbsp Hbs0 Hbs4 Hbs6
                        Hal Hbelow Hcov
@@ -1997,11 +2062,26 @@ Section KexecB3Body.
                           (CIDy2 : CPU) = (CID0 : CPU)) by wp_next_chain.
                 iDestruct (wp_next_retarget CID0 CIDy2 true (proc_addr jp) _ Hbcr
                              with "Hcont") as "Hcont".
-                iApply (B2.kxc_bad324 (CID0 := CIDy2) Q gs jp gl pd pav pu
+                (* ---- THE CAUSE (S5): [vaddr % PGSIZE != 0], which
+                   [kexec_loadable]'s own [Forall] forbids. ---- *)
+                assert (HSin : (S i <= Z.to_nat (eh_phnum ef))%nat) by lia.
+                assert (Hnl : ~ KexecBuilt.kxb_walk_loadable (kxc_fb datl dnf) ef).
+                { apply (kxb_not_walk_loadable (kxc_fb datl dnf) ef i HSin Hty1).
+                  intros (_ & _ & Halgn).
+                  assert (Hvanal : (le_at pf 16 8 `mod` 4096 <> 0)%Z).
+                  { rewrite -(kxc_le8_unsigned pf 16).
+                    apply kxc_and4095_nonzero.
+                    rewrite -Hw67 -HU12a4 -HU12a5 -HU13a5
+                            -(rget_ne U13 Ra5 ltac:(bnz)).
+                    exact (kxc_neq_true _ _ Eal). }
+                  rewrite -Hfva in Halgn. unfold PGSIZE in Halgn.
+                  exact (Hvanal Halgn). }
+                iApply (B2.kxc_bad324 (CID0 := CIDy2) Q QF gs jp gl pd pav pu
                           gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl
                           n2 plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas m U13
                           K sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef P Mi szv eb ∅
+                          (ex_intro _ KexecOkQ.KfNotLoadable (Hqfnl Hnl))
                           HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                           Hgs Hsp Hra Hs0 Hs1 Hs2 Hbsp Hbs0 Hbs4 Hbs6
                           Hal Hbelow Hcov
@@ -2548,13 +2628,15 @@ Section KexecB3Body.
                                 Hbcr2 with "Hcont") as "Hcont".
                    assert (HM4s6' : M4 !!! Regidx Rs6 = page_base P4.(ud_root))
                      by (rewrite HM4s6 HP4rt; reflexivity).
-                   iApply (B2.kxc_bad324 (CID0 := CIDw3) Q gs jp gl pd
+                   iApply (B2.kxc_bad324 (CID0 := CIDw3) Q QF gs jp gl pd
                              pav pu gilf gislf gf
 
                              kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na
                              avf alen aslen afun pidv U dqb dqs dqa dqpv dqas m M4 K
                              sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef
                              P4 M4i szv eb ∅
+                             (* the cause (S5): uvmalloc returned 0 *)
+                             (ex_intro _ KexecOkQ.KfNoMem Hqfnm)
                              HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb
                              Hib Hn2 Hjp Hgs Hsp Hra Hs0 Hs1 Hs2
                              HM4sp HM4s0 HM4s4 HM4s6' Hal Hbel4z Hcov4z
@@ -3054,7 +3136,7 @@ Section KexecB3Body.
                                  (CIDv5 : CPU) = (CID0 : CPU)) by wp_next_chain.
                        iDestruct (wp_next_retarget CID0 CIDv5 true (proc_addr jp)
                                     _ Hcrl with "Hcont") as "Hcont".
-                       iApply (B2.kxc_ls (CID0 := CIDv5) Q gs jp gl pd pav
+                       iApply (B2.kxc_ls (CID0 := CIDv5) Q QF gs jp gl pd pav
                                  pu gilf gislf gf
 
                                  kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na
@@ -3063,6 +3145,7 @@ Section KexecB3Body.
                                  (M4 !!! Regidx Ra0) w67 ef P4 M4i M4i i
                                  (Z_to_bv 64 (le_at pf 16 8) : mword 64)
                                  (le_at pf 32 4) (le_at pf 8 4) eb ∅
+                                 Hqfnm
                                  HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb
                                  Hib Hn2 Hjp Hgs Hsp Hra Hs0 Hs1 Hs2
                                  Hal Hbel4n Hcov4n Hfzr Hpor
@@ -3313,11 +3396,30 @@ Section KexecB3Body.
                 (CIDb2 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CIDb2 true (proc_addr jp) _ Hcrb
                    with "Hcont") as "Hcont".
-      iApply (B2.kxc_bad324 (CID0 := CIDb2) Q gs jp gl pd pav pu
+      (* ---- THE CAUSE (S5): readi could not deliver 56 bytes at
+         [kxb_phoff ef i], i.e. the program-header table runs past the end
+         of the file -- which [elf_wf]'s own window bound forbids.  This is
+         [kxb_walk_loadable]'s third conjunct, and it is the reason that
+         conjunct is there. ---- *)
+      assert (Hnlshort : ~ KexecBuilt.kxb_walk_loadable (kxc_fb datl dnf) ef).
+      { apply (kxb_not_walk_loadable_off (kxc_fb datl dnf) ef i);
+          [ lia |].
+        assert (Htoteqs : tot = rd_clamp (di_size dnf) offn 56%nat).
+        { destruct Hret as [(_ & Hbad) | (_ & Hv)];
+            [discriminate Hbad | exact Hv]. }
+        assert (Hshort : (Z.to_nat (bv_unsigned (di_size dnf)) < offn + 56)%nat).
+        { rewrite /rd_clamp in Htoteqs.
+          destruct (decide (Z.to_nat (bv_unsigned (di_size dnf))
+                            < offn + 56)%nat) as [Hlt | Hge];
+            [exact Hlt | exfalso; apply Htot56; exact Htoteqs]. }
+        unfold kxc_fb. rewrite file_bytes_length.
+        change (KexecBuilt.kxb_phoff ef i) with offn. lia. }
+      iApply (B2.kxc_bad324 (CID0 := CIDb2) Q QF gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl
                 n2 plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas m M2
                 K sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef P Mi szv eb ∅
+                (ex_intro _ KexecOkQ.KfNotLoadable (Hqfnl Hnlshort))
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                 Hgs Hsp Hra Hs0 Hs1 Hs2 HM2sp HM2s0 HM2s4 HM2s6
                 Hal Hbelow Hcov
@@ -3356,6 +3458,7 @@ Section KexecB3Loop.
 
   Lemma kxc_phdr `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
@@ -3368,6 +3471,10 @@ Section KexecB3Loop.
       (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) :
+    (* the failure-side plug's two causes (S5; SpecKexecB3's note) *)
+    (~ KexecBuilt.kxb_walk_loadable (kxc_fb datl dnf) ef ->
+       QF KexecOkQ.KfNotLoadable) ->
+    QF KexecOkQ.KfNoMem ->
     (K_kexec <= K)%nat ->
     (kf < NINODE)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -3399,7 +3506,7 @@ Section KexecB3Loop.
                (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                w67 ef P Mi i szv -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
            pfun av dqa avf aslen dqas afun) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -3413,23 +3520,23 @@ Section KexecB3Loop.
                    (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                    w67 ef P' Mo szv' (m !!! Regidx Rs11) -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
                eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
+    intros Hqfnl Hqfnm HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
            Hsp Hra Hs0 Hs1 Hs2.
     intro W. revert CID0.
     induction W as [| W IH]; intros CID0 M P Mi i szv Hfuel;
       iIntros "#Htext #Hfab Hst Hcont Hc1a4";
-      iApply (kxc_ph_step (CID0 := CID0) Q gs jp gl pd pav pu
+      iApply (kxc_ph_step (CID0 := CID0) Q QF gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen
                 pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas m M K
                 sp0 ra0 s00 s10 s20 pv av w67 ef P Mi i szv
-                HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
+                Hqfnl Hqfnm HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
                 Hsp Hra Hs0 Hs1 Hs2
                 with "Htext Hfab Hst Hcont [Hc1a4]");
       iIntros (CIDn Hsn M' P' Mo szv') "[Hnext | Hexit] Hcont".
@@ -3894,6 +4001,7 @@ Section KexecB3Main.
 
   Lemma kxc_b2
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
@@ -3906,22 +4014,22 @@ Section KexecB3Main.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (i : nat) (szv : mword 64) :
-    kxc_b2_body Q gs jp gl pd pav pu gilf gislf
+    kxc_b2_body Q QF gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
       pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
       ef P Mi i szv.
   Proof.
     cbv beta delta [kxc_b2_body].
-    intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
+    intros Hqfnl Hqfnm HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
            Hsp Hra Hs0 Hs1 Hs2.
     iIntros "#Htext #Hfab Hst Hcont Hc1ae".
-    iApply (kxc_phdr (CID0 := CID0) Q gs jp gl pd pav pu
+    iApply (kxc_phdr (CID0 := CID0) Q QF gs jp gl pd pav pu
               gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf
               alen aslen afun pidv U eb dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20
               pv av w67 ef
-              HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
+              Hqfnl Hqfnm HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
               Hsp Hra Hs0 Hs1 Hs2
               (Z.to_nat (eh_phnum ef)) M P Mi i szv
               ltac:(rewrite Z2Nat.id;

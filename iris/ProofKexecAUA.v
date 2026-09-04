@@ -198,6 +198,7 @@ Section KexecAUABody.
 
   Lemma kxc_a1_au
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (* the caller's walk one-shot, its miss receipt, the REST of the AU
          bundle (opaque -- phase A only threads or refunds it) and the
          refund shape the [-1] tail owes. *)
@@ -215,6 +216,9 @@ Section KexecAUABody.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (* the exit, opaque -- see the premise below *)
       (KEX : CpuId -> iProp Σ) :
+    (* the failure-side plug's cause (S5), relayed: the pinned run's own
+       two [bad:] tails are phase A's, and it plugs the hole vacuously. *)
+    (exists c : KexecOkQ.kxf_cause, QF c) ->
     (K_kexec <= K)%nat ->
     icfg_dev = ROOTDEV ->
     (0 < icfg_nib)%nat ->
@@ -278,7 +282,7 @@ Section KexecAUABody.
        passes its exit and the identity wand. ---- *)
     wp_next true (proc_addr jp) KEX -∗
     □ (∀ CX : CpuId, KEX CX -∗ FAIL -∗
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
            eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: the state at +0x032.
@@ -305,7 +309,7 @@ Section KexecAUABody.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+    intros Hqf HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hcstr Hplen Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab #Hka Hbm Hins #Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hwp Hau Hwd Hcont #Hkw Hcont32".
@@ -709,10 +713,10 @@ Section KexecAUABody.
         rewrite (callee_saved_lookup Hcse r Hr).
         rewrite /P1 upd_ne; [| regne].
         exact (HM4thr r Hr Nsp Ns0 Ns1 Ns2). }
-      iApply (T.kxc_exit_m1 Q (proc_addr jp) gf
+      iApply (T.kxc_exit_m1 Q QF (proc_addr jp) gf
                 plen pfun na avf alen aslen afun pidv U
                 dqb dqs dqa dqpv dqas m P2 K eb eb lks sp0 ra0 s00 s10 s20 pv av
-                ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HP2sp HP2a0 HP2thr
+                Hqf ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HP2sp HP2a0 HP2thr
                 with "Hcg Hcnt Hextc Hclmc Htext Hpc [Hframe] Hbm Hins Hka Hpriv
                       Hpath Hargv Hargs Hbs Hirs").
       { iApply (kxc_frameA_epi with "Hframe"). }
@@ -978,6 +982,7 @@ Section KexecAUAMain.
 
   Lemma kxc_phaseA_au
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gf : gname)
@@ -995,6 +1000,9 @@ Section KexecAUAMain.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (* the exit, opaque -- see the premise below *)
       (KEX : CpuId -> iProp Σ) :
+    (* the failure-side plug's cause (S5), relayed: the pinned run's own
+       two [bad:] tails are phase A's, and it plugs the hole vacuously. *)
+    (exists c : KexecOkQ.kxf_cause, QF c) ->
     (K_kexec <= K)%nat ->
     icfg_dev = ROOTDEV ->
     (0 < icfg_nib)%nat ->
@@ -1048,7 +1056,7 @@ Section KexecAUAMain.
     □ (∀ CX : CpuId,
        KEX CX -∗
        SpecKexecAU.exec_post_fail ΓL fsc_fs P Pmiss Φo na alen afun sts -∗
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
            eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: phase B's entry at +0x090, [kxc_phaseA]'s
@@ -1116,7 +1124,7 @@ Section KexecAUAMain.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+    intros Hqf HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hcstr Hplen Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab Hwp Hoc Hsl #Hka Hbm Hins
              #Hbits Hpriv Hpath Hargv Hargs Hbs Hirs Hcont #Hkw Hcont90".
@@ -1125,14 +1133,14 @@ Section KexecAUAMain.
     iDestruct (SpecKexec.fs_fabric_all with "Hfab")
       as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hireg & _)".
     iDestruct (ireg_inv_ftop with "Hireg") as "#Hftop".
-    iApply (kxc_a1_au (CID0 := CID0) Q P Pmiss
+    iApply (kxc_a1_au (CID0 := CID0) Q QF P Pmiss
               (SpecSysOpenAU.aopen_commit_at ΓL fsabsE Φo
                  ∗ SpecKexecAU.exec_slot_pre Φo na alen afun sts)%I
               (SpecKexecAU.exec_post_fail ΓL fsc_fs P Pmiss Φo na alen afun sts)
               gs jp gl pd pav pu gf
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m K eb b lks sp0 ra0 s00 s10 s20 pv av KEX
-              HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+              Hqf HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
               Hiregb Hcstr Hplen Hjp Hgs Hsp Hra Hs0 Hs1 Hs2
               Ha0 Ha1
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hka Hbm Hins Hbits Hpriv
@@ -1145,7 +1153,7 @@ Section KexecAUAMain.
     iIntros (CIDs Hss M32 ipv zi n1) "HP [Hoc Hsl] Hseam Hexit".
     iDestruct (wp_next_retarget CID0 CIDs true (proc_addr jp) _ Hss
                  with "Hcont90") as "Hcont90".
-    iApply (LA.kxc_a2_r (CID0 := CIDs) Q gs jp gl pd pav pu gf
+    iApply (LA.kxc_a2_r (CID0 := CIDs) Q QF gs jp gl pd pav pu gf
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1
               (kxa_receipt P Φo (length (path_elems (bview plen pfun))) zi
@@ -1153,7 +1161,7 @@ Section KexecAUAMain.
               (kxa_receipt_x P Φo (length (path_elems (bview plen pfun))) zi
                              na alen afun sts)
               KEX
-              HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+              Hqf HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
               Hiregb Hjp Hgs Hsp Hra Hs0 Hs1 Hs2
               with "Htext Hfab [HP Hoc Hsl] [] Hseam Hexit [] [Hcont90]").
     { (* ==== THE ORACLE'S INSTANT: the caller's commit, spent off the

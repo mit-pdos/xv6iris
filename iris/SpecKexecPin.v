@@ -692,6 +692,7 @@ Lemma kexec_closer_weaken `{XI : TsoCtx.CurCtx}
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
     (gf ga : gname) (pj : mword 64) (pidv : mword 32) (U : ustate)
     (m : regfile) (ret_tgt : mword 64) (K : nat) (b eb : bool)
     (lks : gset string) (dqb dqs : dfrac) (bmapstart : Z)
@@ -699,11 +700,12 @@ Lemma kexec_closer_weaken `{XI : TsoCtx.CurCtx}
     (plen : nat) (pv : mword 64) (dqpv : dfrac) (pfun : nat -> bv 8)
     (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64)
     (aslen : nat -> nat) (dqas : dfrac) (afun : nat -> nat -> bv 8) :
-  kexec_closer (fun (_ : mword 64) (_ : ustate) => Logic.True) gf ga pj pidv U m ret_tgt K b
+  kexec_closer (fun (_ : mword 64) (_ : ustate) => Logic.True)
+               (fun _ : kxf_cause => Logic.True) gf ga pj pidv U m ret_tgt K b
                eb lks dqb dqs
                bmapstart na alen plen pv dqpv pfun av dqa avf aslen dqas afun
   -∗
-  kexec_closer Q gf ga pj pidv U m ret_tgt K b eb lks dqb dqs
+  kexec_closer Q QF gf ga pj pidv U m ret_tgt K b eb lks dqb dqs
                bmapstart na alen plen pv dqpv pfun av dqa avf aslen dqas afun.
 Proof.
   rewrite /kexec_closer.
@@ -713,8 +715,8 @@ Proof.
             with "[%] [%] Hsie Hcpu Htc Hcc Hpc Hbm Hin Hka Hpp Hpa Hav
                   Has Hbs Hir").
   - exact Hcs.
-  - apply kexec_ok_q_of_True.
-    exact (kexec_ok_q_weaken _ _ _ _ _ _ _ _ _ Hok).
+  - apply kexec_ok_qf_of_q, kexec_ok_q_of_True.
+    exact (kexec_ok_qf_weaken _ _ _ _ _ _ _ _ _ _ Hok).
 Qed.
 
 (*  THE BODY: [SpecKexec.wp_kexec_sconf_body] VERBATIM -- same machine
@@ -812,7 +814,8 @@ Definition wp_kexec_pinned_view_body
      failure arm character for character, and the success arm carries
      [entry = kxp_entry pb] in front ([kexec_ok_pin_read]). ==== *)
   wp_next true pj (fun (CID : CpuId) =>
-    kexec_closer (kxp_entry_ok pb) gf fsc_kalloc pj pidv U m ret_tgt K b eb
+    kexec_closer (kxp_entry_ok pb) (fun _ : kxf_cause => Logic.True)
+                 gf fsc_kalloc pj pidv U m ret_tgt K b eb
                  lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
                  av dqa avf aslen dqas afun) -∗
   WP (Loop : expr riscv_lang).
@@ -901,7 +904,8 @@ Definition wp_kexec_pinned_body
      failure arm character for character, and the success arm carries
      [entry = kxp_entry pb] in front ([kexec_ok_pin_read]). ==== *)
   wp_next true pj (fun (CID : CpuId) =>
-    kexec_closer (kxp_entry_ok pb) gf fsc_kalloc pj pidv U m ret_tgt K b eb
+    kexec_closer (kxp_entry_ok pb) (fun _ : kxf_cause => Logic.True)
+                 gf fsc_kalloc pj pidv U m ret_tgt K b eb
                  lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
                  av dqa avf aslen dqas afun) -∗
   WP (Loop : expr riscv_lang).

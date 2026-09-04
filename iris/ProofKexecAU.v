@@ -200,6 +200,7 @@ Section KexecAUTail.
   (* ------------------------------------------------------------------ *)
   Local Lemma kxc_d_tail `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -211,6 +212,15 @@ Section KexecAUTail.
       (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (sz1 : mword 64) (c : nat) :
     (forall U' : ustate,
        kexec_built fb ef sz1 na alen afun U' -> Q (kxq_entry ef) U') ->
+    (* THE FAILURE-SIDE PLUG'S TWO CAUSES (S5), relayed to phases C/D:
+       [KfNoMem] for the copyout / allocation tails and, at the size the
+       run settled on, [KfArgsFit] for the two [sp < stackbase] tails. *)
+    QF KexecOkQ.KfNoMem ->
+    (forall z : Z,
+       (KexecBuilt.kxb_walk_ok fb ef ->
+          (z = UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
+               + 2 * PageGeom.PGSIZE)%Z) ->
+       ~ kxc_stack_ok z (z - PageGeom.PGSIZE) alen na -> QF KexecOkQ.KfArgsFit) ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -229,23 +239,23 @@ Section KexecAUTail.
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
            pfun av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
+    intros HQe Hqfnm Hqfaf HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12.
     iIntros "#Htext Hst Hcont".
-    iApply (PC.kxc_c_close (CID0 := CID0) Q jp gf
+    iApply (PC.kxc_c_close (CID0 := CID0) Q QF jp gf
  plen pfun na avf alen aslen afun
               pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi (pv_sz (us_V U)) sz1 c
-              HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
+              Hqfnm Hqfaf HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               with "Htext Hst Hcont []").
     iIntros (CIDd) "%Hsd". iIntros (Md Pd Mid) "Hst2a6 Hcont".
-    iApply (PD.kxd_phaseD (CID0 := CIDd) Q jp gf
+    iApply (PD.kxd_phaseD (CID0 := CIDd) Q QF jp gf
  plen pfun na avf alen aslen afun
               pidv U eb dqb dqs dqa dqpv dqas m Md K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef Pd Mid sz1 c
@@ -259,6 +269,7 @@ Section KexecAUTail.
   (* ------------------------------------------------------------------ *)
   Local Lemma kxc_cd `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -270,6 +281,15 @@ Section KexecAUTail.
       (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szv : mword 64) :
     (forall (szg : mword 64) (U' : ustate),
        kexec_built fb ef szg na alen afun U' -> Q (kxq_entry ef) U') ->
+    (* THE FAILURE-SIDE PLUG'S TWO CAUSES (S5), relayed to phases C/D:
+       [KfNoMem] for the copyout / allocation tails and, at the size the
+       run settled on, [KfArgsFit] for the two [sp < stackbase] tails. *)
+    QF KexecOkQ.KfNoMem ->
+    (forall z : Z,
+       (KexecBuilt.kxb_walk_ok fb ef ->
+          (z = UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
+               + 2 * PageGeom.PGSIZE)%Z) ->
+       ~ kxc_stack_ok z (z - PageGeom.PGSIZE) alen na -> QF KexecOkQ.KfArgsFit) ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -289,12 +309,12 @@ Section KexecAUTail.
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi szv (m !!! Regidx Rs11) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
            pfun av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HQe HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+    intros HQe Hqfnm Hqfaf HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
            Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12.
     iIntros "#Htext Hst Hcont".
@@ -310,11 +330,11 @@ Section KexecAUTail.
       iSplitR; [iPureIntro; exact Hal |].
       iSplitR; [iPureIntro; exact Hpure3 |].
       iExact "Hrest". }
-    iApply (PC.kxc_c_setup (CID0 := CID0) Q jp gf
+    iApply (PC.kxc_c_setup (CID0 := CID0) Q QF jp gf
  plen pfun na avf alen aslen
               afun pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi szv
-              HK Hmsp Hmra Hms0 Hms1 Hms2
+              Hqfnm HK Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               Halen_b Halen_c Halen_4 Havf_na
               with "Htext Hst Hcont []").
@@ -337,28 +357,28 @@ Section KexecAUTail.
         iSplitR; [iPureIntro; exact Hq3 |].
         iSplitR; [iPureIntro; exact Hq4 |].
         iExact "Hrest2". }
-      iApply (PC.kxc_argv_loop (CID0 := CID1) Q jp gf
+      iApply (PC.kxc_argv_loop (CID0 := CID1) Q QF jp gf
  plen pfun na avf alen aslen
                 afun pidv U eb dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef (pv_sz (us_V U)) sz1
-                HK Halen_b Halen_c Halen_4 Havf_na Hsz1ge Hnamax Hal
+                Hqfnm Hqfaf HK Halen_b Halen_c Halen_4 Havf_na Hsz1ge Hnamax Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 na M1 P1 Mim1 0%nat H0na ltac:(lia)
                 with "Htext Hloop Hcont []").
       iIntros (CID2) "%Hs2". iIntros (M2 P2 Mim2 c2) "Hst272 Hcont".
-      iApply (kxc_d_tail (CID0 := CID2) Q jp gf
+      iApply (kxc_d_tail (CID0 := CID2) Q QF jp gf
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m M2 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P2 Mim2 sz1 c2
-                (HQe sz1) HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
+                (HQe sz1) Hqfnm Hqfaf HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 with "Htext Hst272 Hcont").
-    - iApply (kxc_d_tail (CID0 := CID1) Q jp gf
+    - iApply (kxc_d_tail (CID0 := CID1) Q QF jp gf
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m M1 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P1 Mim1 sz1 0
-                (HQe sz1) HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
+                (HQe sz1) Hqfnm Hqfaf HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 with "Htext Hskip Hcont").
   Qed.
@@ -459,6 +479,34 @@ Section KexecAUExit.
         injection Heq as Hn _. discriminate Hn.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  THE FAILURE-SIDE PLUG (S5), AND WHY IT IS SPELLED ON THE FILE.       *)
+  (*                                                                       *)
+  (*  [KexecOkQ.kexec_ok_qf]'s cause hole is paid at the [bad:] tail that   *)
+  (*  jumped, and the tails know only PURE FACTS ABOUT THE FILE AND THE     *)
+  (*  FRAME -- not about the abstract node the walk observed (the receipt   *)
+  (*  is an iProp, and it is spent at the closer, not inside phase B).  So  *)
+  (*  the plug is a claim about [f] alone, and it is [exec_fail_ok]'s three *)
+  (*  rows with the node projected away:                                    *)
+  (*                                                                        *)
+  (*    KfNotLoadable  the file is not one [kexec_loadable] describes       *)
+  (*    KfArgsFit      IF it is, the arguments do not fit its stack page    *)
+  (*    KfNoMem        nothing (the magic row is the closer's to prove)     *)
+  (*                                                                        *)
+  (*  The [KfArgsFit] row is CONDITIONAL because the size the tails see is  *)
+  (*  the loop's [sz1], and only a loadable file makes that [kexec_sz f].   *)
+  (* ------------------------------------------------------------------ *)
+  Definition kxau_QFp (f : elf_bytes) (na : nat) (alen : nat -> nat)
+      (c : KexecOkQ.kxf_cause) : Prop :=
+    match c with
+    | KexecOkQ.KfNotLoadable => ~ SpecKexecAU.kexec_loadable f
+    | KexecOkQ.KfArgsFit =>
+        SpecKexecAU.kexec_loadable f ->
+        ~ kxc_stack_ok (SpecKexecAU.kexec_sz f)
+                       (SpecKexecAU.kexec_sz f - PageGeom.PGSIZE) alen na
+    | KexecOkQ.KfNoMem => Logic.True
+    end.
+
   (* [EfNoMem]'s side condition, on a loadable file: [elf_wf] tests the
      magic first, so the kernel's own four-byte test passed. *)
   Lemma kxau_nomem_ok (a : anode) (f : elf_bytes) (nl : nat)
@@ -469,6 +517,58 @@ Section KexecAUExit.
     intros Ha Hl. cbn. intros f' nl' Heq.
     rewrite Ha in Heq. injection Heq as Hn _. rewrite <- Hn.
     exact (kexec_magic_of_loadable f Hl).
+  Qed.
+
+  (* THE PLUG, READ AT THE CONTRACT'S OWN CAUSE TYPE.  On a LOADABLE file
+     the three cone-side causes fold to the three [exec_fail_ok] rows --
+     and [KfNotLoadable] is dead there, which is exactly the sentence
+     "a loadable file never fails for being unloadable". *)
+  Lemma kxau_fail_cause (f : elf_bytes) (nl na : nat) (alen : nat -> nat)
+      (c : KexecOkQ.kxf_cause) :
+    SpecKexecAU.kexec_loadable f -> kxau_QFp f na alen c ->
+    exists e : SpecKexecAU.exec_fail_cause,
+      SpecKexecAU.exec_fail_ok (MkAnode (AFile f) nl) na alen e.
+  Proof.
+    intros Hload Hc. destruct c; cbn in Hc.
+    - exfalso. exact (Hc Hload).
+    - exists SpecKexecAU.EfArgsFit. cbn. exists f, nl.
+      split; [reflexivity | exact (Hc Hload)].
+    - exists SpecKexecAU.EfNoMem.
+      exact (kxau_nomem_ok _ f nl na alen eq_refl Hload).
+  Qed.
+
+  (* ...and the two PREMISES the composition owes the cone, both discharged
+     from the loadability the run cannot decide but the plug can name. *)
+  Lemma kxau_notloadable_prem (f : elf_bytes) (ef : nat -> bv 8)
+      (na : nat) (alen : nat -> nat) :
+    (SpecKexecAU.kexec_loadable f ->
+       forall j : nat, (j < 64)%nat -> ef j = f !!! j) ->
+    ~ KexecBuilt.kxb_walk_loadable f ef ->
+    kxau_QFp f na alen KexecOkQ.KfNotLoadable.
+  Proof.
+    intros Hag Hn Hload. apply Hn.
+    apply KexecBuilt.kxb_walk_loadable_of_loadable;
+      [apply (proj1 (KexecImageAlg.kxb_loadable_eq f)); exact Hload
+      | exact (Hag Hload)].
+  Qed.
+
+  Lemma kxau_argsfit_prem (f : elf_bytes) (ef : nat -> bv 8)
+      (na : nat) (alen : nat -> nat) :
+    (SpecKexecAU.kexec_loadable f ->
+       forall j : nat, (j < 64)%nat -> ef j = f !!! j) ->
+    forall z : Z,
+      (KexecBuilt.kxb_walk_ok f ef ->
+         (z = UserPtTree.pgroundup (kexec_sz_after (elf_loads f))
+              + 2 * PageGeom.PGSIZE)%Z) ->
+      ~ kxc_stack_ok z (z - PageGeom.PGSIZE) alen na ->
+      kxau_QFp f na alen KexecOkQ.KfArgsFit.
+  Proof.
+    intros Hag z Hz Hns Hload. cbn.
+    assert (Hwk : KexecBuilt.kxb_walk_ok f ef)
+      by (apply KexecImageAlg.kxb_walk_ok_of_loadable;
+          [exact Hload | exact (Hag Hload)]).
+    rewrite (KexecImageAlg.kexec_sz_of_sz_after f (proj1 Hload)).
+    rewrite <- (Hz Hwk). exact Hns.
   Qed.
 
   Lemma kxau_fb_length (data : nat -> list (bv 8)) (dn : dinode) :
@@ -520,14 +620,16 @@ Section KexecAUExit.
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
     SpecKexecAU.exec_post_fail ΓL fsc_fs P Pmiss Φo na alen afun sts -∗
     KexecOkQ.kexec_closer (CID := CIDx)
-      kxau_QF
+      kxau_QF (fun _ : KexecOkQ.kxf_cause => Logic.True)
       gf fsc_kalloc pj pidv U m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na alen plen pv dqpv pfun av dqa avf aslen dqas afun.
   Proof.
     iIntros "Hret Hfail". rewrite /KexecOkQ.kexec_closer /kxau_QF.
     iIntros (mf U' entry spv szv') "%Hcs %Hq".
     iIntros "Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath Hargv Hargs Hbs Hirs".
-    destruct Hq as [(Hr & HV) | (Hfalse & _)]; [| destruct Hfalse].
+    (* phase A allocates nothing and names no cause: the plug is vacuous
+       here and the arms take the refund straight. *)
+    destruct Hq as [(Hr & HV & _) | (Hfalse & _)]; [| destruct Hfalse].
     rewrite /kxau_ret.
     iApply ("Hret" $! mf U' with "[%] [Hfail] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins
                                   Hka Hpriv Hpath Hargv Hargs Hbs Hirs").
@@ -562,6 +664,7 @@ Section KexecAUExit.
     PA.kxa_receipt P Φo (length (path_elems pl)) zi na alen afun sts dn bm datl -∗
     KexecOkQ.kexec_closer (CID := CIDx)
       (KexecAUBridge.exec_built_Q (kxc_fb datl dn) ef na alen afun)
+      (kxau_QFp (kxc_fb datl dn) na alen)
       gf fsc_kalloc pj pidv U m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na alen plen pv dqpv pfun av dqa avf aslen dqas afun.
   Proof.
@@ -585,17 +688,21 @@ Section KexecAUExit.
         unfold kxc_fb. apply file_bytes_lookup.
         pose proof (kexec_loadable_len _ Hload) as H64.
         rewrite kxau_fb_length in H64. lia. }
-      destruct Hq as [(Hr & HV) | Hsucc].
-      + rewrite /SpecKexecAU.exec_arms. iLeft.
+      destruct Hq as [(Hr & HV & (cc & Hcc)) | Hsucc].
+      + (* THE HONEST CAUSE (S5).  The tail that jumped named [cc]; on a
+           LOADABLE file [KfNotLoadable] is refuted outright, [KfArgsFit]
+           carries the fit condition at [kexec_sz f], and [KfNoMem] is the
+           magic row [kexec_magic_of_loadable] proves. *)
+        destruct (kxau_fail_cause (kxc_fb datl dn) nl na alen cc Hload Hcc)
+          as [ec Hec].
+        rewrite /SpecKexecAU.exec_arms. iLeft.
         iSplitR; [iPureIntro; split; assumption |].
         rewrite /SpecKexecAU.exec_post_fail. iRight. iExists pl. iRight.
-        iExists zi, av0, (MkAnode (AFile (kxc_fb datl dn)) nl),
-                SpecKexecAU.EfNoMem.
+        iExists zi, av0, (MkAnode (AFile (kxc_fb datl dn)) nl), ec.
         iSplitL "HP"; [iExact "HP" |].
         iSplitR; [iPureIntro; exact Hav |].
         iSplitL "HΦ"; [iExact "HΦ" |].
-        iSplitR; [iPureIntro;
-                  exact (kxau_nomem_ok _ (kxc_fb datl dn) nl na alen eq_refl Hload) |].
+        iSplitR; [iPureIntro; exact Hec |].
         iExact "Hsl".
       + assert (Hne : (mf !!! Regidx Ra0) <> (mword_of_int (-1) : mword 64)).
         { destruct Hsucc as (_ & Hr & _). rewrite Hr.
@@ -618,8 +725,10 @@ Section KexecAUExit.
           [exact Hload | exact Himg].
     - (* NOT A LOADABLE FILE.  Arm (b) on success, [EfNotLoadable] on a
          failure past the lock. *)
-      destruct Hq as [(Hr & HV) | Hsucc].
-      + rewrite /SpecKexecAU.exec_arms. iLeft.
+      destruct Hq as [(Hr & HV & _) | Hsucc].
+      + (* the node is not a loadable file, so whatever cause the tail
+           named the honest report is [EfNotLoadable]. *)
+        rewrite /SpecKexecAU.exec_arms. iLeft.
         iSplitR; [iPureIntro; split; assumption |].
         rewrite /SpecKexecAU.exec_post_fail. iRight. iExists pl. iRight.
         iExists zi, av0, (abs_of (FsStateEra.era_node dn bm datl)),
@@ -641,9 +750,10 @@ Section KexecAUExit.
         iSplitR; [iPureIntro; exact Hnl |].
         iSplitR.
         { iPureIntro. exists entry, spv, szv'. split; [exact Hne |].
-          apply (KexecOkQ.kexec_ok_q_weaken
+          apply (KexecOkQ.kexec_ok_qf_weaken
                    (fun e => KexecAUBridge.exec_built_Q (kxc_fb datl dn) ef
-                               na alen afun e U')).
+                               na alen afun e U')
+                   (kxau_QFp (kxc_fb datl dn) na alen)).
           by right. }
         iFrame "HΦ Hsl".
   Qed.
@@ -727,12 +837,14 @@ Section KexecAUMain.
        [Q := False] below +0x090: phase A allocates nothing, so its own
        tails only ever prove [kexec_ok_q]'s FAILURE arm. ---- *)
     iApply (PA.kxc_phaseA_au (CID0 := CID0) kxau_QF
+              (fun _ : KexecOkQ.kxf_cause => Logic.True)
               gs jp gl pd pav pu gf
               plen pfun na avf alen aslen afun pidv U sts dqb dqs dqa dqpv dqas
               m K eb eb ∅
               (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
               (m !!! Regidx Rs1) (m !!! Regidx Rs2)
               (m !!! Regidx Ra0) (m !!! Regidx Ra1) P Pmiss Φo _
+              (ex_intro _ KexecOkQ.KfNoMem I)
               HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml
               Hins0 Hcovb Hiregb Hcstr Hplen Hjp Hgs
               eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
@@ -760,6 +872,7 @@ Section KexecAUMain.
                  (fun CID : CpuId =>
                     KexecOkQ.kexec_closer
                       (KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
+                      (kxau_QFp (kxc_fb datl dnf) na alen)
                       gf fsc_kalloc (proc_addr jp) pidv U m
                       (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs
                       fsc_bmapstart na alen plen (m !!! Regidx Ra0) dqpv pfun
@@ -771,6 +884,19 @@ Section KexecAUMain.
                 (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs na alen aslen afun
                 plen (m !!! Regidx Ra0) dqpv pfun (m !!! Regidx Ra1) dqa avf dqas
                 Hef Htflen ltac:(lia) with "HK HR"). }
+    (* ---- THE FAILURE-SIDE PLUG'S TWO PREMISES (S5).  Both are the SAME
+       observation: the cone's tails speak about the header buffer [ef] and
+       the loop's [sz], and only a LOADABLE file makes [ef] the file's own
+       first 64 bytes (it is at least that long) and [sz1] its
+       [kexec_sz].  So both are proved under [kexec_loadable] and are
+       vacuous otherwise -- which is why the composition can pay them
+       without deciding loadability here. ---- *)
+    assert (Hagf : SpecKexecAU.kexec_loadable (kxc_fb datl dnf) ->
+              forall j : nat, (j < 64)%nat -> ef j = kxc_fb datl dnf !!! j).
+    { intros Hload j Hj. rewrite (Hef j Hj). symmetry.
+      unfold kxc_fb. apply file_bytes_lookup.
+      pose proof (KexecAUBridge.kexec_loadable_len _ Hload) as H64.
+      rewrite kxau_fb_length in H64. lia. }
     (* the nine resources phase B threads whole and never looks inside *)
     iAssert (kxc_open pidv kf qf sf gyf loyf tlyf inumf dnf
                       bmf datl gilf gislf)
@@ -795,6 +921,7 @@ Section KexecAUMain.
     (* ---- PHASE B1: +0x090 .. +0x0cc, plus the +0x31c tail ---- *)
     iApply (PB.kxc_b1 (CID0 := CIDa)
               (KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
+              (kxau_QFp (kxc_fb datl dnf) na alen)
               gs jp gl pd pav pu gf
               kf qf sf gyf loyf tlyf inumf dnf bmf datl gilf gislf n2
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
@@ -802,6 +929,7 @@ Section KexecAUMain.
               (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
               (m !!! Regidx Rs1) (m !!! Regidx Rs2)
               (m !!! Regidx Ra0) (m !!! Regidx Ra1) ef
+              I
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
               Hkf Hinumf Hn2 eq_refl eq_refl eq_refl eq_refl eq_refl
               HM90sp HM90s0 HM90s1 HM90s2 HM90s4 HM90thr
@@ -823,6 +951,7 @@ Section KexecAUMain.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (kxc_cd (CID0 := CIDy)
                 (KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
+                (kxau_QFp (kxc_fb datl dnf) na alen)
                 jp gf
  plen pfun na avf alen aslen afun
                 pidv U eb dqb dqs dqa dqpv dqas m My K
@@ -836,6 +965,7 @@ Section KexecAUMain.
                 (fun szg U' Hb =>
                    KexecAUBridge.exec_built_Q_intro (kxc_fb datl dnf) ef na alen
                      afun szg U' Hb)
+                I (kxau_argsfit_prem (kxc_fb datl dnf) ef na alen Hagf)
                 HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
@@ -844,6 +974,7 @@ Section KexecAUMain.
       iIntros (CIDl) "%Hsl". iIntros (Ml Pl Mil) "Hst12c Hcont".
       iApply (PB3.kxc_b2 (CID0 := CIDl)
                 (KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
+                (kxau_QFp (kxc_fb datl dnf) na alen)
                 gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl n2
@@ -853,12 +984,14 @@ Section KexecAUMain.
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1)
                 (mword_of_int 4095 : mword 64) ef Pl Mil 0%nat
                 (mword_of_int 0 : mword 64)
+                (kxau_notloadable_prem (kxc_fb datl dnf) ef na alen Hagf) I
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hfab Hst12c Hcont []").
       iIntros (CIDy) "%Hsy". iIntros (My Py Miy szvy) "Hst1ae Hcont".
       iApply (kxc_cd (CID0 := CIDy)
                 (KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
+                (kxau_QFp (kxc_fb datl dnf) na alen)
                 jp gf
  plen pfun na avf alen aslen afun
                 pidv U eb dqb dqs dqa dqpv dqas m My K
@@ -872,6 +1005,7 @@ Section KexecAUMain.
                 (fun szg U' Hb =>
                    KexecAUBridge.exec_built_Q_intro (kxc_fb datl dnf) ef na alen
                      afun szg U' Hb)
+                I (kxau_argsfit_prem (kxc_fb datl dnf) ef na alen Hagf)
                 HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl

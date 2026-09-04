@@ -730,6 +730,7 @@ Section KexecDCommit.
       [mword 64 -> Prop]: the commit applies this at [fun e => Q e U'] for
       the closer's [U'], so the [Q entry] premise below is [Q entry U']. *)
   Lemma kxd_kexec_ok (Q : mword 64 -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (V : pprivate) (na : nat) (alen : nat -> nat)
       (P : uptd) (entry sz1 : mword 64) (ns : list (bv 8)) (r : mword 64) :
     Q entry ->
@@ -742,7 +743,7 @@ Section KexecDCommit.
        <= uint (mword_of_int (kxc_sp_final (uint sz1) alen na) : mword 64))%Z ->
     (uint (mword_of_int (kxc_sp_final (uint sz1) alen na) : mword 64)
        <= uint sz1)%Z ->
-    kexec_ok_q Q V
+    kexec_ok_qf Q QF V
       (upd_exec V sz1 P
          (<[kxc_tf_sp_idx
             := (mword_of_int (kxc_sp_final (uint sz1) alen na) : mword 64)]>
@@ -907,6 +908,7 @@ Section KexecDCommit.
   (* ------------------------------------------------------------------- *)
   Lemma kxd_commit
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -975,7 +977,7 @@ Section KexecDCommit.
             dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
             w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi c (pa_add pv q) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
@@ -1952,6 +1954,7 @@ Section KexecDMain.
   (* =================================================================== *)
   Lemma kxd_phaseD
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -1996,7 +1999,7 @@ Section KexecDMain.
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
@@ -2266,7 +2269,7 @@ Section KexecDMain.
                       (CID5 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID5 true (proc_addr jp) _ Hcr5
                    with "Hcont") as "Hcont".
-      iApply (kxd_commit (CID0 := CID5) Q jp gf
+      iApply (kxd_commit (CID0 := CID5) Q QF jp gf
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m D3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi sz1 c 0%nat
@@ -2411,7 +2414,7 @@ Section KexecDMain.
                       (CID9 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID9 true (proc_addr jp) _ Hcr9
                    with "Hcont") as "Hcont".
-      iApply (kxd_commit (CID0 := CID9) Q jp gf
+      iApply (kxd_commit (CID0 := CID9) Q QF jp gf
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m Mf K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi sz1 c q'

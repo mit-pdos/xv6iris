@@ -1165,6 +1165,7 @@ Section KexecExitQ.
 
   Lemma kxc_exit_qgen `{XI : CurCtx} `{CIDx : CpuId}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (pj : mword 64) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -1193,7 +1194,7 @@ Section KexecExitQ.
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     wp_next (CID0 := CIDx) true pj (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc pj pidv U m (ret_pc ra0) K b eb lks dqb
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc pj pidv U m (ret_pc ra0) K b eb lks dqb
            dqs fsc_bmapstart na alen plen pv dqpv pfun av dqa avf
            aslen dqas afun).
   Proof.
@@ -1205,7 +1206,7 @@ Section KexecExitQ.
     iApply ("H" $! mf U' entry spv szv' with
              "[%] [%] Hsie Hcnt Htc Hcl Hpc Hbm Hin Hka Hpriv Hpath Hargv
               Hargs Hbs Hirs");
-      [exact Hcs | exact (kexec_ok_q_weaken _ _ _ _ _ _ _ _ _ Hok)].
+      [exact Hcs | exact (kexec_ok_qf_weaken _ _ _ _ _ _ _ _ _ _ Hok)].
   Qed.
 
 
@@ -1302,6 +1303,7 @@ Section KexecAExit.
   (* =================================================================== *)
   Lemma kxc_exit_m1
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (pj : mword 64) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -1309,6 +1311,11 @@ Section KexecAExit.
       (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m Mt : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
+    (* THE FAILURE-SIDE PLUG'S PAYMENT (S5).  This block IS kexec's [-1]
+       return, so it is the one place [kexec_ok_qf]'s failure arm is
+       proved -- and the cause it names comes from the tail that jumped
+       here.  At [QF := fun _ => True] it is [KfNoMem] and free. *)
+    (exists c : KexecOkQ.kxf_cause, QF c) ->
     (68 <= K)%nat ->
     m !!! Regidx csp_rs1 = sp0 ->
     m !!! Regidx Rra = ra0 ->
@@ -1337,12 +1344,12 @@ Section KexecAExit.
     bslots 3 -∗
     iref_slots 2 -∗
     wp_next true pj (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc pj pidv U m (ret_pc ra0) K b eb lks dqb
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc pj pidv U m (ret_pc ra0) K b eb lks dqb
            dqs fsc_bmapstart na alen plen pv dqpv pfun av dqa avf
            aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmta0 Hthr.
+    intros Hqf HK Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmta0 Hthr.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc Hframe Hbm Hins #Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
@@ -1362,7 +1369,7 @@ Section KexecAExit.
               with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath
                     Hargv Hargs Hbs Hirs").
     - exact Hcs.
-    - left. split; [| reflexivity].
+    - left. split_and!; [| reflexivity | exact Hqf].
       rewrite (Hpres Ra0 ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz)).
       exact Hmta0.
   Qed.
@@ -1413,6 +1420,7 @@ Section KexecABad.
   (* =================================================================== *)
   Lemma kxc_bad64
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gil gisl : gname) (gf : gname)
@@ -1428,6 +1436,8 @@ Section KexecABad.
       (pidv : mword 32) (U : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (m Mt : regfile) (K : nat) (eb : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
+    (* the failure-side plug's cause, relayed to [kxc_exit_m1] (S5) *)
+    (exists c : KexecOkQ.kxf_cause, QF c) ->
     (K_kexec <= K)%nat ->
     (k < NINODE)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
@@ -1497,12 +1507,12 @@ Section KexecABad.
     log_opb icfg_log n2 -∗
     kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
            pfun av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
+    intros Hqf HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
            Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts4 Hthr.
     
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab #Hslkk Hslkd %Hley #Hfly #Hclaims Hdep Hoffr Hidev
@@ -1711,10 +1721,10 @@ Section KexecABad.
       change 55%nat with (50 + 5)%nat.
       rewrite (stack_own_app (KTR := KT1)) (pa_stk_assoc sp0 13 50).
       iSplitL "Hmid"; [iExact "Hmid" | iExact "Htop"]. }
-    iApply (kxc_exit_m1 Q (proc_addr jp) gf
+    iApply (kxc_exit_m1 Q QF (proc_addr jp) gf
  plen pfun na avf alen aslen afun pidv U
               dqb dqs dqa dqpv dqas m B5 K eb eb lks sp0 ra0 s00 s10 s20 pv av
-              ltac:(lia)
+              Hqf ltac:(lia)
               Hsp Hra Hs0 Hs1 Hs2 HB5sp HB5a0 HB5thr
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfr Hbm Hins Hka Hpriv Hpath Hargv
                     Hargs Hbs Hirs2").
@@ -1811,6 +1821,7 @@ Section KexecCBad.
   (* =================================================================== *)
   Lemma kxc_bad_1d6
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (jp : nat)
       (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
@@ -1820,6 +1831,8 @@ Section KexecCBad.
       (m Mt : regfile) (K : nat) (eb : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (P : uptd) (szf w13 : mword 64) :
+    (* the failure-side plug's cause, relayed to [kxc_exit_m1] (S5) *)
+    (exists c : KexecOkQ.kxf_cause, QF c) ->
     (K_kexec <= K)%nat ->
     m !!! Regidx csp_rs1 = sp0 ->
     m !!! Regidx Rra = ra0 ->
@@ -1862,12 +1875,12 @@ Section KexecCBad.
       (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
       (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13 -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
            eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
            pfun av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts3 Hmts6 Hmts11 Hbelow Hcov.
+    intros Hqf HK Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts3 Hmts6 Hmts11 Hbelow Hcov.
     
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc Hpt #Hka Hbm Hins Hpriv Hpath Hargv
              Hargs Hbs Hirs Hframe Hcont".
@@ -2213,10 +2226,10 @@ Section KexecCBad.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID3 CIDj eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iApply (T.kxc_exit_m1 Q (proc_addr jp) gf
+    iApply (T.kxc_exit_m1 Q QF (proc_addr jp) gf
  plen pfun na avf alen aslen afun pidv U
               dqb dqs dqa dqpv dqas m B13 K eb eb lks sp0 ra0 s00 s10 s20 pv av
-              ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HB13sp HB13a0 HB13thr
+              Hqf ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HB13sp HB13a0 HB13thr
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfr Hbm Hins Hka Hpriv Hpath Hargv
                     Hargs Hbs Hirs Hcont").
   Qed.

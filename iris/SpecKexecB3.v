@@ -86,6 +86,7 @@ Notation Ra0 := (mword_of_int 10 : mword 5).
 (* ===================================================================== *)
 Definition kxc_b2_body
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
@@ -99,6 +100,15 @@ Definition kxc_b2_body
     (m M : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (i : nat) (szv : mword 64) :=
+  (* THE FAILURE-SIDE PLUG (S5).  The phdr loop owns five of kexec's eight
+     [bad:] entries: four of them REJECT THE FILE (memsz < filesz, the
+     [vaddr + memsz] wrap, a misaligned [vaddr], and a short read of the
+     header table itself) and the fifth is uvmalloc's exhaustion.  So the
+     block takes one premise per cause -- the first CONDITIONAL on the
+     fact its four tails actually establish. *)
+  (~ KexecBuilt.kxb_walk_loadable (kxc_fb datl dnf) ef ->
+     QF KexecOkQ.KfNotLoadable) ->
+  QF KexecOkQ.KfNoMem ->
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
@@ -128,7 +138,7 @@ Definition kxc_b2_body
              (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
              w67 ef P Mi i szv -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -141,7 +151,7 @@ Definition kxc_b2_body
                  (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                  w67 (kxc_fb datl dnf) ef P' Mo szv' (m !!! Regidx Rs11) -∗
       wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-        KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+        KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
              eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
              pfun av dqa avf aslen dqas afun) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -205,6 +215,7 @@ Module Type KEXECB3.
   Parameter kxc_b2 :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
@@ -217,7 +228,7 @@ Module Type KEXECB3.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (i : nat) (szv : mword 64),
-    kxc_b2_body Q gs jp gl pd pav pu gilf gislf
+    kxc_b2_body Q QF gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
       pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67

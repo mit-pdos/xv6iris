@@ -1088,6 +1088,179 @@ Proof.
   split; [exact Hpok | split; [exact Hle | exact Heq]].
 Qed.
 
+
+(* ====================================================================== *)
+(*  3c.  THE LOADER'S ACCEPTANCE PREDICATE, BELOW THE AU CONTRACT (S5)     *)
+(* ====================================================================== *)
+
+(*  [SpecKexecAU.kexec_loadable] transcribed character for character into a
+    file the kernel-side proofs may name ([loads_ascending] restated as
+    [kxb_ascending], the two bridged in [KexecImageAlg] §3 already).  It
+    exists for ONE reason: the eight [bad:] tails have to say WHY they
+    jumped, and five of them say "this file is not one the loader
+    accepts".  [KexecImageAlg] §4 identifies it with the contract's.      *)
+Definition kxb_loadable (f : elf_bytes) : Prop :=
+  elf_wf f = true
+  /\ (exists e, elf_parse_ehdr f = Some e /\ ee_phoff e < 2 ^ 31)
+  /\ Forall (fun p => ep_offset p < 2 ^ 31 /\ ep_vaddr p `mod` PGSIZE = 0)
+       (elf_loads f)
+  /\ kxb_ascending (elf_loads f).
+
+(*  ...and what a tail INSIDE the phdr loop can actually contradict: the
+    acceptance predicate TOGETHER with the walk's own guard and the table
+    window's file bound.  A tail holds neither the file's first 64 bytes
+    nor the ELF header record, so it cannot derive the guard from the
+    predicate the way [kxb_walk_loadable_of_loadable] below does -- but it
+    does not have to: the guard is a CONJUNCT here, and the composition
+    (which does hold the agreement) is what proves the implication
+    [~ kxb_walk_loadable f ef -> ~ kxb_loadable f].                       *)
+Definition kxb_walk_loadable (f : elf_bytes) (ef : nat -> bv 8) : Prop :=
+  kxb_loadable f
+  /\ kxb_walk_ok f ef
+  /\ (forall i : nat, (i < Z.to_nat (eh_phnum ef))%nat ->
+        (Z.of_nat (kxb_phoff ef i) + 56 <= Z.of_nat (length f))%Z).
+
+(* ---- the two rows [kxb_walk_ok_of_loadable]'s proof was built out of,
+        moved down here so [kxb_walk_loadable_of_loadable] can use them
+        without naming [SpecKexecAU] ([KexecImageAlg] §4 re-exports). ---- *)
+
+Lemma kxb_phdr_at_parse (l : elf_bytes) (o : Z) (p : elf_phdr) :
+  elf_parse_phdr l o = Some p -> kxb_phdr_at l (Z.to_nat o) = p.
+Proof.
+  intros H. unfold kxb_phdr_at. symmetry. exact (elf_parse_phdr_all l o p H).
+Qed.
+
+Lemma kxb_loads_of_list (f : elf_bytes) (ef : nat -> bv 8)
+    (ps : list elf_phdr) (n : nat) :
+  (n <= length ps)%nat ->
+  (forall i p, (i < n)%nat -> ps !! i = Some p -> kxb_phdr f ef i = p) ->
+  kxb_loads f ef n = List.filter (fun p => Z.eqb (ep_type p) 1) (take n ps).
+Proof.
+  induction n as [| n IH]; intros Hn Hag; [reflexivity |].
+  assert (Hlt : (n < length ps)%nat) by lia.
+  destruct (lookup_lt_is_Some_2 ps n Hlt) as [p Hp].
+  rewrite (take_S_r ps n p Hp), List.filter_app.
+  rewrite <- (IH ltac:(lia)
+                 ltac:(intros i q Hi Hq; apply Hag; [lia | exact Hq])).
+  assert (Hpe : kxb_phdr f ef n = p) by (apply Hag; [lia | exact Hp]).
+  destruct (decide (ep_type p = 1)) as [Ht | Ht].
+  - rewrite (kxb_loads_S_load f ef n ltac:(rewrite Hpe; exact Ht)), Hpe.
+    f_equal. simpl. rewrite (proj2 (Z.eqb_eq _ _) Ht). reflexivity.
+  - rewrite (kxb_loads_S_skip f ef n ltac:(rewrite Hpe; exact Ht)).
+    simpl. replace (Z.eqb (ep_type p) 1) with false
+      by (symmetry; apply Z.eqb_neq; exact Ht).
+    rewrite List.app_nil_r. reflexivity.
+Qed.
+
+(* the table window's own file bound, read straight off [elf_wf] *)
+Lemma elf_wf_ph_window (f : elf_bytes) (e : elf_ehdr) :
+  elf_wf f = true -> elf_parse_ehdr f = Some e ->
+  (ee_phoff e + ee_phnum e * 56 <= Z.of_nat (length f))%Z.
+Proof.
+  intros Hwf He. unfold elf_wf in Hwf. rewrite He in Hwf.
+  destruct (elf_phdrs f) as [ps|]; [|discriminate].
+  rewrite !andb_true_iff in Hwf.
+  destruct Hwf as [[[[[[_ _] _] _] Hb] _] _].
+  apply Z.leb_le in Hb. exact Hb.
+Qed.
+
+(*  [KexecImageAlg.kxb_walk_ok_of_loadable]'s argument, at this file's own
+    spelling and with the table window added.  This is the ONE row the
+    composition needs to turn a tail's [~ kxb_walk_loadable f ef] into the
+    contract's [~ kexec_loadable f]: it is the contrapositive.            *)
+Lemma kxb_walk_loadable_of_loadable (f : elf_bytes) (ef : nat -> bv 8) :
+  kxb_loadable f ->
+  (forall j, (j < 64)%nat -> ef j = f !!! j) ->
+  kxb_walk_loadable f ef.
+Proof.
+  intros Hl Hag. pose proof Hl as (Hwf & (e & He & Hpo) & _ & Hasc).
+  destruct (elf_wf_phdrs f Hwf) as [ps Hps].
+  destruct (eh_fields_of_ehdr ef f e He Hag) as (_ & Hphnum & _).
+  pose proof (elf_phdrs_length f e ps He Hps) as Hlen.
+  assert (Hpo0 : 0 <= ee_phoff e).
+  { destruct (elf_parse_ehdr_fields f e He) as (_ & _ & H2 & _).
+    rewrite H2. apply elf_le_at_bound. }
+  assert (Hpn : 0 <= ee_phnum e < 65536).
+  { destruct (elf_parse_ehdr_fields f e He) as (_ & _ & _ & _ & H5).
+    rewrite H5. pose proof (elf_le_at_bound f 56 2) as Hb.
+    change (2 ^ (8 * Z.of_nat 2)) with 65536 in Hb. exact Hb. }
+  (* the offset of entry [i], with the 32-bit truncation killed *)
+  assert (Hoff : forall i : nat, (i < Z.to_nat (ee_phnum e))%nat ->
+            kxb_phoff ef i = Z.to_nat (ee_phoff e + 56 * Z.of_nat i)).
+  { intros i Hi.
+    assert (Hio : ph_at ef i = ee_phoff e + 56 * Z.of_nat i)
+      by exact (ph_at_of_ehdr ef f e i He Hag Hpo).
+    assert (Hib : 0 <= ee_phoff e + 56 * Z.of_nat i < 2 ^ 32).
+    { change (2 ^ 31) with 2147483648 in Hpo.
+      assert (Hiz : Z.of_nat i < 65536) by lia.
+      change (2 ^ 32) with 4294967296. lia. }
+    unfold kxb_phoff. rewrite Hio, (Z.mod_small _ _ Hib). reflexivity. }
+  assert (Hag' : forall i p, (i < length ps)%nat -> ps !! i = Some p ->
+                   kxb_phdr f ef i = p).
+  { intros i p Hi Hp.
+    unfold kxb_phdr. rewrite (Hoff i ltac:(lia)).
+    exact (kxb_phdr_at_parse f _ p (elf_phdrs_parse f e ps i p Hwf He Hps Hp)). }
+  split; [exact Hl | split].
+  - split; [| split].
+    + rewrite <- Hphnum in Hlen. rewrite <- Hlen.
+      rewrite (kxb_loads_of_list f ef ps (length ps) ltac:(lia) Hag').
+      rewrite take_ge by lia. unfold elf_loads. rewrite Hps. reflexivity.
+    + apply Forall_forall. intros p Hp.
+      apply elf_wf_phdr_ok; [exact Hwf | apply elem_of_list_In; exact Hp].
+    + exact Hasc.
+  - intros i Hi. rewrite Hphnum in Hi. rewrite (Hoff i Hi).
+    pose proof (elf_wf_ph_window f e Hwf He) as Hwin.
+    assert (Hiz : Z.of_nat i < ee_phnum e) by lia.
+    rewrite Z2Nat.id by lia. lia.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  WHAT A [bad:] TAIL PAYS WITH.  Five of kexec's eight tails fire on a    *)
+(*  PROGRAM HEADER the loop has just read, and each of the five contradicts *)
+(*  one field of [kxb_walk_loadable]: [memsz < filesz] and the [vaddr +     *)
+(*  memsz] wrap contradict [phdr_ok] (which the walk guard carries for      *)
+(*  every [elf_loads] member), the misaligned [vaddr] and the loadseg short *)
+(*  read contradict [kxb_loadable]'s own [Forall] and [phdr_ok]'s window.   *)
+(*  So they all go through ONE row: locate the header in [elf_loads f].     *)
+(* ---------------------------------------------------------------------- *)
+Lemma kxb_load_hdr_in (f : elf_bytes) (ef : nat -> bv 8) (i : nat) :
+  kxb_walk_ok f ef -> (S i <= Z.to_nat (eh_phnum ef))%nat ->
+  ep_type (kxb_phdr f ef i) = 1 ->
+  kxb_phdr f ef i ∈ elf_loads f.
+Proof.
+  intros Hw Hi Hty. pose proof Hw as (Hid & _ & _).
+  assert (HSi : kxb_phdr f ef i ∈ kxb_loads f ef (S i)).
+  { rewrite (kxb_loads_S_load f ef i Hty).
+    apply elem_of_app; right; apply elem_of_list_singleton; reflexivity. }
+  destruct (kxb_loads_prefix f ef (S i) (Z.to_nat (eh_phnum ef)) Hi) as [r Hr].
+  rewrite Hid in Hr. rewrite Hr. apply elem_of_app. by left.
+Qed.
+
+(* the two field packets a tail contradicts, at the header the loop holds *)
+Lemma kxb_not_walk_loadable (f : elf_bytes) (ef : nat -> bv 8) (i : nat) :
+  (S i <= Z.to_nat (eh_phnum ef))%nat ->
+  ep_type (kxb_phdr f ef i) = 1 ->
+  ~ (phdr_ok f (kxb_phdr f ef i)
+     /\ ep_offset (kxb_phdr f ef i) < 2 ^ 31
+     /\ ep_vaddr (kxb_phdr f ef i) `mod` PGSIZE = 0) ->
+  ~ kxb_walk_loadable f ef.
+Proof.
+  intros Hi Hty Hbad (Hl & Hw & _). apply Hbad.
+  pose proof (kxb_load_hdr_in f ef i Hw Hi Hty) as Hin.
+  destruct Hw as (_ & Hok & _). destruct Hl as (_ & _ & Hfa & _).
+  apply elem_of_list_lookup in Hin as [j Hj].
+  split; [exact (Forall_lookup_1 _ _ _ _ Hok Hj) |].
+  exact (Forall_lookup_1 _ _ _ _ Hfa Hj).
+Qed.
+
+(* ...and the SHORT PHDR READ, which contradicts no header at all: the
+   table window [elf_wf] carries reaches past entry [i]. *)
+Lemma kxb_not_walk_loadable_off (f : elf_bytes) (ef : nat -> bv 8) (i : nat) :
+  (i < Z.to_nat (eh_phnum ef))%nat ->
+  (Z.of_nat (length f) < Z.of_nat (kxb_phoff ef i) + 56)%Z ->
+  ~ kxb_walk_loadable f ef.
+Proof. intros Hi Hshort (_ & _ & Hwin). pose proof (Hwin i Hi). lia. Qed.
+
 (* the fold is at least every member's top -- what says an already-loaded
    segment sits strictly below the size the loop has reached. *)
 Lemma foldr_Zmax_elem (l : list Z) (s x : Z) :

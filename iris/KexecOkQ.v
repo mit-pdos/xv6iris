@@ -141,6 +141,104 @@ Lemma kexec_ok_q_of_True (V V' : pprivate) (r entry spv szv' : mword 64)
   kexec_ok_q (fun _ => True) V V' r entry spv szv' na alen.
 Proof. intro H. by apply kexec_ok_q_True. Qed.
 
+
+(* ===================================================================== *)
+(*  1b.  THE FAILURE ARM'S OWN HOLE (S5)                                  *)
+(* ===================================================================== *)
+
+(*  WHY A SECOND PLUG.  [kexec_ok_q] above says NOTHING about a failed
+    run, which is what made the §1 sweep free -- and also what made the
+    AU composition report every post-lock failure as "out of memory".
+    The honest sentence is the one the C code actually decides: a file
+    the loader rejects fails with [EfNotLoadable], arguments that do not
+    fit the stack page with [EfArgsFit], and only a real allocation
+    failure with [EfNoMem].  So the FAILURE arm gets a hole too, and it
+    is paid at the [bad:] tail that jumped -- each of which knows, as a
+    pure fact about the file and the frame, WHY it jumped.
+
+    [kxf_cause] is [SpecKexecAU.exec_fail_cause] transcribed into a file
+    that sits BELOW the AU contract (the kernel-side cone must not name
+    it); the composition bridges the two by a three-row match.           *)
+Inductive kxf_cause :=
+| KfNotLoadable   (* a phdr test / a short read: the file is not one
+                     [kexec_loadable] describes                        *)
+| KfArgsFit       (* [sp < stackbase]: the arguments do not fit        *)
+| KfNoMem.        (* kalloc / uvmalloc / proc_pagetable exhaustion     *)
+
+(*  [kexec_ok_q] with the failure arm carrying a CAUSE the plug accepts.
+    The success arm is character-for-character §1's, so every site that
+    proves the run   (Q entry /\
+   r = (mword_of_int (Z.of_nat na) : mword 64) /\
+   (na <= MAXARG)%nat /\
+   kxc_stack_ok (uint szv') (uint szv' - 4096) alen na /\
+   pv_sz V' = szv' /\
+   spv = (mword_of_int (kxc_sp_final (uint szv') alen na) : mword 64) /\
+   ud_tfp (pv_upt V') = ud_tfp (pv_upt V) /\
+   kxc_tf (pv_tf V) (pv_tf V') entry spv /\
+   pv_ofile V' = pv_ofile V /\
+   pv_fdg V' = pv_fdg V /\
+   pv_cwd V' = pv_cwd V /\
+   length (pv_name V') = PNAMELEN /\
+   (uint szv' - 4096 <= uint spv)%Z /\
+   (uint spv <= uint szv')%Z)EEDED is unchanged; the [bad:] tails are the ones
+    that pay, and at [QF := fun _ => True] they pay nothing (any [c]). *)
+Definition kexec_ok_qf (Q : mword 64 -> Prop) (QF : kxf_cause -> Prop)
+    (V V' : pprivate) (r : mword 64)
+    (entry spv szv' : mword 64) (na : nat) (alen : nat -> nat) : Prop :=
+  (r = (mword_of_int (-1) : mword 64) /\ V' = V /\ (exists c, QF c))
+  \/
+  (Q entry /\
+   r = (mword_of_int (Z.of_nat na) : mword 64) /\
+   (na <= MAXARG)%nat /\
+   kxc_stack_ok (uint szv') (uint szv' - 4096) alen na /\
+   pv_sz V' = szv' /\
+   spv = (mword_of_int (kxc_sp_final (uint szv') alen na) : mword 64) /\
+   ud_tfp (pv_upt V') = ud_tfp (pv_upt V) /\
+   kxc_tf (pv_tf V) (pv_tf V') entry spv /\
+   pv_ofile V' = pv_ofile V /\
+   pv_fdg V' = pv_fdg V /\
+   pv_cwd V' = pv_cwd V /\
+   length (pv_name V') = PNAMELEN /\
+   (uint szv' - 4096 <= uint spv)%Z /\
+   (uint spv <= uint szv')%Z).
+
+(* the landed reading, dropping both holes *)
+Lemma kexec_ok_qf_weaken (Q : mword 64 -> Prop) (QF : kxf_cause -> Prop)
+    (V V' : pprivate) (r entry spv szv' : mword 64)
+    (na : nat) (alen : nat -> nat) :
+  kexec_ok_qf Q QF V V' r entry spv szv' na alen ->
+  kexec_ok V V' r entry spv szv' na alen.
+Proof.
+  intros [(Hr & HV & _) | (_ & H)]; unfold kexec_ok; [by left | by right].
+Qed.
+
+(* ...and dropping only the cause *)
+Lemma kexec_ok_q_of_qf (Q : mword 64 -> Prop) (QF : kxf_cause -> Prop)
+    (V V' : pprivate) (r entry spv szv' : mword 64)
+    (na : nat) (alen : nat -> nat) :
+  kexec_ok_qf Q QF V V' r entry spv szv' na alen ->
+  kexec_ok_q Q V V' r entry spv szv' na alen.
+Proof. intros [(Hr & HV & _) | H]; unfold kexec_ok_q; [by left | by right]. Qed.
+
+(* THE ROW THE LANDED AND PINNED RUNS GO THROUGH: at the vacuous cause
+   plug every [bad:] tail pays with [KfNoMem] and nothing is claimed. *)
+Lemma kexec_ok_qf_of_q (Q : mword 64 -> Prop)
+    (V V' : pprivate) (r entry spv szv' : mword 64)
+    (na : nat) (alen : nat -> nat) :
+  kexec_ok_q Q V V' r entry spv szv' na alen ->
+  kexec_ok_qf Q (fun _ => True) V V' r entry spv szv' na alen.
+Proof.
+  intros [(Hr & HV) | H]; unfold kexec_ok_qf;
+    [left; split_and!; [exact Hr | exact HV | exists KfNoMem; exact I]
+    | by right].
+Qed.
+
+Lemma kexec_ok_qf_True (V V' : pprivate) (r entry spv szv' : mword 64)
+    (na : nat) (alen : nat -> nat) :
+  kexec_ok V V' r entry spv szv' na alen ->
+  kexec_ok_qf (fun _ => True) (fun _ => True) V V' r entry spv szv' na alen.
+Proof. intro H. apply kexec_ok_qf_of_q, kexec_ok_q_of_True, H. Qed.
+
 (* ===================================================================== *)
 (*  1a.  THE EXIT CONTINUATION THAT RELAYS IT, NAMED ONCE                  *)
 (* ===================================================================== *)
@@ -188,6 +286,10 @@ Definition kexec_closer `{XI : TsoCtx.CurCtx}
        slot is still a claim on [entry], and the row below plugs it with
        [fun e => Q e U'] at the [U'] this continuation binds. *)
     (Q : mword 64 -> ustate -> Prop)
+    (* ...and the FAILURE side's plug (S5): the reason the run gave up,
+       paid at the [bad:] tail that jumped.  [fun _ => True] is the
+       landed/pinned instantiation, at which every tail pays [KfNoMem]. *)
+    (QF : kxf_cause -> Prop)
     (gf ga : gname) (pj : mword 64) (pidv : mword 32) (U : ustate)
     (m : regfile) (ret_tgt : mword 64) (K : nat) (b eb : bool)
     (lks : gset string) (dqb dqs : dfrac) (bmapstart : Z)
@@ -200,9 +302,9 @@ Definition kexec_closer `{XI : TsoCtx.CurCtx}
   (∀ (mf : regfile) (U' : ustate)
       (entry spv szv' : mword 64),
       ⌜callee_saved m mf⌝ -∗
-      ⌜kexec_ok_q (fun e => Q e U') (us_V U) (us_V U')
-                  (mf !!! Regidx (mword_of_int 10 : mword 5))
-                  entry spv szv' na alen⌝ -∗
+      ⌜kexec_ok_qf (fun e => Q e U') QF (us_V U) (us_V U')
+                   (mf !!! Regidx (mword_of_int 10 : mword 5))
+                   entry spv szv' na alen⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗

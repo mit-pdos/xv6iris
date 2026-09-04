@@ -326,6 +326,7 @@ Section KexecABody.
   (* =================================================================== *)
   Lemma kxc_a1
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gf : gname)
@@ -339,6 +340,11 @@ Section KexecABody.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (* the exit, opaque -- see the premise below *)
       (KEX : CpuId -> iProp Σ) :
+    (* the failure-side plug's cause (S5): phase A's own two [bad:] tails
+       are the file-not-loadable ones, and at the AU contract they are
+       reported through the arms rather than through this plug -- so the
+       premise is relayed, not decided, here. *)
+    (exists c : KexecOkQ.kxf_cause, QF c) ->
     (K_kexec <= K)%nat ->
     icfg_dev = ROOTDEV ->
     (0 < icfg_nib)%nat ->
@@ -393,7 +399,7 @@ Section KexecABody.
        passes its exit and the identity wand. ---- *)
     wp_next true (proc_addr jp) KEX -∗
     □ (∀ CX : CpuId, KEX CX -∗
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
            eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: the state at +0x032.
@@ -415,7 +421,7 @@ Section KexecABody.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+    intros Hqf HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hcstr Hplen Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
     
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab #Hka Hbm Hins #Hbits Hpriv
@@ -804,10 +810,10 @@ Section KexecABody.
         rewrite (callee_saved_lookup Hcse r Hr).
         rewrite /P1 upd_ne; [| regne].
         exact (HM4thr r Hr Nsp Ns0 Ns1 Ns2). }
-      iApply (T.kxc_exit_m1 Q (proc_addr jp) gf
+      iApply (T.kxc_exit_m1 Q QF (proc_addr jp) gf
                 plen pfun na avf alen aslen afun pidv U
                 dqb dqs dqa dqpv dqas m P2 K eb eb lks sp0 ra0 s00 s10 s20 pv av
-                ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HP2sp HP2a0 HP2thr
+                Hqf ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HP2sp HP2a0 HP2thr
                 with "Hcg Hcnt Hextc Hclmc Htext Hpc [Hframe] Hbm Hins Hka Hpriv
                       Hpath Hargv Hargs Hbs Hirs").
       { iApply (kxc_frameA_epi with "Hframe"). }
@@ -1012,6 +1018,7 @@ Section KexecABody.
   (* =================================================================== *)
   Lemma kxc_a2_r
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gf : gname)
@@ -1035,6 +1042,11 @@ Section KexecABody.
       (RX : (nat -> bv 8) -> dinode -> blkmap -> (nat -> list (bv 8)) -> iProp Σ)
       (* the exit, opaque -- see the premise below *)
       (KEX : CpuId -> iProp Σ) :
+    (* the failure-side plug's cause (S5): phase A's own two [bad:] tails
+       are the file-not-loadable ones, and at the AU contract they are
+       reported through the arms rather than through this plug -- so the
+       premise is relayed, not decided, here. *)
+    (exists c : KexecOkQ.kxf_cause, QF c) ->
     (K_kexec <= K)%nat ->
     icfg_dev = ROOTDEV ->
     (0 < icfg_nib)%nat ->
@@ -1112,14 +1124,14 @@ Section KexecABody.
     □ (∀ (CX : CpuId) (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
          (ef : nat -> bv 8),
        ⌜kxc_bad_cause dn ef data⌝ -∗ KEX CX -∗ R dn bm data -∗
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
            eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: the state at +0x090, phase B's entry ---- *)
     wp_next true (proc_addr jp) (fun CID : CpuId => kxc_a2_exit1_r jp gf plen pfun na avf aslen afun pidv U dqb dqs dqa dqpv dqas m K eb b lks sp0 ra0 s00 s10 s20 pv av RX KEX CID) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+    intros Hqf HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hjp Hgs Hsp Hra Hs0 Hs1 Hs2.
     pose proof HK as HK'. 
     iIntros "#Htext #Hfab Horacle Hconv Hseam Hcont #Hkw Hcont90".
@@ -1835,12 +1847,12 @@ Section KexecABody.
                      with "[] HR Hcont") as "Hcont".
         { iIntros "!>" (CX) "HK HRx".
           iApply ("Hkw" $! CX dnl bml datl gb with "[%] HK HRx"). exact Hbad. }
-      iApply (T.kxc_bad64 Q gs jp gl pd pav pu
+      iApply (T.kxc_bad64 Q QF gs jp gl pd pav pu
                   gilk gislk gf
  k (q/2)%Qp (q/2)%Qp gy loy tly inum dnl bml n1
                   plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
                   m Q12 K eb lks sp0 ra0 s00 s10 s20 pv av
-                  HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
+                  Hqf HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                   Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HQ12sp HQ12s4 HQ12thr
                   with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd [//] Hfly Hclaimskx Hdep Hoffr
                         Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
@@ -1949,12 +1961,12 @@ Section KexecABody.
                    with "[] HR Hcont") as "Hcont".
       { iIntros "!>" (CX) "HK HRx".
         iApply ("Hkw" $! CX dnl bml datl gb with "[%] HK HRx"). exact Hbad. }
-      iApply (T.kxc_bad64 Q gs jp gl pd pav pu
+      iApply (T.kxc_bad64 Q QF gs jp gl pd pav pu
                 gilk gislk gf
  k (q/2)%Qp (q/2)%Qp gy loy tly inum dnl bml n1
                 plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
                 m Q9 K eb lks sp0 ra0 s00 s10 s20 pv av
-                HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
+                Hqf HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                 Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HQ9sp HQ9s4 HQ9thr
                 with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hslkk Hslkd [//] Hfly Hclaimskx Hdep Hoffr
                       Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
@@ -1987,6 +1999,7 @@ Section KexecABody.
      [-1] tails' extra row is dropped. *)
   Lemma kxc_a2
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gf : gname)
@@ -2012,6 +2025,11 @@ Section KexecABody.
       (XCH : iProp Σ)
       (* the exit, opaque -- see the premise below *)
       (KEX : CpuId -> iProp Σ) :
+    (* the failure-side plug's cause (S5): phase A's own two [bad:] tails
+       are the file-not-loadable ones, and at the AU contract they are
+       reported through the arms rather than through this plug -- so the
+       premise is relayed, not decided, here. *)
+    (exists c : KexecOkQ.kxf_cause, QF c) ->
     (K_kexec <= K)%nat ->
     icfg_dev = ROOTDEV ->
     (0 < icfg_nib)%nat ->
@@ -2078,23 +2096,23 @@ Section KexecABody.
        passes its exit and the identity wand. ---- *)
     wp_next true (proc_addr jp) KEX -∗
     □ (∀ CX : CpuId, KEX CX -∗
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
            eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: the state at +0x090, phase B's entry ---- *)
     wp_next true (proc_addr jp) (fun CID : CpuId => kxc_a2_exit1 jp gf plen pfun na avf aslen afun pidv U dqb dqs dqa dqpv dqas m K eb b lks sp0 ra0 s00 s10 s20 pv av HD XCH KEX CID) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+    intros Hqf HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hjp Hgs Hsp Hra Hs0 Hs1 Hs2.
     iIntros "#Htext #Hfab Horacle Hseam Hcont #Hkw Hcont90".
-    iApply (kxc_a2_r Q gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
+    iApply (kxc_a2_r Q QF gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
               pidv U dqb dqs dqa dqpv dqas m M32 K eb b lks
               sp0 ra0 s00 s10 s20 pv av ipv zi n1
               (fun _ _ data => □ (⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝ ∨ XCH))%I
               (fun ef _ _ _ => □ (⌜kxq_hdr_ok HD ef⌝ ∨ XCH))%I
               KEX
-              HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+              Hqf HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
               Hiregb Hjp Hgs Hsp Hra Hs0 Hs1 Hs2
               with "Htext Hfab Horacle [] Hseam Hcont [] [Hcont90]").
     (* the one step: [kxq_hdr_ok_ext] at readi's window *)
@@ -2150,6 +2168,7 @@ Section KexecAMain.
   (* =================================================================== *)
   Lemma kxc_phaseA
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gf : gname)
@@ -2171,6 +2190,11 @@ Section KexecAMain.
       (XCH : iProp Σ)
       (* the exit, opaque -- see the premise below *)
       (KEX : CpuId -> iProp Σ) :
+    (* the failure-side plug's cause (S5): phase A's own two [bad:] tails
+       are the file-not-loadable ones, and at the AU contract they are
+       reported through the arms rather than through this plug -- so the
+       premise is relayed, not decided, here. *)
+    (exists c : KexecOkQ.kxf_cause, QF c) ->
     (K_kexec <= K)%nat ->
     icfg_dev = ROOTDEV ->
     (0 < icfg_nib)%nat ->
@@ -2236,7 +2260,7 @@ Section KexecAMain.
        passes its exit and the identity wand. ---- *)
     wp_next true (proc_addr jp) KEX -∗
     □ (∀ CX : CpuId, KEX CX -∗
-      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
+      KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
            eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: phase B's entry at +0x090 ---- *)
@@ -2312,16 +2336,16 @@ Section KexecAMain.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+    intros Hqf HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hcstr Hplen Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab Horacle #Hka Hbm Hins #Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont #Hkw Hcont90".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
-    iApply (kxc_a1 (CID0 := CID0) Q gs jp gl pd pav pu gf
+    iApply (kxc_a1 (CID0 := CID0) Q QF gs jp gl pd pav pu gf
 
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m K eb b lks sp0 ra0 s00 s10 s20 pv av KEX
-              HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+              Hqf HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
               Hiregb Hcstr Hplen Hjp Hgs Hsp Hra Hs0 Hs1 Hs2
               Ha0 Ha1
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hka Hbm Hins Hbits Hpriv
@@ -2330,11 +2354,11 @@ Section KexecAMain.
     iIntros (CIDs Hss M32 ipv zi n1) "Hseam Hexit".
     iDestruct (wp_next_retarget CID0 CIDs true (proc_addr jp) _ Hss
                  with "Hcont90") as "Hcont90".
-    iApply (kxc_a2 (CID0 := CIDs) Q gs jp gl pd pav pu gf
+    iApply (kxc_a2 (CID0 := CIDs) Q QF gs jp gl pd pav pu gf
 
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1 HD XCH KEX
-              HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+              Hqf HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
               Hiregb Hjp Hgs Hsp Hra Hs0 Hs1 Hs2
               with "Htext Hfab [Horacle] Hseam Hexit Hkw Hcont90").
     (* the oracle is quantified over the inum HERE; [kxc_a2] wants it at the

@@ -295,6 +295,7 @@ Section KexecB2Body.
   (* =================================================================== *)
   Lemma kxc_bad324
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
@@ -307,14 +308,14 @@ Section KexecB2Body.
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (szf : mword 64) (eb : bool) (lks : gset string) :
-    kxc_bad324_body Q gs jp gl pd pav pu gilf gislf
+    kxc_bad324_body Q QF gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P Mi szf eb lks.
   Proof.
     cbv beta delta [kxc_bad324_body].
-    intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs
+    intros Hqf HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs
            Hsp Hra Hs0 Hs1 Hs2 HMtsp HMts0 HMts4 HMts6 Hal Hbelow Hcov.
     pose proof HK as HK'. 
     destruct (Hiregb inumf Hib) as [Hibc Hibl].
@@ -663,12 +664,12 @@ Section KexecB2Body.
                   (CID13 : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_retarget CID0 CID13 true (proc_addr jp) _ Hcr
                  with "Hcont") as "Hcont".
-    iApply (A.kxc_bad64 Q gs jp gl pd pav pu
+    iApply (A.kxc_bad64 Q QF gs jp gl pd pav pu
               gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf n2
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m U8 K eb lks sp0 ra0 s00 s10 s20 pv av
-              HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
+              Hqf HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
               Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HU8sp HU8s4 HU8thr
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr
                     Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits
@@ -785,6 +786,7 @@ Section KexecB2Loops.
   (* =================================================================== *)
   Lemma kxc_ls `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
@@ -798,14 +800,14 @@ Section KexecB2Loops.
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (Mi Mb : gmap Z (bv 8))
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string) :
-    kxc_ls_body Q gs jp gl pd pav pu gilf gislf
+    kxc_ls_body Q QF gs jp gl pd pav pu gilf gislf
  gf
       kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen pfun na avf alen aslen afun
       pidv U dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P Mi Mb ip va fz po eb lks.
   Proof.
     cbv beta delta [kxc_ls_body].
-    intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs
+    intros Hqfnm HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs
  Hsp Hra Hs0 Hs1 Hs2 Hal Hbelow Hcovp Hfzr Hpor Hvaal Hvatop.
     pose proof HK as HK'. 
     assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
@@ -1745,11 +1747,12 @@ Section KexecB2Loops.
                   (CIDb1 : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_retarget CID0 CIDb1 true (proc_addr jp) _ Hcr3
                      with "Hcont") as "Hcont".
-        iApply (kxc_bad324 (CID0 := CIDb1) Q gs jp gl pd pav pu
+        iApply (kxc_bad324 (CID0 := CIDb1) Q QF gs jp gl pd pav pu
                   gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl n2 plen
                   pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas m M2 K
                   sp0 ra0 s00 s10 s20 pv av w63 w67 ef P _ w65 eb lks
+                  (ex_intro _ KexecOkQ.KfNoMem Hqfnm)
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                   Hgs Hsp Hra Hs0 Hs1 Hs2
                   ltac:(rewrite (HM2get csp_rs1 ltac:(vm_compute; reflexivity)

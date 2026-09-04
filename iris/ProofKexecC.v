@@ -273,8 +273,31 @@ Section KexecCSetup.
   (*  [ProofKexecB3.kxc_incr]): [kxc_at_21a 0] if [argv[0] <> 0], or        *)
   (*  [kxc_at_272 0] if the loop is skipped outright.                      *)
   (* =================================================================== *)
+  (* ---- THE FIT CONDITION, READ BACKWARDS (S5).  A [bad:] tail fires at
+     the argument index it has reached, and the plug's [KfArgsFit] is
+     stated at the FULL count [na]; [kxc_sp] is non-increasing and
+     [kxc_round16] is monotone, so an overflow at any [c <= na] is an
+     overflow at [na].  ---- *)
+  Lemma kxc_round16_mono (x y : Z) :
+    (x <= y)%Z -> (kxc_round16 x <= kxc_round16 y)%Z.
+  Proof.
+    intros H. unfold kxc_round16.
+    rewrite (Z.mod_eq x 16 ltac:(lia)) (Z.mod_eq y 16 ltac:(lia)).
+    assert (Hd : (x / 16 <= y / 16)%Z) by (apply Z.div_le_mono; lia). lia.
+  Qed.
+
+  Lemma kxc_sp_final_mono (top : Z) (len : nat -> nat) (i k : nat) :
+    (i <= k)%nat -> (kxc_sp_final top len k <= kxc_sp_final top len i)%Z.
+  Proof.
+    intros H. unfold kxc_sp_final. apply kxc_round16_mono.
+    pose proof (kxc_sp_mono top len i k H).
+    pose proof (Nat2Z.is_nonneg i). pose proof (Nat2Z.is_nonneg k).
+    assert (Hik : (Z.of_nat i <= Z.of_nat k)%Z) by lia. lia.
+  Qed.
+
   Lemma kxc_c_setup
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -285,6 +308,8 @@ Section KexecCSetup.
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8))
       (szv : mword 64) :
+    (* the failure-side plug (S5): this block's [bad:] tail is uvmalloc's *)
+    QF KexecOkQ.KfNoMem ->
     (K_kexec <= K)%nat ->
     m !!! Regidx csp_rs1 = sp0 -> m !!! Regidx Rra = ra0 ->
     m !!! Regidx Rs0 = s00 -> m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs2 = s20 ->
@@ -308,7 +333,7 @@ Section KexecCSetup.
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi szv
                (m !!! Regidx Rs11) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -335,13 +360,13 @@ Section KexecCSetup.
            one: the caller supplies exactly one and whichever path runs
            receives it.  durable-notes' "CHAINING TWO HALVES" shape. *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
                eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hmsp Hmra Hms0 Hms1 Hms2
+    intros Hqfnm HK Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
            Halen_bound Halen_cstr Halen_4096 Havf_na.
     
@@ -983,9 +1008,11 @@ Section KexecCSetup.
                        (CID18 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID18 true (proc_addr jp) _ Hcr18
                    with "Hcont") as "Hcont".
-    iApply (TC.kxc_bad_1d6 Q jp gf
+    iApply (TC.kxc_bad_1d6 Q QF jp gf
                 plen pfun na avf alen aslen afun pidv U
                 dqb dqs dqa dqpv dqas m U0 K eb ∅ sp0 ra0 s00 s10 s20 pv av P (pgroundup szv) w13
+                (* the cause (S5): uvmalloc could not add the guard+stack pages *)
+                (ex_intro _ KexecOkQ.KfNoMem Hqfnm)
                 ltac:(lia)
                 Hmsp Hmra Hms0 Hms1 Hms2 HU0sp HU0s3 HU0s6
                 HU0s11
@@ -2107,6 +2134,7 @@ Section KexecCExitM1.
      frame. *)
   Lemma kxc_c_exit_m1
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -2117,6 +2145,8 @@ Section KexecCExitM1.
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (sz1 : mword 64) (c : nat)
       (stub : Z) (jimm : mword 21) :
+    (* the cause the caller decided (S5), relayed to [kxc_bad_1d6] *)
+    (exists c : KexecOkQ.kxf_cause, QF c) ->
     (K_kexec <= K)%nat ->
     (c <= 33)%nat ->
     (forall i, (i < 8)%nat ->
@@ -2149,12 +2179,12 @@ Section KexecCExitM1.
               sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi c sz1 alen -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hc33 Hal Hmsp Hmra Hms0 Hms1 Hms2
+    intros Hqf HK Hc33 Hal Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
            HMsp HMs4 HMs6 HMs11 Hbelow Hcov Htgt.
     
@@ -2206,9 +2236,10 @@ Section KexecCExitM1.
     (* the [-1] exits free the half-built space, so the image is dropped
        here on purpose: [kxc_bad_1d6] speaks the ∃-weakened tier. *)
     iDestruct (proc_pt_forget with "Hpt") as "Hpt".
-    iApply (TC.kxc_bad_1d6 Q jp gf
+    iApply (TC.kxc_bad_1d6 Q QF jp gf
               plen pfun na avf alen aslen afun pidv U
               dqb dqs dqa dqpv dqas m Mt K eb ∅ sp0 ra0 s00 s10 s20 pv av P sz1 w13
+              Hqf
               ltac:(lia)
               Hmsp Hmra Hms0 Hms1 Hms2 HMtsp HMts3 HMts6
               HMts11
@@ -2373,6 +2404,7 @@ Section KexecCLoop.
 
   Lemma kxc_argv_step
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -2382,6 +2414,17 @@ Section KexecCLoop.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 : mword 64) (c : nat) :
+    (* the failure-side plug (S5): this block's [bad:] tail is uvmalloc's *)
+    QF KexecOkQ.KfNoMem ->
+    (* ...and the ARGUMENT-FIT cause, at the size the run settled on: the
+       tails know [~ kxc_stack_ok] at [uint sz1] and, under the walk's own
+       guard, what [uint sz1] IS ([kxc_at_21a]'s size row).  Quantified over
+       [z] because only the tail can supply it. *)
+    (forall z : Z,
+       (KexecBuilt.kxb_walk_ok fb ef ->
+          (z = UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
+               + 2 * PGSIZE)%Z) ->
+       ~ kxc_stack_ok z (z - PGSIZE) alen na -> QF KexecOkQ.KfArgsFit) ->
     (K_kexec <= K)%nat ->
     (c < na)%nat ->
     (alen c < aslen c)%nat ->
@@ -2411,7 +2454,7 @@ Section KexecCLoop.
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi oldsz sz1 (m !!! Regidx Rs11) c -∗
     (* ---- kexec's OWN continuation: the three early exits close it ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
     (* ---- THE ONE OUTPUT: continue, or the loop's own natural exit ---- *)
@@ -2426,13 +2469,13 @@ Section KexecCLoop.
                        M' K sp0 ra0 s00 s10 s20 pv av
                        w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P' Mo oldsz sz1 (m !!! Regidx Rs11) (S c) ) -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
                eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hcna Halenlt Hcstr Halen4096 Hsz1ge Hnamax Hal
+    intros Hqfnm Hqfaf HK Hcna Halenlt Hcstr Halen4096 Hsz1ge Hnamax Hal
            Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12.
     unfold MAXARG in Hnamax.
     iIntros "#Htext Hst Hcont Hout".
@@ -2731,11 +2774,18 @@ Section KexecCLoop.
                        (CID6 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID6 true (proc_addr jp) _ Hcr6
                    with "Hcont") as "Hcont".
-      iApply (kxc_c_exit_m1 (CID0 := CID6) Q jp gf
+      iApply (kxc_c_exit_m1 (CID0 := CID6) Q QF jp gf
  plen pfun na avf alen aslen afun
                 pidv U eb dqb dqs dqa dqpv dqas m T3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi sz1 c 0x352
                 (sign_extend' 21 (concat_vec (mword_of_int 1857 : mword 11) ('b"0")))
+                (* THE CAUSE (S5): [sp < stackbase] after argument [c], so the
+                   fit condition fails already at index [S c <= na]. *)
+                (ex_intro _ KexecOkQ.KfArgsFit
+                   (Hqfaf (uint sz1) Hszr
+                      ltac:(intros [Hall _];
+                            pose proof (Hall (S c) ltac:(lia) ltac:(lia)) as Hb;
+                            unfold PGSIZE in Hb; lia)))
                 ltac:(lia) ltac:(lia) Hal
                 Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
                 Hmw12 HT3sp HT3s4 HT3s6 HT3s11 Hbelow Hcov ltac:(pcw)
@@ -3826,11 +3876,16 @@ Section KexecCLoop.
                          (CID21 : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_retarget CID0 CID21 true (proc_addr jp) _ Hcr21
                      with "Hcont") as "Hcont".
-        iApply (kxc_c_exit_m1 (CID0 := CID21) Q jp gf
+        iApply (kxc_c_exit_m1 (CID0 := CID21) Q QF jp gf
  plen pfun na avf alen aslen afun
                   pidv U eb dqb dqs dqa dqpv dqas m T13 K sp0 ra0 s00 s10 s20 pv av
                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pfinal2 M0' sz1 c 0x356
                   (sign_extend' 21 (concat_vec (mword_of_int 1855 : mword 11) ('b"0")))
+                  (* the cause (S5): copyout failed.  In kexec the destination
+                     is the run's OWN fresh table, so this arm is effectively
+                     unreachable; it is classified [KfNoMem] because the only
+                     way copyout can fail is an unmapped destination page. *)
+                  (ex_intro _ KexecOkQ.KfNoMem Hqfnm)
                   ltac:(lia) ltac:(lia) Hal
                   Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
                   Hmw12 HT13sp HT13s4 HT13s6' HT13s11 HbelowF2 HcovF2 ltac:(pcw)
@@ -3881,6 +3936,7 @@ Section KexecCArgvLoop.
 
   Lemma kxc_argv_loop `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -3890,6 +3946,14 @@ Section KexecCArgvLoop.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (fb : elf_bytes) (ef : nat -> bv 8) (oldsz sz1 : mword 64) :
+    (* the failure-side plug (S5): the copyout / allocation causes *)
+    QF KexecOkQ.KfNoMem ->
+    (* ...and the ARGUMENT-FIT cause (see [kxc_argv_step]'s note) *)
+    (forall z : Z,
+       (KexecBuilt.kxb_walk_ok fb ef ->
+          (z = UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
+               + 2 * PGSIZE)%Z) ->
+       ~ kxc_stack_ok z (z - PGSIZE) alen na -> QF KexecOkQ.KfArgsFit) ->
     (K_kexec <= K)%nat ->
     (forall i, (i < na)%nat -> (alen i < aslen i)%nat) ->
     (forall i, (i < na)%nat -> bb_cstr (afun i) (alen i)) ->
@@ -3913,7 +3977,7 @@ Section KexecCArgvLoop.
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi oldsz sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -3923,13 +3987,13 @@ Section KexecCArgvLoop.
                    M' K sp0 ra0 s00 s10 s20 pv av
                    w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P' Mo oldsz sz1 (m !!! Regidx Rs11) c' -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
                eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Halen_bound Halen_cstr Halen_4096 Havf_na Hsz1ge Hnamax Hal
+    intros Hqfnm Hqfaf HK Halen_bound Halen_cstr Halen_4096 Havf_na Hsz1ge Hnamax Hal
            Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
            Hmw12.
     intro W. revert CID0.
@@ -3943,11 +4007,11 @@ Section KexecCArgvLoop.
          derivation.) *)
       exfalso. lia. }
     iIntros "#Htext Hst Hcont Hout".
-    iApply (kxc_argv_step (CID0 := CID0) Q jp gf
+    iApply (kxc_argv_step (CID0 := CID0) Q QF jp gf
  plen pfun na avf alen aslen afun
               pidv U eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi oldsz sz1 c
-              HK Hcna (Halen_bound c Hcna) (Halen_cstr c Hcna)
+              Hqfnm Hqfaf HK Hcna (Halen_bound c Hcna) (Halen_cstr c Hcna)
               (Halen_4096 c Hcna) Hsz1ge Hnamax Hal
               Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
               Hmw12
@@ -4176,6 +4240,7 @@ Section KexecCClose.
 
   Lemma kxc_c_close
       (Q : mword 64 -> ustate -> Prop)
+      (QF : KexecOkQ.kxf_cause -> Prop)
       (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -4185,6 +4250,14 @@ Section KexecCClose.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (fb : elf_bytes) (ef : nat -> bv 8) (P : uptd) (Mi : gmap Z (bv 8)) (oldsz sz1 : mword 64) (c : nat) :
+    (* the failure-side plug (S5): the copyout / allocation causes *)
+    QF KexecOkQ.KfNoMem ->
+    (* ...and the ARGUMENT-FIT cause (see [kxc_argv_step]'s note) *)
+    (forall z : Z,
+       (KexecBuilt.kxb_walk_ok fb ef ->
+          (z = UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
+               + 2 * PGSIZE)%Z) ->
+       ~ kxc_stack_ok z (z - PGSIZE) alen na -> QF KexecOkQ.KfArgsFit) ->
     (K_kexec <= K)%nat ->
     (8192 <= uint sz1)%Z ->
     (forall i, (i < 8)%nat ->
@@ -4200,7 +4273,7 @@ Section KexecCClose.
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P Mi oldsz sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -4210,13 +4283,13 @@ Section KexecCClose.
                    M' K sp0 ra0 s00 s10 s20 pv av
                    w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P' Mo oldsz sz1 (m !!! Regidx Rs11) c -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
                eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
+    intros Hqfnm Hqfaf HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12.
     
     iIntros "#Htext Hst Hcont Hout".
@@ -4715,9 +4788,19 @@ Section KexecCClose.
       (* the [-1] exits free the half-built space, so the image is dropped
        here on purpose: [kxc_bad_1d6] speaks the ∃-weakened tier. *)
     iDestruct (proc_pt_forget with "Hpt") as "Hpt".
-    iApply (TC.kxc_bad_1d6 Q jp gf
+    iApply (TC.kxc_bad_1d6 Q QF jp gf
                 plen pfun na avf alen aslen afun pidv U
                 dqb dqs dqa dqpv dqas m X7 K eb ∅ sp0 ra0 s00 s10 s20 pv av P sz1 w13
+                (* THE CAUSE (S5): the pointer vector does not fit.  The test
+                   is at the count [c] the loop reached and the plug's claim
+                   is at [na]; [kxc_sp_final] is antitone, so [c <= na]
+                   carries the overflow up. *)
+                (ex_intro _ KexecOkQ.KfArgsFit
+                   (Hqfaf (uint sz1) Hszr
+                      ltac:(intros [_ Hfin];
+                            pose proof (kxc_sp_final_mono (uint sz1) alen c na Hcna)
+                              as Hmn;
+                            unfold PGSIZE in Hfin; lia)))
                 ltac:(lia)
                 Hmsp Hmra Hms0 Hms1 Hms2 HX7sp HX7s3 HX7s6
                 HX7s11
@@ -5215,9 +5298,12 @@ Section KexecCClose.
         (* the [-1] exits free the half-built space, so the image is dropped
        here on purpose: [kxc_bad_1d6] speaks the ∃-weakened tier. *)
     iDestruct (proc_pt_forget with "Hpt") as "Hpt".
-    iApply (TC.kxc_bad_1d6 Q jp gf
+    iApply (TC.kxc_bad_1d6 Q QF jp gf
                   plen pfun na avf alen aslen afun pidv U
                   dqb dqs dqa dqpv dqas m X13 K eb ∅ sp0 ra0 s00 s10 s20 pv av P2 sz1 w13
+                  (* the cause (S5): copyout of the pointer vector failed --
+                     see the note at the argv loop's copyout tail. *)
+                  (ex_intro _ KexecOkQ.KfNoMem Hqfnm)
                   ltac:(lia)
                   Hmsp Hmra Hms0 Hms1 Hms2 HX13sp HX13s3 HX13s6'
                   HX13s11
