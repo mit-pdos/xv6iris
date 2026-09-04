@@ -125,6 +125,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import TsoCtx.
+Require Import OffBox.   (* [off_rows]: the inode's off rows (items 35/36) *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -817,6 +818,7 @@ Section KexecPinAMain.
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
+        (loyf tlyf : nat)
         (n2 : nat) (ef : nat -> bv 8),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
@@ -841,6 +843,7 @@ Section KexecPinAMain.
         IcacheRef.cred_floor loyf tlyf -∗
         IcacheInv.iref_claims -∗
         ic_tx_dep fsc_ic kf sf icfg_dev inumf gyf loyf -∗
+        off_rows off_cfg kf cur_ctx -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
         i_valid (ientry kf) ↦₄ valid_word true -∗
