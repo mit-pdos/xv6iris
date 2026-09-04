@@ -54,20 +54,25 @@
       [f = sh_bytes], owes only sh's start WP at sh's key.
 
    OUT (the arms, [exec_arms]):
-   - ret = argc (SUCCESS).  The walk completed at [i], the node observed
-     there was a file [f], the landed success conjuncts hold at
-     [entry = the ELF's entry of f] ([kexec_ok_exec]), and then
-       (a) [f] is loadable: the kernel returns THE CALLER'S WP, applied:
-           [uslot (exec_key U' sts na)] -- the slot at the state the
-           process resumes in (the new trapframe with [a0 := argc], the
-           new image, the new size, the caller's descriptor view) --
-           beside the pure [kexec_image_ok] it was instantiated at.  The
-           receipt was consumed by the WP premise.
-       (b) [f] is NOT loadable yet kexec succeeded (a file the code
-           accepts that [kexec_loadable] does not describe -- see THE
-           ACCEPTANCE PREDICATE): the receipt and the WP premise come
-           back; the kernel has no slot for the new process from this
-           contract and mints the generic one, as it does today.
+   - ret = argc (SUCCESS).  The walk completed at [i] and the node
+     observed there was [a]; then
+       (a) [a] is a loadable file [f]: the landed success conjuncts hold
+           at [entry = the ELF's entry of f] ([kexec_ok_exec]) and the
+           kernel returns THE CALLER'S WP, applied: [uslot (exec_key U'
+           sts na)] -- the slot at the state the process resumes in (the
+           new trapframe with [a0 := argc], the new image, the new size,
+           the caller's descriptor view) -- beside the pure
+           [kexec_image_ok] it was instantiated at.  The receipt was
+           consumed by the WP premise.
+       (b) [a] is anything else and kexec succeeded anyway: a file the
+           code accepts that [kexec_loadable] does not describe (see THE
+           ACCEPTANCE PREDICATE), or NOT A FILE AT ALL -- kexec never
+           tests the inode's type, it reads raw bytes off whatever the
+           path names, so a directory whose dirent bytes begin with the
+           ELF magic is exec'd (a finding of the phase-A proof,
+           2026-09-04).  The landed success conjuncts hold at SOME entry,
+           the receipt and the WP premise come back, and the kernel mints
+           the generic slot as it does today.
    - ret = -1 (FAILURE): the landed failure arm ([V' = V]) beside the
      honest three-way fold of the bundle: (i) nothing fs-visible fired
      (begin_op/namei not reached: unspent bundle back); (ii) the walk died
@@ -157,8 +162,17 @@
    The failure arm past the lock (arm (iii)) names its CAUSE
    ([exec_fail_cause]): the node was not a loadable file, or the
    arguments did not fit the stack page ([kxc_stack_ok] false), or an
-   allocation failed (a kalloc / uvmalloc / proc_pagetable exhaustion --
-   the one cause with no pure witness, since the pool is uncounted).
+   allocation failed (a kalloc / uvmalloc / proc_pagetable exhaustion).
+   The pool is uncounted, so memory exhaustion has no pure witness; what
+   keeps [EfNoMem] from being a blanket excuse is ORDER: every allocation
+   kexec performs comes after the ELF magic test, so a memory failure
+   implies the node's bytes -- if it was a file -- passed THE KERNEL'S
+   test ([kexec_magic_ok]: a header's worth of bytes whose first four
+   are the magic; the code compares only those four, not the class and
+   data bytes [ElfFile.elf_magic_ok] also checks) -- [exec_fail_ok]'s
+   [EfNoMem] row.  A real file that failed that test, or was too short
+   to hold a header, must be blamed on [EfNotLoadable], and the tails
+   have the header buffer to prove it.
    So a caller that proves [kexec_loadable f] and the fit condition for
    its arguments learns that the only way exec fails after resolving
    its path is running out of memory -- and that on success it holds
@@ -241,6 +255,7 @@ Require Import SpecKexec.       (* the landed frame this file parallels:
                                    [kxc_sp_final], [kxc_tf_sp_idx], [MAXARG] *)
 Require Import PageGeom.        (* [PGSIZE]                                  *)
 Require Import UserPtTree.      (* [pgroundup]                               *)
+Require Import ElfEnc.          (* [ELF_MAGIC]: the four bytes the code tests *)
 Require Import ElfFile.         (* [elf_bytes], [elf_wf], [elf_image],
                                    [elf_entry], [elf_loads], [elf_mem_end]  *)
 Require Import UmodeAbi.        (* [uimg_sub]                                *)
@@ -372,6 +387,14 @@ Inductive exec_fail_cause :=
 | EfArgsFit       (* the arguments do not fit the stack page *)
 | EfNoMem.        (* kalloc / uvmalloc / proc_pagetable exhaustion *)
 
+(* THE KERNEL'S MAGIC TEST, on the file: 64 bytes were read (a short
+   read fails before the test) and the first four are the magic.  The
+   code compares exactly these four ([ElfEnc.ELF_MAGIC]); ElfFile's
+   [elf_magic_ok] is stronger (class and data bytes too), so it is NOT
+   what a memory-failure tail can establish. *)
+Definition kexec_magic_ok (f : elf_bytes) : Prop :=
+  (64 <= length f)%nat /\ elf_le_at f 0 4 = ELF_MAGIC.
+
 Definition anode_loadable (a : anode) : Prop :=
   exists (f : elf_bytes) (nl : nat), a = MkAnode (AFile f) nl /\ kexec_loadable f.
 
@@ -383,7 +406,10 @@ Definition exec_fail_ok (a : anode) (na : nat) (alen : nat -> nat)
       exists (f : elf_bytes) (nl : nat),
         a = MkAnode (AFile f) nl
         /\ ~ kxc_stack_ok (kexec_sz f) (kexec_sz f - PGSIZE) alen na
-  | EfNoMem => True
+  | EfNoMem =>
+      (* the allocations all come after the magic test (header) *)
+      forall (f : elf_bytes) (nl : nat),
+        a = MkAnode (AFile f) nl -> kexec_magic_ok f
   end.
 
 (* the landed success conjuncts, at the ELF's entry, the failure arm
@@ -496,19 +522,26 @@ Section KexecAU.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (U U' : ustate) (r : mword 64) : iProp Σ :=
-    (∃ (pl : list (bv 8)) (i : Z) (av : aview) (f : elf_bytes) (nl : nat),
+    (∃ (pl : list (bv 8)) (i : Z) (av : aview) (a : anode),
        P (length (path_elems pl)) i ∗
-       ⌜av !! i = Some (MkAnode (AFile f) nl)⌝ ∗
-       ⌜kexec_ok_exec f (us_V U) (us_V U') r na alen⌝ ∗
-       ((* (a) the program xv6 loaded is the ELF semantics' image: the
-           caller's WP, at the key the process resumes in *)
-        (⌜kexec_loadable f⌝ ∗
-         ⌜kexec_image_ok f na alen afun sts (exec_key U' sts na)⌝ ∗
-         uslot (exec_key U' sts na))
-        ∨ (* (b) accepted by the code, outside [kexec_loadable]: nothing
-             about the image, the receipt and the WP premise back *)
-        (⌜~ kexec_loadable f⌝ ∗
-         Φo av i (MkAnode (AFile f) nl) ∗
+       ⌜av !! i = Some a⌝ ∗
+       ((* (a) a loadable file: the program xv6 loaded is the ELF
+           semantics' image, and the caller's WP is returned at the key
+           the process resumes in *)
+        (∃ (f : elf_bytes) (nl : nat),
+           ⌜a = MkAnode (AFile f) nl⌝ ∗
+           ⌜kexec_loadable f⌝ ∗
+           ⌜kexec_ok_exec f (us_V U) (us_V U') r na alen⌝ ∗
+           ⌜kexec_image_ok f na alen afun sts (exec_key U' sts na)⌝ ∗
+           uslot (exec_key U' sts na))
+        ∨ (* (b) anything else the code accepted (header): the landed
+             success conjuncts at some entry, the receipt and the WP
+             premise back *)
+        (⌜~ anode_loadable a⌝ ∗
+         ⌜exists (entry spv szv' : mword 64),
+            r <> (mword_of_int (-1) : mword 64)
+            /\ kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝ ∗
+         Φo av i a ∗
          exec_slot_pre Φo na alen afun sts)))%I.
 
   (* ret = -1 (header, OUT): the three-way fold of the bundle *)
@@ -562,9 +595,13 @@ Section KexecAU.
     iIntros "[[[%Hr %HV] _] | H]".
     - iPureIntro. exists (mword_of_int 0), (mword_of_int 0), (mword_of_int 0).
       left. split; [exact Hr | exact HV].
-    - iDestruct "H" as (pl i av f nl) "(_ & _ & %Hok & _)".
-      iPureIntro. destruct Hok as (e & spv & szv' & _ & _ & Hok).
-      exists (mword_of_int e), spv, szv'. exact Hok.
+    - iDestruct "H" as (pl i av a) "(_ & _ & [H | H])".
+      + iDestruct "H" as (f nl) "(_ & _ & %Hok & _)".
+        iPureIntro. destruct Hok as (e & spv & szv' & _ & _ & Hok).
+        exists (mword_of_int e), spv, szv'. exact Hok.
+      + iDestruct "H" as "(_ & %Hok & _)".
+        iPureIntro. destruct Hok as (entry & spv & szv' & _ & Hok).
+        exists entry, spv, szv'. exact Hok.
   Qed.
 
 End KexecAU.

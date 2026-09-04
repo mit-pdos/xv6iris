@@ -1684,6 +1684,7 @@ LinkSysReadAU.v
 # LinkKexecPin closes the functor over LinkNameiEra beside LinkNamei.
 ProofKexecPinTrace.v
 ProofKexecPinA.v
+ProofKexecAUA.v
 ProofKexecPin.v
 LinkKexecPin.v
 

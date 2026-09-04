@@ -892,6 +892,107 @@ Section KexecABody.
         wp_next (CID0 := CID) true (proc_addr jp) KEX -∗
         WP (Loop : expr riscv_lang))%I.
 
+  (* WHY [kxc_a2]'s TWO [bad:] TAILS WERE TAKEN, as a pure fact about the
+     payload and the buffer readi filled: EITHER the file was too short to
+     hold a header (the [bne a0,64] at +0x050) OR the four magic bytes are
+     not [\x7fELF] (the [beq a4,a5] at +0x060).  The AU caller needs this to
+     blame the failure on [EfNotLoadable] rather than on memory
+     ([SpecKexecAU.exec_fail_ok], 2026-09-04); a landed caller drops it.
+     0x464C457F = 1179403647 is the constant +0x058/+0x05c builds. *)
+  Definition kxc_bad_cause (dn : dinode) (ef : nat -> bv 8)
+      (data : nat -> list (bv 8)) : Prop :=
+    bv_unsigned (di_size dn) < 64
+    \/ (64 <= bv_unsigned (di_size dn)
+        /\ (forall j, (j < 64)%nat -> ef j = file_byte data j)
+        /\ le_at ef 0 4 <> 1179403647).
+
+  (* [ProofKexecTail.kxc_exit_open] with ONE LINEAR RESOURCE alongside:
+     the AU's [bad:] tails redeem the caller's exit against a receipt the
+     oracle bought, and a receipt cannot ride inside the persistent wand. *)
+  Lemma kxc_exit_open_r `{CIDx : CpuId} (pj : mword 64)
+      (KEX E : CpuId -> iProp Σ) (R : iProp Σ) :
+    □ (∀ CX : CpuId, KEX CX -∗ R -∗ E CX) -∗
+    R -∗
+    wp_next (CID0 := CIDx) true pj KEX -∗
+    wp_next (CID0 := CIDx) true pj E.
+  Proof.
+    rewrite /wp_next. iIntros "#Hw HR H" (CID Hcr).
+    iSpecialize ("H" $! CID with "[%]"); [exact Hcr |].
+    iApply ("Hw" with "H HR").
+  Qed.
+
+  (* THE GENERIC EXIT ROW (2026-09-04, the exec AU lane).  [kxc_a2_exit1]
+     IS this at [RX ef _ _ _ := □ (⌜kxq_hdr_ok HD ef⌝ ∨ XCH)] -- same body,
+     by conversion -- so no landed consumer moves. *)
+  Definition kxc_a2_exit1_r
+      (jp : nat) (gf : gname) (plen : nat) (pfun : nat -> bv 8) (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat) (afun : nat -> nat -> bv 8) (pidv : mword 32) (U : ustate) (dqb : dfrac) (dqs : dfrac) (dqa : dfrac) (dqpv : dfrac) (dqas : dfrac) (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s20 : mword 64) (pv : mword 64) (av : mword 64) (RX : (nat -> bv 8) -> dinode -> blkmap -> (nat -> list (bv 8)) -> iProp Σ) (KEX : CpuId -> iProp Σ) (CID : CpuId) : iProp Σ :=
+    (∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
+        (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
+        (loyf tlyf : nat)
+        (n2 : nat) (ef : nat -> bv 8) (datl : nat -> list (bv 8)),
+        ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
+          M90 !!! Regidx Rs0 = sp0 /\
+          M90 !!! Regidx Rs1 = proc_addr jp /\
+          M90 !!! Regidx Rs2 = pv /\
+          M90 !!! Regidx Rs4 = ientry kf /\
+          (kf < NINODE)%nat /\
+          bv_unsigned inumf < 16 * Z.of_nat icfg_nib /\
+          (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
+             r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 ->
+             M90 !!! Regidx r = m !!! Regidx r) ⌝ -∗
+        ⌜ (iput_units <= n2)%nat ⌝ -∗
+        (* THE HEADER IS THE FILE'S FIRST 64 BYTES (S3b).  Phase A's readi
+           delivered them out of [datl], and the payload goes back at THAT
+           name below, so phase B's loops can read the program-header table
+           off the file rather than off a buffer they overwrite. *)
+        ⌜ forall j, (j < 64)%nat -> ef j = file_byte datl j ⌝ -∗
+        pc_is (mword_of_int (KXA + 0x090) : mword 64) -∗
+        sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
+        cpu_own 0 eb (proc_addr jp) b lks -∗
+        trap_csrs_ext KT1 eb -∗
+        cpu_claim_ext eb (proc_addr jp) -∗
+        is_sleeplock_genl gilf gislf (i_lock (ientry kf)) "inode"%string
+                     (ic_slp fsc_ic kf) (slh_tok (icfg_isl kf)) -∗
+        sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
+        ⌜(loyf <= tlyf)%nat⌝ -∗
+        IcacheRef.cred_floor loyf tlyf -∗
+        IcacheInv.iref_claims -∗
+        ic_tx_dep fsc_ic kf sf icfg_dev inumf gyf loyf -∗
+        off_rows off_cfg kf cur_ctx -∗
+        i_dev (ientry kf) ↦₄{DfracOwn (1/2)} icfg_dev -∗
+        i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
+        i_valid (ientry kf) ↦₄ valid_word true -∗
+        kxc_ldat kf inumf dnf bmf datl -∗
+        (* SpecIlock v5's additive type witness, at the generation the
+           share names -- what SpecIunlockput now needs at +0x064. *)
+        ity_shot gyf (di_type dnf) -∗
+        (* the payload's freeze token (§3.9, RULING A-prime) *)
+        ifreeze_off (bv_unsigned inumf) -∗
+        inode_ref_short kf (qf + sf)%Qp qf icfg_dev inumf -∗
+        (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+        runit_any (bv_unsigned inumf) -∗
+        log_opb icfg_log n2 -∗
+        iref_slots 1 -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
+        sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
+        bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
+        bslots 3 -∗
+        kalloc_env fsc_kalloc None -∗
+        proc_priv gf (proc_addr jp) pidv U -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 na,
+           [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
+        (* THE ROW THE ORACLE BOUGHT, GENERIC (the AU generalisation): a
+           landed caller instantiates [RX] at the persistent header claim
+           and gets [kxc_a2_exit1] back on the nose; the AU caller puts its
+           LINEAR observation receipt here. *)
+        RX ef dnf bmf datl -∗
+        kxc_frameA6x sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) ef -∗
+        (* THE EXIT, HANDED BACK -- see [kxc_phaseA]'s copy below. *)
+        wp_next (CID0 := CID) true (proc_addr jp) KEX -∗
+        WP (Loop : expr riscv_lang))%I.
+
 
   (* =================================================================== *)
   (*  +0x032 .. +0x08e, PLUS the short-read / bad-magic tail at +0x064.   *)
@@ -909,7 +1010,7 @@ Section KexecABody.
   (*  bytes instead would buy nothing -- the naming function is            *)
   (*  existential either way -- and would cost a third frame shape.        *)
   (* =================================================================== *)
-  Lemma kxc_a2
+  Lemma kxc_a2_r
       (Q : mword 64 -> ustate -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -922,18 +1023,16 @@ Section KexecABody.
       (dqb dqs dqa dqpv dqas : dfrac)
       (m M32 : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av ipv : mword 64) (zi : Z) (n1 : nat)
-      (* WHAT THE CALLER WANTS SAID ABOUT THE HEADER (N-5.2B).  [None] for
-         every landed caller -- the oracle below is then [True] and the
-         +0x090 seam publishes nothing.  [Some h] for a caller holding a
-         CONTENTS pin at [zi]: the oracle redeems it against the payload
-         and the seam publishes "the header this walk read is [h]". *)
-      (HD : option (nat -> bv 8))
-      (* ...and the ALTERNATIVE the oracle may answer with instead: the
-         contents lend can have been cancelled between the boot mint and
-         this walk, and that is discovered HERE, at the redeem, not at the
-         call site.  Persistent by construction ([□] below) so it costs the
-         two [bad:] tails nothing.  A landed caller passes [emp]. *)
-      (XCH : iProp Σ)
+      (* WHAT THE ORACLE BUYS, GENERIC (2026-09-04, the exec AU lane).
+         [R] is what the redeem instant hands back about the payload it was
+         shown -- for a landed caller the PERSISTENT header claim
+         [□ (⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝ ∨ XCH)], for the AU
+         caller the LINEAR observation receipt [Φo] bought against
+         [aopen_commit_at].  [RX] is the same thing re-read at the buffer
+         [ef] readi filled, which is what crosses +0x090; [Hconv] below is
+         the one step between them and gets readi's window fact. *)
+      (R : dinode -> blkmap -> (nat -> list (bv 8)) -> iProp Σ)
+      (RX : (nat -> bv 8) -> dinode -> blkmap -> (nat -> list (bv 8)) -> iProp Σ)
       (* the exit, opaque -- see the premise below *)
       (KEX : CpuId -> iProp Σ) :
     (K_kexec <= K)%nat ->
@@ -984,7 +1083,14 @@ Section KexecABody.
             (FsStateEra.era_node dn bm data) ={⊤}=∗
           FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
               (FsStateEra.era_node dn bm data)
-          ∗ □ (⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝ ∨ XCH)) -∗
+          ∗ R dn bm data) -∗
+    (* ---- THE ONE STEP FROM THE PAYLOAD'S READING TO THE BUFFER'S: readi
+       delivered the first 64 bytes of [data] into [ef], and that fact is
+       everything the +0x090 row needs about the two.  A landed caller
+       discharges it with [kxq_hdr_ok_ext]. ---- *)
+    (∀ (ef : nat -> bv 8) (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
+        ⌜forall j, (j < 64)%nat -> ef j = file_byte data j⌝ -∗
+        R dn bm data -∗ RX ef dn bm data) -∗
     kxc_at_a2 jp gf
               plen pfun na avf aslen afun pidv U dqb dqs dqa dqpv dqas
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1 -∗
@@ -1001,18 +1107,22 @@ Section KexecABody.
        is left at +0x090 where the verdict IS known.  A landed caller
        passes its exit and the identity wand. ---- *)
     wp_next true (proc_addr jp) KEX -∗
-    □ (∀ CX : CpuId, KEX CX -∗
+    (* the [-1] tails carry [R] out too: the AU's arm (iii) is the receipt
+       and a cause, and the tails are where the cause is learned. *)
+    □ (∀ (CX : CpuId) (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
+         (ef : nat -> bv 8),
+       ⌜kxc_bad_cause dn ef data⌝ -∗ KEX CX -∗ R dn bm data -∗
       KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
            eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: the state at +0x090, phase B's entry ---- *)
-    wp_next true (proc_addr jp) (fun CID : CpuId => kxc_a2_exit1 jp gf plen pfun na avf aslen afun pidv U dqb dqs dqa dqpv dqas m K eb b lks sp0 ra0 s00 s10 s20 pv av HD XCH KEX CID) -∗
+    wp_next true (proc_addr jp) (fun CID : CpuId => kxc_a2_exit1_r jp gf plen pfun na avf aslen afun pidv U dqb dqs dqa dqpv dqas m K eb b lks sp0 ra0 s00 s10 s20 pv av RX KEX CID) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hjp Hgs Hsp Hra Hs0 Hs1 Hs2.
     pose proof HK as HK'. 
-    iIntros "#Htext #Hfab Horacle Hseam Hcont #Hkw Hcont90".
+    iIntros "#Htext #Hfab Horacle Hconv Hseam Hcont #Hkw Hcont90".
     rewrite /kxc_at_a2.
     iDestruct "Hseam" as "(%Hregs & Hpc & Hcg & Hcnt & Hextc & Hclmc & %Hn1 & Hlog & Hheld &
                            Hirs & #Hbits & Hbs & Hbm & Hins & #Hka &
@@ -1191,7 +1301,7 @@ Section KexecABody.
     iApply fupd_wp.
     iEval (rewrite Hz) in "Htopl".
     iMod ("Horacle" $! dnl bml datl with "[//] Htopl")
-      as "(Htopl & #Hhdr)".
+      as "(Htopl & HR)".
     iEval (rewrite -Hz) in "Htopl".
     iModIntro.
     iAssert (inode_map fsc_fs (ientry k) bml) with "[Haddrs Hindres]" as "Hmap".
@@ -1591,15 +1701,12 @@ Section KexecABody.
         iApply ("Hcont90" $! Q12 k (q/2)%Qp (q/2)%Qp inum dnl bml gilk gislk gy
                   loy tly n1 gb datl with "[%] [%] [%] Hpc Hcg Hcnt Hextc Hclmc Hslkk Hslkd [//] Hfly Hclaimskx Hdep Hoffr
                   Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hlog Hirs Hbm Hins Hbits
-                  Hbs Hka Hpriv Hpath Hargv Hargs [] [-Hcont] Hcont").
+                  Hbs Hka Hpriv Hpath Hargv Hargs [HR Hconv] [-Hcont] Hcont").
         * split_and!; [exact HQ12sp | exact HQ12s0 | exact HQ12s1 | exact HQ12s2
                       | exact HQ12s4 | exact Hk | exact Hib' | exact HQ12thr].
         * exact Hiu.
         * exact Hgb.
-        * iDestruct "Hhdr" as "[%Hh | Hx]".
-          { iModIntro. iLeft. iPureIntro.
-            exact (kxq_hdr_ok_ext HD gb (fun j => file_byte datl j) Hgb Hh). }
-          { iModIntro. iRight. iExact "Hx". }
+        * iApply ("Hconv" $! gb dnl bml datl with "[%] HR"). exact Hgb.
         * rewrite /kxc_frameA6x.
           iSplitR; [iPureIntro; exact Hal |].
           iSplitL "Hf1"; [iExact "Hf1" |].
@@ -1671,7 +1778,63 @@ Section KexecABody.
                         (CID15 : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _ Hcr15
                      with "Hcont") as "Hcont".
-        iDestruct (kxc_exit_open with "Hkw Hcont") as "Hcont".
+        iClear "Hconv".
+        (* ---- THE CAUSE (2026-09-04): the read WAS the whole header, so the
+           buffer IS the file's first 64 bytes, and the compare at +0x060
+           says its magic word is not [\x7fELF]. ---- *)
+        assert (Htot64 : tot = 64%nat).
+        { assert (Hget0 : forall CX : CpuId,
+                    rget (CID := CX) Q9 Ra0 = M2 !!! Regidx Ra0).
+          { intro CX. rewrite (rget_ne (CID := CX) Q9 Ra0 ltac:(nz)).
+            rewrite /Q9 upd_ne; [reflexivity | nz]. }
+          assert (Hget5 : forall CX : CpuId,
+                    rget (CID := CX) Q9 Ra5
+                    = (mword_of_int (Z.of_nat 64) : mword 64)).
+          { intro CX. rewrite (rget_ne (CID := CX) Q9 Ra5 ltac:(nz)).
+            rewrite /Q9. apply upd_eq. }
+          apply eq_vec_true_iff in Ecmp.
+          rewrite Hget0 Hget5 in Ecmp.
+          destruct Hret as [[_ Huser] | [Ha0 _]]; [discriminate Huser |].
+          rewrite Ha0 in Ecmp.
+          apply kxc_moi_nat64_inj in Ecmp; [exact Ecmp | | lia].
+          unfold rd_clamp in Htotb. destruct (decide _); lia. }
+        assert (Hgbm : forall j : nat, (j < 64)%nat -> gb j = file_byte datl j).
+        { intros j Hj. rewrite /gb /rd_delivered.
+          destruct (decide (j < tot)%nat) as [_ | Hno]; [| lia].
+          by rewrite Nat.add_0_l. }
+        assert (Hsz64 : 64 <= bv_unsigned (di_size dnl)).
+        { destruct Hret as [[_ Huser] | [_ Htoteq]]; [discriminate Huser |].
+          rewrite Htot64 in Htoteq. unfold rd_clamp in Htoteq.
+          pose proof (proj1 (bv_unsigned_in_range _ (di_size dnl))) as Hnn.
+          destruct (decide (Z.to_nat (bv_unsigned (di_size dnl)) < 0 + 64)%nat)
+            as [Hc | Hc]; lia. }
+        assert (HQ12a4 : Q12 !!! Regidx Ra4
+                  = sign_extend' 64 (Z_to_bv 32 (le_at gb 0 4) : mword 32)).
+        { rewrite /Q12 upd_ne; [| nz]. rewrite /Q11 upd_ne; [| nz].
+          rewrite /Q10. apply upd_eq. }
+        assert (HQ11a5 : Q11 !!! Regidx Ra5
+                  = luival (mword_of_int 287940 : mword 20)).
+        { rewrite /Q11. apply upd_eq. }
+        assert (HQ12a5 : Q12 !!! Regidx Ra5
+                  = add_vec (luival (mword_of_int 287940 : mword 20))
+                            (sign_extend' 64 (mword_of_int 1407 : mword 12))).
+        { etransitivity; [rewrite /Q12; apply upd_eq |]. by rewrite HQ11a5. }
+        assert (Hmagne : le_at gb 0 4 <> 1179403647).
+        { intros Hm.
+          assert (Heqm : forall CX : CpuId,
+                    eq_vec (rget (CID := CX) Q12 Ra4)
+                           (rget (CID := CX) Q12 Ra5) = true).
+          { intro CX. rewrite (rget_ne (CID := CX) Q12 Ra4 ltac:(nz))
+                              (rget_ne (CID := CX) Q12 Ra5 ltac:(nz)).
+            rewrite HQ12a4 HQ12a5 Hm. apply eq_vec_true_iff.
+            apply bv_eq; vm_compute; reflexivity. }
+          rewrite Heqm in Emag. discriminate. }
+        assert (Hbad : kxc_bad_cause dnl gb datl)
+          by (right; split_and!; [exact Hsz64 | exact Hgbm | exact Hmagne]).
+        iDestruct (kxc_exit_open_r _ KEX _ (R dnl bml datl)
+                     with "[] HR Hcont") as "Hcont".
+        { iIntros "!>" (CX) "HK HRx".
+          iApply ("Hkw" $! CX dnl bml datl gb with "[%] HK HRx"). exact Hbad. }
       iApply (T.kxc_bad64 Q gs jp gl pd pav pu
                   gilk gislk gf
  k (q/2)%Qp (q/2)%Qp gy loy tly inum dnl bml n1
@@ -1751,7 +1914,41 @@ Section KexecABody.
                       (CID11 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID11 true (proc_addr jp) _ Hcr11
                    with "Hcont") as "Hcont".
-      iDestruct (kxc_exit_open with "Hkw Hcont") as "Hcont".
+      iClear "Hconv".
+      (* ---- THE CAUSE (2026-09-04): readi returned fewer than 64 bytes, and
+         [rd_clamp] says that happens only below the size, so the file is
+         too short to hold an ELF header at all. ---- *)
+      assert (Hshort : bv_unsigned (di_size dnl) < 64).
+      { assert (Hget0 : forall CX : CpuId,
+                  rget (CID := CX) Q9 Ra0 = M2 !!! Regidx Ra0).
+        { intro CX. rewrite (rget_ne (CID := CX) Q9 Ra0 ltac:(nz)).
+          rewrite /Q9 upd_ne; [reflexivity | nz]. }
+        assert (Hget5 : forall CX : CpuId,
+                  rget (CID := CX) Q9 Ra5
+                  = (mword_of_int (Z.of_nat 64) : mword 64)).
+        { intro CX. rewrite (rget_ne (CID := CX) Q9 Ra5 ltac:(nz)).
+          rewrite /Q9. apply upd_eq. }
+        destruct Hret as [[_ Huser] | [Ha0 Htoteq]]; [discriminate Huser |].
+        assert (Htotlt : (tot < 64)%nat).
+        { assert (Hle : (tot <= 64)%nat)
+            by (unfold rd_clamp in Htotb; destruct (decide _); lia).
+          destruct (decide (tot = 64%nat)) as [He | Hne]; [| lia].
+          exfalso.
+          assert (Heqs : forall CX : CpuId,
+                    eq_vec (rget (CID := CX) Q9 Ra0)
+                           (rget (CID := CX) Q9 Ra5) = true).
+          { intro CX. rewrite Hget0 Hget5 Ha0 He.
+            apply eq_vec_true_iff. reflexivity. }
+          rewrite Heqs in Ecmp. discriminate. }
+        unfold rd_clamp in Htoteq.
+        pose proof (proj1 (bv_unsigned_in_range _ (di_size dnl))) as Hnn.
+        destruct (decide (Z.to_nat (bv_unsigned (di_size dnl)) < 0 + 64)%nat)
+          as [Hc | Hc]; lia. }
+      assert (Hbad : kxc_bad_cause dnl gb datl) by (left; exact Hshort).
+      iDestruct (kxc_exit_open_r _ KEX _ (R dnl bml datl)
+                   with "[] HR Hcont") as "Hcont".
+      { iIntros "!>" (CX) "HK HRx".
+        iApply ("Hkw" $! CX dnl bml datl gb with "[%] HK HRx"). exact Hbad. }
       iApply (T.kxc_bad64 Q gs jp gl pd pav pu
                 gilk gislk gf
  k (q/2)%Qp (q/2)%Qp gy loy tly inum dnl bml n1
@@ -1784,6 +1981,134 @@ Section KexecABody.
       iSplitL "Hf66"; [iExact "Hf66" |].
       iSplitL "Hf67"; [iExact "Hf67" | iExact "Hf68"].
   Qed.
+
+  (* THE LANDED FORM, A COROLLARY (statement UNCHANGED -- no consumer
+     moves): the oracle's payout is the persistent header claim, and the
+     [-1] tails' extra row is dropped. *)
+  Lemma kxc_a2
+      (Q : mword 64 -> ustate -> Prop)
+      (gs : list gname) (jp : nat) (gl : gname)
+      (pd pav pu : mword 64)
+ (gf : gname)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64)
+      (alen : nat -> nat) (aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (U : ustate)
+      (dqb dqs dqa dqpv dqas : dfrac)
+      (m M32 : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
+      (sp0 ra0 s00 s10 s20 pv av ipv : mword 64) (zi : Z) (n1 : nat)
+      (* WHAT THE CALLER WANTS SAID ABOUT THE HEADER (N-5.2B).  [None] for
+         every landed caller -- the oracle below is then [True] and the
+         +0x090 seam publishes nothing.  [Some h] for a caller holding a
+         CONTENTS pin at [zi]: the oracle redeems it against the payload
+         and the seam publishes "the header this walk read is [h]". *)
+      (HD : option (nat -> bv 8))
+      (* ...and the ALTERNATIVE the oracle may answer with instead: the
+         contents lend can have been cancelled between the boot mint and
+         this walk, and that is discovered HERE, at the redeem, not at the
+         call site.  Persistent by construction ([□] below) so it costs the
+         two [bad:] tails nothing.  A landed caller passes [emp]. *)
+      (XCH : iProp Σ)
+      (* the exit, opaque -- see the premise below *)
+      (KEX : CpuId -> iProp Σ) :
+    (K_kexec <= K)%nat ->
+    icfg_dev = ROOTDEV ->
+    (0 < icfg_nib)%nat ->
+    log_geom_ok fsc_cov fsc_logst ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart ->
+    fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
+    0 <= icfg_ist ->
+    cov_below fsc_cov fsc_size ->
+    ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
+    (jp < NPROC)%nat ->
+    gs !! jp = Some gl ->
+    m !!! Regidx csp_rs1 = sp0 ->
+    m !!! Regidx Rra = ra0 ->
+    m !!! Regidx Rs0 = s00 ->
+    m !!! Regidx Rs1 = s10 ->
+    m !!! Regidx Rs2 = s20 ->
+    kernel_text -∗
+    fs_fabric gs pd pav pu
+ -∗
+    (* ---- THE HEADER ORACLE (N-5.2B) ------------------------------------
+       ONE ghost step, fired at the instant ilock's payload is open and
+       before readi runs on it: the client is handed the locked inode's
+       ERA LEG ([IcacheEscrow.ic_loaded]'s last conjunct, at the inum the
+       +0x032 seam named) together with the payload's own [inode_ok] as a
+       pure premise, and must give the leg back unchanged together with
+       whatever it wanted to claim about the file's bytes.  An intact
+       redeem is a READ, so the leg is returned identical and the payload
+       re-packs at the very same [data] -- which is why readi's landed post
+       still relates its output to it and readi's contract does not move
+       (D-52d).
+         A landed caller instantiates [HD := None] and discharges this with
+       [iIntros; iModIntro; iFrame].
+         THE BYTE RIDE IS GONE (THE DVIEW RETIREMENT, 2026-08-30).  The
+       oracle used to be handed [fv_ride] beside the leg; that ghost had no
+       tie to gamma-top outside the payload, which is why the widening of
+       2026-08-29 put the leg here in the first place -- and the leg is what
+       the pinned verdict actually reads
+       ([ProofKexecPinTrace.kxt_pin_bytes], off the authority's row).
+       Nothing above [ProofKexec.v] moves: [SpecKexec]'s and [KexecOkQ]'s
+       statements are untouched. ---- *)
+    (∀ (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
+        ⌜inode_ok fsc_cov fsc_logst dn bm data⌝ -∗
+        FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
+            (FsStateEra.era_node dn bm data) ={⊤}=∗
+          FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
+              (FsStateEra.era_node dn bm data)
+          ∗ □ (⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝ ∨ XCH)) -∗
+    kxc_at_a2 jp gf
+              plen pfun na avf aslen afun pidv U dqb dqs dqa dqpv dqas
+              m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1 -∗
+    (* ---- kexec's OWN continuation: the +0x064 tail closes the -1 arm ---- *)
+    (* ---- kexec's OWN continuation, AS AN OPAQUE RESOURCE (N-5.2B,
+       §13.4).  Phase A cannot commit to [Q]: the contents verdict is
+       learned at the redeem instant INSIDE [kxc_a2], i.e. AFTER the
+       point at which a [kexec_ok_q Q]-shaped exit would have fixed
+       it -- and the two branches need different [Q]s (the only
+       common one is [True], which the pinned post cannot supply
+       without a receipt already in hand).  So the exit travels as
+       [KEX]; phase A only ever UNFOLDS it, at its own [-1] tails,
+       through this persistent wand, and the caller specialises what
+       is left at +0x090 where the verdict IS known.  A landed caller
+       passes its exit and the identity wand. ---- *)
+    wp_next true (proc_addr jp) KEX -∗
+    □ (∀ CX : CpuId, KEX CX -∗
+      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
+           eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
+           av dqa avf aslen dqas afun) -∗
+    (* ---- and the FALL-THROUGH: the state at +0x090, phase B's entry ---- *)
+    wp_next true (proc_addr jp) (fun CID : CpuId => kxc_a2_exit1 jp gf plen pfun na avf aslen afun pidv U dqb dqs dqa dqpv dqas m K eb b lks sp0 ra0 s00 s10 s20 pv av HD XCH KEX CID) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+           Hiregb Hjp Hgs Hsp Hra Hs0 Hs1 Hs2.
+    iIntros "#Htext #Hfab Horacle Hseam Hcont #Hkw Hcont90".
+    iApply (kxc_a2_r Q gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
+              pidv U dqb dqs dqa dqpv dqas m M32 K eb b lks
+              sp0 ra0 s00 s10 s20 pv av ipv zi n1
+              (fun _ _ data => □ (⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝ ∨ XCH))%I
+              (fun ef _ _ _ => □ (⌜kxq_hdr_ok HD ef⌝ ∨ XCH))%I
+              KEX
+              HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+              Hiregb Hjp Hgs Hsp Hra Hs0 Hs1 Hs2
+              with "Htext Hfab Horacle [] Hseam Hcont [] [Hcont90]").
+    (* the one step: [kxq_hdr_ok_ext] at readi's window *)
+    { iIntros (ef dn bm data) "%Hgb #Hh". iModIntro.
+      iDestruct "Hh" as "[%Hok | Hx]".
+      - iLeft. iPureIntro.
+        exact (kxq_hdr_ok_ext HD ef (fun j => file_byte data j) Hgb Hok).
+      - iRight. iExact "Hx". }
+    (* the exit wand ignores the (persistent) claim the tails were handed *)
+    { iIntros "!>" (CX dn bm data ef) "_ HK _". iApply ("Hkw" $! CX with "HK"). }
+    (* and the continuation IS the generic one at this [RX], by conversion *)
+    { rewrite /kxc_a2_exit1_r. iExact "Hcont90". }
+  Qed.
+
 
 End KexecABody.
 
