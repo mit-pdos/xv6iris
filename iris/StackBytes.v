@@ -265,6 +265,78 @@ Section StackBytes.
       iFrame "Hb Hbn".
   Qed.
 
+  (* [slotsn_bytes_own] AT NAMED VALUES.  Same split, except the slots'
+     contents are given by [wf] rather than existentially quantified, so the
+     byte run comes out NAMED too: byte [j] of the run is byte [j mod 8] of
+     slot [k - j / 8].  A caller that has to say what the bytes ARE (kexec's
+     closing copyout hands its ustack vector to copyout and then has to
+     recognise the result as [kexec_args_at]'s little-endian words) cannot
+     use the ∃-valued pair: [bytes_own_name] re-names the run with a fresh
+     function and the values are gone.  The way BACK is still
+     [bytes_own_slotsn] -- forgetting is free. *)
+  Lemma slotsn_bytes_named (sp : Arch.pa) (k n : nat) (wf : nat -> mword 64) :
+    (n <= S k)%nat ->
+    ([∗ list] i ∈ seq 0 n, pa_stk sp (k - i) ↦₈ wf i) ⊢
+    ⌜forall i, (i < n)%nat ->
+       is_aligned_paddr (Physaddr (pa_stk sp (k - i))) 8 = true⌝ ∗
+    ([∗ list] j ∈ seq 0 (8 * n),
+       (pa_add (pa_stk sp k) j) ↦ₘ nth_byte (wf (j / 8)%nat) (j `mod` 8)%nat).
+  Proof.
+    revert k. induction n as [| n IH]; intros k Hk.
+    - iIntros "_". rewrite Nat.mul_0_r big_sepL_nil.
+      iSplitR; [iPureIntro; intros i Hi; lia | done].
+    - rewrite seq_S big_sepL_app big_sepL_singleton.
+      iIntros "[Hhd Htl]".
+      iDestruct (IH k ltac:(lia) with "Hhd") as "[%Hal Hb]".
+      iDestruct (ctx_word_pointsto_aligned_p with "Htl") as %Han.
+      iDestruct (ctx_word_pointsto_bytes with "Htl") as "Hbn".
+      iSplitR.
+      { iPureIntro. intros i Hi.
+        destruct (decide (i < n)%nat) as [Hlt | Hge]; [exact (Hal i Hlt) |].
+        replace i with n by lia. exact Han. }
+      replace (8 * S n)%nat with (8 * n + 8)%nat by lia.
+      rewrite seq_app big_sepL_app.
+      iSplitL "Hb"; [iExact "Hb" |].
+      replace (seq (0 + 8 * n) 8) with ((Nat.add (8 * n)) <$> seq 0 8)
+        by (rewrite fmap_add_seq; f_equal; lia).
+      rewrite big_sepL_fmap.
+      iApply (big_sepL_mono with "Hbn"). intros i j Hj.
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+      assert (Haddr : pa_add (pa_stk sp k) (8 * n + i)
+                      = pa_add (pa_stk sp (k - n)) i).
+      { rewrite <- pa_add_add, (pa_stk_addn sp k n ltac:(lia)). reflexivity. }
+      assert (Hdiv : ((8 * n + i) / 8)%nat = n).
+      { replace (8 * n + i)%nat with (i + n * 8)%nat by lia.
+        rewrite Nat.div_add; [| lia].
+        rewrite Nat.div_small; [lia | lia]. }
+      assert (Hmod : ((8 * n + i) `mod` 8)%nat = i).
+      { replace (8 * n + i)%nat with (i + n * 8)%nat by lia.
+        rewrite Nat.Div0.mod_add. apply Nat.mod_small. lia. }
+      rewrite Haddr Hdiv Hmod. reflexivity.
+  Qed.
+
+  (* ...and the same at a byte-naming function the CALLER chose, which is
+     what a call site wants: [slotsn_bytes_named]'s own [nth_byte (wf (j /
+     8)) (j mod 8)] is not a name, and a callee's contract (copyout's
+     [src_bytes]) has to be given one. *)
+  Lemma slotsn_bytes_namedf (sp : Arch.pa) (k n : nat) (wf : nat -> mword 64)
+      (bf : nat -> bv 8) :
+    (n <= S k)%nat ->
+    (forall j, (j < 8 * n)%nat ->
+       bf j = nth_byte (wf (j / 8)%nat) (j `mod` 8)%nat) ->
+    ([∗ list] i ∈ seq 0 n, pa_stk sp (k - i) ↦₈ wf i) ⊢
+    ⌜forall i, (i < n)%nat ->
+       is_aligned_paddr (Physaddr (pa_stk sp (k - i))) 8 = true⌝ ∗
+    ([∗ list] j ∈ seq 0 (8 * n), (pa_add (pa_stk sp k) j) ↦ₘ bf j).
+  Proof.
+    intros Hn Hbf. iIntros "H".
+    iDestruct (slotsn_bytes_named sp k n wf Hn with "H") as "[%Hal Hb]".
+    iSplitR; [done |].
+    iApply (big_sepL_mono with "Hb"). intros i j Hj.
+    apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+    rewrite (Hbf i ltac:(lia)). reflexivity.
+  Qed.
+
   (* ... and back, at the alignment facts the split handed out. *)
   Lemma bytes_own_slotsn (sp : Arch.pa) (k n : nat) :
     (n <= S k)%nat ->

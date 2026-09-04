@@ -65,6 +65,7 @@ Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecKexec.
+Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 Require Import KexecOkQ.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
@@ -825,6 +826,18 @@ Section KexecCSetup.
       by (apply (um_covered_pground szv P.(ud_um) Hmaxszv Hcov)).
     assert (Hbelow_pground : um_below (pgroundup szv) P.(ud_um))
       by (apply (um_below_mono szv (pgroundup szv) P.(ud_um) Hpground_ge Hbelow)).
+    (* THE STACK PAGE IS FRESH (S3 item 9).  Everything the new address
+       space maps so far sits strictly below [pgroundup szv] -- and that
+       bound is page-aligned, which is what turns [um_below]'s claim about
+       page BASES into a claim about bytes -- so the two pages uvmalloc is
+       about to add hold no byte yet.  That is exactly the premise
+       [KexecBuilt.kx_page_zero_grow] needs to say the stack page reads
+       zero.  Taken HERE because [Mi] is still the image in hand; past the
+       call it is [umem_grow Mi (uint sz1)]. *)
+    assert (Hpgmod0 : bv_unsigned (pgroundup szv) mod 4096 = 0)
+      by (destruct (pgroundup_maxsz szv Hmaxszv) as [_ Hmod]; exact Hmod).
+    iDestruct (proc_pt_fresh_above P Mi (pgroundup szv) Hpgmod0 Hbelow_pground
+                 with "Hpt") as %Hfresh.
     (* ---- uvmalloc's [_mem] contract wants the memory view at [oldsz],   *)
     (* which its statement computes as [Y !!! Ra1] -- open at THAT term    *)
     (* (not the propositionally-equal [pgroundup szv]) so it unifies with  *)
@@ -1490,6 +1503,25 @@ Section KexecCSetup.
       iDestruct (proc_ptm_wf_get with "Hptcl") as %HwfF.
       iDestruct (proc_ptm_to_pt_cov Pfinal sz1 (umem_grow Mi (uint sz1))
                    HwfF HcovF with "Hptcl") as "Hptcl".
+      (* ---- THE ARGV LOOP'S IMAGE INVARIANT, AT ITS BASE CASE.  No string
+         has been pushed ([kx_str_at ... 0]) and the whole stack page still
+         reads zero, because uvmalloc grew into pages that held nothing
+         ([Hfresh]).  Both entries into the loop's state quote these two --
+         the [argv[0] = NULL] skip below and the loop proper. ---- *)
+      assert (Hzero0 : kx_zero_except (uint sz1)
+                         (kxb_str_zone (uint sz1) alen 0)
+                         (umem_grow Mi (uint sz1))).
+      { apply kx_zero_except_of_page, kx_page_zero_grow.
+        - rewrite uint_unsigned Hszu. unfold PGSIZE.
+          replace (8192 + bv_unsigned (pgroundup szv))%Z
+            with (bv_unsigned (pgroundup szv) + 2 * 4096)%Z by lia.
+          rewrite Z.mod_add; [exact Hpgmod0 | lia].
+        - rewrite uint_unsigned Hszu. unfold PGSIZE.
+          pose proof (bv_unsigned_in_range _ (pgroundup szv)) as [Hlo _]. lia.
+        - intros a Ha. apply Hfresh.
+          rewrite uint_unsigned Hszu in Ha. unfold PGSIZE in Ha. lia. }
+      assert (Hstr0 : kx_str_at (uint sz1) alen afun 0 (umem_grow Mi (uint sz1)))
+        by apply kx_str_at_0.
       destruct (decide (avf 0%nat = (mword_of_int 0 : mword 64))) as [Heq0 | Hne0].
       + (* ==================== argv[0] = NULL: skip the loop ==================== *)
         (* THE TARGET IS THE COLD TRAMPOLINE AT +0x2b6, NOT +0x268, since
@@ -1603,6 +1635,7 @@ Section KexecCSetup.
         iSplitR.
         { iPureIntro. split_and!;
             [rewrite HtfpF Htfp'; exact HPtfp | exact HbelowF | exact HcovF]. }
+        iSplitR; [iPureIntro; exact (conj Hstr0 Hzero0) |].
         iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
         iSplitL "Hcnt"; [iExact "Hcnt" |].
         iSplitL "Hextc"; [iExact "Hextc" |].
@@ -1755,6 +1788,7 @@ Section KexecCSetup.
         iSplitR.
         { iPureIntro. split_and!;
             [rewrite HtfpF Htfp'; exact HPtfp | exact HbelowF | exact HcovF]. }
+        iSplitR; [iPureIntro; exact (conj Hstr0 Hzero0) |].
         iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
         iSplitL "Hcnt"; [iExact "Hcnt" |].
         iSplitL "Hextc"; [iExact "Hextc" |].
@@ -2364,6 +2398,7 @@ Section KexecCLoop.
                           %HMs7 & %HMs9 & %HMs11 & %HMs10) &
                          (%Hcna' & %Hc32 & %Havfc & %Hspok) &
                          (%HPtfp & %Hbelow & %Hcov) &
+                         (%Hstr & %Hzero) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hres)".
     rewrite /kxc_c_res.
     iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & #Hka & Hpt & Hpriv &
@@ -3122,6 +3157,9 @@ Section KexecCLoop.
         by (rewrite /Z2 upd_ne; [exact HT12a0 | nz]).
       assert (HZ2a1 : Z2 !!! Regidx Ra1 = sz1)
         by (rewrite /Z2 upd_ne; [exact HT12a1 | nz]).
+      assert (HZ2a2 : Z2 !!! Regidx Ra2
+                      = (mword_of_int (kxc_sp (uint sz1) alen (S c)) : mword 64))
+        by (rewrite /Z2 upd_ne; [exact HT12a2 | nz]).
       assert (HZ2a4 : Z2 !!! Regidx Ra4 = (mword_of_int (Z.of_nat (alen c) + 1) : mword 64))
         by (rewrite /Z2 upd_ne; [exact HT12a4 | nz]).
       (* [Hargc] came back from the SECOND strlen call addressed at
@@ -3160,6 +3198,33 @@ Section KexecCLoop.
       assert (Hco_res : T13 !!! Regidx Ra0 = (mword_of_int 0 : mword 64)
                         \/ T13 !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)).
       { destruct Hco_wrote as [[Ha0 _] | [Ha0 _]]; [left | right]; exact Ha0. }
+      (* ---- THE ARGV LOOP'S IMAGE INVARIANT, STEPPED (S3 item 9).  copyout
+         wrote the [alen c + 1] bytes of argument [c] and its NUL at
+         [kxc_sp (uint sz1) alen (S c)] -- the very address
+         [KexecBuilt.kx_argv_push] expects -- so [kx_str_at] extends to
+         [S c] and the surviving zeros lose exactly that one run.  Both
+         halves are proved HERE, at the ∃-free map [Hco_wrote] names, and
+         quoted by the two exits below; the [-1] arm reaches only [bad:]
+         tails, which carry no image conjunct.
+
+         [kxc_sp]'s value fits a 64-bit word because it is between
+         [uint sz1 - 4096] ([HspokS]) and [uint sz1] ([kxc_sp_mono] at 0),
+         and [uint sz1 <= 2 ^ 38]; that is also the no-wrap side condition
+         [umem_wr]'s va-keyed run needs to BE an integer-keyed one. ---- *)
+      assert (Hsptop : (kxc_sp (uint sz1) alen (S c) <= uint sz1)%Z).
+      { pose proof (kxc_sp_mono (uint sz1) alen 0 (S c) ltac:(lia)) as Hmono.
+        change (kxc_sp (uint sz1) alen 0) with (uint sz1) in Hmono. lia. }
+      assert (Hsz38 : (uint sz1 <= 274877906944)%Z)
+        by (change (2 ^ 38)%Z with 274877906944%Z in Hsz1max38; lia).
+      assert (Hspval : uint (Z2 !!! Regidx Ra2) = kxc_sp (uint sz1) alen (S c)).
+      { rewrite HZ2a2 uint_unsigned moi64_unsigned. apply bvw64_small.
+        change (2 ^ 64)%Z with 18446744073709551616%Z. lia. }
+      assert (Hlinc : forall i, (i < S (alen c))%nat ->
+                uint (add_vec_int (Z2 !!! Regidx Ra2) (Z.of_nat i))
+                = (uint (Z2 !!! Regidx Ra2) + Z.of_nat i)%Z).
+      { apply kx_wr_linear. rewrite Hspval. lia. }
+      destruct (kx_argv_push (uint sz1) alen afun c Mi (Z2 !!! Regidx Ra2)
+                  Hspval Hlinc (proj2 Hcstr) Hstr Hzero) as [HstrS0 HzeroS0].
       iCombine "Hargc1 Hargc2" as "Hargc".
       iEval (rewrite -big_sepL_app -Hsplit) in "Hargc".
       (* ---- the page table: [uptd_ext_sz] transports [um_below]/[um_covered]
@@ -3230,6 +3295,12 @@ Section KexecCLoop.
          the branch test by [vm_compute] on a now-CONCRETE a0. ---- *)
       destruct Hco_res as [Hcook | Hcofail].
       - (* ==== copyout succeeded: a0 = 0, fall through ==== *)
+        (* the map [Hco_wrote] posted on THIS arm, named once for the two
+           exits below (the natural end and the back edge). *)
+        assert (HM0' : M0' = umem_wr Mi (Z2 !!! Regidx Ra2) (S (alen c)) (afun c)).
+        { destruct Hco_wrote as [[_ Heq] | [Hbad _]]; [exact Heq |].
+          exfalso. rewrite Hcook in Hbad.
+          apply (f_equal bv_unsigned) in Hbad. vm_compute in Hbad. discriminate. }
         iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KXC + 0x24a))
                   (mword_of_int 268 : mword 13) Ra0
                   T13 (K - 68)%nat eb ltac:(nz)
@@ -3603,6 +3674,8 @@ Section KexecCLoop.
           { iPureIntro. split_and!; [lia | lia | exact Hz1 | exact HspokS]. }
           iSplitR.
           { iPureIntro. split_and!; [exact HtfpS | exact HbelowF2 | exact HcovF2]. }
+          iSplitR.
+          { iPureIntro. rewrite HM0'. exact (conj HstrS0 HzeroS0). }
           iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
           iSplitL "Hcnt"; [iExact "Hcnt" |].
           iSplitL "Hextc"; [iExact "Hextc" |].
@@ -3640,6 +3713,8 @@ Section KexecCLoop.
        { iPureIntro. split_and!; [lia | lia | exact Hnz1 | exact HspokS]. }
        iSplitR.
        { iPureIntro. split_and!; [exact HtfpS | exact HbelowF2 | exact HcovF2]. }
+       iSplitR.
+       { iPureIntro. rewrite HM0'. exact (conj HstrS0 HzeroS0). }
        iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
        iSplitL "Hcnt"; [iExact "Hcnt" |].
        iSplitL "Hextc"; [iExact "Hextc" |].
@@ -3818,7 +3893,7 @@ Section KexecCArgvLoop.
     - (* another argument: the BACK EDGE, re-entered at [S c] and at the hart
          this iteration ended on. *)
       iEval (rewrite /kxc_at_21a) in "Hnext".
-      iDestruct "Hnext" as "(%Hp1 & %Hp2 & %Hp3 & Hrest)".
+      iDestruct "Hnext" as "(%Hp1 & %Hp2 & %Hp3 & %Hp4 & Hrest)".
       destruct Hp2 as (HSc & Hp2b & Hp2c & Hp2d).
       assert (HScna : (S c < na)%nat).
       { destruct (Nat.eq_dec (S c) na) as [Heqna | Hne];
@@ -3834,6 +3909,7 @@ Section KexecCArgvLoop.
       iSplitR; [iPureIntro; split_and!;
                 [exact HSc | exact Hp2b | exact Hp2c | exact Hp2d] |].
       iSplitR; [iPureIntro; exact Hp3 |].
+      iSplitR; [iPureIntro; exact Hp4 |].
       iExact "Hrest".
     - (* the loop is over *)
       iSpecialize ("Hout" $! CIDn with "[%]"); [wp_next_chain |].
@@ -4087,6 +4163,7 @@ Section KexecCClose.
                           %HMs7 & %HMs11 & %HMs10) &
                          (%Hcna & %Hc32 & %Havfc & %Hspok) &
                          (%HPtfp & %Hbelow & %Hcov) &
+                         (%Hstr & %Hzero) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hres)".
     rewrite /kxc_c_res.
     iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & #Hka & Hpt & Hpriv &
@@ -4242,16 +4319,34 @@ Section KexecCClose.
     { iApply (kxc_272 with "Htext"). }
     iIntros (CID4 Hs4) "Hcg Hpc Hslot".
     iEval (rewrite Hstoreaddr) in "Hslot".
-    (* the whole written run, contents forgotten -- what both the byte
-       conversion below and the two [bad:] arms want *)
-    iAssert ([∗ list] i ∈ seq 0 (S c), ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈[KT1] w)%I
-      with "[Hwr Hslot]" as "Hustex".
+    (* THE WHOLE WRITTEN RUN, AT ITS VALUES (S3 item 9).  Slot [46 - i]
+       holds ustack[i]: [kxc_sp]'s recurrence for [i < c], zero at [i = c]
+       -- which together IS [KexecBuilt.kxb_ustack], the contract's own
+       [kexec_ustack].  The landed spelling forgot the values here (one
+       ∃-valued run for both the [bad:] arms and the closing copyout), and
+       forgetting them is what made [kexec_args_at]'s pointer-vector
+       conjunct unreachable: copyout's source has to be a NAMED byte
+       function, and [bytes_own_name] would supply a fresh one.  So the run
+       is named here and the [bad:] arms weaken it back where they need to. *)
+    pose (uw := fun i : nat =>
+            (mword_of_int (kxb_ustack (uint sz1) alen c i) : mword 64)).
+    assert (Huwlt : forall i, (i < c)%nat ->
+              uw i = (mword_of_int (kxc_sp (uint sz1) alen (S i)) : mword 64)).
+    { intros i Hi. unfold uw, kxb_ustack.
+      rewrite decide_True; [reflexivity | lia]. }
+    assert (Huwc : uw c = (zero_reg : mword 64)).
+    { unfold uw, kxb_ustack. rewrite decide_False; [| lia].
+      rewrite zero_reg64. reflexivity. }
+    iAssert ([∗ list] i ∈ seq 0 (S c), pa_stk sp0 (46 - i) ↦₈[KT1] uw i)%I
+      with "[Hwr Hslot]" as "Hustnm".
     { rewrite seq_S big_sepL_app big_sepL_singleton.
       iSplitL "Hwr".
       - iApply (big_sepL_impl with "Hwr"). iIntros "!>" (k j Hk) "H".
-        iExists (mword_of_int (kxc_sp (uint sz1) alen (S j)) : mword 64).
-        iExact "H".
-      - iExists (zero_reg : mword 64). iExact "Hslot". }
+        apply lookup_seq in Hk as [Hje Hlt].
+        rewrite (Huwlt j ltac:(lia)). iExact "H".
+      - assert (Hz : uw (0 + c)%nat = (zero_reg : mword 64))
+          by (rewrite Nat.add_0_l; exact Huwc).
+        rewrite Hz. iExact "Hslot". }
     assert (Hpp276 : add_vec_int (mword_of_int (KXC + 0x272) : mword 64) 4
                      = mword_of_int (KXC + 0x276)) by pcw.
     iEval (rewrite Hpp276) in "Hpc".
@@ -4523,6 +4618,11 @@ Section KexecCClose.
       { iApply (kxc_286 with "Htext"). }
       iIntros (CID10 Hs10c). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt1d6a) in "Hpc".
+      (* this arm does not care what the ustack holds: forget the names *)
+      iAssert ([∗ list] i ∈ seq 0 (S c), ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈[KT1] w)%I
+        with "[Hustnm]" as "Hustex".
+      { iApply (big_sepL_impl with "Hustnm"). iIntros "!>" (kk j Hkk) "H".
+        iExists (uw j). iExact "H". }
       iDestruct (kxc_ustack_collapse_ex sp0 (S c) ltac:(lia) with "Hustex") as "Hurun".
       iEval (rewrite Hdepth) in "Hurun".
       iDestruct (stack_own_join (pa_stk sp0 13) 33 (32 - c) (S c) ltac:(lia)
@@ -4710,6 +4810,9 @@ Section KexecCClose.
       { rewrite /X11 upd_eq HX10s6. apply add_vec_zero_l. }
       assert (HX11a1 : X11 !!! Regidx Ra1 = sz1)
         by (rewrite /X11 upd_ne; [exact HX10a1 | nz]).
+      assert (HX11a2 : X11 !!! Regidx Ra2
+                       = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
+        by (rewrite /X11 upd_ne; [exact HX10a2 | nz]).
       assert (HX11a3 : X11 !!! Regidx Ra3 = pa_stk sp0 46)
         by (rewrite /X11 upd_ne; [exact HX10a3 | nz]).
       assert (HX11a4 : X11 !!! Regidx Ra4 = (mword_of_int (8 * Z.of_nat c + 8) : mword 64))
@@ -4760,6 +4863,9 @@ Section KexecCClose.
         by (rewrite /X12 upd_ne; [exact HX11a0 | nz]).
       assert (HX12a1 : X12 !!! Regidx Ra1 = sz1)
         by (rewrite /X12 upd_ne; [exact HX11a1 | nz]).
+      assert (HX12a2 : X12 !!! Regidx Ra2
+                       = (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64))
+        by (rewrite /X12 upd_ne; [exact HX11a2 | nz]).
       assert (HX12a3 : X12 !!! Regidx Ra3 = pa_stk sp0 46)
         by (rewrite /X12 upd_ne; [exact HX11a3 | nz]).
       assert (HX12a4 : X12 !!! Regidx Ra4 = (mword_of_int (8 * Z.of_nat c + 8) : mword 64))
@@ -4790,10 +4896,14 @@ Section KexecCClose.
       (* ---- the source buffer: [S c] frame slots become [8 * S c] NAMED
          bytes.  The alignment facts [slotsn_bytes_own] hands out are what
          [bytes_own_slotsn] needs to put them back afterwards. ---- *)
-      iDestruct (slotsn_bytes_own (KTR := KT1) sp0 46 (S c) ltac:(lia) with "Hustex")
+      (* the source buffer, AT ITS BYTES: slot [46 - i]'s eight bytes are
+         [nth_byte (uw i)], and [KexecBuilt.bv_le_nth_byte] is the row that
+         says those ARE [bv_to_little_endian 8 8 ustack[i]] -- i.e. exactly
+         what [kexec_args_at]'s third conjunct asks for. *)
+      pose (ufun := fun j : nat => nth_byte (uw (j / 8)%nat) (j `mod` 8)%nat).
+      iDestruct (slotsn_bytes_namedf (KTR := KT1) sp0 46 (S c) uw ufun
+                   ltac:(lia) ltac:(intros j _; reflexivity) with "Hustnm")
         as "[%Halust Hubytes]".
-      iDestruct (bytes_own_name (8 * S c) (pa_stk sp0 46) with "Hubytes")
-        as (ufun) "Hubytes".
       iEval (rewrite -HX12a3) in "Hubytes".
       iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
       pose proof (proc_pt_covered_maxsz P sz1 Hwf Hcov) as Hmax.
@@ -4822,6 +4932,46 @@ Section KexecCClose.
       assert (Hco_res : X13 !!! Regidx Ra0 = (mword_of_int 0 : mword 64)
                         \/ X13 !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)).
       { destruct Hco_wrote as [[Ha0 _] | [Ha0 _]]; [left | right]; exact Ha0. }
+      (* ---- THE ARGUMENT BLOCK, CLOSED (S3 item 9).  This copyout is the
+         [8 * (argc + 1)]-byte pointer vector at [kxc_sp_final]; it sits
+         strictly below every string ([KexecBuilt.kxc_sp_vec_disj]), so the
+         loop's [kx_str_at] survives it verbatim, and its own bytes are in
+         [kxb_arg_addr]'s right disjunct, so the surviving zeros widen from
+         the string zone to the whole argument block.  What comes out is
+         [SpecKexecAU.kexec_stack_at]'s second conjunct at [c] -- the first
+         is [Hstackok] just below. ---- *)
+      assert (Hvectop : (kxc_sp_final (uint sz1) alen c
+                         + 8 * (Z.of_nat c + 1) <= uint sz1)%Z).
+      { pose proof (kxc_sp_final_gap (uint sz1) alen c) as Hgap.
+        pose proof (kxc_sp_mono (uint sz1) alen 0 c ltac:(lia)) as Hmono.
+        change (kxc_sp (uint sz1) alen 0) with (uint sz1) in Hmono. lia. }
+      assert (Hsz38v : (uint sz1 <= 274877906944)%Z)
+        by (change (2 ^ 38)%Z with 274877906944%Z in Hsz1max38; lia).
+      assert (Hvecval : uint (X12 !!! Regidx Ra2)
+                        = kxc_sp_final (uint sz1) alen c).
+      { rewrite HX12a2 uint_unsigned moi64_unsigned. apply bvw64_small.
+        change (2 ^ 64)%Z with 18446744073709551616%Z.
+        destruct Hstackok as [_ Hbase]. lia. }
+      assert (Hlinv : forall i, (i < 8 * S c)%nat ->
+                uint (add_vec_int (X12 !!! Regidx Ra2) (Z.of_nat i))
+                = (uint (X12 !!! Regidx Ra2) + Z.of_nat i)%Z).
+      { apply kx_wr_linear. rewrite Hvecval. lia. }
+      assert (Hufun : forall i k, (i <= c)%nat -> (k < 8)%nat ->
+                ufun (8 * i + k)%nat
+                = nth_byte (mword_of_int (kxb_ustack (uint sz1) alen c i)
+                            : mword 64) k).
+      { intros i k Hi Hk.
+        assert (Hd : ((8 * i + k) / 8)%nat = i).
+        { replace (8 * i + k)%nat with (k + i * 8)%nat by lia.
+          rewrite Nat.div_add; [| lia]. rewrite Nat.div_small; [lia | lia]. }
+        assert (Hm : ((8 * i + k) `mod` 8)%nat = k).
+        { replace (8 * i + k)%nat with (k + i * 8)%nat by lia.
+          rewrite Nat.Div0.mod_add. apply Nat.mod_small. lia. }
+        change (ufun (8 * i + k)%nat)
+          with (nth_byte (uw ((8 * i + k) / 8)%nat) ((8 * i + k) `mod` 8)%nat).
+        rewrite Hd Hm. reflexivity. }
+      destruct (kx_argv_vec (uint sz1) alen afun c Mi (X12 !!! Regidx Ra2) ufun
+                  Hvecval Hlinv Hufun Hstr Hzero) as [HstrV HzeroV].
       iEval (rewrite HX12a3) in "Hubytes".
       (* the page table moved; the invariant travels by name *)
       assert (Hext2 : uptd_ext P P2) by (eapply uptd_ext_sz_ext; exact Hextsz).
@@ -4900,6 +5050,11 @@ Section KexecCClose.
                          = mword_of_int (KXC + 0x1d6)) by pcw.
       destruct Hco_res as [Hcook | Hcofail].
       + (* ==== copyout succeeded: fall through into phase D ==== *)
+        (* the map [Hco_wrote] posted on THIS arm -- the whole vector *)
+        assert (HM0v : M0' = umem_wr Mi (X12 !!! Regidx Ra2) (8 * S c)%nat ufun).
+        { destruct Hco_wrote as [[_ Heq] | [Hbad _]]; [exact Heq |].
+          exfalso. rewrite Hcook in Hbad.
+          apply (f_equal bv_unsigned) in Hbad. vm_compute in Hbad. discriminate. }
         iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KXC + 0x298))
                   (mword_of_int 7998 : mword 13) Ra0
                   X13 (K - 68)%nat eb ltac:(nz)
@@ -4937,6 +5092,8 @@ Section KexecCClose.
         iSplitR.
         { iPureIntro. split_and!;
             [rewrite Htfp2; exact HPtfp | exact Hbelow2 | exact Hcov2]. }
+        iSplitR.
+        { iPureIntro. rewrite HM0v. exact (conj HstrV HzeroV). }
         iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
         iSplitL "Hcnt"; [iExact "Hcnt" |].
         iSplitL "Hextc"; [iExact "Hextc" |].

@@ -101,6 +101,31 @@ Section KexecPtImage.
     iApply (umem_own_dom with "Hm").
   Qed.
 
+  (* ...and its CONVERSE at the top: above a PAGE-ALIGNED [um_below]
+     bound, the image has no key at all.  This is what makes the stack
+     page uvmalloc is about to add all zeros ([KexecBuilt.kx_page_zero_grow]
+     asks for exactly this freshness premise).  The alignment hypothesis is
+     load-bearing: [um_below] bounds the page BASE, so without it a mapped
+     page could straddle the bound. *)
+  Lemma proc_pt_fresh_above (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) :
+    bv_unsigned szv `mod` 4096 = 0 ->
+    um_below szv P.(ud_um) ->
+    proc_pt P M -∗ ⌜forall a : Z, (bv_unsigned szv <= a)%Z -> M !! a = None⌝.
+  Proof.
+    intros Halign Hbel. iIntros "Hpt".
+    iDestruct (proc_pt_dom with "Hpt") as %Hdom.
+    iPureIntro. intros a Ha.
+    destruct (M !! a) as [b |] eqn:E; [exfalso | reflexivity].
+    assert (Hin : a ∈ dom M) by (apply elem_of_dom; exists b; exact E).
+    rewrite Hdom in Hin.
+    apply elem_of_uva_dom in Hin as (vpn & w & j & Hl & Hj & ->).
+    pose proof (Hbel vpn w Hl) as Hlt.
+    pose proof (Z.div_mod (bv_unsigned szv) 4096 ltac:(lia)) as Hdm.
+    rewrite Halign in Hdm.
+    assert (Hq : (bv_unsigned vpn < bv_unsigned szv / 4096)%Z) by lia.
+    lia.
+  Qed.
+
   (* every byte of a MAPPED page is recorded in [M] -- what turns the
      total lookup [M !!! va] the accessor names into a real [Some] *)
   Lemma proc_pt_page_bytes (P : uptd) (M : gmap Z (bv 8))

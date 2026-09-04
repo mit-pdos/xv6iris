@@ -73,6 +73,7 @@ Require Import SpecIput.
 Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import SpecKexec.
+Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
@@ -931,6 +932,15 @@ Section KexecBSeam.
        (uint sz1 - 4096 <= kxc_sp (uint sz1) alen c)%Z ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt (us_V U)) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
+     (* ---- THE ARGUMENT BLOCK, WRITE BY WRITE (S3 item 9).  [c] strings
+        are down, each where [kxc_sp]'s recurrence puts it, and the stack
+        page is still the zeros [uvmalloc] left everywhere those [c] runs
+        did not reach.  The exception set is [kxb_str_zone], NOT
+        [kxb_arg_addr]: the latter's pointer-vector disjunct moves with the
+        argument count, so it is not monotone in [c] and cannot be a loop
+        invariant -- see [KexecBuilt] §2. ---- *)
+     ⌜ kx_str_at (uint sz1) alen afun c Mi /\
+       kx_zero_except (uint sz1) (kxb_str_zone (uint sz1) alen c) Mi ⌝ ∗
      pc_is (mword_of_int (KXB + 0x218) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -1001,6 +1011,11 @@ Section KexecBSeam.
        (uint sz1 - 4096 <= kxc_sp (uint sz1) alen c)%Z ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt (us_V U)) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
+     (* [kxc_at_21a]'s image conjunct, verbatim: the loop's exit moves no
+        byte, and the closing block below reads it to introduce
+        [kxb_args_at] over the pointer vector it is about to write. *)
+     ⌜ kx_str_at (uint sz1) alen afun c Mi /\
+       kx_zero_except (uint sz1) (kxb_str_zone (uint sz1) alen c) Mi ⌝ ∗
      pc_is (mword_of_int (KXB + 0x268) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -1078,6 +1093,16 @@ Section KexecBSeam.
        kxc_stack_ok (uint sz1) (uint sz1 - 4096) alen c ⌝ ∗
      ⌜ ud_tfp P = ud_tfp (pv_upt (us_V U)) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
+     (* ---- THE ARGUMENT BLOCK, FINISHED.  The closing copyout at +0x29e
+        put the [c + 1]-word pointer vector down, so the loop's [kx_str_at]
+        has become the contract's own [kexec_args_at] ([KexecBuilt]'s
+        character-for-character spelling of it) and the exception set has
+        widened from the strings alone to all of [kxb_arg_addr].  Beside
+        the [kxc_stack_ok] two conjuncts up, that second half IS
+        [SpecKexecAU.kexec_stack_at]; phase D hands both to the
+        entry-point hole as [KexecBuilt.kexec_built]. ---- *)
+     ⌜ kxb_args_at (uint sz1) alen c afun Mi /\
+       kx_zero_except (uint sz1) (kxb_arg_addr (uint sz1) alen c) Mi ⌝ ∗
      pc_is (mword_of_int (KXB + 0x29c) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗

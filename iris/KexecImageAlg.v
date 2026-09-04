@@ -69,6 +69,9 @@ Require Import UserPtTree.      (* [umem_write], [umem_wr], [umem_grow],
 Require Import UmodeAbi.        (* [uimg_sub]                                *)
 Require Import ElfFile.         (* the image semantics                       *)
 Require Import SpecKexec.       (* [kxc_sp], [kxc_sp_final], [kxc_stack_ok]  *)
+Require Export KexecBuilt.      (* the argument block's algebra, spelled
+                                   below [SpecKexecAU] so the kexec block
+                                   proofs can name it; §5 bridges it       *)
 Require Import SpecKexecAU.     (* [loads_ascending], [kexec_top],
                                    [kexec_sz], [kexec_arg_addr],
                                    [kexec_args_at], [kexec_stack_at],
@@ -159,20 +162,7 @@ Qed.
 (*  PRESERVATION: what a later step of the loop cannot disturb.            *)
 (* ---------------------------------------------------------------------- *)
 
-(* [umem_grow] only ADDS keys ([∪] is left-biased), so nothing already
-   established can move. *)
-Lemma umem_grow_lookup_old (M : gmap Z (bv 8)) (sz a : Z) (b : bv 8) :
-  M !! a = Some b -> umem_grow M sz !! a = Some b.
-Proof. intros H. unfold umem_grow. apply lookup_union_Some_l. exact H. Qed.
-
-Lemma umem_grow_lookup_zero (M : gmap Z (bv 8)) (sz a : Z) :
-  M !! a = None -> uva_live sz a -> umem_grow M sz !! a = Some (bv_0 8).
-Proof.
-  intros Hnone Hlive. unfold umem_grow.
-  rewrite (lookup_union_r M _ a Hnone).
-  apply lookup_gset_to_gmap_Some.
-  split; [apply elem_of_live_set, Hlive | reflexivity].
-Qed.
+(* [umem_grow_lookup_old] / [umem_grow_lookup_zero] are [KexecBuilt]'s. *)
 
 Lemma uimg_sub_umem_grow (img M : gmap Z (bv 8)) (sz : Z) :
   uimg_sub img M -> uimg_sub img (umem_grow M sz).
@@ -390,25 +380,8 @@ Proof.
 Qed.
 
 (* ...hence [kexec_top] and [kexec_sz] in terms of the loop's own state. *)
-Lemma pgroundup_nonneg (sz : Z) : 0 <= sz -> 0 <= pgroundup sz.
-Proof.
-  intros H. unfold pgroundup.
-  apply Z.mul_nonneg_nonneg; [| lia].
-  apply Z.div_pos; lia.
-Qed.
-
-Lemma pgroundup_mod (sz : Z) : pgroundup sz `mod` 4096 = 0.
-Proof. unfold pgroundup. apply Z.mod_mul. lia. Qed.
-
-Lemma pgroundup_aligned (sz : Z) : sz `mod` 4096 = 0 -> pgroundup sz = sz.
-Proof.
-  intros H. unfold pgroundup.
-  pose proof (Z.div_mod sz 4096 ltac:(lia)) as Hdm. rewrite H in Hdm.
-  replace (sz + 4095) with ((sz / 4096) * 4096 + 4095) by lia.
-  rewrite Z.div_add_l by lia.
-  assert (H4 : 4095 / 4096 = 0) by reflexivity.
-  rewrite H4. lia.
-Qed.
+(* [pgroundup_nonneg] / [pgroundup_mod] / [pgroundup_aligned] are
+   [KexecBuilt]'s. *)
 
 Lemma kexec_top_of_sz_after (f : elf_bytes) :
   elf_wf f = true -> kexec_top f = pgroundup (kexec_sz_after (elf_loads f)).
@@ -509,119 +482,50 @@ Lemma kexec_sz_after_take_all (ps : list elf_phdr) :
 Proof. rewrite take_ge by lia. reflexivity. Qed.
 
 (* ====================================================================== *)
-(*  4.  THE STACK                                                         *)
+(*  4.  THE STACK -- MOVED WHOLE TO [KexecBuilt.v]                        *)
 (* ====================================================================== *)
 
-(* ---- the push geometry: [kxc_sp] strictly decreases, by more than the
-        string it just made room for ---- *)
+(*  The push geometry ([kxc_sp_gap] / [kxc_sp_mono] / [kxc_sp_str_disj] /
+    [kxc_sp_vec_disj]), the zero fill ([kx_page_zero], [kx_zero_except])
+    and the argument block written push by push ([kx_str_at],
+    [kxb_args_at_intro]) all live in [KexecBuilt.v] now, and are
+    re-exported by the [Require Export] above.  The reason is the
+    dependency order: the argv loop's INVARIANT is stated in exactly that
+    vocabulary, and [ProofKexecSeam.v] / [ProofKexecC.v] sit below
+    [SpecKexecAU.v] -- which this file requires and they must not.  So the
+    predicates are spelled in [KexecBuilt] and §5 below is the bridge.
+    The two [umem_grow] lookup laws and the three [pgroundup] rows moved
+    with them, for the same reason ([kx_page_zero_grow] needs them).      *)
 
-Lemma kxc_round16_le (x : Z) : kxc_round16 x <= x.
-Proof.
-  unfold kxc_round16. pose proof (Z.mod_pos_bound x 16 ltac:(lia)). lia.
-Qed.
+(* ====================================================================== *)
+(*  5.  THE BRIDGE: [KexecBuilt]'s spelling IS the contract's             *)
+(* ====================================================================== *)
 
-Lemma kxc_sp_gap (top : Z) (alen : nat -> nat) (i : nat) :
-  kxc_sp top alen (S i) + Z.of_nat (alen i) < kxc_sp top alen i.
-Proof.
-  simpl.
-  pose proof (kxc_round16_le (kxc_sp top alen i - (Z.of_nat (alen i) + 1))).
-  lia.
-Qed.
+(*  [kxb_ustack] / [kxb_arg_addr] / [kxb_args_at] / [kxb_stack_at] are
+    [SpecKexecAU]'s four predicates transcribed character for character
+    into a file that does not require [SpecKexecAU], so each of these is
+    the identity -- and stating them is what lets a client of the exec
+    contract consume [KexecBuilt.kexec_built] without ever unfolding it. *)
 
-Lemma kxc_sp_mono (top : Z) (alen : nat -> nat) (i k : nat) :
-  (i <= k)%nat -> kxc_sp top alen k <= kxc_sp top alen i.
-Proof.
-  intros H. induction H as [| k Hk IH]; [lia |].
-  pose proof (kxc_sp_gap top alen k). pose proof (Nat2Z.is_nonneg (alen k)).
-  lia.
-Qed.
+Lemma kxb_ustack_eq (top : Z) (alen : nat -> nat) (na i : nat) :
+  kxb_ustack top alen na i = kexec_ustack top alen na i.
+Proof. reflexivity. Qed.
 
-Lemma kxc_sp_final_gap (top : Z) (alen : nat -> nat) (na : nat) :
-  kxc_sp_final top alen na + 8 * (Z.of_nat na + 1) <= kxc_sp top alen na.
-Proof.
-  unfold kxc_sp_final.
-  pose proof (kxc_round16_le
-                (kxc_sp top alen na - 8 * (Z.of_nat na + 1))).
-  lia.
-Qed.
+Lemma kxb_arg_addr_eq (top : Z) (alen : nat -> nat) (na : nat) (a : Z) :
+  kxb_arg_addr top alen na a <-> kexec_arg_addr top alen na a.
+Proof. reflexivity. Qed.
 
-(* string [i]'s bytes are strictly below every earlier string's sp... *)
-Lemma kxc_sp_str_disj (top : Z) (alen : nat -> nat) (i k j : nat) :
-  (i < k)%nat ->
-  forall m, (m < alen k + 1)%nat ->
-    kxc_sp top alen (S i) + Z.of_nat j <> kxc_sp top alen (S k) + Z.of_nat m.
-Proof.
-  intros Hik m Hm.
-  pose proof (kxc_sp_gap top alen k).
-  pose proof (kxc_sp_mono top alen (S i) k ltac:(lia)).
-  pose proof (Nat2Z.is_nonneg j).
-  lia.
-Qed.
+Lemma kxb_args_at_kexec (top : Z) (alen : nat -> nat) (na : nat)
+    (afun : nat -> nat -> bv 8) (M : gmap Z (bv 8)) :
+  kxb_args_at top alen na afun M -> kexec_args_at top alen na afun M.
+Proof. exact (fun H => H). Qed.
 
-(* ...and the pointer vector is strictly below every string. *)
-Lemma kxc_sp_vec_disj (top : Z) (alen : nat -> nat) (na i j : nat) :
-  (i < na)%nat ->
-  forall m, (m < 8 * (na + 1))%nat ->
-    kxc_sp top alen (S i) + Z.of_nat j
-    <> kxc_sp_final top alen na + Z.of_nat m.
-Proof.
-  intros Hi m Hm.
-  pose proof (kxc_sp_final_gap top alen na).
-  pose proof (kxc_sp_mono top alen (S i) na ltac:(lia)).
-  pose proof (Nat2Z.is_nonneg j).
-  lia.
-Qed.
+Lemma kxb_stack_at_kexec (top : Z) (alen : nat -> nat) (na : nat)
+    (M : gmap Z (bv 8)) :
+  kxb_stack_at top alen na M -> kexec_stack_at top alen na M.
+Proof. exact (fun H => H). Qed.
 
-(* every byte a copyout touches is inside [kexec_arg_addr] *)
-Lemma kexec_arg_addr_str (top : Z) (alen : nat -> nat) (na i j : nat) :
-  (i < na)%nat -> (j < alen i + 1)%nat ->
-  kexec_arg_addr top alen na (kxc_sp top alen (S i) + Z.of_nat j).
-Proof. intros Hi Hj. left. exists i. split; [exact Hi | lia]. Qed.
-
-Lemma kexec_arg_addr_vec (top : Z) (alen : nat -> nat) (na j : nat) :
-  (j < 8 * (na + 1))%nat ->
-  kexec_arg_addr top alen na (kxc_sp_final top alen na + Z.of_nat j).
-Proof. intros Hj. right. lia. Qed.
-
-(* ---- the zero fill ---- *)
-
-Definition kx_page_zero (top : Z) (M : gmap Z (bv 8)) : Prop :=
-  forall a, top - PGSIZE <= a < top -> M !! a = Some (bv_0 8).
-
-(* uvmalloc to [sz1 = top] makes the top page live, and it held nothing
-   before ([sz] was at most [top - 2*PGSIZE]), so every one of its bytes
-   reads zero. *)
-Lemma kx_page_zero_grow (M : gmap Z (bv 8)) (top : Z) :
-  top `mod` PGSIZE = 0 -> PGSIZE <= top ->
-  (forall a, top - PGSIZE <= a < top -> M !! a = None) ->
-  kx_page_zero top (umem_grow M top).
-Proof.
-  intros Halign Hge Hfresh a Ha. unfold PGSIZE in *.
-  apply umem_grow_lookup_zero; [exact (Hfresh a Ha) |].
-  unfold uva_live. rewrite (pgroundup_aligned top Halign). lia.
-Qed.
-
-(* THE SURVIVING ZEROS: [kexec_stack_at]'s second conjunct, carried
-   through the copyouts.  [P] is instantiated with [kexec_arg_addr]. *)
-Definition kx_zero_except (top : Z) (P : Z -> Prop) (M : gmap Z (bv 8)) : Prop :=
-  forall a, top - PGSIZE <= a < top -> ~ P a -> M !! a = Some (bv_0 8).
-
-Lemma kx_zero_except_of_page (top : Z) (P : Z -> Prop) (M : gmap Z (bv 8)) :
-  kx_page_zero top M -> kx_zero_except top P M.
-Proof. intros H a Ha _. exact (H a Ha). Qed.
-
-Lemma kx_zero_except_write (top : Z) (P : Z -> Prop) (M : gmap Z (bv 8))
-    (a : Z) (n : nat) (g : nat -> bv 8) :
-  kx_zero_except top P M ->
-  (forall j, (j < n)%nat -> P (a + Z.of_nat j)) ->
-  kx_zero_except top P (umem_write M a n g).
-Proof.
-  intros Hz Hin va Hva HnP.
-  assert (Hne : forall j, (j < n)%nat -> va <> (a + Z.of_nat j)).
-  { intros j Hj Heq. apply HnP. rewrite Heq. exact (Hin j Hj). }
-  rewrite (umem_write_lookup_out M a n g va Hne). exact (Hz va Hva HnP).
-Qed.
-
+(* ...and the two intro rows, at the contract's own spelling. *)
 Lemma kexec_stack_at_intro (top : Z) (alen : nat -> nat) (na : nat)
     (M : gmap Z (bv 8)) :
   kxc_stack_ok top (top - PGSIZE) alen na ->
@@ -629,56 +533,6 @@ Lemma kexec_stack_at_intro (top : Z) (alen : nat -> nat) (na : nat)
   kexec_stack_at top alen na M.
 Proof. intros Hok Hz. split; [exact Hok | exact Hz]. Qed.
 
-(* ---- the argument block, write by write ---- *)
-
-(* the first two conjuncts of [kexec_args_at], after [k] strings *)
-Definition kx_str_at (top : Z) (alen : nat -> nat)
-    (afun : nat -> nat -> bv 8) (k : nat) (M : gmap Z (bv 8)) : Prop :=
-  (forall i j, (i < k)%nat -> (j < alen i)%nat ->
-     M !! (kxc_sp top alen (S i) + Z.of_nat j) = Some (afun i j))
-  /\ (forall i, (i < k)%nat ->
-     M !! (kxc_sp top alen (S i) + Z.of_nat (alen i)) = Some (bv_0 8)).
-
-Lemma kx_str_at_0 (top : Z) (alen : nat -> nat)
-    (afun : nat -> nat -> bv 8) (M : gmap Z (bv 8)) :
-  kx_str_at top alen afun 0 M.
-Proof. split; intros; exfalso; lia. Qed.
-
-(* ONE PUSH: copyout of [alen k + 1] bytes (the string and its NUL) at
-   [kxc_sp top alen (S k)].  The earlier strings sit strictly ABOVE this
-   run ([kxc_sp_str_disj]), so they survive verbatim. *)
-Lemma kx_str_at_step (top : Z) (alen : nat -> nat)
-    (afun : nat -> nat -> bv 8) (k : nat) (M : gmap Z (bv 8))
-    (src : nat -> bv 8) :
-  kx_str_at top alen afun k M ->
-  (forall j, (j < alen k)%nat -> src j = afun k j) ->
-  src (alen k) = bv_0 8 ->
-  kx_str_at top alen afun (S k)
-    (umem_write M (kxc_sp top alen (S k)) (alen k + 1) src).
-Proof.
-  intros [Hold Hnul] Hsrc Hsrcnul. split.
-  - intros i j Hi Hj. destruct (decide (i = k)) as [-> | Hne].
-    + rewrite (umem_write_lookup_in M (kxc_sp top alen (S k))
-                 (alen k + 1) src j ltac:(lia)).
-      rewrite (Hsrc j Hj). reflexivity.
-    + rewrite (umem_write_lookup_out M (kxc_sp top alen (S k))
-                 (alen k + 1) src _
-                 (kxc_sp_str_disj top alen i k j ltac:(lia))).
-      exact (Hold i j ltac:(lia) Hj).
-  - intros i Hi. destruct (decide (i = k)) as [-> | Hne].
-    + rewrite (umem_write_lookup_in M (kxc_sp top alen (S k))
-                 (alen k + 1) src (alen k) ltac:(lia)).
-      rewrite Hsrcnul. reflexivity.
-    + rewrite (umem_write_lookup_out M (kxc_sp top alen (S k))
-                 (alen k + 1) src _
-                 (kxc_sp_str_disj top alen i k (alen i) ltac:(lia))).
-      exact (Hnul i ltac:(lia)).
-Qed.
-
-(* THE LAST PUSH: the [8 * (na + 1)]-byte pointer vector, at
-   [kxc_sp_final], strictly below every string ([kxc_sp_vec_disj]).  Its
-   [i]-th word is [kexec_ustack top alen na i], little-endian, which is
-   exactly what [kexec_args_at]'s third conjunct asks for. *)
 Lemma kexec_args_at_intro (top : Z) (alen : nat -> nat) (na : nat)
     (afun : nat -> nat -> bv 8) (M : gmap Z (bv 8)) (src : nat -> bv 8) :
   kx_str_at top alen afun na M ->
@@ -687,22 +541,4 @@ Lemma kexec_args_at_intro (top : Z) (alen : nat -> nat) (na : nat)
      = Some (src (8 * i + k)%nat)) ->
   kexec_args_at top alen na afun
     (umem_write M (kxc_sp_final top alen na) (8 * (na + 1)) src).
-Proof.
-  intros [Hold Hnul] Hvec. split; [| split].
-  - intros i j Hi Hj.
-    rewrite (umem_write_lookup_out M (kxc_sp_final top alen na)
-               (8 * (na + 1)) src _
-               (kxc_sp_vec_disj top alen na i j Hi)).
-    exact (Hold i j Hi Hj).
-  - intros i Hi.
-    rewrite (umem_write_lookup_out M (kxc_sp_final top alen na)
-               (8 * (na + 1)) src _
-               (kxc_sp_vec_disj top alen na i (alen i) Hi)).
-    exact (Hnul i Hi).
-  - intros i k Hi Hk.
-    replace (kxc_sp_final top alen na + 8 * Z.of_nat i + Z.of_nat k)
-      with (kxc_sp_final top alen na + Z.of_nat (8 * i + k)%nat) by lia.
-    rewrite (umem_write_lookup_in M (kxc_sp_final top alen na)
-               (8 * (na + 1)) src (8 * i + k)%nat ltac:(lia)).
-    symmetry. exact (Hvec i k Hi Hk).
-Qed.
+Proof. exact (kxb_args_at_intro top alen na afun M src). Qed.

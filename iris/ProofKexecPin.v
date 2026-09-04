@@ -70,6 +70,7 @@ Require Import IrefSlots.
 Require Import UserPtTree.
 Require Import FileInvDefs.
 Require Import SpecKexec.
+Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 Require Import KexecOkQ.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
@@ -304,11 +305,10 @@ Section KexecPinTail.
        fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
        generic for free and takes no such premise.
 
-       The [forall U'] is the widened hole's second argument: the closer
-       plugs [kexec_ok_q] with [fun e => Q e U'] at the exit's own final
-       state, and this sweep does not yet expose that state's facts here,
-       so the premise is asked at EVERY [U']. *)
-    (forall U' : ustate, Q (kxq_entry ef) U') ->
+       THE PREMISE IS GUARDED BY WHAT THE RUN BUILT (S3), exactly as
+       [ProofKexec.kxc_d_tail]'s is; [Q_pin] ignores the state, so the pin's
+       own instantiation just drops the guard. *)
+    (forall U' : ustate, kexec_built sz1 na alen afun U' -> Q (kxq_entry ef) U') ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -372,11 +372,10 @@ Section KexecPinTail.
        fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
        generic for free and takes no such premise.
 
-       The [forall U'] is the widened hole's second argument: the closer
-       plugs [kexec_ok_q] with [fun e => Q e U'] at the exit's own final
-       state, and this sweep does not yet expose that state's facts here,
-       so the premise is asked at EVERY [U']. *)
-    (forall U' : ustate, Q (kxq_entry ef) U') ->
+       THE PREMISE IS GUARDED BY WHAT THE RUN BUILT (S3), with the stack
+       top still ∀-bound here -- [kxc_c_setup]'s uvmalloc picks it. *)
+    (forall (szg : mword 64) (U' : ustate),
+       kexec_built szg na alen afun U' -> Q (kxq_entry ef) U') ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -436,7 +435,7 @@ Section KexecPinTail.
       (* [0 < na] is not a conjunct of the head and cannot be: what says it
          is the head's own [avf 0 <> 0] against the contract's [avf na = 0]. *)
       rewrite /kxc_at_21a.
-      iDestruct "Hloop" as "(%Hq1 & %Hq2 & %Hq3 & Hrest2)".
+      iDestruct "Hloop" as "(%Hq1 & %Hq2 & %Hq3 & %Hq4 & Hrest2)".
       assert (H0na : (0 < na)%nat).
       { destruct Hq2 as (_ & _ & Hnz & _).
         destruct (Nat.eq_dec 0 na) as [Heq | Hne];
@@ -450,6 +449,7 @@ Section KexecPinTail.
         iSplitR; [iPureIntro; exact Hq1 |].
         iSplitR; [iPureIntro; exact Hq2 |].
         iSplitR; [iPureIntro; exact Hq3 |].
+        iSplitR; [iPureIntro; exact Hq4 |].
         iExact "Hrest2". }
       iApply (PC.kxc_argv_loop (CID0 := CID1) Q jp gf
  plen pfun na avf alen aslen
@@ -465,7 +465,7 @@ Section KexecPinTail.
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m M2 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P2 Mim2 sz1 c2
-                HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
+                (HQe sz1) HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 with "Htext Hst272 Hcont").
     - (* argv[0] = NULL: the loop is skipped, and c = 0 *)
@@ -473,7 +473,7 @@ Section KexecPinTail.
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m M1 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P1 Mim1 sz1 0
-                HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
+                (HQe sz1) HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 with "Htext Hskip Hcont").
   Qed.
@@ -636,7 +636,7 @@ Section KexecPinMain.
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13z
                 w67z ef Pz Miz (mword_of_int 0 : mword 64)
-                (Q_pin_of_hdr pb ef Hhp) HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+                (fun _ U' _ => Q_pin_of_hdr pb ef Hhp U') HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
@@ -665,7 +665,7 @@ Section KexecPinMain.
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                 (mword_of_int 4095 : mword 64) ef Py Miy szvy
-                (Q_pin_of_hdr pb ef Hhp) HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+                (fun _ U' _ => Q_pin_of_hdr pb ef Hhp U') HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").

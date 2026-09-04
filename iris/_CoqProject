@@ -1325,6 +1325,7 @@ CodeSysChdir.v
 CodeSysExec.v
 CodeKexec.v
 KexecOkQ.v
+KexecBuilt.v
 SpecKexec.v
 SpecFlags2perm.v
 ProofFlags2perm.v

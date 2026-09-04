@@ -77,6 +77,7 @@ Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecKexec.
+Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 Require Import KexecOkQ.
 Require Import SpecProcFreepagetable.
 Require Import SpecSafestrcpy.
@@ -1964,11 +1965,15 @@ Section KexecDMain.
        fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
        generic for free and takes no such premise.
 
-       The [forall U'] is the widened hole's second argument: the closer
+       THE PREMISE IS GUARDED BY WHAT THE RUN BUILT (S3).  The closer
        plugs [kexec_ok_q] with [fun e => Q e U'] at the exit's own final
-       state, and this sweep does not yet expose that state's facts here,
-       so the premise is asked at EVERY [U']. *)
-    (forall U' : ustate, Q (kxq_entry ef) U') ->
+       state, and phase D's entry state ([kxc_at_2a6]) now carries that
+       state's argument block: the strings where [kxc_sp]'s recurrence puts
+       them, the stack page zero everywhere else, at the size [sz1] the
+       exit reports.  So a caller pays [Q] not at EVERY [U'] but at every
+       [U'] the run could have produced -- [KexecBuilt.kexec_built], which
+       is what the AU contract's [kexec_image_ok] can be reached from. *)
+    (forall U' : ustate, kexec_built sz1 na alen afun U' -> Q (kxq_entry ef) U') ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -1994,24 +1999,29 @@ Section KexecDMain.
   Proof.
     intros HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12.
-    (* the guarded form [kxd_commit] asks for: at THIS altitude the four
-       projections are still ∀-bound, so it follows from the unguarded
-       premise this lemma (and everything above it) carries. *)
-    assert (HQpay : forall (Mg : gmap Z (bv 8)) (szg : mword 64) (Pg : uptd)
-                      (tfg : list (mword 64)),
-                      kxq_pay Q (kxq_entry ef) Mg szg Pg tfg)
-      by (intros Mg szg Pg tfg U' _ _ _ _; exact (HQe U')).
-    
+
     iIntros "#Htext Hst Hcont".
     rewrite /kxc_at_2a6.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs1 & %HMs2 & %HMs4 & %HMs5 & %HMs6 &
                           %HMs11 & %HMs10) &
                          (%Hcna & %Hcmax & %Havfc & %Hstackok) &
                          (%HPtfp & %Hbelow & %Hcov) &
+                         (%Hstr & %Hzero) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hres)".
     assert (Hceq : c = na).
     { destruct (Nat.lt_ge_cases c na) as [Hlt | Hge];
         [exfalso; exact (Havf_nz c Hlt Havfc) | lia]. }
+    (* the GUARDED premise [kxd_commit] asks for, discharged from this
+       state's own image conjuncts: [kxq_pay]'s [U'] is pinned to [Mi] and
+       [sz1], which is exactly where [kexec_built] reads.  Phase D writes
+       only trapframe words, so the image at the commit IS [Mi]. *)
+    assert (HQpay : forall tfg : list (mword 64),
+                      kxq_pay Q (kxq_entry ef) Mi sz1 P tfg).
+    { intros tfg U' HM Hsz _ _. apply HQe.
+      unfold kexec_built. rewrite HM -Hceq.
+      split_and!;
+        [exact Hsz | exact Hstr
+        | apply kxb_stack_at_intro; [exact Hstackok | exact Hzero]]. }
     rewrite /kxc_d_res.
     iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & #Hka & Hpt & Hpriv &
                           Hpath & Hargv & Hargs & Helf & Hframe)".
@@ -2253,7 +2263,7 @@ Section KexecDMain.
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m D3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi sz1 c 0%nat
-                (HQpay _ _ _ _) ltac:(lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
+                (HQpay _) ltac:(lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
@@ -2398,7 +2408,7 @@ Section KexecDMain.
  plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m Mf K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi sz1 c q'
-                (HQpay _ _ _ _) ltac:(lia) Hcstr Hq' Hnamax Hsz1ge Hceq
+                (HQpay _) ltac:(lia) Hcstr Hq' Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
