@@ -68,7 +68,6 @@ MemClaim.v
 TsoCtxAbsorbLb.v
 CtxMorphTac.v
 TsoCtxPark.v
-CtxAnchor.v
 CtxBox.v
 TsoCtxMove.v
 CtxValues.v
@@ -76,7 +75,6 @@ CtxPinw.v
 CtxKMap.v
 CtxPinMint.v
 PtTreeMove.v
-PtTreeShim.v
 CtxRecord.v
 PermInv.v
 PageGeom.v
@@ -702,7 +700,6 @@ SpecBinit.v
 ProofBinit.v
 LinkBinit.v
 BioInv.v
-BioBox.v
 BioFs.v
 BioInitAt.v
 FsBlocks.v
@@ -1476,9 +1473,7 @@ FsFlushedCore.v
 FsDurSyscall.v
 FsAbs.v
 FsAbsInv.v
-FsAbsSeam.v
 SpecSysMknodAU.v
-FsAbsPins.v
 FsAbsEra.v
 SpecNamexEra.v
 ProofNamexEra.v
@@ -1489,7 +1484,6 @@ LinkNameiEra.v
 FsAbsEraMknod.v
 SpecSysWriteAU.v
 FsAbsNpar.v
-FsAbsNparMknod.v
 SpecNparEra.v
 ProofNparEra.v
 LinkNparEra.v
@@ -1561,7 +1555,6 @@ SpecSysReadAUAt.v
 # [ty = T_FILE], where the mkdir arm stays refuted but ARM F-OK comes back;
 # SpecCreateAUFOpen is the bridge into SpecSysOpenAU's create arms.
 # R10: SpecCreate, SpecCreateAU and SpecSysOpenAU are untouched.
-FsAbsCreateFire.v
 SpecCreateAUF.v
 ProofCreateAUF.v
 LinkCreateAUF.v
