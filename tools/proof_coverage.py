@@ -45,7 +45,11 @@ are discovered automatically:
 * a ``_body`` definition whose *entry* ``pc_is`` is ``KernelSyms.<sym>`` at
   offset 0 **and** whose continuation ``pc_is`` is the caller's return address
   (a ``let`` bound from register x1 / ``ra``, whatever it is named) is a
-  WHOLE-FUNCTION spec for ``<sym>``;
+  WHOLE-FUNCTION spec for ``<sym>``.  Either pin may be FACTORED into a
+  same-file predicate the body applies rather than written inline -- the
+  atomic-update specs put both in a shared ``_frame`` (``SpecSysOpenAU.v``),
+  and several older specs factor just the continuation -- so both are followed
+  through the application (``entry_via_frame`` / ``runs_to_end``);
 * the same with a nonzero entry offset, or with a continuation that is another
   address inside the function, is a FRAGMENT spec (prologue / loop / epilogue);
 * the spec is PROVEN if some ``Module <F>Proof ... : <MODTYPE>`` implements it
@@ -279,6 +283,47 @@ def runs_to_end(text: str, entry: str, local_defs: dict | None = None) -> bool:
         if not any(re.search(r"\bpc_is\b", (local_defs or {})[d]) for d in applied):
             return True
     return False
+
+
+def entry_via_frame(text: str, local_defs: dict | None):
+    """The entry pin of a `_body` that FACTORS it into a same-file FRAME.
+
+    A `_body` normally opens with its own `let pcE := mword_of_int
+    KernelSyms.<sym>`.  The atomic-update family does not: `SpecSysOpenAU.v`'s
+    `wp_sys_open_au_plain_body` is one line over `wp_sys_open_au_frame` -- the
+    shared premises and conclusion both its arms ride, parameterised by the
+    arm's precondition and arms -- and the entry pin lives in the frame.
+
+    Reading only the body's own chunk therefore finds no pin, and the spec is
+    not recorded AT ALL: the function then reads ASSUMED off whatever OLDER
+    spec is still in the build, with no evidence line naming the proof that
+    does exist.  That is exactly how sys_open, sys_unlink and sys_mknod came
+    to be reported assumed while LinkSysOpenAU.v, LinkSysUnlinkAU.v and
+    LinkSysMknodAU.v were linking their AU proofs all along -- the same
+    failure mode `runs_to_end`'s factored-postcondition follow exists to
+    prevent, one step earlier in the pipeline.
+
+    The follow is narrow for the same reason that one is.  Only same-file
+    definitions the body actually APPLIES are read; only NON-`_body` ones (a
+    `_body` it applies is the thin-instantiation case, which `body_delegates`
+    already credits through the module type); and a frame that pins a NONZERO
+    offset still yields a fragment, because the offset is taken from the pin
+    rather than assumed.
+
+    Returns ({(symbol, offset): frame_name}, body-text + the frames' text).
+    More than one distinct pin is not something to choose between, so both are
+    returned and the caller reports it instead of picking.
+    """
+    pins, texts = {}, []
+    for dname, dtext in (local_defs or {}).items():
+        if not re.search(rf"\b{re.escape(dname)}\b", text):
+            continue
+        m = ENTRY_PC.search(dtext)
+        if not m:
+            continue
+        pins[(m.group(1), int(m.group(2), 0) if m.group(2) else 0)] = dname
+        texts.append(dtext)
+    return pins, "\n".join([text] + texts)
 REQUIRE = re.compile(r"^\s*(?:From\s+\w+\s+)?Require\s+(?:Import|Export)?\s*([^.]*)\.", re.M)
 MODTYPE_DECL = re.compile(r"^\s*Module\s+Type\s+(\w+)\s*\.", re.M)
 # `Module KfreeProof (A : ACQUIRE) (B : MEMSETPAGE) : KFREE.`
@@ -307,7 +352,19 @@ MODIMPL_DECL = re.compile(
 # INCLUDED one declares, so it discharges that spec too.
 MODTYPE_INCLUDE = re.compile(r"^\s*Include\s+(?:\w+\.)*(\w+)\s*\.", re.M)
 # `Module Kfree := KfreeProof Acquire MemsetPage Release.`
-MODINST_DECL = re.compile(r"^\s*Module\s+(\w+)\s*:=\s*(\w+)((?:\s+\w+)*)\s*\.", re.M)
+#
+# The optional `Import` / `Export` is Rocq's import modifier, which brings the
+# instance's contents into scope at the instantiation point:
+# `Module Import Parts := SysExecParts Argaddr Argstr ... .`  (ProofSysExec.v
+# and ProofSysExecAU.v both open their shared part-functor that way, so the
+# thirty-odd fragment lemmas inside can be named unqualified.)  Without the
+# modifier here the line matched NO `Module` form at all and reached the
+# catch-all below as "unrecognized `Module` form", i.e. as a consistency error
+# on a legal and correct declaration -- which is a red `--check` describing a
+# green tree.
+MODINST_DECL = re.compile(
+    r"^\s*Module\s+(?:(?:Import|Export)\s+)?(\w+)\s*:=\s*(\w+)((?:\s+\w+)*)\s*\.",
+    re.M)
 # `Module WalkNoalloc : WALK_NOALLOC := WalkNoallocProof.` -- an instance that
 # RE-ASCRIBES what it stands over.  Rocq accepts it, and it is redundant (the
 # functor or module on the right already carries the ascription, or should --
@@ -656,19 +713,39 @@ def scan_proofs(repo: str) -> Proofs:
                     body_of_modtype[b] = cur_modtype
             elif kw == "Definition" and name.endswith("_body"):
                 m = ENTRY_PC.search(text)
-                if not m:
-                    # No entry pc of its own: possibly a thin instantiation of
-                    # an indexed body (wp_f_sconf_body := wp_f_pre_body ... pre).
+                if m:
+                    sym = m.group(1)
+                    off = int(m.group(2), 0) if m.group(2) else 0
+                    wtext = text
+                else:
+                    # No entry pc of its own.  Two shapes, and the difference
+                    # matters: a thin instantiation of an indexed body
+                    # (wp_f_sconf_body := wp_f_pre_body ... pre) is credited
+                    # through its delegate, while a body whose pin is FACTORED
+                    # into a same-file frame has to be read out of the frame --
+                    # see `entry_via_frame`.
                     refs = [b for b in re.findall(r"\b(\w+_body)\b", text)
                             if b != name]
                     if refs:
                         body_delegates[name] = refs
-                    continue
+                        continue
+                    pins, wtext = entry_via_frame(text, local_defs)
+                    if not pins:
+                        continue
+                    if len(pins) > 1:
+                        where = ", ".join(sorted(
+                            f"{d}: {s}+{o:#x}" for (s, o), d in pins.items()))
+                        p.errors.append(
+                            f"{base}:{line}: {name} pins no entry pc of its "
+                            f"own and the frames it applies disagree about "
+                            f"the entry ({where}), so no spec is recorded "
+                            f"for it")
+                        continue
+                    (sym, off), _ = next(iter(pins.items()))
                 p.specs.append(Spec(
                     file=base, line=line, body=name,
-                    symbol=m.group(1),
-                    offset=int(m.group(2), 0) if m.group(2) else 0,
-                    whole=runs_to_end(text, m.group(1), local_defs)))
+                    symbol=sym, offset=off,
+                    whole=runs_to_end(wtext, sym, local_defs)))
 
             # An `Include` anywhere inside a `Module Type` block widens what a
             # module of that type exports.  Scanned after the keyword chain
