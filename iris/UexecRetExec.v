@@ -11,14 +11,20 @@
 (* THE ONE DIFFERENCE from [UexecRet.uexec_ret_F]: the returning-syscall   *)
 (* arm splits off [USYS_exec], where the process must ALSO hand over       *)
 (*                                                                         *)
-(*     xbundle W  ∗  <today's generic returning arm, VERBATIM>             *)
+(*     xbundle X W  ∗  <today's generic returning arm, VERBATIM>           *)
 (*                                                                         *)
 (* [xbundle] is the payload family, a field of the ambient class           *)
 (* [uexecXG] declared in this file, so this file's cone gains no fs        *)
 (* import; the kernel-side instance (the AU bundle                         *)
 (* [SpecSysExecAU.sys_exec_au_pre] at the trapping key's image, argv       *)
 (* pointer and descriptor view) lives in UexecExecInst.v, beside the spec  *)
-(* it names.                                                               *)
+(* it names.  THE FAMILY TAKES THE RECURSIVE OCCURRENCE [X]: the bundle's  *)
+(* own slot wand (the caller's WP for the program exec loads) concludes    *)
+(* at the fixpoint variable, so that at the fixpoint it concludes at       *)
+(* [uslot_x] itself -- which is what lets the kernel hand the NEW process  *)
+(* an enriched slot rather than a plain one (a plain [uslot] cannot be     *)
+(* lifted, below).  Non-expansiveness in [X] is a field too: it is what    *)
+(* the fixpoint's contractivity needs of the family.                       *)
 (*                                                                         *)
 (* IT IS A PURE GIVE, and both halves of that matter:                      *)
 (*   - on SUCCESS the kernel CONSUMES the bundle: exec's success arm       *)
@@ -87,6 +93,7 @@ Import Defs.
 (* ...UexecRet.v's block above, VERBATIM (durable-notes: trimmed imports
    have OOM'd the build); the enrichment's own imports below. *)
 From iris.base_logic.lib Require Import ghost_var.
+Require Import ProcGeom.      (* [tf_arg_idx] -- the class's key congruence *)
 Require Import UexecRet.
 Require Import UmodeText.     (* the plain contract this file encloses --
                                  REQUIRED DIRECTLY: [uslot]/[uvb] are
@@ -111,10 +118,25 @@ Require Import UserFd.       (* [ufd_auth] *)
 (* tower, and threading it as an argument would drag that tower's binders  *)
 (* through every U-mode form below.  UexecExecInst.v supplies the one      *)
 (* instance.                                                               *)
+(*                                                                         *)
+(* The first argument is the RECURSIVE OCCURRENCE (header): the family is  *)
+(* applied to the fixpoint variable inside [uexec_ret_x_F] and to          *)
+(* [uslot_x] everywhere a receipt reads the arm back.  [xbundle_cong] is   *)
+(* the key congruence the trap route needs: the bundle reads only the      *)
+(* image, trapframe argument 1 and the descriptor view off its key, and   *)
+(* the key the loop traps at differs from the dispatcher's by the epc     *)
+(* bump alone.                                                             *)
 (* ===================================================================== *)
 Class uexecXG (Σ : gFunctors) := {
-  xbundle : uvis -> iProp Σ
+  xbundle : (uvis -d> iPropO Σ) -> uvis -> iProp Σ;
+  xbundle_ne : forall n, Proper (dist n ==> eq ==> dist n) xbundle;
+  xbundle_cong : forall (X : uvis -d> iPropO Σ) (W W' : uvis),
+    uvis_M W = uvis_M W' ->
+    tf_w (uvis_tf W) (tf_arg_idx 1) = tf_w (uvis_tf W') (tf_arg_idx 1) ->
+    uvis_fd W = uvis_fd W' ->
+    xbundle X W ⊣⊢ xbundle X W'
 }.
+Global Existing Instance xbundle_ne.
 
 Section UexecRetExec.
   Context `{!riscvGS Σ}.
@@ -131,7 +153,8 @@ Section UexecRetExec.
   (* (A) what user execution hands back, at the fixpoint variable [X].
      The difference from [UexecRet.uexec_ret_F], and there is exactly one:
      the returning-syscall arm splits [USYS_exec] off, and there the arm
-     is [xbundle W ∗ <the generic arm verbatim>]. *)
+     is [xbundle X W ∗ <the generic arm verbatim>], the family at the
+     fixpoint variable. *)
   Definition uexec_ret_x_F (X : uvis -d> iPropO Σ) (sc : mword 64) (W : uvis)
       : iProp Σ :=
     (if decide (sc = uecall_scause) then
@@ -157,7 +180,7 @@ Section UexecRetExec.
             resumes); on failure the arm fires at [UsysMemOk]'s exec row,
             which pins [r = -1] and leaves the image, the map and the
             break where they were. *)
-         (xbundle W ∗
+         (xbundle X W ∗
           (∀ (r : mword 64) (M' : gmap Z (bv 8))
              (π' : gmap (mword 27) uperm) (szv' : Z) (fdv' : list fdstate),
              ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W)
@@ -447,7 +470,7 @@ Section UexecRetExec.
      both halves at the one key it is at. *)
   Lemma uexec_ret_x_of_bundle (sc : mword 64) (W : uvis) :
     □ (∀ W' : uvis, uslot W' -∗ uslot_x W') -∗
-    xbundle W -∗
+    xbundle uslot_x W -∗
     uexec_ret sc W -∗
     uexec_ret_x sc W.
   Proof.
@@ -513,7 +536,7 @@ Section UexecRetExec.
     sc = uecall_scause ->
     usys_num (uvis_tf W) = USYS_exec ->
     uexec_ret_x sc W ⊣⊢
-    (xbundle W ∗
+    (xbundle uslot_x W ∗
      (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm)
         (szv' : Z) (fdv' : list fdstate),
         ⌜usys_mem_ok (usys_num (uvis_tf W)) (uvis_tf W) r (uvis_M W)

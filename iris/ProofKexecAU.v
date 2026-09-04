@@ -604,7 +604,7 @@ Section KexecAUExit.
   (* the plug below +0x090: phase A returns nothing but [-1]. *)
   Definition kxau_QF : mword 64 -> ustate -> Prop := fun _ _ => False.
 
-  Lemma kxau_close_fail `{CIDx : CpuId}
+  Lemma kxau_close_fail `{CIDx : CpuId} (Sl : uvis -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (gf : gname) (pj : mword 64) (pidv : mword 32) (U : ustate)
@@ -615,10 +615,10 @@ Section KexecAUExit.
       (plen : nat) (pv : mword 64) (dqpv : dfrac) (pfun : nat -> bv 8)
       (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64) (dqas : dfrac) :
     kxau_ret (CID := CIDx)
-      (SpecKexecAU.exec_arms ΓL fsc_fs P Pmiss Φo na alen afun sts U)
+      (SpecKexecAU.exec_arms Sl ΓL fsc_fs P Pmiss Φo na alen afun sts U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
-    SpecKexecAU.exec_post_fail ΓL fsc_fs P Pmiss Φo na alen afun sts -∗
+    SpecKexecAU.exec_post_fail Sl ΓL fsc_fs P Pmiss Φo na alen afun sts -∗
     KexecOkQ.kexec_closer (CID := CIDx)
       kxau_QF (fun _ : KexecOkQ.kxf_cause => Logic.True)
       gf fsc_kalloc pj pidv U m ret_tgt K b eb lks dqb dqs fsc_bmapstart
@@ -641,7 +641,7 @@ Section KexecAUExit.
   (* ------------------------------------------------------------------ *)
   (*  CONVERSION 2: everything past +0x090, at the RECEIPT.               *)
   (* ------------------------------------------------------------------ *)
-  Lemma kxau_close `{CIDx : CpuId}
+  Lemma kxau_close `{CIDx : CpuId} (Sl : uvis -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (pl : list (bv 8)) (zi : Z)
@@ -658,10 +658,10 @@ Section KexecAUExit.
     length (pv_tf (us_V U)) = TFWORDS ->
     (na <= MAXARG)%nat ->
     kxau_ret (CID := CIDx)
-      (SpecKexecAU.exec_arms ΓL fsc_fs P Pmiss Φo na alen afun sts U)
+      (SpecKexecAU.exec_arms Sl ΓL fsc_fs P Pmiss Φo na alen afun sts U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
-    PA.kxa_receipt P Φo (length (path_elems pl)) zi na alen afun sts dn bm datl -∗
+    PA.kxa_receipt Sl P Φo (length (path_elems pl)) zi na alen afun sts dn bm datl -∗
     KexecOkQ.kexec_closer (CID := CIDx)
       (KexecAUBridge.exec_built_Q (kxc_fb datl dn) ef na alen afun)
       (kxau_QFp (kxc_fb datl dn) na alen)
@@ -787,6 +787,7 @@ Section KexecAUMain.
   Notation ΓL := (FsBytesGamma.fs_gamma_L fsc_fs).
 
   Lemma wp_kexec_au
+      (Sl : uvis -> iProp Σ)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gf : gname)
@@ -799,7 +800,7 @@ Section KexecAUMain.
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ) :
-    SpecKexecAU.wp_kexec_au_body gs jp gl pd pav pu gf plen pfun na avf alen
+    SpecKexecAU.wp_kexec_au_body Sl gs jp gl pd pav pu gf plen pfun na avf alen
       aslen afun pidv U sts dqb dqs dqa dqpv dqas m K eb b lks P Pmiss Φo.
   Proof.
     rewrite /SpecKexecAU.wp_kexec_au_body /SpecKexecAU.wp_kexec_au_frame.
@@ -827,7 +828,7 @@ Section KexecAUMain.
     (* ---- THE EXIT, NAMED.  [kxau_ret] IS the contract's continuation. ---- *)
     iAssert (wp_next true (proc_addr jp) (fun CID : CpuId =>
                kxau_ret (CID := CID)
-                 (SpecKexecAU.exec_arms ΓL fsc_fs P Pmiss Φo na alen afun sts U)
+                 (SpecKexecAU.exec_arms Sl ΓL fsc_fs P Pmiss Φo na alen afun sts U)
                  gf fsc_kalloc (proc_addr jp) pidv m
                  (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs fsc_bmapstart
                  na plen (m !!! Regidx Ra0) dqpv pfun (m !!! Regidx Ra1) dqa
@@ -836,7 +837,7 @@ Section KexecAUMain.
     (* ---- PHASE A: +0x000 .. +0x090, and two of the eight [bad:] tails.
        [Q := False] below +0x090: phase A allocates nothing, so its own
        tails only ever prove [kexec_ok_q]'s FAILURE arm. ---- *)
-    iApply (PA.kxc_phaseA_au (CID0 := CID0) kxau_QF
+    iApply (PA.kxc_phaseA_au (CID0 := CID0) Sl kxau_QF
               (fun _ : KexecOkQ.kxf_cause => Logic.True)
               gs jp gl pd pav pu gf
               plen pfun na avf alen aslen afun pidv U sts dqb dqs dqa dqpv dqas
@@ -852,7 +853,7 @@ Section KexecAUMain.
                     Hins Hbits Hpriv Hpath Hargv Hargs Hbs Hirs Hcont [] []").
     { (* arms (i) and (ii): the refund rides straight into [exec_arms] *)
       iModIntro. iIntros (CX) "HK Hfail".
-      iApply (kxau_close_fail (CIDx := CX) P Pmiss Φo gf (proc_addr jp) pidv U
+      iApply (kxau_close_fail (CIDx := CX) Sl P Pmiss Φo gf (proc_addr jp) pidv U
                 sts m (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs na alen
                 aslen afun plen (m !!! Regidx Ra0) dqpv pfun (m !!! Regidx Ra1)
                 dqa avf dqas with "HK Hfail"). }
@@ -879,7 +880,7 @@ Section KexecAUMain.
                       (m !!! Regidx Ra1) dqa avf aslen dqas afun)
                  _ with "[] Hrcpt Hcont") as "Hcont".
     { iIntros (CX) "HK HR".
-      iApply (kxau_close (CIDx := CX) P Pmiss Φo (bview plen pfun) zi dnf bmf
+      iApply (kxau_close (CIDx := CX) Sl P Pmiss Φo (bview plen pfun) zi dnf bmf
                 datl ef gf (proc_addr jp) pidv U sts m
                 (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs na alen aslen afun
                 plen (m !!! Regidx Ra0) dqpv pfun (m !!! Regidx Ra1) dqa avf dqas

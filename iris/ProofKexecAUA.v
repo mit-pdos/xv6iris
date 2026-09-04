@@ -132,6 +132,7 @@ Require SpecSysOpenAU.   (* [open_walk_pre_era] / [open_walk_dead_era]
 Require FsAbsOpenFire.   (* [opf_start_of_open], [opf_open_fire],
                             [opf_era_file_row]                       *)
 Require SpecKexecAU.     (* the contract this lane serves            *)
+Require UexecSlot.       (* [uvis] -- the slot predicate's key type  *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -769,7 +770,7 @@ Section KexecAUAMain.
   (*  because kexec does not test it: a directory whose first sixty-four   *)
   (*  bytes parsed as an ELF header would reach +0x090 too.                *)
   (* =================================================================== *)
-  Definition kxa_receipt (P : nat -> Z -> iProp Σ)
+  Definition kxa_receipt (Sl : UexecSlot.uvis -> iProp Σ) (P : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (L : nat) (zi : Z)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
@@ -784,31 +785,32 @@ Section KexecAUAMain.
                     (fn_nlink (FsStateEra.era_node dn bm data))⌝ ∗
        Φo av zi (abs_of (FsStateEra.era_node dn bm data)) ∗
        P L zi ∗
-       SpecKexecAU.exec_slot_pre Φo na alen afun sts)%I.
+       SpecKexecAU.exec_slot_pre Sl Φo na alen afun sts)%I.
 
   (* the +0x090 row, and the [bad:] tails' row, are the same receipt: the
      buffer [ef] plays no part in it (the header claim was the only thing
      that had to be re-read at the buffer). *)
-  Definition kxa_receipt_x (P : nat -> Z -> iProp Σ)
+  Definition kxa_receipt_x (Sl : UexecSlot.uvis -> iProp Σ) (P : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (L : nat) (zi : Z)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (ef : nat -> bv 8)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) : iProp Σ :=
-    kxa_receipt P Φo L zi na alen afun sts dn bm data.
+    kxa_receipt Sl P Φo L zi na alen afun sts dn bm data.
 
   (* ---- the two refund shapes, assembled ------------------------------ *)
 
   (* arm (ii): the walk died, nothing was observed, both the commit and the
      slot premise come home beside the era refund. *)
-  Lemma kxa_fail_dead (γ : FsBlocks.fs_names) (P Pmiss : nat -> Z -> iProp Σ)
+  Lemma kxa_fail_dead (Sl : UexecSlot.uvis -> iProp Σ)
+      (γ : FsBlocks.fs_names) (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (pl : list (bv 8)) :
     SpecSysOpenAU.open_walk_dead_era γ P Pmiss pl
       ∗ (SpecSysOpenAU.aopen_commit_at (FsBytesGamma.fs_gamma_L γ) fsabsE Φo
-         ∗ SpecKexecAU.exec_slot_pre Φo na alen afun sts) -∗
-    SpecKexecAU.exec_post_fail (FsBytesGamma.fs_gamma_L γ) γ P Pmiss Φo na alen afun sts.
+         ∗ SpecKexecAU.exec_slot_pre Sl Φo na alen afun sts) -∗
+    SpecKexecAU.exec_post_fail Sl (FsBytesGamma.fs_gamma_L γ) γ P Pmiss Φo na alen afun sts.
   Proof.
     iIntros "(Hd & Hoc & Hsl)". rewrite /SpecKexecAU.exec_post_fail.
     iRight. iExists pl. iLeft. iFrame "Hd Hoc Hsl".
@@ -919,7 +921,8 @@ Section KexecAUAMain.
 
   (* arm (iii): the observation HAPPENED and exec failed past the lock, and
      the cause is [EfNotLoadable] on the nose. *)
-  Lemma kxa_fail_obs (γ : FsBlocks.fs_names) (P Pmiss : nat -> Z -> iProp Σ)
+  Lemma kxa_fail_obs (Sl : UexecSlot.uvis -> iProp Σ)
+      (γ : FsBlocks.fs_names) (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (L : nat) (zi : Z)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
@@ -928,8 +931,8 @@ Section KexecAUAMain.
       (ef : nat -> bv 8) :
     L = length (path_elems pl) ->
     LA.kxc_bad_cause dn ef data ->
-    kxa_receipt P Φo L zi na alen afun sts dn bm data -∗
-    SpecKexecAU.exec_post_fail (FsBytesGamma.fs_gamma_L γ) γ P Pmiss Φo na alen afun sts.
+    kxa_receipt Sl P Φo L zi na alen afun sts dn bm data -∗
+    SpecKexecAU.exec_post_fail Sl (FsBytesGamma.fs_gamma_L γ) γ P Pmiss Φo na alen afun sts.
   Proof.
     intros HL Hbad. iIntros "H". rewrite /kxa_receipt.
     iDestruct "H" as (av) "(%Hav & %Hrow & HΦ & HP & Hsl)".
@@ -981,6 +984,7 @@ Section KexecAUAMain.
   Qed.
 
   Lemma kxc_phaseA_au
+      (Sl : UexecSlot.uvis -> iProp Σ)
       (Q : mword 64 -> ustate -> Prop)
       (QF : KexecOkQ.kxf_cause -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
@@ -1038,7 +1042,7 @@ Section KexecAUAMain.
        hands the caller's receipt out. ==== *)
     SpecSysOpenAU.open_walk_pre_era fsc_fs P Pmiss -∗
     SpecSysOpenAU.aopen_commit_at ΓL fsabsE Φo -∗
-    SpecKexecAU.exec_slot_pre Φo na alen afun sts -∗
+    SpecKexecAU.exec_slot_pre Sl Φo na alen afun sts -∗
     kalloc_env fsc_kalloc None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
@@ -1055,7 +1059,7 @@ Section KexecAUAMain.
     wp_next true (proc_addr jp) KEX -∗
     □ (∀ CX : CpuId,
        KEX CX -∗
-       SpecKexecAU.exec_post_fail ΓL fsc_fs P Pmiss Φo na alen afun sts -∗
+       SpecKexecAU.exec_post_fail Sl ΓL fsc_fs P Pmiss Φo na alen afun sts -∗
       KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
            eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
@@ -1117,7 +1121,7 @@ Section KexecAUAMain.
            [zi] is existential here for the same reason the landed exit's
            [kf] is: phase A found it, nothing above named it. ==== *)
         (∃ zi : Z,
-           kxa_receipt P Φo (length (path_elems (bview plen pfun))) zi
+           kxa_receipt Sl P Φo (length (path_elems (bview plen pfun))) zi
                        na alen afun sts dnf bmf datl) -∗
         kxc_frameA6x sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) ef -∗
         wp_next (CID0 := CID) true (proc_addr jp) KEX -∗
@@ -1135,8 +1139,8 @@ Section KexecAUAMain.
     iDestruct (ireg_inv_ftop with "Hireg") as "#Hftop".
     iApply (kxc_a1_au (CID0 := CID0) Q QF P Pmiss
               (SpecSysOpenAU.aopen_commit_at ΓL fsabsE Φo
-                 ∗ SpecKexecAU.exec_slot_pre Φo na alen afun sts)%I
-              (SpecKexecAU.exec_post_fail ΓL fsc_fs P Pmiss Φo na alen afun sts)
+                 ∗ SpecKexecAU.exec_slot_pre Sl Φo na alen afun sts)%I
+              (SpecKexecAU.exec_post_fail Sl ΓL fsc_fs P Pmiss Φo na alen afun sts)
               gs jp gl pd pav pu gf
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m K eb b lks sp0 ra0 s00 s10 s20 pv av KEX
@@ -1147,7 +1151,7 @@ Section KexecAUAMain.
                     Hpath Hargv Hargs Hbs Hirs Hwp [$Hoc $Hsl] [] Hcont Hkw
                     [Hcont90]").
     { (* arm (ii) *)
-      iIntros "H". iApply (kxa_fail_dead fsc_fs P Pmiss Φo na alen afun sts
+      iIntros "H". iApply (kxa_fail_dead Sl fsc_fs P Pmiss Φo na alen afun sts
                              (bview plen pfun) with "H"). }
     (* ---- the seam at +0x032: [kxc_a2_r] takes it, at the receipt ---- *)
     iIntros (CIDs Hss M32 ipv zi n1) "HP [Hoc Hsl] Hseam Hexit".
@@ -1156,9 +1160,9 @@ Section KexecAUAMain.
     iApply (LA.kxc_a2_r (CID0 := CIDs) Q QF gs jp gl pd pav pu gf
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1
-              (kxa_receipt P Φo (length (path_elems (bview plen pfun))) zi
+              (kxa_receipt Sl P Φo (length (path_elems (bview plen pfun))) zi
                            na alen afun sts)
-              (kxa_receipt_x P Φo (length (path_elems (bview plen pfun))) zi
+              (kxa_receipt_x Sl P Φo (length (path_elems (bview plen pfun))) zi
                              na alen afun sts)
               KEX
               Hqf HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
@@ -1185,7 +1189,7 @@ Section KexecAUAMain.
          discharged from the tail's own pure fact and the receipt's row. *)
       iIntros "!>" (CX dn bm data ef) "%Hbad HK HR".
       iApply ("Hkw" $! CX with "HK").
-      iApply (kxa_fail_obs fsc_fs P Pmiss Φo _ zi na alen afun sts
+      iApply (kxa_fail_obs Sl fsc_fs P Pmiss Φo _ zi na alen afun sts
                 (bview plen pfun) dn bm data ef ltac:(reflexivity) Hbad
                 with "HR"). }
     (* ---- and the +0x090 exit: [kxc_phaseA]'s rows, plus the receipt ---- *)

@@ -2,9 +2,13 @@
    payload family: [UexecRetExec.uexecXG] at [SpecSysExecAU]'s AU bundle.
 
    UexecRetExec.v states the enriched U-mode trap contract over an ambient
-   class [uexecXG Σ] whose one field [xbundle : uvis -> iProp Σ] says what
-   the program hands over at its exec ecall; the class is what keeps the
-   whole U-mode fixpoint's cone clear of the fs tower.  THIS file is where
+   class [uexecXG Σ] whose payload field
+   [xbundle : (uvis -d> iPropO Σ) -> uvis -> iProp Σ] says what the
+   program hands over at its exec ecall, AT THE RECURSIVE OCCURRENCE: the
+   bundle's slot wand concludes at the fixpoint variable, so at the
+   fixpoint it concludes at [uslot_x] -- the enriched slot the kernel
+   returns for the new process.  The class is what keeps the whole
+   U-mode fixpoint's cone clear of the fs tower.  THIS file is where
    the two meet, and it is deliberately a LEAF beside SpecSysExecAU.v (the
    spec it names) rather than anything the U-mode engine requires.
 
@@ -26,6 +30,10 @@
    EXISTENTIAL here: the U-mode contract cannot name the caller's era
    predicates, so the arm says only "some AU bundle at this key", and the
    dispatch route re-binds them when it consumes the bundle.
+
+   The class's two proof fields are paid here from SpecKexecAU's and
+   SpecSysExecAU's own [_ne] lemmas (the slot predicate sits under wands
+   and ∀/∃ only) and from the key congruence of the three projections.
 
    [Γ] and [γfs] are NOT existential: the whole tree runs at the single
    ambient file system ([FsCfg.fsc_fs] with the derived view names
@@ -97,23 +105,47 @@ Section UexecExecInst.
             !irefslotG Σ, !pavG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
 
-  (* what the program hands over at its exec ecall, at the trapping key *)
-  Definition exec_xbundle (W : uvis) : iProp Σ :=
+  (* what the program hands over at its exec ecall, at the trapping key
+     [W]; the bundle's slot wand concludes at [X], the recursive
+     occurrence (header, and UexecRetExec.v's) *)
+  Definition exec_xbundle (X : uvis -d> iPropO Σ) (W : uvis) : iProp Σ :=
     (∃ (P Pmiss : nat -> Z -> iProp Σ)
        (Φo : aview -> Z -> anode -> iProp Σ),
-       sys_exec_au_pre (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo
+       sys_exec_au_pre X (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo
          (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W))%I.
 
+  Lemma exec_xbundle_ne (n : nat) :
+    Proper (dist n ==> eq ==> dist n) exec_xbundle.
+  Proof.
+    intros X Y HXY W ? <-. rewrite /exec_xbundle.
+    apply bi.exist_ne; intros P. apply bi.exist_ne; intros Pmiss.
+    apply bi.exist_ne; intros Φo.
+    exact (sys_exec_au_pre_ne n X Y (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo
+             (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) HXY).
+  Qed.
+
+  Lemma exec_xbundle_cong (X : uvis -d> iPropO Σ) (W W' : uvis) :
+    uvis_M W = uvis_M W' ->
+    tf_w (uvis_tf W) (tf_arg_idx 1) = tf_w (uvis_tf W') (tf_arg_idx 1) ->
+    uvis_fd W = uvis_fd W' ->
+    exec_xbundle X W ⊣⊢ exec_xbundle X W'.
+  Proof.
+    intros HM Hav Hfd. rewrite /exec_xbundle HM Hav Hfd. reflexivity.
+  Qed.
+
   Global Instance uexecXG_sysexec : uexecXG Σ :=
-    {| xbundle := exec_xbundle |}.
+    {| xbundle := exec_xbundle;
+       xbundle_ne := exec_xbundle_ne;
+       xbundle_cong := exec_xbundle_cong |}.
 
   (* the intro: a caller holding a CONCRETE bundle -- its own era
      predicates, its own observation -- has the arm's payload *)
-  Lemma xbundle_intro (W : uvis) (P Pmiss : nat -> Z -> iProp Σ)
+  Lemma xbundle_intro (X : uvis -d> iPropO Σ) (W : uvis)
+      (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ) :
-    sys_exec_au_pre (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo
+    sys_exec_au_pre X (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) -∗
-    xbundle W.
+    xbundle X W.
   Proof.
     iIntros "H". rewrite /xbundle /= /exec_xbundle.
     iExists P, Pmiss, Φo. iExact "H".
@@ -121,11 +153,11 @@ Section UexecExecInst.
 
   (* ...and the elim, the shape the dispatch route (stage E2) reads the
      bundle back at *)
-  Lemma xbundle_elim (W : uvis) :
-    xbundle W -∗
+  Lemma xbundle_elim (X : uvis -d> iPropO Σ) (W : uvis) :
+    xbundle X W -∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ),
-      sys_exec_au_pre (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo
+      sys_exec_au_pre X (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo
         (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W).
   Proof. iIntros "H". rewrite /xbundle /= /exec_xbundle. iExact "H". Qed.
 

@@ -386,7 +386,8 @@ Require Import SpecSyscall.
    [Typeclasses Opaque], so they are imported here directly. *)
 Require Import SpecKexecAU.      (* [exec_post_ok], [exec_key], [kexec_ok_exec] *)
 Require Import SpecSysExecAU.    (* [SYSEXEC_AU], [sys_exec_arms]              *)
-Require Import UexecExecInst.    (* [exec_xbundle]                              *)
+Require Import UexecExecInst.    (* [xbundle_elim]                              *)
+Require Import UexecRetExec.     (* [uslot_x] -- the slot the exec channel returns *)
 Require Import UexecSlot UexecRet UserPerm FsBytesGamma.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -2756,18 +2757,19 @@ Section SyscallArms.
 
   (* the bundle, opened at the arm: [exec_xbundle] is stated at the trapping
      key's own projections, which at the dispatcher's record are the image,
-     trapframe argument 1 and the descriptor view it holds *)
+     trapframe argument 1 and the descriptor view it holds; its slot wand
+     concludes at [uslot_x], the slot the channel returns *)
   Lemma sysc_exec_in_open (U : ustate) (sts : list fdstate) (v1 : mword 64) :
     sysc_num (us_V U) = 7 ->
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     sysc_exec_in true U sts -∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : gmap Z FsAbs.anode -> Z -> FsAbs.anode -> iProp Σ),
-      sys_exec_au_pre (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo (us_M U) v1 sts.
+      sys_exec_au_pre uslot_x (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo (us_M U) v1 sts.
   Proof.
     intros Hn Hv1. rewrite /sysc_exec_in. iIntros "H".
     iDestruct ("H" with "[%]") as "H"; [exact Hn |].
-    rewrite /exec_xbundle. iDestruct "H" as (P Pmiss Φo) "H".
+    iDestruct (xbundle_elim with "H") as (P Pmiss Φo) "H".
     iExists P, Pmiss, Φo.
     rewrite /uvis_of /tf_w. cbn [uvis_M uvis_tf uvis_fd].
     rewrite (list_lookup_total_correct _ _ _ Hv1). iExact "H".
@@ -3914,7 +3916,7 @@ Section SyscallArms.
        opened here. ---- *)
     iDestruct (sysc_exec_in_open U sts v1 ltac:(rewrite Hnum; reflexivity) Hv1
                  with "Hxin") as (P Pmiss Φo) "Hau".
-    iApply (SysExecAU.wp_sys_exec_au γf γs j γl
+    iApply (SysExecAU.wp_sys_exec_au uslot_x γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded v0 v1 pid U sts M (av - 4)%nat true true lks
               P Pmiss Φo

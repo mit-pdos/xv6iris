@@ -136,14 +136,14 @@ Section SysExecAUBridge.
   Implicit Types Γ : fs_view_names Σ.
 
   (* (1) the caller's WP, instantiated at the vector the walk built *)
-  Lemma sys_exec_au_pre_at Γ (γfs : fs_names)
+  Lemma sys_exec_au_pre_at (S : uvis -> iProp Σ) Γ (γfs : fs_names)
       (Pw Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Mim : gmap Z (bv 8)) (avp : mword 64) (sts : list fdstate)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
     exec_args_shape na alen afun ->
-    sys_exec_au_pre Γ γfs Pw Pmiss Φo Mim avp sts -∗
-    exec_au_pre Γ γfs Pw Pmiss Φo na alen afun sts.
+    sys_exec_au_pre S Γ γfs Pw Pmiss Φo Mim avp sts -∗
+    exec_au_pre S Γ γfs Pw Pmiss Φo na alen afun sts.
   Proof.
     intro Hsh. rewrite /sys_exec_au_pre /exec_au_pre /sys_exec_slot_pre.
     iIntros "(Hera & Hcom & Hslot)".
@@ -156,13 +156,13 @@ Section SysExecAUBridge.
      same private block carry the same arm.  Stated on the equation rather
      than on [MkUstate] so both call sites -- the walk's [us_upt _ _] and
      the contract's [MkUstate _ _] -- fit it. *)
-  Lemma exec_post_ok_V Γ (Pw : nat -> Z -> iProp Σ)
+  Lemma exec_post_ok_V (S : uvis -> iProp Σ) Γ (Pw : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (U1 U2 U' : ustate) (r : mword 64) :
     us_V U1 = us_V U2 ->
-    exec_post_ok Γ Pw Φo na alen afun sts U1 U' r -∗
-    exec_post_ok Γ Pw Φo na alen afun sts U2 U' r.
+    exec_post_ok S Γ Pw Φo na alen afun sts U1 U' r -∗
+    exec_post_ok S Γ Pw Φo na alen afun sts U2 U' r.
   Proof.
     intro HV. rewrite /exec_post_ok HV. iIntros "H". iExact "H".
   Qed.
@@ -216,6 +216,7 @@ Section SysExecBreakAU.
 
 
   Lemma sx_break_au `{CID0 : CpuId} `{XI : CurCtx}
+      (S : uvis -> iProp Σ)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
       (γf : gname)
@@ -257,7 +258,7 @@ Section SysExecBreakAU.
     (* the caller's bundle, still quantified over every argument vector of
        the right shape: the instantiation happens below, at the vector the
        fill loop actually built. *)
-    sys_exec_au_pre (fs_gamma_L fsc_fs) fsc_fs Pw Pmiss Φo Mim avp sts -∗
+    sys_exec_au_pre S (fs_gamma_L fsc_fs) fsc_fs Pw Pmiss Φo Mim avp sts -∗
     sx_body γf jp pid U K eb b lks sp0 m plen pfun rest uav
             M P i pg alen afun (mword_of_int (SX + 0xb6) : mword 64) -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
@@ -270,7 +271,7 @@ Section SysExecBreakAU.
         (* the armed post, at the block the copy-ins left and the returned
            a0; [exec_arms_landed] turns it back into the landed
            [kexec_ok] whenever a caller wants that instead. *)
-        exec_arms (fs_gamma_L fsc_fs) fsc_fs Pw Pmiss Φo i alen afun sts
+        exec_arms S (fs_gamma_L fsc_fs) fsc_fs Pw Pmiss Φo i alen afun sts
                   (us_upt U P) U' (mf !!! Regidx Ra0) -∗
         (* the shape the walk established, which the composition needs to
            name the vector in [sys_exec_arms] *)
@@ -303,7 +304,7 @@ Section SysExecBreakAU.
       - unfold MAXARG. lia.
       - intros j Hj. exact (proj2 (proj2 (proj2 (Hok j Hj)))).
       - intros j Hj. pose proof (proj1 (proj2 (proj2 (Hok j Hj)))). lia. }
-    iDestruct (sys_exec_au_pre_at (fs_gamma_L fsc_fs) fsc_fs Pw Pmiss Φo
+    iDestruct (sys_exec_au_pre_at S (fs_gamma_L fsc_fs) fsc_fs Pw Pmiss Φo
                  Mim avp sts i alen afun Hshape with "Hau") as "Hau".
     iDestruct (sx_carry_open sp0 m plen pfun rest with "Hcarry")
       as "(Hf1 & Hf2 & Hspill & F10 & Hpb & Hps)".
@@ -449,7 +450,7 @@ Section SysExecBreakAU.
     iEval (rewrite -HN6a0) in "Hpb".
     iDestruct (cpu_own_transport CID0 CID7 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (KX.wp_kexec_au gs jp gl pd pav pu γf
+    iApply (KX.wp_kexec_au S gs jp gl pd pav pu γf
               plen pfun i (sx_avf pg i) alen (fun _ => 4096%nat) afun
               pid (us_upt U P) sts dqb dqs (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
               N6 (K - 60)%nat eb b lks Pw Pmiss Φo
@@ -565,6 +566,7 @@ Section SysExecWhole.
   Qed.
 
   Lemma wp_sys_exec_au
+      (S : uvis -> iProp Σ)
       (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -575,7 +577,7 @@ Section SysExecWhole.
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ) :
-      wp_sys_exec_au_body γf gs j gl pd pav pu dqb dqs v0 v1 pid U sts
+      wp_sys_exec_au_body S γf gs j gl pd pav pu dqb dqs v0 v1 pid U sts
         m K eb b lks P Pmiss Φo.
   Proof.
     cbv beta zeta delta [wp_sys_exec_au_body].
@@ -665,7 +667,7 @@ Section SysExecWhole.
               with "Htext Hka Hbody").
     iIntros (CID3 Hq3 M3 P3 i3 pg3 al3 af3) "[Hbrk | Hbad]".
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
-      iApply (sx_break_au (CID0 := CID3) gs j gl pd pav pu γf
+      iApply (sx_break_au (CID0 := CID3) S gs j gl pd pav pu γf
                 dqb dqs pid U K true true ∅ sp0 m plen pfun rst v59
                 M3 P3 i3 pg3 al3 af3 sts (us_M U) v1 P Pmiss Φo
                 HK Hlb eq_refl Hplen Hpcstr Halp Hroot Hnib0
@@ -696,7 +698,7 @@ Section SysExecWhole.
              (header, seam 2). *)
           iRight. iExists i3, al3, af3.
           iSplitR; [iPureIntro; exact Hshape |].
-          iApply (exec_post_ok_V (fs_gamma_L fsc_fs) P Φo i3 al3 af3 sts
+          iApply (exec_post_ok_V S (fs_gamma_L fsc_fs) P Φo i3 al3 af3 sts
                     (us_upt U P3)
                     (MkUstate (upd_upt (us_V U) P3) (us_M U))
                     Ubk (mf !!! Regidx Ra0 : mword 64) eq_refl with "Hok"). }
