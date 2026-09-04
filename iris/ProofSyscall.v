@@ -1073,7 +1073,20 @@ Section SyscallVocab.
     iDestruct (FsReady.fs_ready_kalloc with "Hrdy") as "#Hkalloc".
     iDestruct (FsReady.fs_ready_printk with "Hrdy") as "[#Hpr _]".
     iExists γp, γw, γft, γtk.
-    iFrame "Hkalloc Hnextpid Hpav Hwaitlk Hftable Htick Hpr Hfs".
+    (* built, not framed: every row is a definition-valued abstraction
+       ([is_lock], [is_ftable], [printk_env], [sysc_fs_env]), so each of the
+       eight names walked the goal and every attempt against one of them was
+       a conversion.  All eight are persistent, so each row is [iSplitR] +
+       [iExact] (claude-notes/optimization.md, "when every conjunct is
+       definition-valued ... build the WHOLE bundle"). *)
+    iSplitR; [iExact "Hkalloc"|].
+    iSplitR; [iExact "Hnextpid"|].
+    iSplitR; [iExact "Hpav"|].
+    iSplitR; [iExact "Hwaitlk"|].
+    iSplitR; [iExact "Hftable"|].
+    iSplitR; [iExact "Htick"|].
+    iSplitR; [iExact "Hpr"|].
+    iExact "Hfs".
   Qed.
 
   (* [SpecKexec.fs_fabric], re-assembled: the thirteen persistent resources

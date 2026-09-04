@@ -286,9 +286,17 @@ Section ProofKforkB5.
             with "Hrun Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirsp]")
       as "[Hrun Hpctx]".
-    { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirsp".
+    (* built in [park_child]'s own conjunct order rather than framed: its
+       third row is [proc_priv], whose tail is the 4096-element [tf_page],
+       so every name the frame walks past it pays a conversion
+       (claude-notes/optimization.md, "a rebuild is a construction"). *)
+    { rewrite /park_child.
+      iSplitL "Hks"; [iExact "Hks"|].
       (* the two files each define forkret's entry; the constants are equal *)
-      iExact "Hctx". }
+      iSplitL "Hctx"; [iExact "Hctx"|].
+      iSplitL "Hpriv"; [iExact "Hpriv"|].
+      iSplitL "Hfd"; [iExact "Hfd"|].
+      iExact "Hirsp". }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct "Hheld" as "(Htok & Hpstcell & Hpwhole & Hpchan & Hppub)".
     iEval (rewrite kfkb5_pwhole_used) in "Hpwhole".

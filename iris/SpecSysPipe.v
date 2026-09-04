@@ -240,11 +240,18 @@ Section SpecSysPipe.
     rewrite /sys_pipe_post /fd_frags_any.
     iIntros "[[(%Hr & Hp & Hb) | (%fd0 & %fd1 & %l & %k0 & %k1 & %Hpu & Hp & Hb)]
               [Hu0 Hu1]]".
-    - iFrame "Hu0 Hu1". iSplitR "Hb"; [| by iExists sts].
-      iLeft. by iFrame "Hp".
-    - iFrame "Hu0 Hu1". iSplitR "Hb";
-        [| by iExists (<[fd1 := FdOpen false true FdPipe]>
-                         (<[fd0 := FdOpen true false FdPipe]> sts))].
+    (* split the big disjunct off FIRST: [iFrame "Hu0 Hu1"] walks past it and
+       past [fd_frags_any] once per name (claude-notes/optimization.md, "the
+       cheapest fix is usually to split the big conjunct off first"). *)
+    - iSplitR "Hu0 Hu1 Hb".
+      { iLeft. by iFrame "Hp". }
+      iSplitL "Hb"; [by iExists sts|].
+      iSplitL "Hu0"; [iExact "Hu0"|]. iExact "Hu1".
+    - iSplitR "Hu0 Hu1 Hb"; last first.
+      { iSplitL "Hb";
+          [by iExists (<[fd1 := FdOpen false true FdPipe]>
+                         (<[fd0 := FdOpen true false FdPipe]> sts))|].
+        iSplitL "Hu0"; [iExact "Hu0"|]. iExact "Hu1". }
       iRight. iExists fd0, fd1, l, k0, k1. iFrame "Hp". iPureIntro.
       destruct Hpu as (H1 & H2 & H3 & _ & _). exact (conj H1 (conj H2 H3)).
   Qed.
