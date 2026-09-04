@@ -145,17 +145,22 @@
        and [a1] are the vector's address and [a0] is [argc] -- so
        main's [argv] is exactly that vector, which is what a slot
        constructor reads off the key through [kexec_image_ok_argv];
+     - THE PERMISSIONS ([KexecBuilt.kxb_perm_ok] at [uvis_perm W']):
+       every page [uvmalloc] mapped for a PT_LOAD header carries that
+       header's X/W bits ([flags2perm]: X iff [flags & 1], W iff
+       [flags & 2] -- the pages from the previous segment's rounded end
+       up to [vaddr + memsz]), the stack page is W and not X, and the
+       guard page, mapped with U cleared, is ABSENT from the projection.
+       This is the code/data split the U-tier keys on: under the
+       non-coherent instruction cache the only pages a program may run
+       are those executable AND not writable, and a slot constructor
+       reads exactly that off this row for the text segment;
      - the descriptor view is the caller's ([sts]) and the trapframe is
        [TFWORDS] long.
-   NOT YET STATED, and deliberately named here so the follow-on is a
-   list: (d1) the PERMISSION projection [uvis_perm W'] (X on the text
-   segment's pages per the segment flags, W on the stack page, the
-   guard page's U bit cleared) -- the slot constructors
-   ([UkRun.uslot_of_urun], [USyncKernel.sync_uexec_slot]) want an X page
-   at the entry and a W stack, so (d1) is the first conjunct the sh
-   chain will ask for; (d2) the zero fill of the .bss-to-page-end tail
-   and of the guard page's reading; (d3) [p->name].  Each is a pure
-   conjunct on [W'], added without moving any shape.
+   NOT YET STATED, named so the follow-on is a list: (d2) the zero fill
+   of the .bss-to-page-end tail and of the guard page's reading; (d3)
+   [p->name].  Each is a pure conjunct on [W'], added without moving any
+   shape.
 
    ==== LOADABLE MEANS SUCCESS, MODULO MEMORY ===========================
 
@@ -259,6 +264,9 @@ Require Import ElfEnc.          (* [ELF_MAGIC]: the four bytes the code tests *)
 Require Import ElfFile.         (* [elf_bytes], [elf_wf], [elf_image],
                                    [elf_entry], [elf_loads], [elf_mem_end]  *)
 Require Import UmodeAbi.        (* [uimg_sub]                                *)
+Require Import UserPerm.        (* [uperm], [perm_of]: the permission projection *)
+Require Import KexecBuilt.      (* [kxb_perm_ok], [kexec_seg_perm], [kexec_pg]: the
+                                   permission projection kexec builds (its home) *)
 Require Import UserFd.          (* [ufdG] -- UexecRet's section binds it     *)
 Require Import UexecSlot.       (* [uvis], [uvis_of], [tf_w]                 *)
 Require Import UexecRet.        (* [uslot] -- the slot the conclusion is     *)
@@ -376,6 +384,7 @@ Definition kexec_image_ok (f : elf_bytes) (na : nat) (alen : nat -> nat)
   /\ uimg_sub (elf_image f) (uvis_M W')
   /\ kexec_args_at top alen na afun (uvis_M W')
   /\ kexec_stack_at top alen na (uvis_M W')
+  /\ kxb_perm_ok f (kexec_top f) (uvis_perm W')
   /\ uvis_fd W' = sts
   /\ length (uvis_tf W') = TFWORDS.
 
@@ -445,7 +454,23 @@ Qed.
 Lemma kexec_image_ok_fd (f : elf_bytes) (na : nat) (alen : nat -> nat)
     (afun : nat -> nat -> bv 8) (sts : list fdstate) (W' : uvis) :
   kexec_image_ok f na alen afun sts W' -> uvis_fd W' = sts.
-Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & Hfd & _). exact Hfd. Qed.
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & Hfd & _). exact Hfd. Qed.
+
+(* THE TEXT READER (header, THE PERMISSIONS): a page of PT_LOAD header
+   [i] carries that header's bits.  For sh/init the text segment is
+   R-X, so its pages read [MkUperm true false] -- executable and not
+   writable, the U-tier's definition of text. *)
+Lemma kexec_image_ok_perm (f : elf_bytes) (na : nat) (alen : nat -> nat)
+    (afun : nat -> nat -> bv 8) (sts : list fdstate) (W' : uvis)
+    (i : nat) (p : elf_phdr) (b : Z) :
+  kexec_image_ok f na alen afun sts W' ->
+  elf_loads f !! i = Some p ->
+  kexec_seg_pages (elf_loads f) i p b ->
+  uvis_perm W' !! kexec_pg b = Some (kexec_seg_perm p).
+Proof.
+  intros (_ & _ & _ & _ & _ & _ & _ & _ & (Hperm & _ & _) & _) Hi Hb.
+  exact (Hperm i p Hi b Hb).
+Qed.
 
 (* THE ARGV READER (header, THE STACK): what main sees.  [a1] is the
    vector's address; the [i]-th word of the vector, for [i < na], is the

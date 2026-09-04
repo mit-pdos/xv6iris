@@ -826,7 +826,10 @@ Section KexecBBody.
             | intros Hwk; apply uimg_sub_elf_image; intros p Hp;
               rewrite (Hnoloads Hwk) in Hp; apply elem_of_nil in Hp;
               destruct Hp
-            | intros Hwk; rewrite (Hnoloads Hwk); reflexivity]. }
+            | intros Hwk; rewrite (Hnoloads Hwk); reflexivity
+            | (* no segments, so nothing to have permissions (S6) *)
+              intros Hwk j p Hj; rewrite (Hnoloads Hwk) in Hj;
+              rewrite lookup_nil in Hj; discriminate]. }
         (* [iFrame] is NOT usable here: its [Frame] search unfolds [proc_priv]
            and the goal's big-ops, and this state carries a syscall-altitude
            block (measured: >19 GB and climbing before it was replaced).
@@ -1161,7 +1164,9 @@ Section KexecBBody.
               intros _; split;
                 [ rewrite Hu0; reflexivity
                 | intros p Hp; cbn in Hp; exfalso;
-                  exact (not_elem_of_nil p Hp) ] ]. }
+                  exact (not_elem_of_nil p Hp) ]
+            | (* ...and no page has been mapped, so no leaf is claimed (S6) *)
+              intros _; apply kxb_perm_leaves_0 ]. }
         (* [iFrame] is NOT usable here: its [Frame] search unfolds [proc_priv]
            and the goal's big-ops, and this state carries a syscall-altitude
            block (measured: >19 GB and climbing before it was replaced).

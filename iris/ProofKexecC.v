@@ -67,6 +67,7 @@ Require Import FileInvDefs.
 Require Import SpecKexec.
 Require Import UmodeAbi.     (* [uimg_sub] *)
 Require Import ElfFile.      (* [elf_bytes], [elf_image], [elf_loads] *)
+Require Import UserPerm.     (* [perm_of], [perm_leaf]: the projection (S6)  *)
 Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 Require Import KexecOkQ.
 Require Import SpecMyproc.
@@ -374,7 +375,8 @@ Section KexecCSetup.
     rewrite /kxc_at_1ae.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs6 & %HMs11) &
                          %Hal &
-                         (%HPtfp & %Hbelow & %Hcov & %Himg & %Hszr) &
+                         (%HPtfp & %Hbelow & %Hcov & %Himg & %Hszr &
+                          %Hpermsegs) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hirs & Hbm & Hins &
                          Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
@@ -1082,7 +1084,7 @@ Section KexecCSetup.
          zero fill of the pages it just mapped -- and [rsz] IS [sz1]. *)
       assert (Hszrsz : sz1 = rsz) by (rewrite /sz1; exact Hrszeq).
       iEval (rewrite <- Hszrsz) in "Hptnew".
-      destruct Hext as (Hroot' & Htfp' & _).
+      destruct Hext as (Hroot' & Htfp' & Hsubum).
       (* ---- +0x1d2: c.mv s4,a0 (s4 = sz1) ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KXC + 0x1d2)) Rs2 Ra0
                 Mu (K - 68)%nat eb ltac:(nz) ltac:(rdok)
@@ -1577,6 +1579,57 @@ Section KexecCSetup.
                    ltac:(rewrite uvm_maxsz_lit in Hmaxszv;
                          change (2 ^ 64)%Z with 18446744073709551616%Z; lia)).
         unfold PGSIZE. lia. }
+      (* ---- THE PERMISSION PROJECTION, ASSEMBLED (S6).  The segment leaves
+         rode [kxc_at_1ae] on [P]; uvmalloc only GREW the map ([uptd_ext]'s
+         submap) and uvmclear overwrote exactly the guard page, which sits at
+         [PGROUNDUP(fold)] and so above every segment.  The two new leaves
+         are the run's own: page 0 of the run is the guard (U cleared, hence
+         ABSENT from the projection) and page 1 the stack (PTE_W, hence
+         [uperm_rw]).  Every page named is MAPPED, so [perm_of] just reads
+         the leaf and the size index does not matter. ---- *)
+      pose proof (proc_pt_covered_maxsz Pfinal sz1 HwfF HcovF) as HmaxF.
+      rewrite uvm_maxsz_lit in HmaxF.
+      assert (Hpermok0 : kxb_walk_ok fb ef ->
+                kxb_perm_ok fb
+                  (UserPtTree.pgroundup (kexec_sz_after (elf_loads fb)))
+                  (perm_of Pfinal.(ud_um) (uint sz1))).
+      { intros Hwk.
+        assert (Htopeq : UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
+                         = bv_unsigned (pgroundup szv)).
+        { rewrite -(Hszr Hwk) uint_unsigned. symmetry.
+          apply kxc_pgu_bridge.
+          rewrite uvm_maxsz_lit in Hmaxszv.
+          change (2 ^ 64)%Z with 18446744073709551616%Z. lia. }
+        assert (Hkey : svpn_of (pgroundup szv)
+                       = kexec_pg (bv_unsigned (pgroundup szv)))
+          by (rewrite kexec_pg_of_word; reflexivity).
+        rewrite Hszu in HmaxF.
+        assert (Hstk : kexec_pg (bv_unsigned (pgroundup szv) + PGSIZE)
+                       = vpn_at (svpn_of (pgroundup szv)) 1).
+        { apply (kexec_pg_vpn_at szv 1);
+            [ rewrite -uvm_maxsz_lit; exact Hmaxszv
+            | unfold PGSIZE; lia
+            | unfold PGSIZE; lia ]. }
+        assert (Hstkin : vpn_at (svpn_of (pgroundup szv)) 1
+                  ∈ vpn_run (svpn_of (pgroundup szv))
+                      (uvma_np (pgroundup szv) (Y !!! Regidx Ra2))).
+        { apply elem_of_vpn_run. exists 1%nat. rewrite Hn2.
+          split; [lia | reflexivity]. }
+        destruct (Hleaf _ Hstkin) as [rstk Hrstk].
+        rewrite Htopeq /Pfinal /uptd_set /= Hvpn0eq Hkey.
+        apply (kxb_perm_ok_intro_set fb P'.(ud_um) (uint sz1)
+                 (bv_unsigned (pgroundup szv))
+                 (pte_clear_u (uvm_pte (Z.lor 4 18) rleaf))
+                 (uvm_pte (Z.lor 4 18) rstk));
+          [ lia | exact Hpground_mod | rewrite Htopeq; lia
+          | exact (kxb_perm_segs_mono fb P.(ud_um) P'.(ud_um) Hsubum
+                     (Hpermsegs Hwk))
+          | apply kxb_perm_leaf_clear_u
+          | rewrite Hstk; exact Hrstk
+          | apply kxb_perm_leaf_rw
+          | apply kexec_pg_top_stack_ne;
+              [ exact (proj1 (bv_unsigned_in_range 64 (pgroundup szv)))
+              | unfold PGSIZE; lia | exact Hpground_mod ] ]. }
       assert (Hrows0 : (kxb_walk_ok fb ef ->
                           uimg_sub (elf_image fb) (umem_grow Mi (uint sz1)))
                        /\ (kxb_walk_ok fb ef ->
@@ -1703,7 +1756,8 @@ Section KexecCSetup.
         iSplitR;
           [iPureIntro; split_and!;
              [exact Hstr0 | exact Hzero0
-              | exact (proj1 Hrows0) | exact (proj2 Hrows0)] |].
+              | exact (proj1 Hrows0) | exact (proj2 Hrows0)
+              | exact Hpermok0] |].
         iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
         iSplitL "Hcnt"; [iExact "Hcnt" |].
         iSplitL "Hextc"; [iExact "Hextc" |].
@@ -1859,7 +1913,8 @@ Section KexecCSetup.
         iSplitR;
           [iPureIntro; split_and!;
              [exact Hstr0 | exact Hzero0
-              | exact (proj1 Hrows0) | exact (proj2 Hrows0)] |].
+              | exact (proj1 Hrows0) | exact (proj2 Hrows0)
+              | exact Hpermok0] |].
         iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
         iSplitL "Hcnt"; [iExact "Hcnt" |].
         iSplitL "Hextc"; [iExact "Hextc" |].
@@ -2485,7 +2540,7 @@ Section KexecCLoop.
                           %HMs7 & %HMs9 & %HMs11 & %HMs10) &
                          (%Hcna' & %Hc32 & %Havfc & %Hspok) &
                          (%HPtfp & %Hbelow & %Hcov) &
-                         (%Hstr & %Hzero & %Himg & %Hszr) &
+                         (%Hstr & %Hzero & %Himg & %Hszr & %Hpermok) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hres)".
     rewrite /kxc_c_res.
     iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & #Hka & Hpt & Hpriv &
@@ -3401,6 +3456,16 @@ Section KexecCLoop.
            guard that is [PGROUNDUP(fold) + 4096], strictly above every
            segment's top.  So the image survives verbatim, and the size row
            is about [sz1] alone and does not move at all. ---- *)
+        (* THE PERMISSION ROW ACROSS THE COPYOUT (S6): copyout may fault a
+           page in, but a lazy fill inserts vmfault's own RW-user leaf at a
+           live page -- exactly what the projection already read there
+           ([UserPerm.perm_of_uptd_ext_sz]), so [perm_of] does not move. *)
+        assert (HpermokS : kxb_walk_ok fb ef ->
+                  kxb_perm_ok fb
+                    (UserPtTree.pgroundup (kexec_sz_after (elf_loads fb)))
+                    (perm_of Pfinal2.(ud_um) (uint sz1))).
+        { intros Hwk. rewrite (perm_of_uptd_ext_sz sz1 P Pfinal2 Hextsz).
+          exact (Hpermok Hwk). }
         assert (HimgS : kxb_walk_ok fb ef -> uimg_sub (elf_image fb) M0').
         { intros Hwk. rewrite HM0'.
           apply (uimg_sub_elf_image_wr_above fb Mi (Z2 !!! Regidx Ra2)
@@ -3786,7 +3851,7 @@ Section KexecCLoop.
           iSplitR.
           { iPureIntro. split_and!;
               [rewrite HM0'; exact HstrS0 | rewrite HM0'; exact HzeroS0
-               | exact HimgS | exact Hszr]. }
+               | exact HimgS | exact Hszr | exact HpermokS]. }
           iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
           iSplitL "Hcnt"; [iExact "Hcnt" |].
           iSplitL "Hextc"; [iExact "Hextc" |].
@@ -3827,7 +3892,7 @@ Section KexecCLoop.
        iSplitR.
        { iPureIntro. split_and!;
            [rewrite HM0'; exact HstrS0 | rewrite HM0'; exact HzeroS0
-            | exact HimgS | exact Hszr]. }
+            | exact HimgS | exact Hszr | exact HpermokS]. }
        iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
        iSplitL "Hcnt"; [iExact "Hcnt" |].
        iSplitL "Hextc"; [iExact "Hextc" |].
@@ -4299,7 +4364,7 @@ Section KexecCClose.
                           %HMs7 & %HMs11 & %HMs10) &
                          (%Hcna & %Hc32 & %Havfc & %Hspok) &
                          (%HPtfp & %Hbelow & %Hcov) &
-                         (%Hstr & %Hzero & %Himg & %Hszr) &
+                         (%Hstr & %Hzero & %Himg & %Hszr & %Hpermok) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hres)".
     rewrite /kxc_c_res.
     iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & #Hka & Hpt & Hpriv &
@@ -5206,6 +5271,12 @@ Section KexecCClose.
            [kxc_sp_final], which [Hstackok]'s second conjunct puts at or
            above [uint sz1 - 4096], and under the walk's guard that is
            [PGROUNDUP(fold) + 4096] -- above every segment's top. ---- *)
+        assert (HpermokV : kxb_walk_ok fb ef ->
+                  kxb_perm_ok fb
+                    (UserPtTree.pgroundup (kexec_sz_after (elf_loads fb)))
+                    (perm_of P2.(ud_um) (uint sz1))).
+        { intros Hwk. rewrite (perm_of_uptd_ext_sz sz1 P P2 Hextsz).
+          exact (Hpermok Hwk). }
         assert (HimgV : kxb_walk_ok fb ef -> uimg_sub (elf_image fb) M0').
         { intros Hwk. rewrite HM0v.
           apply (uimg_sub_elf_image_wr_above fb Mi (X12 !!! Regidx Ra2)
@@ -5256,7 +5327,7 @@ Section KexecCClose.
         iSplitR.
         { iPureIntro. split_and!;
             [rewrite HM0v; exact HstrV | rewrite HM0v; exact HzeroV
-             | exact HimgV | exact Hszr]. }
+             | exact HimgV | exact Hszr | exact HpermokV]. }
         iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
         iSplitL "Hcnt"; [iExact "Hcnt" |].
         iSplitL "Hextc"; [iExact "Hextc" |].

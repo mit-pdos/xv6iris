@@ -123,6 +123,7 @@ Require Import KexecPtImage.
 Require Import ElfBridge.   (* [file_bytes_lookup] -- readi's bytes ARE the file's *)
 Require Import UmodeAbi.    (* [uimg_sub] *)
 Require Import ElfFile.     (* [elf_phdr] fields, [phdr_ok], [seg_map] *)
+Require Import UserPerm.    (* [perm_leaf]: the permission projection (S6) *)
 Require Import KexecBuilt.  (* [kxb_at] / [kxb_walk_ok] / [load_win] *)
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
@@ -275,6 +276,23 @@ Proof.
   rewrite Hmm Z.land_ones; [| lia].
   change (2 ^ 12)%Z with 4096%Z. rewrite Hm.
   symmetry. vm_compute. reflexivity.
+Qed.
+
+(* THE LOW BITS OF A SIGN-EXTENDED 32-BIT ABI WORD are the field's own --
+   which is the whole of what [flags2perm] reads (bits 0 and 1). *)
+Lemma kxc_w32_bit (x k : Z) :
+  (0 <= x < 2 ^ 32)%Z -> (0 <= k < 32)%Z ->
+  Z.testbit
+    (bv_unsigned (sign_extend' 64 (mword_of_int x : mword 32) : mword 64)) k
+  = Z.testbit x k.
+Proof.
+  intros Hx Hk. rewrite (w32_arg_unsigned x Hx). unfold w32_uarg.
+  case_decide as Hs; [reflexivity |].
+  rewrite <- (Z.mod_pow2_bits_low (x + (2 ^ 64 - 2 ^ 32)) 32 k); [| lia].
+  rewrite <- (Z.mod_pow2_bits_low x 32 k); [| lia].
+  f_equal.
+  replace (x + (2 ^ 64 - 2 ^ 32))%Z with (x + 4294967295 * 2 ^ 32)%Z by lia.
+  rewrite Z_mod_plus_full. reflexivity.
 Qed.
 
 (* an 8-byte little-endian field fits a 64-bit register verbatim *)
@@ -435,7 +453,11 @@ Section KexecB3Seam.
           is what the back edge's own test then discharges). *)
        (kxb_walk_ok (kxc_fb datl dnf) ef ->
         (S i <= Z.to_nat (eh_phnum ef))%nat ->
-          kxb_at (kxc_fb datl dnf) ef (S i) (uint szv) Mi) ⌝ ∗
+          kxb_at (kxc_fb datl dnf) ef (S i) (uint szv) Mi) /\
+       (* ...and the permission invariant, at the same index (S6) *)
+       (kxb_walk_ok (kxc_fb datl dnf) ef ->
+        (S i <= Z.to_nat (eh_phnum ef))%nat ->
+          kxb_perm_leaves (kxc_fb datl dnf) ef (S i) P.(ud_um)) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x11a) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -552,7 +574,8 @@ Section KexecB3Incr.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs4 & %HMs5 & %HMs6 &
                           %HMs9 & %HMs10 & %HMs11) &
                          (%Hk & %Hib & %Hn2 & %Hal & %Hw67) &
-                         (%Hiphn & %HPtfp & %Hbelow & %Hcov & %Himg) &
+                         (%Hiphn & %HPtfp & %Hbelow & %Hcov & %Himg &
+                          %Hperm) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & #Hka & Hres)".
     rewrite /kxc_res.
     iDestruct "Hres" as "(Hopen & Hlog & Hirs & Hbm & Hins & Hbits & Hbs & Hpt &
@@ -802,7 +825,11 @@ Section KexecB3Incr.
       { iPureIntro. split_and!;
           [exact HPtfp | exact Hbelow | exact Hcov
           | intros Hwk; exact (proj1 (Hdone Hwk))
-          | intros Hwk; exact (proj2 (Hdone Hwk))]. }
+          | intros Hwk; exact (proj2 (Hdone Hwk))
+          | (* the permission rows, converted at the same index (S6) *)
+            intros Hwk;
+            exact (kxb_perm_leaves_done (kxc_fb datl dnf) ef (S i) P.(ud_um)
+                     Hwk HSieq (Hperm Hwk ltac:(lia)))]. }
       (* NEVER [iFrame] HERE.  At this altitude the goal carries
          [ProcInv.tf_page]'s 4096-conjunct big-op inside [proc_priv], and
          [iFrame]'s search does not terminate on it (durable-notes.md).  The
@@ -873,6 +900,8 @@ Section KexecB3Incr.
           [exact HSi | exact HPtfp | exact Hbelow | exact Hcov
           | (* the back edge's own test discharges the [S i < phnum] guard *)
             intros Hwk; apply (Himg Hwk);
+            pose proof (eh_phnum_bound ef); lia
+          | intros Hwk; apply (Hperm Hwk);
             pose proof (eh_phnum_bound ef); lia]. }
       (* NEVER [iFrame] HERE.  At this altitude the goal carries
          [ProcInv.tf_page]'s 4096-conjunct big-op inside [proc_priv], and
@@ -1035,7 +1064,8 @@ Section KexecB3Body.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs4 & %HMs5 & %HMs6 &
                           %HMs9 & %HMs10 & %HMs11 & %HMa3) &
                          (%Hk2 & %Hib & %Hn2 & %Hal & %Hw67) &
-                         (%Hiphn & %HPtfp & %Hbelow & %Hcov & %Himg) &
+                         (%Hiphn & %HPtfp & %Hbelow & %Hcov & %Himg &
+                          %Hperm) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hopen & Hlog & Hirs & Hbm & Hins &
                          Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
@@ -1493,7 +1523,11 @@ Section KexecB3Body.
               [lia | exact HPtfp | exact Hbelow | exact Hcov
               | intros Hwk _;
                 exact (kxb_at_step_skip (kxc_fb datl dnf) ef i (uint szv) Mi
-                         Hnety (Himg Hwk))]. }
+                         Hnety (Himg Hwk))
+              | (* a header the loop skips maps no page (S6) *)
+                intros Hwk _;
+                exact (kxb_perm_leaves_skip (kxc_fb datl dnf) ef i P.(ud_um)
+                         Hnety (Hperm Hwk))]. }
           iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
           iSplitL "Hcnt"; [iExact "Hcnt" |].
           iSplitL "Hextc"; [iExact "Hextc" |]. iSplitL "Hclmc"; [iExact "Hclmc" |]. iSplitR; [iExact "Hka" |].
@@ -2194,6 +2228,32 @@ Section KexecB3Body.
                   by (rewrite HU15ra; bpcw).
                 iEval (rewrite Hpc174) in "Hpc".
                 set (xp := f2p (U15 !!! Regidx Ra0)).
+                (* ---- THE SEGMENT'S PERMISSION BITS (S6).  [flags2perm]'s
+                   argument is the header's [flags] field, sign-extended from
+                   32 bits, and the two bits it reads are below that width --
+                   so the leaf [uvmalloc] is about to write projects to
+                   exactly [KexecBuilt.kexec_seg_perm] of THIS header. ---- *)
+                assert (HU15a0 : U15 !!! Regidx Ra0
+                          = (sign_extend' 64 (Z_to_bv 32 (le_at pf 4 4)
+                                              : mword 32) : mword 64))
+                  by (rewrite /U15 upd_ne; [rewrite /U14; apply upd_eq | bnz]).
+                assert (Hfl32 : (0 <= le_at pf 4 4 < 2 ^ 32)%Z).
+                { pose proof (le_at_bound pf 4 4) as Hb44.
+                  change (2 ^ (8 * Z.of_nat 4))%Z with 4294967296%Z in Hb44.
+                  change (2 ^ 32)%Z with 4294967296%Z. exact Hb44. }
+                assert (Hfflags : le_at pf 4 4
+                          = ep_flags (kxb_phdr (kxc_fb datl dnf) ef i))
+                  by (rewrite -Hpeq;
+                      exact (kxb_phdr_flags (kxc_fb datl dnf) pf offn Hpfb)).
+                assert (Hleafperm : forall r : mword 64,
+                          perm_leaf (uvm_pte (Z.lor xp 18) r)
+                          = Some (kexec_seg_perm
+                                    (kxb_phdr (kxc_fb datl dnf) ef i))).
+                { intros r. rewrite /kexec_seg_perm -Hfflags /xp /f2p HU15a0
+                          -kxc_moi32_ztobv
+                          (kxc_w32_bit (le_at pf 4 4) 0 Hfl32 ltac:(lia))
+                          (kxc_w32_bit (le_at pf 4 4) 1 Hfl32 ltac:(lia)).
+                  apply kxb_perm_leaf_bits. }
                 assert (HM3get : forall r : mword 5, is_cs_idx r = true ->
                           r <> Rs1 -> M3 !!! Regidx r = U7 !!! Regidx r).
                 { intros r Hr Hne. rewrite (callee_saved_lookup Hcsf r Hr).
@@ -2464,7 +2524,12 @@ Section KexecB3Body.
                                M4i = umem_grow Mi (uint (M4 !!! Regidx Ra0)) /\
                                (* the SIZE, as [KexecBuilt]'s fold spells it *)
                                uint (M4 !!! Regidx Ra0)
-                               = kx_uvmalloc (uint szv) (bv_unsigned nsz)) /\
+                               = kx_uvmalloc (uint szv) (bv_unsigned nsz) /\
+                               (* ...and the PERMISSION invariant, stepped (S6) *)
+                               (kxb_walk_ok (kxc_fb datl dnf) ef ->
+                                (S i <= Z.to_nat (eh_phnum ef))%nat ->
+                                  kxb_perm_leaves (kxc_fb datl dnf) ef (S i)
+                                    P4.(ud_um))) /\
                             (bv_unsigned (M4 !!! Regidx Ra0) = 0 ->
                                um_below szv P4.(ud_um) /\
                                um_covered szv P4.(ud_um) /\ M4i = Mi)⌝ ∗
@@ -2495,6 +2560,63 @@ Section KexecB3Body.
                                   Hwf Hwf4 Hbelow Hcov Hext
                                   ltac:(rewrite HYa1 HYa2 in Hdom; exact Hdom)
                                   Harm) as [Hbel4 Hcov4].
+                    (* ---- THE PERMISSION STEP (S6).  The leaves already
+                       established survive because the map only GREW
+                       ([uptd_ext]'s submap), and every page THIS header
+                       needs is one uvmalloc just mapped: under the walk's
+                       guard the running fold sits at or below [vaddr], so
+                       the shrink arm is dead and the run is exactly
+                       [[PGROUNDUP(szv), vaddr + memsz)]. ---- *)
+                    rewrite HYa1 HYa2 in Hleaf.
+                    pose proof (proc_pt_covered_maxsz P4 (M4 !!! Regidx Ra0)
+                                  Hwf4 Hcov4) as Hmax4'.
+                    assert (Hpermstep : kxb_walk_ok (kxc_fb datl dnf) ef ->
+                              (S i <= Z.to_nat (eh_phnum ef))%nat ->
+                              kxb_perm_leaves (kxc_fb datl dnf) ef (S i)
+                                P4.(ud_um)).
+                    { intros Hwk HSi'.
+                      destruct (kxb_walk_step (kxc_fb datl dnf) ef i
+                                  Hwk HSi' Hty1) as (Hpok & _ & _).
+                      destruct (Himg Hwk) as [Hszeq _].
+                      pose proof (le_at_bound pf 40 8) as Hmb40.
+                      assert (Hnszval : (bv_unsigned nsz
+                                = ep_vaddr (kxb_phdr (kxc_fb datl dnf) ef i)
+                                  + ep_memsz (kxb_phdr (kxc_fb datl dnf) ef i))%Z)
+                        by (rewrite Hnszv Hfva Hfmz; reflexivity).
+                      assert (Hvle : (bv_unsigned szv <= bv_unsigned nsz)%Z).
+                      { destruct (kxb_walk_step (kxc_fb datl dnf) ef i
+                                    Hwk HSi' Hty1) as (_ & Hle' & _).
+                        rewrite Hnszval -(uint_unsigned szv) Hszeq.
+                        rewrite Hfmz in Hmb40.
+                        change (2 ^ (8 * Z.of_nat 8))%Z
+                          with 18446744073709551616%Z in Hmb40.
+                        lia. }
+                      assert (Ha0nsz : M4 !!! Regidx Ra0 = nsz)
+                        by (destruct Harm as [[Hlt _] | [_ Hv]];
+                            [exfalso; lia | exact Hv]).
+                      rewrite Ha0nsz in Hmax4'.
+                      apply (kxb_perm_leaves_step (kxc_fb datl dnf) ef i
+                               P.(ud_um) P4.(ud_um) Hty1 (Hperm Hwk)
+                               (proj2 (proj2 Hext))).
+                      intros b Hbm Hbr. unfold PGSIZE in Hbm.
+                      assert (Hpgz : UserPtTree.pgroundup (bv_unsigned szv)
+                                     = bv_unsigned (pgroundup szv))
+                        by (apply pgroundup_live;
+                            rewrite uvm_maxsz_val in Hmax;
+                            change (2 ^ 64)%Z with 18446744073709551616%Z;
+                            lia).
+                      rewrite -Hszeq uint_unsigned Hpgz in Hbr.
+                      assert (Hin : kexec_pg b
+                                ∈ vpn_run (svpn_of (pgroundup szv))
+                                    (uvma_np szv nsz)).
+                      { apply kexec_pg_in_run;
+                          [ rewrite -uvm_maxsz_val; exact Hmax
+                          | rewrite -uvm_maxsz_val; exact Hmax4'
+                          | exact Hbm
+                          | rewrite Hnszval; exact Hbr ]. }
+                      destruct (Hleaf (kexec_pg b) Hin) as [r Hr].
+                      exists (uvm_pte (Z.lor xp 18) r).
+                      split; [exact Hr | exact (Hleafperm r)]. }
                     iEval (rewrite <- (proc_pt_ptm_cov P4 (M4 !!! Regidx Ra0)
                                          (umem_grow Mi (uint (M4 !!! Regidx Ra0)))
                                          Hwf4 Hcov4)) in "Hpt".
@@ -2503,7 +2625,8 @@ Section KexecB3Body.
                     destruct Hext as (Hrt & Htf & _).
                     split_and!; [exact Hrt | exact Htf | | ].
                     + intros _. split_and!;
-                        [exact Hbel4 | exact Hcov4 | reflexivity |].
+                        [exact Hbel4 | exact Hcov4 | reflexivity |
+                         | exact Hpermstep].
                       rewrite !uint_unsigned. unfold kx_uvmalloc.
                       destruct Harm as [[Hlt Hv] | [Hle Hv]]; rewrite Hv;
                         [ rewrite (proj2 (Z.ltb_lt _ _) Hlt); reflexivity
@@ -2659,7 +2782,8 @@ Section KexecB3Body.
                    { intro Hz0. apply eq_vec_false_iff in Eoom. apply Eoom.
                      etransitivity; [exact Hsta0b |].
                      apply bv_eq. rewrite Hz0. vm_compute. reflexivity. }
-                   destruct (HP4ne Ha0nz) as (Hbel4n & Hcov4n & Himgn & Ha0eq).
+                   destruct (HP4ne Ha0nz)
+                     as (Hbel4n & Hcov4n & Himgn & Ha0eq & Hpermn).
                    (* ---- the size the loop reached, and the room left ---- *)
                    iDestruct (proc_pt_wf_get with "Hpt") as %Hwf4.
                    pose proof (proc_pt_covered_maxsz P4 (M4 !!! Regidx Ra0)
@@ -2913,7 +3037,7 @@ Section KexecB3Body.
                              [lia
                              | rewrite HP4tf; exact HPtfp
                              | exact Hbel4n | exact Hcov4n
-                             | exact Hstep11]. }
+                             | exact Hstep11 | exact Hpermn]. }
                          iSplitL "Hpc"; [iExact "Hpc" |].
                          iSplitL "Hcg"; [iExact "Hcg" |].
                          iSplitL "Hcnt"; [iExact "Hcnt" |].
@@ -3318,7 +3442,7 @@ Section KexecB3Body.
                              [lia
                              | rewrite HP4tf; exact HPtfp
                              | exact Hbel4n | exact Hcov4n
-                             | exact Hstep11]. }
+                             | exact Hstep11 | exact Hpermn]. }
                          iSplitL "Hpc"; [iExact "Hpc" |].
                          iSplitL "Hcg"; [iExact "Hcg" |].
                          iSplitL "Hcnt"; [iExact "Hcnt" |].
@@ -3550,7 +3674,7 @@ Section KexecB3Loop.
       iApply ("Hc1a4" $! M' P' Mo szv' with "Hexit Hcont").
     - (* another header *)
       iDestruct "Hnext" as "(%Hp1 & %Hp2 & %Hp3 & Hrest)".
-      destruct Hp3 as (HSi & Hp3b & Hp3c & Hp3d & Hp3e).
+      destruct Hp3 as (HSi & Hp3b & Hp3c & Hp3d & Hp3e & Hp3f).
       assert (Hcr : true = false \/ proc_addr jp = zero_reg ->
                 (CIDn : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CIDn true (proc_addr jp) _ Hcr
@@ -3564,7 +3688,7 @@ Section KexecB3Loop.
       iSplitR; [iPureIntro; exact Hp2 |].
       iSplitR; [iPureIntro; split_and!;
                 [exact HSi | exact Hp3b | exact Hp3c | exact Hp3d
-                | exact Hp3e] |].
+                | exact Hp3e | exact Hp3f] |].
       iExact "Hrest".
     - (* the loop is over *)
       iSpecialize ("Hc1a4" $! CIDn with "[%]"); [wp_next_chain |].
@@ -3635,7 +3759,8 @@ Section KexecB3Close.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs1 & %HMs2 & %HMs4 & %HMs6 &
                           %HMthr) &
                          (%Hk & %Hib & %Hn2 & %Hal) &
-                         (%HPtfp & %Hbelow & %Hcov & %Himg0 & %Hsz0) &
+                         (%HPtfp & %Hbelow & %Hcov & %Himg0 & %Hsz0 &
+                          %Hperm0) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hopen & Hlog & Hirs & Hbm & Hins &
                          Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
@@ -3705,7 +3830,8 @@ Section KexecB3Close.
     iSplitR.
     { iPureIntro. split_and!;
         [exact HPtfp | exact Hbelow | exact Hcov | exact Himg0
-        | intros Hwk; rewrite Hu0; exact (Hsz0 Hwk)]. }
+        | intros Hwk; rewrite Hu0; exact (Hsz0 Hwk)
+        | exact Hperm0]. }
     iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hextc"; [iExact "Hextc" |]. iSplitL "Hclmc"; [iExact "Hclmc" |]. iSplitL "Hopen"; [iExact "Hopen" |].
@@ -3770,7 +3896,8 @@ Section KexecB3Close.
     rewrite /kxc_at_1a4.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs4 & %HMs6 & %HMs11) &
                          (%Hk & %Hib & %Hn2 & %Hal) &
-                         (%HPtfp & %Hbelow & %Hcov & %Himg & %Hszr) &
+                         (%HPtfp & %Hbelow & %Hcov & %Himg & %Hszr &
+                          %Hpermsegs) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hopen & Hlog & Hirs & Hbm & Hins &
                          #Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
@@ -3958,7 +4085,8 @@ Section KexecB3Close.
     { iPureIntro. exact Hal. }
     iSplitR.
     { iPureIntro. split_and!;
-        [exact HPtfp | exact Hbelow | exact Hcov | exact Himg | exact Hszr]. }
+        [exact HPtfp | exact Hbelow | exact Hcov | exact Himg | exact Hszr
+        | exact Hpermsegs]. }
     iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hextc"; [iExact "Hextc" |]. iSplitL "Hclmc"; [iExact "Hclmc" |]. iSplitL "Hirs2"; [iExact "Hirs2" |].

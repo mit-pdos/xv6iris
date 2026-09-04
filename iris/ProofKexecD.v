@@ -2013,7 +2013,7 @@ Section KexecDMain.
                           %HMs11 & %HMs10) &
                          (%Hcna & %Hcmax & %Havfc & %Hstackok) &
                          (%HPtfp & %Hbelow & %Hcov) &
-                         (%Hstr & %Hzero & %Himg & %Hszr) &
+                         (%Hstr & %Hzero & %Himg & %Hszr & %Hpermok) &
                          Hpc & Hcg & Hcnt & Hextc & Hclmc & Hres)".
     assert (Hceq : c = na).
     { destruct (Nat.lt_ge_cases c na) as [Hlt | Hge];
@@ -2024,14 +2024,16 @@ Section KexecDMain.
        only trapframe words, so the image at the commit IS [Mi]. *)
     assert (HQpay : forall tfg : list (mword 64),
                       kxq_pay Q (kxq_entry ef) Mi sz1 P tfg).
-    { intros tfg U' HM Hsz _ _. apply HQe.
+    { intros tfg U' HM Hsz Hup _. apply HQe.
       unfold kexec_built. rewrite HM -Hceq.
       split_and!;
         [exact Hsz | exact Hstr
         | apply kxb_stack_at_intro; [exact Hstackok | exact Hzero]
         (* the two S3d rows, straight off [kxc_at_2a6]: phase D writes only
            trapframe words, so the image at the commit IS [Mi]. *)
-        | exact Himg | exact Hszr]. }
+        | exact Himg | exact Hszr
+        (* ...and the permission row (S6), at the table the commit installs *)
+        | rewrite Hup; exact Hpermok]. }
     rewrite /kxc_d_res.
     iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & #Hka & Hpt & Hpriv &
                           Hpath & Hargv & Hargs & Helf & Hframe)".

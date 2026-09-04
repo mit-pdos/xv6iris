@@ -47,6 +47,8 @@ Require Import UmodeAbi.        (* [uimg_sub]                                *)
 Require Import ElfEnc.          (* [le_at], [ph_at], [eh_phnum]              *)
 Require Import ElfFile.         (* the image semantics                       *)
 Require Import ElfBridge.       (* [le_at_shift_of_list], [file_bytes_lookup] *)
+Require Import RiscvPtsto.      (* [svpn_of]: the page key of a user address *)
+Require Import UserPerm.        (* [uperm], [uperm_rw], [perm_of]: the projection the slot is keyed on *)
 Require Import UserPtTree.      (* [umem_write], [umem_wr], [umem_grow],
                                    [uva_live]                               *)
 Require Import ProcDefs.        (* [ustate], [us_M], [us_V], [pv_sz]         *)
@@ -780,6 +782,41 @@ Definition kx_grow (sz : Z) (p : elf_phdr) : Z :=
 (* the loop's [sz] after the PT_LOADs in [ps] have been allocated *)
 Definition kexec_sz_after (ps : list elf_phdr) : Z := foldl kx_grow 0 ps.
 
+(* ===================================================================== *)
+(*  THE PERMISSION PROJECTION kexec BUILDS.  The U-tier keys on the      *)
+(*  X/W bits of every user page ([UserPerm.perm_of]): under the           *)
+(*  non-coherent instruction cache only a page that is executable AND    *)
+(*  NOT writable is text a program may run, so the code/data split is   *)
+(*  part of the resume key, not a detail.  What kexec does: for PT_LOAD  *)
+(*  header [i] it calls [uvmalloc(sz, vaddr+memsz, flags2perm(flags))],  *)
+(*  which maps every page from [PGROUNDUP(sz)] -- the previous segment's *)
+(*  rounded end, so the GAP pages below [vaddr] get this segment's bits  *)
+(*  too -- up to [vaddr+memsz] at X iff [flags & 1], W iff [flags & 2];  *)
+(*  then two pages at [PTE_W] above the rounded end, the lower one       *)
+(*  [uvmclear]ed (U cleared: absent from the projection), the upper one  *)
+(*  the stack.  Stated on page BASES (multiples of PGSIZE), keyed by     *)
+(*  [svpn_of] so the kernel's own leaf map reads it off directly.        *)
+(* ===================================================================== *)
+
+Definition kexec_seg_perm (p : elf_phdr) : uperm :=
+  MkUperm (Z.testbit (ep_flags p) 0) (Z.testbit (ep_flags p) 1).
+
+Definition kexec_pg (b : Z) : mword 27 := svpn_of (mword_of_int b : mword 64).
+
+(* the page bases [uvmalloc] maps for load [i] of [ps] *)
+Definition kexec_seg_pages (ps : list elf_phdr) (i : nat) (p : elf_phdr) (b : Z) : Prop :=
+  b `mod` PGSIZE = 0
+  /\ pgroundup (kexec_sz_after (take i ps)) <= b < ep_vaddr p + ep_memsz p.
+
+Definition kxb_perm_ok (f : elf_bytes) (top : Z) (π : gmap (mword 27) uperm) : Prop :=
+  (forall (i : nat) (p : elf_phdr), elf_loads f !! i = Some p ->
+     forall b : Z, kexec_seg_pages (elf_loads f) i p b ->
+       π !! kexec_pg b = Some (kexec_seg_perm p))
+  (* the guard page: mapped, U cleared, hence not in the projection *)
+  /\ π !! kexec_pg top = None
+  (* the stack page: writable, not executable *)
+  /\ π !! kexec_pg (top + PGSIZE) = Some uperm_rw.
+
 Lemma kexec_sz_after_nil : kexec_sz_after [] = 0.
 Proof. reflexivity. Qed.
 
@@ -1494,6 +1531,409 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(*  3e.  THE PERMISSION PROJECTION, THE CONE'S SIDE                       *)
+(* ====================================================================== *)
+
+(*  Four things, in the order the cone meets them: the three leaf words
+    kexec ever writes PROJECTED (a), the page-key arithmetic that says
+    WHICH page of [uvmalloc]'s run a given segment page is (b), the phdr
+    loop's own leaf invariant with its step and skip (c), and the
+    introduction phase D uses (d).  All of it is stated on the kernel's
+    own leaf map [ud_um P] rather than on [perm_of]: the SIZE index moves
+    under the loader's feet (uvmalloc only chooses it at the very end)
+    and a leaf fact does not care, so [perm_of] is applied exactly once,
+    at the commit.                                                        *)
+
+(* ---- (a) the leaf words, projected ---- *)
+
+Local Lemma kxb_low10 (a b k : Z) :
+  0 <= b < 1024 -> 0 <= k < 10 -> Z.testbit (a * 1024 + b) k = Z.testbit b k.
+Proof.
+  intros Hb Hk.
+  replace (a * 1024 + b) with (b + a * 1024) by lia.
+  rewrite <- (Z.mod_pow2_bits_low (b + a * 1024) 10 k); [| lia].
+  change (2 ^ 10) with 1024.
+  rewrite Z_mod_plus_full, (Z.mod_small b 1024 Hb). reflexivity.
+Qed.
+
+(* [uvm_pte n r] is [mk_pte] of [r]'s ppn at flag byte [Z.lor n 1]; only
+   the FLAG POSITIONS matter, so the ppn stays symbolic. *)
+Lemma kxb_perm_leaf_flags (n m : Z) (r : mword 64) :
+  Z.lor n 1 = m -> 0 <= m < 1024 ->
+  perm_leaf (ProcPtOwn.uvm_pte n r)
+  = if Z.testbit m 4 && Z.testbit m 1
+    then Some (MkUperm (Z.testbit m 3) (Z.testbit m 2)) else None.
+Proof.
+  intros Hm Hb.
+  unfold ProcPtOwn.uvm_pte, PtBuild.mappages_pte, perm_leaf, perm_bits, pte_bit.
+  rewrite Hm, (Pt4kWalk.mk_pte_unsigned _ m Hb).
+  rewrite (kxb_low10 _ m 4 Hb ltac:(lia)), (kxb_low10 _ m 1 Hb ltac:(lia)),
+          (kxb_low10 _ m 3 Hb ltac:(lia)), (kxb_low10 _ m 2 Hb ltac:(lia)).
+  reflexivity.
+Qed.
+
+(* THE SEGMENT LEAF.  [flags2perm] returns [8*(flags&1) + 4*(flags&2)],
+   uvmalloc ors in PTE_U|PTE_R (18) and mappages ors in PTE_V -- so the
+   projection is exactly the header's own X/W pair. *)
+Lemma kxb_perm_leaf_bits (bx bw : bool) (r : mword 64) :
+  perm_leaf (ProcPtOwn.uvm_pte
+               (Z.lor ((if bx then 8 else 0) + (if bw then 4 else 0)) 18) r)
+  = Some (MkUperm bx bw).
+Proof.
+  destruct bx, bw.
+  - change (perm_leaf (ProcPtOwn.uvm_pte 30 r) = Some (MkUperm true true)).
+    rewrite (kxb_perm_leaf_flags 30 31 r eq_refl ltac:(lia)). reflexivity.
+  - change (perm_leaf (ProcPtOwn.uvm_pte 26 r) = Some (MkUperm true false)).
+    rewrite (kxb_perm_leaf_flags 26 27 r eq_refl ltac:(lia)). reflexivity.
+  - change (perm_leaf (ProcPtOwn.uvm_pte 22 r) = Some (MkUperm false true)).
+    rewrite (kxb_perm_leaf_flags 22 23 r eq_refl ltac:(lia)). reflexivity.
+  - change (perm_leaf (ProcPtOwn.uvm_pte 18 r) = Some (MkUperm false false)).
+    rewrite (kxb_perm_leaf_flags 18 19 r eq_refl ltac:(lia)). reflexivity.
+Qed.
+
+(* THE STACK LEAF: the guard/stack pair is allocated at PTE_W. *)
+Lemma kxb_perm_leaf_rw (r : mword 64) :
+  perm_leaf (ProcPtOwn.uvm_pte (Z.lor 4 18) r) = Some uperm_rw.
+Proof. exact (perm_leaf_uvm_pte22 r). Qed.
+
+(* THE GUARD LEAF, after [uvmclear]: U is gone, so the page is ABSENT
+   from the projection -- which is the whole point of the guard. *)
+Lemma kxb_perm_leaf_clear_u (w : mword 64) :
+  perm_leaf (ProcPtOwn.pte_clear_u w) = None.
+Proof.
+  unfold perm_leaf, pte_bit. rewrite ProcPtOwn.pte_clear_u_unsigned.
+  rewrite !Z.land_spec.
+  replace (Z.testbit 18446744073709551599 4) with false
+    by (vm_compute; reflexivity).
+  rewrite andb_false_r. reflexivity.
+Qed.
+
+(* ---- (b) the page key, and the run [uvmalloc] maps ---- *)
+
+Lemma kexec_pg_unsigned (b : Z) :
+  0 <= b <= 274877898752 -> bv_unsigned (kexec_pg b) = b / 4096.
+Proof.
+  intros Hb.
+  assert (Hu : bv_unsigned (mword_of_int b : mword 64) = b)
+    by (apply moi64_small; lia).
+  unfold kexec_pg.
+  rewrite (ProcPtOwn.svpn_of_unsigned_small (mword_of_int b : mword 64)
+             ltac:(rewrite Hu, ProcPtOwn.uvm_maxsz_val; lia)).
+  rewrite Hu. reflexivity.
+Qed.
+
+(* the key of a page named by a WORD is that word's own vpn -- the shape
+   the kernel's leaf map is indexed at *)
+Lemma kexec_pg_of_word (x : mword 64) : kexec_pg (bv_unsigned x) = svpn_of x.
+Proof.
+  unfold kexec_pg. f_equal. apply bv_eq. apply moi64_small.
+  pose proof (bv_unsigned_in_range 64 x) as Hr.
+  change (bv_modulus 64) with 18446744073709551616%Z in Hr. exact Hr.
+Qed.
+
+(* the page at index [k] of the run starting at [PGROUNDUP s] *)
+Lemma kexec_pg_vpn_at (s : mword 64) (k : nat) (b : Z) :
+  (bv_unsigned s <= 274877898752)%Z ->
+  b = (bv_unsigned (ProcPtOwn.pgroundup s) + 4096 * Z.of_nat k)%Z ->
+  (b <= 274877898752)%Z ->
+  kexec_pg b = PtBuild.vpn_at (svpn_of (ProcPtOwn.pgroundup s)) k.
+Proof.
+  intros Hs Hb Hbm.
+  destruct (ProcPtOwn.pgroundup_maxsz s
+              ltac:(rewrite ProcPtOwn.uvm_maxsz_val; lia)) as [[Hge Hle] Hmod].
+  rewrite ProcPtOwn.uvm_maxsz_val in Hle.
+  pose proof (bv_unsigned_in_range 64 (ProcPtOwn.pgroundup s)) as [Hp0 _].
+  pose proof (Nat2Z.is_nonneg k) as Hk0.
+  assert (Hv0 : bv_unsigned (svpn_of (ProcPtOwn.pgroundup s))
+                = (bv_unsigned (ProcPtOwn.pgroundup s) / 4096)%Z)
+    by (apply ProcPtOwn.svpn_of_unsigned_small;
+        rewrite ProcPtOwn.uvm_maxsz_val; lia).
+  pose proof (Z.div_mod (bv_unsigned (ProcPtOwn.pgroundup s)) 4096
+                ltac:(lia)) as Hdm.
+  assert (Hq : (bv_unsigned (ProcPtOwn.pgroundup s) / 4096 <= 67108862)%Z)
+    by lia.
+  assert (Hnw : (bv_unsigned (svpn_of (ProcPtOwn.pgroundup s))
+                 + Z.of_nat k < 134217728)%Z).
+  { rewrite Hv0. lia. }
+  assert (Hb0 : 0 <= b <= 274877898752).
+  { split; [| exact Hbm]. rewrite Hb.
+    apply Z.add_nonneg_nonneg;
+      [exact Hp0 | apply Z.mul_nonneg_nonneg; [lia | exact Hk0]]. }
+  apply bv_eq.
+  rewrite (PtBuild.vpn_at_unsigned _ _ Hnw), Hv0.
+  rewrite (kexec_pg_unsigned b Hb0), Hb.
+  replace (bv_unsigned (ProcPtOwn.pgroundup s) + 4096 * Z.of_nat k)%Z
+    with (bv_unsigned (ProcPtOwn.pgroundup s) + Z.of_nat k * 4096)%Z by lia.
+  rewrite Z.div_add by lia. reflexivity.
+Qed.
+
+(* the index arithmetic, in PLAIN [Z]: [lia]'s bitvector zify hook chokes
+   on goals mixing [bv_unsigned] with division, so the whole computation
+   is done here and the [mword] lemma below only instantiates it. *)
+Local Lemma kxb_page_index (S0 b E : Z) :
+  0 <= S0 -> S0 `mod` 4096 = 0 -> b `mod` 4096 = 0 -> S0 <= b < E ->
+  exists k : nat, b = S0 + 4096 * Z.of_nat k
+                  /\ (k < Z.to_nat ((E - S0 + 4095) / 4096))%nat.
+Proof.
+  intros HS0 HSm Hbm [Hlo Hhi].
+  assert (Hrz : (b - S0) `mod` 4096 = 0)
+    by (rewrite Zminus_mod, Hbm, HSm; reflexivity).
+  pose proof (Z.div_mod (b - S0) 4096 ltac:(lia)) as Hdm.
+  assert (Hq0 : 0 <= (b - S0) / 4096) by (apply Z.div_pos; lia).
+  assert (Hkz : Z.of_nat (Z.to_nat ((b - S0) / 4096)) = (b - S0) / 4096)
+    by (rewrite Z2Nat.id; [reflexivity | exact Hq0]).
+  exists (Z.to_nat ((b - S0) / 4096)). split; [lia |].
+  assert (Hq2 : 0 <= (E - S0 + 4095) / 4096) by (apply Z.div_pos; lia).
+  apply (proj2 (Nat2Z.inj_lt _ _)). rewrite Hkz, (Z2Nat.id _ Hq2).
+  pose proof (Z.div_mod (E - S0 + 4095) 4096 ltac:(lia)) as Hdm2.
+  pose proof (Z.mod_pos_bound (E - S0 + 4095) 4096 ltac:(lia)) as Hmb2.
+  lia.
+Qed.
+
+(* ...and every page base in [[PGROUNDUP s, e)] IS one of them *)
+Lemma kexec_pg_in_run (s e : mword 64) (b : Z) :
+  (bv_unsigned s <= 274877898752)%Z ->
+  (bv_unsigned e <= 274877898752)%Z ->
+  b `mod` 4096 = 0 ->
+  (bv_unsigned (ProcPtOwn.pgroundup s) <= b < bv_unsigned e)%Z ->
+  kexec_pg b ∈ ProcPtOwn.vpn_run (svpn_of (ProcPtOwn.pgroundup s))
+                 (ProcPtOwn.uvma_np s e).
+Proof.
+  intros Hs He Hbm [Hlo Hhi].
+  destruct (ProcPtOwn.pgroundup_maxsz s
+              ltac:(rewrite ProcPtOwn.uvm_maxsz_val; lia)) as [[Hge Hle] Hmod].
+  rewrite ProcPtOwn.uvm_maxsz_val in Hle.
+  pose proof (bv_unsigned_in_range 64 (ProcPtOwn.pgroundup s)) as [Hp0 _].
+  destruct (kxb_page_index (bv_unsigned (ProcPtOwn.pgroundup s)) b
+              (bv_unsigned e) Hp0 Hmod Hbm (conj Hlo Hhi)) as (k & Hbk & Hklt).
+  assert (Hble : (b <= 274877898752)%Z) by lia.
+  apply ProcPtOwn.elem_of_vpn_run. exists k. split;
+    [exact Hklt | exact (kexec_pg_vpn_at s k b Hs Hbk Hble)].
+Qed.
+
+(* ---- (c) the phdr loop's leaf invariant ---- *)
+
+(*  After [i] program headers: every page [uvmalloc] mapped for a PT_LOAD
+    seen so far still holds a leaf whose projection is that header's own
+    X/W pair.  Stated over [kxb_loads f ef i] (the loop's own list); at
+    [i = phnum] the walk's guard turns it into the [elf_loads] form
+    [kxb_perm_segs] below, which is what phases C and D carry.            *)
+Definition kxb_perm_leaves (f : elf_bytes) (ef : nat -> bv 8) (i : nat)
+    (um : gmap (mword 27) (mword 64)) : Prop :=
+  forall (j : nat) (p : elf_phdr), kxb_loads f ef i !! j = Some p ->
+    forall b : Z, kexec_seg_pages (kxb_loads f ef i) j p b ->
+      exists w : mword 64,
+        um !! kexec_pg b = Some w /\ perm_leaf w = Some (kexec_seg_perm p).
+
+Definition kxb_perm_segs (f : elf_bytes)
+    (um : gmap (mword 27) (mword 64)) : Prop :=
+  forall (j : nat) (p : elf_phdr), elf_loads f !! j = Some p ->
+    forall b : Z, kexec_seg_pages (elf_loads f) j p b ->
+      exists w : mword 64,
+        um !! kexec_pg b = Some w /\ perm_leaf w = Some (kexec_seg_perm p).
+
+Lemma kxb_perm_leaves_0 (f : elf_bytes) (ef : nat -> bv 8)
+    (um : gmap (mword 27) (mword 64)) : kxb_perm_leaves f ef 0 um.
+Proof. intros j p Hj. simpl in Hj. rewrite lookup_nil in Hj. discriminate. Qed.
+
+Lemma kxb_perm_leaves_skip (f : elf_bytes) (ef : nat -> bv 8) (i : nat)
+    (um : gmap (mword 27) (mword 64)) :
+  ep_type (kxb_phdr f ef i) <> 1 ->
+  kxb_perm_leaves f ef i um -> kxb_perm_leaves f ef (S i) um.
+Proof.
+  intros Hty H. unfold kxb_perm_leaves in *.
+  rewrite (kxb_loads_S_skip f ef i Hty). exact H.
+Qed.
+
+(* THE STEP.  The already-established leaves survive because [uvmalloc]
+   only ADDS entries ([uptd_ext]'s submap), and the pages of THIS header
+   are the ones its own call just mapped -- from the running fold's
+   PGROUNDUP up to [vaddr + memsz], which is exactly [kexec_seg_pages] at
+   the snoc index. *)
+Lemma kxb_perm_leaves_step (f : elf_bytes) (ef : nat -> bv 8) (i : nat)
+    (um um' : gmap (mword 27) (mword 64)) :
+  ep_type (kxb_phdr f ef i) = 1 ->
+  kxb_perm_leaves f ef i um ->
+  um ⊆ um' ->
+  (forall b : Z, b `mod` PGSIZE = 0 ->
+     pgroundup (kexec_sz_after (kxb_loads f ef i)) <= b
+       < ep_vaddr (kxb_phdr f ef i) + ep_memsz (kxb_phdr f ef i) ->
+     exists w : mword 64, um' !! kexec_pg b = Some w
+       /\ perm_leaf w = Some (kexec_seg_perm (kxb_phdr f ef i))) ->
+  kxb_perm_leaves f ef (S i) um'.
+Proof.
+  intros Hty Hold Hsub Hnew.
+  unfold kxb_perm_leaves, kexec_seg_pages in *.
+  rewrite (kxb_loads_S_load f ef i Hty).
+  intros j q Hj b [Hbm Hbr].
+  destruct (decide (j < length (kxb_loads f ef i))%nat) as [Hlt | Hge].
+  - assert (Hq : kxb_loads f ef i !! j = Some q)
+      by (rewrite lookup_app_l in Hj; [exact Hj | exact Hlt]).
+    assert (Htk : take j (kxb_loads f ef i ++ [kxb_phdr f ef i])%list
+                  = take j (kxb_loads f ef i))
+      by (apply take_app_le; lia).
+    rewrite Htk in Hbr.
+    destruct (Hold j q Hq b (conj Hbm Hbr)) as (w & Hw & Hpl).
+    exists w. split; [exact (lookup_weaken _ _ _ _ Hw Hsub) | exact Hpl].
+  - assert (Hj0 : j = length (kxb_loads f ef i)).
+    { apply lookup_lt_Some in Hj. rewrite length_app in Hj. simpl in Hj. lia. }
+    subst j.
+    assert (Hmid : (kxb_loads f ef i ++ [kxb_phdr f ef i])%list
+                     !! length (kxb_loads f ef i) = Some (kxb_phdr f ef i))
+      by (apply list_lookup_middle; reflexivity).
+    rewrite Hmid in Hj. injection Hj as <-.
+    rewrite take_app_length in Hbr.
+    exact (Hnew b Hbm Hbr).
+Qed.
+
+(* ...and at [phnum] the walk's guard turns the loop's list into the
+   file's own, which is the form [kxb_perm_ok] asks for. *)
+Lemma kxb_perm_leaves_done (f : elf_bytes) (ef : nat -> bv 8) (n : nat)
+    (um : gmap (mword 27) (mword 64)) :
+  kxb_walk_ok f ef -> n = Z.to_nat (eh_phnum ef) ->
+  kxb_perm_leaves f ef n um -> kxb_perm_segs f um.
+Proof.
+  intros (Hid & _ & _) -> H. unfold kxb_perm_segs. rewrite <- Hid. exact H.
+Qed.
+
+Lemma kxb_perm_segs_mono (f : elf_bytes) (um um' : gmap (mword 27) (mword 64)) :
+  um ⊆ um' -> kxb_perm_segs f um -> kxb_perm_segs f um'.
+Proof.
+  intros Hsub H j p Hj b Hb. destruct (H j p Hj b Hb) as (w & Hw & Hpl).
+  exists w. split; [exact (lookup_weaken _ _ _ _ Hw Hsub) | exact Hpl].
+Qed.
+
+(* every segment page lies strictly below the fold the phdr loop reached *)
+Lemma kexec_seg_pg_below (f : elf_bytes) (j : nat) (p : elf_phdr) (b : Z) :
+  elf_loads f !! j = Some p -> kexec_seg_pages (elf_loads f) j p b ->
+  (0 <= b < kexec_sz_after (elf_loads f))%Z.
+Proof.
+  intros Hj [_ [Hlo Hhi]].
+  pose proof (kexec_sz_after_elem (elf_loads f) p
+                (elem_of_list_lookup_2 _ _ _ Hj)).
+  pose proof (pgroundup_nonneg (kexec_sz_after (take j (elf_loads f)))
+                (kexec_sz_after_nonneg _)). lia.
+Qed.
+
+(* ...so the guard/stack pair, which sits at or above [PGROUNDUP] of that
+   fold, never collides with one -- what makes [uvmclear]'s single
+   overwrite invisible to the segment rows. *)
+Lemma kexec_seg_pg_ne (f : elf_bytes) (j : nat) (p : elf_phdr) (b t : Z) :
+  elf_loads f !! j = Some p -> kexec_seg_pages (elf_loads f) j p b ->
+  pgroundup (kexec_sz_after (elf_loads f)) <= t ->
+  (t <= 274877898752)%Z -> t `mod` 4096 = 0 ->
+  kexec_pg b <> kexec_pg t.
+Proof.
+  intros Hj Hb Ht Htm Htmod.
+  pose proof (kexec_seg_pg_below f j p b Hj Hb) as [Hb0 Hblt].
+  pose proof (pgroundup_ge (kexec_sz_after (elf_loads f))).
+  destruct Hb as [Hbm _]. unfold PGSIZE in Hbm.
+  pose proof (Z.div_mod b 4096 ltac:(lia)).
+  pose proof (Z.div_mod t 4096 ltac:(lia)).
+  intros He. apply (f_equal bv_unsigned) in He.
+  rewrite (kexec_pg_unsigned b ltac:(lia)),
+          (kexec_pg_unsigned t ltac:(lia)) in He.
+  lia.
+Qed.
+
+Lemma kxb_perm_segs_insert (f : elf_bytes) (um : gmap (mword 27) (mword 64))
+    (t : Z) (x : mword 64) :
+  (t <= 274877898752)%Z -> t `mod` 4096 = 0 ->
+  pgroundup (kexec_sz_after (elf_loads f)) <= t ->
+  kxb_perm_segs f um -> kxb_perm_segs f (<[kexec_pg t := x]> um).
+Proof.
+  intros Htm Htmod Ht H j p Hj b Hb.
+  destruct (H j p Hj b Hb) as (w & Hw & Hpl).
+  exists w. split; [| exact Hpl].
+  rewrite lookup_insert_ne; [exact Hw |].
+  exact (not_eq_sym (kexec_seg_pg_ne f j p b t Hj Hb Ht Htm Htmod)).
+Qed.
+
+(* ---- (d) what phase D turns it into ---- *)
+
+Lemma perm_of_of_leaf (um : gmap (mword 27) (mword 64)) (sz : Z)
+    (v : mword 27) (w : mword 64) (q : uperm) :
+  um !! v = Some w -> perm_leaf w = Some q -> perm_of um sz !! v = Some q.
+Proof. intros Hl Hp. rewrite (perm_of_lookup um sz v), Hl. exact Hp. Qed.
+
+Lemma perm_of_of_leaf_none (um : gmap (mword 27) (mword 64)) (sz : Z)
+    (v : mword 27) (w : mword 64) :
+  um !! v = Some w -> perm_leaf w = None -> perm_of um sz !! v = None.
+Proof. intros Hl Hp. rewrite (perm_of_lookup um sz v), Hl. exact Hp. Qed.
+
+(* THE INTRODUCTION.  Every page the projection is asked about is MAPPED
+   (the loop's leaves, the [uvmclear]ed guard, the stack), so [perm_of]
+   reads the leaf off and the SIZE index never enters. *)
+Lemma kxb_perm_ok_intro (f : elf_bytes) (um : gmap (mword 27) (mword 64))
+    (sz top : Z) :
+  kxb_perm_segs f um ->
+  (exists w : mword 64, um !! kexec_pg top = Some w /\ perm_leaf w = None) ->
+  (exists w : mword 64, um !! kexec_pg (top + PGSIZE) = Some w
+                        /\ perm_leaf w = Some uperm_rw) ->
+  kxb_perm_ok f top (perm_of um sz).
+Proof.
+  intros Hsegs (wg & Hg & Hgp) (ws & Hs & Hsp).
+  split; [| split].
+  - intros j p Hj b Hb.
+    destruct (Hsegs j p Hj b Hb) as (w & Hw & Hpl).
+    exact (perm_of_of_leaf um sz _ w _ Hw Hpl).
+  - exact (perm_of_of_leaf_none um sz _ wg Hg Hgp).
+  - exact (perm_of_of_leaf um sz _ ws uperm_rw Hs Hsp).
+Qed.
+
+(* the guard and the stack page are DIFFERENT pages -- what makes
+   [uvmclear]'s overwrite miss the stack leaf *)
+Lemma kexec_pg_top_stack_ne (top : Z) :
+  (0 <= top)%Z -> (top + PGSIZE <= 274877898752)%Z -> top `mod` 4096 = 0 ->
+  kexec_pg top <> kexec_pg (top + PGSIZE).
+Proof.
+  intros H0 Hb Hm He. unfold PGSIZE in Hb.
+  apply (f_equal bv_unsigned) in He.
+  rewrite (kexec_pg_unsigned top ltac:(lia)),
+          (kexec_pg_unsigned (top + PGSIZE) ltac:(unfold PGSIZE; lia)) in He.
+  replace (top + PGSIZE)%Z with (top + 1 * 4096)%Z in He
+    by (unfold PGSIZE; lia).
+  rewrite Z.div_add in He; lia.
+Qed.
+
+(* THE INTRODUCTION IN THE SHAPE [kxc_c_setup] HOLDS IT: the table is
+   uvmalloc's, with the guard leaf overwritten by uvmclear at
+   [kexec_pg top].  All the map algebra stays here -- the kexec proofs
+   import the Sail instance modules, where [lookup_insert]'s type-class
+   inference on [gmap (mword 27)] does not resolve. *)
+Lemma kxb_perm_ok_intro_set (f : elf_bytes) (um : gmap (mword 27) (mword 64))
+    (sz top : Z) (xg wstk : mword 64) :
+  (top <= 274877898752)%Z -> top `mod` 4096 = 0 ->
+  pgroundup (kexec_sz_after (elf_loads f)) <= top ->
+  kxb_perm_segs f um ->
+  perm_leaf xg = None ->
+  um !! kexec_pg (top + PGSIZE) = Some wstk ->
+  perm_leaf wstk = Some uperm_rw ->
+  kexec_pg top <> kexec_pg (top + PGSIZE) ->
+  kxb_perm_ok f top (perm_of (<[kexec_pg top := xg]> um) sz).
+Proof.
+  intros Htm Htmod Ht Hsegs Hxg Hstk Hstkp Hne.
+  apply kxb_perm_ok_intro.
+  - apply kxb_perm_segs_insert; assumption.
+  - exists xg. split; [apply lookup_insert | exact Hxg].
+  - exists wstk. split; [| exact Hstkp].
+    rewrite lookup_insert_ne; [exact Hstk | exact Hne].
+Qed.
+
+(* the FLAGS field, in the shape [kxb_phdr_fields] states the other six
+   (a separate row so that lemma's six-way destructuring does not move) *)
+Lemma kxb_phdr_flags (f : elf_bytes) (g : nat -> bv 8) (o : nat) :
+  (forall j, (j < 56)%nat -> g j = f !!! (o + j)%nat) ->
+  le_at g 4 4 = ep_flags (kxb_phdr_at f o).
+Proof.
+  intros Hag. unfold kxb_phdr_at. cbn [ep_flags].
+  apply le_at_shift_of_list. intros j Hj.
+  replace (o + 4 + j)%nat with (o + (4 + j))%nat by lia.
+  apply Hag. lia.
+Qed.
+
+
+(* ====================================================================== *)
 (*  4.  THE FACT BUNDLE THE CONE CARRIES TO ITS ENTRY-POINT HOLE          *)
 (* ====================================================================== *)
 
@@ -1599,4 +2039,11 @@ Definition kexec_built (f : elf_bytes) (ef : nat -> bv 8) (sz1 : mword 64)
   /\ kxb_stack_at (uint sz1) alen na (us_M U')
   /\ (kxb_walk_ok f ef -> uimg_sub (elf_image f) (us_M U'))
   /\ (kxb_walk_ok f ef ->
-        uint sz1 = pgroundup (kexec_sz_after (elf_loads f)) + 2 * PGSIZE).
+        uint sz1 = pgroundup (kexec_sz_after (elf_loads f)) + 2 * PGSIZE)
+  (* S6: THE PERMISSION PROJECTION the run built, at the stack top the
+     size row names.  [KexecAUBridge] turns it into
+     [SpecKexecAU.kexec_image_ok]'s [kxb_perm_ok f (kexec_top f)
+     (uvis_perm W')] with [KexecImageAlg.kexec_top_of_sz_after]. *)
+  /\ (kxb_walk_ok f ef ->
+        kxb_perm_ok f (pgroundup (kexec_sz_after (elf_loads f)))
+          (perm_of (ud_um (pv_upt (us_V U'))) (uint sz1))).

@@ -57,6 +57,8 @@ Require Import FdSlots.         (* [fdstate]                               *)
 Require Import ElfEnc.          (* [le_at]                                 *)
 Require Import ElfFile.         (* [elf_entry] / [elf_image]               *)
 Require Import ElfBridge.       (* [kxq_entry_of_ehdr]                     *)
+Require Import UserPtTree.      (* [ud_um]: the user leaf map               *)
+Require Import UserPerm.        (* [perm_of]: the permission projection     *)
 Require Import UexecSlot.       (* [uvis_of] / [tf_w]                      *)
 Require Import SpecKexec.       (* [kexec_ok] / [kxc_tf] / [kxc_sp_final]  *)
 Require Import KexecOkQ.        (* [kexec_ok_q] / [kxq_entry]              *)
@@ -123,7 +125,8 @@ Proof.
   destruct Hok as [(Hr & _) | Hok]; [by contradiction |].
   destruct Hok as (Hr & Hna & Hstok & Hpsz & Hspv & Htfp & Htf
                    & Hof & Hfdg & Hcwd & Hnm & Hlo & Hhi).
-  destruct Hbuilt as (Hsz & Hargs & Hstk & Himg & Hsize); cbn in Hsz, Hargs, Hstk, Himg, Hsize.
+  destruct Hbuilt as (Hsz & Hargs & Hstk & Himg & Hsize & Hperm);
+    cbn in Hsz, Hargs, Hstk, Himg, Hsize, Hperm.
   destruct Hload as (Hwf & (e0 & He0 & Hpo) & Hfa & Hasc).
   (* (4): the walk's guard, from loadability *)
   assert (Hwalk : kxb_walk_ok f ef).
@@ -155,6 +158,11 @@ Proof.
   assert (Hkeysz : uvis_sz (exec_key (MkUstate V' M') sts na) = uint (pv_sz V'))
     by (destruct V'; reflexivity).
   assert (Hkeyfd : uvis_fd (exec_key (MkUstate V' M') sts na) = sts)
+    by (destruct V'; reflexivity).
+  (* the key's PERMISSION view is the table the commit installed, projected
+     at the size it settled on (S6) *)
+  assert (Hkeyperm : uvis_perm (exec_key (MkUstate V' M') sts na)
+                     = perm_of (ud_um (pv_upt V')) (uint (pv_sz V')))
     by (destruct V'; reflexivity).
   (* the four reads *)
   assert (Hwpc : tf_w ws tf_epc_idx = entry).
@@ -196,6 +204,8 @@ Proof.
     split; [exact (Himg Hwalk) |].
     split; [apply kxb_args_at_kexec; rewrite <- Htop; exact Hargs |].
     split; [apply kxb_stack_at_kexec; rewrite <- Htop; exact Hstk |].
+    split; [rewrite Hkeyperm, Hsz, (kexec_top_of_sz_after f Hwf);
+            exact (Hperm Hwalk) |].
     split; [reflexivity | exact Hwlen].
   - right. rewrite <- Hentry.
     repeat (split; try assumption).

@@ -75,6 +75,7 @@ Require Import ProofKexecTail.
 Require Import SpecKexec.
 Require Import UmodeAbi.     (* [uimg_sub]                                 *)
 Require Import ElfFile.      (* [elf_image], [elf_loads]                   *)
+Require Import UserPerm.     (* [perm_of]: the permission projection (S6)     *)
 Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -640,7 +641,10 @@ Section KexecBSeam.
        (kxb_walk_ok (kxc_fb datl dnf) ef ->
           uimg_sub (elf_image (kxc_fb datl dnf)) Mi) /\
        (kxb_walk_ok (kxc_fb datl dnf) ef ->
-          (0 = kexec_sz_after (elf_loads (kxc_fb datl dnf)))%Z) ⌝ ∗
+          (0 = kexec_sz_after (elf_loads (kxc_fb datl dnf)))%Z) /\
+       (* ...and no segments means no segment pages to have permissions *)
+       (kxb_walk_ok (kxc_fb datl dnf) ef ->
+          kxb_perm_segs (kxc_fb datl dnf) P.(ud_um)) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1f2) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -732,7 +736,14 @@ Section KexecBSeam.
           [sz] is the [uvmalloc] fold over the PT_LOADs seen so far and each
           of their segments is already in the process's image. ---- *)
        (kxb_walk_ok (kxc_fb datl dnf) ef ->
-          kxb_at (kxc_fb datl dnf) ef i (uint szv) Mi) ⌝ ∗
+          kxb_at (kxc_fb datl dnf) ef i (uint szv) Mi) /\
+       (* ---- THE PERMISSION INVARIANT (S6), riding beside the image one:
+          every page [uvmalloc] mapped for a PT_LOAD seen so far still
+          holds a leaf whose projection is that header's own X/W pair.
+          Stated on the LEAF map, not on [perm_of]: the size index only
+          settles at [kxc_c_setup]'s uvmalloc. ---- *)
+       (kxb_walk_ok (kxc_fb datl dnf) ef ->
+          kxb_perm_leaves (kxc_fb datl dnf) ef i P.(ud_um)) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x12c) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -808,7 +819,11 @@ Section KexecBSeam.
        (kxb_walk_ok (kxc_fb datl dnf) ef ->
           uimg_sub (elf_image (kxc_fb datl dnf)) Mi) /\
        (kxb_walk_ok (kxc_fb datl dnf) ef ->
-          uint szv = kexec_sz_after (elf_loads (kxc_fb datl dnf))) ⌝ ∗
+          uint szv = kexec_sz_after (elf_loads (kxc_fb datl dnf))) /\
+       (* the permission invariant, at the walk's end: [kxb_perm_leaves] at
+          [phnum] IS the file's own segment list ([kxb_perm_leaves_done]) *)
+       (kxb_walk_ok (kxc_fb datl dnf) ef ->
+          kxb_perm_segs (kxc_fb datl dnf) P.(ud_um)) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1a4) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -868,7 +883,8 @@ Section KexecBSeam.
           as [kxc_fb datl dnf] -- phase B's caller instantiates it with
           exactly that. ---- *)
        (kxb_walk_ok fb ef -> uimg_sub (elf_image fb) Mi) /\
-       (kxb_walk_ok fb ef -> uint szv = kexec_sz_after (elf_loads fb)) ⌝ ∗
+       (kxb_walk_ok fb ef -> uint szv = kexec_sz_after (elf_loads fb)) /\
+       (kxb_walk_ok fb ef -> kxb_perm_segs fb P.(ud_um)) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1ae) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -1001,7 +1017,14 @@ Section KexecBSeam.
        (kxb_walk_ok fb ef -> uimg_sub (elf_image fb) Mi) /\
        (kxb_walk_ok fb ef ->
           (uint sz1 = UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
-                      + 2 * PGSIZE)%Z) ⌝ ∗
+                      + 2 * PGSIZE)%Z) /\
+       (* THE PERMISSION PROJECTION (S6), already at [perm_of]: past
+          [kxc_c_setup] the table is fixed ([proc_pt P Mi] keeps [P] across
+          every copyout) and so is the size, so the leaf rows are converted
+          once, there, and travel as the finished row. *)
+       (kxb_walk_ok fb ef ->
+          kxb_perm_ok fb (UserPtTree.pgroundup (kexec_sz_after (elf_loads fb)))
+            (perm_of P.(ud_um) (uint sz1))) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x218) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -1080,7 +1103,14 @@ Section KexecBSeam.
        (kxb_walk_ok fb ef -> uimg_sub (elf_image fb) Mi) /\
        (kxb_walk_ok fb ef ->
           (uint sz1 = UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
-                      + 2 * PGSIZE)%Z) ⌝ ∗
+                      + 2 * PGSIZE)%Z) /\
+       (* THE PERMISSION PROJECTION (S6), already at [perm_of]: past
+          [kxc_c_setup] the table is fixed ([proc_pt P Mi] keeps [P] across
+          every copyout) and so is the size, so the leaf rows are converted
+          once, there, and travel as the finished row. *)
+       (kxb_walk_ok fb ef ->
+          kxb_perm_ok fb (UserPtTree.pgroundup (kexec_sz_after (elf_loads fb)))
+            (perm_of P.(ud_um) (uint sz1))) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x268) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
@@ -1173,7 +1203,14 @@ Section KexecBSeam.
        (kxb_walk_ok fb ef -> uimg_sub (elf_image fb) Mi) /\
        (kxb_walk_ok fb ef ->
           (uint sz1 = UserPtTree.pgroundup (kexec_sz_after (elf_loads fb))
-                      + 2 * PGSIZE)%Z) ⌝ ∗
+                      + 2 * PGSIZE)%Z) /\
+       (* THE PERMISSION PROJECTION (S6), already at [perm_of]: past
+          [kxc_c_setup] the table is fixed ([proc_pt P Mi] keeps [P] across
+          every copyout) and so is the size, so the leaf rows are converted
+          once, there, and travel as the finished row. *)
+       (kxb_walk_ok fb ef ->
+          kxb_perm_ok fb (UserPtTree.pgroundup (kexec_sz_after (elf_loads fb)))
+            (perm_of P.(ud_um) (uint sz1))) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x29c) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
