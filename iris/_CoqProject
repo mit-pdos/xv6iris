@@ -1433,6 +1433,12 @@ InodeDefs.v
 SpecSysUnlink.v
 ProofSysUnlinkParts.v
 ProofSysUnlinkTails.v
+ProofSysUnlinkShared.v
+ProofSysUnlinkW1.v
+ProofSysUnlinkW2.v
+ProofSysUnlinkW3.v
+ProofSysUnlinkW5File.v
+ProofSysUnlinkW5Dir.v
 ProofSysUnlink.v
 LinkSysUnlink.v
 ProofSyscall.v

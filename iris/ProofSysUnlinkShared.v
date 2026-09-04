@@ -489,7 +489,7 @@ Lemma su_pn_below `{XI : CurCtx} (lks : gset string) :
   locks_below lks "log" -> locks_below lks "pr".
 Proof. intros H. apply (locks_below_mono lks "log" "pr" H). vm_compute; lia. Qed.
 (* ==================================================================== *)
-(*  ProofSysUnlink.v -- the seal. *)
+(*  ProofSysUnlinkShared.v -- sys_unlink's shared vocabulary. *)
 (*                                                                      *)
 (*  Split out of ProofSysUnlink.v FOR THE BUILD DAG: the five block      *)
 (*  lemmas are mutually independent (each seam is the NEXT block's        *)
@@ -498,26 +498,6 @@ Proof. intros H. apply (locks_below_mono lks "log" "pr" H). vm_compute; lia. Qed
 (*  file makes its own [Tails] and the vocabulary they share             *)
 (*  (ProofSysUnlinkShared.v) needs no functor argument at all.            *)
 (* ==================================================================== *)
-
-Require Import ProofSysUnlinkShared.
-Require Import ProofSysUnlinkW1 ProofSysUnlinkW2 ProofSysUnlinkW3.
-Require Import ProofSysUnlinkW5File ProofSysUnlinkW5Dir.
-
-Module SysUnlinkProof (Argstr : ARGSTR) (BeginOp : BEGIN_OP)
-                      (Nameiparent : NAMEIPARENT) (Ilock : ILOCK)
-                      (Namecmp : NAMECMP) (Dirlookup : DIRLOOKUP)
-                      (Memset : MEMSET) (Readi : READI) (Writei : WRITEI)
-                      (Iupdate : IUPDATE) (Iunlockput : IUNLOCKPUT)
-                      (EndOp : END_OP) (PN : PANIC) : SYSUNLINK.
-
-  Module MW1 := SysUnlinkW1 Iunlockput EndOp PN Argstr BeginOp Nameiparent.
-  Module MW2 := SysUnlinkW2 Iunlockput EndOp PN Ilock Namecmp Dirlookup.
-  Module MW3 := SysUnlinkW3 Iunlockput EndOp PN Ilock Readi.
-  Module MWF := SysUnlinkW5File Iunlockput EndOp PN Memset Writei Iupdate.
-  Module MWD := SysUnlinkW5Dir Iunlockput EndOp PN Memset Writei Iupdate.
-  Import MW1. Import MW2. Import MW3. Import MWF. Import MWD.
-
-Module Tails := SysUnlinkTails Iunlockput EndOp PN.
 
 Section ProofSysUnlinkBody.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
@@ -534,161 +514,172 @@ Section ProofSysUnlinkBody.
   Notation Ra4 := (mword_of_int 14 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
+  (* ================================================================== *)
+  (*  THE FOUR SPLITS AND THE TWO PER-SLOT PROJECTIONS W2 NEEDS          *)
+  (* ================================================================== *)
 
-
-  (* ==================================================================== *)
-  (*  **THE SEAL.**  W1 ∘ W2 ∘ W3 ∘ {W5-FILE, W5-DIR}, and nothing else.  *)
-  (*                                                                      *)
-  (*  Every block is a landed lemma and every seam is the next block's     *)
-  (*  premise list verbatim, so this composes rather than proves: the only *)
-  (*  work is naming the seam's ∀-bound bundle and handing the caller's    *)
-  (*  exit BACK at each stage (durable-notes, "chaining two halves").      *)
-  (*  [trap_csrs_ext eb] and [cpu_claim_ext eb] are DROPPED at entry --    *)
-  (*  both are [emp] at [eb = true], which this contract's own premise     *)
-  (*  forces -- and the exit continuation the walk hands on is the         *)
-  (*  caller's own, which still demands them, so nothing is lost.          *)
-  (*                                                                      *)
-  (*  The T_DIR arm takes NO design-fact premise any more: (D1) and (D2)   *)
-  (*  are derived inside [su_w5_dir] (V5' increment W).                    *)
-  (* ==================================================================== *)
-  Lemma wp_sys_unlink_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
-      (gf : gname)
-      (gs : list gname) (jx : nat) (gl : gname)
-      (pd pav pu : mword 64)
-      (dqb dqs dqbs : dfrac) (v0 : mword 64)
-      (pid : mword 32) (U : ustate)
-      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :
-    SpecSysUnlink.wp_sys_unlink_sconf_body gf gs jx gl pd pav
-      pu
-      dqb dqs dqbs v0 pid U m K eb b lks.
+  (* the two per-slot projections out of the boot families, at the copies
+     THIS contract names ([ic_escrows] is IcacheEscrow's, [ic_sleeplocks]
+     SpecDirlink's). *)
+  Lemma su_esc_acc `{XI : CurCtx} `{GEN : GenId}
+      (k : nat) :
+    (k < NINODE)%nat ->
+    (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
+     : iProp Σ).
   Proof.
-    cbv beta zeta delta [SpecSysUnlink.wp_sys_unlink_sconf_body].
-    intros HK HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
-           Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hnib16 Hprk Hj Hgl Heb Harg0.
-    iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hprenv #Hbio #Hlog
-             Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows
-             #Hslks #Hireg #Hropen Hsbb Hsbi Hsbs #Hbmres #Hkenv #Hprocs Hir Hpriv
-             Hcont".
-    iPoseProof (printk_env_panic with "Hprenv") as "#Hpenv".
-    (* ---- W1, +0x00..+0x2e: the prologue, argstr, begin_op, nameiparent ---- *)
-    iApply (su_w1 gf gs jx gl pd pav pu
- dqb dqs dqbs
-              v0 pid U m K eb b lks HK HdevR Hnib0
-              Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb
-              Harg0
-              with "Hcg Hown Htext Hdata Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hropen
-                    Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hir Hpriv [] Hcont").
-    iIntros (CIDa Ms P1 n1 Sb1 w1 dpv nf bp bnm0 bd be w4 w5 w6 w27 w30).
-    iIntros "%Hal %Hregs1 %Hma01 %Hupt1 %Hn1 %Hw1 %Hdpvnz
-             Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv Hir
-             Hheld HopS Htx Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27 HbE
-             H30 Hcont".
-    (* ---- W2, +0x30..+0x6e: ilock(dp), the two namecmp refusals,
-       dirlookup ---- *)
-    iApply (su_w2 gf gs jx gl pd pav pu
- dqb dqs dqbs
-              pid U P1 n1 Sb1 w1 dpv nf bnm0 bp bd be w4 w5 w6 w27 w30
-              m Ms (m !!! Regidx csp_rs1 : mword 64) K eb b lks
-              HK Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog
-              Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hregs1 Hma01 Hn1
-              Hupt1
-              with "Hcg Hown Htext Hdata Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hropen
-                    Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hir Hpriv Hheld HopS Htx
-                    Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27 HbE H30
-                    [] Hcont").
-    iIntros (CIDb M2 kd ks kk gild gisld gyd loyd tlyd qdi sd qs dinum dnd bmd datd lo t).
-    iIntros "%Hregs2 %Hkd %Hks %Hdinb %Htydir %Hiok %Hrl_datd %Hdok %Hddix
-             %Hdoc %Hduq
-             %Hnotdot %Hnotdd %Hfst %Hma02 %Hal27
-             Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
-             Hslkd Hslkdq %Hleyd #Hflyd #Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS Htx
-             Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
-             Hcont".
-    (* ---- W3, +0x72..+0x88: ilock(ip), the nlink panic, the T_DIR test
-       (and, on the taken arm, the whole isdirempty loop through W4) ---- *)
-    iPoseProof (printk_env_panic with "Hprenv") as "#Hpetop".
-    iApply (su_w3 gf gs jx gl pd pav pu
- dqb dqs dqbs
-              pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd qdi sd qs loyd tlyd
-              dinum dnd bmd datd lo nf bnm0 bp bd be w5 w6 w30
-              m M2 (m !!! Regidx csp_rs1 : mword 64) K eb b lks t
-              HK Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog
-              Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hn1 Hupt1 Hregs2
-              Hkd Hks Hdinb Htydir Hiok Hrl_datd Hdok Hddix Hdoc Hduq
-              Hnotdot Hnotdd
-              Hfst Hma02 Hal27
-              with "Hcg Hown Htext Hdata Hpetop Hpc Hbio Hlog Hseam Hgen Hdev Hgeo
-                    Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hropen Hsbb Hsbi
-                    Hsbs Hbmres Hkenv Hprocs Hpriv Hslkd Hslkdq
-                    [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad
-                    Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS Htx
-                    Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
-                    HbE H30 [] Hcont").
-    iIntros (CIDc M3 s3x bex isdir gili gisli gyi si qsi loyi tlyi dni bmi dati).
-    iIntros "%Hregs3 %Hnlzi %Hioki %Hrl_dati %Hdoki %Hddixi %Hdoci %Hduqi
-             %Hisd
-             Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
-             Hslkd Hslkdq %Hleyd5 #Hflyd5 #Hclaimsyd5 Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd Hfrz Hkeepd Hrud
-             Hslki Hslkiq %Hleyi #Hflyi #Hclaimsyi Hdepi Hoffri Hidevi Hiinumi Hivalidi Hdlnki
-             Hdiati Hmetai Haddrsi Hindi Hblocksi Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
-             Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
-             Hcont".
-    (* ---- W5, +0x8a..: the zeroing and the two tails, split on the seam's
-       own index.  The FILE arm is [su_w5_file]; the T_DIR arm is
-       [su_w5_dir], which since V5' increment W derives (D1) and (D2)
-       internally and takes neither as a premise. ---- *)
-    destruct isdir.
-    - destruct Hisd as (Htyzi & Hdots & Hdead).
-      iApply (su_w5_dir gf gs jx gl pd pav pu
+    iIntros (Hk) "H".
+    iApply (ic_escrows_lookup fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k Hk with "H").
+  Qed.
 
-                dqb dqs dqbs pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd
-                qdi sd qs loyd tlyd dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
-                gili gisli gyi si qsi loyi tlyi dni bmi dati
-                m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks t
-                HK Hprk Hnib0 Hgeom Hsize Hbm0
-                Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hn1
-                Hupt1 Hkd Hks Hdinb Htydir Hiok Hrl_datd Hdok Hddix Hdoc Hduq
-                Hnotdot Hnotdd Hfst Hal27 Hregs3 Hnlzi Hioki Hrl_dati Hdoki
-                Hddixi
-                Hdoci Hduqi Htyzi Hdots Hdead
-                with "Hcg Hown Htext Hdata Hprenv Hpc Hbio Hlog Hseam
-                      Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg Hropen
-                      Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
-                      Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd
-                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd
-                      Hfrz Hkeepd Hrud Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hoffri Hidevi Hiinumi
-                      Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
-                      Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
-                      Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
-                      HbE H30 Hcont").
-    - iApply (su_w5_file gf gs jx gl pd pav pu
+  Lemma su_slk_acc `{XI : CurCtx} `{GEN : GenId} (k : nat) :
+    (k < NINODE)%nat ->
+    (ic_sleeplocks fsc_ic -∗
+     ∃ gil gisl : gname,
+       is_sleeplock_genl gil gisl (i_lock (ientry k)) "inode"%string
+                        (ic_slp fsc_ic k) (slh_tok (icfg_isl k))
+     : iProp Σ).
+  Proof.
+    iIntros (Hk) "H". rewrite /ic_sleeplocks.
+    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
+    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
+  Qed.
 
-                dqb dqs dqbs pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd
-                qdi sd qs loyd tlyd dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
-                gili gisli gyi si qsi loyi tlyi dni bmi dati
-                m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks t
-                HK Hprk Hnib0 Hgeom Hsize Hbm0
-                Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hn1
-                Hupt1 Hkd Hks Hdinb Htydir Hiok Hrl_datd Hdok Hddix Hdoc Hduq
-                Hnotdot Hnotdd Hfst Hal27 Hregs3 Hnlzi Hioki Hrl_dati Hdoki
-                Hddixi
-                Hdoci Hduqi Hisd
-                with "Hcg Hown Htext Hdata Hprenv Hpc Hbio Hlog Hseam
-                      Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg Hropen
-                      Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
-                      Hslkd Hslkdq [//] Hflyd Hclaimsyd Hdepd Hoffrd Hidevd Hiinumd Hivalidd
-                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop Hshotd
-                      Hfrz Hkeepd Hrud Hslki Hslkiq [//] Hflyi Hclaimsyi Hdepi Hoffri Hidevi Hiinumi
-                      Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
-                      Htopi Hshoti Hfrzi Hkeepi Hrui HopS Htx
-                      Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
-                      HbE H30 Hcont").
+  Lemma su_bs3 `{XI : CurCtx} :
+    (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
+  Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
+
+  (* THE GENERATION-NAMED SHED.  [IcacheRef.inode_ref_shed] loses the
+     generation, and nameiparent's [inode_held_ty] payout is exactly the
+     claim that the share handed to ilock names the SAME generation as the
+     type one-shot beside it -- which is what turns the parent's promised
+     T_DIR into [di_type dnd = T_DIR] at the record ilock returns.  Pure
+     resource algebra; its home is [IcacheRef.v] and it is here for that
+     file's rebuild-cone reason. *)
+  Lemma su_carve_gen `{XI : CurCtx} (k : nat) (q s : Qp) (dv inum : mword 32) (gy : gname) :
+    inode_ref_gen k (q + s)%Qp dv inum gy ⊣⊢
+    inode_ref_short_gen k (q + s)%Qp q dv inum gy ∗ inode_shr_gen k s dv inum gy.
+  Proof. apply inode_ref_carve_gen. Qed.
+
+  Lemma su_shed_gen `{XI : CurCtx} (k : nat) (q : Qp) (dv inum : mword 32) (gy : gname) :
+    inode_ref_gen k q dv inum gy ⊣⊢
+    inode_ref_short_gen k (q/2 + q/2)%Qp (q/2)%Qp dv inum gy ∗
+    inode_shr_gen k (q/2)%Qp dv inum gy.
+  Proof.
+    pose proof (su_carve_gen k (q/2)%Qp (q/2)%Qp dv inum gy) as Hc.
+    by rewrite {1}(Qp.div_2 q) in Hc.
+  Qed.
+
+  Lemma su_dot_window `{XI : CurCtx} `{GEN : GenId} (a : mword 64) :
+    a = mword_of_int su_dot_addr ->
+    kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ□ su_dot_f j).
+  Proof.
+    intros ->. iApply (kernel_data_bytes su_dot_addr 14 su_dot_f _ eq_refl
+                         ltac:(unfold text_end, su_dot_addr; lia)
+                         ltac:(vm_compute; discriminate)).
+    intros j Hj.
+    do 14 (destruct j as [|j]; [vm_compute; reflexivity |]).
+    exfalso. lia.
+  Qed.
+
+  Lemma su_dotdot_window `{XI : CurCtx} `{GEN : GenId} (a : mword 64) :
+    a = mword_of_int su_dotdot_addr ->
+    kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ□ su_dotdot_f j).
+  Proof.
+    intros ->. iApply (kernel_data_bytes su_dotdot_addr 14 su_dotdot_f _ eq_refl
+                         ltac:(unfold text_end, su_dotdot_addr; lia)
+                         ltac:(vm_compute; discriminate)).
+    intros j Hj.
+    do 14 (destruct j as [|j]; [vm_compute; reflexivity |]).
+    exfalso. lia.
+  Qed.
+
+  (* ================================================================== *)
+  (*  THE isdirempty [de] RECORD'S BYTE VIEWS -- two bytes as the [lhu]'s *)
+  (*  halfword, fourteen riding.  [ProofDirlookupParts]' shapes, restated *)
+  (*  for that file's whole-function reason.                             *)
+  (* ================================================================== *)
+
+  Lemma su_del_split `{XI : CurCtx} (a : Arch.pa) (f : nat -> bv 8) :
+    ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[KT1] f j)
+    ⊣⊢ ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[KT1] f j)
+       ∗ ([∗ list] j ∈ seq 0 14, pa_add (pa_add a 2) j ↦ₘ[KT1] f (2 + j)%nat).
+  Proof. exact (bb_split a 2 14 f). Qed.
+
+  Lemma su_half_acc `{XI : CurCtx} (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
+    is_aligned_paddr (Physaddr a) 2 = true ->
+    ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[KT1] file_byte data (16 * i + j)%nat)
+    ⊣⊢ a ↦₂[KT1] dir_inum data i.
+  Proof.
+    intro Hal.
+    rewrite (bb_ext (KTR := KT1) a 2 (fun j => file_byte data (16 * i + j)%nat)
+                        (fun j => nth_byte (dir_inum data i) j)
+               (fun j Hj => eq_sym (su_half_bytes_eq data i j Hj))).
+    iSplit.
+    - iIntros "H".
+      iApply (ctx_word2_pointsto_intro (KTR := KT1) cur_ctx a (DfracOwn 1) (dir_inum data i) Hal).
+      iExact "H".
+    - iIntros "H". iApply (ctx_word2_pointsto_bytes (KTR := KT1) with "H").
+  Qed.
+
+  Lemma su_name_acc `{XI : CurCtx} (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
+    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] file_byte data (16 * i + (2 + j))%nat)
+    ⊣⊢ ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] dir_name data i j).
+  Proof.
+    apply (bb_ext (KTR := KT1) a 14 (fun j => file_byte data (16 * i + (2 + j))%nat)
+                       (dir_name data i)
+             (fun j _ => su_name_shift data i j)).
+  Qed.
+
+  (* the whole record, split for the [lhu] and put back *)
+  Lemma su_de_view `{XI : CurCtx} (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
+    is_aligned_paddr (Physaddr a) 2 = true ->
+    ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ[KT1] file_byte data (16 * i + jj)%nat)
+    ⊣⊢ a ↦₂[KT1] dir_inum data i
+       ∗ ([∗ list] jj ∈ seq 0 14, pa_add (pa_add a 2) jj ↦ₘ[KT1] dir_name data i jj).
+  Proof.
+    intro Hal.
+    rewrite -(su_half_acc data i a Hal).
+    rewrite -(su_name_acc data i (pa_add a 2)).
+    exact (su_del_split a (fun jj => file_byte data (16 * i + jj)%nat)).
+  Qed.
+
+  (* readi's sixteen delivered bytes ARE the record's bytes at [tot = 16] *)
+  Lemma su_rdd_view `{XI : CurCtx} (data : nat -> list (bv 8)) (olds : nat -> bv 8)
+      (i : nat) (a : Arch.pa) :
+    ([∗ list] jj ∈ seq 0 16,
+       pa_add a jj ↦ₘ[KT1] rd_delivered data olds (16 * i)%nat 16 jj)
+    ⊣⊢ ([∗ list] jj ∈ seq 0 16,
+          pa_add a jj ↦ₘ[KT1] file_byte data (16 * i + jj)%nat).
+  Proof.
+    apply (bb_ext (KTR := KT1) a 16
+             (fun jj => rd_delivered data olds (16 * i)%nat 16 jj)
+             (fun jj => file_byte data (16 * i + jj)%nat)
+             (fun jj Hj => su_rdd_eq data olds (16 * i)%nat jj Hj)).
+  Qed.
+
+  (* the [&off] argument's address, re-based on the PUSHED sp so that
+     [StackOwn.stack_off_nonzero] applies: slot 27's upper word is
+     [sp + 28] once the frame is down.  NEVER [vm_compute] this goal whole
+     ([su_offcell]'s warning); compose the shifts symbolically first. *)
+  Lemma su_offcell_sp `{XI : CurCtx} `{GEN : GenId} (X : mword 64) :
+    pa_add (pa_stk X 27) 4 = pa_add (pa_stk X 30) 28.
+  Proof.
+    unfold pa_add, pa_stk. rewrite !avi_assoc. unfold add_vec_int.
+    f_equal; try (apply bv_eq; vm_compute; reflexivity).
+  Qed.
+
+  (* the sp bound the capability underwrites, [ProofSysClose.sc_sp_bounds]'
+     shape.  [0 < k] is mandatory: [trap_res false] is nothing, so at the
+     interrupts-off arm the caller's own slots are all that bound sp. *)
+  Lemma su_sp_bounds `{GEN : GenId} `{CIDh : CpuId} `{XI : CurCtx} (M : regfile) (k : nat)
+      (b : bool) (pp : mword 64) :
+    (0 < k)%nat ->
+    sie_cap_gpr KT1 M k b pp -∗
+    ⌜(8 <= uint (M !!! Regidx csp_rs1) < 274877906944 + 8)%Z⌝.
+  Proof.
+    iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
+    iApply (stack_own_sp_bounds (KTR := KT1) _ (trap_res b + k)%nat with "Hstk").
+    destruct b; unfold trap_res; lia.
   Qed.
 
 End ProofSysUnlinkBody.
-
-End SysUnlinkProof.
