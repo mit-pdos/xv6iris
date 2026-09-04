@@ -849,7 +849,7 @@ Section ProofSysOpenAUAlloc.
                 (di_major dn) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb dqs U sts m M7 sp0 K eb b
                 lks w6 w24 bp
                 data vom pl P Pmiss Φo Φt
-                (FdDevice (bv_unsigned (di_major dn)))
+                (FdDevice (bv_unsigned (di_major dn))) 1%positive
                 Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl
                 Hlkempty Hkf Hfdlt Hlen Hfrees (or_intror eq_refl) Hdir
@@ -963,13 +963,20 @@ Section ProofSysOpenAUAlloc.
     assert (Hndz : bv_unsigned (di_type dn) <> FsImg.T_DEVICE_z).
     { intros Hc. apply Hnd3. apply bv_eq. rewrite Hc.
       vm_compute. reflexivity. }
+    (* THE OFFSET SHADOW IS MINTED HERE, beside the word the store just
+       wrote: the AU's descriptor type [FdInode inum γo] has to name it
+       before the publication runs, so the name exists from the store on
+       and the box is born holding both (ProofSysOpenParts.so_deposit). *)
+    iApply fupd_wp.
+    iMod (off_gv_alloc (bv_unsigned (mword_of_int 0 : mword 32))) as (γo) "Hgv".
+    iModIntro.
     iApply (Stores.so_stores_au (CID0 := CID16) gf gs jx gl pd pav pu
               gil gisl
  kk qi s gy loy tly inum dn bm kf fd ll pn FD_INODE
               (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
               (fc_major Cf) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb
               dqs U sts m M8 sp0 K eb b lks w6 w24 bp
-              data vom pl P Pmiss Φo Φt (FdInode (bv_unsigned inum))
+              data vom pl P Pmiss Φo Φt (FdInode (bv_unsigned inum) γo) γo
               Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
               Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty
               Hkf Hfdlt Hlen Hfrees (or_introl eq_refl) Hdir
@@ -981,10 +988,10 @@ Section ProofSysOpenAUAlloc.
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                     Hitinv Hesck Hireg Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffr Hidev Hiinum
                     Hivalid Hflat Hshot Hfrz Hkeep Hru Hfref Hflive Hfpn Hfty Hfrd
-                    Hfwr Hfpip Hfmaj Hfip [Hfoff] Hiru Hcore Howe Hprocs Hdev Hgeo
+                    Hfwr Hfpip Hfmaj Hfip [Hfoff Hgv] Hiru Hcore Howe Hprocs Hdev Hgeo
                     Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hfrag Hauth Hf1 Hf2 Hf3 Hf4
                     Hf5 Hf6 HbP H23lo H23hi H24 HP Hobs Htc Hcont").
-    { try (rewrite (bool_decide_eq_true_2 _ eq_refl)). iExact "Hfoff". }
+    { try (rewrite (bool_decide_eq_true_2 _ eq_refl)). iFrame "Hfoff Hgv". }
   Qed.
 
 End ProofSysOpenAUAlloc.

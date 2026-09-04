@@ -151,8 +151,9 @@ Definition wp_fileread_au_body
     (fn : fread_names)                           (* the heavy arms' ghosts  *)
     (pidv : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
-    (wb : bool) (i : Z)                          (* the descriptor's mode
-                                                    bit and its inum        *)
+    (wb : bool) (i : Z) (γo : gname)             (* the descriptor's mode
+                                                    bit, its inum and its
+                                                    offset shadow           *)
     (Φr : aview -> nat -> anode -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileread in
   let pj := proc_addr j in
@@ -170,7 +171,7 @@ Definition wp_fileread_au_body
   (* EDIT 1: THE DESCRIPTOR IS AN OPEN, READABLE INODE AT [i].  The pipe,
      device and panic arms, and the [f->readable == 0] early return, are out
      of this contract's domain by premise. *)
-  st = FdOpen true wb (FdInode i) ->
+  st = FdOpen true wb (FdInode i γo) ->
   eb = true ->
   locks_below lks "bcache" ->
   sie_cap_gpr KT1 m K b pj -∗
@@ -223,8 +224,8 @@ Module Type FILEREAD_AU.
       (fn : fread_names)
       (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool)
-      (lks : gset string) (wb : bool) (i : Z)
+      (lks : gset string) (wb : bool) (i : Z) (γo : gname)
       (Φr : aview -> nat -> anode -> iProp Σ),
       wp_fileread_au_body γf γs j γlp k q st fn pidv U m K eb n b lks
-        wb i Φr.
+        wb i γo Φr.
 End FILEREAD_AU.

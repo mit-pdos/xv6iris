@@ -864,16 +864,21 @@ Section ProofSysOpenPublish.
      ([wp_store_s_sconf_free_gen]); this step births the box on it, mints
      the share and inserts the L2 row into the inode's set -- the creator
      deposits and never absorbs.  Yields the fd's whole share. *)
-  Lemma so_deposit `{XI : CurCtx} `{CID : CpuId} (E : coPset) (kk kf : nat) (C : fcontent) :
+  (* [γo] IS THE OFFSET SHADOW'S NAME, minted by the caller beside the
+     stored word ([FileOffCell.off_gv γo 1 0] inside [off_resident]) and
+     deposited into the box with it; it is what the published descriptor's
+     [FdSlots.FdInode] reports. *)
+  Lemma so_deposit `{XI : CurCtx} `{CID : CpuId} (E : coPset) (kk kf : nat) (γo : gname)
+      (C : fcontent) :
     ↑(offBoxN .@ kf) ⊆ E ->
     (kk < NINODE)%nat ->
     fc_ip C = ientry kk ->
     fc_type C = FD_INODE ->
     own_context cur_ctx -∗
-    off_resident kf -∗
+    off_resident γo kf -∗
     off_rows off_cfg kk cur_ctx ={E}=∗
     own_context cur_ctx ∗ off_rows off_cfg kk cur_ctx ∗
-    ∃ γb : box_names, off_fd kf 1 γb C.
+    ∃ γb : box_names, off_fd kf 1 γb γo C.
   Proof.
     iIntros (HE Hkk Hip Hty) "Hctx Hres Hrows".
     (* the fd's box: four fresh ghosts, then the birth (OffBox.off_publish_park) *)
@@ -883,7 +888,7 @@ Section ProofSysOpenPublish.
     iMod (ghost_var_alloc (inhabitant : slot_reg nat unit)) as (γd) "Hd".
     iMod (ghost_var_alloc (inhabitant : l2_reg nat)) as (γp) "Hp".
     set (γb := BoxNames γs γc γd γp).
-    iMod (off_publish_park off_cfg kk kf γb cur_ctx E HE
+    iMod (off_publish_park off_cfg kk kf γb γo cur_ctx E HE
             with "Hst Hc Hd Hp Hctx Hres Hrows")
       as "(Hctx & #Hbox & %T0 & %T & Hregd & Hllb & Hcnt & Href & #Hmem & Hrows)".
     iModIntro. iFrame "Hctx Hrows". iExists γb.
@@ -896,7 +901,8 @@ Section ProofSysOpenPublish.
 
   Lemma so_publish `{XI : CurCtx} (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)
       (gy : gname) (inum : mword 32) (ty : bv 16) (C : fcontent)
-      (pn : fpnames) (γb : box_names) (om : mword 32) (rb wb : bool) (lo tl : nat) :
+      (pn : fpnames) (γb : box_names) (γo : gname) (om : mword 32) (rb wb : bool)
+      (lo tl : nat) :
     (* r25 shapes (items 15/16): the parked ident fraction is PINNED to the
        travelling share's -- sys_open lends exactly half of the incoming
        reference's share fraction, so [inode_pay_alloc] parks at [Q + Q]. *)
@@ -948,12 +954,12 @@ Section ProofSysOpenPublish.
     (* item 24: the share from [so_deposit] at FD_INODE, the free word at
        FD_DEVICE; [fpay_tok_update] records [fp_obox := γb] (the creator
        still holds the token whole after fdalloc, note 4) *)
-    (if bool_decide (fc_type C = FD_INODE) then off_fd kf 1 γb C else off_free kf 1) -∗
+    (if bool_decide (fc_type C = FD_INODE) then off_fd kf 1 γb γo C else off_free kf 1) -∗
     (* AT THE STATE THE PUBLISHED FILE GIVES ITS DESCRIPTOR, which is the
        output sys_open then installs in the fd's ghost.  [st] is determined
-       by [C] and [inum] ([fdstate_ok_inj]); it is a parameter rather than a
-       projection because [fdstate_ok] is a relation -- see its note. *)
-    |={E}=> ∃ st : fdstate, ⌜fdstate_ok inum C st⌝ ∗ file_ref gf kf 1 st.
+       by [C], [inum] and [γo] ([fdstate_ok_inj]); it is a parameter rather
+       than a projection because [fdstate_ok] is a relation -- see its note. *)
+    |={E}=> ∃ st : fdstate, ⌜fdstate_ok inum γo C st⌝ ∗ file_ref gf kf 1 st.
   Proof.
     intros Hqs HEi Hkk Hinb Hip Hty Hwrb Hrdb Hwdb Hdir Hdvw Hle. subst qi.
     iIntros "#Hfl Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hcoff".
@@ -975,7 +981,7 @@ Section ProofSysOpenPublish.
             with "Hkeep Hru Hs Hshot")
       as (gx) "Hpay".
     iMod (fpay_tok_update gf kf pn
-            (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy inum γb) with "Hnames")
+            (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy inum γb γo) with "Hnames")
       as "Hnames".
     iModIntro.
     assert (Hnp : bool_decide (fc_type C = FD_PIPE) = false).
@@ -987,9 +993,9 @@ Section ProofSysOpenPublish.
       - rewrite bool_decide_true; [reflexivity | reflexivity].
       - rewrite orb_true_r. reflexivity. }
     set (stpub := if bool_decide (fc_type C = FD_INODE)
-                  then FdOpen rb wb (FdInode (bv_unsigned inum))
+                  then FdOpen rb wb (FdInode (bv_unsigned inum) γo)
                   else FdOpen rb wb (FdDevice (bv_unsigned (fc_major C)))).
-    assert (Hokpub : fdstate_ok inum C stpub).
+    assert (Hokpub : fdstate_ok inum γo C stpub).
     { rewrite /stpub. destruct Hty as [Ht | Ht].
       - rewrite (bool_decide_true _ Ht). cbn. by repeat split.
       - rewrite bool_decide_false.
@@ -999,10 +1005,10 @@ Section ProofSysOpenPublish.
     iExists stpub. iSplitR; [iPureIntro; exact Hokpub|].
     rewrite /file_ref /file_pay_st /file_core /file_core_noff /file_core_off.
     iExists C. iFrame "Href Hflds Hlive".
-    iExists (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy inum γb).
-    cbn [fp_inum]. iSplitR; [iPureIntro; exact Hokpub|].
+    iExists (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy inum γb γo).
+    cbn [fp_inum fp_ooff]. iSplitR; [iPureIntro; exact Hokpub|].
     iFrame "Hnames". rewrite Hnp Hor.
-    cbn [fp_icv fp_iq fp_ig fp_obox].
+    cbn [fp_icv fp_iq fp_ig fp_obox fp_ooff].
     rewrite Hip. iFrame "Hpay". iExact "Hcoff".
   Qed.
 

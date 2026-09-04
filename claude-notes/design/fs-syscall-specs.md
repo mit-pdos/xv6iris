@@ -190,12 +190,12 @@ root_is r    :=  ⌜r = ROOTINO⌝                    (* pure; a literal *)
 cwd ↦ i      :=  the cwd leg of ProcInv.proc_priv  (* landed; create and
                    namex already consume it via proc_priv_cwd_pid *)
 fd f ↦ (i,om) :=  the landed fd-state fragment (FdSlots.fd_frags, row f):
-                   FdOpen (FdInode i) carries the INUM since d1411776;
-                   the mode rides fcontent's readable/writable.  The
-                   OFFSET is the one datum with no ghost of its own —
-                   it lives in fcontent behind file_ref, and the
-                   read/write AU forms bind it there (lane A prices
-                   whether a client-facing offset reading needs a seam).
+                   FdOpen (FdInode i γo) carries the INUM and the name of
+                   the OFFSET SHADOW (a ghost_var over Z equal to f->off,
+                   owned whole by the kernel inside the off box for now --
+                   design/file-table.md, "The offset SHADOW"); the mode
+                   rides fcontent's readable/writable.  The read/write AU
+                   forms take γo and do not yet step it.
 state av     :=  the abs_of-fmap reading of fs_view's γtop authority
                    (FsState.fs_view = ∃ S, ghost_map_auth (γtop Γ) 1
                    (fss_inodes S) ∗ fs_state Γ S) — §9 Q3, RULED as

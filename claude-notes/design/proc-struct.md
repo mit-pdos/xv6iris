@@ -1037,7 +1037,7 @@ pointers.  So the user-visible state is carried as GHOST STATE beside the
 array:
 
 ```coq
-Inductive fdtype  := FdInode (inum : Z) | FdPipe | FdDevice (major : Z).
+Inductive fdtype  := FdInode (inum : Z) (γo : gname) | FdPipe | FdDevice (major : Z).
 Inductive fdstate := FdClosed | FdOpen (readable writable : bool) (t : fdtype).
 ```
 
@@ -1051,6 +1051,23 @@ ghost says open" are ONE clause rather than two.
 a client wants to know — it wants to know WHICH FILE, and on this file system
 a file IS its inum.  That one argument is what made increment 3 more than a
 constructor change; see "Where the inum comes from" below.
+
+**`FdInode` also carries the NAME of its offset shadow, `γo`.**  `f->off` is
+the one mutable field of a `struct file`, and it is per FILE, not per
+descriptor (dup and fork share it).  `γo` names a `ghost_var` over `Z`
+(`FileOffCell.off_gv`, class pinned to `Xv6Cameras.offbox_offG`) whose value
+IS the current `f->off`: the whole ghost rides beside the word inside the
+file's off box header (`off_resident γo k`), so the two cannot drift, and the
+one place the ghost moves is the checkin after an advance
+(`off_resident_intro`).  The name is minted FRESH at every FD_INODE publish —
+by `ProofSysOpen` at its deposit, by `ProofSysOpenAUAlloc` right after the
+`f->off = 0` store (the AU's `t` has to name it before the tail runs) — and is
+never reused: a closed file's name goes dead with its box and the next open of
+the slot mints a new one, so nothing is garbage-collected.  It is tied to the
+payload through `fpnames.fp_ooff` by `fdstate_ok`'s FD_INODE arm, exactly as
+the inum is through `fp_inum`.  Pipes and devices have no meaningful offset
+and carry no name.  The kernel keeps the ghost WHOLE today; the plan is to hand
+the process half of it at open and step it in the read/write AU specs.
 
 **The two mode flags ride on `FdOpen`, not on the type.**  `f->readable` and
 `f->writable` are fields of every `struct file` whatever its type, so putting

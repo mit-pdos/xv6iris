@@ -451,7 +451,7 @@ Section ProofSysOpenAUParts.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
       (U : ustate) (sts : list fdstate)
-      (pl : list (bv 8)) (i : Z) (bs0 : list (bv 8)) (nl : nat) :
+      (pl : list (bv 8)) (i : Z) (bs0 : list (bv 8)) (nl : nat) (γo : gname) :
     om_trunc vom = false ->
     P (length (path_elems pl)) i -∗
     (∃ av : aview, ⌜av !! i = Some (MkAnode (AFile bs0) nl)⌝
@@ -459,7 +459,7 @@ Section ProofSysOpenAUParts.
     atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Φt -∗
     (∀ r : mword 64,
        open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
-         (FdInode i) sts r -∗
+         (FdInode i γo) sts r -∗
        open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv vom P Φo Φt sts U r).
   Proof.
     intros Hnt. iIntros "HP Hobs Htc".
@@ -467,7 +467,7 @@ Section ProofSysOpenAUParts.
     iIntros (r) "Hfd". rewrite /open_post_ok_plain.
     iExists pl, av, i. iFrame "HP". iRight. iLeft.
     iExists bs0, nl. iSplitR; [by iPureIntro |]. iFrame "HΦ".
-    rewrite Hnt. iFrame "Htc Hfd".
+    rewrite Hnt. iFrame "Htc". iExists γo. iFrame "Hfd".
   Qed.
 
   (* ...and the ONE arm that spends the trunc commit: the O_TRUNC file. *)
@@ -477,7 +477,7 @@ Section ProofSysOpenAUParts.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
       (U : ustate) (sts : list fdstate)
-      (pl : list (bv 8)) (i : Z) (bs0 : list (bv 8)) (nl : nat) :
+      (pl : list (bv 8)) (i : Z) (bs0 : list (bv 8)) (nl : nat) (γo : gname) :
     om_trunc vom = true ->
     P (length (path_elems pl)) i -∗
     (∃ av : aview, ⌜av !! i = Some (MkAnode (AFile bs0) nl)⌝
@@ -486,7 +486,7 @@ Section ProofSysOpenAUParts.
                     ∗ Φt av' i bs0) -∗
     (∀ r : mword 64,
        open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
-         (FdInode i) sts r -∗
+         (FdInode i γo) sts r -∗
        open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv vom P Φo Φt sts U r).
   Proof.
     intros Ht. iIntros "HP Hobs Htr".
@@ -494,7 +494,7 @@ Section ProofSysOpenAUParts.
     iIntros (r) "Hfd". rewrite /open_post_ok_plain.
     iExists pl, av, i. iFrame "HP". iRight. iLeft.
     iExists bs0, nl. iSplitR; [by iPureIntro |]. iFrame "HΦ".
-    rewrite Ht. iFrame "Htr Hfd".
+    rewrite Ht. iFrame "Htr". iExists γo. iFrame "Hfd".
   Qed.
 
   (* the DIRECTORY arm, at O_RDONLY exactly -- and its own key is what pays
@@ -505,7 +505,7 @@ Section ProofSysOpenAUParts.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
       (U : ustate) (sts : list fdstate)
-      (pl : list (bv 8)) (i : Z) (ents : gmap fname Z) (nl : nat) :
+      (pl : list (bv 8)) (i : Z) (ents : gmap fname Z) (nl : nat) (γo : gname) :
     om_arg vom = 0 ->
     P (length (path_elems pl)) i -∗
     (∃ av : aview, ⌜av !! i = Some (MkAnode (ADir ents) nl)⌝
@@ -513,7 +513,7 @@ Section ProofSysOpenAUParts.
     atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Φt -∗
     (∀ r : mword 64,
        open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
-         (FdInode i) sts r -∗
+         (FdInode i γo) sts r -∗
        open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv vom P Φo Φt sts U r).
   Proof.
     intros H0. iIntros "HP Hobs Htc".
@@ -523,7 +523,7 @@ Section ProofSysOpenAUParts.
     rewrite Hrd Hwr.
     iExists pl, av, i. iFrame "HP". iRight. iRight.
     iExists ents, nl. iSplitR; [by iPureIntro |].
-    iSplitR; [by iPureIntro |]. iFrame "HΦ Htc Hfd".
+    iSplitR; [by iPureIntro |]. iFrame "HΦ Htc". iExists γo. iFrame "Hfd".
   Qed.
 
   (* ...and the ONE the two non-trunc exits use: the arm read straight off
@@ -536,13 +536,14 @@ Section ProofSysOpenAUParts.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
       (U : ustate) (sts : list fdstate) (pl : list (bv 8)) (i : Z)
-      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) (t : fdtype) :
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) (t : fdtype)
+      (γo : gname) :
     (om_trunc vom = false \/ bv_unsigned (di_type dn) <> FsImg.T_FILE_z) ->
     (bv_unsigned (di_type dn) = T_DIR_z -> om_arg vom = 0) ->
     (bv_unsigned (di_type dn) = FsImg.T_DEVICE_z ->
        0 <= bv_unsigned (di_major dn) <= NDEV_max
        /\ t = FdDevice (bv_unsigned (di_major dn))) ->
-    (bv_unsigned (di_type dn) <> FsImg.T_DEVICE_z -> t = FdInode i) ->
+    (bv_unsigned (di_type dn) <> FsImg.T_DEVICE_z -> t = FdInode i γo) ->
     (bv_unsigned (di_type dn) = T_DIR_z
      \/ bv_unsigned (di_type dn) = FsImg.T_FILE_z
      \/ bv_unsigned (di_type dn) = FsImg.T_DEVICE_z) ->
@@ -560,7 +561,7 @@ Section ProofSysOpenAUParts.
       iIntros "HP Hobs Htc".
       iApply (so_arm_dir gf pj pidv vom P Φo Φt U sts pl i
                 (dir_entries (era_node dn bm data))
-                (fn_nlink (era_node dn bm data)) (Hdirk Hd)
+                (fn_nlink (era_node dn bm data)) γo (Hdirk Hd)
                 with "HP Hobs Htc").
     - rewrite (opf_era_file_row dn bm data Hf)
               (Hino ltac:(rewrite Hf; vm_compute; discriminate)).
@@ -569,7 +570,7 @@ Section ProofSysOpenAUParts.
       iIntros "HP Hobs Htc".
       iApply (so_arm_file gf pj pidv vom P Φo Φt U sts pl i
                 (fn_file_bytes (era_node dn bm data))
-                (fn_nlink (era_node dn bm data)) Hntf with "HP Hobs Htc").
+                (fn_nlink (era_node dn bm data)) γo Hntf with "HP Hobs Htc").
     - destruct (Hdev Hv) as [Hmb Ht].
       rewrite (opf_era_dev_row dn bm data
                  ltac:(rewrite Hv; vm_compute; discriminate)

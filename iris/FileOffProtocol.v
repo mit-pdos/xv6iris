@@ -16,8 +16,10 @@
      filealloc   the opener takes [file_pay] at FD_NONE, the word free  [proto_filealloc]
                  inside; NO box, NO birth                                 [proto_open_slot]
      publish     [f->off = 0] over the free word re-mints the cell at   [proto_store]
-                 the storer's context; THEN the box is born, the share
-                 minted at mass 1, the L2 row inserted                    [proto_publish]
+                 the storer's context and mints its offset SHADOW (the
+                 ghost_var [FdSlots.FdInode] names); THEN the box is
+                 born on both, the share minted at mass 1, the L2 row
+                 inserted                                                 [proto_publish]
      dup         a pure split of the share by fraction                  [proto_dup]
      read        checkout under ip->lock: [Kt] by R1 at the acquire     [proto_read_checkout]
                  presenting the share's llb, [Kp] from the row's floor;
@@ -104,22 +106,25 @@ Section FileOffProtocol.
     rewrite /off_free /wordw_free. change (Z.to_nat 4) with 4%nat. reflexivity.
   Qed.
   Lemma proto_store_remint (k : nat) :
-    wordw_pointsto 4 (a_foff k) (DfracOwn 1) (mword_of_int 0 : mword 32) ⊢ off_resident k.
+    wordw_pointsto 4 (a_foff k) (DfracOwn 1) (mword_of_int 0 : mword 32) ==∗
+    ∃ γo : gname, off_resident γo k.
   Proof.
-    iIntros "H". rewrite /off_resident. iExists (mword_of_int 0).
+    iIntros "H".
+    iMod (off_gv_alloc (bv_unsigned (mword_of_int 0 : mword 32))) as (γo) "Hg".
+    iModIntro. iExists γo. rewrite /off_resident. iExists (mword_of_int 0).
     iSplitL "H".
     { rewrite /wordw_pointsto TsoCtx.ctx_word4_pointsto_unfold.
       change (Z.to_nat 4) with 4%nat. iExact "H". }
-    iPureIntro. exact off_wf_zero.
+    iFrame "Hg". iPureIntro. exact off_wf_zero.
   Qed.
 
   (* ---- the publish: birth on the re-minted cell, share at mass 1, the L2
           row into inode [i]'s set; the creator deposits and never absorbs ---- *)
-  Lemma proto_publish (E : coPset) (i k : nat) (C : fcontent) :
+  Lemma proto_publish (E : coPset) (i k : nat) (γo : gname) (C : fcontent) :
     ↑(offBoxN .@ k) ⊆ E -> (i < NINODE)%nat -> fc_ip C = ientry i -> fc_type C = FD_INODE ->
-    own_context cur_ctx -∗ off_resident k -∗ off_rows off_cfg i cur_ctx ={E}=∗
+    own_context cur_ctx -∗ off_resident γo k -∗ off_rows off_cfg i cur_ctx ={E}=∗
     own_context cur_ctx ∗ off_rows off_cfg i cur_ctx ∗
-    ∃ γb : box_names, off_fd k 1 γb C.
+    ∃ γb : box_names, off_fd k 1 γb γo C.
   Proof.
     iIntros (HE Hi Hip Hty) "Hctx Hres Hrows".
     iMod (own_alloc (● (∅ : gmap (nat * nat) ufrac))) as (γs) "Hst".
@@ -128,7 +133,7 @@ Section FileOffProtocol.
     iMod (ghost_var_alloc (inhabitant : slot_reg nat unit)) as (γd) "Hd".
     iMod (ghost_var_alloc (inhabitant : l2_reg nat)) as (γp) "Hp".
     set (γb := BoxNames γs γc γd γp).
-    iMod (off_publish_park off_cfg i k γb cur_ctx E HE
+    iMod (off_publish_park off_cfg i k γb γo cur_ctx E HE
             with "Hst Hc Hd Hp Hctx Hres Hrows")
       as "(Hctx & #Hbox & %T0 & %T & Hregd & Hllb & Hcnt & Href & #Hmem & Hrows)".
     iModIntro. iFrame "Hctx Hrows". iExists γb.
@@ -140,16 +145,16 @@ Section FileOffProtocol.
   Qed.
 
   (* ---- dup: a pure split of the share by fraction ---- *)
-  Lemma proto_dup (k : nat) (q1 q2 : Qp) (γb : box_names) (C : fcontent) :
-    off_fd k (q1 + q2) γb C ⊣⊢ off_fd k q1 γb C ∗ off_fd k q2 γb C.
+  Lemma proto_dup (k : nat) (q1 q2 : Qp) (γb : box_names) (γo : gname) (C : fcontent) :
+    off_fd k (q1 + q2) γb γo C ⊣⊢ off_fd k q1 γb γo C ∗ off_fd k q2 γb γo C.
   Proof. apply off_fd_split. Qed.
 
   (* ---- read, step 0: name the share's stamps fragment and present its
           llb at the ilock acquire; R1 returns a floor at least that high
           (reviewer 2, item 31: the tie that makes the checkout provable) ---- *)
-  Lemma proto_read_llb (k : nat) (q : Qp) (γb : box_names) (C : fcontent) :
-    off_fd k q γb C -∗
-    ∃ m : gmap (nat * nat) ufrac, off_fd_at k q γb C m ∗ llb loglen_name (max_stamp m).
+  Lemma proto_read_llb (k : nat) (q : Qp) (γb : box_names) (γo : gname) (C : fcontent) :
+    off_fd k q γb γo C -∗
+    ∃ m : gmap (nat * nat) ufrac, off_fd_at k q γb γo C m ∗ llb loglen_name (max_stamp m).
   Proof.
     rewrite /off_fd /off_fd_at /off_ref_stamps.
     iIntros "(%i & %T0 & %Hip & %Hi & #Hbox & #Hmem & Hd & Hc & (%m & %Hq & Href))".
@@ -166,15 +171,15 @@ Section FileOffProtocol.
           acquire, at least the share's llb ([max_stamp m ≤ Kt]); [Kp] is the
           row's transported floor inside off_rows.  THE ONE ABSORB, after the
           acquire. ---- *)
-  Lemma proto_read_checkout (E : coPset) (i k : nat) (q : Qp) (γb : box_names) (C : fcontent)
-      (m : gmap (nat * nat) ufrac) (Kt : nat) (ξ : CtxId) :
+  Lemma proto_read_checkout (E : coPset) (i k : nat) (q : Qp) (γb : box_names) (γo : gname)
+      (C : fcontent) (m : gmap (nat * nat) ufrac) (Kt : nat) (ξ : CtxId) :
     ↑(offBoxN .@ k) ⊆ E -> fc_ip C = ientry i -> (i < NINODE)%nat ->
     (max_stamp m ≤ Kt)%nat ->
     own_context ξ -∗ ctx_floor ξ Kt -∗
-    off_fd_at k q γb C m -∗
+    off_fd_at k q γb γo C m -∗
     off_rows off_cfg i ξ ={E}=∗
-    own_context ξ ∗ off_resident (XI := ξ) k ∗
-    off_box k γb ∗ off_member off_cfg i γb ∗
+    own_context ξ ∗ off_resident (XI := ξ) γo k ∗
+    off_box k γb γo ∗ off_member off_cfg i γb ∗
     ∃ T0 : nat,
       CtxBox.l2_hold (X := unit) γb k m ∗
       ghost_var (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
@@ -190,7 +195,7 @@ Section FileOffProtocol.
     iDestruct (off_rows_take_dep off_cfg i γb ξ with "Hmem Hrows") as "[(%s & Hrow) Hback]".
     rewrite /off_l2_row /CtxBox.l2_row.
     iDestruct "Hrow" as "[(Hrp & %Hh & #Hflp) #Hllbs]".
-    iMod (off_read_checkout off_cfg i k γb ξ m Kt (lr_tp s) E HE HKt
+    iMod (off_read_checkout off_cfg i k γb γo ξ m Kt (lr_tp s) E HE HKt
             with "Hbox Hctx Hflt Hflp Hmem Href [Hrp]") as "(Hctx & Hres & Hhold)".
     { iExists s. iFrame "Hrp". iPureIntro. split; [exact Hh | lia]. }
     iModIntro. iFrame "Hctx Hres Hbox Hmem". iExists T0. iFrame "Hhold Hd Hc".
@@ -199,21 +204,21 @@ Section FileOffProtocol.
 
   (* ---- read: park after the read; the row goes back into the set at the
           fresh stamp ---- *)
-  Lemma proto_read_park (E : coPset) (i k : nat) (q : Qp) (γb : box_names) (C : fcontent)
-      (m : gmap (nat * nat) ufrac) (T0 Tr : nat) (ξ : CtxId) :
+  Lemma proto_read_park (E : coPset) (i k : nat) (q : Qp) (γb : box_names) (γo : gname)
+      (C : fcontent) (m : gmap (nat * nat) ufrac) (T0 Tr : nat) (ξ : CtxId) :
     ↑(offBoxN .@ k) ⊆ E -> fc_ip C = ientry i -> (i < NINODE)%nat ->
     qsum m = Qp_to_Qc q ->
-    own_context ξ -∗ off_resident (XI := ξ) k -∗
+    own_context ξ -∗ off_resident (XI := ξ) γo k -∗
     CtxBox.l2_hold (X := unit) γb k m -∗
     ghost_var (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) -∗
     ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2) 1%nat -∗
-    off_box k γb -∗ off_member off_cfg i γb -∗
+    off_box k γb γo -∗ off_member off_cfg i γb -∗
     off_rows_dep_but off_cfg i γb Tr ={E}=∗
-    own_context ξ ∗ off_fd k q γb C ∗
+    own_context ξ ∗ off_fd k q γb γo C ∗
     ∃ T' : nat, off_rows_dep off_cfg i T'.
   Proof.
     iIntros (HE Hip Hi Hq) "Hctx Hres Hhold Hd Hc #Hbox #Hmem Hrest".
-    iMod (off_read_park k γb ξ m E HE with "Hbox Hctx Hres Hhold")
+    iMod (off_read_park k γb γo ξ m E HE with "Hbox Hctx Hres Hhold")
       as "(Hctx & %T' & %q' & %Hq' & Hrp & Href & #Hllb)".
     iModIntro. iFrame "Hctx". iSplitL "Hd Hc Href".
     { rewrite /off_fd. iExists i, T0. iFrame "Hbox Hmem Hd Hc".
@@ -227,20 +232,20 @@ Section FileOffProtocol.
   Qed.
 
   (* ---- close, non-last: a pure join ---- *)
-  Lemma proto_close_join (k : nat) (q1 q2 : Qp) (γb : box_names) (C : fcontent) :
-    off_fd k q1 γb C ∗ off_fd k q2 γb C ⊢ off_fd k (q1 + q2) γb C.
+  Lemma proto_close_join (k : nat) (q1 q2 : Qp) (γb : box_names) (γo : gname) (C : fcontent) :
+    off_fd k q1 γb γo C ∗ off_fd k q2 γb γo C ⊢ off_fd k (q1 + q2) γb γo C.
   Proof. rewrite (off_fd_split k q1 q2). done. Qed.
 
   (* ---- close, last: the whole share in hand; the free-tier withdraw; the
           retype puts the free word into the FD_NONE payload ---- *)
-  Lemma proto_last_close (E : coPset) (k : nat) (γb : box_names) (C : fcontent) :
+  Lemma proto_last_close (E : coPset) (k : nat) (γb : box_names) (γo : gname) (C : fcontent) :
     ↑(offBoxN .@ k) ⊆ E ->
-    off_fd k 1 γb C ={E}=∗ off_free k 1.
+    off_fd k 1 γb γo C ={E}=∗ off_free k 1.
   Proof.
     iIntros (HE) "Hfd". rewrite /off_fd.
     iDestruct "Hfd" as (i T0) "(%Hip & %Hi & Hbox & _ & Hregd & Hcnt & Hst)".
     rewrite /off_ref_stamps. iDestruct "Hst" as (m) "[%Hq Href]".
-    iMod (off_last_close k _ T0 m E HE Hq with "Hbox Hregd Hcnt Href") as "[_ Hfree]".
+    iMod (off_last_close k _ _ T0 m E HE Hq with "Hbox Hregd Hcnt Href") as "[_ Hfree]".
     iModIntro. rewrite /off_free. iFrame "Hfree". iPureIntro. apply a_foff_aligned.
   Qed.
   Lemma proto_retype_none (k : nat) (pn : fpnames) (C' : fcontent) :
@@ -263,16 +268,16 @@ Section FileOffProtocol.
           and its [Kp] is the row's floor at ξ'.  Both halves are returned
           (reviewer 1, item 29); the read is [proto_read_checkout] at ξ' over
           one of them (reviewer 2, item 31: at the named fragment). ---- *)
-  Lemma proto_fork_child_read (E : coPset) (i k : nat) (q : Qp) (γb : box_names) (C : fcontent)
-      (ξ' : CtxId) :
+  Lemma proto_fork_child_read (E : coPset) (i k : nat) (q : Qp) (γb : box_names) (γo : gname)
+      (C : fcontent) (ξ' : CtxId) :
     ↑(offBoxN .@ k) ⊆ E -> fc_ip C = ientry i -> (i < NINODE)%nat ->
-    off_fd k q γb C -∗
-    off_fd k (q / 2) γb C ∗ off_fd k (q / 2) γb C ∗
+    off_fd k q γb γo C -∗
+    off_fd k (q / 2) γb γo C ∗ off_fd k (q / 2) γb γo C ∗
     □ (∀ (m : gmap (nat * nat) ufrac) (Kt : nat),
          ⌜(max_stamp m ≤ Kt)%nat⌝ -∗
-         own_context ξ' -∗ ctx_floor ξ' Kt -∗ off_fd_at k (q / 2) γb C m -∗ off_rows off_cfg i ξ' ={E}=∗
-         own_context ξ' ∗ off_resident (XI := ξ') k ∗
-         off_box k γb ∗ off_member off_cfg i γb ∗
+         own_context ξ' -∗ ctx_floor ξ' Kt -∗ off_fd_at k (q / 2) γb γo C m -∗ off_rows off_cfg i ξ' ={E}=∗
+         own_context ξ' ∗ off_resident (XI := ξ') γo k ∗
+         off_box k γb γo ∗ off_member off_cfg i γb ∗
          ∃ T0 : nat,
            CtxBox.l2_hold (X := unit) γb k m ∗
            ghost_var (bx_slotd γb) (q / 2 / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
@@ -282,7 +287,7 @@ Section FileOffProtocol.
     iIntros (HE Hip Hi) "Hfd".
     rewrite -{1}(Qp.div_2 q) off_fd_split. iDestruct "Hfd" as "[$ $]".
     iModIntro. iIntros (m Kt HKt) "Hctx Hfl Hat Hrows".
-    iApply (proto_read_checkout E i k (q / 2) γb C m Kt ξ' HE Hip Hi HKt
+    iApply (proto_read_checkout E i k (q / 2) γb γo C m Kt ξ' HE Hip Hi HKt
               with "Hctx Hfl Hat Hrows").
   Qed.
 

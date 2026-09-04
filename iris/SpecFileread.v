@@ -505,7 +505,7 @@ Section SpecFileread.
     (match st with
      | FdOpen _ _ FdPipe        => emp
      | FdOpen _ _ (FdDevice mj) => fileread_dev_env fn mj
-     | FdOpen _ _ (FdInode _)   => fileread_fs_env γf fn
+     | FdOpen _ _ (FdInode _ _)   => fileread_fs_env γf fn
      | FdClosed             => emp
      end)%I.
 
@@ -513,7 +513,7 @@ Section SpecFileread.
     (match st with
      | FdOpen _ _ FdPipe        => emp
      | FdOpen _ _ (FdDevice mj) => fileread_dev_out fn mj
-     | FdOpen _ _ (FdInode _)   => fileread_fs_out fn
+     | FdOpen _ _ (FdInode _ _)   => fileread_fs_out fn
      | FdClosed             => emp
      end)%I.
 
@@ -533,7 +533,7 @@ Section SpecFileread.
     fileread_env γf fn st -∗ fileread_env_out fn st.
   Proof.
     rewrite /fileread_env /fileread_env_out.
-    destruct st as [|? ? [?| |?]]; try by iIntros "$".
+    destruct st as [|? ? [? ?| |?]]; try by iIntros "$".
     iApply fileread_fs_env_out.
   Qed.
 
@@ -650,18 +650,18 @@ Section SpecFileread.
      own [fp_obox pn], so the carve exposes them existentially: a returned
      handle at OTHER names could not be rejoined to the payload. *)
   Definition carve_off (tyc : mword 32) (k : nat) (q : Qp)
-      (γb : Xv6Cameras.box_names) (Cf : fcontent) : iProp Σ :=
+      (γb : Xv6Cameras.box_names) (γo : gname) (Cf : fcontent) : iProp Σ :=
     (if bool_decide (tyc = FD_INODE)
-     then off_fd k q γb Cf else off_free k q)%I.
+     then off_fd k q γb γo Cf else off_free k q)%I.
 
-  Lemma carve_off_inode (tyc : mword 32) (k : nat) (q : Qp) γb Cf :
-    tyc = FD_INODE -> carve_off tyc k q γb Cf = off_fd k q γb Cf.
+  Lemma carve_off_inode (tyc : mword 32) (k : nat) (q : Qp) γb γo Cf :
+    tyc = FD_INODE -> carve_off tyc k q γb γo Cf = off_fd k q γb γo Cf.
   Proof.
     intros ->. rewrite /carve_off. case_bool_decide; [reflexivity | congruence].
   Qed.
 
-  Lemma carve_off_dev (tyc : mword 32) (k : nat) (q : Qp) γb Cf :
-    tyc = FD_DEVICE -> carve_off tyc k q γb Cf = off_free k q.
+  Lemma carve_off_dev (tyc : mword 32) (k : nat) (q : Qp) γb γo Cf :
+    tyc = FD_DEVICE -> carve_off tyc k q γb γo Cf = off_free k q.
   Proof.
     intros ->. rewrite /carve_off. case_bool_decide as Hc; [|reflexivity].
     exfalso. apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
@@ -672,7 +672,7 @@ Section SpecFileread.
     fc_type Cf = FD_INODE \/ fc_type Cf = FD_DEVICE ->
     file_pay_st γf k q Cf st -∗
     ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16) (lo tl : nat)
-      (γb : Xv6Cameras.box_names),
+      (γb : Xv6Cameras.box_names) (γo : gname),
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
       ⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
@@ -680,9 +680,9 @@ Section SpecFileread.
       ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
       IcacheRef.ity_shot g ty ∗
       IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo ∗
-      carve_off (fc_type Cf) k q γb Cf ∗
+      carve_off (fc_type Cf) k q γb γo Cf ∗
       (IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo -∗
-       carve_off (fc_type Cf) k q γb Cf -∗
+       carve_off (fc_type Cf) k q γb γo Cf -∗
          file_pay_st γf k q Cf st).
   Proof.
     intros Hty. iIntros "(%pn & %Hst & Hpn & Hpl)".
@@ -702,7 +702,8 @@ Section SpecFileread.
     iDestruct "Hpl" as "((#Hci & Hown & Hside & Hs & Hwt) & Hop)".
     iDestruct "Hs" as (ik lo tl) "(%Hipk & %Hik & %Hinb & %Hle & #Hfl & Hshr)".
     iDestruct "Hwt" as (ty) "(#Hshot & %Hnd & %Hdv)".
-    iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty, lo, tl, (fp_obox pn).
+    iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty, lo, tl, (fp_obox pn),
+      (fp_ooff pn).
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [done|].
     iSplitR; [done|]. iSplitR; [iExact "Hfl"|].

@@ -290,8 +290,8 @@ Section PilotPure.
     rewrite Hchild2 in Hrowi. injection Hrowi as Hrowi. subst a.
     (* ---- the arm is the device arm ---- *)
     destruct Harms as [Hdev | [Hfile | Hdir]].
-    2: { destruct Hfile as (bs & nlx & Hax & _). discriminate Hax. }
-    2: { destruct Hdir as (ex & nlx & Hax & _). discriminate Hax. }
+    2: { destruct Hfile as (bs & nlx & g & Hax & _). discriminate Hax. }
+    2: { destruct Hdir as (ex & nlx & g & Hax & _). discriminate Hax. }
     destruct Hdev as (ma' & mi' & nl' & Hax & Hrange & Hu3).
     assert (Hma2 : ma' = CONSOLE) by congruence.
     assert (Hmi2 : mi' = 0) by congruence.

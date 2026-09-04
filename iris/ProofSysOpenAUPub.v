@@ -147,7 +147,10 @@ Section ProofSysOpenAUPub.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
-      (t : fdtype) :
+      (t : fdtype)
+      (* the offset shadow's name -- minted by the store block, named by
+         [t] on the FD_INODE arm, deposited into the box here *)
+      (g : gname) :
     qi = s ->   (* r25 shapes: the parked ident fraction IS the travelling share (so_publish) *)
     (K_iunlock <= K - 24)%nat -> (K_end_op <= K - 24)%nat ->
     (24 <= K)%nat -> ((K - 24) + 24 = K)%nat ->
@@ -178,7 +181,7 @@ Section ProofSysOpenAUPub.
     (* ---- the AU side: the omode word IS the caller's argument, and the
        descriptor's type is the one the published content names ---- *)
     om = arg_int32 vom ->
-    (fc_type C = FD_INODE /\ t = FdInode (bv_unsigned inum))
+    (fc_type C = FD_INODE /\ t = FdInode (bv_unsigned inum) g)
     \/ (fc_type C = FD_DEVICE /\ t = FdDevice (bv_unsigned (fc_major C))) ->
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
     so_sp sp0 M -> so_thr m M ->
@@ -227,7 +230,9 @@ Section ProofSysOpenAUPub.
     (* the fd's off cell, TYPE-INDEXED (r25 item 24): the inode arm stored
        zero into the free cell and holds the word at the running context;
        the device arm never touches [f->off] and carries the free cell *)
-    (if bool_decide (fc_type C = FD_INODE) then a_foff kf ↦₄ voff else off_free kf 1) -∗
+    (if bool_decide (fc_type C = FD_INODE)
+     then a_foff kf ↦₄ voff ∗ off_gv g 1 (bv_unsigned voff)
+     else off_free kf 1) -∗
     (* THE UNTYPED SLOT'S OWN UNIT, released when [so_open_slot] took the
        reference apart and handed straight back to the ledger here: the
        publication below parks the walk's inode in this same entry, so the
@@ -298,13 +303,14 @@ Section ProofSysOpenAUPub.
     iAssert (|={⊤}=> own_context cur_ctx ∗ off_rows off_cfg kk cur_ctx ∗
                ∃ γb : box_names,
                  if bool_decide (fc_type C = FD_INODE)
-                 then off_fd kf 1 γb C else off_free kf 1)%I
+                 then off_fd kf 1 γb g C else off_free kf 1)%I
       with "[Hrun Hrows Hfoff]" as ">(Hrun & Hrows & %γb & Hcoff)".
     { destruct (bool_decide (fc_type C = FD_INODE)) eqn:Hbd.
       - apply bool_decide_eq_true_1 in Hbd.
-        iMod (so_deposit ⊤ kk kf C ltac:(solve_ndisj) Hkk Hip Hbd
-                with "Hrun [Hfoff] Hrows") as "(Hrun & Hrows & %γb & Hfd)".
-        { iExists voff. iFrame "Hfoff". iPureIntro. exact (Hwf Hbd). }
+        iDestruct "Hfoff" as "[Hfoff Hgv]".
+        iMod (so_deposit ⊤ kk kf g C ltac:(solve_ndisj) Hkk Hip Hbd
+                with "Hrun [Hfoff Hgv] Hrows") as "(Hrun & Hrows & %γb & Hfd)".
+        { iExists voff. iFrame "Hfoff Hgv". iPureIntro. exact (Hwf Hbd). }
         iModIntro. iFrame "Hrun Hrows". iExists γb. iExact "Hfd".
       - iModIntro. iFrame "Hrun Hrows". iExists inhabitant. iExact "Hfoff". }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
@@ -336,7 +342,7 @@ Section ProofSysOpenAUPub.
     iApply fupd_wp.
     (* A6.146: the retained parent arrives GENLO with its credential. *)
     iDestruct "Hkeep" as (loK tlK) "(%HleK & #HflK & Hkeep)".
-    iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn γb om rb wb
+    iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn γb g om rb wb
             loK tlK
             Hqs ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb
             ltac:(rewrite Hrdw; exact Hrdb) ltac:(rewrite Hwrb; exact Hwdb)
@@ -365,14 +371,14 @@ Section ProofSysOpenAUPub.
     iDestruct (fd_st_agree (pv_fdg (us_V U)) fd FdClosed stq with "Hauth Hfr")
       as "%Hstqcl".
     iMod (proc_priv_settle gf (proc_addr jx) pidv U fd kf 1 stpub FdClosed stq
-                 Hfdlt Hlen Hkf (fdstate_ok_open _ C stpub Hokpub (or_intror Htyor))
+                 Hfdlt Hlen Hkf (fdstate_ok_open _ _ C stpub Hokpub (or_intror Htyor))
                  with "Hcore Howe Href Hauth Hfr") as "[Hpriv Hfr]".
     iDestruct ("Hfrback" $! stpub with "Hfr") as "Hfrags".
     iModIntro.
     (* [stpub] IS the typed state the contract names: the two mode cells
        hold the caller's own omode bits ([ProofSysOpenAUBits]) and the type
        is [Htyt]'s, so [fdstate_ok_inj] pins it. *)
-    assert (Hstok : fdstate_ok inum C
+    assert (Hstok : fdstate_ok inum g C
                       (FdOpen (om_readable vom) (om_writable vom) t)).
     { assert (Hrd : fc_readable C
                     = ((if om_readable vom
@@ -384,7 +390,7 @@ Section ProofSysOpenAUPub.
         by (rewrite Hwrb Hom; apply soau_wr_byte).
       destruct Htyt as [[Hct ->] | [Hct ->]]; cbn; by repeat split. }
     assert (Hpub : stpub = FdOpen (om_readable vom) (om_writable vom) t)
-      by exact (fdstate_ok_inj inum C stpub _ Hokpub Hstok).
+      by exact (fdstate_ok_inj inum g C stpub _ Hokpub Hstok).
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
     iDestruct (iref_slots_combine nsj 1 with "Hisl Hiru") as "Hisl".
     replace (nsj + 1)%nat with (S nsj) by lia.

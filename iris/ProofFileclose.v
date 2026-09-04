@@ -351,7 +351,7 @@ Section ProofFileclose.
     iDestruct "HRres" as (Mg) "(Hauth & Hfdauth & %Hdom & Hslots)".
     iDestruct "Href" as (Cf) "(Hrtok & Hrfields & Hrpay & Hrlv)".
     iDestruct (file_pay_st_ok with "Hrpay") as "[%Hokx Hrpay]".
-    destruct Hokx as (inumx & Hok).
+    destruct Hokx as (inumx & γox & Hok).
     iDestruct (fref_tok_lookup with "Hauth Hrtok")
       as %(qt & cnt & HMk & Hqt1 & Hn1 & _ & Hqlt).
     assert (Hk : (k < NFILE)%nat) by (apply Hdom; rewrite HMk; eauto).
@@ -1135,7 +1135,7 @@ Section ProofFileclose.
         iDestruct "Hcore" as "(#Hispipe & Hpref & Hiru)".
         (* the environment is keyed on the descriptor's STATE and the code
            branched on [f->type]; [fdstate_ok] is what makes those one fact *)
-        destruct (fdstate_ok_pipe _ _ _ Hok Hpipe) as (bdr & bdw & Hstp).
+        destruct (fdstate_ok_pipe _ _ _ _ Hok Hpipe) as (bdr & bdw & Hstp).
         iEval (rewrite Hstp /fileclose_env) in "Henv".
         rewrite /fileclose_pipe_env.
         iDestruct "Henv" as "(%Hn2 & #Hprocs & #Hkmem & Hav)".
@@ -1312,8 +1312,8 @@ Section ProofFileclose.
           iAssert (fileclose_fs_env fn n eb p) with "[Henv]" as "Henv".
           { rewrite /fileclose_env.
             destruct Hinode as [Ht | Ht];
-              [ destruct (fdstate_ok_inode _ _ _ Hok Ht) as (? & ? & ->)
-              | destruct (fdstate_ok_device _ _ _ Hok Ht) as (? & ? & ->) ]; iExact "Henv". }
+              [ destruct (fdstate_ok_inode _ _ _ _ Hok Ht) as (? & ? & ->)
+              | destruct (fdstate_ok_device _ _ _ _ Hok Ht) as (? & ? & ->) ]; iExact "Henv". }
           (* THE PAYLOAD IS THE REFERENCE, and this closer holds ALL of it:
              [file_rest_join] gave fraction one, so the cancel token is
              whole and [FileInv.inode_pay_cancel] turns it into the inode
@@ -1651,8 +1651,8 @@ Section ProofFileclose.
              on [Hislot].) *)
           { rewrite /fileclose_env_out.
             destruct Hinode as [Ht | Ht];
-              [ destruct (fdstate_ok_inode _ _ _ Hok Ht) as (? & ? & ->)
-              | destruct (fdstate_ok_device _ _ _ Hok Ht) as (? & ? & ->) ];
+              [ destruct (fdstate_ok_inode _ _ _ _ Hok Ht) as (? & ? & ->)
+              | destruct (fdstate_ok_device _ _ _ _ Hok Ht) as (? & ? & ->) ];
               rewrite /fileclose_fs_out; iExact "Hbsl". }
         * (* ======== FD_NONE (or anything else): nothing to do ========== *)
           iApply (wp_bgeu_fall_s_sconf (mword_of_int (FC + 0x60))

@@ -307,10 +307,10 @@ Section ProofSysReadAU.
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names) (pidv : mword 32) (U : ustate) (v v1 v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-      (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
+      (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
       (Φr : aview -> nat -> anode -> iProp Σ)
     : wp_sys_read_au_at_body γf γs j γlp fn pidv U v v1 v2 m av eb b lks
-        fd fv wb i Φr.
+        fd fv wb i γo Φr.
   Proof.
     cbv beta delta [wp_sys_read_au_at_body wp_sys_read_au_frame].
     intros Γfs nn pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hrp Hdq
@@ -918,7 +918,7 @@ Section ProofSysReadAU.
       iDestruct (fd_st_agree with "Hauth Hfdst") as %Hstf.
       iApply (FilereadAU.wp_fileread_au γf γs j γlp kk qq stf fn pidv U
                 S4 (av - 6)%nat eb (sys_rw_count v2) b
-                _ wb i Φr ltac:(lia) Hkk Hj Hgs Hlens
+                _ wb i γo Φr ltac:(lia) Hkk Hj Hgs Hlens
                 HS4a0' HS4a2 (sys_rw_count_range v2) Hstf Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs
                       Hfenv Hau").

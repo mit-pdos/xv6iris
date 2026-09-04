@@ -141,9 +141,21 @@ Definition fdslotUR : ucmra := authUR natUR.
    A [Z], like [FdDevice]'s major and for the same reason: these are the
    numbers a USER program reads, and the machine widths belong on the
    kernel side of the boundary.  [FileInvDefs.fdstate_ok] is where the two
-   meet, and it does the [bv_unsigned]. *)
+   meet, and it does the [bv_unsigned].
+
+   [FdInode] ALSO CARRIES THE NAME OF ITS OFFSET GHOST.  [f->off] is the
+   one mutable field of a [struct file], and it is per FILE, not per
+   descriptor: every fd that names the file (dup, fork) shares it.  The
+   name [γo] is that of a [ghost_var] over [Z] whose value IS the current
+   [f->off] ([FileOffCell.off_resident] owns it whole, beside the cell,
+   inside the file's off box), minted fresh at every FD_INODE publish
+   ([ProofSysOpenParts.so_deposit]) and never reused: a closed file's
+   name simply goes dead, and the next open of the same slot mints a new
+   one.  It is tied to the payload's [fpnames.fp_ooff] by
+   [FileInvDefs.fdstate_ok]'s FD_INODE arm.  Pipes and devices have no
+   meaningful offset and carry no name. *)
 Inductive fdtype :=
-| FdInode (inum : Z)
+| FdInode (inum : Z) (γo : gname)
 | FdPipe
 | FdDevice (major : Z).
 

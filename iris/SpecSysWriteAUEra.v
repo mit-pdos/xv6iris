@@ -223,12 +223,12 @@ Definition wp_sys_write_au_era_body
     (pidv : mword 32) (U : ustate)
     (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-    (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
+    (fd : nat) (fv : mword 64) (rb : bool) (i : Z) (γo : gname)
     (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
   wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
-    fd fv rb i
+    fd fv rb i γo
     (awrite_commits_at Γfs fsabsE i Φw 0%nat (wchunks n))
     (* RULING A: the receipts are stated at the caller's OWN image and at
        the buffer address IT passed -- syscall argument 1. *)
@@ -243,13 +243,13 @@ Definition wp_sys_write_au_era_stable_body
     (pidv : mword 32) (U : ustate)
     (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-    (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
+    (fd : nat) (fv : mword 64) (rb : bool) (i : Z) (γo : gname)
     (q : Qp) (bs0 : list (bv 8)) (nl : nat)
     (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
   wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
-    fd fv rb i
+    fd fv rb i γo
     (nview Γfs q i (MkAnode (AFile bs0) nl)
      ∗ awrite_commits_at Γfs fsabsE i Φw 0%nat (wchunks n))%I
     (write_stable_arms_at Γfs i n q bs0 nl (us_M U) v1 Φw).
@@ -268,10 +268,10 @@ Module Type SYSWRITE_AU_ERA.
       (pidv : mword 32) (U : ustate)
       (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-      (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
+      (fd : nat) (fv : mword 64) (rb : bool) (i : Z) (γo : gname)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ),
       wp_sys_write_au_era_body γf γs j γlp fn pidv U v v1 v2 m K eb b lks
-        fd fv rb i Φw.
+        fd fv rb i γo Φw.
 End SYSWRITE_AU_ERA.
 
 (* owed as a DERIVATION from [wp_sys_write_au_era] + the agreement seed
@@ -287,9 +287,9 @@ Module Type SYSWRITE_AU_ERA_STABLE.
       (pidv : mword 32) (U : ustate)
       (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-      (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
+      (fd : nat) (fv : mword 64) (rb : bool) (i : Z) (γo : gname)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ),
       wp_sys_write_au_era_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
-        lks fd fv rb i q bs0 nl Φw.
+        lks fd fv rb i γo q bs0 nl Φw.
 End SYSWRITE_AU_ERA_STABLE.

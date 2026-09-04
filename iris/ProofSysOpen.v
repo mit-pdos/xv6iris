@@ -389,18 +389,22 @@ Section ProofSysOpenBody.
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     (* the inode's off rows arrived FOLDED with ilock's post (items 35/36) *)
     iRename "Hoffr" into "Hrows".
+    (* ...and, on the FD_INODE arm, the OFFSET SHADOW is minted here, fresh
+       per publish, at the stored word's value: the box is born holding the
+       cell and its ghost together. *)
     iAssert (|={⊤}=> own_context cur_ctx ∗ off_rows off_cfg kk cur_ctx ∗
-               ∃ γb : box_names,
+               ∃ (γb : box_names) (γo : gname),
                  if bool_decide (fc_type C = FD_INODE)
-                 then off_fd kf 1 γb C else off_free kf 1)%I
-      with "[Hrun Hrows Hfoff]" as ">(Hrun & Hrows & %γb & Hcoff)".
+                 then off_fd kf 1 γb γo C else off_free kf 1)%I
+      with "[Hrun Hrows Hfoff]" as ">(Hrun & Hrows & %γb & %γo & Hcoff)".
     { destruct (bool_decide (fc_type C = FD_INODE)) eqn:Hbd.
       - apply bool_decide_eq_true_1 in Hbd.
-        iMod (so_deposit ⊤ kk kf C ltac:(solve_ndisj) Hkk Hip Hbd
-                with "Hrun [Hfoff] Hrows") as "(Hrun & Hrows & %γb & Hfd)".
-        { iExists voff. iFrame "Hfoff". iPureIntro. exact (Hwf Hbd). }
-        iModIntro. iFrame "Hrun Hrows". iExists γb. iExact "Hfd".
-      - iModIntro. iFrame "Hrun Hrows". iExists inhabitant. iExact "Hfoff". }
+        iMod (off_gv_alloc (bv_unsigned voff)) as (γo) "Hgv".
+        iMod (so_deposit ⊤ kk kf γo C ltac:(solve_ndisj) Hkk Hip Hbd
+                with "Hrun [Hfoff Hgv] Hrows") as "(Hrun & Hrows & %γb & Hfd)".
+        { iExists voff. iFrame "Hfoff Hgv". iPureIntro. exact (Hwf Hbd). }
+        iModIntro. iFrame "Hrun Hrows". iExists γb, γo. iExact "Hfd".
+      - iModIntro. iFrame "Hrun Hrows". iExists inhabitant, 1%positive. iExact "Hfoff". }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iRename "Hrows" into "Hoffr".
     iModIntro.
@@ -444,7 +448,7 @@ Section ProofSysOpenBody.
     iApply fupd_wp.
     (* A6.146: the retained parent arrives GENLO with its credential. *)
     iDestruct "Hkeep" as (loK tlK) "(%HleK & #HflK & Hkeep)".
-    iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn γb om
+    iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn γb γo om
             (so_rd_of om) (so_wr_of om) loK tlK
             Hqs ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb
             Hrdc Hwrc
@@ -476,17 +480,17 @@ Section ProofSysOpenBody.
     iDestruct (fd_st_agree (pv_fdg (us_V U)) fd FdClosed stq with "Hauth Hfr")
       as "%Hstqcl".
     iMod (proc_priv_settle gf (proc_addr jx) pidv U fd kf 1 stpub FdClosed stq
-                 Hfdlt Hlen Hkf (fdstate_ok_open _ C stpub Hokpub (or_intror Htyor))
+                 Hfdlt Hlen Hkf (fdstate_ok_open _ _ C stpub Hokpub (or_intror Htyor))
                  with "Hcore Howe Href Hauth Hfr") as "[Hpriv Hfr]".
     iDestruct ("Hfrback" with "Hfr") as "Hfrag".
     iModIntro.
     (* the published state IS an [FdOpen] -- which mode and which type is
        the omode argument's and the inode's business, not the table's *)
-    destruct (fdstate_ok_opened _ C stpub Hokpub (or_intror Htyor))
+    destruct (fdstate_ok_opened _ _ C stpub Hokpub (or_intror Htyor))
       as (rbp & wbp & tp & Hstpub).
     (* ...and the published booleans ARE the omode's: [fdstate_ok] pins them
        to [fc_readable]/[fc_writable], and the 0/1 encoding is injective. *)
-    destruct (fdstate_ok_flags inum C rbp wbp tp (so_rd_of om) (so_wr_of om)
+    destruct (fdstate_ok_flags inum γo C rbp wbp tp (so_rd_of om) (so_wr_of om)
                 ltac:(rewrite <- Hstpub; exact Hokpub) Hrdc Hwrc) as [-> ->].
     iAssert (sys_open_post gf (proc_addr jx) pidv U sts om (mf !!! Regidx Ra0 : mword 64))
       with "[Hpriv Hfds Hfrag]" as "Hpost".

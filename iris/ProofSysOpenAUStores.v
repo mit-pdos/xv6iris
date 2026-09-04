@@ -187,7 +187,12 @@ Section ProofSysOpenAUStores.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
-      (t : fdtype) :
+      (t : fdtype)
+      (* THE OFFSET SHADOW'S NAME, minted by the caller right after the
+         [f->off = 0] store (the ghost has to exist before [t] can name it,
+         and [t] is what the AU's arms are stated at); dead on the device
+         arm *)
+      (g : gname) :
     qi = s ->   (* r25 shapes: the parked ident fraction IS the travelling share (so_publish) *)
     (K_iunlock <= K - 24)%nat -> (K_end_op <= K - 24)%nat ->
     (K_itrunc <= K - 24)%nat ->
@@ -221,7 +226,7 @@ Section ProofSysOpenAUStores.
        /\ 0 <= bv_unsigned (di_major dn) <= NDEV_max
        /\ t = FdDevice (bv_unsigned (di_major dn))) ->
     (bv_unsigned (di_type dn) <> FsImg.T_DEVICE_z ->
-       tyw = FD_INODE /\ t = FdInode (bv_unsigned inum)) ->
+       tyw = FD_INODE /\ t = FdInode (bv_unsigned inum) g) ->
     is_aligned_paddr (Physaddr (pa_stk sp0 23)) 8 = true ->
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
     so_sp sp0 N -> so_thr m N ->
@@ -275,7 +280,9 @@ Section ProofSysOpenAUStores.
     a_fpipe kf     ↦₈ pip -∗
     a_fmajor kf    ↦₂ maj -∗
     a_fip kf       ↦₈ ipold -∗
-    (if bool_decide (tyw = FD_INODE) then a_foff kf ↦₄ voff else off_free kf 1) -∗
+    (if bool_decide (tyw = FD_INODE)
+     then a_foff kf ↦₄ voff ∗ off_gv g 1 (bv_unsigned voff)
+     else off_free kf 1) -∗
     (* the untyped slot's own unit, on its way back to the ledger -- see
        [so_tail_pub]'s row for why the entry ends up owing nothing *)
     iref_slot -∗
@@ -351,7 +358,7 @@ Section ProofSysOpenAUStores.
                     /\ t = FdDevice (bv_unsigned (di_major dn)))
       by (intros Hq; destruct (Htd Hq) as (_ & _ & Ha & Hbq); exact (conj Ha Hbq)).
     assert (Hinob : bv_unsigned (di_type dn) <> FsImg.T_DEVICE_z ->
-                    t = FdInode (bv_unsigned inum))
+                    t = FdInode (bv_unsigned inum) g)
       by (intros Hq; exact (proj2 (Hti Hq))).
     (* THE OWNER'S RULING (2026-08-29), AND THIS LANE OWES IT NOTHING NEW:
        [Htd] already says a T_DEVICE inode was stored as FD_DEVICE, so the
@@ -513,7 +520,7 @@ Section ProofSysOpenAUStores.
               /foff_of.
       iFrame "Hfty Hfrd Hfwr Hfpip Hfip Hfmaj". }
     (* the published content's type, in the shape the publication asks for *)
-    assert (Hfdty : (fc_type C = FD_INODE /\ t = FdInode (bv_unsigned inum))
+    assert (Hfdty : (fc_type C = FD_INODE /\ t = FdInode (bv_unsigned inum) g)
                    \/ (fc_type C = FD_DEVICE
                        /\ t = FdDevice (bv_unsigned (fc_major C)))).
     { destruct (decide (bv_unsigned (di_type dn) = FsImg.T_DEVICE_z))
@@ -589,14 +596,14 @@ Section ProofSysOpenAUStores.
         apply bv_eq; vm_compute; reflexivity. }
       iDestruct (so_flat_close with "Hflat") as "Hload".
       iDestruct (so_arm_notr gf (proc_addr jx) pidv vom P Φo Φt U sts pl
-                   (bv_unsigned inum) dn bm data t
+                   (bv_unsigned inum) dn bm data t g
                    (or_introl Hntf) Hdirk Hdevb Hinob Htyen
                    with "HP Hobs Htc") as "Harm".
       iApply (Pub.so_tail_pub_au (CID0 := CID10) gf gs jx gl pd pav pu
                 gil gisl
  kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs U sts m N6 sp0 K eb b lks w6
-                (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t
+                (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t g
                 Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hom Hfdty
@@ -698,14 +705,14 @@ Section ProofSysOpenAUStores.
         vm_compute. reflexivity. }
       iDestruct (so_flat_close with "Hflat") as "Hload".
       iDestruct (so_arm_notr gf (proc_addr jx) pidv vom P Φo Φt U sts pl
-                   (bv_unsigned inum) dn bm data t
+                   (bv_unsigned inum) dn bm data t g
                    (or_intror Hnf2) Hdirk Hdevb Hinob Htyen
                    with "HP Hobs Htc") as "Harm".
       iApply (Pub.so_tail_pub_au (CID0 := CID13) gf gs jx gl pd pav pu
                 gil gisl
  kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
                 (S (S u2)) pidv dqb dqs U sts m N8 sp0 K eb b lks w6
-                (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t
+                (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t g
                 Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hom Hfdty
@@ -918,13 +925,13 @@ Section ProofSysOpenAUStores.
       assert (Hz : so_and om 1024 = (mword_of_int 0 : mword 64))
         by (rewrite Hom; apply (proj2 (soau_trunc_zero_iff vom)); exact Hot).
       rewrite Hz so_eqz_zero in Htr. discriminate. }
-    assert (Htis : t = FdInode (bv_unsigned inum)).
+    assert (Htis : t = FdInode (bv_unsigned inum) g).
     { destruct (Hti ltac:(rewrite Htyfz; vm_compute; discriminate)) as [_ Hq].
       exact Hq. }
     iEval (rewrite /so_obs (opf_era_file_row dn bm data Htyfz)) in "Hobs".
     iDestruct (so_arm_file_tr gf (proc_addr jx) pidv vom P Φo Φt U sts pl
                  (bv_unsigned inum) (fn_file_bytes (era_node dn bm data))
-                 (fn_nlink (era_node dn bm data)) Htrue
+                 (fn_nlink (era_node dn bm data)) g Htrue
                  with "HP Hobs Htr2") as "Harm".
     iEval (rewrite -Htis) in "Harm".
     iApply (Pub.so_tail_pub_au (CID0 := CID17) gf gs jx gl pd pav pu
@@ -932,7 +939,7 @@ Section ProofSysOpenAUStores.
  kk qi s gy loy tly inum (di_trunc dn) bm_empty kf fd l C pn
               om voff nsj u3 pidv dqb dqs U sts m mit sp0 K
               eb b lks w6 (word_of_words lo om) w24 bp
-              vom P Pmiss Φo Φt t
+              vom P Pmiss Φo Φt t g
               Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
               Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
               Hom Hfdty

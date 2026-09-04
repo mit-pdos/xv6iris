@@ -116,15 +116,15 @@ Section ProofStable.
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names) (pidv : mword 32) (U : ustate) (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-      (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
+      (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
       (Φr : aview -> nat -> anode -> iProp Σ)
     : wp_sys_read_au_at_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
-        lks fd fv wb i q bs0 nl Φr.
+        lks fd fv wb i γo q bs0 nl Φr.
   Proof.
     (* MOVE 1: the AU form at the ENRICHED receipt. *)
     pose proof (wp_sys_read_au_at γf γs j γlp fn pidv U v v1 v2 m K eb b lks
-                  fd fv wb i
+                  fd fv wb i γo
                   (arf_pin_recv (fs_gamma_L fsc_fs) i q
                      (MkAnode (AFile bs0) nl) Φr)) as HW.
     cbv beta delta [wp_sys_read_au_at_body wp_sys_read_au_frame] in HW.

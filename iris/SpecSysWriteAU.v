@@ -682,7 +682,8 @@ Definition wp_sys_write_au_frame
     (v v1 v2 : mword 64)                         (* syscall args 0, 1, 2   *)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64)                   (* the descriptor's slot  *)
-    (rb : bool) (i : Z)                          (* its mode bit and inum  *)
+    (rb : bool) (i : Z) (γo : gname)             (* its mode bit, inum and
+                                                    offset shadow           *)
     (EXTRA : iProp Σ) (ARMS : mword 64 -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_write in
   let pj := proc_addr j in
@@ -716,7 +717,7 @@ Definition wp_sys_write_au_frame
   ConsoleInv.devsw_table -∗
   (* THE FD SIDE's resource half: the caller's own fragment -- open,
      WRITABLE, an inode descriptor at inum [i] *)
-  fd_st (pv_fdg (us_V U)) fd (FdOpen rb true (FdInode i)) -∗
+  fd_st (pv_fdg (us_V U)) fd (FdOpen rb true (FdInode i γo)) -∗
   (* ---- THE AU SIDE (the one addition to the landed premise list) ---- *)
   EXTRA -∗
   wp_next true pj (fun (CID : CpuId) =>
@@ -732,7 +733,7 @@ Definition wp_sys_write_au_frame
       filewrite_fs_out fn -∗
       (* the descriptor's state does not move: a write advances the
          offset and the bytes, never the fd table *)
-      fd_st (pv_fdg (us_V U)) fd (FdOpen rb true (FdInode i)) -∗
+      fd_st (pv_fdg (us_V U)) fd (FdOpen rb true (FdInode i γo)) -∗
       (* the armed post on the returned a0 (implies [sys_write_ret]) *)
       ARMS r -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -753,12 +754,12 @@ Definition wp_sys_write_au_body
     (pidv : mword 32) (U : ustate)
     (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-    (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
+    (fd : nat) (fv : mword 64) (rb : bool) (i : Z) (γo : gname)
     (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
   wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
-    fd fv rb i
+    fd fv rb i γo
     (awrite_commits Γfs fsabsE i Φw 0%nat (wchunks n))
     (write_arms Γfs i n (us_M U) v1 Φw).
 
@@ -781,13 +782,13 @@ Definition wp_sys_write_au_stable_body
     (pidv : mword 32) (U : ustate)
     (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-    (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
+    (fd : nat) (fv : mword 64) (rb : bool) (i : Z) (γo : gname)
     (q : Qp) (bs0 : list (bv 8)) (nl : nat)
     (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
   wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
-    fd fv rb i
+    fd fv rb i γo
     (nview Γfs q i (MkAnode (AFile bs0) nl)
      ∗ awrite_commits Γfs fsabsE i Φw 0%nat (wchunks n))%I
     (write_stable_arms Γfs i n q bs0 nl (us_M U) v1 Φw).
@@ -806,10 +807,10 @@ Module Type SYSWRITE_AU.
       (pidv : mword 32) (U : ustate)
       (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-      (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
+      (fd : nat) (fv : mword 64) (rb : bool) (i : Z) (γo : gname)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ),
       wp_sys_write_au_body γf γs j γlp fn pidv U v v1 v2 m K eb b lks
-        fd fv rb i Φw.
+        fd fv rb i γo Φw.
 
   (* owed as a DERIVATION from [wp_sys_write_au] + the agreement seed
      ([awrite_commit_pinned]), never as a second walk; the escape arm of
@@ -823,9 +824,9 @@ Module Type SYSWRITE_AU.
       (pidv : mword 32) (U : ustate)
       (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-      (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
+      (fd : nat) (fv : mword 64) (rb : bool) (i : Z) (γo : gname)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ),
       wp_sys_write_au_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
-        lks fd fv rb i q bs0 nl Φw.
+        lks fd fv rb i γo q bs0 nl Φw.
 End SYSWRITE_AU.

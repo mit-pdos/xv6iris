@@ -11,7 +11,7 @@
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own.   (* [iProp] *)
+From iris.base_logic.lib Require Import own ghost_var.   (* [iProp]; the offset shadow *)
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvExtras.
@@ -20,6 +20,7 @@ Require Import BioDefs.    (* [BSIZE] *)
 Require Import InodeInv.   (* [MAXFILE] *)
 From Kernel Require KernelSyms.
 Require Import TsoCtx.
+Require Import Xv6Cameras.   (* [offboxG] -- the offset shadow's pinned class *)
 Local Open Scope Z_scope.
 
 Definition file_stride : Z := 40.               (* the loop's [addi s1,s1,40] *)
@@ -84,12 +85,73 @@ Proof.
   rewrite E. lia.
 Qed.
 
+(* ==================================================================== *)
+(*  THE OFFSET SHADOW: a ghost_var over Z that IS the value of f->off    *)
+(* ==================================================================== *)
+
+(* [off_gv γo q z] -- fraction [q] of the offset ghost named [γo], at value
+   [z].  Its class is PINNED to [Xv6Cameras.offbox_offG]: [ghost_varG Σ Z]
+   has a second member in the bundle ([uioG]'s break ghost), and two paths
+   to one [inG] are two propositions that print identically.  Every
+   statement about the shadow goes through this wrapper and never through
+   a bare [ghost_var] at [Z].
+
+   WHAT IT IS FOR.  A descriptor's user cannot own [f->off] -- the cell is
+   kernel memory under [ip->lock] -- but it can own HALF of a ghost that
+   tracks it.  The whole ghost rides beside the cell in [off_resident]
+   today; the kernel side keeps [1] and exposes nothing yet.  The plan is
+   for sys_open to hand the other half to the process, and for the read /
+   write AU specs to step it, so that a program knows where its next read
+   lands.  The name is [FdSlots.FdInode]'s [γo], minted per publish. *)
+Section OffGv.
+  Context `{!offboxG Σ}.
+
+  Definition off_gv (γo : gname) (q : Qp) (z : Z) : iProp Σ :=
+    ghost_var (ghost_varG0 := offbox_offG) γo q z.
+
+  Global Instance off_gv_timeless γo q z : Timeless (off_gv γo q z).
+  Proof. rewrite /off_gv. apply _. Qed.
+
+  Lemma off_gv_alloc (z : Z) : ⊢ |==> ∃ γo : gname, off_gv γo 1 z.
+  Proof. rewrite /off_gv. iApply ghost_var_alloc. Qed.
+
+  Lemma off_gv_update (z' : Z) γo (z : Z) : off_gv γo 1 z ==∗ off_gv γo 1 z'.
+  Proof. rewrite /off_gv. iApply ghost_var_update. Qed.
+
+  Lemma off_gv_agree γo (q1 q2 : Qp) (z1 z2 : Z) :
+    off_gv γo q1 z1 -∗ off_gv γo q2 z2 -∗ ⌜z1 = z2⌝.
+  Proof. rewrite /off_gv. iApply ghost_var_agree. Qed.
+
+  Lemma off_gv_split γo (q1 q2 : Qp) (z : Z) :
+    off_gv γo (q1 + q2) z ⊣⊢ off_gv γo q1 z ∗ off_gv γo q2 z.
+  Proof.
+    rewrite /off_gv. iSplit.
+    - iIntros "H". iDestruct (ghost_var_split with "H") as "[$ $]".
+    - iIntros "[H1 H2]". iCombine "H1 H2" as "H". iExact "H".
+  Qed.
+End OffGv.
+
 Section FileOffCell.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, !offboxG Σ}.
   Context `{XI : CurCtx}.
 
-  (* the resident cell, wf -- what the off box holds while a file's [f->off]
-     is not checked out (OffBox.off_hdr), and what the free slot row holds *)
-  Definition off_resident (k : nat) : iProp Σ :=
-    (∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝)%I.
+  (* the resident cell, wf, WITH ITS SHADOW -- what the off box holds while
+     a file's [f->off] is not checked out (OffBox.off_hdr).  The ghost is
+     owned WHOLE here, so the value the cell holds and the value the ghost
+     records cannot drift: a checkout takes both out, a park puts both back
+     at the new word ([off_resident_intro] does the update). *)
+  Definition off_resident (γo : gname) (k : nat) : iProp Σ :=
+    (∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝ ∗ off_gv γo 1 (bv_unsigned v))%I.
+
+  (* the checkin: a wf word, plus the shadow at WHATEVER value it left
+     with, re-forms the resident cell -- the one ghost step of an off
+     advance, and the only place the shadow moves *)
+  Lemma off_resident_intro γo (k : nat) (v : mword 32) (z : Z) :
+    off_wf v ->
+    a_foff k ↦₄ v -∗ off_gv γo 1 z ==∗ off_resident γo k.
+  Proof.
+    iIntros (Hwf) "Hc Hg".
+    iMod (off_gv_update (bv_unsigned v) with "Hg") as "Hg".
+    iModIntro. iExists v. iFrame "Hc Hg". iPureIntro. exact Hwf.
+  Qed.
 End FileOffCell.

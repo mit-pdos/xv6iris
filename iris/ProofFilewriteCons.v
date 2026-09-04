@@ -279,7 +279,7 @@ Section ProofFilewriteCons.
     (* the reference, taken apart as the landed walk does it *)
     iDestruct "Href" as (Cf) "(Hrtok & Hrfields & Hrpay & Hrlv)".
     iDestruct (file_pay_st_ok with "Hrpay") as "[%Hokx Hrpay]".
-    destruct Hokx as (inumx & Hok).
+    destruct Hokx as (inumx & γox & Hok).
     (* ---- THE PREMISES, CASHED.  Everything the four killed branches need
        comes out of [fdstate_ok] at the pinned state. ---- *)
     rewrite Hst in Hok. cbn in Hok.

@@ -734,7 +734,8 @@ Definition wp_sys_read_au_frame
     (v v1 v2 : mword 64)                         (* syscall args 0, 1, 2   *)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64)                   (* the descriptor's slot  *)
-    (wb : bool) (i : Z)                          (* its mode bit and inum  *)
+    (wb : bool) (i : Z) (γo : gname)             (* its mode bit, inum and
+                                                    offset shadow           *)
     (EXTRA : iProp Σ) (ARMS : mword 64 -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_read in
   let pj := proc_addr j in
@@ -766,7 +767,7 @@ Definition wp_sys_read_au_frame
   ConsoleInv.console_inv (frn_cons fn) -∗
   (* THE FD SIDE's resource half: the caller's own fragment -- open,
      READABLE, an inode descriptor at inum [i] *)
-  fd_st (pv_fdg (us_V U)) fd (FdOpen true wb (FdInode i)) -∗
+  fd_st (pv_fdg (us_V U)) fd (FdOpen true wb (FdInode i γo)) -∗
   (* ---- THE AU SIDE (the one addition to the landed premise list) ---- *)
   EXTRA -∗
   wp_next true pj (fun (CID : CpuId) =>
@@ -802,7 +803,7 @@ Definition wp_sys_read_au_frame
       fileread_fs_out fn -∗
       (* the descriptor's state does not move: a read advances the
          offset, never the fd table *)
-      fd_st (pv_fdg (us_V U)) fd (FdOpen true wb (FdInode i)) -∗
+      fd_st (pv_fdg (us_V U)) fd (FdOpen true wb (FdInode i γo)) -∗
       (* the armed post on the returned a0 (implies [sys_read_ret]) *)
       ARMS r -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -823,12 +824,12 @@ Definition wp_sys_read_au_body
     (pidv : mword 32) (U : ustate)
     (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-    (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
+    (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
     (Φr : aview -> nat -> anode -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
   wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
-    fd fv wb i
+    fd fv wb i γo
     (aread_commit Γfs fsabsE i Φr)
     (read_arms Γfs i n Φr).
 
@@ -853,14 +854,14 @@ Definition wp_sys_read_au_stable_body
     (pidv : mword 32) (U : ustate)
     (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-    (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
+    (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
     (q : Qp) (bs0 : list (bv 8)) (nl : nat)
     (Φr : aview -> nat -> anode -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
   0 <= sys_rw_count v2 ->
   wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
-    fd fv wb i
+    fd fv wb i γo
     (nview Γfs q i (MkAnode (AFile bs0) nl)
      ∗ aread_commit Γfs fsabsE i Φr)%I
     (read_stable_arms Γfs i n q bs0 nl Φr).
@@ -879,10 +880,10 @@ Module Type SYSREAD_AU.
       (pidv : mword 32) (U : ustate)
       (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-      (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
+      (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
       (Φr : aview -> nat -> anode -> iProp Σ),
       wp_sys_read_au_body γf γs j γlp fn pidv U v v1 v2 m K eb b lks
-        fd fv wb i Φr.
+        fd fv wb i γo Φr.
 
   (* owed as a DERIVATION from [wp_sys_read_au] + the agreement seed
      ([aread_commit_pinned_self]), never as a second walk; the stable
@@ -897,9 +898,9 @@ Module Type SYSREAD_AU.
       (pidv : mword 32) (U : ustate)
       (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-      (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
+      (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
       (Φr : aview -> nat -> anode -> iProp Σ),
       wp_sys_read_au_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
-        lks fd fv wb i q bs0 nl Φr.
+        lks fd fv wb i γo q bs0 nl Φr.
 End SYSREAD_AU.

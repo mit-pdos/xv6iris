@@ -1612,17 +1612,17 @@ Section ProofPipealloc.
     iEval (rewrite (file_core_noff_none 1 pn1 Cf1 Hk1ty)) in "Hiru1".
     iEval (rewrite (file_core_off_none k1 1 pn1 Cf1 Hk1ty)) in "Hoffd1".
     iMod (fpay_tok_update γf k0 pn0
-            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_inum pn0) (fp_obox pn0))
+            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_inum pn0) (fp_obox pn0) (fp_ooff pn0))
             with "Hpn0") as "Hpn0".
     iMod (fpay_tok_update γf k1 pn1
-            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_inum pn1) (fp_obox pn1))
+            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_inum pn1) (fp_obox pn1) (fp_ooff pn1))
             with "Hpn1") as "Hpn1".
     iAssert (file_pay_st γf k0 1
                (MkFContent FD_PIPE (mword_of_int 1 : mword 8)
                   (mword_of_int 0 : mword 8) pi
                   (fc_ip Cf0) (fc_major Cf0)) (FdOpen true false FdPipe))
       with "[Hpn0 Hrd Hiru0 Hoffd0]" as "Hpay0".
-    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_inum pn0) (fp_obox pn0)).
+    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_inum pn0) (fp_obox pn0) (fp_ooff pn0)).
       (* the retype IS the descriptor's state change: a pipe end reports
          [FdOpen r w FdPipe] at the flags it stores, and [fp_inum] is
          meaningless on this arm *)
@@ -1648,7 +1648,7 @@ Section ProofPipealloc.
                   (mword_of_int 1 : mword 8) pi
                   (fc_ip Cf1) (fc_major Cf1)) (FdOpen false true FdPipe))
       with "[Hpn1 Hwr Hiru1 Hoffd1]" as "Hpay1".
-    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_inum pn1) (fp_obox pn1)).
+    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_inum pn1) (fp_obox pn1) (fp_ooff pn1)).
       (* NOT [by split]: the goal is three [eq_refl]s between concrete
          mwords, but [done] ends in a no-argument [discriminate], which
          head-normalises every hypothesis type in a whole-function

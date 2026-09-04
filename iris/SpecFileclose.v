@@ -317,7 +317,7 @@ Section SpecFileclose.
       (st : fdstate) : iProp Σ :=
     (match st with
      | FdOpen _ _ FdPipe => fileclose_pipe_env fn on n
-     | FdOpen _ _ (FdInode _) | FdOpen _ _ (FdDevice _) => fileclose_fs_env fn n eb p
+     | FdOpen _ _ (FdInode _ _) | FdOpen _ _ (FdDevice _) => fileclose_fs_env fn n eb p
      | FdClosed => emp
      end)%I.
 
@@ -325,7 +325,7 @@ Section SpecFileclose.
       (st : fdstate) : iProp Σ :=
     (match st with
      | FdOpen _ _ FdPipe => fileclose_pipe_out fn on
-     | FdOpen _ _ (FdInode _) | FdOpen _ _ (FdDevice _) => fileclose_fs_out fn
+     | FdOpen _ _ (FdInode _ _) | FdOpen _ _ (FdDevice _) => fileclose_fs_out fn
      | FdClosed => emp
      end)%I.
 
@@ -362,7 +362,7 @@ Section SpecFileclose.
     fileclose_env fn on n eb p st -∗ fileclose_env_out fn on st.
   Proof.
     rewrite /fileclose_env /fileclose_env_out.
-    destruct st as [|? ? [?| |?]].
+    destruct st as [|? ? [? ?| |?]].
     - by iIntros "_".
     - iApply fileclose_fs_env_out.
     - iApply fileclose_pipe_env_out.
@@ -439,7 +439,7 @@ Section SpecFileclose.
        fileclose_pipe_out fn on ∗ fileclose_fs_out fn).
   Proof.
     rewrite /fileclose_env /fileclose_env_out.
-    destruct st as [|? ? [?| |?]].
+    destruct st as [|? ? [? ?| |?]].
     - iIntros "Hp Hf". iSplitR; [done|]. iIntros "_".
       iDestruct (fileclose_pipe_env_out with "Hp") as "$".
       by iApply fileclose_fs_env_out.

@@ -86,14 +86,14 @@ Section ProofStable.
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names) (pidv : mword 32) (U : ustate) (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-      (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
+      (fd : nat) (fv : mword 64) (rb : bool) (i : Z) (γo : gname)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
     : wp_sys_write_au_era_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
-        lks fd fv rb i q bs0 nl Φw.
+        lks fd fv rb i γo q bs0 nl Φw.
   Proof.
     pose proof (W.wp_sys_write_au_era γf γs j γlp fn pidv U v v1 v2 m K eb b
-                  lks fd fv rb i Φw) as HW.
+                  lks fd fv rb i γo Φw) as HW.
     cbv beta delta [wp_sys_write_au_era_body wp_sys_write_au_frame] in HW.
     cbv beta delta [wp_sys_write_au_era_stable_body wp_sys_write_au_frame].
     intros Gfs nn pcE pj ret_tgt Hav Hj Hgs Hlens Hfj Hfprocs

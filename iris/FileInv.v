@@ -332,7 +332,7 @@ Section FileInv.
     rewrite /off_fd.
     iDestruct "Hoff" as (i T0) "(%Hip & %Hi & Hbox & _ & Hregd & Hcnt & Hst)".
     rewrite /off_ref_stamps. iDestruct "Hst" as (m) "[%Hq Href]".
-    iMod (off_last_close k _ T0 m E HE Hq with "Hbox Hregd Hcnt Href") as "[_ Hfree]".
+    iMod (off_last_close k _ _ T0 m E HE Hq with "Hbox Hregd Hcnt Href") as "[_ Hfree]".
     iModIntro. rewrite /off_free. iFrame "Hfree". iPureIntro. apply a_foff_aligned.
   Qed.
 

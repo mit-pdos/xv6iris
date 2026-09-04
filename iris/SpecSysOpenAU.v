@@ -673,8 +673,9 @@ Section SysOpenAU.
                    ⌜av' !! i = Some (MkAnode (AFile bs0) nl)⌝ ∗
                    Φt av' i bs0
             else atrunc_commit_at Γ fsabsE Φt) ∗
-           open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
-             (FdInode i) sts r)
+           ∃ γo : gname,
+             open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
+               (FdInode i γo) sts r)
         ∨ (* DIRECTORY, at O_RDONLY exactly: the arm's own key is what
              pays the writable-fd-is-not-a-directory theorem here
              ([om_rdonly_modes]) *)
@@ -683,7 +684,8 @@ Section SysOpenAU.
            ⌜om_arg vom = 0⌝ ∗
            Φo av i (MkAnode (ADir ents) nl) ∗
            atrunc_commit_at Γ fsabsE Φt ∗
-           open_fd_ok γf p pid UW true false (FdInode i) sts r)))%I.
+           ∃ γo : gname,
+             open_fd_ok γf p pid UW true false (FdInode i γo) sts r)))%I.
 
   (* ret -1: the header's three-way fold, residue returned per arm.  The
      third disjunct's observation is FIRED, not optional: every post-walk
@@ -751,8 +753,9 @@ Section SysOpenAU.
            dlookup_commit_at Γ fsabsE Φex ∗
            aopen_commit_at Γ fsabsE Φo ∗
            atrunc_commit_at Γ fsabsE Φt ∗
-           open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
-             (FdInode i) sts r)
+           ∃ γo : gname,
+             open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
+               (FdInode i γo) sts r)
         ∨ (* EXISTS-OPENS *)
         (∃ (avx : aview) (entsx : gmap fname Z) (nlx : nat),
            ⌜avx !! d = Some (MkAnode (ADir entsx) nlx)⌝ ∗
@@ -769,8 +772,9 @@ Section SysOpenAU.
                           ⌜av' !! i = Some (MkAnode (AFile bs0) nl)⌝ ∗
                           Φt av' i bs0
                    else atrunc_commit_at Γ fsabsE Φt) ∗
-                  open_fd_ok γf p pid UW (om_readable vom)
-                    (om_writable vom) (FdInode i) sts r)
+                  ∃ γo : gname,
+                    open_fd_ok γf p pid UW (om_readable vom)
+                      (om_writable vom) (FdInode i γo) sts r)
                ∨ (* ...or a DEVICE (F-OK admits it; the major test still
                     stands between it and the fd) *)
                (∃ ma mi : Z,
@@ -923,10 +927,10 @@ Section SysOpenAU.
       + iDestruct "H" as (ma mi nl) "(_ & _ & _ & _ & H)".
         iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
           [exact Hrd | exact Hwr].
-      + iDestruct "H" as (bs0 nl) "(_ & _ & _ & H)".
+      + iDestruct "H" as (bs0 nl) "(_ & _ & _ & H)". iDestruct "H" as (γo) "H".
         iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
           [exact Hrd | exact Hwr].
-      + iDestruct "H" as (ents nl) "(_ & %Hom & _ & _ & H)".
+      + iDestruct "H" as (ents nl) "(_ & %Hom & _ & _ & H)". iDestruct "H" as (γo) "H".
         destruct (om_rdonly_modes vom Hom) as [Hrd0 Hwr0].
         iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
           [by rewrite Hrd Hrd0 | by rewrite Hwr Hwr0].
@@ -949,11 +953,12 @@ Section SysOpenAU.
     - iRight.
       iDestruct "H" as (pl d i nm) "(_ & _ & [H | H])".
       + iDestruct "H" as (av ents nl) "(_ & _ & _ & _ & _ & _ & H)".
+        iDestruct "H" as (γo) "H".
         iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
           [exact Hrd | exact Hwr].
       + iDestruct "H" as (avx entsx nlx) "(_ & _ & _ & _ & H)".
         iDestruct "H" as (av nl) "[H | H]".
-        * iDestruct "H" as (bs0) "(_ & _ & _ & H)".
+        * iDestruct "H" as (bs0) "(_ & _ & _ & H)". iDestruct "H" as (γo) "H".
           iApply (open_fd_ok_landed _ _ _ _ _ _ _ _ (trunc32 vom) with "H");
             [exact Hrd | exact Hwr].
         * iDestruct "H" as (ma mi) "(_ & _ & _ & _ & H)".

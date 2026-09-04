@@ -1095,15 +1095,22 @@ Proof.
            (λ t, BoxNames t.1.1.1 t.1.1.2 t.1.2 t.2)).
   by intros [].
 Qed.
+(* [offbox_offG] is the OFFSET SHADOW's class: a [ghost_var] over [Z] whose
+   value is the boxed [f->off] word ([FileOffCell.off_resident]), named per
+   publish by [FdSlots.FdInode]'s [γo].  [ghost_varG Σ Z] has another
+   member in the bundle ([uioG]'s [uio_brkG]), so every use PINS this one
+   ([FileOffCell.off_gv]), exactly as the count's [kalloc_count_inG] is
+   pinned beside the other [ghost_varG Σ nat] members. *)
 Class offboxG (Σ : gFunctors) := OffboxG {
   offbox_stampsG :: inG Σ (stampsR nat);
   offbox_slotdG  :: ghost_varG Σ (slot_reg nat unit);
   offbox_slotpG  :: ghost_varG Σ (l2_reg nat);
   offbox_setG    :: inG Σ (authR (gsetUR box_names));
+  offbox_offG    :: ghost_varG Σ Z;
 }.
 Definition offboxΣ : gFunctors :=
   #[ GFunctor (stampsR nat); ghost_varΣ (slot_reg nat unit); ghost_varΣ (l2_reg nat);
-     GFunctor (authR (gsetUR box_names)) ].
+     GFunctor (authR (gsetUR box_names)); ghost_varΣ Z ].
 Global Instance subG_offboxΣ {Σ} : subG offboxΣ Σ -> offboxG Σ.
 Proof. solve_inG. Qed.
 Global Instance offbox_boxG {Σ} `{!offboxG Σ} `{!kallocG Σ} : boxG nat unit Σ :=

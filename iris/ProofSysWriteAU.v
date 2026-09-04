@@ -301,10 +301,10 @@ Section ProofSysWriteAU.
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names) (pidv : mword 32) (U : ustate) (v v1 v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-      (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
+      (fd : nat) (fv : mword 64) (rb : bool) (i : Z) (γo : gname)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
     : wp_sys_write_au_era_body γf γs j γlp fn pidv U v v1 v2 m av eb b lks
-        fd fv rb i Φw.
+        fd fv rb i γo Φw.
   Proof.
     cbv beta delta [wp_sys_write_au_era_body wp_sys_write_au_frame].
     intros Gfs nn pcE pj ret_tgt Hav Hj Hgs Hlens Hfj Hfprocs
@@ -918,7 +918,7 @@ Section ProofSysWriteAU.
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (FilewriteAU.wp_filewrite_au γf γs j γlp kk qq stf fn pidv U
-                S4 (av - 6)%nat eb (sys_rw_count v2) b lks rb i Φw
+                S4 (av - 6)%nat eb (sys_rw_count v2) b lks rb i γo Φw
                 ltac:(lia) Hkk Hj Hgs Hlens
                 Hfj Hfprocs HS4a0' HS4a2 Hnrange Hstf Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs

@@ -242,8 +242,9 @@ Section ProofSysOpenAUCreArm.
     open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv vom
       (socr_P R i0) (socr_Phio_pure i0 (MkAnode (AFile bs) nl0))
       socr_Phit_triv sts U r
-    ⊢ R ∗ open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
-            (FdInode i0) sts r.
+    ⊢ R ∗ ∃ γo : gname,
+            open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
+              (FdInode i0 γo) sts r.
   Proof.
     rewrite /open_post_ok_plain /socr_P /socr_Phio_pure.
     iIntros "H". iDestruct "H" as (pl av i) "[[%Hi HR] Harm]".
@@ -279,8 +280,9 @@ Section ProofSysOpenAUCreArm.
                     ⌜av' !! i0 = Some (MkAnode (AFile bs0) nl)⌝ ∗
                     Phit av' i0 bs0
              else atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Phit) ∗
-            open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
-              (FdInode i0) sts r)
+            ∃ γo : gname,
+              open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
+                (FdInode i0 γo) sts r)
          ∨ (∃ ma mi : Z,
               ⌜av !! i0 = Some (MkAnode (ADev ma mi) nl)⌝ ∗
               ⌜0 <= ma <= NDEV_max⌝ ∗

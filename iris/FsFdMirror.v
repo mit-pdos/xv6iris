@@ -388,21 +388,23 @@ Section Steps.
                            (um_av u) (um_cwd u))
               \/ (* FILE: the one delta of the no-CREATE surface, iff
                     O_TRUNC *)
-              (exists (bs : list (bv 8)) (nl : nat),
+              (* the offset shadow's name [g] is the kernel's to mint
+                 (fresh per open), so the mirror only says there is one *)
+              (exists (bs : list (bv 8)) (nl : nat) (g : gname),
                  a = MkAnode (AFile bs) nl
                  /\ u' = MkUmirror
                            (<[fd := FdOpen (om_readable vom)
-                                      (om_writable vom) (FdInode i)]>
+                                      (om_writable vom) (FdInode i g)]>
                               (um_fdt u))
                            (if om_trunc vom then delta_trunc i (um_av u)
                             else um_av u)
                            (um_cwd u))
               \/ (* DIRECTORY, at O_RDONLY exactly (the whole-int test) *)
-              (exists (e : gmap fname Z) (nl : nat),
+              (exists (e : gmap fname Z) (nl : nat) (g : gname),
                  a = MkAnode (ADir e) nl
                  /\ om_arg vom = 0
                  /\ u' = MkUmirror
-                           (<[fd := FdOpen true false (FdInode i)]>
+                           (<[fd := FdOpen true false (FdInode i g)]>
                               (um_fdt u))
                            (um_av u) (um_cwd u)))).
 
@@ -533,20 +535,20 @@ Section Steps.
                                   (om_writable vom) (FdDevice ma)]>
                           (um_fdt u))
                        (um_av u) (um_cwd u))
-          \/ (exists (bs : list (bv 8)) (nl : nat),
+          \/ (exists (bs : list (bv 8)) (nl : nat) (g : gname),
                 a = MkAnode (AFile bs) nl
                 /\ u' = MkUmirror
                           (<[fd := FdOpen (om_readable vom)
-                                     (om_writable vom) (FdInode i)]>
+                                     (om_writable vom) (FdInode i g)]>
                              (um_fdt u))
                           (if om_trunc vom then delta_trunc i (um_av u)
                            else um_av u)
                           (um_cwd u))
-          \/ (exists (e : gmap fname Z) (nl : nat),
+          \/ (exists (e : gmap fname Z) (nl : nat) (g : gname),
                 a = MkAnode (ADir e) nl
                 /\ om_arg vom = 0
                 /\ u' = MkUmirror
-                          (<[fd := FdOpen true false (FdInode i)]>
+                          (<[fd := FdOpen true false (FdInode i g)]>
                              (um_fdt u))
                           (um_av u) (um_cwd u))).
   Proof.
@@ -655,14 +657,14 @@ Section Steps.
            asked only that the slot be free. *)
         pose proof Hfd as Hcl.
         destruct Harm as [(ma & mi & nl & _ & _ & ->)
-                         | [(bs & nl & _ & ->) | (e & nl & _ & _ & ->)]].
+                         | [(bs & nl & g & _ & ->) | (e & nl & g & _ & _ & ->)]].
         + exists (om_readable (ufs_arg tf 1)), (om_writable (ufs_arg tf 1)),
                  (FdDevice ma).
           split_and!; [reflexivity | exact Hcl | reflexivity].
         + exists (om_readable (ufs_arg tf 1)), (om_writable (ufs_arg tf 1)),
-                 (FdInode i).
+                 (FdInode i g).
           split_and!; [reflexivity | exact Hcl | reflexivity].
-        + exists true, false, (FdInode i).
+        + exists true, false, (FdInode i g).
           split_and!; [reflexivity | exact Hcl | reflexivity]. }
     destruct (decide (n = USYS_mknod)) as [-> | Hnm].
     { (* ---- mknod = 17: NEITHER table moves a descriptor.  Upstream has

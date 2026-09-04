@@ -132,8 +132,9 @@ Definition wp_filewrite_au_body
     (fn : fwrite_names)                          (* the heavy arms' ghosts  *)
     (pidv : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
-    (rb : bool) (i : Z)                          (* the descriptor's mode
-                                                    bit and its inum        *)
+    (rb : bool) (i : Z) (γo : gname)             (* the descriptor's mode
+                                                    bit, its inum and its
+                                                    offset shadow           *)
     (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filewrite in
   let pj := proc_addr j in
@@ -155,7 +156,7 @@ Definition wp_filewrite_au_body
   - 2 ^ 31 <= n < 2 ^ 31 ->
   (* EDIT 1: THE DESCRIPTOR IS AN OPEN, WRITABLE INODE AT [i].  The pipe,
      device and panic arms are out of this contract's domain by premise. *)
-  st = FdOpen rb true (FdInode i) ->
+  st = FdOpen rb true (FdInode i γo) ->
   eb = true ->
   locks_below lks "log" ->
   sie_cap_gpr KT1 m K b pj -∗
@@ -351,8 +352,8 @@ Module Type FILEWRITE_AU.
       (fn : fwrite_names)
       (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool)
-      (lks : gset string) (rb : bool) (i : Z)
+      (lks : gset string) (rb : bool) (i : Z) (γo : gname)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ),
       wp_filewrite_au_body γf γs j γlp k q st fn pidv U m K eb n b lks
-        rb i Φw.
+        rb i γo Φw.
 End FILEWRITE_AU.

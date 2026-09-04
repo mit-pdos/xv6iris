@@ -95,15 +95,19 @@ Section OffBox.
   Implicit Types (on : off_names) (γ : box_names) (k i : nat).
 
   (* ---- the instance's parameters --------------------------------------- *)
-  Definition off_hdr (k : nat) (_ : unit) (ξ : CtxId) : iProp Σ :=
-    off_resident (XI := ξ) k.
+  (* the header is CLOSED OVER THE SHADOW'S NAME [γo] (FdSlots.FdInode's
+     second argument): the box of a publish holds the cell and the ghost
+     that tracks it, and the handle [off_box k γ γo] a descriptor carries is
+     what fixes which ghost that is *)
+  Definition off_hdr (γo : gname) (k : nat) (_ : unit) (ξ : CtxId) : iProp Σ :=
+    off_resident (XI := ξ) γo k.
   Definition off_rest (_ : unit) (_ : CtxId) : iProp Σ := emp%I.
 
-  Global Instance off_hdr_morph k x : CtxMorph (off_hdr k x).
+  Global Instance off_hdr_morph γo k x : CtxMorph (off_hdr γo k x).
   Proof. rewrite /off_hdr /off_resident. ctx_morph_solve. Qed.
   Global Instance off_rest_morph x : CtxMorph (off_rest x).
   Proof. rewrite /off_rest. apply ctx_morph_const. Qed.
-  Global Instance off_hdr_timeless k x ξ : Timeless (off_hdr k x ξ).
+  Global Instance off_hdr_timeless γo k x ξ : Timeless (off_hdr γo k x ξ).
   (* peel the connectives and let [apply _] see only the LEAVES: a single
      [apply _] over the [∃ ∗ ⌜⌝] tower unifies up to delta, walks straight
      through [↦₄]'s own instance into the byte tower and backtracks over the
@@ -112,15 +116,17 @@ Section OffBox.
   Proof.
     rewrite /off_hdr /off_resident.
     apply bi.exist_timeless; intros ?.
+    apply bi.sep_timeless; [apply _|].
     apply bi.sep_timeless; apply _.
   Qed.
   Global Instance off_rest_timeless x ξ : Timeless (off_rest x ξ).
   Proof. rewrite /off_rest. apply _. Qed.
 
-  (* THE BOX of file slot k, at names γ (fresh per publish lifetime) *)
-  Definition off_box (k : nat) γ : iProp Σ :=
-    CtxBox.is_box (X := unit) off_hdr off_rest (λ _ : nat, emp%I) emp%I (offBoxN .@ k) γ.
-  Global Instance off_box_persistent k γ : Persistent (off_box k γ).
+  (* THE BOX of file slot k, at names γ and shadow γo (both fresh per
+     publish lifetime) *)
+  Definition off_box (k : nat) γ (γo : gname) : iProp Σ :=
+    CtxBox.is_box (X := unit) (off_hdr γo) off_rest (λ _ : nat, emp%I) emp%I (offBoxN .@ k) γ.
+  Global Instance off_box_persistent k γ γo : Persistent (off_box k γ γo).
   Proof. rewrite /off_box /CtxBox.is_box. apply _. Qed.
 
   (* ---- registers, per box ------------------------------------------------ *)
@@ -423,16 +429,16 @@ Section OffBox.
      row is inserted into inode [i]'s set.  What comes out is exactly
      [FileInvDefs.off_fd]'s pieces at [q = 1]: the two register halves, the
      share, membership, the handle. *)
-  Lemma off_publish_park `{CID : RiscvLang.CpuId} on i k γ (ξ : CtxId) (E : coPset) :
+  Lemma off_publish_park `{CID : RiscvLang.CpuId} on i k γ (γo : gname) (ξ : CtxId) (E : coPset) :
     ↑(offBoxN .@ k) ⊆ E ->
     CtxBox.stamps_auth (X := unit) γ ∅ -∗
     ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γ) 1 0%nat -∗
     ghost_var (bx_slotd γ) 1 (inhabitant : slot_reg nat unit) -∗
     ghost_var (bx_slotp γ) 1 (inhabitant : l2_reg nat) -∗
     own_context ξ -∗
-    off_resident (XI := ξ) k -∗
+    off_resident (XI := ξ) γo k -∗
     off_rows on i ξ ={E}=∗
-    own_context ξ ∗ off_box k γ ∗
+    own_context ξ ∗ off_box k γ γo ∗
     ∃ (T0 T : nat),
       off_regd γ (SlotReg T0 false k None) ∗ llb loglen_name T0 ∗
       off_cnt γ 1 ∗
@@ -446,11 +452,11 @@ Section OffBox.
     intros HE.
     rewrite /off_box /off_regd /off_cnt /off_regp.
     iIntros "Hst Hc Hd Hp Hrun Hcell Hrows".
-    iMod (CtxBox.box_alloc_at off_hdr off_rest (λ _ : nat, emp%I) emp%I
+    iMod (CtxBox.box_alloc_at (off_hdr γo) off_rest (λ _ : nat, emp%I) emp%I
             (offBoxN .@ k) γ ξ k E with "Hst Hc Hd Hp Hrun [Hcell]")
       as "(Hrun & %Tb & #Hbx & Hrd & #Hllb & Hcnt & Hrp)".
     { iExists tt. rewrite /off_rest. iSplitL; [iExact "Hcell"|done]. }
-    iMod (CtxBox.box_ref_incr off_hdr off_rest (λ _ : nat, emp%I) emp%I
+    iMod (CtxBox.box_ref_incr (off_hdr γo) off_rest (λ _ : nat, emp%I) emp%I
             (offBoxN .@ k) γ (SlotReg Tb false k None) 0 E HE eq_refl
             with "Hbx Hrd Hcnt") as "(Hrd & Hcnt & %T & Href)".
     iMod (off_rows_insert_row on i γ 0 ξ with "Hrows Hrp []") as "[Hfold #Hmem]".
@@ -462,20 +468,20 @@ Section OffBox.
 
   (* fileread / filewrite, under ip->lock: select the row by membership,
      (e), the cell in hand, (f), the row back (re-floored at the fold) *)
-  Lemma off_read_checkout `{CID : RiscvLang.CpuId} on i k γ (ξ : CtxId)
+  Lemma off_read_checkout `{CID : RiscvLang.CpuId} on i k γ (γo : gname) (ξ : CtxId)
       (m : gmap (nat * nat) ufrac) (Kt Kp : nat) (E : coPset) :
     ↑(offBoxN .@ k) ⊆ E ->
     (max_stamp m ≤ Kt)%nat ->
-    off_box k γ -∗ own_context ξ -∗ ctx_floor ξ Kt -∗ ctx_floor ξ Kp -∗
+    off_box k γ γo -∗ own_context ξ -∗ ctx_floor ξ Kt -∗ ctx_floor ξ Kp -∗
     off_member on i γ -∗
     CtxBox.reference (X := unit) γ k m -∗
     (* the row, taken from the inode payload's set: its floor is Kp *)
     (∃ s : l2_reg nat, ⌜lr_hold s = None⌝ ∗ ⌜(lr_tp s ≤ Kp)%nat⌝ ∗ off_regp γ s) ={E}=∗
-    own_context ξ ∗ off_resident (XI := ξ) k ∗ CtxBox.l2_hold (X := unit) γ k m.
+    own_context ξ ∗ off_resident (XI := ξ) γo k ∗ CtxBox.l2_hold (X := unit) γ k m.
   Proof. (* box_checkout at Q := emp, the row's own floor as Kp *)
     intros HE HKt. rewrite /off_box /off_regp.
     iIntros "#Hbox Hrun #Hflt #Hflp #Hmem Href (%s & %Hh & %Htp & Hrp)".
-    iMod (CtxBox.box_checkout off_hdr off_rest (λ _ : nat, emp%I) emp%I
+    iMod (CtxBox.box_checkout (off_hdr γo) off_rest (λ _ : nat, emp%I) emp%I
             (offBoxN .@ k) γ ξ k m s Kt Kp E HE Hh HKt Htp
             with "Hbox Hrun Hflt Hflp Href [] Hrp") as "(Hrun & Hbun & Hhold)".
     { done. }
@@ -483,11 +489,11 @@ Section OffBox.
     iModIntro. iFrame "Hrun Hhold". iExact "Hcell".
   Qed.
 
-  Lemma off_read_park `{CID : RiscvLang.CpuId} k γ (ξ : CtxId)
+  Lemma off_read_park `{CID : RiscvLang.CpuId} k γ (γo : gname) (ξ : CtxId)
       (m : gmap (nat * nat) ufrac) (E : coPset) :
     ↑(offBoxN .@ k) ⊆ E ->
-    off_box k γ -∗ own_context ξ -∗
-    off_resident (XI := ξ) k -∗
+    off_box k γ γo -∗ own_context ξ -∗
+    off_resident (XI := ξ) γo k -∗
     CtxBox.l2_hold (X := unit) γ k m ={E}=∗
     own_context ξ ∗
     ∃ (T' : nat) (q : ufrac),
@@ -498,7 +504,7 @@ Section OffBox.
   Proof. (* box_park at Q := emp *)
     intros HE. rewrite /off_box /off_regp.
     iIntros "#Hbox Hrun Hcell Hhold".
-    iMod (CtxBox.box_park off_hdr off_rest (λ _ : nat, emp%I) emp%I
+    iMod (CtxBox.box_park (off_hdr γo) off_rest (λ _ : nat, emp%I) emp%I
             (offBoxN .@ k) γ ξ k m E HE with "Hbox Hrun [Hcell] Hhold")
       as "(Hrun & _ & %T' & %q & %Hq & Hrp & Href & #Hllb)".
     { iExists tt. rewrite /off_rest. iSplitL; [iExact "Hcell"|done]. }
@@ -532,10 +538,10 @@ Section OffBox.
      [own_context]; the box is left OUT_L1 with the whole mass inside (a
      stale reader would hold mass > 0 beside it: refuted by Σ).  What comes
      out is the free word, which the retype to FD_NONE puts in the free row. *)
-  Lemma off_last_close k γ (T0 : nat) (m : gmap (nat * nat) ufrac) (E : coPset) :
+  Lemma off_last_close k γ (γo : gname) (T0 : nat) (m : gmap (nat * nat) ufrac) (E : coPset) :
     ↑(offBoxN .@ k) ⊆ E ->
     qsum m = Qp_to_Qc 1 ->
-    off_box k γ -∗
+    off_box k γ γo -∗
     off_regd γ (SlotReg T0 false k None) -∗
     off_cnt γ 1 -∗
     CtxBox.reference (X := unit) γ k m ={E}=∗
@@ -550,19 +556,21 @@ Section OffBox.
     iDestruct "Href" as "(%Hne & %Hkeyed & HfD & #HllbD)".
     assert (Hq1 : qsum m = CtxBox.nat_Qc 1).
     { rewrite Hq CtxBox.nat_Qc_1. exact Qp_to_Qc_1. }
+    (* the shadow dies with the box: nothing owns a fragment of a closed
+       file's [γo] any more, and the next publish mints a fresh name *)
     assert (Hhook : ∀ (x : unit) (ξb : CtxId),
-              emp ∗ off_hdr k x ξb
+              emp ∗ off_hdr γo k x ξb
               ={E ∖ ↑(offBoxN .@ k)}=∗
               ([∗ list] j ∈ seq 0 4, TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn 1))
               ∗ emp).
     { intros x ξb. rewrite /off_hdr /off_resident.
-      iIntros "[_ (%v & Hw & _)]".
+      iIntros "[_ (%v & Hw & _ & _)]".
       rewrite TsoCtx.ctx_word4_pointsto_unfold.
       iDestruct "Hw" as "[_ Hbytes]".
       iModIntro. iSplitL; [| done].
       iApply (big_sepL_impl with "Hbytes").
       iIntros "!#" (j y Hy) "Hb". iApply (TsoCtx.ctx_pointsto_free with "Hb"). }
-    iMod (CtxBox.box_withdraw_L1_free off_hdr off_rest (λ _ : nat, emp%I) emp%I
+    iMod (CtxBox.box_withdraw_L1_free (off_hdr γo) off_rest (λ _ : nat, emp%I) emp%I
             (offBoxN .@ k) γ (SlotReg T0 false k None) 1 m emp%I
             ([∗ list] j ∈ seq 0 4, TsoCtx.mem_free (pa_add (a_foff k) j) (DfracOwn 1))%I
             E HE eq_refl Hq1 Hhook

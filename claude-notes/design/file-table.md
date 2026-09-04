@@ -146,14 +146,14 @@ occurrences of `fc_type` and friends, and `ProcInv.v` no longer mentions
 this file**, tied to the content by `FileInvDefs.fdstate_ok`:
 
 ```coq
-Definition fdstate_ok (inum : mword 32) (C : fcontent) (st : fdstate) : Prop :=
+Definition fdstate_ok (inum : mword 32) (γo : gname) (C : fcontent) (st : fdstate) : Prop :=
   match st with
   | FdClosed             => fc_type C = FD_NONE
   | FdOpen r w t =>
       fc_readable C = (if r then 1 else 0) /\ fc_writable C = (if w then 1 else 0)
       /\ match t with
          | FdPipe      => fc_type C = FD_PIPE
-         | FdInode n   => fc_type C = FD_INODE  /\ n  = bv_unsigned inum
+         | FdInode n g => fc_type C = FD_INODE  /\ n  = bv_unsigned inum /\ g = γo
          | FdDevice mj => fc_type C = FD_DEVICE /\ mj = bv_unsigned (fc_major C)
          end
   end.
@@ -564,6 +564,33 @@ dissolves both horns: it is permanent AND names its inode, so
 `off_content` are gone, the boot mints no per-slot cinvs, and — the M3
 payoff — `fslot`'s ξ-dependence is now points-tos and `own`s only, with no
 invariant assertion inside the ftable lock's resource at all.
+
+### The offset SHADOW rides in the box header
+
+`off_resident γo k := ∃ v, a_foff k ↦₄ v ∗ ⌜off_wf v⌝ ∗ off_gv γo 1 (bv_unsigned v)`
+(`FileOffCell.v`): the boxed header owns, WHOLE, a `ghost_var` over `Z` whose
+value is the word.  Rules:
+
+- **The name is the descriptor's business.**  `γo` is `FdSlots.FdInode`'s
+  second argument and `fpnames.fp_ooff`; `fdstate_ok`'s FD_INODE arm ties the
+  two.  The box handle is `off_box k γb γo` — the header is closed over the
+  name, so a checkout at the fd's handle hands back the ghost the fd names.
+- **Mint per publish, never reuse, never collect.**  Fresh at every FD_INODE
+  publish (`ProofSysOpen`'s deposit block; `ProofSysOpenAUAlloc` mints it
+  right after the `f->off = 0` store because the AU's `t` names it and the
+  tail's arms are stated at `t`); dropped by the last close's hook inside
+  `OffBox.off_last_close`.  A dead name says nothing about the slot's next
+  file, which has a fresh one.
+- **The ghost moves only at a checkin.**  A checkout takes cell and ghost
+  out together; `off_resident_intro` puts them back at the new word and is
+  the ONE `ghost_var_update`.  Nothing else reads or writes the shadow.
+- **Pin the class.**  `ghost_varG Σ Z` has two members in `xv6G`
+  (`offbox_offG`, `uioG`'s break ghost); every statement uses `off_gv`, never
+  a bare `ghost_var` at `Z`.
+- **Kernel-whole for now.**  Nothing outside the box holds a fragment; the
+  read/write AU specs take `γo` as a parameter (`FdInode i γo`) and say
+  nothing about it yet.  The next step is a half to the process at open and
+  an offset transition in the read/write AU fupd.
 
 ## The pid fraction lives in the KERNEL arm — `SpecReadi` / `SpecWritei`
 
