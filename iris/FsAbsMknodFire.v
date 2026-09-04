@@ -143,6 +143,7 @@ Require Import InodeRegion.      (* [ftop_inv]/[ftop_body]/[ftop_clean]     *)
 Require Import Xv6G.
 Require Import SpecCreate.       (* [create_made], [T_DEVICE]               *)
 Require Import SpecSysMknodAU.   (* the frozen statement this parallels     *)
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
 
 Local Open Scope Z_scope.
@@ -340,11 +341,11 @@ Section MknodFire.
   Lemma mkf_dlookup_fire (γfs : fs_names) (E : coPset) (dq : dfrac)
       (Φ : aview -> Z -> fname -> Z -> iProp Σ)
       (d i : Z) (nm : fname) (n : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     fn_is_dir n = true ->
     dir_entries n !! nm = Some i ->
     ftop_inv γfs -∗
-    dlookup_commit_at (fs_gamma_L γfs) ∅ Φ -∗
+    dlookup_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
     top_frag_q (fs_gamma_L γfs) dq d n ={E}=∗
       top_frag_q (fs_gamma_L γfs) dq d n
       ∗ ∃ av : aview,
@@ -359,14 +360,14 @@ Section MknodFire.
        body's own spelling before the invariant is opened -- exactly what
        [InodeRegion.ireg_top_retag] does at its own retag. *)
     rewrite /top_frag_q /fs_gamma_L /=.
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
     assert (Hrow : abs_view I !! d
                    = Some (MkAnode (ADir (dir_entries n)) (fn_nlink n))).
     { by rewrite (abs_view_lookup I d n Hlk) (mkf_abs_of_dir n Hdir). }
-    iMod (fupd_mask_subseteq ∅) as "Hcl2"; [set_solver |].
+    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
     iMod ("Hcm" $! I d i nm (dir_entries n) (fn_nlink n)
             with "[//] [//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
@@ -387,14 +388,14 @@ Section MknodFire.
   Lemma mkf_acre_fire (γfs : fs_names) (E : coPset) (ma mi : Z)
       (Φ : aview -> Z -> fname -> Z -> iProp Σ)
       (d i : Z) (nm : fname) (dqc : dfrac) (np np' nc : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     inode_local d np' ->
     fn_is_dir np = true ->
     dir_entries np !! nm = None ->
     abs_of np' = MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np) ->
     abs_of nc = MkAnode (ADev ma mi) 1%nat ->
     ftop_inv γfs -∗
-    acre_commit_at (fs_gamma_L γfs) ∅ (ADev ma mi) Φ -∗
+    acre_commit_at (fs_gamma_L γfs) fsabsE (ADev ma mi) Φ -∗
     top_frag (fs_gamma_L γfs) d np -∗
     top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
@@ -407,7 +408,7 @@ Section MknodFire.
     iIntros "#Hi Hcm Hfp Hfc".
     (* the same re-spelling as above, and the reason is the same *)
     rewrite /top_frag /top_frag_q /fs_gamma_L /=.
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hfp") as %Hlkp.
@@ -425,7 +426,7 @@ Section MknodFire.
     { rewrite (abs_view_insert I d np') Habsp'.
       by rewrite (delta_create_dev (abs_view I) d nm (dir_entries np)
                     (fn_nlink np) i ma mi Hpre). }
-    iMod (fupd_mask_subseteq ∅) as "Hcl2"; [set_solver |].
+    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
     iMod ("Hcm" $! I d i nm (dir_entries np) (fn_nlink np)
             with "[//] Hta") as "[Hta Hph2]".
     iMod (ghost_map_update np' with "Hta Hfp") as "[Hta Hfp]".
@@ -936,7 +937,7 @@ Section CreateFire.
   Lemma caf_acre_fire (γfs : fs_names) (E : coPset) (c : absnode)
       (Φ : aview -> Z -> fname -> Z -> iProp Σ)
       (d i : Z) (nm : fname) (dqc : dfrac) (np np' nc : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     (forall e, c <> ADir e) ->
     inode_local d np' ->
     fn_is_dir np = true ->
@@ -944,7 +945,7 @@ Section CreateFire.
     abs_of np' = MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np) ->
     abs_of nc = MkAnode c 1%nat ->
     ftop_inv γfs -∗
-    acre_commit_at (fs_gamma_L γfs) ∅ c Φ -∗
+    acre_commit_at (fs_gamma_L γfs) fsabsE c Φ -∗
     top_frag (fs_gamma_L γfs) d np -∗
     top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
@@ -960,7 +961,7 @@ Section CreateFire.
        ([FsAbs.ftop_gamma_top], by reflexivity) but the unifier cannot
        solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag /top_frag_q /fs_gamma_L /=.
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hfp") as %Hlkp.
@@ -976,7 +977,7 @@ Section CreateFire.
     { rewrite (abs_view_insert I d np') Habsp'.
       by rewrite (caf_delta_create_nondir (abs_view I) d nm (dir_entries np)
                     (fn_nlink np) i c Hc Hpre). }
-    iMod (fupd_mask_subseteq ∅) as "Hcl2"; [set_solver |].
+    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
     iMod ("Hcm" $! I d i nm (dir_entries np) (fn_nlink np)
             with "[//] Hta") as "[Hta Hph2]".
     iMod (ghost_map_update np' with "Hta Hfp") as "[Hta Hfp]".
@@ -998,14 +999,14 @@ Section CreateFire.
   Lemma caf_acre_fire_file (γfs : fs_names) (E : coPset)
       (Φ : aview -> Z -> fname -> Z -> iProp Σ)
       (d i : Z) (nm : fname) (dqc : dfrac) (np np' nc : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     inode_local d np' ->
     fn_is_dir np = true ->
     dir_entries np !! nm = None ->
     abs_of np' = MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np) ->
     abs_of nc = MkAnode (AFile []) 1%nat ->
     ftop_inv γfs -∗
-    acre_commit_at (fs_gamma_L γfs) ∅ (AFile []) Φ -∗
+    acre_commit_at (fs_gamma_L γfs) fsabsE (AFile []) Φ -∗
     top_frag (fs_gamma_L γfs) d np -∗
     top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
       top_frag (fs_gamma_L γfs) d np'

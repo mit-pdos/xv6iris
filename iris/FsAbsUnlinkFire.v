@@ -99,6 +99,7 @@ Require Import Xv6G.
 Require Import SpecSysMknodAU.   (* [abs_view_insert]                        *)
 Require Import FsAbsMknodFire.   (* [dlookup_commit_at], [mkf_abs_of_dir]    *)
 Require Import SpecSysUnlinkAU.  (* the statement this file's fires serve    *)
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                  *)
 
 Local Open Scope Z_scope.
@@ -255,11 +256,11 @@ Section UnlinkFire.
   Lemma uf_dmiss_fire (γfs : fs_names) (E : coPset) (dq : dfrac)
       (Φ : aview -> Z -> fname -> iProp Σ)
       (d : Z) (nm : fname) (n : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     fn_is_dir n = true ->
     dir_entries n !! nm = None ->
     ftop_inv γfs -∗
-    dmiss_commit_at (fs_gamma_L γfs) ∅ Φ -∗
+    dmiss_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
     top_frag_q (fs_gamma_L γfs) dq d n ={E}=∗
       top_frag_q (fs_gamma_L γfs) dq d n
       ∗ ∃ av : aview,
@@ -274,14 +275,14 @@ Section UnlinkFire.
        spelling before the invariant is opened -- exactly what
        [InodeRegion.ireg_top_retag] does at its own retag. *)
     rewrite /top_frag_q /fs_gamma_L /=.
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
     assert (Hrow : abs_view I !! d
                    = Some (MkAnode (ADir (dir_entries n)) (fn_nlink n))).
     { by rewrite (abs_view_lookup I d n Hlk) (mkf_abs_of_dir n Hdir). }
-    iMod (fupd_mask_subseteq ∅) as "Hcl2"; [set_solver |].
+    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
     iMod ("Hcm" $! I d nm (dir_entries n) (fn_nlink n)
             with "[//] [//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
@@ -298,13 +299,13 @@ Section UnlinkFire.
   Lemma uf_dex_fire (γfs : fs_names) (E : coPset) (dqd dqt : dfrac)
       (Φ : aview -> Z -> fname -> Z -> iProp Σ)
       (d t : Z) (nm : fname) (nd nt : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     fn_is_dir nd = true ->
     dir_entries nd !! nm = Some t ->
     fn_is_dir nt = true ->
     ~ dots_only (dir_entries nt) ->
     ftop_inv γfs -∗
-    dlookup_commit_at (fs_gamma_L γfs) ∅ Φ -∗
+    dlookup_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
     top_frag_q (fs_gamma_L γfs) dqd d nd -∗
     top_frag_q (fs_gamma_L γfs) dqt t nt ={E}=∗
       top_frag_q (fs_gamma_L γfs) dqd d nd
@@ -318,7 +319,7 @@ Section UnlinkFire.
   Proof.
     intros HE Hdird Hnm Hdirt Hne. iIntros "#Hi Hcm Hfd Hft".
     rewrite /top_frag_q /fs_gamma_L /=.
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hfd") as %Hlkd.
@@ -329,7 +330,7 @@ Section UnlinkFire.
     assert (Hrowt : abs_view I !! t
                     = Some (MkAnode (ADir (dir_entries nt)) (fn_nlink nt))).
     { by rewrite (abs_view_lookup I t nt Hlkt) (mkf_abs_of_dir nt Hdirt). }
-    iMod (fupd_mask_subseteq ∅) as "Hcl2"; [set_solver |].
+    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
     iMod ("Hcm" $! I d t nm (dir_entries nd) (fn_nlink nd)
             with "[//] [//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
@@ -357,7 +358,7 @@ Section UnlinkFire.
   Lemma uf_uent_fire (γfs : fs_names) (E : coPset) (dqt : dfrac)
       (Φ : aview -> Z -> fname -> Z -> iProp Σ)
       (d t : Z) (nm : fname) (dec : nat) (np np' nt : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     inode_local d np' ->
     fn_is_dir np = true ->
     dir_entries np !! nm = Some t ->
@@ -370,7 +371,7 @@ Section UnlinkFire.
     abs_of np'
       = MkAnode (ADir (delete nm (dir_entries np))) (fn_nlink np - dec)%nat ->
     ftop_inv γfs -∗
-    uent_commit_at (fs_gamma_L γfs) ∅ Φ -∗
+    uent_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
     top_frag (fs_gamma_L γfs) d np -∗
     top_frag_q (fs_gamma_L γfs) dqt t nt ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
@@ -382,7 +383,7 @@ Section UnlinkFire.
     intros HE Hloc Hdir Hnm HnD HnDD Hnlp Hnlt Hdots Hdec Habsp'.
     iIntros "#Hi Hcm Hfp Hft".
     rewrite /top_frag /top_frag_q /fs_gamma_L /=.
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hfp") as %Hlkp.
@@ -409,7 +410,7 @@ Section UnlinkFire.
                      = delta_unl_ent d nm dec (abs_view I)).
     { rewrite (abs_view_insert I d np') Habsp'.
       rewrite /delta_unl_ent Hrowp /=. reflexivity. }
-    iMod (fupd_mask_subseteq ∅) as "Hcl2"; [set_solver |].
+    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
     iMod ("Hcm" $! I d t nm (dir_entries np) (fn_nlink np) (abs_of nt)
             with "[//] Hta") as "[Hta Hph2]".
     iMod (ghost_map_update np' with "Hta Hfp") as "[Hta Hfp]".
@@ -438,19 +439,19 @@ Section UnlinkFire.
      could move it between the two instants. *)
   Lemma uf_utgt_fire (γfs : fs_names) (E : coPset)
       (Φ : aview -> Z -> iProp Σ) (t : Z) (nt nt' : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     inode_local t nt' ->
     (1 <= fn_nlink nt)%nat ->
     abs_of nt' = MkAnode (an_node (abs_of nt)) (fn_nlink nt - 1)%nat ->
     ftop_inv γfs -∗
-    utgt_commit_at (fs_gamma_L γfs) ∅ Φ -∗
+    utgt_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
     top_frag (fs_gamma_L γfs) t nt ={E}=∗
       top_frag (fs_gamma_L γfs) t nt'
       ∗ ∃ av : aview, ⌜av !! t = Some (abs_of nt)⌝ ∗ Φ av t.
   Proof.
     intros HE Hloc Hnl Habs'. iIntros "#Hi Hcm Hf".
     rewrite /top_frag /fs_gamma_L /=.
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
@@ -460,7 +461,7 @@ Section UnlinkFire.
                      = delta_unl_tgt t (abs_view I)).
     { rewrite (abs_view_insert I t nt') Habs'.
       rewrite /delta_unl_tgt Hrow. reflexivity. }
-    iMod (fupd_mask_subseteq ∅) as "Hcl2"; [set_solver |].
+    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
     iMod ("Hcm" $! I t (abs_of nt) with "[//] [%] Hta") as "[Hta Hph2]".
     { exact Hnl. }
     iMod (ghost_map_update nt' with "Hta Hf") as "[Hta Hf]".

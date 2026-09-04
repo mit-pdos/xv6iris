@@ -37,8 +37,13 @@ Require Import ProofSyscall.
 Require Import LinkSysFork LinkSysExit LinkSysWait LinkSysPipe LinkSysRead
                 LinkSysKill LinkSysExec LinkSysFstat LinkSysChdir LinkSysDup
                 LinkSysGetpid LinkSysSbrk LinkSysPause LinkSysUptime
-                LinkSysWrite LinkSysMknod LinkSysLink LinkSysMkdir
-                LinkSysClose LinkSysSync LinkSysOpen LinkSysUnlink.
+                LinkSysWrite LinkSysLink LinkSysMkdir
+                LinkSysClose LinkSysSync.
+(* THE THREE FS-MUTATING ENTRIES RUN ON THEIR AU CONTRACTS (2026-09-03):
+   the dispatch takes SYSMKNOD_AU_ERA / SYSOPEN_AU / SYSUNLINK_AU and
+   derives the landed posts itself, so the landed proofs of these three
+   are no longer on the system theorem's cone. *)
+Require Import LinkSysMknodAU LinkSysOpenAUFull LinkSysUnlinkAU.
 (* ...and the three the dispatch itself needs: myproc, printk's general path
    for the unknown-number fallback, and the [p->name] fact below. *)
 Require Import LinkMyproc LinkPrintk.
@@ -46,6 +51,6 @@ Require Import LinkMyproc LinkPrintk.
 Module Syscall :=
   SyscallProof SysFork SysExit SysWait SysPipe SysRead SysKill
                SysExec SysFstat SysChdir SysDup SysGetpid SysSbrk
-               SysPause SysUptime SysWrite SysMknod SysLink SysMkdir
-               SysClose SysSync SysOpen SysUnlink
+               SysPause SysUptime SysWrite SysMknodAU SysLink SysMkdir
+               SysClose SysSync SysOpenAUFull SysUnlinkAU
                Myproc PrintkGen.

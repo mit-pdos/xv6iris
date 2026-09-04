@@ -96,6 +96,7 @@ Require Import FsBytesGamma.
 Require Import SpecSysOpenAU.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUStores.
+Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
 Require Import FsAbs.
 Require Import TsoCtx.
 
@@ -162,7 +163,7 @@ Section ProofSysOpenAUAlloc.
       (dn : dinode) (bm : blkmap)
       (om lo : mword 32) (nsj : nat)
       (u : nat) (pidv : mword 32) (dqb dqs : dfrac)
-      (U : ustate)
+      (U : ustate) (sts : list fdstate)
       (m N : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 w5 w6 w24 : mword 64)
       (bp : nat -> bv 8)
@@ -265,7 +266,7 @@ Section ProofSysOpenAUAlloc.
     fd_slot -∗
     (* the descriptor-state fragments, threaded exactly as the fd unit above
        is: sys_open spends one access, at the settle. *)
-    fd_frags_any (pv_fdg (us_V U)) -∗
+    fd_frags (pv_fdg (us_V U)) sts -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -279,10 +280,10 @@ Section ProofSysOpenAUAlloc.
     (* ---- THE AU RESIDUE, inert across this block ---- *)
     P (length (path_elems pl)) (bv_unsigned inum) -∗
     so_obs Φo (bv_unsigned inum) (era_node dn bm data) -∗
-    atrunc_commit_at (fs_gamma_L fsc_fs) ∅ Φt -∗
+    atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Φt -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
-               dqb dqs (proc_addr jx) pidv vom U P Pmiss Φo Φt m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Φo Φt m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hqs HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
@@ -461,7 +462,7 @@ Section ProofSysOpenAUAlloc.
                 Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag HP Hobs Htc]").
       { exact Hcsf. }
       { reflexivity. }
-      { iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Φo Φt U _ pl
+      { iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Φo Φt U sts _ pl
                   (bv_unsigned inum) (era_node dn bm data) Ha0f
                   with "Hpriv Hfrag Hfds HP Hobs Htc"). } }
     (* ---- filealloc succeeded ---- *)
@@ -643,7 +644,7 @@ Section ProofSysOpenAUAlloc.
                 Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag HP Hobs Htc]").
       { exact Hcsf. }
       { reflexivity. }
-      { iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Φo Φt U _ pl
+      { iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Φo Φt U sts _ pl
                   (bv_unsigned inum) (era_node dn bm data) Ha0f
                   with "Hpriv Hfrag Hfds HP Hobs Htc"). } }
     (* ---- fdalloc installed the descriptor ---- *)
@@ -845,7 +846,7 @@ Section ProofSysOpenAUAlloc.
                 gil gisl
  kk qi s gy loy tly inum dn bm kf fd ll pn FD_DEVICE
                 (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
-                (di_major dn) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb dqs U m M7 sp0 K eb b
+                (di_major dn) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb dqs U sts m M7 sp0 K eb b
                 lks w6 w24 bp
                 data vom pl P Pmiss Φo Φt
                 (FdDevice (bv_unsigned (di_major dn)))
@@ -967,7 +968,7 @@ Section ProofSysOpenAUAlloc.
  kk qi s gy loy tly inum dn bm kf fd ll pn FD_INODE
               (fc_readable Cf) (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf)
               (fc_major Cf) om (mword_of_int 0 : mword 32) lo nsj u pidv dqb
-              dqs U m M8 sp0 K eb b lks w6 w24 bp
+              dqs U sts m M8 sp0 K eb b lks w6 w24 bp
               data vom pl P Pmiss Φo Φt (FdInode (bv_unsigned inum))
               Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
               Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty

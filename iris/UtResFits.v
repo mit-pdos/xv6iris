@@ -233,7 +233,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
        resumer's globals, the parker's context-free rows, and what
        [ut_caps_of_park] rebuilds at [Xc] out of both. *)
     iIntros "#Hdone2 #Htok".
-    iPoseProof "Hdone2" as "Hdone3". iDestruct "Hdone3" as "[_ #Hrdy]".
+    iPoseProof "Hdone2" as "Hdone3". iDestruct "Hdone3" as "(_ & #Hrdy & _)".
     iDestruct (ut_caps_of_park (XI := ξp) Xc N Hwf with "Hcaps Hglob Hrdy") as "#Hc".
     iDestruct "Hc" as "(#Hprocs & _ & _ & _ & _ & #Hwl & #Hft & _ & _ & _ & _ & _ & _
                         & _ & #Hdg & _ & _ & #Hpw)".

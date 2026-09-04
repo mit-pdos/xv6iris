@@ -197,7 +197,7 @@ Section ProofSysOpenAUBody.
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v vom : mword 64)
-      (pid : mword 32) (U : ustate)
+      (pid : mword 32) (U : ustate) (sts : list fdstate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (P Pmiss : nat -> Z -> iProp Σ)
@@ -206,7 +206,7 @@ Section ProofSysOpenAUBody.
     wp_sys_open_au_plain_body gfl gf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v vom
-                           pid U m K eb b lks P Pmiss Φo Φt.
+                           pid U sts m K eb b lks P Pmiss Φo Φt.
   Proof.
     cbv beta zeta delta [wp_sys_open_au_plain_body wp_sys_open_au_frame].
     intros Hncr HK HdevR Hnib0 Hgeom Hsize
@@ -682,19 +682,19 @@ Section ProofSysOpenAUBody.
       iDestruct (cpu_own_transport CID16 CIDy 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf ns P' (us_M U) with "[%] [%] Hcg Hown [] [] Hpc Hbsl
+      iApply ("Hcont" $! mf ns P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
                 Hsbn Hsbi Hsbs Hsbb [%] Hisl [Hpriv Hfds Hfrag Hwp Hoc Htc]").
       { exact Hcsf. }
-      { exact Hupt. }
+      { exact Huptz. }
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
-      { split; lia. }
+      { reflexivity. }
       { (* ARM 0: argstr refused, so nothing fs-visible happened and the
            WHOLE AU bundle comes home unspent. *)
         assert (Ha0m1 : (mf !!! Regidx Ra0 : mword 64)
                         = (mword_of_int (-1) : mword 64))
           by (rewrite Ha0f; exact HR2a0).
-        iApply (so_arm_unspent gf (proc_addr j) pid vom P Pmiss Φo Φt _
+        iApply (so_arm_unspent gf (proc_addr j) pid vom P Pmiss Φo Φt _ sts
                   (mf !!! Regidx Ra0 : mword 64) Ha0m1
                   with "Hpriv Hfrag Hfds [Hwp Hoc Htc]").
         rewrite /open_au_pre_plain. iFrame "Hwp Hoc Htc". } }
@@ -838,7 +838,7 @@ Section ProofSysOpenAUBody.
     iAssert (wp_next (CID0 := CID21) true (proc_addr j)
                (so_cont0_au gf
  ns dqb dqs dqbs dqn (proc_addr j) pid vom
-                         (us_upt U P') P Pmiss Φo Φt m K eb b lks))
+                         (us_upt U P') sts P Pmiss Φo Φt m K eb b lks))
       with "[Hcont]" as "Hcont0".
     { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
       iEval (rewrite /so_cont0_au). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -847,10 +847,10 @@ Section ProofSysOpenAUBody.
       iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
       (* THE IMAGE DOES NOT MOVE (SpecSysOpen's own note), so the frame's
          fourth binder is the one it came in at. *)
-      iApply ("Hcont" $! mf ns2 P' (us_M U) with "[%] [%] Hcg Hown Htce Hcce Hpc
+      iApply ("Hcont" $! mf ns2 P' with "[%] [%] Hcg Hown Htce Hcce Hpc
                 Hbsl Hsbn Hsbi Hsbs Hsbb [%] Hisl Hpost").
       { exact Hcsf. }
-      { exact Hupt. }
+      { exact Huptz. }
       { exact Hns2. } }
     (* ===== +0x36 c.beqz a5, +0xdc -- the O_CREATE SPLIT ===== *)
     destruct (eq_vec (so_and (arg_int32 vom) 512) (zero_reg : mword 64))
@@ -876,7 +876,7 @@ Section ProofSysOpenAUBody.
       iApply (Walk.so_entry_n_au (CID0 := CID22) gfl gf gs j gl pd pav
                 pu
  pk bf (arg_int32 vom) (word_lo u23) ns Sb0
-                pid dqb dqs dqbs dqn (us_upt U P') m S2 sp0 K eb b lks
+                pid dqb dqs dqbs dqn (us_upt U P') sts m S2 sp0 K eb b lks
                 u4 u5 u6 u24
                 vom P Pmiss Φo Φt
                 HKfull HdevR Hnib0 Hgeom Hsize Hbm0

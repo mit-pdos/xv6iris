@@ -1487,11 +1487,7 @@ Section ProofSysMknodBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM13a1). iExact "Hbuf". }
-    iIntros (CID19 Hq19 mas P' bf) "%Hcsas %Huptz Hcg Hown Hpc Hpriv Hbuf %Hfsr".
-    (* argstr now reports [uptd_ext_sz]; this contract is stated at the
-       bare [uptd_ext] (it is not on the dispatcher's permission path), so
-       the extra content is dropped here. *)
-    pose proof (ProcPtOwn.uptd_ext_sz_ext _ _ _ Huptz) as Hupt.
+    iIntros (CID19 Hq19 mas P' bf) "%Hcsas %Hupt Hcg Hown Hpc Hpriv Hbuf %Hfsr".
     iEval (rewrite HM13a1) in "Hbuf".
     assert (Hpc2e : ret_pc (M13 !!! Regidx Rra : mword 64)
                     = mword_of_int (MN + 0x2e)) by (rewrite HM13ra; pcw).

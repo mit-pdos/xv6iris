@@ -125,6 +125,7 @@ Require Import ProofSysOpenAUJoin.
 Require Import SpecCreateAUF.     (* the T_FILE create-AU carry            *)
 Require Import SpecCreateAUFOpen. (* [cauf_fail_to_open]                   *)
 Require Import ProofSysOpenAUCreArm.
+Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
 Require Import FsAbs.
 Require Import TsoCtx.
 
@@ -158,6 +159,7 @@ Section ProofSysOpenAUEntryCCont.
       (gf : gname)
       (ns : nat) (dqb dqs dqbs dqn : dfrac)
       (pj : mword 64) (pidv : mword 32) (vom : mword 64) (U : ustate)
+      (sts : list fdstate)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
       (Phio : aview -> Z -> anode -> iProp Σ)
@@ -180,7 +182,7 @@ Section ProofSysOpenAUEntryCCont.
          bslots 3 -∗
          iref_slots ns' -∗
          open_arms_create (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
-           P Pmiss Phiok Phiex Phio Phit U (mf !!! Regidx Ra0 : mword 64) -∗
+           P Pmiss Phiok Phiex Phio Phit sts U (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
 
 End ProofSysOpenAUEntryCCont.
@@ -217,7 +219,7 @@ Section ProofSysOpenAUEntryC.
       (plen : nat) (bp : nat -> bv 8)
       (om lo : mword 32) (ns : nat) (Sb : gset Z)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
-      (U : ustate)
+      (U : ustate) (sts : list fdstate)
       (m N : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 w5 w6 w24 : mword 64)
       (* ---- the AU side ---- *)
@@ -287,7 +289,7 @@ Section ProofSysOpenAUEntryC.
     bslots 3 -∗
     iref_slots ns -∗
     fd_slot -∗
-    fd_frags_any (pv_fdg (us_V U)) -∗
+    fd_frags (pv_fdg (us_V U)) sts -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -300,13 +302,13 @@ Section ProofSysOpenAUEntryC.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     (* ---- THE AU BUNDLE (the contract's O_CREATE side, verbatim) ---- *)
     mknod_walk_pre_era fsc_fs P Pmiss -∗
-    acre_commit_at (fs_gamma_L fsc_fs) ∅ (AFile []) Phiok -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) ∅ Phiex -∗
-    aopen_commit_at (fs_gamma_L fsc_fs) ∅ Phio -∗
-    atrunc_commit_at (fs_gamma_L fsc_fs) ∅ Phit -∗
+    acre_commit_at (fs_gamma_L fsc_fs) fsabsE (AFile []) Phiok -∗
+    dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Phiex -∗
+    aopen_commit_at (fs_gamma_L fsc_fs) fsabsE Phio -∗
+    atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Phit -∗
     wp_next true (proc_addr jx)
       (so_cont0_au_create gf ns
-                dqb dqs dqbs dqn (proc_addr jx) pidv vom U
+                dqb dqs dqbs dqn (proc_addr jx) pidv vom U sts
                 P Pmiss Phiok Phiex Phio Phit m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -647,7 +649,7 @@ Section ProofSysOpenAUEntryC.
                       (bv_unsigned inum) (era_node dn bm data)) as "Hobs".
       { rewrite -Harow. iApply socr_obs_pure. }
       iAssert (wp_next true (proc_addr jx)
-                 (so_cont_au gf ns1 dqb dqs (proc_addr jx) pidv vom U
+                 (so_cont_au gf ns1 dqb dqs (proc_addr jx) pidv vom U sts
                     (socr_P (socr_fresh P Phiok Phiex Phio Phit
                                (bview plen bp) (bv_unsigned inum))
                             (bv_unsigned inum))
@@ -664,7 +666,7 @@ Section ProofSysOpenAUEntryC.
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply fupd_wp.
         iMod (socr_arms_fresh gf (proc_addr jx) pidv vom P Pmiss
-                Phiok Phiex Phio Phit U _ (bview plen bp) (bv_unsigned inum)
+                Phiok Phiex Phio Phit U sts _ (bview plen bp) (bv_unsigned inum)
                 (fn_file_bytes (era_node dn bm data))
                 (fn_nlink (era_node dn bm data)) with "Hpost") as "Hpost".
         iModIntro.
@@ -674,7 +676,7 @@ Section ProofSysOpenAUEntryC.
         { cbn in Hns1. unfold sys_open_slots, create_slots in *. lia. } }
       iApply (Join.so_join_au (CID0 := CID8) gfl gf gs jx gl pd pav pu
                 gil gisl kk qi ss gy loy tly inum dn bm om lo ns1 u1 pidv dqb dqs
-                U m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
+                U sts m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
                 data vom (bview plen bp)
                 (socr_P (socr_fresh P Phiok Phiex Phio Phit
                            (bview plen bp) (bv_unsigned inum))
@@ -732,7 +734,7 @@ Section ProofSysOpenAUEntryC.
         iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
         iSplitR; [by iPureIntro |]. iFrame "HP HPhi Hac". }
       iAssert (wp_next true (proc_addr jx)
-                 (so_cont_au gf ns1 dqb dqs (proc_addr jx) pidv vom U
+                 (so_cont_au gf ns1 dqb dqs (proc_addr jx) pidv vom U sts
                     (socr_P (socr_exists P Phiok Phiex (bview plen bp)
                                (bv_unsigned inum)) (bv_unsigned inum))
                     (socr_Pm (socr_exists P Phiok Phiex (bview plen bp)
@@ -747,7 +749,7 @@ Section ProofSysOpenAUEntryC.
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply fupd_wp.
         iMod (socr_arms_exists gf (proc_addr jx) pidv vom P Pmiss
-                Phiok Phiex Phio Phit U _ (bview plen bp) (bv_unsigned inum)
+                Phiok Phiex Phio Phit U sts _ (bview plen bp) (bv_unsigned inum)
                 (abs_of (era_node dn bm data)) Hnd with "Hpost") as "Hpost".
         iModIntro.
         iApply ("Hcont" $! mf ns2 with "[%] [%] Hcg Hown Htce Hcce Hpc
@@ -756,7 +758,7 @@ Section ProofSysOpenAUEntryC.
         { cbn in Hns1. unfold sys_open_slots, create_slots in *. lia. } }
       iApply (Join.so_join_au (CID0 := CID8) gfl gf gs jx gl pd pav pu
                 gil gisl kk qi ss gy loy tly inum dn bm om lo ns1 u1 pidv dqb dqs
-                U m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
+                U sts m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
                 data vom (bview plen bp)
                 (socr_P (socr_exists P Phiok Phiex (bview plen bp)
                            (bv_unsigned inum)) (bv_unsigned inum))

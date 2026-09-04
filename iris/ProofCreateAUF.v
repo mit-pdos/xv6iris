@@ -231,6 +231,7 @@ Require Import FsAbsEra.       (* [ep_start]: the DEFERRED start      *)
 Require Import SpecSysMknodAU.   (* [cre_pre], [mknod_parent_elems]     *)
 Require Import FsAbsMknodFire.   (* the commits and FIRE 1              *)
 Require Import SpecCreateAUF.    (* the contract this file seals        *)
+Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
 Require Import FsAbs.            (* LAST of the abstract stack          *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
@@ -2253,8 +2254,8 @@ Section ProofCreateMain.
           NEITHER of them fired on this path -- the exists-lookup MISSED,
           which is how control got here. ---- *)
        P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
-       acre_commit_at (fs_gamma_L fsc_fs) ∅ (AFile []) Φok -∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) ∅ Φex -∗
+       acre_commit_at (fs_gamma_L fsc_fs) fsabsE (AFile []) Φok -∗
+       dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Φex -∗
        (* and the contract's own continuation, ANCHORED AT THE ENTRY HART
           (ProofDirlink's [dl_after_body]): the block's own proof does the
           retargeting, so this file hands over [Hcont] untouched. *)
@@ -2500,8 +2501,8 @@ Section ProofCreateMain.
           that returned -1, i.e. before the entry write, so both commits go
           home beside the cursor. ---- *)
        P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
-       acre_commit_at (fs_gamma_L fsc_fs) ∅ (AFile []) Φok -∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) ∅ Φex -∗
+       acre_commit_at (fs_gamma_L fsc_fs) fsabsE (AFile []) Φok -∗
+       dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Φex -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
             cr_cont_body γf
@@ -2597,8 +2598,8 @@ Section ProofCreateMain.
        path buffer IS [FsAbsEraMknod.mknod_walk_pre_era]) and the two
        commits ---- *)
     ep_start fsc_fs P Pmiss (bview plen pfun) -∗
-    acre_commit_at (fs_gamma_L fsc_fs) ∅ (AFile []) Φok -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) ∅ Φex -∗
+    acre_commit_at (fs_gamma_L fsc_fs) fsabsE (AFile []) Φok -∗
+    dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Φex -∗
     (* ---- THE PARKED ALLOCATE HALF, as a HYPOTHESIS ---- *)
     wp_next true (proc_addr j) (fun CIDa : CpuId =>
       cr_alloc_body γs j γl pd pav pu γf

@@ -1394,8 +1394,12 @@ FirstTok.v
 FsSyscalls.v
 LinkFsSyscalls.v
 SpecSysMknod.v
-ProofSysMknod.v
-LinkSysMknod.v
+# ProofSysMknod.v
+# OFF THE BUILD (2026-09-03, the AU replacement): the dispatch runs sys_open /
+# sys_mknod / sys_unlink on their AU contracts (LinkSyscall.v), so these landed
+# links -- and ProofSysMknod, which nothing else consumes -- have no client.
+# ProofSysOpen*/ProofSysUnlink* stay: the AU proofs reuse them as lemma libraries.
+# LinkSysMknod.v
 SysLinkBudget.v
 SpecSysLink.v
 ProofSysLinkParts.v
@@ -1408,7 +1412,7 @@ SpecSysOpen.v
 ProofSysOpenParts.v
 ProofSysOpenTails.v
 ProofSysOpen.v
-LinkSysOpen.v
+# LinkSysOpen.v
 SpecUserretClosed.v
 ProofUserretClosed.v
 LogDefs.v
@@ -1422,7 +1426,7 @@ SpecSysUnlink.v
 ProofSysUnlinkParts.v
 ProofSysUnlinkTails.v
 ProofSysUnlink.v
-LinkSysUnlink.v
+# LinkSysUnlink.v
 ProofSyscall.v
 LinkUserretClosed.v
 TfPage36.v
@@ -1453,6 +1457,7 @@ LogSnapLaw.v
 FsFlushedCore.v
 FsDurSyscall.v
 FsAbs.v
+FsAbsInv.v
 FsAbsSeam.v
 SpecSysMknodAU.v
 FsAbsPins.v
@@ -1707,6 +1712,7 @@ SystemUartAccepted.v
 # it unconditional -- assumption set = resv_matches, resv_is_valid, funext,
 # i.e. LinkNamexEra's, with nothing new entering the cone.
 FsAbsUnlinkFire.v
+FsAbsInvFire.v
 ProofSysUnlinkAUParts.v
 ProofSysUnlinkAUW1.v
 ProofSysUnlinkAUW2.v

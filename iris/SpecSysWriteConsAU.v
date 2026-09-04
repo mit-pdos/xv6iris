@@ -190,7 +190,7 @@
       count bookkeeping [i += nn] only after a full chunk push gives
       the arms' length equations).
    5. The frame plumbing exactly as the landed ProofSysWrite: the
-      [P']/[M'] staging from either_copyin's user arm, [callee_saved],
+      [P'] staging from either_copyin's user arm (same-M since 512893e42), [callee_saved],
       the a0 decode, [filewrite_fs_out] via [write_env_frame].
 
    ==== OPEN QUESTIONS FOR THE OWNER ===================================
@@ -268,6 +268,7 @@ Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT --
                           [fsc_uart] is the console's ghost bundle        *)
 Import Defs.
 Require Import TsoCtx.
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 
 Local Open Scope Z_scope.
 
@@ -479,7 +480,7 @@ End SysWriteConsAU.
    tie [ma = CONSOLE] selects the one entry consoleinit fills.  The
    fragment is returned UNCHANGED (a console write moves no fd state --
    not even an offset: the device arm never touches [f->off]).  The
-   continuation carries the landed contract's [P']/[M'] staging verbatim
+   continuation carries the landed contract's same-M [P'] staging verbatim
    (the copy leaf may fault a page in), and [ARMS] on the returned a0
    REPLACES the landed ⌜sys_write_ret⌝ -- each arm pins a0, and the
    [arg_fd] premise supplies the landed disjunction's witness
@@ -536,14 +537,14 @@ Definition wp_sys_write_cons_frame
   (* ---- THE RECEIPT SIDE (the one addition to the landed premises) ---- *)
   EXTRA -∗
   wp_next true pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (M' : gmap Z (bv 8)),
+    ∀ (mf : regfile) (r : mword 64) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pidv (upd_usM (us_upt U P') M') -∗
+      proc_priv γf pj pidv (us_upt U P') -∗
       kalloc_env fsc_kalloc None -∗
       filewrite_fs_out fn -∗
       (* the descriptor's state does not move: a console write touches

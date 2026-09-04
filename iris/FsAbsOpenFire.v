@@ -98,6 +98,7 @@ Require Import FsAbsEra.       (* [ex_start]                              *)
 Require Import FsAbsMknodFire.   (* [mkf_abs_of_dir], [mkf_era_is_dir]      *)
 Require FsImg.                   (* [T_FILE_z], [ROOTINO] -- Require, NOT
                                     Import (SpecSysOpenAU's reason)         *)
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
 Require TsoCtx.   (* qualified: the class only, no notation flip *)
 
@@ -239,9 +240,9 @@ Section OpenFire.
      commit only reads. *)
   Lemma opf_open_fire `{XI : TsoCtx.CurCtx} (γfs : fs_names) (E : coPset) (dq : dfrac)
       (Φ : aview -> Z -> anode -> iProp Σ) (i : Z) (n : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     ftop_inv γfs -∗
-    aopen_commit_at (fs_gamma_L γfs) ∅ Φ -∗
+    aopen_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
     top_frag_q (fs_gamma_L γfs) dq i n ={E}=∗
       top_frag_q (fs_gamma_L γfs) dq i n
       ∗ ∃ av : aview,
@@ -251,13 +252,13 @@ Section OpenFire.
     (* the same re-spelling [mkf_dlookup_fire] does, and for the same
        reason: the unifier cannot solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag_q /fs_gamma_L /=.
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
     assert (Hrow : abs_view I !! i = Some (abs_of n))
       by exact (abs_view_lookup I i n Hlk).
-    iMod (fupd_mask_subseteq ∅) as "Hcl2"; [set_solver |].
+    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
     iMod ("Hcm" $! I i (abs_of n) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
@@ -270,9 +271,9 @@ Section OpenFire.
      ([top_frag] whole, from its [ilock] to its [iunlock]) *)
   Lemma opf_open_fire_1 `{XI : TsoCtx.CurCtx} (γfs : fs_names) (E : coPset)
       (Φ : aview -> Z -> anode -> iProp Σ) (i : Z) (n : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     ftop_inv γfs -∗
-    aopen_commit_at (fs_gamma_L γfs) ∅ Φ -∗
+    aopen_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       top_frag (fs_gamma_L γfs) i n
       ∗ ∃ av : aview,
@@ -294,12 +295,12 @@ Section OpenFire.
   Lemma opf_atrunc_fire `{XI : TsoCtx.CurCtx} (γfs : fs_names) (E : coPset)
       (Φ : aview -> Z -> list (bv 8) -> iProp Σ)
       (i : Z) (bs0 : list (bv 8)) (nl : nat) (n n' : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑fsabsN ⊆ E ->
     inode_local i n' ->
     abs_of n = MkAnode (AFile bs0) nl ->
     abs_of n' = MkAnode (AFile []) nl ->
     ftop_inv γfs -∗
-    atrunc_commit_at (fs_gamma_L γfs) ∅ Φ -∗
+    atrunc_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
       ∗ ∃ av : aview,
@@ -307,7 +308,7 @@ Section OpenFire.
   Proof.
     intros HE Hloc Habs Habs'. iIntros "#Hi Hcm Hf".
     rewrite /top_frag /fs_gamma_L /=.
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
@@ -318,7 +319,7 @@ Section OpenFire.
     assert (Hdelta : abs_view (<[i := n']> I) = delta_trunc i (abs_view I)).
     { rewrite (abs_view_insert I i n') Habs'.
       by rewrite (delta_trunc_file (abs_view I) i bs0 nl Hrow). }
-    iMod (fupd_mask_subseteq ∅) as "Hcl2"; [set_solver |].
+    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
     iMod ("Hcm" $! I i bs0 nl with "[//] Hta") as "[Hta Hph2]".
     iMod (ghost_map_update n' with "Hta Hf") as "[Hta Hf]".
     iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "[Hta HΦ]".

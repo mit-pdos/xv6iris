@@ -92,6 +92,7 @@ Require Import FsCfg.
 Require Import SpecCopyin.     (* [ubytes_at]: the content seam (RULING A)  *)
 Require Import SpecSysWriteAU. (* the frozen statement this parallels       *)
 Require Import FsAbsWriteFire. (* [awrite_commit_at] and its bundle         *)
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.          (* LAST (FsAbs's own rule)                   *)
 Import Defs.
 Require Import TsoCtx.
@@ -131,7 +132,7 @@ Section SysWriteAUEra.
           be pinned end-to-end where the destination side cannot. *)
        ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
-       awrite_commits_at Γ ∅ i Φ (length bss)
+       awrite_commits_at Γ fsabsE i Φ (length bss)
          (wchunks n - length bss)%nat)%I.
 
   (* ret -1: filewrite's honest partial arm.  A PREFIX of chunks fired --
@@ -150,7 +151,7 @@ Section SysWriteAUEra.
           delivers a PREFIX of the caller's buffer, and now says so *)
        ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
-       awrite_commits_at Γ ∅ i Φ (length bss)
+       awrite_commits_at Γ fsabsE i Φ (length bss)
          (wchunks n - length bss)%nat)%I.
 
   (* THERE IS NO THIRD ARM.  The frozen sketch of this file carried one --
@@ -199,7 +200,7 @@ Section SysWriteAUEra.
            ⌜ubytes_at M ua (concat bss)⌝ ∗
            (wri_receipts_chained i bs0 nl off0 Φ bss
             ∨ wri_receipts i Φ bss) ∗
-           awrite_commits_at Γ ∅ i Φ (length bss)
+           awrite_commits_at Γ fsabsE i Φ (length bss)
              (wchunks n - length bss)%nat)
       ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
          ∗ write_post_fail_at Γ i n M ua Φ)))%I.
@@ -228,7 +229,7 @@ Definition wp_sys_write_au_era_body
   let n := sys_rw_count v2 in
   wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv rb i
-    (awrite_commits_at Γfs ∅ i Φw 0%nat (wchunks n))
+    (awrite_commits_at Γfs fsabsE i Φw 0%nat (wchunks n))
     (* RULING A: the receipts are stated at the caller's OWN image and at
        the buffer address IT passed -- syscall argument 1. *)
     (write_arms_at Γfs i n (us_M U) v1 Φw).
@@ -250,7 +251,7 @@ Definition wp_sys_write_au_era_stable_body
   wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv rb i
     (nview Γfs q i (MkAnode (AFile bs0) nl)
-     ∗ awrite_commits_at Γfs ∅ i Φw 0%nat (wchunks n))%I
+     ∗ awrite_commits_at Γfs fsabsE i Φw 0%nat (wchunks n))%I
     (write_stable_arms_at Γfs i n q bs0 nl (us_M U) v1 Φw).
 
 (* ===================================================================== *)

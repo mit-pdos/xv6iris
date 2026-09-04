@@ -381,11 +381,11 @@ Section ProofStable.
                   with "Hchain Hacre").
       - iApply (mkr_dlookup_compose _ _ avc root ps ds _ Hrun
                   with "Hchain Hdl"). }
-    iIntros (CID' Hch mf ns' P' M')
+    iIntros (CID' Hch mf ns' P')
       "%Hcs %Hupt Hcg Hown Htcsr Hclaim Hpc Hbsl Hsbn Hsbi Hsbs Hsbb
        %Hns Hiref Hpriv Harms".
     iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hch |].
-    iApply ("Hcont" $! mf ns' P' M'
+    iApply ("Hcont" $! mf ns' P'
               with "[%] [%] Hcg Hown Htcsr Hclaim Hpc Hbsl Hsbn Hsbi Hsbs
                     Hsbb [%] Hiref Hpriv [Harms]").
     { exact Hcs. }

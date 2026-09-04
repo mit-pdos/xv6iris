@@ -130,6 +130,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.
 Require Import FsCfg.
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.           (* LAST (FsAbs's own rule)                  *)
 Import Defs.
 Require Import TsoCtx.
@@ -155,7 +156,7 @@ Section CreateAUSpec.
        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
        ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
        P (length (mknod_parent_elems pl)) d ∗
-       dlookup_commit_at Γ ∅ Φex ∗
+       dlookup_commit_at Γ fsabsE Φex ∗
        Φok av d nm i)%I.
 
   (* ------------------------------------------------------------------ *)
@@ -167,18 +168,18 @@ Section CreateAUSpec.
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (pl : list (bv 8)) : iProp Σ :=
     ((mknod_walk_dead_era γfs P Pmiss pl
-        ∗ acre_commit_at Γ ∅ (ADev ma mi) Φok
-        ∗ dlookup_commit_at Γ ∅ Φex)
+        ∗ acre_commit_at Γ fsabsE (ADev ma mi) Φok
+        ∗ dlookup_commit_at Γ fsabsE Φex)
      ∨ (∃ d : Z,
           P (length (mknod_parent_elems pl)) d
-          ∗ acre_commit_at Γ ∅ (ADev ma mi) Φok
+          ∗ acre_commit_at Γ fsabsE (ADev ma mi) Φok
           ∗ ((∃ (av : aview) (i : Z) (nm : fname) (ents : gmap fname Z)
                 (nl : nat),
                 ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
                 ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
                 ⌜ents !! nm = Some i⌝ ∗
                 Φex av d nm i)
-             ∨ dlookup_commit_at Γ ∅ Φex)))%I.
+             ∨ dlookup_commit_at Γ fsabsE Φex)))%I.
 
 End CreateAUSpec.
 
@@ -283,8 +284,8 @@ Definition wp_create_au_body
      decided inside the walk.  The hop family is over the PARENT PREFIX,
      which is [SpecSysMknodAU.mknod_parent_elems] definitionally. *)
   ep_start fsc_fs P Pmiss pl -∗
-  acre_commit_at Γfs ∅ (ADev ma mi) Φok -∗
-  dlookup_commit_at Γfs ∅ Φex -∗
+  acre_commit_at Γfs fsabsE (ADev ma mi) Φok -∗
+  dlookup_commit_at Γfs fsabsE Φex -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (ok made : bool)
     (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)

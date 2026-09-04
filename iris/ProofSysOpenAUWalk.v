@@ -116,6 +116,7 @@ Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUAlloc.
 Require Import ProofSysOpenAUJoin.
 Require Import ProofSysOpen.   (* [so_neq_of_eq] / [so_neq_of_ne] / [so_bud_iput] *)
+Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
 Require Import FsAbs.
 Require Import TsoCtx.
 
@@ -200,7 +201,7 @@ Section ProofSysOpenAUWalk.
       (plen : nat) (bp : nat -> bv 8)
       (om lo : mword 32) (ns : nat) (Sb : gset Z)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
-      (U : ustate)
+      (U : ustate) (sts : list fdstate)
       (m N : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 w5 w6 w24 : mword 64)
       (* ---- the AU side ---- *)
@@ -273,7 +274,7 @@ Section ProofSysOpenAUWalk.
     fd_slot -∗
     (* the descriptor-state fragments, threaded exactly as the fd unit above
        is: sys_open spends one access, at the settle. *)
-    fd_frags_any (pv_fdg (us_V U)) -∗
+    fd_frags (pv_fdg (us_V U)) sts -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -289,11 +290,11 @@ Section ProofSysOpenAUWalk.
        picks the start inum -- ROOTINO on an absolute path, [p->cwd]'s on a
        relative one -- and fires it there. ---- *)
     open_walk_pre_era fsc_fs P Pmiss -∗
-    aopen_commit_at (fs_gamma_L fsc_fs) ∅ Φo -∗
-    atrunc_commit_at (fs_gamma_L fsc_fs) ∅ Φt -∗
+    aopen_commit_at (fs_gamma_L fsc_fs) fsabsE Φo -∗
+    atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Φt -∗
     wp_next true (proc_addr jx)
       (so_cont0_au gf ns
-                dqb dqs dqbs dqn (proc_addr jx) pidv vom U
+                dqb dqs dqbs dqn (proc_addr jx) pidv vom U sts
                 P Pmiss Φo Φt m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -516,7 +517,7 @@ Section ProofSysOpenAUWalk.
       { unfold sys_open_slots, create_slots in *. lia. }
       { (* ARM B-FAIL: the walk died at some hop, so NOTHING was observed
            and both commits come home beside the era refund. *)
-        iApply (so_arm_dead gf (proc_addr jx) pidv vom P Pmiss Φo Φt U _
+        iApply (so_arm_dead gf (proc_addr jx) pidv vom P Pmiss Φo Φt U sts _
                   (bview plen bp) Ha0f
                   with "Hpriv Hfrag Hfds Hdead Hoc Htc"). } }
     (* ---- namei RESOLVED: the reference, shed and generation-named, and
@@ -760,7 +761,7 @@ Section ProofSysOpenAUWalk.
          spent one of the three. *)
       iAssert (wp_next true (proc_addr jx)
                  (so_cont_au gf
-                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv vom U
+                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv vom U sts
                           P Pmiss Φo Φt m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
@@ -774,7 +775,7 @@ Section ProofSysOpenAUWalk.
       iApply (Join.so_join_au (CID0 := CID10) gfl gf gs jx gl pd pav pu
                 gil gisl
  kk (qq/2)%Qp (qq/2)%Qp gy loy tly inum dn bm om lo
-                (ns - 1)%nat n1 pidv dqb dqs U m Q2 sp0 K eb b lks w4 w5 w6 w24
+                (ns - 1)%nat n1 pidv dqb dqs U sts m Q2 sp0 K eb b lks w4 w5 w6 w24
                 bp1
                 data vom (bview plen bp) P Pmiss Φo Φt
                 eq_refl HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -850,7 +851,7 @@ Section ProofSysOpenAUWalk.
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iAssert (wp_next true (proc_addr jx)
                  (so_cont_au gf
-                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv vom U
+                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv vom U sts
                           P Pmiss Φo Φt m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
@@ -866,7 +867,7 @@ Section ProofSysOpenAUWalk.
       iApply (Alloc.so_alloc_au (CID0 := CID12) gfl gf gs jx gl pd pav pu
                 gil gisl
  kk (qq/2)%Qp (qq/2)%Qp gy loy tly inum dn bm om lo
-                (ns - 1)%nat n1 pidv dqb dqs U m Q3 sp0 K eb b lks w4 w5 w6 w24
+                (ns - 1)%nat n1 pidv dqb dqs U sts m Q3 sp0 K eb b lks w4 w5 w6 w24
                 bp1
                 data vom (bview plen bp) P Pmiss Φo Φt
                 eq_refl HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -937,7 +938,7 @@ Section ProofSysOpenAUWalk.
     { unfold sys_open_slots, create_slots in *. lia. }
     { (* ARM C-FAIL: a directory opened for writing.  The observation HAS
          fired -- this refusal is inside the child's lock window. *)
-      iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Φo Φt U _
+      iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Φo Φt U sts _
                 (bview plen bp) (bv_unsigned inum) (era_node dn bm data) Ha0f
                 with "Hpriv Hfrag Hfds HP Hobs Htc"). }
   Qed.

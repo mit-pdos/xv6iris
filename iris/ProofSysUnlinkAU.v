@@ -8,14 +8,6 @@
    the name tie, the cursor and the four commits) and handing the caller's
    exit BACK at each stage.
 
-   ONE THING IS NOT COMPOSITION, and it is one line: the contract's own
-   inlined return continuation reports the descriptor growth as
-   [ProcPtOwn.uptd_ext], where the landed closer's -- and therefore every
-   block's, since [ProofSysUnlinkAUParts.su_au_closer] is that closer with
-   [ARMS] swapped in -- is the stronger [uptd_ext_sz].
-   [ProcPtOwn.uptd_ext_sz_ext] closes the gap, ONCE, at the top of this
-   proof rather than at each of the eight exits.
-
    The result is [SpecSysUnlinkAU]'s Module Type, SEALED: the two-instant
    AU is an unconditional theorem about the machine, given the twelve
    callees' contracts.  [LinkSysUnlinkAU.v] instantiates it against their
@@ -136,29 +128,10 @@ Section ProofSysUnlinkAU.
              #Hslks #Hireg #Hropen Hsbb Hsbi Hsbs #Hbmres #Hkenv #Hprocs Hir Hpriv
              Hau Hcont".
     iPoseProof (printk_env_panic with "Hprenv") as "#Hpenv".
-    (* THE CALLER'S EXIT, PUT IN THE BLOCKS' SPELLING.  [su_au_closer] is
-       [SpecSysUnlink.sys_unlink_closer]'s rows with [ARMS] in place of the
-       pure return disjunction, and the contract's own inlined copy differs
-       from it in exactly ONE row: the descriptor report is [uptd_ext] where
-       the landed closer's (and therefore every block's) is the stronger
-       [uptd_ext_sz].  One [ProcPtOwn.uptd_ext_sz_ext] closes the gap, once,
-       here -- rather than at each of the eight exits. *)
-    iAssert (wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-               su_au_closer (CID := CIDx) gf (proc_addr jx) pid U m
-                 (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64))
-                 K eb b lks dqb dqs dqbs
-                 (unlink_arms (fs_gamma_L fsc_fs) fsc_fs P Pmiss
-                              Phient Phitgt Phiex Phimiss)))%I
-      with "[Hcont]" as "Hcont".
-    { rewrite /wp_next. iIntros (CIDx) "%Hq".
-      iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hq |].
-      rewrite /su_au_closer.
-      iIntros (mf P') "%Hcs %Hupt Hcgx Hownx Htce Hcce Hpcx Hbslx Hsbbx Hsbix
-                       Hsbsx Hirx Hprivx Harms".
-      iApply ("Hcont" $! mf P' with "[%] [%] Hcgx Hownx Htce Hcce Hpcx Hbslx
-                Hsbbx Hsbix Hsbsx Hirx Hprivx Harms").
-      { exact Hcs. }
-      { exact (uptd_ext_sz_ext _ _ _ Hupt). } }
+    (* The contract's own inlined return continuation IS [su_au_closer]
+       row for row (the descriptor report has been the sized [uptd_ext_sz]
+       on both sides since the landed row), so [Hcont] is handed to W1 as
+       it stands: this proof is composition and nothing else. *)
     (* ---- W1, +0x00..+0x2e: the prologue, argstr, begin_op, nameiparent ---- *)
     iApply (W1.su_w1_au gf gs jx gl pd pav pu
  dqb dqs dqbs

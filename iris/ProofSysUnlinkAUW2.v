@@ -108,6 +108,7 @@ Require Import FsAbsMknodFire.
 Require Import SpecSysUnlinkAU.
 Require Import FsAbsUnlinkFire.
 Require Import ProofSysUnlinkAUParts.
+Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
 Require Import FsAbs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
@@ -433,10 +434,10 @@ Section ProofSysUnlinkAUW2.
        (* the name tie, and the cursor at the parent's own index *)
        ⌜exists es e, nameiparent_of pl es e /\ bname 14 nf = e⌝ -∗
        P (length (mknod_parent_elems pl)) (bv_unsigned dinum) -∗
-       uent_commit_at (fs_gamma_L fsc_fs) ∅ Phient -∗
-       utgt_commit_at (fs_gamma_L fsc_fs) ∅ Phitgt -∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) ∅ Phiex -∗
-       dmiss_commit_at (fs_gamma_L fsc_fs) ∅ Phimiss -∗
+       uent_commit_at (fs_gamma_L fsc_fs) fsabsE Phient -∗
+       utgt_commit_at (fs_gamma_L fsc_fs) fsabsE Phitgt -∗
+       dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Phiex -∗
+       dmiss_commit_at (fs_gamma_L fsc_fs) fsabsE Phimiss -∗
        (* ---- [dp], LOCKED and OPEN ---- *)
        is_sleeplock_genl gild gisld (i_lock (ientry kd)) "inode"%string
                         (ic_slp fsc_ic kd) (slh_tok (icfg_isl kd)) -∗
@@ -569,10 +570,10 @@ Section ProofSysUnlinkAUW2.
     inode_held_ty_at dpv T_DIR iL -∗
     ⌜exists es e, nameiparent_of pl es e /\ bname 14 nf = e⌝ -∗
     P (length (mknod_parent_elems pl)) iL -∗
-    uent_commit_at (fs_gamma_L fsc_fs) ∅ Phient -∗
-    utgt_commit_at (fs_gamma_L fsc_fs) ∅ Phitgt -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) ∅ Phiex -∗
-    dmiss_commit_at (fs_gamma_L fsc_fs) ∅ Phimiss -∗
+    uent_commit_at (fs_gamma_L fsc_fs) fsabsE Phient -∗
+    utgt_commit_at (fs_gamma_L fsc_fs) fsabsE Phitgt -∗
+    dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Phiex -∗
+    dmiss_commit_at (fs_gamma_L fsc_fs) fsabsE Phimiss -∗
     log_opS icfg_log n1 Sb1 -∗
     (* the transaction token rides beside the budget: this walk ends the
        operation, and end_op takes the whole [log_op] (durable-disk lane A) *)

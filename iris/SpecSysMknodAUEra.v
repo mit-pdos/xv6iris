@@ -139,6 +139,7 @@ Require Import FsBytesGamma.
 Require Import SpecSysMknodAU.   (* [dev_arg], and the frozen statement  *)
 Require Import FsAbsMknodFire.   (* the authority-shaped commits         *)
 Require Import SpecCreateAU.     (* [cau_ok] / [cau_fail]                *)
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)              *)
 Require Import PathElems.  (* [path_elems] -- previously via the trimmed SpecSysMknodAU *)
 Import Defs.
@@ -151,13 +152,13 @@ Section SysMknodAUEra.
             !irefslotG Σ, !pavG Σ}.
   Implicit Types Γ : fs_view_names Σ.
 
-  (* everything the AU caller hands in, at the mask floor [∅] *)
+  (* everything the AU caller hands in, at the commit mask [fsabsE] *)
   Definition mknod_au_pre_era Γ (γfs : fs_names) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (mknod_walk_pre_era γfs P Pmiss
-     ∗ acre_commit_at Γ ∅ (ADev ma mi) Φok
-     ∗ dlookup_commit_at Γ ∅ Φex)%I.
+     ∗ acre_commit_at Γ fsabsE (ADev ma mi) Φok
+     ∗ dlookup_commit_at Γ fsabsE Φex)%I.
 
   (* ret 0's real arm: [SpecSysMknodAU.mknod_post_ok], which is
      [SpecCreateAU.cau_ok] at the fetched path beside the region bound
@@ -190,6 +191,18 @@ Section SysMknodAUEra.
       ∗ mknod_post_ok_era Γ ma mi P Φok Φex)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
         ∗ mknod_post_fail_era Γ γfs ma mi P Pmiss Φok Φex))%I.
+
+  (* the landed return blanket, read off the arms: this is the one
+     conjunct of [SpecSysMknod.wp_sys_mknod_sconf_body]'s continuation the
+     AU form replaces, and it is implied *)
+  Lemma mknod_arms_era_ret Γ (γfs : fs_names) (ma mi : Z)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) (r : mword 64) :
+    mknod_arms_era Γ γfs ma mi P Pmiss Φok Φex r ⊢ ⌜sys_mknod_ret r⌝.
+  Proof.
+    rewrite /mknod_arms_era /sys_mknod_ret.
+    iIntros "[[%Hr _] | [%Hr _]]"; iPureIntro; [left | right]; exact Hr.
+  Qed.
 
   (* =================================================================== *)
   (*  THE STABLE COROLLARY, AT THE ERA (and re-cut -- see the note at the *)
@@ -255,7 +268,7 @@ Section SysMknodAUEra.
        ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
        ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜arun av root ps ds⌝ ∗
-       dlookup_commit_at Γ ∅ Φex ∗
+       dlookup_commit_at Γ fsabsE Φex ∗
        Φok av d nm i)%I.
 
   (* ret -1: TWO arms where the AU form has three folds, and the collapse
@@ -267,14 +280,14 @@ Section SysMknodAUEra.
   Definition mknod_stable_fail_era Γ (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    ((acre_commit_at Γ ∅ (ADev ma mi) Φok ∗ dlookup_commit_at Γ ∅ Φex)
+    ((acre_commit_at Γ fsabsE (ADev ma mi) Φok ∗ dlookup_commit_at Γ fsabsE Φex)
      ∨ (∃ (pl : list (bv 8)) (av : aview) (d i : Z) (nm : fname)
           (ents : gmap fname Z) (nl : nat),
           ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
           ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
           ⌜ents !! nm = Some i⌝ ∗
           ⌜arun av root ps ds⌝ ∗
-          acre_commit_at Γ ∅ (ADev ma mi) Φok ∗
+          acre_commit_at Γ fsabsE (ADev ma mi) Φok ∗
           Φex av d nm i))%I.
 
   Definition mknod_stable_arms_era Γ (ma mi : Z) (root : Z)
@@ -406,13 +419,14 @@ Definition wp_sys_mknod_au_era_frame
   (* ---- THE AU SIDE (the one addition to the premise list) ---- *)
   EXTRA -∗
   wp_next true pj (fun (CID : CpuId) =>
-  (* the image moves: the copy leaves may fault a page in, and copyout
-     writes user memory -- milestone J item 1's ∃-weakened staging *)
-  ∀ (mf : regfile) (ns' : nat) (P' : uptd) (M' : gmap Z (bv 8)),
+  (* THE IMAGE DOES NOT MOVE (the landed row, [SpecSysMknod]'s note):
+     sys_mknod only READS user memory (argstr), so the binders are
+     [(mf, ns', P')] and the block returns at [us_upt U P'] -- no [M']. *)
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
-         in.  [uptd_ext] is argstr's own report, relayed. *)
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+         in.  [uptd_ext_sz] is argstr's own report, relayed. *)
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -434,7 +448,7 @@ Definition wp_sys_mknod_au_era_frame
          interval could not support (FsSyscalls.v's note (S3)). *)
       ⌜ns' = ns⌝ -∗
       iref_slots ns' -∗
-      proc_priv γf pj pid (upd_usM (us_upt U P') M') -∗
+      proc_priv γf pj pid (us_upt U P') -∗
       (* the armed post on the returned a0 (implies [sys_mknod_ret]) *)
       ARMS (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -507,8 +521,8 @@ Definition wp_sys_mknod_au_era_stable_body
   wp_sys_mknod_au_era_frame γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v0 v1 v2 pid U m K eb b lks
     (mkr_chain Γfs avc ds ps
-     ∗ acre_commit_at Γfs ∅ (ADev ma mi) Φok
-     ∗ dlookup_commit_at Γfs ∅ Φex)%I
+     ∗ acre_commit_at Γfs fsabsE (ADev ma mi) Φok
+     ∗ dlookup_commit_at Γfs fsabsE Φex)%I
     (mknod_stable_arms_era Γfs ma mi root ps ds Φok Φex).
 
 Module Type SYSMKNOD_AU_ERA.

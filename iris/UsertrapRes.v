@@ -2160,7 +2160,7 @@ Proof.
   iIntros (Hwf Hav ξp) "#Hpark Hown".
   iIntros (h Xc pt' U' sts') "%Hupt #Hglob Hderive #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref Hfrag".
   iDestruct ("Hderive" with "Hdone HW") as "Hsys".
-  iDestruct "Hdone" as "[_ #Hrdy]".
+  iDestruct "Hdone" as "(_ & #Hrdy & _)".
   iDestruct (ut_caps_of_park (XI := ξp) Xc N Hwf with "Hpark Hglob Hrdy") as "#Hcaps".
   iDestruct "Hpark" as "(%Hdq & _)".
   iDestruct "Hglob" as "(_ & _ & _ & _ & _ & _ & _ & Hipx)".
@@ -2191,7 +2191,7 @@ Proof. exact I. Qed.
 
 (* the remainder of the original proof body, kept for the redesign:
   iDestruct ("Hderive" with "Hdone HW") as "Hsys".
-  iDestruct "Hdone" as "[_ #Hrdy]".
+  iDestruct "Hdone" as "(_ & #Hrdy & _)".
   iDestruct (ut_caps_of_park with "Hpark Hrdy") as "#Hcaps".
   iDestruct "Hown" as "(Hbs & Hip)".
   rewrite /ut_res_bare.

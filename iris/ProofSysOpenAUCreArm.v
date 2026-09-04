@@ -82,6 +82,7 @@ Require Import FsBytesGamma.
 Require Import SpecSysMknodAU.
 Require Import SpecSysOpenAU.
 Require Import FsAbsMknodFire.   (* [acre_commit_at], [dlookup_commit_at]   *)
+Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule) *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -143,9 +144,9 @@ Section ProofSysOpenAUCreArm.
        ⌜0 < i0 < 16 * Z.of_nat icfg_nib⌝ ∗
        P (length (mknod_parent_elems pl)) d ∗
        Phiok av d nm i0 ∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) ∅ Phiex ∗
-       aopen_commit_at (fs_gamma_L fsc_fs) ∅ Phio ∗
-       atrunc_commit_at (fs_gamma_L fsc_fs) ∅ Phit)%I.
+       dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Phiex ∗
+       aopen_commit_at (fs_gamma_L fsc_fs) fsabsE Phio ∗
+       atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Phit)%I.
 
   (* ARM F-OK's payout: the exists observation fired, the create commit
      refunded.  Both of open's own commits are SPENT by the tail on this
@@ -159,7 +160,7 @@ Section ProofSysOpenAUCreArm.
        ⌜ents !! nm = Some i0⌝ ∗
        P (length (mknod_parent_elems pl)) d ∗
        Phiex av d nm i0 ∗
-       acre_commit_at (fs_gamma_L fsc_fs) ∅ (AFile []) Phiok)%I.
+       acre_commit_at (fs_gamma_L fsc_fs) fsabsE (AFile []) Phiok)%I.
 
   (* ================================================================== *)
   (*  3.  THE TWO OBSERVATION SEEDS                                      *)
@@ -198,10 +199,10 @@ Section ProofSysOpenAUCreArm.
     open_post_fail_plain (fs_gamma_L fsc_fs) fsc_fs
       (socr_P R i0) (socr_Pm R) Phio Phit
     ={⊤}=∗ R
-           ∗ (aopen_commit_at (fs_gamma_L fsc_fs) ∅ Phio
+           ∗ (aopen_commit_at (fs_gamma_L fsc_fs) fsabsE Phio
               ∨ (∃ (i : Z) (av : aview) (a : anode),
                    ⌜av !! i = Some a⌝ ∗ Phio av i a))
-           ∗ atrunc_commit_at (fs_gamma_L fsc_fs) ∅ Phit.
+           ∗ atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Phit.
   Proof.
     rewrite /open_post_fail_plain /socr_P /socr_Pm.
     iIntros "H". iDestruct "H" as "[Hpre | H]".
@@ -235,12 +236,12 @@ Section ProofSysOpenAUCreArm.
   Lemma socr_ok_fresh_arm `{GEN : GenId}
       (R : iProp Σ) (i0 : Z) (bs : list (bv 8)) (nl0 : nat)
       (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
-      (U : ustate) (r : mword 64) :
+      (U : ustate) (sts : list fdstate) (r : mword 64) :
     open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv vom
       (socr_P R i0) (socr_Phio_pure i0 (MkAnode (AFile bs) nl0))
-      socr_Phit_triv U r
+      socr_Phit_triv sts U r
     ⊢ R ∗ open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
-            (FdInode i0) r.
+            (FdInode i0) sts r.
   Proof.
     rewrite /open_post_ok_plain /socr_P /socr_Phio_pure.
     iIntros "H". iDestruct "H" as (pl av i) "[[%Hi HR] Harm]".
@@ -263,10 +264,10 @@ Section ProofSysOpenAUCreArm.
       (Phio : aview -> Z -> anode -> iProp Σ)
       (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
       (gf : gname) (pj : mword 64) (pidv : mword 32) (vom : mword 64)
-      (U : ustate) (r : mword 64) :
+      (U : ustate) (sts : list fdstate) (r : mword 64) :
     (forall (ents : gmap fname Z) (nl : nat), a0 <> MkAnode (ADir ents) nl) ->
     open_post_ok_plain (fs_gamma_L fsc_fs) gf pj pidv vom
-      (socr_P R i0) (socr_Phio_tag i0 a0 Phio) Phit U r
+      (socr_P R i0) (socr_Phio_tag i0 a0 Phio) Phit sts U r
     ⊢ R ∗ ∃ (av : aview) (nl : nat),
         ((∃ bs0 : list (bv 8),
             ⌜av !! i0 = Some (MkAnode (AFile bs0) nl)⌝ ∗
@@ -275,16 +276,16 @@ Section ProofSysOpenAUCreArm.
              then ∃ av' : aview,
                     ⌜av' !! i0 = Some (MkAnode (AFile bs0) nl)⌝ ∗
                     Phit av' i0 bs0
-             else atrunc_commit_at (fs_gamma_L fsc_fs) ∅ Phit) ∗
+             else atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Phit) ∗
             open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
-              (FdInode i0) r)
+              (FdInode i0) sts r)
          ∨ (∃ ma mi : Z,
               ⌜av !! i0 = Some (MkAnode (ADev ma mi) nl)⌝ ∗
               ⌜0 <= ma <= NDEV_max⌝ ∗
               Phio av i0 (MkAnode (ADev ma mi) nl) ∗
-              atrunc_commit_at (fs_gamma_L fsc_fs) ∅ Phit ∗
+              atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Phit ∗
               open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
-                (FdDevice ma) r)).
+                (FdDevice ma) sts r)).
   Proof.
     intros Hnd.
     rewrite /open_post_ok_plain /socr_P /socr_Phio_tag.
@@ -312,15 +313,15 @@ Section ProofSysOpenAUCreArm.
       (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
       (Phio : aview -> Z -> anode -> iProp Σ)
       (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
-      (U : ustate) (r : mword 64) (pl : list (bv 8)) (i0 : Z)
+      (U : ustate) (sts : list fdstate) (r : mword 64) (pl : list (bv 8)) (i0 : Z)
       (bs : list (bv 8)) (nl0 : nat) :
     open_arms_plain (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
       (socr_P (socr_fresh P Phiok Phiex Phio Phit pl i0) i0)
       (socr_Pm (socr_fresh P Phiok Phiex Phio Phit pl i0))
       (socr_Phio_pure i0 (MkAnode (AFile bs) nl0))
-      socr_Phit_triv U r
+      socr_Phit_triv sts U r
     ={⊤}=∗ open_arms_create (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
-             P Pmiss Phiok Phiex Phio Phit U r.
+             P Pmiss Phiok Phiex Phio Phit sts U r.
   Proof.
     rewrite /open_arms_plain /open_arms_create.
     iIntros "[Harms $]".
@@ -353,14 +354,14 @@ Section ProofSysOpenAUCreArm.
       (Phiok Phiex : aview -> Z -> fname -> Z -> iProp Σ)
       (Phio : aview -> Z -> anode -> iProp Σ)
       (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
-      (U : ustate) (r : mword 64) (pl : list (bv 8)) (i0 : Z) (a0 : anode) :
+      (U : ustate) (sts : list fdstate) (r : mword 64) (pl : list (bv 8)) (i0 : Z) (a0 : anode) :
     (forall (ents : gmap fname Z) (nl : nat), a0 <> MkAnode (ADir ents) nl) ->
     open_arms_plain (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
       (socr_P (socr_exists P Phiok Phiex pl i0) i0)
       (socr_Pm (socr_exists P Phiok Phiex pl i0))
-      (socr_Phio_tag i0 a0 Phio) Phit U r
+      (socr_Phio_tag i0 a0 Phio) Phit sts U r
     ={⊤}=∗ open_arms_create (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
-             P Pmiss Phiok Phiex Phio Phit U r.
+             P Pmiss Phiok Phiex Phio Phit sts U r.
   Proof.
     intros Hnd.
     rewrite /open_arms_plain /open_arms_create.
@@ -386,7 +387,7 @@ Section ProofSysOpenAUCreArm.
         destruct Heq as [Hix _]. subst ix.
         iExists avx, ax. iSplitR; [by iPureIntro |]. iExact "HP2".
     - iDestruct (socr_ok_exists_arm (socr_exists P Phiok Phiex pl i0) i0 a0
-                   Phio Phit gf pj pidv vom U r Hnd with "Hok")
+                   Phio Phit gf pj pidv vom U sts r Hnd with "Hok")
         as "[HR Hrest]".
       rewrite /socr_exists.
       iDestruct "HR" as (d nm av ents nl)

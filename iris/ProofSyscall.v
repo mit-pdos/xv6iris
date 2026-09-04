@@ -331,6 +331,7 @@ Require Import DiskInv.
 Require Import Xv6Cameras.
 Require Import WpUart.
 Require Import FsBlocks LogInv.
+Require InodeInv.   (* the superblock cell ADDRESSES, qualified: [InodeInv.sb_*] *)
 Require Import FsCrash.
 (* [sb_bmapstart]/[bitmap_inv]/[BPB].  The bitmap is a persistent INVARIANT
    now, not a threaded resource: [sysc_bm_cells] reads it (and the two
@@ -360,6 +361,13 @@ Require Import SpecSysFork SpecSysExit SpecSysWait SpecSysPipe SpecSysRead SpecS
                SpecSysPause SpecSysUptime SpecSysWrite SpecSysMknod SpecSysLink SpecSysMkdir
                SpecSysClose SpecSysSync.
 Require Import SpecSysOpen SpecSysUnlink.
+(* THE AU CONTRACTS the three fs-mutating entries run on since 2026-09-03
+   (their landed contracts are corollaries: [open_arms_plain_landed],
+   [mknod_arms_era_ret], [unlink_arms_ret]), and the dischargers that
+   satisfy their bundles out of the application-side abstract-state
+   invariant [FirstTok.fsabs_env] with receipts that say nothing. *)
+Require Import SpecSysMknodAUEra SpecSysOpenAU SpecSysUnlinkAU.
+Require Import FsBytesGamma FsAbsInv FsAbsInvFire.
 Require Import SpecMyproc.
 (* the content-independent bundles the non-closer fs entries state their
    environments over -- [filestat_fs_env]/[fread_names] and friends. *)
@@ -398,9 +406,9 @@ Module SyscallProof
     (SysExec : SYSEXEC) (SysFstat : SYSFSTAT) (SysChdir : SYSCHDIR)
     (SysDup : SYSDUP) (SysGetpid : SYSGETPID) (SysSbrk : SYSSBRK)
     (SysPause : SYSPAUSE) (SysUptime : SYSUPTIME) (SysWrite : SYSWRITE)
-    (SysMknod : SYSMKNOD) (SysLink : SYSLINK) (SysMkdir : SYSMKDIR)
+    (SysMknod : SYSMKNOD_AU_ERA) (SysLink : SYSLINK) (SysMkdir : SYSMKDIR)
     (SysClose : SYSCLOSE) (SysSync : SYS_SYNC)
-    (SysOpen : SYSOPEN) (SysUnlink : SYSUNLINK)
+    (SysOpen : SYSOPEN_AU) (SysUnlink : SYSUNLINK_AU)
     (Myproc : MYPROC) (Printk : PRINTK_GEN) : SYSCALL.
 
 (* ONE SECTION PER HART EPOCH.  Every piece below concludes in [WP Loop],
@@ -957,7 +965,7 @@ Section SyscallVocab.
   Proof.
     iIntros (Hj Hplock Hdq) "#Hextra #Hwl #Hft #Hprocs #Hdg #Hdone #Hworld #Htok".
     iDestruct "Hextra" as "(#Hnextpid & #Hpav & #Htick & #Hcons)".
-    iDestruct "Hdone" as "[#Hcell #Hrdy]".
+    iDestruct "Hdone" as "(#Hcell & #Hrdy & #Habs)".
     (* the disk fabric, at [fn]'s pages rather than at [fs_ready]'s witness *)
     iDestruct (FsReady.fs_ready_disk with "Hrdy") as "[_ Hdex]".
     iDestruct "Hdex" as (pd pav pu) "[#Hdg2 #Hdlk]".
@@ -977,7 +985,7 @@ Section SyscallVocab.
       iFrame "Hprocs Hdg".
       iSplitR; [rewrite Hpd Hpav Hpu; iExact "Hdlk"|].
       iExact "Hrdy". }
-    iSplitR; [rewrite /first_done; iFrame "Hcell Hrdy"|].
+    iSplitR; [rewrite /first_done; iFrame "Hcell Hrdy Habs"|].
     iSplitR; [iExact "Hworld"|].
     iExact "Htok".
   Qed.
@@ -1025,6 +1033,17 @@ Section SyscallVocab.
      keeps its order: an arm's [iDestruct] pattern is an interface, and
      re-shuffling eleven of them by hand is the kind of edit that compiles
      while meaning something else. *)
+  (* THE APPLICATION-SIDE ABSTRACT-STATE INVARIANT, off the environment's
+     [first_done] conjunct ([FirstTok.first_done_fsabs]).  Reached on its
+     own, like the console below, so that no arm's positional pattern
+     moves. *)
+  Lemma syscall_env_fsabs (γf : gname) (pj : mword 64) (fn : fclose_names) :
+    syscall_env γf pj fn -∗ FirstTok.fsabs_env.
+  Proof.
+    rewrite /syscall_env. iIntros "(_ & _ & _ & Hdone & _ & _)".
+    iApply (FirstTok.first_done_fsabs with "Hdone").
+  Qed.
+
   Lemma syscall_env_all (γf : gname) (pj : mword 64)
  (fn : fclose_names) :
     syscall_env γf pj fn -∗
@@ -4465,22 +4484,27 @@ Section SyscallArms.
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
     iDestruct (sysc_iref_split with "Hir") as "[Hirk Hiru]".
-    iApply (SysUnlink.wp_sys_unlink_sconf γf γs j γl
-
+    (* THE AU CONTRACT, at the trivial bundle ([FsAbsInvFire.fsabs_unlink_pre]);
+       the landed return blanket is read back off the arms
+       ([unlink_arms_ret]). *)
+    iDestruct (syscall_env_fsabs with "Henvc") as (γa) "#Hfsabs".
+    iApply (SysUnlink.wp_sys_unlink_au γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
-
-
-
               DfracDiscarded DfracDiscarded DfracDiscarded v0 pid U M
               (av - 4)%nat true true ∅
+              (fun _ _ => True%I) (fun _ _ => True%I)
+              (fun _ _ _ _ => True%I) (fun _ _ => True%I)
+              (fun _ _ _ _ => True%I) (fun _ _ _ => True%I)
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbg Hib (proj2 (proj2 (proj2 Hnin))) Hprg Hj Hgamma
               eq_refl Hv0
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
-                    Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hiru Hpriv").
+                    Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hiru Hpriv []").
+    { iApply (fsabs_unlink_pre with "Hfsabs"). }
     iIntros (CIDy Hsy mf P')
-      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hiru Hpriv %Hrv".
+      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hiru Hpriv Harms".
+    iDestruct (unlink_arms_ret with "Harms") as %Hrv.
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
@@ -5217,23 +5241,27 @@ Section SyscallArms.
     iDestruct (sysc_bm_cells with "Hfsenv") as "(#Hbmp & #Hisp & #Hbmr)".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
-    iApply (SysMknod.wp_sys_mknod_sconf γf γs j γl
-
-              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
-
-
-
- IREFSPARE
+    (* THE AU CONTRACT, at the trivial bundle: every receipt [True], the
+       commits discharged out of the abstract-state invariant
+       ([FsAbsInvFire.fsabs_mknod_pre_era]); the landed return blanket is
+       read back off the arms ([mknod_arms_era_ret]). *)
+    iDestruct (syscall_env_fsabs with "Henvc") as (γa) "#Hfsabs".
+    iApply (SysMknod.wp_sys_mknod_au_era γf γs j γl
+              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) IREFSPARE
               DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
               v0 v1 v2 pid U M (av - 4)%nat true true ∅
+              (fun _ _ => True%I) (fun _ _ => True%I)
+              (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I)
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
               ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1 Hv2
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
-                    Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv").
+                    Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv []").
+    { iApply (fsabs_mknod_pre_era with "Hfsabs"). }
     iIntros (CIDy Hsy mf ns' P')
-      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0".
+      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv Harms".
+    iDestruct (mknod_arms_era_ret with "Harms") as %Hret0.
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
@@ -5344,22 +5372,76 @@ Section SyscallArms.
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
     (* the array's length, which bounds the descriptor open returns *)
     iDestruct (proc_priv_ofile_len with "Hpriv") as %Hoflen.
-    iApply (SysOpen.wp_sys_open_sconf γft γf γs j γl
-
-              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
-
-
-
- IREFSPARE
-              DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
-              v0 v1 pid U sts M (av - 4)%nat true true ∅
-              ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
-              Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
-              ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1
-              with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hftable Hbio Hlog
-                    Hseam Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2
-                    Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
-                    Hfd0 Hpriv Hufrag").
+    (* THE AU CONTRACT, keyed by the O_CREATE bit of the caller's own
+       omode word (the two sealed forms of [SpecSysOpenAU]), at the trivial
+       bundle ([FsAbsInvFire.fsabs_open_pre_plain] / [_create]); the landed
+       [sys_open_post] this arm consumes is read back off the arms
+       ([open_arms_plain_landed] / [open_arms_create_landed]). *)
+    iDestruct (syscall_env_fsabs with "Henvc") as (γa) "#Hfsabs".
+    iAssert (wp_next true (proc_addr j) (fun (CID : CpuId) =>
+      ∀ (mf : regfile) (ns' : nat) (P' : uptd),
+        ⌜callee_saved M mf⌝ -∗
+        ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+        sie_cap_gpr KT1 mf (av - 4)%nat true (proc_addr j) -∗
+        cpu_own 0 true (proc_addr j) true ∅ -∗
+        trap_csrs_ext KT1 true -∗
+        cpu_claim_ext true (proc_addr j) -∗
+        pc_is (ret_pc (M !!! Regidx (mword_of_int 1 : mword 5))) -∗
+        bslots 3 -∗
+        InodeInv.sb_ninodes ↦₄{DfracDiscarded} (mword_of_int fsc_ninodes : mword 32) -∗
+        InodeInv.sb_inodestart ↦₄{DfracDiscarded} (mword_of_int icfg_ist : mword 32) -∗
+        BitmapInv.sb_size ↦₄{DfracDiscarded} (mword_of_int fsc_size : mword 32) -∗
+        BitmapInv.sb_bmapstart ↦₄{DfracDiscarded} (mword_of_int fsc_bmapstart : mword 32) -∗
+        ⌜ns' = IREFSPARE⌝ -∗
+        iref_slots ns' -∗
+        sys_open_post γf (proc_addr j) pid (us_upt U P') sts (trunc32 v1)
+          (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+        WP (Loop : expr riscv_lang)) -∗ WP (Loop : expr riscv_lang))%I
+      with "[Hcg Hcpu Htcx Hccx Hpc Hbs Hir Hfd0 Hpriv Hufrag]" as "Hk".
+    { iIntros "Hcont'".
+      destruct (om_create v1) eqn:Hcre.
+      - iApply (SysOpen.wp_sys_open_au_create γft γf γs j γl
+                  (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) IREFSPARE
+                  DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
+                  v0 v1 pid U sts M (av - 4)%nat true true ∅
+                  (fun _ _ => True%I) (fun _ _ => True%I)
+                  (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I)
+                  (fun _ _ _ => True%I) (fun _ _ _ => True%I)
+                  Hcre ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
+                  Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
+                  ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1
+                  with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hftable Hbio Hlog
+                        Hseam Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2
+                        Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
+                        Hfd0 Hpriv Hufrag []").
+        { iApply (fsabs_open_pre_create with "Hfsabs"). }
+        iIntros (CIDy Hsy mf ns' P')
+          "%Hcs %Hextz Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
+        iDestruct (open_arms_create_landed with "Harms") as "Hpost".
+        iSpecialize ("Hcont'" $! CIDy with "[//]").
+        iApply ("Hcont'" $! mf ns' P' with "[//] [//] Hcg Hcpu Htcx2 Hccx2 Hpc Hbs
+                  Hsbn Hisp Hsbs Hbmp [//] Hir Hpost").
+      - iApply (SysOpen.wp_sys_open_au_plain γft γf γs j γl
+                  (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) IREFSPARE
+                  DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
+                  v0 v1 pid U sts M (av - 4)%nat true true ∅
+                  (fun _ _ => True%I) (fun _ _ => True%I)
+                  (fun _ _ _ => True%I) (fun _ _ _ => True%I)
+                  Hcre ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
+                  Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
+                  ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1
+                  with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hftable Hbio Hlog
+                        Hseam Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2
+                        Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
+                        Hfd0 Hpriv Hufrag []").
+        { iApply (fsabs_open_pre_plain with "Hfsabs"). }
+        iIntros (CIDy Hsy mf ns' P')
+          "%Hcs %Hextz Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
+        iDestruct (open_arms_plain_landed with "Harms") as "Hpost".
+        iSpecialize ("Hcont'" $! CIDy with "[//]").
+        iApply ("Hcont'" $! mf ns' P' with "[//] [//] Hcg Hcpu Htcx2 Hccx2 Hpc Hbs
+                  Hsbn Hisp Hsbs Hbmp [//] Hir Hpost"). }
+    iApply "Hk".
     iIntros (CIDy Hsy mf ns' P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpost".
     (* [Hextz] is the SIZED extension the callee reports, and it is what

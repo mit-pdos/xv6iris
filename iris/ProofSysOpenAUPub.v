@@ -139,7 +139,7 @@ Section ProofSysOpenAUPub.
       (kf fd : nat) (l : list nat) (C : fcontent) (pn : fpnames)
       (om voff : mword 32) (nsj : nat)
       (u : nat) (pidv : mword 32) (dqb dqs : dfrac)
-      (U : ustate)
+      (U : ustate) (sts : list fdstate)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w6 w23 w24 : mword 64)
       (bp : nat -> bv 8)
@@ -251,7 +251,7 @@ Section ProofSysOpenAUPub.
     fd_slot -∗
     (* the descriptor-state fragments, threaded exactly as the fd unit above
        is: sys_open spends one access, at the settle. *)
-    fd_frags_any (pv_fdg (us_V U)) -∗
+    fd_frags (pv_fdg (us_V U)) sts -∗
     (* ...and the descriptor's own AUTHORITY, at [FdClosed]: fdalloc handed
        it out when it made the cell non-null, and the settle below moves it
        to the new file's type. *)
@@ -270,12 +270,12 @@ Section ProofSysOpenAUPub.
        this block's.  All this block earns is the antecedent. ---- *)
     (∀ r : mword 64,
        open_fd_ok gf (proc_addr jx) pidv U
-         (om_readable vom) (om_writable vom) t r -∗
+         (om_readable vom) (om_writable vom) t sts r -∗
        open_post_ok_plain (fs_gamma_L fsc_fs) gf (proc_addr jx) pidv vom
-         P Φo Φt U r) -∗
+         P Φo Φt sts U r) -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
-               dqb dqs (proc_addr jx) pidv vom U P Pmiss Φo Φt m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Φo Φt m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf Hfdlt
@@ -351,18 +351,20 @@ Section ProofSysOpenAUPub.
        new file's type.  fdalloc handed out its authority at [FdClosed] and
        the matching fragment comes out of the bundle -- which is why
        sys_open's contract takes [fd_frags_any] at all. *)
-    (* AT THE EXPLICIT BUNDLE: [fd_frags_acc] where the landed tail takes
-       [fd_frags_any_acc], so the row the settle writes SURVIVES into the
-       receipt ([SpecSysOpenAU.open_fd_ok]'s [⌜sts !! fd = ...⌝]).  Nothing
-       else about the step changes. *)
-    iEval (rewrite /fd_frags_any) in "Hfrag".
-    iDestruct "Hfrag" as (sts) "Hfrags".
+    (* AT THE CALLER'S OWN BUNDLE (the landed row since 34375379c): the
+       row the settle writes SURVIVES into the receipt
+       ([SpecSysOpenAU.open_fd_ok]'s [⌜sts !! fd = Some FdClosed⌝] and its
+       [<[fd := ...]> sts]), and the loan's authority is what identifies
+       that row -- the landed twin's [fd_st_agree] step. *)
+    iRename "Hfrag" into "Hfrags".
     iDestruct (fd_frags_len with "Hfrags") as %Hlensts.
     assert (Hstqe : is_Some (sts !! fd))
       by (apply lookup_lt_is_Some_2; rewrite Hlensts; exact Hfdlt).
     destruct Hstqe as [stq Hstq].
     iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd stq Hstq with "Hfrags")
       as "[Hfr Hfrback]".
+    iDestruct (fd_st_agree (pv_fdg (us_V U)) fd FdClosed stq with "Hauth Hfr")
+      as "%Hstqcl".
     iMod (proc_priv_settle gf (proc_addr jx) pidv U fd kf 1 stpub FdClosed stq
                  Hfdlt Hlen Hkf (fdstate_ok_open _ C stpub Hokpub (or_intror Htyor))
                  with "Hcore Howe Href Hauth Hfr") as "[Hpriv Hfr]".
@@ -395,13 +397,13 @@ Section ProofSysOpenAUPub.
        wand and the descriptor this walk installed. *)
     rewrite /open_arms_plain. iFrame "Hfds". iRight.
     iApply "Harm". rewrite /open_fd_ok.
-    iExists fd, l, kf, (<[fd := stpub]> sts).
+    iExists fd, l, kf.
     iSplitR.
-    { iPureIntro. split; [rewrite Ha0f; reflexivity | exact Hfrees]. }
-    iSplitR.
-    { iPureIntro. rewrite -Hpub. apply list_lookup_insert.
-      rewrite Hlensts. exact Hfdlt. }
-    iFrame "Hpriv Hfrags".
+    { iPureIntro. split_and!.
+      - rewrite Ha0f; reflexivity.
+      - exact Hfrees.
+      - rewrite <- Hstqcl in Hstq. exact Hstq. }
+    rewrite -Hpub. iFrame "Hpriv Hfrags".
   Qed.
 
   (* ---- the two field reads the walk makes into the LOCKED record, as

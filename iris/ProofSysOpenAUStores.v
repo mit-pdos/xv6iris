@@ -108,6 +108,7 @@ Require Import FsAbsOpenFire.
 Require Import ProofSysOpenAUBits.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUPub.
+Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
 Require Import FsAbs.
 Require Import TsoCtx.
 
@@ -176,7 +177,7 @@ Section ProofSysOpenAUStores.
       (tyw : mword 32) (rd0 wr0 : bv 8) (pip ipold : mword 64) (maj : bv 16)
       (om voff lo : mword 32) (nsj : nat)
       (u : nat) (pidv : mword 32) (dqb dqs : dfrac)
-      (U : ustate)
+      (U : ustate) (sts : list fdstate)
       (m N : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w6 w24 : mword 64)
       (bp : nat -> bv 8)
@@ -294,7 +295,7 @@ Section ProofSysOpenAUStores.
     fd_slot -∗
     (* the descriptor-state fragments, threaded exactly as the fd unit above
        is: sys_open spends one access, at the settle. *)
-    fd_frags_any (pv_fdg (us_V U)) -∗
+    fd_frags (pv_fdg (us_V U)) sts -∗
     (* ...and the descriptor's own AUTHORITY, at [FdClosed]: fdalloc handed
        it out when it made the cell non-null, and the settle below moves it
        to the new file's type. *)
@@ -313,10 +314,10 @@ Section ProofSysOpenAUStores.
        terminal observation, and the trunc commit still in hand ---- *)
     P (length (path_elems pl)) (bv_unsigned inum) -∗
     so_obs Φo (bv_unsigned inum) (era_node dn bm data) -∗
-    atrunc_commit_at (fs_gamma_L fsc_fs) ∅ Φt -∗
+    atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Φt -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
-               dqb dqs (proc_addr jx) pidv vom U P Pmiss Φo Φt m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Φo Φt m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hqs HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize Hbm0
@@ -587,14 +588,14 @@ Section ProofSysOpenAUStores.
         apply eq_vec_true_iff in Htr. rewrite Htr.
         apply bv_eq; vm_compute; reflexivity. }
       iDestruct (so_flat_close with "Hflat") as "Hload".
-      iDestruct (so_arm_notr gf (proc_addr jx) pidv vom P Φo Φt U pl
+      iDestruct (so_arm_notr gf (proc_addr jx) pidv vom P Φo Φt U sts pl
                    (bv_unsigned inum) dn bm data t
                    (or_introl Hntf) Hdirk Hdevb Hinob Htyen
                    with "HP Hobs Htc") as "Harm".
       iApply (Pub.so_tail_pub_au (CID0 := CID10) gf gs jx gl pd pav pu
                 gil gisl
  kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
-                (S (S u2)) pidv dqb dqs U m N6 sp0 K eb b lks w6
+                (S (S u2)) pidv dqb dqs U sts m N6 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t
                 Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
@@ -696,14 +697,14 @@ Section ProofSysOpenAUStores.
       { intros Hc. apply Hnf. apply bv_eq. rewrite Hc.
         vm_compute. reflexivity. }
       iDestruct (so_flat_close with "Hflat") as "Hload".
-      iDestruct (so_arm_notr gf (proc_addr jx) pidv vom P Φo Φt U pl
+      iDestruct (so_arm_notr gf (proc_addr jx) pidv vom P Φo Φt U sts pl
                    (bv_unsigned inum) dn bm data t
                    (or_intror Hnf2) Hdirk Hdevb Hinob Htyen
                    with "HP Hobs Htc") as "Harm".
       iApply (Pub.so_tail_pub_au (CID0 := CID13) gf gs jx gl pd pav pu
                 gil gisl
  kk qi s gy loy tly inum dn bm kf fd l C pn om voff nsj
-                (S (S u2)) pidv dqb dqs U m N8 sp0 K eb b lks w6
+                (S (S u2)) pidv dqb dqs U sts m N8 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t
                 Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
                 Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
@@ -921,7 +922,7 @@ Section ProofSysOpenAUStores.
     { destruct (Hti ltac:(rewrite Htyfz; vm_compute; discriminate)) as [_ Hq].
       exact Hq. }
     iEval (rewrite /so_obs (opf_era_file_row dn bm data Htyfz)) in "Hobs".
-    iDestruct (so_arm_file_tr gf (proc_addr jx) pidv vom P Φo Φt U pl
+    iDestruct (so_arm_file_tr gf (proc_addr jx) pidv vom P Φo Φt U sts pl
                  (bv_unsigned inum) (fn_file_bytes (era_node dn bm data))
                  (fn_nlink (era_node dn bm data)) Htrue
                  with "HP Hobs Htr2") as "Harm".
@@ -929,7 +930,7 @@ Section ProofSysOpenAUStores.
     iApply (Pub.so_tail_pub_au (CID0 := CID17) gf gs jx gl pd pav pu
               gil gisl
  kk qi s gy loy tly inum (di_trunc dn) bm_empty kf fd l C pn
-              om voff nsj u3 pidv dqb dqs U m mit sp0 K
+              om voff nsj u3 pidv dqb dqs U sts m mit sp0 K
               eb b lks w6 (word_of_words lo om) w24 bp
               vom P Pmiss Φo Φt t
               Hqs HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf

@@ -336,6 +336,7 @@ Require Import SpecSysMknodAU.  (* [mknod_parent_elems]; the frozen mold *)
 Require Import FsAbsEraMknod.   (* the era walk-premise pair, reused
                                    verbatim (nameiparent-generic) *)
 Require Import FsAbsMknodFire.  (* [dlookup_commit_at]; the [_at] mold *)
+Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
@@ -671,10 +672,10 @@ Section SysUnlinkAU.
       (Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φmiss : aview -> Z -> fname -> iProp Σ) : iProp Σ :=
     (mknod_walk_pre_era γfs P Pmiss
-     ∗ uent_commit_at Γ ∅ Φent
-     ∗ utgt_commit_at Γ ∅ Φtgt
-     ∗ dlookup_commit_at Γ ∅ Φex
-     ∗ dmiss_commit_at Γ ∅ Φmiss)%I.
+     ∗ uent_commit_at Γ fsabsE Φent
+     ∗ utgt_commit_at Γ fsabsE Φtgt
+     ∗ dlookup_commit_at Γ fsabsE Φex
+     ∗ dmiss_commit_at Γ fsabsE Φmiss)%I.
 
   (* ret 0: the fetched path, the cursor at the parent, [unl_pre]
      restated purely at instant 1, BOTH fired receipts, the instant-2
@@ -693,8 +694,8 @@ Section SysUnlinkAU.
        ⌜0 < t < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜av1 !! t = Some a⌝ ∗
        P (length (mknod_parent_elems pl)) d ∗
-       dlookup_commit_at Γ ∅ Φex ∗
-       dmiss_commit_at Γ ∅ Φmiss ∗
+       dlookup_commit_at Γ fsabsE Φex ∗
+       dmiss_commit_at Γ fsabsE Φmiss ∗
        Φent av0 d nm t ∗
        Φtgt av1 t)%I.
 
@@ -709,21 +710,21 @@ Section SysUnlinkAU.
     (unlink_au_pre Γ γfs P Pmiss Φent Φtgt Φex Φmiss
      ∨ (∃ pl : list (bv 8),
           (mknod_walk_dead_era γfs P Pmiss pl
-             ∗ uent_commit_at Γ ∅ Φent
-             ∗ utgt_commit_at Γ ∅ Φtgt
-             ∗ dlookup_commit_at Γ ∅ Φex
-             ∗ dmiss_commit_at Γ ∅ Φmiss)
+             ∗ uent_commit_at Γ fsabsE Φent
+             ∗ utgt_commit_at Γ fsabsE Φtgt
+             ∗ dlookup_commit_at Γ fsabsE Φex
+             ∗ dmiss_commit_at Γ fsabsE Φmiss)
           ∨ (∃ d : Z,
                P (length (mknod_parent_elems pl)) d
-               ∗ uent_commit_at Γ ∅ Φent
-               ∗ utgt_commit_at Γ ∅ Φtgt
+               ∗ uent_commit_at Γ fsabsE Φent
+               ∗ utgt_commit_at Γ fsabsE Φtgt
                ∗ ((* (iii-a) the name is a dot: refused BY NAME, before
                      any lookup -- pure, both observations refunded *)
                   (∃ nm : fname,
                      ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
                      ⌜nm = DOT \/ nm = DOTDOT⌝ ∗
-                     dlookup_commit_at Γ ∅ Φex ∗
-                     dmiss_commit_at Γ ∅ Φmiss)
+                     dlookup_commit_at Γ fsabsE Φex ∗
+                     dmiss_commit_at Γ fsabsE Φmiss)
                   ∨ (* (iii-b) gone: the miss observation FIRED *)
                   (∃ (av : aview) (nm : fname) (ents : gmap fname Z)
                      (nl : nat),
@@ -731,7 +732,7 @@ Section SysUnlinkAU.
                      ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
                      ⌜ents !! nm = None⌝ ∗
                      Φmiss av d nm ∗
-                     dlookup_commit_at Γ ∅ Φex)
+                     dlookup_commit_at Γ fsabsE Φex)
                   ∨ (* (iii-c) dir non-empty: the found observation
                        FIRED, both rows pinned at the one instant *)
                   (∃ (av : aview) (t : Z) (nm : fname)
@@ -742,12 +743,12 @@ Section SysUnlinkAU.
                      ⌜av !! t = Some (MkAnode (ADir est) nlt)⌝ ∗
                      ⌜~ dots_only est⌝ ∗
                      Φex av d nm t ∗
-                     dmiss_commit_at Γ ∅ Φmiss)
+                     dmiss_commit_at Γ fsabsE Φmiss)
                   ∨ (* (iii-d) no abstract observation to report: the
                        k = Lp deaths (parent-level type/nlink guards,
                        "unlink of /") -- everything back *)
-                  (dlookup_commit_at Γ ∅ Φex ∗
-                   dmiss_commit_at Γ ∅ Φmiss)))))%I.
+                  (dlookup_commit_at Γ fsabsE Φex ∗
+                   dmiss_commit_at Γ fsabsE Φmiss)))))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0
      (implies the landed [sys_unlink_ret]) *)
@@ -762,6 +763,20 @@ Section SysUnlinkAU.
       ∗ unlink_post_ok Γ P Φent Φtgt Φex Φmiss)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
         ∗ unlink_post_fail Γ γfs P Pmiss Φent Φtgt Φex Φmiss))%I.
+
+  (* the landed return blanket, read off the arms: the one conjunct of
+     [SpecSysUnlink.sys_unlink_closer] the AU form replaces, implied *)
+  Lemma unlink_arms_ret Γ (γfs : fs_names)
+      (P Pmiss : nat -> Z -> iProp Σ)
+      (Φent : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φtgt : aview -> Z -> iProp Σ)
+      (Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (Φmiss : aview -> Z -> fname -> iProp Σ) (r : mword 64) :
+    unlink_arms Γ γfs P Pmiss Φent Φtgt Φex Φmiss r ⊢ ⌜sys_unlink_ret r⌝.
+  Proof.
+    rewrite /unlink_arms /sys_unlink_ret.
+    iIntros "[[%Hr _] | [%Hr _]]"; iPureIntro; [right | left]; exact Hr.
+  Qed.
 
 End SysUnlinkAU.
 
@@ -867,7 +882,10 @@ Definition wp_sys_unlink_au_frame
      no [M'] (the mknod-era frame's finding does not apply here). *)
   ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      (* the page table may have GROWN: argstr's fetchstr faults user pages
+         in.  [uptd_ext_sz] is argstr's own report, relayed (the landed
+         row since 745672d3c). *)
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗

@@ -93,6 +93,7 @@ Require Import SpecSysOpenAU.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUAlloc.
 Require Import ProofSysOpen.   (* [so_neq_of_eq] / [so_neq_of_ne] / [so_bud_iput] *)
+Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
 Require Import FsAbs.
 Require Import TsoCtx.
 
@@ -159,7 +160,7 @@ Section ProofSysOpenAUJoin.
       (dn : dinode) (bm : blkmap)
       (om lo : mword 32) (nsj : nat)
       (u : nat) (pidv : mword 32) (dqb dqs : dfrac)
-      (U : ustate)
+      (U : ustate) (sts : list fdstate)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 w5 w6 w24 : mword 64)
       (bp : nat -> bv 8)
@@ -254,7 +255,7 @@ Section ProofSysOpenAUJoin.
     fd_slot -∗
     (* the descriptor-state fragments, threaded exactly as the fd unit above
        is: sys_open spends one access, at the settle. *)
-    fd_frags_any (pv_fdg (us_V U)) -∗
+    fd_frags (pv_fdg (us_V U)) sts -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
     (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -268,10 +269,10 @@ Section ProofSysOpenAUJoin.
     (* ---- THE AU RESIDUE, inert across this block ---- *)
     P (length (path_elems pl)) (bv_unsigned inum) -∗
     so_obs Φo (bv_unsigned inum) (era_node dn bm data) -∗
-    atrunc_commit_at (fs_gamma_L fsc_fs) ∅ Φt -∗
+    atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Φt -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
-               dqb dqs (proc_addr jx) pidv vom U P Pmiss Φo Φt m K eb b lks) -∗
+               dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Φo Φt m K eb b lks) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hqs HK Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
@@ -370,7 +371,7 @@ Section ProofSysOpenAUJoin.
       iApply (Alloc.so_alloc_au (CID0 := CID3) gfl gf gs jx gl pd pav pu
                 gil gisl
  kk qi s gy loy tly inum dn bm om lo nsj u
-                pidv dqb dqs U m M2 sp0 K eb b lks w4 w5 w6 w24 bp
+                pidv dqb dqs U sts m M2 sp0 K eb b lks w4 w5 w6 w24 bp
                 data vom pl P Pmiss Φo Φt
                 Hqs HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom
@@ -507,7 +508,7 @@ Section ProofSysOpenAUJoin.
                 Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag HP Hobs Htc]").
       { exact Hcsf. }
       { reflexivity. }
-      { iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Φo Φt U _ pl
+      { iApply (so_arm_fail gf (proc_addr jx) pidv vom P Pmiss Φo Φt U sts _ pl
                   (bv_unsigned inum) (era_node dn bm data) Ha0f
                   with "Hpriv Hfrag Hfds HP Hobs Htc"). } }
     (* ---- the major is a legal device index ---- *)
@@ -545,7 +546,7 @@ Section ProofSysOpenAUJoin.
     iApply (Alloc.so_alloc_au (CID0 := CID6) gfl gf gs jx gl pd pav pu
               gil gisl
  kk qi s gy loy tly inum dn bm om lo nsj u
-               pidv dqb dqs U m M4 sp0 K eb b lks w4 w5 w6 w24 bp
+               pidv dqb dqs U sts m M4 sp0 K eb b lks w4 w5 w6 w24 bp
                data vom pl P Pmiss Φo Φt
                Hqs HKfull Hkk Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
                Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdir Hom
