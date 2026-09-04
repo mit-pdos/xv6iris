@@ -548,9 +548,20 @@ Section UvOpen.
 
   Lemma uv_bytes_forget (pt : uptd) (M : gmap Z (bv 8)) (t : ptree) :
     uv_bytes pt M t ⊢ bytes_own (uv_mm t (upa_map pt M)).
+  (* NO PROOFMODE HERE.  [iApply] on a [⊢] lemma goes through
+     [iIntoEmpValid], whose [first] alternation tries a [notypeclasses
+     refine] per shape, and every FAILING branch unifies against this goal's
+     map -- which is computed ([ptree_bytes 2 t ∪ list_to_map (upa_list pt
+     M)]).  Ltac profiling put 96% of this whole file in ONE
+     [iIntoEmpValid_go] call, 113 s of 132 s.  Sealing [bytes_own] /
+     [bytes_own_p] against instance search is a NULL -- the cost is the
+     failing refines, not the big-op -- so the fix is to stay at the BI
+     level, where every step is an [apply] against the head.
+     (claude-notes/optimization.md, "in a [first [ ... ]] alternation, the
+     cost of a tactic that FAILS grows with the proof term".) *)
   Proof.
-    iIntros "(%IK & _ & H)".
-    iApply (bytes_own_p_forget (uv_F pt M IK) (uv_mm t (upa_map pt M)) with "H").
+    rewrite /uv_bytes. apply bi.exist_elim. intros IK.
+    rewrite bi.sep_elim_r. apply bytes_own_p_forget.
   Qed.
 
   Lemma uv_bytes_ram (pt : uptd) (M : gmap Z (bv 8)) (t : ptree) :
