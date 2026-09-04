@@ -49,7 +49,9 @@ Require Import WpNext.
 Require Import LockRank.
 Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
-Require Import DiskPtsto WpUart.
+Require Import DiskPtsto.
+Require Import UartNames.
+Require Import Xv6Cameras.
 Require Import SpecDevintr.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.

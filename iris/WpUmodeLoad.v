@@ -84,7 +84,7 @@ Require Import MemAccessGen WpMmodeLeafBase WpLoad.
 Require Import UserMemPt UserMemArms UserMemClassify UserMemAccess UserMemMis.
 Require Import UserMemCert UserMemArmsBase UserMemArmsC.
 Require Import UmodeMem UmodeCap UmodeFetch.
-Require Import HartMemRunX UmodeText.
+Require Import UmodeText.
 Require Import WpUmodeStep WpUmodeStore.
 Require Import TsoCtx.
 Local Open Scope Z_scope.

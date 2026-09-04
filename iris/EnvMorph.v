@@ -41,7 +41,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import TsoCtx CtxMorphTac.
 Require Import Xv6Cameras.
-Require Import WpUart.      (* [uart_names] *)
+Require Import UartNames.      (* [uart_names] *)
 Require Import DiskPtsto.   (* [disk_names] *)
 Require Import IcacheRef.   (* [ic_names] / the [icfg] class *)
 Require Import TicksInv.

@@ -31,7 +31,6 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.
-Require Import TsoMemPa.
 Require Import TsoCtx.
 
 Section MemClaim.

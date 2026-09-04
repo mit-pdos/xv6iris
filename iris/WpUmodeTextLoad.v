@@ -32,23 +32,20 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes TsoMemPa RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import RiscvExtras.
-Require Import RegFile WpGpr.
+Require Import WpGpr.
 Require Import CommonWalk.
-Require Import PtreeType PtAdBits PtTree KptTree.
-Require Import SRegime UptTree UptWalkPt.
-Require Import UserMem UserFetch UserPtTree UserTranslate.
+Require Import PtreeType PtTree.
+Require Import UserPtTree.
 Require Import HartSwp HartLift HartSpan HartSpanChar HartGoodb HartMemRun HartMemAsm HartMCycle
         HartEvents HartMFetch HartMFrame.
-Require Import SmodePte PtTreeAdue HartSMem.
+Require Import PtTreeAdue HartSMem.
 Require Import WpMmodeLeafBase.
 Require Import PtBytes UserBytes UserFrame UserClassifyAsm.
-Require Import UserFetchCert UserFaultCert.
-Require Import UserExec UserStep UserTrap UserExecFacts.
-Require Import UserMemPt UserMemAccess UserMemArms UserMemClassify UserMemCert UserMemArmsBase.
-Require UserTotalU.
+Require Import UserExecFacts.
+Require Import UserMemPt UserMemAccess UserMemClassify UserMemCert UserMemArmsBase.
 Require Import UserActiveClass.
-Require Import UmodeMem UmodeCap UmodeFetch.
-Require Import HartMemRunX UmodeText UmodeFetchX UmodeArith.
+Require Import UmodeMem.
+Require Import HartMemRunX UmodeText.
 Require Import WpUmodeFetch WpUmodeStep WpUmodeStore WpUmodeLoad.
 Require Import KptGoodb.
 Require Import TsoCtx.

@@ -268,7 +268,6 @@ Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT --
                           [fsc_uart] is the console's ghost bundle        *)
 Import Defs.
 Require Import TsoCtx.
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 
 Local Open Scope Z_scope.
 

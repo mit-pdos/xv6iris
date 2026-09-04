@@ -37,40 +37,16 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
-Require Import RegFile.
-Require Import RiscvExtras.
-Require Import VcGen.           (* [trunc32_unsigned], for the mode-bit tie *)
-Require Import CalleeSaved KernelText KernelDataInv.
-Require Import IntrDefs.
-Require Import WpNext.
-Require Import WpLock.
+Require Import Xv6Cameras.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import CpuOwn.
-Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskInv.
-Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BitmapInv.
-Require Import InodeInv.
-Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheInv.
-Require Import IcacheEscrow.
-Require Import KvmSpec.
-Require Import FileInv.               (* [is_ftable], [fnode] *)
-Require Import UserPtTree.
-Require Import ProcPtOwn.
+Require Import FileInvDefs.               (* [is_ftable], [fnode] *)
 Require Import ProcInv.
-Require Import SpecPrintk.      (* [printk_env], [printk_gen_contract] *)
-Require Import SpecDirlink.     (* [ic_sleeplocks], [ireg_blocks_ok] *)
-Require Import SpecFdalloc.     (* [fd_frees] *)
-Require Import ConsoleInv.      (* [NDEV_max] *)
 Require Import SpecSysOpen.     (* the landed contract this file states a
                                    parallel form beside; [K_sys_open],
                                    [sys_open_slots] *)
@@ -78,10 +54,8 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
-Require Import PathElems.       (* [path_elems], [SLASH] *)
 Require Import FsTree.          (* [fname] *)
-Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
+Require Import FsStateDefs.    (* [fs_gamma_L]: the live Γ *)
 Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT
                                    Import: [FsImg]'s [fs_sb] field readers
                                    would shadow the superblock CELL

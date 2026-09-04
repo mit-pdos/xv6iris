@@ -46,7 +46,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import WpDecodeBridge HartMemRun HartMemAsm PtBytes.
 Require Import CommonWalk PtAdBits PtreeType PtTree PtTreeAdue PtBuild.
-Require Import UserTranslate UptTree UserPtTree UserBits UserMem UserFetch.
+Require Import UserTranslate UptTree UserPtTree UserBits UserFetch.
 Require Import UserBytes PtWalkCert UserFetchPt.
 Require Import Pt4kWalk.
 Require Import RiscvExtras.

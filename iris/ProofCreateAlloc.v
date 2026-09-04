@@ -87,12 +87,11 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import KernelText KernelDataInv.
-Require Import StackOwn StackBytes.
+Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
@@ -101,10 +100,8 @@ Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
-Require Import SleepLock.
 Require Import WpUart.
 Require Import DiskInv.
 Require Import Xv6Cameras.
@@ -114,7 +111,7 @@ Require Import BioInv.
    [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
    [byte_range], both of which have live twins below, and the LAST import
    wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
-Require Import FsState.
+Require Import FsStateInode.
 Require Import FsBytesGamma.
 Require Import FsStateEra.
 Require Import FsBlocks LogInv.
@@ -125,13 +122,10 @@ Require Import DinodeEnc.
    that, at the ABI's sign-extended [major] / [minor] arguments. *)
 Require Import DinodeSlot.
 Require Import DirentEnc.
-Require Import BvShift.
-Require Import PathElems.
 Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
-Require Import IregLinkNz.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
@@ -141,12 +135,9 @@ Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecPrintk.
-Require Import SpecPanic.
-Require Import SpecBmap SpecWritei.
 Require Import SpecIput SpecIalloc SpecIupdate.
 Require Import SpecIlock SpecIunlockput.
 Require Import SpecDirlookup SpecDirlink.
-Require Import SpecNamex SpecNameiparent.
 Require Import SpecCreate.
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
@@ -157,7 +148,7 @@ Require Import SpecCreate.
    handing it [IA]/[IL] for its two callee hypotheses. *)
 Require Import ProofCreateFreshTy.
 Require Import CodeCreate.
-Require Import ProofDirlookupParts ProofNamexParts ProofCreateParts.
+Require Import ProofCreateParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

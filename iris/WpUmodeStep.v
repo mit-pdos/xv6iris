@@ -37,23 +37,20 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv WpGpr RegFile InstrBytes.
 Require Import WpIntrCore.
-Require Import RiscvExtras.
 Require Import WpDecodeBridge DecodeTotalU.
-Require Import CommonWalk.
-Require Import PtreeType PtAdBits PtTree KptTree.
-Require Import SRegime UptTree UptWalkPt.
-Require Import UserMem UserFetch UserPtTree UserTranslate.
+Require Import PtreeType PtTree.
+Require Import UptTree.
+Require Import UserPtTree.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
         HartStepFull HartRunFull HartRunGen.
-Require Import PtBytes UserBytes UserFrame UserClassifyAsm.
-Require Import UserFetchCert UserFaultCert.
+Require Import UserBytes UserFrame UserClassifyAsm.
 Require Import UserExec UserStep UserTrap UserExecFacts.
 (* NOT [Import]ed: [UserTotalU.u_pins_tick] shadows [UserFrame.u_pins_tick],
    which is the one the frames bridge is stated over. *)
 Require UserTotalU.
 Require Import UserActiveClass.
-Require Import UmodeMem UmodeCap UmodeFetch.
-Require Import HartMemRunX UmodeText UmodeFetchX UmodeArith.
+Require Import UmodeMem UmodeCap.
+Require Import UmodeText.
 Require Export WpUmodeFetch.
 Require Import WpDecode.
 Require Import TsoCtx.

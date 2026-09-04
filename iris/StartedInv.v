@@ -57,7 +57,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExec Ktier.
 From Kernel Require KernelSyms.
 Require Import TsoMemPa TsoGhost TsoCtx TsoCtxAbsorbLb.
-Require Import HartTp WpSconfMem.
+Require Import HartTp.
+Require Import MemClaim.
 Local Open Scope Z_scope.
 
 (* the flag's address, and the two values it ever holds *)

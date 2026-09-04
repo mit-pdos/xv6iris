@@ -65,7 +65,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import W32Arith.
@@ -73,16 +73,14 @@ Require Import StackOwn.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeIntr WpSmodeHalf.
+Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
 Require Import SpecPanic.
-Require Import SpecPrintk.
 Require Import WpUart.
-Require Import ByteBuf.
 Require Import DiskInv.
 Require Import Xv6Cameras.
 Require Import BioInv.
@@ -91,9 +89,6 @@ Require Import BioInv.
    [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
    [byte_range], both of which have live twins below, and the LAST import
    wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
-Require Import FsState.
-Require Import FsBytesGamma.
-Require Import FsStateEra.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
@@ -101,13 +96,10 @@ Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
 Require Import InodeInv.
-Require Import InodeLock.
-Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IregLinkNz.   (* the nonzero-count reading at a held token
                                 ([ireg_tok_nz]) and the agreement of two
@@ -121,14 +113,10 @@ Require Import ProcInv.
 Require Import SpecArgstr.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
-Require Import SpecIlock.
 Require Import SpecIput.
-Require Import SpecIupdate.
 Require Import SpecIunlockput.
-Require Import SpecNamecmp.
 Require Import SpecDirlookup.
 Require Import SpecDirlink.
-Require Import SpecMemset.
 Require Import SpecReadi.
 Require Import SpecWritei.
 Require Import SpecNamex.
@@ -144,7 +132,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
-Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 Set Printing Depth 40.
 

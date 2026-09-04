@@ -73,7 +73,6 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import FileOffProtocol.   (* [proto_store_free]: the free off cell is the free word (r25 item 24) *)
 Require Import OffBox.   (* [off_rows] -- the fd box birth borrows the inode's rows (r25 item 33) *)
 Require Import DirView.
 Require Import FileInvDefs.

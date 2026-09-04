@@ -56,11 +56,11 @@ Require Import UptTree.
 Require Import UserPtTree.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
         HartStepFull HartRunFull HartRunGen.
-Require Import UserBytes UserFrame UserClassifyAsm.
+Require Import UserFrame UserClassifyAsm.
 Require Import UserExec UserStep UserTrap UserExecFacts.
 Require UserTotalU.
 Require Import UserActiveClass.
-Require Import UmodeMem UmodeFetch.
+Require Import UmodeMem.
 Require Import UmodeRegs.
 Require Import WpUmodeStep.
 Require Import UserPerm.
@@ -77,7 +77,7 @@ Local Ltac uv_trap_peel :=
   repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
 
 Require Import UkStep.
-Require Import HartMemRunX UmodeText.
+Require Import UmodeText.
 
 (* ===================================================================== *)
 (* SS0 THE SLOT FAMILY, and the bundle re-stated at it.                    *)

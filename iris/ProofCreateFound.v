@@ -92,7 +92,7 @@ Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import KernelText KernelDataInv.
-Require Import StackOwn StackBytes.
+Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
@@ -114,39 +114,28 @@ Require Import BioInv.
    [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
    [byte_range], both of which have live twins below, and the LAST import
    wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
-Require Import FsState.
-Require Import FsBytesGamma.
-Require Import FsStateEra.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import DinodeEnc.
 (* [trunc16_sext64]: an [sh] of a register an [lh] filled is the identity on
    the halfword -- the three metadata stores at +0xb4 / +0xb8 are exactly
    that, at the ABI's sign-extended [major] / [minor] arguments. *)
-Require Import DinodeSlot.
-Require Import DirentEnc.
-Require Import BvShift.
-Require Import PathElems.
 Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
-Require Import IregLinkNz.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecPrintk.
-Require Import SpecPanic.
-Require Import SpecBmap SpecWritei.
-Require Import SpecIput SpecIalloc SpecIupdate.
+Require Import SpecIput SpecIalloc.
 Require Import SpecIlock SpecIunlockput.
-Require Import SpecDirlookup SpecDirlink.
-Require Import SpecNamex SpecNameiparent.
+Require Import SpecDirlookup.
+Require Import SpecNameiparent.
 Require Import SpecCreate.
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
@@ -155,7 +144,6 @@ Require Import SpecCreate.
    register contract ([cr_cs_but_s3]) and the proof all live in
    [ProofCreateFreshTy.v], and this file applies [create_fresh_ty] directly,
    handing it [IA]/[IL] for its two callee hypotheses. *)
-Require Import ProofCreateFreshTy.
 Require Import CodeCreate.
 Require Import ProofDirlookupParts ProofNamexParts ProofCreateParts.
 From Kernel Require KernelSyms.

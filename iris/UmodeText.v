@@ -30,8 +30,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import TsoMemPa.
-Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartEvents.
-Require Import CommonWalk.
+Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import UptTree UserPtTree UserPerm ProcPtOwn.
 Require Import TsoCtx.
 Require Import HartMemRun HartMemRunX HartBarrier PtBytes.

@@ -22,20 +22,16 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile WpNext.
+Require Import RegFile.
 Require Import WpMmodeLeafBase.
-Require Import RiscvExtras.
 Require Import CalleeSaved.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Import SpecPanic.
 Require Import SpecPrintk.
 Require Import Xv6Cameras.
-Require Import FsBytesGamma.
 Require Import IrefSlots.
 Require Import FsTree.
 Require Import FileInvDefs.
-Require Import ProcPtOwn.
 Require Import ProcDefs.
 Require Import SpecArgstr.
 Require Import SpecBeginOp.
@@ -50,7 +46,6 @@ Require Import SpecReadi.
 Require Import SpecWritei.
 Require Import SpecNparWrapEra.   (* [NPAR_WRAP_ERA]: the era walk         *)
 Require Import SpecSysUnlinkAU.
-Require Import ProofSysUnlinkAUParts.
 Require Import ProofSysUnlinkAUW1.
 Require Import ProofSysUnlinkAUW2.
 Require Import ProofSysUnlinkAUW3.
@@ -60,7 +55,6 @@ Require Import FsAbs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
 Require Import Xv6G.
-Require Import FsCfg.
 Local Open Scope Z_scope.
 Require Import TsoCtx.
 

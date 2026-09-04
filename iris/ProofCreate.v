@@ -85,68 +85,30 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile HartTp.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
-Require Import KernelText KernelDataInv.
-Require Import StackOwn StackBytes.
-Require Import CalleeSaved.
-Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpSmodeHalf.
-Require Import WpSmodeIntr.
-Require Import IntrDefs.
-Require Import CpuOwn.
-Require Import SchedCtx.
-Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
-Require Import SleepLock.
-Require Import WpUart.
-Require Import DiskInv.
 Require Import Xv6Cameras.
-Require Import BioInv.
 (* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
    [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
    [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
    [byte_range], both of which have live twins below, and the LAST import
    wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
-Require Import FsState.
-Require Import FsBytesGamma.
-Require Import FsStateEra.
-Require Import FsBlocks LogInv.
-Require Import BitmapInv.
-Require Import DinodeEnc.
 (* [trunc16_sext64]: an [sh] of a register an [lh] filled is the identity on
    the halfword -- the three metadata stores at +0xb4 / +0xb8 are exactly
    that, at the ABI's sign-extended [major] / [minor] arguments. *)
-Require Import DinodeSlot.
-Require Import DirentEnc.
-Require Import BvShift.
-Require Import PathElems.
-Require Import DirView.
-Require Import InodeInv.
-Require Import InodeLock.
 Require Import InodeRegion.
-Require Import IregLinkNz.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheInv.
-Require Import FsTree.
-Require Import IcacheEscrow.
-Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import ProcInv.
+Require Import ProcDefs.
 Require Import SpecPrintk.
-Require Import SpecPanic.
-Require Import SpecBmap SpecWritei.
-Require Import SpecIput SpecIalloc SpecIupdate.
+Require Import SpecIalloc SpecIupdate.
 Require Import SpecIlock SpecIunlockput.
 Require Import SpecDirlookup SpecDirlink.
-Require Import SpecNamex SpecNameiparent.
+Require Import SpecNameiparent.
 Require Import SpecCreate.
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
@@ -155,16 +117,12 @@ Require Import SpecCreate.
    register contract ([cr_cs_but_s3]) and the proof all live in
    [ProofCreateFreshTy.v], and this file applies [create_fresh_ty] directly,
    handing it [IA]/[IL] for its two callee hypotheses. *)
-Require Import ProofCreateFreshTy.
-Require Import CodeCreate.
-Require Import ProofDirlookupParts ProofNamexParts ProofCreateParts.
+Require Import ProofCreateParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
-Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
 
 (* claude-notes/optimization.md "Register maps": the leaves' premises are
    stated over [rget] (see e.g. [cri_*]'s consumers below), so with these

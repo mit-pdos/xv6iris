@@ -40,28 +40,23 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv WpGpr RegFile InstrBytes.
-Require Import WpIntrCore.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
+Require Import InstrBytes.
 Require Import RiscvExtras.
-Require Import WpDecodeBridge DecodeTotalU.
 Require Import CommonWalk.
 Require Import PtreeType PtAdBits PtTree KptTree.
 Require Import SRegime UptTree UptWalkPt.
-Require Import UserMem UserFetch UserPtTree UserTranslate.
+Require Import UserPtTree UserTranslate.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
         HartStepFull HartRunFull HartRunGen.
 Require Import PtBytes UserBytes UserFrame UserClassifyAsm.
-Require Import UserFetchCert UserFaultCert.
-Require Import UserExec UserStep UserTrap UserExecFacts.
+Require Import UserFetchCert.
 (* NOT [Import]ed: [UserTotalU.u_pins_tick] shadows [UserFrame.u_pins_tick],
    which is the one the frames bridge is stated over. *)
-Require UserTotalU.
 Require Import UserActiveClass.
-Require Import UmodeMem UmodeCap UmodeFetch.
+Require Import UmodeMem UmodeFetch.
 Require Import HartMFetch UserBits.
 Require Import HartMemRunX UmodeText UmodeFetchX UmodeArith.
-Require Import WpDecode.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.

@@ -84,17 +84,17 @@ Require Import UptTree.
 Require Import UserPtTree.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
         HartStepFull HartRunFull HartRunGen.
-Require Import UserBytes UserFrame UserClassifyAsm.
+Require Import UserFrame UserClassifyAsm.
 Require Import UserExec UserStep UserTrap UserExecFacts.
 Require UserTotalU.
 Require Import UserActiveClass.
-Require Import UmodeMem UmodeCap UmodeFetch.
+Require Import UmodeMem UmodeCap.
 Require Import WpUmodeStep.
 Require Import ProcPtOwn.    (* [proc_pt_wf] *)
 Require Import UserPerm.
 Require Import UsysMemOk.
 Require Import UexecWp UexecSlot UexecRet.
-Require Import HartMemRunX UmodeText.
+Require Import UmodeText.
 Require Import FdSlots.      (* [fdstate] -- the key's descriptor view *)
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
 Local Open Scope Z_scope.

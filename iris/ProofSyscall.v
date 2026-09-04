@@ -360,14 +360,14 @@ Require Import SpecSysFork SpecSysExit SpecSysWait SpecSysPipe SpecSysRead SpecS
                SpecSysExec SpecSysFstat SpecSysChdir SpecSysDup SpecSysGetpid SpecSysSbrk
                SpecSysPause SpecSysUptime SpecSysWrite SpecSysMknod SpecSysLink SpecSysMkdir
                SpecSysClose SpecSysSync.
-Require Import SpecSysOpen SpecSysUnlink.
+Require Import SpecSysOpen.
 (* THE AU CONTRACTS the three fs-mutating entries run on since 2026-09-03
    (their landed contracts are corollaries: [open_arms_plain_landed],
    [mknod_arms_era_ret], [unlink_arms_ret]), and the dischargers that
    satisfy their bundles out of the application-side abstract-state
    invariant [FirstTok.fsabs_env] with receipts that say nothing. *)
 Require Import SpecSysMknodAUEra SpecSysOpenAU SpecSysUnlinkAU.
-Require Import FsBytesGamma FsAbsInv FsAbsInvFire.
+Require Import FsAbsInvFire.
 Require Import SpecMyproc.
 (* the content-independent bundles the non-closer fs entries state their
    environments over -- [filestat_fs_env]/[fread_names] and friends. *)

@@ -46,7 +46,7 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec Ris
 Require Import WpGpr RegFile.
 Require Import WpDecodeBridge DecodeTotalU.
 Require Import CommonWalk.
-Require Import PtreeType PtTree.
+Require Import PtreeType.
 Require Import SRegime UptTree.
 Require Import UserPtTree.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
@@ -65,7 +65,7 @@ Require Import UmodeMem UmodeFetch.
 Require Import UmodeRegs.
 Require Import WpUmodeStep WpUmodeStore.
 Require Import ProcPtOwn UserPerm UexecWp UexecRet UkStep.
-Require Import HartMemRunX UmodeText.
+Require Import UmodeText.
 Require Import FdSlots.      (* [fdstate] -- the key's descriptor view *)
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
 Local Open Scope Z_scope.

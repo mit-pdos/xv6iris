@@ -107,7 +107,9 @@ Require Import KernelText KernelDataInv.
 Require Import RegFile.
 Require Import RiscvExtras.
 Require Import CalleeSaved.
-Require Import DiskPtsto WpUart.
+Require Import DiskPtsto.
+Require Import UartNames.
+Require Import Xv6Cameras.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import LockRank.

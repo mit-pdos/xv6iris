@@ -38,7 +38,9 @@ Require Import TsoCtxMove.
    [kernel_text] already are -- the handler contract is a [□], so everything it
    needs from its caller must be persistent, and everything it needs from the
    trap rides in the bundle. *)
-Require Import FdSlots IrefSlots ProcGeom DiskPtsto WpUart.
+Require Import FdSlots IrefSlots ProcGeom DiskPtsto.
+Require Import UartNames.
+Require Import Xv6Cameras.
 Require Import SpecDevintr.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.

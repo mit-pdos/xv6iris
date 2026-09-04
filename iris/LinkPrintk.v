@@ -30,7 +30,8 @@ Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
-Require Import WpLock DiskPtsto WpUart.
+Require Import WpLock DiskPtsto.
+Require Import UartNames.
 Require Import LinkConsputc LinkPrintint LinkAcquire LinkRelease ProofPrintk.
 Require Import SpecPrintk.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

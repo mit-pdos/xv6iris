@@ -274,7 +274,6 @@ Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT
                                    ([sb_ninodes] : fs_sb -> Z) would shadow
                                    the superblock CELL ADDRESSES the frame
                                    below threads *)
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.           (* the abstract state (lane A, landed) *)
 Require Import FsStateDefs.    (* [fs_gamma_L]: the live Γ *)
 From Kernel Require KernelSyms.

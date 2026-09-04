@@ -68,7 +68,9 @@ Require Import SpecPrintk.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
 (* [dev_ncpu], the PLIC's modelled hart count, for plicinithart's premise *)
 Require Import DevModel.
-Require Import DiskPtsto WpUart.
+Require Import DiskPtsto.
+Require Import UartNames.
+Require Import Xv6Cameras.
 Require Import DiskInv.
 Require Import WpLock.
 Require Import FileInvDefs.

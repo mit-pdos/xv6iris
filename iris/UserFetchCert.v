@@ -45,14 +45,14 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import WpDecodeBridge HartMemRun HartMemAsm PtBytes.
 Require Import CommonWalk PtAdBits Pt4kWalk PtreeType KptPt PtTree PtTreeAdue KptTree.
-Require Import ExecCommon UserTranslate UptTree UserPtTree UserBits UserMem UserFetch.
+Require Import ExecCommon UserTranslate UptTree UserPtTree UserBits UserFetch.
 Require Import UserBytes PtWalkCert.
 (* [SmodeCore.ram_fetch_pmp] -- the RAM window's PMP grant -- is the one
    thing section 7 needs from the S-mode core. *)
 Require Import SmodeCore.
 (* the tier's PURE pair convention: [u_state], [u_exec_pins], [Du_r]/[Du_w].
    [UserClassifyAsm] is Iris-free; nothing below is an [iProp]. *)
-Require Import UserFrame UserExec UserClassifyAsm.
+Require Import UserFrame UserClassifyAsm.
 Local Open Scope Z_scope.
 Import Defs.
 
