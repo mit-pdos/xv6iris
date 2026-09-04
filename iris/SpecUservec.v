@@ -199,7 +199,7 @@ Qed.
    [usertrap_res] itself needs are for its holder ([Module Type USERVEC]'s
    [wp_uservec_pt], via [Include USERTRAP_RES]) to supply, not for this
    definition to re-demand. *)
-Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (URes : uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (C : ucfg) (pt : uptd) (vksp : mword 64)
     (* THE ROUND'S ENTRY STATE (milestone J1a) -- see [SpecUsertrap.usertrap_post].
@@ -341,12 +341,17 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
        it, and this round's proof holds it off the kernel residue it just
        released ([tlb_res_pt]'s own conjunct). *)
     KptShare.kpt_creds -∗
+    (* THE EXEC CHANNEL'S ANSWER (lane E3b), forwarded from usertrap's post
+       at this boundary's own entry trapframe -- [SpecUsertrap.ut_exec_out] *)
+    ut_exec_out sc_v (tf_of g (ret_pc sepc_v)) M
+      (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
+      (uint (pv_sz (us_V U))) U' sts sts' -∗
     WP (Loop : expr riscv_lang)).
 Global Typeclasses Opaque uservec_post.
 
 (* Same as [uservec_post]: only [riscvGS]/[sieG] -- [usertrap_res] is held
    opaquely through [URes], never opened. *)
-Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (* A FAMILY, not one predicate: uservec calls usertrap, usertrap PARKS
        (SpecUsertrap.v's own [wp_next true pj] crossing), so everything
        after that call -- the residue included -- is a resource AT WHATEVER
@@ -449,6 +454,11 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
      reason and with the same escape: at a REAL proc ([j < NPROC], hence
      [proc_addr j <> zero_reg]) the pinning condition is vacuous, so the
      caller owes the post at every hart. *)
+  (* the process's exec bundle, owed only at an exec ecall and keyed at the
+     saved frame [tf_of g (ret_pc sepc_v)] over the entry image -- the run
+     projection of the record the loop holds ([SpecUsertrap.ut_exec_in]) *)
+  ut_exec_in sc_v (tf_of g (ret_pc sepc_v))
+    (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) sts -∗
   wp_next true (proc_addr j) (fun CID' : CpuId =>
     uservec_post (CID := CID') (URes CID') C pt vksp U M g sts sepc_v sc_v) -∗
   WP (Loop : expr riscv_lang).

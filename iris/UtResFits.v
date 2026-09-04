@@ -202,6 +202,15 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
          usertrap_res_bare pt ksp (us_tf U ws') sts).
   Proof. exact (ut_res_bare_tf_csrs_open (SY.syscall_env) pt ksp U sts). Qed.
 
+  Lemma usertrap_res_bare_fsabs
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    usertrap_res_bare pt ksp U sts -∗
+    FirstTok.fsabs_env ∗ usertrap_res_bare pt ksp U sts.
+  Proof.
+    exact (ut_res_bare_fsabs (SY.syscall_env) pt ksp U sts
+             (fun γ pj fn => SY.syscall_env_fsabs_keep γ pj fn)).
+  Qed.
+
   (* THE PRODUCER, ASSEMBLED.  Two halves, and the seam between them is the
      whole reason this is provable at all: [ut_res_bare_park] turns
      [ut_park_caps] plus [FirstTok.first_done] into [ut_caps]

@@ -320,17 +320,15 @@ Qed.
    the U-mode loop that consumes it runs on the enriched fixpoint (only
    [uexec_ret_x] carries the bundle at the process's next exec), and
    [uslot W -∗ uslot_x W] is not provable (UexecRetExec.v header).
-   Staged on a boolean: the usertrap side passes [false] until the U-mode
-   loop threads the bundle down, and every non-exec arm owes nothing
-   either way ([sysc_exec_out_ne]). *)
+   Every non-exec arm owes nothing ([sysc_exec_out_ne]). *)
 Section SyscExec.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
 
   (* the process's exec bundle, offered only on exec *)
-  Definition sysc_exec_in (xb : bool) (U : ustate) (sts : list fdstate) : iProp Σ :=
-    if xb then (⌜sysc_num (us_V U) = 7⌝ -∗ xbundle uslot_x (uvis_of U sts))%I else emp%I.
+  Definition sysc_exec_in (U : ustate) (sts : list fdstate) : iProp Σ :=
+    (⌜sysc_num (us_V U) = 7⌝ -∗ xbundle uslot_x (uvis_of U sts))%I.
 
   (* r = -1 and nothing of the process moved but a0: the trapframe up to
      the a0 slot, the image, the permission projection (a copy-in's lazy
@@ -346,31 +344,19 @@ Section SyscExec.
 
   (* [U'] is the record AFTER the dispatcher's own a0 store, so on success
      [uvis_of U' sts'] IS [SpecKexecAU.exec_key]'s resume key *)
-  Definition sysc_exec_out (xb : bool) (U U' : ustate) (sts sts' : list fdstate) : iProp Σ :=
-    if xb then
-      (⌜sysc_num (us_V U) = 7⌝ -∗
-         (⌜sysc_exec_failed U U' sts sts'⌝
-          ∨ uslot_x (uvis_of U' sts')                     (* the new image's slot *)
-          ∨ ⌜pv_tf (us_V U') !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝))%I  (* the loadability gap *)
-    else emp%I.
+  Definition sysc_exec_out (U U' : ustate) (sts sts' : list fdstate) : iProp Σ :=
+    (⌜sysc_num (us_V U) = 7⌝ -∗
+       (⌜sysc_exec_failed U U' sts sts'⌝
+        ∨ uslot_x (uvis_of U' sts')                     (* the new image's slot *)
+        ∨ ⌜pv_tf (us_V U') !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝))%I.  (* the loadability gap *)
 
   (* every other entry owes nothing *)
-  Lemma sysc_exec_out_ne (xb : bool) (U U' : ustate) (sts sts' : list fdstate) :
-    sysc_num (us_V U) <> 7 -> ⊢ sysc_exec_out xb U U' sts sts'.
+  Lemma sysc_exec_out_ne (U U' : ustate) (sts sts' : list fdstate) :
+    sysc_num (us_V U) <> 7 -> ⊢ sysc_exec_out U U' sts sts'.
   Proof.
-    intro Hne. rewrite /sysc_exec_out. destruct xb; [| iEmpIntro].
+    intro Hne. rewrite /sysc_exec_out.
     iIntros "%Hk". exfalso. exact (Hne Hk).
   Qed.
-
-  (* ...and nor does exec at a caller that offered no bundle *)
-  Lemma sysc_exec_out_false (U U' : ustate) (sts sts' : list fdstate) :
-    ⊢ sysc_exec_out false U U' sts sts'.
-  Proof. rewrite /sysc_exec_out. iEmpIntro. Qed.
-
-  (* ...and such a caller offers nothing *)
-  Lemma sysc_exec_in_false (U : ustate) (sts : list fdstate) :
-    ⊢ sysc_exec_in false U sts.
-  Proof. rewrite /sysc_exec_in. iEmpIntro. Qed.
 
 End SyscExec.
 
@@ -391,10 +377,7 @@ Definition wp_syscall_sconf_body
     (pid : mword 32) (U : ustate)
     (* THE DESCRIPTOR STATES syscall() IS ENTERED AT.  The post below states
        [sysc_fd_ok] against them, beside [sysc_mem_ok] against the image. *)
-    (sts : list fdstate) (lks : gset string)
-    (* THE EXEC CHANNEL'S SWITCH: whether the caller offers the process's
-       exec bundle ([sysc_exec_in]) and takes the slot back ([sysc_exec_out]) *)
-    (xb : bool) :=
+    (sts : list fdstate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.syscall in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -450,7 +433,7 @@ Definition wp_syscall_sconf_body
      AT A NAMED TABLE, so the post can say which descriptors moved. *)
   fd_frags (pv_fdg (us_V U)) sts -∗
   (* the process's exec bundle, offered only on exec -- see [sysc_exec_in] *)
-  sysc_exec_in xb U sts -∗
+  sysc_exec_in U sts -∗
   (* THE EXIT SLOT IS AN ADDITIVE CONJUNCTION, AND THAT IS WHAT LETS ONE
      TABLE ENTRY NOT RETURN WITHOUT THE CONTRACT SAYING WHICH ONE.
 
@@ -590,7 +573,7 @@ Definition wp_syscall_sconf_body
       pc_is ret_tgt -∗
       (* ...and the exec channel's answer: on exec, the failure facts or
          the new image's slot at the resume record [U'] *)
-      sysc_exec_out xb U U' sts sts' -∗
+      sysc_exec_out U U' sts sts' -∗
       WP (Loop : expr riscv_lang))
    ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av)) -∗
   WP (Loop : expr riscv_lang).
@@ -681,6 +664,15 @@ Module Type SYSCALL.
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γf : gname) (pj : mword 64) (fn : fclose_names),
       syscall_env γf pj fn -∗ park_world (fcn_procs fn).
+  (* ...and the application-side abstract-state invariant, off the
+     environment's [first_done] conjunct: what the U-mode loop mints the
+     process's exec bundle from ([UexecExecMint]).  Pass-through, since
+     the loop reads it off a residue it goes on holding. *)
+  Parameter syscall_env_fsabs_keep :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+      (γf : gname) (pj : mword 64) (fn : fclose_names),
+      syscall_env γf pj fn -∗ FirstTok.fsabs_env ∗ syscall_env γf pj fn.
   Parameter syscall_env_token :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
@@ -695,6 +687,6 @@ Module Type SYSCALL.
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (sts : list fdstate)
-      (lks : gset string) (xb : bool),
-      wp_syscall_sconf_body (syscall_env) γf γs j γl fn ip dqi m av pid U sts lks xb.
+      (lks : gset string),
+      wp_syscall_sconf_body (syscall_env) γf γs j γl fn ip dqi m av pid U sts lks.
 End SYSCALL.

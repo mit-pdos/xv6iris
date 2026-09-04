@@ -303,6 +303,33 @@ Section UexecRetExec.
       [ exact Hl | exact Hp ].
   Qed.
 
+  (* the enriched slot reads its key at the same six projections the plain
+     one does ([UexecApply.uslot_key_cong]) *)
+  Lemma uslot_x_key_cong (W W' : uvis) :
+    tf_resume_gpr0 (uvis_tf W) = tf_resume_gpr0 (uvis_tf W') ->
+    tf_resume_pc (uvis_tf W) = tf_resume_pc (uvis_tf W') ->
+    uvis_M W = uvis_M W' ->
+    uvis_perm W = uvis_perm W' ->
+    uvis_sz W = uvis_sz W' ->
+    uvis_fd W = uvis_fd W' ->
+    (uslot_x W : iProp Σ) ⊣⊢ uslot_x W'.
+  Proof.
+    intros Hg Hp HM Hpi Hsz Hfd.
+    rewrite (uslot_x_unfold W) (uslot_x_unfold W').
+    rewrite Hg Hp HM Hpi Hsz Hfd. reflexivity.
+  Qed.
+
+  Lemma ukb_x_unfold `{CID : CpuId} `{XI : TsoCtx.CurCtx} (C : ucfg)
+      (pt : uptd) (Rfd : list fdstate -> iProp Σ) (Rut : uptd -> iProp Σ)
+      (sz : Z) (π : gmap (mword 27) uperm) (fdv : list fdstate) :
+    ukb_x C pt Rfd Rut sz π fdv ⊣⊢
+    (∀ (W' : uvis) (sc stv : mword 64),
+       ⌜uvis_perm W' = π⌝ -∗ ⌜uvis_sz W' = sz⌝ -∗ ⌜uvis_fd W' = fdv⌝ -∗
+       trapped_machine C pt Rut sz sc stv W' ∗ Rfd (uvis_fd W') ∗
+       uexec_ret_x sc W' -∗
+       WP (Loop : expr riscv_lang)).
+  Proof. reflexivity. Qed.
+
   (* =================================================================== *)
   (* SS2 THE CONSERVATIVITY RECEIPTS.                                     *)
   (* =================================================================== *)
@@ -556,6 +583,35 @@ Section UexecRetExec.
       [ exfalso; discriminate Hc |].
     destruct (decide (USYS_exec = USYS_exec)) as [_ | Hc]; [| contradiction].
     reflexivity.
+  Qed.
+
+  (* THE SPLIT THE LOOP RUNS ON: the bundle, owed exactly at an exec ecall,
+     beside the plain-SHAPED return at the enriched slot.  The second half
+     is [UexecRet.uexec_ret_F] at [uslot_x] -- the exec arm minus its
+     bundle IS the generic returning arm -- so the round lemmas apply to it
+     generically in the slot family ([UexecApplyX]). *)
+  Lemma uexec_ret_x_split (sc : mword 64) (W : uvis) :
+    uexec_ret_x sc W -∗
+    (⌜sc = uecall_scause /\ usys_num (uvis_tf W) = USYS_exec⌝ -∗
+       xbundle uslot_x W) ∗
+    uexec_ret_F uslot_x sc W.
+  Proof.
+    rewrite /uexec_ret_x /uexec_ret_x_F /uexec_ret_F. cbv zeta.
+    iIntros "Hret".
+    destruct (decide (sc = uecall_scause)) as [Hec | Hne].
+    2: { iSplitR; [| iExact "Hret"].
+         iIntros "%Hc". exfalso. exact (Hne (proj1 Hc)). }
+    destruct (decide (usys_num (uvis_tf W) = USYS_exit)) as [Hx | _].
+    { iSplitR; [| iExact "Hret"].
+      iIntros "%Hc". exfalso. rewrite Hx in Hc. discriminate (proj2 Hc). }
+    destruct (decide (usys_num (uvis_tf W) = USYS_fork)) as [Hf | _].
+    { iSplitR; [| iExact "Hret"].
+      iIntros "%Hc". exfalso. rewrite Hf in Hc. discriminate (proj2 Hc). }
+    destruct (decide (usys_num (uvis_tf W) = USYS_exec)) as [_ | Hnex].
+    - iDestruct "Hret" as "[Hx Harm]".
+      iSplitL "Hx"; [iIntros "_"; iExact "Hx" | iExact "Harm"].
+    - iSplitR; [| iExact "Hret"].
+      iIntros "%Hc". exfalso. exact (Hnex (proj2 Hc)).
   Qed.
 
   (* the transparent arm, verbatim from [UexecRet.uexec_ret_transparent] *)

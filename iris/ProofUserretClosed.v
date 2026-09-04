@@ -93,6 +93,12 @@ Require Import UexecRet.     (* [uslot] / [uexec_ret] / [ukb] / [ukc] /
                                 does not travel through a re-export
                                 (durable-notes). *)
 Require Import UexecApply.   (* the round's tail, as named lemmas *)
+Require Import UexecRetExec.  (* [uslot_x] / [uexec_ret_x] -- the loop runs on the
+                                 enriched slot (lane E3b) *)
+Require Import UexecApplyX.   (* the round's tail at [uslot_x] *)
+Require Import UexecExecInst. (* the exec bundle's instance *)
+Require Import UexecExecMint. (* [uslot_x_mint] / [uexec_ret_x_lift] *)
+Require Import FirstTok.      (* [fsabs_env] -- what the mint needs *)
 Require Import UexecCond.    (* [cond_entry_slot] -- the loop's MINT (R-c) *)
 Require Import UserretUser.
 Require Import TfPage36.
@@ -224,6 +230,10 @@ Section UserretClosed.
     kernel_text -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     wire_inv -∗
+    (* THE APPLICATION-SIDE FS INVARIANT (lane E3b): the one persistent fact
+       the mint at [uslot_x] needs of the kernel ([UexecExecMint]); the entry
+       projects it off the residue it holds. *)
+    fsabs_env -∗
     (* THE ROUND'S ENTRY, NAMED (milestone J).  It used to be the ∃-hidden
        [user_trap_frame] paired with a [uexec_wp]; it is now the trapped
        machine at the user-visible record [W] that trapped, with the cause
@@ -248,21 +258,21 @@ Section UserretClosed.
             value its own key names. *)
          (trapped_machine (CID := h) C pt (Rut_at h sz γfd) sz sc stv W
           ∗ FdSlots.fd_frags γfd (uvis_fd W)
-          ∗ uexec_ret sc W) -∗
+          ∗ uexec_ret_x sc W) -∗
          WP (Loop : expr riscv_lang)).
   Proof.
     intros Hj.
-    iIntros "#Hkt #Hclaim #Hwire".
+    iIntros "#Hkt #Hclaim #Hwire #Hfsabs".
     (* THE LOOP MINTS (refutation R-c).  Two of the round's arms are kernel
-       mints by design -- exec-success, where [uround_ok]'s left disjunct
-       says nothing at all, and fork, where nothing yet says [r <> 0] (K2)
-       -- so [UserretClosed] takes a [UEXEC_GEN] again.  Through
-       [UexecCond.cond_entry_slot], not the bare generic inhabitant, so a
-       process whose key qualifies picks up sync's own constructor. *)
-    iAssert (□ (∀ W : uvis, uslot W))%I as "#Hmk".
+       mints by design -- exec's loadability gap, and fork, where nothing
+       yet says [r <> 0] (K2) -- so [UserretClosed] takes a [UEXEC_GEN]
+       again.  Through [UexecCond.cond_entry_slot], not the bare generic
+       inhabitant, so a process whose key qualifies picks up sync's own
+       constructor -- and LIFTED to the enriched slot ([uslot_x_mint]): the
+       generic bundle the lift needs is minted out of [fsabs_env]. *)
+    iAssert (□ (∀ W : uvis, uslot_x W))%I as "#Hmk".
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
-      iModIntro. iIntros (W).
-      iApply (UexecCond.cond_entry_slot W with "Hgen"). }
+      iApply (uslot_x_mint with "Hfsabs Hgen"). }
     iLöb as "IH".
     iIntros "!>" (h C pt sz γfd W sc stv)
       "%Hok %Hperm %Hszw #Hhw #Hmin #Hcreds (Hframe & Hfrag & Hret)".
@@ -298,20 +308,38 @@ Section UserretClosed.
                  with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr Hupt Hcfg []")
       as "Hframe".
     { done. }
-    (* ---- one round.  [Hret] -- the linear [uexec_ret] user execution
-           handed back -- is FRAMED across the crossing (R-a / K8). ---- *)
+    (* ---- THE SPLIT (lane E3b): the exec bundle -- owed exactly at an
+           exec ecall -- goes DOWN to the kernel as uservec's pre row; the
+           plain-shaped return at the enriched slot stays for the round
+           ([UexecRetExec.uexec_ret_x_split]). ---- *)
+    iDestruct (uexec_ret_x_split sc W with "Hret") as "[Hxin Hret]".
+    (* ---- one round.  [Hret] -- the linear return user execution handed
+           back -- is FRAMED across the crossing (R-a / K8). ---- *)
     iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) j ksp
               (us_upt U0 pt) (uvis_fd W) (uvis_M W) (tf_resume_gpr0 (uvis_tf W))
               ms_v sc stv (tf_w (uvis_tf W) tf_epc_idx)
               Hstv Hdqc Hmie Hj Hnorm Hptwf
-              with "Hkt Hhw Hmin Hclaim Hcreds Hframe Hures [-]").
+              with "Hkt Hhw Hmin Hclaim Hcreds Hframe Hures [Hxin] [-]").
+    { (* the pre row is the bundle at the RUN projection of the trapped key,
+         which reads the same image, a1 word and descriptor view
+         ([UexecApply.uvis_run_arg1]) *)
+      rewrite /SpecUsertrap.ut_exec_in. iIntros "%Hg".
+      iDestruct ("Hxin" with "[%]") as "Hx".
+      { split; [exact (proj1 Hg) |].
+        rewrite <- (uvis_run_num W). exact (proj2 Hg). }
+      match goal with
+      | |- environments.envs_entails _ (xbundle _ ?W') =>
+          rewrite <- (xbundle_cong uslot_x W W' eq_refl
+                        (eq_sym (uvis_run_arg1 W)) eq_refl)
+      end.
+      iExact "Hx". }
     iApply wp_next_intro. iIntros (CID').
     rewrite /uservec_post.
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2)
       "%Huptpt' %Hround' %Hfdkept %Hfdecall %Hpipecall %Hpcret' %Hgprtie'
        %Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
-       Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin' #Hcreds'".
+       Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin' #Hcreds' Hxo".
     (* the three frozen CSRs, duplicated out of the residue for [user_cfg] *)
     iDestruct (UV.usertrap_res_csrs_open (CID := CID') pt' ksp U2 with "Hures'")
       as "[Hcsrs Hcback]".
@@ -371,7 +399,11 @@ Section UserretClosed.
        [Hfdkept] -- [SpecUsertrap.ut_fd_kept], certified by usertrap and
        forwarded by uservec -- says the states did not move, which is
        exactly the transparent arm's premise. *)
-    iDestruct (uexec_ret_round_slot_of sc W (tf_resume_gpr0 (uvis_tf W))
+    (* ...and the kernel's exec result, at the same key: [ut_exec_out]
+       unfolded IS the round lemma's row once the entry permission map and
+       break are the key's own *)
+    iEval (rewrite /SpecUsertrap.ut_exec_out Hpi0 Hsz0) in "Hxo".
+    iDestruct (uexec_ret_x_round_slot_of sc W (tf_resume_gpr0 (uvis_tf W))
                  (tf_w (uvis_tf W) tf_epc_idx) U2 sts2
                  Hlen eq_refl eq_refl Hfdkept
                  (* ...and the ECALL arm's row, which is what stops the
@@ -384,7 +416,7 @@ Section UserretClosed.
                  (* ...and pipe's join beside it, from the same three hops
                     and stated at the same trapframe pair *)
                  Hpipecall Hround'
-                 with "Hmk Hret") as "Hslot".
+                 with "Hmk Hxo Hret") as "Hslot".
     (* ---- STEPS C/D: the guard, and the bundle, both inside the named
            lemma -- the loop only says which key it is at. ---- *)
     assert (Hpi2 : uvis_perm (uvis_of U2 sts2)
@@ -395,7 +427,7 @@ Section UserretClosed.
        and gives it back at the trap; the residue keeps the AUTHORITY, so
        neither side can move a descriptor's state alone
        ([FdSlots.fd_st_both_update]). *)
-    iApply (uslot_apply_loop (CID := CID') (loop_ucfg mdv0 Hmm) pt'
+    iApply (uslot_x_apply_loop (CID := CID') (loop_ucfg mdv0 Hmm) pt'
               (FdSlots.fd_frags (pv_fdg (us_V U2)))
               (Rut_at CID' (uint (pv_sz (us_V U2))) (pv_fdg (us_V U2)))
               (Rut_at_acc CID' (uint (pv_sz (us_V U2))) (pv_fdg (us_V U2)))
@@ -412,7 +444,7 @@ Section UserretClosed.
     (* the next round's contract, under the later the bundle takes it at --
        which is exactly the shape of the Löb hypothesis.  A GENUINE Löb back
        edge, so [iNext] and not [bi.later_intro]. *)
-    iNext. rewrite /ukb /ukb_F.
+    iNext. rewrite ukb_x_unfold.
     (* the fd pin is DROPPED here: the Löb hypothesis is ∀-general in the
        key, so the next round is proved at whatever descriptor view the
        trap-out key names. *)
@@ -465,6 +497,7 @@ Section Res.
   Definition usertrap_res_bare_sz := UV.usertrap_res_bare_sz.
   Definition usertrap_res_tf_csrs_open := UV.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tf_open := UV.usertrap_res_tf_open.
+  Definition usertrap_res_bare_fsabs := UV.usertrap_res_bare_fsabs.
   (* ...and the park's one producer-side entry, threaded like the rest.
      A file that merely passes the residue through has nothing to say about
      it; the entry exists so that whoever PARKS a never-run process can
@@ -499,8 +532,14 @@ End Res.
     iIntros "#Hkt #Hhw #Hmin #Hwire #Hclaim #Hkpt Hhs Hpriv Hms Hmiec Hmdlc
              Hmenvc #Hsenvc Hsepc Hsc Hstval Hstvec #Hmedlc #Hmsec #Hssec
              Hktlb Hufr Hdata Hpc Hfile Hkc Hures".
+    (* THE APPLICATION-SIDE FS INVARIANT, off the residue (pass-through):
+       what the loop's mint at [uslot_x] runs on, and what lifts the plain
+       return the dovetail hands over to the enriched one *)
+    iDestruct (usertrap_res_bare_fsabs pt ksp U fdv with "Hures") as "[#Hfsabs Hures]".
+    iPoseProof UG.uexec_wp_gen as "#Hgen".
+    iDestruct (uexec_ret_x_lift with "Hfsabs Hgen") as "#Hlift".
     (* the loop, once: it is [□], so one instance serves every round *)
-    iDestruct (LP.stvec_handler_loop j Hj with "Hkt Hclaim Hwire") as "#Hloop".
+    iDestruct (LP.stvec_handler_loop j Hj with "Hkt Hclaim Hwire Hfsabs") as "#Hloop".
     (* THE SAVE SLOTS COME OUT OF THE RESIDUE, not from the caller: the
        residue owns the trapframe page, so a boundary that asked for both
        would be unsatisfiable (SpecUserretClosed.v's header).  userret READS
@@ -596,12 +635,15 @@ End Res.
       iIntros (W sc stv) "%Hp %Hs %Hf (Hframe & Hfrag' & Hret)".
       iApply ("Hloop" $! CID C pt (uint (pv_sz (us_V U))) (pv_fdg (us_V U))
                 W sc stv
-                with "[%] [%] [%] Hhw Hmin Hcreds [$Hframe $Hfrag' $Hret]").
+                with "[%] [%] [%] Hhw Hmin Hcreds [$Hframe $Hfrag' Hret]").
       + rewrite /loop_ok.
         split; [exact Hstv | split; [exact Hdqc | split; [exact Hmie |
           split; [exact Hmedl | split; [exact Hnorm | exact Hptwf]]]]].
       + exact Hp.
       + exact Hs.
+      + (* the plain return the dovetail hands over, lifted to the
+           enriched tier ([UexecExecMint.uexec_ret_x_lift]) *)
+        iApply ("Hlift" with "Hret").
   Qed.
 
 End UserretClosedProof.

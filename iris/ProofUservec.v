@@ -112,6 +112,7 @@ Section UservecAllPt.
   Definition usertrap_res_csrs_open := UT.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := UT.usertrap_res_sstc.
   Definition usertrap_res_bare_sz := UT.usertrap_res_bare_sz.
+  Definition usertrap_res_bare_fsabs := UT.usertrap_res_bare_fsabs.
   Definition usertrap_res_tf_csrs_open := UT.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tlb_close := UT.usertrap_res_tlb_close.
   Definition usertrap_res_tlb_open := UT.usertrap_res_tlb_open.
@@ -154,7 +155,7 @@ Section UservecAllPt.
        unify through the definition. See claude-notes/optimization.md. *)
     unfold uservec_gpr.
     intros Hstvec Hdqc Hmie Hjlt Hnorm Hptwf.
-    iIntros "#Hkt #Hhw #Hinv #Hclaim #Hcreds Hframe Hures Hcont".
+    iIntros "#Hkt #Hhw #Hinv #Hclaim #Hcreds Hframe Hures Hxin Hcont".
     (* ============ open the trapped machine ============ *)
     (* AT NAMED DATA (milestone J1a).  [user_trap_frame] is definitionally the
        ∃ over [user_trap_frame_at], so this is the same premise with its five
@@ -1632,14 +1633,29 @@ Section UservecAllPt.
     iApply (UT.wp_usertrap pt j (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> M7)
               ms_v sc_v stval_v sepc_v vksp (uc_mie C) (uc_mideleg C) MENVCFG_S _ sts
               Hums Hjlt Hspv' Htpv' Hmie Hmm Hmenvval0
-              with "Hkt Hpc Hhw Hinv Hhs Hpriv Hms Hsc Hstval Hsepc Hstvec Hmie Hmdl Hmenv Hfile Hures'").
+              with "Hkt Hpc Hhw Hinv Hhs Hpriv Hms Hsc Hstval Hsepc Hstvec Hmie Hmdl Hmenv Hfile Hures' [Hxin]").
+    { (* THE BUNDLE ACROSS THE SAVE WALK: the saved frame is [g]'s registers
+         at the two words the bundle's key and guard read (a1, a7) -- the
+         agreement the round crosses by, restricted to two indices, hence
+         definitional; the image is the frame's own [M] on both sides *)
+      match goal with
+      | |- environments.envs_entails _ (SpecUsertrap.ut_exec_in _ _ ?UU _) =>
+          iApply (ut_exec_in_cong sc_v (tf_of g (ret_pc sepc_v)) (pv_tf (us_V UU))
+                    (upd_usM (us_tf U (tf_of g (ret_pc sepc_v))) M) UU sts
+                    ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
+                          unfold UsysMemOk.usys_num, tf_arg_idx, tf_of; reflexivity)
+                    eq_refl
+                    ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
+                          unfold UexecSlot.tf_w, tf_arg_idx, tf_of; reflexivity)
+                    with "Hxin")
+      end. }
     iApply wp_next_intro. iIntros (CID2).
     iEval (rewrite /usertrap_post).
     (* [usertrap_post] names where the round left the descriptor states *)
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2)
       "%Huptpt2 %Hrd2 %Hfdk2 %Hfde2 %Hpipe2 %Hpcret
        %Hmask %Hpttf %Haccwf %Hmapwf %Hretms %Hsconf2 %Hcalleesaved %Htpcid %Ha0usatp %Hsatprooted
-       Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2".
+       Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2 Hxo2".
     (* x0 IS ZERO in the file usertrap handed back -- the one fact the
        register-file tie below needs of the base ([UexecRet.userret_gpr_x0]). *)
     iDestruct (gpr_file_x0 mf (mword_of_int 0) ltac:(vm_compute; reflexivity)
@@ -1771,6 +1787,18 @@ Section UservecAllPt.
     { intros [Hf | Hz]; [discriminate Hf |].
       exfalso. exact (proc_addr_nonzero j Hjlt Hz). }
     iEval (rewrite /uservec_post) in "Hcont".
+    (* THE SAVE WALK'S OWN FACT, once: the 31 words uservec stored ARE [g]'s
+       registers, and the epc both frames name -- what the round and the
+       exec row cross the walk by *)
+    match type of Hrd2 with
+    | SpecUsertrap.ut_round _ _ ?UU _ =>
+        assert (Hu36 : TfUser.tf_ueq (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V UU)))
+                              (tf_of g (ret_pc sepc_v)))
+    end.
+    { cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf].
+      split; [ reflexivity | ].
+      intros i Hi.
+      do 36 (destruct i as [| i]; [ first [ reflexivity | lia ] | ]). lia. }
     iApply ("Hcont" $! (ud_norm pt') (userret_gpr mf u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128
                               u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232
                               u240 u248 u256 u264 u272 u280 u112)
@@ -1784,7 +1812,7 @@ Section UservecAllPt.
                 deferred to a goal, [?U'] is already resolved by the time the
                 (purely iota) conversion is checked. *)
              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
-                    [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2 Hcreds2").
+                    [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2 Hcreds2 [Hxo2]").
     - (* the descriptor the residue is keyed at IS the one handed over *)
       reflexivity.
     - (* THE ROUND, read at the machine that trapped.  usertrap's [tf0] is
@@ -1801,10 +1829,7 @@ Section UservecAllPt.
           refine (uv_round_of_ut _ U M g sepc_v sc_v UU _ _ _ _
                     (ut_round_same sepc_v sc_v _ U2 UU _ _ eq_refl _ Hrd2))
       end.
-      + cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf].
-        split; [ reflexivity | ].
-        intros i Hi.
-        do 36 (destruct i as [| i]; [ first [ reflexivity | lia ] | ]). lia.
+      + exact Hu36.
       + reflexivity.
       + (* the ENTRY IMAGE: the residue was parked at exactly the frame's own
            [M] ([usertrap_res_ptm_close]), so the round's left image is it. *)
@@ -1857,6 +1882,23 @@ Section UservecAllPt.
     - (* the address space, at the post's index: [us_tf] / [us_upt] move
          neither [pv_sz] nor [us_M], so this is a conversion. *)
       iExact "Hupt3".
+    - (* THE EXEC CHANNEL'S ANSWER: across the walk on the entry side (the
+         frame [Hu36] relates) and, on the exit side, across userret's page
+         words and the renormalisation -- [SpecUsertrap.ut_exec_out_ueq];
+         the image, permission map and break are the entry frame's own. *)
+      match goal with
+      | |- environments.envs_entails _ (SpecUsertrap.ut_exec_out _ _ _ _ _ ?UU' _ _) =>
+          iApply (SpecUsertrap.ut_exec_out_ueq sc_v _ (tf_of g (ret_pc sepc_v)) M
+                    (UserPerm.perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
+                    (uint (pv_sz (us_V U))) U2 UU' sts sts2 Hu36
+                    ltac:(cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf];
+                          rewrite Hws1; apply TfUser.tf_ueq_refl)
+                    eq_refl
+                    ltac:(cbn [us_V pv_upt pv_sz us_upt upd_upt upd_usV us_tf upd_tf];
+                          rewrite Huptpt2; reflexivity)
+                    eq_refl
+                    with "Hxo2")
+      end.
   Qed.
 
 End UservecAllPt.

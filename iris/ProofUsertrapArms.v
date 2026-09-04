@@ -612,6 +612,10 @@ Section Ut56.
     iEval (rewrite Hpa6) in "Hpc".
     (* ---- the bundle back together, and on to +0xa6 ---- *)
     iDestruct ("Hownback" $! U sts with "Hpv Hufr Hsy") as "Hown".
+    iAssert (ut_exec_out scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) (us_M U0)
+               (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
+               (uint (pv_sz (us_V U0))) U sts sts) as "Hxo".
+    { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ Hnec). }
     iApply (T.ut_a6 Rsys N U0 U pt ksp m0 S1 av nx false
               mie_v menvcfg0 epv scv lks sts sts
               Hwf' ltac:(intros _; reflexivity)
@@ -619,7 +623,7 @@ Section Ut56.
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
               Hmiev Hmenvv Hrd
-              with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
+              with "Htext Hpc Hcg [-Hframe Hxo Hcont] Hframe Hxo Hcont").
     all: try lkbelow.
     iApply (ua_hold_on Rsys N U _ sts with "Hcpu [-Hclm Hown] Hclm [-]").
     - rewrite /trap_csrs.
@@ -1029,6 +1033,10 @@ Section UtD0.
         - cbn [us_V]. rewrite HV'upt HV'sz.
           exact (perm_of_uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) Pd Hextd).
         - cbn [us_V]. exact HV'sz. }
+      iAssert (ut_exec_out scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) (us_M U0)
+                 (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
+                 (uint (pv_sz (us_V U0))) (MkUstate V' (us_M U)) sts sts) as "Hxo".
+      { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ Hnec). }
       iApply (T.ut_a6 Rsys N U0 (MkUstate V' (us_M U)) pt ksp m0 mr av nx false
                 mie_v menvcfg0 epv scv lks sts sts
                 Hwf' ltac:(intros _; reflexivity)
@@ -1036,7 +1044,7 @@ Section UtD0.
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv Hrd'
-                with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hcont] Hframe Hxo Hcont").
       all: try lkbelow.
       iApply (ua_hold_on Rsys N (MkUstate V' (us_M U)) with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
@@ -1194,6 +1202,10 @@ Section UtE8.
                           (concat_vec (mword_of_int 6 : mword 8) ('b"0"))))
                      = mword_of_int (UT + 0xfc)) by pcw.
       iEval (rewrite Hpfc) in "Hpc".
+      iAssert (ut_exec_out scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0))) (us_M U0)
+                 (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
+                 (uint (pv_sz (us_V U0))) U sts sts) as "Hxo".
+      { iApply (ut_exec_out_quiet _ _ _ _ _ _ _ _ Hnec). }
       iApply (T.ut_fa Rsys N U0 U pt ksp m0 mf av nx false
                 mie_v menvcfg0 epv scv lks sts sts
                 Hwf' ltac:(intros _; reflexivity)
@@ -1201,7 +1213,7 @@ Section UtE8.
                 (* ...and pipe's join, refuted through the same cause *)
                 ltac:(intros Hc; exfalso; exact (Hnec Hc)) Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
-                with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hcont] Hframe Hxo Hcont").
       iApply (ua_hold_on Rsys N U _ sts with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
     - (* KILLED: fall through to +0xf2's [c.j +0xf6], then kexit(-1). *)

@@ -251,6 +251,19 @@ Section FsAbsInvFire.
     iSplitR; [iApply fsabs_aopen; done | iApply fsabs_atrunc; done].
   Qed.
 
+  (* ...and the fs-facing half of exec's AU bundle
+     ([SpecSysExecAU.sys_exec_au_pre] minus its slot wand), which is open's
+     walk and open's commit at [True] -- what [UexecExecMint] mints the
+     process's exec bundle out of. *)
+  Lemma fsabs_exec_half Γ Γc (γfs : fs_names) :
+    fsabs_inv Γc -∗
+    open_walk_pre_era γfs (fun _ _ => True%I) (fun _ _ => True%I)
+    ∗ aopen_commit_at Γ fsabsE (fun _ _ _ => True%I).
+  Proof.
+    iIntros "#Hinv".
+    iSplitR; [iApply fsabs_open_walk | iApply fsabs_aopen; done].
+  Qed.
+
   Lemma fsabs_open_pre_create Γ Γc (γfs : fs_names) :
     fsabs_inv Γc -∗
     open_au_pre_create Γ γfs (fun _ _ => True%I) (fun _ _ => True%I)

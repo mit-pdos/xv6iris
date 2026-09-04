@@ -1260,6 +1260,36 @@ Section UsertrapRes.
     iApply (proc_priv_nopt_sz_maxsz with "Hpv").
   Qed.
 
+  (* THE APPLICATION-SIDE FS INVARIANT, off the bare residue's syscall
+     environment: the one thing the U-mode loop needs of the kernel to mint
+     the process's exec bundle ([UexecExecMint]).  Persistent conclusion;
+     the residue is spent, and the loop reads it once at its entry. *)
+  Lemma ut_res_bare_fsabs (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) :
+    (forall (γ : gname) (pj : mword 64) (fn : fclose_names),
+       ⊢ Rsys γ pj fn -∗ FirstTok.fsabs_env ∗ Rsys γ pj fn) ->
+    ut_res_bare Rsys pt ksp U sts -∗
+    FirstTok.fsabs_env ∗ ut_res_bare Rsys pt ksp U sts.
+  Proof.
+    intros Henv. iIntros "H".
+    iDestruct "H" as (N av)
+      "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (#Hcaps & Hown))".
+    iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hfr & Hsy & Hback)".
+    iDestruct (Henv with "Hsy") as "[#Hfs Hsy]".
+    iDestruct ("Hback" with "Hpv Hfr Hsy") as "Hown".
+    iSplitR; [iExact "Hfs" |].
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    iExists N, av.
+    iSplitR; [iPureIntro; exact Hupt |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" |].
+    rewrite /ut_env_nopt. iSplitR; [iExact "Hcaps" | iExact "Hown"].
+  Qed.
+
   (* ---- THE SAME TWO CROSSINGS, WITH THE IMAGE NAMED (milestone J, S3) ----
      [ut_res_pt_close] / [_pt_open] were stated at [proc_pt] / [proc_pt_any]
      -- the MAPPED view -- so the open threw the name away

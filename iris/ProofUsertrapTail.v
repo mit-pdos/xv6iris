@@ -67,6 +67,7 @@ Require Import CodeUsertrap.
 Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecUsertrap UsertrapRes.
 Require Import UexecSlot TfUser.   (* [tf_resume_pc] / [ret_pc_idem] / [tf_ueq_epc] *)
+Require Import UserPerm.   (* [perm_of] -- the exec row's entry permission map *)
 Require Import ProofUsertrapParts.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -253,6 +254,11 @@ Section UtRet2.
     ut_env Rsys N U sts -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
+    (* THE EXEC CHANNEL'S ANSWER, relayed exactly like the descriptor rows:
+       this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
+    ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
+      (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
+      (uint (pv_sz (us_V U0))) U sts0 sts -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts0 epw scw) -∗
@@ -265,7 +271,7 @@ Section UtRet2.
     
     destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hcpu Hclm Hsepc Hscause Hstval Hsret Hstvec Hq4
-             Hkptr #Htfk [#Hcaps Hown] Hframe Hcont".
+             Hkptr #Htfk [#Hcaps Hown] Hframe Hxo Hcont".
     (* the boundary hands the trap resource back at the literal [∅] that
        [ut_res] pins -- depth 0 forces the held set empty, so this is a
        re-spelling, not an obligation. *)
@@ -626,7 +632,7 @@ Section UtRet2.
               (kvi_satp_word (ud_root (pv_upt (us_V U)))) (mepc_val uepc) scv stv mdv0 U
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     Hhs Hpriv Hms Hscause Hstval Hsepc [Hstvec] Hpc [Hfile]
-                    Hmie Hmdl Hmenv Hhw Hmin [-]").
+                    Hmie Hmdl Hmenv Hhw Hmin [-Hxo] Hxo").
     - reflexivity.
     - exact Hrd.
     - (* [ut_fd_kept], straight off the premise: this tail re-closes the
@@ -741,6 +747,11 @@ Section UtRet.
     ut_hold Rsys N U b lks sts -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
+    (* THE EXEC CHANNEL'S ANSWER, relayed exactly like the descriptor rows:
+       this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
+    ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
+      (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
+      (uint (pv_sz (us_V U0))) U sts0 sts -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts0 epw scw) -∗
@@ -750,7 +761,7 @@ Section UtRet.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
-    iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
+    iIntros "#Htext Hpc Hcg Hhold Hframe Hxo Hcont".
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     iDestruct (ut_own_priv with "Hown") as "(Hpv & Hufr & Hsy & Hownback)".
     iDestruct (ut_epc_exists with "Hpv") as %Hepcx.
@@ -831,6 +842,17 @@ Section UtRet.
       - cbn [us_V]. rewrite HVrtf. apply prepare_return_tf_ueq.
       - cbn [us_V]. rewrite HVrupt HVrsz. reflexivity.
       - cbn [us_V]. exact HVrsz. }
+    (* ...and the exec row across the same re-arming ([ut_exec_out_ueq]):
+       the entry frame is untouched and the parked record moves in the four
+       kernel words only *)
+    assert (HVru : tf_ueq (pv_tf (us_V U)) (pv_tf (us_V (MkUstate Vr (us_M U))))).
+    { cbn [us_V]. rewrite HVrtf. apply prepare_return_tf_ueq. }
+    assert (HVrpi : perm_of (ud_um (pv_upt (us_V (MkUstate Vr (us_M U)))))
+                      (uint (pv_sz (us_V (MkUstate Vr (us_M U)))))
+                    = perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))).
+    { cbn [us_V]. rewrite HVrupt HVrsz. reflexivity. }
+    iDestruct (ut_exec_out_ueq scw _ _ _ _ _ U (MkUstate Vr (us_M U)) sts0 sts
+                 (tf_ueq_refl _) HVru eq_refl HVrpi HVrsz with "Hxo") as "Hxo".
     (* THE DESCRIPTOR ROW ACROSS prepare_return.  The row reads the parked
        trapframe at a0 alone, and prepare_return re-arms the four KERNEL
        words -- which is exactly what [tf_ueq] is blind to -- so it crosses
@@ -868,7 +890,7 @@ Section UtRet.
                              (ut_cs_of_callee_saved _ _ Hcspr)))
               Hmiev Hmenvv Hrdr Hepcw
               with "Htext Hpc Hcg Hcpu Hclm Hsepc Hscause Hstval Hsret Hstvec
-                    Hq4 Hkptr Htfk [Hown] Hframe Hcont").
+                    Hq4 Hkptr Htfk [Hown] Hframe Hxo Hcont").
     rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
   Qed.
 
@@ -938,6 +960,11 @@ Section UtA6.
     ut_hold Rsys N U b lks sts -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
+    (* THE EXEC CHANNEL'S ANSWER, relayed exactly like the descriptor rows:
+       this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
+    ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
+      (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
+      (uint (pv_sz (us_V U0))) U sts0 sts -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts0 epw scw) -∗
@@ -947,7 +974,7 @@ Section UtA6.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
-    iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
+    iIntros "#Htext Hpc Hcg Hhold Hframe Hxo Hcont".
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
@@ -1152,7 +1179,7 @@ Section UtA6.
                 mie_v menvcfg0 epw scw lks sts0 sts
                 Hwf' Hfdk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
-                with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hcont] Hframe Hxo Hcont").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
       iSplitL "Hclm"; [iExact "Hclm"|].
@@ -1221,6 +1248,11 @@ Section UtFa.
     ut_hold Rsys N U b lks sts -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
+    (* THE EXEC CHANNEL'S ANSWER, relayed exactly like the descriptor rows:
+       this tail moves nothing the row reads -- [SpecUsertrap.ut_exec_out] *)
+    ut_exec_out scw (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) (us_M U0)
+      (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
+      (uint (pv_sz (us_V U0))) U sts0 sts -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
                      mie_v menvcfg0 U0 sts0 epw scw) -∗
@@ -1230,7 +1262,7 @@ Section UtFa.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
-    iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
+    iIntros "#Htext Hpc Hcg Hhold Hframe Hxo Hcont".
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     (* depth 0 forces the held set empty, which is what lets the yield arm
        hand [cpu_own ... ∅] to a contract that pins [∅] (SpecYield.v). *)
@@ -1287,7 +1319,7 @@ Section UtFa.
                 mie_v menvcfg0 epw scw lks sts0 sts
                 Hwf' Hfdk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
                 Hmiev Hmenvv Hrd
-                with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hcont] Hframe Hxo Hcont").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
       iSplitL "Hclm"; [iExact "Hclm"|].
@@ -1375,7 +1407,7 @@ Section UtFa.
                 mie_v menvcfg0 epw scw lks sts0 sts
                 Hwf' Hfdk Hfde Hpipe Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv Hrd
-                with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
+                with "Htext Hpc Hcg [-Hframe Hxo Hcont] Hframe Hxo Hcont").
       (* the yield arm came back at the literal [∅]; [lks = ∅] at depth 0
          makes that the set [ut_hold] names. *)
       rewrite /ut_hold Hlkempty. iSplitL "Hcpu"; [iExact "Hcpu"|].
