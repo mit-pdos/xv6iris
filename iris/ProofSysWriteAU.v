@@ -771,8 +771,15 @@ Section ProofSysWriteAU.
       iDestruct "Hsucc" as (fd' fv') "([%Hr %Hsome] & _ & Hfcell)".
       (* THE SLOT IS THE CONTRACT'S OWN: [arg_fd] is a function, so
          argfd's witness and the premise's are the same pair. *)
+      (* [exact (conj eq_refl eq_refl)], not [done]: after the [injection]'s
+         two substitutions the goal is [fd = fd /\ fv = fv], and [done] ends
+         in a no-argument [discriminate] that head-normalises every
+         hypothesis in this syscall-altitude context looking for a
+         contradiction (claude-notes/optimization.md, "[done] ends in a
+         no-argument [discriminate]"). *)
       assert (Hfdeq : fd' = fd /\ fv' = fv)
-        by (rewrite Hargfd in Hsome; injection Hsome as -> ->; done).
+        by (rewrite Hargfd in Hsome; injection Hsome as -> ->;
+            exact (conj eq_refl eq_refl)).
       destruct Hfdeq as [-> ->].
       pose proof (arg_fd_lookup v (pv_ofile (us_V U)) fd fv Hsome)
         as (Hfdlt & Hlk & Hfvnz & _).

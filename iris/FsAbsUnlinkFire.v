@@ -437,6 +437,16 @@ Section UnlinkFire.
      the one the ret-0 arm pins ([av1 !! t = Some a]) -- true because the
      target's fragment has been in the walk's custody since W3, so nothing
      could move it between the two instants. *)
+  (* THE MASK SIDE CONDITION, ONCE.  Every [uf_*_fire] call site at [⊤]
+     spliced this as [ltac:(solve_ndisj)], and an [ltac:] in argument
+     position is priced by the DEPTH of its call site rather than by its goal
+     (claude-notes/optimization.md, "inline [ltac:] in argument position") --
+     under a [uf_utgt_fire] whose own arguments spell a nested bitvector word
+     three times, that was seconds per site.  The fact is CLOSED, so it
+     belongs in a lemma proved where the context is empty. *)
+  Lemma uf_nd_top : (↑ftopN ∪ ↑fsabsN : coPset) ⊆ ⊤.
+  Proof. solve_ndisj. Qed.
+
   Lemma uf_utgt_fire (γfs : fs_names) (E : coPset)
       (Φ : aview -> Z -> iProp Σ) (t : Z) (nt nt' : fs_node) :
     ↑ftopN ∪ ↑fsabsN ⊆ E ->

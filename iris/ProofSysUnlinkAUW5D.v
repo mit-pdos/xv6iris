@@ -1653,7 +1653,7 @@ Section ProofSysUnlinkAUW5D.
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bm' data')
             (era_node dni bmi dati)
-            ltac:(solve_ndisj) HlocW
+            uf_nd_top HlocW
             Hdirdp Hentd Hkknotdot Hkknotdd
             (su_au_nl1 dnd bmd datd Hdplive)
             (su_au_nl1 dni bmi dati Hnlzi)
@@ -2114,7 +2114,7 @@ Section ProofSysUnlinkAUW5D.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi dati)
-            ltac:(solve_ndisj) Hlocdec
+            uf_nd_top Hlocdec
             (su_au_nl1 dni bmi dati Hnlzi)
             (uf_nlink_row dni (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dni : mword 16)

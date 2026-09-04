@@ -1067,7 +1067,7 @@ Section ProofSysUnlinkAUW5F.
             (dir_bname datd kk) 0%nat
             (era_node dnd bmd datd) (era_node dnW bm' data')
             (era_node dni bmi dati)
-            ltac:(solve_ndisj)
+            uf_nd_top
             (inode_local_of_ok_rec (bv_unsigned dinum) fsc_cov fsc_logst dnW bm'
                data' Hiok' Hrl_data' Hduq' Hddix')
             Hdirdp Hentd Hkknotdot Hkknotdd
@@ -1477,7 +1477,7 @@ Section ProofSysUnlinkAUW5F.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi dati)
-            ltac:(solve_ndisj) Hlocdec
+            uf_nd_top Hlocdec
             (su_au_nl1 dni bmi dati Hnlzi)
             (uf_nlink_row dni (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
