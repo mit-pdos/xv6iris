@@ -293,7 +293,7 @@ Section ProofSysOpenAUParts.
          sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
          bslots 3 -∗
          iref_slots ns' -∗
-         open_arms_plain (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
+         open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
            P Pmiss Φo Φt sts U (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
 
@@ -322,7 +322,7 @@ Section ProofSysOpenAUParts.
          sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
          bslots 3 -∗
          iref_slots ns' -∗
-         open_arms_plain (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
+         open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
            P Pmiss Φo Φt sts U (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
 
@@ -354,7 +354,7 @@ Section ProofSysOpenAUParts.
     P (length (path_elems pl)) i -∗
     so_obs Φo i n -∗
     atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Φt -∗
-    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
+    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
       P Pmiss Φo Φt sts U r.
   Proof.
     intros Hr. iIntros "Hpriv Hfrag Hfds HP Hobs Htc".
@@ -381,7 +381,7 @@ Section ProofSysOpenAUParts.
     open_walk_dead_era fsc_fs P Pmiss pl -∗
     aopen_commit_at (fs_gamma_L fsc_fs) fsabsE Φo -∗
     atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Φt -∗
-    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
+    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
       P Pmiss Φo Φt sts U r.
   Proof.
     intros Hr. iIntros "Hpriv Hfrag Hfds Hdead Hoc Htc".
@@ -402,8 +402,8 @@ Section ProofSysOpenAUParts.
     proc_priv gf pj pidv U -∗
     fd_frags (pv_fdg (us_V U)) sts -∗
     fd_slot -∗
-    open_au_pre_plain (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo Φt -∗
-    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
+    open_au_pre_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss Φo Φt -∗
+    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
       P Pmiss Φo Φt sts U r.
   Proof.
     intros Hr. iIntros "Hpriv Hfrag Hfds Hpre".

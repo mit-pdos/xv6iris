@@ -367,6 +367,7 @@ Require Import SpecSysOpen.
    satisfy their bundles out of the application-side abstract-state
    invariant [FirstTok.fsabs_env] with receipts that say nothing. *)
 Require Import SpecSysMknodAUEra SpecSysOpenAU SpecSysUnlinkAU.
+Require Import SpecSysChdirAU.   (* [SYSCHDIR_AU], [chdir_arms_landed], [fsabs_chdir_pre] (C3) *)
 Require Import FsAbsInvFire.
 Require Import SpecMyproc.
 (* the content-independent bundles the non-closer fs entries state their
@@ -412,7 +413,7 @@ Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module SyscallProof
     (SysFork : SYSFORK) (SysExit : SYSEXIT) (SysWait : SYSWAIT)
     (SysPipe : SYSPIPE) (SysRead : SYSREAD) (SysKill : SYSKILL)
-    (SysExecAU : SYSEXEC_AU) (SysFstat : SYSFSTAT) (SysChdir : SYSCHDIR)
+    (SysExecAU : SYSEXEC_AU) (SysFstat : SYSFSTAT) (SysChdirAU : SYSCHDIR_AU)
     (SysDup : SYSDUP) (SysGetpid : SYSGETPID) (SysSbrk : SYSSBRK)
     (SysPause : SYSPAUSE) (SysUptime : SYSUPTIME) (SysWrite : SYSWRITE)
     (SysMknod : SYSMKNOD_AU_ERA) (SysLink : SYSLINK) (SysMkdir : SYSMKDIR)
@@ -2801,7 +2802,7 @@ Section SyscallArms.
     sysc_exec_in U sts -∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : gmap Z FsAbs.anode -> Z -> FsAbs.anode -> iProp Σ),
-      sys_exec_au_pre uslot_x (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo (us_M U) v1 sts.
+      sys_exec_au_pre uslot_x (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss Φo (us_M U) v1 sts.
   Proof.
     intros Hn Hv1. rewrite /sysc_exec_in. iIntros "H".
     iDestruct ("H" with "[%]") as "H"; [exact Hn |].
@@ -4556,20 +4557,23 @@ Section SyscallArms.
     iDestruct (sysc_iref_split with "Hir") as "[Hirk Hirc]".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
-    iApply (SysChdir.wp_sys_chdir_sconf γf γs j γl
-
+    (* THE AU CONTRACT (lane C3), at the trivial bundle
+       ([FsAbsInvFire.fsabs_chdir_pre]); the landed post is read back off
+       the arms ([chdir_arms_landed]) and the tail below is the landed one. *)
+    iDestruct (syscall_env_fsabs with "Henvc") as (γa) "#Hfsabs".
+    iApply (SysChdirAU.wp_sys_chdir_au γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
-
-
-
               DfracDiscarded DfracDiscarded v0 pid U M (av - 4)%nat true true ∅
+              (fun _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ => True%I)
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hib Hj Hgamma eq_refl Hv0
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpanic Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
-                    Hropen Hbmp Hisp Hbmr Hkalloc Hprocs Hirc Hpriv").
+                    Hropen Hbmp Hisp Hbmr Hkalloc Hprocs Hirc Hpriv []").
+    { iApply (fsabs_chdir_pre with "Hfsabs"). }
     iIntros (CIDy Hsy mf P')
-      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ Hirc Hpost".
+      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ Hirc Harms".
+    iDestruct (chdir_arms_landed with "Harms") as "Hpost".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first

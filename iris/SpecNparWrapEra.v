@@ -184,7 +184,7 @@ Definition wp_npar_wrap_era_body
   (* ---- THE TRACE, OVER THE PARENT PREFIX, DEFERRED IN THE START.
      Threaded straight into [SpecNparEra.wp_npar_era]; this wrapper
      touches it not at all. ---- *)
-  ep_start fsc_fs P Pmiss pl -∗
+  ep_start fsc_fs (pv_cwi (us_V Upr)) P Pmiss pl -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (through namex / dirlookup, down to ilock and sleep), so a park moves
      the hart with interrupts off and the crossing has nothing to do with

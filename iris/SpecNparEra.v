@@ -338,7 +338,7 @@ Definition wp_npar_era_body
      PARENT PREFIX.  [FsAbsStart.ep_start] at this walk's own [pl] IS
      [FsAbsEraMknod.mknod_walk_pre_era] -- same quantifier, same tie, same
      family ([FsAbsNparMknod.np_start_of_mknod], one [iMod]). ---- *)
-  ep_start fsc_fs P Pmiss pl -∗
+  ep_start fsc_fs (pv_cwi (us_V Upr)) P Pmiss pl -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b] -- namex parks. *)
   wp_next true pj (fun (CIDc : CpuId) =>
     npar_era_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks

@@ -460,7 +460,7 @@ Section KexecPinABody.
        SLASH side condition is the contract's [pfun 0 = SLASH] through
        [FsAbsStart.bview_head_slash_intro]. ---- *)
     iDestruct (ireg_inv_ftop with "Hireg") as "#Hftop".
-    iDestruct (kxt_start fsc_fs pb ds (bview plen pfun) Hpl
+    iDestruct (kxt_start fsc_fs _ pb ds (bview plen pfun) Hpl
                  (bview_head_slash_intro plen pfun Hcstr Hslash)
                  with "Hftop Hrp") as "Hstart".
     iApply (NE.wp_namei_era gs jp gl pd pav pu

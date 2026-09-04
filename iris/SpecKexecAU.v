@@ -554,12 +554,12 @@ Section KexecAU.
        S W')%I.
 
   (* everything the caller hands in *)
-  Definition exec_au_pre (S : uvis -> iProp Σ) Γ (γfs : fs_names)
+  Definition exec_au_pre (S : uvis -> iProp Σ) Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) : iProp Σ :=
-    (open_walk_pre_era γfs P Pmiss
+    (open_walk_pre_era γfs cw P Pmiss
      ∗ aopen_commit_at Γ fsabsE Φo
      ∗ exec_slot_pre S Φo na alen afun sts)%I.
 
@@ -574,14 +574,14 @@ Section KexecAU.
     exec_slot_pre S Φo na alen afun sts ≡{n}≡ exec_slot_pre S' Φo na alen afun sts.
   Proof. intros HS. rewrite /exec_slot_pre. solve_proper. Qed.
 
-  Lemma exec_au_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ) Γ (γfs : fs_names)
+  Lemma exec_au_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ) Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) :
     S ≡{n}≡ S' ->
-    exec_au_pre S Γ γfs P Pmiss Φo na alen afun sts
-    ≡{n}≡ exec_au_pre S' Γ γfs P Pmiss Φo na alen afun sts.
+    exec_au_pre S Γ γfs cw P Pmiss Φo na alen afun sts
+    ≡{n}≡ exec_au_pre S' Γ γfs cw P Pmiss Φo na alen afun sts.
   Proof.
     intros HS. rewrite /exec_au_pre.
     by rewrite (exec_slot_pre_ne n S S' Φo na alen afun sts HS).
@@ -621,13 +621,13 @@ Section KexecAU.
          exec_slot_pre S Φo na alen afun sts)))%I.
 
   (* ret = -1 (header, OUT): the three-way fold of the bundle *)
-  Definition exec_post_fail (S : uvis -> iProp Σ) Γ (γfs : fs_names)
+  Definition exec_post_fail (S : uvis -> iProp Σ) Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) : iProp Σ :=
     ((* (i) nothing fs-visible happened *)
-     exec_au_pre S Γ γfs P Pmiss Φo na alen afun sts
+     exec_au_pre S Γ γfs cw P Pmiss Φo na alen afun sts
      ∨ (∃ pl : list (bv 8),
           (* (ii) the walk died at some hop: the era refund shape *)
           (open_walk_dead_era γfs P Pmiss pl
@@ -645,25 +645,25 @@ Section KexecAU.
 
   (* the armed disjunction the continuation receives, keyed on a0, beside
      the landed result relation's own failure equation *)
-  Definition exec_arms (S : uvis -> iProp Σ) Γ (γfs : fs_names)
+  Definition exec_arms (S : uvis -> iProp Σ) Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (U U' : ustate) (r : mword 64) : iProp Σ :=
     ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = us_V U /\ us_M U' = us_M U⌝
-      ∗ exec_post_fail S Γ γfs P Pmiss Φo na alen afun sts)
+      ∗ exec_post_fail S Γ γfs cw P Pmiss Φo na alen afun sts)
      ∨ exec_post_ok S Γ P Φo na alen afun sts U U' r)%I.
 
   (* SANITY: the arms imply the landed result relation, so the parallel
      form never contradicts [SpecKexec.kexec_ok] -- the failure arm is the
      landed one on the nose, the success arm's pure conjunct IS the landed
      success arm at the file's entry. *)
-  Lemma exec_arms_landed (S : uvis -> iProp Σ) Γ (γfs : fs_names)
+  Lemma exec_arms_landed (S : uvis -> iProp Σ) Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (U U' : ustate) (r : mword 64) :
-    exec_arms S Γ γfs P Pmiss Φo na alen afun sts U U' r ⊢
+    exec_arms S Γ γfs cw P Pmiss Φo na alen afun sts U U' r ⊢
       ⌜exists (entry spv szv' : mword 64),
          kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝.
   Proof.
@@ -803,8 +803,8 @@ Definition wp_kexec_au_body
   let Γfs := fs_gamma_L fsc_fs in
   wp_kexec_au_frame gs jp gl pd pav pu gf plen pfun na avf alen aslen afun
     pidv U dqb dqs dqa dqpv dqas m K eb b lks
-    (exec_au_pre S Γfs fsc_fs P Pmiss Φo na alen afun sts)
-    (exec_arms S Γfs fsc_fs P Pmiss Φo na alen afun sts U).
+    (exec_au_pre S Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φo na alen afun sts)
+    (exec_arms S Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φo na alen afun sts U).
 
 (* ===================================================================== *)
 (*  4.  THE SEAL                                                          *)

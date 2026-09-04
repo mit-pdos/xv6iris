@@ -96,13 +96,13 @@ Section UexecExecMint.
   Lemma fsabs_exec_pre (S : uvis -> iProp Σ) :
     fsabs_env -∗
     (∀ W' : uvis, S W') -∗
-    ∀ (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate),
-      sys_exec_au_pre S (fs_gamma_L fsc_fs) fsc_fs
+    ∀ (cw : Z) (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate),
+      sys_exec_au_pre S (fs_gamma_L fsc_fs) fsc_fs cw
         (fun _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ => True%I) M av sts.
   Proof.
-    iIntros "#Henv Hs" (M av sts).
+    iIntros "#Henv Hs" (cw M av sts).
     iDestruct "Henv" as (γa) "#Hinv".
-    iDestruct (fsabs_exec_half (fs_gamma_L fsc_fs) _ fsc_fs with "Hinv")
+    iDestruct (fsabs_exec_half (fs_gamma_L fsc_fs) _ fsc_fs cw with "Hinv")
       as "[#Hwalk #Hcommit]".
     rewrite /sys_exec_au_pre.
     iSplitR; [iExact "Hwalk" |].

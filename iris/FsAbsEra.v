@@ -135,6 +135,7 @@ Require Import IcacheRef.
 Require Import IcacheEscrow.    (* the payload arms                           *)
 Require Import Xv6Cameras.
 Require Import Xv6G.            (* the bundle                                 *)
+Require FsImg.                  (* [FsImg.ROOTINO]: the start rule's root     *)
 Require Import FsAbs.           (* LAST: [nview], [ax_hop], [lend_agrees]     *)
 Require TsoCtx.   (* qualified: the class only, no notation flip *)
 
@@ -862,6 +863,30 @@ Proof.
   - rewrite (bview_lookup (S p') pfun 0%nat ltac:(lia)). by rewrite Hsl.
 Qed.
 
+(* ===================================================================== *)
+(*  0'. NAMEX'S START RULE (lane C3)                                      *)
+(*                                                                        *)
+(*  Pure and top level: absolute paths start at the root, relative ones   *)
+(*  at the process's cwd inum [cw].  [FsFdMirror.um_start] is this same   *)
+(*  rule read off the U-mode mirror ([FsFdMirror.um_start_of_agree]).     *)
+(* ===================================================================== *)
+
+Definition um_start_of (cw : Z) (pl : list (bv 8)) : Z :=
+  if decide (pl !! 0%nat = Some SLASH) then FsImg.ROOTINO else cw.
+
+Lemma um_start_of_slash (cw : Z) (pl : list (bv 8)) :
+  pl !! 0%nat = Some SLASH -> um_start_of cw pl = FsImg.ROOTINO.
+Proof. intros Hsl. rewrite /um_start_of. by rewrite decide_True. Qed.
+
+Lemma um_start_of_rel (cw : Z) (pl : list (bv 8)) :
+  pl !! 0%nat <> Some SLASH -> um_start_of cw pl = cw.
+Proof. intros Hsl. rewrite /um_start_of. by rewrite decide_False. Qed.
+
+(* the two roots agree ([FsAbsNparMknod.np_rootino_agree] restated here,
+   upstream of it, because the tie is now spelled at [FsImg.ROOTINO]) *)
+Lemma rootino_agree : bv_unsigned ROOTINO = FsImg.ROOTINO.
+Proof. vm_compute. reflexivity. Qed.
+
 Section FsAbsStart.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Implicit Types Γ : fs_view_names Σ.
@@ -871,46 +896,51 @@ Section FsAbsStart.
   (* =================================================================== *)
 
   (* THE NAMEI SIDE: the full family over [path_elems pl].  One shot, at
-     the start inum the walk supplies -- ROOTINO on the absolute arm,
-     idup's own package's inum on the relative one. *)
-  Definition ex_start (γfs : fs_names) (P : nat -> Z -> iProp Σ)
+     the start inum namex's start rule picks -- ROOTINO on the absolute
+     arm, the process's cwd inum [cw] on the relative one
+     ([um_start_of], the C3 tie: [cw] is the caller's [pv_cwi], and the
+     relative arm fires it at idup's package, which C1 pinned to that
+     very inum). *)
+  Definition ex_start (γfs : fs_names) (cw : Z) (P : nat -> Z -> iProp Σ)
       (Pmiss : nat -> Z -> iProp Σ) (pl : list (bv 8)) : iProp Σ :=
     (∀ r : Z,
-       ⌜pl !! 0%nat = Some SLASH -> r = bv_unsigned ROOTINO⌝ ={⊤}=∗
+       ⌜r = um_start_of cw pl⌝ ={⊤}=∗
        P 0%nat r ∗ ex_hops_from γfs P Pmiss pl 0%nat)%I.
 
   (* THE NAMEIPARENT SIDE: the same one shot over the PARENT PREFIX
      ([FsAbsNpar.np_elems], which is lane W's [mknod_parent_elems]). *)
-  Definition ep_start (γfs : fs_names) (P : nat -> Z -> iProp Σ)
+  Definition ep_start (γfs : fs_names) (cw : Z) (P : nat -> Z -> iProp Σ)
       (Pmiss : nat -> Z -> iProp Σ) (pl : list (bv 8)) : iProp Σ :=
     (∀ r : Z,
-       ⌜pl !! 0%nat = Some SLASH -> r = bv_unsigned ROOTINO⌝ ={⊤}=∗
+       ⌜r = um_start_of cw pl⌝ ={⊤}=∗
        P 0%nat r ∗ ep_hops_from γfs P Pmiss pl 0%nat)%I.
 
   (* =================================================================== *)
   (*  2.  THE RECEIPTS: THE ABSOLUTE PAIR IS A START                      *)
   (* =================================================================== *)
 
-  Lemma ex_start_of_pair (γfs : fs_names) (P Pmiss : nat -> Z -> iProp Σ)
+  Lemma ex_start_of_pair (γfs : fs_names) (cw : Z) (P Pmiss : nat -> Z -> iProp Σ)
       (pl : list (bv 8)) :
     pl !! 0%nat = Some SLASH ->
     P 0%nat (bv_unsigned ROOTINO) -∗
     ex_hops_from γfs P Pmiss pl 0%nat -∗
-    ex_start γfs P Pmiss pl.
+    ex_start γfs cw P Pmiss pl.
   Proof.
     iIntros (Hsl) "HP Hh". rewrite /ex_start.
-    iIntros (r Hr). rewrite (Hr Hsl). iModIntro. iFrame.
+    iIntros (r Hr). rewrite Hr (um_start_of_slash _ _ Hsl) rootino_agree.
+    iModIntro. iFrame.
   Qed.
 
-  Lemma ep_start_of_pair (γfs : fs_names) (P Pmiss : nat -> Z -> iProp Σ)
+  Lemma ep_start_of_pair (γfs : fs_names) (cw : Z) (P Pmiss : nat -> Z -> iProp Σ)
       (pl : list (bv 8)) :
     pl !! 0%nat = Some SLASH ->
     P 0%nat (bv_unsigned ROOTINO) -∗
     ep_hops_from γfs P Pmiss pl 0%nat -∗
-    ep_start γfs P Pmiss pl.
+    ep_start γfs cw P Pmiss pl.
   Proof.
     iIntros (Hsl) "HP Hh". rewrite /ep_start.
-    iIntros (r Hr). rewrite (Hr Hsl). iModIntro. iFrame.
+    iIntros (r Hr). rewrite Hr (um_start_of_slash _ _ Hsl) rootino_agree.
+    iModIntro. iFrame.
   Qed.
 
 End FsAbsStart.

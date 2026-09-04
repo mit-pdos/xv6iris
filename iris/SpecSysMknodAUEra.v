@@ -153,10 +153,10 @@ Section SysMknodAUEra.
   Implicit Types Γ : fs_view_names Σ.
 
   (* everything the AU caller hands in, at the commit mask [fsabsE] *)
-  Definition mknod_au_pre_era Γ (γfs : fs_names) (ma mi : Z)
+  Definition mknod_au_pre_era Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    (mknod_walk_pre_era γfs P Pmiss
+    (mknod_walk_pre_era γfs cw P Pmiss
      ∗ acre_commit_at Γ fsabsE (ADev ma mi) Φok
      ∗ dlookup_commit_at Γ fsabsE Φex)%I.
 
@@ -172,10 +172,10 @@ Section SysMknodAUEra.
   (* ret -1's three-way fold, the frozen file's verbatim: nothing
      fs-visible happened (argstr failed, or the path was relative -- see
      the header), or the walk died, or create failed at the parent. *)
-  Definition mknod_post_fail_era Γ (γfs : fs_names) (ma mi : Z)
+  Definition mknod_post_fail_era Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    (mknod_au_pre_era Γ γfs ma mi P Pmiss Φok Φex
+    (mknod_au_pre_era Γ γfs cw ma mi P Pmiss Φok Φex
      ∨ (∃ pl : list (bv 8),
           cau_fail Γ γfs ma mi P Pmiss Φok Φex pl))%I.
 
@@ -183,22 +183,22 @@ Section SysMknodAUEra.
      ESCAPE on the [ret = 0] arm since lane A-iii: the walk takes the
      relative start, so a success is a RECEIPT whatever the fetched string
      looked like.  See the header. *)
-  Definition mknod_arms_era Γ (γfs : fs_names) (ma mi : Z)
+  Definition mknod_arms_era Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (r : mword 64) : iProp Σ :=
     ((⌜r = (zero_reg : mword 64)⌝
       ∗ mknod_post_ok_era Γ ma mi P Φok Φex)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ mknod_post_fail_era Γ γfs ma mi P Pmiss Φok Φex))%I.
+        ∗ mknod_post_fail_era Γ γfs cw ma mi P Pmiss Φok Φex))%I.
 
   (* the landed return blanket, read off the arms: this is the one
      conjunct of [SpecSysMknod.wp_sys_mknod_sconf_body]'s continuation the
      AU form replaces, and it is implied *)
-  Lemma mknod_arms_era_ret Γ (γfs : fs_names) (ma mi : Z)
+  Lemma mknod_arms_era_ret Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) (r : mword 64) :
-    mknod_arms_era Γ γfs ma mi P Pmiss Φok Φex r ⊢ ⌜sys_mknod_ret r⌝.
+    mknod_arms_era Γ γfs cw ma mi P Pmiss Φok Φex r ⊢ ⌜sys_mknod_ret r⌝.
   Proof.
     rewrite /mknod_arms_era /sys_mknod_ret.
     iIntros "[[%Hr _] | [%Hr _]]"; iPureIntro; [left | right]; exact Hr.
@@ -477,8 +477,8 @@ Definition wp_sys_mknod_au_era_body
   let mi := dev_arg v2 in
   wp_sys_mknod_au_era_frame γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v0 v1 v2 pid U m K eb b lks
-    (mknod_au_pre_era Γfs fsc_fs ma mi P Pmiss Φok Φex)
-    (mknod_arms_era Γfs fsc_fs ma mi P Pmiss Φok Φex).
+    (mknod_au_pre_era Γfs fsc_fs (pv_cwi (us_V U)) ma mi P Pmiss Φok Φex)
+    (mknod_arms_era Γfs fsc_fs (pv_cwi (us_V U)) ma mi P Pmiss Φok Φex).
 
 (* ===================================================================== *)
 (*  THE STABLE COROLLARY'S BODY                                           *)

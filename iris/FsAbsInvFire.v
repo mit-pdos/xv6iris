@@ -72,6 +72,7 @@ Require Import FsAbsMknodFire.  (* [acre_commit_at], [dlookup_commit_at],
 (* ...and this file's own: the other commit definitions and the invariant.
    FsAbs stays LAST (its own rule), so these go above the block's tail. *)
 Require Import SpecSysOpenAU.      (* [aopen/atrunc_commit_at], [open_walk_pre_era], [open_au_pre_*] *)
+Require Import SpecSysChdirAU.     (* [chdir_au_pre]: the walk premise + open's commit (lane C3) *)
 Require Import SpecSysMknodAUEra.  (* [mknod_au_pre_era] *)
 Require Import SpecSysUnlinkAU.    (* [uent/utgt/dmiss_commit_at], [unlink_au_pre] *)
 Require Import FsAbsReadFire.      (* [aread_commit_at] *)
@@ -103,22 +104,22 @@ Section FsAbsInvFire.
     by destruct (ents !! s).
   Qed.
 
-  Lemma fsabs_open_walk (γfs : fs_names) :
-    ⊢ open_walk_pre_era γfs (fun _ _ => True%I) (fun _ _ => True%I).
+  Lemma fsabs_open_walk (γfs : fs_names) (cw : Z) :
+    ⊢ open_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I).
   Proof.
     rewrite /open_walk_pre_era. iIntros (pl r) "_". iModIntro.
     iSplit; [done |]. iApply fsabs_hops.
   Qed.
 
-  Lemma fsabs_mknod_walk (γfs : fs_names) :
-    ⊢ mknod_walk_pre_era γfs (fun _ _ => True%I) (fun _ _ => True%I).
+  Lemma fsabs_mknod_walk (γfs : fs_names) (cw : Z) :
+    ⊢ mknod_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I).
   Proof.
     rewrite /mknod_walk_pre_era. iIntros (pl r) "_". iModIntro.
     iSplit; [done |]. iApply fsabs_hops.
   Qed.
 
-  Lemma fsabs_ep_start (γfs : fs_names) (pl : list (bv 8)) :
-    ⊢ ep_start γfs (fun _ _ => True%I) (fun _ _ => True%I) pl.
+  Lemma fsabs_ep_start (γfs : fs_names) (cw : Z) (pl : list (bv 8)) :
+    ⊢ ep_start γfs cw (fun _ _ => True%I) (fun _ _ => True%I) pl.
   Proof.
     rewrite /ep_start. iIntros (r) "_". iModIntro.
     iSplit; [done |]. rewrite /ep_hops_from. iApply fsabs_hops.
@@ -241,9 +242,9 @@ Section FsAbsInvFire.
   (*  3.  The bundles the sealed contracts take                           *)
   (* ------------------------------------------------------------------ *)
 
-  Lemma fsabs_open_pre_plain Γ Γc (γfs : fs_names) :
+  Lemma fsabs_open_pre_plain Γ Γc (γfs : fs_names) (cw : Z) :
     fsabs_inv Γc -∗
-    open_au_pre_plain Γ γfs (fun _ _ => True%I) (fun _ _ => True%I)
+    open_au_pre_plain Γ γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ => True%I) (fun _ _ _ => True%I).
   Proof.
     iIntros "#Hinv". rewrite /open_au_pre_plain.
@@ -255,18 +256,18 @@ Section FsAbsInvFire.
      ([SpecSysExecAU.sys_exec_au_pre] minus its slot wand), which is open's
      walk and open's commit at [True] -- what [UexecExecMint] mints the
      process's exec bundle out of. *)
-  Lemma fsabs_exec_half Γ Γc (γfs : fs_names) :
+  Lemma fsabs_exec_half Γ Γc (γfs : fs_names) (cw : Z) :
     fsabs_inv Γc -∗
-    open_walk_pre_era γfs (fun _ _ => True%I) (fun _ _ => True%I)
+    open_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
     ∗ aopen_commit_at Γ fsabsE (fun _ _ _ => True%I).
   Proof.
     iIntros "#Hinv".
     iSplitR; [iApply fsabs_open_walk | iApply fsabs_aopen; done].
   Qed.
 
-  Lemma fsabs_open_pre_create Γ Γc (γfs : fs_names) :
+  Lemma fsabs_open_pre_create Γ Γc (γfs : fs_names) (cw : Z) :
     fsabs_inv Γc -∗
-    open_au_pre_create Γ γfs (fun _ _ => True%I) (fun _ _ => True%I)
+    open_au_pre_create Γ γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I)
       (fun _ _ _ => True%I) (fun _ _ _ => True%I).
   Proof.
@@ -277,9 +278,9 @@ Section FsAbsInvFire.
     iSplitR; [iApply fsabs_aopen; done | iApply fsabs_atrunc; done].
   Qed.
 
-  Lemma fsabs_mknod_pre_era Γ Γc (γfs : fs_names) (ma mi : Z) :
+  Lemma fsabs_mknod_pre_era Γ Γc (γfs : fs_names) (cw : Z) (ma mi : Z) :
     fsabs_inv Γc -∗
-    mknod_au_pre_era Γ γfs ma mi (fun _ _ => True%I) (fun _ _ => True%I)
+    mknod_au_pre_era Γ γfs cw ma mi (fun _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I).
   Proof.
     iIntros "#Hinv". rewrite /mknod_au_pre_era.
@@ -287,9 +288,21 @@ Section FsAbsInvFire.
     iSplitR; [iApply fsabs_acre; done | iApply fsabs_dlookup; done].
   Qed.
 
-  Lemma fsabs_unlink_pre Γ Γc (γfs : fs_names) :
+  (* ...and chdir's (lane C3): open's walk premise at any start beside
+     open's plain commit -- what the dispatcher's chdir arm hands the AU
+     contract at the True families *)
+  Lemma fsabs_chdir_pre Γ Γc (γfs : fs_names) (cw : Z) :
     fsabs_inv Γc -∗
-    unlink_au_pre Γ γfs (fun _ _ => True%I) (fun _ _ => True%I)
+    chdir_au_pre Γ γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
+      (fun _ _ _ => True%I).
+  Proof.
+    iIntros "#Hinv". rewrite /chdir_au_pre.
+    iSplitR; [iApply fsabs_open_walk | iApply fsabs_aopen; done].
+  Qed.
+
+  Lemma fsabs_unlink_pre Γ Γc (γfs : fs_names) (cw : Z) :
+    fsabs_inv Γc -∗
+    unlink_au_pre Γ γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ _ => True%I) (fun _ _ _ => True%I).
   Proof.

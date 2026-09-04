@@ -631,13 +631,16 @@ Section EraMknod.
 
   (* [SpecSysMknodAU.mknod_walk_pre] with [dv_half] replaced by the era
      lend and NOTHING else -- same one-shot fupd, same fetched-path
-     shape, same root tie.  When the nameiparent era walk lands, THIS is
+     shape, same start rule.  When the nameiparent era walk lands, THIS is
      the premise the syscall contract carries; the landed one stays for
-     the dv-firing walk until the retirement step. *)
-  Definition mknod_walk_pre_era (γfs : fs_names)
+     the dv-firing walk until the retirement step.
+       THE START (lane C3): [FsAbsStart.um_start_of cw pl] -- ROOTINO on
+     an absolute fetch, the calling process's cwd inum [cw] on a relative
+     one; the syscall contract passes its block's [pv_cwi]. *)
+  Definition mknod_walk_pre_era (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ) : iProp Σ :=
     (∀ (pl : list (bv 8)) (r : Z),
-       ⌜pl !! 0%nat = Some SLASH -> r = FsImg.ROOTINO⌝ ={⊤}=∗
+       ⌜r = um_start_of cw pl⌝ ={⊤}=∗
        P 0%nat r
        ∗ ax_hops_from (elend (fs_gamma_L γfs)) P Pmiss
            (mknod_parent_elems pl) 0%nat)%I.
@@ -737,25 +740,25 @@ Section NparMknod.
      header).  [ep_start] at a fixed [pl] IS [mknod_walk_pre_era]
      specialized to that [pl] -- same quantifier, same tie, same family --
      so this is a rename plus the two ROOTINOs agreeing. *)
-  Lemma np_start_of_mknod (γfs : fs_names) (P Pmiss : nat -> Z -> iProp Σ)
+  Lemma np_start_of_mknod (γfs : fs_names) (cw : Z) (P Pmiss : nat -> Z -> iProp Σ)
       (pl : list (bv 8)) :
-    mknod_walk_pre_era γfs P Pmiss -∗ ep_start γfs P Pmiss pl.
+    mknod_walk_pre_era γfs cw P Pmiss -∗ ep_start γfs cw P Pmiss pl.
   Proof.
     iIntros "Hpre". rewrite /ep_start. iIntros (r Hr).
     rewrite /mknod_walk_pre_era.
-    iMod ("Hpre" $! pl r with "[%]") as "[$ $]"; [| done].
-    intros Hsl. rewrite -np_rootino_agree. exact (Hr Hsl).
+    iMod ("Hpre" $! pl r with "[%]") as "[$ $]"; [exact Hr | done].
   Qed.
 
-  Lemma np_pre_of_mknod (γfs : fs_names) (P Pmiss : nat -> Z -> iProp Σ)
+  Lemma np_pre_of_mknod (γfs : fs_names) (cw : Z) (P Pmiss : nat -> Z -> iProp Σ)
       (pl : list (bv 8)) :
-    mknod_walk_pre_era γfs P Pmiss ={⊤}=∗
+    pl !! 0%nat = Some SLASH ->
+    mknod_walk_pre_era γfs cw P Pmiss ={⊤}=∗
       P 0%nat (bv_unsigned InodeInv.ROOTINO)
       ∗ ep_hops_from γfs P Pmiss pl 0%nat.
   Proof.
-    iIntros "Hpre". rewrite /mknod_walk_pre_era.
+    iIntros (Hsl) "Hpre". rewrite /mknod_walk_pre_era.
     iMod ("Hpre" $! pl (bv_unsigned InodeInv.ROOTINO) with "[%]") as "[$ $]".
-    { intros _. exact np_rootino_agree. }
+    { rewrite (um_start_of_slash _ _ Hsl). exact np_rootino_agree. }
     done.
   Qed.
 

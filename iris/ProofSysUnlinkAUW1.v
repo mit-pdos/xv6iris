@@ -272,7 +272,7 @@ Section ProofSysUnlinkAUW1.
          su_au_closer (CID := CIDx) gf (proc_addr jx) pid U m
            (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
            dqb dqs dqbs
-           (unlink_arms (fs_gamma_L fsc_fs) fsc_fs P Pmiss
+           (unlink_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss
                         Phient Phitgt Phiex Phimiss)) -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -331,7 +331,7 @@ Section ProofSysUnlinkAUW1.
     iref_slots SpecSysUnlink.sys_unlink_slots -∗
     proc_priv gf (proc_addr jx) pid U -∗
     (* ---- THE AU SIDE: the caller's whole bundle, at the mask floor ---- *)
-    unlink_au_pre (fs_gamma_L fsc_fs) fsc_fs P Pmiss
+    unlink_au_pre (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss
                   Phient Phitgt Phiex Phimiss -∗
     (* ---- THE SEAM: the fall-through, at +0x30 with [dp] resolved ---- *)
     (∀ (CIDs : CpuId) (Ms : regfile) (P1 : uptd)
@@ -346,7 +346,7 @@ Section ProofSysUnlinkAUW1.
       su_au_closer (CID := CIDx) gf (proc_addr jx) pid U m
         (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
         dqb dqs dqbs
-        (unlink_arms (fs_gamma_L fsc_fs) fsc_fs P Pmiss
+        (unlink_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss
                      Phient Phitgt Phiex Phimiss)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -725,7 +725,7 @@ Section ProofSysUnlinkAUW1.
          [FsAbsStart.ep_start] on the nose at every path, with only the
          SLASH -> ROOTINO tie -- and [np_start_of_mknod] is that identity,
          discharged in advance by lane A. *)
-      iDestruct (np_start_of_mknod fsc_fs P Pmiss (bview pk1 bp1)
+      iDestruct (np_start_of_mknod fsc_fs (pv_cwi (us_V U)) P Pmiss (bview pk1 bp1)
                    with "Hwalk") as "Hstart".
       iApply (NparEra.wp_npar_wrap_era (CID := CID16) gs jx gl
                 pd pav pu gf

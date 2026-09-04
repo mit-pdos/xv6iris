@@ -339,7 +339,8 @@ Section UserretClosed.
       match goal with
       | |- environments.envs_entails _ (xbundle _ ?W') =>
           rewrite <- (xbundle_cong uslot_x W W' eq_refl
-                        (eq_sym (uvis_run_arg1 W)) eq_refl)
+                        (eq_sym (uvis_run_arg1 W)) eq_refl
+                        (eq_trans Hcww (eq_sym Hcwi)))
       end.
       iExact "Hx". }
     iApply wp_next_intro. iIntros (CID').

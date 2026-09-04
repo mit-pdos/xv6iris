@@ -35,7 +35,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import ProofSyscall.
 (* the twenty-two table entries, each already linked against its own callees *)
 Require Import LinkSysFork LinkSysExit LinkSysWait LinkSysPipe LinkSysRead
-                LinkSysKill LinkSysExec LinkSysFstat LinkSysChdir LinkSysDup
+                LinkSysKill LinkSysExec LinkSysFstat LinkSysChdirAU LinkSysDup
                 LinkSysGetpid LinkSysSbrk LinkSysPause LinkSysUptime
                 LinkSysWrite LinkSysLink LinkSysMkdir
                 LinkSysClose LinkSysSync.
@@ -55,7 +55,7 @@ Require Import LinkMyproc LinkPrintk.
 
 Module Syscall :=
   SyscallProof SysFork SysExit SysWait SysPipe SysRead SysKill
-               SysExecAU SysFstat SysChdir SysDup SysGetpid SysSbrk
+               SysExecAU SysFstat SysChdirAU SysDup SysGetpid SysSbrk
                SysPause SysUptime SysWrite SysMknodAU SysLink SysMkdir
                SysClose SysSync SysOpenAUFull SysUnlinkAU
                Myproc PrintkGen.

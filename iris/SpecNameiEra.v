@@ -184,7 +184,7 @@ Definition wp_namei_era_body
      form's own position so no stage lemma moved *)
   log_opSt icfg_log n Sb -∗
   (* ---- THE TRACE (ONE premise, DEFERRED IN THE START) ---- *)
-  ex_start fsc_fs P Pmiss pl -∗
+  ex_start fsc_fs (pv_cwi (us_V Upr)) P Pmiss pl -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (Sb' : gset Z)
     (ok : bool) (ipv : mword 64) (w : bool),

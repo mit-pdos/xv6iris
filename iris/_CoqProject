@@ -1774,6 +1774,14 @@ ProofSysUnlinkAUW5F.v
 ProofSysUnlinkAUW5D.v
 ProofSysUnlinkAU.v
 LinkSysUnlinkAU.v
+# sys_chdir's AU contract (lane C3): the walk-only mold (SpecSysUnlinkAU)
+# plus open's observation receipt, so the success arm names the new cwd's
+# inum as the walk's cursor.  ProofSysChdirAU is ProofSysChdir re-walked at
+# SpecNameiEra; LinkSysChdirAU closes it over LinkNameiEra.  The landed
+# SpecSysChdir/ProofSysChdir/LinkSysChdir stay (R10).
+SpecSysChdirAU.v
+ProofSysChdirAU.v
+LinkSysChdirAU.v
 
 # fs-syscall-specs lane SH-TO-URUN, STAGES 1-2: the shell's program proof
 # on the urun engine.  UCodeShK.v is a SECOND code catalog over the SAME

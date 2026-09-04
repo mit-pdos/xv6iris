@@ -552,13 +552,14 @@ Section SysOpenAU.
   (* ONE SHOT, instantiated by the walk at the string argstr fetched and
      at the inum it starts from -- [mknod_walk_pre_era]'s shape over the
      FULL element list (open resolves via namei, not nameiparent).  The
-     start is QUANTIFIED with only the SLASH tie: an absolute fetch pins
-     [FsImg.ROOTINO], a relative one starts at the cwd inode (header,
-     THE WALK PREMISE). *)
-  Definition open_walk_pre_era `{XI : CurCtx} (γfs : fs_names)
+     start is namex's rule ([FsAbsStart.um_start_of]): an absolute fetch
+     pins [FsImg.ROOTINO], a relative one starts at [cw], the calling
+     process's cwd inum -- the contract passes its block's [pv_cwi]
+     (header, THE WALK PREMISE; lane C3). *)
+  Definition open_walk_pre_era `{XI : CurCtx} (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ) : iProp Σ :=
     (∀ (pl : list (bv 8)) (r : Z),
-       ⌜pl !! 0%nat = Some SLASH -> r = FsImg.ROOTINO⌝ ={⊤}=∗
+       ⌜r = um_start_of cw pl⌝ ={⊤}=∗
        P 0%nat r
        ∗ ax_hops_from (elend (fs_gamma_L γfs)) P Pmiss (path_elems pl)
            0%nat)%I.
@@ -583,23 +584,23 @@ Section SysOpenAU.
   (* ------------------------------------------------------------------ *)
 
   (* everything the PLAIN caller hands in, at the mask floor [∅] *)
-  Definition open_au_pre_plain `{XI : CurCtx} Γ (γfs : fs_names)
+  Definition open_au_pre_plain `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
-    (open_walk_pre_era γfs P Pmiss
+    (open_walk_pre_era γfs cw P Pmiss
      ∗ aopen_commit_at Γ fsabsE Φo
      ∗ atrunc_commit_at Γ fsabsE Φt)%I.
 
   (* ...and the O_CREATE caller: the parent-prefix one-shot REUSED from
      the mknod era file, create's fused delta at the child [AFile []],
      the exists observation, and open's own two commits *)
-  Definition open_au_pre_create `{XI : CurCtx} Γ (γfs : fs_names)
+  Definition open_au_pre_create `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
-    (mknod_walk_pre_era γfs P Pmiss
+    (mknod_walk_pre_era γfs cw P Pmiss
      ∗ acre_commit_at Γ fsabsE (AFile []) Φok
      ∗ dlookup_commit_at Γ fsabsE Φex
      ∗ aopen_commit_at Γ fsabsE Φo
@@ -687,11 +688,11 @@ Section SysOpenAU.
   (* ret -1: the header's three-way fold, residue returned per arm.  The
      third disjunct's observation is FIRED, not optional: every post-walk
      failure sits inside the child's lock window. *)
-  Definition open_post_fail_plain `{XI : CurCtx} Γ (γfs : fs_names)
+  Definition open_post_fail_plain `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
-    (open_au_pre_plain Γ γfs P Pmiss Φo Φt
+    (open_au_pre_plain Γ γfs cw P Pmiss Φo Φt
      ∨ (∃ pl : list (bv 8),
           (open_walk_dead_era γfs P Pmiss pl
              ∗ aopen_commit_at Γ fsabsE Φo
@@ -707,7 +708,7 @@ Section SysOpenAU.
      [sts] back on the nose on failure, one row moved on success, and
      [fd_slot] back on every arm); [open_arms_plain_landed] below is the
      tie to [SpecSysOpen.sys_open_post] *)
-  Definition open_arms_plain `{XI : CurCtx} Γ (γfs : fs_names) (γf : gname)
+  Definition open_arms_plain `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z) (γf : gname)
       (p : mword 64) (pid : mword 32) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
@@ -718,7 +719,7 @@ Section SysOpenAU.
        (* the failure arms hand the caller's table back ON THE NOSE: no
           arm that installed a descriptor can fail after doing so *)
        ∗ fd_frags (pv_fdg (us_V UW)) sts
-       ∗ open_post_fail_plain Γ γfs P Pmiss Φo Φt)
+       ∗ open_post_fail_plain Γ γfs cw P Pmiss Φo Φt)
       ∨ open_post_ok_plain Γ γf p pid vom P Φo Φt sts UW r)
      ∗ fd_slot)%I.
 
@@ -783,12 +784,12 @@ Section SysOpenAU.
   (* ret -1: the fold.  Note arm (a): a FRESH create that succeeded
      before open's table-full failure leaves its delta STANDING, and the
      receipt is delivered -- the fs mutation of a failed open is real. *)
-  Definition open_post_fail_create `{XI : CurCtx} Γ (γfs : fs_names)
+  Definition open_post_fail_create `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
-    (open_au_pre_create Γ γfs P Pmiss Φok Φex Φo Φt
+    (open_au_pre_create Γ γfs cw P Pmiss Φok Φex Φo Φt
      ∨ (∃ pl : list (bv 8),
           (mknod_walk_dead_era γfs P Pmiss pl
              ∗ acre_commit_at Γ fsabsE (AFile []) Φok
@@ -826,7 +827,7 @@ Section SysOpenAU.
                    ∗ dlookup_commit_at Γ fsabsE Φex
                    ∗ aopen_commit_at Γ fsabsE Φo)))))%I.
 
-  Definition open_arms_create `{XI : CurCtx} Γ (γfs : fs_names) (γf : gname)
+  Definition open_arms_create `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z) (γf : gname)
       (p : mword 64) (pid : mword 32) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
@@ -836,7 +837,7 @@ Section SysOpenAU.
     (((⌜r = (mword_of_int (-1) : mword 64)⌝
        ∗ proc_priv γf p pid UW
        ∗ fd_frags (pv_fdg (us_V UW)) sts
-       ∗ open_post_fail_create Γ γfs P Pmiss Φok Φex Φo Φt)
+       ∗ open_post_fail_create Γ γfs cw P Pmiss Φok Φex Φo Φt)
       ∨ open_post_ok_create Γ γf p pid vom P Φok Φex Φo Φt sts UW r)
      ∗ fd_slot)%I.
 
@@ -904,13 +905,13 @@ Section SysOpenAU.
     iExists fd, l, k, t. iFrame "Hp Hb". iPureIntro. exact Hpu.
   Qed.
 
-  Lemma open_arms_plain_landed `{XI : CurCtx} Γ (γfs : fs_names) (γf : gname)
+  Lemma open_arms_plain_landed `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z) (γf : gname)
       (p : mword 64) (pid : mword 32) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
       (sts : list fdstate) (UW : ustate) (r : mword 64) :
-    open_arms_plain Γ γfs γf p pid vom P Pmiss Φo Φt sts UW r ⊢
+    open_arms_plain Γ γfs cw γf p pid vom P Pmiss Φo Φt sts UW r ⊢
       sys_open_post γf p pid UW sts (trunc32 vom) r.
   Proof.
     destruct (om_modes_landed vom) as [Hrd Hwr].
@@ -931,14 +932,14 @@ Section SysOpenAU.
           [by rewrite Hrd Hrd0 | by rewrite Hwr Hwr0].
   Qed.
 
-  Lemma open_arms_create_landed `{XI : CurCtx} Γ (γfs : fs_names) (γf : gname)
+  Lemma open_arms_create_landed `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z) (γf : gname)
       (p : mword 64) (pid : mword 32) (vom : mword 64)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ)
       (sts : list fdstate) (UW : ustate) (r : mword 64) :
-    open_arms_create Γ γfs γf p pid vom P Pmiss Φok Φex Φo Φt sts UW r ⊢
+    open_arms_create Γ γfs cw γf p pid vom P Pmiss Φok Φex Φo Φt sts UW r ⊢
       sys_open_post γf p pid UW sts (trunc32 vom) r.
   Proof.
     destruct (om_modes_landed vom) as [Hrd Hwr].
@@ -1108,8 +1109,9 @@ Definition wp_sys_open_au_plain_body
   om_create vom = false ->
   wp_sys_open_au_frame γfl γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v vom pid U sts m K eb b lks
-    (open_au_pre_plain Γfs fsc_fs P Pmiss Φo Φt)
-    (open_arms_plain Γfs fsc_fs γf (proc_addr j) pid vom P Pmiss Φo Φt sts).
+    (open_au_pre_plain Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φo Φt)
+    (open_arms_plain Γfs fsc_fs (pv_cwi (us_V U)) γf (proc_addr j) pid vom
+       P Pmiss Φo Φt sts).
 
 (* THE O_CREATE FORM: create's surface at the child [AFile []]. *)
 Definition wp_sys_open_au_create_body
@@ -1132,8 +1134,8 @@ Definition wp_sys_open_au_create_body
   om_create vom = true ->
   wp_sys_open_au_frame γfl γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v vom pid U sts m K eb b lks
-    (open_au_pre_create Γfs fsc_fs P Pmiss Φok Φex Φo Φt)
-    (open_arms_create Γfs fsc_fs γf (proc_addr j) pid vom P Pmiss
+    (open_au_pre_create Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φok Φex Φo Φt)
+    (open_arms_create Γfs fsc_fs (pv_cwi (us_V U)) γf (proc_addr j) pid vom P Pmiss
        Φok Φex Φo Φt sts).
 
 (* ===================================================================== *)

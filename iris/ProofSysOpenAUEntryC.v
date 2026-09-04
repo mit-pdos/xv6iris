@@ -181,7 +181,7 @@ Section ProofSysOpenAUEntryCCont.
          sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
          bslots 3 -∗
          iref_slots ns' -∗
-         open_arms_create (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
+         open_arms_create (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
            P Pmiss Phiok Phiex Phio Phit sts U (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
 
@@ -301,7 +301,7 @@ Section ProofSysOpenAUEntryC.
     (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] om -∗
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     (* ---- THE AU BUNDLE (the contract's O_CREATE side, verbatim) ---- *)
-    mknod_walk_pre_era fsc_fs P Pmiss -∗
+    mknod_walk_pre_era fsc_fs (pv_cwi (us_V U)) P Pmiss -∗
     acre_commit_at (fs_gamma_L fsc_fs) fsabsE (AFile []) Phiok -∗
     dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Phiex -∗
     aopen_commit_at (fs_gamma_L fsc_fs) fsabsE Phio -∗

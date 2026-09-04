@@ -193,10 +193,10 @@ Section ProofSysOpenAUCreArm.
   (*  4.  RECOVERING THE RESIDUE FROM THE PLAIN FOLD                     *)
   (* ================================================================== *)
 
-  Lemma socr_res_of_fail (R : iProp Σ) (i0 : Z)
+  Lemma socr_res_of_fail (cw : Z) (R : iProp Σ) (i0 : Z)
       (Phio : aview -> Z -> anode -> iProp Σ)
       (Phit : aview -> Z -> list (bv 8) -> iProp Σ) :
-    open_post_fail_plain (fs_gamma_L fsc_fs) fsc_fs
+    open_post_fail_plain (fs_gamma_L fsc_fs) fsc_fs cw
       (socr_P R i0) (socr_Pm R) Phio Phit
     ={⊤}=∗ R
            ∗ (aopen_commit_at (fs_gamma_L fsc_fs) fsabsE Phio
@@ -208,8 +208,10 @@ Section ProofSysOpenAUCreArm.
     iIntros "H". iDestruct "H" as "[Hpre | H]".
     - rewrite /open_au_pre_plain. iDestruct "Hpre" as "(Hwp & Hoc & Htc)".
       rewrite /open_walk_pre_era.
-      iMod ("Hwp" $! [] i0 with "[%]") as "[HP _]".
-      { intros Hc. rewrite lookup_nil in Hc. discriminate. }
+      (* the one-shot fired at the empty path, whose start is the cwd
+         ([FsAbsStart.um_start_of_rel]); only [R] is wanted of the cursor *)
+      iMod ("Hwp" $! [] cw with "[%]") as "[HP _]".
+      { symmetry. apply FsAbsEra.um_start_of_rel. rewrite lookup_nil. discriminate. }
       iDestruct "HP" as "[_ HR]".
       iModIntro. iFrame "HR Htc". by iLeft.
     - iDestruct "H" as (pl) "[Hd | Hf]".
@@ -315,12 +317,12 @@ Section ProofSysOpenAUCreArm.
       (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
       (U : ustate) (sts : list fdstate) (r : mword 64) (pl : list (bv 8)) (i0 : Z)
       (bs : list (bv 8)) (nl0 : nat) :
-    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
+    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
       (socr_P (socr_fresh P Phiok Phiex Phio Phit pl i0) i0)
       (socr_Pm (socr_fresh P Phiok Phiex Phio Phit pl i0))
       (socr_Phio_pure i0 (MkAnode (AFile bs) nl0))
       socr_Phit_triv sts U r
-    ={⊤}=∗ open_arms_create (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
+    ={⊤}=∗ open_arms_create (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
              P Pmiss Phiok Phiex Phio Phit sts U r.
   Proof.
     rewrite /open_arms_plain /open_arms_create.
@@ -356,11 +358,11 @@ Section ProofSysOpenAUCreArm.
       (Phit : aview -> Z -> list (bv 8) -> iProp Σ)
       (U : ustate) (sts : list fdstate) (r : mword 64) (pl : list (bv 8)) (i0 : Z) (a0 : anode) :
     (forall (ents : gmap fname Z) (nl : nat), a0 <> MkAnode (ADir ents) nl) ->
-    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
+    open_arms_plain (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
       (socr_P (socr_exists P Phiok Phiex pl i0) i0)
       (socr_Pm (socr_exists P Phiok Phiex pl i0))
       (socr_Phio_tag i0 a0 Phio) Phit sts U r
-    ={⊤}=∗ open_arms_create (fs_gamma_L fsc_fs) fsc_fs gf pj pidv vom
+    ={⊤}=∗ open_arms_create (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv vom
              P Pmiss Phiok Phiex Phio Phit sts U r.
   Proof.
     intros Hnd.

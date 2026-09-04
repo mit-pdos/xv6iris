@@ -111,7 +111,7 @@ Section UexecExecInst.
   Definition exec_xbundle (X : uvis -d> iPropO Σ) (W : uvis) : iProp Σ :=
     (∃ (P Pmiss : nat -> Z -> iProp Σ)
        (Φo : aview -> Z -> anode -> iProp Σ),
-       sys_exec_au_pre X (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo
+       sys_exec_au_pre X (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) P Pmiss Φo
          (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W))%I.
 
   Lemma exec_xbundle_ne (n : nat) :
@@ -120,7 +120,7 @@ Section UexecExecInst.
     intros X Y HXY W ? <-. rewrite /exec_xbundle.
     apply bi.exist_ne; intros P. apply bi.exist_ne; intros Pmiss.
     apply bi.exist_ne; intros Φo.
-    exact (sys_exec_au_pre_ne n X Y (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo
+    exact (sys_exec_au_pre_ne n X Y (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) P Pmiss Φo
              (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) HXY).
   Qed.
 
@@ -128,9 +128,10 @@ Section UexecExecInst.
     uvis_M W = uvis_M W' ->
     tf_w (uvis_tf W) (tf_arg_idx 1) = tf_w (uvis_tf W') (tf_arg_idx 1) ->
     uvis_fd W = uvis_fd W' ->
+    uvis_cwd W = uvis_cwd W' ->
     exec_xbundle X W ⊣⊢ exec_xbundle X W'.
   Proof.
-    intros HM Hav Hfd. rewrite /exec_xbundle HM Hav Hfd. reflexivity.
+    intros HM Hav Hfd Hcw. rewrite /exec_xbundle HM Hav Hfd Hcw. reflexivity.
   Qed.
 
   Global Instance uexecXG_sysexec : uexecXG Σ :=
@@ -143,7 +144,7 @@ Section UexecExecInst.
   Lemma xbundle_intro (X : uvis -d> iPropO Σ) (W : uvis)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ) :
-    sys_exec_au_pre X (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo
+    sys_exec_au_pre X (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) P Pmiss Φo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) -∗
     xbundle X W.
   Proof.
@@ -157,7 +158,7 @@ Section UexecExecInst.
     xbundle X W -∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ),
-      sys_exec_au_pre X (fs_gamma_L fsc_fs) fsc_fs P Pmiss Φo
+      sys_exec_au_pre X (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) P Pmiss Φo
         (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W).
   Proof. iIntros "H". rewrite /xbundle /= /exec_xbundle. iExact "H". Qed.
 

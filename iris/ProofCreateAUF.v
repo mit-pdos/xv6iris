@@ -2597,7 +2597,7 @@ Section ProofCreateMain.
     (* ---- THE AU SIDE: the walk's DEFERRED start ([ep_start] at this
        path buffer IS [FsAbsEraMknod.mknod_walk_pre_era]) and the two
        commits ---- *)
-    ep_start fsc_fs P Pmiss (bview plen pfun) -∗
+    ep_start fsc_fs (pv_cwi (us_V U)) P Pmiss (bview plen pfun) -∗
     acre_commit_at (fs_gamma_L fsc_fs) fsabsE (AFile []) Φok -∗
     dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Φex -∗
     (* ---- THE PARKED ALLOCATE HALF, as a HYPOTHESIS ---- *)

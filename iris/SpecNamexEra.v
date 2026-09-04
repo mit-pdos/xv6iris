@@ -287,7 +287,7 @@ Definition wp_namex_era_body
      actually closes (that file's header).  A caller that knows its path
      is absolute builds this from the landed pair and loses nothing
      ([FsAbsStart.ex_start_of_pair]). *)
-  ex_start fsc_fs P Pmiss pl -∗
+  ex_start fsc_fs (pv_cwi (us_V Upr)) P Pmiss pl -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b] -- namex parks; see
      [SpecNamex.wp_namex_gen_body]'s note. *)
   wp_next true pj (fun (CIDc : CpuId) =>

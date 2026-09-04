@@ -290,19 +290,19 @@ Section KexecPinTrace.
   (*  THE START ([FsAbsStart.ex_start]): the deferred one-shot.  The tie is
       discharged from the contract's own [pfun 0 = SLASH] premise, through
       [FsAbsStart.bview_head_slash_intro] at the call site.                *)
-  Lemma kxt_start (γfs : fs_names) (pb : kx_pin) (ds : list Z)
+  Lemma kxt_start (γfs : fs_names) (cw : Z) (pb : kx_pin) (ds : list Z)
       (pl : list (bv 8)) :
     path_elems pl = kxp_path pb ->
     pl !! 0%nat = Some SLASH ->
     ftop_inv γfs -∗ kxp_run_pin (fs_gamma_L γfs) pb ds -∗
-      ex_start γfs (kxt_P ds) (kxt_P ds) pl.
+      ex_start γfs cw (kxt_P ds) (kxt_P ds) pl.
   Proof.
     intros Hpl Hsl. iIntros "#Hi #Hp".
     iDestruct (kxp_run_pin_ends with "Hp") as %[Hd0 _].
     rewrite /ex_start. iIntros (r Hr).
-    rewrite (Hr Hsl). iModIntro.
+    rewrite Hr (um_start_of_slash _ _ Hsl). iModIntro.
     iSplitR.
-    { rewrite /kxt_P. iPureIntro. rewrite -kxt_rootino. exact Hd0. }
+    { rewrite /kxt_P. iPureIntro. exact Hd0. }
     iApply (kxt_hops γfs pb ds pl 0%nat Hpl with "Hi Hp").
   Qed.
 

@@ -418,13 +418,14 @@ Lemma ut_exec_in_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
   usys_num tf = usys_num tf' ->
   us_M U = us_M U' ->
   tf_w (pv_tf (us_V U)) (tf_arg_idx 1) = tf_w (pv_tf (us_V U')) (tf_arg_idx 1) ->
+  pv_cwi (us_V U) = pv_cwi (us_V U') ->
   ut_exec_in sc_v tf U sts -∗ ut_exec_in sc_v tf' U' sts.
 Proof.
-  intros Hn HM Ha1. rewrite /ut_exec_in. iIntros "H %Hc".
+  intros Hn HM Ha1 Hcw. rewrite /ut_exec_in. iIntros "H %Hc".
   iDestruct ("H" with "[%]") as "H";
     [ split; [exact (proj1 Hc) | rewrite Hn; exact (proj2 Hc)] |].
   iEval (rewrite (xbundle_cong uslot_x (uvis_of U sts) (uvis_of U' sts)
-                    HM Ha1 eq_refl)) in "H".
+                    HM Ha1 eq_refl Hcw)) in "H".
   iExact "H".
 Qed.
 

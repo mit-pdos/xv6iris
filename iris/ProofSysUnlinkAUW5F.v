@@ -358,7 +358,7 @@ Section ProofSysUnlinkAUW5F.
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       su_au_closer (CID := CIDx) gf (proc_addr jx) pid U m
         (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
-        dqb dqs dqbs (unlink_arms (fs_gamma_L fsc_fs) fsc_fs P Pmiss
+        dqb dqs dqbs (unlink_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss
                         Phient Phitgt Phiex Phimiss)) -∗
     WP (Loop : expr riscv_lang).
   Proof.

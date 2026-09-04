@@ -219,17 +219,16 @@ Section OpenFire.
 
   (* The contract's one-shot, specialised to the string the walk fetched:
      [FsAbsStart.ex_start] at that [pl] IS [open_walk_pre_era] there (same
-     quantifier over the start, same tie, same family over
-     [path_elems pl]), so this is a rename plus the two ROOTINOs agreeing.
+     quantifier over the start, same start rule, same family over
+     [path_elems pl]), so this is a rename.
      The namei-side twin of [FsAbsNparMknod.np_start_of_mknod]. *)
-  Lemma opf_start_of_open `{XI : TsoCtx.CurCtx} (γfs : fs_names) (P Pmiss : nat -> Z -> iProp Σ)
+  Lemma opf_start_of_open `{XI : TsoCtx.CurCtx} (γfs : fs_names) (cw : Z) (P Pmiss : nat -> Z -> iProp Σ)
       (pl : list (bv 8)) :
-    open_walk_pre_era γfs P Pmiss -∗ ex_start γfs P Pmiss pl.
+    open_walk_pre_era γfs cw P Pmiss -∗ ex_start γfs cw P Pmiss pl.
   Proof.
     iIntros "Hpre". rewrite /ex_start. iIntros (r Hr).
     rewrite /open_walk_pre_era.
-    iMod ("Hpre" $! pl r with "[%]") as "[$ $]"; [| done].
-    intros Hsl. rewrite -np_rootino_agree. exact (Hr Hsl).
+    iMod ("Hpre" $! pl r with "[%]") as "[$ $]"; [exact Hr | done].
   Qed.
 
   (* =================================================================== *)

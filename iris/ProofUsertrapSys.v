@@ -430,7 +430,7 @@ Section UtSysBlock.
         by (rewrite /V1; destruct (us_V U); reflexivity).
       assert (Hnumeq0 : sysc_num V1 = usys_num (pv_tf (us_V U))).
       { rewrite (sysc_num_usys V1). rewrite HV1tf0. apply usys_num_epc. }
-      pose proof Hpro as Hpro'. destruct Hpro' as (Hpr1 & Hpr2 & Hpr3 & Hpr4 & _).
+      pose proof Hpro as Hpro'. destruct Hpro' as (Hpr1 & Hpr2 & Hpr3 & Hpr4 & Hpr5).
       (* the entry record's number and a1 word are the dispatcher's: neither
          epc rewrite reads them -- the exec bundle's key congruence
          ([SpecUsertrap.ut_exec_in_cong]) *)
@@ -518,7 +518,7 @@ Section UtSysBlock.
          { split; [exact Hscec | rewrite Hn0; exact Hk7]. }
          iEval (rewrite (xbundle_cong uslot_x (uvis_of U0 sts)
                            (uvis_of (MkUstate V1 (us_M U)) sts)
-                           (eq_sym Hpr4) Ha1w eq_refl)) in "Hx".
+                           (eq_sym Hpr4) Ha1w eq_refl (eq_sym Hpr5))) in "Hx".
          iExact "Hx". }
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now

@@ -615,10 +615,10 @@ Section KexecAUExit.
       (plen : nat) (pv : mword 64) (dqpv : dfrac) (pfun : nat -> bv 8)
       (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64) (dqas : dfrac) :
     kxau_ret (CID := CIDx)
-      (SpecKexecAU.exec_arms Sl ΓL fsc_fs P Pmiss Φo na alen afun sts U)
+      (SpecKexecAU.exec_arms Sl ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Φo na alen afun sts U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
-    SpecKexecAU.exec_post_fail Sl ΓL fsc_fs P Pmiss Φo na alen afun sts -∗
+    SpecKexecAU.exec_post_fail Sl ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Φo na alen afun sts -∗
     KexecOkQ.kexec_closer (CID := CIDx)
       kxau_QF (fun _ : KexecOkQ.kxf_cause => Logic.True)
       gf fsc_kalloc pj pidv U m ret_tgt K b eb lks dqb dqs fsc_bmapstart
@@ -658,7 +658,7 @@ Section KexecAUExit.
     length (pv_tf (us_V U)) = TFWORDS ->
     (na <= MAXARG)%nat ->
     kxau_ret (CID := CIDx)
-      (SpecKexecAU.exec_arms Sl ΓL fsc_fs P Pmiss Φo na alen afun sts U)
+      (SpecKexecAU.exec_arms Sl ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Φo na alen afun sts U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
     PA.kxa_receipt Sl P Φo (length (path_elems pl)) zi na alen afun sts dn bm datl -∗
@@ -828,7 +828,7 @@ Section KexecAUMain.
     (* ---- THE EXIT, NAMED.  [kxau_ret] IS the contract's continuation. ---- *)
     iAssert (wp_next true (proc_addr jp) (fun CID : CpuId =>
                kxau_ret (CID := CID)
-                 (SpecKexecAU.exec_arms Sl ΓL fsc_fs P Pmiss Φo na alen afun sts U)
+                 (SpecKexecAU.exec_arms Sl ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Φo na alen afun sts U)
                  gf fsc_kalloc (proc_addr jp) pidv m
                  (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs fsc_bmapstart
                  na plen (m !!! Regidx Ra0) dqpv pfun (m !!! Regidx Ra1) dqa

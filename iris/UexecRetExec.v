@@ -134,6 +134,7 @@ Class uexecXG (Σ : gFunctors) := {
     uvis_M W = uvis_M W' ->
     tf_w (uvis_tf W) (tf_arg_idx 1) = tf_w (uvis_tf W') (tf_arg_idx 1) ->
     uvis_fd W = uvis_fd W' ->
+    uvis_cwd W = uvis_cwd W' ->
     xbundle X W ⊣⊢ xbundle X W'
 }.
 Global Existing Instance xbundle_ne.

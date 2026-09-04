@@ -290,12 +290,12 @@ Section ProofSysUnlinkAUW2.
     (* THE ARM, ALREADY BUILT.  Both callers arrive at [bad:] having refused
        BY NAME, so the payout is arm (iii-a) at either dot; this block does
        not look at it -- it only spends it against [ARMS] at [-1]. *)
-    unlink_post_fail (fs_gamma_L fsc_fs) fsc_fs P Pmiss
+    unlink_post_fail (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss
                      Phient Phitgt Phiex Phimiss -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       su_au_closer (CID := CIDx) gf (proc_addr jx) pidv U m
         (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
-        dqb dqs dqbs (unlink_arms (fs_gamma_L fsc_fs) fsc_fs P Pmiss
+        dqb dqs dqbs (unlink_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss
                         Phient Phitgt Phiex Phimiss)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -497,7 +497,7 @@ Section ProofSysUnlinkAUW2.
        wp_next (CID0 := CIDs) true (proc_addr jx) (fun (CIDx : CpuId) =>
          su_au_closer (CID := CIDx) gf (proc_addr jx) pid U m
            (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
-           dqb dqs dqbs (unlink_arms (fs_gamma_L fsc_fs) fsc_fs P Pmiss
+           dqb dqs dqbs (unlink_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss
                         Phient Phitgt Phiex Phimiss)) -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -605,7 +605,7 @@ Section ProofSysUnlinkAUW2.
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       su_au_closer (CID := CIDx) gf (proc_addr jx) pid U m
         (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks
-        dqb dqs dqbs (unlink_arms (fs_gamma_L fsc_fs) fsc_fs P Pmiss
+        dqb dqs dqbs (unlink_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss
                         Phient Phitgt Phiex Phimiss)) -∗
     WP (Loop : expr riscv_lang).
   Proof.

@@ -88,7 +88,7 @@ Section CreateAUFOpen.
      returning 0 is exactly what [cauf_fail] is the payout of.  sys_open
      builds (a) from [cauf_ok]'s [made = true] arm at its OWN later
      failures. *)
-  Lemma cauf_fail_to_open Γ (γfs : fs_names)
+  Lemma cauf_fail_to_open Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
@@ -97,7 +97,7 @@ Section CreateAUFOpen.
     cauf_fail Γ γfs P Pmiss Φok Φex pl -∗
     aopen_commit_at Γ fsabsE Φo -∗
     atrunc_commit_at Γ fsabsE Φt -∗
-    open_post_fail_create Γ γfs P Pmiss Φok Φex Φo Φt.
+    open_post_fail_create Γ γfs cw P Pmiss Φok Φex Φo Φt.
   Proof.
     iIntros "Hcf Ho Ht".
     rewrite /cauf_fail /open_post_fail_create.

@@ -289,7 +289,7 @@ Section ProofSysOpenAUWalk.
        ([SpecSysOpenAU.open_walk_pre_era]), handed DOWN unfired: the walk
        picks the start inum -- ROOTINO on an absolute path, [p->cwd]'s on a
        relative one -- and fires it there. ---- *)
-    open_walk_pre_era fsc_fs P Pmiss -∗
+    open_walk_pre_era fsc_fs (pv_cwi (us_V U)) P Pmiss -∗
     aopen_commit_at (fs_gamma_L fsc_fs) fsabsE Φo -∗
     atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Φt -∗
     wp_next true (proc_addr jx)
@@ -391,7 +391,7 @@ Section ProofSysOpenAUWalk.
        [ex_start] at the string argstr fetched IS the contract's premise at
        that string, so nothing is fired here -- the WALK picks the start
        inum and fires it there. *)
-    iDestruct (opf_start_of_open fsc_fs P Pmiss (bview plen bp) with "Hwp")
+    iDestruct (opf_start_of_open fsc_fs (pv_cwi (us_V U)) P Pmiss (bview plen bp) with "Hwp")
       as "Htrace".
     iApply (NameiEra.wp_namei_era (CID := CID2) gs jx gl pd pav pu
  gf

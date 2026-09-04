@@ -1647,6 +1647,7 @@ Section UservecAllPt.
                     eq_refl
                     ltac:(cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf];
                           unfold UexecSlot.tf_w, tf_arg_idx, tf_of; reflexivity)
+                    eq_refl
                     with "Hxin")
       end. }
     iApply wp_next_intro. iIntros (CID2).

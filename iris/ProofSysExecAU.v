@@ -136,14 +136,14 @@ Section SysExecAUBridge.
   Implicit Types Γ : fs_view_names Σ.
 
   (* (1) the caller's WP, instantiated at the vector the walk built *)
-  Lemma sys_exec_au_pre_at (S : uvis -> iProp Σ) Γ (γfs : fs_names)
+  Lemma sys_exec_au_pre_at (S : uvis -> iProp Σ) Γ (γfs : fs_names) (cw : Z)
       (Pw Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Mim : gmap Z (bv 8)) (avp : mword 64) (sts : list fdstate)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
     exec_args_shape na alen afun ->
-    sys_exec_au_pre S Γ γfs Pw Pmiss Φo Mim avp sts -∗
-    exec_au_pre S Γ γfs Pw Pmiss Φo na alen afun sts.
+    sys_exec_au_pre S Γ γfs cw Pw Pmiss Φo Mim avp sts -∗
+    exec_au_pre S Γ γfs cw Pw Pmiss Φo na alen afun sts.
   Proof.
     intro Hsh. rewrite /sys_exec_au_pre /exec_au_pre /sys_exec_slot_pre.
     iIntros "(Hera & Hcom & Hslot)".
@@ -258,7 +258,7 @@ Section SysExecBreakAU.
     (* the caller's bundle, still quantified over every argument vector of
        the right shape: the instantiation happens below, at the vector the
        fill loop actually built. *)
-    sys_exec_au_pre S (fs_gamma_L fsc_fs) fsc_fs Pw Pmiss Φo Mim avp sts -∗
+    sys_exec_au_pre S (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Φo Mim avp sts -∗
     sx_body γf jp pid U K eb b lks sp0 m plen pfun rest uav
             M P i pg alen afun (mword_of_int (SX + 0xb6) : mword 64) -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
@@ -271,7 +271,7 @@ Section SysExecBreakAU.
         (* the armed post, at the block the copy-ins left and the returned
            a0; [exec_arms_landed] turns it back into the landed
            [kexec_ok] whenever a caller wants that instead. *)
-        exec_arms S (fs_gamma_L fsc_fs) fsc_fs Pw Pmiss Φo i alen afun sts
+        exec_arms S (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Φo i alen afun sts
                   (us_upt U P) U' (mf !!! Regidx Ra0) -∗
         (* the shape the walk established, which the composition needs to
            name the vector in [sys_exec_arms] *)
@@ -304,7 +304,7 @@ Section SysExecBreakAU.
       - unfold MAXARG. lia.
       - intros j Hj. exact (proj2 (proj2 (proj2 (Hok j Hj)))).
       - intros j Hj. pose proof (proj1 (proj2 (proj2 (Hok j Hj)))). lia. }
-    iDestruct (sys_exec_au_pre_at S (fs_gamma_L fsc_fs) fsc_fs Pw Pmiss Φo
+    iDestruct (sys_exec_au_pre_at S (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) Pw Pmiss Φo
                  Mim avp sts i alen afun Hshape with "Hau") as "Hau".
     iDestruct (sx_carry_open sp0 m plen pfun rest with "Hcarry")
       as "(Hf1 & Hf2 & Hspill & F10 & Hpb & Hps)".

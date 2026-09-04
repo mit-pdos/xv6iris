@@ -665,13 +665,13 @@ Section SysUnlinkAU.
      ∀ pl r with only the SLASH -> ROOTINO tie, the hop family at the
      era lend over the parent prefix [mknod_parent_elems pl]; it is what
      [FsAbsStart.ep_start] instantiates to at the fetched string). *)
-  Definition unlink_au_pre Γ (γfs : fs_names)
+  Definition unlink_au_pre Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φent : aview -> Z -> fname -> Z -> iProp Σ)
       (Φtgt : aview -> Z -> iProp Σ)
       (Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φmiss : aview -> Z -> fname -> iProp Σ) : iProp Σ :=
-    (mknod_walk_pre_era γfs P Pmiss
+    (mknod_walk_pre_era γfs cw P Pmiss
      ∗ uent_commit_at Γ fsabsE Φent
      ∗ utgt_commit_at Γ fsabsE Φtgt
      ∗ dlookup_commit_at Γ fsabsE Φex
@@ -701,13 +701,13 @@ Section SysUnlinkAU.
 
   (* ret -1: the header's fold -- (i) bundle back, (ii) walk dead,
      (iii) refused at the parent with the observation each refusal IS *)
-  Definition unlink_post_fail Γ (γfs : fs_names)
+  Definition unlink_post_fail Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φent : aview -> Z -> fname -> Z -> iProp Σ)
       (Φtgt : aview -> Z -> iProp Σ)
       (Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φmiss : aview -> Z -> fname -> iProp Σ) : iProp Σ :=
-    (unlink_au_pre Γ γfs P Pmiss Φent Φtgt Φex Φmiss
+    (unlink_au_pre Γ γfs cw P Pmiss Φent Φtgt Φex Φmiss
      ∨ (∃ pl : list (bv 8),
           (mknod_walk_dead_era γfs P Pmiss pl
              ∗ uent_commit_at Γ fsabsE Φent
@@ -752,7 +752,7 @@ Section SysUnlinkAU.
 
   (* the armed disjunction the continuation receives, keyed on a0
      (implies the landed [sys_unlink_ret]) *)
-  Definition unlink_arms Γ (γfs : fs_names)
+  Definition unlink_arms Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φent : aview -> Z -> fname -> Z -> iProp Σ)
       (Φtgt : aview -> Z -> iProp Σ)
@@ -762,17 +762,17 @@ Section SysUnlinkAU.
     ((⌜r = (zero_reg : mword 64)⌝
       ∗ unlink_post_ok Γ P Φent Φtgt Φex Φmiss)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ unlink_post_fail Γ γfs P Pmiss Φent Φtgt Φex Φmiss))%I.
+        ∗ unlink_post_fail Γ γfs cw P Pmiss Φent Φtgt Φex Φmiss))%I.
 
   (* the landed return blanket, read off the arms: the one conjunct of
      [SpecSysUnlink.sys_unlink_closer] the AU form replaces, implied *)
-  Lemma unlink_arms_ret Γ (γfs : fs_names)
+  Lemma unlink_arms_ret Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φent : aview -> Z -> fname -> Z -> iProp Σ)
       (Φtgt : aview -> Z -> iProp Σ)
       (Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φmiss : aview -> Z -> fname -> iProp Σ) (r : mword 64) :
-    unlink_arms Γ γfs P Pmiss Φent Φtgt Φex Φmiss r ⊢ ⌜sys_unlink_ret r⌝.
+    unlink_arms Γ γfs cw P Pmiss Φent Φtgt Φex Φmiss r ⊢ ⌜sys_unlink_ret r⌝.
   Proof.
     rewrite /unlink_arms /sys_unlink_ret.
     iIntros "[[%Hr _] | [%Hr _]]"; iPureIntro; [right | left]; exact Hr.
@@ -926,8 +926,8 @@ Definition wp_sys_unlink_au_body
   let Γfs := fs_gamma_L fsc_fs in
   wp_sys_unlink_au_frame γf gs j gl pd pav pu dqb dqs dqbs
     v0 pid U m K eb b lks
-    (unlink_au_pre Γfs fsc_fs P Pmiss Φent Φtgt Φex Φmiss)
-    (unlink_arms Γfs fsc_fs P Pmiss Φent Φtgt Φex Φmiss).
+    (unlink_au_pre Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φent Φtgt Φex Φmiss)
+    (unlink_arms Γfs fsc_fs (pv_cwi (us_V U)) P Pmiss Φent Φtgt Φex Φmiss).
 
 (* ===================================================================== *)
 (*  4.  THE SEAL                                                          *)

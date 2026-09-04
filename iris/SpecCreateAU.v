@@ -283,7 +283,7 @@ Definition wp_create_au_body
      so the syscall hands its one-shot straight down and the START INUM is
      decided inside the walk.  The hop family is over the PARENT PREFIX,
      which is [SpecSysMknodAU.mknod_parent_elems] definitionally. *)
-  ep_start fsc_fs P Pmiss pl -∗
+  ep_start fsc_fs (pv_cwi (us_V U)) P Pmiss pl -∗
   acre_commit_at Γfs fsabsE (ADev ma mi) Φok -∗
   dlookup_commit_at Γfs fsabsE Φex -∗
   wp_next true pj (fun (CID : CpuId) =>

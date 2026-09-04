@@ -189,6 +189,13 @@ Proof. intros Hf Hall HM. exact (ustr_read_aux_of M pl a UMAXPATH Hf Hall HM). Q
 Definition um_start (u : umirror) (pl : list (bv 8)) : Z :=
   if decide (pl !! 0%nat = Some SLASH) then FsImg.ROOTINO else um_cwd u.
 
+(* ...which is the walk contracts' own start rule ([FsAbsStart.um_start_of],
+   the tie every era walk premise carries since lane C3) read at the
+   mirror's cwd leg: one function, two spellings *)
+Lemma um_start_of_agree (u : umirror) (pl : list (bv 8)) :
+  um_start u pl = FsAbsEra.um_start_of (um_cwd u) pl.
+Proof. reflexivity. Qed.
+
 Definition um_resolve (u : umirror) (pl : list (bv 8)) : option Z :=
   apath_at (um_av u) (um_start u pl) (path_elems pl).
 

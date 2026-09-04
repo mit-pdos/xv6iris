@@ -1698,7 +1698,7 @@ Section ProofSysMknodBody.
               string this call fetched IS [mknod_walk_pre_era] at that
               string, so nothing is fired here -- the WALK picks the start
               inum (ROOTINO, or the cwd's) and fires it there. *)
-           iDestruct (np_start_of_mknod fsc_fs P Pmiss (bview pk bf)
+           iDestruct (np_start_of_mknod fsc_fs (pv_cwi (us_V U)) P Pmiss (bview pk bf)
                         with "Hwp") as "Htr".
            iApply (CreateAU.wp_create_au (CID := CID25) gs j gl pd pav pu
       gf

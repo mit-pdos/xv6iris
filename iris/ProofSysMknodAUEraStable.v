@@ -256,8 +256,8 @@ Section MknodStable.
     by destruct (ents !! s).
   Qed.
 
-  Lemma mkr_walk_triv (γfs : fs_names) :
-    ⊢ mknod_walk_pre_era γfs (fun _ _ => True%I) (fun _ _ => True%I).
+  Lemma mkr_walk_triv (γfs : fs_names) (cw : Z) :
+    ⊢ mknod_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I).
   Proof.
     rewrite /mknod_walk_pre_era. iIntros (pl r) "%Hs". iModIntro.
     iSplitR; [done |]. rewrite /ax_hops_from.
@@ -286,10 +286,10 @@ Section MknodStable.
     iSplitL "Hcm"; [iApply (mkr_dlookup_forget with "Hcm") | iExact "HΦ"].
   Qed.
 
-  Lemma mkr_fail_arm Γ (γfs : fs_names) (ma mi : Z) (root : Z)
+  Lemma mkr_fail_arm Γ (γfs : fs_names) (cw : Z) (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :
-    mknod_post_fail_era Γ γfs ma mi (fun _ _ => True%I) (fun _ _ => True%I)
+    mknod_post_fail_era Γ γfs cw ma mi (fun _ _ => True%I) (fun _ _ => True%I)
       (mkr_recv root ps ds Φok) (mkr_recv root ps ds Φex)
     ⊢ mknod_stable_fail_era Γ ma mi root ps ds Φok Φex.
   Proof.
@@ -317,10 +317,10 @@ Section MknodStable.
       + iApply (mkr_dlookup_forget with "Hdl").
   Qed.
 
-  Lemma mkr_arms Γ (γfs : fs_names) (ma mi : Z) (root : Z)
+  Lemma mkr_arms Γ (γfs : fs_names) (cw : Z) (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) (r : mword 64) :
-    mknod_arms_era Γ γfs ma mi (fun _ _ => True%I) (fun _ _ => True%I)
+    mknod_arms_era Γ γfs cw ma mi (fun _ _ => True%I) (fun _ _ => True%I)
       (mkr_recv root ps ds Φok) (mkr_recv root ps ds Φex) r
     ⊢ mknod_stable_arms_era Γ ma mi root ps ds Φok Φex r.
   Proof.

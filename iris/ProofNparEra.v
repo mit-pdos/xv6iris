@@ -5535,7 +5535,9 @@ Section ProofNparEraMain.
          at idup's own inum, where the implication is refuted instead. *)
       iApply fupd_wp.
       iMod ("Htr" $! (bv_unsigned ROOTINO) with "[%]") as "[HP0 Hhops0]";
-        [intros _; reflexivity |].
+        [ (* the start rule picks ROOTINO: the buffer's head IS SLASH (C3) *)
+          rewrite (um_start_of_slash _ _ (bview_head_slash_intro plen pfun Hcstr Hsl0));
+          exact rootino_agree |].
       iModIntro.
       iSpecialize ("Hloop" $! (S plen) CIDK5 with "[%]"); [wp_next_chain |].
       iApply ("Hloop" $! 0%nat (ientry kig) A8 n Sb [] nfun false
@@ -5715,7 +5717,12 @@ Section ProofNparEraMain.
          clause never applies and the start is idup's own inum. *)
       iApply fupd_wp.
       iMod ("Htr" $! (bv_unsigned iinum) with "[%]") as "[HP0 Hhops0]";
-        [ intros Hpl0; exfalso; exact (Hsl0 (bview_head_slash plen pfun Hpl0)) |].
+        [ (* the start rule's relative branch: the caller's [pv_cwi], which
+             is idup's own inum by C1's pin on the package ([Hiinz]) --
+             this is where the C3 tie is paid *)
+          rewrite (um_start_of_rel _ _
+                     (fun Hpl0 => Hsl0 (bview_head_slash plen pfun Hpl0)));
+          exact Hiinz |].
       iModIntro.
       (* ---- the register facts the two [callee_saved]s carry over ---- *)
       assert (Hcsa1 : is_cs_idx Ra1 = false) by (vm_compute; reflexivity).
