@@ -180,7 +180,7 @@ Section SysExecBreak.
         (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok (upd_upt (us_V U) P) (us_V U') (mf !!! Regidx Ra0) entry spv szv' i alen⌝ -∗
-        ⌜uptd_ext (pv_upt (us_V U)) P⌝ -∗
+        ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
@@ -490,17 +490,17 @@ Section SysExecWhole.
     (* ===== +0x000 .. +0x026 : the prologue ===== *)
     iApply (sx_head γf j pid U v0 v1 m K true true ∅
               HK Harg0 Harg1 Hlb with "Hcg Hcnt Htext Hdata Hpc Hpriv Hka").
-    iIntros (CID1 Hq1 M P' M' plen pfun rst v59 v60) "[Hm1 | Hft]".
+    iIntros (CID1 Hq1 M P' plen pfun rst v59 v60) "[Hm1 | Hft]".
     { (* ---- argstr failed: -1, and the block never moved ---- *)
       iDestruct "Hm1" as "((%Hcs & %Hext & %Ha0) & Hcg & Hcnt & Hpc & Hpriv)".
       iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! M P' M'
+      iApply ("Hcont" $! M P' (us_M U)
                with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp Hbs Hka
                      Hir [Hpriv]").
       { exact Hcs. }
       { exact Hext. }
       { rewrite /sys_exec_post.
-        iExists (upd_usM (us_upt U P') M'), 0%nat, (fun _ => 0%nat),
+        iExists (us_upt U P'), 0%nat, (fun _ => 0%nat),
                 (mword_of_int 0 : mword 64), (mword_of_int 0 : mword 64),
                 (mword_of_int 0 : mword 64).
         iSplitR; [iPureIntro; left; split; [exact Ha0 | reflexivity] |].
@@ -533,12 +533,12 @@ Section SysExecWhole.
     { split_and!;
         [ exact H2sp | exact H2thr | exact H2s0 | exact H2s1 | exact H2s2
         | exact H2s3 | exact H2s4 | exact H2s5 | exact H2s6 | exact H2s7 ]. }
-    iAssert (sx_body γf j pid (upd_usM U M') K true true ∅ sp0 m plen pfun rst v59
+    iAssert (sx_body γf j pid U K true true ∅ sp0 m plen pfun rst v59
                M2 P' 0%nat (fun _ => (mword_of_int 0 : mword 64))
                (fun _ => 0%nat) (fun _ _ => (mword_of_int 0 : mword 8))
                (mword_of_int (SX + 0x56) : mword 64))
       with "[Hpc Hcg Hcnt Hpriv Hcarry F59 F60 Hargv]" as "Hbody".
-    { iApply (sx_body_intro (CID0 := CID2) γf j pid (upd_usM U M') K true true ∅ sp0 m
+    { iApply (sx_body_intro (CID0 := CID2) γf j pid U K true true ∅ sp0 m
                 plen pfun rst v59 M2 P' 0%nat
                 (fun _ => (mword_of_int 0 : mword 64)) (fun _ => 0%nat)
                 (fun _ _ => (mword_of_int 0 : mword 8))
@@ -551,15 +551,15 @@ Section SysExecWhole.
       { rewrite /sx_pages sx_seq00 big_sepL_nil. done. } }
     (* ===== +0x056 .. +0x090 : the fill loop ===== *)
     iApply (sx_loop (CID0 := CID2) γf j pid U K true true ∅ sp0 m plen
-              pfun rst v59 HK Hlb 32%nat M2 P' M' 0%nat
+              pfun rst v59 HK Hlb 32%nat M2 P' 0%nat
               (fun _ => (mword_of_int 0 : mword 64)) (fun _ => 0%nat)
               (fun _ _ => (mword_of_int 0 : mword 8)) ltac:(lia)
               with "Htext Hka Hbody").
-    iIntros (CID3 Hq3 M3 P3 M3i i3 pg3 al3 af3) "[Hbrk | Hbad]".
+    iIntros (CID3 Hq3 M3 P3 i3 pg3 al3 af3) "[Hbrk | Hbad]".
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
       iApply (sx_break (CID0 := CID3) gs j gl pd pav pu
  γf
-                dqb dqs pid (upd_usM U M3i) K true true ∅ sp0 m plen pfun rst v59
+                dqb dqs pid U K true true ∅ sp0 m plen pfun rst v59
                 M3 P3 i3 pg3 al3 af3
                 HK Hlb eq_refl Hplen Hpcstr Halp Hroot Hnib0
                 Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
@@ -577,18 +577,18 @@ Section SysExecWhole.
         iExists (MkUstate V' Mbk), i3, al3, entry, spv, szv'.
         iSplitR; [iPureIntro; exact Hkok |]. iExact "Hpriv". }
     - (* ---- [bad:]: free what was allocated and return -1 ---- *)
-      iApply (sx_bad_tail (CID0 := CID3) γf j pid (upd_usM U M3i) K true true ∅ sp0 m
+      iApply (sx_bad_tail (CID0 := CID3) γf j pid U K true true ∅ sp0 m
                 plen pfun rst v59 M3 P3 i3 pg3 af3
                 HK Hlb eq_refl Hplen Halp with "Htext Hka Hbad").
       iIntros (CID4 Hq4 mf) "%Hcs %Ha0 %Hext3 Hcg Hcnt Hpc Hpriv".
       iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf P3 M3i
+      iApply ("Hcont" $! mf P3 (us_M U)
                with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp Hbs Hka
                      Hir [Hpriv]").
       { exact Hcs. }
       { exact Hext3. }
       { rewrite /sys_exec_post.
-        iExists (upd_usM (us_upt U P3) M3i), 0%nat, (fun _ => 0%nat),
+        iExists (us_upt U P3), 0%nat, (fun _ => 0%nat),
                 (mword_of_int 0 : mword 64), (mword_of_int 0 : mword 64),
                 (mword_of_int 0 : mword 64).
         iSplitR; [iPureIntro; left; split; [exact Ha0 | reflexivity] |].

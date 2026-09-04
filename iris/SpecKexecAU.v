@@ -599,7 +599,7 @@ Section KexecAU.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (U U' : ustate) (r : mword 64) : iProp Σ :=
-    ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = us_V U⌝
+    ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = us_V U /\ us_M U' = us_M U⌝
       ∗ exec_post_fail Γ γfs P Pmiss Φo na alen afun sts)
      ∨ exec_post_ok Γ P Φo na alen afun sts U U' r)%I.
 
@@ -617,7 +617,7 @@ Section KexecAU.
          kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝.
   Proof.
     rewrite /exec_arms /exec_post_ok.
-    iIntros "[[[%Hr %HV] _] | H]".
+    iIntros "[[(%Hr & %HV & _) _] | H]".
     - iPureIntro. exists (mword_of_int 0), (mword_of_int 0), (mword_of_int 0).
       left. split; [exact Hr | exact HV].
     - iDestruct "H" as (pl i av a) "(_ & _ & [H | H])".

@@ -147,6 +147,11 @@ Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
 Require Import UserPtTree.       (* [umem_wr] *)
+Require Import UserFd.           (* [ufdG] -- the class a minted user slot needs *)
+Require Import UserPerm.         (* [perm_of] -- the exec channel's failure row *)
+Require Import UexecSlot.        (* [uvis_of] *)
+Require Import UexecRet.         (* [uslot] *)
+Require Import UexecExecInst.    (* [exec_xbundle] -- the process's exec bundle *)
 Import Defs.
 
 (* ===================================================================== *)
@@ -304,6 +309,66 @@ Proof.
   exact (UsysMemOk.usys_fd_ok_refl_at _ k (pv_tf V) r sts Hk Hc Hd Ho Hp).
 Qed.
 
+(* ===================================================================== *)
+(*  THE EXEC CHANNEL.                                                     *)
+(* ===================================================================== *)
+(* A caller that offers the process's exec bundle ([UexecExecInst.
+   exec_xbundle], the [SpecSysExecAU] AU precondition at the trapping key)
+   gets back, on exec, either the failure facts or the U-mode slot of the
+   NEW image.  Staged on a boolean: the usertrap side passes [false] until
+   the U-mode loop threads the bundle down, and every non-exec arm owes
+   nothing either way ([sysc_exec_out_ne]). *)
+Section SyscExec.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ, !ufdG Σ}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
+
+  (* the process's exec bundle, offered only on exec *)
+  Definition sysc_exec_in (xb : bool) (U : ustate) (sts : list fdstate) : iProp Σ :=
+    if xb then (⌜sysc_num (us_V U) = 7⌝ -∗ exec_xbundle (uvis_of U sts))%I else emp%I.
+
+  (* r = -1 and nothing of the process moved but a0: the trapframe up to
+     the a0 slot, the image, the permission projection (a copy-in's lazy
+     fill grows the descriptor but not the projection), the size, the
+     descriptors *)
+  Definition sysc_exec_failed (U U' : ustate) (sts sts' : list fdstate) : Prop :=
+    pv_tf (us_V U') = <[tf_arg_idx 0 := (mword_of_int (-1) : mword 64)]> (pv_tf (us_V U))
+    /\ us_M U' = us_M U
+    /\ perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U')))
+         = perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))
+    /\ pv_sz (us_V U') = pv_sz (us_V U)
+    /\ sts' = sts.
+
+  (* [U'] is the record AFTER the dispatcher's own a0 store, so on success
+     [uvis_of U' sts'] IS [SpecKexecAU.exec_key]'s resume key *)
+  Definition sysc_exec_out (xb : bool) (U U' : ustate) (sts sts' : list fdstate) : iProp Σ :=
+    if xb then
+      (⌜sysc_num (us_V U) = 7⌝ -∗
+         (⌜sysc_exec_failed U U' sts sts'⌝
+          ∨ uslot (uvis_of U' sts')                       (* the new image's slot *)
+          ∨ ⌜pv_tf (us_V U') !!! tf_arg_idx 0 <> (mword_of_int (-1) : mword 64)⌝))%I  (* the loadability gap *)
+    else emp%I.
+
+  (* every other entry owes nothing *)
+  Lemma sysc_exec_out_ne (xb : bool) (U U' : ustate) (sts sts' : list fdstate) :
+    sysc_num (us_V U) <> 7 -> ⊢ sysc_exec_out xb U U' sts sts'.
+  Proof.
+    intro Hne. rewrite /sysc_exec_out. destruct xb; [| iEmpIntro].
+    iIntros "%Hk". exfalso. exact (Hne Hk).
+  Qed.
+
+  (* ...and nor does exec at a caller that offered no bundle *)
+  Lemma sysc_exec_out_false (U U' : ustate) (sts sts' : list fdstate) :
+    ⊢ sysc_exec_out false U U' sts sts'.
+  Proof. rewrite /sysc_exec_out. iEmpIntro. Qed.
+
+  (* ...and such a caller offers nothing *)
+  Lemma sysc_exec_in_false (U : ustate) (sts : list fdstate) :
+    ⊢ sysc_exec_in false U sts.
+  Proof. rewrite /sysc_exec_in. iEmpIntro. Qed.
+
+End SyscExec.
+
 (* syscall's own frame is 4 slots; below it the deepest table entry, which is
    sys_exit at [K_sys_exit] = 4 + kexit's 74.  Written as an expression, not
    a literal, so a change to kexit's budget cannot silently leave this one
@@ -312,7 +377,7 @@ Qed.
 Notation K_syscall := ((4 + K_sys_exec)%nat) (only parsing).
 Definition wp_syscall_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      !irefslotG Σ, !pavG Σ, !ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (R : gname -> mword 64 -> fclose_names -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
     (fn : fclose_names)
@@ -321,7 +386,10 @@ Definition wp_syscall_sconf_body
     (pid : mword 32) (U : ustate)
     (* THE DESCRIPTOR STATES syscall() IS ENTERED AT.  The post below states
        [sysc_fd_ok] against them, beside [sysc_mem_ok] against the image. *)
-    (sts : list fdstate) (lks : gset string) :=
+    (sts : list fdstate) (lks : gset string)
+    (* THE EXEC CHANNEL'S SWITCH: whether the caller offers the process's
+       exec bundle ([sysc_exec_in]) and takes the slot back ([sysc_exec_out]) *)
+    (xb : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.syscall in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -376,6 +444,8 @@ Definition wp_syscall_sconf_body
 
      AT A NAMED TABLE, so the post can say which descriptors moved. *)
   fd_frags (pv_fdg (us_V U)) sts -∗
+  (* the process's exec bundle, offered only on exec -- see [sysc_exec_in] *)
+  sysc_exec_in xb U sts -∗
   (* THE EXIT SLOT IS AN ADDITIVE CONJUNCTION, AND THAT IS WHAT LETS ONE
      TABLE ENTRY NOT RETURN WITHOUT THE CONTRACT SAYING WHICH ONE.
 
@@ -513,11 +583,13 @@ Definition wp_syscall_sconf_body
       proc_priv γf pj pid U' -∗
       fd_frags (pv_fdg (us_V U)) sts' -∗
       pc_is ret_tgt -∗
+      (* ...and the exec channel's answer: on exec, the failure facts or
+         the new image's slot at the resume record [U'] *)
+      sysc_exec_out xb U U' sts sts' -∗
       WP (Loop : expr riscv_lang))
    ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av)) -∗
   WP (Loop : expr riscv_lang).
 
-Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Module Type SYSCALL.
   (* the kernel-side resources the syscall table's entries consume, for the
      process at [pj] whose open-file table is named by [γf].  Defined
@@ -618,6 +690,6 @@ Module Type SYSCALL.
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (sts : list fdstate)
-      (lks : gset string),
-      wp_syscall_sconf_body (syscall_env) γf γs j γl fn ip dqi m av pid U sts lks.
+      (lks : gset string) (xb : bool),
+      wp_syscall_sconf_body (syscall_env) γf γs j γl fn ip dqi m av pid U sts lks xb.
 End SYSCALL.

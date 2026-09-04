@@ -222,7 +222,7 @@ Section SysExecAU.
       (V : pprivate) (r : mword 64) : iProp Σ :=
     (∃ U' : ustate,
        proc_priv γf pj pid U' ∗
-       ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = V⌝
+       ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = V /\ us_M U' = M⌝
          ∗ sys_exec_post_fail Γ γfs P Pmiss Φo M av sts)
         ∨ (∃ (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8),
              ⌜exec_args_shape na alen afun⌝ ∗
@@ -239,7 +239,7 @@ Section SysExecAU.
       sys_exec_post γf pj pid V r.
   Proof.
     rewrite /sys_exec_arms /sys_exec_post.
-    iIntros "H". iDestruct "H" as (U') "[Hp [[[%Hr %HV] _] | H]]".
+    iIntros "H". iDestruct "H" as (U') "[Hp [[(%Hr & %HV & _) _] | H]]".
     - iExists U', 0%nat, (fun _ => 0%nat),
         (mword_of_int 0), (mword_of_int 0), (mword_of_int 0).
       iFrame "Hp". iPureIntro. left. split; [exact Hr | exact HV].
@@ -310,7 +310,7 @@ Definition wp_sys_exec_au_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗

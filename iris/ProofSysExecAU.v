@@ -275,7 +275,7 @@ Section SysExecBreakAU.
         (* the shape the walk established, which the composition needs to
            name the vector in [sys_exec_arms] *)
         ⌜exec_args_shape i alen afun⌝ -∗
-        ⌜uptd_ext (pv_upt (us_V U)) P⌝ -∗
+        ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
@@ -596,11 +596,11 @@ Section SysExecWhole.
     (* ===== +0x000 .. +0x026 : the prologue ===== *)
     iApply (sx_head γf j pid U v0 v1 m K true true ∅
               HK Harg0 Harg1 Hlb with "Hcg Hcnt Htext Hdata Hpc Hpriv Hka").
-    iIntros (CID1 Hq1 M P' M' plen pfun rst v59 v60) "[Hm1 | Hft]".
+    iIntros (CID1 Hq1 M P' plen pfun rst v59 v60) "[Hm1 | Hft]".
     { (* ---- argstr failed: -1, and the block never moved ---- *)
       iDestruct "Hm1" as "((%Hcs & %Hext & %Ha0) & Hcg & Hcnt & Hpc & Hpriv)".
       iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! M P' M'
+      iApply ("Hcont" $! M P' (us_M U)
                with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp Hbs Hka
                      Hir [Hpriv Hau]").
       { exact Hcs. }
@@ -609,9 +609,9 @@ Section SysExecWhole.
            [sys_exec_post_fail]'s own first disjunct (SpecSysExecAU.v's
            "a FOURTH disjunct this level owns"). *)
         rewrite /sys_exec_arms.
-        iExists (upd_usM (us_upt U P') M').
+        iExists (us_upt U P').
         iSplitL "Hpriv"; [iExact "Hpriv" |]. iLeft.
-        iSplitR; [iPureIntro; split; [exact Ha0 | reflexivity] |].
+        iSplitR; [iPureIntro; split_and!; [exact Ha0 | reflexivity | reflexivity] |].
         rewrite /sys_exec_post_fail. iLeft. iExact "Hau". } }
     (* ---- the path is in: run the rest of the function ---- *)
     iDestruct "Hft" as "((%Hsp & %Hs0 & %Hthr2 & %Hext & %Hplen & %Hpcstr &
@@ -641,12 +641,12 @@ Section SysExecWhole.
     { split_and!;
         [ exact H2sp | exact H2thr | exact H2s0 | exact H2s1 | exact H2s2
         | exact H2s3 | exact H2s4 | exact H2s5 | exact H2s6 | exact H2s7 ]. }
-    iAssert (sx_body γf j pid (upd_usM U M') K true true ∅ sp0 m plen pfun rst v59
+    iAssert (sx_body γf j pid U K true true ∅ sp0 m plen pfun rst v59
                M2 P' 0%nat (fun _ => (mword_of_int 0 : mword 64))
                (fun _ => 0%nat) (fun _ _ => (mword_of_int 0 : mword 8))
                (mword_of_int (SX + 0x56) : mword 64))
       with "[Hpc Hcg Hcnt Hpriv Hcarry F59 F60 Hargv]" as "Hbody".
-    { iApply (sx_body_intro (CID0 := CID2) γf j pid (upd_usM U M') K true true ∅ sp0 m
+    { iApply (sx_body_intro (CID0 := CID2) γf j pid U K true true ∅ sp0 m
                 plen pfun rst v59 M2 P' 0%nat
                 (fun _ => (mword_of_int 0 : mword 64)) (fun _ => 0%nat)
                 (fun _ _ => (mword_of_int 0 : mword 8))
@@ -659,14 +659,14 @@ Section SysExecWhole.
       { rewrite /sx_pages sx_seq00 big_sepL_nil. done. } }
     (* ===== +0x056 .. +0x090 : the fill loop ===== *)
     iApply (sx_loop (CID0 := CID2) γf j pid U K true true ∅ sp0 m plen
-              pfun rst v59 HK Hlb 32%nat M2 P' M' 0%nat
+              pfun rst v59 HK Hlb 32%nat M2 P' 0%nat
               (fun _ => (mword_of_int 0 : mword 64)) (fun _ => 0%nat)
               (fun _ _ => (mword_of_int 0 : mword 8)) ltac:(lia)
               with "Htext Hka Hbody").
-    iIntros (CID3 Hq3 M3 P3 M3i i3 pg3 al3 af3) "[Hbrk | Hbad]".
+    iIntros (CID3 Hq3 M3 P3 i3 pg3 al3 af3) "[Hbrk | Hbad]".
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
       iApply (sx_break_au (CID0 := CID3) gs j gl pd pav pu γf
-                dqb dqs pid (upd_usM U M3i) K true true ∅ sp0 m plen pfun rst v59
+                dqb dqs pid U K true true ∅ sp0 m plen pfun rst v59
                 M3 P3 i3 pg3 al3 af3 sts (us_M U) v1 P Pmiss Φo
                 HK Hlb eq_refl Hplen Hpcstr Halp Hroot Hnib0
                 Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
@@ -682,11 +682,12 @@ Section SysExecWhole.
       { rewrite /sys_exec_arms.
         iExists Ubk. iSplitL "Hpriv"; [iExact "Hpriv" |].
         rewrite /exec_arms.
-        iDestruct "Harms" as "[[[%Hrm1 %Hrm2] Hfail] | Hok]".
+        iDestruct "Harms" as "[[(%Hrm1 & %Hrm2 & %Hrm3) Hfail] | Hok]".
         - (* kexec returned -1: its own three-way fold, at the vector the
              loop built *)
           iLeft.
-          iSplitR; [iPureIntro; split; [exact Hrm1 | rewrite Hrm2; reflexivity] |].
+          iSplitR; [iPureIntro; split_and!;
+                    [exact Hrm1 | rewrite Hrm2; reflexivity | rewrite Hrm3; reflexivity] |].
           rewrite /sys_exec_post_fail. iRight.
           iExists i3, al3, af3.
           iSplitR; [iPureIntro; exact Hshape |]. iExact "Hfail".
@@ -696,25 +697,25 @@ Section SysExecWhole.
           iRight. iExists i3, al3, af3.
           iSplitR; [iPureIntro; exact Hshape |].
           iApply (exec_post_ok_V (fs_gamma_L fsc_fs) P Φo i3 al3 af3 sts
-                    (us_upt (upd_usM U M3i) P3)
+                    (us_upt U P3)
                     (MkUstate (upd_upt (us_V U) P3) (us_M U))
                     Ubk (mf !!! Regidx Ra0 : mword 64) eq_refl with "Hok"). }
     - (* ---- [bad:]: free what was allocated and return -1 ---- *)
-      iApply (sx_bad_tail (CID0 := CID3) γf j pid (upd_usM U M3i) K true true ∅ sp0 m
+      iApply (sx_bad_tail (CID0 := CID3) γf j pid U K true true ∅ sp0 m
                 plen pfun rst v59 M3 P3 i3 pg3 af3
                 HK Hlb eq_refl Hplen Halp with "Htext Hka Hbad").
       iIntros (CID4 Hq4 mf) "%Hcs %Ha0 %Hext3 Hcg Hcnt Hpc Hpriv".
       iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf P3 M3i
+      iApply ("Hcont" $! mf P3 (us_M U)
                with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp Hbs Hka
                      Hir [Hpriv Hau]").
       { exact Hcs. }
       { exact Hext3. }
       { (* [bad:] is also a pre-kexec exit: the bundle is unspent *)
         rewrite /sys_exec_arms.
-        iExists (upd_usM (us_upt U P3) M3i).
+        iExists (us_upt U P3).
         iSplitL "Hpriv"; [iExact "Hpriv" |]. iLeft.
-        iSplitR; [iPureIntro; split; [exact Ha0 | reflexivity] |].
+        iSplitR; [iPureIntro; split_and!; [exact Ha0 | reflexivity | reflexivity] |].
         rewrite /sys_exec_post_fail. iLeft. iExact "Hau". }
   Qed.
 End SysExecWhole.

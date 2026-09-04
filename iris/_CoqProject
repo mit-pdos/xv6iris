@@ -1632,9 +1632,10 @@ KexecAUBridge.v
 SpecSysExecAU.v
 # UexecExecInst = the kernel-side instance of UexecRetExec's [uexecXG]:
 # [xbundle W] := some [sys_exec_au_pre] at the trapping key's image, argv
-# pointer (trapframe argument 1) and descriptor view.  A LEAF -- nothing
-# may require it; it is listed here, beside the spec it names, rather than
-# beside UexecRetExec.v (coqdep orders the build).
+# pointer (trapframe argument 1) and descriptor view.  Required by
+# SpecSyscall (the dispatcher's exec channel, lane E2); listed here, beside
+# the spec it names, rather than beside UexecRetExec.v (coqdep orders the
+# build).
 UexecExecInst.v
 ProofSysExecAU.v
 # THE CHUNK LOOP, AND THE SEAL IT CLOSES (lane W, FILEWRITE-AU).

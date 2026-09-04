@@ -480,13 +480,16 @@ Section UtSysBlock.
         exact Hcsmf. }
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
  (un_fn N) (un_ip N) (un_dqi N)
-                S4 n2 (un_pid N) (MkUstate V1 ((us_M U))) sts lks
+                S4 n2 (un_pid N) (MkUstate V1 ((us_M U))) sts lks false
                 Hj Hjl ltac:(rewrite Hn2; lia) eq_refl
-                with "Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv [Hufr] [-]").
+                with "Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv [Hufr] [] [-]").
     (* the syscall channel takes the bundle AT ITS NAMED STATES now, and
        hands back the states the call left together with the table row that
        says how they moved -- no ∃-weakening on either side of the call. *)
     2: { iExact "Hufr". }
+    (* no exec bundle is offered yet (the channel's [false] side): the row
+       is [emp] *)
+    2: { iApply sysc_exec_in_false. }
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now
          takes no premise at all -- [cpu_own] carries no caller frame to
@@ -535,7 +538,7 @@ Section UtSysBlock.
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
       iIntros (CID2 Hk2 mg U2 stsR)
-        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc".
+        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc _".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).

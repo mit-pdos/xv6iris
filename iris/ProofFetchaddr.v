@@ -664,7 +664,7 @@ Section ProofFetchaddr.
       iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf (pv_upt (us_V U)) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
       { exact Hcsf. }
-      { apply uptd_ext_refl. }
+      { apply uptd_ext_sz_refl. }
       iLeft. iFrame "Hip". iPureIntro. split; [exact Hfa0 | exact Hbad].
     - (* ======= addr < sz: on to the second test ======= *)
       assert (Hlt : (uint addr < uint (pv_sz (us_V U)))%Z).
@@ -786,7 +786,7 @@ Section ProofFetchaddr.
         iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
         iApply ("Hcont" $! mf (pv_upt (us_V U)) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
         { exact Hcsf. }
-        { apply uptd_ext_refl. }
+        { apply uptd_ext_sz_refl. }
         iLeft. iFrame "Hip". iPureIntro. split; [exact Hfa0 | exact Hbad].
       + (* ------- the whole doubleword is in range: call copyin ------- *)
         assert (Hok : fetch_ok addr (pv_sz (us_V U))).
@@ -1018,7 +1018,7 @@ Section ProofFetchaddr.
         iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
         iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
         { exact Hcsf. }
-        { exact (uptd_ext_sz_ext _ _ _ Hext). }
+        { exact Hext. }
         iRight. iSplitR.
         { iPureIntro. split; [| exact Hok]. rewrite Hfa0. exact Hrvcase. }
         iExists wnew. iExact "Hip".

@@ -44,13 +44,16 @@ Require Import LinkSysFork LinkSysExit LinkSysWait LinkSysPipe LinkSysRead
    derives the landed posts itself, so the landed proofs of these three
    are no longer on the system theorem's cone. *)
 Require Import LinkSysMknodAU LinkSysOpenAUFull LinkSysUnlinkAU.
+(* ...and exec's AU contract beside its landed one (lane E2): the exec arm
+   runs on it when the caller offers the process's bundle. *)
+Require Import LinkSysExecAU.
 (* ...and the three the dispatch itself needs: myproc, printk's general path
    for the unknown-number fallback, and the [p->name] fact below. *)
 Require Import LinkMyproc LinkPrintk.
 
 Module Syscall :=
   SyscallProof SysFork SysExit SysWait SysPipe SysRead SysKill
-               SysExec SysFstat SysChdir SysDup SysGetpid SysSbrk
+               SysExec SysExecAU SysFstat SysChdir SysDup SysGetpid SysSbrk
                SysPause SysUptime SysWrite SysMknodAU SysLink SysMkdir
                SysClose SysSync SysOpenAUFull SysUnlinkAU
                Myproc PrintkGen.

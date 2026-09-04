@@ -212,6 +212,19 @@ Proof.
   intros [(Hr & HV & _) | (_ & H)]; unfold kexec_ok; [by left | by right].
 Qed.
 
+(* ...and the two holes, monotone *)
+Lemma kexec_ok_qf_mono (Q Q' : mword 64 -> Prop) (QF QF' : kxf_cause -> Prop)
+    (V V' : pprivate) (r entry spv szv' : mword 64)
+    (na : nat) (alen : nat -> nat) :
+  (forall e, Q e -> Q' e) -> (forall c, QF c -> QF' c) ->
+  kexec_ok_qf Q QF V V' r entry spv szv' na alen ->
+  kexec_ok_qf Q' QF' V V' r entry spv szv' na alen.
+Proof.
+  intros HQ HF [(Hr & HV & (c & Hc)) | (Hq & H)]; unfold kexec_ok_qf;
+    [left; split_and!; [exact Hr | exact HV | exists c; exact (HF c Hc)]
+    | right; split; [exact (HQ _ Hq) | exact H]].
+Qed.
+
 (* ...and dropping only the cause *)
 Lemma kexec_ok_q_of_qf (Q : mword 64 -> Prop) (QF : kxf_cause -> Prop)
     (V V' : pprivate) (r entry spv szv' : mword 64)
@@ -302,7 +315,11 @@ Definition kexec_closer `{XI : TsoCtx.CurCtx}
   (∀ (mf : regfile) (U' : ustate)
       (entry spv szv' : mword 64),
       ⌜callee_saved m mf⌝ -∗
-      ⌜kexec_ok_qf (fun e => Q e U') QF (us_V U) (us_V U')
+      (* the failure plug is widened the same way: a [-1] return leaves
+         the old image in place ([kxc_exit_m1] is the one prover, at
+         [U' := U]), and the AU arms need to say so *)
+      ⌜kexec_ok_qf (fun e => Q e U') (fun c => QF c /\ us_M U' = us_M U)
+                   (us_V U) (us_V U')
                    (mf !!! Regidx (mword_of_int 10 : mword 5))
                    entry spv szv' na alen⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗

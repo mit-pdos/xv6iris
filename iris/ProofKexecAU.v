@@ -629,13 +629,13 @@ Section KexecAUExit.
     iIntros "Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath Hargv Hargs Hbs Hirs".
     (* phase A allocates nothing and names no cause: the plug is vacuous
        here and the arms take the refund straight. *)
-    destruct Hq as [(Hr & HV & _) | (Hfalse & _)]; [| destruct Hfalse].
+    destruct Hq as [(Hr & HV & (_ & _ & HM)) | (Hfalse & _)]; [| destruct Hfalse].
     rewrite /kxau_ret.
     iApply ("Hret" $! mf U' with "[%] [Hfail] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins
                                   Hka Hpriv Hpath Hargv Hargs Hbs Hirs").
     { exact Hcs. }
     rewrite /SpecKexecAU.exec_arms. iLeft.
-    iSplitR; [iPureIntro; split; assumption |]. iExact "Hfail".
+    iSplitR; [iPureIntro; split_and!; assumption |]. iExact "Hfail".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -688,7 +688,7 @@ Section KexecAUExit.
         unfold kxc_fb. apply file_bytes_lookup.
         pose proof (kexec_loadable_len _ Hload) as H64.
         rewrite kxau_fb_length in H64. lia. }
-      destruct Hq as [(Hr & HV & (cc & Hcc)) | Hsucc].
+      destruct Hq as [(Hr & HV & (cc & Hcc & HM)) | Hsucc].
       + (* THE HONEST CAUSE (S5).  The tail that jumped named [cc]; on a
            LOADABLE file [KfNotLoadable] is refuted outright, [KfArgsFit]
            carries the fit condition at [kexec_sz f], and [KfNoMem] is the
@@ -696,7 +696,7 @@ Section KexecAUExit.
         destruct (kxau_fail_cause (kxc_fb datl dn) nl na alen cc Hload Hcc)
           as [ec Hec].
         rewrite /SpecKexecAU.exec_arms. iLeft.
-        iSplitR; [iPureIntro; split; assumption |].
+        iSplitR; [iPureIntro; split_and!; assumption |].
         rewrite /SpecKexecAU.exec_post_fail. iRight. iExists pl. iRight.
         iExists zi, av0, (MkAnode (AFile (kxc_fb datl dn)) nl), ec.
         iSplitL "HP"; [iExact "HP" |].
@@ -725,11 +725,11 @@ Section KexecAUExit.
           [exact Hload | exact Himg].
     - (* NOT A LOADABLE FILE.  Arm (b) on success, [EfNotLoadable] on a
          failure past the lock. *)
-      destruct Hq as [(Hr & HV & _) | Hsucc].
+      destruct Hq as [(Hr & HV & (_ & _ & HM)) | Hsucc].
       + (* the node is not a loadable file, so whatever cause the tail
            named the honest report is [EfNotLoadable]. *)
         rewrite /SpecKexecAU.exec_arms. iLeft.
-        iSplitR; [iPureIntro; split; assumption |].
+        iSplitR; [iPureIntro; split_and!; assumption |].
         rewrite /SpecKexecAU.exec_post_fail. iRight. iExists pl. iRight.
         iExists zi, av0, (abs_of (FsStateEra.era_node dn bm datl)),
                 SpecKexecAU.EfNotLoadable.

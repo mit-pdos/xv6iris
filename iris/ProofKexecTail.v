@@ -1369,9 +1369,10 @@ Section KexecAExit.
               with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath
                     Hargv Hargs Hbs Hirs").
     - exact Hcs.
-    - left. split_and!; [| reflexivity | exact Hqf].
-      rewrite (Hpres Ra0 ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz)).
-      exact Hmta0.
+    - left. split_and!; [| reflexivity |].
+      + rewrite (Hpres Ra0 ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz)).
+        exact Hmta0.
+      + destruct Hqf as [c Hc]. exists c. split; [exact Hc | reflexivity].
   Qed.
 
 

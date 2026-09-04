@@ -715,8 +715,8 @@ Proof.
             with "[%] [%] Hsie Hcpu Htc Hcc Hpc Hbm Hin Hka Hpp Hpa Hav
                   Has Hbs Hir").
   - exact Hcs.
-  - apply kexec_ok_qf_of_q, kexec_ok_q_of_True.
-    exact (kexec_ok_qf_weaken _ _ _ _ _ _ _ _ _ _ Hok).
+  - exact (kexec_ok_qf_mono _ _ _ _ _ _ _ _ _ _ _ _ (fun _ _ => I)
+             (fun _ H => conj I (proj2 H)) Hok).
 Qed.
 
 (*  THE BODY: [SpecKexec.wp_kexec_sconf_body] VERBATIM -- same machine
