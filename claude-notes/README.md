@@ -212,6 +212,14 @@ Audited against the tree 2026-08-28, when six moved to
 (finished) and `sp-migration.md` (archived by the owner with work still
 outstanding; see the `completed/` section below).
 
+- **[`liveness.md`](projects/liveness.md)** — NOT ACTIVE, a parked design
+  PROPOSAL: how to prove progress properties ("these bytes eventually
+  appear on the UART") without changing the WP — fairness as named trace
+  hypotheses, an instruction-granular fuel ghost hidden in `pc_is`,
+  obligations with levels reusing the lock rank, a pure trace-level
+  argument over the existing per-prefix exports.  Records the rejected
+  routes (total WP, Transfinite Iris, PC-observation + CFG) and the one
+  semantic hazard to settle first (the reservation self-loop).
 - **[`icache.md`](projects/icache.md)** — the non-coherent instruction
   cache: a per-hart instruction view beside the data view, the `AK_ifetch`
   fetch arm and the `fence.i` arm of the Ztso machine, the fetch node rule
