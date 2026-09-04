@@ -223,3 +223,117 @@ Proof.
     [exact Hload | exact Hag | exact Hlen | exact Hent | exact Hb | | exact Hne].
   by right.
 Qed.
+
+(* ===================================================================== *)
+(*  3.  DECIDING [kexec_loadable], AND WHAT LOADABILITY BUYS              *)
+(* ===================================================================== *)
+
+(*  The composition's success arm has to choose between [exec_post_ok]'s
+    two disjuncts, and its failure arm past the lock between
+    [EfNotLoadable] and [EfNoMem]; both are the SAME question about the
+    node that was observed, and it has to be answered CONSTRUCTIVELY --
+    the assumption audit admits no classical axiom.  Every conjunct of
+    [kexec_loadable] is decidable: [elf_wf] is a bool, the existential is
+    over an [option], and the two list conditions are structural.        *)
+
+Lemma loads_ascending_dec (ps : list elf_phdr) :
+  {loads_ascending ps} + {~ loads_ascending ps}.
+Proof.
+  induction ps as [| p ps IH]; [left; exact I |].
+  assert (Hhd : {match ps with
+                 | [] => True
+                 | q :: _ => ep_vaddr p + ep_memsz p <= ep_vaddr q
+                 end}
+              + {~ match ps with
+                   | [] => True
+                   | q :: _ => ep_vaddr p + ep_memsz p <= ep_vaddr q
+                   end}).
+  { destruct ps as [| q ps']; [left; exact I |].
+    destruct (Z_le_dec (ep_vaddr p + ep_memsz p) (ep_vaddr q)) as [H | H];
+      [by left | by right]. }
+  destruct Hhd as [H1 | H1]; [| right; intros [Hc _]; exact (H1 Hc)].
+  destruct IH as [H2 | H2];
+    [left; split; assumption | right; intros [_ Hc]; exact (H2 Hc)].
+Qed.
+
+Lemma kexec_loadable_dec (f : elf_bytes) :
+  {kexec_loadable f} + {~ kexec_loadable f}.
+Proof.
+  unfold kexec_loadable.
+  destruct (elf_wf f) eqn:Hwf; [| right; intros (Hc & _); discriminate].
+  destruct (elf_parse_ehdr f) as [e |] eqn:He;
+    [| right; intros (_ & (e0 & He0 & _) & _); discriminate].
+  destruct (Z_lt_dec (ee_phoff e) (2 ^ 31)) as [Hp | Hp].
+  2:{ right. intros (_ & (e0 & He0 & Hlt) & _).
+      injection He0 as <-. exact (Hp Hlt). }
+  destruct (decide (Forall (fun p => ep_offset p < 2 ^ 31
+                                     /\ ep_vaddr p `mod` PGSIZE = 0)
+                      (elf_loads f))) as [HF | HF].
+  2:{ right. intros (_ & _ & Hc & _). exact (HF Hc). }
+  destruct (loads_ascending_dec (elf_loads f)) as [Ha | Ha].
+  2:{ right. intros (_ & _ & _ & Hc). exact (Ha Hc). }
+  left. split; [reflexivity |]. split; [by exists e |]. by split.
+Qed.
+
+(* ---- and what a loadable file certifies about the KERNEL's own test.
+   [elf_wf] checks the magic FIRST, so [EfNoMem]'s side condition
+   ([SpecKexecAU.kexec_magic_ok]: 64 bytes and the four magic bytes) is
+   free on a loadable file -- which is what lets a memory failure past
+   the lock be blamed honestly. ---- *)
+
+Lemma elf_magic_ok_of_wf (f : elf_bytes) :
+  elf_wf f = true -> elf_magic_ok f = true.
+Proof.
+  intros Hwf. unfold elf_wf in Hwf.
+  destruct (elf_parse_ehdr f) as [e |]; [| discriminate].
+  destruct (elf_phdrs f) as [ps |]; [| discriminate].
+  destruct (elf_magic_ok f); [reflexivity |].
+  rewrite !andb_false_l in Hwf. discriminate.
+Qed.
+
+(* a one-byte [elf_le_at] IS the byte *)
+Lemma elf_le_at_one (f : elf_bytes) (k : nat) :
+  elf_le_at f k 1 = bv_unsigned (f !!! k).
+Proof. unfold elf_le_at. simpl. rewrite Nat.add_0_r. lia. Qed.
+
+Lemma elf_byte_is_val (f : elf_bytes) (o v : Z) :
+  elf_byte_is f o v = true -> bv_unsigned (f !!! Z.to_nat o) = v.
+Proof.
+  unfold elf_byte_is, elf_read_u8.
+  destruct (elf_read f o 1) as [b |] eqn:E; [| discriminate].
+  intros Hb. apply Z.eqb_eq in Hb. subst v.
+  pose proof (proj1 (elf_read_Some f o 1 b ltac:(lia)) E) as (_ & _ & Hv).
+  rewrite Hv. symmetry. apply elf_le_at_one.
+Qed.
+
+Lemma elf_magic_le_at (f : elf_bytes) :
+  elf_magic_ok f = true -> elf_le_at f 0 4 = ELF_MAGIC.
+Proof.
+  unfold elf_magic_ok. intros H.
+  apply andb_prop in H as [H _]. apply andb_prop in H as [H _].
+  apply andb_prop in H as [H H3]. apply andb_prop in H as [H H2].
+  apply andb_prop in H as [H0 H1].
+  apply elf_byte_is_val in H0. apply elf_byte_is_val in H1.
+  apply elf_byte_is_val in H2. apply elf_byte_is_val in H3.
+  change (Z.to_nat 0) with 0%nat in H0.
+  change (Z.to_nat 1) with 1%nat in H1.
+  change (Z.to_nat 2) with 2%nat in H2.
+  change (Z.to_nat 3) with 3%nat in H3.
+  unfold elf_le_at, ELF_MAGIC. cbn.
+  rewrite H0, H1, H2, H3. lia.
+Qed.
+
+Lemma kexec_loadable_len (f : elf_bytes) :
+  kexec_loadable f -> (64 <= length f)%nat.
+Proof.
+  intros (_ & (e & He & _) & _).
+  exact (proj1 (elf_parse_ehdr_fields f e He)).
+Qed.
+
+Lemma kexec_magic_of_loadable (f : elf_bytes) :
+  kexec_loadable f -> kexec_magic_ok f.
+Proof.
+  intros Hl. split; [exact (kexec_loadable_len f Hl) |].
+  destruct Hl as (Hwf & _ & _).
+  exact (elf_magic_le_at f (elf_magic_ok_of_wf f Hwf)).
+Qed.

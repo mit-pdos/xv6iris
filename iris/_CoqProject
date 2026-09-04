@@ -1369,6 +1369,8 @@ SpecSysExec.v
 ProofSysExecParts.v
 ProofSysExec.v
 LinkSysExec.v
+# ...and the same shell at the ATOMIC-UPDATE contract, over LinkKexecAU.
+LinkSysExecAU.v
 SpecSysFstat.v
 SpecSysRead.v
 SpecSysWrite.v
@@ -1686,8 +1688,16 @@ LinkSysReadAU.v
 ProofKexecPinTrace.v
 ProofKexecPinA.v
 ProofKexecAUA.v
+# ProofKexecAU is ProofKexecPin's composition once more, at
+# [Q := KexecAUBridge.exec_built_Q (kxc_fb datl dnf) ef ...]: phase A is the
+# AU one, the one paying site is discharged by exec_built_Q_intro, and the
+# exit is converted twice (kxau_close_fail below +0x090, kxau_close at the
+# receipt above it).  LinkKexecAU closes the functor over LinkNameiEra
+# beside LinkNamei, exactly as LinkKexecPin does.
+ProofKexecAU.v
 ProofKexecPin.v
 LinkKexecPin.v
+LinkKexecAU.v
 
 # THE CONSOLE TRACE CONNECTION (fs-syscall-specs; claude-notes/projects/
 # uart-trace.md, the SAFETY direction).
