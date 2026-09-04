@@ -317,8 +317,10 @@ and `design/tlb-translation.md`'s "non-identity kernel memory is NOT a
 `ParkCap.v`) and K5 (the text tier) are LANDED and `main` is GREEN; what
 was NEVER done is the `instr` ktier sweep (statement-identical, 284
 `Code*.v` files) and the uservec/userret trampoline-fetch project that
-consumes `TrampText.tramp_text_mint`.  Anyone picking either up starts
-from this file.
+would have consumed `TrampText.tramp_text_mint`.  Anyone picking either up
+starts from this file — but note that `iris/TrampText.v` itself was DELETED
+in the 2026-09-04 dead-file sweep, having never acquired a consumer; its
+statements are quoted in that file's §K5, and it is in the history.
 
 Kept for their durable design notes, gotchas and reusable recipes; `ls` them.
 **Nobody reads these for current guidance**, so they are the one place a

@@ -75,7 +75,6 @@ CtxPinw.v
 CtxKMap.v
 CtxPinMint.v
 PtTreeMove.v
-CtxRecord.v
 PermInv.v
 PageGeom.v
 KptExecMap.v
@@ -212,7 +211,6 @@ PtAdBits.v
 Pt4kWalk.v
 KptPt.v
 KMap.v
-TrampText.v
 PtTree.v
 KptGhost.v
 KstackArith.v
@@ -274,10 +272,8 @@ UmodeCap.v
 UmodeFetch.v
 UmodeAbi.v
 UmodeArith.v
-UmodeSyscall.v
 WpUmodeFetch.v
 WpUmodeStep.v
-WpUmodeLeaf.v
 WpUmodeBranch.v
 WpUmodeStore.v
 WpUmodeLoad.v
