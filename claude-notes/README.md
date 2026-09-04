@@ -237,6 +237,15 @@ outstanding; see the `completed/` section below).
   durable-disk handed its per-syscall durability statements to, and it owns
   the port of `namei-pinned-lookup.md`'s results (its lane P).
 
+- **[`noninterference.md`](projects/noninterference.md)** — a DESIGN
+  DISCUSSION checkpointed 2026-09-04, not part of the kernel proof's design
+  and nothing implemented: non-interference between user processes as
+  refinement to a deterministic abstract process machine whose inputs are
+  the process's own state and an actor-labelled EVENT HISTORY (a kalloc
+  ledger pins the kernel's causality), the outcome-oracle formulation that
+  was proposed and corrected, the lazy-allocation `vmfault` channel a
+  syscall-free process still has, unary versus double-WP, staged M0–M3.
+
 - **[`device-conformance.md`](projects/device-conformance.md)** — the
   device semantics differentially tested against QEMU **and, since
   2026-08-29, against a real VisionFive 2 board over JTAG**
