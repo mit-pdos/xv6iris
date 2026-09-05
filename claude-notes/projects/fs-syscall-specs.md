@@ -2980,11 +2980,24 @@ things, and the answer differs:
         28, the parser's 60, the runner's 8).  It is what
         `UkSh.ush_loop_head` has to become.
     * **WHAT IS LEFT FOR `ush_rest`, and it is exactly two things.**
-      (a) The RE-CUT in `UkSh.v`: `ush_loop_head`/`ush_rest` must carry
-      `ushl_dat` and `usz` and offer `16 + (80 + n)` instead of `16 + n`.
-      Mechanical — every `16 + n` in the loop proof becomes `16 + (80 + n)`
-      and the sub-calls' tails absorb it — and `wp_kshm_body` is already
-      stated at the target.  (b) The LEXABILITY premise
+      (a) ~~The RE-CUT in `UkSh.v`~~ **DONE (2026-09-05).**
+      `UkSh.ush_loop_head` and `UkSh.ush_rest` now take an **opaque
+      `R : iProp`** — not `ushl_dat`/`usz` spelled out, because naming
+      those would drag `UkShParse*.v` and `UkShMalloc.v` into `UkSh.v`, and
+      the loop walks none of them.  A turn takes `R` and hands it back at
+      the head; `iris/UkShLoop.v` is where it is said what `R` is.  The
+      budget is `ush_Dbody := 80` words (runner 8 + parser 60 + diagnostic
+      subtree 28; the cd arm's 26 fits inside), so every offer reads
+      `16 + (ush_Dbody + n)` and the sub-lemmas absorb it by
+      `set (n := (ush_Dbody + n0)%nat)` — the ~46 `16 + n` rows in the loop
+      proof match unchanged.  `wp_ksh_loop`/`_cmd_head`/`_console`/`_main`/
+      `_start` all gained the `R` parameter and an `R -∗` premise.
+      **`UShKernel.v` followed**: the data below the frame used to be spent
+      on the line buffer alone, and is now spent by a **payload premise**
+      producing `R` *and* the buffer out of the image's writable bytes;
+      `sh_uexec_slot_x` and `sh_slot_of_kexec` both carry it and neither
+      discharges it — like `ush_rest`, it is the shell's to prove.  Audit =
+      the standing three.  (b) The LEXABILITY premise
       (`ushp_no_symbols`, fewer than MAXARGS tokens), which the command
       loop cannot supply about a line the user typed.  That one is NOT
       main's body: a line with a symbol byte does not reach
