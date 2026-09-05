@@ -34,9 +34,24 @@
 (* at a known index -- so rather than duplicate 2 000 lines of the '%s'   *)
 (* arm, [shd_sb] / [shd_str] / [wp_shd_lbu] abstract over WHICH HALF, the *)
 (* '%s' section takes the choice as a section variable [tx : bool], and   *)
-(* the two callers instantiate it.  [shd_str γt γd false] is [ustr γd     *)
-(* DfracDiscarded] and [shd_str γt γd true] is [utext_str γt], both by    *)
-(* conversion, so neither producer had to move.                           *)
+(* the two callers instantiate it.  [shd_str γt γd false dq] is [ustr γd  *)
+(* dq] and [shd_str γt γd true dq] is [utext_str γt], both by conversion, *)
+(* so neither producer had to move.                                       *)
+(*                                                                       *)
+(* AND THE SHARE IS A PARAMETER TOO (2026-09-05).  [dq] used to be pinned *)
+(* at [DfracDiscarded], which made [shd_str] PERSISTENT and let the walk  *)
+(* take a byte and forget to give it back.  sh's [cd] arm broke that:     *)
+(* it prints the LINE BUFFER and then RETURNS to the command loop, which  *)
+(* rewrites that buffer with the next [gets], so the string is BORROWED   *)
+(* rather than given.  So [shd_sb]/[shd_str] carry a dfrac, the three     *)
+(* readers are accessors that hand back a closing wand, and every lemma   *)
+(* that RETURNS -- vprintf's argument loop, the '%s' rounds, vprintf and  *)
+(* fprintf themselves -- returns the string with the run.  The three that *)
+(* do NOT return ([wp_kshd_die], [wp_kshd_panic] and the two runcmd tails *)
+(* under them) still just consume it: they end in [exit].  The one shape  *)
+(* this forced open is [wp_kshd_fprintf_gen], which now carries a         *)
+(* caller-chosen [R] from its inner continuation out to its outer one --  *)
+(* that is where the borrowed string rides past fprintf's own frame.      *)
 (*                                                                       *)
 (* WHAT THE DISCHARGE COSTS ITS CALLER.  [ush_diag_leaf] as stage 5       *)
 (* landed it is NOT dischargeable: it quantifies over the gname triple    *)
@@ -115,82 +130,118 @@ Section UkShDiagStr.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
 
-  Definition shd_sb (γt γd : gname) (tx : bool) (a : Z) (b : bv 8) : iProp Σ :=
-    (if tx then utext γt a b else ubyteq γd DfracDiscarded a b)%I.
+  (* ONE BYTE OF A STRING, IN WHICHEVER HALF IT LIVES -- AND AT WHATEVER
+     SHARE.  [tx] picks the half; [dq] is the DATA half's share and the text
+     half ignores it (a text byte is persistent by construction).  The dfrac
+     is what lets a diagnostic print a MUTABLE buffer: sh's [cd] arm prints
+     the line it was handed and then RETURNS to the command loop, which
+     rewrites that buffer with the next [gets], so the walk may borrow the
+     bytes and must give them back.  Everything else this file prints is a
+     .rodata literal or a discarded string, and passes [DfracDiscarded]. *)
+  Definition shd_sb (γt γd : gname) (tx : bool) (dq : dfrac) (a : Z)
+      (b : bv 8) : iProp Σ :=
+    (if tx then utext γt a b else ubyteq γd dq a b)%I.
 
-  Global Instance shd_sb_persistent γt γd tx a b :
-    Persistent (shd_sb γt γd tx a b).
+  Global Instance shd_sb_persistent_disc γt γd tx a b :
+    Persistent (shd_sb γt γd tx DfracDiscarded a b).
   Proof. rewrite /shd_sb. destruct tx; apply _. Qed.
 
-  Definition shd_str (γt γd : gname) (tx : bool) (a : Z) (len : nat)
-      (f : nat -> bv 8) : iProp Σ :=
+  Global Instance shd_sb_persistent_text γt γd dq a b :
+    Persistent (shd_sb γt γd true dq a b).
+  Proof. rewrite /shd_sb. apply _. Qed.
+
+  Definition shd_str (γt γd : gname) (tx : bool) (dq : dfrac) (a : Z)
+      (len : nat) (f : nat -> bv 8) : iProp Σ :=
     (⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝ ∗
      ⌜ Z.of_nat len < 2 ^ 31 ⌝ ∗
-     ([∗ list] j ∈ seq 0 len, shd_sb γt γd tx (a + Z.of_nat j) (f j)) ∗
-     shd_sb γt γd tx (a + Z.of_nat len) ubyte0)%I.
+     ([∗ list] j ∈ seq 0 len, shd_sb γt γd tx dq (a + Z.of_nat j) (f j)) ∗
+     shd_sb γt γd tx dq (a + Z.of_nat len) ubyte0)%I.
 
-  Global Instance shd_str_persistent γt γd tx a len f :
-    Persistent (shd_str γt γd tx a len f).
+  Global Instance shd_str_persistent_disc γt γd tx a len f :
+    Persistent (shd_str γt γd tx DfracDiscarded a len f).
+  Proof. apply _. Qed.
+
+  Global Instance shd_str_persistent_text γt γd dq a len f :
+    Persistent (shd_str γt γd true dq a len f).
   Proof. apply _. Qed.
 
   (* the two producers, both by CONVERSION: [ustr]'s [ubytesq] IS the
      big-op this predicate spells, and [utext_str]'s body is the same one
      over [utext] *)
-  Lemma shd_str_of_ustr (γt γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
-    ustr γd DfracDiscarded a len f -∗ shd_str γt γd false a len f.
-  Proof. iIntros "H". iExact "H". Qed.
-
-  Lemma shd_str_of_text (γt γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
-    utext_str γt a len f -∗ shd_str γt γd true a len f.
-  Proof. iIntros "H". iExact "H". Qed.
-
-  Lemma shd_str_nonul (γt γd : gname) (tx : bool) (a : Z) (len : nat)
+  Lemma shd_str_of_ustr (γt γd : gname) (dq : dfrac) (a : Z) (len : nat)
       (f : nat -> bv 8) :
-    shd_str γt γd tx a len f -∗
-    ⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝.
-  Proof. iIntros "(%H & _ & _ & _)". iPureIntro. exact H. Qed.
+    ustr γd dq a len f -∗ shd_str γt γd false dq a len f.
+  Proof. iIntros "H". iExact "H". Qed.
 
-  Lemma shd_str_byte (γt γd : gname) (tx : bool) (a : Z) (len : nat)
-      (f : nat -> bv 8) (j : nat) :
-    (j < len)%nat ->
-    shd_str γt γd tx a len f -∗
-      shd_sb γt γd tx (a + Z.of_nat j)%Z (f j) ∗
-      (shd_sb γt γd tx (a + Z.of_nat j)%Z (f j) -∗ shd_str γt γd tx a len f).
+  (* ...and back, which is what makes the borrow a borrow: the cd arm hands
+     the line's bytes over at [DfracOwn 1] and takes them back unchanged. *)
+  Lemma shd_str_to_ustr (γt γd : gname) (dq : dfrac) (a : Z) (len : nat)
+      (f : nat -> bv 8) :
+    shd_str γt γd false dq a len f -∗ ustr γd dq a len f.
+  Proof. iIntros "H". iExact "H". Qed.
+
+  Lemma shd_str_of_text (γt γd : gname) (dq : dfrac) (a : Z) (len : nat)
+      (f : nat -> bv 8) :
+    utext_str γt a len f -∗ shd_str γt γd true dq a len f.
+  Proof. iIntros "H". iExact "H". Qed.
+
+  (* THE THREE READERS ARE ACCESSORS NOW, not projections off a persistent
+     thing: each hands out what it was asked for and a wand that puts the
+     string back.  At [DfracDiscarded] the wand is free (the instances above
+     make the whole predicate persistent), so the discarded callers are
+     unchanged in spirit -- they just name the closing wand. *)
+  Lemma shd_str_nonul (γt γd : gname) (tx : bool) (dq : dfrac) (a : Z)
+      (len : nat) (f : nat -> bv 8) :
+    shd_str γt γd tx dq a len f -∗
+    ⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝ ∗
+    shd_str γt γd tx dq a len f.
   Proof.
-    (* NOT [iFrame]: [shd_str] is transparent and its LAST conjunct is a
-       [shd_sb], so [iFrame] resolves the byte into the copy of [shd_str]
-       sitting under the closing wand and leaves a goal that no longer says
-       what it should.  Split by hand. *)
-    intros Hj. iIntros "#Hs". iSplitR.
-    - iDestruct "Hs" as "(_ & _ & Hbs & _)".
-      iApply (big_sepL_lookup _ _ j j with "Hbs").
-      apply lookup_seq. split; [ lia | exact Hj ].
-    - iIntros "_". iExact "Hs".
+    iIntros "(%H & %HL & Hbs & Hn)". iSplitR; [ iPureIntro; exact H | ].
+    iSplitR; [ iPureIntro; exact H | ]. iSplitR; [ iPureIntro; exact HL | ].
+    iFrame "Hbs Hn".
   Qed.
 
-  Lemma shd_str_nul (γt γd : gname) (tx : bool) (a : Z) (len : nat)
-      (f : nat -> bv 8) :
-    shd_str γt γd tx a len f -∗
-      shd_sb γt γd tx (a + Z.of_nat len)%Z ubyte0 ∗
-      (shd_sb γt γd tx (a + Z.of_nat len)%Z ubyte0 -∗ shd_str γt γd tx a len f).
+  Lemma shd_str_byte (γt γd : gname) (tx : bool) (dq : dfrac) (a : Z)
+      (len : nat) (f : nat -> bv 8) (j : nat) :
+    (j < len)%nat ->
+    shd_str γt γd tx dq a len f -∗
+      shd_sb γt γd tx dq (a + Z.of_nat j)%Z (f j) ∗
+      (shd_sb γt γd tx dq (a + Z.of_nat j)%Z (f j) -∗
+         shd_str γt γd tx dq a len f).
   Proof.
-    iIntros "#Hs". iSplitR.
-    - iDestruct "Hs" as "(_ & _ & _ & Hn)". iExact "Hn".
-    - iIntros "_". iExact "Hs".
+    intros Hj. iIntros "(%H & %HL & Hbs & Hn)".
+    iDestruct (big_sepL_lookup_acc _ _ j j with "Hbs") as "[Hb Hcl]".
+    { apply lookup_seq. split; [ lia | exact Hj ]. }
+    iSplitL "Hb"; [ iExact "Hb" | ].
+    iIntros "Hb". iSplitR; [ iPureIntro; exact H | ].
+    iSplitR; [ iPureIntro; exact HL | ].
+    iSplitL "Hb Hcl"; [ iApply ("Hcl" with "Hb") | iExact "Hn" ].
+  Qed.
+
+  Lemma shd_str_nul (γt γd : gname) (tx : bool) (dq : dfrac) (a : Z)
+      (len : nat) (f : nat -> bv 8) :
+    shd_str γt γd tx dq a len f -∗
+      shd_sb γt γd tx dq (a + Z.of_nat len)%Z ubyte0 ∗
+      (shd_sb γt γd tx dq (a + Z.of_nat len)%Z ubyte0 -∗
+         shd_str γt γd tx dq a len f).
+  Proof.
+    iIntros "(%H & %HL & Hbs & Hn)". iSplitL "Hn"; [ iExact "Hn" | ].
+    iIntros "Hn". iSplitR; [ iPureIntro; exact H | ].
+    iSplitR; [ iPureIntro; exact HL | ]. iFrame "Hbs Hn".
   Qed.
 
   (* the one load, at either half.  Stated at [wp_uk_lbu]'s shape, dfrac
      replaced by the half. *)
   Lemma wp_shd_lbu (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (imm : mword 12) (rs1 rd : mword 5) (tx : bool)
-      (a : Z) (b0 : mword 8) (avail : nat) :
+      (dq : dfrac) (a : Z) (b0 : mword 8) (avail : nat) :
     unot_sp rd ->
     a = uint (m !!! Regidx rs1) + uoff_i12 imm ->
     uint rd <> 0 ->
     uinstr_is γt pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
-    shd_sb γt γd tx a b0 -∗
+    shd_sb γt γd tx dq a b0 -∗
     urun γt γd γs γfd h m pc avail -∗
-    (shd_sb γt γd tx a b0 -∗
+    (shd_sb γt γd tx dq a b0 -∗
        ∀ h' : CpuId,
          urun γt γd γs γfd h'
            (<[Regidx rd := regval_into_reg (zero_extend' 64 b0)]> m)
@@ -198,47 +249,51 @@ Section UkShDiagStr.
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hrd Ha Hne. iIntros "#Hi #Hb Hrun Hcont".
+    intros Hrd Ha Hne. iIntros "#Hi Hb Hrun Hcont".
     destruct tx.
-    - iApply (wp_uk_lbu_text γt γd γs γfd h m pc imm rs1 rd a b0 avail
+    - iDestruct "Hb" as "#Hb".
+      iApply (wp_uk_lbu_text γt γd γs γfd h m pc imm rs1 rd a b0 avail
                 Hrd Ha Hne with "Hi Hb Hrun").
       iApply ("Hcont" with "Hb").
-    - iApply (wp_uk_lbu γt γd γs γfd h m pc imm rs1 rd DfracDiscarded a b0 avail
+    - iApply (wp_uk_lbu γt γd γs γfd h m pc imm rs1 rd dq a b0 avail
                 Hrd Ha Hne with "Hi Hb Hrun").
       iExact "Hcont".
   Qed.
 
   (* the heap's own bounds, read off whichever half the string is in *)
   Lemma urun_shd_sb_bnd (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
-      (pc : mword 64) (avail : nat) (tx : bool) (a : Z) (b : bv 8) :
-    urun γt γd γs γfd h m pc avail -∗ shd_sb γt γd tx a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
+      (pc : mword 64) (avail : nat) (tx : bool) (dq : dfrac) (a : Z)
+      (b : bv 8) :
+    urun γt γd γs γfd h m pc avail -∗ shd_sb γt γd tx dq a b -∗
+    ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
-    iIntros "Hrun #Hb".
+    iIntros "Hrun Hb".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(_ & _ & _ & Hh & _ & _)".
     destruct tx.
-    - iDestruct (uheap_text with "Hh Hb") as %(_ & _ & Hbnd).
+    - iDestruct "Hb" as "#Hb".
+      iDestruct (uheap_text with "Hh Hb") as %(_ & _ & Hbnd).
       iPureIntro. exact Hbnd.
     - iDestruct (uheap_ubyte with "Hh Hb") as %(_ & _ & Hbnd).
       iPureIntro. exact Hbnd.
   Qed.
 
   Lemma urun_shd_str_bnd (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
-      (pc : mword 64) (avail : nat) (tx : bool) (a : Z) (len : nat)
-      (f : nat -> bv 8) :
-    urun γt γd γs γfd h m pc avail -∗ shd_str γt γd tx a len f -∗
+      (pc : mword 64) (avail : nat) (tx : bool) (dq : dfrac) (a : Z)
+      (len : nat) (f : nat -> bv 8) :
+    urun γt γd γs γfd h m pc avail -∗ shd_str γt γd tx dq a len f -∗
     ⌜ 0 <= a /\ a + Z.of_nat len < 2 ^ 38 ⌝.
   Proof.
-    iIntros "Hrun #Hs".
-    iDestruct (shd_str_nul with "Hs") as "[#Hnul _]".
+    iIntros "Hrun Hs".
+    iDestruct (shd_str_nul with "Hs") as "[Hnul Hcln]".
     iDestruct (urun_shd_sb_bnd with "Hrun Hnul") as %Hhi.
+    iDestruct ("Hcln" with "Hnul") as "Hs".
     destruct len as [| len' ].
     - iPureIntro. lia.
-    - iDestruct (shd_str_byte γt γd tx a (S len') f 0%nat ltac:(lia) with "Hs")
-        as "[#Hb0 _]".
+    - iDestruct (shd_str_byte γt γd tx dq a (S len') f 0%nat ltac:(lia)
+                   with "Hs") as "[Hb0 Hclb]".
       iDestruct (urun_shd_sb_bnd with "Hrun Hb0") as %Hlo.
       iPureIntro. lia.
   Qed.
-
 End UkShDiagStr.
 (* ===================================================================== *)
 (* §1 A STRING LITERAL WITH NO DIRECTIVE IN IT, cut out of the read-only    *)
@@ -2871,6 +2926,8 @@ Section UkShDiagVprintfS.
      at a time at a known index -- so the two are ONE proof over this
      boolean; see UkShDiag.v §0a. *)
   Context (tx : bool).
+  (* the share the DATA half is borrowed at; the text half ignores it *)
+  Context (dqs : dfrac).
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -3159,10 +3216,10 @@ Section UkShDiagVprintfS.
     vp_inv3 m0 m sp0 a fd ap v3 i ->
     m !!! Regidx s1_idx = mword_of_int p ->
     shk_code γt -∗
-    shd_sb γt γd tx (p + 1) b1 -∗
+    shd_sb γt γd tx dqs (p + 1) b1 -∗
     urun γt γd γs γfd h m (mword_of_int 0xfdc) (4 + n) -∗
     (∀ (h' : CpuId) (m' : regfile),
-       shd_sb γt γd tx (p + 1) b1 -∗
+       shd_sb γt γd tx dqs (p + 1) b1 -∗
        ⌜ vp_inv3 m0 m' sp0 a fd ap v3 i ⌝ -∗
        ⌜ m' !!! Regidx s1_idx = mword_of_int (p + 1) ⌝ -∗
        ⌜ m' !!! Regidx a1_idx = zero_extend' 64 b1 ⌝ -∗
@@ -3260,7 +3317,8 @@ Section UkShDiagVprintfS.
         by (vm_compute; reflexivity).
       lia. }
     iApply (wp_shd_lbu γt γd γs γfd h4 m4 (mword_of_int 0xfe4)
-              (mword_of_int 0 : mword 12) s1_idx a1_idx tx (p + 1) b1 (4 + n)
+              (mword_of_int 0 : mword 12) s1_idx a1_idx tx dqs (p + 1) b1
+              (4 + n)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               Haddr ltac:(vm_compute; discriminate)
               with "[] Hb1 Hrun").
@@ -3397,10 +3455,11 @@ Section UkShDiagVprintfS.
       vp_inv3 m0 m sp0 a fd ap v3 i ->
       m !!! Regidx s1_idx = mword_of_int (sa + Z.of_nat j) ->
       shk_code γt -∗
-      shd_str γt γd tx sa slen sf -∗
+      shd_str γt γd tx dqs sa slen sf -∗
       urun γt γd γs γfd h m (mword_of_int 0xfdc) (4 + n) -∗
       (∀ (h' : CpuId) (m' : regfile),
          ⌜ vp_inv3 m0 m' sp0 a fd ap v3 i ⌝ -∗
+         shd_str γt γd tx dqs sa slen sf -∗
          urun γt γd γs γfd h' m' (mword_of_int 0xfea) (4 + n) -∗
          WP (Loop : expr riscv_lang)) -∗
       WP (Loop : expr riscv_lang).
@@ -3408,19 +3467,22 @@ Section UkShDiagVprintfS.
     intros Hsa0 Hsahi.
     induction k as [| k IH ];
       intros j h m n Hjk Hinv Hs1;
-      iIntros "#Hcode #Hstr Hrun Hcont";
-      iDestruct (shd_str_nonul with "Hstr") as %Hnn;
+      iIntros "#Hcode Hstr Hrun Hcont";
+      iDestruct (shd_str_nonul with "Hstr") as "[%Hnn Hstr]";
       assert (Hjlt : (j < slen)%nat) by lia;
       assert (Hp0 : 0 <= sa + Z.of_nat j) by lia;
       assert (Hp1 : sa + Z.of_nat j + 1 < Z64) by (unfold Z64; lia).
-    - (* the LAST byte: what 0xfe4 loads is the terminator *)
-      iDestruct (shd_str_nul with "Hstr") as "[#Hnul _]".
+    - (* the LAST byte: what 0xfe4 loads is the terminator ---- the string is
+         BORROWED for the load and put back by the closing wand *)
+      iDestruct (shd_str_nul with "Hstr") as "[Hnul Hcl]".
+      assert (Ea : (sa + Z.of_nat slen)%Z = (sa + Z.of_nat j + 1)%Z) by lia.
+      iEval (rewrite Ea) in "Hnul".
       iApply (wp_kshd_vprintf_sstep m0 sp0 fd ap v3 a i
                 (sa + Z.of_nat j) ubyte0 h m n Hp0 Hp1
-                Hinv Hs1 with "Hcode [] Hrun").
-      { replace (sa + Z.of_nat j + 1)%Z with (sa + Z.of_nat slen)%Z by lia.
-        iExact "Hnul". }
-      iIntros (h1 m1) "_ %Hinv1 %Hs11 %Ha11 Hrun".
+                Hinv Hs1 with "Hcode Hnul Hrun").
+      iIntros (h1 m1) "Hnul %Hinv1 %Hs11 %Ha11 Hrun".
+      iEval (rewrite <- Ea) in "Hnul".
+      iDestruct ("Hcl" with "Hnul") as "Hstr".
       (* ---- 0xfe8  c.bnez a1,0xfdc -- NOT taken: the terminator ---- *)
       assert (Hnt : false = neq_vec (m1 !!! Regidx a1_idx) zero_reg).
       { rewrite Ha11 zext8_moi.
@@ -3443,17 +3505,20 @@ Section UkShDiagVprintfS.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite E70e.
       iIntros (h2) "Hrun".
-      iApply ("Hcont" $! h2 m1 with "[] Hrun"). iPureIntro. exact Hinv1.
+      iApply ("Hcont" $! h2 m1 with "[] Hstr Hrun").
+      iPureIntro. exact Hinv1.
     - (* a BODY byte follows: round again *)
       assert (Hsjlt : (S j < slen)%nat) by lia.
-      iDestruct (shd_str_byte γt γd tx sa slen sf (S j) Hsjlt with "Hstr")
-        as "[#Hb1 _]".
+      iDestruct (shd_str_byte γt γd tx dqs sa slen sf (S j) Hsjlt with "Hstr")
+        as "[Hb1 Hcl]".
+      assert (Ea : (sa + Z.of_nat (S j))%Z = (sa + Z.of_nat j + 1)%Z) by lia.
+      iEval (rewrite Ea) in "Hb1".
       iApply (wp_kshd_vprintf_sstep m0 sp0 fd ap v3 a i
                 (sa + Z.of_nat j) (sf (S j)) h m n Hp0 Hp1
-                Hinv Hs1 with "Hcode [] Hrun").
-      { replace (sa + Z.of_nat j + 1)%Z with (sa + Z.of_nat (S j))%Z by lia.
-        iExact "Hb1". }
-      iIntros (h1 m1) "_ %Hinv1 %Hs11 %Ha11 Hrun".
+                Hinv Hs1 with "Hcode Hb1 Hrun").
+      iIntros (h1 m1) "Hb1 %Hinv1 %Hs11 %Ha11 Hrun".
+      iEval (rewrite <- Ea) in "Hb1".
+      iDestruct ("Hcl" with "Hb1") as "Hstr".
       (* ---- 0xfe8  c.bnez a1,0xfdc -- TAKEN: a body byte is not NUL ---- *)
       assert (Hnz : bv_unsigned (sf (S j)) <> 0).
       { intro He. apply (Hnn (S j) Hsjlt). apply bv_eq.
@@ -3823,10 +3888,11 @@ Section UkShDiagVprintfS.
     shk_code γt -∗
     utext γt (a + Z.of_nat (S i)) c1 -∗
     uwordq γd dq apz (mword_of_int sa) -∗
-    shd_str γt γd tx sa slen sf -∗
+    shd_str γt γd tx dqs sa slen sf -∗
     urun γt γd γs γfd h m (mword_of_int 0xfcc) (4 + n) -∗
     (∀ (h' : CpuId) (m' : regfile),
        uwordq γd dq apz (mword_of_int sa) -∗
+       shd_str γt γd tx dqs sa slen sf -∗
        ⌜ vp_inv m0 m' sp0 a fd (mword_of_int (apz + 8)) (S i) ⌝ -∗
        ⌜ m' !!! Regidx s1_idx = mword_of_int (bv_unsigned c1) ⌝ -∗
        urun γt γd γs γfd h' m' (mword_of_int 0xe3c) (4 + n) -∗
@@ -3836,7 +3902,7 @@ Section UkShDiagVprintfS.
     intros Ha0 Habnd Hap0 Haphi Hapal Hsanz Hinv.
     pose proof Hinv as Hd.
     destruct Hd as (Hsp & Hs0 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hfr).
-    iIntros "#Hcode #Hc1 Hw #Hstr Hrun Hcont".
+    iIntros "#Hcode #Hc1 Hw Hstr Hrun Hcont".
     iDestruct (urun_shd_str_bnd with "Hrun Hstr") as %[Hsa0 Hsahi].
     assert (Ezr : (sign_extend' 64 (mword_of_int 0 : mword 6) : mword 64)
                   = zero_reg)
@@ -3943,20 +4009,20 @@ Section UkShDiagVprintfS.
     destruct slen as [| slen' ].
     - (* THE EMPTY STRING.  0xfd6 reads the terminator, 0xfda is taken, and
          the arm at 0x100a is the loop's exit written out a second time. *)
-      iDestruct (shd_str_nul with "Hstr") as "[#Hnul _]".
+      iDestruct (shd_str_nul with "Hstr") as "[Hnul Hcl]".
       iApply (wp_shd_lbu γt γd γs γfd h3 m2 (mword_of_int 0xfd6)
-                (mword_of_int 0 : mword 12) s1_idx a1_idx tx
+                (mword_of_int 0 : mword 12) s1_idx a1_idx tx dqs
                 (sa + Z.of_nat 0%nat)%Z ubyte0 (4 + n)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 Haddr0 ltac:(vm_compute; discriminate)
-                with "[] [] Hrun").
+                with "[] Hnul Hrun").
       { iApply (uis_shk_fd6 with "Hcode"). }
-      { iExact "Hnul". }
       assert (E6fc : add_vec_int (mword_of_int 0xfd6 : mword 64) 4
                      = mword_of_int 0xfda)
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite E6fc.
-      iIntros "_" (h4) "Hrun".
+      iIntros "Hnul" (h4) "Hrun".
+      iDestruct ("Hcl" with "Hnul") as "Hstr".
       set (m3 := <[Regidx a1_idx
                    := regval_into_reg (zero_extend' 64 (ubyte0 : mword 8) : mword 64)]> m2).
       assert (Hinv3 : vp_inv3 m0 m3 sp0 a fd (mword_of_int apz) (mword_of_int (apz + 8)) i)
@@ -4031,29 +4097,30 @@ Section UkShDiagVprintfS.
       { iApply (uis_shk_100e with "Hcode"). }
       iIntros (h8) "Hrun".
       iApply (wp_kshd_vprintf_bump m0 sp0 fd (mword_of_int (apz + 8)) zero_reg
-                a i c1 h8 _ n Ha0 Habnd Hinv5 with "Hcode Hc1 Hrun [Hw Hcont]").
+                a i c1 h8 _ n Ha0 Habnd Hinv5
+                with "Hcode Hc1 Hrun [Hw Hstr Hcont]").
       iIntros (h9 m9) "%Hinv9 %Hs19 _ Hrun".
-      iApply ("Hcont" $! h9 m9 with "Hw [] [] Hrun").
+      iApply ("Hcont" $! h9 m9 with "Hw Hstr [] [] Hrun").
       + iPureIntro. exact (vp_inv_of3 m0 m9 sp0 a fd
                              (mword_of_int (apz + 8)) (S i) Hinv9).
       + iPureIntro. exact Hs19.
     - (* AT LEAST ONE BYTE.  0xfda falls through into the loop. *)
-      iDestruct (shd_str_byte γt γd tx sa (S slen') sf 0%nat
-                   ltac:(lia) with "Hstr") as "[#Hb0 _]".
-      iDestruct (shd_str_nonul with "Hstr") as %Hnn.
+      iDestruct (shd_str_nonul with "Hstr") as "[%Hnn Hstr]".
+      iDestruct (shd_str_byte γt γd tx dqs sa (S slen') sf 0%nat
+                   ltac:(lia) with "Hstr") as "[Hb0 Hcl]".
       iApply (wp_shd_lbu γt γd γs γfd h3 m2 (mword_of_int 0xfd6)
-                (mword_of_int 0 : mword 12) s1_idx a1_idx tx
+                (mword_of_int 0 : mword 12) s1_idx a1_idx tx dqs
                 (sa + Z.of_nat 0%nat)%Z (sf 0%nat) (4 + n)
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 Haddr0 ltac:(vm_compute; discriminate)
-                with "[] [] Hrun").
+                with "[] Hb0 Hrun").
       { iApply (uis_shk_fd6 with "Hcode"). }
-      { iExact "Hb0". }
       assert (E6fc : add_vec_int (mword_of_int 0xfd6 : mword 64) 4
                      = mword_of_int 0xfda)
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite E6fc.
-      iIntros "_" (h4) "Hrun".
+      iIntros "Hb0" (h4) "Hrun".
+      iDestruct ("Hcl" with "Hb0") as "Hstr".
       set (m3 := <[Regidx a1_idx
                    := regval_into_reg
                         (zero_extend' 64 (sf 0%nat : mword 8)
@@ -4101,7 +4168,7 @@ Section UkShDiagVprintfS.
                 (mword_of_int (apz + 8)) a i sa (S slen') sf slen'
                 Hsa0 Hsahi 0%nat h5 m3 n ltac:(lia) Hinv3 Hs1_3
                 with "Hcode Hstr Hrun [Hw Hcont]").
-      iIntros (h6 m6) "%Hinv6 Hrun".
+      iIntros (h6 m6) "%Hinv6 Hstr Hrun".
       pose proof Hinv6 as Hd6.
       destruct Hd6 as (_ & _ & _ & Hs36 & _).
       (* ---- 0xfea  c.mv s7,s3 ---- *)
@@ -4152,9 +4219,10 @@ Section UkShDiagVprintfS.
       { iApply (uis_shk_fee with "Hcode"). }
       iIntros (h9) "Hrun".
       iApply (wp_kshd_vprintf_bump m0 sp0 fd (mword_of_int (apz + 8)) zero_reg
-                a i c1 h9 _ n Ha0 Habnd Hinv8 with "Hcode Hc1 Hrun [Hw Hcont]").
+                a i c1 h9 _ n Ha0 Habnd Hinv8
+                with "Hcode Hc1 Hrun [Hw Hstr Hcont]").
       iIntros (h10 m10) "%Hinv10 %Hs110 _ Hrun".
-      iApply ("Hcont" $! h10 m10 with "Hw [] [] Hrun").
+      iApply ("Hcont" $! h10 m10 with "Hw Hstr [] [] Hrun").
       + iPureIntro. exact (vp_inv_of3 m0 m10 sp0 a fd
                              (mword_of_int (apz + 8)) (S i) Hinv10).
       + iPureIntro. exact Hs110.
@@ -4182,10 +4250,11 @@ Section UkShDiagVprintfS.
     shk_code γt -∗
     utext γt (a + Z.of_nat (S i)) c1 -∗
     uwordq γd dq apz (mword_of_int sa) -∗
-    shd_str γt γd tx sa slen sf -∗
+    shd_str γt γd tx dqs sa slen sf -∗
     urun γt γd γs γfd h m (mword_of_int 0x103c) (4 + n) -∗
     (∀ (h' : CpuId) (m' : regfile),
        uwordq γd dq apz (mword_of_int sa) -∗
+       shd_str γt γd tx dqs sa slen sf -∗
        ⌜ vp_inv m0 m' sp0 a fd (mword_of_int (apz + 8)) (S i) ⌝ -∗
        ⌜ m' !!! Regidx s1_idx = mword_of_int (bv_unsigned c1) ⌝ -∗
        urun γt γd γs γfd h' m' (mword_of_int 0xe3c) (4 + n) -∗
@@ -4194,7 +4263,7 @@ Section UkShDiagVprintfS.
   Proof.
     intros Ha0 Habnd Hap0 Haphi Hapal Hsanz Hr1 Hr2 Hc1u Hc1x Hc2u Hc2x
            Hinv Ha1 Ha2 Ha5.
-    iIntros "#Hcode #Hc1 Hw #Hstr Hrun Hcont".
+    iIntros "#Hcode #Hc1 Hw Hstr Hrun Hcont".
     assert (Em117 : (sign_extend' 64 (mword_of_int 3979 : mword 12) : mword 64)
                     = mword_of_int (-117))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -4674,10 +4743,11 @@ Section UkShDiagVprintfS.
     utext γt (a + Z.of_nat (S i)) c1 -∗
     utext γt (a + Z.of_nat (S (S i))) c2 -∗
     uwordq γd dq apz (mword_of_int sa) -∗
-    shd_str γt γd tx sa slen sf -∗
+    shd_str γt γd tx dqs sa slen sf -∗
     urun γt γd γs γfd h m (mword_of_int 0xe40) (4 + n) -∗
     (∀ (h' : CpuId) (m' : regfile),
        uwordq γd dq apz (mword_of_int sa) -∗
+       shd_str γt γd tx dqs sa slen sf -∗
        ⌜ vp_inv m0 m' sp0 a fd (mword_of_int (apz + 8)) (S i) ⌝ -∗
        ⌜ m' !!! Regidx s1_idx = mword_of_int (bv_unsigned c1) ⌝ -∗
        urun γt γd γs γfd h' m' (mword_of_int 0xe3c) (4 + n) -∗
@@ -5263,17 +5333,18 @@ Section UkShDiagVprintfS.
     shk_code γt -∗
     utext_str γt a len f -∗
     uwordq γd dq apz (mword_of_int sa) -∗
-    shd_str γt γd tx sa slen sf -∗
+    shd_str γt γd tx dqs sa slen sf -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.vprintf) (12 + (4 + n)) -∗
     (∀ (h' : CpuId) (m' : regfile),
        uwordq γd dq apz (mword_of_int sa) -∗
+       shd_str γt γd tx dqs sa slen sf -∗
        ⌜ ucallee_saved m m' ⌝ -∗
        urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx)) (12 + (4 + n)) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Habnd Hq2 Hfq Hfsq Hpct Hc1d Hc1u Hc1x Hc2set Hapal Hsanz Ha1 Ha2.
-    iIntros "#Hcode #Hstr Hw #Hsstr Hrun Hcont".
+    iIntros "#Hcode #Hstr Hw Hsstr Hrun Hcont".
     iDestruct (urun_uword_bnd with "Hrun Hw") as %[Hap0 Haphi].
     iDestruct (utext_str_nonul with "Hstr") as %Hnn.
     (* the byte two past the directive: a body byte if there is one, and
@@ -5305,8 +5376,8 @@ Section UkShDiagVprintfS.
               (mword_of_int apz) a len f q Ha0 Habnd 0%nat h0 mA n
               ltac:(lia) ltac:(intros j Hj; apply Hpct; lia) Hinv0 Hs1z
               with "Hcode Hstr Hrun
-                    [Hw Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12
-                     Hcont]").
+                    [Hw Hsstr Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11
+                     Hw12 Hcont]").
     iIntros (h1 mB) "%HinvB %Hs1B Hrun".
     rewrite Nat.add_0_l in HinvB, Hs1B.
     (* ---- the '%' round ---- *)
@@ -5316,8 +5387,8 @@ Section UkShDiagVprintfS.
               (mword_of_int apz) a q (f (S q)) h1 mB n Ha0 ltac:(lia) HinvB
               ltac:(rewrite Hs1B Hfq; reflexivity)
               with "Hcode Hbsq Hrun
-                    [Hw Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12
-                     Hcont]").
+                    [Hw Hsstr Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11
+                     Hw12 Hcont]").
     iIntros (h2 mC) "%HinvC %Hs1C %Ha4C Hrun".
     (* ---- 0xe3c, not taken: 's' is not the terminator ---- *)
     assert (Hnt1 : false = uv_btaken BEQ (mC !!! Regidx s1_idx) zero_reg).
@@ -5348,7 +5419,7 @@ Section UkShDiagVprintfS.
               with "Hcode Hbssq Hc2b Hw Hsstr Hrun
                     [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12
                      Hcont]").
-    iIntros (h4 mD) "Hw %HinvD %Hs1D Hrun".
+    iIntros (h4 mD) "Hw Hsstr %HinvD %Hs1D Hrun".
     (* ---- 0xe3c, not taken again: there IS a character after the "%s" ---- *)
     assert (Hnzc1 : bv_unsigned (f (S (S q))) <> 0).
     { intro He. apply (Hnn (S (S q)) ltac:(lia)). apply bv_eq.
@@ -5380,9 +5451,10 @@ Section UkShDiagVprintfS.
               ltac:(intros j Hj; apply Hpct; lia) eq_refl Hal8 Hlo
               (S (S q)) h5 mD n ltac:(lia) ltac:(lia) HinvD Hs1D
               with "Hcode Hstr Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10
-                    Hw11 Hw12 Hrun [Hw Hcont]").
+                    Hw11 Hw12 Hrun [Hw Hsstr Hcont]").
     iIntros (h6 mE) "%Hcs Hrun".
-    iApply ("Hcont" $! h6 mE with "Hw [] Hrun"). iPureIntro. exact Hcs.
+    iApply ("Hcont" $! h6 mE with "Hw Hsstr [] Hrun").
+    iPureIntro. exact Hcs.
   Qed.
 
 End UkShDiagVprintfS.
@@ -5411,6 +5483,8 @@ Section UkShDiagFprintf.
      at a time at a known index -- so the two are ONE proof over this
      boolean; see UkShDiag.v §0a. *)
   Context (tx : bool).
+  (* the share the DATA half is borrowed at; the text half ignores it *)
+  Context (dqs : dfrac).
 
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
   Local Notation s0_idx := (mword_of_int 8 : mword 5).
@@ -6074,7 +6148,14 @@ Section UkShDiagFprintf.
   (*   sp0-8  a7   sp0-16 a6   sp0-24 a5   sp0-32 a4   sp0-40 a3            *)
   (*   sp0-48 a2   sp0-56 ra   sp0-64 s0   sp0-72 ap   sp0-80 --            *)
   (* --------------------------------------------------------------------- *)
-  Lemma wp_kshd_fprintf_gen (a : Z) (h : CpuId) (m : regfile) (n : nat) :
+  (* [R] IS WHAT CROSSES.  fprintf's own instructions carve a frame and
+     jump; the argument string the callee reads is the CALLER's, and when
+     that string is borrowed rather than persistent it has to come back out
+     past this lemma.  [R] is where it rides: the inner continuation hands
+     it over and the outer one receives it.  Callers with nothing to carry
+     instantiate it at [emp]. *)
+  Lemma wp_kshd_fprintf_gen (R : iProp Σ) (a : Z) (h : CpuId) (m : regfile)
+      (n : nat) :
     m !!! Regidx a1_idx = mword_of_int a ->
     shk_code γt -∗
     (* the call at 0x10c8, left to the caller.  fprintf's own instructions
@@ -6092,12 +6173,14 @@ Section UkShDiagFprintf.
        urun γt γd γs γfd h' m' (mword_of_int ShSyms.vprintf) (12 + (4 + n)) -∗
        (∀ (h'' : CpuId) (m'' : regfile),
           ⌜ ucallee_saved m' m'' ⌝ -∗
+          R -∗
           uword γd (uint (m !!! Regidx csp_rs1) - 48) (m !!! Regidx a2_idx) -∗
           urun γt γd γs γfd h'' m'' (mword_of_int 0x10cc) (12 + (4 + n)) -∗
           WP (Loop : expr riscv_lang)) -∗
        WP (Loop : expr riscv_lang)) -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.fprintf) (10 + (12 + (4 + n))) -∗
     (∀ (h' : CpuId) (m' : regfile),
+       R -∗
        ⌜ ucallee_saved m m' ⌝ -∗
        urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx)) (10 + (12 + (4 + n))) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -6428,7 +6511,7 @@ Section UkShDiagFprintf.
     { iPureIntro. exact Ha1q4. }
     { iPureIntro. exact Ha2q4. }
     { iPureIntro. exact Hraq4. }
-    iIntros (h13 mq5) "%Hcs Hu6 Hrun".
+    iIntros (h13 mq5) "%Hcs HR Hu6 Hrun".
     (* ---- 0x10cc  c.ldsp ra,24(sp) ---- *)
     assert (Hspq5 : mq5 !!! Regidx csp_rs1
                     = add_vec_int sp0 (- (8 * Z.of_nat 10))).
@@ -6521,7 +6604,7 @@ Section UkShDiagFprintf.
               with "[] Hrun").
     { iApply (uis_shk_10d2 with "Hcode"). }
     iIntros (h17) "Hrun".
-    iApply ("Hcont" $! h17 mq8 with "[] Hrun").
+    iApply ("Hcont" $! h17 mq8 with "HR [] Hrun").
     iPureIntro. intros r Hr.
     assert (Kne : forall (q : mword 5) (z : Z),
                uint q = z -> uint r <> z -> Regidx r <> Regidx q).
@@ -6583,7 +6666,10 @@ Section UkShDiagFprintf.
   Proof.
     intros Ha0 Habnd Hlen Hpct Ha1.
     iIntros "#Hcode #Hstr Hrun Hcont".
-    iApply (wp_kshd_fprintf_gen a h m n Ha1 with "Hcode [] Hrun Hcont").
+    iApply (wp_kshd_fprintf_gen emp%I a h m n Ha1
+              with "Hcode [] Hrun [Hcont]").
+    2:{ iIntros (h' m') "_ %Hcs Hrun".
+        iApply ("Hcont" $! h' m' with "[] Hrun"). iPureIntro. exact Hcs. }
     iIntros (h' m') "%Ha1' %Ha2' %Hra' Hu6 Hrun Hk".
     iApply (wp_kshd_vprintf γt γd γs γfd a len f h' m' n
               Ha0 Habnd Hlen Hpct Ha1' with "Hcode Hstr Hrun").
@@ -6592,7 +6678,8 @@ Section UkShDiagFprintf.
                    = (mword_of_int 0x10cc : mword 64))
       by (rewrite Hra'; apply bv_eq; vm_compute; reflexivity).
     rewrite Eret.
-    iApply ("Hk" $! h'' m'' with "[] Hu6 Hrun"). iPureIntro. exact Hcs.
+    iApply ("Hk" $! h'' m'' with "[] [] Hu6 Hrun");
+      [ iPureIntro; exact Hcs | done ].
   Qed.
 
   Lemma wp_kshd_fprintf_s (a : Z) (len q : nat) (f : nat -> mword 8)
@@ -6615,33 +6702,36 @@ Section UkShDiagFprintf.
     m !!! Regidx a2_idx = mword_of_int sa ->
     shk_code γt -∗
     utext_str γt a len f -∗
-    shd_str γt γd tx sa slen sf -∗
+    shd_str γt γd tx dqs sa slen sf -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.fprintf) (10 + (12 + (4 + n))) -∗
     (∀ (h' : CpuId) (m' : regfile),
+       shd_str γt γd tx dqs sa slen sf -∗
        ⌜ ucallee_saved m m' ⌝ -∗
        urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx)) (10 + (12 + (4 + n))) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Habnd Hq2 Hfq Hfsq Hpct Hc1d Hc1u Hc1x Hc2set Hsanz Ha1 Ha2.
-    iIntros "#Hcode #Hstr #Hsstr Hrun Hcont".
+    iIntros "#Hcode #Hstr Hsstr Hrun Hcont".
     iDestruct (urun_stack with "Hrun") as %[Hal8 _].
     assert (Hapal : (uint (m !!! Regidx csp_rs1) - 48) mod 8 = 0)
       by (rewrite Zminus_mod Hal8; reflexivity).
-    iApply (wp_kshd_fprintf_gen a h m n Ha1 with "Hcode [] Hrun Hcont").
+    iApply (wp_kshd_fprintf_gen (shd_str γt γd tx dqs sa slen sf)
+              a h m n Ha1 with "Hcode [Hsstr] Hrun Hcont").
     iIntros (h' m') "%Ha1' %Ha2' %Hra' Hu6 Hrun Hk".
     rewrite Ha2.
-    iApply (wp_kshd_vprintf_s γt γd γs γfd tx a len q f
+    iApply (wp_kshd_vprintf_s γt γd γs γfd tx dqs a len q f
               (uint (m !!! Regidx csp_rs1) - 48) sa (DfracOwn 1) slen sf
               h' m' n Ha0 Habnd Hq2 Hfq Hfsq Hpct Hc1d Hc1u Hc1x Hc2set
               Hapal Hsanz Ha1' Ha2'
               with "Hcode Hstr Hu6 Hsstr Hrun").
-    iIntros (h'' m'') "Hu6 %Hcs Hrun".
+    iIntros (h'' m'') "Hu6 Hsstr %Hcs Hrun".
     assert (Eret : ret_pc (m' !!! Regidx ra_idx)
                    = (mword_of_int 0x10cc : mword 64))
       by (rewrite Hra'; apply bv_eq; vm_compute; reflexivity).
     rewrite Eret.
-    iApply ("Hk" $! h'' m'' with "[] Hu6 Hrun"). iPureIntro. exact Hcs.
+    iApply ("Hk" $! h'' m'' with "[] Hsstr Hu6 Hrun").
+    iPureIntro. exact Hcs.
   Qed.
 
 End UkShDiagFprintf.
@@ -6757,7 +6847,7 @@ Section UkShDiagRun.
   (* whose address had to be CONVERTED to match would make every [iApply]    *)
   (* reduce a [Z_to_bv] over a program address.                              *)
   (* --------------------------------------------------------------------- *)
-  Lemma wp_kshd_die (tx : bool) (p0 p1 p2 p3 p4 p5 : Z)
+  Lemma wp_kshd_die (tx : bool) (dqs : dfrac) (p0 p1 p2 p3 p4 p5 : Z)
       (hi : mword 20) (lo : mword 12) (j3 j5 : mword 21) (kx : mword 6)
       (fa : Z) (flen fq : nat) (sa : Z) (slen : nat) (sf : nat -> bv 8)
       (h : CpuId) (m : regfile) (n : nat) :
@@ -6793,7 +6883,7 @@ Section UkShDiagRun.
     m !!! Regidx a2_idx = mword_of_int sa ->
     shk_code γt -∗
     shk_rodata γt -∗
-    shd_str γt γd tx sa slen sf -∗
+    shd_str γt γd tx dqs sa slen sf -∗
     uinstr_is γt (mword_of_int p0) false (UTYPE (hi, Regidx a1_idx, AUIPC)) -∗
     uinstr_is γt (mword_of_int p1) false
       (ITYPE (lo, Regidx a1_idx, Regidx a1_idx, ADDI)) -∗
@@ -6807,7 +6897,7 @@ Section UkShDiagRun.
   Proof.
     intros Hok Hnp Hfa0 Hfahi Hq2 Hpq Hps Hc1d Hc1u Hc1x Hc2set
            E0 E1 E2 E3 E4 Efa Ejf Eje Eret Hsanz Ha2.
-    iIntros "#Hcode #Hro #Hsstr #Ci0 #Ci1 #Ci2 #Ci3 #Ci4 #Ci5 Hrun".
+    iIntros "#Hcode #Hro Hsstr #Ci0 #Ci1 #Ci2 #Ci3 #Ci4 #Ci5 Hrun".
     iDestruct (shd_fmt_str γt fa flen Hok ltac:(lia) with "Hro") as "#Hfstr".
     (* ---- p0  auipc a1,0x1 ---- *)
     iApply (wp_uk_auipc γt γd γs γfd h m (mword_of_int p0) hi a1_idx
@@ -6877,13 +6967,13 @@ Section UkShDiagRun.
                      ltac:(vm_compute; discriminate)).
       exact Ha2. }
     (* ---- fprintf(2, <fmt>, <the string>) ---- *)
-    iApply (wp_kshd_fprintf_s γt γd γs γfd tx fa flen fq (shd_lit fa)
+    iApply (wp_kshd_fprintf_s γt γd γs γfd tx dqs fa flen fq (shd_lit fa)
               sa slen sf h4 m4 n
               Hfa0 Hfahi Hq2 Hpq Hps
               (fun j Hj Hne => shd_nopct_ok fa flen fq j Hnp Hj Hne)
               Hc1d Hc1u Hc1x Hc2set Hsanz Ha1_4 Ha2_4
               with "Hcode Hfstr Hsstr Hrun").
-    iIntros (h5 m5) "_ Hrun".
+    iIntros (h5 m5) "_ _ Hrun".
     rewrite Hra4 Eret.
     (* ---- p4  c.li a0,<k> ---- *)
     iApply (wp_uk_cli γt γd γs γfd h5 m5 (mword_of_int p4) kx a0_idx
@@ -6921,19 +7011,20 @@ Section UkShDiagRun.
   (* it spills are never read.  It is fork1's prologue instruction for       *)
   (* instruction, which is why the two share every constant.                 *)
   (* --------------------------------------------------------------------- *)
-  Lemma wp_kshd_panic (tx : bool) (sa : Z) (slen : nat) (sf : nat -> bv 8)
+  Lemma wp_kshd_panic (tx : bool) (dqs : dfrac) (sa : Z) (slen : nat)
+      (sf : nat -> bv 8)
       (h : CpuId) (m : regfile) (n : nat) :
     sa <> 0 ->
     m !!! Regidx a0_idx = mword_of_int sa ->
     shk_code γt -∗
     shk_rodata γt -∗
-    shd_str γt γd tx sa slen sf -∗
+    shd_str γt γd tx dqs sa slen sf -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.panic)
       (2 + (10 + (12 + (4 + n)))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hsanz Ha0.
-    iIntros "#Hcode #Hro #Hsstr Hrun".
+    iIntros "#Hcode #Hro Hsstr Hrun".
     rewrite shd_pin_panic.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom'].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0e.
@@ -7043,7 +7134,7 @@ Section UkShDiagRun.
     { rewrite /m3 (upd_eq m2 (Regidx a2_idx) (regval_into_reg _)).
       rewrite Ha0_2. apply add_vec_zero_l. }
     (* ---- 0x54..0x64  the block: fprintf(2, "%s\n", s) ; exit(1) ---- *)
-    iApply (wp_kshd_die tx 0x54 0x58 0x5c 0x5e 0x62 0x64
+    iApply (wp_kshd_die tx dqs 0x54 0x58 0x5c 0x5e 0x62 0x64
               (mword_of_int 1 : mword 20) (mword_of_int 572 : mword 12)
               (mword_of_int 4172 : mword 21) (mword_of_int 3106 : mword 21)
               (mword_of_int 1 : mword 6)
@@ -7104,12 +7195,12 @@ Section UkShDiagLeaf.
   Definition ush_Dg : nat := (2 + (10 + (12 + 4)))%nat.
 
   (* a panic message, as a string in the TEXT half *)
-  Local Lemma shd_msg_str (γt γd : gname) (a : Z) (len : nat) :
+  Local Lemma shd_msg_str (γt γd : gname) (dq : dfrac) (a : Z) (len : nat) :
     shd_fmt_ok a len = true -> Z.of_nat len < 2 ^ 31 ->
-    shk_rodata γt -∗ shd_str γt γd true a len (shd_lit a).
+    shk_rodata γt -∗ shd_str γt γd true dq a len (shd_lit a).
   Proof.
     intros Hok Hlen. iIntros "#Hro".
-    iApply (shd_str_of_text γt γd a len (shd_lit a)).
+    iApply (shd_str_of_text γt γd dq a len (shd_lit a)).
     iApply (shd_fmt_str γt a len Hok Hlen with "Hro").
   Qed.
 
@@ -7136,24 +7227,24 @@ Section UkShDiagLeaf.
                        m !!! Regidx a0_idx = (mword_of_int z : mword 64)).
       { intros z Hu. rewrite <- Hu. symmetry. apply moi_of_uint. }
       destruct Hmsg as [Hm1 | [Hm1 | Hm1]].
-      + iDestruct (shd_msg_str γt γd 0x1298 4%nat
+      + iDestruct (shd_msg_str γt γd DfracDiscarded 0x1298 4%nat
                      ltac:(vm_compute; reflexivity) ltac:(lia)
                      with "Hro") as "#Hs".
-        iApply (wp_kshd_panic γt γd γs γfd true 0x1298 4%nat (shd_lit 0x1298)
+        iApply (wp_kshd_panic γt γd γs γfd true DfracDiscarded 0x1298 4%nat (shd_lit 0x1298)
                   h m n ltac:(lia)
                   (Hmoi 0x1298 Hm1)
                   with "Hcode Hro Hs Hrun").
-      + iDestruct (shd_msg_str γt γd 0x12a0 6%nat
+      + iDestruct (shd_msg_str γt γd DfracDiscarded 0x12a0 6%nat
                      ltac:(vm_compute; reflexivity) ltac:(lia)
                      with "Hro") as "#Hs".
-        iApply (wp_kshd_panic γt γd γs γfd true 0x12a0 6%nat (shd_lit 0x12a0)
+        iApply (wp_kshd_panic γt γd γs γfd true DfracDiscarded 0x12a0 6%nat (shd_lit 0x12a0)
                   h m n ltac:(lia)
                   (Hmoi 0x12a0 Hm1)
                   with "Hcode Hro Hs Hrun").
-      + iDestruct (shd_msg_str γt γd 0x12c8 4%nat
+      + iDestruct (shd_msg_str γt γd DfracDiscarded 0x12c8 4%nat
                      ltac:(vm_compute; reflexivity) ltac:(lia)
                      with "Hro") as "#Hs".
-        iApply (wp_kshd_panic γt γd γs γfd true 0x12c8 4%nat (shd_lit 0x12c8)
+        iApply (wp_kshd_panic γt γd γs γfd true DfracDiscarded 0x12c8 4%nat (shd_lit 0x12c8)
                   h m n ltac:(lia)
                   (Hmoi 0x12c8 Hm1)
                   with "Hcode Hro Hs Hrun").
@@ -7185,9 +7276,11 @@ Section UkShDiagLeaf.
       set (m1 := <[Regidx a2_idx
                    := regval_into_reg
                         (mword_of_int (ua_ptr x) : mword 64)]> m).
-      iDestruct (shd_str_of_ustr γt γd (ua_ptr x) (ua_len x) (ua_bytes x)
+      iDestruct (shd_str_of_ustr γt γd DfracDiscarded (ua_ptr x) (ua_len x)
+                   (ua_bytes x)
                    with "Hxs") as "#Hs".
-      iApply (wp_kshd_die γt γd γs γfd false 0xdc 0xe0 0xe4 0xe6 0xea 0xec
+      iApply (wp_kshd_die γt γd γs γfd false DfracDiscarded
+                0xdc 0xe0 0xe4 0xe6 0xea 0xec
                 (mword_of_int 1 : mword 20) (mword_of_int 460 : mword 12)
                 (mword_of_int 4036 : mword 21) (mword_of_int 2970 : mword 21)
                 (mword_of_int 0 : mword 6)
@@ -7250,9 +7343,11 @@ Section UkShDiagLeaf.
       set (m1 := <[Regidx a2_idx
                    := regval_into_reg
                         (mword_of_int (ua_ptr x) : mword 64)]> m).
-      iDestruct (shd_str_of_ustr γt γd (ua_ptr x) (ua_len x) (ua_bytes x)
+      iDestruct (shd_str_of_ustr γt γd DfracDiscarded (ua_ptr x) (ua_len x)
+                   (ua_bytes x)
                    with "Hxs") as "#Hs".
-      iApply (wp_kshd_die γt γd γs γfd false 0x110 0x114 0x118 0x11a 0x11e 0x120
+      iApply (wp_kshd_die γt γd γs γfd false DfracDiscarded
+                0x110 0x114 0x118 0x11a 0x11e 0x120
                 (mword_of_int 1 : mword 20) (mword_of_int 424 : mword 12)
                 (mword_of_int 3984 : mword 21) (mword_of_int 2918 : mword 21)
                 (mword_of_int 1 : mword 6)
