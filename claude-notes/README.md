@@ -230,6 +230,12 @@ outstanding; see the `completed/` section below).
   mkdir, `iput`'s free; delete `top_move`) in flight.  The design of record
   is `design/applications.md`; this file is where a round's measurement
   and deviations are recorded.
+- **[`app-round-e2.md`](projects/app-round-e2.md)** — PROPOSAL awaiting
+  rulings (2026-09-05): round E2 of the applications design — how the 22
+  remaining kernel-mover sites get paid (create as three instants, link
+  as three fires, the free path's AU form at `iput`, the write dispatch),
+  the view restricted to allocated rows, which dead non-AU walks to
+  delete, with per-lane costs and nine owner questions Q-a..Q-i.
 - **[`app-echo.md`](projects/app-echo.md)** — the ECHO APPLICATION's
   worklist: the target statement (`disc κs -> good_out κs /\ pristine`),
   the lanes L2–L7 of `design/applications.md` §6 with their gates (L4

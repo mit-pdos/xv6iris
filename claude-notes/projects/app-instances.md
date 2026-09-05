@@ -376,3 +376,16 @@ Rounds, each a green gate:
   arm); δ_unlink (ProofSysUnlinkW5File ×2, W5Dir ×2); δ_write on the
   non-AU write (ProofFilewrite), the non-AU open's trunc (ProofSysOpen),
   and the AU write's short-chunk arm (ProofFilewriteAU, outside the fire).
+  **E2 PROPOSAL (2026-09-05, read-only lane): `projects/app-round-e2.md`.**
+  Measured: 16 of the remaining rows are LIVE on the dispatched path, 8
+  are reachable only through non-dispatched contracts (non-AU unlink,
+  mknod, open's `so_stores`); the create fire is honest only because the
+  child's leg was moved by `_auto` first (the view covers free rows —
+  the W lane's recorded deviation from fs-syscall-specs §4); every
+  generic discharger pays its step off the PARKED `app_auto`, so E can
+  delete `top_move` and the `_auto` movers but `app_auto`/`Happ_auto`
+  stay until L2 (the docs' L3 clause needs correcting).  Proposed lanes
+  E2-V (view = allocated rows) → E2-D (deltas) → E2-C/F/L (create legs,
+  iput's free, link, in place) → E2-W (write dispatch) → E2-X (delete the
+  dead walks) → E2-Z (delete `_auto`).  Nine owner rulings Q-a..Q-i are
+  listed there with recommendations; NOTHING of E2 is built.
