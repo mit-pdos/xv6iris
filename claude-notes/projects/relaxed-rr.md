@@ -1,11 +1,52 @@
 # Project: relaxing the memory model to allow load–load reordering
 
-**STATUS 2026-09-05: DESIGN PROPOSAL, not started.**  Written for the
-owner's question "can the Ztso view machine be weakened to admit R→R
-reordering while staying within RVWMO, what do the fences then mean, and
-what does the proof pay?".  Every claim below about the tree is measured
-against `main` at `434107f43`; the paragraph tags (§) are for the review
-rounds.
+**STATUS 2026-09-05: LANDED THROUGH STAGE D -- the tree builds green
+under the relaxed machine (1495 files on the VM, no `Admitted`).**  What
+landed, by the plan's stages (§6/§7):
+
+- **A.** `TsoMem` (the spike) and `TsoLitmus`: the eleven verdicts of §2.4,
+  MP and IRIW flipped to allowed, MP+addr recorded as allowed.
+- **B.** `RiscvLang`: the per-hart record `hread` (`hr_rv` the read
+  watermark, `hr_coh` the per-byte coherence floor) as `gstate.ghr`,
+  `mnode_step` grown by ONE argument (`hr`/`hr'`, the icache lane's
+  shape), the plain-read arm with the coherence premise and a fixed floor,
+  `fence_acq`, `hr_ok`/`hr_bound` and their step invariants.
+  `TsoMemPa.fence_post` takes `(drain acq : bool) (tv rv : nat)` as a
+  four-way `match` (so a fence with neither edge REDUCES to `tv`, which
+  several witnesses rely on).  `RiscvPtsto`: `era_rv_name`, the
+  `rview_auth_at` mirror (a per-hart `mono_nat`, the `iview` clone) and
+  `hart_rview_lb_at` as the last conjunct of `era_interp`;
+  `tso_interp_at`/`tso_interp_of` UNTOUCHED, as intended.  `RiscvExec`'s
+  two hart lifting rules lend `hart_rview_auth` beside the instruction-view
+  counter and hand the callback the `hread` as a pure value with
+  `hr_bound`; the device rules frame it.  `HartLift`/`HartLift2`/
+  `HartSpan`/`HartRegNode`/`HartBlock`/`ObsTrace`/`UartAccepted`/
+  `SmodeCorePt`/`PowerBoot`/`RiscvAdequacy` re-threaded.
+- **C.** `HartEvents.wp_hart_ram_read_plain(_ex)`: the floor stays, the
+  watermark takes the max, the receipt is `hart_rview_lb_at cpu_id tvn`
+  (the witness clears every coherence floor of the footprint by
+  `coh_win_max`).  `HartBarrier.wp_hart_fence_acq` / `swp_hart_fence_acq`:
+  the acquire leaf that turns a read receipt at `K` into `hart_view_lb K`.
+  `WpSconfFencePub` §5: `wp_fence_acq_rrw_s_sconf` (`fence r,rw`) and
+  `wp_fence_acq_rwrw_s_sconf` (`fence rw,rw` / `iorw,iorw`), dispatch
+  parameterised by the two bit facts `fbits11`/`fbits10`.  `HartSMem`
+  (15 node rules), `WpSconfMem` (`_rel`/`_relr`/`_reli`), `WpAu4`: the
+  receipt's type.
+- **D.** `ProofMainSecondary`: the `started` spin's `fence r,rw` at
+  `main+0x18` is now the acquire leaf; `started_absorb` consumes the
+  converted receipt.  `ProofVirtioDiskIntr`: `vt_loop_state`, the index
+  read's continuation and the loop's re-read carry the READ receipt; the
+  `fence rw,rw` at `+0x3e` (`wp_vt_reclaim`) is the acquire leaf and the
+  `ctx_bound_raise` moved AFTER it; the reclaim continuation hands the view
+  receipt on.  No other whole-function proof moved -- as §4.3 predicted.
+
+Left: the `.aq` knob of §2.2 (every exclusive access is still an acquire;
+xv6's one AMO is `.aq`, so nothing is lost today), the `make audit-only`
+baseline check on the VM (running at the time of writing; the change adds
+no axiom), the notes sweep (`design/multi-cpu.md`, `ctx-box.md` §1's
+"under TSO" wording) and archiving this file.  The original proposal
+follows unchanged; every claim in it about the tree was measured against
+`main` at `434107f43`.
 
 ## 0. The answer in one paragraph
 

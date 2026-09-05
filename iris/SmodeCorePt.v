@@ -3183,13 +3183,13 @@ Section SmodeCorePt.
       by (rewrite Hm; exact (HC _ (Interface.MemRead n req) K eq_refl)).
     rewrite Hg.
     iApply (RiscvExec.wp_hart_step with "Hcert").
-    { intros oth0 h0 img0 σ0 log0 tv0 itv0 r0 m'0 σ'0 log'0 tv'0 itv'0 r'0 Hs.
+    { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       rewrite /mnode_step in Hs. cbn beta iota in Hs.
       rewrite Hdev in Hs. cbn beta iota in Hs.
-      destruct Hs as [(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)
+      destruct Hs as [(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)
                      |[(Hif' & _) |(Hex & _)]];
         [done|congruence|by rewrite (ak_ifetch_excl _ Hif) in Hex]. }
-    iIntros (σ oth rv img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+    iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
     iDestruct (RiscvExec.tso_interp_of_pin with "Htso") as %Hpin.
     rewrite (RiscvExec.tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
                σ.(sregs) σ.(mdev) Hpin).
@@ -3201,21 +3201,21 @@ Section SmodeCorePt.
                 (Interface.ReadReq.pa req) n
                 (fun j Hj => Hcov _ (Hram j Hj))) as [w0 Hrd0].
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
-    iExists (C (K (inl (w0, None)))), σ, log, tv, itv, rv.
+    iExists (C (K (inl (w0, None)))), σ, log, tv, itv, hr, rv.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota.
       rewrite Hdev. cbn beta iota.
       left. split; [exact Hif|].
       exists (length log), w0.
-      split_and!; [exact Hitv|lia|exact Hrd0|done|done|done|done|done|done]. }
-    iNext. iIntros (m' σ' log' tv' itv' rv') "%Hstep".
+      split_and!; [exact Hitv|lia|exact Hrd0|done|done|done|done|done|done|done]. }
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     rewrite Hdev in Hstep. cbn beta iota in Hstep.
     destruct Hstep as [(_ & tvn & w' & Hlo & Hhi & Hbytes' & -> & -> & ->
-                        & -> & -> & ->)
+                        & -> & -> & -> & ->)
                       |[(Hif' & _) | (Hex & _)]];
       [|congruence|by rewrite (ak_ifetch_excl _ Hif) in Hex].
-    iMod "Hclose" as "_". iModIntro. rewrite -(Hres w'). iFrame "Hσ Hiv".
+    iMod "Hclose" as "_". iModIntro. rewrite -(Hres w'). iFrame "Hσ Hiv Hrv".
     iSplitL "Htso".
     { rewrite -Htv. iApply (RiscvExec.tso_interp_of_idle with "Htso"). }
     iApply "H".

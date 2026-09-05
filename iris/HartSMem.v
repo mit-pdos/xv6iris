@@ -2205,7 +2205,7 @@ Section snodes.
     swp (read_ram Read_plain (Physaddr pa) 1 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 1),
                   ⌜r = (bytes, default_meta)⌝ ∗
-                  (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                  (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                 ⌜Q bytes tvn⌝) ∗ R).
   Proof.
     intro Hdev.
@@ -2256,7 +2256,7 @@ Section snodes.
     swp (read_ram Read_plain (Physaddr pa) 1 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 1),
                   ⌜r = (bytes, default_meta)⌝ ∗
-                  (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                  (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                 Rr bytes tvn)).
   Proof.
     intro Hdev.
@@ -2295,7 +2295,7 @@ Section snodes.
     swp (read_ram Read_plain (Physaddr pa) 2 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 2),
                   ⌜r = (bytes, default_meta)⌝ ∗
-                  (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                  (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                 Rr bytes tvn)).
   Proof.
     intro Hdev.
@@ -2334,7 +2334,7 @@ Section snodes.
     swp (read_ram Read_plain (Physaddr pa) 4 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 4),
                   ⌜r = (bytes, default_meta)⌝ ∗
-                  (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                  (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                 Rr bytes tvn)).
   Proof.
     intro Hdev.
@@ -2373,7 +2373,7 @@ Section snodes.
     swp (read_ram Read_plain (Physaddr pa) 8 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 8),
                   ⌜r = (bytes, default_meta)⌝ ∗
-                  (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                  (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                 Rr bytes tvn)).
   Proof.
     intro Hdev.
@@ -2412,7 +2412,7 @@ Section snodes.
     swp (read_ram Read_plain (Physaddr pa) 2 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 2),
                   ⌜r = (bytes, default_meta)⌝ ∗
-                  (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                  (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                 ⌜Q bytes tvn⌝) ∗ R).
   Proof.
     intro Hdev.
@@ -2452,7 +2452,7 @@ Section snodes.
     swp (read_ram Read_plain (Physaddr pa) 4 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 4),
                   ⌜r = (bytes, default_meta)⌝ ∗
-                  (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                  (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                 ⌜Q bytes tvn⌝) ∗ R).
   Proof.
     intro Hdev.
@@ -2492,7 +2492,7 @@ Section snodes.
     swp (read_ram Read_plain (Physaddr pa) 8 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 8),
                   ⌜r = (bytes, default_meta)⌝ ∗
-                  (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                  (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                 ⌜Q bytes tvn⌝) ∗ R).
   Proof.
     intro Hdev.
@@ -2536,7 +2536,7 @@ Section snodes.
     swp (read_ram Read_plain (Physaddr pa) 1 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 1),
                   ⌜r = (bytes, default_meta)⌝ ∗
-                  (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                  (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                 Q bytes tvn) ∗ R).
   Proof.
     intro Hdev.
@@ -2576,7 +2576,7 @@ Section snodes.
     swp (read_ram Read_plain (Physaddr pa) 2 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 2),
                   ⌜r = (bytes, default_meta)⌝ ∗
-                  (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                  (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                 Q bytes tvn) ∗ R).
   Proof.
     intro Hdev.
@@ -2616,7 +2616,7 @@ Section snodes.
     swp (read_ram Read_plain (Physaddr pa) 4 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 4),
                   ⌜r = (bytes, default_meta)⌝ ∗
-                  (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                  (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                 Q bytes tvn) ∗ R).
   Proof.
     intro Hdev.
@@ -2656,7 +2656,7 @@ Section snodes.
     swp (read_ram Read_plain (Physaddr pa) 8 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 8),
                   ⌜r = (bytes, default_meta)⌝ ∗
-                  (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                  (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                 Q bytes tvn) ∗ R).
   Proof.
     intro Hdev.
@@ -4417,7 +4417,7 @@ Section instances.
       swp (read_ram Read_plain (Physaddr pa) width false)
         (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
                     ⌜r = (bytes, default_meta)⌝ ∗
-                    (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                    (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                   ⌜Q bytes tvn⌝) ∗ R).
   Proof.
     intros [-> | [-> | [-> | ->]]] Hdev;
@@ -4454,7 +4454,7 @@ Section instances.
       swp (read_ram Read_plain (Physaddr pa) width false)
         (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
                     ⌜r = (bytes, default_meta)⌝ ∗
-                    (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                    (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                   Rr bytes tvn)).
   Proof.
     intros [-> | [-> | [-> | ->]]] Hdev;
@@ -4490,7 +4490,7 @@ Section instances.
       swp (read_ram Read_plain (Physaddr pa) width false)
         (fun r => ∃ bytes : SailStdpp.Values.mword (8 * width),
                     ⌜r = (bytes, default_meta)⌝ ∗
-                    (∃ tvn : nat, TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) tvn ∗
+                    (∃ tvn : nat, hart_rview_lb_at cpu_id tvn ∗
                                   Q bytes tvn) ∗ R).
   Proof.
     intros [-> | [-> | [-> | ->]]] Hdev;

@@ -41,7 +41,7 @@ Require Import ProcGeom.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn SchedCtx FdSlots.
-Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
+Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfFencePub.
 Require Import MinstretInv.
 Require Import WpSmodeHalf.
 Require Import VirtioQueue DiskPtsto VirtioProto DiskInv DiskAvail.
@@ -1035,7 +1035,7 @@ Section VtLoopSeam.
        (* A6.126 §6: the read that entered the loop (or its last iteration)
           settled on an index past [nr] at a view [V0] that has every
           completion below it -- in particular the record at [nr] -- in it *)
-       (∃ V0 : nat, TsoCtx.hart_view_lb V0 ∗
+       (∃ V0 : nat, hart_rview_lb_at cpu_id V0 ∗
           [∗ list] u ∈ seq 0 c, ∃ q : nat, disk_done_pos γ u q ∗ ⌜(q <= V0)%nat⌝) ∗
        disk_res_at γ pd pav pu np nr cm fr)%I.
 
@@ -1339,7 +1339,7 @@ Section VtDevRam.
     ( ∀ (k V0 : nat),
         ⌜(nr <= k)%nat /\ (k <= np)%nat⌝ -∗
         disk_done_lb γd k -∗
-        TsoCtx.hart_view_lb V0 -∗
+        hart_rview_lb_at cpu_id V0 -∗
         ([∗ list] p ∈ seq 0 k, ∃ q : nat, disk_done_pos γd p q ∗ ⌜(q <= V0)%nat⌝) -∗
         disk_pub γd np -∗ disk_read_at γd nr -∗ disk_flr γd F -∗ disk_fl γd t0 t1 -∗
         sie_cap_gpr KT1 (<[Regidx rd := regval_into_reg (zero_extend' 64 (wrap16 k : SailStdpp.Values.mword 16))]> m) n false p -∗
@@ -1764,7 +1764,7 @@ Section VtDevRam.
               M' !!! Regidx r = M !!! Regidx r ⌝ -∗
           ⌜ (nr < nc)%nat /\ (nc <= np)%nat ⌝ -∗
           disk_done_lb γd nc -∗
-          TsoCtx.hart_view_lb V0 -∗
+          hart_rview_lb_at cpu_id V0 -∗
           ([∗ list] p ∈ seq 0 nc, ∃ q : nat, disk_done_pos γd p q ∗ ⌜(q <= V0)%nat⌝) -∗
           sie_cap_gpr KT1 M' n false p -∗
           pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x3e) : mword 64) -∗
@@ -2224,9 +2224,10 @@ Section VtBody.
     disk_pub γd np -∗ disk_done_lb γd c -∗ disk_read_at γd nr -∗
     ghost_map_auth (dn_claim γd) 1 cm -∗
     d_used_idx ↦₂ wrap16 nr -∗
-    (* A6.126 §6: the view the index read settled at, with the record at
-       [nr]'s completion position in it *)
-    TsoCtx.hart_view_lb V0 -∗
+    (* A6.126 §6 / relaxed-rr.md §4.3: the view the index read settled at --
+       as the load's READ receipt, which the fence below turns into the view
+       receipt -- with the record at [nr]'s completion position in it *)
+    hart_rview_lb_at cpu_id V0 -∗
     (∃ q0 : nat, disk_done_pos γd nr q0 ∗ ⌜(q0 <= V0)%nat⌝) -∗
     ( ∀ (M' : regfile) (p : nat) (dc : dclaim),
         ⌜ cm !! p = Some dc ⌝ -∗
@@ -2240,31 +2241,33 @@ Section VtBody.
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x50) : mword 64) -∗
         d_used_idx ↦₂ wrap16 nr -∗
         disk_pub γd np -∗ disk_read_at γd nr -∗ ghost_map_auth (dn_claim γd) 1 cm -∗
-        (* the handler's context bound, raised to the read's view *)
+        (* the read's view, ACQUIRED by the fence, and the handler's context
+           bound raised to it *)
+        TsoCtx.hart_view_lb V0 -∗
         TsoCtx.ctx_floor cur_ctx V0 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HMs1 Hnrc.
-    iIntros "Hcg #Htext Hpc #Hdinv #Hgeom Hpub #Hlbc Hrd Hauth Hidx #HV0 #Hq0 Hcont".
-    (* A6.126 §6: the handler's context bound moves to the read's view [V0]
-       first -- the completion's position and the payload's reader floor
-       [max F V0] are then floors of this context *)
+    iIntros "Hcg #Htext Hpc #Hdinv #Hgeom Hpub #Hlbc Hrd Hauth Hidx #HR0 #Hq0 Hcont".
+    iDestruct (vt_done_lb_le γd (S nr) c Hnrc with "Hlbc") as "#Hlbs".
+    iPoseProof "Hgeom" as "(_ & _ & #Hup & _)".
+    (* ---- +0x3e: fence rw,rw -- THE ACQUIRE (relaxed-rr.md §4.3).  The
+       index read minted a READ receipt at [V0]; this fence is where it
+       becomes the VIEW receipt, and only then can the handler's context
+       bound move to [V0] (A6.126 §6: the completion's position and the
+       payload's reader floor [max F V0] are then floors of this context). ---- *)
+    iApply (wp_fence_acq_rwrw_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x3e))
+              (mword_of_int 0) (mword_of_int 15) (mword_of_int 15)
+              (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0)) M n V0
+              fbits11_15 fbits11_15 with "Hcg Hpc [] HR0").
+    { iApply (vti_3e with "Htext"). }
+    iNext. iIntros "Hcg Hpc #HV0".
     iApply fupd_wp.
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (TsoCtx.ctx_bound_raise cur_ctx V0 with "Hrun HV0") as "[Hrun #HflV]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iModIntro.
-    iDestruct (vt_done_lb_le γd (S nr) c Hnrc with "Hlbc") as "#Hlbs".
-    iPoseProof "Hgeom" as "(_ & _ & #Hup & _)".
-    (* ---- +0x3e: fence rw,rw ---- *)
-    iApply (wp_fence_gen_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x3e))
-              (mword_of_int 0) (mword_of_int 15) (mword_of_int 15)
-              (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0)) M n false
-              with "Hcg Hpc []").
-    { iApply (vti_3e with "Htext"). }
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
     assert (Hp42 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_intr + 0x3e) : mword 64) 4 = mword_of_int (KernelSyms.virtio_disk_intr + 0x42))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp42) in "Hpc".
@@ -2398,7 +2401,7 @@ Section VtBody.
     assert (Hp50 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_intr + 0x4e) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_intr + 0x50))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp50) in "Hpc".
-    iApply ("Hcont" $! K5 p dc with "[%] [%] Hord Hcg Hpc Hidx Hpub Hrd Hauth HflV").
+    iApply ("Hcont" $! K5 p dc with "[%] [%] Hord Hcg Hpc Hidx Hpub Hrd Hauth HV0 HflV").
     { exact Hcm. }
     { split.
       - rewrite /K5. apply upd_eq.
@@ -2867,7 +2870,7 @@ Section VtBody.
                 M' !!! Regidx r = M !!! Regidx r) ⌝ -∗
         ⌜ (S nr <= nc)%nat /\ (nc <= np)%nat ⌝ -∗
         disk_done_lb γd nc -∗
-        TsoCtx.hart_view_lb V0 -∗
+        hart_rview_lb_at cpu_id V0 -∗
         ([∗ list] p ∈ seq 0 nc, ∃ q : nat, disk_done_pos γd p q ∗ ⌜(q <= V0)%nat⌝) -∗
         sie_cap_gpr KT1 M' n false pp -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x86) : mword 64) -∗
@@ -3159,7 +3162,7 @@ Section VtLoopProof.
     pose proof Hregs as Hregs'.
     destruct Hregs' as (Hsp & Hs1 & Hthr).
     iDestruct "Hst" as (np nr cm fr c) "(%Hbnd & #Hlbc & Hrcpt0 & Hres)".
-    iDestruct "Hrcpt0" as (V0) "[#HV0 #Hfr]".
+    iDestruct "Hrcpt0" as (V0) "[#HR0 #Hfr]".
     destruct Hbnd as [Hnrc Hcnp].
     (* the record at [nr]'s completion position, under the read's view *)
     iDestruct (big_sepL_lookup _ (seq 0 c) nr nr with "Hfr") as (q0) "[#Hposnr %Hq0V]".
@@ -3170,9 +3173,9 @@ Section VtLoopProof.
     (* ================= CHUNK A: +0x3e .. +0x4e ================= *)
     iApply (wp_vt_reclaim γu γd pd pav pu MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat np c nr cm pme V0
               Hs1 Hnrc
-              with "Hcg Htext Hpc Hdinv Hgeom Hpub Hlbc Hrd Hauth Hidx HV0 []").
+              with "Hcg Htext Hpc Hdinv Hgeom Hpub Hlbc Hrd Hauth Hidx HR0 []").
     { iExists q0. iFrame "Hposnr". iPureIntro. exact Hq0V. }
-    iIntros (M1 p dc) "%Hcm %Hfr1 #Hord Hcg Hpc Hidx Hpub Hrd Hauth #HflV".
+    iIntros (M1 p dc) "%Hcm %Hfr1 #Hord Hcg Hpc Hidx Hpub Hrd Hauth #HV0 #HflV".
     destruct Hfr1 as [HM1a5 HM1thr].
     (* the payload's reader floor after the deposit is a floor of this context *)
     iAssert (TsoCtx.ctx_floor cur_ctx (Nat.max F V0)) as "#HflM".

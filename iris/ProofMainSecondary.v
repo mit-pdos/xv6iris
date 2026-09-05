@@ -49,7 +49,7 @@ Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfFencePub.
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the acquire's context borrow *)
 Require Import WpLock.
 Require Import KptShare.
@@ -366,7 +366,7 @@ Section ProofMainSecondary.
     iIntros (v).
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc HW _".
-    iDestruct "HW" as (V0) "[#Hlb HW]".
+    iDestruct "HW" as (V0) "[#Hrlb HW]".
     pose (M1 := <[Regidx (mword_of_int 15 : mword 5) :=
         regval_into_reg (sign_extend' 64 (v : mword 32))]> m).
     iEval (change (if true then 2%Z else 4%Z) with 2%Z) in "Hpc".
@@ -379,14 +379,17 @@ Section ProofMainSecondary.
            a [▷], which is what turns the invariant's [▷ deposit] into the
            deposit.  Stripping here rather than on the exit path is harmless:
            the iteration that goes around again just drops the payload. ---- *)
-    iApply (wp_fence_gen_later_s_sconf (mword_of_int (KernelSyms.main + 0x18))
+    (* relaxed-rr.md §4.3: THE ACQUIRE.  The spin load minted a READ receipt
+       at [V0]; this `fence r,rw` is where it becomes the VIEW receipt the
+       absorb below consumes. *)
+    iApply (wp_fence_acq_rrw_s_sconf (mword_of_int (KernelSyms.main + 0x18))
               (mword_of_int 0 : mword 4) (mword_of_int 2 : mword 4)
               (mword_of_int 3 : mword 4) (Regidx (mword_of_int 0))
-              (Regidx (mword_of_int 0)) M1 n false with "Hcg Hpc []").
+              (Regidx (mword_of_int 0)) M1 n V0 fbits10_2 fbits11_3
+              with "Hcg Hpc [] Hrlb").
     { iApply (mni_18 with "Htext"). }
-    iApply wp_next_off_intro.
     iNext.
-    iIntros "Hcg Hpc".
+    iIntros "Hcg Hpc #Hlb".
     assert (Hp1c : add_vec_int (mword_of_int (KernelSyms.main + 0x18) : mword 64) 4
                    = mword_of_int (KernelSyms.main + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1c) in "Hpc".

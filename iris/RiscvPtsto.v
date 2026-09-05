@@ -382,7 +382,13 @@ Record riscvEraGS := RiscvEraGS {
      [hart_iview_lb] is the [fence.i] receipt.  Per hart like
      [era_reg_name], and LAST so the positional mint in RiscvAdequacy only
      grows at its tail. *)
-  era_iview_name : CPU -> gname
+  era_iview_name : CPU -> gname;
+  (* THE READ-WATERMARK MIRROR (claude-notes/projects/relaxed-rr.md §4.2):
+     one monotone counter per hart, at the machine's [hr_rv (ghr c)]; its
+     lower bound [hart_rview_lb_at] is the receipt a PLAIN LOAD mints (the
+     view it read at), and an acquire fence turns it into a [view_lb].  Per
+     hart like [era_iview_name], and LAST, for the same reason. *)
+  era_rv_name : CPU -> gname
 }.
 
 Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
@@ -2121,6 +2127,84 @@ Proof.
   rewrite /insert /gtv_insert. case_decide as Hd; [by subst|done].
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* THE READ-WATERMARK MIRROR (claude-notes/projects/relaxed-rr.md §4.2).    *)
+(* [rview_auth_at E f] is the era's authority over every hart's read        *)
+(* watermark [hr_rv (ghr c)]; the lifting rule lends the focused hart's     *)
+(* counter to the node's callback as [hart_rview_auth] (the plain-read rule *)
+(* raises it to the view it read at and mints [hart_rview_lb_at] there, the *)
+(* AMO arm takes it to the top) and takes it back.  Monotone because the    *)
+(* watermark only ever grows ([mnode_step]'s read arms take a [Nat.max]).   *)
+(* The coherence floors [hr_coh] have NO ghost mirror: no proof consumes    *)
+(* them, they only bound the machine's choice of view, and the lifting rule *)
+(* hands the callback the whole [hread] as a pure value.                    *)
+(* ---------------------------------------------------------------------- *)
+Definition rview_auth_at `{!riscvFixedGS Σ} (E : riscvEraGS)
+    (f : CPU -> hread) : iProp Σ :=
+  ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
+     mono_nat_auth_own (era_rv_name E c) 1 (hr_rv (f c)))%I.
+
+Definition hart_rview_auth `{!riscvGS Σ} (c : CPU) (v : nat) : iProp Σ :=
+  mono_nat_auth_own (era_rv_name riscv_eraGS c) 1 v.
+
+Definition hart_rview_lb_at `{!riscvGS Σ} (c : CPU) (K : nat) : iProp Σ :=
+  mono_nat_lb_own (era_rv_name riscv_eraGS c) K.
+
+Global Instance hart_rview_lb_at_persistent `{!riscvGS Σ} c K :
+  Persistent (hart_rview_lb_at c K).
+Proof. apply _. Qed.
+
+Global Instance hart_rview_lb_at_timeless `{!riscvGS Σ} c K :
+  Timeless (hart_rview_lb_at c K).
+Proof. apply _. Qed.
+
+Lemma hart_rview_lb_at_get `{!riscvGS Σ} (c : CPU) (v : nat) :
+  hart_rview_auth c v -∗ hart_rview_lb_at c v.
+Proof. iIntros "H". by iDestruct (mono_nat_lb_own_get with "H") as "#$". Qed.
+
+Lemma hart_rview_lb_at_valid `{!riscvGS Σ} (c : CPU) (v K : nat) :
+  hart_rview_auth c v -∗ hart_rview_lb_at c K -∗ ⌜(K <= v)%nat⌝.
+Proof.
+  iIntros "Ha Hl". by iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ ?].
+Qed.
+
+Lemma hart_rview_lb_at_le `{!riscvGS Σ} (c : CPU) (K K' : nat) :
+  (K' <= K)%nat -> hart_rview_lb_at c K -∗ hart_rview_lb_at c K'.
+Proof. intros Hle. iIntros "H". by iApply (mono_nat_lb_own_le with "H"). Qed.
+
+Lemma hart_rview_auth_update `{!riscvGS Σ} (c : CPU) (v v' : nat) :
+  (v <= v')%nat -> hart_rview_auth c v ==∗ hart_rview_auth c v'.
+Proof. intros Hle. iIntros "H". by iMod (mono_nat_own_update v' with "H") as "[$ _]". Qed.
+
+(* the accessor hands the closing wand an [hread], so the write-back's
+   [<[c := hr']> ghr] is matched without projecting *)
+Lemma rview_interp_acc `{!riscvGS Σ} (c : CPU) (f : CPU -> hread) :
+  rview_auth_at riscv_eraGS f ⊢ hart_rview_auth c (hr_rv (f c)) ∗
+    (∀ hr, hart_rview_auth c (hr_rv hr) -∗ rview_auth_at riscv_eraGS (<[c := hr]> f)).
+Proof.
+  rewrite /rview_auth_at /hart_rview_auth.
+  iIntros "H".
+  iDestruct (big_sepS_delete _ _ c with "H") as "[Hcur Hrest]";
+    [ apply elem_of_fin_to_set |].
+  iFrame "Hcur".
+  iIntros (hr) "Hv".
+  iApply (big_sepS_delete _ _ c); [ apply elem_of_fin_to_set |].
+  rewrite /insert /ghr_insert decide_True //.
+  iFrame "Hv".
+  iApply (big_sepS_mono with "Hrest").
+  intros c' Hc'. apply elem_of_difference in Hc' as [_ Hne].
+  rewrite decide_False; [ done | ].
+  intros ->. apply Hne, elem_of_singleton. reflexivity.
+Qed.
+
+Lemma rview_auth_at_insert_id `{!riscvFixedGS Σ} (E : riscvEraGS)
+    (f : CPU -> hread) (c : CPU) :
+  rview_auth_at E (<[c := f c]> f) ⊣⊢ rview_auth_at E f.
+Proof.
+  rewrite /rview_auth_at. apply big_sepS_proper. intros c' _.
+  rewrite /insert /ghr_insert. case_decide as Hd; [by subst|done].
+Qed.
+
 (* the frag at SOME value: what a hart owns between instructions.  A leaf
    that leaves a dangling reservation (an AMOCAS mismatch, an A/D re-read
    that found the bits set) ends at [Some]; the boundary drops it.  This is
@@ -2248,9 +2332,11 @@ Definition era_interp `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) : iProp 
       pure conjunct is a STEP invariant of the language, so every arm
       re-establishes it and no rule has to carry it. *)
    resv_auth_at E g.(gresv) ∗ ⌜resv_ok g⌝ ∗
-   (* the instruction-view mirror and its bound (icache.md), LAST per the
-      new-conjunct rule *)
-   iview_auth_at E g.(gitv) ∗ ⌜itv_ok g⌝)%I.
+   (* the instruction-view mirror and its bound (icache.md) *)
+   iview_auth_at E g.(gitv) ∗ ⌜itv_ok g⌝ ∗
+   (* the read-watermark mirror and the read side's bound (relaxed-rr.md),
+      LAST per the new-conjunct rule *)
+   rview_auth_at E g.(ghr) ∗ ⌜hr_ok g⌝)%I.
 
 (* THE DURABLE DISK's MACHINE SIDE: the fixed gname's AUTH, always at the
    machine's own disk image.  A FIXED conjunct, NOT part of [era_interp]: the

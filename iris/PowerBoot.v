@@ -162,12 +162,12 @@ Definition boot_gstate (g : gstate) : gstate :=
   GState (fun c => boot_regs c) boot_mem
          (DevState uart0_state plic0_state (virtio_reset g.(gdev).(dvirtio)))
          g.(ggen) true (fun _ => None)
-         boot_mem [] (fun _ => 0%nat) (fun _ => 0%nat).
+         boot_mem [] (fun _ => 0%nat) (fun _ => 0%nat) (fun _ => hread0).
 
 Lemma boot_shape_boot_gstate (g : gstate) : boot_shape g (boot_gstate g).
 Proof.
   unfold boot_shape, boot_facts, boot_gstate.
-  cbn [ggen gpow gregs gmem gdev gresv gimg glog gtv gitv duart dplic dvirtio].
+  cbn [ggen gpow gregs gmem gdev gresv gimg glog gtv gitv ghr duart dplic dvirtio].
   (* NO blanket [try reflexivity]: on the memory clauses it would try to
      unify a lookup in the 134M-entry [list_to_map] with [Some _] and
      compute the whole list.  One tactic per conjunct. *)
@@ -189,6 +189,7 @@ Proof.
      the [gimg = gmem] clause is syntactically the same map on both sides. *)
   - reflexivity.
   - reflexivity.
+  - intro c. reflexivity.
   - intro c. reflexivity.
   - intro c. reflexivity.
 Qed.

@@ -257,6 +257,18 @@ Definition footprint (pa : Arch.pa) (n : N) : gset Arch.pa :=
 Definition snap_of {w : N} (pa : Arch.pa) (n : N) (v : bv w) : resv :=
   write_bytes ∅ pa n v.
 
+(* ONE HART'S READ-SIDE STATE (relaxed-rr.md §2.1; the field doc is on
+   [gstate.ghr] below).  Born at zero with the era. *)
+Record hread := HRead {
+  hr_rv  : nat;
+  hr_coh : TsoMemPa.cohmap;
+}.
+Add Printing Constructor hread.
+
+Definition hread0 : hread := HRead 0 (fun _ => 0%nat).
+
+Global Instance hread_inhabited : Inhabited hread := populate hread0.
+
 Record gstate := GState {
   gregs : CPU -> regstate;
   gmem  : gmap Arch.pa (bv 8);
@@ -291,6 +303,14 @@ Record gstate := GState {
      data view AND its own last store).  Nothing ties it to [gtv]:
      [itv <= tv] is not an invariant, only [itv <= length glog] is. *)
   gitv : CPU -> nat;
+  (* THE READ SIDE (claude-notes/projects/relaxed-rr.md §2): per hart, the
+     READ WATERMARK [hr_rv] (the highest view any plain load has read at --
+     what an R→R fence raises the floor [gtv] to) and the per-byte
+     COHERENCE FLOOR [hr_coh] (the view a byte was last read at -- what a
+     second load of the same byte must clear, RVWMO ppo rule 2).  Bundled
+     so [mnode_step] grows by ONE argument, as [gitv] did.  Nothing ties
+     [hr_rv] to [gtv] in either direction; only [hr_ok] below holds. *)
+  ghr : CPU -> hread;
 }.
 
 (* pointwise update of a single hart's register file *)
@@ -304,6 +324,10 @@ Global Instance gresv_insert : Insert CPU (option resv) (CPU -> option resv) :=
 (* ... and of a single hart's view *)
 Global Instance gtv_insert : Insert CPU nat (CPU -> nat) :=
   fun cpu tv gtv c => if decide (c = cpu) then tv else gtv c.
+
+(* ... and of a single hart's read-side state *)
+Global Instance ghr_insert : Insert CPU hread (CPU -> hread) :=
+  fun cpu hr ghr c => if decide (c = cpu) then hr else ghr c.
 
 (* the agent numbering into [TsoMemPa]'s log: the harts, then the disk
    (the only other bus master) *)
@@ -357,6 +381,16 @@ Definition mm_ok (g : gstate) : Prop :=
    [mm_ok] without a [gitv] to speak of. *)
 Definition itv_ok (g : gstate) : Prop :=
   forall c : CPU, (g.(gitv) c <= length g.(glog))%nat.
+
+(* THE READ SIDE'S BOUND (relaxed-rr.md §2.1), the same way: the watermark
+   and every coherence floor are legal log positions.  The plain-read
+   lifting rule needs it to EXHIBIT a step (the view it picks must clear
+   every floor of the footprint and stay under the top). *)
+Definition hr_bound (hr : hread) (L : nat) : Prop :=
+  (hr_rv hr <= L)%nat /\ (forall a : Arch.pa, (hr_coh hr a <= L)%nat).
+
+Definition hr_ok (g : gstate) : Prop :=
+  forall c : CPU, hr_bound (g.(ghr) c) (length g.(glog)).
 
 (* [mword_of_int (uint w) = w] at the address width -- the round trip the
    image-coverage conjunct needs to meet [boot_facts]' RAM totality, which
@@ -793,15 +827,28 @@ Definition fence_ifetch (b : barrier_kind) : bool :=
    model tell the classes apart is parked, not adopted.  See the flip note's
    rewritten RULING 1. *)
 
-(* ZTSO FENCE SEMANTICS: only a fence ordering W→R does anything — it
-   certifies the author's buffer drained (the view passes the author's
-   last message; [TsoMemPa.fence_post]).  Ztso already orders R→R, R→W
-   and W→W; [fence.tso] (rw→w plus r→rw) has no W→R edge, and [fence.i]
-   is Zifencei, a memory no-op under RULING 1's coherent ifetch. *)
+(* FENCE SEMANTICS (claude-notes/projects/relaxed-rr.md §2.2).  Two edges
+   of a fence matter to this machine, and [TsoMemPa.fence_post] takes both:
+     - a W→R edge DRAINS: the floor passes the author's own last message
+       ("my buffer has drained") -- the Ztso meaning, unchanged;
+     - an R→R edge ACQUIRES: the floor passes the hart's read watermark,
+       so every later load sees at least what every earlier load saw --
+       NEW, because a plain load no longer moves the floor.
+   A fence with a W-only successor ([rw,w], [r,w], [w,w]) is a no-op: W→W
+   order is the single log and R→W order is the interleaving.  [fence.tso]
+   (rw→w plus r→rw) acquires but does not drain; [fence.i] is Zifencei and
+   touches only the instruction view. *)
 Definition fence_drains (b : barrier_kind) : bool :=
   match b with
   | Barrier_RISCV_rw_rw | Barrier_RISCV_rw_r
   | Barrier_RISCV_w_rw | Barrier_RISCV_w_r => true
+  | _ => false
+  end.
+
+Definition fence_acq (b : barrier_kind) : bool :=
+  match b with
+  | Barrier_RISCV_rw_rw | Barrier_RISCV_rw_r
+  | Barrier_RISCV_r_rw | Barrier_RISCV_r_r | Barrier_RISCV_tso => true
   | _ => false
   end.
 
@@ -850,17 +897,19 @@ Definition fence_drains (b : barrier_kind) : bool :=
    [hart_node_step] below is then literally "focus this hart, take one local
    node, write back", exactly the shape the old whole-instruction arm had
    with [run] in place of [mnode_step]. *)
-(* THE HART-LOCAL NODE STEP, POST-FLIP (tso-machine-flip.md §2).  Beside
-   the reservation context it now threads the memory-model state: [h] is
-   this hart's agent number, [img] the era image (read-only — only a
-   power edge moves it), [log]/[log'] the write log, [tv]/[tv'] this
-   hart's view.  [s.(mem)] is the FLAT cache; the arms below keep it in
+(* THE HART-LOCAL NODE STEP, POST-FLIP (tso-machine-flip.md §2), RELAXED FOR
+   R→R (claude-notes/projects/relaxed-rr.md §2).  Beside the reservation
+   context it threads the memory-model state: [h] is this hart's agent
+   number, [img] the era image (read-only — only a power edge moves it),
+   [log]/[log'] the write log, [tv]/[tv'] this hart's FLOOR, [itv]/[itv']
+   its instruction view, [hr]/[hr'] its read side (watermark + coherence
+   floors).  [s.(mem)] is the FLAT cache; the arms below keep it in
    lock-step with the log ([flat_store]), which is [mm_ok]'s induction. *)
 Definition mnode_step (oth : gset Arch.pa) (h : agent)
     (img : gmap Arch.pa (bv 8)) (s : mstate) (log : list pwmsg) (tv itv : nat)
-    (r : option resv) (m : M unit)
+    (hr : hread) (r : option resv) (m : M unit)
     (m' : M unit) (s' : mstate) (log' : list pwmsg) (tv' itv' : nat)
-    (r' : option resv) : Prop :=
+    (hr' : hread) (r' : option resv) : Prop :=
   match m with
   (* THE BOUNDARY / RESTART RULE.  The cycle is over; begin the next one.
      [tick] is chosen nondeterministically here exactly as the old
@@ -870,15 +919,17 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
      view is NOT touched: an instruction boundary is not a fence. *)
   | Interface.Ret _ =>
       exists tick : bool,
-        m' = riscv_step tick /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = None
+        m' = riscv_step tick /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\
+        hr' = hr /\ r' = None
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
        (* registers *)
        | Interface.RegRead rg _ => fun k =>
            m' = k (register_lookup rg s.(sregs)) /\ s' = s /\
-           log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+           log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
        | Interface.RegWrite rg _ v => fun k =>
-           m' = k tt /\ s' = set_reg s rg v /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+           m' = k tt /\ s' = set_reg s rg v /\ log' = log /\ tv' = tv /\ itv' = itv /\
+           hr' = hr /\ r' = r
        | Interface.MemRead n req => fun k =>
            if dev_addr (Interface.ReadReq.pa req) then
              (* MMIO: the device answers, and its state may move (an RHR read
@@ -890,16 +941,8 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
              exists (w : bv (8 * n)) (d' : dev_state),
                dev_read s.(mdev) (Interface.ReadReq.pa req) n = Some (w, d') /\
                m' = k (inl (w, None)) /\ s' = MState s.(sregs) s.(mem) d' /\
-               log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+               log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
            else
-             (* THE PLAIN RAM READ — every non-exclusive read, EXPLICIT OR
-                IMPLICIT (RULING 1 as overruled: fetches and page-table walks
-                come here too).  Advance the view nondeterministically (the
-                drain), then read every byte LATEST-VISIBLE at the new view.
-                Never blocked, never reserves.  Latest-visible per byte at
-                ONE view is what forbids stale-after-fresh; the own-author
-                arm of [visibleb] is store forwarding, which is what lets a
-                hart's own page-table writes be seen by its own walker. *)
              (* THE INSTRUCTION FETCH (claude-notes/projects/icache.md): the
                 icache is not coherent with the data side.  The fetch reads
                 every byte latest-visible TO THE ICACHE AGENT (no store
@@ -915,17 +958,35 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
                      (pa_add (Interface.ReadReq.pa req) j)
                    = Some (nth_byte w j)) /\
                 m' = k (inl (w, None)) /\ s' = s /\
-                log' = log /\ tv' = tv /\ itv' = itv /\ r' = r)
+                log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r)
              \/
+             (* THE PLAIN RAM READ — every non-exclusive read, EXPLICIT OR
+                IMPLICIT (RULING 1 as overruled: fetches aside, page-table
+                walks come here too).  Pick a view [tvn] at or above the
+                hart's FLOOR and at or above every byte's COHERENCE FLOOR,
+                under the top, and read every byte latest-visible at [tvn].
+                THE FLOOR DOES NOT MOVE (relaxed-rr.md §2.1) -- that is the
+                whole of load–load reordering; the read watermark takes the
+                max and the footprint's coherence floors become [tvn].
+                Never blocked, never reserves.  Latest-visible per byte at
+                ONE view is what keeps a mixed-size load single-copy atomic;
+                the own-author arm of [visibleb] is store forwarding, which
+                is what lets a hart's own page-table writes be seen by its
+                own walker. *)
              (ak_ifetch (Interface.ReadReq.access_kind req) = false /\
               ak_excl (Interface.ReadReq.access_kind req) = false /\
               exists (tvn : nat) (w : bv (8 * n)),
                 (tv <= tvn)%nat /\ (tvn <= length log)%nat /\
                 (forall j : nat, (N.of_nat j < n)%N ->
+                   (hr_coh hr (pa_add (Interface.ReadReq.pa req) j) <= tvn)%nat) /\
+                (forall j : nat, (N.of_nat j < n)%N ->
                    tso_read img log h tvn (pa_add (Interface.ReadReq.pa req) j)
                    = Some (nth_byte w j)) /\
                 m' = k (inl (w, None)) /\ s' = s /\
-                log' = log /\ tv' = tvn /\ itv' = itv /\ r' = r)
+                log' = log /\ tv' = tv /\ itv' = itv /\
+                hr' = HRead (Nat.max (hr_rv hr) tvn)
+                        (coh_upd_win (hr_coh hr) (Interface.ReadReq.pa req) n tvn) /\
+                r' = r)
              \/
              (* THE EXCLUSIVE RAM READ ("drain, then read memory"): blocked
                 (self-loop) while another hart reserves any of its bytes --
@@ -934,13 +995,17 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
                 waiting hart holds nothing, hence no wait-for cycle through
                 exclusive reads); otherwise it reads the FLAT cache -- which
                 IS the read at the log top ([tso_read_top_flat]) -- takes the
-                view to the top, and its snapshot becomes this hart's
-                reservation, replacing any stale one.  The view-at-top is
-                what mints the acquire receipt in the lock leaves. *)
+                floor AND the watermark to the top, and its snapshot becomes
+                this hart's reservation, replacing any stale one.  The
+                floor-at-top is what mints the acquire receipt in the lock
+                leaves.  (Every exclusive access is treated as [.aq]; xv6's
+                one AMO is, and honouring a plain AMO's annotation is a
+                recorded follow-up, relaxed-rr.md §2.2.) *)
              (ak_excl (Interface.ReadReq.access_kind req) = true /\
               ((~ (footprint (Interface.ReadReq.pa req) n ## oth) /\
                 m' = Interface.Next (Interface.MemRead n req) k /\
-                s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = None)
+                s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\
+                r' = None)
                \/
                (footprint (Interface.ReadReq.pa req) n ## oth /\
                 exists w : bv (8 * n),
@@ -949,6 +1014,7 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
                      = Some (nth_byte w j)) /\
                   m' = k (inl (w, None)) /\ s' = s /\
                   log' = log /\ tv' = length log /\ itv' = itv /\
+                  hr' = HRead (length log) (hr_coh hr) /\
                   r' = Some (snap_of (Interface.ReadReq.pa req) n w))))
        | Interface.MemWrite n req => fun k =>
            if dev_addr (Interface.WriteReq.pa req) then
@@ -958,23 +1024,23 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
                dev_write s.(mdev) (Interface.WriteReq.pa req) n
                  (Interface.WriteReq.value req) = Some d' /\
                m' = k (inl None) /\ s' = MState s.(sregs) s.(mem) d' /\
-               log' = log /\ tv' = tv /\ itv' = itv /\ r' = None
+               log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = None
            else
              (* THE RAM WRITE, conditional or plain alike: blocked
                 (self-loop) while another hart reserves any of its bytes;
                 otherwise APPEND at the log top and update the flat cache in
                 lock-step ([flat_store]), clearing this hart's own
-                reservation.  A PLAIN store does NOT move the author's view
+                reservation.  A PLAIN store does NOT move the author's floor
                 — that is store buffering, and advancing it would forbid SB.
-                The AMO/conditional write half takes the view past its own
+                The AMO/conditional write half takes the floor past its own
                 append ("the drain includes my write").  A conditional write
                 on the hart's own reservation is never blocked -- no other
                 hart can hold an overlapping one -- but the arm does not
                 need to know that: the rule absorbs the self-loop by Löb
-                either way. *)
+                either way.  The read side does not move on a write. *)
              (~ (footprint (Interface.WriteReq.pa req) n ## oth) /\
               m' = Interface.Next (Interface.MemWrite n req) k /\
-              s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r)
+              s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r)
              \/
              (footprint (Interface.WriteReq.pa req) n ## oth /\
               m' = k (inl None) /\
@@ -985,46 +1051,52 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
                                       (Interface.WriteReq.value req)) h] /\
               tv' = (if ak_excl (Interface.WriteReq.access_kind req)
                      then S (length log) else tv) /\
-              itv' = itv /\ r' = None)
+              itv' = itv /\ hr' = hr /\ r' = None)
        (* trace / announce outcomes: state no-ops, exactly as [run]. *)
        | Interface.InstrAnnounce _    => fun k =>
-           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
        | Interface.BranchAnnounce _ _ => fun k =>
-           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
-       (* THE FENCE (tso-machine-flip.md §2): a W→R-ordering fence drains —
-          the view passes the author's own last message (drains happen in
-          log order, so passing one's own top message passes everything
-          below).  Every other barrier is a no-op under Ztso. *)
+           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
+       (* THE FENCE (relaxed-rr.md §2.2): a W→R edge drains (the floor
+          passes the author's own last message -- drains happen in log
+          order, so passing one's own top message passes everything below)
+          and an R→R edge acquires (the floor passes the read watermark).
+          [TsoMemPa.fence_post] takes both bits.  The read side itself does
+          not move. *)
        | Interface.Barrier b          => fun k =>
            m' = k tt /\ s' = s /\ log' = log /\
-           tv' = fence_post h log (fence_drains b) tv /\
+           tv' = fence_post h log (fence_drains b) (fence_acq b) tv (hr_rv hr) /\
            (* FENCE.I (icache.md): the instruction view passes this hart's
-              data view AND its own last store -- the drain a fetch of the
-              hart's own code needs -- and only ever moves forward. *)
+              data floor AND its own last store -- the drain a fetch of the
+              hart's own code needs -- and only ever moves forward.  It does
+              NOT pass the read watermark: RVWMO+Zifencei orders a hart's
+              own stores before its later fetches, and nothing else. *)
            itv' = (if fence_ifetch b
-                   then Nat.max itv (fence_post h log true tv) else itv) /\
-           r' = r
+                   then Nat.max itv (fence_post h log true false tv (hr_rv hr))
+                   else itv) /\
+           hr' = hr /\ r' = r
        | Interface.CacheOp _          => fun k =>
-           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
        | Interface.TlbOp _            => fun k =>
-           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
        | Interface.TakeException _    => fun k =>
-           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
        | Interface.ReturnException _  => fun k =>
-           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
        | Interface.TranslationStart _ => fun k =>
-           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
        | Interface.TranslationEnd _   => fun k =>
-           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
        | Interface.CycleCount         => fun k =>
-           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
        | Interface.Message _          => fun k =>
-           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+           m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
        | Interface.GetCycleCount      => fun k =>
-           m' = k 0%Z /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+           m' = k 0%Z /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
        (* nondeterminism: branch over every choice *)
        | Interface.Choose _           => fun k =>
-           exists ch, m' = k ch /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ r' = r
+           exists ch, m' = k ch /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\
+                      hr' = hr /\ r' = r
        (* failure / discard / injected exception: stuck *)
        | _ => fun _ => False
        end) k
@@ -1037,14 +1109,15 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
 Definition hart_node_step (gen : nat) (g : gstate) (cpu : CPU) (m : M unit)
     (e' : mexpr) (g' : gstate) : Prop :=
   exists (m' : M unit) (s' : mstate) (log' : list pwmsg) (tv' itv' : nat)
-         (r' : option resv),
+         (hr' : hread) (r' : option resv),
     mnode_step (others_resv g.(gresv) cpu) (hart_agent cpu) g.(gimg)
       (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) g.(glog) (g.(gtv) cpu)
-      (g.(gitv) cpu) (g.(gresv) cpu) m m' s' log' tv' itv' r' /\
+      (g.(gitv) cpu) (g.(ghr) cpu) (g.(gresv) cpu) m m' s' log' tv' itv' hr' r' /\
     e' = HartE gen cpu m' /\
     g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev)
            g.(ggen) g.(gpow) (<[cpu := r']> g.(gresv))
-           g.(gimg) log' (<[cpu := tv']> g.(gtv)) (<[cpu := itv']> g.(gitv)).
+           g.(gimg) log' (<[cpu := tv']> g.(gtv)) (<[cpu := itv']> g.(gitv))
+           (<[cpu := hr']> g.(ghr)).
 
 (* ---------------------------------------------------------------------- *)
 (* THE RESET MACHINE (claude-notes/design/crash.md): what the loader and    *)
@@ -1455,7 +1528,8 @@ Definition boot_facts (g' : gstate) : Prop :=
   /\ g'.(glog) = []
   /\ g'.(gimg) = g'.(gmem)
   /\ (forall c : CPU, g'.(gtv) c = 0%nat)
-  /\ (forall c : CPU, g'.(gitv) c = 0%nat).
+  /\ (forall c : CPU, g'.(gitv) c = 0%nat)
+  /\ (forall c : CPU, g'.(ghr) c = hread0).
 
 (* the machine state a PowerOn hands over (claude-notes/design/crash.md):
    same generation (PowerOff already bumped it), the reset machine above,
@@ -1505,7 +1579,7 @@ Definition prim_step
       exists d',
         uart_step g.(gdev) κ d' /\
         g' = GState g.(gregs) g.(gmem) d' g.(ggen) g.(gpow) g.(gresv)
-               g.(gimg) g.(glog) g.(gtv) g.(gitv))
+               g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr))
      \/ (~ thread_live g gen /\ κ = [] /\ g' = g)))
   \/
   (exists gen, e = DiskLoopE gen /\ e' = DiskLoopE gen /\ κ = [] /\ efs = [] /\
@@ -1524,7 +1598,7 @@ Definition prim_step
            device's own [Idle] arm is what it does instead *)
         (forall a, a ∈ all_resv g.(gresv) -> (W ∪ g.(gmem)) !! a = g.(gmem) !! a) /\
         g' = GState g.(gregs) (W ∪ g.(gmem)) d' g.(ggen) g.(gpow) g.(gresv)
-               g.(gimg) log' g.(gtv) g.(gitv))
+               g.(gimg) log' g.(gtv) g.(gitv) g.(ghr))
      \/ (~ thread_live g gen /\ g' = g)))
   \/
   (exists gen, e = PlicLoopE gen /\ e' = PlicLoopE gen /\ κ = [] /\ efs = [] /\
@@ -1532,7 +1606,7 @@ Definition prim_step
       exists gr',
         plic_step g.(gdev) g.(gregs) gr' /\
         g' = GState gr' g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv)
-               g.(gimg) g.(glog) g.(gtv) g.(gitv))
+               g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr))
      \/ (~ thread_live g gen /\ g' = g)))
   \/
   (* both power arms are OBSERVED (§3b'): power loss and power-on are
@@ -1544,7 +1618,7 @@ Definition prim_step
           what makes [ggen > gen] the one stable death certificate.  The
           memory-model fields are frozen with the rest of RAM. *)
        g' = GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv)
-              g.(gimg) g.(glog) g.(gtv) g.(gitv))
+              g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr))
      \/
      (g.(gpow) = false /\ κ = [ObsPowerOn] /\ efs = power_fork g.(ggen) /\
        boot_shape g g'))).
@@ -1581,7 +1655,7 @@ Lemma prim_step_uart_inv gen g κ e' g' efs :
   ((thread_live g gen /\
     exists d', uart_step g.(gdev) κ d' /\
       g' = GState g.(gregs) g.(gmem) d' g.(ggen) g.(gpow) g.(gresv)
-             g.(gimg) g.(glog) g.(gtv) g.(gitv))
+             g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr))
    \/ (~ thread_live g gen /\ κ = [] /\ g' = g)).
 Proof.
   intros [(? & ? & ? & Heq & _)
@@ -1601,7 +1675,7 @@ Lemma prim_step_disk_inv gen g κ e' g' efs :
        \/ (W <> ∅ /\ log' = g.(glog) ++ [PWMsg W disk_agent])) /\
       (forall a, a ∈ all_resv g.(gresv) -> (W ∪ g.(gmem)) !! a = g.(gmem) !! a) /\
       g' = GState g.(gregs) (W ∪ g.(gmem)) d' g.(ggen) g.(gpow) g.(gresv)
-             g.(gimg) log' g.(gtv) g.(gitv))
+             g.(gimg) log' g.(gtv) g.(gitv) g.(ghr))
    \/ (~ thread_live g gen /\ g' = g)).
 Proof.
   intros [(? & ? & ? & Heq & _)
@@ -1617,7 +1691,7 @@ Lemma prim_step_plic_inv gen g κ e' g' efs :
   ((thread_live g gen /\
     exists gr', plic_step g.(gdev) g.(gregs) gr' /\
       g' = GState gr' g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv)
-             g.(gimg) g.(glog) g.(gtv) g.(gitv))
+             g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr))
    \/ (~ thread_live g gen /\ g' = g)).
 Proof.
   intros [(? & ? & ? & Heq & _)
@@ -1632,7 +1706,7 @@ Lemma prim_step_power_inv g κ e' g' efs :
   e' = PowerLoopE /\
   ((g.(gpow) = true /\ κ = [ObsPowerOff] /\ efs = [] /\
      g' = GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv)
-            g.(gimg) g.(glog) g.(gtv) g.(gitv))
+            g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr))
    \/ (g.(gpow) = false /\ κ = [ObsPowerOn] /\ efs = power_fork g.(ggen) /\
        boot_shape g g')).
 Proof.
@@ -1651,20 +1725,20 @@ Qed.
 
 Lemma hart_node_step_shape gen g cpu m e' g' :
   hart_node_step gen g cpu m e' g' -> exists m', e' = HartE gen cpu m'.
-Proof. intros (m' & s' & log' & tv' & itv' & r' & _ & -> & _). by eexists. Qed.
+Proof. intros (m' & s' & log' & tv' & itv' & hr' & r' & _ & -> & _). by eexists. Qed.
 
 Lemma hart_node_step_era gen g cpu m e' g' :
   hart_node_step gen g cpu m e' g' ->
   g'.(ggen) = g.(ggen) /\ g'.(gpow) = g.(gpow).
-Proof. by intros (m' & s' & log' & tv' & itv' & r' & _ & _ & ->). Qed.
+Proof. by intros (m' & s' & log' & tv' & itv' & hr' & r' & _ & _ & ->). Qed.
 
 (* A hart node never moves the disk IMAGE (crash.md): register effects and
    RAM accesses do not touch the device fabric at all, and an MMIO
    transaction goes through [dev_read]/[dev_write], which preserve [v_disk].
    The per-NODE twin of [run_v_disk], and what lets the hart lifting rule
    FRAME [state_interp]'s durable disk conjunct. *)
-Lemma mnode_step_v_disk oth h img s log tv itv r m m' s' log' tv' itv' r' :
-  mnode_step oth h img s log tv itv r m m' s' log' tv' itv' r' ->
+Lemma mnode_step_v_disk oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' :
+  mnode_step oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' ->
   v_disk (dvirtio (mdev s')) = v_disk (dvirtio (mdev s)).
 Proof.
   rewrite /mnode_step. destruct m as [y|T oc k].
@@ -1676,7 +1750,7 @@ Proof.
     + intros (w & d' & Hdr & _ & -> & _). cbn.
       exact (dev_read_v_disk _ _ _ _ _ Hdr).
     + by intros [(_ & tvn & w & _ & _ & _ & _ & -> & _)
-                |[(_ & _ & tvn & w & _ & _ & _ & _ & -> & _)
+                |[(_ & _ & tvn & w & _ & _ & _ & _ & _ & -> & _)
                  |(_ & [(_ & _ & -> & _) | (_ & w & _ & _ & -> & _)])]].
   - (* MemWrite *)
     destruct (dev_addr _).
@@ -1690,8 +1764,8 @@ Lemma hart_node_step_v_disk gen g cpu m e' g' :
   hart_node_step gen g cpu m e' g' ->
   v_disk (dvirtio g'.(gdev)) = v_disk (dvirtio g.(gdev)).
 Proof.
-  intros (m' & s' & log' & tv' & itv' & r' & Hn & _ & ->). cbn.
-  exact (mnode_step_v_disk _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn).
+  intros (m' & s' & log' & tv' & itv' & hr' & r' & Hn & _ & ->). cbn.
+  exact (mnode_step_v_disk _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn).
 Qed.
 
 (* THE BATCHING LICENCE (claude-notes/design/main-cycle-port.md §5): apart
@@ -1713,7 +1787,7 @@ Lemma prim_step_hart_regs_frame e g κ e' g' efs (c : CPU) :
 Proof.
   intros Hstep Hnot Hnp.
   destruct Hstep as
-    [ (gen & cpu & m & -> & _ & _ & [ (_ & (m' & s' & log' & tv' & itv' & r' & _ & _ & ->)) | (_ & _ & ->) ])
+    [ (gen & cpu & m & -> & _ & _ & [ (_ & (m' & s' & log' & tv' & itv' & hr' & r' & _ & _ & ->)) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & d' & W & log' & _ & _ & _ & ->) | (_ & ->) ])
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & Hp & ->) | (_ & ->) ])
@@ -1748,12 +1822,12 @@ Lemma prim_step_hart_restart gen cpu g (tick : bool) :
     (GState (<[cpu := g.(gregs) cpu]> g.(gregs)) g.(gmem) g.(gdev)
        g.(ggen) g.(gpow) (<[cpu := None]> g.(gresv))
        g.(gimg) g.(glog) (<[cpu := g.(gtv) cpu]> g.(gtv))
-       (<[cpu := g.(gitv) cpu]> g.(gitv))) [].
+       (<[cpu := g.(gitv) cpu]> g.(gitv)) (<[cpu := g.(ghr) cpu]> g.(ghr))) [].
 Proof.
   intros Hl. left. exists gen, cpu, (Interface.Ret tt).
   split_and!; try reflexivity. left. split; [exact Hl|].
   exists (riscv_step tick), (MState (g.(gregs) cpu) g.(gmem) g.(gdev)),
-    g.(glog), (g.(gtv) cpu), (g.(gitv) cpu), None.
+    g.(glog), (g.(gtv) cpu), (g.(gitv) cpu), (g.(ghr) cpu), None.
   split_and!; [by exists tick|reflexivity|reflexivity].
 Qed.
 
@@ -1873,50 +1947,50 @@ Qed.
 
 (* one hart node: its own reservation (if any) still agrees with memory
    afterwards, and no byte another hart has reserved moved *)
-Lemma mnode_step_resv oth h img s log tv itv r m m' s' log' tv' itv' r' :
-  mnode_step oth h img s log tv itv r m m' s' log' tv' itv' r' ->
+Lemma mnode_step_resv oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' :
+  mnode_step oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' ->
   (forall rr, r = Some rr -> rr ⊆ s.(mem)) ->
   (forall rr, r' = Some rr -> rr ⊆ s'.(mem)) /\
   (forall a, a ∈ oth -> s'.(mem) !! a = s.(mem) !! a).
 Proof.
   rewrite /mnode_step. destruct m as [y|T oc k].
-  { intros (tick & _ & -> & _ & _ & _ & ->) _. split; [discriminate|done]. }
+  { intros (tick & _ & -> & _ & _ & _ & _ & ->) _. split; [discriminate|done]. }
   destruct oc; simpl;
-    try (by intros (_ & -> & _ & _ & _ & ->) Hr; split; [exact Hr|done]);
+    try (by intros (_ & -> & _ & _ & _ & _ & ->) Hr; split; [exact Hr|done]);
     try (by intros []).
   - (* MemRead *)
     destruct (dev_addr _).
-    + intros (w & d' & _ & _ & -> & _ & _ & _ & ->) Hr. split; [exact Hr|done].
-    + intros [(_ & tvn & w & _ & _ & _ & _ & -> & _ & _ & _ & ->)
-             |[(_ & _ & tvn & w & _ & _ & _ & _ & -> & _ & _ & _ & ->)
-              |(_ & [(_ & _ & -> & _ & _ & _ & ->)
-                    | (Hdisj & w & Hrd & _ & -> & _ & _ & _ & ->)])]] Hr;
+    + intros (w & d' & _ & _ & -> & _ & _ & _ & _ & ->) Hr. split; [exact Hr|done].
+    + intros [(_ & tvn & w & _ & _ & _ & _ & -> & _ & _ & _ & _ & ->)
+             |[(_ & _ & tvn & w & _ & _ & _ & _ & _ & -> & _ & _ & _ & _ & ->)
+              |(_ & [(_ & _ & -> & _ & _ & _ & _ & ->)
+                    | (Hdisj & w & Hrd & _ & -> & _ & _ & _ & _ & ->)])]] Hr;
         try (by split; [exact Hr|done]);
         try (by split; [discriminate|done]).
       split; [|done]. intros rr [= <-]. exact (snap_of_sub _ _ _ _ Hrd).
   - (* MemWrite *)
     destruct (dev_addr _).
-    + intros (d' & _ & _ & -> & _ & _ & _ & ->) Hr. split; [discriminate|done].
-    + intros [(_ & _ & -> & _ & _ & _ & ->) | (Hdisj & _ & -> & _ & _ & _ & ->)] Hr;
+    + intros (d' & _ & _ & -> & _ & _ & _ & _ & ->) Hr. split; [discriminate|done].
+    + intros [(_ & _ & -> & _ & _ & _ & _ & ->) | (Hdisj & _ & -> & _ & _ & _ & _ & ->)] Hr;
         [by split; [exact Hr|done]|].
       split; [discriminate|]. intros a Ha. cbn.
       apply write_bytes_lookup_notin. intros Hfp.
       exact (Hdisj a Hfp Ha).
-  - (* Choose *) intros (ch & _ & -> & _ & _ & _ & ->) Hr. split; [exact Hr|done].
+  - (* Choose *) intros (ch & _ & -> & _ & _ & _ & _ & ->) Hr. split; [exact Hr|done].
 Qed.
 
 Lemma hart_node_step_resv_ok gen g cpu m e' g' :
   hart_node_step gen g cpu m e' g' -> resv_ok g -> resv_ok g'.
 Proof.
-  intros (m' & s' & log' & tv' & itv' & r' & Hn & _ & ->) Hok c rr. cbn.
+  intros (m' & s' & log' & tv' & itv' & hr' & r' & Hn & _ & ->) Hok c rr. cbn.
   rewrite /insert /gresv_insert. case_decide as Hc.
   - (* the stepping hart: its new reservation *)
     subst c. intros Hr'.
-    destruct (mnode_step_resv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn (Hok cpu)) as (Hown & _).
+    destruct (mnode_step_resv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn (Hok cpu)) as (Hown & _).
     exact (Hown rr Hr').
   - (* another hart: its bytes did not move *)
     intros Hc'. pose proof (Hok c rr Hc') as Hsub.
-    destruct (mnode_step_resv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn (Hok cpu)) as (_ & Hoth).
+    destruct (mnode_step_resv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn (Hok cpu)) as (_ & Hoth).
     apply map_subseteq_spec. intros a b Hab.
     rewrite Hoth; [by eapply map_subseteq_spec in Hsub|].
     eapply elem_of_others_resv; [exact Hc|exact Hc'|].
@@ -1955,52 +2029,64 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 (* one hart node: the flat tie is kept, the log only grows, this hart's
-   view only grows and stays under the (new) top *)
-Lemma mnode_step_mm oth h img s log tv itv r m m' s' log' tv' itv' r' :
-  mnode_step oth h img s log tv itv r m m' s' log' tv' itv' r' ->
+   floor only grows and stays under the (new) top, and so do its instruction
+   view and its read side (relaxed-rr.md: the watermark and every coherence
+   floor are legal log positions) *)
+Lemma mnode_step_mm oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' :
+  mnode_step oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' ->
   s.(mem) = flat img log -> (tv <= length log)%nat ->
+  (hr_rv hr <= length log)%nat -> (forall a, (hr_coh hr a <= length log)%nat) ->
   s'.(mem) = flat img log' /\ (length log <= length log')%nat /\
   (tv' <= length log')%nat /\
-  ((itv <= length log)%nat -> (itv' <= length log')%nat).
+  ((itv <= length log)%nat -> (itv' <= length log')%nat) /\
+  (hr_rv hr' <= length log')%nat /\ (forall a, (hr_coh hr' a <= length log')%nat).
 Proof.
   rewrite /mnode_step. destruct m as [y|T oc k].
-  { intros (tick & _ & -> & -> & -> & -> & _) Hf Htv. by split_and!. }
+  { intros (tick & _ & -> & -> & -> & -> & -> & _) Hf Htv Hrv Hcoh. by split_and!. }
   destruct oc; simpl;
-    try (by intros (_ & -> & -> & -> & -> & _) Hf Htv; split_and!);
+    try (by intros (_ & -> & -> & -> & -> & -> & _) Hf Htv Hrv Hcoh; split_and!);
     try (by intros []).
   - (* MemRead *)
     destruct (dev_addr _).
-    + intros (w & d' & _ & _ & -> & -> & -> & -> & _) Hf Htv. by split_and!.
-    + intros [(_ & tvn & w & Hlo & Hhi & _ & _ & -> & -> & -> & -> & _)
-             |[(_ & _ & tvn & w & Hlo & Hhi & _ & _ & -> & -> & -> & -> & _)
-              |(_ & [(_ & _ & -> & -> & -> & -> & _)
-                    | (_ & w & _ & _ & -> & -> & -> & -> & _)])]] Hf Htv;
-        by split_and!.
+    + intros (w & d' & _ & _ & -> & -> & -> & -> & -> & _) Hf Htv Hrv Hcoh. by split_and!.
+    + intros [(_ & tvn & w & Hlo & Hhi & _ & _ & -> & -> & -> & -> & -> & _)
+             |[(_ & _ & tvn & w & Hlo & Hhi & _ & _ & _ & -> & -> & -> & -> & -> & _)
+              |(_ & [(_ & _ & -> & -> & -> & -> & -> & _)
+                    | (_ & w & _ & _ & -> & -> & -> & -> & -> & _)])]] Hf Htv Hrv Hcoh;
+        split_and!; try done.
+      * (* the plain read: the watermark takes the max, the floors take [tvn] *)
+        cbn. lia.
+      * cbn. apply coh_upd_win_le; [exact Hcoh|exact Hhi].
   - (* MemWrite *)
     destruct (dev_addr _).
-    + intros (d' & _ & _ & -> & -> & -> & -> & _) Hf Htv. by split_and!.
-    + intros [(_ & _ & -> & -> & -> & -> & _) | (_ & _ & -> & -> & -> & -> & _)]
-        Hf Htv.
+    + intros (d' & _ & _ & -> & -> & -> & -> & -> & _) Hf Htv Hrv Hcoh. by split_and!.
+    + intros [(_ & _ & -> & -> & -> & -> & -> & _) | (_ & _ & -> & -> & -> & -> & -> & _)]
+        Hf Htv Hrv Hcoh.
       { by split_and!. }
       split_and!.
       * cbn. rewrite Hf. symmetry. apply flat_store.
       * rewrite length_app /=. lia.
       * rewrite length_app /=. case_match; lia.
       * intros Hi. rewrite length_app /=. lia.
-  - (* Barrier: both drains stay under the top by [own_pub_le] *)
-    intros (_ & -> & -> & -> & -> & _) Hf Htv. split_and!; [done|done| |].
-    + rewrite /fence_post. case_match; [|done].
-      apply Nat.max_lub; [done|apply own_pub_le].
-    + intros Hi. case_match; [|done]. apply Nat.max_lub; [done|].
-      rewrite /fence_post. apply Nat.max_lub; [done|apply own_pub_le].
-  - (* Choose *) intros (ch & _ & -> & -> & -> & -> & _) Hf Htv. by split_and!.
+      * rewrite length_app /=. lia.
+      * intros a. rewrite length_app /=. pose proof (Hcoh a). lia.
+  - (* Barrier: the drain and the acquire both stay under the top
+       ([fence_post_le]: [own_pub_le] for the drain, [Hrv] for the acquire) *)
+    intros (_ & -> & -> & -> & -> & -> & _) Hf Htv Hrv Hcoh. split_and!; [done|done| | |done|done].
+    + apply fence_post_le; [exact Htv|exact Hrv].
+    + (* [simpl] has already reduced the fence.i drain's constant bits to
+         [max tv (own_pub h log)] *)
+      intros Hi. case_match; [|done]. apply Nat.max_lub; [done|].
+      apply Nat.max_lub; [exact Htv|apply own_pub_le].
+  - (* Choose *) intros (ch & _ & -> & -> & -> & -> & -> & _) Hf Htv Hrv Hcoh. by split_and!.
 Qed.
 
 Lemma hart_node_step_mm_ok gen g cpu m e' g' :
-  hart_node_step gen g cpu m e' g' -> mm_ok g -> mm_ok g'.
+  hart_node_step gen g cpu m e' g' -> mm_ok g -> hr_ok g -> mm_ok g'.
 Proof.
-  intros (m' & s' & log' & tv' & itv' & r' & Hn & _ & ->) (Hf & Htv & Hcov).
-  destruct (mnode_step_mm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn Hf (Htv cpu))
+  intros (m' & s' & log' & tv' & itv' & hr' & r' & Hn & _ & ->) (Hf & Htv & Hcov) Hhr.
+  destruct (Hhr cpu) as (Hrv & Hcoh).
+  destruct (mnode_step_mm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn Hf (Htv cpu) Hrv Hcoh)
     as (Hf' & Hgrow & Htv' & _).
   split_and!; [exact Hf'| |exact Hcov].
   intros c. cbn. rewrite /insert /gtv_insert. case_decide as Hc.
@@ -2010,20 +2096,35 @@ Qed.
 
 (* ... and the instruction view's bound, the same way *)
 Lemma hart_node_step_itv_ok gen g cpu m e' g' :
-  hart_node_step gen g cpu m e' g' -> mm_ok g -> itv_ok g -> itv_ok g'.
+  hart_node_step gen g cpu m e' g' -> mm_ok g -> hr_ok g -> itv_ok g -> itv_ok g'.
 Proof.
-  intros (m' & s' & log' & tv' & itv' & r' & Hn & _ & ->) (Hf & Htv & _) Hitv c.
-  destruct (mnode_step_mm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn Hf (Htv cpu))
-    as (_ & Hgrow & _ & Hitv').
+  intros (m' & s' & log' & tv' & itv' & hr' & r' & Hn & _ & ->) (Hf & Htv & _) Hhr Hitv c.
+  destruct (Hhr cpu) as (Hrv & Hcoh).
+  destruct (mnode_step_mm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn Hf (Htv cpu) Hrv Hcoh)
+    as (_ & Hgrow & _ & Hitv' & _).
   cbn. rewrite /insert /gtv_insert. case_decide as Hc.
   - exact (Hitv' (Hitv cpu)).
   - pose proof (Hitv c). lia.
 Qed.
 
-Lemma prim_step_mm_ok e g κ e' g' efs :
-  prim_step e g κ e' g' efs -> mm_ok g -> mm_ok g'.
+(* ... and the read side's *)
+Lemma hart_node_step_hr_ok gen g cpu m e' g' :
+  hart_node_step gen g cpu m e' g' -> mm_ok g -> hr_ok g -> hr_ok g'.
 Proof.
-  intros Hstep Hok.
+  intros (m' & s' & log' & tv' & itv' & hr' & r' & Hn & _ & ->) (Hf & Htv & _) Hhr c.
+  destruct (Hhr cpu) as (Hrv & Hcoh).
+  destruct (mnode_step_mm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn Hf (Htv cpu) Hrv Hcoh)
+    as (_ & Hgrow & _ & _ & Hrv' & Hcoh').
+  cbn. rewrite /insert /ghr_insert. case_decide as Hc.
+  - split; [exact Hrv'|exact Hcoh'].
+  - destruct (Hhr c) as (Hrvc & Hcohc). split; [lia|].
+    intros a. pose proof (Hcohc a). lia.
+Qed.
+
+Lemma prim_step_mm_ok e g κ e' g' efs :
+  prim_step e g κ e' g' efs -> mm_ok g -> hr_ok g -> mm_ok g'.
+Proof.
+  intros Hstep Hok Hhr.
   destruct Hstep as
     [ (gen & cpu & m & -> & _ & _ & [ (_ & Hn) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
@@ -2033,7 +2134,7 @@ Proof.
     try exact Hok;
     try (by destruct Hok as (Hf & Htv & Hcov); split_and!;
             [exact Hf|exact Htv|exact Hcov]).
-  - exact (hart_node_step_mm_ok _ _ _ _ _ _ Hn Hok).
+  - exact (hart_node_step_mm_ok _ _ _ _ _ _ Hn Hok Hhr).
   - (* the disk: append and cache move in lock-step; the IMAGE does not move *)
     destruct Hok as (Hf & Htv & Hcov).
     destruct Hlog as [(-> & ->) | (_ & ->)]; split_and!;
@@ -2048,7 +2149,7 @@ Proof.
        [boot_facts]' own third clause -- so the image-coverage conjunct is
        established exactly where the image is created and nowhere else. *)
     destruct Hboot as (_ & _ & Hbf).
-    destruct Hbf as (_ & _ & Hram & _ & _ & _ & _ & _ & Hlog & Himg & Hgtv & Hgitv).
+    destruct Hbf as (_ & _ & Hram & _ & _ & _ & _ & _ & Hlog & Himg & Hgtv & Hgitv & Hghr).
     split_and!.
     + rewrite Hlog Himg /flat //.
     + intros c. rewrite Hgtv Hlog /=. lia.
@@ -2062,9 +2163,9 @@ Qed.
    ([hart_node_step_itv_ok]), a DMA step only lengthens the log, and a
    power-on resets it to the bottom of the fresh era *)
 Lemma prim_step_itv_ok e g κ e' g' efs :
-  prim_step e g κ e' g' efs -> mm_ok g -> itv_ok g -> itv_ok g'.
+  prim_step e g κ e' g' efs -> mm_ok g -> hr_ok g -> itv_ok g -> itv_ok g'.
 Proof.
-  intros Hstep Hok Hitv.
+  intros Hstep Hok Hhr Hitv.
   destruct Hstep as
     [ (gen & cpu & m & -> & _ & _ & [ (_ & Hn) | (_ & _ & ->) ])
     | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
@@ -2072,12 +2173,34 @@ Proof.
     | [ (gen & -> & _ & _ & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
     | (-> & _ & [ (_ & _ & _ & ->) | (_ & _ & _ & Hboot) ]) ] ] ] ];
     try exact Hitv.
-  - exact (hart_node_step_itv_ok _ _ _ _ _ _ Hn Hok Hitv).
+  - exact (hart_node_step_itv_ok _ _ _ _ _ _ Hn Hok Hhr Hitv).
   - destruct Hlog as [(-> & ->) | (_ & ->)]; [exact Hitv|].
     intros c. cbn. rewrite length_app /=. pose proof (Hitv c). lia.
   - destruct Hboot as (_ & _ & Hbf).
-    destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & _ & Hlog & _ & _ & Hgitv).
+    destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & _ & Hlog & _ & _ & Hgitv & _).
     intros c. rewrite Hgitv. lia.
+Qed.
+
+(* ... and the read side's bound, the same way *)
+Lemma prim_step_hr_ok e g κ e' g' efs :
+  prim_step e g κ e' g' efs -> mm_ok g -> hr_ok g -> hr_ok g'.
+Proof.
+  intros Hstep Hok Hhr.
+  destruct Hstep as
+    [ (gen & cpu & m & -> & _ & _ & [ (_ & Hn) | (_ & _ & ->) ])
+    | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
+    | [ (gen & -> & _ & _ & _ & [ (_ & d' & W & log' & _ & Hlog & _ & ->) | (_ & ->) ])
+    | [ (gen & -> & _ & _ & _ & [ (_ & gr' & _ & ->) | (_ & ->) ])
+    | (-> & _ & [ (_ & _ & _ & ->) | (_ & _ & _ & Hboot) ]) ] ] ] ];
+    try exact Hhr;
+    try (by intros c; exact (Hhr c)).
+  - exact (hart_node_step_hr_ok _ _ _ _ _ _ Hn Hok Hhr).
+  - destruct Hlog as [(-> & ->) | (_ & ->)]; [exact Hhr|].
+    intros c. cbn. destruct (Hhr c) as (Hrv & Hcoh). rewrite length_app /=.
+    split; [lia|]. intros a. pose proof (Hcoh a). lia.
+  - destruct Hboot as (_ & _ & Hbf).
+    destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & _ & Hlog & _ & _ & _ & Hghr).
+    intros c. rewrite Hghr. split; [exact (Nat.le_0_l _)|]. intros a. exact (Nat.le_0_l _).
 Qed.
 
 Definition riscv_lang : language := Language riscv_lang_mixin.

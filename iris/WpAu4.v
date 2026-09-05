@@ -179,7 +179,7 @@ Section Au4Leaves.
         sie_cap_gpr kt (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m)
           av b p -∗
         pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
-        (∃ V0 : nat, TsoCtx.hart_view_lb (CID := CID) V0 ∗ ⌜Q v V0⌝) -∗
+        (∃ V0 : nat, hart_rview_lb_at (@cpu_id CID) V0 ∗ ⌜Q v V0⌝) -∗
         T -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).

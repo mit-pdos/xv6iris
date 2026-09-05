@@ -165,8 +165,8 @@ Qed.
 (* A hart node never moves the wire: register effects and RAM accesses do
    not touch the device fabric, and an MMIO transaction goes through
    [dev_read]/[dev_write].  The twin of [RiscvLang.mnode_step_v_disk]. *)
-Lemma mnode_step_u_wire oth h img s log tv itv r m m' s' log' tv' itv' r' :
-  mnode_step oth h img s log tv itv r m m' s' log' tv' itv' r' ->
+Lemma mnode_step_u_wire oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' :
+  mnode_step oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' ->
   u_wire (duart (mdev s')) = u_wire (duart (mdev s)).
 Proof.
   rewrite /mnode_step. destruct m as [y|T oc k].
@@ -178,7 +178,7 @@ Proof.
     + intros (w & d' & Hdr & _ & -> & _). cbn.
       exact (dev_read_u_wire _ _ _ _ _ Hdr).
     + by intros [(_ & tvn & w & _ & _ & _ & _ & -> & _)
-                |[(_ & _ & tvn & w & _ & _ & _ & _ & -> & _)
+                |[(_ & _ & tvn & w & _ & _ & _ & _ & _ & -> & _)
                  |(_ & [(_ & _ & -> & _) | (_ & w & _ & _ & -> & _)])]].
   - (* MemWrite *)
     destruct (dev_addr _).
@@ -319,10 +319,10 @@ Proof.
     | (-> & _ & [ (Hpw & -> & _ & ->) | (Hpw & -> & _ & Hboot) ]) ] ] ] ];
     try (rewrite app_nil_r; by split_and!).
   - (* a hart node: silent, and it never moves the wire *)
-    rewrite app_nil_r. destruct Hn as (m' & s' & log' & tv' & itv' & r' & Hn & _ & ->). cbn.
+    rewrite app_nil_r. destruct Hn as (m' & s' & log' & tv' & itv' & hr' & r' & Hn & _ & ->). cbn.
     split_and!; [exact Hsh|exact Hbt|].
     intros Hpw. rewrite (Hwire Hpw). symmetry.
-    exact (mnode_step_u_wire _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn).
+    exact (mnode_step_u_wire _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hn).
   - (* the UART: its events extend the open cycle, and by exactly what
        reached the wire *)
     pose proof (uart_step_io _ _ _ Hu) as Hio. cbn.

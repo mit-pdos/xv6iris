@@ -240,14 +240,15 @@ outstanding; see the `completed/` section below).
   argument over the existing per-prefix exports.  Records the rejected
   routes (total WP, Transfinite Iris, PC-observation + CFG) and the one
   semantic hazard to settle first (the reservation self-loop).
-- **[`relaxed-rr.md`](projects/relaxed-rr.md)** — NOT STARTED, a design
-  PROPOSAL (2026-09-05): weakening the Ztso view machine to admit
-  load–load reordering within RVWMO — a plain load stops moving the view,
-  a read watermark `rv` and a per-byte `coh` come in, fences with an R→R
-  edge become ACQUIRES (`fence r,rw` at `started`/`first`, the virtio
-  interrupt loop's `rw,rw`), release fences stay no-ops, the ownership
-  layer is untouched.  Litmus table, the two proofs that change, and a
-  staged effort estimate (~2 agent-weeks).
+- **[`relaxed-rr.md`](projects/relaxed-rr.md)** — LANDED THROUGH STAGE D
+  (2026-09-05, tree green): the memory model now admits load–load
+  reordering within RVWMO — a plain load no longer moves the view, a
+  per-hart read watermark and per-byte coherence floor (`hread`) came in,
+  fences with an R→R edge are ACQUIRES (the `hart_rview_lb_at` →
+  `hart_view_lb` conversion at `HartBarrier.wp_hart_fence_acq`), release
+  fences stay no-ops, the ownership layer untouched.  Its top says exactly
+  what landed and what is left (the `.aq` knob, the notes sweep); the
+  proposal below it has the litmus table and the design.
 - **[`relaxed-ww.md`](projects/relaxed-ww.md)** — NOT STARTED, the
   companion ANALYSIS (2026-09-05): store–store reordering (PSO).  Why W→W
   breaks the two facts the ownership layer rests on (timestamps at issue,

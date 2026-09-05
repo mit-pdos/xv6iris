@@ -29,6 +29,7 @@
     a W→R fence drains (view past the author's last message), and
     exclusive/AMO reads read at the top. *)
 From Stdlib.ssr Require Import ssreflect.
+From Stdlib Require Import NArith.
 From stdpp Require Import gmap list.
 From stdpp Require Import bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.
@@ -210,11 +211,94 @@ Proof.
   apply lookup_lt_Some in Hlk. case_bool_decide => /=; lia.
 Qed.
 
-(** FENCE: the drain (the caller decides drain-ness from the barrier
-    kind — [RiscvLang.fence_drains], W→R edges only under Ztso). *)
-Definition fence_post (h : agent) (log : list pwmsg) (drain : bool)
-    (tv : nat) : nat :=
-  if drain then Nat.max tv (own_pub h log) else tv.
+(** FENCE (claude-notes/projects/relaxed-rr.md §2.2).  Two edges matter,
+    and the caller decides both from the barrier kind: a W→R edge DRAINS
+    ([RiscvLang.fence_drains]: the floor passes the author's own last
+    message) and an R→R edge ACQUIRES ([RiscvLang.fence_acq]: the floor
+    passes the hart's read watermark [rv], so every later load sees at least
+    what every earlier load saw).  A fence with neither edge is a no-op. *)
+Definition fence_post (h : agent) (log : list pwmsg) (drain acq : bool)
+    (tv rv : nat) : nat :=
+  match drain, acq with
+  | false, false => tv
+  | true, false => Nat.max tv (own_pub h log)
+  | false, true => Nat.max tv rv
+  | true, true => Nat.max tv (Nat.max (own_pub h log) rv)
+  end.
+
+Lemma fence_post_ge h log drain acq tv rv :
+  (tv ≤ fence_post h log drain acq tv rv)%nat.
+Proof. rewrite /fence_post. destruct drain, acq; lia. Qed.
+
+Lemma fence_post_le h log drain acq tv rv :
+  (tv ≤ length log)%nat → (rv ≤ length log)%nat →
+  (fence_post h log drain acq tv rv ≤ length log)%nat.
+Proof.
+  intros Htv Hrv. rewrite /fence_post. pose proof (own_pub_le h log).
+  destruct drain, acq; lia.
+Qed.
+
+Lemma fence_post_drain h log acq tv rv :
+  (own_pub h log ≤ fence_post h log true acq tv rv)%nat.
+Proof. rewrite /fence_post. destruct acq; lia. Qed.
+
+Lemma fence_post_acq h log drain tv rv :
+  (rv ≤ fence_post h log drain true tv rv)%nat.
+Proof. rewrite /fence_post. destruct drain; lia. Qed.
+
+(** THE COHERENCE FLOOR (relaxed-rr.md §2.1): per byte, the view at which a
+    hart last read it.  A total function on [Arch.pa], like the image on
+    [Z] in the spike; [coh_upd_win] stamps a load's whole footprint and
+    [coh_win_max] is the floor a load of that footprint must clear. *)
+Definition cohmap : Type := Arch.pa → nat.
+
+Definition coh_upd (c : cohmap) (a : Arch.pa) (t : nat) : cohmap :=
+  λ a', if bool_decide (a' = a) then t else c a'.
+
+Lemma coh_upd_eq c a t : coh_upd c a t a = t.
+Proof. rewrite /coh_upd. by rewrite bool_decide_eq_true_2. Qed.
+
+Lemma coh_upd_ne c a a' t : a' ≠ a → coh_upd c a t a' = c a'.
+Proof. intros Hne. rewrite /coh_upd. by rewrite bool_decide_eq_false_2. Qed.
+
+Lemma coh_upd_le c a t (L : nat) :
+  (∀ a', c a' ≤ L)%nat → (t ≤ L)%nat → ∀ a', (coh_upd c a t a' ≤ L)%nat.
+Proof.
+  intros Hc Ht a'. rewrite /coh_upd. case_bool_decide; [lia|apply Hc].
+Qed.
+
+Definition coh_upd_win (c : cohmap) (pa : Arch.pa) (n : N) (t : nat) : cohmap :=
+  foldr (λ j c', coh_upd c' (pa_add pa j) t) c (seq 0%nat (N.to_nat n)).
+
+Lemma coh_upd_win_le c pa n t (L : nat) :
+  (∀ a, c a ≤ L)%nat → (t ≤ L)%nat → ∀ a, (coh_upd_win c pa n t a ≤ L)%nat.
+Proof.
+  intros Hc Ht. rewrite /coh_upd_win.
+  induction (seq 0%nat (N.to_nat n)) as [|j js IH]; simpl; [exact Hc|].
+  apply coh_upd_le; [exact IH|exact Ht].
+Qed.
+
+Definition coh_win_max (c : cohmap) (pa : Arch.pa) (n : N) : nat :=
+  foldr Nat.max 0%nat ((λ j, c (pa_add pa j)) <$> seq 0%nat (N.to_nat n)).
+
+Lemma coh_win_max_ge c pa n (j : nat) :
+  (N.of_nat j < n)%N → (c (pa_add pa j) ≤ coh_win_max c pa n)%nat.
+Proof.
+  intros Hj. rewrite /coh_win_max. apply foldr_max_ge.
+  apply elem_of_list_fmap. exists j. split; [done|].
+  assert (Hj' : (j < N.to_nat n)%nat).
+  { apply Nat.compare_lt_iff. rewrite -{1}(Nat2N.id j) -N2Nat.inj_compare.
+    by apply N.compare_lt_iff. }
+  apply elem_of_seq. lia.
+Qed.
+
+Lemma coh_win_max_le c pa n (L : nat) :
+  (∀ a, c a ≤ L)%nat → (coh_win_max c pa n ≤ L)%nat.
+Proof.
+  intros Hc. rewrite /coh_win_max. apply foldr_max_le.
+  apply Forall_forall => x Hx. apply elem_of_list_In in Hx.
+  apply elem_of_list_fmap in Hx as (j & -> & _). apply Hc.
+Qed.
 
 (* ------------------------------------------------------------------ *)
 (** ** The flat cache: memory at the top of the log *)

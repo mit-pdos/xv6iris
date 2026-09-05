@@ -1275,7 +1275,7 @@ Section WpSconfMem.
       wp_next b p (fun (CID : CpuId) =>
         sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
         pc_is (add_vec_int pc (if c then 2 else 4)) -∗
-        (∃ V0 : nat, TsoCtx.hart_view_lb (CID := CID) V0 ∗ ⌜Q v V0⌝) -∗ T -∗
+        (∃ V0 : nat, hart_rview_lb_at (@cpu_id CID) V0 ∗ ⌜Q v V0⌝) -∗ T -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1295,7 +1295,7 @@ Section WpSconfMem.
                  ∃ v : mword (8*width),
                    ⌜npc = add_vec_int pc (if c then 2 else 4)⌝ ∗
                    ⌜m' = <[Regidx rd := regval_into_reg (ext v)]> m⌝ ∗
-                   ⌜n' = n⌝ ∗ (∃ V0 : nat, TsoCtx.hart_view_lb (CID := _CIDx) V0 ∗ ⌜Q v V0⌝) ∗ T)%I
+                   ⌜n' = n⌝ ∗ (∃ V0 : nat, hart_rview_lb_at (@cpu_id _CIDx) V0 ∗ ⌜Q v V0⌝) ∗ T)%I
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
@@ -1399,7 +1399,7 @@ Section WpSconfMem.
                     imm rs1 rd uns (tp_pin (CID := CID) m) (pa_of ppn ea)
                     pmar0 pcfg paddr
                     (fun bs => ((∃ tvn : nat,
-                                   TsoGhost.view_lb view_name loglen_name (hart_agent (@cpu_id CID)) tvn ∗
+                                   hart_rview_lb_at (@cpu_id CID) tvn ∗
                                    ⌜Q bs tvn⌝) ∗ Rex)%I)
                     (Mobl_ram_exvv width (pa_of ppn ea) Q Rex)
                     (sr_swp_res (strans_regime (CID := CID))) rr
@@ -1545,7 +1545,7 @@ Section WpSconfMem.
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       iDestruct "HQv" as (tvn) "[#Hrcpt %HQ]".
       iExists tvn. iSplitR; [| by iPureIntro].
-      rewrite TsoCtx.hart_view_lb_unseal /TsoCtx.hart_view_lb_def. iExact "Hrcpt".
+      iExact "Hrcpt".
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HQv & HT)".
@@ -1642,7 +1642,7 @@ Section WpSconfMem.
       wp_next b p (fun (CID : CpuId) =>
         sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
         pc_is (add_vec_int pc (if c then 2 else 4)) -∗
-        (∃ V0 : nat, TsoCtx.hart_view_lb (CID := CID) V0 ∗ W v V0) -∗ T -∗
+        (∃ V0 : nat, hart_rview_lb_at (@cpu_id CID) V0 ∗ W v V0) -∗ T -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1662,7 +1662,7 @@ Section WpSconfMem.
                  ∃ v : mword (8*width),
                    ⌜npc = add_vec_int pc (if c then 2 else 4)⌝ ∗
                    ⌜m' = <[Regidx rd := regval_into_reg (ext v)]> m⌝ ∗
-                   ⌜n' = n⌝ ∗ (∃ V0 : nat, TsoCtx.hart_view_lb (CID := _CIDx) V0 ∗ W v V0) ∗ T)%I
+                   ⌜n' = n⌝ ∗ (∃ V0 : nat, hart_rview_lb_at (@cpu_id _CIDx) V0 ∗ W v V0) ∗ T)%I
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
@@ -1766,7 +1766,7 @@ Section WpSconfMem.
                     imm rs1 rd uns (tp_pin (CID := CID) m) (pa_of ppn ea)
                     pmar0 pcfg paddr
                     (fun bs => (∃ tvn : nat,
-                                   TsoGhost.view_lb view_name loglen_name (hart_agent (@cpu_id CID)) tvn ∗
+                                   hart_rview_lb_at (@cpu_id CID) tvn ∗
                                    (W bs tvn ∗ Rex))%I)
                     (Mobl_ram_exvvr width (pa_of ppn ea) (fun bs tvn => (W bs tvn ∗ Rex)%I))
                     (sr_swp_res (strans_regime (CID := CID))) rr
@@ -1900,7 +1900,7 @@ Section WpSconfMem.
       iExists v. iFrame "HT".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       iExists tvn. iFrame "HW".
-      rewrite TsoCtx.hart_view_lb_unseal /TsoCtx.hart_view_lb_def. iExact "Hrcpt".
+      iExact "Hrcpt".
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HQv & HT)".
@@ -1987,7 +1987,7 @@ Section WpSconfMem.
       wp_next b p (fun (CID : CpuId) =>
         sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
         pc_is (add_vec_int pc (if c then 2 else 4)) -∗
-        (∃ V0 : nat, TsoCtx.hart_view_lb (CID := CID) V0 ∗ Q v V0) -∗ T -∗
+        (∃ V0 : nat, hart_rview_lb_at (@cpu_id CID) V0 ∗ Q v V0) -∗ T -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2007,7 +2007,7 @@ Section WpSconfMem.
                  ∃ v : mword (8*width),
                    ⌜npc = add_vec_int pc (if c then 2 else 4)⌝ ∗
                    ⌜m' = <[Regidx rd := regval_into_reg (ext v)]> m⌝ ∗
-                   ⌜n' = n⌝ ∗ (∃ V0 : nat, TsoCtx.hart_view_lb (CID := _CIDx) V0 ∗ Q v V0) ∗ T)%I
+                   ⌜n' = n⌝ ∗ (∃ V0 : nat, hart_rview_lb_at (@cpu_id _CIDx) V0 ∗ Q v V0) ∗ T)%I
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
@@ -2111,7 +2111,7 @@ Section WpSconfMem.
                     imm rs1 rd uns (tp_pin (CID := CID) m) (pa_of ppn ea)
                     pmar0 pcfg paddr
                     (fun bs => ((∃ tvn : nat,
-                                   TsoGhost.view_lb view_name loglen_name (hart_agent (@cpu_id CID)) tvn ∗
+                                   hart_rview_lb_at (@cpu_id CID) tvn ∗
                                    Q bs tvn) ∗ Rex)%I)
                     (Mobl_ram_exvi width (pa_of ppn ea) Q Rex)
                     (sr_swp_res (strans_regime (CID := CID))) rr
@@ -2259,7 +2259,7 @@ Section WpSconfMem.
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       iDestruct "HQv" as (tvn) "[#Hrcpt HQ]".
       iExists tvn. iSplitR "HQ"; [| iExact "HQ"].
-      rewrite TsoCtx.hart_view_lb_unseal /TsoCtx.hart_view_lb_def. iExact "Hrcpt".
+      iExact "Hrcpt".
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HQv & HT)".

@@ -768,7 +768,7 @@ Section power.
              log and the views are the DURABLE record of RAM across a power
              cycle -- [RiscvLang]'s own arm spells it exactly this way. *)
           (GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv)
-             g.(gimg) g.(glog) g.(gtv) g.(gitv)), [].
+             g.(gimg) g.(glog) g.(gtv) g.(gitv) g.(ghr)), [].
         do 4 right. split_and!; [done|done|].
         left. split_and!; done. }
       iIntros (e2 g2 efs Hstep) "!>".
@@ -925,7 +925,9 @@ Section power.
       iMod (mono_nat_own_alloc 0%nat) as (γloglen) "[Hloglenauth2 _]".
       iMod (view_auth_alloc (avf g2)) as (γview) "Hviewauth2".
       iMod (iview_alloc_cpus (enum CPU) (NoDup_enum CPU)) as (fiv) "Hivauths2".
-      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γkptb γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv γts γlogm γloglen γview g2.(gimg) fiv).
+      (* the read-watermark mirror (relaxed-rr.md): the same shape, born at 0 *)
+      iMod (iview_alloc_cpus (enum CPU) (NoDup_enum CPU)) as (frv) "Hrvauths2".
+      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γkptb γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv γts γlogm γloglen γview g2.(gimg) fiv frv).
       (* the started counter ticks (PowerOff had already bumped [ggen], so
          the count moves from [ggen + 0] to [ggen + 1]) *)
       iMod (mono_nat_own_update (n := start_count g) (g.(ggen) + 1)%nat
@@ -982,11 +984,11 @@ Section power.
       iModIntro.
       rewrite /start_count Hpw /= Nat.add_0_r in Hdom.
       iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth
-               Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2 Hivauths2 Hoauth".
+               Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2 Hivauths2 Hrvauths2 Hoauth".
       { rewrite /state_interp /=.
         (* the trace conjunct, at the extended history *)
         iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth
-                 Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2 Hivauths2";
+                 Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2 Hivauths2 Hrvauths2";
           last first.
         { iDestruct (obs_interp_close _ _ _ _ _ _ h κs Hstep0 Hwf Htot
                        with "Hoauth") as "Hobs". iExact "Hobs". }
@@ -1025,7 +1027,7 @@ Section power.
         (* [boot_shape]'s own reset clause supplies every one of them.    *)
         (* ============================================================ *)
         destruct Hbf as (_ & _ & Hramtot2 & _ & _ & _ & _ & Hreset).
-        destruct Hreset as (Hresv0 & Hlog0 & Himg0 & Htv0 & Hitv0).
+        destruct Hreset as (Hresv0 & Hlog0 & Himg0 & Htv0 & Hitv0 & Hghr0).
         iSplitL "Htsauth2 Hlogmauth2 Hloglenauth2 Hviewauth2".
         { rewrite /tso_interp_at.
           iExists ((fun _ : bv 8 => ((0%nat, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem))
@@ -1074,7 +1076,17 @@ Section power.
                     (fun _ c => mono_nat_auth_own (fiv c) 1 0%nat)).
           { intros k c Hk. rewrite Hitv0. iIntros "H". iExact "H". }
           iExact "Hivauths2". }
-        iPureIntro. intros c. rewrite Hitv0. lia. }
+        iSplitR; [iPureIntro; intros c; rewrite Hitv0; lia|].
+        (* the read-watermark mirror (relaxed-rr.md): every counter at the
+           fresh era's bottom, and the read side's bound is trivial there *)
+        iSplitL "Hrvauths2".
+        { rewrite /rview_auth_at. iApply big_sepL_enum_to_set.
+          iApply (big_sepL_mono
+                    (fun _ c => mono_nat_auth_own (frv c) 1 0%nat)).
+          { intros k c Hk. rewrite Hghr0. iIntros "H". iExact "H". }
+          iExact "Hrvauths2". }
+        iPureIntro. intros c. rewrite Hghr0.
+        split; [exact (Nat.le_0_l _)|]. intros a. exact (Nat.le_0_l _). }
       iSplitR; [iApply "IH"|].
       (* the fork obligations: the new generation's whole complement *)
       rewrite /power_fork big_sepL_app big_sepL_fmap /=.

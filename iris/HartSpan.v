@@ -455,10 +455,11 @@ Section span.
     rewrite (HC _ oc k Hoc).
     iApply (wp_hart_step with "Hcert").
     { (* a span node is a register or silent node: it keeps the reservation *)
-      intros oth0 h0 img0 σ0 log0 tv0 itv0 r0 m'0 σ'0 log'0 tv'0 itv'0 r'0 Hs.
+      intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       destruct oc; try discriminate Hns;
-        destruct Hs as (_ & _ & _ & _ & _ & ->); reflexivity. }
-    iIntros (σ oth rv img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+        destruct Hs as (_ & _ & _ & _ & _ & _ & ->); reflexivity. }
+    iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
+    destruct Hhr as (Hrvlen & _).
     destruct σ as [rsM mem0 dev0].
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (hreg_frame_agree rs Drw rsM with "Hri Hrf") as %HagW.
@@ -477,16 +478,17 @@ Section span.
     { iDestruct "Htso" as (TM LM) "(_&_&_&_&_&_&_&_&%Hb&_)".
       iPureIntro. rewrite -Htv. apply Hb. }
     assert (Hadv : (V (hart_agent cpu_id)
-                    <= hbar_tv (hart_agent cpu_id) log oc tv)%nat)
+                    <= hbar_tv (hart_agent cpu_id) log oc tv (hr_rv hr))%nat)
       by (rewrite Htv; apply hbar_tv_ge).
     iMod (tso_interp_of_advance _ img mem0 log V (hart_agent cpu_id)
-            (hbar_tv (hart_agent cpu_id) log oc tv)
-            (fin_to_nat_lt cpu_id) Hadv (hbar_tv_le _ _ _ _ Htvlen)
+            (hbar_tv (hart_agent cpu_id) log oc tv (hr_rv hr))
+            (fin_to_nat_lt cpu_id) Hadv (hbar_tv_le _ _ _ _ _ Htvlen Hrvlen)
            with "Htso") as "Htso".
     (* ... and the INSTRUCTION view, the same way: only [fence.i] moves it
        ([HartLift.hbar_itv]), and it reduces per arm exactly like [hbar_tv] *)
-    iMod (hart_iview_auth_update cpu_id itv (hbar_itv (hart_agent cpu_id) log oc tv itv)
-            (hbar_itv_ge _ _ _ _ _) with "Hiv") as "Hiv".
+    iMod (hart_iview_auth_update cpu_id itv
+            (hbar_itv (hart_agent cpu_id) log oc tv (hr_rv hr) itv)
+            (hbar_itv_ge _ _ _ _ _ _) with "Hiv") as "Hiv".
     destruct oc; try discriminate Hns.
     (* 14 goals: RegRead, RegWrite, then the 12 silent classes *)
     2: { (* RegWrite: [hspan_stops = false] forces [reg ∈ Drw] *)
@@ -507,17 +509,18 @@ Section span.
         by apply HagO. }
       iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
       iExists (C (k tt)), (MState (register_set reg regval rsM) mem0 dev0),
-        log, tv, itv, rv.
+        log, tv, itv, hr, rv.
       iSplitR; [iPureIntro; split_and!; reflexivity|].
-      iNext. iIntros (m' σ' log' tv' itv' rv') "%Hstep".
-      destruct Hstep as (-> & Hσ' & -> & -> & -> & ->).
+      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+      destruct Hstep as (-> & Hσ' & -> & -> & -> & -> & ->).
       assert (σ' = MState (register_set reg regval rsM) mem0 dev0) as ->
         by exact Hσ'.
       iMod (hreg_frame_update rs Drw reg regval rsM Hns with "Hri Hrf")
         as "[Hri Hrf]".
       iMod "Hmask" as "_". iModIntro.
-      iSplitR "H Hrf Hro Htso Hiv"; [iFrame "Hri Hmem Hdev"|].
+      iSplitR "H Hrf Hro Htso Hiv Hrv"; [iFrame "Hri Hmem Hdev"|].
       iSplitL "Hiv"; [iExact "Hiv"|].
+      iSplitL "Hrv"; [iExact "Hrv"|].
       iSplitL "Htso"; [iExact "Htso"|].
       iApply ("H" $! (k tt) rsM (register_set reg regval rsM)
                 with "[%] [%] [Hrf] [Hro]").
@@ -529,13 +532,14 @@ Section span.
                      Dro HagO'). }
     (* RegRead and the silent classes: the file does not move *)
     all: iApply fupd_mask_intro; [apply empty_subseteq|]; iIntros "Hmask";
-         iExists _, (MState rsM mem0 dev0), log, _, _, rv;
+         iExists _, (MState rsM mem0 dev0), log, _, _, hr, rv;
          (iSplitR; [iPureIntro; split_and!; reflexivity|]);
-         iNext; iIntros (m' σ' log' tv' itv' rv') "%Hstep";
-         destruct Hstep as (-> & -> & -> & -> & -> & ->);
+         iNext; iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep";
+         destruct Hstep as (-> & -> & -> & -> & -> & -> & ->);
          iMod "Hmask" as "_"; iModIntro;
-         (iSplitR "H Hrf Hro Htso Hiv"; [iFrame "Hri Hmem Hdev"|]);
+         (iSplitR "H Hrf Hro Htso Hiv Hrv"; [iFrame "Hri Hmem Hdev"|]);
          (iSplitL "Hiv"; [iExact "Hiv"|]);
+         (iSplitL "Hrv"; [iExact "Hrv"|]);
          (iSplitL "Htso"; [iExact "Htso"|]);
          iApply ("H" $! _ rsM rsM with "[%] [%] [Hrf] [Hro]");
          [ exact Hag

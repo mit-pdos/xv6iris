@@ -113,10 +113,10 @@ Definition mstep1 (h : agent) (img : gmap Arch.pa (bv 8))
     (c c' : M unit * mstate) : Prop :=
   match c.1 with
   | Interface.Ret _ => False
-  | _ => exists (log log' : list pwmsg) (tv tv' itv itv' : nat)
+  | _ => exists (log log' : list pwmsg) (tv tv' itv itv' : nat) (hr hr' : hread)
                 (r r' : option resv),
       c.2.(mem) = flat img log /\ all_own h log /\ fetch_unwritten log c.1 /\
-      mnode_step ∅ h img c.2 log tv itv r c.1 c'.1 c'.2 log' tv' itv' r'
+      mnode_step ∅ h img c.2 log tv itv hr r c.1 c'.1 c'.2 log' tv' itv' hr' r'
   end.
 
 Definition mblock (h : agent) (img : gmap Arch.pa (bv 8))
@@ -141,7 +141,7 @@ Lemma mnode_step_run (h : agent) (img : gmap Arch.pa (bv 8))
 Proof.
   rewrite /mstep1 /=.
   destruct m as [y|T oc k]; [by intros []|].
-  intros (log & log' & tv & tv' & itv & itv' & r & r' & Hflat & Hown & Hfu & Hn).
+  intros (log & log' & tv & tv' & itv & itv' & hr & hr' & r & r' & Hflat & Hown & Hfu & Hn).
   revert Hfu Hn.
   rewrite /mnode_step /fetch_unwritten.
   (* [cbn beta iota] and NOT [simpl]: it reduces the dependent match that
@@ -155,7 +155,7 @@ Proof.
     + intros _ (w & d' & Hdr & Hm & Hs & _) x s2 H. subst m' s'.
       cbn [run]. rewrite Hd Hdr. exact H.
     + intros Hfu [(Hif & tvn & w & _ & _ & Hbytes & Hm & Hs & _)
-                 |[(_ & _ & tvn & w & _ & _ & Hbytes & Hm & Hs & _)
+                 |[(_ & _ & tvn & w & _ & _ & _ & Hbytes & Hm & Hs & _)
                   |(_ & [(Hov & _) | (_ & w & Hbytes & Hm & Hs & _)])]] x s2 H.
       * (* THE FETCH: [Hbytes] reads through the icache agent at some view
            [tvn] at or above the instruction view; the third tie says the
@@ -229,9 +229,9 @@ Proof. intros H. exact (mblock_run _ _ _ _ H tt eq_refl). Qed.
 
 Lemma mnode_step_all_own (oth : gset Arch.pa) (h : agent)
     (img : gmap Arch.pa (bv 8)) (s : mstate) (log : list pwmsg) (tv itv : nat)
-    (r : option resv) (m m' : M unit) (s' : mstate) (log' : list pwmsg)
-    (tv' itv' : nat) (r' : option resv) :
-  mnode_step oth h img s log tv itv r m m' s' log' tv' itv' r' ->
+    (hr : hread) (r : option resv) (m m' : M unit) (s' : mstate) (log' : list pwmsg)
+    (tv' itv' : nat) (hr' : hread) (r' : option resv) :
+  mnode_step oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' ->
   all_own h log -> all_own h log'.
 Proof.
   rewrite /mnode_step. destruct m as [y|T oc k].
@@ -242,7 +242,7 @@ Proof.
     destruct (dev_addr _).
     + by intros (w & d' & _ & _ & _ & -> & _).
     + by intros [(_ & tvn & w & _ & _ & _ & _ & _ & -> & _)
-                |[(_ & _ & tvn & w & _ & _ & _ & _ & _ & -> & _)
+                |[(_ & _ & tvn & w & _ & _ & _ & _ & _ & _ & -> & _)
                  |(_ & [(_ & _ & _ & -> & _) | (_ & w & _ & _ & _ & -> & _)])]].
   - (* MemWrite: the MMIO half is strongly ordered (no log); the RAM half
        appends THIS hart's message *)

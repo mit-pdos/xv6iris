@@ -128,23 +128,23 @@ Section barrier.
       by (rewrite Hm; exact (HC _ (Interface.Barrier bk) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step with "Hcert").
-    { intros oth0 h0 img0 σ0 log0 tv0 itv0 r0 m'0 σ'0 log'0 tv'0 itv'0 r'0 Hs.
+    { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       rewrite /mnode_step in Hs. cbn beta iota in Hs.
-      by destruct Hs as (_ & _ & _ & _ & _ & ->). }
-    iIntros (σ oth rv img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+      by destruct Hs as (_ & _ & _ & _ & _ & _ & ->). }
+    iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
+    destruct Hhr as (Hrvlen & _).
     iDestruct (tso_interp_of_bound with "Htso") as %Hb.
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     assert (Htvlen : (tv <= length log)%nat) by (rewrite -Htv; apply Hb).
     (* the drained view, and the two bounds it satisfies *)
     set (h := hart_agent cpu_id).
-    set (tvn := fence_post h log (fence_drains bk) tv).
+    set (tvn := fence_post h log (fence_drains bk) (fence_acq bk) tv (hr_rv hr)).
     assert (Hadv : (V h <= tvn)%nat).
-    { rewrite Htv /tvn /fence_post Hdrain. lia. }
+    { rewrite Htv /tvn. apply fence_post_ge. }
     assert (Htop : (tvn <= length log)%nat).
-    { rewrite /tvn /fence_post Hdrain.
-      pose proof (own_pub_le h log). lia. }
+    { rewrite /tvn. apply fence_post_le; [exact Htvlen|exact Hrvlen]. }
     assert (Hown : (own_pub h log <= tvn)%nat)
-      by (rewrite /tvn /fence_post Hdrain; lia).
+      by (rewrite /tvn Hdrain; apply fence_post_drain).
     iMod (tso_interp_of_advance _ img σ.(mem) log V h tvn
             (fin_to_nat_lt cpu_id) Hadv Htop with "Htso") as "Htso".
     iDestruct (tso_interp_of_receipt_at riscv_eraGS img σ.(mem) log
@@ -173,15 +173,15 @@ Section barrier.
     (* a DRAINING fence is not fence.i: the instruction view stays *)
     assert (Hfi : fence_ifetch bk = false)
       by (destruct bk; try reflexivity; discriminate Hdrain).
-    iExists (C (K tt)), σ, log, tvn, itv, rv.
+    iExists (C (K tt)), σ, log, tvn, itv, hr, rv.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota. rewrite Hfi.
       by split_and!. }
-    iNext. iIntros (m' σ' log' tv' itv' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep. rewrite Hfi in Hstep.
-    destruct Hstep as (-> & -> & -> & -> & -> & ->).
+    destruct Hstep as (-> & -> & -> & -> & -> & -> & ->).
     iMod "Hclose" as "_". iModIntro.
-    iFrame "Hri Hmem Hdev Htso Hiv".
+    iFrame "Hri Hmem Hdev Htso Hiv Hrv".
     rewrite -Hres. iApply ("H" with "HQ").
   Qed.
 
@@ -251,22 +251,21 @@ Section barrier.
       by (rewrite Hm; exact (HC _ (Interface.Barrier bk) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step with "Hcert").
-    { intros oth0 h0 img0 σ0 log0 tv0 itv0 r0 m'0 σ'0 log'0 tv'0 itv'0 r'0 Hs.
+    { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       rewrite /mnode_step in Hs. cbn beta iota in Hs.
-      by destruct Hs as (_ & _ & _ & _ & _ & ->). }
-    iIntros (σ oth rv img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+      by destruct Hs as (_ & _ & _ & _ & _ & _ & ->). }
+    iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
+    destruct Hhr as (Hrvlen & _).
     iDestruct (tso_interp_of_bound with "Htso") as %Hb.
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     assert (Htvlen : (tv <= length log)%nat) by (rewrite -Htv; apply Hb).
     set (h := hart_agent cpu_id).
-    set (tvn := fence_post h log (fence_drains bk) tv).
-    (* the two bounds, at EITHER kind: [fence_post] is [tv] when the kind
-       does not drain and [max tv (own_pub h log)] when it does. *)
+    set (tvn := fence_post h log (fence_drains bk) (fence_acq bk) tv (hr_rv hr)).
+    (* the two bounds, at EVERY kind ([fence_post_ge]/[fence_post_le]) *)
     assert (Hadv : (V h <= tvn)%nat).
-    { rewrite Htv /tvn /fence_post. destruct (fence_drains bk); lia. }
+    { rewrite Htv /tvn. apply fence_post_ge. }
     assert (Htop : (tvn <= length log)%nat).
-    { rewrite /tvn /fence_post. destruct (fence_drains bk);
-        [ pose proof (own_pub_le h log); lia | exact Htvlen ]. }
+    { rewrite /tvn. apply fence_post_le; [exact Htvlen|exact Hrvlen]. }
     iMod (tso_interp_of_advance _ img σ.(mem) log V h tvn
             (fin_to_nat_lt cpu_id) Hadv Htop with "Htso") as "Htso".
     assert (Hpin' : forall h', (NCPU <= h')%nat -> vstep h tvn log V h' = length log).
@@ -286,18 +285,19 @@ Section barrier.
     (* the INSTRUCTION view (icache.md): a fence.i raises it past the data
        view and the hart's own last store; any other barrier leaves it *)
     set (itvn := if fence_ifetch bk
-                 then Nat.max itv (fence_post h log true tv) else itv).
-    iExists (C (K tt)), σ, log, tvn, itvn, rv.
+                 then Nat.max itv (fence_post h log true false tv (hr_rv hr))
+                 else itv).
+    iExists (C (K tt)), σ, log, tvn, itvn, hr, rv.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota. by split_and!. }
-    iNext. iIntros (m' σ' log' tv' itv' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
-    destruct Hstep as (-> & -> & -> & -> & -> & ->).
+    destruct Hstep as (-> & -> & -> & -> & -> & -> & ->).
     iMod "Hclose" as "_".
     iMod (hart_iview_auth_update cpu_id itv itvn with "Hiv") as "Hiv".
     { rewrite /itvn. case_match; lia. }
     iModIntro.
-    iFrame "Hri Hmem Hdev Htso Hiv".
+    iFrame "Hri Hmem Hdev Htso Hiv Hrv".
     rewrite -Hres. iApply ("H" with "HQ").
   Qed.
 
@@ -341,14 +341,15 @@ Section barrier.
       by (rewrite Hm; exact (HC _ (Interface.Barrier Barrier_RISCV_i) K eq_refl)).
     rewrite Hg.
     iApply (wp_hart_step with "Hcert").
-    { intros oth0 h0 img0 σ0 log0 tv0 itv0 r0 m'0 σ'0 log'0 tv'0 itv'0 r'0 Hs.
+    { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       rewrite /mnode_step in Hs. cbn beta iota in Hs.
-      by destruct Hs as (_ & _ & _ & _ & _ & ->). }
-    iIntros (σ oth rv img log tv itv V) "%Htv %Hitv Hσ Hiv Htso".
+      by destruct Hs as (_ & _ & _ & _ & _ & _ & ->). }
+    iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
+    destruct Hhr as (Hrvlen & _).
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     set (h := hart_agent cpu_id).
     (* the data view does not move; the instruction view goes to [itvn] *)
-    set (itvn := Nat.max itv (fence_post h log true tv)).
+    set (itvn := Nat.max itv (fence_post h log true false tv (hr_rv hr))).
     iMod (hart_iview_auth_update cpu_id itv itvn with "Hiv") as "Hiv".
     { rewrite /itvn. lia. }
     iDestruct (hart_iview_lb_at_get with "Hiv") as "#Hlb".
@@ -364,14 +365,14 @@ Section barrier.
     rewrite -(tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
                 σ.(sregs) σ.(mdev) Hpin').
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
-    iExists (C (K tt)), σ, log, tv, itvn, rv.
+    iExists (C (K tt)), σ, log, tv, itvn, hr, rv.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota. by split_and!. }
-    iNext. iIntros (m' σ' log' tv' itv' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
-    destruct Hstep as (-> & -> & -> & -> & -> & ->).
+    destruct Hstep as (-> & -> & -> & -> & -> & -> & ->).
     iMod "Hclose" as "_". iModIntro.
-    iFrame "Hri Hmem Hdev Hiv".
+    iFrame "Hri Hmem Hdev Hiv Hrv".
     iSplitL "Htso".
     { rewrite -Htv. iApply (tso_interp_of_idle with "Htso"). }
     rewrite -Hres. iApply ("H" with "HQ").
@@ -404,6 +405,99 @@ Section barrier.
               with "Hcert Hpub HP [H Hcont]").
     iNext. iIntros "HQ".
     iApply (swp_use _ Φ C HC with "[H HQ] Hcont"). by iApply "H".
+  Qed.
+
+  (* ================================================================== *)
+  (* THE ACQUIRE LEAF (claude-notes/projects/relaxed-rr.md §4.2).           *)
+  (*                                                                     *)
+  (* A fence with an R→R edge ([fence_acq]: r,r / r,rw / rw,r / rw,rw /   *)
+  (* fence.tso) raises this hart's FLOOR past its READ WATERMARK.  A       *)
+  (* client holding a plain load's receipt [hart_rview_lb_at cpu_id K]     *)
+  (* ("I have read at view K") therefore leaves with [hart_view_lb K]     *)
+  (* ("my floor is at or past K"), which is what every later load and      *)
+  (* every floor law consumes.  This is the ONE place the conversion is    *)
+  (* honest: the leaf holds the watermark's counter on loan and the view   *)
+  (* authority in the bundle at the same step, so [K <= rv <= tv'] is      *)
+  (* read off the two authorities and the receipt is an inclusion.  A      *)
+  (* client with several load receipts converts the largest.  The         *)
+  (* continuation is under a LATER, as [wp_hart_barrier]'s is: a fence IS  *)
+  (* a program step.  The kinds that also drain drain here too (the arm   *)
+  (* is the machine's); a client that wants the drain's receipt as well    *)
+  (* uses [wp_hart_barrier], whose [pub_step] can be extended when a site  *)
+  (* needs both -- none does today.                                        *)
+  (* ================================================================== *)
+  Lemma wp_hart_fence_acq {X : Type} (C : M X -> M unit) (bk : barrier_kind)
+      (m : M X) (K : nat) :
+    mctx C ->
+    hbar_at m = Some bk ->
+    fence_acq bk = true ->
+    gen_cert -∗ hart_rview_lb_at cpu_id K -∗
+    ▷ (hart_view_lb K -∗ WP (HartE gen_id cpu_id (C (hbar_resume m)) : expr riscv_lang)) -∗
+    WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
+  Proof.
+    iIntros (HC Hproj Hacq) "#Hcert #HK H".
+    destruct (hbar_at_inv _ _ Hproj) as (Kc & Hm & Hres).
+    assert (Hg : C m = Interface.Next (Interface.Barrier bk) (fun v => C (Kc v)))
+      by (rewrite Hm; exact (HC _ (Interface.Barrier bk) Kc eq_refl)).
+    rewrite Hg.
+    iApply (wp_hart_step with "Hcert").
+    { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
+      rewrite /mnode_step in Hs. cbn beta iota in Hs.
+      by destruct Hs as (_ & _ & _ & _ & _ & _ & ->). }
+    iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
+    destruct Hhr as (Hrvlen & _).
+    iDestruct (tso_interp_of_bound with "Htso") as %Hb.
+    assert (Htvlen : (tv <= length log)%nat) by (rewrite -Htv; apply Hb).
+    (* the load's receipt sits under the watermark ... *)
+    iDestruct (hart_rview_lb_at_valid with "Hrv HK") as %HKrv.
+    set (h := hart_agent cpu_id).
+    set (tvn := fence_post h log (fence_drains bk) (fence_acq bk) tv (hr_rv hr)).
+    assert (Hadv : (V h <= tvn)%nat).
+    { rewrite Htv /tvn. apply fence_post_ge. }
+    assert (Htop : (tvn <= length log)%nat).
+    { rewrite /tvn. apply fence_post_le; [exact Htvlen|exact Hrvlen]. }
+    (* ... and the watermark under the floor the fence leaves behind *)
+    assert (HKtvn : (K <= tvn)%nat).
+    { rewrite /tvn Hacq.
+      pose proof (fence_post_acq h log (fence_drains bk) tv (hr_rv hr)). lia. }
+    iMod (tso_interp_of_advance _ img σ.(mem) log V h tvn
+            (fin_to_nat_lt cpu_id) Hadv Htop with "Htso") as "Htso".
+    iDestruct (tso_interp_of_receipt_at riscv_eraGS img σ.(mem) log
+                 (vstep h tvn log V) h tvn (vstep_here h tvn log V)
+                 with "Htso") as "[Htso #Hrcpt]".
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    set (itvn := if fence_ifetch bk
+                 then Nat.max itv (fence_post h log true false tv (hr_rv hr))
+                 else itv).
+    iExists (C (Kc tt)), σ, log, tvn, itvn, hr, rv.
+    iSplitR.
+    { iPureIntro. rewrite /mnode_step. cbn beta iota. by split_and!. }
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+    rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
+    destruct Hstep as (-> & -> & -> & -> & -> & -> & ->).
+    iMod "Hclose" as "_".
+    iMod (hart_iview_auth_update cpu_id itv itvn with "Hiv") as "Hiv".
+    { rewrite /itvn. case_match; lia. }
+    iModIntro.
+    iFrame "Hσ Htso Hiv Hrv".
+    rewrite -Hres. iApply "H".
+    rewrite hart_view_lb_unseal /hart_view_lb_def /view_name /loglen_name.
+    iApply (TsoGhost.view_lb_le _ _ _ tvn K HKtvn with "Hrcpt").
+  Qed.
+
+  Lemma swp_hart_fence_acq {X : Type} (bk : barrier_kind) (m : M X)
+      (Φ : X -> iProp Σ) (K : nat) :
+    hbar_at m = Some bk ->
+    fence_acq bk = true ->
+    gen_cert -∗ hart_rview_lb_at cpu_id K -∗
+    ▷ (hart_view_lb K -∗ swp (hbar_resume m) Φ) -∗
+    swp m Φ.
+  Proof.
+    iIntros (Hproj Hacq) "#Hcert #HK H".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    iApply (wp_hart_fence_acq C bk m K HC Hproj Hacq with "Hcert HK [H Hcont]").
+    iNext. iIntros "HV".
+    iApply (swp_use _ Φ C HC with "[H HV] Hcont"). by iApply "H".
   Qed.
 
 End barrier.
