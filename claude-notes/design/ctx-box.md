@@ -10,8 +10,10 @@ plan of record with its rulings table).
 
 ## 1. Why a box exists
 
-Under the TSO model (`TsoCtx.v`) a physical cell is owned in one of three
-tiers: **T1**, a running context's exact cell; **T2**, parked at a stamped
+Under the view-machine model (`TsoCtx.v`; born as Ztso, relaxed for
+load–load reordering by `projects/relaxed-rr.md` -- the relaxation changed
+what a plain LOAD mints, not what a cell IS, so everything here reads as
+written) a physical cell is owned in one of three tiers: **T1**, a running context's exact cell; **T2**, parked at a stamped
 context inside a box or lock record; **T3**, a ledger pin above a floor
 (racy reads).  A cell that is written under one lock and read under another
 — a buffer's data, an in-core inode's header, a file's `off` — cannot sit
