@@ -1,6 +1,13 @@
 # Round E2 — design proposal (2026-09-05): AU forms for create's legs, link, mkdir, iput's free, write; the view; the rulings needed
 
-STATUS: PROPOSAL awaiting the owner's rulings on Q-a..Q-i (last section).  Produced read-only against HEAD 668441141 after round E1's census; every claim carries file:line.  Design of record: design/applications.md §2/§6 L3; rounds record: app-instances.md §7 E.
+STATUS: PROPOSAL; RULINGS SO FAR (owner, 2026-09-05): Q-a YES (view = allocated rows; lane E2-V
+launched); Q-b NO (nlink-0 inodes stay in the view: a process may hold an open fd to one); Q-c YES
+(strengthen in place — "we have a single kernel proof, only one of these contracts can be in the
+real kernel"); Q-e W1 ("doesn't matter"); Q-f YES (dead pre-AU proofs not linked into the kernel and
+superseded by an AU spec are deleted); Q-h YES ("otherwise the spec cannot be complete and sound");
+Q-i YES ("a bug in the sys_write spec; the whole write spec may be non-deterministic but must account
+for the short write").  OPEN: Q-d (how the free step reaches iput) and Q-g (why `Happ_auto` outlives
+round E) — the owner asked for a plain-language explanation; being discussed.  Produced read-only against HEAD 668441141 after round E1's census; every claim carries file:line.  Design of record: design/applications.md §2/§6 L3; rounds record: app-instances.md §7 E.
 
 
 Scope: app-instances.md §6 ruling 4 / §7 E, applications.md §2 + §6 L3, fs-syscall-specs.md §4/§7.
