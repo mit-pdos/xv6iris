@@ -4091,28 +4091,44 @@ Section UkSh.
      never closes either descriptor -- a REDIR runs in the forked CHILD,
      which gets its own descriptor authority at the fork arm -- so the two
      states that come round the loop are the two that went in. *)
-  Definition ush_loop_head (l : list fdstate) : iProp Σ :=
+  (* THE BODY'S FRAME, as the sum it is.  main's body reaches [fork1] (2
+     words), the diagnostic subtree under it (28 -- [UkShDiag.ush_Dg]),
+     the parser (60) and the runner (8); the [cd] arm's own 26 (fprintf's
+     frame) fits inside the same total.  It is a NUMBER here and a sum in
+     the files that spend it, because this file walks none of them. *)
+  Definition ush_Dbody : nat := 80%nat.
+
+  (* [R] IS WHAT A TURN CARRIES AND DOES NOT CREATE, and it is abstract
+     here on purpose.  Stages 1-2 carried the five constants, the
+     descriptor promise and the line buffer; main's body also needs the two
+     static lexer tables, the allocator's first-call state and the break --
+     and naming any of those would drag the parser's and the allocator's
+     files into this one.  So the loop carries an OPAQUE [R] round its
+     cycle, and iris/UkShLoop.v is where it is said what [R] is. *)
+  Definition ush_loop_head (R : iProp Σ) (l : list fdstate) : iProp Σ :=
     (∀ (h : CpuId) (m : regfile) (f : nat -> bv 8) (n : nat),
        ⌜ ush_regs m ⌝ -∗
        ush_std l -∗
+       R -∗
        ubytes γd sh_buf sh_nbuf f -∗
-       urun γt γd γs γfd h m (mword_of_int 0x938) (16 + n) -∗
+       urun γt γd γs γfd h m (mword_of_int 0x938) (16 + (ush_Dbody + n)) -∗
        WP (Loop : expr riscv_lang))%I.
 
-  Definition ush_rest : iProp Σ :=
+  Definition ush_rest (R : iProp Σ) : iProp Σ :=
     (□ (∀ (l : list fdstate),
-        ush_loop_head l -∗
+        ush_loop_head R l -∗
         ∀ (h : CpuId) (m : regfile) (f : nat -> bv 8) (k i2 : nat) (n : nat),
           ⌜ ush_regs m ⌝ -∗
           ⌜ m !!! Regidx s1_idx = mword_of_int (sh_buf + Z.of_nat k) ⌝ -∗
           ⌜ m !!! Regidx a5_idx = mword_of_int (bv_unsigned (f k)) ⌝ -∗
           ⌜ (k <= i2 < sh_nbuf)%nat /\ f i2 = ubyte0 ⌝ -∗
           ush_std l -∗
+          R -∗
           ubytes γd sh_buf sh_nbuf f -∗
-          urun γt γd γs γfd h m (mword_of_int 0x97a) (16 + n) -∗
+          urun γt γd γs γfd h m (mword_of_int 0x97a) (16 + (ush_Dbody + n)) -∗
           WP (Loop : expr riscv_lang)))%I.
 
-  Global Instance ush_rest_persistent : Persistent ush_rest.
+  Global Instance ush_rest_persistent R : Persistent (ush_rest R).
   Proof. apply _. Qed.
 
   (* ---- ONE TURN of the leading-blank scan, 0x964..0x974 ---------------- *)
@@ -4500,15 +4516,16 @@ Section UkSh.
 
   (* ---- the loop itself: 0x938..0x976, under one iLöb ------------------ *)
   (* DEPENDS ON [ush_read_leaf] (through getcmd).                          *)
-  Local Lemma wp_ksh_loop (l : list fdstate) :
-    ush_rest -∗ shk_code γt -∗ ush_loop_head l.
+  Local Lemma wp_ksh_loop (R : iProp Σ) (l : list fdstate) :
+    ush_rest R -∗ shk_code γt -∗ ush_loop_head R l.
   Proof.
     assert (Hbf : sh_buf = 8224) by (vm_compute; reflexivity).
     assert (Hnb : sh_nbuf = 100%nat) by (vm_compute; reflexivity).
     assert (Hnbz : Z.of_nat sh_nbuf = 100) by (vm_compute; reflexivity).
     iIntros "#Hrest #Hcode".
     iLöb as "IH".
-    iIntros (h m f n) "%Hregs Hstd Hbs Hrun".
+    iIntros (h m f n0) "%Hregs Hstd HR Hbs Hrun".
+    set (n := (ush_Dbody + n0)%nat).
     pose proof Hregs as (Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
     (* ---- 0x938  c.mv a1,s3 ---- *)
     iApply (wp_uk_cmv γt γd γs γfd h m (mword_of_int 0x938) a1_idx s3_idx
@@ -4698,7 +4715,7 @@ Section UkSh.
                       = mword_of_int (bv_unsigned (g kk)) ⌝ -∗
                   ubytes γd sh_buf sh_nbuf g -∗
                   urun γt γd γs γfd hh mm (mword_of_int 0x976) (16 + n) -∗
-                  WP (Loop : expr riscv_lang))%I with "[Hstd]" as "Htail".
+                  WP (Loop : expr riscv_lang))%I with "[Hstd HR]" as "Htail".
     { iIntros (hh mm kk) "%Hrm %Hkk %Hsm %Ham Hbs Hrun".
       pose proof Hrm as (_ & _ & Hs4m & _ & _).
       remember (uv_btaken BEQ (mm !!! Regidx a5_idx) (mm !!! Regidx s4_idx))
@@ -4714,7 +4731,7 @@ Section UkSh.
       destruct tk76.
       { (* a blank line: round the command loop again *)
         iNext. iIntros (hh1) "Hrun".
-        iApply ("IH" $! hh1 mm g n with "[] Hstd Hbs Hrun").
+        iApply ("IH" $! hh1 mm g n0 with "[] Hstd HR Hbs Hrun").
         iPureIntro. exact Hrm. }
       iNext.
       assert (E976 : add_vec_int (mword_of_int 0x976 : mword 64) 4
@@ -4722,7 +4739,8 @@ Section UkSh.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite E976. iIntros (hh1) "Hrun".
       iDestruct ("Hrest" $! l with "IH") as "Hbody".
-      iApply ("Hbody" $! hh1 mm g kk i2 n with "[] [] [] [] Hstd Hbs Hrun");
+      iApply ("Hbody" $! hh1 mm g kk i2 n0
+                with "[] [] [] [] Hstd HR Hbs Hrun");
         iPureIntro; [ exact Hrm | exact Hsm | exact Ham
                     | split; [ lia | exact Hnul ] ]. }
     (* the two auipc/addi pairs that both land s1 on the buffer *)
@@ -4865,16 +4883,18 @@ Section UkSh.
   (*                                                                       *)
   (* DEPENDS ON [ush_read_leaf] (through the loop).                         *)
   (* ===================================================================== *)
-  Lemma wp_ksh_cmd_head (h : CpuId) (m : regfile) (f : nat -> bv 8) (n : nat)
-      (l : list fdstate) :
-    ush_rest -∗
+  Lemma wp_ksh_cmd_head (R : iProp Σ) (h : CpuId) (m : regfile)
+      (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
+    ush_rest R -∗
     shk_code γt -∗
     ush_std l -∗
+    R -∗
     ubytes γd sh_buf sh_nbuf f -∗
-    urun γt γd γs γfd h m (mword_of_int 0x914) (16 + n) -∗
+    urun γt γd γs γfd h m (mword_of_int 0x914) (16 + (ush_Dbody + n0)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hrest #Hcode Hstd Hbs Hrun".
+    iIntros "#Hrest #Hcode Hstd HR Hbs Hrun".
+    set (n := (ush_Dbody + n0)%nat).
     (* ---- 0x914  li s3,100 ---- *)
     iApply (wp_uk_li γt γd γs γfd h m (mword_of_int 0x914)
               (mword_of_int 100 : mword 12) s3_idx (mword_of_int 100) (16 + n)
@@ -5022,8 +5042,8 @@ Section UkSh.
                  (regval_into_reg (mword_of_int 99 : mword 64))).
       - exact (upd_eq m5 (Regidx s6_idx)
                  (regval_into_reg (mword_of_int 32 : mword 64))). }
-    iDestruct (wp_ksh_loop l with "Hrest Hcode") as "Hhead".
-    iApply ("Hhead" $! h7 m6 f n with "[] Hstd Hbs Hrun").
+    iDestruct (wp_ksh_loop R l with "Hrest Hcode") as "Hhead".
+    iApply ("Hhead" $! h7 m6 f n0 with "[] Hstd HR Hbs Hrun").
     iPureIntro. exact Hregs.
   Qed.
 
@@ -5041,20 +5061,20 @@ Section UkSh.
   (* computes what the kernel returned -- and the only thing carried round  *)
   (* the cycle is [urun … 0x900 n] itself.                                  *)
   (* ===================================================================== *)
-  Local Lemma wp_ksh_console (h : CpuId) (m : regfile) (f : nat -> bv 8)
-      (n0 : nat)
-      (l : list fdstate) :
-    ush_rest -∗
+  Local Lemma wp_ksh_console (R : iProp Σ) (h : CpuId) (m : regfile)
+      (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
+    ush_rest R -∗
     shk_code γt -∗
     ush_std l -∗
+    R -∗
     ubytes γd sh_buf sh_nbuf f -∗
-    urun γt γd γs γfd h m (mword_of_int 0x900) (16 + n0) -∗
+    urun γt γd γs γfd h m (mword_of_int 0x900) (16 + (ush_Dbody + n0)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hrest #Hcode".
-    set (n := (16 + n0)%nat).
+    set (n := (16 + (ush_Dbody + n0))%nat).
     iLöb as "IH" forall (h m).
-    iIntros "Hstd Hbs Hrun".
+    iIntros "Hstd HR Hbs Hrun".
     (* ---- 0x900  c.mv a1,s1 ---- *)
     iApply (wp_uk_cmv γt γd γs γfd h m (mword_of_int 0x900) a1_idx s1_idx
               (add_vec zero_reg (m !!! Regidx s1_idx)) n
@@ -5123,7 +5143,8 @@ Section UkSh.
     destruct t1.
     { (* open failed -- straight to the command loop's head *)
       iIntros (h5) "Hrun".
-      iApply (wp_ksh_cmd_head h5 mD f n0 l with "Hrest Hcode Hstd Hbs Hrun"). }
+      iApply (wp_ksh_cmd_head R h5 mD f n0 l
+                with "Hrest Hcode Hstd HR Hbs Hrun"). }
     assert (E908 : add_vec_int (mword_of_int 0x908 : mword 64) 4
                    = mword_of_int 0x90c)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -5141,7 +5162,7 @@ Section UkSh.
     { iApply (uis_shk_90c with "Hcode"). }
     destruct t2.
     { (* fd <= 2 -- round again, on the Löb hypothesis *)
-      iNext. iIntros (h6) "Hrun". iApply ("IH" with "Hstd Hbs Hrun"). }
+      iNext. iIntros (h6) "Hrun". iApply ("IH" with "Hstd HR Hbs Hrun"). }
     iNext.
     assert (E90c : add_vec_int (mword_of_int 0x90c : mword 64) 4
                    = mword_of_int 0x910)
@@ -5193,7 +5214,8 @@ Section UkSh.
     assert (Eret2 : ret_pc (mword_of_int 0x914 : mword 64) = mword_of_int 0x914)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Eret2.
-    iApply (wp_ksh_cmd_head h8 _ f n0 l with "Hrest Hcode Hstd Hbs Hrun").
+    iApply (wp_ksh_cmd_head R h8 _ f n0 l
+              with "Hrest Hcode Hstd HR Hbs Hrun").
   Qed.
 
 
@@ -5204,17 +5226,19 @@ Section UkSh.
   (* main never returns.  0x8f6..0x8fc load O_RDWR and the address of the   *)
   (* "console" literal, and 0x900 is the loop above.                        *)
   (* ===================================================================== *)
-  Lemma wp_ksh_main (h : CpuId) (m : regfile) (f : nat -> bv 8) (n0 : nat)
-      (l : list fdstate) :
-    ush_rest -∗
+  Lemma wp_ksh_main (R : iProp Σ) (h : CpuId) (m : regfile)
+      (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
+    ush_rest R -∗
     shk_code γt -∗
     ush_std l -∗
+    R -∗
     ubytes γd sh_buf sh_nbuf f -∗
-    urun γt γd γs γfd h m (mword_of_int ShSyms.main) (8 + (16 + n0)) -∗
+    urun γt γd γs γfd h m (mword_of_int ShSyms.main)
+      (8 + (16 + (ush_Dbody + n0))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hrest #Hcode Hstd Hbs Hrun".
-    set (n := (16 + n0)%nat).
+    iIntros "#Hrest #Hcode Hstd HR Hbs Hrun".
+    set (n := (16 + (ush_Dbody + n0))%nat).
     rewrite shp_main.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0.
@@ -5424,7 +5448,8 @@ Section UkSh.
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E8fc. iIntros (he) "Hrun".
     (* ---- 0x900  the console loop ---- *)
-    iApply (wp_ksh_console he _ f n0 l with "Hrest Hcode Hstd Hbs Hrun").
+    iApply (wp_ksh_console R he _ f n0 l
+              with "Hrest Hcode Hstd HR Hbs Hrun").
   Qed.
 
 
@@ -5435,17 +5460,19 @@ Section UkSh.
   (* appears here.  The [avail] arithmetic is the call chain spelled out:   *)
   (* start's two words and main's eight.                                    *)
   (* ===================================================================== *)
-  Lemma wp_ksh_start (h : CpuId) (m : regfile) (f : nat -> bv 8) (n0 : nat)
-      (l : list fdstate) :
-    ush_rest -∗
+  Lemma wp_ksh_start (R : iProp Σ) (h : CpuId) (m : regfile)
+      (f : nat -> bv 8) (n0 : nat) (l : list fdstate) :
+    ush_rest R -∗
     shk_code γt -∗
     ush_std l -∗
+    R -∗
     ubytes γd sh_buf sh_nbuf f -∗
-    urun γt γd γs γfd h m (mword_of_int ShSyms.start) (2 + (8 + (16 + n0))) -∗
+    urun γt γd γs γfd h m (mword_of_int ShSyms.start)
+      (2 + (8 + (16 + (ush_Dbody + n0)))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hrest #Hcode Hstd Hbs Hrun".
-    set (n := (16 + n0)%nat).
+    iIntros "#Hrest #Hcode Hstd HR Hbs Hrun".
+    set (n := (16 + (ush_Dbody + n0))%nat).
     rewrite shp_start.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0.
@@ -5543,7 +5570,7 @@ Section UkSh.
        had work to do while the wide catalog destruct was dumping unused
        [uinstr_is] hypotheses holding the literal into the context. *)
     rewrite <- ?shp_main.
-    iApply (wp_ksh_main h5 _ f n0 l with "Hrest Hcode Hstd Hbs Hrun").
+    iApply (wp_ksh_main R h5 _ f n0 l with "Hrest Hcode Hstd HR Hbs Hrun").
   Qed.
 
 End UkSh.

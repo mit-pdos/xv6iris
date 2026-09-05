@@ -257,25 +257,20 @@ Section UShKernel.
   (* ------------------------------------------------------------------- *)
   (* SS2 THE DEPOSIT (header (1), (2)).                                   *)
   (* ------------------------------------------------------------------- *)
-  Lemma sh_uexec_slot_x (W : uvis) (n0 : nat) :
+  Lemma sh_uexec_slot_x (R : gname -> gname -> gname -> iProp Σ)
+      (W : uvis) (n0 : nat) :
     tf_resume_pc (uvis_tf W) = (mword_of_int ShSyms.start : mword 64) ->
     shk_img_sub (uvis_M W) ->
     (forall a : Z, 0 <= a < 8192 ->
        ux_addr (uvis_perm W) a /\ ~ uw_addr (uvis_perm W) a) ->
     uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 ->
-    8 * Z.of_nat (2 + (8 + (16 + n0)))
+    8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
       <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) ->
-    (forall j : nat, (j < 8 * (2 + (8 + (16 + n0))))%nat ->
+    (forall j : nat, (j < 8 * (2 + (8 + (16 + (ush_Dbody + n0)))))%nat ->
        is_Some (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)
                  !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
-                     - 8 * Z.of_nat (2 + (8 + (16 + n0))) + Z.of_nat j)%Z)) ->
-    (* the line buffer: below the frame, and present in the writable data *)
-    sh_buf + Z.of_nat sh_nbuf
-      <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
-         - 8 * Z.of_nat (2 + (8 + (16 + n0))) ->
-    (forall j : nat, (j < sh_nbuf)%nat ->
-       is_Some (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)
-                 !! (sh_buf + Z.of_nat j)%Z)) ->
+                     - 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
+                     + Z.of_nat j)%Z)) ->
     length (uvis_fd W) = NOFILE ->
     fd_lowest_closed (uvis_fd W) = None ->
     (* the map stops at the break -- [UkRun.uslot_of_urun]'s own premise,
@@ -283,33 +278,38 @@ Section UShKernel.
        below reads it off [kexec_image_ok]'s page rows. *)
     (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
+    (* THE PAYLOAD.  The data below the frame is handed over whole, and it
+       is here that it is spent: on the line buffer, which every stage has
+       needed, AND on [R] -- the two static lexer tables, the allocator's
+       first-call state, the break.  Naming those would drag the parser's
+       and the allocator's files into this one, so the cut is exactly the
+       one [UkSh.ush_rest] makes: an opaque [R], produced once out of the
+       image's own writable data and carried round the loop thereafter. *)
+    □ (∀ γt γd γs : gname,
+        usz γs (uvis_sz W) -∗
+        ([∗ map] k ↦ b ∈ base.filter
+              (fun kv : Z * bv 8 =>
+                 kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
+                        - 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0)))))
+              (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)),
+           ubyte γd k b) -∗
+        ∃ f : nat -> bv 8, R γt γd γs ∗ ubytes γd sh_buf sh_nbuf f) -∗
     □ (∀ W' : uvis, xbundle uslot_x W') -∗
-    (∀ γt γd γs γfd : gname, ush_rest γt γd γs γfd) -∗
+    (∀ γt γd γs γfd : gname, ush_rest γt γd γs γfd (R γt γd γs)) -∗
     uslot_x W.
   Proof.
-    intros Hpc Hsub Hx Hal8 Hroom Hstk Hbelow Hbss Hfdlen Hfdnone Hstop.
-    iIntros "#Hxb #Hrest".
-    iApply (uslot_x_of_urun_all W (2 + (8 + (16 + n0))) Hal8 Hroom Hstk Hfdlen
-              Hstop).
+    intros Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hfdnone Hstop.
+    iIntros "#Hpay #Hxb #Hrest".
+    iApply (uslot_x_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Hal8
+              Hroom Hstk Hfdlen Hstop).
     iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht Hstd Dlo _ Hrun".
     rewrite Hpc.
-    (* the line buffer, out of the data below the frame *)
-    set (D := udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)).
-    set (base := uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
-                 - 8 * Z.of_nat (2 + (8 + (16 + n0)))).
-    set (f := fun j : nat => default (bv_0 8) (D !! (sh_buf + Z.of_nat j)%Z)).
-    assert (Hf : forall j : nat, (j < sh_nbuf)%nat ->
-                   base.filter (fun kv : Z * bv 8 => kv.1 < base) D
-                     !! (sh_buf + Z.of_nat j)%Z = Some (f j)).
-    { intros j Hj. destruct (Hbss j Hj) as [b Hb].
-      assert (Hb' : base.filter (fun kv : Z * bv 8 => kv.1 < base) D
-                      !! (sh_buf + Z.of_nat j)%Z = Some b)
-        by (apply umap_filter_lookup_lt; [ unfold base; lia | exact Hb ]).
-      unfold f. rewrite Hb' Hb. reflexivity. }
-    iDestruct (ubytes_of_map γd _ sh_buf sh_nbuf f Hf with "Dlo") as "Hbs".
+    (* [R] and the line buffer, out of the data below the frame *)
+    iDestruct ("Hpay" $! γt γd γs with "Hszf Dlo") as (f) "[HR Hbs]".
     iPoseProof ("Hrest" $! γt γd γs γfd) as "#Hr".
     iApply (wp_ksh_start γt γd γs γfd (ush_read_leaf_of_win γt γd γs γfd)
-              h _ f n0 (take NSTD (uvis_fd W)) with "Hr [] [Hstd] Hbs [Hrun]").
+              (R γt γd γs) h _ f n0 (take NSTD (uvis_fd W))
+              with "Hr [] [Hstd] HR Hbs [Hrun]").
     - iApply (shk_code_of_text γt (uvis_M W) (uvis_perm W)
                 (shk_img_text _ Hsub) Hx with "Ht").
     - rewrite /ush_std. iFrame "Hstd". iPureIntro.
@@ -320,11 +320,12 @@ Section UShKernel.
   (* ------------------------------------------------------------------- *)
   (* SS3 THE BRIDGE from the kernel's image fact (header).                *)
   (* ------------------------------------------------------------------- *)
-  Lemma sh_slot_of_kexec (na : nat) (alen : nat -> nat)
-      (afun : nat -> nat -> bv 8) (sts : list fdstate) (W' : uvis) (n0 : nat) :
+  Lemma sh_slot_of_kexec (R : gname -> gname -> gname -> iProp Σ) (na : nat)
+      (alen : nat -> nat) (afun : nat -> nat -> bv 8) (sts : list fdstate)
+      (W' : uvis) (n0 : nat) :
     kexec_image_ok sh_elf na alen afun sts W' ->
     (* room for sh's frames on the stack page, below the argument block *)
-    kexec_sz sh_elf - PGSIZE + 8 * Z.of_nat (2 + (8 + (16 + n0)))
+    kexec_sz sh_elf - PGSIZE + 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
       <= kxc_sp_final (kexec_sz sh_elf) alen na ->
     length sts = NOFILE -> fd_lowest_closed sts = None ->
     (* THE MAP STOPS AT THE BREAK, and it is the ONE premise the image fact
@@ -336,8 +337,18 @@ Section UShKernel.
        ([UserHeap.uheap]'s map-stop clause). *)
     (forall (p : mword 27) (q : uperm), uvis_perm W' !! p = Some q ->
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W')) ->
+    (* the payload, passed straight through: see [sh_uexec_slot_x] *)
+    □ (∀ γt γd γs : gname,
+        usz γs (uvis_sz W') -∗
+        ([∗ map] k ↦ b ∈ base.filter
+              (fun kv : Z * bv 8 =>
+                 kv.1 < uint (tf_resume_gpr0 (uvis_tf W') !!! Regidx csp_rs1)
+                        - 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0)))))
+              (udata_lo (uvis_M W') (uvis_perm W') (uvis_sz W')),
+           ubyte γd k b) -∗
+        ∃ f : nat -> bv 8, R γt γd γs ∗ ubytes γd sh_buf sh_nbuf f) -∗
     □ (∀ W : uvis, xbundle uslot_x W) -∗
-    (∀ γt γd γs γfd : gname, ush_rest γt γd γs γfd) -∗
+    (∀ γt γd γs γfd : gname, ush_rest γt γd γs γfd (R γt γd γs)) -∗
     uslot_x W'.
   Proof.
     intros Hok Hroom Hlen Hnone Hstop.
@@ -413,25 +424,14 @@ Section UShKernel.
       intros [ (i & Hi & Hlo & _) | (Hlo & _) ]; [| clear -Ha Hlo; lia ].
       pose proof (kxc_sp_mono 0x5000 alen (S i) na Hi) as Hm.
       clear -Ha Hlo Hm Hgap; lia. }
-    (* ---- the .bss buffer: zero in the image, hence in M ---- *)
-    assert (Hbssm : forall a : Z, 0x2010 <= a < 0x2098 -> is_Some (M !! a)).
-    { intros a Ha.
-      assert (Hin : is_Some (elf_image sh_elf !! a)).
-      { rewrite sh_elf_image_concrete.
-        apply lookup_union_is_Some. right.
-        exists elf_zero_byte. apply lookup_map_seqZ_Some.
-        unfold sh_bss_lo, sh_bss_size. split; [ clear -Ha; lia | ].
-        apply lookup_replicate. split; [ reflexivity | clear -Ha; lia ]. }
-      destruct Hin as [b Hb]. exists b. exact (Himg a b Hb). }
-    (* ---- the deposit ---- *)
-    assert (Hbuf : forall j : nat, (j < sh_nbuf)%nat ->
-              0x2010 <= sh_buf + Z.of_nat j < 0x2098 /\
-              0x2000 <= sh_buf + Z.of_nat j < 0x3000)
-      by (intros j Hj; unfold sh_buf, sh_nbuf in *; clear -Hj; lia).
-    assert (Hfrm : forall j : nat, (j < 8 * (2 + (8 + (16 + n0))))%nat ->
-              0x4000 <= spv - 8 * Z.of_nat (2 + (8 + (16 + n0))) + Z.of_nat j < spv)
+    (* ---- the deposit.  The line buffer is no longer carved here: it
+           comes out of the payload premise, together with [R]. ---- *)
+    assert (Hfrm : forall j : nat,
+              (j < 8 * (2 + (8 + (16 + (ush_Dbody + n0)))))%nat ->
+              0x4000 <= spv - 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
+                        + Z.of_nat j < spv)
       by (intros j Hj; clear -Hj Hroom; lia).
-    iApply (sh_uexec_slot_x W' n0).
+    iApply (sh_uexec_slot_x R W' n0).
     - rewrite Hpc. exact sh_start_pc.
     - exact (kxp_image_sh nil 0 M Himg).
     - exact Hx.
@@ -442,12 +442,6 @@ Section UShKernel.
       + apply Hbelow. exact (conj Hj0 Hj1).
       + apply Hwstk. split; [ exact Hj0 | clear -Hj1 Hspv; lia ].
       + rewrite Hszv. clear -Hj1 Hspv; lia.
-    - rewrite Hsp'. unfold sh_buf, sh_nbuf. clear -Hroom; lia.
-    - intros j Hj. destruct (Hbuf j Hj) as [Hj0 Hj1].
-      destruct (Hbssm _ Hj0) as [b Hb].
-      apply (udata_lo_is_Some M π (uvis_sz W') _ b Hb).
-      + apply Hwbss. exact Hj1.
-      + rewrite Hszv. clear -Hj1; lia.
     - rewrite Hfd. exact Hlen.
     - rewrite Hfd. exact Hnone.
     - exact Hstop.
