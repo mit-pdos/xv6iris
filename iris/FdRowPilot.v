@@ -44,6 +44,7 @@ Require Import FsDurSnap.
 Require Import FsCfgBoot.
 Require Import FsImgDisk.
 Require Import FsImgCheck.
+Require Export FsImgConsole.   (* [fname_console] / [console_str] / [fsimg_console_miss] *)
 Require Import FsImg.
 Require Import FsAbsDefs.
 Require Import FsInitPin.       (* [era0_D], [era0_root_row], [img_astep_root] *)
@@ -73,23 +74,14 @@ Require Import UexecRetFs.
 
 Local Open Scope Z_scope.
 
-(* [FsImgCheck]'s own [Ltac], which is [Local] there *)
-Local Ltac vm_eq :=
-  lazymatch goal with
-  | |- _ = ?r => vm_cast_no_check (@eq_refl _ r)
-  end.
-
 (* ===================================================================== *)
 (*  1.  "console", THE NAME AND THE STRING                                 *)
 (* ===================================================================== *)
 
-Definition fname_console : fname :=
-  [fsimg_byte 0x63; fsimg_byte 0x6f; fsimg_byte 0x6e; fsimg_byte 0x73;
-   fsimg_byte 0x6f; fsimg_byte 0x6c; fsimg_byte 0x65].
-
-(* the string as fetched: same bytes, no terminator (the terminator is
-   [ustrq]'s business) *)
-Definition console_str : list (bv 8) := fname_console.
+(* [fname_console] / [console_str] and the image fact [fsimg_console_miss]
+   live in FsImgConsole.v (an image-check leaf that compiles beside
+   FsImgCheck, off this file's place on the build's serial tail); they are
+   RE-EXPORTED here so FdRowMint.v and UkInitFs.v see them as before. *)
 
 Lemma console_str_elems : path_elems console_str = [fname_console].
 Proof. vm_compute. reflexivity. Qed.
@@ -128,12 +120,6 @@ Definition era0_seed (u : umirror) : Prop :=
 (* ---- the boot instantiation: the era-0 map denotes only states whose
    root is a console-less directory (FsInitPin's route (b), one more
    instance) ---- *)
-
-(* the ONE computing sentence of this file, [fsimg_init_path]'s mold *)
-Lemma fsimg_console_miss :
-  path_at (tree_of_disk fsimg_P fsimg_sb) FsImg.ROOTINO [fname_console]
-  = None.
-Proof. rewrite fsimg_path_root. vm_eq. Qed.
 
 Lemma era0_root_dir :
   fn_is_dir (img_node fsimg_P fsimg_sb FsImg.ROOTINO) = true.

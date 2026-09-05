@@ -726,6 +726,7 @@ ElfUser.v
 FsImg.v
 FsImgDisk.v
 FsImgCheck.v
+FsImgConsole.v
 PathElems.v
 CodeWriteHead.v
 CodeInstallTrans.v
