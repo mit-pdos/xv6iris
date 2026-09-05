@@ -1905,7 +1905,22 @@ UkShDiag.v
 # every stage-1/2 edit rebuilds.  [shp_code] and [shk_code] are the SAME
 # proposition ([utext_img g ShInstrs.sh_bytes]); UkShParse.v's
 # [ushp_code_shk] is the one-line bridge.
-#   UkShParse.v is stage 4's walk.  Landed: the pure vocabulary
+#   STAGE 4'S WALK IS SIX FILES (split 2026-09-05, for ITERATION COST: the
+# monolith was 14 900 lines and ~2 min 30 s, which every one-line edit
+# anywhere in the parser paid in full).  The cuts are at the call graph's
+# own joints -- UkShParse.v the BASE (pure vocabulary, byte/register
+# algebra, [ushp_sstr], strchr, strlen, the frame runs, the TREE PREDICATE
+# and [ushp_malloc_ty]), then UkShParseLex.v (peek, the token tables,
+# execcmd), UkShParseTok.v (gettoken), UkShParseRedir.v (parseredirs),
+# UkShParseExec.v (parseexec, the argument loop) and UkShParseCmd.v
+# (parsepipe, parseline, nulterminate, parsecmd and THE THEOREM).  Each
+# downstream file opens with a block of [Local Notation X := (Mod.X γt γd
+# γs γfd)] -- one per name it uses -- so the bodies are unchanged text
+# despite the Section discharge, and the aliases carry [rewrite /X] and
+# [unfold X] through as well.  The cost is ~20 s of prelude per file, so
+# the SUM is longer; the WORST single file is 1 min 52 s and four of the
+# six are under 30 s, which is the trade.
+#   Landed across the six: the pure vocabulary
 # ([ushp_skipws]/[ushp_toklen]/[ushp_tokens]/[ushp_find], USpecShParse.v's
 # and USpecSh.v's predicates transposed from [list (bv 8)] onto the index
 # functions [ubytes]/[ustr] carry), the TREE PREDICATE [ushp_tree] that is
@@ -1926,6 +1941,11 @@ UkShDiag.v
 # its own theorem without stage 4 having an opinion about it.
 UCodeShP.v
 UkShParse.v
+UkShParseLex.v
+UkShParseTok.v
+UkShParseRedir.v
+UkShParseExec.v
+UkShParseCmd.v
 
 # ... STAGE 3: the ALLOCATOR.  UCodeShM.v is a FOURTH catalog over the same
 # dump (tools/ucode_shm.txt, [--prog shm]) -- 150 instructions in four

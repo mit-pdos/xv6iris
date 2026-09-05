@@ -62,6 +62,11 @@ Require Import FdSlots UserFd.
 Require Import UCodeShK.
 Require Import UCodeShP.
 Require Import UkShParse.
+Require Import UkShParseLex.
+Require Import UkShParseTok.
+Require Import UkShParseRedir.
+Require Import UkShParseExec.
+Require Import UkShParseCmd.
 Require Import UkShRun.
 Require Import UkShDiag.
 Require Import UkShMalloc.
@@ -84,6 +89,10 @@ Section UkShMain.
   Local Notation a5_idx := (mword_of_int 15 : mword 5).
   Local Notation s1_idx := (mword_of_int 9 : mword 5).
   Local Notation ra_idx := (mword_of_int 1 : mword 5).
+
+(*ALIASES-BEGIN*)
+  (* ---- the parser's files, at this file's own ghost names ---- *)
+(*ALIASES-END*)
 
   (* ===================================================================== *)
   (* §1 PERSISTING A RUN.                                                   *)
@@ -540,8 +549,8 @@ Section UkShMain.
       by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
           apply bv_eq; vm_compute; reflexivity).
     (* ---- parsecmd ---- *)
-    iApply (wp_kshp_parser γt γd γs γfd UMalloc (usz γs szv) Hmalloc
-              (Hclw γt γd γs γfd)
+    iApply (UkShParseCmd.wp_kshp_parser γt γd γs γfd UMalloc (usz γs szv)
+              Hmalloc (Hclw γt γd γs γfd)
               h2 m2 dw dv s0 len f toks
               (8 + (UkShDiag.ush_Dg + n))
               Ha0_2 Hns Htoks Htlen Hs0 Hs64
