@@ -2545,6 +2545,50 @@ Section UkShParse.
     - iSplit; [ iPureIntro; exact Hal | iExact "Hr" ].
   Qed.
 
+  (* ===================================================================== *)
+  (* THE MISS PREMISE, AS ONE [vm_compute].                                  *)
+  (*                                                                        *)
+  (* Every consumer of [ushp_spillback_ne] / [ushp_spillback_ra] and of the  *)
+  (* two runs below has to discharge                                         *)
+  (*   forall i r u, rs !! i = Some (r, u) -> Regidx q <> Regidx r           *)
+  (* about a CLOSED spill list, and the obvious way to do it inline is       *)
+  (* [intros i r u Hi; destruct i as [| [| ... ]]; cbn in Hi;                *)
+  (*  try discriminate; injection Hi as Hr Hu0; subst; vm_compute;           *)
+  (*  discriminate] -- one [cbn] over the whole list and one [vm_compute]    *)
+  (* PER ENTRY, and the lists in this catalog run to eight and eleven.       *)
+  (* Measured 4-6 s PER SITE in iris/UkShParseExec.v.  The boolean form      *)
+  (* below is the same fact and is ONE [vm_compute] over a closed list.      *)
+  (* ===================================================================== *)
+  Definition ushp_ne_list (q : mword 5) (rs : list (mword 5 * mword 6)) : bool :=
+    forallb (fun ru : mword 5 * mword 6 => neq_vec (fst ru) q) rs.
+
+  Lemma ushp_ne_of_list (q : mword 5) (rs : list (mword 5 * mword 6)) :
+    ushp_ne_list q rs = true ->
+    forall (i : nat) (r : mword 5) (u : mword 6),
+      rs !! i = Some (r, u) -> Regidx q <> Regidx r.
+  Proof.
+    unfold ushp_ne_list.
+    induction rs as [| ru rs IH ]; intros Hb i r u Hi.
+    { destruct i; discriminate Hi. }
+    cbn [forallb] in Hb. apply andb_prop in Hb as [ H0 Hb ].
+    destruct i as [| i ]; cbn [lookup list_lookup] in Hi.
+    - injection Hi as Hru. subst ru. cbn [fst] in H0.
+      unfold neq_vec in H0. apply negb_true_iff, eq_vec_false_iff in H0.
+      intros Heq. injection Heq as Heq'. apply H0. symmetry. exact Heq'.
+    - exact (IH Hb i r u Hi).
+  Qed.
+
+  (* the same at [rs !! S i] -- [ushp_spillback_ra]'s second premise, which
+     skips the slot the return address itself was spilled into *)
+  Lemma ushp_ne_of_list_S (q : mword 5) (rs : list (mword 5 * mword 6)) :
+    ushp_ne_list q (tail rs) = true ->
+    forall (i : nat) (r : mword 5) (u : mword 6),
+      rs !! S i = Some (r, u) -> Regidx q <> Regidx r.
+  Proof.
+    intros Hb i r u Hi. destruct rs as [| ru rs ]; [ discriminate Hi | ].
+    exact (ushp_ne_of_list q rs Hb i r u Hi).
+  Qed.
+
   (* THE SPILL RUN.  [c.sdsp] writes no register, so [m] is the SAME at     *)
   (* every step -- which is why this induction carries nothing but the pc.  *)
   Lemma wp_kshp_spill (spn : mword 64) (nn : nat) :
@@ -3493,3 +3537,11 @@ Section UkShParse.
       WP (Loop : expr riscv_lang).
 
 End UkShParse.
+
+(* The closer the call sites use for the two lemmas above: it is the SHAPE
+   that varies (a spill list read at [i] or at [S i]), never the work, so
+   the [first] costs one failed [apply] and not a search.  OUTSIDE the
+   section on purpose -- an [Ltac] inside one does not survive [End]. *)
+Ltac ushp_ne_vm :=
+  first [ apply ushp_ne_of_list | apply ushp_ne_of_list_S ];
+  vm_compute; reflexivity.

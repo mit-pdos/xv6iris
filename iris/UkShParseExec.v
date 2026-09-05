@@ -1139,7 +1139,12 @@ Section UkShParseExec.
                  (x0_idx, mword_of_int 0 : mword 6);
                  (x0_idx, mword_of_int 0 : mword 6)]
                  ltac:(cbn [length]; lia) with "Hloc") as "[Hlc Hbot]".
-    rewrite !big_sepL_cons big_sepL_nil.
+    (* [iEval ... in "H"] and NOT a bare [rewrite]: ssr's [!] repeats over
+       the WHOLE [envs_entails], so one such rewrite re-walks every OTHER
+       [big_sepL] in the context as well.  Per hypothesis it is the same
+       law at a fraction of the cost (7.6 s -> 1.7 s at the pair below). *)
+    iEval (rewrite !big_sepL_cons big_sepL_nil) in "Hsl".
+    iEval (rewrite !big_sepL_cons big_sepL_nil) in "Hlc".
     iDestruct "Hsl" as "(C0 & C1 & C2 & C3 & C4 & C5 & C6 & C7 & C8 & C9 &
                          C10 & C11 & C12 & _)".
     iDestruct "Hlc" as "([%wl0 L0] & [%wq Lq] & [%weq Leq] & _)".
@@ -1195,7 +1200,7 @@ Section UkShParseExec.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| i ]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ unfold adA; rewrite Hspu; vm_compute uoff_sdsp; lia
@@ -1432,7 +1437,7 @@ Section UkShParseExec.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| [| [| [| i ]]]]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ unfold adB; rewrite Hspu; vm_compute uoff_sdsp; lia
@@ -2122,7 +2127,7 @@ Section UkShParseExec.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| [| [| [| i ]]]]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ unfold adB; rewrite Hspu; vm_compute uoff_sdsp; lia
@@ -2170,20 +2175,12 @@ Section UkShParseExec.
                (s11_idx, mword_of_int 3 : mword 6)] valsB mh q Hq)).
     assert (Hs1_i : mi !!! Regidx s1_idx = mword_of_int p).
     { rewrite (Hmi s1_idx
-                 ltac:(intros i r u Hi;
-                       destruct i as [| [| [| [| [| [| [| [| i ]]]]]]]];
-                       cbn in Hi; try discriminate;
-                       injection Hi as Hr Hu0; subst;
-                       vm_compute; discriminate))
+                 ltac:(ushp_ne_vm))
               (Hmh s1_idx ltac:(vm_compute; discriminate))
               (Hmg s1_idx ltac:(vm_compute; discriminate)). exact Hs1f. }
     assert (Hsp_i : mi !!! Regidx csp_rs1 = spn).
     { rewrite (Hmi csp_rs1
-                 ltac:(intros i r u Hi;
-                       destruct i as [| [| [| [| [| [| [| [| i ]]]]]]]];
-                       cbn in Hi; try discriminate;
-                       injection Hi as Hr Hu0; subst;
-                       vm_compute; discriminate)). exact Hsp_h. }
+                 ltac:(ushp_ne_vm)). exact Hsp_h. }
     (* ---- 0x680  c.j 0x5f8 -- into the common tail ---- *)
     iApply (wp_uk_cj γt γd γs γfd h35 mi (mword_of_int 0x680)
               (mword_of_int 1980 : mword 11) (mword_of_int 0x5f8) (24 + nn)
@@ -2224,7 +2221,7 @@ Section UkShParseExec.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| i ]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ unfold adA; rewrite Hspu; vm_compute uoff_sdsp; lia
@@ -2251,11 +2248,7 @@ Section UkShParseExec.
                (s1_idx, mword_of_int 13 : mword 6);
                (s4_idx, mword_of_int 10 : mword 6);
                (s5_idx, mword_of_int 9 : mword 6)] valsA mj csp_rs1
-                 ltac:(intros i r u Hi;
-                       destruct i as [| [| [| [| [| i ]]]]];
-                       cbn in Hi; try discriminate;
-                       injection Hi as Hr Hu0; subst;
-                       vm_compute; discriminate)). exact Hsp_j. }
+                 ltac:(ushp_ne_vm)). exact Hsp_j. }
     assert (Hrak : mk !!! Regidx ra_idx = valsA 0%nat)
       by exact (ushp_spillback_ra [(ra_idx, mword_of_int 15 : mword 6);
                (s0_idx, mword_of_int 14 : mword 6);
@@ -2263,11 +2256,7 @@ Section UkShParseExec.
                (s4_idx, mword_of_int 10 : mword 6);
                (s5_idx, mword_of_int 9 : mword 6)] (mword_of_int 15 : mword 6) valsA mj
                   eq_refl
-                  ltac:(intros i r u Hi;
-                        destruct i as [| [| [| [| i ]]]];
-                        cbn in Hi; try discriminate;
-                        injection Hi as Hr Hu0; subst;
-                        vm_compute; discriminate)).
+                  ltac:(ushp_ne_vm)).
     (* ---- the frame, put back together ---- *)
     set (valsAll := fun i : nat =>
                       match i with
@@ -2284,7 +2273,8 @@ Section UkShParseExec.
                       | 10%nat => m !!! Regidx s9_idx
                       | 11%nat => m !!! Regidx s10_idx
                       | _ => m !!! Regidx s11_idx end).
-    rewrite !big_sepL_cons big_sepL_nil.
+    iEval (rewrite !big_sepL_cons big_sepL_nil) in "HslA".
+    iEval (rewrite !big_sepL_cons big_sepL_nil) in "HslB".
     iDestruct "HslA" as "(A0 & A1 & A2 & A3 & A4 & _)".
     iDestruct "HslB" as "(B0 & B1 & B2 & B3 & B4 & B5 & B6 & B7 & _)".
     (* ---- 0x604  c.addi16sp sp,sp,128 -- THE POP ---- *)
@@ -2367,7 +2357,7 @@ Section UkShParseExec.
                (s5_idx, mword_of_int 9 : mword 6)] valsA m mj sp0 eq_refl).
       + intros i r u Hi.
         destruct i as [| [| [| [| [| i ]]]]];
-          cbn in Hi; try discriminate;
+          cbn in Hi; try discriminate Hi;
           injection Hi as Hr Hu0; subst; reflexivity.
       + intros q Hq Hqsp Hmiss.
         rewrite (Hmj q (ushp_cs_ne q a0_idx Hq
@@ -2426,7 +2416,7 @@ Section UkShParseExec.
           reflexivity.
         * intros i r u Hi He.
           destruct i as [| [| [| [| [| [| [| [| i ]]]]]]]];
-            cbn in Hi; try discriminate;
+            cbn in Hi; try discriminate Hi;
             injection Hi as Hr Hu0; subst; unfold valsB;
             rewrite <- He; reflexivity.
     - iPureIntro.
@@ -2438,7 +2428,7 @@ Section UkShParseExec.
                  (regval_into_reg (mword_of_int p : mword 64))).
       + intros i r u Hi He.
         destruct i as [| [| [| [| [| i ]]]]];
-          cbn in Hi; try discriminate;
+          cbn in Hi; try discriminate Hi;
           injection Hi as Hr Hu0; subst; vm_compute in He; discriminate.
   Qed.
 

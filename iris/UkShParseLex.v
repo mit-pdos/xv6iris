@@ -566,7 +566,7 @@ Section UkShParseLex.
               unot_sp r /\ uint r <> 0).
     { intros i r u Hi.
       destruct i as [| [| [| [| [| [| [| i ]]]]]]]; cbn in Hi;
-        try discriminate; injection Hi as Hr Hu0; subst;
+        try discriminate Hi; injection Hi as Hr Hu0; subst;
         (split;
          [ rewrite Hspu; vm_compute uoff_sdsp; lia
          | split;
@@ -620,11 +620,7 @@ Section UkShParseLex.
                       (s3_idx, mword_of_int 3 : mword 6);
                       (s4_idx, mword_of_int 2 : mword 6);
                       (s5_idx, mword_of_int 1 : mword 6)] vals me csp_rs1
-                     ltac:(intros i r u Hi;
-                           destruct i as [| [| [| [| [| [| [| i ]]]]]]];
-                           cbn in Hi; try discriminate;
-                           injection Hi as Hr Hu0; subst;
-                           vm_compute; discriminate)).
+                     ltac:(ushp_ne_vm)).
       exact Hsp. }
     assert (Hrar : mr !!! Regidx ra_idx = vals 0%nat).
     { rewrite /mr. cbn [ushp_spillback fst].
@@ -798,7 +794,7 @@ Section UkShParseLex.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| [| [| i ]]]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ rewrite Hspu; vm_compute uoff_sdsp; lia
@@ -1731,7 +1727,7 @@ Section UkShParseLex.
               (uint sp0 - 8 * (Z.of_nat i + 1)) mod 8 = 0 /\
               unot_sp r /\ uint r <> 0).
     { intros i r u Hi.
-      destruct i as [| [| [| i ]]]; cbn in Hi; try discriminate;
+      destruct i as [| [| [| i ]]]; cbn in Hi; try discriminate Hi;
         injection Hi as Hr Hu0; subst.
       - assert (Hu : uoff_sdsp (mword_of_int 3 : mword 6) = 24)
           by (vm_compute; reflexivity).
@@ -1770,7 +1766,7 @@ Section UkShParseLex.
               ltac:(intros i r u Hi;
                     destruct (Hoff i r u Hi) as [ H1 [ H2 [ H3 H4 ]]];
                     split; [ exact H1 | split; [ exact H2 | ] ];
-                    destruct i as [| [| [| i ]]]; cbn in Hi; try discriminate;
+                    destruct i as [| [| [| i ]]]; cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst; cbn;
                     [ exact (eq_sym (Hm1 ra_idx ltac:(vm_compute; discriminate)))
                     | exact (eq_sym (Hm1 s0_idx ltac:(vm_compute; discriminate)))

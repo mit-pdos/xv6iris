@@ -194,7 +194,7 @@ Section UkShParseCmd.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| [| i ]]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ vm_compute uoff_sdsp; lia
@@ -561,18 +561,14 @@ Section UkShParseCmd.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| [| i ]]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ vm_compute uoff_sdsp; lia
                      | split; [ unfold unot_sp; vm_compute; discriminate
                               | vm_compute; discriminate ] ]))
               ltac:(reflexivity)
-              ltac:(intros i r u Hi;
-                    destruct i as [| [| [| [| [| i ]]]]];
-                    cbn in Hi; try discriminate;
-                    injection Hi as Hr Hu0; subst;
-                    vm_compute; discriminate)
+              ltac:(ushp_ne_vm)
               with "Hcode [] [] [] Hsl Hloc Hrun").
     { rewrite !big_sepL_cons big_sepL_nil.
       iSplit; [ iApply (uis_shp_6b2 with "Hcode") | ].
@@ -595,7 +591,7 @@ Section UkShParseCmd.
                (s4_idx, mword_of_int 0 : mword 6)] vals m me sp0 eq_refl).
       + intros i r u Hi.
         destruct i as [| [| [| [| [| [| i ]]]]]];
-          cbn in Hi; try discriminate;
+          cbn in Hi; try discriminate Hi;
           injection Hi as Hr Hu0; subst; reflexivity.
       + intros q Hq Hqsp Hmiss.
         exact (Hkeep q Hq Hqsp
@@ -613,7 +609,7 @@ Section UkShParseCmd.
                  (regval_into_reg (mword_of_int p : mword 64))).
       + intros i r u Hi He.
         destruct i as [| [| [| [| [| [| i ]]]]]];
-          cbn in Hi; try discriminate;
+          cbn in Hi; try discriminate Hi;
           injection Hi as Hr Hu0; subst; vm_compute in He; discriminate.
   Qed.
 
@@ -691,7 +687,7 @@ Section UkShParseCmd.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| [| i ]]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ vm_compute uoff_sdsp; lia
@@ -1231,18 +1227,14 @@ Section UkShParseCmd.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| [| i ]]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ vm_compute uoff_sdsp; lia
                      | split; [ unfold unot_sp; vm_compute; discriminate
                               | vm_compute; discriminate ] ]))
               ltac:(reflexivity)
-              ltac:(intros i r u Hi;
-                    destruct i as [| [| [| [| [| i ]]]]];
-                    cbn in Hi; try discriminate;
-                    injection Hi as Hr Hu0; subst;
-                    vm_compute; discriminate)
+              ltac:(ushp_ne_vm)
               with "Hcode [] [] [] Hsl Hloc Hrun").
     { rewrite !big_sepL_cons big_sepL_nil.
       iSplit; [ iApply (uis_shp_73a with "Hcode") | ].
@@ -1265,7 +1257,7 @@ Section UkShParseCmd.
                (s4_idx, mword_of_int 0 : mword 6)] vals m me sp0 eq_refl).
       + intros i r u Hi.
         destruct i as [| [| [| [| [| [| i ]]]]]];
-          cbn in Hi; try discriminate;
+          cbn in Hi; try discriminate Hi;
           injection Hi as Hr Hu0; subst; reflexivity.
       + intros q Hq Hqsp Hmiss.
         exact (Hkeep q Hq Hqsp
@@ -1283,7 +1275,7 @@ Section UkShParseCmd.
                  (regval_into_reg (mword_of_int p : mword 64))).
       + intros i r u Hi He.
         destruct i as [| [| [| [| [| [| i ]]]]]];
-          cbn in Hi; try discriminate;
+          cbn in Hi; try discriminate Hi;
           injection Hi as Hr Hu0; subst; vm_compute in He; discriminate.
   Qed.
 
@@ -1774,18 +1766,14 @@ Section UkShParseCmd.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| i ]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ vm_compute uoff_sdsp; lia
                      | split; [ unfold unot_sp; vm_compute; discriminate
                               | vm_compute; discriminate ] ]))
               ltac:(reflexivity)
-              ltac:(intros i r u Hi;
-                    destruct i as [| [| i ]];
-                    cbn in Hi; try discriminate;
-                    injection Hi as Hr Hu0; subst;
-                    vm_compute; discriminate)
+              ltac:(ushp_ne_vm)
               with "Hcode [] [] [] Hsl Hloc Hrun").
     { rewrite !big_sepL_cons big_sepL_nil.
       iSplit; [ iApply (uis_shp_840 with "Hcode") | ].
@@ -1874,7 +1862,7 @@ Section UkShParseCmd.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| i ]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ rewrite Hspu; vm_compute uoff_sdsp; lia
@@ -2264,7 +2252,7 @@ Section UkShParseCmd.
                  sp0 eq_refl).
         * intros i r u Hi.
           destruct i as [| [| [| i ]]];
-            cbn in Hi; try discriminate;
+            cbn in Hi; try discriminate Hi;
             injection Hi as Hr Hu0; subst; reflexivity.
         * intros q Hq Hqsp Hmiss.
           rewrite (upd_ne m13 (Regidx a0_idx) (Regidx q) _
@@ -2287,7 +2275,7 @@ Section UkShParseCmd.
                    (regval_into_reg (mword_of_int p : mword 64))).
         * intros i r u Hi He.
           destruct i as [| [| [| i ]]];
-            cbn in Hi; try discriminate;
+            cbn in Hi; try discriminate Hi;
             injection Hi as Hr Hu0; subst; vm_compute in He; discriminate.
     - (* ======= AT LEAST ONE ARGUMENT: into the loop =================== *)
       assert (Eslot0 : ushp_slot s0 (p + 8) (tk :: rest) fst 0%nat
@@ -2417,7 +2405,7 @@ Section UkShParseCmd.
                  sp0 eq_refl).
         * intros i r u Hi.
           destruct i as [| [| [| i ]]];
-            cbn in Hi; try discriminate;
+            cbn in Hi; try discriminate Hi;
             injection Hi as Hr Hu0; subst; reflexivity.
         * intros q Hq Hqsp Hmiss.
           rewrite (upd_ne mf (Regidx a0_idx) (Regidx q) _
@@ -2443,7 +2431,7 @@ Section UkShParseCmd.
                    (regval_into_reg (mword_of_int p : mword 64))).
         * intros i r u Hi He.
           destruct i as [| [| [| i ]]];
-            cbn in Hi; try discriminate;
+            cbn in Hi; try discriminate Hi;
             injection Hi as Hr Hu0; subst; vm_compute in He; discriminate.
   Qed.
 
@@ -2611,7 +2599,7 @@ Section UkShParseCmd.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| i ]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ rewrite Hspu; vm_compute uoff_sdsp; lia
@@ -3284,18 +3272,14 @@ Section UkShParseCmd.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| i ]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ vm_compute uoff_sdsp; lia
                      | split; [ unfold unot_sp; vm_compute; discriminate
                               | vm_compute; discriminate ] ]))
               ltac:(reflexivity)
-              ltac:(intros i r u Hi;
-                    destruct i as [| [| [| [| i ]]]];
-                    cbn in Hi; try discriminate;
-                    injection Hi as Hr Hu0; subst;
-                    vm_compute; discriminate)
+              ltac:(ushp_ne_vm)
               with "Hcode [] [] [] Hsl [L0 Lcur L2 Hbot] Hrun").
     { rewrite !big_sepL_cons big_sepL_nil.
       iSplit; [ iApply (uis_shp_8ba with "Hcode") | ].
@@ -3327,7 +3311,7 @@ Section UkShParseCmd.
                (s3_idx, mword_of_int 3 : mword 6)] vals m me sp0 eq_refl).
       + intros i r u Hi.
         destruct i as [| [| [| [| [| i ]]]]];
-          cbn in Hi; try discriminate;
+          cbn in Hi; try discriminate Hi;
           injection Hi as Hr Hu0; subst; reflexivity.
       + intros q Hq Hqsp Hmiss.
         exact (Hkeep q Hq Hqsp
@@ -3344,7 +3328,7 @@ Section UkShParseCmd.
                  (regval_into_reg (mword_of_int p : mword 64))).
       + intros i r u Hi He.
         destruct i as [| [| [| [| [| i ]]]]];
-          cbn in Hi; try discriminate;
+          cbn in Hi; try discriminate Hi;
           injection Hi as Hr Hu0; subst; vm_compute in He; discriminate.
   Qed.
 

@@ -2348,11 +2348,17 @@ Section UkShMalloc.
               Regidx q <> Regidx ra_idx -> Regidx q <> Regidx a0_idx ->
               Regidx q <> Regidx a4_idx ->
               nP !!! Regidx q = nL !!! Regidx q).
+    (* PEELED BY [eq_trans], NOT BY [rewrite].  The register file is a
+       FUNCTION and the chain is sixteen [set]s deep, so ssr's keyed
+       matching tries the equation's LHS against the goal's RIGHT-hand
+       [nL !!! _] too and delta-walks both towers to fail -- 10 s per
+       [rewrite], 40 s of this file.  A term chain unifies each link
+       against its own definition once and never searches. *)
     { intros q Hra Ha Ha4.
-      rewrite /nP (upd_ne nO (Regidx ra_idx) (Regidx q) _ Hra).
-      rewrite /nO (upd_ne nN (Regidx a0_idx) (Regidx q) _ Ha).
-      rewrite /nN (upd_ne nM (Regidx a0_idx) (Regidx q) _ Ha).
-      rewrite /nM (upd_ne nL (Regidx a4_idx) (Regidx q) _ Ha4). reflexivity. }
+      exact (eq_trans (upd_ne nO (Regidx ra_idx) (Regidx q) _ Hra)
+            (eq_trans (upd_ne nN (Regidx a0_idx) (Regidx q) _ Ha)
+            (eq_trans (upd_ne nM (Regidx a0_idx) (Regidx q) _ Ha)
+                      (upd_ne nL (Regidx a4_idx) (Regidx q) _ Ha4)))). }
     assert (HDA : forall q : mword 5,
               Regidx q <> Regidx a4_idx -> Regidx q <> Regidx a5_idx ->
               nD !!! Regidx q = nA !!! Regidx q).

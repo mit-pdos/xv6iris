@@ -198,7 +198,7 @@ Section UkShParseRedir.
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| [| [| [| [| [| [| i
                       ]]]]]]]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ vm_compute uoff_sdsp; lia
@@ -624,19 +624,14 @@ Section UkShParseRedir.
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| [| [| [| [| [| [| i
                       ]]]]]]]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ vm_compute uoff_sdsp; lia
                      | split; [ unfold unot_sp; vm_compute; discriminate
                               | vm_compute; discriminate ] ]))
               ltac:(reflexivity)
-              ltac:(intros i r u Hi;
-                    destruct i as [| [| [| [| [| [| [| [| [| [| i
-                      ]]]]]]]]]];
-                    cbn in Hi; try discriminate;
-                    injection Hi as Hr Hu0; subst;
-                    vm_compute; discriminate)
+              ltac:(ushp_ne_vm)
               with "Hcode [] [] [] Hsl Hloc Hrun").
     { rewrite !big_sepL_cons big_sepL_nil.
       iSplit; [ iApply (uis_shp_576 with "Hcode") | ].
@@ -658,7 +653,7 @@ Section UkShParseRedir.
       apply (ushp_frame_cs _ vals m me sp0 eq_refl).
       + intros i r u Hi.
         destruct i as [| [| [| [| [| [| [| [| [| [| [| i ]]]]]]]]]]];
-          cbn in Hi; try discriminate;
+          cbn in Hi; try discriminate Hi;
           injection Hi as Hr Hu0; subst; reflexivity.
       + intros q Hq Hqsp Hmiss.
         rewrite (Hme q (ushp_cs_ne q a0_idx Hq
@@ -703,7 +698,7 @@ Section UkShParseRedir.
                  (regval_into_reg (mword_of_int cmd : mword 64))).
       + intros i r u Hi He.
         destruct i as [| [| [| [| [| [| [| [| [| [| [| i ]]]]]]]]]]];
-          cbn in Hi; try discriminate;
+          cbn in Hi; try discriminate Hi;
           injection Hi as Hr Hu0; subst; vm_compute in He; discriminate.
   Qed.
 

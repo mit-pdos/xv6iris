@@ -1558,7 +1558,7 @@ Section UkShParseTok.
               unot_sp r /\ uint r <> 0).
     { intros i r u Hi.
       destruct i as [| [| [| [| [| [| [| [| i ]]]]]]]]; cbn in Hi;
-        try discriminate; injection Hi as Hr Hu0; subst;
+        try discriminate Hi; injection Hi as Hr Hu0; subst;
         (split;
          [ rewrite Hspu; vm_compute uoff_sdsp; lia
          | split;
@@ -1617,11 +1617,7 @@ Section UkShParseTok.
                       (s4_idx, mword_of_int 2 : mword 6);
                       (s5_idx, mword_of_int 1 : mword 6);
                       (s6_idx, mword_of_int 0 : mword 6)] vals me csp_rs1
-                     ltac:(intros i r u Hi;
-                           destruct i as [| [| [| [| [| [| [| [| i ]]]]]]]];
-                           cbn in Hi; try discriminate;
-                           injection Hi as Hr Hu0; subst;
-                           vm_compute; discriminate)).
+                     ltac:(ushp_ne_vm)).
       exact Hsp. }
     assert (Hrar : mr !!! Regidx ra_idx = vals 0%nat).
     { rewrite /mr. cbn [ushp_spillback fst].
@@ -2557,7 +2553,7 @@ Section UkShParseTok.
                     cbn in Hi |- *; try reflexivity; lia)
               ltac:(intros i r u Hi;
                     destruct i as [| [| [| [| [| [| [| [| i ]]]]]]]];
-                    cbn in Hi; try discriminate;
+                    cbn in Hi; try discriminate Hi;
                     injection Hi as Hr Hu0; subst;
                     (split;
                      [ rewrite Hspu; vm_compute uoff_sdsp; lia
