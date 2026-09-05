@@ -83,7 +83,14 @@ End OffGv.
 (* ==================================================================== *)
 (*  THE USER HALF: the existential invariant, and the permit it yields   *)
 (* ==================================================================== *)
-Definition foffN : namespace := nroot .@ "xv6foff".
+(* UNDER [FsAbsInv.fsabsN] (= [nroot .@ "fsabs"]), spelled out because this
+   file sits below the fs layer: a client whose only knowledge of its half
+   is this invariant discharges the read/write AU commits -- which fire at
+   [fsabsE = ↑fsabsN] -- by opening it INSIDE the commit
+   ([FsAbsInvFire.fsabs_aread], [fsabs_awrite_chain]).  Nothing else opens
+   it beside another [fsabs]-namespaced invariant, so the nesting is never
+   simultaneous. *)
+Definition foffN : namespace := nroot .@ "fsabs" .@ "foff".
 
 Section OffUser.
   Context `{!riscvGS Σ, !offboxG Σ}.
@@ -109,12 +116,22 @@ Section OffUser.
     iApply (inv_alloc foffN E with "[H]"). iNext. iExists z. iExact "H".
   Qed.
 
-  Lemma off_user_inv_permit γo : off_user_inv γo -∗ off_permit γo.
+  (* THE MOVE, at any mask that contains the namespace: the kernel's half
+     goes from any value to any value against the existential *)
+  Lemma off_user_inv_move (E : coPset) γo (z z' : Z) :
+    ↑foffN ⊆ E ->
+    off_user_inv γo -∗ off_gv γo (1/2) z ={E}=∗ off_gv γo (1/2) z'.
   Proof.
-    rewrite /off_user_inv /off_permit. iIntros "#Hinv !>" (z z') "Hk".
+    intros HE. rewrite /off_user_inv. iIntros "#Hinv Hk".
     iInv "Hinv" as (zu) ">Hu" "Hclose".
     iMod (off_gv_update_halves z' with "Hk Hu") as "[Hk Hu]".
     iMod ("Hclose" with "[Hu]") as "_"; [iNext; iExists z'; iExact "Hu" |].
     iModIntro. iExact "Hk".
+  Qed.
+
+  Lemma off_user_inv_permit γo : off_user_inv γo -∗ off_permit γo.
+  Proof.
+    rewrite /off_permit. iIntros "#Hinv !>" (z z') "Hk".
+    iApply (off_user_inv_move ⊤ γo z z' with "Hinv Hk"). solve_ndisj.
   Qed.
 End OffUser.

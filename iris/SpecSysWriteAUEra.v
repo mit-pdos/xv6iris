@@ -38,7 +38,9 @@
      [wri_receipts_chained] mention no commit, so nothing about them moves.
    - THE ARMS, THE TOTALS AND THE COUNT BOUND are [write_post_ok] /
      [write_post_fail] / [write_arms] with [awrite_commits] replaced by
-     [awrite_commits_at] in the refund, and nothing else.
+     the commit CHAIN [awrite_chain] in the refund -- the offset fold's
+     shape (FsAbsWriteFire's header) -- and the fail arm's refund resuming
+     [x <= 1] nodes past the receipts, for the short chunk's offset move.
 
    ==== ...AND ONE DELETION, PAID FOR BY TWO OWNER RULINGS ==============
 
@@ -91,7 +93,8 @@ Require Import Xv6G.
 Require Import FsCfg.
 Require Import SpecCopyin.     (* [ubytes_at]: the content seam (RULING A)  *)
 Require Import SpecSysWriteAU. (* the frozen statement this parallels       *)
-Require Import FsAbsWriteFire. (* [awrite_commit_at] and its bundle         *)
+Require Import FsAbsWriteFire. (* [awrite_chain]: the offset-folded commits *)
+Require Import OffGv.          (* [off_gv]: the descriptor's offset shadow  *)
 Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.          (* LAST (FsAbs's own rule)                   *)
 Import Defs.
@@ -109,8 +112,10 @@ Section SysWriteAUEra.
   (* ------------------------------------------------------------------ *)
 
   (* ret n (0 <= n): every byte landed.  The fired chunks concatenate to the
-     whole count and the unfired tail of the bundle refunds. *)
-  Definition write_post_ok_at Γ (i : Z) (n : Z)
+     whole count and the unfired tail of the chain refunds.  Every chunk was
+     FULL (a short one ends the loop at -1), so the chain resumes exactly at
+     the receipts' length. *)
+  Definition write_post_ok_at Γ (i : Z) (γo : gname) (n : Z)
       (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (∃ bss : list (list (bv 8)),
@@ -132,7 +137,7 @@ Section SysWriteAUEra.
           be pinned end-to-end where the destination side cannot. *)
        ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
-       awrite_commits_at Γ fsabsE i Φ (length bss)
+       awrite_chain Γ fsabsE i γo Φ (length bss)
          (wchunks n - length bss)%nat)%I.
 
   (* ret -1: filewrite's honest partial arm.  A PREFIX of chunks fired --
@@ -140,19 +145,24 @@ Section SysWriteAUEra.
      the count.  The short chunk that ENDED the loop is deliberately not in
      [bss]: writei's disturbed tail is not the splice, so its instant is not
      one this contract's receipts can speak about (FsAbsWriteFire's second
-     finding).  That is exactly the slack "< n" leaves. *)
-  Definition write_post_fail_at Γ (i : Z) (n : Z)
+     finding).  That is exactly the slack "< n" leaves.  BUT ITS OFFSET
+     MOVE IS REAL: if it wrote anything, [f->off] advanced by it, and the
+     kernel took the chain's PARTIAL arm to move the half -- so the chain
+     resumes one node past the receipts ([x = 1]); on writei's -1 and the
+     never-entered loop nothing moved ([x = 0]). *)
+  Definition write_post_fail_at Γ (i : Z) (γo : gname) (n : Z)
       (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) : iProp Σ :=
-    (∃ bss : list (list (bv 8)),
+    (∃ (bss : list (list (bv 8))) (x : nat),
        ⌜Z.of_nat (length (concat bss)) < n \/ (n < 0 /\ bss = [])⌝ ∗
-       ⌜(length bss <= wchunks n)%nat⌝ ∗
+       ⌜(length bss + x <= wchunks n)%nat⌝ ∗
+       ⌜(x <= 1)%nat⌝ ∗
        (* the FIRED PREFIX's bytes are pinned too (RULING A): a partial write
           delivers a PREFIX of the caller's buffer, and now says so *)
        ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
-       awrite_commits_at Γ fsabsE i Φ (length bss)
-         (wchunks n - length bss)%nat)%I.
+       awrite_chain Γ fsabsE i γo Φ (length bss + x)
+         (wchunks n - length bss - x)%nat)%I.
 
   (* THERE IS NO THIRD ARM.  The frozen sketch of this file carried one --
      "the row does not read as a FILE" -- because the fd payload's whole
@@ -174,17 +184,17 @@ Section SysWriteAUEra.
      record, the negation of the reason its own [-1] arm reports).  So
      there is no chunk the prover has to skip, the two arms are keyed on
      the return value alone, and this arm answers exactly [-1]. *)
-  Definition write_arms_at Γ (i : Z) (n : Z)
+  Definition write_arms_at Γ (i : Z) (γo : gname) (n : Z)
       (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
       (r : mword 64) : iProp Σ :=
     ((⌜r = (mword_of_int n : mword 64) /\ 0 <= n⌝
-      ∗ write_post_ok_at Γ i n M ua Φ)
+      ∗ write_post_ok_at Γ i γo n M ua Φ)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ write_post_fail_at Γ i n M ua Φ))%I.
+        ∗ write_post_fail_at Γ i γo n M ua Φ))%I.
 
   (* the stable corollary's arms, at the same substitution *)
-  Definition write_stable_arms_at Γ (i : Z) (n : Z) (q : Qp)
+  Definition write_stable_arms_at Γ (i : Z) (γo : gname) (n : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
       (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
@@ -200,10 +210,10 @@ Section SysWriteAUEra.
            ⌜ubytes_at M ua (concat bss)⌝ ∗
            (wri_receipts_chained i bs0 nl off0 Φ bss
             ∨ wri_receipts i Φ bss) ∗
-           awrite_commits_at Γ fsabsE i Φ (length bss)
+           awrite_chain Γ fsabsE i γo Φ (length bss)
              (wchunks n - length bss)%nat)
       ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-         ∗ write_post_fail_at Γ i n M ua Φ)))%I.
+         ∗ write_post_fail_at Γ i γo n M ua Φ)))%I.
 
 End SysWriteAUEra.
 
@@ -229,10 +239,10 @@ Definition wp_sys_write_au_era_body
   let n := sys_rw_count v2 in
   wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv rb i γo
-    (awrite_commits_at Γfs fsabsE i Φw 0%nat (wchunks n))
+    (awrite_chain Γfs fsabsE i γo Φw 0%nat (wchunks n))
     (* RULING A: the receipts are stated at the caller's OWN image and at
        the buffer address IT passed -- syscall argument 1. *)
-    (write_arms_at Γfs i n (us_M U) v1 Φw).
+    (write_arms_at Γfs i γo n (us_M U) v1 Φw).
 
 Definition wp_sys_write_au_era_stable_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -251,8 +261,8 @@ Definition wp_sys_write_au_era_stable_body
   wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv rb i γo
     (nview Γfs q i (MkAnode (AFile bs0) nl)
-     ∗ awrite_commits_at Γfs fsabsE i Φw 0%nat (wchunks n))%I
-    (write_stable_arms_at Γfs i n q bs0 nl (us_M U) v1 Φw).
+     ∗ awrite_chain Γfs fsabsE i γo Φw 0%nat (wchunks n))%I
+    (write_stable_arms_at Γfs i γo n q bs0 nl (us_M U) v1 Φw).
 
 (* ===================================================================== *)
 (*  3.  THE SEALS                                                         *)
@@ -274,9 +284,8 @@ Module Type SYSWRITE_AU_ERA.
         fd fv rb i γo Φw.
 End SYSWRITE_AU_ERA.
 
-(* owed as a DERIVATION from [wp_sys_write_au_era] + the agreement seed
-   ([FsAbsWriteFire.awrite_commit_at_pinned]), never as a second walk; the
-   escape arm of [write_stable_arms_at] is what makes it land *)
+(* owed as a DERIVATION from [wp_sys_write_au_era], never as a second walk;
+   the escape arm of [write_stable_arms_at] is what makes it land *)
 Module Type SYSWRITE_AU_ERA_STABLE.
   Parameter wp_sys_write_au_era_stable :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,

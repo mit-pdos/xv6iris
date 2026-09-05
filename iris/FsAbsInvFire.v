@@ -76,7 +76,8 @@ Require Import SpecSysChdirAU.     (* [chdir_au_pre]: the walk premise + open's 
 Require Import SpecSysMknodAUEra.  (* [mknod_au_pre_era] *)
 Require Import SpecSysUnlinkAU.    (* [uent/utgt/dmiss_commit_at], [unlink_au_pre] *)
 Require Import FsAbsReadFire.      (* [aread_commit_at] *)
-Require Import FsAbsWriteFire.     (* [awrite_commit_at], [awrite_commits_at] *)
+Require Import FsAbsWriteFire.     (* [awrite_full_at], [awrite_chain] *)
+Require Import OffGv.              (* [off_user_inv], the process's half *)
 Require Import FsAbsInv.
 Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
@@ -210,32 +211,46 @@ Section FsAbsInvFire.
     iModIntro. by iFrame "Ha".
   Qed.
 
-  Lemma fsabs_aread Γ Γc (i : Z) :
-    fsabs_inv Γc -∗ aread_commit_at Γ fsabsE i (fun _ _ _ => True%I).
+  (* THE READ AND WRITE COMMITS TAKE THE OFFSET TOO (OffGv.v): a process
+     whose half of the descriptor's offset shadow lives in the existential
+     [off_user_inv] -- the generic user-mode process, whose descriptor rows
+     carry exactly that ([FdSlots.foff_row]) -- opens it INSIDE the commit,
+     at the commit's own mask ([foffN] sits under [fsabsN] for this), and
+     lets the kernel's half go anywhere. *)
+  Lemma foffN_fsabsE : ↑foffN ⊆ fsabsE.
+  Proof. rewrite /fsabsE /fsabsN /foffN. solve_ndisj. Qed.
+
+  Lemma fsabs_aread Γ Γc (i : Z) (γo : gname) :
+    fsabs_inv Γc -∗ off_user_inv γo -∗
+    aread_commit_at Γ fsabsE i γo (fun _ _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv". rewrite /aread_commit_at /fsabsE.
-    iIntros (I off a) "%Hpre Ha".
+    iIntros "#Hinv #Hoinv". rewrite /aread_commit_at.
+    iIntros (I off a d) "%Hpre Ha Hk".
     iMod (fsabs_set Γc I with "Hinv") as "_".
-    iModIntro. by iFrame "Ha".
+    iMod (off_user_inv_move fsabsE γo _ (Z.of_nat (off + d)) foffN_fsabsE
+            with "Hoinv Hk") as "Hk".
+    iModIntro. by iFrame "Ha Hk".
   Qed.
 
-  Lemma fsabs_awrite Γ Γc (i : Z) (k : nat) :
-    fsabs_inv Γc -∗ awrite_commit_at Γ fsabsE i k (fun _ _ _ _ => True%I).
+  Lemma fsabs_awrite_chain Γ Γc (i : Z) (γo : gname) (k cnt : nat) :
+    fsabs_inv Γc -∗ off_user_inv γo -∗
+    awrite_chain Γ fsabsE i γo (fun _ _ _ _ => True%I) k cnt.
   Proof.
-    iIntros "#Hinv". rewrite /awrite_commit_at /fsabsE.
-    iIntros (I off bs bs0 nl) "%Hpre Ha".
-    iMod (fsabs_set Γc I with "Hinv") as "_".
-    iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'".
-    iMod (fsabs_set Γc I' with "Hinv") as "_".
-    iModIntro. by iFrame "Ha'".
-  Qed.
-
-  Lemma fsabs_awrites Γ Γc (i : Z) (lo cnt : nat) :
-    fsabs_inv Γc -∗
-    awrite_commits_at Γ fsabsE i (fun _ _ _ _ => True%I) lo cnt.
-  Proof.
-    iIntros "#Hinv". rewrite /awrite_commits_at.
-    iApply big_sepL_intro. iIntros "!>" (j k _). iApply fsabs_awrite. done.
+    iIntros "#Hinv #Hoinv".
+    iInduction cnt as [| cnt] "IH" forall (k).
+    { rewrite awrite_chain_0. done. }
+    rewrite awrite_chain_S. iSplit.
+    - rewrite /awrite_full_at. iIntros (I off bs bs0 nl) "%Hpre Ha Hk".
+      iMod (fsabs_set Γc I with "Hinv") as "_".
+      iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'".
+      iMod (fsabs_set Γc I' with "Hinv") as "_".
+      iMod (off_user_inv_move fsabsE γo _ (Z.of_nat (off + length bs)) foffN_fsabsE
+              with "Hoinv Hk") as "Hk".
+      iModIntro. iFrame "Ha' Hk". iSplitR; [done |]. iApply "IH".
+    - rewrite /awrite_part_at. iIntros (off d) "Hk".
+      iMod (off_user_inv_move fsabsE γo _ (Z.of_nat (off + d)) foffN_fsabsE
+              with "Hoinv Hk") as "Hk".
+      iModIntro. iFrame "Hk". iApply "IH".
   Qed.
 
   (* ------------------------------------------------------------------ *)

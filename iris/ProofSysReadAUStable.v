@@ -118,7 +118,7 @@ Section ProofStable.
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
-      (Φr : aview -> nat -> anode -> iProp Σ)
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ)
     : wp_sys_read_au_at_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
         lks fd fv wb i γo q bs0 nl Φr.
   Proof.
@@ -132,10 +132,10 @@ Section ProofStable.
     intros Γfs nn Hnn pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2
            Hrp Hdq Heb Hargfd.
     iIntros "Hcg Hcpu Htext Hdata Hpc Hpenv Hpriv Hkenv Hprocs Henv Hci
-             Hfdst #Hperm [Hn Hcm] Hcont".
+             Hfdst [Hn Hcm] Hcont".
     iApply (HW Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hrp Hdq Heb Hargfd
               with "Hcg Hcpu Htext Hdata Hpc Hpenv Hpriv Hkenv Hprocs Henv
-                    Hci Hfdst Hperm [Hn Hcm]").
+                    Hci Hfdst [Hn Hcm]").
     (* MOVE 2: the client's share is spent HERE, once, and rides inside every
        receipt from now on. *)
     { iApply (arf_pin_compose with "Hn Hcm"). }
@@ -157,7 +157,7 @@ Section ProofStable.
     { exact Hdex. }
     { exact Hra. }
     (* MOVE 3: THE COLLAPSE.  [Hnn] is what kills the guard arm's refund. *)
-    iApply (arf_stable_of_arms (fs_gamma_L fsc_fs) i (sys_rw_count v2) q
+    iApply (arf_stable_of_arms (fs_gamma_L fsc_fs) i γo (sys_rw_count v2) q
               bs0 nl Φr r Hnn with "Harms").
   Qed.
 

@@ -308,7 +308,7 @@ Section ProofSysReadAU.
       (fn : fread_names) (pidv : mword 32) (U : ustate) (v v1 v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
-      (Φr : aview -> nat -> anode -> iProp Σ)
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ)
     : wp_sys_read_au_at_body γf γs j γlp fn pidv U v v1 v2 m av eb b lks
         fd fv wb i γo Φr.
   Proof.
@@ -335,7 +335,7 @@ Section ProofSysReadAU.
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
     iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv #Hkenv #Hprocs Henv #Hci
-             Hfdst #Hperm Hau Hcont".
+             Hfdst Hau Hcont".
     (* THE DEVICE COLUMN, PROJECTED.  What the contract holds is the console
        invariant -- one persistent proposition out of [syscall_env]; what
        fileread asks for is the read column, and this is the projection.  It
@@ -906,8 +906,7 @@ Section ProofSysReadAU.
         as (kk qq stf) "((%Hfvk & %Hkk & %Hty) & Href & Hauth & Hcore & Howe)".
       assert (HS4a0' : S4 !!! Regidx Ra0 = fnode kk) by (rewrite HS4a0; exact Hfvk).
       iDestruct (fd_st_agree with "Hauth Hfdst") as %Hstf.
-      iDestruct (read_env_frame γf fn stf with "Henv Hdev [Hperm]") as "[Hfenv Hfback]".
-      { rewrite Hstf /foff_permit_row /=. iExact "Hperm". }
+      iDestruct (read_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       (* ---- THE FD BRIDGE (difference 2).  The lend hands the reference out

@@ -958,14 +958,14 @@ Section ProofSysWrite.
       iDestruct ("Hfrback" with "Hfr Hrow") as "Hufrag".
       iEval (rewrite (list_insert_id sts fd stf Hstq)) in "Hufrag".
       iDestruct (foff_row_permit with "Hrow") as "#Hprow".
-      iDestruct (write_env_frame γf fn stf with "Henv Hdev Hprow") as "[Hfenv Hfback]".
+      iDestruct (write_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Filewrite.wp_filewrite_sconf γf γs j γlp kk qq stf fn pidv U
                 S4 (av - 6)%nat eb (sys_rw_count v2) b lks
                 ltac:(lia) Hkk Hj Hgs Hlens
                 Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb
-                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
+                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hprow").
       all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".

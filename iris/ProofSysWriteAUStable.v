@@ -99,11 +99,11 @@ Section ProofStable.
     intros Gfs nn pcE pj ret_tgt Hav Hj Hgs Hlens Hfj Hfprocs
            Harg0 Harg1 Harg2 Hwp Hdq Heb Hargfd.
     iIntros "Hcg Hcpu Htext Hdata Hpc Hpenv Hpriv Hkenv Hprocs Henv
-             Hcaps Htbl Hfdst #Hperm [Hn Hbundle] Hcont".
+             Hcaps Htbl Hfdst [Hn Hbundle] Hcont".
     iApply (HW Hav Hj Hgs Hlens Hfj Hfprocs Harg0 Harg1 Harg2 Hwp Hdq Heb
               Hargfd
               with "Hcg Hcpu Htext Hdata Hpc Hpenv Hpriv Hkenv Hprocs Henv
-                    Hcaps Htbl Hfdst Hperm Hbundle").
+                    Hcaps Htbl Hfdst Hbundle").
     iIntros (CID' Hchain mf r P')
       "%Hcs %Hupt %Hra Hcg Hcpu Hpc Hpriv Hkenv Hout Hfdst Harms".
     iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hchain |].

@@ -403,10 +403,10 @@ Section ProofFileread.
   Local Lemma fr_env_fs (γf' : gname) (fn' : fread_names)
       (st' : fdstate) (Cf' : fcontent) (inum : mword 32) (γo : gname) :
     fdstate_ok inum γo Cf' st' -> fc_type Cf' = FD_INODE ->
-    fileread_env γf' fn' st' -∗ fileread_fs_env γf' fn' ∗ off_permit γo.
+    fileread_env γf' fn' st' -∗ fileread_fs_env γf' fn'.
   Proof.
     intros Hok Ht. destruct (fdstate_ok_inode inum γo Cf' st' Hok Ht) as (? & ? & ->).
-    rewrite /fileread_env /=. by iIntros "$".
+    by iIntros "$".
   Qed.
 
   Local Lemma fr_env_out_fs (fn' : fread_names)
@@ -428,7 +428,7 @@ Section ProofFileread.
     intros pcE pj addr ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn Heb Hbelow.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hprow Hcont".
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     (* the reference, taken apart: the four content cells the dispatch reads
        are fractions of it, and it is rebuilt unchanged at every exit. *)
@@ -1963,7 +1963,9 @@ Section ProofFileread.
                 BORROW protocol; iunlock. *)
              assert (Htyi : fc_type Cf = FD_INODE)
                by (apply eq_vec_true_iff; exact Hp2).
-             iDestruct (fr_env_fs γf fn st Cf inumx _ Hok Htyi with "Henv") as "[Henv #Hperm]".
+             iDestruct (fr_env_fs γf fn st Cf inumx _ Hok Htyi with "Henv") as "Henv".
+             (* the process's leave to move the offset's shadow, off the row *)
+             iDestruct (foff_permit_row_inode _ _ _ _ Hok Htyi with "Hprow") as "#Hperm".
              rewrite /fileread_fs_env.
              iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
                                    #Hbio & #Hitbl & #Hclaimsfr & #Hescs &

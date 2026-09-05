@@ -106,8 +106,16 @@ Section FileOffCell.
   Definition off_resident (γo : gname) (k : nat) : iProp Σ :=
     (∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝ ∗ off_gv γo (1/2) (bv_unsigned v))%I.
 
-  (* THE CHECKIN, and the one place the shadow moves: a wf word, the
-     kernel's half at WHATEVER value it left with, and the process's permit
+  (* THE CHECKIN when the shadow has ALREADY moved -- the AU paths, whose
+     fs commit moved both halves at the fire: a wf word and the kernel's
+     half at exactly that word re-form the resident cell, no ghost step. *)
+  Lemma off_resident_of γo (k : nat) (v : mword 32) :
+    off_wf v ->
+    a_foff k ↦₄ v -∗ off_gv γo (1/2) (bv_unsigned v) -∗ off_resident γo k.
+  Proof. iIntros (Hwf) "Hc Hg". iExists v. iFrame "Hc Hg". iPureIntro. exact Hwf. Qed.
+
+  (* THE CHECKIN WITH THE PROCESS'S PERMIT -- the landed paths: a wf word,
+     the kernel's half at WHATEVER value it left with, and the permit
      re-form the resident cell.  At ⊤, before the box is opened. *)
   Lemma off_resident_intro γo (k : nat) (v : mword 32) (z : Z) :
     off_wf v ->

@@ -1053,10 +1053,10 @@ Section ProofFilewrite.
   Local Lemma fw_env_fs (gf' : gname) (fn' : fwrite_names)
       (st' : fdstate) (Cf' : fcontent) (inum : mword 32) (γo : gname) :
     fdstate_ok inum γo Cf' st' -> fc_type Cf' = FD_INODE ->
-    filewrite_env gf' fn' st' -∗ filewrite_fs_env gf' fn' ∗ off_permit γo.
+    filewrite_env gf' fn' st' -∗ filewrite_fs_env gf' fn'.
   Proof.
     intros Hok Ht. destruct (fdstate_ok_inode inum γo Cf' st' Hok Ht) as (? & ? & ->).
-    rewrite /filewrite_env /=. by iIntros "$".
+    by iIntros "$".
   Qed.
 
   Local Lemma fw_env_out_fs (fn' : fwrite_names)
@@ -2724,7 +2724,7 @@ Section ProofFilewrite.
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Heb
            Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hprow Hcont".
     (* PIN THE INDEX.  This contract carries [eb = true ->] and [cpu_own] at
        level 0, so [cpu_own_eb_agree] forces [b] to be the literal [true].
        That is what reconciles the [true]-spelled crossings (this contract's
@@ -4307,7 +4307,9 @@ Section ProofFilewrite.
                  assert (Hpos : (0 < n)%Z).
                  { destruct (Z.le_gt_cases n 0) as [Hle | Hgt]; [| exact Hgt].
                    exfalso. rewrite (proj2 (Z.geb_le 0 n) Hle) in Hz0. discriminate. }
-                 iPoseProof (fw_env_fs _ _ st Cf inumx _ Hok Htyi with "Henv") as "[Henv #Hperm]".
+                 iPoseProof (fw_env_fs _ _ st Cf inumx _ Hok Htyi with "Henv") as "Henv".
+                 (* the process's leave to move the offset's shadow, off the row *)
+                 iDestruct (foff_permit_row_inode _ _ _ _ Hok Htyi with "Hprow") as "#Hperm".
                  iEval (rewrite /filewrite_fs_env) in "Henv".
                  (* 25 conjuncts, not 31: the six per-inode fields (the two
                     slot facts, the two point geometry facts, the share and

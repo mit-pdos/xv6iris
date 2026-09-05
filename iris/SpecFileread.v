@@ -505,11 +505,7 @@ Section SpecFileread.
     (match st with
      | FdOpen _ _ FdPipe        => emp
      | FdOpen _ _ (FdDevice mj) => fileread_dev_env fn mj
-     (* AN INODE DESCRIPTOR ALSO OWES THE OFFSET PERMIT: fileread advances
-        [f->off], the kernel owns only half of the offset's shadow (OffGv.v),
-        and the process's half is moved by this obligation -- the state
-        names the shadow, so the environment can ask for it here. *)
-     | FdOpen _ _ (FdInode _ γo) => fileread_fs_env γf fn ∗ off_permit γo
+     | FdOpen _ _ (FdInode _ _)   => fileread_fs_env γf fn
      | FdClosed             => emp
      end)%I.
 
@@ -538,7 +534,7 @@ Section SpecFileread.
   Proof.
     rewrite /fileread_env /fileread_env_out.
     destruct st as [|? ? [? ?| |?]]; try by iIntros "$".
-    iIntros "[H _]". iApply (fileread_fs_env_out with "H").
+    iApply fileread_fs_env_out.
   Qed.
 
   (* A file that is neither a pipe, nor a device, nor an inode costs its
@@ -800,6 +796,11 @@ Definition wp_fileread_sconf_body
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
   fileread_env γf fn st -∗
+  (* ...AND THE OFFSET PERMIT ON AN INODE DESCRIPTOR: fileread advances
+     [f->off], the kernel owns only half of the offset's shadow (OffGv.v),
+     and the process's half is moved by this obligation.  The AU form takes
+     the offset transition INSIDE its commit instead ([SpecFilereadAU]). *)
+  foff_permit_row st -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the

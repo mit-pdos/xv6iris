@@ -90,13 +90,13 @@ Definition wp_sys_read_au_at_body
     (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
-    (Φr : aview -> nat -> anode -> iProp Σ) :=
+    (Φr : aview -> nat -> anode -> nat -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
   wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv wb i γo
-    (aread_commit_at Γfs fsabsE i Φr)
-    (read_arms Γfs i n Φr).
+    (aread_commit_at Γfs fsabsE i γo Φr)
+    (read_arms Γfs i γo n Φr).
 
 (* THE STABLE COROLLARY at the same swap. *)
 Definition wp_sys_read_au_at_stable_body
@@ -110,14 +110,14 @@ Definition wp_sys_read_au_at_stable_body
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
     (q : Qp) (bs0 : list (bv 8)) (nl : nat)
-    (Φr : aview -> nat -> anode -> iProp Σ) :=
+    (Φr : aview -> nat -> anode -> nat -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
   0 <= sys_rw_count v2 ->
   wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv wb i γo
     (nview Γfs q i (MkAnode (AFile bs0) nl)
-     ∗ aread_commit_at Γfs fsabsE i Φr)%I
+     ∗ aread_commit_at Γfs fsabsE i γo Φr)%I
     (read_stable_arms Γfs i n q bs0 nl Φr).
 
 Module Type SYSREAD_AU_AT.
@@ -131,7 +131,7 @@ Module Type SYSREAD_AU_AT.
       (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
-      (Φr : aview -> nat -> anode -> iProp Σ),
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ),
       wp_sys_read_au_at_body γf γs j γlp fn pidv U v v1 v2 m K eb b lks
         fd fv wb i γo Φr.
 
@@ -146,7 +146,7 @@ Module Type SYSREAD_AU_AT.
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
-      (Φr : aview -> nat -> anode -> iProp Σ),
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ),
       wp_sys_read_au_at_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
         lks fd fv wb i γo q bs0 nl Φr.
 End SYSREAD_AU_AT.

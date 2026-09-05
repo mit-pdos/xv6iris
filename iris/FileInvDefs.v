@@ -1953,4 +1953,15 @@ Section FoffRow.
     destruct Hok as (_ & _ & Ht & _ & ->).
     rewrite (bool_decide_eq_true_2 _ Ht). iIntros "$".
   Qed.
+
+  (* the landed fileread/filewrite take [foff_permit_row st] and learn their
+     descriptor's shape from [fdstate_ok]: on an inode file the row IS the
+     permit at the payload's shadow name *)
+  Lemma foff_permit_row_inode (inum : mword 32) (γo : gname) (C : fcontent) (st : fdstate) :
+    fdstate_ok inum γo C st -> fc_type C = FD_INODE ->
+    foff_permit_row st -∗ off_permit γo.
+  Proof.
+    intros Hok Ht. destruct (fdstate_ok_inode inum γo C st Hok Ht) as (r & w & ->).
+    rewrite /foff_permit_row /=. iIntros "$".
+  Qed.
 End FoffRow.

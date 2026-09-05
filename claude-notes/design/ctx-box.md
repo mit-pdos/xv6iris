@@ -135,7 +135,7 @@ unprovable checkout.
 |---|---|---|---|---|---|---|---|
 | bcache | `BioInv.v` | `(dev, blockno)` | — | the buffer's cells | `λ _, emp` | `emp` | `bioxN .@ k` |
 | icache | `IcacheEscrow.v` | `option (dev*inum)` | `IcRaw / IcUnloaded g / IcLoaded g dn bm` | valid/nlink/ident halves + the payload ghost + `ic_id ¼` | `0 ↦ ic_q_recycle` (two-armed: dead quarter, or live quarter + `ipool_shape_np`); `S _ ↦ ic_pin_tx` | `∃ d dev inum, tie ∗ ic_deposit ½ d ∗ ic_q_side d ∗ ic_id ¼ true` | `icBoxN .@ k` |
-| off | `OffBox.v` | the file slot | `unit` | `off_resident γo` (the `f->off` word, `off_wf`, and its offset shadow `off_gv γo 1 v` — the header is closed over the shadow's name) | `λ _, emp` | `emp` | `offBoxN .@ k` |
+| off | `OffBox.v` | the file slot | `unit` | `off_resident γo` (the `f->off` word, `off_wf`, and its offset shadow's KERNEL half `off_gv γo ½ v` — the header is closed over the shadow's name) | `λ _, emp` | `emp` | `offBoxN .@ k` |
 
 Per-slot namespaces because the commit's collection opens all fifty icache
 boxes inside one fupd.  The icache instance is the one with a VIEWER

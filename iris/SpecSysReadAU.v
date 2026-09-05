@@ -42,14 +42,19 @@
 
    ==== READ-ONLY: THE STATE NEVER MOVES ================================
 
-   There is no delta.  The commit is [SpecSysMknodAU.dlookup_commit]'s
-   single-phase read-only mold, shaped for [FsAbs.ftop_astate_ro]: the
-   prover opens [ftopN] inside the lock window, borrows [astate], fires
-   the caller's fupd ONCE (agreement against caller-held [nview] shares
-   happens here), and hands the SAME authority back -- no row obligation,
-   no ghost update, nothing for any other party to observe.  THE MASK IS
-   THE FLOOR [∅], mknod's ruling inherited verbatim; the definition takes
-   [E] for reuse and the machine contract instantiates [∅].
+   There is no delta to the FS STATE.  The commit is
+   [SpecSysMknodAU.dlookup_commit]'s single-phase read-only mold, shaped
+   for [FsAbs.ftop_astate_ro]: the prover opens [ftopN] inside the lock
+   window, borrows [astate], fires the caller's fupd ONCE (agreement
+   against caller-held [nview] shares happens here), and hands the SAME
+   authority back -- no row obligation.  WHAT DOES MOVE IS THE OFFSET: the
+   kernel lends its half of the descriptor's offset shadow ([OffGv.off_gv
+   γo ½], the client owns the other half) at the offset the read used and
+   takes it back advanced by the count [d] it delivered, in the same fupd
+   -- the offset-shadow fold (design/file-table.md, "The offset SHADOW").
+   THE MASK IS THE FLOOR [∅], mknod's ruling inherited verbatim; the
+   definition takes [E] for reuse and the machine contract instantiates
+   [∅].
 
    ==== THE RETURN TIE, AND THE SLICE VOCABULARY ========================
 
@@ -590,19 +595,32 @@ Section SysReadAU.
      arises.  Fired ONCE, inside fileread's lock window; agreement
      against caller-held [nview] shares happens here.  [E] for reuse;
      the machine contract instantiates the floor [∅]. *)
-  Definition aread_commit Γ (E : coPset) (i : Z)
-      (Φ : aview -> nat -> anode -> iProp Σ) : iProp Σ :=
-    (∀ (av : aview) (off : nat) (a : anode),
+  (* ...AND THE OFFSET MOVES IN THE SAME FUPD (the offset-shadow fold): the
+     kernel lends the fs state AND its half of the descriptor's offset
+     ghost ([OffGv.off_gv γo ½ off] -- the half IS the offset the read used,
+     since the box ties it to [f->off]); the client returns both, the half
+     advanced by the count [d] the read delivered, and keeps the receipt
+     [Φ av off a d].  ONE instant, inside [ip->lock], at the checkin of the
+     cell: what the client observes of the bytes and what it learns about
+     its offset cannot be torn apart.  [d] is the kernel's: [read_post_ok]
+     ties it to the answer, the fault arm fires it at 0. *)
+  Definition aread_commit Γ (E : coPset) (i : Z) (γo : gname)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) : iProp Σ :=
+    (∀ (av : aview) (off : nat) (a : anode) (d : nat),
        ⌜ard_pre av i off a⌝ -∗
-       astate Γ av ={E}=∗ astate Γ av ∗ Φ av off a)%I.
+       astate Γ av -∗ off_gv γo (1/2) (Z.of_nat off) ={E}=∗
+       astate Γ av ∗ off_gv γo (1/2) (Z.of_nat (off + d)) ∗ Φ av off a d)%I.
 
-  (* sanity: satisfiable with the trivial receipt (the module type below
-     cannot be vacuously blocked on the caller side) *)
-  Lemma aread_commit_unit Γ E i :
-    ⊢ aread_commit Γ E i (fun _ _ _ => True%I).
+  (* sanity: satisfiable with the trivial receipt by a client holding its
+     half of the shadow -- at ANY value: agreement inside the fupd pins it
+     to the offset the kernel names *)
+  Lemma aread_commit_unit Γ E i γo (z : Z) :
+    off_gv γo (1/2) z ⊢ aread_commit Γ E i γo (fun _ _ _ _ => True%I).
   Proof.
-    rewrite /aread_commit. iIntros (av off a) "%Hpre Hst".
-    iModIntro. by iFrame "Hst".
+    rewrite /aread_commit. iIntros "Hu" (av off a d) "%Hpre Hst Hk".
+    iDestruct (off_gv_agree with "Hk Hu") as %->.
+    iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk _]".
+    iModIntro. by iFrame "Hst Hk".
   Qed.
 
   (* THE STABLE SEEDS.  The general one watches ANY row (a caller
@@ -611,34 +629,42 @@ Section SysReadAU.
      forces the observed node to be the client's, with no cost to any
      arm (a read fires no retag, so a held share blocks nothing this
      call does; the vacuity is the custody seam alone -- header). *)
-  Lemma aread_commit_pinned Γ E (i : Z) (q : Qp) (jpin : Z) (b : anode)
-      (Φ : aview -> nat -> anode -> iProp Σ) :
+  (* the seeds take the client's half too: a commit moves the offset, so
+     nobody can build one without owning the other half *)
+  Lemma aread_commit_pinned Γ E (i : Z) γo (z : Z) (q : Qp) (jpin : Z) (b : anode)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) :
+    off_gv γo (1/2) z -∗
     nview Γ q jpin b -∗
-    (∀ (av : aview) (off : nat) (a : anode),
-       ⌜av !! jpin = Some b⌝ -∗ nview Γ q jpin b -∗ Φ av off a) -∗
-    aread_commit Γ E i Φ.
+    (∀ (av : aview) (off : nat) (a : anode) (d : nat),
+       ⌜av !! jpin = Some b⌝ -∗ nview Γ q jpin b -∗ Φ av off a d) -∗
+    aread_commit Γ E i γo Φ.
   Proof.
-    iIntros "Hn HΦ". rewrite /aread_commit.
-    iIntros (av off a) "%Hpre Hst".
+    iIntros "Hu Hn HΦ". rewrite /aread_commit.
+    iIntros (av off a d) "%Hpre Hst Hk".
     iDestruct (astate_nview with "Hst Hn") as %Hav.
-    iModIntro. iFrame "Hst".
-    iApply ("HΦ" $! av off a with "[%] Hn"). done.
+    iDestruct (off_gv_agree with "Hk Hu") as %->.
+    iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk _]".
+    iModIntro. iFrame "Hst Hk".
+    iApply ("HΦ" $! av off a d with "[%] Hn"). done.
   Qed.
 
-  Lemma aread_commit_pinned_self Γ E (i : Z) (q : Qp) (b : anode)
-      (Φ : aview -> nat -> anode -> iProp Σ) :
+  Lemma aread_commit_pinned_self Γ E (i : Z) γo (z : Z) (q : Qp) (b : anode)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) :
+    off_gv γo (1/2) z -∗
     nview Γ q i b -∗
-    (∀ (av : aview) (off : nat),
-       ⌜av !! i = Some b⌝ -∗ nview Γ q i b -∗ Φ av off b) -∗
-    aread_commit Γ E i Φ.
+    (∀ (av : aview) (off : nat) (d : nat),
+       ⌜av !! i = Some b⌝ -∗ nview Γ q i b -∗ Φ av off b d) -∗
+    aread_commit Γ E i γo Φ.
   Proof.
-    iIntros "Hn HΦ". rewrite /aread_commit.
-    iIntros (av off a) "%Hpre Hst".
+    iIntros "Hu Hn HΦ". rewrite /aread_commit.
+    iIntros (av off a d) "%Hpre Hst Hk".
     iDestruct (astate_nview with "Hst Hn") as %Hav.
     destruct Hpre as (Hrow & _ & _).
     assert (a = b) as -> by congruence.
-    iModIntro. iFrame "Hst".
-    iApply ("HΦ" $! av off with "[%] Hn"). done.
+    iDestruct (off_gv_agree with "Hk Hu") as %->.
+    iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk _]".
+    iModIntro. iFrame "Hst Hk".
+    iApply ("HΦ" $! av off d with "[%] Hn"). done.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -651,11 +677,14 @@ Section SysReadAU.
      is what makes it an equality and not a bound on the file arm).
      [0 <= n] rides because this arm is only reachable past the fork's
      sign guard. *)
+  (* ...AND THE ADVANCE IS THE ANSWER: the receipt's [d] is the count the
+     read delivered and the offset moved by exactly it. *)
   Definition read_post_ok Γ (i : Z) (n : Z)
-      (Φ : aview -> nat -> anode -> iProp Σ) (r : mword 64) : iProp Σ :=
-    (∃ (av : aview) (off : nat) (a : anode),
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (r : mword 64) : iProp Σ :=
+    (∃ (av : aview) (off : nat) (a : anode) (d : nat),
        ⌜ard_pre av i off a⌝ ∗ ⌜0 <= n⌝ ∗ ⌜ard_ret_tie n a off r⌝ ∗
-       Φ av off a)%I.
+       ⌜Z.of_nat d = bv_unsigned r⌝ ∗
+       Φ av off a d)%I.
 
   (* ret -1: the fork's two live failure arms, keyed by the sign the
      caller already knows (header: THE FAILURE ARMS).  The guard arm
@@ -663,19 +692,21 @@ Section SysReadAU.
      arm delivers the FIRED receipt -- the transfer's source value was
      observed even though the copy died -- with no count tie (readi
      answers -1, the offset does not move, the user bytes are unstated). *)
-  Definition read_post_fail Γ (i : Z) (n : Z)
-      (Φ : aview -> nat -> anode -> iProp Σ) : iProp Σ :=
-    ((⌜n < 0⌝ ∗ aread_commit Γ fsabsE i Φ)
+  (* the fault arm fires at advance 0: readi answered -1 and the offset did
+     not move *)
+  Definition read_post_fail Γ (i : Z) (γo : gname) (n : Z)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) : iProp Σ :=
+    ((⌜n < 0⌝ ∗ aread_commit Γ fsabsE i γo Φ)
      ∨ (⌜0 <= n⌝
         ∗ ∃ (av : aview) (off : nat) (a : anode),
-            ⌜ard_pre av i off a⌝ ∗ Φ av off a))%I.
+            ⌜ard_pre av i off a⌝ ∗ Φ av off a 0%nat))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0 *)
-  Definition read_arms Γ (i : Z) (n : Z)
-      (Φ : aview -> nat -> anode -> iProp Σ) (r : mword 64) : iProp Σ :=
+  Definition read_arms Γ (i : Z) (γo : gname) (n : Z)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (r : mword 64) : iProp Σ :=
     (read_post_ok Γ i n Φ r
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ read_post_fail Γ i n Φ))%I.
+        ∗ read_post_fail Γ i γo n Φ))%I.
 
   (* ------------------------------------------------------------------ *)
   (*  2c.  The stable corollary's arms (statement; header's caveats)      *)
@@ -688,17 +719,19 @@ Section SysReadAU.
      of the stable body is what removes the refund arm (header). *)
   Definition read_stable_arms Γ (i : Z) (n : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
-      (Φ : aview -> nat -> anode -> iProp Σ) (r : mword 64) : iProp Σ :=
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (r : mword 64) : iProp Σ :=
     (nview Γ q i (MkAnode (AFile bs0) nl) ∗
-     (∃ (av : aview) (off : nat),
+     (∃ (av : aview) (off d : nat),
         ⌜av !! i = Some (MkAnode (AFile bs0) nl)⌝ ∗
         ⌜(off <= MAXFILE * BSIZE)%nat⌝ ∗
         ⌜(length bs0 <= MAXFILE * BSIZE)%nat⌝ ∗
-        ⌜r = (mword_of_int
-                (Z.of_nat (ard_count (Z.to_nat n) off (length bs0)))
-              : mword 64)
-         \/ r = (mword_of_int (-1) : mword 64)⌝ ∗
-        Φ av off (MkAnode (AFile bs0) nl)))%I.
+        (* the advance IS the exact count on the ok arm and 0 on the fault *)
+        ⌜(r = (mword_of_int
+                 (Z.of_nat (ard_count (Z.to_nat n) off (length bs0)))
+               : mword 64)
+          /\ d = ard_count (Z.to_nat n) off (length bs0))
+         \/ (r = (mword_of_int (-1) : mword 64) /\ d = 0%nat)⌝ ∗
+        Φ av off (MkAnode (AFile bs0) nl) d))%I.
 
 End SysReadAU.
 
@@ -768,10 +801,6 @@ Definition wp_sys_read_au_frame
   (* THE FD SIDE's resource half: the caller's own fragment -- open,
      READABLE, an inode descriptor at inum [i] *)
   fd_st (pv_fdg (us_V U)) fd (FdOpen true wb (FdInode i γo)) -∗
-  (* ...AND ITS OFFSET PERMIT: the kernel holds half of the offset's shadow
-     and fileread moves it with the client's leave.  The receipt-free stub
-     of the offset transition the AU commit below will carry (OffGv.v). *)
-  off_permit γo -∗
   (* ---- THE AU SIDE (the one addition to the landed premise list) ---- *)
   EXTRA -∗
   wp_next true pj (fun (CID : CpuId) =>
@@ -829,13 +858,13 @@ Definition wp_sys_read_au_body
     (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
-    (Φr : aview -> nat -> anode -> iProp Σ) :=
+    (Φr : aview -> nat -> anode -> nat -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
   wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv wb i γo
-    (aread_commit Γfs fsabsE i Φr)
-    (read_arms Γfs i n Φr).
+    (aread_commit Γfs fsabsE i γo Φr)
+    (read_arms Γfs i γo n Φr).
 
 (* THE STABLE COROLLARY'S STATEMENT (header: THE STABLE COROLLARY; its
    derivation is the sealer's, expected from the AU form + the agreement
@@ -860,14 +889,14 @@ Definition wp_sys_read_au_stable_body
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
     (q : Qp) (bs0 : list (bv 8)) (nl : nat)
-    (Φr : aview -> nat -> anode -> iProp Σ) :=
+    (Φr : aview -> nat -> anode -> nat -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
   0 <= sys_rw_count v2 ->
   wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv wb i γo
     (nview Γfs q i (MkAnode (AFile bs0) nl)
-     ∗ aread_commit Γfs fsabsE i Φr)%I
+     ∗ aread_commit Γfs fsabsE i γo Φr)%I
     (read_stable_arms Γfs i n q bs0 nl Φr).
 
 (* ===================================================================== *)
@@ -885,7 +914,7 @@ Module Type SYSREAD_AU.
       (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
-      (Φr : aview -> nat -> anode -> iProp Σ),
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ),
       wp_sys_read_au_body γf γs j γlp fn pidv U v v1 v2 m K eb b lks
         fd fv wb i γo Φr.
 
@@ -904,7 +933,7 @@ Module Type SYSREAD_AU.
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z) (γo : gname)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
-      (Φr : aview -> nat -> anode -> iProp Σ),
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ),
       wp_sys_read_au_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
         lks fd fv wb i γo q bs0 nl Φr.
 End SYSREAD_AU.

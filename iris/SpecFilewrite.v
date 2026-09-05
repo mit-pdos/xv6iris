@@ -514,9 +514,7 @@ Section SpecFilewrite.
     (match st with
      | FdOpen _ _ FdPipe        => emp
      | FdOpen _ _ (FdDevice mj) => filewrite_dev_env fn mj
-     (* ...and the OFFSET PERMIT on an inode descriptor -- see
-        [SpecFileread.fileread_env] *)
-     | FdOpen _ _ (FdInode _ γo) => filewrite_fs_env γf fn ∗ off_permit γo
+     | FdOpen _ _ (FdInode _ _)   => filewrite_fs_env γf fn
      | FdClosed             => emp
      end)%I.
 
@@ -547,7 +545,7 @@ Section SpecFilewrite.
   Proof.
     rewrite /filewrite_env /filewrite_env_out.
     destruct st as [|? ? [? ?| |?]]; try by iIntros "$".
-    iIntros "[H _]". iApply (filewrite_fs_env_out with "H").
+    iApply filewrite_fs_env_out.
   Qed.
 
   (* A file that is neither a pipe, nor a device, nor an inode costs its
@@ -614,6 +612,9 @@ Definition wp_filewrite_sconf_body
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
   filewrite_env γf fn st -∗
+  (* ...and the offset permit on an inode descriptor -- see
+     [SpecFileread.wp_fileread_sconf_body] *)
+  foff_permit_row st -∗
   (* THE CROSSING IS [true], NOT [b].  Every arm of this function parks, and
      the porting guide's rule is that a PARKING function's [wp_next] index is
      [true] unconditionally -- a swtch moves the hart whatever SIE was doing.

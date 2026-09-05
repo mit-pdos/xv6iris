@@ -583,19 +583,43 @@ Rules:
   tail's arms are stated at `t`); dropped by the last close's hook inside
   `OffBox.off_last_close`.  A dead name says nothing about the slot's next
   file, which has a fresh one.
-- **The ghost moves only at a checkin, with the process's permit.**  A
-  checkout takes cell and kernel half out together; `off_resident_intro`
-  puts them back at the new word, using `off_permit γo`
-  (`□ ∀ z z', off_gv γo ½ z ={⊤}=∗ off_gv γo ½ z'`) to move the halves.  It
-  fires at ⊤ BEFORE the box is opened, so the two invariants never nest.
-  Nothing else reads or writes the shadow.
-- **The permit comes through the state-keyed environment.**  `fileread_env`
-  / `filewrite_env`'s `FdInode _ γo` arm is `fs_env ∗ off_permit γo`; the
-  `fr_env_fs` / `fw_env_fs` bridges hand the permit out beside the fs bundle
-  and `fw_loop` takes it as its own premise.  The box's `γo` (the carve's
-  `fp_ooff`) and the permit's (the state's) are identified by
-  `fdstate_ok_inode_names` — two `fdstate_ok` facts about one state name one
-  shadow — which is why `fileread_pay_carve` now also outputs `fdstate_ok`.
+- **The ghost moves only inside the `ip->lock` hold, between checkout and
+  checkin, and only in one of two ways.**  A checkout takes cell and kernel
+  half out together.  The LANDED `fileread`/`filewrite` move the half with
+  the process's permit `off_permit γo` (`□ ∀ z z', off_gv γo ½ z ={⊤}=∗
+  off_gv γo ½ z'`) at the checkin (`off_resident_intro`, at ⊤ before the box
+  is opened so the invariants never nest); the permit is the landed body's
+  own premise `foff_permit_row st` (`FileInvDefs.foff_permit_row_inode` reads
+  it off the state), and the landed dispatcher derives it from the process's
+  row (`foff_row_permit`).  The AU `fileread`/`filewrite` move it INSIDE the
+  fs commit (next rule) and re-form the cell with `off_resident_of`, which
+  takes the half already at the stored word.  Nothing else reads or writes
+  the shadow.  The box's `γo` (the carve's `fp_ooff`) and the state's are
+  identified by `fdstate_ok_inode_names` — two `fdstate_ok` facts about one
+  state name one shadow — which is why `fileread_pay_carve` also outputs
+  `fdstate_ok`.
+- **The AU commit carries the offset: one fupd for the bytes and the
+  offset.**  `aread_commit_at Γ E i γo Φ` lends the fs authority AND
+  `off_gv γo ½ off` and takes both back, the half at `off + d`, against the
+  receipt `Φ av off a d`; `read_post_ok` ties `d` to the answer
+  (`Z.of_nat d = bv_unsigned r`), the fault arm fires at `d = 0`.  It fires
+  at the CHECKIN (`arf_read_fire`, once per exit), because the advance is
+  known only after `readi` and the state does not move inside the hold.
+  Write's per-chunk bundle became a CHAIN (`FsAbsWriteFire.awrite_chain Γ E
+  i γo Φ k cnt`, a `Fixpoint` on `cnt`): one half cannot sit in `wchunks n`
+  independent commits, so each node is an `∧` of the FULL arm
+  (`awrite_full_at`: two phases, half in at `off`, out at `off + length bs`
+  with the receipt and the rest of the chain) and the PARTIAL arm
+  (`awrite_part_at`: a short chunk moved `f->off` by `rz` with no receipt —
+  writei's disturbed tail is not the splice — so the half moves by any `d`
+  and the chain resumes one node on).  `fw_au_raw … t p x` carries the
+  spent-without-receipt count `x ≤ 1`, 0 on every loop entry; the fail arm
+  refunds the chain at `length bss + x`.  A client owning its half at any
+  value builds the trivial-receipt commit (`aread_commit_at_unit`,
+  `awrite_chain_unit`); a client owning it only through `off_user_inv`
+  opens the invariant INSIDE the commit — `foffN` sits under `fsabsN` for
+  exactly this (`FsAbsInvFire.fsabs_aread`, `fsabs_awrite_chain`).  The AU
+  frames take no permit.
 - **The user half of a GENERIC process lives in `fd_frags`'s row family.**
   `fd_frags γ sts` carries, beside the fragments, `foff_rows sts`: for every
   `FdOpen _ _ (FdInode _ γo)` row the persistent `off_user_inv γo :=
@@ -617,13 +641,10 @@ Rules:
 - **Pin the class.**  `ghost_varG Σ Z` has two members in `xv6G`
   (`offbox_offG`, `uioG`'s break ghost); every statement uses `off_gv`, never
   a bare `ghost_var` at `Z`.
-- **The AU client-facing specs take the permit as a stub.**  `SpecSysReadAU`
-  / `SpecSysWriteAU`'s frames take `off_permit γo` beside their `fd_st`
-  premise and the fileread/filewrite AU bodies get it through the
-  environment.  The next step folds the offset transition into the fs AU
-  commit — fired at the checkin, inside the same `ip->lock` hold, lending the
-  kernel half with the abstract state and returning it advanced by the
-  count, with a receipt tying bytes and offset — and the permit goes away.
+- **The legacy astate-shaped write family (`SpecSysWriteAU.awrite_commit`,
+  `awrite_commits`, `write_arms`) does not carry the offset** and has no
+  prover (its `astate` shape was already undischargeable — `SpecSysWriteAUEra`'s
+  header); the proven family is the `_at` one.
 - **A verified process that keeps its half** needs a per-row POLICY where
   `foff_row` now puts the invariant; the enriched open row (the fd-row
   pilot's deposit disjunct) is where that choice is made.  Not built.

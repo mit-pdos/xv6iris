@@ -240,23 +240,19 @@ Section SpecSysRead.
      neither bundle mentions the content: the syscall owns both, fileread's
      type test decides which is consumed, and either way both come back.
      ([SpecFileclose.fileclose_env_frame] is the same move one stage down.) *)
-  (* ...PLUS THE STATE'S OFFSET OBLIGATION ([FdSlots.foff_permit_row]: the
-     permit on an inode row, nothing otherwise).  The landed dispatcher reads
-     it off the process's descriptor bundle ([FdSlots.fd_frags]'s row,
-     [foff_row_permit]); an AU client supplies the permit itself. *)
   Lemma read_env_frame (γf : gname) (fn : fread_names) (st : fdstate) :
-    fileread_fs_env γf fn -∗ fileread_devsw fn -∗ foff_permit_row st -∗
+    fileread_fs_env γf fn -∗ fileread_devsw fn -∗
     fileread_env γf fn st ∗
     (fileread_env_out fn st -∗ fileread_fs_out fn ∗ fileread_devsw fn).
   Proof.
-    iIntros "Hfs Hdev #Hrow". rewrite /fileread_env /fileread_env_out /foff_permit_row.
+    iIntros "Hfs Hdev". rewrite /fileread_env /fileread_env_out.
     destruct st as [|? ? [? ?| |mj]].
     { (* CLOSED -- the panic arm; argfd never hands one over, but the
          environment is total. *)
       iSplitR; [done|]. iIntros "_".
       iDestruct (fileread_fs_env_out with "Hfs") as "$". iFrame "Hdev". }
-    { (* an INODE: the fs half and the permit go, the column stays *)
-      iSplitL "Hfs"; [iFrame "Hfs Hrow"|]. iIntros "$". iFrame "Hdev". }
+    { (* an INODE: the fs half goes, the column stays *)
+      iSplitL "Hfs"; [iExact "Hfs"|]. iIntros "$". iFrame "Hdev". }
     { (* a PIPE: nothing is asked for, and the fs half must still answer
          [fileread_fs_out] -- which it does, [fileread_fs_env_out]. *)
       iSplitR; [done|]. iIntros "_".

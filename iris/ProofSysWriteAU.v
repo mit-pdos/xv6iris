@@ -335,7 +335,7 @@ Section ProofSysWriteAU.
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
     iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv #Hkenv #Hprocs Henv #Hcaps #Htbl
-             Hfdst #Hperm Hbundle Hcont".
+             Hfdst Hbundle Hcont".
     (* THE DEVICE COLUMN, PROJECTED out of the console table.  The CAPS are
        separate -- consolewrite drives the UART, so they are [dev_inv] and
        the tx lock, both from [printk_env] -- and both halves are persistent,
@@ -906,8 +906,7 @@ Section ProofSysWriteAU.
         as (kk qq stf) "((%Hfvk & %Hkk & %Hty) & Href & Hauth & Hcore & Howe)".
       assert (HS4a0' : S4 !!! Regidx Ra0 = fnode kk) by (rewrite HS4a0; exact Hfvk).
       iDestruct (fd_st_agree with "Hauth Hfdst") as %Hstf.
-      iDestruct (write_env_frame γf fn stf with "Henv Hdev [Hperm]") as "[Hfenv Hfback]".
-      { rewrite Hstf /foff_permit_row /=. iExact "Hperm". }
+      iDestruct (write_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
       (* ---- THE FD BRIDGE.  The lend hands the reference out at an
          EXISTENTIAL state together with the slot's AUTHORITY; the
          contract's own fragment pins it.  That is the whole of item 3 --

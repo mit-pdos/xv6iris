@@ -154,7 +154,7 @@ Definition wp_fileread_au_body
     (wb : bool) (i : Z) (γo : gname)             (* the descriptor's mode
                                                     bit, its inum and its
                                                     offset shadow           *)
-    (Φr : aview -> nat -> anode -> iProp Σ) :=
+    (Φr : aview -> nat -> anode -> nat -> iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileread in
   let pj := proc_addr j in
   let addr := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -186,7 +186,7 @@ Definition wp_fileread_au_body
   (* EDIT 2: THE CALLER'S ONE READ-ONLY COMMIT, fired at the single instant
      inside the lock window (the RAW-MAP form: the astate-shaped one is not
      dischargeable -- FsAbsReadFire's header). *)
-  aread_commit_at Γfs fsabsE i Φr -∗
+  aread_commit_at Γfs fsabsE i γo Φr -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
@@ -210,7 +210,7 @@ Definition wp_fileread_au_body
       proc_priv_core pj pidv
         (upd_usM (us_upt U P') (umem_wr (us_M U) addr d bs)) -∗
       fileread_env_out fn st -∗
-      read_arms Γfs i n Φr r -∗
+      read_arms Γfs i γo n Φr r -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -225,7 +225,7 @@ Module Type FILEREAD_AU.
       (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool)
       (lks : gset string) (wb : bool) (i : Z) (γo : gname)
-      (Φr : aview -> nat -> anode -> iProp Σ),
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ),
       wp_fileread_au_body γf γs j γlp k q st fn pidv U m K eb n b lks
         wb i γo Φr.
 End FILEREAD_AU.

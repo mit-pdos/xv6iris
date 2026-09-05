@@ -930,8 +930,7 @@ Section ProofSysWriteConsAU.
         as (kk qq stf) "((%Hfvk & %Hkk & %Hty) & Href & Hauth & Hcore & Howe)".
       assert (HS4a0' : S4 !!! Regidx Ra0 = fnode kk) by (rewrite HS4a0; exact Hfvk).
       iDestruct (fd_st_agree with "Hauth Hfdst") as %Hstf.
-      iDestruct (write_env_frame γf fn stf with "Henv Hdev []") as "[Hfenv Hfback]".
-      { rewrite Hstf /foff_permit_row /=. by iPureIntro. }
+      iDestruct (write_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
       (* ---- THE FD BRIDGE.  The lend hands the reference out at an
          EXISTENTIAL state together with the slot's AUTHORITY; the
          contract's own fragment pins it.  That is the whole of item 3 --

@@ -718,8 +718,6 @@ Definition wp_sys_write_au_frame
   (* THE FD SIDE's resource half: the caller's own fragment -- open,
      WRITABLE, an inode descriptor at inum [i] *)
   fd_st (pv_fdg (us_V U)) fd (FdOpen rb true (FdInode i γo)) -∗
-  (* ...and its offset permit -- see [SpecSysReadAU] *)
-  off_permit γo -∗
   (* ---- THE AU SIDE (the one addition to the landed premise list) ---- *)
   EXTRA -∗
   wp_next true pj (fun (CID : CpuId) =>

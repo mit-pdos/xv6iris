@@ -82,6 +82,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 Require Import SailStdpp.Operators_mwords.   (* [mword_of_int]              *)
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.
+Require Import RiscvExtras.     (* [moi64_unsigned], [bvw64_small]         *)
 Require Import DinodeEnc.
 Require Import FsBlocks.         (* [fs_names]                              *)
 Require Import FsBytesGamma.     (* [fs_gamma_L]                            *)
@@ -212,32 +213,40 @@ Section ReadFire.
   (* SINGLE-PHASE AND READ-ONLY at the RAW MAP: the caller hands the very
      same [ghost_map_auth] back, which is what [ftop_astate_ro]'s give-back
      wants and what [astate]'s existential destroys (header). *)
-  Definition aread_commit_at Γ (E : coPset) (i : Z)
-      (Φ : aview -> nat -> anode -> iProp Σ) : iProp Σ :=
-    (∀ (I : gmap Z fs_node) (off : nat) (a : anode),
+  (* ...WITH THE OFFSET'S HALF LENT AND RETURNED ADVANCED, exactly as
+     [SpecSysReadAU.aread_commit] -- the one fupd covers the bytes and the
+     offset (the offset-shadow fold; OffGv.v). *)
+  Definition aread_commit_at Γ (E : coPset) (i : Z) (γo : gname)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) : iProp Σ :=
+    (∀ (I : gmap Z fs_node) (off : nat) (a : anode) (d : nat),
        ⌜ard_pre (abs_view I) i off a⌝ -∗
-       ghost_map_auth (γtop Γ) 1 I ={E}=∗
-       ghost_map_auth (γtop Γ) 1 I ∗ Φ (abs_view I) off a)%I.
+       ghost_map_auth (γtop Γ) 1 I -∗ off_gv γo (1/2) (Z.of_nat off) ={E}=∗
+       ghost_map_auth (γtop Γ) 1 I ∗ off_gv γo (1/2) (Z.of_nat (off + d)) ∗
+       Φ (abs_view I) off a d)%I.
 
   (* THE ONE RELATION THAT HOLDS -- [FsAbsMknodFire.dlookup_commit_at_weaken]'s
      argument verbatim.  The reverse does not: nothing ties the authority a
      client returns to the map the borrow named. *)
-  Lemma aread_commit_at_weaken Γ E i Φ :
-    aread_commit_at Γ E i Φ ⊢ aread_commit Γ E i Φ.
+  Lemma aread_commit_at_weaken Γ E i γo Φ :
+    aread_commit_at Γ E i γo Φ ⊢ aread_commit Γ E i γo Φ.
   Proof.
     iIntros "Hcm". rewrite /aread_commit.
-    iIntros (av off a) "%Hpre Hst".
+    iIntros (av off a d) "%Hpre Hst Hg".
     iDestruct (astate_elim with "Hst") as (I) "[Ha %Hav]". subst av.
-    iMod ("Hcm" $! I off a with "[//] Ha") as "[Ha HΦ]".
-    iModIntro. iFrame "HΦ". iApply astate_intro. iExact "Ha".
+    iMod ("Hcm" $! I off a d with "[//] Ha Hg") as "(Ha & Hg & HΦ)".
+    iModIntro. iFrame "HΦ Hg". iApply astate_intro. iExact "Ha".
   Qed.
 
-  (* satisfiability: the seal cannot be vacuously blocked on the caller *)
-  Lemma aread_commit_at_unit Γ E i :
-    ⊢ aread_commit_at Γ E i (fun _ _ _ => True%I).
+  (* satisfiability: a client holding its half of the shadow, at any value,
+     can build the trivial-receipt commit -- the seal cannot be vacuously
+     blocked on the caller *)
+  Lemma aread_commit_at_unit Γ E i γo (z : Z) :
+    off_gv γo (1/2) z ⊢ aread_commit_at Γ E i γo (fun _ _ _ _ => True%I).
   Proof.
-    rewrite /aread_commit_at. iIntros (I off a) "%Hpre Ha".
-    iModIntro. by iFrame "Ha".
+    rewrite /aread_commit_at. iIntros "Hu" (I off a d) "%Hpre Ha Hk".
+    iDestruct (off_gv_agree with "Hk Hu") as %->.
+    iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk _]".
+    iModIntro. by iFrame "Ha Hk".
   Qed.
 
   (* THE AGREEMENT AT THE RAW AUTHORITY.  [astate_nview] reads a client
@@ -257,38 +266,45 @@ Section ReadFire.
 
   (* THE STABLE SEEDS at the raw map, both of the frozen file's, so the
      stable corollary's derivation stays assembly rather than proof. *)
-  Lemma aread_commit_at_pinned Γ E (i : Z) (q : Qp) (jpin : Z) (b : anode)
-      (Φ : aview -> nat -> anode -> iProp Σ) :
+  (* the seeds take the client's half: a commit moves the offset *)
+  Lemma aread_commit_at_pinned Γ E (i : Z) γo (z : Z) (q : Qp) (jpin : Z) (b : anode)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) :
+    off_gv γo (1/2) z -∗
     nview Γ q jpin b -∗
-    (∀ (av : aview) (off : nat) (a : anode),
-       ⌜av !! jpin = Some b⌝ -∗ nview Γ q jpin b -∗ Φ av off a) -∗
-    aread_commit_at Γ E i Φ.
+    (∀ (av : aview) (off : nat) (a : anode) (d : nat),
+       ⌜av !! jpin = Some b⌝ -∗ nview Γ q jpin b -∗ Φ av off a d) -∗
+    aread_commit_at Γ E i γo Φ.
   Proof.
-    iIntros "Hn HΦ". rewrite /aread_commit_at.
-    iIntros (I off a) "%Hpre Ha".
+    iIntros "Hu Hn HΦ". rewrite /aread_commit_at.
+    iIntros (I off a d) "%Hpre Ha Hk".
     iDestruct (arf_auth_nview with "Ha Hn") as %Hav.
+    iDestruct (off_gv_agree with "Hk Hu") as %->.
+    iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk _]".
     (* the reading is all the seed needs, and it is the borrow's own *)
-    iModIntro. iFrame "Ha".
-    iApply ("HΦ" $! (abs_view I) off a with "[%] Hn").
+    iModIntro. iFrame "Ha Hk".
+    iApply ("HΦ" $! (abs_view I) off a d with "[%] Hn").
     exact Hav.
   Qed.
 
   (* read's own collapse: the pin is on the READ row, so agreement forces
      the observed node to be the client's *)
-  Lemma aread_commit_at_pinned_self Γ E (i : Z) (q : Qp) (b : anode)
-      (Φ : aview -> nat -> anode -> iProp Σ) :
+  Lemma aread_commit_at_pinned_self Γ E (i : Z) γo (z : Z) (q : Qp) (b : anode)
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) :
+    off_gv γo (1/2) z -∗
     nview Γ q i b -∗
-    (∀ (av : aview) (off : nat),
-       ⌜av !! i = Some b⌝ -∗ nview Γ q i b -∗ Φ av off b) -∗
-    aread_commit_at Γ E i Φ.
+    (∀ (av : aview) (off : nat) (d : nat),
+       ⌜av !! i = Some b⌝ -∗ nview Γ q i b -∗ Φ av off b d) -∗
+    aread_commit_at Γ E i γo Φ.
   Proof.
-    iIntros "Hn HΦ". rewrite /aread_commit_at.
-    iIntros (I off a) "%Hpre Ha".
+    iIntros "Hu Hn HΦ". rewrite /aread_commit_at.
+    iIntros (I off a d) "%Hpre Ha Hk".
     iDestruct (arf_auth_nview with "Ha Hn") as %Hav.
     destruct Hpre as (Hrow & _ & _).
     assert (a = b) as -> by congruence.
-    iModIntro. iFrame "Ha".
-    iApply ("HΦ" $! (abs_view I) off with "[%] Hn").
+    iDestruct (off_gv_agree with "Hk Hu") as %->.
+    iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk _]".
+    iModIntro. iFrame "Ha Hk".
+    iApply ("HΦ" $! (abs_view I) off d with "[%] Hn").
     exact Hav.
   Qed.
 
@@ -299,20 +315,27 @@ Section ReadFire.
   (* [FsAbsOpenFire.opf_open_fire]'s mold at the read commit.  Any share
      suffices: the commit only reads.  The two caps are premises about the
      SAME node, which is where fileread has them (header). *)
+  (* ...AND IT MOVES THE OFFSET: the kernel's half goes in at the offset
+     the read used and comes back advanced by [d], the count it delivered.
+     Fired at the CHECKIN of the cell, after readi -- the one instant of
+     the hold where the count is known; the row cannot move between the
+     lock's acquire and there. *)
   Lemma arf_read_fire (γfs : fs_names) (E : coPset) (dq : dfrac)
-      (Φ : aview -> nat -> anode -> iProp Σ) (i : Z) (off : nat)
-      (n : fs_node) :
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (i : Z) (γo : gname)
+      (off d : nat) (n : fs_node) :
     ↑ftopN ∪ ↑fsabsN ⊆ E ->
     (off <= MAXFILE * BSIZE)%nat ->
     anode_size_ok (abs_of n) ->
     ftop_inv γfs -∗
-    aread_commit_at (fs_gamma_L γfs) fsabsE i Φ -∗
-    top_frag_q (fs_gamma_L γfs) dq i n ={E}=∗
+    aread_commit_at (fs_gamma_L γfs) fsabsE i γo Φ -∗
+    top_frag_q (fs_gamma_L γfs) dq i n -∗
+    off_gv γo (1/2) (Z.of_nat off) ={E}=∗
       top_frag_q (fs_gamma_L γfs) dq i n
+      ∗ off_gv γo (1/2) (Z.of_nat (off + d))
       ∗ ∃ av : aview,
-          ⌜av !! i = Some (abs_of n)⌝ ∗ Φ av off (abs_of n).
+          ⌜av !! i = Some (abs_of n)⌝ ∗ Φ av off (abs_of n) d.
   Proof.
-    intros HE Hoff Hsz. iIntros "#Hi Hcm Hf".
+    intros HE Hoff Hsz. iIntros "#Hi Hcm Hf Hg".
     (* the same re-spelling [opf_open_fire] does, and for the same reason:
        the unifier cannot solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag_q /fs_gamma_L /=.
@@ -325,31 +348,33 @@ Section ReadFire.
     assert (Hpre : ard_pre (abs_view I) i off (abs_of n))
       by (split; [exact Hrow | split; [exact Hoff | exact Hsz]]).
     iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
-    iMod ("Hcm" $! I off (abs_of n) with "[//] Hta") as "[Hta HΦ]".
+    iMod ("Hcm" $! I off (abs_of n) d with "[//] Hta Hg") as "(Hta & Hg & HΦ)".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
     { iNext. rewrite /ftop_body. iExists I, A. by iFrame. }
-    iModIntro. iFrame "Hf". iExists (abs_view I).
+    iModIntro. iFrame "Hf Hg". iExists (abs_view I).
     iSplitR; [by iPureIntro |]. iExact "HΦ".
   Qed.
 
   (* the [DfracOwn 1] reading, which is the spelling fileread holds
      ([top_frag] whole, from its [ilock] to its [iunlock]) *)
   Lemma arf_read_fire_1 (γfs : fs_names) (E : coPset)
-      (Φ : aview -> nat -> anode -> iProp Σ) (i : Z) (off : nat)
-      (n : fs_node) :
+      (Φ : aview -> nat -> anode -> nat -> iProp Σ) (i : Z) (γo : gname)
+      (off d : nat) (n : fs_node) :
     ↑ftopN ∪ ↑fsabsN ⊆ E ->
     (off <= MAXFILE * BSIZE)%nat ->
     anode_size_ok (abs_of n) ->
     ftop_inv γfs -∗
-    aread_commit_at (fs_gamma_L γfs) fsabsE i Φ -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    aread_commit_at (fs_gamma_L γfs) fsabsE i γo Φ -∗
+    top_frag (fs_gamma_L γfs) i n -∗
+    off_gv γo (1/2) (Z.of_nat off) ={E}=∗
       top_frag (fs_gamma_L γfs) i n
+      ∗ off_gv γo (1/2) (Z.of_nat (off + d))
       ∗ ∃ av : aview,
-          ⌜av !! i = Some (abs_of n)⌝ ∗ Φ av off (abs_of n).
+          ⌜av !! i = Some (abs_of n)⌝ ∗ Φ av off (abs_of n) d.
   Proof.
     intros HE Hoff Hsz. rewrite top_frag_1.
-    exact (arf_read_fire γfs E _ Φ i off n HE Hoff Hsz).
+    exact (arf_read_fire γfs E _ Φ i γo off d n HE Hoff Hsz).
   Qed.
 
   (* =================================================================== *)
@@ -361,29 +386,29 @@ Section ReadFire.
      client's value, and the share comes back.  This is what makes the
      derivation assembly rather than a second walk. *)
   Definition arf_pin_recv Γ (i : Z) (q : Qp) (b : anode)
-      (Φr : aview -> nat -> anode -> iProp Σ)
-      : aview -> nat -> anode -> iProp Σ :=
-    fun av off a =>
-      (⌜av !! i = Some b⌝ ∗ ⌜a = b⌝ ∗ nview Γ q i b ∗ Φr av off a)%I.
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ)
+      : aview -> nat -> anode -> nat -> iProp Σ :=
+    fun av off a d =>
+      (⌜av !! i = Some b⌝ ∗ ⌜a = b⌝ ∗ nview Γ q i b ∗ Φr av off a d)%I.
 
   (* THE COMPOSITION: a client that holds the share AND its own commit has
      the commit at the enriched receipt.  Agreement fires at the instant --
      the whole content of [aread_commit_at_pinned_self], now carrying the
      client's own commit through instead of discarding it. *)
-  Lemma arf_pin_compose Γ E (i : Z) (q : Qp) (b : anode)
-      (Φr : aview -> nat -> anode -> iProp Σ) :
+  Lemma arf_pin_compose Γ E (i : Z) γo (q : Qp) (b : anode)
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ) :
     nview Γ q i b -∗
-    aread_commit_at Γ E i Φr -∗
-    aread_commit_at Γ E i (arf_pin_recv Γ i q b Φr).
+    aread_commit_at Γ E i γo Φr -∗
+    aread_commit_at Γ E i γo (arf_pin_recv Γ i q b Φr).
   Proof.
     iIntros "Hn Hcm". rewrite /aread_commit_at.
-    iIntros (I off a) "%Hpre Ha".
+    iIntros (I off a d) "%Hpre Ha Hg".
     iDestruct (arf_auth_nview with "Ha Hn") as %Hav.
     destruct Hpre as (Hrow & Hoff & Hsz).
     assert (a = b) as Hab by congruence.
-    iMod ("Hcm" $! I off a with "[%] Ha") as "[Ha HΦ]".
+    iMod ("Hcm" $! I off a d with "[%] Ha Hg") as "(Ha & Hg & HΦ)".
     { split; [exact Hrow | split; [exact Hoff | exact Hsz]]. }
-    iModIntro. iFrame "Ha". rewrite /arf_pin_recv.
+    iModIntro. iFrame "Ha Hg". rewrite /arf_pin_recv.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     iFrame "Hn HΦ".
   Qed.
@@ -407,25 +432,33 @@ Section ReadFire.
      that no longer match the goal's. *)
   Lemma arf_stable_ok_arm Γ (i : Z) (nz : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
-      (Φr : aview -> nat -> anode -> iProp Σ) (r : mword 64) :
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ) (r : mword 64) :
     read_post_ok Γ i nz
       (arf_pin_recv Γ i q (MkAnode (AFile bs0) nl) Φr) r
     ⊢ read_stable_arms Γ i nz q bs0 nl Φr r.
   Proof.
     rewrite /read_post_ok /read_stable_arms /arf_pin_recv.
     iIntros "Hok".
-    iDestruct "Hok" as (av off a)
-      "(%Hpre & %Hnn & %Htie & %Hrow & %Hab & Hnv & HΦ)".
+    iDestruct "Hok" as (av off a d)
+      "(%Hpre & %Hnn & %Htie & %Hrd & %Hrow & %Hab & Hnv & HΦ)".
     subst a. destruct Hpre as (Hlk & Hoff & Hsz).
     assert (Hsz' : (length bs0 <= MAXFILE * BSIZE)%nat) by exact Hsz.
     assert (Htie' : r = (mword_of_int
                (Z.of_nat (ard_count (Z.to_nat nz) off (length bs0)))
              : mword 64)) by exact Htie.
-    iFrame "Hnv". iExists av, off.
+    (* the advance IS the count: [r] is that count as a word, and the count
+       is small ([ard_count_sub]: at most the file's length) *)
+    assert (Hd : d = ard_count (Z.to_nat nz) off (length bs0)).
+    { rewrite Htie' moi64_unsigned bvw64_small in Hrd; [lia |].
+      pose proof (ard_count_sub (Z.to_nat nz) off (length bs0)).
+      assert (length bs0 - off <= MAXFILE * BSIZE)%nat by lia.
+      split; [lia |]. apply (Z.le_lt_trans _ (Z.of_nat (MAXFILE * BSIZE)));
+        [lia | vm_compute; reflexivity]. }
+    iFrame "Hnv". iExists av, off, d.
     iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |].
-    iSplitR; [iPureIntro; left; exact Htie' |].
+    iSplitR; [iPureIntro; left; split; [exact Htie' | exact Hd] |].
     iExact "HΦ".
   Qed.
 
@@ -433,12 +466,12 @@ Section ReadFire.
      the wrapped share inside the returned closure.  With the premise that
      disjunct is refuted, so the surviving arm carries a FIRED receipt --
      which is why read needs no escape arm where write does. *)
-  Lemma arf_stable_fail_arm Γ (i : Z) (nz : Z) (q : Qp)
+  Lemma arf_stable_fail_arm Γ (i : Z) γo (nz : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
-      (Φr : aview -> nat -> anode -> iProp Σ) (r : mword 64) :
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ) (r : mword 64) :
     0 <= nz ->
     r = (mword_of_int (-1) : mword 64) ->
-    read_post_fail Γ i nz
+    read_post_fail Γ i γo nz
       (arf_pin_recv Γ i q (MkAnode (AFile bs0) nl) Φr)
     ⊢ read_stable_arms Γ i nz q bs0 nl Φr r.
   Proof.
@@ -448,29 +481,29 @@ Section ReadFire.
     iDestruct "Hrest" as (av off a) "(%Hpre & %Hrow & %Hab & Hnv & HΦ)".
     subst a. destruct Hpre as (Hlk & Hoff & Hsz).
     assert (Hsz' : (length bs0 <= MAXFILE * BSIZE)%nat) by exact Hsz.
-    iFrame "Hnv". iExists av, off.
+    iFrame "Hnv". iExists av, off, 0%nat.
     iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |].
-    iSplitR; [iPureIntro; right; exact Hr |].
+    iSplitR; [iPureIntro; right; split; [exact Hr | reflexivity] |].
     iExact "HΦ".
   Qed.
 
   (* ...AND THE ARMS COLLAPSE.  This is the whole of item 7 that does not
      touch the machine: instantiate the AU at [arf_pin_recv] and every arm
      lands at the client's own value. *)
-  Lemma arf_stable_of_arms Γ (i : Z) (nz : Z) (q : Qp)
+  Lemma arf_stable_of_arms Γ (i : Z) γo (nz : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
-      (Φr : aview -> nat -> anode -> iProp Σ) (r : mword 64) :
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ) (r : mword 64) :
     0 <= nz ->
-    read_arms Γ i nz
+    read_arms Γ i γo nz
       (arf_pin_recv Γ i q (MkAnode (AFile bs0) nl) Φr) r
     ⊢ read_stable_arms Γ i nz q bs0 nl Φr r.
   Proof.
     intros Hnz. rewrite /read_arms.
     iIntros "[Hok | [%Hr Hfail]]".
     - iApply (arf_stable_ok_arm with "Hok").
-    - iApply (arf_stable_fail_arm Γ i nz q bs0 nl Φr r Hnz Hr with "Hfail").
+    - iApply (arf_stable_fail_arm Γ i γo nz q bs0 nl Φr r Hnz Hr with "Hfail").
   Qed.
 
 End ReadFire.

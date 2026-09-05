@@ -1,7 +1,8 @@
 (* FsAbsWriteFire.v -- sys_write's PER-CHUNK FIRE POINT, DISCHARGED AGAINST
    THE INVARIANT, plus the reading bridge and the instant-count arithmetic
    [SpecSysWriteAU]'s header owes its prover (items 1, 2, 4 and the [wri_pre]
-   half of item 5).
+   half of item 5) -- with the descriptor's OFFSET SHADOW folded into every
+   commit (OffGv.v; design/file-table.md "The offset SHADOW").
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the write AU
    prover).  A NEW LEAF rather than an append to [FsAbsMknodFire.v] /
@@ -31,12 +32,25 @@
    PHASE, and the two-phase forms do not relate in either direction (phase
    2 names the POST map, which no [astate] at the delta determines).
 
-   [awrite_commit_at] below is therefore a PARALLEL FORM beside the frozen
-   one, in the campaign's usual sense -- R10 leaves [SpecSysWriteAU]
-   byte-identical and the era-side contract ([SpecSysWriteAUEra]) carries
-   these.  Everything the frozen file offers a client is offered here at the
-   same strength: the trivial-receipt units ([_unit]) and the agreement seed
-   ([_pinned]) the stable corollary is derived from.
+   [awrite_full_at] below is therefore a PARALLEL FORM beside the frozen
+   one, in the campaign's usual sense -- the frozen astate family in
+   [SpecSysWriteAU] stays as stated and the era-side contract
+   ([SpecSysWriteAUEra]) carries these.
+
+   ==== THE OFFSET FOLD, AND WHY THE BUNDLE BECAME A CHAIN ==============
+
+   Every commit moves the ONE half of the descriptor's offset shadow the
+   client owns ([off_gv γo ½]): in at the chunk's offset, out advanced by
+   the chunk.  So the client cannot pre-build [wchunks n] independent
+   commits -- each would have to own the half -- and the bundle is a CHAIN
+   ([awrite_chain]): one node at a time, each node an [∧] of the FULL arm
+   ([awrite_full_at], receipt + the rest of the chain) and the PARTIAL arm
+   ([awrite_part_at]: a short chunk advanced [f->off] by what it wrote,
+   with no receipt, and the chain resumes one node on).  The kernel picks
+   the arm; the partial arm ends the loop, so it is spent at most once.
+   Satisfiability is [awrite_chain_unit] (a client holding its half) and
+   [FsAbsInvFire.fsabs_awrite_chain] (a client holding only the existential
+   invariant).
 
    ==== THE FIRE POINT: ONE PER CHUNK, AT THAT CHUNK'S RETAG =============
 
@@ -79,9 +93,10 @@
    [tot = n -> dist = 0], and filewrite's loop BREAKS on [r <> n1], so every
    chunk that continues the loop is a FULL chunk with [dist = 0] and the
    short chunk that ends it is not fired at all (its bytes are simply not
-   in [bss], and the fail arm's total falls short by exactly that much).
-   This is the one place the contract's honest silence about WHERE the loop
-   died is load-bearing.
+   in [bss], and the fail arm's total falls short by exactly that much) --
+   only its OFFSET move is paid, through the chain's partial arm.  This is
+   the one place the contract's honest silence about WHERE the loop died is
+   load-bearing.
 
    ==== ITEM 4: THE INSTANT COUNT =======================================
 
@@ -373,73 +388,90 @@ Section WriteFire.
   (*  2.  THE AUTHORITY-SHAPED CHUNK COMMIT                               *)
   (* =================================================================== *)
 
-  (* [SpecSysWriteAU.awrite_commit] one step down: the RAW MAP goes in and
-     the very same [ghost_map_auth] comes back, so the invariant's row
-     obligation survives.  Phase 2 is quantified over the POST map and
-     constrained by its READING alone, so a client still witnesses exactly
-     "the chunk's delta was applied" and nothing about the record the mover
-     chose. *)
-  Definition awrite_commit_at Γ (E : coPset) (i : Z) (k : nat)
-      (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) : iProp Σ :=
+  (* THE FULL-CHUNK COMMIT: [SpecSysWriteAU.awrite_commit] one step down --
+     the RAW MAP goes in and the very same [ghost_map_auth] comes back, so
+     the invariant's row obligation survives; phase 2 is quantified over the
+     POST map and constrained by its READING alone -- AND WITH THE OFFSET
+     FOLDED IN (OffGv.v).  The kernel lends its half of the descriptor's
+     offset shadow at the offset the chunk was written at (the box ties the
+     half to [f->off]) and takes it back at phase 2 advanced by the chunk's
+     length: the bytes and the offset move in the one fupd, inside
+     [ip->lock], at the row's retag.  [REST] is what the client hands back
+     beside the receipt -- the rest of the chain, below. *)
+  Definition awrite_full_at Γ (E : coPset) (i : Z) (γo : gname) (k : nat)
+      (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
+      (REST : iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (off : nat) (bs bs0 : list (bv 8)) (nl : nat),
        ⌜wri_pre (abs_view I) i off bs bs0 nl⌝ -∗
-       ghost_map_auth (γtop Γ) 1 I ={E}=∗
+       ghost_map_auth (γtop Γ) 1 I -∗ off_gv γo (1/2) (Z.of_nat off) ={E}=∗
        ghost_map_auth (γtop Γ) 1 I ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_write i off bs (abs_view I)⌝ -∗
             ghost_map_auth (γtop Γ) 1 I' ={E}=∗
-            ghost_map_auth (γtop Γ) 1 I' ∗ Φ k (abs_view I) off bs))%I.
+            ghost_map_auth (γtop Γ) 1 I' ∗
+            off_gv γo (1/2) (Z.of_nat (off + length bs)) ∗
+            Φ k (abs_view I) off bs ∗ REST))%I.
 
-  (* THE BUNDLE, at the same indexing as [SpecSysWriteAU.awrite_commits]. *)
-  Definition awrite_commits_at Γ (E : coPset) (i : Z)
+  (* THE PARTIAL-CHUNK MOVE: writei stopped short (0 < r < the chunk) and
+     filewrite advanced [f->off] by [r] anyway.  Those bytes are writei's
+     DISTURBED tail, not the splice, so there is no delta this contract can
+     receipt -- but the offset DID move, and the kernel's half must follow
+     it.  The client lets it, from any offset by any amount, and gets no
+     receipt; the fs state is what the fs invariant says it is. *)
+  Definition awrite_part_at (E : coPset) (γo : gname) (REST : iProp Σ) : iProp Σ :=
+    (∀ (off d : nat),
+       off_gv γo (1/2) (Z.of_nat off) ={E}=∗
+       off_gv γo (1/2) (Z.of_nat (off + d)) ∗ REST)%I.
+
+  (* THE CHAIN -- what replaced the per-chunk bundle when the offset was
+     folded in.  A bundle of independent commits cannot work: every commit
+     moves the ONE half the client owns, so the client cannot pre-build
+     [wchunks n] of them side by side.  The chain hands out one node at a
+     time; each node offers BOTH arms and the kernel picks ([∧], the
+     kernel's choice), and either arm's fupd returns the next node.  The
+     partial arm ends filewrite's loop ([r != n1] breaks), so it is taken at
+     most once, last -- [SpecSysWriteAUEra]'s [x <= 1] slack. *)
+  Fixpoint awrite_chain Γ (E : coPset) (i : Z) (γo : gname)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
-      (lo cnt : nat) : iProp Σ :=
-    ([∗ list] k ∈ seq lo cnt, awrite_commit_at Γ E i k Φ)%I.
+      (k cnt : nat) : iProp Σ :=
+    match cnt with
+    | O => True%I
+    | S cnt' =>
+        (awrite_full_at Γ E i γo k Φ (awrite_chain Γ E i γo Φ (S k) cnt')
+         ∧ awrite_part_at E γo (awrite_chain Γ E i γo Φ (S k) cnt'))%I
+    end.
 
-  (* the loop's own peel: fire the head, carry the tail *)
-  Lemma awrite_commits_at_peel Γ E i Φ lo cnt :
-    awrite_commits_at Γ E i Φ lo (S cnt)
-    ⊣⊢ awrite_commit_at Γ E i lo Φ ∗ awrite_commits_at Γ E i Φ (S lo) cnt.
+  Lemma awrite_chain_0 Γ E i γo Φ k : awrite_chain Γ E i γo Φ k 0 ⊣⊢ True.
+  Proof. reflexivity. Qed.
+
+  Lemma awrite_chain_S Γ E i γo Φ k cnt :
+    awrite_chain Γ E i γo Φ k (S cnt) ⊣⊢
+      awrite_full_at Γ E i γo k Φ (awrite_chain Γ E i γo Φ (S k) cnt)
+      ∧ awrite_part_at E γo (awrite_chain Γ E i γo Φ (S k) cnt).
+  Proof. reflexivity. Qed.
+
+  (* satisfiability: a client holding its half of the shadow, at ANY value
+     (agreement inside each fupd pins it to the kernel's), builds the
+     trivial-receipt chain of any length -- the seal cannot be vacuously
+     blocked on the caller's side.  [FsAbsInvFire.fsabs_awrite_chain] is
+     the same for a client that owns the half only through the existential
+     invariant. *)
+  Lemma awrite_chain_unit Γ E i γo (z : Z) k cnt :
+    off_gv γo (1/2) z ⊢ awrite_chain Γ E i γo (fun _ _ _ _ => True%I) k cnt.
   Proof.
-    rewrite /awrite_commits_at /= //.
-  Qed.
-
-  Lemma awrite_commits_at_nil Γ E i Φ lo :
-    ⊢ awrite_commits_at Γ E i Φ lo 0.
-  Proof. rewrite /awrite_commits_at //=. Qed.
-
-  (* satisfiability: the seal cannot be vacuously blocked on the caller's
-     side ([SpecSysWriteAU]'s [_unit] pair, restated at this shape) *)
-  Lemma awrite_commit_at_unit Γ E i k :
-    ⊢ awrite_commit_at Γ E i k (fun _ _ _ _ => True%I).
-  Proof.
-    rewrite /awrite_commit_at. iIntros (I off bs bs0 nl) "%Hpre Ha".
-    iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'". iModIntro.
-    by iFrame "Ha'".
-  Qed.
-
-  Lemma awrite_commits_at_unit Γ E i lo cnt :
-    ⊢ awrite_commits_at Γ E i (fun _ _ _ _ => True%I) lo cnt.
-  Proof.
-    rewrite /awrite_commits_at. iApply big_sepL_intro.
-    iIntros "!>" (j k Hk). iApply awrite_commit_at_unit.
-  Qed.
-
-  (* THE STABLE SEED at this shape: a held [nview] share turns the phase-1
-     observation into "a state whose row at MY inum is MY value".
-     [FsAbsMknodFire.mkf_auth_nview] is the agreement, reused. *)
-  Lemma awrite_commit_at_pinned Γ E (i : Z) (k : nat) (q : Qp) (jpin : Z)
-      (a : anode) (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) :
-    nview Γ q jpin a -∗
-    (∀ (av : aview) (off : nat) (bs : list (bv 8)),
-       ⌜av !! jpin = Some a⌝ -∗ nview Γ q jpin a -∗ Φ k av off bs) -∗
-    awrite_commit_at Γ E i k Φ.
-  Proof.
-    iIntros "Hn HΦ". rewrite /awrite_commit_at.
-    iIntros (I off bs bs0 nl) "%Hpre Ha".
-    iDestruct (mkf_auth_nview with "Ha Hn") as %Hav.
-    iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'". iModIntro.
-    iFrame "Ha'". iApply ("HΦ" $! (abs_view I) off bs with "[%] Hn"). done.
+    revert k z. induction cnt as [| cnt IH]; intros k z.
+    { rewrite awrite_chain_0. by iIntros "_". }
+    rewrite awrite_chain_S. iIntros "Hu". iSplit.
+    - rewrite /awrite_full_at. iIntros (I off bs bs0 nl) "%Hpre Ha Hk".
+      iDestruct (off_gv_agree with "Hk Hu") as %<-.
+      iMod (off_gv_update_halves (Z.of_nat (off + length bs)) with "Hk Hu")
+        as "[Hk Hu]".
+      iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'". iModIntro.
+      iFrame "Ha' Hk". iSplitR; [done |]. iApply (IH with "Hu").
+    - rewrite /awrite_part_at. iIntros (off d) "Hk".
+      iDestruct (off_gv_agree with "Hk Hu") as %<-.
+      iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk Hu]".
+      iModIntro. iFrame "Hk". iApply (IH with "Hu").
   Qed.
 
   (* =================================================================== *)
@@ -449,11 +481,12 @@ Section WriteFire.
   (* Replaces the [InodeRegion.ireg_top_retag] filewrite's inode arm calls
      after writei returns: same [inode_local] premise, same payout (the
      moved fragment), plus the caller's two phases inside the one [ftopN]
-     critical section.  The receipt's pre-state row is the OBSERVED one --
-     the fragment read is the one the fire retags, so nothing can move
-     between the observation and the update. *)
-  Lemma wrf_awrite_fire (γfs : fs_names) (E : coPset) (i : Z) (k : nat)
-      (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
+     critical section, AND the offset's half in at the chunk's offset and
+     out advanced by its length.  The receipt's pre-state row is the
+     OBSERVED one -- the fragment read is the one the fire retags, so
+     nothing can move between the observation and the update. *)
+  Lemma wrf_awrite_fire (γfs : fs_names) (E : coPset) (i : Z) (γo : gname) (k : nat)
+      (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) (REST : iProp Σ)
       (off : nat) (bs bs0 : list (bv 8)) (nl : nat) (n n' : fs_node) :
     ↑ftopN ∪ ↑fsabsN ⊆ E ->
     inode_local i n' ->
@@ -463,12 +496,15 @@ Section WriteFire.
     abs_of n = MkAnode (AFile bs0) nl ->
     abs_of n' = MkAnode (AFile (blk_splice off bs bs0)) nl ->
     ftop_inv γfs -∗
-    awrite_commit_at (fs_gamma_L γfs) fsabsE i k Φ -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    awrite_full_at (fs_gamma_L γfs) fsabsE i γo k Φ REST -∗
+    top_frag (fs_gamma_L γfs) i n -∗
+    off_gv γo (1/2) (Z.of_nat off) ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
+      ∗ off_gv γo (1/2) (Z.of_nat (off + length bs))
+      ∗ REST
       ∗ ∃ av : aview, ⌜wri_pre av i off bs bs0 nl⌝ ∗ Φ k av off bs.
   Proof.
-    intros HE Hloc Hpos Hoff Hcap Habs Habs'. iIntros "#Hi Hcm Hf".
+    intros HE Hloc Hpos Hoff Hcap Habs Habs'. iIntros "#Hi Hcm Hf Hg".
     (* the re-spelling [mkf_acre_fire] does, and for the same reason: the
        unifier cannot solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag /fs_gamma_L /=.
@@ -488,9 +524,9 @@ Section WriteFire.
     { rewrite (abs_view_insert I i n') Habs'.
       by rewrite (delta_write_file (abs_view I) i off bs bs0 nl Hrow). }
     iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
-    iMod ("Hcm" $! I off bs bs0 nl with "[//] Hta") as "[Hta Hph2]".
+    iMod ("Hcm" $! I off bs bs0 nl with "[//] Hta Hg") as "[Hta Hph2]".
     iMod (ghost_map_update n' with "Hta Hf") as "[Hta Hf]".
-    iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "[Hta HΦ]".
+    iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "(Hta & Hg & HΦ & Hrest)".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
     { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
@@ -499,8 +535,22 @@ Section WriteFire.
       - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         exact (Hcl jj mm Hj Hun). }
-    iModIntro. iFrame "Hf". iExists (abs_view I).
+    iModIntro. iFrame "Hf Hg Hrest". iExists (abs_view I).
     iSplitR; [by iPureIntro |]. iExact "HΦ".
+  Qed.
+
+  (* THE PARTIAL ARM, at the caller's mask: the short chunk's offset move,
+     lifted from the commit mask exactly as the fire lifts its phases. *)
+  Lemma wrf_partial_move (E : coPset) (γo : gname) (REST : iProp Σ) (off d : nat) :
+    ↑fsabsN ⊆ E ->
+    awrite_part_at fsabsE γo REST -∗
+    off_gv γo (1/2) (Z.of_nat off) ={E}=∗
+      off_gv γo (1/2) (Z.of_nat (off + d)) ∗ REST.
+  Proof.
+    intros HE. iIntros "Hp Hg". rewrite /awrite_part_at.
+    iMod (fupd_mask_subseteq fsabsE) as "Hcl"; [rewrite /fsabsE; solve_ndisj |].
+    iMod ("Hp" $! off d with "Hg") as "[Hg Hrest]".
+    iMod "Hcl". iModIntro. iFrame "Hg Hrest".
   Qed.
 
   (* =================================================================== *)
@@ -530,5 +580,6 @@ Section WriteFire.
 
 End WriteFire.
 
-(* the big-op bodies get the same seal [SpecSysWriteAU] gives its own *)
-Global Typeclasses Opaque awrite_commits_at.
+(* the chain gets the seal [SpecSysWriteAU] gives its big-op bodies: its
+   nodes are [∧]-pairs and an [iFrame] near a consumer must not look inside *)
+Global Typeclasses Opaque awrite_chain.

@@ -39,16 +39,18 @@
       the astate-shaped commit; the weakening is the one direction that
       holds).
 
-   2. THE FIRE REPLACES NOTHING -- IT IS ONE INSERTION.  A read retags no row,
-      so unlike the write lane there is no [ireg_top_retag] to fuse into.
-      [FsAbsReadFire.arf_read_fire] opens [ftopN] off the payload's OWN
-      [top_frag] quarter -- the one [FsStateEra.inode_rd_era_era_node_to]
-      hands out at the read-arm shed -- fires the caller's fupd once, and
-      gives the quarter straight back.  It stands immediately after the
-      [f->off] CHECKOUT, which is the earliest boundary in the lock window at
-      which the offset the receipt reports is known; every later boundary
-      would do, because the state does not move between them (that is the
-      whole content of THE ONE INSTANT).
+   2. THE FIRE REPLACES NOTHING -- IT IS ONE INSERTION, AT THE CHECKIN.  A
+      read retags no row, so unlike the write lane there is no
+      [ireg_top_retag] to fuse into.  [FsAbsReadFire.arf_read_fire] opens
+      [ftopN] off the payload's OWN [top_frag] quarter -- the one
+      [FsStateEra.inode_rd_era_era_node_to] hands out at the read-arm shed
+      -- fires the caller's fupd once with the kernel's half of the offset
+      shadow lent and returned advanced by the count, and gives the quarter
+      straight back.  It stands at the [f->off] CHECKIN of each exit, after
+      readi: the advance is known only there, and the state does not move
+      between the checkout and the checkin (that is the whole content of
+      THE ONE INSTANT).  The checkin then re-forms the cell from the
+      returned half ([FileOffCell.off_resident_of]).
 
    3. THE RETURN TIE IS ASSEMBLED FROM readi'S OWN ARM 2.  [frau_ret_tie]
       below is [FsAbsReadFire.arf_count_bridge_era] on the file row and
@@ -228,10 +230,10 @@ Section ProofFilereadAU.
   Local Lemma fr_env_fs (γf' : gname) (fn' : fread_names)
       (st' : fdstate) (Cf' : fcontent) (inum : mword 32) (γo : gname) :
     fdstate_ok inum γo Cf' st' -> fc_type Cf' = FD_INODE ->
-    fileread_env γf' fn' st' -∗ fileread_fs_env γf' fn' ∗ off_permit γo.
+    fileread_env γf' fn' st' -∗ fileread_fs_env γf' fn'.
   Proof.
     intros Hok Ht. destruct (fdstate_ok_inode inum γo Cf' st' Hok Ht) as (? & ? & ->).
-    rewrite /fileread_env /=. by iIntros "$".
+    by iIntros "$".
   Qed.
 
   Local Lemma fr_env_out_fs (fn' : fread_names)
@@ -329,7 +331,7 @@ Section ProofFilereadAU.
       (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool)
       (lks : gset string) (wb : bool) (i : Z) (γo : gname)
-      (Φr : aview -> nat -> anode -> iProp Σ)
+      (Φr : aview -> nat -> anode -> nat -> iProp Σ)
     : wp_fileread_au_body γf γs j γlp k q st fn pidv U m K eb n b lks
         wb i γo Φr.
   Proof.
@@ -953,7 +955,7 @@ Section ProofFilereadAU.
                 BORROW protocol; iunlock. *)
              assert (Htyi : fc_type Cf = FD_INODE)
                by (apply eq_vec_true_iff; exact Hp2).
-             iDestruct (fr_env_fs γf fn st Cf inumx _ Hok Htyi with "Henv") as "[Henv #Hperm]".
+             iDestruct (fr_env_fs γf fn st Cf inumx _ Hok Htyi with "Henv") as "Henv".
              rewrite /fileread_fs_env.
              iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
                                    #Hbio & #Hitbl & #Hclaimsfr & #Hescs &
@@ -978,6 +980,8 @@ Section ProofFilereadAU.
              (* the box's shadow IS the one the environment's permit is about *)
              assert (Hgo : γox = γo0)
                by exact (proj2 (fdstate_ok_inode_names _ _ _ _ _ _ Hok Hokc Htyi)).
+             (* ...and it is the one the CONTRACT's commit moves *)
+             assert (Hgoo : γo = γo0) by (rewrite Hgx0; exact Hgo).
              (* AU EDIT (difference 4): THE INUM BRIDGE.  The carve's
                 [fdstate_ok] output and the contract's premise read the SAME
                 payload record, so the [i] the commit is indexed by IS the
@@ -1224,24 +1228,23 @@ Section ProofFilereadAU.
                by (apply Z2Nat.id; exact (proj1 Hvr)).
              assert (Hnz : Z.of_nat (Z.to_nat n) = n) by (apply Z2Nat.id; exact Hn0).
              (* =============================================================
-                AU EDIT (difference 2): THE FIRE, AND IT REPLACES NOTHING.
+                AU EDIT (difference 2): THE FIRE IS AT THE CHECKIN, below,
+                once per exit -- [FsAbsReadFire.arf_read_fire] opens [ftopN]
+                off the payload's OWN [top_frag] quarter, fires the caller's
+                fupd once with the kernel's half of the offset shadow lent
+                and returned advanced by the count, and gives the quarter
+                straight back.  A read retags no row, so this is an
+                INSERTION, not a replacement (contrast [ProofFilewriteAU]'s
+                difference 3).
 
-                [FsAbsReadFire.arf_read_fire] opens [ftopN] off the payload's
-                OWN [top_frag] quarter -- the one the read-arm shed just
-                handed out -- fires the caller's fupd once, and gives the
-                quarter straight back.  A read retags no row, so there is no
-                retag to fuse into and this is an INSERTION, not a
-                replacement (contrast [ProofFilewriteAU]'s difference 3).
-
-                WHY HERE.  [ard_pre]'s three conjuncts are exactly what is in
-                hand at this boundary and nowhere earlier: the row is the
-                authority's (the fire proves that itself, off the fragment),
-                the offset respects [FileInvDefs.off_wf] (the checkout has just
-                produced it), and the row's bytes respect the size cap (the
-                loaded record's own [Hszb], the premise readi is about to be
-                given).  Every LATER boundary inside the window would do
-                equally well -- the state does not move between them, which
-                is THE ONE INSTANT -- and this is the first.
+                WHY THERE.  The offset's half is what the commit moves, and
+                it moves by the count readi delivered -- known only after
+                readi.  The state does not move between the checkout and the
+                checkin (the lock window IS the one instant), so the readings
+                [ard_pre] needs are the checkout's: the offset respects
+                [FileInvDefs.off_wf] (the cell just produced it), the row's
+                bytes respect the size cap (the loaded record's [Hszb]), and
+                the row is the authority's (the fire proves that itself).
                 ============================================================= *)
              assert (Hoffcap : (Z.to_nat (bv_unsigned v) <= MAXFILE * BSIZE)%nat).
              { assert (Hwfz : (bv_unsigned v
@@ -1251,22 +1254,7 @@ Section ProofFilereadAU.
              assert (Hszn : (bv_unsigned (di_size dnl)
                              <= Z.of_nat (MAXFILE * BSIZE)%nat)%Z)
                by (rewrite Nat2Z.inj_mul; exact Hszb).
-             iMod (arf_read_fire fsc_fs ⊤ (DfracOwn (1/4)) Φr
-                     (bv_unsigned inm) (Z.to_nat (bv_unsigned v))
-                     (era_node dnl bml data)
-                     ltac:(solve_ndisj) Hoffcap
-                     (arf_size_ok_era dnl bml data Hszn)
-                     with "[] Hau Htop") as "[Htop Hfired]";
-               [iApply (ireg_inv_ftop with "Hireg") |].
              iModIntro.
-             iDestruct "Hfired" as (avf) "[%Hrowf HΦf]".
-             (* the observation's own side conditions, packaged once: every
-                arm below hands THIS to [read_post_ok] / [read_post_fail]. *)
-             assert (Hpref : ard_pre avf (bv_unsigned inm)
-                               (Z.to_nat (bv_unsigned v))
-                               (abs_of (era_node dnl bml data))).
-             { split; [exact Hrowf | split;
-                 [exact Hoffcap | exact (arf_size_ok_era dnl bml data Hszn)]]. }
              (* ---- +0x34 c.mv a4,s3 : a4 := n ---- *)
              iApply (wp_cmv_s_sconf (mword_of_int (FR + 0x3a)) Ra4 Rs3 mil (K - 6)%nat b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1544,19 +1532,23 @@ Section ProofFilereadAU.
                 AU EDIT: the right disjunct carries readi's EQUATION as well,
                 because the exact return tie is read off it and nothing below
                 the [destruct] mentions [Hrdret] again on that side. *)
-             assert (Hcase : zopz0zKzJ_s (zero_reg : mword 64) (mrd !!! Regidx Ra0) = true
+             assert (Hcase : (zopz0zKzJ_s (zero_reg : mword 64) (mrd !!! Regidx Ra0) = true
+                              /\ (mrd !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
+                                  \/ (mrd !!! Regidx Ra0
+                                        = (mword_of_int (Z.of_nat tot) : mword 64)
+                                      /\ tot = 0%nat)))
                              \/ (mrd !!! Regidx Ra0
                                  = (mword_of_int (Z.of_nat tot) : mword 64)
                                  /\ (0 < tot)%nat
                                  /\ tot = rd_clamp (di_size dnl)
                                             (Z.to_nat (bv_unsigned v)) (Z.to_nat n))).
              { destruct Hrdret as [[H1 _] | [H1 Hteq]].
-               - left. rewrite H1. exact fr_blez_m1.
+               - left. split; [rewrite H1; exact fr_blez_m1 | left; exact H1].
                - destruct (decide (tot = 0%nat)) as [Ht0 | Htne].
-                 + left. rewrite H1 Ht0. exact fr_blez_zero.
+                 + left. split; [rewrite H1 Ht0; exact fr_blez_zero | right; by split].
                  + right. split; [exact H1 |]. split; [| exact Hteq].
                    destruct tot as [| t']; [contradiction | apply Nat.lt_0_succ]. }
-             destruct Hcase as [Htk | (Hra0 & Htotpos & Htoteq)].
+             destruct Hcase as [[Htk Hskip] | (Hra0 & Htotpos & Htoteq)].
              ++ (* ---- the update is SKIPPED: the cell goes back unchanged ---- *)
                 iApply (wp_bge_x0_taken_s_sconf (mword_of_int (FR + 0x4a))
                           (mword_of_int 10 : mword 13) Ra0 M1 (K - 6)%nat b
@@ -1567,11 +1559,26 @@ Section ProofFilereadAU.
                 { iApply (fri_4a with "Htext"). }
                 iApply bi.later_intro. iIntros (CID80 Hs80) "Hcg Hpc".
                 iEval (rewrite Htgt54) in "Hpc".
-                (* CHECK IN the cell, at the value it went out with *)
                 iApply fupd_wp.
+                (* THE FIRE, at advance 0: the offset did not move *)
+                iMod (arf_read_fire fsc_fs ⊤ (DfracOwn (1/4)) Φr
+                        (bv_unsigned inm) γo0 (Z.to_nat (bv_unsigned v)) 0%nat
+                        (era_node dnl bml data)
+                        ltac:(solve_ndisj) Hoffcap
+                        (arf_size_ok_era dnl bml data Hszn)
+                        with "[] [Hau] [Htop] [Hgv]") as "(Htop & Hgv & Hfired)";
+                  [iApply (ireg_inv_ftop with "Hireg") | rewrite -Hgoo; iExact "Hau"
+                  | iExact "Htop" | rewrite Hoffz; iExact "Hgv" |].
+                iDestruct "Hfired" as (avf) "[%Hrowf HΦf]".
+                assert (Hpref : ard_pre avf (bv_unsigned inm)
+                                  (Z.to_nat (bv_unsigned v))
+                                  (abs_of (era_node dnl bml data))).
+                { split; [exact Hrowf | split;
+                    [exact Hoffcap | exact (arf_size_ok_era dnl bml data Hszn)]]. }
+                (* CHECK IN the cell, at the value it went out with *)
                 iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-                iMod (off_resident_intro γo0 k v _ Hwf with "Hoff Hgv []") as "Hres".
-                { rewrite -Hgo. iExact "Hperm". }
+                iEval (rewrite Nat.add_0_r Hoffz) in "Hgv".
+                iDestruct (off_resident_of γo0 k v Hwf with "Hoff Hgv") as "Hres".
                 iMod (proto_read_park ⊤ ikk k q γb0 γo0 Cf mo T0 Tr TsoCtx.cur_ctx
                         ltac:(solve_ndisj) Hipk Hik Hqmo
                         with "Hrun Hres Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")
@@ -1762,21 +1769,25 @@ Section ProofFilereadAU.
                    was observed even though the copy died -- and readi's
                    zero-count return is an ordinary ok arm at the exact
                    count. *)
-                { destruct Hrdret as [[H1 _] | [H1 Hteq]].
+                { destruct Hskip as [H1 | [H1 Ht0]].
                   - rewrite /read_arms /read_post_fail. iRight.
                     iSplitR; [iPureIntro; exact H1 |]. iRight.
                     iSplitR; [iPureIntro; exact Hn0 |].
                     iExists avf, (Z.to_nat (bv_unsigned v)),
                       (abs_of (era_node dnl bml data)).
                     iSplitR; [iPureIntro; exact Hpref |]. iExact "HΦf".
-                  - rewrite /read_arms /read_post_ok. iLeft.
+                  - destruct Hrdret as [[H1' _] | [_ Hteq]].
+                    { exfalso. rewrite H1' in H1. apply (f_equal bv_unsigned) in H1.
+                      rewrite Ht0 in H1. vm_compute in H1. discriminate. }
+                    rewrite /read_arms /read_post_ok. iLeft.
                     iExists avf, (Z.to_nat (bv_unsigned v)),
-                      (abs_of (era_node dnl bml data)).
+                      (abs_of (era_node dnl bml data)), 0%nat.
                     iSplitR; [iPureIntro; exact Hpref |].
                     iSplitR; [iPureIntro; exact Hn0 |].
                     iSplitR; [iPureIntro; rewrite H1;
                               exact (frau_ret_tie n dnl bml data
                                        (Z.to_nat (bv_unsigned v)) tot Hn0 Hteq) |].
+                    iSplitR; [iPureIntro; rewrite H1 Ht0; vm_compute; reflexivity |].
                     iExact "HΦf". }
              ++ (* ---- the update RUNS: f->off += r ---- *)
                 assert (Hadv : (Z.of_nat (Z.to_nat (bv_unsigned v)) + Z.of_nat tot
@@ -1890,12 +1901,32 @@ Section ProofFilereadAU.
                                 = mword_of_int (FR + 0x54))
                   by (apply bv_eq; vm_compute; reflexivity).
                 iEval (rewrite Hpp54) in "Hpc".
-                (* CHECK IN the advanced cell *)
                 iApply fupd_wp.
+                (* THE FIRE, at advance [tot]: the bytes and the offset move
+                   in the one fupd *)
+                iMod (arf_read_fire fsc_fs ⊤ (DfracOwn (1/4)) Φr
+                        (bv_unsigned inm) γo0 (Z.to_nat (bv_unsigned v)) tot
+                        (era_node dnl bml data)
+                        ltac:(solve_ndisj) Hoffcap
+                        (arf_size_ok_era dnl bml data Hszn)
+                        with "[] [Hau] [Htop] [Hgv]") as "(Htop & Hgv & Hfired)";
+                  [iApply (ireg_inv_ftop with "Hireg") | rewrite -Hgoo; iExact "Hau"
+                  | iExact "Htop" | rewrite Hoffz; iExact "Hgv" |].
+                iDestruct "Hfired" as (avf) "[%Hrowf HΦf]".
+                assert (Hpref : ard_pre avf (bv_unsigned inm)
+                                  (Z.to_nat (bv_unsigned v))
+                                  (abs_of (era_node dnl bml data))).
+                { split; [exact Hrowf | split;
+                    [exact Hoffcap | exact (arf_size_ok_era dnl bml data Hszn)]]. }
+                (* CHECK IN the advanced cell: the half came back at exactly
+                   the word the store wrote *)
                 iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-                iMod (off_resident_intro γo0 k (mword_of_int (bv_unsigned v + Z.of_nat tot))
-                        _ Hwf2 with "Hoff Hgv []") as "Hres".
-                { rewrite -Hgo. iExact "Hperm". }
+                iEval (rewrite Nat2Z.inj_add Hoffz) in "Hgv".
+                iDestruct (off_resident_of γo0 k (mword_of_int (bv_unsigned v + Z.of_nat tot))
+                             Hwf2 with "Hoff [Hgv]") as "Hres".
+                { rewrite moi32_unsigned bvw32_small; [iExact "Hgv" |].
+                  split; [lia |]. apply (Z.le_lt_trans _ (Z.of_nat MAXFILE * Z.of_nat BSIZE));
+                    [exact Hadv | vm_compute; reflexivity]. }
                 iMod (proto_read_park ⊤ ikk k q γb0 γo0 Cf mo T0 Tr TsoCtx.cur_ctx
                         ltac:(solve_ndisj) Hipk Hik Hqmo
                         with "Hrun Hres Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")
@@ -2078,12 +2109,14 @@ Section ProofFilereadAU.
                    readi's own equation, carried down by [Hcase]. *)
                 { rewrite /read_arms /read_post_ok. iLeft.
                   iExists avf, (Z.to_nat (bv_unsigned v)),
-                    (abs_of (era_node dnl bml data)).
+                    (abs_of (era_node dnl bml data)), tot.
                   iSplitR; [iPureIntro; exact Hpref |].
                   iSplitR; [iPureIntro; exact Hn0 |].
                   iSplitR; [iPureIntro;
                             exact (frau_ret_tie n dnl bml data
                                      (Z.to_nat (bv_unsigned v)) tot Hn0 Htoteq) |].
+                  iSplitR; [iPureIntro; rewrite moi64_unsigned bvw64_small;
+                            [reflexivity | change (2 ^ 64)%Z with 18446744073709551616%Z; lia] |].
                   iExact "HΦf". }
           -- (* ========== THE PANIC ARM IS DEAD (AU EDIT) ===============
                 [f->type] is FD_INODE, so the [bne a5,a4] at +0x30 cannot be
