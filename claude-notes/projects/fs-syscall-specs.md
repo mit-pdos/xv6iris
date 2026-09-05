@@ -2997,13 +2997,31 @@ things, and the answer differs:
       producing `R` *and* the buffer out of the image's writable bytes;
       `sh_uexec_slot_x` and `sh_slot_of_kexec` both carry it and neither
       discharges it — like `ush_rest`, it is the shell's to prove.  Audit =
-      the standing three.  (b) The LEXABILITY premise
+      the standing three.  **AND THE JOIN LANDED WITH IT**:
+      `UkShFork.ushf_rest_of_body` discharges `UkSh.ush_rest γt γd γs γfd
+      (UkShLoop.ushl_R γd γs sz)` from `wp_kshm_body`, taking `shk_code`,
+      `shk_rodata`, `ush_jtab`, the three break facts and ONE assumption
+      (`ushf_lexable`).  The two gaps that DID close are worth naming:
+      *where the line ends* (`ush_rest` gives only "some byte at or after
+      `k` is NUL"; `ushf_first_nul` walks from `k` to that witness and
+      returns the FIRST one, which is the `len` the body wants, with
+      `k + len <= i2 < sh_nbuf` for free) and *the resources*
+      (`UkShLoop.ushl_R := ushl_dat ∗ usz γs sz`, uncurried into
+      `ushl_head` by `ushl_head_of_R`; the budgets already agreed).
+      Audit = the standing three.  (b) The LEXABILITY premise
       (`ushp_no_symbols`, fewer than MAXARGS tokens), which the command
       loop cannot supply about a line the user typed.  That one is NOT
       main's body: a line with a symbol byte does not reach
       `wp_kshp_parser` at all, and if it did, `runcmd` refutes the REDIRECT
       and PIPE arms from `ush_simple` — the two arms that MOVE THE
-      DESCRIPTOR TABLE.  Closing it is stage 5 work, not stage 6.
+      DESCRIPTOR TABLE.  Closing it is stage 5 work, not stage 6.  It is
+      now written down as `UkShFork.ushf_lexable`, over an arbitrary `f`
+      and `k` because that is how the loop hands the line over: whatever is
+      in the buffer.  **This is the ONLY thing between the shell and a
+      closed command loop**, together with `UShKernel`'s payload premise
+      (which is bookkeeping — the image's writable bytes yield `ushl_R` and
+      the line buffer — and needs the `.bss`/`.rodata` image facts that
+      `sh_slot_of_kexec` used to derive for the buffer alone).
 
   **ASKS (relay, in priority order).**
   1. ~~**`wp_uk_ecall_window` in `UkRunSys.v`**~~ **DONE — built in-house
