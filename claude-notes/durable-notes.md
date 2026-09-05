@@ -2863,3 +2863,47 @@ Two things this cost that a statement-level review would not have caught:
   `start` actually fetches, the literal is gone and the tactic fails with
   `Found no subterm matching "2274"`.  The rewrite had never been doing
   anything to the real goal.  Expect one of these per converted proof.
+
+## THREE THINGS THAT MAKE A 90-INSTRUCTION STRAIGHT-LINE WALK TRACTABLE
+##   (from `iris/UkShMalloc.v`, the K&R allocator's first call)
+
+A walk of ninety instructions writes a dozen registers many times over, and
+the naive bookkeeping — one `Hxx_k : m_k !!! Regidx r = v` per (register,
+step) — is quadratic in the walk and is what actually makes such a proof
+unwritable.  Three habits keep it linear.
+
+- **ONE LIVE-SET PREDICATE PER PHASE, with its own `_upd` lemma.**  Collect
+  the registers that must survive a stretch into a `Definition … : Prop` and
+  prove `P mm -> (r is none of them) -> P (<[Regidx r := v]> mm)` once.  Each
+  step is then a four-line `assert … by (apply …_upd; [assumption | …])`
+  instead of one `rewrite` chain per register.  `ushm_free_live` does this
+  for free's three long-lived registers; malloc's phases are longer, so it
+  uses the second habit instead.
+- **ONE COMPOSITE `Hkeep`, NOT n CHAINS.**  For a stretch that writes the
+  set `W`, state `forall q, q ∉ W -> m_end !!! Regidx q = m_start !!! Regidx
+  q` as a single `assert` whose proof is the one `rewrite /m_k (upd_ne …)`
+  chain, and read every preserved register off it.  This is also exactly the
+  shape the ABI read-back (`ucallee_saved m m'`) wants at the end: `q`
+  callee-saved gives `q ∉ W` for every caller-saved `W`, by
+  `ucallee_saved_idx q = true` versus `ucallee_saved_idx r = false`.
+- **CUT THE EPILOGUE OUT AS A LEMMA when two arms share it.**  malloc's
+  `sbrk` test has a failure arm and a success arm that meet again at the
+  eight-word epilogue; `wp_kshm_malloc_epi` is that epilogue proved once,
+  and it is also where the frame's `ustack` is rebuilt.  The two-word frame
+  already existed this way — `UkShParse.wp_kshp_pro2`/`wp_kshp_epi2`,
+  parametric in the pc, which is why `sbrk` and `free` cost four lines of
+  frame each.
+
+### And two paper cuts on the way
+
+- **A C CAST IN A COMMENT ENDS THE COMMENT.**  `(* … (Header*)ap … *)` and
+  `(* … (Header *)ap … *)` both close at the `*)`, and the error is
+  `Syntax error: illegal begin of vernac` pointing at whatever follows.
+  Write `(Header * )ap`.  Same trap as `sizeof( *cmd)` needing its space.
+- **SPLITTING A `ubytes` RUN THAT IS ALREADY IN THE IRIS CONTEXT** needs
+  `iEval (rewrite Ec ubytes_app) in "H"`, not a bare `rewrite` — and the
+  address each piece lands at is `a + Z.of_nat k`, so `assert (E : a +
+  Z.of_nat k = a + K) by lia` and `iEval (rewrite E) in "H"`, INNERMOST
+  PIECE LAST (rewriting the outer address first stops the inner pattern from
+  matching).  Sizes stated as `Z.to_nat 65536` are fine to `rewrite` and
+  fatal to `vm_compute`: `seq 0 65536` is a real list.
