@@ -4,7 +4,7 @@
    file-system-internal invariant.
 
    Design of record: claude-notes/design/applications.md sections 1-2 (the
-   conditional invariant [⌜A I⌝ ∨ tainted], the body and its two carriers)
+   conditional invariant [A I ∨ tainted], its iProp left arm, the body and its two carriers)
    on top of fs-syscall-specs.md sections 0-2 (the AU forms and the
    [FsAbs] carriers), and the owner's 2026-09-03 ruling: the invariant
    lives SIDE BY SIDE with the file system's crash invariant
@@ -36,14 +36,20 @@
 
    WHAT IT SAYS: THE APPLICATION CONJUNCT (applications.md section 1).
    Beside the copy the body carries [fsabs_ok I]: EITHER the application's
-   predicate on the abstract state holds of the copy -- [fsc_app I], a
-   field of the era's file-system configuration ([FsCfg.fscfg]), chosen at
-   the era mint -- OR the run is TAINTED, witnessed by a lower bound of 1
-   on the machine's CLIENT PHASE COUNTER ([RiscvPtsto.client_lb 1]).  The
-   counter is fixed-layer for the same reason the durable disk's name is:
-   a taint must outlive the era it was minted in, and every era has to be
-   able to name it without learning it.  Both arms are persistent, so the
-   conjunct costs nothing to carry and nothing to duplicate.
+   predicate on the abstract state holds of the copy -- [app_pred I], an
+   iProp over the raw node map, the one field of the era's application
+   record ([AppCfg.appcfg], a field of [FileInvDefs.fileG] beside [icfg]
+   and [fscfg], chosen at the era mint) -- OR the run is TAINTED, witnessed
+   by a lower bound of 1 on the machine's CLIENT PHASE COUNTER
+   ([RiscvPtsto.client_lb 1]).  The counter is fixed-layer for the same
+   reason the durable disk's name is: a taint must outlive the era it was
+   minted in, and every era has to be able to name it without learning it.
+   The left arm is an iProp and NOT a Prop (the owner's 2026-09-05
+   correction): an application's claim owns resources -- per-node
+   fragments, receipts, its own ghosts -- and a pure arm cannot.  So
+   nothing about the conjunct is timeless or persistent: the body keeps it
+   under the invariant's later, and the dischargers move it without
+   stripping ([fsabs_body_later_lic_set] below, applications.md section 2).
 
    WHERE IT IS ESTABLISHED, AND WHERE IT IS RE-ESTABLISHED.  The copy is
    MINTED AT THE ERA MINT ([FsCfgSnap.fs_cfg_alloc_snap], through
@@ -64,7 +70,7 @@
    holds the kernel's lent map, not the copy's, and nothing relates the
    two until every mover fires (lane L3), so a license indexed by the
    write deltas ([FsAbsDelta.fs_delta]) could not be applied.  The generic
-   application ([fsc_app = fun _ => True]) holds the license outright
+   application ([app_pred = fun _ => True]) holds the license outright
    ([fsabs_lic_raw_triv]); an application that constrains the state holds
    it only once tainted ([fsabs_lic_raw_tainted]).  Nothing here claims the
    copy tracks the kernel between fire points: paths that move [γtop]
@@ -85,7 +91,7 @@
    unify with this file's, both printing identically.  The boot chain
    ([FsCfgSnap], [BootShared], [xv6_boot_era]) states its premises at the
    pinned forms for that reason.  [fsabs_ok]/[fsabs_lic] are the pinned
-   forms at the ambient [fsc_app], which is what the body and the
+   forms at the ambient [app_pred], which is what the body and the
    dischargers use.
 
    THE MASK.  The AU commits used to be instantiated at the mask floor
@@ -102,7 +108,7 @@ From iris.base_logic.lib Require Import invariants ghost_map mono_nat.
 Require Import RiscvPtsto.      (* [riscvGS]: the invariant class, the way FsAbs section 5 binds it;
                                    [riscv_client_name] / [client_lb]: the taint *)
 Require Import Xv6Cameras.
-Require Import FsCfg.           (* [fscfg]: [fsc_app], the application's predicate *)
+Require Import AppCfg.          (* [appcfg]: [app_pred], the application's predicate *)
 Require Import FsState.         (* [fs_view_names], [top_frag] *)
 
 Definition fsabsN : namespace := nroot .@ "fsabs".
@@ -116,33 +122,31 @@ Section FsAbsRaw.
   Context `{!mono_natG Σ}.
 
   (* the application conjunct: the predicate holds of [I], or the run is
-     tainted (the client counter has passed 1) *)
-  Definition fsabs_ok_raw (γcl : gname) (A : gmap Z fs_node -> Prop)
+     tainted (the client counter has passed 1).  [A I] is an arbitrary
+     iProp, so the disjunction is neither persistent nor timeless; the
+     license below is what a discharger uses in place of either. *)
+  Definition fsabs_ok_raw (γcl : gname) (A : gmap Z fs_node -> iProp Σ)
       (I : gmap Z fs_node) : iProp Σ :=
-    (⌜A I⌝ ∨ mono_nat_lb_own γcl 1%nat)%I.
+    (A I ∨ mono_nat_lb_own γcl 1%nat)%I.
 
   (* THE LICENSE: the copy may be re-synced to any map *)
-  Definition fsabs_lic_raw (γcl : gname) (A : gmap Z fs_node -> Prop) : iProp Σ :=
+  Definition fsabs_lic_raw (γcl : gname) (A : gmap Z fs_node -> iProp Σ) : iProp Σ :=
     (□ (∀ I I' : gmap Z fs_node, fsabs_ok_raw γcl A I -∗ fsabs_ok_raw γcl A I'))%I.
 
-  Global Instance fsabs_ok_raw_persistent γcl A I : Persistent (fsabs_ok_raw γcl A I).
-  Proof. rewrite /fsabs_ok_raw. apply _. Qed.
-  Global Instance fsabs_ok_raw_timeless γcl A I : Timeless (fsabs_ok_raw γcl A I).
-  Proof. rewrite /fsabs_ok_raw. apply _. Qed.
   Global Instance fsabs_lic_raw_persistent γcl A : Persistent (fsabs_lic_raw γcl A).
   Proof. rewrite /fsabs_lic_raw. apply _. Qed.
 
-  Lemma fsabs_ok_raw_intro γcl A I : A I -> ⊢ fsabs_ok_raw γcl A I.
-  Proof. intros HA. rewrite /fsabs_ok_raw. iLeft. done. Qed.
+  Lemma fsabs_ok_raw_intro γcl A I : A I -∗ fsabs_ok_raw γcl A I.
+  Proof. iIntros "H". rewrite /fsabs_ok_raw. iLeft. iExact "H". Qed.
 
   Lemma fsabs_ok_raw_tainted γcl A I : mono_nat_lb_own γcl 1%nat -∗ fsabs_ok_raw γcl A I.
   Proof. iIntros "H". rewrite /fsabs_ok_raw. iRight. iExact "H". Qed.
 
   (* the generic application's license: [fun _ => True] holds of any map *)
-  Lemma fsabs_lic_raw_triv γcl : ⊢ fsabs_lic_raw γcl (fun _ : gmap Z fs_node => True%type).
+  Lemma fsabs_lic_raw_triv γcl : ⊢ fsabs_lic_raw γcl (fun _ : gmap Z fs_node => True%I).
   Proof.
     rewrite /fsabs_lic_raw. iIntros "!>" (J J') "_".
-    iApply fsabs_ok_raw_intro. exact Logic.I.
+    rewrite /fsabs_ok_raw. iLeft. iPureIntro. exact Logic.I.
   Qed.
 
   (* ...and a constraining application's: only once tainted *)
@@ -162,23 +166,19 @@ Section FsAbsAt.
      [mono_natG] in scope -- exactly [client_lb]'s binding (header) *)
   Context `{!riscvFixedGS Σ}.
 
-  Definition fsabs_ok_at (A : gmap Z fs_node -> Prop) (I : gmap Z fs_node) : iProp Σ :=
+  Definition fsabs_ok_at (A : gmap Z fs_node -> iProp Σ) (I : gmap Z fs_node) : iProp Σ :=
     fsabs_ok_raw riscv_client_name A I.
-  Definition fsabs_lic_at (A : gmap Z fs_node -> Prop) : iProp Σ :=
+  Definition fsabs_lic_at (A : gmap Z fs_node -> iProp Σ) : iProp Σ :=
     fsabs_lic_raw riscv_client_name A.
 
-  Global Instance fsabs_ok_at_persistent A I : Persistent (fsabs_ok_at A I).
-  Proof. rewrite /fsabs_ok_at. apply _. Qed.
-  Global Instance fsabs_ok_at_timeless A I : Timeless (fsabs_ok_at A I).
-  Proof. rewrite /fsabs_ok_at. apply _. Qed.
   Global Instance fsabs_lic_at_persistent A : Persistent (fsabs_lic_at A).
   Proof. rewrite /fsabs_lic_at. apply _. Qed.
 
-  Lemma fsabs_ok_at_intro A I : A I -> ⊢ fsabs_ok_at A I.
-  Proof. intros HA. rewrite /fsabs_ok_at. by iApply fsabs_ok_raw_intro. Qed.
+  Lemma fsabs_ok_at_intro A I : A I -∗ fsabs_ok_at A I.
+  Proof. rewrite /fsabs_ok_at. iApply fsabs_ok_raw_intro. Qed.
   Lemma fsabs_ok_at_tainted A I : client_lb 1 -∗ fsabs_ok_at A I.
   Proof. rewrite /fsabs_ok_at /client_lb. iApply fsabs_ok_raw_tainted. Qed.
-  Lemma fsabs_lic_at_triv : ⊢ fsabs_lic_at (fun _ : gmap Z fs_node => True%type).
+  Lemma fsabs_lic_at_triv : ⊢ fsabs_lic_at (fun _ : gmap Z fs_node => True%I).
   Proof. rewrite /fsabs_lic_at. iApply fsabs_lic_raw_triv. Qed.
   Lemma fsabs_lic_at_tainted A : client_lb 1 -∗ fsabs_lic_at A.
   Proof. rewrite /fsabs_lic_at /client_lb. iApply fsabs_lic_raw_tainted. Qed.
@@ -193,9 +193,9 @@ Section FsAbsInv.
      pinned by the machine's own instance, or a consumer's statement that
      mentions nothing else ([fsabs_inv] beside a plain fupd) cannot resolve it *)
   Context `{!riscvGS Σ, !fsLinkG Σ, !fsTopG Σ}.
-  (* the era's configuration, for [fsc_app] (consumers reach it through
-     [fileG]'s [file_fscfg]; the kits and the mint pass it explicitly) *)
-  Context `{FSC : fscfg}.
+  (* the era's application record, for [app_pred] (consumers reach it
+     through [fileG]'s [file_app]; the kits and the mint pass it explicitly) *)
+  Context `{APP : appcfg Σ}.
   Implicit Types Γ : fs_view_names Σ.
 
   (* the client Γ: the live one with a fresh [γtop] *)
@@ -209,14 +209,10 @@ Section FsAbsInv.
   Definition fsabs_frags Γ (I : gmap Z fs_node) : iProp Σ :=
     ([∗ map] i ↦ n ∈ I, top_frag Γ i n)%I.
 
-  (* the application conjunct and the license at [fsc_app] *)
-  Definition fsabs_ok (I : gmap Z fs_node) : iProp Σ := fsabs_ok_at fsc_app I.
-  Definition fsabs_lic : iProp Σ := fsabs_lic_at fsc_app.
+  (* the application conjunct and the license at [app_pred] *)
+  Definition fsabs_ok (I : gmap Z fs_node) : iProp Σ := fsabs_ok_at app_pred I.
+  Definition fsabs_lic : iProp Σ := fsabs_lic_at app_pred.
 
-  Global Instance fsabs_ok_persistent I : Persistent (fsabs_ok I).
-  Proof. rewrite /fsabs_ok. apply _. Qed.
-  Global Instance fsabs_ok_timeless I : Timeless (fsabs_ok I).
-  Proof. rewrite /fsabs_ok. apply _. Qed.
   Global Instance fsabs_lic_persistent : Persistent fsabs_lic.
   Proof. rewrite /fsabs_lic. apply _. Qed.
 
@@ -228,7 +224,8 @@ Section FsAbsInv.
   Qed.
 
   (* the body: the client authority beside all of its frags and the
-     application conjunct (header) *)
+     application conjunct (header).  NOT timeless: the conjunct is an
+     arbitrary iProp, and it stays under the invariant's later. *)
   Definition fsabs_body Γ : iProp Σ :=
     (∃ I : gmap Z fs_node,
        ghost_map_auth (γtop Γ) 1 I ∗ fsabs_frags Γ I ∗ fsabs_ok I)%I.
@@ -237,20 +234,19 @@ Section FsAbsInv.
 
   Global Instance fsabs_frags_timeless Γ I : Timeless (fsabs_frags Γ I).
   Proof. rewrite /fsabs_frags /top_frag. apply _. Qed.
-  Global Instance fsabs_body_timeless Γ : Timeless (fsabs_body Γ).
-  Proof. rewrite /fsabs_body. apply _. Qed.
   Global Instance fsabs_inv_persistent Γ : Persistent (fsabs_inv Γ).
   Proof. rewrite /fsabs_inv. apply _. Qed.
 
-  (* THE REPLACEMENT: with every frag inside, the whole map may be
+  (* THE REPLACEMENT: with every frag in hand, the whole map may be
      overwritten -- delete everything, then insert the new map.  This is
-     the one ghost move the dischargers make; the old map's conjunct is
-     dropped with it. *)
-  Lemma fsabs_body_replace Γ (I' : gmap Z fs_node) :
-    fsabs_body Γ ==∗ ghost_map_auth (γtop Γ) 1 I' ∗ fsabs_frags Γ I'.
+     the one ghost move the dischargers make, stated on the two TIMELESS
+     conjuncts alone so that the later-shaped discharger below can strip
+     them and leave the application conjunct where it is. *)
+  Lemma fsabs_map_replace Γ (I I' : gmap Z fs_node) :
+    ghost_map_auth (γtop Γ) 1 I -∗ fsabs_frags Γ I ==∗
+    ghost_map_auth (γtop Γ) 1 I' ∗ fsabs_frags Γ I'.
   Proof.
-    iIntros "H". iDestruct "H" as (I) "(Ha & Hf & _)".
-    rewrite /fsabs_frags /top_frag.
+    iIntros "Ha Hf". rewrite /fsabs_frags /top_frag.
     iMod (ghost_map_delete_big I with "Ha Hf") as "Ha".
     rewrite map_difference_diag.
     iMod (ghost_map_insert_big I' with "Ha") as "[Ha Hf]".
@@ -258,22 +254,48 @@ Section FsAbsInv.
     rewrite map_union_empty. iModIntro. iFrame "Ha Hf".
   Qed.
 
+  (* ...on the whole body; the old map's conjunct is dropped with it *)
+  Lemma fsabs_body_replace Γ (I' : gmap Z fs_node) :
+    fsabs_body Γ ==∗ ghost_map_auth (γtop Γ) 1 I' ∗ fsabs_frags Γ I'.
+  Proof.
+    iIntros "H". iDestruct "H" as (I) "(Ha & Hf & _)".
+    iApply (fsabs_map_replace Γ I I' with "Ha Hf").
+  Qed.
+
   (* ...re-closed at a map whose conjunct the caller pays *)
   Lemma fsabs_body_set Γ (I' : gmap Z fs_node) :
     fsabs_body Γ -∗ fsabs_ok I' ==∗ fsabs_body Γ.
   Proof.
-    iIntros "H #Hok". iMod (fsabs_body_replace Γ I' with "H") as "[Ha Hf]".
+    iIntros "H Hok". iMod (fsabs_body_replace Γ I' with "H") as "[Ha Hf]".
     iModIntro. iExists I'. iFrame "Ha Hf Hok".
   Qed.
 
-  (* ...and paid with the license: what every discharger uses *)
+  (* ...and paid with the license: the body's conjunct is spent on the new
+     map's, so the ghost move runs on the two other conjuncts *)
   Lemma fsabs_body_lic_set Γ (I' : gmap Z fs_node) :
     fsabs_lic -∗ fsabs_body Γ ==∗ fsabs_body Γ.
   Proof.
-    iIntros "#Hlic H". iDestruct "H" as (I) "(Ha & Hf & #Hok)".
-    iDestruct (fsabs_lic_apply I I' with "Hlic Hok") as "#Hok'".
-    iApply (fsabs_body_set Γ I' with "[Ha Hf] Hok'").
-    iExists I. iFrame "Ha Hf Hok".
+    iIntros "#Hlic H". iDestruct "H" as (I) "(Ha & Hf & Hok)".
+    iDestruct (fsabs_lic_apply I I' with "Hlic Hok") as "Hok'".
+    iMod (fsabs_map_replace Γ I I' with "Ha Hf") as "[Ha Hf]".
+    iModIntro. iExists I'. iFrame "Ha Hf Hok'".
+  Qed.
+
+  (* THE LATER-SHAPED STEP: what every discharger uses (applications.md
+     section 2).  Opening the invariant yields [▷ fsabs_body Γ]; the two
+     timeless conjuncts come out from under the later, the map is replaced
+     on them, and the license is applied UNDER the later -- [▷ (P -∗ Q) ∗
+     ▷ P ⊢ ▷ Q], the license being persistent hence [▷]-introducible -- so
+     the body closes with [▷ fsabs_ok I'] in place.  No timelessness is
+     asked of the application. *)
+  Lemma fsabs_body_later_lic_set Γ (I' : gmap Z fs_node) :
+    fsabs_lic -∗ ▷ fsabs_body Γ ==∗ ▷ fsabs_body Γ.
+  Proof.
+    iIntros "#Hlic H". rewrite /fsabs_body.
+    iDestruct "H" as (I) "(>Ha & >Hf & Hok)".
+    iMod (fsabs_map_replace Γ I I' with "Ha Hf") as "[Ha Hf]".
+    iModIntro. iNext. iExists I'. iFrame "Ha Hf".
+    iApply (fsabs_lic_apply I I' with "Hlic Hok").
   Qed.
 
   (* ALLOCATION: a fresh client copy at a map whose conjunct the caller
@@ -282,8 +304,8 @@ Section FsAbsInv.
   Lemma fsabs_alloc Γ (I : gmap Z fs_node) (E : coPset) :
     fsabs_ok I -∗ |={E}=> ∃ γa : gname, fsabs_inv (fsabs_client Γ γa).
   Proof.
-    iIntros "#Hok". iMod (ghost_map_alloc I) as (γa) "[Ha Hf]".
-    iExists γa. iApply (inv_alloc fsabsN E with "[Ha Hf]").
+    iIntros "Hok". iMod (ghost_map_alloc I) as (γa) "[Ha Hf]".
+    iExists γa. iApply (inv_alloc fsabsN E with "[Ha Hf Hok]").
     iExists I. rewrite /fsabs_frags /top_frag fsabs_client_top.
     iFrame "Ha Hf Hok".
   Qed.
@@ -306,7 +328,7 @@ Section FsAbsInv.
   Lemma fsabs_env_alloc Γ (I : gmap Z fs_node) (E : coPset) :
     fsabs_ok I -∗ fsabs_lic -∗ |={E}=> fsabs_env Γ.
   Proof.
-    iIntros "#Hok #Hlic". iMod (fsabs_alloc Γ I E with "Hok") as (γa) "#Hinv".
+    iIntros "Hok #Hlic". iMod (fsabs_alloc Γ I E with "Hok") as (γa) "#Hinv".
     iModIntro. iApply (fsabs_env_intro Γ γa with "Hinv Hlic").
   Qed.
 

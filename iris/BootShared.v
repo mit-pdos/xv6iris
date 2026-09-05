@@ -71,6 +71,7 @@ Require Import FsImg.          (* the image sweeps' vocabulary *)
 Require Import FsCfgBoot.      (* the two boot kits *)
 Require Import FsCfgSnap.      (* [fs_cfg_alloc_snap] -- the era mint *)
 Require Import FsAbsInv.       (* [fsabs_ok_at]/[fsabs_lic_at]: the application's boot obligation and license, handed to the mint *)
+Require Import AppCfg.         (* [appcfg]: the application's record, the third field [fileG_of] takes *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 
@@ -1407,12 +1408,13 @@ Section BootAlloc.
   Lemma boot_shared_alloc (g : gstate) (ndisk : nat)
       (sb : fs_sb) (nib : nat) (cov : gset Z)
       (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8))
-      (* THE APPLICATION'S PREDICATE on the abstract file-system state
-         (claude-notes/design/applications.md sections 1-3): threaded
-         straight to the mint, with the two resources it asks for below --
-         the seed's conjunct (the boot obligation, which the era's caller
-         pays out of the power arm's lend) and the license. *)
-      (A : gmap Z FsNode.fs_node -> Prop)
+      (* THE APPLICATION'S RECORD -- its predicate on the abstract
+         file-system state (claude-notes/design/applications.md sections
+         1-3): threaded straight to the mint, with the two resources it asks
+         for below -- the seed's conjunct (the boot obligation, which the
+         era's caller pays out of the power arm's lend) and the license --
+         and installed as the third field of the era's [fileG] below. *)
+      (APP : appcfg Σ)
       (* THE CLIENT'S LENT RESOURCE (durable-disk BT-1).  It arrives on
          [power_boot_res] and this fupd DROPS it: the boot mint does not
          read it yet (BT-3 is where [fs_cfg_alloc_snap] starts taking the
@@ -1438,7 +1440,8 @@ Section BootAlloc.
     fs_boot_snap_wf (v_disk (g.(gdev).(dvirtio))) ndisk S Pb sb nib cov ->
     (* the application's boot obligation at the founded map, and its
        license -- both straight through to [FsCfgSnap.fs_cfg_alloc_snap] *)
-    fsabs_ok_at A (FsState.fss_inodes S) -∗ fsabs_lic_at A -∗
+    fsabs_ok_at (@app_pred Σ APP) (FsState.fss_inodes S) -∗
+    fsabs_lic_at (@app_pred Σ APP) -∗
     (* THE DURABLE SNAPSHOT, LENT BY THE POWER ARM (durable-disk BT-3).
        It arrives on [power_boot_res]'s [Rb] conjunct as
        [FsCrash.P_fs_lend]; the caller splits that off
@@ -1525,7 +1528,7 @@ Section BootAlloc.
          chain arms above are applied at.  Stage (e) is the consumer:
          kit 1 in [ProofMain.mn_grp_fs], kit 2 through [SpecUserinit] to
          forkret's first arm. *)
-      fs_boot_supply (@file_icfg Σ HF) (@file_fscfg Σ HF)
+      fs_boot_supply (@file_icfg Σ HF) (@file_fscfg Σ HF) (@file_app Σ HF)
         (v_disk (g.(gdev).(dvirtio))) sb nib cov γd γv Rspent Pb
         (FsCrash.hdr_wset
            (FsCrash.fs_blocks (v_disk (g.(gdev).(dvirtio))))
@@ -1557,7 +1560,7 @@ Section BootAlloc.
     pose proof Hbf as Hbf'.
     destruct Hbf' as (Hpow & Hin & Hmemf & Hregsf & Hu0 & Hp0 & Hv0' & _).
     destruct Hv0' as (v0 & Hv0).
-    iIntros "#Hok #Hlic Hdursnap H".
+    iIntros "Hok #Hlic Hdursnap H".
     iDestruct (power_boot_res_unpack Rb g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hkptb & Hstrans & Hsie & Hspp & Hspie &
         Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hswlb &
@@ -1754,7 +1757,7 @@ Section BootAlloc.
             (FsCrash.hdr_wset
                (FsCrash.fs_blocks (v_disk (g.(gdev).(dvirtio))))
                (FsImg.sb_logstart (FsState.fss_sb S)))
-            A HlPb
+            APP HlPb
             (FsCrash.hdr_wset_home _ cov _ Hhwf)
             (FsCrash.hdr_wset_sb _ cov _ Hhwf)
             Hagr Hnibeq Hnib32 Hcovin Hcovmeta
@@ -1765,12 +1768,14 @@ Section BootAlloc.
        LINK family's per-inum authorities and their token piles are the
        inode REGION's ([InodeRegion.ireg_lnk]).  Both are routed inside
        [fs_cfg_alloc], so nothing is dropped here. *)
-    (* [fileG_of]'s two projections ARE the two minted records, by iota.
-       Named, so the postcondition's row needs no conversion step inside the
-       proofmode. *)
-    assert (Hpi : @file_icfg Σ (fileG_of FGP ICFG FSC) = ICFG)
+    (* [fileG_of]'s three projections ARE the three records, by iota (the
+       two minted ones and the application's, passed in).  Named, so the
+       postcondition's row needs no conversion step inside the proofmode. *)
+    assert (Hpi : @file_icfg Σ (fileG_of FGP ICFG FSC APP) = ICFG)
       by reflexivity.
-    assert (Hpf : @file_fscfg Σ (fileG_of FGP ICFG FSC) = FSC)
+    assert (Hpf : @file_fscfg Σ (fileG_of FGP ICFG FSC APP) = FSC)
+      by reflexivity.
+    assert (Hpa : @file_app Σ (fileG_of FGP ICFG FSC APP) = APP)
       by reflexivity.
     (* ================================================================ *)
     (* ---- the eight harts' register sides, and the sixteen wire pins ---- *)
@@ -1832,7 +1837,7 @@ Section BootAlloc.
     (* [Hprocsavail] -- [procs_avail (Some NPROC)] -- now leaves in the
        postcondition: userinit is proven and its contract
        ([SpecUserinit.v]) takes exactly this. *)
-    iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC), γd, γv,
+    iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC APP), γd, γv,
                        (snap_spent S nib), γi, ξd.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iExact "Hktext" |].
@@ -1872,7 +1877,7 @@ Section BootAlloc.
     iSplitL "Hirauth"; [iExact "Hirauth" |].
     iSplitL "Hirslot"; [iExact "Hirslot" |].
     (* the ten ties and the two kits, restated at [fileG_of]'s projections *)
-    rewrite /fs_boot_supply Hpi Hpf. iExact "Hfs".
+    rewrite /fs_boot_supply Hpi Hpf Hpa. iExact "Hfs".
   Qed.
 
 End BootAlloc.

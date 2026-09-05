@@ -1445,7 +1445,7 @@ Section ProofMain.
        stage (f) is what deposits it into [FirstTok.first_tok]'s widened
        left disjunct so that forkret's [fsinit] can spend it. *)
     fs_kit_icache_rest _ _ -∗
-    fs_kit_fsinit_ghost _ _ (FsCrash.fs_blocks dk) Rspent Pb
+    fs_kit_fsinit_ghost _ _ _ (FsCrash.fs_blocks dk) Rspent Pb
       (FsCrash.hdr_wset (FsCrash.fs_blocks dk) fsc_logst) -∗
     (* ---- ROWS (A)/(B)/(C) OF [FirstTok.first_fsinit] (fs-cfg-boot.md
        (f-2)): the 32 raw [&sb] bytes and the whole [struct log], both

@@ -47,6 +47,7 @@ Require Import FsAbsInv.    (* [fsabs_ok_raw]/[fsabs_lic_raw] and their pinned f
 Require Import ProcGeom.
 Require Import FdSlots.
 Require Import FileInvDefs.
+Require Import AppCfg.      (* [MkAppcfg]: the boot builds the application's record for the mint *)
 Require Import WpUart.
 Require Import BootConfig.
 Require Import BootChain BootShared.
@@ -300,12 +301,14 @@ Section SystemBoot.
   Lemma xv6_boot_era (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
       (* THE APPLICATION'S FILE-SYSTEM SIDE (claude-notes/design/
          applications.md sections 1-3): its predicate on the abstract state
-         ([fsc_app] of the era's record) and its LEND -- what the PowerOn
-         arm hands this boot about the durable state, at the client
-         counter's name, riding [power_boot_res]'s [Rb] beside the file
-         system's own [P_fs_lend].  Stated at the AMBIENT names, since the
-         era's record is in scope here: the PINNED forms of [FsAbsInv]. *)
-      (A : gmap Z FsNode.fs_node -> Prop)
+         -- an iProp over the node map; this boot BUILDS the era's
+         application record [MkAppcfg A] for the mint -- and its LEND --
+         what the PowerOn arm hands this boot about the durable state, at
+         the client counter's name, riding [power_boot_res]'s [Rb] beside
+         the file system's own [P_fs_lend].  Stated at the AMBIENT names,
+         since the era's record is in scope here: the PINNED forms of
+         [FsAbsInv]. *)
+      (A : gmap Z FsNode.fs_node -> iProp Σ)
       (Rl : gname -> (Z -> bv 8) -> iProp Σ)
       (* THE BOOT OBLIGATION: at every era, the founded map -- the state the
          lent epoch stands at -- satisfies the predicate, or the run is
@@ -460,10 +463,10 @@ Section SystemBoot.
        the seed's conjunct, and the license comes with it.  Both go into
        the mint through [boot_shared_alloc]. *)
     iMod (Happ_boot S D (v_disk (g.(gdev).(dvirtio))) Hsnok Hrec with "Hrl")
-      as "#Hok".
+      as "Hok".
     iPoseProof Happ_lic as "#Hlic".
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
-            S Pb A (fun _ _ => emp)%I gsn gln gtn Hbf Hbundle
+            S Pb (MkAppcfg A) (fun _ _ => emp)%I gsn gln gtn Hbf Hbundle
             with "Hok Hlic Hdursnap Hres")
       as (Hfd Hir Hpav Hbs HF γd γv Rspent γi ξd)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
@@ -632,7 +635,7 @@ Theorem xv6_power_adequacy_gen Σ
        the raw forms at [γcl] ARE [xv6_boot_era]'s pinned ones by iota.
        The generic application is [fun _ => True] / [emp] / [iLeft] /
        [fsabs_lic_raw_triv] (the two instances after this theorem). *)
-    (app_fs : gmap Z FsNode.fs_node -> Prop)
+    (app_fs : gmap Z FsNode.fs_node -> iProp Σ)
     (Rl : gname -> (Z -> bv 8) -> iProp Σ)
     (Hlend : forall (γd γsw γreg γst γcl : gname) (dk : Z -> bv 8),
        ⊢ ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov (FsImg.sb_logstart sb) -∗
@@ -917,7 +920,7 @@ Proof.
   refine (xv6_power_adequacy_gen Σ g sb nib cov
             (* the GENERIC application (applications.md section 0): any
                abstract state, nothing lent, the license outright *)
-            (fun _ => True) (fun _ _ => emp)%I
+            (fun _ => True%I) (fun _ _ => emp)%I
             ltac:(intros γd γsw γreg γst γcl dk; cbv beta; iIntros "HP";
                   iModIntro; iModIntro; by iFrame "HP")
             ltac:(intros γcl S D dk _ _; cbv beta; iIntros "_"; iModIntro;
@@ -972,7 +975,7 @@ Proof.
   refine (xv6_power_adequacy_gen Σ g sb nib cov
             (* the GENERIC application (applications.md section 0): any
                abstract state, nothing lent, the license outright *)
-            (fun _ => True) (fun _ _ => emp)%I
+            (fun _ => True%I) (fun _ _ => emp)%I
             ltac:(intros γd γsw γreg γst γcl dk; cbv beta; iIntros "HP";
                   iModIntro; iModIntro; by iFrame "HP")
             ltac:(intros γcl S D dk _ _; cbv beta; iIntros "_"; iModIntro;
@@ -1355,7 +1358,7 @@ Proof.
   refine (xv6_power_adequacy_gen xv6Σ g fsimg_sb fsimg_nib fsimg_cov
             (* the GENERIC application (applications.md section 0): any
                abstract state, nothing lent, the license outright *)
-            (fun _ => True) (fun _ _ => emp)%I
+            (fun _ => True%I) (fun _ _ => emp)%I
             ltac:(intros γd γsw γreg γst γcl dk; cbv beta; iIntros "HP";
                   iModIntro; iModIntro; by iFrame "HP")
             ltac:(intros γcl S D dk _ _; cbv beta; iIntros "_"; iModIntro;

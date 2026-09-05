@@ -583,7 +583,7 @@ Section SpecMain.
        projections -- so that every row is at the instance the boot chain is
        applied at, which is the same discipline
        [BootShared.boot_shared_alloc]'s return uses. *)
-    fs_boot_supply _ _ dk sb nib cov γd γv Rspent Pb
+    fs_boot_supply _ _ _ dk sb nib cov γd γv Rspent Pb
       (FsCrash.hdr_wset (FsCrash.fs_blocks dk) (FsImg.sb_logstart sb)) -∗
     (* ---- ROW (B) OF THE fsinit BUNDLE: the ERA's log-region mirror
        variable, straight out of [BootShared.boot_shared_alloc] (the era

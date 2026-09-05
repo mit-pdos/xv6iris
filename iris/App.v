@@ -18,8 +18,9 @@
    claude-notes/projects/app-echo.md.
 
    HOW THE PIECES MEET THE THEOREM.
-   - [app_fs] becomes the era's [FsCfg.fsc_app]: [SystemAdequacy.xv6_boot_era]
-     threads it to the era mint ([FsCfgSnap.fs_cfg_alloc_snap]), which seeds
+   - [app_fs] becomes the era's [AppCfg.app_pred]: [SystemAdequacy.xv6_boot_era]
+     builds the record [MkAppcfg app_fs] and threads it to the era mint
+     ([FsCfgSnap.fs_cfg_alloc_snap]), which seeds
      the client copy of the abstract state at the founded map under
      [fsabs_ok_raw γcl app_fs] -- the application's BOOT obligation
      [Happ_boot], paid out of what the PowerOn arm lent ([app_lend γcl dk],
@@ -68,6 +69,7 @@ Require Import Xv6G.
 Require Import UserFd.
 (* ...and this file's own *)
 Require Import FsNode.
+Require Import AppCfg.           (* [app_pred]: what [app_fs] becomes at the era *)
 Require Import SystemAdequacy.
 (* the image's own superblock and region width, and the disk literal, for
    the closed corollary at the real image *)
@@ -77,8 +79,9 @@ Local Open Scope Z_scope.
 
 Record xv6_app (Σ : gFunctors) := MkApp {
   (* the application's predicate on the abstract state between taints
-     (applications.md section 1): the era's [FsCfg.fsc_app] *)
-  app_fs   : gmap Z fs_node -> Prop;
+     (applications.md section 1): an iProp over the node map -- a claim
+     that OWNS resources -- and the era's [AppCfg.app_pred] *)
+  app_fs   : gmap Z fs_node -> iProp Σ;
   (* what the PowerOn arm lends the boot about the durable state, at the
      client phase counter's name (section 3); the boot obligation reads it *)
   app_lend : gname -> (Z -> bv 8) -> iProp Σ;
@@ -93,7 +96,7 @@ Arguments app_R {Σ} _ _ _. Arguments app_phi {Σ} _ _ _.
 
 (* THE GENERIC APPLICATION: nothing claimed, nothing lent, nothing read *)
 Definition app_triv (Σ : gFunctors) : xv6_app Σ :=
-  MkApp (fun _ => True) (fun _ _ => emp%I) (fun _ _ => emp%I) (fun _ _ => True).
+  MkApp (fun _ => True%I) (fun _ _ => emp%I) (fun _ _ => emp%I) (fun _ _ => True).
 
 (* ---------------------------------------------------------------------- *)
 (* THE THEOREM.  [xv6_power_adequacy_gen] at the application: the trace     *)
@@ -199,7 +202,10 @@ Section AppTriv.
   Lemma app_triv_boot (γcl : gname) (S : fs_state_rec) (dk : Z -> bv 8) :
     ⊢ app_lend (app_triv Σ) γcl dk -∗
       |==> fsabs_ok_raw γcl (app_fs (app_triv Σ)) (fss_inodes S).
-  Proof. iIntros "_". iModIntro. by iApply fsabs_ok_raw_intro. Qed.
+  Proof.
+    iIntros "_". iModIntro. rewrite /fsabs_ok_raw. cbn [app_triv app_fs].
+    iLeft. iPureIntro. exact Logic.I.
+  Qed.
 
   Lemma app_triv_lic (γcl : gname) : ⊢ fsabs_lic_raw γcl (app_fs (app_triv Σ)).
   Proof. exact (fsabs_lic_raw_triv γcl). Qed.
@@ -211,20 +217,25 @@ End AppTriv.
 
 (* ---------------------------------------------------------------------- *)
 (* THE ARBITRARY APPLICATION, CLOSED: at the real image, powered off,       *)
-(* never booted, every run is reducible -- and the application's           *)
-(* conclusion is [True].  Every obligation of the record is a line; the    *)
-(* generic user-safety WP is what the boot mints, so user space does        *)
-(* anything and the abstract state is anything.                             *)
+(* never booted, every run is reducible.  The application's conclusion is   *)
+(* [True], so the statement says reducibility and nothing else -- and       *)
+(* DELIBERATELY names no [Σ]: stated as [app_phi (app_triv xv6Σ) g2 κs] it  *)
+(* would unfold through the record at the functor list and put the whole    *)
+(* ghost layer (the camera classes [xv6Σ] names) into the STATEMENT's       *)
+(* trusted base, ~500 lines nobody has to read for "every run is           *)
+(* reducible" (tools/tcb; measured 2026-09-05).  Every obligation of the    *)
+(* record is a line; the generic user-safety WP is what the boot mints, so  *)
+(* user space does anything and the abstract state is anything.            *)
 (* ---------------------------------------------------------------------- *)
 Corollary xv6_app_adequacy_triv_xv6Σ (g : gstate)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow0 : g.(gpow) = false)
     (Hdisk : v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk) :
   forall (n : nat) (κs : list mobs) t2 g2,
     nsteps n ([PowerLoopE : expr riscv_lang], g) κs (t2, g2) ->
-    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2)
-    /\ app_phi (app_triv xv6Σ) g2 κs.
+    forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2.
 Proof.
-  apply (xv6_app_adequacy xv6Σ g fsimg_sb fsimg_nib fsimg_cov (app_triv xv6Σ)
+  intros n κs t2 g2 Hn.
+  refine (proj1 (xv6_app_adequacy xv6Σ g fsimg_sb fsimg_nib fsimg_cov (app_triv xv6Σ)
            ltac:(intros γcl h; cbn [app_triv app_R]; apply _)
            app_triv_R0
            ltac:(intros γcl h on dk _; cbn [app_triv app_R]; iIntros "_"; by iModIntro)
@@ -238,6 +249,6 @@ Proof.
            app_triv_lic
            ltac:(intros Hinv γgen γstart γreg γd γsw γobs γcl T g' h;
                  iIntros "_ _ _ _ _"; iModIntro; iPureIntro; exact Logic.I)
-           Hgen0 Hpow0).
+           Hgen0 Hpow0 _ n κs t2 g2 Hn)).
   rewrite Hdisk. exact fsimg_image_wf.
 Qed.

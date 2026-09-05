@@ -80,6 +80,7 @@ Require Export FdSlots.
 Require Import PipeInvDefs.
 Require Import IcacheRef.
 Require Import FsCfg.   (* [fscfg] -- see the note on [fileG] below *)
+Require Import AppCfg.  (* [appcfg] -- the application's predicate, the third record (applications.md section 1) *)
 Require Export FileOffCell.   (* the entry addresses, [off_wf], [off_resident] (r25 shapes) *)
 Require Import CtxBox.   (* [bx_slotd]/[bx_cnt], [SlotReg] -- the fd share's register halves (item 24) *)
 Require Import OffBox.        (* the off box's rows: [fslot]'s L1 row, [file_core_off]'s fd row (r25 shapes) *)
@@ -426,9 +427,14 @@ Class fileG (Σ : gFunctors) := FileG {
   file_inG :: inG Σ fileUR;
   file_icfg :: icfg;
   file_fscfg :: fscfg;
+  (* THE THIRD RECORD (applications.md section 1): the application's
+     predicate on the abstract state, an [iProp Σ] and hence not a field of
+     [fscfg] (AppCfg.v says why).  Carried and minted exactly as the two
+     above are: [fileG_of] takes it, [BootShared] builds it. *)
+  file_app :: appcfg Σ;
 }.
 Definition fileΣ : gFunctors := #[GFunctor fileUR].
-Global Instance subG_fileΣ {Σ} `{ICFG : icfg} `{FSC : fscfg} :
+Global Instance subG_fileΣ {Σ} `{ICFG : icfg} `{FSC : fscfg} `{APP : appcfg Σ} :
   subG fileΣ Σ -> fileG Σ.
 Proof. solve_inG. Qed.
 
@@ -463,12 +469,13 @@ Class fileGpreS (Σ : gFunctors) := FileGpreS { file_preG : inG Σ fileUR }.
 Global Instance subG_fileGpreS {Σ} : subG fileΣ Σ -> fileGpreS Σ.
 Proof. solve_inG. Qed.
 
-(* THE CONSTRUCTOR.  [fileG] = capacity + the two records, so the boot
+(* THE CONSTRUCTOR.  [fileG] = capacity + the three records, so the boot
    fupd's existentials plug straight in.  Applied EXPLICITLY at the wiring
    site (fs-cfg-boot.md stage 4: "this is an application, not an
    elaboration"), which is what keeps the double-path trap shut. *)
 Definition fileG_of {Σ} (FGP : fileGpreS Σ) (ICFG : icfg) (FSC : fscfg)
-  : fileG Σ := @FileG Σ (@file_preG Σ FGP) ICFG FSC.
+    (APP : appcfg Σ)
+  : fileG Σ := @FileG Σ (@file_preG Σ FGP) ICFG FSC APP.
 
 (* The immutable-while-referenced content of a [struct file]: every field but
    [ref] AND [off].

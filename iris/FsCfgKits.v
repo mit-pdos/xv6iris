@@ -63,6 +63,7 @@ Require Import IcacheEscrow.
    [BitmapEnc] for the encoder the equation is stated over. *)
 Require Import BitmapInv.
 Require Import FsCfg.          (* the record this file finally gives a value *)
+Require Import AppCfg.         (* [appcfg]: the application's record, threaded beside [fscfg] *)
 Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ the application copy shadows *)
 Require Import FsAbsInv.       (* [fsabs_env]: kit 2's last row (applications.md section 2) *)
 Require Import Xv6G.
@@ -259,7 +260,7 @@ Section FsCfgKits.
      [FsCrash.fr_D] -- and [Xexc] is where the two differ (durable-disk
      lane E-except).  At a clean on-disk header the two functions agree on
      the home set and [Xexc] is empty. *)
-  Definition fs_kit_fsinit_ghost (ICFG : icfg) (FSC : fscfg)
+  Definition fs_kit_fsinit_ghost (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ)
       (P : Z -> list (bv 8)) (Rspent : gset Z)
       (Pb : Z -> list (bv 8)) (Xexc : gset Z) : iProp Σ :=
     ((* the log's four gnames at genesis, AT [icfg_log] -- which is what
@@ -314,13 +315,15 @@ Section FsCfgKits.
         MINTED AT THE ERA MINT at the founded map, beside the application's
         license.  Persistent; forkret's boot arm projects it into
         [FirstTok.first_done] instead of minting a copy of its own.  LAST,
-        so the pass-through sites' patterns only grow at the end. *)
-     FsAbsInv.fsabs_env (FSC := FSC) (fs_gamma_L fsc_fs))%I.
+        so the pass-through sites' patterns only grow at the end.  At the
+        application record [APP] this kit threads (applications.md
+        section 1: explicit through the kits, ambient everywhere else). *)
+     FsAbsInv.fsabs_env (APP := APP) (fs_gamma_L fsc_fs))%I.
 
-  Lemma fs_kit_fsinit_ghost_open (ICFG : icfg) (FSC : fscfg)
+  Lemma fs_kit_fsinit_ghost_open (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ)
       (P : Z -> list (bv 8)) (Rspent : gset Z)
       (Pb : Z -> list (bv 8)) (Xexc : gset Z) :
-    fs_kit_fsinit_ghost ICFG FSC P Rspent Pb Xexc -∗
+    fs_kit_fsinit_ghost ICFG FSC APP P Rspent Pb Xexc -∗
       log_free_tok icfg_log ∗
       ireg_boot ∗
       ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib ∗
@@ -339,7 +342,7 @@ Section FsCfgKits.
       fs_bytes_inv (fs_bytes fsc_fs) (fs_cache fsc_fs) (fs_exc fsc_fs)
                    (fs_home_set fsc_cov fsc_logst) Pb ∗
       exc_own (fs_exc fsc_fs) Xexc ∗
-      FsAbsInv.fsabs_env (FSC := FSC) (fs_gamma_L fsc_fs).
+      FsAbsInv.fsabs_env (APP := APP) (fs_gamma_L fsc_fs).
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
@@ -458,12 +461,12 @@ Section FsCfgKits.
       inode-cache rows (stage (e)), while the kit as a whole rides on to
       forkret's [fsinit] (stage (f)).  Stated as its own lemma so neither
       site has to know the kit's ordering.                                *)
-  Lemma fs_kit_fsinit_ghost_ireg (ICFG : icfg) (FSC : fscfg)
+  Lemma fs_kit_fsinit_ghost_ireg (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ)
       (P : Z -> list (bv 8)) (Rspent : gset Z)
       (Pb : Z -> list (bv 8)) (Xexc : gset Z) :
-    fs_kit_fsinit_ghost ICFG FSC P Rspent Pb Xexc -∗
+    fs_kit_fsinit_ghost ICFG FSC APP P Rspent Pb Xexc -∗
       ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib ∗
-      fs_kit_fsinit_ghost ICFG FSC P Rspent Pb Xexc.
+      fs_kit_fsinit_ghost ICFG FSC APP P Rspent Pb Xexc.
   Proof.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
@@ -478,12 +481,12 @@ Section FsCfgKits.
   (* ...and the same peel for the equally-persistent BITMAP row, so a
      boot client (ProofMain's [first_boot_persist] assembly) reads it off
      the kit without knowing the kit's layout. *)
-  Lemma fs_kit_fsinit_ghost_bitmap (ICFG : icfg) (FSC : fscfg)
+  Lemma fs_kit_fsinit_ghost_bitmap (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ)
       (P : Z -> list (bv 8)) (Rspent : gset Z)
       (Pb : Z -> list (bv 8)) (Xexc : gset Z) :
-    fs_kit_fsinit_ghost ICFG FSC P Rspent Pb Xexc -∗
+    fs_kit_fsinit_ghost ICFG FSC APP P Rspent Pb Xexc -∗
       bitmap_reg fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
-      fs_kit_fsinit_ghost ICFG FSC P Rspent Pb Xexc.
+      fs_kit_fsinit_ghost ICFG FSC APP P Rspent Pb Xexc.
   Proof.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")

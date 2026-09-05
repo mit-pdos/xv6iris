@@ -61,6 +61,7 @@ Require Import DiskPtsto.      (* [disk_names] *)
 Require Import WpLockAt BioInitAt KallocInv IrefSlots BioDefs.
 Require Import LogInv.
 Require Import FsCfg.
+Require Import AppCfg.        (* [appcfg]: the application's record, minted beside [fscfg] *)
 Require Import FsAbsInv.      (* [fsabs_env_alloc]: the application's copy, kit 2's last row *)
 Require Import FileInvDefs.   (* the off ledger's boot face (off-ledger ruling) *)
 Require Import FsBoot FsCfgBoot.
@@ -829,15 +830,17 @@ Section SnapMint.
          need a determinacy theorem to identify. ---- *)
       (gsn gln gtn : gname)
       (Pb : Z -> list (bv 8)) (Xexc : gset Z)
-      (* ---- THE APPLICATION'S PREDICATE on the abstract state
-         (claude-notes/design/applications.md sections 1-2): [fsc_app] of
-         the minted record.  The mint seeds the application's client copy
-         of the top map at the founded map [fss_inodes S], so it takes the
-         seed's application conjunct -- the boot obligation, paid one rung
-         up by the power arm's lend -- and the LICENSE the dischargers will
-         re-sync the copy with, and packs both as kit 2's last row.  Spelled
-         at the PINNED forms ([FsAbsInv]'s header says why). ---- *)
-      (A : gmap Z FsNode.fs_node -> Prop) :
+      (* ---- THE APPLICATION'S RECORD (claude-notes/design/applications.md
+         sections 1-2): [app_pred] of it is the predicate on the abstract
+         state, an iProp over the node map.  The mint seeds the
+         application's client copy of the top map at the founded map
+         [fss_inodes S], so it takes the seed's application conjunct -- the
+         boot obligation, paid one rung up by the power arm's lend -- and
+         the LICENSE the dischargers will re-sync the copy with, and packs
+         both as kit 2's last row AT [APP].  Spelled at the PINNED forms
+         ([FsAbsInv]'s header says why), at the record's own projection so
+         nothing ambient is consulted. ---- *)
+      (APP : appcfg Σ) :
     (forall b : Z, length (Pb b) = BSIZE) ->
     Xexc ⊆ fs_home_set cov (sb_logstart (fss_sb S)) ->
     (1 : Z) ∉ Xexc ->
@@ -857,7 +860,7 @@ Section SnapMint.
     (forall b : Z, 1 <= b < fs_data_start (fss_sb S) -> b ∈ cov) ->
     disk_bytes γv 0 (disk_read dk 0 ndisk) -∗
     bslots_auth -∗ bslots BSLOTS_FS -∗
-    fsabs_ok_at A (fss_inodes S) -∗ fsabs_lic_at A -∗
+    fsabs_ok_at (@app_pred Σ APP) (fss_inodes S) -∗ fsabs_lic_at (@app_pred Σ APP) -∗
     (* ---- THE DURABLE SNAPSHOT, AS A RESOURCE, and it is the whole of the
        file system's side: the committed map IS what the machine would
        recover to, and it is the encoding of the abstract state [S].  What
@@ -876,7 +879,7 @@ Section SnapMint.
       ⌜fsc_size = sb_size (fss_sb S)⌝ ∗
       ⌜fsc_ninodes = sb_ninodes (fss_sb S)⌝ ∗
       fs_kit_icache ICFG FSC ∗
-      fs_kit_fsinit_ghost ICFG FSC (fs_blocks dk) (snap_spent S nib) Pb Xexc ∗
+      fs_kit_fsinit_ghost ICFG FSC APP (fs_blocks dk) (snap_spent S nib) Pb Xexc ∗
       (* STATEMENT CHANGE (r25 pass 1): the old off LEDGER row
          [ioff_escrows_at fsc_fol fsc_foff] is RETIRED (plan item 16, the
          ledger's retirement from [fs_ready]); what stays is the off-borrow
@@ -901,7 +904,7 @@ Section SnapMint.
                     (fs_home_set cov (sb_logstart (fss_sb S))))).
     { intros b bs Hbs. apply fs_restrict_lookup_Some in Hbs as [_ ->].
       exact (HlPb b). }
-    iIntros "Hdisk Hsa Hsf #Hok #Hlic Hsnap".
+    iIntros "Hdisk Hsa Hsf Hok #Hlic Hsnap".
     (* THE TIE IS A READING (durable-disk BT-3, plan section 2's "the
        epoch's IDENTITY is a resource"): [snap_ok] is no longer handed in
        anywhere on the boot side -- it comes off the epoch's own resources,
@@ -1239,25 +1242,21 @@ Section SnapMint.
        client copy of the top map, seeded at the founded map [fss_inodes S]
        -- the same map [ftop_alloc] founded the kernel's authority at in
        step 7 -- with the seed's conjunct and the license packed beside it;
-       kit 2's last row.  Its [fsabs_ok] is at the record being minted, so
-       the record is spelled here once more: [fsc_app] of it is [A] by iota,
-       which is what turns the premise into the seed. ---- *)
-    iMod (fsabs_env_alloc
-            (FSC := MkFscfg gpr gkm gkp γd γv gdl bn γfs γi cn git
-                      cov (sb_logstart (fss_sb S)) (sb_bmapstart (fss_sb S))
-                      (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol A)
-            (fs_gamma_L γfs) (fss_inodes S) E with "[] []") as "#Henv";
-      [rewrite /fsabs_ok; cbn [fsc_app]; iExact "Hok"
-      | rewrite /fsabs_lic; cbn [fsc_app]; iExact "Hlic" |].
+       kit 2's last row.  Its [fsabs_ok] is at the application record
+       [APP] this lemma takes, so the premise IS the seed by unfolding. ---- *)
+    iMod (fsabs_env_alloc (APP := APP)
+            (fs_gamma_L γfs) (fss_inodes S) E with "[Hok] []") as "#Henv";
+      [rewrite /fsabs_ok; iExact "Hok"
+      | rewrite /fsabs_lic; iExact "Hlic" |].
     iModIntro.
     iExists ICFG,
       (MkFscfg gpr gkm gkp γd γv gdl bn γfs γi cn git
                cov (sb_logstart (fss_sb S)) (sb_bmapstart (fss_sb S))
-               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol A).
+               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol).
     rewrite /fs_kit_icache /fs_kit_fsinit_ghost.
     cbn [fsc_printk fsc_kalloc fsc_kpages fsc_uart fsc_disk fsc_dlock
          fsc_bio fsc_fs fsc_ireg fsc_ic fsc_itlock fsc_cov fsc_logst
-         fsc_bmapstart fsc_size fsc_ninodes fsc_fol fsc_app].
+         fsc_bmapstart fsc_size fsc_ninodes fsc_fol].
     rewrite Hdev Histq Hlogq.
     assert (Hset : (((((cov ∖ ({[ (1:Z) ]} : gset Z))
                          ∖ log_region_set (sb_logstart (fss_sb S)))

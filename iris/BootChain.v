@@ -743,7 +743,7 @@ Section BootPrimary.
     (* the file system's boot-era mint and the iref-slot authority, both out
        of [BootShared.boot_shared_alloc] and both spent in
        [ProofMain.mn_grp_fs] -- see [SpecMain]'s own rows *)
-    fs_boot_supply _ _ dk sb nib cov γd γv Rspent Pb
+    fs_boot_supply _ _ _ dk sb nib cov γd γv Rspent Pb
       (FsCrash.hdr_wset (FsCrash.fs_blocks dk) (FsImg.sb_logstart sb)) -∗
     (* rows (B) and (C) of the fsinit bundle -- see [SpecMain]'s own rows.
        Row (B) is VALUE-BEARING since durable-disk 1a: the era's mirror half

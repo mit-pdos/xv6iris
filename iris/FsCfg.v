@@ -73,7 +73,6 @@ Require Import UartNames.     (* [uart_names] -- NOT WpUart, which would
 Require Import DiskPtsto.     (* [disk_names] *)
 Require Import BioDefs.       (* [bio_names]  *)
 Require Import FsBlocks.      (* [fs_names]   *)
-Require Import FsNode.        (* [fs_node]: the application predicate's domain *)
 Require Import IcacheRef.     (* [ic_names]   *)
 Local Open Scope Z_scope.
 
@@ -154,11 +153,10 @@ Class fscfg := MkFscfg {
      off LEDGER that once lived beside it is gone (tso-cutover r25: the off
      BOX, OffBox.v). *)
   fsc_fol       : gname;
-  (* THE APPLICATION'S PREDICATE ON THE ABSTRACT FILE-SYSTEM STATE
-     (claude-notes/design/applications.md §1): what the application
-     proven on top of xv6 claims of the node map between taints, chosen at
-     the era mint and carried here so that [FsAbsInv.fsabs_ok] can name it
-     ambiently.  Pure data, exactly as [fsc_cov] is; the GENERIC
-     application's is [fun _ => True]. *)
-  fsc_app       : gmap Z fs_node -> Prop;
+  (* THE APPLICATION'S PREDICATE IS NOT HERE.  It was, for one round, a
+     [Prop]-valued field; it is an [iProp] now (applications.md section 1,
+     the owner's 2026-09-05 correction), which puts a [Σ] on it that this
+     record -- pure data, mintable before the era's [fileG] exists -- must
+     not carry.  It has a class record of its own, [AppCfg.appcfg Σ],
+     carried beside this one as a field of [FileInvDefs.fileG]. *)
 }.

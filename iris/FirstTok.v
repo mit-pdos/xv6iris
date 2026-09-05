@@ -386,7 +386,7 @@ Section FirstTok.
           [FsCrash.fs_rec_view]), nobody below reads either, and what the
           WAL's exception handle is at is not a choice -- it is the
           header's own write set. *)
-       fs_kit_fsinit_ghost _ _ (FsCrash.fs_blocks dk) Rspent Pb
+       fs_kit_fsinit_ghost _ _ _ (FsCrash.fs_blocks dk) Rspent Pb
          (list_to_set
             (hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).2) ∗
        (* rows (A): the raw cells fsinit / initlog write *)

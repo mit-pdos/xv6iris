@@ -257,18 +257,31 @@ End EchoLedger.
    Echo's own pin is lane L6's (with the Uk-engine proof that needs it).
    Per-inum rather than "the map is the image's" on purpose: the durable
    snapshot pins a state per inum and no whole-map equality exists
-   (fs-syscall-specs.md lane D, gap (3)). *)
-Definition echo_fs (I : gmap Z fs_node) : Prop :=
+   (fs-syscall-specs.md lane D, gap (3)).  The claim is PURE -- it owns
+   nothing -- so it is stated as a Prop and embedded: the application's
+   predicate is an iProp (applications.md section 1), and this
+   application's happens to be [⌜echo_fs_pure I⌝]. *)
+Definition echo_fs_pure (I : gmap Z fs_node) : Prop :=
   era0_pins (abs_view I) /\ era0_sh_pins (abs_view I).
+
+Section EchoFs.
+  Context {Σ : gFunctors}.
+
+  Definition echo_fs (I : gmap Z fs_node) : iProp Σ := ⌜echo_fs_pure I⌝%I.
+
+  Lemma echo_fs_intro (I : gmap Z fs_node) : echo_fs_pure I -> ⊢ echo_fs I.
+  Proof. intros H. rewrite /echo_fs. iPureIntro. exact H. Qed.
+End EchoFs.
 
 (* THE BOOT OBLIGATION AT ERA 0: the map a boot founds its file system at
    satisfies the predicate when the disk is mkfs's image -- the two pin
-   files' transport theorems, read together. *)
+   files' transport theorems, read together.  About the Prop; [echo_fs_intro]
+   lifts it. *)
 Lemma echo_fs_era0 (dk : Z -> bv 8) (D : gmap Z (list (bv 8))) (S : fs_state_rec) :
   fs_blocks dk = fsimg_P ->
   fs_recovery (fs_blocks dk) D fsimg_cov (FsImg.sb_logstart fsimg_sb) ->
   snap_ok S D ->
-  echo_fs (fss_inodes S).
+  echo_fs_pure (fss_inodes S).
 Proof.
   intros Hdk Hrec HS. split.
   - exact (era0_recovery_pins dk D S Hdk Hrec HS).

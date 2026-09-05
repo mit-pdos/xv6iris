@@ -42,15 +42,20 @@ the discipline from the beginning of era 0, OR the abstract state is now
 arbitrary.  It is realised as a disjunction with a persistent, monotone,
 FIXED-LAYER witness on the right:
 
-    fsabs_ok I  :=  ⌜fsc_app I⌝  ∨  tainted
+    fsabs_ok I  :=  app_pred I  ∨  tainted
     tainted     :=  client_lb 1              (* mono_nat_lb_own riscv_client_name 1 *)
 
-- **`fsc_app : gmap Z fs_node -> Prop`** is the application's predicate on
-  the abstract state, a field of the era's file-system configuration
-  record `FsCfg.fscfg` (§2).  Stated over the RAW node map, the form
-  `InodeRegion.ftop_body` holds; an application writes it through
-  `FsAbsDefs.abs_view` (`fun I => abs_view I = av0`).  Pure, so it costs
-  nothing to carry and nothing to state at the boot.
+- **`app_pred : gmap Z fs_node -> iProp Σ`** is the application's
+  predicate on the abstract state — an `iProp`, NOT a `Prop` (owner's
+  correction, 2026-09-05: a pure left arm is bogus; an application's claim
+  owns resources — per-node fragments, receipts, its own ghosts).  It is
+  the one field of the class record `AppCfg.appcfg Σ`, carried exactly as
+  `icfg`/`fscfg` are: a field of `fileG` (`file_app`), threaded explicitly
+  through the kits and the era mint, ambient everywhere else.  Stated over
+  the RAW node map, the form `InodeRegion.ftop_body` holds; a pure
+  application writes `⌜abs_view I = av0⌝`.  Nothing about it is assumed
+  timeless or persistent: the body keeps it under the invariant's later,
+  and the dischargers move it without stripping (§2).
 - **The taint is a lower bound on the CLIENT PHASE COUNTER**, a mono-nat
   the machine layer allocates ONCE into the fixed record
   (`RiscvPtsto.riscv_client_name`, typed by the record's own `mono_natG`)
@@ -75,11 +80,12 @@ FIXED-LAYER witness on the right:
 
 ## 2. The invariant's body and its two carriers
 
-`FsAbsInv.fsabs_inv Γc = inv fsabsN (∃ I, client_auth I ∗ frags I ∗ fsabs_ok I)`:
+`FsAbsInv.fsabs_inv A Γc = inv fsabsN (∃ I, client_auth I ∗ frags I ∗ fsabs_ok A I)`:
 the client copy of the node map at its own gname (FsAbsInv's header says
 why a copy and not a share of the kernel's map), every element inside,
 and the application conjunct.  The application reaches it as
-`fsabs_env := ∃ γa, fsabs_inv (fsabs_client (fs_gamma_L fsc_fs) γa) ∗ fsabs_lic`,
+`fsabs_env A := ∃ γa, fsabs_inv A (fsabs_client (fs_gamma_L fsc_fs) γa) ∗ fsabs_lic A`
+(FirstTok's ambient reading is at `A := app_pred`),
 persistent, carried beside the sealed file system in `FirstTok.first_done`
 and read by the dispatcher off `syscall_env`.  Two things changed from
 the purely-existential body:
@@ -103,8 +109,14 @@ the purely-existential body:
   invariant, replaces the copy by the map the kernel lent it (the pre-map
   at phase 1, the post-map at phase 2) and closes, paying `fsabs_ok` of
   the new map with the license — exactly today's `fsabs_set`, one premise
-  richer.  For the generic application the license is `⊢ fsabs_lic`
-  outright (`fsc_app = fun _ => True`); for the echo application it is
+  richer.  The application conjunct is an arbitrary `iProp`, so it stays
+  under the invariant's later: the discharger strips `▷` off the two
+  timeless conjuncts (the client auth and its frags), applies the license
+  under `▷` (`▷ (P -∗ Q) ∗ ▷ P ⊢ ▷ Q`, the license being persistent hence
+  `▷`-introducible) and closes with `▷ fsabs_ok I'` in place.  No
+  timelessness is asked of the application.  For the generic application
+  the license is `⊢ fsabs_lic` outright (`app_pred = fun _ => True`); for
+  the echo application it is
   `tainted -∗ fsabs_lic` — so an era can only hold it once tainted, which
   is the honest statement that TODAY the license is era-wide and only the
   generic application can pay it.
@@ -134,7 +146,7 @@ invariant change and is deferred with it.
 ## 3. The application record and the theorem (`App.v`)
 
     Record xv6_app Σ := MkApp {
-      app_fs    : gmap Z fs_node -> Prop;              (* §1: fsc_app *)
+      app_fs    : gmap Z fs_node -> iProp Σ;           (* §1: app_pred *)
       app_lend  : gname -> (Z -> bv 8) -> iProp Σ;     (* what PowerOn lends the boot about the durable state, at the client counter's name *)
       app_R     : gname -> list mobs -> iProp Σ;       (* the trace ledger, at the client counter's name *)
       app_phi   : gstate -> list mobs -> Prop;         (* the conclusion *)
@@ -246,11 +258,11 @@ record or the theorem.  Priced against the tree as of 2026-09-04.
 
 ## 6. Rejected shapes
 
-- **The application predicate as an `iProp` body.**  Needs `Σ` in a
-  record that has none (`fscfg`) or a third machine-level slot; a pure
-  predicate plus the taint covers the conditional shape the owner asked
-  for, and the frag-lending extension (per-node fragments handed to a
-  program) is orthogonal to the body's conjunct.
+- **The application predicate as a `Prop`** (the scaffold's first cut,
+  `fsc_app : gmap Z fs_node -> Prop` in `fscfg`).  Corrected by the owner
+  2026-09-05: an application's claim is a resource.  `fscfg` cannot hold
+  an `iProp` (no `Σ`, 166 files name it), so the predicate is its own
+  class record `appcfg Σ` beside `icfg`/`fscfg` in `fileG`.
 - **A functor/module-type application** (an `APP` module argument on the
   boot chain's Link spine).  The body is used inside DEFINITIONS that ride
   `proc_priv` (`first_tok`), so it must be ambient, not a parameter.  The

@@ -1414,6 +1414,9 @@ ProofSysChdir.v
 SpecSysMkdir.v
 ProofSysMkdir.v
 LinkSysMkdir.v
+# AppCfg = the application's predicate on the abstract state, as a class
+# record ([appcfg Σ], applications.md section 1); a field of [fileG] below
+AppCfg.v
 FsCfg.v
 FsReady.v
 EnvMorph.v

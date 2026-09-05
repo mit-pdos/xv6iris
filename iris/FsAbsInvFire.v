@@ -32,7 +32,7 @@
    Every discharger and every bundle below therefore takes, beside the
    invariant, the application's LICENSE [FsAbsInv.fsabs_lic] -- the
    persistent wand "the copy may be re-synced to any map" -- and pays
-   with it ([fsabs_set], through [fsabs_body_lic_set]).  Read-kind and
+   with it ([fsabs_set], through [fsabs_body_later_lic_set]).  Read-kind and
    write-kind commits alike: all of them re-sync, and under the ruled
    delta-free license that is exactly what is paid for.  The dispatcher
    holds both out of [FirstTok.fsabs_env]. *)
@@ -142,13 +142,17 @@ Section FsAbsInvFire.
   (* ------------------------------------------------------------------ *)
 
   (* the one ghost move, packaged: open, overwrite the copy under the
-     license, close *)
+     license, close.  The body is NOT timeless (its application conjunct
+     is an arbitrary iProp, applications.md section 2), so it is moved
+     UNDER the later: [FsAbsInv.fsabs_body_later_lic_set] strips the two
+     timeless conjuncts, replaces the map on them and applies the license
+     under [▷]. *)
   Lemma fsabs_set Γc (I : gmap Z fs_node) :
     fsabs_inv Γc -∗ fsabs_lic -∗ |={↑fsabsN}=> True.
   Proof.
     iIntros "#Hinv #Hlic". rewrite /fsabs_inv.
-    iInv fsabsN as ">Hbody" "Hclose".
-    iMod (fsabs_body_lic_set Γc I with "Hlic Hbody") as "Hbody".
+    iInv fsabsN as "Hbody" "Hclose".
+    iMod (fsabs_body_later_lic_set Γc I with "Hlic Hbody") as "Hbody".
     iMod ("Hclose" with "Hbody") as "_". done.
   Qed.
 

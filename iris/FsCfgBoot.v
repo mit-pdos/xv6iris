@@ -82,6 +82,7 @@ Require Import FsImg.
 Require Import FsImgBridge.
 Require Import FsStateEra.     (* [era_node] / [inode_rec_local] -- the era node *)
 Require Import FsCfg.          (* the record this file finally gives a value *)
+Require Import AppCfg.         (* [appcfg]: threaded through [fs_boot_supply] beside [fscfg] *)
 Require Import Xv6G.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import OffBox.   (* [off_rows] / [off_rows_dep] / [off_rows_to_dep] -- the inode's off rows (items 35/36) *)
@@ -713,7 +714,7 @@ Definition fs_boot_snap_wf (dk : Z -> bv 8) (ndisk : nat)
     existentially. *)
 Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
     `{XI : TsoCtx.CurCtx}
-    (ICFG : icfg) (FSC : fscfg) (dk : Z -> bv 8)
+    (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ) (dk : Z -> bv 8)
     (sb : fs_sb) (nib : nat) (cov : gset Z)
     (γd : uart_names) (γv : disk_names)
     (Rspent : gset Z) (Pb : Z -> list (bv 8)) (Xexc : gset Z) : iProp Σ :=
@@ -724,7 +725,7 @@ Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
    ⌜fsc_bmapstart = FsImg.sb_bmapstart sb⌝ ∗
    ⌜fsc_size = FsImg.sb_size sb⌝ ∗ ⌜fsc_ninodes = FsImg.sb_ninodes sb⌝ ∗
    fs_kit_icache ICFG FSC ∗
-   fs_kit_fsinit_ghost ICFG FSC (FsCrash.fs_blocks dk) Rspent Pb Xexc ∗
+   fs_kit_fsinit_ghost ICFG FSC APP (FsCrash.fs_blocks dk) Rspent Pb Xexc ∗
    (* the off-borrow liveness authority and, r25 (item 24/33), the NINODE
       per-inode-slot set authorities of the off boxes (minted EMPTY; the
       icache boot puts them into each slot's sleeplock payload); see

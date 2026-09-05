@@ -61,7 +61,8 @@ The pure data and the obligations provable WITHOUT any lane:
   the theorem's wands frame the UART ghosts around them) and
   `echo_R_untainted` (`disc h` and `client_lb 1` contradict: what the end
   of the run reads).
-- `echo_fs I := era0_pins (abs_view I) /\ era0_sh_pins (abs_view I)` (the
+- `echo_fs_pure I := era0_pins (abs_view I) /\ era0_sh_pins (abs_view I)`, and
+  `echo_fs I := ⌜echo_fs_pure I⌝` as the application's `iProp` predicate (the
   /init and /sh binaries are the image's, path and content; per inum, not
   a whole-map equality) and `echo_fs_era0` (`Happ_boot` at era 0, off
   `FsInitPinBoot.era0_recovery_pins` / `FsShPin.era0_recovery_sh_pins`).
