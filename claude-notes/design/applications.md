@@ -78,6 +78,16 @@ FIXED-LAYER witness on the right:
   open the trace slot at the commit mask; they need a witness they can
   hold, and a persistent lower bound is exactly that.
 
+> **SUPERSEDED IN PART (2026-09-05).**  §2 (the client copy and its
+> license) and §3's `app_lend`/`Hlend`/`Happ_boot` are being replaced by
+> the two-instance design of
+> [`../projects/app-instances.md`](../projects/app-instances.md): the
+> application's claim holds HALF of the abstract map's authority in its
+> own invariant (running) and half of the snapshot's (durable), and
+> crosses by an application-supplied transport.  §1's conditional shape,
+> the client counter, the trace side (§4) and the lanes (§5) stand.  This
+> file is rewritten when the rounds of app-instances.md §7 land.
+
 ## 2. The invariant's body and its two carriers
 
 `FsAbsInv.fsabs_inv A Γc = inv fsabsN (∃ I, client_auth I ∗ frags I ∗ fsabs_ok A I)`:
