@@ -240,6 +240,21 @@ outstanding; see the `completed/` section below).
   argument over the existing per-prefix exports.  Records the rejected
   routes (total WP, Transfinite Iris, PC-observation + CFG) and the one
   semantic hazard to settle first (the reservation self-loop).
+- **[`relaxed-rr.md`](projects/relaxed-rr.md)** — NOT STARTED, a design
+  PROPOSAL (2026-09-05): weakening the Ztso view machine to admit
+  load–load reordering within RVWMO — a plain load stops moving the view,
+  a read watermark `rv` and a per-byte `coh` come in, fences with an R→R
+  edge become ACQUIRES (`fence r,rw` at `started`/`first`, the virtio
+  interrupt loop's `rw,rw`), release fences stay no-ops, the ownership
+  layer is untouched.  Litmus table, the two proofs that change, and a
+  staged effort estimate (~2 agent-weeks).
+- **[`relaxed-ww.md`](projects/relaxed-ww.md)** — NOT STARTED, the
+  companion ANALYSIS (2026-09-05): store–store reordering (PSO).  Why W→W
+  breaks the two facts the ownership layer rests on (timestamps at issue,
+  prefix views), the reserved-slot + drained-set encoding, `fence rw,w`
+  becoming load-bearing, drain receipts through park/resume, the box and
+  the lock rows; the four-way comparison with relaxed-rr (complementary;
+  R→R first; W→W an order of magnitude more proof, 6–10 agent-weeks).
 - **[`icache.md`](projects/icache.md)** — the non-coherent instruction
   cache: a per-hart instruction view beside the data view, the `AK_ifetch`
   fetch arm and the `fence.i` arm of the Ztso machine, the fetch node rule
