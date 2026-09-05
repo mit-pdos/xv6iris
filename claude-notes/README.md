@@ -220,6 +220,13 @@ Audited against the tree 2026-08-28, when six moved to
 (finished) and `sp-migration.md` (archived by the owner with work still
 outstanding; see the `completed/` section below).
 
+- **[`app-instances.md`](projects/app-instances.md)** — PROPOSAL (2026-09-05,
+  iterating with the owner): the application predicate at TWO INSTANCES,
+  running (beside the abstract map's authority in `ftop_body`) and durable
+  (inside the snapshot), crossing the boundary by an application-supplied
+  TRANSPORT at the three points the kernel's own predicate crosses — the
+  commit, the PowerOn clone, the boot mint.  Deletes the client copy, the
+  license and the boot lend if adopted.
 - **[`app-echo.md`](projects/app-echo.md)** — the ECHO APPLICATION's
   worklist: the target statement (`disc κs -> good_out κs /\ pristine`),
   the six lanes L2–L7 of `design/applications.md` §5 with their gates,
