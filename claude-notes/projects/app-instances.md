@@ -71,33 +71,54 @@ kind:
 
 Plus the trace side unchanged (`app_R`, its four steps, `app_phi`, `Hphi`).
 
-## 2. Where the two instances live
+## 2. Where the two instances live: SEPARATE invariants, tied by half an authority
 
-- **Running:** `InodeRegion.ftop_body γfs` gains the conjunct
-  `app_pred app_run I` beside `ghost_map_auth (fs_top γfs) 1 I`.  It is
-  the abstract map's HOME, so the claim about the map sits with the map:
-  a fire that lends the authority lends the claim; a mover that changes
-  the map re-establishes it (`app_step`).  `ftop_body` stops being
-  timeless; the mover strips the later off the timeless conjuncts only
-  and applies `app_step` under `▷` (round 4's shape).
-- **Durable:** `FsDurSnap.P_dur D` becomes
-  `∃ g gl gt S, fs_snap (snap_gamma g gl gt) g D S ∗ ∃ γa, app_pred γa (fss_inodes S)`,
-  sharing the snapshot's `S`.  `P_dur` stops being timeless; the machine
-  layer already treats the crash slot as non-timeless (`◇` in every
-  hook), and the two in-tree strips of `P_dur`'s later get round 4's
-  treatment.  `FsDurSnap` binds `appcfg` as a section Context; every
-  consumer above it already binds `fileG` or passes the record.
+Owner's rule (2026-09-05): nothing application-specific inside a kernel
+file-system invariant.  The two invariants move together; they are not
+one.  What ties an application's claim about `I` to the kernel's `I` is
+therefore a SHARED PIECE, and the cheapest piece that already exists is
+the map authority itself: `ghost_map_auth γ q m` is fractional, any two
+fractions AGREE on `m` (`ghost_map_auth_agree`), and an UPDATE needs the
+whole.  So:
+
+- **Running.**  `InodeRegion.ftop_body γfs` keeps exactly what it has,
+  with the authority at HALF: `ghost_map_auth (fs_top γfs) (1/2) I`.  The
+  application's own invariant, `app_inv := inv appN (∃ I, ghost_map_auth
+  (fs_top γfs) (1/2) I ∗ app_pred app_run I)`, holds the other half beside
+  the claim.  Agreement pins the two `I`s; the one mover
+  (`ireg_top_retag`) needs the whole authority, so it opens BOTH
+  invariants and re-establishes the claim (`app_step`) — that is what
+  "they move together" means as a resource, and it is enforced by
+  ownership, not by discipline.  The kernel's invariant names no
+  application anything; its only change is `1` → `1/2` and the mover's
+  extra opening.
+- **Durable.**  `FsDurSnap.fs_snap` keeps its snapshot authority
+  `ghost_map_auth (γtop Γ) 1 (fss_inodes S)` at HALF, and the
+  application's durable claim is a SEPARATE conjunct of the crash slot,
+  `app_dur := ∃ gt γa I, ghost_map_auth gt (1/2) I ∗ app_pred γa I`, tied
+  to the current snapshot by the same agreement.  The crash slot at xv6
+  becomes `P_fs_named ∗ app_dur`-shaped, two named predicates side by
+  side under the one fixed-layer invariant, exactly as `Pc` and `Pt` are
+  two slots: the file system's record is untouched in statement, and the
+  application's is its own.  (The snapshot's `gt` is existential inside
+  `P_dur`; the tie needs no binder to be shared, because the half
+  authority IS the identification.)  Neither predicate is timeless once
+  the claim is an arbitrary `iProp`; the machine layer already treats
+  the crash slot as non-timeless (`◇` in every hook).
 
 ## 3. The three crossings, each one `app_xfer`
 
 1. **Commit** (`LogSnapLaw.snap_law`'s proof, at quiescence).  The
-   collection already lends the running bundle and the `ftop` authority
-   at `I` (`FsCollectAll.col_bodies_acc`; `fss_inodes S = I` on the nose,
-   `FsCollect.col_state`).  It now also lends `app_pred app_run I`; the
-   law runs `app_xfer` once and packs `∃ γa', app_pred γa' I` into the
-   new `P_dur`, returning the running claim to the body.  The WAL stays
-   application-agnostic: the law is file-system-supplied and persistent,
-   as today.
+   collection lends the running bundle and the `ftop` authority at `I`
+   (`FsCollectAll.col_bodies_acc`; `fss_inodes S = I` on the nose,
+   `FsCollect.col_state`).  The application's half of the commit is a
+   SECOND law beside the file system's: given the kernel's new snapshot
+   authority (its half at `gt`) and the application's running claim at
+   the same `I` (read through `app_inv` — the two halves agree), run
+   `app_xfer` once and produce `app_dur` at `gt`, returning the running
+   claim to `app_inv`.  The WAL stays application-agnostic: it runs two
+   persistent laws where it ran one, and the second is supplied by the
+   application.
 2. **PowerOn** (`FsCrash.P_fs_swap`, the clone).  `P_dur_clone` re-mints
    the snapshot at fresh names; the application conjunct is cloned by
    `app_xfer`.  `P_fs_lend` carries the clone to the boot unchanged in
@@ -131,16 +152,31 @@ Plus the trace side unchanged (`app_R`, its four steps, `app_phi`, `Hphi`).
 
 Deleted: `FsAbsInv`'s client copy and `fsabs_env`, the license, the fire
 dischargers' `fsabs_set`, `app_lend`/`Hlend`/`Happ_boot`, the era-0
-seeding through the kit.  Changed: `ftop_body` (+1 conjunct, −timeless),
+seeding through the kit.  Changed: `ftop_body` (the authority at `1/2`, −timeless is NOT needed
+now — the claim is in the application's own invariant),
 `ireg_top_retag` (+1 premise: `app_step` at the moved inum) and its ~20
-call sites (trivially at the generic application), `P_dur` (+1 conjunct,
-−timeless), `snap_law`'s proof (+1 transport), `P_dur_clone` (+1
-transport), `fs_cfg_alloc_snap` (+1 transport, `app_run` chosen there),
+call sites (trivially at the generic application), `fs_snap` (the authority at `1/2`), the crash slot at xv6 (`P_fs_named ∗
+app_dur`), a second commit law beside `snap_law` (the application's
+transport), the clone (+1 transport on the application's slot), `fs_cfg_alloc_snap` (+1 transport, `app_run` chosen there),
 `img_P_dur_alloc` (+`app_init`), the `appcfg` record.  Lane L3 ("every
 mover fires") dissolves: the claim is at the map's home, so a mover that
 does not fire an AU still re-establishes it — with the generic
 application's trivial step until a real application's proof supplies a
 real one.  Lane L4 dissolves into the transport.
+
+## 5½. Who proves the transport, and how often
+
+The APPLICATION proves `app_xfer` ONCE, as a Coq lemma about its own
+predicate — a closed entailment `⊢ ∀ γa I, app_pred γa I ==∗ …` with no
+resource premise.  It reaches the tree as a premise of the system
+theorem (beside `HPc`, `Hswap`, `HPt`), so it is a proof term, usable at
+every era and every crossing; nothing consumes it.  Inside an era the
+kernel needs it as an `iProp` at the commit's law, and a closed
+entailment is freely boxed (`□ (∀ γa I, app_pred γa I ==∗ …)` from the
+lemma by `bi.intuitionistically_intro`), so the boot parks the boxed
+form beside `LogSnapLaw.snap_law` in `log_ctx` once per era and the
+committer reads both laws off the ledger.  Nothing is re-proved per
+commit; nothing is per era but the parking.
 
 ## 6. Open questions for the owner
 
@@ -153,10 +189,9 @@ real one.  Lane L4 dissolves into the transport.
    what the fires lend and the movers change; `S` adds the superblock,
    the bitmap's used set and the byte view, which no application has
    asked for.  Proposed: `I`, with `fss_inodes S` at the durable instance.
-3. **Should the durable conjunct sit inside `P_dur` (sharing the
-   snapshot's `S`) or beside it in `P_fs` at `∀ S, snap_ok S D → …`?**
-   Inside is proposed: it is the same binder the snapshot uses, and it is
-   what lets a resource-valued claim refer to the state it is about.
+3. ~~Inside `P_dur` or beside it?~~  RULED beside (owner, 2026-09-05):
+   separate invariants, tied by half of the snapshot's map authority
+   (§2).
 4. **The mover's premise shape.**  `app_step` at the raw map with the
    changed inum, or at the abstract-view delta (`FsAbsDelta`)?  The mover
    sees the map; the AU fires already know the delta and can derive the
