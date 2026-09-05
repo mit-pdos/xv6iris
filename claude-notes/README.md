@@ -199,11 +199,14 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   report against the landed tree.
 
 - **[`applications.md`](design/applications.md)** — APPLICATIONS: how a
-  collection of user programs plugs into the whole-system theorem — the
-  conditional invariant `⌜A I⌝ ∨ tainted` on the abstract file-system
-  state (the taint a fixed-layer client counter), the application record
-  and `App.xv6_app_adequacy`, the license the fire dischargers take, the
-  era mint that seeds the client copy, and the lanes the echo application
+  collection of user programs plugs into the whole-system theorem — ONE
+  claim on the abstract file-system view at TWO INSTANCES (running, in the
+  application's own invariant tied to the kernel's map by half its
+  authority; durable, beside the snapshot in the crash slot), crossing at
+  commit/clone/boot by an application-supplied later-shaped TRANSPORT; the
+  fixed part born once into the machine record; the movers; the opaque
+  guest that keeps the WAL application-agnostic; the record and
+  `App.xv6_app_adequacy`; and the lanes the echo application
   (`echo hello world`, file system unmodified) still owes.
 
 - **[`ctx-box.md`](design/ctx-box.md)** — THE TRANSIT BOX (`CtxBox.v`): the
@@ -220,16 +223,17 @@ Audited against the tree 2026-08-28, when six moved to
 (finished) and `sp-migration.md` (archived by the owner with work still
 outstanding; see the `completed/` section below).
 
-- **[`app-instances.md`](projects/app-instances.md)** — PROPOSAL (2026-09-05,
-  iterating with the owner): the application predicate at TWO INSTANCES,
-  running (beside the abstract map's authority in `ftop_body`) and durable
-  (inside the snapshot), crossing the boundary by an application-supplied
-  TRANSPORT at the three points the kernel's own predicate crosses — the
-  commit, the PowerOn clone, the boot mint.  Deletes the client copy, the
-  license and the boot lend if adopted.
+- **[`app-instances.md`](projects/app-instances.md)** — the two-instance
+  application design's RULINGS and ROUNDS (2026-09-05): rounds A (running
+  tie), C (durable instance), D0 (birth step) LANDED with their as-built
+  deviations; round E (every mover on `_same`/`_step`, AU forms for link,
+  mkdir, `iput`'s free; delete `top_move`) in flight.  The design of record
+  is `design/applications.md`; this file is where a round's measurement
+  and deviations are recorded.
 - **[`app-echo.md`](projects/app-echo.md)** — the ECHO APPLICATION's
   worklist: the target statement (`disc κs -> good_out κs /\ pristine`),
-  the six lanes L2–L7 of `design/applications.md` §5 with their gates,
+  the lanes L2–L7 of `design/applications.md` §6 with their gates (L4
+  dissolved into round C),
   and what `iris/AppEcho.v` holds today (pure data and the obligations
   provable without any lane).
 - **[`liveness.md`](projects/liveness.md)** — NOT ACTIVE, a parked design

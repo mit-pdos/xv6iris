@@ -3,8 +3,10 @@
 Design of record: [`../design/applications.md`](../design/applications.md).
 This file is what is LEFT to make `AppEcho` an instance of
 `App.xv6_app_adequacy`, in execution order.  The scaffold itself — the
-record, the theorem, the client counter, the conditional invariant, the
-license, the era mint — is landed (see the top banner of `iris/App.v`).
+record, the theorem, the two-instance claim (running in `app_inv`, durable
+in the crash slot), the transport, the birth step, the era mint — is
+landed (rounds A/C/D0 of `app-instances.md`, 2026-09-05; the top banner
+of `iris/App.v`).
 
 ## The target statement
 
@@ -19,25 +21,29 @@ cycle's inputs, and `pristine dk` says the committed map `dk` recovers to
 has the mkfs image's abstract view (so init, sh and echo are the image's
 binaries at every reboot).
 
-## Lanes (design §5), with what each unblocks
+## Lanes (design §6), with what each unblocks
 
-- [ ] **L2 — per-process license.**  The returning-ecall arm's persistent
-  give `app_lic`, the dispatcher's write-kind fires taking it, the
-  generic slot at `tainted -∗ □ uexec_wp`.  Unblocks: every non-generic
-  `Happ_lic`.  Gate: none.  Shape: `fd-row-pilot.md` §2's deposit
-  disjunct at a persistent payload; `UexecRetExec.uexecXG` for the
-  ambient class.
-- [ ] **L3 — every mover fires.**  mkdir, link, iput-free on AU forms
-  whose fires re-sync the copy; the `ftop_body` tie half.  Unblocks:
-  `⌜fsc_app I⌝` meaning the file system.  Gate: none; it is
-  `fs-syscall-specs.md`'s remaining lanes.
-- [ ] **L4 — the crash predicate's application conjunct.**  Unblocks:
-  `Happ_swap`, hence `Happ_boot` at a non-pristine boot, hence the
-  `pristine` half of `app_phi`.  Gate: L3 (the collection reads the copy).
-- [ ] **L5 — console input tie.**  Unblocks: sh minting `tainted` at the
+- [ ] **L2 — the step moves to the process.**  The returning-ecall arm's
+  persistent give carrying `app_step`, the AU fires taking it from there,
+  the generic slot at `taint -∗ □ uexec_wp`.  Unblocks: every non-generic
+  step.  Gate: L3 (a site still on `_auto` is paid era-wide by `app_auto`,
+  which only the generic application has).  Shape: `fd-row-pilot.md` §2's
+  deposit disjunct at a persistent payload; `UexecRetExec.uexecXG` for
+  the ambient class.
+- [ ] **L3 — round E of `app-instances.md`** (kernel side, application-
+  independent).  Every `ireg_top_retag_auto` site becomes `_same` (view
+  unchanged) or `_step` (paid from an AU contract's `app_step`); link,
+  mkdir and `iput`'s free move onto AU forms with their deltas
+  (`fs-syscall-specs.md` §4); then `top_move`, the `_auto` movers and
+  `Happ_auto` are deleted.  Gate: none.
+- [x] ~~**L4 — the crash predicate's application conjunct.**~~  Dissolved
+  into the durable instance and the transport (round C): the claim rides
+  the crash slot beside the snapshot and crosses at commit/clone/boot as a
+  resource.
+- [ ] **L5 — console input tie.**  Unblocks: sh minting the taint at the
   point it leaves the discipline; hence L2's last step and L6's sh.
   Gate: none (console.c is proven; the ledger is new).
-- [ ] **L6 — the programs.**  init and sh on the Uk engine with licensed
+- [ ] **L6 — the programs.**  init and sh on the Uk engine with paid
   ecalls; the exec-site gate at the observed image; fork's real row.
   Gate: L2, L5; `user-wp-slot.md` items 1–3.
 - [ ] **L7 — the output side.**  `echo_out`, `good_out`, the tx wand.
@@ -55,20 +61,23 @@ The pure data and the obligations provable WITHOUT any lane:
   element of `cycles_of` while the power is on.  Closure laws:
   `disc_out` (an output byte moves nothing), `disc_power` (a power event
   moves nothing), `disc_in` (breaking the discipline is forever).
-- `echo_R γcl h := mono_nat_auth_own γcl 1 (if decide (disc h) then 0 else 1)`
-  with `echo_R_alloc` (`HR0`), `echo_R_pow` (`Hpow`), `echo_R_tx`,
-  `echo_R_rx` (the two UART arms, as basic updates over the ledger alone —
-  the theorem's wands frame the UART ghosts around them) and
-  `echo_R_untainted` (`disc h` and `client_lb 1` contradict: what the end
-  of the run reads).
-- `echo_fs_pure I := era0_pins (abs_view I) /\ era0_sh_pins (abs_view I)`, and
-  `echo_fs I := ⌜echo_fs_pure I⌝` as the application's `iProp` predicate (the
-  /init and /sh binaries are the image's, path and content; per inum, not
-  a whole-map equality) and `echo_fs_era0` (`Happ_boot` at era 0, off
-  `FsInitPinBoot.era0_recovery_pins` / `FsShPin.era0_recovery_sh_pins`).
+- The FIXED PART: `echo_fixed := gname`, `echo_cl γ := mono_nat_auth_own γ 1 0`,
+  `echo_birth` (`Hbirth`); the ledger `echo_R γ h := mono_nat_auth_own γ 1 (echo_phase h)`
+  (0 while `disc h`, 1 after) with `echo_R_alloc` (`HR0`, off `echo_cl`),
+  `echo_R_pow` (`Hpow`), `echo_R_tx`, `echo_R_rx` (the two UART arms, as
+  basic updates over the ledger alone — the theorem's wands frame the UART
+  ghosts around them) and `echo_R_untainted` (`disc h` and the taint
+  `mono_nat_lb_own γ 1` contradict: what the end of the run reads).
+- `echo_fs_pure av := era0_pins av /\ era0_sh_pins av` over the VIEW, and
+  `echo_fs av := ⌜echo_fs_pure av⌝` as the application's `iProp` predicate
+  (the /init and /sh binaries are the image's, path and content; per inum,
+  not a whole-map equality); `echo_xfer` (`Happ_xfer`, by
+  `app_xfer_raw_pure`: a pure claim duplicates); `echo_fs_era0`/`echo_init`
+  (`Happ_init` at the image, off `FsInitPinBoot.era0_recovery_pins` /
+  `FsShPin.era0_recovery_sh_pins`).
 
-Not there, on purpose: a theorem.  `Happ_lic` is payable only from
-`tainted` until L2; `Hlend`/`Happ_boot` at a non-pristine boot need L4;
-`Hphi` needs both and L7.  A theorem taking those as hypotheses would be
+Not there, on purpose: a theorem.  `Happ_auto` is payable only by the
+generic application until L3 (and then the steps only from a process,
+L2); `Hphi` needs L2 and L7.  A theorem taking those as hypotheses would be
 the GAP-premise trap (`durable-notes.md`).  Echo's own pin (`/echo`'s
 inum and bytes, `FsShPin`'s shape) joins `echo_fs` with L6.

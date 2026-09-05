@@ -197,11 +197,12 @@ Three principles, in order of force:
    rides the `boot_fixedGS` seam equation into the boot cone):
    `riscv_gen_name`, `riscv_start_name`, `riscv_registry_name`,
    `riscv_disk_name` (+ its `riscv_disk_size`), `riscv_swap_name`, the
-   history ghost `riscv_obs_name` and the CLIENT PHASE COUNTER
-   `riscv_client_name` (a mono-nat the client owns through its trace slot;
-   a lower bound on it is an application's taint —
-   [`applications.md`](applications.md) §1), beside the client's two
-   opaque predicates `riscv_crash_pred`/`riscv_obs_pred : iProp Σ`.
+   history ghost `riscv_obs_name` and the APPLICATION'S FIXED PART, the
+   dependent pair `riscv_client_T : Type; riscv_client : riscv_client_T`
+   (born once by the application's birth step before the crash slot is
+   built; for the echo application a mono-nat whose lower bound is its
+   taint — [`applications.md`](applications.md) §1), beside the client's
+   two opaque predicates `riscv_crash_pred`/`riscv_obs_pred : iProp Σ`.
 
    **THERE IS NO FIXED-LAYER DURABLE VIEW, and that is what the snapshot
    buys.**  A committed BYTE view at a fixed gname, plus a record of the

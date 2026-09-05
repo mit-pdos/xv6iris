@@ -1,9 +1,10 @@
 # PROPOSAL: the application predicate at two instances — running ↔ durable by transport
 
-STATUS: DESIGN PROPOSAL (2026-09-05), not built; iterating with the owner.
-Supersedes, if adopted, `design/applications.md` §2's client copy, its
-license, and §3's `app_lend`/`Hlend`/`Happ_boot`, and it re-scopes lanes
-L3 and L4 of `app-echo.md`.  Nothing here is specific to any application.
+STATUS: ADOPTED AND BUILT (rounds A, C, D0 landed 2026-09-05; round E in
+flight — see §7).  The design of record is now `design/applications.md`,
+rewritten from this file; §0–§5½ below are the proposal as ruled, §6 the
+rulings, §7 the rounds with their measurements and as-built deviations.
+Nothing here is specific to any application.
 
 ## 0. The principle
 
