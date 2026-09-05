@@ -271,6 +271,21 @@ Rounds, each a green gate:
   gain the step wands; the client copy, its license and `fsabs_env` are
   deleted; the generic dischargers are stateless.  The boot obligation
   and the lend stay as today until C.
+  **LANDED 2026-09-05 (green, audit unchanged).**  As built, four
+  deviations worth knowing: the write-kind commit shapes' step is
+  LATER-SHAPED and indexed by the raw inserted node
+  (`AppInv.app_step i I av' := ∀ n', ⌜abs_view (<[i:=n']> I) = av'⌝ -∗
+  ▷ app_pred … (abs_view I) -∗ ▷ app_pred … (abs_view (<[i:=n']> I))`) —
+  phase 1 already binds `I`, the fire needs the raw insert for the mover,
+  and a plain wand lifts into it; the generic dischargers take `app_inv`
+  (they pay the step off the parked license, since at an ambient `APP`
+  no step is trivial) and `FirstTok.fsabs_env` is `app_inv fsc_fs`; the
+  spec-layer reading `FsAbs.astate` is fraction-agnostic (`∃ q, astate_q`)
+  so the running readers (half) and the durable ones (whole) share it;
+  38 files bind `appcfg` ambiently (every inode-primitive Spec*/Proof*
+  binds `icfg` directly and states `ireg_inv`), the five mint/boot files
+  pass it.  No site needed `_same`; 22 sites use `_auto`, 9 `_armed_auto`,
+  the six write fires pay the contract's step.
 - **B — the AU fires pay steps from the contract**, and the dispatcher
   threads them (generic: trivial).  May fold into A.
 - **C — the durable instance.**  `fs_snap` at `1/2` returning the guest
