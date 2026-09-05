@@ -43,6 +43,10 @@ Definition auipc_off (imm : mword 20) : mword 64 :=
 Definition trunc32 (w : mword 64) : mword 32 :=
   autocast (T := mword) (subrange_vec_dec w (Z.sub (Z.mul 4 8) 1) 0).
 
+(* ...and its 2-byte twin: the value a halfword store commits. *)
+Definition trunc16 (w : mword 64) : mword 16 :=
+  autocast (T := mword) (subrange_vec_dec w (Z.sub (Z.mul 2 8) 1) 0).
+
 (* ---- [mword_of_int] at width 32, and its sign extension to 64 ----
    Generic bitvector facts about a small non-negative literal stored in a
    4-byte cell: its unsigned value survives, and so does its signed value
@@ -194,6 +198,25 @@ Proof.
   change (Z.of_N 0) with 0%Z. rewrite Z.shiftr_0_r.
   change (MachineWord.MachineWord.Z_idx (Z.sub (Z.mul 4 8) 1 - 0 + 1)) with 32%N.
   rewrite (bv_wrap_bv_wrap 32 64 _ ltac:(lia)).
+  unfold bv_signed. rewrite bv_wrap_swrap.
+  apply bv_wrap_small. apply bv_unsigned_in_range.
+Qed.
+
+(* the 16-bit twin: an [lh] followed by an [sh] of the same register is the
+   identity on the halfword (every dinode metadata copy is exactly this). *)
+Lemma trunc16_sext64 (w : mword 16) : trunc16 (sign_extend' 64 w) = w.
+Proof.
+  apply bv_eq. unfold trunc16. rewrite autocast_id.
+  unfold subrange_vec_dec, to_word_idx, to_word, get_word,
+         MachineWord.MachineWord.slice.
+  rewrite bv_extract_unsigned.
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+       to_word get_word MachineWord.MachineWord.sign_extend].
+  rewrite bv_sign_extend_unsigned.
+  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+  change (Z.of_N 0) with 0%Z. rewrite Z.shiftr_0_r.
+  change (MachineWord.MachineWord.Z_idx (Z.sub (Z.mul 2 8) 1 - 0 + 1)) with 16%N.
+  rewrite (bv_wrap_bv_wrap 16 64 _ ltac:(lia)).
   unfold bv_signed. rewrite bv_wrap_swrap.
   apply bv_wrap_small. apply bv_unsigned_in_range.
 Qed.

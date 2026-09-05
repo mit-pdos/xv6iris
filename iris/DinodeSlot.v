@@ -20,10 +20,9 @@
        see through that.  Every [Z] step is factored into an mword-FREE
        helper, because [lia] answers "Cannot find witness" as soon as a
        [bv_unsigned] is in the goal (claude-notes/durable-notes.md).
-       Also here: [trunc16_sext64], the 16-bit twin of
-       [RiscvExtras.trunc32_sext64] -- an [lh] followed by an [sh] of the
-       same register is the identity on the halfword, which is what all
-       four metadata copies are, in EITHER direction.
+       The halfword round trip every metadata copy performs -- an [lh]
+       followed by an [sh] of the same register -- is
+       [RiscvExtras.trunc16_sext64], beside its 32-bit twin.
 
    (2) THE ADDRESSES.  bp->data, the dinode slot inside it, its five field
        cells, and their alignment (bcache geometry, as in write_head and
@@ -56,7 +55,6 @@ Require Import RiscvExtras.
 Require Import PrintintArith.
 Require Import ByteCursor.
 Require Import ByteBuf.
-Require Import WpSmodeHalf.
 Require Import DiskPtsto.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks.
@@ -110,26 +108,6 @@ Proof.
   assert (H1 : (2147483648 `mod` 16)%Z = 0) by (vm_compute; reflexivity).
   rewrite H1 Z.sub_0_r Zmod_mod.
   rewrite Zplus_mod H1 Z.add_0_r Zmod_mod. reflexivity.
-Qed.
-
-(* ---- an [lh] followed by an [sh] of the same register is the identity
-   on the halfword: the 16-bit twin of [RiscvExtras.trunc32_sext64].  All
-   four metadata copies are exactly this. ---- *)
-Lemma trunc16_sext64 (w : mword 16) : trunc16 (sign_extend' 64 w) = w.
-Proof.
-  apply bv_eq. unfold trunc16. rewrite autocast_id.
-  unfold subrange_vec_dec, to_word_idx, to_word, get_word,
-         MachineWord.MachineWord.slice.
-  rewrite bv_extract_unsigned.
-  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
-  rewrite bv_sign_extend_unsigned.
-  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
-  change (Z.of_N 0) with 0%Z. rewrite Z.shiftr_0_r.
-  change (MachineWord.MachineWord.Z_idx (Z.sub (Z.mul 2 8) 1 - 0 + 1)) with 16%N.
-  rewrite (bv_wrap_bv_wrap 16 64 _ ltac:(lia)).
-  unfold bv_signed. rewrite bv_wrap_swrap.
-  apply bv_wrap_small. apply bv_unsigned_in_range.
 Qed.
 
 (* ---- the low half of a sign extension ---- *)

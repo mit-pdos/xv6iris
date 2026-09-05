@@ -10,9 +10,8 @@
 
    The only non-frame content is the EXTENSION bookkeeping.  Four of the five
    pairs load and store at the SAME width, so the extension the load applied
-   is undone by the store's truncation ([trunc32_sext64], and its halfword
-   twin [trunc16_sext64] below -- the one lemma this file has to prove, and
-   [RiscvExtras.trunc32_sext64]'s proof transposed to width 2).  The fifth
+   is undone by the store's truncation ([RiscvExtras.trunc32_sext64] and
+   its halfword twin [RiscvExtras.trunc16_sext64]).  The fifth
    pair does not: [lwu a5,76(a0)] followed by [sd a5,16(a1)] widens a 4-byte
    [uint] into an 8-byte field, so [st->size] is the ZERO-extension of
    [ip->size] and the AST's [is_unsigned = true] is load-bearing there and
@@ -46,26 +45,6 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
-
-(* [RiscvExtras.trunc32_sext64] at width 2: the round trip an [lh] feeding an
-   [sh] performs.  (It belongs beside [WpSmodeHalf.trunc16]; kept here so
-   nothing below it has to be rebuilt.) *)
-Lemma trunc16_sext64 (w : mword 16) : trunc16 (sign_extend' 64 w) = w.
-Proof.
-  apply bv_eq. unfold trunc16. rewrite autocast_id.
-  unfold subrange_vec_dec, to_word_idx, to_word, get_word,
-         MachineWord.MachineWord.slice.
-  rewrite bv_extract_unsigned.
-  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
-  rewrite bv_sign_extend_unsigned.
-  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
-  change (Z.of_N 0) with 0%Z. rewrite Z.shiftr_0_r.
-  change (MachineWord.MachineWord.Z_idx (Z.sub (Z.mul 2 8) 1 - 0 + 1)) with 16%N.
-  rewrite (bv_wrap_bv_wrap 16 64 _ ltac:(lia)).
-  unfold bv_signed. rewrite bv_wrap_swrap.
-  apply bv_wrap_small. apply bv_unsigned_in_range.
-Qed.
 
 Module StatiProof : STATI.
 

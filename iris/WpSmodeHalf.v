@@ -51,12 +51,6 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
-(* Truncate a 64-bit register to its low 16 bits -- the value a 2-byte store
-   commits, the exact analogue of [RiscvExtras.trunc32].  (It belongs next to
-   [trunc32] in RiscvExtras.v; kept here to avoid rebuilding the world.)     *)
-Definition trunc16 (w : mword 64) : mword 16 :=
-  autocast (T := mword) (subrange_vec_dec w (Z.sub (Z.mul 2 8) 1) 0).
-
 Section WpSmodeHalf.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
