@@ -43,7 +43,7 @@ Require Import StartedInv.
 Require Import SpecMain SpecMainSecondary.
 Require Import BootConfig PowerBoot.
 Require Import BootCarve BootCarveMain.
-Require Import BootChain.
+Require Import BootHart.   (* the geometry, [boot_entry_pre], [boot_hart_res] -- and NOT BootChain, which waits for LinkMain *)
 Require Import MbootVocab.
 Require Import RiscvAdequacy.
 Require Import BootReset.   (* the garbage-anchored register clause's bridge *)
@@ -315,7 +315,7 @@ Section BootBss.
          push_off writes it). *)
   (* THE [proc] CELL STAYS RAW HERE, and that is the eight-hart adequacy trap
      answered (tso-port.md §0.16′).  It is a TIMESTAMP-0 boot-image cell and
-     it is the ONLY ξ-indexed row of [BootChain.boot_hart_res]; the carve runs
+     it is the ONLY ξ-indexed row of [BootHart.boot_hart_res]; the carve runs
      ONCE, before any hart has a thread of control, while each hart's chain
      runs at ITS OWN [own_context_boot] identity.  So the cell crosses at the
      CONSUMER, not here: [boot_hart_pre] turns it into
@@ -436,7 +436,7 @@ Section BootBssChain.
             !irefslotG Σ}.
   Context `{GEN : GenId}.
 
-  (* ONE hart's memory share, exactly as [BootChain.boot_hart_res] spells it
+  (* ONE hart's memory share, exactly as [BootHart.boot_hart_res] spells it
      (its stack slice and its four [cpus[h]] cells; the image word it also
      takes is PERSISTENT and shared, so it is not here).
 
@@ -1010,7 +1010,7 @@ End BootBssChain.
 (* is a control-flow fact, not a taste:                                    *)
 (*   - [WireInv.wire_inv_alloc] wants ALL EIGHT harts' [sig_seip]/         *)
 (*     [sig_meip] at once and must run before any hart's WP, so            *)
-(*     [BootChain.boot_entry_pre] is called per hart INSIDE this fupd and  *)
+(*     [BootHart.boot_entry_pre] is called per hart INSIDE this fupd and  *)
 (*     the sixteen pins are kept (which is exactly why [boot_hart_res]     *)
 (*     excludes them);                                                     *)
 (*   - each [cpus[h].proc] cell is split in half, one half into that       *)
@@ -1064,7 +1064,7 @@ Qed.
    says 1 ([KernelData], via [boot_cran_cell4_at]), and pinning it here is
    what lets the FIRST process carry the right to run that arm. *)
 (* [first]'s FOUR IMAGE BYTES, as a named lemma.  It is named for the reason
-   [BootChain.entry_got_bytes] is: the discharge is a [vm_compute] over an
+   [BootHart.entry_got_bytes] is: the discharge is a [vm_compute] over an
    image map, and inlining one into a proof context normalises
    [boot_byte] -- the filtered union of BOTH image maps -- rather than a
    single lookup.  Named, it is paid once.
@@ -1177,7 +1177,7 @@ Section BootAlloc.
 
   (* this hart's RESERVATION MIRROR at [None], as adequacy mints it: a hart
      that has executed nothing holds no reservation.  It goes into that
-     hart's [InstrBytes.pc_is] via [BootChain.boot_entry_pre]
+     hart's [InstrBytes.pc_is] via [BootHart.boot_entry_pre]
      (claude-notes/projects/main-cycle-port.md §3a), which is why it is a
      per-hart family here rather than an output of this file. *)
   Definition hart_resv (c : CPU) : iProp Σ :=
