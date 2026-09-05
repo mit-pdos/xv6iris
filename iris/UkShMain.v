@@ -294,26 +294,49 @@ Section UkShMain.
                  (fun j : nat => g (fst tk + j)%nat)).
   Proof. intro Hi. unfold ush_args. rewrite list_lookup_fmap Hi. reflexivity. Qed.
 
+  (* every byte a program owns is inside the user region -- read off the
+     run's own heap, and the run survives because the conclusion is pure *)
+  Local Lemma urun_ubytes_bnd (h : CpuId) (m : regfile) (pc : mword 64)
+      (avail : nat) (a : Z) (nb : nat) (fb : nat -> bv 8) :
+    urun γt γd γs γfd h m pc avail -∗ ubytes γd a nb fb -∗
+    ⌜ forall j : nat, (j < nb)%nat -> 0 <= a + Z.of_nat j < 2 ^ 38 ⌝.
+  Proof.
+    iIntros "Hrun Hbs".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw)
+      "(_ & _ & _ & Hheap & _)".
+    iDestruct (uheap_ubytes_img γt γd γs M pm sz a nb fb with "Hheap Hbs")
+      as %Hall.
+    iPureIntro. intros j Hj. exact (proj2 (Hall j Hj)).
+  Qed.
+
   (* THE CONVERSION.  Everything the runner's tree names is built here out
      of the parser's node and the NUL-cut line, and every byte of it is
      DISCARDED on the way -- which is what makes the tree persistent, hence
      what lets it cross the fork as a payload. *)
-  Lemma ush_cmd_of_ushp (s0 p : Z) (len : nat) (f : nat -> bv 8)
+  Lemma ush_cmd_of_ushp (h : CpuId) (m : regfile) (pc : mword 64) (avail : nat)
+      (s0 p : Z) (len : nat) (f : nat -> bv 8)
       (toks : list (nat * nat)) :
     ushp_tokens len f 0 toks ->
     ushp_no_symbols len f ->
     (forall j : nat, (j < len)%nat -> f j <> ubyte0) ->
     Z.of_nat len < 2 ^ 31 ->
-    0 < s0 -> s0 + Z.of_nat len < 2 ^ 38 -> 0 < p < 2 ^ 38 ->
+    0 < s0 -> s0 + Z.of_nat len < 2 ^ 38 ->
+    (* the run is here only to read the node's address bound off the heap *)
+    urun γt γd γs γfd h m pc avail -∗
     ushp_tree γd s0 p (UshpExec toks) -∗
     ubytes γd s0 (S len) (ushp_nulfold toks (ushp_ext len f)) ==∗
+    urun γt γd γs γfd h m pc avail ∗
     ush_cmd γd p (UExec (ush_args s0 (ushp_nulfold toks (ushp_ext len f)) toks)).
   Proof.
-    intros Htoks Hns Hnn Hlen31 Hs0 Hs0hi Hp.
+    intros Htoks Hns Hnn Hlen31 Hs0 Hs0hi.
     set (g := ushp_nulfold toks (ushp_ext len f)).
-    iIntros "Hnode Hline".
+    iIntros "Hrun Hnode Hline".
     iMod (ubytes_persist γd s0 (S len) g with "Hline") as "#Hline".
     iDestruct "Hnode" as "(%Hlt10 & %Hp0 & %Hp8 & [Hty _] & Hargv & _)".
+    iDestruct (urun_ubytes_bnd h m pc avail p 4 _ with "Hrun Hty") as %Hpb.
+    assert (Hp : 0 < p < 2 ^ 38).
+    { split; [ exact Hp0 | ].
+      destruct (Hpb 0%nat ltac:(lia)) as [_ Hhi]. lia. }
     iMod (ubytes_persist γd p 4 _ with "Hty") as "#Hty".
     (* ---- the ten argv slots, persisted down to the ones that matter ---- *)
     assert (E10 : (10 = S (length toks) + (10 - S (length toks)))%nat) by lia.
@@ -378,7 +401,7 @@ Section UkShMain.
           by lia.
         iEval (rewrite Ea) in "Hb". iExact "Hb". }
     (* ---- assemble ---- *)
-    iModIntro. rewrite /ush_cmd.
+    iModIntro. iFrame "Hrun". rewrite /ush_cmd.
     iSplitR; [ iPureIntro; lia | ].
     iSplitR; [ iPureIntro; exact Hp8 | ].
     iSplitR.
@@ -419,6 +442,150 @@ Section UkShMain.
       [ apply lookup_seq; lia | ].
     rewrite (lookup_ge_None_2 toks (length toks) ltac:(lia)).
     iExact "Hw".
+  Qed.
+
+  (* ===================================================================== *)
+  (* §4 THE CHILD: parse the line, then run the tree.                       *)
+  (*                                                                       *)
+  (*   0x9c0  c.mv a0,s1        the line                                    *)
+  (*   0x9c2  jal  ra,parsecmd  -> the node                                 *)
+  (*   0x9c6  jal  ra,runcmd    -> exec, and never back                     *)
+  (*                                                                       *)
+  (* This is where the theorem's content is: the tree [runcmd] walks is the *)
+  (* one [parsecmd] just built out of THIS line, so the [exec] at the       *)
+  (* bottom of [runcmd]'s EXEC arm names the line's own words.              *)
+  (* ===================================================================== *)
+  Lemma wp_kshm_child
+      (Hmalloc : forall (h : CpuId) (m : regfile) (nbytes : Z) (avail : nat),
+         m !!! Regidx (mword_of_int 10) = mword_of_int nbytes ->
+         0 < nbytes -> nbytes < Z31 ->
+         shp_code γt -∗
+         urun γt γd γs γfd h m (mword_of_int ShSyms.malloc) (10 + avail) -∗
+         (∀ (h' : CpuId) (m' : regfile) (p : Z) (g : nat -> bv 8),
+            ⌜ ucallee_saved m m' ⌝ -∗
+            ⌜ m' !!! Regidx (mword_of_int 10) = mword_of_int p ⌝ -∗
+            ⌜ 0 < p /\ p mod 16 = 0 /\ p + nbytes < 2 ^ 38 ⌝ -∗
+            ubytes γd p (Z.to_nat nbytes) g -∗
+            urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx (mword_of_int 1)))
+              (10 + avail) -∗
+            WP (Loop : expr riscv_lang)) -∗
+         WP (Loop : expr riscv_lang))
+      (Hclw : UkShDiag.ushd_clw_text_ty)
+      (h : CpuId) (m : regfile) (dw dv : dfrac)
+      (s0 : Z) (len : nat) (f : nat -> bv 8) (toks : list (nat * nat))
+      (szv : Z) (ld : list fdstate) (n : nat) :
+    m !!! Regidx s1_idx = (mword_of_int s0 : mword 64) ->
+    ushp_no_symbols len f ->
+    ushp_tokens len f 0 toks ->
+    (length toks < 10)%nat ->
+    0 < s0 -> s0 + Z.of_nat len + 1 < Z64 -> s0 + Z.of_nat len < 2 ^ 38 ->
+    shk_code γt -∗ shp_code γt -∗ shp_rodata γt -∗ ush_jtab γt -∗
+    ustr γd (DfracOwn 1) s0 len f -∗
+    ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
+    ustr γd dv ushp_symbols 7 ushp_sym_f -∗
+    usz γs szv -∗ UserFd.ustd γfd ld -∗
+    urun γt γd γs γfd h m (mword_of_int 0x9c0)
+      (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38.
+    iIntros "#Hcode #Hpcode #Hpro #Hjt Hline Hws Hsy Hsz Hstd Hrun".
+    (* the line's own bytes are non-NUL, which is what makes each token a
+       string once the cut lands *)
+    iDestruct (ustr_nonul with "Hline") as %Hnn0.
+    iDestruct (ustr_len with "Hline") as %Hlen31.
+    (* ---- 0x9c0  c.mv a0,s1 ---- *)
+    iApply (wp_uk_cmv γt γd γs γfd h m (mword_of_int 0x9c0) a0_idx s1_idx
+              (add_vec zero_reg (m !!! Regidx s1_idx))
+              (60 + (8 + (UkShDiag.ush_Dg + n)))
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) eq_refl with "[] Hrun").
+    { iApply (uis_shk_9c0 with "Hcode"). }
+    assert (E9c0 : add_vec_int (mword_of_int 0x9c0 : mword 64) 2
+                   = mword_of_int 0x9c2)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E9c0. iIntros (h1) "Hrun".
+    set (m1 := <[Regidx a0_idx
+                 := regval_into_reg (add_vec zero_reg (m !!! Regidx s1_idx))]> m).
+    assert (Ha0_1 : m1 !!! Regidx a0_idx = (mword_of_int s0 : mword 64)).
+    { rewrite /m1 (upd_eq m (Regidx a0_idx) _).
+      rewrite Hs1. apply bv_eq. rewrite add_vec_unsigned.
+      unfold bv_wrap. cbn [bv_unsigned]. rewrite Z.add_0_l.
+      rewrite Z.mod_small; [ reflexivity | ].
+      pose proof (bv_unsigned_in_range _ (mword_of_int s0 : mword 64)) as Hr.
+      assert (Hm : bv_modulus (MachineWord.Z_idx 64) = 18446744073709551616%Z)
+        by (vm_compute; reflexivity).
+      rewrite Hm in Hr. exact Hr. }
+    assert (Hs1_1 : m1 !!! Regidx s1_idx = (mword_of_int s0 : mword 64))
+      by (rewrite /m1 (upd_ne m (Regidx a0_idx) (Regidx s1_idx) _
+                         ltac:(vm_compute; discriminate)); exact Hs1).
+    (* ---- 0x9c2  jal ra,parsecmd ---- *)
+    iApply (wp_uk_jal γt γd γs γfd h1 m1 (mword_of_int 0x9c2)
+              (mword_of_int 2096812 : mword 21) (mword_of_int 1 : mword 5)
+              (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9c6)
+              (60 + (8 + (UkShDiag.ush_Dg + n)))
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              ltac:(apply bv_eq; vm_compute; reflexivity)
+              ltac:(apply bv_eq; vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_shk_9c2 with "Hcode"). }
+    iIntros (h2) "Hrun".
+    set (m2 := <[Regidx (mword_of_int 1 : mword 5)
+                 := regval_into_reg (mword_of_int 0x9c6 : mword 64)]> m1).
+    assert (Ha0_2 : m2 !!! Regidx a0_idx = (mword_of_int s0 : mword 64))
+      by (rewrite /m2 (upd_ne m1 (Regidx (mword_of_int 1 : mword 5))
+                         (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
+          exact Ha0_1).
+    assert (Hra_2 : ret_pc (m2 !!! Regidx (mword_of_int 1 : mword 5))
+                    = (mword_of_int 0x9c6 : mword 64))
+      by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
+          apply bv_eq; vm_compute; reflexivity).
+    (* ---- parsecmd ---- *)
+    iApply (wp_kshp_parser γt γd γs γfd Hmalloc (Hclw γt γd γs γfd)
+              h2 m2 dw dv s0 len f toks
+              (8 + (UkShDiag.ush_Dg + n))
+              Ha0_2 Hns Htoks Htlen Hs0 Hs64
+              with "Hpcode Hpro Hline Hws Hsy Hrun").
+    iIntros (p) "%Hparses Hnode Hline %Hcut Hws Hsy".
+    iIntros (h3 m3) "%Hcs3 %Ha0_3 Hrun".
+    rewrite Hra_2.
+    (* ---- 0x9c6  jal ra,runcmd ---- *)
+    iApply (wp_uk_jal γt γd γs γfd h3 m3 (mword_of_int 0x9c6)
+              (mword_of_int 2094792 : mword 21) (mword_of_int 1 : mword 5)
+              (mword_of_int ShSyms.runcmd) (mword_of_int 0x9ca)
+              (60 + (8 + (UkShDiag.ush_Dg + n)))
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              ltac:(apply bv_eq; vm_compute; reflexivity)
+              ltac:(apply bv_eq; vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_shk_9c6 with "Hcode"). }
+    iIntros (h4) "Hrun".
+    set (m4 := <[Regidx (mword_of_int 1 : mword 5)
+                 := regval_into_reg (mword_of_int 0x9ca : mword 64)]> m3).
+    assert (Ha0_4 : m4 !!! Regidx a0_idx = (mword_of_int p : mword 64))
+      by (rewrite /m4 (upd_ne m3 (Regidx (mword_of_int 1 : mword 5))
+                         (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
+          exact Ha0_3).
+    (* ---- THE SEAM: the node the parser built is the tree runcmd walks ---- *)
+    iMod (ush_cmd_of_ushp h4 m4 (mword_of_int ShSyms.runcmd)
+            (60 + (8 + (UkShDiag.ush_Dg + n))) s0 p len f toks
+            Htoks Hns Hnn0 Hlen31 Hs0 Hs38
+            with "Hrun Hnode Hline") as "(Hrun & #Htree)".
+    (* ---- runcmd, which reaches [exec] and never returns ---- *)
+    replace (60 + (8 + (UkShDiag.ush_Dg + n)))%nat
+      with (6 * ush_ht (UExec (ush_args s0
+                                (ushp_nulfold toks (ushp_ext len f)) toks))
+            + (2 + (UkShDiag.ush_Dg + (60 + n))))%nat
+      by (cbn [ush_ht]; lia).
+    iApply (UkShDiag.wp_kshr_runcmd_final Hclw
+              (UExec (ush_args s0 (ushp_nulfold toks (ushp_ext len f)) toks))
+              ltac:(cbn [ush_simple]; exact I)
+              γt γd γs γfd h4 m4 p szv ld (60 + n) Ha0_4
+              with "Hcode Hjt Htree Hsz Hstd Hrun").
   Qed.
 
 End UkShMain.
