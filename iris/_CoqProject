@@ -28,6 +28,7 @@ DiskImg.v
 DevModel.v
 RiscvLang.v
 ObsTrace.v
+LiveProgress.v
 HartBlock.v
 HartSwp.v
 HartLift.v

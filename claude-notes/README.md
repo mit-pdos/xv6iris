@@ -225,14 +225,7 @@ outstanding; see the `completed/` section below).
   the six lanes L2–L7 of `design/applications.md` §5 with their gates,
   and what `iris/AppEcho.v` holds today (pure data and the obligations
   provable without any lane).
-- **[`liveness.md`](projects/liveness.md)** — NOT ACTIVE, a parked design
-  PROPOSAL: how to prove progress properties ("these bytes eventually
-  appear on the UART") without changing the WP — fairness as named trace
-  hypotheses, an instruction-granular fuel ghost hidden in `pc_is`,
-  obligations with levels reusing the lock rank, a pure trace-level
-  argument over the existing per-prefix exports.  Records the rejected
-  routes (total WP, Transfinite Iris, PC-observation + CFG) and the one
-  semantic hazard to settle first (the reservation self-loop).
+- **[`liveness.md`](projects/liveness.md)** — ACTIVE on branch `liveness`: the fuel/ledger liveness design, §7 is the pilot handoff (what is built, the per-prefix finding, the P1 target and worklist).
 - **[`icache.md`](projects/icache.md)** — the non-coherent instruction
   cache: a per-hart instruction view beside the data view, the `AK_ifetch`
   fetch arm and the `fence.i` arm of the Ztso machine, the fetch node rule

@@ -1,9 +1,11 @@
 # Project: liveness — proving "this output eventually appears on the console"
 
-**STATUS: NOT ACTIVE.  A design PROPOSAL, parked 2026-09-04 by the owner to
-keep the ideas on record; nothing below is implemented and nothing in the
-tree depends on it.  If it is picked up, the §4.6 milestones are the worklist
-and §4.1 item 4 (the reservation self-loop) is the first thing to settle.**
+**STATUS: ACTIVE on branch `liveness` (pilot started 2026-09-05).  Sections
+0–6 below are the ORIGINAL PROPOSAL, kept verbatim; §7 ("Pilot handoff") is
+the worklist and supersedes the proposal where they disagree — in
+particular the proposal's claim that per-state adequacy exports suffice
+(§3.1/§4.4, "no König-style compactness is needed") is WRONG as stated, and
+§7.2 records why and what replaces it.  Read §7 first.**
 
 
 Audience: the owner, deciding how to extend the Iris/CSL proof of xv6 to
@@ -488,3 +490,236 @@ shape as `run_out_accepted`, one quantifier up.
   fairness predicates and the ledger's pure shape to the statement; the
   `tools/tcb` report should be run at M2 to see what the reader has to
   trust beyond `xv6_out_accepted_xv6Σ`.
+
+
+## 7. Pilot handoff (branch `liveness`, written 2026-09-05)
+
+Audience: the agent picking this up.  Everything here was established by
+reading the tree at `79d98e07e` and by one standalone proof; nothing in the
+base layer has been edited yet.  The branch has exactly two changes:
+`iris/LiveProgress.v` (new, listed in `iris/_CoqProject` after `ObsTrace.v`)
+and this section.
+
+### 7.1 What exists
+
+- `iris/LiveProgress.v` — the abstract progress theorem of §4.4 over
+  INFINITE streams: threads `TOff | TIn rank (option obligation) budget`,
+  one-shot obligations with a fixed holder (`None` = environment) and a
+  level, the checkpoint rule (refresh the budget only while waiting on a
+  pending obligation of lower level than everything the thread holds), and
+  the rule that the waited obligation is FIXED at a rank (without it the
+  theorem is false: the spinlock re-wait scenario, F-lock).  Theorem
+  `progress : pend n o -> ∃ m ≥ n, ful m o`, by well-founded induction on
+  level, then rank, then budget (twice).  Constructive: every fairness and
+  environment hypothesis is a witnessing existential (fairness is "from any
+  point the thread cycles or leaves the tier"), and `Print Assumptions
+  progress` is closed under the global context.  Compiles standalone
+  (stdpp only, ~2 s).  Its header says why nothing can feed it yet (§7.2).
+- Build: the VM recipe in `remote-build-gcp.md` ("drive each sub-tree through
+  its own CoqMakefile") was used from this checkout and is green at
+  `79d98e07e` (1475 files); `./gcp-rocq/run-on-gcp --pull-vo` brought the
+  `.vo` back, so single-file `coqc` rechecks work locally.  The 11 `.v`
+  files that stay newer than their `.vo` after the pull (`App*.v`,
+  `*Pinned*.v`, `*Tr.v`, `DirViewPin.v`, `NameiInitPinned.v`) are not in
+  `_CoqProject` — ignore them.  The owner wants builds on the VM, not
+  locally.
+
+### 7.2 The finding that changes the plan: per-prefix exports are separate witnesses
+
+`riscv_power_adequacy` concludes `phi g_N κs_N` for each finite prefix `N`,
+where `phi := ∃ ledger, ok ledger h g`.  Each `N` is a SEPARATE application
+of `wp_strong_adequacy`, so the ledger witnesses at `N` and `N+1` are
+unrelated: nothing says the second extends the first.  Consequences,
+checked carefully:
+
+1. An infinite ghost stream (what `LiveProgress.progress` consumes) cannot
+   be assembled from per-prefix exports without a compactness/choice
+   argument (König over a finite snapshot space, classical), i.e. a
+   Trillium-style trace adequacy.  The proposal's "no König needed" is
+   false for that formulation.  Trillium/Fairis indeed use classical logic
+   and choice for exactly this step.
+2. A MID-RUN hypothesis ("the ledger says hart 0 is in a window at N₀") is
+   about one witness and cannot be transported to the witness at a larger
+   `N`.  Nor can "in the tier" be made physical: the uncounted restart
+   permit (§7.3 D3) must be provable for every PC, so the ledger invariant
+   cannot say "PC in region ⇒ counted".  So conditional liveness theorems of
+   the form "whenever `uartputc_sync` is entered, its byte is eventually
+   accepted" are NOT statable at the system level with the present
+   adequacy.  They live at the Iris contract level only (the counted
+   contract's precondition/postcondition), which is meaningful but
+   informal as a system statement.
+3. FROM-THE-START targets ARE statable and provable per prefix, with no
+   classical axiom, provided: (a) the initial ledger is a fixed constant
+   baked into the client's `Pt` (hart 0 starts counted with budget B₀ at
+   PowerOn), (b) the window's CLOSE is physically constrained (allowed only
+   at a cycle event whose PC is in the declared exit set — or, for the
+   console, only once the target bytes are in the accepted list carried by
+   the event), (c) ledger records are ALIGNED with physical cycle events in
+   the trace, (d) budgets are bounded by declared constants.  Then at any
+   prefix with more than B₀ hart-0 cycles, EVERY consistent witness must
+   contain a close, hence the physical exit event.  Consistency is
+   prefix-closed, so the argument for a target inside a longer window
+   ("first the FIFO drains, then B more cycles") picks its prefix
+   adaptively from physical facts and uses one witness.  No fictitious
+   witness can dodge it because the initial ledger and the close condition
+   are not the witness's choice.
+
+So the pilot targets are from-the-start properties, and the first one
+(§7.4) has no wait at all.
+
+### 7.3 The design as it will be built (supersedes §4.1–4.4 where different)
+
+- **D1 Alignment via a cycle observation.**  `RiscvLang.mobs` gains
+  `ObsCycle (c : CPU) (pc : mword 64) (d : dev_state)`, emitted by the
+  hart arm exactly at the restart node (`mnode_step`'s `Ret _` case,
+  RiscvLang.v:873; `prim_step`'s hart arm at RiscvLang.v:1497 currently has
+  `κ = []` — change to `κ = hart_obs g cpu m` in the live branch and `κ = []`
+  in the corpse branch).  `pc := register_lookup PC (g.(gregs) cpu)`,
+  `d := g.(gdev)`.  The device-state SAMPLE is what makes wait
+  justifications trace facts (§7.2 (3)(c)): "FIFO nonempty at this cycle"
+  is `u_tx (duart d) ≠ []` of the event, and "banner accepted" is a sublist
+  test on `uart_acc (duart d)`.  No LOOP/FCR hypotheses needed for the
+  checkpoint.  Observation-only: no behaviour changes.  Consumers of the
+  hart arm's shape to repair: `prim_step_hart_inv` (RiscvLang.v:1566),
+  `prim_step_hart_dead` (:1733), RiscvLang.v:1716/1931/2028/2069 destructs,
+  `ObsTrace.prim_step_obs_wf` (:310; `obs_step`/`is_io`/`obs_wire`/
+  `obs_boots`/`seg_step`/`cyc_step` need the new constructor — ObsCycle is
+  an in-segment event, `is_io = true`, not on the wire),
+  `UartAccepted.prim_step_gout_wire_ok` (:177), `RiscvAdequacy.v:773,845`,
+  `RiscvExec` (`wp_dead`, `wp_hart_step`, `wp_hart_step_resv`,
+  `wp_hart_restart`).  Files mentioning observation constructors (ten):
+  App, AppEcho, ObsTrace, UartAccepted, RiscvAdequacy, RiscvLang,
+  SystemUartAccepted, SpecSysWriteConsAU, WpUart, SystemAdequacy.
+- **D2 The two node rules.**  `wp_hart_step`/`wp_hart_step_resv`
+  (RiscvExec.v:745/885) are stated for a general `m` and frame `obs_interp`
+  with `obs_interp_silent`; with D1 that is only right for `Next` nodes, so
+  they gain a premise `⌜hart_silent m⌝` (`Next _ _ ↦ True`), discharged by
+  `done` at their ~15 call sites (HartEvents ×7, HartBarrier ×3, HartLift,
+  HartLift2, HartRegNode).  Write ONE general rule `wp_hart_step_obs` whose
+  callback also receives `obs_auth h ∗ ⌜obs_wf h g⌝` and returns
+  `obs_auth (h ++ hart_obs g cpu m)`, and re-derive both silent rules and
+  the restart rule from it.  The restart's event is DETERMINED by `g`, so
+  the permit runs in the `⊤` phase before the mask drops (unlike the UART
+  thread, whose `κ` is the device's choice — see `wp_uart_step`'s proof
+  at RiscvExec.v:1074 and the loop at WpUart.v:884 for the mask discipline).
+- **D3 The fuel ghost.**  Per-era `ghost_map CPU fuel_kind` with
+  `fuel_kind := Any | Exact nat` (mirror `era_resv_name`/`resv_frag`,
+  RiscvPtsto.v:364/2061; class in `riscvGpreS` beside
+  `riscv_pre_resvGS`, RiscvAdequacy.v:123; allocated in the PowerOn arm
+  beside `γresv`, RiscvAdequacy.v:908; the `RiscvEraGS` constructor at
+  :924 gains a field).  `fuel_frag c k := c ↪[era_fuel_name] k`; the AUTH
+  lives in the client's `Pt` (D5).  `InstrBytes.pc_is x` (:701) becomes
+  `pc_isk Any x` with `pc_isk k x := PC ↦ᵣ x ∗ nextPC ↦ᵣ x ∗ minstret_res ∗
+  clock_res ∗ resv_any cpu_id ∗ fuel_frag cpu_id k` and
+  `pc_isb b x := pc_isk (Exact b) x`.  The 13 unfolding sites (grep
+  `/pc_is`): InstrBytes:1027, BootChain:355, UserFrame:932, TrampStepPt:340,
+  SmodeCorePt:5153/5299, WpInstrConfig:375, WpIntrInv:3087,
+  UserActiveClass:403, WpUmodeStep:504, WpSmodeIntr:565/815, WpSmodeWfi:1320
+  — each rebuilds or destructures `pc_is` and needs the frag threaded (the
+  boot one, BootChain:355, gets it from `power_boot_res`, which gains a row
+  `[∗ set] c, c ↪[era_fuel_name HE] Any` next to the resv row at
+  RiscvAdequacy.v:534; `BootShared.power_boot_res_unpack` (:1194) is a
+  27-row positional unpack and must gain the row).
+- **D4 Permits, in `gen_cert`.**  `gen_cert` (RiscvPtsto.v:665) gains a
+  fourth persistent conjunct, the UNCOUNTED cycle permit
+  `□ ∀ h g c, ⌜obs_wf h g⌝ -∗ obs_auth h -∗ fuel_frag c Any ={⊤}=∗
+  obs_auth (h ++ [ObsCycle c (pc of g) (gdev g)]) ∗ fuel_frag c Any`,
+  supplied by a new client hook `Hcyc` in `riscv_power_adequacy` (like
+  `Hobs`) and built into the certificate at era birth (the bundle is
+  assembled at RiscvAdequacy.v:587 inside `power_boot_res`, and
+  `wp_power_loop` must derive the permit from `obs_inv` + the hook).
+  Destructuring sites of `gen_cert` as a triple: RiscvExec's rules
+  (`#(Hborn & Hstarted & Hrege)`), ProofEndOp.v:4340, ProofInitlog.v:2141
+  and :2380, BootShared.v:1245–1300 (`/gen_cert` unfold).  The COUNTED
+  permit (`Exact (S b) → Exact b`) is NOT in `gen_cert` (the trivial client
+  cannot prove it); it is an explicit persistent premise of the counted
+  restart rule `wp_hart_restart_b` and of every counted contract, derived by
+  the liveness client from `obs_inv` (like `uart_obs_permit_ledger`,
+  WpUart.v:829).  Statement of `wp_hart_restart`/`swp_loop`/
+  `wp_loop_cycle{,_ex}` stays; their counted twins take `fuel_frag c
+  (Exact (S b))` and return `Exact b`.  Open (Any→Exact B) and close
+  (Exact→Any) are CLIENT view shifts on `Pt` (no rule), the close checked
+  against the last cycle event's PC in `h`.
+- **D5 The liveness client's `Pt`.**  `∃ h, obs_frag h ∗ (power on ⇒ ∃ E,
+  era_registered (obs_boots h − 1) E ∗ fuel_auth E ks) ∗ ⌜∃ H, consistent
+  ledger₀ H h ks⌝` — the HISTORY `H` is a pure existential (one snapshot
+  per event of `h`), not a resource; the ghost map auth is what forces
+  leaves to be honest.  The permit identifies the era through
+  `era_registered` agreement (persistent `↪□` elements).  At PowerOn the
+  power hook receives the new era's auth; the corpse era's is dropped.
+  `phi` exports `∃ H, consistent ledger₀ H h ks` at every prefix.
+- **D6 Fuel-generic M-mode lemmas, not twins.**  The M-mode boot proofs
+  are self-contained: `wp_entry_boot` (SpecEntry.v:88, proof
+  ProofEntry.v:45) composes `WpEntryNew.wp_entry` (:198) and
+  `WpStartNew.wp_start` (:917), which are ~40 applications of the
+  `wp_*_gpr` leaves in `WpMmode*.v`, each of which is one `iApply
+  WpInstrConfig.wp_instr` (the M-mode closer, the one that unfolds `pc_is`
+  at :375 and calls `HartMCycle.wp_loop_cycle_ex`).  Make `wp_instr`, the
+  leaves and `wp_entry`/`wp_start`/`wp_entry_boot` generic in `k` with
+  premise `⌜fuel_ok k⌝` and continuation at `pc_isk (fuel_next k)`; keep the
+  old statements as one-line `Any` instances where a caller outside the
+  chain exists (`WpTimerinit.v` is the only other caller of `wp_*_gpr`).
+  This is the proposal's "re-run the script" without duplicating ~30
+  lemmas.
+
+### 7.4 The first target (P1) and its worklist
+
+**P1: from reset, under F-pool for hart 0 and no PowerOff, hart 0 eventually
+has a cycle event at `PC = KernelSyms.main`.**  Ledger₀: hart 0
+`Exact B₀`, exit set `{main}`, every other hart `Any`.  Pure argument (per
+prefix): with more than B₀ `ObsCycle 0` events in `κs_N`, any consistent
+witness has a close, and a close needs an event at `main`.  No wait, no
+device, no obligations: it tests exactly the risky machinery — D1–D5 and
+the zero-churn claim — end to end.  B₀ is the instruction count of
+`_entry` + `start` on hart 0 (spell it as the sum of the two, per
+durable-notes).
+
+Order of work, each step validated by a VM build:
+
+1. D1 in `RiscvLang.v` + the pure repairs (ObsTrace, UartAccepted, the
+   RiscvLang destructs) + `RiscvExec` (D2, no fuel yet: the restart rule
+   needs the uncounted permit, so do D3/D4's `gen_cert` change in the same
+   step, with `fuel_frag` and the permit) + `RiscvPtsto` (fuel ghost, `pc_is`
+   redefinition, `gen_cert`) + `RiscvAdequacy` (allocation, hook, bundle) +
+   the 13 unfolding sites + `power_boot_res_unpack` + the gen_cert
+   destructs.  Tree green with NO OTHER EDIT is the zero-churn result;
+   record the count of files that did need edits.
+2. `wp_hart_restart_b`, `swp_loop_k`, `wp_loop_cycle_ex_k`, `wp_instr_k`,
+   the M-mode leaves and `wp_entry_boot` generic (D6).
+3. The liveness client: `LiveLedger.v` (the ledger record, `consistent`,
+   the permits' proofs), a `xv6_live_adequacy` twin of
+   `SystemAdequacy.xv6_trace_adequacy` (:942) with `Pt := live_ledger_at`,
+   `BootChain.boot_entry_bridge` calling the counted `wp_entry_boot` for
+   hart 0 and closing the window at `main`.
+4. `LiveRun.v` (pure): runs as `nat → cfg`, F-pool as "infinitely many
+   restart steps of hart c", the P1 theorem from `phi` + prefix-closure.
+5. Then P2 = §2.3 T2 (the banner), which needs kernel `printf`
+   (`SpecPrintk.v`/`ProofConsputc.v` exist; check coverage), the counted
+   S-mode leaves used by the path, and the THRE wait as a checkpoint
+   justified by the event's `u_tx ≠ []`; and the T1 pure step "accepted ⇒
+   eventually on the wire" under F-uart, no-LOOP and no-FCR-clear run
+   hypotheses.
+
+### 7.5 Things settled while reading, so nobody re-derives them
+
+- The reservation self-loop (§4.1 item 4) does not bite P1 or P2 on hart 0
+  during boot (no other hart holds a reservation on its footprint); it
+  returns at T3.
+- `uart_out_lb γd l` (persistent, THRE-set case of
+  `WpSconfUartAccess.wp_uart_lsr_read_s_sconf`) is the ghost that lets a
+  counted poll loop refute the THRE-clear branch once the FIFO is known
+  empty; the counted poll needs a leaf variant that takes it as a premise
+  and concludes `lsr_thre_clear bt = false`.
+- The checkpoint for the THRE poll should be a RESTART-rule variant
+  (`Exact b → Exact B` when the event's FIFO is nonempty, else `Exact (S b')
+  → Exact b'`), because only the restart rule sees the device state at the
+  boundary; a between-instruction view shift cannot relate the LSR read's
+  knowledge to the trace.
+- `dev_inv` (WpUart.v:610) is the era device ghosts; `dev_interp`
+  (RiscvPtsto.v:1957) is the machine's half — `phi` sees the latter and
+  `obs_wf`'s wire tie, never `dev_inv`.  Anything the pure layer needs about
+  the device at a past instant has to be in the trace (D1's sample).
+- For T3 the wait ("process p sleeps until woken") is a KERNEL-MEMORY fact
+  with no trace footprint; the PC in `ObsCycle` is what will let scheduler
+  events (swtch, trap entry) be trace facts.  F-sched/F-intr will have to be
+  phrased on those, not on process state.
