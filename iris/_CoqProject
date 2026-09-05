@@ -1984,6 +1984,19 @@ UkShMalloc.v
 # things left on the far side of the seam are the engine's width-4 text
 # load and stage 3's named sbrk assumption -- and the break the theorem
 # hands [runcmd] is the one the allocator moved it to.
+# ... THE [cd] BUILTIN.  UkShCd.v walks 0x97a..0x9be -- the three byte
+# tests, [strlen], the NUL that chops the newline, [chdir] and the one
+# diagnostic in sh that COMES BACK.  That last is why UkShDiag's string
+# predicate carries a dfrac: the argument is BORROWED out of the line
+# buffer at [DfracOwn 1] and given back, because the command loop rewrites
+# that buffer on its next turn.  [chdir] itself is three instructions on
+# the QUIET row -- the row is about what a syscall WRITES into user memory
+# and chdir writes none, and the working directory rides inside [urun]
+# existentially, so moving it needs no premise here.  The arm is stated at
+# the budget it wants ([16 + (10 + (12 + (4 + n)))], fprintf's 26-word
+# frame included); [UkSh.ush_rest] hands [16 + n], so joining the two is a
+# re-cut of the loop head's budget, which belongs with the fork arm.
+UkShCd.v
 UkShMain.v
 
 # FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
