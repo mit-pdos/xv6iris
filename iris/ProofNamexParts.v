@@ -58,7 +58,18 @@
        [L] the element count; each turn of the loop consumes one element and
        at most one [iput_units] interval, so the invariant needs exactly
        [nx_bud_step] (the premise survives one turn) and [nx_bud_int] (the
-       spend-at-most intervals compose). *)
+       spend-at-most intervals compose).
+
+   7.  THE CLOSED SIDE-CONDITIONS OF THE WALK ITSELF -- the [nx_wi_*]
+       budget-invariant steps, the register-bundle updates [nx_regs_s2] /
+       [nx_regs_s10], the SLASH comparisons and the sign-extension facts
+       at the end of this file.  They are stated over [SpecNamex]'s
+       [walk_need] / [walk_spend] and are what the whole-function proof and
+       its two era re-derivations (ProofNamexEra.v, ProofNparEra.v) all
+       consume; they live here so that the three 80-100 s whole-function
+       proofs need import nothing from one another and compile side by
+       side.  A `Require` between two Proof*.v files is pure critical path
+       (claude-notes/optimization.md, "Build shape"). *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -78,6 +89,9 @@ Require Import DirentEnc.
 Require Import PathElems.
 Require Import SpecIput.
 Require Import ProofDirlookupParts.
+Require Import RiscvExtras.
+Require Import SpecIdup SpecIget SpecIlock SpecIunlock SpecIunlockput SpecDirlookup.
+Require Import SpecNamex.   (* [walk_need] / [walk_spend] / [K_namex]: the walk's budget vocabulary (item 7) *)
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
@@ -638,3 +652,378 @@ Proof. intro H. unfold neq_vec. rewrite (nx_nul_ne v H). reflexivity. Qed.
 Lemma nx_nnul_eq (v : mword 8) : v = NUL ->
   neq_vec (zero_extend' 64 v : mword 64) (zero_reg : mword 64) = false.
 Proof. intro H. unfold neq_vec. rewrite (nx_nul_eq v H). reflexivity. Qed.
+
+(* ===================================================================== *)
+(*  7. THE CLOSED SIDE-CONDITIONS OF THE WALK, as facts over [Z] / [nat]  *)
+(*  -- the route N3d recorded: never run [lia] inside the whole-function  *)
+(*  context.  Shared by ProofNamex.v, ProofNamexEra.v and ProofNparEra.v. *)
+(* ===================================================================== *)
+
+(* THE BUDGET INVARIANT'S FOUR MOVING PARTS (fs-log.md §G.24).  [ncur] is
+   the reservation the walk still holds and [wc] its running "somebody has
+   already paid for the bitmap block" bit; the walk is no longer priced per
+   LEVEL, because every per-level [iunlockput] runs [crz := true] on the
+   inode block and [crb := wc] on the bitmap.  What is left is ONE unit for
+   the whole walk, and [wc] is the honest read of whether it is gone.
+
+   The [crb = true -> w = false] premise below (§G.25) is what makes the
+   step lemma true at all: without it a CREDITED level's post admits
+   [w = true], i.e. that the level spent the unit the caller had already
+   paid, and the invariant cannot be re-established. *)
+
+Lemma nx_wi_need (L n : nat) :
+  (walk_need L <= n)%nat -> (0 < L)%nat -> (iput_units + 1 <= n)%nat.
+Proof. destruct L; unfold walk_need, iput_units; lia. Qed.
+
+(* ...and one iput's worth is in hand whatever the path length, which is
+   what the arms that run at [Lr = 0] (the nameiparent-of-"/" iput) read *)
+Lemma nx_wi_need0 (L n : nat) : (walk_need L <= n)%nat -> (iput_units <= n)%nat.
+Proof. destruct L; unfold walk_need, iput_units; lia. Qed.
+
+(* the back edge: a level that ran CREDITED on the inode block *)
+Lemma nx_wi_step (Lr n ncur ncur' : nat) (wc w' : bool) :
+  ((n - walk_spend wc)%nat <= ncur)%nat -> (ncur <= n)%nat ->
+  (iput_units <= ncur)%nat ->
+  ((0 < S Lr)%nat ->
+     (iput_units + (if wc then 0%nat else 1%nat) <= ncur)%nat) ->
+  (wc = true -> w' = false) ->
+  ((ncur - ip_spend_w w' false true)%nat <= ncur')%nat ->
+  (ncur' <= ncur)%nat ->
+  ((n - walk_spend (wc || w')%bool)%nat <= ncur')%nat /\ (ncur' <= n)%nat
+  /\ (iput_units <= ncur')%nat
+  /\ ((0 < Lr)%nat ->
+      (iput_units + (if (wc || w')%bool then 0%nat else 1%nat) <= ncur')%nat).
+Proof.
+  intros HA HB HD0 HC HD HE HF.
+  assert (HC' : (iput_units + (if wc then 0%nat else 1%nat) <= ncur)%nat)
+    by (apply HC; lia).
+  destruct wc, w'; simpl in *;
+    try (specialize (HD eq_refl); discriminate);
+    unfold walk_spend, ip_spend_w, ip_bm, iput_units in *; simpl in *;
+    (split_and!; [lia | lia | lia | intros _; lia]).
+Qed.
+
+(* a TERMINAL arm that spends one iput -- credited on the inode block
+   ([cz = true], L_miss) or not ([cz = false], L_notdir / L_nlink / the
+   nameiparent-of-"/" iput).  All three are the LAST call the walk makes,
+   which is why the walk's failure figure is [walk_spend w + 1] and not
+   [+ 1] per level. *)
+Lemma nx_wi_spend (n ncur n' : nat) (wc w' cz : bool) :
+  ((n - walk_spend wc)%nat <= ncur)%nat -> (ncur <= n)%nat ->
+  (wc = true -> w' = false) ->
+  ((ncur - ip_spend_w w' false cz)%nat <= n')%nat -> (n' <= ncur)%nat ->
+  ((n - (walk_spend (wc || w')%bool + 1))%nat <= n')%nat /\ (n' <= n)%nat.
+Proof.
+  intros HA HB HD HE HF.
+  destruct wc, w', cz; simpl in *;
+    try (specialize (HD eq_refl); discriminate);
+    unfold walk_spend, ip_spend_w, ip_bm in *; simpl in *; split; lia.
+Qed.
+
+(* an exit that spends NOTHING: [L_par]'s iunlock, and namei's plain
+   return.  These are the SUCCESS arms, and they are why the walk's figure
+   is indexed by [ok]. *)
+Lemma nx_wi_free (n ncur : nat) (wc : bool) :
+  ((n - walk_spend wc)%nat <= ncur)%nat -> (ncur <= n)%nat ->
+  ((n - (walk_spend wc + 0))%nat <= ncur)%nat /\ (ncur <= n)%nat.
+Proof. intros. split; lia. Qed.
+
+(* the initial instance, at [ncur = n] and nothing paid *)
+Lemma nx_wi_init (n : nat) : ((n - walk_spend false)%nat <= n)%nat.
+Proof. unfold walk_spend. lia. Qed.
+
+(* the nlink guard's fall-through, at the region's vocabulary: the mint
+   wants the UNSIGNED field nonzero and the branch decided the halfword *)
+Lemma nx_nlink_nz (t : mword 16) :
+  t <> (mword_of_int 0 : mword 16) -> bv_unsigned t <> 0.
+Proof.
+  intros Hne Hz. apply Hne. apply bv_eq. rewrite Hz.
+  vm_compute. reflexivity.
+Qed.
+
+(* K_namex's single premise, turned into the seven bounds the callees and
+   the [sie_cap_gpr] pop want.  [dl_kb]'s analogue. *)
+Lemma nx_kb (K : nat) : (K_namex <= K)%nat ->
+  (10 <= K - 12)%nat /\ (K_idup <= K - 12)%nat /\ (K_iget <= K - 12)%nat
+  /\ (2 <= K - 12)%nat /\ (K_ilock <= K - 12)%nat /\ (K_iunlock <= K - 12)%nat
+  /\ (K_iunlockput <= K - 12)%nat /\ (K_dirlookup <= K - 12)%nat
+  /\ (K_iput <= K - 12)%nat /\ ((K - 12) + 12 = K)%nat /\ (12 <= K)%nat.
+Proof.
+  
+  intro H. split_and!; lia.
+Qed.
+
+
+(* ---- THE [addi a4,a5,-47] SLASH TEST at +0x10c and +0x11c (N4b trap 8).
+   The immediate decodes as [4049 : mword 12] = -47, and [a4] is zero exactly
+   when the loaded byte is the separator.  The route is [bv_unsigned]
+   arithmetic, like the [nx_slash_*] family, with the wrap done by hand. *)
+Lemma nx_m47_val :
+  (sign_extend' 64 (mword_of_int 4049 : mword 12) : mword 64)
+  = (mword_of_int 18446744073709551569 : mword 64).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma nx_a4_unsigned (v : mword 8) :
+  bv_unsigned (add_vec (zero_extend' 64 v : mword 64)
+                 (sign_extend' 64 (mword_of_int 4049 : mword 12)) : mword 64)
+  = ((bv_unsigned v + 18446744073709551569) mod 18446744073709551616)%Z.
+Proof.
+  rewrite nx_m47_val add_vec64_unsigned nx_zext8_unsigned.
+  assert (Hc : bv_unsigned (mword_of_int 18446744073709551569 : mword 64)
+               = 18446744073709551569%Z) by (vm_compute; reflexivity).
+  rewrite Hc. unfold bv_wrap.
+  assert (Hm : bv_modulus 64 = 18446744073709551616%Z)
+    by (vm_compute; reflexivity).
+  rewrite Hm. reflexivity.
+Qed.
+
+(* the wrap, over PLAIN [Z].  It has to be a separate lemma: with
+   bitvector.tactics' zify hook in scope a goal mentioning [bv_unsigned]
+   makes [lia] give up with "Cannot find witness" (ProofMemmove's
+   [mm_overlap_arith] is the same split for the same reason). *)
+Lemma nx_m47_arith (uv : Z) :
+  (0 <= uv)%Z -> (uv < 256)%Z ->
+  ((uv + 18446744073709551569) mod 18446744073709551616)%Z = 0%Z ->
+  uv = 47%Z.
+Proof.
+  intros H0 H1 Hc.
+  destruct (Z_lt_ge_dec uv 47) as [Hlt | Hge].
+  - rewrite Z.mod_small in Hc; lia.
+  - replace (uv + 18446744073709551569)%Z
+      with ((uv - 47) + 1 * 18446744073709551616)%Z in Hc by lia.
+    rewrite Z_mod_plus_full in Hc. rewrite Z.mod_small in Hc; lia.
+Qed.
+
+Lemma nx_a4_eq (v : mword 8) : v = SLASH ->
+  eq_vec (add_vec (zero_extend' 64 v : mword 64)
+            (sign_extend' 64 (mword_of_int 4049 : mword 12)) : mword 64)
+         (zero_reg : mword 64) = true.
+Proof.
+  intros ->. apply (proj2 (eq_vec_true_iff _ _)).
+  apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma nx_a4_ne (v : mword 8) : v <> SLASH ->
+  eq_vec (add_vec (zero_extend' 64 v : mword 64)
+            (sign_extend' 64 (mword_of_int 4049 : mword 12)) : mword 64)
+         (zero_reg : mword 64) = false.
+Proof.
+  intro Hne. apply (proj2 (eq_vec_false_iff _ _)). intro Hc.
+  apply (f_equal bv_unsigned) in Hc. rewrite nx_a4_unsigned in Hc.
+  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0%Z)
+    by (vm_compute; reflexivity).
+  rewrite Hz in Hc.
+  pose proof (bv_unsigned_in_range 8 v) as Hr.
+  assert (Hm8 : bv_modulus 8 = 256%Z) by (vm_compute; reflexivity).
+  rewrite Hm8 in Hr. destruct Hr as [Hlo Hhi].
+  apply Hne. apply bv_eq. unfold SLASH.
+  assert (H47 : bv_unsigned (mword_of_int 47 : mword 8) = 47%Z)
+    by (vm_compute; reflexivity).
+  rewrite H47. exact (nx_m47_arith (bv_unsigned v) Hlo Hhi Hc).
+Qed.
+
+(* [a4] in the [c.beqz] polarity is the same fact; both DEAD re-tests at
+   +0x110 / +0x112 and the live +0x120 read it. *)
+
+(* ===================================================================== *)
+(*  THE PURE BRIDGE THE WALK'S BODY OWES: from "every byte in [off,a) is  *)
+(*  a separator and the byte at [a] is not" to the suffix [nx_skipelem_at] *)
+(*  computes at.  The loop invariant is stated over [drop off pl]; the    *)
+(*  element starts at [a]; [pe_skip] is exactly the difference.           *)
+(* ===================================================================== *)
+Lemma nx_pe_skip_at (off a plen : nat) (f : nat -> bv 8) :
+  (off <= a)%nat -> (a <= plen)%nat ->
+  (forall i : nat, (off <= i)%nat -> (i < a)%nat -> f i = SLASH) ->
+  f a <> SLASH ->
+  pe_skip (drop off (bview plen f)) = drop a (bview plen f).
+Proof.
+  intros Hoa Hap Hsl Hns.
+  remember (a - off)%nat as d eqn:Hd. revert off Hd Hoa Hsl.
+  induction d as [|d IH]; intros off Hd Hoa Hsl.
+  - assert (Ha : off = a) by lia. subst off.
+    destruct (Nat.lt_ge_cases a plen) as [Hlt | Hge].
+    + rewrite (nx_drop_cons a plen f Hlt) (pe_skip_ne (f a) _ Hns).
+      reflexivity.
+    + rewrite (nx_drop_nil a plen f Hge). reflexivity.
+  - assert (Hlt : (off < a)%nat) by lia.
+    assert (Hop : (off < plen)%nat) by lia.
+    rewrite (nx_drop_cons off plen f Hop) (Hsl off ltac:(lia) Hlt).
+    rewrite pe_skip_slash. apply (IH (S off)); [lia | lia |].
+    intros i Hi1 Hi2. apply Hsl; lia.
+Qed.
+
+(* THE ARM DECISION, MADE ON THE DATA.  A block with two exits needs BOTH
+   continuations supplied, and the walk's thirty-slot bundle cannot be
+   split between them -- so the caller decides on [pfun] which arm runs and
+   REFUTES the other from its own exit facts.  This is the decision the
+   loop head makes: is there anything but separators left? *)
+Lemma nx_first_ns (off plen : nat) (f : nat -> bv 8) :
+  (off <= plen)%nat ->
+  (forall i : nat, (off <= i)%nat -> (i < plen)%nat -> f i = SLASH)
+  \/ (exists a : nat, (off <= a)%nat /\ (a < plen)%nat /\ f a <> SLASH).
+Proof.
+  remember (plen - off)%nat as d eqn:Hd. revert off Hd.
+  induction d as [|d IH]; intros off Hd Hop.
+  - left. intros i H1 H2. exfalso. lia.
+  - destruct (decide (f off = SLASH)) as [He | Hne].
+    + destruct (IH (S off) ltac:(lia) ltac:(lia))
+        as [HL | (a & Ha1 & Ha2 & Ha3)].
+      * left. intros i H1 H2. destruct (Nat.eq_dec i off) as [Hi | Hi];
+          [rewrite Hi; exact He | apply HL; lia].
+      * right. exists a. split; [lia | split; [lia | exact Ha3]].
+    + right. exists off. split; [lia | split; [lia | exact Hne]].
+Qed.
+
+(* [skipelem]'s [take 14] on the LONG branch: the fourteen bytes the copy
+   moved are the element's own fourteen. *)
+Lemma nx_take14_lookup (u : list (bv 8)) (jj : nat) :
+  (jj < 14)%nat -> take 14 u !!! jj = u !!! jj.
+Proof.
+  intro Hj. rewrite !list_lookup_total_alt.
+  assert (Ht : take 14 u !! jj = u !! jj) by (apply lookup_take; lia).
+  rewrite Ht. reflexivity.
+Qed.
+
+
+(* ---- THE LENGTH ARITHMETIC at +0x90/+0x94.  The [sext.w] is the
+   identity because the contract now bounds [plen] below 2^31 (N4c2's
+   premise B), and the SIGNED [bge] against 13 then decides [len <= 13]. *)
+Lemma nx_sint_moi (z : Z) :
+  (- 9223372036854775808 <= z < 9223372036854775808)%Z ->
+  sint (mword_of_int z : mword 64) = z.
+Proof.
+  intro Hz.
+  assert (Hhm : bv_half_modulus 64 = 9223372036854775808%Z)
+    by (vm_compute; reflexivity).
+  change (sint ?x) with (bv_swrap 64 (bv_unsigned x)).
+  rewrite moi64_unsigned bv_swrap_wrap.
+  apply bv_swrap_small. rewrite Hhm. lia.
+Qed.
+
+Lemma nx_geb_s (x y : Z) :
+  (- 9223372036854775808 <= x < 9223372036854775808)%Z ->
+  (- 9223372036854775808 <= y < 9223372036854775808)%Z ->
+  zopz0zKzJ_s (mword_of_int x : mword 64) (mword_of_int y : mword 64)
+  = Z.geb x y.
+Proof.
+  intros Hx Hy. unfold zopz0zKzJ_s.
+  rewrite (nx_sint_moi x Hx) (nx_sint_moi y Hy). reflexivity.
+Qed.
+
+Lemma nx_sextw0 (r : nat) (o : mword 64) :
+  o = (mword_of_int 0 : mword 64) ->
+  (Z.of_nat r < 2147483648)%Z ->
+  (sign_extend' 64 (subrange_vec_dec
+     (add_vec (mword_of_int (Z.of_nat r) : mword 64) o) 31 0) : mword 64)
+  = (mword_of_int (Z.of_nat r) : mword 64).
+Proof.
+  intros -> H31.
+  pose proof (Nat2Z.is_nonneg r) as Hr0.
+  assert (Hadd : bv_unsigned (add_vec (mword_of_int (Z.of_nat r) : mword 64)
+                                (mword_of_int 0 : mword 64))
+                 = Z.of_nat r).
+  { rewrite add_vec64_unsigned (moi64_unsigned (Z.of_nat r)) (moi64_unsigned 0).
+    rewrite (bvw64_small (Z.of_nat r)
+               ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z; lia)).
+    rewrite (bvw64_small 0
+               ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z; lia)).
+    rewrite Z.add_0_r.
+    apply bvw64_small. change (2 ^ 64)%Z with 18446744073709551616%Z. lia. }
+  rewrite sext32_64_moi.
+  assert (Hsg : bv_signed (subrange_vec_dec
+                   (add_vec (mword_of_int (Z.of_nat r) : mword 64)
+                            (mword_of_int 0 : mword 64)) 31 0 : mword 32)
+                = Z.of_nat r).
+  { unfold bv_signed. rewrite subrange_31_0_unsigned Hadd.
+    rewrite (Z.mod_small (Z.of_nat r) 4294967296); [| lia].
+    assert (Hhm : bv_half_modulus 32 = 2147483648%Z) by (vm_compute; reflexivity).
+    rewrite bv_swrap_small; [lia | rewrite Hhm; lia]. }
+  rewrite Hsg. reflexivity.
+Qed.
+
+(* THE [bge s8,s10] AT +0x9e, both polarities, decided in a CLEAN context.
+   In the walk's own context [lia] answers "Cannot find witness" (the trap
+   the N4c2 ledger records for [bv_unsigned]; the same happens here with
+   [2 ^ 31] in scope), so the whole decision is a closed lemma. *)
+Lemma nx_bge13_le (r : nat) : (r <= 13)%nat ->
+  zopz0zKzJ_s (mword_of_int 13 : mword 64)
+              (mword_of_int (Z.of_nat r) : mword 64) = true.
+Proof.
+  intro H. pose proof (Nat2Z.is_nonneg r) as H0.
+  assert (Hr : (Z.of_nat r <= 13)%Z) by lia.
+  rewrite (nx_geb_s 13 (Z.of_nat r) ltac:(lia) ltac:(lia)).
+  rewrite Z.geb_leb. apply (proj2 (Z.leb_le _ _)). exact Hr.
+Qed.
+
+Lemma nx_bge13_gt (r : nat) : (13 < r)%nat -> (Z.of_nat r < 2147483648)%Z ->
+  zopz0zKzJ_s (mword_of_int 13 : mword 64)
+              (mword_of_int (Z.of_nat r) : mword 64) = false.
+Proof.
+  intros H H31. pose proof (Nat2Z.is_nonneg r) as H0.
+  assert (Hr : (13 < Z.of_nat r)%Z) by lia.
+  rewrite (nx_geb_s 13 (Z.of_nat r) ltac:(lia) ltac:(lia)).
+  rewrite Z.geb_leb. apply (proj2 (Z.leb_gt _ _)). exact Hr.
+Qed.
+
+(* memmove's own 2^32 bound, out of the walk's context *)
+Lemma nx_len32 (r : nat) : (Z.of_nat r < 2147483648)%Z ->
+  (Z.of_nat r < 2 ^ 32)%Z.
+Proof. intro H. change (2 ^ 32)%Z with 4294967296%Z. lia. Qed.
+
+(* the two immediate shapes namex's [sext.w]s actually carry -- stated with
+   NO evar for the offset, because [ltac:] side conditions are elaborated
+   before unification and [vm_compute] on an open [?o] kills coqc. *)
+Lemma nx_sextw_i12 (r : nat) : (Z.of_nat r < 2147483648)%Z ->
+  (sign_extend' 64 (subrange_vec_dec
+     (add_vec (mword_of_int (Z.of_nat r) : mword 64)
+        (sign_extend' 64 (mword_of_int 0 : mword 12))) 31 0) : mword 64)
+  = (mword_of_int (Z.of_nat r) : mword 64).
+Proof.
+  intro H. apply nx_sextw0;
+    [apply bv_eq; vm_compute; reflexivity | exact H].
+Qed.
+
+Lemma nx_sextw_i6 (r : nat) : (Z.of_nat r < 2147483648)%Z ->
+  (sign_extend' 64 (subrange_vec_dec
+     (add_vec (mword_of_int (Z.of_nat r) : mword 64)
+        (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6))))
+     31 0) : mword 64)
+  = (mword_of_int (Z.of_nat r) : mword 64).
+Proof.
+  intro H. apply nx_sextw0;
+    [apply bv_eq; vm_compute; reflexivity | exact H].
+Qed.
+
+(* ---- the two callee-saved registers the walk writes INSIDE a turn and
+   that [nx_regs] deliberately leaves out of its record: s2 (the element
+   scanner, rewritten at +0xe8) and s10 (the length, at +0x9a).  Both are
+   already excluded from the thread fact, so the bundle simply rides. *)
+Lemma nx_regs_s2 (m : regfile) (sp0 s1v ipv nbv npv v : mword 64)
+    (Ml : regfile) :
+  nx_regs m sp0 s1v ipv nbv npv Ml ->
+  nx_regs m sp0 s1v ipv nbv npv
+    (<[Regidx (mword_of_int 18 : mword 5) := v]> Ml).
+Proof.
+  intros (H2 & H8 & H9 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & Hthr).
+  unfold nx_regs. split_and!;
+    try (rewrite upd_ne; [assumption | vm_compute; discriminate]).
+  intros c Hc N2 N8 N9 N18 N19 N20 N21 N22 N23 N24 N25 N26.
+  rewrite upd_ne;
+    [ exact (Hthr c Hc N2 N8 N9 N18 N19 N20 N21 N22 N23 N24 N25 N26)
+    | dlk_xne N18 ].
+Qed.
+
+Lemma nx_regs_s10 (m : regfile) (sp0 s1v ipv nbv npv v : mword 64)
+    (Ml : regfile) :
+  nx_regs m sp0 s1v ipv nbv npv Ml ->
+  nx_regs m sp0 s1v ipv nbv npv
+    (<[Regidx (mword_of_int 26 : mword 5) := v]> Ml).
+Proof.
+  intros (H2 & H8 & H9 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & Hthr).
+  unfold nx_regs. split_and!;
+    try (rewrite upd_ne; [assumption | vm_compute; discriminate]).
+  intros c Hc N2 N8 N9 N18 N19 N20 N21 N22 N23 N24 N25 N26.
+  rewrite upd_ne;
+    [ exact (Hthr c Hc N2 N8 N9 N18 N19 N20 N21 N22 N23 N24 N25 N26)
+    | dlk_xne N26 ].
+Qed.

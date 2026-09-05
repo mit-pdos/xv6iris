@@ -135,7 +135,6 @@ Require Import FsAbsStart.    (* [ex_start] and [bview_head_slash]: the
                                  deferred start the two arms fire *)
 Require Import SpecNamexEra.
 Require Import ProofDirlookupParts ProofNamexParts.
-Require Import ProofNamex.    (* READ-ONLY REUSE: its top-level pure lemmas *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.
