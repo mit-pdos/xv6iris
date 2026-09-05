@@ -20,6 +20,7 @@
       IRIW + r,r both readers  forbidden    (one log: multi-copy atomic)
       n6                       allowed      (the buffer drains late)
       AMO .aq                  acquire      (no fence needed after a lock)
+      AMO plain (no .aq)       ALLOWED      (the floor does not move)
 
     Every FORBIDDEN verdict comes with a reachability witness (the shape it
     quantifies over is reached with the verdict's hypotheses satisfied), so
@@ -110,9 +111,18 @@ Inductive instr :=
 | ILoadInd (ra reg : nat)
 | IStore (a : Z) (v : bv 8)
 | IFence (pr pw sr sw : bool)
-(** [amoswap.aq]: the read half takes the globally latest value and the write
-    half appends, in one step; the floor lands past the append. *)
-| IAmoSwapAq (reg : nat) (a : Z) (v : bv 8).
+(** [amoswap]: the read half takes the globally latest value and the write
+    half appends, in one step.  With [aq] the floor lands past the append
+    (RVWMO's acquire annotation); without it only the read watermark moves —
+    a plain AMO orders nothing after itself.  Sail puts the acquire strength
+    on the read kind ([Read_RISCV_reserved_acquire]) and the language layer
+    carries it to the paired write as [RiscvLang.hr_acq]; here the pair is
+    one step, so the bit sits on the instruction. *)
+| IAmoSwap (aq : bool) (reg : nat) (a : Z) (v : bv 8).
+
+(** the AMO's floor: past its own append iff it acquires *)
+Definition amo_post (aq : bool) (tv : nat) (log : list wmsg) : nat :=
+  if aq then S (length log) else tv.
 
 (** The WHOLE per-hart memory state, beside the program and registers: the
     floor, the read watermark, the per-byte coherence floor. *)
@@ -164,12 +174,13 @@ Definition lstep (c c' : config) : Prop :=
           <[i := Hart rest (h_regs h)
                    (fence_post i (c_log c) pr pw sr sw (h_tv h) (h_rv h))
                    (h_rv h) (h_coh h)]> (c_harts c)
-    | IAmoSwapAq r a v :: rest => ∃ (v_old : bv 8),
+    | IAmoSwap aq r a v :: rest => ∃ (v_old : bv 8),
         excl_read_ok (c_img c) (c_log c) i (h_tv h) a v_old ∧
         c_log c' = store_log (c_log c) i a [v] ∧
         c_harts c' =
           <[i := Hart rest (<[r := v_old]> (h_regs h))
-                   (S (length (c_log c))) (S (length (c_log c))) (h_coh h)]> (c_harts c)
+                   (amo_post aq (h_tv h) (c_log c)) (S (length (c_log c))) (h_coh h)]>
+            (c_harts c)
     end.
 
 (* ------------------------------------------------------------------ *)
@@ -217,15 +228,15 @@ Proof.
   split_and!; [done|done|]. simpl. by split_and!.
 Qed.
 
-Lemma step_amo c i r a v rest regs tv rv coh v_old :
-  c_harts c !! i = Some (Hart (IAmoSwapAq r a v :: rest) regs tv rv coh) →
+Lemma step_amo c i aq r a v rest regs tv rv coh v_old :
+  c_harts c !! i = Some (Hart (IAmoSwap aq r a v :: rest) regs tv rv coh) →
   excl_read_ok (c_img c) (c_log c) i tv a v_old →
   lstep c (Cfg (c_img c) (c_log c ++ [WMsg a [v] i])
                (<[i := Hart rest (<[r := v_old]> regs)
-                        (S (length (c_log c))) (S (length (c_log c))) coh]>
+                        (amo_post aq tv (c_log c)) (S (length (c_log c))) coh]>
                   (c_harts c))).
 Proof.
-  intros Hlk Hex. exists i, (Hart (IAmoSwapAq r a v :: rest) regs tv rv coh).
+  intros Hlk Hex. exists i, (Hart (IAmoSwap aq r a v :: rest) regs tv rv coh).
   split_and!; [done|done|]. simpl. exists v_old. by split_and!.
 Qed.
 
@@ -1591,8 +1602,8 @@ Lemma AMB_ne_AMA : AMB ≠ AMA.
 Proof. intros H. by simplify_eq/=. Qed.
 
 Definition amo_c0 : config :=
-  Cfg img0 [] [Hart [IStore ax b1; IAmoSwapAq rg1 ay b1] ∅ 0%nat 0%nat (λ _, 0%nat);
-               Hart [IAmoSwapAq rg2 ay b2; ILoad rg3 ax] ∅ 0%nat 0%nat (λ _, 0%nat)].
+  Cfg img0 [] [Hart [IStore ax b1; IAmoSwap true rg1 ay b1] ∅ 0%nat 0%nat (λ _, 0%nat);
+               Hart [IAmoSwap true rg2 ay b2; ILoad rg3 ax] ∅ 0%nat 0%nat (λ _, 0%nat)].
 
 Definition amo_content (log : list wmsg) : Prop :=
   ∀ m, m ∈ log → m = AMX ∨ m = AMA ∨ m = AMB.
@@ -1606,13 +1617,13 @@ Proof.
 Qed.
 
 Definition amo_A (p : list instr) (log : list wmsg) : Prop :=
-  (p = [IStore ax b1; IAmoSwapAq rg1 ay b1]) ∨
-  (p = [IAmoSwapAq rg1 ay b1] ∧ ∃ j, log !! j = Some AMX) ∨
+  (p = [IStore ax b1; IAmoSwap true rg1 ay b1]) ∨
+  (p = [IAmoSwap true rg1 ay b1] ∧ ∃ j, log !! j = Some AMX) ∨
   (p = []).
 
 Definition amo_B (p : list instr) (regs : gmap nat (bv 8)) (tv : nat)
     (log : list wmsg) : Prop :=
-  (p = [IAmoSwapAq rg2 ay b2; ILoad rg3 ax]) ∨
+  (p = [IAmoSwap true rg2 ay b2; ILoad rg3 ax]) ∨
   (p = [ILoad rg3 ax] ∧ (∀ jb, log !! jb = Some AMB → (S jb ≤ tv)%nat)) ∨
   (p = [] ∧
      (∀ ja jb, log !! ja = Some AMA → log !! jb = Some AMB →
@@ -1905,10 +1916,10 @@ Proof.
   rewrite /amo_c0. eexists _, _, _, _, _, _. split.
   { eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
     eapply rtc_l;
-      [eapply (step_amo _ 0%nat rg1 ay b1 _ _ _ _ _ b0);
+      [eapply (step_amo _ 0%nat true rg1 ay b1 _ _ _ _ _ b0);
         [reflexivity|solve_excl]|]. simpl.
     eapply rtc_l;
-      [eapply (step_amo _ 1%nat rg2 ay b2 _ _ _ _ _ b1);
+      [eapply (step_amo _ 1%nat true rg2 ay b2 _ _ _ _ _ b1);
         [reflexivity|solve_excl]|]. simpl.
     eapply rtc_l;
       [eapply (step_load _ 1%nat rg3 ax _ _ _ _ _ 3%nat b1);
@@ -1917,4 +1928,42 @@ Proof.
   split; [reflexivity|]. split; [reflexivity|]. split_and!;
     [reflexivity|reflexivity|].
   rewrite lookup_insert //.
+Qed.
+
+(* ================================================================== *)
+(** ** AMO without [.aq] — the .aq knob (relaxed-rr.md).
+
+    The same shape with hart 1's AMO PLAIN: the read half still takes the
+    globally latest word (so the AMO pair is atomic and hart 1 does see
+    hart 0's AMO in the log), but the floor does not move, so the later
+    load of [x] may read at view 0 — the pre-AMO store is missed.  This is
+    exactly what RVWMO allows for an un-annotated AMO, and it is why the
+    lock leaves use [amoswap.aq] while the Svadu A/D write-back's plain
+    LR/SC needs no ordering.  Exhibited as a reachability witness. *)
+
+Definition amo_plain_c0 : config :=
+  Cfg img0 [] [Hart [IStore ax b1; IAmoSwap true rg1 ay b1] ∅ 0%nat 0%nat (λ _, 0%nat);
+               Hart [IAmoSwap false rg2 ay b2; ILoad rg3 ax] ∅ 0%nat 0%nat (λ _, 0%nat)].
+
+Lemma amo_plain_allowed :
+  ∃ c h0 regs tv rv coh,
+    reach amo_plain_c0 c ∧ c_harts c = [h0; Hart [] regs tv rv coh] ∧
+    c_log c = [AMX; AMA; AMB] ∧
+    regs !! rg2 = Some b1 ∧ regs !! rg3 = Some b0.
+Proof.
+  rewrite /amo_plain_c0. eexists _, _, _, _, _, _. split.
+  { eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
+    eapply rtc_l;
+      [eapply (step_amo _ 0%nat true rg1 ay b1 _ _ _ _ _ b0);
+        [reflexivity|solve_excl]|]. simpl.
+    eapply rtc_l;
+      [eapply (step_amo _ 1%nat false rg2 ay b2 _ _ _ _ _ b1);
+        [reflexivity|solve_excl]|]. simpl.
+    eapply rtc_l;
+      [eapply (step_load _ 1%nat rg3 ax _ _ _ _ _ 0%nat b0);
+        [reflexivity|solve_load]|]. simpl.
+    apply rtc_refl. }
+  split; [reflexivity|]. split; [reflexivity|]. split.
+  - rewrite lookup_insert_ne // lookup_insert //.
+  - rewrite lookup_insert //.
 Qed.

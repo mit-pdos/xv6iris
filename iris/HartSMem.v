@@ -3566,7 +3566,7 @@ Section swnodes.
     iIntros "#Hcert Hfrag Hmem";
     iApply (swp_hart_ram_write _ req _ _ _ Hproj ltac:(assumption)
               with "Hcert Hfrag [Hmem]");
-    iIntros (s ? ? ? ?) "%Htv Hs Htso";
+    iIntros (s ? ? ? ? ?) "%Htv Hs Htso";
     iMod ("Hmem" $! _ _ _ _ _ with "[//] Hs Htso") as "Hcl";
     iModIntro; iNext; iMod "Hcl" as "(Hs & Htso & HR)"; iModIntro;
     rewrite Hval; iFrame "Hs Htso"; iIntros "Hfrag _";
@@ -4706,7 +4706,7 @@ Section samo_nodes.
         ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
     swp (read_ram Read_RISCV_reserved_acquire (Physaddr pa) 4 false)
       (fun r => ⌜r = (bytes, default_meta)⌝ ∗ R ∗
-                resv_frag cpu_id (Some (snap_of pa 4 bytes))).
+                resv_fragb cpu_id (Some (snap_of pa 4 bytes)) true).
   Proof.
     intro Hdev. iIntros "#Hcert Hfrag Hmem".
     iApply (swp_hart_ram_read_excl 4 (mread_req4_racq pa) _ _ rr
@@ -4745,7 +4745,7 @@ Section samo_nodes.
     swp (read_ram Read_RISCV_reserved_acquire (Physaddr pa) 4 false)
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 4),
                   ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes ∗
-                  resv_frag cpu_id (Some (snap_of pa 4 bytes))).
+                  resv_fragb cpu_id (Some (snap_of pa 4 bytes)) true).
   Proof.
     intro Hdev. iIntros "#Hcert Hfrag Hmem".
     iApply (swp_hart_ram_read_excl 4 (mread_req4_racq pa) _ _ rr
@@ -4768,7 +4768,7 @@ Section samo_nodes.
       (v old : SailStdpp.Values.mword (8 * 4)) (R : iProp Σ) :
     dev_addr pa = false ->
     gen_cert -∗
-    resv_frag cpu_id (Some (snap_of pa 4 old)) -∗
+    resv_fragb cpu_id (Some (snap_of pa 4 old)) true -∗
     (* THE CONDITIONAL WRITE APPENDS LIKE ANY OTHER STORE, and its view goes
        PAST its own append ([ak_excl] is true here -- "the drain includes my
        write"), which is what makes the AMO an acquire. *)
@@ -4787,7 +4787,7 @@ Section samo_nodes.
       (fun r => ⌜r = true⌝ ∗ R ∗ resv_frag cpu_id None).
   Proof.
     intro Hdev. iIntros "#Hcert Hfrag Hmem".
-    iApply (swp_hart_ram_write_cond 4 (mwrite_req4_con pa v) _ _ old
+    iApply (swp_hart_ram_write_cond 4 (mwrite_req4_con pa v) _ _ old true
               (hwrite_req_at_write_ram4_con pa v) Hdev ltac:(lia)
               with "Hcert Hfrag [Hmem]").
     iIntros (s ? ? ? ?) "%Hrb %Htv Hs Htso".
@@ -4944,7 +4944,7 @@ Section samo.
            true false true false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
-                resv_frag cpu_id (Some (snap_of pa 4 bytes))).
+                resv_fragb cpu_id (Some (snap_of pa 4 bytes)) true).
   Proof.
     intros Hdisj HDpma HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr
       HA Hord HR HW Hcov Hpallow Hram Hpa.
@@ -4997,12 +4997,12 @@ Section samo.
               (read_ram Read_RISCV_reserved_acquire (Physaddr pa) 4 false)
               (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                          hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
-                         resv_frag cpu_id (Some (snap_of pa 4 bytes)))%I)
+                         resv_fragb cpu_id (Some (snap_of pa 4 bytes)) true)%I)
               _ _ _ _ C HC with "[Hrw Hro Hmem Hfrag] [-]").
     { iApply (swp_mono
                 (read_ram Read_RISCV_reserved_acquire (Physaddr pa) 4 false)
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗ R ∗
-                           resv_frag cpu_id (Some (snap_of pa 4 bytes)))%I)
+                           resv_fragb cpu_id (Some (snap_of pa 4 bytes)) true)%I)
                 with "[Hrw Hro] [Hmem Hfrag]").
       - iIntros (r) "(-> & HR & Hfrag)". by iFrame.
       - iApply (swp_read_ram_node4_racq pa bytes R rr
@@ -5056,7 +5056,7 @@ Section samo.
       (fun r => ∃ bytes : SailStdpp.Values.mword (8 * 4),
                   ⌜r = Values.Ok (bytes, tt)⌝ ∗
                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ Rr bytes ∗
-                  resv_frag cpu_id (Some (snap_of pa 4 bytes))).
+                  resv_fragb cpu_id (Some (snap_of pa 4 bytes)) true).
   Proof.
     intros Hdisj HDpma HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr
       HA Hord HR HW Hcov Hpallow Hram Hpa.
@@ -5111,13 +5111,13 @@ Section samo.
                          ⌜r = (bytes, default_meta)⌝ ∗
                          hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
                          Rr bytes ∗
-                         resv_frag cpu_id (Some (snap_of pa 4 bytes)))%I)
+                         resv_fragb cpu_id (Some (snap_of pa 4 bytes)) true)%I)
               _ _ _ _ C HC with "[Hrw Hro Hmem Hfrag] [-]").
     { iApply (swp_mono
                 (read_ram Read_RISCV_reserved_acquire (Physaddr pa) 4 false)
                 (fun r => (∃ bytes : SailStdpp.Values.mword (8 * 4),
                            ⌜r = (bytes, default_meta)⌝ ∗ Rr bytes ∗
-                           resv_frag cpu_id (Some (snap_of pa 4 bytes)))%I)
+                           resv_fragb cpu_id (Some (snap_of pa 4 bytes)) true)%I)
                 with "[Hrw Hro] [Hmem Hfrag]").
       - iIntros (r) "(%bytes & -> & HR & Hfrag)". iExists bytes. by iFrame.
       - iApply (swp_read_ram_node4_racq_ex pa Rr rr
@@ -5260,7 +5260,7 @@ Section samo.
     addr_is_ram pa ->
     is_aligned_paddr (Physaddr pa) 4 = true ->
     gen_cert -∗
-    resv_frag cpu_id (Some (snap_of pa 4 old)) -∗
+    resv_fragb cpu_id (Some (snap_of pa 4 old)) true -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (* THE CONDITIONAL WRITE APPENDS LIKE ANY OTHER STORE, and its view goes
@@ -5381,7 +5381,7 @@ Section samo.
     addr_is_ram pa ->
     is_aligned_paddr (Physaddr pa) 4 = true ->
     gen_cert -∗
-    resv_frag cpu_id (Some (snap_of pa 4 old)) -∗
+    resv_fragb cpu_id (Some (snap_of pa 4 old)) true -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (* THE CONDITIONAL WRITE APPENDS LIKE ANY OTHER STORE, and its view goes
@@ -5581,7 +5581,7 @@ Section samo.
                             true false true)
               _ _ _ C HC with "[Hrw Hro Hrd0 Hfrag] [-]").
     { iApply (swp_mem_read_amo_S Drw Dro Df rsf (Physaddr pa) bytes
-                (Rr ∗ resv_frag cpu_id (Some (snap_of pa 4 bytes)))%I
+                (Rr ∗ resv_fragb cpu_id (Some (snap_of pa 4 bytes)) true)%I
                 Hdisj HDmst HDpriv Hpriv'
                 ltac:(rewrite Hmst'; exact Hep)
                 with "Hcert Hrw Hro [Hrd0 Hfrag]").
@@ -5589,7 +5589,7 @@ Section samo.
       iApply (swp_mono _
                 (fun r => (⌜r = Values.Ok (bytes, tt)⌝ ∗
                            hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗ Rr ∗
-                           resv_frag cpu_id (Some (snap_of pa 4 bytes)))%I)
+                           resv_fragb cpu_id (Some (snap_of pa 4 bytes)) true)%I)
                 with "[] [Hrw Hro Hrd0 Hfrag]").
       - iIntros (r) "(-> & Hrw & Hro & HRr & Hfrag)". by iFrame.
       - iApply (swp_checked_mem_read_amo_S Drw Dro Df rsf pa pmar0 pcfg paddr
@@ -5793,7 +5793,7 @@ Section samo.
                             true false true)
               _ _ _ C HC with "[Hrw Hro Hrd0 Hfrag] [-]").
     { iApply (swp_mem_read_amo_S_ex Drw Dro Df rsf (Physaddr pa)
-                (fun b => Rr b ∗ resv_frag cpu_id (Some (snap_of pa 4 b)))%I
+                (fun b => Rr b ∗ resv_fragb cpu_id (Some (snap_of pa 4 b)) true)%I
                 Hdisj HDmst HDpriv Hpriv'
                 ltac:(rewrite Hmst'; exact Hep)
                 with "Hcert Hrw Hro [Hrd0 Hfrag]").
@@ -5803,7 +5803,7 @@ Section samo.
                            ⌜r = Values.Ok (b, tt)⌝ ∗
                            hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                            Rr b ∗
-                           resv_frag cpu_id (Some (snap_of pa 4 b)))%I)
+                           resv_fragb cpu_id (Some (snap_of pa 4 b)) true)%I)
                 with "[] [Hrw Hro Hrd0 Hfrag]").
       - iIntros (r) "(%b & -> & Hrw & Hro & HRr & Hfrag)".
         iExists b. by iFrame.

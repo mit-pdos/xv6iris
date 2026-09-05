@@ -457,7 +457,7 @@ Section span.
     { (* a span node is a register or silent node: it keeps the reservation *)
       intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       destruct oc; try discriminate Hns;
-        destruct Hs as (_ & _ & _ & _ & _ & _ & ->); reflexivity. }
+        destruct Hs as (_ & _ & _ & _ & _ & -> & ->); by split. }
     iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
     destruct Hhr as (Hrvlen & _).
     destruct σ as [rsM mem0 dev0].

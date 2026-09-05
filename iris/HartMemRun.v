@@ -304,7 +304,7 @@ Section memrun.
   Lemma bytes_own_wobl (img : gmap Arch.pa (bv 8)) (sg : mstate)
       (log : list pwmsg) (V : agent -> nat) (tv : nat)
       (n : N) (req : Interface.WriteReq.t n)
-      (mm : gmap Arch.pa (bv 8)) :
+      (mm : gmap Arch.pa (bv 8)) (b : bool) :
     V (hart_agent cpu_id) = tv ->
     bytes_owned mm (Interface.WriteReq.pa req) n = true ->
     gen_heap_interp (hG := riscv_memGS) sg.(mem) -∗
@@ -321,7 +321,7 @@ Section memrun.
                         (Interface.WriteReq.value req))
                  (hart_agent cpu_id)])%list
       (vstep (hart_agent cpu_id)
-         (wstore_tv (Interface.WriteReq.access_kind req) log tv)
+         (wstore_tv (Interface.WriteReq.access_kind req) b log tv)
          (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
                            (Interface.WriteReq.value req))
                     (hart_agent cpu_id)])%list V) ∗
@@ -336,16 +336,16 @@ Section memrun.
     set (val := Interface.WriteReq.value req).
     set (log' := (log ++ [PWMsg (snap_of pa n val) (hart_agent cpu_id)])%list).
     set (V' := vstep (hart_agent cpu_id)
-                 (wstore_tv (Interface.WriteReq.access_kind req) log tv)
+                 (wstore_tv (Interface.WriteReq.access_kind req) b log tv)
                  log' V).
     assert (Hlen' : length log' = S (length log))
       by (rewrite /log' length_app /=; lia).
     assert (Htvlen : (tv <= length log)%nat)
       by (rewrite -Htv; apply Hb).
-    assert (Hw1 : (tv <= wstore_tv (Interface.WriteReq.access_kind req) log tv)%nat
-              /\ (wstore_tv (Interface.WriteReq.access_kind req) log tv
+    assert (Hw1 : (tv <= wstore_tv (Interface.WriteReq.access_kind req) b log tv)%nat
+              /\ (wstore_tv (Interface.WriteReq.access_kind req) b log tv
                   <= length log')%nat).
-    { rewrite /wstore_tv Hlen'. destruct (ak_excl _); split; lia. }
+    { rewrite /wstore_tv Hlen'. destruct (ak_excl _); [destruct b|]; split; lia. }
     destruct Hw1 as [Hwlo Hwhi].
     assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
     { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
@@ -514,7 +514,7 @@ Section memrun.
         iSplitL "Hri Hmem Hdv"; [iFrame|]. iFrame "Htso".
         iIntros "Hfrag". rewrite Hres.
         iApply (IH rs mm _ x rs' mm' Hf with "Hcert [Hfrag] Hrw Hro Hrun Hown").
-        by iApply resv_any_intro.
+        by iApply resv_any_of_fragb.
       + (* NON-EXCLUSIVE -- and now there is only ONE such arm.  RULING 1 is
            overruled: an instruction fetch and a page-table walk take the
            same Ztso arm as a plain data load, so the [ak_strong] split that
@@ -558,11 +558,11 @@ Section memrun.
       iDestruct "Hany" as (rr) "Hfrag".
       iApply (swp_hart_ram_write nb wreq _ _ rr Hproj Hdev
                 with "Hcert Hfrag").
-      iIntros (sg img log tv V) "%Htv Hsi Htso". rewrite /mstate_interp.
+      iIntros (sg img log tv V b) "%Htv Hsi Htso". rewrite /mstate_interp.
       iDestruct "Hsi" as "(Hri & Hmem & Hdv)".
       iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
       iNext. iMod "Hcl" as "_".
-      iMod (bytes_own_wobl img sg log V tv nb wreq mm Htv Hfp
+      iMod (bytes_own_wobl img sg log V tv nb wreq mm b Htv Hfp
               with "Hmem Htso Hrun Hown")
         as "(Hmem & Htso & Hrun & Hown)".
       iModIntro. iSplitL "Hri Hmem Hdv"; [iFrame|]. iFrame "Htso".

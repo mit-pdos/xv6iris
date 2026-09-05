@@ -3186,9 +3186,9 @@ Section SmodeCorePt.
     { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       rewrite /mnode_step in Hs. cbn beta iota in Hs.
       rewrite Hdev in Hs. cbn beta iota in Hs.
-      destruct Hs as [(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)
+      destruct Hs as [(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & -> & ->)
                      |[(Hif' & _) |(Hex & _)]];
-        [done|congruence|by rewrite (ak_ifetch_excl _ Hif) in Hex]. }
+        [by split|congruence|by rewrite (ak_ifetch_excl _ Hif) in Hex]. }
     iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
     iDestruct (RiscvExec.tso_interp_of_pin with "Htso") as %Hpin.
     rewrite (RiscvExec.tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V

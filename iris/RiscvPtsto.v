@@ -447,7 +447,7 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   (* the reservation mirror's class (§3a); the NAME is per-era
      ([riscvEraGS.era_resv_name] above), since reservations do not survive a
      power cycle -- [boot_shape] mints them all at [None]. *)
-  riscvF_resvGS :: ghost_mapG Σ CPU (option resv);
+  riscvF_resvGS :: ghost_mapG Σ CPU (option resv * bool);
   (* the TSO machine ghosts' functor bundle (TsoGhost.v); the NAMES are
      per-era (the four [era_*_name] fields above) *)
   riscvF_tsomemGS :: tsoMemG Σ;
@@ -2006,35 +2006,44 @@ Definition gregs_interp `{!riscvGS Σ} (gr : CPU -> regstate) : iProp Σ :=
 (* [map_imap] over [fin_to_set CPU], which makes the lookup lemma three       *)
 (* rewrites with no [NoDup] obligation (the [list_to_map] spelling costs one).*)
 (* ---------------------------------------------------------------------- *)
-Definition resv_map (f : CPU -> option resv) : gmap CPU (option resv) :=
-  map_imap (fun c _ => Some (f c)) (gset_to_gmap () (fin_to_set CPU : gset CPU)).
+(* THE ACQUIRE BIT RIDES BESIDE THE RESERVATION (relaxed-rr.md §2.2, the .aq
+   knob): the mirror's value is the pair [(gresv c, hr_acq (ghr c))], so the
+   fragment a hart holds across an AMO's two halves pins whether the pair is
+   an acquire -- the conditional write's view move depends on it, and the
+   lock leaves must be able to name it ([resv_fragb]).  [resv_frag] stays the
+   bit-agnostic spelling every other consumer holds. *)
+Definition resv_map (f : CPU -> option resv) (a : CPU -> hread)
+    : gmap CPU (option resv * bool) :=
+  map_imap (fun c _ => Some (f c, hr_acq (a c)))
+    (gset_to_gmap () (fin_to_set CPU : gset CPU)).
 
-Lemma resv_map_lookup (f : CPU -> option resv) (c : CPU) :
-  resv_map f !! c = Some (f c).
+Lemma resv_map_lookup (f : CPU -> option resv) (a : CPU -> hread) (c : CPU) :
+  resv_map f a !! c = Some (f c, hr_acq (a c)).
 Proof.
   rewrite /resv_map map_lookup_imap lookup_gset_to_gmap.
   rewrite option_guard_True; [ reflexivity | apply elem_of_fin_to_set ].
 Qed.
 
-Lemma resv_map_insert (f : CPU -> option resv) (c : CPU) (r : option resv) :
-  resv_map (<[c := r]> f) = <[c := r]> (resv_map f).
+Lemma resv_map_insert (f : CPU -> option resv) (a : CPU -> hread) (c : CPU)
+    (r : option resv) (hr : hread) :
+  resv_map (<[c := r]> f) (<[c := hr]> a) = <[c := (r, hr_acq hr)]> (resv_map f a).
 Proof.
   apply map_eq. intros c'. rewrite resv_map_lookup.
   destruct (decide (c' = c)) as [->|Hne].
-  - rewrite lookup_insert /insert /gresv_insert. by rewrite decide_True.
-  - rewrite lookup_insert_ne // resv_map_lookup /insert /gresv_insert.
-    by rewrite decide_False.
+  - rewrite lookup_insert /insert /gresv_insert /ghr_insert. by rewrite !decide_True.
+  - rewrite lookup_insert_ne // resv_map_lookup /insert /gresv_insert /ghr_insert.
+    by rewrite !decide_False.
 Qed.
 
 (* the all-[None] map (every era begins there): what the boot allocation
-   hands out, one [None] fragment per hart *)
-Lemma resv_map_none (f : CPU -> option resv) :
-  (forall c, f c = None) ->
-  resv_map f = gset_to_gmap None (fin_to_set CPU : gset CPU).
+   hands out, one [(None, false)] fragment per hart *)
+Lemma resv_map_none (f : CPU -> option resv) (a : CPU -> hread) :
+  (forall c, f c = None) -> (forall c, hr_acq (a c) = false) ->
+  resv_map f a = gset_to_gmap (None, false) (fin_to_set CPU : gset CPU).
 Proof.
-  intros Hf. apply map_eq. intros c.
+  intros Hf Ha. apply map_eq. intros c.
   rewrite resv_map_lookup lookup_gset_to_gmap option_guard_True;
-    [ by rewrite Hf | apply elem_of_fin_to_set ].
+    [ by rewrite Hf Ha | apply elem_of_fin_to_set ].
 Qed.
 
 (* THE PRESERVING CASE, which is what lets the rules whose arms never touch
@@ -2043,22 +2052,33 @@ Qed.
    already there leaves the auth's map alone, so no fragment is needed.  Only
    the arms that CHANGE it -- every RAM/MMIO write, the exclusive read, and the
    [Ret] boundary -- have to carry [resv_frag]. *)
-Lemma resv_map_insert_id (f : CPU -> option resv) (c : CPU) (r : option resv) :
-  f c = r -> resv_map (<[c := r]> f) = resv_map f.
+Lemma resv_map_insert_id (f : CPU -> option resv) (a : CPU -> hread) (c : CPU)
+    (r : option resv) (hr : hread) :
+  f c = r -> hr_acq (a c) = hr_acq hr ->
+  resv_map (<[c := r]> f) (<[c := hr]> a) = resv_map f a.
 Proof.
-  intros Hfc. apply map_eq. intros c'.
-  rewrite !resv_map_lookup /insert /gresv_insert.
-  case_decide as Hc; [ by rewrite Hc Hfc | reflexivity ].
+  intros Hfc Hac. apply map_eq. intros c'.
+  rewrite !resv_map_lookup /insert /gresv_insert /ghr_insert.
+  case_decide as Hc; [ by rewrite Hc Hfc Hac | reflexivity ].
 Qed.
 
 (* the authoritative half, held by [era_interp]; and the per-hart fragment,
-   which [pc_is] carries at [None] on every instruction boundary *)
+   which [pc_is] carries at [None] on every instruction boundary.  The
+   bit-carrying spelling [resv_fragb] is what the AMO chain holds between the
+   exclusive read and the conditional write; [resv_frag] is its existential. *)
 Definition resv_auth_at `{!riscvFixedGS Σ} (E : riscvEraGS)
-    (f : CPU -> option resv) : iProp Σ :=
-  ghost_map_auth (era_resv_name E) 1 (resv_map f).
+    (f : CPU -> option resv) (a : CPU -> hread) : iProp Σ :=
+  ghost_map_auth (era_resv_name E) 1 (resv_map f a).
+
+Definition resv_fragb `{!riscvGS Σ} (c : CPU) (r : option resv) (b : bool) : iProp Σ :=
+  (c ↪[era_resv_name riscv_eraGS] (r, b))%I.
 
 Definition resv_frag `{!riscvGS Σ} (c : CPU) (r : option resv) : iProp Σ :=
-  (c ↪[era_resv_name riscv_eraGS] r)%I.
+  (∃ b : bool, resv_fragb c r b)%I.
+
+Lemma resv_frag_of_fragb `{!riscvGS Σ} (c : CPU) (r : option resv) (b : bool) :
+  resv_fragb c r b -∗ resv_frag c r.
+Proof. iIntros "H". by iExists b. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* THE INSTRUCTION-VIEW MIRROR (claude-notes/projects/icache.md).           *)
@@ -2216,22 +2236,38 @@ Lemma resv_any_intro `{!riscvGS Σ} (c : CPU) (r : option resv) :
   resv_frag c r -∗ resv_any c.
 Proof. iIntros "H". by iExists r. Qed.
 
-Lemma resv_frag_agree `{!riscvGS Σ} (f : CPU -> option resv) (c : CPU)
-    (r : option resv) :
-  resv_auth_at riscv_eraGS f -∗ resv_frag c r -∗ ⌜f c = r⌝.
+Lemma resv_any_of_fragb `{!riscvGS Σ} (c : CPU) (r : option resv) (b : bool) :
+  resv_fragb c r b -∗ resv_any c.
+Proof. iIntros "H". iExists r. by iApply resv_frag_of_fragb. Qed.
+
+Lemma resv_fragb_agree `{!riscvGS Σ} (f : CPU -> option resv) (a : CPU -> hread)
+    (c : CPU) (r : option resv) (b : bool) :
+  resv_auth_at riscv_eraGS f a -∗ resv_fragb c r b -∗
+  ⌜f c = r /\ hr_acq (a c) = b⌝.
 Proof.
   iIntros "Ha Hf".
   iDestruct (ghost_map_lookup with "Ha Hf") as %Hl.
-  rewrite resv_map_lookup in Hl. by injection Hl.
+  rewrite resv_map_lookup in Hl. injection Hl as Hl. by inversion Hl.
 Qed.
 
-Lemma resv_frag_update `{!riscvGS Σ} (f : CPU -> option resv) (c : CPU)
-    (r r' : option resv) :
-  resv_auth_at riscv_eraGS f -∗ resv_frag c r ==∗
-  resv_auth_at riscv_eraGS (<[c := r']> f) ∗ resv_frag c r'.
+Lemma resv_frag_agree `{!riscvGS Σ} (f : CPU -> option resv) (a : CPU -> hread)
+    (c : CPU) (r : option resv) :
+  resv_auth_at riscv_eraGS f a -∗ resv_frag c r -∗ ⌜f c = r⌝.
+Proof.
+  iIntros "Ha Hf". iDestruct "Hf" as (b) "Hf".
+  iDestruct (resv_fragb_agree with "Ha Hf") as %[? _]. done.
+Qed.
+
+(* the update moves the reservation AND the acquire bit to the node's
+   write-back ([hr'] is the read side the arm produced) *)
+Lemma resv_fragb_update `{!riscvGS Σ} (f : CPU -> option resv) (a : CPU -> hread)
+    (c : CPU) (r : option resv) (b : bool) (r' : option resv) (hr' : hread) :
+  resv_auth_at riscv_eraGS f a -∗ resv_fragb c r b ==∗
+  resv_auth_at riscv_eraGS (<[c := r']> f) (<[c := hr']> a) ∗
+  resv_fragb c r' (hr_acq hr').
 Proof.
   iIntros "Ha Hf".
-  iMod (ghost_map_update r' with "Ha Hf") as "[Ha Hf]".
+  iMod (ghost_map_update (r', hr_acq hr') with "Ha Hf") as "[Ha Hf]".
   iModIntro. rewrite /resv_auth_at resv_map_insert. iFrame.
 Qed.
 
@@ -2331,7 +2367,7 @@ Definition era_interp `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) : iProp 
    (* the reservation mirror and its snapshot invariant (design §3a).  The
       pure conjunct is a STEP invariant of the language, so every arm
       re-establishes it and no rule has to carry it. *)
-   resv_auth_at E g.(gresv) ∗ ⌜resv_ok g⌝ ∗
+   resv_auth_at E g.(gresv) g.(ghr) ∗ ⌜resv_ok g⌝ ∗
    (* the instruction-view mirror and its bound (icache.md) *)
    iview_auth_at E g.(gitv) ∗ ⌜itv_ok g⌝ ∗
    (* the read-watermark mirror and the read side's bound (relaxed-rr.md),

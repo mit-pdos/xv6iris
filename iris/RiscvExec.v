@@ -750,7 +750,8 @@ Section WPExec.
      pure value only -- nothing owns them. *)
   Lemma wp_hart_step (m : M unit) :
     (forall oth h img σ log tv itv hr r m' σ' log' tv' itv' hr' r',
-       mnode_step oth h img σ log tv itv hr r m m' σ' log' tv' itv' hr' r' -> r' = r) ->
+       mnode_step oth h img σ log tv itv hr r m m' σ' log' tv' itv' hr' r' ->
+       r' = r /\ hr_acq hr' = hr_acq hr) ->
     gen_cert -∗
     (∀ σ oth r img log tv itv hr V,
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
@@ -880,8 +881,9 @@ Section WPExec.
     iSplitL "Hresv".
     { iEval (rewrite /resv_auth_at) in "Hresv".
       rewrite /resv_auth_at
-        (resv_map_insert_id g.(gresv) cpu_id r2
-           (eq_sym (Hpres _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hnode))).
+        (resv_map_insert_id g.(gresv) g.(ghr) cpu_id r2 hr2
+           (eq_sym (proj1 (Hpres _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hnode)))
+           (eq_sym (proj2 (Hpres _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hnode)))).
       iFrame "Hresv". }
     iSplitR; [iPureIntro; exact (prim_step_resv_ok _ _ _ _ _ _ Hstep Hrok)|].
     iFrame "Hiv2 Hrv2". iPureIntro.
@@ -895,10 +897,14 @@ Section WPExec.
      [r := rr] (agreement with the auth), learns that a [Some] reservation's
      snapshot still IS memory ([resv_ok], the fact the conditional write
      lives on), and gets the frag back at whatever the arm set. *)
-  Lemma wp_hart_step_resv (m : M unit) (rr : option resv) :
+  (* THE ACQUIRE BIT (relaxed-rr.md §2.2): the fragment carries it, so the
+     callback learns [hr_acq hr = b] beside the reservation's snapshot fact,
+     and gets the fragment back at the arm's new bit. *)
+  Lemma wp_hart_step_resv (m : M unit) (rr : option resv) (b : bool) :
     gen_cert -∗
-    resv_frag cpu_id rr -∗
+    resv_fragb cpu_id rr b -∗
     (∀ σ oth img log tv itv hr V, ⌜forall rv, rr = Some rv -> rv ⊆ σ.(mem)⌝ -∗
+       ⌜hr_acq hr = b⌝ -∗
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
        ⌜(itv <= length log)%nat⌝ -∗
        ⌜hr_bound hr (length log)⌝ -∗
@@ -917,7 +923,7 @@ Section WPExec.
                hart_rview_auth cpu_id (hr_rv hr') ∗
                tso_interp_of riscv_eraGS img σ'.(mem) log'
                  (vstep (hart_agent cpu_id) tv' log' V) ∗
-               (resv_frag cpu_id r' -∗
+               (resv_fragb cpu_id r' (hr_acq hr') -∗
                 WP (HartE gen_id cpu_id m' : expr riscv_lang)))) -∗
     WP (HartE gen_id cpu_id m : expr riscv_lang).
   Proof.
@@ -962,7 +968,7 @@ Section WPExec.
     iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Htso & Hresv & %Hrok & Hiv & %Hiok & Hrv & %Hhok)".
     iDestruct (tso_interp_at_mm_ok with "Htso") as %Hmm.
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
-    iDestruct (resv_frag_agree _ cpu_id rr with "Hresv Hfrag") as %Hrr.
+    iDestruct (resv_fragb_agree _ _ cpu_id rr b with "Hresv Hfrag") as %[Hrr Hb].
     iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
     iDestruct (iview_interp_acc cpu_id with "Hiv") as "[Hivc Hivclose]".
     iDestruct (rview_interp_acc cpu_id with "Hrv") as "[Hrvc Hrvclose]".
@@ -970,9 +976,10 @@ Section WPExec.
     iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev))
             (others_resv g.(gresv) cpu_id)
             g.(gimg) g.(glog) (g.(gtv) cpu_id) (g.(gitv) cpu_id) (g.(ghr) cpu_id) (avf g)
-            with "[] [] [] [] [Hri Hmem Hdev] Hivc Hrvc Htso")
+            with "[] [] [] [] [] [Hri Hmem Hdev] Hivc Hrvc Htso")
       as (m0 σ0 log0 tv0 itv0 hr0 r0) "(%Hwit & Hk)".
     { iPureIntro. intros rv0 Hrv0. apply (Hrok cpu_id). by rewrite Hrr. }
+    { iPureIntro. exact Hb. }
     { iPureIntro. apply avf_hart. }
     { iPureIntro. exact (Hiok cpu_id). }
     { iPureIntro. exact (Hhok cpu_id). }
@@ -1007,7 +1014,7 @@ Section WPExec.
     iDestruct ("Hrvclose" with "Hrvc'") as "Hrv2".
     iDestruct (tso_interp_hart_wb _ g cpu_id σ2.(sregs) σ2.(mem) σ2.(mdev)
                  r2 log2 tv2 itv2 hr2 with "Htso'") as "Htso2".
-    iMod (resv_frag_update g.(gresv) cpu_id rr r2 with "Hresv Hfrag")
+    iMod (resv_fragb_update g.(gresv) g.(ghr) cpu_id rr b r2 hr2 with "Hresv Hfrag")
       as "[Hresv Hfrag]".
     iDestruct ("HWP" with "Hfrag") as "HWP".
     iIntros "_ !>".
@@ -1054,20 +1061,24 @@ Section WPExec.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcert Hfrag H". rewrite /LoopE.
-    iApply (wp_hart_step_resv _ rr with "Hcert Hfrag").
-    iIntros (σ oth img log tv itv hr V) "_ %Htv %Hitv %Hhr Hsi Hiv Hrv Htso".
+    iDestruct "Hfrag" as (b) "Hfrag".
+    iApply (wp_hart_step_resv _ rr b with "Hcert Hfrag").
+    iIntros (σ oth img log tv itv hr V) "_ _ %Htv %Hitv %Hhr Hsi Hiv Hrv Htso".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
-    iExists (riscv_step false), σ, log, tv, itv, hr, None.
+    iExists (riscv_step false), σ, log, tv, itv,
+      (HRead (hr_rv hr) (hr_coh hr) false), None.
     iSplitR; [iPureIntro; by exists false|].
     iNext. iIntros (m' σ' log' tv' itv' hr' r') "%Hn".
     destruct Hn as (tick & -> & -> & -> & -> & -> & -> & ->).
     iMod "Hback" as "_". iModIntro. iFrame "Hsi Hiv Hrv".
     (* the boundary touches neither the log nor the view (an instruction
        boundary is not a fence, tso-machine-flip.md §2): the bundle goes
-       back untouched. *)
+       back untouched; the read side drops a dangling acquire with the
+       dangling reservation. *)
     iSplitL "Htso".
     { rewrite -Htv. iApply (tso_interp_of_idle with "Htso"). }
-    iIntros "Hfrag". iApply ("H" with "Hfrag").
+    iIntros "Hfrag". iApply ("H" with "[Hfrag]").
+    iApply (resv_frag_of_fragb with "Hfrag").
   Qed.
 
 End WPExec.

@@ -130,7 +130,7 @@ Section barrier.
     iApply (wp_hart_step with "Hcert").
     { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       rewrite /mnode_step in Hs. cbn beta iota in Hs.
-      by destruct Hs as (_ & _ & _ & _ & _ & _ & ->). }
+      destruct Hs as (_ & _ & _ & _ & _ & -> & ->). by split. }
     iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
     destruct Hhr as (Hrvlen & _).
     iDestruct (tso_interp_of_bound with "Htso") as %Hb.
@@ -253,7 +253,7 @@ Section barrier.
     iApply (wp_hart_step with "Hcert").
     { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       rewrite /mnode_step in Hs. cbn beta iota in Hs.
-      by destruct Hs as (_ & _ & _ & _ & _ & _ & ->). }
+      destruct Hs as (_ & _ & _ & _ & _ & -> & ->). by split. }
     iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
     destruct Hhr as (Hrvlen & _).
     iDestruct (tso_interp_of_bound with "Htso") as %Hb.
@@ -343,7 +343,7 @@ Section barrier.
     iApply (wp_hart_step with "Hcert").
     { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       rewrite /mnode_step in Hs. cbn beta iota in Hs.
-      by destruct Hs as (_ & _ & _ & _ & _ & _ & ->). }
+      destruct Hs as (_ & _ & _ & _ & _ & -> & ->). by split. }
     iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
     destruct Hhr as (Hrvlen & _).
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
@@ -443,7 +443,7 @@ Section barrier.
     iApply (wp_hart_step with "Hcert").
     { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       rewrite /mnode_step in Hs. cbn beta iota in Hs.
-      by destruct Hs as (_ & _ & _ & _ & _ & _ & ->). }
+      destruct Hs as (_ & _ & _ & _ & _ & -> & ->). by split. }
     iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
     destruct Hhr as (Hrvlen & _).
     iDestruct (tso_interp_of_bound with "Htso") as %Hb.

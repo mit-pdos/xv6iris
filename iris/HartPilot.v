@@ -410,7 +410,7 @@ Section pilot.
        and the appended log.  [wstore_tv] is [tv] here -- the pilot's store
        is plain, so the view does not move. *)
     (∀ (σw : mstate) (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
-       (tv : nat) (V : agent -> nat),
+       (tv : nat) (V : agent -> nat) (b : bool),
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
        tso_interp_of riscv_eraGS img σw.(mem) log V ==∗
        tso_interp_of riscv_eraGS img
@@ -420,7 +420,7 @@ Section pilot.
                            (Interface.WriteReq.value reqw))
                     (hart_agent cpu_id)])%list
          (vstep (hart_agent cpu_id)
-            (wstore_tv (Interface.WriteReq.access_kind reqw) log tv)
+            (wstore_tv (Interface.WriteReq.access_kind reqw) b log tv)
             (log ++ [PWMsg (snap_of (Interface.WriteReq.pa reqw) nw
                               (Interface.WriteReq.value reqw))
                        (hart_agent cpu_id)])%list V)) -∗
@@ -458,14 +458,14 @@ Section pilot.
     (* the store *)
     iApply (wp_hart_ram_write (fun m' : M unit => m') nw reqw x2.2 rr mctx_id
               Hreqw Hdevw with "Hcert Hfrag").
-    iIntros (σ' img log tv V) "%Htv Hσ Htso". rewrite /mstate_interp.
+    iIntros (σ' img log tv V b) "%Htv Hσ Htso". rewrite /mstate_interp.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
     iNext. iMod "Hmask" as "_".
     iMod (phys_upd_window σ'.(mem) (Interface.WriteReq.pa reqw) nw vold
             (Interface.WriteReq.value reqw) with "Hmem Hold")
       as "[Hmem Hnew]".
-    iMod ("Hwobl" $! σ' img log tv V with "[//] Htso") as "Htso".
+    iMod ("Hwobl" $! σ' img log tv V b with "[//] Htso") as "Htso".
     iModIntro.
     iSplitL "Hri Hmem Hdev"; [by iFrame|].
     iFrame "Htso".
@@ -498,7 +498,7 @@ Section pilot.
     TsoCtx.pristine_win (Interface.ReadReq.pa hp_reqf) 4 -∗
     ([∗ list] j ∈ seq 0 4, (pa_add hp_flag j) ↦ₚ nth_byte vold j) -∗
     (∀ (σw : mstate) (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
-       (tv : nat) (V : agent -> nat),
+       (tv : nat) (V : agent -> nat) (b : bool),
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
        tso_interp_of riscv_eraGS img σw.(mem) log V ==∗
        tso_interp_of riscv_eraGS img
@@ -508,7 +508,7 @@ Section pilot.
                            (Interface.WriteReq.value hp_reqw))
                     (hart_agent cpu_id)])%list
          (vstep (hart_agent cpu_id)
-            (wstore_tv (Interface.WriteReq.access_kind hp_reqw) log tv)
+            (wstore_tv (Interface.WriteReq.access_kind hp_reqw) b log tv)
             (log ++ [PWMsg (snap_of (Interface.WriteReq.pa hp_reqw) 4
                               (Interface.WriteReq.value hp_reqw))
                        (hart_agent cpu_id)])%list V)) -∗

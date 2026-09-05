@@ -36,12 +36,15 @@
         W-only successor (`rw,w`, `r,w`, `w,w`) are no-ops: W→W order is
         the single log and R→W order is the interleaving.
       - EXCLUSIVE/AMO read: read at `tv' = length glog` — the globally
-        latest value ("drain, then read memory").  The write half of an
-        `.aq` AMO appends and takes the FLOOR past its own append (a plain
-        AMO would raise only `rv`; the litmus language has `.aq` only,
-        which is the one AMO xv6 uses).  Atomicity — no foreign write lands
-        between the two halves — is the LANGUAGE's obligation, exactly the
-        reservation self-loop arms in `RiscvLang.mnode_step`.
+        latest value ("drain, then read memory") — and raise `rv` to the
+        top.  The write half of an `.aq` AMO appends and takes the FLOOR
+        past its own append; a PLAIN exclusive pair (no `.aq`) moves no
+        floor at all — the Svadu A/D write-back's LR/SC is one, the lock
+        leaves' `amoswap.aq` is the other kind.  Sail carries the acquire
+        strength on the READ kind; `RiscvLang.hr_acq` carries it to the
+        paired write.  Atomicity — no foreign write lands between the two
+        halves — is the LANGUAGE's obligation, exactly the reservation
+        self-loop arms in `RiscvLang.mnode_step`.
       - NOT MODELLED: RVWMO's syntactic address/data/control dependency
         order (ppo 9–13).  A load whose address came from an earlier load
         may still read at a lower view; the MP+addr litmus records this as
@@ -73,8 +76,9 @@ Definition image : Type := Z → option (bv 8).
 
 (** One write event, covering the byte range [wm_pa, wm_pa + |wm_data|).
     Every message carries its author: forwarding keys on it.  There is no
-    message class and no annotation field — under Ztso every store is a
-    release and every load an acquire, so there is nothing to record. *)
+    message class and no annotation field — every store is a release (W→W
+    order is the single log) and a load's ordering is the reader's floor,
+    so nothing per-message needs recording. *)
 Record wmsg := WMsg {
   wm_pa   : Z;
   wm_data : list (bv 8);

@@ -1255,7 +1255,7 @@ Section BootAlloc.
     iDestruct "H" as "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26)".
     rewrite /boot_reg_res /boot_raw_bytes /kmap_auth /kpt_unset /kptb_unset
             /hart_strans /hart_sie /hart_spp /hart_spie /hart_locks /hart_full
-            /pstate_full /resv_frag /uart_frag /plic_frag /virtio_frag
+            /pstate_full /resv_frag /resv_fragb /uart_frag /plic_frag /virtio_frag
             /log_mirror_half /BootCarve.boot_led_all /gen_cert.
     (* NOT a bare [iFrame]: it prices (27 hypotheses x 27 goal conjuncts) and
        every attempt against a row whose wrapper is sealed is a CONVERSION, so

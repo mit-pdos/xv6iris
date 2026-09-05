@@ -193,14 +193,15 @@ Lemma hsil_node2_pres (Drw Dro : gset register) (rs rs' : regstate)
          (s : mstate) (log : list pwmsg) (tv itv : nat) (hr : hread) (r : option resv)
          (m2 : M unit) (s2 : mstate) (log2 : list pwmsg) (tv2 itv2 : nat)
          (hr2 : hread) (r2 : option resv),
-    mnode_step oth h img s log tv itv hr r m m2 s2 log2 tv2 itv2 hr2 r2 -> r2 = r.
+    mnode_step oth h img s log tv itv hr r m m2 s2 log2 tv2 itv2 hr2 r2 ->
+    r2 = r /\ hr_acq hr2 = hr_acq hr.
 Proof.
   intros Hnode oth h img s log tv itv hr r m2 s2 log2 tv2 itv2 hr2 r2 Hstep.
   destruct m as [y|T oc k]; [by simpl in Hnode|].
   destruct oc; simpl in Hnode; try discriminate Hnode;
     try (case_decide; [|discriminate Hnode]);
-    injection Hnode as <- <-; destruct Hstep as (_ & _ & _ & _ & _ & _ & ->);
-    reflexivity.
+    injection Hnode as <- <-; destruct Hstep as (_ & _ & _ & _ & _ & -> & ->);
+    by split.
 Qed.
 
 Lemma hsil_node2_agree {X : Type} (Drw Dro : gset register) (rs1 rs2 : regstate)

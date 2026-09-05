@@ -495,7 +495,7 @@ Section store.
                         (Interface.WriteReq.value req))
                  (hart_agent cpu_id)])%list
       (vstep (hart_agent cpu_id)
-         (wstore_tv (Interface.WriteReq.access_kind req) log
+         (wstore_tv (Interface.WriteReq.access_kind req) false log
             (V (hart_agent cpu_id)))
          (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
                            (Interface.WriteReq.value req))
@@ -567,10 +567,13 @@ Section store.
     set (val := Interface.WriteReq.value req).
     set (log' := (log ++ [PWMsg (snap_of pa n val) (hart_agent cpu_id)])%list).
     set (V' := vstep (hart_agent cpu_id)
-                 (wstore_tv (Interface.WriteReq.access_kind req) log
+                 (wstore_tv (Interface.WriteReq.access_kind req) false log
                     (V (hart_agent cpu_id))) log' V).
-    assert (Hw : wstore_tv (Interface.WriteReq.access_kind req) log
-                   (V (hart_agent cpu_id)) = S (length log))
+    (* THE .aq KNOB (relaxed-rr.md): the A/D write-back is a PLAIN LR/SC
+       pair, so its conditional half carries no acquire bit and the view
+       stays put -- [wobl_ram] is stated at the pending bit [false]. *)
+    assert (Hw : wstore_tv (Interface.WriteReq.access_kind req) false log
+                   (V (hart_agent cpu_id)) = V (hart_agent cpu_id))
       by (rewrite /wstore_tv Hex; reflexivity).
     assert (Hlen' : length log' = S (length log))
       by (rewrite /log' length_app /=; lia).
@@ -585,7 +588,7 @@ Section store.
     { intros c. rewrite /V' /vstep.
       pose proof (Hb (hart_agent c)) as Hbc.
       case_decide as Hd.
-      - rewrite Hw. lia.
+      - rewrite Hd Hw. lia.
       - destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; first lia.
         exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
     assert (Htvtop : forall c : CPU,
@@ -593,7 +596,7 @@ Section store.
     { intros c. rewrite /V' /vstep.
       pose proof (Hb (hart_agent c)) as Hbc.
       case_decide as Hd.
-      - rewrite Hw Hlen'. lia.
+      - rewrite Hw Hlen'. pose proof (Hb (hart_agent cpu_id)). lia.
       - destruct (lt_dec (hart_agent c) NCPU) as [|Hge].
         + rewrite Hlen'. lia.
         + exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
@@ -641,9 +644,9 @@ Section store.
     set (val := Interface.WriteReq.value req).
     set (log' := (log ++ [PWMsg (snap_of pa n val) (hart_agent cpu_id)])%list).
     set (V' := vstep (hart_agent cpu_id)
-                 (wstore_tv (Interface.WriteReq.access_kind req) log
+                 (wstore_tv (Interface.WriteReq.access_kind req) false log
                     (V (hart_agent cpu_id))) log' V).
-    assert (Hw : wstore_tv (Interface.WriteReq.access_kind req) log
+    assert (Hw : wstore_tv (Interface.WriteReq.access_kind req) false log
                    (V (hart_agent cpu_id)) = V (hart_agent cpu_id))
       by (rewrite /wstore_tv Hex; reflexivity).
     assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
@@ -915,9 +918,14 @@ Section store.
                            R ∗ resv_frag cpu_id None)%I)
                 rr (hwrite_req_at_write_ram pa v)
                 (addr_is_ram_not_dev pa Hram) with "Hcert Hfrag [Hrw Hro Hmem]").
-      iIntros (σ img log tv V) "%Htv Hσ Htso". subst tv.
+      iIntros (σ img log tv V b) "%Htv Hσ Htso". subst tv.
       iMod ("Hmem" $! σ img log V with "Hσ Htso") as "Hclose".
       iModIntro. iNext. iMod "Hclose" as "(Hσ & Htso & HR)". iModIntro.
+      rewrite (wstore_tv_plain (Interface.WriteReq.access_kind (mwrite_req pa v))
+                 b log _ eq_refl).
+      iEval (rewrite /wobl_ram
+               (wstore_tv_plain (Interface.WriteReq.access_kind (mwrite_req pa v))
+                  false log _ eq_refl)) in "Htso".
       iFrame "Hσ Htso". iIntros "Hfrag Hrec".
       rewrite hwrite_resume_write_ram. iApply swp_ret. by iFrame. }
     iIntros (v0) "(-> & Hrw & Hro & HR & Hfrag)". s_glue.
@@ -1007,9 +1015,14 @@ Section store.
                            R ∗ resv_frag cpu_id None)%I)
                 rr (hwrite_req_at_write_ram8 pa v)
                 (addr_is_ram_not_dev pa Hram) with "Hcert Hfrag [Hrw Hro Hmem]").
-      iIntros (σ img log tv V) "%Htv Hσ Htso". subst tv.
+      iIntros (σ img log tv V b) "%Htv Hσ Htso". subst tv.
       iMod ("Hmem" $! σ img log V with "Hσ Htso") as "Hclose".
       iModIntro. iNext. iMod "Hclose" as "(Hσ & Htso & HR)". iModIntro.
+      rewrite (wstore_tv_plain (Interface.WriteReq.access_kind (mwrite_req8 pa v))
+                 b log _ eq_refl).
+      iEval (rewrite /wobl_ram
+               (wstore_tv_plain (Interface.WriteReq.access_kind (mwrite_req8 pa v))
+                  false log _ eq_refl)) in "Htso".
       iFrame "Hσ Htso". iIntros "Hfrag Hrec".
       rewrite hwrite_resume_write_ram8. iApply swp_ret. by iFrame. }
     iIntros (v0) "(-> & Hrw & Hro & HR & Hfrag)". s_glue.

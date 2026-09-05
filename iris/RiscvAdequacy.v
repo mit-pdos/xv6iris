@@ -120,7 +120,7 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   (* the FS log-region mirror (crash/power layer): capacity only *)
   riscv_pre_mirrorGS :: ghost_varG Σ log_mirror;
   (* the per-hart reservation mirror (design/main-cycle-port.md §3a) *)
-  riscv_pre_resvGS :: ghost_mapG Σ CPU (option resv);
+  riscv_pre_resvGS :: ghost_mapG Σ CPU (option resv * bool);
   (* the generation counter (crash/power layer) *)
   riscv_pre_genGS :: mono_natG Σ;
   (* the generation REGISTRY (crash/power layer): gen -> era record *)
@@ -155,7 +155,7 @@ Definition riscvΣ : gFunctors :=
      ghost_varΣ CPU;
      ghost_varΣ (SailStdpp.Values.mword 32);
      ghost_varΣ log_mirror;
-     ghost_mapΣ CPU (option resv);
+     ghost_mapΣ CPU (option resv * bool);
      mono_natΣ;
      ghost_mapΣ nat riscvEraGS;
      diskImgΣ;
@@ -535,7 +535,10 @@ Section power.
      ([∗ list] j ∈ seq 0 nproc,
         ghost_var (era_pstate_name HE j) 1 (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32)) ∗
      (* every hart's reservation mirror, at [None] (design §3a) *)
-     ([∗ set] c ∈ (fin_to_set CPU : gset CPU), c ↪[era_resv_name HE] None) ∗
+     (* the reservation mirror at [None], whatever acquire bit rides with
+        it (relaxed-rr.md, the .aq knob: the machine's is [false]) *)
+     ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
+        ∃ b : bool, c ↪[era_resv_name HE] (None, b)) ∗
      ghost_var (era_uart_name HE) (1/2)%Qp (g'.(gdev).(duart)) ∗
      ghost_var (era_plic_name HE) (1/2)%Qp (g'.(gdev).(dplic)) ∗
      ghost_var (era_virtio_name HE) (1/2)%Qp (g'.(gdev).(dvirtio)) ∗
@@ -909,7 +912,7 @@ Section power.
       iMod (ghost_var_alloc (Mof (v_disk (g2.(gdev).(dvirtio)))))
         as (γmir) "Hmir".
       iMod (own_alloc_lockset_cpus (enum CPU) (NoDup_enum CPU)) as (γlks) "Hlks".
-      iMod (ghost_map_alloc (resv_map g2.(gresv))) as (γresv) "[Hresvauth Hresvfrags]".
+      iMod (ghost_map_alloc (resv_map g2.(gresv) g2.(ghr))) as (γresv) "[Hresvauth Hresvfrags]".
       (* A6.63' / carve Q4: THE POWER ARM'S FIVE FLIP GNAMES.  A6.59 landed
          these in the system theorem and the power path never got them, so
          its era record was short by five and this arm could not build one.
@@ -967,11 +970,14 @@ Section power.
         iFrame "Helems".
         iSplitL "Hresvfrags".
         { destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & Hnone).
-          (* A6.71: [boot_facts]' last conjunct is the flip's FOUR-way
-             machine-reset fact (reservations, log, image, views), not the
-             reservation clause alone -- take its first arm. *)
-          rewrite (resv_map_none _ (proj1 Hnone)) big_sepM_gset_to_gmap.
-          iExact "Hresvfrags". }
+          (* A6.71: [boot_facts]' last conjunct is the flip's machine-reset
+             fact (reservations, log, image, views, read sides), not the
+             reservation clause alone -- take its first and last arms. *)
+          destruct Hnone as (Hresv0 & _ & _ & _ & _ & Hghr0).
+          rewrite (resv_map_none _ _ Hresv0
+                     (fun c => f_equal hr_acq (Hghr0 c))) big_sepM_gset_to_gmap.
+          iApply (big_sepS_mono with "Hresvfrags").
+          iIntros (c _) "H". by iExists false. }
         (* the client's lent resource, at the RESET machine's disk --
            which is the disk [Hswap] just ran at ([Hdk2]) *)
         iSplitL "HRb"; [iExact "HRb"|].

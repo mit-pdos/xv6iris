@@ -190,7 +190,7 @@ Section regnode.
     iApply (wp_hart_step with "Hcert").
     { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       cbv beta iota delta [mnode_step] in Hs.
-      exact (proj2 (proj2 (proj2 (proj2 (proj2 (proj2 Hs)))))). }
+      destruct Hs as (_ & _ & _ & _ & _ & -> & ->). by split. }
     (* a register node touches no memory-model state: the bundle goes back
        exactly as it came ([RiscvExec.tso_interp_of_idle]) *)
     iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
@@ -231,7 +231,7 @@ Section regnode.
     iApply (wp_hart_step with "Hcert").
     { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       cbv beta iota delta [mnode_step] in Hs.
-      exact (proj2 (proj2 (proj2 (proj2 (proj2 (proj2 Hs)))))). }
+      destruct Hs as (_ & _ & _ & _ & _ & -> & ->). by split. }
     iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
     iMod ("H" $! σ with "Hσ") as "H".
     iModIntro.
@@ -316,7 +316,7 @@ Section regnode.
     iApply (wp_hart_step with "Hcert").
     { intros oth0 h0 img0 σ0 log0 tv0 itv0 hr0 r0 m'0 σ'0 log'0 tv'0 itv'0 hr'0 r'0 Hs.
       cbv beta iota delta [mnode_step] in Hs.
-      exact (proj2 (proj2 (proj2 (proj2 (proj2 (proj2 Hs)))))). }
+      destruct Hs as (_ & _ & _ & _ & _ & -> & ->). by split. }
     iIntros (σ oth rv img log tv itv hr V) "%Htv %Hitv %Hhr Hσ Hiv Hrv Htso".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".

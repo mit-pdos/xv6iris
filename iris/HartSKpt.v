@@ -688,7 +688,7 @@ Section kptnode.
     xread_obl_ex (pt_addr0 p1 vpn) (fun w => pte_canon w = pte_canon leaf0).
   Proof.
     intros Hmaps. rewrite /xread_obl_ex.
-    iIntros "#Hlb0 #Hkinv" (σ img log tv V) "%Htv Hσ Htso Hvlb".
+    iIntros "#Hlb0 #Hkinv" (σ img log tv V) "%Htv Hσ Htso".
     iPoseProof (kpt_leaf_node_canon root_ppn t0 vpn p2 p1 leaf0 a0 d0 Hmaps
                   with "Hlb0 Hkinv") as "H".
     iMod ("H" $! σ with "Hσ") as "[Hex Hcl]".
@@ -843,9 +843,10 @@ Section kptnode.
       by rewrite Nat2Z.id. }
     (* THE APPEND, paid by the PINNED context-free ledger gate.  The A/D
        write-back is a CONDITIONAL write ([mwrite_req8_con] is
-       [AV_exclusive]), so the hart's view goes PAST its own append -- the
-       [_ex] form -- and the pin's bound and sets are UNCHANGED, which is
-       what keeps the shared table canon-INVARIANT under its own store. *)
+       [AV_exclusive]) of a PLAIN LR/SC pair, so the hart's view does NOT
+       move (relaxed-rr.md, the .aq knob) -- the [_exf] form -- and the
+       pin's bound and sets are UNCHANGED, which is what keeps the shared
+       table canon-INVARIANT under its own store. *)
     set (Bg := fun a' : Arch.pa =>
                  Bf (Z.to_nat (uint a' - uint (pt_addr0 p1 vpn)))).
     assert (HBg : forall j : nat, (j < 8)%nat ->

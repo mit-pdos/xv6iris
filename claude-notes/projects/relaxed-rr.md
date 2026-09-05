@@ -1,8 +1,9 @@
 # Project: relaxing the memory model to allow load–load reordering
 
-**STATUS 2026-09-05: LANDED THROUGH STAGE D -- the tree builds green
-under the relaxed machine (1495 files on the VM, no `Admitted`).**  What
-landed, by the plan's stages (§6/§7):
+**STATUS 2026-09-05: LANDED, INCLUDING THE `.aq` KNOB -- the tree builds
+green under the relaxed machine (1495 files on the VM, no `Admitted`),
+`make audit-only` at the thirteen-axiom baseline.**  What landed, by the
+plan's stages (§6/§7):
 
 - **A.** `TsoMem` (the spike) and `TsoLitmus`: the eleven verdicts of §2.4,
   MP and IRIW flipped to allowed, MP+addr recorded as allowed.
@@ -40,13 +41,43 @@ landed, by the plan's stages (§6/§7):
   `ctx_bound_raise` moved AFTER it; the reclaim continuation hands the view
   receipt on.  No other whole-function proof moved -- as §4.3 predicted.
 
-Left: the `.aq` knob of §2.2 (every exclusive access is still an acquire;
-xv6's one AMO is `.aq`, so nothing is lost today), the `make audit-only`
-baseline check on the VM (running at the time of writing; the change adds
-no axiom), the notes sweep (`design/multi-cpu.md`, `ctx-box.md` §1's
-"under TSO" wording) and archiving this file.  The original proposal
-follows unchanged; every claim in it about the tree was measured against
-`main` at `434107f43`.
+- **E. The `.aq` knob** (§2.2's "IF the access strength is acquire").
+  Sail puts the acquire strength on the READ kind only
+  (`Read_RISCV_reserved_acquire` is `AS_rel_or_acq`; the paired
+  `Write_RISCV_conditional` is `AS_normal`), and foreign appends may land
+  between the two halves (the reservation arms only block OVERLAPPING
+  writes), so the write half cannot recompute "am I an acquire" from its
+  own kind or from `tv = length log`.  The bit is CARRIED: `hread` grew
+  `hr_acq : bool`, set by the exclusive-read arm to `ak_acq` of the kind
+  (`AK_explicit` with a non-`AS_normal` strength, or `AK_arch`), consumed
+  by the RAM-write arm (`tv' = if ak_excl then (if hr_acq then S (length
+  log) else tv) else tv`), cleared by every write, MMIO write and
+  instruction boundary; the exclusive read's own floor move is `if ak_acq
+  then length log else tv`.  The ghost side rides on the reservation map:
+  its values are `(option resv * bool)`, `resv_fragb c r b` is the explicit
+  form and `resv_frag c r := ∃ b, resv_fragb c r b` keeps every existing
+  client's statement; `era_interp`'s `resv_auth_at` takes `ghr` beside
+  `gresv`.  `RiscvExec.wp_hart_step_resv` takes the bit and tells the
+  callback `hr_acq hr = b`; `wp_hart_step`'s preservation premise is
+  `r' = r ∧ hr_acq hr' = hr_acq hr`.  `HartEvents`: `wstore_tv ak b log tv`;
+  `wp_hart_ram_write`'s callback is `∀ … (b : bool)` (a plain store's
+  obligation is the same for both, `wstore_tv_plain`); `wp_hart_ram_read_excl`
+  is generic in the kind -- bundle and receipt at `rtv ak log tv`, the
+  fragment out at `ak_acq ak`; `wp_hart_ram_write_cond` takes the
+  fragment's bit.  The lock leaves (`HartSMem` racq/con, `WpSconfLock`)
+  run at `true` and are otherwise unchanged; the Svadu A/D write-back
+  (`PtTreeAdue`, `HartSKpt.kpt_leaf_write_node`, `HartMStore.wobl_ram` /
+  `wobl_ram_ledger_pin_exf`) is a PLAIN `LR/SC` and now moves NO view:
+  `xread_obl(_ex)` is restated at `vstep h tv log V` with no receipt, and
+  `wobl_ram` at the pending bit `false`.  `TsoLitmus.IAmoSwap (aq : bool)`
+  with `amo_post`, and the new verdict `amo_plain_allowed` (an un-annotated
+  AMO orders nothing after itself -- the later load may miss the pre-AMO
+  store).
+
+Left: the notes sweep (`design/multi-cpu.md`, `ctx-box.md` §1's "under
+TSO" wording -- pointer sentences are in) and archiving this file to
+`completed/`.  The original proposal follows unchanged; every claim in it
+about the tree was measured against `main` at `434107f43`.
 
 ## 0. The answer in one paragraph
 

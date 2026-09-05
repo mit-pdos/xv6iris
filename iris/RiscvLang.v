@@ -262,10 +262,17 @@ Definition snap_of {w : N} (pa : Arch.pa) (n : N) (v : bv w) : resv :=
 Record hread := HRead {
   hr_rv  : nat;
   hr_coh : TsoMemPa.cohmap;
+  (* THE PENDING ACQUIRE (relaxed-rr.md §2.2, the .aq knob): set by an
+     exclusive read to its kind's acquire bit, consumed by the conditional
+     write that pairs with it -- the AMO's acquire is applied at the WRITE
+     half, which is the AMO's position in the store order (foreign writes
+     may land between the two halves), and Sail carries the bit on the
+     read kind only.  Cleared by every write and at the boundary. *)
+  hr_acq : bool;
 }.
 Add Printing Constructor hread.
 
-Definition hread0 : hread := HRead 0 (fun _ => 0%nat).
+Definition hread0 : hread := HRead 0 (fun _ => 0%nat) false.
 
 Global Instance hread_inhabited : Inhabited hread := populate hread0.
 
@@ -800,6 +807,26 @@ Definition ak_excl (ak : Interface.accessKind) : bool :=
       av_excl (RISCV_strong_access_variety a)
   end.
 
+(* IS THIS ACCESS AN ACQUIRE (relaxed-rr.md §2.2)?  The strength of an
+   explicit access kind: [AS_rel_or_acq] on a read is [.aq]
+   ([Read_RISCV_reserved_acquire]), [AS_acq_rcpc] the RCpc form; the
+   [AK_arch] kinds are the STRONG (.aqrl) accesses.  On a write the same
+   strength means [.rl], which this machine treats as a no-op (W→W and R→W
+   order come free), so only READ kinds are ever asked. *)
+Definition as_acq (s : SailStdpp.ConcurrencyInterfaceTypes.Access_strength) : bool :=
+  match s with
+  | SailStdpp.ConcurrencyInterfaceTypes.AS_normal => false
+  | _ => true
+  end.
+
+Definition ak_acq (ak : Interface.accessKind) : bool :=
+  match ak with
+  | SailStdpp.ConcurrencyInterfaceTypes.AK_explicit eak =>
+      as_acq (SailStdpp.ConcurrencyInterfaceTypes.Explicit_access_kind_strength eak)
+  | SailStdpp.ConcurrencyInterfaceTypes.AK_arch _ => true
+  | _ => false
+  end.
+
 (* IS THIS READ AN INSTRUCTION FETCH?  The fork's model tags one [AK_ifetch]
    ([RiscvExtras.rk_select]); it takes the icache arm below.  Disjoint from
    [ak_excl] by construction. *)
@@ -920,7 +947,7 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
   | Interface.Ret _ =>
       exists tick : bool,
         m' = riscv_step tick /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\
-        hr' = hr /\ r' = None
+        hr' = HRead (hr_rv hr) (hr_coh hr) false /\ r' = None
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
        (* registers *)
@@ -985,7 +1012,8 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
                 m' = k (inl (w, None)) /\ s' = s /\
                 log' = log /\ tv' = tv /\ itv' = itv /\
                 hr' = HRead (Nat.max (hr_rv hr) tvn)
-                        (coh_upd_win (hr_coh hr) (Interface.ReadReq.pa req) n tvn) /\
+                        (coh_upd_win (hr_coh hr) (Interface.ReadReq.pa req) n tvn)
+                        (hr_acq hr) /\
                 r' = r)
              \/
              (* THE EXCLUSIVE RAM READ ("drain, then read memory"): blocked
@@ -995,12 +1023,12 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
                 waiting hart holds nothing, hence no wait-for cycle through
                 exclusive reads); otherwise it reads the FLAT cache -- which
                 IS the read at the log top ([tso_read_top_flat]) -- takes the
-                floor AND the watermark to the top, and its snapshot becomes
-                this hart's reservation, replacing any stale one.  The
-                floor-at-top is what mints the acquire receipt in the lock
-                leaves.  (Every exclusive access is treated as [.aq]; xv6's
-                one AMO is, and honouring a plain AMO's annotation is a
-                recorded follow-up, relaxed-rr.md §2.2.) *)
+                watermark to the top, the FLOOR to the top iff the kind is an
+                acquire ([ak_acq]: .aq / .aqrl), records the acquire bit for
+                the paired write, and its snapshot becomes this hart's
+                reservation, replacing any stale one.  The floor-at-top is
+                what mints the acquire receipt in the lock leaves; a plain LR
+                (the Svadu A/D write-back's) moves no floor. *)
              (ak_excl (Interface.ReadReq.access_kind req) = true /\
               ((~ (footprint (Interface.ReadReq.pa req) n ## oth) /\
                 m' = Interface.Next (Interface.MemRead n req) k /\
@@ -1013,8 +1041,12 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
                      s.(mem) !! (pa_add (Interface.ReadReq.pa req) j)
                      = Some (nth_byte w j)) /\
                   m' = k (inl (w, None)) /\ s' = s /\
-                  log' = log /\ tv' = length log /\ itv' = itv /\
-                  hr' = HRead (length log) (hr_coh hr) /\
+                  log' = log /\
+                  tv' = (if ak_acq (Interface.ReadReq.access_kind req)
+                         then length log else tv) /\
+                  itv' = itv /\
+                  hr' = HRead (length log) (hr_coh hr)
+                          (ak_acq (Interface.ReadReq.access_kind req)) /\
                   r' = Some (snap_of (Interface.ReadReq.pa req) n w))))
        | Interface.MemWrite n req => fun k =>
            if dev_addr (Interface.WriteReq.pa req) then
@@ -1024,7 +1056,8 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
                dev_write s.(mdev) (Interface.WriteReq.pa req) n
                  (Interface.WriteReq.value req) = Some d' /\
                m' = k (inl None) /\ s' = MState s.(sregs) s.(mem) d' /\
-               log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = None
+               log' = log /\ tv' = tv /\ itv' = itv /\
+               hr' = HRead (hr_rv hr) (hr_coh hr) false /\ r' = None
            else
              (* THE RAM WRITE, conditional or plain alike: blocked
                 (self-loop) while another hart reserves any of its bytes;
@@ -1032,12 +1065,16 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
                 lock-step ([flat_store]), clearing this hart's own
                 reservation.  A PLAIN store does NOT move the author's floor
                 — that is store buffering, and advancing it would forbid SB.
-                The AMO/conditional write half takes the floor past its own
-                append ("the drain includes my write").  A conditional write
-                on the hart's own reservation is never blocked -- no other
-                hart can hold an overlapping one -- but the arm does not
-                need to know that: the rule absorbs the self-loop by Löb
-                either way.  The read side does not move on a write. *)
+                The conditional write half of an ACQUIRE pair ([hr_acq], set
+                by the paired exclusive read) takes the floor past its own
+                append ("the drain includes my write" -- and every foreign
+                write that landed between the two halves, which is where the
+                AMO sits in the store order); a plain pair's write moves no
+                floor.  A conditional write on the hart's own reservation is
+                never blocked -- no other hart can hold an overlapping one --
+                but the arm does not need to know that: the rule absorbs the
+                self-loop by Löb either way.  Every write consumes the
+                pending acquire; the watermark and floors do not move. *)
              (~ (footprint (Interface.WriteReq.pa req) n ## oth) /\
               m' = Interface.Next (Interface.MemWrite n req) k /\
               s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r)
@@ -1050,8 +1087,8 @@ Definition mnode_step (oth : gset Arch.pa) (h : agent)
               log' = log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
                                       (Interface.WriteReq.value req)) h] /\
               tv' = (if ak_excl (Interface.WriteReq.access_kind req)
-                     then S (length log) else tv) /\
-              itv' = itv /\ hr' = hr /\ r' = None)
+                     then (if hr_acq hr then S (length log) else tv) else tv) /\
+              itv' = itv /\ hr' = HRead (hr_rv hr) (hr_coh hr) false /\ r' = None)
        (* trace / announce outcomes: state no-ops, exactly as [run]. *)
        | Interface.InstrAnnounce _    => fun k =>
            m' = k tt /\ s' = s /\ log' = log /\ tv' = tv /\ itv' = itv /\ hr' = hr /\ r' = r
@@ -1822,12 +1859,15 @@ Lemma prim_step_hart_restart gen cpu g (tick : bool) :
     (GState (<[cpu := g.(gregs) cpu]> g.(gregs)) g.(gmem) g.(gdev)
        g.(ggen) g.(gpow) (<[cpu := None]> g.(gresv))
        g.(gimg) g.(glog) (<[cpu := g.(gtv) cpu]> g.(gtv))
-       (<[cpu := g.(gitv) cpu]> g.(gitv)) (<[cpu := g.(ghr) cpu]> g.(ghr))) [].
+       (<[cpu := g.(gitv) cpu]> g.(gitv))
+       (<[cpu := HRead (hr_rv (g.(ghr) cpu)) (hr_coh (g.(ghr) cpu)) false]>
+          g.(ghr))) [].
 Proof.
   intros Hl. left. exists gen, cpu, (Interface.Ret tt).
   split_and!; try reflexivity. left. split; [exact Hl|].
   exists (riscv_step tick), (MState (g.(gregs) cpu) g.(gmem) g.(gdev)),
-    g.(glog), (g.(gtv) cpu), (g.(gitv) cpu), (g.(ghr) cpu), None.
+    g.(glog), (g.(gtv) cpu), (g.(gitv) cpu),
+    (HRead (hr_rv (g.(ghr) cpu)) (hr_coh (g.(ghr) cpu)) false), None.
   split_and!; [by exists tick|reflexivity|reflexivity].
 Qed.
 
@@ -2042,7 +2082,8 @@ Lemma mnode_step_mm oth h img s log tv itv hr r m m' s' log' tv' itv' hr' r' :
   (hr_rv hr' <= length log')%nat /\ (forall a, (hr_coh hr' a <= length log')%nat).
 Proof.
   rewrite /mnode_step. destruct m as [y|T oc k].
-  { intros (tick & _ & -> & -> & -> & -> & -> & _) Hf Htv Hrv Hcoh. by split_and!. }
+  { intros (tick & _ & -> & -> & -> & -> & -> & _) Hf Htv Hrv Hcoh.
+    split_and!; [done|done|done|done|exact Hrv|exact Hcoh]. }
   destruct oc; simpl;
     try (by intros (_ & -> & -> & -> & -> & -> & _) Hf Htv Hrv Hcoh; split_and!);
     try (by intros []).
@@ -2052,24 +2093,29 @@ Proof.
     + intros [(_ & tvn & w & Hlo & Hhi & _ & _ & -> & -> & -> & -> & -> & _)
              |[(_ & _ & tvn & w & Hlo & Hhi & _ & _ & _ & -> & -> & -> & -> & -> & _)
               |(_ & [(_ & _ & -> & -> & -> & -> & -> & _)
-                    | (_ & w & _ & _ & -> & -> & -> & -> & -> & _)])]] Hf Htv Hrv Hcoh;
-        split_and!; try done.
+                    | (_ & w & _ & _ & -> & -> & -> & -> & -> & _)])]] Hf Htv Hrv Hcoh.
+      * by split_and!.
       * (* the plain read: the watermark takes the max, the floors take [tvn] *)
-        cbn. lia.
-      * cbn. apply coh_upd_win_le; [exact Hcoh|exact Hhi].
+        split_and!; try done.
+        -- cbn. lia.
+        -- cbn. apply coh_upd_win_le; [exact Hcoh|exact Hhi].
+      * by split_and!.
+      * (* the exclusive read: the floor goes to the top iff acquire *)
+        split_and!; try done. case_match; lia.
   - (* MemWrite *)
     destruct (dev_addr _).
-    + intros (d' & _ & _ & -> & -> & -> & -> & -> & _) Hf Htv Hrv Hcoh. by split_and!.
+    + intros (d' & _ & _ & -> & -> & -> & -> & -> & _) Hf Htv Hrv Hcoh.
+      split_and!; [done|done|done|done|exact Hrv|exact Hcoh].
     + intros [(_ & _ & -> & -> & -> & -> & -> & _) | (_ & _ & -> & -> & -> & -> & -> & _)]
         Hf Htv Hrv Hcoh.
       { by split_and!. }
       split_and!.
       * cbn. rewrite Hf. symmetry. apply flat_store.
       * rewrite length_app /=. lia.
-      * rewrite length_app /=. case_match; lia.
+      * rewrite length_app /=. case_match; [case_match|]; lia.
       * intros Hi. rewrite length_app /=. lia.
-      * rewrite length_app /=. lia.
-      * intros a. rewrite length_app /=. pose proof (Hcoh a). lia.
+      * cbn. rewrite length_app /=. lia.
+      * intros a. cbn. rewrite length_app /=. pose proof (Hcoh a). lia.
   - (* Barrier: the drain and the acquire both stay under the top
        ([fence_post_le]: [own_pub_le] for the drain, [Hrv] for the acquire) *)
     intros (_ & -> & -> & -> & -> & -> & _) Hf Htv Hrv Hcoh. split_and!; [done|done| | |done|done].

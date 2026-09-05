@@ -525,11 +525,11 @@ Section SPmpSwp.
   (* whole chain in this file is a PASS-THROUGH for that: nothing here    *)
   (* owns a points-to, so no lemma DISCHARGES it.                        *)
   (*                                                                     *)
-  (* THE ACQUIRE RECEIPT IS DROPPED, deliberately.  The rule mints        *)
-  (* [view_lb] at the top (A6.6: the leaf is the only place a receipt is  *)
-  (* born) and the page walk has no use for it -- it is not taking a lock.*)
-  (* A consumer that later DOES want the walk's AMO to mint the resume    *)
-  (* premise takes it here, and this is the one place to widen.           *)
+  (* THERE IS NO ACQUIRE RECEIPT (relaxed-rr.md, the .aq knob): the A/D  *)
+  (* write-back's LR is [Read_RISCV_reserved] -- a PLAIN exclusive read, *)
+  (* [AS_normal] -- so the machine moves no floor for it, the rule's      *)
+  (* [rtv] is [tv], and the bundle comes and goes at the hart's own view. *)
+  (* (The page walk is not taking a lock; it never wanted the receipt.)   *)
   (* ------------------------------------------------------------------ *)
   Definition xread_obl (pa : SailStdpp.Values.mword 64) (bytes : bv 64)
       : iProp Σ :=
@@ -537,12 +537,11 @@ Section SPmpSwp.
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
        mstate_interp σ -∗
        tso_interp_of riscv_eraGS img σ.(mem) log
-         (vstep (hart_agent cpu_id) (length log) log V) -∗
-       view_lb view_name loglen_name (hart_agent cpu_id) (length log) ={⊤,∅}=∗
+         (vstep (hart_agent cpu_id) tv log V) ={⊤,∅}=∗
        ⌜read_bytes σ.(mem) pa 8 = Some bytes⌝ ∗
        ▷ (|={∅,⊤}=> mstate_interp σ ∗
             tso_interp_of riscv_eraGS img σ.(mem) log
-              (vstep (hart_agent cpu_id) (length log) log V)))%I.
+              (vstep (hart_agent cpu_id) tv log V)))%I.
 
   (* the same at an existentially-quantified value (the predicate-indexed
      nodes below): the witness comes out of the obligation. *)
@@ -552,12 +551,11 @@ Section SPmpSwp.
        ⌜V (hart_agent cpu_id) = tv⌝ -∗
        mstate_interp σ -∗
        tso_interp_of riscv_eraGS img σ.(mem) log
-         (vstep (hart_agent cpu_id) (length log) log V) -∗
-       view_lb view_name loglen_name (hart_agent cpu_id) (length log) ={⊤,∅}=∗
+         (vstep (hart_agent cpu_id) tv log V) ={⊤,∅}=∗
        (∃ w : bv 64, ⌜read_bytes σ.(mem) pa 8 = Some w⌝ ∗ ⌜P w⌝) ∗
        ▷ (|={∅,⊤}=> mstate_interp σ ∗
             tso_interp_of riscv_eraGS img σ.(mem) log
-              (vstep (hart_agent cpu_id) (length log) log V)))%I.
+              (vstep (hart_agent cpu_id) tv log V)))%I.
 
   Lemma swp_pmpCheck_S (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (pcfg : type_of_register pmpcfg_n)
@@ -785,7 +783,7 @@ Section pteread.
            (Physaddr pa) 8 false false true false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                resv_frag cpu_id (Some (snap_of pa 8 bytes))).
+                resv_fragb cpu_id (Some (snap_of pa 8 bytes)) false).
   Proof.
     intros Hdisj HD HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr
       HA Hord Hrange HR Hpallow Hacc Hram Hpa.
@@ -834,12 +832,12 @@ Section pteread.
     { iApply (swp_hart_ram_read_excl 8 (mread_req8_res pa) _
                 (fun r => (⌜r = (bytes, default_meta)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                           resv_frag cpu_id (Some (snap_of pa 8 bytes)))%I)
+                           resv_fragb cpu_id (Some (snap_of pa 8 bytes)) false)%I)
                 rr (hread_req_at_read_ram8_res pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert Hfrag [Hrw Hro Hmem]").
-      iIntros (σ img log tv V) "%Htv Hσ Htso Hrec".
-      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso Hrec")
+      iIntros (σ img log tv V) "%Htv Hσ Htso _".
+      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso")
         as "[%Hrb Hclose]".
       iModIntro. iExists bytes. iSplitR; [done|]. iNext.
       iMod "Hclose" as "[Hσ Htso]". iModIntro. iFrame "Hσ Htso".
@@ -1054,7 +1052,7 @@ Section pteread.
            (Physaddr pa) 8 false false true false)
       (fun r => ∃ w, ⌜r = Values.Ok (w, tt)⌝ ∗ ⌜P w⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                resv_frag cpu_id (Some (snap_of pa 8 w))).
+                resv_fragb cpu_id (Some (snap_of pa 8 w)) false).
   Proof.
     intros Hdisj HD HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr
       HA Hord Hrange HR Hpallow Hacc Hram Hpa.
@@ -1103,12 +1101,12 @@ Section pteread.
     { iApply (swp_hart_ram_read_excl 8 (mread_req8_res pa) _
                 (fun r => (∃ w, ⌜r = (w, default_meta)⌝ ∗ ⌜P w⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                           resv_frag cpu_id (Some (snap_of pa 8 w)))%I)
+                           resv_fragb cpu_id (Some (snap_of pa 8 w)) false)%I)
                 rr (hread_req_at_read_ram8_res pa)
                 (addr_is_ram_not_dev pa Hram) ltac:(reflexivity)
                 with "Hcert Hfrag [Hrw Hro Hmem]").
-      iIntros (σ img log tv V) "%Htv Hσ Htso Hrec".
-      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso Hrec")
+      iIntros (σ img log tv V) "%Htv Hσ Htso _".
+      iMod ("Hmem" $! σ img log tv V with "[//] Hσ Htso")
         as "[Hw Hclose]".
       iDestruct "Hw" as (w) "[%Hrb %HP]".
       iModIntro. iExists w. iSplitR; [done|]. iNext.
@@ -1274,7 +1272,7 @@ Section ptewrite.
     addr_is_ram pa ->
     is_aligned_paddr (Physaddr pa) 8 = true ->
     gen_cert -∗
-    resv_frag cpu_id (Some (snap_of pa 8 w)) -∗
+    resv_fragb cpu_id (Some (snap_of pa 8 w)) false -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     wpte_obl_at pa w (mwrite_req8_con pa v) R -∗
@@ -1332,7 +1330,7 @@ Section ptewrite.
                 (fun r => (⌜r = true⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
                            R ∗ resv_frag cpu_id None)%I)
-                w (hwrite_req_at_write_ram8_con pa v)
+                w false (hwrite_req_at_write_ram8_con pa v)
                 (addr_is_ram_not_dev pa Hram) ltac:(lia)
                 with "Hcert Hfrag [Hrw Hro Hmem]").
       iIntros (σ img log tv V) "%Hrb %Htv Hσ Htso". subst tv.
@@ -1398,11 +1396,11 @@ Section ptewrite.
               (Physaddr pa) 8 false false true false)
          (fun r => ⌜r = Values.Ok (w, tt)⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                   resv_frag cpu_id (Some (snap_of pa 8 w)))) -∗
+                   resv_fragb cpu_id (Some (snap_of pa 8 w)) false)) -∗
     swp (read_pte_exclusive (Physaddr pa) 8)
       (fun r => ⌜r = Values.Ok w⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                resv_frag cpu_id (Some (snap_of pa 8 w))).
+                resv_fragb cpu_id (Some (snap_of pa 8 w)) false).
   Proof.
     iIntros "#Hcert Hrw Hro Hcmr".
     unfold read_pte_exclusive, mem_read_priv, mem_read_priv_meta.
@@ -1410,12 +1408,12 @@ Section ptewrite.
     iApply (swp_bind_use _ _
               (fun r => (⌜r = Values.Ok (w, tt)⌝ ∗
                          hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                         resv_frag cpu_id (Some (snap_of pa 8 w)))%I) _
+                         resv_fragb cpu_id (Some (snap_of pa 8 w)) false)%I) _
               with "[Hrw Hro Hcmr] [-]").
     { iApply (swp_bind_use _ _
                 (fun r => (⌜r = Values.Ok (w, tt)⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                           resv_frag cpu_id (Some (snap_of pa 8 w)))%I) _
+                           resv_fragb cpu_id (Some (snap_of pa 8 w)) false)%I) _
                 with "[Hrw Hro Hcmr] [-]").
       - iApply ("Hcmr" with "Hrw Hro").
       - iIntros (v) "(-> & Hrw & Hro & Hfrag)". iApply swp_ret. by iFrame. }
@@ -1548,7 +1546,7 @@ Section ptewrite.
     iApply (swp_bind_use _ _
               (fun r => (⌜r = Values.Ok m0⌝ ∗
                          hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                         resv_frag cpu_id (Some (snap_of pa 8 m0)))%I) _
+                         resv_fragb cpu_id (Some (snap_of pa 8 m0)) false)%I) _
               with "[Hrw Hro Hfrag Hrd] [-]").
     { iApply (swp_read_pte_exclusive_S Drw Dro Df rs pa m0
                 with "Hcert Hrw Hro [Hfrag Hrd]").
@@ -1597,11 +1595,11 @@ Section ptewrite.
               (Physaddr pa) 8 false false true false)
          (fun r => ∃ w, ⌜r = Values.Ok (w, tt)⌝ ∗ ⌜P w⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                   resv_frag cpu_id (Some (snap_of pa 8 w)))) -∗
+                   resv_fragb cpu_id (Some (snap_of pa 8 w)) false)) -∗
     swp (read_pte_exclusive (Physaddr pa) 8)
       (fun r => ∃ w, ⌜r = Values.Ok w⌝ ∗ ⌜P w⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                resv_frag cpu_id (Some (snap_of pa 8 w))).
+                resv_fragb cpu_id (Some (snap_of pa 8 w)) false).
   Proof.
     iIntros "#Hcert Hrw Hro Hcmr".
     unfold read_pte_exclusive, mem_read_priv, mem_read_priv_meta.
@@ -1609,12 +1607,12 @@ Section ptewrite.
     iApply (swp_bind_use _ _
               (fun r => (∃ w, ⌜r = Values.Ok (w, tt)⌝ ∗ ⌜P w⌝ ∗
                          hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                         resv_frag cpu_id (Some (snap_of pa 8 w)))%I) _
+                         resv_fragb cpu_id (Some (snap_of pa 8 w)) false)%I) _
               with "[Hrw Hro Hcmr] [-]").
     { iApply (swp_bind_use _ _
                 (fun r => (∃ w, ⌜r = Values.Ok (w, tt)⌝ ∗ ⌜P w⌝ ∗
                            hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                           resv_frag cpu_id (Some (snap_of pa 8 w)))%I) _
+                           resv_fragb cpu_id (Some (snap_of pa 8 w)) false)%I) _
                 with "[Hrw Hro Hcmr] [-]").
       - iApply ("Hcmr" with "Hrw Hro").
       - iIntros (v) "(%w & -> & %HP & Hrw & Hro & Hfrag)". iApply swp_ret.
@@ -1752,7 +1750,7 @@ Section ptewrite.
     iApply (swp_bind_use _ _
               (fun r => (∃ w, ⌜r = Values.Ok w⌝ ∗ ⌜P w⌝ ∗
                          hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
-                         resv_frag cpu_id (Some (snap_of pa 8 w)))%I) _
+                         resv_fragb cpu_id (Some (snap_of pa 8 w)) false)%I) _
               with "[Hrw Hro Hfrag Hrd] [-]").
     { iApply (swp_read_pte_exclusive_S_ex Drw Dro Df rs pa P
                 with "Hcert Hrw Hro [Hfrag Hrd]").
@@ -1804,7 +1802,7 @@ Section ptewrite.
     - (* no write: the bits were set between the walk's read and the re-read *)
       rewrite Hupdw. cbn match.
       iApply swp_ret. iExists w, w.
-      iDestruct (resv_any_intro with "Hfrag") as "Hany".
+      iDestruct (resv_any_of_fragb with "Hfrag") as "Hany".
       iFrame "Hrw Hro Hany". iSplitR; [done|]. iSplitR.
       { iPureIntro. left. split; [exact Hupdw | reflexivity]. }
       iSplitR; [done|]. iLeft. iPureIntro. exact Hupdw.
