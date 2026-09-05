@@ -69,6 +69,10 @@ Require Import UserFd.
 (* ...and this file's own *)
 Require Import FsNode.
 Require Import SystemAdequacy.
+(* the image's own superblock and region width, and the disk literal, for
+   the closed corollary at the real image *)
+Require Import FsImgCheck.
+Require FsImgDisk.
 Local Open Scope Z_scope.
 
 Record xv6_app (Σ : gFunctors) := MkApp {
