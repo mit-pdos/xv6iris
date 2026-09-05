@@ -204,3 +204,36 @@ Section AppTriv.
     mono_nat_auth_own γcl 1 0%nat ⊢ |==> app_R (app_triv Σ) γcl [].
   Proof. iIntros "_". by iModIntro. Qed.
 End AppTriv.
+
+(* ---------------------------------------------------------------------- *)
+(* THE ARBITRARY APPLICATION, CLOSED: at the real image, powered off,       *)
+(* never booted, every run is reducible -- and the application's           *)
+(* conclusion is [True].  Every obligation of the record is a line; the    *)
+(* generic user-safety WP is what the boot mints, so user space does        *)
+(* anything and the abstract state is anything.                             *)
+(* ---------------------------------------------------------------------- *)
+Corollary xv6_app_adequacy_triv_xv6Σ (g : gstate)
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow0 : g.(gpow) = false)
+    (Hdisk : v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk) :
+  forall (n : nat) (κs : list mobs) t2 g2,
+    nsteps n ([PowerLoopE : expr riscv_lang], g) κs (t2, g2) ->
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2)
+    /\ app_phi (app_triv xv6Σ) g2 κs.
+Proof.
+  apply (xv6_app_adequacy xv6Σ g fsimg_sb fsimg_nib fsimg_cov (app_triv xv6Σ)
+           ltac:(intros γcl h; cbn [app_triv app_R]; apply _)
+           app_triv_R0
+           ltac:(intros γcl h on dk _; cbn [app_triv app_R]; iIntros "_"; by iModIntro)
+           ltac:(intros HR γ; cbn [app_triv app_R];
+                 iIntros "!>" (h b u u') "_ _ _ _ Hg _"; iModIntro; by iFrame "Hg")
+           ltac:(intros HR γ; cbn [app_triv app_R];
+                 iIntros "!>" (h b u u') "_ _ Hg _"; iModIntro; by iFrame "Hg")
+           ltac:(intros γd γsw γreg γst γcl dk; cbn [app_triv app_lend];
+                 iIntros "HP"; iModIntro; iModIntro; by iFrame "HP")
+           ltac:(intros γcl S D dk _ _; exact (app_triv_boot γcl S dk))
+           app_triv_lic
+           ltac:(intros Hinv γgen γstart γreg γd γsw γobs γcl T g' h;
+                 iIntros "_ _ _ _ _"; iModIntro; iPureIntro; exact Logic.I)
+           Hgen0 Hpow0).
+  rewrite Hdisk. exact fsimg_image_wf.
+Qed.
