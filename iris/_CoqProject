@@ -1998,6 +1998,7 @@ UkShMalloc.v
 # re-cut of the loop head's budget, which belongs with the fork arm.
 UkShCd.v
 UkShMain.v
+UkShFork.v
 
 # FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
 # u-tier syscall row.  FsFdMirror = the pure mirror + step table;
