@@ -1159,7 +1159,7 @@ Section UkShParse.
   (* THE PROLOGUE.  It hands back the two spilled words as [uword]s at the
      caller's own [sp], which is what makes the epilogue below a pure
      inverse: nothing about WHAT was spilled crosses the function body. *)
-  Local Lemma wp_kshp_pro2 (h : CpuId) (m : regfile)
+  Lemma wp_kshp_pro2 (h : CpuId) (m : regfile)
       (p0 p1 p2 p3 p4 : Z) (nn : nat) :
     p1 = p0 + 2 -> p2 = p1 + 2 -> p3 = p2 + 2 -> p4 = p3 + 2 ->
     uinstr_is γt (mword_of_int p0) true
@@ -1265,7 +1265,7 @@ Section UkShParse.
 
   (* THE EPILOGUE -- the prologue's inverse, and the point at which the
      caller's [ucallee_saved] read-back is assembled. *)
-  Local Lemma wp_kshp_epi2 (h : CpuId) (me : regfile)
+  Lemma wp_kshp_epi2 (h : CpuId) (me : regfile)
       (q0 q1 q2 q3 : Z) (sp0 vra vs0 : mword 64) (nn : nat) :
     q1 = q0 + 2 -> q2 = q1 + 2 -> q3 = q2 + 2 ->
     uint sp0 mod 8 = 0 ->

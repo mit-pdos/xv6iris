@@ -1,0 +1,51 @@
+# ucode_shm.txt -- the pc set of iris/UCodeShM.v, for tools/gen_ucode.py.
+#
+#   tools/gen_ucode.py --module Sh --prog shm --out iris/UCodeShM.v \
+#       --spec tools/ucode_shm.txt
+#
+# THE FOURTH CATALOG OVER THE SAME DUMP, and the reason there is a fourth is
+# the one measured in stage 4: the catalog's cost is LINEAR in instructions
+# (~22 s fixed + ~1.9 s each), so a function set that no other stage's edit
+# touches belongs in a file of its own that builds in parallel with them.
+# tools/ucode_sh.txt drives iris/UCodeSh.v (the first-generation [uinstr] /
+# page-table form); tools/ucode_shk.txt drives iris/UCodeShK.v (SH lane
+# stages 1-2 and 5, plus the diagnostic subtree); tools/ucode_shp.txt drives
+# iris/UCodeShP.v (stage 4, the parser).  This file drives STAGE 3 -- THE
+# ALLOCATOR -- which every one of those stages reaches through exactly one
+# call and none of them fetches an instruction of.
+#
+# [--prog shm] names what this file DEFINES ([shm_text_sub], [uis_shm_*],
+# [shm_code]) while the dump maps it READS stay [ShInstrs.sh_bytes] /
+# [ShData.sh_data], so all four catalogs sit on-build without colliding.
+# [shm_code], [shp_code] and [shk_code] are the SAME proposition (each is
+# [utext_img g ShInstrs.sh_bytes]); iris/UkShMalloc.v carries the one-line
+# bridges, which is what lets the allocator walk be stated against the
+# catalog the parser already holds.
+
+note SH LANE STAGE 3: the ALLOCATOR -- K&R [malloc]/[free] over [sbrk].
+note
+note [malloc] (0x118c, 91 instructions) has [morecore] INLINED into it: the
+note first-call arm at 0x11e2 initialises the degenerate free list ([base]
+note points at itself with size 0 and [freep] points at [base]), the arm at
+note 0x1226 asks [sbrk] for a 4096-unit chunk and hands it to [free], and the
+note cut at 0x1244 splits the block the search found.  [free] (0x1106, 46
+note instructions) is the circular-list insert with its two coalesce arms.
+note
+note [sbrk] (0xc52) is NOT one of the two-instruction usys.S stubs the other
+note catalogs hold: user/umalloc.c calls the C wrapper, which passes the
+note EAGER flag in a1 and tail-calls the real stub [sys_sbrk] (0xd0e).  Both
+note are here, and both are on the walk.
+
+# ---- the allocator ---------------------------------------------------
+func malloc
+func free
+
+# ---- what [morecore] asks the kernel for.  [sbrk] sets the eager flag
+# ---- and calls [sys_sbrk], which is the usys.S stub proper.
+func sbrk
+func sys_sbrk
+
+skipdefault stage 3 is the ALLOCATOR and nothing else: the shell's own code
+skipdefault is catalogued in UCodeShK.v (stages 1-2, 5 and the diagnostic
+skipdefault subtree) and UCodeShP.v (stage 4, the parser), and [sbrklazy] is
+skipdefault dead in this image -- umalloc.c calls [sbrk], never it

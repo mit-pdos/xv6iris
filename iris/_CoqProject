@@ -1922,6 +1922,23 @@ UkShDiag.v
 UCodeShP.v
 UkShParse.v
 
+# ... STAGE 3: the ALLOCATOR.  UCodeShM.v is a FOURTH catalog over the same
+# dump (tools/ucode_shm.txt, [--prog shm]) -- 150 instructions in four
+# functions: malloc, free, sbrk and the usys.S stub sys_sbrk.  Same measured
+# reason for the split as stage 4's: nothing else rebuilds when the
+# allocator's walk moves, and this file builds in parallel with the other
+# three.  [shm_code] is the SAME proposition as [shk_code]/[shp_code]
+# ([utext_img g ShInstrs.sh_bytes]) and UkShMalloc.v carries the bridges.
+#   UkShMalloc.v is stage 3's walk.  It runs on [UkRunSys.wp_uk_ecall_sbrk],
+# the consumer leaf that landed with the sbrk RETURN-VALUE row, and it is
+# FIRST-CALL SCOPED ([freep == 0]) exactly as the first-generation stack's
+# [wp_sh_malloc_first_body] was: the arm that initialises [base], asks the
+# kernel for a 4096-unit chunk, inserts it with [free] and cuts the request
+# off its end.  What it hands back is the natural separation-logic spec --
+# the request's bytes, OWNED -- plus the allocator state for the next call.
+UCodeShM.v
+UkShMalloc.v
+
 # ... STAGE 6: main's body, and the seam between the two lanes.  UkShMain.v
 # is the only file that imports BOTH stage 4's parser and stage 5's runner:
 # what one BUILDS ([UkShParse.ushp_tree], owned, argv as index pairs into the
