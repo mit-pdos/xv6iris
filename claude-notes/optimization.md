@@ -373,31 +373,20 @@ upstream.
 This is the single most productive rule in this file — instances of it have been
 worth more than an order of magnitude on individual files.
 
-- **`discriminate` WITH NO ARGUMENT IS ONE OF THEM, AND IT IS THE CHEAPEST FIX
-  IN THIS FILE: NAME THE HYPOTHESIS.** Coq's `discriminate` closes a goal of
-  the form `t1 <> t2` directly, but on any *other* goal it falls back to
-  "try `discriminate H` for every hypothesis `H`" — so inside a whole-function
-  proof it walks hundreds of hypotheses, normalising each, before it can even
-  fail. Measured on `iris/UkShParseExec.v`: an `Ltac` profile of the single
-  sentence
-
-  ```coq
-  destruct i as [| [| [| [| [| [| [| [| i ]]]]]]]];
-    cbn in Hi; try discriminate;
-    injection Hi as Hr Hu0; subst; unfold valsB; rewrite <- He; reflexivity.
-  ```
-
-  reads **98.9 % in nine `discriminate` calls at 0.45 s each** — and eight of
-  the nine were always going to fail (they are the branches where `Hi` is a
-  real `Some _ = Some _`). Writing `try discriminate Hi` takes the sentence to
-  nothing. 35 sites across the sh files were worth **30 s**: `UkShParseExec`
-  40 → 27 s, `UkShParseCmd` 37 → 21 s, `UkShParseRedir` 13.5 → 8 s. Grep is
-  `try discriminate;` and `discriminate.` **not** followed by a name; ~44 such
-  sites remain elsewhere in `iris/` and have not been measured. The same
-  reading applies to a bare `injection` and to `congruence`. Note the
-  contrast with `ltac:(vm_compute; discriminate)`, which is everywhere in
-  this tree and is CHEAP — there the goal really is `t1 <> t2`, so no
-  hypothesis walk happens; do not sweep those.
+- **`discriminate` WITH NO ARGUMENT IS ONE OF THEM: NAME THE HYPOTHESIS.**
+  It closes a goal of the form `t1 <> t2` directly, but on any *other* goal it
+  falls back to "try `discriminate H` for every hypothesis `H`" — inside a
+  whole-function proof that is hundreds of hypotheses, normalised one by one,
+  before it can even fail. So a `try discriminate` in a `destruct i` walk pays
+  the full scan in every branch where it was always going to fail: **~0.45 s
+  each**, and an `Ltac` profile of one such sentence reads 98.9 % in nine of
+  them. `try discriminate Hi` takes the same sentence to nothing (35 sites in
+  the sh files, 30 s; ~44 unmeasured sites remain elsewhere in `iris/`). Grep
+  is `try discriminate;` and `discriminate.` **not** followed by a name; a bare
+  `injection` and `congruence` read the same way. The contrast worth knowing:
+  `ltac:(vm_compute; discriminate)` is everywhere in this tree and is CHEAP,
+  because there the goal really is `t1 <> t2` and no scan happens — do not
+  sweep those.
 
 - **`set_solver` IS FIXED — the tree overrides it, and the old prohibition no
   longer applies.** `iris/FastSetSolver.v` replaces stdpp's `set_solver` tree-wide
@@ -1406,37 +1395,28 @@ whose goal is a raw payload body, that needs a tactic.
     is `rewrite !big_sepL_sep` followed by an `iFrame`.
 - **AND PEEL A `set`-CHAIN BY `eq_trans`, NEVER BY `rewrite /X (lemma …)` —
   a FUNCTION-valued chain makes ssr's keyed matching delta-walk BOTH sides.**
-  `iris/UkShMalloc.v`'s `HPL` read
-  ```coq
-  rewrite /nP (upd_ne nO (Regidx ra_idx) (Regidx q) _ Hra).   (* ×4 *)
-  ```
-  over a sixteen-deep register-file chain, and each of the four cost **ten
-  seconds** — 40 s of a 65 s file, on a goal that prints in one line. The
-  register file here is `regidx -> mword 64` (`RegFile.v`), so
-  `nP !!! Regidx q = nL !!! Regidx q` has the SAME head on both sides;
-  ssr's matcher tries the equation's LHS against the right-hand
-  `nL !!! Regidx q` too and delta-unfolds both towers to discover it does not
-  match. The term form has nothing to search:
+  The register file is `regidx -> mword 64` (`RegFile.v`), so a goal like
+  `nP !!! Regidx q = nL !!! Regidx q` has the same head on both sides: the
+  matcher tries the equation's LHS against the RIGHT-hand occurrence too and
+  delta-unfolds both `set` towers to discover it does not match. At sixteen
+  deep that is **ten seconds per `rewrite`** on a goal that prints in one line
+  (`UkShMalloc`'s `HPL`, 40 s of a 65 s file). The term form has nothing to
+  search — each link unifies against its own `set` definition by one delta
+  step:
   ```coq
   exact (eq_trans (upd_ne nO (Regidx ra_idx) (Regidx q) _ Hra)
         (eq_trans (upd_ne nN (Regidx a0_idx) (Regidx q) _ Ha)
-        (eq_trans (upd_ne nM (Regidx a0_idx) (Regidx q) _ Ha)
-                  (upd_ne nL (Regidx a4_idx) (Regidx q) _ Ha4)))).
+                  (upd_ne nM (Regidx a0_idx) (Regidx q) _ Ha))).
   ```
-  Each link unifies against its own `set` definition by one delta step. The
-  file went 65 → 24 s. The tell that a site has this shape is a `rewrite`
-  whose equation's two sides are both `M !!! k` — i.e. the register-map
-  section's rule read from the `rewrite` side rather than the `set` side.
+  The tell is a `rewrite` whose equation has `M !!! k` on both sides.
 - **A LIST-LOOKUP SIDE PREMISE BELONGS IN A BOOLEAN, NOT IN A `destruct i`.**
   `forall i r u, rs !! i = Some (r, u) -> Regidx q <> Regidx r` over a closed
-  spill list was discharged inline by `intros i r u Hi; destruct i as
-  [| [| … ]]; cbn in Hi; try discriminate; injection …; subst; vm_compute;
-  discriminate` — one `cbn` over the whole list and one `vm_compute` PER
-  ENTRY, and this catalog's lists run to eleven. 4–6 s per site. The boolean
-  form (`UkShParse.ushp_ne_list` / `ushp_ne_of_list` / `ushp_ne_of_list_S`,
-  with the `ushp_ne_vm` closer) is the same fact as ONE `vm_compute` over a
-  closed list: 11 sites, 16 s. Write the `Ltac` OUTSIDE the `Section` — an
-  `Ltac` defined inside one does not survive `End`.
+  list, discharged inline by `destruct i as [| [| … ]]; cbn in Hi; …`, is one
+  `cbn` over the whole list and one `vm_compute` PER ENTRY — 4–6 s per site at
+  an eleven-entry list. State it as `forallb … = true` with a lookup lemma
+  (`UkShParse.ushp_ne_list` / `ushp_ne_of_list`) and it is ONE `vm_compute`.
+  Put the closer `Ltac` OUTSIDE the `Section` — an `Ltac` defined inside one
+  does not survive `End`.
 - **`rewrite !big_sepL_cons` IS WORTH `iEval … in "H"` ONLY WHEN THE TARGET IS
   A HYPOTHESIS.** ssr's `!` repeats over the whole `envs_entails`, so a
   rewrite meant for the goal re-walks every OTHER `[∗ list]` in the context:
@@ -1444,28 +1424,17 @@ whose goal is a raw payload body, that needs a tactic.
   1.7 s as two `iEval (rewrite !big_sepL_cons big_sepL_nil) in "HslA"`.
   Wrapping the GOAL-side sites in `iEval` measured neutral (their cost is the
   `Proper` proofs over the predicate, not the context) — leave those alone.
-- **FIVE THINGS MEASURED NULL OR WORSE ON THE SAME FILES; DO NOT REDO THEM.**
-  (1) `iEval (rewrite !big_sepL_cons big_sepL_nil)` on a GOAL-side site: 1.39 →
-  1.44 s, 3.05 → 2.92 s — noise. (2) Replacing that rewrite with an
-  `iApply ushp_sepL_cons` intro-lemma chain (the "prefer the wand form"
-  rule, applied where the predicate is the cost rather than the context):
-  `UkShParseRedir` **8.0 → 12.4 s**, a clear regression — `iApply` per cons
-  costs more than the setoid step it replaces. (3) The `vm_eq`
-  /`vm_cast_no_check` sweep over `UkShDiag`'s 531 `vm_compute; reflexivity`
-  sites: tactic time 34.8 → 34.4 s but **wall 36.03/36.06 → 36.35/36.67 s**,
-  i.e. a small regression — the proofmode re-elaborates a spliced term, so
-  the cast is re-checked and nothing is saved. This is the counter-example
-  to the `ElfKernel`/`FsImgCheck` rule above: `vm_eq` pays where the sentence
-  is a bare `Lemma … Proof. vm_compute. reflexivity. Qed.`, not where the
-  `vm_compute` is inside an `ltac:` in a proofmode `iApply`. (4) Hoisting
-  nine `ltac:(apply bv_eq; vm_compute; reflexivity)` arguments of a
-  22-premise `iApply` into named `assert`s: 34.4 → 34.9 s. An `Ltac` profile
-  of that one `iApply` reads **98.9 % local to `iPoseProofCore`** — the cost
-  is elaborating a 22-premise lemma against a large Iris context, and no
-  rearrangement of the arguments touches it. That shape is the floor.
-  (5) `cbn [lookup list_lookup] in Hi` instead of a bare `cbn in Hi` in the
-  `destruct i` walks: 40.37 → 40.03 s. The `cbn` was never the cost; the
-  `discriminate` beside it was (see the closer rule above).
+- **`vm_cast_no_check` DOES NOT PAY INSIDE AN `ltac:` IN A PROOFMODE `iApply`,
+  which is the counter-example to the `vm_eq` rule above.** The proofmode
+  re-elaborates a spliced term, so the cast is re-checked and nothing is
+  saved: a sweep of 531 sites in `UkShDiag` moved tactic time 34.8 → 34.4 s
+  and WALL time 36.0 → 36.5 s. `vm_eq` pays where the sentence is a bare
+  `Proof. vm_compute. reflexivity. Qed.`
+- **AN `iApply` OF A LEMMA WITH ~20 PREMISES IS A FLOOR, NOT A BUG.** Its
+  `Ltac` profile is ~99 % *local* to `iPoseProofCore` — elaborating the
+  applied term against a large Iris context — so neither hoisting its inline
+  `ltac:` arguments into named `assert`s nor `unshelve` touches it. Read a
+  4–5 s `iApply` of that shape as paid for, and look elsewhere.
 - **PEEL A CHAIN BY `apply`, NEVER BY `erewrite` — an equation lemma builds an
   `eq_ind_r` motive over the whole remaining term at every step.** `goodb_bind`
   is stated as `goodb D (bind m f) s = goodb D (f x) s`, so
