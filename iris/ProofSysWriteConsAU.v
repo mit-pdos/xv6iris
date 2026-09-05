@@ -929,7 +929,9 @@ Section ProofSysWriteConsAU.
       iDestruct (proc_priv_lend γf pj pidv U fd fv Hlk Hfvnz with "Hpriv")
         as (kk qq stf) "((%Hfvk & %Hkk & %Hty) & Href & Hauth & Hcore & Howe)".
       assert (HS4a0' : S4 !!! Regidx Ra0 = fnode kk) by (rewrite HS4a0; exact Hfvk).
-      iDestruct (write_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
+      iDestruct (fd_st_agree with "Hauth Hfdst") as %Hstf.
+      iDestruct (write_env_frame γf fn stf with "Henv Hdev []") as "[Hfenv Hfback]".
+      { rewrite Hstf /foff_permit_row /=. by iPureIntro. }
       (* ---- THE FD BRIDGE.  The lend hands the reference out at an
          EXISTENTIAL state together with the slot's AUTHORITY; the
          contract's own fragment pins it.  That is the whole of item 3 --
@@ -938,7 +940,6 @@ Section ProofSysWriteConsAU.
          descriptor at the major [ma] the console tie names).  The fragment is
          PURE-consumed here and threaded on: a write moves the offset and
          the bytes, never the descriptor's state. ---- *)
-      iDestruct (fd_st_agree with "Hauth Hfdst") as %Hstf.
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (FilewriteCons.wp_filewrite_cons γf γs j γlp kk qq stf fn pidv U

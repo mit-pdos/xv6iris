@@ -514,7 +514,9 @@ Section SpecFilewrite.
     (match st with
      | FdOpen _ _ FdPipe        => emp
      | FdOpen _ _ (FdDevice mj) => filewrite_dev_env fn mj
-     | FdOpen _ _ (FdInode _ _)   => filewrite_fs_env γf fn
+     (* ...and the OFFSET PERMIT on an inode descriptor -- see
+        [SpecFileread.fileread_env] *)
+     | FdOpen _ _ (FdInode _ γo) => filewrite_fs_env γf fn ∗ off_permit γo
      | FdClosed             => emp
      end)%I.
 
@@ -545,7 +547,7 @@ Section SpecFilewrite.
   Proof.
     rewrite /filewrite_env /filewrite_env_out.
     destruct st as [|? ? [? ?| |?]]; try by iIntros "$".
-    iApply filewrite_fs_env_out.
+    iIntros "[H _]". iApply (filewrite_fs_env_out with "H").
   Qed.
 
   (* A file that is neither a pipe, nor a device, nor an inode costs its

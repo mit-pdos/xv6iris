@@ -1093,7 +1093,9 @@ share was invalid).
 
 - **Two halves, and they are SPLIT.**  `fd_st_auth γ fd st` rides with the
   array inside `ofile_slot`; `fd_st γ fd st` lives in `FdSlots.fd_frags`, a
-  whole-array bundle that travels BESIDE the process block.  Both are the same
+  whole-array bundle that travels BESIDE the process block (and carries, per
+  row, the process's half of an inode file's offset shadow in an existential
+  invariant — `file-table.md`, "The offset SHADOW").  Both are the same
   `1/2`-fraction resource, so either alone PINS the state (`fd_st_agree`) and
   neither alone can move it — an update needs both (`fd_st_move`, the form
   every site actually has them in).  That is exactly the power wanted: the

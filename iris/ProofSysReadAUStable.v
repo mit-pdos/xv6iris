@@ -132,10 +132,10 @@ Section ProofStable.
     intros Γfs nn Hnn pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2
            Hrp Hdq Heb Hargfd.
     iIntros "Hcg Hcpu Htext Hdata Hpc Hpenv Hpriv Hkenv Hprocs Henv Hci
-             Hfdst [Hn Hcm] Hcont".
+             Hfdst #Hperm [Hn Hcm] Hcont".
     iApply (HW Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hrp Hdq Heb Hargfd
               with "Hcg Hcpu Htext Hdata Hpc Hpenv Hpriv Hkenv Hprocs Henv
-                    Hci Hfdst [Hn Hcm]").
+                    Hci Hfdst Hperm [Hn Hcm]").
     (* MOVE 2: the client's share is spent HERE, once, and rides inside every
        receipt from now on. *)
     { iApply (arf_pin_compose with "Hn Hcm"). }

@@ -716,9 +716,9 @@ Section KforkB3Proof.
            caller handed in -- so this is where "a copy of the pointers"
            becomes "a copy of the TABLE". *)
         iDestruct (fd_frags_acc (pv_fdg (us_V Up)) stsP i stp HstpL with "Hpfrag")
-          as "[Hpfr Hpfrback]".
+          as "(Hpfr & #Hprow & Hpfrback)".
         iDestruct (fd_st_agree with "Hst Hpfr") as %Heqst. subst stp.
-        iDestruct ("Hpfrback" with "Hpfr") as "Hpfrag".
+        iDestruct ("Hpfrback" with "Hpfr Hprow") as "Hpfrag".
         iEval (rewrite (list_insert_id stsP i stf HstpL)) in "Hpfrag".
         (* the child's slot [i] is CLOSED in the list the scan has built so
            far -- which is what [kfk_at] says at the index it has reached *)
@@ -727,10 +727,13 @@ Section KforkB3Proof.
           apply lookup_replicate. split; [reflexivity | unfold NOFILE in *; lia]. }
         iDestruct (fd_frags_acc (pv_fdg (kfk_childV (us_V U0) (pv_ofile (us_V Up)) i))
                      (kfk_at stsP fdt0 i) i FdClosed HcC with "Hcfrag")
-          as "[Hcfr Hcfrback]".
+          as "(Hcfr & _ & Hcfrback)".
         iMod (fd_st_move _ i FdClosed FdClosed stf with "Hst2 Hcfr")
           as "[Hst2 Hcfr]".
-        iDestruct ("Hcfrback" with "Hcfr") as "Hcfrag".
+        (* THE CHILD'S OFFSET ROW IS THE PARENT'S: one file, one shadow, and
+           the parent's entry is persistent -- this is where a forked child
+           inherits its parent's offsets *)
+        iDestruct ("Hcfrback" with "Hcfr Hprow") as "Hcfrag".
         iEval (rewrite (kfk_at_step stsP fdt0 i stf HlenP fdt0_length HstpL Hi))
           in "Hcfrag".
         iDestruct (ofile_slot_file γf _ npa i k (q/2)%Qp stf Hk Hty

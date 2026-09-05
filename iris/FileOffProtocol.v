@@ -107,15 +107,17 @@ Section FileOffProtocol.
   Qed.
   Lemma proto_store_remint (k : nat) :
     wordw_pointsto 4 (a_foff k) (DfracOwn 1) (mword_of_int 0 : mword 32) ==∗
-    ∃ γo : gname, off_resident γo k.
+    ∃ γo : gname, off_resident γo k ∗ off_gv γo (1/2) (bv_unsigned (mword_of_int 0 : mword 32)).
   Proof.
     iIntros "H".
     iMod (off_gv_alloc (bv_unsigned (mword_of_int 0 : mword 32))) as (γo) "Hg".
-    iModIntro. iExists γo. rewrite /off_resident. iExists (mword_of_int 0).
+    iDestruct (off_gv_halves with "Hg") as "[Hk Hu]".
+    iModIntro. iExists γo. iSplitR "Hu"; [| iExact "Hu"].
+    rewrite /off_resident. iExists (mword_of_int 0).
     iSplitL "H".
     { rewrite /wordw_pointsto TsoCtx.ctx_word4_pointsto_unfold.
       change (Z.to_nat 4) with 4%nat. iExact "H". }
-    iFrame "Hg". iPureIntro. exact off_wf_zero.
+    iSplitR; [iPureIntro; exact off_wf_zero | iExact "Hk"].
   Qed.
 
   (* ---- the publish: birth on the re-minted cell, share at mass 1, the L2

@@ -156,6 +156,8 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
 Section MirrorLegs.
   Context {Σ : gFunctors}.
   Context `{!fdslotG Σ}.
+  (* the bundle's offset rows ([FdSlots.foff_rows]) name an invariant *)
+  Context `{!riscvGS Σ, !offboxG Σ}.
 
   (* DESIGN SECTION 5 FACT 1, AT ITS GHOST.  [ProcInv]'s slot-open mint
      runs [FdSlots.fd_st_alloc NOFILE] and reads the fragment side with
@@ -201,6 +203,8 @@ Section MirrorHomes.
   Context `{XI : CurCtx}.
   Context `{!ghost_varG Σ umirror}.
   Context `{!fdslotG Σ}.
+  (* the bundle's offset rows ([FdSlots.foff_rows]) name an invariant *)
+  Context `{!riscvGS Σ, !offboxG Σ}.
   Context `{!fsLinkG Σ, !fsTopG Σ}.
   Implicit Types Γ : fs_view_names Σ.
 
@@ -360,6 +364,7 @@ Section MirrorMint.
   Context {Σ : gFunctors}.
   Context `{XI : CurCtx}.
   Context `{!ghost_varG Σ umirror}.
+  Context `{!riscvGS Σ, !offboxG Σ}.
   Context `{!fdslotG Σ}.
   Context `{!fsLinkG Σ, !fsTopG Σ}.
   Implicit Types Γ : fs_view_names Σ.
@@ -470,7 +475,7 @@ End MirrorMint.
 (* ===================================================================== *)
 
 Section MirrorPark.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, !offboxG Σ}.
   Context `{!ufdG Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.

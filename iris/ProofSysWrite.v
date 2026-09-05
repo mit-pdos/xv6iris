@@ -330,9 +330,10 @@ Section ProofSysWrite.
   (* =================================================================== *)
   Lemma wp_sys_write_sconf
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
-      (fn : fwrite_names) (pidv : mword 32) (U : ustate) (v v2 : mword 64)
+      (fn : fwrite_names) (pidv : mword 32) (U : ustate) (sts : list fdstate)
+      (v v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_sys_write_sconf_body γf γs j γlp fn pidv U v v2 m av eb b lks.
+    : wp_sys_write_sconf_body γf γs j γlp fn pidv U sts v v2 m av eb b lks.
   Proof.
     cbv beta delta [wp_sys_write_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Hfj Hfprocs
@@ -361,7 +362,7 @@ Section ProofSysWrite.
     (* [KvmSpec.kalloc_env γa None] IS PERSISTENT (durable-notes.md): filewrite
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv #Hkenv #Hprocs Henv #Hcaps #Htbl Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv Hufrag #Hkenv #Hprocs Henv #Hcaps #Htbl Hcont".
     (* THE DEVICE COLUMN, PROJECTED out of the console table.  The CAPS are
        separate -- consolewrite drives the UART, so they are [dev_inv] and
        the tx lock, both from [printk_env] -- and both halves are persistent,
@@ -816,7 +817,7 @@ Section ProofSysWrite.
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension *)
       iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U))
-                with "[%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
+                with "[%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hufrag Hkenv [Henv]").
       { exact Hcsf. }
       { apply uptd_ext_sz_refl. }
       { left. split; [reflexivity | exact Hnone]. }
@@ -944,7 +945,20 @@ Section ProofSysWrite.
       iDestruct (proc_priv_lend γf pj pidv U fd fv Hlk Hfvnz with "Hpriv")
         as (kk qq stf) "((%Hfvk & %Hkk & %Hty) & Href & Hauth & Hcore & Howe)".
       assert (HS4a0' : S4 !!! Regidx Ra0 = fnode kk) by (rewrite HS4a0; exact Hfvk).
-      iDestruct (write_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
+      (* THE ROW: the loaned descriptor's authority names its state, the
+         bundle yields that row's fragment and offset entry, and the bundle
+         goes back on the nose -- this call moves no descriptor. *)
+      iDestruct (fd_frags_len with "Hufrag") as %Hstslen.
+      assert (Hstqx : is_Some (sts !! fd))
+        by (apply lookup_lt_is_Some_2; rewrite Hstslen; exact Hfdlt).
+      destruct Hstqx as [stq Hstq].
+      iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd stq Hstq with "Hufrag")
+        as "(Hfr & #Hrow & Hfrback)".
+      iDestruct (fd_st_agree with "Hauth Hfr") as %<-.
+      iDestruct ("Hfrback" with "Hfr Hrow") as "Hufrag".
+      iEval (rewrite (list_insert_id sts fd stf Hstq)) in "Hufrag".
+      iDestruct (foff_row_permit with "Hrow") as "#Hprow".
+      iDestruct (write_env_frame γf fn stf with "Henv Hdev Hprow") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Filewrite.wp_filewrite_sconf γf γs j γlp kk qq stf fn pidv U
@@ -1002,7 +1016,7 @@ Section ProofSysWrite.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mg rv P'
-                with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv").
+                with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hufrag Hkenv Henv").
       { exact Hcsg. }
       { exact Hupt. }
       { right. exists fd, fv. split; [exact Hsome | exact Hrvok]. }

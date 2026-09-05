@@ -548,7 +548,7 @@ Section ProcInv.
                  ltac:(intros j _; reflexivity) with "Ho") as "[Hslot _]".
     rewrite (ofile_lent_or_slot_out γf γd pa D fd v Hout).
     iDestruct (fd_frags_acc_lt γd sts fd HfdN with "Hfr")
-      as (st) "(%Hst & Hfrag & _)".
+      as (st) "(%Hst & Hfrag & _ & _)".
     iDestruct (ofile_slot_agree with "Hfrag Hslot") as %[[Hz _] | [_ Hne]];
       [ contradiction (Hnn Hz) | ].
     iPureIntro. rewrite Hst. intros Hc. apply Hne. by injection Hc.
@@ -605,7 +605,7 @@ Section ProcInv.
        fs !! j = Some v -> sts !! j = Some st ->
        (v = (zero_reg : mword 64) <-> st = FdClosed)⌝.
   Proof.
-    iIntros "[_ Ho] [_ Hs]".
+    iIntros "[_ Ho] (_ & Hs & _)".
     iApply (ofile_slots_states_agree γf γd pa 0%nat fs sts with "[Ho] [Hs]").
     - iApply (big_sepL_mono with "Ho"). intros i v _. by rewrite Nat.add_0_l.
     - iApply (big_sepL_mono with "Hs"). intros i st _. by rewrite Nat.add_0_l.

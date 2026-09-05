@@ -335,7 +335,7 @@ Section ProofSysWriteAU.
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
     iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv #Hkenv #Hprocs Henv #Hcaps #Htbl
-             Hfdst Hbundle Hcont".
+             Hfdst #Hperm Hbundle Hcont".
     (* THE DEVICE COLUMN, PROJECTED out of the console table.  The CAPS are
        separate -- consolewrite drives the UART, so they are [dev_inv] and
        the tx lock, both from [printk_env] -- and both halves are persistent,
@@ -905,7 +905,9 @@ Section ProofSysWriteAU.
       iDestruct (proc_priv_lend γf pj pidv U fd fv Hlk Hfvnz with "Hpriv")
         as (kk qq stf) "((%Hfvk & %Hkk & %Hty) & Href & Hauth & Hcore & Howe)".
       assert (HS4a0' : S4 !!! Regidx Ra0 = fnode kk) by (rewrite HS4a0; exact Hfvk).
-      iDestruct (write_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
+      iDestruct (fd_st_agree with "Hauth Hfdst") as %Hstf.
+      iDestruct (write_env_frame γf fn stf with "Henv Hdev [Hperm]") as "[Hfenv Hfback]".
+      { rewrite Hstf /foff_permit_row /=. iExact "Hperm". }
       (* ---- THE FD BRIDGE.  The lend hands the reference out at an
          EXISTENTIAL state together with the slot's AUTHORITY; the
          contract's own fragment pins it.  That is the whole of item 3 --
@@ -914,7 +916,6 @@ Section ProofSysWriteAU.
          descriptor at the [i] the receipts speak about).  The fragment is
          PURE-consumed here and threaded on: a write moves the offset and
          the bytes, never the descriptor's state. ---- *)
-      iDestruct (fd_st_agree with "Hauth Hfdst") as %Hstf.
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (FilewriteAU.wp_filewrite_au γf γs j γlp kk qq stf fn pidv U

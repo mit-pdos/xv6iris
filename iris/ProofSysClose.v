@@ -900,10 +900,10 @@ Section ProofSysClose.
         by (apply lookup_lt_is_Some_2; rewrite Hstslen; unfold NOFILE in *; lia).
       destruct Hstq as [stq Hstq].
       iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd stq Hstq with "Hfrag")
-        as "[Hfr Hfrback]".
+        as "(Hfr & _ & Hfrback)".
       iMod (fd_st_move _ fd stf stq FdClosed with "Hst Hfr")
         as "[Hst Hfr]".
-      iDestruct ("Hfrback" with "Hfr") as "Hfrag".
+      iDestruct ("Hfrback" with "Hfr []") as "Hfrag"; [iApply foff_row_closed |].
       iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpbare [Hcell Hfdslot Hst]")
         as "Hpriv".
       { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hfdslot Hst". }

@@ -392,19 +392,29 @@ Section ProofSysOpenBody.
     (* ...and, on the FD_INODE arm, the OFFSET SHADOW is minted here, fresh
        per publish, at the stored word's value: the box is born holding the
        cell and its ghost together. *)
+    (* ...ONE HALF INTO THE BOX, THE OTHER TO THE PROCESS: the kernel keeps
+       the half the header owns; the user half goes into the existential
+       invariant the descriptor's row will carry ([FdSlots.foff_row]) --
+       this process is managed by the generic user-mode WP and lets the
+       kernel move its offsets freely (OffGv.v's header). *)
     iAssert (|={⊤}=> own_context cur_ctx ∗ off_rows off_cfg kk cur_ctx ∗
                ∃ (γb : box_names) (γo : gname),
-                 if bool_decide (fc_type C = FD_INODE)
-                 then off_fd kf 1 γb γo C else off_free kf 1)%I
-      with "[Hrun Hrows Hfoff]" as ">(Hrun & Hrows & %γb & %γo & Hcoff)".
+                 (if bool_decide (fc_type C = FD_INODE)
+                  then off_fd kf 1 γb γo C else off_free kf 1) ∗
+                 (if bool_decide (fc_type C = FD_INODE)
+                  then off_user_inv γo else True))%I
+      with "[Hrun Hrows Hfoff]" as ">(Hrun & Hrows & %γb & %γo & Hcoff & #Huinv)".
     { destruct (bool_decide (fc_type C = FD_INODE)) eqn:Hbd.
       - apply bool_decide_eq_true_1 in Hbd.
         iMod (off_gv_alloc (bv_unsigned voff)) as (γo) "Hgv".
+        iDestruct (off_gv_halves with "Hgv") as "[Hgk Hgu]".
         iMod (so_deposit ⊤ kk kf γo C ltac:(solve_ndisj) Hkk Hip Hbd
-                with "Hrun [Hfoff Hgv] Hrows") as "(Hrun & Hrows & %γb & Hfd)".
-        { iExists voff. iFrame "Hfoff Hgv". iPureIntro. exact (Hwf Hbd). }
-        iModIntro. iFrame "Hrun Hrows". iExists γb, γo. iExact "Hfd".
-      - iModIntro. iFrame "Hrun Hrows". iExists inhabitant, 1%positive. iExact "Hfoff". }
+                with "Hrun [Hfoff Hgk] Hrows") as "(Hrun & Hrows & %γb & Hfd)".
+        { iExists voff. iFrame "Hfoff Hgk". iPureIntro. exact (Hwf Hbd). }
+        iMod (off_user_inv_alloc ⊤ γo _ with "Hgu") as "#Huinv".
+        iModIntro. iFrame "Hrun Hrows". iExists γb, γo. iFrame "Huinv". iExact "Hfd".
+      - iModIntro. iFrame "Hrun Hrows". iExists inhabitant, 1%positive.
+        iSplitL; [iExact "Hfoff" | by iPureIntro]. }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iRename "Hrows" into "Hoffr".
     iModIntro.
@@ -470,7 +480,7 @@ Section ProofSysOpenBody.
       by (apply lookup_lt_is_Some_2; rewrite Hstslen; exact Hfdlt).
     destruct Hstqx as [stq Hstq].
     iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd stq Hstq with "Hfrag")
-      as "[Hfr Hfrback]".
+      as "(Hfr & _ & Hfrback)".
     (* THE SLOT WAS FREE, LEARNED FROM THE TWO HALVES.  fdalloc handed its
        authority back still at [FdClosed] and the bundle just yielded the
        matching fragment, so [fd_st_agree] identifies [stq] -- and that is
@@ -482,7 +492,10 @@ Section ProofSysOpenBody.
     iMod (proc_priv_settle gf (proc_addr jx) pidv U fd kf 1 stpub FdClosed stq
                  Hfdlt Hlen Hkf (fdstate_ok_open _ _ C stpub Hokpub (or_intror Htyor))
                  with "Hcore Howe Href Hauth Hfr") as "[Hpriv Hfr]".
-    iDestruct ("Hfrback" with "Hfr") as "Hfrag".
+    (* the new row's offset entry: the user half's invariant on the inode
+       arm, nothing on the device arm -- read off the publish's tie *)
+    iDestruct ("Hfrback" with "Hfr [Huinv]") as "Hfrag".
+    { iApply (foff_row_of_ok _ _ _ _ Hokpub with "Huinv"). }
     iModIntro.
     (* the published state IS an [FdOpen] -- which mode and which type is
        the omode argument's and the inode's business, not the table's *)

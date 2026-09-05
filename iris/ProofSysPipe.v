@@ -1847,7 +1847,7 @@ Section ProofSysPipe.
        [FdClosed] and the pipe end makes it [FdOpen _ _ FdPipe], at the
        flags that say which end it is. *)
     iDestruct (fd_frags_acc_lt (pv_fdg (us_V U)) _ fd0 Hfd0N with "Hfrag")
-      as (stq0) "[%Hlkstq0 [Hfr0 Hfrback0]]".
+      as (stq0) "(%Hlkstq0 & Hfr0 & _ & Hfrback0)".
     (* the slot fdalloc handed out is FREE, so its fragment is closed --
        which is what makes the failure tails' re-null the IDENTITY on
        the table, and hence what lets the failure arm say [sts]
@@ -1857,7 +1857,7 @@ Section ProofSysPipe.
                  (FdOpen true false FdPipe) FdClosed FdClosed
                  Hfd0N Hlen1 Hk0lt ltac:(discriminate)
                  with "Hcore Hof Href0 Hauth0 Hfr0") as "[Hpriv Hfr0]".
-    iDestruct ("Hfrback0" with "Hfr0") as "Hfrag".
+    iDestruct ("Hfrback0" with "Hfr0 []") as "Hfrag"; [iApply foff_row_pipe |].
     destruct (sp_fd_range fd0 Hfd0N) as [Hfd0b16 Hfd0b31].
     iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x3c))
               (mword_of_int 140 : mword 13) Ra0 Y0 (av - 8)%nat b
@@ -2040,10 +2040,10 @@ Section ProofSysPipe.
       (* the descriptor is nulled again on this failure path, so its state
          goes back to [FdClosed] -- out of the bundle, like every retype. *)
       iDestruct (fd_frags_acc_lt (pv_fdg (us_V U)) _ fd0 Hfd0N with "Hfrag")
-        as (stqx) "[%Hlkstqx [Hfrx Hfrbackx]]".
+        as (stqx) "(%Hlkstqx & Hfrx & _ & Hfrbackx)".
       iMod (fd_st_move _ fd0 st0' stqx FdClosed with "Hst0 Hfrx")
         as "[Hst0 Hfrx]".
-      iDestruct ("Hfrbackx" with "Hfrx") as "Hfrag".
+      iDestruct ("Hfrbackx" with "Hfrx []") as "Hfrag"; [iApply foff_row_closed |].
       iDestruct ("Hback" $! (zero_reg : mword 64) with "[Hcell Hu0 Hst0]") as "Hpriv".
       { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hu0 Hst0". }
       rewrite (sp_us_ofile_restore U fd0 (fnode k0) Hfree0).
@@ -2130,7 +2130,7 @@ Section ProofSysPipe.
       by (rewrite upd_ofile_length; exact Hlen2).
     (* ...and the second's, out of the same bundle *)
     iDestruct (fd_frags_acc_lt (pv_fdg (us_V U)) _ fd1 Hfd1N with "Hfrag")
-      as (stq1) "[%Hlkstq1 [Hfr1 Hfrback1]]".
+      as (stq1) "(%Hlkstq1 & Hfr1 & _ & Hfrback1)".
     (* the slot fdalloc handed out is FREE, so its fragment is closed --
        which is what makes the failure tails' re-null the IDENTITY on
        the table, and hence what lets the failure arm say [sts]
@@ -2140,7 +2140,7 @@ Section ProofSysPipe.
                  1%Qp (FdOpen false true FdPipe) FdClosed FdClosed Hfd1N Hlen2' Hk1lt
                  ltac:(discriminate)
                  with "Hcore Hof Href1 Hauth1 Hfr1") as "[Hpriv Hfr1]".
-    iDestruct ("Hfrback1" with "Hfr1") as "Hfrag".
+    iDestruct ("Hfrback1" with "Hfr1 []") as "Hfrag"; [iApply foff_row_pipe |].
     destruct (sp_fd_range fd1 Hfd1N) as [Hfd1b16 Hfd1b31].
     iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x4c))
               (mword_of_int 104 : mword 13) Ra0 U0 (av - 8)%nat b
@@ -2526,10 +2526,10 @@ Section ProofSysPipe.
       { iApply (spi_8c with "Htext"). }
       iIntros (CID63 Hcr63 E2) "%HE2thr Hcg Hpc Hcell".
       iDestruct (fd_frags_acc_lt (pv_fdg (us_V U)) _ fd0 Hfd0N with "Hfrag")
-        as (stqz) "[%Hlkstqz [Hfrz Hfrbackz]]".
+        as (stqz) "(%Hlkstqz & Hfrz & _ & Hfrbackz)".
       iMod (fd_st_move _ fd0 st0' stqz FdClosed with "Hst0 Hfrz")
         as "[Hst0 Hfrz]".
-      iDestruct ("Hfrbackz" with "Hfrz") as "Hfrag".
+      iDestruct ("Hfrbackz" with "Hfrz []") as "Hfrag"; [iApply foff_row_closed |].
       iDestruct ("Hback" $! (zero_reg : mword 64) with "[Hcell Hua Hst0]") as "Hpriv".
       { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hua Hst0". }
       (* +0x90 lw a5,-64(s0) -- reload fd1 *)
@@ -2578,10 +2578,10 @@ Section ProofSysPipe.
       { iApply (spi_9c with "Htext"). }
       iIntros (CID65 Hcr65 E4) "%HE4thr Hcg Hpc Hcell1".
       iDestruct (fd_frags_acc_lt (pv_fdg (us_V U)) _ fd1 Hfd1N with "Hfrag")
-        as (stqy) "[%Hlkstqy [Hfry Hfrbacky]]".
+        as (stqy) "(%Hlkstqy & Hfry & _ & Hfrbacky)".
       iMod (fd_st_move _ fd1 st1' stqy FdClosed with "Hst1 Hfry")
         as "[Hst1 Hfry]".
-      iDestruct ("Hfrbacky" with "Hfry") as "Hfrag".
+      iDestruct ("Hfrbacky" with "Hfry []") as "Hfrag"; [iApply foff_row_closed |].
       iDestruct ("Hback1" $! (zero_reg : mword 64) with "[Hcell1 Hub Hst1]") as "Hpriv".
       { rewrite /ofile_slot. iFrame "Hcell1". iLeft. by iFrame "Hub Hst1". }
       rewrite (sp_us_restore_upt U P' _ fd0 fd1 (fnode k0) (fnode k1) Hne01 Hfree0 Hfree1V).

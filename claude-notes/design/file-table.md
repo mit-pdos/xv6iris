@@ -565,11 +565,13 @@ dissolves both horns: it is permanent AND names its inode, so
 payoff — `fslot`'s ξ-dependence is now points-tos and `own`s only, with no
 invariant assertion inside the ftable lock's resource at all.
 
-### The offset SHADOW rides in the box header
+### The offset SHADOW: the kernel's half rides in the box header, the process's half is the descriptor row's
 
-`off_resident γo k := ∃ v, a_foff k ↦₄ v ∗ ⌜off_wf v⌝ ∗ off_gv γo 1 (bv_unsigned v)`
-(`FileOffCell.v`): the boxed header owns, WHOLE, a `ghost_var` over `Z` whose
-value is the word.  Rules:
+`off_resident γo k := ∃ v, a_foff k ↦₄ v ∗ ⌜off_wf v⌝ ∗ off_gv γo (1/2) (bv_unsigned v)`
+(`FileOffCell.v`, the ghost's home is `OffGv.v`): the boxed header owns ONE
+HALF of a `ghost_var` over `Z` whose value is the word.  The other half is
+the process's, and an offset advance therefore needs the process's leave.
+Rules:
 
 - **The name is the descriptor's business.**  `γo` is `FdSlots.FdInode`'s
   second argument and `fpnames.fp_ooff`; `fdstate_ok`'s FD_INODE arm ties the
@@ -581,16 +583,50 @@ value is the word.  Rules:
   tail's arms are stated at `t`); dropped by the last close's hook inside
   `OffBox.off_last_close`.  A dead name says nothing about the slot's next
   file, which has a fresh one.
-- **The ghost moves only at a checkin.**  A checkout takes cell and ghost
-  out together; `off_resident_intro` puts them back at the new word and is
-  the ONE `ghost_var_update`.  Nothing else reads or writes the shadow.
+- **The ghost moves only at a checkin, with the process's permit.**  A
+  checkout takes cell and kernel half out together; `off_resident_intro`
+  puts them back at the new word, using `off_permit γo`
+  (`□ ∀ z z', off_gv γo ½ z ={⊤}=∗ off_gv γo ½ z'`) to move the halves.  It
+  fires at ⊤ BEFORE the box is opened, so the two invariants never nest.
+  Nothing else reads or writes the shadow.
+- **The permit comes through the state-keyed environment.**  `fileread_env`
+  / `filewrite_env`'s `FdInode _ γo` arm is `fs_env ∗ off_permit γo`; the
+  `fr_env_fs` / `fw_env_fs` bridges hand the permit out beside the fs bundle
+  and `fw_loop` takes it as its own premise.  The box's `γo` (the carve's
+  `fp_ooff`) and the permit's (the state's) are identified by
+  `fdstate_ok_inode_names` — two `fdstate_ok` facts about one state name one
+  shadow — which is why `fileread_pay_carve` now also outputs `fdstate_ok`.
+- **The user half of a GENERIC process lives in `fd_frags`'s row family.**
+  `fd_frags γ sts` carries, beside the fragments, `foff_rows sts`: for every
+  `FdOpen _ _ (FdInode _ γo)` row the persistent `off_user_inv γo :=
+  inv foffN (∃ z, off_gv γo ½ z)`, nothing for other rows.  Existential and
+  unconstrained, because a process the generic user-mode WP manages knows
+  nothing of its descriptors — the fs abstract state is discharged the same
+  way, off `syscall_env`'s existential invariant.  Keyed by the STATE, so the
+  family is a function of the list the bundle is already indexed by and every
+  site that threads the bundle opaquely is untouched; `fd_frags_acc`'s closer
+  takes the NEW row's entry, so a retype pays for its row: open mints the
+  invariant from the half `so_publish`'s caller split off (`ProofSysOpen` /
+  `ProofSysOpenAUPub`'s deposit block, `foff_row_of_ok`), dup copies the
+  source's, kfork copies the parent's (`ProofKforkB3`: one file, one shadow,
+  the child inherits it for free), close / pipe / exit owe `True`.  The landed
+  `wp_sys_read_sconf` / `wp_sys_write_sconf` take the bundle in and out
+  unchanged for this row alone (`read_env_frame` / `write_env_frame` take
+  `foff_permit_row st`, derived by `foff_row_permit`).  `fd_frags` is no
+  longer timeless, and nothing needed it to be.
 - **Pin the class.**  `ghost_varG Σ Z` has two members in `xv6G`
   (`offbox_offG`, `uioG`'s break ghost); every statement uses `off_gv`, never
   a bare `ghost_var` at `Z`.
-- **Kernel-whole for now.**  Nothing outside the box holds a fragment; the
-  read/write AU specs take `γo` as a parameter (`FdInode i γo`) and say
-  nothing about it yet.  The next step is a half to the process at open and
-  an offset transition in the read/write AU fupd.
+- **The AU client-facing specs take the permit as a stub.**  `SpecSysReadAU`
+  / `SpecSysWriteAU`'s frames take `off_permit γo` beside their `fd_st`
+  premise and the fileread/filewrite AU bodies get it through the
+  environment.  The next step folds the offset transition into the fs AU
+  commit — fired at the checkin, inside the same `ip->lock` hold, lending the
+  kernel half with the abstract state and returning it advanced by the
+  count, with a receipt tying bytes and offset — and the permit goes away.
+- **A verified process that keeps its half** needs a per-row POLICY where
+  `foff_row` now puts the invariant; the enriched open row (the fd-row
+  pilot's deposit disjunct) is where that choice is made.  Not built.
 
 ## The pid fraction lives in the KERNEL arm — `SpecReadi` / `SpecWritei`
 

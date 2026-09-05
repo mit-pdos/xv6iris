@@ -768,6 +768,10 @@ Definition wp_sys_read_au_frame
   (* THE FD SIDE's resource half: the caller's own fragment -- open,
      READABLE, an inode descriptor at inum [i] *)
   fd_st (pv_fdg (us_V U)) fd (FdOpen true wb (FdInode i γo)) -∗
+  (* ...AND ITS OFFSET PERMIT: the kernel holds half of the offset's shadow
+     and fileread moves it with the client's leave.  The receipt-free stub
+     of the offset transition the AU commit below will carry (OffGv.v). *)
+  off_permit γo -∗
   (* ---- THE AU SIDE (the one addition to the landed premise list) ---- *)
   EXTRA -∗
   wp_next true pj (fun (CID : CpuId) =>

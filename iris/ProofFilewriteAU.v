@@ -1478,9 +1478,10 @@ Section ProofFilewriteAU.
   Local Lemma fw_env_fs (gf' : gname) (fn' : fwrite_names)
       (st' : fdstate) (Cf' : fcontent) (inum : mword 32) (γo : gname) :
     fdstate_ok inum γo Cf' st' -> fc_type Cf' = FD_INODE ->
-    filewrite_env gf' fn' st' -∗ filewrite_fs_env gf' fn'.
+    filewrite_env gf' fn' st' -∗ filewrite_fs_env gf' fn' ∗ off_permit γo.
   Proof.
-    intros Hok Ht. destruct (fdstate_ok_inode inum γo Cf' st' Hok Ht) as (? & ? & ->). by iIntros "$".
+    intros Hok Ht. destruct (fdstate_ok_inode inum γo Cf' st' Hok Ht) as (? & ? & ->).
+    rewrite /filewrite_env /=. by iIntros "$".
   Qed.
 
   Local Lemma fw_env_out_fs (fn' : fwrite_names)
@@ -1995,6 +1996,9 @@ Section ProofFilewriteAU.
     BitmapInv.bitmap_inv fsc_fs (fsc_bmapstart) fsc_cov
       fsc_logst (fsc_size) -∗
     (* ---- the EXCLUSIVE half ---- *)
+    (* the process's leave to move the offset's shadow ([OffGv.off_permit]),
+       out of the state-keyed environment's inode arm *)
+    off_permit γx -∗
     filewrite_fs_out fn -∗
     (* ---- AU EDIT (difference 2): the carried commit state ---- *)
     fw_au_raw (fs_gamma_L fsc_fs) nx n (us_M U) (m !!! Regidx Ra1) Φw t p -∗
@@ -2038,7 +2042,7 @@ Section ProofFilewriteAU.
              Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
              Href Hpriv #Hkenv
              #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hclaimsfw #Hescs #Hireg
-             #Hslks #Hdev #Hgeo #Hdlk #Hbm Hout Hau Hcont".
+             #Hslks #Hdev #Hgeo #Hdlk #Hbm #Hperm Hout Hau Hcont".
     (* ---- THE REFERENCE, OPENED, AND THE TWO FIELD FACTS OFF THE STATE ----
        The loop reads [f->type] and [f->writable] off the field cells, so it
        needs equations about the [fcontent] the reference carries -- but not
@@ -2207,7 +2211,7 @@ Section ProofFilewriteAU.
        IS the row the contract's receipts are indexed by ([nx]) -- the sixth
        output is what makes the two the same existential. *)
     pose proof Pst as Pstx. rewrite Hstx in Pstx.
-    destruct Pstx as (_ & _ & _ & Hnum & _).
+    destruct Pstx as (_ & _ & _ & Hnum & Hgo0).
     assert (P3 : IBLOCK inum icfg_ist ∈ fsc_cov)
       by (apply P3q; exact P5).
     assert (P4 : IBLOCK inum icfg_ist
@@ -2778,7 +2782,8 @@ Section ProofFilewriteAU.
     (* ---- CHECK IN the cell and REBUILD the checked-out bundle ---- *)
     iApply fupd_wp.
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (off_resident_intro γo0 kx v2 _ Hwf2 with "Hcell Hgv") as "Hres".
+    iMod (off_resident_intro γo0 kx v2 _ Hwf2 with "Hcell Hgv []") as "Hres".
+    { rewrite -Hgo0. iExact "Hperm". }
     iMod (proto_read_park ⊤ ik kx qx γb0 γo0 Cf mo T0 Tr TsoCtx.cur_ctx
             ltac:(solve_ndisj) P8 P9 Hqmo
             with "Hrun Hres Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")
@@ -3335,7 +3340,7 @@ Section ProofFilewriteAU.
                         Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                         Href Hpriv Hkenv
                         Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hclaimsfw Hescs Hireg
-                        Hslks Hdev Hgeo Hdlk Hbm Hout Hau Hcont").
+                        Hslks Hdev Hgeo Hdlk Hbm Hperm Hout Hau Hcont").
     - (* ====== THE SHORT WRITE (and writei's -1): straight to +0xe2 ======
          Before 31f115a this arm ran its own five restores at +0xea first;
          gcc now sends both loop exits into the tail, which owns them. *)
@@ -4390,7 +4395,7 @@ Section ProofFilewriteAU.
                  assert (Hpos : (0 < n)%Z).
                  { destruct (Z.le_gt_cases n 0) as [Hle | Hgt]; [| exact Hgt].
                    exfalso. rewrite (proj2 (Z.geb_le 0 n) Hle) in Hz0. discriminate. }
-                 iPoseProof (fw_env_fs _ _ st Cf inumx _ Hok Htyi with "Henv") as "Henv".
+                 iPoseProof (fw_env_fs _ _ st Cf inumx _ Hok Htyi with "Henv") as "[Henv #Hperm]".
                  iEval (rewrite /filewrite_fs_env) in "Henv".
                  (* 25 conjuncts, not 31: the six per-inode fields (the two
                     slot facts, the two point geometry facts, the share and
@@ -4440,10 +4445,13 @@ Section ProofFilewriteAU.
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] Hkenv
                                  E8 E9 E10 E11 E12 E13 E14 E26 E15 E16 E17
-                                 E22 E23 E24 E21 [E18 E19 E20 E25] [Hbundle]").
+                                 E22 E23 E24 E21 [Hperm] [E18 E19 E20 E25] [Hbundle]").
                  { rewrite /file_ref /file_fields. iExists Cf.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                  { rewrite HVid. iExact "Hpriv". }
+                 { (* the permit is stated at the payload's shadow name; the
+                      contract's [γo] IS it, by [fdstate_ok] at the pinned state *)
+                   rewrite Hgxeq. iExact "Hperm". }
                  { rewrite /filewrite_fs_out.
                    iFrame "E18 E19 E20 E25". }
                  { (* AU EDIT: the bundle, at the loop's entry state *)

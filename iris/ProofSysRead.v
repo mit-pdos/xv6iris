@@ -315,9 +315,10 @@ Section ProofSysRead.
   (* =================================================================== *)
   Lemma wp_sys_read_sconf
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
-      (fn : fread_names) (pidv : mword 32) (U : ustate) (v v1 v2 : mword 64)
+      (fn : fread_names) (pidv : mword 32) (U : ustate) (sts : list fdstate)
+      (v v1 v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_sys_read_sconf_body γf γs j γlp fn pidv U v v1 v2 m av eb b lks.
+    : wp_sys_read_sconf_body γf γs j γlp fn pidv U sts v v1 v2 m av eb b lks.
   Proof.
     cbv beta delta [wp_sys_read_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hrp Hdq Heb.
@@ -337,7 +338,7 @@ Section ProofSysRead.
     (* [KvmSpec.kalloc_env γa None] IS PERSISTENT (durable-notes.md): fileread
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv #Hkenv #Hprocs Henv #Hci Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv Hufrag #Hkenv #Hprocs Henv #Hci Hcont".
     (* THE DEVICE COLUMN, PROJECTED.  What the contract holds is the console
        invariant -- one persistent proposition out of [syscall_env]; what
        fileread asks for is the read column, and this is the projection.  It
@@ -795,7 +796,7 @@ Section ProofSysRead.
          nose. *)
       iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U))
                 0%nat (fun _ => bv_0 8)
-                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hufrag Hkenv [Henv]").
       { exact Hcsf. }
       { apply uptd_ext_sz_refl. }
       { left. split; [reflexivity | exact Hnone]. }
@@ -930,7 +931,20 @@ Section ProofSysRead.
       iDestruct (proc_priv_lend γf pj pidv U fd fv Hlk Hfvnz with "Hpriv")
         as (kk qq stf) "((%Hfvk & %Hkk & %Hty) & Href & Hauth & Hcore & Howe)".
       assert (HS4a0' : S4 !!! Regidx Ra0 = fnode kk) by (rewrite HS4a0; exact Hfvk).
-      iDestruct (read_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
+      (* THE ROW: the loaned descriptor's authority names its state, the
+         bundle yields that row's fragment and offset entry, and the bundle
+         goes back on the nose -- this call moves no descriptor. *)
+      iDestruct (fd_frags_len with "Hufrag") as %Hstslen.
+      assert (Hstqx : is_Some (sts !! fd))
+        by (apply lookup_lt_is_Some_2; rewrite Hstslen; exact Hfdlt).
+      destruct Hstqx as [stq Hstq].
+      iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd stq Hstq with "Hufrag")
+        as "(Hfr & #Hrow & Hfrback)".
+      iDestruct (fd_st_agree with "Hauth Hfr") as %<-.
+      iDestruct ("Hfrback" with "Hfr Hrow") as "Hufrag".
+      iEval (rewrite (list_insert_id sts fd stf Hstq)) in "Hufrag".
+      iDestruct (foff_row_permit with "Hrow") as "#Hprow".
+      iDestruct (read_env_frame γf fn stf with "Henv Hdev Hprow") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Fileread.wp_fileread_sconf γf γs j γlp kk qq stf fn pidv U
@@ -995,7 +1009,7 @@ Section ProofSysRead.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mg rv P' dw bsw
-                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv").
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hufrag Hkenv Henv").
       { exact Hcsg. }
       { exact Hupt. }
       { right. exists fd, fv. split; [exact Hsome | exact Hrvok]. }

@@ -240,19 +240,23 @@ Section SpecSysRead.
      neither bundle mentions the content: the syscall owns both, fileread's
      type test decides which is consumed, and either way both come back.
      ([SpecFileclose.fileclose_env_frame] is the same move one stage down.) *)
+  (* ...PLUS THE STATE'S OFFSET OBLIGATION ([FdSlots.foff_permit_row]: the
+     permit on an inode row, nothing otherwise).  The landed dispatcher reads
+     it off the process's descriptor bundle ([FdSlots.fd_frags]'s row,
+     [foff_row_permit]); an AU client supplies the permit itself. *)
   Lemma read_env_frame (γf : gname) (fn : fread_names) (st : fdstate) :
-    fileread_fs_env γf fn -∗ fileread_devsw fn -∗
+    fileread_fs_env γf fn -∗ fileread_devsw fn -∗ foff_permit_row st -∗
     fileread_env γf fn st ∗
     (fileread_env_out fn st -∗ fileread_fs_out fn ∗ fileread_devsw fn).
   Proof.
-    iIntros "Hfs Hdev". rewrite /fileread_env /fileread_env_out.
-    destruct st as [|? ? [?| |mj]].
+    iIntros "Hfs Hdev #Hrow". rewrite /fileread_env /fileread_env_out /foff_permit_row.
+    destruct st as [|? ? [? ?| |mj]].
     { (* CLOSED -- the panic arm; argfd never hands one over, but the
          environment is total. *)
       iSplitR; [done|]. iIntros "_".
       iDestruct (fileread_fs_env_out with "Hfs") as "$". iFrame "Hdev". }
-    { (* an INODE: the fs half goes, the column stays *)
-      iSplitL "Hfs"; [iExact "Hfs"|]. iIntros "$". iFrame "Hdev". }
+    { (* an INODE: the fs half and the permit go, the column stays *)
+      iSplitL "Hfs"; [iFrame "Hfs Hrow"|]. iIntros "$". iFrame "Hdev". }
     { (* a PIPE: nothing is asked for, and the fs half must still answer
          [fileread_fs_out] -- which it does, [fileread_fs_env_out]. *)
       iSplitR; [done|]. iIntros "_".
@@ -274,6 +278,7 @@ Definition wp_sys_read_sconf_body
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (fn : fread_names)                           (* the file system's ghosts *)
     (pidv : mword 32) (U : ustate)
+    (sts : list fdstate)                         (* the process's descriptor view *)
     (v v1 v2 : mword 64)                         (* syscall arguments 0, 1, 2 *)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_read in
@@ -316,6 +321,14 @@ Definition wp_sys_read_sconf_body
      bundle printk needs.  Persistent, and syscall already holds it. *)
   panic_env -∗
   proc_priv γf pj pidv U -∗
+  (* THE DESCRIPTOR BUNDLE, in and out UNCHANGED: a read moves no descriptor.
+     It is here for its OFFSET ROW ([FdSlots.foff_row]): fileread advances
+     [f->off], the kernel holds only half of the offset's shadow, and the
+     process's half -- parked in the row's existential invariant for a
+     process the generic WP manages -- is what pays fileread's permit
+     ([fileread_env]'s inode arm).  Which row is read off the loaned
+     descriptor's authority ([fd_st_agree]). *)
+  fd_frags (pv_fdg (us_V U)) sts -∗
   kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
   (* ...and the file system in the form that does NOT name a file, plus the
@@ -360,6 +373,7 @@ Definition wp_sys_read_sconf_body
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_usM (us_upt U P') (umem_wr (us_M U) v1 d bs)) -∗
+      fd_frags (pv_fdg (us_V U)) sts -∗
       kalloc_env fsc_kalloc None -∗
       (* the file system, back.  fileread's own postcondition returns the
          superblock fraction and the slot unit; everything else in the bundle
@@ -379,8 +393,8 @@ Module Type SYSREAD.
  (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names)
-      (pidv : mword 32) (U : ustate)
+      (pidv : mword 32) (U : ustate) (sts : list fdstate)
       (v v1 v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_sys_read_sconf_body γf γs j γlp fn pidv U v v1 v2 m av eb b lks.
+      wp_sys_read_sconf_body γf γs j γlp fn pidv U sts v v1 v2 m av eb b lks.
 End SYSREAD.

@@ -505,7 +505,11 @@ Section SpecFileread.
     (match st with
      | FdOpen _ _ FdPipe        => emp
      | FdOpen _ _ (FdDevice mj) => fileread_dev_env fn mj
-     | FdOpen _ _ (FdInode _ _)   => fileread_fs_env γf fn
+     (* AN INODE DESCRIPTOR ALSO OWES THE OFFSET PERMIT: fileread advances
+        [f->off], the kernel owns only half of the offset's shadow (OffGv.v),
+        and the process's half is moved by this obligation -- the state
+        names the shadow, so the environment can ask for it here. *)
+     | FdOpen _ _ (FdInode _ γo) => fileread_fs_env γf fn ∗ off_permit γo
      | FdClosed             => emp
      end)%I.
 
@@ -534,7 +538,7 @@ Section SpecFileread.
   Proof.
     rewrite /fileread_env /fileread_env_out.
     destruct st as [|? ? [? ?| |?]]; try by iIntros "$".
-    iApply fileread_fs_env_out.
+    iIntros "[H _]". iApply (fileread_fs_env_out with "H").
   Qed.
 
   (* A file that is neither a pipe, nor a device, nor an inode costs its
@@ -673,6 +677,10 @@ Section SpecFileread.
     file_pay_st γf k q Cf st -∗
     ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16) (lo tl : nat)
       (γb : Xv6Cameras.box_names) (γo : gname),
+      (* the state's tie, read off the SAME payload record as the names
+         below -- what lets a caller identify the box's shadow with the one
+         its environment's permit is about ([fdstate_ok_inode_names]) *)
+      ⌜fdstate_ok inum γo Cf st⌝ ∗
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
       ⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
@@ -704,6 +712,7 @@ Section SpecFileread.
     iDestruct "Hwt" as (ty) "(#Hshot & %Hnd & %Hdv)".
     iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty, lo, tl, (fp_obox pn),
       (fp_ooff pn).
+    iSplitR; [done|].
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [done|].
     iSplitR; [done|]. iSplitR; [iExact "Hfl"|].

@@ -4261,12 +4261,12 @@ Section SyscallArms.
                  with "Hdata Htx Hfsenv Hbs") as "Hfse".
     iApply (SysWrite.wp_sys_write_sconf γf γs j γl
               (sysc_fwrite_names γtxl γs j γl fn)
-              pid U v0 v2 M (av - 4)%nat true true ∅
+              pid U sts v0 v2 M (av - 4)%nat true true ∅
               ltac:(lia) Hj Hgamma Hlen eq_refl eq_refl Hv0
               (ex_intro _ v1 Hv1) Hv2 eq_refl eq_refl eq_refl
-              with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs
+              with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs
                     Hfse Hcaps Htbl").
-    iIntros (CIDy Hsy mf r P') "%Hcs %Hextz %Hret' %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    iIntros (CIDy Hsy mf r P') "%Hcs %Hextz %Hret' %Hmfa0 Hcg Hcpu Hpc Hpriv Hufrag _ Hout".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
@@ -4361,12 +4361,12 @@ Section SyscallArms.
     iDestruct (sysc_fileread_env γf γc (proc_addr j) fn with "Hfsenv Hsl")
       as "[Hfse Hback]".
     iApply (SysRead.wp_sys_read_sconf γf γs j γl (sysc_fread_names γc fn)
-              pid U v0 v1 v2 M (av - 4)%nat true true ∅
+              pid U sts v0 v1 v2 M (av - 4)%nat true true ∅
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 Hv2
               eq_refl eq_refl eq_refl
-              with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs Hfse Hci").
+              with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs Hfse Hci").
     iIntros (CIDy Hsy mf r P' dw bsw)
-      "%Hcs %Hextz %Hret' %Hdwle %Htie %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+      "%Hcs %Hextz %Hret' %Hdwle %Htie %Hmfa0 Hcg Hcpu Hpc Hpriv Hufrag _ Hout".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first

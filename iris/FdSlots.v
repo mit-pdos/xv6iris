@@ -33,6 +33,8 @@ From iris.algebra Require Import auth numbers frac agree gmap.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own.
 Require Import ProcGeom.
+Require Import RiscvPtsto Xv6Cameras.   (* [riscvGS] / [offboxG] -- the classes the offset row binds; IMPORTED, or the binder below generalises them silently *)
+Require Import OffGv.   (* [off_user_inv] / [off_permit] -- the fd row's offset shadow *)
 Local Open Scope Z_scope.
 
 (* param.h: open files per process.  (NPROC comes from ProcGeom.) *)
@@ -479,8 +481,95 @@ Section FdSlots.
      [ProofUserretClosed.Rut_at] for free.  The next increment lifts it OUT
      of that residue so userret can hand it to a verified user program
      instead of parking it. *)
+  (* =================================================================== *)
+  (*  THE OFFSET-SHADOW ROW FAMILY                                        *)
+  (* =================================================================== *)
+  (* Beside each descriptor's FRAGMENT the bundle carries what the process
+     holds of that descriptor's OFFSET: for an FD_INODE row, the user half
+     of the file's offset ghost parked in an existential invariant
+     ([OffGv.off_user_inv] -- the process this bundle belongs to is managed
+     by the generic user-mode WP, knows nothing of its offsets, and lets
+     the kernel move them freely); nothing for a pipe, a device or a closed
+     slot.  PERSISTENT, so a forked child's copy of the table (kfork
+     retypes the child's rows at the parent's list) carries the same
+     invariants at no cost, and a dup of a row carries its source's.
+
+     A ROW, NOT A GNAME: it is keyed by the STATE, so the family is a pure
+     function of the list the bundle is already indexed by, and every site
+     that threads the bundle opaquely is untouched.  The sites that RETYPE
+     a row pay for the new row's entry: open mints the invariant from the
+     half the publish returned; dup copies the source's; close, pipe and
+     kfork's closed rows owe nothing.
+
+     WHAT IS NOT YET HERE: a verified process that keeps its half instead
+     takes a per-row POLICY where this family now takes the invariant; the
+     enriched open row is where that choice will be made. *)
+  Context `{!riscvGS Σ, !offboxG Σ}.
+
+  Definition foff_row (st : fdstate) : iProp Σ :=
+    match st with
+    | FdOpen _ _ (FdInode _ γo) => off_user_inv γo
+    | _ => True
+    end.
+  Global Instance foff_row_persistent st : Persistent (foff_row st).
+  Proof. destruct st as [|? ? [? ?| |?]]; apply _. Qed.
+
+  Lemma foff_row_closed : ⊢ foff_row FdClosed.
+  Proof. done. Qed.
+  Lemma foff_row_pipe (r w : bool) : ⊢ foff_row (FdOpen r w FdPipe).
+  Proof. done. Qed.
+  Lemma foff_row_dev (r w : bool) (mj : Z) : ⊢ foff_row (FdOpen r w (FdDevice mj)).
+  Proof. done. Qed.
+  Lemma foff_row_inode (r w : bool) (i : Z) (γo : gname) :
+    off_user_inv γo -∗ foff_row (FdOpen r w (FdInode i γo)).
+  Proof. iIntros "$". Qed.
+
+  (* the obligation a state's row yields to the file layer ([SpecFileread]'s
+     state-keyed environment): the permit on an inode row, nothing else *)
+  Definition foff_permit_row (st : fdstate) : iProp Σ :=
+    match st with
+    | FdOpen _ _ (FdInode _ γo) => off_permit γo
+    | _ => True
+    end.
+  Global Instance foff_permit_row_persistent st : Persistent (foff_permit_row st).
+  Proof. destruct st as [|? ? [? ?| |?]]; apply _. Qed.
+
+  Lemma foff_row_permit (st : fdstate) : foff_row st -∗ foff_permit_row st.
+  Proof.
+    destruct st as [|? ? [? ?| |?]]; cbn;
+      [by iIntros "_" | | by iIntros "_" | by iIntros "_"].
+    iApply off_user_inv_permit.
+  Qed.
+
+  Definition foff_rows (sts : list fdstate) : iProp Σ :=
+    ([∗ list] st ∈ sts, foff_row st)%I.
+  Global Instance foff_rows_persistent sts : Persistent (foff_rows sts).
+  Proof. rewrite /foff_rows. apply _. Qed.
+
+  Lemma foff_rows_closed (n : nat) : ⊢ foff_rows (replicate n FdClosed).
+  Proof.
+    rewrite /foff_rows. iApply big_sepL_intro. iIntros "!>" (k st Hk).
+    apply lookup_replicate in Hk as [-> _]. iApply foff_row_closed.
+  Qed.
+
+  Lemma foff_rows_lookup (sts : list fdstate) (fd : nat) (st : fdstate) :
+    sts !! fd = Some st -> foff_rows sts -∗ foff_row st.
+  Proof.
+    iIntros (Hfd) "#H". iDestruct (big_sepL_lookup _ _ _ _ Hfd with "H") as "$".
+  Qed.
+
+  Lemma foff_rows_insert (sts : list fdstate) (fd : nat) (st st' : fdstate) :
+    sts !! fd = Some st ->
+    foff_rows sts -∗ foff_row st' -∗ foff_rows (<[fd := st']> sts).
+  Proof.
+    iIntros (Hfd) "#H Hst'". rewrite /foff_rows.
+    iDestruct (big_sepL_insert_acc _ _ _ _ Hfd with "H") as "[_ Hback]".
+    iApply ("Hback" with "Hst'").
+  Qed.
+
   Definition fd_frags (γ : gname) (sts : list fdstate) : iProp Σ :=
-    (⌜length sts = NOFILE⌝ ∗ [∗ list] fd ↦ st ∈ sts, fd_st γ fd st)%I.
+    (⌜length sts = NOFILE⌝ ∗ ([∗ list] fd ↦ st ∈ sts, fd_st γ fd st) ∗
+     foff_rows sts)%I.
 
   (* [fd_frags_any] IS BEING RETIRED, and this note records what it cost.
      The values were existential as a staging decision -- nothing outside
@@ -693,24 +782,33 @@ Section FdSlots.
 
   Definition fd_frags_any (γ : gname) : iProp Σ := (∃ sts, fd_frags γ sts)%I.
 
-  Global Instance fd_frags_timeless γ sts : Timeless (fd_frags γ sts).
-  Proof. apply _. Qed.
+  (* NOT TIMELESS ANY MORE: the row family holds invariants.  Nothing in
+     the tree stripped a later off the bundle. *)
 
   Lemma fd_frags_len γ sts : fd_frags γ sts -∗ ⌜length sts = NOFILE⌝.
-  Proof. iIntros "[$ _]". Qed.
+  Proof. iIntros "($ & _ & _)". Qed.
+
+  Lemma fd_frags_rows γ sts : fd_frags γ sts -∗ foff_rows sts.
+  Proof. iIntros "(_ & _ & $)". Qed.
 
   (* open one descriptor's fragment and close it back at a new state -- the
-     only thing an fd operation ever does to the bundle. *)
+     only thing an fd operation ever does to the bundle.  The row's offset
+     entry comes out with the fragment (persistent), and the closer takes
+     the NEW state's entry: a retype pays for its row. *)
   Lemma fd_frags_acc (γ : gname) (sts : list fdstate) (fd : nat) (st : fdstate) :
     sts !! fd = Some st ->
     fd_frags γ sts -∗
-    fd_st γ fd st ∗ (∀ st', fd_st γ fd st' -∗ fd_frags γ (<[fd := st']> sts)).
+    fd_st γ fd st ∗ foff_row st ∗
+    (∀ st', fd_st γ fd st' -∗ foff_row st' -∗ fd_frags γ (<[fd := st']> sts)).
   Proof.
-    iIntros (Hfd) "[%Hlen Hs]".
-    iDestruct (big_sepL_insert_acc _ _ _ _ Hfd with "Hs") as "[$ Hback]".
-    iIntros (st') "Hst". iSplitR.
+    iIntros (Hfd) "(%Hlen & Hs & #Hrows)".
+    iDestruct (foff_rows_lookup _ _ _ Hfd with "Hrows") as "#Hrow".
+    iDestruct (big_sepL_insert_acc _ _ _ _ Hfd with "Hs") as "[Hst Hback]".
+    iSplitL "Hst"; [iExact "Hst" |]. iSplitR "Hback"; [iExact "Hrow" |].
+    iIntros (st') "Hst Hrow'". iSplitR.
     { iPureIntro. rewrite length_insert. exact Hlen. }
-    iApply ("Hback" with "Hst").
+    iSplitL "Hst Hback"; [iApply ("Hback" with "Hst") |].
+    iApply (foff_rows_insert _ _ _ _ Hfd with "Hrows Hrow'").
   Qed.
 
   (* ...and at the quantified bundle, which is what a syscall actually
@@ -727,8 +825,8 @@ Section FdSlots.
     (fd < NOFILE)%nat ->
     fd_frags γ sts -∗
     ∃ st : fdstate,
-      ⌜sts !! fd = Some st⌝ ∗ fd_st γ fd st ∗
-      (∀ st', fd_st γ fd st' -∗ fd_frags γ (<[fd := st']> sts)).
+      ⌜sts !! fd = Some st⌝ ∗ fd_st γ fd st ∗ foff_row st ∗
+      (∀ st', fd_st γ fd st' -∗ foff_row st' -∗ fd_frags γ (<[fd := st']> sts)).
   Proof.
     iIntros (Hfd) "Hb".
     iDestruct (fd_frags_len with "Hb") as %Hlen.
@@ -741,15 +839,16 @@ Section FdSlots.
   Lemma fd_frags_any_acc (γ : gname) (fd : nat) :
     (fd < NOFILE)%nat ->
     fd_frags_any γ -∗
-    ∃ st : fdstate, fd_st γ fd st ∗ (∀ st', fd_st γ fd st' -∗ fd_frags_any γ).
+    ∃ st : fdstate, fd_st γ fd st ∗ foff_row st ∗
+      (∀ st', fd_st γ fd st' -∗ foff_row st' -∗ fd_frags_any γ).
   Proof.
     iIntros (Hfd) "(%sts & Hb)".
     iDestruct (fd_frags_len with "Hb") as %Hlen.
     assert (Hlk : is_Some (sts !! fd)) by (apply lookup_lt_is_Some_2; lia).
     destruct Hlk as [st Hst].
-    iDestruct (fd_frags_acc γ sts fd st Hst with "Hb") as "[Hst Hback]".
-    iExists st. iFrame "Hst". iIntros (st') "Hst".
-    iExists (<[fd := st']> sts). iApply ("Hback" with "Hst").
+    iDestruct (fd_frags_acc γ sts fd st Hst with "Hb") as "(Hst & #Hrow & Hback)".
+    iExists st. iFrame "Hst Hrow". iIntros (st') "Hst Hrow'".
+    iExists (<[fd := st']> sts). iApply ("Hback" with "Hst Hrow'").
   Qed.
 
   (* THE MINT'S SPLIT.  [fd_st_alloc] produces both halves paired, one per
@@ -779,7 +878,8 @@ Section FdSlots.
     fd_frags γ (replicate NOFILE FdClosed).
   Proof.
     iIntros "H". iSplitR; [iPureIntro; apply length_replicate|].
-    iApply (fd_frags_of_closed_at γ NOFILE 0 with "H").
+    iSplitL; [iApply (fd_frags_of_closed_at γ NOFILE 0 with "H") |].
+    iApply foff_rows_closed.
   Qed.
 
   (* the parcelled-out form the fd table wants: one unit per ARRAY SLOT,

@@ -1034,16 +1034,16 @@ Section ProofSysDup.
       by (apply lookup_lt_is_Some_2; rewrite Hstslen; exact Hfd0N).
     destruct Hst0x as [st0 Hst0].
     iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd0 st0 Hst0 with "Hfrag")
-      as "[Hfr0 Hfrback0]".
+      as "(Hfr0 & #Hrow0 & Hfrback0)".
     iDestruct (fd_st_agree with "Hauth0 Hfr0") as %<-.
-    iDestruct ("Hfrback0" with "Hfr0") as "Hfrag".
+    iDestruct ("Hfrback0" with "Hfr0 Hrow0") as "Hfrag".
     rewrite (list_insert_id sts fd0 stf Hst0).
     (* ...and now the DESTINATION, which is the row that moves *)
     assert (Hst1x : is_Some (sts !! fd1))
       by (apply lookup_lt_is_Some_2; rewrite Hstslen; exact Hfd1N).
     destruct Hst1x as [stq Hst1].
     iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd1 stq Hst1 with "Hfrag")
-      as "[Hfr Hfrback]".
+      as "(Hfr & _ & Hfrback)".
     (* THE DESTINATION SLOT WAS FREE -- fdalloc's authority is still at
        [FdClosed], the bundle yielded the fragment, [fd_st_agree] joins
        them.  [sys_dup_post] exposes it; see [SpecSysOpen]'s note. *)
@@ -1051,7 +1051,8 @@ Section ProofSysDup.
       as "%Hstqcl".
     iMod (fd_st_move _ fd1 FdClosed stq stf with "Hauth1 Hfr")
       as "[Hauth1 Hfr]".
-    iDestruct ("Hfrback" with "Hfr") as "Hfrag".
+    (* the destination's offset row is the SOURCE's: one file, one shadow *)
+    iDestruct ("Hfrback" with "Hfr Hrow0") as "Hfrag".
     iDestruct (proc_ofiles_repay γf (pv_fdg (us_V U)) p (pv_ofile (upd_ofile (us_V U) fd1 (fnode k)))
                  {[fd0]} fd1 k (q/2)%Qp stf
                  ltac:(apply not_elem_of_singleton_2; exact Hne01)

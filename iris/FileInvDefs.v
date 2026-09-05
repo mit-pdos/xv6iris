@@ -669,6 +669,21 @@ Proof.
       (apply (f_equal bv_unsigned) in Hw; vm_compute in Hw; discriminate Hw).
 Qed.
 
+(* TWO NAMES FOR ONE FILE AGREE.  A proof that reads its descriptor's state
+   off two openings of the same payload -- [file_pay_st_ok]'s and the carve's
+   -- has two [fdstate_ok] facts about one [st]; on an inode file they name
+   the same inum and the same offset shadow, since the state records both. *)
+Lemma fdstate_ok_inode_names (inum1 inum2 : mword 32) (γ1 γ2 : gname)
+    (C : fcontent) (st : fdstate) :
+  fdstate_ok inum1 γ1 C st -> fdstate_ok inum2 γ2 C st -> fc_type C = FD_INODE ->
+  bv_unsigned inum1 = bv_unsigned inum2 /\ γ1 = γ2.
+Proof.
+  intros H1 H2 Ht.
+  destruct (fdstate_ok_inode inum1 γ1 C st H1 Ht) as (r1 & w1 & E1).
+  destruct (fdstate_ok_inode inum2 γ2 C st H2 Ht) as (r2 & w2 & E2).
+  rewrite E1 in E2. injection E2 as _ _ Hn Hg. auto.
+Qed.
+
 (* ...and the SHAPE the three per-type readings share: an open descriptor is
    [FdOpen] at some mode and type.  [sys_open]'s post wants exactly this and
    nothing finer -- which mode and which type are facts about the omode
@@ -1916,3 +1931,26 @@ Section FileLiveEq.
     flive_auth_at fsc_fol = flive_own (● (∅ : gmap nat positive)).
   Proof. reflexivity. Qed.
 End FileLiveEq.
+
+(* ==================================================================== *)
+(*  THE DESCRIPTOR BUNDLE'S OFFSET ROW, read off a publish              *)
+(* ==================================================================== *)
+(* What sys_open owes [FdSlots.fd_frags]'s row for the descriptor it fills:
+   the user half's invariant on the FD_INODE arm, nothing on the others.
+   Stated against [fdstate_ok] so the publish can pay it without knowing
+   which arm it took -- the state decides, and the state's shadow name IS
+   the payload's. *)
+Section FoffRow.
+  Context `{!riscvGS Σ, !offboxG Σ}.
+
+  Lemma foff_row_of_ok (inum : mword 32) (γo : gname) (C : fcontent) (st : fdstate) :
+    fdstate_ok inum γo C st ->
+    (if bool_decide (fc_type C = FD_INODE) then off_user_inv γo else True) -∗
+    foff_row st.
+  Proof.
+    intros Hok. destruct st as [|r w [n g| |mj]]; cbn;
+      [by iIntros "_" | | by iIntros "_" | by iIntros "_"].
+    destruct Hok as (_ & _ & Ht & _ & ->).
+    rewrite (bool_decide_eq_true_2 _ Ht). iIntros "$".
+  Qed.
+End FoffRow.

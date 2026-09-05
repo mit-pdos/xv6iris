@@ -132,19 +132,20 @@ Section SpecSysWrite.
      content-independent bundles this contract owns.
      [SpecSysRead.read_env_frame]'s twin, and the whole of what the S4 opener
      was trying to be. *)
+  (* ...PLUS THE STATE'S OFFSET OBLIGATION -- see [SpecSysRead.read_env_frame] *)
   Lemma write_env_frame (γf : gname) (fn : fwrite_names) (st : fdstate) :
-    filewrite_fs_env γf fn -∗ filewrite_devsw fn -∗
+    filewrite_fs_env γf fn -∗ filewrite_devsw fn -∗ foff_permit_row st -∗
     filewrite_env γf fn st ∗
     (filewrite_env_out fn st -∗ filewrite_fs_out fn ∗ filewrite_devsw fn).
   Proof.
-    iIntros "Hfs Hdev". rewrite /filewrite_env /filewrite_env_out.
-    destruct st as [|? ? [?| |mj]].
+    iIntros "Hfs Hdev #Hrow". rewrite /filewrite_env /filewrite_env_out /foff_permit_row.
+    destruct st as [|? ? [? ?| |mj]].
     { (* CLOSED *)
       iSplitR; [done|]. iIntros "_".
       iDestruct (filewrite_fs_env_out with "Hfs") as "Hout".
       iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
-    { (* an INODE *)
-      iSplitL "Hfs"; [iExact "Hfs"|]. iIntros "Hout".
+    { (* an INODE: the fs half and the permit *)
+      iSplitL "Hfs"; [iFrame "Hfs Hrow"|]. iIntros "Hout".
       iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
     { (* a PIPE *)
       iSplitR; [done|]. iIntros "_".
@@ -167,6 +168,7 @@ Definition wp_sys_write_sconf_body
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (fn : fwrite_names)                          (* the file system's ghosts *)
     (pidv : mword 32) (U : ustate)
+    (sts : list fdstate)                         (* the process's descriptor view *)
     (v v2 : mword 64)                            (* syscall arguments 0, 2  *)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_write in
@@ -208,6 +210,9 @@ Definition wp_sys_write_sconf_body
      mints the literal, and this is the console bundle printk needs. *)
   panic_env -∗
   proc_priv γf pj pidv U -∗
+  (* the descriptor bundle, in and out unchanged, for its offset row -- see
+     [SpecSysRead.wp_sys_read_sconf_body] *)
+  fd_frags (pv_fdg (us_V U)) sts -∗
   kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
   (* ...and the file system in the form that does NOT name a file, plus the
@@ -237,6 +242,7 @@ Definition wp_sys_write_sconf_body
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (us_upt U P') -∗
+      fd_frags (pv_fdg (us_V U)) sts -∗
       kalloc_env fsc_kalloc None -∗
       (* the file system, back *)
       filewrite_fs_out fn -∗
@@ -251,8 +257,8 @@ Module Type SYSWRITE.
  (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)
-      (pidv : mword 32) (U : ustate)
+      (pidv : mword 32) (U : ustate) (sts : list fdstate)
       (v v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_sys_write_sconf_body γf γs j γlp fn pidv U v v2 m av eb b lks.
+      wp_sys_write_sconf_body γf γs j γlp fn pidv U sts v v2 m av eb b lks.
 End SYSWRITE.

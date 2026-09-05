@@ -228,9 +228,10 @@ Section ProofFilereadAU.
   Local Lemma fr_env_fs (γf' : gname) (fn' : fread_names)
       (st' : fdstate) (Cf' : fcontent) (inum : mword 32) (γo : gname) :
     fdstate_ok inum γo Cf' st' -> fc_type Cf' = FD_INODE ->
-    fileread_env γf' fn' st' -∗ fileread_fs_env γf' fn'.
+    fileread_env γf' fn' st' -∗ fileread_fs_env γf' fn' ∗ off_permit γo.
   Proof.
-    intros Hok Ht. destruct (fdstate_ok_inode inum γo Cf' st' Hok Ht) as (? & ? & ->). by iIntros "$".
+    intros Hok Ht. destruct (fdstate_ok_inode inum γo Cf' st' Hok Ht) as (? & ? & ->).
+    rewrite /fileread_env /=. by iIntros "$".
   Qed.
 
   Local Lemma fr_env_out_fs (fn' : fread_names)
@@ -952,7 +953,7 @@ Section ProofFilereadAU.
                 BORROW protocol; iunlock. *)
              assert (Htyi : fc_type Cf = FD_INODE)
                by (apply eq_vec_true_iff; exact Hp2).
-             iDestruct (fr_env_fs γf fn st Cf inumx _ Hok Htyi with "Henv") as "Henv".
+             iDestruct (fr_env_fs γf fn st Cf inumx _ Hok Htyi with "Henv") as "[Henv #Hperm]".
              rewrite /fileread_fs_env.
              iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
                                    #Hbio & #Hitbl & #Hclaimsfr & #Hescs &
@@ -974,6 +975,9 @@ Section ProofFilereadAU.
                     #Hshot0 & Hshr0 & Hoh & Hpayback)".
              (* the off output IS the fd's off box handle on this arm *)
              iEval (rewrite (SpecFileread.carve_off_inode _ _ _ _ _ _ Htyi)) in "Hoh".
+             (* the box's shadow IS the one the environment's permit is about *)
+             assert (Hgo : γox = γo0)
+               by exact (proj2 (fdstate_ok_inode_names _ _ _ _ _ _ Hok Hokc Htyi)).
              (* AU EDIT (difference 4): THE INUM BRIDGE.  The carve's
                 [fdstate_ok] output and the contract's premise read the SAME
                 payload record, so the [i] the commit is indexed by IS the
@@ -1566,7 +1570,8 @@ Section ProofFilereadAU.
                 (* CHECK IN the cell, at the value it went out with *)
                 iApply fupd_wp.
                 iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-                iMod (off_resident_intro γo0 k v _ Hwf with "Hoff Hgv") as "Hres".
+                iMod (off_resident_intro γo0 k v _ Hwf with "Hoff Hgv []") as "Hres".
+                { rewrite -Hgo. iExact "Hperm". }
                 iMod (proto_read_park ⊤ ikk k q γb0 γo0 Cf mo T0 Tr TsoCtx.cur_ctx
                         ltac:(solve_ndisj) Hipk Hik Hqmo
                         with "Hrun Hres Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")
@@ -1889,7 +1894,8 @@ Section ProofFilereadAU.
                 iApply fupd_wp.
                 iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
                 iMod (off_resident_intro γo0 k (mword_of_int (bv_unsigned v + Z.of_nat tot))
-                        _ Hwf2 with "Hoff Hgv") as "Hres".
+                        _ Hwf2 with "Hoff Hgv []") as "Hres".
+                { rewrite -Hgo. iExact "Hperm". }
                 iMod (proto_read_park ⊤ ikk k q γb0 γo0 Cf mo T0 Tr TsoCtx.cur_ctx
                         ltac:(solve_ndisj) Hipk Hik Hqmo
                         with "Hrun Hres Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")

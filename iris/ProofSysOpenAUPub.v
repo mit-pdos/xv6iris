@@ -300,19 +300,27 @@ Section ProofSysOpenAUPub.
     iApply fupd_wp.
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iRename "Hoffr" into "Hrows".
+    (* ...ONE HALF INTO THE BOX, THE OTHER TO THE PROCESS (the landed twin's
+       block verbatim, OffGv.v's header): the user half goes into the
+       existential invariant the descriptor's row carries. *)
     iAssert (|={⊤}=> own_context cur_ctx ∗ off_rows off_cfg kk cur_ctx ∗
                ∃ γb : box_names,
-                 if bool_decide (fc_type C = FD_INODE)
-                 then off_fd kf 1 γb g C else off_free kf 1)%I
-      with "[Hrun Hrows Hfoff]" as ">(Hrun & Hrows & %γb & Hcoff)".
+                 (if bool_decide (fc_type C = FD_INODE)
+                  then off_fd kf 1 γb g C else off_free kf 1) ∗
+                 (if bool_decide (fc_type C = FD_INODE)
+                  then off_user_inv g else True))%I
+      with "[Hrun Hrows Hfoff]" as ">(Hrun & Hrows & %γb & Hcoff & #Huinv)".
     { destruct (bool_decide (fc_type C = FD_INODE)) eqn:Hbd.
       - apply bool_decide_eq_true_1 in Hbd.
         iDestruct "Hfoff" as "[Hfoff Hgv]".
+        iDestruct (off_gv_halves with "Hgv") as "[Hgk Hgu]".
         iMod (so_deposit ⊤ kk kf g C ltac:(solve_ndisj) Hkk Hip Hbd
-                with "Hrun [Hfoff Hgv] Hrows") as "(Hrun & Hrows & %γb & Hfd)".
-        { iExists voff. iFrame "Hfoff Hgv". iPureIntro. exact (Hwf Hbd). }
-        iModIntro. iFrame "Hrun Hrows". iExists γb. iExact "Hfd".
-      - iModIntro. iFrame "Hrun Hrows". iExists inhabitant. iExact "Hfoff". }
+                with "Hrun [Hfoff Hgk] Hrows") as "(Hrun & Hrows & %γb & Hfd)".
+        { iExists voff. iFrame "Hfoff Hgk". iPureIntro. exact (Hwf Hbd). }
+        iMod (off_user_inv_alloc ⊤ g _ with "Hgu") as "#Huinv".
+        iModIntro. iFrame "Hrun Hrows". iExists γb. iFrame "Huinv". iExact "Hfd".
+      - iModIntro. iFrame "Hrun Hrows". iExists inhabitant.
+        iSplitL; [iExact "Hfoff" | by iPureIntro]. }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iRename "Hrows" into "Hoffr".
     iModIntro.
@@ -367,13 +375,14 @@ Section ProofSysOpenAUPub.
       by (apply lookup_lt_is_Some_2; rewrite Hlensts; exact Hfdlt).
     destruct Hstqe as [stq Hstq].
     iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd stq Hstq with "Hfrags")
-      as "[Hfr Hfrback]".
+      as "(Hfr & _ & Hfrback)".
     iDestruct (fd_st_agree (pv_fdg (us_V U)) fd FdClosed stq with "Hauth Hfr")
       as "%Hstqcl".
     iMod (proc_priv_settle gf (proc_addr jx) pidv U fd kf 1 stpub FdClosed stq
                  Hfdlt Hlen Hkf (fdstate_ok_open _ _ C stpub Hokpub (or_intror Htyor))
                  with "Hcore Howe Href Hauth Hfr") as "[Hpriv Hfr]".
-    iDestruct ("Hfrback" $! stpub with "Hfr") as "Hfrags".
+    iDestruct ("Hfrback" $! stpub with "Hfr [Huinv]") as "Hfrags".
+    { iApply (foff_row_of_ok _ _ _ _ Hokpub with "Huinv"). }
     iModIntro.
     (* [stpub] IS the typed state the contract names: the two mode cells
        hold the caller's own omode bits ([ProofSysOpenAUBits]) and the type

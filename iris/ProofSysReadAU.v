@@ -335,7 +335,7 @@ Section ProofSysReadAU.
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
     iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv #Hkenv #Hprocs Henv #Hci
-             Hfdst Hau Hcont".
+             Hfdst #Hperm Hau Hcont".
     (* THE DEVICE COLUMN, PROJECTED.  What the contract holds is the console
        invariant -- one persistent proposition out of [syscall_env]; what
        fileread asks for is the read column, and this is the projection.  It
@@ -905,7 +905,9 @@ Section ProofSysReadAU.
       iDestruct (proc_priv_lend γf pj pidv U fd fv Hlk Hfvnz with "Hpriv")
         as (kk qq stf) "((%Hfvk & %Hkk & %Hty) & Href & Hauth & Hcore & Howe)".
       assert (HS4a0' : S4 !!! Regidx Ra0 = fnode kk) by (rewrite HS4a0; exact Hfvk).
-      iDestruct (read_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
+      iDestruct (fd_st_agree with "Hauth Hfdst") as %Hstf.
+      iDestruct (read_env_frame γf fn stf with "Henv Hdev [Hperm]") as "[Hfenv Hfback]".
+      { rewrite Hstf /foff_permit_row /=. iExact "Hperm". }
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       (* ---- THE FD BRIDGE (difference 2).  The lend hands the reference out
@@ -915,7 +917,6 @@ Section ProofSysReadAU.
          (open, READABLE, an inode descriptor at the [i] the receipt speaks
          about).  The fragment is threaded on: a read moves the offset, never
          the descriptor's state. ---- *)
-      iDestruct (fd_st_agree with "Hauth Hfdst") as %Hstf.
       iApply (FilereadAU.wp_fileread_au γf γs j γlp kk qq stf fn pidv U
                 S4 (av - 6)%nat eb (sys_rw_count v2) b
                 _ wb i γo Φr ltac:(lia) Hkk Hj Hgs Hlens

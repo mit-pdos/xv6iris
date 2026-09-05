@@ -471,9 +471,9 @@ Section ProofSysDupAU.
        BACK at the state it came out at, so [sts] is unchanged and both
        postconditions see the source row exactly as handed in. *)
     iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd0 (FdOpen rb wb t) Hrow0
-                 with "Hfrag") as "[Hfr0 Hfr0back]".
+                 with "Hfrag") as "(Hfr0 & #Hofr0 & Hfr0back)".
     iDestruct (fd_st_agree with "Hauth0 Hfr0") as %->.
-    iDestruct ("Hfr0back" $! (FdOpen rb wb t) with "Hfr0") as "Hfrag".
+    iDestruct ("Hfr0back" $! (FdOpen rb wb t) with "Hfr0 Hofr0") as "Hfrag".
     assert (Hins0 : <[fd0 := FdOpen rb wb t]> sts = sts)
       by (apply list_insert_id; exact Hrow0).
     iEval (rewrite Hins0) in "Hfrag".
@@ -774,11 +774,12 @@ Section ProofSysDupAU.
       by (apply lookup_lt_is_Some_2; rewrite Hlensts; exact Hfd1N).
     destruct Hstq1 as [stq Hstq].
     iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd1 stq Hstq with "Hfrag")
-      as "[Hfr Hfrback]".
+      as "(Hfr & _ & Hfrback)".
     iDestruct (fd_st_agree with "Hauth1 Hfr") as %<-.
     iMod (fd_st_move _ fd1 FdClosed FdClosed (FdOpen rb wb t) with "Hauth1 Hfr")
       as "[Hauth1 Hfr]".
-    iDestruct ("Hfrback" $! (FdOpen rb wb t) with "Hfr") as "Hfrag".
+    (* the destination's offset row is the SOURCE's: one file, one shadow *)
+    iDestruct ("Hfrback" $! (FdOpen rb wb t) with "Hfr Hofr0") as "Hfrag".
     iDestruct (proc_ofiles_repay γf (pv_fdg (us_V U)) p (pv_ofile (upd_ofile (us_V U) fd1 (fnode k)))
                  {[fd0]} fd1 k (q/2)%Qp (FdOpen rb wb t)
                  ltac:(apply not_elem_of_singleton_2; exact Hne01)

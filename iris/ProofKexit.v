@@ -872,10 +872,10 @@ Section KexitLoop.
            descriptor moves its state, and the array holds only the
            authority. *)
         iDestruct (fd_frags_any_acc (pv_fdg (us_V U)) fd ltac:(unfold NOFILE in *; lia)
-                     with "Hfrag") as (stq) "[Hfr Hfrback]".
+                     with "Hfrag") as (stq) "(Hfr & _ & Hfrback)".
         iMod (fd_st_move _ fd stf stq FdClosed with "Hst Hfr")
           as "[Hst Hfr]".
-        iDestruct ("Hfrback" with "Hfr") as "Hfrag".
+        iDestruct ("Hfrback" with "Hfr []") as "Hfrag"; [iApply foff_row_closed |].
         iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpbare [Hcell Hfdslot Hst]") as "Hpriv".
         { rewrite /ofile_slot. iSplitL "Hcell"; [iExact "Hcell"|].
           iLeft. iFrame "Hfdslot Hst". done. }

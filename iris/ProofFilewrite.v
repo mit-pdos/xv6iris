@@ -1053,9 +1053,10 @@ Section ProofFilewrite.
   Local Lemma fw_env_fs (gf' : gname) (fn' : fwrite_names)
       (st' : fdstate) (Cf' : fcontent) (inum : mword 32) (γo : gname) :
     fdstate_ok inum γo Cf' st' -> fc_type Cf' = FD_INODE ->
-    filewrite_env gf' fn' st' -∗ filewrite_fs_env gf' fn'.
+    filewrite_env gf' fn' st' -∗ filewrite_fs_env gf' fn' ∗ off_permit γo.
   Proof.
-    intros Hok Ht. destruct (fdstate_ok_inode inum γo Cf' st' Hok Ht) as (? & ? & ->). by iIntros "$".
+    intros Hok Ht. destruct (fdstate_ok_inode inum γo Cf' st' Hok Ht) as (? & ? & ->).
+    rewrite /filewrite_env /=. by iIntros "$".
   Qed.
 
   Local Lemma fw_env_out_fs (fn' : fwrite_names)
@@ -1552,6 +1553,9 @@ Section ProofFilewrite.
     BitmapInv.bitmap_inv fsc_fs (fsc_bmapstart) fsc_cov
       fsc_logst (fsc_size) -∗
     (* ---- the EXCLUSIVE half ---- *)
+    (* the process's leave to move the offset's shadow ([OffGv.off_permit]),
+       out of the state-keyed environment's inode arm *)
+    off_permit γx -∗
     filewrite_fs_out fn -∗
     (* ---- and the contract's own continuation ---- *)
     (* [true], verbatim from [SpecFilewrite]: this IS the contract's crossing,
@@ -1591,7 +1595,7 @@ Section ProofFilewrite.
              Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
              Href Hpriv #Hkenv
              #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hclaimsfw #Hescs #Hireg
-             #Hslks #Hdev #Hgeo #Hdlk #Hbm Hout Hcont".
+             #Hslks #Hdev #Hgeo #Hdlk #Hbm #Hperm Hout Hcont".
     (* ---- THE REFERENCE, OPENED, AND THE TWO FIELD FACTS OFF THE STATE ----
        The loop reads [f->type] and [f->writable] off the field cells, so it
        needs equations about the [fcontent] the reference carries -- but not
@@ -1752,10 +1756,13 @@ Section ProofFilewrite.
        them is re-derived on the next one. ---- *)
     iDestruct (fileread_pay_carve gf kx qx Cf _ (or_introl Htyi) with "Hrpay")
       as (ik inum sh g ty lox tlx γb0 γo0)
-         "(%P8 & %P9 & %P5 & %P10 & %P10d & %Hlex & #Hflx & #Hty & Hshr & Hoh &
+         "(%Pst & %P8 & %P9 & %P5 & %P10 & %P10d & %Hlex & #Hflx & #Hty & Hshr & Hoh &
            Hpayback)".
     (* the off output IS the ledger fragment on this arm *)
     iEval (rewrite (carve_off_inode _ _ _ _ _ _ Htyi)) in "Hoh".
+    (* the box's shadow IS the state's, hence the permit's *)
+    pose proof Pst as Pstx. rewrite Hstx in Pstx.
+    destruct Pstx as (_ & _ & _ & _ & Hgo0).
     assert (P3 : IBLOCK inum icfg_ist ∈ fsc_cov)
       by (apply P3q; exact P5).
     assert (P4 : IBLOCK inum icfg_ist
@@ -2275,7 +2282,8 @@ Section ProofFilewrite.
     (* ---- CHECK IN the cell and REBUILD the checked-out bundle ---- *)
     iApply fupd_wp.
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (off_resident_intro γo0 kx v2 _ Hwf2 with "Hcell Hgv") as "Hres".
+    iMod (off_resident_intro γo0 kx v2 _ Hwf2 with "Hcell Hgv []") as "Hres".
+    { rewrite -Hgo0. iExact "Hperm". }
     iMod (proto_read_park ⊤ ik kx qx γb0 γo0 Cf mo T0 Tr TsoCtx.cur_ctx
             ltac:(solve_ndisj) P8 P9 Hqmo
             with "Hrun Hres Hhold Hd0 Hc0 Hbox0 Hmem0 Hrest")
@@ -2659,7 +2667,7 @@ Section ProofFilewrite.
                         Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                         Href Hpriv Hkenv
                         Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hclaimsfw Hescs Hireg
-                        Hslks Hdev Hgeo Hdlk Hbm Hout Hcont").
+                        Hslks Hdev Hgeo Hdlk Hbm Hperm Hout Hcont").
     - (* ====== THE SHORT WRITE (and writei's -1): straight to +0xe2 ======
          Before 31f115a this arm ran its own five restores at +0xea first;
          gcc now sends both loop exits into the tail, which owns them. *)
@@ -4299,7 +4307,7 @@ Section ProofFilewrite.
                  assert (Hpos : (0 < n)%Z).
                  { destruct (Z.le_gt_cases n 0) as [Hle | Hgt]; [| exact Hgt].
                    exfalso. rewrite (proj2 (Z.geb_le 0 n) Hle) in Hz0. discriminate. }
-                 iPoseProof (fw_env_fs _ _ st Cf inumx _ Hok Htyi with "Henv") as "Henv".
+                 iPoseProof (fw_env_fs _ _ st Cf inumx _ Hok Htyi with "Henv") as "[Henv #Hperm]".
                  iEval (rewrite /filewrite_fs_env) in "Henv".
                  (* 25 conjuncts, not 31: the six per-inode fields (the two
                     slot facts, the two point geometry facts, the share and
@@ -4352,7 +4360,7 @@ Section ProofFilewrite.
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] Hkenv
                                  E8 E9 E10 E11 E12 E13 E14 E26 E15 E16 E17
-                                 E22 E23 E24 E21 [E18 E19 E20 E25]").
+                                 E22 E23 E24 E21 Hperm [E18 E19 E20 E25]").
                  { rewrite /file_ref /file_fields. iExists Cf.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                  { rewrite HVid. iExact "Hpriv". }
