@@ -3465,17 +3465,29 @@ Section UkShParse.
   (* [parseline] and [parsecmd] land they will carry it THROUGH §7, each    *)
   (* labelled in its own header the way stage 2 labelled its seven.         *)
   (* ===================================================================== *)
+  (* THE ALLOCATOR'S STATE, ABSTRACT.  The parser calls [malloc] exactly
+     ONCE per line -- [execcmd] is the only constructor a symbol-free line
+     reaches -- so the state it spends is a ONE-SHOT resource and nothing in
+     this file needs to know what it is.  Naming it here rather than baking
+     a concrete free-list predicate into the parser's statements is what
+     lets stage 3 pick the scope of its own theorem (see iris/UkShMalloc.v:
+     what discharges this is FIRST-CALL, [freep == 0]) without stage 4
+     having an opinion about it. *)
+  Context (UMalloc UMalloc' : iProp Σ).
+
   Hypothesis ushp_malloc_ok :
     forall (h : CpuId) (m : regfile) (nbytes : Z) (avail : nat),
       m !!! Regidx a0_idx = mword_of_int nbytes ->
-      0 < nbytes -> nbytes < Z31 ->
+      0 < nbytes -> nbytes <= 65504 ->
       shp_code γt -∗
+      UMalloc -∗
       urun γt γd γs γfd h m (mword_of_int ShSyms.malloc) (10 + avail) -∗
       (∀ (h' : CpuId) (m' : regfile) (p : Z) (g : nat -> bv 8),
          ⌜ ucallee_saved m m' ⌝ -∗
          ⌜ m' !!! Regidx a0_idx = mword_of_int p ⌝ -∗
          ⌜ 0 < p /\ p mod 16 = 0 /\ p + nbytes < 2 ^ 38 ⌝ -∗
          ubytes γd p (Z.to_nat nbytes) g -∗
+         UMalloc' -∗
          urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx)) (10 + avail) -∗
          WP (Loop : expr riscv_lang)) -∗
       WP (Loop : expr riscv_lang).
@@ -5011,17 +5023,19 @@ Section UkShParse.
 
   Lemma wp_kshp_execcmd (h : CpuId) (m : regfile) (s0 : Z) (nn : nat) :
     shp_code γt -∗
+    UMalloc -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.execcmd) (4 + (10 + nn)) -∗
     (∀ (h' : CpuId) (m' : regfile) (p : Z),
        ⌜ ucallee_saved m m' ⌝ -∗
        ⌜ m' !!! Regidx a0_idx = mword_of_int p ⌝ -∗
        ⌜ 0 < p /\ p mod 16 = 0 /\ p + 168 < 2 ^ 38 ⌝ -∗
        ushp_exec_pre s0 p [] -∗
+       UMalloc' -∗
        urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx)) (4 + (10 + nn)) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont".
+    iIntros "#Hcode HM Hrun Hcont".
     iDestruct (ushp_code_shk γt with "Hcode") as "#Hkcode".
     rewrite shpp_execcmd.
     iDestruct (urun_stack with "Hrun") as %[Hal8 Hroom].
@@ -5185,8 +5199,8 @@ Section UkShParse.
     rewrite <- shpp_malloc.
     (* ---- malloc(168) -- THE HYPOTHESIS, and this lemma's only taint ---- *)
     iApply (ushp_malloc_ok h5 m4 168 nn Ha0_4 ltac:(lia)
-              ltac:(unfold Z31; lia) with "Hcode Hrun").
-    iIntros (h6 m5 p g) "%Hcs45 %Ha0_5 %Hpb Hbs Hrun".
+              ltac:(lia) with "Hcode HM Hrun").
+    iIntros (h6 m5 p g) "%Hcs45 %Ha0_5 %Hpb Hbs HM' Hrun".
     rewrite Eret1.
     destruct Hpb as [ Hp0 [ Hp16 Hpsz ] ].
     assert (H38 : (2:Z) ^ 38 = 274877906944) by (vm_compute; reflexivity).
@@ -5446,7 +5460,7 @@ Section UkShParse.
     { iApply (uis_shp_1fe with "Hcode"). }
     iIntros (h17) "Hrun".
     (* ---- what the caller reads back ---- *)
-    iApply ("Hcont" $! h17 mf p with "[] [] [] [Hty Hpad Hav Hev] Hrun").
+    iApply ("Hcont" $! h17 mf p with "[] [] [] [Hty Hpad Hav Hev] HM' Hrun").
     - iPureIntro. intros q Hq.
       destruct (Z.eq_dec (uint q) 2) as [ Eq2 | Eq2 ].
       { rewrite (ushp_ridx_eq q csp_rs1
@@ -10191,6 +10205,7 @@ Section UkShParse.
     ustr γd dq s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
+    UMalloc -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.parseexec) (16 + (24 + nn)) -∗
     (∀ p : Z,
        ⌜ p + 168 < Z64 ⌝ -∗
@@ -10202,13 +10217,14 @@ Section UkShParse.
          ∀ (h' : CpuId) (m' : regfile),
            ⌜ ucallee_saved m m' ⌝ -∗
            ⌜ m' !!! Regidx a0_idx = mword_of_int p ⌝ -∗
+           UMalloc' -∗
            urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx))
              (16 + (24 + nn)) -∗
            WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Ha1 Hoffle Hw0 Hnosym Htoks Htlen Hs0 Hs64 Hps0 Hps8 Hpssz.
-    iIntros "#Hcode #Hro Hcur Hstr Hws Hsy Hrun Hcont".
+    iIntros "#Hcode #Hro Hcur Hstr Hws Hsy HM Hrun Hcont".
     rewrite shpp_parseexec.
     iDestruct (urun_stack with "Hrun") as %[Hal8 Hroom].
     set (sp0 := m !!! Regidx csp_rs1) in *.
@@ -10619,8 +10635,8 @@ Section UkShParse.
                  (regval_into_reg (mword_of_int 0x5c6 : mword 64))).
       apply bv_eq; vm_compute; reflexivity. }
     rewrite <- shpp_execcmd.
-    iApply (wp_kshp_execcmd h13 m10 s0 (10 + nn) with "Hcode Hrun").
-    iIntros (h14 m11 p) "%Hcs1011 %Ha0_11 %Hpb Hnode Hrun".
+    iApply (wp_kshp_execcmd h13 m10 s0 (10 + nn) with "Hcode HM Hrun").
+    iIntros (h14 m11 p) "%Hcs1011 %Ha0_11 %Hpb Hnode HM' Hrun".
     rewrite Eret10.
     destruct Hpb as [ Hp0 [ Hp16 Hpsz ] ].
     assert (H38 : (2:Z) ^ 38 = 274877906944) by (vm_compute; reflexivity).
@@ -11473,7 +11489,7 @@ Section UkShParse.
               with "[] Hrun").
     { iApply (uis_shp_606 with "Hcode"). }
     iIntros (h40) "Hrun".
-    iApply ("Hcont" $! p with "[] [Hty Hav Hev] Hcur Hstr Hws Hsy [] [] Hrun").
+    iApply ("Hcont" $! p with "[] [Hty Hav Hev] Hcur Hstr Hws Hsy [] [] HM' Hrun").
     - iPureIntro. lia.
     - iApply ushp_exec_pre_at. rewrite /ushp_exec_pre.
       iSplitR; [ iPureIntro; exact Htlen | ].
@@ -11600,6 +11616,7 @@ Section UkShParse.
     ustr γd dq s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
+    UMalloc -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.parsepipe)
       (6 + (16 + (24 + nn))) -∗
     (∀ p : Z,
@@ -11612,13 +11629,14 @@ Section UkShParse.
          ∀ (h' : CpuId) (m' : regfile),
            ⌜ ucallee_saved m m' ⌝ -∗
            ⌜ m' !!! Regidx a0_idx = mword_of_int p ⌝ -∗
+           UMalloc' -∗
            urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx))
              (6 + (16 + (24 + nn))) -∗
            WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Ha1 Hoffle Hw0 Hnosym Htoks Htlen Hs0 Hs64 Hps0 Hps8 Hpssz.
-    iIntros "#Hcode #Hro Hcur Hstr Hws Hsy Hrun Hcont".
+    iIntros "#Hcode #Hro Hcur Hstr Hws Hsy HM Hrun Hcont".
     rewrite shpp_parsepipe.
     assert (Elen0 : (len + ushp_skipws (len - len) len f)%nat = len)
       by (rewrite Nat.sub_diag; cbn [ushp_skipws]; lia).
@@ -11773,9 +11791,9 @@ Section UkShParse.
     iApply (wp_kshp_parseexec h5 m5 dq dw dv ps s0 len off f w0 toks nn
               Ha0_5 Ha1_5 Hoffle Hw0 Hnosym Htoks Htlen Hs0 Hs64
               Hps0 Hps8 Hpssz
-              with "Hcode Hro Hcur Hstr Hws Hsy Hrun").
+              with "Hcode Hro Hcur Hstr Hws Hsy HM Hrun").
     iIntros (p) "%Hpsz Hnode Hcur Hstr Hws Hsy".
-    iIntros (h6 m6) "%Hcs56 %Ha0_6 Hrun".
+    iIntros (h6 m6) "%Hcs56 %Ha0_6 HM' Hrun".
     rewrite Eret5.
     (* ---- 0x69c  c.mv s3,a0 ---- *)
     iApply (wp_uk_cmv γt γd γs γfd h6 m6 (mword_of_int 0x69c) s3_idx a0_idx
@@ -12042,7 +12060,7 @@ Section UkShParse.
     { iApply (uis_shp_6be with "Hcode"). }
     { iApply (uis_shp_6c0 with "Hcode"). }
     iIntros (hf) "Hrun".
-    iApply ("Hcont" $! p with "[] Hnode Hcur Hstr Hws Hsy [] [] Hrun").
+    iApply ("Hcont" $! p with "[] Hnode Hcur Hstr Hws Hsy [] [] HM' Hrun").
     - iPureIntro. exact Hpsz.
     - iPureIntro.
       apply (ushp_frame_cs [(ra_idx, mword_of_int 5 : mword 6);
@@ -12095,6 +12113,7 @@ Section UkShParse.
     ustr γd dq s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
+    UMalloc -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.parseline)
       (6 + (6 + (16 + (24 + nn)))) -∗
     (∀ p : Z,
@@ -12107,13 +12126,14 @@ Section UkShParse.
          ∀ (h' : CpuId) (m' : regfile),
            ⌜ ucallee_saved m m' ⌝ -∗
            ⌜ m' !!! Regidx a0_idx = mword_of_int p ⌝ -∗
+           UMalloc' -∗
            urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx))
              (6 + (6 + (16 + (24 + nn)))) -∗
            WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Ha1 Hoffle Hw0 Hnosym Htoks Htlen Hs0 Hs64 Hps0 Hps8 Hpssz.
-    iIntros "#Hcode #Hro Hcur Hstr Hws Hsy Hrun Hcont".
+    iIntros "#Hcode #Hro Hcur Hstr Hws Hsy HM Hrun Hcont".
     rewrite shpp_parseline.
     assert (Elen0 : (len + ushp_skipws (len - len) len f)%nat = len)
       by (rewrite Nat.sub_diag; cbn [ushp_skipws]; lia).
@@ -12249,9 +12269,9 @@ Section UkShParse.
     iApply (wp_kshp_parsepipe h4 m4 dq dw dv ps s0 len off f w0 toks nn
               Ha0_4 Ha1_4 Hoffle Hw0 Hnosym Htoks Htlen Hs0 Hs64
               Hps0 Hps8 Hpssz
-              with "Hcode Hro Hcur Hstr Hws Hsy Hrun").
+              with "Hcode Hro Hcur Hstr Hws Hsy HM Hrun").
     iIntros (p) "%Hpsz Hnode Hcur Hstr Hws Hsy".
-    iIntros (h5 m5) "%Hcs45 %Ha0_5 Hrun".
+    iIntros (h5 m5) "%Hcs45 %Ha0_5 HM' Hrun".
     rewrite Eret4.
     (* ---- 0x6fa  c.mv s1,a0 ---- *)
     iApply (wp_uk_cmv γt γd γs γfd h5 m5 (mword_of_int 0x6fa) s1_idx a0_idx
@@ -12710,7 +12730,7 @@ Section UkShParse.
     { iApply (uis_shp_746 with "Hcode"). }
     { iApply (uis_shp_748 with "Hcode"). }
     iIntros (hf) "Hrun".
-    iApply ("Hcont" $! p with "[] Hnode Hcur Hstr Hws Hsy [] [] Hrun").
+    iApply ("Hcont" $! p with "[] Hnode Hcur Hstr Hws Hsy [] [] HM' Hrun").
     - iPureIntro. exact Hpsz.
     - iPureIntro.
       apply (ushp_frame_cs [(ra_idx, mword_of_int 5 : mword 6);
@@ -13970,6 +13990,7 @@ Section UkShParse.
     ustr γd (DfracOwn 1) s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
+    UMalloc -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.parsecmd)
       (8 + (6 + (6 + (16 + (24 + nn))))) -∗
     (∀ p : Z,
@@ -13980,13 +14001,14 @@ Section UkShParse.
          ∀ (h' : CpuId) (m' : regfile),
            ⌜ ucallee_saved m m' ⌝ -∗
            ⌜ m' !!! Regidx a0_idx = mword_of_int p ⌝ -∗
+           UMalloc' -∗
            urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx))
              (8 + (6 + (6 + (16 + (24 + nn))))) -∗
            WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Hnosym Htoks Htlen Hs0 Hs64.
-    iIntros "#Hcode #Hro Hstr Hws Hsy Hrun Hcont".
+    iIntros "#Hcode #Hro Hstr Hws Hsy HM Hrun Hcont".
     rewrite shpp_parsecmd.
     iDestruct (ustr_len with "Hstr") as %Hlen31.
     iDestruct (urun_stack with "Hrun") as %[Hal8 Hroom].
@@ -14356,9 +14378,9 @@ Section UkShParse.
               ltac:(f_equal; lia)
               Hnosym Htoks Htlen ltac:(lia) ltac:(lia)
               Hcur0 Hcur8 Hcurz
-              with "Hcode Hro Lcur Hstr Hws Hsy Hrun").
+              with "Hcode Hro Lcur Hstr Hws Hsy HM Hrun").
     iIntros (p) "%Hpsz Hnode Lcur Hstr Hws Hsy".
-    iIntros (h15 m13) "%Hcs1213 %Ha0_13 Hrun".
+    iIntros (h15 m13) "%Hcs1213 %Ha0_13 HM' Hrun".
     rewrite Eret12.
     iDestruct "Hnode" as "(%Hnl & %Hp0 & %Hp8 & Hty & Hav & Hev)".
     iAssert (ushp_exec_at s0 p toks) with "[Hty Hav Hev]" as "Hnode".
@@ -14772,7 +14794,7 @@ Section UkShParse.
       iSplitL "Lcur"; [ iExact "Lcur" | ].
       iSplitL "L2"; [ iExact "L2" | done ]. }
     iIntros (hf) "Hrun".
-    iApply ("Hcont" $! p with "Hnode Hline Hws Hsy [] [] Hrun").
+    iApply ("Hcont" $! p with "Hnode Hline Hws Hsy [] [] HM' Hrun").
     - iPureIntro.
       apply (ushp_frame_cs [(ra_idx, mword_of_int 7 : mword 6);
                (s0_idx, mword_of_int 6 : mword 6);
@@ -14869,6 +14891,7 @@ Section UkShParse.
     ustr γd (DfracOwn 1) s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
+    UMalloc -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.parsecmd) (60 + nn) -∗
     (∀ p : Z,
        ⌜ ushp_parses s0 len f p (UshpExec toks) ⌝ -∗
@@ -14881,16 +14904,17 @@ Section UkShParse.
          ∀ (h' : CpuId) (m' : regfile),
            ⌜ ucallee_saved m m' ⌝ -∗
            ⌜ m' !!! Regidx a0_idx = mword_of_int p ⌝ -∗
+           UMalloc' -∗
            urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx))
              (60 + nn) -∗
            WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Hnosym Htoks Htlen Hs0 Hs64.
-    iIntros "#Hcode #Hro Hstr Hws Hsy Hrun Hcont".
+    iIntros "#Hcode #Hro Hstr Hws Hsy HM Hrun Hcont".
     iApply (wp_kshp_parsecmd h m dw dv s0 len f toks nn
               Ha0 Hnosym Htoks Htlen Hs0 Hs64
-              with "Hcode Hro Hstr Hws Hsy Hrun").
+              with "Hcode Hro Hstr Hws Hsy HM Hrun").
     iIntros (p) "Hnode Hline Hws Hsy".
     iApply ("Hcont" $! p with "[] Hnode Hline [] Hws Hsy").
     - iPureIntro. exists toks. split; [ exact Htoks | ].

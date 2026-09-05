@@ -1461,7 +1461,8 @@ Section UkShMalloc.
     (∀ (h' : CpuId) (m' : regfile) (r : mword 64),
        ⌜ ucallee_saved m m' ⌝ -∗
        ⌜ m' !!! Regidx a0_idx = r ⌝ -∗
-       ((⌜ r = (mword_of_int 0 : mword 64) ⌝ ∗ usz γs sz)
+       ((⌜ r = (mword_of_int 0 : mword 64) ⌝ ∗
+         ushm_sbrk_ans sz 65536 (mword_of_int (-1)))
         ∨ (∃ (q : Z) (g : nat -> bv 8),
              ⌜ r = (mword_of_int q : mword 64) ⌝ ∗
              ⌜ 0 < q /\ q mod 16 = 0 /\ q + nbytes < 2 ^ 38 ⌝ ∗
@@ -2670,7 +2671,7 @@ Section UkShMalloc.
         rewrite /r2 (upd_ne r1 (Regidx s1_idx) (Regidx a0_idx) _
                        ltac:(vm_compute; discriminate)).
         exact (upd_eq mQ (Regidx a0_idx) _).
-      + iLeft. iSplitR; [ done | ]. iExact "Hsz".
+      + iLeft. iSplitR; [ done | ]. iLeft. iSplitR; [ done | ]. iExact "Hsz".
     - (* ============ THE SUCCESS ARM ===================================== *)
       (* the chunk, carved the way the allocator is about to use it:
          a header at the break, the rest of the first block, the header of
@@ -3491,5 +3492,89 @@ Section UkShMalloc.
 
 
 
+
+  (* ===================================================================== *)
+  (* §6 THE ADAPTER -- what stage 4's [ushp_malloc_ok] becomes, and the ONE *)
+  (* assumption that is left.                                              *)
+  (*                                                                        *)
+  (* [UkShParse]'s malloc contract has NO FAILURE ARM, and that is not an   *)
+  (* oversight in the contract: sh's constructors do not test malloc        *)
+  (* ([execcmd] goes straight into [memset(cmd, 0, 168)]), so a NULL return *)
+  (* is a FAULT in the shell rather than a branch, and a contract with a    *)
+  (* failure arm would be unusable by the very code it is for.  The         *)
+  (* allocator's own theorem above HAS both arms; what closes the gap is    *)
+  (* the single named Hypothesis below.                                    *)
+  (*                                                                        *)
+  (* WHAT IS BEING ASSUMED, EXACTLY: that the 64 KiB [sbrk] [morecore]      *)
+  (* issues SUCCEEDS.  It can fail -- [growproc] calls [kalloc] and         *)
+  (* [kalloc] can return NULL -- so this is a real assumption and not a     *)
+  (* theorem, and it is stated on the ROW'S OWN ANSWER so that it cannot be *)
+  (* used anywhere else: the only way to instantiate it is to be HOLDING an *)
+  (* [ushm_sbrk_ans], which only the leaf hands out.                        *)
+  (*                                                                        *)
+  (* AND WHAT IT REPLACES.  Before this file, stage 4 assumed               *)
+  (* [ushp_malloc_ok] -- that ninety-one instructions of C behave.  After   *)
+  (* it, the assumption is that the kernel has sixteen pages.  That is the  *)
+  (* whole point of the stage.                                             *)
+  (* ===================================================================== *)
+  Hypothesis ushm_sbrk_never_fails :
+    forall (sz n : Z) (r : mword 64),
+      ushm_sbrk_ans sz n r -∗
+      ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗ ushm_sbrk_ans sz n r.
+
+  (* THE ALLOCATOR'S STATE BEFORE ITS FIRST CALL.  This is what
+     [UkShParse.UMalloc] is instantiated at: the [freep] cell holding zero,
+     the sixteen bytes of [base] (whatever the loader left there) and the
+     break.  It is a ONE-SHOT resource -- the theorem that consumes it is
+     first-call scoped -- and that is exactly why stage 4 was cut to name
+     the allocator's state abstractly rather than to know what it is. *)
+  Definition ushm_fresh (sz : Z) : iProp Σ :=
+    (uword γd SH_FREEP (mword_of_int 0) ∗
+     (∃ fb : nat -> bv 8, ubytes γd SH_BASE 16 fb) ∗
+     usz γs sz)%I.
+
+  Theorem ushm_malloc_ok_holds (sz : Z) :
+    SH_BASE + 16 <= sz ->
+    UserPtTree.pgroundup sz = sz ->
+    usz_ok (sz + 65536) ->
+    forall (h : CpuId) (m : regfile) (nbytes : Z) (avail : nat),
+      m !!! Regidx a0_idx = mword_of_int nbytes ->
+      0 < nbytes -> nbytes <= 65504 ->
+      shp_code γt -∗
+      ushm_fresh sz -∗
+      urun γt γd γs γfd h m (mword_of_int ShSyms.malloc) (10 + avail) -∗
+      (∀ (h' : CpuId) (m' : regfile) (p : Z) (g : nat -> bv 8),
+         ⌜ ucallee_saved m m' ⌝ -∗
+         ⌜ m' !!! Regidx a0_idx = mword_of_int p ⌝ -∗
+         ⌜ 0 < p /\ p mod 16 = 0 /\ p + nbytes < 2 ^ 38 ⌝ -∗
+         ubytes γd p (Z.to_nat nbytes) g -∗
+         usz γs (sz + 65536) -∗
+         urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx ra_idx)) (10 + avail) -∗
+         WP (Loop : expr riscv_lang)) -∗
+      WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hszlo Hszal Hszok h m nbytes avail Ha0 Hnb0 Hnbhi.
+    iIntros "#Hcode (Hfreep & [%fb Hbase] & Hsz) Hrun Hcont".
+    iDestruct (ushm_code_shp γt with "Hcode") as "#Hmcode".
+    iApply (wp_kshm_malloc_first h m nbytes sz fb avail
+              Ha0 Hnb0 Hnbhi Hszlo Hszal Hszok
+              with "Hmcode Hfreep Hbase Hsz Hrun").
+    iIntros (h' m' r) "%Hcs %Ha0' Hans Hrun".
+    iDestruct "Hans" as "[[-> Hbad] | (%q & %g & -> & %Hqb & Hsz & Hbytes)]".
+    - (* REFUTED by the assumption: [sbrk] did not fail *)
+      iDestruct (ushm_sbrk_never_fails sz 65536 (mword_of_int (-1))
+                   with "Hbad") as "[%Hc _]".
+      exfalso.
+      assert (Hu1 : uint (mword_of_int (-1) : mword 64)
+                    = 18446744073709551615)
+        by (vm_compute; reflexivity).
+      assert (Hszhi : sz + 65536 < 2 ^ 38).
+      { pose proof (pgroundup_ge (sz + 65536) ltac:(lia)) as Hge.
+        unfold usz_ok in Hszok.
+        change (2 ^ 38)%Z with 274877906944%Z. lia. }
+      rewrite Hc (uint_moi sz ltac:(unfold Z64; lia)) in Hu1. lia.
+    - iApply ("Hcont" $! h' m' q g with "[%] [%] [%] Hbytes Hsz Hrun");
+        [ exact Hcs | exact Ha0' | exact Hqb ].
+  Qed.
 
 End UkShMalloc.

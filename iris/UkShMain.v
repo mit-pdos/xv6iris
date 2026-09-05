@@ -455,17 +455,19 @@ Section UkShMain.
   (* one [parsecmd] just built out of THIS line, so the [exec] at the       *)
   (* bottom of [runcmd]'s EXEC arm names the line's own words.              *)
   (* ===================================================================== *)
-  Lemma wp_kshm_child
+  Lemma wp_kshm_child (UMalloc : iProp Σ) (szv : Z)
       (Hmalloc : forall (h : CpuId) (m : regfile) (nbytes : Z) (avail : nat),
          m !!! Regidx (mword_of_int 10) = mword_of_int nbytes ->
-         0 < nbytes -> nbytes < Z31 ->
+         0 < nbytes -> nbytes <= 65504 ->
          shp_code γt -∗
+         UMalloc -∗
          urun γt γd γs γfd h m (mword_of_int ShSyms.malloc) (10 + avail) -∗
          (∀ (h' : CpuId) (m' : regfile) (p : Z) (g : nat -> bv 8),
             ⌜ ucallee_saved m m' ⌝ -∗
             ⌜ m' !!! Regidx (mword_of_int 10) = mword_of_int p ⌝ -∗
             ⌜ 0 < p /\ p mod 16 = 0 /\ p + nbytes < 2 ^ 38 ⌝ -∗
             ubytes γd p (Z.to_nat nbytes) g -∗
+            usz γs szv -∗
             urun γt γd γs γfd h' m' (ret_pc (m !!! Regidx (mword_of_int 1)))
               (10 + avail) -∗
             WP (Loop : expr riscv_lang)) -∗
@@ -473,7 +475,7 @@ Section UkShMain.
       (Hclw : UkShDiag.ushd_clw_text_ty)
       (h : CpuId) (m : regfile) (dw dv : dfrac)
       (s0 : Z) (len : nat) (f : nat -> bv 8) (toks : list (nat * nat))
-      (szv : Z) (ld : list fdstate) (n : nat) :
+      (ld : list fdstate) (n : nat) :
     m !!! Regidx s1_idx = (mword_of_int s0 : mword 64) ->
     ushp_no_symbols len f ->
     ushp_tokens len f 0 toks ->
@@ -483,13 +485,13 @@ Section UkShMain.
     ustr γd (DfracOwn 1) s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
-    usz γs szv -∗ UserFd.ustd γfd ld -∗
+    UserFd.ustd γfd ld -∗ UMalloc -∗
     urun γt γd γs γfd h m (mword_of_int 0x9c0)
       (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38.
-    iIntros "#Hcode #Hpcode #Hpro #Hjt Hline Hws Hsy Hsz Hstd Hrun".
+    iIntros "#Hcode #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd HM Hrun".
     (* the line's own bytes are non-NUL, which is what makes each token a
        string once the cut lands *)
     iDestruct (ustr_nonul with "Hline") as %Hnn0.
@@ -543,13 +545,14 @@ Section UkShMain.
       by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
           apply bv_eq; vm_compute; reflexivity).
     (* ---- parsecmd ---- *)
-    iApply (wp_kshp_parser γt γd γs γfd Hmalloc (Hclw γt γd γs γfd)
+    iApply (wp_kshp_parser γt γd γs γfd UMalloc (usz γs szv) Hmalloc
+              (Hclw γt γd γs γfd)
               h2 m2 dw dv s0 len f toks
               (8 + (UkShDiag.ush_Dg + n))
               Ha0_2 Hns Htoks Htlen Hs0 Hs64
-              with "Hpcode Hpro Hline Hws Hsy Hrun").
+              with "Hpcode Hpro Hline Hws Hsy HM Hrun").
     iIntros (p) "%Hparses Hnode Hline %Hcut Hws Hsy".
-    iIntros (h3 m3) "%Hcs3 %Ha0_3 Hrun".
+    iIntros (h3 m3) "%Hcs3 %Ha0_3 Hsz Hrun".
     rewrite Hra_2.
     (* ---- 0x9c6  jal ra,runcmd ---- *)
     iApply (wp_uk_jal γt γd γs γfd h3 m3 (mword_of_int 0x9c6)
