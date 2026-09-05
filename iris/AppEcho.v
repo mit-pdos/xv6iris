@@ -70,6 +70,7 @@ Require Import FsNode.           (* [fs_node] *)
 Require Import FsAbsDefs.        (* [aview], [abs_view] *)
 Require Import FsInitPinBoot.    (* [era0_pins], [era0_recovery_pins] *)
 Require Import FsShPin.          (* [era0_sh_pins], [era0_recovery_sh_pins] *)
+Require Import AppInv.           (* [app_xfer_raw], [app_xfer_raw_pure]: the transport (round C) *)
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -307,6 +308,13 @@ Section EchoFs.
 
   Lemma echo_fs_intro (av : aview) : echo_fs_pure av -> ⊢ echo_fs av.
   Proof. intros H. rewrite /echo_fs. iPureIntro. exact H. Qed.
+
+  (* THE TRANSPORT (app-instances.md round C, section 1): the claim is
+     pure, so a copy at fresh names is the claim itself -- at every fixed
+     part, at the one instance *)
+  Lemma echo_xfer (γ : echo_fixed) :
+    ⊢ app_xfer_raw (fun (_ : unit) (av : aview) => echo_fs av).
+  Proof. exact (app_xfer_raw_pure (N := unit) echo_fs_pure). Qed.
 End EchoFs.
 
 (* THE BOOT OBLIGATION AT ERA 0: the view of the map a boot founds its file
@@ -322,4 +330,18 @@ Proof.
   intros Hdk Hrec HS. split.
   - exact (era0_recovery_pins dk D S Hdk Hrec HS).
   - exact (era0_recovery_sh_pins dk D S Hdk Hrec HS).
+Qed.
+
+(* ...AND AS THE ERA-0 OBLIGATION'S SHAPE (round C, [App.xv6_app_adequacy]'s
+   [Happ_init]): the claim at the founded state's view, at the one
+   instance, under the update -- [echo_fs_era0] lifted by [echo_fs_intro]. *)
+Lemma echo_init {Σ : gFunctors} (dk : Z -> bv 8) (D : gmap Z (list (bv 8)))
+    (S : fs_state_rec) :
+  fs_blocks dk = fsimg_P ->
+  fs_recovery (fs_blocks dk) D fsimg_cov (FsImg.sb_logstart fsimg_sb) ->
+  snap_ok S D ->
+  ⊢ |==> ∃ r : unit, echo_fs (Σ := Σ) (abs_view (fss_inodes S)).
+Proof.
+  intros Hdk Hrec HS. iModIntro. iExists ().
+  iApply (echo_fs_intro _ (echo_fs_era0 dk D S Hdk Hrec HS)).
 Qed.

@@ -577,11 +577,14 @@ Section FsinitMain.
     assert (Hbnolt : (uint bno < 2147483648)%Z) by (rewrite Hbnou; lia).
     assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs fsc_disk icfg_dev fsc_cov))
       by (rewrite Hbnou; exact H1cov).
-    iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam #Hgen
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseamg #Hxfer #Hgen
               Hmirror Hlfree #Hbinv Hfsb Hxo Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks #Hbm
               Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk
               HauthL HauthD Hdirty Hhdr Hlslots Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hiref Hcont".
+    (* the arity-free seam initlog and ireclaim take, off the one at the
+       application's guest (round C) *)
+    iPoseProof (FsCrash.fs_crash_seam_of_at with "Hseamg") as "#Hseam".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
     iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     (* THE BYTE VIEW'S ROW, off the bitmap invariant fsinit already holds
@@ -609,8 +612,8 @@ Section FsinitMain.
       as "#Hlawf".
     { iModIntro. iIntros "#Hpark".
       iApply (fs_snap_law_build icfg_log fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib sbrec
-                eq_refl Hcgeom'
-                with "Hireg' Hbm' Hesc Hpoolinv Hpark"). }
+                eq_refl eq_refl Hcgeom'
+                with "Hseamg Hxfer Hireg' Hbm' Hesc Hpoolinv Hpark"). }
     iAssert (fsi_cont (CID0 := CID)
  v_magic v_size v_nblocks v_nlog
                pidv dq j m K eb b lks Upr)%I with "[Hcont]" as "Hcont";

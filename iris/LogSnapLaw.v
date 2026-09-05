@@ -57,7 +57,9 @@ Require Import LogDefs.        (* [log_names], [ln_tx], [fs_restrict],
                                   [fs_home_set]                        *)
 Require Import FsBlocks.       (* [fs_names], [fs_bytes], [logN]/[fsbN],
                                   [bytes_tie], [bytes_dom]             *)
-Require Import FsDurSnap.      (* [P_dur]: the durable epoch registry *)
+Require Import FsDurSnap.      (* [P_dur_at]/[dur_pair]: the durable epoch registry *)
+Require Import FsCrash.        (* [fs_crash_seam_at]: the seam at the law's
+                                  guest, carried beside the law (round C) *)
 
 Local Open Scope Z_scope.
 
@@ -67,23 +69,35 @@ Section SnapLaw.
      Both are members of [Xv6G.xv6G], so every consumer that binds the
      bundle resolves them, and this file (like [LogInv]) sits BELOW the
      bundle and therefore names the members. *)
-  Context `{!riscvGS Σ, !fsLogG Σ, !logG Σ, !fsLinkG Σ, !fsTopG Σ}.
+  (* ...plus the seam's two ([fsCrashG], [lockG]), because the arity-free
+     law below carries the crash seam at its own guest (round C); both are
+     [Xv6G.xv6G] members too. *)
+  Context `{!riscvGS Σ, !fsLogG Σ, !logG Σ, !fsLinkG Σ, !fsTopG Σ,
+            !fsCrashG Σ, !lockG Σ}.
 
   (* THE CONCLUSION, AS ONE NAME.  [LogInv] must be able to STATE the law
      and to hand its output on, and it deliberately imports no pure
      well-formedness layer (see its header); wrapping the epoch here is
      what keeps [FsDurSnap]'s vocabulary out of [log_ctx]'s text
      ([dv_of_D] itself is [LogDefs] vocabulary, which [LogInv] has).  [FsCollect.col_view C home] IS [fs_restrict (dv_of_D C) home],
-     so this is the registry at exactly the map the commit jumps to. *)
-  Definition snap_law_out (C : gmap Z (list (bv 8))) (home : gset Z)
-    : iProp Σ :=
-    P_dur (fs_restrict (dv_of_D C) home).
+     so this is the registry at exactly the map the commit jumps to.
 
-  (* THE LAW, at a NAMED mask.  Every premise below is a row of
-     [FsBlocks.fs_bytes_body] -- what a committer holds when it has [fsbN]
-     open -- plus the empty transaction authority. *)
+     ...AND THE GUEST BESIDE IT (app-instances.md round C).  The law
+     produces the PAIR [FsDurSnap.dur_pair]: the file system's snapshot and
+     an OPAQUE guest [G] at the snapshot's map name, under a later.  The WAL
+     never learns what [G] is -- the one law the tree builds is at
+     [AppDur.app_guest] ([FsCollectAll.fs_snap_law_build]) -- and no file
+     below [fileG] binds the application's record. *)
+  Definition snap_law_out (G : gname -> iProp Σ)
+      (C : gmap Z (list (bv 8))) (home : gset Z) : iProp Σ :=
+    dur_pair G (fs_restrict (dv_of_D C) home).
+
+  (* THE LAW, at a NAMED mask and a NAMED guest.  Every premise below is a
+     row of [FsBlocks.fs_bytes_body] -- what a committer holds when it has
+     [fsbN] open -- plus the empty transaction authority. *)
   Definition snap_law_at (γ : log_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z) (N : coPset) : iProp Σ :=
+      (cov : gset Z) (logstart : Z) (N : coPset) (G : gname -> iProp Σ)
+    : iProp Σ :=
     (□ (∀ (E : coPset) (Lb : gmap Z (bv 8)) (C : gmap Z (list (bv 8))),
           ⌜N ⊆ E⌝ -∗
           ⌜dom C = fs_home_set cov logstart⌝ -∗
@@ -93,19 +107,25 @@ Section SnapLaw.
           ⌜bytes_dom Lb (fs_home_set cov logstart)⌝ -∗
           ghost_map_auth (fs_bytes γfs) 1 Lb -∗
           ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) ={E}=∗
-            snap_law_out C (fs_home_set cov logstart)
+            snap_law_out G C (fs_home_set cov logstart)
             ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
             ∗ ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit)))%I.
 
-  (* ...and the arity-free form [LogInv.log_ctx] carries: the mask is
-     closed over, with the one fact a holder still needs about it. *)
+  (* ...and the arity-free form [LogInv.log_ctx] carries: the mask and the
+     guest are closed over, with the one fact a holder still needs about
+     the mask -- and, beside the law, THE CRASH SEAM AT THE SAME GUEST
+     (round C), so that the committer reads seam and epoch off ONE handle
+     and hands both to the commit permit at one [G]
+     ([FsCrash.fs_commit_L_seq_permit]). *)
   Definition snap_law (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) : iProp Σ :=
-    (∃ N : coPset,
-       ⌜(↑fsbN : coPset) ## N⌝ ∗ snap_law_at γ γfs cov logstart N)%I.
+    (∃ (N : coPset) (G : gname -> iProp Σ),
+       ⌜(↑fsbN : coPset) ## N⌝ ∗
+       fs_crash_seam_at G cov logstart ∗
+       snap_law_at γ γfs cov logstart N G)%I.
 
-  Global Instance snap_law_at_persistent γ γfs cov logstart N :
-    Persistent (snap_law_at γ γfs cov logstart N).
+  Global Instance snap_law_at_persistent γ γfs cov logstart N G :
+    Persistent (snap_law_at γ γfs cov logstart N G).
   Proof. rewrite /snap_law_at. apply _. Qed.
 
   Global Instance snap_law_persistent γ γfs cov logstart :
@@ -113,12 +133,13 @@ Section SnapLaw.
   Proof. rewrite /snap_law. apply _. Qed.
 
   Lemma snap_law_intro (γ : log_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z) (N : coPset) :
+      (cov : gset Z) (logstart : Z) (N : coPset) (G : gname -> iProp Σ) :
     (↑fsbN : coPset) ## N ->
-    snap_law_at γ γfs cov logstart N -∗ snap_law γ γfs cov logstart.
+    fs_crash_seam_at G cov logstart -∗
+    snap_law_at γ γfs cov logstart N G -∗ snap_law γ γfs cov logstart.
   Proof.
-    intros Hdj. iIntros "#H". rewrite /snap_law. iExists N.
-    iSplitR; [iPureIntro; exact Hdj |]. iExact "H".
+    intros Hdj. iIntros "#Hseam #H". rewrite /snap_law. iExists N, G.
+    iSplitR; [iPureIntro; exact Hdj |]. iFrame "Hseam". iExact "H".
   Qed.
 
   (* THE READING A COMMITTER TAKES.  It holds [fsbN] open -- that is where
@@ -139,14 +160,19 @@ Section SnapLaw.
     snap_law γ γfs cov logstart -∗
     ghost_map_auth (fs_bytes γfs) 1 Lb -∗
     ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) ={⊤ ∖ ↑fsbN}=∗
-      snap_law_out C (fs_home_set cov logstart)
+      (* the epoch AND the seam, at the law's own guest (round C) *)
+      (∃ G : gname -> iProp Σ,
+         fs_crash_seam_at G cov logstart ∗
+         snap_law_out G C (fs_home_set cov logstart))
       ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
       ∗ ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit).
   Proof.
     intros Hdom Hlens Htie Hdm. iIntros "#Hlaw Hb Ht".
-    iDestruct "Hlaw" as (N Hdj) "#Hbody".
-    iApply ("Hbody" $! (⊤ ∖ ↑fsbN) Lb C with "[%] [%] [%] [%] [%] Hb Ht");
-      [| exact Hdom | exact Hlens | exact Htie | exact Hdm].
+    iDestruct "Hlaw" as (N G Hdj) "[#Hseam #Hbody]".
+    iMod ("Hbody" $! (⊤ ∖ ↑fsbN) Lb C with "[%] [%] [%] [%] [%] Hb Ht")
+      as "(Hout & Hb & Ht)";
+      [| exact Hdom | exact Hlens | exact Htie | exact Hdm |].
+    2: { iModIntro. iFrame "Hb Ht". iExists G. iFrame "Hseam". iExact "Hout". }
     (* the law's mask misses [fsbN] -- the one namespace a committer, which
        is holding the byte view open, cannot offer it *)
     intros x Hx. apply elem_of_difference. split.

@@ -1735,7 +1735,12 @@ Section LogCtx.
     log_ctx γ bn γfs cov logstart dev -∗
     ghost_map_auth (fs_bytes γfs) 1 Lb -∗
     ghost_map_auth (ln_tx γ) 1 T ={⊤ ∖ ↑fsbN}=∗
-      snap_law_out C (fs_home_set cov logstart)
+      (* the epoch AND the crash seam, at the law's own guest
+         (app-instances.md round C): the commit permit takes both at one
+         [G], and this is where they come off one handle *)
+      (∃ G : gname -> iProp Σ,
+         FsCrash.fs_crash_seam_at G cov logstart ∗
+         snap_law_out G C (fs_home_set cov logstart))
       ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
       ∗ ghost_map_auth (ln_tx γ) 1 T.
   Proof.

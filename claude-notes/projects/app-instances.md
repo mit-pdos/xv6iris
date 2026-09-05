@@ -317,6 +317,25 @@ Rounds, each a green gate:
   app_guest`) and adequacy know what `G` is.  Ruling 7's "machine layer
   untouched" was the proposal's wording, not a ruling; ruling 1 already
   commits the machine record to the client `Type`.
+  LANDED 2026-09-05 on top of D0 (22 files, new `AppDur.v`; audit 13
+  axioms; trivial theorem's TCB unchanged at 8 files / 338 defs / 2845
+  lines).  As built: `app_body` carries a pure DOMAIN row `⌜app_dom I⌝`
+  (`dom I` = the inode region), because the commit's snapshot is at
+  `col_reg_map nib I` and `ftop_body` has no domain row — proved at the
+  mint from the snapshot's geometry, preserved by the mover; the law reads
+  `app_xfer` from the fsinit kit beside the seam (an `▷ app_xfer` read off
+  `app_inv` cannot run at the commit's step-free ghost move), so
+  `fs_cfg_alloc_snap`/`boot_shared_alloc`/`fs_kit_fsinit_ghost`/
+  `SpecFsinit` carry `fs_crash_seam_at app_guest` and `app_xfer`;
+  `dur_pair` lives in FsDurSnap (FsCrash's commit permit needs it);
+  the boot founds `app_inv` from the lent `▷ app_dur_raw` directly by
+  agreement with the clone's kernel half (no transport at the boot);
+  `P_fs_lend`/`P_fs_rec`/`P_fs_any`/`P_dur_clone`/`dsnap_step` deleted
+  (`P_dur_at_clone` returns the clone's guest at the caller's map);
+  `SystemAdequacy.xv6_slot` is the composite `Pc`; `Rb c dk := ∃ gt,
+  P_fs_lend_at gt … dk ∗ ▷ app_dur_raw (app_fs c) gt`; `xv6_app` loses
+  `app_lend`, gains obligations `Happ_xfer` and `Happ_init` (at the
+  image state); FsFlushedCore opened `P_fs` and gained the `gt` binder.
 - **D0 — the birth step, machine half (pulled ahead of C).**  The fixed
   record carries `riscv_client_T : Type; riscv_client : riscv_client_T`
   in place of the mono-nat name; `riscv_power_adequacy` takes `(CT :

@@ -599,6 +599,28 @@ Proof.
   - exact (sk_dirloc Hb).
 Qed.
 
+(* THE REGION'S INUM SPACE IS EXACTLY THE MAP'S DOMAIN (app-instances.md
+   round C): [fg_reg] bounds every named inum's record block by the bitmap
+   block, [fg_regdom] fills the region, and the superblock's layout
+   ([FsImg.sbo_bmapstart]) makes the two bounds one number.  This is what
+   the era mint founds the application's domain row from
+   ([AppInv.app_dom]), so that the commit's region-restricted snapshot
+   ([FsCollectAll.col_reg_map]) IS the running map. *)
+Lemma snap_ok_inum_dom (S : fs_state_rec) (D : gmap Z (list (bv 8))) :
+  snap_ok S D ->
+  forall z : Z,
+    is_Some (fss_inodes S !! z) <-> 0 <= z < 16 * (sb_ninodes (fss_sb S) / 16 + 1).
+Proof.
+  intros H z. pose proof (fs_geom_of_ok S D H) as Hg.
+  pose proof (sbo_bmapstart _ (fg_sbok Hg)) as Hbm.
+  split.
+  - intros [n Hn]. destruct (fg_reg Hg z n Hn) as [Hz0 Hzb].
+    pose proof (Z.div_mod z 16 ltac:(lia)) as Hdm.
+    pose proof (Z.mod_pos_bound z 16 ltac:(lia)) as Hmb.
+    split; [exact Hz0 | lia].
+  - intros Hz. exact (fg_regdom Hg z Hz).
+Qed.
+
 (* THE PER-INODE READING, as a record so that no clause of it is spelled
    inside a [⌜ ⌝] (where [a + b] would parse as [sum] -- durable-notes.md,
    the scope-stack trap). *)
@@ -804,9 +826,15 @@ Section Snap.
      THE ONE PURE CONJUNCT LEFT IS [snap_shape], and section
      1c' says why no resource can pin it.  Nothing outside [crashN] ever
      holds a piece of any of this. *)
+  (* ...AT THE KERNEL HALF OF THE ABSTRACT MAP'S AUTHORITY (app-instances.md
+     round C, section 6 ruling 6).  The other half -- the GUEST half,
+     [snap_guest] below -- leaves every producer of a snapshot beside it and
+     is what the application's durable claim ([AppDur.app_dur_raw]) holds:
+     the two halves AGREE on the map, so the guest is tied to THIS snapshot
+     with no binder shared and no application anything in here. *)
   Definition fs_snap Γ (g : gname) D S : iProp Σ :=
     (snap_auth g D
-     ∗ ghost_map_auth (γtop Γ) 1 (fss_inodes S)
+     ∗ ghost_map_auth (γtop Γ) (1/2) (fss_inodes S)
      ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag Γ i n)
      ∗ fs_state Γ (DfracOwn 1) S
      ∗ (∃ kv : ity, own (γlink Γ) (link_tok_elem ROOTINO kv))
@@ -816,17 +844,72 @@ Section Snap.
     Timeless (fs_snap Γ g D S).
   Proof. rewrite /fs_snap. apply _. Qed.
 
+  (* THE GUEST HALF of a snapshot's abstract map, at the map name [gt]
+     (round C): what every producer of a snapshot hands out beside it, and
+     what the application's durable claim owns. *)
+  Definition snap_guest (gt : gname) (I : gmap Z fs_node) : iProp Σ :=
+    ghost_map_auth gt (1/2) I.
+
+  Global Instance snap_guest_timeless gt I : Timeless (snap_guest gt I).
+  Proof. rewrite /snap_guest. apply _. Qed.
+
+  (* the tie, read: any fraction of the snapshot's map authority agrees with
+     the snapshot's own node map *)
+  Lemma fs_snap_top_agree Γ (g : gname) D S (q : Qp) (I : gmap Z fs_node) :
+    fs_snap Γ g D S -∗ ghost_map_auth (γtop Γ) q I -∗ ⌜I = fss_inodes S⌝.
+  Proof.
+    rewrite /fs_snap. iIntros "(_ & Hta & _) Hh".
+    iDestruct (ghost_map_auth_agree with "Hh Hta") as %Heq.
+    iPureIntro. exact Heq.
+  Qed.
+
+  (* ...and the kernel half as an ACCESSOR: out, and a wand that puts it
+     back -- what the boot agrees a lent guest against *)
+  Lemma fs_snap_top_acc Γ (g : gname) D S :
+    fs_snap Γ g D S -∗
+      ghost_map_auth (γtop Γ) (1/2) (fss_inodes S) ∗
+      (ghost_map_auth (γtop Γ) (1/2) (fss_inodes S) -∗ fs_snap Γ g D S).
+  Proof.
+    rewrite /fs_snap. iIntros "(Hba & Hta & Htf & HS & Hlk & %Hsh)".
+    iFrame "Hta". iIntros "Hta".
+    iSplitL "Hba"; [iExact "Hba" |].
+    iSplitL "Hta"; [iExact "Hta" |].
+    iSplitL "Htf"; [iExact "Htf" |].
+    iSplitL "HS"; [iExact "HS" |].
+    iSplitL "Hlk"; [iExact "Hlk" |].
+    iPureIntro. exact Hsh.
+  Qed.
+
   (* THE REGISTRY: the CURRENT snapshot, at the committed block map [D].
      The gname family, the byte map and the state are existential -- an
      epoch is named only by the map it stands at, which is what makes
      [P_dur] a function of [D] alone and therefore droppable into
-     [FsCrash.P_fs] with no arity change. *)
-  Definition P_dur D : iProp Σ :=
-    (∃ (g gl gt : gname) (S : fs_state_rec),
+     [FsCrash.P_fs] with no arity change.
+
+     ...AND ITS MAP NAME EXPOSED (round C): [P_dur_at gt D] is the registry
+     at a NAMED abstract-map gname, so a guest half can be tied to the
+     snapshot it belongs to.  [P_dur] is its existential; every statement
+     about [P_dur] is unchanged and lifts by opening the one binder. *)
+  Definition P_dur_at (gt : gname) D : iProp Σ :=
+    (∃ (g gl : gname) (S : fs_state_rec),
        fs_snap (snap_gamma g gl gt) g D S)%I.
+
+  Definition P_dur D : iProp Σ := (∃ gt : gname, P_dur_at gt D)%I.
+
+  Global Instance P_dur_at_timeless gt D : Timeless (P_dur_at gt D).
+  Proof. rewrite /P_dur_at. apply _. Qed.
 
   Global Instance P_dur_timeless D : Timeless (P_dur D).
   Proof. rewrite /P_dur. apply _. Qed.
+
+  (* THE PAIR (round C): the snapshot AND an OPAQUE guest at its map name,
+     the guest UNDER A LATER -- the transport yields [▷ A], so this is the
+     shape every producer of a durable pair can reach, and the shape the
+     WAL's commit permit takes ([LogSnapLaw.snap_law_out]).  The WAL never
+     learns what [G] is; the one value the tree supplies is
+     [AppDur.app_guest]. *)
+  Definition dur_pair (G : gname -> iProp Σ) D : iProp Σ :=
+    (∃ gt : gname, P_dur_at gt D ∗ ▷ G gt)%I.
 
 
 
@@ -861,13 +944,18 @@ Section Snap.
     own (γlink Γ) (link_tok_elem ROOTINO v) ==∗
       A ∗ fs_state Γ (DfracOwn q) S
       ∗ own (γlink Γ) (link_tok_elem ROOTINO v)
-      ∗ P_dur D.
+      (* ...and the fresh epoch WITH ITS GUEST HALF (round C, ruling 6) *)
+      ∗ ∃ gt : gname, P_dur_at gt D ∗ snap_guest gt (fss_inodes S).
   Proof.
     intros Hq Hsh Hle. iIntros "HA HS Ht".
     iMod (fs_state_xfer_tok Γ Hex A M Hag q S ROOTINO v Hq with "HA HS Ht")
       as (g gl gt B) "(%Hin & HA & HS & Ht & Hba & Hta & Htf & HS' & Ht')".
     iModIntro. iFrame "HA HS Ht".
-    iExists g, gl, gt, S. rewrite /fs_snap /snap_auth.
+    (* the fresh map's authority splits: the kernel half into the snapshot,
+       the guest half out *)
+    iDestruct "Hta" as "[Hta Hguest]".
+    iExists gt. iSplitR "Hguest"; [| rewrite /snap_guest; iExact "Hguest"].
+    rewrite /P_dur_at. iExists g, gl, S. rewrite /fs_snap /snap_auth.
     iSplitL "Hba".
     { iExists B. iFrame "Hba". iPureIntro. exact (transitivity Hin Hle). }
     iFrame "Hta Htf HS'".
@@ -902,10 +990,21 @@ Section Snap.
   (*  byte authority, so a bare [iFrame] would unify the wrong gname.    *)
   (*  Every conjunct is placed by name.                                  *)
   (* ================================================================== *)
-  Lemma P_dur_clone D : P_dur D ==∗ P_dur D ∗ P_dur D.
+  (* ...AT A NAMED MAP (round C).  The clone's guest half is handed out at
+     the SOURCE's own map [I]: the caller holds a fraction of the source's
+     map authority (the crash slot's guest half, [FsCrash.P_fs_swap]),
+     agreement pins it to the snapshot's node map, and the copy's guest is
+     stated at that same [I] -- so the caller never names the snapshot's
+     state. *)
+  Lemma P_dur_at_clone (gt : gname) D (I : gmap Z fs_node) :
+    P_dur_at gt D -∗ ghost_map_auth gt (1/2) I ==∗
+      P_dur_at gt D ∗ ghost_map_auth gt (1/2) I
+      ∗ ∃ gt' : gname, P_dur_at gt' D ∗ snap_guest gt' I.
   Proof.
-    iIntros "HD". rewrite {1}/P_dur.
-    iDestruct "HD" as (g gl gt S) "Hs".
+    iIntros "HD Hg". rewrite {1}/P_dur_at.
+    iDestruct "HD" as (g gl S) "Hs".
+    iDestruct (fs_snap_top_agree (snap_gamma g gl gt) g D S (1/2) I
+                 with "Hs Hg") as %->.
     rewrite /fs_snap. iDestruct "Hs" as "(Hba & Hta & Htf & HS & Hlk & %Hsh)".
     rewrite /snap_auth. iDestruct "Hba" as (B) "[Hba %Hin]".
     iDestruct "Hlk" as (kv) "Hlk".
@@ -913,8 +1012,8 @@ Section Snap.
             (ghost_map_auth g 1 B) B (snap_gamma_agree g gl gt B) 1%Qp S D kv
             qp_half_lt_1 Hsh Hin with "Hba HS Hlk")
       as "(Hba & HS & Hlk & Hnew)".
-    iModIntro. iSplitR "Hnew"; [| iExact "Hnew"].
-    rewrite /P_dur. iExists g, gl, gt, S. rewrite /fs_snap.
+    iModIntro. iSplitR "Hg Hnew"; [| iSplitL "Hg"; [iExact "Hg" | iExact "Hnew"]].
+    rewrite /P_dur_at. iExists g, gl, S. rewrite /fs_snap.
     iSplitL "Hba".
     { rewrite /snap_auth. iExists B. iSplitL "Hba"; [iExact "Hba" |].
       iPureIntro. exact Hin. }
@@ -1361,23 +1460,19 @@ Section Snap.
     iSplitR; [by iPureIntro | iExact "H"].
   Qed.
 
-  (* THE COMMIT'S STEP.  The previous epoch is DISCARDED (affine) and the
-     next one allocated; no ghost is updated, so the step needs nothing
-     from the old instance and nothing from the era but the value and the
-     facts. *)
-  Definition dsnap_step D D' : iProp Σ := (P_dur D ==∗ P_dur D')%I.
-
-  (* THE STEP TAKES THE NEXT EPOCH ITSELF (durable-disk lane H2).  Its
-     predecessor [dsnap_step_of] took the VALUE and the pure tie and built
-     the epoch inside the WAL's permit -- the value-first entry, wrong at
-     the commit for the reason plan section 4 gives -- and is DELETED: the
-     file system now builds its own epoch at its own ghost step, where its
-     invariants are open ([FsCollectAll.fs_snap_law_build]), and the WAL
-     only swaps the registry over.  The old epoch is DISCARDED (affine);
-     nothing is read out of it, which is why the step needs no premise
-     about [D] at all. *)
-  Lemma dsnap_step_xfer D D' : P_dur D' -∗ dsnap_step D D'.
-  Proof. rewrite /dsnap_step. iIntros "H _". by iModIntro. Qed.
+  (* THE COMMIT'S STEP TAKES THE NEXT PAIR ITSELF (durable-disk lane H2;
+     round C).  Its predecessor [dsnap_step_of] took the VALUE and the pure
+     tie and built the epoch inside the WAL's permit -- the value-first
+     entry, wrong at the commit for the reason plan section 4 gives -- and
+     is DELETED: the file system builds its own epoch, and the guest beside
+     it, at its own ghost step where its invariants are open
+     ([FsCollectAll.fs_snap_law_build]), and the WAL only swaps the pair
+     over.  The old snapshot AND the old guest are DISCARDED (affine);
+     nothing is read out of either, which is why the step needs no premise
+     about [D] at all.  The guest stays OPAQUE here. *)
+  Lemma dsnap_step_xfer (G : gname -> iProp Σ) (gt : gname) D D' :
+    dur_pair G D' -∗ P_dur_at gt D -∗ ▷ G gt ==∗ dur_pair G D'.
+  Proof. iIntros "H _ _". by iModIntro. Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  8.  WHAT A CONSUMER READS OFF THE CURRENT SNAPSHOT                  *)
@@ -1386,22 +1481,37 @@ Section Snap.
   (* THE TIE IS A READING (durable-disk lane H3): the epoch's own resources
      say it, so the receipt costs nothing and nothing is spent -- the
      conclusion is pure and the snapshot stays whole. *)
+  Lemma P_dur_at_tie (gt : gname) D :
+    dblk_full D -> P_dur_at gt D -∗ ∃ S, ⌜snap_ok S D⌝.
+  Proof.
+    intros Hf. iIntros "H". iDestruct "H" as (g gl S) "Hs".
+    iDestruct (fs_snap_read_ok _ _ _ _ _ Hf with "Hs") as %Hok. eauto.
+  Qed.
+
   Lemma P_dur_tie D : dblk_full D -> P_dur D -∗ ∃ S, ⌜snap_ok S D⌝.
   Proof.
-    intros Hf. iIntros "H". iDestruct "H" as (g gl gt S) "Hs".
-    iDestruct (fs_snap_read_ok _ _ _ _ _ Hf with "Hs") as %Hok. eauto.
+    intros Hf. iIntros "H". iDestruct "H" as (gt) "Hs".
+    iApply (P_dur_at_tie gt D Hf with "Hs").
   Qed.
 
   (* ...and the same with the snapshot HANDED BACK, which is the form an
      invariant's opener needs.  Everything a consumer reads off the current
      snapshot goes through this plus the pure clauses of [snap_ok]. *)
+  Lemma P_dur_at_tie_keep (gt : gname) D :
+    dblk_full D -> P_dur_at gt D -∗ ∃ S, ⌜snap_ok S D⌝ ∗ P_dur_at gt D.
+  Proof.
+    intros Hf. iIntros "H". iDestruct "H" as (g gl S) "Hs".
+    iDestruct (fs_snap_read_ok _ _ _ _ _ Hf with "Hs") as %Hok.
+    iExists S. iSplitR; [iPureIntro; exact Hok |].
+    iExists g, gl, S. iExact "Hs".
+  Qed.
+
   Lemma P_dur_tie_keep D :
     dblk_full D -> P_dur D -∗ ∃ S, ⌜snap_ok S D⌝ ∗ P_dur D.
   Proof.
-    intros Hf. iIntros "H". iDestruct "H" as (g gl gt S) "Hs".
-    iDestruct (fs_snap_read_ok _ _ _ _ _ Hf with "Hs") as %Hok.
-    iExists S. iSplitR; [iPureIntro; exact Hok |].
-    iExists g, gl, gt, S. iExact "Hs".
+    intros Hf. iIntros "H". iDestruct "H" as (gt) "Hs".
+    iDestruct (P_dur_at_tie_keep gt D Hf with "Hs") as (S) "[%Hok Hs]".
+    iExists S. iSplitR; [iPureIntro; exact Hok |]. iExists gt. iExact "Hs".
   Qed.
 
 End Snap.

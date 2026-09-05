@@ -175,6 +175,8 @@ Require Import BitmapInv.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
+Require Import AppInv.       (* [app_xfer]: the transport, off kit 2 (round C) *)
+Require Import AppDur.       (* [app_guest]: the guest kit 2's crash seam is stated at (round C) *)
 (* the commit's collection geometry and the law it supports (durable-disk
    C-8): fsinit is what carries the law down to [initlog], which is the one
    site that can compose it with block 1's park *)
@@ -389,9 +391,14 @@ Definition wp_fsinit_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   printk_env fsc_printk fsc_uart fsc_disk -∗
   bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
-  (* initlog's crash seam, era certificate and the era's BORN-TRUE mirror
-     half + swap receipt (durable-disk 1a) *)
-  fs_crash_seam fsc_cov fsc_logst -∗
+  (* THE CRASH SEAM AT THE APPLICATION'S GUEST, AND THE TRANSPORT
+     (app-instances.md round C), both off kit 2: fsinit builds the commit's
+     law from them ([FsCollectAll.fs_snap_law_build], which produces the
+     snapshot AND the application's durable claim beside it) and derives
+     initlog's arity-free seam from the first.  Then the era certificate
+     and the era's BORN-TRUE mirror half + swap receipt (durable-disk 1a). *)
+  fs_crash_seam_at app_guest fsc_cov fsc_logst -∗
+  app_xfer -∗
   gen_cert -∗
   log_mirror_born M -∗
   (* THE LOG'S FOUR GNAMES, AT THEIR GENESIS VALUES, AND THEY ARE

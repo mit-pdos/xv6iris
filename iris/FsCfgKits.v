@@ -65,7 +65,11 @@ Require Import BitmapInv.
 Require Import FsCfg.          (* the record this file finally gives a value *)
 Require Import AppCfg.         (* [appcfg]: the application's record, threaded beside [fscfg] *)
 Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ the application copy shadows *)
-Require Import AppInv.         (* [app_inv]: kit 2's last row (app-instances.md section 2) *)
+Require Import AppInv.         (* [app_inv]: kit 2's application row (app-instances.md section 2);
+                                  [app_xfer]: the transport, kit 2's last row (round C) *)
+Require Import AppDur.         (* [app_guest]: the guest the crash seam is stated at (round C) *)
+Require FsCrash.               (* [fs_crash_seam_at]: the seam at the application's guest,
+                                  spelled QUALIFIED -- this file does not want FsCrash's exports *)
 Require Import Xv6G.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import TsoCtx.
@@ -319,7 +323,18 @@ Section FsCfgKits.
         patterns only grow at the end.  At the application record [APP]
         this kit threads (explicit through the kits, ambient everywhere
         else). *)
-     AppInv.app_inv (APP := APP) fsc_fs)%I.
+     AppInv.app_inv (APP := APP) fsc_fs ∗
+     (* THE CRASH SEAM AT THE APPLICATION'S GUEST, AND THE TRANSPORT
+        (app-instances.md round C).  Both are what fsinit builds the
+        commit's law from ([FsCollectAll.fs_snap_law_build]), and neither
+        can be minted inside an era: the seam is a conversion at the
+        composite crash slot, made only where the fixed record is built
+        ([SystemAdequacy]), and the transport is the application's own
+        closed lemma.  So both ride this kit from the system theorem down
+        to forkret's fsinit arm ([FirstTok.first_fsinit]).  Persistent;
+        LAST, after the application's invariant. *)
+     FsCrash.fs_crash_seam_at (app_guest (APP := APP)) fsc_cov fsc_logst ∗
+     AppInv.app_xfer (APP := APP))%I.
 
   Lemma fs_kit_fsinit_ghost_open (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ)
       (P : Z -> list (bv 8)) (Rspent : gset Z)
@@ -343,7 +358,9 @@ Section FsCfgKits.
       fs_bytes_inv (fs_bytes fsc_fs) (fs_cache fsc_fs) (fs_exc fsc_fs)
                    (fs_home_set fsc_cov fsc_logst) Pb ∗
       exc_own (fs_exc fsc_fs) Xexc ∗
-      AppInv.app_inv (APP := APP) fsc_fs.
+      AppInv.app_inv (APP := APP) fsc_fs ∗
+      FsCrash.fs_crash_seam_at (app_guest (APP := APP)) fsc_cov fsc_logst ∗
+      AppInv.app_xfer (APP := APP).
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
@@ -472,11 +489,11 @@ Section FsCfgKits.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           Hbmres & Hrem & #Hbinv & Hxo & #Henv)".
+           Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hxfer)".
     iSplitR; [iExact "Hireg" |].
     rewrite /fs_kit_fsinit_ghost.
     iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem Hbinv Hxo
-            Henv".
+            Henv Hseam Hxfer".
   Qed.
 
   (* ...and the same peel for the equally-persistent BITMAP row, so a
@@ -492,11 +509,11 @@ Section FsCfgKits.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           #Hbmres & Hrem & #Hbinv & Hxo & #Henv)".
+           #Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hxfer)".
     iSplitR; [iExact "Hbmres" |].
     rewrite /fs_kit_fsinit_ghost.
     iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem Hbinv Hxo
-            Henv".
+            Henv Hseam Hxfer".
   Qed.
 
 End FsCfgKits.

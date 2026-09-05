@@ -44,6 +44,8 @@ Require Import RiscvLang ObsTrace RiscvPtsto.
 Require Import FsState.
 Require FsAbsDefs.          (* [anode], [abs_view]: the application's claim is over the view
                                (Require, not Import: it re-exports FsState) *)
+Require Import AppDur.      (* [app_dur_raw]: the application's DURABLE claim beside the snapshot,
+                               tied by the guest half of its map (app-instances.md round C) *)
 Require Import AppInv.      (* [app_auto_raw]: the application's parked license, at the raw gname; the
                                application's boot obligation and license (applications.md) *)
 Require Import ProcGeom.
@@ -214,21 +216,65 @@ Qed.
    disk's auth out of [state_interp] ([RiscvAdequacy.power_interp_disk_auth]
    -- a FIXED conjunct, so it is there at every state of the trace, powered
    on or off).  Nothing new is proved and nothing new is assumed. *)
+(* ---------------------------------------------------------------------- *)
+(* THE COMPOSITE CRASH SLOT (app-instances.md round C, section 6 rulings   *)
+(* 3 and 7).  Two predicates side by side under the one fixed-layer        *)
+(* invariant: the file system's durability record at its snapshot's map    *)
+(* name ([FsCrash.P_fs_named_at]), and the application's durable claim at  *)
+(* that SAME name ([AppDur.app_dur_raw] at the application's predicate,    *)
+(* its fixed part applied) -- tied to the snapshot by the guest half of    *)
+(* the map's authority, and by nothing else.  The binder is the SLOT's:   *)
+(* the record is untouched in statement and the application's conjunct is *)
+(* its own.  No later on the guest here: the slot sits under the machine's *)
+(* own [▷] ([crash_inv]).                                                  *)
+(* ---------------------------------------------------------------------- *)
+Definition xv6_slot {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
+    {CT : Type} (N : Type) (app_fs : CT -> N -> FsAbsDefs.aview -> iProp Σ)
+    (cov : gset Z) (ls : Z)
+    (γd γsw γreg γst : gname) (c : CT) : iProp Σ :=
+  (∃ gt : gname,
+     P_fs_named_at gt γd XV6_DISK_BYTES γsw γreg γst cov ls ∗
+     app_dur_raw (app_fs c) gt)%I.
+
+(* THE PURE PROJECTION OF THE COMPOSITE: the file system's half is
+   projected ([FsCrash.P_fs_project]) and the guest is FRAMED -- the map
+   name does not move.  Both [Hproj] and the trace hooks below are this. *)
+Lemma xv6_slot_project {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
+    {CT : Type} (N : Type) (app_fs : CT -> N -> FsAbsDefs.aview -> iProp Σ)
+    (cov : gset Z) (ls : Z)
+    (γd γsw γreg γst : gname) (c : CT) (dk : Z -> bv 8) :
+  ⊢ disk_img_auth_sized γd XV6_DISK_BYTES dk -∗
+    ▷ xv6_slot N app_fs cov ls γd γsw γreg γst c -∗
+    ◇ (disk_img_auth_sized γd XV6_DISK_BYTES dk ∗
+       ▷ xv6_slot N app_fs cov ls γd γsw γreg γst c ∗
+       ⌜fs_boot_pure cov ls dk⌝).
+Proof.
+  iIntros "Ha HP". rewrite /xv6_slot.
+  iDestruct "HP" as (gt) "[HP HG]".
+  iMod (P_fs_project gt γd XV6_DISK_BYTES γsw γreg γst cov ls dk
+          with "Ha HP") as "(Ha & HP & %Hp)".
+  (* placed by name, never framed: the record owns the durable disk's byte
+     big-op behind a [Definition] (durable-notes on [iFrame]) *)
+  iModIntro. iSplitL "Ha"; [iExact "Ha" |]. iSplitL; [| iPureIntro; exact Hp].
+  iNext. iExists gt. iSplitL "HP"; [iExact "HP" | iExact "HG"].
+Qed.
+
 Lemma fs_trace_hook (Σ : gFunctors) `{!xv6G Σ, !riscvGpreS Σ}
-    (cov : gset Z) (ls : Z) (CT : Type)
+    (cov : gset Z) (ls : Z) (CT N : Type)
+    (app_fs : CT -> N -> FsAbsDefs.aview -> iProp Σ)
     (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs : gname) (c : CT)
     (T : list mobs) (g' : gstate) :
   ⊢ @power_interp Σ
        (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-          (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov ls)
+          (xv6_slot N app_fs cov ls γd γsw γreg γstart c)
           γobs T (obs_pred_at γobs) CT c) g' -∗
-    ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov ls -∗
+    ▷ xv6_slot N app_fs cov ls γd γsw γreg γstart c -∗
     ◇ ⌜fs_boot_pure cov ls (v_disk (g'.(gdev).(dvirtio)))⌝.
 Proof.
   exact (disk_proj_trace XV6_DISK_BYTES CT
-           (fun a b c d _ => P_fs_named a XV6_DISK_BYTES b c d cov ls)
+           (xv6_slot N app_fs cov ls)
            (fs_boot_pure cov ls)
-           (fun a b c d _ dk => P_fs_project a XV6_DISK_BYTES b c d cov ls dk)
+           (xv6_slot_project N app_fs cov ls)
            Hinv γgen γstart γreg γd γsw γobs T (obs_pred_at γobs) c g').
 Qed.
 
@@ -254,22 +300,23 @@ Definition xv6_trace_pure (cov : gset Z) (ls : Z) (g : gstate) : Prop :=
   (g.(gpow) = true -> resv_ok g).
 
 Lemma xv6_trace_hook (Σ : gFunctors) `{!xv6G Σ, !riscvGpreS Σ}
-    (cov : gset Z) (ls : Z) (CT : Type)
+    (cov : gset Z) (ls : Z) (CT N : Type)
+    (app_fs : CT -> N -> FsAbsDefs.aview -> iProp Σ)
     (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs : gname) (c : CT)
     (T : list mobs) (g' : gstate) :
   ⊢ @power_interp Σ
        (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-          (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov ls)
+          (xv6_slot N app_fs cov ls γd γsw γreg γstart c)
           γobs T (obs_pred_at γobs) CT c) g' -∗
-    ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov ls -∗
+    ▷ xv6_slot N app_fs cov ls γd γsw γreg γstart c -∗
     ◇ ⌜xv6_trace_pure cov ls g'⌝.
 Proof.
   iIntros "Hsi HP".
   (* the era-side fact first: its conclusion is PURE, so [state_interp] is
      not spent and the disk projection still has it *)
   iDestruct (power_interp_resv_ok with "Hsi") as %Hresv.
-  iDestruct (fs_trace_hook Σ cov ls CT Hinv γgen γstart γreg γd γsw γobs c T g'
-               with "Hsi HP") as ">%Hdisk".
+  iDestruct (fs_trace_hook Σ cov ls CT N app_fs Hinv γgen γstart γreg γd γsw
+               γobs c T g' with "Hsi HP") as ">%Hdisk".
   iModIntro. iPureIntro. split; [exact Hdisk | exact Hresv].
 Qed.
 
@@ -313,18 +360,13 @@ Section SystemBoot.
          [power_boot_res]'s [Rb] beside the file system's own
          [P_fs_lend]. *)
       (N : Type) (A : N -> gmap Z FsAbsDefs.anode -> iProp Σ)
-      (Rl : (Z -> bv 8) -> iProp Σ)
-      (* THE BOOT OBLIGATION (app-instances.md round A): at every era, the
-         founded map's VIEW -- the state the lent epoch stands at -- satisfies
-         the predicate at SOME instance of the application's names, which
-         becomes the era's running instance; paid out of the lend.  [()] and
-         [True] for the generic application. *)
-      (Happ_boot : forall (S : fs_state_rec) (D : gmap Z (list (bv 8)))
-                          (dk : Z -> bv 8),
-         snap_ok S D ->
-         fs_recovery (fs_blocks dk) D cov (FsImg.sb_logstart sb) ->
-         ⊢ Rl dk -∗
-           |==> ∃ r : N, A r (FsAbsDefs.abs_view (fss_inodes S)))
+      (* THE TRANSPORT (app-instances.md round C, section 1): the
+         application's one durability obligation, parked in the era's
+         invariant by the mint and carried to fsinit on the kit, where the
+         commit's law copies the running claim onto each fresh snapshot.
+         The boot itself needs no transport: the lent durable claim IS the
+         era's running one. *)
+      (Happ_xfer : ⊢ app_xfer_raw A)
       (* THE PARKED LICENSE, at every instance: the moves the application
          admits from anyone, parked in its invariant by the mint *)
       (Happ_auto : forall r : N, ⊢ app_auto_raw A r) :
@@ -357,7 +399,10 @@ Section SystemBoot.
        has to come from -- that is [riscv_power_adequacy]'s [Hcp], and this
        premise is [Hcp] read at the FS's own [Pc].  The seam is assembled
        from it below and rides [first_tok] to forkret's first arm. *)
-    riscv_crash_pred = P_fs_any cov (FsImg.sb_logstart sb) ->
+    (* ...SINCE ROUND C THE SLOT IS THE COMPOSITE: the record at its
+       snapshot's map name beside the application's durable claim at that
+       name ([FsCrash.P_fs_comp] at the guest [app_dur_raw A]). *)
+    riscv_crash_pred = P_fs_comp (app_dur_raw A) cov (FsImg.sb_logstart sb) ->
     (* THE TRACE SLOT'S VALUE, likewise (claude-notes/projects/uart-trace.md):
        this boot states no trace property, so the slot holds the trivial
        predicate, and that is what discharges the UART thread's permit. *)
@@ -370,7 +415,13 @@ Section SystemBoot.
     obs_inv -∗
     power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES
       (fun dk => mirror_of (fs_blocks dk))
-      (fun dk => P_fs_lend cov (FsImg.sb_logstart sb) dk ∗ Rl dk)%I g
+      (* THE LEND (round C): the crash predicate's clone at its map name,
+         and the application's durable claim at that same name, tied by the
+         guest half -- what the PowerOn arm produced by [FsCrash.P_fs_swap]
+         and the transport *)
+      (fun dk => ∃ gt : gname,
+         P_fs_lend_at gt cov (FsImg.sb_logstart sb) dk ∗
+         ▷ app_dur_raw A gt)%I g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
          WP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗
@@ -399,17 +450,28 @@ Section SystemBoot.
     destruct Hpure as (Hext & D & Hrec & Hhwf & _).
     (* ---- THE LENT EPOCH, OFF [power_boot_res]'s CLIENT CONJUNCT ---- *)
     iDestruct (power_boot_res_lend with "Hres") as "[Hlend Hres]".
-    (* ...which is the file system's epoch beside the APPLICATION's lend *)
-    iEval (cbv beta) in "Hlend". iDestruct "Hlend" as "[Hlend Hrl]".
-    iEval (rewrite /P_fs_lend) in "Hlend".
+    (* ...which is the file system's clone at its map name beside the
+       APPLICATION's durable claim at that name (round C) *)
+    iEval (cbv beta) in "Hlend". iDestruct "Hlend" as (gtn) "[Hlend Hguest]".
+    iEval (rewrite /P_fs_lend_at) in "Hlend".
     iDestruct "Hlend" as (D0) "[%Hrec0 Hdur]".
     (* the identification, and it is one step: recovery is a FUNCTION of the
        physical disk, so the map the crash predicate's epoch stands at IS
        the map this boot's own projection names. *)
     pose proof (fs_recovery_det _ _ _ _ _ Hrec0 Hrec) as HD0. subst D0.
     (* ...and the state comes out of the resource. *)
-    iEval (rewrite /P_dur) in "Hdur".
-    iDestruct "Hdur" as (gsn gln gtn S) "Hdursnap".
+    iEval (rewrite /P_dur_at) in "Hdur".
+    iDestruct "Hdur" as (gsn gln S) "Hdursnap".
+    (* THE APPLICATION'S CLAIM COMES OUT OF THE GUEST (round C, section 3
+       crossing 3): the guest's half agrees with the clone's kernel half, so
+       the claim is about the clone's own state -- the founded map -- at
+       SOME instance, which becomes the era's running one.  The guest half
+       itself is dropped: the era founds its own map. *)
+    iDestruct (fs_snap_top_acc with "Hdursnap") as "[Htopk Hdursnap]".
+    iMod (app_dur_raw_agree A gtn (1/2) (fss_inodes S) with "Htopk Hguest")
+      as "(Htopk & _ & Hok)".
+    iDestruct ("Hdursnap" with "Htopk") as "Hdursnap".
+    iDestruct "Hok" as (r) "Hok".
     iDestruct (fs_snap_read_ok_keep _ _ _ _ _
                  (fs_recovery_blocks_full _ _ _ _ Hrec) with "Hdursnap")
       as "[%Hsnok Hdursnap]".
@@ -457,25 +519,29 @@ Section SystemBoot.
        predicate IS the crash predicate" means.  It is spelled at the ERA's
        superblock, which is where the boot chain wants it; [Hlseq] is the
        one step. *)
-    iAssert (fs_crash_seam cov (FsImg.sb_logstart (fss_sb S))) as "#Hseam".
-    { rewrite Hlseq /fs_crash_seam. iModIntro.
+    iAssert (fs_crash_seam_at (app_dur_raw A) cov (FsImg.sb_logstart (fss_sb S)))
+      as "#Hseamg".
+    { rewrite Hlseq /fs_crash_seam_at. iModIntro.
       rewrite Hcp. iSplitL; iIntros "H"; iExact "H". }
+    (* ...and its arity-free form, which the boot chain's sixty carriers
+       take (the seam at SOME guest) *)
+    iPoseProof (fs_crash_seam_of_at with "Hseamg") as "#Hseam".
     (* THE BOOT HART'S THREAD-OF-CONTROL TOKEN (tso-port M2): minted HERE,
        before the shared carve, so the carve's ξ-indexed rows are pinned at
        the identity the boot hart will run as.  The secondaries mint their
        own below; each reads the started deposit through its own token. *)
     iMod (own_context_boot (CID := 0%fin)) as (ξ0) "Hthr0".
-    (* THE APPLICATION'S BOOT OBLIGATION, PAID: the founded map is the lent
-       epoch's own state [S], whose [snap_ok] was read off the resource
-       above and whose committed map is the boot's own [D]; the lend pays
-       the seed's conjunct, and the license comes with it.  Both go into
-       the mint through [boot_shared_alloc]. *)
-    iMod (Happ_boot S D (v_disk (g.(gdev).(dvirtio))) Hsnok Hrec with "Hrl")
-      as (r) "Hok".
+    (* THE APPLICATION'S RUNNING CLAIM IS THE LENT DURABLE ONE (round C):
+       [Hok] is at the founded map [fss_inodes S], later-shaped, at the
+       instance [r] the transport minted; the license and the transport
+       come with it, and the seam at the application's guest goes down to
+       fsinit on the kit.  All of it goes into the mint through
+       [boot_shared_alloc]. *)
     iPoseProof (Happ_auto r) as "#Hlic".
+    iPoseProof Happ_xfer as "#Hxfer".
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
             S Pb (MkAppcfg N A r) (fun _ => emp)%I gsn gln gtn Hbf Hbundle
-            with "Hok Hlic Hdursnap Hres")
+            with "Hok Hlic Hxfer Hseamg Hdursnap Hres")
       as (Hfd Hir Hpav Hbs HF γd γv Rspent γi ξd)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
@@ -630,14 +696,15 @@ Theorem xv6_power_adequacy_gen Σ
        boot application below is explicit ([@]) and passes it positionally. *)
     `{Hufd : !ufdG Σ}
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
-    (* THE APPLICATION'S FILE-SYSTEM SIDE (claude-notes/design/applications.md
-       sections 1-3): its predicate on the abstract state, its LEND -- what
-       the PowerOn arm hands each boot about the durable state, at the
-       application's fixed part, beside the file system's own [P_fs_lend] --
-       the lend's production out of the crash predicate ([Hlend], composed
-       with [FsCrash.P_fs_swap] into [riscv_power_adequacy]'s [Hswap]
-       below), the boot obligation ([Happ_boot]: the founded map satisfies
-       the predicate or the run is tainted) and the license ([Happ_lic]).
+    (* THE APPLICATION'S FILE-SYSTEM SIDE (claude-notes/projects/
+       app-instances.md sections 1-3, round C): its predicate on the
+       abstract state's view, the TRANSPORT ([Happ_xfer]: what copies its
+       claim onto each fresh durable instance -- the PowerOn clone in
+       [Hswap] below, the commit's snapshot in the file system's law), its
+       ERA-0 claim ([Happ_init], packed into the initial composite slot
+       beside the image's snapshot) and the license ([Happ_auto]).  The
+       durable claim rides the crash slot ([xv6_slot]) and the lend
+       ([Rb] below); the boot founds the era's running one from the lend.
        All at the RAW forms over an arbitrary value of the application's
        FIXED PART (app-instances.md section 6 ruling 1, round D0: its
        [Type] [CT], what its birth step [Hbirth] yields, and the step
@@ -650,18 +717,21 @@ Theorem xv6_power_adequacy_gen Σ
     (CT : Type) (Cl : CT -> iProp Σ)
     (Hbirth : ⊢ |==> ∃ c : CT, Cl c)
     (app_names : Type) (app_fs : CT -> app_names -> gmap Z FsAbsDefs.anode -> iProp Σ)
-    (Rl : CT -> (Z -> bv 8) -> iProp Σ)
-    (Hlend : forall (γd γsw γreg γst : gname) (c : CT) (dk : Z -> bv 8),
-       ⊢ ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov (FsImg.sb_logstart sb) -∗
-         |==> ◇ (▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov
-                    (FsImg.sb_logstart sb) ∗
-                 Rl c dk))
-    (Happ_boot : forall (c : CT) (S : fs_state_rec)
-                        (D : gmap Z (list (bv 8))) (dk : Z -> bv 8),
-       snap_ok S D ->
-       fs_recovery (fs_blocks dk) D cov (FsImg.sb_logstart sb) ->
-       ⊢ Rl c dk -∗
-         |==> ∃ r : app_names, app_fs c r (FsAbsDefs.abs_view (fss_inodes S)))
+    (* THE TRANSPORT (app-instances.md round C, section 1; section 6 ruling
+       5): a copy of the claim can be made at fresh instance names without
+       spending the original, under the later every crossing hands it over
+       at.  It is what copies the running claim onto each commit's snapshot
+       and the crash slot's claim onto each PowerOn clone. *)
+    (Happ_xfer : forall c : CT, ⊢ app_xfer_raw (app_fs c))
+    (* ERA 0 (round C, section 1): the claim at the IMAGE's own abstract
+       state -- the one snapshot in the tree with no source instance -- at
+       some instance; packed against the image snapshot's guest half into
+       the initial crash slot *)
+    (Happ_init : forall c : CT,
+       ⊢ |==> ∃ r : app_names,
+           app_fs c r (FsAbsDefs.abs_view
+             (fss_inodes (FsDurImg.img_state
+                (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib))))
     (Happ_auto : forall (c : CT) (r : app_names),
        ⊢ app_auto_raw (app_fs c) r)
     (* THE TRACE INVARIANT, PASSED THROUGH TO
@@ -702,21 +772,25 @@ Theorem xv6_power_adequacy_gen Σ
                (c : CT) (T : list mobs),
           riscv_fixedGS =
             boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-              (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov
-                 (FsImg.sb_logstart sb))
+              (xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
+                 γd γsw γreg γstart c)
               γobs T (Pt γobs c) CT c) ->
        ⊢ obs_inv -∗ uart_obs_permit γ)
     (phi : gstate -> list mobs -> Prop)
+    (* ...the slot [Hphi] holds at the end of the run is the COMPOSITE
+       (round C): the application reads its durable claim off it beside the
+       file system's record and the ledger *)
     (Hphi : forall (Hinv : invGS Σ)
                    (γgen γstart γreg γd γsw γobs : gname) (c : CT)
                    (T : list mobs) (g' : gstate) (h : list mobs),
        ⊢ @power_interp Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov
-                  (FsImg.sb_logstart sb))
+               (xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
+                  γd γsw γreg γstart c)
                γobs T (Pt γobs c) CT c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
-         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov (FsImg.sb_logstart sb) -∗
+         ▷ xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
+             γd γsw γreg γstart c -∗
          ▷ Pt γobs c -∗
          ◇ ⌜phi g' h⌝)
     (* the hypotheses about the machine: it is off, and nothing has ever
@@ -785,7 +859,10 @@ Proof.
      over [FsDurAlloc]'s carve -- builds it.
      THIS IS THE ONLY PLACE THE IMAGE DECODER IS READ: every later era's boot
      re-founds the file system from the snapshot the previous era committed. *)
-  assert (Hsnap0 : ⊢ |==> P_dur D0).
+  assert (Hsnap0 : ⊢ |==> ∃ gt : gname,
+            P_dur_at gt D0 ∗
+            snap_guest gt (fss_inodes (FsDurImg.img_state
+               (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib))).
   { pose proof Himg as Hw.
     assert (Hclean : hdr_n (fs_blocks (v_disk (g.(gdev).(dvirtio)))
                               (log_hdr_bno (FsImg.sb_logstart sb))) = 0).
@@ -804,30 +881,40 @@ Proof.
            (* THE APPLICATION'S BIRTH STEP, straight through: the power
               theorem runs it first (app-instances.md section 6 ruling 1) *)
            CT Cl Hbirth
-           (* the crash slot does not name the fixed part YET: round C's
-              [app_dur] conjunct is what fills the fifth argument *)
-           (fun (γd γsw γreg γst : gname) (_ : CT) =>
-              P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov
-                (FsImg.sb_logstart sb))
+           (* THE COMPOSITE SLOT (round C): the record at its snapshot's map
+              name, beside the application's durable claim at that name, at
+              the application's fixed part [c] *)
+           (xv6_slot app_names app_fs cov (FsImg.sb_logstart sb))
+           (* ERA 0: the record from mkfs's recovery fact and the image's
+              snapshot, whose guest half packs the application's era-0
+              claim ([Happ_init]) *)
            ltac:(intros γd γsw γreg γst c; iIntros "(Hfr & Hsw)";
-                 iMod (P_fs_alloc γsw γreg γst _ D0 cov
-                         (FsImg.sb_logstart sb) Hrec Hhwf Hsnap0
-                         with "Hsw") as (γs) "(%Hseq & HP & _)";
-                 iModIntro;
-                 rewrite /P_fs_named;
-                 iExists (v_disk (g.(gdev).(dvirtio))); iFrame "Hfr";
-                 iSplitR; [iPureIntro; exact Hext |];
-                 rewrite /P_fs_rec_named; iExists γs;
-                 iSplitR; [iPureIntro; exact Hseq | iExact "HP"])
+                 iMod (P_fs_alloc γsw γreg γst _ D0
+                         (FsDurImg.img_state
+                            (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib)
+                         cov (FsImg.sb_logstart sb) Hrec Hhwf Hsnap0
+                         with "Hsw") as (γs gt) "(%Hseq & HP & Hguest & _)";
+                 iMod (Happ_init c) as (r) "Hcl";
+                 iModIntro; rewrite /xv6_slot; iExists gt;
+                 iSplitR "Hguest Hcl";
+                 [ rewrite /P_fs_named_at;
+                   iExists (v_disk (g.(gdev).(dvirtio))); iFrame "Hfr";
+                   iSplitR; [iPureIntro; exact Hext |];
+                   rewrite /P_fs_rec_named_at; iExists γs;
+                   iSplitR; [iPureIntro; exact Hseq | iExact "HP"]
+                 | iEval (rewrite /snap_guest) in "Hguest";
+                   rewrite /app_dur_raw;
+                   iExists r, (fss_inodes (FsDurImg.img_state
+                      (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib));
+                   iSplitL "Hguest"; [iExact "Hguest" | iExact "Hcl"] ])
            (* THE PURE PROJECTION (stage H0): the crash predicate's own
               reading of the physical disk, at every era.  [P_fs_project] IS
-              the obligation -- the durable auth is lent for the one
-              agreement that identifies [P_fs]'s image with the machine's,
-              and nothing is spent. *)
+              the obligation on the file system's half -- the durable auth
+              is lent for the one agreement that identifies [P_fs]'s image
+              with the machine's, and nothing is spent; the application's
+              conjunct is framed ([xv6_slot_project]). *)
            (fs_boot_pure cov (FsImg.sb_logstart sb))
-           ltac:(intros γd γsw γreg γst c dk;
-                 exact (P_fs_project γd XV6_DISK_BYTES γsw γreg γst cov
-                          (FsImg.sb_logstart sb) dk))
+           (xv6_slot_project app_names app_fs cov (FsImg.sb_logstart sb))
            (* CUSTODY AT BIRTH (durable-disk 1a): the era's mirror is the
               picture of the era's own disk, and [P_fs_swap] IS the hook's
               obligation -- it installs [P_fs]'s custody arm at that
@@ -847,19 +934,46 @@ Proof.
               no state-determinacy theorem is needed.  [xv6_boot_era]
               splits it off [power_boot_res] and hands its contents to the
               mint (durable-disk BT-3). *)
-           (* ...BESIDE THE APPLICATION'S LEND (applications.md section 3):
-              [P_fs_swap] produces the epoch, and [Hlend] then produces the
-              application's resource out of the record it hands back, in the
-              same [==∗ ◇]. *)
-           (fun c dk => P_fs_lend cov (FsImg.sb_logstart sb) dk ∗ Rl c dk)%I
+           (* ...BESIDE THE APPLICATION'S DURABLE CLAIM (app-instances.md
+              round C, section 3 crossing 2): [P_fs_swap] clones the record's
+              snapshot and hands the clone's guest half out at the slot's
+              own map; the transport ([Happ_xfer]) copies the slot's claim
+              under its later; the copy packs onto the clone's half and
+              rides the lend, the original goes back into the slot. *)
+           (fun c dk => ∃ gt : gname,
+              P_fs_lend_at gt cov (FsImg.sb_logstart sb) dk ∗
+              ▷ app_dur_raw (app_fs c) gt)%I
            ltac:(intros γd γsw γreg γst c Er gen dk; cbv beta;
                  iIntros "#Hreg #Hst Hsa Ha HM HP";
-                 iMod (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst cov
-                         (FsImg.sb_logstart sb) dk Er gen
-                         with "Hreg Hst Hsa Ha HM HP")
-                   as ">(Hsa & Ha & HP & HM & #Hsw & Hl)";
-                 iMod (Hlend γd γsw γreg γst c dk with "HP") as ">[HP Hrl]";
-                 iModIntro; iModIntro; iFrame "Hsa Ha HP HM Hsw Hl Hrl")
+                 rewrite /xv6_slot; iDestruct "HP" as (gt) "[HP HG]";
+                 iMod (app_dur_raw_open with "HG") as (r I) "[Hh Hcl]";
+                 iMod (P_fs_swap gt γd XV6_DISK_BYTES γsw γreg γst cov
+                         (FsImg.sb_logstart sb) dk Er gen I
+                         with "Hreg Hst Hsa Ha HM [Hh] HP")
+                   as ">(Hsa & Ha & HP & HM & #Hsw & Hh & Hl)";
+                 [rewrite /snap_guest; iExact "Hh" |];
+                 iPoseProof (Happ_xfer c) as "#Hxfer";
+                 iEval (rewrite /app_xfer_raw) in "Hxfer";
+                 iMod ("Hxfer" with "Hcl") as "[Hcl Hnew]";
+                 iDestruct "Hl" as (gt') "[Hl Hg']";
+                 iEval (rewrite /snap_guest) in "Hh Hg'";
+                 (* NO BARE [iFrame] PAST THE SLOT (durable-notes: "[iFrame]
+                    resolves its instances up to delta"): the slot's record
+                    owns the durable disk's 2 MB byte big-op behind a
+                    [Definition], and a frame that has to pass it to reach
+                    a later conjunct unfolds it -- measured unbounded.
+                    Every conjunct is placed by name. *)
+                 iModIntro; iModIntro;
+                 iSplitL "Hsa"; [iExact "Hsa" |];
+                 iSplitL "Ha"; [iExact "Ha" |];
+                 iSplitL "HP Hh Hcl";
+                 [ iNext; iExists gt; iSplitL "HP"; [iExact "HP" |];
+                   rewrite /app_dur_raw; iExists r, I;
+                   iSplitL "Hh"; [iExact "Hh" | iExact "Hcl"] |];
+                 iSplitL "HM"; [iExact "HM" |];
+                 iSplitR; [iExact "Hsw" |];
+                 iExists gt'; iSplitL "Hl"; [iExact "Hl" |];
+                 iApply (app_dur_raw_pack with "Hg' Hnew"))
            (* THE TRACE SLOT AND THE TRACE HOOK, threaded straight through:
               this layer fixes the crash predicate but says nothing about the
               trace, so both pass down unexamined. *)
@@ -883,7 +997,7 @@ Proof.
      [Gcl] (round D0): below the boot nothing names the record's
      [riscv_client], so they are terms here, not holes *)
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ Hufd _ _ _ _ _ gen g' sb nib cov
-            app_names (app_fs Gcl) (Rl Gcl) (Happ_boot Gcl) (Happ_auto Gcl)
+            app_names (app_fs Gcl) (Happ_xfer Gcl) (Happ_auto Gcl)
             Hbf Hpure Hcovin Hlogsub Hls2 _ _).
   (* the descriptor class comes back as a GOAL here rather than being
      shelved, because the application is explicit ([@]); it is the section's
@@ -916,10 +1030,11 @@ Theorem xv6_power_adequacy Σ
                    (T : list mobs) (g' : gstate),
        ⊢ @power_interp Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov
-                  (FsImg.sb_logstart sb))
+               (xv6_slot unit (fun _ _ _ => True%I) cov (FsImg.sb_logstart sb)
+                  γd γsw γreg γstart c)
                γobs T (obs_pred_at γobs) unit c) g' -∗
-         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov (FsImg.sb_logstart sb) -∗
+         ▷ xv6_slot unit (fun _ _ _ => True%I) cov (FsImg.sb_logstart sb)
+             γd γsw γreg γstart c -∗
          ◇ ⌜phi g'⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (Himg : fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
@@ -935,11 +1050,10 @@ Proof.
                part, any abstract state, nothing lent, the license outright *)
             unit (fun _ => True%I)
             ltac:(iModIntro; iExists (); iPureIntro; exact Logic.I)
-            unit (fun _ _ _ => True%I) (fun _ _ => emp)%I
-            ltac:(intros γd γsw γreg γst c dk; cbv beta; iIntros "HP";
-                  iModIntro; iModIntro; by iFrame "HP")
-            ltac:(intros c S D dk _ _; cbv beta; iIntros "_"; iModIntro;
-                  iExists (); iPureIntro; exact Logic.I)
+            unit (fun _ _ _ => True%I)
+            ltac:(intros c; apply app_xfer_raw_triv; intros r av; reflexivity)
+            ltac:(intros c; cbv beta; iModIntro; iExists ();
+                  iPureIntro; exact Logic.I)
             ltac:(intros c r; apply app_auto_raw_triv; intros r' av;
                   reflexivity)
             (fun γobs _ => obs_pred_at γobs)
@@ -994,11 +1108,10 @@ Proof.
                part, any abstract state, nothing lent, the license outright *)
             unit (fun _ => True%I)
             ltac:(iModIntro; iExists (); iPureIntro; exact Logic.I)
-            unit (fun _ _ _ => True%I) (fun _ _ => emp)%I
-            ltac:(intros γd γsw γreg γst c dk; cbv beta; iIntros "HP";
-                  iModIntro; iModIntro; by iFrame "HP")
-            ltac:(intros c S D dk _ _; cbv beta; iIntros "_"; iModIntro;
-                  iExists (); iPureIntro; exact Logic.I)
+            unit (fun _ _ _ => True%I)
+            ltac:(intros c; apply app_xfer_raw_triv; intros r av; reflexivity)
+            ltac:(intros c; cbv beta; iModIntro; iExists ();
+                  iPureIntro; exact Logic.I)
             ltac:(intros c r; apply app_auto_raw_triv; intros r' av;
                   reflexivity)
             (fun γobs _ => obs_ledger_at R γobs)
@@ -1264,11 +1377,11 @@ Corollary xv6_power_adequacy_xv6Σ (g : gstate)
                    (T : list mobs) (g' : gstate),
        ⊢ @power_interp xv6Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart fsimg_cov
-                  (FsImg.sb_logstart fsimg_sb))
+               (xv6_slot unit (fun _ _ _ => True%I) fsimg_cov
+                  (FsImg.sb_logstart fsimg_sb) γd γsw γreg γstart c)
                γobs T (obs_pred_at γobs) unit c) g' -∗
-         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart fsimg_cov
-             (FsImg.sb_logstart fsimg_sb) -∗
+         ▷ xv6_slot unit (fun _ _ _ => True%I) fsimg_cov
+             (FsImg.sb_logstart fsimg_sb) γd γsw γreg γstart c -∗
          ◇ ⌜phi g'⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (* THE ONE HYPOTHESIS LEFT, and it is about the HARDWARE SETUP, not the
@@ -1326,7 +1439,8 @@ Proof.
      this corollary used to pass, by conversion on the record literal. *)
   exact (xv6_power_adequacy_xv6Σ g
            (xv6_trace_pure fsimg_cov (FsImg.sb_logstart fsimg_sb))
-           (xv6_trace_hook xv6Σ fsimg_cov (FsImg.sb_logstart fsimg_sb) unit)
+           (xv6_trace_hook xv6Σ fsimg_cov (FsImg.sb_logstart fsimg_sb) unit unit
+              (fun _ _ _ => True%I))
            Hgen0 Hpow Hdisk).
 Qed.
 
@@ -1381,11 +1495,10 @@ Proof.
                part, any abstract state, nothing lent, the license outright *)
             unit (fun _ => True%I)
             ltac:(iModIntro; iExists (); iPureIntro; exact Logic.I)
-            unit (fun _ _ _ => True%I) (fun _ _ => emp)%I
-            ltac:(intros γd γsw γreg γst c dk; cbv beta; iIntros "HP";
-                  iModIntro; iModIntro; by iFrame "HP")
-            ltac:(intros c S D dk _ _; cbv beta; iIntros "_"; iModIntro;
-                  iExists (); iPureIntro; exact Logic.I)
+            unit (fun _ _ _ => True%I)
+            ltac:(intros c; apply app_xfer_raw_triv; intros r av; reflexivity)
+            ltac:(intros c; cbv beta; iModIntro; iExists ();
+                  iPureIntro; exact Logic.I)
             ltac:(intros c r; apply app_auto_raw_triv; intros r' av;
                   reflexivity)
             (fun γobs _ => obs_pred_at γobs)

@@ -1678,8 +1678,13 @@ Section DurImgAlloc.
   Lemma img_P_dur_alloc (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb)
       (nib : nat) (cov : gset Z) :
     fs_boot_image_wf dk ndisk sb nib cov ->
-    ⊢ |==> P_dur (fs_restrict (fs_blocks dk)
-                    (fs_home_set cov (FsImg.sb_logstart sb))).
+    ⊢ |==> ∃ gt : gname,
+        P_dur_at gt (fs_restrict (fs_blocks dk)
+                       (fs_home_set cov (FsImg.sb_logstart sb)))
+        (* ...and the GUEST HALF of era 0's map, at the image's own state
+           (app-instances.md round C): what the application's era-0 claim
+           ([SystemAdequacy]'s [Happ_init]) is packed against *)
+        ∗ snap_guest gt (fss_inodes (img_state (fs_blocks dk) sb nib)).
   Proof.
     intros Himg.
     exact (P_dur_alloc (img_state (fs_blocks dk) sb nib)

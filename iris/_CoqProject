@@ -894,6 +894,9 @@ AppCfg.v
 # authority beside its claim, and the one ghost move on the map
 # (app-instances.md section 2); below InodeRegion, whose movers open it
 AppInv.v
+# AppDur = the application's DURABLE instance: its claim beside the snapshot,
+#   tied by the guest half of the snapshot's map authority (round C)
+AppDur.v
 FsAbsDelta.v
 FsBytesGamma.v
 BitmapInv.v

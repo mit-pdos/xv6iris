@@ -842,7 +842,12 @@ Section EndOpDefs.
     log_ctx γ bn γfs cov logstart dev -∗
     ghost_map_auth (fs_cache γfs) 1 L -∗
     ghost_map_auth (ln_tx γ) 1 T ={⊤}=∗
-      P_dur (fs_restrict (dv_of_D L) (fs_home_set cov logstart)) ∗
+      (* the epoch AND the crash seam at the law's own guest
+         (app-instances.md round C): what the commit permit takes, at one
+         [G], and what the file system's law hands down as a pair *)
+      (∃ G : gname -> iProp Σ,
+         fs_crash_seam_at G cov logstart ∗
+         snap_law_out G L (fs_home_set cov logstart)) ∗
       ghost_map_auth (fs_cache γfs) 1 L ∗
       ghost_map_auth (ln_tx γ) 1 T.
   Proof.
@@ -865,6 +870,7 @@ Section EndOpDefs.
     iMod ("Hclose" with "[Hba HC Hxa]") as "_".
     { iApply bi.later_intro. iExists Lb, C, ∅. by iFrame. }
     iModIntro. iFrame "HcL Ht".
+    iDestruct "Hlaw" as (G) "[#Hseam Hlaw]". iExists G. iFrame "Hseam".
     rewrite /snap_law_out.
     rewrite -(eo_restrict_of_sub C L (fs_home_set cov logstart) Hdom Hsub).
     iExact "Hlaw".
@@ -1002,7 +1008,9 @@ Section EndOpDefs.
     log_ctx γ bn γfs cov logstart dev -∗
     eo_open bn γfs cov logstart n W L Db Lw t -∗
     ghost_map_auth (ln_tx γ) 1 T ={⊤}=∗
-      P_dur (fs_restrict (dv_of_D L) (fs_home_set cov logstart)) ∗
+      (∃ G : gname -> iProp Σ,
+         fs_crash_seam_at G cov logstart ∗
+         snap_law_out G L (fs_home_set cov logstart)) ∗
       eo_open bn γfs cov logstart n W L Db Lw t ∗
       ghost_map_auth (ln_tx γ) 1 T.
   Proof.
@@ -1991,6 +1999,9 @@ Section EndOpBlocks.
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (* the law's own guest (round C): the commit permit's seam and epoch
+         are both at it *)
+      (G : gname -> iProp Σ)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool) (Mc : log_mirror)
       (pidv : mword 32) (dq : dfrac)
@@ -2050,8 +2061,13 @@ Section EndOpBlocks.
        accounting critical section, where the ledger is provably empty and
        the authority is in hand, and carries THE NEXT DURABLE EPOCH down in
        its hand.  The copy loop writes only log SLOTS, so the map this
-       stands at does not move ([eo_home_restrict_upd]). *)
-    P_dur (fs_restrict (dv_of_D L) (fs_home_set cov logstart)) -∗
+       stands at does not move ([eo_home_restrict_upd]).
+       ...AND SINCE ROUND C IT IS THE PAIR -- the snapshot and the
+       application's durable claim beside it, at the law's opaque guest
+       [G] -- with the crash seam at that same [G] beside it, both read off
+       [log_ctx]'s one law handle. *)
+    fs_crash_seam_at G cov logstart -∗
+    snap_law_out G L (fs_home_set cov logstart) -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2060,7 +2076,8 @@ Section EndOpBlocks.
     destruct Hshape as [HnW Hn30].
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
-              Hopen Hepoch Hcont".
+              Hopen #Hseamg Hepoch Hcont".
+    iEval (rewrite /snap_law_out) in "Hepoch".
     iPoseProof (log_ctx_swap with "Hlctx") as "#Hswlb".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
     (* the byte view's row, for install_trans's recovering arm (unused on
@@ -2126,7 +2143,7 @@ Section EndOpBlocks.
        and the mirror half comes back at the header picture the write just
        laid down, which is what the install fupds below then read. *)
     { iIntros (bs' Hlen' Hhn' Hdec').
-      iApply (fs_commit_L_seq_permit cov logstart Mc (lm_view Mc) L n
+      iApply (fs_commit_L_seq_permit G cov logstart Mc (lm_view Mc) L n
                 (map uint W) bs'
                 ltac:(exact Hlen') ltac:(exact Hdec')
                 ltac:(exact Hn30) ltac:(by apply NoDup_ListNoDup)
@@ -2143,7 +2160,7 @@ Section EndOpBlocks.
                       rewrite (HMcslot i
                                  ltac:(apply lookup_lt_Some in Hv; lia));
                       exact (HLw i v Hv))
-                with "Hseam Hregc Hswlb Hmirc Hepoch"). }
+                with "Hseamg Hregc Hswlb Hmirc Hepoch"). }
     iIntros (CIDb1 Hsb1 mf1 bs1) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid
                                   Hncell HW HauthL Hhdr %Hhdrn1 %Hhdec1 Hu1 HQ1".
     (* the mirror half back (the receipt is dropped: nothing in this stage
@@ -2759,6 +2776,7 @@ Section EndOpBlocks.
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (G : gname -> iProp Σ)
       (n : nat) (W : list (mword 32)) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (lks : gset string) (Upr : ustate) (fuel : nat) :
@@ -2822,8 +2840,10 @@ Section EndOpBlocks.
        [end_op]'s accounting critical section, where the WAL's transaction
        authority is in hand; every fill writes a log SLOT, which is not a
        home block, so the map it stands at is literally the same term at the
-       back edge ([eo_home_restrict_upd]). *)
-    P_dur (fs_restrict (dv_of_D L) (fs_home_set cov logstart)) -∗
+       back edge ([eo_home_restrict_upd]).  Since round C it is the PAIR at
+       the law's guest [G], with the crash seam at that [G] beside it. *)
+    fs_crash_seam_at G cov logstart -∗
+    snap_law_out G L (fs_home_set cov logstart) -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2836,7 +2856,7 @@ Section EndOpBlocks.
       [ exfalso; exact (eo_fuel_absurd t n Ht Hfuel) |].
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
-              Hopen Hepoch Hcont".
+              Hopen #Hseamg Hepoch Hcont".
     iPoseProof (log_ctx_swap with "Hlctx") as "#Hswlb".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
     (* the byte view's row, for install_trans's recovering arm (unused on
@@ -3946,14 +3966,16 @@ Section EndOpBlocks.
     (* the law's map is untouched by a slot write (lane CE), so the EPOCH in
        the walk's hand is already at the bumped cursor's map -- one rewrite,
        no re-reading of the law (durable-disk lane H2) *)
-    assert (Hsnapmap : fs_restrict (dv_of_D (<[uint bnol := bs2]> L))
+    assert (Hsnapmap : snap_law_out G (<[uint bnol := bs2]> L)
                          (fs_home_set cov logstart)
-                       = fs_restrict (dv_of_D L) (fs_home_set cov logstart))
-      by exact (eo_home_restrict_upd L cov logstart (uint bnol) bs2
-                  ltac:(rewrite Hubnol;
-                        apply FsCrash.log_region_not_home;
-                        apply eo_slot_in_region;
-                        exact (eo_t_lt_lb t n Ht Hn30))).
+                       = snap_law_out G L (fs_home_set cov logstart)).
+    { rewrite /snap_law_out.
+      rewrite (eo_home_restrict_upd L cov logstart (uint bnol) bs2
+                 ltac:(rewrite Hubnol;
+                       apply FsCrash.log_region_not_home;
+                       apply eo_slot_in_region;
+                       exact (eo_t_lt_lb t n Ht Hn30))).
+      reflexivity. }
     iEval (rewrite -Hsnapmap) in "Hepoch".
     assert (Hrow' : log_mirror_tie_body Mc'
                       (<[uint bnol := bs2]> L) cov logstart
@@ -4031,7 +4053,7 @@ Section EndOpBlocks.
                 (eo_fuel_step t n fuel Hfuel) HLw' HMc'hdr HMc'slot Hrow'
                 HJ3regs HJ3s2 HJ3s4 HJ3s5
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
-                      Hopen Hepoch Hcont").
+                      Hopen Hseamg Hepoch Hcont").
     - (* the loop is done: S t = n, and the commit tail follows *)
       assert (Htn : S t = n) by lia.
       assert (Hcmp : zopz0zI_s (rget J3 Rs2) (rget J3 Ra5) = false).
@@ -4063,7 +4085,7 @@ Section EndOpBlocks.
       rewrite Htn in HLw'. rewrite Htn in HMc'slot.
       iEval (rewrite Htn) in "Hopen".
       iApply (eo_commit (CID0 := CIDa25)  γs j γl γu γd γk pd pav pu bn γ γfs
-                cov logstart dev
+                cov logstart dev G
                 n W Lw' (<[uint bnol := bs2]> L) D Mc' pidv dq m J3 K eb lks
                 Upr HK (conj Hcovok Hlogsub) Hj Hgl (conj HnW Hn30) Hnd Hwok
                 ltac:(intros i v Hv; apply (HLw' i v);
@@ -4071,7 +4093,7 @@ Section EndOpBlocks.
                 HMc'hdr HMc'slot Hrow'
                 HJ3regs Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
-                      Hopen Hepoch Hcont").
+                      Hopen Hseamg Hepoch Hcont").
   Qed.
 
 
@@ -4849,6 +4871,9 @@ Section ProofEndOp.
               (delete i0 om) (delete tt0 Tx) nl W L Dd (fun _ => []) 0
               Hsztd Hommt0 with "Hlctx Hopen Htxa")
         as "(Hepoch & Hopen & Htxa)".
+      (* the law's guest, named where its existential is opened (round C):
+         the seam and the epoch at it go down together *)
+      iDestruct "Hepoch" as (G) "[#Hseamg Hepoch]".
       iModIntro.
       assert (Hnz26 : neq_vec (rget T4 Rs2) (zero_reg : mword 64) = false).
       { rgne. rewrite HT4s2 (eo_neq0 (out - 1)%nat Hout3d) Hzero. reflexivity. }
@@ -5320,14 +5345,14 @@ Section ProofEndOp.
                      ltac:(wp_next_chain) with "Hextm") as "Hextm".
         iDestruct (eo_cont_shift (CIDa := CIDr) (CIDb := CIDs9)  j pidv dq m K eb eb lks Upr
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply (eo_loop γs j γl γu γd γk pd pav pu bn γ γfs cov logstart dev
+        iApply (eo_loop γs j γl γu γd γk pd pav pu bn γ γfs cov logstart dev G
                   nl W Dd pidv dq m K eb lks Upr nl
                   HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok Hbelow
                   CIDs9 0%nat Y4 L (fun _ => []) M0 ltac:(lia) ltac:(lia)
                   ltac:(intros i v Hi Hv; lia) HM0hdr ltac:(intros i Hi; lia)
                   HM0row HY4regs HY4s2 HY4s4 HY4s5
                   with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
-                        Hopen Hepoch Hcont").
+                        Hopen Hseamg Hepoch Hcont").
     - (* ---- THE FAST PATH: other operations are still open ---- *)
       assert (Hnz26 : neq_vec (rget T4 Rs2) (zero_reg : mword 64) = true).
       { rgne. rewrite HT4s2 (eo_neq0 (out - 1)%nat Hout3d).

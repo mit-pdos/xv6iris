@@ -62,7 +62,8 @@ Require Import WpLockAt BioInitAt KallocInv IrefSlots BioDefs.
 Require Import LogInv.
 Require Import FsCfg.
 Require Import AppCfg.        (* [appcfg]: the application's record, minted beside [fscfg] *)
-Require Import AppInv.        (* [app_inv_alloc]: the application's invariant, founded here; kit 2's last row *)
+Require Import AppInv.        (* [app_inv_alloc]: the application's invariant, founded here; kit 2's application row *)
+Require Import AppDur.        (* [app_guest]: the guest the kit's crash seam is stated at (round C) *)
 Require FsAbsDefs.            (* [abs_view]: the application's claim is over the founded map's view (Require, not Import: it re-exports FsState) *)
 Require Import FileInvDefs.   (* the off ledger's boot face (off-ledger ruling) *)
 Require Import FsBoot FsCfgBoot.
@@ -862,8 +863,16 @@ Section SnapMint.
     (forall b : Z, 1 <= b < fs_data_start (fss_sb S) -> b ∈ cov) ->
     disk_bytes γv 0 (disk_read dk 0 ndisk) -∗
     bslots_auth -∗ bslots BSLOTS_FS -∗
-    @app_pred Σ APP (@app_run Σ APP) (FsAbsDefs.abs_view (fss_inodes S)) -∗
+    (* the running claim, LATER-SHAPED: it comes off the lent durable
+       instance through the transport (app-instances.md round C), and
+       [inv_alloc] takes the later *)
+    ▷ @app_pred Σ APP (@app_run Σ APP) (FsAbsDefs.abs_view (fss_inodes S)) -∗
     app_auto (APP := APP) -∗
+    (* ...the transport, parked in the invariant and handed to fsinit on
+       the kit, and the crash seam at the application's guest, handed to
+       fsinit on the kit (round C) *)
+    app_xfer (APP := APP) -∗
+    FsCrash.fs_crash_seam_at (app_guest (APP := APP)) cov (sb_logstart (fss_sb S)) -∗
     (* ---- THE DURABLE SNAPSHOT, AS A RESOURCE, and it is the whole of the
        file system's side: the committed map IS what the machine would
        recover to, and it is the encoding of the abstract state [S].  What
@@ -907,7 +916,7 @@ Section SnapMint.
                     (fs_home_set cov (sb_logstart (fss_sb S))))).
     { intros b bs Hbs. apply fs_restrict_lookup_Some in Hbs as [_ ->].
       exact (HlPb b). }
-    iIntros "Hdisk Hsa Hsf Hok #Hlic Hsnap".
+    iIntros "Hdisk Hsa Hsf Hok #Hlic #Hxfer #Hseamg Hsnap".
     (* THE TIE IS A READING (durable-disk BT-3, plan section 2's "the
        epoch's IDENTITY is a resource"): [snap_ok] is no longer handed in
        anywhere on the boot side -- it comes off the epoch's own resources,
@@ -1043,7 +1052,13 @@ Section SnapMint.
     iDestruct "Htopa" as "[Htopa Htopb]".
     iMod (ftop_alloc E γfs (fss_inodes S) Hloc with "Htopa Hlkauth")
       as "#Hftopi".
-    iMod (app_inv_alloc (APP := APP) γfs (fss_inodes S) E with "Htopb Hok Hlic")
+    (* THE DOMAIN ROW (round C): the founded map's inums are exactly the
+       region's -- the snapshot's own geometry says so, at the record's
+       width *)
+    assert (Hdomapp : app_dom (fss_inodes S)).
+    { intros z. rewrite (snap_ok_inum_dom S _ Hok z) Hnibeq. done. }
+    iMod (app_inv_alloc (APP := APP) γfs (fss_inodes S) E Hdomapp
+            with "Htopb Hok Hlic Hxfer")
       as "#Henv".
     iEval (rewrite (big_sepM_as_set (fss_inodes S)
                       (fun i n => top_frag (fs_gamma_L γfs) i n))) in "Htopf".
@@ -1322,7 +1337,9 @@ Section SnapMint.
       iSplitL "Hbmres"; [iExact "Hbmres" |].
       iSplitL "Hrem"; [iExact "Hrem" |].
       iSplitR; [iExact "Hbinv" |].
-      iSplitL "Hxo"; [iExact "Hxo" | iExact "Henv"]. }
+      iSplitL "Hxo"; [iExact "Hxo" |].
+      iSplitR; [iExact "Henv" |].
+      iSplitR; [iExact "Hseamg" | iExact "Hxfer"]. }
     iSplitL "Hfol"; [iExact "Hfol" | iExact "Hoffa"].
   Qed.
 

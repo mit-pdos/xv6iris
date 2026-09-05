@@ -194,8 +194,8 @@ Section flushed_hist.
       ⌜exists r : fs_rec,
          fs_rec_wf r (fs_blocks dk) cov ls /\ fr_hist r !! b = Some D⌝.
   Proof.
-    rewrite /P_fs /flushed_at.
-    iIntros "Hp Hf". iDestruct "Hp" as (r) "(Hauth & %Hwf & _)".
+    rewrite /P_fs /P_fs_at /flushed_at.
+    iIntros "Hp Hf". iDestruct "Hp" as (gt r) "(Hauth & %Hwf & _)".
     iDestruct "Hf" as (l Hl) "Hlb".
     iDestruct (fs_hist_valid with "Hauth Hlb") as %Hpre.
     iPureIntro. exists r. split; [exact Hwf |].
@@ -224,9 +224,9 @@ Section flushed_hist.
         ⌜fs_recovery (fs_blocks dk) D cov ls⌝ ∗ ⌜snap_holds D⌝ ∗
         flushed_at γs b D ∗ P_fs γs cov ls dk.
   Proof.
-    rewrite /P_fs. iIntros "Hp".
-    iDestruct "Hp" as (r) "(Hauth & %Hwf & Harm & Hdur)".
-    iDestruct (P_dur_tie_keep (fr_D r)
+    rewrite /P_fs /P_fs_at. iIntros "Hp".
+    iDestruct "Hp" as (gt r) "(Hauth & %Hwf & Harm & Hdur)".
+    iDestruct (P_dur_at_tie_keep gt (fr_D r)
                  (fs_recovery_blocks_full dk (fr_D r) cov ls (proj1 Hwf))
                  with "Hdur") as (S Hok) "Hdur".
     iDestruct (fs_hist_snapshot with "Hauth") as "[Hauth #Hlb]".
@@ -237,7 +237,7 @@ Section flushed_hist.
     iSplitR; [iPureIntro; by exists S |].
     iSplitR.
     { iExists l. iSplitR; [by iPureIntro |]. rewrite -Hl. iExact "Hlb". }
-    iExists r. iFrame "Hauth Harm Hdur". iPureIntro.
+    iExists gt, r. iFrame "Hauth Harm Hdur". iPureIntro.
     split_and!; [exact Hrec | exact Hlast | exact Hhdr].
   Qed.
 

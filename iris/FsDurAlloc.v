@@ -958,7 +958,9 @@ Section AllocSnap.
   Theorem fs_snap_alloc S D :
     snap_ok S D ->
     ⊢ |==> ∃ g gl gt : gname,
-        fs_snap (snap_gamma g gl gt) g D S.
+        fs_snap (snap_gamma g gl gt) g D S
+        (* ...and the GUEST HALF of its map (app-instances.md round C) *)
+        ∗ snap_guest gt (fss_inodes S).
   Proof.
     intros Hok.
     iMod (snap_bytes_alloc (fs_dbytes D)) as (g) "[Hba Hbe]".
@@ -968,8 +970,9 @@ Section AllocSnap.
     iModIntro. iExists g, gl, gt.
     iDestruct (snap_ledger_of_elems g gl gt D (sk_bsz (sk_bytes Hok)) with "Hbe")
       as "Hled".
-    rewrite /fs_snap /snap_auth /top_frag /snap_gamma /=.
-    iFrame "Hta Htf".
+    iDestruct "Hta" as "[Hta Hguest]".
+    rewrite /fs_snap /snap_auth /top_frag /snap_gamma /snap_guest /=.
+    iFrame "Hta Htf Hguest".
     iSplitL "Hba";
       [iExists (fs_dbytes D); iFrame "Hba"; iPureIntro; reflexivity |].
     iSplitL "Hled Hlinks".
@@ -979,10 +982,16 @@ Section AllocSnap.
     iPureIntro. exact (snap_shape_of_ok S D Hok).
   Qed.
 
-  Lemma P_dur_alloc S D : snap_ok S D -> ⊢ |==> P_dur D.
+  Lemma P_dur_alloc S D :
+    snap_ok S D ->
+    ⊢ |==> ∃ gt : gname, P_dur_at gt D ∗ snap_guest gt (fss_inodes S).
   Proof.
     intros Hok.
-    iMod (fs_snap_alloc S D Hok) as (g gl gt) "Hsnap".
-    iModIntro. iExists g, gl, gt, S. iExact "Hsnap".
+    iMod (fs_snap_alloc S D Hok) as (g gl gt) "[Hsnap Hguest]".
+    (* placed by name: a bare [iFrame] of the half would unfold the snapshot
+       and frame the KERNEL half's slot (durable-notes: "[iFrame] resolves
+       its instances up to delta") *)
+    iModIntro. iExists gt. iSplitL "Hsnap"; [| iExact "Hguest"].
+    rewrite /P_dur_at. iExists g, gl, S. iExact "Hsnap".
   Qed.
 End AllocSnap.

@@ -60,6 +60,8 @@ Require Import FsBlocks.        (* [fs_names], [fs_top] *)
 Require Import FsNode.          (* [fs_node] *)
 Require Import FsAbsDefs.       (* [aview], [abs_view], [abs_view_insert_same] *)
 Require Import AppCfg.          (* [appcfg]: [app_names], [app_pred], [app_run] *)
+Require Import IcacheRef.       (* [icfg_nib]: the inode region's width, for
+                                   the body's DOMAIN row (round C) *)
 
 Local Open Scope Z_scope.
 
@@ -106,6 +108,46 @@ Section AppAutoRaw.
     iApply (bi.equiv_entails_1_2 _ _ (Htriv r (abs_view (<[i := n']> I)))).
     iPureIntro. exact Logic.I.
   Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  1b.  THE TRANSPORT (app-instances.md section 1; section 6 ruling 5) *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE ONE DURABILITY OBLIGATION: a copy of the claim about the view [av]
+     can be made at FRESH instance names without spending the original.  A
+     pure or persistent predicate pays it by duplication; one owning an
+     exclusive token pays it by allocating a fresh one -- the existential
+     is what lets it.  LATER-SHAPED (ruling 5): the commit's law, the boot
+     mint and the PowerOn clone are fupds without a step, so the claim
+     reaches every crossing under an invariant's later, and a basic update
+     cannot run under it; a timeless claim strips, a claim holding
+     invariants duplicates under the later.  RAW -- the predicate is an
+     ARGUMENT -- for [app_auto_raw]'s reason. *)
+  Definition app_xfer_raw {N : Type} (A : N -> aview -> iProp Σ) : iProp Σ :=
+    (□ (∀ (r : N) (av : aview),
+          ▷ A r av ==∗ ▷ A r av ∗ ∃ r' : N, ▷ A r' av))%I.
+
+  Global Instance app_xfer_raw_persistent {N} (A : N -> aview -> iProp Σ) :
+    Persistent (app_xfer_raw A).
+  Proof. rewrite /app_xfer_raw. apply _. Qed.
+
+  (* the generic application's: a predicate that holds of every view is its
+     own copy (at the instance handed in, so no inhabitant is needed) *)
+  Lemma app_xfer_raw_triv {N} (A : N -> aview -> iProp Σ) :
+    (forall r av, A r av ⊣⊢ True) -> ⊢ app_xfer_raw A.
+  Proof.
+    intros Htriv. rewrite /app_xfer_raw. iIntros "!>" (r av) "H".
+    iModIntro. iSplitL "H"; [iExact "H" |]. iExists r. iNext.
+    iApply (bi.equiv_entails_1_2 _ _ (Htriv r av)). iPureIntro. exact Logic.I.
+  Qed.
+
+  (* a PURE claim duplicates outright *)
+  Lemma app_xfer_raw_pure {N} (P : aview -> Prop) :
+    ⊢ app_xfer_raw (fun (_ : N) (av : aview) => ⌜P av⌝%I).
+  Proof.
+    rewrite /app_xfer_raw. iIntros "!>" (r av) "#H".
+    iModIntro. iSplitR; [iExact "H" |]. iExists r. iExact "H".
+  Qed.
 End AppAutoRaw.
 
 (* ------------------------------------------------------------------ *)
@@ -121,6 +163,11 @@ Section AppInv.
   (* the era's application record (consumers reach it through [fileG]'s
      [file_app]; the kits and the mint pass it explicitly) *)
   Context `{APP : appcfg Σ}.
+  (* ...and the inode cache's, for the region's width alone: the body's
+     DOMAIN row below is stated at [icfg_nib].  Every carrier of [app_inv]
+     has the record ambient already ([ireg_reg] is [InodeRegion]'s, and the
+     files above [fileG] see it through [file_icfg]). *)
+  Context `{ICFG : icfg}.
 
   Definition app_auto : iProp Σ := app_auto_raw app_pred app_run.
 
@@ -131,14 +178,46 @@ Section AppInv.
     (forall r av, app_pred r av ⊣⊢ True) -> ⊢ app_auto.
   Proof. intros Htriv. rewrite /app_auto. by apply app_auto_raw_triv. Qed.
 
+  (* THE TRANSPORT, PINNED (round C): parked in the body so the era owns
+     it, and a premise of the era mint beside [app_auto]. *)
+  Definition app_xfer : iProp Σ := app_xfer_raw app_pred.
+
+  Global Instance app_xfer_persistent : Persistent app_xfer.
+  Proof. rewrite /app_xfer. apply _. Qed.
+
+  (* THE DOMAIN ROW (round C).  The abstract map names EXACTLY the region's
+     inums.  [InodeRegion.ftop_body] carries no such row, so the commit's
+     collection states its snapshot at the map RESTRICTED to the region
+     ([FsCollectAll.col_reg_map]); the application's durable claim is tied
+     to that snapshot by the half authority and must therefore be about the
+     same map -- which is the running one only if the running one has no
+     inum outside the region.  It never has: the mint founds the map at the
+     snapshot's own node map, whose inums are the region's
+     ([FsState.fs_geom]'s [fg_reg]/[fg_regdom]), and the one mover inserts
+     at an existing key.  Kept HERE, in the application's invariant, because
+     this is the one body the tie reads and the one the mover alone
+     re-closes; nothing in the kernel's own invariants moves. *)
+  Definition app_dom (I : gmap Z fs_node) : Prop :=
+    forall z : Z, is_Some (I !! z) <-> 0 <= z < 16 * Z.of_nat icfg_nib.
+
+  Lemma app_dom_insert (I : gmap Z fs_node) (i : Z) (n n' : fs_node) :
+    I !! i = Some n -> app_dom I -> app_dom (<[i := n']> I).
+  Proof.
+    intros Hi Hd z. rewrite lookup_insert_is_Some'. rewrite -(Hd z).
+    split; [| by right]. intros [-> | H]; [by eexists | exact H].
+  Qed.
+
   (* THE BODY: the application's half of the authority, the claim about the
-     map it carries (read through the view), and the parked license.  NOT
-     timeless: the claim is an arbitrary iProp and stays under the later. *)
+     map it carries (read through the view), the domain row, the parked
+     license and the transport.  NOT timeless: the claim is an arbitrary
+     iProp and stays under the later. *)
   Definition app_body (γfs : fs_names) : iProp Σ :=
     (∃ I : gmap Z fs_node,
        ghost_map_auth (fs_top γfs) (1/2) I ∗
        app_pred app_run (abs_view I) ∗
-       app_auto)%I.
+       ⌜app_dom I⌝ ∗
+       app_auto ∗
+       app_xfer)%I.
 
   Definition app_inv (γfs : fs_names) : iProp Σ := inv appN (app_body γfs).
 
@@ -146,17 +225,20 @@ Section AppInv.
   Proof. rewrite /app_inv. apply _. Qed.
 
   (* ALLOCATION, at the era mint: the guest half of the authority the boot
-     founded, the claim at the founded map (the application's boot
-     obligation, paid one rung up out of the power arm's lend), and the
-     license. *)
+     founded, the claim at the founded map -- LATER-SHAPED, because it
+     arrives from the durable instance through the transport (round C) and
+     [inv_alloc] takes the later -- the domain row, the license and the
+     transport. *)
   Lemma app_inv_alloc (γfs : fs_names) (I : gmap Z fs_node) (E : coPset) :
+    app_dom I ->
     ghost_map_auth (fs_top γfs) (1/2) I -∗
-    app_pred app_run (abs_view I) -∗
-    app_auto -∗ |={E}=> app_inv γfs.
+    ▷ app_pred app_run (abs_view I) -∗
+    app_auto -∗ app_xfer -∗ |={E}=> app_inv γfs.
   Proof.
-    iIntros "Hh Hp #Ha". rewrite /app_inv.
+    iIntros (Hd) "Hh Hp #Ha #Hx". rewrite /app_inv.
     iApply (inv_alloc appN E with "[Hh Hp]").
-    iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Ha".
+    iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Ha Hx".
+    iPureIntro. exact Hd.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -184,7 +266,7 @@ Section AppInv.
     iIntros (HE) "#Hinv Hstep Hk Hf".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & #Ha)".
+    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hd & #Ha & #Hx)".
     iDestruct (ghost_map_auth_agree with "Hk Hh") as %<-.
     iDestruct (ghost_map_lookup with "Hk Hf") as %Hi.
     iAssert (ghost_map_auth (fs_top γfs) 1 I) with "[Hk Hh]" as "Hk".
@@ -193,7 +275,8 @@ Section AppInv.
     iDestruct "Hk" as "[Hk Hh]".
     iDestruct ("Hstep" with "[//] Ha Hp") as "Hp".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists (<[i := n']> I). iFrame "Hh Hp Ha". }
+    { iNext. rewrite /app_body. iExists (<[i := n']> I). iFrame "Hh Hp Ha Hx".
+      iPureIntro. exact (app_dom_insert I i n n' Hi Hd). }
     iModIntro. iFrame "Hk Hf".
   Qed.
 
@@ -296,10 +379,28 @@ Section AppInv.
     iIntros (HE) "#Hinv".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(Hh & Hp & #Ha)".
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Ha". }
+    iDestruct "Hbody" as (I) "(Hh & Hp & Hd & #Ha & #Hx)".
+    iMod ("Hclose" with "[Hh Hp Hd]") as "_".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hd Ha Hx". }
     iModIntro. iExact "Ha".
+  Qed.
+
+  (* THE TRANSPORT, READ OFF THE INVARIANT: [▷]-shaped, like the license.
+     Note what this is NOT good for: a fupd under a later cannot run
+     without a step, so the commit's law does not read the transport here
+     -- it takes [app_xfer] itself, carried from the mint on the fsinit kit
+     ([FsCfgKits.fs_kit_fsinit_ghost]). *)
+  Lemma app_xfer_acc (E : coPset) (γfs : fs_names) :
+    ↑appN ⊆ E ->
+    app_inv γfs ={E}=∗ ▷ app_xfer.
+  Proof.
+    iIntros (HE) "#Hinv".
+    iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iEval (rewrite /app_body) in "Hbody".
+    iDestruct "Hbody" as (I) "(Hh & Hp & Hd & #Ha & #Hx)".
+    iMod ("Hclose" with "[Hh Hp Hd]") as "_".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hd Ha Hx". }
+    iModIntro. iExact "Hx".
   Qed.
 
   Lemma app_step_acc (E : coPset) (γfs : fs_names) (i : Z)
