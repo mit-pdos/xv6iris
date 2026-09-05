@@ -1984,6 +1984,14 @@ UkShMalloc.v
 # things left on the far side of the seam are the engine's width-4 text
 # load and stage 3's named sbrk assumption -- and the break the theorem
 # hands [runcmd] is the one the allocator moved it to.
+# ... THE LOOP'S INTERFACE, once main's body is walked.  UkShLoop.v is two
+# definitions and a one-line accessor: [ushl_dat] (the two static lexer
+# tables, and the allocator's untouched first-call state) and [ushl_head]
+# (the loop head at [16 + (80 + n)] -- fork1's 2, the diagnostic subtree's
+# 28, the parser's 60, the runner's 8).  It is a file of its own only so
+# that the cd arm and the fork arm can be stated against the same interface
+# without one requiring the other; it is what [UkSh.ush_loop_head] has to
+# become.
 # ... THE [cd] BUILTIN.  UkShCd.v walks 0x97a..0x9be -- the three byte
 # tests, [strlen], the NUL that chops the newline, [chdir] and the one
 # diagnostic in sh that COMES BACK.  That last is why UkShDiag's string
@@ -1996,8 +2004,25 @@ UkShMalloc.v
 # the budget it wants ([16 + (10 + (12 + (4 + n)))], fprintf's 26-word
 # frame included); [UkSh.ush_rest] hands [16 + n], so joining the two is a
 # re-cut of the loop head's budget, which belongs with the fork arm.
+UkShLoop.v
+UkShLoop.v
 UkShCd.v
 UkShMain.v
+# ... AND MAIN'S BODY, WHOLE.  UkShFork.v walks the fork arm (0x92c..0x938:
+# fork1, the child/parent split, wait) and then JOINS it to the cd arm as
+# [wp_kshm_body], 0x97a onwards -- the three byte tests dispatch, and the
+# two arms are the two lemmas.  The dispatch is DECIDED BEFORE ANYTHING IS
+# WALKED, because the cd arm's own walk begins at those three tests.
+# What crosses the fork is a [Forkable] payload -- the text and its jump
+# table, [UkShLoop.ushl_dat], and the line buffer -- and the parent gets it
+# all back, which is exactly the address-space copy fork performs.  The
+# break is NOT in it: [usz] is a ghost var, not bytes, so fork1's own leaf
+# hands it to the child.
+#   [wp_kshm_body] IS [UkSh.ush_rest]'s shape modulo two things: the loop
+# head's budget and carried resources ([UkShLoop.ushl_head] instead of
+# [UkSh.ush_loop_head]), and the LEXABILITY premise, which the command loop
+# cannot supply about a line the user typed -- that second one is stage 5's
+# [ush_simple] scope and not this file's.
 UkShFork.v
 
 # FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
