@@ -180,7 +180,13 @@ commit; nothing is per era but the parking.
 
 ## 6. Open questions for the owner (2026-09-05, the full list)
 
-1. **The instance index.**  AGREED: `app_names` splits into a FIXED part
+1. **The instance index.**  RULED (owner, 2026-09-05): a client BIRTH STEP
+   and an explicit `Type` field for the fixed names — `app_fixed : Type`
+   born once by `⊢ |==> ∃ c, Cl c` and threaded into the machine's record
+   as a dependent pair (`riscv_client_T : Type; riscv_client : riscv_client_T`,
+   replacing today's mono-nat name), and `app_names : Type` for the
+   per-instance part refreshed by every transport.  The earlier note:
+   `app_names` splits into a FIXED part
    (born once, nameable by the fixed layer and the machine's record) and a
    PER-INSTANCE part (refreshed by every transport).  Remaining: the fixed
    part's birth.  Proposed: a client birth step `⊢ |==> ∃ γ, Cl γ` run
@@ -188,8 +194,8 @@ commit; nothing is per era but the parking.
    `γobs` is (today's mono-nat at `riscv_client_name` is the special
    case); `app_pred : gname -> app_names -> gmap Z fs_node -> iProp Σ`,
    fixed name first; `app_names : Type`.
-2. **Index by `I` or by `S`.**  Proposed `I`: the fires lend it, the mover
-   changes it, the durable side's `fss_inodes S` IS it at the commit.
+2. **Index by `I` or by `S`.**  RULED `I` (owner): the claim is purely
+   about the abstract state; nothing invisible to user-level code.
 3. ~~Inside `P_dur` or beside it?~~  RULED beside, tied by half an authority.
 4. **The mover's premise.**  Proposed raw at the mover (`<[i := n']> I`,
    the only total form — the landed non-AU movers have no delta
@@ -203,16 +209,16 @@ commit; nothing is per era but the parking.
    timeless laters.  Either require `Timeless (app_pred …)` or state the
    transport under the later,
    `▷ app_pred γa I ==∗ ▷ app_pred γa I ∗ ▷ (∃ γa', app_pred γa' I)`.
-   Proposed: the later-shaped transport (timeless claims strip; claims
-   holding invariants duplicate under the later); `app_step` stays a
-   plain wand, which lifts under the later for free.
+   RULED (owner): the later-shaped transport (timeless claims strip;
+   claims holding invariants duplicate under the later); `app_step` stays
+   a plain wand, which lifts under the later for free.
 6. **Who hands out the halves.**  Each fresh-instance operation of the
    kernel returns the guest half: the snapshot law (`ghost_map_auth gt
    (1/2) I` beside `P_dur`), the PowerOn clone (`P_fs_swap`, via
    `P_dur_clone`), the boot mint (the era's `γtop`).  The collection reads
    the map at the kernel's fraction or borrows the application's half
    while it has the application's invariant open.  One uniform interface,
-   three lemmas.
+   three lemmas.  RULED (owner): yes.
 7. **The crash slot's composition.**  `Pc := P_fs_named ∗ app_dur_named`
    at xv6; `HPc` = `P_fs_alloc` ∗ the era-0 claim at the image's snapshot
    half; `Hproj` frames the application conjunct; `Hswap` = `P_fs_swap`
