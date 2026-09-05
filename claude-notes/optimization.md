@@ -1885,6 +1885,31 @@ Context for an ambient hart before starting.**
   and split each phase into heavy-part + seam. Finding the cut is mechanical:
   `.glob`'s `R` lines give every reference with its defining library; filter to
   the byte range before the functor.
+- **A VOCABULARY FILE WITH HUNDREDS OF IMPORTERS IS ON EVERY ROUTE: CUT IT
+  BY DEPENDENCY CLOSURE, NOT BY SECTION.** Such a file (`TsoCtx`) has no slow
+  sentence to fix — its wall is thousands of ~7 ms sentences — so the only
+  lever is which sentences the routes wait for.  The `.glob` `R` lines give
+  every importer's roots and every lemma's references; a route's need is the
+  closure of its roots and its cost is the sum of those lemmas' `.v.timing`
+  sentences.  Cut where the closures end (definitions, cheap laws and
+  notations in the vocabulary file; each heavy gate family in a sibling that
+  reopens the same `Section`), assign importers by closure, and price it with
+  the static model BEFORE writing files: a cut by file region measured 3.5 s
+  where the closure cut measured 20 s, because the routes reach into the
+  tower's last layer for cheap lemmas.  Two mechanical traps: a section-local
+  `Local Lemma` that crosses the cut must lose its `Local`, and a file that
+  names a moved lemma QUALIFIED without a direct `Require` of the vocabulary
+  file is invisible to a `Require`-line scan — take users from every `.glob`.
+- **THE SERIAL TAIL IS EVERYTHING AFTER THE LAST `Link*`, AND IT PAYS ONE FOR
+  ONE.** From `LinkMain` through `BootChain`, `SystemAdequacy` and the pins
+  the build is one file wide (the profiler's "effectively serial" figure), so
+  a file there must import VOCABULARY, never a proof it does not use.  Read
+  the `.glob`: if a tail file's references into a chain file are all `def`s,
+  the edge is a vocabulary edge and the definitions move to a file with no
+  `Link*` import (`BootHart` is `BootChain`'s).  And no whole-image
+  `vm_compute` belongs in a tail file: its `Qed` re-runs the computation in
+  the kernel, so it goes in an image-check leaf beside `FsImgCheck`
+  (`FsImgConsole`), re-exported if the tail file's consumers name it.
 - **Where ΣCPU goes tree-wide, by leading tactic:** `iApply` ~16 %, `Qed` ~15 %,
   `Require`/`From` ~17 %, `iIntros` ~8 %, `iDestruct` ~4 %. The import line is
   the one to internalise — pure module loading, a floor rather than a bug, and
