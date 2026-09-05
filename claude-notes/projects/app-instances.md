@@ -235,3 +235,49 @@ commit; nothing is per era but the parking.
    channel `Hswap`/`Rb`; the application's conjunct frames through it and
    travels on the lend.  Folding `Hproj` into the lend (`⌜Ppure⌝` beside
    the epoch) is an optional tidy-up, not part of this design.
+
+## 7. Execution plan (started 2026-09-05)
+
+The design is settled (§6, all rulings).  `design/applications.md` §2–§3
+are SUPERSEDED by this file while the rounds land; it is rewritten at
+the end.  Two refinements from the site survey, both rulings-consistent:
+
+- **The predicate is over the user-visible view.**  `app_pred : gname ->
+  app_names -> aview -> iProp Σ` (`FsAbsDefs.aview`, the `abs_view` of the
+  map), never over raw nodes: block addresses and records are invisible
+  to user code.  A retag that preserves `abs_of` therefore needs nothing
+  from the application.
+- **Three mover forms**, because two view-changing retags sit outside
+  any AU fire and inside contracts every path calls (`ilock`'s fresh-inode
+  claim: free → typed; the escrow deposit: orphan → free):
+  `ireg_top_retag_same` (`abs_of n = abs_of n'`, no application input),
+  `ireg_top_retag_step` (a step wand from the caller's contract — the AU
+  fires), and `ireg_top_retag_auto` (`⌜app_auto_ok (abs_of n) (abs_of n')⌝`,
+  paid by a persistent license the application parks in its invariant
+  for the deltas it admits from anyone; `fun _ _ => True` for the generic
+  application).  Non-AU sites use the third form now and move to the
+  second as their AU forms land (round E).
+
+Rounds, each a green gate:
+
+- **A — the running tie.**  `AppCfg.appcfg` over `aview` with
+  `app_names`, `app_pred`, `app_auto_ok`, `app_run`; `AppInv.v` below
+  `InodeRegion` (`app_body γfs := ∃ I, ghost_map_auth (fs_top γfs) (1/2) I ∗
+  app_pred riscv_client_name app_run (abs_view I) ∗ app_auto`); `ftop_body`
+  at `1/2`; `ireg_reg`/`ireg_inv` carry `app_inv γfs`; the three mover
+  forms; the 17 files between `InodeRegion` and `fileG` bind `appcfg`; the
+  era mint founds the half into `app_inv`; the collections and the AU
+  commit shapes read/lend the kernel's half; the AU contracts' bundles
+  gain the step wands; the client copy, its license and `fsabs_env` are
+  deleted; the generic dischargers are stateless.  The boot obligation
+  and the lend stay as today until C.
+- **B — the AU fires pay steps from the contract**, and the dispatcher
+  threads them (generic: trivial).  May fold into A.
+- **C — the durable instance.**  `fs_snap` at `1/2` returning the guest
+  half; `app_dur` beside `P_fs_named` in the slot; the second commit law;
+  the later-shaped transport; the clone; the boot founds `app_inv` from
+  the lend; era 0 from `app_init`.  Deletes `app_lend`/`Hlend`/`Happ_boot`.
+- **D — the birth step.**  The machine record's client `Type`, the
+  application's fixed names; the taint counter becomes the echo
+  application's fixed part.
+- **E — AU forms for link, mkdir, `iput`'s free**, with their deltas.
