@@ -93,7 +93,7 @@ Require Import SpecSysOpenAU.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUAlloc.
 Require Import ProofSysOpen.   (* [so_neq_of_eq] / [so_neq_of_ne] / [so_bud_iput] *)
-Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.
 
@@ -269,7 +269,7 @@ Section ProofSysOpenAUJoin.
     (* ---- THE AU RESIDUE, inert across this block ---- *)
     P (length (path_elems pl)) (bv_unsigned inum) -∗
     so_obs Φo (bv_unsigned inum) (era_node dn bm data) -∗
-    atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Φt -∗
+    atrunc_commit_at (fs_gamma_L fsc_fs) appE Φt -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
                dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Φo Φt m K eb b lks) -∗

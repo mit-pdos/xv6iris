@@ -125,7 +125,7 @@ Require Import ProofSysOpenAUJoin.
 Require Import SpecCreateAUF.     (* the T_FILE create-AU carry            *)
 Require Import SpecCreateAUFOpen. (* [cauf_fail_to_open]                   *)
 Require Import ProofSysOpenAUCreArm.
-Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.
 
@@ -302,10 +302,10 @@ Section ProofSysOpenAUEntryC.
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     (* ---- THE AU BUNDLE (the contract's O_CREATE side, verbatim) ---- *)
     mknod_walk_pre_era fsc_fs (pv_cwi (us_V U)) P Pmiss -∗
-    acre_commit_at (fs_gamma_L fsc_fs) fsabsE (AFile []) Phiok -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Phiex -∗
-    aopen_commit_at (fs_gamma_L fsc_fs) fsabsE Phio -∗
-    atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Phit -∗
+    acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Phiok -∗
+    dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex -∗
+    aopen_commit_at (fs_gamma_L fsc_fs) appE Phio -∗
+    atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit -∗
     wp_next true (proc_addr jx)
       (so_cont0_au_create gf ns
                 dqb dqs dqbs dqn (proc_addr jx) pidv vom U sts
@@ -701,7 +701,8 @@ Section ProofSysOpenAUEntryC.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { rewrite /socr_P. iSplitR; [by iPureIntro |]. iExact "HR". }
-      { iApply atrunc_commit_at_unit. }
+      { iApply (atrunc_commit_at_unit fsc_fs appE ltac:(rewrite /appE; done)).
+        iApply (ireg_inv_app with "Hireg"). }
     - (* ============ ARM F-OK: the name was there =====================
          The contract wants the terminal observation FIRED at the found
          node, so it fires here, off the payload's own [top_frag]. *)

@@ -83,14 +83,15 @@ End OffGv.
 (* ==================================================================== *)
 (*  THE USER HALF: the existential invariant, and the permit it yields   *)
 (* ==================================================================== *)
-(* UNDER [FsAbsInv.fsabsN] (= [nroot .@ "fsabs"]), spelled out because this
-   file sits below the fs layer: a client whose only knowledge of its half
-   is this invariant discharges the read/write AU commits -- which fire at
-   [fsabsE = ↑fsabsN] -- by opening it INSIDE the commit
+(* UNDER [AppInv.appN] (= [nroot .@ "app"]), spelled out because this file
+   sits below the fs layer: a client whose only knowledge of its half is
+   this invariant discharges the read/write AU commits -- which fire at
+   [appE = ↑appN] -- by opening it INSIDE the commit
    ([FsAbsInvFire.fsabs_aread], [fsabs_awrite_chain]).  Nothing else opens
-   it beside another [fsabs]-namespaced invariant, so the nesting is never
-   simultaneous. *)
-Definition foffN : namespace := nroot .@ "fsabs" .@ "foff".
+   it beside another [app]-namespaced invariant (the application's own
+   [AppInv.app_inv] is opened only by the map's movers, with every commit
+   fupd closed), so the nesting is never simultaneous. *)
+Definition foffN : namespace := nroot .@ "app" .@ "foff".
 
 Section OffUser.
   Context `{!riscvGS Σ, !offboxG Σ}.

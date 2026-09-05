@@ -172,6 +172,7 @@ Require Import LockRank.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
@@ -185,7 +186,7 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Notation K_idup := (14%nat) (only parsing).
 Require Import TsoCtx.
 Definition wp_idup_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (k : nat) (z : Z)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
@@ -265,7 +266,7 @@ Definition wp_idup_sconf_body
 
 Module Type IDUP.
   Parameter wp_idup_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (k : nat) (z : Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),

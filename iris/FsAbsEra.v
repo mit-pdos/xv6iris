@@ -328,17 +328,27 @@ Section FsAbsEra.
      opens ftopN INSIDE the hop's [={T}=*] reads the parent's row as an
      [ADir] at the lent entry map.  That is [SpecSysMknodAU]'s
      [dlookup_commit] shape on the nose. *)
-  Lemma elend_astate Γ (av : aview) (d : Z) (dq : dfrac)
+  Lemma elend_astate_q Γ (q : Qp) (av : aview) (d : Z) (dq : dfrac)
       (ents : gmap fname Z) :
-    astate Γ av -∗ elend Γ d dq ents -∗
+    astate_q Γ q av -∗ elend Γ d dq ents -∗
       ⌜∃ nl : nat, av !! d = Some (MkAnode (ADir ents) nl)⌝.
   Proof.
     rewrite /elend. iIntros "Hst HF".
     iDestruct "HF" as (n) "[Hf [%Hdir %Hde]]".
     iDestruct (nview_of_frag with "Hf") as "Hn".
-    iDestruct (astate_nview_dq with "Hst Hn") as %Hav.
+    iDestruct (astate_q_nview_dq with "Hst Hn") as %Hav.
     iPureIntro. exists (fn_nlink n).
     by rewrite Hav /abs_of /abs_node Hdir Hde.
+  Qed.
+
+  (* ...and at the READING, any fraction *)
+  Lemma elend_astate Γ (av : aview) (d : Z) (dq : dfrac)
+      (ents : gmap fname Z) :
+    astate Γ av -∗ elend Γ d dq ents -∗
+      ⌜∃ nl : nat, av !! d = Some (MkAnode (ADir ents) nl)⌝.
+  Proof.
+    iIntros "Hst HF". iDestruct "Hst" as (q) "Hst".
+    iApply (elend_astate_q with "Hst HF").
   Qed.
 
   (* ...and the same reading with the row's own [anode] named, for a

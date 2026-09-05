@@ -1196,11 +1196,11 @@ Section ProofSysOpenBody.
       - apply (dir_dots_ix_not_dir (bv_unsigned inum) (di_trunc dn) _).
         rewrite Htyt. exact Htynd. }
     iApply fupd_wp.
-    iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned inum)
+    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned inum)
             (era_node dn bm data)
             (era_node (di_trunc dn) bm_empty (fun _ => replicate BSIZE (bv_0 8)))
-            ltac:(solve_ndisj) Hloctr with "[] Htop") as "Htop";
-      [iApply (ireg_inv_ftop with "Hireg") |].
+            ltac:(solve_ndisj) Logic.I Hloctr with "[] [] Htop") as "Htop";
+      [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iModIntro.
     iDestruct (so_trunc_loaded kk inum dn Htynz Htynd Hrl
                  with "Hat Hmeta Hmap Hblk Htop") as "Hload".

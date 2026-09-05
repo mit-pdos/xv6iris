@@ -45,7 +45,7 @@
 
    [opf_atrunc_fire] is [mkf_acre_fire]'s two-phase mold at
    [SpecSysOpenAU.delta_trunc], FUSED WITH THE ROW RETAG -- it replaces the
-   [InodeRegion.ireg_top_retag] sys_open performs after [itrunc] returns
+   [InodeRegion.ireg_top_retag_*] sys_open performs after [itrunc] returns
    (the O_TRUNC bridge), with one extra premise (the caller's commit) and
    one extra payout (the receipt).  Same premise as the retag it replaces
    ([inode_local] at the truncated record), same payout (the moved
@@ -98,7 +98,8 @@ Require Import FsAbsEra.       (* [ex_start]                              *)
 Require Import FsAbsMknodFire.   (* [mkf_abs_of_dir], [mkf_era_is_dir]      *)
 Require FsImg.                   (* [T_FILE_z], [ROOTINO] -- Require, NOT
                                     Import (SpecSysOpenAU's reason)         *)
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
+Require Import AppCfg.          (* [app_pred], [app_run]: the application's claim, for the step wands *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                 *)
 Require TsoCtx.   (* qualified: the class only, no notation flip *)
 
@@ -239,9 +240,9 @@ Section OpenFire.
      commit only reads. *)
   Lemma opf_open_fire `{XI : TsoCtx.CurCtx} (γfs : fs_names) (E : coPset) (dq : dfrac)
       (Φ : aview -> Z -> anode -> iProp Σ) (i : Z) (n : fs_node) :
-    ↑ftopN ∪ ↑fsabsN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     ftop_inv γfs -∗
-    aopen_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
+    aopen_commit_at (fs_gamma_L γfs) appE Φ -∗
     top_frag_q (fs_gamma_L γfs) dq i n ={E}=∗
       top_frag_q (fs_gamma_L γfs) dq i n
       ∗ ∃ av : aview,
@@ -257,7 +258,7 @@ Section OpenFire.
     iDestruct (ghost_map_lookup with "Hta Hf") as %Hlk.
     assert (Hrow : abs_view I !! i = Some (abs_of n))
       by exact (abs_view_lookup I i n Hlk).
-    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
+    iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I i (abs_of n) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
@@ -270,9 +271,9 @@ Section OpenFire.
      ([top_frag] whole, from its [ilock] to its [iunlock]) *)
   Lemma opf_open_fire_1 `{XI : TsoCtx.CurCtx} (γfs : fs_names) (E : coPset)
       (Φ : aview -> Z -> anode -> iProp Σ) (i : Z) (n : fs_node) :
-    ↑ftopN ∪ ↑fsabsN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     ftop_inv γfs -∗
-    aopen_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
+    aopen_commit_at (fs_gamma_L γfs) appE Φ -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       top_frag (fs_gamma_L γfs) i n
       ∗ ∃ av : aview,
@@ -286,7 +287,7 @@ Section OpenFire.
   (* =================================================================== *)
 
   (* [mkf_acre_fire]'s mold at [delta_trunc].  Replaces the
-     [InodeRegion.ireg_top_retag] sys_open calls after [itrunc] returns:
+     [InodeRegion.ireg_top_retag_*] sys_open calls after [itrunc] returns:
      same [inode_local] premise, same payout, plus the caller's two phases
      inside the one [ftopN] critical section.  The receipt's pre-state row
      is the OBSERVED one -- the fragment is the same one the terminal
@@ -294,18 +295,18 @@ Section OpenFire.
   Lemma opf_atrunc_fire `{XI : TsoCtx.CurCtx} (γfs : fs_names) (E : coPset)
       (Φ : aview -> Z -> list (bv 8) -> iProp Σ)
       (i : Z) (bs0 : list (bv 8)) (nl : nat) (n n' : fs_node) :
-    ↑ftopN ∪ ↑fsabsN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local i n' ->
     abs_of n = MkAnode (AFile bs0) nl ->
     abs_of n' = MkAnode (AFile []) nl ->
-    ftop_inv γfs -∗
-    atrunc_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
+    ftop_inv γfs -∗ app_inv γfs -∗
+    atrunc_commit_at (fs_gamma_L γfs) appE Φ -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
       ∗ ∃ av : aview,
           ⌜av !! i = Some (MkAnode (AFile bs0) nl)⌝ ∗ Φ av i bs0.
   Proof.
-    intros HE Hloc Habs Habs'. iIntros "#Hi Hcm Hf".
+    intros HE Hloc Habs Habs'. iIntros "#Hi #Hai Hcm Hf".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
@@ -318,9 +319,14 @@ Section OpenFire.
     assert (Hdelta : abs_view (<[i := n']> I) = delta_trunc i (abs_view I)).
     { rewrite (abs_view_insert I i n') Habs'.
       by rewrite (delta_trunc_file (abs_view I) i bs0 nl Hrow). }
-    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
-    iMod ("Hcm" $! I i bs0 nl with "[//] Hta") as "[Hta Hph2]".
-    iMod (ghost_map_update n' with "Hta Hf") as "[Hta Hf]".
+    iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
+    iMod ("Hcm" $! I i bs0 nl with "[//] Hta") as "(Hta & Hstep & Hph2)".
+    (* THE MOVE, at the whole authority: the application's half comes out
+       of [appN] beside its claim, which the caller's step re-establishes
+       under the later ([AppInv.app_top_update]) *)
+    iMod (app_top_update appE γfs I i n n' ltac:(rewrite /appE; done)
+            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+    { iIntros (_) "_ Hp". iApply (app_step_at i I _ n' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".

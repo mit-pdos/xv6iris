@@ -1913,7 +1913,7 @@ Section ProofSysLinkBody.
                   by (rewrite /sl_incnl sl_setnl_type;
                       exact (sl_tdir_zne _ Hty)).
                 (* THE ERA's abstract value follows the count, which
-                   is the one column [sl_incnl] moves: [ireg_top_retag]
+                   is the one column [sl_incnl] moves: [ireg_top_retag_*]
                    opens [ftopN] alone (durable-disk 2b-inode-3). *)
                 iRename "Htopl" into "Htop".
                 (* THE RETAG OWES THE ROW (durable-disk lane A): a raised
@@ -1931,10 +1931,10 @@ Section ProofSysLinkBody.
                   - apply (dir_dots_ix_not_dir (bv_unsigned inum)).
                     rewrite /sl_incnl sl_setnl_type. exact (sl_tdir_zne _ Hty). }
                 iApply fupd_wp.
-                iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned inum)
+                iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned inum)
                         (era_node dn bm dat) (era_node (sl_incnl dn) bm dat)
-                        ltac:(solve_ndisj) Hlocnl with "[] Htop") as "Htop";
-                  [iApply (ireg_inv_ftop with "Hireg") |].
+                        ltac:(solve_ndisj) Logic.I Hlocnl with "[] [] Htop") as "Htop";
+                  [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
                 iModIntro.
                 iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum (sl_incnl dn) bm)
                   with "[Hdlnk2 Hdiat Hmeta Hmap Hblocks Htop]"
@@ -3083,21 +3083,21 @@ Section ProofSysLinkBody.
                                carrier's. *)
                             iApply fupd_wp.
                             (* ...and the ERA's abstract value with them
-                               (durable-disk 2b-inode-3): [ireg_top_retag]
+                               (durable-disk 2b-inode-3): [ireg_top_retag_*]
                                opens [ftopN] alone. *)
                             (* THE RETAG OWES THE ROW (durable-disk lane A):
                                the four facts are the re-pack's own, already
                                named. *)
-                            iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned dinum)
+                            iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dinum)
                                     (era_node dnd bmd datd)
                                     (era_node dnd' bmd' datd')
-                                    ltac:(solve_ndisj)
+                                    ltac:(solve_ndisj) Logic.I
                                     (inode_local_of_ok_rec (bv_unsigned dinum)
                                        fsc_cov fsc_logst dnd' bmd' datd'
                                        Hdiok' Hrl_datd' Hduq' Hddix')
-                                    with "[] Htopd")
+                                    with "[] [] Htopd")
                               as "Htopd";
-                              [iApply (ireg_inv_ftop with "Hireg") |].
+                              [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
                             iModIntro.
                             iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dinum dnd' bmd')
                               with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Htopd]"
@@ -3574,21 +3574,21 @@ Section ProofSysLinkBody.
                                carrier's. *)
                             iApply fupd_wp.
                             (* ...and the ERA's abstract value with them
-                               (durable-disk 2b-inode-3): [ireg_top_retag]
+                               (durable-disk 2b-inode-3): [ireg_top_retag_*]
                                opens [ftopN] alone. *)
                             (* THE RETAG OWES THE ROW (durable-disk lane A):
                                the four facts are the re-pack's own, already
                                named. *)
-                            iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned dinum)
+                            iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dinum)
                                     (era_node dnd bmd datd)
                                     (era_node dnd' bmd' datd')
-                                    ltac:(solve_ndisj)
+                                    ltac:(solve_ndisj) Logic.I
                                     (inode_local_of_ok_rec (bv_unsigned dinum)
                                        fsc_cov fsc_logst dnd' bmd' datd'
                                        Hdiok' Hrl_datd' Hduq' Hddix')
-                                    with "[] Htopd")
+                                    with "[] [] Htopd")
                               as "Htopd";
-                              [iApply (ireg_inv_ftop with "Hireg") |].
+                              [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
                             iModIntro.
                             iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dinum dnd' bmd')
                               with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Htopd]"

@@ -117,11 +117,11 @@ Require Import ProofKexecA.    (* the LANDED blocks, opened as [LA]  *)
    (ElfBridge).  Needed only by the two [bad:] tails' honesty argument. *)
 Require Import ElfFile.
 Require Import ElfBridge.
-(* THE ABSTRACT SIDE.  [FsAbsInv] for the commit mask [fsabsE] and [FsAbs]
+(* THE ABSTRACT SIDE.  [FsAbsInv] for the commit mask [appE] and [FsAbs]
    for [anode] / [aview] / [abs_of]; per [FsAbs]'s own rule they go LAST of
    the two, and this file names none of the [FsState*] twins they shadow
    ([fs_view], [byte_range]). *)
-Require Import FsAbsInv.
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.
 (* THE AU LEAVES, QUALIFIED: their statements are all this file wants and a
    fourth import of the abstract stack buys nothing. *)
@@ -806,7 +806,7 @@ Section KexecAUAMain.
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (pl : list (bv 8)) :
     SpecSysOpenAU.open_walk_dead_era γ P Pmiss pl
-      ∗ (SpecSysOpenAU.aopen_commit_at (FsBytesGamma.fs_gamma_L γ) fsabsE Φo
+      ∗ (SpecSysOpenAU.aopen_commit_at (FsBytesGamma.fs_gamma_L γ) appE Φo
          ∗ SpecKexecAU.exec_slot_pre Sl Φo na alen afun sts) -∗
     SpecKexecAU.exec_post_fail Sl (FsBytesGamma.fs_gamma_L γ) γ cw P Pmiss Φo na alen afun sts.
   Proof.
@@ -1039,7 +1039,7 @@ Section KexecAUAMain.
        from a pin; this one SPENDS the caller's commit at that instant and
        hands the caller's receipt out. ==== *)
     SpecSysOpenAU.open_walk_pre_era fsc_fs (pv_cwi (us_V U)) P Pmiss -∗
-    SpecSysOpenAU.aopen_commit_at ΓL fsabsE Φo -∗
+    SpecSysOpenAU.aopen_commit_at ΓL appE Φo -∗
     SpecKexecAU.exec_slot_pre Sl Φo na alen afun sts -∗
     kalloc_env fsc_kalloc None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
@@ -1136,7 +1136,7 @@ Section KexecAUAMain.
       as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hireg & _)".
     iDestruct (ireg_inv_ftop with "Hireg") as "#Hftop".
     iApply (kxc_a1_au (CID0 := CID0) Q QF P Pmiss
-              (SpecSysOpenAU.aopen_commit_at ΓL fsabsE Φo
+              (SpecSysOpenAU.aopen_commit_at ΓL appE Φo
                  ∗ SpecKexecAU.exec_slot_pre Sl Φo na alen afun sts)%I
               (SpecKexecAU.exec_post_fail Sl ΓL fsc_fs (pv_cwi (us_V U)) P Pmiss Φo na alen afun sts)
               gs jp gl pd pav pu gf

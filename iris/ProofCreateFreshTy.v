@@ -91,6 +91,7 @@ Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
@@ -128,7 +129,7 @@ Definition cr_cs_but_s3 (m mf : regfile) : Prop :=
 
 Definition create_fresh_ty_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)
     (pd pav pu : mword 64)
  (ty : mword 16)
@@ -362,7 +363,7 @@ Qed.
 
 Section CftHelpers.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
   Context `{XI : CurCtx}.
   Context `{GEN : GenId}.
 
@@ -400,7 +401,7 @@ Local Ltac nz := vm_compute; discriminate.
 
 Lemma create_fresh_ty :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16)

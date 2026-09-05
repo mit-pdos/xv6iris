@@ -12,7 +12,7 @@
 
    The abstract row moves at the γtop RETAG, and the retag is
    filewrite's -- [ProofFilewrite.v]'s "THE RETAG OWES THE ROW", the
-   [InodeRegion.ireg_top_retag] it performs between writei's return and its
+   [InodeRegion.ireg_top_retag_*] it performs between writei's return and its
    [iunlock].  [SpecWritei] never touches γtop at all: it takes
    [inode_meta] / [inode_map] / [inode_blocks] / [dinode_at] and gives them
    back at the new record, and the era fragment is the CALLER's.  So writei
@@ -34,7 +34,7 @@
        ∗ ⌜Z.of_nat (length (concat bss)) = iz⌝     (* the offset IS the total *)
        ∗ ⌜iz = FW_MAX * Z.of_nat p⌝                (* every fired chunk is full *)
        ∗ wri_receipts i Φw bss                      (* the fired receipts       *)
-       ∗ awrite_chain Γfs fsabsE i γo Φw p (wchunks n - p)   (* the rest of the chain *)
+       ∗ awrite_chain Γfs appE i γo Φw p (wchunks n - p)   (* the rest of the chain *)
 
    -- and the three arithmetic facts it needs are
    [FsAbsWriteFire.wri_count_lt] (the bundle is not exhausted while the loop
@@ -120,7 +120,7 @@ Require Import SpecSysWriteAU.     (* [wchunks], [wri_receipts]             *)
 Require Import FsAbsWriteFire.     (* [awrite_chain]                        *)
 Require Import SpecCopyin.         (* [ubytes_at]: the content seam         *)
 Require Import SpecSysWriteAUEra.  (* [write_arms_at]                       *)
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.              (* LAST (FsAbs's own rule)               *)
 Import Defs.
 Require Import TsoCtx.
@@ -177,7 +177,7 @@ Definition wp_filewrite_au_body
   (* EDIT 2: THE CALLER'S COMMIT CHAIN, one node per possible chunk,
      indexed from 0 ([wchunks n] of them); each node moves the bytes and the
      descriptor's offset shadow in one fupd ([FsAbsWriteFire.awrite_chain]). *)
-  awrite_chain Γfs fsabsE i γo Φw 0%nat (wchunks n) -∗
+  awrite_chain Γfs appE i γo Φw 0%nat (wchunks n) -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (r : mword 64) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
@@ -259,10 +259,10 @@ Section FilewriteAUState.
           included -- and both exits read it off unchanged. *)
        ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
-       awrite_chain Γ fsabsE i γo Φ (p + x) (wchunks n - p - x)%nat)%I.
+       awrite_chain Γ appE i γo Φ (p + x) (wchunks n - p - x)%nat)%I.
 
   Lemma fw_au_raw_init Γ (i : Z) γo (n : Z) M ua Φ :
-    awrite_chain Γ fsabsE i γo Φ 0%nat (wchunks n) -∗
+    awrite_chain Γ appE i γo Φ 0%nat (wchunks n) -∗
     fw_au_raw Γ i γo n M ua Φ 0 0%nat 0%nat.
   Proof.
     iIntros "Hcm". rewrite /fw_au_raw. iExists [].
@@ -279,8 +279,8 @@ Section FilewriteAUState.
   Lemma fw_au_raw_take Γ (i : Z) γo (n : Z) M ua Φ (t : Z) (p : nat) :
     (0 <= t)%Z -> (t < n)%Z -> t = FW_MAX * Z.of_nat p ->
     fw_au_raw Γ i γo n M ua Φ t p 0%nat -∗
-      awrite_full_at Γ fsabsE i γo p Φ
-        (awrite_chain Γ fsabsE i γo Φ (S p) (wchunks n - S p)) ∗
+      awrite_full_at Γ appE i γo p Φ
+        (awrite_chain Γ appE i γo Φ (S p) (wchunks n - S p)) ∗
       (∀ (bs : list (bv 8)) (av : aview) (off : nat) (bs0 : list (bv 8))
          (nl : nat),
          ⌜wri_pre av i off bs bs0 nl⌝ -∗
@@ -291,7 +291,7 @@ Section FilewriteAUState.
             [SpecWritei]'s user-arm clause delivers. *)
          ⌜ubytes_at M (add_vec_int ua t) bs⌝ -∗
          Φ p av off bs -∗
-         awrite_chain Γ fsabsE i γo Φ (S p) (wchunks n - S p) -∗
+         awrite_chain Γ appE i γo Φ (S p) (wchunks n - S p) -∗
          fw_au_raw Γ i γo n M ua Φ (t + Z.of_nat (length bs)) (S p) 0%nat).
   Proof.
     intros Ht Htn Htie. iIntros "Hst".
@@ -330,9 +330,9 @@ Section FilewriteAUState.
   Lemma fw_au_raw_spend_part Γ (i : Z) γo (n : Z) M ua Φ (t : Z) (p : nat) :
     (0 <= t)%Z -> (t < n)%Z -> t = FW_MAX * Z.of_nat p ->
     fw_au_raw Γ i γo n M ua Φ t p 0%nat -∗
-      awrite_part_at fsabsE γo
-        (awrite_chain Γ fsabsE i γo Φ (S p) (wchunks n - S p)) ∗
-      (awrite_chain Γ fsabsE i γo Φ (S p) (wchunks n - S p) -∗
+      awrite_part_at appE γo
+        (awrite_chain Γ appE i γo Φ (S p) (wchunks n - S p)) ∗
+      (awrite_chain Γ appE i γo Φ (S p) (wchunks n - S p) -∗
        fw_au_raw Γ i γo n M ua Φ t p 1%nat).
   Proof.
     intros Ht Htn Htie. iIntros "Hst".

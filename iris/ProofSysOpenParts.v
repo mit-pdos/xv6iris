@@ -1071,7 +1071,7 @@ Section ProofSysOpenPublish.
       inode_blocks fsc_fs bm data ∗
       (* ...and the era's abstract value (durable-disk 2b-inode-3): itrunc
          MOVES the record, so the walk retags it between this peel and the
-         seal below ([InodeRegion.ireg_top_retag]). *)
+         seal below ([InodeRegion.ireg_top_retag_*]). *)
       top_frag (fs_gamma_L fsc_fs) (bv_unsigned inum) (era_node dn bm data).
   Proof.
     iIntros "H".

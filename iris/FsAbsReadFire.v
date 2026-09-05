@@ -102,7 +102,8 @@ Require Import SpecReadi.        (* [rd_clamp]                              *)
 Require Import SpecSysReadAU.    (* the contract this file serves           *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import
                                     ([FsAbsOpenFire]'s reason)              *)
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
+Require Import AppCfg.          (* [app_pred], [app_run]: the application's claim, for the step wands *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
 Require Import TsoCtx.
 
@@ -220,8 +221,8 @@ Section ReadFire.
       (Φ : aview -> nat -> anode -> nat -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (off : nat) (a : anode) (d : nat),
        ⌜ard_pre (abs_view I) i off a⌝ -∗
-       ghost_map_auth (γtop Γ) 1 I -∗ off_gv γo (1/2) (Z.of_nat off) ={E}=∗
-       ghost_map_auth (γtop Γ) 1 I ∗ off_gv γo (1/2) (Z.of_nat (off + d)) ∗
+       ghost_map_auth (γtop Γ) (1/2) I -∗ off_gv γo (1/2) (Z.of_nat off) ={E}=∗
+       ghost_map_auth (γtop Γ) (1/2) I ∗ off_gv γo (1/2) (Z.of_nat (off + d)) ∗
        Φ (abs_view I) off a d)%I.
 
   (* THE ONE RELATION THAT HOLDS -- [FsAbsMknodFire.dlookup_commit_at_weaken]'s
@@ -232,9 +233,9 @@ Section ReadFire.
   Proof.
     iIntros "Hcm". rewrite /aread_commit.
     iIntros (av off a d) "%Hpre Hst Hg".
-    iDestruct (astate_elim with "Hst") as (I) "[Ha %Hav]". subst av.
+    iDestruct (astate_q_elim with "Hst") as (I) "[Ha %Hav]". subst av.
     iMod ("Hcm" $! I off a d with "[//] Ha Hg") as "(Ha & Hg & HΦ)".
-    iModIntro. iFrame "HΦ Hg". iApply astate_intro. iExact "Ha".
+    iModIntro. iFrame "HΦ Hg". iApply astate_q_intro. iExact "Ha".
   Qed.
 
   (* satisfiability: a client holding its half of the shadow, at any value,
@@ -254,8 +255,8 @@ Section ReadFire.
      the AUTHORITY ITSELF still in hand, because the raw-map commit must
      hand back the very map it was given -- wrapping and unwrapping loses
      it (that is the whole finding this file exists for). *)
-  Lemma arf_auth_nview Γ (I : gmap Z fs_node) (q : Qp) (i : Z) (a : anode) :
-    ghost_map_auth (γtop Γ) 1 I -∗ nview Γ q i a -∗
+  Lemma arf_auth_nview Γ (qa : Qp) (I : gmap Z fs_node) (q : Qp) (i : Z) (a : anode) :
+    ghost_map_auth (γtop Γ) qa I -∗ nview Γ q i a -∗
     ⌜abs_view I !! i = Some a⌝.
   Proof.
     iIntros "Ha Hn".
@@ -323,11 +324,11 @@ Section ReadFire.
   Lemma arf_read_fire (γfs : fs_names) (E : coPset) (dq : dfrac)
       (Φ : aview -> nat -> anode -> nat -> iProp Σ) (i : Z) (γo : gname)
       (off d : nat) (n : fs_node) :
-    ↑ftopN ∪ ↑fsabsN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     (off <= MAXFILE * BSIZE)%nat ->
     anode_size_ok (abs_of n) ->
     ftop_inv γfs -∗
-    aread_commit_at (fs_gamma_L γfs) fsabsE i γo Φ -∗
+    aread_commit_at (fs_gamma_L γfs) appE i γo Φ -∗
     top_frag_q (fs_gamma_L γfs) dq i n -∗
     off_gv γo (1/2) (Z.of_nat off) ={E}=∗
       top_frag_q (fs_gamma_L γfs) dq i n
@@ -347,7 +348,7 @@ Section ReadFire.
       by exact (abs_view_lookup I i n Hlk).
     assert (Hpre : ard_pre (abs_view I) i off (abs_of n))
       by (split; [exact Hrow | split; [exact Hoff | exact Hsz]]).
-    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
+    iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I off (abs_of n) d with "[//] Hta Hg") as "(Hta & Hg & HΦ)".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
@@ -361,11 +362,11 @@ Section ReadFire.
   Lemma arf_read_fire_1 (γfs : fs_names) (E : coPset)
       (Φ : aview -> nat -> anode -> nat -> iProp Σ) (i : Z) (γo : gname)
       (off d : nat) (n : fs_node) :
-    ↑ftopN ∪ ↑fsabsN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     (off <= MAXFILE * BSIZE)%nat ->
     anode_size_ok (abs_of n) ->
     ftop_inv γfs -∗
-    aread_commit_at (fs_gamma_L γfs) fsabsE i γo Φ -∗
+    aread_commit_at (fs_gamma_L γfs) appE i γo Φ -∗
     top_frag (fs_gamma_L γfs) i n -∗
     off_gv γo (1/2) (Z.of_nat off) ={E}=∗
       top_frag (fs_gamma_L γfs) i n

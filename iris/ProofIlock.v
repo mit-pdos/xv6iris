@@ -126,6 +126,8 @@ Require Import InodeInv.
 Require Import DirView.
 Require Import InodeLock.
 Require Import InodeRegion.
+Require Import AppInv.       (* [top_move]: ilock's fresh-inode claim is a non-AU move *)
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import FsTree.
@@ -343,7 +345,7 @@ Definition il_sp (m M : regfile) : Prop :=
       (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))).
 
 Section IlockDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
   Context `{XI : CurCtx}.
 
   (* ilock's 32-byte frame: ra@24 s0@16 s1@8, and slot 4 (s2's) held
@@ -440,7 +442,7 @@ End IlockDefs.
 (*  +0x1e .. +0x26 : THE JOIN -- pop ra/s0/s1, ret, and the contract.     *)
 (* ===================================================================== *)
 Section IlockEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
   Context `{XI : CurCtx}.
 
   Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId}
@@ -693,7 +695,7 @@ End IlockEpilogue.
 (*  +0x36 .. +0xa0 : THE UNCACHED ARM.                                    *)
 (* ===================================================================== *)
 Section IlockLoad.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
   Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
@@ -1263,11 +1265,15 @@ Section IlockLoad.
              box's own node.  This ONE retag is the whole move now: the two
              contents holds that used to be set beside it were readings of
              this very fragment (THE DVIEW RETIREMENT). *)
-          iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned inum) n0
+          (* ...a NON-AU move (free -> typed), paid by the application's
+             parked license until round E gives the claim its AU form
+             (app-instances.md section 7) *)
+          iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned inum) n0
                   (era_node dn bm_empty (fun _ => replicate BSIZE (bv_0 8)))
-                  ltac:(solve_ndisj) Hlocbox
-                  with "[Hireg] Htop") as "Htop".
+                  ltac:(solve_ndisj) Logic.I Hlocbox
+                  with "[Hireg] [Hireg] Htop") as "Htop".
           { iApply (ireg_inv_ftop with "Hireg"). }
+          { iApply (ireg_inv_app with "Hireg"). }
           iModIntro. iFrame "HL". iLeft. iFrame "Hdn Hwb".
           (* §16.4's CLAIM BOX: [ireg_withdraw] just PAID [fresh_shape], and
              this is where it now leaves the function instead of being spent
@@ -2214,7 +2220,7 @@ Section IlockLoad.
 End IlockLoad.
 
 Section ProofIlockMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_ilock_dep_sconf

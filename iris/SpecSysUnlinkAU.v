@@ -72,7 +72,7 @@
    dir arm also parent.nlink-1.  The fused delta is stated below
    ([delta_unlink], total, side conditions in [unl_pre]) -- but IT IS NOT
    REALIZABLE AT ONE COMMIT, and the landed proof is the evidence.
-   [ProofSysUnlink]'s success walks fire TWO [InodeRegion.ireg_top_retag]
+   [ProofSysUnlink]'s success walks fire TWO [InodeRegion.ireg_top_retag_*]
    steps:
 
      instant 1 -- THE PARENT ROW: at the zeroing ([memset]+[writei] of
@@ -172,7 +172,7 @@
 
    1. THE FIRE POINTS, fused with the two retags the landed walk already
       performs (the mold is [FsAbsMknodFire.mkf_acre_fire]: same premise
-      as [ireg_top_retag], same payout, plus the caller's two phases
+      as [ireg_top_retag_*], same payout, plus the caller's two phases
       inside the one [ftopN] critical section):
         - [uent_commit_at]'s pair around the PARENT retag --
           [ProofSysUnlink] W5-FILE's retag at the zeroing, W5-DIR's
@@ -218,7 +218,7 @@
       [link_toks_reps_S]/[link_reps_1] split it) and hands back
       [2 <= dir_nrec (di_size ip)].  The abstract commits ride BESIDE
       this: instant 1's fire sits where [ent_toks_unlink] +
-      [ireg_top_retag] already sit, instant 2's where the second retag
+      [ireg_top_retag_*] already sit, instant 2's where the second retag
       sits after the token is spent.  Nothing about the tokens crosses
       THIS interface -- the ledger stays below the abstraction, as the
       doc's nlink bullet (section 1) rules.
@@ -336,7 +336,8 @@ Require Import SpecSysMknodAU.  (* [mknod_parent_elems]; the frozen mold *)
 Require Import FsAbsEraMknod.   (* the era walk-premise pair, reused
                                    verbatim (nameiparent-generic) *)
 Require Import FsAbsMknodFire.  (* [dlookup_commit_at]; the [_at] mold *)
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
+Require Import AppCfg.          (* [app_pred], [app_run]: the application's claim, for the step wands *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
@@ -447,20 +448,24 @@ Section SysUnlinkAU.
   (* INSTANT 1 -- the parent-row commit, two-phase at the raw map
      ([acre_commit_at]'s mold: phase 1 observes the pre-state under
      [unl_pre], phase 2 witnesses the parent half applied; the prover
-     fires the pair around the parent's [ireg_top_retag] inside one
+     fires the pair around the parent's [ireg_top_retag_*] inside one
      [ftopN] critical section). *)
   Definition uent_commit_at Γ (E : coPset)
       (Φ : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (d t : Z) (nm : fname)
        (ents : gmap fname Z) (nl : nat) (a : anode),
        ⌜unl_pre (abs_view I) d nm ents nl t a⌝ -∗
-       ghost_map_auth (γtop Γ) 1 I ={E}=∗
-       ghost_map_auth (γtop Γ) 1 I ∗
+       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth (γtop Γ) (1/2) I ∗
+         (* THE CALLER'S STEP (app-instances.md section 7): its claim about
+            the pre-view survives the delta, at the RAW insert the mover
+            performs ([AppInv.app_step]; the delta is its reading) *)
+         app_step d I (delta_unl_ent d nm (unl_dec (an_node a)) (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I'
              = delta_unl_ent d nm (unl_dec (an_node a)) (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) 1 I' ={E}=∗
-            ghost_map_auth (γtop Γ) 1 I' ∗ Φ (abs_view I) d nm t))%I.
+            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) d nm t))%I.
 
   (* INSTANT 2 -- the target-row commit, same mold.  No name, no parent:
      by this instant only the target's identity is in the machine's
@@ -472,12 +477,16 @@ Section SysUnlinkAU.
     (∀ (I : gmap Z fs_node) (t : Z) (a : anode),
        ⌜abs_view I !! t = Some a⌝ -∗
        ⌜(1 <= an_nlink a)%nat⌝ -∗
-       ghost_map_auth (γtop Γ) 1 I ={E}=∗
-       ghost_map_auth (γtop Γ) 1 I ∗
+       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth (γtop Γ) (1/2) I ∗
+         (* THE CALLER'S STEP (app-instances.md section 7): its claim about
+            the pre-view survives the delta, at the RAW insert the mover
+            performs ([AppInv.app_step]; the delta is its reading) *)
+         app_step t I (delta_unl_tgt t (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_unl_tgt t (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) 1 I' ={E}=∗
-            ghost_map_auth (γtop Γ) 1 I' ∗ Φ (abs_view I) t))%I.
+            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) t))%I.
 
   (* THE MISS OBSERVATION, single-phase and read-only --
      [dlookup_commit_at]'s twin at the ABSENT entry (header, deviation
@@ -488,8 +497,8 @@ Section SysUnlinkAU.
        (ents : gmap fname Z) (nl : nat),
        ⌜abs_view I !! d = Some (MkAnode (ADir ents) nl)⌝ -∗
        ⌜ents !! nm = None⌝ -∗
-       ghost_map_auth (γtop Γ) 1 I ={E}=∗
-       ghost_map_auth (γtop Γ) 1 I ∗ Φ (abs_view I) d nm)%I.
+       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth (γtop Γ) (1/2) I ∗ Φ (abs_view I) d nm)%I.
 
   (* The FOUND observation is [FsAbsMknodFire.dlookup_commit_at],
      reused verbatim -- fired here at the isdirempty refusal (arm
@@ -497,19 +506,28 @@ Section SysUnlinkAU.
 
   (* sanity: none of the three new commits can be vacuously blocked on
      the caller's side (the family's [*_unit] discipline) *)
-  Lemma uent_commit_at_unit Γ E :
-    ⊢ uent_commit_at Γ E (fun _ _ _ _ => True%I).
+  (* the two write-kind shapes owe the caller's step, paid here out of the
+     parked license ([AppInv.app_step_acc]) at the live Γ *)
+  Lemma uent_commit_at_unit (γfs : fs_names) E :
+    ↑appN ⊆ E ->
+    app_inv γfs -∗ uent_commit_at (fs_gamma_L γfs) E (fun _ _ _ _ => True%I).
   Proof.
-    rewrite /uent_commit_at. iIntros (I d t nm ents nl a) "%Hpre Ha".
-    iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'". iModIntro.
+    iIntros (HE) "#Hai". rewrite /uent_commit_at.
+    iIntros (I d t nm ents nl a) "%Hpre Ha".
+    iMod (app_step_acc E γfs d I _ HE
+            (abs_view_lookup_is_Some I d _ (proj1 Hpre)) with "Hai") as "Hstep".
+    iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.
 
-  Lemma utgt_commit_at_unit Γ E :
-    ⊢ utgt_commit_at Γ E (fun _ _ => True%I).
+  Lemma utgt_commit_at_unit (γfs : fs_names) E :
+    ↑appN ⊆ E ->
+    app_inv γfs -∗ utgt_commit_at (fs_gamma_L γfs) E (fun _ _ => True%I).
   Proof.
-    rewrite /utgt_commit_at. iIntros (I t a) "%Ht %Hnl Ha".
-    iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'". iModIntro.
+    iIntros (HE) "#Hai". rewrite /utgt_commit_at. iIntros (I t a) "%Ht %Hnl Ha".
+    iMod (app_step_acc E γfs t I _ HE
+            (abs_view_lookup_is_Some I t _ Ht) with "Hai") as "Hstep".
+    iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.
 
@@ -537,10 +555,10 @@ Section SysUnlinkAU.
       (Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (Φmiss : aview -> Z -> fname -> iProp Σ) : iProp Σ :=
     (mknod_walk_pre_era γfs cw P Pmiss
-     ∗ uent_commit_at Γ fsabsE Φent
-     ∗ utgt_commit_at Γ fsabsE Φtgt
-     ∗ dlookup_commit_at Γ fsabsE Φex
-     ∗ dmiss_commit_at Γ fsabsE Φmiss)%I.
+     ∗ uent_commit_at Γ appE Φent
+     ∗ utgt_commit_at Γ appE Φtgt
+     ∗ dlookup_commit_at Γ appE Φex
+     ∗ dmiss_commit_at Γ appE Φmiss)%I.
 
   (* ret 0: the fetched path, the cursor at the parent, [unl_pre]
      restated purely at instant 1, BOTH fired receipts, the instant-2
@@ -559,8 +577,8 @@ Section SysUnlinkAU.
        ⌜0 < t < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜av1 !! t = Some a⌝ ∗
        P (length (mknod_parent_elems pl)) d ∗
-       dlookup_commit_at Γ fsabsE Φex ∗
-       dmiss_commit_at Γ fsabsE Φmiss ∗
+       dlookup_commit_at Γ appE Φex ∗
+       dmiss_commit_at Γ appE Φmiss ∗
        Φent av0 d nm t ∗
        Φtgt av1 t)%I.
 
@@ -575,21 +593,21 @@ Section SysUnlinkAU.
     (unlink_au_pre Γ γfs cw P Pmiss Φent Φtgt Φex Φmiss
      ∨ (∃ pl : list (bv 8),
           (mknod_walk_dead_era γfs P Pmiss pl
-             ∗ uent_commit_at Γ fsabsE Φent
-             ∗ utgt_commit_at Γ fsabsE Φtgt
-             ∗ dlookup_commit_at Γ fsabsE Φex
-             ∗ dmiss_commit_at Γ fsabsE Φmiss)
+             ∗ uent_commit_at Γ appE Φent
+             ∗ utgt_commit_at Γ appE Φtgt
+             ∗ dlookup_commit_at Γ appE Φex
+             ∗ dmiss_commit_at Γ appE Φmiss)
           ∨ (∃ d : Z,
                P (length (mknod_parent_elems pl)) d
-               ∗ uent_commit_at Γ fsabsE Φent
-               ∗ utgt_commit_at Γ fsabsE Φtgt
+               ∗ uent_commit_at Γ appE Φent
+               ∗ utgt_commit_at Γ appE Φtgt
                ∗ ((* (iii-a) the name is a dot: refused BY NAME, before
                      any lookup -- pure, both observations refunded *)
                   (∃ nm : fname,
                      ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
                      ⌜nm = DOT \/ nm = DOTDOT⌝ ∗
-                     dlookup_commit_at Γ fsabsE Φex ∗
-                     dmiss_commit_at Γ fsabsE Φmiss)
+                     dlookup_commit_at Γ appE Φex ∗
+                     dmiss_commit_at Γ appE Φmiss)
                   ∨ (* (iii-b) gone: the miss observation FIRED *)
                   (∃ (av : aview) (nm : fname) (ents : gmap fname Z)
                      (nl : nat),
@@ -597,7 +615,7 @@ Section SysUnlinkAU.
                      ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
                      ⌜ents !! nm = None⌝ ∗
                      Φmiss av d nm ∗
-                     dlookup_commit_at Γ fsabsE Φex)
+                     dlookup_commit_at Γ appE Φex)
                   ∨ (* (iii-c) dir non-empty: the found observation
                        FIRED, both rows pinned at the one instant *)
                   (∃ (av : aview) (t : Z) (nm : fname)
@@ -608,12 +626,12 @@ Section SysUnlinkAU.
                      ⌜av !! t = Some (MkAnode (ADir est) nlt)⌝ ∗
                      ⌜~ dots_only est⌝ ∗
                      Φex av d nm t ∗
-                     dmiss_commit_at Γ fsabsE Φmiss)
+                     dmiss_commit_at Γ appE Φmiss)
                   ∨ (* (iii-d) no abstract observation to report: the
                        k = Lp deaths (parent-level type/nlink guards,
                        "unlink of /") -- everything back *)
-                  (dlookup_commit_at Γ fsabsE Φex ∗
-                   dmiss_commit_at Γ fsabsE Φmiss)))))%I.
+                  (dlookup_commit_at Γ appE Φex ∗
+                   dmiss_commit_at Γ appE Φmiss)))))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0
      (implies the landed [sys_unlink_ret]) *)

@@ -70,6 +70,7 @@ Require Import FsStateBitmap.
 Require Import FsState.
 Require Import FsStateEra.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import BitmapInv.
 Require Import SbPark.
 Require Import IcacheRef.
@@ -276,7 +277,7 @@ Qed.
 Section CollectAll.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
   Context `{XI : TsoCtx.CurCtx}.
 
   (* the inum-as-a-number reading of the region's currency; the region and
@@ -723,12 +724,12 @@ Section CollectAll.
     m !! z = Some d ->
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ghost_map_auth γi 1 m -∗
-    ghost_map_auth (fs_top γfs) 1 I -∗
+    ghost_map_auth (fs_top γfs) (1/2) I -∗
     col_row γfs γi w Q -∗
     ireg_slot γfs γi z d -∗
       ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
       ∗ ghost_map_auth γi 1 m
-      ∗ ghost_map_auth (fs_top γfs) 1 I
+      ∗ ghost_map_auth (fs_top γfs) (1/2) I
       ∗ col_got γfs γi I z
       ∗ (col_got γfs γi I z -∗ Q ∗ ireg_slot γfs γi z d).
   Proof.
@@ -760,12 +761,12 @@ Section CollectAll.
     (forall z : Z, z ∈ Rs -> 0 <= z < 2 ^ 32) ->
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ghost_map_auth γi 1 m -∗
-    ghost_map_auth (fs_top γfs) 1 I -∗
+    ghost_map_auth (fs_top γfs) (1/2) I -∗
     ([∗ set] z ∈ Rs, col_rowz γfs γi z (Ψ z)) -∗
     ([∗ set] z ∈ Rs, ∃ d : dinode, ⌜m !! z = Some d⌝ ∗ ireg_slot γfs γi z d) -∗
       ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
       ∗ ghost_map_auth γi 1 m
-      ∗ ghost_map_auth (fs_top γfs) 1 I
+      ∗ ghost_map_auth (fs_top γfs) (1/2) I
       ∗ ([∗ set] z ∈ Rs, col_got γfs γi I z)
       ∗ (([∗ set] z ∈ Rs, col_got γfs γi I z)
          -∗ ([∗ set] z ∈ Rs, Ψ z)
@@ -819,7 +820,7 @@ Section CollectAll.
     (forall z : Z, z ∈ ic_live_inums ids -> 0 <= z < 2 ^ 32) ->
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ghost_map_auth γi 1 m -∗
-    ghost_map_auth (fs_top γfs) 1 I -∗
+    ghost_map_auth (fs_top γfs) (1/2) I -∗
     ([∗ list] k ↦ p ∈ ids,
        (ic_id cn (o + k) (1/4) p.1.1 p.1.2 p.2
         ∗ ic_slot_cover cn γfs γi cov ls (o + k))) -∗
@@ -827,7 +828,7 @@ Section CollectAll.
        ∃ d : dinode, ⌜m !! z = Some d⌝ ∗ ireg_slot γfs γi z d) -∗
       ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
       ∗ ghost_map_auth γi 1 m
-      ∗ ghost_map_auth (fs_top γfs) 1 I
+      ∗ ghost_map_auth (fs_top γfs) (1/2) I
       ∗ ([∗ set] z ∈ ic_live_inums ids, col_got γfs γi I z)
       ∗ (([∗ set] z ∈ ic_live_inums ids, col_got γfs γi I z)
          -∗ ([∗ list] k ↦ p ∈ ids,
@@ -1406,7 +1407,7 @@ Section CollectAll.
     fs_parse_sb (fun _ => sbb) = Some sb ->
     (ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
      ∗ col_auth γfs Lb C (fs_home_set cov ls)
-     ∗ ghost_map_auth (fs_top γfs) 1 I
+     ∗ ghost_map_auth (fs_top γfs) (1/2) I
      ∗ ghost_map_auth γi 1 m
      ∗ ([∗ list] bi ∈ seq 0%nat nib,
           ireg_blk γi γfs (FsImg.sb_inodestart sb) m bi)
@@ -1426,7 +1427,7 @@ Section CollectAll.
            -∗ fs_state (fs_gamma_L γfs) (DfracOwn (3/4)) S
            -∗ (ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
                ∗ col_auth γfs Lb C (fs_home_set cov ls)
-               ∗ ghost_map_auth (fs_top γfs) 1 I
+               ∗ ghost_map_auth (fs_top γfs) (1/2) I
                ∗ ghost_map_auth γi 1 m
                ∗ ([∗ list] bi ∈ seq 0%nat nib,
                     ireg_blk γi γfs (FsImg.sb_inodestart sb) m bi)
@@ -1789,7 +1790,7 @@ Section CollectAll.
   Proof.
     intros Hgeom Hft Hir Hbmn Hsbn Hipn Hien.
     iIntros "#Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx".
-    iDestruct "Hireg" as "(#Hiregi & _ & #Hftop)".
+    iDestruct "Hireg" as "(#Hiregi & _ & #Hftop & _)".
     iDestruct "Hbmi" as "(#Hbmb & _)".
     (* ---- 1. the abstract map's authority ---- *)
     iMod (inv_acc E ftopN with "Hftop") as "[Hfb Hclft]"; [exact Hft |].

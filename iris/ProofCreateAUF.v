@@ -231,7 +231,7 @@ Require Import FsAbsEra.       (* [ep_start]: the DEFERRED start      *)
 Require Import SpecSysMknodAU.   (* [cre_pre], [mknod_parent_elems]     *)
 Require Import FsAbsMknodFire.   (* the commits and FIRE 1              *)
 Require Import SpecCreateAUF.    (* the contract this file seals        *)
-Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.            (* LAST of the abstract stack          *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
@@ -1722,51 +1722,59 @@ Section ProofCreateMain.
      and hand the transaction token back -- create's four exits (the FILE
      arm, the two mkdir failures, the mkdir success) each take exactly one
      of these. *)
+  (* ...EACH A NON-AU MOVE of the suspended child (app-instances.md section
+     7): the application's parked license pays it ([ireg_top_retag_armed_auto],
+     [top_move] being everything in round A) until round E gives create's
+     directory child its AU form. *)
   Lemma cr_dirty_arm (E : coPset) (t : nat) (i : Z)
       (n n' : fs_node) :
-    ↑ftopN ⊆ E ->
-    ftop_inv fsc_fs -∗ t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
     top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
       cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'.
   Proof.
-    iIntros (HE) "#Hi Htx Hf".
-    iMod (ireg_arm E fsc_fs i t (1/2)%Qp HE with "Hi Htx") as (k) "Harm".
-    iMod (ireg_top_retag_armed E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) with "Hi Harm Hf")
+    iIntros (HE) "#Hi #Hai Htx Hf".
+    iMod (ireg_arm E fsc_fs i t (1/2)%Qp (ftopN_sub_app E HE) with "Hi Htx")
+      as (k) "Harm".
+    iMod (ireg_top_retag_armed_auto E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Logic.I with "Hi Hai Harm Hf")
       as "[Harm Hf]".
     iModIntro. iFrame "Hf". rewrite /cr_dirty. iExists k. iExact "Harm".
   Qed.
 
   Lemma cr_dirty_retag (E : coPset) (t : nat) (i : Z)
       (n n' : fs_node) :
-    ↑ftopN ⊆ E ->
-    ftop_inv fsc_fs -∗ cr_dirty t i -∗ top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
+    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
       cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'.
   Proof.
-    iIntros (HE) "#Hi Hd Hf". rewrite /cr_dirty.
+    iIntros (HE) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
-    iMod (ireg_top_retag_armed E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) with "Hi Harm Hf")
+    iMod (ireg_top_retag_armed_auto E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Logic.I with "Hi Hai Harm Hf")
       as "[Harm Hf]".
     iModIntro. iFrame "Hf". iExists k. iExact "Harm".
   Qed.
 
   Lemma cr_dirty_clear (E : coPset) (t : nat) (i : Z)
       (n n' : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local i n' ->
-    ftop_inv fsc_fs -∗ cr_dirty t i -∗ top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
+    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'.
   Proof.
-    iIntros (HE Hloc) "#Hi Hd Hf". rewrite /cr_dirty.
+    iIntros (HE Hloc) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
-    iMod (ireg_top_retag_armed E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) with "Hi Harm Hf")
+    iMod (ireg_top_retag_armed_auto E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Logic.I with "Hi Hai Harm Hf")
       as "[Harm Hf]".
-    iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' HE Hloc with "Hi Harm Hf")
-      as "[Harm Hf]".
+    iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
+            with "Hi Harm Hf") as "[Harm Hf]".
     iEval (rewrite difference_diag_L) in "Harm".
-    iMod (ireg_release E fsc_fs k t (1/2)%Qp HE with "Hi Harm") as "Htx".
+    iMod (ireg_release E fsc_fs k t (1/2)%Qp (ftopN_sub_app E HE) with "Hi Harm")
+      as "Htx".
     iModIntro. iFrame "Htx Hf".
   Qed.
 
@@ -2254,8 +2262,8 @@ Section ProofCreateMain.
           NEITHER of them fired on this path -- the exists-lookup MISSED,
           which is how control got here. ---- *)
        P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
-       acre_commit_at (fs_gamma_L fsc_fs) fsabsE (AFile []) Φok -∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Φex -∗
+       acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Φok -∗
+       dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
        (* and the contract's own continuation, ANCHORED AT THE ENTRY HART
           (ProofDirlink's [dl_after_body]): the block's own proof does the
           retargeting, so this file hands over [Hcont] untouched. *)
@@ -2501,8 +2509,8 @@ Section ProofCreateMain.
           that returned -1, i.e. before the entry write, so both commits go
           home beside the cursor. ---- *)
        P (length (mknod_parent_elems (bview plen pfun))) (bv_unsigned dind) -∗
-       acre_commit_at (fs_gamma_L fsc_fs) fsabsE (AFile []) Φok -∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Φex -∗
+       acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Φok -∗
+       dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
             cr_cont_body γf
@@ -2598,8 +2606,8 @@ Section ProofCreateMain.
        path buffer IS [FsAbsEraMknod.mknod_walk_pre_era]) and the two
        commits ---- *)
     ep_start fsc_fs (pv_cwi (us_V U)) P Pmiss (bview plen pfun) -∗
-    acre_commit_at (fs_gamma_L fsc_fs) fsabsE (AFile []) Φok -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Φex -∗
+    acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Φok -∗
+    dlookup_commit_at (fs_gamma_L fsc_fs) appE Φex -∗
     (* ---- THE PARKED ALLOCATE HALF, as a HYPOTHESIS ---- *)
     wp_next true (proc_addr j) (fun CIDa : CpuId =>
       cr_alloc_body γs j γl pd pav pu γf
@@ -5157,9 +5165,9 @@ Section ProofCreateMain.
               (era_node dnc bmc datc)
               (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                         bmc datc)
-              ltac:(solve_ndisj) with "[] Htx Hctop")
+              ltac:(solve_ndisj) with "[] [] Htx Hctop")
         as "[Hdirty Hctop]";
-        [iApply (ireg_inv_ftop with "Hiregi") |].
+        [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
       iModIntro.
       iDestruct "Hcmeta" as "(Hcity & Hcimaj & Hcimin & Hcinl & Hcisz)".
       iEval (rewrite /i_major) in "Hcimaj".
@@ -5464,9 +5472,9 @@ Section ProofCreateMain.
                           bmc datc)
                 (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                           bmc datc)
-                ltac:(solve_ndisj) Hlocfile with "[] Hdirty Hctop")
+                ltac:(solve_ndisj) Hlocfile with "[] [] Hdirty Hctop")
           as "[Htx Hctop]";
-          [iApply (ireg_inv_ftop with "Hiregi") |].
+          [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
         iModIntro.
         assert (Hq0ce : add_vec_int (mword_of_int (CK + 0xca) : mword 64) 4
                         = mword_of_int (CK + 0xce)) by pcw.
@@ -5876,7 +5884,7 @@ Section ProofCreateMain.
              (*  which, under [cre_pre], IS the fused delta                  *)
              (*  ([SpecSysMknodAU.delta_create_dev]).                        *)
              (*  [FsAbsMknodFire.mkf_acre_fire] REPLACES the                 *)
-             (*  [InodeRegion.ireg_top_retag] the frozen walk calls here: it *)
+             (*  [InodeRegion.ireg_top_retag_*] the frozen walk calls here: it *)
              (*  owes the SAME row and performs the SAME [ghost_map_update], *)
              (*  with the caller's two phases on either side of it inside    *)
              (*  ONE [ftopN] critical section.                               *)
@@ -5943,8 +5951,8 @@ Section ProofCreateMain.
                      (inode_local_of_ok_rec (bv_unsigned dind) fsc_cov fsc_logst
                         dn' bm' data' Hiok' Hrl' Hduq' Hddix')
                      (mkf_era_is_dir dn bm data Hdz) Hnonep Habsp' Habsc
-                     with "[] Hacre Htop Hctop") as "(Htop & Hctop & Hokr)";
-               [iApply (ireg_inv_ftop with "Hiregi") |].
+                     with "[] [] Hacre Htop Hctop") as "(Htop & Hctop & Hokr)";
+               [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
              iEval (rewrite -top_frag_1) in "Hctop".
              iModIntro.
              iDestruct "Hokr" as (avy) "(%Hprey & HFok)".
@@ -6899,13 +6907,13 @@ Section ProofCreateMain.
       - apply dir_uniq_not_dir. rewrite cr_setf_type. exact Htdirz.
       - apply dir_dots_ix_not_dir. rewrite cr_setf_type. exact Htdirz. }
     iApply fupd_wp.
-    iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned cinum)
+    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned cinum)
             (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                       bmc datc)
             (era_node (cr_setf dnc major minor (mword_of_int 0 : mword 16))
                       bmc datc)
-            ltac:(solve_ndisj) Hlocz with "[] Hctop") as "Hctop";
-      [iApply (ireg_inv_ftop with "Hiregi") |].
+            ltac:(solve_ndisj) Logic.I Hlocz with "[] [] Hctop") as "Hctop";
+      [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
     iModIntro.
     iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum
                  (cr_setf dnc major minor (mword_of_int 0 : mword 16))
@@ -7147,13 +7155,13 @@ Section ProofCreateMain.
        the retag owes the registry's row and this is where the post
        record's four well-formedness facts have just been assembled. *)
     iApply fupd_wp.
-    iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned dind)
+    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dind)
             (era_node dn bm data) (era_node dn' bm' data')
-            ltac:(solve_ndisj)
+            ltac:(solve_ndisj) Logic.I
             (inode_local_of_ok_rec (bv_unsigned dind) fsc_cov fsc_logst dn' bm'
                data' Hiok' Hrl' Hduq' Hddix')
-            with "[] Htop") as "Htop";
-      [iApply (ireg_inv_ftop with "Hiregi") |].
+            with "[] [] Htop") as "Htop";
+      [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
     iModIntro.
     iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dn' bm' data'
                  Hiok' Hrl' Hdok' Hddix' (cr_doc_of_live dn dn' data' Hnl' Hnl0)

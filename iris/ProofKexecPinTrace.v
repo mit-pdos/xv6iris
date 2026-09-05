@@ -196,7 +196,7 @@ Section KexecPinTrace.
 
   Lemma kxp_run_pin_read Γ (pb : kx_pin) (ds : list Z)
       (I : gmap Z fs_node) :
-    kxp_run_pin Γ pb ds -∗ ghost_map_auth (γtop Γ) 1 I -∗
+    kxp_run_pin Γ pb ds -∗ ghost_map_auth (γtop Γ) (1/2) I -∗
       ⌜kxp_pins (abs_view I) pb
        /\ arun (abs_view I) FsImg.ROOTINO (kxp_path pb) ds⌝.
   Proof.
@@ -207,7 +207,7 @@ Section KexecPinTrace.
 
   Lemma kxt_elend_aents Γ (I : gmap Z fs_node) (d : Z) (dq : dfrac)
       (ents : gmap fname Z) :
-    ghost_map_auth (γtop Γ) 1 I -∗ elend Γ d dq ents -∗
+    ghost_map_auth (γtop Γ) (1/2) I -∗ elend Γ d dq ents -∗
       ⌜aents (abs_view I) d = Some ents⌝.
   Proof.
     iIntros "Hta HF".
@@ -221,7 +221,7 @@ Section KexecPinTrace.
   Lemma kxt_frag_bytes Γ (pb : kx_pin) (I : gmap Z fs_node) (dq : dfrac)
       (n : fs_node) :
     kxp_pins (abs_view I) pb ->
-    ghost_map_auth (γtop Γ) 1 I -∗ top_frag_q Γ dq (kxp_ino pb) n -∗
+    ghost_map_auth (γtop Γ) (1/2) I -∗ top_frag_q Γ dq (kxp_ino pb) n -∗
       ⌜fn_file_bytes n = kxp_bytes pb⌝.
   Proof.
     intros Hpins. iIntros "Hta Hf".

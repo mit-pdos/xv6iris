@@ -44,6 +44,8 @@ Require Import DinodeEnc.
 Require Import FsStateDefs.
 Require Import FsBytesGamma.
 Require Import InodeRegion.
+Require Import AppInv.       (* [appN], [top_move]: the deposit's retag opens the application's invariant *)
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import EscrowDefs.
 Require Import EscrowInode.
 (* durable-disk C-7: the deposit's own ghost step is a CORPSE LEDGER swap,
@@ -55,7 +57,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Section EscrowDeposit.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
 
   Lemma ireg_free_deposit_au (E : coPset) (icn : ic_names) (γi : gname)
       (γfs : fs_names) (inodestart : Z) (cov : gset Z) (logstart : Z)
@@ -75,7 +77,7 @@ Section EscrowDeposit.
        parked region-side ([InodeRegion.ireg_top_park]), which is what gives
        the commit's collection a whole bundle at a free inum.  The retag needs
        the abstract map's authority, and [ireg_inv] already bundles it. *)
-    ↑ftopN ⊆ E ∖ ↑iregN ∖ ↑escAN (bv_unsigned inum) ->
+    ↑ftopN ∪ ↑appN ⊆ E ∖ ↑iregN ∖ ↑escAN (bv_unsigned inum) ->
     (bv_unsigned inum < 16 * Z.of_nat nib)%Z ->
     dinode_wf dn' ->
     bv_unsigned (di_type dn') = 0 ->
@@ -161,7 +163,7 @@ Section EscrowDeposit.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi #Happi]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -235,10 +237,13 @@ Section EscrowDeposit.
        this deposit builds hands the commit's collection a whole
        [FsStateEra.inode_owned_era] at this inum. *)
     iDestruct "Htop" as (ntop) "Htop".
-    iMod (ireg_top_retag (E ∖ ↑iregN ∖ ↑escAN (bv_unsigned inum)) γfs
-            (bv_unsigned inum) ntop (free_node dn') Hftop_mask
+    (* ...a NON-AU move (orphan -> free), paid by the application's parked
+       license until round E gives the free path its AU form
+       (app-instances.md section 7) *)
+    iMod (ireg_top_retag_auto (E ∖ ↑iregN ∖ ↑escAN (bv_unsigned inum)) γfs
+            (bv_unsigned inum) ntop (free_node dn') Hftop_mask Logic.I
             (inode_local_free_node (bv_unsigned inum) dn' Hbare Hnl0' Hz)
-            with "Hftopi Htop") as "Htop".
+            with "Hftopi Happi Htop") as "Htop".
     iDestruct (ireg_top_park_free γfs (bv_unsigned inum) dn' Hbare with "Htop")
       as "Hpark".
     iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %->.

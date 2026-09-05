@@ -72,6 +72,7 @@ Require Import IregLinkNz.
 Require Import IgetLic.
 Require Import IrefSlots.
 Require Import IcacheRef.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import ProofDirlookupParts.
 Require Import ProofNamexParts.
 Require Import CodeNamex.
@@ -102,7 +103,7 @@ Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.
 
 Section ProofNamexRoot.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 

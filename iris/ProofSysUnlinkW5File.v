@@ -1384,17 +1384,17 @@ Section ProofSysUnlinkW5File.
        (N-3/N-4), not the carrier's. *)
     iApply fupd_wp.
     (* ...and the ERA's abstract value with them (durable-disk 2b-inode-3):
-       [ireg_top_retag] opens [ftopN] alone. *)
+       [ireg_top_retag_*] opens [ftopN] alone. *)
     (* THE RETAG OWES THE ROW (durable-disk lane A): the four facts are the
        re-pack's own, already named -- a zeroed entry leaves the directory
        well-formed (its dots are untouched and its names stay unique). *)
-    iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned dinum)
+    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dinum)
             (era_node dnd bmd datd) (era_node dnW bm' data')
-            ltac:(solve_ndisj)
+            ltac:(solve_ndisj) Logic.I
             (inode_local_of_ok_rec (bv_unsigned dinum) fsc_cov fsc_logst dnW bm'
                data' Hiok' Hrl_data' Hduq' Hddix')
-            with "[] Htop") as "Htop";
-      [iApply (ireg_inv_ftop with "Hireg") |].
+            with "[] [] Htop") as "Htop";
+      [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iModIntro.
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dinum dnW bm')
       with "[Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Htop]"
@@ -1774,7 +1774,7 @@ Section ProofSysUnlinkW5File.
       - apply dir_uniq_not_dir. rewrite su_setnl_type. exact Htynzi.
       - apply dir_dots_ix_not_dir. rewrite su_setnl_type. exact Htynzi. }
     iApply fupd_wp.
-    iMod (ireg_top_retag ⊤ fsc_fs
+    iMod (ireg_top_retag_auto ⊤ fsc_fs
             (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
                           : mword 32))
             (era_node dni bmi dati)
@@ -1784,8 +1784,8 @@ Section ProofSysUnlinkW5File.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi dati)
-            ltac:(solve_ndisj) Hlocdec with "[] Htopi") as "Htopi";
-      [iApply (ireg_inv_ftop with "Hireg") |].
+            ltac:(solve_ndisj) Logic.I Hlocdec with "[] [] Htopi") as "Htopi";
+      [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iModIntro.
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ks
                (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)

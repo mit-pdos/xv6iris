@@ -876,6 +876,14 @@ FsStateInode.v
 FsStateBitmap.v
 FsState.v
 FsAbsDefs.v
+# AppCfg = the application's predicate on the abstract state's VIEW, as a
+# class record ([appcfg Σ], app-instances.md sections 1-2); a field of
+# [fileG] below, bound as a section class from InodeRegion up to it
+AppCfg.v
+# AppInv = the application's running invariant: half of the abstract map's
+# authority beside its claim, and the one ghost move on the map
+# (app-instances.md section 2); below InodeRegion, whose movers open it
+AppInv.v
 FsAbsDelta.v
 FsBytesGamma.v
 BitmapInv.v
@@ -1418,9 +1426,6 @@ ProofSysChdir.v
 SpecSysMkdir.v
 ProofSysMkdir.v
 LinkSysMkdir.v
-# AppCfg = the application's predicate on the abstract state, as a class
-# record ([appcfg Σ], applications.md section 1); a field of [fileG] below
-AppCfg.v
 FsCfg.v
 FsReady.v
 EnvMorph.v
@@ -1497,7 +1502,6 @@ LogSnapLaw.v
 FsFlushedCore.v
 FsDurSyscall.v
 FsAbs.v
-FsAbsInv.v
 SpecSysMknodAU.v
 FsAbsEra.v
 SpecNamexEra.v

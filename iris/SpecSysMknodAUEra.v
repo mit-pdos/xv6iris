@@ -139,7 +139,7 @@ Require Import FsBytesGamma.
 Require Import SpecSysMknodAU.   (* [dev_arg], and the frozen statement  *)
 Require Import FsAbsMknodFire.   (* the authority-shaped commits         *)
 Require Import SpecCreateAU.     (* [cau_ok] / [cau_fail]                *)
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)              *)
 Require Import PathElems.  (* [path_elems] -- previously via the trimmed SpecSysMknodAU *)
 Import Defs.
@@ -152,13 +152,13 @@ Section SysMknodAUEra.
             !irefslotG Σ, !pavG Σ}.
   Implicit Types Γ : fs_view_names Σ.
 
-  (* everything the AU caller hands in, at the commit mask [fsabsE] *)
+  (* everything the AU caller hands in, at the commit mask [appE] *)
   Definition mknod_au_pre_era Γ (γfs : fs_names) (cw : Z) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
     (mknod_walk_pre_era γfs cw P Pmiss
-     ∗ acre_commit_at Γ fsabsE (ADev ma mi) Φok
-     ∗ dlookup_commit_at Γ fsabsE Φex)%I.
+     ∗ acre_commit_at Γ appE (ADev ma mi) Φok
+     ∗ dlookup_commit_at Γ appE Φex)%I.
 
   (* ret 0's real arm: [SpecSysMknodAU.mknod_post_ok], which is
      [SpecCreateAU.cau_ok] at the fetched path beside the region bound
@@ -268,7 +268,7 @@ Section SysMknodAUEra.
        ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
        ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜arun av root ps ds⌝ ∗
-       dlookup_commit_at Γ fsabsE Φex ∗
+       dlookup_commit_at Γ appE Φex ∗
        Φok av d nm i)%I.
 
   (* ret -1: TWO arms where the AU form has three folds, and the collapse
@@ -280,14 +280,14 @@ Section SysMknodAUEra.
   Definition mknod_stable_fail_era Γ (ma mi : Z) (root : Z)
       (ps : list fname) (ds : list Z)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    ((acre_commit_at Γ fsabsE (ADev ma mi) Φok ∗ dlookup_commit_at Γ fsabsE Φex)
+    ((acre_commit_at Γ appE (ADev ma mi) Φok ∗ dlookup_commit_at Γ appE Φex)
      ∨ (∃ (pl : list (bv 8)) (av : aview) (d i : Z) (nm : fname)
           (ents : gmap fname Z) (nl : nat),
           ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
           ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
           ⌜ents !! nm = Some i⌝ ∗
           ⌜arun av root ps ds⌝ ∗
-          acre_commit_at Γ fsabsE (ADev ma mi) Φok ∗
+          acre_commit_at Γ appE (ADev ma mi) Φok ∗
           Φex av d nm i))%I.
 
   Definition mknod_stable_arms_era Γ (ma mi : Z) (root : Z)
@@ -521,8 +521,8 @@ Definition wp_sys_mknod_au_era_stable_body
   wp_sys_mknod_au_era_frame γf gs j gl pd pav pu ns dqb dqs dqbs dqn
     v0 v1 v2 pid U m K eb b lks
     (mkr_chain Γfs avc ds ps
-     ∗ acre_commit_at Γfs fsabsE (ADev ma mi) Φok
-     ∗ dlookup_commit_at Γfs fsabsE Φex)%I
+     ∗ acre_commit_at Γfs appE (ADev ma mi) Φok
+     ∗ dlookup_commit_at Γfs appE Φex)%I
     (mknod_stable_arms_era Γfs ma mi root ps ds Φok Φex).
 
 Module Type SYSMKNOD_AU_ERA.

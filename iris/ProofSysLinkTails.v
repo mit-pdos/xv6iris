@@ -1418,7 +1418,7 @@ Section ProofSysLinkTails.
     (* THE ERA'S ABSTRACT VALUE IS RETAGGED (durable-disk 2b-inode-3): the
        payload's last name IS that fragment, the flush MOVED the record
        ([dn'] is [sl_setnl dn ..], one halfword and no byte), and
-       [InodeRegion.ireg_top_retag] is the one-line move.  It opens [ftopN]
+       [InodeRegion.ireg_top_retag_*] is the one-line move.  It opens [ftopN]
        alone, so no mask this walk holds is disturbed. *)
     iRename "Htopl" into "Htop".
     (* THE RETAG OWES THE ROW (durable-disk lane A): the raised record is
@@ -1435,10 +1435,10 @@ Section ProofSysLinkTails.
       - apply dir_uniq_not_dir. rewrite /dn' sl_setnl_type. exact Hnotdir.
       - exact (sl_setnl_ddix _ dn dat _ Hnz Hddix). }
     iApply fupd_wp.
-    iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned inum)
+    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned inum)
             (era_node dn bm dat) (era_node dn' bm dat)
-            ltac:(solve_ndisj) Hloc' with "[] Htop") as "Htop";
-      [iApply (ireg_inv_ftop with "Hireg") |].
+            ltac:(solve_ndisj) Logic.I Hloc' with "[] [] Htop") as "Htop";
+      [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iModIntro.
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn' bm)
       with "[Hdlnk Hdiat Hmeta Hmap Hblocks Htop]" as "Hload".

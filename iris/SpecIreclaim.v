@@ -164,6 +164,7 @@ Require Import FsCrash.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
@@ -185,7 +186,7 @@ Local Open Scope Z_scope.
 Notation K_ireclaim := (84%nat) (only parsing).
 Definition wp_ireclaim_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -326,7 +327,7 @@ Definition wp_ireclaim_sconf_body
 Module Type IRECLAIM.
   Parameter wp_ireclaim_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)

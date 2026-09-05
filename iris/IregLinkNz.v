@@ -41,13 +41,14 @@ Require Import DinodeEnc.
 Require Import IcacheRef.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
 Section IregLinkNz.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
 
   (* ------------------------------------------------------------------ *)
   (*  "A HELD TOKEN MEANS A NONZERO COUNT", AT A RECORD THE CALLER NAMES  *)
@@ -89,7 +90,7 @@ Section IregLinkNz.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -143,7 +144,7 @@ Section IregLinkNz.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -216,7 +217,7 @@ Section IregLinkNz.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -263,7 +264,7 @@ Section IregLinkNz.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.

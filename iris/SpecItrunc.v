@@ -109,6 +109,7 @@ Require Import BitmapInv.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IcacheInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -152,7 +153,7 @@ Proof.
 Qed.
 
 Section ItruncSpec.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg}.
 
   (* "THE BITMAP BLOCK'S LOG SLOT IS PAID FOR, and u units remain for
      everything else."
@@ -305,7 +306,7 @@ Section ItruncSpec.
 End ItruncSpec.
 
 Definition wp_itrunc_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -509,7 +510,7 @@ Definition wp_itrunc_sconf_body
 (*  every counted caller unmoved.                                         *)
 (* ===================================================================== *)
 Definition wp_itrunc_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -640,7 +641,7 @@ Definition wp_itrunc_gen_body
 
 Module Type ITRUNC.
   Parameter wp_itrunc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (inum : mword 32)
@@ -658,7 +659,7 @@ Module Type ITRUNC.
      [crb := cru := false], derived at the [log_op] existential's own
      witness. *)
   Parameter wp_itrunc_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (inum : mword 32)

@@ -311,7 +311,8 @@ Require Import FsAbsEraMknod.   (* [mknod_walk_pre_era], [mknod_walk_dead_era]
                                    -- the parent-prefix one-shot, REUSED *)
 Require Import FsAbsMknodFire.  (* [acre_commit_at], [dlookup_commit_at],
                                    [mkf_auth_nview] *)
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
+Require Import AppCfg.          (* [app_pred], [app_run]: the application's claim, for the step wands *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
@@ -408,8 +409,8 @@ Section SysOpenAU.
       (Φ : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (i : Z) (a : anode),
        ⌜abs_view I !! i = Some a⌝ -∗
-       ghost_map_auth (γtop Γ) 1 I ={E}=∗
-       ghost_map_auth (γtop Γ) 1 I ∗ Φ (abs_view I) i a)%I.
+       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth (γtop Γ) (1/2) I ∗ Φ (abs_view I) i a)%I.
 
   (* the astate-shaped reading, for a client that reasons abstractly --
      the read-only direction holds ([FsAbsMknodFire]'s
@@ -420,16 +421,16 @@ Section SysOpenAU.
       (Φ : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
     (∀ (av : aview) (i : Z) (a : anode),
        ⌜av !! i = Some a⌝ -∗
-       astate Γ av ={E}=∗ astate Γ av ∗ Φ av i a)%I.
+       astate_q Γ (1/2) av ={E}=∗ astate_q Γ (1/2) av ∗ Φ av i a)%I.
 
   Lemma aopen_commit_at_weaken `{XI : CurCtx} Γ E Φ :
     aopen_commit_at Γ E Φ ⊢ aopen_commit Γ E Φ.
   Proof.
     iIntros "Hcm". rewrite /aopen_commit.
     iIntros (av i a) "%Hi Hst".
-    iDestruct (astate_elim with "Hst") as (I) "[Ha %Hav]". subst av.
+    iDestruct (astate_q_elim with "Hst") as (I) "[Ha %Hav]". subst av.
     iMod ("Hcm" $! I i a with "[//] Ha") as "[Ha HΦ]".
-    iModIntro. iFrame "HΦ". iApply astate_intro. iExact "Ha".
+    iModIntro. iFrame "HΦ". iApply astate_q_intro. iExact "Ha".
   Qed.
 
   (* satisfiability: the seal cannot be vacuously blocked on the caller *)
@@ -470,32 +471,46 @@ Section SysOpenAU.
       (Φ : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (i : Z) (bs0 : list (bv 8)) (nl : nat),
        ⌜abs_view I !! i = Some (MkAnode (AFile bs0) nl)⌝ -∗
-       ghost_map_auth (γtop Γ) 1 I ={E}=∗
-       ghost_map_auth (γtop Γ) 1 I ∗
+       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth (γtop Γ) (1/2) I ∗
+         (* THE CALLER'S STEP (app-instances.md section 7): its claim about
+            the pre-view survives the delta, at the RAW insert the mover
+            performs ([AppInv.app_step]; the delta is its reading) *)
+         app_step i I (delta_trunc i (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_trunc i (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) 1 I' ={E}=∗
-            ghost_map_auth (γtop Γ) 1 I' ∗ Φ (abs_view I) i bs0))%I.
+            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i bs0))%I.
 
-  Lemma atrunc_commit_at_unit `{XI : CurCtx} Γ E :
-    ⊢ atrunc_commit_at Γ E (fun _ _ _ => True%I).
+  (* satisfiability, at the live Γ: a write-kind shape owes the caller's
+     step, which a client that knows nothing pays out of the parked license
+     ([AppInv.app_step_acc], inside the commit's own fupd) *)
+  Lemma atrunc_commit_at_unit `{XI : CurCtx} (γfs : fs_names) E :
+    ↑appN ⊆ E ->
+    app_inv γfs -∗ atrunc_commit_at (fs_gamma_L γfs) E (fun _ _ _ => True%I).
   Proof.
-    rewrite /atrunc_commit_at. iIntros (I i bs0 nl) "%Hpre Ha".
-    iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'". iModIntro.
+    iIntros (HE) "#Hai". rewrite /atrunc_commit_at. iIntros (I i bs0 nl) "%Hpre Ha".
+    iMod (app_step_acc E γfs i I (delta_trunc i (abs_view I)) HE
+            (abs_view_lookup_is_Some I i _ Hpre) with "Hai") as "Hstep".
+    iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     by iFrame "Ha'".
   Qed.
 
-  Lemma atrunc_commit_at_pinned `{XI : CurCtx} Γ E (q : Qp) (jpin : Z) (b : anode)
+  Lemma atrunc_commit_at_pinned `{XI : CurCtx} (γfs : fs_names) E (q : Qp) (jpin : Z) (b : anode)
       (Φ : aview -> Z -> list (bv 8) -> iProp Σ) :
-    nview Γ q jpin b -∗
+    ↑appN ⊆ E ->
+    app_inv γfs -∗
+    nview (fs_gamma_L γfs) q jpin b -∗
     (∀ (av : aview) (i : Z) (bs : list (bv 8)),
-       ⌜av !! jpin = Some b⌝ -∗ nview Γ q jpin b -∗ Φ av i bs) -∗
-    atrunc_commit_at Γ E Φ.
+       ⌜av !! jpin = Some b⌝ -∗ nview (fs_gamma_L γfs) q jpin b -∗ Φ av i bs) -∗
+    atrunc_commit_at (fs_gamma_L γfs) E Φ.
   Proof.
-    iIntros "Hn HΦ". rewrite /atrunc_commit_at.
+    iIntros (HE) "#Hai Hn HΦ". rewrite /atrunc_commit_at.
     iIntros (I i bs0 nl) "%Hpre Ha".
     iDestruct (mkf_auth_nview with "Ha Hn") as %Hav.
-    iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'". iModIntro.
+    iMod (app_step_acc E γfs i I (delta_trunc i (abs_view I)) HE
+            (abs_view_lookup_is_Some I i _ Hpre) with "Hai") as "Hstep".
+    iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
     iFrame "Ha'".
     iApply ("HΦ" $! (abs_view I) i bs0 with "[%] Hn"). done.
   Qed.
@@ -544,8 +559,8 @@ Section SysOpenAU.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (open_walk_pre_era γfs cw P Pmiss
-     ∗ aopen_commit_at Γ fsabsE Φo
-     ∗ atrunc_commit_at Γ fsabsE Φt)%I.
+     ∗ aopen_commit_at Γ appE Φo
+     ∗ atrunc_commit_at Γ appE Φt)%I.
 
   (* ...and the O_CREATE caller: the parent-prefix one-shot REUSED from
      the mknod era file, create's fused delta at the child [AFile []],
@@ -556,10 +571,10 @@ Section SysOpenAU.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (Φt : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (mknod_walk_pre_era γfs cw P Pmiss
-     ∗ acre_commit_at Γ fsabsE (AFile []) Φok
-     ∗ dlookup_commit_at Γ fsabsE Φex
-     ∗ aopen_commit_at Γ fsabsE Φo
-     ∗ atrunc_commit_at Γ fsabsE Φt)%I.
+     ∗ acre_commit_at Γ appE (AFile []) Φok
+     ∗ dlookup_commit_at Γ appE Φex
+     ∗ aopen_commit_at Γ appE Φo
+     ∗ atrunc_commit_at Γ appE Φt)%I.
 
   (* ------------------------------------------------------------------ *)
   (*  2e.  The descriptor story                                           *)
@@ -614,7 +629,7 @@ Section SysOpenAU.
            ⌜av !! i = Some (MkAnode (ADev ma mi) nl)⌝ ∗
            ⌜0 <= ma <= NDEV_max⌝ ∗
            Φo av i (MkAnode (ADev ma mi) nl) ∗
-           atrunc_commit_at Γ fsabsE Φt ∗
+           atrunc_commit_at Γ appE Φt ∗
            open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
              (FdDevice ma) sts r)
         ∨ (* FILE: the ONE delta of this surface, iff O_TRUNC -- the trunc
@@ -627,7 +642,7 @@ Section SysOpenAU.
             then ∃ av' : aview,
                    ⌜av' !! i = Some (MkAnode (AFile bs0) nl)⌝ ∗
                    Φt av' i bs0
-            else atrunc_commit_at Γ fsabsE Φt) ∗
+            else atrunc_commit_at Γ appE Φt) ∗
            ∃ γo : gname,
              open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
                (FdInode i γo) sts r)
@@ -638,7 +653,7 @@ Section SysOpenAU.
            ⌜av !! i = Some (MkAnode (ADir ents) nl)⌝ ∗
            ⌜om_arg vom = 0⌝ ∗
            Φo av i (MkAnode (ADir ents) nl) ∗
-           atrunc_commit_at Γ fsabsE Φt ∗
+           atrunc_commit_at Γ appE Φt ∗
            ∃ γo : gname,
              open_fd_ok γf p pid UW true false (FdInode i γo) sts r)))%I.
 
@@ -652,13 +667,13 @@ Section SysOpenAU.
     (open_au_pre_plain Γ γfs cw P Pmiss Φo Φt
      ∨ (∃ pl : list (bv 8),
           (open_walk_dead_era γfs P Pmiss pl
-             ∗ aopen_commit_at Γ fsabsE Φo
-             ∗ atrunc_commit_at Γ fsabsE Φt)
+             ∗ aopen_commit_at Γ appE Φo
+             ∗ atrunc_commit_at Γ appE Φt)
           ∨ (∃ i : Z,
                P (length (path_elems pl)) i
                ∗ (∃ (av : aview) (a : anode),
                     ⌜av !! i = Some a⌝ ∗ Φo av i a)
-               ∗ atrunc_commit_at Γ fsabsE Φt)))%I.
+               ∗ atrunc_commit_at Γ appE Φt)))%I.
 
   (* the armed disjunction the continuation receives, keyed on a0, with
      the landed post's fd-side bundle folded in per arm (the caller's
@@ -705,9 +720,9 @@ Section SysOpenAU.
            ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
            ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
            Φok av d nm i ∗
-           dlookup_commit_at Γ fsabsE Φex ∗
-           aopen_commit_at Γ fsabsE Φo ∗
-           atrunc_commit_at Γ fsabsE Φt ∗
+           dlookup_commit_at Γ appE Φex ∗
+           aopen_commit_at Γ appE Φo ∗
+           atrunc_commit_at Γ appE Φt ∗
            ∃ γo : gname,
              open_fd_ok γf p pid UW (om_readable vom) (om_writable vom)
                (FdInode i γo) sts r)
@@ -716,7 +731,7 @@ Section SysOpenAU.
            ⌜avx !! d = Some (MkAnode (ADir entsx) nlx)⌝ ∗
            ⌜entsx !! nm = Some i⌝ ∗
            Φex avx d nm i ∗
-           acre_commit_at Γ fsabsE (AFile []) Φok ∗
+           acre_commit_at Γ appE (AFile []) Φok ∗
            (∃ (av : aview) (nl : nat),
               ((* the found node is a FILE *)
                (∃ bs0 : list (bv 8),
@@ -726,7 +741,7 @@ Section SysOpenAU.
                    then ∃ av' : aview,
                           ⌜av' !! i = Some (MkAnode (AFile bs0) nl)⌝ ∗
                           Φt av' i bs0
-                   else atrunc_commit_at Γ fsabsE Φt) ∗
+                   else atrunc_commit_at Γ appE Φt) ∗
                   ∃ γo : gname,
                     open_fd_ok γf p pid UW (om_readable vom)
                       (om_writable vom) (FdInode i γo) sts r)
@@ -736,7 +751,7 @@ Section SysOpenAU.
                   ⌜av !! i = Some (MkAnode (ADev ma mi) nl)⌝ ∗
                   ⌜0 <= ma <= NDEV_max⌝ ∗
                   Φo av i (MkAnode (ADev ma mi) nl) ∗
-                  atrunc_commit_at Γ fsabsE Φt ∗
+                  atrunc_commit_at Γ appE Φt ∗
                   open_fd_ok γf p pid UW (om_readable vom)
                     (om_writable vom) (FdDevice ma) sts r))))))%I.
 
@@ -751,13 +766,13 @@ Section SysOpenAU.
     (open_au_pre_create Γ γfs cw P Pmiss Φok Φex Φo Φt
      ∨ (∃ pl : list (bv 8),
           (mknod_walk_dead_era γfs P Pmiss pl
-             ∗ acre_commit_at Γ fsabsE (AFile []) Φok
-             ∗ dlookup_commit_at Γ fsabsE Φex
-             ∗ aopen_commit_at Γ fsabsE Φo
-             ∗ atrunc_commit_at Γ fsabsE Φt)
+             ∗ acre_commit_at Γ appE (AFile []) Φok
+             ∗ dlookup_commit_at Γ appE Φex
+             ∗ aopen_commit_at Γ appE Φo
+             ∗ atrunc_commit_at Γ appE Φt)
           ∨ (∃ d : Z,
                P (length (mknod_parent_elems pl)) d
-               ∗ atrunc_commit_at Γ fsabsE Φt
+               ∗ atrunc_commit_at Γ appE Φt
                ∗ ((* (a) create succeeded FRESH; open failed past it *)
                   (∃ (av : aview) (i : Z) (nm : fname)
                      (ents : gmap fname Z) (nl : nat),
@@ -765,8 +780,8 @@ Section SysOpenAU.
                      ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
                      ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
                      Φok av d nm i
-                     ∗ dlookup_commit_at Γ fsabsE Φex
-                     ∗ aopen_commit_at Γ fsabsE Φo)
+                     ∗ dlookup_commit_at Γ appE Φex
+                     ∗ aopen_commit_at Γ appE Φo)
                   ∨ (* (b) the name existed: found DIR (F-BAD), a bad
                        found-device major, or table full past a good
                        found node; -1 does not say which *)
@@ -776,15 +791,15 @@ Section SysOpenAU.
                      ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
                      ⌜ents !! nm = Some i⌝ ∗
                      Φex av d nm i
-                     ∗ acre_commit_at Γ fsabsE (AFile []) Φok
-                     ∗ (aopen_commit_at Γ fsabsE Φo
+                     ∗ acre_commit_at Γ appE (AFile []) Φok
+                     ∗ (aopen_commit_at Γ appE Φo
                         ∨ (∃ (av' : aview) (a : anode),
                              ⌜av' !! i = Some a⌝ ∗ Φo av' i a)))
                   ∨ (* (c) nothing observed: the nlink guard, out of
                        inodes, dirlink failure, "/" *)
-                  (acre_commit_at Γ fsabsE (AFile []) Φok
-                   ∗ dlookup_commit_at Γ fsabsE Φex
-                   ∗ aopen_commit_at Γ fsabsE Φo)))))%I.
+                  (acre_commit_at Γ appE (AFile []) Φok
+                   ∗ dlookup_commit_at Γ appE Φex
+                   ∗ aopen_commit_at Γ appE Φo)))))%I.
 
   Definition open_arms_create `{XI : CurCtx} Γ (γfs : fs_names) (cw : Z) (γf : gname)
       (p : mword 64) (pid : mword 32) (vom : mword 64)

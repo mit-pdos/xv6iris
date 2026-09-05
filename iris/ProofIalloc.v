@@ -105,6 +105,7 @@ Require Import DinodeEnc.
 Require Import DinodeSlot.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IgetLic.
 Require Import IrefSlots.
 Require Import IcacheRef.
@@ -321,7 +322,7 @@ Lemma ia_fresh_of_zero `{XI : CurCtx} (ty : mword 16) :
 Proof. reflexivity. Qed.
 
 Section IallocBytes.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg}.
   Context `{XI : CurCtx}.
 
   (* THE RAW 64-BYTE WINDOW of slot [k], borrowed out of the block's byte
@@ -428,7 +429,7 @@ Local Ltac iaidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (* ===================================================================== *)
 Section IallocDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   (* ialloc's 64-byte frame: ra@56 s0@48 s1@40 s2@32 s3@24 s4@16 s5@8 s6@0.
      [pa_stk sp j] counts DOWN from the entry sp, so slot j holds the
@@ -544,7 +545,7 @@ Definition ia_sp (m M : regfile) : Prop :=
 (* ===================================================================== *)
 Section IallocEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat)
@@ -770,7 +771,7 @@ End IallocEpilogue.
 (* ===================================================================== *)
 Section IallocOut.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_out `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat)
@@ -1108,7 +1109,7 @@ End IallocOut.
 (* ===================================================================== *)
 Section IallocClaim.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_claim `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
@@ -1984,7 +1985,7 @@ End IallocClaim.
 (* ===================================================================== *)
 Section IallocScan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_scan `{XI : CurCtx} `{GEN : GenId} `{CIDe : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
@@ -2858,7 +2859,7 @@ End IallocScan.
 (* ===================================================================== *)
 Section IallocMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-            ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+            ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Lemma wp_ialloc_gen `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)

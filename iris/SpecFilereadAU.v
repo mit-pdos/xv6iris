@@ -13,7 +13,7 @@
    ==== WHY THE SEAM IS AT FILEREAD AND NOT AT READI ====================
 
    The same argument the write lane recorded, with the sign flipped.  On the
-   write side the abstract row MOVES at filewrite's own [ireg_top_retag], so
+   write side the abstract row MOVES at filewrite's own [ireg_top_retag_*], so
    the fire had to be fused into that line.  On the read side the row does not
    move at all: [SpecReadi] takes the metadata cells and the byte legs and
    gives them back, and the whole transfer sits inside ONE [ilock]/[iunlock]
@@ -133,7 +133,7 @@ Require Import FsCfg.
 Require Import SpecSysReadAU.      (* [read_arms], the armed post            *)
 Require Import FsAbsReadFire.      (* [aread_commit_at], the dischargeable
                                       form of the commit                     *)
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.              (* LAST (FsAbs's own rule)                *)
 Import Defs.
 Require Import TsoCtx.
@@ -186,7 +186,7 @@ Definition wp_fileread_au_body
   (* EDIT 2: THE CALLER'S ONE READ-ONLY COMMIT, fired at the single instant
      inside the lock window (the RAW-MAP form: the astate-shaped one is not
      dischargeable -- FsAbsReadFire's header). *)
-  aread_commit_at Γfs fsabsE i γo Φr -∗
+  aread_commit_at Γfs appE i γo Φr -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗

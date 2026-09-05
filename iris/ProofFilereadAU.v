@@ -41,7 +41,7 @@
 
    2. THE FIRE REPLACES NOTHING -- IT IS ONE INSERTION, AT THE CHECKIN.  A
       read retags no row, so unlike the write lane there is no
-      [ireg_top_retag] to fuse into.  [FsAbsReadFire.arf_read_fire] opens
+      [ireg_top_retag_*] to fuse into.  [FsAbsReadFire.arf_read_fire] opens
       [ftopN] off the payload's OWN [top_frag] quarter -- the one
       [FsStateEra.inode_rd_era_era_node_to] hands out at the read-arm shed
       -- fires the caller's fupd once with the kernel's half of the offset

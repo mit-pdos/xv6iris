@@ -55,6 +55,7 @@ Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IcacheInv.
 Require Import SpecBread SpecBrelse SpecBfree SpecIupdate.
 Require Import SpecItrunc.
@@ -86,7 +87,7 @@ Notation IT := KernelSyms.itrunc.
 (*  The continuation: itrunc's postcondition, as a resource               *)
 (* ===================================================================== *)
 Section ItruncCont.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg}.
 
   Definition it_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (ip : mword 64) (inum : mword 32) (dn : dinode) (bm : blkmap)
@@ -187,7 +188,7 @@ Proof. apply elem_of_union_r, elem_of_singleton_2. reflexivity. Qed.
 (*  budget still owed is iupdate's one unit.                              *)
 (* ===================================================================== *)
 Section ItruncTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg}.
 
   Local Lemma it_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -665,7 +666,7 @@ End ItruncTail.
 (*  Fuel induction over NDIRECT - k, the lw_scan idiom.                    *)
 (* ===================================================================== *)
 Section ItruncDLoop.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg}.
 
   (* what the loop hands on at +0x32, once every direct entry is gone *)
   Definition it_dexit `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
@@ -1233,7 +1234,7 @@ End ItruncDLoop.
 (*  store, no map, and no [inode_map] traffic at all.                      *)
 (* ===================================================================== *)
 Section ItruncELoop.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg}.
 
   Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
  (ip : mword 64) (bm : blkmap)
@@ -1762,7 +1763,7 @@ End ItruncELoop.
 (*  clears the cell, restores s4 and rejoins the tail at +0x38.            *)
 (* ===================================================================== *)
 Section ItruncIArm.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg}.
 
   (* what the arm hands to the tail: the inode names nothing at all *)
   Definition it_armexit `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
@@ -2484,7 +2485,7 @@ End ItruncIArm.
 (*  and the shared tail.                                                  *)
 (* ===================================================================== *)
 Section ItruncMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg}.
 
   (* THE WALK IS THE GEN FORM (GR-2a finding 1).  [log_opS] is an exclusive
      ghost_map element with no auth-monotone shadow, so a counted post hands

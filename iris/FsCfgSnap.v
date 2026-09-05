@@ -62,7 +62,8 @@ Require Import WpLockAt BioInitAt KallocInv IrefSlots BioDefs.
 Require Import LogInv.
 Require Import FsCfg.
 Require Import AppCfg.        (* [appcfg]: the application's record, minted beside [fscfg] *)
-Require Import FsAbsInv.      (* [fsabs_env_alloc]: the application's copy, kit 2's last row *)
+Require Import AppInv.        (* [app_inv_alloc]: the application's invariant, founded here; kit 2's last row *)
+Require FsAbsDefs.            (* [abs_view]: the application's claim is over the founded map's view (Require, not Import: it re-exports FsState) *)
 Require Import FileInvDefs.   (* the off ledger's boot face (off-ledger ruling) *)
 Require Import FsBoot FsCfgBoot.
 Require Import Xv6G.
@@ -830,16 +831,17 @@ Section SnapMint.
          need a determinacy theorem to identify. ---- *)
       (gsn gln gtn : gname)
       (Pb : Z -> list (bv 8)) (Xexc : gset Z)
-      (* ---- THE APPLICATION'S RECORD (claude-notes/design/applications.md
-         sections 1-2): [app_pred] of it is the predicate on the abstract
-         state, an iProp over the node map.  The mint seeds the
-         application's client copy of the top map at the founded map
-         [fss_inodes S], so it takes the seed's application conjunct -- the
-         boot obligation, paid one rung up by the power arm's lend -- and
-         the LICENSE the dischargers will re-sync the copy with, and packs
-         both as kit 2's last row AT [APP].  Spelled at the PINNED forms
-         ([FsAbsInv]'s header says why), at the record's own projection so
-         nothing ambient is consulted. ---- *)
+      (* ---- THE APPLICATION'S RECORD (app-instances.md sections 1-2, 7):
+         [app_pred] is its claim about the abstract state's VIEW at a fixed
+         name and an instance, [app_run] the era's running instance.  The
+         mint founds the application's invariant ([AppInv.app_inv]) with the
+         GUEST HALF of the top map's authority it has just minted, at the
+         founded map [fss_inodes S]: it takes the claim at that map's view
+         -- the boot obligation, paid one rung up by the power arm's lend --
+         and the LICENSE the application parks there ([app_auto]), and hands
+         the invariant to the region bundle and to kit 2's last row, AT
+         [APP].  Spelled at the record's own projections so nothing ambient
+         is consulted. ---- *)
       (APP : appcfg Σ) :
     (forall b : Z, length (Pb b) = BSIZE) ->
     Xexc ⊆ fs_home_set cov (sb_logstart (fss_sb S)) ->
@@ -860,7 +862,8 @@ Section SnapMint.
     (forall b : Z, 1 <= b < fs_data_start (fss_sb S) -> b ∈ cov) ->
     disk_bytes γv 0 (disk_read dk 0 ndisk) -∗
     bslots_auth -∗ bslots BSLOTS_FS -∗
-    fsabs_ok_at (@app_pred Σ APP) (fss_inodes S) -∗ fsabs_lic_at (@app_pred Σ APP) -∗
+    @app_pred Σ APP riscv_client_name (@app_run Σ APP) (FsAbsDefs.abs_view (fss_inodes S)) -∗
+    app_auto (APP := APP) -∗
     (* ---- THE DURABLE SNAPSHOT, AS A RESOURCE, and it is the whole of the
        file system's side: the committed map IS what the machine would
        recover to, and it is the encoding of the abstract state [S].  What
@@ -1033,8 +1036,15 @@ Section SnapMint.
     (* ---- THE TOP MAP IS ROUTED HERE --------------------------------- *)
     iEval (rewrite -Htp) in "Htopa".
     iEval (rewrite -Htp) in "Htopf".
+    (* THE AUTHORITY IS SPLIT (app-instances.md section 2): the kernel's
+       half founds [ftop_inv]; the other half founds the application's
+       invariant beside its claim at the same map and its parked license.
+       Agreement ties the two from here on. *)
+    iDestruct "Htopa" as "[Htopa Htopb]".
     iMod (ftop_alloc E γfs (fss_inodes S) Hloc with "Htopa Hlkauth")
       as "#Hftopi".
+    iMod (app_inv_alloc (APP := APP) γfs (fss_inodes S) E with "Htopb Hok Hlic")
+      as "#Henv".
     iEval (rewrite (big_sepM_as_set (fss_inodes S)
                       (fun i n => top_frag (fs_gamma_L γfs) i n))) in "Htopf".
     assert (Hregdom : region_inums icfg_nib ⊆ dom (fss_inodes S)).
@@ -1107,7 +1117,7 @@ Section SnapMint.
                            (fs_home_set cov (sb_logstart (fss_sb S)))
                            dss icfg_nib Hfull Hb Hloc Hnibeq Hnib32
                            Hdl Hdwf Hde))
-            with "Hla Hlnks HcntR HmirR Hep Htopreg Hbireg Hbrow Hftopi Hboot Hrauth")
+            with "Hla Hlnks HcntR HmirR Hep Htopreg Hbireg Hbrow Hftopi Henv Hboot Hrauth")
       as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hout)".
     iDestruct "Hireginv" as "#Hireginv".
     (* the payout is at the DECODED record; restate it at [S]'s own *)
@@ -1238,16 +1248,9 @@ Section SnapMint.
        authority's gname, the NINODE ghost-map family, and the NINODE
        per-inode invariants over it, all minted empty ---- *)
     iMod flive_auth_at_alloc as (γfol) "Hfol".
-    (* ---- 8c. THE APPLICATION'S COPY (applications.md section 2): the
-       client copy of the top map, seeded at the founded map [fss_inodes S]
-       -- the same map [ftop_alloc] founded the kernel's authority at in
-       step 7 -- with the seed's conjunct and the license packed beside it;
-       kit 2's last row.  Its [fsabs_ok] is at the application record
-       [APP] this lemma takes, so the premise IS the seed by unfolding. ---- *)
-    iMod (fsabs_env_alloc (APP := APP)
-            (fs_gamma_L γfs) (fss_inodes S) E with "[Hok] []") as "#Henv";
-      [rewrite /fsabs_ok; iExact "Hok"
-      | rewrite /fsabs_lic; iExact "Hlic" |].
+    (* ---- 8c. THE APPLICATION'S INVARIANT (app-instances.md section 2) was
+       founded in step 7, beside the kernel's, at the same map; it is kit 2's
+       last row ([Henv]). ---- *)
     iModIntro.
     iExists ICFG,
       (MkFscfg gpr gkm gkp γd γv gdl bn γfs γi cn git

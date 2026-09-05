@@ -495,9 +495,9 @@ Section ProofCreateFailMkdir.
             (era_node dc bmc datc)
             (era_node (cr_setf dc major minor (mword_of_int 0 : mword 16))
                       bmc datc)
-            ltac:(solve_ndisj) Hlocorph with "[] Hdirty Hctop")
+            ltac:(solve_ndisj) Hlocorph with "[] [] Hdirty Hctop")
       as "[Htx Hctop]";
-      [iApply (ireg_inv_ftop with "Hiregi") |].
+      [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
     iModIntro.
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum
                (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc)

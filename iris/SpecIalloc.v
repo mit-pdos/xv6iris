@@ -137,6 +137,7 @@ Require Import FsBlocks LogInv.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
@@ -181,7 +182,7 @@ Proof. rewrite /dinode_wf /ialloc_fresh /=. reflexivity. Qed.
 
 Definition wp_ialloc_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -375,7 +376,7 @@ Definition wp_ialloc_sconf_body
    inside every [dirlink] on [ip].                                        *)
 Definition wp_ialloc_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -541,7 +542,7 @@ Module Type IALLOC.
      the sconf form moves. *)
   Parameter wp_ialloc_gen :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16)
@@ -556,7 +557,7 @@ Module Type IALLOC.
 
   Parameter wp_ialloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16)

@@ -38,6 +38,7 @@ Require Import LogInv.
 Require Import Xv6Cameras.
 Require Import IrefSlots.
 Require Import IcacheRef.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import CodeNamei.
 Require Import WpUart.
 Require Import SpecNamex.
@@ -105,7 +106,7 @@ Local Ltac regne :=
         | congruence ].
 
 Section ProofNameiRoot.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 

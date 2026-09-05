@@ -62,6 +62,7 @@ Require Import DirentEnc.
 Require Import PathElems.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KvmSpec.
@@ -387,7 +388,7 @@ End NAMEI.
 (* namei's own frame is 32 bytes (4 slots) over the corner's 28. *)
 Notation K_namei_root := (74%nat) (only parsing).
 Definition wp_namei_root_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (dqp : dfrac)
     (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
@@ -437,7 +438,7 @@ Definition wp_namei_root_body
 
 Module Type NAMEI_ROOT.
   Parameter wp_namei_root :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)

@@ -118,7 +118,7 @@ Require Import UserFd.         (* [ufdG]                             *)
 Require Import UexecSlot.      (* [uvis]                             *)
 Require Import SpecSysOpenAU.  (* [open_walk_pre_era], [aopen_commit_at] *)
 Require Import SpecKexecAU.    (* [exec_slot_pre], [exec_post_ok], [exec_post_fail] *)
-Require Import FsAbsInv.       (* [fsabsE]                           *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.          (* LAST (FsAbs's own rule)            *)
 Require Import FsBytesGamma.   (* [fs_gamma_L]                       *)
 From Kernel Require KernelSyms.
@@ -195,7 +195,7 @@ Section SysExecAU.
       (Φo : aview -> Z -> anode -> iProp Σ)
       (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate) : iProp Σ :=
     (open_walk_pre_era γfs cw P Pmiss
-     ∗ aopen_commit_at Γ fsabsE Φo
+     ∗ aopen_commit_at Γ appE Φo
      ∗ sys_exec_slot_pre S Φo M av sts)%I.
 
   (* non-expansive in the slot predicate, as [SpecKexecAU.exec_au_pre_ne]:

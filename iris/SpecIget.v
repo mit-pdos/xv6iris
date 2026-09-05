@@ -193,6 +193,7 @@ Require Import CpuOwn.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
@@ -209,7 +210,7 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Notation K_iget := (58%nat) (only parsing).
 Require Import TsoCtx.
 Definition wp_iget_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (inum : mword 32)
     (l : ilic)                                   (* THE LICENCE, §7.1 *)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
@@ -283,7 +284,7 @@ Definition wp_iget_sconf_body
 
 Module Type IGET.
   Parameter wp_iget_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (inum : mword 32)
       (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)

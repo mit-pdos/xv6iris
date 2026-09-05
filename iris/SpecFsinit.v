@@ -174,6 +174,7 @@ Require Import FsCrash.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 (* the commit's collection geometry and the law it supports (durable-disk
    C-8): fsinit is what carries the law down to [initlog], which is the one
    site that can compose it with block 1's park *)
@@ -252,7 +253,7 @@ Qed.
 
 Definition wp_fsinit_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -522,7 +523,7 @@ Definition wp_fsinit_sconf_body
 Module Type FSINIT.
   Parameter wp_fsinit_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+             ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (v_magic v_size v_nblocks v_ninodes v_nlog

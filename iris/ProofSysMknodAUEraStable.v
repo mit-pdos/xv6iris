@@ -123,7 +123,7 @@ Section MknodStable.
   Lemma mkr_chain_at Γ (I : gmap Z fs_node) (avc : aview) (ds : list Z)
       (ps : list fname) (j : nat) :
     (j < length ps)%nat ->
-    ghost_map_auth (γtop Γ) 1 I -∗ mkr_chain Γ avc ds ps -∗
+    ghost_map_auth (γtop Γ) (1/2) I -∗ mkr_chain Γ avc ds ps -∗
       ⌜abs_view I !! (ds !!! j) = avc !! (ds !!! j)⌝.
   Proof.
     intros Hj. iIntros "Ha Hc".
@@ -141,7 +141,7 @@ Section MknodStable.
   Lemma mkr_chain_run Γ (I : gmap Z fs_node) (avc : aview) (root : Z)
       (ps : list fname) (ds : list Z) :
     arun avc root ps ds ->
-    ghost_map_auth (γtop Γ) 1 I -∗ mkr_chain Γ avc ds ps -∗
+    ghost_map_auth (γtop Γ) (1/2) I -∗ mkr_chain Γ avc ds ps -∗
       ⌜arun (abs_view I) root ps ds⌝.
   Proof.
     intros Hr. iIntros "Ha #Hc".
@@ -199,8 +199,8 @@ Section MknodStable.
     intros Hr. iIntros "#Hc Hcm". rewrite /acre_commit_at.
     iIntros (I d i nm ents nl) "%Hpre Ha".
     iDestruct (mkr_chain_run Γ I avc root ps ds Hr with "Ha Hc") as %Hrun.
-    iMod ("Hcm" $! I d i nm ents nl with "[//] Ha") as "[Ha Hph2]".
-    iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'".
+    iMod ("Hcm" $! I d i nm ents nl with "[//] Ha") as "(Ha & Hstep & Hph2)".
+    iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'".
     iMod ("Hph2" $! I' with "[//] Ha'") as "[Ha' HΦ]".
     iModIntro. iFrame "Ha'". rewrite /mkr_recv.
     iSplitR; [by iPureIntro |]. iExact "HΦ".
@@ -238,8 +238,8 @@ Section MknodStable.
   Proof.
     iIntros "Hcm". rewrite /acre_commit_at.
     iIntros (I d i nm ents nl) "%Hpre Ha".
-    iMod ("Hcm" $! I d i nm ents nl with "[//] Ha") as "[Ha Hph2]".
-    iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'".
+    iMod ("Hcm" $! I d i nm ents nl with "[//] Ha") as "(Ha & Hstep & Hph2)".
+    iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'".
     iMod ("Hph2" $! I' with "[//] Ha'") as "[Ha' HΦ]".
     rewrite /mkr_recv. iDestruct "HΦ" as "[_ HΦ]". iModIntro. by iFrame.
   Qed.

@@ -182,6 +182,7 @@ Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
@@ -202,7 +203,7 @@ Local Open Scope Z_scope.
    memmove 2. *)
 Notation K_ilock := (62%nat) (only parsing).
 Definition wp_ilock_dep_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -478,7 +479,7 @@ Definition wp_ilock_dep_sconf_body
    ([wp_ilock_tx_of_dep] below); not a line of ilock's own proof is
    re-run. *)
 Definition wp_ilock_tx_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -731,7 +732,7 @@ Definition wp_ilock_tx_sconf_body
    halves rejoined into [IcacheEscrow.ic_tx_dep] at the post.  The escrow
    holds its half from the checkout on. *)
 Lemma wp_ilock_tx_of_dep
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
     (gil gisl : gname)
@@ -779,7 +780,7 @@ Module Type ILOCK.
      ([fileread], [filestat]) uses it at [DepRd] directly, which is what
      retires [ic_shed_rd] at those two sites. *)
   Parameter wp_ilock_dep_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -794,7 +795,7 @@ Module Type ILOCK.
      proof; what selects it is whether the caller brings [LogInv.log_tx].
      [ProofIlock] defines it by [wp_ilock_tx_of_dep]. *)
   Parameter wp_ilock_tx_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)

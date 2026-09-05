@@ -277,7 +277,7 @@ Require Import UserFd.          (* [ufdG] -- UexecRet's section binds it     *)
 Require Import UexecSlot.       (* [uvis], [uvis_of], [tf_w]                 *)
 Require Import SpecSysOpenAU.   (* [open_walk_pre_era], [open_walk_dead_era],
                                    [aopen_commit_at] -- REUSED, see header  *)
-Require Import FsAbsInv.        (* [fsabsE]: the commit mask                 *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.           (* LAST (FsAbs's own rule)                   *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ                  *)
 From Kernel Require KernelSyms.
@@ -557,7 +557,7 @@ Section KexecAU.
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) : iProp Σ :=
     (open_walk_pre_era γfs cw P Pmiss
-     ∗ aopen_commit_at Γ fsabsE Φo
+     ∗ aopen_commit_at Γ appE Φo
      ∗ exec_slot_pre S Φo na alen afun sts)%I.
 
   (* non-expansive in the slot predicate: UexecExecInst.v instantiates
@@ -628,7 +628,7 @@ Section KexecAU.
      ∨ (∃ pl : list (bv 8),
           (* (ii) the walk died at some hop: the era refund shape *)
           (open_walk_dead_era γfs P Pmiss pl
-             ∗ aopen_commit_at Γ fsabsE Φo
+             ∗ aopen_commit_at Γ appE Φo
              ∗ exec_slot_pre S Φo na alen afun sts)
           ∨ (* (iii) the walk completed and the node was observed; exec
                failed past the lock, and the arm says WHY (header,

@@ -126,7 +126,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.
 Require Import FsCfg.
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.           (* LAST (FsAbs's own rule)                  *)
 Import Defs.
 Require Import TsoCtx.
@@ -153,7 +153,7 @@ Section CreateAUFSpec.
                 child [AFile []]; the exists commit is refunded UNFIRED. *)
           ∃ (av : aview) (ents : gmap fname Z) (nl : nat),
             ⌜ cre_pre av d nm ents nl i (AFile []) ⌝ ∗
-            dlookup_commit_at Γ fsabsE Φex ∗
+            dlookup_commit_at Γ appE Φex ∗
             Φok av d nm i
         else (* ARM F-OK: the exists observation fired at the found
                 instant and NOTHING MOVED, so the create commit is
@@ -161,7 +161,7 @@ Section CreateAUFSpec.
           ∃ (av : aview) (ents : gmap fname Z) (nl : nat),
             ⌜ av !! d = Some (MkAnode (ADir ents) nl) ⌝ ∗
             ⌜ ents !! nm = Some i ⌝ ∗
-            acre_commit_at Γ fsabsE (AFile []) Φok ∗
+            acre_commit_at Γ appE (AFile []) Φok ∗
             Φex av d nm i))%I.
 
   (* ------------------------------------------------------------------ *)
@@ -174,18 +174,18 @@ Section CreateAUFSpec.
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (pl : list (bv 8)) : iProp Σ :=
     ((mknod_walk_dead_era gfs P Pmiss pl
-        ∗ acre_commit_at Γ fsabsE (AFile []) Φok
-        ∗ dlookup_commit_at Γ fsabsE Φex)
+        ∗ acre_commit_at Γ appE (AFile []) Φok
+        ∗ dlookup_commit_at Γ appE Φex)
      ∨ (∃ d : Z,
           P (length (mknod_parent_elems pl)) d
-          ∗ acre_commit_at Γ fsabsE (AFile []) Φok
+          ∗ acre_commit_at Γ appE (AFile []) Φok
           ∗ ((∃ (av : aview) (i : Z) (nm : fname) (ents : gmap fname Z)
                 (nl : nat),
                 ⌜ list_basics.last (path_elems pl) = Some nm ⌝ ∗
                 ⌜ av !! d = Some (MkAnode (ADir ents) nl) ⌝ ∗
                 ⌜ ents !! nm = Some i ⌝ ∗
                 Φex av d nm i)
-             ∨ dlookup_commit_at Γ fsabsE Φex)))%I.
+             ∨ dlookup_commit_at Γ appE Φex)))%I.
 
   (* ------------------------------------------------------------------ *)
   (*  THE TWO PROJECTIONS THE CONSUMER'S PROVER USES                     *)
@@ -200,7 +200,7 @@ Section CreateAUFSpec.
         ⌜ cre_pre av d nm ents nl i (AFile []) ⌝ ∗
         P (length (mknod_parent_elems pl)) d ∗
         Φok av d nm i ∗
-        dlookup_commit_at Γ fsabsE Φex.
+        dlookup_commit_at Γ appE Φex.
   Proof.
     rewrite /cauf_ok. iIntros "H".
     iDestruct "H" as (d nm) "(%Hlast & HP & Harm)".
@@ -219,7 +219,7 @@ Section CreateAUFSpec.
         ⌜ ents !! nm = Some i ⌝ ∗
         P (length (mknod_parent_elems pl)) d ∗
         Φex av d nm i ∗
-        acre_commit_at Γ fsabsE (AFile []) Φok.
+        acre_commit_at Γ appE (AFile []) Φok.
   Proof.
     rewrite /cauf_ok. iIntros "H".
     iDestruct "H" as (d nm) "(%Hlast & HP & Harm)".
@@ -335,8 +335,8 @@ Definition wp_create_auf_body
      decided inside the walk.  The hop family is over the PARENT PREFIX,
      which is [SpecSysMknodAU.mknod_parent_elems] definitionally. *)
   ep_start fsc_fs (pv_cwi (us_V U)) P Pmiss pl -∗
-  acre_commit_at Γfs fsabsE (AFile []) Φok -∗
-  dlookup_commit_at Γfs fsabsE Φex -∗
+  acre_commit_at Γfs appE (AFile []) Φok -∗
+  dlookup_commit_at Γfs appE Φex -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (ok made : bool)
     (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)

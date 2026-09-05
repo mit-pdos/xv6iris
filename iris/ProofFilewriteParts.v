@@ -84,6 +84,7 @@ Require Import SpecPanic.
 Require Import CpuOwn.
 Require Import LockRank.
 Require Import IcacheRef.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import CodeFilewrite.
 Require Import ProofFilereadParts.
 From Kernel Require KernelSyms.
@@ -396,7 +397,7 @@ Qed.
 (*  [live_gen_agree].  Two lemmas, and nothing else changes.                *)
 (* ---------------------------------------------------------------------- *)
 Section FwShare.
-  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, APP : appcfg Σ}.
   Context `{XI : CurCtx}.   (* M1 stage 2: [inode_ident]'s two [↦₄] cells *)
 
   Lemma fw_shr_gen_split (k : nat) (s1 s2 : Qp) (dev inum : mword 32) (g : gname) :

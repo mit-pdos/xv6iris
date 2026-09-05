@@ -107,6 +107,8 @@ Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
+Require Import AppInv.       (* [app_inv]: the application's half of the top map, carried by [ireg_reg] *)
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 (* durable-disk 2b-inode-3: the pool's allocated arm is the era bundle.
    [FsState] for [top_frag], [FsBytesGamma] for [fs_gamma_L], [FsStateEra]
    for [era_node] / [inode_rec_local] / [inode_owned_era_era_node_of]. *)
@@ -401,7 +403,7 @@ Qed.
 
 Section IcacheBootRegion.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
 
   (* [FsBoot.fs_C0_big], for this map *)
   Lemma ireg_M0_big (Phi : Z -> dinode -> iProp Σ)
@@ -714,6 +716,10 @@ Section IcacheBootRegion.
        [InodeRegion.ftop_alloc] off the map [FsState.fs_boot_alloc] just
        minted.  Persistent, so it rides through untouched. *)
     ftop_inv γfs -∗
+    (* ...AND THE APPLICATION'S (app-instances.md round A): the other half of
+       that map's authority beside the application's claim, founded by the
+       same mint right after [ftop_alloc]; [ireg_reg] carries it LAST. *)
+    app_inv γfs -∗
     (* the boot-shelter token rides through, from [icfg_alloc] to fsinit
        (fs-fragments.md §7.12) -- carried, never consumed here *)
     ireg_boot -∗
@@ -732,7 +738,7 @@ Section IcacheBootRegion.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
     destruct (Himg dss Hl Hwf He)
       as (Hl3 & Hl4 & Hl5 & Hlnkat & Hbare & Hrecat).
-    iIntros "Hlk Hlnks Hcnts Hmirs Hepa Htops Hblks #Hbinv #Hftopi Hboot Hrauth".
+    iIntros "Hlk Hlnks Hcnts Hmirs Hepa Htops Hblks #Hbinv #Hftopi #Happi Hboot Hrauth".
     (* OPTION A: bulk-register every inum with a dummy escrow gname pair, then
        wrap as [ireg_registry] for the region body. *)
     iMod (ghost_map_insert_big (dummy_reg nib) with "Hrauth") as "[Hrauth Hfulls]".
@@ -875,7 +881,7 @@ Section IcacheBootRegion.
     iMod (inv_alloc iregN E (ireg_body γi γfs inodestart nib) with "[Hbody]")
       as "#Hinv"; [by iNext |].
     iAssert (ireg_reg γi γfs inodestart nib) as "#Hrinv".
-    { rewrite /ireg_reg. iFrame "Hinv Hftopi". rewrite /fs_bytes_row.
+    { rewrite /ireg_reg. iFrame "Hinv Hftopi Happi". rewrite /fs_bytes_row.
       iExists home. iFrame "Hbinv". }
     iModIntro. iExists γi, dss.
     iSplitR; [done |]. iSplitR; [done |]. iSplitR; [iPureIntro; exact He |].
@@ -889,7 +895,7 @@ End IcacheBootRegion.
 (* ===================================================================== *)
 
 Section IcacheBootPool.
-  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, APP : appcfg Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
 
   (* THE POOL'S KEYS ARE THE [mword] ROUND TRIP, and the ledger's are plain
@@ -1150,7 +1156,7 @@ Lemma ci_inums_empty : ci_inums ∅ = (∅ : gset Z).
 Proof. rewrite /ci_inums map_to_list_empty //. Qed.
 
 Section IcacheBootTable.
-  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, APP : appcfg Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
 

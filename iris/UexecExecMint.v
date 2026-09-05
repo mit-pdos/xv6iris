@@ -72,8 +72,9 @@ Section UexecExecMint.
         (fun _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ => True%I) M av sts.
   Proof.
     iIntros "#Henv Hs" (cw M av sts).
-    iDestruct "Henv" as (γa) "[#Hinv #Hlic]".
-    iDestruct (fsabs_exec_half (fs_gamma_L fsc_fs) _ fsc_fs cw with "Hinv Hlic")
+    (* read-kind only ([fsabs_exec_half]): the environment is carried, not
+       spent *)
+    iDestruct (fsabs_exec_half (fs_gamma_L fsc_fs) fsc_fs cw)
       as "[#Hwalk #Hcommit]".
     rewrite /sys_exec_au_pre.
     iSplitR; [iExact "Hwalk" |].

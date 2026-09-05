@@ -454,9 +454,9 @@ Section ProofCreateAlloc.
               (era_node dnc bmc datc)
               (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                         bmc datc)
-              ltac:(solve_ndisj) with "[] Htx Hctop")
+              ltac:(solve_ndisj) with "[] [] Htx Hctop")
         as "[Hdirty Hctop]";
-        [iApply (ireg_inv_ftop with "Hiregi") |].
+        [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
       iModIntro.
       iDestruct "Hcmeta" as "(Hcity & Hcimaj & Hcimin & Hcinl & Hcisz)".
       iEval (rewrite /i_major) in "Hcimaj".
@@ -832,9 +832,9 @@ Section ProofCreateAlloc.
                           bmc datc)
                 (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                           bmc datc)
-                ltac:(solve_ndisj) Hlocfile with "[] Hdirty Hctop")
+                ltac:(solve_ndisj) Hlocfile with "[] [] Hdirty Hctop")
           as "[Htx Hctop]";
-          [iApply (ireg_inv_ftop with "Hiregi") |].
+          [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
         iModIntro.
         assert (Hq0ce : add_vec_int (mword_of_int (CK + 0xca) : mword 64) 4
                         = mword_of_int (CK + 0xce)) by pcw.
@@ -1236,18 +1236,18 @@ Section ProofCreateAlloc.
                    rewrite Ht16 Nat2Z.inj_add Nat2Z.inj_mul. lia. }
              (* ...AND THE ERA'S ABSTRACT VALUE IS RETAGGED: dirlink MOVED
                 the parent's record and its bytes, and
-                [InodeRegion.ireg_top_retag] opens [ftopN] alone. *)
+                [InodeRegion.ireg_top_retag_*] opens [ftopN] alone. *)
              iApply fupd_wp.
              (* THE RETAG OWES THE ROW (durable-disk lane A): an appended
                 entry leaves the parent well-formed, and these are the four
                 facts the re-pack below proves anyway. *)
-             iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned dind)
+             iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dind)
                      (era_node dn bm data) (era_node dn' bm' data')
-                     ltac:(solve_ndisj)
+                     ltac:(solve_ndisj) Logic.I
                      (inode_local_of_ok_rec (bv_unsigned dind) fsc_cov fsc_logst
                         dn' bm' data' Hiok' Hrl' Hduq' Hddix')
-                     with "[] Htop") as "Htop";
-               [iApply (ireg_inv_ftop with "Hiregi") |].
+                     with "[] [] Htop") as "Htop";
+               [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
              iModIntro.
              iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dn' bm')
                with "[Hdlnk Hdiat Hmeta Hmap Hblocks Htop]"

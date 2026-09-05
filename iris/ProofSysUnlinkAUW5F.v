@@ -10,7 +10,7 @@
    mknod mold:
 
      INSTANT 1, at the memset+writei that zeroes the found record:
-       [FsAbsUnlinkFire.uf_uent_fire] REPLACES the [ireg_top_retag] the
+       [FsAbsUnlinkFire.uf_uent_fire] REPLACES the [ireg_top_retag_*] the
        landed walk calls there.  Same premise, same payout, plus the
        caller's two phases inside the one [ftopN] critical section.  It
        reads [ip]'s row BESIDE the parent's -- [unl_pre]'s last three
@@ -115,7 +115,7 @@ Require Import FsAbsMknodFire.
 Require Import SpecSysUnlinkAU.
 Require Import FsAbsUnlinkFire.
 Require Import ProofSysUnlinkAUParts.
-Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
@@ -334,10 +334,10 @@ Section ProofSysUnlinkAUW5F.
     (* ---- THE AU SIDE, as W3's seam hands it ---- *)
     ⌜exists es e, nameiparent_of pl es e /\ bname 14 nf = e⌝ -∗
     P (length (mknod_parent_elems pl)) (bv_unsigned dinum) -∗
-    uent_commit_at (fs_gamma_L fsc_fs) fsabsE Phient -∗
-    utgt_commit_at (fs_gamma_L fsc_fs) fsabsE Phitgt -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Phiex -∗
-    dmiss_commit_at (fs_gamma_L fsc_fs) fsabsE Phimiss -∗
+    uent_commit_at (fs_gamma_L fsc_fs) appE Phient -∗
+    utgt_commit_at (fs_gamma_L fsc_fs) appE Phitgt -∗
+    dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex -∗
+    dmiss_commit_at (fs_gamma_L fsc_fs) appE Phimiss -∗
     (* ---- the frame, slot 5 FILLED ---- *)
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -1038,13 +1038,13 @@ Section ProofSysUnlinkAUW5F.
        (N-3/N-4), not the carrier's. *)
     iApply fupd_wp.
     (* ...and the ERA's abstract value with them (durable-disk 2b-inode-3):
-       [ireg_top_retag] opens [ftopN] alone. *)
+       [ireg_top_retag_*] opens [ftopN] alone. *)
     (* THE RETAG OWES THE ROW (durable-disk lane A): the four facts are the
        re-pack's own, already named -- a zeroed entry leaves the directory
        well-formed (its dots are untouched and its names stay unique). *)
     (* ===== INSTANT 1: THE PARENT'S ROW =====
        The zeroing is the linearization instant for the ENTRY half of the
-       delta, and the fire REPLACES the [ireg_top_retag] the landed walk
+       delta, and the fire REPLACES the [ireg_top_retag_*] the landed walk
        calls here: same premise, same payout, plus the caller's two phases
        inside the one [ftopN] critical section.  It reads [ip]'s row too --
        [unl_pre]'s last three conjuncts -- off the fragment W3 locked and
@@ -1078,8 +1078,8 @@ Section ProofSysUnlinkAUW5F.
             (su_au_parent_row_era dnd dnW bmd bm' datd data'
                (dir_bname datd kk) 0%nat Htydz Hty'v
                ltac:(rewrite /fn_nlink !era_node_rec Hnl'v; lia) Hentsd)
-            with "[] Hcent Htop Htopi") as "(Htop & Htopi & Hfire1)";
-      [iApply (ireg_inv_ftop with "Hireg") |].
+            with "[] [] Hcent Htop Htopi") as "(Htop & Htopi & Hfire1)";
+      [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iDestruct "Hfire1" as (av0) "(%Hpre0 & Hent)".
     iModIntro.
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dinum dnW bm')
@@ -1493,8 +1493,8 @@ Section ProofSysUnlinkAUW5F.
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi bmi dati dati Hnlzi
                   ltac:(lia)))
-            with "[] Hctgt Htopi") as "(Htopi & Hfire2)";
-      [iApply (ireg_inv_ftop with "Hireg") |].
+            with "[] [] Hctgt Htopi") as "(Htopi & Hfire2)";
+      [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iDestruct "Hfire2" as (av1) "(%Hrow1 & Htgt)".
     iModIntro.
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ks

@@ -317,7 +317,7 @@ Require Import SpecSysRead.    (* the landed contract this file states a
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbs.          (* the abstract state (lane A, landed)       *)
 Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ                  *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -608,8 +608,8 @@ Section SysReadAU.
       (Φ : aview -> nat -> anode -> nat -> iProp Σ) : iProp Σ :=
     (∀ (av : aview) (off : nat) (a : anode) (d : nat),
        ⌜ard_pre av i off a⌝ -∗
-       astate Γ av -∗ off_gv γo (1/2) (Z.of_nat off) ={E}=∗
-       astate Γ av ∗ off_gv γo (1/2) (Z.of_nat (off + d)) ∗ Φ av off a d)%I.
+       astate_q Γ (1/2) av -∗ off_gv γo (1/2) (Z.of_nat off) ={E}=∗
+       astate_q Γ (1/2) av ∗ off_gv γo (1/2) (Z.of_nat (off + d)) ∗ Φ av off a d)%I.
 
   (* sanity: satisfiable with the trivial receipt by a client holding its
      half of the shadow -- at ANY value: agreement inside the fupd pins it
@@ -641,7 +641,7 @@ Section SysReadAU.
   Proof.
     iIntros "Hu Hn HΦ". rewrite /aread_commit.
     iIntros (av off a d) "%Hpre Hst Hk".
-    iDestruct (astate_nview with "Hst Hn") as %Hav.
+    iDestruct (astate_q_nview with "Hst Hn") as %Hav.
     iDestruct (off_gv_agree with "Hk Hu") as %->.
     iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk _]".
     iModIntro. iFrame "Hst Hk".
@@ -658,7 +658,7 @@ Section SysReadAU.
   Proof.
     iIntros "Hu Hn HΦ". rewrite /aread_commit.
     iIntros (av off a d) "%Hpre Hst Hk".
-    iDestruct (astate_nview with "Hst Hn") as %Hav.
+    iDestruct (astate_q_nview with "Hst Hn") as %Hav.
     destruct Hpre as (Hrow & _ & _).
     assert (a = b) as -> by congruence.
     iDestruct (off_gv_agree with "Hk Hu") as %->.
@@ -696,7 +696,7 @@ Section SysReadAU.
      not move *)
   Definition read_post_fail Γ (i : Z) (γo : gname) (n : Z)
       (Φ : aview -> nat -> anode -> nat -> iProp Σ) : iProp Σ :=
-    ((⌜n < 0⌝ ∗ aread_commit Γ fsabsE i γo Φ)
+    ((⌜n < 0⌝ ∗ aread_commit Γ appE i γo Φ)
      ∨ (⌜0 <= n⌝
         ∗ ∃ (av : aview) (off : nat) (a : anode),
             ⌜ard_pre av i off a⌝ ∗ Φ av off a 0%nat))%I.
@@ -863,7 +863,7 @@ Definition wp_sys_read_au_body
   let n := sys_rw_count v2 in
   wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv wb i γo
-    (aread_commit Γfs fsabsE i γo Φr)
+    (aread_commit Γfs appE i γo Φr)
     (read_arms Γfs i γo n Φr).
 
 (* THE STABLE COROLLARY'S STATEMENT (header: THE STABLE COROLLARY; its
@@ -896,7 +896,7 @@ Definition wp_sys_read_au_stable_body
   wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv wb i γo
     (nview Γfs q i (MkAnode (AFile bs0) nl)
-     ∗ aread_commit Γfs fsabsE i γo Φr)%I
+     ∗ aread_commit Γfs appE i γo Φr)%I
     (read_stable_arms Γfs i n q bs0 nl Φr).
 
 (* ===================================================================== *)

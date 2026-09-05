@@ -71,6 +71,7 @@ Require Import WpAu4.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcachePinwObl.
@@ -118,7 +119,7 @@ Qed.
 Module IdupProof (Acquire : ACQUIRE) (Release : RELEASE) (RLI : RELEASE_IN) : IDUP.
 
 Section ProofIdup.
-  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).

@@ -2311,10 +2311,10 @@ Section ProofFilewrite.
                fsc_logst dn' bm' data' Hiok2 Hrl2).
       - exact (dir_uniq_not_dir dn' data' Hnodir').
       - exact (dir_dots_ix_not_dir (bv_unsigned inum) dn' data' Hnodir'). }
-    iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned inum)
+    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned inum)
             (era_node dnl bml datal) (era_node dn' bm' data')
-            ltac:(solve_ndisj) Hlocw with "[] Htop") as "Htop";
-      [iApply (ireg_inv_ftop with "Hireg") |].
+            ltac:(solve_ndisj) Logic.I Hlocw with "[] [] Htop") as "Htop";
+      [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iModIntro.
     iAssert (i_valid (ientry ik) ↦₄ valid_word true)%I
       with "[Hmark]" as "Hvalid".

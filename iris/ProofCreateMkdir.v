@@ -2080,7 +2080,7 @@ Section ProofCreateMkdir.
           iEval (rewrite /inode_map) in "Hmap".
           iDestruct "Hmap" as "[Hpaddrs Hpind]".
           (* ...and the ERA's abstract value at the bumped parent: mkdir's
-             append moved the record AND the bytes, and [ireg_top_retag]
+             append moved the record AND the bytes, and [ireg_top_retag_*]
              opens [ftopN] alone (durable-disk 2b-inode-3). *)
           (* THE RECORD-ONLY FACTS AT THE BUMPED PARENT (durable-disk
              2b-inode-3): the type rides [cr_setf], the [++] is short by
@@ -2101,18 +2101,18 @@ Section ProofCreateMkdir.
                           (dir_nrec (bv_unsigned (di_size dn)))) + 1)%Z.
                 rewrite Ht163 Nat2Z.inj_add Nat2Z.inj_mul. lia. }
           (* ...and the ERA's abstract value at the bumped parent: mkdir's
-             append moved the record AND the bytes, and [ireg_top_retag]
+             append moved the record AND the bytes, and [ireg_top_retag_*]
              opens [ftopN] alone (durable-disk 2b-inode-3).  A raised link
              count and an appended entry leave the parent well-formed, which
              is the row the retag owes (durable-disk lane A) -- and these are
              [ic_mk_loaded]'s own four facts, one line below. *)
           iApply fupd_wp.
-          iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned dind)
+          iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dind)
                   (era_node dn bm data)
                   (era_node (cr_setf dp3 (di_major dp3) (di_minor dp3)
                                (add_vec (di_nlink dp3 : mword 16)
                                   (mword_of_int 1 : mword 16))) bm3 dat3)
-                  ltac:(solve_ndisj)
+                  ltac:(solve_ndisj) Logic.I
                   (inode_local_of_ok_rec (bv_unsigned dind) fsc_cov fsc_logst _
                      bm3 dat3
                      (cr_setf_inode_ok fsc_cov fsc_logst dp3 bm3 dat3
@@ -2124,8 +2124,8 @@ Section ProofCreateMkdir.
                         (cr_setf_type _ _ _ _)
                         (fun _ => Hp3nlnz)
                         Hp3setfsz eq_refl Hp3ddix))
-                  with "[] Htop") as "Htop";
-            [iApply (ireg_inv_ftop with "Hiregi") |].
+                  with "[] [] Htop") as "Htop";
+            [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
           iModIntro.
           iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind
                        (cr_setf dp3 (di_major dp3) (di_minor dp3)
@@ -2348,8 +2348,8 @@ Section ProofCreateMkdir.
                   ltac:(solve_ndisj)
                   (inode_local_of_ok_rec (bv_unsigned cinum) fsc_cov fsc_logst
                      dc2 bm2 dat2 Hc2iok Hc2rl Hc2duq (Hc2ddix Ht162))
-                  with "[] Hdirty Hctop") as "[Htx Hctop]";
-            [iApply (ireg_inv_ftop with "Hiregi") |].
+                  with "[] [] Hdirty Hctop") as "[Htx Hctop]";
+            [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
           iModIntro.
           iApply fupd_wp.
           iMod (ic_grow_tx ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst kslot (q/2)%Qp icfg_dev cinum g _
@@ -2488,21 +2488,21 @@ Section ProofCreateMkdir.
                           (dir_nrec (bv_unsigned (di_size dn)))))%Z.
                 rewrite Nat.add_0_r Nat2Z.inj_mul. lia. }
           iApply fupd_wp.
-          iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned dind)
+          iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dind)
                   (era_node dn bm data) (era_node dp3 bm3 dat3)
-                  ltac:(solve_ndisj)
+                  ltac:(solve_ndisj) Logic.I
                   (inode_local_of_ok_rec (bv_unsigned dind) fsc_cov fsc_logst dp3
                      bm3 dat3 Hp3iok Hp3rl Hp3duq Hp3ddix)
-                  with "[] Htop") as "Htop";
-            [iApply (ireg_inv_ftop with "Hiregi") |].
+                  with "[] [] Htop") as "Htop";
+            [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
           (* ...and the ERA's abstract value at that same record
              (durable-disk 2b-inode-3). *)
           iMod (cr_dirty_retag ⊤ t (bv_unsigned cinum)
                   (era_node (cr_setf dnc major minor
                                (mword_of_int 1 : mword 16)) bmc datc)
                   (era_node dc2 bm2 dat2)
-                  ltac:(solve_ndisj) with "[] Hdirty Hctop") as "[Hdirty Hctop]";
-            [iApply (ireg_inv_ftop with "Hiregi") |].
+                  ltac:(solve_ndisj) with "[] [] Hdirty Hctop") as "[Hdirty Hctop]";
+            [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
           iModIntro.
           (* THE ["."] UNIT COMES BACK OUT OF THE CHILD'S PAYLOAD (lane
              G5).  [cr_fail_mkdir_body] takes the child WITHOUT its
@@ -2639,8 +2639,8 @@ Section ProofCreateMkdir.
                 (era_node (cr_setf dnc major minor
                              (mword_of_int 1 : mword 16)) bmc datc)
                 (era_node dc2 bm2 dat2)
-                ltac:(solve_ndisj) with "[] Hdirty Hctop") as "[Hdirty Hctop]";
-          [iApply (ireg_inv_ftop with "Hiregi") |].
+                ltac:(solve_ndisj) with "[] [] Hdirty Hctop") as "[Hdirty Hctop]";
+          [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
         iModIntro.
         (* THE ["."] UNIT COMES BACK OUT OF THE CHILD'S PAYLOAD (lane
            G5).  [cr_fail_mkdir_body] takes the child WITHOUT its
@@ -2770,8 +2770,8 @@ Section ProofCreateMkdir.
               (era_node (cr_setf dnc major minor
                            (mword_of_int 1 : mword 16)) bmc datc)
               (era_node dc1 bm1 dat1)
-              ltac:(solve_ndisj) with "[] Hdirty Hctop") as "[Hdirty Hctop]";
-        [iApply (ireg_inv_ftop with "Hiregi") |].
+              ltac:(solve_ndisj) with "[] [] Hdirty Hctop") as "[Hdirty Hctop]";
+        [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
       iModIntro.
       iPoseProof (cr_fail_mkdir_half (CID := CID) γs j γl pd pav pu
  γf

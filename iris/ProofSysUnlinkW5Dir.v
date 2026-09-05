@@ -1948,7 +1948,7 @@ Section ProofSysUnlinkW5Dir.
        the [su_setnl] that follows moves [di_nlink] only. *)
     iApply fupd_wp.
     (* ...and the ERA's abstract value with them (durable-disk 2b-inode-3):
-       [ireg_top_retag] opens [ftopN] alone. *)
+       [ireg_top_retag_*] opens [ftopN] alone. *)
     (* THE RETAG OWES THE ROW (durable-disk lane A): rmdir lowers the
        parent's own count, and the re-pack below proves the same four facts
        -- the entry's removal left the directory well-formed and the count
@@ -1968,15 +1968,15 @@ Section ProofSysUnlinkW5Dir.
                  (proj2 (proj2 Hrl_data'))).
       - exact HduqF2.
       - exact HddixF2. }
-    iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned dinum)
+    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dinum)
             (era_node dnd bmd datd) (era_node (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
                             : mword 64)
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bm' data')
-            ltac:(solve_ndisj) HlocW with "[] Htop") as "Htop";
-      [iApply (ireg_inv_ftop with "Hireg") |].
+            ltac:(solve_ndisj) Logic.I HlocW with "[] [] Htop") as "Htop";
+      [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iModIntro.
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dinum (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
@@ -2399,7 +2399,7 @@ Section ProofSysUnlinkW5Dir.
       - exact HduqZ.
       - exact HddixZ. }
     iApply fupd_wp.
-    iMod (ireg_top_retag ⊤ fsc_fs
+    iMod (ireg_top_retag_auto ⊤ fsc_fs
             (bv_unsigned (zero_extend' 32 (dir_inum datd kk : mword 16)
                           : mword 32))
             (era_node dni bmi dati)
@@ -2409,8 +2409,8 @@ Section ProofSysUnlinkW5Dir.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi dati)
-            ltac:(solve_ndisj) Hlocdec with "[] Htopi") as "Htopi";
-      [iApply (ireg_inv_ftop with "Hireg") |].
+            ltac:(solve_ndisj) Logic.I Hlocdec with "[] [] Htopi") as "Htopi";
+      [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iModIntro.
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ks
                (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)

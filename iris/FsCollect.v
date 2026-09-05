@@ -157,7 +157,7 @@
 (*      retags the record 0 -> [fresh_shape], carries it across with NO    *)
 (*      resource move and no [ftopN] open, and [ireg_withdraw] hands it to *)
 (*      the fill in the same shape the marker arm used to, leaving         *)
-(*      ProofIlock's [ireg_top_retag] untouched.                          *)
+(*      ProofIlock's [ireg_top_retag_*] untouched.                          *)
 (*                                                                        *)
 (*      HOW IT GETS BACK TO THE REGION, which was the whole difficulty:    *)
 (*      the fragment a free inum needs is the one iput's payload carried,  *)
@@ -302,6 +302,7 @@ Require Import FsState.       (* [fs_state_rec], [fs_links], [sb_owned]     *)
 Require Import FsStateEra.    (* [inode_owned_era_q]                        *)
 Require Import EscrowDefs.    (* [reg_full] / [reg_half] / [region_pending] *)
 Require Import InodeRegion.   (* [dinode_at], [ireg_recs], [ireg_couple]    *)
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IcacheEscrow.  (* [ic_inode_leg] -- WHAT A SLOT HOLDS OF ONE
    INODE, which is what [col_side] takes (durable-disk EV stage 5).  The
    predicate is the pair [FsStateInode.ent_toks_x] beside
@@ -382,7 +383,7 @@ Section Collect.
      escrow payload's [DirView.dir_ok] is stated at, and tying it to the
      collected state's superblock is what lets the commit read
      [FsDurSnap.sk_dirloc].  Instance-implicit, so no call site moves. *)
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
 
   Implicit Types γfs : fs_names.
 
@@ -651,7 +652,7 @@ Section Collect.
      authority [InodeRegion.ftop_inv] holds.  This is where the collection's
      state comes from (durable-disk C-8). *)
   Lemma col_bundle_top γfs γi (i : Z) (n : fs_node) (I : gmap Z fs_node) :
-    ghost_map_auth (fs_top γfs) 1 I -∗ col_bundle γfs γi i n -∗
+    ghost_map_auth (fs_top γfs) (1/2) I -∗ col_bundle γfs γi i n -∗
     ⌜I !! i = Some n⌝.
   Proof.
     iIntros "Ha H". iDestruct "H" as (inum Hbv) "H".
@@ -1575,11 +1576,11 @@ Section Collect.
       (d : dinode) (m : gmap Z dinode) (I : gmap Z fs_node) :
     m !! bv_unsigned inum = Some d ->
     ghost_map_auth γi 1 m -∗
-    ghost_map_auth (fs_top γfs) 1 I -∗
+    ghost_map_auth (fs_top γfs) (1/2) I -∗
     ireg_lnk γfs (bv_unsigned inum) d -∗
     ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗
       ghost_map_auth γi 1 m
-      ∗ ghost_map_auth (fs_top γfs) 1 I
+      ∗ ghost_map_auth (fs_top γfs) (1/2) I
       ∗ ⌜I !! bv_unsigned inum = Some n⌝
       ∗ col_bundle γfs γi (bv_unsigned inum) n
       ∗ fs_link_node (fs_link γfs) (bv_unsigned inum) n

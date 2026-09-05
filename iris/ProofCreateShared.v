@@ -126,6 +126,7 @@ Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
+Require Import AppInv.       (* [appN], [app_inv]: the suspended child's movers open the application's invariant *)
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import FsTree.
@@ -1616,51 +1617,59 @@ Section ProofCreateMain.
      and hand the transaction token back -- create's four exits (the FILE
      arm, the two mkdir failures, the mkdir success) each take exactly one
      of these. *)
+  (* ...EACH A NON-AU MOVE of the suspended child (app-instances.md section
+     7): the application's parked license pays it ([ireg_top_retag_armed_auto],
+     [top_move] being everything in round A) until round E gives create's
+     directory child its AU form. *)
   Lemma cr_dirty_arm (E : coPset) (t : nat) (i : Z)
       (n n' : fs_node) :
-    ↑ftopN ⊆ E ->
-    ftop_inv fsc_fs -∗ t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
     top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
       cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'.
   Proof.
-    iIntros (HE) "#Hi Htx Hf".
-    iMod (ireg_arm E fsc_fs i t (1/2)%Qp HE with "Hi Htx") as (k) "Harm".
-    iMod (ireg_top_retag_armed E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) with "Hi Harm Hf")
+    iIntros (HE) "#Hi #Hai Htx Hf".
+    iMod (ireg_arm E fsc_fs i t (1/2)%Qp (ftopN_sub_app E HE) with "Hi Htx")
+      as (k) "Harm".
+    iMod (ireg_top_retag_armed_auto E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Logic.I with "Hi Hai Harm Hf")
       as "[Harm Hf]".
     iModIntro. iFrame "Hf". rewrite /cr_dirty. iExists k. iExact "Harm".
   Qed.
 
   Lemma cr_dirty_retag (E : coPset) (t : nat) (i : Z)
       (n n' : fs_node) :
-    ↑ftopN ⊆ E ->
-    ftop_inv fsc_fs -∗ cr_dirty t i -∗ top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
+    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
       cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'.
   Proof.
-    iIntros (HE) "#Hi Hd Hf". rewrite /cr_dirty.
+    iIntros (HE) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
-    iMod (ireg_top_retag_armed E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) with "Hi Harm Hf")
+    iMod (ireg_top_retag_armed_auto E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Logic.I with "Hi Hai Harm Hf")
       as "[Harm Hf]".
     iModIntro. iFrame "Hf". iExists k. iExact "Harm".
   Qed.
 
   Lemma cr_dirty_clear (E : coPset) (t : nat) (i : Z)
       (n n' : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local i n' ->
-    ftop_inv fsc_fs -∗ cr_dirty t i -∗ top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
+    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'.
   Proof.
-    iIntros (HE Hloc) "#Hi Hd Hf". rewrite /cr_dirty.
+    iIntros (HE Hloc) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
-    iMod (ireg_top_retag_armed E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) with "Hi Harm Hf")
+    iMod (ireg_top_retag_armed_auto E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Logic.I with "Hi Hai Harm Hf")
       as "[Harm Hf]".
-    iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' HE Hloc with "Hi Harm Hf")
-      as "[Harm Hf]".
+    iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
+            with "Hi Harm Hf") as "[Harm Hf]".
     iEval (rewrite difference_diag_L) in "Harm".
-    iMod (ireg_release E fsc_fs k t (1/2)%Qp HE with "Hi Harm") as "Htx".
+    iMod (ireg_release E fsc_fs k t (1/2)%Qp (ftopN_sub_app E HE) with "Hi Harm")
+      as "Htx".
     iModIntro. iFrame "Htx Hf".
   Qed.
 

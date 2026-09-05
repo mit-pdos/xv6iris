@@ -109,7 +109,7 @@ Require Import SpecSysMknodAU.
 Require Import FsAbsMknodFire.
 Require Import SpecSysUnlinkAU.
 Require Import ProofSysUnlinkAUParts.
-Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
@@ -240,10 +240,10 @@ Section ProofSysUnlinkAUW1.
           in order; nothing comes back *)
        P (length (mknod_parent_elems pl)) iL -∗
        (* the four commits, UNSPENT *)
-       uent_commit_at (fs_gamma_L fsc_fs) fsabsE Phient -∗
-       utgt_commit_at (fs_gamma_L fsc_fs) fsabsE Phitgt -∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Phiex -∗
-       dmiss_commit_at (fs_gamma_L fsc_fs) fsabsE Phimiss -∗
+       uent_commit_at (fs_gamma_L fsc_fs) appE Phient -∗
+       utgt_commit_at (fs_gamma_L fsc_fs) appE Phitgt -∗
+       dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex -∗
+       dmiss_commit_at (fs_gamma_L fsc_fs) appE Phimiss -∗
        log_opS icfg_log n1 Sb1 -∗
        (* the transaction token rides beside the budget: this walk ends the
           operation, and end_op takes the whole [log_op] (durable-disk lane A) *)

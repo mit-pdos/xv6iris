@@ -38,6 +38,7 @@ Require Import FsNode.  (* [fs_node], [inode_local]                  *)
 Require Import FsBlocks.      (* [fs_names], [fs_top]                      *)
 Require Import FsDurSnap.     (* [snap_local]                              *)
 Require Import InodeRegion.   (* [ftopN], [ftop_inv], [ireg_clean_acc]     *)
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IcacheRef.     (* [icfg], [icfg_log]                        *)
 
 Local Open Scope Z_scope.
@@ -45,7 +46,7 @@ Local Open Scope Z_scope.
 Section IregClean.
   Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ,
             !logG Σ, !fsTopG Σ, !fsLinkG Σ}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
 
   (* ---- (a) THE ACCESSOR, at the empty transaction authority ---------- *)
 
@@ -59,10 +60,10 @@ Section IregClean.
     (ftop_inv γfs : iProp Σ) -∗
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ={E, E ∖ ↑ftopN}=∗
       ∃ I : gmap Z fs_node,
-        ghost_map_auth (fs_top γfs) 1 I ∗
+        ghost_map_auth (fs_top γfs) (1/2) I ∗
         ⌜forall S : fs_state_rec, fss_inodes S = I -> snap_local S⌝ ∗
         ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ∗
-        (ghost_map_auth (fs_top γfs) 1 I ={E ∖ ↑ftopN, E}=∗ True).
+        (ghost_map_auth (fs_top γfs) (1/2) I ={E ∖ ↑ftopN, E}=∗ True).
   Proof.
     iIntros (HE) "#Hi Htxa".
     iMod (ireg_clean_acc E γfs HE with "Hi Htxa")
@@ -87,10 +88,10 @@ Section IregClean.
     (ftop_inv γfs : iProp Σ) -∗
     ghost_map_auth (ln_tx icfg_log) 1 T ={E, E ∖ ↑ftopN}=∗
       ∃ I : gmap Z fs_node,
-        ghost_map_auth (fs_top γfs) 1 I ∗
+        ghost_map_auth (fs_top γfs) (1/2) I ∗
         ⌜forall S : fs_state_rec, fss_inodes S = I -> snap_local S⌝ ∗
         ghost_map_auth (ln_tx icfg_log) 1 T ∗
-        (ghost_map_auth (fs_top γfs) 1 I ={E ∖ ↑ftopN, E}=∗ True).
+        (ghost_map_auth (fs_top γfs) (1/2) I ={E ∖ ↑ftopN, E}=∗ True).
   Proof.
     iIntros (HE Hsz Hom) "#Hi Htxa".
     rewrite (log_tx_empty_of_ops om T Hsz Hom).

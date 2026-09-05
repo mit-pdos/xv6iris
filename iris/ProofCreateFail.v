@@ -471,13 +471,13 @@ Section ProofCreateFail.
       - apply dir_uniq_not_dir. rewrite cr_setf_type. exact Htdirz.
       - apply dir_dots_ix_not_dir. rewrite cr_setf_type. exact Htdirz. }
     iApply fupd_wp.
-    iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned cinum)
+    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned cinum)
             (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                       bmc datc)
             (era_node (cr_setf dnc major minor (mword_of_int 0 : mword 16))
                       bmc datc)
-            ltac:(solve_ndisj) Hlocz with "[] Hctop") as "Hctop";
-      [iApply (ireg_inv_ftop with "Hiregi") |].
+            ltac:(solve_ndisj) Logic.I Hlocz with "[] [] Hctop") as "Hctop";
+      [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
     iModIntro.
     iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum
                  (cr_setf dnc major minor (mword_of_int 0 : mword 16))
@@ -719,13 +719,13 @@ Section ProofCreateFail.
        the retag owes the registry's row and this is where the post
        record's four well-formedness facts have just been assembled. *)
     iApply fupd_wp.
-    iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned dind)
+    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dind)
             (era_node dn bm data) (era_node dn' bm' data')
-            ltac:(solve_ndisj)
+            ltac:(solve_ndisj) Logic.I
             (inode_local_of_ok_rec (bv_unsigned dind) fsc_cov fsc_logst dn' bm'
                data' Hiok' Hrl' Hduq' Hddix')
-            with "[] Htop") as "Htop";
-      [iApply (ireg_inv_ftop with "Hiregi") |].
+            with "[] [] Htop") as "Htop";
+      [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
     iModIntro.
     iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dn' bm' data'
                  Hiok' Hrl' Hdok' Hddix' (cr_doc_of_live dn dn' data' Hnl' Hnl0)

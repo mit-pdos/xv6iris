@@ -158,7 +158,7 @@
 
    - THE SHARE IS ON THE WRITTEN ROW, which is exactly the shape
      SpecSysMknodAU's header REFUSES for the parent: a held [nview]
-     share pins its row against every mover ([ireg_top_retag] needs the
+     share pins its row against every mover ([ireg_top_retag_*] needs the
      whole element), so it blocks THIS CALL'S OWN chunk retags.  Today
      the payload arms hold the element whole ([FsAbsSeam]'s finding 3),
      so a client share against a live inum is refuted outright and the
@@ -269,7 +269,7 @@ Require Import SpecSysWrite.   (* the landed contract this file states a
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbs.          (* the abstract state (lane A, landed)       *)
 Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ                  *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -415,8 +415,8 @@ Section SysWriteAU.
           astate Γ (delta_write i off bs av) ∗ Φ k av off bs))%I.
 
   (* THE BUNDLE: [cnt] consecutive chunk commits from index [lo].  The
-     caller hands [awrite_commits Γ fsabsE i Φ 0 (wchunks n)]; the arms return
-     the unfired suffix [awrite_commits Γ fsabsE i Φ p (wchunks n - p)]. *)
+     caller hands [awrite_commits Γ appE i Φ 0 (wchunks n)]; the arms return
+     the unfired suffix [awrite_commits Γ appE i Φ p (wchunks n - p)]. *)
   Definition awrite_commits Γ (E : coPset) (i : Z)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
       (lo cnt : nat) : iProp Σ :=
@@ -505,7 +505,7 @@ Section SysWriteAU.
           the BYTES are the caller's own run at [ua]. *)
        ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
-       awrite_commits Γ fsabsE i Φ (length bss)
+       awrite_commits Γ appE i Φ (length bss)
          (wchunks n - length bss)%nat)%I.
 
   (* ret -1: filewrite's honest partial arm.  A PREFIX of chunks fired --
@@ -521,7 +521,7 @@ Section SysWriteAU.
        ⌜(length bss <= wchunks n)%nat⌝ ∗
        ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
-       awrite_commits Γ fsabsE i Φ (length bss)
+       awrite_commits Γ appE i Φ (length bss)
          (wchunks n - length bss)%nat)%I.
 
   (* the armed disjunction the continuation receives, keyed on a0.  TWO
@@ -558,7 +558,7 @@ Section SysWriteAU.
            ⌜ubytes_at M ua (concat bss)⌝ ∗
            (wri_receipts_chained i bs0 nl off0 Φ bss
             ∨ wri_receipts i Φ bss) ∗
-           awrite_commits Γ fsabsE i Φ (length bss)
+           awrite_commits Γ appE i Φ (length bss)
              (wchunks n - length bss)%nat)
       ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
          ∗ write_post_fail Γ i n M ua Φ)))%I.
@@ -673,7 +673,7 @@ Definition wp_sys_write_au_body
   let n := sys_rw_count v2 in
   wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv rb i γo
-    (awrite_commits Γfs fsabsE i Φw 0%nat (wchunks n))
+    (awrite_commits Γfs appE i Φw 0%nat (wchunks n))
     (write_arms Γfs i n (us_M U) v1 Φw).
 
 (* THE STABLE COROLLARY'S STATEMENT (header: THE STABLE COROLLARY, AND ITS
@@ -703,7 +703,7 @@ Definition wp_sys_write_au_stable_body
   wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv rb i γo
     (nview Γfs q i (MkAnode (AFile bs0) nl)
-     ∗ awrite_commits Γfs fsabsE i Φw 0%nat (wchunks n))%I
+     ∗ awrite_commits Γfs appE i Φw 0%nat (wchunks n))%I
     (write_stable_arms Γfs i n q bs0 nl (us_M U) v1 Φw).
 
 (* ===================================================================== *)

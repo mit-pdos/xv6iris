@@ -110,7 +110,7 @@ Require Import FsAbsMknodFire.
 Require Import SpecSysUnlinkAU.
 Require Import FsAbsUnlinkFire.
 Require Import ProofSysUnlinkAUParts.
-Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
@@ -1181,10 +1181,10 @@ Section ProofSysUnlinkAUW3.
        (* the name tie, the cursor and the four commits *)
        ⌜exists es e, nameiparent_of pl es e /\ bname 14 nf = e⌝ -∗
        P (length (mknod_parent_elems pl)) (bv_unsigned dinum) -∗
-       uent_commit_at (fs_gamma_L fsc_fs) fsabsE Phient -∗
-       utgt_commit_at (fs_gamma_L fsc_fs) fsabsE Phitgt -∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Phiex -∗
-       dmiss_commit_at (fs_gamma_L fsc_fs) fsabsE Phimiss -∗
+       uent_commit_at (fs_gamma_L fsc_fs) appE Phient -∗
+       utgt_commit_at (fs_gamma_L fsc_fs) appE Phitgt -∗
+       dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex -∗
+       dmiss_commit_at (fs_gamma_L fsc_fs) appE Phimiss -∗
        (* ---- the frame, slot 5 FILLED ---- *)
        (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
        (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -1335,10 +1335,10 @@ Section ProofSysUnlinkAUW3.
     (* ---- THE AU SIDE, as W2's seam hands it ---- *)
     ⌜exists es e, nameiparent_of pl es e /\ bname 14 nf = e⌝ -∗
     P (length (mknod_parent_elems pl)) (bv_unsigned dinum) -∗
-    uent_commit_at (fs_gamma_L fsc_fs) fsabsE Phient -∗
-    utgt_commit_at (fs_gamma_L fsc_fs) fsabsE Phitgt -∗
-    dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Phiex -∗
-    dmiss_commit_at (fs_gamma_L fsc_fs) fsabsE Phimiss -∗
+    uent_commit_at (fs_gamma_L fsc_fs) appE Phient -∗
+    utgt_commit_at (fs_gamma_L fsc_fs) appE Phitgt -∗
+    dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex -∗
+    dmiss_commit_at (fs_gamma_L fsc_fs) appE Phimiss -∗
     (* ---- the frame, as the +0x72 seam hands it ---- *)
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗

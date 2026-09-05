@@ -82,7 +82,7 @@ Require Import FsBytesGamma.
 Require Import SpecSysMknodAU.
 Require Import SpecSysOpenAU.
 Require Import FsAbsMknodFire.   (* [acre_commit_at], [dlookup_commit_at]   *)
-Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule) *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -144,9 +144,9 @@ Section ProofSysOpenAUCreArm.
        ⌜0 < i0 < 16 * Z.of_nat icfg_nib⌝ ∗
        P (length (mknod_parent_elems pl)) d ∗
        Phiok av d nm i0 ∗
-       dlookup_commit_at (fs_gamma_L fsc_fs) fsabsE Phiex ∗
-       aopen_commit_at (fs_gamma_L fsc_fs) fsabsE Phio ∗
-       atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Phit)%I.
+       dlookup_commit_at (fs_gamma_L fsc_fs) appE Phiex ∗
+       aopen_commit_at (fs_gamma_L fsc_fs) appE Phio ∗
+       atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit)%I.
 
   (* ARM F-OK's payout: the exists observation fired, the create commit
      refunded.  Both of open's own commits are SPENT by the tail on this
@@ -160,7 +160,7 @@ Section ProofSysOpenAUCreArm.
        ⌜ents !! nm = Some i0⌝ ∗
        P (length (mknod_parent_elems pl)) d ∗
        Phiex av d nm i0 ∗
-       acre_commit_at (fs_gamma_L fsc_fs) fsabsE (AFile []) Phiok)%I.
+       acre_commit_at (fs_gamma_L fsc_fs) appE (AFile []) Phiok)%I.
 
   (* ================================================================== *)
   (*  3.  THE TWO OBSERVATION SEEDS                                      *)
@@ -199,10 +199,10 @@ Section ProofSysOpenAUCreArm.
     open_post_fail_plain (fs_gamma_L fsc_fs) fsc_fs cw
       (socr_P R i0) (socr_Pm R) Phio Phit
     ={⊤}=∗ R
-           ∗ (aopen_commit_at (fs_gamma_L fsc_fs) fsabsE Phio
+           ∗ (aopen_commit_at (fs_gamma_L fsc_fs) appE Phio
               ∨ (∃ (i : Z) (av : aview) (a : anode),
                    ⌜av !! i = Some a⌝ ∗ Phio av i a))
-           ∗ atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Phit.
+           ∗ atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit.
   Proof.
     rewrite /open_post_fail_plain /socr_P /socr_Pm.
     iIntros "H". iDestruct "H" as "[Hpre | H]".
@@ -279,7 +279,7 @@ Section ProofSysOpenAUCreArm.
              then ∃ av' : aview,
                     ⌜av' !! i0 = Some (MkAnode (AFile bs0) nl)⌝ ∗
                     Phit av' i0 bs0
-             else atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Phit) ∗
+             else atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit) ∗
             ∃ γo : gname,
               open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
                 (FdInode i0 γo) sts r)
@@ -287,7 +287,7 @@ Section ProofSysOpenAUCreArm.
               ⌜av !! i0 = Some (MkAnode (ADev ma mi) nl)⌝ ∗
               ⌜0 <= ma <= NDEV_max⌝ ∗
               Phio av i0 (MkAnode (ADev ma mi) nl) ∗
-              atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Phit ∗
+              atrunc_commit_at (fs_gamma_L fsc_fs) appE Phit ∗
               open_fd_ok gf pj pidv U (om_readable vom) (om_writable vom)
                 (FdDevice ma) sts r)).
   Proof.

@@ -116,7 +116,7 @@ Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUAlloc.
 Require Import ProofSysOpenAUJoin.
 Require Import ProofSysOpen.   (* [so_neq_of_eq] / [so_neq_of_ne] / [so_bud_iput] *)
-Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.
 
@@ -290,8 +290,8 @@ Section ProofSysOpenAUWalk.
        picks the start inum -- ROOTINO on an absolute path, [p->cwd]'s on a
        relative one -- and fires it there. ---- *)
     open_walk_pre_era fsc_fs (pv_cwi (us_V U)) P Pmiss -∗
-    aopen_commit_at (fs_gamma_L fsc_fs) fsabsE Φo -∗
-    atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Φt -∗
+    aopen_commit_at (fs_gamma_L fsc_fs) appE Φo -∗
+    atrunc_commit_at (fs_gamma_L fsc_fs) appE Φt -∗
     wp_next true (proc_addr jx)
       (so_cont0_au gf ns
                 dqb dqs dqbs dqn (proc_addr jx) pidv vom U sts

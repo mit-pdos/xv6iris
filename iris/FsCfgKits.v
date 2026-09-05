@@ -65,7 +65,7 @@ Require Import BitmapInv.
 Require Import FsCfg.          (* the record this file finally gives a value *)
 Require Import AppCfg.         (* [appcfg]: the application's record, threaded beside [fscfg] *)
 Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ the application copy shadows *)
-Require Import FsAbsInv.       (* [fsabs_env]: kit 2's last row (applications.md section 2) *)
+Require Import AppInv.         (* [app_inv]: kit 2's last row (app-instances.md section 2) *)
 Require Import Xv6G.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import TsoCtx.
@@ -310,15 +310,16 @@ Section FsCfgKits.
         fsinit threads it into [initlog], which empties it and seals it into
         [LogInv.log_ctx]. *)
      exc_own (fs_exc fsc_fs) Xexc ∗
-     (* THE APPLICATION'S ENVIRONMENT (claude-notes/design/applications.md
-        section 2): the client copy of the abstract state at the live Γ,
-        MINTED AT THE ERA MINT at the founded map, beside the application's
-        license.  Persistent; forkret's boot arm projects it into
-        [FirstTok.first_done] instead of minting a copy of its own.  LAST,
-        so the pass-through sites' patterns only grow at the end.  At the
-        application record [APP] this kit threads (applications.md
-        section 1: explicit through the kits, ambient everywhere else). *)
-     FsAbsInv.fsabs_env (APP := APP) (fs_gamma_L fsc_fs))%I.
+     (* THE APPLICATION'S INVARIANT (app-instances.md section 2): the other
+        half of the abstract map's authority beside the application's claim
+        about its view and its parked license, FOUNDED AT THE ERA MINT at
+        the founded map.  Persistent; forkret's boot arm projects it into
+        [FirstTok.first_done], and it is the handle the generic dischargers
+        pay every commit's step through.  LAST, so the pass-through sites'
+        patterns only grow at the end.  At the application record [APP]
+        this kit threads (explicit through the kits, ambient everywhere
+        else). *)
+     AppInv.app_inv (APP := APP) fsc_fs)%I.
 
   Lemma fs_kit_fsinit_ghost_open (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ)
       (P : Z -> list (bv 8)) (Rspent : gset Z)
@@ -342,7 +343,7 @@ Section FsCfgKits.
       fs_bytes_inv (fs_bytes fsc_fs) (fs_cache fsc_fs) (fs_exc fsc_fs)
                    (fs_home_set fsc_cov fsc_logst) Pb ∗
       exc_own (fs_exc fsc_fs) Xexc ∗
-      FsAbsInv.fsabs_env (APP := APP) (fs_gamma_L fsc_fs).
+      AppInv.app_inv (APP := APP) fsc_fs.
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)

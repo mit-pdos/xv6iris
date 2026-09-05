@@ -37,6 +37,7 @@ Require Import FsBoot.         (* [fs_cov_in] *)
 Require Import FsCfgBoot.      (* [fs_boot_image_wf] *)
 Require Import DinodeEnc.     (* [dinode], [di_type], [di_nlink]           *)
 Require Import InodeRegion.   (* [free_node], [ireg_bare], [ireg_top_park] *)
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import FsStateEra.    (* [inode_owned_era] *)
 Require Import FsCollect.      (* [col_geom], [col_bundle_free]           *)
 Require Import BioDefs.        (* [bio_names] *)
@@ -59,7 +60,7 @@ Local Open Scope Z_scope.
    than [size] blocks), which is the only place the bitmap's range meets
    the coverage set. *)
 Section ImgGeom.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
 
 Lemma img_col_geom (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (nib : nat)
     (cov : gset Z) :
@@ -300,7 +301,7 @@ Section CollectImgFree.
   (*  every inum.                                                          *)
   (* ==================================================================== *)
   Section CollectImgSlot.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
 
   Lemma img_col_region_slot (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb)
       (nib : nat) (cov : gset Z) (γfs : fs_names) (γi : gname)

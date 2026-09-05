@@ -163,7 +163,7 @@ Require Import EscrowDefs.   (* OPTION A: region_pending / reg_half / committedA
    column, its accessors ([ireg_lcols], [ireg_lends], [ireg_lends_acc],
    [ireg_lcols_use], [ireg_lcol_use], [ireg_fcol_use]) and its movers
    ([dv_set_rt], [fv_set_rt], [dvw_set_rt]) are gone with it.  Every mover
-   site's dv step was SUBSUMED by the [ireg_top_retag] it already performs. *)
+   site's dv step was SUBSUMED by the [ireg_top_retag_*] it already performs. *)
 (* [logged_at] / [log_epoch_lb]: the zero-receipt parked in [ireg_slot]
    (fs-log.md §G.17).  This is what puts [logG] in the section's context,
    and hence in the context of the four files that STATE something over
@@ -184,6 +184,14 @@ Require Import TxPin.
 Require Import SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvExtras.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
+Require FsAbsDefs.          (* [abs_view], [abs_of]: the application's claim is over the VIEW.
+                               Require, NOT Import: it re-exports [FsState], whose
+                               [link_auth] would shadow this file's *)
+Require Import AppCfg.      (* [appcfg]: the era's application record, bound below *)
+Require Import AppInv.      (* [app_inv], [appN], [app_top_update_*], [top_move]:
+                               the application's half of the abstract map
+                               (app-instances.md section 2), which every mover
+                               of [ftop_body]'s map opens beside [ftopN] *)
 Require TsoCtx.   (* qualified: the class only, no notation flip *)
 Local Open Scope Z_scope.
 
@@ -1278,6 +1286,12 @@ Section InodeRegion.
   Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ,
             !logG Σ, !fsTopG Σ, !fsLinkG Σ}.
   Context `{ICFG : icfg}.
+  (* THE ERA'S APPLICATION RECORD (app-instances.md section 7, round A):
+     [ireg_reg]/[ireg_inv] carry the application's invariant [AppInv.app_inv]
+     beside [ftop_inv], and the movers below open it, so this file binds
+     [appcfg] as it binds [icfg] -- ambient here, explicit through the kits
+     and the mint, [fileG]'s [file_app] everywhere above. *)
+  Context `{APP : appcfg Σ}.
   (* M1 flip, STAGE 2: this file states NO points-to of its own (grep: zero
      [↦] occurrences), but it names [IcacheRef.inode_ref], whose identity
      cells are [↦₄] and therefore context-indexed since the flip.  The
@@ -2489,7 +2503,7 @@ Section InodeRegion.
   (*  the fragment rides UNTIED exactly as it did in the pool, so            *)
   (*  [ireg_claim_au] -- which retags the record 0 -> [fresh_shape] -- owes  *)
   (*  nothing and moves no resource, and the fill's own                      *)
-  (*  [ireg_top_retag] (ProofIlock) is unchanged.                            *)
+  (*  [ireg_top_retag_*] (ProofIlock) is unchanged.                            *)
   (*                                                                        *)
   (*  WHERE IT ENTERS AND LEAVES.  In: boot ([IcacheBoot]) at every free     *)
   (*  inum of the image, and [EscrowDeposit.ireg_free_deposit_au] -- iput's  *)
@@ -3039,9 +3053,15 @@ Section InodeRegion.
          A !! k = Some (t, q, S) -> i ∉ S) ->
       inode_local i n.
 
+  (* THE AUTHORITY IS THE KERNEL'S HALF (app-instances.md section 2): the
+     application's invariant [AppInv.app_inv] holds the other half beside
+     its claim about the map's view.  Agreement pins the two maps to one;
+     an update needs the whole, so every mover of this map opens both
+     ([ireg_top_retag_*] below, and the AU fires through
+     [AppInv.app_top_update_*]).  Reads work at any fraction. *)
   Definition ftop_body (γfs : fs_names) : iProp Σ :=
     (∃ (I : gmap Z fs_node) (A : gmap nat ireg_arm_ent),
-       ghost_map_auth (fs_top γfs) 1 I ∗
+       ghost_map_auth (fs_top γfs) (1/2) I ∗
        ghost_map_auth icfg_lk 1 A ∗
        (* the arming transactions' tokens, parked at each arm's own share:
           this is what makes "no transaction is open" imply "nothing is
@@ -3067,7 +3087,7 @@ Section InodeRegion.
 
   Lemma ftop_alloc (E : coPset) (γfs : fs_names) (I : gmap Z fs_node) :
     (forall i n, I !! i = Some n -> inode_local i n) ->
-    ghost_map_auth (fs_top γfs) 1 I -∗
+    ghost_map_auth (fs_top γfs) (1/2) I -∗
     ghost_map_auth icfg_lk 1 (∅ : gmap nat ireg_arm_ent) ={E}=∗ ftop_inv γfs.
   Proof.
     iIntros (Hloc) "Ha Hlk".
@@ -3199,10 +3219,10 @@ Section InodeRegion.
     ftop_inv γfs -∗
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ={E, E ∖ ↑ftopN}=∗
       ∃ I : gmap Z fs_node,
-        ghost_map_auth (fs_top γfs) 1 I ∗
+        ghost_map_auth (fs_top γfs) (1/2) I ∗
         ⌜forall i n, I !! i = Some n -> inode_local i n⌝ ∗
         ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ∗
-        (ghost_map_auth (fs_top γfs) 1 I ={E ∖ ↑ftopN, E}=∗ True).
+        (ghost_map_auth (fs_top γfs) (1/2) I ={E ∖ ↑ftopN, E}=∗ True).
   Proof.
     iIntros (HE) "#Hi Htxa".
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
@@ -3239,16 +3259,22 @@ Section InodeRegion.
   Definition ireg_reg (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) : iProp Σ :=
     (inv iregN (ireg_body γi γfs inodestart nib) ∗
-     fs_bytes_row γfs ∗ ftop_inv γfs)%I.
+     fs_bytes_row γfs ∗ ftop_inv γfs ∗ app_inv γfs)%I.
 
   (* ...AND THE REGION EVERY OTHER CONSUMER TAKES: the same three rows with
      the byte row SEALED.  fsinit builds it out of [ireg_reg] and the seal
      [initlog] made, and it is what [FsReady.fs_ready] carries, so not one
      [ilock]/[ialloc]/[iput]/[iupdate] site had to learn about the window. *)
+  (* ...AND, LAST, THE APPLICATION'S INVARIANT (app-instances.md section 2):
+     the other half of the abstract map's authority beside the application's
+     claim, at the same [γfs].  It rides here because every mover of the map
+     has to open it beside [ftopN], and [ireg_inv] is the ambient credential
+     every such mover already carries.  LAST, so the destructuring patterns
+     of the forty-odd consumers only grow at the end (durable-notes). *)
   Definition ireg_inv (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) : iProp Σ :=
     (inv iregN (ireg_body γi γfs inodestart nib) ∗
-     ireg_bytes γfs ∗ ftop_inv γfs)%I.
+     ireg_bytes γfs ∗ ftop_inv γfs ∗ app_inv γfs)%I.
 
   Global Instance ireg_reg_persistent γi γfs inodestart nib :
     Persistent (ireg_reg γi γfs inodestart nib).
@@ -3261,48 +3287,86 @@ Section InodeRegion.
   Lemma ireg_inv_reg γi γfs inodestart nib :
     ireg_inv γi γfs inodestart nib -∗ ireg_reg γi γfs inodestart nib.
   Proof.
-    iIntros "($ & Hb & $)". iApply (fs_bytes_any_row with "Hb").
+    iIntros "($ & Hb & $ & $)". iApply (fs_bytes_any_row with "Hb").
   Qed.
 
   Lemma ireg_inv_of γi γfs inodestart nib :
     ireg_reg γi γfs inodestart nib -∗ exc_sealed (fs_exc γfs) -∗
     ireg_inv γi γfs inodestart nib.
-  Proof. iIntros "($ & Hb & $) Hs". iFrame. Qed.
+  Proof. iIntros "($ & Hb & $ & $) Hs". iFrame. Qed.
 
   Lemma ireg_inv_bytes γi γfs inodestart nib :
     ireg_inv γi γfs inodestart nib -∗ fs_bytes_any γfs.
-  Proof. iIntros "(_ & $ & _)". Qed.
+  Proof. iIntros "(_ & $ & _ & _)". Qed.
 
   Lemma ireg_inv_ftop γi γfs inodestart nib :
     ireg_inv γi γfs inodestart nib -∗ ftop_inv γfs.
-  Proof. iIntros "(_ & _ & $)". Qed.
+  Proof. iIntros "(_ & _ & $ & _)". Qed.
+
+  (* the application's invariant, off either bundle *)
+  Lemma ireg_reg_app γi γfs inodestart nib :
+    ireg_reg γi γfs inodestart nib -∗ app_inv γfs.
+  Proof. iIntros "(_ & _ & _ & $)". Qed.
+
+  Lemma ireg_inv_app γi γfs inodestart nib :
+    ireg_inv γi γfs inodestart nib -∗ app_inv γfs.
+  Proof. iIntros "(_ & _ & _ & $)". Qed.
+
+  (* the mask every mover asks for, split for the inner step: [appN] is
+     still open once [ftopN] has been taken *)
+  Lemma appN_sub_ftop (E : coPset) :
+    ↑ftopN ∪ ↑appN ⊆ E -> ↑appN ⊆ E ∖ ↑ftopN.
+  Proof. intros HE. solve_ndisj. Qed.
+
+  Lemma ftopN_sub_app (E : coPset) :
+    ↑ftopN ∪ ↑appN ⊆ E -> ↑ftopN ⊆ E.
+  Proof. intros HE. set_solver. Qed.
 
   (* THE RETAG, ALONE.  A walk that has already moved the region's record
      proxy (iupdate did it, at the region's own AU) and only owes the
-     abstract value takes this one; it opens nothing but [ftopN].
+     abstract value takes this one; it opens [ftopN] and, through
+     [AppInv.app_top_update], the application's [appN] -- the map's
+     authority is split between the two (app-instances.md section 2), and
+     an update needs the whole.
 
-     IT NOW CARRIES THE ROW (durable-disk lane A, plan section 4b): the new
+     IT CARRIES THE ROW (durable-disk lane A, plan section 4b): the new
      node has to be well-formed, because the map the walk is moving is the
      one a commit reads.  A walk whose write leaves the inode HALF-BUILT --
      create's mkdir child between its [nlink = 1] and its two dot entries,
      itrunc between the cleared pointers and the zeroed size -- takes
-     [ireg_top_retag_armed] instead, having suspended the row first
+     [ireg_top_retag_armed_*] instead, having suspended the row first
      ([ireg_arm]).  The obligation is free at every other site: they
      re-establish exactly these facts to re-pack their payload anyway, and
      [FsStateEra.inode_local_of_ok_rec] is the one line that assembles
-     them. *)
-  Lemma ireg_top_retag (E : coPset) (γfs : fs_names) (i : Z)
+     them.
+
+     ...AND THE APPLICATION'S CLAIM, in one of THREE FORMS (app-instances.md
+     section 7): [_same] when the reading is unchanged ([FsAbsDefs.abs_of n = FsAbsDefs.abs_of
+     n'], nothing from the application); [_step] with a step wand from the
+     caller's contract (the AU fires: round A pays it from the generic
+     dischargers, round B from the process's payload); [_auto] for a move
+     the kernel admits by itself ([AppInv.top_move] -- everything in round A,
+     narrowed in round E as each non-AU site gets an AU form), paid by the
+     license the application parks in its invariant.  The general form,
+     with the step under the later, is the one proof; the three are its
+     readings. *)
+  Lemma ireg_top_retag_gen (E : coPset) (γfs : fs_names) (i : Z)
       (n n' : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local i n' ->
-    ftop_inv γfs -∗
+    ftop_inv γfs -∗ app_inv γfs -∗
+    (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗ ▷ app_auto -∗
+       ▷ app_pred riscv_client_name app_run (FsAbsDefs.abs_view I) -∗
+       ▷ app_pred riscv_client_name app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
   Proof.
-    iIntros (HE Hloc) "#Hi Hf".
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iIntros (HE Hloc) "#Hi #Hai Hstep Hf".
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Ha & Hla & Hpark & %Hcl)".
     rewrite /top_frag /fs_gamma_L /=.
-    iMod (ghost_map_update n' with "Ha Hf") as "[Ha Hf]".
+    iMod (app_top_update (E ∖ ↑ftopN) γfs I i n n' (appN_sub_ftop E HE)
+            with "Hai [Hstep] Ha Hf") as "[Ha Hf]".
+    { iApply ("Hstep" $! I). }
     iMod ("Hclose" with "[Ha Hla Hpark]") as "_".
     { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
       iFrame "Ha Hla Hpark". iPureIntro.
@@ -3313,22 +3377,72 @@ Section InodeRegion.
     iModIntro. iExact "Hf".
   Qed.
 
+  Lemma ireg_top_retag_same (E : coPset) (γfs : fs_names) (i : Z)
+      (n n' : fs_node) :
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    FsAbsDefs.abs_of n = FsAbsDefs.abs_of n' ->
+    inode_local i n' ->
+    ftop_inv γfs -∗ app_inv γfs -∗
+    top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
+  Proof.
+    iIntros (HE Habs Hloc) "#Hi #Hai Hf".
+    iApply (ireg_top_retag_gen E γfs i n n' HE Hloc with "Hi Hai [] Hf").
+    iIntros (I Hin) "_ Hp". rewrite (FsAbsDefs.abs_view_insert_same I i n n' Hin Habs). iExact "Hp".
+  Qed.
+
+  Lemma ireg_top_retag_step (E : coPset) (γfs : fs_names) (i : Z)
+      (n n' : fs_node) :
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    inode_local i n' ->
+    ftop_inv γfs -∗ app_inv γfs -∗
+    (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗
+       app_pred riscv_client_name app_run (FsAbsDefs.abs_view I) -∗
+       app_pred riscv_client_name app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
+    top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
+  Proof.
+    iIntros (HE Hloc) "#Hi #Hai Hstep Hf".
+    iApply (ireg_top_retag_gen E γfs i n n' HE Hloc with "Hi Hai [Hstep] Hf").
+    iIntros (I Hin) "_ Hp". iNext. iApply ("Hstep" $! I with "[//] Hp").
+  Qed.
+
+  Lemma ireg_top_retag_auto (E : coPset) (γfs : fs_names) (i : Z)
+      (n n' : fs_node) :
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    top_move n n' ->
+    inode_local i n' ->
+    ftop_inv γfs -∗ app_inv γfs -∗
+    top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
+  Proof.
+    iIntros (HE Hmv Hloc) "#Hi #Hai Hf".
+    iApply (ireg_top_retag_gen E γfs i n n' HE Hloc with "Hi Hai [] Hf").
+    iIntros (I Hin) "#Ha Hp". iNext.
+    iEval (rewrite /app_auto /app_auto_raw) in "Ha".
+    iApply ("Ha" $! I i n n' with "[//] [//] Hp").
+  Qed.
+
   (* ...and the SUSPENDED form: the walk holds a receipt naming this inum,
-     so the row says nothing about it and the new node may be anything. *)
-  Lemma ireg_top_retag_armed (E : coPset) (γfs : fs_names) (k t : nat)
+     so the row says nothing about it and the new node may be anything.
+     The application's claim is owed all the same, in the same three
+     forms. *)
+  Lemma ireg_top_retag_armed_gen (E : coPset) (γfs : fs_names) (k t : nat)
       (q : Qp) (S : gset Z) (i : Z) (n n' : fs_node) :
-    ↑ftopN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     i ∈ S ->
-    ftop_inv γfs -∗ ireg_armed k t q S -∗
+    ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
+    (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗ ▷ app_auto -∗
+       ▷ app_pred riscv_client_name app_run (FsAbsDefs.abs_view I) -∗
+       ▷ app_pred riscv_client_name app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'.
   Proof.
-    iIntros (HE Hin) "#Hi Hrec Hf". rewrite /ireg_armed.
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iIntros (HE Hin) "#Hi #Hai Hrec Hstep Hf". rewrite /ireg_armed.
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Ha & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hla Hrec") as %HAt.
     rewrite /top_frag /fs_gamma_L /=.
-    iMod (ghost_map_update n' with "Ha Hf") as "[Ha Hf]".
+    iMod (app_top_update (E ∖ ↑ftopN) γfs I i n n' (appN_sub_ftop E HE)
+            with "Hai [Hstep] Ha Hf") as "[Ha Hf]".
+    { iApply ("Hstep" $! I). }
     iMod ("Hclose" with "[Ha Hla Hpark]") as "_".
     { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
       iFrame "Ha Hla Hpark". iPureIntro.
@@ -3338,6 +3452,55 @@ Section InodeRegion.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         exact (Hcl j m Hj Hun). }
     iModIntro. iFrame "Hrec Hf".
+  Qed.
+
+  Lemma ireg_top_retag_armed_same (E : coPset) (γfs : fs_names) (k t : nat)
+      (q : Qp) (S : gset Z) (i : Z) (n n' : fs_node) :
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    i ∈ S ->
+    FsAbsDefs.abs_of n = FsAbsDefs.abs_of n' ->
+    ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
+    top_frag (fs_gamma_L γfs) i n ={E}=∗
+      ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'.
+  Proof.
+    iIntros (HE Hin Habs) "#Hi #Hai Hrec Hf".
+    iApply (ireg_top_retag_armed_gen E γfs k t q S i n n' HE Hin
+              with "Hi Hai Hrec [] Hf").
+    iIntros (I Hlk) "_ Hp". rewrite (FsAbsDefs.abs_view_insert_same I i n n' Hlk Habs). iExact "Hp".
+  Qed.
+
+  Lemma ireg_top_retag_armed_step (E : coPset) (γfs : fs_names) (k t : nat)
+      (q : Qp) (S : gset Z) (i : Z) (n n' : fs_node) :
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    i ∈ S ->
+    ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
+    (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗
+       app_pred riscv_client_name app_run (FsAbsDefs.abs_view I) -∗
+       app_pred riscv_client_name app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
+    top_frag (fs_gamma_L γfs) i n ={E}=∗
+      ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'.
+  Proof.
+    iIntros (HE Hin) "#Hi #Hai Hrec Hstep Hf".
+    iApply (ireg_top_retag_armed_gen E γfs k t q S i n n' HE Hin
+              with "Hi Hai Hrec [Hstep] Hf").
+    iIntros (I Hlk) "_ Hp". iNext. iApply ("Hstep" $! I with "[//] Hp").
+  Qed.
+
+  Lemma ireg_top_retag_armed_auto (E : coPset) (γfs : fs_names) (k t : nat)
+      (q : Qp) (S : gset Z) (i : Z) (n n' : fs_node) :
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    i ∈ S ->
+    top_move n n' ->
+    ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
+    top_frag (fs_gamma_L γfs) i n ={E}=∗
+      ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'.
+  Proof.
+    iIntros (HE Hin Hmv) "#Hi #Hai Hrec Hf".
+    iApply (ireg_top_retag_armed_gen E γfs k t q S i n n' HE Hin
+              with "Hi Hai Hrec [] Hf").
+    iIntros (I Hlk) "#Ha Hp". iNext.
+    iEval (rewrite /app_auto /app_auto_raw) in "Ha".
+    iApply ("Ha" $! I i n n' with "[//] [//] Hp").
   Qed.
 
   (* [logN], [iregN] and [ftopN] are pairwise distinct namespaces, so a
@@ -3463,7 +3626,7 @@ Section InodeRegion.
     dinode_at γi inum dn ∗ (b ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
     iIntros (HE HEl Hin Hb) "#Hinv Hdn Hhalf".
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iDestruct "Hrb" as "[Hrb0 #Hseal]".
     iDestruct "Hrb0" as (home Xv) "#Hbinv".
     assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
@@ -3529,7 +3692,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -3594,7 +3757,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -3658,7 +3821,7 @@ Section InodeRegion.
     ((inodestart + Z.of_nat bi) ↪[fs_cache γfs]{#(1/2)} bsl).
   Proof.
     iIntros (HE HEl Hbi) "#Hinv Hhalf".
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iDestruct "Hrb" as "[Hrb0 #Hseal]".
     iDestruct "Hrb0" as (home Xv) "#Hbinv".
     assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
@@ -3765,7 +3928,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -3966,7 +4129,7 @@ Section InodeRegion.
     pose proof (fresh_shape_wf dn' Hfr) as Hdn'.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -4022,7 +4185,7 @@ Section InodeRegion.
        carries it across UNTOUCHED: the new record is [fresh_shape], hence
        nonzero-typed, and the park's tie is guarded by [di_type = 0] -- so no
        resource moves at the claim and no [ftopN] open is needed here.  It is
-       the fill ([ireg_withdraw] then ProofIlock's [ireg_top_retag]) that
+       the fill ([ireg_withdraw] then ProofIlock's [ireg_top_retag_*]) that
        re-ties the fragment at the node it parks. *)
     iAssert ((bv_unsigned inum ↪[γi] (ds !!! islot inum))
              ∗ (∃ ge gr, reg_full (bv_unsigned inum) ge gr)
@@ -4262,7 +4425,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -4377,7 +4540,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -4435,7 +4598,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -4650,7 +4813,7 @@ Section InodeRegion.
        and this is the ONE exit from the region's IN arm.  It comes out
        UNTIED -- the box is [fresh_shape], so [ireg_top_park]'s tie is on its
        vacuous side -- which is exactly the shape the fill used to take off
-       the pool's marker arm, so ProofIlock's [ireg_top_retag] is unchanged. *)
+       the pool's marker arm, so ProofIlock's [ireg_top_retag_*] is unchanged. *)
     (∃ n : fs_node, top_frag (fs_gamma_L γfs) (bv_unsigned inum) n).
   Proof.
     iIntros (HE HEl Hfills Hin Hb Hwf Hbsl Hnz) "#Hinv Hmk Hcl Hhalf".
@@ -4658,7 +4821,7 @@ Section InodeRegion.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
     assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iDestruct "Hrb" as "[Hrb0 #Hseal]".
     iDestruct "Hrb0" as (home Xv) "#Hbinv".
     assert (HlogI : (↑logN : coPset) ⊆ E ∖ ↑iregN)
@@ -4816,7 +4979,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -5007,7 +5170,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -5244,7 +5407,7 @@ Section InodeRegion.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -5408,7 +5571,7 @@ Section InodeRegion.
       to the new record's own readings.
 
       ALL GONE, AND NOT ONE MOVER SITE LOST A FACT.  A re-pack's dv step was
-      always SUBSUMED by the [ireg_top_retag] beside it: the retag moves the
+      always SUBSUMED by the [ireg_top_retag_*] beside it: the retag moves the
       era fragment to [era_node dn' bm' data'], and the entry map and the byte
       list of that node ARE what [dv_of]/[fv_of] read off the same record and
       bytes ([FsStateEra.dir_entries_era_node], [fn_file_bytes]).  So the

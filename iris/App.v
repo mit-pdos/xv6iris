@@ -1,14 +1,16 @@
 (* App.v -- APPLICATIONS: the record, and the whole-system theorem at one.
 
-   Design of record: claude-notes/design/applications.md.  An application is
-   a collection of user programs plus what it claims -- a predicate on the
-   abstract file-system state, what it is lent at every boot about the
-   durable state, a trace ledger, and a pure conclusion.  The DATA is the
-   record [xv6_app]; the OBLIGATIONS are the premises of [xv6_app_adequacy],
-   stated exactly as [SystemAdequacy.xv6_power_adequacy_gen] states them
-   (at the raw gnames, the [boot_fixedGS] literal), so that an application
-   that can pay some and not others is a DEFINITION and never a vacuous
-   theorem.
+   Design of record: claude-notes/projects/app-instances.md (sections 0-2,
+   7), superseding design/applications.md sections 1-3 while its rounds
+   land.  An application is a collection of user programs plus what it
+   claims -- a predicate on the abstract file-system state's VIEW, at its
+   own per-instance ghost names ([AppCfg.appcfg]'s data), what it is lent
+   at every boot about the durable state, a trace ledger, and a pure
+   conclusion.  The DATA is the record [xv6_app]; the OBLIGATIONS are the
+   premises of [xv6_app_adequacy], stated exactly as
+   [SystemAdequacy.xv6_power_adequacy_gen] states them (at the raw gnames,
+   the [boot_fixedGS] literal), so that an application that can pay some
+   and not others is a DEFINITION and never a vacuous theorem.
 
    THE GENERIC APPLICATION [app_triv] -- user space does anything, the
    abstract state is anything, the kernel stays correct -- pays every
@@ -18,16 +20,20 @@
    claude-notes/projects/app-echo.md.
 
    HOW THE PIECES MEET THE THEOREM.
-   - [app_fs] becomes the era's [AppCfg.app_pred]: [SystemAdequacy.xv6_boot_era]
-     builds the record [MkAppcfg app_fs] and threads it to the era mint
-     ([FsCfgSnap.fs_cfg_alloc_snap]), which seeds
-     the client copy of the abstract state at the founded map under
-     [fsabs_ok_raw γcl app_fs] -- the application's BOOT obligation
-     [Happ_boot], paid out of what the PowerOn arm lent ([app_lend γcl dk],
-     produced by [Hlend] out of the crash predicate).
-   - [Happ_lic] is the era's license to re-sync the copy at every fire
-     point (applications.md section 2: "the copy may be re-synced to any
-     map"; a constraining application holds it only once tainted).
+   - [app_names]/[app_pred] become the era's [AppCfg.appcfg]:
+     [SystemAdequacy.xv6_boot_era] builds the record [MkAppcfg _ app_pred r]
+     at the running instance [r] the boot obligation witnesses and threads
+     it to the era mint ([FsCfgSnap.fs_cfg_alloc_snap]), which founds the
+     application's invariant ([AppInv.app_inv]: its half of the abstract
+     map's authority beside its claim) at the founded map's view.  The
+     claim is the application's BOOT obligation [Happ_boot], paid out of
+     what the PowerOn arm lent ([app_lend γcl dk], produced by [Hlend] out
+     of the crash predicate) -- until round C, when the durable instance
+     replaces the lend.
+   - [Happ_auto] is the application's PARKED LICENSE ([AppInv.app_auto]):
+     the moves it admits from anyone -- in round A, every one-row move
+     ([AppInv.top_move]), which is why a constraining application cannot
+     pay it yet ([AppEcho]); the era mint parks it in [app_inv].
    - [app_R γcl] is the trace slot's resource at the client phase counter's
      name; [HR0] RECEIVES the counter at 0 ([obs_ledger_at_alloc_client]);
      the power step and the two UART-arm wands are [xv6_trace_adequacy]'s,
@@ -49,7 +55,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang ObsTrace RiscvPtsto.
 Require Import FsState.
-Require Import FsAbsInv.
+Require Import FsAbsDefs.        (* [aview], [abs_view]: the claim is over the view *)
+Require Import AppInv.           (* [app_auto_raw]: the parked license, at the raw gname *)
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import WpUart.
@@ -69,7 +76,7 @@ Require Import Xv6G.
 Require Import UserFd.
 (* ...and this file's own *)
 Require Import FsNode.
-Require Import AppCfg.           (* [app_pred]: what [app_fs] becomes at the era *)
+Require Import AppCfg.           (* [appcfg]: what the record's data becomes at the era *)
 Require Import SystemAdequacy.
 (* the image's own superblock and region width, and the disk literal, for
    the closed corollary at the real image *)
@@ -78,10 +85,12 @@ Require FsImgDisk.
 Local Open Scope Z_scope.
 
 Record xv6_app (Σ : gFunctors) := MkApp {
-  (* the application's predicate on the abstract state between taints
-     (applications.md section 1): an iProp over the node map -- a claim
-     that OWNS resources -- and the era's [AppCfg.app_pred] *)
-  app_fs   : gmap Z fs_node -> iProp Σ;
+  (* the application's own per-instance ghost names, and its predicate on
+     the abstract state's VIEW at a fixed name and an instance
+     (app-instances.md section 1): an iProp -- a claim that OWNS resources
+     -- and the era's [AppCfg.app_pred] *)
+  app_names : Type;
+  app_pred  : gname -> app_names -> aview -> iProp Σ;
   (* what the PowerOn arm lends the boot about the durable state, at the
      client phase counter's name (section 3); the boot obligation reads it *)
   app_lend : gname -> (Z -> bv 8) -> iProp Σ;
@@ -90,18 +99,21 @@ Record xv6_app (Σ : gFunctors) := MkApp {
   (* the conclusion, over the operational state and the run's trace *)
   app_phi  : gstate -> list mobs -> Prop;
 }.
-Arguments MkApp {Σ} _ _ _ _.
-Arguments app_fs {Σ} _ _. Arguments app_lend {Σ} _ _ _.
+Arguments MkApp {Σ} _ _ _ _ _.
+Arguments app_names {Σ} _. Arguments app_pred {Σ} _ _ _ _.
+Arguments app_lend {Σ} _ _ _.
 Arguments app_R {Σ} _ _ _. Arguments app_phi {Σ} _ _ _.
 
 (* THE GENERIC APPLICATION: nothing claimed, nothing lent, nothing read *)
 Definition app_triv (Σ : gFunctors) : xv6_app Σ :=
-  MkApp (fun _ => True%I) (fun _ _ => emp%I) (fun _ _ => emp%I) (fun _ _ => True).
+  MkApp unit (fun _ _ _ => True%I) (fun _ _ => emp%I) (fun _ _ => emp%I)
+        (fun _ _ => True).
 
 (* ---------------------------------------------------------------------- *)
 (* THE THEOREM.  [xv6_power_adequacy_gen] at the application: the trace     *)
 (* slot is the ledger of [app_R] at the client name, the lend is the FS's   *)
-(* epoch beside [app_lend], the era's predicate is [app_fs].                *)
+(* epoch beside [app_lend], the era's predicate is [app_pred] at the        *)
+(* instance the boot obligation witnesses.                                  *)
 (* ---------------------------------------------------------------------- *)
 Theorem xv6_app_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
@@ -137,13 +149,17 @@ Theorem xv6_app_adequacy Σ
          |==> ◇ (▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov
                     (FsImg.sb_logstart sb) ∗
                  app_lend A γcl dk))
-    (* ---- the era's two obligations (section 2): the seed and the license ---- *)
+    (* ---- the era's two obligations (app-instances.md sections 1-2): the
+       running claim at the founded map's view, at SOME instance -- the one
+       the era runs at -- and the parked license ---- *)
     (Happ_boot : forall (γcl : gname) (S : fs_state_rec)
                         (D : gmap Z (list (bv 8))) (dk : Z -> bv 8),
        snap_ok S D ->
        fs_recovery (fs_blocks dk) D cov (FsImg.sb_logstart sb) ->
-       ⊢ app_lend A γcl dk -∗ |==> fsabs_ok_raw γcl (app_fs A) (fss_inodes S))
-    (Happ_lic : forall γcl : gname, ⊢ fsabs_lic_raw γcl (app_fs A))
+       ⊢ app_lend A γcl dk -∗
+         |==> ∃ r : app_names A, app_pred A γcl r (abs_view (fss_inodes S)))
+    (Happ_auto : forall (γcl : gname) (r : app_names A),
+       ⊢ app_auto_raw γcl (app_pred A) r)
     (* ---- the conclusion's proof, at the end of the run ---- *)
     (Hphi : forall (Hinv : invGS Σ)
                    (γgen γstart γreg γd γsw γobs γcl : gname) (T : list mobs)
@@ -181,7 +197,7 @@ Proof.
               (Htx HRg γ) (Hrx HRg γ)).
     rewrite Heq. reflexivity. }
   exact (xv6_power_adequacy_gen Σ g sb nib cov
-           (app_fs A) (app_lend A) Hlend Happ_boot Happ_lic
+           (app_names A) (app_pred A) (app_lend A) Hlend Happ_boot Happ_auto
            (fun γobs γcl => obs_ledger_at (app_R A γcl) γobs)
            (fun γobs γcl =>
               obs_ledger_at_alloc_client (app_R A γcl) γobs γcl (HR0 γcl))
@@ -201,14 +217,19 @@ Section AppTriv.
 
   Lemma app_triv_boot (γcl : gname) (S : fs_state_rec) (dk : Z -> bv 8) :
     ⊢ app_lend (app_triv Σ) γcl dk -∗
-      |==> fsabs_ok_raw γcl (app_fs (app_triv Σ)) (fss_inodes S).
+      |==> ∃ r : app_names (app_triv Σ),
+             app_pred (app_triv Σ) γcl r (abs_view (fss_inodes S)).
   Proof.
-    iIntros "_". iModIntro. rewrite /fsabs_ok_raw. cbn [app_triv app_fs].
-    iLeft. iPureIntro. exact Logic.I.
+    iIntros "_". iModIntro. cbn [app_triv app_names app_pred].
+    iExists (). iPureIntro. exact Logic.I.
   Qed.
 
-  Lemma app_triv_lic (γcl : gname) : ⊢ fsabs_lic_raw γcl (app_fs (app_triv Σ)).
-  Proof. exact (fsabs_lic_raw_triv γcl). Qed.
+  Lemma app_triv_auto (γcl : gname) (r : app_names (app_triv Σ)) :
+    ⊢ app_auto_raw γcl (app_pred (app_triv Σ)) r.
+  Proof.
+    cbn [app_triv app_pred]. apply app_auto_raw_triv.
+    intros f r' av. reflexivity.
+  Qed.
 
   Lemma app_triv_R0 (γcl : gname) :
     mono_nat_auth_own γcl 1 0%nat ⊢ |==> app_R (app_triv Σ) γcl [].
@@ -246,7 +267,7 @@ Proof.
            ltac:(intros γd γsw γreg γst γcl dk; cbn [app_triv app_lend];
                  iIntros "HP"; iModIntro; iModIntro; by iFrame "HP")
            ltac:(intros γcl S D dk _ _; exact (app_triv_boot γcl S dk))
-           app_triv_lic
+           app_triv_auto
            ltac:(intros Hinv γgen γstart γreg γd γsw γobs γcl T g' h;
                  iIntros "_ _ _ _ _"; iModIntro; iPureIntro; exact Logic.I)
            Hgen0 Hpow0 _ n κs t2 g2 Hn)).

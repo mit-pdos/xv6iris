@@ -1,18 +1,33 @@
 (*  AppCfg.v -- THE APPLICATION'S PREDICATE ON THE ABSTRACT FILE-SYSTEM
     STATE, as a class record and nothing else.
 
-    Design of record: claude-notes/design/applications.md section 1.  An
-    application proven on top of xv6 claims something of the node map
-    between taints -- [app_pred I], an iProp over the RAW node map, so that
-    the claim can OWN resources (per-node fragments, receipts, the
-    application's own ghosts; the owner's 2026-09-05 correction: a pure
-    left arm is bogus).  It is the one field here, and the record is
+    Design of record: claude-notes/projects/app-instances.md sections 0-2
+    and 7 (round A), superseding design/applications.md sections 1-3 while
+    the rounds land.  An application proven on top of xv6 claims something
+    of the user-visible abstract state -- [app_pred f r av], an iProp over
+    the VIEW [FsAbsDefs.aview] (the [abs_view] of the raw node map, never
+    the raw nodes: block addresses and records are invisible to user code,
+    so a retag that preserves [abs_of] needs nothing from the application),
+    at a FIXED ghost name [f] (today the machine's client counter
+    [RiscvPtsto.riscv_client_name]; round D gives the application its own
+    fixed [Type]) and at an INSTANCE [r] of the application's own per-era
+    names [app_names] (the running instance [app_run] here; round C adds the
+    durable one, refreshed by every transport).  The claim can OWN
+    resources (per-node fragments, receipts, the application's own ghosts;
+    the owner's 2026-09-05 correction: a pure left arm is bogus), so
+    nothing about it is assumed timeless or persistent.
+
+    WHERE IT LIVES.  Beside the running map's authority, in the
+    application's OWN invariant [AppInv.app_inv] (app-instances.md section
+    2: nothing application-specific inside a kernel file-system invariant;
+    the two invariants are tied by half an authority).  The record is
     carried exactly as [IcacheRef.icfg] and [FsCfg.fscfg] are: a field of
     [FileInvDefs.fileG] ([file_app]), threaded EXPLICITLY through the boot
     kits ([FsCfgKits.fs_kit_fsinit_ghost], [FsCfgBoot.fs_boot_supply]) and
-    the era mint ([FsCfgSnap.fs_cfg_alloc_snap]), and AMBIENT everywhere
-    else -- [FsAbsInv.fsabs_ok] names it through the class, and every file
-    that binds [fileG] sees it through [file_app].
+    the era mint ([FsCfgSnap.fs_cfg_alloc_snap]), which founds the era's
+    [app_inv] at the running instance; and AMBIENT everywhere else -- every
+    file between [InodeRegion] and [fileG] binds it as a section class, and
+    every file that binds [fileG] sees it through [file_app].
 
     WHY ITS OWN RECORD, AND NOT A FIELD OF [fscfg].  [fscfg] is pure data
     (gnames, gsets, block numbers) with no [Σ] in sight, which is what lets
@@ -20,29 +35,34 @@
     [iProp Σ] field would put [Σ] on it and on every consumer that only
     wanted a gname.  The application's predicate is a PROOF-side choice
     made once per theorem ([SystemAdequacy.xv6_boot_era] builds
-    [MkAppcfg A] for the mint), so it gets a record of its own, parametric
-    in [Σ], below [fscfg] in the tree.
+    [MkAppcfg _ A r] for the mint), so it gets a record of its own,
+    parametric in [Σ], below [fscfg] in the tree -- and below
+    [InodeRegion], whose movers open the application's invariant.
 
-    IT IS PER-ERA, EXACTLY AS [icfg] IS: a class assumption of each section,
-    instantiated by each era's boot chain.  Nothing about the predicate is
-    assumed timeless or persistent (applications.md section 2: the body
-    keeps it under the invariant's later, and the dischargers move it
-    without stripping).  The GENERIC application's is [fun _ => True]. *)
+    THE GENERIC APPLICATION: [app_names := unit], [app_pred := fun _ _ _ =>
+    True], [app_run := ()] -- user space does anything, the abstract state
+    is anything, the kernel stays correct. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap.
 From iris.base_logic Require Import iprop.
-Require Import FsNode.        (* [fs_node]: the predicate's domain *)
+Require Import FsAbsDefs.     (* [aview]: the predicate's domain, the VIEW *)
 
 Class appcfg (Σ : gFunctors) := MkAppcfg {
-  (* THE APPLICATION'S PREDICATE ON THE ABSTRACT FILE-SYSTEM STATE
-     (claude-notes/design/applications.md section 1): an iProp over the raw
-     node map, carried exactly as [icfg]/[fscfg] are -- a field of
-     [fileG], threaded explicitly through the kits and the era mint,
-     ambient everywhere else.  The GENERIC application's is
-     [fun _ => True]. *)
-  app_pred : gmap Z fs_node -> iProp Σ;
+  (* THE APPLICATION'S OWN PER-INSTANCE GHOST NAMES (app-instances.md
+     section 1): a running instance per era, a durable one per snapshot
+     (round C); the generic application's is [unit]. *)
+  app_names : Type;
+  (* THE APPLICATION'S PREDICATE ON THE ABSTRACT FILE-SYSTEM STATE, at a
+     fixed name (the machine's client counter until round D), at an
+     instance of [app_names], over the user-visible VIEW.  The generic
+     application's is [fun _ _ _ => True]. *)
+  app_pred  : gname -> app_names -> aview -> iProp Σ;
+  (* THE ERA'S RUNNING INSTANCE, chosen where the era's record is built
+     ([SystemAdequacy.xv6_boot_era], out of the boot obligation's witness)
+     and founded into [AppInv.app_inv] by the era mint. *)
+  app_run   : app_names;
 }.
 (* the boot builds the record at a predicate whose [Σ] is already fixed
-   ([SystemAdequacy.xv6_boot_era]: [MkAppcfg A]); [Σ] is implicit there
+   ([SystemAdequacy.xv6_boot_era]: [MkAppcfg _ A r]); [Σ] is implicit there
    exactly as it is on [App.MkApp] *)
-Arguments MkAppcfg {Σ} _.
+Arguments MkAppcfg {Σ} _ _ _.

@@ -8,7 +8,7 @@
    ==== THE TRUNC FIRE REPLACES THE RETAG ===============================
 
    The landed block, after itrunc returns, moves the era row with
-   [InodeRegion.ireg_top_retag] and re-seals the payload with
+   [InodeRegion.ireg_top_retag_*] and re-seals the payload with
    [ProofSysOpenParts.so_trunc_loaded].  [FsAbsOpenFire.opf_atrunc_fire] IS
    that retag with the caller's two phases fused around its
    [ghost_map_update] -- same premise ([inode_local] at the truncated
@@ -108,7 +108,7 @@ Require Import FsAbsOpenFire.
 Require Import ProofSysOpenAUBits.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUPub.
-Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.
 Require Import TsoCtx.
 
@@ -321,7 +321,7 @@ Section ProofSysOpenAUStores.
        terminal observation, and the trunc commit still in hand ---- *)
     P (length (path_elems pl)) (bv_unsigned inum) -∗
     so_obs Φo (bv_unsigned inum) (era_node dn bm data) -∗
-    atrunc_commit_at (fs_gamma_L fsc_fs) fsabsE Φt -∗
+    atrunc_commit_at (fs_gamma_L fsc_fs) appE Φt -∗
     wp_next true (proc_addr jx)
       (so_cont_au gf nsj
                dqb dqs (proc_addr jx) pidv vom U sts P Pmiss Φo Φt m K eb b lks) -∗
@@ -890,8 +890,8 @@ Section ProofSysOpenAUStores.
             (opf_era_file_row dn bm data Htyfz)
             (opf_trunc_row dn bm bm_empty data
                (fun _ => replicate BSIZE (bv_0 8)) Htyfz)
-            with "[] Htc Htop") as "[Htop Htr2]";
-      [iApply (ireg_inv_ftop with "Hireg") |].
+            with "[] [] Htc Htop") as "[Htop Htr2]";
+      [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iModIntro.
     iDestruct (so_trunc_loaded kk inum dn Htynz Htynd Hrl
                  with "Hat Hmeta Hmap Hblk Htop") as "Hload".

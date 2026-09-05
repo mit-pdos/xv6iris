@@ -118,6 +118,7 @@ Require Import DinodeEnc.
 Require Import DinodeSlot.
 Require Import InodeLock.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)
 (* and the nightly dead-import sweep skips [Require Export] lines.         *)
@@ -440,7 +441,7 @@ Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz  := vm_compute; discriminate.
 
 Section IputCommon.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
   Context `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
@@ -528,7 +529,7 @@ End IputCommon.
 (* ===================================================================== *)
 
 Section IputTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
   Context `{XI : CurCtx}.
 
   (* R3 / F28: THE GUARD'S OPEN WINDOW.  On Exit A (valid == 0 or nlink != 0)
@@ -1683,7 +1684,7 @@ End IputTail.
 (* ===================================================================== *)
 
 Section IputFreePath.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
   Context `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
@@ -5037,7 +5038,7 @@ End IputFreePath.
 (* ===================================================================== *)
 
 Section ProofIput.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).

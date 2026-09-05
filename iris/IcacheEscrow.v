@@ -175,6 +175,7 @@ Require Import InodeInv.
 Require Import InodeLock.
 Require Import SleepLock.  (* [is_sleeplock_gen] / [slh_tok] -- see [ic_sleeplocks] below *)
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 (* durable-disk 2b-inode-3: the payload's OWNERSHIP is the era bundle.
    [FsState] for [top_frag], [FsBytesGamma] for [fs_gamma_L], [FsStateEra]
    for [inode_owned_era] and the payload dictionary ([era_node],
@@ -228,7 +229,7 @@ Require Import TsoCtx.
 Section IcacheEscrow.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
   Context `{XI : CurCtx}.
 
   (* THE STRUCTURAL Timeless PEELER, and it lives HERE -- at the top of the
@@ -1065,7 +1066,7 @@ Section IcacheEscrow.
           bundle CONTAINS what three conjuncts used to say separately --
           [dinode_at], [ind_res] and [inode_blocks] -- and adds the era's
           abstract value [top_frag], which is what a holder retags at its
-          writes ([InodeRegion.ireg_top_retag]).  A consumer that wants the
+          writes ([InodeRegion.ireg_top_retag_*]).  A consumer that wants the
           old shape back applies [ic_loaded_open], an ordinary entailment;
           see [ipool_alloc]'s note for why [inode_ok] stays a conjunct
           rather than being derived. *)
@@ -1935,7 +1936,7 @@ Section IcacheEscrow.
      ([FsStateEra.inode_rec_local] -- the type enumeration, the nlink bound
      and a directory's 16-divisible size).  Both are the walk's own
      evidence: the fragment is what it retagged at its writes
-     ([InodeRegion.ireg_top_retag]) and the three facts are what its record
+     ([InodeRegion.ireg_top_retag_*]) and the three facts are what its record
      delta preserved.  [inode_ok] stays a PREMISE here rather than a
      conjunct of the payload -- every producer already had it, and it is
      what [FsStateEra.inode_local_of_ok_rec] needs. *)
@@ -1976,7 +1977,7 @@ Section IcacheEscrow.
      ENTAILMENT.  It hands back EXACTLY the conjunct list [ic_loaded] used
      to have, in the same order, plus the two things the era bundle knows
      and the old payload did not: the era's abstract value [top_frag]
-     (which a re-park retags, [InodeRegion.ireg_top_retag]) and
+     (which a re-park retags, [InodeRegion.ireg_top_retag_*]) and
      [FsStateEra.inode_rec_local] of the record, which a re-park owes of
      its NEW record and gets here for its old one.  So a consumer's whole
      cost is one line -- this lemma in place of the [rewrite /ic_loaded] it
@@ -3435,7 +3436,7 @@ Definition icBoxN : namespace := nroot .@ "xv6icbox".
 (* ====================================================================== *)
 Section IcacheBoxAmb.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId} `{ICFG : icfg}.
+  Context `{GEN : GenId} `{ICFG : icfg, APP : appcfg Σ}.
   Context `{XI : CurCtx}.
   Implicit Types (cn : ic_names).
 
@@ -4081,7 +4082,7 @@ End IcacheBoxAmb.
 (* ====================================================================== *)
 Section IcacheBox.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId} `{ICFG : icfg}.
+  Context `{GEN : GenId} `{ICFG : icfg, APP : appcfg Σ}.
   (* the ambient context for the HOLDER-side rows (inode_ref / inode_shr /
      the handle's identity cells); the box λs below take an explicit ξ *)
   Context `{XI : CurCtx}.
@@ -5515,7 +5516,7 @@ End IcacheBox.
 Section IcacheTable.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
   Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
@@ -6265,7 +6266,7 @@ End IcacheTable.
 Section IcacheEnvMorph.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
 
   (* the icache's NINODE inode sleeplocks, under their two gname
      existentials; the payload λ is [ic_slp cn k] ([ic_slp_morph]). *)

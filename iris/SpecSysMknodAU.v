@@ -88,7 +88,7 @@
    caller WITNESSES the post-state authority at
    [delta_create d nm i c av]); pay the give-back wand's ROW OBLIGATION
    ([inode_local] at every entry -- the same obligation
-   [InodeRegion.ireg_top_retag] charges every mover); close [ftopN].
+   [InodeRegion.ireg_top_retag_*] charges every mover); close [ftopN].
    Both phases are inside one invariant-open critical section, so the
    pair is ONE instant to every other party.
 
@@ -176,7 +176,7 @@
    the landed discipline:
 
    - THE PARENT CARRIES NO PIN.  A held [nview] share pins its row
-     against every mover ([ireg_top_retag] needs the whole element), so a
+     against every mover ([ireg_top_retag_*] needs the whole element), so a
      client share on the PARENT would make the success retag impossible
      and the success arm unprovable.  The chain directories are only
      READ, so chain pins are compatible with success; the guard premise
@@ -385,10 +385,10 @@ Section SysMknodAU.
     (∀ (av : aview) (d i : Z) (nm : fname) (ents : gmap fname Z)
        (nl : nat),
        ⌜cre_pre av d nm ents nl i c⌝ -∗
-       astate Γ av ={E}=∗
-       astate Γ av ∗
-         (astate Γ (delta_create d nm i c av) ={E}=∗
-          astate Γ (delta_create d nm i c av) ∗ Φ av d nm i))%I.
+       astate_q Γ (1/2) av ={E}=∗
+       astate_q Γ (1/2) av ∗
+         (astate_q Γ (1/2) (delta_create d nm i c av) ={E}=∗
+          astate_q Γ (1/2) (delta_create d nm i c av) ∗ Φ av d nm i))%I.
 
   (* THE FOUND OBSERVATION, single-phase and read-only: dirlookup found
      [nm ↦ i] in the locked parent at the instant; the state does not
@@ -400,7 +400,7 @@ Section SysMknodAU.
        (nl : nat),
        ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ -∗
        ⌜ents !! nm = Some i⌝ -∗
-       astate Γ av ={E}=∗ astate Γ av ∗ Φ av d nm i)%I.
+       astate_q Γ (1/2) av ={E}=∗ astate_q Γ (1/2) av ∗ Φ av d nm i)%I.
 
   (* sanity: both commits are satisfiable with the trivial receipt (the
      module type below cannot be vacuously blocked on the caller side) *)
@@ -435,7 +435,7 @@ Section SysMknodAU.
     iIntros "Hn HΦ". rewrite /dlookup_commit.
     iIntros (av d i nm ents nl) "%Hd %Hlk Hst".
     destruct (decide (d = dpin)) as [-> | Hne].
-    - iDestruct (astate_nview with "Hst Hn") as %Hav.
+    - iDestruct (astate_q_nview with "Hst Hn") as %Hav.
       iModIntro. iFrame "Hst".
       iApply ("HΦ" $! av dpin nm i with "[%] Hn"). auto.
     - iModIntro. iFrame "Hst".
@@ -451,7 +451,7 @@ Section SysMknodAU.
   Proof.
     iIntros "Hn HΦ". rewrite /acre_commit.
     iIntros (av d i nm ents nl) "%Hpre Hst".
-    iDestruct (astate_nview with "Hst Hn") as %Hav.
+    iDestruct (astate_q_nview with "Hst Hn") as %Hav.
     iModIntro. iFrame "Hst". iIntros "Hst'". iModIntro. iFrame "Hst'".
     iApply ("HΦ" $! av d nm i with "[%] Hn"). done.
   Qed.

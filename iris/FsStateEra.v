@@ -1197,7 +1197,7 @@ Section EraRes.
      residue keeps three quarters of it, the read-locker carries a quarter,
      and [FsState.top_frag_q_agree] pins the arm's existentially-bound node
      to the holder's at [iunlock].  It also says the honest thing about a
-     read-locker: a retag ([InodeRegion.ireg_top_retag]) needs the WHOLE
+     read-locker: a retag ([InodeRegion.ireg_top_retag_*]) needs the WHOLE
      element, so a quarter cannot move the abstract map.
 
      The RECORD PROXY does not take it: records park region-side at fraction

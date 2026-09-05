@@ -20,7 +20,7 @@
                 agreement, split/join, timelessness -- are [top_frag_q_agree],
                 [top_frag_q_split] and [top_frag_q_timeless] read through the
                 [abs_of] equation, and its STABILITY is the landed mover
-                discipline itself: every retag ([InodeRegion.ireg_top_retag])
+                discipline itself: every retag ([InodeRegion.ireg_top_retag_*])
                 needs the WHOLE element, so an outstanding share pins the
                 node.  That is why there is no cancellation arm anywhere
                 below -- contrast [DirViewPin.dvp_lost], which exists because
@@ -66,7 +66,7 @@
          The give-back wand carries the ROW ([inode_local] at every entry of
          the returned map), because [ftop_body]'s [ftop_clean] is not
          recoverable from an abstract [av]: [abs_of] forgets the record.
-         That is the same obligation [InodeRegion.ireg_top_retag] already
+         That is the same obligation [InodeRegion.ireg_top_retag_*] already
          charges every mover, so nothing new is asked of a caller.
 
    SECTION 3's PATH LAYER.  [apath_at] is the hop-by-hop first-match lookup
@@ -274,9 +274,23 @@ Section FsAbsCarrier.
   (* ------------------------------------------------------------------ *)
 
   (* The pure conjunct goes LAST (durable-notes) even in a new definition:
-     every consumer destructures the authority first. *)
-  Definition astate Γ (av : aview) : iProp Σ :=
-    (∃ I, ghost_map_auth (γtop Γ) 1 I ∗ ⌜av = abs_view I⌝)%I.
+     every consumer destructures the authority first.
+
+     AT A FRACTION (app-instances.md round A).  The running authority is
+     SPLIT between the kernel ([InodeRegion.ftop_body], the half every AU
+     commit shape lends) and the application ([AppInv.app_inv]); the
+     durable one ([FsDurSnap.fs_snap]) is whole.  [astate_q] names the
+     fraction; [astate] -- the READING every pin and every hop is stated
+     over -- is at SOME fraction, so it is introduced from whichever the
+     reader holds and eliminated only up to that fraction.  Reads
+     (agreement) work at any fraction, which is all a reading needs. *)
+  Definition astate_q Γ (q : Qp) (av : aview) : iProp Σ :=
+    (∃ I, ghost_map_auth (γtop Γ) q I ∗ ⌜av = abs_view I⌝)%I.
+
+  Definition astate Γ (av : aview) : iProp Σ := (∃ q : Qp, astate_q Γ q av)%I.
+
+  Global Instance astate_q_timeless Γ q av : Timeless (astate_q Γ q av).
+  Proof. rewrite /astate_q. apply _. Qed.
 
   Global Instance astate_timeless Γ av : Timeless (astate Γ av).
   Proof. rewrite /astate. apply _. Qed.
@@ -286,24 +300,46 @@ Section FsAbsCarrier.
      [InodeRegion.ftop_inv]: [astate] is a READING of [ghost_map_auth], so
      both directions are the definition.  The borrow off [ftop_body] itself
      is [ftop_astate_acc] (section 5). *)
-  Lemma astate_intro Γ I :
-    ghost_map_auth (γtop Γ) 1 I ⊢ astate Γ (abs_view I).
+  Lemma astate_q_intro Γ (q : Qp) I :
+    ghost_map_auth (γtop Γ) q I ⊢ astate_q Γ q (abs_view I).
   Proof. iIntros "Ha". iExists I. by iFrame. Qed.
 
-  Lemma astate_elim Γ av :
-    astate Γ av ⊢ ∃ I, ghost_map_auth (γtop Γ) 1 I ∗ ⌜av = abs_view I⌝.
+  Lemma astate_q_elim Γ (q : Qp) av :
+    astate_q Γ q av ⊢ ∃ I, ghost_map_auth (γtop Γ) q I ∗ ⌜av = abs_view I⌝.
   Proof. by iIntros "H". Qed.
 
+  Lemma astate_of_q Γ (q : Qp) av : astate_q Γ q av ⊢ astate Γ av.
+  Proof. iIntros "H". iExists q. iExact "H". Qed.
+
+  Lemma astate_intro Γ (q : Qp) I :
+    ghost_map_auth (γtop Γ) q I ⊢ astate Γ (abs_view I).
+  Proof. iIntros "Ha". iApply astate_of_q. iApply astate_q_intro. iExact "Ha". Qed.
+
+  Lemma astate_elim Γ av :
+    astate Γ av ⊢ ∃ (q : Qp) I, ghost_map_auth (γtop Γ) q I ∗ ⌜av = abs_view I⌝.
+  Proof. iIntros "H". iDestruct "H" as (q) "H". iExists q. iExact "H". Qed.
+
   (* A HELD FRAGMENT AGREES WITH THE AUTHORITY'S ROW. *)
-  Lemma astate_nview_dq Γ av dq i a :
-    astate Γ av -∗ nview_dq Γ dq i a -∗ ⌜av !! i = Some a⌝.
+  Lemma astate_q_nview_dq Γ (q : Qp) av dq i a :
+    astate_q Γ q av -∗ nview_dq Γ dq i a -∗ ⌜av !! i = Some a⌝.
   Proof.
-    rewrite /astate /nview_dq /top_frag_q.
+    rewrite /astate_q /nview_dq /top_frag_q.
     iIntros "Hst Hn". iDestruct "Hst" as (I) "(Ha & %Hav)".
     iDestruct "Hn" as (n) "[Hf %Han]".
     iDestruct (ghost_map_lookup with "Ha Hf") as %Hl.
     iPureIntro. subst av. by rewrite (abs_view_lookup I i n Hl) Han.
   Qed.
+
+  Lemma astate_nview_dq Γ av dq i a :
+    astate Γ av -∗ nview_dq Γ dq i a -∗ ⌜av !! i = Some a⌝.
+  Proof.
+    iIntros "Hst Hn". iDestruct "Hst" as (q) "Hst".
+    iApply (astate_q_nview_dq with "Hst Hn").
+  Qed.
+
+  Lemma astate_q_nview Γ (q' : Qp) av q i a :
+    astate_q Γ q' av -∗ nview Γ q i a -∗ ⌜av !! i = Some a⌝.
+  Proof. apply astate_q_nview_dq. Qed.
 
   Lemma astate_nview Γ av q i a :
     astate Γ av -∗ nview Γ q i a -∗ ⌜av !! i = Some a⌝.
@@ -877,14 +913,14 @@ Section FsAbsFtop.
 
      WHY THE ROW IS ON THE GIVE-BACK.  [ftop_body]'s [ftop_clean I A] is a
      statement about the RECORDS, and [abs_of] forgets them, so no [av] can
-     pay for it; the mover re-establishes [inode_local] anyway ([ireg_top_retag]
+     pay for it; the mover re-establishes [inode_local] anyway ([ireg_top_retag_*]
      charges exactly this, and [FsStateEra.inode_local_of_ok_rec] is the one
      line that assembles it).  The obligation is stated at the STRONGER,
      A-free form -- every entry local -- which implies [ftop_clean I' A] for
      the [A] the body happens to carry, so the caller never has to see the
      arming registry.  A caller that suspends the row instead ([ireg_arm])
      is not this accessor's customer: it moves the map through
-     [ireg_top_retag_armed] and never opens [ftopN] itself.
+     [ireg_top_retag_armed_*] and never opens [ftopN] itself.
 
      WHY THE GIVE-BACK NAMES THE MAP AND NOT JUST [astate].  [abs_view] is
      not injective (again: [abs_of] forgets the record), so "an [astate] at
@@ -896,16 +932,16 @@ Section FsAbsFtop.
      rewrite. *)
   Lemma ftop_astate_acc (γfs : fs_names) :
     ftop_body γfs -∗
-      ∃ av, astate (fs_gamma_L γfs) av
+      ∃ av, astate_q (fs_gamma_L γfs) (1/2) av
           ∗ (∀ I' : gmap Z fs_node,
                ⌜forall i n, I' !! i = Some n -> inode_local i n⌝ -∗
-               ghost_map_auth (fs_top γfs) 1 I' -∗ ftop_body γfs).
+               ghost_map_auth (fs_top γfs) (1/2) I' -∗ ftop_body γfs).
   Proof.
     iIntros "Hb". rewrite /ftop_body.
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iExists (abs_view I).
     iSplitL "Hta".
-    { iApply astate_intro. iExact "Hta". }
+    { iApply astate_q_intro. iExact "Hta". }
     iIntros (I' Hloc) "Hta".
     iExists I', A. iFrame "Hta Hla Hpark". iPureIntro.
     intros i n Hi _. exact (Hloc i n Hi).
@@ -917,13 +953,13 @@ Section FsAbsFtop.
   Lemma ftop_astate_ro (γfs : fs_names) :
     ftop_body γfs -∗
       ∃ I : gmap Z fs_node,
-        astate (fs_gamma_L γfs) (abs_view I)
-        ∗ (ghost_map_auth (fs_top γfs) 1 I -∗ ftop_body γfs).
+        astate_q (fs_gamma_L γfs) (1/2) (abs_view I)
+        ∗ (ghost_map_auth (fs_top γfs) (1/2) I -∗ ftop_body γfs).
   Proof.
     iIntros "Hb". rewrite /ftop_body.
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     iExists I. iSplitL "Hta".
-    { iApply astate_intro. iExact "Hta". }
+    { iApply astate_q_intro. iExact "Hta". }
     iIntros "Hta". iExists I, A. by iFrame.
   Qed.
 

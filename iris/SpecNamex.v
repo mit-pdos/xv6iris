@@ -224,6 +224,7 @@ Require Import DirentEnc.
 Require Import PathElems.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KvmSpec.
@@ -819,7 +820,7 @@ End NAMEX.
 (* 12 slots for namex's own frame, over iget's 16. *)
 Notation K_namex_root := (70%nat) (only parsing).
 Definition wp_namex_root_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (dqp : dfrac)
     (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
@@ -886,7 +887,7 @@ Definition wp_namex_root_body
 
 Module Type NAMEX_ROOT.
   Parameter wp_namex_root :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)

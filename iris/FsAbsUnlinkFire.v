@@ -17,7 +17,7 @@
    no seam is needed at any of the four instants).
 
      [uf_uent_fire]  INSTANT 1, fused with the PARENT-row retag.  Replaces
-        the [InodeRegion.ireg_top_retag] the landed walk performs at the
+        the [InodeRegion.ireg_top_retag_*] the landed walk performs at the
         zeroing (W5-FILE) resp. after [iupdate(dp)] (W5-DIR): same
         premise ([inode_local] of the new record), same payout (the moved
         fragment), plus the caller's two phases inside the one critical
@@ -99,7 +99,8 @@ Require Import Xv6G.
 Require Import SpecSysMknodAU.   (* [abs_view_insert]                        *)
 Require Import FsAbsMknodFire.   (* [dlookup_commit_at], [mkf_abs_of_dir]    *)
 Require Import SpecSysUnlinkAU.  (* the statement this file's fires serve    *)
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
+Require Import AppCfg.          (* [app_pred], [app_run]: the application's claim, for the step wands *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                  *)
 
 Local Open Scope Z_scope.
@@ -256,11 +257,11 @@ Section UnlinkFire.
   Lemma uf_dmiss_fire (γfs : fs_names) (E : coPset) (dq : dfrac)
       (Φ : aview -> Z -> fname -> iProp Σ)
       (d : Z) (nm : fname) (n : fs_node) :
-    ↑ftopN ∪ ↑fsabsN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     fn_is_dir n = true ->
     dir_entries n !! nm = None ->
     ftop_inv γfs -∗
-    dmiss_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
+    dmiss_commit_at (fs_gamma_L γfs) appE Φ -∗
     top_frag_q (fs_gamma_L γfs) dq d n ={E}=∗
       top_frag_q (fs_gamma_L γfs) dq d n
       ∗ ∃ av : aview,
@@ -273,7 +274,7 @@ Section UnlinkFire.
        ([FsAbs.ftop_gamma_top], by reflexivity) but the unifier cannot solve
        [γtop ?Γ =?= fs_top γfs], so the fragment is put in the body's own
        spelling before the invariant is opened -- exactly what
-       [InodeRegion.ireg_top_retag] does at its own retag. *)
+       [InodeRegion.ireg_top_retag_*] does at its own retag. *)
     rewrite /top_frag_q /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
@@ -282,7 +283,7 @@ Section UnlinkFire.
     assert (Hrow : abs_view I !! d
                    = Some (MkAnode (ADir (dir_entries n)) (fn_nlink n))).
     { by rewrite (abs_view_lookup I d n Hlk) (mkf_abs_of_dir n Hdir). }
-    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
+    iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I d nm (dir_entries n) (fn_nlink n)
             with "[//] [//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
@@ -299,13 +300,13 @@ Section UnlinkFire.
   Lemma uf_dex_fire (γfs : fs_names) (E : coPset) (dqd dqt : dfrac)
       (Φ : aview -> Z -> fname -> Z -> iProp Σ)
       (d t : Z) (nm : fname) (nd nt : fs_node) :
-    ↑ftopN ∪ ↑fsabsN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     fn_is_dir nd = true ->
     dir_entries nd !! nm = Some t ->
     fn_is_dir nt = true ->
     ~ dots_only (dir_entries nt) ->
     ftop_inv γfs -∗
-    dlookup_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
+    dlookup_commit_at (fs_gamma_L γfs) appE Φ -∗
     top_frag_q (fs_gamma_L γfs) dqd d nd -∗
     top_frag_q (fs_gamma_L γfs) dqt t nt ={E}=∗
       top_frag_q (fs_gamma_L γfs) dqd d nd
@@ -330,7 +331,7 @@ Section UnlinkFire.
     assert (Hrowt : abs_view I !! t
                     = Some (MkAnode (ADir (dir_entries nt)) (fn_nlink nt))).
     { by rewrite (abs_view_lookup I t nt Hlkt) (mkf_abs_of_dir nt Hdirt). }
-    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
+    iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I d t nm (dir_entries nd) (fn_nlink nd)
             with "[//] [//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
@@ -345,7 +346,7 @@ Section UnlinkFire.
   (*  2b.  INSTANT 1 -- the parent row, fused with its retag             *)
   (* ------------------------------------------------------------------ *)
 
-  (* Replaces [InodeRegion.ireg_top_retag] at the parent: same premise
+  (* Replaces [InodeRegion.ireg_top_retag_*] at the parent: same premise
      ([inode_local] of the flushed record), same payout (the moved
      fragment), plus the caller's two phases on either side of the
      [ghost_map_update] INSIDE the one [ftopN] critical section (the
@@ -358,7 +359,7 @@ Section UnlinkFire.
   Lemma uf_uent_fire (γfs : fs_names) (E : coPset) (dqt : dfrac)
       (Φ : aview -> Z -> fname -> Z -> iProp Σ)
       (d t : Z) (nm : fname) (dec : nat) (np np' nt : fs_node) :
-    ↑ftopN ∪ ↑fsabsN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local d np' ->
     fn_is_dir np = true ->
     dir_entries np !! nm = Some t ->
@@ -370,8 +371,8 @@ Section UnlinkFire.
     unl_dec (an_node (abs_of nt)) = dec ->
     abs_of np'
       = MkAnode (ADir (delete nm (dir_entries np))) (fn_nlink np - dec)%nat ->
-    ftop_inv γfs -∗
-    uent_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
+    ftop_inv γfs -∗ app_inv γfs -∗
+    uent_commit_at (fs_gamma_L γfs) appE Φ -∗
     top_frag (fs_gamma_L γfs) d np -∗
     top_frag_q (fs_gamma_L γfs) dqt t nt ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
@@ -381,7 +382,7 @@ Section UnlinkFire.
           ∗ Φ av d nm t.
   Proof.
     intros HE Hloc Hdir Hnm HnD HnDD Hnlp Hnlt Hdots Hdec Habsp'.
-    iIntros "#Hi Hcm Hfp Hft".
+    iIntros "#Hi #Hai Hcm Hfp Hft".
     rewrite /top_frag /top_frag_q /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
@@ -410,10 +411,16 @@ Section UnlinkFire.
                      = delta_unl_ent d nm dec (abs_view I)).
     { rewrite (abs_view_insert I d np') Habsp'.
       rewrite /delta_unl_ent Hrowp /=. reflexivity. }
-    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
+    iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I d t nm (dir_entries np) (fn_nlink np) (abs_of nt)
-            with "[//] Hta") as "[Hta Hph2]".
-    iMod (ghost_map_update np' with "Hta Hfp") as "[Hta Hfp]".
+            with "[//] Hta") as "(Hta & Hstep & Hph2)".
+    (* THE MOVE, at the whole authority: the application's half comes out
+       of [appN] beside its claim, which the caller's step re-establishes
+       under the later ([AppInv.app_top_update]) *)
+    iMod (app_top_update appE γfs I d np np' ltac:(rewrite /appE; done)
+            with "Hai [Hstep] Hta Hfp") as "[Hta Hfp]".
+    { iIntros (_) "_ Hp". iApply (app_step_at d I _ np' with "Hstep Hp").
+      by rewrite Hdelta Hdec. }
     iMod ("Hph2" $! (<[d := np']> I) with "[%] Hta") as "[Hta HΦ]".
     { by rewrite Hdelta Hdec. }
     iMod "Hcl2".
@@ -444,22 +451,22 @@ Section UnlinkFire.
      under a [uf_utgt_fire] whose own arguments spell a nested bitvector word
      three times, that was seconds per site.  The fact is CLOSED, so it
      belongs in a lemma proved where the context is empty. *)
-  Lemma uf_nd_top : (↑ftopN ∪ ↑fsabsN : coPset) ⊆ ⊤.
+  Lemma uf_nd_top : (↑ftopN ∪ ↑appN : coPset) ⊆ ⊤.
   Proof. solve_ndisj. Qed.
 
   Lemma uf_utgt_fire (γfs : fs_names) (E : coPset)
       (Φ : aview -> Z -> iProp Σ) (t : Z) (nt nt' : fs_node) :
-    ↑ftopN ∪ ↑fsabsN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local t nt' ->
     (1 <= fn_nlink nt)%nat ->
     abs_of nt' = MkAnode (an_node (abs_of nt)) (fn_nlink nt - 1)%nat ->
-    ftop_inv γfs -∗
-    utgt_commit_at (fs_gamma_L γfs) fsabsE Φ -∗
+    ftop_inv γfs -∗ app_inv γfs -∗
+    utgt_commit_at (fs_gamma_L γfs) appE Φ -∗
     top_frag (fs_gamma_L γfs) t nt ={E}=∗
       top_frag (fs_gamma_L γfs) t nt'
       ∗ ∃ av : aview, ⌜av !! t = Some (abs_of nt)⌝ ∗ Φ av t.
   Proof.
-    intros HE Hloc Hnl Habs'. iIntros "#Hi Hcm Hf".
+    intros HE Hloc Hnl Habs'. iIntros "#Hi #Hai Hcm Hf".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
@@ -471,10 +478,15 @@ Section UnlinkFire.
                      = delta_unl_tgt t (abs_view I)).
     { rewrite (abs_view_insert I t nt') Habs'.
       rewrite /delta_unl_tgt Hrow. reflexivity. }
-    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
-    iMod ("Hcm" $! I t (abs_of nt) with "[//] [%] Hta") as "[Hta Hph2]".
+    iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
+    iMod ("Hcm" $! I t (abs_of nt) with "[//] [%] Hta") as "(Hta & Hstep & Hph2)".
     { exact Hnl. }
-    iMod (ghost_map_update nt' with "Hta Hf") as "[Hta Hf]".
+    (* THE MOVE, at the whole authority: the application's half comes out
+       of [appN] beside its claim, which the caller's step re-establishes
+       under the later ([AppInv.app_top_update]) *)
+    iMod (app_top_update appE γfs I t nt nt' ltac:(rewrite /appE; done)
+            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+    { iIntros (_) "_ Hp". iApply (app_step_at t I _ nt' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[t := nt']> I) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".

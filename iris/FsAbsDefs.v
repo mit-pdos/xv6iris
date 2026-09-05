@@ -356,3 +356,22 @@ Definition abs_view (I : gmap Z fs_node) : aview := abs_of <$> I.
 Lemma abs_view_lookup I i n :
   I !! i = Some n -> abs_view I !! i = Some (abs_of n).
 Proof. intros Hi. by rewrite /abs_view lookup_fmap Hi. Qed.
+
+Lemma abs_view_lookup_is_Some (I : gmap Z fs_node) (i : Z) (a : anode) :
+  abs_view I !! i = Some a -> is_Some (I !! i).
+Proof.
+  rewrite /abs_view lookup_fmap. intros Ha.
+  destruct (I !! i) as [n |]; [by exists n | discriminate].
+Qed.
+
+(* A RETAG THAT KEEPS THE READING KEEPS THE VIEW (app-instances.md section 7,
+   the [_same] mover form): block addresses and records are invisible to
+   user code, so a node moved to another node with the same [abs_of] moves
+   nothing an application can see. *)
+Lemma abs_view_insert_same (I : gmap Z fs_node) (i : Z) (n n' : fs_node) :
+  I !! i = Some n -> abs_of n = abs_of n' ->
+  abs_view (<[i := n']> I) = abs_view I.
+Proof.
+  intros Hi Heq. rewrite /abs_view fmap_insert -Heq.
+  apply insert_id. by rewrite lookup_fmap Hi.
+Qed.

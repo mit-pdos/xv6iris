@@ -92,6 +92,7 @@ Require Import InodeInv.
 Require Import DinodeEnc.  (* [islot]/[islot_lt]: the inum's slot in its block *)
 Require Import FsBlocks.    (* [fs_names], which [ireg_inv] is keyed by *)
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 (* iclaim-ledger.md §3.1's licence table -- the up-count movers refute a
    standing [FrzPre] with [IgetLic.iname_not_frozen] instead of with a
    freeze token they cannot have (RULING A's custody clause).  No cycle:
@@ -383,7 +384,7 @@ Qed.
 
 Section IcacheGhost.
   Context `{!xv6G Σ}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
   Context `{XI : CurCtx}.
 
   (* [itable_half], [iref_frag], [iref_tok] and [live_frac] are
@@ -1455,7 +1456,7 @@ End IcacheGhost.
 
 Section IcacheRefInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
   Context `{GEN : GenId}.
   (* M1 stage 2: the ↦₂/↦₄ cells here are context-indexed. *)
   Context `{XI : CurCtx}.
@@ -2353,7 +2354,7 @@ Section IcacheRefInvReg.
      classes has to be IN SCOPE (see the preamble's import note), or the
      backtick generalisation quietly invents a same-named variable instead. *)
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
   Context `{GEN : GenId}.
   (* M1 stage 2: the ref words are ↦₄, hence context-indexed. *)
 
@@ -2495,7 +2496,7 @@ Section IcacheRefInvReg.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -2593,7 +2594,7 @@ Section IcacheRefInvReg.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -2722,7 +2723,7 @@ Section IcacheRefInvReg.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -2881,7 +2882,7 @@ Section IcacheRefInvReg.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -2976,7 +2977,7 @@ Section IcacheRefInvReg.
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
+    iDestruct "Hinv" as "[#Hiinv [#Hrb [#Hftopi _]]]".
     iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
     iDestruct "Hbody" as (mrg) "(>Ha & Hblks & >Hreg)".
     pose proof (ireg_bi_lt inum nib Hin) as Hbi.
@@ -4172,7 +4173,7 @@ End IcacheRefInvReg.
 
 Section IcacheTable.
   Context `{!riscvGS Σ, !xv6G Σ, !irefslotG Σ}.
-  Context `{ICFG : icfg}.
+  Context `{ICFG : icfg, APP : appcfg Σ}.
   Context `{GEN : GenId}.
   Context `{XI : CurCtx}.
 

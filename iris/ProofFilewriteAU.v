@@ -34,7 +34,7 @@
       [|filewrite_ret n r|] (each arm pins [r]) and gains [write_arms_at].
 
    3. THE FIRE REPLACES THE RETAG, AND MOVES THE OFFSET'S HALF.
-      [FsAbsWriteFire.wrf_awrite_fire] is [InodeRegion.ireg_top_retag] plus
+      [FsAbsWriteFire.wrf_awrite_fire] is [InodeRegion.ireg_top_retag_*] plus
       the caller's two phases inside the one [ftopN] critical section, with
       the kernel's half of the offset shadow lent at the chunk's offset and
       returned advanced; it stands where the retag stood, between writei's
@@ -2825,7 +2825,7 @@ Section ProofFilewriteAU.
     (* =================================================================
        AU EDIT (differences 3 and 4): THE FIRE, IN PLACE OF THE RETAG.
 
-       [FsAbsWriteFire.wrf_awrite_fire] IS [ireg_top_retag] with the
+       [FsAbsWriteFire.wrf_awrite_fire] IS [ireg_top_retag_*] with the
        caller's two phases on either side of the [ghost_map_update], inside
        the ONE [ftopN] critical section -- so the chunk's commit and the
        row's move are one instant.  It is taken on the ONE KEY [rz = c]:
@@ -2946,8 +2946,8 @@ Section ProofFilewriteAU.
                 (fn_nlink (era_node dnl bml datal))
                 (era_node dnl bml datal) (era_node dn' bm' data')
                 ltac:(solve_ndisj) Hlocw Hposbs Hoffbs Hcapbs Hrow Hrow'
-                with "[] Hcm Htop [Hgv]") as "(Htop & Hgv & Htail & Hrec)";
-          [iApply (ireg_inv_ftop with "Hireg") | rewrite Hgxo Hoffz; iExact "Hgv" |].
+                with "[] [] Hcm Htop [Hgv]") as "(Htop & Hgv & Htail & Hrec)";
+          [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") | rewrite Hgxo Hoffz; iExact "Hgv" |].
         iDestruct "Hrec" as (av) "[%Hpre HΦ]".
         iModIntro. iFrame "Htop".
         iSplitL "Hgv".
@@ -2968,10 +2968,10 @@ Section ProofFilewriteAU.
           [iPureIntro; exact Hpre | iPureIntro; exact Hchunkb |].
         rewrite -Hlenc. iApply ("Hback" with "HΦ Htail").
       - (* ---- THE CHUNK DOES NOT FIRE: the landed retag, unchanged ---- *)
-        iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned inum)
+        iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned inum)
                 (era_node dnl bml datal) (era_node dn' bm' data')
-                ltac:(solve_ndisj) Hlocw with "[] Htop") as "Htop";
-          [iApply (ireg_inv_ftop with "Hireg") |].
+                ltac:(solve_ndisj) Logic.I Hlocw with "[] [] Htop") as "Htop";
+          [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
         destruct (decide (0 < rz)%Z) as [Hrzpos | Hrzle].
         + (* ---- ...BUT THE OFFSET MOVED: the SHORT chunk spends the
              chain's partial arm ---- *)

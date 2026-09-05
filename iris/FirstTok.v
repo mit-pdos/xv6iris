@@ -77,7 +77,7 @@ Require Import ProcAvail.
    second lemma there would be a dependency cycle. *)
 Require Import FsBoot.
 Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ the client copy shadows *)
-Require Import FsAbsInv.       (* [fsabs_inv]: the application-side abstract-state invariant *)
+Require Import AppInv.         (* [app_inv]: the application's running invariant (app-instances.md) *)
 Require Import FsImg.
 Require Import FsImgBridge.
 (* THE COLLECTION'S GEOMETRY (durable-disk C-8).  [FsCollect.col_geom] is
@@ -330,19 +330,18 @@ Section FirstTok.
             = Some b ->
           Pb b = FsCrash.fs_blocks dk (log_slot_bno fsc_logst i)).
 
-  (* THE APPLICATION-SIDE ABSTRACT-STATE INVARIANT ([FsAbsInv]), carried
-     SIDE BY SIDE with the sealed file system -- not inside [fs_ready], and
-     not inside any fs-internal invariant (the owner's 2026-09-03 ruling:
-     it is the piece that changes with the application proven on top of
-     xv6, so nothing of the kernel's own invariants may depend on it).
-     It is [FsAbsInv.fsabs_env] at the live Γ: the client copy at an
-     existential gname beside the application's LICENSE
-     (claude-notes/design/applications.md section 2).  MINTED AT THE ERA
-     MINT, not here: it rides kit 2 ([FsCfgKits.fs_kit_fsinit_ghost]'s
-     last row) through [first_fsinit] to forkret's boot arm, which projects
-     it into [first_done].  Every consumer opens it through [fsabs_inv]
-     and pays the dischargers with the license. *)
-  Definition fsabs_env : iProp Σ := FsAbsInv.fsabs_env (fs_gamma_L fsc_fs).
+  (* THE APPLICATION'S ENVIRONMENT: its running invariant
+     ([AppInv.app_inv], app-instances.md section 2 -- half of the abstract
+     map's authority beside the application's claim and its parked
+     license), carried SIDE BY SIDE with the sealed file system as the row
+     the dispatcher's generic dischargers ([FsAbsInvFire]) and the U-mode
+     loop's exec mint ([UexecExecMint]) read.  MINTED AT THE ERA MINT, not
+     here: it rides kit 2 ([FsCfgKits.fs_kit_fsinit_ghost]'s last row)
+     through [first_fsinit] to forkret's boot arm, which projects it into
+     [first_done].  The name is the row's from the client-copy round; the
+     copy and its license are gone (round A), and what is left is the one
+     handle every commit's step is paid through. *)
+  Definition fsabs_env : iProp Σ := app_inv fsc_fs.
 
   Global Instance fsabs_env_persistent : Persistent fsabs_env.
   Proof. rewrite /fsabs_env. apply _. Qed.

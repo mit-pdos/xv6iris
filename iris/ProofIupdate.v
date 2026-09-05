@@ -80,6 +80,7 @@ Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import CodeIupdate.
 Require Import KernelDataInv.
 Require Import SpecPanic.
@@ -122,7 +123,7 @@ Local Ltac iuidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  continuation.                                                         *)
 (* ===================================================================== *)
 Section IupdateDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg}.
   Context `{XI : CurCtx}.
 
   (* iupdate's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
@@ -407,7 +408,7 @@ Definition iu_sp (m M : regfile) : Prop :=
 (*  +0x66 .. +0x7c : log_write, brelse, and the epilogue.                 *)
 (* ===================================================================== *)
 Section IupdateTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg}.
   Context `{XI : CurCtx}.
 
   Local Lemma iu_tail `{GEN : GenId} `{CID0 : CpuId}
@@ -901,7 +902,7 @@ End IupdateTail.
 (*  memmove.                                                              *)
 (* ===================================================================== *)
 Section ProofIupdateMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE GENERIC CREDITED CORE: [eb] and its complement [trap_csrs_ext]/

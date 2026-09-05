@@ -57,7 +57,7 @@
    [wrf_awrite_fire] is [FsAbsMknodFire.mkf_acre_fire]'s /
    [FsAbsOpenFire.opf_atrunc_fire]'s two-phase mold at
    [SpecSysWriteAU.delta_write], FUSED WITH THE ROW RETAG: it replaces the
-   [InodeRegion.ireg_top_retag] filewrite's inode arm performs after writei
+   [InodeRegion.ireg_top_retag_*] filewrite's inode arm performs after writei
    returns (ProofFilewrite.v's "THE RETAG OWES THE ROW"), with one extra
    premise (the chunk's commit) and one extra payout (the receipt).  Same
    [inode_local] premise, same payout, and the caller's two phases on
@@ -149,7 +149,8 @@ Require Import SpecSysMknodAU.   (* [abs_view_insert]                       *)
 Require Import SpecSysWriteAU.   (* the contract this file serves           *)
 Require Import FsAbsOpenFire.    (* [opf_era_file_row], [opf_era_type]      *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import       *)
-Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
+Require Import AppCfg.          (* [app_pred], [app_run]: the application's claim, for the step wands *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                 *)
 Require Import TsoCtx.
 
@@ -402,12 +403,16 @@ Section WriteFire.
       (REST : iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (off : nat) (bs bs0 : list (bv 8)) (nl : nat),
        ⌜wri_pre (abs_view I) i off bs bs0 nl⌝ -∗
-       ghost_map_auth (γtop Γ) 1 I -∗ off_gv γo (1/2) (Z.of_nat off) ={E}=∗
-       ghost_map_auth (γtop Γ) 1 I ∗
+       ghost_map_auth (γtop Γ) (1/2) I -∗ off_gv γo (1/2) (Z.of_nat off) ={E}=∗
+       ghost_map_auth (γtop Γ) (1/2) I ∗
+         (* THE CALLER'S STEP (app-instances.md section 7): its claim about
+            the pre-view survives the delta, at the RAW insert the mover
+            performs ([AppInv.app_step]; the delta is its reading) *)
+         app_step i I (delta_write i off bs (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_write i off bs (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) 1 I' ={E}=∗
-            ghost_map_auth (γtop Γ) 1 I' ∗
+            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth (γtop Γ) (1/2) I' ∗
             off_gv γo (1/2) (Z.of_nat (off + length bs)) ∗
             Φ k (abs_view I) off bs ∗ REST))%I.
 
@@ -455,29 +460,35 @@ Section WriteFire.
      blocked on the caller's side.  [FsAbsInvFire.fsabs_awrite_chain] is
      the same for a client that owns the half only through the existential
      invariant. *)
-  Lemma awrite_chain_unit Γ E i γo (z : Z) k cnt :
-    off_gv γo (1/2) z ⊢ awrite_chain Γ E i γo (fun _ _ _ _ => True%I) k cnt.
+  (* ...at the live Γ, since the full arm owes the caller's step, paid here
+     out of the parked license ([AppInv.app_step_acc]) *)
+  Lemma awrite_chain_unit (γfs : fs_names) E i γo (z : Z) k cnt :
+    ↑appN ⊆ E ->
+    app_inv γfs -∗ off_gv γo (1/2) z -∗
+    awrite_chain (fs_gamma_L γfs) E i γo (fun _ _ _ _ => True%I) k cnt.
   Proof.
-    revert k z. induction cnt as [| cnt IH]; intros k z.
-    { rewrite awrite_chain_0. by iIntros "_". }
-    rewrite awrite_chain_S. iIntros "Hu". iSplit.
+    intros HE. revert k z. induction cnt as [| cnt IH]; intros k z.
+    { rewrite awrite_chain_0. by iIntros "_ _". }
+    rewrite awrite_chain_S. iIntros "#Hai Hu". iSplit.
     - rewrite /awrite_full_at. iIntros (I off bs bs0 nl) "%Hpre Ha Hk".
       iDestruct (off_gv_agree with "Hk Hu") as %<-.
       iMod (off_gv_update_halves (Z.of_nat (off + length bs)) with "Hk Hu")
         as "[Hk Hu]".
-      iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'". iModIntro.
-      iFrame "Ha' Hk". iSplitR; [done |]. iApply (IH with "Hu").
+      iMod (app_step_acc E γfs i I _ HE
+              (abs_view_lookup_is_Some I i _ (proj1 Hpre)) with "Hai") as "Hstep".
+      iModIntro. iFrame "Ha Hstep". iIntros (I') "%Heq Ha'". iModIntro.
+      iFrame "Ha' Hk". iSplitR; [done |]. iApply (IH with "Hai Hu").
     - rewrite /awrite_part_at. iIntros (off d) "Hk".
       iDestruct (off_gv_agree with "Hk Hu") as %<-.
       iMod (off_gv_update_halves (Z.of_nat (off + d)) with "Hk Hu") as "[Hk Hu]".
-      iModIntro. iFrame "Hk". iApply (IH with "Hu").
+      iModIntro. iFrame "Hk". iApply (IH with "Hai Hu").
   Qed.
 
   (* =================================================================== *)
   (*  3.  ITEM 1: THE CHUNK FIRE, FUSED WITH THE ROW RETAG                *)
   (* =================================================================== *)
 
-  (* Replaces the [InodeRegion.ireg_top_retag] filewrite's inode arm calls
+  (* Replaces the [InodeRegion.ireg_top_retag_*] filewrite's inode arm calls
      after writei returns: same [inode_local] premise, same payout (the
      moved fragment), plus the caller's two phases inside the one [ftopN]
      critical section, AND the offset's half in at the chunk's offset and
@@ -487,15 +498,15 @@ Section WriteFire.
   Lemma wrf_awrite_fire (γfs : fs_names) (E : coPset) (i : Z) (γo : gname) (k : nat)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) (REST : iProp Σ)
       (off : nat) (bs bs0 : list (bv 8)) (nl : nat) (n n' : fs_node) :
-    ↑ftopN ∪ ↑fsabsN ⊆ E ->
+    ↑ftopN ∪ ↑appN ⊆ E ->
     inode_local i n' ->
     (0 < length bs)%nat ->
     (off <= length bs0)%nat ->
     (off + length bs <= MAXFILE * BSIZE)%nat ->
     abs_of n = MkAnode (AFile bs0) nl ->
     abs_of n' = MkAnode (AFile (blk_splice off bs bs0)) nl ->
-    ftop_inv γfs -∗
-    awrite_full_at (fs_gamma_L γfs) fsabsE i γo k Φ REST -∗
+    ftop_inv γfs -∗ app_inv γfs -∗
+    awrite_full_at (fs_gamma_L γfs) appE i γo k Φ REST -∗
     top_frag (fs_gamma_L γfs) i n -∗
     off_gv γo (1/2) (Z.of_nat off) ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
@@ -503,7 +514,7 @@ Section WriteFire.
       ∗ REST
       ∗ ∃ av : aview, ⌜wri_pre av i off bs bs0 nl⌝ ∗ Φ k av off bs.
   Proof.
-    intros HE Hloc Hpos Hoff Hcap Habs Habs'. iIntros "#Hi Hcm Hf Hg".
+    intros HE Hloc Hpos Hoff Hcap Habs Habs'. iIntros "#Hi #Hai Hcm Hf Hg".
     (* the re-spelling [mkf_acre_fire] does, and for the same reason: the
        unifier cannot solve [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag /fs_gamma_L /=.
@@ -522,9 +533,14 @@ Section WriteFire.
                      = delta_write i off bs (abs_view I)).
     { rewrite (abs_view_insert I i n') Habs'.
       by rewrite (delta_write_file (abs_view I) i off bs bs0 nl Hrow). }
-    iMod (fupd_mask_subseteq fsabsE) as "Hcl2"; [rewrite /fsabsE; solve_ndisj |].
-    iMod ("Hcm" $! I off bs bs0 nl with "[//] Hta Hg") as "[Hta Hph2]".
-    iMod (ghost_map_update n' with "Hta Hf") as "[Hta Hf]".
+    iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
+    iMod ("Hcm" $! I off bs bs0 nl with "[//] Hta Hg") as "(Hta & Hstep & Hph2)".
+    (* THE MOVE, at the whole authority: the application's half comes out
+       of [appN] beside its claim, which the caller's step re-establishes
+       under the later ([AppInv.app_top_update]) *)
+    iMod (app_top_update appE γfs I i n n' ltac:(rewrite /appE; done)
+            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+    { iIntros (_) "_ Hp". iApply (app_step_at i I _ n' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "(Hta & Hg & HΦ & Hrest)".
     iMod "Hcl2".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
@@ -541,13 +557,13 @@ Section WriteFire.
   (* THE PARTIAL ARM, at the caller's mask: the short chunk's offset move,
      lifted from the commit mask exactly as the fire lifts its phases. *)
   Lemma wrf_partial_move (E : coPset) (γo : gname) (REST : iProp Σ) (off d : nat) :
-    ↑fsabsN ⊆ E ->
-    awrite_part_at fsabsE γo REST -∗
+    ↑appN ⊆ E ->
+    awrite_part_at appE γo REST -∗
     off_gv γo (1/2) (Z.of_nat off) ={E}=∗
       off_gv γo (1/2) (Z.of_nat (off + d)) ∗ REST.
   Proof.
     intros HE. iIntros "Hp Hg". rewrite /awrite_part_at.
-    iMod (fupd_mask_subseteq fsabsE) as "Hcl"; [rewrite /fsabsE; solve_ndisj |].
+    iMod (fupd_mask_subseteq appE) as "Hcl"; [rewrite /appE; solve_ndisj |].
     iMod ("Hp" $! off d with "Hg") as "[Hg Hrest]".
     iMod "Hcl". iModIntro. iFrame "Hg Hrest".
   Qed.

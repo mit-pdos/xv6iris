@@ -39,6 +39,7 @@ Require Import LogInv.
 Require Import DinodeEnc.
 Require Import BlkmapDefs.
 Require Import IcacheRef.
+Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IrefSlots.
 Require Import IcacheEscrow.
 Require Import TxPin.   (* [tx_pin_elem]: the pin and the raw element *)
@@ -84,7 +85,7 @@ Definition iulp_sp (m M : regfile) : Prop :=
       (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))).
 
 Section ProofIunlockputMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, APP : appcfg Σ, FSC : fscfg,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 

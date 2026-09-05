@@ -238,7 +238,7 @@ Section FsState.
      QUARTER of this element beside the quarter of the byte legs, and the
      escrow's read arm keeps three quarters.  Two things ride on that one
      line: a read-locker cannot RETAG (every mover --
-     [InodeRegion.ireg_top_retag] -- needs the whole element), and the arm's
+     [InodeRegion.ireg_top_retag_*] -- needs the whole element), and the arm's
      existentially-bound node is PINNED to the holder's by ghost-map
      agreement, which is what lets [IcacheEscrow.ic_unshed_rd] re-form the
      payload with no per-slot pin ghost at all.

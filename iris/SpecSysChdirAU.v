@@ -80,7 +80,7 @@ Require Import SpecSysChdir.    (* K_sys_chdir, [sys_chdir_post]: the landed
 Require Import PathElems.       (* [path_elems] *)
 Require Import FsTree.          (* [fname] *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
-Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
+Require Import AppInv.          (* [appN]/[appE]: the application's namespace, the commit mask (app-instances.md round A) *)
 Require Import SpecSysOpenAU.   (* [open_walk_pre_era], [open_walk_dead_era],
                                    [aopen_commit_at] *)
 Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
@@ -99,14 +99,14 @@ Section SysChdirAU.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
-  (* everything the AU caller hands in, at the commit mask [fsabsE]:
+  (* everything the AU caller hands in, at the commit mask [appE]:
      open's walk premise at the process's cwd inum, and open's plain
      observation commit *)
   Definition chdir_au_pre Γ (γfs : fs_names) (cw : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
     (open_walk_pre_era γfs cw P Pmiss
-     ∗ aopen_commit_at Γ fsabsE Φo)%I.
+     ∗ aopen_commit_at Γ appE Φo)%I.
 
   (* ret -1: the three-way fold -- (i) nothing fs-visible happened (argstr
      failed: the bundle back whole), (ii) the walk died (the era refund
@@ -118,7 +118,7 @@ Section SysChdirAU.
     (chdir_au_pre Γ γfs cw P Pmiss Φo
      ∨ (∃ pl : list (bv 8),
           (open_walk_dead_era γfs P Pmiss pl
-             ∗ aopen_commit_at Γ fsabsE Φo)
+             ∗ aopen_commit_at Γ appE Φo)
           ∨ (∃ (i : Z) (av : aview) (a : anode),
                P (length (path_elems pl)) i
                ∗ ⌜av !! i = Some a⌝ ∗ Φo av i a

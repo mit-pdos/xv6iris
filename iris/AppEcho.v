@@ -26,15 +26,21 @@
                                    pins of /init and /sh
                                    ([FsInitPinBoot.era0_pins],
                                    [FsShPin.era0_sh_pins]) read on the
-                                   abstract state (echo's own pin is lane
-                                   L6's, with its Uk-engine proof);
+                                   abstract state's VIEW ([FsAbsDefs.aview],
+                                   app-instances.md round A -- the
+                                   application's [app_pred], at any fixed
+                                   name and any instance; echo's own pin
+                                   is lane L6's, with its Uk-engine proof);
      the BOOT obligation AT ERA 0 -- the founded map satisfies [echo_fs]
                                    when the disk is the mkfs image
                                    ([echo_fs_era0]).
 
-   WHAT IS DELIBERATELY NOT HERE: a theorem.  The license is payable only
-   from [tainted] until lane L2; the boot lend at a non-pristine boot
-   needs the crash predicate's application conjunct (lane L4); the
+   WHAT IS DELIBERATELY NOT HERE: a theorem.  The application's parked
+   license ([AppInv.app_auto], over [AppInv.top_move]) is UNPAYABLE for
+   [echo_fs] until round E of app-instances.md narrows [top_move] -- in
+   round A it admits every one-row move, which no pin survives -- exactly
+   as the old delta-free license was payable only from [tainted]; the boot
+   lend at a non-pristine boot needs the durable instance (round C); the
    conclusion needs both.  A theorem taking those as hypotheses would be
    durable-notes.md's GAP-premise trap, so the application is a
    definition and its lanes are the worklist. *)
@@ -53,7 +59,7 @@ Require Import SystemAdequacy.
 Require Import FsImgCheck.
 Require Import FsState.
 Require Import FsNode.           (* [fs_node] *)
-Require Import FsAbsDefs.        (* [abs_view] *)
+Require Import FsAbsDefs.        (* [aview], [abs_view] *)
 Require Import FsInitPinBoot.    (* [era0_pins], [era0_recovery_pins] *)
 Require Import FsShPin.          (* [era0_sh_pins], [era0_recovery_sh_pins] *)
 Local Open Scope Z_scope.
@@ -253,35 +259,36 @@ End EchoLedger.
 (*  3.  THE PREDICATE: the binaries are the image's                        *)
 (* ====================================================================== *)
 
-(* /init and /sh are the image's, path and content, on the abstract state.
-   Echo's own pin is lane L6's (with the Uk-engine proof that needs it).
-   Per-inum rather than "the map is the image's" on purpose: the durable
-   snapshot pins a state per inum and no whole-map equality exists
+(* /init and /sh are the image's, path and content, on the abstract state's
+   VIEW.  Echo's own pin is lane L6's (with the Uk-engine proof that needs
+   it).  Per-inum rather than "the map is the image's" on purpose: the
+   durable snapshot pins a state per inum and no whole-map equality exists
    (fs-syscall-specs.md lane D, gap (3)).  The claim is PURE -- it owns
    nothing -- so it is stated as a Prop and embedded: the application's
-   predicate is an iProp (applications.md section 1), and this
-   application's happens to be [⌜echo_fs_pure I⌝]. *)
-Definition echo_fs_pure (I : gmap Z fs_node) : Prop :=
-  era0_pins (abs_view I) /\ era0_sh_pins (abs_view I).
+   predicate is an iProp over the view at a fixed name and an instance
+   ([AppCfg.app_pred], app-instances.md section 7), and this application's
+   happens to be [⌜echo_fs_pure av⌝] at every name and instance. *)
+Definition echo_fs_pure (av : aview) : Prop :=
+  era0_pins av /\ era0_sh_pins av.
 
 Section EchoFs.
   Context {Σ : gFunctors}.
 
-  Definition echo_fs (I : gmap Z fs_node) : iProp Σ := ⌜echo_fs_pure I⌝%I.
+  Definition echo_fs (av : aview) : iProp Σ := ⌜echo_fs_pure av⌝%I.
 
-  Lemma echo_fs_intro (I : gmap Z fs_node) : echo_fs_pure I -> ⊢ echo_fs I.
+  Lemma echo_fs_intro (av : aview) : echo_fs_pure av -> ⊢ echo_fs av.
   Proof. intros H. rewrite /echo_fs. iPureIntro. exact H. Qed.
 End EchoFs.
 
-(* THE BOOT OBLIGATION AT ERA 0: the map a boot founds its file system at
-   satisfies the predicate when the disk is mkfs's image -- the two pin
-   files' transport theorems, read together.  About the Prop; [echo_fs_intro]
-   lifts it. *)
+(* THE BOOT OBLIGATION AT ERA 0: the view of the map a boot founds its file
+   system at satisfies the predicate when the disk is mkfs's image -- the
+   two pin files' transport theorems, read together.  About the Prop;
+   [echo_fs_intro] lifts it. *)
 Lemma echo_fs_era0 (dk : Z -> bv 8) (D : gmap Z (list (bv 8))) (S : fs_state_rec) :
   fs_blocks dk = fsimg_P ->
   fs_recovery (fs_blocks dk) D fsimg_cov (FsImg.sb_logstart fsimg_sb) ->
   snap_ok S D ->
-  echo_fs_pure (fss_inodes S).
+  echo_fs_pure (abs_view (fss_inodes S)).
 Proof.
   intros Hdk Hrec HS. split.
   - exact (era0_recovery_pins dk D S Hdk Hrec HS).

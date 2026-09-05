@@ -70,7 +70,8 @@ Require Import FsBoot.         (* [fs_cov_in] *)
 Require Import FsImg.          (* the image sweeps' vocabulary *)
 Require Import FsCfgBoot.      (* the two boot kits *)
 Require Import FsCfgSnap.      (* [fs_cfg_alloc_snap] -- the era mint *)
-Require Import FsAbsInv.       (* [fsabs_ok_at]/[fsabs_lic_at]: the application's boot obligation and license, handed to the mint *)
+Require Import AppInv.         (* [app_auto]: the application's parked license, handed to the mint *)
+Require FsAbsDefs.             (* [abs_view]: the application's claim is over the founded map's view (Require, not Import: it re-exports FsState) *)
 Require Import AppCfg.         (* [appcfg]: the application's record, the third field [fileG_of] takes *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
@@ -1438,10 +1439,13 @@ Section BootAlloc.
        [FsCrash.P_fs] carries across the power cycle and
        [SystemAdequacy.fs_boot_pure] delivers into this fupd. *)
     fs_boot_snap_wf (v_disk (g.(gdev).(dvirtio))) ndisk S Pb sb nib cov ->
-    (* the application's boot obligation at the founded map, and its
-       license -- both straight through to [FsCfgSnap.fs_cfg_alloc_snap] *)
-    fsabs_ok_at (@app_pred Σ APP) (FsState.fss_inodes S) -∗
-    fsabs_lic_at (@app_pred Σ APP) -∗
+    (* the application's boot obligation -- its claim at the founded map's
+       view, at the era's running instance -- and its parked license, both
+       straight through to [FsCfgSnap.fs_cfg_alloc_snap] (app-instances.md
+       round A) *)
+    @app_pred Σ APP riscv_client_name (@app_run Σ APP)
+      (FsAbsDefs.abs_view (FsState.fss_inodes S)) -∗
+    app_auto (APP := APP) -∗
     (* THE DURABLE SNAPSHOT, LENT BY THE POWER ARM (durable-disk BT-3).
        It arrives on [power_boot_res]'s [Rb] conjunct as
        [FsCrash.P_fs_lend]; the caller splits that off
