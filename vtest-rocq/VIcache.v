@@ -1,13 +1,13 @@
 (* ====================================================================== *)
-(* VIcache.v -- ONE HART UNDER THE Ztso MACHINE WITH ITS INSTRUCTION VIEW, *)
-(* executably.                                                             *)
+(* VIcache.v -- ONE HART UNDER THE RELAXED MACHINE WITH ITS INSTRUCTION    *)
+(* VIEW, executably.                                                       *)
 (*                                                                         *)
 (* [VTso.texec] threads the memory-model state of one hart -- the era      *)
-(* image, the write log and the hart's DATA view -- and answers a plain    *)
-(* read at a view a schedule chooses.  It predates the icache flip          *)
-(* (claude-notes/projects/icache.md) and treats an instruction fetch as a  *)
-(* plain read, which under its own-store-forwarding arm means a hart       *)
-(* always fetches its own latest store: the fetch is coherent there.       *)
+(* image, the write log, the hart's DATA floor and its read side -- and    *)
+(* answers a plain read at a view a schedule chooses.  It predates the     *)
+(* icache flip (claude-notes/projects/icache.md) and treats an instruction *)
+(* fetch as a plain read, which under its own-store-forwarding arm means a *)
+(* hart always fetches its own latest store: the fetch is coherent there.  *)
 (*                                                                         *)
 (* [RiscvLang.mnode_step]'s fetch arm is not: an instruction fetch reads   *)
 (* every byte latest-visible TO THE ICACHE AGENT -- which authors nothing, *)
@@ -18,8 +18,8 @@
 (*                                                                         *)
 (* [itexec] is [texec] with that arm, the instruction view threaded.  The  *)
 (* hart is alone (every message in the log is its own), so its DATA reads  *)
-(* take the [PFresh] policy -- the flat cache, view drained -- and the one  *)
-(* choice left is the FETCH view, [ipol]:                                  *)
+(* take the [PFresh] policy -- the flat cache, the floor staying put -- and *)
+(* the one choice left is the FETCH view, [ipol]:                          *)
 (*                                                                         *)
 (*   [IFresh]  the fetch reads at the top of the log: reading at the top   *)
 (*             through the log is the flat read whoever the agent is        *)
@@ -49,55 +49,61 @@ Inductive ipol := IFresh | IStale.
 (* ---------------------------------------------------------------------- *)
 (* 2. The whole-instruction interpreter, both views threaded.              *)
 (* ---------------------------------------------------------------------- *)
-Definition iout (X : Type) : Type := X * mstate * list pwmsg * nat * nat.
+Definition iout (X : Type) : Type := X * mstate * list pwmsg * nat * nat * hread.
 
 Fixpoint itexec {X} (ip : ipol) (h : agent) (img : gmap Arch.pa (bv 8))
-    (m : M X) (s : mstate) (log : list pwmsg) (tv itv : nat) {struct m}
+    (m : M X) (s : mstate) (log : list pwmsg) (tv itv : nat) (hr : hread) {struct m}
   : option (iout X) :=
   match m with
-  | Interface.Ret y => Some (y, s, log, tv, itv)
+  (* the boundary: a dangling acquire bit does not cross an instruction *)
+  | Interface.Ret y => Some (y, s, log, tv, itv, hr_clear hr)
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T return (T -> M X) -> option (iout X) with
        | Interface.RegRead r _ => fun k =>
-           itexec ip h img (k (register_lookup r s.(sregs))) s log tv itv
+           itexec ip h img (k (register_lookup r s.(sregs))) s log tv itv hr
        | Interface.RegWrite r _ v => fun k =>
-           itexec ip h img (k tt) (set_reg s r v) log tv itv
+           itexec ip h img (k tt) (set_reg s r v) log tv itv hr
        | Interface.MemRead n req => fun k =>
            if dev_addr (Interface.ReadReq.pa req) then
              (* MMIO: strongly ordered, no log, no view action *)
              match dev_read s.(mdev) (Interface.ReadReq.pa req) n with
              | Some (w, d') =>
                  itexec ip h img (k (inl (w, None)))
-                        (MState s.(sregs) s.(mem) d') log tv itv
+                        (MState s.(sregs) s.(mem) d') log tv itv hr
              | None => None
              end
            else if ak_ifetch (Interface.ReadReq.access_kind req) then
              (* THE INSTRUCTION FETCH: no forwarding, the view a policy
-                chooses, neither view moved *)
+                chooses, neither view moved, the read side untouched *)
              match ip with
              | IFresh =>
                  match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
-                 | Some w => itexec ip h img (k (inl (w, None))) s log tv itv
+                 | Some w => itexec ip h img (k (inl (w, None))) s log tv itv hr
                  | None => None
                  end
              | IStale =>
                  match tso_read_bytes_f img log (ifetch_agent h) itv
                          (Interface.ReadReq.pa req) n with
-                 | Some w => itexec ip h img (k (inl (w, None))) s log tv itv
+                 | Some w => itexec ip h img (k (inl (w, None))) s log tv itv hr
                  | None => None
                  end
              end
            else if ak_excl (Interface.ReadReq.access_kind req) then
-             (* "drain, then read memory": the flat cache, view to the top *)
+             (* "drain, then read memory": the flat cache; the watermark to
+                the top, the floor to the top iff the kind is an acquire *)
              match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
-             | Some w => itexec ip h img (k (inl (w, None))) s log (List.length log) itv
+             | Some w => itexec ip h img (k (inl (w, None))) s log
+                           (excl_tv (Interface.ReadReq.access_kind req) log tv) itv
+                           (hr_excl hr (Interface.ReadReq.access_kind req) log)
              | None => None
              end
            else
              (* a plain DATA read: the hart is alone in its era, so the top of
-                the log is what it sees -- [VTso]'s [PFresh] *)
+                the log is what it sees -- [VTso]'s [PFresh].  The floor
+                stays; the read side records the view read at. *)
              match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
-             | Some w => itexec ip h img (k (inl (w, None))) s log (List.length log) itv
+             | Some w => itexec ip h img (k (inl (w, None))) s log tv itv
+                           (hr_read hr (Interface.ReadReq.pa req) n (List.length log))
              | None => None
              end
        | Interface.MemWrite n req => fun k =>
@@ -105,59 +111,68 @@ Fixpoint itexec {X} (ip : ipol) (h : agent) (img : gmap Arch.pa (bv 8))
              match dev_write s.(mdev) (Interface.WriteReq.pa req) n
                              (Interface.WriteReq.value req) with
              | Some d' => itexec ip h img (k (inl None))
-                                 (MState s.(sregs) s.(mem) d') log tv itv
+                                 (MState s.(sregs) s.(mem) d') log tv itv (hr_clear hr)
              | None => None
              end
            else
              (* append at the top, cache in lock-step; a PLAIN store leaves
-                the data view (store buffering), an AMO/conditional one takes
-                it past its own append; the INSTRUCTION view never moves *)
+                the floor (store buffering), the conditional half of an
+                ACQUIRE pair takes it past its own append; the INSTRUCTION
+                view never moves; every write consumes the pending acquire *)
              itexec ip h img (k (inl None))
                     (MState s.(sregs)
                        (write_bytes s.(mem) (Interface.WriteReq.pa req) n
                                     (Interface.WriteReq.value req)) s.(mdev))
                     (log ++ [PWMsg (snap_of (Interface.WriteReq.pa req) n
                                       (Interface.WriteReq.value req)) h])%list
-                    (if ak_excl (Interface.WriteReq.access_kind req)
-                     then S (List.length log) else tv)
-                    itv
-       | Interface.InstrAnnounce _   => fun k => itexec ip h img (k tt) s log tv itv
-       | Interface.BranchAnnounce _ _=> fun k => itexec ip h img (k tt) s log tv itv
-       (* the fence: a W->R edge drains the data view; fence.i raises the
-          instruction view to the drained data view *)
+                    (write_tv (Interface.WriteReq.access_kind req) hr log tv)
+                    itv (hr_clear hr)
+       | Interface.InstrAnnounce _   => fun k => itexec ip h img (k tt) s log tv itv hr
+       | Interface.BranchAnnounce _ _=> fun k => itexec ip h img (k tt) s log tv itv hr
+       (* the fence: a W->R edge drains the floor and an R->R edge acquires
+          (the floor passes the read watermark); fence.i raises the
+          instruction view past the DRAINED floor -- not the watermark
+          (RVWMO+Zifencei orders a hart's own stores before its later
+          fetches, and nothing else) *)
        | Interface.Barrier b         => fun k =>
            itexec ip h img (k tt) s log
-                  (fence_post h log (fence_drains b) tv)
+                  (fence_post h log (fence_drains b) (fence_acq b) tv (hr_rv hr))
                   (if fence_ifetch b
-                   then Nat.max itv (fence_post h log true tv) else itv)
-       | Interface.CacheOp _         => fun k => itexec ip h img (k tt) s log tv itv
-       | Interface.TlbOp _           => fun k => itexec ip h img (k tt) s log tv itv
-       | Interface.TakeException _   => fun k => itexec ip h img (k tt) s log tv itv
-       | Interface.ReturnException _ => fun k => itexec ip h img (k tt) s log tv itv
-       | Interface.TranslationStart _=> fun k => itexec ip h img (k tt) s log tv itv
-       | Interface.TranslationEnd _  => fun k => itexec ip h img (k tt) s log tv itv
-       | Interface.CycleCount        => fun k => itexec ip h img (k tt) s log tv itv
-       | Interface.Message _         => fun k => itexec ip h img (k tt) s log tv itv
-       | Interface.GetCycleCount     => fun k => itexec ip h img (k 0%Z) s log tv itv
+                   then Nat.max itv (fence_post h log true false tv (hr_rv hr))
+                   else itv)
+                  hr
+       | Interface.CacheOp _         => fun k => itexec ip h img (k tt) s log tv itv hr
+       | Interface.TlbOp _           => fun k => itexec ip h img (k tt) s log tv itv hr
+       | Interface.TakeException _   => fun k => itexec ip h img (k tt) s log tv itv hr
+       | Interface.ReturnException _ => fun k => itexec ip h img (k tt) s log tv itv hr
+       | Interface.TranslationStart _=> fun k => itexec ip h img (k tt) s log tv itv hr
+       | Interface.TranslationEnd _  => fun k => itexec ip h img (k tt) s log tv itv hr
+       | Interface.CycleCount        => fun k => itexec ip h img (k tt) s log tv itv hr
+       | Interface.Message _         => fun k => itexec ip h img (k tt) s log tv itv hr
+       | Interface.GetCycleCount     => fun k => itexec ip h img (k 0%Z) s log tv itv hr
        | _ => fun _ => None   (* Choose / GenericFail / Discard: stuck, as exec *)
        end) k
   end.
 
 (* ---------------------------------------------------------------------- *)
-(* 3. Running.  A hart state carries the two views beside the machine.     *)
+(* 3. Running.  A hart state carries the two views and the read side       *)
+(*    beside the machine.                                                  *)
 (* ---------------------------------------------------------------------- *)
 Record istate := IState {
   i_s   : mstate;
   i_log : list pwmsg;
   i_tv  : nat;
-  i_itv : nat
+  i_itv : nat;
+  i_hr  : hread
 }.
 
 (* one instruction, then every enabled device action (the eager default) *)
 Definition istep (ip : ipol) (h : agent) (img : gmap Arch.pa (bv 8))
     (st : istate) : option istate :=
-  match itexec ip h img (riscv_step false) st.(i_s) st.(i_log) st.(i_tv) st.(i_itv) with
-  | Some (_, s', log', tv', itv') => Some (IState (settle dev_fuel s') log' tv' itv')
+  match itexec ip h img (riscv_step false) st.(i_s) st.(i_log) st.(i_tv) st.(i_itv)
+               st.(i_hr) with
+  | Some (_, s', log', tv', itv', hr') =>
+      Some (IState (settle dev_fuel s') log' tv' itv' hr')
   | None => None
   end.
 
@@ -230,8 +245,8 @@ Module IcacheRun (P : ICACHE_CASE) <: TEST_RUN.
   Definition observed : list (list Z) := map P.proj P.observed_raw.
   Definition start_s : mstate := start_hart_with P.hart P.text P.regions.
   (* the TSO axis at power-on: the era image is the loaded memory, the log
-     is empty, both views are 0 *)
-  Definition start : istate := IState start_s [] 0%nat 0%nat.
+     is empty, both views are 0, the read side is at zero *)
+  Definition start : istate := IState start_s [] 0%nat 0%nat hread0.
   Definition h : agent := Z.to_nat P.hart.
   Definition outcome : model_outcome :=
     MDone (map P.proj (iobs_all h (mem start_s) P.budget P.schedules start)).

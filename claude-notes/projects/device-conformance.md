@@ -18,25 +18,36 @@ tools/vtest/README.md pinned `conc_sb`'s (0,0) as unreachable; and
 All of that is now false of the model, and durable-notes' rule for a pinned
 finding applies: when the model moves, the test file is revisited.
 
-**`VTso.v` is the multi-hart stepper under Ztso.**  `texec` is `exec` with
-`mnode_step`'s four memory-model arms (plain store: append, view stays;
-plain load: advance-then-read-latest-visible; exclusive read: drain to the
-top; W->R fence: `fence_post`), threading `h`/`img`/`log`/`tv` exactly as
-the relation does.  The ONE choice the arms leave open — how far a plain
-load advances the view — is a schedule parameter, `rpol`: `PFresh` drains
-to the top (reading there IS the flat read, so this is provably the old
-harness, `texec_fresh_exec`) and `PStale` stays put.  `VConc.citem` gains
-`CCpuStale`; `VNode` steps through the same arms one node at a time
-(`tnode`); the device settle now returns the DMA write sets
+**`VTso.v` is the multi-hart stepper under the relaxed machine.**  `texec`
+is `exec` with `mnode_step`'s memory-model arms (plain store: append, floor
+stays; plain load: read latest-visible at any view that clears the floor
+and the footprint's coherence floors, floor stays, watermark and coherence
+floors stamped; exclusive read: the flat cache, floor to the top iff `.aq`;
+conditional write of an acquire pair: floor past its own append; fence:
+`fence_post` with the drain AND acquire bits), threading
+`h`/`img`/`log`/`tv`/`hr` exactly as the relation does — `hr` is the
+model's own `hread`.  The ONE choice the arms leave open — which admissible
+view a plain load reads at — is a schedule parameter, `rpol`: `PFresh`
+reads at the top (reading there IS the flat read, so this is provably the
+old harness, `texec_fresh_exec`) and `PStale` at the lowest admissible view
+(`stale_view`: the floor, or a byte's coherence floor if higher).  Neither
+moves the floor — since the load–load relaxation
+(`completed/relaxed-rr.md`) only a fence or an acquire pair does, so a
+`PFresh` stretch does not make a later `PStale` one fresh.  `VConc.citem`
+gains `CCpuStale`; `VNode` steps through the same arms one node at a time
+(`tnode`, and its instruction boundary drops the pending acquire bit,
+`gboundary`); the device settle now returns the DMA write sets
 (`VSched.sapply_w`/`settle_w`) and `VConc.gsettle` appends them to the log as
 `disk_agent` messages, so a stale hart cannot see a DMA it should not.
+`VIcache.itexec` threads the same read side beside the instruction view.
 
 **`ConcSbSched.sb_00` = `align ++ [CCpuStale hart0 2; CCpuStale hart1 2]`
 exhibits (0,0)**, and `ConcSbQemuPass` is in `_CoqProject`: the last red
 run on the QEMU side that was a genuine model unsoundness is green, and the
-finding moved to "Findings fixed".  The model facts are restated as
-`model_plain_store_buffers` and `model_plain_load_may_read_stale`, both
-direct instances of `mnode_step`'s arms.
+finding moved to "Findings fixed".  (The model facts
+`model_plain_store_buffers` / `model_plain_load_may_read_stale` that once
+restated the two arms were dropped in `6e4483a3a`; `mnode_step`'s arms are
+the record.)
 
 Standing caveat, unchanged: no soundness lemma ties `texec`/`tnode` to
 `mnode_step`; each arm is a transcription.  Not expressible yet: a view

@@ -745,25 +745,30 @@ old `VConc` recorded that off the model (`model_hart_sees_the_one_memory`,
 `model_store_is_immediately_global`) and enumerated all six interleavings of
 the two two-instruction sequences, none of which gives (0,0).
 
-**FIXED BY THE TSO CUTOVER.**  The language is now a Ztso machine
-(`RiscvLang.mnode_step` over `TsoMemPa`): the era has a global append-only
-write log, every hart a monotone VIEW into it, a plain store appends without
-moving the author's view, and a plain load first advances the view to any
-index up to the top and then reads latest-visible there -- below the view, or
-the hart's own message (which is store forwarding).  A W->R fence drains.
-The harness follows: `VTso.texec` is `exec` with those arms, its read policy
-is a schedule choice, and `VConc.CCpuStale` runs a hart without moving its
-view.  `ConcSbSched.sb_00` -- `align ++ [CCpuStale hart0 2; CCpuStale hart1
-2]` -- is the (0,0) execution: each hart's view was last drained by the
-spin-load on the other's rendezvous flag, before either litmus store, so each
-load reads below the other hart's store.  The two arms it uses are stated off
-the model in `VModelFacts.model_plain_store_buffers` and
-`VModelFacts.model_plain_load_may_read_stale`.  With `sw; fence; lw` the
-same schedule reads at the top and (0,0) is gone, so xv6's
-`__sync_synchronize()` in `acquire`/`release` is now OBSERVABLE.
+**FIXED BY THE TSO CUTOVER.**  The language is now a store-buffering
+machine (`RiscvLang.mnode_step` over `TsoMemPa`): the era has a global
+append-only write log, every hart a monotone FLOOR into it, a plain store
+appends without moving the author's floor, and a plain load reads
+latest-visible at any view between the floor and the top -- below the view,
+or the hart's own message (which is store forwarding).  A W->R fence drains.
+Since the load-load relaxation (claude-notes/completed/relaxed-rr.md) a plain
+load moves no floor either -- it raises a read WATERMARK and the per-byte
+COHERENCE floors, and a fence with an R->R edge acquires (floor to the
+watermark).  The harness follows: `VTso.texec` is `exec` with those arms,
+its read policy is a schedule choice, and `VConc.CCpuStale` runs a hart
+reading at the lowest view the model admits.  `ConcSbSched.sb_00` -- `align
+++ [CCpuStale hart0 2; CCpuStale hart1 2]` -- is the (0,0) execution: no
+load moved either hart's floor and conc_sb.S has no fence before the litmus
+load, so each hart's floor is still 0, before either litmus store, and each
+load reads below the other hart's store.  (The two arms it uses were once
+stated off the model in `VModelFacts`; those lemmas went with the
+`mnode_step` arity change in `6e4483a3a`, and the arms themselves are the
+record.)  With `sw; fence; lw` the same schedule reads at the top and (0,0)
+is gone, so xv6's `__sync_synchronize()` in `acquire`/`release` is now
+OBSERVABLE.
 
 The model reproduces all four observed outcomes, whole result region each
-(`ConcSbQemuPass`).  The draining policy (`CCpu`) is provably the old harness
+(`ConcSbQemuPass`).  The fresh policy (`CCpu`) is provably the old harness
 (`VTso.texec_fresh_exec`), so every other multi-hart run computes what it
 computed before.
 

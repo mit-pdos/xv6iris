@@ -94,7 +94,10 @@ Definition g0_of_at (base : Z) (text : list Z) (rs : list region) : gstate :=
             IS the loaded memory, the write log is empty, every view is 0 *)
          m [] (fun _ => 0%nat)
          (* ...and so is every hart's INSTRUCTION view (icache.md) *)
-         (fun _ => 0%nat).
+         (fun _ => 0%nat)
+         (* ...and its READ SIDE (relaxed-rr.md): watermark 0, every
+            coherence floor 0, no pending acquire *)
+         (fun _ => hread0).
 
 Definition g0_of (text : list Z) (rs : list region) : gstate :=
   g0_of_at 0 text rs.
@@ -107,15 +110,16 @@ Definition ghart (g : gstate) (c : CPU) : mstate :=
 
 Definition gput (g : gstate) (c : CPU) (s : mstate) : gstate :=
   GState (<[c := sregs s]> (gregs g)) (mem s) (mdev s)
-         (ggen g) (gpow g) (gresv g) (gimg g) (glog g) (gtv g) (gitv g).
+         (ggen g) (gpow g) (gresv g) (gimg g) (glog g) (gtv g) (gitv g) (ghr g).
 
 (* ---------------------------------------------------------------------- *)
 (* 2. The schedule.                                                        *)
 (* ---------------------------------------------------------------------- *)
 
 (* [n] whole instructions of hart [c] under read policy [pol] (VTso.v):
-   [PFresh] drains the view at every plain load -- the old harness --
-   and [PStale] never moves it. *)
+   [PFresh] reads at the top at every plain load -- the old harness --
+   and [PStale] at the lowest view the model admits.  Neither moves the
+   hart's floor; only a fence does. *)
 Fixpoint gcpu_pol (pol : rpol) (c : CPU) (n : nat) (g : gstate) : option gstate :=
   match n with
   | 0%nat => Some g

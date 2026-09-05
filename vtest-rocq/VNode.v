@@ -21,8 +21,8 @@
 (* nothing interleaves inside a block.                                     *)
 (*                                                                         *)
 (* WHAT IS STILL MISSING, stated plainly: the soundness lemma              *)
-(*   tnode pol h img s log tv m = Some (m', s', log', tv') ->             *)
-(*     mnode_step oth h img s log tv r m m' s' log' tv' r'                *)
+(*   tnode pol h img s log tv hr m = Some (m', s', log', tv', hr') ->     *)
+(*     mnode_step oth h img s log tv itv hr r m m' s' log' tv' itv hr' r' *)
 (* which is the converse [HartBlock.v]'s header defers to "the language's  *)
 (* own functional interpreter (the reflective stepper)".  Every arm below  *)
 (* is a transcription of the corresponding [mnode_step] arm, so the proof  *)
@@ -99,12 +99,12 @@ Definition n0_of (text : list Z) (rs : list region) : nstate :=
 Definition nstep1 (pol : rpol) (c : CPU) (x : nstate) : option nstate :=
   match ns_m x c with
   | Interface.Ret _ =>
-      Some (NState (ns_g x) (<[c := riscv_step false]> (ns_m x)))
+      Some (NState (gboundary (ns_g x) c) (<[c := riscv_step false]> (ns_m x)))
   | m =>
       match tnode pol (hart_agent c) (gimg (ns_g x)) (gfocus (ns_g x) c)
-                  (glog (ns_g x)) (gtv (ns_g x) c) m with
-      | Some (m', s', log', tv') =>
-          Some (NState (gwb (ns_g x) c s' log' tv') (<[c := m']> (ns_m x)))
+                  (glog (ns_g x)) (gtv (ns_g x) c) (ghr (ns_g x) c) m with
+      | Some (m', s', log', tv', hr') =>
+          Some (NState (gwb (ns_g x) c s' log' tv' hr') (<[c := m']> (ns_m x)))
       | None => None
       end
   end.
@@ -134,8 +134,8 @@ Fixpoint nrun_to_addr (fuel : nat) (c : CPU) (addr : Z) (x : nstate)
   end.
 
 Inductive nitem :=
-  | NCpu (c : CPU) (n : nat)        (* n NODES of hart c, draining at loads *)
-  | NCpuStale (c : CPU) (n : nat)   (* n NODES of hart c at its current view *)
+  | NCpu (c : CPU) (n : nat)        (* n NODES of hart c, loads read at the top *)
+  | NCpuStale (c : CPU) (n : nat)   (* n NODES of hart c, loads as stale as allowed *)
   | NUntil (c : CPU) (addr : Z)     (* hart c up to its access of addr *)
   | NDev.
 
