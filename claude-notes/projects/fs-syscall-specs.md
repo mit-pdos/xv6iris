@@ -2933,18 +2933,36 @@ things, and the answer differs:
       the seam are the engine's width-4 text load (`Hclw`) and stage 3's
       named sbrk one (`Hsbrk`).  The break the theorem hands `runcmd` is
       the one the allocator moved it to (`sz + 65536`).
-    * **WHAT IS NOT YET DONE, and why each is not a gap in this file.**
+    * **THE `cd` BUILTIN IS DONE (2026-09-05, `iris/UkShCd.v`, ~1100
+      lines; audit = the standing three, zero `Admitted`, zero
+      `Hypothesis`).**  0x97a..0x9be end to end, BOTH arms.  What it took:
+      `strlen` was already stage 4's and already parametric in the dfrac,
+      which is what lets it measure a MUTABLE buffer; `chdir` is three
+      instructions on the QUIET row (right even though `sys_chdir` moves
+      `p->cwd`, because the row is about what a syscall WRITES INTO USER
+      MEMORY and chdir writes none — the cwd rides inside `urun`
+      existentially, and the path costs the walk NO resource at all);
+      and `UkShDiag.shd_str` gained a dfrac, because this is the ONE
+      diagnostic in sh that comes back, so its argument is BORROWED out of
+      the line buffer and given back rather than discarded.  The arm also
+      WRITES (`buf[strlen(buf)-1] = 0`), so what goes round the loop is
+      `ush_set f (k+L-1) 0`; the loop head can take it because it
+      quantifies over the contents.  The one non-uniform case is a line
+      with no newline to chop (`L = 3`), where the path is terminated by
+      the NUL that was already there — nat subtraction makes `plen = L - 4`
+      name both.
+    * **WHAT IS NOT YET DONE, and why each is not a gap in what landed.**
       (a) The FORK/PARENT arm (0x92c `jal fork1`, 0x930 `c.beqz` → the
       child, 0x932/0x934 `li a0,0 ; jal wait`, falling into the loop head
       at 0x938) — the leaves are all there (`wp_kshr_fork1_final`,
       `wp_kshr_wait`), what it needs is the payload assembled and `usz` +
       the parser's static tables threaded through `UkSh.ush_loop_head`,
-      which do not appear in it today.  (b) The `cd` BUILTIN (0x98e..0x9be)
-      — needs `strlen` catalogued, a `chdir` walk, and `UkShDiag.shd_str`
-      re-cut at a dfrac (it is persistent-only, and the cd arm's `fprintf`
-      prints the MUTABLE line buffer).  (c) Therefore `UkSh.ush_rest` is
-      NOT discharged, and it cannot be until (b) is, because the loop head
-      cannot supply a "this line is not a cd command" premise.
+      which do not appear in it today.  (b) `UkSh.ush_rest` is therefore
+      still open, and it needs one more thing besides the fork arm: a
+      BUDGET RE-CUT.  `ush_rest` hands its walk `16 + n` and fprintf's
+      frame is 26 words, so the loop head has to carry `16 + (26 + n)`.
+      That is mechanical (`UkShCd.wp_kshc_cd` is already stated at the
+      budget it wants) and belongs with (a).
 
   **ASKS (relay, in priority order).**
   1. ~~**`wp_uk_ecall_window` in `UkRunSys.v`**~~ **DONE — built in-house

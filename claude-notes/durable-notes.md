@@ -2907,3 +2907,20 @@ unwritable.  Three habits keep it linear.
   PIECE LAST (rewriting the outer address first stops the inner pattern from
   matching).  Sizes stated as `Z.to_nat 65536` are fine to `rewrite` and
   fatal to `vm_compute`: `seq 0 65536` is a real list.
+
+## `vm_compute` TURNS AN ARITHMETIC GOAL INTO ONE `lia` CANNOT SEE
+
+`Z.lt` is a Definition — `x < y` is `Z.compare x y = Lt` — so `vm_compute`
+on a closed comparison leaves `Lt = Lt`, which is a goal about CONSTRUCTORS
+and not about numbers.  `lia` then fails with `Cannot find witness`, which
+reads like an arithmetic failure and is not one.
+
+    ltac:(vm_compute; lia)          (* Cannot find witness *)
+    ltac:(vm_compute; reflexivity)  (* right *)
+
+The rule: after `vm_compute` on a closed `<` / `<=` goal, finish with
+`reflexivity`, not `lia`.  Use `lia` INSTEAD of `vm_compute` when the goal
+still has variables in it.  Cost of learning this the slow way: one compile
+per occurrence, and the two occurrences look identical to the ones on the
+line above that legitimately do end in `lia` (`0 <= 4992`, which lia closes
+directly because nothing reduced it first).
