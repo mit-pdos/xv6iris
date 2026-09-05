@@ -827,12 +827,12 @@ Section ProofCreateAlloc.
           - apply dir_uniq_not_dir. rewrite cr_setf_type. exact Htdirz.
           - apply dir_dots_ix_not_dir. rewrite cr_setf_type. exact Htdirz. }
         iApply fupd_wp.
-        iMod (cr_dirty_clear ⊤ t (bv_unsigned cinum)
+        iMod (cr_dirty_clear_same ⊤ t (bv_unsigned cinum)
                 (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                           bmc datc)
                 (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                           bmc datc)
-                ltac:(solve_ndisj) Hlocfile with "[] [] Hdirty Hctop")
+                ltac:(solve_ndisj) eq_refl Hlocfile with "[] [] Hdirty Hctop")
           as "[Htx Hctop]";
           [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
         iModIntro.

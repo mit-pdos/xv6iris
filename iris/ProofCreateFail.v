@@ -718,10 +718,20 @@ Section ProofCreateFail.
        body hands the parent's fragment over at the ENTRY record, because
        the retag owes the registry's row and this is where the post
        record's four well-formedness facts have just been assembled. *)
+    (* ...and it is VIEW-PRESERVING (round E1): the failing dirlink wrote
+       nothing ([Heqent0]) and the type and the count ride, so the
+       application is not consulted. *)
+    assert (Habs0 : FsAbsDefs.abs_of (era_node dn bm data)
+                    = FsAbsDefs.abs_of (era_node dn' bm' data')).
+    { apply FsAbsDefs.abs_of_dir_same.
+      - rewrite /fn_is_dir /fn_type era_node_rec Htydir. vm_compute. reflexivity.
+      - rewrite /fn_type !era_node_rec Hty'. reflexivity.
+      - rewrite /fn_nlink !era_node_rec Hnl'. reflexivity.
+      - symmetry. exact Heqent0. }
     iApply fupd_wp.
-    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dind)
+    iMod (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned dind)
             (era_node dn bm data) (era_node dn' bm' data')
-            ltac:(solve_ndisj) Logic.I
+            ltac:(solve_ndisj) Habs0
             (inode_local_of_ok_rec (bv_unsigned dind) fsc_cov fsc_logst dn' bm'
                data' Hiok' Hrl' Hduq' Hddix')
             with "[] [] Htop") as "Htop";

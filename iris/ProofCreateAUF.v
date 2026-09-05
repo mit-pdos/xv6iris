@@ -1742,33 +1742,24 @@ Section ProofCreateMain.
     iModIntro. iFrame "Hf". rewrite /cr_dirty. iExists k. iExact "Harm".
   Qed.
 
-  Lemma cr_dirty_retag (E : coPset) (t : nat) (i : Z)
-      (n n' : fs_node) :
-    ↑ftopN ∪ ↑appN ⊆ E ->
-    ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
-      cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'.
-  Proof.
-    iIntros (HE) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
-    iDestruct "Hd" as (k) "Harm".
-    iMod (ireg_top_retag_armed_auto E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) Logic.I with "Hi Hai Harm Hf")
-      as "[Harm Hf]".
-    iModIntro. iFrame "Hf". iExists k. iExact "Harm".
-  Qed.
-
+  (* ROUND E1: the non-directory create has no interior-link retag, so
+     [ProofCreateShared.cr_dirty_retag]'s copy is gone from here; and its
+     one CLEAR is at the node the arm parked, so the reading is unchanged
+     and the move rides [InodeRegion.ireg_top_retag_armed_same] -- the
+     application is not consulted. *)
   Lemma cr_dirty_clear (E : coPset) (t : nat) (i : Z)
       (n n' : fs_node) :
     ↑ftopN ∪ ↑appN ⊆ E ->
+    FsAbsDefs.abs_of n = FsAbsDefs.abs_of n' ->
     inode_local i n' ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
     top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'.
   Proof.
-    iIntros (HE Hloc) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
+    iIntros (HE Habs Hloc) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
-    iMod (ireg_top_retag_armed_auto E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) Logic.I with "Hi Hai Harm Hf")
+    iMod (ireg_top_retag_armed_same E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Habs with "Hi Hai Harm Hf")
       as "[Harm Hf]".
     iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
             with "Hi Harm Hf") as "[Harm Hf]".
@@ -5472,7 +5463,7 @@ Section ProofCreateMain.
                           bmc datc)
                 (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                           bmc datc)
-                ltac:(solve_ndisj) Hlocfile with "[] [] Hdirty Hctop")
+                ltac:(solve_ndisj) eq_refl Hlocfile with "[] [] Hdirty Hctop")
           as "[Htx Hctop]";
           [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
         iModIntro.
@@ -7154,10 +7145,20 @@ Section ProofCreateMain.
        body hands the parent's fragment over at the ENTRY record, because
        the retag owes the registry's row and this is where the post
        record's four well-formedness facts have just been assembled. *)
+    (* ...and it is VIEW-PRESERVING (round E1): the failing dirlink wrote
+       nothing ([Heqent0]) and the type and the count ride, so the
+       application is not consulted. *)
+    assert (Habs0 : FsAbsDefs.abs_of (era_node dn bm data)
+                    = FsAbsDefs.abs_of (era_node dn' bm' data')).
+    { apply FsAbsDefs.abs_of_dir_same.
+      - rewrite /fn_is_dir /fn_type era_node_rec Htydir. vm_compute. reflexivity.
+      - rewrite /fn_type !era_node_rec Hty'. reflexivity.
+      - rewrite /fn_nlink !era_node_rec Hnl'. reflexivity.
+      - symmetry. exact Heqent0. }
     iApply fupd_wp.
-    iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dind)
+    iMod (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned dind)
             (era_node dn bm data) (era_node dn' bm' data')
-            ltac:(solve_ndisj) Logic.I
+            ltac:(solve_ndisj) Habs0
             (inode_local_of_ok_rec (bv_unsigned dind) fsc_cov fsc_logst dn' bm'
                data' Hiok' Hrl' Hduq' Hddix')
             with "[] [] Htop") as "Htop";

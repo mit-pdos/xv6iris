@@ -2487,10 +2487,20 @@ Section ProofCreateMkdir.
               + exists (Z.of_nat (dir_slot data
                           (dir_nrec (bv_unsigned (di_size dn)))))%Z.
                 rewrite Nat.add_0_r Nat2Z.inj_mul. lia. }
+          (* ...and it is VIEW-PRESERVING (round E1): the failing append
+             wrote nothing ([Heqentm]) and the type and the count ride, so
+             the application is not consulted. *)
+          assert (Habsp : FsAbsDefs.abs_of (era_node dn bm data)
+                          = FsAbsDefs.abs_of (era_node dp3 bm3 dat3)).
+          { apply FsAbsDefs.abs_of_dir_same.
+            - rewrite /fn_is_dir /fn_type era_node_rec Htydir. vm_compute. reflexivity.
+            - rewrite /fn_type !era_node_rec Hp3ty. reflexivity.
+            - rewrite /fn_nlink !era_node_rec Hp3nl. reflexivity.
+            - symmetry. exact Heqentm. }
           iApply fupd_wp.
-          iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dind)
+          iMod (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned dind)
                   (era_node dn bm data) (era_node dp3 bm3 dat3)
-                  ltac:(solve_ndisj) Logic.I
+                  ltac:(solve_ndisj) Habsp
                   (inode_local_of_ok_rec (bv_unsigned dind) fsc_cov fsc_logst dp3
                      bm3 dat3 Hp3iok Hp3rl Hp3duq Hp3ddix)
                   with "[] [] Htop") as "Htop";
@@ -2766,11 +2776,28 @@ Section ProofCreateMkdir.
       (* THE MOVER (§9 W3): the child's first interior link moved its bytes. *)
       iApply fupd_wp.
       (* ...and the ERA's abstract value at the same record. *)
-      iMod (cr_dirty_retag ⊤ t (bv_unsigned cinum)
+      (* ...and the move is VIEW-PRESERVING (round E1): the failing ["."]
+         wrote nothing ([tot1 = 0]), so the child is a bare directory at
+         count 1 on both sides and the application is not consulted. *)
+      assert (Habs1 : FsAbsDefs.abs_of
+                        (era_node (cr_setf dnc major minor
+                                     (mword_of_int 1 : mword 16)) bmc datc)
+                      = FsAbsDefs.abs_of (era_node dc1 bm1 dat1)).
+      { apply FsAbsDefs.abs_of_dir_same.
+        - rewrite /fn_is_dir /fn_type era_node_rec -Hc1ty0 Hc1tyd.
+          vm_compute. reflexivity.
+        - rewrite /fn_type !era_node_rec Hc1ty0. reflexivity.
+        - rewrite /fn_nlink !era_node_rec Hc1nl0. reflexivity.
+        - rewrite (FsAbsDefs.dir_entries_size_0 (era_node dc1 bm1 dat1));
+            [| rewrite /fn_size era_node_rec Hc1szmax Hcsz0 Htot10;
+               vm_compute; reflexivity].
+          rewrite (FsAbsDefs.dir_entries_size_0 (era_node _ bmc datc));
+            [reflexivity | rewrite /fn_size era_node_rec; exact Hcsz0]. }
+      iMod (cr_dirty_retag_same ⊤ t (bv_unsigned cinum)
               (era_node (cr_setf dnc major minor
                            (mword_of_int 1 : mword 16)) bmc datc)
               (era_node dc1 bm1 dat1)
-              ltac:(solve_ndisj) with "[] [] Hdirty Hctop") as "[Hdirty Hctop]";
+              ltac:(solve_ndisj) Habs1 with "[] [] Hdirty Hctop") as "[Hdirty Hctop]";
         [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
       iModIntro.
       iPoseProof (cr_fail_mkdir_half (CID := CID) γs j γl pd pav pu

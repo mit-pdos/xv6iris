@@ -361,3 +361,18 @@ Rounds, each a green gate:
   application's fixed names; the taint counter becomes the echo
   application's fixed part.
 - **E — AU forms for link, mkdir, `iput`'s free**, with their deltas.
+  **E1 LANDED 2026-09-05** (8 files; audit 13): census of the 31 real
+  `_auto` mover sites (`scratchpad/roundE1-census.md` of the session;
+  table in the E1 commit message): 9 view-preserving rows moved to
+  `_same`/`_armed_same` (`FsAbsDefs.abs_of_dir_same`,
+  `dir_entries_size_0`; `ProofCreateShared.cr_dirty_{retag,clear}_same`),
+  2 dead helpers deleted, 0 sites sat inside an AU fire.  REMAINING (E2's
+  worklist, 22 sites = 17 `_auto` + 5 `_armed_auto`): δ_free at the iput
+  deposit (EscrowDeposit); δ_create's fresh leg (ProofIlock's claim,
+  `cr_dirty_arm` ×3); δ_create's dir leg / mkdir's fused parent step
+  (ProofCreateAlloc, ProofCreateMkdir ×2 + shared helpers); create/mkdir
+  FAILURE arms (child nlink 1→0: ProofCreateFail, ProofCreateMkdir ×2,
+  ProofCreateAU/AUF ×2); δ_link (ProofSysLink ×2, ProofSysLinkTails' fail
+  arm); δ_unlink (ProofSysUnlinkW5File ×2, W5Dir ×2); δ_write on the
+  non-AU write (ProofFilewrite), the non-AU open's trunc (ProofSysOpen),
+  and the AU write's short-chunk arm (ProofFilewriteAU, outside the fire).

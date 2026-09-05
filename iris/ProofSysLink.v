@@ -3579,10 +3579,20 @@ Section ProofSysLinkBody.
                             (* THE RETAG OWES THE ROW (durable-disk lane A):
                                the four facts are the re-pack's own, already
                                named. *)
-                            iMod (ireg_top_retag_auto ⊤ fsc_fs (bv_unsigned dinum)
+                            (* ...and it is VIEW-PRESERVING (round E1): the dirlink wrote
+                               nothing ([Heqentd]) and the type and the count ride, so the
+                               application is not consulted. *)
+                            assert (Habsd : FsAbsDefs.abs_of (era_node dnd bmd datd)
+                                            = FsAbsDefs.abs_of (era_node dnd' bmd' datd')).
+                            { apply FsAbsDefs.abs_of_dir_same.
+                              - rewrite /fn_is_dir /fn_type era_node_rec Htyd. vm_compute. reflexivity.
+                              - rewrite /fn_type !era_node_rec Htyeq. reflexivity.
+                              - rewrite /fn_nlink !era_node_rec Hnleq. reflexivity.
+                              - symmetry. exact Heqentd. }
+                            iMod (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned dinum)
                                     (era_node dnd bmd datd)
                                     (era_node dnd' bmd' datd')
-                                    ltac:(solve_ndisj) Logic.I
+                                    ltac:(solve_ndisj) Habsd
                                     (inode_local_of_ok_rec (bv_unsigned dinum)
                                        fsc_cov fsc_logst dnd' bmd' datd'
                                        Hdiok' Hrl_datd' Hduq' Hddix')

@@ -1673,6 +1673,52 @@ Section ProofCreateMain.
     iModIntro. iFrame "Htx Hf".
   Qed.
 
+  (* ...AND THE VIEW-PRESERVING TWINS (app-instances.md section 7, round
+     E1): a retag whose reading is unchanged ([FsAbsDefs.abs_of n =
+     FsAbsDefs.abs_of n']) owes the application nothing, so it rides
+     [InodeRegion.ireg_top_retag_armed_same] and the parked license is not
+     consulted.  The FILE arm's disarm (the node does not move at all) and
+     mkdir's failing-["."] arm (a bare directory at count 1 either side)
+     take these; the byte-moving arms stay on the [_auto] forms above until
+     round E2 gives them their AU steps. *)
+  Lemma cr_dirty_retag_same (E : coPset) (t : nat) (i : Z)
+      (n n' : fs_node) :
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    FsAbsDefs.abs_of n = FsAbsDefs.abs_of n' ->
+    ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
+    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+      cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'.
+  Proof.
+    iIntros (HE Habs) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
+    iDestruct "Hd" as (k) "Harm".
+    iMod (ireg_top_retag_armed_same E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Habs with "Hi Hai Harm Hf")
+      as "[Harm Hf]".
+    iModIntro. iFrame "Hf". iExists k. iExact "Harm".
+  Qed.
+
+  Lemma cr_dirty_clear_same (E : coPset) (t : nat) (i : Z)
+      (n n' : fs_node) :
+    ↑ftopN ∪ ↑appN ⊆ E ->
+    FsAbsDefs.abs_of n = FsAbsDefs.abs_of n' ->
+    inode_local i n' ->
+    ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
+    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+      t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'.
+  Proof.
+    iIntros (HE Habs Hloc) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
+    iDestruct "Hd" as (k) "Harm".
+    iMod (ireg_top_retag_armed_same E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
+            ltac:(apply elem_of_singleton, eq_refl) Habs with "Hi Hai Harm Hf")
+      as "[Harm Hf]".
+    iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
+            with "Hi Harm Hf") as "[Harm Hf]".
+    iEval (rewrite difference_diag_L) in "Harm".
+    iMod (ireg_release E fsc_fs k t (1/2)%Qp (ftopN_sub_app E HE) with "Hi Harm")
+      as "Htx".
+    iModIntro. iFrame "Htx Hf".
+  Qed.
+
   Definition cr_cont_body
       (γf : gname)
       (plen : nat) (pfun : nat -> bv 8) (pv : mword 64)

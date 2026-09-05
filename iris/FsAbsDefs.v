@@ -136,6 +136,33 @@ Proof.
   by destruct Hb as (_ & _ & _ & _ & ->).
 Qed.
 
+(* THE VIEW-PRESERVING RETAG (app-instances.md section 7, round E1).  A
+   kernel move whose reading is unchanged owes the application nothing
+   ([InodeRegion.ireg_top_retag_same]), and the shape that recurs at the
+   sites is a DIRECTORY whose type, count and entry map all ride -- a
+   dirlink that wrote nothing (create's and link's fail bodies, mkdir's
+   failing parent append), or a bare directory either side (mkdir's failing
+   ["."]).  The block addresses and the bytes past the size may move
+   freely: [abs_of] never reads them. *)
+Lemma abs_of_dir_same (n n' : fs_node) :
+  fn_is_dir n = true ->
+  fn_type n = fn_type n' ->
+  fn_nlink n = fn_nlink n' ->
+  dir_entries n = dir_entries n' ->
+  abs_of n = abs_of n'.
+Proof.
+  intros Hd Hty Hnl He.
+  assert (Hd' : fn_is_dir n' = true) by (rewrite /fn_is_dir -Hty; exact Hd).
+  rewrite /abs_of /abs_node Hd Hd' He Hnl. reflexivity.
+Qed.
+
+(* ...and a directory at size 0 has no entries whatever its bytes say *)
+Lemma dir_entries_size_0 (n : fs_node) : fn_size n = 0 -> dir_entries n = ∅.
+Proof.
+  intros Hsz. rewrite /dir_entries. destruct (fn_is_dir n); [| reflexivity].
+  rewrite /fn_nrec Hsz dir_nrec_zero. apply dir_view_nil.
+Qed.
+
 (* ---------------------------------------------------------------------
    1a.  THE BRIDGE TO [FsTree.fsnode] -- WALK-ONLY, AND SAID SO
 
