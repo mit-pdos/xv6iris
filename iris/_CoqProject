@@ -2009,7 +2009,6 @@ UkShMalloc.v
 # frame included); [UkSh.ush_rest] hands [16 + n], so joining the two is a
 # re-cut of the loop head's budget, which belongs with the fork arm.
 UkShLoop.v
-UkShLoop.v
 UkShCd.v
 UkShMain.v
 # ... AND MAIN'S BODY, WHOLE.  UkShFork.v walks the fork arm (0x92c..0x938:
