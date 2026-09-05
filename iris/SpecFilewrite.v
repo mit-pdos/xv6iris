@@ -66,10 +66,10 @@
 
    It crosses as a resource.  The lent share is GENERATION-NAMED
    ([IcacheRef.inode_shr_gen] at [fwn_g]); SpecIlock's postcondition hands
-   back [IcacheRef.ity_shot fwn_g (di_type dn)] at that same generation
+   back [IcacheRefDefs.ity_shot fwn_g (di_type dn)] at that same generation
    (pinned by [live_gen_agree], with no itable fact anywhere); this contract
    carries the fd's own [ity_shot fwn_g fwn_ty] with [fwn_ty <> T_DIR];
-   [IcacheRef.ity_shot_agree] joins them and [DirView.dir_ok_not_dir]
+   [IcacheRefDefs.ity_shot_agree] joins them and [DirView.dir_ok_not_dir]
    finishes.  A generation sees AT MOST ONE FILL (§17.6), which is what makes
    that agreement mean anything.
 
@@ -251,7 +251,7 @@ Proof. intros Hle Htot. lia. Qed.
    of the reference itself ([SpecFileread.fileread_pay_carve], which is
    [SpecFilestat.filestat_pay_carve] GROWN by the [ty] output precisely so
    that filewrite's [ity_shot] can come from the same place), or is the
-   ambient cache's ([IcacheRef.icfg_dev] / [icfg_nib]), or is existential
+   ambient cache's ([IcacheRefDefs.icfg_dev] / [icfg_nib]), or is existential
    under the sleeplock FAMILY. *)
 Record fwrite_names := MkFWriteNames {
   fwn_procs      : list gname;    (* the proc table's per-slot lock names   *)

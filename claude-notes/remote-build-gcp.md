@@ -199,8 +199,22 @@ every dump target as up to date without touching the tracked `.v`:
   -o xv6-riscv/kernel/kernel -o xv6-riscv/fs.img \
   -o xv6-riscv/user/_sh -o xv6-riscv/user/_init \
   -o xv6-riscv/user/_echo -o xv6-riscv/user/_sync \
+  -o xv6-riscv/user/_cat \
   -k proofs
 ```
+
+The `-o` list is `$(USER_DUMPS)` plus the kernel ELF, `fs.img` and the
+dumper — **re-read `USER_DUMPS` in the top-level Makefile before trusting a
+copy of it**, since a program added there needs a row here too.
+
+**`-o` CANNOT SAVE A DUMP TARGET THAT DOES NOT EXIST ON DISK** — it only
+says "do not remake because THIS prerequisite is newer", and a MISSING
+target is out of date regardless, so the rule runs and dies in
+`--format rocq-raw`.  `user-rocq/CatElfRaw.v` is that case: nothing in
+`user-rocq/_CoqProject` builds it, so it is untracked and no `-o` list gets
+past it.  Then stop fighting the top-level `make` and drive the sub-trees
+through their own generated `CoqMakefile`s — the WORKTREE recipe at the top
+of this file, which never reaches a dump rule.
 
 Two traps in getting there:
 

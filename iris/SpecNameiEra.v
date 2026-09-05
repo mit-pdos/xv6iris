@@ -80,7 +80,7 @@ Require Import PathElems.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IcacheInv.
 Require Import IcacheEscrow.   (* the payload arms *)
 Require Import FsTree.         (* [fname], [dir_view]'s home *)
@@ -103,7 +103,7 @@ Local Open Scope Z_scope.
 (* ===================================================================== *)
 (*  1. THE VOCABULARY IS IMPORTED, NOT RESTATED                          *)
 (*                                                                       *)
-(*  [SpecNameiTr.inode_held_at] (the pinned package: [IcacheRef.inode_held]
+(*  [SpecNameiTr.inode_held_at] (the pinned package: [IcacheHeld.inode_held]
     with the inum exposed) is the RULED artifact and stays where it is --
     the two contracts hand back the same pin, and a second copy would make
     [inode_held_at_held] ambiguous at every consumer.  The hop family is

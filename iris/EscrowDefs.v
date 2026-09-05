@@ -12,7 +12,7 @@ From iris.algebra Require Import excl dfrac.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_map mono_nat own invariants.
 Require Import RiscvPtsto.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 
 Notation ST_EMPTY := 0%nat.
 Notation ST_FILLED := 1%nat.
@@ -44,7 +44,7 @@ Section EscrowDefs.
   (*  THE CORPSE LEDGER's ELEMENT (durable-disk lane C-7)                 *)
   (* ------------------------------------------------------------------ *)
   (* One row per inum in the pool's IN-TRANSITION index, at the ambient
-     [IcacheRef.icfg_pcrp].  The AUTHORITY is a conjunct of
+     [IcacheRefDefs.icfg_pcrp].  The AUTHORITY is a conjunct of
      [IcacheEscrow.ipool_body] (so the commit reads every row with no lock
      taken); THIS is the element the freeing walk carries from the +0x94 park
      ([IcacheEscrow.ipool_put_corpse]) to the off-lock deposit

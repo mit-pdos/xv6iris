@@ -88,7 +88,7 @@ Require Import BitmapInv.
 Require Import DinodeSlot.
 Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheEscrow.
 Require Import CodeFsinit.
 Require Import SpecBread SpecBrelse SpecMemmove.

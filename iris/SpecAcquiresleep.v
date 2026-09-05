@@ -395,7 +395,7 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
     (γl γsl : gname) (s : string) (R : iProp Σ)
     (* THE DEPOSIT'S OWN GNAME, separate from the lock's.  A client keys the
        "may hold" right by the OBJECT rather than by the lock -- the icache
-       keys it by the inode SLOT ([IcacheRef.icfg_isl k]) so that a reference
+       keys it by the inode SLOT ([IcacheRefDefs.icfg_isl k]) so that a reference
        can carry it -- and the refutation only ever looks at this one. *)
     (γt : gname) (q : Qp)
     (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool)
@@ -438,7 +438,7 @@ Definition wp_acquiresleep_nb_genl_llb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG �
     (γl γsl : gname) (s : string) (R : TsoCtx.CtxId -> iProp Σ)
     (* THE DEPOSIT'S OWN GNAME, separate from the lock's.  A client keys the
        "may hold" right by the OBJECT rather than by the lock -- the icache
-       keys it by the inode SLOT ([IcacheRef.icfg_isl k]) so that a reference
+       keys it by the inode SLOT ([IcacheRefDefs.icfg_isl k]) so that a reference
        can carry it -- and the refutation only ever looks at this one. *)
     (γt : gname) (q : Qp)
     (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool)

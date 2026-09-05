@@ -49,7 +49,7 @@
 
    WHY THE Q-c GAP WAS NOT A GAP IN THE CWD's READING.  A relative walk
    starts at [idup(p->cwd)] and the recorded blocker was that
-   [IcacheRef.inode_held] hides the cwd's inum existentially, so a caller
+   [IcacheHeld.inode_held] hides the cwd's inum existentially, so a caller
    cannot write [P 0 <that inum>].  It never has to: idup's post hands the
    walk a package whose own witness is the slot's inum, so the PROOF reads
    it there and fires the caller's one shot at that value.  No new reading
@@ -106,7 +106,7 @@ Require Import PathElems.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IcacheInv.
 Require Import IcacheEscrow.   (* the payload arms *)
 Require Import KvmSpec.

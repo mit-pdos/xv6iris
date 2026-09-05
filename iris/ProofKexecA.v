@@ -217,7 +217,7 @@ Require Import DirentEnc.
 Require Import PathElems.
 Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IcacheInv.
 Require Import KvmSpec.
 (* Names the nightly dead-import sweep stopped delivering transitively. *)

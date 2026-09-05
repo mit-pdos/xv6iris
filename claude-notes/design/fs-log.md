@@ -1431,7 +1431,7 @@ files stay byte-stable.  What it does cost, and what needs the ruling:
   runs after it (SpecFsinit.v:332).  So γ exists before `ic_names_alloc`;
   SpecFsinit is the one statement that has to open that existential
   earlier and re-share it.
-(The alternative — adding `icfg_log`/`icfg_ist` to `IcacheRef.icfg`
+(The alternative — adding `icfg_log`/`icfg_ist` to `IcacheRefDefs.icfg`
 (:388), the ambient config class — is even cheaper syntactically but makes
 the log's γ AMBIENT while the whole fs cone threads it as a value, and the
 same tie is then needed anyway.  Not recommended, but it is the other
@@ -1832,7 +1832,7 @@ independent of all of the above and is the one piece that could land
 early — the fact is in `ProofNamex`'s context at `L_par` — but §G.5's
 "the trio's posts move once" is the reason it did not: it would force a
 second move of six statements and a second `ProofNamex` cone.  Its one
-open design question, for whoever takes it: `IcacheRef.inode_held` hides
+open design question, for whoever takes it: `IcacheHeld.inode_held` hides
 the generation, so the success post needs a generation-NAMED form beside
 it (`inode_shr_held_gen`'s shape, at a full reference rather than a
 share), and that definition lives in `IcacheRef.v` — a 350-file cone.

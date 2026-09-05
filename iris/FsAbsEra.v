@@ -131,7 +131,7 @@ Require Import IrefSlots.       (* [irefslotG]: section 0's binder list       *)
 Require Import FsBlocks.        (* [fs_names]                                 *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the LIVE Gamma               *)
 Require Import FsStateEra.      (* [era_node], [era_node_rec]                 *)
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheEscrow.    (* the payload arms                           *)
 Require Import Xv6Cameras.
 Require Import Xv6G.            (* the bundle                                 *)
@@ -803,7 +803,7 @@ End FsAbsNpar.
    beside the scope premise [pfun 0 = SLASH].  A RELATIVE walk starts at
    [idup(p->cwd)] instead, and the recorded blocker (SpecNameiTr's Q-c,
    restated in [SpecNparEra]'s header) was that no landed reading exposes
-   the cwd's inum: [IcacheRef.inode_held] hides it existentially, so
+   the cwd's inum: [IcacheHeld.inode_held] hides it existentially, so
    [P 0 <the cwd's inum>] is not a formula the caller can write.
 
    IT DOES NOT HAVE TO BE.  The caller never needs to NAME the start inum

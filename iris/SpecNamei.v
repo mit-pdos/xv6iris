@@ -67,7 +67,7 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IrefSlots.
 Require Import SpecIput.
 Require Import SpecDirlink.

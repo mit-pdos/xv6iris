@@ -59,7 +59,7 @@ Require Import LogInv.
 Require Import BioDefs.   (* [BSIZE]: the block size [bm_covers] divides by *)
 Require Import BlockWords.
 Require Import DinodeEnc.
-Require Export IcacheRef.   (* the in-core scalar fields + the reference *)
+Require Export IcacheRefDefs.   (* the in-core scalar fields + the reference *)
 Require Export InodeDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.

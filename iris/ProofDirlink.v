@@ -95,7 +95,7 @@ Require Import DirentEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheEscrow.
 Require Import ProcInv.
 Require Import FileInvDefs.

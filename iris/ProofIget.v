@@ -215,7 +215,7 @@ Proof.
 Qed.
 
 (* the [beq s1,a3] at +0x40: [a3] is [&itable.inode[NINODE]], which IS the
-   next symbol ([IcacheRef.ientry_sentinel]), so the exit test is the index
+   next symbol ([IcacheRefDefs.ientry_sentinel]), so the exit test is the index
    test the induction runs on. *)
 Lemma ig_sentinel_eq (j : nat) :
   (j <= NINODE)%nat ->
@@ -1089,7 +1089,7 @@ Section ProofIget.
         WP (Loop : expr riscv_lang))%I with "[]" as "Hstep".
       { iIntros (Ms) "%Hsreg %Hscan' %Hemp' Hcg Hpc Hcnt Hpay Htok Hhalf Hstamps Hiauth Hipool Hslots Hpool Hislot Hlic Hcont2".
         destruct Hsreg as (HSs1 & HSa3 & HSs2 & HSs4 & HSsp & HSra & HScs).
-        (* +0x3c addi s1,s1,136 -- [IcacheRef.ientry_step] *)
+        (* +0x3c addi s1,s1,136 -- [IcacheRefDefs.ientry_step] *)
         iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iget + 0x3c)) Rs1 Rs1
                   (mword_of_int 136 : mword 12) Ms (trap_res b + (K - 6))%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
@@ -1443,7 +1443,7 @@ Section ProofIget.
                         (∃ (g : gname) (loA : nat),
                            IcacheInv.iref_tok_genlo e (1/2/2)%Qp g loA ∗
                            IcacheRef.live_genlo e (1/2)%Qp g loA ∗
-                           IcacheRef.ity_pending g ∗
+                           IcacheRefDefs.ity_pending g ∗
                            TsoCtx.ctx_wrote TsoCtx.cur_ctx loA
                              (i_ref (ientry e)) ∗
                            (∃ tstn : nat, ⌜(loA <= tstn)%nat⌝ ∗

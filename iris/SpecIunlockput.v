@@ -261,7 +261,7 @@ Definition wp_iunlockput_dep_sconf_body
      canonical [inode_refp k (qi + s)] that iput then spends -- unit still
      attached, because the unit rode with the short parent and never with
      the travelling share (item 7a-wire).  Every caller already holds the
-     pair in this shape: it is exactly what [IcacheRef.inode_held_shed]
+     pair in this shape: it is exactly what [IcacheHeld.inode_held_shed]
      leaves behind, and [inode_held_short] is now stated over it. *)
   inode_refp_short k (qi + s)%Qp qi icfg_dev inum -∗
   (* ---- iput's own resources ---- *)
@@ -419,7 +419,7 @@ Definition wp_iunlockput_dep_gen_body
      canonical [inode_refp k (qi + s)] that iput then spends -- unit still
      attached, because the unit rode with the short parent and never with
      the travelling share (item 7a-wire).  Every caller already holds the
-     pair in this shape: it is exactly what [IcacheRef.inode_held_shed]
+     pair in this shape: it is exactly what [IcacheHeld.inode_held_shed]
      leaves behind, and [inode_held_short] is now stated over it. *)
   inode_refp_short k (qi + s)%Qp qi icfg_dev inum -∗
   (* ---- iput's own resources ---- *)
@@ -577,7 +577,7 @@ Definition wp_iunlockput_tx_sconf_body
      canonical [inode_refp k (qi + s)] that iput then spends -- unit still
      attached, because the unit rode with the short parent and never with
      the travelling share (item 7a-wire).  Every caller already holds the
-     pair in this shape: it is exactly what [IcacheRef.inode_held_shed]
+     pair in this shape: it is exactly what [IcacheHeld.inode_held_shed]
      leaves behind, and [inode_held_short] is now stated over it. *)
   inode_refp_short k (qi + s)%Qp qi icfg_dev inum -∗
   (* ---- iput's own resources ---- *)
@@ -717,7 +717,7 @@ Definition wp_iunlockput_tx_gen_body
      canonical [inode_refp k (qi + s)] that iput then spends -- unit still
      attached, because the unit rode with the short parent and never with
      the travelling share (item 7a-wire).  Every caller already holds the
-     pair in this shape: it is exactly what [IcacheRef.inode_held_shed]
+     pair in this shape: it is exactly what [IcacheHeld.inode_held_shed]
      leaves behind, and [inode_held_short] is now stated over it. *)
   inode_refp_short k (qi + s)%Qp qi icfg_dev inum -∗
   (* ---- iput's own resources ---- *)

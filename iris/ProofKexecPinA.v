@@ -89,7 +89,7 @@ Require Import DirentEnc.
 Require Import PathElems.
 Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IcacheInv.
 Require Import KvmSpec.
 (* Names the nightly dead-import sweep stopped delivering transitively. *)
@@ -171,7 +171,7 @@ Section KexecPinABody.
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.
 
-  (* the pinned twin of [IcacheRef.inode_held_ne_zero]: the era post hands
+  (* the pinned twin of [IcacheHeld.inode_held_ne_zero]: the era post hands
      back the package AT ITS INUM, and the [beqz a0] at +0x030 needs the
      register non-zero either way. *)
   Lemma inode_held_at_ne_zero (v : mword 64) (z : Z) :

@@ -343,7 +343,7 @@ Require Import FsCrash.
 Require Import BitmapInv.
 Require Import ConsoleInv.
 Require Import CstringInv.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IrefSlots FdSlots.
 Require Import FileInvDefs FileInv.
 Require Import ProcInv.
@@ -505,7 +505,7 @@ Ltac stkeq := unfold pa_stk, add_vec_int; f_equal; apply bv_eq; vm_compute; refl
    THE SECOND ANSWER, WHICH IS THIS ONE, IS THAT THERE IS ONLY ONE FILE
    SYSTEM.  [FsReady.fs_ready] is that fact as a predicate: every fs
    invariant, lock handle, certificate, superblock cell and geometry
-   premise, at the AMBIENT [FsCfg.fscfg]/[IcacheRef.icfg] names, with a
+   premise, at the AMBIENT [FsCfg.fscfg]/[IcacheRefDefs.icfg] names, with a
    PRODUCER ([FsReady.fs_ready_establish]) -- which no version of
    [syscall_env] ever had.  So the environment is [fs_ready] plus the
    equations saying the caller's threaded [bn]/[fn] name that same file

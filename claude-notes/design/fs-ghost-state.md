@@ -1320,7 +1320,7 @@ SUSPENDS IT.**  `ftop_body γfs = ∃ I A, ghost_map_auth (fs_top γfs) 1 I ∗
 ghost_map_auth icfg_lk 1 A ∗ ([∗ map] e ∈ A, ireg_parked e) ∗
 ⌜ftop_clean I A⌝`, where `A : gmap nat ireg_arm_ent` is the ARMED REGISTRY
 (`Xv6Cameras.ireg_arm_ent = (nat * Qp * gset Z)`, class
-`Xv6Cameras.icache_lkG`, ambient gname `IcacheRef.icfg_lk`).  Its point in
+`Xv6Cameras.icache_lkG`, ambient gname `IcacheRefDefs.icfg_lk`).  Its point in
 one sentence: every inode the abstract map names is WELL-FORMED, except the
 ones some open transaction has said it is in the middle of writing.
 
@@ -1573,7 +1573,7 @@ the twenty, and a bare existential is useless downstream: a consumer handed
 `∃ γ…, fs_ready γ…` cannot feed it to `SpecKexec.fs_fabric` or to
 `UsertrapRes.ut_res_bare`, whose own resources are keyed to the *caller's*
 concrete names, because nothing relates the two.  Ambient names remove the
-existential instead of hiding it.  The argument is `IcacheRef.icfg`'s,
+existential instead of hiding it.  The argument is `IcacheRefDefs.icfg`'s,
 verbatim, one layer out: there is exactly one file system per boot.
 `FsCfg.fscfg` is per-era for the same reason `icfg` is (the disk image
 ghost is re-minted at PowerOn — `design/crash.md`), i.e. a Class ASSUMPTION

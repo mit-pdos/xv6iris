@@ -1053,7 +1053,7 @@ Global Instance biobox_boxG {Σ} `{!bioboxG Σ} `{!kallocG Σ} : boxG bio_id bio
 
 (* ---- THE ICACHE INSTANCE (R3, endgame §4.2 M-1'/M-3): identity = Some
    (dev × inum) with None = dead (M-1'), shape with the generation (M-3).
-   The per-slot box names are a field of [IcacheRef.icfg] (canonical, like
+   The per-slot box names are a field of [IcacheRefDefs.icfg] (canonical, like
    icfg_isl) so inode_ref / inode_shr keep their arity. ---- *)
 Notation ic_bid := (option bio_id).
 Inductive ic_x : Type :=

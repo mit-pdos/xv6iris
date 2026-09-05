@@ -79,6 +79,7 @@ Require Import SpecSafestrcpy.
 Require Import ProofKforkParts.
 Require Import CodeKfork.
 Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
+Require Import IcacheHeld.   (* [inode_held_at] *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)

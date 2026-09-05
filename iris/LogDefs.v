@@ -561,7 +561,7 @@ End LogFrags.
 (*  name the file system's configuration record mentions is minted ONCE, *)
 (*  in the era fupd, and every downstream constructor FILLS a name it is *)
 (*  handed rather than returning a fresh one.  [icfg_log] is such a      *)
-(*  field ([IcacheRef.icfg_alloc] already takes the whole [log_names] as *)
+(*  field ([IcacheRefDefs.icfg_alloc] already takes the whole [log_names] as *)
 (*  a tie argument), so [initlog] -- which used to mint all four at WP   *)
 (*  time and return them existentially -- has to become an [_at] form.   *)
 (*                                                                      *)

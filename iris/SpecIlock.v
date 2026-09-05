@@ -26,7 +26,7 @@
 
    ---- THE ENTRY IS A SLOT, NOT A POINTER ------------------------------
 
-   [ip] is [IcacheRef.ientry k] for a slot [k < NINODE], not a free pointer:
+   [ip] is [IcacheRefDefs.ientry k] for a slot [k < NINODE], not a free pointer:
    the whole icache is indexed by slot ([ientry_inj] makes the two views
    interchangeable) and the escrow, the reference algebra and the [ref]-word
    invariant are all keyed that way.  It is also what kills the first
@@ -247,7 +247,7 @@ Definition wp_ilock_dep_sconf_body
      in the arm, so the holder cannot refute a standing [iclaim] either.  Both
      are exactly [InodeRegion.ShotK]: its licence IS this generation's type
      one-shot, which kills the unloaded payload
-     ([IcacheRef.ity_pending_shot_excl]) inside the checkout's own ghost step,
+     ([IcacheRefDefs.ity_pending_shot_excl]) inside the checkout's own ghost step,
      and [ilk_post (ShotK _)] already reports [filled = false].  [fileread] and
      [filestat] -- the only two [ilock] callers holding no transaction -- come
      in at [ShotK] and nowhere else does. *)
@@ -347,7 +347,7 @@ Definition wp_ilock_dep_sconf_body
                     hold, free and persistent, is this generation's own
                     one-shot -- and a one-shot in hand means the generation
                     has already been filled, so it refutes the UNCACHED arm
-                    outright ([IcacheRef.ity_pending_shot_excl]) and the
+                    outright ([IcacheRefDefs.ity_pending_shot_excl]) and the
                     post reports [filled = false].
 
      STATED AT THE CALLER'S [g], like [ity_shot] below and for the same
@@ -424,7 +424,7 @@ Definition wp_ilock_dep_sconf_body
          writing is not a directory, and "not a directory" is sys_open's
          invariant, five frames up.  [FileInv.inode_pay] carries the fd's own
          [ity_shot g ty] with [fc_wbool C = true -> ty <> T_DIR];
-         [IcacheRef.ity_shot_agree] joins the two, and [DirView.dir_ok] is
+         [IcacheRefDefs.ity_shot_agree] joins the two, and [DirView.dir_ok] is
          vacuous.  A generation sees at most one fill (17.6), which is what
          makes that agreement sound. *)
       ity_shot g (di_type dn) -∗
@@ -585,7 +585,7 @@ Definition wp_ilock_tx_sconf_body
                     hold, free and persistent, is this generation's own
                     one-shot -- and a one-shot in hand means the generation
                     has already been filled, so it refutes the UNCACHED arm
-                    outright ([IcacheRef.ity_pending_shot_excl]) and the
+                    outright ([IcacheRefDefs.ity_pending_shot_excl]) and the
                     post reports [filled = false].
 
      STATED AT THE CALLER'S [g], like [ity_shot] below and for the same
@@ -680,7 +680,7 @@ Definition wp_ilock_tx_sconf_body
          writing is not a directory, and "not a directory" is sys_open's
          invariant, five frames up.  [FileInv.inode_pay] carries the fd's own
          [ity_shot g ty] with [fc_wbool C = true -> ty <> T_DIR];
-         [IcacheRef.ity_shot_agree] joins the two, and [DirView.dir_ok] is
+         [IcacheRefDefs.ity_shot_agree] joins the two, and [DirView.dir_ok] is
          vacuous.  A generation sees at most one fill (17.6), which is what
          makes that agreement sound. *)
       ity_shot g (di_type dn) -∗

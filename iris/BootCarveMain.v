@@ -47,7 +47,7 @@ Require Import ProcGeom UserPtTree ProcInv SwtchCtx SchedCtx.
    are the field addresses it is stated over.  IMPORTED BEFORE [SpecIinit],
    deliberately: [IcacheRef] has its own [NINODE], and every [NINODE] in this
    file is [SpecIinit]'s (they are the same 50, but not the same constant). *)
-Require Import DinodeEnc IcacheRef InodeInv InodeLock IcacheBoot.
+Require Import DinodeEnc IcacheRefDefs InodeInv InodeLock IcacheBoot.
 Require Import SleepLock BcacheInv SpecIinit.
 (* the bcache's PAYLOAD rows: [BufOwn]'s field addresses, [BioInv]'s [bpa] /
    [brefcnt], and [BioInitAt.buf_raw] -- the named row [bio_init_at] takes and
@@ -265,7 +265,7 @@ Proof. reflexivity. Qed.
    [itable+24] (just past the 24-byte spinlock), and their 136-byte records
    are what the byte carve has to cut -- one family, not two, since the two
    ranges OVERLAP and no two big-ops can both own them (the [bnode_raw]
-   precedent below).  The array ends exactly at [IcacheRef.ientry NINODE],
+   precedent below).  The array ends exactly at [IcacheRefDefs.ientry NINODE],
    i.e. at the next symbol; the old sleeplock-anchored window ran 16 bytes
    past it. *)
 Definition inode_entry_base : Z := KernelSyms.itable + 24.

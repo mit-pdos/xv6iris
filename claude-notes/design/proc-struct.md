@@ -342,7 +342,7 @@ Definition proc_priv (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivat
    cwd_ref (pv_cwd V))%I.
 ```
 
-**`cwd_ref` HAS NO NULL ARM.** `cwd_ref v := IcacheRef.inode_held v`, so
+**`cwd_ref` HAS NO NULL ARM.** `cwd_ref v := IcacheHeld.inode_held v`, so
 `cwd_ref v ⊢ ⌜v ≠ 0⌝` (`cwd_ref_nonzero`) is a free projection of `proc_priv`
 — which is why it is a projection and not a conjunct anywhere near
 `proc_slots`: `SchedCtx.proc_slots_recast` moves SLEEPING → RUNNABLE → RUNNING
@@ -1182,7 +1182,7 @@ IcacheRef.inode_shr_gen         inode_ident k' _ icfg_dev (fp_inum pn)
 The bottom line is a POINTS-TO on the entry's own `i_inum` cell, so the ghost
 cannot drift from the inode the file actually holds, and two holders of one
 file agree on it for the same reason they agree on the rest of `pn`
-(`fpay_tok_agree`).  `IcacheRef.inode_shr_held_gen` used to leave the inum
+(`fpay_tok_agree`).  `IcacheHeld.inode_shr_held_gen` used to leave the inum
 ∃-bound; **it was changed in place rather than duplicated**, because a share
 of "some inode, number unknown" was never worth holding — the resource
 already pinned the number, the quantifier just hid it.

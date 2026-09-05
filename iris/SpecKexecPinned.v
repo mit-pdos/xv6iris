@@ -114,7 +114,7 @@ Require Import InodeDefs.        (* [file_byte]                               *)
 Require Import InodeInv.
 Require Import InodeRegion.      (* §LF: [fv_pin_redeem]                      *)
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import DirViewG.         (* [fv_of], [fv_half]                        *)
@@ -348,7 +348,7 @@ Definition wp_kexec_pinned_body
      namei's walk MINTS the group receipt at its nlink guard, and
      [InodeRegion]'s vocabulary is ambient, so a contract that threads its
      own [g] and [inodestart] meets it through a pure equation.  Same
-     pattern as the two above, and true at boot by [IcacheRef.icfg_alloc]. *)
+     pattern as the two above, and true at boot by [IcacheRefDefs.icfg_alloc]. *)
   g = icfg_log ->
   inodestart = icfg_ist ->
   dev = ROOTDEV ->

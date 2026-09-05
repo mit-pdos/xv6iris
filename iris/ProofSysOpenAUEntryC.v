@@ -85,7 +85,7 @@ Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KvmSpec.

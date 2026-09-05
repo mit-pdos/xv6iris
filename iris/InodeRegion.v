@@ -1814,7 +1814,7 @@ Section InodeRegion.
      bundle ANYWHERE, so the commit's collection cannot reach it, and nothing
      in [ireg_slot] used to distinguish the corpse from an ordinary
      checked-out inode: the f column's clause was the REGIME alone, a
-     persistent [IcacheRef.ireg_open] at the runtime index, which an empty
+     persistent [IcacheRefDefs.ireg_open] at the runtime index, which an empty
      [LogDefs.ln_tx] authority cannot touch ([FsCollect.col_corpse_not_refuted]
      was that wall).
 
@@ -4667,9 +4667,9 @@ Section InodeRegion.
      inode payload lives behind a cancellable invariant that no syscall may
      hold open across the call, so no whole unit and no claim reaches them.
      What they DO hold, persistently and for free, is the generation's own
-     one-shot [IcacheRef.ity_shot g ty] (FileInvDefs.inode_pay carries it) --
+     one-shot [IcacheRefDefs.ity_shot g ty] (FileInvDefs.inode_pay carries it) --
      and a one-shot in hand says the generation has ALREADY been filled, so
-     it refutes the uncached arm outright ([IcacheRef.ity_pending_shot_excl]
+     it refutes the uncached arm outright ([IcacheRefDefs.ity_pending_shot_excl]
      at ilock's peel) and the fill never runs.  That is [ShotK].
 
      AND THE CLAIM ARM BECOMES A CONVERSION.  Under C' the claimant's own
@@ -4686,7 +4686,7 @@ Section InodeRegion.
     match o with
     | ClaimK ty t q => (iclaim z ty t q ∗ IcacheRef.runit_claim z)%I
     | PlainK        => IcacheRef.runit_plain z
-    | ShotK ty      => IcacheRef.ity_shot g ty
+    | ShotK ty      => IcacheRefDefs.ity_shot g ty
     end.
 
   (* what comes BACK: the claim arm's pair CONVERTS into the plain unit, the
@@ -4708,7 +4708,7 @@ Section InodeRegion.
     | ClaimK _ t q => (IcacheRef.runit_plain z
                        ∗ t ↪[ln_tx icfg_log]{#q} tt)%I
     | PlainK       => IcacheRef.runit_plain z
-    | ShotK ty     => IcacheRef.ity_shot g ty
+    | ShotK ty     => IcacheRefDefs.ity_shot g ty
     end.
 
   (* THE CLAIM PACKAGE's ELIM (SIMP-2, ghost-simplification.md §5.1).

@@ -2248,7 +2248,7 @@ Section ProofIlockMain.
               #Hdlock Hsl" (Tl) "Hllb Hcont".
     (* THE READ ARM'S ONE-SHOT, TAKEN OUT OF THE LICENCE AND KEPT (durable-disk
        B''-tx3).  At [DepRd] the caller is a [ShotK] site, so its licence IS
-       [IcacheRef.ity_shot] -- persistent, hence the licence itself survives
+       [IcacheRefDefs.ity_shot] -- persistent, hence the licence itself survives
        and every later use of [Hcl] is untouched. *)
     iAssert (ireg_wd_lic o g (bv_unsigned inum) ∗
              (if ic_dep_rd d then ∃ ty : bv 16, ity_shot g ty else emp))%I
@@ -2814,7 +2814,7 @@ Section ProofIlockMain.
          carries the generation's PENDING one-shot -- the fill has not run
          for [g] yet -- and the fd sites hold its SHOT twin, which is what
          they present in place of a unit.  The two cannot coexist
-         ([IcacheRef.ity_pending_shot_excl]), so the three fd callers never
+         ([IcacheRefDefs.ity_pending_shot_excl]), so the three fd callers never
          reach the fill and their post's [filled = false] is a theorem.
          What comes out is [ilk_fills o], the premise [il_load] takes. *)
       iAssert (ireg_wd_lic o g (bv_unsigned inum) ∗ ity_pending g

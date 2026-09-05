@@ -2,7 +2,7 @@
 
    This is [SpecNamei.wp_namei_root_body] with the four INODE-CACHE rows
    removed and nothing else changed: same entry, same budget, same lock
-   order, same two path bytes, same [IcacheRef.inode_held] out.  It is the
+   order, same two path bytes, same [IcacheHeld.inode_held] out.  It is the
    ONE assumed contract in the boot cone ([LinkNameiRootBoot.v] holds the
    [Axiom]), and it replaced a much larger one -- [userinit]'s whole body,
    which is now PROVEN against it ([ProofUserinit.v]).
@@ -48,7 +48,7 @@
    [icfg_dev = ROOTDEV] and [0 < icfg_nib] are the conditions under which
    the corner's [iget(1,1)] is a reference THIS cache can hold
    ([SpecIget]'s [bv_unsigned ROOTINO < 16 * nib]), and they matter: at
-   [icfg_nib = 0] the [IcacheRef.inode_held] this contract returns carries
+   [icfg_nib = 0] the [IcacheHeld.inode_held] this contract returns carries
    [bv_unsigned inum < 0] and cannot exist, so the assumption would be
    vacuous rather than merely unproved.
 
@@ -67,7 +67,7 @@
 
    This is fs-icache.md C7 (c)'s ambient-[icfg] tie seen from below, and it
    is structural: nothing can be proved about the cache's configuration
-   until [IcacheRef.icfg_alloc] runs inside the boot fupd.  So the
+   until [IcacheRefDefs.icfg_alloc] runs inside the boot fupd.  So the
    configuration is a property of the INSTANCE instead, and
    [SystemAdequacy.adequacy_icfg] is chosen to satisfy it -- see the note
    there.  Anyone re-pointing this [Axiom] at [LinkNameiRoot.NameiRoot]
@@ -102,7 +102,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import DirentEnc.
 Require Import PathElems.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 (* THE FOUR INODE-CACHE ROWS, and the ambient configuration they are stated
    at (fs-cfg-boot.md stage (e)).  This is the whole of what USED to be
    assumed: [is_itable2] / [itable_inv] from [IcacheInv], [ic_escrows] from

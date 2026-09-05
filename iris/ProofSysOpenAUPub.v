@@ -219,7 +219,7 @@ Section ProofSysOpenAUPub.
        ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
        IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi icfg_dev inum gy loK) -∗
     (* its PROVENANCE UNIT (item 7a-wire): the parent parks in the fd slot's
-       [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
+       [cinv] as [IcacheHeld.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
     runit_any (bv_unsigned inum) -∗
     (* the six raw pieces the walk carries across the tail *)

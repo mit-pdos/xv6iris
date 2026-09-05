@@ -130,7 +130,7 @@ Require Import BioDefs.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import FileInvDefs.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
@@ -157,7 +157,7 @@ Require Import TsoCtx.
 (*  [fs_geom] IS GONE (rank 1d).  It was the nineteen pure premises the two
     seals take between them, as one record parameterised by the numbers a
     syscall contract used to thread.  Every one of those numbers is a
-    [FsCfg.fscfg] / [IcacheRef.icfg] field now -- [fsc_bmapstart],
+    [FsCfg.fscfg] / [IcacheRefDefs.icfg] field now -- [fsc_bmapstart],
     [fsc_size], [fsc_ninodes] were the last three -- so the record has no
     parameters left to take, and a parameter-free statement of the image's
     geometry already exists one layer down: [FsReady.fs_geom_ok], with

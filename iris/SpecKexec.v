@@ -176,7 +176,7 @@ Require Import ByteBuf.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import UserPtTree.
@@ -359,7 +359,7 @@ Definition fs_fabric
      the block and log ctx's, the crash seam, the era certificate, the
      icache's four, the inode region and its sealed regime, the device
      invariant -- at names each caller threaded.  Every one of those names
-     is a [FsCfg.fscfg] / [IcacheRef.icfg] field now, and a bundle spelled
+     is a [FsCfg.fscfg] / [IcacheRefDefs.icfg] field now, and a bundle spelled
      entirely at ambient names IS [FsReady.fs_ready]: a copy of a
      parameter-free predicate is still a copy.  [fs_fabric_all] below hands
      back the sixteen rows in the ORDER the cone's destructs read them, so

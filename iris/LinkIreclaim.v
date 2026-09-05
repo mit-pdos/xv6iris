@@ -19,7 +19,7 @@
      and balloc's [beqz a5] at the same offset are;
    - the [beq s3,zero] at +0x50 -- the C source's [if(ip)] -- is refuted from
      iget's POSTCONDITION ([a0 = ientry k] with [k < NINODE], hence
-     [IcacheRef.ientry_ne_zero]) and NOT from any premise of this contract.
+     [IcacheRefDefs.ientry_ne_zero]) and NOT from any premise of this contract.
      That is the one refutation in this cone that a caller cannot see.
 
    The [kernel_data] / [panic_env] the contract takes are threaded to all

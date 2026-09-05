@@ -68,7 +68,7 @@
 
    N5a's ledger settled where these go and it is here, not in IcacheBoot:
    [icache_boot] is device-generic BY CONSTRUCTION (it takes [dv] and [nib]
-   as parameters), and the [dv = icfg_dev] tie is [IcacheRef.icfg_alloc]'s to
+   as parameters), and the [dv = icfg_dev] tie is [IcacheRefDefs.icfg_alloc]'s to
    make.  The two TIES that used to ride here ([dev = icfg_dev],
    [nib = icfg_nib]) are gone with the threaded copies (rank 1c); what is
    left is what they were there to enable -- [icfg_dev = ROOTDEV] and
@@ -180,7 +180,7 @@ Require Import AppCfg.       (* [appcfg]: the era's application record, bound be
    site that can compose it with block 1's park *)
 Require Import FsCollect.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 From Kernel Require KernelSyms.

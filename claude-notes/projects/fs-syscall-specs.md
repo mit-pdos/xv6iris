@@ -602,7 +602,7 @@ things, and the answer differs:
     the payload's generation `fp_ig`, which is ∃-bound in `file_pay_st`,
     so a caller's own `ity_shot` cannot be tied to it from outside.  A
     consumer joins the carve's `ity_shot g ty` to ilock's copy with
-    `IcacheRef.ity_shot_agree` and reads `di_type dn <> T_DEVICE_z`.
+    `IcacheRefDefs.ity_shot_agree` and reads `di_type dn <> T_DEVICE_z`.
     `FileInvDefs.inode_pay_not_dev` states the same at the invariant's
     own altitude (payload + a shot at its generation ⊢ the pure
     disequality; pure conclusion, so it costs the payload nothing).

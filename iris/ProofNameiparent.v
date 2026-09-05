@@ -47,7 +47,7 @@ Require Import LogInv.
 Require Import DirentEnc.
 Require Import PathElems.
 Require Import FileInvDefs.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IrefSlots.
 Require Import CodeNameiparent.
 Require Import SpecDirlookup.

@@ -536,7 +536,17 @@ FdSlots.v
 # rides inside [UkRun.urun], the handles are what a user-level proof carries.
 # Distinct from FdSlots' kernel/process split -- see UserFd.v's header.
 UserFd.v
+# THE ITABLE ENTRY, IN THREE LAYERS.  IcacheRefDefs is the entry's
+# geometry, the cache's constants ([icfg]) and the algebra's boot
+# literals -- what sixty-odd files want and nothing more; IcacheRef is
+# the reference predicate proper; IcacheHeld re-keys it by the pointer a
+# register holds and carries the [CtxMorph] transports.  Each re-exports
+# the one below, so a consumer still names exactly one of them -- but
+# naming the RIGHT one is what keeps [EscrowDefs] (three field
+# projections) off the back of nine hundred lines of splits and carves.
+IcacheRefDefs.v
 IcacheRef.v
+IcacheHeld.v
 EscrowDefs.v
 OffGv.v
 FileOffCell.v

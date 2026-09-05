@@ -80,7 +80,7 @@ Require Import IregLinkNz.
 Require Import IgetLic.
 Require Import IcacheEscrow.  (* Require Export's DirViewG: [dv_hold], [dv_of] *)
 Require Import FileInvDefs.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IrefSlots.
 Require Import SpecMyproc SpecIdup SpecIget SpecMemmove.
 Require Import SpecIlock SpecIunlock SpecIunlockput SpecIput.

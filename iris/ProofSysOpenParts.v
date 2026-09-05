@@ -73,7 +73,7 @@ Require Import BioDefs.               (* [BSIZE] *)
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
-Require Import IcacheRef.             (* the reference algebra the publication
+Require Import IcacheHeld.             (* the reference algebra the publication
                                          re-pins its generation in *)
 (* KEPT against 43b8097e's sweep: it judged these dead in ITS tree, which
    does not carry our fragment-campaign content.  A surplus import costs a

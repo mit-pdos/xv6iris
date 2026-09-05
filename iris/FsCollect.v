@@ -103,7 +103,7 @@
 (*      finding).  C-4 SPLIT THEM.  The inum a walk is CARRYING between an *)
 (*      eviction's identity flip and its deposit gets its own key and its  *)
 (*      own parked share ([IcacheEscrow.ipool_tkey] /                      *)
-(*      [IcacheEscrow.ipool_transit] at the ambient [IcacheRef.icfg_ptrn], *)
+(*      [IcacheEscrow.ipool_transit] at the ambient [IcacheRefDefs.icfg_ptrn], *)
 (*      grown by [ipool_evict_lend] and shrunk by [ipool_put]), so it is   *)
 (*      REFUTED at a commit: [ipool_transit] IS a [TxPin.tx_pins], and the *)
 (*      commit's door [IcacheEscrow.ipool_quiesce_acc] calls               *)
@@ -379,7 +379,7 @@ Section Collect.
   Context `{!riscvGS Σ, !xv6G Σ}.
   (* THE BOOT CONFIGURATION (durable-disk lane E-clauses).  It was declared
      per NESTED section until [col_geom] and [col_hand] gained rows about
-     the inode region's WIDTH: [IcacheRef.icfg_nib] is the width every
+     the inode region's WIDTH: [IcacheRefDefs.icfg_nib] is the width every
      escrow payload's [DirView.dir_ok] is stated at, and tying it to the
      collected state's superblock is what lets the commit read
      [FsDurSnap.sk_dirloc].  Instance-implicit, so no call site moves. *)
@@ -554,7 +554,7 @@ Section Collect.
        boot chain pays nothing new.  LAST, so no destructuring moves. *)
     cg_width : Z.of_nat nib = sb_ninodes sb / 16 + 1;
     (* THE REGION'S WIDTH IS THE CACHE'S (durable-disk lane E-clauses).
-       Every escrow payload states [DirView.dir_ok] at [IcacheRef.icfg_nib]
+       Every escrow payload states [DirView.dir_ok] at [IcacheRefDefs.icfg_nib]
        -- the ambient boot configuration's width, which is what [iget]'s
        region bound is checked against -- while the collection is stated at
        its own [nib].  They are the same number, and saying so HERE is what
@@ -989,7 +989,7 @@ Section Collect.
      stays a LEAF and the [icEscN]/[ipoolN] side never enters its cone. *)
   (* A NESTED SECTION, and it costs the file nothing: [InodeRegion.ireg_slot]
      is stated over the ambient region configuration, so naming it needs
-     [IcacheRef.icfg] -- a class the outer section deliberately does not have
+     [IcacheRefDefs.icfg] -- a class the outer section deliberately does not have
      (the arithmetic above is configuration-free).  A nested section puts the
      parameter on these two lemmas alone. *)
   Section FreeSlot.

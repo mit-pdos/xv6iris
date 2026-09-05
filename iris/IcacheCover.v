@@ -25,7 +25,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvPtsto.
 Require Import Xv6Cameras.
 Require Import FsBlocks.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import InodeRegion.
 Require Import FsStateInode.
 Require Import LogDefs.       (* [fs_home_set] -- [ic_loaded_open]'s row *)

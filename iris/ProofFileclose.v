@@ -68,7 +68,7 @@ Require Import SpecAcquire SpecRelease.
 Require Import SpecPipeclose SpecBeginOp SpecIput SpecEndOp.
 Require Import IrefSlots.
 Require Import IcacheEscrow.  (* [ic_sleeplocks], hoisted out of the two function specs *)
-Require Import IcacheRef.     (* [icfg_log] / [icfg_ist] / [icfg_nib] / [icfg_dev] *)
+Require Import IcacheRefDefs.     (* [icfg_log] / [icfg_ist] / [icfg_nib] / [icfg_dev] *)
 Require Import FsCfg.         (* the ambient fs names the FS arm now runs at *)
 Require Import FsReady.       (* [fs_ready] and its projection family *)
 Require Import SpecFileclose.

@@ -89,7 +89,7 @@ Require Import LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IcacheInv.
 Require Import KallocInv.
 Require Import KvmSpec.
@@ -982,7 +982,7 @@ Section KexecASeam.
   (* [inode_held] IS [inode_held_at] with the inum forgotten, so the walk
      publishes the sharper form by ∃-introduction and no landed contract
      grows a premise.  N-5.2B's whole cost at this seam.  The lemma is
-     [IcacheRef.inode_held_zi] now (lane C1). *)
+     [IcacheHeld.inode_held_zi] now (lane C1). *)
 
   Definition kxc_at_a2
       (jp : nat)

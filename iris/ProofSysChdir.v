@@ -114,7 +114,7 @@ Require Import InodeInv.
 Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IcacheEscrow.
 Require Import FileInvDefs.
 Require Import ProcInv.

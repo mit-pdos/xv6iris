@@ -55,7 +55,7 @@ Require Export ProcDefs.
    broad [iFrame] calls do not unfold the 4 KiB [tf_page] big-op imported
    from [ProcDefs]. *)
 Typeclasses Opaque tf_words tf_tail tf_page.
-(* [IcacheRef.inode_held]: what [p->cwd] owns, and [IrefSlots.iref_slots]:
+(* [IcacheHeld.inode_held]: what [p->cwd] owns, and [IrefSlots.iref_slots]:
    the supply a dormant block parks.  Exported, because a consumer of
    [proc_priv] that has to name the reference should not have to know which
    of the two files it came from. *)
@@ -78,6 +78,7 @@ Require Import FirstTok.
 Typeclasses Opaque first_tok first_boot_persist.
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
+Require Import IcacheHeld.   (* [inode_held]: what p->cwd holds (Import is not transitive) *)
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)
 (* and the nightly dead-import sweep skips [Require Export] lines.         *)
@@ -293,7 +294,7 @@ Section ProcInv.
      [proc_priv_core]), and its boot arm names [RiscvPtsto.gen_cert]; that
      is the ONLY new index the block acquires.  The file-system's own two
      configuration classes are NOT new binders here: [fileG] already carries
-     [IcacheRef.icfg] and [FsCfg.fscfg] as superclass fields
+     [IcacheRefDefs.icfg] and [FsCfg.fscfg] as superclass fields
      ([FileInvDefs.file_icfg] / [file_fscfg]), so every mention of the token
      below -- and hence [proc_priv]'s own elaboration -- is at exactly the
      instance the whole process layer already shares.  Nothing downstream
@@ -1105,7 +1106,7 @@ Section ProcInv.
   (* =================================================================== *)
   (* THE resource that rides alongside [cur_proc p].                      *)
   (* =================================================================== *)
-  (* [cwd]: p->cwd holds ONE WHOLE inode reference -- [IcacheRef.inode_held],
+  (* [cwd]: p->cwd holds ONE WHOLE inode reference -- [IcacheHeld.inode_held],
      the same predicate the last [fileclose] of an FD_INODE file recovers
      from its payload and hands to iput.  (C6b: this was [emp] while there
      was no inode model; design/proc-struct.md's "holes to be honest about"
@@ -1132,7 +1133,7 @@ Section ProcInv.
      rides inside the Löb'd obligation and no recast ever looks at it. *)
   (* AT ITS INUM (lane C1): the block ties the pointer to [pv_cwi], the
      inum the process's cwd names, and this is the tie --
-     [IcacheRef.inode_held_at], the same package with its inum a pure
+     [IcacheHeld.inode_held_at], the same package with its inum a pure
      conjunct.  [cwd_ref] is its ∃-form, kept for the consumers that only
      ever wanted the reference. *)
   Definition cwd_ref_at (v : mword 64) (z : Z) : iProp Σ := inode_held_at v z.

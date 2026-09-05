@@ -49,7 +49,7 @@ Record pprivate := MkPPriv {
      directory it names, not the [struct inode *] the kernel happens to
      cache it in.  So the block carries the inum beside the pointer, and
      [ProcInv.proc_priv_core] ties the two with [ProcInv.cwd_ref_at]
-     ([IcacheRef.inode_held_at] -- the reference AT this inum).  It is not
+     ([IcacheHeld.inode_held_at] -- the reference AT this inum).  It is not
      a cell: nothing in [struct proc] stores it, the icache's identity does.
      LAST, so every positional [MkPPriv] only gained a trailing argument.
      chdir writes it ([upd_cwi]), fork copies it, exec and everything else

@@ -105,7 +105,7 @@ Require Import ProofKexecD.
 Require Import InstrBytes.     (* [pc_is]                            *)
 Require Import LogInv.
 Require Import LogDefs.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import KvmSpec.
 Require Import BioDefs.

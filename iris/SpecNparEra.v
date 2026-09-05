@@ -33,7 +33,7 @@
        and lane W's caller has no directory to discharge it against.
 
    (c) THE SUCCESS ARM RETURNS THE PARENT, TYPED AND PINNED.
-       [inode_held_ty_at ipv T_DIR iL] is [IcacheRef.inode_held_ty] with
+       [inode_held_ty_at ipv T_DIR iL] is [IcacheHeld.inode_held_ty] with
        the inum exposed, exactly as [SpecNameiTr.inode_held_at] is
        [inode_held] with the inum exposed; the walk can carry BOTH because
        [L_par] is reached only through the +0xbc type test and its
@@ -108,7 +108,7 @@ Require Import PathElems.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IcacheInv.
 Require Import IcacheEscrow.   (* the payload arms *)
 Require Import KvmSpec.
@@ -142,7 +142,7 @@ Section NparEraDefs.
             !irefslotG Σ, !pavG Σ}.
   Context `{XI : CurCtx}.
 
-  (* [IcacheRef.inode_held_ty] with the inum EXPOSED -- the same one new
+  (* [IcacheHeld.inode_held_ty] with the inum EXPOSED -- the same one new
      pure tie [SpecNameiTr.inode_held_at] adds to [inode_held], and for the
      same reason: the trace's [P] is indexed by an inum, so the returned
      reference has to name the one the cursor is about.  The two forget

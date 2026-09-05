@@ -649,7 +649,7 @@ Definition wp_create_sconf_body
      [InodeRegion.ireg_claim_au] -- the one mover that mints a [c] column --
      does.  It rides the SAME channel [ireg_inv] does, from the syscall
      dispatch's [sysc_fs_env] down; its producer is the boot chain's
-     ([IcacheRef.ity_shoot] on fsinit's [ireg_boot]), terminating at the
+     ([IcacheRefDefs.ity_shoot] on fsinit's [ireg_boot]), terminating at the
      EXISTING [LinkForkretNF.wp_forkret_nf_ax] IOU. *)
   ireg_open -∗
   (* ---- the four superblock cells ---- *)

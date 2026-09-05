@@ -21,7 +21,7 @@
        of namex's entry test are proven;
      - the success arm gains the cursor at the parent index and exposes the
        returned inum ([SpecNparEra.inode_held_ty_at] in place of
-       [IcacheRef.inode_held_ty]);
+       [IcacheHeld.inode_held_ty]);
      - the failure arm gains [FsAbsNpar.np_dead].
 
    The counted contract ([wp_nameiparent_sconf_body]) has NO twin here, for
@@ -67,7 +67,7 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IrefSlots.
 Require Import SpecDirlookup.
 Require Import SpecDirlink.

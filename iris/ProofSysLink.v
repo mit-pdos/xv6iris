@@ -108,7 +108,7 @@ Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import UserPtTree.

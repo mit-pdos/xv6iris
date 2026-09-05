@@ -43,7 +43,7 @@ Require Import TsoCtx CtxMorphTac.
 Require Import Xv6Cameras.
 Require Import UartNames.      (* [uart_names] *)
 Require Import DiskPtsto.   (* [disk_names] *)
-Require Import IcacheRef.   (* [ic_names] / the [icfg] class *)
+Require Import IcacheRefDefs.   (* [ic_names] / the [icfg] class *)
 Require Import TicksInv.
 Require Import Xv6G.        (* the [xv6G] bundle -- NAMED in the section
                                binders below, so it must be IMPORTED, not

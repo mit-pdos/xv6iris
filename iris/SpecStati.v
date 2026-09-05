@@ -65,7 +65,7 @@
    about five loads.  A caller destructs [ic_loaded]'s [inode_meta] conjunct,
    calls stati, and puts it back.
 
-   The entry pointer is NOT constrained to be [IcacheRef.ientry k]: stati
+   The entry pointer is NOT constrained to be [IcacheRefDefs.ientry k]: stati
    does no arithmetic on slots and has no panic to refute, so it is stated
    at an arbitrary [ip].
 
@@ -98,7 +98,7 @@ Local Open Scope Z_scope.
 (* ===================================================================== *)
 
 (* Stated in the 12-bit displacement form the sw/sh/sd that reach them
-   encode, exactly as [IcacheRef.i_dev] / [InodeInv.i_type] are, so a
+   encode, exactly as [IcacheRefDefs.i_dev] / [InodeInv.i_type] are, so a
    store's effective address unifies with the cell without rewriting. *)
 Definition st_dev   (st : mword 64) : mword 64 :=
   add_vec st (sign_extend' 64 (mword_of_int 0 : mword 12)).

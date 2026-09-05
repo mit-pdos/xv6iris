@@ -753,7 +753,7 @@ Qed.
 (*       section 5's "one small fact the mint needs").                       *)
 (*                                                                          *)
 (* [fsinit] calls [readsb] BEFORE [initlog], so the superblock record the    *)
-(* whole file-system configuration is built from ([IcacheRef.icfg_nib],      *)
+(* whole file-system configuration is built from ([IcacheRefDefs.icfg_nib],      *)
 (* [icfg_ist], the region geometry) is decoded from the RAW disk, while the  *)
 (* snapshot the boot mint reads describes the RECOVERED view [D].  The two   *)
 (* agree at a home block exactly when the on-disk log's write set does not   *)
@@ -808,7 +808,7 @@ Qed.
 
 (* THE MINT'S READING OF IT (plan section 5).  The era's file-system instance
    is cloned from the snapshot, which describes [D]; the file-system
-   CONFIGURATION ([IcacheRef.icfg_nib], the region geometry) is decoded from
+   CONFIGURATION ([IcacheRefDefs.icfg_nib], the region geometry) is decoded from
    the record [readsb] parsed off the raw disk.  Those are one record: the
    snapshot's two superblock clauses ([FsDurSnap.sk_sb], [sk_parse]) read at
    [D]'s block 1, which the lemma above identifies with the raw one. *)

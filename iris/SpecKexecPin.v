@@ -152,7 +152,7 @@ Require Import BitmapInv.
 Require Import ByteBuf.
 Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import KvmSpec.
 Require Import ProcInv.

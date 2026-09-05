@@ -42,7 +42,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import TsoGhost TsoCtx CtxBox.   (* [llb loglen_name], [ufrac] stamps *)
 Require Import MemClaim.   (* [wordw_free], [wordw_pointsto] -- the store's two faces *)
 Require Import FdSlots IrefSlots FileInvDefs FileInv OffBox.   (* [irefslotG] must be IMPORTED, or the binder below silently generalises it *)
-Require Import IcacheRef.   (* [NINODE], [ientry] *)
+Require Import IcacheRefDefs.   (* [NINODE], [ientry] *)
 Require Import Xv6G.
 Local Open Scope Z_scope.
 

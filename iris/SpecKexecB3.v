@@ -41,7 +41,7 @@ Require Import LogInv.
 Require Import BitmapInv.
 Require Import BlkmapDefs.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import DinodeEnc.
 Require Import ProcDefs.

@@ -252,11 +252,21 @@ class carries the gname as a field, so the predicate's arity is unchanged
 
 What landed (see completed/fs-icache.md's C6b entry for the whole story):
 
-* the reference layer moved BELOW the file table, into a new
-  `IcacheRef.v` — `IrefSlots.v` imports `FileInv.v`, so `FileInv.v`
-  cannot import `IcacheInv.v`. `IcacheInv.v`/`InodeInv.v` re-export it,
-  so no unqualified name moved;
-* the class is `IcacheRef.icfg` — THREE fields, not one: the
+* the reference layer sits BELOW the file table, in `IcacheRef.v` —
+  `IrefSlots.v` imports `FileInv.v`, so `FileInv.v` cannot import
+  `IcacheInv.v`. `IcacheInv.v`/`InodeInv.v` re-export it;
+* it is THREE files, each re-exporting the one below, and **a consumer
+  names the LOWEST one that suffices** (most of the tree wants only the
+  first, and pointing higher puts it behind proofs it never uses):
+  `IcacheRefDefs.v` — the entry's geometry (`i_dev` … `ientry`), the
+  algebra's constructors and boot literals, `Class icfg`, `Record
+  ic_names`, `icfg_alloc`, and the boot regimes `ireg_boot` / `ireg_open` /
+  `ireg_regime`; `IcacheRef.v` — the link ledger, the liveness pool and the
+  reference predicate (`inode_ident`, `inode_ref`, `inode_shr`,
+  `inode_ref_short`); `IcacheHeld.v` — the same reference keyed by the
+  pointer a register holds (`inode_held`, `inode_held_at`,
+  `inode_shr_held`) plus the `CtxMorph` transports;
+* the class is `IcacheRefDefs.icfg` — THREE fields, not one: the
   count-authority gname, THE device (§13.11's single-device pin makes
   that honest) and the inode region's block count (which is what bounds
   an inum). A reference is `inode_held v := ∃ k q inum, ⌜v = ientry k⌝ ∗
@@ -270,7 +280,7 @@ What landed (see completed/fs-icache.md's C6b entry for the whole story):
   `FdSlots` made for their own supplies. It arrived with the kfork
   merge, which had made it independently as `IcacheInv.irefNameG`;
   folding that class into `icfg` is what the merge did with it.)
-  `IcacheRef.icfg_alloc` mints one, and `IcacheBoot.icache_boot` takes
+  `IcacheRefDefs.icfg_alloc` mints one, and `IcacheBoot.icache_boot` takes
   the authority `own icfg_iref (● ∅)` as a premise rather than allocating
   it — the ambient `icfg` the file table is stated over is the one the
   boot has to be about;
@@ -2744,7 +2754,7 @@ two halves live in the escrow's arm and in `IcacheInv.islot2`.  Both
 homes sit behind the itable lock or inside the escrow, and **the
 consumer §17 was written for holds neither**: filewrite reaches the
 fact through `FileInv.inode_pay`, whose only icache-side resource is
-`IcacheRef.inode_shr_held` — the two identity CELLS at a fraction plus
+`IcacheHeld.inode_shr_held` — the two identity CELLS at a fraction plus
 a `live_frac` slice.  A counter bolted onto `ic_id` is unreadable from
 there, so the generation cannot be plumbed that way at any price.
 
@@ -3196,7 +3206,7 @@ Worked against the instruction streams rather than argued:
 2. `ProofIlock.v:974` fills from the pool bundle's `dinode_at`, at type
    `ty₁`.
 3. sys_open publishes an fd; the payload's share is
-   `IcacheRef.inode_shr_held_gen … g` (`IcacheRef.v:954`).  The fd is
+   `IcacheHeld.inode_shr_held_gen … g` (`IcacheRef.v:954`).  The fd is
    closed later; a persistent `ity_shot g ty₁` survives in whatever
    context copied it.
 4. iput's last close takes the free path: `ProofIput.v:1366`
@@ -3856,7 +3866,7 @@ nowhere else: `ProofIlock.v:1030` is the single `ity_shoot g (di_type dn)`,
 placed there because it is "the only instruction in this kernel that knows
 `di_type`".  create's only handle on that value is `SpecIlock.v:285`'s
 `ity_shot g (di_type dn)` — the very term it is trying to evaluate.  Closing
-by `IcacheRef.ity_shot_agree` (`IcacheRef.v:457`) needs a SECOND,
+by `IcacheRefDefs.ity_shot_agree` (`IcacheRef.v:457`) needs a SECOND,
 independent `ity_shot g ty`, and `ty` lives in one frame which cannot reach
 the pending: the pending is parked inside `ic_payload`'s UNLOADED polarity
 (`IcacheEscrow.v:538`), behind the entry's sleeplock, and `iget`'s recycle

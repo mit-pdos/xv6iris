@@ -60,6 +60,7 @@ Require Import SpecNamexTr.
 Require Import ProofNamei.   (* READ-ONLY REUSE: its top-level pure lemmas *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import IcacheHeld.   (* [inode_held_at] *)
 Require Import Xv6G.
 Require Import ProcDefs.
 Require Import TsoCtx.

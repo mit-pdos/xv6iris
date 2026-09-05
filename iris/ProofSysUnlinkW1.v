@@ -98,7 +98,7 @@ Require Import DirView.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import IregLinkNz.   (* the nonzero-count reading at a held token

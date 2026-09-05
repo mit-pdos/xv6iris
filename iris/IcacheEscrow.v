@@ -201,6 +201,7 @@ Require Import IrefSlots.
    LICENCE ([IgetLic.iname_freeze_off]) rather than with a wand into False *)
 Require Import IgetLic.
 Require Import IcacheInv.
+Require Import IcacheHeld.   (* the pointer-keyed reference and its [CtxMorph] transports *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -1614,7 +1615,7 @@ Section IcacheEscrow.
   Proof. rewrite /ic_dep_res. tl_struct. Qed.
 
   (* the descriptor's generation is the one its slice names -- the bridge
-     between the pure [IcacheRef.ic_dep_gname] side condition every swap
+     between the pure [IcacheRefDefs.ic_dep_gname] side condition every swap
      lemma carries and the resource. *)
   Lemma ic_dep_half_gname k d :
     ic_dep_half k d -∗
@@ -3423,7 +3424,7 @@ End IcacheEscrow.
    F20  boot deposits ic_rest k IcRaw. *)
 
 (* the identity, the shape and the cameras live in Xv6Cameras §15; the
-   per-slot box names are [icfg_box k] (IcacheRef.icfg, canonical) *)
+   per-slot box names are [icfg_box k] (IcacheRefDefs.icfg, canonical) *)
 Definition ic_x_loaded (x : ic_x) : bool :=
   match x with IcLoaded _ _ _ => true | _ => false end.
 Definition ic_x_gen (x : ic_x) : option gname :=

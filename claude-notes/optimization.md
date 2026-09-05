@@ -1957,6 +1957,36 @@ Context for an ambient hart before starting.**
   `Local Lemma` that crosses the cut must lose its `Local`, and a file that
   names a moved lemma QUALIFIED without a direct `Require` of the vocabulary
   file is invisible to a `Require`-line scan — take users from every `.glob`.
+- **A SPLIT RETURNS WHAT THE PATH'S NEXT NODE DOES *NOT* NAME, MINUS ~2.5 s
+  PER NEW FILE** (1.9 s of import prelude plus ~0.6 s of process and `.vo`
+  overhead).  So find the cut by asking what the next node names, never by
+  where the file's own section banners fall: cutting `IcacheRef` at the
+  `inode_held` sections -- which `InodeRegion` does not name -- returned the
+  whole available 4 s, while cutting it at the `icfg` class measured
+  **−0.6 s**, the path still waiting for both halves and paying a second
+  prelude for it.
+- **THE FS CONE IS OFF THE CRITICAL PATH; THE BINDING ROUTE IS THE WP
+  ENGINE.**  The two meet at `ProofSysOpenParts`, the engine
+  (`RiscvPtsto` -> `TsoCtx` -> `HartLift` -> … -> `SmodeCorePt` ->
+  `WpIntrInv` -> `WpSconfMem`) arriving ~2 s later than the fs route
+  (`LogDefs` -> `IcacheRefDefs` -> `IcacheRef` -> `InodeRegion` ->
+  `IcacheInv` -> `IcacheEscrow` -> `ProcInv` -> the `SpecSysOpen` chain).
+  **Work on the fs cone pays at most those 2 s** until the engine moves,
+  and the engine's wall is four files: `WpIntrInv` (~40 s), `SmodeCorePt`
+  (~34 s), `WpSconfMem` (~23 s), `TsoCtx` (~15 s).  Two seconds is also
+  inside the margin, so re-measure before betting either way.
+- **A `.glob` CLOSURE DOES NOT SEE TYPECLASS INSTANCES, AND `Require Import`
+  IS NOT TRANSITIVE.**  Both bite when a vocabulary file is cut and its
+  importers are reassigned, and neither shows up in the analysis that chose
+  the cut: an instance resolved by SEARCH (`CtxMorph …`, `Timeless …`)
+  leaves no `R` line, and a consumer that reached the old file through
+  someone else's `Require Export` chain does not reach the new sibling --
+  its error is `The reference foo was not found` in a file whose own
+  `Require` lines never named either.  Check both by grepping the
+  COMMENT-STRIPPED sources for every moved name and computing
+  in-scope-ness through `Require Export` edges only.  **The stripper must
+  lex Coq strings INSIDE comments**: one `"` in one comment desynchronises
+  a naive one and the rest of that file reads as commented-out.
 - **THE SERIAL TAIL IS EVERYTHING AFTER THE LAST `Link*`, AND IT PAYS ONE FOR
   ONE.** From `LinkMain` through `BootChain`, `SystemAdequacy` and the pins
   the build is one file wide (the profiler's "effectively serial" figure), so

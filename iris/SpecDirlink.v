@@ -197,7 +197,7 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IrefSlots.
 Require Import SpecBmap.
 (* [iput_units], for [dl_need]: the found arm spends an iput and the set-form

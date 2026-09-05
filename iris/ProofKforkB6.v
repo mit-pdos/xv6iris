@@ -63,7 +63,7 @@ Require Import KallocInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
 Require Import Xv6Cameras.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.

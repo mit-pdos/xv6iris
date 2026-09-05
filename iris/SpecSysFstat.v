@@ -81,7 +81,7 @@
    the old environment asked its caller for (the itable slot, the inum, the
    device, the region bound and the SHARE) were inside the reference all
    along: [FileInvDefs.inode_pay] carries
-   [IcacheRef.inode_shr_held_gen (fc_ip Cf) (q * Q) g], which names all four
+   [IcacheHeld.inode_shr_held_gen (fc_ip Cf) (q * Q) g], which names all four
    and IS the share ilock wants.  filestat carves it out itself
    ([SpecFilestat.filestat_pay_carve]) and gathers it back, so the syscall
    owes nothing per-file at all.  The type test stays filestat's business,

@@ -78,7 +78,7 @@ Require Import RiscvModelBytes.   (* [pa_add] -- the free word (item 24) *)
 Require Import ArrCursor.
 Require Export FdSlots.
 Require Import PipeInvDefs.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import FsCfg.   (* [fscfg] -- see the note on [fileG] below *)
 Require Import AppCfg.  (* [appcfg] -- the application's predicate, the third record (applications.md section 1) *)
 Require Export FileOffCell.   (* the entry addresses, [off_wf], [off_resident] (r25 shapes) *)
@@ -217,7 +217,7 @@ Definition frefUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    WHY IT HAS TO BE A CONSTANT RATHER THAN AN EXISTENTIAL.  An existential
    "some share" splits and rejoins freely, which would make
    [file_core_split] fall out for nothing -- and would make the inode
-   UNFREEABLE.  [IcacheRef.inode_held_gather] re-forms the canonical reference
+   UNFREEABLE.  [IcacheHeld.inode_held_gather] re-forms the canonical reference
    only from the EXACT fraction that was carved (canonical pairing, design
    §14.6/§14.7), and [IcacheInv.iref_close_last_step] then requires the final
    closer to hold the whole outstanding slice; so every sliver handed out has
@@ -231,10 +231,10 @@ Definition frefUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    [fp_ig] IS THE INODE SLOT'S LIVENESS GENERATION (design fs-icache.md
    §17.6 (5), ratified §17.7), and it is [fp_iq]'s exact status: a per-slot
    CONSTANT fixed when the file is published.  It is what the fd's type
-   witness is keyed on -- [inode_pay] carries [IcacheRef.ity_shot fp_ig ty]
+   witness is keyed on -- [inode_pay] carries [IcacheRefDefs.ity_shot fp_ig ty]
    with "[ty] is not a directory if this fd is writable" and "[ty] is not a
    device if this fd is FD_INODE", and filewrite joins it to ilock's copy
-   with [IcacheRef.ity_shot_agree].  It can be a constant
+   with [IcacheRefDefs.ity_shot_agree].  It can be a constant
    because a live reference PINS the generation: a bump needs the slot's
    whole liveness unit, which does not exist while any share is outstanding
    ([IcacheInv.live_slot_alloc] at the recycle, [IcacheInv.live_slot_regen]
@@ -258,7 +258,7 @@ Definition frefUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
 
    IT IS TIED, not merely recorded: [file_core]'s inode arm states
    [inode_pay] at THIS inum, and [inode_pay] carries
-   [IcacheRef.inode_shr_held_gen] at it -- whose [inode_ident] is a
+   [IcacheHeld.inode_shr_held_gen] at it -- whose [inode_ident] is a
    points-to on the entry's own [i_inum] cell.  So the field cannot drift
    from the machine, and two holders of one file agree on it for the same
    reason they agree on the rest of [pn] ([fpay_tok_agree]).
@@ -1016,7 +1016,7 @@ Section FileInv.
   (* ---- AN FD_INODE FILE'S PAYLOAD: A SHARE OF ONE INODE REFERENCE ----
 
      The predicate this file carried as [emp] until C6b.  What replaced it
-     is NOT [IcacheRef.inode_held] at fraction [q], and the reason is the
+     is NOT [IcacheHeld.inode_held] at fraction [q], and the reason is the
      whole content of the definition:
 
      an icache reference is [iref_tok γ k q ∗ inode_ident k q dev inum],
@@ -1046,7 +1046,7 @@ Section FileInv.
      cinv's content is not accessible without cancelling it.  It is carved
      ONCE, when the payload is published ([inode_pay_alloc]), and what goes
      into the cinv is therefore the parent SHORT by the whole outstanding
-     slice: [IcacheRef.inode_held_short v (fp_iq pn)].  That is not a breach of
+     slice: [IcacheHeld.inode_held_short v (fp_iq pn)].  That is not a breach of
      canonical pairing -- [inode_ref_short] IS the design's name for a parent
      with a share out, and the pairing is restored by the gather, which is the
      last closer's move ([inode_pay_cancel]) and happens before iput ever sees
@@ -1073,7 +1073,7 @@ Section FileInv.
      The travelling share is therefore GENERATION-NAMED, and the witness is
      that generation's one-shot: ilock's postcondition hands filewrite
      [ity_shot g (di_type dn)] at the caller's [g], this payload holds
-     [ity_shot g ty] with [ty <> T_DIR], [IcacheRef.ity_shot_agree] joins
+     [ity_shot g ty] with [ty <> T_DIR], [IcacheRefDefs.ity_shot_agree] joins
      them, and [DirView.dir_ok_not_dir] finishes.  A generation sees at most
      one fill (§17.6), which is what makes the agreement mean something.
 
@@ -1274,7 +1274,7 @@ Section FileInv.
 
      The fifth conjunct, surfaced against a caller's OWN copy of the
      generation's one-shot -- which is what ilock's postcondition hands
-     filewrite and fileread ([IcacheRef.ity_shot_agree] joins the two, the
+     filewrite and fileread ([IcacheRefDefs.ity_shot_agree] joins the two, the
      generation seeing at most one fill).  So a function that has locked the
      inode behind an FD_INODE descriptor can refute the device row outright:
      [FsAbs.abs_node]'s [ADev] arm is unreachable there, which is what

@@ -21,7 +21,7 @@
    follow them, because everything ABOVE it wants the vocabulary that stays.
 
    WHAT STAYS, AND WHO WANTS IT.  [inode_held_at] (and [inode_held_at_held]) --
-   [IcacheRef.inode_held] with the inum exposed -- is the currency of the ERA
+   [IcacheHeld.inode_held] with the inum exposed -- is the currency of the ERA
    walk that replaced this contract as the consumed form: [SpecNameiEra],
    [SpecNamexEra], [SpecNparEra], [SpecNparWrapEra] state their pins in it,
    their provers and [ProofSysOpenAU*] / [ProofKexecPin*] read it, and
@@ -119,8 +119,8 @@ Section NameiTrDefs.
      fupd, and that ghost no longer exists; [FsAbsEra.ex_hop] /
      [ex_hops_from] are the era walk's replacements. *)
 
-  (* [IcacheRef.inode_held] with the inum EXPOSED -- the pinned package --
-     is [IcacheRef.inode_held_at] now (lane C1 moved it down: the process
+  (* [IcacheHeld.inode_held] with the inum EXPOSED -- the pinned package --
+     is [IcacheHeld.inode_held_at] now (lane C1 moved it down: the process
      block's cwd tie and idup's contract speak it too).  Same four
      conjuncts, one new pure tie; [inode_held_at_held] recovers the landed
      shape so every existing consumer composes unchanged. *)

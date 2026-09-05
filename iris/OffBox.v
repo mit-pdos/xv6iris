@@ -61,7 +61,7 @@ Require Import CtxMorphTac.
 Require Import Xv6Cameras.
 Require Import CtxBox.
 Require Import RiscvModelBytes.   (* [pa_add] -- the free bytes of the last close (item 24) *)
-Require Import IcacheRef.   (* [icfg] -- the two names ride in it (r25 shapes) *)
+Require Import IcacheRefDefs.   (* [icfg] -- the two names ride in it (r25 shapes) *)
 Require Import FileOffCell.   (* [off_resident] -- the boxed cell; this file builds BEFORE FileInvDefs (r25 shapes) *)
 
 (* F35: the per-inode-slot set is keyed by the WHOLE names record, so a

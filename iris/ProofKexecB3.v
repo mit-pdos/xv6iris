@@ -90,7 +90,7 @@ Require Import BioDefs.
 Require Import LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import KvmSpec.
 Require Import DinodeEnc.

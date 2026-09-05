@@ -118,7 +118,7 @@ Require Import LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import DinodeEnc.
 Require Import ProcInv.
 Require Import PtreeType.

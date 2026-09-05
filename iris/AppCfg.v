@@ -27,7 +27,7 @@
     application's OWN invariant [AppInv.app_inv] (app-instances.md section
     2: nothing application-specific inside a kernel file-system invariant;
     the two invariants are tied by half an authority).  The record is
-    carried exactly as [IcacheRef.icfg] and [FsCfg.fscfg] are: a field of
+    carried exactly as [IcacheRefDefs.icfg] and [FsCfg.fscfg] are: a field of
     [FileInvDefs.fileG] ([file_app]), threaded EXPLICITLY through the boot
     kits ([FsCfgKits.fs_kit_fsinit_ghost], [FsCfgBoot.fs_boot_supply]) and
     the era mint ([FsCfgSnap.fs_cfg_alloc_snap]), which founds the era's

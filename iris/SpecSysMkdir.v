@@ -144,7 +144,7 @@ Require Import BitmapInv.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KvmSpec.
@@ -257,7 +257,7 @@ Definition wp_sys_mkdir_sconf_body
      borrowed and never spent; it rides the SAME channel [ireg_inv] does,
      down to [SpecCreate] -> [SpecIalloc] -> [InodeRegion.ireg_claim_au],
      the one mover that mints a [c] column.  Its producer is the boot
-     chain's ([IcacheRef.ity_shoot] on fsinit's returned [ireg_boot]), which
+     chain's ([IcacheRefDefs.ity_shoot] on fsinit's returned [ireg_boot]), which
      terminates at the EXISTING [LinkForkretNF.wp_forkret_nf_ax] IOU -- no
      new axiom, and a premise pulls nothing into [Print Assumptions]. *)
   ireg_open -∗

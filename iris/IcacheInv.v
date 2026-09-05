@@ -747,7 +747,7 @@ Section IcacheGhost.
     rewrite /live_slot /live_norm /live_frzn (Hagree x Hxk). iExact "H".
   Qed.
 
-  (* BOOT (RULING R-e).  The reserved half of [IcacheRef.live_boot_map]'s
+  (* BOOT (RULING R-e).  The reserved half of [IcacheRefDefs.live_boot_map]'s
      keyspace arrives beside the pool's own units and is retagged to the
      [false] literal here -- which is the ONLY reason this is a fupd. *)
   Lemma live_pool_empty :
@@ -1814,7 +1814,7 @@ Section IcacheRefInv.
       itable_half M ∗
       IcacheRef.live_genlo k qt g' lo ∗
       IcacheRef.live_genlo k (1/2)%Qp g' lo ∗
-      IcacheRef.ity_pending g'.
+      IcacheRefDefs.ity_pending g'.
   Proof.
     iIntros (HE HMk) "#Hinv Hhalf Hq Hh".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
@@ -3805,7 +3805,7 @@ Section IcacheRefInvReg.
       IcacheRef.live_genlo k q g' loA ∗
       IcacheRef.live_genlo k (1/2)%Qp g' loA ∗
       IcacheRef.live_genlo k c g' loA ∗
-      IcacheRef.ity_pending g'.
+      IcacheRefDefs.ity_pending g'.
   Proof.
     iIntros (Hq) "Hfull".
     iMod (IcacheRef.live_genlo_bump k g0 lo0 loA with "Hfull")
@@ -3845,7 +3845,7 @@ Section IcacheRefInvReg.
       isl_slot (<[k := (q, 1%positive)]> M) k ∗
       (∃ g : gname,
          iref_tok_genlo k q g loA ∗
-         IcacheRef.live_genlo k (1/2)%Qp g loA ∗ IcacheRef.ity_pending g) ∗
+         IcacheRef.live_genlo k (1/2)%Qp g loA ∗ IcacheRefDefs.ity_pending g) ∗
       frzsel k (1/2)%Qp false ∗
       iname γi γfs inodestart inum l ∗
       ifreeze_off (bv_unsigned inum) ∗

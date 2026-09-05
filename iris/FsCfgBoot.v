@@ -60,7 +60,7 @@ Require Import LogInv.
    cache's whole ghost record, the page allocator's count/seal pair *)
 Require Import InodeInv.
 Require Import InodeLock.   (* [inode_ok] -- the image node's readings, moved down here *)
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
@@ -732,4 +732,4 @@ Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
       [FsCfgSnap.fs_cfg_alloc_snap]'s conclusion, which this body restates
       verbatim. *)
    FileInvDefs.flive_auth_at fsc_fol ∗
-   ([∗ list] k ∈ seq 0 IcacheRef.NINODE, OffBox.off_set_auth OffBox.off_cfg k ∅))%I.
+   ([∗ list] k ∈ seq 0 IcacheRefDefs.NINODE, OffBox.off_set_auth OffBox.off_cfg k ∅))%I.

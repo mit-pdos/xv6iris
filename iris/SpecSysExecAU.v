@@ -102,7 +102,7 @@ Require Import LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.

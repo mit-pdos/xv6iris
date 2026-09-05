@@ -3,7 +3,7 @@
    A COMPATIBILITY SHIM, and deliberately a thin one.  The predicate this
    file was created to hold -- "this pointer names a live itable entry and
    this is one of its references" -- already exists, one layer down, as
-   [IcacheRef.inode_held]: the fs-icache line split the entry geometry, the
+   [IcacheHeld.inode_held]: the fs-icache line split the entry geometry, the
    Arc-style count algebra and the address-keyed reference out of
    [IcacheInv.v] into [IcacheRef.v] precisely so that [FileInv.v] and
    [ProcInv.v] could name a reference without importing the filesystem
@@ -15,7 +15,7 @@
    iref-slot supply in scope at once.  Re-exporting the two real modules is
    the whole content.
 
-   THE AUTHORITY'S GNAME IS CANONICAL, and it lives in [IcacheRef.icfg]
+   THE AUTHORITY'S GNAME IS CANONICAL, and it lives in [IcacheRefDefs.icfg]
    ([icfg_iref]) rather than in a class of its own: there is exactly one
    inode cache per system, so threading its gname would put a filesystem
    ghost name on [ProcInv.proc_priv] and hence on the thirty-odd spec files
@@ -29,7 +29,7 @@ From stdpp Require Import bitvector.definitions.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export IrefSlots.
-Require Export IcacheRef.
+Require Export IcacheRefDefs.
 Local Open Scope Z_scope.
 
 (* [ientry k] is a kernel address, so it is never null.  Stated here under

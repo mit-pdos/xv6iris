@@ -685,12 +685,12 @@ Section IcacheBootRegion.
        inum and all at ZERO -- boot caches no inode.  A PREMISE for the
        ledger's own reason: the gname is the ambient class's, so only the
        [own_alloc] that minted it can hand the halves over
-       ([IcacheRef.icfg_alloc] + [IcacheRef.icnt_split]). *)
+       ([IcacheRefDefs.icfg_alloc] + [IcacheRef.icnt_split]). *)
     ([∗ set] z ∈ region_inums nib, icnt_half z 0) -∗
     (* THE FREEZE MIRROR's REGION HALVES (iclaim-ledger.md §3.16 / A⁗), one
        per inum and all DOWN -- boot's f column is [FrzOff] everywhere, so
        [ireg_frzm_ok] holds at [false] at every slot.  A PREMISE for the
-       count halves' reason ([IcacheRef.icfg_alloc] +
+       count halves' reason ([IcacheRefDefs.icfg_alloc] +
        [IcacheRef.frzm_boot_split]; the OTHER half of each goes to the free
        pool's bundle). *)
     ([∗ set] z ∈ region_inums nib, frzm_h z false) -∗
@@ -699,7 +699,7 @@ Section IcacheBootRegion.
        [⌜v = 0⌝] disjunct that carries the receipt over the mkfs image's
        free inodes.  A PREMISE for [icfg_iref]'s reason -- the gnames are
        the ambient class's, so only the [own_alloc] that minted them can
-       hand them over ([IcacheRef.icfg_alloc]). *)
+       hand them over ([IcacheRefDefs.icfg_alloc]). *)
     ([∗ set] z ∈ region_inums nib, mono_nat_auth_own (icfg_iep z) 1 0) -∗
     (* THE FREE INUMS' ABSTRACT VALUE (durable-disk C-3c): one [top_frag] per
        FREE inum, at the node its record determines, parked region-side in
@@ -1354,16 +1354,16 @@ Section IcacheBootTable.
       (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
     (* THE COUNT AUTHORITY, at the empty table.  A PREMISE rather than an
        allocation, because the authority's gname is CANONICAL -- it is
-       [IcacheRef.icfg_iref] of the ambient cache, the same one every
+       [IcacheRefDefs.icfg_iref] of the ambient cache, the same one every
        reference in the system is stated over -- so this lemma cannot mint
-       it and then claim to have built THE itable.  [IcacheRef.icfg_alloc]
+       it and then claim to have built THE itable.  [IcacheRefDefs.icfg_alloc]
        is what discharges it. *)
     own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) -∗
     (* THE LIVENESS POOL, at the all-free state and at EPOCH 0 (A6.145's
        [live_frac0], straight out of [IcacheRef.live_boot_split]): one whole
        unit per slot plus the shadow batch that mints the freeze selectors. *)
     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) -∗
-    (* THE PER-SLOT SLEEPLOCK GHOSTS, as [IcacheRef.icfg_alloc] hands them
+    (* THE PER-SLOT SLEEPLOCK GHOSTS, as [IcacheRefDefs.icfg_alloc] hands them
        over: an unbuilt lock's free arm, and the AUTHORITATIVE ZERO of its
        outstanding-share count. *)
     ([∗ list] k ∈ seq 0 NINODE,
@@ -1375,7 +1375,7 @@ Section IcacheBootTable.
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     iref_slots_auth -∗
     (* A6.145: the fifty per-slot STAMP authorities, at 0 -- straight out
-       of [IcacheRef.icfg_alloc]'s post *)
+       of [IcacheRefDefs.icfg_alloc]'s post *)
     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) -∗
     (* THE STOCKED POOL, as ORDINARY ROWS (durable-disk B''-esc), beside the
        residency key WHOLE; this lemma allocates the pool's own invariant out
@@ -1402,7 +1402,7 @@ Section IcacheBootTable.
     (* THE POOL'S CORPSE LEDGER (durable-disk C-7), WHOLE and empty *)
     ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) -∗
     (* THE FIFTY BOXES' FRESH GHOSTS (tso-flip F19/F23): minted by
-       [IcacheRef.icfg_alloc] into [icfg_box k]; [CtxBox.box_alloc_at]
+       [IcacheRefDefs.icfg_alloc] into [icfg_box k]; [CtxBox.box_alloc_at]
        builds the boxes into them here. *)
     ([∗ list] k ∈ seq 0 NINODE,
        own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
@@ -1413,7 +1413,7 @@ Section IcacheBootTable.
        empty.  [ic_slp cn k] gained the conjunct [OffBox.off_rows off_cfg k ξ]
        (the third final shape), and at boot no file points at any inode, so
        every slot's published set is [∅] -- which is exactly
-       [off_set_auth off_cfg k ∅], the row [IcacheRef.icfg_alloc] now mints
+       [off_set_auth off_cfg k ∅], the row [IcacheRefDefs.icfg_alloc] now mints
        ([own (icfg_off k) (● ∅)]).  It cannot be allocated here: [icfg_off]
        is a canonical name of the ambient [icfg], so only [icfg_alloc]'s own
        [own_alloc] can produce its authority. *)

@@ -36,7 +36,7 @@
    are now a PARAMETER, and the premise [LogDefs.log_free_tok γ] is the
    era fupd's receipt for having minted them at their genesis values (the
    empty ledger, epoch one, the empty append registry, and the "log"
-   spinlock's free ghost state).  The reason is [IcacheRef.icfg_log]: the
+   spinlock's free ghost state).  The reason is [IcacheRefDefs.icfg_log]: the
    configuration record names the log's gnames as an AMBIENT field, so
    they must exist before any proof runs, and an ambient field cannot be a
    WP-time existential.  The contract stays GENERAL in [γ] -- it is the
@@ -304,7 +304,7 @@ Definition wp_initlog_sconf_body
      boot path is a value-chained one that re-bases nothing. *)
   log_mirror_born M -∗
   (* THE FOUR GNAMES, AT THEIR GENESIS VALUES (fs-cfg-boot.md staging step
-     1).  The era fupd minted them -- they are [IcacheRef.icfg_log]'s value
+     1).  The era fupd minted them -- they are [IcacheRefDefs.icfg_log]'s value
      -- and this is the receipt initlog spends to BUILD the layer at them:
      the empty ledger, epoch one, the empty append registry go straight into
      [log_res], and the lock's free ghost state is what [WpLockAt.newlock_at]

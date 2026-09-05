@@ -51,7 +51,7 @@ Require Import WpUart.
 Require Import Xv6Cameras.
 Require Import LogInv.
 Require Import FileInvDefs.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IrefSlots.
 Require Import CodeNamei.
 Require Import SpecNamex.

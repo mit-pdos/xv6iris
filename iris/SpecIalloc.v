@@ -68,7 +68,7 @@
    [a0 = ientry kslot], and ONE [IcacheRef.inode_ref kslot q icfg_dev inum].
    The inum is existential -- the scan finds it -- and its region bound
    [bv_unsigned inum < 16 * icfg_nib] travels with it, which is what lets a
-   caller rebuild [IcacheRef.inode_held] outright.  Until rank 1c the device
+   caller rebuild [IcacheHeld.inode_held] outright.  Until rank 1c the device
    and the inode count were THREADED and the caller had to bring
    [dev = icfg_dev] / [nib = icfg_nib]; there is one file system and one
    device, so both are read off the class now and the two ties are gone.
@@ -253,11 +253,11 @@ Definition wp_ialloc_sconf_body
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  §2.4's
      claim-pin clause makes [ireg_slot]'s [c = Some] arm exhibit
-     [IcacheRef.ireg_open], so [InodeRegion.ireg_claim_au] -- the one mover
+     [IcacheRefDefs.ireg_open], so [InodeRegion.ireg_claim_au] -- the one mover
      that mints a [c] -- takes it, and ialloc is the one function that runs
      that mover.  It is PERSISTENT (a [ity_shot] at the boot one-shot), so
      it is borrowed and never spent, and its production is the boot chain's:
-     fsinit returns [ireg_boot], [IcacheRef.ity_shoot] seals it once in
+     fsinit returns [ireg_boot], [IcacheRefDefs.ity_shoot] seals it once in
      forkret's first branch, and every syscall's ambient [sysc_fs_env]
      carries the result down this channel.  §3.2's termination clause: the
      chain ends at [LinkForkretNF.wp_forkret_nf_ax], an EXISTING accepted
@@ -447,11 +447,11 @@ Definition wp_ialloc_gen_body
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  §2.4's
      claim-pin clause makes [ireg_slot]'s [c = Some] arm exhibit
-     [IcacheRef.ireg_open], so [InodeRegion.ireg_claim_au] -- the one mover
+     [IcacheRefDefs.ireg_open], so [InodeRegion.ireg_claim_au] -- the one mover
      that mints a [c] -- takes it, and ialloc is the one function that runs
      that mover.  It is PERSISTENT (a [ity_shot] at the boot one-shot), so
      it is borrowed and never spent, and its production is the boot chain's:
-     fsinit returns [ireg_boot], [IcacheRef.ity_shoot] seals it once in
+     fsinit returns [ireg_boot], [IcacheRefDefs.ity_shoot] seals it once in
      forkret's first branch, and every syscall's ambient [sysc_fs_env]
      carries the result down this channel.  §3.2's termination clause: the
      chain ends at [LinkForkretNF.wp_forkret_nf_ax], an EXISTING accepted

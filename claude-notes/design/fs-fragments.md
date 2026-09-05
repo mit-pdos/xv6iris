@@ -3238,7 +3238,7 @@ would enter `ireg_inv`'s arity, i.e. every fs contract):
 
 The refutation lemma is landed and is the whole engine:
 `ity_pending_shot_excl : ity_pending g -∗ ity_shot g ty -∗ False`
-(→ `IcacheRef.ireg_boot_open_excl`).
+(→ `IcacheRefDefs.ireg_boot_open_excl`).
 
 **The clause.**  `InodeRegion.ireg_slot`'s ∃-block gains, beside `link_auth`,
 the DISJUNCTIVE `(⌜c = None⌝ ∨ ireg_open)` — a claimed slot (`c = Some`) must

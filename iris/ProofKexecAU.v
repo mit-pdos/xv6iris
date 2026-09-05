@@ -101,7 +101,7 @@ Require Import ProofKexecD.
 (* ---- and the names the AU contract's body is written in ---- *)
 Require Import InstrBytes.     (* [pc_is]                            *)
 Require Import LogInv.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import KvmSpec.
 Require Import BioDefs.
 Require Import InodeInv.       (* [ROOTDEV], [MAXFILE]               *)

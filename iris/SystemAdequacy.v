@@ -282,10 +282,10 @@ Section SystemBoot.
   Context `{GEN : GenId}.
 
   (* NO [fileG] AND NO [icacheG] BINDER ANY MORE (fs-cfg-boot.md stage
-     (d2b)).  [fileG] carries [IcacheRef.icfg] and [FsCfg.fscfg] as
+     (d2b)).  [fileG] carries [IcacheRefDefs.icfg] and [FsCfg.fscfg] as
      superclass fields, and nothing in the tree ever produced either: the
      two records used to be the hardcoded [adequacy_icfg]/[adequacy_fscfg]
-     of this file, at [icfg_nib = 0], where an [IcacheRef.inode_held] cannot
+     of this file, at [icfg_nib = 0], where an [IcacheHeld.inode_held] cannot
      exist -- so the boot cone's one assumed contract was VACUOUS at the
      instance the corollaries below are taken at.  [boot_shared_alloc] now
      MINTS both inside the era fupd, off the era's own disk, and hands the
@@ -1022,11 +1022,11 @@ Qed.
 
 (* [adequacy_icfg] AND [adequacy_fscfg] ARE GONE, and their deletion is the
    point of fs-cfg-boot.md stage (d2b).  They were two [Local Instance]s of
-   all-[1%positive] records -- an [IcacheRef.icfg] with [icfg_nib = 0] and an
+   all-[1%positive] records -- an [IcacheRefDefs.icfg] with [icfg_nib = 0] and an
    [FsCfg.fscfg] nobody allocated -- and they existed only because [fileG]
    had to be RESOLVED here: nothing in the tree could produce either record,
    so the corollaries below could not be stated without inventing them.  At
-   [icfg_nib = 0] an [IcacheRef.inode_held] cannot exist, so the boot cone's
+   [icfg_nib = 0] an [IcacheHeld.inode_held] cannot exist, so the boot cone's
    one assumed contract ([SpecNameiRootBoot.v]'s [namei("/")]) was VACUOUS at
    exactly the instance the corollaries were taken at.  That was a defect in
    the top-level statement, not a missing convenience.

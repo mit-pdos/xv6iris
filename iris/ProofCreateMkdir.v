@@ -1140,7 +1140,7 @@ Section ProofCreateMkdir.
       (*  links have written record 0 = ["."] at its own inum and record    *)
       (*  1 = [".."] at the PARENT's, and the second writei's size makes    *)
       (*  the count two.  Record 1's LIVENESS is [dp->inum <> 0], which has *)
-      (*  no supplier anywhere in the tree -- [IcacheRef.inode_held] keeps  *)
+      (*  no supplier anywhere in the tree -- [IcacheHeld.inode_held] keeps  *)
       (*  only the upper bound and namex drops [SpecDirlookup]'s own        *)
       (*  [0 < inum] -- so it comes from the PARENT'S OWN copy of this      *)
       (*  clause, whose ["."] half says the parent's record 0 names the     *)

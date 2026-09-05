@@ -49,14 +49,14 @@ Require Import RiscvAdequacy.
 Require Import BootReset.   (* the garbage-anchored register clause's bridge *)
 From Kernel Require KernelData.
 From Kernel Require KernelSyms.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IrefSlots.
 Require Import TicksInv.
 Require Import WaitInv.        (* [wait_res_of_cells] -- the parent cells, gathered *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* THE FILE SYSTEM'S BOOT-ERA MINT (claude-notes/projects/fs-cfg-boot.md
    stage (d2b)).  [FsCfgBoot.fs_cfg_alloc] is what finally gives
-   [IcacheRef.icfg] and [FsCfg.fscfg] VALUES, and it has to run here: the
+   [IcacheRefDefs.icfg] and [FsCfg.fscfg] VALUES, and it has to run here: the
    two records reach every proof as superclass fields of
    [FileInvDefs.fileG], so they must exist before the first hart's WP, and
    this file's fupd is the only thing that runs earlier.  The disk mint it
@@ -1026,7 +1026,7 @@ End BootBssChain.
 (* [bioslotG] carry a ghost name, [pavG] carries one, and [fileG] carries   *)
 (* the file table's                                                         *)
 (* camera TOGETHER WITH the two configuration records                       *)
-(* ([IcacheRef.icfg], [FsCfg.fscfg]) -- which is why it could not be a      *)
+(* ([IcacheRefDefs.icfg], [FsCfg.fscfg]) -- which is why it could not be a      *)
 (* functor constraint either (fs-cfg-boot.md stage 3/(d2b)).  Everything    *)
 (* else the boot needs is capacity only and is in [Σ] from the start.       *)
 (* ====================================================================== *)

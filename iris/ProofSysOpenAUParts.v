@@ -62,7 +62,7 @@ Require Import InodeLock.
 Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheEscrow.
 Require Import DirView.
 Require Import FileInvDefs.

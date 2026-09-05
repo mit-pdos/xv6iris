@@ -203,9 +203,9 @@ Proof. rewrite /fstat_has_inode. apply _. Defined.
    borrowed out of [ProcInv.ofile_slot] comes with its slot, fraction and
    content existentially quantified.  Every one of them comes out of the
    reference itself instead ([FileInvDefs.inode_pay] carries
-   [IcacheRef.inode_shr_held_gen (fc_ip Cf) (q * Q) g], which names the slot,
+   [IcacheHeld.inode_shr_held_gen (fc_ip Cf) (q * Q) g], which names the slot,
    the device and the inum and IS the share ilock wants), or is the ambient
-   cache's ([IcacheRef.icfg_dev] / [icfg_nib]), or is existential under the
+   cache's ([IcacheRefDefs.icfg_dev] / [icfg_nib]), or is existential under the
    sleeplock FAMILY.  What is left is exactly the content-independent bundle
    [SpecFileclose.fileclose_fs_env] already had. *)
 Record fstat_names := MkFStatNames {
@@ -409,7 +409,7 @@ Section SpecFilestat.
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
       ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
-      IcacheRef.ity_shot g ty ∗
+      IcacheRefDefs.ity_shot g ty ∗
       IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo ∗
       (IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo -∗
          file_pay_st γf k q Cf st).

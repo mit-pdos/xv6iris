@@ -113,7 +113,7 @@ Require Import FsTree.          (* [fname]                                  *)
 Require Import InodeInv.        (* [ROOTINO] : mword 32                     *)
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KvmSpec.

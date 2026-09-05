@@ -35,7 +35,7 @@
                                      end_op, then FALL into +0x6e.  The
                                      [beq s3,zero] at +0x50 is DEAD, refuted
                                      by iget's POSTCONDITION
-                                     ([IcacheRef.ientry_ne_zero]) and by no
+                                     ([IcacheRefDefs.ientry_ne_zero]) and by no
                                      premise of this contract.
      [irc_scan]      +0x7c .. +0xb0  THE LOOP BODY, by induction on the fuel:
                                      bread, the slot arithmetic, [lh a4,0] and
@@ -927,7 +927,7 @@ End IreclaimStep.
 (*                                                                        *)
 (*  THE [beq s3,zero] AT +0x50 IS DEAD, and what refutes it is iget's     *)
 (*  POSTCONDITION ([a0 = ientry k] with [k < NINODE], hence               *)
-(*  [IcacheRef.ientry_ne_zero]) -- no premise of this contract says       *)
+(*  [IcacheRefDefs.ientry_ne_zero]) -- no premise of this contract says       *)
 (*  anything about it.                                                    *)
 (* ===================================================================== *)
 Section IreclaimOrphan.

@@ -64,7 +64,7 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IrefSlots.
 Require Import SpecIput.
 Require Import SpecDirlookup.
@@ -338,7 +338,7 @@ Definition wp_nameiparent_gen_body
                through [L_par]; create performs no parent type test at all,
                so this is what closes fs-sysfile's Blocker B.  Cashed by
                shedding a share at this generation and joining ilock's own
-               one-shot with [IcacheRef.ity_shot_agree]. *)
+               one-shot with [IcacheRefDefs.ity_shot_agree]. *)
             inode_held_ty ipv T_DIR ∗
             iref_slots 1
        else ⌜mf !!! Regidx (mword_of_int 10 : mword 5)

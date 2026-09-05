@@ -19,7 +19,7 @@
        extra resources (the trace rows [P 0 ROOTINO] and
        [FsAbsNpar.ep_hops_from]), and a success arm that binds
        [∃ iL es e] with [SpecNparEra.inode_held_ty_at] in place of
-       [IcacheRef.inode_held_ty].  The inum the walk exposes IS the
+       [IcacheHeld.inode_held_ty].  The inum the walk exposes IS the
        parent's ([HdiL]), which is what puts the cursor and the payload on
        the same [d]; the failure arm's [FsAbsNpar.np_dead] is folded by
        [FsAbsNparMknod.np_dead_to_mknod].

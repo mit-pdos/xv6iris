@@ -39,7 +39,7 @@ Require Import FsBlocks.      (* [fs_names], [fs_top]                      *)
 Require Import FsDurSnap.     (* [snap_local]                              *)
 Require Import InodeRegion.   (* [ftopN], [ftop_inv], [ireg_clean_acc]     *)
 Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
-Require Import IcacheRef.     (* [icfg], [icfg_log]                        *)
+Require Import IcacheRefDefs.     (* [icfg], [icfg_log]                        *)
 
 Local Open Scope Z_scope.
 

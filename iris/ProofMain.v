@@ -101,7 +101,7 @@ Require Import SpecAllocproc.
    four the four persistent rows it produces.  IMPORTED BEFORE [SpecIinit]
    on purpose: [NINODE] below must stay [SpecIinit]'s, which is what
    [main_globals_raw] and iinit's own postcondition are stated at
-   ([IcacheRef.NINODE] is convertible with it, and every crossing is a
+   ([IcacheRefDefs.NINODE] is convertible with it, and every crossing is a
    conversion the [icache_boot_at] application does itself). *)
 Require Import FsCfgKits.
 (* [FirstTok.first_fsinit] and the two pure producers: stage (f)'s transport
@@ -111,7 +111,7 @@ Require Import FsReady FirstTok.
 Require Import WpLockAt.   (* [newlock_at] / [lock_free_tok] *)
 Require Import BioInitAt.  (* [bio_init_at] / [bio_free_tok] / [buf_raw] *)
 Require Import IcacheBoot IcacheEscrow InodeInv.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IrefSlots FsCfg FsBlocks.
 Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
 Require Import SpecUserinit SpecScheduler SpecKernelvec SpecFreerange.
@@ -1387,7 +1387,7 @@ Section ProofMain.
     flive_own ((● ∅) : fliveUR) -∗
     (* r25 (item 24/33): the off boxes' per-inode-slot set authorities, minted
        empty at the era mint and put into the icache slots' payloads here *)
-    ([∗ list] k ∈ seq 0 IcacheRef.NINODE, OffBox.off_set_auth OffBox.off_cfg k ∅) -∗
+    ([∗ list] k ∈ seq 0 IcacheRefDefs.NINODE, OffBox.off_set_auth OffBox.off_cfg k ∅) -∗
     (* ---- `static int first = 1', PINNED (fs-cfg-boot.md (f-2)).  One of
        the image's two writable initialized .data words, carved at
        [BootShared]'s boot data run and threaded pinned-not-existential the

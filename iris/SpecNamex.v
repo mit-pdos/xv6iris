@@ -87,7 +87,7 @@
 
    ---- WHAT IT SPEAKS IN ----------------------------------------------------
 
-   THE LOOP CURRENCY IS [IcacheRef.inode_held] -- the pointer-keyed,
+   THE LOOP CURRENCY IS [IcacheHeld.inode_held] -- the pointer-keyed,
    slot/fraction/inum-existential form that [ProcInv.cwd_ref] already is.  Both
    starting arms produce exactly that (iget's postcondition IS a reference at
    an existential fraction; idup's mint likewise), and both wrappers hand it
@@ -229,7 +229,7 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IrefSlots.
 Require Import SpecIput.
 Require Import SpecDirlookup.
@@ -794,7 +794,7 @@ End NAMEX.
 (*  So the two are not a cross-product to be collapsed: they are two      *)
 (*  disjoint REGIMES of the same code, and the corner's whole point is    *)
 (*  that it assumes strictly less.  What it shares with the general       *)
-(*  contract -- the currency ([IcacheRef.inode_held]), the frame          *)
+(*  contract -- the currency ([IcacheHeld.inode_held]), the frame          *)
 (*  geometry, the epilogue -- it shares verbatim.                         *)
 (*                                                                        *)
 (*  WHAT THE CORNER DOES *NOT* TAKE, and why the list matters.  This        *)

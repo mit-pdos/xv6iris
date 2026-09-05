@@ -953,7 +953,7 @@ Definition dotdot_name : list (bv 8) := [Z_to_bv 8 0x2e; Z_to_bv 8 0x2e].
     cannot get anywhere else: [dirlink(ip, "..", dp->inum)] writes the
     PARENT's inum into the child's record 1, and [dir_live] of that record
     is exactly [dp->inum <> 0] -- which no landed statement provides
-    ([IcacheRef.inode_held] carries only the upper bound, and namex drops
+    ([IcacheHeld.inode_held] carries only the upper bound, and namex drops
     [SpecDirlookup]'s own [0 < inum] when it returns an entry pointer).
     Under this clause the parent supplies it about ITSELF: a live directory's
     record 0 is a live ["."] naming its own inum, so [dir_dots_ix_self]

@@ -57,7 +57,7 @@
 
     So every name is ambient: the four the inode cache already owned
     ([icfg_log], [icfg_ist], [icfg_nib], [icfg_dev]) and the eighteen
-    [FsCfg.fscfg] adds.  That is [IcacheRef.icfg]'s own argument one layer
+    [FsCfg.fscfg] adds.  That is [IcacheRefDefs.icfg]'s own argument one layer
     out -- there is exactly one file system per boot -- and [fscfg] is
     per-era exactly as [icfg] is (the disk image ghost is re-minted at
     PowerOn; design/crash.md), i.e. a Class ASSUMPTION each era's boot
@@ -140,7 +140,7 @@ Require Import BitmapInv.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import FsCfg.
@@ -372,7 +372,7 @@ Section FsReady.
   (* ================================================================== *)
 
   (* THE SEAL ITSELF.  fsinit's EXCLUSIVE boot-shelter token
-     ([IcacheRef.ireg_boot] = [ity_pending icfg_boot], threaded from
+     ([IcacheRefDefs.ireg_boot] = [ity_pending icfg_boot], threaded from
      [icfg_alloc] through the whole boot chain and handed back by
      [SpecFsinit]'s post) is SHOT here, and what it becomes is the
      persistent sealed regime.  One [bupd], no invariant, no mask.

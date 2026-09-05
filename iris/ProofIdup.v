@@ -157,7 +157,7 @@ Section ProofIdup.
 
      What SIMP-2 changed is the PUBLIC face, not this: the carve and the
      gather that every caller used to perform around the call moved inside,
-     so the contract now speaks [IcacheRef.inode_held] -- the package both
+     so the contract now speaks [IcacheHeld.inode_held] -- the package both
      callers already hold -- and this core is derived-from, not stated by,
      [SpecIdup].  The derivation below is the whole of the difference. *)
   Local Lemma wp_idup_core

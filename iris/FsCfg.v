@@ -1,7 +1,7 @@
 (*  FsCfg.v -- THE FILE SYSTEM'S CANONICAL GHOST NAMES.
 
     There is exactly ONE file system per boot, so its ghost names are
-    ambient rather than threaded -- the argument [IcacheRef.icfg] already
+    ambient rather than threaded -- the argument [IcacheRefDefs.icfg] already
     makes for the inode cache ("there is exactly one inode cache per
     system, so threading its gname would put a filesystem ghost name on
     [ProcInv.proc_priv] and hence on the thirty-odd spec files that mention
@@ -73,7 +73,7 @@ Require Import UartNames.     (* [uart_names] -- NOT WpUart, which would
 Require Import DiskPtsto.     (* [disk_names] *)
 Require Import BioDefs.       (* [bio_names]  *)
 Require Import FsBlocks.      (* [fs_names]   *)
-Require Import IcacheRef.     (* [ic_names]   *)
+Require Import IcacheRefDefs.     (* [ic_names]   *)
 Local Open Scope Z_scope.
 
 Class fscfg := MkFscfg {

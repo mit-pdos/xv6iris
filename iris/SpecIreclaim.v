@@ -166,7 +166,7 @@ Require Import InodeInv.
 Require Import InodeRegion.
 Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 From Kernel Require KernelSyms.

@@ -206,7 +206,7 @@ Definition wp_iput_sconf_body
      SPECIALIZED BY SIMP-1).  iput's free path FREEZES the inode
      ([InodeRegion.ireg_freeze_au] at +0x50), and §2.3's boot-shelter clause
      makes a freezer exhibit the regime it is freezing under.  A RUNTIME
-     thread's regime is the sealed [IcacheRef.ireg_open] -- persistent, fired
+     thread's regime is the sealed [IcacheRefDefs.ireg_open] -- persistent, fired
      once by RULING B between fsinit and kexec("/init") -- so the indexed
      form's "lend a copy, get a copy back" round-trip carried no information
      at all here, and both the [(rg : bool)] binder and the return clause are
@@ -391,7 +391,7 @@ Definition wp_iput_gen_body
   (* THE SEALED REGIME, BORROWED AND RETURNED (iclaim-ledger.md §6′, RULING G).
      iput's free path FREEZES the inode ([InodeRegion.ireg_freeze_au] at
      +0x50), and §2.3's boot-shelter clause makes a freezer exhibit the regime
-     it is freezing under: the sealed [IcacheRef.ireg_open] a RUNTIME thread
+     it is freezing under: the sealed [IcacheRefDefs.ireg_open] a RUNTIME thread
      carries (persistent, fired once by RULING B between fsinit and
      kexec("/init")), or the exclusive [ireg_boot] the pre-userspace thread
      carries instead.  It is BORROWED, not consumed: the off-lock deposit at

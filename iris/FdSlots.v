@@ -135,7 +135,7 @@ Definition fdslotUR : ucmra := authUR natUR.
    file system a file IS its inum.  It is not free: [fcontent] records
    [f->ip], the itable ENTRY, and an entry is recycled, so the inum has to
    come from the inode reference the file holds.  It does
-   ([IcacheRef.inode_shr_held_gen], through [FileInvDefs.inode_pay], the
+   ([IcacheHeld.inode_shr_held_gen], through [FileInvDefs.inode_pay], the
    [fp_inum] field of [fpnames], and [FileInvDefs.file_ref]'s state index)
    -- the share already pinned it, through a points-to on the entry's own
    [i_inum] cell; naming it is what this costs.

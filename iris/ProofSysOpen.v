@@ -76,7 +76,7 @@ Require Import InodeLock.
 Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import FileOffProtocol.   (* [proto_store_free]: the free off cell is the free word (r25 item 24) *)
@@ -315,7 +315,7 @@ Section ProofSysOpenBody.
        ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
        IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi icfg_dev inum gy loK) -∗
     (* its PROVENANCE UNIT (item 7a-wire): the parent parks in the fd slot's
-       [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
+       [cinv] as [IcacheHeld.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
     runit_any (bv_unsigned inum) -∗
     (* the six raw pieces the walk carries across the tail *)
@@ -662,7 +662,7 @@ Section ProofSysOpenBody.
        ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
        IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi icfg_dev inum gy loK) -∗
     (* its PROVENANCE UNIT (item 7a-wire): the parent parks in the fd slot's
-       [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
+       [cinv] as [IcacheHeld.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
     runit_any (bv_unsigned inum) -∗
     (* the fresh slot, six cells PLAIN and [f->ip] WHOLE *)
@@ -1336,7 +1336,7 @@ Section ProofSysOpenBody.
        ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
        IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi icfg_dev inum gy loK) -∗
     (* its PROVENANCE UNIT (item 7a-wire): the parent parks in the fd slot's
-       [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
+       [cinv] as [IcacheHeld.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
     runit_any (bv_unsigned inum) -∗
     proc_priv gf (proc_addr jx) pidv U -∗
@@ -2143,7 +2143,7 @@ Section ProofSysOpenBody.
        ⌜(loK <= tlK)%nat⌝ ∗ IcacheRef.cred_floor loK tlK ∗
        IcacheRef.inode_ref_short_genlo kk (qi + s)%Qp qi icfg_dev inum gy loK) -∗
     (* its PROVENANCE UNIT (item 7a-wire): the parent parks in the fd slot's
-       [cinv] as [IcacheRef.inode_held_short], and that is one of the unit's
+       [cinv] as [IcacheHeld.inode_held_short], and that is one of the unit's
        two rest homes, so it travels with [Hkeep] the whole way. *)
     runit_any (bv_unsigned inum) -∗
     proc_priv gf (proc_addr jx) pidv U -∗

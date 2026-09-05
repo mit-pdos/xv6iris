@@ -37,7 +37,7 @@ Require Import CpuOwn.
 Require Import LogInv.
 Require Import Xv6Cameras.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import CodeNamei.
 Require Import WpUart.

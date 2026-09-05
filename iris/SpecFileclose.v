@@ -125,7 +125,7 @@ Require Import BioDefs.
 Require Import LogInv.
 Require Import BitmapInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import IcacheEscrow.
 Require Import SpecEndOp.
 From Kernel Require KernelSyms.

@@ -73,7 +73,7 @@
    Everything per-inode that the old, content-indexed form asked its caller
    for -- the itable slot, the inum, the device, the region bound and the
    lent SHARE -- comes out of the reference itself: [FileInvDefs.inode_pay]
-   carries [IcacheRef.inode_shr_held_gen (fc_ip Cf) (q * Q) g], which names
+   carries [IcacheHeld.inode_shr_held_gen (fc_ip Cf) (q * Q) g], which names
    the slot, the device and the inum and IS the share ilock wants.
    [fileread_pay_carve] below hands them out and takes the share back; the
    per-slot escrow and sleeplock then come out of the two FAMILIES
@@ -264,7 +264,7 @@ Qed.
    [ProcInv.ofile_slot] comes with its slot, fraction and content
    existentially quantified.  Every one of them comes out of the reference
    itself ([fileread_pay_carve]), or is the ambient cache's
-   ([IcacheRef.icfg_dev] / [icfg_nib]), or is existential under the sleeplock
+   ([IcacheRefDefs.icfg_dev] / [icfg_nib]), or is existential under the sleeplock
    FAMILY. *)
 Record fread_names := MkFReadNames {
   frn_procs      : list gname;    (* the proc table's per-slot lock names   *)
@@ -636,7 +636,7 @@ Section SpecFileread.
      T_DEVICE; it can only be read HERE, because the generation it is keyed
      on is the payload's own [fp_ig] and nothing above this carve names it.
      A caller joins the [ity_shot] output to ilock's copy with
-     [IcacheRef.ity_shot_agree] and the row is a FILE or a DIRECTORY --
+     [IcacheRefDefs.ity_shot_agree] and the row is a FILE or a DIRECTORY --
      which is what refutes [FsAbs.abs_node]'s [ADev] arm on a write
      ([SpecSysWriteAUEra]'s third arm) and gives read its "FdInode => AFile
      or ADir" tie ([SpecSysReadAU]'s owner question 2).  The invariant-level
@@ -682,7 +682,7 @@ Section SpecFileread.
       ⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
       ⌜fc_type Cf = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝ ∗
       ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
-      IcacheRef.ity_shot g ty ∗
+      IcacheRefDefs.ity_shot g ty ∗
       IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo ∗
       carve_off (fc_type Cf) k q γb γo Cf ∗
       (IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo -∗

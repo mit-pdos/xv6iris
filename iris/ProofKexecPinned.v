@@ -160,7 +160,7 @@ Require Import ProofKexecPinnedA.
 Require Import SpecKexecPinned.
 Require Import KexecOkQ.
 Require Import DirViewLend.
-Require Import IcacheRef.
+Require Import IcacheRefDefs.
 Require Import TsoCtx.
 
 

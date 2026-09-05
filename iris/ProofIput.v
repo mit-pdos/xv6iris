@@ -1843,7 +1843,7 @@ Section IputFreePath.
        freeing transaction's share -- and the deposit below is where it is
        SPENT: the marker this walk's region open takes off the MARKED arm
        goes in, and the share comes back out.  The element is what locates
-       the row, because this tail holds no half of [IcacheRef.icfg_pext]. *)
+       the row, because this tail holds no half of [IcacheRefDefs.icfg_pext]. *)
     ipool_inv fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib -∗
     crp_elem (bv_unsigned inum) (CrpPre t q) -∗
     proc_priv_bare pj pidv Upr -∗
@@ -2720,7 +2720,7 @@ Section IputFreePath.
        the old generation's shot and the regenerated one's pending token *)
     ic_loaded_ghost fsc_fs fsc_ireg fsc_cov fsc_logst inum dn bm -∗
     ity_shot g1 (di_type dn) -∗
-    IcacheRef.ity_pending g2 -∗
+    IcacheRefDefs.ity_pending g2 -∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     (* ---- THE LEDGER's UNCACHED CAPITAL, threaded to the off-lock tail
        (iclaim-ledger.md §1.4, and §1.5's cost table row for this file:
@@ -4110,7 +4110,7 @@ Section IputFreePath.
        ic_id fsc_ic k (1/4) true icfg_dev inum -∗
        ic_loaded_ghost fsc_fs fsc_ireg fsc_cov fsc_logst inum dn bm -∗
        ity_shot g1 (di_type dn) -∗
-       IcacheRef.ity_pending g2 -∗
+       IcacheRefDefs.ity_pending g2 -∗
        ifreeze_pre ((rg, (tid, (qtx/2)%Qp)) : frzidx) (bv_unsigned inum) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗

@@ -380,7 +380,7 @@ out as its own `Hc : sign_extend' 64 … = mword_of_int k` (closed, so
 the top of the tree (2026-08-19).** `vm_compute` ignores `Qed`-opacity: point
 it at a goal whose head sits behind an opaque instance and it will unfold
 that instance's proof term. `FileInv.subG_fileΣ` is `solve_inG. Qed.`, so at
-`xv6Σ` the ambient `IcacheRef.icfg` — a superclass FIELD of `fileG` — is
+`xv6Σ` the ambient `IcacheRefDefs.icfg` — a superclass FIELD of `fileG` — is
 behind it, and a goal as small as `icfg_dev = ROOTDEV` behaves like this:
 
 - `reflexivity` FAILS, with *"Unable to unify `ROOTDEV` with `icfg_dev`"*,
@@ -392,9 +392,9 @@ behind it, and a goal as small as `icfg_dev = ROOTDEV` behaves like this:
 **The rule: a fact about the ambient `icfg` is not provable by conversion
 anywhere below the boot fupd, and reaching for `vm_compute` to force it is
 the failure above.** It is `fs-icache.md` C7 (c)'s ambient-`icfg` tie seen
-from below — only `IcacheRef.icfg_alloc` can establish anything about the
+from below — only `IcacheRefDefs.icfg_alloc` can establish anything about the
 cache's configuration. Where the configuration matters (it does: at
-`icfg_nib = 0` an `IcacheRef.inode_held` cannot exist), make it a property
+`icfg_nib = 0` an `IcacheHeld.inode_held` cannot exist), make it a property
 of the concrete INSTANCE and say so at its definition, as
 `SystemAdequacy.adequacy_icfg` now does — do not make it a premise and
 thread it, because nothing at the far end can discharge it.

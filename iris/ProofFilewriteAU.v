@@ -1125,7 +1125,7 @@ Section ProofFilewriteAU.
       ⌜fc_wbool Cf' = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
       ⌜fc_type Cf' = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝ ∗
       ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
-      IcacheRef.ity_shot g ty ∗
+      IcacheRefDefs.ity_shot g ty ∗
       IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo ∗
       SpecFileread.carve_off (fc_type Cf') kk qq γb γo Cf' ∗
       (IcacheRef.inode_shr_genlo ik s icfg_dev inum g lo -∗

@@ -79,7 +79,7 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import SpecMyproc SpecAcquire SpecRelease SpecSched.
-Require Import IrefSlots InodeRegion IcacheRef IcacheInv IcacheEscrow.
+Require Import IrefSlots InodeRegion IcacheRefDefs IcacheInv IcacheEscrow.
 Require Import BitmapInv DinodeEnc InodeInv.
 Require Import FsCfg FsReady.  (* [fs_ready] and the ambient names it is at *)
 Require Import SpecFileclose SpecReparent SpecWakeup.

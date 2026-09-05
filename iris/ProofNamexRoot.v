@@ -71,7 +71,7 @@ Require Import InodeInv.
 Require Import IregLinkNz.
 Require Import IgetLic.
 Require Import IrefSlots.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
 Require Import ProofDirlookupParts.
 Require Import ProofNamexParts.

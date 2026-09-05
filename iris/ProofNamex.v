@@ -145,7 +145,7 @@ Require Import IregLinkNz.
 Require Import IgetLic.
 Require Import IcacheEscrow.
 Require Import FileInvDefs.
-Require Import IcacheRef.
+Require Import IcacheHeld.
 Require Import IrefSlots.
 Require Import SpecMyproc SpecIdup SpecIget SpecMemmove.
 Require Import SpecIlock SpecIunlock SpecIunlockput SpecIput.

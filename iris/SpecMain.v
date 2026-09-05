@@ -485,7 +485,7 @@ Section SpecMain.
        one of [fs_boot_supply]'s ties because the era holds it about [nib]
        and the boot chain has it in hand; main forwards it to userinit's
        namei corner, where [icfg_nib = 0] would make the returned
-       [IcacheRef.inode_held] uninhabitable. *)
+       [IcacheHeld.inode_held] uninhabitable. *)
     (* THE WHOLE SNAPSHOT HYPOTHESIS, not two readings of it (fs-cfg-boot.md
        stage (f); durable-disk lane E-himg).  Main used to take exactly
        [0 < nib] (userinit's namei corner) and [0 ∉ cov]
@@ -572,7 +572,7 @@ Section SpecMain.
     procs_avail (Some NPROC) -∗
     (* ---- THE FILE SYSTEM'S BOOT-ERA MINT (fs-cfg-boot.md stage (e)) ----
        [FsCfgBoot.fs_cfg_alloc] runs inside [BootShared.boot_shared_alloc]
-       and gives [IcacheRef.icfg] / [FsCfg.fscfg] their VALUES; this row is
+       and gives [IcacheRefDefs.icfg] / [FsCfg.fscfg] their VALUES; this row is
        its whole output -- ten configuration ties plus the two boot kits --
        threaded here unopened.  Main spends kit 1 between +0x8e and +0xa2
        ([bio_init_at], [icache_boot_at], the [newlock_at]s) and carries kit 2

@@ -150,7 +150,7 @@
    the caller's share names a live slot -- so the bound comes out of
    [IcacheEscrow.ic_ci_wf]'s third clause inside the proof, off the very
    [ci !! k] the mint already reads.  Every caller would have had it (both
-   sites hold [IcacheRef.inode_held]'s), but at [icfg_nib] rather than at
+   sites hold [IcacheHeld.inode_held]'s), but at [icfg_nib] rather than at
    this contract's generic [nib], and deriving it costs the proof one
    [destruct].                                                             *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
@@ -176,6 +176,7 @@ Require Import AppCfg.       (* [appcfg]: the era's application record, bound be
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import IcacheHeld.   (* [inode_held_at] *)
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -215,7 +216,7 @@ Definition wp_idup_sconf_body
   (* THE precondition that makes [ip->ref++] safe -- see the header. *)
   iref_slot -∗
   (* ---- ONE ROW IN, TWO ROWS OUT (SIMP-2) ---------------------------
-     STATED OVER [IcacheRef.inode_held] -- the POINTER-keyed package --
+     STATED OVER [IcacheHeld.inode_held] -- the POINTER-keyed package --
      because that is what idup's two callers already hold: kfork's parent
      block and namex's cwd both carry [inode_held] and, before SIMP-2,
      had to open it, shed a share by [inode_ref_shed], hand the share and
