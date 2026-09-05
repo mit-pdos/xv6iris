@@ -390,7 +390,7 @@ Section UexecRetFs.
        ⌜ forall pt' : uptd,
            ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h) TsoCtx.cur_ctx ∗
                         (TsoCtx.own_context (CID := h) TsoCtx.cur_ctx -∗ Rut pt') ⌝ ∗
-       uheap γt γd γs M pm ∗
+       uheap γt γd γs M pm sz ∗
        ustack γd (m !!! Regidx csp_rs1) avail ∗
        (* the program's own descriptor authority, exactly as [UkRun.urun]
           carries it -- see its note -- WITH ITS LEDGER, which [UkRun.urun]
@@ -445,9 +445,9 @@ Section UexecRetFs.
      file's cone stops at UserHeap (the mirror-staleness note in the
      worklist records why) *)
   Local Lemma uheap_ubytes_pts (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pmv : gmap (mword 27) uperm) (dq : dfrac) (a : Z) (nb : nat)
+      (pmv : gmap (mword 27) uperm) (sz : Z) (dq : dfrac) (a : Z) (nb : nat)
       (f : nat -> bv 8) :
-    uheap γt γd γs M pmv -∗ ubytesq γd dq a nb f -∗
+    uheap γt γd γs M pmv sz -∗ ubytesq γd dq a nb f -∗
     ⌜ forall j : nat, (j < nb)%nat -> M !! (a + Z.of_nat j)%Z = Some (f j) ⌝.
   Proof.
     iInduction nb as [| kb IH] "IH"; iIntros "Hheap Hbs".
@@ -464,12 +464,12 @@ Section UexecRetFs.
   (* owning the string is what makes the row's [ustr_read] arm CONCRETE:
      the resource half of FsFdMirror's [ustr_read_of] *)
   Lemma uheap_ustrq (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (dq : dfrac) (a : Z) (pl : list (bv 8)) :
-    uheap γt γd γs M pm -∗ ustrq γd dq a pl -∗
+      (pm : gmap (mword 27) uperm) (sz : Z) (dq : dfrac) (a : Z) (pl : list (bv 8)) :
+    uheap γt γd γs M pm sz -∗ ustrq γd dq a pl -∗
     ⌜ustr_read M a = Some pl⌝.
   Proof.
     iIntros "Hheap (%Hall & %Hlen & Hbs)".
-    iDestruct (uheap_ubytes_pts γt γd γs M pm dq a (S (length pl))
+    iDestruct (uheap_ubytes_pts γt γd γs M pm sz dq a (S (length pl))
                  (ustr_bytes pl) with "Hheap Hbs") as %HM.
     iPureIntro. apply ustr_read_of; [exact Hlen | exact Hall |].
     intros j Hj. apply HM. lia.

@@ -132,7 +132,7 @@ Section UkRun.
        ⌜ forall pt' : uptd,
            ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h) (cur_ctx (CurCtx := xi)) ∗
                         (TsoCtx.own_context (CID := h) (cur_ctx (CurCtx := xi)) -∗ Rut pt') ⌝ ∗
-       uheap γt γd γs M pm ∗
+       uheap γt γd γs M pm sz ∗
        ustack γd (m !!! Regidx csp_rs1) avail ∗
        (* THE PROGRAM'S OWN VIEW OF ITS DESCRIPTORS, keyed at the very [fdv]
           the bundle is at.  This is the conjunct that makes a user-level fd
@@ -164,7 +164,7 @@ Section UkRun.
   Lemma urun_close (γt γd γs γfd : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (sz : Z) (fdv : list fdstate) (cw : Z) (m : regfile) (pc : mword 64)
       (avail : nat) :
-    uheap γt γd γs M pm -∗
+    uheap γt γd γs M pm sz -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     (* ...and the descriptor authority, at the same [fdv] the key is at *)
     ufd_auth γfd fdv -∗
@@ -200,7 +200,7 @@ Section UkRun.
       (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5) (v : mword 64)
       (sz : Z) (fdv : list fdstate) (cw : Z) (pc' : mword 64) (avail : nat) :
     unot_sp rd ->
-    uheap γt γd γs M pm -∗
+    uheap γt γd γs M pm sz -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     ufd_auth γfd fdv -∗
     (∀ h : CpuId, urun γt γd γs γfd h (<[Regidx rd := v]> m) pc' avail -∗
@@ -224,8 +224,8 @@ Section UkRun.
   (* which this lemma already has in hand.                                  *)
   (* ===================================================================== *)
   Lemma uheap_text_byte (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (a : Z) (b : bv 8) :
-    uheap γt γd γs M pm -∗ utext γt a b -∗
+      (szh : Z) (a : Z) (b : bv 8) :
+    uheap γt γd γs M pm szh -∗ utext γt a b -∗
     ⌜ M !! a = Some b /\ forall pt sz, proc_pt_wf pt ->
         perm_of (ud_um pt) sz = pm -> uva_fetch_leaf pt (mword_of_int a) ⌝.
   Proof.
@@ -243,8 +243,8 @@ Section UkRun.
      the pc is canonical, and its page is fetch-ok at any table realizing the
      key.  Factored out so the three decode shapes below do not triplicate it. *)
   Lemma uheap_text_pc (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (pc : mword 64) (b : bv 8) :
-    uheap γt γd γs M pm -∗ utext γt (uint pc + Z.of_nat 0) b -∗
+      (szh : Z) (pc : mword 64) (b : bv 8) :
+    uheap γt γd γs M pm szh -∗ utext γt (uint pc + Z.of_nat 0) b -∗
     ⌜ uva_canon pc /\
       forall pt sz, proc_pt_wf pt -> perm_of (ud_um pt) sz = pm ->
                     uva_fetch_leaf pt pc ⌝.
@@ -263,8 +263,8 @@ Section UkRun.
      X off the text half's class, not-W off its new clause, and
      [UmodeText.uva_text_of_perm] reads both off the leaf word *)
   Lemma uheap_text_pc_text (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (pc : mword 64) (b : bv 8) :
-    uheap γt γd γs M pm -∗ utext γt (uint pc + Z.of_nat 0) b -∗
+      (szh : Z) (pc : mword 64) (b : bv 8) :
+    uheap γt γd γs M pm szh -∗ utext γt (uint pc + Z.of_nat 0) b -∗
     ⌜ forall pt sz, proc_pt_wf pt -> perm_of (ud_um pt) sz = pm ->
                     uva_text pt (uint pc) ⌝.
   Proof.
@@ -286,8 +286,8 @@ Section UkRun.
      the code bytes from the run -- except [ui_inpage], which [uinstr_is]
      still carries for its one remaining consumer. *)
   Lemma uinstr_is_uk_instr (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (pc : mword 64) (is_rvc : bool) (i : instruction) :
-    uheap γt γd γs M pm -∗ uinstr_is γt pc is_rvc i -∗
+      (szh : Z) (pc : mword 64) (is_rvc : bool) (i : instruction) :
+    uheap γt γd γs M pm szh -∗ uinstr_is γt pc is_rvc i -∗
     ⌜ uk_instr pm M pc is_rvc i ⌝.
   Proof.
     iIntros "Hheap #Hi". rewrite /uinstr_is.
@@ -362,8 +362,8 @@ Section UkRun.
      Consuming the run inside this proof is free: the conclusion is pure, so
      the caller's [iDestruct … as %…] keeps both the heap and the word. *)
   Lemma uheap_uword_at (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (dq : dfrac) (a : Z) (w : mword 64) :
-    uheap γt γd γs M pm -∗ uwordq γd dq a w -∗
+      (pm : gmap (mword 27) uperm) (sz : Z) (dq : dfrac) (a : Z) (w : mword 64) :
+    uheap γt γd γs M pm sz -∗ uwordq γd dq a w -∗
     ⌜ 0 <= a < 2 ^ 38 /\ uw_addr pm a ⌝.
   Proof.
     iIntros "Hheap Hw". rewrite /uwordq /ubytesq.
@@ -379,9 +379,9 @@ Section UkRun.
      goes through -- it is what replaces the caller-supplied permission,
      canonicity and presence premises of the UkStore/UkLoad leaves. *)
   Lemma uheap_ubytes_at (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (dq : dfrac) (a : Z) (n : nat)
+      (pm : gmap (mword 27) uperm) (sz : Z) (dq : dfrac) (a : Z) (n : nat)
       (f : nat -> bv 8) :
-    uheap γt γd γs M pm -∗ ubytesq γd dq a n f -∗
+    uheap γt γd γs M pm sz -∗ ubytesq γd dq a n f -∗
     ⌜ forall j : nat, (j < n)%nat ->
         M !! (a + Z.of_nat j)%Z = Some (f j) /\
         uw_addr pm (a + Z.of_nat j)%Z /\
@@ -409,8 +409,8 @@ Section UkRun.
   (* a premise.                                                            *)
   (* ===================================================================== *)
   Lemma ustack_room (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (sp : mword 64) (n : nat) :
-    uheap γt γd γs M pm -∗ ustack γd sp n -∗ ⌜ 8 * Z.of_nat n <= uint sp ⌝.
+      (pm : gmap (mword 27) uperm) (sz : Z) (sp : mword 64) (n : nat) :
+    uheap γt γd γs M pm sz -∗ ustack γd sp n -∗ ⌜ 8 * Z.of_nat n <= uint sp ⌝.
   Proof.
     iIntros "Hheap Hstk".
     destruct n as [| n'].
@@ -425,13 +425,13 @@ Section UkRun.
   (* ...and the same fact read at a MOVED sp: had [sp + 8k] wrapped, its own
      frame's deepest word would be at a negative address. *)
   Lemma ustack_nowrap (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (sp : mword 64) (k : nat) :
-    uheap γt γd γs M pm -∗
+      (pm : gmap (mword 27) uperm) (sz : Z) (sp : mword 64) (k : nat) :
+    uheap γt γd γs M pm sz -∗
     ustack γd (add_vec_int sp (8 * Z.of_nat k)) k -∗
     ⌜ uint sp + 8 * Z.of_nat k < Z64 ⌝.
   Proof.
     iIntros "Hheap Hstk".
-    iDestruct (ustack_room γt γd γs M pm
+    iDestruct (ustack_room γt γd γs M pm sz
                  (add_vec_int sp (8 * Z.of_nat k)) k with "Hheap Hstk") as %Hr.
     iPureIntro.
     pose proof (bv_unsigned_in_range _ (add_vec_int sp (8 * Z.of_nat k))) as Hr2.
@@ -534,6 +534,13 @@ Section UkRun.
     (* the descriptor table is [NOFILE] slots -- what the process's own
        authority is minted with ([UserFd.ufd_auth] carries it) *)
     length (uvis_fd W) = NOFILE ->
+    (* THE MAP STOPS AT THE BREAK: above the page the break sits in, the
+       key's permission view has no entry.  It is the U tier's reading of
+       [ProcPtOwn.um_below] -- which the bundle does not carry, so it is
+       stated here, where the program's own layout decides it -- and it is
+       what makes [sbrk]'s new run FRESH ([UserHeap]'s own clause). *)
+    (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
+       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (∀ (γt γd γs γfd : gname) (h : CpuId),
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz γs (uvis_sz W) -∗
@@ -552,7 +559,7 @@ Section UkRun.
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    intros Hal8 Hroom Hstk Hfdlen. iIntros "Hprog". rewrite uslot_ukc /ukc.
+    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "Hprog". rewrite uslot_ukc /ukc.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -562,7 +569,7 @@ Section UkRun.
       "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
         Hfrag & Hcfg & Hgpr & Hpc & Hrut & Hkont)".
     iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
-    iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan)
+    iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan Hstop)
       as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
     (* ...AND THE PROGRAM'S DESCRIPTOR AUTHORITY, minted here beside the
        heap's three names.  This is where a process's [urun] is created, so
@@ -622,6 +629,13 @@ Section UkRun.
     (* the descriptor table is [NOFILE] slots -- what the process's own
        authority is minted with ([UserFd.ufd_auth] carries it) *)
     length (uvis_fd W) = NOFILE ->
+    (* THE MAP STOPS AT THE BREAK: above the page the break sits in, the
+       key's permission view has no entry.  It is the U tier's reading of
+       [ProcPtOwn.um_below] -- which the bundle does not carry, so it is
+       stated here, where the program's own layout decides it -- and it is
+       what makes [sbrk]'s new run FRESH ([UserHeap]'s own clause). *)
+    (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
+       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (∀ (γt γd γs γfd : gname) (h : CpuId),
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz γs (uvis_sz W) -∗
@@ -645,7 +659,7 @@ Section UkRun.
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    intros Hal8 Hroom Hstk Hfdlen. iIntros "Hprog". rewrite uslot_ukc /ukc.
+    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "Hprog". rewrite uslot_ukc /ukc.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -655,7 +669,7 @@ Section UkRun.
       "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
         Hfrag & Hcfg & Hgpr & Hpc & Hrut & Hkont)".
     iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
-    iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan)
+    iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan Hstop)
       as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
     (* ...AND THE PROGRAM'S DESCRIPTOR AUTHORITY, minted here beside the
        heap's three names.  This is where a process's [urun] is created, so

@@ -409,14 +409,17 @@ Section UEchoKernel.
     (* the process's table is [NOFILE] slots -- what its own descriptor
        authority is minted at ([UserFd.ufd_auth] carries it) *)
     length (uvis_fd W) = NOFILE ->
+    (* the map stops at the break -- see [UkRun.uslot_of_urun]'s premise *)
+    (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
+       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     ⊢ uslot W.
   Proof.
-    intros Hpc Hsub Hx Hroom Hal8 Hstk Hargs Havd Havs Hfdlen.
+    intros Hpc Hsub Hx Hroom Hal8 Hstk Hargs Havd Havs Hfdlen Hstop.
     assert (Hsp0 : 0 <= uint (uvis_sp W)) by lia.
     assert (Hargc0 : 0 <= uvis_argc W)
       by exact (proj1 (uka_argc _ _ _ _ _ _ Hargs)).
     iApply (uslot_of_urun_ro W 12 Hal8
-              ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen).
+              ltac:(unfold uvis_sp in Hroom; lia) Hstk Hfdlen Hstop).
     (* echo makes no descriptor call, so its ledger is dropped here *)
     iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht _ #HA Hrun".
     rewrite Hpc.

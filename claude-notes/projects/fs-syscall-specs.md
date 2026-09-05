@@ -1970,10 +1970,54 @@ things, and the answer differs:
   * **STAGE 3 — the allocator.**  `malloc` (0x118c, 91) → `morecore` →
     `sbrk` (0xc52, 10) → `sys_sbrk` (0xd0e), and `free` (0x1106, 46).  The
     first call is the only one the old stack proved (`freep == 0`), and
-    that scoping carries.  **Blocked on `wp_uk_ecall_sbrk`**, the second
-    unbuilt row — and this one moves `π` and `sz`, so it is strictly
-    harder than the window.  `USpecSh`'s `sh_nunits`, `SH_FREEP`,
-    `SH_BASE` and `UProofShMem`'s `heap_leaf`/`data_leaf` port.
+    that scoping carries.  `USpecSh`'s `sh_nunits`, `SH_FREEP`, `SH_BASE`
+    and `UProofShMem`'s `heap_leaf`/`data_leaf` port.
+
+    **THE LEAF IS BUILT: `UkRunSys.wp_uk_ecall_sbrk` (2026-09-05).**  What
+    it took was not the walk but a ROW that did not exist, and the shape of
+    the fix is the lane's most reusable result:
+
+    * **THE KERNEL KNEW WHERE THE MEMORY WENT AND THE U TIER COULD NOT SEE
+      IT.**  `usys_mem_ok`'s sbrk row said the image grew and the map
+      gained pages, and said NOTHING about the return value — so a caller
+      learned that memory grew but not WHERE, and `malloc` cannot own a
+      block whose address it cannot name.  The fact is
+      `SpecSysSbrk.sys_sbrk_ok`'s ("failure is total; success returns the
+      OLD size"), and it is now carried out through the dispatcher exactly
+      as lane C2 carried the cwd: `UsysMemOk.usys_sbrk_ret` is the U tier's
+      row (a third conjunct in the same sbrk branch — no arity moved, so no
+      reader of `uexec_ret` changed), `SpecSyscall`'s returning post and
+      `ProofSyscall`'s `sysc_hcont_ty`/`sysc_ret_tail`/`sysc_epilogue_tail`
+      gain one pure premise each, the twenty-one non-sbrk arms pay it with
+      `or_introl (sysc_num_ne12 _ _ Hnum eq_refl)`, and sbrk's own arm pays
+      it with `sysc_sbrk_ret_of_ok`.  **Only the GROW direction is pinned**
+      (`0 <= n → szv' = szv + n`): a shrink whose sum wraps past the old
+      size leaves `p->sz` where it was, so an equation would be false
+      there, and no caller of this row shrinks.
+    * **THE HEAP HAD TO SAY WHERE THE PROCESS'S MEMORY ENDS.**
+      `UserHeap.uheap` gained the break as a PARAMETER (it was an
+      existential, so nothing could say the heap's break is the one the KEY
+      was resumed at — `UkRun.urun` now passes its own `sz`) and two
+      clauses: the slack is EXACTLY the data at or above the break (an iff,
+      not just "above"), and THE MAP STOPS AT THE BREAK (no page at or
+      above `pgroundup sz` is in the key's permission view).  The second is
+      the U tier's reading of the kernel's `um_below`, which the trap
+      bundle does not carry; it is a premise of `uslot_of_urun` and so of
+      each program's slot constructor, where the layout decides it.
+      Together they are what makes the run `sbrk` hands out FRESH: on a
+      page-aligned break every address the call adds is on a page the
+      process did not have, hence a byte the data authority does not
+      record, hence one the leaf can mint (`uheap_grow_run`).
+    * **WHAT THE LEAF SAYS.**  At a page-aligned break and a non-negative
+      argument: either `-1` back and the break unmoved, or the OLD break
+      back, `usz γs (sz + n)`, and `ubytes γd sz n` — the bytes, owned.
+      There is NO failure-free arm: `sbrk` goes through `growproc` and
+      `kalloc` can fail, so a caller that does not check (sh's `morecore`
+      checks; `execcmd` does not check `malloc`) is where an assumption
+      will have to be named.
+    * **WHAT IS LEFT FOR THE WALK**: the fourth catalog (`malloc`, `free`
+      and the `sbrk` stub, ~150 instructions) and the walk itself, which
+      discharges `UkShParse.ushp_malloc_ok`.
   * **STAGE 4 — the parser's recursion.**  `parsecmd` (0x86e) →
     `parseline` (0x6e2) → `parsepipe` (0x682) → `parseexec` (0x590) →
     `parseredirs` (0x4ac), over `peek` (0x448) / `gettoken` (0x310) /

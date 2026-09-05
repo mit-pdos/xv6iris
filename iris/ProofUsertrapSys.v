@@ -568,7 +568,7 @@ Section UtSysBlock.
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
       iIntros (CID2 Hk2 mg U2 stsR)
-        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg %Hcwig Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc Hxo".
+        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg %Hcwig %Hsbrg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc Hxo".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
@@ -642,7 +642,7 @@ Section UtSysBlock.
       assert (Ha5 : rget S3 Ra5 = add_vec_int (pv_tf (us_V U) !!! tf_epc_idx) 4).
       { rewrite (list_lookup_total_correct _ _ _ Hepc) HS3a5 HS2a5.
         apply addv_sext4. }
-      cbn [us_V us_M] in Hmemg, Hmemne2, Hmema0, Hmemupt, Hmemsz, Hcwig.
+      cbn [us_V us_M] in Hmemg, Hmemne2, Hmema0, Hmemupt, Hmemsz, Hcwig, Hsbrg.
       (* the dispatcher's record is the entry one but for the epc word, so
          its cwd inum is the entry's *)
       assert (HV1cwi : pv_cwi V1 = pv_cwi (us_V U))
@@ -691,15 +691,36 @@ Section UtSysBlock.
           exists w.
           assert (Hbump : pv_tf V2 = bump_tf (pv_tf (us_V U)) w).
           { rewrite Hw HV1tf Ha5. unfold bump_tf. reflexivity. }
+          (* THE STORED a0 WORD, hoisted: the cwd row and sbrk's both read it *)
+          assert (Ha0w : pv_tf V2 !!! tf_arg_idx 0 = w).
+          { rewrite Hw. apply list_lookup_total_insert.
+            rewrite HV1tf length_insert Htflen0. unfold tf_arg_idx, TFWORDS. lia. }
+          (* the dispatcher's record differs from the entry's in the EPC word
+             alone, so the two agree at a7 (the number) and at a0 (sbrk's
+             argument) *)
+          assert (Hnum2 : sysc_num (us_V U) = sysc_num V1)
+            by (rewrite (sysc_num_usys (us_V U)); symmetry; exact Hnumeq).
+          (* SBRK'S ANSWER, off the dispatcher's clause and in the shape the
+             U tier's row reads (lane SB).  It is what makes a verified
+             [malloc] possible: the image row says memory grew, this says
+             the call handed back the OLD break. *)
+          assert (Hsbret : sysc_num V1 = 12 ->
+                    usys_sbrk_ret (pv_tf V1) w
+                      (uint (pv_sz V1)) (uint (pv_sz V2))).
+          { intro Hsb.
+            unfold usys_sbrk_ret.
+            rewrite (UmodeArith.moi_of_uint (pv_sz V1)).
+            destruct Hsbrg as [Hne12 | [ [Hm1 Hsz] | [Hr Himp] ]].
+            - exfalso. exact (Hne12 Hsb).
+            - left. rewrite Ha0w in Hm1. split; [ exact Hm1 | ].
+              rewrite Hsz. reflexivity.
+            - right. rewrite Ha0w in Hr. split; [ exact Hr | exact Himp ]. }
           (* THE CWD ROW, off the dispatcher's clause: a chdir that returned
              nonzero moved nothing, and every other entry moved nothing.
              The clause reads the stored a0 word, which is [w]. *)
           assert (Hcwrow : usys_cwd_ok (usys_num (pv_tf (us_V U))) w
                              (pv_cwi (us_V U)) (pv_cwi V2)).
           { rewrite <- Hnumeq.
-            assert (Ha0w : pv_tf V2 !!! tf_arg_idx 0 = w).
-            { rewrite Hw. apply list_lookup_total_insert.
-              rewrite HV1tf length_insert Htflen0. unfold tf_arg_idx, TFWORDS. lia. }
             unfold usys_cwd_ok.
             destruct (decide (sysc_num V1 = USYS_chdir)) as [H9 | Hn9].
             - intros Hnz0.
@@ -726,7 +747,7 @@ Section UtSysBlock.
             destruct (decide (sysc_num V1 = 12)) as [Hsb | Hnsb].
             * (* SBRK, for real (stage S8b) *)
               exact (sysc_mem_ok_usys_sbrk V1 V2 (us_M U) M2 w _ _
-                       Hsb (Hsbperm Hsb) Hmemg).
+                       Hsb (Hsbperm Hsb) (Hsbret Hsb) Hmemg).
             * (* the other twenty-one: the permission half is where clause
                  (ii)'s size and RW-leaf content is spent *)
               (* clause (ii)'s SIZE half, hoisted: the row's break is named

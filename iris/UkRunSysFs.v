@@ -300,7 +300,7 @@ Section UkRunSysFs.
       (pm : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate) (cw : Z)
       (m : regfile) (pc : mword 64)
       (avail : nat) :
-    uheap γt γd γs M pm -∗
+    uheap γt γd γs M pm sz -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     (* the descriptor authority, exactly as [UkRun.urun_close] takes it *)
     ufd_state γfd fdv -∗
@@ -321,7 +321,7 @@ Section UkRunSysFs.
       (v : mword 64) (sz : Z) (fdv : list fdstate) (cw : Z) (pc' : mword 64)
       (avail : nat) :
     unot_sp rd ->
-    uheap γt γd γs M pm -∗
+    uheap γt γd γs M pm sz -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     ufd_state γfd fdv -∗
     (∀ h : CpuId,

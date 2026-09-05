@@ -51,6 +51,7 @@ From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
+Require Import Riscv.rv64d.   (* [sign_extend'] -- sbrk's argument, sign-extended *)
 Require Import ProcGeom.     (* [tf_arg_idx] / [tf_epc_idx] / [TFWORDS] *)
 Require Import TfUser.       (* [tf_ueq] -- the resume-visible word equality *)
 Require Import UserPtTree.   (* [umem_wr] / [umem_grow] / [umem_del] *)
@@ -115,6 +116,48 @@ Definition USYS_chdir : Z := 9.
 Definition usys_rdcount (tf : list (mword 64)) : Z :=
   bv_signed (subrange_vec_dec (tf !!! tf_arg_idx 2) 31 0 : mword 32).
 
+(* sbrk's ARGUMENT, as the kernel reads it back: [argint] stores the low
+   32 bits of a0 into the caller's [int] cell and the [lw] that reloads it
+   sign-extends, so the value that reaches growproc -- and the value the
+   break moves by -- is this one.  Definitionally [SpecSysSbrk.sbrk_arg]
+   at [tf !!! tf_arg_idx 0]. *)
+Definition usys_sbrk_arg (tf : list (mword 64)) : mword 64 :=
+  sign_extend' 64 (trunc32 (tf !!! tf_arg_idx 0)).
+
+(* WHAT sbrk ANSWERED, and it is the row the ALLOCATOR needs.  The image and
+   permission rows below say how memory moved; neither says WHERE the new
+   memory is, because neither mentions the return value -- and a [malloc]
+   that cannot say [sbrk(n)] returned the OLD break cannot own the block it
+   just asked for.  So:
+
+     FAILURE is total: [-1] back, and the break did not move.  (All three
+     of sys_sbrk's failure arms return before writing anything.)
+     SUCCESS returns the OLD break -- sbrk's contract with userspace -- and,
+     WHEN THE ARGUMENT IS NON-NEGATIVE, the break went up by exactly it.
+
+   The grow direction alone is pinned on purpose: a SHRINK whose sum wraps
+   past the old size leaves [p->sz] where it was (uvmdealloc does nothing),
+   so an equation would be false there, and no caller of this row shrinks.
+   [SpecSysSbrk.sys_sbrk_ok] is where both halves come from; the bridge is
+   [UsysMemOkSpec.sysc_mem_ok_usys_sbrk]. *)
+Definition usys_sbrk_ret (tf : list (mword 64)) (r : mword 64)
+    (szv szv' : Z) : Prop :=
+  (r = (mword_of_int (-1) : mword 64) /\ szv' = szv)
+  \/ (r = (mword_of_int szv : mword 64) /\
+      ((0 <= sint (usys_sbrk_arg tf))%Z ->
+         szv' = szv + sint (usys_sbrk_arg tf))).
+
+(* ...and it reads ONE trapframe word, so it crosses any frame that agrees
+   there -- the epc rewrite the dispatcher's record carries, in particular. *)
+Lemma usys_sbrk_ret_arg (tf tf' : list (mword 64)) (r : mword 64)
+    (szv szv' : Z) :
+  tf !!! tf_arg_idx 0 = tf' !!! tf_arg_idx 0 ->
+  usys_sbrk_ret tf r szv szv' -> usys_sbrk_ret tf' r szv szv'.
+Proof.
+  intros H0 H. unfold usys_sbrk_ret, usys_sbrk_arg in H |- *.
+  rewrite <- H0. exact H.
+Qed.
+
 (* sbrk's row on the IMAGE, at the OLD size [szv] and the NEW one [szv'].
    EITHER EXTEND THE MEMORY UP WITH ZEROED PAGES, OR CUT IT DOWN -- the C's
    own two directions, and nothing existential in either.  [umem_grow] IS
@@ -168,9 +211,11 @@ Definition usys_mem_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        trapframe word list does not carry [p->sz]; now the KEY does, so the
        row says what happens at the process's actual break rather than at
        some pair of sizes.  A caller of sbrk therefore learns [szv'], which
-       is what makes the return value meaningful. *)
+       is what makes the return value meaningful -- and [usys_sbrk_ret]
+       says what the ANSWER was, which is what makes it usable. *)
     usys_sbrk_img M M' (mword_of_int szv) (mword_of_int szv') /\
-    usys_sbrk_perm π π' (mword_of_int szv) (mword_of_int szv')
+    usys_sbrk_perm π π' (mword_of_int szv) (mword_of_int szv') /\
+    usys_sbrk_ret tf r szv szv'
   else if decide (n = USYS_wait) then
     (* copyout of the zombie's four-byte [xstate] at argument 0 -- and a
        NULL destination is not a destination, so a caller passing a null
@@ -754,7 +799,10 @@ Proof.
     by (destruct Hu as [_ Hg]; apply Hg; unfold tf_arg_idx; lia).
   unfold usys_mem_ok, usys_rdcount in H |- *.
   destruct (decide (n = USYS_exec)); [ exact H | ].
-  destruct (decide (n = USYS_sbrk)); [ exact H | ].
+  (* sbrk's row now reads argument 0 too -- its ANSWER is stated at the
+     step the break moved by, which the C reads out of a0 *)
+  destruct (decide (n = USYS_sbrk));
+    [ unfold usys_sbrk_ret, usys_sbrk_arg in H |- *; rewrite <- H0; exact H | ].
   destruct (decide (n = USYS_wait)); [ rewrite <- H0; exact H | ].
   destruct (decide (n = USYS_pipe)); [ rewrite <- H0; exact H | ].
   destruct (decide (n = USYS_read)); [ rewrite <- H1; rewrite <- H2; exact H | ].
@@ -781,7 +829,8 @@ Proof.
     by (apply list_lookup_total_insert_ne; unfold tf_arg_idx, tf_epc_idx; lia).
   assert (E2 : (<[tf_epc_idx := v]> tf) !!! tf_arg_idx 2 = tf !!! tf_arg_idx 2)
     by (apply list_lookup_total_insert_ne; unfold tf_arg_idx, tf_epc_idx; lia).
-  unfold usys_mem_ok, usys_rdcount. rewrite E0; rewrite E1; rewrite E2.
+  unfold usys_mem_ok, usys_rdcount, usys_sbrk_ret, usys_sbrk_arg.
+  rewrite E0; rewrite E1; rewrite E2.
   intros H; exact H.
 Qed.
 

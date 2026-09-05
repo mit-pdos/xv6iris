@@ -1683,6 +1683,16 @@ Section SyscallVocab.
            it succeeds (lanes C1/C2) *)
         ⌜ (sysc_num (us_V U) = 9 /\ uint (pv_tf (us_V U') !!! tf_arg_idx 0) = 0)
           \/ pv_cwi (us_V U') = pv_cwi (us_V U) ⌝ -∗
+        (* ...and sbrk's ANSWER -- [SpecSyscall]'s own clause, which is what
+           makes the U tier's row usable (lane SB) *)
+        ⌜ sysc_num (us_V U) <> 12
+          \/ (pv_tf (us_V U') !!! tf_arg_idx 0 = (mword_of_int (-1) : mword 64)
+              /\ pv_sz (us_V U') = pv_sz (us_V U))
+          \/ (pv_tf (us_V U') !!! tf_arg_idx 0 = pv_sz (us_V U)
+              /\ ((0 <= sint (usys_sbrk_arg (pv_tf (us_V U))))%Z ->
+                   (uint (pv_sz (us_V U'))
+                    = uint (pv_sz (us_V U))
+                      + sint (usys_sbrk_arg (pv_tf (us_V U))))%Z)) ⌝ -∗
         sie_cap_gpr KT1 mf av true pj -∗
         cpu_own 0%nat true pj true lks -∗
         bslots 3 -∗
@@ -1869,6 +1879,17 @@ Section SyscallVocab.
        C1/C2), read at the stored a0 word like the descriptor row *)
     ((sysc_num (us_V U) = 9 /\ uint (pv_tf (us_V U') !!! tf_arg_idx 0) = 0)
      \/ pv_cwi (us_V U') = pv_cwi (us_V U)) ->
+    (* ...and sbrk's ANSWER, read at the stored a0 word like the two rows
+       above it: failure is total, success returns the OLD break, and a
+       non-negative argument moved the break up by exactly it. *)
+    (sysc_num (us_V U) <> 12
+     \/ (pv_tf (us_V U') !!! tf_arg_idx 0 = (mword_of_int (-1) : mword 64)
+         /\ pv_sz (us_V U') = pv_sz (us_V U))
+     \/ (pv_tf (us_V U') !!! tf_arg_idx 0 = pv_sz (us_V U)
+         /\ ((0 <= sint (usys_sbrk_arg (pv_tf (us_V U))))%Z ->
+              (uint (pv_sz (us_V U'))
+               = uint (pv_sz (us_V U))
+                 + sint (usys_sbrk_arg (pv_tf (us_V U))))%Z))) ->
     (* THIS ARM RETURNS, hence is not [exit] (milestone J, K1) -- the last
        pure premise, so that every call site adds exactly one argument
        immediately before its [with "..."].  Free at every one of them:
@@ -1893,7 +1914,7 @@ Section SyscallVocab.
     sysc_exec_out U U' sts sts' -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hne2.
+    intros HEsp Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hne2.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont Hxo".
     assert (Hb1 : pa_stk sp0 1 = add_vec (pa_stk sp0 4) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))))
@@ -2040,7 +2061,7 @@ Section SyscallVocab.
               (Hst3 (or_intror Hgood)) (Hst2 (or_intror Hgood)) (Hst1 (or_intror Hgood)).
       reflexivity. }
     iApply ("Hcont" $! T5 U' sts'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hxo").
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hxo").
     { unfold callee_saved.
       split_and!.
       - exact HT5sp.
@@ -2067,7 +2088,8 @@ Section SyscallVocab.
     { exact Hszv. }
     { exact Hud. }
     { exact Hfg. }
-    exact Hcwi.
+    { exact Hcwi. }
+    exact Hsbr.
   Qed.
 
   (* the jalr's target, at a symbolic table index -- [ret_pc] is the
@@ -2580,6 +2602,17 @@ Section SyscallRet.
        store below is what turns it into the trapframe-word form *)
     ((sysc_num (us_V U) = 9 /\ uint (E !!! Regidx (mword_of_int 10 : mword 5)) = 0)
      \/ pv_cwi (us_V U') = pv_cwi (us_V U)) ->
+    (* ...and sbrk's ANSWER, at the return REGISTER for the same reason:
+       the [sd a0,112(s2)] below is what turns it into the word form. *)
+    (sysc_num (us_V U) <> 12
+     \/ (E !!! Regidx (mword_of_int 10 : mword 5)
+           = (mword_of_int (-1) : mword 64)
+         /\ pv_sz (us_V U') = pv_sz (us_V U))
+     \/ (E !!! Regidx (mword_of_int 10 : mword 5) = pv_sz (us_V U)
+         /\ ((0 <= sint (usys_sbrk_arg (pv_tf (us_V U))))%Z ->
+              (uint (pv_sz (us_V U'))
+               = uint (pv_sz (us_V U))
+                 + sint (usys_sbrk_arg (pv_tf (us_V U))))%Z))) ->
     (* THIS ARM RETURNS, hence is not [exit] (milestone J, K1) -- the last
        pure premise, so that every call site adds exactly one argument
        immediately before its [with "..."].  Free at every one of them:
@@ -2610,7 +2643,7 @@ Section SyscallRet.
       sts sts' -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hne2.
+    intros HEsp HEs2 Hrest Hav4 Hmem Hfdrow Hpiperow Ha0 Hupte Hszv Hud Hfg Hcwi Hsbr Hne2.
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont Hxo".
     (* the stored word, as the store lemma spells it *)
     assert (Hrg : rget E Ra0 = E !!! Regidx Ra0) by (rgne; reflexivity).
@@ -2662,6 +2695,19 @@ Section SyscallRet.
                         \/ pv_cwi (us_V U') = pv_cwi (us_V U)).
     { rewrite list_lookup_total_insert; [| exact Hi14].
       rgne. exact Hcwi. }
+    (* ...and sbrk's answer makes the same move *)
+    assert (Hsbstored : sysc_num (us_V U) <> 12
+      \/ (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U')) !!! tf_arg_idx 0
+            = (mword_of_int (-1) : mword 64)
+          /\ pv_sz (us_V U') = pv_sz (us_V U))
+      \/ (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U')) !!! tf_arg_idx 0
+            = pv_sz (us_V U)
+          /\ ((0 <= sint (usys_sbrk_arg (pv_tf (us_V U))))%Z ->
+               (uint (pv_sz (us_V U'))
+                = uint (pv_sz (us_V U))
+                  + sint (usys_sbrk_arg (pv_tf (us_V U))))%Z))).
+    { rewrite list_lookup_total_insert; [| exact Hi14].
+      rgne. exact Hsbr. }
     assert (Hp3e : add_vec_int (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64) 4
                    = mword_of_int (KernelSyms.syscall + 0x3e)) by pcw.
     iEval (rewrite Hp3e) in "Hpc".
@@ -2709,6 +2755,7 @@ Section SyscallRet.
               Hud
               ltac:(cbn [pv_fdg upd_tf]; exact Hfg)
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_cwi pv_tf]; exact Hcwstored)
+              ltac:(cbn [us_V us_tf upd_usV upd_tf pv_sz pv_tf]; exact Hsbstored)
               Hne2
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont Hxo").
   Qed.
@@ -2988,6 +3035,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3045,6 +3093,83 @@ Section SyscallArms.
       [ | exfalso; exact (Hc (Z.le_refl _)) ].
     split; [ apply uptd_ext_sz_refl | ].
     symmetry. apply umem_grow_id. exact Hdom.
+  Qed.
+
+  (* THE NO-WRAP ARGUMENT, ONCE.  A non-negative [b] added to [a] either
+     wraps -- in which case the sum lands BELOW [a], because [sint b] is
+     less than 2^63 -- or it does not, and then the unsigned sum is the
+     arithmetic one.  So "the result did not go down" is exactly "it did
+     not wrap", which is the form both of sbrk's growing arms hand over
+     ([growproc_ok]'s GREW arm and the lazy path both carry
+     [uint szv <= uint szv']). *)
+  Lemma addv_sint_of_le (a b : mword 64) :
+    (0 <= sint b)%Z -> (uint a <= uint (add_vec a b))%Z ->
+    uint (add_vec a b) = (uint a + sint b)%Z.
+  Proof.
+    intros Hb Hle.
+    pose proof (sint64_range b) as Hrb.
+    pose proof (bv_unsigned_in_range _ a) as Ha.
+    assert (Hm : bv_modulus (MachineWord.Z_idx 64) = 18446744073709551616%Z)
+      by (vm_compute; reflexivity).
+    rewrite Hm in Ha.
+    pose proof (uint_unsigned a) as Hua.
+    pose proof (uint_unsigned (add_vec a b)) as Huab.
+    assert (Hsum : bv_unsigned (add_vec a b)
+                   = ((bv_unsigned a + sint b) mod 18446744073709551616)%Z).
+    { rewrite add_vec_unsigned. rewrite (sint64_unsigned b Hb).
+      unfold bv_wrap, bv_modulus. reflexivity. }
+    assert (Hlt : (bv_unsigned a + sint b < 18446744073709551616)%Z).
+    { destruct (Z_lt_le_dec (bv_unsigned a + sint b) 18446744073709551616)%Z
+        as [H | H]; [ exact H | exfalso ].
+      (* the quotient is pinned to 1, so the mod is the subtraction and the
+         sum lands BELOW where it started -- which [Hle] refutes *)
+      pose proof (Z.mod_eq (bv_unsigned a + sint b) 18446744073709551616
+                    ltac:(discriminate)) as Heq.
+      assert (Hq1 : (1 <= (bv_unsigned a + sint b) / 18446744073709551616)%Z)
+        by (apply Z.div_le_lower_bound; lia).
+      assert (Hq2 : ((bv_unsigned a + sint b) / 18446744073709551616 < 2)%Z)
+        by (apply Z.div_lt_upper_bound; lia).
+      rewrite Heq in Hsum. lia. }
+    rewrite Huab Hua Hsum. apply Zmod_small. lia.
+  Qed.
+
+  (* ...and what sbrk ANSWERED, in the shape the U tier's row reads (lane
+     SB): failure is total, success returns the OLD break, and a
+     non-negative argument moved the break up by exactly it.  The SHRINK
+     arm is where the guard earns its keep -- a shrink whose sum wraps past
+     the old size leaves [p->sz] where it was -- and [n = 0] is the grow
+     arm at a zero step. *)
+  Lemma sysc_sbrk_ret_of_ok (V : pprivate) (v0 v1 : mword 64)
+      (P' : uptd) (szv' r : mword 64) (M M' : gmap Z (bv 8)) :
+    pv_tf V !!! tf_arg_idx 0 = v0 ->
+    sys_sbrk_ok V v0 v1 P' szv' r M M' ->
+    (r = (mword_of_int (-1) : mword 64) /\ szv' = pv_sz V)
+    \/ (r = pv_sz V /\
+        ((0 <= sint (usys_sbrk_arg (pv_tf V)))%Z ->
+           uint szv' = (uint (pv_sz V) + sint (usys_sbrk_arg (pv_tf V)))%Z)).
+  Proof.
+    intros Hv0 Hok.
+    assert (Harg : usys_sbrk_arg (pv_tf V) = sbrk_arg v0)
+      by (unfold usys_sbrk_arg, sbrk_arg; rewrite Hv0; reflexivity).
+    rewrite Harg.
+    destruct Hok as [ (Hr & _ & Hs & _) | (Hr & Hg) ].
+    - left. split; [ exact Hr | exact Hs ].
+    - right. split; [ exact Hr | ]. intro Hnn.
+      destruct Hg as [ (_ & Hgp) | (_ & _ & _ & _ & Hsz & Hle & _) ].
+      + (* the EAGER path: growproc, at a return value of 0 *)
+        destruct Hgp as [ (Hbad & _)
+                        | [ (_ & _ & _ & Hsz & Hle & _)
+                          | [ (_ & Hz & _ & Hs & _) | (_ & Hneg & _) ] ] ].
+        * (* growproc FAILED -- but the syscall succeeded, so this arm is
+             refuted by its own return value *)
+          exfalso. vm_compute in Hbad. discriminate Hbad.
+        * rewrite Hsz. rewrite Hsz in Hle.
+          exact (addv_sint_of_le (pv_sz V) (sbrk_arg v0) Hnn Hle).
+        * rewrite Hs. rewrite Hz. lia.
+        * exfalso. lia.
+      + (* the LAZY path *)
+        rewrite Hsz. rewrite Hsz in Hle.
+        exact (addv_sint_of_le (pv_sz V) (sbrk_arg v0) Hnn Hle).
   Qed.
 
   (* ...and what sbrk did to the ADDRESS SPACE, in the shape
@@ -3193,6 +3318,13 @@ Section SyscallArms.
               ltac:(right; left; rewrite Hnum; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
+              (* SBRK'S OWN ANSWER, the one row a caller cannot get from the
+                 image: [sys_sbrk_ok] says failure is total and success
+                 returns the OLD break, and [sysc_sbrk_ret_of_ok] reads it
+                 in the U tier's shape. *)
+              (or_intror (sysc_sbrk_ret_of_ok (us_V U) v0 v1 P' szv'
+                            (mf !!! Regidx Ra0) (us_M U) M'
+                            (list_lookup_total_correct _ _ _ Hv0) Hok))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3282,6 +3414,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3364,6 +3497,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3440,6 +3574,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3516,6 +3651,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3689,6 +3825,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -3788,6 +3925,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4010,6 +4148,7 @@ Section SyscallArms.
               ltac:(left; rewrite Hnum; reflexivity)
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont Hxo").
   Qed.
@@ -4180,6 +4319,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4311,6 +4451,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4418,6 +4559,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4509,6 +4651,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4638,6 +4781,7 @@ Section SyscallArms.
               ltac:(destruct Hcw' as [Hz | Heq];
                     [ left; split; [ rewrite Hnum; reflexivity | exact Hz ]
                     | right; exact Heq ])
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4755,6 +4899,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -4853,6 +4998,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5007,6 +5153,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_iref_join3 with "Hir Hiru").
@@ -5283,6 +5430,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_iref_join3 with "Hir Hiru").
@@ -5413,6 +5561,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5529,6 +5678,7 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               ltac:(right; reflexivity)
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -5775,6 +5925,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
               ltac:(right; exact Hcwi')
+              (or_introl (sysc_num_ne12 _ _ Hnum eq_refl))
               (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
@@ -6179,6 +6330,8 @@ Section SyscallArms.
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               ltac:(right; reflexivity)
+              (* out of range, so certainly not sbrk's number either *)
+              ltac:(left; unfold UsysMemOk.USYS_sbrk in *; lia)
               (sysc_num_ne2_range _ Hrange)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont []").
     iApply (sysc_exec_out_ne _ _ _ _ (sysc_num_ne7_range _ Hrange)).

@@ -882,8 +882,8 @@ Section UkRunFsLeaf.
   (* [UexecRetFs.uheap_ubytes_pts] on the TEXT half, and by the same
      induction: the authority names each of a persistent run's bytes *)
   Local Lemma uheap_utext_pts (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pmv : gmap (mword 27) uperm) (a : Z) (nb : nat) (f : nat -> bv 8) :
-    uheap γt γd γs M pmv -∗
+      (pmv : gmap (mword 27) uperm) (sz : Z) (a : Z) (nb : nat) (f : nat -> bv 8) :
+    uheap γt γd γs M pmv sz -∗
     ([∗ list] j ∈ seq 0 nb, utext γt (a + Z.of_nat j) (f j)) -∗
     ⌜ forall j : nat, (j < nb)%nat -> M !! (a + Z.of_nat j)%Z = Some (f j) ⌝.
   Proof.
@@ -899,11 +899,11 @@ Section UkRunFsLeaf.
   Qed.
 
   Lemma uheap_ustrt (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (a : Z) (pl : list (bv 8)) :
-    uheap γt γd γs M pm -∗ ustrt γt a pl -∗ ⌜ustr_read M a = Some pl⌝.
+      (pm : gmap (mword 27) uperm) (sz : Z) (a : Z) (pl : list (bv 8)) :
+    uheap γt γd γs M pm sz -∗ ustrt γt a pl -∗ ⌜ustr_read M a = Some pl⌝.
   Proof.
     iIntros "Hheap (%Hall & %Hlen & (_ & _ & Hbody & Hnul))".
-    iDestruct (uheap_utext_pts γt γd γs M pm a (length pl) (ustr_bytes pl)
+    iDestruct (uheap_utext_pts γt γd γs M pm sz a (length pl) (ustr_bytes pl)
                  with "Hheap Hbody") as %Hbody.
     iDestruct (uheap_text with "Hheap Hnul") as %(HMn & _ & _).
     iPureIntro. apply ustr_read_of; [ exact Hlen | exact Hall | ].

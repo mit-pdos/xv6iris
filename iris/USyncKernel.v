@@ -141,10 +141,17 @@ Section USyncKernel.
     (* the process's table is [NOFILE] slots -- what its own descriptor
        authority is minted at ([UserFd.ufd_auth] carries it) *)
     length (uvis_fd W) = NOFILE ->
+    (* THE MAP STOPS AT THE BREAK: above the page the break sits in, the key
+       has no page at all.  It is the U tier's reading of the kernel's own
+       [um_below], carried as a key premise because the trap bundle does not
+       state it, and it is what makes a later [sbrk] hand out FRESH memory
+       ([UserHeap.uheap]'s own clause). *)
+    (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
+       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     ⊢ uslot W.
   Proof.
-    intros Hpc Hsub Hx Hroom Hal8 Hdata Hfdlen.
-    iApply (uslot_of_urun W 4 Hal8 ltac:(lia) Hdata Hfdlen).
+    intros Hpc Hsub Hx Hroom Hal8 Hdata Hfdlen Hstop.
+    iApply (uslot_of_urun W 4 Hal8 ltac:(lia) Hdata Hfdlen Hstop).
     (* sync makes no descriptor call, so its ledger is dropped here *)
     iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht _ Hrun".
     rewrite Hpc.

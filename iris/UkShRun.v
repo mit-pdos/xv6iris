@@ -479,7 +479,7 @@ Section UkShRun.
     intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm dq a 8 (nth_byte w)
+    iDestruct (uheap_access γt γd γs M pm sz dq a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal
                  with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
@@ -522,7 +522,7 @@ Section UkShRun.
     intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm dq a 4 (nth_byte wv)
+    iDestruct (uheap_access γt γd γs M pm sz dq a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal
                  with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
@@ -563,7 +563,7 @@ Section UkShRun.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw) "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm dq a 4 (nth_byte wv)
+    iDestruct (uheap_access γt γd γs M pm sz dq a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal
                  with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).

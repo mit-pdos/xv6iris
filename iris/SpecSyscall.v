@@ -149,6 +149,7 @@ Require Import TsoCtx.
 Require Import UserPtTree.       (* [umem_wr] *)
 Require Import UserFd.           (* [ufdG] -- the class a minted user slot needs *)
 Require Import UserPerm.         (* [perm_of] -- the exec channel's failure row *)
+Require Import UsysMemOk.        (* [usys_sbrk_arg] -- sbrk's argument, read back *)
 Require Import UexecSlot.        (* [uvis_of] *)
 Require Import UexecRetExec.     (* [uslot_x] / [xbundle] -- the enriched slot *)
 Require Import UexecExecInst.    (* the [xbundle] instance: the process's exec bundle *)
@@ -569,6 +570,25 @@ Definition wp_syscall_sconf_body
          the outgoing a0 word, as [sysc_fd_ok]'s is. *)
       ⌜ (sysc_num (us_V U) = 9 /\ uint (pv_tf (us_V U') !!! tf_arg_idx 0) = 0)
         \/ pv_cwi (us_V U') = pv_cwi (us_V U) ⌝ -∗
+      (* ...and sbrk's ANSWER, which is the one thing about a return value
+         the U tier's table cannot get from the image row.  sbrk (12) is
+         the entry whose whole point is WHERE the new memory is: a failed
+         call returns -1 and leaves [p->sz] alone, a successful one returns
+         the OLD break -- sbrk's contract with userspace -- and, for a
+         non-negative argument, moved the break up by exactly it.  Without
+         this a verified [malloc] cannot own the block it just asked for.
+         Only the grow direction is pinned: a shrink whose sum wraps past
+         the old size leaves [p->sz] where it was.  Every other entry
+         escapes by its number, as the clauses above do.
+         [UsysMemOk.usys_sbrk_ret] is the U tier's reading of this. *)
+      ⌜ sysc_num (us_V U) <> 12
+        \/ (pv_tf (us_V U') !!! tf_arg_idx 0 = (mword_of_int (-1) : mword 64)
+            /\ pv_sz (us_V U') = pv_sz (us_V U))
+        \/ (pv_tf (us_V U') !!! tf_arg_idx 0 = pv_sz (us_V U)
+            /\ ((0 <= sint (usys_sbrk_arg (pv_tf (us_V U))))%Z ->
+                 (uint (pv_sz (us_V U'))
+                  = uint (pv_sz (us_V U))
+                    + sint (usys_sbrk_arg (pv_tf (us_V U))))%Z)) ⌝ -∗
       sie_cap_gpr KT1 mf av true pj -∗
       cpu_own 0%nat true pj true lks -∗
       bslots 3 -∗

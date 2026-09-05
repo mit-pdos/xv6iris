@@ -148,8 +148,8 @@ Section UkRunSysX.
        lent for the pure facts the program needs off them *)
     (∀ (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z)
        (fdv : list fdstate) (cw : Z),
-       uheap γt γd γs M pm -∗ ufd_auth γfd fdv -∗
-       uheap γt γd γs M pm ∗ ufd_auth γfd fdv ∗
+       uheap γt γd γs M pm sz -∗ ufd_auth γfd fdv -∗
+       uheap γt γd γs M pm sz ∗ ufd_auth γfd fdv ∗
        xbundle uslot_x (uvis_of_run m pc M pm sz fdv cw)) -∗
     (* the failure return: -1, and not one byte moved *)
     (∀ h' : CpuId,

@@ -279,13 +279,19 @@ Section UShKernel.
                  !! (sh_buf + Z.of_nat j)%Z)) ->
     length (uvis_fd W) = NOFILE ->
     fd_lowest_closed (uvis_fd W) = None ->
+    (* the map stops at the break -- [UkRun.uslot_of_urun]'s own premise,
+       which is what lets a later [sbrk] hand sh fresh memory.  The bridge
+       below reads it off [kexec_image_ok]'s page rows. *)
+    (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
+       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     □ (∀ W' : uvis, xbundle uslot_x W') -∗
     (∀ γt γd γs γfd : gname, ush_rest γt γd γs γfd) -∗
     uslot_x W.
   Proof.
-    intros Hpc Hsub Hx Hal8 Hroom Hstk Hbelow Hbss Hfdlen Hfdnone.
+    intros Hpc Hsub Hx Hal8 Hroom Hstk Hbelow Hbss Hfdlen Hfdnone Hstop.
     iIntros "#Hxb #Hrest".
-    iApply (uslot_x_of_urun_all W (2 + (8 + (16 + n0))) Hal8 Hroom Hstk Hfdlen).
+    iApply (uslot_x_of_urun_all W (2 + (8 + (16 + n0))) Hal8 Hroom Hstk Hfdlen
+              Hstop).
     iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht Hstd Dlo _ Hrun".
     rewrite Hpc.
     (* the line buffer, out of the data below the frame *)
@@ -322,11 +328,20 @@ Section UShKernel.
     kexec_sz sh_elf - PGSIZE + 8 * Z.of_nat (2 + (8 + (16 + n0)))
       <= kxc_sp_final (kexec_sz sh_elf) alen na ->
     length sts = NOFILE -> fd_lowest_closed sts = None ->
+    (* THE MAP STOPS AT THE BREAK, and it is the ONE premise the image fact
+       does not give: [KexecBuilt.kxb_perm_ok] says which pages the new
+       address space HAS, not that it has no others, so the converse --
+       the kernel's own [ProcPtOwn.um_below] at the image exec just built
+       -- is carried in from the exec channel.  It is what lets sh's later
+       [sbrk] see that the run it is handed is fresh
+       ([UserHeap.uheap]'s map-stop clause). *)
+    (forall (p : mword 27) (q : uperm), uvis_perm W' !! p = Some q ->
+       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W')) ->
     □ (∀ W : uvis, xbundle uslot_x W) -∗
     (∀ γt γd γs γfd : gname, ush_rest γt γd γs γfd) -∗
     uslot_x W'.
   Proof.
-    intros Hok Hroom Hlen Hnone.
+    intros Hok Hroom Hlen Hnone Hstop.
     destruct sh_loads as (p0 & p1 & Hld & Hv0 & Hm0 & Hf0 & Hv1 & Hm1 & Hf1).
     pose proof sh_kexec_sz as Hsz. pose proof sh_kexec_top as Htop.
     pose proof (kexec_image_ok_pc _ _ _ _ _ _ _ Hok sh_elf_entry) as Hpc.
@@ -436,6 +451,7 @@ Section UShKernel.
       + rewrite Hszv. clear -Hj1; lia.
     - rewrite Hfd. exact Hlen.
     - rewrite Hfd. exact Hnone.
+    - exact Hstop.
   Qed.
 
 End UShKernel.

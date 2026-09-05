@@ -474,7 +474,7 @@ Section UexecRetExec.
            ⊢ Rut pt' -∗ TsoCtx.own_context (CID := h) (cur_ctx (CurCtx := xi)) ∗
                         (TsoCtx.own_context (CID := h) (cur_ctx (CurCtx := xi))
                          -∗ Rut pt') ⌝ ∗
-       uheap γt γd γs M pm ∗
+       uheap γt γd γs M pm sz ∗
        ustack γd (m !!! Regidx csp_rs1) avail ∗
        ufd_auth γfd fdv ∗
        uvb_x (CID := h) (XI := xi) C pt Rfd Rut sz pm fdv cw M m pc)%I.

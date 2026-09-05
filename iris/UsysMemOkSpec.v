@@ -120,11 +120,18 @@ Lemma sysc_mem_ok_usys_sbrk (V V' : pprivate) (M M' : gmap Z (bv 8)) (r : mword 
     (π π' : gmap (mword 27) uperm) :
   sysc_num V = 12 ->
   usys_sbrk_perm π π' (pv_sz V) (pv_sz V') ->
+  (* ...and what sbrk ANSWERED (lane SB).  It is a PREMISE and not a
+     consequence of the dispatcher's image row: [sysc_mem_ok] never
+     mentions the return value, and the tie between it and the old break is
+     [SpecSysSbrk.sys_sbrk_ok]'s, carried out through the dispatcher's
+     returning post.  Without it the U tier learns that memory grew but not
+     WHERE, which is exactly what a verified [malloc] needs. *)
+  usys_sbrk_ret (pv_tf V) r (uint (pv_sz V)) (uint (pv_sz V')) ->
   sysc_mem_ok V V' M M' ->
   usys_mem_ok (sysc_num V) (pv_tf V) r M π (uint (pv_sz V))
               M' π' (uint (pv_sz V')).
 Proof.
-  intros Hn Hp H.
+  intros Hn Hp Hret H.
   pose proof (sysc_mem_ok_sbrk_row V V' M M' Hn H) as Hrow.
   unfold usys_mem_ok, USYS_exec, USYS_sbrk. rewrite Hn.
   destruct (decide (12 = 7)) as [Hc | _]; [ discriminate Hc | ].
@@ -132,7 +139,8 @@ Proof.
   (* the row's sizes are NAMED now, so this is no longer an [exists]: the
      two [mword_of_int (uint ...)] round-trips are the only work left *)
   rewrite !moi_of_uint.
-  split; [ exact (usys_sbrk_img_of_row _ _ _ _ _ _ Hrow) | exact Hp ].
+  split_and!;
+    [ exact (usys_sbrk_img_of_row _ _ _ _ _ _ Hrow) | exact Hp | exact Hret ].
 Qed.
 
 (* ===================================================================== *)

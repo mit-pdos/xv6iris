@@ -240,9 +240,9 @@ Section UkRunSys.
   (* [Z], the kernel's row at [uint (add_vec_int dst j)], and the two agree *)
   (* exactly because every mapped user address is below MAXVA.              *)
   Lemma uheap_ubytes_run (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pmv : gmap (mword 27) uperm) (dq : dfrac) (a : Z) (nb : nat)
+      (pmv : gmap (mword 27) uperm) (sz : Z) (dq : dfrac) (a : Z) (nb : nat)
       (f : nat -> bv 8) :
-    uheap γt γd γs M pmv -∗ ubytesq γd dq a nb f -∗
+    uheap γt γd γs M pmv sz -∗ ubytesq γd dq a nb f -∗
     ⌜ forall j : nat, (j < nb)%nat ->
         M !! (a + Z.of_nat j)%Z = Some (f j) /\ 0 <= a + Z.of_nat j < 2 ^ 38 ⌝.
   Proof.
@@ -1023,7 +1023,7 @@ Section UkRunSys.
        the only place the update CAN run, the row being what says how far
        the image moved *)
     iApply uslot_bupd.
-    iMod (uheap_store_run γt γd γs M pm a cnt f
+    iMod (uheap_store_run γt γd γs M pm sz a cnt f
             (fun k => if decide (k < d)%nat then bs k else f k)
             with "Hheap Hbs") as "[Hheap Hbs]".
     iModIntro.
@@ -1237,7 +1237,7 @@ Section UkRunSys.
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     (* THE NO-WRAP FACT, off the ownership rather than off a premise *)
-    iDestruct (uheap_ubytes_run γt γd γs M pm (DfracOwn 1) (uint dst) k f
+    iDestruct (uheap_ubytes_run γt γd γs M pm sz (DfracOwn 1) (uint dst) k f
                  with "Hheap Hbuf") as %Hbnd.
     assert (Hlin : forall i : nat, (i < k)%nat ->
               uint (add_vec_int dst (Z.of_nat i)) = (uint dst + Z.of_nat i)%Z).
@@ -1297,7 +1297,7 @@ Section UkRunSys.
     rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' Hb'".
     iEval (rewrite (ubytes_split γd (uint dst) d k f Hdk)) in "Hbuf".
     iDestruct "Hbuf" as "[Hblo Hbhi]".
-    iMod (uheap_store_run γt γd γs M pm (uint dst) d f g with "Hheap Hblo")
+    iMod (uheap_store_run γt γd γs M pm sz (uint dst) d f g with "Hheap Hblo")
       as "[Hheap Hblo]".
     iDestruct (ubytes_ext γd (uint dst + Z.of_nat d) (k - d)
                  (fun j => f (d + j)%nat) (fun j => g (d + j)%nat)
@@ -1388,7 +1388,7 @@ Section UkRunSys.
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
-    iDestruct (uheap_ubytes_run γt γd γs M pm (DfracOwn 1) (uint dst) 8 f
+    iDestruct (uheap_ubytes_run γt γd γs M pm sz (DfracOwn 1) (uint dst) 8 f
                  with "Hheap Hbuf") as %Hbnd.
     assert (Hlin : forall i : nat, (i < 8)%nat ->
               uint (add_vec_int dst (Z.of_nat i)) = (uint dst + Z.of_nat i)%Z).
@@ -1508,7 +1508,7 @@ Section UkRunSys.
     rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' Hb'".
     iEval (rewrite (ubytes_split γd (uint dst) dd 8 f Hdd8)) in "Hbuf".
     iDestruct "Hbuf" as "[Hblo Hbhi]".
-    iMod (uheap_store_run γt γd γs M pm (uint dst) dd f gg with "Hheap Hblo")
+    iMod (uheap_store_run γt γd γs M pm sz (uint dst) dd f gg with "Hheap Hblo")
       as "[Hheap Hblo]".
     (* hoisted out of argument position: the tail bound [j < 8 - dd] is what
        [Hgf] needs and an [ltac:] there would be run before it is in scope
@@ -1624,6 +1624,276 @@ Section UkRunSys.
     iIntros (h' r d g) "%Hd %Hgf Hrun Hbuf".
     iApply ("Hcont" $! h' r d g with "[%] [%] Hrun Hbuf");
       [ exact Hd | exact Hgf ].
+  Qed.
+
+  (* THE PAGE FLOOR OF AN ADDRESS AT OR ABOVE A PAGE BOUNDARY is itself at
+     or above it -- the one arithmetic fact the sbrk leaf's two page-set
+     arguments turn on. *)
+  Local Lemma upage_floor_ge (a c : Z) :
+    0 <= c -> c mod 4096 = 0 -> c <= a -> c <= (a / 4096) * 4096.
+  Proof.
+    intros Hc0 Hcm Hle.
+    assert (Hk : c = 4096 * (c / 4096))
+      by (apply (proj2 (Z.div_exact c 4096 ltac:(discriminate))); exact Hcm).
+    assert (Hdiv : c / 4096 <= a / 4096)
+      by (apply Z.div_le_mono; [ lia | exact Hle ]).
+    lia.
+  Qed.
+
+  (* ...and the page number of an in-region address, in the shape the page
+     sets are stated at *)
+  Local Lemma usvpn_floor (a : Z) :
+    0 <= a < 2 ^ 38 ->
+    bv_unsigned (svpn_of (mword_of_int a : mword 64)) * 4096 = (a / 4096) * 4096.
+  Proof.
+    intros Ha.
+    rewrite (ProcPtOwn.svpn_of_unsigned_gen (mword_of_int a : mword 64)).
+    rewrite <- uint_unsigned. rewrite (uint_moi a ltac:(unfold Z64; lia)).
+    rewrite (Z.mod_small (a / 4096) 134217728); [ reflexivity | ].
+    split; [ apply Z.div_pos; lia | ].
+    apply Z.div_lt_upper_bound; lia.
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* ecall, at SBRK -- THE ENTRY THAT MOVES THE ADDRESS SPACE.             *)
+  (*                                                                       *)
+  (* Every other row leaves the process's memory where it was; this one    *)
+  (* GROWS it, and the whole point of the call is that the caller comes    *)
+  (* back OWNING the new bytes.  Three rows meet here:                     *)
+  (*                                                                       *)
+  (*   the IMAGE row  [usys_sbrk_img]: the image gained the bytes that     *)
+  (*     became readable, as zeros ([UserPtTree.umem_grow]);               *)
+  (*   the MAP row    [usys_sbrk_perm]: the pages that became live are in  *)
+  (*     the permission view at RW;                                        *)
+  (*   the ANSWER row [usys_sbrk_ret]: -1 and nothing moved, or the OLD    *)
+  (*     break back and the break up by exactly the argument.              *)
+  (*                                                                       *)
+  (* The third is what makes the other two usable: without it a caller     *)
+  (* learns that memory grew and not WHERE, and [malloc] cannot own the    *)
+  (* block it just asked for.  It is carried from [SpecSysSbrk.            *)
+  (* sys_sbrk_ok] through the dispatcher's returning post.                  *)
+  (*                                                                       *)
+  (* THE PAGE-ALIGNED BREAK IS A PREMISE, and it is what makes the run     *)
+  (* FRESH: [UserHeap.uheap]'s map-stop clause says the key has no page at *)
+  (* or above [pgroundup sz], so on an aligned break every address the     *)
+  (* call adds is on a page the process did not have -- hence a byte the   *)
+  (* data authority does not record, hence one this leaf can mint.  exec   *)
+  (* leaves the break page-aligned and [malloc]'s [morecore] asks for      *)
+  (* whole pages, so no caller pays for it.                                *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uk_ecall_sbrk (γt γd γs γfd : gname) (h : CpuId) (m : regfile)
+      (pc : mword 64) (sz n : Z) (avail : nat) :
+    usysno m = USYS_sbrk ->
+    (* the argument, as [argint] reads it back: the low 32 bits of a0, sign
+       extended -- [UsysMemOk.usys_sbrk_arg] at this trapframe *)
+    sint (sign_extend' 64 (trunc32 (m !!! Regidx (mword_of_int 10)))) = n ->
+    0 <= n -> 0 <= sz -> usz_ok (sz + n) ->
+    pgroundup sz = sz ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is γt pc false (ECALL tt) -∗
+    urun γt γd γs γfd h m pc avail -∗
+    usz γs sz -∗
+    (∀ (h' : CpuId) (r : mword 64),
+       ((⌜ r = (mword_of_int (-1) : mword 64) ⌝ ∗ usz γs sz)
+        ∨ (⌜ r = (mword_of_int sz : mword 64) ⌝ ∗ usz γs (sz + n) ∗
+           ∃ g : nat -> bv 8, ubytes γd sz (Z.to_nat n) g)) -∗
+       urun γt γd γs γfd h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hn Harg Hn0 Hsz0 Hszok' Hal Hal4.
+    (* the new break is inside the user region, which is what every bound
+       below reads off [usz_ok] *)
+    assert (Hhi : (sz + n < 2 ^ 38)%Z).
+    { pose proof (pgroundup_ge (sz + n) ltac:(lia)) as Hge.
+      unfold usz_ok in Hszok'.
+      change (2 ^ 38)%Z with 274877906944%Z. lia. }
+    iIntros "#Hi Hrun Hsz Hcont".
+    iDestruct "Hrun" as (xi C pt Rfd Rut szk M pm fdv cw)
+      "(%Hlo & %Hpm & %HRut & Hheap & Hstk & Hufd & Hb)".
+    (* the key's break IS the program's *)
+    iDestruct (uheap_usz with "Hheap Hsz") as %->.
+    iDestruct (uheap_stop with "Hheap") as %Hstoppg.
+    (* the map-stop clause, at ADDRESSES: a page at or above the break's own
+       page is not in the map, so no address on it is either *)
+    assert (Hstop : forall a : Z, pgroundup sz <= a < 2 ^ 38 ->
+              pm !! svpn_of (mword_of_int a : mword 64) = None).
+    { intros a Ha.
+      destruct (pm !! svpn_of (mword_of_int a : mword 64)) as [q |] eqn:E;
+        [ exfalso | reflexivity ].
+      pose proof (Hstoppg _ q E) as Hlt.
+      rewrite (usvpn_floor a ltac:(lia)) in Hlt.
+      assert (Hgep : pgroundup sz <= (a / 4096) * 4096).
+      { apply upage_floor_ge; [ | | lia ].
+        - unfold pgroundup.
+          pose proof (Z.mul_div_le (sz + 4095) 4096 ltac:(lia)).
+          assert (H0 : (0 <= (sz + 4095) / 4096)%Z)
+            by (apply Z.div_pos; lia).
+          lia.
+        - unfold pgroundup. apply Z_mod_mult. }
+      lia. }
+    iDestruct (uheap_canon with "Hheap") as %Hcanon.
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (UkStep.uvb_pure with "Hb") as "[%Hpure Hb]".
+    destruct Hpure as [Mp Hpure].
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut M m pc fdv cw Hui
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s pc ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hp Hc)
+              with "Hb").
+    rewrite (uexec_ret_ecall _ _ eq_refl).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw))
+                   = USYS_sbrk).
+    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    rewrite Hnum. cbv zeta.
+    destruct (decide (USYS_sbrk = USYS_exit)) as [He | _];
+      [ exfalso; discriminate He | ].
+    destruct (decide (USYS_sbrk = USYS_fork)) as [He | _];
+      [ exfalso; discriminate He | ].
+    iIntros (r M' pm' sz' fdv' cw') "%Hok %Hfdok %Hpiperow %Hcwrow".
+    cbn [uvis_M uvis_perm uvis_sz uvis_fd uvis_cwd uvis_of_run] in Hok |- *.
+    (* the row, in three pieces *)
+    unfold usys_mem_ok in Hok.
+    destruct (decide (USYS_sbrk = USYS_exec)) as [He | _];
+      [ exfalso; discriminate He | ].
+    destruct (decide (USYS_sbrk = USYS_sbrk)) as [_ | Hc];
+      [ | exfalso; exact (Hc eq_refl) ].
+    destruct Hok as (Himg & Hperm & Hret).
+    (* the descriptor view does not move: sbrk is none of the four *)
+    assert (Hview : fdv' = fdv).
+    { apply (usys_fd_ok_quiet USYS_sbrk
+               (uvis_tf (uvis_of_run m pc M pm sz fdv cw)) r fdv fdv');
+        [ | | | | exact Hfdok ]; vm_compute; discriminate. }
+    rewrite Hview.
+    (* the argument the row reads is the one the caller named *)
+    assert (Harg' : usys_sbrk_arg (uvis_tf (uvis_of_run m pc M pm sz fdv cw))
+                    = sign_extend' 64 (trunc32 (m !!! Regidx (mword_of_int 10)))).
+    { cbn [uvis_tf uvis_of_run]. unfold usys_sbrk_arg.
+      rewrite tf_of_arg0. reflexivity. }
+    unfold usys_sbrk_ret in Hret. rewrite Harg' in Hret.
+    destruct Hret as [(Hr & Hsz') | (Hr & Hup)].
+    - (* ---- FAILED: the break did not move, so neither did the image ---- *)
+      subst sz'.
+      unfold usys_sbrk_img in Himg.
+      destruct (decide (uint (mword_of_int sz) <= uint (mword_of_int sz))%Z)
+        as [_ | Hc]; [ | exfalso; exact (Hc (Z.le_refl _)) ].
+      unfold usys_sbrk_perm in Hperm.
+      destruct (decide (uint (mword_of_int sz) <= uint (mword_of_int sz))%Z)
+        as [_ | Hc]; [ | exfalso; exact (Hc (Z.le_refl _)) ].
+      rewrite difference_diag_L gset_to_gmap_empty right_id_L in Hperm.
+      subst pm'.
+      (* the image gained nothing it did not already have: the grow is at
+         the SAME size, and every live byte is already recorded *)
+      assert (Hui38 : uint (mword_of_int sz : mword 64) = sz)
+        by (apply uint_moi; unfold Z64; lia).
+      (* the grow is at the SAME size, and every live byte is already
+         recorded, so the image did not move ([umem_grow_id]) *)
+      assert (HMg : umem_grow M (uint (mword_of_int sz : mword 64)) = M).
+      { rewrite Hui38. apply umem_grow_id.
+        intros a Ha. exact (proj2 (ukp_img pt sz M Mp a Hpure) (or_intror Ha)). }
+      subst M'. rewrite HMg.
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' r Hx0 Hal4).
+      iApply (urun_close_upd γt γd γs γfd M pm m (mword_of_int 10) r sz fdv cw'
+                (add_vec_int pc 4) avail
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                with "Hheap Hstk Hufd [Hcont Hsz]").
+      iIntros (h'') "Hrun".
+      iApply ("Hcont" $! h'' r with "[Hsz] Hrun").
+      iLeft. iSplitR; [ iPureIntro; exact Hr | ]. iExact "Hsz".
+    - (* ---- SUCCEEDED: the break moved up by the argument ---- *)
+      rewrite Harg in Hup. specialize (Hup Hn0). subst sz'.
+      (* the image row, at the two sizes the answer names *)
+      assert (Hle : (uint (mword_of_int sz : mword 64)
+                     <= uint (mword_of_int (sz + n) : mword 64))%Z).
+      { rewrite (uint_moi sz ltac:(unfold Z64; lia)).
+        rewrite (uint_moi (sz + n) ltac:(unfold Z64; lia)). lia. }
+      unfold usys_sbrk_img in Himg.
+      destruct (decide (uint (mword_of_int sz : mword 64)
+                        <= uint (mword_of_int (sz + n) : mword 64))%Z)
+        as [_ | Hc]; [ | exfalso; exact (Hc Hle) ].
+      rewrite (uint_moi (sz + n) ltac:(unfold Z64; lia)) in Himg.
+      unfold usys_sbrk_perm in Hperm.
+      destruct (decide (uint (mword_of_int sz : mword 64)
+                        <= uint (mword_of_int (sz + n) : mword 64))%Z)
+        as [_ | Hc]; [ | exfalso; exact (Hc Hle) ].
+      rewrite (uint_moi sz ltac:(unfold Z64; lia)) in Hperm.
+      rewrite (uint_moi (sz + n) ltac:(unfold Z64; lia)) in Hperm.
+      (* ---- the three facts [uheap_grow_run] wants, off the map row ---- *)
+      assert (Hext : forall p : mword 27, is_Some (pm !! p) ->
+                pm' !! p = pm !! p).
+      { intros p [q Hq]. rewrite Hperm Hq.
+        exact (lookup_union_Some_l _ _ p q Hq). }
+      assert (Hszok : usz_ok sz) by exact (ukp_sz pt sz M Mp Hpure).
+
+      assert (Hfresh : forall a : Z, sz <= a < sz + n -> uw_addr pm' a).
+      { intros a Ha.
+        assert (Hbnd : (0 <= a < 2 ^ 38)%Z) by lia.
+        assert (Hfl : bv_unsigned (svpn_of (mword_of_int a : mword 64)) * 4096
+                      = (a / 4096) * 4096) by exact (usvpn_floor a Hbnd).
+        assert (Hszm : sz mod 4096 = 0).
+        { rewrite <- Hal. unfold pgroundup. apply Z_mod_mult. }
+        assert (Hge : sz <= (a / 4096) * 4096)
+          by (apply upage_floor_ge; [ lia | exact Hszm | lia ]).
+        assert (Hnone : pm !! svpn_of (mword_of_int a) = None)
+          by (apply Hstop; rewrite Hal; lia).
+        exists uperm_rw. split; [ | reflexivity ].
+        unfold uperm_at. rewrite Hperm.
+        rewrite (lookup_union_r pm _ _ Hnone).
+        apply lookup_gset_to_gmap_Some. split; [ | reflexivity ].
+        apply elem_of_difference. split.
+        - apply live_pages_mem. rewrite Hfl.
+          pose proof (pgroundup_ge (sz + n) ltac:(lia)).
+          pose proof (Z.mul_div_le a 4096 ltac:(lia)). lia.
+        - intro Hin.
+          pose proof (live_pages_bound sz _ Hszok Hin) as Hlt.
+          rewrite Hfl in Hlt. rewrite Hal in Hlt. lia. }
+      assert (Hcan' : forall a : Z,
+                is_Some (umem_grow M (sz + n) !! a) -> (0 <= a < 2 ^ 38)%Z).
+      { intros a Ha. unfold umem_grow in Ha.
+        destruct (M !! a) as [b |] eqn:E.
+        - exact (Hcanon a (mk_is_Some _ _ E)).
+        - rewrite (lookup_union_r M _ a E) in Ha.
+          destruct Ha as [b Hb].
+          apply lookup_gset_to_gmap_Some in Hb as [Hin _].
+          unfold live_set in Hin. apply elem_of_list_to_set in Hin.
+          apply elem_of_seqZ in Hin.
+          unfold pgroundup in Hin.
+          assert (Hup : (sz + n + 4095) / 4096 * 4096 <= sz + n + 4095)
+            by (pose proof (Z.mul_div_le (sz + n + 4095) 4096 ltac:(lia)); lia).
+          change (2 ^ 38)%Z with 274877906944%Z in Hhi |- *. lia. }
+      assert (Hstop' : forall (p : mword 27) (q : uperm),
+                pm' !! p = Some q ->
+                bv_unsigned p * 4096 < pgroundup (sz + n)).
+      { intros p q Hq. rewrite Hperm in Hq.
+        apply lookup_union_Some_raw in Hq as [Hq | [_ Hq]].
+        - (* an OLD page: below the old break's page, hence below the new *)
+          pose proof (Hstoppg p q Hq) as Hlt.
+          pose proof (pgroundup_mono sz (sz + n) ltac:(lia)). lia.
+        - (* a page the fill added: live at the new size *)
+          apply lookup_gset_to_gmap_Some in Hq as [Hin _].
+          apply elem_of_difference in Hin as [Hin _].
+          exact (live_pages_bound (sz + n) p Hszok' Hin). }
+      (* ---- the heap grows, and the caller gets the run ---- *)
+      rewrite Himg.
+      rewrite (uslot_bump_run m pc M (umem_grow M (sz + n)) pm pm'
+                 sz (sz + n) fdv fdv cw cw' r Hx0 Hal4).
+      rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' Hb'".
+      iMod (uheap_grow_run γt γd γs M pm pm' sz n Hsz0 Hn0 Hfresh Hext
+              Hcan' Hstop' with "Hheap Hsz") as "(Hheap & Hsz & Hrun')".
+      iDestruct (urun_close_upd γt γd γs γfd (umem_grow M (sz + n)) pm' m
+                   (mword_of_int 10) r (sz + n) fdv cw' (add_vec_int pc 4) avail
+                   ltac:(unfold unot_sp; vm_compute; discriminate)
+                   with "Hheap Hstk Hufd [Hcont Hsz Hrun']") as "Hkc".
+      { iIntros (h'') "Hrun".
+        iApply ("Hcont" $! h'' r with "[Hsz Hrun'] Hrun").
+        iRight. iSplitR; [ iPureIntro; exact Hr | ]. iFrame "Hsz Hrun'". }
+      iApply ("Hkc" $! h' xi' C' pt' Rfd' Rut' with "[%] [%] Hb'");
+        [ exact Hlo' | exact Hpm' ].
   Qed.
 
   Lemma wp_uk_ecall_exit (γt γd γs γfd : gname) (h : CpuId) (m : regfile)

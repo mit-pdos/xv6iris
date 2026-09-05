@@ -554,9 +554,15 @@ Section UserHeap.
   (* Two authorities against one image, with the segment facts that make    *)
   (* each half's points-to mean what it means.                             *)
   (* ===================================================================== *)
+  (* THE BREAK IS A PARAMETER, not an existential inside.  It used to be
+     hidden here, and then nothing could say that the heap's break is the
+     one the KEY was resumed at -- which is exactly what [sbrk] needs, since
+     the row that says how far memory grew is stated at the key's break and
+     the fragments that have to be minted are the ghost's.  [UkRun.urun]
+     passes its own [sz], so the two are one datum by construction. *)
   Definition uheap (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) : iProp Σ :=
-    (∃ (Mt Md Mslack : gmap Z (bv 8)) (sz : Z),
+      (pm : gmap (mword 27) uperm) (sz : Z) : iProp Σ :=
+    (∃ (Mt Md Mslack : gmap Z (bv 8)),
        ⌜ Mt ⊆ M ⌝ ∗ ⌜ Md ⊆ M ⌝ ∗ ⌜ Mt ##ₘ Md ⌝ ∗
        (* CANONICITY, ONCE FOR THE WHOLE ADDRESS SPACE.  Every mapped user
           address is below MAXVA, hence Sv39-canonical.  Stating it here
@@ -582,7 +588,28 @@ Section UserHeap.
           hands out eight bytes off the slack whether or not a fresh page
           came from the kernel, and [sbrk (-8)] takes eight back into it. *)
        ghost_var γs (1/2) sz ∗
-       ⌜ forall a : Z, is_Some (Mslack !! a) -> sz <= a ⌝ ∗
+       (* THE SLACK IS EXACTLY THE DATA AT OR ABOVE THE BREAK, and the
+          equality is what makes the break a boundary of OWNERSHIP: below it
+          the process holds the fragments, at or above it the invariant
+          does.  The ⊇ half is what [sbrk] needs -- without it the run the
+          call hands out could contain a byte the authority already records
+          and nobody owns, so it could be neither minted nor taken from the
+          slack.  Established at the mint ([uheap_alloc] splits at exactly
+          this boundary) and preserved by every step: a store moves no
+          domain, and the grow moves the boundary up with the run. *)
+       ⌜ forall a : Z, is_Some (Mslack !! a) <->
+                       (is_Some (Md !! a) /\ sz <= a) ⌝ ∗
+       (* THE MAP STOPS AT THE BREAK.  Above the page the break sits in,
+          the permission view has NO entry at all: [UserPerm.perm_of] fills
+          only the LIVE pages (which stop at [pgroundup sz]) and the table
+          maps only below the break ([ProcPtOwn.um_below], the kernel's own
+          invariant).  It is here rather than derived because the U tier's
+          bundle does not carry [um_below] -- and it is what [sbrk] needs to
+          know the run it is about to hand out is FRESH: an address above
+          the break is on no page of the map, hence on no page the data half
+          may hold a byte of, hence mintable. *)
+       ⌜ forall (p : mword 27) (q : uperm), pm !! p = Some q ->
+                 bv_unsigned p * 4096 < pgroundup sz ⌝ ∗
        ([∗ map] a ↦ b ∈ Mslack, ubyte γd a b))%I.
 
   (* the canonicity fact in the shape an access wants: the address round-trips
@@ -601,13 +628,14 @@ Section UserHeap.
   (* A TEXT byte names the byte the image holds, and its page is FETCHABLE.
      Both come straight off the text half's invariant -- no dfrac argument,
      no permission in the statement. *)
-  Lemma uheap_text (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b : bv 8) :
-    uheap γt γd γs M pm -∗ utext γt a b -∗
+  Lemma uheap_text (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (sz : Z) (a : Z) (b : bv 8) :
+    uheap γt γd γs M pm sz -∗ utext γt a b -∗
     ⌜ M !! a = Some b /\ ux_addr (pm) a /\ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (Mt Md Mslack sz)
-      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
+    iDestruct "Hrun" as (Mt Md Mslack)
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & %Hstop & Hslack)".
     iDestruct (ghost_map_lookup with "Ht Hb") as %HMt.
     assert (HM : M !! a = Some b)
       by exact (proj1 (map_subseteq_spec Mt (M)) Hst a b HMt).
@@ -617,24 +645,26 @@ Section UserHeap.
   Qed.
 
   (* ...and its page is NOT writable: a text byte is on an X-and-not-W page *)
-  Lemma uheap_text_nw (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b : bv 8) :
-    uheap γt γd γs M pm -∗ utext γt a b -∗ ⌜ ~ uw_addr (pm) a ⌝.
+  Lemma uheap_text_nw (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (sz : Z) (a : Z) (b : bv 8) :
+    uheap γt γd γs M pm sz -∗ utext γt a b -∗ ⌜ ~ uw_addr (pm) a ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (Mt Md Mslack sz)
-      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
+    iDestruct "Hrun" as (Mt Md Mslack)
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & %Hstop & Hslack)".
     iDestruct (ghost_map_lookup with "Ht Hb") as %HMt.
     iPureIntro. exact (Hxw a (mk_is_Some _ _ HMt)).
   Qed.
 
   (* ...and a DATA byte names its byte and its page is WRITABLE. *)
-  Lemma uheap_ubyte (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (dq : dfrac) (a : Z) (b : bv 8) :
-    uheap γt γd γs M pm -∗ ubyteq γd dq a b -∗
+  Lemma uheap_ubyte (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (sz : Z) (dq : dfrac) (a : Z) (b : bv 8) :
+    uheap γt γd γs M pm sz -∗ ubyteq γd dq a b -∗
     ⌜ M !! a = Some b /\ uw_addr (pm) a /\ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (Mt Md Mslack sz)
-      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
+    iDestruct "Hrun" as (Mt Md Mslack)
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & %Hstop & Hslack)".
     iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
     assert (HM : M !! a = Some b)
       by exact (proj1 (map_subseteq_spec Md (M)) Hsd a b HMd).
@@ -648,8 +678,8 @@ Section UserHeap.
      and the heap through plain [Z] addition, and the two agree exactly
      because every owned address is below MAXVA. *)
   Lemma uheap_ubytes_img (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (a : Z) (n : nat) (f : nat -> bv 8) :
-    uheap γt γd γs M pm -∗ ubytes γd a n f -∗
+      (pm : gmap (mword 27) uperm) (sz : Z) (a : Z) (n : nat) (f : nat -> bv 8) :
+    uheap γt γd γs M pm sz -∗ ubytes γd a n f -∗
     ⌜ forall k : nat, (k < n)%nat ->
         M !! (a + Z.of_nat k)%Z = Some (f k)
         /\ 0 <= (a + Z.of_nat k)%Z < 2 ^ 38 ⌝.
@@ -670,18 +700,19 @@ Section UserHeap.
      key's image moves with it.  The text half is untouched, and it stays a
      SUBMAP because the two halves are disjoint -- which is the whole reason
      they are two heaps. *)
-  Lemma uheap_store (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b b' : bv 8) :
-    uheap γt γd γs M pm -∗ ubyte γd a b ==∗
-      uheap γt γd γs (<[a := b']> M) pm ∗ ubyte γd a b'.
+  Lemma uheap_store (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (sz : Z) (a : Z) (b b' : bv 8) :
+    uheap γt γd γs M pm sz -∗ ubyte γd a b ==∗
+      uheap γt γd γs (<[a := b']> M) pm sz ∗ ubyte γd a b'.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (Mt Md Mslack sz)
-      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
+    iDestruct "Hrun" as (Mt Md Mslack)
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & %Hstop & Hslack)".
     iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
     assert (Hnt : Mt !! a = None)
       by exact (map_disjoint_Some_r Mt Md a b Hdisj HMd).
     iMod (ghost_map_update b' with "Hd Hb") as "[Hd Hb]".
-    iModIntro. iFrame "Hb". iExists Mt, (<[a := b']> Md), Mslack, sz.
+    iModIntro. iFrame "Hb". iExists Mt, (<[a := b']> Md), Mslack.
         iFrame "Ht Hd Hszg Hslack". iPureIntro. split_and!.
     - apply insert_subseteq_r; [ exact Hnt | exact Hst ].
     - apply insert_mono. exact Hsd.
@@ -700,7 +731,18 @@ Section UserHeap.
       + rewrite lookup_insert_ne in Hk; [ exact Hk | exact (not_eq_sym Hne) ].
     (* the break and the slack are untouched: a store moves one DATA byte the
        process owns, and the slack is what the invariant owns above the break *)
-    - exact Hsl.
+    - (* the break and the slack are untouched, and the store moved no
+         DOMAIN -- it replaced a key that was already there -- so the
+         boundary equality still reads the same two sides *)
+      intros k. rewrite (Hsl k).
+      assert (Hdk : is_Some (<[a := b']> Md !! k) <-> is_Some (Md !! k)).
+      { destruct (decide (k = a)) as [-> | Hne].
+        - rewrite lookup_insert. split; intros _;
+            [ exact (mk_is_Some _ _ HMd) | exact (mk_is_Some _ _ eq_refl) ].
+        - rewrite lookup_insert_ne; [ reflexivity | exact (not_eq_sym Hne) ]. }
+      rewrite Hdk. reflexivity.
+    - (* the permission map and the break did not move *)
+      exact Hstop.
   Qed.
 
   (* ===================================================================== *)
@@ -717,12 +759,18 @@ Section UserHeap.
        the image's keys; it is taken here rather than re-derived so that this
        file stays independent of the bundle. *)
     (forall a : Z, is_Some (M !! a) -> 0 <= a < 2 ^ 38) ->
+    (* ...and the map stops at the break -- see [uheap]'s own clause.  At the
+       entry this is a fact about the image [exec] built, which the program's
+       slot constructor reads off its layout.  Stated over the MAP'S OWN
+       DOMAIN so that a gate can decide it. *)
+    (forall (p : mword 27) (q : uperm), pm !! p = Some q ->
+       bv_unsigned p * 4096 < pgroundup sz) ->
     ⊢ |==> ∃ γt γd γs : gname,
-        uheap γt γd γs M pm ∗ usz γs sz ∗
+        uheap γt γd γs M pm sz ∗ usz γs sz ∗
         ([∗ map] a ↦ b ∈ utext_part M pm, utext γt a b) ∗
         ([∗ map] a ↦ b ∈ udata_lo M pm sz, ubyte γd a b).
   Proof.
-    intros Hcan.
+    intros Hcan Hstop.
     iMod (ghost_map_alloc (utext_part M pm)) as (γt) "[Htauth Htfrag]".
     iMod (ghost_map_alloc (udata_part M pm)) as (γd) "[Hdauth Hdfrag]".
     iMod (ghost_var_alloc sz) as (γs) "Hsz".
@@ -743,7 +791,7 @@ Section UserHeap.
     iModIntro. iExists γt, γd, γs.
     iSplitL "Htauth Hdauth HszA Hslack";
       [ | iFrame "HszF"; iFrame "Hlo"; iFrame "Htp" ].
-    iExists (utext_part M pm), (udata_part M pm), (udata_slack M pm sz), sz.
+    iExists (utext_part M pm), (udata_part M pm), (udata_slack M pm sz).
     iFrame "Htauth Hdauth HszA Hslack". iPureIntro. split_and!.
     - apply utext_part_sub.
     - apply udata_part_sub.
@@ -752,7 +800,301 @@ Section UserHeap.
     - exact (utext_part_x M pm).
     - exact (utext_part_nw M pm).
     - exact (udata_part_w M pm).
-    - exact (udata_slack_above M pm sz).
+    - (* THE SPLIT IS AT THE BREAK, in both directions *)
+      intro a. unfold udata_slack. split.
+      + intros [b Hb].
+        destruct (proj1 (map_lookup_filter_Some _ _ _ _) Hb) as [Hd Hge].
+        cbn [fst] in Hge. split; [ exact (mk_is_Some _ _ Hd) | exact Hge ].
+      + intros [[b Hb] Hge]. exists b.
+        apply map_lookup_filter_Some. split; [ exact Hb | cbn [fst]; exact Hge ].
+    - exact Hstop.
+  Qed.
+
+  (* a byte range, out of a map that contains it -- the bridge every
+     resource that arrives as a [big_sepM] crosses to reach a run. *)
+  Lemma ubytes_of_map (γd : gname) (D : gmap Z (bv 8)) (a : Z) (n : nat)
+      (f : nat -> bv 8) :
+    (forall j : nat, (j < n)%nat -> D !! (a + Z.of_nat j)%Z = Some (f j)) ->
+    ([∗ map] k ↦ b ∈ D, ubyte γd k b) -∗ ubytes γd a n f.
+  Proof.
+    revert D. induction n as [| n IH]; intros D HD; iIntros "HD".
+    - rewrite /ubytes /ubytesq /=. done.
+    - iDestruct (big_sepM_delete _ D (a + Z.of_nat n)%Z (f n) with "HD")
+        as "[Hb HD]"; [ exact (HD n ltac:(lia)) | ].
+      (* hoisted, not [ltac:]: an inline side-condition is elaborated before
+         the map argument is known, and runs against an evar *)
+      assert (HD' : forall j : nat, (j < n)%nat ->
+                delete (a + Z.of_nat n)%Z D !! (a + Z.of_nat j)%Z = Some (f j)).
+      { intros j Hj. rewrite lookup_delete_ne; [ apply HD; lia | lia ]. }
+      iDestruct (IH (delete (a + Z.of_nat n)%Z D) HD' with "HD") as "Hlo".
+      rewrite /ubytes /ubytesq seq_S big_sepL_app /=.
+      iFrame "Hlo Hb".
+  Qed.
+
+  (* THE HEAP'S BREAK IS THE PROGRAM'S: the two halves of one ghost, so a
+     lemma that holds both reads the equation off agreement.  This is what
+     lets a leaf that has [urun] (hence the KEY's break inside [uheap]) and
+     a program's [usz] treat them as one number. *)
+  Lemma uheap_usz (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (sz sz' : Z) :
+    uheap γt γd γs M pm sz -∗ usz γs sz' -∗ ⌜ sz = sz' ⌝.
+  Proof.
+    iIntros "Hheap Hsz".
+    iDestruct "Hheap" as (Mt Md Mslack)
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & Hszg & _)".
+    iDestruct (ghost_var_agree with "Hszg Hsz") as %->. done.
+  Qed.
+
+  (* the canonicity clause, read out: every byte the image records is inside
+     the user region, which is what a row that GROWS the image has to
+     re-establish for the bytes it adds *)
+  Lemma uheap_canon (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (sz : Z) :
+    uheap γt γd γs M pm sz -∗
+    ⌜ forall a : Z, is_Some (M !! a) -> 0 <= a < 2 ^ 38 ⌝.
+  Proof.
+    iIntros "Hheap".
+    iDestruct "Hheap" as (Mt Md Mslack)
+      "(_ & _ & _ & %Hcan & _)".
+    iPureIntro. exact Hcan.
+  Qed.
+
+  (* ...and the map-stop clause, read out.  A leaf that is about to grow the
+     break needs it to see that the run it is handing over is on pages the
+     key does not have yet. *)
+  Lemma uheap_stop (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (sz : Z) :
+    uheap γt γd γs M pm sz -∗
+    ⌜ forall (p : mword 27) (q : uperm), pm !! p = Some q ->
+        bv_unsigned p * 4096 < pgroundup sz ⌝.
+  Proof.
+    iIntros "Hheap".
+    iDestruct "Hheap" as (Mt Md Mslack)
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hstop & _)".
+    iPureIntro. exact Hstop.
+  Qed.
+
+  (* ===================================================================== *)
+  (* §4b THE BREAK MOVES UP -- what [sbrk] hands the process.               *)
+  (*                                                                       *)
+  (* The kernel's sbrk row says the image gained the bytes that became      *)
+  (* readable ([UserPtTree.umem_grow]) and the permission map gained the    *)
+  (* pages that became live at RW.  What the PROCESS gets is the run        *)
+  (* [sz, sz+n) as fragments it owns -- which is what makes [malloc]        *)
+  (* provable at all: without it a program can see that memory grew and     *)
+  (* still not own a byte of it.                                           *)
+  (*                                                                       *)
+  (* THE BYTES ARE ZERO, and that is the kernel's own row rather than a     *)
+  (* convenience: [umem_grow] fills with [bv_0 8], which is what the lazy   *)
+  (* view says an untouched live page holds and what [vmfault] will later   *)
+  (* back it with.                                                        *)
+  (*                                                                       *)
+  (* THE TWO PAGE-ALIGNMENT PREMISES ARE WHAT KEEP THE SLACK EMPTY.  The    *)
+  (* invariant holds the writable bytes AT OR ABOVE the break ([Mslack]);   *)
+  (* between a page-aligned break and the next page boundary there are      *)
+  (* none, and the image stops at the break, so the slack is empty on both  *)
+  (* sides of this step and no fragment has to change hands.  A break in    *)
+  (* mid-page would want the slack SPLIT instead -- honest, and not what    *)
+  (* any caller does: [exec] leaves the break page-aligned and [malloc]     *)
+  (* asks for whole pages ([morecore] clamps to 4096 headers = 64 KiB).     *)
+  (* ===================================================================== *)
+  Lemma uheap_grow_run (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm pm' : gmap (mword 27) uperm) (sz n : Z) :
+    0 <= sz -> 0 <= n ->
+    (* the run the break moves over is writable in the NEW map, and the two
+       old classes survive it -- all three straight off the kernel's own
+       permission row ([UsysMemOk.usys_sbrk_perm]) *)
+    (forall a : Z, sz <= a < sz + n -> uw_addr pm' a) ->
+    (* ...and the new map EXTENDS the old one -- the row's union, where the
+       left operand wins -- which is what carries both halves' classes *)
+    (forall p : mword 27, is_Some (pm !! p) -> pm' !! p = pm !! p) ->
+    (* ...and the grown image is still inside the user region *)
+    (forall a : Z, is_Some (umem_grow M (sz + n) !! a) -> 0 <= a < 2 ^ 38) ->
+    (* ...and the NEW map stops at the NEW break, which is the row again:
+       the fill reaches only the pages that became live. *)
+    (forall (p : mword 27) (q : uperm), pm' !! p = Some q ->
+       bv_unsigned p * 4096 < pgroundup (sz + n)) ->
+    uheap γt γd γs M pm sz -∗ usz γs sz ==∗
+      uheap γt γd γs (umem_grow M (sz + n)) pm' (sz + n) ∗ usz γs (sz + n) ∗
+      ∃ g : nat -> bv 8, ubytes γd sz (Z.to_nat n) g.
+  Proof.
+    intros Hsz0 Hn0 Hnew Hext Hcan' Hstop'.
+    (* the three class transports, off the one extension premise *)
+    assert (Hwkeep : forall a : Z, uw_addr pm a -> uw_addr pm' a).
+    { intros a (q & Hq & Hw). exists q. split; [ | exact Hw ].
+      unfold uperm_at in Hq |- *. rewrite (Hext _ (mk_is_Some _ _ Hq)). exact Hq. }
+    assert (Hxkeep : forall a : Z, ux_addr pm a -> ux_addr pm' a).
+    { intros a (q & Hq & Hx). exists q. split; [ | exact Hx ].
+      unfold uperm_at in Hq |- *. rewrite (Hext _ (mk_is_Some _ _ Hq)). exact Hq. }
+    assert (Hnwkeep : forall a : Z, ux_addr pm a -> ~ uw_addr pm a ->
+                        ~ uw_addr pm' a).
+    { intros a (q & Hq & _) Hnw (q' & Hq' & Hw').
+      unfold uperm_at in Hq, Hq'.
+      rewrite (Hext _ (mk_is_Some _ _ Hq)) Hq in Hq'.
+      injection Hq' as <-. exact (Hnw (ex_intro _ q (conj Hq Hw'))). }
+    iIntros "Hheap Hsz".
+    iDestruct "Hheap" as (Mt Md Mslack)
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & %Hstop & Hslack)".
+    set (M' := umem_grow M (sz + n)).
+    (* THE GROWN IMAGE HOLDS THE WHOLE RUN: every address the break moves
+       over is live at the new size, so [umem_grow]'s fill reaches it. *)
+    assert (HM'run : forall a : Z, sz <= a < sz + n -> is_Some (M' !! a)).
+    { intros a Ha. unfold M', umem_grow.
+      destruct (M !! a) as [b |] eqn:E.
+      - exact (mk_is_Some _ _ (lookup_union_Some_l M _ a b E)).
+      - rewrite (lookup_union_r M _ a E).
+        assert (Hin : gset_to_gmap (bv_0 8) (live_set (sz + n)) !! a
+                      = Some (bv_0 8)).
+        { apply lookup_gset_to_gmap_Some. split; [ | reflexivity ].
+          unfold live_set. apply elem_of_list_to_set. apply elem_of_seqZ.
+          pose proof (pgroundup_ge (sz + n)). lia. }
+        exact (mk_is_Some _ _ Hin). }
+    assert (HMsub : M ⊆ M') by (unfold M', umem_grow; apply map_union_subseteq_l).
+    (* THE THREE PIECES OF THE RUN.  [Sin] is what the invariant already
+       owns inside it, [Nw] is what has to be minted, and [Sout] is the
+       slack that stays above the new break. *)
+    set (Sin := base.filter (fun kv : Z * bv 8 => sz <= kv.1 < sz + n) Mslack).
+    set (Sout := base.filter (fun kv : Z * bv 8 => ~ (sz <= kv.1 < sz + n)) Mslack).
+    set (Nw := base.filter (fun kv : Z * bv 8 =>
+                         sz <= kv.1 < sz + n /\ Md !! kv.1 = None) M').
+    assert (HSin : forall a : Z, Sin !! a = if decide (sz <= a < sz + n)
+                                            then Mslack !! a else None).
+    { intro a. unfold Sin. destruct (decide (sz <= a < sz + n)) as [Hin | Hout].
+      - destruct (Mslack !! a) as [b |] eqn:E.
+        + apply map_lookup_filter_Some. split; [ exact E | cbn [fst]; exact Hin ].
+        + apply map_lookup_filter_None. left. exact E.
+      - apply map_lookup_filter_None. right. intros b _. cbn [fst]. exact Hout. }
+    assert (HSout : forall a : Z, Sout !! a = if decide (sz <= a < sz + n)
+                                              then None else Mslack !! a).
+    { intro a. unfold Sout. destruct (decide (sz <= a < sz + n)) as [Hin | Hout].
+      - apply map_lookup_filter_None. right. intros b _. cbn [fst]. intro Hc. exact (Hc Hin).
+      - destruct (Mslack !! a) as [b |] eqn:E.
+        + apply map_lookup_filter_Some. split; [ exact E | cbn [fst]; exact Hout ].
+        + apply map_lookup_filter_None. left. exact E. }
+    assert (HNw : forall a : Z,
+              Nw !! a = if decide (sz <= a < sz + n /\ Md !! a = None)
+                        then M' !! a else None).
+    { intro a. unfold Nw.
+      destruct (decide (sz <= a < sz + n /\ Md !! a = None)) as [Hin | Hout].
+      - destruct (M' !! a) as [b |] eqn:E.
+        + apply map_lookup_filter_Some. split; [ exact E | cbn [fst]; exact Hin ].
+        + apply map_lookup_filter_None. left. exact E.
+      - apply map_lookup_filter_None. right. intros b _. cbn [fst]. exact Hout. }
+    (* the run is covered: a byte of it is either the invariant's already or
+       new to the authority *)
+    assert (Hcover : forall a : Z, sz <= a < sz + n ->
+              is_Some (Sin !! a) \/ is_Some (Nw !! a)).
+    { intros a Ha. assert (Hge : sz <= a) by lia.
+      destruct (Md !! a) as [b |] eqn:E.
+      - left. rewrite HSin. destruct (decide (sz <= a < sz + n)); [ | lia ].
+        exact (proj2 (Hsl a) (conj (mk_is_Some _ _ E) Hge)).
+      - right. rewrite HNw.
+        destruct (decide (sz <= a < sz + n /\ Md !! a = None)) as [_ | Hc];
+          [ exact (HM'run a Ha) | exfalso; exact (Hc (conj Ha E)) ]. }
+    assert (HNwMd : Nw ##ₘ Md).
+    { apply map_disjoint_spec. intros a b1 b2 H1 H2.
+      rewrite HNw in H1.
+      destruct (decide (sz <= a < sz + n /\ Md !! a = None)) as [[_ Hnone] | _];
+        [ rewrite Hnone in H2; discriminate H2 | discriminate H1 ]. }
+    assert (HSinNw : Sin ##ₘ Nw).
+    { apply map_disjoint_spec. intros a b1 b2 H1 H2.
+      rewrite HNw in H2.
+      destruct (decide (sz <= a < sz + n /\ Md !! a = None)) as [[_ Hnone] | _];
+        [ | discriminate H2 ].
+      rewrite HSin in H1. destruct (decide (sz <= a < sz + n)); [ | discriminate H1 ].
+      destruct (proj1 (Hsl a) (mk_is_Some _ _ H1)) as [HMd _].
+      rewrite Hnone in HMd. destruct HMd as [b Hb]. discriminate Hb. }
+    (* the slack splits *)
+    assert (HslackU : Mslack = Sin ∪ Sout).
+    { apply map_eq. intro a. symmetry.
+      rewrite lookup_union HSin HSout.
+      destruct (decide (sz <= a < sz + n)) as [Hin | Hout];
+        destruct (Mslack !! a) as [b |]; reflexivity. }
+    assert (HSdisj : Sin ##ₘ Sout).
+    { apply map_disjoint_spec. intros a b1 b2 H1 H2.
+      rewrite HSin in H1. rewrite HSout in H2.
+      destruct (decide (sz <= a < sz + n)); [ discriminate H2 | discriminate H1 ]. }
+    iEval (rewrite HslackU big_sepM_union; [ | exact HSdisj ]) in "Hslack".
+    iDestruct "Hslack" as "[HSin HSout]".
+    iMod (ghost_map_insert_big Nw with "Hd") as "[Hd HNwf]"; [ exact HNwMd | ].
+    iMod (usz_update γs sz sz (sz + n) with "Hsz Hszg") as "[Hsz Hszg]".
+    iModIntro.
+    iSplitR "Hsz HSin HNwf".
+    - iExists Mt, (Nw ∪ Md), Sout.
+      iFrame "Ht Hd Hszg HSout". iPureIntro. split_and!.
+      + (* the text half is still inside the image *)
+        exact (transitivity Hst HMsub).
+      + (* ...and so is the data half, the run included *)
+        apply map_subseteq_spec. intros a b Hb.
+        destruct (Nw !! a) as [b' |] eqn:E.
+        * rewrite (lookup_union_Some_l Nw Md a b' E) in Hb.
+          injection Hb as <-. rewrite HNw in E.
+          destruct (decide (sz <= a < sz + n /\ Md !! a = None)); [ exact E | discriminate E ].
+        * rewrite (lookup_union_r Nw Md a E) in Hb.
+          exact (proj1 (map_subseteq_spec Md M') (transitivity Hsd HMsub) a b Hb).
+      + (* the two halves are still disjoint: the run is data *)
+        apply map_disjoint_union_r. split; [ | exact Hdisj ].
+        apply map_disjoint_spec. intros a b1 b2 H1 H2.
+        rewrite HNw in H2.
+        destruct (decide (sz <= a < sz + n /\ Md !! a = None)) as [[Ha _] | _];
+          [ | discriminate H2 ].
+        (* a text byte on a page the run makes writable is a contradiction *)
+        assert (HM : is_Some (M !! a))
+          by exact (mk_is_Some _ _ (proj1 (map_subseteq_spec Mt M) Hst a b1 H1)).
+        exact (Hnwkeep a (Hx a (mk_is_Some _ _ H1))
+                 (Hxw a (mk_is_Some _ _ H1)) (Hnew a Ha)).
+      + exact Hcan'.
+      + intros a Ha. exact (Hxkeep a (Hx a Ha)).
+      + intros a Ha. exact (Hnwkeep a (Hx a Ha) (Hxw a Ha)).
+      + (* the data half's class: the run by the row, the rest as before *)
+        intros a Ha.
+        destruct (Nw !! a) as [b |] eqn:E.
+        * rewrite HNw in E.
+          destruct (decide (sz <= a < sz + n /\ Md !! a = None)) as [[Ha' _] | _];
+            [ exact (Hnew a Ha') | discriminate E ].
+        * assert (HMd : is_Some (Md !! a))
+            by (destruct Ha as [b' Hb']; rewrite lookup_union_r in Hb';
+                [ exact (mk_is_Some _ _ Hb') | exact E ]).
+          exact (Hwkeep a (Hw a HMd)).
+      + (* THE BOUNDARY MOVED UP WITH THE RUN: what is left of the slack is
+           exactly the data at or above the NEW break. *)
+        intro a. rewrite HSout.
+        assert (HNwa : ~ (sz <= a < sz + n) -> Nw !! a = None).
+        { intro Hc. rewrite HNw.
+          destruct (decide (sz <= a < sz + n /\ Md !! a = None)) as [[Hc' _] | _];
+            [ exfalso; exact (Hc Hc') | reflexivity ]. }
+        destruct (decide (sz <= a < sz + n)) as [Hin | Hout].
+        * split.
+          -- intros [b Hb]. discriminate Hb.
+          -- intros [_ Hge]. exfalso. lia.
+        * split.
+          -- intros Ha.
+             destruct (proj1 (Hsl a) Ha) as [HMd Hge].
+             split; [ | lia ].
+             destruct HMd as [b Hb]. exists b.
+             rewrite lookup_union_r; [ exact Hb | exact (HNwa Hout) ].
+          -- intros [Ha Hge].
+             assert (Hge' : sz <= a) by lia.
+             assert (HMd : is_Some (Md !! a)).
+             { destruct Ha as [b Hb].
+               rewrite (lookup_union_r Nw Md a (HNwa Hout)) in Hb.
+               exact (mk_is_Some _ _ Hb). }
+             exact (proj2 (Hsl a) (conj HMd Hge')).
+      + exact Hstop'.
+    - iSplitL "Hsz"; [ iExact "Hsz" | ].
+      (* THE RUN THE CALLER GETS: the invariant's own bytes inside it, plus
+         the freshly minted ones, as one map over exactly [sz, sz+n). *)
+      iExists (fun j : nat => default (bv_0 8) ((Sin ∪ Nw) !! (sz + Z.of_nat j)%Z)).
+      iApply (ubytes_of_map γd (Sin ∪ Nw) sz (Z.to_nat n) _ with "[HSin HNwf]").
+      + intros j Hj.
+        destruct (Hcover (sz + Z.of_nat j)%Z ltac:(lia)) as [[b Hb] | [b Hb]].
+        * rewrite (lookup_union_Some_l Sin Nw _ b Hb). reflexivity.
+        * rewrite (lookup_union_r Sin Nw (sz + Z.of_nat j)%Z).
+          -- rewrite Hb. reflexivity.
+          -- destruct (Sin !! (sz + Z.of_nat j)%Z) as [b' |] eqn:E;
+               [ exfalso | reflexivity ].
+             exact (proj1 (map_disjoint_spec Sin Nw) HSinNw _ b' b E Hb).
+      + rewrite big_sepM_union; [ | exact HSinNw ]. iFrame "HSin HNwf".
   Qed.
 
   (* ===================================================================== *)
@@ -773,9 +1115,9 @@ Section UserHeap.
   (* and this lemma is not even needed.                                     *)
   (* ===================================================================== *)
   Lemma uheap_store_run (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (a : Z) (n : nat) (f g : nat -> bv 8) :
-    uheap γt γd γs M pm -∗ ubytes γd a n f ==∗
-      uheap γt γd γs (umem_write M a n g) pm ∗ ubytes γd a n g.
+      (pm : gmap (mword 27) uperm) (sz : Z) (a : Z) (n : nat) (f g : nat -> bv 8) :
+    uheap γt γd γs M pm sz -∗ ubytes γd a n f ==∗
+      uheap γt γd γs (umem_write M a n g) pm sz ∗ ubytes γd a n g.
   Proof.
     iInduction n as [ | k IH ] "IH" forall (M).
     { iIntros "Hrun _". iModIntro. iFrame "Hrun". rewrite /ubytes /ubytesq /=. done. }
@@ -862,8 +1204,8 @@ Section UserHeap.
   (* every byte of a text run is the byte the image holds -- the [uM_bytes]
      clause [uinstr] states, read off the fragments one at a time *)
   Lemma uheap_text_run {k : N} (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (a : Z) (n : nat) (w : bv k) :
-    uheap γt γd γs M pm -∗
+      (pm : gmap (mword 27) uperm) (sz : Z) (a : Z) (n : nat) (w : bv k) :
+    uheap γt γd γs M pm sz -∗
     ([∗ list] j ∈ seq 0 n, utext γt (a + Z.of_nat j) (nth_byte w j)) -∗
     ⌜ uM_bytes M a n w ⌝.
   Proof.
@@ -1595,24 +1937,6 @@ Section UserHeap.
   (* ===================================================================== *)
 
   (* (1) a contiguous run, out of a map that contains it *)
-  Lemma ubytes_of_map (γd : gname) (D : gmap Z (bv 8)) (a : Z) (n : nat)
-      (f : nat -> bv 8) :
-    (forall j : nat, (j < n)%nat -> D !! (a + Z.of_nat j)%Z = Some (f j)) ->
-    ([∗ map] k ↦ b ∈ D, ubyte γd k b) -∗ ubytes γd a n f.
-  Proof.
-    revert D. induction n as [| n IH]; intros D HD; iIntros "HD".
-    - rewrite /ubytes /ubytesq /=. done.
-    - iDestruct (big_sepM_delete _ D (a + Z.of_nat n)%Z (f n) with "HD")
-        as "[Hb HD]"; [ exact (HD n ltac:(lia)) | ].
-      (* hoisted, not [ltac:]: an inline side-condition is elaborated before
-         the map argument is known, and runs against an evar *)
-      assert (HD' : forall j : nat, (j < n)%nat ->
-                delete (a + Z.of_nat n)%Z D !! (a + Z.of_nat j)%Z = Some (f j)).
-      { intros j Hj. rewrite lookup_delete_ne; [ apply HD; lia | lia ]. }
-      iDestruct (IH (delete (a + Z.of_nat n)%Z D) HD' with "HD") as "Hlo".
-      rewrite /ubytes /ubytesq seq_S big_sepL_app /=.
-      iFrame "Hlo Hb".
-  Qed.
 
   (* (2) the split of a run *)
   Lemma ubytes_app (γd : gname) (a : Z) (k n : nat) (f : nat -> bv 8) :

@@ -150,6 +150,26 @@ Proof. exact (uimg_sub_text_region_eq_of SyncInstrs.sync_bytes M). Qed.
    [udata_lo] is filtered at [sz], and with [sz] bound by the slot's own ∀
    the condition had to hold at every size the slot admitted -- including
    zero, where it is false.  [uvis_sz W] pins it. *)
+
+(* THE MAP STOPS AT THE BREAK -- the key-level reading of the kernel's own
+   [ProcPtOwn.um_below], which the trap bundle does not carry and which
+   [UserHeap.uheap] needs so that a later [sbrk] can see that the run it is
+   handing out is fresh.  Stated over the MAP'S OWN DOMAIN so it is a
+   [map_Forall] and therefore decidable, like every other gate condition. *)
+Definition ustop_gate (W : uvis) : Prop :=
+  map_Forall (fun (p : mword 27) (_ : uperm) =>
+                (bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W))%Z)
+             (uvis_perm W).
+
+Global Instance ustop_gate_dec (W : uvis) : Decision (ustop_gate W).
+Proof. unfold ustop_gate. apply _. Defined.
+
+Lemma ustop_gate_at (W : uvis) :
+  ustop_gate W ->
+  forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
+    (bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W))%Z.
+Proof. intros H p q Hq. exact (H p q Hq). Qed.
+
 Definition sync_gate (W : uvis) : Prop :=
   text_region_eq (uvis_M W) /\
   tf_resume_pc (uvis_tf W) = (mword_of_int SyncSyms.start : mword 64) /\
@@ -160,7 +180,9 @@ Definition sync_gate (W : uvis) : Prop :=
   (* ...and the descriptor table is a table.  Decidable like the rest, and
      what the process's own fd authority is minted at
      ([UserFd.ufd_auth] carries the length). *)
-  length (uvis_fd W) = NOFILE.
+  length (uvis_fd W) = NOFILE /\
+  (* ...and the map stops at the break *)
+  ustop_gate W.
 
 Global Instance sync_gate_dec (W : uvis) : Decision (sync_gate W).
 Proof. unfold sync_gate. apply _. Defined.
@@ -192,7 +214,9 @@ Definition echo_gate (W : uvis) : Prop :=
   echo_avd_arr W /\
   echo_avd_str W /\
   (* ...and the descriptor table is a table -- see [sync_gate] *)
-  length (uvis_fd W) = NOFILE.
+  length (uvis_fd W) = NOFILE /\
+  (* ...and the map stops at the break -- see [sync_gate] *)
+  ustop_gate W.
 
 Global Instance echo_gate_dec (W : uvis) : Decision (echo_gate W).
 Proof. unfold echo_gate. apply _. Defined.
@@ -218,23 +242,25 @@ Section UexecCond.
   (* the gate's yes branch: sync's own slot *)
   Lemma sync_gate_slot (W : uvis) : sync_gate W -> ⊢ uslot W.
   Proof.
-    intros (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hfdlen).
+    intros (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hfdlen & Hstop).
     exact (sync_uexec_slot W Hpc
              (text_region_eq_uimg_sub (uvis_M W) Hteq)
              (sync_xopage_addrs (uvis_perm W) Hxo)
-             Hroom Hal8 (sync_stkdata_all W Hstk) Hfdlen).
+             Hroom Hal8 (sync_stkdata_all W Hstk) Hfdlen
+             (ustop_gate_at W Hstop)).
   Qed.
 
   (* ...and echo's *)
   Lemma echo_gate_slot (W : uvis) : echo_gate W -> ⊢ uslot W.
   Proof.
     intros (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hargs & Havd & Havs
-            & Hfdlen).
+            & Hfdlen & Hstop).
     exact (echo_uexec_slot W Hpc
              (text_region_eq_of_uimg_sub EchoInstrs.echo_bytes (uvis_M W) Hteq)
              (sync_xopage_addrs (uvis_perm W) Hxo)
              Hroom Hal8 (echo_stkdata_all W Hstk) Hargs
-             (echo_avd_arr_all W Havd) (echo_avd_str_all W Havs) Hfdlen).
+             (echo_avd_arr_all W Havd) (echo_avd_str_all W Havs) Hfdlen
+             (ustop_gate_at W Hstop)).
   Qed.
 
   Lemma cond_entry_slot (W : uvis) : □ uexec_wp -∗ uslot W.

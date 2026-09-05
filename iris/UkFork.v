@@ -264,20 +264,20 @@ Section UkFork.
   (* ===================================================================== *)
   Lemma uheap_fork (γt γd γs : gname) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (szv : Z) (Ft Fp F : gmap Z (bv 8)) :
-    uheap γt γd γs M pm -∗
+    uheap γt γd γs M pm szv -∗
     ([∗ map] a ↦ b ∈ Ft, utext γt a b) -∗
     ([∗ map] a ↦ b ∈ Fp, ubyteq γd DfracDiscarded a b) -∗
     ([∗ map] a ↦ b ∈ F, ubyte γd a b) -∗
-    |==> uheap γt γd γs M pm ∗ ([∗ map] a ↦ b ∈ F, ubyte γd a b) ∗
+    |==> uheap γt γd γs M pm szv ∗ ([∗ map] a ↦ b ∈ F, ubyte γd a b) ∗
          ∃ γt' γd' γs' : gname,
-           uheap γt' γd' γs' M pm ∗ usz γs' szv ∗
+           uheap γt' γd' γs' M pm szv ∗ usz γs' szv ∗
            ([∗ map] a ↦ b ∈ Ft, utext γt' a b) ∗
            ([∗ map] a ↦ b ∈ Fp, ubyteq γd' DfracDiscarded a b) ∗
            ([∗ map] a ↦ b ∈ F, ubyte γd' a b).
   Proof.
     iIntros "Hheap #Htf Hpf Hdf".
-    iDestruct "Hheap" as (Mt Md Mslack isz)
-      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
+    iDestruct "Hheap" as (Mt Md Mslack)
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hxw & %Hw & Ht & Hd & Hszg & %Hsl & %Hstop & Hslack)".
     (* ---- pure inventory, all non-consuming ---- *)
     iDestruct (ghost_frags_sub γt 1 Mt Ft DfracDiscarded with "Ht Htf") as %HFt.
     iDestruct (ghost_frags_sub γd 1 Md Fp DfracDiscarded with "Hd Hpf") as %HFp.
@@ -288,6 +288,29 @@ Section UkFork.
     assert (HFdMd : Fd ⊆ Md)
       by (apply map_union_sub; [ exact HF | exact HFp ]).
     assert (HFdM : Fd ⊆ M) by (etransitivity; [ exact HFdMd | exact Hsd ]).
+    (* THE CHILD'S FRAGMENTS ARE ALL BELOW THE BREAK, and the reason is the
+       invariant's own boundary: a data byte at or above it is the SLACK's,
+       which the invariant holds EXCLUSIVELY, so a fragment the process (or
+       a persisted area) holds there would be a second claim on it. *)
+    iAssert (⌜ forall a : Z, is_Some (Fd !! a) -> a < szv ⌝)%I
+      with "[Hslack Hdf Hpf]" as %Hbelow.
+    { rewrite bi.pure_forall. iIntros (a). rewrite bi.pure_impl. iIntros (Ha).
+      destruct (decide (a < szv)) as [Hlt | Hge]; [ iPureIntro; exact Hlt | ].
+      iExFalso.
+      assert (HMd : is_Some (Md !! a))
+        by (destruct Ha as [b Hb]; exists b;
+            exact (proj1 (map_subseteq_spec Fd Md) HFdMd a b Hb)).
+      assert (Hge' : szv <= a) by lia.
+      destruct (proj2 (Hsl a) (conj HMd Hge')) as [b0 Hb0].
+      iDestruct (big_sepM_lookup _ _ a b0 Hb0 with "Hslack") as "Hinv".
+      destruct Ha as [b1 Hb1].
+      destruct (proj1 (lookup_union_Some F Fp a b1 HFFp) Hb1) as [HF1 | HFp1].
+      - iDestruct (big_sepM_lookup _ _ a b1 HF1 with "Hdf") as "Hf".
+        iDestruct (ghost_map_elem_valid_2 with "Hinv Hf") as %[Hv _].
+        done.
+      - iDestruct (big_sepM_lookup _ _ a b1 HFp1 with "Hpf") as "Hf".
+        iDestruct (ghost_map_elem_valid_2 with "Hinv Hf") as %[Hv _].
+        done. }
     (* ---- the three fresh ghosts ---- *)
     iMod (ghost_map_alloc Mt) as (γt') "[Ht' Htfr]".
     iAssert (|==> [∗ map] a ↦ b ∈ Mt, utext γt' a b)%I
@@ -310,13 +333,13 @@ Section UkFork.
     (* ---- reassemble the parent, hand over the child ---- *)
     iModIntro.
     iSplitL "Ht Hd Hszg Hslack".
-    { iExists Mt, Md, Mslack, isz. iFrame "Ht Hd Hszg Hslack".
+    { iExists Mt, Md, Mslack. iFrame "Ht Hd Hszg Hslack".
       iPureIntro. split_and!; assumption. }
     iFrame "Hdf".
     iExists γt', γd', γs'.
     iSplitL "Ht' Hd' HszA'".
     { (* the child's heap invariant, clause by clause *)
-      iExists Mt, Fd, ∅, szv.
+      iExists Mt, Fd, ∅.
       iSplitR; [ iPureIntro; exact Hst | ].
       iSplitR; [ iPureIntro; exact HFdM | ].
       iSplitR;
@@ -330,8 +353,10 @@ Section UkFork.
         exists b. exact (proj1 (map_subseteq_spec Fd Md) HFdMd a b Hb). }
       iFrame "Ht' Hd' HszA'".
       iSplitR.
-      { iPureIntro. intros a Ha. rewrite lookup_empty in Ha.
-        destruct Ha as [b Hb]. discriminate Hb. }
+      { iPureIntro. intro a. split.
+        - intros [b Hb]. rewrite lookup_empty in Hb. discriminate Hb.
+        - intros [Ha Hge]. exfalso. pose proof (Hbelow a Ha). lia. }
+      iSplitR; [ iPureIntro; exact Hstop | ].
       rewrite big_sepM_empty. done. }
     iFrame "HszF'".
     iSplitR; [ iExact "Htf'" | ].
@@ -782,6 +807,8 @@ Section UkFork.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     (* the caller's handles ARE the parent's table, at the slots they name --
        which is what licenses re-minting them at the child's fresh name *)
+    (* the program's break IS the key's, now that the heap carries it *)
+    iDestruct (uheap_usz with "Hheap Hsz") as %<-.
     iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
     iDestruct (ufd_sub_hi γfd fdv D with "Hufd HD") as %Hsub.
     (* ...and the ledger says the child's standard streams are these *)
@@ -794,7 +821,7 @@ Section UkFork.
     iDestruct (FPS γt γd γs with "[HP Hstk]")
       as (Ft Fp F) "(#Htf & #Hpf & Hdf & Hrestore & #Hrebuild)";
       [ iSplitL "HP"; [ iExact "HP" | iExact "Hstk" ] | ].
-    iMod (uheap_fork γt γd γs M pm szv Ft Fp F with "Hheap Htf Hpf Hdf")
+    iMod (uheap_fork γt γd γs M pm sz Ft Fp F with "Hheap Htf Hpf Hdf")
       as "(Hheap & Hdf & Hchildres)".
     iDestruct ("Hrestore" with "Hdf") as "[HP Hstk]".
     iDestruct "Hchildres" as (γt' γd' γs')

@@ -275,7 +275,8 @@ Lemma usys_mem_ok_args (n : Z) (tf tf' : list (mword 64)) (r : mword 64)
 Proof.
   intros H0 H1 H2 H. unfold usys_mem_ok, usys_rdcount in H |- *.
   destruct (decide (n = USYS_exec)); [ exact H | ].
-  destruct (decide (n = USYS_sbrk)); [ exact H | ].
+  destruct (decide (n = USYS_sbrk));
+    [ unfold usys_sbrk_ret, usys_sbrk_arg in H |- *; rewrite <- H0; exact H | ].
   destruct (decide (n = USYS_wait)); [ rewrite <- H0; exact H | ].
   destruct (decide (n = USYS_pipe)); [ rewrite <- H0; exact H | ].
   destruct (decide (n = USYS_read)); [ rewrite <- H1; rewrite <- H2; exact H | ].

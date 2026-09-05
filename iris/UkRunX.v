@@ -113,6 +113,9 @@ Section UkRunX.
                  !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
                      - 8 * Z.of_nat avail + Z.of_nat j)%Z)) ->
     length (uvis_fd W) = NOFILE ->
+    (* the map stops at the break -- [UkRun.uslot_of_urun]'s own premise *)
+    (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
+       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (∀ (γt γd γs γfd : gname) (h : CpuId),
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz γs (uvis_sz W) -∗
@@ -134,7 +137,7 @@ Section UkRunX.
        WP (Loop : expr riscv_lang))
     -∗ uslot_x W.
   Proof.
-    intros Hal8 Hroom Hstk Hfdlen. iIntros "Hprog". rewrite uslot_x_unfold.
+    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "Hprog". rewrite uslot_x_unfold.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -144,7 +147,7 @@ Section UkRunX.
       "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
         Hfrag & Hcfg & Hgpr & Hpc & Hrut & Hkont)".
     iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
-    iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan)
+    iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan Hstop)
       as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
     iMod (ufd_alloc_std (uvis_fd W) ∅ Hfdlen (map_empty_subseteq _))
       as (γfd) "(Hufd & Hstd & _)".
@@ -213,6 +216,9 @@ Section UkRunX.
                  !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
                      - 8 * Z.of_nat avail + Z.of_nat j)%Z)) ->
     length (uvis_fd W) = NOFILE ->
+    (* the map stops at the break -- [UkRun.uslot_of_urun]'s own premise *)
+    (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
+       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (∀ (γt γd γs γfd : gname) (h : CpuId),
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz γs (uvis_sz W) -∗
@@ -223,8 +229,8 @@ Section UkRunX.
        WP (Loop : expr riscv_lang))
     -∗ uslot_x W.
   Proof.
-    intros Hal8 Hroom Hstk Hfdlen. iIntros "Hprog".
-    iApply (uslot_x_of_urun_all W avail Hal8 Hroom Hstk Hfdlen).
+    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "Hprog".
+    iApply (uslot_x_of_urun_all W avail Hal8 Hroom Hstk Hfdlen Hstop).
     iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht Hstd _ _ Hrun".
     iApply ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht Hstd Hrun").
     exact Hsz.
@@ -241,6 +247,9 @@ Section UkRunX.
                  !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
                      - 8 * Z.of_nat avail + Z.of_nat j)%Z)) ->
     length (uvis_fd W) = NOFILE ->
+    (* the map stops at the break -- [UkRun.uslot_of_urun]'s own premise *)
+    (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
+       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (∀ (γt γd γs γfd : gname) (h : CpuId),
        ⌜ usz_ok (uvis_sz W) ⌝ -∗
        usz γs (uvis_sz W) -∗
@@ -256,8 +265,8 @@ Section UkRunX.
        WP (Loop : expr riscv_lang))
     -∗ uslot_x W.
   Proof.
-    intros Hal8 Hroom Hstk Hfdlen. iIntros "Hprog".
-    iApply (uslot_x_of_urun_all W avail Hal8 Hroom Hstk Hfdlen).
+    intros Hal8 Hroom Hstk Hfdlen Hstop. iIntros "Hprog".
+    iApply (uslot_x_of_urun_all W avail Hal8 Hroom Hstk Hfdlen Hstop).
     iIntros (γt γd γs γfd h) "%Hsz Hszf #Ht Hstd _ Dhi Hrun".
     iMod (uarea_persist γd _ with "Dhi") as "#Dhi".
     iApply ("Hprog" $! γt γd γs γfd h with "[%] Hszf Ht Hstd Dhi Hrun").
@@ -430,7 +439,7 @@ Section UkRunX.
   Lemma urun_x_close (γt γd γs γfd : gname) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (sz : Z) (fdv : list fdstate) (cw : Z)
       (m : regfile) (pc : mword 64) (avail : nat) :
-    uheap γt γd γs M pm -∗
+    uheap γt γd γs M pm sz -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     ufd_auth γfd fdv -∗
     (∀ h : CpuId, urun_x γt γd γs γfd h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
@@ -448,7 +457,7 @@ Section UkRunX.
       (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5) (v : mword 64)
       (sz : Z) (fdv : list fdstate) (cw : Z) (pc' : mword 64) (avail : nat) :
     unot_sp rd ->
-    uheap γt γd γs M pm -∗
+    uheap γt γd γs M pm sz -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     ufd_auth γfd fdv -∗
     (∀ h : CpuId, urun_x γt γd γs γfd h (<[Regidx rd := v]> m) pc' avail -∗
