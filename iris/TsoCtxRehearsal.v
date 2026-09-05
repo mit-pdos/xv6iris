@@ -59,7 +59,7 @@ From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import dfrac.
 From iris.base_logic.lib Require Import ghost_map ghost_var.
-From xv6iris Require Import TsoMem TsoCtxTwin.
+From xv6iris Require Import TsoMemOne TsoCtxTwin.
 
 Local Open Scope Z_scope.
 

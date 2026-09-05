@@ -70,7 +70,7 @@ From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_map.
-From xv6iris Require Import TsoMem.
+From xv6iris Require Import TsoMemOne.
 
 Local Open Scope Z_scope.
 

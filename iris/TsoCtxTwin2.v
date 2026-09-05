@@ -87,7 +87,7 @@ From iris.algebra Require Import auth dfrac numbers functions.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own ghost_map mono_nat.
-From xv6iris Require Import TsoMem.
+From xv6iris Require Import TsoMemOne.
 From xv6iris Require TsoCtxTwin.
 
 Local Open Scope Z_scope.

@@ -20,6 +20,7 @@ TsoMem.v
 TsoMemPa.v
 TsoGhost.v
 TsoLitmus.v
+TsoMemOne.v
 TsoCtxTwin.v
 TsoCtxRehearsal.v
 TsoCtxTwin2.v
