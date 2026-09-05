@@ -178,22 +178,43 @@ form beside `LogSnapLaw.snap_law` in `log_ctx` once per era and the
 committer reads both laws off the ledger.  Nothing is re-proved per
 commit; nothing is per era but the parking.
 
-## 6. Open questions for the owner
+## 6. Open questions for the owner (2026-09-05, the full list)
 
-1. **`app_names : Type` in the record**, or existential names inside
-   `app_pred` and no instance index at all?  The index is what lets a
-   PROCESS name the running instance's ghosts (e.g. hold the other half
-   of a variable the claim owns); without it every application ghost is
-   invariant-internal.  Cost: one Type field.
-2. **Index by `I` (the raw map) or by `S` (`fs_state_rec`)?**  The map is
-   what the fires lend and the movers change; `S` adds the superblock,
-   the bitmap's used set and the byte view, which no application has
-   asked for.  Proposed: `I`, with `fss_inodes S` at the durable instance.
-3. ~~Inside `P_dur` or beside it?~~  RULED beside (owner, 2026-09-05):
-   separate invariants, tied by half of the snapshot's map authority
-   (§2).
-4. **The mover's premise shape.**  `app_step` at the raw map with the
-   changed inum, or at the abstract-view delta (`FsAbsDelta`)?  The mover
-   sees the map; the AU fires already know the delta and can derive the
-   raw step from it.  Proposed: raw at the mover, delta-indexed at the
-   fires.
+1. **The instance index.**  AGREED: `app_names` splits into a FIXED part
+   (born once, nameable by the fixed layer and the machine's record) and a
+   PER-INSTANCE part (refreshed by every transport).  Remaining: the fixed
+   part's birth.  Proposed: a client birth step `⊢ |==> ∃ γ, Cl γ` run
+   first by the power theorem, its name threaded into the record as
+   `γobs` is (today's mono-nat at `riscv_client_name` is the special
+   case); `app_pred : gname -> app_names -> gmap Z fs_node -> iProp Σ`,
+   fixed name first; `app_names : Type`.
+2. **Index by `I` or by `S`.**  Proposed `I`: the fires lend it, the mover
+   changes it, the durable side's `fss_inodes S` IS it at the commit.
+3. ~~Inside `P_dur` or beside it?~~  RULED beside, tied by half an authority.
+4. **The mover's premise.**  Proposed raw at the mover (`<[i := n']> I`,
+   the only total form — the landed non-AU movers have no delta
+   vocabulary and must open the application's invariant like everyone
+   else), delta-indexed at the AU fires where the process's payload
+   proves it.  A non-trivial application is green only once every retag
+   site has a step; the generic application's is trivial everywhere.
+5. **Laters at the crossings.**  The commit's law, the boot mint and the
+   PowerOn clone are fupds without a step, so the claim arrives as
+   `▷ app_pred` and a basic update cannot run under it; `◇` strips only
+   timeless laters.  Either require `Timeless (app_pred …)` or state the
+   transport under the later,
+   `▷ app_pred γa I ==∗ ▷ app_pred γa I ∗ ▷ (∃ γa', app_pred γa' I)`.
+   Proposed: the later-shaped transport (timeless claims strip; claims
+   holding invariants duplicate under the later); `app_step` stays a
+   plain wand, which lifts under the later for free.
+6. **Who hands out the halves.**  Each fresh-instance operation of the
+   kernel returns the guest half: the snapshot law (`ghost_map_auth gt
+   (1/2) I` beside `P_dur`), the PowerOn clone (`P_fs_swap`, via
+   `P_dur_clone`), the boot mint (the era's `γtop`).  The collection reads
+   the map at the kernel's fraction or borrows the application's half
+   while it has the application's invariant open.  One uniform interface,
+   three lemmas.
+7. **The crash slot's composition.**  `Pc := P_fs_named ∗ app_dur_named`
+   at xv6; `HPc` = `P_fs_alloc` ∗ the era-0 claim at the image's snapshot
+   half; `Hproj` frames the application conjunct; `Hswap` = `P_fs_swap`
+   returning the clone's guest half, then the application's later-shaped
+   clone, then the lend carrying both.  The machine layer is untouched.
