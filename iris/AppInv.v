@@ -13,7 +13,7 @@
     is fractional, any two fractions AGREE on the map
     ([ghost_map_auth_agree]), and an UPDATE needs the whole.
     [InodeRegion.ftop_body] keeps the kernel's half; [app_body] below keeps
-    the other half beside [app_pred riscv_client_name app_run (abs_view I)].
+    the other half beside [app_pred app_run (abs_view I)].
     Agreement pins the two maps to one; the mover needs the whole, so it
     opens BOTH invariants and re-establishes the claim -- "they move
     together" as a resource, enforced by ownership, not by discipline.  The
@@ -54,7 +54,7 @@ From stdpp Require Import gmap.
 From iris.proofmode Require Import proofmode.
 From iris.bi.lib Require Import fractional.
 From iris.base_logic.lib Require Import invariants ghost_map.
-Require Import RiscvPtsto.      (* [riscvGS]: the invariant class; [riscv_client_name]: the fixed name *)
+Require Import RiscvPtsto.      (* [riscvGS]: the invariant class *)
 Require Import Xv6Cameras.      (* [fsTopG]: the top map's ghost class *)
 Require Import FsBlocks.        (* [fs_names], [fs_top] *)
 Require Import FsNode.          (* [fs_node] *)
@@ -75,34 +75,35 @@ Definition appE : coPset := ↑appN.
 Definition top_move (n n' : fs_node) : Prop := True.
 
 (* ------------------------------------------------------------------ *)
-(*  1.  The raw license: at a gname, a predicate and an instance        *)
+(*  1.  The raw license: at a predicate and an instance                 *)
 (* ------------------------------------------------------------------ *)
 
 Section AppAutoRaw.
   Context {Σ : gFunctors}.
 
   (* the application's PARKED LICENSE: it admits the kernel's non-AU moves.
-     RAW -- the counter's gname, the predicate and the instance are
-     ARGUMENTS -- so the system theorem can state it under [riscvGpreS],
-     before the fixed record exists ([SystemAdequacy.xv6_power_adequacy_gen]'s
-     [Happ_auto]); [app_auto] below is the pinned form. *)
-  Definition app_auto_raw (γcl : gname) {N : Type}
-      (A : gname -> N -> aview -> iProp Σ) (r : N) : iProp Σ :=
+     RAW -- the predicate (its fixed part already applied) and the instance
+     are ARGUMENTS -- so the system theorem can state it under
+     [riscvGpreS], before the fixed record exists
+     ([SystemAdequacy.xv6_power_adequacy_gen]'s [Happ_auto]); [app_auto]
+     below is the pinned form. *)
+  Definition app_auto_raw {N : Type}
+      (A : N -> aview -> iProp Σ) (r : N) : iProp Σ :=
     (□ (∀ (I : gmap Z fs_node) (i : Z) (n n' : fs_node),
           ⌜I !! i = Some n⌝ -∗ ⌜top_move n n'⌝ -∗
-          A γcl r (abs_view I) -∗ A γcl r (abs_view (<[i := n']> I))))%I.
+          A r (abs_view I) -∗ A r (abs_view (<[i := n']> I))))%I.
 
-  Global Instance app_auto_raw_persistent γcl {N} (A : gname -> N -> aview -> iProp Σ) r :
-    Persistent (app_auto_raw γcl A r).
+  Global Instance app_auto_raw_persistent {N} (A : N -> aview -> iProp Σ) r :
+    Persistent (app_auto_raw A r).
   Proof. rewrite /app_auto_raw. apply _. Qed.
 
   (* the generic application's: a predicate that holds of every view holds
      of the moved one *)
-  Lemma app_auto_raw_triv γcl {N} (A : gname -> N -> aview -> iProp Σ) (r : N) :
-    (forall f r av, A f r av ⊣⊢ True) -> ⊢ app_auto_raw γcl A r.
+  Lemma app_auto_raw_triv {N} (A : N -> aview -> iProp Σ) (r : N) :
+    (forall r av, A r av ⊣⊢ True) -> ⊢ app_auto_raw A r.
   Proof.
     intros Htriv. rewrite /app_auto_raw. iIntros "!>" (I i n n') "_ _ _".
-    iApply (bi.equiv_entails_1_2 _ _ (Htriv γcl r (abs_view (<[i := n']> I)))).
+    iApply (bi.equiv_entails_1_2 _ _ (Htriv r (abs_view (<[i := n']> I)))).
     iPureIntro. exact Logic.I.
   Qed.
 End AppAutoRaw.
@@ -115,19 +116,19 @@ Section AppInv.
   (* [riscvGS] rather than a bare [invGS_gen hlc]: the has_lc index has to be
      pinned by the machine's own instance, or a consumer's statement that
      mentions nothing else ([app_inv] beside a plain fupd) cannot resolve
-     it; and it is where [riscv_client_name] comes from. *)
+     it. *)
   Context `{!riscvGS Σ, !fsTopG Σ}.
   (* the era's application record (consumers reach it through [fileG]'s
      [file_app]; the kits and the mint pass it explicitly) *)
   Context `{APP : appcfg Σ}.
 
-  Definition app_auto : iProp Σ := app_auto_raw riscv_client_name app_pred app_run.
+  Definition app_auto : iProp Σ := app_auto_raw app_pred app_run.
 
   Global Instance app_auto_persistent : Persistent app_auto.
   Proof. rewrite /app_auto. apply _. Qed.
 
   Lemma app_auto_of_triv :
-    (forall f r av, app_pred f r av ⊣⊢ True) -> ⊢ app_auto.
+    (forall r av, app_pred r av ⊣⊢ True) -> ⊢ app_auto.
   Proof. intros Htriv. rewrite /app_auto. by apply app_auto_raw_triv. Qed.
 
   (* THE BODY: the application's half of the authority, the claim about the
@@ -136,7 +137,7 @@ Section AppInv.
   Definition app_body (γfs : fs_names) : iProp Σ :=
     (∃ I : gmap Z fs_node,
        ghost_map_auth (fs_top γfs) (1/2) I ∗
-       app_pred riscv_client_name app_run (abs_view I) ∗
+       app_pred app_run (abs_view I) ∗
        app_auto)%I.
 
   Definition app_inv (γfs : fs_names) : iProp Σ := inv appN (app_body γfs).
@@ -150,7 +151,7 @@ Section AppInv.
      license. *)
   Lemma app_inv_alloc (γfs : fs_names) (I : gmap Z fs_node) (E : coPset) :
     ghost_map_auth (fs_top γfs) (1/2) I -∗
-    app_pred riscv_client_name app_run (abs_view I) -∗
+    app_pred app_run (abs_view I) -∗
     app_auto -∗ |={E}=> app_inv γfs.
   Proof.
     iIntros "Hh Hp #Ha". rewrite /app_inv.
@@ -175,8 +176,8 @@ Section AppInv.
     ↑appN ⊆ E ->
     app_inv γfs -∗
     (⌜I !! i = Some n⌝ -∗ ▷ app_auto -∗
-       ▷ app_pred riscv_client_name app_run (abs_view I) -∗
-       ▷ app_pred riscv_client_name app_run (abs_view (<[i := n']> I))) -∗
+       ▷ app_pred app_run (abs_view I) -∗
+       ▷ app_pred app_run (abs_view (<[i := n']> I))) -∗
     ghost_map_auth (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
       ghost_map_auth (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
   Proof.
@@ -215,8 +216,8 @@ Section AppInv.
       (i : Z) (n n' : fs_node) :
     ↑appN ⊆ E ->
     app_inv γfs -∗
-    (app_pred riscv_client_name app_run (abs_view I) -∗
-       app_pred riscv_client_name app_run (abs_view (<[i := n']> I))) -∗
+    (app_pred app_run (abs_view I) -∗
+       app_pred app_run (abs_view (<[i := n']> I))) -∗
     ghost_map_auth (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
       ghost_map_auth (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
   Proof.
@@ -258,15 +259,15 @@ Section AppInv.
   Definition app_step (i : Z) (I : gmap Z fs_node) (av' : aview) : iProp Σ :=
     (∀ n' : fs_node,
        ⌜abs_view (<[i := n']> I) = av'⌝ -∗
-       ▷ app_pred riscv_client_name app_run (abs_view I) -∗
-       ▷ app_pred riscv_client_name app_run (abs_view (<[i := n']> I)))%I.
+       ▷ app_pred app_run (abs_view I) -∗
+       ▷ app_pred app_run (abs_view (<[i := n']> I)))%I.
 
   (* the fire's reading: at the node it chose *)
   Lemma app_step_at (i : Z) (I : gmap Z fs_node) (av' : aview) (n' : fs_node) :
     abs_view (<[i := n']> I) = av' ->
     app_step i I av' -∗
-    ▷ app_pred riscv_client_name app_run (abs_view I) -∗
-    ▷ app_pred riscv_client_name app_run (abs_view (<[i := n']> I)).
+    ▷ app_pred app_run (abs_view I) -∗
+    ▷ app_pred app_run (abs_view (<[i := n']> I)).
   Proof.
     intros Heq. iIntros "Hstep Hp". rewrite /app_step.
     iApply ("Hstep" $! n' with "[//] Hp").

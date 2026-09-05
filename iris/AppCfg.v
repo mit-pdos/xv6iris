@@ -8,11 +8,17 @@
     the VIEW [FsAbsDefs.aview] (the [abs_view] of the raw node map, never
     the raw nodes: block addresses and records are invisible to user code,
     so a retag that preserves [abs_of] needs nothing from the application),
-    at a FIXED ghost name [f] (today the machine's client counter
-    [RiscvPtsto.riscv_client_name]; round D gives the application its own
-    fixed [Type]) and at an INSTANCE [r] of the application's own per-era
-    names [app_names] (the running instance [app_run] here; round C adds the
-    durable one, refreshed by every transport).  The claim can OWN
+    at an INSTANCE [r] of the application's own per-era names [app_names]
+    (the running instance [app_run] here; round C adds the durable one,
+    refreshed by every transport).  THE FIXED PART IS ALREADY APPLIED
+    (app-instances.md section 6 ruling 1, round D0): the application's
+    fixed names are a [Type] of its own, born once by the power theorem's
+    birth step and carried by the machine's record as
+    [RiscvPtsto.riscv_client]; the boot applies the application's predicate
+    to that value when it builds the era's record
+    ([SystemAdequacy.xv6_boot_era]: [MkAppcfg N (app_fs riscv_client) r]),
+    so below the boot [app_pred] is a constant of the run and nobody names
+    the fixed part.  The claim can OWN
     resources (per-node fragments, receipts, the application's own ghosts;
     the owner's 2026-09-05 correction: a pure left arm is bogus), so
     nothing about it is assumed timeless or persistent.
@@ -39,7 +45,7 @@
     parametric in [Σ], below [fscfg] in the tree -- and below
     [InodeRegion], whose movers open the application's invariant.
 
-    THE GENERIC APPLICATION: [app_names := unit], [app_pred := fun _ _ _ =>
+    THE GENERIC APPLICATION: [app_names := unit], [app_pred := fun _ _ =>
     True], [app_run := ()] -- user space does anything, the abstract state
     is anything, the kernel stays correct. *)
 From Stdlib Require Import ZArith.
@@ -52,11 +58,11 @@ Class appcfg (Σ : gFunctors) := MkAppcfg {
      section 1): a running instance per era, a durable one per snapshot
      (round C); the generic application's is [unit]. *)
   app_names : Type;
-  (* THE APPLICATION'S PREDICATE ON THE ABSTRACT FILE-SYSTEM STATE, at a
-     fixed name (the machine's client counter until round D), at an
-     instance of [app_names], over the user-visible VIEW.  The generic
-     application's is [fun _ _ _ => True]. *)
-  app_pred  : gname -> app_names -> aview -> iProp Σ;
+  (* THE APPLICATION'S PREDICATE ON THE ABSTRACT FILE-SYSTEM STATE, at an
+     instance of [app_names], over the user-visible VIEW -- with the fixed
+     part ALREADY APPLIED: a constant of the run.  The generic
+     application's is [fun _ _ => True]. *)
+  app_pred  : app_names -> aview -> iProp Σ;
   (* THE ERA'S RUNNING INSTANCE, chosen where the era's record is built
      ([SystemAdequacy.xv6_boot_era], out of the boot obligation's witness)
      and founded into [AppInv.app_inv] by the era mint. *)

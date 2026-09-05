@@ -3356,8 +3356,8 @@ Section InodeRegion.
     inode_local i n' ->
     ftop_inv γfs -∗ app_inv γfs -∗
     (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗ ▷ app_auto -∗
-       ▷ app_pred riscv_client_name app_run (FsAbsDefs.abs_view I) -∗
-       ▷ app_pred riscv_client_name app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
+       ▷ app_pred app_run (FsAbsDefs.abs_view I) -∗
+       ▷ app_pred app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
   Proof.
     iIntros (HE Hloc) "#Hi #Hai Hstep Hf".
@@ -3396,8 +3396,8 @@ Section InodeRegion.
     inode_local i n' ->
     ftop_inv γfs -∗ app_inv γfs -∗
     (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗
-       app_pred riscv_client_name app_run (FsAbsDefs.abs_view I) -∗
-       app_pred riscv_client_name app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
+       app_pred app_run (FsAbsDefs.abs_view I) -∗
+       app_pred app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
   Proof.
     iIntros (HE Hloc) "#Hi #Hai Hstep Hf".
@@ -3430,8 +3430,8 @@ Section InodeRegion.
     i ∈ S ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
     (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗ ▷ app_auto -∗
-       ▷ app_pred riscv_client_name app_run (FsAbsDefs.abs_view I) -∗
-       ▷ app_pred riscv_client_name app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
+       ▷ app_pred app_run (FsAbsDefs.abs_view I) -∗
+       ▷ app_pred app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'.
   Proof.
@@ -3475,8 +3475,8 @@ Section InodeRegion.
     i ∈ S ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
     (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗
-       app_pred riscv_client_name app_run (FsAbsDefs.abs_view I) -∗
-       app_pred riscv_client_name app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
+       app_pred app_run (FsAbsDefs.abs_view I) -∗
+       app_pred app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'.
   Proof.

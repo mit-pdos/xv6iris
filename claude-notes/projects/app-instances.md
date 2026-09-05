@@ -292,6 +292,51 @@ Rounds, each a green gate:
   half; `app_dur` beside `P_fs_named` in the slot; the second commit law;
   the later-shaped transport; the clone; the boot founds `app_inv` from
   the lend; era 0 from `app_init`.  Deletes `app_lend`/`Hlend`/`Happ_boot`.
+  Launched 2026-09-05 with two refinements measured against the tree:
+  (i) `FsCrash.fs_crash_seam cov ls` keeps its arity and becomes the seam
+  of the composite `∃ gt, P_fs_any_at gt cov ls ∗ app_guest gt` — its 60
+  carriers never unfold it, so only FsCrash's own permits change; the
+  composite is not timeless, so a permit strips the later off the FS half
+  only and frames `▷ app_guest gt` opaquely, and `fs_rec_permit` carries
+  the guest with `gt' := gt` at every non-commit write.  (ii) The
+  transport yields `▷ A`, so the durable guest is produced UNDER A LATER:
+  `dur_pair D := ∃ gt, P_dur_at gt D ∗ ▷ app_guest gt` is what
+  `snap_law_out` hands the commit permit; the running claim in `app_body`
+  stays later-free because `inv_alloc` takes `▷ P`.
+  MEASURED 2026-09-05 (the lane stopped before editing): (a) the crash
+  slot must name the application's FIXED part, but the machine allocates
+  the client counter AFTER `HPc` and `Pc` takes only the four machine
+  names — so ruling 1's birth step is pulled FORWARD as round D0 (below)
+  and C lands on top of it; (b) an ambient-`appcfg` `snap_law_out` would
+  drag the record into 17 WAL files below `fileG`, so the seam and the
+  law are indexed by an OPAQUE guest `G : gname -> iProp`:
+  `fs_crash_seam cov ls := ∃ G, fs_crash_seam_at G cov ls` (arity kept,
+  the 60 carriers untouched), `snap_law := ∃ N G, … ∗ fs_crash_seam_at G
+  cov ls ∗ snap_law_at … N G` so the committer reads seam and epoch off
+  one handle, and only `FsCollectAll.fs_snap_law_build` (at `G :=
+  app_guest`) and adequacy know what `G` is.  Ruling 7's "machine layer
+  untouched" was the proposal's wording, not a ruling; ruling 1 already
+  commits the machine record to the client `Type`.
+- **D0 — the birth step, machine half (pulled ahead of C).**  The fixed
+  record carries `riscv_client_T : Type; riscv_client : riscv_client_T`
+  in place of the mono-nat name; `riscv_power_adequacy` takes `(CT :
+  Type) (Cl : CT -> iProp Σ) (Hbirth : ⊢ |==> ∃ c, Cl c)`, runs the birth
+  BEFORE `HPc`, and states `Pc`/`Pt`/`Rb`/`Hswap`/`Hobs`/`Hphi` at `c`;
+  `client_auth`/`client_lb` leave the machine (the taint counter becomes
+  the echo application's fixed part).  The era's `appcfg` carries the
+  fixed value APPLIED: `app_pred : app_names -> aview -> iProp Σ`, built
+  by the boot as `app_pred A riscv_client`; `xv6_app` gains `app_fixed :
+  Type` and `app_cl`.  LANDED 2026-09-05 (10 files, first build green,
+  audit 13 axioms).  As built: the lend BELOW the power theorem is
+  already applied (`power_boot_res … (Rb : (Z -> bv 8) -> iProp)`,
+  `xv6_boot_era … (Rl : (Z -> bv 8) -> iProp)`), and `Hboot`'s shape
+  witnesses are quantified OUTSIDE the record equation (`∀ … (c : CT), F
+  = boot_fixedGS … CT c -> …`) because at an arbitrary `F` the record's
+  client type is not `CT`, so only `Rb c` can be stated there; for the
+  same reason `xv6_app_adequacy`'s `Htx`/`Hrx` quantify over `c :
+  app_fixed A`.  `obs_ledger_at_alloc_cl R γ P : (P ⊢ |==> R []) -> …` is
+  the one birth lemma.  The fire/AU files never named the fixed part
+  (`app_step` is applied), so the sweep touched only the named files.
 - **D — the birth step.**  The machine record's client `Type`, the
   application's fixed names; the taint counter becomes the echo
   application's fixed part.

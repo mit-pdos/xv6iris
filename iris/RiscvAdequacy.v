@@ -485,8 +485,12 @@ Section power.
          The PowerOn arm is the ONE point that holds both, so a resource
          the boot is LENT out of the crash predicate has to cross here.
          No FS constant appears -- [Rb] is exactly as abstract as [Mof]
-         already is, and this layer never looks inside it. *)
-      (Rb : gname -> (Z -> bv 8) -> iProp Σ)
+         already is, and this layer never looks inside it.  ALREADY AT THE
+         APPLICATION'S FIXED PART (app-instances.md §6 ruling 1, round D0):
+         [riscv_power_adequacy] applies its [Rb : CT -> ...] to the value
+         its birth step produced, so below it the lend is a constant of the
+         run and nobody here names the fixed part. *)
+      (Rb : (Z -> bv 8) -> iProp Σ)
       (g' : gstate) : iProp Σ :=
     (([∗ list] c ∈ enum CPU, [∗ set] r ∈ D c,
         ghost_map_elem (era_reg_name HE c) r (DfracOwn 1)
@@ -561,7 +565,7 @@ Section power.
         because [BootShared.power_boot_res_unpack] spells the last three as
         the single bundle [gen_cert]: appending after that bundle would
         re-associate it, and the unpack must stay pure conversion. *)
-     Rb riscv_client_name (v_disk (g'.(gdev).(dvirtio))) ∗
+     Rb (v_disk (g'.(gdev).(dvirtio))) ∗
      (* the crash-spanning invariant: FIXED-layer, so every boot gets the
         SAME one -- which is the whole point (the durability property is what
         survives the power cycle).  The boot client threads it to
@@ -603,10 +607,10 @@ Section power.
   Lemma power_boot_res_lend (HE : riscvEraGS) (gen : nat)
       (D : CPU -> gset register) (nproc ndisk : nat)
       (Mof : (Z -> bv 8) -> log_mirror)
-      (Rb : gname -> (Z -> bv 8) -> iProp Σ) (g' : gstate) :
+      (Rb : (Z -> bv 8) -> iProp Σ) (g' : gstate) :
     power_boot_res HE gen D nproc ndisk Mof Rb g' ⊢
-      Rb riscv_client_name (v_disk (g'.(gdev).(dvirtio))) ∗
-      power_boot_res HE gen D nproc ndisk Mof (fun _ _ => emp)%I g'.
+      Rb (v_disk (g'.(gdev).(dvirtio))) ∗
+      power_boot_res HE gen D nproc ndisk Mof (fun _ => emp)%I g'.
   Proof.
     rewrite /power_boot_res.
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12 &
@@ -662,7 +666,7 @@ Section power.
       (* the client's picture of a disk image (see [power_boot_res]) *)
       (Mof : (Z -> bv 8) -> log_mirror)
       (* ...and the resource it is lent beside it (see [power_boot_res]) *)
-      (Rb : gname -> (Z -> bv 8) -> iProp Σ)
+      (Rb : (Z -> bv 8) -> iProp Σ)
       (* THE CUSTODY HOOK (durable-disk 1a), the second client hook and the
          reason the era's mirror can be BORN TRUE.  A born-true value alone
          is not enough: a later WAL permit's disk image is ∀-bound, so the
@@ -695,14 +699,14 @@ Section power.
                 ghost_var (era_mirror_name HE) (1/2) (Mof dk) ∗
                 swap_lb (S gen) ∗
                 (* ...AND THE CLIENT'S LENT RESOURCE (durable-disk BT-1),
-                   at the client phase counter's name (applications.md
-                   §3: the boot's lend may mention the taint).
+                   already at the application's fixed part (see
+                   [power_boot_res]).
                    This hook already runs with [crashN] open and the fixed
                    auth in hand, and it is a plain [==∗], which is all a
                    transport needs; so it is where a resource comes OUT of
                    the crash predicate, not just where the mirror's other
                    half goes in. *)
-                Rb riscv_client_name dk))
+                Rb dk))
       (* THE TRACE HOOK (claude-notes/projects/uart-trace.md).  Both power
          arms are OBSERVED (RiscvLang §3b'), and the history ghost can only
          move with the client's half, which lives in its trace predicate --
@@ -1101,9 +1105,10 @@ Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
     (* the trace layer (uart-trace.md): the history ghost's name, the run's
        whole trace, and the client's trace predicate *)
     (γobs : gname) (T : list mobs) (Ptp : iProp Σ)
-    (* the client phase counter's name (applications.md §1), allocated by
-       [riscv_power_adequacy] beside the history ghost *)
-    (γcl : gname)
+    (* the application's FIXED PART (app-instances.md §6 ruling 1): its
+       type and the one value [riscv_power_adequacy]'s birth step produced,
+       before the crash slot *)
+    (CT : Type) (c : CT)
   : riscvFixedGS Σ :=
   (* A6.71: TWO MORE ANONYMOUS SLOTS than main had.  [riscvFixedGS] gained
      [riscvF_kptbGS] (A6.53's pin bound, between [riscvF_kptGS] and
@@ -1112,7 +1117,7 @@ Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
      runs of underscores are one longer each; the trace fields at the end
      are main's.  All resolve from [riscvGpreS]. *)
   RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
-    _ _ _ γdisk ndisk Pcp γswap _ γobs T Ptp γcl.
+    _ _ _ γdisk ndisk Pcp γswap _ γobs T Ptp CT c.
 
 (* ---------------------------------------------------------------------- *)
 (* THE TRACE HOOK'S HELPERS -- ONE PER CONJUNCT OF [state_interp].          *)
@@ -1166,28 +1171,28 @@ Proof. iIntros "(_ & _ & Htie & _)". iExact "Htie". Qed.
    obligation.  The auth is borrowed and returned inside [Hproj]; here it is
    simply dropped, because at the end of the trace nothing is owed. *)
 Lemma disk_proj_trace {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
-    (ndisk : nat)
-    (Pc : gname -> gname -> gname -> gname -> iProp Σ)
+    (ndisk : nat) (CT : Type)
+    (Pc : gname -> gname -> gname -> gname -> CT -> iProp Σ)
     (Ppure : (Z -> bv 8) -> Prop)
-    (Hproj : forall (γdisk γsw γreg γst : gname)
+    (Hproj : forall (γdisk γsw γreg γst : gname) (c : CT)
                     (dk : Z -> bv 8),
        ⊢ disk_img_auth_sized γdisk ndisk dk -∗
-         ▷ Pc γdisk γsw γreg γst -∗
+         ▷ Pc γdisk γsw γreg γst c -∗
          ◇ (disk_img_auth_sized γdisk ndisk dk ∗
-            ▷ Pc γdisk γsw γreg γst ∗ ⌜Ppure dk⌝))
+            ▷ Pc γdisk γsw γreg γst c ∗ ⌜Ppure dk⌝))
     (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap : gname)
-    (γobs : gname) (T : list mobs) (Ptp : iProp Σ) (γcl : gname)
+    (γobs : gname) (T : list mobs) (Ptp : iProp Σ) (c : CT)
     (g' : gstate) :
   ⊢ @power_interp Σ
        (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-          (Pc γdisk γswap γreg γstart) γobs T Ptp γcl) g' -∗
-    ▷ Pc γdisk γswap γreg γstart -∗
+          (Pc γdisk γswap γreg γstart c) γobs T Ptp CT c) g' -∗
+    ▷ Pc γdisk γswap γreg γstart c -∗
     ◇ ⌜Ppure (v_disk (dvirtio (gdev g')))⌝.
 Proof.
   iIntros "Hsi HP".
   iDestruct (power_interp_disk_auth with "Hsi") as "Htie".
   rewrite /disk_fixed_auth /=.
-  iDestruct (Hproj γdisk γswap γreg γstart
+  iDestruct (Hproj γdisk γswap γreg γstart c
                (v_disk (dvirtio (gdev g'))) with "Htie HP")
     as ">(_ & _ & %Hp)".
   iModIntro. iPureIntro. exact Hp.
@@ -1255,11 +1260,12 @@ Lemma obs_pred_at_alloc {Σ : gFunctors} `{!riscvGpreS Σ} (γ : gname) :
 Proof. iIntros "H". iModIntro. iExists []. iExact "H". Qed.
 
 (* ...and the same birth at the shape [riscv_power_adequacy] asks for: the
-   client phase counter arrives beside the history's half and a client that
-   states no trace property drops it (applications.md §1). *)
-Lemma obs_pred_at_alloc_cl {Σ : gFunctors} `{!riscvGpreS Σ} (γ γcl : gname) :
-  mono_nat_auth_own γcl 1 0%nat ∗ ghost_var γ (1/2) ([] : list mobs)
-    ⊢ |==> obs_pred_at γ.
+   application's fixed part arrives beside the history's half
+   (app-instances.md §6 ruling 1) and a client that states no trace
+   property drops it. *)
+Lemma obs_pred_at_alloc_cl {Σ : gFunctors} `{!riscvGpreS Σ} {CT : Type}
+    (Cl : CT -> iProp Σ) (γ : gname) (c : CT) :
+  Cl c ∗ ghost_var γ (1/2) ([] : list mobs) ⊢ |==> obs_pred_at γ.
 Proof. iIntros "[_ H]". iApply (obs_pred_at_alloc with "H"). Qed.
 
 Lemma obs_pred_at_step {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ} (ndisk : nat)
@@ -1301,21 +1307,16 @@ Proof.
   intros HR0. iIntros "H". iMod HR0 as "HR". iModIntro. iExists []. iFrame.
 Qed.
 
+(* ...and the birth at the shape [riscv_power_adequacy] asks for: the
+   ledger is born beside an ARBITRARY birth resource [P] -- what the
+   application's birth step yielded (app-instances.md §6 ruling 1; the
+   echo application's is its taint counter at 0) -- and the application's
+   [R []] is built from it, so the ledger owns it from the first instant.
+   A client with nothing to keep passes [P := True] and drops it. *)
 Lemma obs_ledger_at_alloc_cl {Σ : gFunctors} `{!riscvGpreS Σ}
-    (R : list mobs -> iProp Σ) (γ γcl : gname) :
-  (⊢ |==> R []) ->
-  mono_nat_auth_own γcl 1 0%nat ∗ ghost_var γ (1/2) ([] : list mobs)
-    ⊢ |==> obs_ledger_at R γ.
-Proof. intros HR0. iIntros "[_ H]". iApply (obs_ledger_at_alloc R γ HR0 with "H"). Qed.
-
-(* ...and the birth of a ledger that KEEPS the client phase counter
-   (applications.md §4): the application's [R []] is built from the auth at
-   0, so the ledger owns the counter from the first instant. *)
-Lemma obs_ledger_at_alloc_client {Σ : gFunctors} `{!riscvGpreS Σ}
-    (R : list mobs -> iProp Σ) (γ γcl : gname) :
-  (mono_nat_auth_own γcl 1 0%nat ⊢ |==> R []) ->
-  mono_nat_auth_own γcl 1 0%nat ∗ ghost_var γ (1/2) ([] : list mobs)
-    ⊢ |==> obs_ledger_at R γ.
+    (R : list mobs -> iProp Σ) (γ : gname) (P : iProp Σ) :
+  (P ⊢ |==> R []) ->
+  P ∗ ghost_var γ (1/2) ([] : list mobs) ⊢ |==> obs_ledger_at R γ.
 Proof.
   intros HR0. iIntros "[Hc H]". iMod (HR0 with "Hc") as "HR".
   iModIntro. iExists []. iFrame.
@@ -1362,23 +1363,34 @@ Qed.
    and device steps is reducible. *)
 Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
     (D : CPU -> gset register) (nproc ndisk : nat) (g : gstate)
+    (* THE APPLICATION'S BIRTH STEP (app-instances.md §6 ruling 1, round
+       D0): the type of its FIXED PART, what the birth yields about a value
+       of it, and the birth itself -- a basic update producing ONE value,
+       run FIRST by this proof, before the crash slot is allocated, so that
+       the crash predicate and the trace slot can both NAME the value.  The
+       value rides the fixed record ([riscv_client_T]/[riscv_client]) and
+       every era can name it; the machine never reads it.  A client with
+       no fixed part takes [CT := unit], [Cl := fun _ => True]. *)
+    (CT : Type) (Cl : CT -> iProp Σ)
+    (Hbirth : ⊢ |==> ∃ c : CT, Cl c)
     (* the crash predicate (see [riscv_system_adequacy]): allocated ONCE, into
        the fixed layer, so the SAME [crash_inv] is handed to every boot --
        which is what makes a durability property span power cycles.  Taken
        before [Hboot] so the [crash_inv] inside [power_boot_res] is this
        one.  Its four gnames are the durable disk's, the swap counter's,
-       the generation registry's and the started counter's. *)
-    (Pc : gname -> gname -> gname -> gname -> iProp Σ)
+       the generation registry's and the started counter's; its fifth
+       argument is the application's fixed part, so the slot CAN name it. *)
+    (Pc : gname -> gname -> gname -> gname -> CT -> iProp Σ)
     (* ...ESTABLISHED ONCE, at the initial disk, from the durable disk's full
        fragments and the swap counter: the ONLY place the initial image is
        ever named.  From here on [Pc] is the loop invariant across eras --
        every PowerOn boots into a disk the predicate describes, and it
        describes it through the fragments it owns (design/crash.md, "The
        durable disk"). *)
-    (HPc : forall γdisk γsw γreg γst : gname,
+    (HPc : forall (γdisk γsw γreg γst : gname) (c : CT),
        disk_img_bytes γdisk 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
        mono_nat_auth_own γsw 1 0%nat ⊢
-         |==> Pc γdisk γsw γreg γst)
+         |==> Pc γdisk γsw γreg γst c)
     (* THE PURE PROJECTION HOOK (stage H0, claude-notes/projects/
        durable-disk.md).  [Ppure] is a client-chosen pure consequence of [Pc]
        AT THE MACHINE'S OWN DISK IMAGE, and [Hproj] is its proof -- stated,
@@ -1392,12 +1404,12 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        result to [Hboot] below: a boot LEARNS this about the disk it boots
        on, rather than assuming it. *)
     (Ppure : (Z -> bv 8) -> Prop)
-    (Hproj : forall (γdisk γsw γreg γst : gname)
+    (Hproj : forall (γdisk γsw γreg γst : gname) (c : CT)
                     (dk : Z -> bv 8),
        ⊢ disk_img_auth_sized γdisk ndisk dk -∗
-         ▷ Pc γdisk γsw γreg γst -∗
+         ▷ Pc γdisk γsw γreg γst c -∗
          ◇ (disk_img_auth_sized γdisk ndisk dk ∗
-            ▷ Pc γdisk γsw γreg γst ∗ ⌜Ppure dk⌝))
+            ▷ Pc γdisk γsw γreg γst c ∗ ⌜Ppure dk⌝))
     (* THE CUSTODY HOOK (durable-disk 1a), stated at the same raw gnames as
        [Hproj] and for the same reason.  [Mof] is the client's picture of a
        disk image; the era's mirror variable is allocated at [Mof] of the
@@ -1413,8 +1425,8 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        produces it out of [Pc] and [power_boot_res] delivers it to [Hboot];
        this layer never looks inside it.  A client with nothing to lend
        instantiates it at [emp]. *)
-    (Rb : gname -> (Z -> bv 8) -> iProp Σ)
-    (Hswap : forall (γdisk γsw γreg γst γcl : gname)
+    (Rb : CT -> (Z -> bv 8) -> iProp Σ)
+    (Hswap : forall (γdisk γsw γreg γst : gname) (c : CT)
                     (E : riscvEraGS)
                     (gen : nat) (dk : Z -> bv 8),
        ⊢ gen ↪[γreg]□ E -∗
@@ -1422,15 +1434,15 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
          mono_nat_auth_own γst 1 (gen + 1)%nat -∗
          disk_img_auth_sized γdisk ndisk dk -∗
          ghost_var (era_mirror_name E) 1 (Mof dk) -∗
-         ▷ Pc γdisk γsw γreg γst ==∗
+         ▷ Pc γdisk γsw γreg γst c ==∗
            ◇ (mono_nat_auth_own γst 1 (gen + 1)%nat ∗
               disk_img_auth_sized γdisk ndisk dk ∗
-              ▷ Pc γdisk γsw γreg γst ∗
+              ▷ Pc γdisk γsw γreg γst c ∗
               ghost_var (era_mirror_name E) (1/2) (Mof dk) ∗
               mono_nat_lb_own γsw (S gen) ∗
               (* ...and the client's lent resource (durable-disk BT-1), at
-                 the client phase counter's name (applications.md §3) *)
-              Rb γcl dk))
+                 the application's fixed part (app-instances.md §6) *)
+              Rb c dk))
     (* THE TRACE PREDICATE (claude-notes/projects/uart-trace.md): the SECOND
        fixed-layer named slot, beside the crash predicate and for a
        different job.  The crash predicate is the file system's durable
@@ -1442,13 +1454,14 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        the UART thread's tx/rx arms through [WpUart.uart_obs_permit], the
        power arms through [Hobs] below.  Stated at the raw gname for the
        same reason as [Pc].  Born holding the empty history ([HPt]). *)
-    (Pt : gname -> gname -> iProp Σ)
-    (* ...born holding the empty history AND the client phase counter at 0
-       (applications.md §1): the counter is allocated here, beside the
-       history ghost, and the trace slot is its owner from birth. *)
-    (HPt : forall γobs γcl : gname,
-       mono_nat_auth_own γcl 1 0%nat ∗ ghost_var γobs (1/2) ([] : list mobs)
-         ⊢ |==> Pt γobs γcl)
+    (Pt : gname -> CT -> iProp Σ)
+    (* ...born holding the empty history AND what the application's birth
+       step yielded (app-instances.md §6 ruling 1): the birth ran first,
+       and the trace slot is the owner of its yield from the slot's own
+       birth. *)
+    (HPt : forall (γobs : gname) (c : CT),
+       Cl c ∗ ghost_var γobs (1/2) ([] : list mobs)
+         ⊢ |==> Pt γobs c)
     (* THE POWER HOOK: a power event is observed, and the client moves its
        half of the history by it, knowing the shape of the history so far
        (the power is [on]).  The durable disk's auth is LENT beside it, as
@@ -1456,12 +1469,12 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        ERA-LOCAL facts through the durable disk reads the disk at exactly
        these two points.  A basic update under a [◇], for [Hswap]'s
        reasons. *)
-    (Hobs : forall (γdisk γobs γcl : gname) (h : list mobs) (on : bool)
+    (Hobs : forall (γdisk γobs : gname) (c : CT) (h : list mobs) (on : bool)
                    (dk : Z -> bv 8),
        trace_shape h on ->
-       ⊢ disk_img_auth_sized γdisk ndisk dk -∗ ▷ Pt γobs γcl -∗
+       ⊢ disk_img_auth_sized γdisk ndisk dk -∗ ▷ Pt γobs c -∗
          ghost_var γobs (1/2) h ==∗
-           ◇ (disk_img_auth_sized γdisk ndisk dk ∗ ▷ Pt γobs γcl ∗
+           ◇ (disk_img_auth_sized γdisk ndisk dk ∗ ▷ Pt γobs c ∗
               ghost_var γobs (1/2)
                 (h ++ [if on then ObsPowerOff else ObsPowerOn])%list))
     (* THE TRACE INVARIANT (the strengthening of this theorem's conclusion).
@@ -1508,13 +1521,13 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        trace, which is what the conclusion says. *)
     (phi : gstate -> list mobs -> Prop)
     (Hphi : forall (Hinv : invGS Σ)
-                   (γgen γstart γreg γdisk γswap γobs γcl : gname)
+                   (γgen γstart γreg γdisk γswap γobs : gname) (c : CT)
                    (T : list mobs) (g' : gstate) (h : list mobs),
        ⊢ @power_interp Σ
             (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-               (Pc γdisk γswap γreg γstart) γobs T (Pt γobs γcl) γcl) g' -∗
+               (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) CT c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
-         ▷ Pc γdisk γswap γreg γstart -∗ ▷ Pt γobs γcl -∗
+         ▷ Pc γdisk γswap γreg γstart c -∗ ▷ Pt γobs c -∗
          ◇ ⌜phi g' h⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (* the client boots ANY era over ANY machine of the reset shape; what it
@@ -1545,12 +1558,19 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
           shape over says it once, and every projection then reduces.
 
           It costs the client nothing ([eq_refl] here) and it does not
-          weaken the obligation: [boot_fixedGS] IS what this proof builds. *)
-       (exists (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap γobs γcl : gname)
-               (T : list mobs),
-          F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-                (Pc γdisk γswap γreg γstart) γobs T (Pt γobs γcl) γcl) ->
-       ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
+          weaken the obligation: [boot_fixedGS] IS what this proof builds.
+
+          THE SHAPE'S COMPONENTS ARE QUANTIFIED OUTSIDE (round D0), not
+          existentially inside the equation: the lend is [Rb] at the
+          application's fixed part [c], and [power_boot_res] below carries
+          it ALREADY APPLIED ([Rb c]) -- at an arbitrary [F] the record's
+          client type is not [CT], so the applied form is the only one
+          that can be stated there. *)
+       forall (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap γobs : gname)
+              (c : CT) (T : list mobs),
+       F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
+             (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) CT c ->
+       ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof (Rb c) g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
           WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
@@ -1596,9 +1616,13 @@ Proof.
      the auth goes into the crash invariant beside the client's predicate --
      a fixed-layer invariant never dies, so it never strands. *)
   iMod (mono_nat_own_alloc 0%nat) as (γswap) "[Hswap _]".
-  iMod (HPc γfdisk γswap γreg γstart
+  (* THE APPLICATION'S BIRTH STEP (app-instances.md §6 ruling 1), FIRST:
+     the fixed part's one value exists before the crash slot is allocated,
+     so the slot can name it; its yield goes to the trace slot below. *)
+  iMod Hbirth as (c) "Hcl".
+  iMod (HPc γfdisk γswap γreg γstart c
           with "[$Hfdfrags $Hswap]") as "HPc0".
-  iMod (inv_alloc crashN ⊤ (Pc γfdisk γswap γreg γstart) with "HPc0")
+  iMod (inv_alloc crashN ⊤ (Pc γfdisk γswap γreg γstart c) with "HPc0")
     as "#Hcinv".
   (* THE HISTORY GHOST, at the EMPTY history: the machine's half goes into
      [state_interp]'s trace conjunct, the client's into its trace predicate,
@@ -1606,22 +1630,21 @@ Proof.
   iMod (ghost_var_alloc ([] : list mobs)) as (γobs) "Hob".
   iEval (rewrite -Qp.half_half) in "Hob".
   iDestruct (ghost_var_split with "Hob") as "[HobA HobF]".
-  (* THE CLIENT PHASE COUNTER (applications.md §1), at 0, into the client's
-     trace predicate beside its half of the history *)
-  iMod (mono_nat_own_alloc 0%nat) as (γcl) "[Hcl _]".
-  iMod (HPt γobs γcl with "[$Hcl $HobF]") as "HPt0".
-  iMod (inv_alloc obsN ⊤ (Pt γobs γcl) with "HPt0") as "#Hoinv".
+  (* the birth step's yield, into the client's trace predicate beside its
+     half of the history *)
+  iMod (HPt γobs c with "[$Hcl $HobF]") as "HPt0".
+  iMod (inv_alloc obsN ⊤ (Pt γobs c) with "HPt0") as "#Hoinv".
   (* no disk image map is allocated here: the machine starts POWERED OFF, so
      there is no era, hence no image conjunct in [state_interp].  The first
      boot mints the first one ([wp_power_loop]'s PowerOn arm). *)
   (* the run's whole trace [κs] is a FIELD of the fixed record: that is what
      lets [state_interp] tie the history so far to the future *)
   set (F := boot_fixedGS Hinv γgen γstart γreg γfdisk ndisk γswap
-              (Pc γfdisk γswap γreg γstart) γobs κs (Pt γobs γcl) γcl).
+              (Pc γfdisk γswap γreg γstart c) γobs κs (Pt γobs c) CT c).
   (* the client's trace hook at the gnames just allocated.  [F] is a local
      DEFINITION, so this statement and the one the final observation below
      faces are convertible. *)
-  pose proof (Hphi Hinv γgen γstart γreg γfdisk γswap γobs γcl κs) as Hph.
+  pose proof (Hphi Hinv γgen γstart γreg γfdisk γswap γobs c κs) as Hph.
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (κs' : list mobs) (_ : nat) =>
@@ -1649,17 +1672,15 @@ Proof.
     iExact "HobA". }
   iSplitL.
   { cbn. iSplitL; [|done].
-    assert (Hshape : exists (Hi : invGS Σ) (γg γs γr γd γsw γob γc : gname)
-                            (T : list mobs),
-              F = boot_fixedGS Hi γg γs γr γd ndisk γsw
-                    (Pc γd γsw γr γs) γob T (Pt γob γc) γc)
-      by (exists Hinv, γgen, γstart, γreg, γfdisk, γswap, γobs, γcl, κs;
-          reflexivity).
+    (* the shape [Hboot] is handed is [F]'s own definition: [F] is a local
+       DEFINITION, so [eq_refl] is the proof *)
     iApply (@wp_power_loop Σ F _ D nproc ndisk Ppure
-              (Hproj γfdisk γswap γreg γstart)
-              Mof Rb (Hswap γfdisk γswap γreg γstart γcl)
-              (Hobs γfdisk γobs γcl)
-              (fun HE gen g' Hbf Hp => Hboot F HE gen g' Hbf Hp Hshape)
+              (Hproj γfdisk γswap γreg γstart c)
+              Mof (Rb c) (Hswap γfdisk γswap γreg γstart c)
+              (Hobs γfdisk γobs c)
+              (fun HE gen g' Hbf Hp =>
+                 Hboot F HE gen g' Hbf Hp Hinv γgen γstart γreg γfdisk γswap
+                   γobs c κs eq_refl)
               with "Hcinv Hoinv"). }
   (* THE FINAL OBSERVATION, AND IT IS NOW TWO FACTS.
 
@@ -1699,6 +1720,8 @@ Qed.
 (* gets [P] OF THE RUN'S OBSERVABLE TRACE.  [phi] is folded into [P]: a      *)
 (* client wanting a state fact beside it uses [riscv_power_adequacy].       *)
 (* ---------------------------------------------------------------------- *)
+(* ...AT NO FIXED PART: the generic instance of the birth step is
+   [CT := unit], [Cl := fun _ => True], so nothing here is indexed by it. *)
 Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
     (D : CPU -> gset register) (nproc ndisk : nat) (g : gstate)
     (Pc : gname -> gname -> gname -> gname -> iProp Σ)
@@ -1714,8 +1737,8 @@ Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
          ◇ (disk_img_auth_sized γdisk ndisk dk ∗
             ▷ Pc γdisk γsw γreg γst ∗ ⌜Ppure dk⌝))
     (Mof : (Z -> bv 8) -> log_mirror)
-    (Rb : gname -> (Z -> bv 8) -> iProp Σ)
-    (Hswap : forall (γdisk γsw γreg γst γcl : gname)
+    (Rb : (Z -> bv 8) -> iProp Σ)
+    (Hswap : forall (γdisk γsw γreg γst : gname)
                     (E : riscvEraGS)
                     (gen : nat) (dk : Z -> bv 8),
        ⊢ gen ↪[γreg]□ E -∗
@@ -1729,7 +1752,7 @@ Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
               ▷ Pc γdisk γsw γreg γst ∗
               ghost_var (era_mirror_name E) (1/2) (Mof dk) ∗
               mono_nat_lb_own γsw (S gen) ∗
-              Rb γcl dk))
+              Rb dk))
     (* THE CLIENT'S TRACE RESOURCE, its birth, its power step, and its pure
        reading (uart-trace.md).  The UART-arm steps are the two wands of
        [WpUart.uart_obs_permit_ledger], which the boot ([Hboot]) runs. *)
@@ -1744,10 +1767,10 @@ Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
                     (g' : gstate),
        boot_facts g' ->
        Ppure (v_disk (g'.(gdev).(dvirtio))) ->
-       (exists (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap γobs γcl : gname)
-               (T : list mobs),
-          F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-                (Pc γdisk γswap γreg γstart) γobs T (obs_ledger_at R γobs) γcl) ->
+       forall (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap γobs : gname)
+              (c : unit) (T : list mobs),
+       F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
+             (Pc γdisk γswap γreg γstart) γobs T (obs_ledger_at R γobs) unit c ->
        ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
@@ -1758,12 +1781,18 @@ Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
     nsteps n ([PowerLoopE : expr riscv_lang], g) κs (t2, g2) ->
     (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ P κs.
 Proof.
-  apply (riscv_power_adequacy Σ D nproc ndisk g Pc HPc Ppure Hproj Mof Rb Hswap
+  apply (riscv_power_adequacy Σ D nproc ndisk g
+           unit (fun _ => True%I) ltac:(iModIntro; iExists (); iPureIntro; exact Logic.I)
+           (fun γdisk γsw γreg γst _ => Pc γdisk γsw γreg γst)
+           (fun γdisk γsw γreg γst _ => HPc γdisk γsw γreg γst)
+           Ppure (fun γdisk γsw γreg γst _ => Hproj γdisk γsw γreg γst)
+           Mof (fun _ => Rb) (fun γdisk γsw γreg γst _ => Hswap γdisk γsw γreg γst)
            (fun γobs _ => obs_ledger_at R γobs)
-           (fun γobs γcl => obs_ledger_at_alloc_cl R γobs γcl HR0)
+           (fun γobs _ => obs_ledger_at_alloc_cl R γobs True%I
+                            ltac:(iIntros "_"; iMod HR0 as "HR"; by iModIntro))
            (fun γdisk γobs _ => obs_ledger_at_step ndisk R HRt Hpow γdisk γobs)
            (fun _ h => P h)
-           ltac:(intros Hinv γgen γstart γreg γdisk γswap γobs γcl T g' h;
+           ltac:(intros Hinv γgen γstart γreg γdisk γswap γobs c T g' h;
                  iIntros "_ Hauth _ _ HPt";
                  iApply (obs_ledger_at_phi R HRt P HR γobs h with "Hauth HPt"))
            Hgen0 Hpow0 Hboot).

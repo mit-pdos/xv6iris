@@ -12,25 +12,33 @@
                                    are a prefix of [echo_line]^*;
                                    decidable, prefix-closed, and unmoved
                                    by output bytes and power events;
-     the LEDGER [echo_R]        -- the client phase counter at 0 while the
-                                   input keeps the discipline and at 1
-                                   from the first byte that breaks it, so
-                                   [client_auth 0] IS "untainted";
+     the FIXED PART [echo_cl]   -- the taint counter's name, born once at
+                                   0 by [echo_birth] (app-instances.md
+                                   section 6 ruling 1, round D0: what used
+                                   to be the machine's client counter is
+                                   this application's own);
+     the LEDGER [echo_R]        -- that counter at 0 while the input keeps
+                                   the discipline and at 1 from the first
+                                   byte that breaks it, so the counter at
+                                   0 IS "untainted" and its lower bound at
+                                   1 is the taint;
      its four steps             -- birth, the power arm, the tx arm, the
-                                   rx arm ([echo_R_alloc], [echo_R_pow],
-                                   [echo_R_tx], [echo_R_rx]), each a basic
-                                   update over the ledger alone: the
-                                   theorem's wands frame the UART ghosts
-                                   around them;
+                                   rx arm ([echo_R_alloc] -- exactly the
+                                   theorem's [HR0], out of [echo_cl] --
+                                   [echo_R_pow], [echo_R_tx], [echo_R_rx]),
+                                   each a basic update over the ledger
+                                   alone: the theorem's wands frame the
+                                   UART ghosts around them;
      the PREDICATE [echo_fs]    -- the binaries are the image's: the era-0
                                    pins of /init and /sh
                                    ([FsInitPinBoot.era0_pins],
                                    [FsShPin.era0_sh_pins]) read on the
                                    abstract state's VIEW ([FsAbsDefs.aview],
                                    app-instances.md round A -- the
-                                   application's [app_pred], at any fixed
-                                   name and any instance; echo's own pin
-                                   is lane L6's, with its Uk-engine proof);
+                                   application's [app_pred], ignoring its
+                                   fixed part and its instance; echo's own
+                                   pin is lane L6's, with its Uk-engine
+                                   proof);
      the BOOT obligation AT ERA 0 -- the founded map satisfies [echo_fs]
                                    when the disk is the mkfs image
                                    ([echo_fs_era0]).
@@ -191,23 +199,43 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
-(*  2.  THE LEDGER: the client phase counter reads the discipline          *)
+(*  2.  THE FIXED PART AND THE LEDGER: the taint counter reads the         *)
+(*      discipline                                                         *)
 (* ====================================================================== *)
+
+(* THE FIXED PART'S TYPE (app-instances.md section 6 ruling 1): the taint
+   counter's ghost name.  The machine's record carries one value of it for
+   the whole run ([RiscvPtsto.riscv_client]), born by [echo_birth]. *)
+Definition echo_fixed : Type := gname.
 
 Section EchoLedger.
   Context `{!mono_natG Σ}.
+
+  (* what the birth step yields: the counter, whole, at 0 *)
+  Definition echo_cl (γ : echo_fixed) : iProp Σ :=
+    mono_nat_auth_own γ 1 0%nat.
+
+  (* THE BIRTH STEP: run first by the power theorem, before the crash slot,
+     so both the crash predicate and the ledger can name the counter *)
+  Lemma echo_birth : ⊢ |==> ∃ γ : echo_fixed, echo_cl γ.
+  Proof.
+    iMod (mono_nat_own_alloc 0%nat) as (γ) "[Ha _]".
+    iModIntro. iExists γ. iExact "Ha".
+  Qed.
 
   (* the counter's value at a history: 0 while disciplined, 1 after *)
   Definition echo_phase (h : list mobs) : nat :=
     if decide (disc h) then 0%nat else 1%nat.
 
-  Definition echo_R (γcl : gname) (h : list mobs) : iProp Σ :=
+  Definition echo_R (γcl : echo_fixed) (h : list mobs) : iProp Σ :=
     mono_nat_auth_own γcl 1 (echo_phase h).
 
   Global Instance echo_R_timeless γcl h : Timeless (echo_R γcl h).
   Proof. rewrite /echo_R. apply _. Qed.
 
-  (* "untainted" is the counter at 0: what the end of the trace reads *)
+  (* "untainted" is the counter at 0: what the end of the trace reads.  The
+     TAINT [mono_nat_lb_own γcl 1] is this application's own fact now (it
+     was the machine's [client_lb 1] before round D0). *)
   Lemma echo_R_untainted γcl h :
     disc h -> echo_R γcl h -∗ mono_nat_lb_own γcl 1 -∗ False.
   Proof.
@@ -215,11 +243,12 @@ Section EchoLedger.
     iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ Hle]. lia.
   Qed.
 
-  (* birth: the counter arrives at 0, and the empty history is disciplined *)
+  (* birth: the counter arrives at 0 out of the birth step's yield, and the
+     empty history is disciplined -- exactly [App.xv6_app_adequacy]'s [HR0] *)
   Lemma echo_R_alloc γcl :
-    mono_nat_auth_own γcl 1 0%nat ⊢ |==> echo_R γcl [].
+    echo_cl γcl ⊢ |==> echo_R γcl [].
   Proof.
-    iIntros "H". rewrite /echo_R /echo_phase decide_True; last exact disc_nil.
+    iIntros "H". rewrite /echo_cl /echo_R /echo_phase decide_True; last exact disc_nil.
     by iModIntro.
   Qed.
 

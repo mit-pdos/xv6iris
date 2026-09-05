@@ -862,7 +862,7 @@ Section SnapMint.
     (forall b : Z, 1 <= b < fs_data_start (fss_sb S) -> b ∈ cov) ->
     disk_bytes γv 0 (disk_read dk 0 ndisk) -∗
     bslots_auth -∗ bslots BSLOTS_FS -∗
-    @app_pred Σ APP riscv_client_name (@app_run Σ APP) (FsAbsDefs.abs_view (fss_inodes S)) -∗
+    @app_pred Σ APP (@app_run Σ APP) (FsAbsDefs.abs_view (fss_inodes S)) -∗
     app_auto (APP := APP) -∗
     (* ---- THE DURABLE SNAPSHOT, AS A RESOURCE, and it is the whole of the
        file system's side: the committed map IS what the machine would
