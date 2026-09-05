@@ -63,6 +63,8 @@ Require Import IcacheEscrow.
    [BitmapEnc] for the encoder the equation is stated over. *)
 Require Import BitmapInv.
 Require Import FsCfg.          (* the record this file finally gives a value *)
+Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ the application copy shadows *)
+Require Import FsAbsInv.       (* [fsabs_env]: kit 2's last row (applications.md section 2) *)
 Require Import Xv6G.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import TsoCtx.
@@ -305,8 +307,15 @@ Section FsCfgKits.
      (* ...AND THE WAL'S EXCEPTION HANDLE.  The era's mint hands the WAL the
         home blocks on which the byte view and the buffer cache disagree;
         fsinit threads it into [initlog], which empties it and seals it into
-        [LogInv.log_ctx].  LAST. *)
-     exc_own (fs_exc fsc_fs) Xexc)%I.
+        [LogInv.log_ctx]. *)
+     exc_own (fs_exc fsc_fs) Xexc ∗
+     (* THE APPLICATION'S ENVIRONMENT (claude-notes/design/applications.md
+        section 2): the client copy of the abstract state at the live Γ,
+        MINTED AT THE ERA MINT at the founded map, beside the application's
+        license.  Persistent; forkret's boot arm projects it into
+        [FirstTok.first_done] instead of minting a copy of its own.  LAST,
+        so the pass-through sites' patterns only grow at the end. *)
+     FsAbsInv.fsabs_env (FSC := FSC) (fs_gamma_L fsc_fs))%I.
 
   Lemma fs_kit_fsinit_ghost_open (ICFG : icfg) (FSC : fscfg)
       (P : Z -> list (bv 8)) (Rspent : gset Z)
@@ -329,7 +338,8 @@ Section FsCfgKits.
          fsblock (fs_bytes fsc_fs) b (Pb b)) ∗
       fs_bytes_inv (fs_bytes fsc_fs) (fs_cache fsc_fs) (fs_exc fsc_fs)
                    (fs_home_set fsc_cov fsc_logst) Pb ∗
-      exc_own (fs_exc fsc_fs) Xexc.
+      exc_own (fs_exc fsc_fs) Xexc ∗
+      FsAbsInv.fsabs_env (FSC := FSC) (fs_gamma_L fsc_fs).
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
@@ -458,10 +468,11 @@ Section FsCfgKits.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           Hbmres & Hrem & #Hbinv & Hxo)".
+           Hbmres & Hrem & #Hbinv & Hxo & #Henv)".
     iSplitR; [iExact "Hireg" |].
     rewrite /fs_kit_fsinit_ghost.
-    iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem Hbinv Hxo".
+    iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem Hbinv Hxo
+            Henv".
   Qed.
 
   (* ...and the same peel for the equally-persistent BITMAP row, so a
@@ -477,10 +488,11 @@ Section FsCfgKits.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           #Hbmres & Hrem & #Hbinv & Hxo)".
+           #Hbmres & Hrem & #Hbinv & Hxo & #Henv)".
     iSplitR; [iExact "Hbmres" |].
     rewrite /fs_kit_fsinit_ghost.
-    iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem Hbinv Hxo".
+    iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem Hbinv Hxo
+            Henv".
   Qed.
 
 End FsCfgKits.

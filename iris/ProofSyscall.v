@@ -4560,7 +4560,7 @@ Section SyscallArms.
     (* THE AU CONTRACT (lane C3), at the trivial bundle
        ([FsAbsInvFire.fsabs_chdir_pre]); the landed post is read back off
        the arms ([chdir_arms_landed]) and the tail below is the landed one. *)
-    iDestruct (syscall_env_fsabs with "Henvc") as (γa) "#Hfsabs".
+    iDestruct (syscall_env_fsabs with "Henvc") as (γa) "[#Hfsabs #Hlic]".
     iApply (SysChdirAU.wp_sys_chdir_au γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded v0 pid U M (av - 4)%nat true true ∅
@@ -4570,7 +4570,7 @@ Section SyscallArms.
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpanic Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hbmp Hisp Hbmr Hkalloc Hprocs Hirc Hpriv []").
-    { iApply (fsabs_chdir_pre with "Hfsabs"). }
+    { iApply (fsabs_chdir_pre with "Hfsabs Hlic"). }
     iIntros (CIDy Hsy mf P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ Hirc Harms".
     iDestruct (chdir_arms_landed with "Harms") as "Hpost".
@@ -4699,7 +4699,7 @@ Section SyscallArms.
     (* THE AU CONTRACT, at the trivial bundle ([FsAbsInvFire.fsabs_unlink_pre]);
        the landed return blanket is read back off the arms
        ([unlink_arms_ret]). *)
-    iDestruct (syscall_env_fsabs with "Henvc") as (γa) "#Hfsabs".
+    iDestruct (syscall_env_fsabs with "Henvc") as (γa) "[#Hfsabs #Hlic]".
     iApply (SysUnlink.wp_sys_unlink_au γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
               DfracDiscarded DfracDiscarded DfracDiscarded v0 pid U M
@@ -4713,7 +4713,7 @@ Section SyscallArms.
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hiru Hpriv []").
-    { iApply (fsabs_unlink_pre with "Hfsabs"). }
+    { iApply (fsabs_unlink_pre with "Hfsabs Hlic"). }
     iIntros (CIDy Hsy mf P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hiru Hpriv Harms".
     iDestruct (unlink_arms_ret with "Harms") as %Hrv.
@@ -5469,7 +5469,7 @@ Section SyscallArms.
        commits discharged out of the abstract-state invariant
        ([FsAbsInvFire.fsabs_mknod_pre_era]); the landed return blanket is
        read back off the arms ([mknod_arms_era_ret]). *)
-    iDestruct (syscall_env_fsabs with "Henvc") as (γa) "#Hfsabs".
+    iDestruct (syscall_env_fsabs with "Henvc") as (γa) "[#Hfsabs #Hlic]".
     iApply (SysMknod.wp_sys_mknod_au_era γf γs j γl
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) IREFSPARE
               DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
@@ -5482,7 +5482,7 @@ Section SyscallArms.
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv []").
-    { iApply (fsabs_mknod_pre_era with "Hfsabs"). }
+    { iApply (fsabs_mknod_pre_era with "Hfsabs Hlic"). }
     iIntros (CIDy Hsy mf ns' P')
       "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv Harms".
     iDestruct (mknod_arms_era_ret with "Harms") as %Hret0.
@@ -5603,7 +5603,7 @@ Section SyscallArms.
        bundle ([FsAbsInvFire.fsabs_open_pre_plain] / [_create]); the landed
        [sys_open_post] this arm consumes is read back off the arms
        ([open_arms_plain_landed] / [open_arms_create_landed]). *)
-    iDestruct (syscall_env_fsabs with "Henvc") as (γa) "#Hfsabs".
+    iDestruct (syscall_env_fsabs with "Henvc") as (γa) "[#Hfsabs #Hlic]".
     iAssert (wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (ns' : nat) (P' : uptd),
         ⌜callee_saved M mf⌝ -∗
@@ -5640,7 +5640,7 @@ Section SyscallArms.
                         Hseam Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2
                         Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
                         Hfd0 Hpriv Hufrag []").
-        { iApply (fsabs_open_pre_create with "Hfsabs"). }
+        { iApply (fsabs_open_pre_create with "Hfsabs Hlic"). }
         iIntros (CIDy Hsy mf ns' P')
           "%Hcs %Hextz Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
         iDestruct (open_arms_create_landed with "Harms") as "Hpost".
@@ -5660,7 +5660,7 @@ Section SyscallArms.
                         Hseam Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2
                         Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
                         Hfd0 Hpriv Hufrag []").
-        { iApply (fsabs_open_pre_plain with "Hfsabs"). }
+        { iApply (fsabs_open_pre_plain with "Hfsabs Hlic"). }
         iIntros (CIDy Hsy mf ns' P')
           "%Hcs %Hextz Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
         iDestruct (open_arms_plain_landed with "Harms") as "Hpost".

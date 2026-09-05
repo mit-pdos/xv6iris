@@ -24,7 +24,18 @@
 
    THE MASK.  Every commit is at [fsabsE] = [↑fsabsN] (FsAbsInv's note);
    [iInv fsabsN] inside a [={↑fsabsN}=∗] leaves the mask at [∅], which
-   is what the [FsAbs*Fire] lemmas fire the commit under. *)
+   is what the [FsAbs*Fire] lemmas fire the commit under.
+
+   THE LICENSE (claude-notes/design/applications.md section 2).  The body
+   carries the application conjunct [FsAbsInv.fsabs_ok] of the copy's
+   map, so overwriting the copy has to re-establish it at the new map.
+   Every discharger and every bundle below therefore takes, beside the
+   invariant, the application's LICENSE [FsAbsInv.fsabs_lic] -- the
+   persistent wand "the copy may be re-synced to any map" -- and pays
+   with it ([fsabs_set], through [fsabs_body_lic_set]).  Read-kind and
+   write-kind commits alike: all of them re-sync, and under the ruled
+   delta-free license that is exactly what is paid for.  The dispatcher
+   holds both out of [FirstTok.fsabs_env]. *)
 (* Require block: SpecSysOpenAU.v's, VERBATIM (durable-notes: trimmed imports
    have OOM'd the build, and a class name that is not in scope silently becomes
    a section VARIABLE), plus this file's own lines. *)
@@ -130,84 +141,85 @@ Section FsAbsInvFire.
   (*  2.  The commits, one lemma per shape                                *)
   (* ------------------------------------------------------------------ *)
 
-  (* the one ghost move, packaged: open, overwrite the copy, close *)
+  (* the one ghost move, packaged: open, overwrite the copy under the
+     license, close *)
   Lemma fsabs_set Γc (I : gmap Z fs_node) :
-    fsabs_inv Γc -∗ |={↑fsabsN}=> True.
+    fsabs_inv Γc -∗ fsabs_lic -∗ |={↑fsabsN}=> True.
   Proof.
-    iIntros "#Hinv". rewrite /fsabs_inv.
+    iIntros "#Hinv #Hlic". rewrite /fsabs_inv.
     iInv fsabsN as ">Hbody" "Hclose".
-    iMod (fsabs_body_set Γc I with "Hbody") as "Hbody".
+    iMod (fsabs_body_lic_set Γc I with "Hlic Hbody") as "Hbody".
     iMod ("Hclose" with "Hbody") as "_". done.
   Qed.
 
   Lemma fsabs_aopen Γ Γc :
-    fsabs_inv Γc -∗ aopen_commit_at Γ fsabsE (fun _ _ _ => True%I).
+    fsabs_inv Γc -∗ fsabs_lic -∗ aopen_commit_at Γ fsabsE (fun _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv". rewrite /aopen_commit_at /fsabsE.
+    iIntros "#Hinv #Hlic". rewrite /aopen_commit_at /fsabsE.
     iIntros (I i a) "%Hi Ha".
-    iMod (fsabs_set Γc I with "Hinv") as "_".
+    iMod (fsabs_set Γc I with "Hinv Hlic") as "_".
     iModIntro. by iFrame "Ha".
   Qed.
 
   Lemma fsabs_atrunc Γ Γc :
-    fsabs_inv Γc -∗ atrunc_commit_at Γ fsabsE (fun _ _ _ => True%I).
+    fsabs_inv Γc -∗ fsabs_lic -∗ atrunc_commit_at Γ fsabsE (fun _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv". rewrite /atrunc_commit_at /fsabsE.
+    iIntros "#Hinv #Hlic". rewrite /atrunc_commit_at /fsabsE.
     iIntros (I i bs0 nl) "%Hpre Ha".
-    iMod (fsabs_set Γc I with "Hinv") as "_".
+    iMod (fsabs_set Γc I with "Hinv Hlic") as "_".
     iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'".
-    iMod (fsabs_set Γc I' with "Hinv") as "_".
+    iMod (fsabs_set Γc I' with "Hinv Hlic") as "_".
     iModIntro. by iFrame "Ha'".
   Qed.
 
   Lemma fsabs_dlookup Γ Γc :
-    fsabs_inv Γc -∗ dlookup_commit_at Γ fsabsE (fun _ _ _ _ => True%I).
+    fsabs_inv Γc -∗ fsabs_lic -∗ dlookup_commit_at Γ fsabsE (fun _ _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv". rewrite /dlookup_commit_at /fsabsE.
+    iIntros "#Hinv #Hlic". rewrite /dlookup_commit_at /fsabsE.
     iIntros (I d i nm ents nl) "%Hd %Hnm Ha".
-    iMod (fsabs_set Γc I with "Hinv") as "_".
+    iMod (fsabs_set Γc I with "Hinv Hlic") as "_".
     iModIntro. by iFrame "Ha".
   Qed.
 
   Lemma fsabs_acre Γ Γc (c : absnode) :
-    fsabs_inv Γc -∗ acre_commit_at Γ fsabsE c (fun _ _ _ _ => True%I).
+    fsabs_inv Γc -∗ fsabs_lic -∗ acre_commit_at Γ fsabsE c (fun _ _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv". rewrite /acre_commit_at /fsabsE.
+    iIntros "#Hinv #Hlic". rewrite /acre_commit_at /fsabsE.
     iIntros (I d i nm ents nl) "%Hpre Ha".
-    iMod (fsabs_set Γc I with "Hinv") as "_".
+    iMod (fsabs_set Γc I with "Hinv Hlic") as "_".
     iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'".
-    iMod (fsabs_set Γc I' with "Hinv") as "_".
+    iMod (fsabs_set Γc I' with "Hinv Hlic") as "_".
     iModIntro. by iFrame "Ha'".
   Qed.
 
   Lemma fsabs_uent Γ Γc :
-    fsabs_inv Γc -∗ uent_commit_at Γ fsabsE (fun _ _ _ _ => True%I).
+    fsabs_inv Γc -∗ fsabs_lic -∗ uent_commit_at Γ fsabsE (fun _ _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv". rewrite /uent_commit_at /fsabsE.
+    iIntros "#Hinv #Hlic". rewrite /uent_commit_at /fsabsE.
     iIntros (I d t nm ents nl a) "%Hpre Ha".
-    iMod (fsabs_set Γc I with "Hinv") as "_".
+    iMod (fsabs_set Γc I with "Hinv Hlic") as "_".
     iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'".
-    iMod (fsabs_set Γc I' with "Hinv") as "_".
+    iMod (fsabs_set Γc I' with "Hinv Hlic") as "_".
     iModIntro. by iFrame "Ha'".
   Qed.
 
   Lemma fsabs_utgt Γ Γc :
-    fsabs_inv Γc -∗ utgt_commit_at Γ fsabsE (fun _ _ => True%I).
+    fsabs_inv Γc -∗ fsabs_lic -∗ utgt_commit_at Γ fsabsE (fun _ _ => True%I).
   Proof.
-    iIntros "#Hinv". rewrite /utgt_commit_at /fsabsE.
+    iIntros "#Hinv #Hlic". rewrite /utgt_commit_at /fsabsE.
     iIntros (I t a) "%Ht %Hnl Ha".
-    iMod (fsabs_set Γc I with "Hinv") as "_".
+    iMod (fsabs_set Γc I with "Hinv Hlic") as "_".
     iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'".
-    iMod (fsabs_set Γc I' with "Hinv") as "_".
+    iMod (fsabs_set Γc I' with "Hinv Hlic") as "_".
     iModIntro. by iFrame "Ha'".
   Qed.
 
   Lemma fsabs_dmiss Γ Γc :
-    fsabs_inv Γc -∗ dmiss_commit_at Γ fsabsE (fun _ _ _ => True%I).
+    fsabs_inv Γc -∗ fsabs_lic -∗ dmiss_commit_at Γ fsabsE (fun _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv". rewrite /dmiss_commit_at /fsabsE.
+    iIntros "#Hinv #Hlic". rewrite /dmiss_commit_at /fsabsE.
     iIntros (I d nm ents nl) "%Hd %Hnm Ha".
-    iMod (fsabs_set Γc I with "Hinv") as "_".
+    iMod (fsabs_set Γc I with "Hinv Hlic") as "_".
     iModIntro. by iFrame "Ha".
   Qed.
 
@@ -221,29 +233,29 @@ Section FsAbsInvFire.
   Proof. rewrite /fsabsE /fsabsN /foffN. solve_ndisj. Qed.
 
   Lemma fsabs_aread Γ Γc (i : Z) (γo : gname) :
-    fsabs_inv Γc -∗ off_user_inv γo -∗
+    fsabs_inv Γc -∗ fsabs_lic -∗ off_user_inv γo -∗
     aread_commit_at Γ fsabsE i γo (fun _ _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv #Hoinv". rewrite /aread_commit_at.
+    iIntros "#Hinv #Hlic #Hoinv". rewrite /aread_commit_at.
     iIntros (I off a d) "%Hpre Ha Hk".
-    iMod (fsabs_set Γc I with "Hinv") as "_".
+    iMod (fsabs_set Γc I with "Hinv Hlic") as "_".
     iMod (off_user_inv_move fsabsE γo _ (Z.of_nat (off + d)) foffN_fsabsE
             with "Hoinv Hk") as "Hk".
     iModIntro. by iFrame "Ha Hk".
   Qed.
 
   Lemma fsabs_awrite_chain Γ Γc (i : Z) (γo : gname) (k cnt : nat) :
-    fsabs_inv Γc -∗ off_user_inv γo -∗
+    fsabs_inv Γc -∗ fsabs_lic -∗ off_user_inv γo -∗
     awrite_chain Γ fsabsE i γo (fun _ _ _ _ => True%I) k cnt.
   Proof.
-    iIntros "#Hinv #Hoinv".
+    iIntros "#Hinv #Hlic #Hoinv".
     iInduction cnt as [| cnt] "IH" forall (k).
     { rewrite awrite_chain_0. done. }
     rewrite awrite_chain_S. iSplit.
     - rewrite /awrite_full_at. iIntros (I off bs bs0 nl) "%Hpre Ha Hk".
-      iMod (fsabs_set Γc I with "Hinv") as "_".
+      iMod (fsabs_set Γc I with "Hinv Hlic") as "_".
       iModIntro. iFrame "Ha". iIntros (I') "%Heq Ha'".
-      iMod (fsabs_set Γc I' with "Hinv") as "_".
+      iMod (fsabs_set Γc I' with "Hinv Hlic") as "_".
       iMod (off_user_inv_move fsabsE γo _ (Z.of_nat (off + length bs)) foffN_fsabsE
               with "Hoinv Hk") as "Hk".
       iModIntro. iFrame "Ha' Hk". iSplitR; [done |]. iApply "IH".
@@ -258,11 +270,11 @@ Section FsAbsInvFire.
   (* ------------------------------------------------------------------ *)
 
   Lemma fsabs_open_pre_plain Γ Γc (γfs : fs_names) (cw : Z) :
-    fsabs_inv Γc -∗
+    fsabs_inv Γc -∗ fsabs_lic -∗
     open_au_pre_plain Γ γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ => True%I) (fun _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv". rewrite /open_au_pre_plain.
+    iIntros "#Hinv #Hlic". rewrite /open_au_pre_plain.
     iSplitR; [iApply fsabs_open_walk |].
     iSplitR; [iApply fsabs_aopen; done | iApply fsabs_atrunc; done].
   Qed.
@@ -272,21 +284,21 @@ Section FsAbsInvFire.
      walk and open's commit at [True] -- what [UexecExecMint] mints the
      process's exec bundle out of. *)
   Lemma fsabs_exec_half Γ Γc (γfs : fs_names) (cw : Z) :
-    fsabs_inv Γc -∗
+    fsabs_inv Γc -∗ fsabs_lic -∗
     open_walk_pre_era γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
     ∗ aopen_commit_at Γ fsabsE (fun _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv".
+    iIntros "#Hinv #Hlic".
     iSplitR; [iApply fsabs_open_walk | iApply fsabs_aopen; done].
   Qed.
 
   Lemma fsabs_open_pre_create Γ Γc (γfs : fs_names) (cw : Z) :
-    fsabs_inv Γc -∗
+    fsabs_inv Γc -∗ fsabs_lic -∗
     open_au_pre_create Γ γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I)
       (fun _ _ _ => True%I) (fun _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv". rewrite /open_au_pre_create.
+    iIntros "#Hinv #Hlic". rewrite /open_au_pre_create.
     iSplitR; [iApply fsabs_mknod_walk |].
     iSplitR; [iApply fsabs_acre; done |].
     iSplitR; [iApply fsabs_dlookup; done |].
@@ -294,11 +306,11 @@ Section FsAbsInvFire.
   Qed.
 
   Lemma fsabs_mknod_pre_era Γ Γc (γfs : fs_names) (cw : Z) (ma mi : Z) :
-    fsabs_inv Γc -∗
+    fsabs_inv Γc -∗ fsabs_lic -∗
     mknod_au_pre_era Γ γfs cw ma mi (fun _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ _ => True%I) (fun _ _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv". rewrite /mknod_au_pre_era.
+    iIntros "#Hinv #Hlic". rewrite /mknod_au_pre_era.
     iSplitR; [iApply fsabs_mknod_walk |].
     iSplitR; [iApply fsabs_acre; done | iApply fsabs_dlookup; done].
   Qed.
@@ -307,21 +319,21 @@ Section FsAbsInvFire.
      open's plain commit -- what the dispatcher's chdir arm hands the AU
      contract at the True families *)
   Lemma fsabs_chdir_pre Γ Γc (γfs : fs_names) (cw : Z) :
-    fsabs_inv Γc -∗
+    fsabs_inv Γc -∗ fsabs_lic -∗
     chdir_au_pre Γ γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv". rewrite /chdir_au_pre.
+    iIntros "#Hinv #Hlic". rewrite /chdir_au_pre.
     iSplitR; [iApply fsabs_open_walk | iApply fsabs_aopen; done].
   Qed.
 
   Lemma fsabs_unlink_pre Γ Γc (γfs : fs_names) (cw : Z) :
-    fsabs_inv Γc -∗
+    fsabs_inv Γc -∗ fsabs_lic -∗
     unlink_au_pre Γ γfs cw (fun _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ _ => True%I) (fun _ _ => True%I)
       (fun _ _ _ _ => True%I) (fun _ _ _ => True%I).
   Proof.
-    iIntros "#Hinv". rewrite /unlink_au_pre.
+    iIntros "#Hinv #Hlic". rewrite /unlink_au_pre.
     iSplitR; [iApply fsabs_mknod_walk |].
     iSplitR; [iApply fsabs_uent; done |].
     iSplitR; [iApply fsabs_utgt; done |].

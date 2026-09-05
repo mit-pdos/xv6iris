@@ -45,12 +45,29 @@ binaries at every reboot).
 
 ## What is in `iris/AppEcho.v` today
 
-The pure data: `disc`, `echo_line`, the image's abstract view `echo_av0`
-and `echo_fs`, the record `echo_app` at `app_lend := ⌜pristine⌝ ∨
-tainted`, `echo_R` with the counter at `if decide (disc h) then 0 else 1`,
-and the obligations that are provable WITHOUT any lane: `HR0`, `HRt`,
-`Hpow`, `Hrx` (the counter's step), `Happ_boot` at era 0 (the image's
-map is `echo_av0`, off `FsInitPinBoot`'s route).  No theorem is stated
-for the application: `Htx`, `Happ_lic`, `Happ_swap` and `Hphi` are the
-lanes' outputs, and a theorem taking them as hypotheses would be the
-GAP-premise trap (`durable-notes.md`).
+The pure data and the obligations provable WITHOUT any lane:
+
+- `echo_line` ("echo hello world\n" as bytes), `ins` (the input bytes of
+  a history), `star_prefix pat l` ("l is a prefix of pat^*", spelled as
+  one list equality so it is decidable and prefix-closed by one `take`),
+  `disc_seg`, and `disc h := Forall disc_seg (cycles_of h)` — every
+  cycle's input so far keeps the discipline; the open cycle is the last
+  element of `cycles_of` while the power is on.  Closure laws:
+  `disc_out` (an output byte moves nothing), `disc_power` (a power event
+  moves nothing), `disc_in` (breaking the discipline is forever).
+- `echo_R γcl h := mono_nat_auth_own γcl 1 (if decide (disc h) then 0 else 1)`
+  with `echo_R_alloc` (`HR0`), `echo_R_pow` (`Hpow`), `echo_R_tx`,
+  `echo_R_rx` (the two UART arms, as basic updates over the ledger alone —
+  the theorem's wands frame the UART ghosts around them) and
+  `echo_R_untainted` (`disc h` and `client_lb 1` contradict: what the end
+  of the run reads).
+- `echo_fs I := era0_pins (abs_view I) /\ era0_sh_pins (abs_view I)` (the
+  /init and /sh binaries are the image's, path and content; per inum, not
+  a whole-map equality) and `echo_fs_era0` (`Happ_boot` at era 0, off
+  `FsInitPinBoot.era0_recovery_pins` / `FsShPin.era0_recovery_sh_pins`).
+
+Not there, on purpose: a theorem.  `Happ_lic` is payable only from
+`tainted` until L2; `Hlend`/`Happ_boot` at a non-pristine boot need L4;
+`Hphi` needs both and L7.  A theorem taking those as hypotheses would be
+the GAP-premise trap (`durable-notes.md`).  Echo's own pin (`/echo`'s
+inum and bytes, `FsShPin`'s shape) joins `echo_fs` with L6.

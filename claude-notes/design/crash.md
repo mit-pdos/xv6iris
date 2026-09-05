@@ -191,13 +191,17 @@ Three principles, in order of force:
 2. **One fixed-layer gname `γdisk` for the durable bytes.** The machine layer
    (`state_interp`) holds `● v_disk` at it; PowerOn preserves `v_disk`, so
    the auth is simply still right in the new era — nothing is re-minted and
-   nothing is re-associated. **The FIXED-layer roster is FIVE gnames and no
+   nothing is re-associated. **The FIXED-layer roster is SEVEN gnames and no
    bundle** (`RiscvPtsto.riscvFixedGS`; every one of them is a
    `Pc`/`HPc`/`Hproj`/`Hswap`/`boot_fixedGS` argument in `RiscvAdequacy` and
    rides the `boot_fixedGS` seam equation into the boot cone):
    `riscv_gen_name`, `riscv_start_name`, `riscv_registry_name`,
-   `riscv_disk_name` (+ its `riscv_disk_size`) and `riscv_swap_name`,
-   beside the client's opaque `riscv_crash_pred : iProp Σ`.
+   `riscv_disk_name` (+ its `riscv_disk_size`), `riscv_swap_name`, the
+   history ghost `riscv_obs_name` and the CLIENT PHASE COUNTER
+   `riscv_client_name` (a mono-nat the client owns through its trace slot;
+   a lower bound on it is an application's taint —
+   [`applications.md`](applications.md) §1), beside the client's two
+   opaque predicates `riscv_crash_pred`/`riscv_obs_pred : iProp Σ`.
 
    **THERE IS NO FIXED-LAYER DURABLE VIEW, and that is what the snapshot
    buys.**  A committed BYTE view at a fixed gname, plus a record of the

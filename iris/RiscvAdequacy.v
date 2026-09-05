@@ -1308,6 +1308,19 @@ Lemma obs_ledger_at_alloc_cl {Σ : gFunctors} `{!riscvGpreS Σ}
     ⊢ |==> obs_ledger_at R γ.
 Proof. intros HR0. iIntros "[_ H]". iApply (obs_ledger_at_alloc R γ HR0 with "H"). Qed.
 
+(* ...and the birth of a ledger that KEEPS the client phase counter
+   (applications.md §4): the application's [R []] is built from the auth at
+   0, so the ledger owns the counter from the first instant. *)
+Lemma obs_ledger_at_alloc_client {Σ : gFunctors} `{!riscvGpreS Σ}
+    (R : list mobs -> iProp Σ) (γ γcl : gname) :
+  (mono_nat_auth_own γcl 1 0%nat ⊢ |==> R []) ->
+  mono_nat_auth_own γcl 1 0%nat ∗ ghost_var γ (1/2) ([] : list mobs)
+    ⊢ |==> obs_ledger_at R γ.
+Proof.
+  intros HR0. iIntros "[Hc H]". iMod (HR0 with "Hc") as "HR".
+  iModIntro. iExists []. iFrame.
+Qed.
+
 Lemma obs_ledger_at_step {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ} (ndisk : nat)
     (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
     (Hpow : forall (h : list mobs) (on : bool) (dk : Z -> bv 8),

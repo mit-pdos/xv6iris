@@ -100,7 +100,6 @@ Set Printing Depth 40.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
 Require Import FsBytesGamma.   (* [fs_gamma_L] *)
-Require Import FsAbsInv.       (* [fsabs_alloc]: the boot arm mints the client copy *)
 Module ForkretProof (MP : MYPROC) (RL : RELEASE) (PR : PREPARE_RETURN)
                     (FS : FSINIT) (KX : KEXEC) (PN : PANIC)
                     (UC : USERRET_CLOSED) : FORKRET.
@@ -1004,7 +1003,7 @@ Proof.
     "(%Hpures & Hmirf & Hlfree & Hb1 & Hsbraw & _ & Hboot & _ &
       Hlock0 & Hlname & Hlcpu & Hlstart & Hldev & Hlout & Hlcmt & Hlnc & Hlhn &
       Hlhblk & Hauths & Hdirty & Hhdr & Hlslots & Hsl35 & Hirs2 & Hrem &
-      #Hbinvf & Hxo)".
+      #Hbinvf & Hxo & #Hfsabs)".
   destruct Hpures as [[v_magic [v_nblocks [v_nlog [Himg Hmagic]]]]
                       [Hhdrwf [H1cov [H1log [Hsbparse [Hsbok
                        [Hcgeom [Hbmq [Hszq Hxvslot]]]]]]]]].
@@ -1226,17 +1225,16 @@ Proof.
     iSplitR; [iExact "Hkmem" |].
     iPureIntro; exact Hgeom. }
   iMod (fs_ready_establish with "Hpre Hboot") as "#Hfsr".
-  (* THE APPLICATION-SIDE ABSTRACT-STATE INVARIANT, minted here beside the
-     sealed file system ([FirstTok.fsabs_env]): a fresh client copy of the
-     abstract state, seeded empty -- nothing below reads the seed, and the
-     AU dischargers overwrite it at every fire point ([FsAbsInvFire]). *)
-  iApply fupd_wp. iMod (fsabs_alloc (fs_gamma_L fsc_fs) ∅ ⊤) as (γa) "#Hfsabs".
-  iModIntro.
+  (* THE APPLICATION-SIDE ABSTRACT-STATE INVARIANT ([FirstTok.fsabs_env])
+     is NOT minted here any more (applications round 2): it was minted at
+     the era mint, at the founded map, and arrived on kit 2's last row
+     ([Hfsabs], out of [first_fsinit_open] above); this arm only projects it
+     into the steady token beside the sealed file system. *)
   (* the token, rebuilt at its steady arm -- and with it the whole process
      block, which every later step (kexec, prepare_return, the residue) takes
      as [proc_priv]. *)
   iAssert (first_done) as "#Hdone".
-  { rewrite /first_done. iFrame "Hfirst0 Hfsr". iExists γa. iExact "Hfsabs". }
+  { rewrite /first_done. iFrame "Hfirst0 Hfsr". iExact "Hfsabs". }
   iDestruct (first_tok_of_done with "Hdone") as "#Hftok".
   (* ================================================================== *)
   (*  +0x3c .. +0x52: kexec("/init", (char *[]){"/init", 0}).            *)

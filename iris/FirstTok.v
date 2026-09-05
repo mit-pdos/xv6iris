@@ -330,6 +330,23 @@ Section FirstTok.
             = Some b ->
           Pb b = FsCrash.fs_blocks dk (log_slot_bno fsc_logst i)).
 
+  (* THE APPLICATION-SIDE ABSTRACT-STATE INVARIANT ([FsAbsInv]), carried
+     SIDE BY SIDE with the sealed file system -- not inside [fs_ready], and
+     not inside any fs-internal invariant (the owner's 2026-09-03 ruling:
+     it is the piece that changes with the application proven on top of
+     xv6, so nothing of the kernel's own invariants may depend on it).
+     It is [FsAbsInv.fsabs_env] at the live Γ: the client copy at an
+     existential gname beside the application's LICENSE
+     (claude-notes/design/applications.md section 2).  MINTED AT THE ERA
+     MINT, not here: it rides kit 2 ([FsCfgKits.fs_kit_fsinit_ghost]'s
+     last row) through [first_fsinit] to forkret's boot arm, which projects
+     it into [first_done].  Every consumer opens it through [fsabs_inv]
+     and pays the dischargers with the license. *)
+  Definition fsabs_env : iProp Σ := FsAbsInv.fsabs_env (fs_gamma_L fsc_fs).
+
+  Global Instance fsabs_env_persistent : Persistent fsabs_env.
+  Proof. rewrite /fsabs_env. apply _. Qed.
+
   (* ================================================================== *)
   (*  3.  THE EXCLUSIVE HALF -- [SpecFsinit]'s premise pile               *)
   (* ================================================================== *)
@@ -338,10 +355,12 @@ Section FirstTok.
      walk names neither the image nor the spent set, and the kit rides
      inside opaquely.
 
-     ROWS.  The pure block; kit 2 (TEN rows since (f0): the log free token,
+     ROWS.  The pure block; kit 2 (ELEVEN rows: the log free token,
      [ireg_boot], [ireg_inv], block 1's [fs_chalf], the [fs_cache]/[fs_dirty]
      auths, the dirty halves, the log header + slots, [bitmap_inv], the
-     coverage remainder); rows (A) -- the 32 raw [&sb] bytes and the whole
+     coverage remainder, the byte view's row and the WAL's exception handle,
+     and -- applications round 2 -- the application's [fsabs_env], LAST);
+     rows (A) -- the 32 raw [&sb] bytes and the whole
      [struct log], carved in [BootShared.boot_bss_carve]; row (B) --
      [LogDefs.log_mirror_born], the ERA's mirror half at the disk's own
      picture plus the swap receipt; row (C) --
@@ -434,7 +453,10 @@ Section FirstTok.
                      (fs_home_set fsc_cov fsc_logst) Pb ∗
         exc_own (fs_exc fsc_fs)
           (list_to_set
-             (hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).2).
+             (hdr_dec (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst))).2) ∗
+        (* ...and the application's environment, kit 2's last row: what
+           forkret's boot arm projects into [first_done] *)
+        fsabs_env.
   Proof.
     iIntros "H". rewrite /first_fsinit.
     iDestruct "H" as (dk sb Rspent Pb vlock v_start v_dev v_nc v_n vname vcpu
@@ -443,12 +465,12 @@ Section FirstTok.
         Hnc & Hn & Hblk & Hmir & Hiref & Hbsl)".
     iDestruct (fs_kit_fsinit_ghost_open with "Hkit")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           Hbmres & Hrem & #Hbinv & Hxo)".
+           Hbmres & Hrem & #Hbinv & Hxo & #Henv)".
     iExists dk, sb, Rspent, Pb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu,
             sb_old.
     iFrame "Hmir Hlog Hb1 Hsb Hireg Hboot Hbmres Hlk Hnm Hcpu Hst Hdv Hout
             Hcmt Hnc Hn Hblk Hauths Hdty Hhdr Hslots Hbsl Hiref Hrem Hbinv Hxo".
-    iPureIntro. exact Hp.
+    iSplitR; [iPureIntro; exact Hp |]. rewrite /fsabs_env. iExact "Henv".
   Qed.
 
   (* ================================================================== *)
@@ -507,19 +529,6 @@ Section FirstTok.
      unreachable from a bundle at all ([WpLock.is_lock] is an [inv], and
      Iris invariants do not agree), which is the whole reason the pinning
      happened. *)
-  (* THE APPLICATION-SIDE ABSTRACT-STATE INVARIANT ([FsAbsInv]), minted
-     beside the sealed file system and carried SIDE BY SIDE with it -- not
-     inside [fs_ready], and not inside any fs-internal invariant (the
-     owner's 2026-09-03 ruling: it is the piece that changes with the
-     application proven on top of xv6, so nothing of the kernel's own
-     invariants may depend on it).  Its gname is existential: no consumer
-     needs to name it, every consumer opens it through [fsabs_inv]. *)
-  Definition fsabs_env : iProp Σ :=
-    (∃ γa : gname, fsabs_inv (fsabs_client (fs_gamma_L fsc_fs) γa))%I.
-
-  Global Instance fsabs_env_persistent : Persistent fsabs_env.
-  Proof. rewrite /fsabs_env. apply _. Qed.
-
   Definition first_tok : iProp Σ :=
     ((first_addr ↦₄ (mword_of_int 1 : mword 32)
         ∗ first_boot_persist ∗ kalloc_avail fsc_kpages None ∗ first_fsinit)

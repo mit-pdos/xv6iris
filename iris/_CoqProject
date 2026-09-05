@@ -1632,6 +1632,7 @@ ProofSysWriteConsAU.v
 # cone: it reuses both files' generic layers and restates nothing (R10),
 # so only its own two dinode vm_eq's compute.
 FsShPin.v
+AppEcho.v
 ProofFilewriteCons.v
 LinkFilewriteCons.v
 LinkSysWriteConsAU.v
@@ -1741,6 +1742,11 @@ LinkKexecAU.v
 UartAccepted.v
 UartSentResidue.v
 SystemUartAccepted.v
+# APPLICATIONS (claude-notes/design/applications.md): the record and the
+# whole-system theorem at one ([App.xv6_app_adequacy]); the echo
+# application's data and lane-free obligations (AppEcho, a leaf over the
+# era-0 pin files -- an image-check consumer, like them).
+App.v
 
 # The stage-1 init program proof (first Uk generation) is GONE as of
 # 2026-08-30: UkInit.v was replaced by the urun port below, and its two

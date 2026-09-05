@@ -1,0 +1,215 @@
+(* App.v -- APPLICATIONS: the record, and the whole-system theorem at one.
+
+   Design of record: claude-notes/design/applications.md.  An application is
+   a collection of user programs plus what it claims -- a predicate on the
+   abstract file-system state, what it is lent at every boot about the
+   durable state, a trace ledger, and a pure conclusion.  The DATA is the
+   record [xv6_app]; the OBLIGATIONS are the premises of [xv6_app_adequacy],
+   stated exactly as [SystemAdequacy.xv6_power_adequacy_gen] states them
+   (at the raw gnames, the [boot_fixedGS] literal), so that an application
+   that can pay some and not others is a DEFINITION and never a vacuous
+   theorem.
+
+   THE GENERIC APPLICATION [app_triv] -- user space does anything, the
+   abstract state is anything, the kernel stays correct -- pays every
+   obligation trivially; [SystemAdequacy.xv6_trace_adequacy] and its
+   siblings are [xv6_power_adequacy_gen] at exactly its data.  The first
+   non-trivial application is [AppEcho.v]; what it still owes is
+   claude-notes/projects/app-echo.md.
+
+   HOW THE PIECES MEET THE THEOREM.
+   - [app_fs] becomes the era's [FsCfg.fsc_app]: [SystemAdequacy.xv6_boot_era]
+     threads it to the era mint ([FsCfgSnap.fs_cfg_alloc_snap]), which seeds
+     the client copy of the abstract state at the founded map under
+     [fsabs_ok_raw γcl app_fs] -- the application's BOOT obligation
+     [Happ_boot], paid out of what the PowerOn arm lent ([app_lend γcl dk],
+     produced by [Hlend] out of the crash predicate).
+   - [Happ_lic] is the era's license to re-sync the copy at every fire
+     point (applications.md section 2: "the copy may be re-synced to any
+     map"; a constraining application holds it only once tainted).
+   - [app_R γcl] is the trace slot's resource at the client phase counter's
+     name; [HR0] RECEIVES the counter at 0 ([obs_ledger_at_alloc_client]);
+     the power step and the two UART-arm wands are [xv6_trace_adequacy]'s,
+     at the ambient [riscv_client_name].
+   - [app_phi] is read at the end of the run by [Hphi], which holds the
+     crash predicate and the ledger side by side -- which is where an
+     application relates "the input kept the discipline" (its counter at
+     0) to "the durable state is still what it claims" (the crash
+     predicate's arm of the disjunction; lane L4). *)
+(* Require block: SystemAdequacy.v's, VERBATIM (durable-notes: trimmed
+   imports have OOM'd the build), plus this file's own lines. *)
+From Stdlib Require Import ZArith Lia List.
+From stdpp Require Import gmap finite list_numbers bitvector.definitions.
+From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map mono_nat.
+From iris.program_logic Require Import language lifting adequacy.
+Require Import SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import SailStdpp.Base.
+Require Import RiscvLang ObsTrace RiscvPtsto.
+Require Import FsState.
+Require Import FsAbsInv.
+Require Import ProcGeom.
+Require Import FdSlots.
+Require Import FileInvDefs.
+Require Import WpUart.
+Require Import BootConfig.
+Require Import BootChain BootShared.
+Require Import FsCfgBoot.
+Require Import RiscvAdequacy.
+Require Import FsCrash.
+Require Import FsDurSnap.
+Require Import FsDurImg.
+Require Import FirstTok.
+Require Import FsImgDisk.
+Require Import FsImgCheck.
+Require Import VirtioModel.
+Require Import IrefSlots.
+Require Import LogDefs.
+Require Import Xv6Cameras.
+Require Import FsImg.
+Require Import ProcAvail.
+Require Import Xv6G.
+Require Import TsoCtx.
+(* ...and the rest of SystemAdequacy's block, which the first cut missed:
+   a class name that is not in scope silently becomes a VARIABLE
+   (durable-notes), which is how [ufdG] became one here once. *)
+Require Import UserFd.
+(* ...and this file's own *)
+Require Import FsNode.
+Require Import SystemAdequacy.
+Local Open Scope Z_scope.
+
+Record xv6_app (Σ : gFunctors) := MkApp {
+  (* the application's predicate on the abstract state between taints
+     (applications.md section 1): the era's [FsCfg.fsc_app] *)
+  app_fs   : gmap Z fs_node -> Prop;
+  (* what the PowerOn arm lends the boot about the durable state, at the
+     client phase counter's name (section 3); the boot obligation reads it *)
+  app_lend : gname -> (Z -> bv 8) -> iProp Σ;
+  (* the trace ledger, at the client phase counter's name (section 4) *)
+  app_R    : gname -> list mobs -> iProp Σ;
+  (* the conclusion, over the operational state and the run's trace *)
+  app_phi  : gstate -> list mobs -> Prop;
+}.
+Arguments MkApp {Σ} _ _ _ _.
+Arguments app_fs {Σ} _ _. Arguments app_lend {Σ} _ _ _.
+Arguments app_R {Σ} _ _ _. Arguments app_phi {Σ} _ _ _.
+
+(* THE GENERIC APPLICATION: nothing claimed, nothing lent, nothing read *)
+Definition app_triv (Σ : gFunctors) : xv6_app Σ :=
+  MkApp (fun _ => True) (fun _ _ => emp%I) (fun _ _ => emp%I) (fun _ _ => True).
+
+(* ---------------------------------------------------------------------- *)
+(* THE THEOREM.  [xv6_power_adequacy_gen] at the application: the trace     *)
+(* slot is the ledger of [app_R] at the client name, the lend is the FS's   *)
+(* epoch beside [app_lend], the era's predicate is [app_fs].                *)
+(* ---------------------------------------------------------------------- *)
+Theorem xv6_app_adequacy Σ
+    `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
+      !irefslotGpreS Σ, !bioslotGpreS Σ}
+    `{!ufdG Σ}
+    (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
+    (A : xv6_app Σ)
+    (* ---- the trace ledger's obligations ([xv6_trace_adequacy]'s, the
+       counter received at the birth) ---- *)
+    (HRt : forall (γcl : gname) (h : list mobs), Timeless (app_R A γcl h))
+    (HR0 : forall γcl : gname,
+       mono_nat_auth_own γcl 1 0%nat ⊢ |==> app_R A γcl [])
+    (Hpow : forall (γcl : gname) (h : list mobs) (on : bool) (dk : Z -> bv 8),
+       trace_shape h on ->
+       ⊢ app_R A γcl h ==∗
+         app_R A γcl (h ++ [if on then ObsPowerOff else ObsPowerOn])%list)
+    (Htx : forall (HR : riscvGS Σ) (γ : uart_names),
+       ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
+              ⌜uart_tx_pop u = Some (b, u')⌝ -∗ ⌜uart_loopback u = false⌝ -∗
+              ⌜trace_shape h true⌝ -∗ ⌜obs_wire (open_seg h) = u_wire u⌝ -∗
+              uart_ghosts γ u' -∗ app_R A riscv_client_name h
+                ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
+              uart_ghosts γ u' ∗ app_R A riscv_client_name (h ++ [ObsUartOut b])%list))
+    (Hrx : forall (HR : riscvGS Σ) (γ : uart_names),
+       ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
+              ⌜uart_rx_push u b = Some u'⌝ -∗ ⌜trace_shape h true⌝ -∗
+              uart_ghosts γ u' -∗ app_R A riscv_client_name h
+                ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
+              uart_ghosts γ u' ∗ app_R A riscv_client_name (h ++ [ObsUartIn b])%list))
+    (* ---- the boot's lend, out of the crash predicate (section 3) ---- *)
+    (Hlend : forall (γd γsw γreg γst γcl : gname) (dk : Z -> bv 8),
+       ⊢ ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov (FsImg.sb_logstart sb) -∗
+         |==> ◇ (▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov
+                    (FsImg.sb_logstart sb) ∗
+                 app_lend A γcl dk))
+    (* ---- the era's two obligations (section 2): the seed and the license ---- *)
+    (Happ_boot : forall (γcl : gname) (S : fs_state_rec)
+                        (D : gmap Z (list (bv 8))) (dk : Z -> bv 8),
+       snap_ok S D ->
+       fs_recovery (fs_blocks dk) D cov (FsImg.sb_logstart sb) ->
+       ⊢ app_lend A γcl dk -∗ |==> fsabs_ok_raw γcl (app_fs A) (fss_inodes S))
+    (Happ_lic : forall γcl : gname, ⊢ fsabs_lic_raw γcl (app_fs A))
+    (* ---- the conclusion's proof, at the end of the run ---- *)
+    (Hphi : forall (Hinv : invGS Σ)
+                   (γgen γstart γreg γd γsw γobs γcl : gname) (T : list mobs)
+                   (g' : gstate) (h : list mobs),
+       ⊢ @power_interp Σ
+            (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
+               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov
+                  (FsImg.sb_logstart sb))
+               γobs T (obs_ledger_at (app_R A γcl) γobs) γcl) g' -∗
+         ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
+         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov (FsImg.sb_logstart sb) -∗
+         ▷ obs_ledger_at (app_R A γcl) γobs -∗
+         ◇ ⌜app_phi A g' h⌝)
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow0 : g.(gpow) = false)
+    (Himg : fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
+              sb nib cov) :
+  forall (n : nat) (κs : list mobs) t2 g2,
+    nsteps n ([PowerLoopE : expr riscv_lang], g) κs (t2, g2) ->
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ app_phi A g2 κs.
+Proof.
+  (* the permit at the ledger: the application's two wands, at the record
+     the era boots over -- where [riscv_client_name] IS the counter the
+     ledger was born with *)
+  assert (Hperm : forall (HR : riscvGS Σ) (GEN : GenId) (γ : uart_names),
+      (exists (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs γcl : gname)
+              (T : list mobs),
+         riscv_fixedGS =
+           boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
+             (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov
+                (FsImg.sb_logstart sb))
+             γobs T (obs_ledger_at (app_R A γcl) γobs) γcl) ->
+      ⊢ obs_inv -∗ uart_obs_permit γ).
+  { intros HRg GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & Gcl & GT & Heq).
+    refine (uart_obs_permit_ledger (app_R A riscv_client_name) γ (HRt _) _
+              (Htx HRg γ) (Hrx HRg γ)).
+    rewrite Heq. reflexivity. }
+  exact (xv6_power_adequacy_gen Σ g sb nib cov
+           (app_fs A) (app_lend A) Hlend Happ_boot Happ_lic
+           (fun γobs γcl => obs_ledger_at (app_R A γcl) γobs)
+           (fun γobs γcl =>
+              obs_ledger_at_alloc_client (app_R A γcl) γobs γcl (HR0 γcl))
+           (fun γd γobs γcl =>
+              obs_ledger_at_step XV6_DISK_BYTES (app_R A γcl) (HRt γcl) (Hpow γcl)
+                γd γobs)
+           Hperm (app_phi A) Hphi Hgen0 Hpow0 Himg).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE GENERIC APPLICATION PAYS EVERYTHING: the four obligations that       *)
+(* mention its data, each in one line.  [xv6_trace_adequacy] is the record  *)
+(* at these with a client's ledger in place of [emp].                       *)
+(* ---------------------------------------------------------------------- *)
+Section AppTriv.
+  Context {Σ : gFunctors} `{!riscvGpreS Σ}.
+
+  Lemma app_triv_boot (γcl : gname) (S : fs_state_rec) (dk : Z -> bv 8) :
+    ⊢ app_lend (app_triv Σ) γcl dk -∗
+      |==> fsabs_ok_raw γcl (app_fs (app_triv Σ)) (fss_inodes S).
+  Proof. iIntros "_". iModIntro. by iApply fsabs_ok_raw_intro. Qed.
+
+  Lemma app_triv_lic (γcl : gname) : ⊢ fsabs_lic_raw γcl (app_fs (app_triv Σ)).
+  Proof. exact (fsabs_lic_raw_triv γcl). Qed.
+
+  Lemma app_triv_R0 (γcl : gname) :
+    mono_nat_auth_own γcl 1 0%nat ⊢ |==> app_R (app_triv Σ) γcl [].
+  Proof. iIntros "_". by iModIntro. Qed.
+End AppTriv.

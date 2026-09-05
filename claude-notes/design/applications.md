@@ -135,7 +135,7 @@ invariant change and is deferred with it.
 
     Record xv6_app Σ := MkApp {
       app_fs    : gmap Z fs_node -> Prop;              (* §1: fsc_app *)
-      app_lend  : (Z -> bv 8) -> iProp Σ;              (* what PowerOn lends the boot about the durable state *)
+      app_lend  : gname -> (Z -> bv 8) -> iProp Σ;     (* what PowerOn lends the boot about the durable state, at the client counter's name *)
       app_R     : gname -> list mobs -> iProp Σ;       (* the trace ledger, at the client counter's name *)
       app_phi   : gstate -> list mobs -> Prop;         (* the conclusion *)
     }.
@@ -147,18 +147,25 @@ theorem:
 
 | premise | what it says | generic app |
 |---|---|---|
-| `Happ_boot` | `snap_ok S D`, `fs_recovery dk D`, `app_lend dk ⊢ ⌜app_fs (fss_inodes S)⌝ ∨ client_lb γc 1` | `iLeft` |
-| `Happ_lic` | `⊢ fsabs_lic` at `fsc_app := app_fs` | trivial |
-| `Happ_swap` | the PowerOn arm produces `app_lend dk` beside the FS's own lend, out of `▷ P_fs_named` (the `Hswap` shape) | `emp` |
-| `HR0`, `HRt`, `Hpow`, `Htx`, `Hrx` | `xv6_trace_adequacy`'s ledger obligations, with `client_auth γc 0` at the birth | as today |
-| `Hphi` | `xv6_power_adequacy_gen`'s, at `Pt := obs_ledger_at (app_R γc)` | as today |
+| `Happ_boot` | `snap_ok S D`, `fs_recovery dk D`, `app_lend γcl dk ⊢ |==> fsabs_ok_raw γcl app_fs (fss_inodes S)` | `iLeft` |
+| `Happ_lic` | `⊢ fsabs_lic_raw γcl app_fs` | `fsabs_lic_raw_triv` |
+| `Hlend` | the PowerOn arm produces `app_lend γcl dk` beside the FS's own lend, out of `▷ P_fs_named` under `==∗ ◇` (composed with `P_fs_swap` into the machine's `Hswap`) | `emp` |
+| `HR0`, `HRt`, `Hpow`, `Htx`, `Hrx` | `xv6_trace_adequacy`'s ledger obligations, `HR0` RECEIVING the counter's auth at 0 (`obs_ledger_at_alloc_client`) | as today |
+| `Hphi` | `xv6_power_adequacy_gen`'s, at `Pt γobs γcl := obs_ledger_at (app_R γcl) γobs` | as today |
 
-The theorem is `xv6_power_adequacy_gen` at `Pt γobs γc := obs_ledger_at
-(app_R γc) γobs`, `Rb dk := P_fs_lend … dk ∗ app_lend dk`, and it threads
-`app_fs`, `Happ_boot` and `Happ_lic` to `xv6_boot_era`, which hands them
-to `BootShared.boot_shared_alloc` and the mint.  `xv6_trace_adequacy` is
-its instance at the fs-trivial application; `xv6_fs_adequacy_xv6Σ` keeps
-its statement and its audit.
+The raw forms `fsabs_ok_raw`/`fsabs_lic_raw` take the counter's gname and
+the predicate as arguments and bind only `mono_natG`, so the theorem can
+state them under `riscvGpreS`; the boot chain states the same at the
+pinned spellings `fsabs_ok_at`/`fsabs_lic_at` (at `riscv_client_name`),
+which unfold to the raw ones — RiscvPtsto's rule for `client_lb`.
+
+The theorem is `App.xv6_app_adequacy` = `xv6_power_adequacy_gen` at
+`Pt γobs γcl := obs_ledger_at (app_R γcl) γobs`, `Rb γcl dk := P_fs_lend …
+dk ∗ app_lend γcl dk`; the general theorem threads `app_fs`, `Happ_boot`
+and `Happ_lic` to `xv6_boot_era`, which hands them to
+`BootShared.boot_shared_alloc` and the mint.  `xv6_trace_adequacy` and its
+siblings are the general theorem at the generic application's data;
+`xv6_fs_adequacy_xv6Σ` keeps its statement and its audit.
 
 **Why the boot's lend and not `Hproj`.**  `Hproj` is pure and cannot
 carry `tainted`; `Hswap`'s `Rb` is the one resource channel from the

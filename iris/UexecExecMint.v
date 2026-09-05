@@ -71,7 +71,9 @@ Require Import SpecSysOpenAU.
 Require Import SpecKexecAU.
 Require Import SpecSysExecAU.
 Require Import FsAbsInvFire.    (* [fsabs_exec_half] *)
-Require Import FirstTok.        (* [fsabs_env] *)
+Require Import FirstTok.        (* [FirstTok.fsabs_env] -- spelled QUALIFIED below:
+                                   [FsAbsInv] (imported after it) exports a
+                                   Γ-indexed [fsabs_env] of its own *)
 Require Import UexecExecInst.   (* the [xbundle] instance, [xbundle_intro] *)
 Require Import FsAbsInv.
 Require Import FsAbs.
@@ -94,15 +96,15 @@ Section UexecExecMint.
   (* exec's AU bundle at a generic slot family: the fs half out of the
      invariant, the slot half out of the family *)
   Lemma fsabs_exec_pre (S : uvis -> iProp Σ) :
-    fsabs_env -∗
+    FirstTok.fsabs_env -∗
     (∀ W' : uvis, S W') -∗
     ∀ (cw : Z) (M : gmap Z (bv 8)) (av : mword 64) (sts : list fdstate),
       sys_exec_au_pre S (fs_gamma_L fsc_fs) fsc_fs cw
         (fun _ _ => True%I) (fun _ _ => True%I) (fun _ _ _ => True%I) M av sts.
   Proof.
     iIntros "#Henv Hs" (cw M av sts).
-    iDestruct "Henv" as (γa) "#Hinv".
-    iDestruct (fsabs_exec_half (fs_gamma_L fsc_fs) _ fsc_fs cw with "Hinv")
+    iDestruct "Henv" as (γa) "[#Hinv #Hlic]".
+    iDestruct (fsabs_exec_half (fs_gamma_L fsc_fs) _ fsc_fs cw with "Hinv Hlic")
       as "[#Hwalk #Hcommit]".
     rewrite /sys_exec_au_pre.
     iSplitR; [iExact "Hwalk" |].
@@ -114,7 +116,7 @@ Section UexecExecMint.
 
   (* the process's exec bundle, at any key *)
   Lemma xbundle_mint (W : uvis) :
-    fsabs_env -∗ (∀ W' : uvis, uslot_x W') -∗ xbundle uslot_x W.
+    FirstTok.fsabs_env -∗ (∀ W' : uvis, uslot_x W') -∗ xbundle uslot_x W.
   Proof.
     iIntros "#Henv Hs".
     iApply (xbundle_intro uslot_x W (fun _ _ => True%I) (fun _ _ => True%I)
@@ -126,7 +128,7 @@ Section UexecExecMint.
      plain family to mint the bundle's slot wand from.  Loeb through the
      ▷ in [ukont_x]. *)
   Lemma uslot_x_lift_of :
-    fsabs_env -∗
+    FirstTok.fsabs_env -∗
     □ (∀ W : uvis, uslot W) -∗
     □ (∀ W : uvis, uslot W -∗ uslot_x W).
   Proof.
@@ -161,7 +163,7 @@ Section UexecExecMint.
   Qed.
 
   Lemma uslot_x_lift :
-    fsabs_env -∗ □ uexec_wp -∗ □ (∀ W : uvis, uslot W -∗ uslot_x W).
+    FirstTok.fsabs_env -∗ □ uexec_wp -∗ □ (∀ W : uvis, uslot W -∗ uslot_x W).
   Proof.
     iIntros "#Henv #Hgen".
     iApply (uslot_x_lift_of with "Henv").
@@ -170,7 +172,7 @@ Section UexecExecMint.
 
   (* the loop's mint: the plain generic slot, lifted *)
   Lemma uslot_x_mint :
-    fsabs_env -∗ □ uexec_wp -∗ □ (∀ W : uvis, uslot_x W).
+    FirstTok.fsabs_env -∗ □ uexec_wp -∗ □ (∀ W : uvis, uslot_x W).
   Proof.
     iIntros "#Henv #Hgen".
     iDestruct (uslot_x_lift with "Henv Hgen") as "#Hlift".
@@ -181,7 +183,7 @@ Section UexecExecMint.
   (* ...and the return channel lifted with it: what the loop's ENTRY
      needs, where userret's dovetail hands it a plain return *)
   Lemma uexec_ret_x_lift :
-    fsabs_env -∗ □ uexec_wp -∗
+    FirstTok.fsabs_env -∗ □ uexec_wp -∗
     □ (∀ (sc : mword 64) (W : uvis), uexec_ret sc W -∗ uexec_ret_x sc W).
   Proof.
     iIntros "#Henv #Hgen".

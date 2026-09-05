@@ -61,6 +61,7 @@ Require Import DiskPtsto.      (* [disk_names] *)
 Require Import WpLockAt BioInitAt KallocInv IrefSlots BioDefs.
 Require Import LogInv.
 Require Import FsCfg.
+Require Import FsAbsInv.      (* [fsabs_env_alloc]: the application's copy, kit 2's last row *)
 Require Import FileInvDefs.   (* the off ledger's boot face (off-ledger ruling) *)
 Require Import FsBoot FsCfgBoot.
 Require Import Xv6G.
@@ -827,7 +828,16 @@ Section SnapMint.
          boot's state the epoch's own rather than a second one that would
          need a determinacy theorem to identify. ---- *)
       (gsn gln gtn : gname)
-      (Pb : Z -> list (bv 8)) (Xexc : gset Z) :
+      (Pb : Z -> list (bv 8)) (Xexc : gset Z)
+      (* ---- THE APPLICATION'S PREDICATE on the abstract state
+         (claude-notes/design/applications.md sections 1-2): [fsc_app] of
+         the minted record.  The mint seeds the application's client copy
+         of the top map at the founded map [fss_inodes S], so it takes the
+         seed's application conjunct -- the boot obligation, paid one rung
+         up by the power arm's lend -- and the LICENSE the dischargers will
+         re-sync the copy with, and packs both as kit 2's last row.  Spelled
+         at the PINNED forms ([FsAbsInv]'s header says why). ---- *)
+      (A : gmap Z FsNode.fs_node -> Prop) :
     (forall b : Z, length (Pb b) = BSIZE) ->
     Xexc ⊆ fs_home_set cov (sb_logstart (fss_sb S)) ->
     (1 : Z) ∉ Xexc ->
@@ -847,6 +857,7 @@ Section SnapMint.
     (forall b : Z, 1 <= b < fs_data_start (fss_sb S) -> b ∈ cov) ->
     disk_bytes γv 0 (disk_read dk 0 ndisk) -∗
     bslots_auth -∗ bslots BSLOTS_FS -∗
+    fsabs_ok_at A (fss_inodes S) -∗ fsabs_lic_at A -∗
     (* ---- THE DURABLE SNAPSHOT, AS A RESOURCE, and it is the whole of the
        file system's side: the committed map IS what the machine would
        recover to, and it is the encoding of the abstract state [S].  What
@@ -890,7 +901,7 @@ Section SnapMint.
                     (fs_home_set cov (sb_logstart (fss_sb S))))).
     { intros b bs Hbs. apply fs_restrict_lookup_Some in Hbs as [_ ->].
       exact (HlPb b). }
-    iIntros "Hdisk Hsa Hsf Hsnap".
+    iIntros "Hdisk Hsa Hsf #Hok #Hlic Hsnap".
     (* THE TIE IS A READING (durable-disk BT-3, plan section 2's "the
        epoch's IDENTITY is a resource"): [snap_ok] is no longer handed in
        anywhere on the boot side -- it comes off the epoch's own resources,
@@ -1224,12 +1235,25 @@ Section SnapMint.
        authority's gname, the NINODE ghost-map family, and the NINODE
        per-inode invariants over it, all minted empty ---- *)
     iMod flive_auth_at_alloc as (γfol) "Hfol".
+    (* ---- 8c. THE APPLICATION'S COPY (applications.md section 2): the
+       client copy of the top map, seeded at the founded map [fss_inodes S]
+       -- the same map [ftop_alloc] founded the kernel's authority at in
+       step 7 -- with the seed's conjunct and the license packed beside it;
+       kit 2's last row.  Its [fsabs_ok] is at the record being minted, so
+       the record is spelled here once more: [fsc_app] of it is [A] by iota,
+       which is what turns the premise into the seed. ---- *)
+    iMod (fsabs_env_alloc
+            (FSC := MkFscfg gpr gkm gkp γd γv gdl bn γfs γi cn git
+                      cov (sb_logstart (fss_sb S)) (sb_bmapstart (fss_sb S))
+                      (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol A)
+            (fs_gamma_L γfs) (fss_inodes S) E with "[] []") as "#Henv";
+      [rewrite /fsabs_ok; cbn [fsc_app]; iExact "Hok"
+      | rewrite /fsabs_lic; cbn [fsc_app]; iExact "Hlic" |].
     iModIntro.
     iExists ICFG,
       (MkFscfg gpr gkm gkp γd γv gdl bn γfs γi cn git
                cov (sb_logstart (fss_sb S)) (sb_bmapstart (fss_sb S))
-               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol
-               (fun _ : gmap Z fs_node => True)).
+               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol A).
     rewrite /fs_kit_icache /fs_kit_fsinit_ghost.
     cbn [fsc_printk fsc_kalloc fsc_kpages fsc_uart fsc_disk fsc_dlock
          fsc_bio fsc_fs fsc_ireg fsc_ic fsc_itlock fsc_cov fsc_logst
@@ -1295,7 +1319,8 @@ Section SnapMint.
       iSplitL "Hslots"; [iExact "Hslots" |].
       iSplitL "Hbmres"; [iExact "Hbmres" |].
       iSplitL "Hrem"; [iExact "Hrem" |].
-      iSplitR; [iExact "Hbinv" | iExact "Hxo"]. }
+      iSplitR; [iExact "Hbinv" |].
+      iSplitL "Hxo"; [iExact "Hxo" | iExact "Henv"]. }
     iSplitL "Hfol"; [iExact "Hfol" | iExact "Hoffa"].
   Qed.
 

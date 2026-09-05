@@ -70,6 +70,7 @@ Require Import FsBoot.         (* [fs_cov_in] *)
 Require Import FsImg.          (* the image sweeps' vocabulary *)
 Require Import FsCfgBoot.      (* the two boot kits *)
 Require Import FsCfgSnap.      (* [fs_cfg_alloc_snap] -- the era mint *)
+Require Import FsAbsInv.       (* [fsabs_ok_at]/[fsabs_lic_at]: the application's boot obligation and license, handed to the mint *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 
@@ -1406,6 +1407,12 @@ Section BootAlloc.
   Lemma boot_shared_alloc (g : gstate) (ndisk : nat)
       (sb : fs_sb) (nib : nat) (cov : gset Z)
       (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8))
+      (* THE APPLICATION'S PREDICATE on the abstract file-system state
+         (claude-notes/design/applications.md sections 1-3): threaded
+         straight to the mint, with the two resources it asks for below --
+         the seed's conjunct (the boot obligation, which the era's caller
+         pays out of the power arm's lend) and the license. *)
+      (A : gmap Z FsNode.fs_node -> Prop)
       (* THE CLIENT'S LENT RESOURCE (durable-disk BT-1).  It arrives on
          [power_boot_res] and this fupd DROPS it: the boot mint does not
          read it yet (BT-3 is where [fs_cfg_alloc_snap] starts taking the
@@ -1429,6 +1436,9 @@ Section BootAlloc.
        [FsCrash.P_fs] carries across the power cycle and
        [SystemAdequacy.fs_boot_pure] delivers into this fupd. *)
     fs_boot_snap_wf (v_disk (g.(gdev).(dvirtio))) ndisk S Pb sb nib cov ->
+    (* the application's boot obligation at the founded map, and its
+       license -- both straight through to [FsCfgSnap.fs_cfg_alloc_snap] *)
+    fsabs_ok_at A (FsState.fss_inodes S) -∗ fsabs_lic_at A -∗
     (* THE DURABLE SNAPSHOT, LENT BY THE POWER ARM (durable-disk BT-3).
        It arrives on [power_boot_res]'s [Rb] conjunct as
        [FsCrash.P_fs_lend]; the caller splits that off
@@ -1547,7 +1557,7 @@ Section BootAlloc.
     pose proof Hbf as Hbf'.
     destruct Hbf' as (Hpow & Hin & Hmemf & Hregsf & Hu0 & Hp0 & Hv0' & _).
     destruct Hv0' as (v0 & Hv0).
-    iIntros "Hdursnap H".
+    iIntros "#Hok #Hlic Hdursnap H".
     iDestruct (power_boot_res_unpack Rb g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hkptb & Hstrans & Hsie & Hspp & Hspie &
         Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hswlb &
@@ -1744,11 +1754,11 @@ Section BootAlloc.
             (FsCrash.hdr_wset
                (FsCrash.fs_blocks (v_disk (g.(gdev).(dvirtio))))
                (FsImg.sb_logstart (FsState.fss_sb S)))
-            HlPb
+            A HlPb
             (FsCrash.hdr_wset_home _ cov _ Hhwf)
             (FsCrash.hdr_wset_sb _ cov _ Hhwf)
             Hagr Hnibeq Hnib32 Hcovin Hcovmeta
-            with "Hdimg Hbsauth Hbslots Hdursnap") as (ICFG FSC) "Hfs".
+            with "Hdimg Hbsauth Hbslots Hok Hlic Hdursnap") as (ICFG FSC) "Hfs".
     (* durable-disk 2b-inode-3 / 2b-inode-4: NEITHER ERA GHOST ARRIVES HERE
        ANY MORE.  The top map's authority is [InodeRegion.ftop_inv] (carried
        by [ireg_inv]) and its per-inum fragments are the free pool's; the

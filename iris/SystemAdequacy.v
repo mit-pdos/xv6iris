@@ -42,6 +42,8 @@ Require Import RiscvLang ObsTrace RiscvPtsto.
    IMPORT is what makes [fsLinkG]/[fsTopG]'s instance fields active, which a
    bare [Require] does not. *)
 Require Import FsState.
+Require Import FsAbsInv.    (* [fsabs_ok_raw]/[fsabs_lic_raw] and their pinned forms: the
+                               application's boot obligation and license (applications.md) *)
 Require Import ProcGeom.
 Require Import FdSlots.
 Require Import FileInvDefs.
@@ -295,7 +297,26 @@ Section SystemBoot.
      of that resource, not one an existential in [fs_boot_pure] chose.
      That is what makes the durability claim's [snap_ok] a READING at every
      era and a premise of nothing. *)
-  Lemma xv6_boot_era (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z) :
+  Lemma xv6_boot_era (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
+      (* THE APPLICATION'S FILE-SYSTEM SIDE (claude-notes/design/
+         applications.md sections 1-3): its predicate on the abstract state
+         ([fsc_app] of the era's record) and its LEND -- what the PowerOn
+         arm hands this boot about the durable state, at the client
+         counter's name, riding [power_boot_res]'s [Rb] beside the file
+         system's own [P_fs_lend].  Stated at the AMBIENT names, since the
+         era's record is in scope here: the PINNED forms of [FsAbsInv]. *)
+      (A : gmap Z FsNode.fs_node -> Prop)
+      (Rl : gname -> (Z -> bv 8) -> iProp Σ)
+      (* THE BOOT OBLIGATION: at every era, the founded map -- the state the
+         lent epoch stands at -- satisfies the predicate, or the run is
+         tainted; paid out of the lend.  [iLeft] for the generic application. *)
+      (Happ_boot : forall (S : fs_state_rec) (D : gmap Z (list (bv 8)))
+                          (dk : Z -> bv 8),
+         snap_ok S D ->
+         fs_recovery (fs_blocks dk) D cov (FsImg.sb_logstart sb) ->
+         ⊢ Rl riscv_client_name dk -∗ |==> fsabs_ok_at A (fss_inodes S))
+      (* THE LICENSE, era-wide: the dischargers re-sync the copy with it *)
+      (Happ_lic : ⊢ fsabs_lic_at A) :
     boot_facts g ->
     (* THE PROJECTION THE POWER THEOREM PROVES AT THIS ERA, AND IT IS THE
        WHOLE OF WHAT THIS BOOT KNOWS ABOUT ITS DISK (durable-disk lane
@@ -338,7 +359,7 @@ Section SystemBoot.
     obs_inv -∗
     power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES
       (fun dk => mirror_of (fs_blocks dk))
-      (fun _ => P_fs_lend cov (FsImg.sb_logstart sb)) g
+      (fun γ dk => P_fs_lend cov (FsImg.sb_logstart sb) dk ∗ Rl γ dk)%I g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
          WP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗
@@ -367,6 +388,8 @@ Section SystemBoot.
     destruct Hpure as (Hext & D & Hrec & Hhwf & _).
     (* ---- THE LENT EPOCH, OFF [power_boot_res]'s CLIENT CONJUNCT ---- *)
     iDestruct (power_boot_res_lend with "Hres") as "[Hlend Hres]".
+    (* ...which is the file system's epoch beside the APPLICATION's lend *)
+    iEval (cbv beta) in "Hlend". iDestruct "Hlend" as "[Hlend Hrl]".
     iEval (rewrite /P_fs_lend) in "Hlend".
     iDestruct "Hlend" as (D0) "[%Hrec0 Hdur]".
     (* the identification, and it is one step: recovery is a FUNCTION of the
@@ -431,9 +454,17 @@ Section SystemBoot.
        the identity the boot hart will run as.  The secondaries mint their
        own below; each reads the started deposit through its own token. *)
     iMod (own_context_boot (CID := 0%fin)) as (ξ0) "Hthr0".
+    (* THE APPLICATION'S BOOT OBLIGATION, PAID: the founded map is the lent
+       epoch's own state [S], whose [snap_ok] was read off the resource
+       above and whose committed map is the boot's own [D]; the lend pays
+       the seed's conjunct, and the license comes with it.  Both go into
+       the mint through [boot_shared_alloc]. *)
+    iMod (Happ_boot S D (v_disk (g.(gdev).(dvirtio))) Hsnok Hrec with "Hrl")
+      as "#Hok".
+    iPoseProof Happ_lic as "#Hlic".
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
-            S Pb (fun _ _ => emp)%I gsn gln gtn Hbf Hbundle
-            with "Hdursnap Hres")
+            S Pb A (fun _ _ => emp)%I gsn gln gtn Hbf Hbundle
+            with "Hok Hlic Hdursnap Hres")
       as (Hfd Hir Hpav Hbs HF γd γv Rspent γi ξd)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & Hprim & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
@@ -588,6 +619,32 @@ Theorem xv6_power_adequacy_gen Σ
        boot application below is explicit ([@]) and passes it positionally. *)
     `{Hufd : !ufdG Σ}
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
+    (* THE APPLICATION'S FILE-SYSTEM SIDE (claude-notes/design/applications.md
+       sections 1-3): its predicate on the abstract state, its LEND -- what
+       the PowerOn arm hands each boot about the durable state, at the
+       client counter's name, beside the file system's own [P_fs_lend] --
+       the lend's production out of the crash predicate ([Hlend], composed
+       with [FsCrash.P_fs_swap] into [riscv_power_adequacy]'s [Hswap]
+       below), the boot obligation ([Happ_boot]: the founded map satisfies
+       the predicate or the run is tainted) and the license ([Happ_lic]).
+       All at the RAW forms over an arbitrary counter name, because the
+       fixed record does not exist yet; once its shape is destructed below,
+       the raw forms at [γcl] ARE [xv6_boot_era]'s pinned ones by iota.
+       The generic application is [fun _ => True] / [emp] / [iLeft] /
+       [fsabs_lic_raw_triv] (the two instances after this theorem). *)
+    (app_fs : gmap Z FsNode.fs_node -> Prop)
+    (Rl : gname -> (Z -> bv 8) -> iProp Σ)
+    (Hlend : forall (γd γsw γreg γst γcl : gname) (dk : Z -> bv 8),
+       ⊢ ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov (FsImg.sb_logstart sb) -∗
+         |==> ◇ (▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov
+                    (FsImg.sb_logstart sb) ∗
+                 Rl γcl dk))
+    (Happ_boot : forall (γcl : gname) (S : fs_state_rec)
+                        (D : gmap Z (list (bv 8))) (dk : Z -> bv 8),
+       snap_ok S D ->
+       fs_recovery (fs_blocks dk) D cov (FsImg.sb_logstart sb) ->
+       ⊢ Rl γcl dk -∗ |==> fsabs_ok_raw γcl app_fs (fss_inodes S))
+    (Happ_lic : forall γcl : gname, ⊢ fsabs_lic_raw γcl app_fs)
     (* THE TRACE INVARIANT, PASSED THROUGH TO
        [RiscvAdequacy.riscv_power_adequacy] (whose header is the full
        story).  [phi] is any pure statement about the OPERATIONAL state, and
@@ -766,10 +823,19 @@ Proof.
               no state-determinacy theorem is needed.  [xv6_boot_era]
               splits it off [power_boot_res] and hands its contents to the
               mint (durable-disk BT-3). *)
-           (fun _ => P_fs_lend cov (FsImg.sb_logstart sb))
-           ltac:(intros γd γsw γreg γst γcl Er gen dk;
-                 exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst cov
-                          (FsImg.sb_logstart sb) dk Er gen))
+           (* ...BESIDE THE APPLICATION'S LEND (applications.md section 3):
+              [P_fs_swap] produces the epoch, and [Hlend] then produces the
+              application's resource out of the record it hands back, in the
+              same [==∗ ◇]. *)
+           (fun γcl dk => P_fs_lend cov (FsImg.sb_logstart sb) dk ∗ Rl γcl dk)%I
+           ltac:(intros γd γsw γreg γst γcl Er gen dk; cbv beta;
+                 iIntros "#Hreg #Hst Hsa Ha HM HP";
+                 iMod (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst cov
+                         (FsImg.sb_logstart sb) dk Er gen
+                         with "Hreg Hst Hsa Ha HM HP")
+                   as ">(Hsa & Ha & HP & HM & #Hsw & Hl)";
+                 iMod (Hlend γd γsw γreg γst γcl dk with "HP") as ">[HP Hrl]";
+                 iModIntro; iModIntro; iFrame "Hsa Ha HP HM Hsw Hl Hrl")
            (* THE TRACE SLOT AND THE TRACE HOOK, threaded straight through:
               this layer fixes the crash predicate but says nothing about the
               trace, so both pass down unexamined. *)
@@ -790,8 +856,19 @@ Proof.
      member now, so the section generalises one class less. *)
   (* one [_] MORE since the program's descriptor class ([UserFd.ufdG]) joined
      the section: this application counts them positionally. *)
+  (* the application's two obligations are HOLES, closed once the
+     conclusion has pinned the record: they mention [riscv_client_name] of
+     the era instance, which is only [Gcl] by iota after [RiscvGS Σ _ HE]'s
+     [_] is the destructed literal -- passed as terms they are checked
+     against an unresolved evar and fail to unify. *)
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ Hufd _ _ _ _ _ gen g' sb nib cov
+            app_fs Rl _ _
             Hbf Hpure Hcovin Hlogsub Hls2 _ _).
+  (* the application's boot obligation and license, at the era's own
+     counter name: [riscv_client_name] of the record IS [Gcl] by iota, and
+     [FsAbsInv]'s pinned forms unfold to the raw ones at it *)
+  { exact (Happ_boot Gcl). }
+  { exact (Happ_lic Gcl). }
   (* the descriptor class comes back as a GOAL here rather than being
      shelved, because the application is explicit ([@]); it is the section's
      own instance. *)
@@ -838,6 +915,14 @@ Proof.
   intros t2 g2 Hrtc.
   apply erased_steps_nsteps in Hrtc as (n & κs & Hn).
   refine (xv6_power_adequacy_gen Σ g sb nib cov
+            (* the GENERIC application (applications.md section 0): any
+               abstract state, nothing lent, the license outright *)
+            (fun _ => True) (fun _ _ => emp)%I
+            ltac:(intros γd γsw γreg γst γcl dk; cbv beta; iIntros "HP";
+                  iModIntro; iModIntro; by iFrame "HP")
+            ltac:(intros γcl S D dk _ _; cbv beta; iIntros "_"; iModIntro;
+                  rewrite /fsabs_ok_raw; iLeft; iPureIntro; exact Logic.I)
+            ltac:(intros γcl; exact (fsabs_lic_raw_triv γcl))
             (fun γobs _ => obs_pred_at γobs) obs_pred_at_alloc_cl
             (fun γd γobs _ => obs_pred_at_step XV6_DISK_BYTES γd γobs)
             _ (fun g _ => phi g)
@@ -885,6 +970,14 @@ Theorem xv6_trace_adequacy Σ
     (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ P κs.
 Proof.
   refine (xv6_power_adequacy_gen Σ g sb nib cov
+            (* the GENERIC application (applications.md section 0): any
+               abstract state, nothing lent, the license outright *)
+            (fun _ => True) (fun _ _ => emp)%I
+            ltac:(intros γd γsw γreg γst γcl dk; cbv beta; iIntros "HP";
+                  iModIntro; iModIntro; by iFrame "HP")
+            ltac:(intros γcl S D dk _ _; cbv beta; iIntros "_"; iModIntro;
+                  rewrite /fsabs_ok_raw; iLeft; iPureIntro; exact Logic.I)
+            ltac:(intros γcl; exact (fsabs_lic_raw_triv γcl))
             (fun γobs _ => obs_ledger_at R γobs)
             (fun γobs γcl => obs_ledger_at_alloc_cl R γobs γcl HR0)
             (fun γd γobs _ => obs_ledger_at_step XV6_DISK_BYTES R HRt Hpow γd γobs)
@@ -1260,6 +1353,14 @@ Corollary xv6_obs_wf_xv6Σ (g : gstate)
     (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ obs_wf κs g2.
 Proof.
   refine (xv6_power_adequacy_gen xv6Σ g fsimg_sb fsimg_nib fsimg_cov
+            (* the GENERIC application (applications.md section 0): any
+               abstract state, nothing lent, the license outright *)
+            (fun _ => True) (fun _ _ => emp)%I
+            ltac:(intros γd γsw γreg γst γcl dk; cbv beta; iIntros "HP";
+                  iModIntro; iModIntro; by iFrame "HP")
+            ltac:(intros γcl S D dk _ _; cbv beta; iIntros "_"; iModIntro;
+                  rewrite /fsabs_ok_raw; iLeft; iPureIntro; exact Logic.I)
+            ltac:(intros γcl; exact (fsabs_lic_raw_triv γcl))
             (fun γobs _ => obs_pred_at γobs) obs_pred_at_alloc_cl
             (fun γd γobs _ => obs_pred_at_step XV6_DISK_BYTES γd γobs)
             _ (fun g h => obs_wf h g)

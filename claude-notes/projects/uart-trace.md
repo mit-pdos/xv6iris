@@ -191,6 +191,16 @@ below.
 6. Notes: `design/adequacy.md` item (b) updated at phase 3; the design
    section above still belongs in `design/` once the client API settles.
 
+## The client phase counter (2026-09-04, `design/applications.md`)
+
+The trace slot is `Pt γobs γcl`: the power theorem allocates a fixed-layer
+mono-nat (`riscv_client_name`) beside the history ghost and hands its auth
+to the slot at birth.  An application's ledger keeps it at 0 while the
+input keeps its discipline and moves it to 1 at the first byte that does
+not; a lower bound on it is the application's TAINT, nameable by every
+era.  The boot lend `Rb` is at the client name too.  Clients with no use
+for the counter drop it (`obs_pred_at_alloc_cl`, `obs_ledger_at_alloc_cl`).
+
 ## Open (after phase 4)
 
 - **`R` is required TIMELESS** by every ledger hook (`obs_ledger_at_step`,
