@@ -1,7 +1,8 @@
 # Project: relaxing the memory model to allow store–store reordering (PSO)
 
 **STATUS 2026-09-05: DESIGN ANALYSIS, not started.**  The companion of
-[`relaxed-rr.md`](relaxed-rr.md) (load–load reordering), written to
+[`completed/relaxed-rr.md`](../completed/relaxed-rr.md) (load–load
+reordering, landed the same day), written to
 answer: what does W→W reordering mean in the Ztso view machine, are the
 two relaxations complementary, which order, which is easier to represent,
 which costs more proof.  Measured against `main` at `434107f43`.

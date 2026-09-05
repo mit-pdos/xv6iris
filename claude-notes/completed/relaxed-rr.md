@@ -74,10 +74,13 @@ plan's stages (§6/§7):
   AMO orders nothing after itself -- the later load may miss the pre-AMO
   store).
 
-Left: the notes sweep (`design/multi-cpu.md`, `ctx-box.md` §1's "under
-TSO" wording -- pointer sentences are in) and archiving this file to
-`completed/`.  The original proposal follows unchanged; every claim in it
-about the tree was measured against `main` at `434107f43`.
+ARCHIVED 2026-09-05 with nothing left: the pointer sentences in
+`design/multi-cpu.md` and `design/ctx-box.md` §1 are the durable record,
+and the litmus suite (`iris/TsoLitmus.v`) is the standing obligation.  The
+companion analysis for store–store reordering is
+`projects/relaxed-ww.md` (not started).  The original proposal follows
+unchanged; every claim in it about the tree was measured against `main` at
+`434107f43`, and the landed shape is the one described above (stages A–E).
 
 ## 0. The answer in one paragraph
 

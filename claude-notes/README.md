@@ -240,20 +240,9 @@ outstanding; see the `completed/` section below).
   argument over the existing per-prefix exports.  Records the rejected
   routes (total WP, Transfinite Iris, PC-observation + CFG) and the one
   semantic hazard to settle first (the reservation self-loop).
-- **[`relaxed-rr.md`](projects/relaxed-rr.md)** — LANDED (2026-09-05,
-  tree green, audit at baseline): the memory model now admits load–load
-  reordering within RVWMO — a plain load no longer moves the view, a
-  per-hart read watermark and per-byte coherence floor (`hread`) came in,
-  fences with an R→R edge are ACQUIRES (the `hart_rview_lb_at` →
-  `hart_view_lb` conversion at `HartBarrier.wp_hart_fence_acq`), release
-  fences stay no-ops, the ownership layer untouched; the `.aq` knob is
-  precise (an exclusive pair acquires iff its read kind says so — the bit
-  rides `hread.hr_acq` and the reservation fragment `resv_fragb`; the
-  Svadu A/D write-back's plain LR/SC moves no view).  Its top says exactly
-  what landed and what is left (the notes sweep, archiving); the
-  proposal below it has the litmus table and the design.
 - **[`relaxed-ww.md`](projects/relaxed-ww.md)** — NOT STARTED, the
-  companion ANALYSIS (2026-09-05): store–store reordering (PSO).  Why W→W
+  companion ANALYSIS (2026-09-05) of the landed load–load relaxation
+  (`completed/relaxed-rr.md`): store–store reordering (PSO).  Why W→W
   breaks the two facts the ownership layer rests on (timestamps at issue,
   prefix views), the reserved-slot + drained-set encoding, `fence rw,w`
   becoming load-bearing, drain receipts through park/resume, the box and
@@ -329,6 +318,22 @@ outstanding; see the `completed/` section below).
   direction.
 
 ## `completed/` — finished projects, archived for reference
+
+**[`relaxed-rr.md`](completed/relaxed-rr.md)** is THE LOAD–LOAD RELAXATION
+(2026-09-05): the memory model admits load–load reordering within RVWMO —
+a plain load no longer moves the hart's view, a per-hart read watermark
+and per-byte coherence floor (`RiscvLang.hread`, on `gstate.ghr`) came in,
+fences with an R→R edge are ACQUIRES (the `hart_rview_lb_at` →
+`hart_view_lb` conversion at `HartBarrier.wp_hart_fence_acq`), release
+fences stay no-ops, the ownership layer untouched, and the `.aq` knob is
+precise (an exclusive pair acquires iff its read kind says so: the bit
+rides `hread.hr_acq` and the reservation fragment `resv_fragb`; the Svadu
+A/D write-back's plain LR/SC moves no view).  Landed on `main` as four
+commits ending at `bbac5d088`, tree green, `make audit-only` at the
+thirteen-axiom baseline.  Its top says what landed by stage; the proposal
+below it has the litmus table (`iris/TsoLitmus.v` is the standing
+obligation) and the design.  The companion store–store analysis is
+`projects/relaxed-ww.md`.
 
 **[`tso-cutover-endgame.md`](completed/tso-cutover-endgame.md)** is the
 close-out of THE TSO PORT (2026-09-03): the proofs run under the real TSO
