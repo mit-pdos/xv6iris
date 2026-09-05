@@ -84,4 +84,21 @@ Section UkShLoop.
        urun γt γd γs γfd h m (mword_of_int 0x938) (16 + (80 + n)) -∗
        WP (Loop : expr riscv_lang))%I.
 
+  (* [UkSh.ush_rest]'s opaque [R], AT THIS SHELL.  The re-cut left [R] a
+     parameter precisely so that this line -- which mentions the parser's
+     tables and the allocator's cells -- does not have to live in
+     iris/UkSh.v.  The break rides with them: [usz] is not bytes, so it is
+     not part of [ushl_dat], but a turn carries it all the same. *)
+  Definition ushl_R (sz : Z) : iProp Σ := (ushl_dat ∗ usz γs sz)%I.
+
+  (* ...and then [UkSh.ush_loop_head] AT that [R] IS [ushl_head]: the same
+     four binders, the same budget ([UkSh.ush_Dbody] is 80), and the two
+     halves of [ushl_R] uncurried. *)
+  Lemma ushl_head_of_R (l : list fdstate) (sz : Z) :
+    UkSh.ush_loop_head γt γd γs γfd (ushl_R sz) l -∗ ushl_head l sz.
+  Proof.
+    iIntros "H" (h m f n) "%Hregs Hstd Hdat Hsz Hbuf Hrun".
+    iApply ("H" $! h m f n with "[%//] Hstd [$Hdat $Hsz] Hbuf Hrun").
+  Qed.
+
 End UkShLoop.

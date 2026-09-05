@@ -36,18 +36,18 @@
 (* the address space.  So the parent carrying an untouched [ushf_dat]      *)
 (* round the loop is the actual control flow and not a weakening.          *)
 (*                                                                        *)
-(* WHAT THIS IS NOT YET.  [UkSh.ush_rest] hands its walk [16 + n] and      *)
-(* carries neither the tables, nor the allocator state, nor [usz]; this    *)
-(* arm needs all three and a budget of [16 + (80 + n)] (fork1's 2, the     *)
-(* diagnostic subtree's 28, the parser's 60 and the runner's 8).  So the   *)
-(* loop head is stated HERE, as [ushf_head], at the interface the re-cut   *)
-(* will have to meet.  The other reason [ush_rest] is not dischargeable is *)
-(* not about fork at all: the child's walk needs the line to be one the    *)
+(* AND IT JOINS [UkSh.ush_rest] (SS5).  The re-cut landed: the loop head    *)
+(* carries an opaque [R] and hands its walk [16 + (UkSh.ush_Dbody + n)],   *)
+(* which at [R := UkShLoop.ushl_R] is exactly the tables, the allocator's  *)
+(* first-call state, [usz] and the [16 + (80 + n)] this arm needs.  So     *)
+(* [ushf_rest_of_body] discharges [ush_rest] -- from ONE premise, and it   *)
+(* is not about fork at all: the child's walk needs the line to be one the *)
 (* LEXER ACCEPTS ([ushp_no_symbols], fewer than MAXARGS tokens), and the   *)
 (* command loop cannot promise that about a line the user typed.  That is  *)
-(* stage 5's [ush_simple] scope -- the REDIRECT and PIPE arms -- and it is *)
-(* a premise here for the same reason [UkShCd] takes "this line begins     *)
-(* cd " as one.                                                            *)
+(* [ushf_lexable], stage 5's [ush_simple] scope -- the REDIRECT and PIPE   *)
+(* arms -- and it is a premise here for the same reason [UkShCd] takes     *)
+(* "this line begins cd " as one.  Everything else the loop knew already:  *)
+(* where the line ends comes off its own scan, via [ushf_first_nul].       *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
@@ -681,6 +681,109 @@ Section UkShFork.
                   Hregs Hs1 Hns Htoks Htlen Hnn Hnul Hkl
                   Hszlo Hszal Hszok
                   with "Hhead Hcode Hro Hjt Hstd Hdat Hsz Hbuf Hrun").
+  Qed.
+
+  (* ===================================================================== *)
+  (* §5 THE JOIN: main's body IS [UkSh.ush_rest], modulo LEXABILITY.        *)
+  (*                                                                        *)
+  (* [wp_kshm_body] is stated at 0x97a with the line spelled out -- where   *)
+  (* it ends, that the lexer accepts it, and how it tokenises.  [ush_rest]  *)
+  (* is stated with almost none of that: the command loop knows only that   *)
+  (* SOME byte at or after [k] is NUL, because that is what its own scan    *)
+  (* established.  Two of the three gaps close on the spot; the third does  *)
+  (* not, and is the whole of what is left.                                 *)
+  (*                                                                        *)
+  (*   WHERE THE LINE ENDS is derivable: [ushf_first_nul] walks from [k] to *)
+  (*     the witness and returns the FIRST NUL, which is exactly the        *)
+  (*     [len] the body asks for, with [k + len <= i2 < sh_nbuf].           *)
+  (*   THE RESOURCES are the re-cut's [R], instantiated at                  *)
+  (*     [UkShLoop.ushl_R]; [ushl_head_of_R] uncurries it into the head the *)
+  (*     body wants.                                                        *)
+  (*   THAT THE LEXER ACCEPTS THE LINE is NOT derivable and never will be   *)
+  (*     from inside the loop -- the user may type a symbol byte or eleven  *)
+  (*     words.  It is [ushf_lexable] below, and closing it is stage 5's    *)
+  (*     [ush_simple] work: a line with a symbol byte does not reach        *)
+  (*     [wp_kshp_parser] at all, and [runcmd]'s REDIRECT and PIPE arms --  *)
+  (*     the two that MOVE THE DESCRIPTOR TABLE -- are what a real          *)
+  (*     [ush_simple] has to refute.                                        *)
+  (* ===================================================================== *)
+
+  (* the FIRST NUL at or after [k], out of any NUL at or after [k] *)
+  Local Lemma ushf_first_nul_aux (f : nat -> bv 8) (d : nat) :
+    forall k : nat, f (k + d)%nat = ubyte0 ->
+      exists len : nat, (len <= d)%nat /\
+        (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) /\
+        f (k + len)%nat = ubyte0.
+  Proof.
+    induction d as [| d IH]; intros k Hd.
+    - exists 0%nat. split; [ lia | ].
+      split; [ intros j Hj; lia | exact Hd ].
+    - destruct (decide (f k = ubyte0)) as [H0 | H0].
+      + exists 0%nat. split; [ lia | ].
+        split; [ intros j Hj; lia | ].
+        rewrite Nat.add_0_r. exact H0.
+      + destruct (IH (S k)) as (len & Hle & Hnn & Hnul).
+        { replace (S k + d)%nat with (k + S d)%nat by lia. exact Hd. }
+        exists (S len). split; [ lia | ]. split.
+        * intros j Hj. destruct j as [| j'].
+          { rewrite Nat.add_0_r. exact H0. }
+          { replace (k + S j')%nat with (S k + j')%nat by lia.
+            apply Hnn. lia. }
+        * replace (k + S len)%nat with (S k + len)%nat by lia. exact Hnul.
+  Qed.
+
+  Lemma ushf_first_nul (f : nat -> bv 8) (k i2 : nat) :
+    (k <= i2)%nat -> f i2 = ubyte0 ->
+    exists len : nat, (k + len <= i2)%nat /\
+      (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) /\
+      f (k + len)%nat = ubyte0.
+  Proof.
+    intros Hk Hi2.
+    destruct (ushf_first_nul_aux f (i2 - k)%nat k
+                ltac:(replace (k + (i2 - k))%nat with i2 by lia; exact Hi2))
+      as (len & Hle & Hnn & Hnul).
+    exists len. split; [ lia | exact (conj Hnn Hnul) ].
+  Qed.
+
+  (* THE ONE THING THE COMMAND LOOP CANNOT PROMISE about a line the user
+     typed.  Stated over an arbitrary [f] and [k] because that is how the
+     loop hands it over: the line is whatever is in the buffer. *)
+  Definition ushf_lexable : Prop :=
+    forall (f : nat -> bv 8) (k len : nat),
+      (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) ->
+      f (k + len)%nat = ubyte0 ->
+      ushp_no_symbols len (fun j : nat => f (k + j)%nat) /\
+      exists toks : list (nat * nat),
+        ushp_tokens len (fun j : nat => f (k + j)%nat) 0 toks /\
+        (length toks < 10)%nat.
+
+  Lemma ushf_rest_of_body
+      (Hsbrk : forall (gd gs : gname) (sz n : Z) (r : mword 64),
+         UkShMalloc.ushm_sbrk_ans gd gs sz n r -∗
+         ⌜ r = (mword_of_int sz : mword 64) ⌝ ∗
+         UkShMalloc.ushm_sbrk_ans gd gs sz n r)
+      (Hclw : UkShDiag.ushd_clw_text_ty) (sz : Z) :
+    ushf_lexable ->
+    (* the break, as [exec] leaves it *)
+    8344 <= sz ->
+    UserPtTree.pgroundup sz = sz ->
+    usz_ok (sz + 65536) ->
+    shk_code γt -∗ shk_rodata γt -∗ ush_jtab γt -∗
+    UkSh.ush_rest γt γd γs γfd (UkShLoop.ushl_R γd γs sz).
+  Proof.
+    intros Hlex Hszlo Hszal Hszok.
+    iIntros "#Hcode #Hro #Hjt".
+    iModIntro. iIntros (l) "Hhead".
+    iIntros (h m f k i2 n) "%Hregs %Hs1 %Ha5 %Hi2 Hstd [Hdat Hsz] Hbuf Hrun".
+    destruct Hi2 as [[Hki2 Hi2n] Hnul2].
+    destruct (ushf_first_nul f k i2 Hki2 Hnul2) as (len & Hle & Hnn & Hnul).
+    destruct (Hlex f k len Hnn Hnul) as (Hns & toks & Htoks & Htlen).
+    iApply (wp_kshm_body Hsbrk Hclw h m f k len toks sz l n
+              Hregs Hs1 Ha5 Hnn Hnul ltac:(lia) Hns Htoks Htlen
+              Hszlo Hszal Hszok
+              with "[Hhead] Hcode Hro [] Hjt Hstd Hdat Hsz Hbuf Hrun").
+    - iApply (UkShLoop.ushl_head_of_R γt γd γs γfd with "Hhead").
+    - iApply (ushf_code_shp with "Hcode").
   Qed.
 
 End UkShFork.
