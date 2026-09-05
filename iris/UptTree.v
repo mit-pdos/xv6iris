@@ -718,7 +718,7 @@ Section UptTranslateIris.
     (* A6.24's payer, threaded at the memory-indexed (CHAINABLE) currency
        and PERSISTENT -- see [KptTree.tlb_inv_pt_translateAddr_at].  A USER
        page table is the [Some ξ] tier, so the caller discharges this with
-       [TsoCtx.ctx_store_win_ok] AND its own [own_context] -- it IS its own
+       [TsoCtxStore.ctx_store_win_ok] AND its own [own_context] -- it IS its own
        page table. *)
     □ (∀ (m : gmap Arch.pa (bv 8)) (a : Arch.pa) (wold wnew : mword 64),
          gen_heap_interp m -∗ S m -∗

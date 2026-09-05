@@ -4549,7 +4549,7 @@ Section VirtioProto.
 
      A6.48 ruling 4, THE INSIDE-OUT, and A6.126 §6, THE RELEASE WINDOW.  The
      completion APPENDS its two bytes to the era log; the ledger gate that
-     does it ([TsoCtx.ledger_store_rel_map_ok]) moves [gen_heap_interp] and
+     does it ([TsoCtxStore.ledger_store_rel_map_ok]) moves [gen_heap_interp] and
      [tso_interp_at] together, so the append belongs to the one caller that
      holds both -- [WpUart]'s disk loop.  The write set is exactly the index
      word's snapshot ([used_idx_writes_snap]), which the protocol keeps

@@ -639,7 +639,7 @@ Section DiskInv.
      DMA's own [wp_disk_step] callback must move those fragments to the
      appended log (§6 amendment A6.2), and the reclaiming thread -- whose
      lock acquire put its view at the log top -- mints [ctx_dom ξ cur_ctx]
-     with [TsoCtx.ctx_dom_of_parked] and re-registers the bytes through
+     with [TsoCtxLedger.ctx_dom_of_parked] and re-registers the bytes through
      [ctx_morph_word].  That is the ctx_dom handoff tso-port.md §1's
      RULING 2 promised; nothing shorter is sound, because a byte the DEVICE
      wrote is visible to a hart for exactly one reason -- the hart's view

@@ -58,7 +58,7 @@ Section AbsorbLb.
   Qed.
 
   (* THE ACQUIRE-SIDE MINT AT A RECEIPT.  Same conclusion as
-     [TsoCtx.ctx_dom_of_parked]; the source's stamp is compared with the
+     [TsoCtxLedger.ctx_dom_of_parked]; the source's stamp is compared with the
      claimer's own view rather than with the log length, so no interp is
      consulted and the mint is available at any ghost step where the
      running token is. *)

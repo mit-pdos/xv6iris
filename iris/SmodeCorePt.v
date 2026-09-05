@@ -114,6 +114,7 @@ Require Import SmodePte RiscvExtras.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxStore TsoCtxLedger.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -566,7 +567,7 @@ Section SmodeCorePt.
 
   (* THE CLAIM-KEYED WINDOW STORE, PAID.  One append over the whole window
      (a store is ONE message, §1's payload ruling), through
-     [TsoCtx.ctx_store_win_ok] at [RiscvExec.gs_of] -- A6.1a's bridge, paid
+     [TsoCtxStore.ctx_store_win_ok] at [RiscvExec.gs_of] -- A6.1a's bridge, paid
      once in each direction.  The conclusion is [HartSMem.Wobl_ram]'s tso
      conjunct verbatim: a PLAIN store moves no view, so the [vstep] is at
      the hart's own [tv]. *)
@@ -617,7 +618,7 @@ Section SmodeCorePt.
       have := Hbd (hart_agent c). lia. }
     rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
                σ.(sregs) σ.(mdev) Hpin).
-    iMod (TsoCtx.ctx_store_win_ok
+    iMod (TsoCtxStore.ctx_store_win_ok
             (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
             (gs_of img (write_bytes σ.(mem) pa n vnew) log' V'
                σ.(sregs) σ.(mdev))
@@ -637,7 +638,7 @@ Section SmodeCorePt.
      own only their future; the new ones come back REGISTERED to the
      writer's own context -- the mint, at the one place the interp is in
      hand.  Word for word [wordw_win_store_c] with the two free bridges
-     substituted and [TsoCtx.ctx_store_win_free_ok] in place of
+     substituted and [TsoCtxLedger.ctx_store_win_free_ok] in place of
      [ctx_store_win_ok]. *)
   Lemma wordw_win_store_free_c `{KTR : !CurKtier} (n : N) {m : N}
       (img : TsoMemPa.bytemap) (σ : mstate) (log : list pwmsg)
@@ -687,7 +688,7 @@ Section SmodeCorePt.
       have := Hbd (hart_agent c). lia. }
     rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
                σ.(sregs) σ.(mdev) Hpin).
-    iMod (TsoCtx.ctx_store_win_free_ok
+    iMod (TsoCtxLedger.ctx_store_win_free_ok
             (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
             (gs_of img (write_bytes σ.(mem) pa n vnew) log' V'
                σ.(sregs) σ.(mdev))
@@ -855,7 +856,7 @@ Section SmodeCorePt.
       have := Hbd (hart_agent c). lia. }
     rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
                σ.(sregs) σ.(mdev) Hpin).
-    iMod (TsoCtx.ledger_store_win_wpay_mint_frag_ok
+    iMod (TsoCtxLedger.ledger_store_win_wpay_mint_frag_ok
             (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
             (gs_of img (write_bytes σ.(mem) pa 8 vnew) log' V'
                σ.(sregs) σ.(mdev))

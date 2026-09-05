@@ -332,7 +332,7 @@ Definition ram_hi : Z := 0x88000000.
    "NO EVIDENCE" READ'S OBLIGATION.  [TsoMemPa.read_down] bottoms out at
    timestamp 0 -- the era image -- so a reader with no receipt and no
    ownership still gets a VALUE exactly when the image has one at that
-   address ([TsoCtx.ledger_read_any_ok]).  A6.74 §(3) priced that gate as
+   address ([TsoCtxLedger.ledger_read_any_ok]).  A6.74 §(3) priced that gate as
    payable "from [addr_is_ram] plus the interp's image coverage" and A6.75
    then had to leave the coverage as a PREMISE, because no such interp
    conjunct existed.  This is it, and it is where it belongs: [gimg] is

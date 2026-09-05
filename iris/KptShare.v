@@ -66,7 +66,7 @@ Section KptShare.
      [PtTree.ptree_own_at None]): a PTE is read by the hardware walker at
      [Read_ttw] -- RULING 1's flat arm -- so no plain-load licence is ever
      wanted, and the Svadu A/D write-back's append is paid by
-     [TsoCtx.ledger_store_ok], which needs neither a context nor a token. *)
+     [TsoCtxStore.ledger_store_ok], which needs neither a context nor a token. *)
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
@@ -340,7 +340,7 @@ Section KptShareTranslate.
     (* A6.24's payer, threaded at the memory-indexed (CHAINABLE) currency
        and PERSISTENT -- see [KptTree.tlb_inv_pt_translateAddr_at].  The
        SHARED table is the [None] tier, so this is discharged with
-       [TsoCtx.ledger_store_ok] and needs no [own_context]. *)
+       [TsoCtxStore.ledger_store_ok] and needs no [own_context]. *)
     □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64) (B : nat),
          ⌜pte_wb_ok wold wnew⌝ -∗
          gen_heap_interp m -∗ S m -∗

@@ -816,7 +816,7 @@ Section Pt2TranslateIris.
        walker's A/D write-back is a real store to a LEDGER slot, so it owes
        the era log's append and cannot be paid by [phys_word_pointsto_write]
        (a gen_heap-only gate); the caller discharges it with
-       [TsoCtx.ctx_store_win_ok] and its own [own_context]. *)
+       [TsoCtxStore.ctx_store_win_ok] and its own [own_context]. *)
     □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
          gen_heap_interp m -∗ S m -∗
          TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a (DfracOwn 1) wold ==∗
@@ -1162,7 +1162,7 @@ Section Pt2TrampInstKcur.
        the SHARED KERNEL tree at the [None] tier ([kptree_own]).  The
        kernel tree's A/D write-back is a context-FREE ledger store (A6.20 --
        its owner is a bare [inv], so it can name no context), so it needs its
-       own currency: [TsoCtx.ledger_store_win_ok] rather than
+       own currency: [TsoCtxLedger.ledger_store_win_ok] rather than
        [ctx_store_win_ok].  Two payers, one per tier, is the honest shape. *)
     □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64) (B : nat),
          ⌜pte_wb_ok wold wnew⌝ -∗
@@ -1470,7 +1470,7 @@ Section Pt2TrampInstKprev.
        the SHARED KERNEL tree at the [None] tier ([kptree_own]).  The
        kernel tree's A/D write-back is a context-FREE ledger store (A6.20 --
        its owner is a bare [inv], so it can name no context), so it needs its
-       own currency: [TsoCtx.ledger_store_win_ok] rather than
+       own currency: [TsoCtxLedger.ledger_store_win_ok] rather than
        [ctx_store_win_ok].  Two payers, one per tier, is the honest shape. *)
     □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64) (B : nat),
          ⌜pte_wb_ok wold wnew⌝ -∗

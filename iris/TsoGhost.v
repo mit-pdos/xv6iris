@@ -242,7 +242,7 @@ Section ghosts.
      never certify [ctx_floor ξ lo] for the floor its own store just made
      (A6.101's bootstrap, one level up).  What it CAN take off the
      interpretation is this: "[lo] is a real log position".  Paired with an
-     AMO's log-top view at the first acquire ([TsoCtx.hart_view_lb_get] +
+     AMO's log-top view at the first acquire ([TsoCtxLedger.hart_view_lb_get] +
      [ctx_bound_raise]) that is exactly ruling §0.35'(iii)'s ABSORB, so the
      floor is bought by the READER instead of the writer. <<< *)
   Lemma llb_get γll n :

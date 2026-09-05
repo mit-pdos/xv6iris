@@ -409,7 +409,7 @@ Section TsoBundle.
        (* THE ERA IMAGE COVERS RAM ([RiscvLang.mm_ok]'s third conjunct,
           A6.78) -- carried here for the same reason the flat tie is: the
           [⊣⊢] with [tso_interp_at] has to reconstruct it, and the "no
-          evidence" read's obligation ([TsoCtx.ledger_read_any_ram_ok]) is
+          evidence" read's obligation ([TsoCtxLedger.ledger_read_any_ram_ok]) is
           discharged from it INSIDE a leaf, where no [gstate] is in
           scope. *)
        ⌜∀ a : Arch.pa,
@@ -496,7 +496,7 @@ Section TsoBundle.
 
   (* THE IMAGE-COVERAGE ACCESSOR, so no leaf ever destructures the bundle:
      the "no evidence" read's whole obligation, at the leaf's own
-     abstracted [img] ([TsoCtx.ledger_read_any_ram_ok] is the [gstate]-side
+     abstracted [img] ([TsoCtxLedger.ledger_read_any_ram_ok] is the [gstate]-side
      twin, reached through [tso_interp_of_at_gs]). *)
   Lemma tso_interp_of_img_cover E img mem log (V : agent -> nat) :
     tso_interp_of E img mem log V -∗

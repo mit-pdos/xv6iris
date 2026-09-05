@@ -65,6 +65,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
    the class -- a silent no-op).  [bytes_own] is context-indexed since
    A6.16, so the class has to be in scope where it is defined. *)
 Require Import TsoCtx.
+Require Import TsoCtxStore.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -292,7 +293,7 @@ Section memrun.
   (* This REPLACES the old [bytes_own_upd]/[bytes_own_write] pair, which   *)
   (* walked the footprint byte by byte updating gen_heap.  A byte at a     *)
   (* time is a MESSAGE at a time, i.e. a different machine, so the window  *)
-  (* is now paid in one step by [TsoCtx.ctx_store_sub_ok] -- the submap    *)
+  (* is now paid in one step by [TsoCtxStore.ctx_store_sub_ok] -- the submap    *)
   (* form, because the walker owns MORE than it writes.  The written bytes *)
   (* come back DIRTY at the new top and the rest of the map is untouched.  *)
   (*                                                                      *)
@@ -374,7 +375,7 @@ Section memrun.
       apply elem_of_dom. apply (bytes_owned_spec mm pa n Hfp j Hj). }
     rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log V
                sg.(sregs) sg.(mdev) Hpin).
-    iMod (TsoCtx.ctx_store_sub_ok
+    iMod (TsoCtxStore.ctx_store_sub_ok
             (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
             (gs_of img (write_bytes sg.(mem) pa n val) log' V'
                sg.(sregs) sg.(mdev))

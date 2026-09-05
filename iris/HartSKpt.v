@@ -767,7 +767,7 @@ Section kptnode.
        WRITE-BACK IS PAYABLE HERE AND NOWHERE ABOVE.  [wpte_obl_at] is a
        CALLBACK -- the walk hands it [tso_interp_of] -- so this seam holds
        the slot AND the bundle at the same instant, which is exactly what
-       [TsoCtx.ledger_store_ok] needs (the interp's tie relates the flat
+       [TsoCtxStore.ledger_store_ok] needs (the interp's tie relates the flat
        cell to the ledger, so neither moves without the other).  The [exec]
        lane's translation lemmas can only THREAD a payer, because nothing
        above them ever holds the bundle. *)

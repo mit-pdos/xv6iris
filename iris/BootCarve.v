@@ -1362,7 +1362,7 @@ Section BootCarve.
   (* ================================================================== *)
   (* THE RACY PAYLOAD'S CARVE INPUT (A6.80).                             *)
   (*                                                                    *)
-  (* [TsoCtx.ledger_wpay_mint] mints the lock's owner-word payload from  *)
+  (* [TsoCtxLedger.ledger_wpay_mint] mints the lock's owner-word payload from  *)
   (* cells AT TIMESTAMP 0 -- the ledger's own certificate that nothing   *)
   (* has written the byte in this era, which is what makes [win_ok1]'s   *)
   (* history conjuncts vacuous (A6.79).  [TsoCtx.ctx_pointsto] HIDES the *)

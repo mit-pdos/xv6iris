@@ -14,7 +14,7 @@
    free by construction: hart 0 reaches [__sync_synchronize] -- a
    [Barrier_RISCV_rw_rw], which [RiscvLang.fence_drains] DRAINS -- so its
    view sits at the log top, [length glog <= gtv cpu_id] holds, and
-   [TsoCtx.hart_view_lb_get] hands back both the [hart_view_lb] the pin's
+   [TsoCtxLedger.hart_view_lb_get] hands back both the [hart_view_lb] the pin's
    readers compare against and (through [TsoGhost.view_lb_llb]) the [llb]
    that makes [B] a legal log position.  This is the interp-side dual of
    [TsoCtxAbsorbLb.ctx_absorb_lb].

@@ -325,7 +325,7 @@ Section CtxPinMint.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (* §4 THE RECEIPT, AT THE CURRENT VIEW.  [TsoCtx.hart_view_lb_get] asks *)
+  (* §4 THE RECEIPT, AT THE CURRENT VIEW.  [TsoCtxLedger.hart_view_lb_get] asks *)
   (* for the at-the-top premise only to COMPARE a stamp against the view; *)
   (* the receipt itself is an INCLUSION and is free at any state          *)
   (* ([mm_ok] already bounds the view by the log length).  A publisher     *)

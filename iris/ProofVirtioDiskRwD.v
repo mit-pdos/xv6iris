@@ -68,6 +68,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxStore.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -763,7 +764,7 @@ Section VdrwdLeaves.
     iDestruct (TsoCtx.own_context_expose_w with "Hctx") as (W) "[#HWl Hctxw]".
     iDestruct (TsoCtx.tso_interp_llb_valid with "Htso HWl") as "[Htso %HWle]".
     cbn [glog gs_of] in HWle.
-    iMod (TsoCtx.ledger_store_win_at_ok (CID := CIDw)
+    iMod (TsoCtxStore.ledger_store_win_at_ok (CID := CIDw)
             (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
             (gs_of img (write_bytes sigma.(mem) (pa_add pav 2%nat) (Z.to_N 2) vnew)
                log' V' sigma.(sregs) sigma.(mdev))

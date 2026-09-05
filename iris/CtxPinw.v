@@ -1,17 +1,17 @@
 (* CtxPinw.v -- A6.143's STORE ROUTE: the word-set pin's member store.
 
-   The rpay author-store pattern verbatim ([TsoCtx.ledger_store_rel_map_ok]),
+   The rpay author-store pattern verbatim ([TsoCtxStore.ledger_store_rel_map_ok]),
    one arm over and SIMPLER: the pinw window's floor and member predicate do
    not move across a member store (rel extends its history; the pinw claim
    is history-free), so the sequence is
 
      extract the pure [pinw_ok1]s  (they survive the append by
                                     [TsoMemPa.pinw_ok1_app_member])
-     drop the arms                 ([TsoCtx.ledger_pinw_drop], to plain
+     drop the arms                 ([TsoCtxStore.ledger_pinw_drop], to plain
                                     ledger cells)
-     the generic at-tier store     ([TsoCtx.ledger_store_win_at_ok] --
+     the generic at-tier store     ([TsoCtxStore.ledger_store_win_at_ok] --
                                     no store-gate clone, the whole point)
-     re-mint at the SAME window    ([TsoCtx.ledger_pinw_mint1] at the
+     re-mint at the SAME window    ([TsoCtxStore.ledger_pinw_mint1] at the
                                     transported pure claim).
 
    WHY ITS OWN FILE: the CtxValues.v/CtxPinMint.v precedent -- everything
@@ -26,6 +26,7 @@ Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto.
 Require Import TsoMemPa TsoGhost TsoCtx.
+Require Import TsoCtxStore.
 Require Import RiscvExec.  (* [tso_interp_of]/[gs_of]/[vstep]: the leaf-
    obligation face of the member store ([pinw_write_c] below) *)
 

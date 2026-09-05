@@ -1115,7 +1115,7 @@ Section PtTreeIris.
   (*             ruling 2); read by the HARDWARE walker at [Read_ttw],     *)
   (*             RULING 1's flat arm, so no load licence is ever wanted;   *)
   (*             written by the Svadu A/D write-back, which owes the       *)
-  (*             append.  Context-free ledger ([TsoCtx.phys_ledger_word],  *)
+  (*             append.  Context-free ledger ([TsoCtxLedger.phys_ledger_word],  *)
   (*             A6.20) is the only sound shape and also the cheapest.     *)
   (*                                                                      *)
   (*   [Some ξ]  a USER page table -- owned by a THREAD, read by SOFTWARE  *)
@@ -1152,7 +1152,7 @@ Section PtTreeIris.
      hart 0 a token-free read credential ([CtxValues.cv_own]); a secondary
      reads through [view_lb B] and [Ba <= B].  The A/D write-back restamps
      the cell but keeps [(Ba, pte_slot_set w)] -- the [Bg]-generalized
-     store gate ([TsoCtx.ledger_store_win_pin_okf]). *)
+     store gate ([TsoCtxStore.ledger_store_win_pin_okf]). *)
   Definition kpt_slot_pin (a : Arch.pa) (dq : dfrac) (w : bv 64)
       (B : nat) : iProp Σ :=
     (⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗

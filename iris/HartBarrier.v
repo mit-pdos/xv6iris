@@ -309,7 +309,7 @@ Section barrier.
   (* one moment an instruction-view RECEIPT is honestly born.  The rule   *)
   (* mints [hart_iview_lb_at cpu_id IK] at the raised view and runs the   *)
   (* client's ghost step with the two bounds the stamp needs             *)
-  (* ([TsoCtx.ctx_xstamp]: the hart's view and its own last message are  *)
+  (* ([TsoCtxLedger.ctx_xstamp]: the hart's view and its own last message are  *)
   (* both under [IK]) -- the [userret] STEP 0 stamping of a process's     *)
   (* executable pages is exactly such a step.                             *)
   (* ------------------------------------------------------------------ *)

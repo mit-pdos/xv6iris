@@ -60,6 +60,7 @@ Require Export UartNames.  (* [uart_names]: split out for the build DAG *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
+Require Import TsoCtxStore.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -1118,7 +1119,7 @@ Section DevLoops.
          off the slot's fragments, and comes straight back.
 
          THE APPEND IS PERFORMED HERE, by the disk loop, and not inside the
-         protocol lemma (A6.48 ruling 4): [TsoCtx.ledger_store_ok] moves
+         protocol lemma (A6.48 ruling 4): [TsoCtxStore.ledger_store_ok] moves
          [gen_heap_interp] and [tso_interp_at] TOGETHER, and the loop is the
          one holder of both.  The device is an agent of the era log, so the
          transaction goes in as ONE message authored by [disk_agent]; the
@@ -1172,7 +1173,7 @@ Section DevLoops.
           rewrite (tso_interp_of_at_gs riscv_eraGS img m log V
                      (gr 0%fin) d Hpin).
           iEval (rewrite /phys_map) in "Hold".
-          iMod (TsoCtx.ledger_store_ok
+          iMod (TsoCtxStore.ledger_store_ok
                   (gs_of img m log V (gr 0%fin) d)
                   (gs_of img (w ∪ m)
                      (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'
@@ -1251,7 +1252,7 @@ Section DevLoops.
       (* THE INDEX BUMP'S APPEND (A6.48 ruling 4, A6.126 §6).  The write   *)
       (* set is exactly the index word's snapshot; it goes in as ONE       *)
       (* message authored by [disk_agent] through the RELEASE-WINDOW gate  *)
-      (* ([TsoCtx.ledger_store_rel_map_ok]), which re-mints the window     *)
+      (* ([TsoCtxStore.ledger_store_rel_map_ok]), which re-mints the window     *)
       (* with its history extended by this append's position.  The record  *)
       (* the handler will read was written by the EARLIER transactions:    *)
       (* its sealed cells come out of the protocol and go back as          *)
@@ -1314,7 +1315,7 @@ Section DevLoops.
               by (destruct Hho as [Hlen _]; rewrite Hnil in Hlen; cbn in Hlen; lia).
             subst hist. rewrite Hnc0.
             iEval (rewrite /TsoCtx.rel_pre_cells) in "Hpre".
-            iMod (TsoCtx.ledger_rpay_mint (gs_of img m log V (gr 0%fin) d)
+            iMod (TsoCtxStore.ledger_rpay_mint (gs_of img m log V (gr 0%fin) d)
                     (used_idx_pa (v_cfg vs)) 2 disk_agent lo tf (nth_byte (wrap16 0))
                     ltac:(lia) Htf Hlo with "Hmem Htso Hpre") as "(Hmem & Htso & Hcells)".
             iModIntro. iFrame "Htso Hmem". rewrite /TsoCtx.rel_cells.
@@ -1326,7 +1327,7 @@ Section DevLoops.
           { rewrite /TsoCtx.rel_cells.
             iDestruct (big_sepL_lookup _ (seq 0 2) 0%nat 0%nat with "Hrel") as (tc) "Hc0";
               [reflexivity|].
-            iDestruct (TsoCtx.ledger_rpay_ok with "Htso Hc0") as %Hok0.
+            iDestruct (TsoCtxStore.ledger_rpay_ok with "Htso Hc0") as %Hok0.
             iPureIntro. intros k q' g Hk.
             destruct Hok0 as (_ & _ & _ & _ & H1b & _). cbn in H1b.
             destruct (H1b q' g (elem_of_list_lookup_2 _ _ _ Hk)) as (_ & i0 & mg & -> & Hlk & _).
@@ -1336,7 +1337,7 @@ Section DevLoops.
                        with "Hmem Htso Hold") as "(Hmem & Htso & Hold)".
           iEval (cbn [gs_of glog]) in "Hold".
           (* the append: the index word alone, through the window gate *)
-          iMod (TsoCtx.ledger_store_rel_map_ok
+          iMod (TsoCtxStore.ledger_store_rel_map_ok
                   (gs_of img m log V (gr 0%fin) d)
                   (gs_of img (w ∪ m)
                      (log ++ [TsoMemPa.PWMsg w disk_agent])%list V'

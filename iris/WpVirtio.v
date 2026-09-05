@@ -116,7 +116,7 @@ Section WpVirtio.
   (* THE LEASE IS AN ACCESSOR NOW, NOT AN UPDATER (A6.48 ruling 4, the
      inside-out).  [dma_update] used to do the [gen_heap] write itself; it
      cannot any more, because a device write APPENDS to the era log and
-     [TsoCtx.ledger_store_ok] moves [gen_heap_interp] and [tso_interp_at]
+     [TsoCtxStore.ledger_store_ok] moves [gen_heap_interp] and [tso_interp_at]
      TOGETHER -- the interpretation's own tie relates the flat cell and the
      timestamp element, so the two authorities cannot be split across two
      lemmas.  So the lease hands its written-to bytes OUT at the ledger tier,

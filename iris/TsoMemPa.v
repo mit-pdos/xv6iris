@@ -929,7 +929,7 @@ Section racy.
   (* ---- AND THE FREE HALF: the OWN-WRITE read needs no receipt at all.
      [visibleb_own] makes the author's own message visible at EVERY view,
      so the holder's read of the cell it itself wrote is exact.  This is
-     the pure form of what [TsoCtx.ledger_read_vis_ok] already does in
+     the pure form of what [TsoCtxStore.ledger_read_vis_ok] already does in
      Iris -- recorded here because it is what makes the memo's ruling 2
      ("only [notheld] gets new kit") true. ---- *)
   Lemma racy_read_own (img : gmap Arch.pa (bv 8)) (log : list pwmsg) (h : agent)

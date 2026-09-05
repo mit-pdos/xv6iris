@@ -23,6 +23,7 @@ Require Import RiscvExtras RiscvFetchExec.
 (* [pwmsg]/[agent]: [wobl_ram] below is stated over the write log *)
 Require Import TsoMemPa.
 Require Import TsoCtx.
+Require Import TsoCtxStore.
 Local Open Scope Z_scope.
 
 Local Arguments Z.sub _ _ : simpl nomatch.
@@ -505,7 +506,7 @@ Section store.
   (* A6.16).  [wobl_ram] above says WHAT is owed; this says WHO can pay.  *)
   (* A running context's OWNED WINDOW over the footprint pays the whole   *)
   (* thing -- the flat update and the append's four ghost steps alike --  *)
-  (* through [TsoCtx.ctx_store_win_ok], and the bytes come back at the    *)
+  (* through [TsoCtxStore.ctx_store_win_ok], and the bytes come back at the    *)
   (* new value, DIRTY at the new top (visible to this hart by the         *)
   (* forwarding arm, to any other only after a park raises the bound).    *)
   (*                                                                      *)
@@ -598,7 +599,7 @@ Section store.
         + exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
     rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log V
                sg.(sregs) sg.(mdev) Hpin).
-    iMod (TsoCtx.ledger_store_win_pin_okf
+    iMod (TsoCtxStore.ledger_store_win_pin_okf
             (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
             (gs_of img (write_bytes sg.(mem) pa n val) log' V'
                sg.(sregs) sg.(mdev))
@@ -664,7 +665,7 @@ Section store.
       lia. }
     rewrite (tso_interp_of_at_gs riscv_eraGS img sg.(mem) log V
                sg.(sregs) sg.(mdev) Hpin).
-    iMod (TsoCtx.ctx_store_win_ok
+    iMod (TsoCtxStore.ctx_store_win_ok
             (gs_of img sg.(mem) log V sg.(sregs) sg.(mdev))
             (gs_of img (write_bytes sg.(mem) pa n val) log' V'
                sg.(sregs) sg.(mdev))

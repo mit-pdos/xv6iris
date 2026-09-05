@@ -485,7 +485,7 @@ Section PtSlotBridge.
   (* mapping the two families are the same resource under a persistent  *)
   (* [kmap_at].  Both directions below are lossless -- the timestamp    *)
   (* and the clean/dirty bit ride through untouched -- so the store     *)
-  (* inside the bracket is [TsoCtx.ctx_store_win_ok]'s and nothing goes *)
+  (* inside the bracket is [TsoCtxStore.ctx_store_win_ok]'s and nothing goes *)
   (* stale.                                                            *)
   (*                                                                  *)
   (* CASCADE (deliberate, and the honest one): the slot's owner --      *)
@@ -591,7 +591,7 @@ Section KptTreeInv.
      PTE is read by the HARDWARE walker at [Read_ttw] -- RULING 1's FLAT arm
      -- so no plain-load licence is ever wanted, while the Svadu A/D
      write-back is a real store and owes the append, which
-     [TsoCtx.ledger_store_ok] pays with no context and no token. *)
+     [TsoCtxStore.ledger_store_ok] pays with no context and no token. *)
 
   (* The generalized invariant (rwx-kmap): the table is constrained by the
      M-INDEXED spec [kpt_tree_spec_gen], and the kernel-mapping auth
@@ -1058,8 +1058,8 @@ Section PtTranslateOwn.
 
      A6.24 -- THE CORE TAKES ITS PAYER, IT DOES NOT BE ONE.  The Svadu A/D
      write-back is a real store and post-flip owes the log append; but the
-     two tiers pay DIFFERENTLY ([TsoCtx.ledger_store_ok] with no context for
-     the kernel table, [TsoCtx.ctx_store_win_ok] plus [own_context] for a
+     two tiers pay DIFFERENTLY ([TsoCtxStore.ledger_store_ok] with no context for
+     the kernel table, [TsoCtxStore.ctx_store_win_ok] plus [own_context] for a
      user one), and this lemma is at the wrong ALTITUDE to pay either -- it
      is an [mstate]-level fact with no memory-model bundle in it.  So the
      append is a THREADED PREMISE ([Sto]/[Stoq] carry the caller's currency;
@@ -1280,7 +1280,7 @@ Section KptTranslateIris.
        once -- a straddling fetch does -- must use it more than once; it is
        a gate, not a resource, so [□] costs its supplier nothing.  The tree
        is the KERNEL one, so the slot is a CONTEXT-FREE ledger word and the
-       caller discharges this with [TsoCtx.ledger_store_ok] -- no
+       caller discharges this with [TsoCtxStore.ledger_store_ok] -- no
        [own_context] anywhere on this lane.  ADDRESS- and OLD-VALUE-generic:
        which leaf slot the walk lands on is decided inside the callee. *)
     □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64) (B : nat),

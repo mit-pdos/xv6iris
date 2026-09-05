@@ -62,6 +62,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoMemPa.  (* [agent]/[pwmsg]/[bytemap]: the era log's vocabulary
                              (A6.58 -- the write node speaks it now) *)
 Require Import TsoCtx.
+Require Import TsoCtxStore TsoCtxLedger.
 (* the window and its address claim, split out for the build DAG (see that
    file's header): [Export], so every consumer that reached [wordw_pointsto]
    / [wordw_claim] / [wordw_free] through this file still does. *)
@@ -3674,7 +3675,7 @@ Section WpSconfMem.
      [ctx_floor ξ 0] free at every boot-static handle and breaks the
      bootstrap (the first acquire of the first lock cannot buy its floor).
 
-     NOTHING NEW UNDERNEATH.  [TsoCtx.ledger_store_win_wpay_ok] is the gate
+     NOTHING NEW UNDERNEATH.  [TsoCtxLedger.ledger_store_win_wpay_ok] is the gate
      and it has been in the tree since the M4 unit with NO CLIENT -- its two
      arms were written for exactly these two stores ([initlock]'s and
      release's clear-write take the first; acquire's [lk->cpu = mycpu()]
@@ -3735,7 +3736,7 @@ Section WpSconfMem.
       have := Hbd (hart_agent c). lia. }
     rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
                σ.(sregs) σ.(mdev) Hpin).
-    iMod (TsoCtx.ledger_store_win_wpay_ok (CID := CIDw)
+    iMod (TsoCtxLedger.ledger_store_win_wpay_ok (CID := CIDw)
             (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
             (gs_of img (write_bytes σ.(mem) a 8 vnew) log' V'
                σ.(sregs) σ.(mdev))
@@ -3785,7 +3786,7 @@ Section WpSconfMem.
       (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
          (log ++ [PWMsg (snap_of a 8 vnew) (hart_agent (@cpu_id CIDw))])%list V) ∗
     (* A6.114: the store's OWN-MESSAGE FRAGMENT, kept rather than dropped.
-       [TsoCtx.ledger_vis_own] turns it into "the write at [S (length log)] is
+       [TsoCtxLedger.ledger_vis_own] turns it into "the write at [S (length log)] is
        mine", which is what the owner cell's per-agent record needs in order to
        stay discharge-able after a release (option 1: every agent's record is
        the floor OR its own message). *)
@@ -3819,7 +3820,7 @@ Section WpSconfMem.
       have := Hbd (hart_agent c). lia. }
     rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
                σ.(sregs) σ.(mdev) Hpin).
-    iMod (TsoCtx.ledger_store_win_wpay_ok (CID := CIDw)
+    iMod (TsoCtxLedger.ledger_store_win_wpay_ok (CID := CIDw)
             (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
             (gs_of img (write_bytes σ.(mem) a 8 vnew) log' V'
                σ.(sregs) σ.(mdev))

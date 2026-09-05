@@ -56,6 +56,7 @@ Require Import WpSconfMem.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxStore TsoCtxLedger.
 (* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
    contract flip.  See its tombstone. *)
 Local Open Scope Z_scope.
@@ -163,7 +164,7 @@ Section WpSconfLock.
 
   (* A6.119: THE DISCHARGE, at the word.  Release stores 0 and 0 is not in
      [{1}], so the pin CANNOT be carried across that store
-     ([TsoCtx.ledger_store_win_pin_ok] wants the stored value in the set) --
+     ([TsoCtxLedger.ledger_store_win_pin_ok] wants the stored value in the set) --
      the lock is going free, and a free word is the plain ledger cell.  So the
      order is RETRACT THEN STORE, and the store afterwards is the ordinary one
      the free arm already uses.  The design confirming itself: the only place
@@ -184,7 +185,7 @@ Section WpSconfLock.
     - rewrite seq_S !big_sepL_app /=.
       iIntros "Hgh Hint [Hb [(%t & Hlast) _]]".
       iMod (IH with "Hgh Hint Hb") as "(Hgh & Hint & Hb)".
-      iMod (TsoCtx.ledger_pin_drop with "Hgh Hint Hlast")
+      iMod (TsoCtxLedger.ledger_pin_drop with "Hgh Hint Hlast")
         as "(Hgh & Hint & Hlast)".
       iModIntro. iFrame "Hgh Hint Hb".
       iSplitL; [ by iApply TsoCtx.phys_ledger_at_ledger | done ].
@@ -244,7 +245,7 @@ Section WpSconfLock.
      promises its caller NOTHING about the value needs no resource from the
      invariant at all -- the obligation is discharged from RAM-ness (which
      the address claim now carries per byte, A6.87) and the interp, through
-     [TsoCtx.ledger_read_any_word_ok].  The lock is never opened.
+     [TsoCtxLedger.ledger_read_any_word_ok].  The lock is never opened.
 
      STATED AS ITS OWN LEMMA because the AU's obligation is a Coq premise:
      an [_] for it is SHELVED, not a goal, so it has to be passed by name.
@@ -276,7 +277,7 @@ Section WpSconfLock.
     rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
                sigma.(sregs) sigma.(mdev) Hpin).
     rewrite (ktier_pin_id ppn ea Hid).
-    iDestruct (TsoCtx.ledger_read_any_word_ok (CID := CIDw)
+    iDestruct (TsoCtxLedger.ledger_read_any_word_ok (CID := CIDw)
                  (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
                  ea 4%nat 32 ltac:(lia) Hram with "Htso") as %Hrd4.
     iPureIntro. intros tvr _. destruct (Hrd4 tvr) as [w Hw].
@@ -325,7 +326,7 @@ Section WpSconfLock.
        FROM THE INVARIANT AT ALL.  The lock is never opened here -- the
        obligation is discharged from RAM-ness (which the address claim now
        carries per byte) and the interp, through
-       [TsoCtx.ledger_read_any_word_ok].  The value-UNKNOWN AU ([_exv],
+       [TsoCtxLedger.ledger_read_any_word_ok].  The value-UNKNOWN AU ([_exv],
        A6.78) is the shape that lets the datum be a value-INDEPENDENT
        resource; here that resource is [emp].  <<< *)
     iDestruct (WpLock.lk_addr_claim_ram lk 4 with "Hc4") as %Hram.
@@ -354,7 +355,7 @@ Section WpSconfLock.
   (* >>> A6.89: THE HOLDER'S EXACT READ, AND THE NO-MIGRATION FACT THAT
      PAYS FOR IT.  The invariant's held arm carries the acquire's own
      message fragment ([lock_word_ex (Some h0)] = [phys_ledger_word4_vis
-     (hart_agent h0) 0]); [TsoCtx.ledger_read_word4_vis_ok] redeems such a
+     (hart_agent h0) 0]); [TsoCtxLedger.ledger_read_word4_vis_ok] redeems such a
      receipt only for a reader that IS its author, so this obligation --
      discharged at the FRESH [CpuId] the instruction binds -- owes
      [(CIDw : CPU) = h0].
@@ -413,7 +414,7 @@ Section WpSconfLock.
     rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
                sigma.(sregs) sigma.(mdev) Hpin).
     rewrite (ktier_pin_id ppn ea Hid).
-    iDestruct (TsoCtx.ledger_read_pin_bytes_ok (CID := CIDw)
+    iDestruct (TsoCtxLedger.ledger_read_pin_bytes_ok (CID := CIDw)
                  (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
                  ea 4%nat (DfracOwn 1) (nth_byte v) B WpLock.lkw_set
                  with "Htso HB Hpin") as %Hrd.
@@ -455,7 +456,7 @@ Section WpSconfLock.
     rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
                sigma.(sregs) sigma.(mdev) Hpin).
     rewrite (ktier_pin_id ppn ea Hid).
-    iDestruct (TsoCtx.ledger_read_word4_vis_ok (CID := CIDw)
+    iDestruct (TsoCtxLedger.ledger_read_word4_vis_ok (CID := CIDw)
                  (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
                  ea (DfracOwn 1) v with "Hmem Htso Hw") as %Hrd.
     iPureIntro. intros tvr Hle. exact (Hrd tvr Hle).
@@ -534,7 +535,7 @@ Section WpSconfLock.
       - exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
     rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
                sigma.(sregs) sigma.(mdev) Hpin).
-    iMod (TsoCtx.ledger_store_win_pin_ok (CID := CIDw)
+    iMod (TsoCtxLedger.ledger_store_win_pin_ok (CID := CIDw)
             (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
             (gs_of img (write_bytes sigma.(mem) ea 4%N vnew) log' V'
                sigma.(sregs) sigma.(mdev))
@@ -613,7 +614,7 @@ Section WpSconfLock.
       - exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
     rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
                sigma.(sregs) sigma.(mdev) Hpin).
-    iMod (TsoCtx.ledger_store_win_at_ok (CID := CIDw)
+    iMod (TsoCtxStore.ledger_store_win_at_ok (CID := CIDw)
             (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
             (gs_of img (write_bytes sigma.(mem) ea 4%N vnew) log' V'
                sigma.(sregs) sigma.(mdev))
@@ -641,7 +642,7 @@ Section WpSconfLock.
                           log' V' sigma.(sregs) sigma.(mdev)).(gtv)
                          (@cpu_id CIDw))%nat).
     { cbn [glog gtv gs_of]. rewrite Hlen' HV'h. lia. }
-    iDestruct (TsoCtx.hart_view_lb_get (CID := CIDw) _ 0%nat Htop
+    iDestruct (TsoCtxLedger.hart_view_lb_get (CID := CIDw) _ 0%nat Htop
                  with "Htso []") as "(Htso & #Hvlb & _)";
       [ iApply TsoGhost.llb_0 | ].
     iMod (TsoCtx.ctx_bound_raise (CID := CIDw) TsoCtx.cur_ctx
@@ -865,7 +866,7 @@ Section WpSconfLock.
       have := Hbd (hart_agent c). lia. }
     rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
                sigma.(sregs) sigma.(mdev) Hpin).
-    iMod (TsoCtx.ledger_store_win_at_ok (CID := CIDw)
+    iMod (TsoCtxStore.ledger_store_win_at_ok (CID := CIDw)
             (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
             (gs_of img (write_bytes sigma.(mem) ea (Z.to_N 4) vnew) log' V'
                sigma.(sregs) sigma.(mdev))
@@ -1035,7 +1036,7 @@ Section WpSconfLock.
     rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
                sigma.(sregs) sigma.(mdev) Hpin).
     rewrite (ktier_pin_id ppn ea Hid).
-    iDestruct (TsoCtx.ledger_read_any_word_ok (CID := CIDw)
+    iDestruct (TsoCtxLedger.ledger_read_any_word_ok (CID := CIDw)
                  (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
                  ea 8%nat 64 ltac:(lia) Hram with "Htso") as %Hrd8.
     iPureIntro. intros tvr _. destruct (Hrd8 tvr) as [w Hw].
@@ -1105,7 +1106,7 @@ Section WpSconfLock.
   (* >>> A6.89: THE HOLDER'S EXACT READ OF THE OWNER CELL -- the SECOND
      field of A6.87 §(7)'s "one item, two fields", and it is the word
      leaf's argument verbatim.  [lk_cpu_pay_vis] (A6.84) is the held arm's
-     author receipt; [TsoCtx.ledger_read_wpay_bytes_vis_ok] redeems it only
+     author receipt; [TsoCtxLedger.ledger_read_wpay_bytes_vis_ok] redeems it only
      for the reader that IS its author, and the no-migration pin the load
      leaf now threads is what identifies the two.  [B := 0] because the
      author arm is what pays ([TsoGhost.view_lb_0]). <<< *)
@@ -1144,7 +1145,7 @@ Section WpSconfLock.
     rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
                sigma.(sregs) sigma.(mdev) Hpin).
     rewrite (ktier_pin_id ppn (lock_cpu lk) Hid).
-    iDestruct (TsoCtx.ledger_read_wpay_bytes_vis_ok (CID := CIDw)
+    iDestruct (TsoCtxLedger.ledger_read_wpay_bytes_vis_ok (CID := CIDw)
                  (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
                  (lock_cpu lk) 8%nat v (DfracOwn 1) 0
                  (fun j => TsoMemPa.TsWin (lock_cpu lk) 8 j lkcpu_z lkcpu_cp own lo)
@@ -1239,7 +1240,7 @@ Section WpSconfLock.
                  own lo t K ltac:(rewrite Hag; exact Ht)
                  with "Htso HK Hfv Hav [Hb]") as %Hne'.
     { rewrite /lk_cpu_pay. iExact "Hb". }
-    iDestruct (TsoCtx.ledger_read_any_word_ok (CID := CIDw)
+    iDestruct (TsoCtxLedger.ledger_read_any_word_ok (CID := CIDw)
                  (gs_of img sigma.(mem) log V sigma.(sregs) sigma.(mdev))
                  (lock_cpu lk) 8%nat 64 ltac:(lia) Hram with "Htso") as %Hrd.
     iPureIntro. intros tvr Htvr.
@@ -1583,7 +1584,7 @@ Section WpSconfLock.
       iSplitR.
       { iIntros (h t) "%Ht". rewrite /own' in Ht. case_decide as Hd.
         - injection Ht as <-. subst h.
-          iApply (TsoCtx.ledger_vis_own hw lo (length log)
+          iApply (TsoCtxLedger.ledger_vis_own hw lo (length log)
                     (PWMsg (snap_of (lock_cpu lk) 8 unew) hw) eq_refl).
           iExact "Hmsg".
         - iApply ("Han" $! h t). by iPureIntro. }
@@ -1613,7 +1614,7 @@ Section WpSconfLock.
          [_mono]'s premise is a bare entailment with an EMPTY Iris context. *)
       iApply (big_sepL_impl with "Hnew"). iIntros "!>" (kk j _) "H".
       iExists (S (length log)). iSplitR; [| iExact "H" ].
-      iApply (TsoCtx.ledger_vis_own hw 0 (length log)
+      iApply (TsoCtxLedger.ledger_vis_own hw 0 (length log)
                 (PWMsg (snap_of (lock_cpu lk) 8 unew) hw) eq_refl).
       iExact "Hmsg".
   Qed.
@@ -2335,7 +2336,7 @@ Section WpSconfLock.
                 { rewrite -(tso_interp_of_at_gs riscv_eraGS img _ _ _
                                   sigma.(sregs) sigma.(mdev) Hpina).
                   iExact "Htso". }
-                iDestruct (TsoCtx.hart_view_lb_get (CID := CID) _ Tl Htopa
+                iDestruct (TsoCtxLedger.hart_view_lb_get (CID := CID) _ Tl Htopa
                                  with "Htso Hllb") as "(Htso & #Hvlba & %HTlKa)".
                 iMod (TsoCtx.ctx_bound_raise (CID := CID) TsoCtx.cur_ctx _
                         with "Hctx Hvlba") as "[Hctx #Hflba]".
@@ -2382,7 +2383,7 @@ Section WpSconfLock.
                 { rewrite -(tso_interp_of_at_gs riscv_eraGS img _ _ _
                                   sigma.(sregs) sigma.(mdev) Hpina).
                   iExact "Htso". }
-                iDestruct (TsoCtx.hart_view_lb_get (CID := CID) _ Tl Htopa
+                iDestruct (TsoCtxLedger.hart_view_lb_get (CID := CID) _ Tl Htopa
                                  with "Htso Hllb") as "(Htso & #Hvlba & %HTlKa)".
                 iMod (TsoCtx.ctx_bound_raise (CID := CID) TsoCtx.cur_ctx _
                         with "Hctx Hvlba") as "[Hctx #Hflba]".

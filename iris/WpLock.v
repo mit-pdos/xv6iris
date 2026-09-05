@@ -609,7 +609,7 @@ Section Lock.
             kmap_at (svpn_of (pa_add a j)) ppj KP_rw ∗
             ⌜(uint (pa_add a j) < 274877906944)%Z⌝ ∗
             ⌜ktier_pin KT0 ppj (pa_add a j)⌝ ∗
-            (* A6.87: RAM-ness PER BYTE.  [TsoCtx.ledger_read_any_word_ok]
+            (* A6.87: RAM-ness PER BYTE.  [TsoCtxLedger.ledger_read_any_word_ok]
                -- the gate that makes the free-path word read own nothing --
                asks for it at every byte of the window, and the producer has
                it for free off the very ctx byte it is reading the mapping
@@ -872,7 +872,7 @@ Section Lock.
 
   (* the AUTHOR's form: the same window with the store's own message
      fragment beside every byte.  That is what makes the HOLDER's read of
-     the cell IT wrote exact ([TsoCtx.ledger_read_wpay_vis_ok]) -- and it
+     the cell IT wrote exact ([TsoCtxLedger.ledger_read_wpay_vis_ok]) -- and it
      is why the held arm carries more than the free one, which A6.78 §(2)
      named and nothing before it did. *)
   Definition lk_cpu_pay_vis (h : agent) (lk : mword 64) (v : mword 64)
@@ -1047,7 +1047,7 @@ Section Lock.
      The right arm is what it DOES have: "[lo] is a real log position"
      ([TsoGhost.llb loglen_name lo], handed out by the store leaf beside the
      window).  Paired with an AMO's log-top view it yields the left arm on
-     the spot -- [TsoCtx.hart_view_lb_get] then [ctx_bound_raise] -- which is
+     the spot -- [TsoCtxLedger.hart_view_lb_get] then [ctx_bound_raise] -- which is
      ruling §0.35'(iii)'s ABSORB, verbatim, at the first acquire.  So the
      floor is bought by the READER that needs it exact, not by the writer
      that cannot.
@@ -1066,7 +1066,7 @@ Section Lock.
      left the creator's own first acquire (kinit's kfree, printfinit's
      printf) with no route.  The [llb] stays beside the witness: it is what
      [initlock] already exports, and the AMO-side upgrade
-     ([TsoCtx.hart_view_lb_get]) still reads it. <<< *)
+     ([TsoCtxLedger.hart_view_lb_get]) still reads it. <<< *)
   (* A6.123: the [llb] that used to ride beside the witness is gone -- no
      consumer read it (the read cashes the witness alone, [lk_floor_vis]),
      and a cell forgotten out of the tower has the witness but no
@@ -1208,7 +1208,7 @@ Section Lock.
      rather than implied: the invariant must hold the cell's context PARKED
      ([TsoCtx.ctx_parked ξ T]) beside the word, and the acquirer -- whose
      AMO puts its view at the log top -- mints [ctx_dom ξ cur_ctx] from it
-     with [TsoCtx.ctx_dom_of_parked] and moves the word with
+     with [TsoCtxLedger.ctx_dom_of_parked] and moves the word with
      [ctx_morph_word].  That is the racy-kit design; it is the ONE reason
      [lk_cpu_res] may not simply go ambient (an ambient index in the payload
      would drag a context into the persistent [is_lock] handle).  The

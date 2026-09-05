@@ -57,6 +57,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExec Ktier.
 From Kernel Require KernelSyms.
 Require Import TsoMemPa TsoGhost TsoCtx TsoCtxAbsorbLb.
+Require Import TsoCtxStore.
 Require Import HartTp.
 Require Import MemClaim.
 Local Open Scope Z_scope.

@@ -1395,7 +1395,7 @@ Section UserPtTranslate.
     (* A6.24's payer, threaded through the U-mode wrapper unchanged
        (A6.27/A6.28; the template is [UptTree]'s two wrappers).  A user page
        table is the [Some ξ] tier, so the discharge is
-       [TsoCtx.ctx_store_win_ok] at the caller's OWN context -- a process IS
+       [TsoCtxStore.ctx_store_win_ok] at the caller's OWN context -- a process IS
        its own page table. *)
     □ (∀ (m : TsoMemPa.bytemap) (a : Arch.pa) (wold wnew : mword 64),
          gen_heap_interp m -∗ S m -∗

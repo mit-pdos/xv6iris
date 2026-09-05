@@ -64,6 +64,8 @@ Ktier.v
 UartNames.v
 RiscvPtsto.v
 TsoCtx.v
+TsoCtxStore.v
+TsoCtxLedger.v
 MemClaim.v
 TsoCtxAbsorbLb.v
 CtxMorphTac.v
