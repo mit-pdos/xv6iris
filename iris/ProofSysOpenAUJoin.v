@@ -94,7 +94,7 @@ Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUAlloc.
 Require Import ProofSysOpen.   (* [so_neq_of_eq] / [so_neq_of_ne] / [so_bud_iput] *)
 Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
-Require Import FsAbs.
+Require Import FsAbsDefs.
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.

@@ -95,7 +95,7 @@ Require Import ProofSysWrite.      (* [sw_addr_p]/[sw_addr_n]/[sw_addr_f]/
 Require Import SpecSysWriteAU.     (* [wchunks], [wp_sys_write_au_frame]   *)
 Require Import SpecSysWriteAUEra.  (* the contract this file seals         *)
 Require Import SpecFilewriteAU.    (* the callee's AU form                 *)
-Require Import FsAbs.              (* LAST (FsAbs's own rule)              *)
+Require Import FsAbsDefs.              (* LAST (FsAbs's own rule)              *)
 
 Local Open Scope Z_scope.
 

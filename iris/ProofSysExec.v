@@ -27,14 +27,10 @@ Require Import WpNext.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import StackOwn.
-Require Import StackBytes.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import KernelDataInv.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeIntr.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import LockRank.
@@ -52,9 +48,7 @@ Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import KallocInv.
 Require Import KvmSpec.
-Require Import PageGeom.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FileInvDefs.
@@ -66,7 +60,6 @@ Require Import SpecArgstr.
 (* [proc_priv_tfp_valid] -- [page_valid] of the trapframe page, which
    argaddr's own load now takes as a premise (SpecArgraw's mem-tier fix).
    It is a PROJECTION of [proc_priv], not an obligation on this caller. *)
-Require Import ProofKforkParts.
 Require Import SpecFetchaddr.
 Require Import SpecFetchstr.
 Require Import SpecKalloc.

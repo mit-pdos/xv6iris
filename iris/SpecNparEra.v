@@ -116,7 +116,6 @@ Require Import FileInvDefs.
 Require Import SpecDirlink.
 Require Import SpecDirlookup.  (* [T_DIR]: the type the L_par arm carries *)
 Require Import SpecNamex.      (* K_namex, walk_need / walk_spend, ROOT* *)
-Require Import SpecNameiTr.    (* [inode_held_at] ONLY -- the pinned package *)
 Require Import FsAbsEra.      (* [np_elems], [ep_hops_from], [np_dead] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

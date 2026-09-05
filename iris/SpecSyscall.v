@@ -152,7 +152,6 @@ Require Import UserPerm.         (* [perm_of] -- the exec channel's failure row 
 Require Import UsysMemOk.        (* [usys_sbrk_arg] -- sbrk's argument, read back *)
 Require Import UexecSlot.        (* [uvis_of] *)
 Require Import UexecRetExec.     (* [uslot_x] / [xbundle] -- the enriched slot *)
-Require Import UexecExecInst.    (* the [xbundle] instance: the process's exec bundle *)
 Import Defs.
 
 (* ===================================================================== *)

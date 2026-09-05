@@ -83,7 +83,7 @@ Require Import SpecSysMknodAU.
 Require Import SpecSysOpenAU.
 Require Import FsAbsMknodFire.   (* [acre_commit_at], [dlookup_commit_at]   *)
 Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
-Require Import FsAbs.            (* LAST (FsAbs's own rule) *)
+Require Import FsAbsDefs.            (* LAST (FsAbs's own rule) *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.

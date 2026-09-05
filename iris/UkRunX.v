@@ -46,20 +46,13 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvModelBytes.
-Require Import RegFile InstrBytes WpGpr.
+Require Import RegFile.
 Require Import UserPtTree UserExec ProcPtOwn.
-Require Import UmodeMem UmodeArith UmodeText.
+Require Import UmodeText.
 Require Import UserPerm UexecWp UexecSlot UexecRet.
-Require Import UsysMemOk.
-Require Import UmodeRegs.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import WpMmodeLeafBase.
-Require Import UptTree.
-Require Import WpUmodeStore.
-Require Import WpUmodeStep.
-Require Import UkStep.
-Require Import RiscvExtras.
 Require Import UserHeap.
 Require Import TsoCtx.
 Require Import UserFd.

@@ -147,7 +147,7 @@ Require Import FsStateEra.         (* [era_node]                              *)
 Require Import SpecSysReadAU.      (* [ard_pre], [ard_ret_tie], [read_arms]   *)
 Require Import FsAbsReadFire.      (* [arf_read_fire] and the row readings    *)
 Require Import SpecFilereadAU.     (* the contract this file seals            *)
-Require Import FsAbs.              (* LAST (FsAbs's own rule)                 *)
+Require Import FsAbsDefs.              (* LAST (FsAbs's own rule)                 *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 

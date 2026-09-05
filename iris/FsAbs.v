@@ -157,10 +157,7 @@ From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import gmap dfrac.
 From iris.bi.lib Require Import fractional.
 From iris.base_logic.lib Require Import iprop own ghost_map fancy_updates.
-Require Import DinodeEnc.
-Require Import DirView.        (* [T_DIR_z]                                  *)
 Require Import FsTree.         (* [fname], [fsnode], [path_at], [node_of]    *)
-Require Import FsImg.          (* [T_FILE_z], [ROOTINO]                      *)
 Require Import Xv6Cameras.     (* [fsTopG]/[fsLinkG] -- IMPORTED (see header) *)
 Require Export FsState.        (* Export's FsStateInode: the readings        *)
 

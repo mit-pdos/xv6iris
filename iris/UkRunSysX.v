@@ -45,16 +45,11 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import UsysMemOk UexecSlot UexecRet.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Import UserPtTree UserExec.   (* [ucfg] *)
 Require Import UexecWp.               (* [loop_ok] *)
 Require Import UkStep.
-Require Import UmodeArith.
 Require Import UserHeap.
 Require Import UserPerm.
-Require Import UserBits.
-Require Import RiscvExtras.
-Require Import RiscvModelBytes.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
@@ -73,7 +68,6 @@ Local Open Scope Z_scope.
 Require Import UkRun.
 Require Import UkRunSys.       (* [usysno] *)
 Require Import UserFd.
-Require Import UmodeText.
 Require Import UexecRetExec.   (* [uslot_x] / [uvb_x] / [urun_x]: REQUIRED
                                   DIRECTLY, both are [Typeclasses Opaque] *)
 Require Import UkStepGen.      (* the X-generic engine *)

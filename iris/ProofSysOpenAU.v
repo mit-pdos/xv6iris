@@ -112,7 +112,7 @@ Require Import SpecSysOpenAU.
 Require Import ProofSysOpenAUBits.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUWalk.
-Require Import FsAbs.
+Require Import FsAbsDefs.
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.

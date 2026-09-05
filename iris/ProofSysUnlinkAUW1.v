@@ -110,7 +110,7 @@ Require Import FsAbsMknodFire.
 Require Import SpecSysUnlinkAU.
 Require Import ProofSysUnlinkAUParts.
 Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
-Require Import FsAbs.
+Require Import FsAbsDefs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
 Require Import Xv6G.

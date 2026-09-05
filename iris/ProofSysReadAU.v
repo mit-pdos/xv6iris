@@ -94,7 +94,7 @@ Require Import ProofSysRead.       (* [sr_addr_p]/[sr_addr_n]/[sr_addr_f]/
 Require Import SpecSysReadAU.      (* [wp_sys_read_au_frame], [read_arms]   *)
 Require Import SpecSysReadAUAt.    (* the contract this file seals          *)
 Require Import SpecFilereadAU.     (* the callee's AU form                  *)
-Require Import FsAbs.              (* LAST (FsAbs's own rule)               *)
+Require Import FsAbsDefs.              (* LAST (FsAbs's own rule)               *)
 Import Defs.
 Local Open Scope Z_scope.
 

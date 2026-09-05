@@ -66,8 +66,6 @@ Require Import RiscvModelBytes.
 Require Import PageGeom.        (* [PGSIZE]                                  *)
 Require Import UserPtTree.      (* [umem_write], [umem_wr], [umem_grow],
                                    [pgroundup], [uva_live], [live_set]      *)
-Require Import UmodeAbi.        (* [uimg_sub]                                *)
-Require Import ElfEnc.          (* [ph_at], [eh_phnum] -- the CODE-side readers *)
 Require Import ElfFile.         (* the image semantics                       *)
 Require Import ElfBridge.       (* [elf_parse_phdr_all], [ph_at_of_ehdr] --
                                    §4's identification of the code's walk  *)

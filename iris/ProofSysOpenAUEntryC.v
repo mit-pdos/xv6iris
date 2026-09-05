@@ -126,7 +126,7 @@ Require Import SpecCreateAUF.     (* the T_FILE create-AU carry            *)
 Require Import SpecCreateAUFOpen. (* [cauf_fail_to_open]                   *)
 Require Import ProofSysOpenAUCreArm.
 Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
-Require Import FsAbs.
+Require Import FsAbsDefs.
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.

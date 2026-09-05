@@ -261,8 +261,6 @@ Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import SpecDirlink.
 Require Import PathElems.       (* [SLASH], [path_elems]                     *)
-Require Import FsTree.          (* [fname]                                   *)
-Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT Import *)
 Require Import FsBlocks.        (* [fs_names]                                *)
 Require Import SpecKexec.       (* the landed frame this file parallels:
                                    [K_kexec], [kexec_ok], [kxc_sp],
@@ -273,7 +271,6 @@ Require Import ElfEnc.          (* [ELF_MAGIC]: the four bytes the code tests *)
 Require Import ElfFile.         (* [elf_bytes], [elf_wf], [elf_image],
                                    [elf_entry], [elf_loads], [elf_mem_end]  *)
 Require Import UmodeAbi.        (* [uimg_sub]                                *)
-Require Import UserPerm.        (* [uperm], [perm_of]: the permission projection *)
 Require Import KexecBuilt.      (* [kxb_perm_ok], [kexec_seg_perm], [kexec_pg]: the
                                    permission projection kexec builds (its home) *)
 Require Import UserFd.          (* [ufdG] -- UexecRet's section binds it     *)
@@ -281,7 +278,7 @@ Require Import UexecSlot.       (* [uvis], [uvis_of], [tf_w]                 *)
 Require Import SpecSysOpenAU.   (* [open_walk_pre_era], [open_walk_dead_era],
                                    [aopen_commit_at] -- REUSED, see header  *)
 Require Import FsAbsInv.        (* [fsabsE]: the commit mask                 *)
-Require Import FsAbs.           (* LAST (FsAbs's own rule)                   *)
+Require Import FsAbsDefs.           (* LAST (FsAbs's own rule)                   *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ                  *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

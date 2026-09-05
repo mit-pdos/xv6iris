@@ -42,7 +42,6 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import mono_nat.
-Require Import DevModel.         (* [uart_state], [uart_tx_pop], [uart_rx_push] *)
 Require Import RiscvLang.        (* [mobs] *)
 Require Import ObsTrace.         (* [cycles_of], [open_seg], [trace_shape] *)
 (* the vocabulary of the era-0 pin theorems, imported by name: Import is

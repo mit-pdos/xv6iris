@@ -106,9 +106,7 @@ Require Import SpecNamei.
 Require Import SpecNamex.
 Require Import ProofKexecTail.
 Require Import CodeKexec.
-Require Import SpecNameiTr.    (* [inode_held_at] and its readings   *)
 Require Import SpecNameiEra.   (* THE ERA WALK: the one call swapped *)
-Require Import FsAbsEra.     (* [bview_head_slash_intro]           *)
 (* NOT [SpecKexecPin]: that file's own chain reaches the boot composition
    (FsInitPin -> ... -> LinkKexec), and a phase-A leaf must not.  Its one
    pure lemma this file wants ([fn_file_bytes_era_ok]) is nine lines and is
@@ -124,7 +122,7 @@ Require Import ElfBridge.
    the two, and this file names none of the [FsState*] twins they shadow
    ([fs_view], [byte_range]). *)
 Require Import FsAbsInv.
-Require Import FsAbs.
+Require Import FsAbsDefs.
 (* THE AU LEAVES, QUALIFIED: their statements are all this file wants and a
    fourth import of the abstract stack buys nothing. *)
 Require SpecSysOpenAU.   (* [open_walk_pre_era] / [open_walk_dead_era]

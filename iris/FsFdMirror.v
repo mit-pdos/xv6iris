@@ -63,7 +63,7 @@ Require Import PathElems.
 Require Import FsTree.
 Require FsImg.
 Require Import SpecSysMknodAU.
-Require Import FsAbs.
+Require Import FsAbsDefs.
 Import Defs.
 Require Import TsoCtx.
 Require Import SpecSysOpenAU.   (* [om_*], [delta_trunc] -- the mode readings

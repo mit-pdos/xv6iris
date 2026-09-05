@@ -89,7 +89,6 @@ Require Import FileInvDefs.
 Require Import SpecDirlink.
 Require Import SpecNamex.
 Require Import SpecNamei.      (* K_namei, and the landed body this shadows *)
-Require Import SpecNameiTr.    (* [inode_held_at]: the RULED pin, imported *)
 Require Import FsAbsEra.       (* [ex_hops_from]: the ERA lend's hop family *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

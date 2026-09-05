@@ -100,7 +100,7 @@ Require Import SpecSysMknodAU.   (* [abs_view_insert]                        *)
 Require Import FsAbsMknodFire.   (* [dlookup_commit_at], [mkf_abs_of_dir]    *)
 Require Import SpecSysUnlinkAU.  (* the statement this file's fires serve    *)
 Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
-Require Import FsAbs.            (* LAST (FsAbs's own rule)                  *)
+Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                  *)
 
 Local Open Scope Z_scope.
 

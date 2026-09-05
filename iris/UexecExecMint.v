@@ -28,46 +28,17 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
-Require Import RegFile.
-Require Import RiscvExtras.
-Require Import CalleeSaved KernelText KernelDataInv.
-Require Import IntrDefs.
-Require Import WpNext.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import CpuOwn.
 Require Import Xv6Cameras.
-Require Import BioDefs.
-Require Import LogInv.
-Require Import BitmapInv.
-Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheInv.
-Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import UserPtTree.
-Require Import ProcPtOwn.
-Require Import ProcInv.
-Require Import SpecDirlink.
-Require Import ByteBuf.
-Require Import FsBlocks.
-Require Import FsTree.
-Require Import PathElems.
-Require Import SpecKexec.
-Require Import SpecSysExec.
-Require Import ElfFile.
-Require Import UmodeAbi.
 Require Import UserFd.
 Require Import UexecSlot.
 Require Import UexecWp.
 Require Import UexecRet.
-Require Import UmodeText.
 Require Import UexecRetExec.
 Require Import UexecCond.       (* [cond_entry_slot] -- the plain generic slot *)
-Require Import SpecSysOpenAU.
 Require Import SpecKexecAU.
 Require Import SpecSysExecAU.
 Require Import FsAbsInvFire.    (* [fsabs_exec_half] *)
@@ -75,8 +46,6 @@ Require Import FirstTok.        (* [FirstTok.fsabs_env] -- spelled QUALIFIED bel
                                    [FsAbsInv] (imported after it) exports a
                                    Γ-indexed [fsabs_env] of its own *)
 Require Import UexecExecInst.   (* the [xbundle] instance, [xbundle_intro] *)
-Require Import FsAbsInv.
-Require Import FsAbs.
 Require Import FsBytesGamma.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

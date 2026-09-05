@@ -99,7 +99,6 @@ Local Open Scope Z_scope.
 Set Printing Depth 40.
 
 Require Import UserFd.   (* [ufdG] -- the class a minted user slot needs *)
-Require Import FsBytesGamma.   (* [fs_gamma_L] *)
 Module ForkretProof (MP : MYPROC) (RL : RELEASE) (PR : PREPARE_RETURN)
                     (FS : FSINIT) (KX : KEXEC) (PN : PANIC)
                     (UC : USERRET_CLOSED) : FORKRET.

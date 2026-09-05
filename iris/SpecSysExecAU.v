@@ -112,18 +112,14 @@ Require Import ProcInv.
 Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
 Require Import ByteBuf.        (* [bb_cstr]                          *)
 Require Import FsBlocks.       (* [fs_names]                         *)
-Require Import FsTree.         (* [fname]                            *)
-Require Import PathElems.
 Require Import SpecKexec.      (* [MAXARG], [kexec_ok]               *)
 Require Import SpecSysExec.    (* the landed frame this file parallels: [K_sys_exec] *)
-Require Import ElfFile.        (* [elf_bytes]                        *)
-Require Import UmodeAbi.
 Require Import UserFd.         (* [ufdG]                             *)
 Require Import UexecSlot.      (* [uvis]                             *)
 Require Import SpecSysOpenAU.  (* [open_walk_pre_era], [aopen_commit_at] *)
 Require Import SpecKexecAU.    (* [exec_slot_pre], [exec_post_ok], [exec_post_fail] *)
 Require Import FsAbsInv.       (* [fsabsE]                           *)
-Require Import FsAbs.          (* LAST (FsAbs's own rule)            *)
+Require Import FsAbsDefs.          (* LAST (FsAbs's own rule)            *)
 Require Import FsBytesGamma.   (* [fs_gamma_L]                       *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

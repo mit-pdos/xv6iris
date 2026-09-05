@@ -54,7 +54,6 @@ Require Import FileInvDefs.
 Require Import IrefSlots.
 Require Import CodeNamei.
 Require Import IcacheRef.     (* [inode_held_at]: the RULED pin (lane C1 moved it here) *)
-Require Import SpecNameiTr.
 Require Import FsAbsEra.      (* [ex_hops_from]: the relayed rows *)
 Require Import SpecNameiEra.
 Require Import SpecNamexEra.

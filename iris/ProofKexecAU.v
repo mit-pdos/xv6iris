@@ -101,16 +101,11 @@ Require Import ProofKexecD.
 (* ---- and the names the AU contract's body is written in ---- *)
 Require Import InstrBytes.     (* [pc_is]                            *)
 Require Import LogInv.
-Require Import LogDefs.
 Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import KvmSpec.
 Require Import BioDefs.
 Require Import InodeInv.       (* [ROOTDEV], [MAXFILE]               *)
 Require Import DinodeEnc.      (* [di_type] / [di_size]              *)
-Require Import InodeLock.
-Require Import SleepLock.
-Require Import OffBox.
 Require Import PathElems.      (* [SLASH], [path_elems]              *)
 Require Import DirentEnc.      (* [bview]                            *)
 Require Import FsTree.         (* [fname], [file_bytes], [file_byte] *)
@@ -119,14 +114,11 @@ Require DirView.               (* [DirView.T_DIR_z]                  *)
 Require Import SpecNameiEra.   (* [NAMEI_ERA]: the functor argument  *)
 Require Import UserFd.         (* [ufdG] -- the slot's descriptor leg *)
 Require Import UexecSlot.
-Require Import UexecRet.       (* [uslot]                            *)
 Require Import ProofKexecAUA.  (* the AU phase A                     *)
 Require FsBytesGamma.          (* [FsBytesGamma.fs_gamma_L]          *)
 (* THE ABSTRACT SIDE.  [FsAbs] LAST of the two, per its own rule; the
    AU leaves stay QUALIFIED (their statements are all this file wants). *)
-Require Import FsAbsInv.
-Require Import FsAbs.
-Require SpecSysOpenAU.
+Require Import FsAbsDefs.
 Require FsAbsOpenFire.
 Require SpecKexecAU.           (* THE CONTRACT                       *)
 From Kernel Require KernelSyms.

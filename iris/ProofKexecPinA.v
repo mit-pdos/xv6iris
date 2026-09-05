@@ -113,7 +113,6 @@ Require Import SpecNamei.
 Require Import SpecNamex.
 Require Import ProofKexecTail.
 Require Import CodeKexec.
-Require Import SpecNameiTr.    (* [inode_held_at] and its readings   *)
 Require Import SpecNameiEra.   (* THE ERA WALK: the one call swapped *)
 Require Import FsAbsEra.     (* [bview_head_slash_intro]           *)
 Require Import SpecKexecPin.   (* the contract this lane serves      *)

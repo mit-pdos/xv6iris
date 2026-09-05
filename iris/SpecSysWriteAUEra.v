@@ -94,7 +94,6 @@ Require Import FsCfg.
 Require Import SpecCopyin.     (* [ubytes_at]: the content seam (RULING A)  *)
 Require Import SpecSysWriteAU. (* the frozen statement this parallels       *)
 Require Import FsAbsWriteFire. (* [awrite_chain]: the offset-folded commits *)
-Require Import OffGv.          (* [off_gv]: the descriptor's offset shadow  *)
 Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
 Require Import FsAbs.          (* LAST (FsAbs's own rule)                   *)
 Import Defs.

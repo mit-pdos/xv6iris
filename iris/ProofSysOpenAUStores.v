@@ -109,7 +109,7 @@ Require Import ProofSysOpenAUBits.
 Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUPub.
 Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
-Require Import FsAbs.
+Require Import FsAbsDefs.
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.

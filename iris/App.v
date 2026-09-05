@@ -49,28 +49,19 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang ObsTrace RiscvPtsto.
 Require Import FsState.
 Require Import FsAbsInv.
-Require Import ProcGeom.
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import WpUart.
-Require Import BootConfig.
-Require Import BootChain BootShared.
 Require Import FsCfgBoot.
 Require Import RiscvAdequacy.
 Require Import FsCrash.
 Require Import FsDurSnap.
-Require Import FsDurImg.
-Require Import FirstTok.
-Require Import FsImgDisk.
-Require Import FsImgCheck.
 Require Import VirtioModel.
 Require Import IrefSlots.
-Require Import LogDefs.
 Require Import Xv6Cameras.
 Require Import FsImg.
 Require Import ProcAvail.
 Require Import Xv6G.
-Require Import TsoCtx.
 (* ...and the rest of SystemAdequacy's block, which the first cut missed:
    a class name that is not in scope silently becomes a VARIABLE
    (durable-notes), which is how [ufdG] became one here once. *)

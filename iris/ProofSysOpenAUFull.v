@@ -106,7 +106,7 @@ Require Import ProofSysOpenAUBits.
 Require Import SpecCreateAUF.        (* the T_FILE create-AU carry        *)
 Require Import ProofSysOpenAU.       (* [SysOpenAUPlainProof]: the plain arm *)
 Require Import ProofSysOpenAUEntryC. (* [so_entry_c_au], [so_cont0_au_create] *)
-Require Import FsAbs.
+Require Import FsAbsDefs.
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.

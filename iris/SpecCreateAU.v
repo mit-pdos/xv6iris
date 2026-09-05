@@ -131,7 +131,7 @@ Require Import ProcAvail.
 Require Import Xv6G.
 Require Import FsCfg.
 Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
-Require Import FsAbs.           (* LAST (FsAbs's own rule)                  *)
+Require Import FsAbsDefs.           (* LAST (FsAbs's own rule)                  *)
 Import Defs.
 Require Import TsoCtx.
 

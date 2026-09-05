@@ -99,7 +99,7 @@ Require Import FsAbsMknodFire.   (* [mkf_abs_of_dir], [mkf_era_is_dir]      *)
 Require FsImg.                   (* [T_FILE_z], [ROOTINO] -- Require, NOT
                                     Import (SpecSysOpenAU's reason)         *)
 Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
-Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
+Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                 *)
 Require TsoCtx.   (* qualified: the class only, no notation flip *)
 
 Local Open Scope Z_scope.

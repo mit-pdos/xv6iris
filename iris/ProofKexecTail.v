@@ -112,7 +112,6 @@ Require Import SpecIlock.
 Require Import SpecReadi.
 Require Import SpecIunlockput.
 Require Import SpecNamei.
-Require Import SpecNameiTr.   (* [inode_held_at]: the +0x032 seam's inum *)
 Require Import SpecProcFreepagetable.
 Require Import ProofKexecParts.
 Require Import CodeKexec.

@@ -118,11 +118,10 @@ Require Import Xv6G.
 Require Import FsCfg.
 Require Import SpecSysWriteAU.     (* [wchunks], [wri_receipts]             *)
 Require Import FsAbsWriteFire.     (* [awrite_chain]                        *)
-Require Import OffGv.              (* [off_gv]                              *)
 Require Import SpecCopyin.         (* [ubytes_at]: the content seam         *)
 Require Import SpecSysWriteAUEra.  (* [write_arms_at]                       *)
 Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
-Require Import FsAbs.              (* LAST (FsAbs's own rule)               *)
+Require Import FsAbsDefs.              (* LAST (FsAbs's own rule)               *)
 Import Defs.
 Require Import TsoCtx.
 

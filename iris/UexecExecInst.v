@@ -48,47 +48,17 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
-Require Import RegFile.
-Require Import RiscvExtras.
-Require Import CalleeSaved KernelText KernelDataInv.
-Require Import IntrDefs.
-Require Import WpNext.
 Require Import FdSlots.
 Require Import ProcGeom.       (* [tf_arg_idx]                        *)
 Require Export SwtchCtx.
-Require Import CpuOwn.
 Require Import Xv6Cameras.
-Require Import BioDefs.
-Require Import LogInv.
-Require Import BitmapInv.
-Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheInv.
-Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import UserPtTree.
-Require Import ProcPtOwn.
-Require Import ProcInv.
-Require Import SpecDirlink.
-Require Import ByteBuf.
-Require Import FsBlocks.
-Require Import FsTree.
-Require Import PathElems.
-Require Import SpecKexec.
-Require Import SpecSysExec.
-Require Import ElfFile.
-Require Import UmodeAbi.
 Require Import UserFd.         (* [ufdG]                              *)
 Require Import UexecSlot.      (* [uvis] / [tf_w]                     *)
-Require Import UexecRet.       (* [uslot]                             *)
 Require Import UexecRetExec.   (* [uexecXG] / [xbundle]               *)
-Require Import SpecSysOpenAU.
-Require Import SpecKexecAU.
 Require Import SpecSysExecAU.  (* [sys_exec_au_pre]                   *)
-Require Import FsAbsInv.
-Require Import FsAbs.          (* LAST (FsAbs's own rule)             *)
+Require Import FsAbsDefs.          (* LAST (FsAbs's own rule)             *)
 Require Import FsBytesGamma.   (* [fs_gamma_L]                        *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

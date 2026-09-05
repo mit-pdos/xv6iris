@@ -45,7 +45,7 @@ Require Import FsCfgBoot.
 Require Import FsImgDisk.
 Require Import FsImgCheck.
 Require Import FsImg.
-Require Import FsAbs.
+Require Import FsAbsDefs.
 Require Import FsInitPin.       (* [era0_D], [era0_root_row], [img_astep_root] *)
 
 (* ...the machine layer the walk-shaped corollary is stated on... *)

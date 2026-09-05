@@ -92,7 +92,7 @@ Require Import SpecSysReadAUAt.
 Require Import FsAbsReadFire.
 Require Import SpecFilereadAU.
 Require Import ProofSysReadAU.
-Require Import FsAbs.          (* LAST (FsAbs's own rule) *)
+Require Import FsAbsDefs.          (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
 

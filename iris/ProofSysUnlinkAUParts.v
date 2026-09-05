@@ -89,7 +89,7 @@ Require Import ProofSysUnlink.   (* the top-level pure layer; see header   *)
 Require Import FsAbsMknodFire.
 Require Import SpecSysUnlinkAU.
 Require Import FsAbsUnlinkFire.
-Require Import FsAbs.
+Require Import FsAbsDefs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
 Require Import Xv6G.

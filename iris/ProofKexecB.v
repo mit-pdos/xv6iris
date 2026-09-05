@@ -147,7 +147,6 @@ Require Import SpecDirlink.
 Require Import SpecNamei.
 Require Import SpecProcPagetable.
 Require Import ProofKexecTail.
-Require Import UmodeAbi.     (* [uimg_sub]                                 *)
 Require Import ElfFile.      (* [elf_image], [elf_loads]                   *)
 Require Import KexecBuilt.   (* [kxb_walk_ok], [kxb_walk_phnum0]           *)
 Require Import ProofKexecSeam.

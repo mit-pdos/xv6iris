@@ -95,7 +95,6 @@ Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import Xv6Cameras.
 Require Import IrefSlots.
-Require Import IcacheRef.
 Require Import FileInvDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

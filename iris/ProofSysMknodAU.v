@@ -135,7 +135,7 @@ Require Import SpecSysMknodAU.   (* [dev_arg]                           *)
 Require Import FsAbsMknodFire.   (* the commits and [mkf_dev_arg]       *)
 Require Import SpecCreateAU.     (* [CREATE_AU], [cau_ok] / [cau_fail]  *)
 Require Import SpecSysMknodAUEra. (* the contract this file seals       *)
-Require Import FsAbs.            (* LAST of the abstract stack          *)
+Require Import FsAbsDefs.            (* LAST of the abstract stack          *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

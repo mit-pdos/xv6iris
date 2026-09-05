@@ -58,7 +58,7 @@ Require Import FsAbsMknodFire.   (* the two commits                         *)
 Require Import SpecCreateAUF.    (* [cauf_ok], [cauf_fail]                  *)
 Require Import SpecSysOpenAU.    (* the consumer, which does NOT move       *)
 Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
-Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
+Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                 *)
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.

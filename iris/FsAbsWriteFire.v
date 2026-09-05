@@ -147,11 +147,10 @@ Require Import SpecWritei.       (* [wi_dinode]                             *)
 Require Import SpecFilewrite.    (* [FW_MAX]                                *)
 Require Import SpecSysMknodAU.   (* [abs_view_insert]                       *)
 Require Import SpecSysWriteAU.   (* the contract this file serves           *)
-Require Import FsAbsMknodFire.   (* [mkf_auth_nview]                        *)
 Require Import FsAbsOpenFire.    (* [opf_era_file_row], [opf_era_type]      *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import       *)
 Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
-Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
+Require Import FsAbsDefs.            (* LAST (FsAbs's own rule)                 *)
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.

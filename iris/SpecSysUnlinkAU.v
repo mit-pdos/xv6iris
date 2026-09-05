@@ -337,7 +337,7 @@ Require Import FsAbsEraMknod.   (* the era walk-premise pair, reused
                                    verbatim (nameiparent-generic) *)
 Require Import FsAbsMknodFire.  (* [dlookup_commit_at]; the [_at] mold *)
 Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
-Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
+Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
 

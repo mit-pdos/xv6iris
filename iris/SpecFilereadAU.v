@@ -134,7 +134,7 @@ Require Import SpecSysReadAU.      (* [read_arms], the armed post            *)
 Require Import FsAbsReadFire.      (* [aread_commit_at], the dischargeable
                                       form of the commit                     *)
 Require Import FsAbsInv.        (* [fsabsN]/[fsabsE]: the commit mask *)
-Require Import FsAbs.              (* LAST (FsAbs's own rule)                *)
+Require Import FsAbsDefs.              (* LAST (FsAbs's own rule)                *)
 Import Defs.
 Require Import TsoCtx.
 

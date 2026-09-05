@@ -51,7 +51,7 @@ Require Import ProofSysUnlinkAUW2.
 Require Import ProofSysUnlinkAUW3.
 Require Import ProofSysUnlinkAUW5F.
 Require Import ProofSysUnlinkAUW5D.
-Require Import FsAbs.
+Require Import FsAbsDefs.
 From Kernel Require KernelSyms KernelData.
 Require Import ProcAvail.
 Require Import Xv6G.

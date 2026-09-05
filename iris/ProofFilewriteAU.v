@@ -1053,7 +1053,7 @@ Require Import FsAbsWriteFire.     (* the fire, the splice bridge, item 4  *)
 Require Import SpecSysWriteAUEra.  (* [write_arms_at]                      *)
 Require Import SpecCopyin.         (* [ubytes_at], [add_vec_moi_comm]      *)
 Require Import SpecFilewriteAU.    (* the contract this file seals         *)
-Require Import FsAbs.              (* LAST (FsAbs's own rule)              *)
+Require Import FsAbsDefs.              (* LAST (FsAbs's own rule)              *)
 
 Module FilewriteAUProof (Ilock : ILOCK) (Writei : WRITEI)
                         (Iunlock : IUNLOCK) (BeginOp : BEGIN_OP)

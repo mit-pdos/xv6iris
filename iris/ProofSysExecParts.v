@@ -93,14 +93,10 @@ Require Export SwtchCtx.
 Require Import WpUart.
 Require Import DiskInv.
 Require Import Xv6Cameras.
-Require Import BioDefs.
 Require Import LogInv.
 Require Import BitmapInv.
 Require Import ByteBuf.
-Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import KallocInv.
 Require Import KvmSpec.
 Require Import PageGeom.
@@ -108,8 +104,6 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FileInvDefs.
 Require Import ProcInv.
-Require Import W32Arith.
-Require Import SpecDirlink.
 Require Import SpecArgaddr.
 Require Import SpecArgstr.
 (* [proc_priv_tfp_valid] -- [page_valid] of the trapframe page, which

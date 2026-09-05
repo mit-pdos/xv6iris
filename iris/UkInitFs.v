@@ -74,7 +74,7 @@ Require Import ConsoleInv.      (* [CONSOLE] *)
 Require Import SpecSysMknodAU.  (* [dev_arg] *)
 Require Import SpecSysOpenAU.   (* [om_arg] *)
 Require Import FdSlots.         (* [fdstate] *)
-Require Import FsAbs.           (* [anode]/[MkAnode]/[ADev] *)
+Require Import FsAbsDefs.           (* [anode]/[MkAnode]/[ADev] *)
 Require Import FsFdMirror.
 Require Import UexecRetFs.
 Require Import UkRunSysFs.

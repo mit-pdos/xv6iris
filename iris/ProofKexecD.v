@@ -77,7 +77,6 @@ Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecKexec.
-Require Import UmodeAbi.     (* [uimg_sub] *)
 Require Import ElfFile.      (* [elf_bytes], [elf_image], [elf_loads] *)
 Require Import KexecBuilt.   (* the argument block's algebra + [kexec_built] *)
 Require Import KexecOkQ.

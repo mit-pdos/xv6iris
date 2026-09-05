@@ -67,7 +67,7 @@ Require Import ProcAvail.
 Require Import Xv6G.
 Require Import SpecSysWriteAU.
 Require Import SpecSysWriteAUEra.
-Require Import FsAbs.          (* LAST (FsAbs's own rule) *)
+Require Import FsAbsDefs.          (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
 

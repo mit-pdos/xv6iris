@@ -75,7 +75,7 @@ Require Import FsBytesGamma.
 Require Import SpecSysOpenAU.
 Require Import FsAbsOpenFire.
 Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
-Require Import FsAbs.            (* LAST (FsAbs's own rule) *)
+Require Import FsAbsDefs.            (* LAST (FsAbs's own rule) *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.

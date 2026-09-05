@@ -83,7 +83,7 @@ Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
 Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
 Require Import SpecSysOpenAU.   (* [open_walk_pre_era], [open_walk_dead_era],
                                    [aopen_commit_at] *)
-Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
+Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
 Require Import TsoCtx.
 

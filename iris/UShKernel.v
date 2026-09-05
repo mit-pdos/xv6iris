@@ -82,7 +82,6 @@ Require Import SpecKexecAU.    (* [kexec_image_ok] *)
 Require Import SpecKexecPin.   (* [kxp_image_sh] -- the image inclusion at sh *)
 Require Import ElfUser.        (* [sh_elf] and its reduced facts (leaf, see header) *)
 Require User.ShSyms User.ShData User.ShInstrs.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 

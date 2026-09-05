@@ -389,7 +389,7 @@ Require Import SpecKexecAU.      (* [exec_post_ok], [exec_key], [kexec_ok_exec] 
 Require Import SpecSysExecAU.    (* [SYSEXEC_AU], [sys_exec_arms]              *)
 Require Import UexecExecInst.    (* [xbundle_elim]                              *)
 Require Import UexecRetExec.     (* [uslot_x] -- the slot the exec channel returns *)
-Require Import UexecSlot UexecRet UserPerm FsBytesGamma.
+Require Import UexecSlot UserPerm FsBytesGamma.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.

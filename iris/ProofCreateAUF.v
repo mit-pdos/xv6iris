@@ -232,7 +232,7 @@ Require Import SpecSysMknodAU.   (* [cre_pre], [mknod_parent_elems]     *)
 Require Import FsAbsMknodFire.   (* the commits and FIRE 1              *)
 Require Import SpecCreateAUF.    (* the contract this file seals        *)
 Require Import FsAbsInv.        (* [fsabsE]: the commit mask *)
-Require Import FsAbs.            (* LAST of the abstract stack          *)
+Require Import FsAbsDefs.            (* LAST of the abstract stack          *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
    [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
    OWN body rather than a callee, so it is NOT a functor argument -- the

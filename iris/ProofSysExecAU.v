@@ -47,14 +47,10 @@ Require Import WpNext.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import StackOwn.
-Require Import StackBytes.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import KernelDataInv.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeIntr.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import LockRank.
@@ -72,9 +68,7 @@ Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import KallocInv.
 Require Import KvmSpec.
-Require Import PageGeom.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FileInvDefs.
@@ -86,7 +80,6 @@ Require Import SpecArgstr.
 (* [proc_priv_tfp_valid] -- [page_valid] of the trapframe page, which
    argaddr's own load now takes as a premise (SpecArgraw's mem-tier fix).
    It is a PROJECTION of [proc_priv], not an obligation on this caller. *)
-Require Import ProofKforkParts.
 Require Import SpecFetchaddr.
 Require Import SpecFetchstr.
 Require Import SpecKalloc.
@@ -109,19 +102,12 @@ Set Printing Depth 40.
 
 Require Import ProofSysExecParts.
 Require Import FsBlocks.
-Require Import FsTree.
-Require Import PathElems.
-Require Import ElfFile.
-Require Import UmodeAbi.
 Require Import UserFd.          (* [ufdG] *)
 Require Import UexecSlot.       (* [uvis] *)
-Require Import UexecRet.        (* [uslot] *)
-Require Import SpecSysOpenAU.   (* [open_walk_pre_era], [aopen_commit_at] *)
 Require Import SpecKexecAU.     (* [exec_au_pre], [exec_post_ok], [exec_arms] *)
-Require Import FsAbsInv.
 Require Import FsBytesGamma.    (* [fs_gamma_L] *)
 Require Import SpecSysExecAU.
-Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
+Require Import FsAbsDefs.           (* LAST (FsAbs's own rule) *)
 Require Import TsoCtx.
 
 Local Open Scope Z_scope.

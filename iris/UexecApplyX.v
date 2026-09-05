@@ -39,11 +39,9 @@ Require Import UexecWp.
 Require Import ProcGeom.
 Require Import UserPtTree.
 Require Import UmodeText.
-Require Import ProcPtOwn.
 Require Import UserPerm.
 Require Import UserExec.
 Require Import UsysMemOk.
-Require Import SpecUserret.
 Require Import UexecSlot.
 Require Import FdSlots.
 Require Import UexecRet.

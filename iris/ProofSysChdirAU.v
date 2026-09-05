@@ -154,14 +154,10 @@ Require Import SpecSysChdir.
 Require Import SpecSysChdirAU.  (* the AU contract this file seals *)
 Require Import FsStateEra.      (* [era_node] *)
 Require Import DirentEnc.       (* [bview]: the fetched string as a list *)
-Require Import PathElems.       (* [path_elems] *)
 Require Import FsTree.          (* [fname] *)
-Require Import FsBytesGamma.    (* [fs_gamma_L] *)
 Require Import SpecNameiEra.    (* the era walk *)
-Require Import SpecSysOpenAU.   (* [open_walk_pre_era], [aopen_commit_at] *)
 Require Import FsAbsOpenFire.   (* [opf_start_of_open], [opf_open_fire_1] *)
-Require Import FsAbsInv.        (* [fsabsE] *)
-Require Import FsAbs.
+Require Import FsAbsDefs.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

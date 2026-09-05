@@ -93,13 +93,12 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile WpGpr.
-Require Import AlignBits WpMmodeLeafBase.
-Require Import UserBits UserPtTree UserExec ProcPtOwn.
+Require Import RegFile.
+Require Import WpMmodeLeafBase.
+Require Import UserBits.
 Require Import WpUmodeBranch.
-Require Import UmodeMem UmodeFetch UmodeArith UmodeAbi.
-Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet.
-Require Import UkStep.
+Require Import UmodeArith UmodeAbi.
+Require Import UsysMemOk.
 Require Import UserHeap UkRun UkRunLeaf UkRunMem UkRunSys UkRunBr.
 Require UkLoad.
 Require Import UkFork.
@@ -207,7 +206,6 @@ Definition ush_jarm (c : ushcmd) : Z :=
   end.
 
 Require Import FdSlots.   (* [fdstate] / [fdtype] -- pipe's two ends *)
-Require Import ProcGeom.  (* [NOFILE] -- pipe's two slots are slots *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)

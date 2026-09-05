@@ -96,10 +96,8 @@ Require Import UexecApply.   (* the round's tail, as named lemmas *)
 Require Import UexecRetExec.  (* [uslot_x] / [uexec_ret_x] -- the loop runs on the
                                  enriched slot (lane E3b) *)
 Require Import UexecApplyX.   (* the round's tail at [uslot_x] *)
-Require Import UexecExecInst. (* the exec bundle's instance *)
 Require Import UexecExecMint. (* [uslot_x_mint] / [uexec_ret_x_lift] *)
 Require Import FirstTok.      (* [fsabs_env] -- what the mint needs *)
-Require Import UexecCond.    (* [cond_entry_slot] -- the loop's MINT (R-c) *)
 Require Import UserretUser.
 Require Import TfPage36.
 From Kernel Require KernelSyms.
