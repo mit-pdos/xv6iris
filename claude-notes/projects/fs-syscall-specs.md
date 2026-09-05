@@ -2951,18 +2951,46 @@ things, and the answer differs:
       with no newline to chop (`L = 3`), where the path is terminated by
       the NUL that was already there — nat subtraction makes `plen = L - 4`
       name both.
-    * **WHAT IS NOT YET DONE, and why each is not a gap in what landed.**
-      (a) The FORK/PARENT arm (0x92c `jal fork1`, 0x930 `c.beqz` → the
-      child, 0x932/0x934 `li a0,0 ; jal wait`, falling into the loop head
-      at 0x938) — the leaves are all there (`wp_kshr_fork1_final`,
-      `wp_kshr_wait`), what it needs is the payload assembled and `usz` +
-      the parser's static tables threaded through `UkSh.ush_loop_head`,
-      which do not appear in it today.  (b) `UkSh.ush_rest` is therefore
-      still open, and it needs one more thing besides the fork arm: a
-      BUDGET RE-CUT.  `ush_rest` hands its walk `16 + n` and fprintf's
-      frame is 26 words, so the loop head has to carry `16 + (26 + n)`.
-      That is mechanical (`UkShCd.wp_kshc_cd` is already stated at the
-      budget it wants) and belongs with (a).
+    * **THE FORK ARM IS DONE (2026-09-05, `iris/UkShFork.v`), AND MAIN'S
+      BODY IS ONE THEOREM.**  `wp_kshf_fork` walks 0x92c..0x938 — fork1,
+      the child/parent split, `wait` — and `wp_kshm_body` joins it to the
+      cd arm at 0x97a.  Audit = the standing three, zero `Admitted`.
+      * **The payload.**  `Forkable P` hands the PARENT `P` back and mints
+        the CHILD's copy at fresh ghost names, which is exactly the
+        address-space copy fork performs, so `P` is everything the child
+        reads out of memory: the text and its jump table, the two static
+        lexer tables, the allocator's untouched first-call state, and the
+        line buffer.  Every conjunct had an instance already; the instance
+        is eight lines.
+      * **The break is NOT in the payload.**  `usz` is a ghost var, not
+        bytes, so it cannot be `Forkable` — `wp_kshr_fork1_final` hands
+        `usz gs szv` to the child itself, and the child assembles
+        `ushm_fresh` out of that plus the payload's two data cells.
+      * **First-call-only malloc is enough FOREVER**, which looks like a
+        gap and is not: the PARENT never calls malloc.  Only the forked
+        child does, once, in a fresh copy of the address space.
+      * **The dispatch is decided BEFORE anything is walked**, because the
+        cd arm's own walk begins at the three byte tests.  The loads at
+        k+1 and k+2 are in bounds because of the STRING and not because of
+        a premise: `lbu a5,1(s1)` is only reached when buf[k] is 'c',
+        which is not NUL.
+      * `iris/UkShLoop.v` is the interface both arms now meet at:
+        `ushl_dat` (the tables + the allocator state) and `ushl_head` (the
+        loop head at `16 + (80 + n)` — fork1's 2, the diagnostic subtree's
+        28, the parser's 60, the runner's 8).  It is what
+        `UkSh.ush_loop_head` has to become.
+    * **WHAT IS LEFT FOR `ush_rest`, and it is exactly two things.**
+      (a) The RE-CUT in `UkSh.v`: `ush_loop_head`/`ush_rest` must carry
+      `ushl_dat` and `usz` and offer `16 + (80 + n)` instead of `16 + n`.
+      Mechanical — every `16 + n` in the loop proof becomes `16 + (80 + n)`
+      and the sub-calls' tails absorb it — and `wp_kshm_body` is already
+      stated at the target.  (b) The LEXABILITY premise
+      (`ushp_no_symbols`, fewer than MAXARGS tokens), which the command
+      loop cannot supply about a line the user typed.  That one is NOT
+      main's body: a line with a symbol byte does not reach
+      `wp_kshp_parser` at all, and if it did, `runcmd` refutes the REDIRECT
+      and PIPE arms from `ush_simple` — the two arms that MOVE THE
+      DESCRIPTOR TABLE.  Closing it is stage 5 work, not stage 6.
 
   **ASKS (relay, in priority order).**
   1. ~~**`wp_uk_ecall_window` in `UkRunSys.v`**~~ **DONE — built in-house
