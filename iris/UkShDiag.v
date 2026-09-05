@@ -109,6 +109,7 @@ Lemma shd_pin_exit    : ShSyms.exit    = 0xc86.  Proof. reflexivity. Qed.
 (* [ustr_byte]'s and [wp_uk_lbu]'s shapes so the '%s' walk below is the   *)
 (* upstream text with the resource's NAME changed and nothing else.       *)
 (* ===================================================================== *)
+Require Import FdSlots.  (* [fdstate] -- the descriptor ledger's states *)
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
@@ -7125,7 +7126,7 @@ Section UkShDiagLeaf.
       urun γt γd γs γfd h m (mword_of_int pc) (ush_Dg + n) -∗
       WP (Loop : expr riscv_lang).
   Proof.
-    intros γt γd γs h m pc n Hat.
+    intros γt γd γs γfd h m pc n Hat.
     iIntros "#Hcode #Hro Hres Hrun".
     destruct Hat as [ [-> Hmsg] | [ [-> Hal] | [-> Hal] ] ].
     - (* =============== panic, at one of the three messages =============== *)
@@ -7295,25 +7296,60 @@ Section UkShDiagLeaf.
   (* lemma applied to [ush_Dg] and to the discharge above; nothing else in  *)
   (* [UkShRun.v] ever carried the Hypothesis.                              *)
   (* --------------------------------------------------------------------- *)
-  Lemma wp_kshr_runcmd_final (c : ushcmd) :
-    forall (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (t szv : Z) (n : nat),
+  (* THE ONE HYPOTHESIS THAT IS NOT THIS FILE'S: the four-byte load out of
+     the TEXT half that runcmd's jump table (and nulterminate's) needs.
+     [UkShRun.v] carries it as a section variable, so the two theorems
+     below carry it too, spelled here once and passed on.  See
+     [UkShRun.v]'s header: the engine's text reader is width-1 all the way
+     down (WpUmodeTextLoad.v), so this is a genuine gap and one engine leaf
+     discharges it here and in [UkShParse.v]. *)
+  Definition ushd_clw_text_ty : Prop :=
+    forall (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+           (uimm : mword 5) (crs1 crd : mword 3) (rs1 rd : mword 5) (a : Z)
+           (wv : mword 32) (avail : nat),
+      unot_sp rd ->
+      creg2reg_idx (Cregidx crs1) = Regidx rs1 ->
+      creg2reg_idx (Cregidx crd) = Regidx rd ->
+      a = uint (m !!! Regidx rs1) + uoff_c4 uimm ->
+      a mod 4 = 0 ->
+      uint rd <> 0 ->
+      uinstr_is γt pc true (C_LW (uimm, Cregidx crs1, Cregidx crd)) -∗
+      ([∗ list] j ∈ seq 0 4, utext γt (a + Z.of_nat j) (nth_byte wv j)) -∗
+      urun γt γd γs γfd h m pc avail -∗
+      (∀ h' : CpuId,
+         urun γt γd γs γfd h'
+           (<[Regidx rd := regval_into_reg (sign_extend' 64 wv)]> m)
+           (add_vec_int pc 2) avail -∗
+         WP (Loop : expr riscv_lang)) -∗
+      WP (Loop : expr riscv_lang).
+
+  Lemma wp_kshr_runcmd_final (Hclw : ushd_clw_text_ty) (c : ushcmd) :
+    ush_simple c ->
+    forall (γt γd γs γfd : gname) (h : CpuId) (m : regfile) (t szv : Z)
+           (ld : list fdstate) (n : nat),
       m !!! Regidx a0_idx = (mword_of_int t : mword 64) ->
       shk_code γt -∗ ush_jtab γt -∗ ush_cmd γd t c -∗ usz γs szv -∗
+      UserFd.ustd γfd ld -∗
       urun γt γd γs γfd h m (mword_of_int ShSyms.runcmd)
         (6 * ush_ht c + (2 + (ush_Dg + n))) -∗
       WP (Loop : expr riscv_lang).
-  Proof. exact (wp_kshr_runcmd ush_Dg ush_diag_leaf_holds c). Qed.
+  Proof. exact (wp_kshr_runcmd ush_Dg Hclw ush_diag_leaf_holds c). Qed.
 
   Lemma wp_kshr_fork1_final (γt γd γs γfd : gname)
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P}
-      (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
+      (szv : Z) (l : list fdstate) (D : gmap nat fdstate)
+      (h : CpuId) (m : regfile) (n : nat) :
     shk_code γt -∗ shk_rodata γt -∗ P γt γd γs -∗ usz γs szv -∗
+    UserFd.ustd γfd l -∗
+    ([∗ map] fd ↦ st ∈ D, UserFd.ufd γfd fd st) -∗
     urun γt γd γs γfd h m (mword_of_int ShSyms.fork1) (2 + (ush_Dg + n)) -∗
     ((∀ (h' : CpuId) (m' : regfile) (r : mword 64),
         ⌜ r <> (mword_of_int 0 : mword 64) ⌝ -∗
         ⌜ ucallee_saved m m' ⌝ -∗
         ⌜ m' !!! Regidx a0_idx = r ⌝ -∗
         P γt γd γs -∗ usz γs szv -∗
+        UserFd.ustd γfd l -∗
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd γfd fd st) -∗
         urun γt γd γs γfd h' m'
           (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
           (2 + (ush_Dg + n)) -∗
@@ -7321,14 +7357,17 @@ Section UkShDiagLeaf.
      (∀ (gt gd gs gfd : gname) (h' : CpuId) (m' : regfile),
         ⌜ ucallee_saved m m' ⌝ -∗
         ⌜ m' !!! Regidx a0_idx = (mword_of_int 0 : mword 64) ⌝ -∗
-        shk_code gt -∗ P gt gd gs gfd -∗ usz gs szv -∗
+        shk_code gt -∗ P gt gd gs -∗ usz gs szv -∗
+        UserFd.ustd gfd l -∗
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd gfd fd st) -∗
         urun gt gd gs gfd h' m'
           (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
           (2 + (ush_Dg + n)) -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    exact (wp_kshr_fork1 ush_Dg ush_diag_leaf_holds γt γd γs γfd P szv h m n).
+    exact (wp_kshr_fork1 ush_Dg ush_diag_leaf_holds
+             γt γd γs γfd P szv l D h m n).
   Qed.
 
 End UkShDiagLeaf.

@@ -1857,105 +1857,36 @@ LinkSysChdirAU.v
 # string, sh's panic prints a .rodata literal -- so the '%s' arm is proved
 # once for both instead of twice.  Audit = the standing three.
 # ---------------------------------------------------------------------
-# SH'S COMMAND-TREE RUNNER IS PARKED; SH'S SYSCALL LAYER IS NOT.
+# SH'S COMMAND-TREE RUNNER IS ON-BUILD, AT THE SCOPE ITS RESOURCES REACH.
 #
-# [UkSh.v] BUILDS: its open/close/dup stubs carry descriptor handles now,
-# and sh's console loop is fully threaded -- it opens "console" and, on the
-# [fd >= 3] path, closes what it opened, spending the handle its own open
-# minted.  The failure arm is refuted by sh's own [bltz].
+# UkShRun.v walks [runcmd] and [fork1] for a tree that is [ush_simple] --
+# no REDIRECT and no PIPE node.  Those two arms are the two that MOVE THE
+# DESCRIPTOR TABLE (REDIR is close-then-open, each half of a PIPE is
+# close/dup/close/close), a descriptor move is spent against the program-
+# side LEDGER ([UserFd.ustd] / [UkSh.ush_std]), and the walk carries the
+# ledger only to FRAME it -- so the two arms are REFUTED from the premise
+# rather than assumed away: [ush_cmd] pins the node's type word, so the
+# jump table's rows 2 and 3 are as dead as its DEFAULT row.  It is the
+# scope stage 4 already hands over (a line with no symbol byte parses to a
+# single EXEC node), and the fd-row port is what takes the premise off.
+# The deleted walks are recoverable: `git show 60a91c01b:iris/UkShRun.v`.
 #
-# [UkShRun.v] and the files above it are parked, and BOTH REASONS THE NOTE
-# USED TO GIVE ARE NOW GONE.  What is left is a third one, found by actually
-# un-parking and building rather than by reading:
-#
-#   (a) CLOSED.  The pipe row used to bind its two descriptors existentially
-#       without tying them to the two words pipe WRITES into the caller's
-#       buffer, so no leaf could mint handles a program could identify.
-#       [UsysMemOk.usys_pipe_ok] is that tie and
-#       [UkRunSys.wp_uk_ecall_pipe] is the leaf.  [wp_kshr_pipe] in
-#       UkShRun.v is already rewritten onto it and its two extra imports
-#       (FdSlots, ProcGeom) are in place -- that stub is READY, and so are
-#       PIPE's two closes IN THE PARENT.
-#
-#   (b) CLOSED.  sh's REDIR closes the INHERITED fds, which it never opened.
-#       [UkSh.ush_std] is the entry precondition that hands sh the LEDGER
-#       of its standard streams, all three open, threaded from
-#       [wp_ksh_start] out through [ush_rest] to exactly this file's front
-#       door.
-#
-#   (c) THE KERNEL HALF IS CLOSED; ONE U-TIER SEAM IS LEFT.  The u-tier
-#       CARRIES the fork fact: [UexecRet.uexec_ret_F]'s child arm reads
-#       [fdv' = uvis_fd W], like the parent's, and
-#       [UkFork.wp_uk_ecall_fork] takes a handle set and a LEDGER and hands
-#       both back to the two processes at their own ghost names.
-#       [UkShRun]'s [wp_kshr_fork]/[wp_kshr_fork1] thread it, and
-#       [wp_kshr_rcall] (new, §4') is the call shape close needs -- a stub
-#       with an [R] going in and an [S r] coming back, stated at the ONE
-#       register file it is applied to because close's precondition reads
-#       a0 and no fact about a0 holds for an arbitrary frame.
-#
-#       WHAT THE KERNEL NOW EARNS: kfork's copy loop
-#       ([ProofKforkB3.kfkb3_fd_loop]) carries the PARTIALLY COPIED TABLE in
-#       its invariant and retypes the child's ghost at the state the
-#       PARENT's own list records, so the child is parked
-#       ([ParkCap.park_token_park]) at that very list and resumed at a key
-#       whose [uvis_fd] is it.  [SpecKfork]'s slot premise is restricted to
-#       that table accordingly -- which is the shape a VERIFIED parent's
-#       fork-continuation can be handed in as, where the ∀-key family could
-#       not be.  See claude-notes/design/user-fd.md SS4.
-#
-#       WHAT IS STILL NOT EARNED: [UexecApply.uexec_ret_round_slot]'s fork
-#       case MINTS a slot from that family instead of INSTANTIATING the
-#       program's own child arm, so a verified parent's continuation still
-#       has no route to the child (projects/user-wp-slot.md SS4c, R-b).
-#       That is now the only thing between sh's runner and its REDIR.
-#
-#   (d) HALF OPEN, and it is REDIR's.
-#
-#       FIRST, and still open: a redirect's fd is 0 or 1, and nothing says
-#       so.  It is DATA in the AST ([URedir c1 file mode fd], constrained
-#       only by [ush_w32 g (t + 36) fd]), so it has to be SAID -- as a
-#       conjunct of [ush_cmd]'s URedir case, discharged by the parser,
-#       which only ever builds 0 (for '<') or 1 (for '>' and '>>').
-#       Without it runcmd cannot spend the ledger's entry on the close,
-#       since [UkSh.ush_std] covers exactly the low three slots.
-#
-#       SECOND: CLOSED.  Saying a REDIR REDIRECTS needs [close(fd);
-#       open(...)] to reopen that very fd, which needs the LOWEST-free
-#       promise AND a way for a program to say a slot is CLOSED.  Both are
-#       landed: the row carries [fd_least_closed], and the program-side
-#       carrier is [UserFd.ustd], the LEDGER of the low three descriptors,
-#       tracked open-or-closed rather than only when open
-#       (claude-notes/design/user-fd.md).  runcmd's REDIR is then
-#       [wp_uk_ecall_close_std] followed by [wp_uk_ecall_open] at a ledger
-#       whose slot [fd] is shut, and [UserFd.ualloc] computes the answer.
-#       Closing cannot fail either -- [UsysMemOk.usys_fd_ok]'s close row
-#       says an OPEN descriptor's close returns 0 -- so sh, which checks
-#       neither result, has no unreachable arm to carry.
-# ---------------------------------------------------------------------
-# UCodeShK.v IS NOT PARKED AND MUST NOT BE: it is the [uis_shk_*] catalog
-# UkSh.v READS, so parking it while listing UkSh.v leaves a dangling
-# dependency -- a local tree with a stale UCodeShK.vo still builds and a
-# fresh checkout does not ("No rule to make target 'UCodeShK.vo', needed by
-# 'UkSh.vo'").  It costs 10.6 s (see the catalog note above), so there was
-# never a build-time reason to shelve it either.
-#
-# Of the four files that ARE parked, nothing outside them refers to them,
-# so parking those costs the rest of the tree nothing.  Un-parking is the
-# follow-on to closing (c) above.
-#
-# THE FOUR PARKED ROWS BELOW ARE BARE '# Foo.v' COMMENTS, AND THE SPELLING
-# MATTERS.  tools/proof_coverage.py --check treats a comment whose body is
-# exactly a filename as a DELIBERATE descope and exempts it; anything else
-# -- '# PARKED: Foo.v', say -- is prose, so the file reads as an accident
-# ("added to iris/ and forgotten") and CI's coverage step fails.  Put the
-# explanation in prose lines like these and leave the row itself bare.
+# THE ONE THING THE ENGINE OWES IT: a FOUR-BYTE LOAD OUT OF THE TEXT HALF.
+# runcmd's jump table at 0x1398 and nulterminate's at 0x13b0 are .rodata,
+# which shares the executable segment's pages, so the heap files them
+# under the TEXT gname; [UkLoad.uk_load_ok] demands a WRITABLE target page
+# (text bytes are stamped and outside the walker's map --
+# claude-notes/projects/icache.md) and the tier's one text reader,
+# [UkRunMem.wp_uk_lbu_text], is width-1 all the way down
+# (WpUmodeTextLoad.v).  So UkShRun.v and UkShParse.v each carry the SAME
+# statement as a named Hypothesis ([wp_uk_clw_text] / [ushp_clw_text_ok])
+# and one engine leaf discharges both.
 # ---------------------------------------------------------------------
 UCodeShK.v
 UkRunBr.v
 UkSh.v
-# UkShRun.v
-# UkShDiag.v
+UkShRun.v
+UkShDiag.v
 
 # ... STAGE 4: the parser.  UCodeShP.v is a THIRD catalog over the same
 # dump (tools/ucode_shp.txt, [--prog shp]) -- 564 instructions in eleven
@@ -1977,12 +1908,13 @@ UkSh.v
 # three exits), and the two leaf walks the lexer and parsecmd sit on:
 # [wp_kshp_strchr] and [wp_kshp_strlen], both parametric in the string and
 # both closing their loop by bounded Rocq induction on the [ustr]
-# resource's own terminator rather than an iLoeb.  ONE Hypothesis,
-# [ushp_malloc_ok] (stage 3's allocator, blocked on [wp_uk_ecall_sbrk]);
-# it taints NOTHING yet -- every lemma in the file is unconditional today.
+# resource's own terminator rather than an iLoeb.  THE PARSER THEOREM
+# [wp_kshp_parser] is at the foot of the file, over TWO named Hypotheses:
+# [ushp_malloc_ok] (stage 3's allocator, blocked on [wp_uk_ecall_sbrk])
+# and [ushp_clw_text_ok] (the engine's width-4 text load, above).
 # Audit = the standing three, zero Admitted, zero Axiom.
-# UCodeShP.v
-# UkShParse.v
+UCodeShP.v
+UkShParse.v
 
 # FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
 # u-tier syscall row.  FsFdMirror = the pure mirror + step table;
