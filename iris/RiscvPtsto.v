@@ -515,6 +515,17 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscv_obs_name : gname;
   riscv_obs_total : list mobs;
   riscv_obs_pred : iProp Σ;
+  (* THE CLIENT PHASE COUNTER (claude-notes/design/applications.md §1): a
+     FIXED-layer mono-nat the machine allocates once, at 0, and hands to
+     the trace slot at its birth ([RiscvAdequacy.riscv_power_adequacy]'s
+     [HPt]).  Every era can NAME it through this record; the client OWNS
+     it ([client_auth] below) and [state_interp] never reads it.  What the
+     machine layer fixes is that a lower bound on it is persistent and
+     survives every power cycle -- which is what makes it the home of an
+     application's TAINT ([FsAbsInv.fsabs_ok]: the abstract file-system
+     state satisfies the application's predicate, OR the counter has
+     moved past 0). *)
+  riscv_client_name : gname;
 }.
 
 Class riscvGS (Σ : gFunctors) := RiscvGS {
@@ -690,6 +701,13 @@ Definition obs_auth `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
   ghost_var riscv_obs_name (1/2) h.
 Definition obs_frag `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
   ghost_var riscv_obs_name (1/2) h.
+
+(* the client phase counter (applications.md §1): the auth is the trace
+   slot's, a lower bound is anyone's and persistent *)
+Definition client_auth `{!riscvFixedGS Σ} (n : nat) : iProp Σ :=
+  mono_nat_auth_own riscv_client_name 1 n.
+Definition client_lb `{!riscvFixedGS Σ} (n : nat) : iProp Σ :=
+  mono_nat_lb_own riscv_client_name n.
 
 Definition obs_inv `{!riscvFixedGS Σ} : iProp Σ :=
   inv obsN riscv_obs_pred.

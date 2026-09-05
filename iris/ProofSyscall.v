@@ -2801,7 +2801,7 @@ Section SyscallArms.
     pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
     sysc_exec_in U sts -∗
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
-      (Φo : gmap Z FsAbs.anode -> Z -> FsAbs.anode -> iProp Σ),
+      (Φo : gmap Z FsAbsDefs.anode -> Z -> FsAbsDefs.anode -> iProp Σ),
       sys_exec_au_pre uslot_x (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) P Pmiss Φo (us_M U) v1 sts.
   Proof.
     intros Hn Hv1. rewrite /sysc_exec_in. iIntros "H".

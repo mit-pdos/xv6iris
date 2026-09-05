@@ -1189,7 +1189,7 @@ Section BootAlloc.
      rather than fixed: adequacy chooses it, this file only carries it.  It
      is the LAST conjunct on both sides, so nothing above moved and the
      proof is still one [iExact]. *)
-  Lemma power_boot_res_unpack (Rb : (Z -> bv 8) -> iProp Σ)
+  Lemma power_boot_res_unpack (Rb : gname -> (Z -> bv 8) -> iProp Σ)
       (g : gstate) (ndisk : nat) :
     power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk
       (fun dk => FsCrash.mirror_of (FsCrash.fs_blocks dk)) Rb g ⊢
@@ -1230,8 +1230,9 @@ Section BootAlloc.
       log_mirror_half (FsCrash.mirror_of
          (FsCrash.fs_blocks (v_disk (g.(gdev).(dvirtio))))) ∗
       swap_lb (S gen_id) ∗
-      (* the client's lent resource, straight through *)
-      Rb (v_disk (g.(gdev).(dvirtio))) ∗
+      (* the client's lent resource, straight through, at the client phase
+         counter's name *)
+      Rb riscv_client_name (v_disk (g.(gdev).(dvirtio))) ∗
       (* THE ELEMENT HALF OF THE IMAGE (tso-machine-flip.md A6.81).  The
          [boot_raw_bytes] row above is the FLAT byte only; a registered
          (context-tier) byte is that byte PLUS the address's ledger
@@ -1410,7 +1411,7 @@ Section BootAlloc.
          read it yet (BT-3 is where [fs_cfg_alloc_snap] starts taking the
          epoch).  Threading it now is what keeps the change to the audited
          cone's spine one commit of its own. *)
-      (Rb : (Z -> bv 8) -> iProp Σ)
+      (Rb : gname -> (Z -> bv 8) -> iProp Σ)
       (* THE EPOCH'S OWN GHOST NAMES (durable-disk BT-3).  This fupd does
          not read the snapshot itself -- it hands it straight to
          [FsCfgSnap.fs_cfg_alloc_snap], which reads [snap_ok] off it.  The

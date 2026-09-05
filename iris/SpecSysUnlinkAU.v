@@ -347,64 +347,13 @@ Local Open Scope Z_scope.
 (*  1.  THE DELTA AND ITS SIDE CONDITIONS (PURE)                          *)
 (* ===================================================================== *)
 
-(* the dir-arm's parent decrement -- [acre_bump]'s inverse-shaped sibling:
-   unlinking a directory child drops the parent's [".."]-backed count *)
-Definition unl_dec (c : absnode) : nat :=
-  match c with ADir _ => 1%nat | _ => 0%nat end.
+Require Export FsAbsDelta.   (* [unl_dec], [delta_unl_ent]/[delta_unl_tgt]/[delta_unlink] + their row algebra (hoisted 2026-09-04) *)
 
 (* THE ISDIREMPTY READING: the entry map holds nothing but the dots.
    (The dots THEMSELVES stay -- doc section 1: ".", ".." are ordinary
    names of [ents], hidden only by the tree layer.) *)
 Definition dots_only (es : gmap fname Z) : Prop :=
   forall nm, is_Some (es !! nm) -> nm = DOT \/ nm = DOTDOT.
-
-(* THE TWO ONE-ROW HALVES THE MACHINE REALIZES (header: THE DELTA IS TWO
-   INSTANTS).  Total on purpose; applied off-shape they are the
-   identity. *)
-
-(* instant 1 -- the parent's row: the name deleted, the count down [dec]
-   (the dir arm's [dp->nlink--], zero otherwise) *)
-Definition delta_unl_ent (d : Z) (nm : fname) (dec : nat)
-    (av : aview) : aview :=
-  match av !! d with
-  | Some p =>
-      match an_node p with
-      | ADir ents =>
-          <[d := MkAnode (ADir (delete nm ents))
-                         (an_nlink p - dec)%nat]> av
-      | _ => av
-      end
-  | None => av
-  end.
-
-(* instant 2 -- the target's row: same node, count down one *)
-Definition delta_unl_tgt (t : Z) (av : aview) : aview :=
-  match av !! t with
-  | Some a => <[t := MkAnode (an_node a) (an_nlink a - 1)%nat]> av
-  | None => av
-  end.
-
-(* THE FUSED DELTA (doc section 4's [δ_unlink], the quiescent reading):
-   parent loses [nm], target's nlink drops, a directory target drops the
-   parent's nlink too.  [delta_unlink_split] below ties it to the two
-   halves; the AU commits fire the halves. *)
-Definition delta_unlink (d : Z) (nm : fname) (t : Z)
-    (av : aview) : aview :=
-  match av !! d with
-  | Some p =>
-      match av !! t with
-      | Some a =>
-          match an_node p with
-          | ADir ents =>
-              <[t := MkAnode (an_node a) (an_nlink a - 1)%nat]>
-                (<[d := MkAnode (ADir (delete nm ents))
-                                (an_nlink p - unl_dec (an_node a))%nat]> av)
-          | _ => av
-          end
-      | None => av
-      end
-  | None => av
-  end.
 
 (* THE SIDE CONDITIONS, as one proposition -- everything the kernel has
    walked by instant 1, restated abstractly (header: THE SIDE
@@ -432,39 +381,6 @@ Proof.
     [exact (HnD Hc) | exact (HnDD Hc)].
 Qed.
 
-(* ---- the halves' row algebra ---------------------------------------- *)
-
-Lemma delta_unl_ent_parent (av : aview) (d : Z) (nm : fname) (dec : nat)
-    (ents : gmap fname Z) (nl : nat) :
-  av !! d = Some (MkAnode (ADir ents) nl) ->
-  delta_unl_ent d nm dec av !! d
-  = Some (MkAnode (ADir (delete nm ents)) (nl - dec)%nat).
-Proof. intros Hd. rewrite /delta_unl_ent Hd /=. by rewrite lookup_insert. Qed.
-
-Lemma delta_unl_ent_other (av : aview) (d : Z) (nm : fname) (dec : nat)
-    (j : Z) :
-  j <> d -> delta_unl_ent d nm dec av !! j = av !! j.
-Proof.
-  intros Hj. rewrite /delta_unl_ent.
-  destruct (av !! d) as [p |]; [| done].
-  destruct (an_node p) as [bs | ents0 | ma mi]; [done | | done].
-  by rewrite lookup_insert_ne; [| congruence].
-Qed.
-
-Lemma delta_unl_tgt_target (av : aview) (t : Z) (a : anode) :
-  av !! t = Some a ->
-  delta_unl_tgt t av !! t
-  = Some (MkAnode (an_node a) (an_nlink a - 1)%nat).
-Proof. intros Ht. rewrite /delta_unl_tgt Ht. by rewrite lookup_insert. Qed.
-
-Lemma delta_unl_tgt_other (av : aview) (t j : Z) :
-  j <> t -> delta_unl_tgt t av !! j = av !! j.
-Proof.
-  intros Hj. rewrite /delta_unl_tgt.
-  destruct (av !! t) as [a |]; [| done].
-  by rewrite lookup_insert_ne; [| congruence].
-Qed.
-
 (* ---- THE COMPOSITION (header: what makes the pair one delta) --------- *)
 
 Lemma delta_unlink_split (av : aview) (d : Z) (nm : fname)
@@ -481,58 +397,7 @@ Proof.
   rewrite Ht. reflexivity.
 Qed.
 
-(* ---- the fused delta's row algebra ---------------------------------- *)
-
-Lemma delta_unlink_parent (av : aview) (d : Z) (nm : fname)
-    (ents : gmap fname Z) (nl : nat) (t : Z) (a : anode) :
-  av !! d = Some (MkAnode (ADir ents) nl) -> av !! t = Some a -> d <> t ->
-  delta_unlink d nm t av !! d
-  = Some (MkAnode (ADir (delete nm ents))
-                  (nl - unl_dec (an_node a))%nat).
-Proof.
-  intros Hd Ht Hne. rewrite /delta_unlink Hd Ht /=.
-  rewrite lookup_insert_ne; [| congruence]. by rewrite lookup_insert.
-Qed.
-
-Lemma delta_unlink_target (av : aview) (d : Z) (nm : fname)
-    (ents : gmap fname Z) (nl : nat) (t : Z) (a : anode) :
-  av !! d = Some (MkAnode (ADir ents) nl) -> av !! t = Some a ->
-  delta_unlink d nm t av !! t
-  = Some (MkAnode (an_node a) (an_nlink a - 1)%nat).
-Proof.
-  intros Hd Ht. rewrite /delta_unlink Hd Ht /=. by rewrite lookup_insert.
-Qed.
-
-Lemma delta_unlink_other (av : aview) (d : Z) (nm : fname) (t j : Z) :
-  j <> d -> j <> t -> delta_unlink d nm t av !! j = av !! j.
-Proof.
-  intros Hjd Hjt. rewrite /delta_unlink.
-  destruct (av !! d) as [p |]; [| done].
-  destruct (av !! t) as [a |]; [| done].
-  destruct (an_node p) as [bs | ents0 | ma mi]; [done | | done].
-  rewrite lookup_insert_ne; [| congruence].
-  by rewrite lookup_insert_ne; [| congruence].
-Qed.
-
 (* ---- THE ORPHAN FAMILY (header: nothing leaves the map) -------------- *)
-
-(* no key ever leaves: unlink deletes an EDGE, never a node.  [δ_free]
-   (the row leaving [aview]) is iput's, at nlink 0 + last reference --
-   doc sections 1, 4 and 7. *)
-Lemma delta_unlink_is_Some (av : aview) (d : Z) (nm : fname) (t j : Z) :
-  is_Some (delta_unlink d nm t av !! j) <-> is_Some (av !! j).
-Proof.
-  rewrite /delta_unlink.
-  destruct (av !! d) as [p |] eqn:Hd; [| done].
-  destruct (av !! t) as [a |] eqn:Ht; [| done].
-  destruct (an_node p) as [bs | ents0 | ma mi]; [done | | done].
-  destruct (decide (j = t)) as [-> | Hjt].
-  { rewrite lookup_insert Ht. split; intros _; by eexists. }
-  rewrite lookup_insert_ne; [| congruence].
-  destruct (decide (j = d)) as [-> | Hjd].
-  { rewrite lookup_insert Hd. split; intros _; by eexists. }
-  by rewrite lookup_insert_ne; [| congruence].
-Qed.
 
 (* a file target whose only link this was: the row STAYS, reading
    [an_nlink = 0] -- the unlinked-but-open state the doc's orphan bullet

@@ -297,29 +297,7 @@ Definition dev_arg (v : mword 64) : Z := (bv_unsigned v) mod (2 ^ 16).
 Lemma dev_arg_range (v : mword 64) : 0 <= dev_arg v < 2 ^ 16.
 Proof. apply Z.mod_pos_bound. lia. Qed.
 
-(* mkdir's fused parent bump (doc section 4: "mkdir additionally:
-   d.nlink+1 -- fused, one delta"); zero for every other child kind *)
-Definition acre_bump (c : absnode) : nat :=
-  match c with ADir _ => 1%nat | _ => 0%nat end.
-
-(* THE DELTA (doc section 4's [δ_create], type-parameterized): the parent
-   gains [nm ↦ i], the child's row becomes [c] at nlink 1, and a
-   directory child bumps the parent's nlink.  Total on purpose -- applied
-   where the parent is not a directory it is the identity; the side
-   conditions live in [cre_pre], not in the function. *)
-Definition delta_create (d : Z) (nm : fname) (i : Z) (c : absnode)
-    (av : aview) : aview :=
-  match av !! d with
-  | Some a =>
-      match an_node a with
-      | ADir ents =>
-          <[i := MkAnode c 1%nat]>
-            (<[d := MkAnode (ADir (<[nm := i]> ents))
-                            (an_nlink a + acre_bump c)%nat]> av)
-      | _ => av
-      end
-  | None => av
-  end.
+Require Export FsAbsDelta.   (* [acre_bump], [delta_create] + its row algebra (hoisted 2026-09-04) *)
 
 (* THE SIDE CONDITIONS, as one proposition: the parent is a directory
    whose map lacks the name, and the child's row already reads as the
@@ -338,36 +316,6 @@ Lemma cre_pre_ne (av : aview) (d : Z) (nm : fname) (ents : gmap fname Z)
 Proof.
   intros (Hd & _ & Hi) Hc Heq. subst i. rewrite Hd in Hi.
   injection Hi as Hc' _. exact (Hc ents (eq_sym Hc')).
-Qed.
-
-(* the delta's row algebra -- the caller-facing readings unlink and write
-   will restate in their own vocabulary *)
-Lemma delta_create_parent (av : aview) (d : Z) (nm : fname)
-    (ents : gmap fname Z) (nl : nat) (i : Z) (c : absnode) :
-  av !! d = Some (MkAnode (ADir ents) nl) -> d <> i ->
-  delta_create d nm i c av !! d
-  = Some (MkAnode (ADir (<[nm := i]> ents)) (nl + acre_bump c)%nat).
-Proof.
-  intros Hd Hne. rewrite /delta_create Hd /=.
-  rewrite lookup_insert_ne; [| congruence].
-  by rewrite lookup_insert.
-Qed.
-
-Lemma delta_create_child (av : aview) (d : Z) (nm : fname)
-    (ents : gmap fname Z) (nl : nat) (i : Z) (c : absnode) :
-  av !! d = Some (MkAnode (ADir ents) nl) ->
-  delta_create d nm i c av !! i = Some (MkAnode c 1%nat).
-Proof. intros Hd. rewrite /delta_create Hd /=. by rewrite lookup_insert. Qed.
-
-Lemma delta_create_other (av : aview) (d : Z) (nm : fname) (i : Z)
-    (c : absnode) (j : Z) :
-  j <> d -> j <> i -> delta_create d nm i c av !! j = av !! j.
-Proof.
-  intros Hjd Hji. rewrite /delta_create.
-  destruct (av !! d) as [a |]; [| done].
-  destruct (an_node a) as [bs | ents0 | ma0 mi0]; [done | | done].
-  rewrite lookup_insert_ne; [| congruence].
-  by rewrite lookup_insert_ne; [| congruence].
 Qed.
 
 (* THE COLLAPSE (the header's freshness argument, machine-checked): under

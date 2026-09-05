@@ -198,6 +198,14 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   the standing constraint that (L6) must NEVER be stated) over a verification
   report against the landed tree.
 
+- **[`applications.md`](design/applications.md)** — APPLICATIONS: how a
+  collection of user programs plugs into the whole-system theorem — the
+  conditional invariant `⌜A I⌝ ∨ tainted` on the abstract file-system
+  state (the taint a fixed-layer client counter), the application record
+  and `App.xv6_app_adequacy`, the license the fire dischargers take, the
+  era mint that seeds the client copy, and the lanes the echo application
+  (`echo hello world`, file system unmodified) still owes.
+
 - **[`ctx-box.md`](design/ctx-box.md)** — THE TRANSIT BOX (`CtxBox.v`): the
   one mechanism for a cell that crosses locks under TSO — tiers, the
   register-selected arms, the seven hooked transitions, the accessors, the
@@ -212,6 +220,11 @@ Audited against the tree 2026-08-28, when six moved to
 (finished) and `sp-migration.md` (archived by the owner with work still
 outstanding; see the `completed/` section below).
 
+- **[`app-echo.md`](projects/app-echo.md)** — the ECHO APPLICATION's
+  worklist: the target statement (`disc κs -> good_out κs /\ pristine`),
+  the six lanes L2–L7 of `design/applications.md` §5 with their gates,
+  and what `iris/AppEcho.v` holds today (pure data and the obligations
+  provable without any lane).
 - **[`liveness.md`](projects/liveness.md)** — NOT ACTIVE, a parked design
   PROPOSAL: how to prove progress properties ("these bytes eventually
   appear on the UART") without changing the WP — fairness as named trace

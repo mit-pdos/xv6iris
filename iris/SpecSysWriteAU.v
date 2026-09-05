@@ -283,56 +283,7 @@ Local Open Scope Z_scope.
 (*  1.  THE DELTA AND ITS ALGEBRA (PURE)                                  *)
 (* ===================================================================== *)
 
-(* THE SPLICE IS [FsBlocks.blk_splice], REUSED: [blk_splice off sub bs] is
-   [take off bs ++ sub ++ drop (off + length sub) bs], which is the doc's
-   "AFile (splice off bs)" already -- and it MAY GROW: past the end the
-   [drop] is empty and the result's length is [off + length sub].
-   [blk_splice_length_grow] is the "size = max" reading; FsBlocks's own
-   [blk_splice_length] is the in-bounds special case. *)
-
-Lemma blk_splice_nil (off : nat) (bs : list (bv 8)) :
-  blk_splice off [] bs = bs.
-Proof. rewrite /blk_splice /= Nat.add_0_r take_drop //. Qed.
-
-Lemma blk_splice_length_grow (off : nat) (sub bs : list (bv 8)) :
-  (off <= length bs)%nat ->
-  length (blk_splice off sub bs) = Nat.max (off + length sub) (length bs).
-Proof.
-  intros Hle.
-  rewrite /blk_splice !length_app length_take_le // length_drop. lia.
-Qed.
-
-(* THE COMPOSITION: two splices at adjacent offsets ARE one splice of the
-   concatenation.  This is what makes the per-chunk deltas COMPOSE, and it
-   is the pure heart of the stable corollary. *)
-Lemma blk_splice_splice (off : nat) (bs1 bs2 bs0 : list (bv 8)) :
-  (off <= length bs0)%nat ->
-  blk_splice (off + length bs1)%nat bs2 (blk_splice off bs1 bs0)
-  = blk_splice off (bs1 ++ bs2) bs0.
-Proof.
-  intros Hle. rewrite {1 2}/blk_splice.
-  assert (HA : off = length (take off bs0))
-    by (rewrite length_take_le //).
-  rewrite (take_app_add' _ _ _ _ HA) take_app_length.
-  rewrite -Nat.add_assoc (drop_app_add' _ _ _ _ HA) drop_app_add drop_drop.
-  rewrite /blk_splice length_app Nat.add_assoc -!app_assoc //.
-Qed.
-
-(* THE DELTA (doc section 4's [δ_write]): splice [new] into the file's
-   bytes at [off]; nlink untouched.  Total on purpose -- applied where the
-   row is not an [AFile] it is the identity; the side conditions live in
-   [wri_pre], not in the function (the mknod mold's rule). *)
-Definition delta_write (i : Z) (off : nat) (new : list (bv 8))
-    (av : aview) : aview :=
-  match av !! i with
-  | Some a =>
-      match an_node a with
-      | AFile bs =>
-          <[i := MkAnode (AFile (blk_splice off new bs)) (an_nlink a)]> av
-      | _ => av
-      end
-  | None => av
-  end.
+Require Export FsAbsDelta.   (* the splice algebra, [delta_write] + its row algebra (hoisted 2026-09-04) *)
 
 (* THE SIDE CONDITIONS a fired chunk's caller may assume at its instant,
    each realized by a writei guard (header, prover item 5): the row is a
@@ -345,44 +296,6 @@ Definition wri_pre (av : aview) (i : Z) (off : nat)
   /\ (0 < length bs)%nat
   /\ (off <= length bs0)%nat
   /\ (off + length bs <= MAXFILE * BSIZE)%nat.
-
-(* the delta's row algebra *)
-Lemma delta_write_file (av : aview) (i : Z) (off : nat)
-    (new bs0 : list (bv 8)) (nl : nat) :
-  av !! i = Some (MkAnode (AFile bs0) nl) ->
-  delta_write i off new av
-  = <[i := MkAnode (AFile (blk_splice off new bs0)) nl]> av.
-Proof. intros Hi. rewrite /delta_write Hi //=. Qed.
-
-Lemma delta_write_lookup (av : aview) (i : Z) (off : nat)
-    (new bs0 : list (bv 8)) (nl : nat) :
-  av !! i = Some (MkAnode (AFile bs0) nl) ->
-  delta_write i off new av !! i
-  = Some (MkAnode (AFile (blk_splice off new bs0)) nl).
-Proof.
-  intros Hi. rewrite (delta_write_file _ _ _ _ _ _ Hi) lookup_insert //.
-Qed.
-
-Lemma delta_write_other (av : aview) (i : Z) (off : nat)
-    (new : list (bv 8)) (j : Z) :
-  j <> i -> delta_write i off new av !! j = av !! j.
-Proof.
-  intros Hj. rewrite /delta_write.
-  destruct (av !! i) as [a |]; [| done].
-  destruct (an_node a) as [bs | ents | ma mi]; [| done | done].
-  rewrite lookup_insert_ne //.
-Qed.
-
-(* a zero-byte chunk is the identity -- which is why [wri_pre] may demand
-   [0 < length bs] with nothing lost *)
-Lemma delta_write_nil (av : aview) (i : Z) (off : nat)
-    (bs0 : list (bv 8)) (nl : nat) :
-  av !! i = Some (MkAnode (AFile bs0) nl) ->
-  delta_write i off [] av = av.
-Proof.
-  intros Hi.
-  rewrite (delta_write_file _ _ _ _ _ _ Hi) blk_splice_nil insert_id //.
-Qed.
 
 (* ---------------------------------------------------------------------
    1a.  THE CHAINED READING (what the stable corollary is made of)

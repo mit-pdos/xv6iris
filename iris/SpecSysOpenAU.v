@@ -381,52 +381,7 @@ Proof.
   - rewrite (blk_splice_length_grow off new bs0 Hoff). lia.
 Qed.
 
-(* THE DELTA: the file's bytes become empty; nlink untouched.  Total on
-   purpose -- applied where the row is not an [AFile] it is the identity;
-   the side condition lives in the commit's premise, not in the function
-   (the family rule). *)
-Definition delta_trunc `{XI : CurCtx} (i : Z) (av : aview) : aview :=
-  match av !! i with
-  | Some a =>
-      match an_node a with
-      | AFile _ => <[i := MkAnode (AFile []) (an_nlink a)]> av
-      | _ => av
-      end
-  | None => av
-  end.
-
-(* the delta's row algebra *)
-Lemma delta_trunc_file `{XI : CurCtx} (av : aview) (i : Z) (bs0 : list (bv 8))
-    (nl : nat) :
-  av !! i = Some (MkAnode (AFile bs0) nl) ->
-  delta_trunc i av = <[i := MkAnode (AFile []) nl]> av.
-Proof. intros Hi. rewrite /delta_trunc Hi //=. Qed.
-
-Lemma delta_trunc_lookup `{XI : CurCtx} (av : aview) (i : Z) (bs0 : list (bv 8))
-    (nl : nat) :
-  av !! i = Some (MkAnode (AFile bs0) nl) ->
-  delta_trunc i av !! i = Some (MkAnode (AFile []) nl).
-Proof.
-  intros Hi. rewrite (delta_trunc_file av i bs0 nl Hi) lookup_insert //.
-Qed.
-
-Lemma delta_trunc_other `{XI : CurCtx} (av : aview) (i j : Z) :
-  j <> i -> delta_trunc i av !! j = av !! j.
-Proof.
-  intros Hj. rewrite /delta_trunc.
-  destruct (av !! i) as [a |]; [| done].
-  destruct (an_node a) as [bs | ents | ma mi]; [| done | done].
-  rewrite lookup_insert_ne //.
-Qed.
-
-(* truncating an EMPTY file is the identity -- why the CREATE-fresh arm
-   refunds the trunc commit instead of firing it vacuously (header) *)
-Lemma delta_trunc_nil `{XI : CurCtx} (av : aview) (i : Z) (nl : nat) :
-  av !! i = Some (MkAnode (AFile []) nl) -> delta_trunc i av = av.
-Proof.
-  intros Hi. rewrite (delta_trunc_file av i [] nl Hi).
-  by rewrite (insert_id av i (MkAnode (AFile []) nl) Hi).
-Qed.
+Require Export FsAbsDelta.   (* [delta_trunc] + its row algebra (hoisted 2026-09-04) *)
 
 (* ===================================================================== *)
 (*  2.  THE COMMITS, THE WALK PACKAGE, THE FD STORY, AND THE ARMS         *)

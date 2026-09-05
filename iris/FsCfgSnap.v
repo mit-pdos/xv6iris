@@ -1228,11 +1228,12 @@ Section SnapMint.
     iExists ICFG,
       (MkFscfg gpr gkm gkp γd γv gdl bn γfs γi cn git
                cov (sb_logstart (fss_sb S)) (sb_bmapstart (fss_sb S))
-               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol).
+               (sb_size (fss_sb S)) (sb_ninodes (fss_sb S)) γfol
+               (fun _ : gmap Z fs_node => True)).
     rewrite /fs_kit_icache /fs_kit_fsinit_ghost.
     cbn [fsc_printk fsc_kalloc fsc_kpages fsc_uart fsc_disk fsc_dlock
          fsc_bio fsc_fs fsc_ireg fsc_ic fsc_itlock fsc_cov fsc_logst
-         fsc_bmapstart fsc_size fsc_ninodes fsc_fol].
+         fsc_bmapstart fsc_size fsc_ninodes fsc_fol fsc_app].
     rewrite Hdev Histq Hlogq.
     assert (Hset : (((((cov ∖ ({[ (1:Z) ]} : gset Z))
                          ∖ log_region_set (sb_logstart (fss_sb S)))
