@@ -1,23 +1,29 @@
-(** * TsoLitmus.v — executable litmus programs over the minimal Ztso machine
+(** * TsoLitmus.v — executable litmus programs over the relaxed view machine
 
-    A tiny hart-program language (NOT Sail) on top of [TsoMem]'s Ztso view
-    machine, plus the litmus suite that leg T1 of
-    [claude-notes/projects/tso-port.md] makes a standing obligation: SB with
-    and without fences, MP, CoRR, LB, IRIW, n6, and an AMO sanity verdict.
+    A tiny hart-program language (NOT Sail) on top of [TsoMem]'s view
+    machine, plus the litmus suite that is a standing obligation of the
+    memory model: every verdict here is the model's answer, and a change
+    to [TsoMem] that flips one is a design change.
 
-    THE VERDICTS.  Ztso forbids everything RVWMO forbids plus all reordering
-    except W→R, so among the classical shapes SB is the ONLY allowed
-    relaxation — every other forbidden outcome here is forbidden by the same
-    single-log/monotone-view argument, with no fence in sight.  The one extra
-    allowed outcome is n6, whose "the buffer drains late" behaviour TSO allows
-    and SC forbids; it is the witness that this machine is not secretly SC.
+    THE VERDICTS, after the R→R relaxation (claude-notes/projects/relaxed-rr.md
+    §2.4).  The machine keeps a total store order and R→W order, and relaxes
+    load–load order; so among the classical shapes:
 
-    Under Ztso there are no acquire/release annotations to model (every load
-    is an acquire, every store a release), so the language has none — the
-    difference from the `weak-memory` branch's [WeakLitmus.v] mold, whose
-    loads carry an [aq] flag.
+      SB                       allowed      (store buffering, as under Ztso)
+      SB + fence w,r both      forbidden    (the drain)
+      MP, no fences            ALLOWED      (flipped: the reader reorders)
+      MP + w,w / r,r fences    forbidden    (the acquire)
+      MP + addr dependency     ALLOWED      (dependencies are NOT modelled)
+      CoRR                     forbidden    (the per-byte coherence floor)
+      LB                       forbidden    (R→W kept — stronger than RVWMO)
+      IRIW, no fences          ALLOWED      (flipped)
+      IRIW + r,r both readers  forbidden    (one log: multi-copy atomic)
+      n6                       allowed      (the buffer drains late)
+      AMO .aq                  acquire      (no fence needed after a lock)
 
-    Like [TsoMem.v] this file imports only stdpp. *)
+    Every FORBIDDEN verdict comes with a reachability witness (the shape it
+    quantifies over is reached with the verdict's hypotheses satisfied), so
+    none is vacuous.  Like [TsoMem.v] this file imports only stdpp. *)
 From Stdlib.ssr Require Import ssreflect.
 From stdpp Require Import gmap finite relations list.
 From stdpp Require Import bitvector.definitions.
@@ -40,24 +46,31 @@ Proof. intros H. apply (f_equal bv_unsigned) in H. by vm_compute in H. Qed.
 Lemma b1_ne_b2 : b1 ≠ b2.
 Proof. intros H. apply (f_equal bv_unsigned) in H. by vm_compute in H. Qed.
 
-(** The two litmus addresses and the four litmus registers. *)
+(** The three litmus addresses and the four litmus registers.  [az] sits at
+    address 1 so that the BYTE [b1] read out of a pointer cell IS its
+    address — what the MP+addr test needs. *)
 Local Notation ax := (0%Z).
+Local Notation az := (1%Z).
 Local Notation ay := (8%Z).
 Local Notation rg1 := (1%nat).
 Local Notation rg2 := (2%nat).
 Local Notation rg3 := (3%nat).
 Local Notation rg4 := (4%nat).
 
-(** The era-initial image: both litmus bytes read as 0 at timestamp 0. *)
-Definition img0m : gmap Z (bv 8) := <[ax := b0]> {[ay := b0]}.
+(** The era-initial image: all three litmus bytes read as 0 at timestamp 0. *)
+Definition img0m : gmap Z (bv 8) := <[ax := b0]> (<[az := b0]> {[ay := b0]}).
 (** [TsoMem.image] is a partial FUNCTION on [Z] (the [gmap Arch.pa _]
-    Countable trap); the litmus image is still built as a two-entry map. *)
+    Countable trap); the litmus image is still built as a map. *)
 Definition img0 : image := λ a, img0m !! a.
 
 Lemma img0_x : img0 ax = Some b0.
 Proof. rewrite /img0 /img0m lookup_insert //. Qed.
+Lemma img0_z : img0 az = Some b0.
+Proof. rewrite /img0 /img0m lookup_insert_ne // lookup_insert //. Qed.
 Lemma img0_y : img0 ay = Some b0.
-Proof. rewrite /img0 /img0m lookup_insert_ne // lookup_singleton //. Qed.
+Proof.
+  rewrite /img0 /img0m lookup_insert_ne // lookup_insert_ne // lookup_singleton //.
+Qed.
 Lemma img0_x_nb1 : img0 ax ≠ Some b1.
 Proof. rewrite img0_x. intros H. apply b0_ne_b1. congruence. Qed.
 Lemma img0_x_nb2 : img0 ax ≠ Some b2.
@@ -87,21 +100,28 @@ Qed.
 (* ------------------------------------------------------------------ *)
 (** ** The hart-program language
 
-    No annotations: under Ztso every load is an acquire and every store a
-    release, so [ILoad]/[IStore] carry nothing but their address. *)
+    Loads and stores carry no annotations (the machine has no acquire/
+    release bit on a plain access); [ILoadInd] reads through a register —
+    the address is the byte in [ra] — so an address dependency can be
+    written down. *)
 
 Inductive instr :=
 | ILoad (reg : nat) (a : Z)
+| ILoadInd (ra reg : nat)
 | IStore (a : Z) (v : bv 8)
 | IFence (pr pw sr sw : bool)
 (** [amoswap.aq]: the read half takes the globally latest value and the write
-    half appends, in one step; the view lands past the append. *)
+    half appends, in one step; the floor lands past the append. *)
 | IAmoSwapAq (reg : nat) (a : Z) (v : bv 8).
 
+(** The WHOLE per-hart memory state, beside the program and registers: the
+    floor, the read watermark, the per-byte coherence floor. *)
 Record hart := Hart {
   h_prog : list instr;               (* the remaining program IS the pc *)
   h_regs : gmap nat (bv 8);
-  h_tv   : nat;                      (* the WHOLE per-hart memory state *)
+  h_tv   : nat;
+  h_rv   : nat;
+  h_coh  : cohmap;
 }.
 
 Record config := Cfg {
@@ -109,6 +129,10 @@ Record config := Cfg {
   c_log   : list wmsg;
   c_harts : list hart;
 }.
+
+(** The address held in register [ra] (0 if unset). *)
+Definition reg_addr (regs : gmap nat (bv 8)) (ra : nat) : Z :=
+  match regs !! ra with Some b => bv_unsigned b | None => 0%Z end.
 
 (** One small step: pick a hart, execute its next instruction.  The hart's
     INDEX is its agent id, so forwarding keys on it. *)
@@ -118,67 +142,90 @@ Definition lstep (c c' : config) : Prop :=
     match h_prog h with
     | [] => False
     | ILoad r a :: rest => ∃ (tv' : nat) (v : bv 8),
-        load_ok (c_img c) (c_log c) i (h_tv h) tv' a v ∧
+        load_ok (c_img c) (c_log c) i (h_tv h) (h_coh h a) tv' a v ∧
         c_log c' = c_log c ∧
         c_harts c' =
-          <[i := Hart rest (<[r := v]> (h_regs h)) tv']> (c_harts c)
+          <[i := Hart rest (<[r := v]> (h_regs h)) (h_tv h)
+                   (Nat.max (h_rv h) tv') (coh_upd (h_coh h) a tv')]> (c_harts c)
+    | ILoadInd ra r :: rest => ∃ (tv' : nat) (v : bv 8),
+        load_ok (c_img c) (c_log c) i (h_tv h) (h_coh h (reg_addr (h_regs h) ra))
+          tv' (reg_addr (h_regs h) ra) v ∧
+        c_log c' = c_log c ∧
+        c_harts c' =
+          <[i := Hart rest (<[r := v]> (h_regs h)) (h_tv h)
+                   (Nat.max (h_rv h) tv')
+                   (coh_upd (h_coh h) (reg_addr (h_regs h) ra) tv')]> (c_harts c)
     | IStore a v :: rest =>
         c_log c' = store_log (c_log c) i a [v] ∧
-        c_harts c' = <[i := Hart rest (h_regs h) (h_tv h)]> (c_harts c)
+        c_harts c' = <[i := Hart rest (h_regs h) (h_tv h) (h_rv h) (h_coh h)]> (c_harts c)
     | IFence pr pw sr sw :: rest =>
         c_log c' = c_log c ∧
         c_harts c' =
           <[i := Hart rest (h_regs h)
-                   (fence_post i (c_log c) pr pw sr sw (h_tv h))]> (c_harts c)
+                   (fence_post i (c_log c) pr pw sr sw (h_tv h) (h_rv h))
+                   (h_rv h) (h_coh h)]> (c_harts c)
     | IAmoSwapAq r a v :: rest => ∃ (v_old : bv 8),
         excl_read_ok (c_img c) (c_log c) i (h_tv h) a v_old ∧
         c_log c' = store_log (c_log c) i a [v] ∧
         c_harts c' =
           <[i := Hart rest (<[r := v_old]> (h_regs h))
-                   (S (length (c_log c)))]> (c_harts c)
+                   (S (length (c_log c))) (S (length (c_log c))) (h_coh h)]> (c_harts c)
     end.
 
 (* ------------------------------------------------------------------ *)
 (** ** Step constructors (used to exhibit interleavings) *)
 
-Lemma step_load c i r a rest regs tv tv' v :
-  c_harts c !! i = Some (Hart (ILoad r a :: rest) regs tv) →
-  load_ok (c_img c) (c_log c) i tv tv' a v →
+Lemma step_load c i r a rest regs tv rv coh tv' v :
+  c_harts c !! i = Some (Hart (ILoad r a :: rest) regs tv rv coh) →
+  load_ok (c_img c) (c_log c) i tv (coh a) tv' a v →
   lstep c (Cfg (c_img c) (c_log c)
-               (<[i := Hart rest (<[r := v]> regs) tv']> (c_harts c))).
+               (<[i := Hart rest (<[r := v]> regs) tv (Nat.max rv tv')
+                        (coh_upd coh a tv')]> (c_harts c))).
 Proof.
-  intros Hlk Hok. exists i, (Hart (ILoad r a :: rest) regs tv).
+  intros Hlk Hok. exists i, (Hart (ILoad r a :: rest) regs tv rv coh).
   split_and!; [done|done|]. simpl. exists tv', v. by split_and!.
 Qed.
 
-Lemma step_store c i a v rest regs tv :
-  c_harts c !! i = Some (Hart (IStore a v :: rest) regs tv) →
-  lstep c (Cfg (c_img c) (c_log c ++ [WMsg a [v] i])
-               (<[i := Hart rest regs tv]> (c_harts c))).
+Lemma step_load_ind c i ra r rest regs tv rv coh tv' v :
+  c_harts c !! i = Some (Hart (ILoadInd ra r :: rest) regs tv rv coh) →
+  load_ok (c_img c) (c_log c) i tv (coh (reg_addr regs ra)) tv' (reg_addr regs ra) v →
+  lstep c (Cfg (c_img c) (c_log c)
+               (<[i := Hart rest (<[r := v]> regs) tv (Nat.max rv tv')
+                        (coh_upd coh (reg_addr regs ra) tv')]> (c_harts c))).
 Proof.
-  intros Hlk. exists i, (Hart (IStore a v :: rest) regs tv).
+  intros Hlk Hok. exists i, (Hart (ILoadInd ra r :: rest) regs tv rv coh).
+  split_and!; [done|done|]. simpl. exists tv', v. by split_and!.
+Qed.
+
+Lemma step_store c i a v rest regs tv rv coh :
+  c_harts c !! i = Some (Hart (IStore a v :: rest) regs tv rv coh) →
+  lstep c (Cfg (c_img c) (c_log c ++ [WMsg a [v] i])
+               (<[i := Hart rest regs tv rv coh]> (c_harts c))).
+Proof.
+  intros Hlk. exists i, (Hart (IStore a v :: rest) regs tv rv coh).
   split_and!; [done|done|]. simpl. by split_and!.
 Qed.
 
-Lemma step_fence c i pr pw sr sw rest regs tv :
-  c_harts c !! i = Some (Hart (IFence pr pw sr sw :: rest) regs tv) →
+Lemma step_fence c i pr pw sr sw rest regs tv rv coh :
+  c_harts c !! i = Some (Hart (IFence pr pw sr sw :: rest) regs tv rv coh) →
   lstep c (Cfg (c_img c) (c_log c)
                (<[i := Hart rest regs
-                        (fence_post i (c_log c) pr pw sr sw tv)]>
+                        (fence_post i (c_log c) pr pw sr sw tv rv) rv coh]>
                   (c_harts c))).
 Proof.
-  intros Hlk. exists i, (Hart (IFence pr pw sr sw :: rest) regs tv).
+  intros Hlk. exists i, (Hart (IFence pr pw sr sw :: rest) regs tv rv coh).
   split_and!; [done|done|]. simpl. by split_and!.
 Qed.
 
-Lemma step_amo c i r a v rest regs tv v_old :
-  c_harts c !! i = Some (Hart (IAmoSwapAq r a v :: rest) regs tv) →
+Lemma step_amo c i r a v rest regs tv rv coh v_old :
+  c_harts c !! i = Some (Hart (IAmoSwapAq r a v :: rest) regs tv rv coh) →
   excl_read_ok (c_img c) (c_log c) i tv a v_old →
   lstep c (Cfg (c_img c) (c_log c ++ [WMsg a [v] i])
                (<[i := Hart rest (<[r := v_old]> regs)
-                        (S (length (c_log c)))]> (c_harts c))).
+                        (S (length (c_log c))) (S (length (c_log c))) coh]>
+                  (c_harts c))).
 Proof.
-  intros Hlk Hex. exists i, (Hart (IAmoSwapAq r a v :: rest) regs tv).
+  intros Hlk Hex. exists i, (Hart (IAmoSwapAq r a v :: rest) regs tv rv coh).
   split_and!; [done|done|]. simpl. exists v_old. by split_and!.
 Qed.
 
@@ -187,7 +234,7 @@ Qed.
     argument of a [step_*] below is instantiated before these fire.) *)
 Ltac solve_load :=
   rewrite /load_ok; split_and!;
-  [vm_compute; lia | vm_compute; lia | vm_compute; reflexivity].
+  [vm_compute; lia | vm_compute; lia | vm_compute; lia | vm_compute; reflexivity].
 Ltac solve_excl := rewrite /excl_read_ok; vm_compute; reflexivity.
 
 (** Reachability. *)
@@ -202,8 +249,10 @@ Proof. intros H0 Hpres H. induction H as [|???? IH]; [done|]. eauto. Qed.
 
     [tso_read_src]: a read's value came from the image or from a visible
     logged message.  [tso_read_from_below]: a read cannot come from BELOW a
-    visible write to the same byte — this is the latest-visible rule, i.e.
-    the whole reason Ztso forbids R→R reordering. *)
+    visible write to the same byte — the latest-visible rule.  Under the
+    relaxation the second is applied at the load's OWN view, and what makes
+    a fenced verdict go is that the view is bounded below by the floor, the
+    floor by the fence, the fence by the watermark. *)
 
 Lemma tso_read_src img log h tv a v :
   tso_read img log h tv a = Some v →
@@ -257,8 +306,8 @@ Qed.
 (* ------------------------------------------------------------------ *)
 (** ** [own_pub] bounds a hart's own messages from above
 
-    The one fact the W→R fence needs: after [fence rw,rw] the view is past
-    every message this hart has already published. *)
+    The one fact the W→R fence needs: after a draining fence the floor is
+    past every message this hart has already published. *)
 
 Lemma foldr_max_ge (l : list nat) (i x : nat) :
   l !! i = Some x → (x ≤ foldr Nat.max 0 l)%nat.
@@ -307,45 +356,47 @@ Lemma lookup_app_new (l : list wmsg) (m : wmsg) :
   (l ++ [m]) !! length l = Some m.
 Proof. by apply list_lookup_middle. Qed.
 
+(** The fence kinds the suite uses. *)
+Local Notation FENCE := (IFence true true true true).      (* rw,rw *)
+Local Notation FENCE_RR := (IFence true false true false). (* r,r  *)
+Local Notation FENCE_WW := (IFence false true false true). (* w,w  *)
+
 (* ================================================================== *)
-(** ** SB — store buffering.  Both loads reading 0 is ALLOWED (herd: allowed
-       under Ztso; this is the W→R relaxation, and the ONLY one). *)
+(** ** SB — store buffering.  Both loads reading 0 is ALLOWED. *)
 
 Definition sb_c0 : config :=
-  Cfg img0 [] [Hart [IStore ax b1; ILoad rg1 ay] ∅ 0%nat;
-               Hart [IStore ay b1; ILoad rg2 ax] ∅ 0%nat].
+  Cfg img0 [] [Hart [IStore ax b1; ILoad rg1 ay] ∅ 0%nat 0%nat (λ _, 0%nat);
+               Hart [IStore ay b1; ILoad rg2 ax] ∅ 0%nat 0%nat (λ _, 0%nat)].
 
 Lemma sb_allowed :
   ∃ c, reach sb_c0 c ∧
-       (∃ regs tv, c_harts c !! 0%nat = Some (Hart [] regs tv) ∧
-                   regs !! rg1 = Some b0) ∧
-       (∃ regs tv, c_harts c !! 1%nat = Some (Hart [] regs tv) ∧
-                   regs !! rg2 = Some b0).
+       (∃ regs tv rv coh, c_harts c !! 0%nat = Some (Hart [] regs tv rv coh) ∧
+                          regs !! rg1 = Some b0) ∧
+       (∃ regs tv rv coh, c_harts c !! 1%nat = Some (Hart [] regs tv rv coh) ∧
+                          regs !! rg2 = Some b0).
 Proof.
   rewrite /sb_c0. eexists. split.
   { eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
     eapply rtc_l; [eapply (step_store _ 1%nat); reflexivity|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 0%nat rg1 ay _ _ _ 0%nat b0);
+      [eapply (step_load _ 0%nat rg1 ay _ _ _ _ _ 0%nat b0);
         [reflexivity|solve_load]|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 1%nat rg2 ax _ _ _ 0%nat b0);
+      [eapply (step_load _ 1%nat rg2 ax _ _ _ _ _ 0%nat b0);
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split.
-  - do 2 eexists. split; [reflexivity|]. rewrite lookup_insert //.
-  - do 2 eexists. split; [reflexivity|]. rewrite lookup_insert //.
+  - do 4 eexists. split; [reflexivity|]. rewrite lookup_insert //.
+  - do 4 eexists. split; [reflexivity|]. rewrite lookup_insert //.
 Qed.
 
 (* ================================================================== *)
-(** ** SB with a [fence rw,rw] in both harts — (0,0) is FORBIDDEN
-       (herd: forbidden).
+(** ** SB with a [fence rw,rw] in both harts — (0,0) is FORBIDDEN.
 
-    The mechanism: a [pw ∧ sr] fence pushes the view past the hart's own
+    The mechanism: a [pw ∧ sr] fence pushes the floor past the hart's own
     message, and the log order is the drain order, so whichever hart's store
     landed LATER in the log is forced to see the other's. *)
 
-Local Notation FENCE := (IFence true true true true).
 Local Notation SBX := (WMsg ax [b1] 0%nat).
 Local Notation SBY := (WMsg ay [b1] 1%nat).
 
@@ -361,8 +412,8 @@ Lemma mb_SBY_y : msg_byte SBY ay = Some b1.
 Proof. rewrite msg_byte_single //. Qed.
 
 Definition sbf_c0 : config :=
-  Cfg img0 [] [Hart [IStore ax b1; FENCE; ILoad rg1 ay] ∅ 0%nat;
-               Hart [IStore ay b1; FENCE; ILoad rg2 ax] ∅ 0%nat].
+  Cfg img0 [] [Hart [IStore ax b1; FENCE; ILoad rg1 ay] ∅ 0%nat 0%nat (λ _, 0%nat);
+               Hart [IStore ay b1; FENCE; ILoad rg2 ax] ∅ 0%nat 0%nat (λ _, 0%nat)].
 
 Definition sbf_content (log : list wmsg) : Prop :=
   ∀ m, m ∈ log → m = SBX ∨ m = SBY.
@@ -443,7 +494,8 @@ Qed.
 
 Lemma sbf_step c c' : sbf_inv c → lstep c c' → sbf_inv c'.
 Proof.
-  intros (Himg & [p0 regs0 tv0] & [p1 regs1 tv1] & Hh & Hcont & HA & HB) Hstep.
+  intros (Himg & [p0 regs0 tv0 rv0 coh0] & [p1 regs1 tv1 rv1 coh1]
+          & Hh & Hcont & HA & HB) Hstep.
   simpl in HA, HB.
   destruct Hstep as (i & h & Hlk & Himg' & Hst).
   rewrite Hh in Hlk.
@@ -467,14 +519,15 @@ Proof.
       rewrite Hlog. split_and!.
       * exact Hcont.
       * right; right; left. split; [reflexivity|]. split; [exact Hex|].
-        intros j Hj. rewrite /fence_post /=.
+        intros j Hj.
         assert (S j ≤ own_pub 0%nat (c_log c))%nat
           by (eapply own_pub_ge; [exact Hj|reflexivity]).
-        lia.
+        pose proof (fence_post_drain 0%nat (c_log c) true true true true tv0 rv0
+                      eq_refl). lia.
       * exact HB.
     + (* load rg1 <- y *)
       destruct Hst as (tv' & v & Hok & Hlog & Hharts).
-      destruct Hok as (Hle & Hlen & Hread). rewrite Himg in Hread.
+      destruct Hok as (Hle & Hcoh & Hlen & Hread). rewrite Himg in Hread.
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!.
@@ -510,13 +563,14 @@ Proof.
       * exact Hcont.
       * exact HA.
       * right; right; left. split; [reflexivity|]. split; [exact Hex|].
-        intros j Hj. rewrite /fence_post /=.
+        intros j Hj.
         assert (S j ≤ own_pub 1%nat (c_log c))%nat
           by (eapply own_pub_ge; [exact Hj|reflexivity]).
-        lia.
+        pose proof (fence_post_drain 1%nat (c_log c) true true true true tv1 rv1
+                      eq_refl). lia.
     + (* load rg2 <- x *)
       destruct Hst as (tv' & v & Hok & Hlog & Hharts).
-      destruct Hok as (Hle & Hlen & Hread). rewrite Himg in Hread.
+      destruct Hok as (Hle & Hcoh & Hlen & Hread). rewrite Himg in Hread.
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!.
@@ -541,9 +595,9 @@ Proof.
 Qed.
 
 (** SB with both harts fenced: (rg1, rg2) = (0, 0) is UNREACHABLE. *)
-Theorem sb_fence_forbidden c regs0 tv0 regs1 tv1 :
+Theorem sb_fence_forbidden c regs0 tv0 rv0 coh0 regs1 tv1 rv1 coh1 :
   reach sbf_c0 c →
-  c_harts c = [Hart [] regs0 tv0; Hart [] regs1 tv1] →
+  c_harts c = [Hart [] regs0 tv0 rv0 coh0; Hart [] regs1 tv1 rv1 coh1] →
   regs0 !! rg1 = Some b1 ∨ regs1 !! rg2 = Some b1.
 Proof.
   intros Hre Hh.
@@ -561,9 +615,10 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(** ** MP — message passing with NO fences.  The weak outcome is FORBIDDEN
-       (herd: forbidden under Ztso).  THE Ztso HEADLINE: no fence anywhere,
-       and the flag/data pair still transfers. *)
+(** ** MP — message passing with NO fences.  The weak outcome is ALLOWED
+       (herd: allowed under RVWMO).  THE RELAXATION'S HEADLINE, and the
+       verdict that flipped: the reader takes the flag at a high view and
+       the data at a low one. *)
 
 Local Notation MPX := (WMsg ax [b1] 0%nat).
 Local Notation MPY := (WMsg ay [b1] 0%nat).
@@ -578,37 +633,75 @@ Lemma mb_MPY_y : msg_byte MPY ay = Some b1.
 Proof. rewrite msg_byte_single //. Qed.
 
 Definition mp_c0 : config :=
-  Cfg img0 [] [Hart [IStore ax b1; IStore ay b1] ∅ 0%nat;
-               Hart [ILoad rg1 ay; ILoad rg2 ax] ∅ 0%nat].
+  Cfg img0 [] [Hart [IStore ax b1; IStore ay b1] ∅ 0%nat 0%nat (λ _, 0%nat);
+               Hart [ILoad rg1 ay; ILoad rg2 ax] ∅ 0%nat 0%nat (λ _, 0%nat)].
+
+Lemma mp_allowed :
+  ∃ c h0 regs tv rv coh,
+    reach mp_c0 c ∧ c_harts c = [h0; Hart [] regs tv rv coh] ∧
+    regs !! rg1 = Some b1 ∧ regs !! rg2 = Some b0.
+Proof.
+  rewrite /mp_c0. eexists _, _, _, _, _, _. split.
+  { eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
+    eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
+    eapply rtc_l;
+      [eapply (step_load _ 1%nat rg1 ay _ _ _ _ _ 2%nat b1);
+        [reflexivity|solve_load]|]. simpl.
+    eapply rtc_l;
+      [eapply (step_load _ 1%nat rg2 ax _ _ _ _ _ 0%nat b0);
+        [reflexivity|solve_load]|]. simpl.
+    apply rtc_refl. }
+  split; [reflexivity|]. split.
+  - rewrite lookup_insert_ne // lookup_insert //.
+  - rewrite lookup_insert //.
+Qed.
+
+(* ================================================================== *)
+(** ** MP with the RVWMO fences — writer [fence w,w], reader [fence r,r]:
+       the weak outcome is FORBIDDEN.
+
+    The writer's fence is a no-op here (W→W is the log) and is kept so the
+    program is the one RVWMO needs.  The reader's fence is the whole story:
+    the flag load raised the watermark past the flag's message, the fence
+    raises the floor past the watermark, and the data load reads at or
+    above the floor. *)
+
+Definition mpf_c0 : config :=
+  Cfg img0 [] [Hart [IStore ax b1; FENCE_WW; IStore ay b1] ∅ 0%nat 0%nat (λ _, 0%nat);
+               Hart [ILoad rg1 ay; FENCE_RR; ILoad rg2 ax] ∅ 0%nat 0%nat (λ _, 0%nat)].
 
 (** The writer is the only writer, so its phase FIXES the log. *)
-Definition mp_W (p : list instr) (log : list wmsg) : Prop :=
-  (p = [IStore ax b1; IStore ay b1] ∧ log = []) ∨
+Definition mpf_W (p : list instr) (log : list wmsg) : Prop :=
+  (p = [IStore ax b1; FENCE_WW; IStore ay b1] ∧ log = []) ∨
+  (p = [FENCE_WW; IStore ay b1] ∧ log = [MPX]) ∨
   (p = [IStore ay b1] ∧ log = [MPX]) ∨
   (p = [] ∧ log = [MPX; MPY]).
 
-(** The reader's phase carries the ordering it accumulated: having seen
-    y = 1 its view is past timestamp 2, hence past the x-message at 1. *)
-Definition mp_R (p : list instr) (regs : gmap nat (bv 8)) (tv : nat) : Prop :=
-  (p = [ILoad rg1 ay; ILoad rg2 ax]) ∨
+(** The reader's phases carry the ordering as it moves: watermark after the
+    flag load, floor after the fence. *)
+Definition mpf_R (p : list instr) (regs : gmap nat (bv 8)) (tv rv : nat) : Prop :=
+  (p = [ILoad rg1 ay; FENCE_RR; ILoad rg2 ax]) ∨
+  (p = [FENCE_RR; ILoad rg2 ax] ∧ (regs !! rg1 = Some b1 → (2 ≤ rv)%nat)) ∨
   (p = [ILoad rg2 ax] ∧ (regs !! rg1 = Some b1 → (2 ≤ tv)%nat)) ∨
   (p = [] ∧ (regs !! rg1 = Some b1 → regs !! rg2 = Some b1)).
 
-Definition mp_inv (c : config) : Prop :=
+Definition mpf_inv (c : config) : Prop :=
   c_img c = img0 ∧
   ∃ h0 h1, c_harts c = [h0; h1] ∧
-    mp_W (h_prog h0) (c_log c) ∧
-    mp_R (h_prog h1) (h_regs h1) (h_tv h1).
+    mpf_W (h_prog h0) (c_log c) ∧
+    mpf_R (h_prog h1) (h_regs h1) (h_tv h1) (h_rv h1).
 
-Lemma mp_step c c' : mp_inv c → lstep c c' → mp_inv c'.
+Lemma mpf_step c c' : mpf_inv c → lstep c c' → mpf_inv c'.
 Proof.
-  intros (Himg & [p0 regs0 tv0] & [p1 regs1 tv1] & Hh & HW & HR) Hstep.
+  intros (Himg & [p0 regs0 tv0 rv0 coh0] & [p1 regs1 tv1 rv1 coh1]
+          & Hh & HW & HR) Hstep.
   simpl in HW, HR.
   destruct Hstep as (i & h & Hlk & Himg' & Hst).
   rewrite Hh in Hlk.
   destruct i as [|[|i]]; simpl in Hlk; simplify_eq/=.
   - (* ---- the writer ---- *)
-    destruct HW as [[-> Hl]|[[-> Hl]|[-> Hl]]]; simpl in Hst; [| |done].
+    destruct HW as [[-> Hl]|[[-> Hl]|[[-> Hl]|[-> Hl]]]]; simpl in Hst;
+      [| | |done].
     + destruct Hst as [Hlog Hharts].
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
@@ -617,13 +710,18 @@ Proof.
     + destruct Hst as [Hlog Hharts].
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
-      * right; right. split; [reflexivity|]. rewrite Hlog /store_log Hl //.
+      * right; right; left. split; [reflexivity|]. rewrite Hlog //.
+      * exact HR.
+    + destruct Hst as [Hlog Hharts].
+      split; [rewrite Himg' //|]. eexists _, _.
+      split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
+      * right; right; right. split; [reflexivity|]. rewrite Hlog /store_log Hl //.
       * exact HR.
   - (* ---- the reader ---- *)
-    destruct HR as [->|[[-> Hc]|[-> _]]]; simpl in Hst; [| |done].
-    + (* load rg1 <- y *)
+    destruct HR as [->|[[-> Hc]|[[-> Hc]|[-> _]]]]; simpl in Hst; [| | |done].
+    + (* load rg1 <- y: the watermark passes the flag's message *)
       destruct Hst as (tv' & v & Hok & Hlog & Hharts).
-      destruct Hok as (Hle & Hlen & Hread). rewrite Himg in Hread.
+      destruct Hok as (Hle & Hcoh & Hlen & Hread). rewrite Himg in Hread.
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
       * rewrite Hlog. exact HW.
@@ -632,8 +730,10 @@ Proof.
         destruct (tso_read_src _ _ _ _ _ _ Hread) as [Hi|(k & m & Hk & Hmb & Hvis)].
         { by destruct (img0_y_nb1 Hi). }
         (* the only y-write is [MPY], at log position 1 *)
-        destruct HW as [[_ Hl]|[[_ Hl]|[_ Hl]]]; rewrite Hl in Hk Hvis.
+        destruct HW as [[_ Hl]|[[_ Hl]|[[_ Hl]|[_ Hl]]]]; rewrite Hl in Hk Hvis.
         { rewrite lookup_nil in Hk. discriminate. }
+        { destruct k as [|k]; simpl in Hk; [|discriminate].
+          injection Hk as Hm; subst. rewrite mb_MPX_y in Hmb. done. }
         { destruct k as [|k]; simpl in Hk; [|discriminate].
           injection Hk as Hm; subst. rewrite mb_MPX_y in Hmb. done. }
         destruct k as [|[|k]]; simpl in Hk; [| |discriminate];
@@ -642,18 +742,27 @@ Proof.
         assert (S 1 ≤ tv')%nat; [|lia].
         eapply (visibleb_foreign 1%nat tv' [MPX; MPY] 1%nat MPY);
           [reflexivity|done|exact Hvis].
-    + (* load rg2 <- x *)
-      destruct Hst as (tv' & v & Hok & Hlog & Hharts).
-      destruct Hok as (Hle & Hlen & Hread). rewrite Himg in Hread.
+    + (* fence r,r: the floor passes the watermark *)
+      destruct Hst as [Hlog Hharts].
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
       * rewrite Hlog. exact HW.
-      * right; right. split; [reflexivity|].
+      * right; right; left. split; [reflexivity|]. intros Hv.
+        specialize (Hc Hv).
+        pose proof (fence_post_acq 1%nat (c_log c) true false true false tv1 rv1
+                      eq_refl). lia.
+    + (* load rg2 <- x: at or above the floor, hence past both messages *)
+      destruct Hst as (tv' & v & Hok & Hlog & Hharts).
+      destruct Hok as (Hle & Hcoh & Hlen & Hread). rewrite Himg in Hread.
+      split; [rewrite Himg' //|]. eexists _, _.
+      split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
+      * rewrite Hlog. exact HW.
+      * right; right; right. split; [reflexivity|].
         rewrite lookup_insert_ne // lookup_insert.
         intros Hv. specialize (Hc Hv).
         (* the view is past 2, so the log has both messages *)
         assert (Hl : c_log c = [MPX; MPY]).
-        { destruct HW as [[_ Hl]|[[_ Hl]|[_ Hl]]]; [| |exact Hl];
+        { destruct HW as [[_ Hl]|[[_ Hl]|[[_ Hl]|[_ Hl]]]]; [| | |exact Hl];
             exfalso; rewrite Hl in Hlen; simpl in Hlen; lia. }
         rewrite Hl in Hread.
         assert (Hvis : visibleb 1%nat tv' [MPX; MPY] (S 0) = true)
@@ -667,36 +776,74 @@ Proof.
         rewrite mb_MPY_x in Hmb. done.
 Qed.
 
-Lemma mp_inv0 : mp_inv mp_c0.
+Lemma mpf_inv0 : mpf_inv mpf_c0.
 Proof.
   split; [done|]. eexists _, _. split; [reflexivity|]. simpl.
   split; by left.
 Qed.
 
-(** MP with NO fences: rg1 = 1 forces rg2 = 1. *)
-Theorem mp_forbidden c h0 regs tv :
-  reach mp_c0 c →
-  c_harts c = [h0; Hart [] regs tv] →
+(** MP with the RVWMO fences: rg1 = 1 forces rg2 = 1. *)
+Theorem mp_fence_forbidden c h0 regs tv rv coh :
+  reach mpf_c0 c →
+  c_harts c = [h0; Hart [] regs tv rv coh] →
   regs !! rg1 = Some b1 → regs !! rg2 = Some b1.
 Proof.
   intros Hre Hh H1.
-  assert (Hinv : mp_inv c).
-  { eapply inv_reach; [apply mp_inv0| |exact Hre]. intros. by eapply mp_step. }
+  assert (Hinv : mpf_inv c).
+  { eapply inv_reach; [apply mpf_inv0| |exact Hre]. intros. by eapply mpf_step. }
   destruct Hinv as (_ & g0 & g1 & Hh' & _ & HR).
   rewrite Hh in Hh'. simplify_eq/=.
-  destruct HR as [Hc|[[Hc _]|[_ Himp]]]; try discriminate. by apply Himp.
+  destruct HR as [Hc|[[Hc _]|[[Hc _]|[_ Himp]]]]; try discriminate. by apply Himp.
+Qed.
+
+(* ================================================================== *)
+(** ** MP + addr — the reader's second load is ADDRESS-DEPENDENT on the
+       first, with no fence.  RVWMO FORBIDS the weak outcome (ppo rule 9);
+       this machine ALLOWS it, because syntactic dependencies are not
+       modelled (relaxed-rr.md §5).  Recorded as the standing reminder that
+       a proof may appeal to a fence or an [.aq] for ordering, never to a
+       dependency.
+
+    The pointer cell [ay] is published as [b1] = address 1 = [az]; the
+    reader loads the pointer (sees 1) and then the byte it points to. *)
+
+Definition mpa_c0 : config :=
+  Cfg img0 [] [Hart [IStore az b1; FENCE_WW; IStore ay b1] ∅ 0%nat 0%nat (λ _, 0%nat);
+               Hart [ILoad rg1 ay; ILoadInd rg1 rg2] ∅ 0%nat 0%nat (λ _, 0%nat)].
+
+Lemma mp_addr_allowed :
+  ∃ c h0 regs tv rv coh,
+    reach mpa_c0 c ∧ c_harts c = [h0; Hart [] regs tv rv coh] ∧
+    regs !! rg1 = Some b1 ∧ regs !! rg2 = Some b0.
+Proof.
+  rewrite /mpa_c0. eexists _, _, _, _, _, _. split.
+  { eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
+    eapply rtc_l; [eapply (step_fence _ 0%nat); reflexivity|]. simpl.
+    eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
+    eapply rtc_l;
+      [eapply (step_load _ 1%nat rg1 ay _ _ _ _ _ 2%nat b1);
+        [reflexivity|solve_load]|]. simpl.
+    eapply rtc_l;
+      [eapply (step_load_ind _ 1%nat rg1 rg2 _ _ _ _ _ 0%nat b0);
+        [reflexivity|solve_load]|]. simpl.
+    apply rtc_refl. }
+  split; [reflexivity|]. split.
+  - rewrite lookup_insert_ne // lookup_insert //.
+  - rewrite lookup_insert //.
 Qed.
 
 (* ================================================================== *)
 (** ** CoRR — read-read coherence.  Reading a fresh value and then a stale
        one is FORBIDDEN (herd: forbidden).
 
+    THE PER-BYTE COHERENCE FLOOR AT WORK: the first load records its view
+    at [ax], and the second load of [ax] must read at or above it.  Without
+    [coh] the relaxed reader could read 2 then 1.
+
     Two verdicts, both non-vacuous.  [corr_no_stale]: once C has seen a
     logged write it can never read the era-initial byte again.
     [corr_forbidden]: on the run whose store order is x=1 then x=2, C that
-    read 2 must read 2 again.  (The second is stated at a CONCRETE final log
-    because the coherence order is a race between the two writers; the
-    statement is the herd verdict for that execution.) *)
+    read 2 must read 2 again. *)
 
 Local Notation CX1 := (WMsg ax [b1] 0%nat).
 Local Notation CX2 := (WMsg ax [b2] 1%nat).
@@ -707,9 +854,9 @@ Lemma mb_CX2 : msg_byte CX2 ax = Some b2.
 Proof. rewrite msg_byte_single //. Qed.
 
 Definition corr_c0 : config :=
-  Cfg img0 [] [Hart [IStore ax b1] ∅ 0%nat;
-               Hart [IStore ax b2] ∅ 0%nat;
-               Hart [ILoad rg1 ax; ILoad rg2 ax] ∅ 0%nat].
+  Cfg img0 [] [Hart [IStore ax b1] ∅ 0%nat 0%nat (λ _, 0%nat);
+               Hart [IStore ax b2] ∅ 0%nat 0%nat (λ _, 0%nat);
+               Hart [ILoad rg1 ax; ILoad rg2 ax] ∅ 0%nat 0%nat (λ _, 0%nat)].
 
 Definition corr_content (log : list wmsg) : Prop :=
   ∀ m, m ∈ log → m = CX1 ∨ m = CX2.
@@ -721,12 +868,14 @@ Proof.
   apply elem_of_list_singleton in Hin as ->. done.
 Qed.
 
-Definition corr_C (p : list instr) (regs : gmap nat (bv 8)) (tv : nat)
+(** The reader's middle phase is stated on its COHERENCE FLOOR at [ax], not
+    on its view: that is the one thing the second load is bounded by. *)
+Definition corr_C (p : list instr) (regs : gmap nat (bv 8)) (coh : cohmap)
     (log : list wmsg) : Prop :=
   (p = [ILoad rg1 ax; ILoad rg2 ax]) ∨
   (p = [ILoad rg2 ax] ∧
-     (regs !! rg1 = Some b1 → ∃ j, log !! j = Some CX1 ∧ (S j ≤ tv)%nat) ∧
-     (regs !! rg1 = Some b2 → ∃ j, log !! j = Some CX2 ∧ (S j ≤ tv)%nat)) ∨
+     (regs !! rg1 = Some b1 → ∃ j, log !! j = Some CX1 ∧ (S j ≤ coh ax)%nat) ∧
+     (regs !! rg1 = Some b2 → ∃ j, log !! j = Some CX2 ∧ (S j ≤ coh ax)%nat)) ∨
   (p = [] ∧
      ((regs !! rg1 = Some b1 ∨ regs !! rg1 = Some b2) →
         regs !! rg2 ≠ Some b0) ∧
@@ -735,8 +884,8 @@ Definition corr_C (p : list instr) (regs : gmap nat (bv 8)) (tv : nat)
         ∃ j1 j2, log !! j1 = Some CX1 ∧ log !! j2 = Some CX2 ∧
                  (j2 ≤ j1)%nat)).
 
-Lemma corr_C_app p regs tv log m :
-  corr_C p regs tv log → corr_C p regs tv (log ++ [m]).
+Lemma corr_C_app p regs coh log m :
+  corr_C p regs coh log → corr_C p regs coh (log ++ [m]).
 Proof.
   intros [->|[[-> [H1 H2]]|[-> [H1 H2]]]].
   - by left.
@@ -755,12 +904,12 @@ Definition corr_inv (c : config) : Prop :=
   ∃ h0 h1 h2, c_harts c = [h0; h1; h2] ∧ corr_content (c_log c) ∧
     (h_prog h0 = [IStore ax b1] ∨ h_prog h0 = []) ∧
     (h_prog h1 = [IStore ax b2] ∨ h_prog h1 = []) ∧
-    corr_C (h_prog h2) (h_regs h2) (h_tv h2) (c_log c).
+    corr_C (h_prog h2) (h_regs h2) (h_coh h2) (c_log c).
 
 Lemma corr_step c c' : corr_inv c → lstep c c' → corr_inv c'.
 Proof.
-  intros (Himg & [p0 regs0 tv0] & [p1 regs1 tv1] & [p2 regs2 tv2]
-          & Hh & Hcont & H0 & H1 & HC) Hstep.
+  intros (Himg & [p0 regs0 tv0 rv0 coh0] & [p1 regs1 tv1 rv1 coh1]
+          & [p2 regs2 tv2 rv2 coh2] & Hh & Hcont & H0 & H1 & HC) Hstep.
   simpl in H0, H1, HC.
   destruct Hstep as (i & h & Hlk & Himg' & Hst).
   rewrite Hh in Hlk.
@@ -787,13 +936,13 @@ Proof.
     + by apply corr_C_app.
   - (* the reader *)
     destruct HC as [->|[[-> [Hc1 Hc2]]|[-> _]]]; simpl in Hst; [| |done].
-    + (* first load *)
+    + (* first load: the coherence floor at [ax] becomes this view *)
       destruct Hst as (tv' & v & Hok & Hlog & Hharts).
-      destruct Hok as (Hle & Hlen & Hread). rewrite Himg in Hread.
+      destruct Hok as (Hle & Hcoh & Hlen & Hread). rewrite Himg in Hread.
       split; [rewrite Himg' //|]. eexists _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1|].
-      right; left. split; [reflexivity|]. rewrite lookup_insert. split.
+      right; left. split; [reflexivity|]. rewrite lookup_insert coh_upd_eq. split.
       * intros Hv. assert (v = b1) as -> by congruence.
         destruct (tso_read_src _ _ _ _ _ _ Hread)
           as [Hi|(k & m & Hk & Hmb & Hvis)].
@@ -811,9 +960,9 @@ Proof.
         { rewrite mb_CX1 in Hmb. destruct b1_ne_b2. congruence. }
         exists k. split; [exact Hk|].
         eapply (visibleb_foreign 2%nat tv' (c_log c) k CX2); [exact Hk|done|done].
-    + (* second load *)
+    + (* second load: bounded below by the coherence floor *)
       destruct Hst as (tv' & v & Hok & Hlog & Hharts).
-      destruct Hok as (Hle & Hlen & Hread). rewrite Himg in Hread.
+      destruct Hok as (Hle & Hcoh & Hlen & Hread). rewrite Himg in Hread.
       split; [rewrite Himg' //|]. eexists _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1|].
@@ -856,9 +1005,9 @@ Proof.
 Qed.
 
 (** CoRR, part 1: after a fresh read, the era-initial byte is gone forever. *)
-Theorem corr_no_stale c h0 h1 regs tv :
+Theorem corr_no_stale c h0 h1 regs tv rv coh :
   reach corr_c0 c →
-  c_harts c = [h0; h1; Hart [] regs tv] →
+  c_harts c = [h0; h1; Hart [] regs tv rv coh] →
   (regs !! rg1 = Some b1 ∨ regs !! rg1 = Some b2) → regs !! rg2 ≠ Some b0.
 Proof.
   intros Hre Hh H1.
@@ -872,9 +1021,9 @@ Qed.
 
 (** CoRR, part 2: on the execution whose store order is x=1 then x=2, a
     reader that saw 2 cannot go back to 1 — it must see 2 again. *)
-Theorem corr_forbidden c h0 h1 regs tv :
+Theorem corr_forbidden c h0 h1 regs tv rv coh :
   reach corr_c0 c →
-  c_harts c = [h0; h1; Hart [] regs tv] →
+  c_harts c = [h0; h1; Hart [] regs tv rv coh] →
   c_log c = [CX1; CX2] →
   regs !! rg1 = Some b2 → regs !! rg2 = Some b2.
 Proof.
@@ -894,9 +1043,10 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(** ** LB — load buffering.  Both loads returning 1 is FORBIDDEN
-       (herd: forbidden under Ztso — R→W is ordered, so the log cannot
-       contain a store that its own hart's earlier load has not resolved). *)
+(** ** LB — load buffering.  Both loads returning 1 is FORBIDDEN (herd:
+       ALLOWED under RVWMO — this machine keeps R→W order, so the log
+       cannot contain a store that its own hart's earlier load has not
+       resolved; a deliberate over-promise, relaxed-rr.md §2.3). *)
 
 Local Notation LBX := (WMsg ax [b1] 0%nat).   (* hart 0's store *)
 Local Notation LBY := (WMsg ay [b1] 1%nat).   (* hart 1's store *)
@@ -913,8 +1063,8 @@ Lemma mb_LBY_y : msg_byte LBY ay = Some b1.
 Proof. rewrite msg_byte_single //. Qed.
 
 Definition lb_c0 : config :=
-  Cfg img0 [] [Hart [ILoad rg1 ay; IStore ax b1] ∅ 0%nat;
-               Hart [ILoad rg2 ax; IStore ay b1] ∅ 0%nat].
+  Cfg img0 [] [Hart [ILoad rg1 ay; IStore ax b1] ∅ 0%nat 0%nat (λ _, 0%nat);
+               Hart [ILoad rg2 ax; IStore ay b1] ∅ 0%nat 0%nat (λ _, 0%nat)].
 
 Definition lb_content (log : list wmsg) : Prop :=
   ∀ m, m ∈ log → m = LBX ∨ m = LBY.
@@ -948,8 +1098,8 @@ Definition lb_inv (c : config) : Prop :=
 
 Lemma lb_step c c' : lb_inv c → lstep c c' → lb_inv c'.
 Proof.
-  intros (Himg & [p0 regs0 tv0] & [p1 regs1 tv1] & Hh & Hcont & Hn0 & Hn1
-          & Hp0 & Hp1 & Hy1 & Hr1 & Hr0 & Hno) Hstep.
+  intros (Himg & [p0 regs0 tv0 rv0 coh0] & [p1 regs1 tv1 rv1 coh1]
+          & Hh & Hcont & Hn0 & Hn1 & Hp0 & Hp1 & Hy1 & Hr1 & Hr0 & Hno) Hstep.
   simpl in Hn0, Hn1, Hp0, Hp1, Hy1, Hr1, Hr0, Hno.
   destruct Hstep as (i & h & Hlk & Himg' & Hst).
   rewrite Hh in Hlk.
@@ -958,7 +1108,7 @@ Proof.
     destruct Hp0 as [->|[->| ->]]; simpl in Hst; [| |done].
     + (* load rg1 <- y *)
       destruct Hst as (tv' & v & Hok & Hlog & Hharts).
-      destruct Hok as (Hle & Hlen & Hread). rewrite Himg in Hread.
+      destruct Hok as (Hle & Hcoh & Hlen & Hread). rewrite Himg in Hread.
       assert (HnX : LBX ∉ c_log c) by (apply Hn0; by left).
       assert (Hv : v = b1 → LBY ∈ c_log c).
       { intros ->.
@@ -1006,7 +1156,7 @@ Proof.
     destruct Hp1 as [->|[->| ->]]; simpl in Hst; [| |done].
     + (* load rg2 <- x *)
       destruct Hst as (tv' & v & Hok & Hlog & Hharts).
-      destruct Hok as (Hle & Hlen & Hread). rewrite Himg in Hread.
+      destruct Hok as (Hle & Hcoh & Hlen & Hread). rewrite Himg in Hread.
       assert (HnY : LBY ∉ c_log c) by (apply Hn1; by left).
       assert (Hv : v = b1 → LBX ∈ c_log c).
       { intros ->.
@@ -1061,9 +1211,9 @@ Proof.
 Qed.
 
 (** LB: rg1 = 1 ∧ rg2 = 1 is UNREACHABLE. *)
-Theorem lb_forbidden c regs0 tv0 regs1 tv1 :
+Theorem lb_forbidden c regs0 tv0 rv0 coh0 regs1 tv1 rv1 coh1 :
   reach lb_c0 c →
-  c_harts c = [Hart [] regs0 tv0; Hart [] regs1 tv1] →
+  c_harts c = [Hart [] regs0 tv0 rv0 coh0; Hart [] regs1 tv1 rv1 coh1] →
   regs0 !! rg1 = Some b1 → regs1 !! rg2 ≠ Some b1.
 Proof.
   intros Hre Hh Ha Hb.
@@ -1074,11 +1224,9 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(** ** IRIW — independent reads of independent writes.  FORBIDDEN with NO
-       fences (herd: forbidden under Ztso; TSO is multi-copy atomic).
-
-    The single global log is the total store order, so "x entered before y"
-    and "y entered before x" cannot both hold. *)
+(** ** IRIW — independent reads of independent writes.  With NO fences the
+       weak outcome is ALLOWED (herd: allowed under RVWMO): each reader
+       takes its first load high and its second low.  Flipped from Ztso. *)
 
 Local Notation IX := (WMsg ax [b1] 0%nat).
 Local Notation IY := (WMsg ay [b1] 1%nat).
@@ -1094,10 +1242,55 @@ Proof. rewrite msg_byte_single //. Qed.
 
 Definition iriw_c0 : config :=
   Cfg img0 []
-      [Hart [IStore ax b1] ∅ 0%nat;
-       Hart [IStore ay b1] ∅ 0%nat;
-       Hart [ILoad rg1 ax; ILoad rg2 ay] ∅ 0%nat;
-       Hart [ILoad rg3 ay; ILoad rg4 ax] ∅ 0%nat].
+      [Hart [IStore ax b1] ∅ 0%nat 0%nat (λ _, 0%nat);
+       Hart [IStore ay b1] ∅ 0%nat 0%nat (λ _, 0%nat);
+       Hart [ILoad rg1 ax; ILoad rg2 ay] ∅ 0%nat 0%nat (λ _, 0%nat);
+       Hart [ILoad rg3 ay; ILoad rg4 ax] ∅ 0%nat 0%nat (λ _, 0%nat)].
+
+Lemma iriw_allowed :
+  ∃ c h0 h1 regs2 tv2 rv2 coh2 regs3 tv3 rv3 coh3,
+    reach iriw_c0 c ∧
+    c_harts c = [h0; h1; Hart [] regs2 tv2 rv2 coh2; Hart [] regs3 tv3 rv3 coh3] ∧
+    regs2 !! rg1 = Some b1 ∧ regs2 !! rg2 = Some b0 ∧
+    regs3 !! rg3 = Some b1 ∧ regs3 !! rg4 = Some b0.
+Proof.
+  rewrite /iriw_c0. eexists _, _, _, _, _, _, _, _, _, _, _. split.
+  { eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
+    eapply rtc_l; [eapply (step_store _ 1%nat); reflexivity|]. simpl.
+    eapply rtc_l;
+      [eapply (step_load _ 2%nat rg1 ax _ _ _ _ _ 1%nat b1);
+        [reflexivity|solve_load]|]. simpl.
+    eapply rtc_l;
+      [eapply (step_load _ 2%nat rg2 ay _ _ _ _ _ 0%nat b0);
+        [reflexivity|solve_load]|]. simpl.
+    eapply rtc_l;
+      [eapply (step_load _ 3%nat rg3 ay _ _ _ _ _ 2%nat b1);
+        [reflexivity|solve_load]|]. simpl.
+    eapply rtc_l;
+      [eapply (step_load _ 3%nat rg4 ax _ _ _ _ _ 0%nat b0);
+        [reflexivity|solve_load]|]. simpl.
+    apply rtc_refl. }
+  split; [reflexivity|]. split_and!.
+  - rewrite lookup_insert_ne // lookup_insert //.
+  - rewrite lookup_insert //.
+  - rewrite lookup_insert_ne // lookup_insert //.
+  - rewrite lookup_insert //.
+Qed.
+
+(* ================================================================== *)
+(** ** IRIW with [fence r,r] in both readers — FORBIDDEN (herd: forbidden
+       under RVWMO, which is multi-copy atomic).
+
+    The single global log is the total store order, so "x entered before y"
+    and "y entered before x" cannot both hold; the fences are what carry
+    each reader's first observation to its second load. *)
+
+Definition iriwf_c0 : config :=
+  Cfg img0 []
+      [Hart [IStore ax b1] ∅ 0%nat 0%nat (λ _, 0%nat);
+       Hart [IStore ay b1] ∅ 0%nat 0%nat (λ _, 0%nat);
+       Hart [ILoad rg1 ax; FENCE_RR; ILoad rg2 ay] ∅ 0%nat 0%nat (λ _, 0%nat);
+       Hart [ILoad rg3 ay; FENCE_RR; ILoad rg4 ax] ∅ 0%nat 0%nat (λ _, 0%nat)].
 
 Definition iriw_content (log : list wmsg) : Prop :=
   ∀ m, m ∈ log → m = IX ∨ m = IY.
@@ -1109,12 +1302,15 @@ Proof.
   apply elem_of_list_singleton in Hin as ->. done.
 Qed.
 
-(** Reader C: x then y.  Its final conjunct is "the x-message is strictly
-    below EVERY y-message" — stable under appends because a fresh message
-    lands past every existing index. *)
-Definition iriw_C (p : list instr) (regs : gmap nat (bv 8)) (tv : nat)
+(** Reader C: x, fence, y.  The watermark carries the first observation to
+    the fence, the floor carries it to the second load.  The final conjunct
+    is "the x-message is strictly below EVERY y-message" — stable under
+    appends because a fresh message lands past every existing index. *)
+Definition iriw_C (p : list instr) (regs : gmap nat (bv 8)) (tv rv : nat)
     (log : list wmsg) : Prop :=
-  (p = [ILoad rg1 ax; ILoad rg2 ay]) ∨
+  (p = [ILoad rg1 ax; FENCE_RR; ILoad rg2 ay]) ∨
+  (p = [FENCE_RR; ILoad rg2 ay] ∧
+     (regs !! rg1 = Some b1 → ∃ j, log !! j = Some IX ∧ (S j ≤ rv)%nat)) ∨
   (p = [ILoad rg2 ay] ∧
      (regs !! rg1 = Some b1 → ∃ j, log !! j = Some IX ∧ (S j ≤ tv)%nat)) ∨
   (p = [] ∧
@@ -1122,9 +1318,11 @@ Definition iriw_C (p : list instr) (regs : gmap nat (bv 8)) (tv : nat)
         ∃ jx, log !! jx = Some IX ∧
               ∀ jy, log !! jy = Some IY → (jx < jy)%nat)).
 
-Definition iriw_D (p : list instr) (regs : gmap nat (bv 8)) (tv : nat)
+Definition iriw_D (p : list instr) (regs : gmap nat (bv 8)) (tv rv : nat)
     (log : list wmsg) : Prop :=
-  (p = [ILoad rg3 ay; ILoad rg4 ax]) ∨
+  (p = [ILoad rg3 ay; FENCE_RR; ILoad rg4 ax]) ∨
+  (p = [FENCE_RR; ILoad rg4 ax] ∧
+     (regs !! rg3 = Some b1 → ∃ j, log !! j = Some IY ∧ (S j ≤ rv)%nat)) ∨
   (p = [ILoad rg4 ax] ∧
      (regs !! rg3 = Some b1 → ∃ j, log !! j = Some IY ∧ (S j ≤ tv)%nat)) ∨
   (p = [] ∧
@@ -1132,14 +1330,16 @@ Definition iriw_D (p : list instr) (regs : gmap nat (bv 8)) (tv : nat)
         ∃ jy, log !! jy = Some IY ∧
               ∀ jx, log !! jx = Some IX → (jy < jx)%nat)).
 
-Lemma iriw_C_app p regs tv log m :
-  iriw_C p regs tv log → iriw_C p regs tv (log ++ [m]).
+Lemma iriw_C_app p regs tv rv log m :
+  iriw_C p regs tv rv log → iriw_C p regs tv rv (log ++ [m]).
 Proof.
-  intros [->|[[-> H]|[-> H]]].
+  intros [->|[[-> H]|[[-> H]|[-> H]]]].
   - by left.
   - right; left. split; [done|]. intros Hr. destruct (H Hr) as (j & Hj & ?).
     exists j. split; [by apply lookup_app_l_Some|done].
-  - right; right. split; [done|]. intros H1 H2.
+  - right; right; left. split; [done|]. intros Hr. destruct (H Hr) as (j & Hj & ?).
+    exists j. split; [by apply lookup_app_l_Some|done].
+  - right; right; right. split; [done|]. intros H1 H2.
     destruct (H H1 H2) as (jx & Hjx & Hlt).
     assert (Hb : (jx < length log)%nat) by (eapply lookup_lt_Some; exact Hjx).
     exists jx. split; [by apply lookup_app_l_Some|].
@@ -1147,14 +1347,16 @@ Proof.
       [by apply Hlt|lia].
 Qed.
 
-Lemma iriw_D_app p regs tv log m :
-  iriw_D p regs tv log → iriw_D p regs tv (log ++ [m]).
+Lemma iriw_D_app p regs tv rv log m :
+  iriw_D p regs tv rv log → iriw_D p regs tv rv (log ++ [m]).
 Proof.
-  intros [->|[[-> H]|[-> H]]].
+  intros [->|[[-> H]|[[-> H]|[-> H]]]].
   - by left.
   - right; left. split; [done|]. intros Hr. destruct (H Hr) as (j & Hj & ?).
     exists j. split; [by apply lookup_app_l_Some|done].
-  - right; right. split; [done|]. intros H1 H2.
+  - right; right; left. split; [done|]. intros Hr. destruct (H Hr) as (j & Hj & ?).
+    exists j. split; [by apply lookup_app_l_Some|done].
+  - right; right; right. split; [done|]. intros H1 H2.
     destruct (H H1 H2) as (jy & Hjy & Hlt).
     assert (Hb : (jy < length log)%nat) by (eapply lookup_lt_Some; exact Hjy).
     exists jy. split; [by apply lookup_app_l_Some|].
@@ -1162,18 +1364,18 @@ Proof.
       [by apply Hlt|lia].
 Qed.
 
-Definition iriw_inv (c : config) : Prop :=
+Definition iriwf_inv (c : config) : Prop :=
   c_img c = img0 ∧
   ∃ h0 h1 h2 h3, c_harts c = [h0; h1; h2; h3] ∧ iriw_content (c_log c) ∧
     (h_prog h0 = [IStore ax b1] ∨ h_prog h0 = []) ∧
     (h_prog h1 = [IStore ay b1] ∨ h_prog h1 = []) ∧
-    iriw_C (h_prog h2) (h_regs h2) (h_tv h2) (c_log c) ∧
-    iriw_D (h_prog h3) (h_regs h3) (h_tv h3) (c_log c).
+    iriw_C (h_prog h2) (h_regs h2) (h_tv h2) (h_rv h2) (c_log c) ∧
+    iriw_D (h_prog h3) (h_regs h3) (h_tv h3) (h_rv h3) (c_log c).
 
-Lemma iriw_step c c' : iriw_inv c → lstep c c' → iriw_inv c'.
+Lemma iriwf_step c c' : iriwf_inv c → lstep c c' → iriwf_inv c'.
 Proof.
-  intros (Himg & [q0 g0 u0] & [q1 g1 u1] & [q2 g2 u2] & [q3 g3 u3]
-          & Hh & Hcont & H0 & H1 & HC & HD) Hstep.
+  intros (Himg & [q0 g0 u0 w0 k0] & [q1 g1 u1 w1 k1] & [q2 g2 u2 w2 k2]
+          & [q3 g3 u3 w3 k3] & Hh & Hcont & H0 & H1 & HC & HD) Hstep.
   simpl in H0, H1, HC, HD.
   destruct Hstep as (i & h & Hlk & Himg' & Hst).
   rewrite Hh in Hlk.
@@ -1201,9 +1403,10 @@ Proof.
     + by apply iriw_C_app.
     + by apply iriw_D_app.
   - (* reader C *)
-    destruct HC as [->|[[-> Hc]|[-> _]]]; simpl in Hst; [| |done].
-    + destruct Hst as (tv' & v & Hok & Hlog & Hharts).
-      destruct Hok as (Hle & Hlen & Hread). rewrite Himg in Hread.
+    destruct HC as [->|[[-> Hc]|[[-> Hc]|[-> _]]]]; simpl in Hst; [| | |done].
+    + (* load x: the watermark passes the x-message *)
+      destruct Hst as (tv' & v & Hok & Hlog & Hharts).
+      destruct Hok as (Hle & Hcoh & Hlen & Hread). rewrite Himg in Hread.
       split; [rewrite Himg' //|]. eexists _, _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1| |exact HD].
@@ -1216,13 +1419,24 @@ Proof.
         last first.
       { rewrite mb_IY_x in Hmb. done. }
       exists k. split; [exact Hk|].
-      eapply (visibleb_foreign 2%nat tv' (c_log c) k IX); [exact Hk|done|done].
-    + destruct Hst as (tv' & v & Hok & Hlog & Hharts).
-      destruct Hok as (Hle & Hlen & Hread). rewrite Himg in Hread.
+      pose proof (visibleb_foreign 2%nat tv' (c_log c) k IX Hk ltac:(done) Hvis).
+      lia.
+    + (* fence r,r: the floor passes the watermark *)
+      destruct Hst as [Hlog Hharts].
       split; [rewrite Himg' //|]. eexists _, _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1| |exact HD].
-      right; right. split; [reflexivity|].
+      right; right; left. split; [reflexivity|]. intros Hv.
+      destruct (Hc Hv) as (j & Hj & Hjrv). exists j. split; [exact Hj|].
+      pose proof (fence_post_acq 2%nat (c_log c) true false true false u2 w2
+                    eq_refl). lia.
+    + (* load y: at or above the floor *)
+      destruct Hst as (tv' & v & Hok & Hlog & Hharts).
+      destruct Hok as (Hle & Hcoh & Hlen & Hread). rewrite Himg in Hread.
+      split; [rewrite Himg' //|]. eexists _, _, _, _.
+      split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
+      rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1| |exact HD].
+      right; right; right. split; [reflexivity|].
       rewrite lookup_insert_ne // lookup_insert.
       intros Hv1 Hv2. assert (v = b0) as -> by congruence.
       destruct (Hc Hv1) as (jx & Hjx & Hjtv). exists jx. split; [exact Hjx|].
@@ -1236,9 +1450,9 @@ Proof.
       { rewrite mb_IX_y in Hmb. done. }
       rewrite mb_IY_y in Hmb. apply b0_ne_b1. congruence.
   - (* reader D *)
-    destruct HD as [->|[[-> Hc]|[-> _]]]; simpl in Hst; [| |done].
+    destruct HD as [->|[[-> Hc]|[[-> Hc]|[-> _]]]]; simpl in Hst; [| | |done].
     + destruct Hst as (tv' & v & Hok & Hlog & Hharts).
-      destruct Hok as (Hle & Hlen & Hread). rewrite Himg in Hread.
+      destruct Hok as (Hle & Hcoh & Hlen & Hread). rewrite Himg in Hread.
       split; [rewrite Himg' //|]. eexists _, _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1|exact HC|].
@@ -1250,13 +1464,22 @@ Proof.
       destruct (Hcont m (elem_of_list_lookup_2 _ _ _ Hk)) as [-> | ->].
       { rewrite mb_IX_y in Hmb. done. }
       exists k. split; [exact Hk|].
-      eapply (visibleb_foreign 3%nat tv' (c_log c) k IY); [exact Hk|done|done].
-    + destruct Hst as (tv' & v & Hok & Hlog & Hharts).
-      destruct Hok as (Hle & Hlen & Hread). rewrite Himg in Hread.
+      pose proof (visibleb_foreign 3%nat tv' (c_log c) k IY Hk ltac:(done) Hvis).
+      lia.
+    + destruct Hst as [Hlog Hharts].
       split; [rewrite Himg' //|]. eexists _, _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1|exact HC|].
-      right; right. split; [reflexivity|].
+      right; right; left. split; [reflexivity|]. intros Hv.
+      destruct (Hc Hv) as (j & Hj & Hjrv). exists j. split; [exact Hj|].
+      pose proof (fence_post_acq 3%nat (c_log c) true false true false u3 w3
+                    eq_refl). lia.
+    + destruct Hst as (tv' & v & Hok & Hlog & Hharts).
+      destruct Hok as (Hle & Hcoh & Hlen & Hread). rewrite Himg in Hread.
+      split; [rewrite Himg' //|]. eexists _, _, _, _.
+      split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
+      rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1|exact HC|].
+      right; right; right. split; [reflexivity|].
       rewrite lookup_insert_ne // lookup_insert.
       intros Hv1 Hv2. assert (v = b0) as -> by congruence.
       destruct (Hc Hv1) as (jy & Hjy & Hjtv). exists jy. split; [exact Hjy|].
@@ -1271,27 +1494,27 @@ Proof.
       rewrite mb_IY_x in Hmb. done.
 Qed.
 
-Lemma iriw_inv0 : iriw_inv iriw_c0.
+Lemma iriwf_inv0 : iriwf_inv iriwf_c0.
 Proof.
   split; [done|]. eexists _, _, _, _. split; [reflexivity|]. simpl.
   split_and!; [by intros ? ?%elem_of_nil|by left|by left|by left|by left].
 Qed.
 
-(** IRIW with NO fences: (1,0,1,0) is UNREACHABLE. *)
-Theorem iriw_forbidden c h0 h1 regs2 tv2 regs3 tv3 :
-  reach iriw_c0 c →
-  c_harts c = [h0; h1; Hart [] regs2 tv2; Hart [] regs3 tv3] →
+(** IRIW with [fence r,r] in both readers: (1,0,1,0) is UNREACHABLE. *)
+Theorem iriw_fence_forbidden c h0 h1 regs2 tv2 rv2 coh2 regs3 tv3 rv3 coh3 :
+  reach iriwf_c0 c →
+  c_harts c = [h0; h1; Hart [] regs2 tv2 rv2 coh2; Hart [] regs3 tv3 rv3 coh3] →
   regs2 !! rg1 = Some b1 → regs2 !! rg2 = Some b0 →
   regs3 !! rg3 = Some b1 → regs3 !! rg4 ≠ Some b0.
 Proof.
   intros Hre Hh Ha1 Ha2 Hb1 Hb2.
-  assert (Hinv : iriw_inv c).
-  { eapply inv_reach; [apply iriw_inv0| |exact Hre].
-    intros. by eapply iriw_step. }
+  assert (Hinv : iriwf_inv c).
+  { eapply inv_reach; [apply iriwf_inv0| |exact Hre].
+    intros. by eapply iriwf_step. }
   destruct Hinv as (_ & k0 & k1 & k2 & k3 & Hh' & _ & _ & _ & HC & HD).
   rewrite Hh in Hh'. simplify_eq/=.
-  destruct HC as [Hc|[[Hc _]|[_ HimpC]]]; try discriminate.
-  destruct HD as [Hc|[[Hc _]|[_ HimpD]]]; try discriminate.
+  destruct HC as [Hc|[[Hc _]|[[Hc _]|[_ HimpC]]]]; try discriminate.
+  destruct HD as [Hc|[[Hc _]|[[Hc _]|[_ HimpD]]]]; try discriminate.
   destruct (HimpC Ha1 Ha2) as (jx & Hjx & HltC).
   destruct (HimpD Hb1 Hb2) as (jy & Hjy & HltD).
   specialize (HltC _ Hjy). specialize (HltD _ Hjx). lia.
@@ -1299,7 +1522,7 @@ Qed.
 
 (* ================================================================== *)
 (** ** n6 — the store buffer drains LATE.  ALLOWED (herd: allowed under
-       Ztso, forbidden under SC).
+       Ztso and RVWMO, forbidden under SC).
 
     Hart 0 reads its own [x = 1] by forwarding while its buffer has not
     drained, misses hart 1's [y = 2] entirely, and its x-store still lands
@@ -1308,14 +1531,14 @@ Qed.
     not see.  No SC interleaving produces this. *)
 
 Definition n6_c0 : config :=
-  Cfg img0 [] [Hart [IStore ax b1; ILoad rg1 ax; ILoad rg2 ay] ∅ 0%nat;
-               Hart [IStore ay b2; IStore ax b2] ∅ 0%nat].
+  Cfg img0 [] [Hart [IStore ax b1; ILoad rg1 ax; ILoad rg2 ay] ∅ 0%nat 0%nat (λ _, 0%nat);
+               Hart [IStore ay b2; IStore ax b2] ∅ 0%nat 0%nat (λ _, 0%nat)].
 
 Lemma n6_allowed :
   ∃ c, reach n6_c0 c ∧
-       (∃ regs tv, c_harts c !! 0%nat = Some (Hart [] regs tv) ∧
-                   regs !! rg1 = Some b1 ∧ regs !! rg2 = Some b0) ∧
-       (∃ regs tv, c_harts c !! 1%nat = Some (Hart [] regs tv)) ∧
+       (∃ regs tv rv coh, c_harts c !! 0%nat = Some (Hart [] regs tv rv coh) ∧
+                          regs !! rg1 = Some b1 ∧ regs !! rg2 = Some b0) ∧
+       (∃ regs tv rv coh, c_harts c !! 1%nat = Some (Hart [] regs tv rv coh)) ∧
        flat img0 (c_log c) ax = Some b1.
 Proof.
   rewrite /n6_c0. eexists. split.
@@ -1323,28 +1546,30 @@ Proof.
     eapply rtc_l; [eapply (step_store _ 1%nat); reflexivity|]. simpl.
     eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 0%nat rg1 ax _ _ _ 0%nat b1);
+      [eapply (step_load _ 0%nat rg1 ax _ _ _ _ _ 0%nat b1);
         [reflexivity|solve_load]|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 0%nat rg2 ay _ _ _ 0%nat b0);
+      [eapply (step_load _ 0%nat rg2 ay _ _ _ _ _ 0%nat b0);
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split_and!.
-  - do 2 eexists. split; [reflexivity|].
+  - do 4 eexists. split; [reflexivity|].
     rewrite lookup_insert. split; [|reflexivity].
     rewrite lookup_insert_ne // lookup_insert //.
-  - do 2 eexists. reflexivity.
+  - do 4 eexists. reflexivity.
   - vm_compute. reflexivity.
 Qed.
 
 (* ================================================================== *)
 (** ** AMO strength — lock-acquire ordering with ZERO fences.
 
-    [amoswap.aq] reads at the top of the log and lands its view past its own
-    append, so an AMO that took the lock word after another hart's AMO sees
-    everything that hart published before releasing.  The hypothesis "B's AMO
-    is log-later than A's" is stated as an index comparison in the final log;
-    without it the outcome is genuinely allowed (B may take the word first). *)
+    [amoswap.aq] reads at the top of the log and lands its FLOOR past its
+    own append, so an AMO that took the lock word after another hart's AMO
+    sees everything that hart published before releasing — every later
+    load reads at or above the floor.  The hypothesis "B's AMO is
+    log-later than A's" is stated as an index comparison in the final log;
+    without it the outcome is genuinely allowed (B may take the word
+    first). *)
 
 Local Notation AMX := (WMsg ax [b1] 0%nat).   (* hart 0's plain store *)
 Local Notation AMA := (WMsg ay [b1] 0%nat).   (* hart 0's AMO write *)
@@ -1366,8 +1591,8 @@ Lemma AMB_ne_AMA : AMB ≠ AMA.
 Proof. intros H. by simplify_eq/=. Qed.
 
 Definition amo_c0 : config :=
-  Cfg img0 [] [Hart [IStore ax b1; IAmoSwapAq rg1 ay b1] ∅ 0%nat;
-               Hart [IAmoSwapAq rg2 ay b2; ILoad rg3 ax] ∅ 0%nat].
+  Cfg img0 [] [Hart [IStore ax b1; IAmoSwapAq rg1 ay b1] ∅ 0%nat 0%nat (λ _, 0%nat);
+               Hart [IAmoSwapAq rg2 ay b2; ILoad rg3 ax] ∅ 0%nat 0%nat (λ _, 0%nat)].
 
 Definition amo_content (log : list wmsg) : Prop :=
   ∀ m, m ∈ log → m = AMX ∨ m = AMA ∨ m = AMB.
@@ -1410,8 +1635,8 @@ Qed.
 
 Lemma amo_step c c' : amo_inv c → lstep c c' → amo_inv c'.
 Proof.
-  intros (Himg & [p0 regs0 tv0] & [p1 regs1 tv1] & Hh & Hcont & Hord & HA & HB)
-         Hstep.
+  intros (Himg & [p0 regs0 tv0 rv0 coh0] & [p1 regs1 tv1 rv1 coh1]
+          & Hh & Hcont & Hord & HA & HB) Hstep.
   simpl in HA, HB.
   destruct Hstep as (i & h & Hlk & Himg' & Hst).
   rewrite Hh in Hlk.
@@ -1466,7 +1691,7 @@ Proof.
           [by apply (H ja jb)|lia].
   - (* ---- hart 1 ---- *)
     destruct HB as [->|[[-> Htv]|[-> _]]]; simpl in Hst; [| |done].
-    + (* the AMO write [y := 2]: the view lands past the append *)
+    + (* the AMO write [y := 2]: the floor lands past the append *)
       destruct Hst as (v_old & Hex & Hlog & Hharts).
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
@@ -1482,9 +1707,9 @@ Proof.
         assert (jb < length (c_log c ++ [AMB]))%nat
           by (eapply lookup_lt_Some; exact Hjb).
         rewrite length_app /= in H. lia.
-    + (* load rg3 <- x *)
+    + (* load rg3 <- x: at or above the floor *)
       destruct Hst as (tv' & v & Hok & Hlog & Hharts).
-      destruct Hok as (Hle & Hlen & Hread). rewrite Himg in Hread.
+      destruct Hok as (Hle & Hcoh & Hlen & Hread). rewrite Himg in Hread.
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!.
@@ -1515,9 +1740,9 @@ Qed.
 
 (** AMO strength: if hart 1's AMO write is log-later than hart 0's, hart 1's
     plain load of x sees hart 0's pre-AMO store — no fence anywhere. *)
-Theorem amo_strong c h0 regs tv ja jb :
+Theorem amo_strong c h0 regs tv rv coh ja jb :
   reach amo_c0 c →
-  c_harts c = [h0; Hart [] regs tv] →
+  c_harts c = [h0; Hart [] regs tv rv coh] →
   c_log c !! ja = Some AMA → c_log c !! jb = Some AMB → (ja < jb)%nat →
   regs !! rg3 = Some b1.
 Proof.
@@ -1545,40 +1770,43 @@ Qed.
     really produces the one-sided outcome (0, 1) — the store that lost the
     race to the log is the one whose hart is forced to see the winner. *)
 Lemma sbf_completed_reachable :
-  ∃ c regs0 tv0 regs1 tv1,
-    reach sbf_c0 c ∧ c_harts c = [Hart [] regs0 tv0; Hart [] regs1 tv1] ∧
+  ∃ c regs0 tv0 rv0 coh0 regs1 tv1 rv1 coh1,
+    reach sbf_c0 c ∧
+    c_harts c = [Hart [] regs0 tv0 rv0 coh0; Hart [] regs1 tv1 rv1 coh1] ∧
     regs0 !! rg1 = Some b0 ∧ regs1 !! rg2 = Some b1.
 Proof.
-  rewrite /sbf_c0. eexists _, _, _, _, _. split.
+  rewrite /sbf_c0. eexists _, _, _, _, _, _, _, _, _. split.
   { eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
     eapply rtc_l; [eapply (step_fence _ 0%nat); reflexivity|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 0%nat rg1 ay _ _ _ 1%nat b0);
+      [eapply (step_load _ 0%nat rg1 ay _ _ _ _ _ 1%nat b0);
         [reflexivity|solve_load]|]. simpl.
     eapply rtc_l; [eapply (step_store _ 1%nat); reflexivity|]. simpl.
     eapply rtc_l; [eapply (step_fence _ 1%nat); reflexivity|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 1%nat rg2 ax _ _ _ 2%nat b1);
+      [eapply (step_load _ 1%nat rg2 ax _ _ _ _ _ 2%nat b1);
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split; [reflexivity|]. split; rewrite lookup_insert //.
 Qed.
 
-(** [mp_forbidden]: the reader can and does read the flag as 1 — and then,
-    as the theorem says, the data too. *)
-Lemma mp_completed_reachable :
-  ∃ c h0 regs tv,
-    reach mp_c0 c ∧ c_harts c = [h0; Hart [] regs tv] ∧
+(** [mp_fence_forbidden]: the fenced reader can and does read the flag as
+    1 — and then, as the theorem says, the data too. *)
+Lemma mpf_completed_reachable :
+  ∃ c h0 regs tv rv coh,
+    reach mpf_c0 c ∧ c_harts c = [h0; Hart [] regs tv rv coh] ∧
     regs !! rg1 = Some b1 ∧ regs !! rg2 = Some b1.
 Proof.
-  rewrite /mp_c0. eexists _, _, _, _. split.
+  rewrite /mpf_c0. eexists _, _, _, _, _, _. split.
   { eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
+    eapply rtc_l; [eapply (step_fence _ 0%nat); reflexivity|]. simpl.
     eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 1%nat rg1 ay _ _ _ 2%nat b1);
+      [eapply (step_load _ 1%nat rg1 ay _ _ _ _ _ 2%nat b1);
         [reflexivity|solve_load]|]. simpl.
+    eapply rtc_l; [eapply (step_fence _ 1%nat); reflexivity|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 1%nat rg2 ax _ _ _ 2%nat b1);
+      [eapply (step_load _ 1%nat rg2 ax _ _ _ _ _ 2%nat b1);
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split; [reflexivity|]. split.
@@ -1589,19 +1817,19 @@ Qed.
 (** [corr_forbidden]/[corr_no_stale]: the concrete log [CX1; CX2] and the
     first read of 2 are both reachable. *)
 Lemma corr_completed_reachable :
-  ∃ c h0 h1 regs tv,
-    reach corr_c0 c ∧ c_harts c = [h0; h1; Hart [] regs tv] ∧
+  ∃ c h0 h1 regs tv rv coh,
+    reach corr_c0 c ∧ c_harts c = [h0; h1; Hart [] regs tv rv coh] ∧
     c_log c = [CX1; CX2] ∧
     regs !! rg1 = Some b2 ∧ regs !! rg2 = Some b2.
 Proof.
-  rewrite /corr_c0. eexists _, _, _, _, _. split.
+  rewrite /corr_c0. eexists _, _, _, _, _, _, _. split.
   { eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
     eapply rtc_l; [eapply (step_store _ 1%nat); reflexivity|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 2%nat rg1 ax _ _ _ 2%nat b2);
+      [eapply (step_load _ 2%nat rg1 ax _ _ _ _ _ 2%nat b2);
         [reflexivity|solve_load]|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 2%nat rg2 ax _ _ _ 2%nat b2);
+      [eapply (step_load _ 2%nat rg2 ax _ _ _ _ _ 2%nat b2);
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split; [reflexivity|]. split; [reflexivity|]. split.
@@ -1611,47 +1839,50 @@ Qed.
 
 (** [lb_forbidden]: both LB harts complete; the machine produces (0, 1). *)
 Lemma lb_completed_reachable :
-  ∃ c regs0 tv0 regs1 tv1,
-    reach lb_c0 c ∧ c_harts c = [Hart [] regs0 tv0; Hart [] regs1 tv1] ∧
+  ∃ c regs0 tv0 rv0 coh0 regs1 tv1 rv1 coh1,
+    reach lb_c0 c ∧
+    c_harts c = [Hart [] regs0 tv0 rv0 coh0; Hart [] regs1 tv1 rv1 coh1] ∧
     regs0 !! rg1 = Some b0 ∧ regs1 !! rg2 = Some b1.
 Proof.
-  rewrite /lb_c0. eexists _, _, _, _, _. split.
+  rewrite /lb_c0. eexists _, _, _, _, _, _, _, _, _. split.
   { eapply rtc_l;
-      [eapply (step_load _ 0%nat rg1 ay _ _ _ 0%nat b0);
+      [eapply (step_load _ 0%nat rg1 ay _ _ _ _ _ 0%nat b0);
         [reflexivity|solve_load]|]. simpl.
     eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 1%nat rg2 ax _ _ _ 1%nat b1);
+      [eapply (step_load _ 1%nat rg2 ax _ _ _ _ _ 1%nat b1);
         [reflexivity|solve_load]|]. simpl.
     eapply rtc_l; [eapply (step_store _ 1%nat); reflexivity|]. simpl.
     apply rtc_refl. }
   split; [reflexivity|]. split; rewrite lookup_insert //.
 Qed.
 
-(** [iriw_forbidden]: all four harts complete, and THREE of the four
+(** [iriw_fence_forbidden]: all four harts complete, and THREE of the four
     hypothesised reads happen — only [rg4 = 0] is missing, which is exactly
     what the theorem forbids. *)
-Lemma iriw_completed_reachable :
-  ∃ c h0 h1 regs2 tv2 regs3 tv3,
-    reach iriw_c0 c ∧
-    c_harts c = [h0; h1; Hart [] regs2 tv2; Hart [] regs3 tv3] ∧
+Lemma iriwf_completed_reachable :
+  ∃ c h0 h1 regs2 tv2 rv2 coh2 regs3 tv3 rv3 coh3,
+    reach iriwf_c0 c ∧
+    c_harts c = [h0; h1; Hart [] regs2 tv2 rv2 coh2; Hart [] regs3 tv3 rv3 coh3] ∧
     regs2 !! rg1 = Some b1 ∧ regs2 !! rg2 = Some b0 ∧
     regs3 !! rg3 = Some b1 ∧ regs3 !! rg4 = Some b1.
 Proof.
-  rewrite /iriw_c0. eexists _, _, _, _, _, _, _. split.
+  rewrite /iriwf_c0. eexists _, _, _, _, _, _, _, _, _, _, _. split.
   { eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
+    eapply rtc_l;
+      [eapply (step_load _ 2%nat rg1 ax _ _ _ _ _ 1%nat b1);
+        [reflexivity|solve_load]|]. simpl.
+    eapply rtc_l; [eapply (step_fence _ 2%nat); reflexivity|]. simpl.
+    eapply rtc_l;
+      [eapply (step_load _ 2%nat rg2 ay _ _ _ _ _ 1%nat b0);
+        [reflexivity|solve_load]|]. simpl.
     eapply rtc_l; [eapply (step_store _ 1%nat); reflexivity|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 2%nat rg1 ax _ _ _ 1%nat b1);
+      [eapply (step_load _ 3%nat rg3 ay _ _ _ _ _ 2%nat b1);
         [reflexivity|solve_load]|]. simpl.
+    eapply rtc_l; [eapply (step_fence _ 3%nat); reflexivity|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 2%nat rg2 ay _ _ _ 1%nat b0);
-        [reflexivity|solve_load]|]. simpl.
-    eapply rtc_l;
-      [eapply (step_load _ 3%nat rg3 ay _ _ _ 2%nat b1);
-        [reflexivity|solve_load]|]. simpl.
-    eapply rtc_l;
-      [eapply (step_load _ 3%nat rg4 ax _ _ _ 2%nat b1);
+      [eapply (step_load _ 3%nat rg4 ax _ _ _ _ _ 2%nat b1);
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split; [reflexivity|]. split_and!.
@@ -1665,22 +1896,22 @@ Qed.
     log index 1 with hart 1's at index 2, and hart 1's plain load then reads
     hart 0's pre-AMO store — the verdict, exhibited. *)
 Lemma amo_completed_reachable :
-  ∃ c h0 regs tv,
-    reach amo_c0 c ∧ c_harts c = [h0; Hart [] regs tv] ∧
+  ∃ c h0 regs tv rv coh,
+    reach amo_c0 c ∧ c_harts c = [h0; Hart [] regs tv rv coh] ∧
     c_log c = [AMX; AMA; AMB] ∧
     c_log c !! 1%nat = Some AMA ∧ c_log c !! 2%nat = Some AMB ∧
     regs !! rg3 = Some b1.
 Proof.
-  rewrite /amo_c0. eexists _, _, _, _. split.
+  rewrite /amo_c0. eexists _, _, _, _, _, _. split.
   { eapply rtc_l; [eapply (step_store _ 0%nat); reflexivity|]. simpl.
     eapply rtc_l;
-      [eapply (step_amo _ 0%nat rg1 ay b1 _ _ _ b0);
+      [eapply (step_amo _ 0%nat rg1 ay b1 _ _ _ _ _ b0);
         [reflexivity|solve_excl]|]. simpl.
     eapply rtc_l;
-      [eapply (step_amo _ 1%nat rg2 ay b2 _ _ _ b1);
+      [eapply (step_amo _ 1%nat rg2 ay b2 _ _ _ _ _ b1);
         [reflexivity|solve_excl]|]. simpl.
     eapply rtc_l;
-      [eapply (step_load _ 1%nat rg3 ax _ _ _ 3%nat b1);
+      [eapply (step_load _ 1%nat rg3 ax _ _ _ _ _ 3%nat b1);
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split; [reflexivity|]. split; [reflexivity|]. split_and!;

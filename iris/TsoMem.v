@@ -1,37 +1,51 @@
-(** * TsoMem.v — the minimal Ztso view machine (leg T spike)
+(** * TsoMem.v — the minimal view machine (leg T spike), RELAXED FOR R→R
 
-    The memory model for the TSO port ([claude-notes/projects/tso-port.md],
-    leg T): a global append-only write log plus, per hart, a SINGLE monotone
-    log index — nothing else.  This is the deliberate simplification of the
-    `weak-memory` branch's promise-free RVWMO machine (its `WeakMem.v`, whose
-    per-hart state is a per-byte coherence map, five scalar views, a forward
-    bank and more): TSO's implicit annotations (every load an acquire, every
-    store a release) collapse all of that into one number.
+    The memory model of record: a global append-only write log plus a
+    small per-hart state.  Born as the Ztso machine of the TSO port
+    ([claude-notes/completed/tso-cutover-endgame.md]) with ONE monotone
+    log index per hart; relaxed for load–load reordering per
+    [claude-notes/projects/relaxed-rr.md], which adds two per-hart pieces
+    and deletes one assignment.  It is still the deliberate simplification
+    of the `weak-memory` branch's promise-free RVWMO machine (per-byte
+    coherence map, five scalar views, a forward bank): a total store order
+    and R→W order are KEPT, so only the reader's freedom is modelled.
 
     THE MACHINE.  State = era-initial image + `glog : list wmsg` (each
-    message carries its author) + per hart a view `tv : nat`.
+    message carries its author) + per hart: a FLOOR `tv : nat`, a READ
+    WATERMARK `rv : nat`, and a per-byte COHERENCE FLOOR `coh : Z → nat`.
 
       - A message at log position `i` has TIMESTAMP `S i`; timestamp 0 is
         the era-initial image.  The log order IS the total store order.
-      - VISIBILITY: hart `h` at view `tv` sees timestamp `t` iff `t ≤ tv`
+      - VISIBILITY: hart `h` at view `tv'` sees timestamp `t` iff `t ≤ tv'`
         or the message at `t` is h's own.  Own messages being always
         visible is store-buffer FORWARDING; it is load-bearing (a store
         must NOT advance the author's view — that would forbid SB).
-      - LOAD: choose any `tv' ` with `tv ≤ tv' ≤ length glog` (drain
-        nondeterminism), move to `tv'`, and read the LATEST visible write
-        of each byte.  Latest-visible (not "any non-superseded", as in
-        RVWMO) is what forbids stale reads after fresh ones (R→R).
-      - STORE: append at the top; the view does not move.
-      - FENCE with a W→R edge (`pw ∧ sr`): raise the view past the hart's
-        own last message — "my buffer has drained", and because drains
-        happen in log order, everything below it has drained too.  All
-        other fences are no-ops: Ztso already orders R→R, R→W, W→W.
+      - LOAD of byte `a`: choose any `tv'` with `tv ≤ tv'`, `coh a ≤ tv'`
+        and `tv' ≤ length glog`, and read the LATEST visible write at
+        `tv'`.  THE FLOOR DOES NOT MOVE (under Ztso it moved to `tv'`,
+        which is the whole of load–load order); `rv := max rv tv'` and
+        `coh a := tv'`.  Two loads may thus read at views in either order
+        — MP and IRIW without fences are allowed — while a second load of
+        the SAME byte reads at or above the first (CoRR, RVWMO ppo rule 2).
+      - STORE: append at the top; nothing per-hart moves.
+      - FENCE: a W→R edge (`pw ∧ sr`) DRAINS — the floor passes the hart's
+        own last message (drains happen in log order, so everything below
+        it has drained too); an R→R edge (`pr ∧ sr`) ACQUIRES — the floor
+        passes the read watermark, so every later load sees at least what
+        every earlier load saw.  `fence rw,rw` does both.  Fences with a
+        W-only successor (`rw,w`, `r,w`, `w,w`) are no-ops: W→W order is
+        the single log and R→W order is the interleaving.
       - EXCLUSIVE/AMO read: read at `tv' = length glog` — the globally
-        latest value ("drain, then read memory").  The write half appends
-        and takes the view past its own append.  Atomicity — no foreign
-        write lands between the two halves — is the LANGUAGE's obligation,
-        exactly today's reservation self-loop arms in `RiscvLang.mnode_step`,
-        which this port keeps.
+        latest value ("drain, then read memory").  The write half of an
+        `.aq` AMO appends and takes the FLOOR past its own append (a plain
+        AMO would raise only `rv`; the litmus language has `.aq` only,
+        which is the one AMO xv6 uses).  Atomicity — no foreign write lands
+        between the two halves — is the LANGUAGE's obligation, exactly the
+        reservation self-loop arms in `RiscvLang.mnode_step`.
+      - NOT MODELLED: RVWMO's syntactic address/data/control dependency
+        order (ppo 9–13).  A load whose address came from an earlier load
+        may still read at a lower view; the MP+addr litmus records this as
+        ALLOWED on purpose (relaxed-rr.md §5).
 
     Devices (the disk's DMA) are just agents: an agent index, a view, the
     same rules.  Crash/power: the log is per-era and dies with RAM at a
@@ -173,23 +187,59 @@ Definition own_pub (h : agent) (log : list wmsg) : nat :=
   foldr Nat.max 0%nat
     (imap (λ i m, if bool_decide (wm_tid m = h) then S i else 0%nat) log).
 
-(** LOAD: advance the view (bounded by the log top), read latest-visible. *)
+(** The per-byte coherence floor: the view at which this hart last read
+    the byte (0 = never).  A total function on [Z], like the image. *)
+Definition cohmap : Type := Z → nat.
+
+Definition coh_upd (c : cohmap) (a : Z) (t : nat) : cohmap :=
+  λ a', if bool_decide (a' = a) then t else c a'.
+
+Lemma coh_upd_eq c a t : coh_upd c a t a = t.
+Proof. rewrite /coh_upd. by rewrite bool_decide_eq_true_2. Qed.
+
+Lemma coh_upd_ne c a a' t : a' ≠ a → coh_upd c a t a' = c a'.
+Proof. intros Hne. rewrite /coh_upd. by rewrite bool_decide_eq_false_2. Qed.
+
+(** LOAD: pick a view at or above the hart's floor [tv] AND at or above
+    the byte's coherence floor [ca] (= [coh a]), bounded by the log top;
+    read latest-visible there.  The floor itself does not move — the
+    caller records [rv := max rv tv'] and [coh a := tv']. *)
 Definition load_ok (img : image) (log : list wmsg) (h : agent)
-    (tv tv' : tview) (a : Z) (v : bv 8) : Prop :=
-  (tv ≤ tv')%nat ∧ (tv' ≤ length log)%nat ∧
+    (tv ca tv' : tview) (a : Z) (v : bv 8) : Prop :=
+  (tv ≤ tv')%nat ∧ (ca ≤ tv')%nat ∧ (tv' ≤ length log)%nat ∧
   tso_read img log h tv' a = Some v.
 
-(** STORE: append at the top; the view does not move. *)
+(** STORE: append at the top; nothing per-hart moves. *)
 Definition store_log (log : list wmsg) (h : agent) (a : Z)
     (data : list (bv 8)) : list wmsg :=
   log ++ [WMsg a data h].
 
-(** FENCE: only a fence ordering W→R ([pw ∧ sr]) does anything — it
-    certifies the author's buffer drained, i.e. the view passes the
-    author's last message.  Every other fence is a no-op under Ztso. *)
+(** FENCE.  Two edges matter.  W→R ([pw ∧ sr]) DRAINS: the floor passes
+    the author's last message.  R→R ([pr ∧ sr]) ACQUIRES: the floor passes
+    the read watermark [rv], so later loads see at least what earlier
+    loads saw.  A fence with neither edge ([rw,w], [r,w], [w,w]) is a
+    no-op: W→W is the single log, R→W the interleaving. *)
+Definition fence_drains (pw sr : bool) : bool := pw && sr.
+Definition fence_acq (pr sr : bool) : bool := pr && sr.
+
 Definition fence_post (h : agent) (log : list wmsg)
-    (pr pw sr sw : bool) (tv : tview) : tview :=
-  if pw && sr then Nat.max tv (own_pub h log) else tv.
+    (pr pw sr sw : bool) (tv rv : tview) : tview :=
+  Nat.max tv (Nat.max (if fence_drains pw sr then own_pub h log else 0%nat)
+                      (if fence_acq pr sr then rv else 0%nat)).
+
+Lemma fence_post_ge_tv h log pr pw sr sw tv rv :
+  (tv ≤ fence_post h log pr pw sr sw tv rv)%nat.
+Proof. rewrite /fence_post. lia. Qed.
+
+Lemma fence_post_drain h log pr pw sr sw tv rv :
+  fence_drains pw sr = true →
+  (own_pub h log ≤ fence_post h log pr pw sr sw tv rv)%nat.
+Proof. rewrite /fence_post => ->. lia. Qed.
+
+Lemma fence_post_acq h log pr pw sr sw tv rv :
+  fence_acq pr sr = true →
+  (rv ≤ fence_post h log pr pw sr sw tv rv)%nat.
+Proof. rewrite /fence_post => ->. lia. Qed.
 
 (** EXCLUSIVE READ (the read half of an AMO, `ak_latest`): drain and read
     the globally latest value; the view goes to the top. *)
